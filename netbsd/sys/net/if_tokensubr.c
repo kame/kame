@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tokensubr.c,v 1.10 2000/06/14 05:10:28 mycroft Exp $	*/
+/*	$NetBSD: if_tokensubr.c,v 1.19 2001/11/12 23:49:45 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997-1999
@@ -38,6 +38,10 @@
  *
  *	from: NetBSD: if_fddisubr.c,v 1.2 1995/08/19 04:35:29 cgd Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_tokensubr.c,v 1.19 2001/11/12 23:49:45 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
@@ -45,6 +49,8 @@
 #include "opt_iso.h"
 #include "opt_ns.h"
 #include "opt_gateway.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,13 +72,17 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
+
 #include <net/if_ether.h>
+#include <net/if_token.h>
 
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/if_inarp.h>
-#include <net/if_token.h>
 #endif
 
 #ifdef NS
@@ -144,7 +154,7 @@ token_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t etype;
-	int s, error = 0;
+	int s, len, error = 0;
 	u_char edst[ISO88025_ADDR_LEN];
 	struct mbuf *m = m0;
 	struct rtentry *rt;
@@ -156,10 +166,11 @@ token_output(ifp, m0, dst, rt0)
 	struct token_rif *rif = (struct  token_rif *)0;
 	struct token_rif bcastrif;
 	size_t riflen = 0;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
+	short mflags;
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 	if ((rt = rt0)) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 			if ((rt0 = rt = RTALLOC1(dst, 1)))
@@ -182,6 +193,13 @@ token_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -438,22 +456,26 @@ token_output(ifp, m0, dst, rt0)
 		trrif = TOKEN_RIF(trh);
 		bcopy(rif, trrif, riflen);
 	}
+#ifdef INET
 send:
+#endif
 
-	s = splimp();
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	if (m->m_flags & M_MCAST)
+	ifp->if_obytes += len;
+	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
-	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -487,7 +509,6 @@ token_input(ifp, m)
 
 	trh = mtod(m, struct token_header *);
 
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	if (bcmp((caddr_t)tokenbroadcastaddr, (caddr_t)trh->token_dhost,
 	    sizeof(tokenbroadcastaddr)) == 0)
@@ -657,7 +678,7 @@ token_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -675,11 +696,11 @@ token_ifattach(ifp, lla)
 	struct ifnet *ifp;
 	caddr_t	lla;
 {
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ISO88025;
 	ifp->if_addrlen = ISO88025_ADDR_LEN;
 	ifp->if_hdrlen = 14;
+	ifp->if_dlt = DLT_IEEE802;
 	ifp->if_mtu = ISO88025_MTU;
 	ifp->if_output = token_output;
 	ifp->if_input = token_input;
@@ -687,11 +708,13 @@ token_ifattach(ifp, lla)
 #ifdef IFF_NOTRAILERS
 	ifp->if_flags |= IFF_NOTRAILERS;
 #endif
-	if ((sdl = ifp->if_sadl) != NULL && sdl->sdl_family == AF_LINK) {
-		sdl->sdl_type = IFT_ISO88025;
-		sdl->sdl_alen = ifp->if_addrlen;
-		bcopy(lla, LLADDR(sdl), ifp->if_addrlen);
-	}
+
+	if_alloc_sadl(ifp);
+	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
+
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_IEEE802, sizeof(struct token_header));
+#endif
 }
 
 void    
@@ -699,5 +722,8 @@ token_ifdetach(ifp)
         struct ifnet *ifp;
 {
 
-        /* Nothing. */
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
+	if_free_sadl(ifp);
 }

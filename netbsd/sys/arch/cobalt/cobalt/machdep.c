@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.17.2.2 2001/06/17 00:26:29 cyber Exp $	*/
+/*	$NetBSD: machdep.c,v 1.37 2002/01/13 23:02:33 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -26,6 +26,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_execfmt.h"
 
 #include <sys/param.h>
@@ -43,14 +44,12 @@
 #include <sys/device.h>
 #include <sys/user.h>
 #include <sys/exec.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 #include <sys/kcore.h>
-
-#include <vm/vm_kern.h>
-#include <uvm/uvm_extern.h>
+#include <sys/boot_flag.h>
 
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -58,25 +57,24 @@
 #include <machine/pte.h>
 #include <machine/autoconf.h>
 #include <machine/intr.h>
+#include <machine/intr_machdep.h>
 #include <mips/locore.h>
 
 #include <machine/nvram.h>
 #include <machine/leds.h>
 
+#include <dev/cons.h>
+
+#ifdef KGDB
+#include <sys/kgdb.h>
+#endif
+
 #ifdef DDB
 #include <machine/db_machdep.h>
-#include <ddb/db_access.h>
-#include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
-#ifndef DB_ELFSIZE
-#error Must define DB_ELFSIZE!
-#endif
 #define ELFSIZE		DB_ELFSIZE
 #include <sys/exec_elf.h>
 #endif
-
-#include <dev/cons.h>
-
 
 /* For sysctl. */
 char machine[] = MACHINE;
@@ -87,9 +85,9 @@ char cpu_model[] = "Cobalt Microserver";
 struct cpu_info cpu_info_store;
 
 /* Maps for VM objects. */
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 int	physmem;		/* Total physical memory */
 
@@ -128,7 +126,7 @@ void
 mach_init(memsize)
 	unsigned int memsize;
 {
-	caddr_t kernend, v, p0;
+	caddr_t kernend, v;
         u_long first, last;
 	vsize_t size;
 	extern char edata[], end[];
@@ -142,7 +140,7 @@ mach_init(memsize)
 		esym = end;
 		esym += ((Elf_Ehdr *)end)->e_entry;
 		kernend = (caddr_t)mips_round_page(esym);
-		bzero(edata, end - edata);
+		memset(edata, 0, end - edata);
 	} else
 #endif
 	{
@@ -178,14 +176,14 @@ mach_init(memsize)
 	decode_bootstring();
 
 #ifdef DDB
-	/*
-	 * Initialize machine-dependent DDB commands, in case of early panic.
-	 */
-	db_machine_init();
-
+	ddb_init(0, NULL, NULL);
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif
+#ifdef KGDB
+        if (boothowto & RB_KDB)
+                kgdb_connect(0);
+#endif    
 
 	/*
 	 * Load the rest of the available pages into the VM system.
@@ -201,11 +199,19 @@ mach_init(memsize)
 	mips_init_msgbuf();
 
 	/*
-	 * Allocate space for proc0's USPACE
+	 * Compute the size of system data structures.  pmap_bootstrap()
+	 * needs some of this information.
 	 */
-	p0 = (caddr_t)pmap_steal_memory(USPACE, NULL, NULL); 
-	proc0.p_addr = proc0paddr = (struct user *)p0;
-	proc0.p_md.md_regs = (struct frame *)(p0 + USPACE) - 1;
+	size = (vsize_t)allocsys(NULL, NULL);
+
+	pmap_bootstrap();
+
+	/*
+	 * Allocate space for proc0's USPACE.
+	 */
+	v = (caddr_t)uvm_pageboot_alloc(USPACE); 
+	proc0.p_addr = proc0paddr = (struct user *)v;
+	proc0.p_md.md_regs = (struct frame *)(v + USPACE) - 1;
 	curpcb = &proc0.p_addr->u_pcb;
 	curpcb->pcb_context[11] = MIPS_INT_MASK | MIPS_SR_INT_IE; /* SR */
 
@@ -215,12 +221,9 @@ mach_init(memsize)
 	 * memory is directly addressable.  We don't have to map these into
 	 * virtual address space.
 	 */
-	size = (vsize_t)allocsys(NULL, NULL);
-	v = (caddr_t)pmap_steal_memory(size, NULL, NULL); 
+	v = (caddr_t)uvm_pageboot_alloc(size); 
 	if ((allocsys(v, NULL) - v) != size)
 		panic("mach_init: table size inconsistency");
-
-	pmap_bootstrap();
 }
 
 /*
@@ -249,9 +252,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-		    UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+		    UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	base = bufpages / nbuf;
@@ -281,6 +284,7 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -432,10 +436,7 @@ delay(n)
 
 #define NINTR	6
 
-static struct {
-	int (*func)(void *);
-	void *arg;
-} intrtab[NINTR];
+static struct cobalt_intr intrtab[NINTR];
 
 void *
 cpu_intr_establish(level, ipl, func, arg)
@@ -450,10 +451,23 @@ cpu_intr_establish(level, ipl, func, arg)
 	if (intrtab[level].func != NULL)
 		panic("cannot share CPU interrupts");
 
+	intrtab[level].cookie_type = COBALT_COOKIE_TYPE_CPU;
 	intrtab[level].func = func;
 	intrtab[level].arg = arg;
 
-	return (void *)-1;
+	return &intrtab[level];
+}
+
+void
+cpu_intr_disestablish(cookie)
+	void *cookie;
+{
+	struct cobalt_intr *p = cookie;
+
+        if (p->cookie_type == COBALT_COOKIE_TYPE_CPU) {
+		p->func = NULL;
+		p->arg = NULL;
+	}
 }
 
 void
@@ -492,8 +506,8 @@ cpu_intr(status, cause, pc, ipending)
 	}
 
 	if (ipending & MIPS_INT_MASK_5) {
-		cycles = mips3_cycle_count();
-		mips3_write_compare(cycles + 1250000);	/* XXX */
+		cycles = mips3_cp0_count_read();
+		mips3_cp0_compare_write(cycles + 1250000);	/* XXX */
 
 #if 0
 		cf.pc = pc;
@@ -518,7 +532,7 @@ cpu_intr(status, cause, pc, ipending)
 		clearsoftclock();
 		uvmexp.softs++;
 		intrcnt[SOFTCLOCK_INTR]++;
-		softclock();
+		softclock(NULL);
 	}
 }
 
@@ -537,17 +551,7 @@ decode_bootstring(void)
 		if (work[0] == '-') {
 			i = 1;
 			while (work[i] != ' ' && work[i] != '\0') {
-				switch (work[i]) {
-				case 'a':
-					boothowto |= RB_ASKNAME;
-					break;
-				case 'd':
-					boothowto |= RB_KDB;
-					break;
-				case 's':
-					boothowto |= RB_SINGLE;
-					break;
-				}
+				BOOT_FLAG(work[i], boothowto);
 				i++;
 			}
 		} else

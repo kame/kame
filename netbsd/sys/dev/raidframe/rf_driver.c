@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_driver.c,v 1.37.2.1 2000/10/17 20:15:00 tv Exp $	*/
+/*	$NetBSD: rf_driver.c,v 1.46 2002/01/07 01:58:03 oster Exp $	*/
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -72,7 +72,9 @@
  ******************************************************************************/
 
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_driver.c,v 1.46 2002/01/07 01:58:03 oster Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -95,7 +97,6 @@
 #include "rf_utils.h"
 #include "rf_etimer.h"
 #include "rf_acctrace.h"
-#include "rf_configure.h"
 #include "rf_general.h"
 #include "rf_desc.h"
 #include "rf_states.h"
@@ -572,11 +573,7 @@ rf_AllocRaidAccDesc(
     RF_SectorCount_t numBlocks,
     caddr_t bufPtr,
     void *bp,
-    RF_DagHeader_t ** paramDAG,
-    RF_AccessStripeMapHeader_t ** paramASM,
     RF_RaidAccessFlags_t flags,
-    void (*cbF) (struct buf *),
-    void *cbA,
     RF_AccessState_t * states)
 {
 	RF_RaidAccessDesc_t *desc;
@@ -600,16 +597,16 @@ rf_AllocRaidAccDesc(
 	desc->numBlocks = numBlocks;
 	desc->bufPtr = bufPtr;
 	desc->bp = bp;
-	desc->paramDAG = paramDAG;
-	desc->paramASM = paramASM;
+	desc->paramDAG = NULL;
+	desc->paramASM = NULL;
 	desc->flags = flags;
 	desc->states = states;
 	desc->state = 0;
 
 	desc->status = 0;
-	bzero((char *) &desc->tracerec, sizeof(RF_AccTraceEntry_t));
-	desc->callbackFunc = (void (*) (RF_CBParam_t)) cbF;	/* XXX */
-	desc->callbackArg = cbA;
+	memset((char *) &desc->tracerec, 0, sizeof(RF_AccTraceEntry_t));
+	desc->callbackFunc = NULL;
+	desc->callbackArg = NULL;
 	desc->next = NULL;
 	desc->head = desc;
 	desc->numPending = 0;
@@ -648,12 +645,7 @@ rf_DoAccess(
     RF_SectorCount_t numBlocks,
     caddr_t bufPtr,
     void *bp_in,
-    RF_DagHeader_t ** paramDAG,
-    RF_AccessStripeMapHeader_t ** paramASM,
-    RF_RaidAccessFlags_t flags,
-    RF_RaidAccessDesc_t ** paramDesc,
-    void (*cbF) (struct buf *),
-    void *cbA)
+    RF_RaidAccessFlags_t flags)
 /*
 type should be read or write
 async_flag should be RF_TRUE or RF_FALSE
@@ -694,8 +686,7 @@ bp_in is a buf pointer.  void * to facilitate ignoring it outside the kernel
 		return (ENOSPC);
 	}
 	desc = rf_AllocRaidAccDesc(raidPtr, type, raidAddress,
-	    numBlocks, lbufPtr, bp, paramDAG, paramASM,
-	    flags, cbF, cbA, raidPtr->Layout.map->states);
+	    numBlocks, lbufPtr, bp, flags, raidPtr->Layout.map->states);
 
 	if (desc == NULL) {
 		return (ENOMEM);
@@ -708,6 +699,7 @@ bp_in is a buf pointer.  void * to facilitate ignoring it outside the kernel
 
 	return (0);
 }
+#if 0
 /* force the array into reconfigured mode without doing reconstruction */
 int 
 rf_SetReconfiguredMode(raidPtr, row, col)
@@ -731,9 +723,7 @@ rf_SetReconfiguredMode(raidPtr, row, col)
 	RF_UNLOCK_MUTEX(raidPtr->mutex);
 	return (0);
 }
-
-extern int fail_row, fail_col, fail_time;
-extern int delayed_recon;
+#endif
 
 int 
 rf_FailDisk(
@@ -994,4 +984,25 @@ rf_PrintUserStats(RF_Raid_t * raidPtr)
 	printf("Total sectors moved:        %ld\n", raidPtr->userstats.num_sect_moved);
 	printf("Average access size (sect): %ld\n", RF_DB0_CHECK(raidPtr->userstats.num_sect_moved, raidPtr->userstats.num_ios));
 	printf("Achieved data rate:         %ld.%ld MB/sec\n", mbs, mbs_frac);
+}
+
+
+void
+rf_print_panic_message(line,file)
+	int line;
+	char *file;
+{
+	sprintf(rf_panicbuf,"raidframe error at line %d file %s",
+		line, file);
+}
+
+void
+rf_print_assert_panic_message(line,file,condition)
+	int line;
+	char *file;
+	char *condition;
+{
+	sprintf(rf_panicbuf,
+		"raidframe error at line %d file %s (failed asserting %s)\n",
+		line, file, condition);
 }

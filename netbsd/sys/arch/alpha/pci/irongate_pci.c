@@ -1,4 +1,4 @@
-/* $NetBSD: irongate_pci.c,v 1.1 2000/06/01 20:30:30 thorpej Exp $ */
+/* $NetBSD: irongate_pci.c,v 1.3 2001/09/15 04:31:40 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -43,13 +43,14 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: irongate_pci.c,v 1.1 2000/06/01 20:30:30 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irongate_pci.c,v 1.3 2001/09/15 04:31:40 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -132,7 +133,7 @@ irongate_conf_read(void *ipv, pcitag_t tag, int offset)
 	 * point for getting at it from machdep code.
 	 */
 	irongate_decompose_tag(ipv, tag, NULL, &d, NULL);
-	if (d == IRONGATE_PCIHOST_DEV)
+	if (d == IRONGATE_PCIHOST_DEV && offset == PCI_ID_REG)
 		return ((pcireg_t) -1);
 	
 	return (irongate_conf_read0(ipv, tag, offset));

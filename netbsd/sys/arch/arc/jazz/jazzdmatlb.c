@@ -1,4 +1,4 @@
-/*	$NetBSD: jazzdmatlb.c,v 1.1 2000/06/09 05:22:22 soda Exp $	*/
+/*	$NetBSD: jazzdmatlb.c,v 1.6 2001/11/14 18:15:15 thorpej Exp $	*/
 /*	$OpenBSD: dma.c,v 1.5 1998/03/01 16:49:57 niklas Exp $	*/
 
 /*-
@@ -37,15 +37,17 @@
 #include <sys/malloc.h>
 #include <sys/extent.h>
 #include <sys/device.h>
+#include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
 
-#include <arc/pica/pica.h>
 #include <arc/jazz/jazzdmatlbreg.h>
 #include <arc/jazz/jazzdmatlbvar.h>
+
+#include <mips/cache.h>
 
 extern paddr_t	kvtophys __P((vaddr_t));	/* XXX */
 
@@ -75,11 +77,11 @@ jazz_dmatlb_init(iot, ioaddr)
 	dmatlb_iot = iot;
 	err = bus_space_map(iot, ioaddr, JAZZ_DMATLB_REGSIZE, 0, &dmatlb_ioh);
 	if (err != 0)
-		panic("jazz_dmatlb_init: cannot map 0x%x\n", ioaddr);
+		panic("jazz_dmatlb_init: cannot map 0x%lx\n", ioaddr);
 
 	dma_tlb = (jazz_dma_pte_t *)PICA_TL_BASE;
 
-	mips3_FlushCache();	/* Make sure no map entries are cached */
+	mips_dcache_wbinv_all();/* Make sure no map entries are cached */
 	bzero((char *)dma_tlb, JAZZ_DMATLB_SIZE);
 
 	dmatlbmap = extent_create("dmatlb", 0, NDMATLB, M_DEVBUF, NULL, NULL,

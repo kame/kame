@@ -1,4 +1,4 @@
-/*	$NetBSD: pdqvar.h,v 1.27 2000/05/03 19:17:54 thorpej Exp $	*/
+/*	$NetBSD: pdqvar.h,v 1.33 2001/07/07 16:13:50 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1996 Matt Thomas <matt@3am-software.com>
@@ -10,7 +10,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -68,8 +68,8 @@ enum _pdq_type_t {
 #include <sys/mbuf.h>
 #endif /* M_CAST */
 #include <sys/malloc.h>
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+
+#include <uvm/uvm_extern.h>
 
 #define	PDQ_USE_MBUFS
 #if defined(__NetBSD__)
@@ -79,13 +79,13 @@ enum _pdq_type_t {
 #define	PDQ_OS_PREFIX			"%s%d: "
 #define	PDQ_OS_PREFIX_ARGS		pdq->pdq_os_name, pdq->pdq_unit
 #endif
-#if defined(__FreeBSD__) && BSD >= 199506
+#if (defined(__FreeBSD__) && BSD >= 199506) || defined(__NetBSD__)
 #define	PDQ_OS_PAGESIZE			PAGE_SIZE
 #else
 #define	PDQ_OS_PAGESIZE			NBPG
 #endif
 #define	PDQ_OS_USEC_DELAY(n)		DELAY(n)
-#define	PDQ_OS_MEMZERO(p, n)		bzero((caddr_t)(p), (n))
+#define	PDQ_OS_MEMZERO(p, n)		memset((caddr_t)(p), 0, (n))
 #if defined(__NetBSD__) && !defined(PDQ_NO_BUS_DMA)
 #define PDQ_BUS_DMA
 #endif
@@ -316,6 +316,8 @@ typedef struct _pdq_os_ctx_t {
 #if defined(IFM_FDDI)
     struct ifmedia sc_ifmedia;
 #endif
+    int sc_flags;
+#define	PDQIF_DOWNCALL		0x0001	/* active calling from if to pdq */
     pdq_t *sc_pdq;
 #if defined(__alpha__) || defined(__i386__)
     pdq_bus_ioport_t sc_iobase;

@@ -1,4 +1,4 @@
-/*	$NetBSD: lebuffer.c,v 1.7 2000/04/14 08:22:49 mrg Exp $ */
+/*	$NetBSD: lebuffer.c,v 1.13 2002/03/20 17:52:41 eeh Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,7 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lebuffer.c,v 1.13 2002/03/20 17:52:41 eeh Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -103,10 +105,9 @@ lebufattach(parent, self, aux)
 	sc->sc_bustag = sa->sa_bustag;
 	sc->sc_dmatag = sa->sa_dmatag;
 
-	if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
-			 sa->sa_offset,
-			 sa->sa_size,
-			 0, 0, &bh) != 0) {
+	if (sbus_bus_map(sa->sa_bustag,
+			 sa->sa_slot, sa->sa_offset, sa->sa_size,
+			 BUS_SPACE_MAP_LINEAR, &bh) != 0) {
 		printf("%s: attach: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -116,7 +117,7 @@ lebufattach(parent, self, aux)
 	 * Lance ring-buffers can be stored. Note the buffer's location
 	 * and size, so the `le' driver can pick them up.
 	 */
-	sc->sc_buffer = (caddr_t)(u_long)bh;
+	sc->sc_buffer = bus_space_vaddr(sa->sa_bustag, bh);
 	sc->sc_bufsiz = sa->sa_size;
 
 	node = sc->sc_node = sa->sa_node;
@@ -128,7 +129,7 @@ lebufattach(parent, self, aux)
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-	sc->sc_burst = getpropint(node, "burst-sizes", -1);
+	sc->sc_burst = PROM_getpropint(node, "burst-sizes", -1);
 	if (sc->sc_burst == -1)
 		/* take SBus burst sizes */
 		sc->sc_burst = sbusburst;
@@ -139,8 +140,8 @@ lebufattach(parent, self, aux)
 	sbus_establish(&sc->sc_sd, &sc->sc_dev);
 
 	/* Allocate a bus tag */
-	sbt = (bus_space_tag_t)
-		malloc(sizeof(struct sparc_bus_space_tag), M_DEVBUF, M_NOWAIT);
+	sbt = (bus_space_tag_t) malloc(sizeof(struct sparc_bus_space_tag), 
+	    M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (sbt == NULL) {
 		printf("%s: attach: out of memory\n", self->dv_xname);
 		return;
@@ -148,7 +149,6 @@ lebufattach(parent, self, aux)
 
 	printf(": %dK memory\n", sc->sc_bufsiz / 1024);
 
-	bzero(sbt, sizeof *sbt);
 	sbt->cookie = sc;
 	sbt->parent = sc->sc_bustag;
 

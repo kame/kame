@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.40.6.3 2001/04/25 08:40:52 he Exp $	*/
+/*	$NetBSD: param.h,v 1.48 2002/02/26 15:13:23 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -68,7 +68,8 @@
  *
  */
 #define ALIGNBYTES		(sizeof(int) - 1)
-#define ALIGN(p)		(((u_int)(p) + ALIGNBYTES) &~ ALIGNBYTES)
+#define ALIGN(p)		(((u_int)(u_long)(p) + ALIGNBYTES) &~ \
+    ALIGNBYTES)
 #define ALIGNED_POINTER(p,t)	1
 
 #define	PGSHIFT		12		/* LOG2(NBPG) */
@@ -77,7 +78,7 @@
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
 #define	KERNBASE	0xc0000000	/* start of kernel virtual space */
-#define	KERNTEXTOFF	0xc0100000	/* start of kernel text */
+#define	KERNTEXTOFF	(KERNBASE + 0x100000) /* start of kernel text */
 #define	BTOPKERNBASE	((u_long)KERNBASE >> PGSHIFT)
 
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
@@ -106,17 +107,16 @@
 #define	MSIZE		256		/* size of an mbuf */
 
 #ifndef MCLSHIFT
-# define	MCLSHIFT	11	/* convert bytes to m_buf clusters */
+#define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
+					/* 2K cluster can hold Ether frame */
 #endif	/* MCLSHIFT */
 
 #define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
-#define	MCLOFSET	(MCLBYTES - 1)	/* offset within a m_buf cluster */
 
 #ifndef NMBCLUSTERS
-
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#endif
 
 #ifdef GATEWAY
 #define	NMBCLUSTERS	2048		/* map size, max cluster allocation */

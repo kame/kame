@@ -1,4 +1,4 @@
-/*	$NetBSD: xy.c,v 1.25.2.4 2001/05/15 21:08:14 he Exp $	*/
+/*	$NetBSD: xy.c,v 1.39 2002/01/14 13:32:48 tsutsui Exp $	*/
 
 /*
  *
@@ -50,6 +50,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: xy.c,v 1.39 2002/01/14 13:32:48 tsutsui Exp $");
+
 #undef XYC_DEBUG		/* full debug */
 #undef XYC_DIAG			/* extra sanity checks */
 #if defined(DIAGNOSTIC) && !defined(XYC_DIAG)
@@ -72,9 +75,6 @@
 #include <sys/syslog.h>
 #include <sys/dkbad.h>
 #include <sys/conf.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -310,16 +310,16 @@ xy_dmamem_alloc(tag, map, seg, nsegp, len, kvap, dmap)
 		return (error);
 	}
 
-	if ((error = bus_dmamap_load_raw(tag, map,
-					seg, nseg, len, BUS_DMA_NOWAIT)) != 0) {
+	if ((error = bus_dmamem_map(tag, seg, nseg,
+				    len, kvap,
+				    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
 		bus_dmamem_free(tag, seg, nseg);
 		return (error);
 	}
 
-	if ((error = bus_dmamem_map(tag, seg, nseg,
-				    len, kvap,
-				    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
-		bus_dmamap_unload(tag, map);
+	if ((error = bus_dmamap_load(tag, map, *kvap, len, NULL,
+				     BUS_DMA_NOWAIT)) != 0) {
+		bus_dmamem_unmap(tag, *kvap, len);
 		bus_dmamem_free(tag, seg, nseg);
 		return (error);
 	}
@@ -482,10 +482,10 @@ xycattach(parent, self, aux)
 	bzero(xyc->iopbase, XYC_MAXIOPB * sizeof(struct xy_iopb));
 
 	xyc->reqs = (struct xy_iorq *)
-	    malloc(XYC_MAXIOPB * sizeof(struct xy_iorq), M_DEVBUF, M_NOWAIT);
+	    malloc(XYC_MAXIOPB * sizeof(struct xy_iorq),
+	    M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (xyc->reqs == NULL)
 		panic("xyc malloc");
-	bzero(xyc->reqs, XYC_MAXIOPB * sizeof(struct xy_iorq));
 
 	/*
 	 * init iorq to iopb pointers, and non-zero fields in the
@@ -1360,7 +1360,7 @@ int del;
 
 /*
  * xyc_cmd: front end for POLL'd and WAIT'd commands.  Returns 0 or error.
- * note that NORM requests are handled seperately.
+ * note that NORM requests are handled separately.
  */
 int
 xyc_cmd(xycsc, cmd, subfn, unit, block, scnt, dptr, fullmode)
@@ -1466,7 +1466,7 @@ xyc_startbuf(xycsc, xysc, bp)
 	/* init iorq and load iopb from it */
 	xyc_rqinit(iorq, xycsc, xysc, XY_SUB_NORM | XY_MODE_VERBO, block,
 		   bp->b_bcount / XYFM_BPS,
-		   (caddr_t)iorq->dmamap->dm_segs[0].ds_addr,
+		   (caddr_t)(u_long)iorq->dmamap->dm_segs[0].ds_addr,
 		   bp);
 
 	xyc_rqtopb(iorq, iopb, (bp->b_flags & B_READ) ? XYCMD_RD : XYCMD_WR, 0);

@@ -1,4 +1,4 @@
-/* $NetBSD: conf.c,v 1.47.2.1 2001/05/01 10:42:41 he Exp $ */
+/* $NetBSD: conf.c,v 1.62 2002/03/16 16:55:52 martin Exp $ */
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -37,7 +37,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: conf.c,v 1.47.2.1 2001/05/01 10:42:41 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: conf.c,v 1.62 2002/03/16 16:55:52 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,7 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: conf.c,v 1.47.2.1 2001/05/01 10:42:41 he Exp $");
 
 #include <machine/conf.h>
 
-#include <vm/vm.h>		/* XXX for _PMAP_MAY_USE_PROM_CONSOLE */
+#include <uvm/uvm_extern.h>	/* XXX for _PMAP_MAY_USE_PROM_CONSOLE */
 
 #include "fdc.h"
 bdev_decl(fd);
@@ -92,22 +92,9 @@ struct bdevsw	bdevsw[] =
 	bdev_lkm_dummy(),		/* 14 */
 	bdev_lkm_dummy(),		/* 15 */
 	bdev_disk_init(NRAID,raid),	/* 16: RAIDframe disk driver */
-	bdev_disk_init(NLD,ld),		/* 17: Compaq array */
+	bdev_disk_init(NLD,ld),		/* 17: logical disk driver */
 };
 int	nblkdev = sizeof (bdevsw) / sizeof (bdevsw[0]);
-
-/* open, close, write, ioctl */
-#define cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
-
-/* open, close, read, ioctl, poll */
-#define cdev_satlink_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
-	(dev_type_mmap((*))) enodev }
 
 cdev_decl(cn);
 cdev_decl(ctty);
@@ -204,54 +191,35 @@ cdev_decl(ugen);
 cdev_decl(ulpt);
 #include "ucom.h"
 cdev_decl(ucom);
+#include "urio.h"
+cdev_decl(urio);
+#include "uscanner.h"
+cdev_decl(uscanner);
 
-#ifdef __I4B_IS_INTEGRATED
-/* open, close, ioctl */
-#define cdev_i4bctl_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, seltrue, \
-	(dev_type_mmap((*))) enodev }
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
 
-/* open, close, read, write */
-#define	cdev_i4brbch_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, \
-	0, dev_init(c,n,poll), (dev_type_mmap((*))) enodev }
+#include <altq/altqconf.h>
 
-/* open, close, read, write */
-#define	cdev_i4btel_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), (dev_type_ioctl((*))) enodev, \
-	(dev_type_stop((*))) enodev, \
-	0, dev_init(c,n,poll), (dev_type_mmap((*))) enodev, D_TTY }
+#include "pci.h"
+cdev_decl(pci);
 
-/* open, close, read, ioctl */
-#define cdev_i4btrc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, (dev_type_poll((*))) enodev, \
-	(dev_type_mmap((*))) enodev }
+#include "agp.h"
+cdev_decl(agp);
 
-/* open, close, read, poll, ioctl */
-#define cdev_i4b_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
-	(dev_type_mmap((*))) enodev }	
+#include "stic.h"
+cdev_decl(stic);
 
-#include "i4b.h"
-#include "i4bctl.h"
-#include "i4btrc.h"
-#include "i4brbch.h"
-#include "i4btel.h"
-cdev_decl(i4b);
-cdev_decl(i4bctl);
-cdev_decl(i4btrc);
-cdev_decl(i4brbch);
-cdev_decl(i4btel);
-#endif
+#include "clockctl.h"
+cdev_decl(clockctl);
 
 struct cdevsw	cdevsw[] =
 {
@@ -316,32 +284,25 @@ struct cdevsw	cdevsw[] =
 	cdev_ugen_init(NUGEN,ugen),	/* 48: USB generic driver */
 	cdev_midi_init(NMIDI,midi),	/* 49: MIDI I/O */
 	cdev_midi_init(NSEQUENCER,sequencer),	/* 50: sequencer I/O */
-#ifdef __I4B_IS_INTEGRATED
-	cdev_i4b_init(NI4B, i4b),		/* 51: i4b main device */
-	cdev_i4bctl_init(NI4BCTL, i4bctl),	/* 52: i4b control device */
-	cdev_i4brbch_init(NI4BRBCH, i4brbch),	/* 53: i4b raw b-chnl access */
-	cdev_i4btrc_init(NI4BTRC, i4btrc),	/* 54: i4b trace device */
-	cdev_i4btel_init(NI4BTEL, i4btel),	/* 55: i4b phone device */
-#else
-	cdev_notdef(),			/* 51 */
-	cdev_notdef(),			/* 52 */
-	cdev_notdef(),			/* 53 */
-	cdev_notdef(),			/* 54 */
-	cdev_notdef(),			/* 55 */
-#endif
+	cdev_isdn_init(NISDN, isdn),		/* 51: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 52: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 53: isdn raw b-chnl access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 54: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 55: isdn phone device */
 	cdev_mouse_init(NWSMUX, wsmux),	/* 56: ws multiplexor */
 	cdev_tty_init(NUCOM, ucom),	/* 57: USB tty */
 	cdev_ses_init(NSES,ses),	/* 58: SCSI SES/SAF-TE */
-	cdev_disk_init(NLD,ld),		/* 59: Compaq array */
+	cdev_disk_init(NLD,ld),		/* 59: logical disk driver */
 	cdev_tty_init(NCY,cy),		/* 60: Cyclades Cyclom-Y serial */
 	cdev_tty_init(NCZ,cztty),	/* 61: Cyclades-Z serial */
-	cdev_notdef(),			/* 62: reserved */
-	cdev_notdef(),			/* 63: reserved */
-	cdev_notdef(),			/* 64: reserved */
+	cdev_usbdev_init(NURIO,urio),	/* 62: Diamond Rio 500 */
+	cdev_ugen_init(NUSCANNER,uscanner),/* 63: USB scanner */
+	cdev_altq_init(NALTQ,altq),	/* 64: ALTQ control interface */
 	cdev__oci_init(NMLX,mlx),	/* 65: Mylex DAC960 control interface */
-	cdev_notdef(),			/* 66: reserved */
-	cdev_notdef(),			/* 67: reserved */
-	cdev_notdef(),			/* 68: reserved */
+	cdev_pci_init(NPCI,pci),	/* 66: PCI bus access device */
+	cdev__ocim_init(NAGP,agp),	/* 67: AGP graphics aperture device */
+	cdev__ocm_init(NSTIC,stic),	/* 68: PixelStamp mmap interface */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 69: clockctl pseudo device */
 };
 int	nchrdev = sizeof (cdevsw) / sizeof (cdevsw[0]);
 
@@ -452,6 +413,7 @@ static int chrtoblktbl[] = {
 	/* 66 */	NODEV,
 	/* 67 */	NODEV,
 	/* 68 */	NODEV,
+	/* 69 */	NODEV,
 };
 
 /*

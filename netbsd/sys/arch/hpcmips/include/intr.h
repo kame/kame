@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.5 2000/04/11 17:57:43 uch Exp $	*/
+/*	$NetBSD: intr.h,v 1.16 2002/05/15 15:19:54 uch Exp $	*/
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -33,19 +33,43 @@
 #ifndef _HPCMIPS_INTR_H_
 #define _HPCMIPS_INTR_H_
 
+#include <sys/device.h>
+#include <sys/lock.h>
+#include <sys/queue.h>
+
 #define	IPL_NONE	0	/* disable only this interrupt */
-#define	IPL_BIO		1	/* disable block I/O interrupts */
-#define	IPL_NET		2	/* disable network interrupts */
-#define	IPL_TTY		3	/* disable terminal interrupts */
-#define	IPL_CLOCK	4	/* disable clock interrupts */
-#define	IPL_STATCLOCK	5	/* disable profiling interrupts */
-#if 0 /* XXX */
-#define	IPL_SERIAL	6	/* disable serial hardware interrupts */
-#endif
-#define	IPL_DMA		7	/* disable DMA reload interrupts */
+
+#define	IPL_SOFT	1	/* generic software interrupts (SI 0) */
+#define	IPL_SOFTCLOCK	2	/* clock software interrupts (SI 0) */
+#define	IPL_SOFTNET	3	/* network software interrupts (SI 1) */
+#define	IPL_SOFTSERIAL	4	/* serial software interrupts (SI 1) */
+
+#define	IPL_BIO		5	/* disable block I/O interrupts */
+#define	IPL_NET		6	/* disable network interrupts */
+#define	IPL_TTY		7	/* disable terminal interrupts */
+#define	IPL_SERIAL	7	/* disable serial hardware interrupts */
+#define	IPL_CLOCK	8	/* disable clock interrupts */
+#define	IPL_STATCLOCK	8	/* disable profiling interrupts */
 #define	IPL_HIGH	8	/* disable all interrupts */
 
+#define	_IPL_NSOFT	4
+#define	_IPL_N		9
+
+#define	_IPL_SI0_FIRST	IPL_SOFT
+#define	_IPL_SI0_LAST	IPL_SOFTCLOCK
+
+#define	_IPL_SI1_FIRST	IPL_SOFTNET
+#define	_IPL_SI1_LAST	IPL_SOFTSERIAL
+
+#define	IPL_SOFTNAMES {							\
+	"misc",								\
+	"clock",							\
+	"net",								\
+	"serial",							\
+}
+
 /* Interrupt sharing types. */
+#define	IST_UNUSABLE	-1	/* interrupt cannot be used */
 #define	IST_NONE	0	/* none */
 #define	IST_PULSE	1	/* pulsed */
 #define	IST_EDGE	2	/* edge-triggered */
@@ -53,92 +77,94 @@
 
 #ifdef _KERNEL
 #ifndef _LOCORE
-
 #include <mips/cpuregs.h>
 
-int	_splraise __P((int));
-int	_spllower __P((int));
-int	_splset __P((int));
-int	_splget __P((void));
-void	_splnone __P((void));
-void	_setsoftintr __P((int));
-void	_clrsoftintr __P((int));
+extern const u_int32_t *ipl_sr_bits;
+extern const u_int32_t ipl_si_to_sr[_IPL_NSOFT];
 
-#define splhigh()	_splraise(MIPS_INT_MASK)
-#define spl0()		(void)_spllower(0)
-#define splx(s)		(void)_splset(s)
-#define splbio()	(_splraise(splvec.splbio))
-#define splnet()	(_splraise(splvec.splnet))
-#define spltty()	(_splraise(splvec.spltty))
-#define splimp()	(_splraise(splvec.splimp))
-#define splpmap()	(_splraise(splvec.splimp))
-#define splclock()	(_splraise(splvec.splclock))
-#define splstatclock()	(_splraise(splvec.splstatclock))
-#define spllowersoftclock() _spllower(MIPS_SOFT_INT_MASK_0)
-#define splsoftclock()	_splraise(MIPS_SOFT_INT_MASK_0)
-#define splsoftnet()	_splraise(MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
+void	intr_init(void);
+int	_splraise(int);
+int	_spllower(int);
+int	_splset(int);
+int	_splget(void);
+void	_splnone(void);
+void	_setsoftintr(int);
+void	_clrsoftintr(int);
 
-struct splvec {
-	int	splbio;
-	int	splnet;
-	int	spltty;
-	int	splimp;
-	int	splclock;
-	int	splstatclock;
-};
-extern struct splvec splvec;
+#define	splhigh()	_splraise(ipl_sr_bits[IPL_HIGH])
+#define	spl0()		(void) _spllower(0)
+#define	splx(s)		(void) _splset(s)
+#define	splbio()	_splraise(ipl_sr_bits[IPL_BIO])
+#define	splnet()	_splraise(ipl_sr_bits[IPL_NET])
+#define	spltty()	_splraise(ipl_sr_bits[IPL_TTY])
+#define	splserial()	_splraise(ipl_sr_bits[IPL_SERIAL])
+#define	splvm()		spltty()
+#define	splclock()	_splraise(ipl_sr_bits[IPL_CLOCK])
+#define	splstatclock()	splclock()
 
-/* Conventionals ... */
+#define	splsched()	splclock()
+#define	spllock()	splhigh()
+#define	spllpt()	spltty()
 
-#define MIPS_SPLHIGH (MIPS_INT_MASK)
-#define MIPS_SPL0 (MIPS_INT_MASK_0|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
-#define MIPS_SPL1 (MIPS_INT_MASK_1|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
-#define MIPS_SPL2 (MIPS_INT_MASK_2|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
-#define MIPS_SPL3 (MIPS_INT_MASK_3|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
-#define MIPS_SPL4 (MIPS_INT_MASK_4|MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
-#define MIPS_SPL_0_1	 (MIPS_INT_MASK_1|MIPS_SPL0)
-#define MIPS_SPL_0_1_2	 (MIPS_INT_MASK_2|MIPS_SPL_0_1)
-#define MIPS_SPL_0_1_3	 (MIPS_INT_MASK_3|MIPS_SPL_0_1)
-#define MIPS_SPL_0_1_2_3 (MIPS_INT_MASK_3|MIPS_SPL_0_1_2)
-#define MIPS_SPL_2_4     (MIPS_INT_MASK_4|MIPS_SPL2)
+#define	splsoft()	_splraise(ipl_sr_bits[IPL_SOFT])
+#define	splsoftclock()	_splraise(ipl_sr_bits[IPL_SOFTCLOCK])
+#define	splsoftnet()	_splraise(ipl_sr_bits[IPL_SOFTNET])
+#define	splsoftserial()	_splraise(ipl_sr_bits[IPL_SOFTSERIAL])
 
-/*
- * Index into intrcnt[], which is defined in locore
- */
-extern u_long intrcnt[];
-
-#define	SOFTCLOCK_INTR	0
-#define	SOFTNET_INTR	1
-#define	SERIAL0_INTR	2
-#define	SERIAL1_INTR	3
-#define	SERIAL2_INTR	4
-#define	LANCE_INTR	5
-#define	SCSI_INTR	6
-#define	ERROR_INTR	7
-#define	HARDCLOCK	8
-#define	FPU_INTR	9
-#define	SLOT0_INTR	10
-#define	SLOT1_INTR	11
-#define	SLOT2_INTR	12
-#define	DTOP_INTR	13
-#define	ISDN_INTR	14
-#define	FLOPPY_INTR	15
-#define	STRAY_INTR	16
+#define	spllowersoftclock() _spllower(ipl_sr_bits[IPL_SOFTCLOCK])
 
 /*
  * software simulated interrupt
  */
-extern unsigned ssir;
+#define	setsoft(x)							\
+do {									\
+	_setsoftintr(ipl_si_to_sr[(x) - IPL_SOFT]);			\
+} while (0)
 
-#define SIR_NET		0x1
+struct hpcmips_soft_intrhand {
+	TAILQ_ENTRY(hpcmips_soft_intrhand)
+		sih_q;
+	struct hpcmips_soft_intr *sih_intrhead;
+	void	(*sih_fn)(void *);
+	void	*sih_arg;
+	int	sih_pending;
+};
 
-#define setsoftnet()	setsoft(SIR_NET)
-#define setsoft(x) \
-	do { ssir |= (x); _setsoftintr(MIPS_SOFT_INT_MASK_1); } while (0)
+struct hpcmips_soft_intr {
+	TAILQ_HEAD(, hpcmips_soft_intrhand)
+		softintr_q;
+	struct evcnt softintr_evcnt;
+	struct simplelock softintr_slock;
+	unsigned long softintr_ipl;
+};
 
-#define setsoftclock()	_setsoftintr(MIPS_SOFT_INT_MASK_0)
-#define clearsoftclock() _clrsoftintr(MIPS_SOFT_INT_MASK_0)
-#define clearsoftnet()	 _clrsoftintr(MIPS_SOFT_INT_MASK_1)
+void	softintr_init(void);
+void	softintr(u_int32_t);
+void	*softintr_establish(int, void (*)(void *), void *);
+void	softintr_disestablish(void *);
+void	softintr_dispatch(void);
+
+#define	softintr_schedule(arg)						\
+do {									\
+	struct hpcmips_soft_intrhand *__sih = (arg);			\
+	struct hpcmips_soft_intr *__si = __sih->sih_intrhead;		\
+	int __s;							\
+									\
+	__s = splhigh();						\
+	simple_lock(&__si->softintr_slock);				\
+	if (__sih->sih_pending == 0) {					\
+		TAILQ_INSERT_TAIL(&__si->softintr_q, __sih, sih_q);	\
+		__sih->sih_pending = 1;					\
+		setsoft(__si->softintr_ipl);				\
+	}								\
+	simple_unlock(&__si->softintr_slock);				\
+	splx(__s);							\
+} while (0)
+
+/* XXX For legacy software interrupts. */
+extern struct hpcmips_soft_intrhand *softnet_intrhand;
+
+#define	setsoftnet()	softintr_schedule(softnet_intrhand)
 
 #endif /* !_LOCORE */
 #endif /* _KERNEL */

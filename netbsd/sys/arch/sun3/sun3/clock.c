@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.44 2000/01/19 02:52:21 msaitoh Exp $	*/
+/*	$NetBSD: clock.c,v 1.46 2001/09/05 13:21:09 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
@@ -99,7 +99,7 @@ clock_match(parent, cf, args)
 	struct confargs *ca = args;
 
 	/* This driver only supports one unit. */
-	if (cf->cf_unit != 0)
+	if (intersil_va)
 		return (0);
 
 	/* Make sure there is something there... */
@@ -164,7 +164,7 @@ set_clk_mode(on, off, enable_clk)
 	u_char on, off;
 	int enable_clk;
 {
-	register u_char interreg;
+	u_char interreg;
 
 	/*
 	 * If we have not yet mapped the register,
@@ -303,7 +303,7 @@ clock_intr(cf)
  */
 void
 microtime(tvp)
-	register struct timeval *tvp;
+	struct timeval *tvp;
 {
 	int s = splhigh();
 	static struct timeval lasttime;

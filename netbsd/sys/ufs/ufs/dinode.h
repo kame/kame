@@ -1,4 +1,4 @@
-/*	$NetBSD: dinode.h,v 1.12 1999/11/15 18:49:15 fvdl Exp $	*/
+/*	$NetBSD: dinode.h,v 1.13 2001/07/27 01:24:54 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1989, 1993

@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.21 1999/08/05 18:08:12 thorpej Exp $	*/
+/*	$NetBSD: psl.h,v 1.26 2001/04/13 23:30:03 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -183,7 +183,7 @@ splx(ncpl)
 #define splnet()	splraise(imask[IPL_NET])
 #define spltty()	splraise(imask[IPL_TTY])
 #define splclock()	splraise(imask[IPL_CLOCK])
-#define splimp()	splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_IMP])
 #define splrtty()	splraise(imask[IPL_RTTY])
 #define	splstatclock()	splclock()
 
@@ -201,6 +201,8 @@ splx(ncpl)
  * Miscellaneous
  */
 #define	splhigh()	splraise(imask[IPL_HIGH])
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
 #define	spl0()		splx(imask[IPL_ZERO])
 #define splnone()	spl0()
 

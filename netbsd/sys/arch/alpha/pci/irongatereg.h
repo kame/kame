@@ -1,4 +1,4 @@
-/* $NetBSD: irongatereg.h,v 1.1.2.1 2000/06/27 19:45:58 thorpej Exp $ */
+/* $NetBSD: irongatereg.h,v 1.2 2000/06/26 02:42:10 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_revent.c,v 1.7.2.2 2000/10/17 20:15:21 tv Exp $	*/
+/*	$NetBSD: rf_revent.c,v 1.10 2001/11/13 07:11:16 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -28,6 +28,9 @@
 /*
  * revent.c -- reconstruction event handling code
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_revent.c,v 1.10 2001/11/13 07:11:16 lukem Exp $");
 
 #include <sys/errno.h>
 

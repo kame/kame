@@ -1,10 +1,10 @@
-#	$NetBSD: Makefile,v 1.4 1999/11/11 08:14:43 itohy Exp $
+#	$NetBSD: Makefile,v 1.6 2001/12/12 01:49:55 tv Exp $
 
 LIB=	dos
 
-MKLINT=no
-MKPROFILE=no
-MKPIC=no
+NOLINT=# defined
+NOPROFILE=# defined
+NOPIC=# defined
 
 CPPFLAGS+=	-I${.CURDIR}
 
@@ -63,4 +63,6 @@ dos_strerror.S: ${.CURDIR}/dos_errno.h ${MAKESTRERR}
 # only needed during build
 libinstall::
 
+.include <bsd.own.mk>
+.undef DESTDIR
 .include <bsd.lib.mk>

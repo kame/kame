@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: pci_subr.c,v 1.50 2002/05/19 00:01:09 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1997 Zubin D. Dittia.  All rights reserved.
@@ -34,34 +34,35 @@
 
 /*
  * PCI autoconfiguration support functions.
+ *
+ * Note: This file is also built into a userland library (libpci).
+ * Pay attention to this when you make modifications.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_subr.c,v 1.50 2002/05/19 00:01:09 sommerfeld Exp $");
+
+#ifdef _KERNEL_OPT
 #include "opt_pci.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/device.h>
 
+#ifdef _KERNEL
 #include <machine/intr.h>
+#else
+#include <pci.h>
+#include <stdio.h>
+#endif
 
 #include <dev/pci/pcireg.h>
+#ifdef _KERNEL
 #include <dev/pci/pcivar.h>
+#endif
 #ifdef PCIVERBOSE
 #include <dev/pci/pcidevs.h>
 #endif
-
-static void pci_conf_print_common __P((pci_chipset_tag_t, pcitag_t,
-    const pcireg_t *regs));
-static int pci_conf_print_bar __P((pci_chipset_tag_t, pcitag_t, 
-    const pcireg_t *regs, int, const char *));
-static void pci_conf_print_regs __P((const pcireg_t *regs, int first,
-    int pastlast));
-static void pci_conf_print_type0 __P((pci_chipset_tag_t, pcitag_t,
-    const pcireg_t *regs));
-static void pci_conf_print_type1 __P((pci_chipset_tag_t, pcitag_t,
-    const pcireg_t *regs));
-static void pci_conf_print_type2 __P((pci_chipset_tag_t, pcitag_t,
-    const pcireg_t *regs));
 
 /*
  * Descriptions of known PCI classes and subclasses.
@@ -70,18 +71,18 @@ static void pci_conf_print_type2 __P((pci_chipset_tag_t, pcitag_t,
  * NULL subclass pointer.
  */
 struct pci_class {
-	char		*name;
+	const char	*name;
 	int		val;		/* as wide as pci_{,sub}class_t */
-	struct pci_class *subclasses;
+	const struct pci_class *subclasses;
 };
 
-struct pci_class pci_subclass_prehistoric[] = {
+const struct pci_class pci_subclass_prehistoric[] = {
 	{ "miscellaneous",	PCI_SUBCLASS_PREHISTORIC_MISC,		},
 	{ "VGA",		PCI_SUBCLASS_PREHISTORIC_VGA,		},
 	{ 0 }
 };
 
-struct pci_class pci_subclass_mass_storage[] = {
+const struct pci_class pci_subclass_mass_storage[] = {
 	{ "SCSI",		PCI_SUBCLASS_MASS_STORAGE_SCSI,		},
 	{ "IDE",		PCI_SUBCLASS_MASS_STORAGE_IDE,		},
 	{ "floppy",		PCI_SUBCLASS_MASS_STORAGE_FLOPPY,	},
@@ -92,7 +93,7 @@ struct pci_class pci_subclass_mass_storage[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_network[] = {
+const struct pci_class pci_subclass_network[] = {
 	{ "ethernet",		PCI_SUBCLASS_NETWORK_ETHERNET,		},
 	{ "token ring",		PCI_SUBCLASS_NETWORK_TOKENRING,		},
 	{ "FDDI",		PCI_SUBCLASS_NETWORK_FDDI,		},
@@ -104,7 +105,7 @@ struct pci_class pci_subclass_network[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_display[] = {
+const struct pci_class pci_subclass_display[] = {
 	{ "VGA",		PCI_SUBCLASS_DISPLAY_VGA,		},
 	{ "XGA",		PCI_SUBCLASS_DISPLAY_XGA,		},
 	{ "3D",			PCI_SUBCLASS_DISPLAY_3D,		},
@@ -112,7 +113,7 @@ struct pci_class pci_subclass_display[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_multimedia[] = {
+const struct pci_class pci_subclass_multimedia[] = {
 	{ "video",		PCI_SUBCLASS_MULTIMEDIA_VIDEO,		},
 	{ "audio",		PCI_SUBCLASS_MULTIMEDIA_AUDIO,		},
 	{ "telephony",		PCI_SUBCLASS_MULTIMEDIA_TELEPHONY,	},
@@ -120,14 +121,14 @@ struct pci_class pci_subclass_multimedia[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_memory[] = {
+const struct pci_class pci_subclass_memory[] = {
 	{ "RAM",		PCI_SUBCLASS_MEMORY_RAM,		},
 	{ "flash",		PCI_SUBCLASS_MEMORY_FLASH,		},
 	{ "miscellaneous",	PCI_SUBCLASS_MEMORY_MISC,		},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_bridge[] = {
+const struct pci_class pci_subclass_bridge[] = {
 	{ "host",		PCI_SUBCLASS_BRIDGE_HOST,		},
 	{ "ISA",		PCI_SUBCLASS_BRIDGE_ISA,		},
 	{ "EISA",		PCI_SUBCLASS_BRIDGE_EISA,		},
@@ -143,17 +144,19 @@ struct pci_class pci_subclass_bridge[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_communications[] = {
+const struct pci_class pci_subclass_communications[] = {
 	{ "serial",		PCI_SUBCLASS_COMMUNICATIONS_SERIAL,	},
 	{ "parallel",		PCI_SUBCLASS_COMMUNICATIONS_PARALLEL,	},
 	{ "multi-port serial",	PCI_SUBCLASS_COMMUNICATIONS_MPSERIAL,	},
 	{ "modem",		PCI_SUBCLASS_COMMUNICATIONS_MODEM,	},
+	{ "GPIB",		PCI_SUBCLASS_COMMUNICATIONS_GPIB,	},
+	{ "smartcard",		PCI_SUBCLASS_COMMUNICATIONS_SMARTCARD,	},
 	{ "miscellaneous",	PCI_SUBCLASS_COMMUNICATIONS_MISC,	},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_system[] = {
-	{ "8259 PIC",		PCI_SUBCLASS_SYSTEM_PIC,		},
+const struct pci_class pci_subclass_system[] = {
+	{ "interrupt",		PCI_SUBCLASS_SYSTEM_PIC,		},
 	{ "8237 DMA",		PCI_SUBCLASS_SYSTEM_DMA,		},
 	{ "8254 timer",		PCI_SUBCLASS_SYSTEM_TIMER,		},
 	{ "RTC",		PCI_SUBCLASS_SYSTEM_RTC,		},
@@ -162,7 +165,7 @@ struct pci_class pci_subclass_system[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_input[] = {
+const struct pci_class pci_subclass_input[] = {
 	{ "keyboard",		PCI_SUBCLASS_INPUT_KEYBOARD,		},
 	{ "digitizer",		PCI_SUBCLASS_INPUT_DIGITIZER,		},
 	{ "mouse",		PCI_SUBCLASS_INPUT_MOUSE,		},
@@ -172,13 +175,13 @@ struct pci_class pci_subclass_input[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_dock[] = {
+const struct pci_class pci_subclass_dock[] = {
 	{ "generic",		PCI_SUBCLASS_DOCK_GENERIC,		},
 	{ "miscellaneous",	PCI_SUBCLASS_DOCK_MISC,			},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_processor[] = {
+const struct pci_class pci_subclass_processor[] = {
 	{ "386",		PCI_SUBCLASS_PROCESSOR_386,		},
 	{ "486",		PCI_SUBCLASS_PROCESSOR_486,		},
 	{ "Pentium",		PCI_SUBCLASS_PROCESSOR_PENTIUM,		},
@@ -189,7 +192,7 @@ struct pci_class pci_subclass_processor[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_serialbus[] = {
+const struct pci_class pci_subclass_serialbus[] = {
 	{ "Firewire",		PCI_SUBCLASS_SERIALBUS_FIREWIRE,	},
 	{ "ACCESS.bus",		PCI_SUBCLASS_SERIALBUS_ACCESS,		},
 	{ "SSA",		PCI_SUBCLASS_SERIALBUS_SSA,		},
@@ -204,20 +207,22 @@ struct pci_class pci_subclass_serialbus[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_wireless[] = {
-	{ "iRDA",		PCI_SUBCLASS_WIRELESS_IRDA,		},
+const struct pci_class pci_subclass_wireless[] = {
+	{ "IrDA",		PCI_SUBCLASS_WIRELESS_IRDA,		},
 	{ "Consumer IR",	PCI_SUBCLASS_WIRELESS_CONSUMERIR,	},
 	{ "RF",			PCI_SUBCLASS_WIRELESS_RF,		},
+	{ "bluetooth",		PCI_SUBCLASS_WIRELESS_BLUETOOTH,	},
+	{ "broadband",		PCI_SUBCLASS_WIRELESS_BROADBAND,	},
 	{ "miscellaneous",	PCI_SUBCLASS_WIRELESS_MISC,		},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_i2o[] = {
+const struct pci_class pci_subclass_i2o[] = {
 	{ "standard",		PCI_SUBCLASS_I2O_STANDARD,		},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_satcom[] = {
+const struct pci_class pci_subclass_satcom[] = {
 	{ "TV",			PCI_SUBCLASS_SATCOM_TV,			},
 	{ "audio",		PCI_SUBCLASS_SATCOM_AUDIO,		},
 	{ "voice",		PCI_SUBCLASS_SATCOM_VOICE,		},
@@ -225,21 +230,23 @@ struct pci_class pci_subclass_satcom[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_crypto[] = {
+const struct pci_class pci_subclass_crypto[] = {
 	{ "network/computing",	PCI_SUBCLASS_CRYPTO_NETCOMP,		},
 	{ "entertainment",	PCI_SUBCLASS_CRYPTO_ENTERTAINMENT,	},
 	{ "miscellaneous",	PCI_SUBCLASS_CRYPTO_MISC,		},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_dasp[] = {
+const struct pci_class pci_subclass_dasp[] = {
 	{ "DPIO",		PCI_SUBCLASS_DASP_DPIO,			},
 	{ "Time and Frequency",	PCI_SUBCLASS_DASP_TIMEFREQ,		},
+	{ "synchronization",	PCI_SUBCLASS_DASP_SYNC,			},
+	{ "management",		PCI_SUBCLASS_DASP_MGMT,			},
 	{ "miscellaneous",	PCI_SUBCLASS_DASP_MISC,			},
 	{ 0 },
 };
 
-struct pci_class pci_class[] = {
+const struct pci_class pci_class[] = {
 	{ "prehistoric",	PCI_CLASS_PREHISTORIC,
 	    pci_subclass_prehistoric,				},
 	{ "mass storage",	PCI_CLASS_MASS_STORAGE,
@@ -297,12 +304,11 @@ struct pci_knowndev {
 #endif /* PCIVERBOSE */
 
 char *
-pci_findvendor(id_reg)
-	pcireg_t id_reg;
+pci_findvendor(pcireg_t id_reg)
 {
 #ifdef PCIVERBOSE
 	pci_vendor_id_t vendor = PCI_VENDOR(id_reg);
-	struct pci_knowndev *kdp;
+	const struct pci_knowndev *kdp;
 
 	kdp = pci_knowndevs;
         while (kdp->vendorname != NULL) {	/* all have vendor name */
@@ -317,10 +323,7 @@ pci_findvendor(id_reg)
 }
 
 void
-pci_devinfo(id_reg, class_reg, showclass, cp)
-	pcireg_t id_reg, class_reg;
-	int showclass;
-	char *cp;
+pci_devinfo(pcireg_t id_reg, pcireg_t class_reg, int showclass, char *cp)
 {
 	pci_vendor_id_t vendor;
 	pci_product_id_t product;
@@ -329,9 +332,9 @@ pci_devinfo(id_reg, class_reg, showclass, cp)
 	pci_interface_t interface;
 	pci_revision_t revision;
 	char *vendor_namep, *product_namep;
-	struct pci_class *classp, *subclassp;
+	const struct pci_class *classp, *subclassp;
 #ifdef PCIVERBOSE
-	struct pci_knowndev *kdp;
+	const struct pci_knowndev *kdp;
 	const char *unmatched = "unknown ";
 #else
 	const char *unmatched = "";
@@ -414,7 +417,7 @@ pci_devinfo(id_reg, class_reg, showclass, cp)
  *
  *	#ifdef MYDEV_DEBUG
  *		printf("%s: ", sc->sc_dev.dv_xname);
- *		pci_conf_print(pa->pa_pc, pa->pa_tag);
+ *		pci_conf_print(pa->pa_pc, pa->pa_tag, NULL);
  *	#endif
  */
 
@@ -424,15 +427,16 @@ pci_devinfo(id_reg, class_reg, showclass, cp)
 	printf("      %s: %s\n", (str), (rval & (bit)) ? "on" : "off");
 
 static void
-pci_conf_print_common(pc, tag, regs)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	const pcireg_t *regs;
+pci_conf_print_common(
+#ifdef _KERNEL
+    pci_chipset_tag_t pc, pcitag_t tag,
+#endif
+    const pcireg_t *regs)
 {
 #ifdef PCIVERBOSE
-	struct pci_knowndev *kdp;
+	const struct pci_knowndev *kdp;
 #endif
-	struct pci_class *classp, *subclassp;
+	const struct pci_class *classp, *subclassp;
 	pcireg_t rval;
 
 	rval = regs[o2i(PCI_ID_REG)];
@@ -539,17 +543,23 @@ pci_conf_print_common(pc, tag, regs)
 }
 
 static int
-pci_conf_print_bar(pc, tag, regs, reg, name)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	const pcireg_t *regs;
-	int reg;
-	const char *name;
+pci_conf_print_bar(
+#ifdef _KERNEL
+    pci_chipset_tag_t pc, pcitag_t tag,
+#endif
+    const pcireg_t *regs, int reg, const char *name
+#ifdef _KERNEL
+    , int sizebar
+#endif
+    )
 {
-	int s, width;
-	pcireg_t mask, rval;
-	pcireg_t mask64h, rval64h;
-	
+	int width;
+	pcireg_t rval, rval64h;
+#ifdef _KERNEL
+	int s;
+	pcireg_t mask, mask64h;
+#endif
+
 	width = 4;
 
 	/*
@@ -562,8 +572,18 @@ pci_conf_print_bar(pc, tag, regs, reg, name)
 	 * the bottom n bits of the address to 0.  As recommended,
 	 * we write all 1s and see what we get back.
 	 */
+
 	rval = regs[o2i(reg)];
-	if (rval != 0) {
+	if (PCI_MAPREG_TYPE(rval) == PCI_MAPREG_TYPE_MEM &&
+	    PCI_MAPREG_MEM_TYPE(rval) == PCI_MAPREG_MEM_TYPE_64BIT) {
+		rval64h = regs[o2i(reg + 4)];
+		width = 8;
+	} else
+		rval64h = 0;
+
+#ifdef _KERNEL
+	/* XXX don't size unknown memory type? */
+	if (rval != 0 && sizebar) {
 		/*
 		 * The following sequence seems to make some devices
 		 * (e.g. host bus bridges, which don't normally
@@ -579,15 +599,14 @@ pci_conf_print_bar(pc, tag, regs, reg, name)
 		pci_conf_write(pc, tag, reg, rval);
 		if (PCI_MAPREG_TYPE(rval) == PCI_MAPREG_TYPE_MEM &&
 		    PCI_MAPREG_MEM_TYPE(rval) == PCI_MAPREG_MEM_TYPE_64BIT) {
-			rval64h = regs[o2i(reg + 4)];
 			pci_conf_write(pc, tag, reg + 4, 0xffffffff);
 			mask64h = pci_conf_read(pc, tag, reg + 4);
 			pci_conf_write(pc, tag, reg + 4, rval64h);
-			width = 8;
 		}
 		splx(s);
 	} else
 		mask = 0;
+#endif /* _KERNEL */
 
 	printf("    Base address register at 0x%02x", reg);
 	if (name)
@@ -622,35 +641,55 @@ pci_conf_print_bar(pc, tag, regs, reg, name)
 		printf("%s %sprefetchable memory\n", type, prefetch);
 		switch (PCI_MAPREG_MEM_TYPE(rval)) {
 		case PCI_MAPREG_MEM_TYPE_64BIT:
-			printf("      base: 0x%016llx, size: 0x%016llx\n",
+			printf("      base: 0x%016llx, ",
 			    PCI_MAPREG_MEM64_ADDR(
-				((((long long) rval64h) << 32) | rval)),
-			    PCI_MAPREG_MEM64_SIZE(
-				((((long long) mask64h) << 32) | mask)));
+				((((long long) rval64h) << 32) | rval)));
+#ifdef _KERNEL
+			if (sizebar)
+				printf("size: 0x%016llx",
+				    PCI_MAPREG_MEM64_SIZE(
+				      ((((long long) mask64h) << 32) | mask)));
+			else
+#endif /* _KERNEL */
+				printf("not sized");
+			printf("\n");
 			break;
 		case PCI_MAPREG_MEM_TYPE_32BIT:
 		case PCI_MAPREG_MEM_TYPE_32BIT_1M:
 		default:
-			printf("      base: 0x%08x, size: 0x%08x\n",
-			    PCI_MAPREG_MEM_ADDR(rval),
-			    PCI_MAPREG_MEM_SIZE(mask));
+			printf("      base: 0x%08x, ",
+			    PCI_MAPREG_MEM_ADDR(rval));
+#ifdef _KERNEL
+			if (sizebar)
+				printf("size: 0x%08x",
+				    PCI_MAPREG_MEM_SIZE(mask));
+			else
+#endif /* _KERNEL */
+				printf("not sized");
+			printf("\n");
 			break;
 		}
-
 	} else {
+#ifdef _KERNEL
+		if (sizebar)
+			printf("%d-bit ", mask & ~0x0000ffff ? 32 : 16);
+#endif /* _KERNEL */
 		printf("i/o\n");
-		printf("      base: 0x%08x, size: 0x%08x\n",
-		    PCI_MAPREG_IO_ADDR(rval),
-		    PCI_MAPREG_IO_SIZE(mask));
+		printf("      base: 0x%08x, ", PCI_MAPREG_IO_ADDR(rval));
+#ifdef _KERNEL
+		if (sizebar)
+			printf("size: 0x%08x", PCI_MAPREG_IO_SIZE(mask));
+		else
+#endif /* _KERNEL */
+			printf("not sized");
+		printf("\n");
 	}
 
 	return width;
 }
 
 static void
-pci_conf_print_regs(regs, first, pastlast)
-	const pcireg_t *regs;
-	int first, pastlast;
+pci_conf_print_regs(const pcireg_t *regs, int first, int pastlast)
 {
 	int off, needaddr, neednl;
 
@@ -673,16 +712,26 @@ pci_conf_print_regs(regs, first, pastlast)
 }
 
 static void
-pci_conf_print_type0(pc, tag, regs)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	const pcireg_t *regs;
+pci_conf_print_type0(
+#ifdef _KERNEL
+    pci_chipset_tag_t pc, pcitag_t tag,
+#endif
+    const pcireg_t *regs
+#ifdef _KERNEL
+    , int sizebars
+#endif
+    )
 {
 	int off, width;
 	pcireg_t rval;
 
-	for (off = PCI_MAPREG_START; off < PCI_MAPREG_END; off += width)
-		width = pci_conf_print_bar(pc, tag, regs, off, NULL);
+	for (off = PCI_MAPREG_START; off < PCI_MAPREG_END; off += width) {
+#ifdef _KERNEL
+		width = pci_conf_print_bar(pc, tag, regs, off, NULL, sizebars);
+#else
+		width = pci_conf_print_bar(regs, off, NULL);
+#endif
+	}
 
 	printf("    Cardbus CIS Pointer: 0x%08x\n", regs[o2i(0x28)]);
 
@@ -788,10 +837,15 @@ pci_conf_print_type0(pc, tag, regs)
 }
 
 static void
-pci_conf_print_type1(pc, tag, regs)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	const pcireg_t *regs;
+pci_conf_print_type1(
+#ifdef _KERNEL
+    pci_chipset_tag_t pc, pcitag_t tag,
+#endif
+    const pcireg_t *regs
+#ifdef _KERNEL
+    , int sizebars
+#endif
+    )
 {
 	int off, width;
 	pcireg_t rval;
@@ -805,8 +859,13 @@ pci_conf_print_type1(pc, tag, regs)
 	 * respect to various standards. (XXX)
 	 */
 
-	for (off = 0x10; off < 0x18; off += width)
-		width = pci_conf_print_bar(pc, tag, regs, off, NULL);
+	for (off = 0x10; off < 0x18; off += width) {
+#ifdef _KERNEL
+		width = pci_conf_print_bar(pc, tag, regs, off, NULL, sizebars);
+#else
+		width = pci_conf_print_bar(regs, off, NULL);
+#endif
+	}
 
 	printf("    Primary bus number: 0x%02x\n",
 	    (regs[o2i(0x18)] >> 0) & 0xff);
@@ -913,10 +972,15 @@ pci_conf_print_type1(pc, tag, regs)
 }
 
 static void
-pci_conf_print_type2(pc, tag, regs)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	const pcireg_t *regs;
+pci_conf_print_type2(
+#ifdef _KERNEL
+    pci_chipset_tag_t pc, pcitag_t tag,
+#endif
+    const pcireg_t *regs
+#ifdef _KERNEL
+    , int sizebars
+#endif
+    )
 {
 	pcireg_t rval;
 
@@ -929,8 +993,12 @@ pci_conf_print_type2(pc, tag, regs)
 	 * respect to various standards. (XXX)
 	 */
 
+#ifdef _KERNEL
 	pci_conf_print_bar(pc, tag, regs, 0x10,
-	    "CardBus socket/ExCA registers");
+	    "CardBus socket/ExCA registers", sizebars);
+#else
+	pci_conf_print_bar(regs, 0x10, "CardBus socket/ExCA registers");
+#endif
 
 	printf("    Reserved @ 0x14: 0x%04x\n",
 	    (regs[o2i(0x14)] >> 0) & 0xffff);
@@ -1031,31 +1099,63 @@ pci_conf_print_type2(pc, tag, regs)
 	printf("    Subsystem vendor ID: 0x%04x\n", PCI_VENDOR(rval));
 	printf("    Subsystem ID: 0x%04x\n", PCI_PRODUCT(rval));
 
-	pci_conf_print_bar(pc, tag, regs, 0x44, "legacy-mode registers");
+#ifdef _KERNEL
+	pci_conf_print_bar(pc, tag, regs, 0x44, "legacy-mode registers",
+	    sizebars);
+#else
+	pci_conf_print_bar(regs, 0x44, "legacy-mode registers");
+#endif
 }
 
 void
-pci_conf_print(pc, tag, printfn)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	void (*printfn)(pci_chipset_tag_t, pcitag_t, const pcireg_t *);
+pci_conf_print(
+#ifdef _KERNEL
+    pci_chipset_tag_t pc, pcitag_t tag,
+    void (*printfn)(pci_chipset_tag_t, pcitag_t, const pcireg_t *)
+#else
+    int pcifd, u_int bus, u_int dev, u_int func
+#endif
+    )
 {
 	pcireg_t regs[o2i(256)];
 	int off, endoff, hdrtype;
 	const char *typename;
-	void (*typeprintfn)(pci_chipset_tag_t, pcitag_t, const pcireg_t *);
+#ifdef _KERNEL
+	void (*typeprintfn)(pci_chipset_tag_t, pcitag_t, const pcireg_t *, int);
+	int sizebars;
+#else
+	void (*typeprintfn)(const pcireg_t *);
+#endif
 
 	printf("PCI configuration registers:\n");
 
-	for (off = 0; off < 256; off += 4)
+	for (off = 0; off < 256; off += 4) {
+#ifdef _KERNEL
 		regs[o2i(off)] = pci_conf_read(pc, tag, off);
+#else
+		if (pcibus_conf_read(pcifd, bus, dev, func, off,
+		    &regs[o2i(off)]) == -1)
+			regs[o2i(off)] = 0;
+#endif
+	}
+
+#ifdef _KERNEL
+	sizebars = 1;
+	if (PCI_CLASS(regs[o2i(PCI_CLASS_REG)]) == PCI_CLASS_BRIDGE &&
+	    PCI_SUBCLASS(regs[o2i(PCI_CLASS_REG)]) == PCI_SUBCLASS_BRIDGE_HOST)
+		sizebars = 0;
+#endif
 
 	/* common header */
 	printf("  Common header:\n");
 	pci_conf_print_regs(regs, 0, 16);
 
 	printf("\n");
+#ifdef _KERNEL
 	pci_conf_print_common(pc, tag, regs);
+#else
+	pci_conf_print_common(regs);
+#endif
 	printf("\n");
 
 	/* type-dependent header */
@@ -1091,9 +1191,13 @@ pci_conf_print(pc, tag, printfn)
 	printf("header:\n");
 	pci_conf_print_regs(regs, 16, endoff);
 	printf("\n");
-	if (typeprintfn)
-		(*typeprintfn)(pc, tag, regs);
-	else
+	if (typeprintfn) {
+#ifdef _KERNEL
+		(*typeprintfn)(pc, tag, regs, sizebars);
+#else
+		(*typeprintfn)(regs);
+#endif
+	} else
 		printf("    Don't know how to pretty-print type %d header.\n",
 		    hdrtype);
 	printf("\n");
@@ -1102,9 +1206,11 @@ pci_conf_print(pc, tag, printfn)
 	printf("  Device-dependent header:\n");
 	pci_conf_print_regs(regs, endoff, 256);
 	printf("\n");
+#ifdef _KERNEL
 	if (printfn)
 		(*printfn)(pc, tag, regs);
 	else
 		printf("    Don't know how to pretty-print device-dependent header.\n");
 	printf("\n");
+#endif /* _KERNEL */
 }

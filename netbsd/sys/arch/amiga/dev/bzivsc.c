@@ -1,4 +1,4 @@
-/*	$NetBSD: bzivsc.c,v 1.9 2000/06/05 15:08:02 tsutsui Exp $	*/
+/*	$NetBSD: bzivsc.c,v 1.12 2002/01/28 09:56:52 aymeric Exp $ */
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -35,6 +35,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bzivsc.c,v 1.12 2002/01/28 09:56:52 aymeric Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,8 +65,8 @@
 #include <amiga/dev/bzivscvar.h>
 #include <amiga/dev/zbusvar.h>
 
-void	bzivscattach	__P((struct device *, struct device *, void *));
-int	bzivscmatch	__P((struct device *, struct cfdata *, void *));
+void	bzivscattach(struct device *, struct device *, void *);
+int	bzivscmatch(struct device *, struct cfdata *, void *);
 
 /* Linkup to the rest of the kernel */
 struct cfattach bzivsc_ca = {
@@ -73,16 +76,16 @@ struct cfattach bzivsc_ca = {
 /*
  * Functions and the switch for the MI code.
  */
-u_char	bzivsc_read_reg __P((struct ncr53c9x_softc *, int));
-void	bzivsc_write_reg __P((struct ncr53c9x_softc *, int, u_char));
-int	bzivsc_dma_isintr __P((struct ncr53c9x_softc *));
-void	bzivsc_dma_reset __P((struct ncr53c9x_softc *));
-int	bzivsc_dma_intr __P((struct ncr53c9x_softc *));
-int	bzivsc_dma_setup __P((struct ncr53c9x_softc *, caddr_t *,
-	    size_t *, int, size_t *));
-void	bzivsc_dma_go __P((struct ncr53c9x_softc *));
-void	bzivsc_dma_stop __P((struct ncr53c9x_softc *));
-int	bzivsc_dma_isactive __P((struct ncr53c9x_softc *));
+u_char	bzivsc_read_reg(struct ncr53c9x_softc *, int);
+void	bzivsc_write_reg(struct ncr53c9x_softc *, int, u_char);
+int	bzivsc_dma_isintr(struct ncr53c9x_softc *);
+void	bzivsc_dma_reset(struct ncr53c9x_softc *);
+int	bzivsc_dma_intr(struct ncr53c9x_softc *);
+int	bzivsc_dma_setup(struct ncr53c9x_softc *, caddr_t *,
+	    size_t *, int, size_t *);
+void	bzivsc_dma_go(struct ncr53c9x_softc *);
+void	bzivsc_dma_stop(struct ncr53c9x_softc *);
+int	bzivsc_dma_isactive(struct ncr53c9x_softc *);
 
 struct ncr53c9x_glue bzivsc_glue = {
 	bzivsc_read_reg,
@@ -115,17 +118,14 @@ struct {
 } bzivsc_trace[128];
 int bzivsc_trace_ptr = 0;
 int bzivsc_trace_enable = 1;
-void bzivsc_dump __P((void));
+void bzivsc_dump(void);
 #endif
 
 /*
  * if we are a Phase5 Blizzard 12x0-IV
  */
 int
-bzivscmatch(parent, cf, aux)
-	struct device *parent;
-	struct cfdata *cf;
-	void *aux;
+bzivscmatch(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct zbus_args *zap;
 	volatile u_char *regs;
@@ -152,9 +152,7 @@ bzivscmatch(parent, cf, aux)
  * Attach this instance, and then all the sub-devices
  */
 void
-bzivscattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+bzivscattach(struct device *parent, struct device *self, void *aux)
 {
 	struct bzivsc_softc *bsc = (void *)self;
 	struct ncr53c9x_softc *sc = &bsc->sc_ncr53c9x;
@@ -234,7 +232,9 @@ bzivscattach(parent, self, aux)
 	/*
 	 * Now try to attach all the sub-devices
 	 */
-	ncr53c9x_attach(sc, NULL, NULL);
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	sc->sc_adapter.adapt_minphys = minphys;
+	ncr53c9x_attach(sc);
 }
 
 /*
@@ -242,9 +242,7 @@ bzivscattach(parent, self, aux)
  */
 
 u_char
-bzivsc_read_reg(sc, reg)
-	struct ncr53c9x_softc *sc;
-	int reg;
+bzivsc_read_reg(struct ncr53c9x_softc *sc, int reg)
 {
 	struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
 
@@ -252,10 +250,7 @@ bzivsc_read_reg(sc, reg)
 }
 
 void
-bzivsc_write_reg(sc, reg, val)
-	struct ncr53c9x_softc *sc;
-	int reg;
-	u_char val;
+bzivsc_write_reg(struct ncr53c9x_softc *sc, int reg, u_char val)
 {
 	struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
 	u_char v = val;
@@ -271,8 +266,7 @@ if (bzivsc_trace_enable/* && sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_C
 }
 
 int
-bzivsc_dma_isintr(sc)
-	struct ncr53c9x_softc *sc;
+bzivsc_dma_isintr(struct ncr53c9x_softc *sc)
 {
 	struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
 
@@ -291,8 +285,7 @@ if (/*sc->sc_nexus && sc->sc_nexus->xs->xs_control & XS_CTL_POLL &&*/ bzivsc_tra
 }
 
 void
-bzivsc_dma_reset(sc)
-	struct ncr53c9x_softc *sc;
+bzivsc_dma_reset(struct ncr53c9x_softc *sc)
 {
 	struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
 
@@ -300,8 +293,7 @@ bzivsc_dma_reset(sc)
 }
 
 int
-bzivsc_dma_intr(sc)
-	struct ncr53c9x_softc *sc;
+bzivsc_dma_intr(struct ncr53c9x_softc *sc)
 {
 	register struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
 	register int	cnt;
@@ -335,12 +327,8 @@ bzivsc_dma_intr(sc)
 }
 
 int
-bzivsc_dma_setup(sc, addr, len, datain, dmasize)
-	struct ncr53c9x_softc *sc;
-	caddr_t *addr;
-	size_t *len;
-	int datain;
-	size_t *dmasize;
+bzivsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
+                 int datain, size_t *dmasize)
 {
 	struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
 	paddr_t pa;
@@ -424,20 +412,17 @@ if (xfer != *len)
 }
 
 void
-bzivsc_dma_go(sc)
-	struct ncr53c9x_softc *sc;
+bzivsc_dma_go(struct ncr53c9x_softc *sc)
 {
 }
 
 void
-bzivsc_dma_stop(sc)
-	struct ncr53c9x_softc *sc;
+bzivsc_dma_stop(struct ncr53c9x_softc *sc)
 {
 }
 
 int
-bzivsc_dma_isactive(sc)
-	struct ncr53c9x_softc *sc;
+bzivsc_dma_isactive(struct ncr53c9x_softc *sc)
 {
 	struct bzivsc_softc *bsc = (struct bzivsc_softc *)sc;
 
@@ -446,7 +431,7 @@ bzivsc_dma_isactive(sc)
 
 #ifdef DEBUG
 void
-bzivsc_dump()
+bzivsc_dump(void)
 {
 	int i;
 

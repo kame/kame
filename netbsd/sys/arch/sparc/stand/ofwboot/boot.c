@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.1.2.1 2000/08/26 00:05:16 mrg Exp $	*/
+/*	$NetBSD: boot.c,v 1.3 2001/05/31 08:55:19 mrg Exp $	*/
 #define DEBUG
 /*
  * Copyright (c) 1997, 1999 Eduardo E. Horvath.  All rights reserved.
@@ -55,6 +55,7 @@
 #include <sys/exec_elf.h>
 #include <sys/reboot.h>
 #include <sys/disklabel.h>
+#include <sys/boot_flag.h>
 
 #include <machine/cpu.h>
 
@@ -127,7 +128,7 @@ parseargs(str, howtop)
 	int i;
 
 	/* Allow user to drop back to the PROM. */
-	if (strcmp(str, "exit") == 0)
+	if (strcmp(str, "exit") == 0 || strcmp(str, "halt") == 0)
 		_rtt();
 
 	/* Insert the kernel name if it is not there. */
@@ -149,22 +150,16 @@ parseargs(str, howtop)
 	
 	*cp++ = 0;
 	while (*cp) {
+		BOOT_FLAG(*cp, *howtop);
+		/* handle specialties */
 		switch (*cp++) {
-		case 'a':
-			*howtop |= RB_ASKNAME;
-			break;
-		case 's':
-			*howtop |= RB_SINGLE;
-			break;
 		case 'd':
-			*howtop |= RB_KDB;
 			if (!debug) debug = 1;
 			break;
 		case 'D':
 			debug = 2;
 			break;
-		case 'v':
-			if (!debug) debug = 1;
+		default:
 			break;
 		}
 	}

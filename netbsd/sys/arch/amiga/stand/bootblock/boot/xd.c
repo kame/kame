@@ -1,5 +1,5 @@
 /*
- * $NetBSD: xd.c,v 1.3 1997/02/01 01:46:28 mhitch Exp $
+ * $NetBSD: xd.c,v 1.5 2002/01/26 13:18:58 aymeric Exp $
  *
  * Copyright (c) 1996 Ignatios Souvatzis.
  * Copyright (c) 1995 Waldi Ravens.
@@ -18,7 +18,7 @@
  *        This product includes software developed by Waldi Ravens.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission
- *      
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -35,25 +35,27 @@
 
 #include <stand.h>
 #include <ufs.h>
-
+#include <ustarfs.h>
 
 #include "samachdep.h"
 #include "amigaio.h"
 #include "libstubs.h"
 
-static int xdstrategy __P((void *, int, daddr_t, size_t, void *, size_t *));
-static int xdopenclose __P((struct open_file *));
-static int xdioctl __P((struct open_file *, u_long, void *));
+static int xdstrategy(void *, int, daddr_t, size_t, void *, size_t *);
+static int xdopenclose(struct open_file *);
+static int xdioctl(struct open_file *, u_long, void *);
 
 u_int32_t aio_base;
 static struct AmigaIO *aio_save;
 
 static struct devsw devsw[] = {
         { "xd", xdstrategy, (void *)xdopenclose, (void *)xdopenclose, xdioctl }
-};              
+};
 
 struct fs_ops file_system[] = {
 	{ ufs_open, ufs_close, ufs_read, ufs_write, ufs_seek, ufs_stat },
+	{ ustarfs_open, ustarfs_close, ustarfs_read, ustarfs_write, ustarfs_seek,
+	  ustarfs_stat },
 };
 
 int nfsys = sizeof(file_system)/sizeof(struct fs_ops);
@@ -63,14 +65,13 @@ int nfsys = sizeof(file_system)/sizeof(struct fs_ops);
 /* called from configure */
 
 void
-xdinit(aio)
-	void *aio;
+xdinit(void *aio)
 {
 	aio_save = aio;
 	aio_base = aio_save->offset;
 }
 
-/* 
+/*
  * Kernel ist loaded from device and partition the kickstart
  * menu or boot priority has chosen:
  */
@@ -90,13 +91,8 @@ devopen(f, fname, file)
 /* tell kickstart to do the real work */
 
 static int
-xdstrategy (devd, flag, dblk, size, buf, rsize)
-	void	*devd;
-	int     flag;
-	daddr_t dblk;
-	size_t  size;
-	void    *buf;
-	size_t  *rsize; 
+xdstrategy(void *devd, int flag, daddr_t dblk, size_t size, void *buf,
+	   size_t *rsize)
 {
 	struct AmigaIO *aio = (struct AmigaIO *)devd;
 
@@ -116,7 +112,7 @@ xdstrategy (devd, flag, dblk, size, buf, rsize)
 	DoIO(aio);
 
 #ifdef XDDEBUG
-	printf("strategy got err %ld, rsize %ld\n", aio->err, aio->actual);
+	printf("strategy got err %ld, rsize %ld\n", (long)aio->err, (long)aio->actual);
 #endif
 
 	if (aio->err) {
@@ -132,17 +128,22 @@ xdstrategy (devd, flag, dblk, size, buf, rsize)
 /* nothing do do for these: */
 
 static int
-xdopenclose(f)
-	struct open_file *f;
+xdopenclose(struct open_file *f)
 {
+	aio_save->offset = aio_base;	/* Restore original offset */
 	return 0;
 }
 
 static int
-xdioctl (f, cmd, data)
-	struct open_file *f;
-	u_long  cmd;
-	void    *data;
+xdioctl(struct open_file *f, u_long cmd, void *data)
 {
 	return EIO;
 }
+
+#ifdef _PRIMARY_BOOT
+void
+xdreset(void)
+{
+	aio_save->offset = aio_base;	/* Restore original offset */
+}
+#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_vsbus.c,v 1.8 2000/06/05 00:09:19 matt Exp $	*/
+/*	$NetBSD: if_le_vsbus.c,v 1.12 2001/11/28 05:22:48 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -83,14 +83,13 @@
 #include <sys/device.h>
 #include <sys/reboot.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
 
-#if INET
+#ifdef INET
 #include <netinet/in.h>
 #include <netinet/if_inarp.h>
 #endif
@@ -161,7 +160,7 @@ le_vsbus_match(parent, cf, aux)
 	int rv = 0;
 	int error;
 
-	if (vax_boardtype == VAX_BTYP_49)
+	if (vax_boardtype == VAX_BTYP_49 || vax_boardtype == VAX_BTYP_53)
 		return 0;
 
 	error = bus_dmamap_create(va->va_dmat, sizeof(initblock), 1,

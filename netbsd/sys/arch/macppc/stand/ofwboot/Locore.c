@@ -1,4 +1,4 @@
-/*	$NetBSD: Locore.c,v 1.6 1999/12/22 18:57:12 thorpej Exp $	*/
+/*	$NetBSD: Locore.c,v 1.10 2002/03/29 15:15:07 tsutsui Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -43,7 +43,7 @@ static int (*openfirmware) __P((void *));
 static void startup __P((void *, int, int (*)(void *), char *, int));
 static void setup __P((void));
 
-static int stack[4096/4];
+static int stack[8192/4 + 4];
 
 #ifdef XCOFF_GLUE
 asm("
@@ -71,7 +71,7 @@ _start:
 
 	lis	1,stack@ha
 	addi	1,1,stack@l
-	addi	1,1,4096
+	addi	1,1,8192
 
 	mfmsr	8
 	li	0,0
@@ -123,7 +123,7 @@ startup(vpd, res, openfirm, arg, argl)
 {
 	extern char etext[], _end[], _edata[];
 
-	bzero(_edata, (_end - _edata));
+	memset(_edata, 0, (_end - _edata));
 	openfirmware = openfirm;
 	setup();
 	main();
@@ -161,8 +161,8 @@ OF_finddevice(name)
 		"finddevice",
 		1,
 		1,
-	};	
-	
+	};
+
 	args.device = name;
 	if (openfirmware(&args) == -1)
 		return -1;
@@ -184,7 +184,7 @@ OF_instance_to_package(ihandle)
 		1,
 		1,
 	};
-	
+
 	args.ihandle = ihandle;
 	if (openfirmware(&args) == -1)
 		return -1;
@@ -212,7 +212,7 @@ OF_getprop(handle, prop, buf, buflen)
 		4,
 		1,
 	};
-	
+
 	args.phandle = handle;
 	args.prop = prop;
 	args.buf = buf;
@@ -244,7 +244,7 @@ OF_setprop(handle, prop, buf, len)
 		4,
 		1,
 	};
-	
+
 	args.phandle = handle;
 	args.prop = prop;
 	args.buf = buf;
@@ -270,7 +270,7 @@ OF_open(dname)
 		1,
 		1,
 	};
-	
+
 #ifdef OFW_DEBUG
 	printf("OF_open(%s) -> ", dname);
 #endif
@@ -302,7 +302,7 @@ OF_close(handle)
 		1,
 		0,
 	};
-	
+
 #ifdef OFW_DEBUG
 	printf("OF_close(%d)\n", handle);
 #endif
@@ -408,7 +408,7 @@ OF_seek(handle, pos)
 		3,
 		1,
 	};
-	
+
 #ifdef OFW_DEBUG
 	printf("OF_seek(%d, %x, %x) -> ", handle, (int)(pos >> 32), (int)pos);
 #endif
@@ -481,7 +481,7 @@ OF_release(virt, size)
 		2,
 		0,
 	};
-	
+
 #ifdef OFW_DEBUG
 	printf("OF_release(%x, %x)\n", virt, size);
 #endif
@@ -503,7 +503,7 @@ OF_milliseconds()
 		0,
 		1,
 	};
-	
+
 	openfirmware(&args);
 	return args.ms;
 }
@@ -595,10 +595,14 @@ OF_call_method(method, ihandle, nargs, nreturns, va_alist)
 	for (ip = args.args_n_results + (n = nargs); --n >= 0;)
 		*--ip = va_arg(ap, int);
 
-	if (openfirmware(&args) == -1)
+	if (openfirmware(&args) == -1) {
+		va_end(ap);
 		return -1;
-	if (args.args_n_results[nargs])
+	}
+	if (args.args_n_results[nargs]) {
+		va_end(ap);
 		return args.args_n_results[nargs];
+	}
 	for (ip = args.args_n_results + nargs + (n = args.nreturns); --n > 0;)
 		*va_arg(ap, int *) = *--ip;
 	va_end(ap);

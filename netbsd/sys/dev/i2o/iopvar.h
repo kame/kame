@@ -1,4 +1,4 @@
-/*	$NetBSD: iopvar.h,v 1.10.4.1 2001/10/25 17:53:55 he Exp $	*/
+/*	$NetBSD: iopvar.h,v 1.10 2001/09/27 18:43:38 ad Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: union_vfsops.c,v 1.25 2000/06/10 18:27:04 assar Exp $	*/
+/*	$NetBSD: union_vfsops.c,v 1.30 2001/11/15 09:48:23 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 The Regents of the University of California.
@@ -43,10 +43,12 @@
  * Union Layer
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: union_vfsops.c,v 1.30 2001/11/15 09:48:23 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
@@ -125,15 +127,13 @@ union_mount(mp, path, data, ndp, p)
 	/*
 	 * Find upper node.
 	 */
-	NDINIT(ndp, LOOKUP, FOLLOW|WANTPARENT,
+	NDINIT(ndp, LOOKUP, FOLLOW,
 	       UIO_USERSPACE, args.target, p);
 
 	if ((error = namei(ndp)) != 0)
 		goto bad;
 
 	upperrootvp = ndp->ni_vp;
-	vrele(ndp->ni_dvp);
-	ndp->ni_dvp = NULL;
 
 	if (upperrootvp->v_type != VDIR) {
 		error = EINVAL;
@@ -560,9 +560,9 @@ union_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	return (EOPNOTSUPP);
 }
 
-extern struct vnodeopv_desc union_vnodeop_opv_desc;
+extern const struct vnodeopv_desc union_vnodeop_opv_desc;
 
-struct vnodeopv_desc *union_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const union_vnodeopv_descs[] = {
 	&union_vnodeop_opv_desc,
 	NULL,
 };
@@ -580,6 +580,7 @@ struct vfsops union_vfsops = {
 	union_fhtovp,
 	union_vptofh,
 	union_init,
+	NULL,
 	union_done,
 	union_sysctl,
 	NULL,				/* vfs_mountroot */

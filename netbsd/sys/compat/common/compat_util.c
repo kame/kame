@@ -1,4 +1,4 @@
-/* 	$NetBSD: compat_util.c,v 1.14.12.2 2000/10/18 16:23:57 tv Exp $	*/
+/* 	$NetBSD: compat_util.c,v 1.23 2002/03/17 00:16:07 christos Exp $	*/
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: compat_util.c,v 1.23 2002/03/17 00:16:07 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -51,7 +54,6 @@
 #include <sys/syslog.h>
 #include <sys/mount.h>
 
-#include <vm/vm_param.h>
 
 #include <compat/common/compat_util.h>
 
@@ -59,9 +61,8 @@
  * Search an alternate path before passing pathname arguments on
  * to system calls. Useful for keeping a separate 'emulation tree'.
  *
- * If cflag is set, we check if an attempt can be made to create
- * the named file, i.e. we check if the directory it should
- * be in exists.
+ * According to sflag, we either check for existance of the file or if
+ * it can be created or if the file is symlink.
  *
  * In case of success, emul_find returns 0:
  * 	If sgp is provided, the path is in user space, and pbuf gets
@@ -71,13 +72,13 @@
  * In case of error, the error number is returned and *pbuf = path.
  */
 int
-emul_find(p, sgp, prefix, path, pbuf, cflag)
+emul_find(p, sgp, prefix, path, pbuf, sflag)
 	struct proc	 *p;
 	caddr_t		 *sgp;		/* Pointer to stackgap memory */
 	const char	 *prefix;
 	const char	 *path;
 	const char	**pbuf;
-	int		  cflag;
+	int		  sflag;
 {
 	struct nameidata	 nd;
 	struct nameidata	 ndroot;
@@ -128,11 +129,12 @@ emul_find(p, sgp, prefix, path, pbuf, cflag)
 	 * We know that there is a / somewhere in this pathname.
 	 * Search backwards for it, to find the file's parent dir
 	 * to see if it exists in the alternate tree. If it does,
-	 * and we want to create a file (cflag is set). We don't
+	 * and we want to create a file (sflag is set). We don't
 	 * need to worry about the root comparison in this case.
 	 */
 
-	if (cflag) {
+	switch (sflag) {
+	case CHECK_ALT_FL_CREAT:
 		for (cp = &ptr[len] - 1; *cp != '/'; cp--)
 			;
 		*cp = '\0';
@@ -143,9 +145,12 @@ emul_find(p, sgp, prefix, path, pbuf, cflag)
 			goto bad;
 
 		*cp = '/';
-	}
-	else {
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, buf, p);
+		break;
+	case CHECK_ALT_FL_EXISTS:
+	case CHECK_ALT_FL_SYMLINK:
+		NDINIT(&nd, LOOKUP,	
+			(sflag == CHECK_ALT_FL_SYMLINK) ? NOFOLLOW : FOLLOW,
+			UIO_SYSSPACE, buf, p);
 
 		if ((error = namei(&nd)) != 0)
 			goto bad;
@@ -175,10 +180,12 @@ emul_find(p, sgp, prefix, path, pbuf, cflag)
 			error = ENOENT;
 			goto bad3;
 		}
+
+		break;
 	}
 
 	vrele(nd.ni_vp);
-	if (!cflag)
+	if (sflag == CHECK_ALT_FL_EXISTS)
 		vrele(ndroot.ni_vp);
 
 good:
@@ -186,7 +193,7 @@ good:
 		*pbuf = buf;
 	else {
 		sz = &ptr[len] - buf;
-		*pbuf = stackgap_alloc(sgp, sz + 1);
+		*pbuf = stackgap_alloc(p, sgp, sz + 1);
 		if (*pbuf == NULL) {
 			error = ENAMETOOLONG;
 			goto bad;
@@ -231,32 +238,35 @@ emul_flags_translate(const struct emul_flags_xtab *tab,
 }
 
 caddr_t
-stackgap_init(e)
-	struct emul *e;
+stackgap_init(p, sz)
+	const struct proc *p;
+	size_t sz;
 {
-	struct proc *p = curproc;		/* XXX */
-
-#define szsigcode ((caddr_t)(e->e_esigcode - e->e_sigcode))
+	if (sz == 0)
+		sz = STACKGAPLEN;
+	if (sz > STACKGAPLEN)
+		panic("size %lu > STACKGAPLEN", (unsigned long)sz);
+#define szsigcode ((caddr_t)(p->p_emul->e_esigcode - p->p_emul->e_sigcode))
 	return (caddr_t)(((unsigned long)p->p_psstr - (unsigned long)szsigcode
-		- STACKGAPLEN) & ~ALIGNBYTES);
+		- sz) & ~ALIGNBYTES);
 #undef szsigcode
 }
 
 
 void *
-stackgap_alloc(sgp, sz)
+stackgap_alloc(p, sgp, sz)
+	const struct proc *p;
 	caddr_t *sgp;
 	size_t sz;
 {
 	void *n = (void *) *sgp;
 	caddr_t nsgp;
-	struct proc *p = curproc;		/* XXX */
-	struct emul *e = p->p_emul;
+	const struct emul *e = p->p_emul;
 	int sigsize = e->e_esigcode - e->e_sigcode;
 	
 	sz = ALIGN(sz);
 	nsgp = *sgp + sz;
-	if (nsgp > (((caddr_t)p->p_psstr) - sigsize))
+	if (nsgp > (((const caddr_t)p->p_psstr) - sigsize))
 		return NULL;
 	*sgp = nsgp;
 	return n;

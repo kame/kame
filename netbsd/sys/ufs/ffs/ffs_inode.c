@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_inode.c,v 1.35.2.3 2002/02/26 21:13:18 he Exp $	*/
+/*	$NetBSD: ffs_inode.c,v 1.51 2001/12/18 10:57:21 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -35,7 +35,10 @@
  *	@(#)ffs_inode.c	8.13 (Berkeley) 4/21/95
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ffs_inode.c,v 1.51 2001/12/18 10:57:21 fvdl Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_ffs.h"
 #include "opt_quota.h"
 #endif
@@ -51,10 +54,6 @@
 #include <sys/malloc.h>
 #include <sys/trace.h>
 #include <sys/resourcevar.h>
-
-#include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -172,39 +171,28 @@ ffs_truncate(v)
 		struct proc *a_p;
 	} */ *ap = v;
 	struct vnode *ovp = ap->a_vp;
+	struct genfs_node *gp = VTOG(ovp);
 	ufs_daddr_t lastblock;
 	struct inode *oip;
-	ufs_daddr_t bn, lbn, lastiblock[NIADDR], indir_lbn[NIADDR];
+	ufs_daddr_t bn, lastiblock[NIADDR], indir_lbn[NIADDR];
 	ufs_daddr_t oldblks[NDADDR + NIADDR], newblks[NDADDR + NIADDR];
 	off_t length = ap->a_length;
 	struct fs *fs;
-	struct buf *bp;
 	int offset, size, level;
 	long count, nblocks, blocksreleased = 0;
-	int i;
-	int aflags, error, allerror = 0;
+	int i, ioflag, aflag;
+	int error, allerror = 0;
 	off_t osize;
 
 	if (length < 0)
 		return (EINVAL);
 	oip = VTOI(ovp);
-#if 1
-	/*
-	 * XXX. Was in Kirk's patches. Is it good behavior to just
-	 * return and not update modification times?
-	 */
-	if (oip->i_ffs_size == length)
-		return (0);
-#endif
 	if (ovp->v_type == VLNK &&
 	    (oip->i_ffs_size < ovp->v_mount->mnt_maxsymlinklen ||
 	     (ovp->v_mount->mnt_maxsymlinklen == 0 &&
 	      oip->i_din.ffs_din.di_blocks == 0))) {
-#ifdef DIAGNOSTIC
-		if (length != 0)
-			panic("ffs_truncate: partial truncate of symlink");
-#endif
-		memset((char *)&oip->i_ffs_shortlink, 0, (u_int)oip->i_ffs_size);
+		KDASSERT(length == 0);
+		memset(&oip->i_ffs_shortlink, 0, (size_t)oip->i_ffs_size);
 		oip->i_ffs_size = 0;
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
 		return (VOP_UPDATE(ovp, NULL, NULL, UPDATE_WAIT));
@@ -218,13 +206,85 @@ ffs_truncate(v)
 		return (error);
 #endif
 	fs = oip->i_fs;
+	if (length > fs->fs_maxfilesize)
+		return (EFBIG);
+
 	osize = oip->i_ffs_size;
-	ovp->v_lasta = ovp->v_clen = ovp->v_cstart = ovp->v_lastw = 0;
+	ioflag = ap->a_flags;
+	aflag = ioflag & IO_SYNC ? B_SYNC : 0;
+
+	/*
+	 * Lengthen the size of the file. We must ensure that the
+	 * last byte of the file is allocated. Since the smallest
+	 * value of osize is 0, length will be at least 1.
+	 */
+
+	if (osize < length) {
+		if (lblkno(fs, osize) < NDADDR &&
+		    lblkno(fs, osize) != lblkno(fs, length) &&
+		    blkroundup(fs, osize) != osize) {
+			error = ufs_balloc_range(ovp, osize,
+			    blkroundup(fs, osize) - osize, ap->a_cred, aflag);
+			if (error) {
+				return error;
+			}
+			if (ioflag & IO_SYNC) {
+				ovp->v_size = blkroundup(fs, osize);
+				simple_lock(&ovp->v_interlock);
+				VOP_PUTPAGES(ovp,
+				    trunc_page(osize & ~(fs->fs_bsize - 1)),
+				    round_page(ovp->v_size),
+				    PGO_CLEANIT | PGO_SYNCIO);
+			}
+		}
+		error = ufs_balloc_range(ovp, length - 1, 1, ap->a_cred,
+		    aflag);
+		if (error) {
+			(void) VOP_TRUNCATE(ovp, osize, ioflag & IO_SYNC,
+			    ap->a_cred, ap->a_p);
+			return error;
+		}
+		uvm_vnp_setsize(ovp, length);
+		oip->i_flag |= IN_CHANGE | IN_UPDATE;
+		KASSERT(ovp->v_size == oip->i_ffs_size);
+		return (VOP_UPDATE(ovp, NULL, NULL, 1));
+	}
+
+	/*
+	 * When truncating a regular file down to a non-block-aligned size,
+	 * we must zero the part of last block which is past the new EOF.
+	 * We must synchronously flush the zeroed pages to disk
+	 * since the new pages will be invalidated as soon as we
+	 * inform the VM system of the new, smaller size.
+	 * We must do this before acquiring the GLOCK, since fetching
+	 * the pages will acquire the GLOCK internally.
+	 * So there is a window where another thread could see a whole
+	 * zeroed page past EOF, but that's life.
+	 */
+
+	offset = blkoff(fs, length);
+	if (ovp->v_type == VREG && length < osize && offset != 0) {
+		voff_t eoz;
+
+		error = ufs_balloc_range(ovp, length - 1, 1, ap->a_cred,
+		    aflag);
+		if (error) {
+			return error;
+		}
+		size = blksize(fs, oip, lblkno(fs, length));
+		eoz = MIN(lblktosize(fs, lblkno(fs, length)) + size, osize);
+		uvm_vnp_zerorange(ovp, length, eoz - length);
+		simple_lock(&ovp->v_interlock);
+		error = VOP_PUTPAGES(ovp, trunc_page(length), round_page(eoz),
+		    PGO_CLEANIT | PGO_DEACTIVATE | PGO_SYNCIO);
+		if (error) {
+			return error;
+		}
+	}
+
+	lockmgr(&gp->g_glock, LK_EXCLUSIVE, NULL);
 
 	if (DOINGSOFTDEP(ovp)) {
-		uvm_vnp_setsize(ovp, length);
-		if (ovp->v_usecount)	/* can't be cached if usecount=0 */
-			(void) uvm_vnp_uncache(ovp);
 		if (length > 0) {
 			/*
 			 * If a file is only partially truncated, then
@@ -236,89 +296,25 @@ ffs_truncate(v)
 			 * so that it will have no data structures left.
 			 */
 			if ((error = VOP_FSYNC(ovp, ap->a_cred, FSYNC_WAIT,
-			    0, 0, ap->a_p)) != 0)
+			    0, 0, ap->a_p)) != 0) {
+				lockmgr(&gp->g_glock, LK_RELEASE, NULL);
 				return (error);
+			if (oip->i_flag & IN_SPACECOUNTED)
+				fs->fs_pendingblocks -= oip->i_ffs_blocks;
+			}
 		} else {
+			uvm_vnp_setsize(ovp, length);
 #ifdef QUOTA
  			(void) chkdq(oip, -oip->i_ffs_blocks, NOCRED, 0);
 #endif
 			softdep_setup_freeblocks(oip, length);
 			(void) vinvalbuf(ovp, 0, ap->a_cred, ap->a_p, 0, 0);
+			lockmgr(&gp->g_glock, LK_RELEASE, NULL);
 			oip->i_flag |= IN_CHANGE | IN_UPDATE;
 			return (VOP_UPDATE(ovp, NULL, NULL, 0));
 		}
 	}
-	/*
-	 * Lengthen the size of the file. We must ensure that the
-	 * last byte of the file is allocated. Since the smallest
-	 * value of osize is 0, length will be at least 1.
-	 */
-	if (osize < length) {
-		if (length > fs->fs_maxfilesize)
-			return (EFBIG);
-		aflags = B_CLRBUF;
-		if (ap->a_flags & IO_SYNC)
-			aflags |= B_SYNC;
-		error = VOP_BALLOC(ovp, length - 1, 1, ap->a_cred, aflags, &bp);
-		if (error)
-			return (error);
-		oip->i_ffs_size = length;
-		uvm_vnp_setsize(ovp, length);
-		(void) uvm_vnp_uncache(ovp);
-		if (aflags & B_SYNC)
-			bwrite(bp);
-		else
-			bawrite(bp);
-		oip->i_flag |= IN_CHANGE | IN_UPDATE;
-		return (VOP_UPDATE(ovp, NULL, NULL, UPDATE_WAIT));
-	}
-	/*
-	 * Shorten the size of the file. If the file is not being
-	 * truncated to a block boundary, the contents of the
-	 * partial block following the end of the file must be
-	 * zero'ed in case it ever becomes accessible again because
-	 * of subsequent file growth. Directories however are not
-	 * zero'ed as they should grow back initialized to empty.
-	 */
-	offset = blkoff(fs, length);
-	if (offset == 0) {
-		oip->i_ffs_size = length;
-	} else {
-		lbn = lblkno(fs, length);
-		aflags = B_CLRBUF;
-		if (ap->a_flags & IO_SYNC)
-			aflags |= B_SYNC;
-		error = VOP_BALLOC(ovp, length - 1, 1, ap->a_cred, aflags, &bp);
-		if (error)
-			return (error);
-		/*
-		 * When we are doing soft updates and the VOP_BALLOC
-		 * above fills in a direct block hole with a full sized
-		 * block that will be truncated down to a fragment below,
-		 * we must flush out the block dependency with an FSYNC
-		 * so that we do not get a soft updates inconsistency
-		 * when we create the fragment below.
-		 */
-		if (DOINGSOFTDEP(ovp) && lbn < NDADDR &&
-		    fragroundup(fs, blkoff(fs, length)) < fs->fs_bsize) {
-			error = VOP_FSYNC(ovp, ap->a_cred, FSYNC_WAIT, 0, 0,
-			    ap->a_p);
-			if (error != 0)
-				return error;
-		}
-
-		oip->i_ffs_size = length;
-		size = blksize(fs, oip, lbn);
-		(void) uvm_vnp_uncache(ovp);
-		if (ovp->v_type != VDIR)
-			memset((char *)bp->b_data + offset, 0,
-			       (u_int)(size - offset));
-		allocbuf(bp, size);
-		if (aflags & B_SYNC)
-			bwrite(bp);
-		else
-			bawrite(bp);
-	}
+	oip->i_ffs_size = length;
 	uvm_vnp_setsize(ovp, length);
 	/*
 	 * Calculate index into inode's block list of
@@ -450,12 +446,12 @@ done:
 	 */
 	oip->i_ffs_size = length;
 	oip->i_ffs_blocks -= blocksreleased;
-	if (oip->i_ffs_blocks < 0)			/* sanity */
-		oip->i_ffs_blocks = 0;
+	lockmgr(&gp->g_glock, LK_RELEASE, NULL);
 	oip->i_flag |= IN_CHANGE;
 #ifdef QUOTA
 	(void) chkdq(oip, -blocksreleased, NOCRED, 0);
 #endif
+	KASSERT(ovp->v_type != VREG || ovp->v_size == oip->i_ffs_size);
 	return (allerror);
 }
 
@@ -529,7 +525,7 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 
 	bap = (ufs_daddr_t *)bp->b_data;
 	if (lastbn >= 0) {
-		MALLOC(copy, ufs_daddr_t *, fs->fs_bsize, M_TEMP, M_WAITOK);
+		copy = (ufs_daddr_t *) malloc(fs->fs_bsize, M_TEMP, M_WAITOK);
 		memcpy((caddr_t)copy, (caddr_t)bap, (u_int)fs->fs_bsize);
 		memset((caddr_t)&bap[last + 1], 0,
 		  (u_int)(NINDIR(fs) - (last + 1)) * sizeof (ufs_daddr_t));

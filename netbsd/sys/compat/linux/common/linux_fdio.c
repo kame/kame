@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_fdio.c,v 1.1.6.1 2001/03/30 21:39:58 he Exp $	*/
+/*	$NetBSD: linux_fdio.c,v 1.3 2001/11/13 02:08:51 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Wasabi Systems, Inc.
@@ -34,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_fdio.c,v 1.3 2001/11/13 02:08:51 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,9 +77,7 @@ linux_ioctl_fdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	com = (u_long)SCARG(uap, data);
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);

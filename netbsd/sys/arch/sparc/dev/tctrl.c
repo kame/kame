@@ -1,4 +1,4 @@
-/*	$NetBSD: tctrl.c,v 1.10.2.2 2000/07/26 07:28:33 toddpw Exp $	*/
+/*	$NetBSD: tctrl.c,v 1.14 2002/03/11 16:27:02 pk Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -186,10 +186,11 @@ tctrl_attach(parent, self, aux)
 	 * looks like an sbus slot.
 	 */
 	sc->sc_memt = sa->sa_bustag;
-	if (sbus_bus_map(sc->sc_memt, sa->sa_slot,
-			 sa->sa_offset - TS102_REG_UCTRL_INT, sa->sa_size,
-			 BUS_SPACE_MAP_LINEAR, 0,
-			 &sc->sc_memh) != 0) {
+	if (sbus_bus_map(sc->sc_memt,
+			 sa->sa_slot,
+			 sa->sa_offset - TS102_REG_UCTRL_INT,
+			 sa->sa_size,
+			 BUS_SPACE_MAP_LINEAR, &sc->sc_memh) != 0) {
 		printf(": can't map registers\n");
 		return;
 	}
@@ -606,7 +607,7 @@ tctrl_set_lcd(what, which)
 	req.cmdbuf[4] = (u_int8_t)(~which>>8);
 	req.cmdbuf[1] = (u_int8_t)(~which&0xff);
 
-	/* XXX this thing is wierd.... */
+	/* XXX this thing is weird.... */
 	req.cmdlen = 3;
 	req.rsplen = 2;
 #if 0

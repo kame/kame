@@ -1,4 +1,4 @@
-/*	$NetBSD: uninorth.c,v 1.1 2000/02/03 19:27:46 tsubai Exp $	*/
+/*	$NetBSD: uninorth.c,v 1.4 2002/05/16 01:01:38 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -64,7 +64,7 @@ uninorth_match(parent, cf, aux)
 	if (strcmp(ca->ca_name, "pci") != 0)
 		return 0;
 
-	bzero(compat, sizeof(compat));
+	memset(compat, 0, sizeof(compat));
 	OF_getprop(ca->ca_node, "compatible", compat, sizeof(compat));
 	if (strcmp(compat, "uni-north") != 0)
 		return 0;
@@ -124,18 +124,19 @@ uninorth_attach(parent, self, aux)
 		volatile int *gmac_gbclock_en = (void *)0xf8000020;
 		char compat[32];
 
-		bzero(compat, sizeof(compat));
+		memset(compat, 0, sizeof(compat));
 		OF_getprop(child, "compatible", compat, sizeof(compat));
 		if (strcmp(compat, "gmac") == 0)
 			*gmac_gbclock_en |= 0x02;
 	}
 
-	bzero(&pba, sizeof(pba));
+	memset(&pba, 0, sizeof(pba));
 	pba.pba_busname = "pci";
 	pba.pba_memt = pc->memt;
 	pba.pba_iot = pc->iot;
 	pba.pba_dmat = &pci_bus_dma_tag;
 	pba.pba_bus = pc->bus;
+	pba.pba_bridgetag = NULL;
 	pba.pba_pc = pc;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 
@@ -180,12 +181,8 @@ uninorth_conf_read(pc, tag, reg)
 		panic("pci_conf_read: func > 7");
 
 	if (bus == pc->bus) {
-		if (dev < 11) {
-			if (reg == PCI_ID_REG)
-				return 0xffffffff;
-			else
-				panic("pci_conf_read: dev < 11");
-		}
+		if (dev < 11)
+			return 0xffffffff;
 		x = (1 << dev) | (func << 8) | reg;
 	} else
 		x = tag | reg | 1;

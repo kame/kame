@@ -1,4 +1,4 @@
-/*      $NetBSD: procfs_linux.c,v 1.2.4.1 2001/03/30 21:48:11 he Exp $      */
+/*      $NetBSD: procfs_linux.c,v 1.4 2001/12/09 03:07:44 chs Exp $      */
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -34,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: procfs_linux.c,v 1.4 2001/12/09 03:07:44 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,16 +78,16 @@ procfs_domeminfo(struct proc *curp, struct proc *p, struct pfsnode *pfs,
 		PGTOB(uvmexp.npages - uvmexp.free),
 		PGTOB(uvmexp.free),
 		0L,
-		0L,
-		0L,
+		PGTOB(uvmexp.filepages),
+		PGTOB(uvmexp.anonpages + uvmexp.filepages + uvmexp.execpages),
 		PGTOB(uvmexp.swpages),
 		PGTOB(uvmexp.swpginuse),
 		PGTOB(uvmexp.swpages - uvmexp.swpginuse),
 		PGTOKB(uvmexp.npages),
 		PGTOKB(uvmexp.free),
 		0L,
-		0L,
-		0L,
+		PGTOKB(uvmexp.filepages),
+		PGTOKB(uvmexp.anonpages + uvmexp.filepages + uvmexp.execpages),
 		PGTOKB(uvmexp.swpages),
 		PGTOKB(uvmexp.swpages - uvmexp.swpginuse));
 
@@ -124,16 +127,3 @@ procfs_docpuinfo(struct proc *curp, struct proc *p, struct pfsnode *pfs,
 		error = uiomove(cp, len, uio);
 	return error;
 }
-
-/*
- * XXX 1.5 branch only.
- */
-#ifndef __i386__
-int
-procfs_getcpuinfstr(char *buf, int *len)
-{
-	*len = 0;
-
-	return 0;
-}
-#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_vfsops.c,v 1.91.2.1 2000/12/14 23:37:22 he Exp $	*/
+/*	$NetBSD: nfs_vfsops.c,v 1.112.10.2 2002/07/29 15:00:57 lukem Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993, 1995
@@ -38,8 +38,12 @@
  *	@(#)nfs_vfsops.c	8.12 (Berkeley) 5/20/95
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_vfsops.c,v 1.112.10.2 2002/07/29 15:00:57 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
+#include "opt_nfs.h"
 #endif
 
 #include <sys/param.h>
@@ -55,7 +59,6 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 
@@ -84,11 +87,11 @@ int nfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
  * nfs vfs operations.
  */
 
-extern struct vnodeopv_desc nfsv2_vnodeop_opv_desc;
-extern struct vnodeopv_desc spec_nfsv2nodeop_opv_desc;
-extern struct vnodeopv_desc fifo_nfsv2nodeop_opv_desc;
+extern const struct vnodeopv_desc nfsv2_vnodeop_opv_desc;
+extern const struct vnodeopv_desc spec_nfsv2nodeop_opv_desc;
+extern const struct vnodeopv_desc fifo_nfsv2nodeop_opv_desc;
 
-struct vnodeopv_desc *nfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const nfs_vnodeopv_descs[] = {
 	&nfsv2_vnodeop_opv_desc,
 	&spec_nfsv2nodeop_opv_desc,
 	&fifo_nfsv2nodeop_opv_desc,
@@ -108,6 +111,7 @@ struct vfsops nfs_vfsops = {
 	nfs_fhtovp,
 	nfs_vptofh,
 	nfs_vfs_init,
+	nfs_vfs_reinit,
 	nfs_vfs_done,
 	nfs_sysctl,
 	nfs_mountroot,
@@ -140,23 +144,26 @@ nfs_statfs(mp, sbp, p)
 	int32_t t1, t2;
 	caddr_t bpos, dpos, cp2;
 	struct nfsmount *nmp = VFSTONFS(mp);
-	int error = 0, v3 = (nmp->nm_flag & NFSMNT_NFSV3), retattr;
+	int error = 0, retattr;
+#ifdef NFS_V2_ONLY
+	const int v3 = 0;
+#else
+	int v3 = (nmp->nm_flag & NFSMNT_NFSV3);
+#endif
 	struct mbuf *mreq, *mrep = NULL, *md, *mb, *mb2;
 	struct ucred *cred;
-	struct nfsnode *np;
 	u_quad_t tquad;
 
 #ifndef nolint
 	sfp = (struct nfs_statfs *)0;
 #endif
-	error = nfs_nget(mp, (nfsfh_t *)nmp->nm_fh, nmp->nm_fhsize, &np);
-	if (error)
-		return (error);
-	vp = NFSTOV(np);
+	vp = nmp->nm_vnode;
 	cred = crget();
 	cred->cr_ngroups = 0;
+#ifndef NFS_V2_ONLY
 	if (v3 && (nmp->nm_iflag & NFSMNT_GOTFSINFO) == 0)
 		(void)nfs_fsinfo(nmp, vp, cred, p);
+#endif
 	nfsstats.rpccnt[NFSPROC_FSSTAT]++;
 	nfsm_reqhead(vp, NFSPROC_FSSTAT, NFSX_FH(v3));
 	nfsm_fhtom(vp, v3);
@@ -202,11 +209,11 @@ nfs_statfs(mp, sbp, p)
 	}
 	strncpy(&sbp->f_fstypename[0], mp->mnt_op->vfs_name, MFSNAMELEN);
 	nfsm_reqdone;
-	vrele(vp);
 	crfree(cred);
 	return (error);
 }
 
+#ifndef NFS_V2_ONLY
 /*
  * nfs version 3 fsinfo rpc call
  */
@@ -272,6 +279,7 @@ nfs_fsinfo(nmp, vp, cred, p)
 	nfsm_reqdone;
 	return (error);
 }
+#endif
 
 /*
  * Mount a remote root fs via. NFS.  It goes like this:
@@ -430,8 +438,8 @@ nfs_decode_args(nmp, argp)
 	adjsock |= ((nmp->nm_flag & NFSMNT_NOCONN) !=
 		    (argp->flags & NFSMNT_NOCONN));
 
-	/* Update flags atomically.  Don't change the lock bits. */
-	nmp->nm_flag = argp->flags | nmp->nm_flag;
+	/* Update flags. */
+	nmp->nm_flag = argp->flags;
 	splx(s);
 
 	if ((argp->flags & NFSMNT_TIMEO) && argp->timeo > 0) {
@@ -448,12 +456,14 @@ nfs_decode_args(nmp, argp)
 			nmp->nm_retry = NFS_MAXREXMIT;
 	}
 
+#ifndef NFS_V2_ONLY
 	if (argp->flags & NFSMNT_NFSV3) {
 		if (argp->sotype == SOCK_DGRAM)
 			maxio = NFS_MAXDGRAMDATA;
 		else
 			maxio = NFS_MAXDATA;
 	} else
+#endif
 		maxio = NFS_V2MAXDATA;
 
 	if ((argp->flags & NFSMNT_WSIZE) && argp->wsize > 0) {
@@ -550,15 +560,21 @@ nfs_mount(mp, path, data, ndp, p)
 	struct nfs_args args;
 	struct mbuf *nam;
 	struct vnode *vp;
-	char pth[MNAMELEN], hst[MNAMELEN];
+	char *pth, *hst;
 	size_t len;
-	u_char nfh[NFSX_V3FHMAX];
+	u_char *nfh;
 
 	error = copyin(data, (caddr_t)&args, sizeof (struct nfs_args));
 	if (error)
 		return (error);
 	if (args.version != NFS_ARGSVERSION)
 		return (EPROGMISMATCH);
+#ifdef NFS_V2_ONLY
+	if (args.flags & NFSMNT_NQNFS)
+		return (EPROGUNAVAIL);
+	if (args.flags & NFSMNT_NFSV3)
+		return (EPROGMISMATCH);
+#endif
 	if (mp->mnt_flag & MNT_UPDATE) {
 		struct nfsmount *nmp = VFSTONFS(mp);
 
@@ -575,23 +591,36 @@ nfs_mount(mp, path, data, ndp, p)
 		nfs_decode_args(nmp, &args);
 		return (0);
 	}
+	if (args.fhsize < 0 || args.fhsize > NFSX_V3FHMAX)
+		return (EINVAL);
+	MALLOC(nfh, u_char *, NFSX_V3FHMAX, M_TEMP, M_WAITOK);
 	error = copyin((caddr_t)args.fh, (caddr_t)nfh, args.fhsize);
 	if (error)
 		return (error);
-	error = copyinstr(path, pth, MNAMELEN-1, &len);
+	MALLOC(pth, char *, MNAMELEN, M_TEMP, M_WAITOK);
+	error = copyinstr(path, pth, MNAMELEN - 1, &len);
 	if (error)
-		return (error);
+		goto free_nfh;
 	memset(&pth[len], 0, MNAMELEN - len);
-	error = copyinstr(args.hostname, hst, MNAMELEN-1, &len);
+	MALLOC(hst, char *, MNAMELEN, M_TEMP, M_WAITOK);
+	error = copyinstr(args.hostname, hst, MNAMELEN - 1, &len);
 	if (error)
-		return (error);
+		goto free_pth;
 	memset(&hst[len], 0, MNAMELEN - len);
 	/* sockargs() call must be after above copyin() calls */
 	error = sockargs(&nam, (caddr_t)args.addr, args.addrlen, MT_SONAME);
 	if (error)
-		return (error);
+		goto free_hst;
 	args.fh = nfh;
 	error = mountnfs(&args, mp, nam, pth, hst, &vp, p);
+
+free_hst:
+	FREE(hst, M_TEMP);
+free_pth:
+	FREE(pth, M_TEMP);
+free_nfh:
+	FREE(nfh, M_TEMP);
+
 	return (error);
 }
 
@@ -610,7 +639,7 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 	struct nfsmount *nmp;
 	struct nfsnode *np;
 	int error;
-	struct vattr attrs;
+	struct vattr *attrs;
 	struct ucred *cr;
 
 	/* 
@@ -619,7 +648,7 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 	 */
 
 	if (nfs_niothreads < 0) {
-		nfs_niothreads = 4;
+		nfs_niothreads = NFS_DEFAULT_NIOTHREADS;
 		nfs_getset_niothreads(TRUE);
 	}
 	
@@ -639,6 +668,7 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 	vfs_getnewfsid(mp);
 	nmp->nm_mountp = mp;
 
+#ifndef NFS_V2_ONLY
 	if (argp->flags & NFSMNT_NQNFS)
 		/*
 		 * We have to set mnt_maxsymlink to a non-zero value so
@@ -647,8 +677,11 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 		 * unsuspecting binaries).
 		 */
 		mp->mnt_maxsymlinklen = 1;
+#endif
 
+#ifndef NFS_V2_ONLY
 	if ((argp->flags & NFSMNT_NFSV3) == 0)
+#endif
 		/*
 		 * V2 can only handle 32 bit filesizes. For v3, nfs_fsinfo
 		 * will fill this in.
@@ -666,8 +699,6 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 	nmp->nm_deadthresh = NQ_DEADTHRESH;
 	CIRCLEQ_INIT(&nmp->nm_timerhead);
 	nmp->nm_inprog = NULLVP;
-	nmp->nm_fhsize = argp->fhsize;
-	memcpy((caddr_t)nmp->nm_fh, (caddr_t)argp->fh, argp->fhsize);
 #ifdef COMPAT_09
 	mp->mnt_stat.f_type = 2;
 #else
@@ -685,6 +716,9 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 
 	nfs_decode_args(nmp, argp);
 
+	mp->mnt_fs_bshift = ffs(MIN(nmp->nm_rsize, nmp->nm_wsize)) - 1;
+	mp->mnt_dev_bshift = DEV_BSHIFT;
+
 	/*
 	 * For Connection based sockets (TCP,...) defer the connect until
 	 * the first request, in case the server is not responding.
@@ -700,27 +734,33 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 	 * point.
 	 */
 	mp->mnt_stat.f_iosize = NFS_MAXDGRAMDATA;
+	error = nfs_nget(mp, (nfsfh_t *)argp->fh, argp->fhsize, &np);
+	if (error)
+		goto bad;
+	*vpp = NFSTOV(np);
+	MALLOC(attrs, struct vattr *, sizeof(struct vattr), M_TEMP, M_WAITOK);
+	VOP_GETATTR(*vpp, attrs, p->p_ucred, p);
+	if ((nmp->nm_flag & NFSMNT_NFSV3) && ((*vpp)->v_type == VDIR)) {
+		cr = crget();
+		cr->cr_uid = attrs->va_uid;
+		cr->cr_gid = attrs->va_gid;
+		cr->cr_ngroups = 0;
+		nfs_cookieheuristic(*vpp, &nmp->nm_iflag, p, cr);
+		crfree(cr);
+	}
+	FREE(attrs, M_TEMP);
+
 	/*
 	 * A reference count is needed on the nfsnode representing the
 	 * remote root.  If this object is not persistent, then backward
 	 * traversals of the mount point (i.e. "..") will not work if
 	 * the nfsnode gets flushed out of the cache. Ufs does not have
 	 * this problem, because one can identify root inodes by their
-	 * number == ROOTINO (2).
+	 * number == ROOTINO (2). So, just unlock, but no rele.
 	 */
-	error = nfs_nget(mp, (nfsfh_t *)nmp->nm_fh, nmp->nm_fhsize, &np);
-	if (error)
-		goto bad;
-	*vpp = NFSTOV(np);
-	VOP_GETATTR(*vpp, &attrs, p->p_ucred, p);
-	if ((nmp->nm_flag & NFSMNT_NFSV3) && ((*vpp)->v_type == VDIR)) {
-		cr = crget();
-		cr->cr_uid = attrs.va_uid;
-		cr->cr_gid = attrs.va_gid;
-		cr->cr_ngroups = 0;
-		nfs_cookieheuristic(*vpp, &nmp->nm_iflag, p, cr);
-		crfree(cr);
-	}
+
+	nmp->nm_vnode = *vpp;
+	VOP_UNLOCK(*vpp, 0);
 
 	return (0);
 bad:
@@ -740,7 +780,6 @@ nfs_unmount(mp, mntflags, p)
 	struct proc *p;
 {
 	struct nfsmount *nmp;
-	struct nfsnode *np;
 	struct vnode *vp;
 	int error, flags = 0;
 
@@ -761,10 +800,11 @@ nfs_unmount(mp, mntflags, p)
 	 * the remote root.  See comment in mountnfs().  The VFS unmount()
 	 * has done vput on this vnode, otherwise we would get deadlock!
 	 */
-	error = nfs_nget(mp, (nfsfh_t *)nmp->nm_fh, nmp->nm_fhsize, &np);
-	if (error)
-		return(error);
-	vp = NFSTOV(np);
+	vp = nmp->nm_vnode;
+	error = vget(vp, LK_EXCLUSIVE | LK_RETRY);
+	if (error != 0)
+		return error;
+
 	if ((mntflags & MNT_FORCE) == 0 && vp->v_usecount > 2) {
 		vput(vp);
 		return (EBUSY);
@@ -791,10 +831,11 @@ nfs_unmount(mp, mntflags, p)
 	nmp->nm_iflag |= NFSMNT_DISMNT;
 
 	/*
-	 * There are two reference counts to get rid of here.
+	 * There are two reference counts to get rid of here
+	 * (see comment in mountnfs()).
 	 */
 	vrele(vp);
-	vrele(vp);
+	vput(vp);
 	vgone(vp);
 	nfs_disconnect(nmp);
 	m_freem(nmp->nm_nam);
@@ -817,14 +858,13 @@ nfs_root(mp, vpp)
 {
 	struct vnode *vp;
 	struct nfsmount *nmp;
-	struct nfsnode *np;
 	int error;
 
 	nmp = VFSTONFS(mp);
-	error = nfs_nget(mp, (nfsfh_t *)nmp->nm_fh, nmp->nm_fhsize, &np);
-	if (error)
-		return (error);
-	vp = NFSTOV(np);
+	vp = nmp->nm_vnode;
+	error = vget(vp, LK_EXCLUSIVE | LK_RETRY);
+	if (error != 0)
+		return error;
 	if (vp->v_type == VNON)
 		vp->v_type = VDIR;
 	vp->v_flag = VROOT;
@@ -861,8 +901,9 @@ loop:
 		 */
 		if (vp->v_mount != mp)
 			goto loop;
-		if (VOP_ISLOCKED(vp) || vp->v_dirtyblkhd.lh_first == NULL ||
-		    waitfor == MNT_LAZY)
+		if (waitfor == MNT_LAZY || VOP_ISLOCKED(vp) ||
+		    (LIST_EMPTY(&vp->v_dirtyblkhd) &&
+		     vp->v_uobj.uo_npages == 0))
 			continue;
 		if (vget(vp, LK_EXCLUSIVE))
 			goto loop;

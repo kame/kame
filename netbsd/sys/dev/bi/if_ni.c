@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ni.c,v 1.5 2000/06/05 00:09:17 matt Exp $ */
+/*	$NetBSD: if_ni.c,v 1.14 2001/11/13 12:51:34 lukem Exp $ */
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -35,6 +35,9 @@
  *	Collect statistics.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ni.c,v 1.14 2001/11/13 12:51:34 lukem Exp $");
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -44,6 +47,7 @@
 #include <sys/device.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
+#include <sys/sched.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
@@ -202,7 +206,7 @@ ni_getpgs(struct ni_softc *sc, int size, caddr_t *v, paddr_t *p)
 
 	if (p)
 		*p = seg.ds_addr;
-	bzero(*v, size);
+	memset(*v, 0, size);
 }
 
 static int
@@ -288,6 +292,7 @@ niattach(parent, self, aux)
 	ifp->if_start = nistart;
 	ifp->if_ioctl = niioctl;
 	ifp->if_watchdog = nitimeout;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Start init sequence.
@@ -343,7 +348,7 @@ niattach(parent, self, aux)
 #if NBPG < 4096
 #error pagesize too small
 #endif
-	s = splimp();
+	s = splvm();
 	/* Set up message free queue */
 	ni_getpgs(sc, NMSGBUF * 512, &va, 0);
 	for (i = 0; i < NMSGBUF; i++) {
@@ -451,7 +456,7 @@ retry:	WAITREG(NI_PCR, PCR_OWN);
 	msg->nm_len = 18;
 	msg->nm_opcode2 = NI_STPTDB;
 	ptdb = (struct ni_ptdb *)&msg->nm_text[0];
-	bzero(ptdb, sizeof(struct ni_ptdb));
+	memset(ptdb, 0, sizeof(struct ni_ptdb));
 	ptdb->np_index = 1;
 	ptdb->np_fque = 1;
 
@@ -475,10 +480,6 @@ retry:	WAITREG(NI_PCR, PCR_OWN);
 	if (shutdownhook_establish(ni_shutdown, sc) == 0)
 		printf("%s: WARNING: unable to establish shutdown hook\n",
 		    sc->sc_dev.dv_xname);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 }
 
 /*
@@ -524,16 +525,17 @@ nistart(ifp)
 #endif
 
 	while (fqb->nf_dforw) {
-		IF_DEQUEUE(&sc->sc_if.if_snd, m);
+		IFQ_POLL(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 
 		data = REMQHI(&fqb->nf_dforw);
 		if ((int)data == Q_EMPTY) {
-			IF_PREPEND(&sc->sc_if.if_snd, m);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 
 		/*
 		 * Count number of mbufs in chain.
@@ -590,7 +592,6 @@ nistart(ifp)
 void
 niintr(void *arg)
 {
-	struct ether_header *eh;
 	struct ni_softc *sc = arg;
 	struct ni_dg *data;
 	struct ni_msg *msg;
@@ -605,6 +606,7 @@ niintr(void *arg)
 	if ((NI_RREG(NI_PSR) & PSR_ERR))
 		printf("%s: PSR %x\n", sc->sc_dev.dv_xname, NI_RREG(NI_PSR));
 
+	KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 	/* Got any response packets?  */
 	while ((NI_RREG(NI_PSR) & PSR_RSQ) && (data = REMQHI(&gvp->nc_forwr))) {
 
@@ -613,7 +615,8 @@ niintr(void *arg)
 			idx = data->bufs[0]._index;
 			bd = &bbd[idx];
 			m = (void *)data->nd_cmdref;
-			m->m_pkthdr.len = m->m_len = data->bufs[0]._len;
+			m->m_pkthdr.len = m->m_len =
+			    data->bufs[0]._len - ETHER_CRC_LEN;
 			m->m_pkthdr.rcvif = ifp;
 			if (ni_add_rxbuf(sc, data, idx)) {
 				bd->nb_len = (m->m_ext.ext_size - 2);
@@ -633,18 +636,8 @@ niintr(void *arg)
 				break; /* Out of mbufs */
 
 #if NBPFILTER > 0
-			eh = mtod(m, struct ether_header *);
-			if (ifp->if_bpf) {
+			if (ifp->if_bpf)
 				bpf_mtap(ifp->if_bpf, m);
-				if ((ifp->if_flags & IFF_PROMISC) != 0
-				    && bcmp(LLADDR(ifp->if_sadl),
-				    eh->ether_dhost,
-				    ETHER_ADDR_LEN) != 0 &&
-				    ((eh->ether_dhost[0] & 1) == 0)) {
-					m_freem(m);
-					continue;
-				}
-			}
 #endif
 			(*ifp->if_input)(ifp, m);
 			break;
@@ -664,7 +657,7 @@ niintr(void *arg)
 			msg = (struct ni_msg *)data;
 			switch (msg->nm_opcode2) {
 				case NI_WPARAM:
-					bcopy(((struct ni_param *)&msg->nm_text[0])->np_dpa, sc->sc_enaddr, ETHER_ADDR_LEN);
+					memcpy(sc->sc_enaddr, ((struct ni_param *)&msg->nm_text[0])->np_dpa, ETHER_ADDR_LEN);
 					endwait = 1;
 					break;
 
@@ -699,6 +692,7 @@ niintr(void *arg)
 	nistart(ifp);
 
 	NI_WREG(NI_PSR, NI_RREG(NI_PSR) & ~(PSR_OWN|PSR_RSQ));
+	KERNEL_UNLOCK();
 }
 
 /*
@@ -832,7 +826,7 @@ ni_setup(struct ni_softc *sc)
 		return; /* What to do? */
 
 	ptdb = (struct ni_ptdb *)&msg->nm_text[0];
-	bzero(ptdb, sizeof(struct ni_ptdb));
+	memset(ptdb, 0, sizeof(struct ni_ptdb));
 
 	msg->nm_opcode = BVP_MSG;
 	msg->nm_len = 18;
@@ -859,7 +853,7 @@ ni_setup(struct ni_softc *sc)
 				}
 				msg->nm_len += 8;
 				ptdb->np_adrlen++;
-				bcopy(enm->enm_addrlo, ptdb->np_mcast[i++],
+				memcpy(ptdb->np_mcast[i++], enm->enm_addrlo,
 				    ETHER_ADDR_LEN);
 				ETHER_NEXT_MULTI(step, enm);
 			}

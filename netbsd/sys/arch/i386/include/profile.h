@@ -1,4 +1,4 @@
-/*	$NetBSD: profile.h,v 1.14 2000/01/22 22:46:56 mycroft Exp $	*/
+/*	$NetBSD: profile.h,v 1.16 2001/11/30 06:53:56 enami Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -58,19 +58,16 @@ mcount()								\
 	 *								\
 	 * selfpc = pc pushed by mcount call				\
 	 */								\
-	__asm__("movl 4(%%ebp),%0" : "=r" (selfpc));			\
+	__asm__ __volatile__("movl 4(%%ebp),%0" : "=r" (selfpc));	\
 	/*								\
 	 * frompcindex = pc pushed by call into self.			\
 	 */								\
-	__asm__("movl (%%ebp),%0;movl 4(%0),%0" : "=r" (frompcindex));	\
+	__asm__ __volatile__("movl (%%ebp),%0;movl 4(%0),%0"		\
+	    : "=r" (frompcindex));					\
 	_mcount((u_long)frompcindex, (u_long)selfpc);			\
 }
 
 #ifdef _KERNEL
-/*
- * Note that we assume splhigh() and splx() cannot call mcount()
- * recursively.
- */
-#define	MCOUNT_ENTER	s = splhigh()
-#define	MCOUNT_EXIT	splx(s)
+#define	MCOUNT_ENTER	(void)&s; __asm__("cli");
+#define	MCOUNT_EXIT	__asm__("sti");
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$NetBSD: coda_venus.c,v 1.7 1998/11/18 03:09:20 ross Exp $	*/
+/*	$NetBSD: coda_venus.c,v 1.12 2002/03/27 05:10:40 phil Exp $	*/
 
 /*
  * 
@@ -30,6 +30,9 @@
  * 
  * 	@(#) coda/coda_venus.c,v 1.1.1.1 1998/08/29 21:26:45 rvb Exp $ 
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: coda_venus.c,v 1.12 2002/03/27 05:10:40 phil Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -101,7 +104,7 @@
 	      (in)->cred.cr_uid = ident->cr_uid;              \
 	      (in)->cred.cr_groupid = ident->cr_gid;          \
           } else {                                            \
-	      bzero(&((in)->cred),sizeof(struct coda_cred));  \
+	      memset(&((in)->cred), 0, sizeof(struct coda_cred)); \
 	      (in)->cred.cr_uid = -1;                         \
 	      (in)->cred.cr_groupid = -1;                     \
           }                                                   \
@@ -413,7 +416,7 @@ venus_lookup(void *mdp, ViceFid *fid,
     /* NOTE:
      * Between version 1 and version 2 we have added an extra flag field
      * to this structure.  But because the string was at the end and because
-     * of the wierd way we represent strings by having the slot point to
+     * of the weird way we represent strings by having the slot point to
      * where the string characters are in the "heap", we can just slip the
      * flag parameter in after the string slot pointer and veni that don't
      * know better won't see this new flag field ...
@@ -634,6 +637,25 @@ venus_readdir(void *mdp, ViceFid *fid,
     }
 
     CODA_FREE(inp, coda_readdir_size);
+    return error;
+}
+
+int
+venus_statfs(void *mdp, struct ucred *cred, struct proc *p,
+   /*out*/   struct coda_statfs *fsp)
+{
+    DECL(coda_statfs);			/* sets Isize & Osize */
+    ALLOC(coda_statfs);			/* sets inp & outp */
+
+    /* send the open to venus. */
+    INIT_IN(&inp->ih, CODA_STATFS, cred, p);
+
+    error = coda_call(mdp, Isize, &Osize, (char *)inp);
+    if (!error) {
+        *fsp = outp->stat;
+    }
+
+    CODA_FREE(inp, coda_statfs_size);
     return error;
 }
 

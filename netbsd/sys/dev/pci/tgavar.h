@@ -1,4 +1,4 @@
-/* $NetBSD: tgavar.h,v 1.9 2000/04/20 05:25:20 nathanw Exp $ */
+/* $NetBSD: tgavar.h,v 1.12 2001/12/12 07:50:05 elric Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -76,7 +76,6 @@ struct tga_devconfig {
 		    *dc_ramdac_cookie;	/* the RAMDAC type; see above */
 
 	vaddr_t dc_vaddr;		/* memory space virtual base address */
-	paddr_t dc_paddr;		/* memory space physical base address */
 
 	int	    dc_wid;		/* width of frame buffer */
 	int	    dc_ht;		/* height of frame buffer */
@@ -110,13 +109,16 @@ struct tga_softc {
 #define	TGA_TYPE_T32_04		4	/* 32bpp, 4MB */
 #define	TGA_TYPE_T32_08		5	/* 32bpp, 8MB */
 #define	TGA_TYPE_T32_88		6	/* 32bpp, 16MB */
-#define	TGA_TYPE_UNKNOWN	7	/* unknown */
+#define	TGA_TYPE_POWERSTORM_4D20	7	/* unknown */
+#define	TGA_TYPE_UNKNOWN	8	/* unknown */
 
 #define	DEVICE_IS_TGA(class, id)					\
 	    (((PCI_VENDOR(id) == PCI_VENDOR_DEC &&			\
 	       PCI_PRODUCT(id) == PCI_PRODUCT_DEC_21030) ||		\
 	       PCI_PRODUCT(id) == PCI_PRODUCT_DEC_PBXGB) ? 10 : 0)
 
+int tga_cnmatch __P((bus_space_tag_t, bus_space_tag_t, pci_chipset_tag_t,
+		    pcitag_t));
 int tga_cnattach __P((bus_space_tag_t, bus_space_tag_t, pci_chipset_tag_t,
 		      int, int, int));
 

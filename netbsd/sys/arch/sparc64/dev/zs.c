@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.21.2.1 2000/07/18 16:23:21 mrg Exp $	*/
+/*	$NetBSD: zs.c,v 1.34 2002/03/21 01:19:41 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -45,6 +45,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,7 +61,6 @@
 
 #include <machine/autoconf.h>
 #include <machine/openfirm.h>
-#include <machine/bsd_openprom.h>
 #include <machine/conf.h>
 #include <machine/cpu.h>
 #include <machine/eeprom.h>
@@ -69,11 +69,13 @@
 
 #include <dev/cons.h>
 #include <dev/ic/z8530reg.h>
+#include <dev/sun/kbd_ms_ttyvar.h>
 #include <ddb/db_output.h>
 
 #include <sparc64/dev/cons.h>
 
 #include "kbd.h"	/* NKBD */
+#include "ms.h"		/* NMS */
 #include "zs.h" 	/* NZS */
 
 /* Make life easier for the initialized arrays here. */
@@ -177,7 +179,7 @@ extern int fbnode;
 /* Interrupt handlers. */
 int zscheckintr __P((void *));
 static int zshard __P((void *));
-static int zssoft __P((void *));
+static void zssoft __P((void *));
 
 static int zs_get_speed __P((struct zs_chanstate *));
 
@@ -213,6 +215,7 @@ zs_attach_mainbus(parent, self, aux)
 {
 	struct zsc_softc *zsc = (void *) self;
 	struct sbus_attach_args *sa = aux;
+	bus_space_handle_t bh;
 	int zs_unit = zsc->zsc_dev.dv_unit;
 
 	if (sa->sa_nintr == 0) {
@@ -220,7 +223,7 @@ zs_attach_mainbus(parent, self, aux)
 		return;
 	}
 
-	/* Use the mapping setup by the Sun PROM. */
+	/* Use the mapping setup by the Sun PROM if possible. */
 	if (zsaddr[zs_unit] == NULL) {
 		/* Only map registers once. */
 		if (sa->sa_npromvaddrs) {
@@ -234,28 +237,27 @@ zs_attach_mainbus(parent, self, aux)
 			 * high 4GB range, this needs to be changed to
 			 * sign-extend the address.
 			 */
-			zsaddr[zs_unit] = 
-				(struct zsdevice *)
-				(uintptr_t)sa->sa_promvaddrs[0];
+			sparc_promaddr_to_handle(sa->sa_bustag,
+				sa->sa_promvaddrs[0], &bh);
+
 		} else {
-			bus_space_handle_t kvaddr;
 
 			if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
 					 sa->sa_offset,
 					 sa->sa_size,
 					 BUS_SPACE_MAP_LINEAR,
-					 0, &kvaddr) != 0) {
+					 &bh) != 0) {
 				printf("%s @ sbus: cannot map registers\n",
 				       self->dv_xname);
 				return;
 			}
-			zsaddr[zs_unit] = (struct zsdevice *)
-				(uintptr_t)kvaddr;
 		}
+		zsaddr[zs_unit] = (struct zsdevice *)
+			bus_space_vaddr(sa->sa_bustag, bh);
 	}
 	zsc->zsc_bustag = sa->sa_bustag;
 	zsc->zsc_dmatag = sa->sa_dmatag;
-	zsc->zsc_promunit = getpropint(sa->sa_node, "slave", -2);
+	zsc->zsc_promunit = PROM_getpropint(sa->sa_node, "slave", -2);
 	zsc->zsc_node = sa->sa_node;
 	zs_attach(zsc, zsaddr[zs_unit], sa->sa_pri);
 }
@@ -288,6 +290,8 @@ zs_attach(zsc, zsd, pri)
 	 */
 	for (channel = 0; channel < 2; channel++) {
 		struct zschan *zc;
+		struct device *child;
+		extern struct cfdriver zstty_cd; /* in ioconf.c */
 
 		zsc_args.channel = channel;
 		cs = &zsc->zsc_cs_store[channel];
@@ -300,6 +304,7 @@ zs_attach(zsc, zsd, pri)
 
 		zc = (channel == 0) ? &zsd->zs_chan_a : &zsd->zs_chan_b;
 
+		zsc_args.consdev = NULL;
 		zsc_args.hwflags = zs_console_flags(zsc->zsc_promunit,
 						    zsc->zsc_node,
 						    channel);
@@ -315,8 +320,8 @@ zs_attach(zsc, zsd, pri)
 		if ((zsc_args.hwflags & ZS_HWFLAG_CONSOLE_OUTPUT) != 0) {
 			zs_conschan_put = zc;
 		}
-		/* Childs need to set cn_dev, etc */
 
+		/* Children need to set cn_dev, etc */
 		cs->cs_reg_csr  = &zc->zc_csr;
 		cs->cs_reg_data = &zc->zc_data;
 
@@ -346,14 +351,52 @@ zs_attach(zsc, zsd, pri)
 		 * Look for a child driver for this channel.
 		 * The child attach will setup the hardware.
 		 */
-		if (!config_found(&zsc->zsc_dev, (void *)&zsc_args, zs_print)) {
+		if (!(child = 
+		      config_found(&zsc->zsc_dev, (void *)&zsc_args, zs_print))) {
 			/* No sub-driver.  Just reset it. */
 			u_char reset = (channel == 0) ?
 				ZSWR9_A_RESET : ZSWR9_B_RESET;
 			s = splzs();
 			zs_write_reg(cs,  9, reset);
 			splx(s);
+		} 
+#if (NKBD > 0) || (NMS > 0)
+		/* 
+		 * If this was a zstty it has a keyboard
+		 * property on it we need to attach the
+		 * sunkbd and sunms line disciplines.
+		 */
+		if (child 
+		    && (child->dv_cfdata->cf_driver == &zstty_cd) 
+		    && (PROM_getproplen(zsc->zsc_node, "keyboard") == 0)) {
+			struct kbd_ms_tty_attach_args kma;
+			struct zstty_softc {	
+				/* The following are the only fields we need here */
+				struct	device zst_dev;
+				struct  tty *zst_tty;
+				struct	zs_chanstate *zst_cs;
+			} *zst = (struct zstty_softc *)child;
+			struct tty *tp;
+
+			kma.kmta_tp = tp = zst->zst_tty;
+			kma.kmta_dev = tp->t_dev;
+			kma.kmta_consdev = zsc_args.consdev;
+			
+			/* Attach 'em if we got 'em. */
+#if (NKBD > 0)
+			if (channel == 0) {
+				kma.kmta_name = "keyboard";
+				config_found(child, (void *)&kma, NULL);
+			}
+#endif
+#if (NMS > 0)
+			if (channel == 1) {
+				kma.kmta_name = "mouse";
+				config_found(child, (void *)&kma, NULL);
+			}
+#endif
 		}
+#endif
 	}
 
 	/*
@@ -381,18 +424,6 @@ zs_attach(zsc, zsd, pri)
 	zs_write_reg(cs, 9, zs_init_reg[9]);
 	splx(s);
 
-#if 0
-	/*
-	 * XXX: L1A hack - We would like to be able to break into
-	 * the debugger during the rest of autoconfiguration, so
-	 * lower interrupts just enough to let zs interrupts in.
-	 * This is done after both zs devices are attached.
-	 */
-	if (zsc->zsc_promunit == 1) {
-		printf("zs1: enabling zs interrupts\n");
-		(void)splfd(); /* XXX: splzs - 1 */
-	}
-#endif
 }
 
 static int
@@ -458,7 +489,7 @@ zscheckintr(arg)
 /*
  * We need this only for TTY_DEBUG purposes.
  */
-static int
+static void
 zssoft(arg)
 	void *arg;
 {
@@ -482,7 +513,6 @@ zssoft(arg)
 	}
 #endif
 	splx(s);
-	return (1);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.24 2000/06/01 15:38:27 matt Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.27.2.1 2002/06/24 04:56:33 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman
@@ -31,6 +31,7 @@
  */
 
 #include "opt_compat_netbsd.h"
+#include "scsibus.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -72,8 +73,6 @@ int x68k_realconfig;
 void
 cpu_configure()
 {
-	extern int x68k_realconfig;
-	
 	x68k_realconfig = 1;
 
 	if (config_rootfound("mainbus", "mainbus") == NULL)
@@ -118,7 +117,6 @@ x68k_config_found(pcfp, pdp, auxp, pfn)
 {
 	struct device temp;
 	struct cfdata *cf;
-	extern int x68k_realconfig;
 
 	if (x68k_realconfig)
 		return(config_found(pdp, auxp, pfn) != NULL);
@@ -240,11 +238,12 @@ static struct device *
 scsi_find(bdev)
 	dev_t bdev;	/* encoded boot device */
 {
+#if defined(NSCSIBUS) && NSCSIBUS > 0
 	int ifid;
 	char tname[16];
 	struct device *scsibus;
 	struct scsibus_softc *sbsc;
-	struct scsipi_link *sc_link;
+	struct scsipi_periph *periph;
 
 	ifid = B_X68K_SCSI_IF(bdev);
 	if (ifid >= sizeof name_scsiif/sizeof name_scsiif[0] ||
@@ -278,9 +277,13 @@ scsi_find(bdev)
 	if (!scsibus)
 		return NULL;
 	sbsc = (struct scsibus_softc *) scsibus;
-	sc_link = sbsc->sc_link[B_X68K_SCSI_ID(bdev)][B_X68K_SCSI_LUN(bdev)];
+	periph = scsipi_lookup_periph(sbsc->sc_channel,
+	    B_X68K_SCSI_ID(bdev), B_X68K_SCSI_LUN(bdev));
 
-	return sc_link ? sc_link->device_softc : NULL;
+	return periph ? periph->periph_dev : NULL;
+#else
+	return NULL;
+#endif /* NSCSIBUS > 0 */
 }
 
 /*

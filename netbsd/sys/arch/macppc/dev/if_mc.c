@@ -1,4 +1,4 @@
-/*	$NetBSD: if_mc.c,v 1.2 1998/05/30 06:16:06 tsubai Exp $	*/
+/*	$NetBSD: if_mc.c,v 1.5 2001/07/22 11:29:46 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997 David Huang <khym@bga.com>
@@ -45,7 +45,7 @@
 #include <net/if_ether.h>
 #include <net/if_media.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/ofw/openfirm.h>
 
@@ -68,6 +68,7 @@ hide void	mc_reset_txdma __P((struct mc_softc *sc));
 hide void	mc_select_utp __P((struct mc_softc *sc));
 hide void	mc_select_aui __P((struct mc_softc *sc));
 hide int	mc_mediachange __P((struct mc_softc *sc));
+hide void	mc_mediastatus __P((struct mc_softc *sc, struct ifmediareq *));
 
 int mc_supmedia[] = {
 	IFM_ETHER | IFM_10_T,
@@ -127,8 +128,8 @@ mc_attach(parent, self, aux)
 	sc->sc_tail = 0;
 	sc->sc_txdmacmd = dbdma_alloc(sizeof(dbdma_command_t) * 2);
 	sc->sc_rxdmacmd = (void *)dbdma_alloc(sizeof(dbdma_command_t) * 8);
-	bzero(sc->sc_txdmacmd, sizeof(dbdma_command_t) * 2);
-	bzero(sc->sc_rxdmacmd, sizeof(dbdma_command_t) * 8);
+	memset(sc->sc_txdmacmd, 0, sizeof(dbdma_command_t) * 2);
+	memset(sc->sc_rxdmacmd, 0, sizeof(dbdma_command_t) * 8);
 
 	printf(": irq %d,%d,%d",
 		ca->ca_intr[0], ca->ca_intr[1], ca->ca_intr[2]);
@@ -141,7 +142,7 @@ mc_attach(parent, self, aux)
 	/* allocate memory for transmit buffer and mark it non-cacheable */
 	sc->sc_txbuf = malloc(NBPG, M_DEVBUF, M_WAITOK);
 	sc->sc_txbuf_phys = kvtop(sc->sc_txbuf);
-	bzero(sc->sc_txbuf, NBPG);
+	memset(sc->sc_txbuf, 0, NBPG);
 
 	/*
 	 * allocate memory for receive buffer and mark it non-cacheable
@@ -153,7 +154,7 @@ mc_attach(parent, self, aux)
 	 */
 	sc->sc_rxbuf = malloc(MC_NPAGES * NBPG, M_DEVBUF, M_WAITOK);
 	sc->sc_rxbuf_phys = kvtop(sc->sc_rxbuf);
-	bzero(sc->sc_rxbuf, MC_NPAGES * NBPG);
+	memset(sc->sc_rxbuf, 0, MC_NPAGES * NBPG);
 
 	if ((int)sc->sc_txbuf & PGOFSET)
 		printf("txbuf is not page-aligned\n");
@@ -228,7 +229,6 @@ mc_dmaintr(arg)
 	int status, offset, statoff;
 	int datalen, resid;
 	int i, n;
-	u_int maccc;
 	dbdma_command_t *cmd;
 
 	/* We've received some packets from the MACE */

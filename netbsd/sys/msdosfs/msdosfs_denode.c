@@ -1,4 +1,4 @@
-/*	$NetBSD: msdosfs_denode.c,v 1.44 2000/05/28 04:13:57 mycroft Exp $	*/
+/*	$NetBSD: msdosfs_denode.c,v 1.55.8.1 2002/06/05 03:26:27 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1994, 1995, 1997 Wolfgang Solfrank.
@@ -47,6 +47,9 @@
  * October 1992
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: msdosfs_denode.c,v 1.55.8.1 2002/06/05 03:26:27 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mount.h>
@@ -59,8 +62,6 @@
 #include <sys/dirent.h>
 #include <sys/namei.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <msdosfs/bpb.h>
@@ -69,14 +70,22 @@
 #include <msdosfs/denode.h>
 #include <msdosfs/fat.h>
 
-struct denode **dehashtbl;
+LIST_HEAD(ihashhead, denode) *dehashtbl;
 u_long dehash;			/* size of hash table - 1 */
-#define	DEHASH(dev, dcl, doff)	(((dev) + (dcl) + (doff) / sizeof(struct direntry)) \
-				 & dehash)
+#define	DEHASH(dev, dcl, doff) \
+    (((dev) + (dcl) + (doff) / sizeof(struct direntry)) & dehash)
 
 struct simplelock msdosfs_ihash_slock;
 
 struct pool msdosfs_denode_pool;
+
+extern int prtactive;
+
+struct genfs_ops msdosfs_genfsops = {
+	genfs_size,
+	msdosfs_gop_alloc,
+	genfs_gop_write,
+};
 
 static struct denode *msdosfs_hashget __P((dev_t, u_long, u_long));
 static void msdosfs_hashins __P((struct denode *));
@@ -85,11 +94,43 @@ static void msdosfs_hashrem __P((struct denode *));
 void
 msdosfs_init()
 {
-	dehashtbl = hashinit(desiredvnodes/2, M_MSDOSFSMNT, M_WAITOK, &dehash);
+	dehashtbl = hashinit(desiredvnodes / 2, HASH_LIST, M_MSDOSFSMNT,
+	    M_WAITOK, &dehash);
 	simple_lock_init(&msdosfs_ihash_slock);
 	pool_init(&msdosfs_denode_pool, sizeof(struct denode), 0, 0, 0,
-	    "msdosnopl", 0, pool_page_alloc_nointr, pool_page_free_nointr,
-	    M_MSDOSFSNODE);
+	    "msdosnopl", &pool_allocator_nointr);
+}
+
+/*
+ * Reinitialize inode hash table.
+ */
+
+void
+msdosfs_reinit()
+{
+	struct denode *dep;
+	struct ihashhead *oldhash, *hash;
+	u_long oldmask, mask, val;
+	int i;
+
+	hash = hashinit(desiredvnodes / 2, HASH_LIST, M_MSDOSFSMNT, M_WAITOK,
+	    &mask);
+
+	simple_lock(&msdosfs_ihash_slock);
+	oldhash = dehashtbl;
+	oldmask = dehash;
+	dehashtbl = hash;
+	dehash = mask;
+	for (i = 0; i <= oldmask; i++) {
+		while ((dep = LIST_FIRST(&oldhash[i])) != NULL) {
+			LIST_REMOVE(dep, de_hash);
+			val = DEHASH(dep->de_dev, dep->de_dirclust,
+			    dep->de_diroffset);
+			LIST_INSERT_HEAD(&hash[val], dep, de_hash);
+		}
+	}
+	simple_unlock(&msdosfs_ihash_slock);
+	hashdone(oldhash, M_MSDOSFSMNT);
 }
 
 void
@@ -110,8 +151,7 @@ msdosfs_hashget(dev, dirclust, diroff)
 
 loop:
 	simple_lock(&msdosfs_ihash_slock);
-	for (dep = dehashtbl[DEHASH(dev, dirclust, diroff)]; dep;
-	     dep = dep->de_next) {
+	LIST_FOREACH(dep, &dehashtbl[DEHASH(dev, dirclust, diroff)], de_hash) {
 		if (dirclust == dep->de_dirclust &&
 		    diroff == dep->de_diroffset &&
 		    dev == dep->de_dev &&
@@ -132,16 +172,13 @@ static void
 msdosfs_hashins(dep)
 	struct denode *dep;
 {
-	struct denode **depp, *deq;
+	struct ihashhead *depp;
+	int val;
 
-	/* XXX use queue macros here */
 	simple_lock(&msdosfs_ihash_slock);
-	depp = &dehashtbl[DEHASH(dep->de_dev, dep->de_dirclust, dep->de_diroffset)];
-	if ((deq = *depp) != NULL)
-		deq->de_prev = &dep->de_next;
-	dep->de_next = deq;
-	dep->de_prev = depp;
-	*depp = dep;
+	val = DEHASH(dep->de_dev, dep->de_dirclust, dep->de_diroffset);
+	depp = &dehashtbl[val];
+	LIST_INSERT_HEAD(depp, dep, de_hash);
 	simple_unlock(&msdosfs_ihash_slock);
 }
 
@@ -149,17 +186,8 @@ static void
 msdosfs_hashrem(dep)
 	struct denode *dep;
 {
-	struct denode *deq;
-
-	/* XXX use queue macros here */
 	simple_lock(&msdosfs_ihash_slock);
-	if ((deq = dep->de_next) != NULL)
-		deq->de_prev = dep->de_prev;
-	*dep->de_prev = deq;
-#ifdef DIAGNOSTIC
-	dep->de_next = NULL;
-	dep->de_prev = NULL;
-#endif
+	LIST_REMOVE(dep, de_hash);
 	simple_unlock(&msdosfs_ihash_slock);
 }
 
@@ -231,7 +259,7 @@ deget(pmp, dirclust, diroffset, depp)
 		return (error);
 	}
 	ldep = pool_get(&msdosfs_denode_pool, PR_WAITOK);
-	memset((caddr_t)ldep, 0, sizeof *ldep);
+	memset(ldep, 0, sizeof *ldep);
 	nvp->v_data = ldep;
 	ldep->de_vnode = nvp;
 	ldep->de_flag = 0;
@@ -322,8 +350,10 @@ deget(pmp, dirclust, diroffset, depp)
 		}
 	} else
 		nvp->v_type = VREG;
+	genfs_node_init(nvp, &msdosfs_genfsops);
 	VREF(ldep->de_devvp);
 	*depp = ldep;
+	nvp->v_size = ldep->de_FileSize;
 	return (0);
 }
 
@@ -416,27 +446,22 @@ detrunc(dep, length, flags, cred, p)
 			bn = cntobn(pmp, eofentry);
 			error = bread(pmp->pm_devvp, bn, pmp->pm_bpcluster,
 			    NOCRED, &bp);
-		} else {
-			bn = de_blk(pmp, length);
-			error = bread(DETOV(dep), bn, pmp->pm_bpcluster,
-			    NOCRED, &bp);
-		}
-		if (error) {
-			brelse(bp);
+			if (error) {
+				brelse(bp);
 #ifdef MSDOSFS_DEBUG
-			printf("detrunc(): bread fails %d\n", error);
+				printf("detrunc(): bread fails %d\n", error);
 #endif
-			return (error);
+				return (error);
+			}
+			memset(bp->b_data + boff, 0, pmp->pm_bpcluster - boff);
+			if (flags & IO_SYNC)
+				bwrite(bp);
+			else
+				bdwrite(bp);
+		} else {
+			uvm_vnp_zerorange(DETOV(dep), length,
+					  pmp->pm_bpcluster - boff);
 		}
-		uvm_vnp_uncache(DETOV(dep));	/* what's this for? */
-		/*
-		 * is this the right place for it?
-		 */
-		memset(bp->b_data + boff, 0, pmp->pm_bpcluster - boff);
-		if (flags & IO_SYNC)
-			bwrite(bp);
-		else
-			bdwrite(bp);
 	}
 
 	/*
@@ -490,7 +515,7 @@ deextend(dep, length, cred)
 	struct ucred *cred;
 {
 	struct msdosfsmount *pmp = dep->de_pmp;
-	u_long count;
+	u_long count, osize;
 	int error;
 
 	/*
@@ -523,8 +548,12 @@ deextend(dep, length, cred)
 		}
 	}
 
+	osize = dep->de_FileSize;
 	dep->de_FileSize = length;
+	uvm_vnp_setsize(DETOV(dep), (voff_t)dep->de_FileSize);
 	dep->de_flag |= DE_UPDATE|DE_MODIFIED;
+	uvm_vnp_zerorange(DETOV(dep), (off_t)osize,
+	    (size_t)(dep->de_FileSize - osize));
 	return (deupdat(dep, 1));
 }
 
@@ -559,7 +588,6 @@ msdosfs_reclaim(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct denode *dep = VTODE(vp);
-	extern int prtactive;
 
 #ifdef MSDOSFS_DEBUG
 	printf("msdosfs_reclaim(): dep %p, file %s, refcnt %ld\n",
@@ -600,7 +628,6 @@ msdosfs_inactive(v)
 	struct vnode *vp = ap->a_vp;
 	struct denode *dep = VTODE(vp);
 	int error = 0;
-	extern int prtactive;
 
 #ifdef MSDOSFS_DEBUG
 	printf("msdosfs_inactive(): dep %p, de_Name[0] %x\n", dep, dep->de_Name[0]);
@@ -615,22 +642,20 @@ msdosfs_inactive(v)
 	if (dep->de_Name[0] == SLOT_DELETED)
 		goto out;
 
-#ifdef DIAGNOSTIC
-	if (!VOP_ISLOCKED(vp))
-		panic("msdosfs_inactive: unlocked denode");
-#endif
 	/*
 	 * If the file has been deleted and it is on a read/write
 	 * filesystem, then truncate the file, and mark the directory slot
 	 * as empty.  (This may not be necessary for the dos filesystem.)
 	 */
 #ifdef MSDOSFS_DEBUG
-	printf("msdosfs_inactive(): dep %p, refcnt %ld, mntflag %x %s",
+	printf("msdosfs_inactive(): dep %p, refcnt %ld, mntflag %x %s\n",
 	       dep, dep->de_refcnt, vp->v_mount->mnt_flag,
 		(vp->v_mount->mnt_flag & MNT_RDONLY) ? "MNT_RDONLY" : "");
 #endif
 	if (dep->de_refcnt <= 0 && (vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
-		error = detrunc(dep, (u_long)0, 0, NOCRED, NULL);
+		if (dep->de_FileSize != 0) {
+			error = detrunc(dep, (u_long)0, 0, NOCRED, NULL);
+		}
 		dep->de_Name[0] = SLOT_DELETED;
 	}
 	deupdat(dep, 0);
@@ -641,10 +666,17 @@ out:
 	 * so that it can be reused immediately.
 	 */
 #ifdef MSDOSFS_DEBUG
-	printf("msdosfs_inactive(): v_usecount %ld, de_Name[0] %x\n",
+	printf("msdosfs_inactive(): v_usecount %d, de_Name[0] %x\n",
 		vp->v_usecount, dep->de_Name[0]);
 #endif
 	if (dep->de_Name[0] == SLOT_DELETED)
 		vrecycle(vp, (struct simplelock *)0, p);
 	return (error);
+}
+
+int
+msdosfs_gop_alloc(struct vnode *vp, off_t off, off_t len, int flags,
+    struct ucred *cred)
+{
+	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.14.22.1 2001/06/17 22:27:12 he Exp $	*/
+/*	$NetBSD: db_machdep.h,v 1.18 2002/05/12 23:16:52 matt Exp $	*/
 
 /* 
  * Mach Operating System
@@ -34,17 +34,21 @@
  */
 
 #include <sys/param.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/trap.h>
 
 typedef	vaddr_t		db_addr_t;	/* address - unsigned */
 typedef	long		db_expr_t;	/* expression - signed */
 
 typedef struct trapframe db_regs_t;
-db_regs_t	ddb_regs;	/* register state */
+extern db_regs_t ddb_regs;	/* register state */
 #define	DDB_REGS	(&ddb_regs)
 
+#if defined(lint)
+#define	PC_REGS(regs)	((regs)->tf_eip)
+#else
 #define	PC_REGS(regs)	((db_addr_t)(regs)->tf_eip)
+#endif
 
 #define	BKPT_INST	0xcc		/* breakpoint instruction */
 #define	BKPT_SIZE	(1)		/* size of breakpoint inst */

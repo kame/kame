@@ -1,4 +1,4 @@
-/*	$NetBSD: clock_subr.c,v 1.4 1997/10/14 17:25:57 gwr Exp $	*/
+/*	$NetBSD: clock_subr.c,v 1.7 2001/11/13 05:32:49 lukem Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -48,13 +48,13 @@
  * Derived from arch/hp300/hp300/clock.c
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock_subr.c,v 1.7 2001/11/13 05:32:49 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/systm.h>
 
 #include <dev/clock_subr.h>
-
-/* Traditional POSIX base year */
-#define	POSIX_BASE_YEAR	1970
 
 static inline int leapyear __P((int year));
 #define FEBRUARY	2
@@ -137,7 +137,7 @@ clock_secs_to_ymdhms(secs, dt)
 	 * so the copy can be modified (and thread-safe).
 	 * See the definition of days_in_month() above.
 	 */
-	bcopy(month_days, mthdays, sizeof(mthdays));
+	memcpy(mthdays, month_days, sizeof(mthdays));
 #define month_days mthdays
 
 	days = secs / SECDAY;

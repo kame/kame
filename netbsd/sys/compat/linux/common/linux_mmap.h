@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_mmap.h,v 1.7 2000/04/10 01:22:44 chs Exp $	*/
+/*	$NetBSD: linux_mmap.h,v 1.13 2002/03/22 15:21:29 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -53,6 +53,12 @@
 #include <compat/linux/arch/m68k/linux_mmap.h>
 #elif defined(__alpha__)
 #include <compat/linux/arch/alpha/linux_mmap.h>
+#elif defined(__powerpc__)
+#include <compat/linux/arch/powerpc/linux_mmap.h>
+#elif defined(__mips__)
+#include <compat/linux/arch/mips/linux_mmap.h>
+#elif defined(__arm__)
+#include <compat/linux/arch/arm/linux_mmap.h>
 /*
  * XXX ERH: All below here are guesses.  The header
  * XXX ERH: files are correct but the defined(*)
@@ -63,10 +69,6 @@
  * XXX ERH: use all the defines, but I don't want to go looking
  * XXX ERH: through all the kernel sources right now.
  */
-#elif defined(__mips__)
-#include <compat/linux/arch/mips/linux_mmap.h>
-#elif defined(__powerpc__)
-#include <compat/linux/arch/powerpc/linux_mmap.h>
 #elif defined(__sparc__)
 #include <compat/linux/arch/sparc/linux_mmap.h>
 #else
@@ -82,7 +84,7 @@ struct linux_sys_mmap_args {
 	syscallarg(int) prot;
 	syscallarg(int) flags;
 	syscallarg(int) fd;
-	syscallarg(off_t) offset;
+	syscallarg(linux_off_t) offset;
 };
 
 #ifdef _KERNEL

@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_exec.h,v 1.8 1997/10/05 18:29:56 thorpej Exp $	*/
+/*	$NetBSD: hpux_exec.h,v 1.10 2001/09/08 02:35:25 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -101,7 +101,7 @@ struct hpux_exec {
 	long	ha_pad1;
 	long	ha_supsyms;	/* supplementary symbol table */
 	long	ha_drelocs;	/* non-PIC relocation info */
-	long	ha_extentions;	/* file offset of special extensions */
+	long	ha_extensions;	/* file offset of special extensions */
 };
 
 #define	HPUX_EXEC_HDR_SIZE	(sizeof(struct hpux_exec))
@@ -147,12 +147,15 @@ struct hpux_exec {
 #define	HPUX_SUPSYMOFF(x, m)	(HPUX_SYMOFF((x), (m)) + (x).ha_symbols)
 #define	HPUX_RTEXTOFF(x, m)	(HPUX_SUPSYMOFF((x), (m)) + (x).ha_supsyms)
 #define	HPUX_RDATAOFF(x, m)	(HPUX_RTEXTOFF((x), (m)) + (x).ha_trsize)
-#define	HPUX_EXTOFF(x, m)	((x).ha_extentions)
+#define	HPUX_EXTOFF(x, m)	((x).ha_extensions)
 
 #define	HPUXM_VALID	0x00000001
 #define HPUXM_STKWT	0x02000000
 #define HPUXM_DATAWT	0x04000000
 
 int	exec_hpux_makecmds __P((struct proc *, struct exec_package *));
+void	hpux_setregs __P((struct proc *, struct exec_package *, u_long));
+
+extern const struct emul emul_hpux;
 
 #endif /* _HPUX_EXEC_H_ */

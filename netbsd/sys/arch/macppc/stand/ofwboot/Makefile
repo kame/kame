@@ -1,34 +1,36 @@
-#	$NetBSD: Makefile,v 1.11.2.6 2002/02/14 19:57:10 he Exp $
+#	$NetBSD: Makefile,v 1.33 2002/04/13 13:35:23 tsutsui Exp $
 
 S=	${.CURDIR}/../../../..
 
 PROG=		ofwboot
 FILES=		${PROG}.elf ${PROG}.xcf
-SRCS=		Locore.c ofdev.c hfs.c net.c netif_of.c alloc.c vers.c
+SRCS=		Locore.c ofdev.c hfs.c net.c netif_of.c vers.c
 XCOFFXTRA=	Xcoffxtra.c
 XCOFFXTRAOBJ=	Xcoffxtra.o
-CFLAGS+=	-msoft-float
-#CFLAGS+=	-DDEBUG -DNETIF_DEBUG
-CPPFLAGS+=	-D_STANDALONE -DSUPPORT_DHCP -I${.CURDIR}
+CFLAGS+=	-Wno-main -msoft-float -mmultiple
+#CPPFLAGS+=	-DDEBUG -DNETIF_DEBUG
+CPPFLAGS+=	-D_STANDALONE -DSUPPORT_DHCP
+CPPFLAGS+=	-DSUPPORT_USTARFS -DHAVE_CHANGEDISK_HOOK
+CPPFLAGS+=	-DLIBSA_USE_MEMCPY -DLIBSA_USE_MEMSET
+DBG=		-Os
 
 .PATH:		${S}/arch/powerpc/powerpc
 SRCS+=		ofwmagic.S
 
-MKMAN=		no
+NOMAN=		# defined
 STRIPFLAG=
 BINMODE=	444
-OBJCOPY?=	objcopy
 
 .if !defined(FIXCOFF)
-.ifnmake(print-objdir)
-FIXCOFFDIR!=	cd ${.CURDIR}/../fixcoff; ${MAKE} print-objdir
+.include <bsd.own.mk>
+
+FIXCOFFDIR!=	cd ${.CURDIR}/../fixcoff && ${PRINTOBJDIR}
 FIXCOFF=	${FIXCOFFDIR}/fixcoff
 FIXCOFFTARG=	${FIXCOFF}
 
 ${FIXCOFF}:
-	(cd ${.CURDIR}/../fixcoff; make)
+	(cd ${.CURDIR}/../fixcoff; ${MAKE})
 
-.endif
 .else
 FIXCOFFTARG=
 .endif
@@ -39,23 +41,24 @@ NEWVERSWHAT=	"OpenFirmware Boot"
 #RELOC=		20000
 RELOC=		640000
 RELOC_FLATFILE=	600000
-COPTS=		-Os -mmultiple
 
 ENTRY=		_start
 
-CLEANFILES+=	vers.c vers.o ${PROG}.elf ${PROG}.el1 ${PROG}.mrg ${PROG}.xcf
+CLEANFILES+=	vers.c ${PROG}.elf ${PROG}.el1 ${PROG}.mrg ${PROG}.xcf
 CLEANFILES+=	machine powerpc
 
-CPPFLAGS+=	-I. -I${.CURDIR}/../../.. -I${.CURDIR}/../../../..
+CPPFLAGS+=	-I. -I${.CURDIR} -I${.CURDIR}/../../.. -I${.CURDIR}/../../../..
 CPPFLAGS+=	-DRELOC=0x${RELOC} -DRELOC_FLATFILE=0x${RELOC_FLATFILE}
 #CPPFLAGS+=	-DXCOFF_GLUE		# for booting PCI Powermacs
 
 CLEANFILES+= ${XCOFFXTRAOBJ} boot.o boot1.o
 
+.if !make(obj) && !make(clean) && !make(cleandir)
 .BEGIN:
 	@[ -h machine ] || ln -s ${S}/arch/${MACHINE}/include machine
 	@[ -h powerpc ] || ln -s ${S}/arch/powerpc/include powerpc
 .NOPATH: machine powerpc
+.endif
 CLEANFILES+= machine powerpc
 
 ### find out what to use for libkern
@@ -74,9 +77,14 @@ SAMISCMAKEFLAGS= SA_USE_CREAD=yes SA_USE_LOADFILE=yes
 .include "${S}/lib/libsa/Makefile.inc"
 LIBSA=		${SALIB}
 
+cleandir distclean: cleanlibdir
+
+cleanlibdir:
+	rm -rf lib
+
 .PHONY: vers.c
 vers.c: version
-	sh ${.CURDIR}/../newvers.sh ${.CURDIR}/version ${NEWVERSWHAT}
+	sh ${S}/conf/newvers_stand.sh ${.CURDIR}/version "macppc" ${NEWVERSWHAT}
 
 all realall: ${PROG} ${PROG}.xcf ${PROG}.elf
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: grf.c,v 1.35.12.1 2000/06/30 16:27:23 simonb Exp $	*/
+/*	$NetBSD: grf.c,v 1.43 2002/03/15 05:52:53 gmcgarry Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -48,6 +48,9 @@
  * Hardware access is through the machine dependent grf switch routines.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.43 2002/03/15 05:52:53 gmcgarry Exp $");                                                  
+
 #include "opt_compat_hpux.h"
 
 #include <sys/param.h>
@@ -72,10 +75,8 @@
 
 #ifdef COMPAT_HPUX
 #include <compat/hpux/hpux.h>
-extern struct emul emul_hpux;
 #endif
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 #include <uvm/uvm_map.h>
 
@@ -261,7 +262,7 @@ grfioctl(dev, cmd, data, flag, p)
 	switch (cmd) {
 
 	case GRFIOCGINFO:
-		bcopy((caddr_t)&gp->g_display, data, sizeof(struct grfinfo));
+		memcpy(data, (caddr_t)&gp->g_display, sizeof(struct grfinfo));
 		break;
 
 	case GRFIOCON:
@@ -638,7 +639,8 @@ grfmap(dev, addrp, p)
 	vn.v_specinfo = &si;			/* XXX */
 	vn.v_rdev = dev;			/* XXX */
 	error = uvm_mmap(&p->p_vmspace->vm_map, (vaddr_t *)addrp,
-			 (vsize_t)len, VM_PROT_ALL, VM_PROT_ALL,
+			 (vsize_t)len, VM_PROT_READ|VM_PROT_WRITE,
+			 VM_PROT_READ|VM_PROT_WRITE,
 			 flags, (caddr_t)&vn, 0,
 			 p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 	if (error == 0)
@@ -655,7 +657,6 @@ grfunmap(dev, addr, p)
 	struct grf_softc *sc = grf_cd.cd_devs[GRFUNIT(dev)];
 	struct grf_data *gp = sc->sc_data;
 	vsize_t size;
-	int rv;
 
 #ifdef DEBUG
 	if (grfdebug & GDB_MMAP)
@@ -665,9 +666,8 @@ grfunmap(dev, addr, p)
 		return(EINVAL);		/* XXX: how do we deal with this? */
 	(void) (*gp->g_sw->gd_mode)(gp, GM_UNMAP, 0);
 	size = round_page(gp->g_display.gd_regsize + gp->g_display.gd_fbsize);
-	rv = uvm_unmap(&p->p_vmspace->vm_map, (vaddr_t)addr,
-	    (vaddr_t)addr + size);
-	return(rv == KERN_SUCCESS ? 0 : EINVAL);
+	uvm_unmap(&p->p_vmspace->vm_map, (vaddr_t)addr, (vaddr_t)addr + size);
+	return 0;
 }
 
 #ifdef COMPAT_HPUX
@@ -714,11 +714,9 @@ grffindpid(gp)
 	int i, limit;
 	int ni;
 
-	if (gp->g_pid == NULL) {
-		gp->g_pid = (short *)
-			malloc(GRFMAXLCK * sizeof(short), M_DEVBUF, M_WAITOK);
-		bzero((caddr_t)gp->g_pid, GRFMAXLCK * sizeof(short));
-	}
+	if (gp->g_pid == NULL)
+		MALLOC(gp->g_pid, short *, GRFMAXLCK*sizeof(short),
+		    M_DEVBUF, M_WAITOK | M_ZERO);
 	pid = curproc->p_pid;
 	ni = limit = gp->g_pid[0];
 	for (i = 1, sp = &gp->g_pid[1]; i <= limit; i++, sp++) {

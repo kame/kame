@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.7 2000/04/09 08:26:15 takemura Exp $	*/
+/*	$NetBSD: conf.c,v 1.18 2002/03/23 09:02:02 hamajima Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -39,9 +39,6 @@
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/buf.h>
-#include <sys/ioctl.h>
 #include <sys/tty.h>
 #include <sys/conf.h>
 #include <sys/vnode.h>
@@ -78,14 +75,15 @@ struct bdevsw	bdevsw[] =
 	bdev_disk_init(NCCD,ccd),	/* 7: concatenated disk driver */
 	bdev_disk_init(NVND,vnd),	/* 8: vnode disk driver */
 	bdev_disk_init(NRAID,raid),	/* 9: RAIDframe disk driver */
+
+	bdev_lkm_dummy(),		/* 10 */
+	bdev_lkm_dummy(),		/* 11 */
+	bdev_lkm_dummy(),		/* 12 */
+	bdev_lkm_dummy(),		/* 13 */
+	bdev_lkm_dummy(),		/* 14 */
+	bdev_lkm_dummy(),		/* 15 */
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
-
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
 
 /*
  * Swapdev is a fake block device implemented  in sw.c and only used 
@@ -173,8 +171,29 @@ cdev_decl(ugen);
 cdev_decl(ulpt);
 #include "ucom.h"
 cdev_decl(ucom);
+#include "urio.h"
+cdev_decl(urio);
+#include "uscanner.h"
+cdev_decl(uscanner);
+
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
 
 #include "rnd.h"
+
+#include "clockctl.h"
+cdev_decl(clockctl);
+
+#include "audio.h"
+cdev_decl(audio);
 
 struct cdevsw	cdevsw[] =
 {
@@ -223,6 +242,16 @@ struct cdevsw	cdevsw[] =
 	cdev_audio_init(NUCBSND,ucbsnd),/* 36: UCB1200 Codec (TX39 companion chip) */
 	cdev_tty_init(NUCOM, ucom),	/* 37: USB tty */
 	cdev_mouse_init(NWSMUX,	wsmux), /* 38: ws multiplexor */
+	cdev_usbdev_init(NURIO,urio),	/* 39: Diamond Rio 500 */
+	cdev_ugen_init(NUSCANNER,uscanner),/* 40: USB scanner */
+	cdev_isdn_init(NISDN, isdn),	/* 41: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 42: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 43: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 44: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 45: isdn phone device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 46: clockctl pseudo device */
+	cdev_lkm_init(NLKM,lkm),	/* 47: loadable module driver */
+	cdev_audio_init(NAUDIO,audio),		/* 48: VR4121 audio interface */
 };
 
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
@@ -233,9 +262,9 @@ int	mem_no = 0; 	/* major device number of memory special file */
  * Routine that identifies /dev/mem and /dev/kmem.
  */
 int
-iskmemdev(dev)
-	dev_t dev;
+iskmemdev(dev_t dev)
 {
+
 	return (major(dev) == mem_no && minor(dev) < 2);
 }
 
@@ -243,9 +272,9 @@ iskmemdev(dev)
  * Returns true if dev is /dev/zero.
  */
 int
-iszerodev(dev)
-	dev_t dev;
+iszerodev(dev_t dev)
 {
+
 	return (major(dev) == mem_no && minor(dev) == 12);
 }
 
@@ -290,14 +319,24 @@ static int chrtoblktbl[] =  {
 	/* 35 */	NODEV,
 	/* 36 */	NODEV,
 	/* 37 */	NODEV,
+	/* 38 */	NODEV,
+	/* 39 */	NODEV,
+	/* 40 */	NODEV,
+	/* 41 */	NODEV,
+	/* 42 */	NODEV,
+	/* 43 */	NODEV,
+	/* 44 */	NODEV,
+	/* 45 */	NODEV,
+	/* 46 */	NODEV,
+	/* 47 */	NODEV,
+	/* 48 */	NODEV,
 };
 
 /*
  * Routine to convert from character to block device number.
  */
 dev_t
-chrtoblk(dev)
-	dev_t dev;
+chrtoblk(dev_t dev)
 {
 	int blkmaj;
 

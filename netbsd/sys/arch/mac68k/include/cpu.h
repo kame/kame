@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.64 2000/05/26 21:19:50 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.70 2002/04/10 04:38:49 briggs Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -68,7 +68,7 @@
  * Exported definitions unique to mac68k/68k cpu support.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -77,6 +77,7 @@
  */
 #include <m68k/cpu.h>
 #define	M68K_MMU_MOTOROLA
+#include <m68k/cacheops.h>
 
 /*
  * Get interrupt glue.
@@ -115,7 +116,7 @@ struct clockframe {
 	u_short	sr;		/* sr at time of interrupt */
 	u_long	pc;		/* pc at time of interrupt */
 	u_short	vo;		/* vector offset (4-word frame) */
-};
+} __attribute__((packed));
 
 #define	CLKF_USERMODE(framep)	(((framep)->sr & PSL_S) == 0)
 #define	CLKF_BASEPRI(framep)	(((framep)->sr & PSL_IPL) == 0)
@@ -127,7 +128,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define	need_resched()	{ want_resched++; aston(); }
+#define	need_resched(ci)	{ want_resched++; aston(); }
 
 /*
  * Give a profiling tick to the current process from the softclock
@@ -199,6 +200,7 @@ extern int astpending;		/* need to trap before returning to user mode */
 #define MACH_MACP550		80
 #define MACH_MACCCLASSICII	83
 #define MACH_MACPB165		84
+#define MACH_MACPB190CS		85
 #define MACH_MACTV		88
 #define MACH_MACLC475		89
 #define MACH_MACLC475_33	90
@@ -326,25 +328,6 @@ u_int	get_mapping __P((void));
 /* locore.s functions */
 void	m68881_save __P((struct fpframe *));
 void	m68881_restore __P((struct fpframe *));
-void	DCIA __P((void));
-void	DCIS __P((void));
-void	DCIU __P((void));
-void	ICIA __P((void));
-void	ICPA __P((void));
-void	PCIA __P((void));
-void	TBIA __P((void));
-void	TBIS __P((vaddr_t));
-void	TBIAS __P((void));
-void	TBIAU __P((void));
-#if defined(M68040)
-void	DCFA __P((void));
-void	DCFP __P((paddr_t));
-void	DCFL __P((paddr_t));
-void	DCPL __P((paddr_t));
-void	DCPP __P((paddr_t));
-void	ICPL __P((paddr_t));
-void	ICPP __P((paddr_t));
-#endif
 int	suline __P((caddr_t, caddr_t));
 void	savectx __P((struct pcb *));
 void	switch_exit __P((struct proc *));
@@ -358,9 +341,6 @@ int	cachectl1 __P((unsigned long, vaddr_t, size_t, struct proc *));
 void	physaccess __P((caddr_t, caddr_t, register int, register int));
 void	physunaccess __P((caddr_t, register int));
 int	kvtop __P((caddr_t));
-
-/* trap.c */
-void	child_return __P((void *));
 
 #endif
 

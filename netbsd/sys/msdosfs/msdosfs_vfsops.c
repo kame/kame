@@ -1,4 +1,4 @@
-/*	$NetBSD: msdosfs_vfsops.c,v 1.69.4.1 2000/12/14 23:36:24 he Exp $	*/
+/*	$NetBSD: msdosfs_vfsops.c,v 1.81 2002/03/25 20:42:40 jdolecek Exp $	*/
 
 /*-
  * Copyright (C) 1994, 1995, 1997 Wolfgang Solfrank.
@@ -47,7 +47,10 @@
  * October 1992
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: msdosfs_vfsops.c,v 1.81 2002/03/25 20:42:40 jdolecek Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_quota.h"
 #include "opt_compat_netbsd.h"
 #endif
@@ -100,9 +103,9 @@ static int update_mp __P((struct mount *, struct msdosfs_args *));
 
 #define ROOTNAME "root_device"
 
-extern struct vnodeopv_desc msdosfs_vnodeop_opv_desc;
+extern const struct vnodeopv_desc msdosfs_vnodeop_opv_desc;
 
-struct vnodeopv_desc *msdosfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const msdosfs_vnodeopv_descs[] = {
 	&msdosfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -120,6 +123,7 @@ struct vfsops msdosfs_vfsops = {
 	msdosfs_fhtovp,
 	msdosfs_vptofh,
 	msdosfs_init,
+	msdosfs_reinit,
 	msdosfs_done,
 	msdosfs_sysctl,
 	msdosfs_mountroot,
@@ -574,9 +578,10 @@ msdosfs_mountfs(devvp, mp, p, argp)
 	pmp->pm_fatsize = pmp->pm_FATsecs * pmp->pm_BytesPerSec;
 
 	if (argp->flags & MSDOSFSMNT_GEMDOSFS) {
-		if ((pmp->pm_nmbrofclusters <= (0xff0 - 2))
-		      && ((dtype == DTYPE_FLOPPY) || ((dtype == DTYPE_VNODE)
-		      && ((pmp->pm_Heads == 1) || (pmp->pm_Heads == 2))))
+		if (pmp->pm_nmbrofclusters <= (0xff0 - 2)
+		      && (dtype == DTYPE_FLOPPY
+			  || (dtype == DTYPE_VND
+				&& (pmp->pm_Heads == 1 || pmp->pm_Heads == 2)))
 		    ) {
 			pmp->pm_fatmask = FAT12_MASK;
 			pmp->pm_fatmult = 3;
@@ -655,8 +660,13 @@ msdosfs_mountfs(devvp, mp, p, argp)
 	}
 
 	/*
-	 * Check and validate (or perhaps invalidate?) the fsinfo structure?		XXX
+	 * Check and validate (or perhaps invalidate?) the fsinfo structure?
+	 * XXX
 	 */
+	if (pmp->pm_fsinfo) {
+		if (pmp->pm_nxtfree == (u_long)-1)
+			pmp->pm_fsinfo = 0;
+	}
 
 	/*
 	 * Allocate memory for the bitmap of allocated clusters, and then
@@ -699,6 +709,9 @@ msdosfs_mountfs(devvp, mp, p, argp)
         mp->mnt_stat.f_fsid.val[0] = (long)dev;
         mp->mnt_stat.f_fsid.val[1] = makefstype(MOUNT_MSDOS);
 	mp->mnt_flag |= MNT_LOCAL;
+	mp->mnt_dev_bshift = pmp->pm_bnshift;
+	mp->mnt_fs_bshift = pmp->pm_cnshift;
+
 #ifdef QUOTA
 	/*
 	 * If we ever do quotas for DOS filesystems this would be a place
@@ -764,14 +777,14 @@ msdosfs_unmount(mp, mntflags, p)
 		struct vnode *vp = pmp->pm_devvp;
 
 		printf("msdosfs_umount(): just before calling VOP_CLOSE()\n");
-		printf("flag %08lx, usecount %ld, writecount %ld, holdcnt %ld\n",
+		printf("flag %08x, usecount %d, writecount %ld, holdcnt %ld\n",
 		    vp->v_flag, vp->v_usecount, vp->v_writecount, vp->v_holdcnt);
-		printf("lastr %d, id %lu, mount %p, op %p\n",
-		    vp->v_lastr, vp->v_id, vp->v_mount, vp->v_op);
+		printf("id %lu, mount %p, op %p\n",
+		    vp->v_id, vp->v_mount, vp->v_op);
 		printf("freef %p, freeb %p, mount %p\n",
 		    vp->v_freelist.tqe_next, vp->v_freelist.tqe_prev,
 		    vp->v_mount);
-		printf("cleanblkhd %p, dirtyblkhd %p, numoutput %ld, type %d\n",
+		printf("cleanblkhd %p, dirtyblkhd %p, numoutput %d, type %d\n",
 		    vp->v_cleanblkhd.lh_first,
 		    vp->v_dirtyblkhd.lh_first,
 		    vp->v_numoutput, vp->v_type);
@@ -893,10 +906,11 @@ loop:
 		simple_lock(&vp->v_interlock);
 		nvp = vp->v_mntvnodes.le_next;
 		dep = VTODE(vp);
-		if (vp->v_type == VNON || (((dep->de_flag &
+		if (waitfor == MNT_LAZY || vp->v_type == VNON ||
+		    (((dep->de_flag &
 		    (DE_ACCESS | DE_CREATE | DE_UPDATE | DE_MODIFIED)) == 0) &&
-		    (vp->v_dirtyblkhd.lh_first == NULL ||
-		     waitfor == MNT_LAZY))) {
+		     (LIST_EMPTY(&vp->v_dirtyblkhd) &&
+		      vp->v_uobj.uo_npages == 0))) {
 			simple_unlock(&vp->v_interlock);
 			continue;
 		}

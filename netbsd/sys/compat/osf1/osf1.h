@@ -1,4 +1,4 @@
-/* $NetBSD: osf1.h,v 1.21 1999/06/26 01:21:30 cgd Exp $ */
+/* $NetBSD: osf1.h,v 1.23 2001/04/04 19:52:18 ross Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -71,6 +71,8 @@ typedef void		*osf1_data_ptr;	/* XXX hard to fix size */
 typedef void		*osf1_fcn_ptr;	/* XXX hard to fix size, bogus */
 typedef	osf1_int	osf1_key_t;
 typedef	osf1_int	osf1_pid_t;
+typedef u_int64_t	osf1_blksize_t;
+typedef u_int64_t	osf1_blkcnt_t;
 
 struct osf1_timeval {				/* time.h */
 	osf1_time_t	tv_sec;
@@ -502,6 +504,39 @@ struct osf1_stat {
 	osf1_uint_t	st_gen;
 };
 
+struct osf1_stat2 {
+	osf1_dev_t	st_dev;
+	osf1_int	st_dead1;	/* was st_ino */
+	osf1_mode_t	st_mode;
+	osf1_nlink_t	st_nlink;
+	osf1_short	st_dead2;	/* something to do with nlink? */
+	osf1_uid_t	st_uid;
+	osf1_gid_t	st_gid;
+	osf1_dev_t	st_rdev;
+	osf1_dev_t	st_rdev2;
+	osf1_off_t	st_size;
+	osf1_time_t	st_dead3;
+	osf1_int	st_uatime;
+	osf1_time_t	st_dead4;
+	osf1_int	st_umtime;
+	osf1_time_t	st_dead5;
+	osf1_int	st_uctime;
+	osf1_int	st_dead6;
+	osf1_int	st_dead7;
+	osf1_uint_t	st_flags;
+	osf1_uint_t	st_generation;
+	osf1_long	st_unused1[4];
+	osf1_ino_t	st_ino;
+	osf1_int	st_unused;
+	osf1_time_t	st_atime_sec;
+	osf1_int	st_unused2;
+	osf1_time_t	st_mtime_sec;
+	osf1_int	st_unused3;
+	osf1_time_t	st_ctime_sec;
+	osf1_int	st_unused4;
+	osf1_blksize_t	st_blocksize;
+	osf1_blkcnt_t	st_blocks;
+};
 
 /* systeminfo.h */
 
@@ -590,5 +625,32 @@ struct osf1_utsname {
 
 /* XXX should have status word bits */
 
+
+/* for set/get sysinfo */
+
+struct	osf1_cpu_info {
+	int		current_cpu;
+	int     	cpus_in_box;
+	int		cpu_type;
+	int		ncpus;
+	u_int64_t	cpus_present;
+	u_int64_t 	cpus_running;
+	u_int64_t	cpu_binding;
+	u_int64_t	cpu_ex_binding;
+	int  		mhz;
+	int  		unused[3];
+};
+
+#define	OSF_SET_IEEE_FP_CONTROL  14
+
+#define OSF_GET_MAX_UPROCS      2
+#define OSF_GET_PHYSMEM         19
+#define OSF_GET_MAX_CPU         30
+#define OSF_GET_IEEE_FP_CONTROL 45
+#define OSF_GET_CPUS_IN_BOX     55
+#define OSF_GET_CPU_INFO        59
+#define OSF_GET_PROC_TYPE       60
+#define OSF_GET_HWRPB           101
+#define OSF_GET_PLATFORM_NAME   103
 
 #endif /* _COMPAT_OSF1_OSF1_H_ */

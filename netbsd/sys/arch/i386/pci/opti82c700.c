@@ -1,4 +1,4 @@
-/*	$NetBSD: opti82c700.c,v 1.1.8.1 2000/08/10 22:29:58 soda Exp $	*/
+/*	$NetBSD: opti82c700.c,v 1.3 2001/11/15 07:03:33 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -65,6 +65,9 @@
 /*
  * Support for the Opti 82c700 FireStar PCI-ISA bridge interrupt controller.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: opti82c700.c,v 1.3 2001/11/15 07:03:33 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

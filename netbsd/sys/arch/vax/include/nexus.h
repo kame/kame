@@ -1,4 +1,4 @@
-/*	$NetBSD: nexus.h,v 1.18 2000/06/12 11:13:16 ragge Exp $	*/
+/*	$NetBSD: nexus.h,v 1.19.18.1 2002/06/05 04:12:51 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
@@ -70,22 +70,22 @@ enum bustypes {
 #define MAXNMCR         1
 
 #define	NNEXSBI		16
-#if VAX8600
+#if VAX8600 || VAXANY
 #define	NNEX8600	NNEXSBI
 #define	NEXA8600	((struct nexus *)(0x20000000))
 #define	NEXB8600	((struct nexus *)(0x22000000))
 #endif
-#if VAX780
+#if VAX780 || VAXANY
 #define	NNEX780	NNEXSBI
 #define	NEX780	((struct nexus *)0x20000000)
 #endif
-#if VAX730
+#if VAX730 || VAXANY
 #define	NNEX730	NNEXSBI
 #define	NEX730	((struct nexus *)0xf20000)
 #endif
 #define	NEXSIZE	0x2000
 
-#if VAX8600
+#if VAX8600 || VAXANY
 #define	MAXNNEXUS (2 * NNEXSBI)
 #else 
 #define	MAXNNEXUS NNEXSBI
@@ -104,6 +104,7 @@ struct	nexus {
 struct sbi_attach_args {
 	int sa_nexnum; 		/* This nexus TR number */
 	int sa_type;		/* This nexus type */
+	int sa_sbinum;
 	bus_space_tag_t sa_iot;
 	bus_space_handle_t sa_ioh;
 };
@@ -138,7 +139,7 @@ struct bp_conf {
 #define	NEX_CFGFLT	(0xfc000000)
 
 #ifndef _LOCORE
-#if VAX780 || VAX8600
+#if VAX780 || VAX8600 || VAXANY
 #define	NEXFLT_BITS \
 "\20\40PARFLT\37WSQFLT\36URDFLT\35ISQFLT\34MXTFLT\33XMTFLT"
 #endif

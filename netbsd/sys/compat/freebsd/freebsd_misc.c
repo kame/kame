@@ -1,4 +1,4 @@
-/*	$NetBSD: freebsd_misc.c,v 1.5.4.1 2002/03/06 22:03:59 he Exp $	*/
+/*	$NetBSD: freebsd_misc.c,v 1.14 2001/11/13 02:08:09 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Frank van der Linden
@@ -35,7 +35,13 @@
  * FreeBSD compatibility module. Try to deal with various FreeBSD system calls.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: freebsd_misc.c,v 1.14 2001/11/13 02:08:09 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_ntp.h"
+#include "opt_ktrace.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,11 +49,15 @@
 #include <sys/mount.h>
 #include <sys/signal.h>
 #include <sys/signalvar.h>
+#include <sys/malloc.h>
+#ifdef KTRACE
+#include <sys/ktrace.h>
+#endif
 
 #include <sys/syscallargs.h>
 
 #include <compat/freebsd/freebsd_syscallargs.h>
-#include <compat/freebsd/freebsd_util.h>
+#include <compat/common/compat_util.h>
 #include <compat/freebsd/freebsd_rtprio.h>
 #include <compat/freebsd/freebsd_timex.h>
 #include <compat/freebsd/freebsd_signal.h>
@@ -148,4 +158,26 @@ freebsd_sys_sigaction4(p, v, retval)
 			return (error);
 	}
 	return (0);
+}
+
+int
+freebsd_sys_utrace(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+#ifdef KTRACE
+	struct freebsd_sys_utrace_args /* {
+		syscallarg(void *) addr;
+		syscallarg(size_t) len;
+	} */ *uap = v;
+
+	if (KTRPOINT(p, KTR_USER))
+		ktruser(p, "FreeBSD utrace", SCARG(uap, addr), SCARG(uap, len),
+			0);
+	
+	return (0);
+#else
+	return (ENOSYS);
+#endif
 }

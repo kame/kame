@@ -1,4 +1,4 @@
-/*	$NetBSD: ohci_cardbus.c,v 1.7 2000/04/27 15:26:44 augustss Exp $	*/
+/*	$NetBSD: ohci_cardbus.c,v 1.11 2001/11/13 12:51:13 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -44,12 +44,16 @@
  * USB spec: http://www.teleport.com/cgi-bin/mailmerge.cgi/~usb/cgiform.tpl
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ohci_cardbus.c,v 1.11 2001/11/13 12:51:13 lukem Exp $");
+
+#include "ehci.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/proc.h>
-#include <sys/queue.h>
 
 #include <machine/bus.h>
 
@@ -60,6 +64,8 @@
 #include <dev/cardbus/cardbusvar.h>
 #include <dev/cardbus/cardbusdevs.h>
 
+#include <dev/cardbus/usb_cardbus.h>
+
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdivar.h>
@@ -68,12 +74,15 @@
 #include <dev/usb/ohcireg.h>
 #include <dev/usb/ohcivar.h>
 
-int	ohci_cardbus_match __P((struct device *, struct cfdata *, void *));
-void	ohci_cardbus_attach __P((struct device *, struct device *, void *));
-int	ohci_cardbus_detach __P((device_ptr_t, int));
+int	ohci_cardbus_match(struct device *, struct cfdata *, void *);
+void	ohci_cardbus_attach(struct device *, struct device *, void *);
+int	ohci_cardbus_detach(device_ptr_t, int);
 
 struct ohci_cardbus_softc {
 	ohci_softc_t		sc;
+#if NEHCI > 0
+	struct usb_cardbus	sc_cardbus;
+#endif
 	cardbus_chipset_tag_t	sc_cc;
 	cardbus_function_tag_t	sc_cf;
 	cardbus_devfunc_t	sc_ct;
@@ -91,12 +100,9 @@ struct cfattach ohci_cardbus_ca = {
 #define cardbus_devinfo pci_devinfo
 
 int
-ohci_cardbus_match(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+ohci_cardbus_match(struct device *parent, struct cfdata *match, void *aux)
 {
-	struct cardbus_attach_args *ca = (struct cardbus_attach_args *) aux;
+	struct cardbus_attach_args *ca = (struct cardbus_attach_args *)aux;
 
 	if (CARDBUS_CLASS(ca->ca_class) == CARDBUS_CLASS_SERIALBUS &&
 	    CARDBUS_SUBCLASS(ca->ca_class) == CARDBUS_SUBCLASS_SERIALBUS_USB &&
@@ -107,10 +113,7 @@ ohci_cardbus_match(parent, match, aux)
 }
 
 void
-ohci_cardbus_attach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+ohci_cardbus_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct ohci_cardbus_softc *sc = (struct ohci_cardbus_softc *)self;
 	struct cardbus_attach_args *ca = aux;
@@ -121,7 +124,7 @@ ohci_cardbus_attach(parent, self, aux)
 	char devinfo[256];
 	usbd_status r;
 	char *vendor;
-	char *devname = sc->sc.sc_bus.bdev.dv_xname;
+	const char *devname = sc->sc.sc_bus.bdev.dv_xname;
 
 	cardbus_devinfo(ca->ca_id, ca->ca_class, 0, devinfo);
 	printf(": %s (rev. 0x%02x)\n", devinfo,
@@ -186,15 +189,17 @@ XXX	(ct->ct_cf->cardbus_mem_open)(cc, 0, iob, iob + 0x40);
 		return;
 	}
 
+#if NEHCI > 0
+	usb_cardbus_add(&sc->sc_cardbus, ca, &sc->sc.sc_bus);
+#endif
+
 	/* Attach usb device. */
 	sc->sc.sc_child = config_found((void *)sc, &sc->sc.sc_bus,
 				       usbctlprint);
 }
 
 int
-ohci_cardbus_detach(self, flags)
-	device_ptr_t self;
-	int flags;
+ohci_cardbus_detach(device_ptr_t self, int flags)
 {
 	struct ohci_cardbus_softc *sc = (struct ohci_cardbus_softc *)self;
 	struct cardbus_devfunc *ct = sc->sc_ct;
@@ -212,5 +217,8 @@ ohci_cardbus_detach(self, flags)
 		    sc->sc.ioh, sc->sc.sc_size);
 		sc->sc.sc_size = 0;
 	}
+#if NEHCI > 0
+	usb_cardbus_rem(&sc->sc_cardbus);
+#endif
 	return (0);
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: bt463.c,v 1.2 2000/06/13 17:21:06 nathanw Exp $ */
+/* $NetBSD: bt463.c,v 1.7.10.1 2002/08/07 01:31:47 lukem Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -68,13 +68,17 @@
   *	 NetBSD: tga_bt463.c,v 1.5 2000/03/04 10:27:59 elric Exp 
   */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bt463.c,v 1.7.10.1 2002/08/07 01:31:47 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/buf.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/tgareg.h>
@@ -130,6 +134,7 @@ struct ramdac_funcs bt463_funcsstruct = {
 	bt463_check_curcmap,
 	bt463_set_curcmap,
 	bt463_get_curcmap,
+	NULL,
 };
 
 /*
@@ -268,7 +273,7 @@ bt463_init(rc)
 
 	BTWREG(data, BT463_IREG_COMMAND_0, 0x40);
 	BTWREG(data, BT463_IREG_COMMAND_1, 0x48);
-	BTWREG(data, BT463_IREG_COMMAND_2, 0xC0);
+	BTWREG(data, BT463_IREG_COMMAND_2, 0x40);
 
 	/*
 	 * Initialize the read mask.
@@ -291,7 +296,7 @@ bt463_init(rc)
 	BTWREG(data, BT463_IREG_TEST, 0);
 
 	/*
-	 * Initalize the RAMDAC info struct to hold all of our
+	 * Initialize the RAMDAC info struct to hold all of our
 	 * data, and fill it in.
 	 */
 	data->changed = DATA_ALL_CHANGED;
@@ -360,10 +365,11 @@ bt463_set_cmap(rc, cmapp)
 	struct wsdisplay_cmap *cmapp;
 {
 	struct bt463data *data = (struct bt463data *)rc;
-	int count, index, s;
+	u_int count, index;
+	int s;
 
-	if ((u_int)cmapp->index >= BT463_NCMAP_ENTRIES ||
-	    ((u_int)cmapp->index + (u_int)cmapp->count) > BT463_NCMAP_ENTRIES)
+	if (cmapp->index >= BT463_NCMAP_ENTRIES ||
+	    cmapp->count > BT463_NCMAP_ENTRIES - cmapp->index)
 		return (EINVAL);
 	if (!uvm_useracc(cmapp->red, cmapp->count, B_READ) ||
 	    !uvm_useracc(cmapp->green, cmapp->count, B_READ) ||
@@ -392,10 +398,11 @@ bt463_get_cmap(rc, cmapp)
 	struct wsdisplay_cmap *cmapp;
 {
 	struct bt463data *data = (struct bt463data *)rc;
-	int error, count, index;
+	u_int count, index;
+	int error;
 
-	if ((u_int)cmapp->index >= BT463_NCMAP_ENTRIES ||
-	    ((u_int)cmapp->index + (u_int)cmapp->count) > BT463_NCMAP_ENTRIES)
+	if (cmapp->index >= BT463_NCMAP_ENTRIES ||
+	    cmapp->count > BT463_NCMAP_ENTRIES - cmapp->index)
 		return (EINVAL);
 
 	count = cmapp->count;

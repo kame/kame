@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.1 1999/09/13 10:31:17 itojun Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.3 2002/04/28 17:10:34 uch Exp $	*/
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -31,7 +31,7 @@
  */
 
 #ifndef _MACHINE_DISKLABEL_H_
-#define _MACHINE_DISKLABEL_H_
+#define	_MACHINE_DISKLABEL_H_
 
 #define	LABELSECTOR	1		/* sector containing label */
 #define	LABELOFFSET	0		/* offset of label in sector */
@@ -51,7 +51,7 @@ struct cpu_disklabel {
 
 #ifdef _KERNEL
 struct disklabel;
-int	bounds_check_with_label __P((struct buf *, struct disklabel *, int));
+int	bounds_check_with_label(struct buf *, struct disklabel *, int);
 #endif
 
 #endif /* _MACHINE_DISKLABEL_H_ */

@@ -1,7 +1,7 @@
-# $NetBSD: Makefile,v 1.6 1999/02/13 02:54:38 lukem Exp $
+# $NetBSD: Makefile,v 1.8 2001/12/12 01:49:36 tv Exp $
 
-PROG=sw-kbdmap
-MKMAN=	no
-FILES=sw.map
+HOSTPROG=	sw-kbdmap
+NOMAN=		# defined
+FILES=		sw.map
 
-.include <bsd.prog.mk>
+.include <bsd.hostprog.mk>

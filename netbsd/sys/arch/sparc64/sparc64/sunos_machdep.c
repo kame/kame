@@ -1,4 +1,4 @@
-/*	$NetBSD: sunos_machdep.c,v 1.10 2000/04/10 13:34:20 pk Exp $	*/
+/*	$NetBSD: sunos_machdep.c,v 1.15 2002/03/02 12:28:16 mrg Exp $	*/
 
 /*
  * Copyright (c) 1995 Matthew R. Green
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Matthew R. Green for
- *      the NetBSD Project.
- * 4. The name of the author may not be used to endorse or promote products
+ * 3. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
@@ -32,7 +28,9 @@
  * SUCH DAMAGE.
  */
 
+#ifdef _KERNEL_OPT
 #include "opt_ddb.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,7 +84,6 @@ sunos_sendsig(catcher, sig, mask, code)
 	u_long code;
 {
 	register struct proc *p = curproc;
-	register struct sigacts *psp = p->p_sigacts;
 	register struct sunos_sigframe *fp;
 	register struct trapframe64 *tf;
 	register int addr, onstack; 
@@ -101,12 +98,12 @@ sunos_sendsig(catcher, sig, mask, code)
 	 * one signal frame, and align.
 	 */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	if (onstack)
-		fp = (struct sunos_sigframe *)((char *)psp->ps_sigstk.ss_sp +
-					       psp->ps_sigstk.ss_size);
+		fp = (struct sunos_sigframe *)((char *)p->p_sigctx.ps_sigstk.ss_sp +
+					p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct sunos_sigframe *)oldsp;
 	fp = (struct sunos_sigframe *)((long)(fp - 1) & ~7);
@@ -134,7 +131,7 @@ sunos_sendsig(catcher, sig, mask, code)
 	/*
 	 * Build the signal context to be used by sigreturn.
 	 */
-	sf.sf_sc.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	sf.sf_sc.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 	native_sigset_to_sigset13(mask, &sf.sf_sc.sc_mask);
 	sf.sf_sc.sc_sp = (long)oldsp;
 	sf.sf_sc.sc_pc = tf->tf_pc;
@@ -196,7 +193,7 @@ sunos_sendsig(catcher, sig, mask, code)
 #ifdef DEBUG
 	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid) {
 		printf("sunos_sendsig: about to return to catcher %p thru %p\n", 
-		       catcher, addr);
+		       catcher, (void *)(u_long)addr);
 #ifdef DDB
 		if (sigdebug & SDB_DDB) Debugger();
 #endif
@@ -219,10 +216,6 @@ sunos_sys_sigreturn(p, v, retval)
 
 	/* First ensure consistent stack state (see sendsig). */
 	write_user_windows();
-#if 0
-	/* Make sure our D$ is not polluted w/bad data */
-	blast_vcache();
-#endif
 	if (rwindow_save(p))
 		sigexit(p, SIGILL);
 #ifdef DEBUG
@@ -249,7 +242,7 @@ sunos_sys_sigreturn(p, v, retval)
 	if (((scp->sc_pc | scp->sc_npc) & 3) != 0 || scp->sc_pc == 0 || scp->sc_npc == 0)
 #ifdef DEBUG
 	{
-		printf("sunos_sigreturn: pc %p or npc %p invalid\n", scp->sc_pc, scp->sc_npc);
+		printf("sunos_sigreturn: pc %p or npc %p invalid\n", (void *)(u_long)scp->sc_pc, (void *)(u_long)scp->sc_npc);
 #ifdef DDB
 		Debugger();
 #endif
@@ -267,7 +260,7 @@ sunos_sys_sigreturn(p, v, retval)
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW) {
 		printf("sunos_sigreturn: return trapframe pc=%p sp=%p tstate=%llx\n",
-		       (vaddr_t)tf->tf_pc, (vaddr_t)tf->tf_out[6], tf->tf_tstate);
+		       (void *)(u_long)tf->tf_pc, (void *)(u_long)tf->tf_out[6], (unsigned long long)tf->tf_tstate);
 #ifdef DDB
 		if (sigdebug & SDB_DDB) Debugger();
 #endif
@@ -275,9 +268,9 @@ sunos_sys_sigreturn(p, v, retval)
 #endif
 
 	if (scp->sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask */
 	native_sigset13_to_sigset(&scp->sc_mask, &mask);

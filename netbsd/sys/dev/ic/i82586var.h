@@ -1,4 +1,4 @@
-/*	$NetBSD: i82586var.h,v 1.14 2000/05/11 20:55:04 bjh21 Exp $	*/
+/*	$NetBSD: i82586var.h,v 1.16 2001/03/10 20:04:30 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -167,6 +167,8 @@
 			  `offset' argument will be 16-bit aligned
  *	bus_write24	- write a 24-bit i82586 pointer
 			  `offset' argument will be 32-bit aligned
+ *	bus_barrier	- perform a bus barrier operation, forcing
+			  all outstanding reads/writes to complete
  *
  */
 
@@ -190,7 +192,7 @@ struct ie_softc {
 	/* Bus glue */
 	void	(*hwreset) __P((struct ie_softc *, int));
 	void	(*hwinit) __P((struct ie_softc *));
-	void	(*chan_attn) __P((struct ie_softc *));
+	void	(*chan_attn) __P((struct ie_softc *, int));
 	int	(*intrhook) __P((struct ie_softc *, int where));
 
 	void	(*memcopyin) __P((struct ie_softc *, void *, int, size_t));
@@ -201,6 +203,8 @@ struct ie_softc {
 					u_int16_t value));
 	void	(*ie_bus_write24) __P((struct ie_softc *, int offset,
 					int addr));
+	void	(*ie_bus_barrier) __P((struct ie_softc *, int offset, 
+					int length, int flags));
 
 	/* Media management */
         int  (*sc_mediachange) __P((struct ie_softc *));
@@ -266,3 +270,14 @@ int 	i82586_intr	__P((void *));
 int 	i82586_proberam __P((struct ie_softc *));
 void 	i82586_attach 	__P((struct ie_softc *, char *, u_int8_t *, 
 			     int*, int, int));
+
+/* Shortcut macros to optional (driver uses default if unspecified) callbacks */
+#define IE_BUS_BARRIER(sc, offset, length, flags)			  \
+do { 	    								  \
+	if ((sc)->ie_bus_barrier) 					  \
+		((sc)->ie_bus_barrier)((sc), (offset), (length), (flags));\
+	else 								  \
+		bus_space_barrier((sc)->bt, (sc)->bh, (offset), (length), \
+							        (flags)); \
+} while (0)
+

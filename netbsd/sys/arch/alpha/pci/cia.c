@@ -1,4 +1,4 @@
-/* $NetBSD: cia.c,v 1.55 2000/04/03 01:48:07 thorpej Exp $ */
+/* $NetBSD: cia.c,v 1.58 2002/05/16 01:01:31 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -72,18 +72,20 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: cia.c,v 1.55 2000/04/03 01:48:07 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cia.c,v 1.58 2002/05/16 01:01:31 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/rpb.h>
 #include <machine/sysarch.h>
+#include <machine/alpha.h>
 
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
@@ -218,8 +220,7 @@ cia_init(ccp, mallocsafe)
 	 *	- It hasn't been disbled by the user,
 	 *	- it's enabled in CNFG,
 	 *	- we're implementation version ev5,
-	 *	- BWX is enabled in the CPU's capabilities mask (yes,
-	 *	  the bit is really cleared if the capability exists...)
+	 *	- BWX is enabled in the CPU's capabilities mask
 	 */
 	if ((pci_use_bwx || bus_use_bwx) &&
 	    (ccp->cc_cnfg & CNFG_BWEN) != 0 &&
@@ -417,6 +418,7 @@ ciaattach(parent, self, aux)
 	    alphabus_dma_get_tag(&ccp->cc_dmat_direct, ALPHA_BUS_PCI);
 	pba.pba_pc = &ccp->cc_pc;
 	pba.pba_bus = 0;
+	pba.pba_bridgetag = NULL;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 	if ((ccp->cc_flags & CCF_PYXISBUG) == 0)
 		pba.pba_flags |= PCI_FLAGS_MRL_OKAY | PCI_FLAGS_MRM_OKAY |

@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.173.2.3 2000/08/13 09:09:28 jdolecek Exp $	*/
+/*	$NetBSD: machdep.c,v 1.199 2002/03/05 16:14:28 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.173.2.3 2000/08/13 09:09:28 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.199 2002/03/05 16:14:28 simonb Exp $");
 
 #include "fs_mfs.h"
 #include "opt_ddb.h"
@@ -56,15 +56,17 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.173.2.3 2000/08/13 09:09:28 jdolecek E
 #include <sys/user.h>
 #include <sys/mount.h>
 #include <sys/kcore.h>
+#include <sys/boot_flag.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <sys/sysctl.h>			/* XXX after <vm/vm.h> */
+#include <uvm/uvm_extern.h>
+
+#include <sys/sysctl.h>
 
 #include <dev/cons.h>
 
 #include <ufs/mfs/mfs_extern.h>		/* mfs_initminiroot() */
 
+#include <mips/cache.h>
 #include <machine/psl.h>
 #include <machine/autoconf.h>
 #include <machine/dec_prom.h>
@@ -72,6 +74,9 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.173.2.3 2000/08/13 09:09:28 jdolecek E
 #include <machine/bootinfo.h>
 #include <machine/locore.h>
 #include <pmax/pmax/machdep.h>
+
+#define _PMAX_BUS_DMA_PRIVATE
+#include <machine/bus.h>
 
 #ifdef DDB
 #include <sys/exec_aout.h>		/* XXX backwards compatilbity for DDB */
@@ -93,9 +98,9 @@ unsigned ssir;				/* simulated interrupt register */
 struct cpu_info cpu_info_store;
 
 /* maps for VM objects */
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 int		systype;		/* mother board type */
 char		*bootinfo = NULL;	/* pointer to bootinfo structure */
@@ -244,6 +249,12 @@ mach_init(argc, argv, code, cv, bim, bip)
 	 */
 	mips_vector_init();
 
+	/*
+	 * We know the CPU type now.  Initialize our DMA tags (might
+	 * need this early, for certain types of console devices!!).
+	 */
+	pmax_bus_dma_init();
+
 	/* Check for direct boot from DS5000 REX monitor */
 	if (argc > 0 && strcmp(argv[0], "boot") == 0) {
 		argc--;
@@ -267,20 +278,17 @@ mach_init(argc, argv, code, cv, bim, bip)
 				boothowto &= ~RB_SINGLE;
 				break;
 
-			case 'd': /* break into the kernel debugger ASAP */
-				boothowto |= RB_KDB;
-				break;
-
-			case 'm': /* mini root present in memory */
-				boothowto |= RB_MINIROOT;
-				break;
-
 			case 'n': /* ask for names */
 				boothowto |= RB_ASKNAME;
 				break;
 
 			case 'N': /* don't ask for names */
 				boothowto &= ~RB_ASKNAME;
+				break;
+
+			default:
+				BOOT_FLAG(*cp, boothowto);
+				break;
 			}
 		}
 	}
@@ -295,10 +303,6 @@ mach_init(argc, argv, code, cv, bim, bip)
 #endif
 
 #ifdef DDB
-	/*
-	 * Initialize machine-dependent DDB commands, in case of early panic.
-	 */
-	db_machine_init();
 	/* init symbols if present */
 	if (esym)
 		ddb_init(esym - ssym, ssym, esym);
@@ -339,30 +343,27 @@ mach_init(argc, argv, code, cv, bim, bip)
 	physmem = (*platform.memsize)(kernend);
 
 	/*
-	 * Now that we know how much memory we have, initialize the
-	 * mem cluster array.
-	 */
-	mem_clusters[0].start = 0;		/* XXX is this correct? */
-	mem_clusters[0].size  = ctob(physmem);
-	mem_cluster_cnt = 1;
-
-	/*
 	 * Load the rest of the available pages into the VM system.
 	 * Put the first 8M of RAM onto a lower-priority free list, since
 	 * some TC boards (e.g. PixelStamp boards) are only able to DMA
 	 * into this region, and we want them to have a fighting chance of
 	 * allocating their DMA memory during autoconfiguration.
 	 */
-	first = round_page(MIPS_KSEG0_TO_PHYS(kernend));
-	last = mem_clusters[0].start + mem_clusters[0].size;
-	if (last <= (8 * 1024 * 1024)) {
-		uvm_page_physload(atop(first), atop(last), atop(first),
-		    atop(last), VM_FREELIST_DEFAULT);
-	} else {
-		uvm_page_physload(atop(first), atop(8 * 1024 * 1024),
-		    atop(first), atop(8 * 1024 * 1024), VM_FREELIST_FIRST8);
-		uvm_page_physload(atop(8 * 1024 * 1024), atop(last),
-		    atop(8 * 1024 * 1024), atop(last), VM_FREELIST_DEFAULT);
+	for (i = 0, physmem = 0; i < mem_cluster_cnt; ++i) {
+		first = mem_clusters[i].start;
+		if (first == 0)
+			first = round_page(MIPS_KSEG0_TO_PHYS(kernend));
+		last = mem_clusters[i].start + mem_clusters[i].size;
+		physmem += atop(mem_clusters[i].size);
+		if (i != 0 || last <= (8 * 1024 * 1024)) {
+			uvm_page_physload(atop(first), atop(last), atop(first),
+			    atop(last), VM_FREELIST_DEFAULT);
+		} else {
+			uvm_page_physload(atop(first), atop(8 * 1024 * 1024),
+			    atop(first), atop(8 * 1024 * 1024), VM_FREELIST_FIRST8);
+			uvm_page_physload(atop(8 * 1024 * 1024), atop(last),
+			    atop(8 * 1024 * 1024), atop(last), VM_FREELIST_DEFAULT);
+		}
 	}
 
 	/*
@@ -371,20 +372,33 @@ mach_init(argc, argv, code, cv, bim, bip)
 	mips_init_msgbuf();
 
 	/*
-	 * Allocate space for system data structures.  These data structures
-	 * are allocated here instead of cpu_startup() because physical memory
-	 * is directly addressable.  We don't have to map these into virtual
-	 * address space.
+	 * Compute the size of system data structures.  pmap_bootstrap()
+	 * needs some of this information.
 	 */
 	size = (unsigned)allocsys(NULL, NULL);
-	v = (caddr_t)pmap_steal_memory(size, NULL, NULL);
-	if ((allocsys(v, NULL) - v) != size)
-		panic("mach_init: table size inconsistency");
 
 	/*
 	 * Initialize the virtual memory system.
 	 */
 	pmap_bootstrap();
+
+	/*
+	 * Allocate space for system data structures.  These data structures
+	 * are allocated here instead of cpu_startup() because physical memory
+	 * is directly addressable.  We don't have to map these into virtual
+	 * address space.
+	 */
+	v = (caddr_t)uvm_pageboot_alloc(size);
+	if ((allocsys(v, NULL) - v) != size)
+		panic("mach_init: table size inconsistency");
+}
+
+void
+mips_machdep_cache_config(void)
+{
+	/* All r4k pmaxen have a 1MB L2 cache. */
+	if (CPUISMIPS3)
+		mips_sdcache_size = 1024 * 1024;
 }
 
 void
@@ -428,9 +442,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("cpu_startup: cannot allocate VM for buffers");
 
 	minaddr = (vaddr_t)buffers;
@@ -466,6 +480,8 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
+
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -653,6 +669,14 @@ memsize_scan(first)
 		mem++;
 	}
 
+	/*
+	 * Now that we know how much memory we have, initialize the
+	 * mem cluster array.
+	 */
+	mem_clusters[0].start = 0;		/* XXX is this correct? */
+	mem_clusters[0].size  = ctob(mem);
+	mem_cluster_cnt = 1;
+
 	/* clear any memory error conditions possibly caused by probe */
 	(*platform.bus_reset)();
 	return (mem);
@@ -665,8 +689,38 @@ int
 memsize_bitmap(first)
 	caddr_t first;
 {
+	memmap *prom_memmap = (memmap *)first;
+	int i, mapbytes;
+	int segstart, curaddr, xsize, segnum;
 
-	panic("memsize_bitmap not implemented");
+	mapbytes = prom_getbitmap(prom_memmap);
+	if (mapbytes == 0)
+		return (memsize_scan(first));
+
+	segstart = curaddr = i = segnum = 0;
+	xsize = prom_memmap->pagesize * 8;
+	while (i < mapbytes) {
+		while (prom_memmap->bitmap[i] == 0xff && i < mapbytes) {
+			++i;
+			curaddr += xsize;
+		}
+		if (curaddr > segstart) {
+			mem_clusters[segnum].start = segstart;
+			mem_clusters[segnum].size = curaddr - segstart;
+			++segnum;
+		}
+		while (i < mapbytes && prom_memmap->bitmap[i] != 0xff) {
+			++i;
+			curaddr += xsize;
+		}
+		segstart = curaddr;
+	}
+	mem_cluster_cnt = segnum;
+	for (i = 0; i < segnum; ++i) {
+		printf("segment %2d start %08lx size %08lx\n", i,
+		    (long)mem_clusters[i].start, (long)mem_clusters[i].size);
+	}
+	return (mapbytes * 8);
 }
 
 /*
@@ -724,69 +778,6 @@ nullwork()
 }
 
 /*
- * pmax uses standard mips1 convention, wiring FPU to hard interupt 5.
- */
-#define INT_MASK_FPU	MIPS_INT_MASK_5
-#define	INT_MASK_DEV	(MIPS_HARD_INT_MASK &~ MIPS_INT_MASK_5)
-
-void
-cpu_intr(status, cause, pc, ipending)
-	u_int32_t status;
-	u_int32_t cause;
-	u_int32_t pc;
-	u_int32_t ipending;
-{
-	extern void MachFPInterrupt __P((unsigned, unsigned, unsigned, struct frame *));
-
-	uvmexp.intrs++;
-
-	/* device interrupts */
-	if (ipending & INT_MASK_DEV) {
-		(*platform.iointr)(status, cause, pc, ipending);
-	}
-	/* FPU nofiticaition */
-	if (ipending & INT_MASK_FPU) {
-		if (!USERMODE(status))
-			goto kerneltouchedFPU;
-		intrcnt[FPU_INTR]++;
-		/* dealfpu(status, cause, pc); */
-		MachFPInterrupt(status, cause, pc, curproc->p_md.md_regs);
-	}
-
-	/* software simulated interrupt */
-	if ((ipending & MIPS_SOFT_INT_MASK_1)
-		    || (ssir && (status & MIPS_SOFT_INT_MASK_1))) {
-
-#define DO_SIR(bit, fn)						\
-	do {							\
-		if (n & (bit)) {				\
-			uvmexp.softs++;				\
-			fn;					\
-		}						\
-	} while (0)
-
-		unsigned n;
-		n = ssir; ssir = 0;
-		_clrsoftintr(MIPS_SOFT_INT_MASK_1);
-
-		DO_SIR(SIR_NET, netintr());
-#undef DO_SIR
-	}
-
-	/* 'softclock' interrupt */
-	if (ipending & MIPS_SOFT_INT_MASK_0) {
-		_clrsoftintr(MIPS_SOFT_INT_MASK_0);
-		uvmexp.softs++;
-		intrcnt[SOFTCLOCK_INTR]++;
-		softclock();
-	}
-	return;
-
-kerneltouchedFPU:
-	panic("kernel used FPU: PC %x, CR %x, SR %x", pc, cause, status);
-}
-
-/*
  * Return the best possible estimate of the time in the timeval to
  * which tvp points.  We guarantee that the time will be greater than
  * the value obtained by a previous call.  Some models of DECstations
@@ -800,7 +791,7 @@ microtime(tvp)
 	static struct timeval lasttime;
 
 	*tvp = time;
-#if (DEC_3MIN + DEC_MAXINE + DEC_3MAXPLUS) > 0
+#if defined(DEC_3MIN) || defined(DEC_MAXINE) || defined(DEC_3MAXPLUS)
 	tvp->tv_usec += (*platform.clkread)();
 #endif
 	if (tvp->tv_usec >= 1000000) {

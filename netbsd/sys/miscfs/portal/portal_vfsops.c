@@ -1,4 +1,4 @@
-/*	$NetBSD: portal_vfsops.c,v 1.24 2000/06/10 18:27:03 assar Exp $	*/
+/*	$NetBSD: portal_vfsops.c,v 1.29 2001/11/15 09:48:23 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -43,14 +43,16 @@
  * Portal Filesystem
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: portal_vfsops.c,v 1.29 2001/11/15 09:48:23 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/proc.h>
 #include <sys/filedesc.h>
 #include <sys/file.h>
@@ -347,9 +349,9 @@ portal_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	return (EOPNOTSUPP);
 }
 
-extern struct vnodeopv_desc portal_vnodeop_opv_desc;
+extern const struct vnodeopv_desc portal_vnodeop_opv_desc;
 
-struct vnodeopv_desc *portal_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const portal_vnodeopv_descs[] = {
 	&portal_vnodeop_opv_desc,
 	NULL,
 };
@@ -367,6 +369,7 @@ struct vfsops portal_vfsops = {
 	portal_fhtovp,
 	portal_vptofh,
 	portal_init,
+	NULL,
 	portal_done,
 	portal_sysctl,
 	NULL,				/* vfs_mountroot */

@@ -1,4 +1,4 @@
-/*	$NetBSD: byte_swap_2.S,v 1.1.12.1 2000/08/11 17:01:34 msaitoh Exp $	*/
+/*	$NetBSD: byte_swap_2.S,v 1.2 2000/07/21 11:19:10 msaitoh Exp $	*/
 
 /*-
  * Copyright (C) 1999 SHIMIZU Ryo.  All rights reserved.

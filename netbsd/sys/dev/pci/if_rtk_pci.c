@@ -1,4 +1,4 @@
-/*	$NetBSD: if_rtk_pci.c,v 1.3.4.1 2001/06/11 19:34:39 he Exp $	*/
+/*	$NetBSD: if_rtk_pci.c,v 1.12 2002/02/06 12:43:05 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -46,49 +46,8 @@
  * Columbia University, New York City
  */
 
-/*
- * The RealTek 8139 PCI NIC redefines the meaning of 'low end.' This is
- * probably the worst PCI ethernet controller ever made, with the possible
- * exception of the FEAST chip made by SMC. The 8139 supports bus-master
- * DMA, but it has a terrible interface that nullifies any performance
- * gains that bus-master DMA usually offers.
- *
- * For transmission, the chip offers a series of four TX descriptor
- * registers. Each transmit frame must be in a contiguous buffer, aligned
- * on a longword (32-bit) boundary. This means we almost always have to
- * do mbuf copies in order to transmit a frame, except in the unlikely
- * case where a) the packet fits into a single mbuf, and b) the packet
- * is 32-bit aligned within the mbuf's data area. The presence of only
- * four descriptor registers means that we can never have more than four
- * packets queued for transmission at any one time.
- *
- * Reception is not much better. The driver has to allocate a single large
- * buffer area (up to 64K in size) into which the chip will DMA received
- * frames. Because we don't know where within this region received packets
- * will begin or end, we have no choice but to copy data from the buffer
- * area into mbufs in order to pass the packets up to the higher protocol
- * levels.
- *
- * It's impossible given this rotten design to really achieve decent
- * performance at 100Mbps, unless you happen to have a 400Mhz PII or
- * some equally overmuscled CPU to drive it.
- *
- * On the bright side, the 8139 does have a built-in PHY, although
- * rather than using an MDIO serial interface like most other NICs, the
- * PHY registers are directly accessible through the 8139's register
- * space. The 8139 supports autonegotiation, as well as a 64-bit multicast
- * filter.
- *
- * The 8129 chip is an older version of the 8139 that uses an external PHY
- * chip. The 8129 has a serial MDIO interface for accessing the MII where
- * the 8139 lets you directly access the on-board PHY registers. We need
- * to select which interface to use depending on the chip type.
- */
-
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h"
-#include "rnd.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_rtk_pci.c,v 1.12 2002/02/06 12:43:05 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,21 +64,6 @@
 #include <net/if_ether.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#endif
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#endif
-#if NRND > 0
-#include <sys/rnd.h>
-#endif
 
 #include <machine/bus.h>
 
@@ -138,14 +82,16 @@
  * on the part of RealTek. Memory mapped mode does appear to work on
  * uniprocessor systems though.
  */
+#ifndef dreamcast		/* XXX */
 #define RTK_USEIOSPACE
+#endif
 
 #include <dev/ic/rtl81x9reg.h>
 #include <dev/ic/rtl81x9var.h>
 
 struct rtk_pci_softc {
 	struct rtk_softc sc_rtk;	/* real rtk softc */
-	
+
 	/* PCI-specific goo.*/
 	void *sc_ih;
 	pci_chipset_tag_t sc_pc; 	/* PCI chipset */
@@ -168,7 +114,10 @@ static const struct rtk_type rtk_pci_devs[] = {
 	{ PCI_VENDOR_ADDTRON, PCI_PRODUCT_ADDTRON_8139,
 		"Addtron Technology 8139 10/100BaseTX",
 		RTK_8139 },
-	{	PCI_VENDOR_DLINK, PCI_PRODUCT_DLINK_DFE530TXPLUS,
+	{ PCI_VENDOR_SEGA, PCI_PRODUCT_SEGA_BROADBAND,
+		"SEGA Broadband Adapter",
+		RTK_8139 },
+	{ PCI_VENDOR_DLINK, PCI_PRODUCT_DLINK_DFE530TXPLUS,
 		"D-Link Systems DFE 530TX+",
 		RTK_8139 },
 	{ 0, 0, NULL, 0 }
@@ -189,7 +138,7 @@ rtk_pci_lookup(pa)
 {
 	const struct rtk_type *t;
 
-	for (t = rtk_pci_devs; t->rtk_name != NULL; t++){ 	
+	for (t = rtk_pci_devs; t->rtk_name != NULL; t++) {
 		if (PCI_VENDOR(pa->pa_id) == t->rtk_vid &&
 		    PCI_PRODUCT(pa->pa_id) == t->rtk_did) {
 			return (t);
@@ -254,12 +203,12 @@ rtk_pci_attach(parent, self, aux)
 			iobase = pci_conf_read(pc, pa->pa_tag, RTK_PCI_LOIO);
 			membase = pci_conf_read(pc, pa->pa_tag, RTK_PCI_LOMEM);
 			irq = pci_conf_read(pc, pa->pa_tag,
-					    PCI_PRODUCT_DELTA_8139);
+			    PCI_PRODUCT_DELTA_8139);
 
 			/* Reset the power state. */
 			printf("%s: chip is is in D%d power mode "
-			"-- setting to D0\n", sc->sc_dev.dv_xname,
-			       command & RTK_PSTATE_MASK);
+			    "-- setting to D0\n", sc->sc_dev.dv_xname,
+			    command & RTK_PSTATE_MASK);
 			command &= 0xFFFFFFFC;
 			pci_conf_write(pc, pa->pa_tag, pmreg + 4, command);
 
@@ -267,7 +216,7 @@ rtk_pci_attach(parent, self, aux)
 			pci_conf_write(pc, pa->pa_tag, RTK_PCI_LOIO, iobase);
 			pci_conf_write(pc, pa->pa_tag, RTK_PCI_LOMEM, membase);
 			pci_conf_write(pc, pa->pa_tag,
-				       PCI_PRODUCT_DELTA_8139, irq);
+			    PCI_PRODUCT_DELTA_8139, irq);
 		}
 	}
 
@@ -283,14 +232,13 @@ rtk_pci_attach(parent, self, aux)
 #else
 	if (pci_mapreg_map(pa, RTK_PCI_LOMEM, PCI_MAPREG_TYPE_MEM, 0,
 	    &sc->rtk_btag, &sc->rtk_bhandle, NULL, NULL)) {
-		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
+		printf("%s: can't map mem space\n", sc->sc_dev.dv_xname);
 		return;
 	}
 #endif
 
 	/* Allocate interrupt */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -310,6 +258,6 @@ rtk_pci_attach(parent, self, aux)
 	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
 	sc->sc_dmat = pa->pa_dmat;
-	
+
 	rtk_attach(sc);
 }

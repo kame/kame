@@ -1,4 +1,4 @@
-/*	$NetBSD: kernfs_vnops.c,v 1.67.12.1 2000/07/14 18:11:56 thorpej Exp $	*/
+/*	$NetBSD: kernfs_vnops.c,v 1.79.10.1 2002/07/21 00:52:37 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -42,11 +42,13 @@
  * Kernel parameter filesystem (/kern)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kernfs_vnops.c,v 1.79.10.1 2002/07/21 00:52:37 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/vmmeter.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
@@ -62,8 +64,6 @@
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/kernfs/kernfs.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #define KSTRING	256		/* Largest I/O available via this filesystem */
@@ -73,7 +73,7 @@
 #define	WRITE_MODE	(S_IWUSR|S_IRUSR|S_IRGRP|S_IROTH)
 #define DIR_MODE	(S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
 
-struct kern_target kern_targets[] = {
+const struct kern_target kern_targets[] = {
 /* NOTE: The name must be less than UIO_MX-16 chars in length */
 #define N(s) sizeof(s)-1, s
      /*        name            data          tag           type  ro/rw */
@@ -116,7 +116,6 @@ int	kernfs_write	__P((void *));
 #define	kernfs_ioctl	genfs_enoioctl
 #define	kernfs_poll	genfs_poll
 #define kernfs_revoke	genfs_revoke
-#define	kernfs_mmap	genfs_eopnotsupp
 #define	kernfs_fsync	genfs_nullop
 #define	kernfs_seek	genfs_nullop
 #define	kernfs_remove	genfs_eopnotsupp_rele
@@ -144,12 +143,13 @@ int	kernfs_pathconf	__P((void *));
 #define	kernfs_truncate	genfs_eopnotsupp
 #define	kernfs_update	genfs_nullop
 #define	kernfs_bwrite	genfs_eopnotsupp
+#define	kernfs_putpages	genfs_putpages
 
-int	kernfs_xread __P((struct kern_target *, int, char **, int));
-int	kernfs_xwrite __P((struct kern_target *, char *, int));
+static int	kernfs_xread __P((const struct kern_target *, int, char **, size_t, size_t *));
+static int	kernfs_xwrite __P((const struct kern_target *, char *, size_t));
 
 int (**kernfs_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc kernfs_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc kernfs_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, kernfs_lookup },		/* lookup */
 	{ &vop_create_desc, kernfs_create },		/* create */
@@ -165,7 +165,6 @@ struct vnodeopv_entry_desc kernfs_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, kernfs_ioctl },		/* ioctl */
 	{ &vop_poll_desc, kernfs_poll },		/* poll */
 	{ &vop_revoke_desc, kernfs_revoke },		/* revoke */
-	{ &vop_mmap_desc, kernfs_mmap },		/* mmap */
 	{ &vop_fsync_desc, kernfs_fsync },		/* fsync */
 	{ &vop_seek_desc, kernfs_seek },		/* seek */
 	{ &vop_remove_desc, kernfs_remove },		/* remove */
@@ -193,17 +192,19 @@ struct vnodeopv_entry_desc kernfs_vnodeop_entries[] = {
 	{ &vop_truncate_desc, kernfs_truncate },	/* truncate */
 	{ &vop_update_desc, kernfs_update },		/* update */
 	{ &vop_bwrite_desc, kernfs_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, kernfs_putpages },	/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc kernfs_vnodeop_opv_desc =
+const struct vnodeopv_desc kernfs_vnodeop_opv_desc =
 	{ &kernfs_vnodeop_p, kernfs_vnodeop_entries };
 
-int
-kernfs_xread(kt, off, bufp, len)
-	struct kern_target *kt;
+static int
+kernfs_xread(kt, off, bufp, len, wrlen)
+	const struct kern_target *kt;
 	int off;
 	char **bufp;
-	int len;
+	size_t len;
+	size_t *wrlen;
 {
 
 	switch (kt->kt_tag) {
@@ -250,14 +251,17 @@ kernfs_xread(kt, off, bufp, len)
 		 * message buffer header are corrupted, but that'll cause
 		 * the system to die anyway.
 		 */
-		if (off >= msgbufp->msg_bufs)
+		if (off >= msgbufp->msg_bufs) {
+			*wrlen = 0;
 			return (0);
+		}
 		n = msgbufp->msg_bufx + off;
 		if (n >= msgbufp->msg_bufs)
 			n -= msgbufp->msg_bufs;
 		len = min(msgbufp->msg_bufs - n, msgbufp->msg_bufs - off);
 		*bufp = msgbufp->msg_bufc + n;
-		return (len);
+		*wrlen = len;
+		return (0);
 	}
 
 	case KTT_HOSTNAME: {
@@ -281,21 +285,25 @@ kernfs_xread(kt, off, bufp, len)
 		break;
 
 	default:
+		*wrlen = 0;
 		return (0);
 	}
 
 	len = strlen(*bufp);
 	if (len <= off)
-		return (0);
-	*bufp += off;
-	return (len - off);
+		*wrlen = 0;
+	else {
+		*bufp += off;
+		*wrlen = len - off;
+	}
+	return (0);
 }
 
-int
+static int
 kernfs_xwrite(kt, buf, len)
-	struct kern_target *kt;
+	const struct kern_target *kt;
 	char *buf;
-	int len;
+	size_t len;
 {
 
 	switch (kt->kt_tag) {
@@ -304,7 +312,7 @@ kernfs_xwrite(kt, buf, len)
 			--len;
 		memcpy(hostname, buf, len);
 		hostname[len] = '\0';
-		hostnamelen = len;
+		hostnamelen = (size_t) len;
 		return (0);
 
 	default:
@@ -330,7 +338,7 @@ kernfs_lookup(v)
 	struct vnode **vpp = ap->a_vpp;
 	struct vnode *dvp = ap->a_dvp;
 	const char *pname = cnp->cn_nameptr;
-	struct kern_target *kt;
+	const struct kern_target *kt;
 	struct vnode *fvp;
 	int error, i, wantpunlock;
 
@@ -438,7 +446,7 @@ kernfs_access(v)
 	if (vp->v_flag & VROOT) {
 		mode = DIR_MODE;
 	} else {
-		struct kern_target *kt = VTOKERN(vp)->kf_kt;
+		const struct kern_target *kt = VTOKERN(vp)->kf_kt;
 		mode = kt->kt_mode;
 	}
 
@@ -488,8 +496,8 @@ kernfs_getattr(v)
 		vap->va_fileid = 2;
 		vap->va_size = DEV_BSIZE;
 	} else {
-		struct kern_target *kt = VTOKERN(vp)->kf_kt;
-		int nbytes, total;
+		const struct kern_target *kt = VTOKERN(vp)->kf_kt;
+		size_t total;
 #ifdef KERNFS_DIAGNOSTIC
 		printf("kernfs_getattr: stat target %s\n", kt->kt_name);
 #endif
@@ -497,11 +505,10 @@ kernfs_getattr(v)
 		vap->va_mode = kt->kt_mode;
 		vap->va_nlink = 1;
 		vap->va_fileid = 1 + (kt - kern_targets);
-		total = 0;
-		while (buf = strbuf,
-		       nbytes = kernfs_xread(kt, total, &buf, sizeof(strbuf)))
-			total += nbytes;
-		vap->va_size = total;
+		buf = strbuf;
+		if (0 == (error = kernfs_xread(kt, 0, &buf,
+				sizeof(strbuf), &total)))
+			vap->va_size = total;
 	}
 
 #ifdef KERNFS_DIAGNOSTIC
@@ -536,9 +543,10 @@ kernfs_read(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct uio *uio = ap->a_uio;
-	struct kern_target *kt;
+	const struct kern_target *kt;
 	char strbuf[KSTRING], *buf;
-	int off, len;
+	off_t off;
+	size_t len;
 	int error;
 
 	if (vp->v_type == VDIR)
@@ -551,17 +559,10 @@ kernfs_read(v)
 #endif
 
 	off = uio->uio_offset;
-#if 0
-	while (buf = strbuf,
-#else
-	if (buf = strbuf,
-#endif
-	    len = kernfs_xread(kt, off, &buf, sizeof(strbuf))) {
-		if ((error = uiomove(buf, len, uio)) != 0)
-			return (error);
-		off += len;
-	}
-	return (0);
+	buf = strbuf;
+	if ((error = kernfs_xread(kt, off, &buf, sizeof(strbuf), &len)) == 0)
+		error = uiomove(buf, len, uio);
+	return (error);
 }
 
 int
@@ -576,7 +577,7 @@ kernfs_write(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct uio *uio = ap->a_uio;
-	struct kern_target *kt;
+	const struct kern_target *kt;
 	int error, xlen;
 	char strbuf[KSTRING];
 
@@ -614,7 +615,7 @@ kernfs_readdir(v)
 	} */ *ap = v;
 	struct uio *uio = ap->a_uio;
 	struct dirent d;
-	struct kern_target *kt;
+	const struct kern_target *kt;
 	off_t i;
 	int error;
 	off_t *cookies = NULL;
@@ -640,15 +641,14 @@ kernfs_readdir(v)
 	if (ap->a_ncookies) {
 		nc = uio->uio_resid / UIO_MX;
 		nc = min(nc, (nkern_targets - i));
-		MALLOC(cookies, off_t *, nc * sizeof(off_t), M_TEMP,
-		    M_WAITOK);
+		cookies = malloc(nc * sizeof(off_t), M_TEMP, M_WAITOK);
 		*ap->a_cookies = cookies;
 	}
 
 	for (kt = &kern_targets[i];
 	     uio->uio_resid >= UIO_MX && i < nkern_targets; kt++, i++) {
 #ifdef KERNFS_DIAGNOSTIC
-		printf("kernfs_readdir: i = %d\n", i);
+		printf("kernfs_readdir: i = %d\n", (int)i);
 #endif
 
 		if (kt->kt_tag == KTT_DEVICE) {
@@ -674,7 +674,7 @@ kernfs_readdir(v)
 
 	if (ap->a_ncookies) {
 		if (error) {
-			FREE(*ap->a_cookies, M_TEMP);
+			free(*ap->a_cookies, M_TEMP);
 			*ap->a_ncookies = 0;
 			*ap->a_cookies = NULL;
 		} else

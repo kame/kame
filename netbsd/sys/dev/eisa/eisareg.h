@@ -1,4 +1,4 @@
-/*	$NetBSD: eisareg.h,v 1.3.40.1 2000/08/11 18:00:09 thorpej Exp $	*/
+/*	$NetBSD: eisareg.h,v 1.5 2000/08/11 00:44:37 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Christopher G. Demetriou

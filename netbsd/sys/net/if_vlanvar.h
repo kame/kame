@@ -1,4 +1,4 @@
-/*	$NetBSD: if_vlanvar.h,v 1.4.4.1 2000/12/31 20:14:35 jhawk Exp $	*/
+/*	$NetBSD: if_vlanvar.h,v 1.4 2000/10/03 23:50:52 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

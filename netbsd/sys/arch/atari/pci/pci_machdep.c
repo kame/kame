@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.22 2000/06/04 19:14:35 cgd Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.35 2002/05/16 01:01:34 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.  All rights reserved.
@@ -31,6 +31,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "opt_mbtype.h"
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -39,17 +40,17 @@
 #include <sys/device.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#define _ATARI_BUS_DMA_PRIVATE
+#include <machine/bus.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <machine/cpu.h>
 #include <machine/iomap.h>
 #include <machine/mfp.h>
-#include <machine/bswap.h>
-#include <machine/bus.h>
 
 #include <atari/atari/device.h>
 #include <atari/pci/pci_vga.h>
@@ -66,7 +67,7 @@
  */
 #define PCI_MEM_START   0x00100000      /*   1 MByte */
 #define PCI_IO_START    0x00004000      /*  16 kByte (some PCI cards allow only
-					    I/O adresses up to 0xffff) */
+					    I/O addresses up to 0xffff) */
 
 /*
  * PCI memory and IO should be aligned acording to this masks
@@ -93,6 +94,28 @@ struct pci_memreg {
 
 typedef LIST_HEAD(pci_memreg_head, pci_memreg) PCI_MEMREG;
 
+/*
+ * Entry points for PCI DMA.  Use only the 'standard' functions.
+ */
+int	_bus_dmamap_create __P((bus_dma_tag_t, bus_size_t, int, bus_size_t,
+	    bus_size_t, int, bus_dmamap_t *));
+struct atari_bus_dma_tag pci_bus_dma_tag = {
+	0,
+#if defined(_ATARIHW_)
+	0x80000000, /* On the Hades, CPU memory starts here PCI-wise */
+#else
+	0,
+#endif
+	_bus_dmamap_create,
+	_bus_dmamap_destroy,
+	_bus_dmamap_load,
+	_bus_dmamap_load_mbuf,
+	_bus_dmamap_load_uio,
+	_bus_dmamap_load_raw,
+	_bus_dmamap_unload,
+	_bus_dmamap_sync,
+};
+
 int	pcibusprint __P((void *auxp, const char *));
 int	pcibusmatch __P((struct device *, struct cfdata *, void *));
 void	pcibusattach __P((struct device *, struct device *, void *));
@@ -101,11 +124,16 @@ static void enable_pci_devices __P((void));
 static void insert_into_list __P((PCI_MEMREG *head, struct pci_memreg *elem));
 static int overlap_pci_areas __P((struct pci_memreg *p,
 	struct pci_memreg *self, u_int addr, u_int size, u_int what));
-static int pci_config_offset __P((pcitag_t));
 
 struct cfattach pcibus_ca = {
 	sizeof(struct device), pcibusmatch, pcibusattach
 };
+
+/*
+ * We need some static storage to probe pci-busses for VGA cards during
+ * early console init.
+ */
+static struct atari_bus_space	bs_storage[2];	/* 1 iot, 1 memt */
 
 int
 pcibusmatch(pdp, cfp, auxp)
@@ -113,11 +141,24 @@ struct device	*pdp;
 struct cfdata	*cfp;
 void		*auxp;
 {
+	static int	nmatched = 0;
+
+	if (strcmp((char *)auxp, "pcibus"))
+		return (0);	/* Wrong number... */
+
 	if(atari_realconfig == 0)
-		return (0);
-	if (strcmp((char *)auxp, "pcibus") || cfp->cf_unit != 0)
-		return(0);
-	return(machineid & ATARI_HADES ? 1 : 0);
+		return (1);
+
+	if (machineid & (ATARI_HADES|ATARI_MILAN)) {
+		/*
+		 * Both Hades and Milan have only one pci bus
+		 */
+		if (nmatched)
+			return (0);
+		nmatched++;
+		return (1);
+	}
+	return (0);
 }
 
 void
@@ -127,15 +168,14 @@ void		*auxp;
 {
 	struct pcibus_attach_args	pba;
 
-	enable_pci_devices();
-
 	pba.pba_busname = "pci";
 	pba.pba_pc      = NULL;
 	pba.pba_bus     = 0;
+	pba.pba_bridgetag = NULL;
 	pba.pba_flags	= PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
-	pba.pba_dmat	= BUS_PCI_DMA_TAG;
-	pba.pba_iot     = leb_alloc_bus_space_tag(NULL);
-	pba.pba_memt    = leb_alloc_bus_space_tag(NULL);
+	pba.pba_dmat	= &pci_bus_dma_tag;
+	pba.pba_iot     = leb_alloc_bus_space_tag(&bs_storage[0]);
+	pba.pba_memt    = leb_alloc_bus_space_tag(&bs_storage[1]);
 	if ((pba.pba_iot == NULL) || (pba.pba_memt == NULL)) {
 		printf("leb_alloc_bus_space_tag failed!\n");
 		return;
@@ -143,7 +183,21 @@ void		*auxp;
 	pba.pba_iot->base  = PCI_IO_PHYS;
 	pba.pba_memt->base = PCI_MEM_PHYS;
 
+	if (dp == NULL) {
+		/*
+		 * Scan the bus for a VGA-card that we support. If we
+		 * find one, try to initialize it to a 'standard' text
+		 * mode (80x25).
+		 */
+		check_for_vga(pba.pba_iot, pba.pba_memt);
+		return;
+	}
+
+	enable_pci_devices();
+
+#if defined(_ATARIHW_)
 	MFP2->mf_aer &= ~(0x27); /* PCI interrupts: HIGH -> LOW */
+#endif
 
 	printf("\n");
 
@@ -197,12 +251,6 @@ init_pci_bus()
 		csr &= ~PCI_COMMAND_MASTER_ENABLE;
 		pci_conf_write(pc, tag, PCI_COMMAND_STATUS_REG, csr);
 	}
-
-	/*
-	 * Scan the bus for a VGA-card that we support. If we find
-	 * one, try to initialize it to a 'standard' text mode (80x25).
-	 */
-	check_for_vga();
 }
 
 /*
@@ -244,23 +292,23 @@ overlap_pci_areas(p, self, addr, size, what)
     
     q = p;
     while (q != NULL) {
-	if ((q != self) && (q->csr & what)) {
-	    if ((addr >= q->address) && (addr < (q->address + q->size))) {
+      if ((q != self) && (q->csr & what)) {
+	if ((addr >= q->address) && (addr < (q->address + q->size))) {
 #ifdef DEBUG_PCI_MACHDEP
-		printf("\noverlap area dev %d reg 0x%02x with dev %d reg 0x%02x",
+	  printf("\noverlap area dev %d reg 0x%02x with dev %d reg 0x%02x",
 			self->dev, self->reg, q->dev, q->reg);
 #endif
-		return 1;
-	    }
-	    if ((q->address >= addr) && (q->address < (addr + size))) {
-#ifdef DEBUG_PCI_MACHDEP
-		printf("\noverlap area dev %d reg 0x%02x with dev %d reg 0x%02x",
-			self->dev, self->reg, q->dev, q->reg);
-#endif
-		return 1;
-	    }
+	  return 1;
 	}
-	q = LIST_NEXT(q, link);
+	if ((q->address >= addr) && (q->address < (addr + size))) {
+#ifdef DEBUG_PCI_MACHDEP
+	  printf("\noverlap area dev %d reg 0x%02x with dev %d reg 0x%02x",
+			self->dev, self->reg, q->dev, q->reg);
+#endif
+	  return 1;
+	}
+      }
+      q = LIST_NEXT(q, link);
     }
     return 0;
 }
@@ -397,21 +445,28 @@ enable_pci_devices()
 	    }
 	}
 
+
+#if defined(_ATARIHW_)
 	/*
 	 * Both interrupt pin & line are set to the device (== slot)
-	 * number. This makes sense on the atari because the
+	 * number. This makes sense on the atari Hades because the
 	 * individual slots are hard-wired to a specific MFP-pin.
 	 */
 	csr  = (DEV2SLOT(dev) << PCI_INTERRUPT_PIN_SHIFT);
 	csr |= (DEV2SLOT(dev) << PCI_INTERRUPT_LINE_SHIFT);
 	pci_conf_write(pc, tag, PCI_INTERRUPT_REG, csr);
+#else
+	/*
+	 * On the Milan, we accept the BIOS's choice.
+	 */
+#endif
     }
 
     /*
      * second step: calculate the memory and I/O adresses beginning from
      * PCI_MEM_START and PCI_IO_START. Care about already mapped areas.
      *
-     * beginn with memory list
+     * begin with memory list
      */
 
     address = PCI_MEM_START;
@@ -551,26 +606,6 @@ enable_pci_devices()
     }
 }
 
-/*
- * Atari_init.c maps the config areas NBPG bytes apart....
- */
-static int pci_config_offset(tag)
-pcitag_t	tag;
-{
-	int	device;
-
-	device = (tag >> 11) & 0x1f;
-	return(device * NBPG);
-}
-
-int
-pci_bus_maxdevs(pc, busno)
-	pci_chipset_tag_t pc;
-	int busno;
-{
-	return (4);
-}
-
 pcitag_t
 pci_make_tag(pc, bus, device, function)
 	pci_chipset_tag_t pc;
@@ -579,52 +614,78 @@ pci_make_tag(pc, bus, device, function)
 	return ((bus << 16) | (device << 11) | (function << 8));
 }
 
-pcireg_t
-pci_conf_read(pc, tag, reg)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	int reg;
-{
-	u_long	data;
-
-	data = *(u_long *)(pci_conf_addr + pci_config_offset(tag) + reg);
-	return (bswap32(data));
-}
-
 void
-pci_conf_write(pc, tag, reg, data)
+pci_decompose_tag(pc, tag, bp, dp, fp)
 	pci_chipset_tag_t pc;
 	pcitag_t tag;
-	int reg;
-	pcireg_t data;
+	int *bp, *dp, *fp;
 {
-	*((u_long *)(pci_conf_addr + pci_config_offset(tag) + reg))
-		= bswap32(data);
+
+	if (bp != NULL)
+		*bp = (tag >> 16) & 0xff;
+	if (dp != NULL)
+		*dp = (tag >> 11) & 0x1f;
+	if (fp != NULL)
+		*fp = (tag >> 8) & 0x7;
 }
 
 int
-pci_intr_map(pc, intrtag, pin, line, ihp)
-	pci_chipset_tag_t pc;
-	pcitag_t intrtag;
-	int pin, line;
+pci_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
+	int line = pa->pa_intrline;
+
+#if defined(_MILANHW_)
+	/*
+	 * On the Hades, the 'pin' info is useless.
+	 */
+	{
+		int pin = pa->pa_intrpin;
+
+		if (pin == 0) {
+			/* No IRQ used. */
+			goto bad;
+		}
+		if (pin > PCI_INTERRUPT_PIN_MAX) {
+			printf("pci_intr_map: bad interrupt pin %d\n", pin);
+			goto bad;
+		}
+	}
+#endif /* _MILANHW_ */
+
 	/*
 	 * According to the PCI-spec, 255 means `unknown' or `no connection'.
 	 * Interpret this as 'no interrupt assigned'.
 	 */
-	if (line == 255) {
-		*ihp = -1;
-		return 1;
-	}
+	if (line == 255)
+		goto bad;
 
 	/*
-	 * Values are pretty useless because the on the Hades all interrupt
-	 * lines for a card are tied together and hardwired to the TT-MFP
-	 * I/O port.
+	 * Values are pretty useless on the Hades since all interrupt
+	 * lines for a card are tied together and hardwired to a
+	 * specific TT-MFP I/O port.
+	 * On the Milan, they are tied to the ICU.
 	 */
+#if defined(_MILANHW_)
+	if (line >= 16) {
+		printf("pci_intr_map: bad interrupt line %d\n", line);
+		goto bad;
+	}
+	if (line == 2) {
+		printf("pci_intr_map: changed line 2 to line 9\n");
+		line = 9;
+	}
+	/* Assume line == 0 means unassigned */
+	if (line == 0)
+		goto bad;
+#endif
 	*ihp = line;
 	return 0;
+
+bad:
+	*ihp = -1;
+	return 1;
 }
 
 const char *
@@ -650,101 +711,4 @@ pci_intr_evcnt(pc, ih)
 
 	/* XXX for now, no evcnt parent reported */
 	return NULL;
-}
-
-/*
- * The interrupt stuff is rather ugly. On the Hades, all interrupt lines
- * for a slot are wired together and connected to IO 0,1,2 or 5 (slots:
- * (0-3) on the TT-MFP. The Pci-config code initializes the irq. number
- * to the slot position.
- */
-static pci_intr_info_t iinfo[4] = { { -1 }, { -1 }, { -1 }, { -1 } };
-
-static int	iifun __P((int, int));
-
-static int
-iifun(slot, sr)
-int	slot;
-int	sr;
-{
-	pci_intr_info_t *iinfo_p;
-	int		s;
-
-	iinfo_p = &iinfo[slot];
-
-	/*
-	 * Disable the interrupts
-	 */
-	MFP2->mf_imrb  &= ~iinfo_p->imask;
-
-	if ((sr & PSL_IPL) >= (iinfo_p->ipl & PSL_IPL)) {
-		/*
-		 * We're running at a too high priority now.
-		 */
-		add_sicallback((si_farg)iifun, (void*)slot, 0);
-	}
-	else {
-		s = splx(iinfo_p->ipl);
-		(void) (iinfo_p->ifunc)(iinfo_p->iarg);
-		splx(s);
-
-		/*
-		 * Re-enable interrupts after handling
-		 */
-		MFP2->mf_imrb |= iinfo_p->imask;
-	}
-	return 1;
-}
-
-void *
-pci_intr_establish(pc, ih, level, ih_fun, ih_arg)
-	pci_chipset_tag_t	pc;
-	pci_intr_handle_t	ih;
-	int			level;
-	int			(*ih_fun) __P((void *));
-	void			*ih_arg;
-{
-	pci_intr_info_t *iinfo_p;
-	struct intrhand	*ihand;
-	int		slot;
-
-	slot    = ih;
-	iinfo_p = &iinfo[slot];
-
-	if (iinfo_p->ipl > 0)
-	    panic("pci_intr_establish: interrupt was already established\n");
-
-	ihand = intr_establish((slot == 3) ? 23 : 16 + slot, USER_VEC, 0,
-				(hw_ifun_t)iifun, (void *)slot);
-	if (ihand != NULL) {
-		iinfo_p->ipl   = level;
-		iinfo_p->imask = (slot == 3) ? 0x80 : (0x01 << slot);
-		iinfo_p->ifunc = ih_fun;
-		iinfo_p->iarg  = ih_arg;
-		iinfo_p->ihand = ihand;
-
-		/*
-		 * Enable (unmask) the interrupt
-		 */
-		MFP2->mf_imrb |= iinfo_p->imask;
-		MFP2->mf_ierb |= iinfo_p->imask;
-		return(iinfo_p);
-	}
-	return NULL;
-}
-
-void
-pci_intr_disestablish(pc, cookie)
-	pci_chipset_tag_t pc;
-	void *cookie;
-{
-	pci_intr_info_t *iinfo_p = (pci_intr_info_t *)cookie;
-
-	if (iinfo->ipl < 0)
-	    panic("pci_intr_disestablish: interrupt was not established\n");
-
-	MFP2->mf_imrb &= ~iinfo->imask;
-	MFP2->mf_ierb &= ~iinfo->imask;
-	(void) intr_disestablish(iinfo_p->ihand);
-	iinfo_p->ipl = -1;
 }

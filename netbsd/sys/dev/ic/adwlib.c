@@ -1,4 +1,4 @@
-/* $NetBSD: adwlib.c,v 1.17 2000/05/27 18:24:50 dante Exp $        */
+/* $NetBSD: adwlib.c,v 1.24 2001/11/15 09:48:04 lukem Exp $        */
 
 /*
  * Low level routines for the Advanced Systems Inc. SCSI controllers chips
@@ -51,7 +51,9 @@
  * modification.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: adwlib.c,v 1.24 2001/11/15 09:48:04 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -68,9 +70,7 @@
 
 #include <dev/pci/pcidevs.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/ic/adwlib.h>
 #include <dev/ic/adwmcode.h>
@@ -287,7 +287,9 @@ ADW_SOFTC      *sc;
 		case ADW_CHIP_ASC38C1600:
 			eep_config = adw_38C1600_Default_EEPROM;
 
-// XXX	  TODO!!!	if (ASC_PCI_ID2FUNC(sc->cfg.pci_slot_info) != 0) {
+#if 0
+XXX	  TODO!!!	if (ASC_PCI_ID2FUNC(sc->cfg.pci_slot_info) != 0) {
+#endif
 			if (sc->cfg.pci_slot_info != 0) {
 				u_int8_t lsw_msb;
 
@@ -853,12 +855,12 @@ ADW_SOFTC      *sc;
 	/*
 	 * The first command issued will be placed in the stopper carrier.
 	 */
-	sc->icq_sp->next_ba = ASC_CQ_STOPPER;
+	sc->icq_sp->next_ba = htole32(ASC_CQ_STOPPER);
 
 	/*
 	 * Set RISC ICQ physical address start value.
 	 */
-	ADW_WRITE_DWORD_LRAM(iot, ioh, ADW_MC_ICQ, sc->icq_sp->carr_ba);
+	ADW_WRITE_DWORD_LRAM(iot, ioh, ADW_MC_ICQ, le32toh(sc->icq_sp->carr_ba));
 
 	/*
 	 * Initialize the COMMA register to the same value otherwise
@@ -866,7 +868,7 @@ ADW_SOFTC      *sc;
 	 */
 	if(sc->chip_type == ADW_CHIP_ASC38C1600) {
 		ADW_WRITE_DWORD_REGISTER(iot, ioh, IOPDW_COMMA,
-							sc->icq_sp->carr_ba);
+						le32toh(sc->icq_sp->carr_ba));
 	}
 
 	/*
@@ -885,12 +887,12 @@ ADW_SOFTC      *sc;
 	 * Note: Set 'next_ba' to ASC_CQ_STOPPER. When the request is
 	 * completed the RISC will set the ASC_RQ_DONE bit.
 	 */
-	sc->irq_sp->next_ba = ASC_CQ_STOPPER;
+	sc->irq_sp->next_ba = htole32(ASC_CQ_STOPPER);
 
 	/*
 	 * Set RISC IRQ physical address start value.
 	 */
-	ADW_WRITE_DWORD_LRAM(iot, ioh, ADW_MC_IRQ, sc->irq_sp->carr_ba);
+	ADW_WRITE_DWORD_LRAM(iot, ioh, ADW_MC_IRQ, le32toh(sc->irq_sp->carr_ba));
 	sc->carr_pending_cnt = 0;
 
 	ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_INTR_ENABLES,
@@ -1498,15 +1500,17 @@ AdwASC38C1600Cabling(iot, ioh, cfg)
 				break;
 
 			case 0x0:
+#if 0
 	/* !!!!TODO!!!! */
-//				if (ASC_PCI_ID2FUNC(cfg->pci_slot_info) == 0) {
+				if (ASC_PCI_ID2FUNC(cfg->pci_slot_info) == 0) {
 				/* Function 0 - TERM_SE_HI: off, TERM_SE_LO: off */
-//				}
-//				else
-//				{
+				}
+				else
+#endif
+				{
 				/* Function 1 - TERM_SE_HI: on, TERM_SE_LO: off */
 					cfg->termination |= ADW_TERM_SE_HI;
-//				}
+				}
 				break;
 			}
 	}
@@ -1755,14 +1759,14 @@ ADW_SCSI_REQ_Q	*scsiq;
 	 * to the stopper value. The current stopper will be changed
 	 * below to point to the new stopper.
 	 */
-	new_carrp->next_ba = ASC_CQ_STOPPER;
+	new_carrp->next_ba = htole32(ASC_CQ_STOPPER);
 
 	req_size = sizeof(ADW_SCSI_REQ_Q);
 	req_paddr = sc->sc_dmamap_control->dm_segs[0].ds_addr +
 		ADW_CCB_OFF(ccb) + offsetof(struct adw_ccb, scsiq);
 
 	/* Save physical address of ADW_SCSI_REQ_Q and Carrier. */
-	scsiq->scsiq_rptr = req_paddr;
+	scsiq->scsiq_rptr = htole32(req_paddr);
 
 	/*
 	 * Every ADV_CARR_T.carr_ba is byte swapped to little-endian
@@ -1776,7 +1780,7 @@ ADW_SCSI_REQ_Q	*scsiq;
 	 * the microcode. The newly allocated stopper will become the new
 	 * stopper.
 	 */
-	sc->icq_sp->areq_ba = req_paddr;
+	sc->icq_sp->areq_ba = htole32(req_paddr);
 
 	/*
 	 * Set the 'next_ba' pointer for the old stopper to be the
@@ -1803,7 +1807,7 @@ ADW_SCSI_REQ_Q	*scsiq;
 		 * Tickle the RISC to tell it to read its Command Queue Head
 		 * pointer.
 		 */
-		ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_TICKLE, ADV_TICKLE_A);
+		ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_TICKLE, ADW_TICKLE_A);
 		if (sc->chip_type == ADW_CHIP_ASC3550) {
 			/*
 			 * Clear the tickle value. In the ASC-3550 the RISC flag
@@ -1811,7 +1815,7 @@ ADW_SCSI_REQ_Q	*scsiq;
 			 * value is cleared.
 			 */
 			ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_TICKLE,
-					ADV_TICKLE_NOP);
+					ADW_TICKLE_NOP);
 		}
 	} else if (sc->chip_type == ADW_CHIP_ASC38C1600) {
 		/*
@@ -1819,7 +1823,7 @@ ADW_SCSI_REQ_Q	*scsiq;
 		 * address of the new carrier stopper to the COMMA register.
 		 */
 		ADW_WRITE_DWORD_REGISTER(iot, ioh, IOPDW_COMMA,
-				new_carrp->carr_ba);
+				le32toh(new_carrp->carr_ba));
 	}
 
 	/*
@@ -2036,10 +2040,10 @@ ADW_SOFTC	*sc;
 			if (intrb_code == ADV_ASYNC_CARRIER_READY_FAILURE &&
 				sc->carr_pending_cnt != 0) {
 				ADW_WRITE_BYTE_REGISTER(iot, ioh,
-					IOPB_TICKLE, ADV_TICKLE_A);
+					IOPB_TICKLE, ADW_TICKLE_A);
 				if (sc->chip_type == ADW_CHIP_ASC3550) {
 					ADW_WRITE_BYTE_REGISTER(iot, ioh,
-						IOPB_TICKLE, ADV_TICKLE_NOP);
+						IOPB_TICKLE, ADW_TICKLE_NOP);
 				}
 			}
 		}
@@ -2052,7 +2056,7 @@ ADW_SOFTC	*sc;
 	/*
 	 * Check if the IRQ stopper carrier contains a completed request.
 	 */
-	while (((irq_next_pa = sc->irq_sp->next_ba) & ASC_RQ_DONE) != 0)
+	while (((le32toh(irq_next_pa = sc->irq_sp->next_ba)) & ASC_RQ_DONE) != 0)
 	{
 #if ADW_DEBUG
 		printf("irq 0x%x, 0x%x, 0x%x, 0x%x\n",
@@ -2080,7 +2084,7 @@ ADW_SOFTC	*sc;
 		 * DMAed to host memory by the firmware. Set all status fields
 		 * to indicate good status.
 		 */
-		if ((irq_next_pa & ASC_RQ_GOOD) != 0) {
+		if ((le32toh(irq_next_pa) & ASC_RQ_GOOD) != 0) {
 			scsiq->done_status = QD_NO_ERROR;
 			scsiq->host_status = scsiq->scsi_status = 0;
 			scsiq->data_cnt = 0L;
@@ -2187,14 +2191,14 @@ u_int32_t       idle_cmd_parameter;
 	/*
 	 * Tickle the RISC to tell it to process the idle command.
 	 */
-	ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_TICKLE, ADV_TICKLE_B);
+	ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_TICKLE, ADW_TICKLE_B);
 	if (sc->chip_type == ADW_CHIP_ASC3550) {
 		/*
 		 * Clear the tickle value. In the ASC-3550 the RISC flag
 		 * command 'clr_tickle_b' does not work unless the host
 		 * value is cleared.
 		 */
-		ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_TICKLE, ADV_TICKLE_NOP);
+		ADW_WRITE_BYTE_REGISTER(iot, ioh, IOPB_TICKLE, ADW_TICKLE_NOP);
 	}
 
 	/* Wait for up to 100 millisecond for the idle command to timeout. */

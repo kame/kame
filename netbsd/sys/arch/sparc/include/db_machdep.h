@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.13 1999/04/30 13:28:36 christos Exp $ */
+/*	$NetBSD: db_machdep.h,v 1.17 2001/11/09 06:52:24 thorpej Exp $ */
 
 /*
  * Mach Operating System
@@ -34,7 +34,7 @@
  */
 
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/frame.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
@@ -50,10 +50,18 @@ typedef struct {
 	struct frame	 db_fr;
 } db_regs_t;
 
+#if defined(MULTIPROCESSOR) && defined(DDB)
+extern db_regs_t *ddb_regp;
+#define DDB_REGS        (ddb_regp)
+#define	DDB_TF		(&ddb_regp->db_tf)
+#define	DDB_FR		(&ddb_regp->db_fr)
+#define ddb_regs        (*ddb_regp)
+#else
 db_regs_t		ddb_regs;	/* register state */
 #define	DDB_REGS	(&ddb_regs)
 #define	DDB_TF		(&ddb_regs.db_tf)
 #define	DDB_FR		(&ddb_regs.db_fr)
+#endif
 
 #if defined(lint)
 #define	PC_REGS(regs)	((regs)->db_tf.tf_pc)
@@ -107,7 +115,6 @@ db_addr_t	db_branch_taken __P((int inst, db_addr_t pc, db_regs_t *regs));
 
 #define DB_MACHINE_COMMANDS
 
-void db_machine_init __P((void));
 int kdb_trap __P((int, struct trapframe *));
 
 /*

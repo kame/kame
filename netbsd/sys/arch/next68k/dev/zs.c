@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.12 2000/03/06 04:14:15 deberg Exp $	*/
+/*	$NetBSD: zs.c,v 1.15 2001/05/30 15:24:24 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -50,6 +50,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_serial.h"
 
 #include <sys/param.h>
@@ -93,11 +94,7 @@ int zs_major = 12;
 /*
  * The NeXT provides a 3.686400 MHz clock to the ZS chips.
  */
-#if 1
 #define PCLK	(9600 * 384)		/* PCLK pin input clock rate */
-#else
-#define PCLK	10000000
-#endif
 
 #define	ZS_DELAY()		delay(2)
 
@@ -181,7 +178,7 @@ extern struct cfdriver zsc_cd;
 
 /* Interrupt handlers. */
 static int zshard __P((void *));
-static int zssoft __P((void *));
+static void zssoft __P((void *));
 
 static int zs_get_speed __P((struct zs_chanstate *));
 
@@ -219,6 +216,10 @@ zs_attach(parent, self, aux)
 	printf("\n");
 
 	zs_unit = zsc->zsc_dev.dv_unit;
+
+	if (zs_unit == 0) {
+		zsaddr[0] = (void *)IIOV(NEXT_P_SCC);
+	}
 
 	if (zsaddr[zs_unit] == NULL)
 		panic("zs_attach: zs%d not mapped\n", zs_unit);
@@ -361,7 +362,7 @@ zshard(arg)
 /*
  * Similar scheme as for zshard (look at all of them)
  */
-static int
+static void
 zssoft(arg)
 	void *arg;
 {
@@ -370,7 +371,7 @@ zssoft(arg)
 
 	/* This is not the only ISR on this IPL. */
 	if (zssoftpending == 0)
-		return (0);
+		panic("zssoft not pending");
 
 	/*
 	 * The soft intr. bit will be set by zshard only if
@@ -390,7 +391,6 @@ zssoft(arg)
 		(void)zsc_intr_soft(zsc);
 	}
 	splx(s);
-	return (1);
 }
 
 

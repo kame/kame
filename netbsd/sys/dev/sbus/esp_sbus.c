@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_sbus.c,v 1.10.2.1 2000/07/19 02:53:05 mrg Exp $	*/
+/*	$NetBSD: esp_sbus.c,v 1.20 2002/03/21 00:16:15 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,13 +37,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esp_sbus.c,v 1.20 2002/03/21 00:16:15 eeh Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/errno.h>
 #include <sys/device.h>
 #include <sys/buf.h>
+#include <sys/malloc.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -61,6 +62,8 @@
 #include <dev/ic/ncr53c9xvar.h>
 
 #include <dev/sbus/sbusvar.h>
+
+/* #define ESP_SBUS_DEBUG */
 
 struct esp_softc {
 	struct ncr53c9x_softc sc_ncr53c9x;	/* glue to MI code */
@@ -141,6 +144,9 @@ espmatch_sbus(parent, cf, aux)
 	int rv;
 	struct sbus_attach_args *sa = aux;
 
+	if (strcmp("SUNW,fas", sa->sa_name) == 0)
+	        return 1;
+
 	rv = (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0 ||
 	    strcmp("ptscII", sa->sa_name) == 0);
 	return (rv);
@@ -154,15 +160,134 @@ espattach_sbus(parent, self, aux)
 	struct esp_softc *esc = (void *)self;
 	struct ncr53c9x_softc *sc = &esc->sc_ncr53c9x;
 	struct sbus_attach_args *sa = aux;
+	struct lsi64854_softc *lsc;
+	int burst, sbusburst;
 
 	esc->sc_bustag = sa->sa_bustag;
 	esc->sc_dmatag = sa->sa_dmatag;
 
-	sc->sc_id = getpropint(sa->sa_node, "initiator-id", 7);
-	sc->sc_freq = getpropint(sa->sa_node, "clock-frequency", -1);
+	sc->sc_id = PROM_getpropint(sa->sa_node, "initiator-id", 7);
+	sc->sc_freq = PROM_getpropint(sa->sa_node, "clock-frequency", -1);
 	if (sc->sc_freq < 0)
 		sc->sc_freq = ((struct sbus_softc *)
 		    sc->sc_dev.dv_parent)->sc_clockfreq;
+
+#ifdef ESP_SBUS_DEBUG
+	printf("%s: espattach_sbus: sc_id %d, freq %d\n",
+	       self->dv_xname, sc->sc_id, sc->sc_freq);
+#endif
+
+	if (strcmp("SUNW,fas", sa->sa_name) == 0) {
+
+		/*
+		 * fas has 2 register spaces: dma(lsi64854) and SCSI core (ncr53c9x)
+		 */
+		if (sa->sa_nreg != 2) {
+			printf("%s: %d register spaces\n", self->dv_xname, sa->sa_nreg);
+			return;
+		}
+
+		/*
+		 * allocate space for dma, in SUNW,fas there are no separate
+		 * dma device
+		 */
+		lsc = malloc(sizeof (struct lsi64854_softc), M_DEVBUF, M_NOWAIT);
+
+		if (lsc == NULL) {
+			printf("%s: out of memory (lsi64854_softc)\n",
+			       self->dv_xname);
+			return;
+		}
+		esc->sc_dma = lsc;
+
+		lsc->sc_bustag = sa->sa_bustag;
+		lsc->sc_dmatag = sa->sa_dmatag;
+
+		bcopy(sc->sc_dev.dv_xname, lsc->sc_dev.dv_xname,
+		      sizeof (lsc->sc_dev.dv_xname));
+
+		/* Map dma registers */
+		if (sa->sa_npromvaddrs) {
+			sbus_promaddr_to_handle(sa->sa_bustag,
+				sa->sa_promvaddrs[0], &lsc->sc_regs);
+		} else {
+			if (sbus_bus_map(sa->sa_bustag,
+				sa->sa_reg[0].sbr_slot,
+				sa->sa_reg[0].sbr_offset,
+				sa->sa_reg[0].sbr_size,
+				0, &lsc->sc_regs) != 0) {
+				printf("%s: cannot map dma registers\n",
+					self->dv_xname);
+				return;
+			}
+		}
+
+		/*
+		 * XXX is this common(from bpp.c), the same in dma_sbus...etc.
+		 *
+		 * Get transfer burst size from PROM and plug it into the
+		 * controller registers. This is needed on the Sun4m; do
+		 * others need it too?
+		 */
+		sbusburst = ((struct sbus_softc *)parent)->sc_burst;
+		if (sbusburst == 0)
+			sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
+
+		burst = PROM_getpropint(sa->sa_node, "burst-sizes", -1);
+
+#if ESP_SBUS_DEBUG
+		printf("espattach_sbus: burst 0x%x, sbus 0x%x\n",
+		    burst, sbusburst);
+#endif
+
+		if (burst == -1)
+			/* take SBus burst sizes */
+			burst = sbusburst;
+
+		/* Clamp at parent's burst sizes */
+		burst &= sbusburst;
+		lsc->sc_burst = (burst & SBUS_BURST_32) ? 32 :
+		    (burst & SBUS_BURST_16) ? 16 : 0;
+
+		lsc->sc_channel = L64854_CHANNEL_SCSI;
+		lsc->sc_client = sc;
+
+		lsi64854_attach(lsc);
+
+		/*
+		 * map SCSI core registers
+		 */
+		if (sa->sa_npromvaddrs > 1) {
+			sbus_promaddr_to_handle(sa->sa_bustag,
+				sa->sa_promvaddrs[1], &esc->sc_reg);
+		} else {
+			if (sbus_bus_map(sa->sa_bustag,
+				sa->sa_reg[1].sbr_slot,
+				sa->sa_reg[1].sbr_offset,
+				sa->sa_reg[1].sbr_size,
+				0, &esc->sc_reg) != 0) {
+				printf("%s @ sbus: "
+					"cannot map scsi core registers\n",
+					self->dv_xname);
+				return;
+			}
+		}
+
+		if (sa->sa_nintr == 0) {
+			printf("\n%s: no interrupt property\n", self->dv_xname);
+			return;
+		}
+
+		esc->sc_pri = sa->sa_pri;
+
+		/* add me to the sbus structures */
+		esc->sc_sd.sd_reset = (void *) ncr53c9x_reset;
+		sbus_establish(&esc->sc_sd, &sc->sc_dev);
+
+		espattach(esc, &esp_sbus_glue);
+
+		return;
+	}
 
 	/*
 	 * Find the DMA by poking around the dma device structures
@@ -187,17 +312,23 @@ espattach_sbus(parent, self, aux)
 	}
 
 	/*
+	 * The `ESC' DMA chip must be reset before we can access
+	 * the esp registers.
+	 */
+	if (esc->sc_dma->sc_rev == DMAREV_ESC)
+		DMA_RESET(esc->sc_dma);
+
+	/*
 	 * Map my registers in, if they aren't already in virtual
 	 * address space.
 	 */
-	if (sa->sa_npromvaddrs)
-		esc->sc_reg = (bus_space_handle_t)sa->sa_promvaddrs[0];
-	else {
-		if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
-				 sa->sa_offset,
-				 sa->sa_size,
-				 BUS_SPACE_MAP_LINEAR,
-				 0, &esc->sc_reg) != 0) {
+	if (sa->sa_npromvaddrs) {
+		sbus_promaddr_to_handle(sa->sa_bustag,
+			sa->sa_promvaddrs[0], &esc->sc_reg);
+	} else {
+		if (sbus_bus_map(sa->sa_bustag,
+			sa->sa_slot, sa->sa_offset, sa->sa_size,
+			0, &esc->sc_reg) != 0) {
 			printf("%s @ sbus: cannot map registers\n",
 				self->dv_xname);
 			return;
@@ -242,8 +373,8 @@ espattach_dma(parent, self, aux)
 	esc->sc_bustag = sa->sa_bustag;
 	esc->sc_dmatag = sa->sa_dmatag;
 
-	sc->sc_id = getpropint(sa->sa_node, "initiator-id", 7);
-	sc->sc_freq = getpropint(sa->sa_node, "clock-frequency", -1);
+	sc->sc_id = PROM_getpropint(sa->sa_node, "initiator-id", 7);
+	sc->sc_freq = PROM_getpropint(sa->sa_node, "clock-frequency", -1);
 
 	esc->sc_dma = (struct lsi64854_softc *)parent;
 	esc->sc_dma->sc_client = sc;
@@ -252,15 +383,13 @@ espattach_dma(parent, self, aux)
 	 * Map my registers in, if they aren't already in virtual
 	 * address space.
 	 */
-	if (sa->sa_npromvaddrs)
-		esc->sc_reg = (bus_space_handle_t)sa->sa_promvaddrs[0];
-	else {
-		if (bus_space_map2(sa->sa_bustag,
-				   sa->sa_slot,
-				   sa->sa_offset,
-				   sa->sa_size,
-				   BUS_SPACE_MAP_LINEAR,
-				   0, &esc->sc_reg) != 0) {
+	if (sa->sa_npromvaddrs) {
+		sbus_promaddr_to_handle(sa->sa_bustag,
+			sa->sa_promvaddrs[0], &esc->sc_reg);
+	} else {
+		if (sbus_bus_map(sa->sa_bustag,
+			sa->sa_slot, sa->sa_offset, sa->sa_size,
+			0, &esc->sc_reg) != 0) {
 			printf("%s @ dma: cannot map registers\n",
 				self->dv_xname);
 			return;
@@ -296,6 +425,7 @@ espattach(esc, gluep)
 {
 	struct ncr53c9x_softc *sc = &esc->sc_ncr53c9x;
 	void *icookie;
+	unsigned int uid = 0;
 
 	/*
 	 * Set up glue for MI code early; we use some of it here.
@@ -340,8 +470,17 @@ espattach(esc, gluep)
 			sc->sc_cfg3 = 0;
 			NCR_WRITE_REG(sc, NCR_CFG3, sc->sc_cfg3);
 			sc->sc_rev = NCR_VARIANT_ESP200;
+
+			/* XXX spec says it's valid after power up or chip reset */
+			uid = NCR_READ_REG(sc, NCR_UID);
+			if (((uid & 0xf8) >> 3) == 0x0a) /* XXX */
+				sc->sc_rev = NCR_VARIANT_FAS366;
 		}
 	}
+
+#ifdef ESP_SBUS_DEBUG
+	printf("espattach: revision %d, uid 0x%x\n", sc->sc_rev, uid);
+#endif
 
 	/*
 	 * XXX minsync and maxxfer _should_ be set up in MI code,
@@ -378,6 +517,7 @@ espattach(esc, gluep)
 		break;
 
 	case NCR_VARIANT_ESP200:
+	case NCR_VARIANT_FAS366:
 		sc->sc_maxxfer = 16 * 1024 * 1024;
 		/* XXX - do actually set FAST* bits */
 		break;
@@ -391,16 +531,68 @@ espattach(esc, gluep)
 	evcnt_attach_dynamic(&sc->sc_intrcnt, EVCNT_TYPE_INTR, NULL,
 	    sc->sc_dev.dv_xname, "intr");
 
-	/* Do the common parts of attachment. */
-	ncr53c9x_attach(sc, NULL, NULL);
-
 	/* Turn on target selection using the `dma' method */
-	ncr53c9x_dmaselect = 1;
+	if (sc->sc_rev != NCR_VARIANT_FAS366)
+		sc->sc_features |= NCR_F_DMASELECT;
+
+	/* Do the common parts of attachment. */
+	sc->sc_adapter.adapt_minphys = minphys;
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	ncr53c9x_attach(sc);
+
 }
 
 /*
  * Glue functions.
  */
+
+#ifdef ESP_SBUS_DEBUG
+int esp_sbus_debug = 0;
+
+static struct {
+	char *r_name;
+	int   r_flag; 
+} esp__read_regnames [] = {
+	{ "TCL", 0},			/* 0/00 */
+	{ "TCM", 0},			/* 1/04 */
+	{ "FIFO", 0},			/* 2/08 */
+	{ "CMD", 0},			/* 3/0c */
+	{ "STAT", 0},			/* 4/10 */
+	{ "INTR", 0},			/* 5/14 */
+	{ "STEP", 0},			/* 6/18 */
+	{ "FFLAGS", 1},			/* 7/1c */
+	{ "CFG1", 1},			/* 8/20 */
+	{ "STAT2", 0},			/* 9/24 */
+	{ "CFG4", 1},			/* a/28 */
+	{ "CFG2", 1},			/* b/2c */
+	{ "CFG3", 1},			/* c/30 */
+	{ "-none", 1},			/* d/34 */
+	{ "TCH", 1},			/* e/38 */
+	{ "TCX", 1},			/* f/3c */
+};
+
+static struct {
+	char *r_name;
+	int   r_flag;
+} esp__write_regnames[] = {
+	{ "TCL", 1},			/* 0/00 */
+	{ "TCM", 1},			/* 1/04 */
+	{ "FIFO", 0},			/* 2/08 */
+	{ "CMD", 0},			/* 3/0c */
+	{ "SELID", 1},			/* 4/10 */
+	{ "TIMEOUT", 1},		/* 5/14 */
+	{ "SYNCTP", 1},			/* 6/18 */
+	{ "SYNCOFF", 1},		/* 7/1c */
+	{ "CFG1", 1},			/* 8/20 */
+	{ "CCF", 1},			/* 9/24 */
+	{ "TEST", 1},			/* a/28 */
+	{ "CFG2", 1},			/* b/2c */
+	{ "CFG3", 1},			/* c/30 */
+	{ "-none", 1},			/* d/34 */
+	{ "TCH", 1},			/* e/38 */
+	{ "TCX", 1},			/* f/3c */
+};
+#endif
 
 u_char
 esp_read_reg(sc, reg)
@@ -408,8 +600,15 @@ esp_read_reg(sc, reg)
 	int reg;
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
+	u_char v;
 
-	return (bus_space_read_1(esc->sc_bustag, esc->sc_reg, reg * 4));
+	v = bus_space_read_1(esc->sc_bustag, esc->sc_reg, reg * 4);
+#ifdef ESP_SBUS_DEBUG
+	if (esp_sbus_debug && (reg < 0x10) && esp__read_regnames[reg].r_flag)
+		printf("RD:%x <%s> %x\n", reg * 4,
+		    ((unsigned)reg < 0x10) ? esp__read_regnames[reg].r_name : "<***>", v);
+#endif
+	return v;
 }
 
 void
@@ -420,6 +619,11 @@ esp_write_reg(sc, reg, v)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
+#ifdef ESP_SBUS_DEBUG
+	if (esp_sbus_debug && (reg < 0x10) && esp__write_regnames[reg].r_flag)
+		printf("WR:%x <%s> %x\n", reg * 4,
+		    ((unsigned)reg < 0x10) ? esp__write_regnames[reg].r_name : "<***>", v);
+#endif
 	bus_space_write_1(esc->sc_bustag, esc->sc_reg, reg * 4, v);
 }
 
@@ -513,3 +717,60 @@ esp_dma_isactive(sc)
 
 	return (DMA_ISACTIVE(esc->sc_dma));
 }
+
+#include "opt_ddb.h"
+#ifdef DDB
+#include <machine/db_machdep.h>
+#include <ddb/db_output.h>
+
+void db_esp __P((db_expr_t, int, db_expr_t, char*));
+
+void
+db_esp(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+	struct ncr53c9x_softc *sc;
+	struct ncr53c9x_ecb *ecb;
+	struct ncr53c9x_linfo *li;
+	int u, t, i;
+
+	for (u=0; u<10; u++) {
+		sc = (struct ncr53c9x_softc *)
+			getdevunit("esp", u);
+		if (!sc) continue;
+
+		db_printf("esp%d: nexus %p phase %x prev %x dp %p dleft %lx ify %x\n",
+			  u, sc->sc_nexus, sc->sc_phase, sc->sc_prevphase, 
+			  sc->sc_dp, sc->sc_dleft, sc->sc_msgify);
+		db_printf("\tmsgout %x msgpriq %x msgin %x:%x:%x:%x:%x\n",
+			  sc->sc_msgout, sc->sc_msgpriq, sc->sc_imess[0],
+			  sc->sc_imess[1], sc->sc_imess[2], sc->sc_imess[3],
+			  sc->sc_imess[0]);
+		db_printf("ready: ");
+		for (ecb = sc->ready_list.tqh_first; ecb; ecb = ecb->chain.tqe_next) {
+			db_printf("ecb %p ", ecb);
+			if (ecb == ecb->chain.tqe_next) {
+				db_printf("\nWARNING: tailq loop on ecb %p", ecb);
+				break;
+			}
+		}
+		db_printf("\n");
+		
+		for (t=0; t<NCR_NTARG; t++) {
+			LIST_FOREACH(li, &sc->sc_tinfo[t].luns, link) {
+				db_printf("t%d lun %d untagged %p busy %d used %x\n",
+					  t, (int)li->lun, li->untagged, li->busy,
+					  li->used);
+				for (i=0; i<256; i++)
+					if ((ecb = li->queued[i])) {
+						db_printf("ecb %p tag %x\n", ecb, i);
+					}
+			}
+		}
+	}
+}
+#endif
+

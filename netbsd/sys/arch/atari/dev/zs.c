@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.31 2000/03/29 14:19:23 leo Exp $	*/
+/*	$NetBSD: zs.c,v 1.35 2002/03/17 19:40:36 atatat Exp $	*/
 
 /*
  * Copyright (c) 1995 L. Weppelman (Atari modifications)
@@ -202,6 +202,7 @@ dev_type_open(zsopen);
 dev_type_close(zsclose);
 dev_type_read(zsread);
 dev_type_write(zswrite);
+dev_type_poll(zspoll);
 dev_type_ioctl(zsioctl);
 dev_type_tty(zstty);
 
@@ -408,7 +409,7 @@ struct proc	*p;
 	if (error)
 		goto bad;
 	
-	error = linesw[tp->t_line].l_open(dev, tp);
+	error = tp->t_linesw->l_open(dev, tp);
 	if(error)
 		goto bad;
 	return (0);
@@ -443,7 +444,7 @@ struct proc	*p;
 	cs = &zi->zi_cs[unit & 1];
 	tp = cs->cs_ttyp;
 
-	linesw[tp->t_line].l_close(tp, flags);
+	tp->t_linesw->l_close(tp, flags);
 	ttyclose(tp);
 
 	if (!(tp->t_state & TS_ISOPEN) && tp->t_wopen == 0) {
@@ -476,7 +477,7 @@ int		flags;
 	cs   = &zi->zi_cs[unit & 1];
 	tp   = cs->cs_ttyp;
 
-	return(linesw[tp->t_line].l_read(tp, uio, flags));
+	return(tp->t_linesw->l_read(tp, uio, flags));
 }
 
 int
@@ -495,7 +496,26 @@ int		flags;
 	cs   = &zi->zi_cs[unit & 1];
 	tp   = cs->cs_ttyp;
 
-	return(linesw[tp->t_line].l_write(tp, uio, flags));
+	return(tp->t_linesw->l_write(tp, uio, flags));
+}
+
+int
+zspoll(dev, events, p)
+dev_t		dev;
+int		events;
+struct proc	*p;
+{
+	register struct zs_chanstate	*cs;
+	register struct zs_softc	*zi;
+	register struct tty		*tp;
+		 int			unit;
+
+	unit = ZS_UNIT(dev);
+	zi   = zs_cd.cd_devs[unit >> 1];
+	cs   = &zi->zi_cs[unit & 1];
+	tp   = cs->cs_ttyp;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -706,7 +726,7 @@ again:
 	unit   = cs->cs_unit;	/* set up to handle interrupts	*/
 	zc     = cs->cs_zc;
 	tp     = cs->cs_ttyp;
-	line   = &linesw[tp->t_line];
+	line   = tp->t_linesw;
 	/*
 	 * Compute the number of interrupts in the receive ring.
 	 * If the count is overlarge, we lost some events, and
@@ -814,11 +834,12 @@ struct proc	*p;
 	register int			error, s;
 	register struct zs_chanstate	*cs = &zi->zi_cs[unit & 1];
 
-	error = linesw[tp->t_line].l_ioctl(tp, cmd, data, flag, p);
-	if(error >= 0)
+	error = tp->t_linesw->l_ioctl(tp, cmd, data, flag, p);
+	if(error != EPASSTHROUGH)
 		return(error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if(error >= 0)
+	if(error !=EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -915,7 +936,7 @@ struct proc	*p;
 	case TIOCMBIS:
 	case TIOCMBIC:
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }

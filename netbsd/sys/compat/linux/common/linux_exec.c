@@ -1,7 +1,7 @@
-/*	$NetBSD: linux_exec.c,v 1.35 1999/02/09 20:37:19 christos Exp $	*/
+/*	$NetBSD: linux_exec.c,v 1.58 2002/04/02 20:23:43 jdolecek Exp $	*/
 
 /*-
- * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1994, 1995, 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -37,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_exec.c,v 1.58 2002/04/02 20:23:43 jdolecek Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -51,10 +54,6 @@
 #include <sys/mman.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_map.h>
-
 #include <machine/cpu.h>
 #include <machine/reg.h>
 
@@ -66,9 +65,21 @@
 
 #include <compat/linux/linux_syscallargs.h>
 #include <compat/linux/linux_syscall.h>
+#include <compat/linux/common/linux_misc.h>
+#include <compat/linux/common/linux_errno.h>
+#include <compat/linux/common/linux_emuldata.h>
 
+extern struct sysent linux_sysent[];
+extern const char * const linux_syscallnames[];
+extern char linux_sigcode[], linux_esigcode[];
+#ifndef __HAVE_SYSCALL_INTERN
+void LINUX_SYSCALL_FUNCTION __P((void));
+#endif
 
-const char linux_emul_path[] = "/emul/linux";
+static void linux_e_proc_exec __P((struct proc *, struct exec_package *));
+static void linux_e_proc_fork __P((struct proc *, struct proc *));
+static void linux_e_proc_exit __P((struct proc *));
+static void linux_e_proc_init __P((struct proc *, struct vmspace *));
 
 /*
  * Execve(2). Just check the alternate emulation path, and pass it on
@@ -88,12 +99,104 @@ linux_sys_execve(p, v, retval)
 	struct sys_execve_args ap;
 	caddr_t sg;
 
-	sg = stackgap_init(p->p_emul);
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	sg = stackgap_init(p, 0);
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&ap, path) = SCARG(uap, path);
 	SCARG(&ap, argp) = SCARG(uap, argp);
 	SCARG(&ap, envp) = SCARG(uap, envp);
 
 	return sys_execve(p, &ap, retval);
+}
+
+/*
+ * Emulation switch.
+ */
+const struct emul emul_linux = {
+	"linux",
+	"/emul/linux",
+#ifndef __HAVE_MINIMAL_EMUL
+	0,
+	(int*)native_to_linux_errno,
+	LINUX_SYS_syscall,
+	LINUX_SYS_MAXSYSCALL,
+#endif
+	linux_sysent,
+	linux_syscallnames,
+	linux_sendsig,
+	linux_trapsignal,
+	linux_sigcode,
+	linux_esigcode,
+	linux_setregs,
+	linux_e_proc_exec,
+	linux_e_proc_fork,
+	linux_e_proc_exit,
+#ifdef __HAVE_SYSCALL_INTERN
+	linux_syscall_intern,
+#else
+	LINUX_SYSCALL_FUNCTION,
+#endif
+	linux_sysctl,
+};
+
+static void
+linux_e_proc_init(p, vmspace)
+	struct proc *p;
+	struct vmspace *vmspace;
+{
+	if (!p->p_emuldata) {
+		/* allocate new Linux emuldata */
+		MALLOC(p->p_emuldata, void *, sizeof(struct linux_emuldata),
+			M_EMULDATA, M_WAITOK);
+	}
+
+	memset(p->p_emuldata, '\0', sizeof(struct linux_emuldata));
+	
+	/* Set the process idea of the break to the real value */
+	((struct linux_emuldata*)(p->p_emuldata))->p_break = 
+	    vmspace->vm_daddr + ctob(vmspace->vm_dsize);
+}
+
+/*
+ * Allocate per-process structures. Called when executing Linux
+ * process. We can reuse the old emuldata - if it's not null,
+ * the executed process is of same emulation as original forked one.
+ */
+static void
+linux_e_proc_exec(p, epp)
+	struct proc *p;
+	struct exec_package *epp;
+{
+	/* exec, use our vmspace */
+	linux_e_proc_init(p, p->p_vmspace);
+}
+
+/*
+ * Emulation per-process exit hook.
+ */
+static void
+linux_e_proc_exit(p)
+	struct proc *p;
+{
+	/* free Linux emuldata and set the pointer to null */
+	FREE(p->p_emuldata, M_EMULDATA);
+	p->p_emuldata = NULL;
+}
+
+/*
+ * Emulation fork hook.
+ */
+static void
+linux_e_proc_fork(p, parent)
+	struct proc *p, *parent;
+{
+	/*
+	 * It could be desirable to copy some stuff from parent's
+	 * emuldata. We don't need anything like that for now.
+	 * So just allocate new emuldata for the new process.
+	 */
+	p->p_emuldata = NULL;
+
+	/* fork, use parent's vmspace (our vmspace may not be setup yet) */
+	linux_e_proc_init(p, parent->p_vmspace);
 }

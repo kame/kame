@@ -1,0 +1,39 @@
+#	$NetBSD: files.acpi,v 1.6 2002/04/22 12:42:56 augustss Exp $
+
+include "dev/acpi/acpica/files.acpica"
+
+defflag	opt_acpi.h	ACPI_DEBUG
+
+device	acpi { }
+attach	acpi at acpibus
+file	dev/acpi/acpi.c			acpi		needs-flag
+file	dev/acpi/acpi_resource.c	acpi
+
+# ACPI Embedded Controller
+device	acpiec
+attach	acpiec at acpi
+file	dev/acpi/acpi_ec.c		acpiec
+
+# ACPI Lid Switch
+device	acpilid
+attach	acpilid at acpi
+file	dev/acpi/acpi_lid.c		acpilid
+
+# ACPI Button
+device	acpibut
+attach	acpibut at acpi
+file	dev/acpi/acpi_button.c		acpibut
+
+# ACPI AC Adapter
+device	acpiacad
+attach	acpiacad at acpi
+file	dev/acpi/acpi_acad.c		acpiacad
+
+# ACPI Control Method Battery
+device	acpibat
+attach	acpibat at acpi
+file	dev/acpi/acpi_bat.c		acpibat
+
+# Sony SPIC (jog dial etc.)
+attach	spic at acpi with spic_acpi
+file	dev/acpi/spic_acpi.c		spic_acpi

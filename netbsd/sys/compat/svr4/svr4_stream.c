@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_stream.c,v 1.38.4.1 2000/08/30 03:59:21 sommerfeld Exp $	 */
+/*	$NetBSD: svr4_stream.c,v 1.48 2002/03/16 20:43:57 christos Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -42,6 +42,10 @@
  *
  * ToDo: The state machine for getmsg needs re-thinking
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: svr4_stream.c,v 1.48 2002/03/16 20:43:57 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -278,12 +282,12 @@ clean_pipe(p, path)
 	register_t retval;
 	struct stat st;
 	int error;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 	size_t l = strlen(path) + 1;
 	void *tpath;
 
-	tpath = stackgap_alloc(&sg, l);
-	SCARG(&la, ub) = stackgap_alloc(&sg, sizeof(struct stat));
+	tpath = stackgap_alloc(p, &sg, l);
+	SCARG(&la, ub) = stackgap_alloc(p, &sg, sizeof(struct stat));
 
 	if ((error = copyout(path, tpath, l)) != 0)
 		return error;
@@ -826,8 +830,8 @@ ti_bind(fp, fd, ioc, p)
 		return ENOSYS;
 	}
 
-	sg = stackgap_init(p->p_emul);
-	sup = stackgap_alloc(&sg, sasize);
+	sg = stackgap_init(p, 0);
+	sup = stackgap_alloc(p, &sg, sasize);
 
 	if ((error = copyout(skp, sup, sasize)) != 0)
 		return error;
@@ -936,9 +940,9 @@ svr4_stream_ti_ioctl(fp, p, retval, fd, cmd, dat)
 		return ENOSYS;
 	}
 
-	sg = stackgap_init(p->p_emul);
-	sup = stackgap_alloc(&sg, sasize);
-	lenp = stackgap_alloc(&sg, sizeof(*lenp));
+	sg = stackgap_init(p, 0);
+	sup = stackgap_alloc(p, &sg, sasize);
+	lenp = stackgap_alloc(p, &sg, sizeof(*lenp));
 
 	if ((error = copyout(&sasize, lenp, sizeof(*lenp))) != 0) {
 		DPRINTF(("ti_ioctl: error copying out lenp\n"));
@@ -1276,7 +1280,7 @@ i_setsig(fp, p, retval, fd, cmd, dat)
 	/* set up SIGIO receiver if needed */
 	if (dat != NULL) {
 		SCARG(&fa, cmd) = F_SETOWN;
-		SCARG(&fa, arg) = (void *) p->p_pid;
+		SCARG(&fa, arg) = (void *)(u_long)p->p_pid;
 		return sys_fcntl(p, &fa, &flags);
 	}
 	return 0;
@@ -1503,17 +1507,12 @@ svr4_sys_putmsg(p, v, retval)
 	int error;
 	caddr_t sg;
 
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
-		return EBADF;
-
 #ifdef DEBUG_SVR4
 	show_msg(">putmsg", SCARG(uap, fd), SCARG(uap, ctl),
 		 SCARG(uap, dat), SCARG(uap, flags));
 #endif /* DEBUG_SVR4 */
 
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return EBADF;
 
 	if (SCARG(uap, ctl) != NULL) {
@@ -1565,7 +1564,7 @@ svr4_sys_putmsg(p, v, retval)
 				 * Hmm, expedited data seems to be sc.cmd = 4.
 				 * I think 3 is normal data. (christos)
 				 */
-				DPRINTF(("sending expedited data (???)\n"));
+				DPRINTF(("sending expedited data (?)\n"));
 				SCARG(&wa, fd) = SCARG(uap, fd);
 				SCARG(&wa, buf) = dat.buf;
 				SCARG(&wa, nbyte) = dat.len;
@@ -1608,8 +1607,8 @@ svr4_sys_putmsg(p, v, retval)
 		return ENOSYS;
 	}
 
-	sg = stackgap_init(p->p_emul);
-	sup = stackgap_alloc(&sg, sasize);
+	sg = stackgap_init(p, 0);
+	sup = stackgap_alloc(p, &sg, sasize);
 
 	if ((error = copyout(skp, sup, sasize)) != 0)
 		return error;
@@ -1677,19 +1676,14 @@ svr4_sys_getmsg(p, v, retval)
 	int fl;
 	caddr_t sg;
 
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
-		return EBADF;
-
 	memset(&sc, 0, sizeof(sc));
 
 #ifdef DEBUG_SVR4
 	show_msg(">getmsg", SCARG(uap, fd), SCARG(uap, ctl),
 		 SCARG(uap, dat), 0);
 #endif /* DEBUG_SVR4 */
-			
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return EBADF;
 
 	if (SCARG(uap, ctl) != NULL) {
@@ -1740,9 +1734,9 @@ svr4_sys_getmsg(p, v, retval)
 		return ENOSYS;
 	}
 
-	sg = stackgap_init(p->p_emul);
-	sup = stackgap_alloc(&sg, sasize);
-	flen = (int *) stackgap_alloc(&sg, sizeof(*flen));
+	sg = stackgap_init(p, 0);
+	sup = stackgap_alloc(p, &sg, sasize);
+	flen = (int *) stackgap_alloc(p, &sg, sizeof(*flen));
 
 	fl = sasize;
 	if ((error = copyout(&fl, flen, sizeof(fl))) != 0)
@@ -1907,7 +1901,8 @@ svr4_sys_getmsg(p, v, retval)
 		aiov.iov_len = dat.maxlen;
 		msg.msg_flags = 0;
 
-		error = recvit(p, SCARG(uap, fd), &msg, (caddr_t) flen, retval);
+		error = recvit(p, SCARG(uap, fd), &msg, (caddr_t) flen,
+		    retval);
 
 		if (error) {
 			DPRINTF(("getmsg: recvit failed %d\n", error));
@@ -1945,7 +1940,7 @@ svr4_sys_getmsg(p, v, retval)
 		if (st->s_cmd == SVR4_TI_CONNECT_REQUEST) {
 		        struct sys_read_args ra;
 
-			/* More wierdness:  Again, I can't find documentation
+			/* More weirdness:  Again, I can't find documentation
 			 * to back this up, but when a process does a generic
 			 * "getmsg()" call it seems that the command field is
 			 * zero and the length of the data area is zero.  I

@@ -1,4 +1,4 @@
-/* $NetBSD$ */
+/* $NetBSD: device.h,v 1.49 2002/02/15 11:18:26 simonb Exp $ */
 
 /*
  * Copyright (c) 1996, 2000 Christopher G. Demetriou
@@ -93,7 +93,7 @@ enum devclass {
 	DV_DISK,		/* disk drive (label, etc) */
 	DV_IFNET,		/* network interface */
 	DV_TAPE,		/* tape device */
-	DV_TTY			/* serial line interface (???) */
+	DV_TTY			/* serial line interface (?) */
 };
 
 /*
@@ -101,7 +101,7 @@ enum devclass {
  */
 enum devact {
 	DVACT_ACTIVATE,		/* activate the device */
-	DVACT_DEACTIVATE,	/* deactivate the device */
+	DVACT_DEACTIVATE	/* deactivate the device */
 };
 
 struct device {
@@ -142,6 +142,7 @@ TAILQ_HEAD(evcntlist, evcnt);
 /* ev_type values */
 #define	EVCNT_TYPE_MISC		0	/* miscellaneous; catch all */
 #define	EVCNT_TYPE_INTR		1	/* interrupt; count with vmstat -i */
+#define	EVCNT_TYPE_TRAP		2	/* processor trap/execption */
 
 /*
  * initializer for an event count structure.  the lengths are initted and
@@ -173,9 +174,11 @@ struct cfdata {
 	short	*cf_parents;		/* potential parents */
 	const char **cf_locnames;	/* locator names (machine dependent) */
 };
-#define FSTATE_NOTFOUND	0	/* has not been found */
-#define	FSTATE_FOUND	1	/* has been found */
-#define	FSTATE_STAR	2	/* duplicable */
+#define FSTATE_NOTFOUND		0	/* has not been found */
+#define	FSTATE_FOUND		1	/* has been found */
+#define	FSTATE_STAR		2	/* duplicable */
+#define FSTATE_DSTAR		3	/* has not been found, and disabled */
+#define FSTATE_DNOTFOUND	4	/* duplicate, and disabled */
 
 typedef int (*cfmatch_t)(struct device *, struct cfdata *, void *);
 
@@ -247,6 +250,7 @@ struct device *config_found_sm(struct device *, void *, cfprint_t, cfmatch_t);
 struct device *config_rootfound(const char *, void *);
 struct device *config_attach(struct device *, struct cfdata *, void *,
     cfprint_t);
+void config_makeroom(int n, struct cfdriver *cd);
 int config_detach(struct device *, int);
 int config_activate(struct device *);
 int config_deactivate(struct device *);
@@ -271,6 +275,9 @@ void	evcnt_detach(struct evcnt *);
 #define	device_lookup(cfd, unit)					\
 	(((unit) < (cfd)->cd_ndevs) ? (cfd)->cd_devs[(unit)] : NULL)
 
+#ifdef DDB
+void event_print(int, void (*)(const char *, ...));
+#endif
 #endif /* _KERNEL */
 
 #endif /* !_SYS_DEVICE_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_elf.h,v 1.37.4.3 2002/03/07 17:59:45 he Exp $	*/
+/*	$NetBSD: exec_elf.h,v 1.60 2002/01/28 22:15:54 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -39,45 +39,58 @@
 #ifndef _SYS_EXEC_ELF_H_
 #define	_SYS_EXEC_ELF_H_
 
-#include <machine/types.h>
+/*
+ * The current ELF ABI specification is available at:
+ *	http://www.sco.com/developer/gabi/
+ *
+ * Current header definitions are in:
+ *	http://www.sco.com/developer/gabi/latest/ch4.eheader.html
+ */
 
-typedef	u_int8_t  	Elf_Byte;
+#if defined(_KERNEL) || defined(_STANDALONE)
+#include <sys/types.h>
+#else
+#include <inttypes.h>
+#endif /* _KERNEL || _STANDALONE */
 
-typedef	u_int32_t	Elf32_Addr;
+#include <machine/elf_machdep.h>
+
+typedef	uint8_t  	Elf_Byte;
+
+typedef	uint32_t	Elf32_Addr;
 #define	ELF32_FSZ_ADDR	4
-typedef	u_int32_t Elf32_Off;
+typedef	uint32_t	Elf32_Off;
 #define	ELF32_FSZ_OFF	4
-typedef	int32_t   Elf32_Sword;
+typedef	int32_t		Elf32_Sword;
 #define	ELF32_FSZ_SWORD	4
-typedef	u_int32_t Elf32_Word;
+typedef	uint32_t	Elf32_Word;
 #define	ELF32_FSZ_WORD	4
-typedef	u_int16_t Elf32_Half;
+typedef	uint16_t	Elf32_Half;
 #define	ELF32_FSZ_HALF	2
 
-typedef	u_int64_t	Elf64_Addr;
+typedef	uint64_t	Elf64_Addr;
 #define	ELF64_FSZ_ADDR	8
-typedef	u_int64_t	Elf64_Off;
+typedef	uint64_t	Elf64_Off;
 #define	ELF64_FSZ_OFF	8
 typedef	int32_t		Elf64_Shalf;
 #define	ELF64_FSZ_SHALF	4
-#ifdef __sparc_v9__
+
+#ifndef ELF64_FSZ_SWORD
 typedef	int32_t		Elf64_Sword;
 #define	ELF64_FSZ_SWORD	4
-typedef	u_int32_t	Elf64_Word;
+#endif /* ELF64_FSZ_SWORD */
+#ifndef ELF64_FSZ_WORD
+typedef	uint32_t	Elf64_Word;
 #define	ELF64_FSZ_WORD	4
-#else
-typedef	int64_t		Elf64_Sword;
-#define	ELF64_FSZ_SWORD	8
-typedef	u_int64_t	Elf64_Word;
-#define	ELF64_FSZ_WORD	8
-#endif
+#endif /* ELF64_FSZ_WORD */
+
 typedef	int64_t		Elf64_Sxword;
 #define	ELF64_FSZ_XWORD	8
-typedef	u_int64_t	Elf64_Xword;
+typedef	uint64_t	Elf64_Xword;
 #define	ELF64_FSZ_XWORD	8
-typedef	u_int32_t	Elf64_Half;
+typedef	uint32_t	Elf64_Half;
 #define	ELF64_FSZ_HALF	4
-typedef	u_int16_t Elf64_Quarter;
+typedef	uint16_t	Elf64_Quarter;
 #define	ELF64_FSZ_QUARTER 2
 
 /*
@@ -169,6 +182,7 @@ typedef struct {
 #define ELFOSABI_TRU64		10	/* TRU64 UNIX */
 #define ELFOSABI_MODESTO	11	/* Novell Modesto */
 #define ELFOSABI_OPENBSD	12	/* OpenBSD */
+/* Unofficial OSABIs follow */
 #define ELFOSABI_ARM		97	/* ARM */
 #define	ELFOSABI_STANDALONE	255	/* Standalone (embedded) application */
 
@@ -197,6 +211,7 @@ typedef struct {
 #define	EM_MIPS		8	/* MIPS I Architecture */
 #define	EM_S370		9	/* Amdahl UTS on System/370 */
 #define	EM_MIPS_RS3_LE	10	/* MIPS RS3000 Little-endian */
+			/* 11-14 - Reserved */
 #define	EM_RS6000	11	/* IBM RS/6000 XXX reserved */
 #define	EM_PARISC	15	/* Hewlett-Packard PA-RISC */
 #define	EM_NCUBE	16	/* NCube XXX reserved */
@@ -204,6 +219,8 @@ typedef struct {
 #define	EM_SPARC32PLUS	18	/* Enhanced instruction set SPARC */
 #define	EM_960		19	/* Intel 80960 */
 #define	EM_PPC		20	/* PowerPC */
+#define	EM_PPC64	21	/* 64-bit PowerPC */
+			/* 22-35 - Reserved */
 #define	EM_V800		36	/* NEC V800 */
 #define	EM_FR20		37	/* Fujitsu FR20 */
 #define	EM_RH32		38	/* TRW RH-32 */
@@ -222,7 +239,49 @@ typedef struct {
 #define	EM_MIPS_X	51	/* Stanford MIPS-X */
 #define	EM_COLDFIRE	52	/* Motorola Coldfire */
 #define	EM_68HC12	53	/* Motorola MC68HC12 */
-#define	EM_VAX		75	/* DIGITAL VAX */
+#define	EM_MMA		54	/* Fujitsu MMA Multimedia Accelerator */
+#define	EM_PCP		55	/* Siemens PCP */
+#define	EM_NCPU		56	/* Sony nCPU embedded RISC processor */
+#define	EM_NDR1		57	/* Denso NDR1 microprocessor */
+#define	EM_STARCORE	58	/* Motorola Star*Core processor */
+#define	EM_ME16		59	/* Toyota ME16 processor */
+#define	EM_ST100	60	/* STMicroelectronics ST100 processor */
+#define	EM_TINYJ	61	/* Advanced Logic Corp. TinyJ embedded family processor */
+#define	EM_X86_64	62	/* AMD x86-64 architecture */
+#define	EM_PDSP		63	/* Sony DSP Processor */
+			/* 64-65 - Reserved */
+#define	EM_FX66		66	/* Siemens FX66 microcontroller */
+#define	EM_ST9PLUS	67	/* STMicroelectronics ST9+ 8/16 bit microcontroller */
+#define	EM_ST7		68	/* STMicroelectronics ST7 8-bit microcontroller */
+#define	EM_68HC16	69	/* Motorola MC68HC16 Microcontroller */
+#define	EM_68HC11	70	/* Motorola MC68HC11 Microcontroller */
+#define	EM_68HC08	71	/* Motorola MC68HC08 Microcontroller */
+#define	EM_68HC05	72	/* Motorola MC68HC05 Microcontroller */
+#define	EM_SVX		73	/* Silicon Graphics SVx */
+#define	EM_ST19		74	/* STMicroelectronics ST19 8-bit cpu */
+#define	EM_VAX		75	/* Digital VAX */
+#define	EM_CRIS		76	/* Axis Communications 32-bit embedded processor */
+#define	EM_JAVELIN	77	/* Infineon Technologies 32-bit embedded cpu */
+#define	EM_FIREPATH	78	/* Element 14 64-bit DSP processor */
+#define	EM_ZSP		79	/* LSI Logic's 16-bit DSP processor */
+#define	EM_MMIX		80	/* Donald Knuth's educational 64-bit processor */
+#define	EM_HUANY	81	/* Harvard's machine-independent format */
+#define	EM_PRISM	82	/* SiTera Prism */
+#define	EM_AVR		83	/* Atmel AVR 8-bit microcontroller */
+#define	EM_FR30		84	/* Fujitsu FR30 */
+#define	EM_D10V		85	/* Mitsubishi D10V */
+#define	EM_D30V		86	/* Mitsubishi D30V */
+#define	EM_V850		87	/* NEC v850 */
+#define	EM_M32R		88	/* Mitsubishi M32R */
+#define	EM_MN10300	89	/* Matsushita MN10300 */
+#define	EM_MN10200	90	/* Matsushita MN10200 */
+#define	EM_PJ		91	/* picoJava */
+#define	EM_OPENRISC	92	/* OpenRISC 32-bit embedded processor */
+#define	EM_ARC_A5	93	/* ARC Cores Tangent-A5 */
+#define	EM_XTENSA	94	/* Tensilica Xtensa Architecture */
+#define	EM_NS32K	97	/* National Semiconductor 32000 series */
+
+/* Unofficial machine types follow */
 #define	EM_ALPHA_EXP	36902	/* used by NetBSD/alpha; obsolete */
 #define	EM_NUM		36903
 
@@ -304,18 +363,18 @@ typedef struct {
 } Elf64_Shdr;
 
 /* sh_type */
-#define	SHT_NULL	0
-#define	SHT_PROGBITS	1
-#define	SHT_SYMTAB	2
-#define	SHT_STRTAB	3
-#define	SHT_RELA	4
-#define	SHT_HASH	5
-#define	SHT_DYNAMIC	6
-#define	SHT_NOTE	7
-#define	SHT_NOBITS	8
-#define	SHT_REL		9
-#define	SHT_SHLIB	10
-#define	SHT_DYNSYM	11
+#define	SHT_NULL	0		/* Section header table entry unused */
+#define	SHT_PROGBITS	1		/* Program information */
+#define	SHT_SYMTAB	2		/* Symbol table */
+#define	SHT_STRTAB	3		/* String table */
+#define	SHT_RELA	4		/* Relocation information w/ addend */
+#define	SHT_HASH	5		/* Symbol hash table */
+#define	SHT_DYNAMIC	6		/* Dynamic linking information */
+#define	SHT_NOTE	7		/* Auxiliary information */
+#define	SHT_NOBITS	8		/* No space allocated in file image */
+#define	SHT_REL		9		/* Relocation information w/o addend */
+#define	SHT_SHLIB	10		/* Reserved, unspecified semantics */
+#define	SHT_DYNSYM	11		/* Symbol table for dynamic linker */
 #define	SHT_NUM		12
 
 #define	SHT_LOOS	0x60000000	/* Operating system specific range */
@@ -569,13 +628,21 @@ typedef struct {
 	Elf64_Half n_type;
 } Elf64_Nhdr;
 
-#define	ELF_NOTE_TYPE_OSVERSION		1
+#define	ELF_NOTE_TYPE_ABI_TAG		1
 
-/* NetBSD-specific note type: OS Version.  desc is 4-byte NetBSD integer. */
-#define	ELF_NOTE_NETBSD_TYPE_OSVERSION	ELF_NOTE_TYPE_OSVERSION
+/* GNU-specific note name and description sizes */
+#define	ELF_NOTE_ABI_NAMESZ		4
+#define	ELF_NOTE_ABI_DESCSZ		16
+/* GNU-specific note name */
+#define	ELF_NOTE_ABI_NAME		"GNU\0"
+
+/* GNU-specific OS/version value stuff */
+#define	ELF_NOTE_ABI_OS_LINUX		0
+#define	ELF_NOTE_ABI_OS_HURD		1
+#define	ELF_NOTE_ABI_OS_SOLARIS		2
 
 /* NetBSD-specific note type: Emulation name.  desc is emul name string. */
-#define	ELF_NOTE_NETBSD_TYPE_EMULNAME	2
+#define	ELF_NOTE_TYPE_NETBSD_TAG	1
 
 /* NetBSD-specific note name and description sizes */
 #define	ELF_NOTE_NETBSD_NAMESZ		7
@@ -583,16 +650,59 @@ typedef struct {
 /* NetBSD-specific note name */
 #define	ELF_NOTE_NETBSD_NAME		"NetBSD\0\0"
 
-/* GNU-specific note name and description sizes */
-#define	ELF_NOTE_GNU_NAMESZ		4
-#define	ELF_NOTE_GNU_DESCSZ		4
-/* GNU-specific note name */
-#define	ELF_NOTE_GNU_NAME		"GNU\0"
+/*
+ * NetBSD-specific core file information.
+ *
+ * NetBSD ELF core files use notes to provide information about
+ * the process's state.  The note name is "NetBSD-CORE" for
+ * information that is global to the process, and "NetBSD-CORE@nn",
+ * where "nn" is the lwpid of the LWP that the information belongs
+ * to (such as register state).
+ *
+ * We use the following note identifiers:
+ *
+ *	ELF_NOTE_NETBSD_CORE_PROCINFO
+ *		Note is a "netbsd_elfcore_procinfo" structure.
+ *
+ * We also use ptrace(2) request numbers (the ones that exist in
+ * machine-dependent space) to identify register info notes.  The
+ * info in such notes is in the same format that ptrace(2) would
+ * export that information.
+ *
+ * Please try to keep the members of this structure nicely aligned,
+ * and if you add elements, add them to the end and bump the version.
+ */
 
-/* GNU-specific OS/version value stuff */
-#define	ELF_NOTE_GNU_OSMASK		(u_int32_t)0xff000000
-#define	ELF_NOTE_GNU_OSLINUX		(u_int32_t)0x01000000
-#define	ELF_NOTE_GNU_OSMACH		(u_int32_t)0x00000000
+#define	ELF_NOTE_NETBSD_CORE_NAME	"NetBSD-CORE"
+
+#define	ELF_NOTE_NETBSD_CORE_PROCINFO	1
+
+#define	NETBSD_ELFCORE_PROCINFO_VERSION	1
+
+struct netbsd_elfcore_procinfo {
+	/* Version 1 fields start here. */
+	uint32_t	cpi_version;	/* netbsd_elfcore_procinfo version */
+	uint32_t	cpi_cpisize;	/* sizeof(netbsd_elfcore_procinfo) */
+	uint32_t	cpi_signo;	/* killing signal */
+	uint32_t	cpi_sigcode;	/* signal code */
+	uint32_t	cpi_sigpend[4];	/* pending signals */
+	uint32_t	cpi_sigmask[4];	/* blocked signals */
+	uint32_t	cpi_sigignore[4];/* blocked signals */
+	uint32_t	cpi_sigcatch[4];/* blocked signals */
+	int32_t		cpi_pid;	/* process ID */
+	int32_t		cpi_ppid;	/* parent process ID */
+	int32_t		cpi_pgrp;	/* process group ID */
+	int32_t		cpi_sid;	/* session ID */
+	uint32_t	cpi_ruid;	/* real user ID */
+	uint32_t	cpi_euid;	/* effective user ID */
+	uint32_t	cpi_svuid;	/* saved user ID */
+	uint32_t	cpi_rgid;	/* real group ID */
+	uint32_t	cpi_egid;	/* effective group ID */
+	uint32_t	cpi_svgid;	/* saved group ID */
+	uint32_t	cpi_nlwps;	/* number of LWPs */
+	int8_t		cpi_name[32];	/* copy of p->p_comm */
+	/* Add version 2 fields below here. */
+};
 
 #if defined(ELFSIZE)
 #define	CONCAT(x,y)	__CONCAT(x,y)
@@ -601,8 +711,6 @@ typedef struct {
 #define	ELFNAMEEND(x)	CONCAT(x,CONCAT(_elf,ELFSIZE))
 #define	ELFDEFNNAME(x)	CONCAT(ELF,CONCAT(ELFSIZE,CONCAT(_,x)))
 #endif
-
-#include <machine/elf_machdep.h>
 
 #if defined(ELFSIZE) && (ELFSIZE == 32)
 #define	Elf_Ehdr	Elf32_Ehdr
@@ -664,6 +772,20 @@ typedef struct {
 #define ELF_NO_ADDR	ELF32_NO_ADDR
 #endif
 
+#ifndef ELF32_EHDR_FLAGS_OK
+#define	ELF32_EHDR_FLAGS_OK(eh)	1
+#endif
+
+#ifndef ELF64_EHDR_FLAGS_OK
+#define	ELF64_EHDR_FLAGS_OK(eh)	1
+#endif
+
+#if defined(ELFSIZE) && (ELFSIZE == 64)
+#define	ELF_EHDR_FLAGS_OK(eh)	ELF64_EHDR_FLAGS_OK(eh)
+#else
+#define	ELF_EHDR_FLAGS_OK(eh)	ELF32_EHDR_FLAGS_OK(eh)
+#endif
+
 #if defined(ELFSIZE)
 struct elf_args {
         Elf_Addr  arg_entry;      /* program entry point */
@@ -680,18 +802,24 @@ struct elf_args {
 
 #ifdef EXEC_ELF32
 int	exec_elf32_makecmds __P((struct proc *, struct exec_package *));
-int	elf32_read_from __P((struct proc *, struct vnode *, u_long,
-	    caddr_t, int));
-void	*elf32_copyargs __P((struct exec_package *, struct ps_strings *,
-	    void *, void *));
+int	elf32_copyargs __P((struct exec_package *, struct ps_strings *,
+    char **, void *));
+
+int	coredump_elf32 __P((struct proc *, struct vnode *, struct ucred *));
+int	coredump_writenote_elf32 __P((struct proc *, struct vnode *,
+	    struct ucred *, off_t, Elf32_Nhdr *, const char *, void *));
 #endif
 
 #ifdef EXEC_ELF64
 int	exec_elf64_makecmds __P((struct proc *, struct exec_package *));
 int	elf64_read_from __P((struct proc *, struct vnode *, u_long,
-	    caddr_t, int));
-void	*elf64_copyargs __P((struct exec_package *, struct ps_strings *,
-	    void *, void *));
+    caddr_t, int));
+int	elf64_copyargs __P((struct exec_package *, struct ps_strings *,
+    char **, void *));
+
+int	coredump_elf64 __P((struct proc *, struct vnode *, struct ucred *));
+int	coredump_writenote_elf64 __P((struct proc *, struct vnode *,
+	    struct ucred *, off_t, Elf64_Nhdr *, const char *, void *));
 #endif
 
 /* common */

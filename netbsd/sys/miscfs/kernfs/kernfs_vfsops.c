@@ -1,4 +1,4 @@
-/*	$NetBSD: kernfs_vfsops.c,v 1.37 2000/06/10 18:27:03 assar Exp $	*/
+/*	$NetBSD: kernfs_vfsops.c,v 1.43 2001/11/15 09:48:22 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -42,14 +42,16 @@
  * Kernel params Filesystem
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.43 2001/11/15 09:48:22 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
-#include <sys/types.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
@@ -107,8 +109,13 @@ kernfs_get_rrootdev()
 		return;
 	for (cmaj = 0; cmaj < nchrdev; cmaj++) {
 		rrootdev = makedev(cmaj, minor(rootdev));
-		if (chrtoblk(rrootdev) == rootdev)
+		if (chrtoblk(rrootdev) == rootdev) {
+#ifdef KERNFS_DIAGNOSTIC
+	printf("kernfs_mount: rootdev = %u.%u; rrootdev = %u.%u\n",
+	    major(rootdev), minor(rootdev), major(rrootdev), minor(rrootdev));
+#endif
 			return;
+		}
 	}
 	rrootdev = NODEV;
 	printf("kernfs_get_rrootdev: no raw root device\n");
@@ -361,9 +368,9 @@ kernfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	return (EOPNOTSUPP);
 }
 
-extern struct vnodeopv_desc kernfs_vnodeop_opv_desc;
+extern const struct vnodeopv_desc kernfs_vnodeop_opv_desc;
 
-struct vnodeopv_desc *kernfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const kernfs_vnodeopv_descs[] = {
 	&kernfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -381,6 +388,7 @@ struct vfsops kernfs_vfsops = {
 	kernfs_fhtovp,
 	kernfs_vptofh,
 	kernfs_init,
+	NULL,
 	kernfs_done,
 	kernfs_sysctl,
 	NULL,				/* vfs_mountroot */

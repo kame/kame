@@ -1,4 +1,4 @@
-/* $NetBSD: pci_kn20aa.c,v 1.39 2000/06/05 21:47:26 thorpej Exp $ */
+/* $NetBSD: pci_kn20aa.c,v 1.43 2002/05/15 16:57:42 thorpej Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pci_kn20aa.c,v 1.39 2000/06/05 21:47:26 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_kn20aa.c,v 1.43 2002/05/15 16:57:42 thorpej Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,7 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_kn20aa.c,v 1.39 2000/06/05 21:47:26 thorpej Exp 
 #include <sys/device.h>
 #include <sys/syslog.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 
@@ -57,7 +57,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_kn20aa.c,v 1.39 2000/06/05 21:47:26 thorpej Exp 
 #include <alpha/pci/siovar.h>
 #endif
 
-int	dec_kn20aa_intr_map __P((void *, pcitag_t, int, int,
+int	dec_kn20aa_intr_map __P((struct pci_attach_args *,
 	    pci_intr_handle_t *));
 const char *dec_kn20aa_intr_string __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_kn20aa_intr_evcnt __P((void *, pci_intr_handle_t));
@@ -71,7 +71,7 @@ void	dec_kn20aa_intr_disestablish __P((void *, void *));
 
 struct alpha_shared_intr *kn20aa_pci_intr;
 
-void	kn20aa_iointr __P((void *framep, unsigned long vec));
+void	kn20aa_iointr __P((void *arg, unsigned long vec));
 void	kn20aa_enable_intr __P((int irq));
 void	kn20aa_disable_intr __P((int irq));
 
@@ -112,19 +112,16 @@ pci_kn20aa_pickintr(ccp)
 	sio_intr_setup(pc, iot);
 	kn20aa_enable_intr(KN20AA_PCEB_IRQ);
 #endif
-
-	set_iointr(kn20aa_iointr);
 }
 
 int     
-dec_kn20aa_intr_map(ccv, bustag, buspin, line, ihp)
-        void *ccv;
-        pcitag_t bustag; 
-        int buspin, line;
+dec_kn20aa_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
         pci_intr_handle_t *ihp;
 {
-	struct cia_config *ccp = ccv;
-	pci_chipset_tag_t pc = &ccp->cc_pc;
+	pcitag_t bustag = pa->pa_intrtag;
+	int buspin = pa->pa_intrpin;
+	pci_chipset_tag_t pc = pa->pa_pc;
 	int device;
 	int kn20aa_irq;
 
@@ -144,7 +141,7 @@ dec_kn20aa_intr_map(ccv, bustag, buspin, line, ihp)
 	 * The DEC engineers who did this hardware obviously engaged
 	 * in random drug testing.
 	 */
-	alpha_pci_decompose_tag(pc, bustag, NULL, &device, NULL);
+	pci_decompose_tag(pc, bustag, NULL, &device, NULL);
 	switch (device) {
 	case 11:
 	case 12:
@@ -234,8 +231,10 @@ dec_kn20aa_intr_establish(ccv, ih, level, func, arg)
 	    level, func, arg, "kn20aa irq");
 
 	if (cookie != NULL &&
-	    alpha_shared_intr_isactive(kn20aa_pci_intr, ih))
+	    alpha_shared_intr_firstactive(kn20aa_pci_intr, ih)) {
+		scb_set(0x900 + SCB_IDXTOVEC(ih), kn20aa_iointr, NULL);
 		kn20aa_enable_intr(ih);
+	}
 	return (cookie);
 }
 
@@ -258,38 +257,27 @@ dec_kn20aa_intr_disestablish(ccv, cookie)
 		kn20aa_disable_intr(irq);
 		alpha_shared_intr_set_dfltsharetype(kn20aa_pci_intr, irq,
 		    IST_NONE);
+		scb_free(0x900 + SCB_IDXTOVEC(irq));
 	}
  
 	splx(s);
 }
 
 void
-kn20aa_iointr(framep, vec)
-	void *framep;
+kn20aa_iointr(arg, vec)
+	void *arg;
 	unsigned long vec;
 {
 	int irq;
 
-	if (vec >= 0x900) {
-		if (vec >= 0x900 + (KN20AA_MAX_IRQ << 4))
-			panic("kn20aa_iointr: vec 0x%lx out of range\n", vec);
-		irq = (vec - 0x900) >> 4;
+	irq = SCB_VECTOIDX(vec - 0x900);
 
-		if (!alpha_shared_intr_dispatch(kn20aa_pci_intr, irq)) {
-			alpha_shared_intr_stray(kn20aa_pci_intr, irq,
-			    "kn20aa irq");
-			if (ALPHA_SHARED_INTR_DISABLE(kn20aa_pci_intr, irq))
-				kn20aa_disable_intr(irq);
-		}
-		return;
+	if (!alpha_shared_intr_dispatch(kn20aa_pci_intr, irq)) {
+		alpha_shared_intr_stray(kn20aa_pci_intr, irq,
+		    "kn20aa irq");
+		if (ALPHA_SHARED_INTR_DISABLE(kn20aa_pci_intr, irq))
+			kn20aa_disable_intr(irq);
 	}
-#if NSIO > 0 || NPCEB > 0
-	if (vec >= 0x800) {
-		sio_iointr(framep, vec);
-		return;
-	} 
-#endif
-	panic("kn20aa_iointr: weird vec 0x%lx\n", vec);
 }
 
 void

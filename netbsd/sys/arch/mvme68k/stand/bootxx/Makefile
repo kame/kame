@@ -1,29 +1,15 @@
 #	from: @(#)Makefile	8.1 (Berkeley) 6/10/93
-#	$NetBSD: Makefile,v 1.3.28.1 2000/06/26 18:14:03 scw Exp $
+#	$NetBSD: Makefile,v 1.8 2000/12/05 21:51:38 scw Exp $
 
-RELOC=0x3F0000 
+COMPILE.S= $(CC) -x assembler-with-cpp -traditional-cpp \
+		$(ASFLAGS) $(CPPFLAGS) $(INCPATH) -c -o $*.o
 
-S=	${.CURDIR}/../../../..
-DEFS= 
-NOMAN=	1
-NOLINT=	1
-INCPATH=-I${.CURDIR} -I${.CURDIR}/../libsa -I${.CURDIR}/../libbug \
-	-I${.CURDIR}/../../include -I${S} -I${S}/lib/libsa
-CFLAGS=	-O2 ${INCPATH} ${DEFS} ${COPTS}
-CLEANFILES+=bootxx
-
-.include "${S}/arch/mvme68k/stand/bugcrt/Makefile.inc"
-.include "${S}/arch/mvme68k/stand/libbug/Makefile.inc"
-.include "${S}/arch/mvme68k/stand/libsa/Makefile.inc"
-
-SRCS=   bootxx.c conf.c version.c
+SRCS=   bootxx.c conf.c block_x.S
 PROG=	bootxx
 LIBS=	${LIBSA} ${LIBBUG}
+DPADD=	${LIBS}
+SRTOBJ=
 
-${PROG}: ${OBJS} ${BUGCRT} ${LIBS}
-	${LD} -N -T ${RELOC} ${BUGCRT} ${OBJS} ${LIBS} -o $@
-
-install:
-	${INSTALL} -c -m 555 -g bin -o bin ${PROG} ${DESTDIR}${MDEC_DIR}
+.include "../Makefile.booters"
 
 .include <bsd.prog.mk>

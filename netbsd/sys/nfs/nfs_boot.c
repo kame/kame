@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_boot.c,v 1.53.4.1 2000/12/15 00:08:12 he Exp $	*/
+/*	$NetBSD: nfs_boot.c,v 1.57 2001/11/10 10:59:09 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1997 The NetBSD Foundation, Inc.
@@ -41,6 +41,10 @@
  * about where to mount root from, what pathnames, etc.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_boot.c,v 1.57 2001/11/10 10:59:09 lukem Exp $");
+
+#include "opt_nfs.h"
 #include "opt_nfs_boot.h"
 
 #include <sys/param.h>
@@ -211,7 +215,8 @@ nfs_boot_ifupdown(ifp, procp, up)
 	}
 
 	if (up)
-		delay(3000000); /* give the link some time to get up */
+		/* give the link some time to get up */
+		tsleep(nfs_boot_ifupdown, PZERO, "nfsbif", 3 * hz);
 out:
 	soclose(so);
 	return (error);
@@ -269,7 +274,8 @@ nfs_boot_setaddress(ifp, procp, addr, netmask, braddr)
 		goto out;
 	}
 
-	delay(3000000); /* give the link some time to get up */
+	/* give the link some time to get up */
+	tsleep(nfs_boot_setaddress, PZERO, "nfsbtd", 3 * hz);
 out:
 	soclose(so);
 	return (error);
@@ -564,8 +570,11 @@ nfs_boot_getfh(ndm)
 #endif
 	args->fh       = ndm->ndm_fh;
 	args->hostname = ndm->ndm_host;
-	args->flags    = NFSMNT_NFSV3 | NFSMNT_NOCONN | NFSMNT_RESVPORT;
+	args->flags    = NFSMNT_NOCONN | NFSMNT_RESVPORT;
 
+#ifndef NFS_V2_ONLY
+	args->flags    |= NFSMNT_NFSV3;
+#endif
 #ifdef	NFS_BOOT_OPTIONS
 	args->flags    |= NFS_BOOT_OPTIONS;
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: fs.h,v 1.12.4.7 2001/11/25 20:00:41 he Exp $	*/
+/*	$NetBSD: fs.h,v 1.25 2002/04/10 14:31:07 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -37,8 +37,6 @@
 
 #ifndef	_UFS_FFS_FS_H_
 #define	_UFS_FFS_FS_H_
-
-#include <ufs/ufs/dinode.h>
 
 /*
  * Each disk drive contains some number of file systems.
@@ -251,7 +249,9 @@ struct fs {
 	int32_t	 fs_snapinum[20];	/* RESERVED for snapshot inode nums */
 	int32_t	 fs_avgfilesize;	/* expected average file size */
 	int32_t	 fs_avgfpdir;		/* expected # of files per directory */
-	int32_t	 fs_sparecon[28];	/* RESERVED for future constants */
+	int32_t	 fs_sparecon[26];	/* RESERVED for future constants */
+	int32_t  fs_pendingblocks;	/* blocks in process of being freed */
+	int32_t  fs_pendinginodes;	/* inodes in process of being freed */
 	int32_t	 fs_contigsumsize;	/* size of cluster summary array */
 	int32_t	 fs_maxsymlinklen;	/* max length of an internal symlink */
 	int32_t	 fs_inodefmt;		/* format of on-disk inodes */
@@ -475,10 +475,11 @@ struct ocg {
 #define	blkmap(fs, map, loc) \
     (((map)[(loc) / NBBY] >> ((loc) % NBBY)) & (0xff >> (NBBY - (fs)->fs_frag)))
 #define	cbtocylno(fs, bno) \
-    ((bno) * NSPF(fs) / (fs)->fs_spc)
+    (fsbtodb(fs, bno) / (fs)->fs_spc)
 #define	cbtorpos(fs, bno) \
-    (((bno) * NSPF(fs) % (fs)->fs_spc / (fs)->fs_nsect * (fs)->fs_trackskew + \
-     (bno) * NSPF(fs) % (fs)->fs_spc % (fs)->fs_nsect * (fs)->fs_interleave) % \
+    ((fs)->fs_nrpos <= 1 ? 0 : \
+     (fsbtodb(fs, bno) % (fs)->fs_spc / (fs)->fs_nsect * (fs)->fs_trackskew + \
+      fsbtodb(fs, bno) % (fs)->fs_spc % (fs)->fs_nsect * (fs)->fs_interleave) % \
      (fs)->fs_nsect * (fs)->fs_nrpos / (fs)->fs_npsect)
 
 /*

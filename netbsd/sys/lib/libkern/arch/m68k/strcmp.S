@@ -1,4 +1,4 @@
-/*	$NetBSD: strcmp.S,v 1.6 1999/11/11 01:32:13 thorpej Exp $	*/
+/*	$NetBSD: strcmp.S,v 1.8 2001/05/16 03:14:12 fredette Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -40,7 +40,7 @@
 #include <machine/asm.h>
 
 #if defined(LIBC_SCCS) && !defined(lint)
-	RCSID("$NetBSD: strcmp.S,v 1.6 1999/11/11 01:32:13 thorpej Exp $")
+	RCSID("$NetBSD: strcmp.S,v 1.8 2001/05/16 03:14:12 fredette Exp $")
 #endif /* LIBC_SCCS and not lint */
 
 ENTRY(strcmp)
@@ -67,13 +67,12 @@ L1:				/* unrolled by 4 for 680[23]0's */
 	subb	%a1@+,%d1
 	jeq	L1
 
-	scs	%d0
-	extbl	%d0
+L3:	scs	%d0
+	EXTBL(%d0)
 	movb	%d1,%d0
 	rts
 
-L2:	subb	%a1@,%d1
-L3:	scs	%d0
-	extbl	%d0
-	movb	%d1,%d0
+L2:	movq	#0,%d0
+	movb	%a1@,%d0
+	negl	%d0
 	rts

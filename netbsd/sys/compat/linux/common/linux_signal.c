@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_signal.c,v 1.26.4.1 2001/03/30 21:43:30 he Exp $	*/
+/*	$NetBSD: linux_signal.c,v 1.37 2002/03/31 22:22:47 christos Exp $	*/
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -53,6 +53,9 @@
  *	linux_sys_rt_sigtimedwait	: sigsuspend w/timeout.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_signal.c,v 1.37 2002/03/31 22:22:47 christos Exp $");
+
 #define COMPAT_LINUX 1
 
 #include <sys/param.h>
@@ -83,52 +86,24 @@
 #define	linux_sigaddset(s, n)	((s)->sig[((n) - 1) / LINUX__NSIG_BPW]	\
 					|= (1 << ((n) - 1) % LINUX__NSIG_BPW))
 
-/* Note: linux_to_native_sig[] is in <arch>/linux_sigarray.c */
-int native_to_linux_sig[NSIG] = {
-	0,
-	LINUX_SIGHUP,
-	LINUX_SIGINT,
-	LINUX_SIGQUIT,
-	LINUX_SIGILL,
-	LINUX_SIGTRAP,
-	LINUX_SIGABRT,
-	0,			/* SIGEMT */
-	LINUX_SIGFPE,
-	LINUX_SIGKILL,
-	LINUX_SIGBUS,
-	LINUX_SIGSEGV,
-	0,			/* SIGSYS */
-	LINUX_SIGPIPE,
-	LINUX_SIGALRM,
-	LINUX_SIGTERM,
-	LINUX_SIGURG,
-	LINUX_SIGSTOP,
-	LINUX_SIGTSTP,
-	LINUX_SIGCONT,
-	LINUX_SIGCHLD,
-	LINUX_SIGTTIN,
-	LINUX_SIGTTOU,
-	LINUX_SIGIO,
-	LINUX_SIGXCPU,
-	LINUX_SIGXFSZ,
-	LINUX_SIGVTALRM,
-	LINUX_SIGPROF,
-	LINUX_SIGWINCH,
-	0,			/* SIGINFO */
-	LINUX_SIGUSR1,
-	LINUX_SIGUSR2,
-	LINUX_SIGPWR,
-};
+#ifdef DEBUG_LINUX
+#define DPRINTF(a)	uprintf a
+#else
+#define DPRINTF(a)
+#endif
+
+extern const int native_to_linux_signo[];
+extern const int linux_to_native_signo[];
 
 /*
  * Convert between Linux and BSD signal sets.
  */
 #if LINUX__NSIG_WORDS > 1
 void
-linux_old_extra_to_native_sigset(lss, extra, bss)
+linux_old_extra_to_native_sigset(bss, lss, extra)
+	sigset_t *bss;
 	const linux_old_sigset_t *lss;
 	const unsigned long *extra;
-	sigset_t *bss;
 {
 	linux_sigset_t lsnew;
 
@@ -136,41 +111,41 @@ linux_old_extra_to_native_sigset(lss, extra, bss)
 	linux_sigemptyset(&lsnew);
 	lsnew.sig[0] = *lss;
 	if (extra)
-		bcopy(extra, &lsnew.sig[1],
-			sizeof(linux_sigset_t) - sizeof(linux_old_sigset_t));
+		memcpy(&lsnew.sig[1], extra,
+		    sizeof(linux_sigset_t) - sizeof(linux_old_sigset_t));
 
-	linux_to_native_sigset(&lsnew, bss);
+	linux_to_native_sigset(bss, &lsnew);
 }
 
 void
-native_to_linux_old_extra_sigset(bss, lss, extra)
-	const sigset_t *bss;
+native_to_linux_old_extra_sigset(lss, extra, bss)
 	linux_old_sigset_t *lss;
 	unsigned long *extra;
+	const sigset_t *bss;
 {
 	linux_sigset_t lsnew;
 
-	native_to_linux_sigset(bss, &lsnew);
+	native_to_linux_sigset(&lsnew, bss);
 
 	/* convert new sigset to old sigset */
 	*lss = lsnew.sig[0];
 	if (extra)
-		bcopy(&lsnew.sig[1], extra,
-			sizeof(linux_sigset_t) - sizeof(linux_old_sigset_t));
+		memcpy(extra, &lsnew.sig[1],
+		    sizeof(linux_sigset_t) - sizeof(linux_old_sigset_t));
 }
 #endif
 
 void
-linux_to_native_sigset(lss, bss)
-	const linux_sigset_t *lss;
+linux_to_native_sigset(bss, lss)
 	sigset_t *bss;
+	const linux_sigset_t *lss;
 {
 	int i, newsig;
 
 	sigemptyset(bss);
 	for (i = 1; i < LINUX__NSIG; i++) {
 		if (linux_sigismember(lss, i)) {
-			newsig = linux_to_native_sig[i];
+			newsig = linux_to_native_signo[i];
 			if (newsig)
 				sigaddset(bss, newsig);
 		}
@@ -178,20 +153,67 @@ linux_to_native_sigset(lss, bss)
 }
 
 void
-native_to_linux_sigset(bss, lss)
-	const sigset_t *bss;
+native_to_linux_sigset(lss, bss)
 	linux_sigset_t *lss;
+	const sigset_t *bss;
 {
 	int i, newsig;
 
 	linux_sigemptyset(lss);
 	for (i = 1; i < NSIG; i++) {
 		if (sigismember(bss, i)) {
-			newsig = native_to_linux_sig[i];
+			newsig = native_to_linux_signo[i];
 			if (newsig)
 				linux_sigaddset(lss, newsig);
 		}
 	}
+}
+
+unsigned int
+native_to_linux_sigflags(bsf)
+	const int bsf;
+{
+	unsigned int lsf = 0;
+	if ((bsf & SA_NOCLDSTOP) != 0)
+		lsf |= LINUX_SA_NOCLDSTOP;
+	if ((bsf & SA_NOCLDWAIT) != 0)
+		lsf |= LINUX_SA_NOCLDWAIT;
+	if ((bsf & SA_ONSTACK) != 0)
+		lsf |= LINUX_SA_ONSTACK;
+	if ((bsf & SA_RESTART) != 0)
+		lsf |= LINUX_SA_RESTART;
+	if ((bsf & SA_NODEFER) != 0)
+		lsf |= LINUX_SA_NOMASK;
+	if ((bsf & SA_RESETHAND) != 0)
+		lsf |= LINUX_SA_ONESHOT;
+	if ((bsf & SA_SIGINFO) != 0)
+		lsf |= LINUX_SA_SIGINFO;
+	return lsf;
+}
+
+int
+linux_to_native_sigflags(lsf)
+	const unsigned long lsf;
+{
+	int bsf = 0;
+	if ((lsf & LINUX_SA_NOCLDSTOP) != 0)
+		bsf |= SA_NOCLDSTOP;
+	if ((lsf & LINUX_SA_NOCLDWAIT) != 0)
+		bsf |= SA_NOCLDWAIT;
+	if ((lsf & LINUX_SA_ONSTACK) != 0)
+		bsf |= SA_ONSTACK;
+	if ((lsf & LINUX_SA_RESTART) != 0)
+		bsf |= SA_RESTART;
+	if ((lsf & LINUX_SA_ONESHOT) != 0)
+		bsf |= SA_RESETHAND;
+	if ((lsf & LINUX_SA_NOMASK) != 0)
+		bsf |= SA_NODEFER;
+	if ((lsf & LINUX_SA_SIGINFO) != 0)
+		bsf |= SA_SIGINFO;
+	if ((lsf & ~LINUX_SA_ALLBITS) != 0)
+		DPRINTF(("linux_old_to_native_sigflags: "
+		    "%lx extra bits ignored\n", lsf));
+	return bsf;
 }
 
 /*
@@ -199,114 +221,62 @@ native_to_linux_sigset(bss, lss)
  * has one extra field (sa_restorer) which we don't support.
  */
 void
-linux_old_to_native_sigaction(lsa, bsa)
-	struct linux_old_sigaction *lsa;
+linux_old_to_native_sigaction(bsa, lsa)
 	struct sigaction *bsa;
+	const struct linux_old_sigaction *lsa;
 {
-
 	bsa->sa_handler = lsa->sa_handler;
-	linux_old_to_native_sigset(&lsa->sa_mask, &bsa->sa_mask);
-	bsa->sa_flags = 0;
-	if ((lsa->sa_flags & LINUX_SA_NOCLDSTOP) != 0)
-		bsa->sa_flags |= SA_NOCLDSTOP;
-	if ((lsa->sa_flags & LINUX_SA_ONSTACK) != 0)
-		bsa->sa_flags |= SA_ONSTACK;
-	if ((lsa->sa_flags & LINUX_SA_RESTART) != 0)
-		bsa->sa_flags |= SA_RESTART;
-	if ((lsa->sa_flags & LINUX_SA_ONESHOT) != 0)
-		bsa->sa_flags |= SA_RESETHAND;
-	if ((lsa->sa_flags & LINUX_SA_NOMASK) != 0)
-		bsa->sa_flags |= SA_NODEFER;
-	if ((lsa->sa_flags & LINUX_SA_SIGINFO) != 0)
-		bsa->sa_flags |= SA_SIGINFO;
-#ifdef DEBUG_LINUX
-	if ((lsa->sa_flags & ~LINUX_SA_ALLBITS) != 0)
-/*XXX*/		printf("linux_old_to_native_sigaction: extra bits ignored\n");
-	if (lsa->sa_restorer != 0)
-/*XXX*/		printf("linux_old_to_native_sigaction: sa_restorer ignored\n");
+	linux_old_to_native_sigset(&bsa->sa_mask, &lsa->sa_mask);
+	bsa->sa_flags = linux_to_native_sigflags(lsa->sa_flags);
+#ifndef __alpha__
+/*
+ * XXX: On the alpha sa_restorer is elsewhere.
+ */
+	if (lsa->sa_restorer != NULL)
+		DPRINTF(("linux_old_to_native_sigaction: "
+		    "sa_restorer ignored\n"));
 #endif
 }
 
 void
-native_to_linux_old_sigaction(bsa, lsa)
-	struct sigaction *bsa;
+native_to_linux_old_sigaction(lsa, bsa)
 	struct linux_old_sigaction *lsa;
+	const struct sigaction *bsa;
 {
-
-	/* Clear sa_flags and sa_restorer (if it exists) */
-	bzero(lsa, sizeof(struct linux_old_sigaction));
-
-	/* ...and fill in the mask and flags */
-	native_to_linux_old_sigset(&bsa->sa_mask, &lsa->sa_mask);
-	if ((bsa->sa_flags & SA_NOCLDSTOP) != 0)
-		lsa->sa_flags |= LINUX_SA_NOCLDSTOP;
-	if ((bsa->sa_flags & SA_ONSTACK) != 0)
-		lsa->sa_flags |= LINUX_SA_ONSTACK;
-	if ((bsa->sa_flags & SA_RESTART) != 0)
-		lsa->sa_flags |= LINUX_SA_RESTART;
-	if ((bsa->sa_flags & SA_NODEFER) != 0)
-		lsa->sa_flags |= LINUX_SA_NOMASK;
-	if ((bsa->sa_flags & SA_RESETHAND) != 0)
-		lsa->sa_flags |= LINUX_SA_ONESHOT;
-	if ((bsa->sa_flags & SA_SIGINFO) != 0)
-		lsa->sa_flags |= LINUX_SA_SIGINFO;
 	lsa->sa_handler = bsa->sa_handler;
+	native_to_linux_old_sigset(&lsa->sa_mask, &bsa->sa_mask);
+	lsa->sa_flags = native_to_linux_sigflags(bsa->sa_flags);
+#ifndef __alpha__
+	lsa->sa_restorer = NULL;
+#endif
 }
 
 /* ...and the new sigaction conversion funcs. */
 void
-linux_to_native_sigaction(lsa, bsa)
-	struct linux_sigaction *lsa;
+linux_to_native_sigaction(bsa, lsa)
 	struct sigaction *bsa;
+	const struct linux_sigaction *lsa;
 {
-
 	bsa->sa_handler = lsa->sa_handler;
-	linux_to_native_sigset(&lsa->sa_mask, &bsa->sa_mask);
-	bsa->sa_flags = 0;
-	if ((lsa->sa_flags & LINUX_SA_NOCLDSTOP) != 0)
-		bsa->sa_flags |= SA_NOCLDSTOP;
-	if ((lsa->sa_flags & LINUX_SA_ONSTACK) != 0)
-		bsa->sa_flags |= SA_ONSTACK;
-	if ((lsa->sa_flags & LINUX_SA_RESTART) != 0)
-		bsa->sa_flags |= SA_RESTART;
-	if ((lsa->sa_flags & LINUX_SA_ONESHOT) != 0)
-		bsa->sa_flags |= SA_RESETHAND;
-	if ((lsa->sa_flags & LINUX_SA_NOMASK) != 0)
-		bsa->sa_flags |= SA_NODEFER;
-	if ((lsa->sa_flags & LINUX_SA_SIGINFO) != 0)
-		bsa->sa_flags |= SA_SIGINFO;
-#ifdef DEBUG_LINUX
-	if ((lsa->sa_flags & ~LINUX_SA_ALLBITS) != 0)
-/*XXX*/		printf("linux_to_native_sigaction: extra bits ignored\n");
+	linux_to_native_sigset(&bsa->sa_mask, &lsa->sa_mask);
+	bsa->sa_flags = linux_to_native_sigflags(lsa->sa_flags);
+#ifndef __alpha__
 	if (lsa->sa_restorer != 0)
-/*XXX*/		printf("linux_to_native_sigaction: sa_restorer ignored\n");
+		DPRINTF(("linux_to_native_sigaction: sa_restorer ignored\n"));
 #endif
 }
 
 void
-native_to_linux_sigaction(bsa, lsa)
-	struct sigaction *bsa;
+native_to_linux_sigaction(lsa, bsa)
 	struct linux_sigaction *lsa;
+	const struct sigaction *bsa;
 {
-
-	/* Clear sa_flags and sa_restorer (if it exists) */
-	bzero(lsa, sizeof(struct linux_sigaction));
-
-	/* ...and fill in the mask and flags */
-	native_to_linux_sigset(&bsa->sa_mask, &lsa->sa_mask);
-	if ((bsa->sa_flags & SA_NOCLDSTOP) != 0)
-		lsa->sa_flags |= LINUX_SA_NOCLDSTOP;
-	if ((bsa->sa_flags & SA_ONSTACK) != 0)
-		lsa->sa_flags |= LINUX_SA_ONSTACK;
-	if ((bsa->sa_flags & SA_RESTART) != 0)
-		lsa->sa_flags |= LINUX_SA_RESTART;
-	if ((bsa->sa_flags & SA_NODEFER) != 0)
-		lsa->sa_flags |= LINUX_SA_NOMASK;
-	if ((bsa->sa_flags & SA_RESETHAND) != 0)
-		lsa->sa_flags |= LINUX_SA_ONESHOT;
-	if ((bsa->sa_flags & SA_SIGINFO) != 0)
-		lsa->sa_flags |= LINUX_SA_SIGINFO;
 	lsa->sa_handler = bsa->sa_handler;
+	native_to_linux_sigset(&lsa->sa_mask, &bsa->sa_mask);
+	lsa->sa_flags = native_to_linux_sigflags(bsa->sa_flags);
+#ifndef __alpha__
+	lsa->sa_restorer = NULL;
+#endif
 }
 
 /* ----------------------------------------------------------------------- */
@@ -339,25 +309,24 @@ linux_sys_rt_sigaction(p, v, retval)
 		error = copyin(SCARG(uap, nsa), &nlsa, sizeof(nlsa));
 		if (error)
 			return (error);
-		linux_to_native_sigaction(&nlsa, &nbsa);
+		linux_to_native_sigaction(&nbsa, &nlsa);
 	}
 	sig = SCARG(uap, signum);
 	if (sig < 0 || sig >= LINUX__NSIG)
 		return (EINVAL);
-	if (sig > 0 && !linux_to_native_sig[sig]) {
+	if (sig > 0 && !linux_to_native_signo[sig]) {
 		/* Pretend that we did something useful for unknown signals. */
 		obsa.sa_handler = SIG_IGN;
 		sigemptyset(&obsa.sa_mask);
 		obsa.sa_flags = 0;
 	} else {
-		error = sigaction1(p, linux_to_native_sig[sig],
-		    SCARG(uap, nsa) ? &nbsa : NULL,
-		    SCARG(uap, osa) ? &obsa : NULL);
+		error = sigaction1(p, linux_to_native_signo[sig],
+		    SCARG(uap, nsa) ? &nbsa : NULL, SCARG(uap, osa) ? &obsa : NULL);
 		if (error)
 			return (error);
 	}
 	if (SCARG(uap, osa)) {
-		native_to_linux_sigaction(&obsa, &olsa);
+		native_to_linux_sigaction(&olsa, &obsa);
 		error = copyout(&olsa, SCARG(uap, osa), sizeof(olsa));
 		if (error)
 			return (error);
@@ -394,14 +363,14 @@ linux_sigprocmask1(p, how, set, oset)
 		error = copyin(set, &nlss, sizeof(nlss));
 		if (error)
 			return (error);
-		linux_old_to_native_sigset(&nlss, &nbss);
+		linux_old_to_native_sigset(&nbss, &nlss);
 	}
 	error = sigprocmask1(p, how,
-	    set ? &nbss : 0, oset ? &obss : 0);
+	    set ? &nbss : NULL, oset ? &obss : NULL);
 	if (error)
 		return (error); 
 	if (oset) {
-		native_to_linux_old_sigset(&obss, &olss);
+		native_to_linux_old_sigset(&olss, &obss);
 		error = copyout(&olss, oset, sizeof(olss));
 		if (error)
 			return (error);
@@ -451,17 +420,13 @@ linux_sys_rt_sigprocmask(p, v, retval)
 		error = copyin(set, &nlss, sizeof(nlss));
 		if (error)
 			return (error);
-		linux_to_native_sigset(&nlss, &nbss);
+		linux_to_native_sigset(&nbss, &nlss);
 	}
 	error = sigprocmask1(p, how,
-	    set ? &nbss : 0, oset ? &obss : 0);
-	if (error)
-		return (error); 
-	if (oset) {
-		native_to_linux_sigset(&obss, &olss);
+	    set ? &nbss : NULL, oset ? &obss : NULL);
+	if (!error && oset) {
+		native_to_linux_sigset(&olss, &obss);
 		error = copyout(&olss, oset, sizeof(olss));
-		if (error)
-			return (error);
 	}       
 	return (error);
 }
@@ -483,7 +448,7 @@ linux_sys_rt_sigpending(p, v, retval)
 		return (EINVAL);
 
 	sigpending1(p, &bss);
-	native_to_linux_sigset(&bss, &lss);
+	native_to_linux_sigset(&lss, &bss);
 	return copyout(&lss, SCARG(uap, set), sizeof(lss));
 }
 
@@ -500,7 +465,7 @@ linux_sys_sigpending(p, v, retval)
 	linux_old_sigset_t lss;
 
 	sigpending1(p, &bss);
-	native_to_linux_old_sigset(&bss, &lss);
+	native_to_linux_old_sigset(&lss, &bss);
 	return copyout(&lss, SCARG(uap, set), sizeof(lss));
 }
 
@@ -519,7 +484,7 @@ linux_sys_sigsuspend(p, v, retval)
 	sigset_t bss;
 
 	lss = SCARG(uap, mask);
-	linux_old_to_native_sigset(&lss, &bss);
+	linux_old_to_native_sigset(&bss, &lss);
 	return (sigsuspend1(p, &bss));
 }
 int
@@ -543,7 +508,7 @@ linux_sys_rt_sigsuspend(p, v, retval)
 	if (error)
 		return (error);
 
-	linux_to_native_sigset(&lss, &bss);
+	linux_to_native_sigset(&bss, &lss);
 
 	return (sigsuspend1(p, &bss));
 }
@@ -589,6 +554,76 @@ linux_sys_kill(p, v, retval)
 	sig = SCARG(uap, signum);
 	if (sig < 0 || sig >= LINUX__NSIG)
 		return (EINVAL);
-	SCARG(&ka, signum) = linux_to_native_sig[sig];
+	SCARG(&ka, signum) = linux_to_native_signo[sig];
 	return sys_kill(p, &ka, retval);
 }
+
+#ifdef LINUX_SS_ONSTACK
+static void linux_to_native_sigaltstack __P((struct sigaltstack *,
+    const struct linux_sigaltstack *));
+static void native_to_linux_sigaltstack __P((struct linux_sigaltstack *,
+    const struct sigaltstack *));
+
+static void
+linux_to_native_sigaltstack(bss, lss)
+	struct sigaltstack *bss;
+	const struct linux_sigaltstack *lss;
+{
+	bss->ss_sp = lss->ss_sp;
+	bss->ss_size = lss->ss_size;
+	if (lss->ss_flags & LINUX_SS_ONSTACK)
+	    bss->ss_flags = SS_ONSTACK;
+	else if (lss->ss_flags & LINUX_SS_DISABLE)
+	    bss->ss_flags = SS_DISABLE;
+	else
+	    bss->ss_flags = 0;
+}
+
+static void
+native_to_linux_sigaltstack(lss, bss)
+	struct linux_sigaltstack *lss;
+	const struct sigaltstack *bss;
+{
+	lss->ss_sp = bss->ss_sp;
+	lss->ss_size = bss->ss_size;
+	if (bss->ss_flags & SS_ONSTACK)
+	    lss->ss_flags = LINUX_SS_ONSTACK;
+	else if (bss->ss_flags & SS_DISABLE)
+	    lss->ss_flags = LINUX_SS_DISABLE;
+	else
+	    lss->ss_flags = 0;
+}
+
+int
+linux_sys_sigaltstack(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_sigaltstack_args /* {
+		syscallarg(const struct linux_sigaltstack *) ss;
+		syscallarg(struct linux_sigaltstack *) oss;
+	} */ *uap = v;
+	struct linux_sigaltstack ss;
+	struct sigaltstack nss, oss;
+	int error;
+
+	if (SCARG(uap, ss) != NULL) {
+		if ((error = copyin(SCARG(uap, ss), &ss, sizeof(ss))) != 0)
+			return error;
+		linux_to_native_sigaltstack(&nss, &ss);
+	}
+
+	error = sigaltstack1(p,
+	    SCARG(uap, ss) ? &nss : NULL, SCARG(uap, oss) ? &oss : NULL);
+	if (error)
+		return error;
+
+	if (SCARG(uap, oss) != NULL) {
+		native_to_linux_sigaltstack(&ss, &oss);
+		if ((error = copyout(&ss, SCARG(uap, oss), sizeof(ss))) != 0)
+			return error;
+	}
+	return 0;
+}
+#endif

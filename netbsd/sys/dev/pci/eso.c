@@ -1,4 +1,4 @@
-/*	$NetBSD: eso.c,v 1.18.4.1 2000/06/30 16:27:50 simonb Exp $	*/
+/*	$NetBSD: eso.c,v 1.24 2002/04/25 00:52:21 kleink Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Klaus J. Klein
@@ -31,6 +31,9 @@
 /*
  * ESS Technology Inc. Solo-1 PCI AudioDrive (ES1938/1946) device driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: eso.c,v 1.24 2002/04/25 00:52:21 kleink Exp $");
 
 #include "mpu.h"
 
@@ -82,6 +85,7 @@ struct eso_dma {
 static int eso_match __P((struct device *, struct cfdata *, void *));
 static void eso_attach __P((struct device *, struct device *, void *));
 static void eso_defer __P((struct device *));
+static int eso_print __P((void *, const char *));
 
 struct cfattach eso_ca = {
 	sizeof (struct eso_softc), eso_match, eso_attach
@@ -139,7 +143,8 @@ static struct audio_hw_if eso_hw_if = {
 	eso_mappage,
 	eso_get_props,
 	eso_trigger_output,
-	eso_trigger_input
+	eso_trigger_input,
+	NULL,			/* dev_ioctl */
 };
 
 static const char * const eso_rev2model[] = {
@@ -166,7 +171,7 @@ static void	eso_write_ctlreg __P((struct eso_softc *, uint8_t, uint8_t));
 static void	eso_write_mixreg __P((struct eso_softc *, uint8_t, uint8_t));
 /* DMA memory allocation */
 static int	eso_allocmem __P((struct eso_softc *, size_t, size_t, size_t,
-		    int, struct eso_dma *));
+		    int, int, struct eso_dma *));
 static void	eso_freemem __P((struct eso_dma *));
 
 
@@ -308,8 +313,7 @@ eso_attach(parent, self, aux)
 	eso_set_recsrc(sc, ESO_MIXREG_ERS_MIC);
 	
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -372,6 +376,11 @@ eso_attach(parent, self, aux)
 		mvctl |= ESO_MIXREG_MVCTL_MPUIRQM;
 		eso_write_mixreg(sc, ESO_MIXREG_MVCTL, mvctl);
 	}
+
+	aa.type = AUDIODEV_TYPE_AUX;
+	aa.hwif = NULL;
+	aa.hdl = NULL;
+	(void)config_found(&sc->sc_dev, &aa, eso_print);
 }
 
 static void
@@ -408,6 +417,20 @@ eso_defer(self)
 	}
 	
 	printf("can't map Audio 1 DMA into I/O space\n");
+}
+
+/* ARGSUSED */
+static int
+eso_print(aux, pnp)
+	void *aux;
+	const char *pnp;
+{
+
+	/* Only joys can attach via this; easy. */
+	if (pnp)
+		printf("joy at %s:", pnp);
+
+	return (UNCONF);
 }
 
 static void
@@ -1447,12 +1470,13 @@ eso_query_devinfo(hdl, dip)
 }
 
 static int
-eso_allocmem(sc, size, align, boundary, flags, ed)
+eso_allocmem(sc, size, align, boundary, flags, direction, ed)
 	struct eso_softc *sc;
 	size_t size;
 	size_t align;
 	size_t boundary;
 	int flags;
+	int direction;
 	struct eso_dma *ed;
 {
 	int error, wait;
@@ -1477,7 +1501,8 @@ eso_allocmem(sc, size, align, boundary, flags, ed)
 		goto unmap;
 
 	error = bus_dmamap_load(ed->ed_dmat, ed->ed_map, ed->ed_addr,
-	    ed->ed_size, NULL, wait);
+	    ed->ed_size, NULL, wait |
+	    (direction == AUMODE_RECORD) ? BUS_DMA_READ : BUS_DMA_WRITE);
 	if (error)
 		goto destroy;
 
@@ -1541,7 +1566,7 @@ eso_allocm(hdl, direction, size, type, flags)
 #endif
 		ed->ed_dmat = sc->sc_dmat;
 
-	error = eso_allocmem(sc, size, 32, boundary, flags, ed);
+	error = eso_allocmem(sc, size, 32, boundary, flags, direction, ed);
 	if (error) {
 		free(ed, type);
 		return (NULL);

@@ -1,1 +1,3 @@
-#include "../../hpcmips/platid.c"
+#include <stand.h>
+
+#include "../../../hpc/hpc/platid.c"

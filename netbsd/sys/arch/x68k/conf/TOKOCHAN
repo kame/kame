@@ -1,4 +1,4 @@
-#	$NetBSD: TOKOCHAN,v 1.14.2.1 2001/01/25 20:10:42 jhawk Exp $
+#	$NetBSD: TOKOCHAN,v 1.27.4.1 2002/08/01 04:35:24 lukem Exp $
 
 #
 #	TOKOCHAN -- Believe in the BSD power; Toko to issyo-ni make all!
@@ -6,7 +6,9 @@
 
 include "arch/x68k/conf/std.x68k"
 
-#ident 		"TOKOCHAN-$Revision: 1.14.2.1 $"
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+#ident 		"TOKOCHAN-$Revision: 1.27.4.1 $"
 
 maxusers	10
 
@@ -16,10 +18,10 @@ maxusers	10
 ## Options for variants of the m68k MPU
 ## you must have at least the correct one; REQUIRED
 options 	M68030
-options 	M68040
+#options 	M68040
 #options 	M68060
 ## If you want an optimized kernel for a specific processor, use either:
-#makeoptions	CMACHFLAGS="-m68030"
+makeoptions	CMACHFLAGS="-m68030"
 #makeoptions	CMACHFLAGS="-m68040 -Wa,-m68030 -Wa,-m68851"
 #makeoptions	CMACHFLAGS="-m68060 -Wa,-m68030 -Wa,-m68851"
 
@@ -59,11 +61,18 @@ options 	KTRACE
 ## System V compatible IPC subsystem.  (msgctl(2), semctl(2), and shmctl(2))
 options 	SYSVMSG		# System V message queues
 options 	SYSVSEM		# System V semaphores
+#options 	SEMMNI=10	# number of semaphore identifiers
+#options 	SEMMNS=60	# number of semaphores in system
+#options 	SEMUME=10	# max number of undo entries per process
+#options 	SEMMNU=30	# number of undo structures in system
 options 	SYSVSHM		# System V shared memory
 options 	SHMMAXPGS=2048	# 1024 pages is the default
 
 ## Loadable kernel module support
 #options 	LKM
+
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
 
 ## NFS boot options; not supported currently: needs nfsboot program
 #options 	NFS_BOOT_BOOTPARAM
@@ -77,22 +86,22 @@ options 	SHMMAXPGS=2048	# 1024 pages is the default
 ## intercept.  DDB_HISTORY_SIZE adds up/down arrow command history.
 options 	DDB			# kernel dynamic debugger
 options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
-options 	DDB_ONPANIC=0		# see also sysctl(8): `ddb.onpanic'
+options 	DDB_ONPANIC=1		# see also sysctl(8): `ddb.onpanic'
 options 	PANICBUTTON		# interrupt switch invokes DDB
 
 ## You may also use gdb, on another computer connected to this machine over
-## a serial port.  Both KGDBDEV and KGDBRATE should be specified; KGDBDEV is
-## a dev_t encoded device number of the serial port to use.
+## a serial port.  Both KGDB_DEV and KGDB_DEVRATE should be specified;
+## KGDB_DEV is a dev_t encoded device number of the serial port to use.
 ## KGDB is not supported for now.
-#options 	KGDB		# support for kernel gdb
-#options 	KGDBDEV=0xc00	# kgdb device number
-#options 	KGDBRATE=9600	# baud rate
+#options 	KGDB			# support for kernel gdb
+#options 	KGDB_DEV=0xc00		# kgdb device number
+#options 	KGDB_DEVRATE=9600	# baud rate
 
 ## Compile the kernel with debugging symbols (`netbsd.gdb' is the debug file),
 ## such that gdb(1) can be used on a kernel coredump.
 
-makeoptions 	DEBUG="-g"
-makeoptions 	COPTS="-O2 -pipe"	# pass -pipe option to CC
+makeoptions	DEBUG="-g"
+makeoptions	COPTS="-O2 -pipe"	# pass -pipe option to CC
 
 ## Adds code to the kernel that does internal consistency checks, and will
 ## cause the kernel to panic if corruption of internal data structures
@@ -133,11 +142,12 @@ options 	COMPAT_43	# 4.3BSD system interfaces
 #options 	COMPAT_12	# NetBSD 1.2 binary compatibility
 options 	COMPAT_13	# NetBSD 1.3 binary compatibility
 options 	COMPAT_14	# NetBSD 1.4 binary compatibility
+options 	COMPAT_AOUT_M68K # compatibility with NetBSD/m68k a.out
 #options 	COMPAT_M68K4K	# NetBSD/m68k4k binaries
 #options 	COMPAT_SUNOS	# SunOS 4.x binary compatibility; broken
 #options 	COMPAT_SVR4	# SVR4 binary compatibility; broken
 #options 	COMPAT_LINUX	# Linux/m68k binary compatibility
-#options 	EXEC_ELF32	# 32-bit ELF executables (Linux, SVR4)
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 ## File systems.
 file-system	FFS		# Berkeley Fast Filesystem
@@ -152,7 +162,7 @@ file-system	LFS		# Log-structured filesystem (experimental)
 #file-system	PORTAL		# portal filesystem (experimental)
 file-system	PROCFS		# /proc
 file-system	CD9660		# ISO 9660 + Rock Ridge file system
-#file-system	UNION		# union file system
+#file-system	UNION		# union file system (a little buggy)
 file-system	MSDOSFS		# MS-DOS FAT filesystem(s).
 #file-system 	ADOSFS		# AmigaDOS filesystem
 
@@ -160,7 +170,7 @@ file-system	MSDOSFS		# MS-DOS FAT filesystem(s).
 options 	NFSSERVER	# Sun NFS-compatible filesystem server
 #options 	QUOTA		# FFS quotas
 #options 	FFS_EI		# FFS Endian Independent support
-options 	SOFTDEP         # FFS soft updates support.
+options 	SOFTDEP		# FFS soft updates support.
 
 ## Network protocol support.  In most environments, INET is required.
 options 	INET		# IP (Internet Protocol) v4
@@ -168,7 +178,6 @@ options 	INET6		# IPV6
 options 	IPSEC		# IP security
 options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 #options 	IPSEC_DEBUG	# debug for IP security
-#options 	TCP_COMPAT_42	# 4.2BSD IP implementation compatibility
 #options 	GATEWAY		# packet forwarding ("router switch")
 #options 	MROUTING	# packet forwarding of multicast packets
 #options 	DIRECTED_BROADCAST	# allow broadcasts through routers
@@ -185,6 +194,7 @@ options 	IPFILTER_LOG	# Add ipmon(8) logging for ipfilter device
 #options 	PPP_BSDCOMP	# Add BSD compression to ppp device
 #options 	PPP_DEFLATE	# Add deflate (libz) compression to ppp device
 #options 	PPP_FILTER	# Add active filters for ppp (via bpf)
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 options 	NVNODE=1024	# 'make build' required huge vnode table
 options 	MSGBUFSIZE=32768 # increase msgbuf to preserve debug messages
@@ -221,6 +231,7 @@ scsibus* at spc?
 mha0	at scsirom?			# Mankai MK-HA1 (Mach-2)
 scsibus* at mha0
 
+sd1	at scsibus? target 1 lun 0
 sd*	at scsibus? target ? lun ?	# SCSI disks
 cd*	at scsibus? target ? lun ?	# SCSI CD-ROMs
 #st*	at scsibus? target ? lun ?	# SCSI tapes
@@ -246,15 +257,15 @@ pseudo-device	bell			# OPM bell
 #xcom0	at mainbus0			# NS16550 fast serial
 #xcom1	at mainbus0
 
-## Audio device; broken
-#okiadpcm0 at intio0 addr 0xe92000 intr 106 errintr 107 dma 3
-#audio*	at okiadpcm*
+## Audio device
+vs0 at intio0 addr 0xe92000 dma 3 dmaintr 106
+audio*	at vs?
 
 ## Network interfaces
+#ne*	at intio0 addr 0xece300 intr 249	# Nereid Ethernet
 neptune0 at intio0 addr 0xece000 intr 249	# Neptune-X
 neptune1 at intio0 addr 0xece400 intr 249	# Neptune-X at alt. addr.
 ne0	at neptune? addr 0x300			# NE2000 or clone
-#se0	at scsibus? target ? lun ?		# Ether+; broken
 
 
 #### Pseudo devices
@@ -301,23 +312,28 @@ pseudo-device	bpfilter	4
 
 ## IP Filter, used in firewall and NAT applications.  See ipnat(8) for
 ## one example of the use of the IP Filter.
-pseudo-device	ipfilter
+#pseudo-device	ipfilter
 
 ## for IPv6
-#pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
+#pseudo-device	gif		1	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
+#pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
+
+## IEEE 802.1Q Virtual LAN encapsulation, see vlan(4).
+#pseudo-device	vlan
+
+## Simple inter-network traffic bridging
+#pseudo-device	bridge
 
 #### Other device configuration
 
 ## Pseudo ttys, required for network logins and programs like screen.
-## 32 is a good number for average systems; you may have as many as you
-## like, though 256 is more or less the upper limit.  Increasing this
-## number still requires you to run /dev/MAKEDEV to create the files
-## for the ptys.
 
-pseudo-device	pty		16	# pseudo-ttys (for network, etc.)
+pseudo-device	pty			# pseudo-terminals
 
 ## Random device, used to implement /dev/random (a source of random noise),
 ## and generate randomness for some kernel formulae.
 
 pseudo-device	rnd
+
+pseudo-device	clockctl		# user control of clock subsystem

@@ -1,5 +1,5 @@
 /*	$OpenBSD: db_machdep.h,v 1.2 1997/03/21 00:48:48 niklas Exp $	*/
-/*	$NetBSD: db_machdep.h,v 1.4.22.1 2000/08/05 11:10:43 wiz Exp $	*/
+/*	$NetBSD: db_machdep.h,v 1.13 2002/05/13 06:05:32 matt Exp $	*/
 
 /* 
  * Mach Operating System
@@ -33,9 +33,13 @@
 #ifndef	_PPC_DB_MACHDEP_H_
 #define	_PPC_DB_MACHDEP_H_
 
-#include <vm/vm_prot.h>
-#include <vm/vm_param.h>
+#include <uvm/uvm_prot.h>
+#include <uvm/uvm_param.h>
 #include <machine/trap.h>
+
+#ifdef _KERNEL
+#include "opt_ppcarch.h"
+#endif
 
 #define	DB_ELF_SYMBOLS
 #define	DB_ELFSIZE	32
@@ -46,19 +50,25 @@ struct powerpc_saved_state {
 	u_int32_t	r[32];		/* data registers */
 	u_int32_t	iar;
 	u_int32_t	msr;
+	u_int32_t	lr;
+	u_int32_t	ctr;
+	u_int32_t	cr;
+	u_int32_t	xer;
+	u_int32_t	dear;
+	u_int32_t	esr;
+	u_int32_t	pid;
 };
 typedef struct powerpc_saved_state db_regs_t;
-db_regs_t	ddb_regs;		/* register state */
+extern	db_regs_t	ddb_regs;		/* register state */
 #define DDB_REGS	(&ddb_regs)
 
 #define	PC_REGS(regs)	((db_addr_t)(regs)->iar)
 
-#define	BKPT_INST	0x7C810808	/* breakpoint instruction */
+#define	BKPT_ASM	"trap"				/* should match BKPT_INST */
+#define	BKPT_INST	0x7fe00008	/* breakpoint instruction */
 
 #define	BKPT_SIZE	(4)		/* size of breakpoint inst */
 #define	BKPT_SET(inst)	(BKPT_INST)
-
-#define	FIXUP_PC_AFTER_BREAK(regs)	((regs)->iar -= 4)
 
 #define SR_SINGLESTEP	0x400
 #define	db_clear_single_step(regs)	((regs)->msr &= ~SR_SINGLESTEP)
@@ -90,10 +100,39 @@ db_regs_t	ddb_regs;		/* register state */
 #define inst_load(ins)		0
 #define inst_store(ins)		0
 
+/*
+ * GDB's register array is:
+ *  32 4-byte GPRs
+ *  32 8-byte FPRs
+ *   7 4-byte UISA special-purpose registers
+ *  16 4-byte segment registers
+ *  32 4-byte standard OEA special-purpose registers,
+ * and up to 64 4-byte non-standard OES special-purpose registers.
+ * GDB keeps some extra space, so the total size of the register array
+ * they use is 880 bytes (gdb-5.0).
+ */
+typedef long	kgdb_reg_t;
+#define KGDB_NUMREGS	220	/* Treat all registers as 4-byte */
+#define KGDB_BUFLEN	(2*KGDB_NUMREGS*sizeof(kgdb_reg_t)+1)
+#define KGDB_PPC_PC_REG		96	/* first UISA SP register */
+#define KGDB_PPC_MSR_REG	97
+#define KGDB_PPC_CR_REG		98
+#define KGDB_PPC_LR_REG		99
+#define KGDB_PPC_CTR_REG	100
+#define KGDB_PPC_XER_REG	101
+#define KGDB_PPC_MQ_REG		102
+
 #ifdef _KERNEL
 
 void	kdb_kintr __P((void *));
 int	kdb_trap __P((int, void *));
+
+#ifdef PPC_IBM4XX
+/*
+ * We have machine-dependent commands.
+ */
+#define	DB_MACHINE_COMMANDS
+#endif
 
 #endif /* _KERNEL */
 

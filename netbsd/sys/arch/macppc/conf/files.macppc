@@ -1,4 +1,4 @@
-#	$NetBSD$
+#	$NetBSD: files.macppc,v 1.50 2002/04/22 09:41:20 augustss Exp $
 #
 # macppc-specific configuration info
 
@@ -16,14 +16,28 @@ file arch/macppc/macppc/conf.c
 file arch/macppc/macppc/disksubr.c		disk
 file arch/macppc/macppc/extintr.c
 file arch/macppc/macppc/machdep.c
+file arch/macppc/macppc/procfs_machdep.c	procfs
 file arch/macppc/dev/dbdma.c
 file dev/cons.c
 
 #
 # Memory Disk for install floppy
 #
-file arch/macppc/macppc/md_root.c		memory_disk_hooks
+file dev/md_root.c				memory_disk_hooks
 major {md = 9}
+
+#
+# Compatibility modules
+#
+
+# OSS audio driver compatibility
+include "compat/ossaudio/files.ossaudio"
+
+# Linux binary compatibility (COMPAT_LINUX)
+include "compat/linux/files.linux"
+include "compat/linux/arch/powerpc/files.linux_powerpc"
+file arch/powerpc/powerpc/linux_sigcode.S	compat_linux
+file arch/powerpc/powerpc/linux_trap.c		compat_linux
 
 #
 # RAIDframe
@@ -46,14 +60,14 @@ major {wd = 10}
 #
 # Generic OpenFirmware device support
 #
-#include "dev/ofw/files.ofw"
-#major {ofdisk = 0}
+include "dev/ofw/files.ofw"
+major {ofdisk = 0}
 
 #
 # Machine-independent I2O drivers
 #
-
 include "dev/i2o/files.i2o"
+major {ld = 13}
 
 #
 # System bus types
@@ -63,7 +77,7 @@ device mainbus: mainbus
 attach mainbus at root
 file arch/macppc/macppc/mainbus.c		mainbus
 
-device cpu
+device cpu: sysmon_envsys
 attach cpu at mainbus
 file arch/macppc/macppc/cpu.c
 
@@ -83,11 +97,6 @@ file arch/macppc/pci/uninorth.c			uninorth
 
 # PCI bus support
 include "dev/pci/files.pci"
-
-file arch/macppc/pci/pciide_machdep.c		pciide
-
-# network devices MII bus
-include "dev/mii/files.mii"
 
 include "dev/wscons/files.wscons"
 include "dev/wsfont/files.wsfont"
@@ -135,6 +144,7 @@ device zsc {channel = -1}
 attach zsc at obio
 file arch/macppc/dev/zs.c	 		zsc needs-flag
 file dev/ic/z8530sc.c				zsc
+file arch/macppc/dev/zs_kgdb.c			zsc & kgdb
 
 device zstty: tty
 attach zstty at zsc
@@ -169,9 +179,17 @@ file arch/macppc/dev/nvram.c			nvram needs-flag
 attach wdc at obio with wdc_obio
 file arch/macppc/dev/wdc_obio.c			wdc_obio
 
-device awacs: audio, auconv, mulaw
+attach wi at obio with wi_obio
+file arch/macppc/dev/if_wi_obio.c		wi_obio
+
+device awacs: audiobus, auconv, mulaw
 attach awacs at obio
 file arch/macppc/dev/awacs.c			awacs
+
+device gpio {}
+attach gpio at obio with gpio_obio
+attach gpio at gpio with gpio_gpio
+file arch/macppc/dev/gpio.c			gpio
 
 define grfdev {}
 
@@ -193,6 +211,7 @@ attach macofcons at pci
 file arch/macppc/dev/ofcons.c			macofcons needs-flag
 
 include "dev/usb/files.usb"
+include "dev/ieee1394/files.ieee1394"
 
 #
 # Machine-independent CardBus drivers

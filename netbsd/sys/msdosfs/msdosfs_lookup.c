@@ -1,4 +1,4 @@
-/*	$NetBSD: msdosfs_lookup.c,v 1.49 2000/03/27 09:44:45 jdolecek Exp $	*/
+/*	$NetBSD: msdosfs_lookup.c,v 1.52 2001/11/10 13:26:45 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1994, 1995, 1997 Wolfgang Solfrank.
@@ -46,6 +46,9 @@
  *
  * October 1992
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: msdosfs_lookup.c,v 1.52 2001/11/10 13:26:45 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -200,8 +203,7 @@ msdosfs_lookup(v)
 		slotcount = 0;
 
 #ifdef MSDOSFS_DEBUG
-	printf("msdosfs_lookup(): dos version of filename %.*s, ",
-	    (int)cnp->cn_namelen, dosfilename);
+	printf("msdosfs_lookup(): dos filename: %s\n", dosfilename);
 #endif
 	/*
 	 * Search the directory pointed at by vdp for the name pointed at
@@ -966,9 +968,7 @@ readep(pmp, dirclust, diroffset, bpp, epp)
 	int error;
 	daddr_t bn;
 	int blsize;
-	u_long boff;
 
-	boff = diroffset & ~pmp->pm_crbomask;
 	blsize = pmp->pm_bpcluster;
 	if (dirclust == MSDOSFSROOT
 	    && de_blk(pmp, diroffset + blsize) > pmp->pm_rootdirsize)

@@ -1,4 +1,4 @@
-/* $NetBSD: cpuconf.c,v 1.25.2.1 2000/06/27 19:32:48 thorpej Exp $ */
+/* $NetBSD: cpuconf.c,v 1.27 2000/06/26 02:42:04 enami Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

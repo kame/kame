@@ -1,4 +1,4 @@
-/* $NetBSD: asm_1080.h,v 1.1.2.2 2001/03/16 19:10:20 he Exp $ */
+/* $NetBSD: asm_1080.h,v 1.2 2001/02/12 23:19:55 mjacob Exp $ */
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 Qlogic, Inc.
  * All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: iso_chksum.c,v 1.13 2000/03/30 13:10:11 augustss Exp $	*/
+/*	$NetBSD: iso_chksum.c,v 1.16 2001/11/13 01:10:49 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -77,6 +77,9 @@ SOFTWARE.
  * stuffed, and the length of the chunk.  The 2 octets have to be logically
  * adjacent, but may be physically located in separate mbufs.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(1, "$NetBSD: iso_chksum.c,v 1.16 2001/11/13 01:10:49 lukem Exp $");
 
 #include "opt_iso.h"
 
@@ -308,7 +311,7 @@ m_compress(in, out)
 	struct mbuf *in, **out;
 {
 	int    datalen = 0;
-	int             s = splimp();
+	int             s = splnet();
 
 	if (in->m_next == NULL) {
 		*out = in;
@@ -332,7 +335,7 @@ m_compress(in, out)
 		return -1;
 	}
 	(*out)->m_len = 0;
-	(*out)->m_act = NULL;
+	(*out)->m_nextpkt = NULL;
 
 	while (in) {
 #ifdef ARGO_DEBUG
@@ -383,7 +386,7 @@ m_compress(in, out)
 				return -1;
 			}
 			(*out)->m_len = 0;
-			(*out)->m_act = NULL;
+			(*out)->m_nextpkt = NULL;
 			*out = (*out)->m_next;
 		}
 	}

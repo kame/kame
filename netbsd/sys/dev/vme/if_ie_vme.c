@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie_vme.c,v 1.9 2000/04/10 02:16:15 chs Exp $	*/
+/*	$NetBSD: if_ie_vme.c,v 1.14 2001/11/13 06:17:07 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1995 Charles D. Cranor
@@ -144,6 +144,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ie_vme.c,v 1.14 2001/11/13 06:17:07 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -156,8 +159,6 @@
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_ether.h>
-
-#include <vm/vm.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -230,7 +231,7 @@ static int media[] = {
 
 
 static void ie_vmereset __P((struct ie_softc *, int));
-static void ie_vmeattend __P((struct ie_softc *));
+static void ie_vmeattend __P((struct ie_softc *, int));
 static void ie_vmerun __P((struct ie_softc *));
 static int  ie_vmeintr __P((struct ie_softc *, int));
 
@@ -267,8 +268,9 @@ ie_vmereset(sc, what)
 }
 
 void
-ie_vmeattend(sc)
+ie_vmeattend(sc, why)
 	struct ie_softc *sc;
+	int why;
 {
 	struct ie_vme_softc *vsc = (struct ie_vme_softc *)sc;
 
@@ -527,6 +529,8 @@ ie_vme_attach(parent, self, aux)
 	sc->intrhook = ie_vmeintr;
 	sc->memcopyout = ie_memcopyout;
 	sc->memcopyin = ie_memcopyin;
+
+	sc->ie_bus_barrier = NULL;
 	sc->ie_bus_read16 = ie_vme_read16;
 	sc->ie_bus_write16 = ie_vme_write16;
 	sc->ie_bus_write24 = ie_vme_write24;

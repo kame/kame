@@ -1,4 +1,4 @@
-/*	$NetBSD: interwave.c,v 1.12.4.1 2000/06/30 16:27:46 simonb Exp $	*/
+/*	$NetBSD: interwave.c,v 1.15 2002/02/06 14:50:42 pooka Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: interwave.c,v 1.15 2002/02/06 14:50:42 pooka Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -50,7 +53,6 @@
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/pio.h>
-#include <machine/cpufunc.h>
 #include <sys/audioio.h>
 #include <dev/audio_if.h>
 #include <dev/mulaw.h>

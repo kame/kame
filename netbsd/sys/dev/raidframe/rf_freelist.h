@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_freelist.h,v 1.3 1999/02/05 00:06:11 oster Exp $	*/
+/*	$NetBSD: rf_freelist.h,v 1.5 2001/10/04 15:58:53 oster Exp $	*/
 /*
  * rf_freelist.h
  */
@@ -41,7 +41,8 @@
 #ifndef _RF__RF_FREELIST_H_
 #define _RF__RF_FREELIST_H_
 
-#include "rf_types.h"
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_debugMem.h"
 #include "rf_general.h"
 #include "rf_threadstuff.h"
@@ -60,7 +61,7 @@ typedef struct RF_FreeListStats_s {
 	int     max_outstanding;
 }       RF_FreeListStats_t;
 #define RF_FREELIST_STAT_INIT(_fl_) { \
-	bzero((char *)&((_fl_)->stats), sizeof(RF_FreeListStats_t)); \
+	memset((char *)&((_fl_)->stats), 0, sizeof(RF_FreeListStats_t)); \
 	(_fl_)->stats.file = __FILE__; \
 	(_fl_)->stats.line = __LINE__; \
 }

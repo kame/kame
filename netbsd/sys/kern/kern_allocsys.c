@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_allocsys.c,v 1.10 2000/03/24 11:57:15 enami Exp $	*/
+/*	$NetBSD: kern_allocsys.c,v 1.18 2001/11/12 15:25:05 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -70,8 +70,11 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_allocsys.c,v 1.18 2001/11/12 15:25:05 lukem Exp $");
 
 #include "opt_bufcache.h"
+#include "opt_callout.h"
 #include "opt_sysv.h"
 
 #include <sys/param.h>
@@ -87,10 +90,7 @@
 #ifdef SYSVSHM
 #include <sys/shm.h>
 #endif
-
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-
+#include <uvm/uvm_extern.h>
 /*
  * Declare these as initialized data so we can patch them.
  */
@@ -128,9 +128,7 @@ int	bufcache = BUFCACHE;	/* % of RAM to use for buffer cache */
  */
 
 caddr_t
-allocsys(v, mdcallback)
-	caddr_t	v;
-	caddr_t (*mdcallback) __P((caddr_t));
+allocsys(caddr_t v, caddr_t (*mdcallback)(caddr_t))
 {
 
 	/* Calculate the number of callwheels if necessary. */

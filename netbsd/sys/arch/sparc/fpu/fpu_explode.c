@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu_explode.c,v 1.4.2.1 2000/08/07 01:31:36 mrg Exp $ */
+/*	$NetBSD: fpu_explode.c,v 1.8 2002/01/23 10:19:42 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -48,6 +48,10 @@
  * FPU subroutines: `explode' the machine's `packed binary' format numbers
  * into our internal format.
  */
+
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -303,6 +307,14 @@ fpu_explode(fe, fp, type, reg)
 				((type == FTYPE_DBL) ? 'd' :
 					((type == FTYPE_EXT) ? 'q' : '?')))), 
 		reg));
+#ifdef DEBUG
+	if (fpe_debug & FPE_REG) {
+		if (type == FTYPE_INT) printf("%d ", s);
+#ifdef SUN4U
+		if (type == FTYPE_LNG) printf("%ld ", l);
+#endif /* SUN4U */
+	}
+#endif /* DEBUG */
 	DUMPFPN(FPE_REG, fp);
 	DPRINTF(FPE_REG, ("\n"));
 }

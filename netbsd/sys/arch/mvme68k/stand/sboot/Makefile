@@ -1,39 +1,34 @@
-#	$NetBSD: Makefile,v 1.5.20.1 2000/06/26 18:16:35 scw Exp $
+#	$NetBSD: Makefile,v 1.13 2002/04/09 19:37:22 scw Exp $
 
 #
 # sboot would like a newer GNU ld because it can generate S-Records.
 # Until then, we convert.
 #
 
-COMPILE.s= $(AS) $(ASFLAGS) -o $*.o
-LDFLAGS=-x -N -Ttext 0x4000 -e start
-MKMAN=	no
-SRCS=	start.s clock.c console.c etherfun.c le_poll.c libc_sa.c \
+COMPILE.s= $(CC) -x assembler-with-cpp -traditional-cpp \
+	$(ASFLAGS) $(CPPFLAGS) $(INCPATH) -c -o $*.o
+
+RELOC=		0x4000
+SRCS=		start.s clock.c console.c etherfun.c le_poll.c \
 		oc_cksum.s sboot.c
-OBJS=	${SRCS:N*.h:R:S/$/.o/g}
-CLEANFILES+= srec sboot sboot.srec
+SRTOBJ=
+PROG=		sboot
+LIBS=		${LIBSA}
+DPADD=		${LIBS}
+CLEANFILES+=	sboot.srec
 
-BOOTS=	sboot.srec
+PROGDEPENDS=	${OBJS} ${LIBS}
+PROGLINKOBJS=	${OBJS} ${LIBS}
 
-realall: ${BOOTS}
+sboot.srec:	${PROG}
+	${OBJCOPY} -O srec ${.OBJDIR}/sboot ${.TARGET}
 
-sboot.srec: sboot srec
-	dd ibs=32 skip=1 if=sboot | ${.OBJDIR}/srec 4 0x4000 sboot > ${.TARGET}
+.include "../Makefile.booters"
 
-sboot: ${OBJS}
-	${LD} ${LDFLAGS} -o ${.TARGET} ${OBJS}
+all realall:	sboot.srec
 
-srec: ${.CURDIR}/srec.c
-	${CC} ${CFLAGS} ${.CURDIR}/srec.c -o ${.TARGET}
-
-install:
-	${INSTALL} -c -m 444 -g bin -o bin sboot.srec \
-	    ${DESTDIR}${MDEC_DIR}/sboot
-
-afterdepend:	.depend
-	@(TMP=/tmp/_depend$$$$; \
-		sed -e 's/^\([^\.]*\).o[ ]*:/\1.o g\1.o s\1.o:/' \
-		< .depend > $$TMP; \
-	mv $$TMP .depend)
+install:	sboot.srec
+	${INSTALL_FILE} ${STRIPFLAG} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+		${.OBJDIR}/sboot.srec ${DESTDIR}${MDEC_DIR}/sboot
 
 .include <bsd.prog.mk>

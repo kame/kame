@@ -1,4 +1,4 @@
-/*	$NetBSD: isadma.c,v 1.43.4.1 2000/06/30 16:27:48 simonb Exp $	*/
+/*	$NetBSD: isadma.c,v 1.49 2001/11/13 08:01:22 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -41,15 +41,18 @@
  * Device driver for the ISA on-board DMA controller.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isadma.c,v 1.49 2001/11/13 08:01:22 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
-
 #include <machine/bus.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
@@ -357,13 +360,15 @@ _isa_dmastart(ids, chan, addr, nbytes, p, flags, busdmaflags)
 	if (chan & 4) {
 		if (nbytes > (1 << 17) || nbytes & 1 || (u_long)addr & 1) {
 			printf("%s: drq %d, nbytes 0x%lx, addr %p\n",
-			    ids->ids_dev->dv_xname, chan, nbytes, addr);
+			    ids->ids_dev->dv_xname, chan,
+			    (unsigned long) nbytes, addr);
 			goto lose;
 		}
 	} else {
 		if (nbytes > (1 << 16)) {
 			printf("%s: drq %d, nbytes 0x%lx\n",
-			    ids->ids_dev->dv_xname, chan, nbytes);
+			    ids->ids_dev->dv_xname, chan,
+			    (unsigned long) nbytes);
 			goto lose;
 		}
 	}
@@ -373,7 +378,8 @@ _isa_dmastart(ids, chan, addr, nbytes, p, flags, busdmaflags)
 		panic("_isa_dmastart: no DMA map for chan %d\n", chan);
 
 	error = bus_dmamap_load(ids->ids_dmat, dmam, addr, nbytes,
-	    p, busdmaflags);
+	    p, busdmaflags |
+	    ((flags & DMAMODE_READ) ? BUS_DMA_READ : BUS_DMA_WRITE));
 	if (error)
 		return (error);
 
@@ -631,7 +637,7 @@ _isa_dmamem_alloc(ids, chan, size, addrp, flags)
 
 	size = round_page(size);
 
-	error = bus_dmamem_alloc(ids->ids_dmat, size, NBPG, boundary,
+	error = bus_dmamem_alloc(ids->ids_dmat, size, PAGE_SIZE, boundary,
 	    &seg, 1, &rsegs, flags);
 	if (error)
 		return (error);

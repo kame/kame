@@ -1,4 +1,4 @@
-/*	$NetBSD: spp_debug.c,v 1.9 1998/07/05 00:51:29 jonathan Exp $	*/
+/*	$NetBSD: spp_debug.c,v 1.12 2001/11/13 01:08:11 lukem Exp $	*/
 
 /*
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
@@ -35,6 +35,9 @@
  *	@(#)spp_debug.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: spp_debug.c,v 1.12 2001/11/13 01:08:11 lukem Exp $");
+
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -58,10 +61,19 @@
 #define SPPTIMERS
 #include <netns/spp_timer.h>
 #include <netns/spp_var.h>
-#define	SANAMES
+#define SANAMES
 #include <netns/spp_debug.h>
 
+extern char *prurequests[];
+extern char *tcpstates[];
+extern const char * const sanames[];
+extern const char * const sppnames[];
+
 int	sppconsdebug = 0;
+
+struct	spp_debug spp_debug[SPP_NDEBUG];
+int	spp_debx;
+
 /*
  * spp debug routines
  */
@@ -74,15 +86,11 @@ spp_trace(act, ostate, sp, si, req)
 	int req;
 {
 #ifdef INET
-#ifdef TCPDEBUG
+#ifdef SPPDEBUG
 	u_short seq, ack, len, alo;
 	unsigned long iptime();
 	int flags;
 	struct spp_debug *sd = &spp_debug[spp_debx++];
-	extern char *prurequests[];
-	extern char *sanames[];
-	extern char *tcpstates[];
-	extern char *spptimers[];
 
 	if (spp_debx == SPP_NDEBUG)
 		spp_debx = 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ntwoc_pci.c,v 1.3 2000/01/04 06:31:39 chopps Exp $	*/
+/*	$NetBSD: if_ntwoc_pci.c,v 1.6 2001/11/13 07:48:44 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998 Vixie Enterprises
@@ -35,6 +35,9 @@
  * <explorer@flame.org>.  To learn more about Vixie Enterprises, see
  * ``http://www.vix.com''.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ntwoc_pci.c,v 1.6 2001/11/13 07:48:44 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -230,8 +233,7 @@ ntwoc_pci_attach(struct device *parent, struct device *self, void *aux)
 	/*
 	 * Map and establish the interrupt
 	 */
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -719,7 +721,7 @@ ntwoc_pci_setup_dma(struct sca_softc *sc)
 	 */
 	if (sc->scu_allocsize != addroff)
 		printf("ERROR:  scu_allocsize != addroff: %lu != %lu\n",
-		       sc->scu_allocsize, addroff);
+		       (u_long)sc->scu_allocsize, addroff);
 }
 
 #if __NetBSD_Version__ >= 104160000

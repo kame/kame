@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.47 1998/08/15 10:51:16 mycroft Exp $	*/
+/*	$NetBSD: if_le.c,v 1.49 2002/03/15 05:55:36 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -74,6 +74,9 @@
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le.c,v 1.49 2002/03/15 05:55:36 gmcgarry Exp $");                                                  
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -123,7 +126,7 @@ struct cfattach le_ca = {
 
 int	leintr __P((void *));
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 

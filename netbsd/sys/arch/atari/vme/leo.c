@@ -1,4 +1,4 @@
-/*	$NetBSD: leo.c,v 1.2.6.1 2000/06/30 16:27:20 simonb Exp $	*/
+/*	$NetBSD: leo.c,v 1.3 2000/06/26 04:55:35 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1997 maximum entropy <entropy@zippy.bernstein.com>

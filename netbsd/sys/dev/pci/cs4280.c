@@ -1,4 +1,4 @@
-/*	$NetBSD: cs4280.c,v 1.4.4.8 2001/05/06 15:10:26 he Exp $	*/
+/*	$NetBSD: cs4280.c,v 1.19 2001/11/15 09:48:11 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Tatoku Ogaito.  All rights reserved.
@@ -51,6 +51,9 @@
  * Joystick support
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cs4280.c,v 1.19 2001/11/15 09:48:11 lukem Exp $");
+
 #include "midi.h"
 
 #include <sys/param.h>
@@ -60,7 +63,6 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/proc.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 
 #include <dev/pci/pcidevs.h>
@@ -148,6 +150,7 @@ struct audio_hw_if cs4280_hw_if = {
 	cs428x_get_props,
 	cs4280_trigger_output,
 	cs4280_trigger_input,
+	NULL,
 };
 
 #if NMIDI > 0
@@ -262,8 +265,7 @@ cs4280_attach(parent, self, aux)
 	}
 	
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}

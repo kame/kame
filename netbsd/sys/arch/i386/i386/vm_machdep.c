@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.89.2.2 2001/03/30 21:31:22 he Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.102 2001/11/15 07:03:31 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1995 Charles M. Hannum.  All rights reserved.
@@ -45,7 +45,12 @@
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.102 2001/11/15 07:03:31 lukem Exp $");
+
 #include "opt_user_ldt.h"
+#include "opt_largepages.h"
+#include "opt_mtrr.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,15 +63,13 @@
 #include <sys/exec.h>
 #include <sys/ptrace.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/gdt.h>
 #include <machine/reg.h>
 #include <machine/specialreg.h>
+#include <machine/mtrr.h>
 
 #include "npx.h"
 #if NNPX > 0
@@ -198,6 +201,11 @@ cpu_exit(p)
 		npxproc = 0;
 #endif
 
+#ifdef MTRR
+	if (p->p_md.md_flags & MDP_USEDMTRR)
+		mtrr_clean(p);
+#endif
+
 	/*
 	 * No need to do user LDT cleanup here; it's handled in
 	 * pmap_destroy().
@@ -305,10 +313,17 @@ pagemove(from, to, size)
 {
 	register pt_entry_t *fpte, *tpte, ofpte, otpte;
 
-	if (size % NBPG)
+	if (size & PAGE_MASK)
 		panic("pagemove");
-	fpte = kvtopte(from);
-	tpte = kvtopte(to);
+	fpte = kvtopte((vaddr_t)from);
+	tpte = kvtopte((vaddr_t)to);
+#ifdef LARGEPAGES
+	/* XXX For now... */
+	if (*fpte & PG_PS)
+		panic("pagemove: fpte PG_PS");
+	if (*tpte & PG_PS)
+		panic("pagemove: tpte PG_PS");
+#endif
 	while (size > 0) {
 		otpte = *tpte;
 		ofpte = *fpte;
@@ -323,13 +338,13 @@ pagemove(from, to, size)
 			if (ofpte & PG_V)
 				pmap_update_pg((vaddr_t) from);
 		}
-		from += NBPG;
-		to += NBPG;
-		size -= NBPG;
+		from += PAGE_SIZE;
+		to += PAGE_SIZE;
+		size -= PAGE_SIZE;
 	}
 #if defined(I386_CPU)
 	if (cpu_class == CPUCLASS_386)
-		pmap_update();
+		tlbflush();
 #endif
 }
 
@@ -347,7 +362,7 @@ kvtop(addr)
 	return((int)pa);
 }
 
-extern vm_map_t phys_map;
+extern struct vm_map *phys_map;
 
 /*
  * Map a user I/O request into kernel virtual address space.
@@ -389,6 +404,7 @@ vmapbuf(bp, len)
 		taddr += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -407,6 +423,7 @@ vunmapbuf(bp, len)
 	off = (vaddr_t)bp->b_data - addr;
 	len = round_page(off + len);
 	pmap_kremove(addr, len);
+	pmap_update(pmap_kernel());
 	uvm_km_free_wakeup(phys_map, addr, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: grfabs_et.c,v 1.16 2000/04/11 07:08:45 leo Exp $	*/
+/*	$NetBSD: grfabs_et.c,v 1.19 2002/03/04 15:35:57 wiz Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.
@@ -50,8 +50,7 @@
 #include <sys/device.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 /*
  * For PCI probing...
@@ -167,7 +166,7 @@ struct grfabs_et_priv {
 
 /*
  * XXX: called from ite console init routine.
- * Initialize list of posible video modes.
+ * Initialize list of possible video modes.
  */
 void
 et_probe_video(modelp)

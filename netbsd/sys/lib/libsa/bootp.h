@@ -1,4 +1,4 @@
-/*	$NetBSD: bootp.h,v 1.5 1999/02/11 09:10:43 pk Exp $	*/
+/*	$NetBSD: bootp.h,v 1.7 2002/03/20 23:10:39 thorpej Exp $	*/
 
 /*
  * Bootstrap Protocol (BOOTP).  RFC951 and RFC1048.

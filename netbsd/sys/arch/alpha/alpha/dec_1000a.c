@@ -1,4 +1,4 @@
-/* $NetBSD: dec_1000a.c,v 1.8.2.1 2000/06/27 19:32:49 thorpej Exp $ */
+/* $NetBSD: dec_1000a.c,v 1.14 2001/06/05 04:53:11 thorpej Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -68,9 +68,11 @@
  * Additional Copyright (c) 1997 by Matthew Jacob for NASA/Ames Research Center
  */
 
+#include "opt_kgdb.h"
+
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_1000a.c,v 1.8.2.1 2000/06/27 19:32:49 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_1000a.c,v 1.14 2001/06/05 04:53:11 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -112,6 +114,15 @@ static int comcnrate = CONSPEED;
 void _dec_1000a_init __P((void));
 static void dec_1000a_cons_init __P((void));
 static void dec_1000a_device_register __P((struct device *, void *));
+
+#ifdef KGDB
+#include <machine/db_machdep.h>
+
+static const char *kgdb_devlist[] = {
+	"com",
+	NULL,
+};
+#endif /* KGDB */
 
 static const struct alpha_variation_table dec_1000_variations[] = {
 	{ 0, "AlphaServer 1000" },
@@ -179,7 +190,7 @@ dec_1000a_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case CTB_PRINTERPORT: 
 		/* serial console ... */
 		/* XXX */
 		{
@@ -198,19 +209,28 @@ dec_1000a_cons_init()
 			break;
 		}
 
-	case 3:
+	case CTB_GRAPHICS:
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
 		(void) pckbc_cnattach(iot, IO_KBD, KBCMDP, PCKBC_KBD_SLOT);
 
-		if (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot) ==
-		    CTB_TURBOSLOT_TYPE_ISA)
-			isa_display_console(iot, memt);
-		else
-			pci_display_console(iot, memt,
-			    pcichipset, CTB_TURBOSLOT_BUS(ctb->ctb_turboslot),
+		/*
+		 * AlphaServer 1000s have a firmware bug whereby the
+		 * built-in ISA VGA is reported incorrectly -- ctb_turboslot
+		 * is mostly 0.
+		 */
+		switch (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot)) {
+		case CTB_TURBOSLOT_TYPE_PCI:
+			pci_display_console(iot, memt, pcichipset,
+			    CTB_TURBOSLOT_BUS(ctb->ctb_turboslot),
 			    CTB_TURBOSLOT_SLOT(ctb->ctb_turboslot), 0);
+			break;
+
+		default:
+			isa_display_console(iot, memt);
+			break;
+		}
 #else
 		panic("not configured to use display && keyboard console");
 #endif
@@ -223,6 +243,10 @@ dec_1000a_cons_init()
 		panic("consinit: unknown console type %ld\n",
 		    ctb->ctb_term_type);
 	}
+#ifdef KGDB
+	/* Attach the KGDB device. */
+	alpha_kgdb_init(kgdb_devlist, iot);
+#endif /* KGDB */
 }
 
 static void
@@ -295,7 +319,7 @@ dec_1000a_device_register(dev, aux)
 		if (parent->dv_parent != scsidev)
 			return;
 
-		if (b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+		if (b->unit / 100 != sa->sa_periph->periph_target)
 			return;
 
 		/* XXX LUN! */

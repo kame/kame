@@ -1,4 +1,4 @@
-/*	$NetBSD: bsd-comp.c,v 1.7 1997/03/12 20:26:46 christos Exp $	*/
+/*	$NetBSD: bsd-comp.c,v 1.11 2001/11/15 09:48:25 lukem Exp $	*/
 /*	Id: bsd-comp.c,v 1.6 1996/08/28 06:31:58 paulus Exp 	*/
 
 /* Because this code is derived from the 4.3BSD compress source:
@@ -44,8 +44,10 @@
  * This version is for use with mbufs on BSD-derived systems.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bsd-comp.c,v 1.11 2001/11/15 09:48:25 lukem Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
@@ -349,18 +351,18 @@ bsd_alloc(options, opt_len, decomp)
 
     maxmaxcode = MAXCODE(bits);
     newlen = sizeof(*db) + (hsize-1) * (sizeof(db->dict[0]));
-    MALLOC(db, struct bsd_db *, newlen, M_DEVBUF, M_NOWAIT);
+    db = malloc(newlen, M_DEVBUF, M_NOWAIT);
     if (!db)
 	return NULL;
-    bzero(db, sizeof(*db) - sizeof(db->dict));
+    memset(db, 0, sizeof(*db) - sizeof(db->dict));
 
     if (!decomp) {
 	db->lens = NULL;
     } else {
-	MALLOC(db->lens, u_int16_t *, (maxmaxcode+1) * sizeof(db->lens[0]),
-	       M_DEVBUF, M_NOWAIT);
+	db->lens = malloc((maxmaxcode+1) * sizeof(db->lens[0]),
+	    M_DEVBUF, M_NOWAIT);
 	if (!db->lens) {
-	    FREE(db, M_DEVBUF);
+	    free(db, M_DEVBUF);
 	    return NULL;
 	}
     }
@@ -381,8 +383,8 @@ bsd_free(state)
     struct bsd_db *db = (struct bsd_db *) state;
 
     if (db->lens)
-	FREE(db->lens, M_DEVBUF);
-    FREE(db, M_DEVBUF);
+	free(db->lens, M_DEVBUF);
+    free(db, M_DEVBUF);
 }
 
 static void *

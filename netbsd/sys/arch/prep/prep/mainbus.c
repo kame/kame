@@ -1,5 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.1 2000/02/29 15:21:47 nonaka Exp $	*/
-
+/*	$NetBSD: mainbus.c,v 1.11 2002/05/16 01:01:39 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -31,30 +30,45 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "opt_pci.h"
+#include "opt_residual.h"
+
+#include "obio.h"
+#include "pci.h"
+
 #include <sys/param.h>
+#include <sys/extent.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/malloc.h>
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
 
-#include "pci.h"
 #include <dev/pci/pcivar.h>
+#include <dev/pci/pciconf.h>
 
+#include <prep/dev/obiovar.h>
 
-int	mainbus_match __P((struct device *, struct cfdata *, void *));
-void	mainbus_attach __P((struct device *, struct device *, void *));
+#include <machine/platform.h>
+#include <machine/residual.h>
+
+int	mainbus_match(struct device *, struct cfdata *, void *);
+void	mainbus_attach(struct device *, struct device *, void *);
 
 struct cfattach mainbus_ca = {
 	sizeof(struct device), mainbus_match, mainbus_attach
 };
 
-int	mainbus_print __P((void *, const char *));
+int	mainbus_print(void *, const char *);
 
 union mainbus_attach_args {
 	const char *mba_busname;		/* first elem of all */
 	struct pcibus_attach_args mba_pba;
 };
+
+/* There can be only one. */
+int mainbus_found = 0;
 
 /*
  * Probe for the mainbus; always succeeds.
@@ -65,9 +79,8 @@ mainbus_match(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	struct cfdata *cf = match;
 
-	if (cf->cf_unit > 0)
+	if (mainbus_found)
 		return 0;
 	return 1;
 }
@@ -83,12 +96,28 @@ mainbus_attach(parent, self, aux)
 {
 	union mainbus_attach_args mba;
 	struct confargs ca;
+#if NPCI > 0
+	static struct prep_pci_chipset pc;
+#ifdef PCI_NETBSD_CONFIGURE
+	struct extent *ioext, *memext;
+#endif
+#endif
+
+	mainbus_found = 1;
 
 	printf("\n");
+
+#if defined(RESIDUAL_DATA_DUMP)
+	print_residual_device_info();
+#endif
 
 	ca.ca_name = "cpu";
 	ca.ca_node = 0;
 	config_found(self, &ca, mainbus_print);
+
+#if NOBIO > 0
+	obio_reserve_resource_map();
+#endif
 
 	/*
 	 * XXX Note also that the presence of a PCI bus should
@@ -97,14 +126,41 @@ mainbus_attach(parent, self, aux)
 	 * XXX that's not currently possible.
 	 */
 #if NPCI > 0
+	(*platform->pci_get_chipset_tag)(&pc);
+
+#ifdef PCI_NETBSD_CONFIGURE
+	ioext  = extent_create("pciio",  0x00008000, 0x0000ffff, M_DEVBUF,
+	    NULL, 0, EX_NOWAIT);
+	memext = extent_create("pcimem", 0x00000000, 0x0fffffff, M_DEVBUF,
+	    NULL, 0, EX_NOWAIT);
+
+	pci_configure_bus(&pc, ioext, memext, NULL, 0, CACHELINESIZE);
+
+	extent_destroy(ioext);
+	extent_destroy(memext);
+#endif
+
 	mba.mba_pba.pba_busname = "pci";
-	mba.mba_pba.pba_iot = (bus_space_tag_t)PREP_BUS_SPACE_IO;
-	mba.mba_pba.pba_memt = (bus_space_tag_t)PREP_BUS_SPACE_MEM;
+	mba.mba_pba.pba_iot = &prep_io_space_tag;
+	mba.mba_pba.pba_memt = &prep_mem_space_tag;
 	mba.mba_pba.pba_dmat = &pci_bus_dma_tag;
+	mba.mba_pba.pba_pc = &pc;
 	mba.mba_pba.pba_bus = 0;
-	mba.mba_pba.pba_flags = PCI_FLAGS_IO_ENABLED |
-	    PCI_FLAGS_MEM_ENABLED;
+	mba.mba_pba.pba_bridgetag = NULL;
+	mba.mba_pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 	config_found(self, &mba.mba_pba, mainbus_print);
+#endif
+
+#if NOBIO > 0
+	obio_reserve_resource_unmap();
+
+	if (platform->obiodevs != obiodevs_nodev) {
+		bzero(&mba, sizeof(mba));
+		mba.mba_pba.pba_busname = "obio";
+		mba.mba_pba.pba_iot = &prep_isa_io_space_tag;
+		mba.mba_pba.pba_memt = &prep_isa_mem_space_tag;
+		config_found(self, &mba.mba_pba, mainbus_print);
+	}
 #endif
 }
 

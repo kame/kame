@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.2.4.1 2000/12/24 07:48:40 jhawk Exp $	*/
+/*	$NetBSD: locore.S,v 1.3 2000/11/25 04:42:07 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Izumi Tsutsui.  All rights reserved.

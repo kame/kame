@@ -1,4 +1,4 @@
-/*	$NetBSD: lockf.h,v 1.8.2.2 2000/08/11 23:51:11 jdolecek Exp $	*/
+/*	$NetBSD: lockf.h,v 1.10 2000/08/04 09:20:21 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993

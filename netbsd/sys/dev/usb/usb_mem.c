@@ -1,4 +1,4 @@
-/*	$NetBSD: usb_mem.c,v 1.21 2000/06/01 14:29:01 augustss Exp $	*/
+/*	$NetBSD: usb_mem.c,v 1.23 2002/05/19 06:24:33 augustss Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * memory blocks that can be used for DMA.  Using the bus_dma
  * routines directly would incur large overheads in space and time.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: usb_mem.c,v 1.23 2002/05/19 06:24:33 augustss Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -269,7 +272,7 @@ usb_freemem(usbd_bus_handle bus, usb_dma_t *p)
 		usb_block_freemem(p->block);
 		return;
 	}
-	f = KERNADDR(p);
+	f = KERNADDR(p, 0);
 	f->block = p->block;
 	f->offs = p->offs;
 	s = splusb();

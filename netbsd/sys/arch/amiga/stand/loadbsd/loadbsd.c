@@ -1,4 +1,4 @@
-/*	$NetBSD: loadbsd.c,v 1.24 2000/06/15 13:43:35 is Exp $	*/
+/*	$NetBSD: loadbsd.c,v 1.27 2002/01/26 13:21:12 aymeric Exp $	*/
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -114,8 +114,9 @@ void warnx __P((const char *, ...));
  *	2.15	07/28/96 is - Add first version of kludges needed to
  *		get FusionForty kickrom'd memory back. Hope this doesn't
  *		break anything else.
+ *	2.16	07/08/00 - added bootverbose support
  */
-static const char _version[] = "$VER: LoadBSD 2.15 (28.7.96)";
+static const char _version[] = "$VER: LoadBSD 2.16 (19.9.2000)";
 
 /*
  * Kernel startup interface version
@@ -202,7 +203,7 @@ main(argc, argv)
 	if ((ExpansionBase=(void *)OpenLibrary(EXPANSIONNAME, 0)) == NULL)
 		err(20, "can't open expansion library");
 
-	while ((ch = getopt(argc, argv, "aAbc:DhI:km:n:ptsSVZ")) != -1) {
+	while ((ch = getopt(argc, argv, "aAbc:DhI:km:n:qptsSvVZ")) != -1) {
 		switch (ch) {
 		case 'k':
 			k_flag = 1;
@@ -226,6 +227,12 @@ main(argc, argv)
 		case 's':
 			boothowto &= ~(RB_AUTOBOOT);
 			boothowto |= RB_SINGLE;
+			break;
+		case 'q':
+			boothowto |= AB_QUIET;
+			break;
+		case 'v':
+			boothowto |= AB_VERBOSE;
 			break;
 		case 'V':
 			fprintf(stderr,"%s\n",_version + 6);
@@ -315,7 +322,7 @@ main(argc, argv)
 	if (kp == NULL)
 		err(20, "failed malloc %d\n", ksize);
 
-	if (read(fd, kp, e.a_text) != e.a_text 
+	if (read(fd, kp, e.a_text) != e.a_text
 	    || read(fd, kp + textsz, e.a_data) != e.a_data)
 		err(20, "unable to read kernel image\n");
 
@@ -370,7 +377,7 @@ main(argc, argv)
 	}
 	*nkcd = ncd;
 
-	kcd = (struct ConfigDev *)(nkcd + 1); 
+	kcd = (struct ConfigDev *)(nkcd + 1);
 	while(cd = FindConfigDev(cd, -1, -1)) {
 		*kcd = *cd;
 		if (((cpuid >> 24) == 0x7d) &&
@@ -429,7 +436,7 @@ main(argc, argv)
 	 */
 	if (t_flag) {
 		if (kp)
-			FreeMem(kp, ksize + ((char *)startit_end 
+			FreeMem(kp, ksize + ((char *)startit_end
 			    - (char *)startit) + 256);
 		exit(0);
 	}
@@ -472,7 +479,7 @@ get_mem_config(fmem, fmemsz, cmemsz)
 		seg = (u_int)CachePreDMA((APTR)nseg, (LONG *)&segsz, 0L);
 		nsegsz -= segsz, nseg += segsz;
 		for (;segsz;
-		    segsz = nsegsz, 
+		    segsz = nsegsz,
 		    seg = (u_int)CachePreDMA((APTR)nseg, (LONG *)&segsz, DMA_Continue),
 		    nsegsz -= segsz, nseg += segsz, ++nmem) {
 
@@ -489,8 +496,8 @@ get_mem_config(fmem, fmemsz, cmemsz)
 				segsz = ((segsz -1) | 0xfffff) + 1;
 				seg = eseg - segsz;
 
-				/* 
-				 * Only use first SIMM to boot; we know it is VA==PA. 
+				/*
+				 * Only use first SIMM to boot; we know it is VA==PA.
 				 * Enter into table and continue. Yes,
 				 * this is ugly.
 				 */
@@ -500,7 +507,7 @@ get_mem_config(fmem, fmemsz, cmemsz)
 					memlist.m_seg[nmem].ms_size = segsz;
 					memlist.m_seg[nmem].ms_start = seg;
 					++nmem;
-					continue; 
+					continue;
 				}
 
 				memlist.m_seg[nmem].ms_attrib = mh->mh_Attributes;
@@ -519,9 +526,9 @@ get_mem_config(fmem, fmemsz, cmemsz)
 			memlist.m_seg[nmem].ms_start = seg;
 		
 			if ((mh->mh_Attributes & (MEMF_CHIP|MEMF_FAST)) == MEMF_CHIP) {
-				/* 
-				 * there should hardly be more than one entry for 
-				 * chip mem, but handle it the same nevertheless 
+				/*
+				 * there should hardly be more than one entry for
+				 * chip mem, but handle it the same nevertheless
 				 * cmem always starts at 0, so include vector area
 				 */
 				memlist.m_seg[nmem].ms_start = seg = 0;
@@ -534,14 +541,14 @@ get_mem_config(fmem, fmemsz, cmemsz)
 					*cmemsz = segsz;
 				continue;
 			}
-			/* 
+			/*
 			 * some heuristics..
 			 */
 			seg &= -__LDPGSZ;
 			eseg = (eseg + __LDPGSZ - 1) & -__LDPGSZ;
 	
 			/*
-			 * get the mem back stolen by incore kickstart on 
+			 * get the mem back stolen by incore kickstart on
 			 * A3000 with V36 bootrom.
 			 */
 			if (eseg == 0x07f80000)
@@ -557,7 +564,7 @@ get_mem_config(fmem, fmemsz, cmemsz)
 			 * or by Fusion Forty fastrom
 			 */
 			if ((seg & ~(1024*1024-1)) == 0x11000000) {
-				/* 
+				/*
 				 * XXX we should test the name.
 				 * Unfortunately, the memory is just called
 				 * "32 bit memory" which isn't very specific.
@@ -575,7 +582,7 @@ get_mem_config(fmem, fmemsz, cmemsz)
 			if (segsz < 2 * 1024 * 1024)
 				continue;
 			/*
-			 * if p_flag is set, select memory by priority 
+			 * if p_flag is set, select memory by priority
 			 * instead of size
 			 */
 			if ((!p_flag && segsz > *fmemsz) || (p_flag &&
@@ -879,11 +886,13 @@ OPTIONS
 \t    segment. The higher priority segment is usually faster
 \t    (i.e. 32 bit memory), but some people have smaller amounts
 \t    of 32 bit memory.
+\t-q  Boot up in quiet mode.
 \t-s  Boot up in singleuser mode (default).
 \t-S  Include kernel symbol table.
 \t-t  This is a *test* option.  It prints out the memory
 \t    list information being passed to the kernel and also
 \t    exits without actually starting NetBSD.
+\t-v  Boot up in verbose mode.
 \t-V  Version of loadbsd program.
 \t-Z  Force kernel load to chipmem.
 HISTORY
@@ -917,7 +926,7 @@ _Vdomessage(doexit, eval, doerrno, fmt, args)
 	fprintf(stderr, "\n");
 	if (doexit) {
 		if (kp)
-			FreeMem(kp, ksize + ((char *)startit_end 
+			FreeMem(kp, ksize + ((char *)startit_end
 			    - (char *)startit) + 256);
 		exit(eval);
 	}

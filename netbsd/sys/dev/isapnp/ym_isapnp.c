@@ -1,4 +1,4 @@
-/*	$NetBSD: ym_isapnp.c,v 1.11.12.1 2002/03/27 10:18:51 he Exp $ */
+/*	$NetBSD: ym_isapnp.c,v 1.13 2002/03/10 13:57:11 itohy Exp $ */
 
 
 /*
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ym_isapnp.c,v 1.11.12.1 2002/03/27 10:18:51 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ym_isapnp.c,v 1.13 2002/03/10 13:57:11 itohy Exp $");
 
 #include "mpu_ym.h"
 

@@ -1,4 +1,4 @@
-/* $NetBSD: envsys.h,v 1.4.4.1 2000/07/30 17:55:18 bouyer Exp $ */
+/* $NetBSD: envsys.h,v 1.5 2000/06/24 19:50:28 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

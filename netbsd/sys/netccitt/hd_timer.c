@@ -1,4 +1,4 @@
-/*	$NetBSD: hd_timer.c,v 1.8 2000/03/30 13:53:33 augustss Exp $	*/
+/*	$NetBSD: hd_timer.c,v 1.10 2001/11/13 00:12:57 lukem Exp $	*/
 
 /*
  * Copyright (c) 1984 University of British Columbia.
@@ -40,6 +40,9 @@
  *	@(#)hd_timer.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd_timer.c,v 1.10 2001/11/13 00:12:57 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -77,7 +80,7 @@ void
 hd_timer()
 {
 	struct hdcb *hdp;
-	int    s = splimp();
+	int    s = splnet();
 
 	for (hdp = hdcbhead; hdp; hdp = hdp->hd_next) {
 		if (hdp->hd_rrtimer && (--hdp->hd_rrtimer == 0)) {

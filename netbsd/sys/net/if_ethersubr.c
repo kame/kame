@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ethersubr.c,v 1.58.2.2 2001/06/07 17:00:32 he Exp $	*/
+/*	$NetBSD: if_ethersubr.c,v 1.95 2002/05/18 22:52:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,6 +64,9 @@
  *	@(#)if_ethersubr.c	8.2 (Berkeley) 4/4/96
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95 2002/05/18 22:52:44 itojun Exp $");
+
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
@@ -71,11 +74,17 @@
 #include "opt_iso.h"
 #include "opt_ns.h"
 #include "opt_gateway.h"
+#include "opt_pfil_hooks.h"
 #include "vlan.h"
+#include "pppoe.h"
+#include "bridge.h"
+#include "bpfilter.h"
+#include "arp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/callout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
@@ -93,9 +102,28 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 
+#if NARP == 0
+/*
+ * XXX there should realy be a way to issue this warning from within config(8)
+ */
+#error You have included a pseudo-device in your configuration that depends on the presence of ethernet interfaces, but have no such interfaces configured. Check if you realy need pseudo-device bridge, ppppoe or vlan.
+#endif
+
+#if NBPFILTER > 0 
+#include <net/bpf.h>
+#endif
+
 #include <net/if_ether.h>
 #if NVLAN > 0
 #include <net/if_vlanvar.h>
+#endif
+
+#if NPPPOE > 0
+#include <net/if_pppoe.h>
+#endif
+
+#if NBRIDGE > 0
+#include <net/if_bridgevar.h>
 #endif
 
 #include <netinet/in.h>
@@ -169,22 +197,23 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 	struct rtentry *rt0)
 {
 	u_int16_t etype = 0;
-	int s, error = 0, hdrcmplt = 0;
+	int s, len, error = 0, hdrcmplt = 0;
  	u_char esrc[6], edst[6];
 	struct mbuf *m = m0;
 	struct rtentry *rt;
 	struct mbuf *mcopy = (struct mbuf *)0;
 	struct ether_header *eh;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 #ifdef INET
 	struct arphdr *ah;
 #endif /* INET */
 #ifdef NETATALK
 	struct at_ifaddr *aa;
 #endif /* NETATALK */
+	short mflags;
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 	if ((rt = rt0) != NULL) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 			if ((rt0 = rt = rtalloc1(dst, 1)) != NULL) {
@@ -217,6 +246,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -264,16 +294,10 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 #endif
 #ifdef INET6
 	case AF_INET6:
-#ifdef OLDIP6OUTPUT
-		if (!nd6_resolve(ifp, rt, m, dst, (u_char *)edst))
-			return(0);	/* if not yet resolves */
-#else
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst)){
-			/* this must be impossible, so we bark */
-			printf("nd6_storelladdr failed\n");
+			/* something bad happened */
 			return(0);
 		}
-#endif /* OLDIP6OUTPUT */
 		etype = htons(ETHERTYPE_IPV6);
 		break;
 #endif
@@ -464,20 +488,49 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 	else
 	 	bcopy(LLADDR(ifp->if_sadl), (caddr_t)eh->ether_shost,
 		    sizeof(eh->ether_shost));
-	s = splimp();
+
+#ifdef PFIL_HOOKS
+	if ((error = pfil_run_hooks(&ifp->if_pfil, &m, ifp, PFIL_OUT)) != 0)
+		return (error);
+	if (m == NULL)
+		return (0);
+#endif
+
+#if NBRIDGE > 0
+	/*
+	 * Bridges require special output handling.
+	 */
+	if (ifp->if_bridge)
+		return (bridge_output(ifp, m, NULL, NULL));
+#endif
+
+#ifdef ALTQ
+	/*
+	 * If ALTQ is enabled on the parent interface, do
+	 * classification; the queueing discipline might not
+	 * require classification, but might require the
+	 * address family/header pointer in the pktattr.
+	 */
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
+		altq_etherclassify(&ifp->if_snd, m, &pktattr);
+#endif
+
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	if (m->m_flags & M_MCAST)
+	ifp->if_obytes += len;
+	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
-	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -489,6 +542,99 @@ bad:
 	return (error);
 }
 
+#ifdef ALTQ
+/*
+ * This routine is a slight hack to allow a packet to be classified
+ * if the Ethernet headers are present.  It will go away when ALTQ's
+ * classification engine understands link headers.
+ */
+void
+altq_etherclassify(struct ifaltq *ifq, struct mbuf *m,
+    struct altq_pktattr *pktattr)
+{
+	struct ether_header *eh;
+	u_int16_t ether_type;
+	int hlen, af, hdrsize;
+	caddr_t hdr;
+
+	hlen = ETHER_HDR_LEN;
+	eh = mtod(m, struct ether_header *);
+
+	ether_type = htons(eh->ether_type);
+
+	if (ether_type < ETHERMTU) {
+		/* LLC/SNAP */
+		struct llc *llc = (struct llc *)(eh + 1);
+		hlen += 8;
+
+		if (m->m_len < hlen ||
+		    llc->llc_dsap != LLC_SNAP_LSAP ||
+		    llc->llc_ssap != LLC_SNAP_LSAP ||
+		    llc->llc_control != LLC_UI) {
+			/* Not SNAP. */
+			goto bad;
+		}
+
+		ether_type = htons(llc->llc_un.type_snap.ether_type);
+	}
+
+	switch (ether_type) {
+	case ETHERTYPE_IP:
+		af = AF_INET;
+		hdrsize = 20;		/* sizeof(struct ip) */
+		break;
+
+	case ETHERTYPE_IPV6:
+		af = AF_INET6;
+		hdrsize = 40;		/* sizeof(struct ip6_hdr) */
+		break;
+
+	default:
+		af = AF_UNSPEC;
+		hdrsize = 0;
+		break;
+	}
+
+	while (m->m_len <= hlen) {
+		hlen -= m->m_len;
+		m = m->m_next;
+	}
+	if (m->m_len < (hlen + hdrsize)) {
+		/*
+		 * protocol header not in a single mbuf.
+		 * We can't cope with this situation right
+		 * now (but it shouldn't ever happen, really, anyhow).
+		 */
+#ifdef DEBUG
+		printf("altq_etherclassify: headers span multiple mbufs: "
+		    "%d < %d\n", m->m_len, (hlen + hdrsize));
+#endif
+		goto bad;
+	}
+
+	m->m_data += hlen;
+	m->m_len -= hlen;
+
+	hdr = mtod(m, caddr_t);
+
+	if (ALTQ_NEEDS_CLASSIFY(ifq))
+		pktattr->pattr_class =
+		    (*ifq->altq_classify)(ifq->altq_clfier, m, af);
+	pktattr->pattr_af = af;
+	pktattr->pattr_hdr = hdr;
+
+	m->m_data -= hlen;
+	m->m_len += hlen;
+
+	return;
+
+ bad:
+	pktattr->pattr_class = NULL;
+	pktattr->pattr_hdr = NULL;
+	pktattr->pattr_af = AF_UNSPEC;
+}
+#endif /* ALTQ */
+
 /*
  * Process a received Ethernet packet;
  * the packet is in the mbuf chain m with
@@ -497,6 +643,7 @@ bad:
 static void
 ether_input(struct ifnet *ifp, struct mbuf *m)
 {
+	struct ethercom *ec = (struct ethercom *) ifp;
 	struct ifqueue *inq;
 	u_int16_t etype;
 	int s;
@@ -517,43 +664,102 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 	/*
 	 * Determine if the packet is within its size limits.
 	 */
-	if (m->m_pkthdr.len > 
+	if (m->m_pkthdr.len >
 	    ETHER_MAX_FRAME(ifp, etype, m->m_flags & M_HASFCS)) {
-		printf("%s: discarding oversize frame (len=%d)\n", 
+		printf("%s: discarding oversize frame (len=%d)\n",
 		    ifp->if_xname, m->m_pkthdr.len);
 		m_freem(m);
 		return;
 	}
 
-	ifp->if_lastchange = time;
-	ifp->if_ibytes += m->m_pkthdr.len;
-	if (eh->ether_dhost[0] & 1) {
-		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
-		    sizeof(etherbroadcastaddr)) == 0)
+	if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
+		/*
+		 * If this is not a simplex interface, drop the packet
+		 * if it came from us.
+		 */
+		if ((ifp->if_flags & IFF_SIMPLEX) == 0 &&
+		    memcmp(LLADDR(ifp->if_sadl), eh->ether_shost,
+		    ETHER_ADDR_LEN) == 0) {
+			m_freem(m);
+			return;
+		}
+
+		if (memcmp(etherbroadcastaddr,
+		    eh->ether_dhost, ETHER_ADDR_LEN) == 0)
 			m->m_flags |= M_BCAST;
 		else
 			m->m_flags |= M_MCAST;
 		ifp->if_imcasts++;
-	} else if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-		   memcmp(LLADDR(ifp->if_sadl), eh->ether_dhost,
-			  ETHER_ADDR_LEN) != 0) {
+	}
+
+	/* If the CRC is still on the packet, trim it off. */
+	if (m->m_flags & M_HASFCS) {
+		m_adj(m, -ETHER_CRC_LEN);
+		m->m_flags &= ~M_HASFCS;
+	}
+
+	ifp->if_ibytes += m->m_pkthdr.len;
+
+#if NBRIDGE > 0
+	/*
+	 * Tap the packet off here for a bridge.  bridge_input()
+	 * will return NULL if it has consumed the packet, otherwise
+	 * it gets processed as normal.  Note that bridge_input()
+	 * will always return the original packet if we need to
+	 * process it locally.
+	 */
+	if (ifp->if_bridge) {
+		m = bridge_input(ifp, m);
+		if (m == NULL)
+			return;
+
+		/*
+		 * Bridge has determined that the packet is for us.
+		 * Update our interface pointer -- we may have had
+		 * to "bridge" the packet locally.
+		 */
+		ifp = m->m_pkthdr.rcvif;
+	}
+#endif /* NBRIDGE > 0 */
+
+	/*
+	 * XXX This comparison is redundant if we are a bridge
+	 * XXX and processing the packet locally.
+	 */
+	if ((m->m_flags & (M_BCAST|M_MCAST)) == 0 &&
+	    (ifp->if_flags & IFF_PROMISC) != 0 &&
+	    memcmp(LLADDR(ifp->if_sadl), eh->ether_dhost,
+		   ETHER_ADDR_LEN) != 0) {
 		m_freem(m);
 		return;
 	}
 
-	/* Check if the mbuf has a VLAN tag */
-	n = m_aux_find(m, AF_LINK, ETHERTYPE_VLAN);
-	if (n) {
+#ifdef PFIL_HOOKS
+	if (pfil_run_hooks(&ifp->if_pfil, &m, ifp, PFIL_IN) != 0)
+		return;
+	if (m == NULL)
+		return;
+
+	eh = mtod(m, struct ether_header *);
+	etype = ntohs(eh->ether_type);
+#endif
+
+	/*
+	 * If VLANs are configured on the interface, check to
+	 * see if the device performed the decapsulation and
+	 * provided us with the tag.
+	 */
+	if (ec->ec_nvlans &&
+	    (n = m_aux_find(m, AF_LINK, ETHERTYPE_VLAN)) != NULL) {
 #if NVLAN > 0
 		/*
 		 * vlan_input() will either recursively call ether_input()
 		 * or drop the packet.
 		 */
-		if (((struct ethercom *)ifp)->ec_nvlans != 0)
-			vlan_input(ifp, m);
-		else
+		vlan_input(ifp, m);
+#else
+		m_freem(m);
 #endif
-			m_freem(m);
 		return;
 	}
 
@@ -574,16 +780,40 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 			m_freem(m);
 		return;
 #endif /* NVLAN > 0 */
+#if NPPPOE > 0
+	case ETHERTYPE_PPPOEDISC:
+	case ETHERTYPE_PPPOE:
+		if (etype == ETHERTYPE_PPPOEDISC) 
+			inq = &ppoediscinq;
+		else
+			inq = &ppoeinq;
+		s = splnet();
+		if (IF_QFULL(inq)) {
+			IF_DROP(inq);
+			m_freem(m);
+		} else
+			IF_ENQUEUE(inq, m);
+		splx(s);
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+		if (!callout_active(&pppoe_softintr))
+			callout_reset(&pppoe_softintr, 1, pppoe_softintr_handler, NULL);
+#else
+		softintr_schedule(pppoe_softintr);
+#endif
+		return;
+#endif /* NPPPOE > 0 */
 	default:
-		/* Nothing. */
+		; /* Nothing. */
 	}
 
 	/* Strip off the Ethernet header. */
 	m_adj(m, sizeof(struct ether_header));
 
 	/* If the CRC is still on the packet, trim it off. */
-	if (m->m_flags & M_HASFCS)
+	if (m->m_flags & M_HASFCS) {
 		m_adj(m, -ETHER_CRC_LEN);
+		m->m_flags &= ~M_HASFCS;
+	}
 
 	switch (etype) {
 #ifdef INET
@@ -774,7 +1004,7 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 #endif /* ISO || LLC || NETATALK*/
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -809,40 +1039,44 @@ ether_sprintf(const u_char *ap)
 void
 ether_ifattach(struct ifnet *ifp, const u_int8_t *lla)
 {
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ETHER;
-	ifp->if_addrlen = 6;
-	ifp->if_hdrlen = 14;
+	ifp->if_addrlen = ETHER_ADDR_LEN;
+	ifp->if_hdrlen = ETHER_HDR_LEN;
+	ifp->if_dlt = DLT_EN10MB;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_output = ether_output;
 	ifp->if_input = ether_input;
 	if (ifp->if_baudrate == 0)
 		ifp->if_baudrate = IF_Mbps(10);		/* just a default */
-	if ((sdl = ifp->if_sadl) &&
-	    sdl->sdl_family == AF_LINK) {
-		sdl->sdl_type = IFT_ETHER;
-		sdl->sdl_alen = ifp->if_addrlen;
-		bcopy(lla, LLADDR(sdl), ifp->if_addrlen);
-	}
+
+	if_alloc_sadl(ifp);
+	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
+
 	LIST_INIT(&((struct ethercom *)ifp)->ec_multiaddrs);
 	ifp->if_broadcastaddr = etherbroadcastaddr;
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+#endif
 }
 
 void
 ether_ifdetach(struct ifnet *ifp)
 {
 	struct ethercom *ec = (void *) ifp;
-	struct sockaddr_dl *sdl = ifp->if_sadl;
 	struct ether_multi *enm;
 	int s;
+
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
 
 #if NVLAN > 0
 	if (ec->ec_nvlans)
 		vlan_ifdetach(ifp);
 #endif
 
-	s = splimp();
+	s = splnet();
 	while ((enm = LIST_FIRST(&ec->ec_multiaddrs)) != NULL) {
 		LIST_REMOVE(enm, enm_list);
 		free(enm, M_IFADDR);
@@ -850,9 +1084,7 @@ ether_ifdetach(struct ifnet *ifp)
 	}
 	splx(s);
 
-	memset(LLADDR(sdl), 0, ETHER_ADDR_LEN);
-	sdl->sdl_alen = 0;
-	sdl->sdl_type = 0;
+	if_free_sadl(ifp);
 }
 
 #if 0
@@ -1014,7 +1246,7 @@ ether_addmulti(struct ifreq *ifr, struct ethercom *ec)
 	struct ether_multi *enm;
 	u_char addrlo[ETHER_ADDR_LEN];
 	u_char addrhi[ETHER_ADDR_LEN];
-	int s = splimp(), error;
+	int s = splnet(), error;
 
 	error = ether_multiaddr(&ifr->ifr_addr, addrlo, addrhi);
 	if (error != 0) {
@@ -1073,7 +1305,7 @@ ether_delmulti(struct ifreq *ifr, struct ethercom *ec)
 	struct ether_multi *enm;
 	u_char addrlo[ETHER_ADDR_LEN];
 	u_char addrhi[ETHER_ADDR_LEN];
-	int s = splimp(), error;
+	int s = splnet(), error;
 
 	error = ether_multiaddr(&ifr->ifr_addr, addrlo, addrhi);
 	if (error != 0) {
@@ -1108,4 +1340,132 @@ ether_delmulti(struct ifreq *ifr, struct ethercom *ec)
 	 * and its reception filter should be adjusted accordingly.
 	 */
 	return (ENETRESET);
+}
+
+/*
+ * Common ioctls for Ethernet interfaces.  Note, we must be
+ * called at splnet().
+ */
+int
+ether_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+{
+	struct ethercom *ec = (void *) ifp;
+	struct ifreq *ifr = (struct ifreq *)data;
+	struct ifaddr *ifa = (struct ifaddr *)data;
+	int error = 0;
+
+	switch (cmd) {
+	case SIOCSIFADDR:
+		ifp->if_flags |= IFF_UP;
+		switch (ifa->ifa_addr->sa_family) {
+		case AF_LINK:
+		    {
+			struct sockaddr_dl *sdl =
+			    (struct sockaddr_dl *) ifa->ifa_addr;
+
+			if (sdl->sdl_type != IFT_ETHER ||
+			    sdl->sdl_alen != ifp->if_addrlen) {
+				error = EINVAL;
+				break;
+			}
+
+			memcpy(LLADDR(ifp->if_sadl), LLADDR(sdl),
+			    ifp->if_addrlen);
+
+			/* Set new address. */
+			error = (*ifp->if_init)(ifp);
+			break;
+		    }
+#ifdef INET
+		case AF_INET:
+			if ((ifp->if_flags & IFF_RUNNING) == 0 &&
+			    (error = (*ifp->if_init)(ifp)) != 0)
+				break;
+			arp_ifinit(ifp, ifa);
+			break;
+#endif /* INET */
+#ifdef NS
+		case AF_NS:
+		    {
+			struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
+
+			if (ns_nullhost(*ina))
+				ina->x_host = *(union ns_host *)
+				    LLADDR(ifp->if_sadl);
+			else
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host, ifp->if_addrlen);
+			/* Set new address. */
+			error = (*ifp->if_init)(ifp);
+			break;
+		    }
+#endif /* NS */
+		default:
+			if ((ifp->if_flags & IFF_RUNNING) == 0)
+				error = (*ifp->if_init)(ifp);
+			break;
+		}
+		break;
+
+	case SIOCGIFADDR:
+		memcpy(((struct sockaddr *)&ifr->ifr_data)->sa_data,
+		    LLADDR(ifp->if_sadl), ETHER_ADDR_LEN);
+		break;
+
+	case SIOCSIFMTU:
+	    {
+		int maxmtu;
+
+		if (ec->ec_capabilities & ETHERCAP_JUMBO_MTU)
+			maxmtu = ETHERMTU_JUMBO;
+		else
+			maxmtu = ETHERMTU;
+
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > maxmtu)
+			error = EINVAL;
+		else {
+			ifp->if_mtu = ifr->ifr_mtu;
+
+			/* Make sure the device notices the MTU change. */
+			if (ifp->if_flags & IFF_UP)
+				error = (*ifp->if_init)(ifp);
+		}
+		break;
+	    }
+
+	case SIOCSIFFLAGS:
+		if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) == IFF_RUNNING) {
+			/*
+			 * If interface is marked down and it is running,
+			 * then stop and disable it.
+			 */
+			(*ifp->if_stop)(ifp, 1);
+		} else if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) == IFF_UP) {
+			/*
+			 * If interface is marked up and it is stopped, then
+			 * start it.
+			 */
+			error = (*ifp->if_init)(ifp);
+		} else if ((ifp->if_flags & IFF_UP) != 0) {
+			/*
+			 * Reset the interface to pick up changes in any other
+			 * flags that affect the hardware state.
+			 */
+			error = (*ifp->if_init)(ifp);
+		}
+		break;
+
+	case SIOCADDMULTI:
+		error = ether_addmulti(ifr, ec);
+		break;
+
+	case SIOCDELMULTI:
+		error = ether_delmulti(ifr, ec);
+		break;
+
+	default:
+		error = ENOTTY;
+	}
+
+	return (error);
 }

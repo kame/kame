@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.25 2000/02/11 19:30:29 thorpej Exp $ */
+/*	$NetBSD: vmparam.h,v 1.30 2001/11/15 18:06:17 soren Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -44,9 +44,14 @@
  *	@(#)vmparam.h	8.1 (Berkeley) 6/11/93
  */
 
+#ifndef _SPARC_VMPARAM_H_
+#define _SPARC_VMPARAM_H_
+
 /*
  * Machine dependent constants for Sun-4c SPARC
  */
+
+#include <machine/param.h>
 
 /*
  * USRTEXT is the start of the user text/data space, while USRSTACK
@@ -82,17 +87,6 @@
 #endif
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
@@ -114,9 +108,24 @@
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
 
+#if !defined(_LKM)
+/*
+ * Make the VM PAGE_* macros constants, if possible.
+ */
+#if NBPG == 4096 || NBPG == 8192
+#define PAGE_SIZE	NBPG
+#define PAGE_SHIFT	PGSHIFT
+#define PAGE_MASK	(NBPG-1)
+#endif
+#endif /* _LKM */
+
+#define	__HAVE_PMAP_PHYSSEG
+
 /*
  * pmap specific data stored in the vm_physmem[] array
  */
+struct pvlist;
 struct pmap_physseg {
-	/* NULL */
+	struct pvlist *pvhead;
 };
+#endif /* _SPARC_VMPARAM_H_ */

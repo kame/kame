@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.7 2000/06/04 19:14:41 cgd Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.12 2002/01/13 23:02:35 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -32,12 +32,10 @@
 #include <sys/errno.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #define _COBALT_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 #include <machine/intr.h>
+#include <machine/intr_machdep.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
@@ -150,12 +148,14 @@ pci_conf_write(pc, tag, reg, data)
 }
 
 int
-pci_intr_map(pc, intrtag, pin, line, ihp)
-	pci_chipset_tag_t pc;
-	pcitag_t intrtag;
-	int pin, line;
+pci_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
+	pci_chipset_tag_t pc = pa->pa_pc;
+	pcitag_t intrtag = pa->pa_intrtag;
+	int pin = pa->pa_intrpin;
+	int line = pa->pa_intrline;
 	int bus, dev, func;
 
 	pci_decompose_tag(pc, intrtag, &bus, &dev, &func);
@@ -218,7 +218,7 @@ pci_intr_disestablish(pc, cookie)
 	pci_chipset_tag_t pc;
 	void *cookie;
 {
-	panic("pci_intr_disestablish: not implemented");
-
-	return;
+	/* Try both, only the valid one will disestablish. */
+	cpu_intr_disestablish(cookie);
+	icu_intr_disestablish(cookie);
 }

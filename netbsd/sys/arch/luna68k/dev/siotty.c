@@ -1,4 +1,4 @@
-/* $NetBSD: siotty.c,v 1.4 2000/03/06 21:36:09 thorpej Exp $ */
+/* $NetBSD: siotty.c,v 1.9 2002/03/17 19:40:43 atatat Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: siotty.c,v 1.4 2000/03/06 21:36:09 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: siotty.c,v 1.9 2002/03/17 19:40:43 atatat Exp $");
 
 #include "opt_ddb.h"
 
@@ -182,17 +182,14 @@ siottyintr(chan)
 				return;
 			}
 #endif
-			(*linesw[tp->t_line].l_rint)(code, tp);
+			(*tp->t_linesw->l_rint)(code, tp);
 		} while ((rr = getsiocsr(sio)) & RR_RXRDY);
 	}
 	if (rr & RR_TXRDY) {
 		sio->sio_cmd = WR0_RSTPEND;
 		if (tp != NULL) {
 			tp->t_state &= ~(TS_BUSY|TS_FLUSH);
-			if (tp->t_line)
-				(*linesw[tp->t_line].l_start)(tp);
-			else
-				siostart(tp);
+			(*tp->t_linesw->l_start)(tp);
 		}
 	}
 }
@@ -405,7 +402,7 @@ sioopen(dev, flag, mode, p)
 	error = ttyopen(tp, 0, (flag & O_NONBLOCK));
 	if (error > 0)
 		return error;
-	return (*linesw[tp->t_line].l_open)(dev, tp);
+	return (*tp->t_linesw->l_open)(dev, tp);
 }
  
 int
@@ -418,7 +415,7 @@ sioclose(dev, flag, mode, p)
 	struct tty *tp = sc->sc_tty;
 	int s;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 
 	s = spltty();
 	siomctl(sc, TIOCM_BREAK, DMBIC);
@@ -443,7 +440,7 @@ sioread(dev, uio, flag)
 	struct siotty_softc *sc = siotty_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	return (*linesw[tp->t_line].l_read)(tp, uio, flag);
+	return (*tp->t_linesw->l_read)(tp, uio, flag);
 }
  
 int
@@ -455,7 +452,19 @@ siowrite(dev, uio, flag)
 	struct siotty_softc *sc = siotty_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	return (*linesw[tp->t_line].l_write)(tp, uio, flag);
+	return (*tp->t_linesw->l_write)(tp, uio, flag);
+}
+
+int
+siopoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct siotty_softc *sc = siotty_cd.cd_devs[minor(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -470,11 +479,12 @@ sioioctl(dev, cmd, data, flag, p)
 	struct tty *tp = sc->sc_tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return error;
 
 	/* the last resort for TIOC ioctl tranversing */
@@ -510,7 +520,7 @@ sioioctl(dev, cmd, data, flag, p)
 		*(int *)data = sc->sc_flags;
 		break;
 	default:
-		return ENOTTY;
+		return EPASSTHROUGH;
 	}
 	return 0;
 }

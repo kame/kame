@@ -1,4 +1,4 @@
-/*	$NetBSD: coda_vfsops.c,v 1.10 2000/03/30 11:24:17 augustss Exp $	*/
+/*	$NetBSD: coda_vfsops.c,v 1.16 2002/03/27 05:10:41 phil Exp $	*/
 
 /*
  * 
@@ -44,6 +44,9 @@
  * M. Satyanarayanan.  
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: coda_vfsops.c,v 1.16 2002/03/27 05:10:41 phil Exp $");
+
 #ifdef	_LKM
 #define	NVCODA 4
 #else
@@ -71,7 +74,7 @@
 int codadebug = 0;
 
 int coda_vfsop_print_entry = 0;
-#define ENTRY if(coda_vfsop_print_entry) myprintf(("Entered %s\n",__FUNCTION__))
+#define ENTRY if(coda_vfsop_print_entry) myprintf(("Entered %s\n",__func__))
 
 struct vnode *coda_ctlvp;
 struct coda_mntinfo coda_mnttbl[NVCODA]; /* indexed by minor device number */
@@ -88,9 +91,9 @@ struct coda_op_stats coda_vfsopstats[CODA_VFSOPS_SIZE];
 extern int coda_nc_initialized;     /* Set if cache has been initialized */
 extern int vc_nb_open __P((dev_t, int, int, struct proc *));
 extern struct cdevsw cdevsw[];    /* For sanity check in coda_mount */
-extern struct vnodeopv_desc coda_vnodeop_opv_desc;
+extern const struct vnodeopv_desc coda_vnodeop_opv_desc;
 
-struct vnodeopv_desc *coda_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const coda_vnodeopv_descs[] = {
 	&coda_vnodeop_opv_desc,
 	NULL,
 };
@@ -109,9 +112,8 @@ struct vfsops coda_vfsops = {
 	eopnotsupp,
     (int (*) (struct vnode *, struct fid *)) eopnotsupp,
     coda_init,
-#ifdef __NetBSD__
+    NULL,
     coda_done,
-#endif
     coda_sysctl,
     (int (*)(void)) eopnotsupp,
     (int (*)(struct mount *, struct mbuf *, int *, struct ucred **))
@@ -419,34 +421,43 @@ coda_nb_statfs(vfsp, sbp, p)
     struct statfs *sbp;
     struct proc *p;
 {
+    struct coda_statfs fsstat;
+    int error;
+
     ENTRY;
-/*  MARK_ENTRY(CODA_STATFS_STATS); */
+    MARK_ENTRY(CODA_STATFS_STATS);
     if (!CODA_MOUNTED(vfsp)) {
-/*	MARK_INT_FAIL(CODA_STATFS_STATS);*/
+/*	MARK_INT_FAIL(CODA_STATFS_STATS); */
 	return(EINVAL);
     }
     
-    bzero(sbp, sizeof(struct statfs));
+    memset(sbp, 0, sizeof(struct statfs));
     /* XXX - what to do about f_flags, others? --bnoble */
     /* Below This is what AFS does
     	#define NB_SFS_SIZ 0x895440
      */
     /* Note: Normal fs's have a bsize of 0x400 == 1024 */
-    sbp->f_type = 0;
-    sbp->f_bsize = 8192; /* XXX */
-    sbp->f_iosize = 8192; /* XXX */
-#define NB_SFS_SIZ 0x8AB75D
-    sbp->f_blocks = NB_SFS_SIZ;
-    sbp->f_bfree = NB_SFS_SIZ;
-    sbp->f_bavail = NB_SFS_SIZ;
-    sbp->f_files = NB_SFS_SIZ;
-    sbp->f_ffree = NB_SFS_SIZ;
-    bcopy((caddr_t)&(vfsp->mnt_stat.f_fsid), (caddr_t)&(sbp->f_fsid), sizeof (fsid_t));
-    strncpy(sbp->f_fstypename, MOUNT_CODA, MFSNAMELEN-1);
-    strcpy(sbp->f_mntonname, "/coda");
-    strcpy(sbp->f_mntfromname, "CODA");
-/*  MARK_INT_SAT(CODA_STATFS_STATS); */
-    return(0);
+
+    error = venus_statfs(vftomi(vfsp), p->p_cred->pc_ucred, p, &fsstat);
+
+    if (!error) {
+	sbp->f_type = 0;
+	sbp->f_bsize = 8192; /* XXX */
+	sbp->f_iosize = 8192; /* XXX */
+	sbp->f_blocks = fsstat.f_blocks;
+	sbp->f_bfree  = fsstat.f_bfree;
+	sbp->f_bavail = fsstat.f_bavail;
+	sbp->f_files  = fsstat.f_files;
+	sbp->f_ffree  = fsstat.f_ffree;
+        bcopy((caddr_t)&(vfsp->mnt_stat.f_fsid),
+	      (caddr_t)&(sbp->f_fsid), sizeof (fsid_t));
+        strncpy(sbp->f_fstypename, MOUNT_CODA, MFSNAMELEN-1);
+        strcpy(sbp->f_mntonname, "/coda");
+        strcpy(sbp->f_mntfromname, "CODA");
+    }
+
+    MARK_INT_SAT(CODA_STATFS_STATS);
+    return(error);
 }
 
 /*
@@ -538,13 +549,11 @@ coda_init(void)
     ENTRY;
 }
 
-#ifdef __NetBSD__
 void
 coda_done(void)
 {
     ENTRY;
 }
-#endif
 
 int
 coda_sysctl(name, namelen, oldp, oldlp, newp, newl, p)

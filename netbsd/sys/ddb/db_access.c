@@ -1,33 +1,36 @@
-/*	$NetBSD: db_access.c,v 1.14 2000/03/30 11:31:26 augustss Exp $	*/
+/*	$NetBSD: db_access.c,v 1.17 2002/02/15 07:33:49 simonb Exp $	*/
 
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
  *	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_access.c,v 1.17 2002/02/15 07:33:49 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -42,7 +45,7 @@
  * boundaries.
  */
 
-int db_extend[] = {	/* table for sign-extending */
+const int db_extend[] = {	/* table for sign-extending */
 	0,
 	0xFFFFFF80,
 	0xFFFF8000,
@@ -50,10 +53,7 @@ int db_extend[] = {	/* table for sign-extending */
 };
 
 db_expr_t
-db_get_value(addr, size, is_signed)
-	db_addr_t addr;
-	size_t size;
-	boolean_t is_signed;
+db_get_value(db_addr_t addr, size_t size, boolean_t is_signed)
 {
 	char data[sizeof(db_expr_t)];
 	db_expr_t value;
@@ -68,17 +68,14 @@ db_get_value(addr, size, is_signed)
 	for (i = 0; i < size; i++)
 #endif /* BYTE_ORDER */
 		value = (value << 8) + (data[i] & 0xFF);
-	    
+
 	if (size < 4 && is_signed && (value & db_extend[size]) != 0)
 		value |= db_extend[size];
 	return (value);
 }
 
 void
-db_put_value(addr, size, value)
-	db_addr_t addr;
-	size_t size;
-	db_expr_t value;
+db_put_value(db_addr_t addr, size_t size, db_expr_t value)
 {
 	char data[sizeof(db_expr_t)];
 	size_t i;

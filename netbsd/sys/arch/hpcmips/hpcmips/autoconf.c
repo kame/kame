@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.7 2000/06/01 15:38:24 matt Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.12 2002/01/31 17:56:33 uch Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,51 +43,37 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.7 2000/06/01 15:38:24 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.12 2002/01/31 17:56:33 uch Exp $");
+
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/conf.h>	/* setroot() */
+
+#include <machine/disklabel.h>
+
+#include <machine/sysconf.h>
+#include <machine/config_hook.h>
+
+void makebootdev(const char *);
+
+struct device *booted_device;
+int booted_partition;
+static char __booted_device_name[16];
+static void get_device(const char *);
 
 /*
  * Setup the system to run on the current machine.
  *
- * Configure() is called at boot time.  Available
+ * cpu_configure() is called at boot time.  Available
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
- */
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/map.h>
-#include <sys/buf.h>
-#include <sys/dkstat.h>
-#include <sys/conf.h>
-#include <sys/disklabel.h>
-#include <sys/reboot.h>
-#include <sys/device.h>
-
-#include <machine/cpu.h>
-#include <machine/bus.h>
-#include <machine/autoconf.h>
-#include <machine/sysconf.h>
-
-#include <machine/config_hook.h>
-
-int	cpuspeed = 7;	/* approx # instr per usec. */
-
-struct device *booted_device;
-int booted_partition;
-
-static char booted_device_name[16];
-static void get_device __P((char *name));
-
-/*
- * Determine mass storage and memory configuration for a machine.
- * Print cpu type, and then iterate over an array of devices
- * found on the baseboard or in turbochannel option slots.
- * Once devices are configured, enable interrupts, and probe
- * for attached scsi devices.
  */
 void
 cpu_configure()
 {
+
+	softintr_init();
+
 	/* Kick off autoconfiguration. */
 	(void)splhigh();
 
@@ -96,9 +82,6 @@ cpu_configure()
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
 
-	/* Reset any bus errors due to probing nonexistent devices. */
-	(*platform.bus_reset)();
-
 	/* Configuration is finished, turn on interrupts. */
 	_splnone();	/* enable all source forcing SOFT_INTs cleared */
 }
@@ -106,7 +89,8 @@ cpu_configure()
 void
 cpu_rootconf()
 {
-	get_device(booted_device_name);
+
+	get_device(__booted_device_name);
 
 	printf("boot device: %s\n",
 	    booted_device ? booted_device->dv_xname : "<unknown>");
@@ -115,18 +99,18 @@ cpu_rootconf()
 }
 
 void
-makebootdev(cp)
-	char *cp;
+makebootdev(const char *cp)
 {
-	strncpy(booted_device_name, cp, 16);
+
+	strncpy(__booted_device_name, cp, 16);
 }
 
 static void
-get_device(name)
-	char *name;
+get_device(const char *name)
 {
 	int loop, unit, part;
-	char buf[32], *cp;
+	char buf[32];
+	const char *cp;
 	struct device *dv;
 
 	if (strncmp(name, "/dev/", 5) == 0)

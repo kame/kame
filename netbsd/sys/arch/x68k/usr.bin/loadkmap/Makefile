@@ -1,8 +1,8 @@
-#	$NetBSD: Makefile,v 1.6 2000/04/16 14:19:53 minoura Exp $
+#	$NetBSD: Makefile,v 1.9 2001/12/12 01:50:00 tv Exp $
 # Makefile for loadkmap
 
 PROG=		loadkmap
-MKMAN=		no
+NOMAN=		# defined
 FILES=		ascii_kmap jis_kmap
 FILESDIR=	/usr/share/keymaps/x68k
 
@@ -12,14 +12,12 @@ realall:	loadkmap ascii_kmap jis_kmap
 
 ascii_kmap: ascii_kmap.c
 	$(CC) -c -o ${.TARGET}.aout ${.CURDIR}/ascii_kmap.c
-	strip ${.TARGET}.aout
-	dd bs=1 skip=32 if=${.TARGET}.aout of=${.TARGET}
+	${OBJCOPY} -O binary ${.TARGET}.aout ${.TARGET}
 	rm ${.TARGET}.aout
 
 jis_kmap: jis_kmap.c
 	$(CC) -c -o ${.TARGET}.aout ${.CURDIR}/jis_kmap.c
-	strip ${.TARGET}.aout
-	dd bs=1 skip=32 if=${.TARGET}.aout of=${.TARGET}
+	${OBJCOPY} -O binary ${.TARGET}.aout ${.TARGET}
 	rm ${.TARGET}.aout
 
 .include <bsd.prog.mk>

@@ -1,4 +1,4 @@
-/*	$NetBSD: comvar.h,v 1.32 2000/03/23 07:01:30 thorpej Exp $	*/
+/*	$NetBSD: comvar.h,v 1.43 2002/04/12 19:32:30 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -31,20 +31,28 @@
  */
 
 #include "rnd.h"
+#include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
+#include "opt_com.h"
+#include "opt_kgdb.h"
+
 #if NRND > 0 && defined(RND_COM)
 #include <sys/rnd.h>
 #endif
 
 #include <sys/callout.h>
 #include <sys/timepps.h>
-
-int comcnattach __P((bus_space_tag_t, int, int, int, tcflag_t));
-
-#ifdef KGDB
-int com_kgdb_attach __P((bus_space_tag_t, int, int, int, tcflag_t));
+#if (defined(MULTIPROCESSOR) || defined(LOCKDEBUG)) && defined(COM_MPLOCK)
+#include <sys/lock.h>
 #endif
 
-int com_is_console __P((bus_space_tag_t, int, bus_space_handle_t *));
+int comcnattach __P((bus_space_tag_t, bus_addr_t, int, int, tcflag_t));
+
+#ifdef KGDB
+int com_kgdb_attach __P((bus_space_tag_t, bus_addr_t, int, int, tcflag_t));
+#endif
+
+int com_is_console __P((bus_space_tag_t, bus_addr_t, bus_space_handle_t *));
 
 /* Hardware flag masks */
 #define	COM_HW_NOIEN	0x01
@@ -55,6 +63,7 @@ int com_is_console __P((bus_space_tag_t, int, bus_space_handle_t *));
 #define	COM_HW_CONSOLE	0x40
 #define	COM_HW_KGDB	0x80
 #define	COM_HW_TXFIFO_DISABLE	0x100
+#define	COM_HW_NO_TXPRELOAD	0x200
 
 /* Buffer size for character buffer */
 #define	COM_RING_SIZE	2048
@@ -66,7 +75,7 @@ struct com_softc {
 
 	struct callout sc_diag_callout;
 
-	int sc_iobase;			/* XXX ISA-centric name */
+	bus_addr_t sc_iobase;			/* XXX ISA-centric name */
 	int sc_frequency;
 
 	bus_space_tag_t sc_iot;
@@ -110,6 +119,10 @@ struct com_softc {
 	    sc_mcr_active, sc_lcr, sc_ier, sc_fifo, sc_dlbl, sc_dlbh, sc_efr;
 	u_char sc_mcr_dtr, sc_mcr_rts, sc_msr_cts, sc_msr_dcd;
 
+#ifdef COM_HAYESP
+	u_char sc_prescaler;
+#endif
+
 	/* power management hooks */
 	int (*enable) __P((struct com_softc *));
 	void (*disable) __P((struct com_softc *));
@@ -125,6 +138,9 @@ struct com_softc {
 #if NRND > 0 && defined(RND_COM)
 	rndsource_element_t  rnd_source;
 #endif
+#if (defined(MULTIPROCESSOR) || defined(LOCKDEBUG)) && defined(COM_MPLOCK)
+	struct simplelock	sc_lock;
+#endif
 };
 
 /* Macros to clear/set/test flags. */
@@ -135,12 +151,10 @@ struct com_softc {
 int comprobe1 __P((bus_space_tag_t, bus_space_handle_t));
 int comintr __P((void *));
 void com_attach_subr __P((struct com_softc *));
-int cominit __P((bus_space_tag_t, int, int, int, tcflag_t,
-	bus_space_handle_t *));
 int com_detach __P((struct device *, int));
 int com_activate __P((struct device *, enum devact));
 
-#ifndef __GENERIC_SOFT_INTERRUPTS
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 #ifdef __NO_SOFT_SERIAL_INTERRUPT
 #define	IPL_SERIAL	IPL_TTY
 #define	splserial()	spltty()

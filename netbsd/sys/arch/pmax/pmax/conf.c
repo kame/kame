@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.39 2000/05/02 06:43:43 augustss Exp $	*/
+/*	$NetBSD: conf.c,v 1.44 2002/02/24 00:39:36 ad Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -60,10 +60,8 @@ bdev_decl(sw);
 bdev_decl(vnd);
 #include "audio.h"
 cdev_decl(audio);
-#include "rz.h"
-#include "tz.h"
-bdev_decl(rz);
-bdev_decl(tz);
+#include "clockctl.h"
+cdev_decl(clockctl);
 
 struct bdevsw	bdevsw[] =
 {
@@ -87,8 +85,8 @@ struct bdevsw	bdevsw[] =
 	bdev_disk_init(NMD,md),		/* 17: memory disk driver */
 	bdev_tape_init(NST,st),		/* 18: MI SCSI tape */
 	bdev_disk_init(NSD,sd),		/* 19: MI SCSI disk */
-	bdev_tape_init(NTZ, tz),	/* 20: ULTRIX tz tape */
-	bdev_disk_init(NRZ,rz),		/* 21: ULTRIX rz disk & CD-ROM */
+	bdev_notdef(),			/* 20: ULTRIX tz tape */
+	bdev_notdef(),			/* 21: ULTRIX rz disk & CD-ROM */
 	bdev_notdef(),			/* 22: nodev */
 	bdev_notdef(),			/* 23: ULTRIX mscp */
 
@@ -169,19 +167,12 @@ cdev_decl(dtop);
 cdev_decl(fb);
 cdev_decl(px);
 cdev_decl(rcons);
-cdev_decl(rz);
 cdev_decl(scc);
-cdev_decl(tz);
 
 /* a framebuffer with an attached mouse: */
+
 /* open, close, ioctl, poll, mmap */
-
-#define	cdev_fbm_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
-	dev_init(c,n,mmap) }
-
+#define	cdev_fbm_init(c,n)	cdev__ocipm_init(c,n)
 
 struct cdevsw	cdevsw[] =
 {
@@ -195,7 +186,7 @@ struct cdevsw	cdevsw[] =
 	cdev_fd_init(1,filedesc),	/* 7: file descriptor pseudo-dev */
 	cdev_notdef(),			/* 8: ULTRIX fl */
 	cdev_disk_init(NSD,sd),		/* 9: MI SCSI disk */
-	cdev_tape_init(NTZ,tz),		/* 10: ULTRIX tz tape */
+	cdev_notdef(),			/* 10: ULTRIX tz tape */
 	cdev_disk_init(NVND,vnd),	/* 11: vnode disk driver */
 	cdev_bpftun_init(NBPFILTER,bpf),/* 12: Berkeley packet filter */
 	cdev_notdef(),			/* 13: ULTRIX up */
@@ -241,9 +232,9 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),		/* 51: ULTRIX sh tty */
 	cdev_notdef(),		/* 52: ULTRIX its */
 	cdev_scanner_init(NSS,ss),	/* 53: MI SCSI scanner */
-	cdev_ch_init(NCH,ch),		/* 54: MI SCSI autochanger */
-	cdev_uk_init(NUK,uk),		/* 55: MI SCSI unknown */
-	cdev_disk_init(NRZ,rz), /* 56: ULTRIX rz SCSI, gross coupling to PrestoServe driver */
+	cdev_ch_init(NCH,ch),	/* 54: MI SCSI autochanger */
+	cdev_uk_init(NUK,uk),	/* 55: MI SCSI unknown */
+	cdev_notdef(),		/* 56: ULTRIX rz SCSI, gross coupling to PrestoServe driver */
 	cdev_notdef(),		/* 57: nodev */
 	cdev_notdef(),		/* 58: ULTRIX fc */
 	cdev_notdef(),		/* 59: ULTRIX fg, again gross coupling to PrestoServe driver */
@@ -286,7 +277,10 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NRAID,raid),	/* 96: RAIDframe disk driver */
 	cdev_disk_init(NMD,md),	/* 97: memory disk  driver */
 	cdev_fbm_init(NPX,px),	/* 98: PixelStamp board driver */
-	cdev_audio_init(NAUDIO,audio),  /* 99 generic audio I/O */
+	cdev_audio_init(NAUDIO,audio),  /* 99: generic audio I/O */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 100: clockctl pseudo device */
+	cdev_notdef(),		/* 101: reserved for wsmux */
+	cdev_notdef(),		/* 102: reserved for wsfont */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -425,6 +419,9 @@ static int chrtoblktbl[] =  {
 	/* 97 */	17,		/* memory disk */
 	/* 98 */	NODEV,
 	/* 99 */	NODEV,
+	/* 100 */	NODEV,
+	/* 101 */	NODEV,
+	/* 102 */	NODEV,
 };
 
 /*

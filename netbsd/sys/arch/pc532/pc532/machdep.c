@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.111 2000/06/05 23:45:00 jhawk Exp $	*/
+/*	$NetBSD: machdep.c,v 1.127 2002/03/20 17:59:25 christos Exp $	*/
 
 /*-
  * Copyright (c) 1996 Matthias Pfaller.
@@ -43,12 +43,7 @@
  */
 
 #include "opt_ddb.h"
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-#include "opt_natm.h"
+#include "opt_kgdb.h"
 #include "opt_compat_netbsd.h"
 
 #include <sys/param.h>
@@ -75,10 +70,6 @@
 
 #include <dev/cons.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <sys/sysctl.h>
@@ -92,44 +83,6 @@
 #include <machine/kcore.h>
 
 #include <net/netisr.h>
-#include <net/if.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#include <netinet/ip_var.h>
-#endif
-#ifdef INET6
-# ifndef INET
-#  include <netinet/in.h>
-# endif
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#endif
-#ifdef NETATALK
-#include <netatalk/at_extern.h>
-#endif
-#ifdef NS
-#include <netns/ns_var.h>
-#endif
-#ifdef ISO
-#include <netiso/iso.h>
-#include <netiso/clnp.h>
-#endif
-#ifdef CCITT
-#include <netccitt/x25.h>
-#include <netccitt/pk.h>
-#include <netccitt/pk_extern.h>
-#endif
-#ifdef NATM
-#include <netnatm/natm.h>
-#endif
-#include "arp.h"
-#include "ppp.h"
-#if NPPP > 0
-#include <net/ppp_defs.h>
-#include <net/if_ppp.h>
-#endif
 
 #ifdef DDB
 #include <machine/db_machdep.h>
@@ -167,9 +120,9 @@ int	boothowto;
 vaddr_t msgbuf_vaddr;
 paddr_t msgbuf_paddr;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 extern	char etext[], end[];
 #if defined(DDB)
@@ -213,6 +166,7 @@ cpu_startup()
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_kenter_pa(msgbuf_vaddr + i * NBPG,
 		    msgbuf_paddr + i * NBPG, VM_PROT_READ | VM_PROT_WRITE);
+	pmap_update(pmap_kernel());
 
 	initmsgbuf((caddr_t)msgbuf_vaddr, round_page(MSGBUFSIZE));
 
@@ -236,9 +190,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("cpu_startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
@@ -266,11 +220,13 @@ cpu_startup()
 			if (pg == NULL)
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
-			pmap_kenter_pgs(curbuf, &pg, 1);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -298,7 +254,7 @@ cpu_startup()
 	if (uvm_map_protect(kernel_map,
 			   ns532_round_page(&kernel_text),
 			   ns532_round_page(&etext),
-			   UVM_PROT_READ|UVM_PROT_EXEC, TRUE) != KERN_SUCCESS)
+			   UVM_PROT_READ|UVM_PROT_EXEC, TRUE) != 0)
 		panic("can't protect kernel text");
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
@@ -373,20 +329,19 @@ sendsig(catcher, sig, mask, code)
 	struct proc *p = curproc;
 	struct reg *regs;
 	struct sigframe *fp, frame;
-	struct sigacts *psp = p->p_sigacts;
 	int onstack;
 
 	regs = p->p_md.md_regs;
 
 	/* Do we need to jump onto the signal stack? */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context. */
 	if (onstack)
-		fp = (struct sigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-						  psp->ps_sigstk.ss_size);
+		fp = (struct sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+					  p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct sigframe *)regs->r_sp;
 	fp--;
@@ -413,7 +368,7 @@ sendsig(catcher, sig, mask, code)
 	frame.sf_sc.sc_reg[REG_R0] = regs->r_r0;
 
 	/* Save signal stack. */
-	frame.sf_sc.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	frame.sf_sc.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 
 	/* Save the signal mask. */
 	frame.sf_sc.sc_mask = *mask;
@@ -441,11 +396,11 @@ sendsig(catcher, sig, mask, code)
 	 * Build context to run handler in.
 	 */
 	regs->r_sp = (int)fp;
-	regs->r_pc = (int)psp->ps_sigcode;
+	regs->r_pc = (int)p->p_sigctx.ps_sigcode;
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 }
 
 /*
@@ -504,9 +459,9 @@ sys___sigreturn14(p, v, retval)
 
 	/* Restore signal stack. */
 	if (context.sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask. */
 	(void) sigprocmask1(p, SIG_SETMASK, &context.sc_mask, 0);
@@ -604,7 +559,7 @@ haltsys:
 /*
  * These variables are needed by /sbin/savecore
  */
-u_long	dumpmag = 0x8fca0101;	/* magic number */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number */
 int 	dumpsize = 0;		/* pages */
 long	dumplo = 0; 		/* blocks */
 
@@ -834,7 +789,7 @@ setregs(p, pack, stack)
 	r->r_sp  = stack;
 	r->r_pc  = pack->ep_entry;
 	r->r_psr = PSL_USERSET;
-	r->r_r7  = (int)PS_STRINGS;
+	r->r_r7  = (int)p->p_psstr;
 
 	pcbp->pcb_fsr = FPC_UEN;
 	memset(pcbp->pcb_freg, 0, sizeof(pcbp->pcb_freg));
@@ -895,9 +850,9 @@ map(pd, virtual, physical, protection, size)
  *
  * Level one and level two page tables are initialized to create
  * the following mapping:
- *	0xf7c00000-0xf7ffefff:	Kernel level two page tables
- *	0xf7fff000-0xf7ffffff:	Kernel level one page table
- *	0xf8000000-0xff7fffff:	Kernel code and data
+ *	0xdfc00000-0xdfffefff:	Kernel level two page tables
+ *	0xdffff000-0xf7ffffff:	Kernel level one page table
+ *	0xe0000000-0xff7fffff:	Kernel code and data
  *	0xffc00000-0xffc00fff:	Kernel temporary stack
  *	0xffc80000-0xffc80fff:	Duarts and Parity control
  *	0xffd00000-0xffdfffff:	SCSI polled
@@ -1064,45 +1019,6 @@ init532()
 	panic("main returned to init532\n");
 }
 
-struct queue {
-	struct queue *q_next, *q_prev;
-};
-
-/*
- * insert an element into a queue
- */
-void
-_insque(v1, v2)
-	void *v1;
-	void *v2;
-{
-	register struct queue *elem = v1, *head = v2;
-	register struct queue *next;
-
-	next = head->q_next;
-	elem->q_next = next;
-	head->q_next = elem;
-	elem->q_prev = head;
-	next->q_prev = elem;
-}
-
-/*
- * remove an element from a queue
- */
-void
-_remque(v)
-	void *v;
-{
-	register struct queue *elem = v;
-	register struct queue *next, *prev;
-
-	next = elem->q_next;
-	prev = elem->q_prev;
-	next->q_prev = prev;
-	prev->q_next = next;
-	elem->q_prev = 0;
-}
-
 /*
  * cpu_exec_aout_makecmds():
  *	cpu-dependent a.out format hook for execve().
@@ -1180,16 +1096,6 @@ cpu_reset()
 }
 
 /*
- * Clock software interrupt routine
- */
-void
-do_softclock(arg)
-	void *arg;
-{
-	softclock();
-}
-
-/*
  * Network software interrupt routine
  */
 void
@@ -1201,31 +1107,13 @@ softnet(arg)
 	di(); isr = netisr; netisr = 0; ei();
 	if (isr == 0) return;
 
-#ifdef INET
-#if NARP > 0
-	if (isr & (1 << NETISR_ARP)) arpintr();
-#endif
-	if (isr & (1 << NETISR_IP)) ipintr();
-#endif
-#ifdef INET6
-	if (isr & (1 << NETISR_IPV6)) ip6intr();
-#endif
-#ifdef NETATALK
-	if (isr & (1 << NETISR_ATALK)) atintr();
-#endif
-#ifdef NS
-	if (isr & (1 << NETISR_NS)) nsintr();
-#endif
-#ifdef ISO
-	if (isr & (1 << NETISR_ISO)) clnlintr();
-#endif
-#ifdef CCITT
-	if (isr & (1 << NETISR_CCITT)) ccittintr();
-#endif
-#ifdef NATM
-	if (isr & (1 << NETISR_NATM)) natmintr();
-#endif
-#if NPPP > 0
-	if (isr & (1 << NETISR_PPP)) pppintr();
-#endif
+#define DONETISR(bit, fn)		\
+    do {				\
+	if (isr & (1 << bit))		\
+		fn();			\
+    } while (0)
+
+#include <net/netisr_dispatch.h>
+
+#undef DONETISR
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: sfbreg.h,v 1.2.6.1 2000/12/26 15:58:02 jhawk Exp $ */
+/* $NetBSD: sfbreg.h,v 1.3 2000/12/19 01:25:46 perseant Exp $ */
 
 /*
  * Copyright (c) 1996 Carnegie-Mellon University.

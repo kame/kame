@@ -1,4 +1,4 @@
-/*	$NetBSD: ite.c,v 1.22 2000/05/25 03:30:19 itohy Exp $	*/
+/*	$NetBSD: ite.c,v 1.28 2002/03/17 19:40:53 atatat Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -221,7 +221,7 @@ iteattach(pdp, dp, auxp)
 			 * console reinit copy params over.
 			 * and console always gets keyboard
 			 */
-			bcopy(&con_itesoftc.grf, &ip->grf,
+			memcpy(&ip->grf, &con_itesoftc.grf,
 			    (char *)&ip[1] - (char *)&ip->grf);
 			con_itesoftc.grf = NULL;
 			kbd_ite = ip;
@@ -264,7 +264,7 @@ iteinit(dev)
 
 	if (ip->flags & ITE_INITED)
 		return;
-	bcopy(&ascii_kbdmap, &kbdmap, sizeof(struct kbdmap));
+	memcpy(&kbdmap, &ascii_kbdmap, sizeof(struct kbdmap));
 
 	ip->curx = 0;
 	ip->cury = 0;
@@ -405,7 +405,7 @@ iteopen(dev, mode, devtype, p)
 		tp->t_state = TS_ISOPEN|TS_CARR_ON;
 		ttsetwater(tp);
 	}
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error == 0) {
 		tp->t_winsize.ws_row = ip->rows;
 		tp->t_winsize.ws_col = ip->cols;
@@ -423,7 +423,7 @@ iteclose(dev, flag, mode, p)
 {
 	register struct tty *tp = ite_tty[UNIT(dev)];
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 	iteoff(dev, 0);
 #if 0
@@ -441,7 +441,7 @@ iteread(dev, uio, flag)
 {
 	register struct tty *tp = ite_tty[UNIT(dev)];
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -452,7 +452,18 @@ itewrite(dev, uio, flag)
 {
 	register struct tty *tp = ite_tty[UNIT(dev)];
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+itepoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	register struct tty *tp = ite_tty[UNIT(dev)];
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -475,24 +486,25 @@ iteioctl(dev, cmd, addr, flag, p)
 	register struct tty *tp = ite_tty[UNIT(dev)];
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, addr, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, addr, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, addr, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
 	case ITEIOCSKMAP:
 		if (addr == 0)
 			return(EFAULT);
-		bcopy(addr, &kbdmap, sizeof(struct kbdmap));
+		memcpy(&kbdmap, addr, sizeof(struct kbdmap));
 		return(0);
 
 	case ITEIOCGKMAP:
 		if (addr == NULL)
 			return(EFAULT);
-		bcopy(&kbdmap, addr, sizeof(struct kbdmap));
+		memcpy(addr, &kbdmap, sizeof(struct kbdmap));
 		return(0);
 
 	case ITEIOCGREPT:
@@ -509,7 +521,8 @@ iteioctl(dev, cmd, addr, flag, p)
 #if x68k
 	case ITELOADFONT:
 		if (addr) {
-			bcopy(addr, kern_font, 4096 /*sizeof (kernel_font)*/);
+			memcpy(kern_font, addr, 4096 /*sizeof (kernel_font)*/);
+			ite_set_glyph();
 			return 0;
 		} else
 			return EFAULT;
@@ -522,7 +535,7 @@ iteioctl(dev, cmd, addr, flag, p)
 		}
 #endif
 	}
-	return (ENOTTY);
+	return (EPASSTHROUGH);
 }
 
 void
@@ -747,7 +760,7 @@ __inline static void
 itesendch (ch)
 	int ch;
 {
-	(*linesw[kbd_tty->t_line].l_rint)(ch, kbd_tty);
+	(*kbd_tty->t_linesw->l_rint)(ch, kbd_tty);
 }
 
 
@@ -851,7 +864,7 @@ ite_filter(c)
 	 * this should probably be configurable..
 	 */
 	if (mod == (KBD_MOD_LALT|KBD_MOD_LMETA) && c == 0x63) {
-		bcopy (&ascii_kbdmap, &kbdmap, sizeof (struct kbdmap));
+		memcpy(&kbdmap, &ascii_kbdmap, sizeof(struct kbdmap));
 		splx (s);
 		return;
 	}
@@ -898,9 +911,9 @@ ite_filter(c)
 		 * keypad-appmode sends SS3 followed by the above
 		 * translated character
 		 */
-		(*linesw[kbd_tty->t_line].l_rint) (27, kbd_tty);
-		(*linesw[kbd_tty->t_line].l_rint) ('O', kbd_tty);
-		(*linesw[kbd_tty->t_line].l_rint) (out[cp - in], kbd_tty);
+		(*kbd_tty->t_linesw->l_rint) (27, kbd_tty);
+		(*kbd_tty->t_linesw->l_rint) ('O', kbd_tty);
+		(*kbd_tty->t_linesw->l_rint) (out[cp - in], kbd_tty);
 		splx(s);
 		return;
 	} else {
@@ -919,7 +932,7 @@ ite_filter(c)
 		 * to the above table. This is *nasty* !
 		 */
 		if (c >= 0x3b && c <= 0x3e && kbd_ite->cursor_appmode
-		    && !bcmp(str, "\x03\x1b[", 3) &&
+		    && !memcmp(str, "\x03\x1b[", 3) &&
 		    index("ABCD", str[3]))
 			str = app_cursor + 4 * (str[3] - 'A');
 
@@ -929,11 +942,11 @@ ite_filter(c)
 		 * in the default keymap
 		 */
 		for (i = *str++; i; i--)
-			(*linesw[kbd_tty->t_line].l_rint) (*str++, kbd_tty);
+			(*kbd_tty->t_linesw->l_rint) (*str++, kbd_tty);
 		splx(s);
 		return;
 	}
-	(*linesw[kbd_tty->t_line].l_rint)(code, kbd_tty);
+	(*kbd_tty->t_linesw->l_rint)(code, kbd_tty);
 
 	splx(s);
 	return;

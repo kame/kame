@@ -1,4 +1,4 @@
-/*	$NetBSD: advnops.c,v 1.53 2000/05/19 18:54:22 thorpej Exp $	*/
+/*	$NetBSD: advnops.c,v 1.62 2001/11/12 22:59:18 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -31,7 +31,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: advnops.c,v 1.62 2001/11/12 22:59:18 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_quota.h"
 #endif
 
@@ -89,7 +92,7 @@ int	adosfs_pathconf	__P((void *));
 #define adosfs_mkdir 	genfs_eopnotsupp
 #define adosfs_mknod 	genfs_eopnotsupp
 #define adosfs_revoke	genfs_revoke
-#define adosfs_mmap 	genfs_eopnotsupp
+#define adosfs_mmap 	genfs_mmap
 #define adosfs_remove 	genfs_eopnotsupp
 #define adosfs_rename 	genfs_eopnotsupp
 #define adosfs_rmdir 	genfs_eopnotsupp
@@ -98,7 +101,7 @@ int	adosfs_pathconf	__P((void *));
 #define adosfs_update 	genfs_nullop
 #define adosfs_valloc 	genfs_eopnotsupp
 
-struct vnodeopv_entry_desc adosfs_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc adosfs_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, adosfs_lookup },		/* lookup */
 	{ &vop_create_desc, adosfs_create },		/* create */
@@ -143,10 +146,12 @@ struct vnodeopv_entry_desc adosfs_vnodeop_entries[] = {
 	{ &vop_truncate_desc, adosfs_truncate },	/* truncate */
 	{ &vop_update_desc, adosfs_update },		/* update */
 	{ &vop_bwrite_desc, adosfs_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_getpages_desc, genfs_getpages },		/* getpages */
+	{ &vop_putpages_desc, genfs_putpages },		/* putpages */
+	{ NULL, NULL }
 };
 
-struct vnodeopv_desc adosfs_vnodeop_opv_desc =
+const struct vnodeopv_desc adosfs_vnodeop_opv_desc =
 	{ &adosfs_vnodeop_p, adosfs_vnodeop_entries };
 
 int
@@ -226,6 +231,7 @@ adosfs_read(v)
 		int a_ioflag;
 		struct ucred *a_cred;
 	} */ *sp = v;
+	struct vnode *vp = sp->a_vp;
 	struct adosfsmount *amp;
 	struct anode *ap;
 	struct uio *uio;
@@ -265,15 +271,33 @@ adosfs_read(v)
 	/*
 	 * taken from ufs_read()
 	 */
+
+	if (vp->v_type == VREG && IS_FFS(amp)) {
+		error = 0;
+		while (uio->uio_resid > 0) {
+			void *win;
+			vsize_t bytelen = MIN(ap->fsize - uio->uio_offset,
+					      uio->uio_resid);
+
+			if (bytelen == 0) {
+				break;
+			}
+			win = ubc_alloc(&vp->v_uobj, uio->uio_offset,
+					&bytelen, UBC_READ);
+			error = uiomove(win, bytelen, uio);
+			ubc_release(win, 0);
+			if (error) {
+				break;
+			}
+		}
+		goto out;
+	}
+
 	do {
-		/*
-		 * we are only supporting ADosFFS currently
-		 * (which have data blocks without headers)
-		 */
 		size = amp->dbsize;
 		lbn = uio->uio_offset / size;
 		on = uio->uio_offset % size;
-		n = min((u_int)(size - on), uio->uio_resid);
+		n = MIN(size - on, uio->uio_resid);
 		diff = ap->fsize - uio->uio_offset;
 		/* 
 		 * check for EOF
@@ -293,8 +317,6 @@ adosfs_read(v)
 			brelse(bp);
 			goto reterr;
 		}
-		sp->a_vp->v_lastr = lbn;
-
 		if (!IS_FFS(amp)) {
 			if (bp->b_resid > 0)
 				error = EIO; /* OFS needs the complete block */
@@ -303,14 +325,13 @@ adosfs_read(v)
 				printf("adosfs: bad primary type blk %ld\n",
 				    bp->b_blkno / (amp->bsize / DEV_BSIZE));
 #endif
-				error=EINVAL;
-			}
-			else if ( adoscksum(bp, ap->nwords)) {
+				error = EINVAL;
+			} else if (adoscksum(bp, ap->nwords)) {
 #ifdef DIAGNOSTIC
 				printf("adosfs: blk %ld failed cksum.\n",
 				    bp->b_blkno / (amp->bsize / DEV_BSIZE));
 #endif
-				error=EINVAL;
+				error = EINVAL;
 			}
 		}
 
@@ -321,11 +342,13 @@ adosfs_read(v)
 #ifdef ADOSFS_DIAGNOSTIC
 		printf(" %d+%d-%d+%d", lbn, on, lbn, n);
 #endif
-		n = min(n, (u_int)size - bp->b_resid);
+		n = MIN(n, size - bp->b_resid);
 		error = uiomove(bp->b_data + on +
 				amp->bsize - amp->dbsize, (int)n, uio);
 		brelse(bp);
 	} while (error == 0 && uio->uio_resid > 0 && n != 0);
+
+out:
 reterr:
 #ifdef ADOSFS_DIAGNOSTIC
 	printf(" %d)", error);
@@ -460,6 +483,9 @@ adosfs_bmap(v)
 	ap = VTOA(sp->a_vp);
 	bn = sp->a_bn / (ap->amp->bsize / DEV_BSIZE);
 	bnp = sp->a_bnp;
+	if (sp->a_runp) {
+		*sp->a_runp = 0;
+	}
 	error = 0;
 
 	if (sp->a_vpp != NULL)
@@ -638,8 +664,7 @@ adosfs_readdir(v)
 
 	if (sp->a_ncookies) {
 		ncookies = 0;
-		MALLOC(cookies, off_t *, sizeof (off_t) * uavail, M_TEMP,
-		    M_WAITOK);
+		cookies = malloc(sizeof (off_t) * uavail, M_TEMP, M_WAITOK);
 		*sp->a_cookies = cookies;
 	}
 
@@ -752,7 +777,7 @@ reterr:
 #endif
 	if (sp->a_ncookies) {
 		if (error) {
-			FREE(*sp->a_cookies, M_TEMP);
+			free(*sp->a_cookies, M_TEMP);
 			*sp->a_ncookies = 0;
 			*sp->a_cookies = NULL;
 		} else
@@ -851,7 +876,7 @@ adosfs_inactive(v)
 #endif
 	VOP_UNLOCK(vp, 0);
 	/* XXX this needs to check if file was deleted */
-	vrecycle(vp, (struct simplelock *)0, p);
+	vrecycle(vp, NULL, p);
 
 #ifdef ADOSFS_DIAGNOSTIC
 	printf(" 0)");
@@ -888,7 +913,6 @@ adosfs_reclaim(v)
 	vp->v_data = NULL;
 	return(0);
 }
-
 
 /*
  * POSIX pathconf info, grabbed from kern/u fs, probably need to 

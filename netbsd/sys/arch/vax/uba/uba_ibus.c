@@ -1,4 +1,4 @@
-/*	$NetBSD: uba_ibus.c,v 1.1 1999/08/07 10:36:47 ragge Exp $	   */
+/*	$NetBSD: uba_ibus.c,v 1.4 2001/05/16 05:36:54 matt Exp $	   */
 /*
  * Copyright (c) 1996 Jonathan Stone.
  * Copyright (c) 1994, 1996 Ludd, University of Lule}, Sweden.
@@ -47,10 +47,13 @@
 #include <machine/nexus.h>
 #include <machine/cpu.h>
 #include <machine/sgmap.h>
+#include <machine/sid.h>
 
 #include <dev/qbus/ubavar.h>
 
 #include <arch/vax/uba/uba_common.h>
+
+#include "opt_cputype.h"
 
 /* Some Qbus-specific defines */
 #define	QBASIZE	(8192 * VAX_NBPG)
@@ -72,6 +75,7 @@ struct	cfattach uba_ibus_ca = {
 };
 
 extern	struct vax_bus_space vax_mem_bus_space;
+extern	struct vax_bus_dma_tag vax_bus_dma_tag;
 
 int
 qba_match(parent, vcf, aux)
@@ -102,6 +106,7 @@ qba_attach(parent, self, aux)
 	sc->uv_sc.uh_ubainit = qba_init;
 	sc->uv_sc.uh_iot = &vax_mem_bus_space;
 	sc->uv_sc.uh_dmat = &sc->uv_dmat;
+	sc->uv_sc.uh_type = UBA_QBUS;
 
 	/*
 	 * Fill in variables used by the sgmap system.
@@ -109,7 +114,14 @@ qba_attach(parent, self, aux)
 	sc->uv_size = QBASIZE;	/* Size in bytes of Qbus space */
 	sc->uv_addr = QBAMAP;	/* Physical address of map registers */
 
-	uba_dma_init(sc);
+#if VAX610 || VAXANY
+	if (vax_boardtype == VAX_BTYP_610) {
+		sc->uv_sc.uh_dmat = &vax_bus_dma_tag;
+		sc->uv_sc.uh_beforescan = NULL;
+		sc->uv_sc.uh_type = UBA_MVI;
+	} else
+#endif
+		uba_dma_init(sc);
 	uba_attach(&sc->uv_sc, QIOPAGE);
 }
 

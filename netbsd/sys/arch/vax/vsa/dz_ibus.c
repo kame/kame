@@ -1,4 +1,4 @@
-/*	$NetBSD: dz_ibus.c,v 1.18 2000/06/05 00:09:20 matt Exp $ */
+/*	$NetBSD: dz_ibus.c,v 1.24 2002/02/25 14:58:09 ad Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -13,8 +13,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *      This product includes software developed at Ludd, University of 
- *      Lule}, Sweden and its contributors.
+ *	This product includes software developed at Ludd, University of 
+ *	Lule}, Sweden and its contributors.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission
  *
@@ -50,23 +50,25 @@
 #include <machine/vsbus.h>
 #include <machine/cpu.h>
 #include <machine/scb.h>
+#include <machine/nexus.h>
 
-#include <machine/../vax/gencons.h>
+#include <arch/vax/vax/gencons.h>
 
-#include <dev/qbus/dzreg.h>
-#include <dev/qbus/dzvar.h>
+#include <dev/dec/dzreg.h>
+#include <dev/dec/dzvar.h>
 
 #include "ioconf.h"
-#include "lkc.h"
 
-static  int     dz_vsbus_match __P((struct device *, struct cfdata *, void *));
-static  void    dz_vsbus_attach __P((struct device *, struct device *, void *));
-static	int	dz_print __P((void *, const char *));
+#define DZADDR	0x25000000
+#define DZVEC	0x154
 
-static	vaddr_t dz_regs; /* Used for console */
+static	int	dz_ibus_match(struct device *, struct cfdata *, void *);
+static	void	dz_ibus_attach(struct device *, struct device *, void *);
 
-struct  cfattach dz_vsbus_ca = {
-	sizeof(struct dz_softc), dz_vsbus_match, dz_vsbus_attach
+static	vaddr_t idz_regs; /* Used for console */
+
+struct	cfattach dz_ibus_ca = {
+	sizeof(struct dz_softc), dz_ibus_match, dz_ibus_attach
 };
 
 #define REG(name)     short name; short X##name##X;
@@ -79,58 +81,39 @@ static volatile struct ss_dz {/* base address of DZ-controller: 0x200A0000 */
 	REG(lpr1);	/* 14 Lpr0: */
 	REG(lpr2);	/* 18 Lpr0: */
 	REG(lpr3);	/* 1C Lpr0: */
-} *dz;
+} *idz;
 #undef REG
 
-cons_decl(dz);
-
-int
-dz_print(aux, name)
-	void *aux;
-	const char *name;
-{
-	if (name)
-		printf ("lkc at %s", name);
-	return (UNCONF);
-}
+cons_decl(idz);
 
 static int
-dz_vsbus_match(parent, cf, aux)
+dz_ibus_match(parent, cf, aux)
 	struct device *parent;
 	struct cfdata *cf;
 	void *aux;
 {
-	struct vsbus_attach_args *va = aux;
-	struct ss_dz *dzP;
-	short i;
+	struct bp_conf *bp = aux;
 
-	dzP = (struct ss_dz *)va->va_addr;
-	i = dzP->tcr;
-	dzP->csr = DZ_CSR_MSE|DZ_CSR_TXIE;
-	dzP->tcr = 0;
-	DELAY(1000);
-	dzP->tcr = 1;
-	DELAY(100000);
-	dzP->tcr = i;
-
-	/* If the device doesn't exist, no interrupt has been generated */
-	return 1;
+	if (strcmp(bp->type, "dz") == 0)
+		return 1;
+	return 0;
 }
 
 static void
-dz_vsbus_attach(parent, self, aux)
+dz_ibus_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
-	struct  dz_softc *sc = (void *)self;
-	struct vsbus_attach_args *va = aux;
+	struct	dz_softc *sc = (void *)self;
+	struct ss_dz *dzP;
+	int i, vec, br;
 
 	/* 
 	 * XXX - This is evil and ugly, but...
 	 * due to the nature of how bus_space_* works on VAX, this will
 	 * be perfectly good until everything is converted.
 	 */
-	sc->sc_ioh = dz_regs;
+	sc->sc_ioh = idz_regs;
 	sc->sc_dr.dr_csr = 0;
 	sc->sc_dr.dr_rbuf = 4;
 	sc->sc_dr.dr_dtr = 9;
@@ -142,23 +125,31 @@ dz_vsbus_attach(parent, self, aux)
 
 	sc->sc_type = DZ_DZV;
 
+	scb_vecref(0, 0);
+	dzP = (struct ss_dz *)idz_regs;
+	i = dzP->tcr;
+	dzP->csr = DZ_CSR_MSE|DZ_CSR_TXIE;
+	dzP->tcr = 0;
+	DELAY(1000);
+	dzP->tcr = 1;
+	DELAY(100000);
+	dzP->tcr = i;
+	i = scb_vecref(&vec, &br);
+	printf(": vec %o ipl %x", vec, br);
+	if(i == 0 || vec == 0) printf(" -> NO INT!");
+
 	sc->sc_dsr = 0x0f; /* XXX check if VS has modem ctrl bits */
 
-	scb_vecalloc(va->va_cvec, dzxint, sc, SCB_ISTACK, &sc->sc_tintrcnt);
-	scb_vecalloc(va->va_cvec - 4, dzrint, sc, SCB_ISTACK, &sc->sc_rintrcnt);
+	scb_vecalloc(DZVEC, dzxint, sc, SCB_ISTACK, &sc->sc_tintrcnt);
+	scb_vecalloc(DZVEC - 4, dzrint, sc, SCB_ISTACK, &sc->sc_rintrcnt);
 
 	printf("\n%s: 4 lines", self->dv_xname);
 
 	dzattach(sc, NULL);
-
-	if (((vax_confdata & 0x80) == 0) ||/* workstation, have lkc */
-	    (vax_boardtype == VAX_BTYP_48))
-		if (cn_tab->cn_pri > CN_NORMAL) /* Passed cnsl detect */
-			config_found(self, 0, dz_print);
 }
 
 int
-dzcngetc(dev) 
+idzcngetc(dev) 
 	dev_t dev;
 {
 	int c = 0;
@@ -166,9 +157,9 @@ dzcngetc(dev)
 	u_short rbuf;
 
 	do {
-		while ((dz->csr & 0x80) == 0)
+		while ((idz->csr & 0x80) == 0)
 			; /* Wait for char */
-		rbuf = dz->rbuf;
+		rbuf = idz->rbuf;
 		if (((rbuf >> 8) & 3) != mino)
 			continue;
 		c = rbuf & 0x7f;
@@ -180,135 +171,70 @@ dzcngetc(dev)
 	return (c);
 }
 
-#define	DZMAJOR	1
+#define	DZMAJOR 1
 
 void
-dzcnprobe(cndev)
+idzcnprobe(cndev)
 	struct	consdev *cndev;
 {
 	extern	vaddr_t iospace;
 	int diagcons;
-	paddr_t ioaddr = 0x200A0000;
+	paddr_t ioaddr = DZADDR;
 
-	switch (vax_boardtype) {
-	case VAX_BTYP_410:
-	case VAX_BTYP_420:
-	case VAX_BTYP_43:
-		diagcons = (vax_confdata & 0x20 ? 3 : 0);
-		break;
+	/* not fine... but for now only KA53 is known to have dz@ibus */
 
-	case VAX_BTYP_46:
-	case VAX_BTYP_48:
-		diagcons = (vax_confdata & 0x100 ? 3 : 0);
-		break;
-
-	case VAX_BTYP_49:
-		ioaddr = 0x25000000;
-		diagcons = 3;
-		break;
-
-	default:
+	if(vax_boardtype != VAX_BTYP_53) {
 		cndev->cn_pri = CN_DEAD;
 		return;
 	}
-	if (diagcons)
-		cndev->cn_pri = CN_REMOTE;
-	else
-		cndev->cn_pri = CN_NORMAL;
+
+	diagcons = 3;
+	cndev->cn_pri = CN_NORMAL;
 	cndev->cn_dev = makedev(DZMAJOR, diagcons);
-	dz_regs = iospace;
+	idz_regs = iospace;
 	ioaccess(iospace, ioaddr, 1);
 }
 
 void
-dzcninit(cndev)
+idzcninit(cndev)
 	struct	consdev *cndev;
 {
-	dz = (void*)dz_regs;
+	idz = (void*)idz_regs;
 
-	dz->csr = 0;    /* Disable scanning until initting is done */
-	dz->tcr = (1 << minor(cndev->cn_dev));    /* Turn on xmitter */
-	dz->csr = 0x20; /* Turn scanning back on */
+	idz->csr = 0;	 /* Disable scanning until initting is done */
+	idz->tcr = (1 << minor(cndev->cn_dev));	   /* Turn on xmitter */
+	idz->csr = 0x20; /* Turn scanning back on */
 }
 
 
 void
-dzcnputc(dev,ch)
+idzcnputc(dev,ch)
 	dev_t	dev;
 	int	ch;
 {
-	int timeout = 1<<15;            /* don't hang the machine! */
+	int timeout = 1<<15;		/* don't hang the machine! */
 	int mino = minor(dev);
 	u_short tcr;
 
 	if (mfpr(PR_MAPEN) == 0)
 		return;
 
-	tcr = dz->tcr;	/* remember which lines to scan */
-	dz->tcr = (1 << mino);
+	tcr = idz->tcr; /* remember which lines to scan */
+	idz->tcr = (1 << mino);
 
-	while ((dz->csr & 0x8000) == 0) /* Wait until ready */
+	while ((idz->csr & 0x8000) == 0) /* Wait until ready */
 		if (--timeout < 0)
 			break;
-	dz->tdr = ch;                    /* Put the  character */
+	idz->tdr = ch;			  /* Put the  character */
 	timeout = 1<<15;
-	while ((dz->csr & 0x8000) == 0) /* Wait until ready */
+	while ((idz->csr & 0x8000) == 0) /* Wait until ready */
 		if (--timeout < 0)
 			break;
 
-	dz->tcr = tcr;
+	idz->tcr = tcr;
 }
 
-void 
-dzcnpollc(dev, pollflag)
-	dev_t dev;
-	int pollflag;
+void    
+idzcnpollc(dev_t dev, int pollflag)
 {
-	static	u_char mask;
-
-	if (pollflag)
-		mask = vsbus_setmask(0);
-	else
-		vsbus_setmask(mask);
 }
-
-#if NLKC
-cons_decl(lkc);
-
-void
-lkccninit(cndev)
-	struct	consdev *cndev;
-{
-	dz = (void*)dz_regs;
-
-	dz->csr = 0;    /* Disable scanning until initting is done */
-	dz->tcr = 1;    /* Turn off all but line 0's xmitter */
-	dz->rbuf = 0x1c18; /* XXX */
-	dz->csr = 0x20; /* Turn scanning back on */
-}
-
-int
-lkccngetc(dev) 
-	dev_t dev;
-{
-	int lkc_decode(int);
-	int c;
-//	u_char mask;
-
-	
-//	mask = vsbus_setmask(0);	/* save old state */
-
-loop:
-	while ((dz->csr & 0x80) == 0)
-		; /* Wait for char */
-
-	c = lkc_decode(dz->rbuf & 255);
-	if (c < 1)
-		goto loop;
-
-//	vsbus_clrintr(0x80); /* XXX */
-//	vsbus_setmask(mask);
-
-	return (c);
-}
-#endif

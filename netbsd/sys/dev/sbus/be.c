@@ -1,4 +1,4 @@
-/*	$NetBSD: be.c,v 1.20.4.1 2000/07/19 02:53:03 mrg Exp $	*/
+/*	$NetBSD: be.c,v 1.31 2002/03/20 20:39:15 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -62,6 +62,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: be.c,v 1.31 2002/03/20 20:39:15 eeh Exp $");
 
 #include "opt_ddb.h"
 #include "opt_inet.h"
@@ -254,46 +257,50 @@ beattach(parent, self, aux)
 		return;
 	}
 
-	if (bus_space_map2(sa->sa_bustag,
-			  (bus_type_t)sa->sa_reg[0].sbr_slot,
-			  (bus_addr_t)sa->sa_reg[0].sbr_offset,
+	if (bus_space_map(sa->sa_bustag,
+			  (bus_addr_t)BUS_ADDR(
+				sa->sa_reg[0].sbr_slot,
+				sa->sa_reg[0].sbr_offset),
 			  (bus_size_t)sa->sa_reg[0].sbr_size,
-			  BUS_SPACE_MAP_LINEAR, 0, &sc->sc_cr) != 0) {
+			  0, &sc->sc_cr) != 0) {
 		printf("beattach: cannot map registers\n");
 		return;
 	}
 
-	if (bus_space_map2(sa->sa_bustag,
-			  (bus_type_t)sa->sa_reg[1].sbr_slot,
-			  (bus_addr_t)sa->sa_reg[1].sbr_offset,
+	if (bus_space_map(sa->sa_bustag,
+			  (bus_addr_t)BUS_ADDR(
+				sa->sa_reg[1].sbr_slot,
+				sa->sa_reg[1].sbr_offset),
 			  (bus_size_t)sa->sa_reg[1].sbr_size,
-			  BUS_SPACE_MAP_LINEAR, 0, &sc->sc_br) != 0) {
+			  0, &sc->sc_br) != 0) {
 		printf("beattach: cannot map registers\n");
 		return;
 	}
 
-	if (bus_space_map2(sa->sa_bustag,
-			  (bus_type_t)sa->sa_reg[2].sbr_slot,
-			  (bus_addr_t)sa->sa_reg[2].sbr_offset,
+	if (bus_space_map(sa->sa_bustag,
+			  (bus_addr_t)BUS_ADDR(
+				sa->sa_reg[2].sbr_slot,
+				sa->sa_reg[2].sbr_offset),
 			  (bus_size_t)sa->sa_reg[2].sbr_size,
-			  BUS_SPACE_MAP_LINEAR, 0, &sc->sc_tr) != 0) {
+			  0, &sc->sc_tr) != 0) {
 		printf("beattach: cannot map registers\n");
 		return;
 	}
 
+	sc->sc_bustag = sa->sa_bustag;
 	sc->sc_qec = qec;
 	sc->sc_qr = qec->sc_regs;
 
-	sc->sc_rev = getpropint(node, "board-version", -1);
+	sc->sc_rev = PROM_getpropint(node, "board-version", -1);
 	printf(" rev %x", sc->sc_rev);
 
 	bestop(sc);
 
-	sc->sc_channel = getpropint(node, "channel#", -1);
+	sc->sc_channel = PROM_getpropint(node, "channel#", -1);
 	if (sc->sc_channel == -1)
 		sc->sc_channel = 0;
 
-	sc->sc_burst = getpropint(node, "burst-sizes", -1);
+	sc->sc_burst = PROM_getpropint(node, "burst-sizes", -1);
 	if (sc->sc_burst == -1)
 		sc->sc_burst = qec->sc_burst;
 
@@ -336,26 +343,27 @@ beattach(parent, self, aux)
 		return;
 	}
 
-	/* Load the buffer */
-	if ((error = bus_dmamap_load_raw(dmatag, sc->sc_dmamap,
-				&seg, rseg, size, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: DMA buffer map load error %d\n",
-			self->dv_xname, error);
-		bus_dmamem_free(dmatag, &seg, rseg);
-		return;
-	}
-	sc->sc_rb.rb_dmabase = sc->sc_dmamap->dm_segs[0].ds_addr;
-
 	/* Map DMA memory in CPU addressable space */
 	if ((error = bus_dmamem_map(sa->sa_dmatag, &seg, rseg, size,
 			            &sc->sc_rb.rb_membase,
 			            BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
 		printf("%s: DMA buffer map error %d\n",
 			self->dv_xname, error);
-		bus_dmamap_unload(dmatag, sc->sc_dmamap);
 		bus_dmamem_free(sa->sa_dmatag, &seg, rseg);
 		return;
 	}
+
+	/* Load the buffer */
+	if ((error = bus_dmamap_load(dmatag, sc->sc_dmamap,
+				     sc->sc_rb.rb_membase, size, NULL,
+				     BUS_DMA_NOWAIT)) != 0) {
+		printf("%s: DMA buffer map load error %d\n",
+			self->dv_xname, error);
+		bus_dmamem_unmap(dmatag, sc->sc_rb.rb_membase, size);
+		bus_dmamem_free(dmatag, &seg, rseg);
+		return;
+	}
+	sc->sc_rb.rb_dmabase = sc->sc_dmamap->dm_segs[0].ds_addr;
 
 	/*
 	 * Initialize our media structures and MII info.
@@ -470,14 +478,11 @@ beattach(parent, self, aux)
 	ifp->if_watchdog = bewatchdog;
 	ifp->if_flags =
 		IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 }
 
 
@@ -635,7 +640,7 @@ bestart(ifp)
 	bix = sc->sc_rb.rb_tdhead;
 
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 
@@ -1095,7 +1100,7 @@ beinit(sc)
 	u_int8_t *ea;
 	int s;
 
-	s = splimp();
+	s = splnet();
 
 	qec_meminit(&sc->sc_rb, BE_PKT_BUF_SZ);
 

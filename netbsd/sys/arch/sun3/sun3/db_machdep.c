@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.c,v 1.14 1999/10/28 06:55:31 lukem Exp $	*/
+/*	$NetBSD: db_machdep.c,v 1.17 2001/05/28 22:00:12 chs Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -53,29 +53,20 @@
 
 #include <ddb/db_command.h>
 #include <ddb/db_output.h>
+#include <ddb/db_interface.h>
 
 static void db_mach_abort   __P((db_expr_t, int, db_expr_t, char *));
 static void db_mach_halt    __P((db_expr_t, int, db_expr_t, char *));
 static void db_mach_reboot  __P((db_expr_t, int, db_expr_t, char *));
 static void db_mach_pagemap __P((db_expr_t, int, db_expr_t, char *));
 
-struct db_command db_machine_cmds[] = {
+const struct db_command db_machine_command_table[] = {
 	{ "abort",	db_mach_abort,	0,	0 },
 	{ "halt",	db_mach_halt,	0,	0 },
 	{ "pgmap",	db_mach_pagemap, 	CS_SET_DOT, 0 },
 	{ "reboot",	db_mach_reboot,	0,	0 },
-	{ (char *)0, }
+	{ NULL }
 };
-
-/*
- * This is called before ddb_init() to install the
- * machine-specific command table. (see machdep.c)
- */
-void
-db_machine_init()
-{
-	db_machine_commands_install(db_machine_cmds);
-}
 
 /*
  * Machine-specific ddb commands for the sun3:
@@ -131,13 +122,16 @@ db_mach_pagemap(addr, have_addr, count, modif)
 	int sme;
 
 	sme = get_segmap(va);
-	if (sme == 0xFF) pte = 0;
-	else pte = get_pte(va);
-	db_printf("0x%08x [%02x] 0x%08x", va, sme, pte);
+	if (sme == 0xFF) {
+		pte = 0;
+	} else {
+		pte = get_pte(va);
+	}
+	db_printf("0x%08lx [%02x] 0x%08x", va, sme, pte);
 #endif /* SUN3 */
 #ifdef	_SUN3X_
 	pte = get_pte(va);
-	db_printf("0x%08x 0x%08x", va, pte);
+	db_printf("0x%08lx 0x%08x", va, pte);
 #endif /* SUN3X */
 
 	pte_print(pte);
@@ -150,7 +144,7 @@ pte_print(pte)
 	int pte;
 {
 	int t;
-	static char *pgt_names[] = {
+	static const char *pgt_names[] = {
 		"MEM", "OBIO", "VMES", "VMEL",
 	};
 
@@ -170,8 +164,8 @@ pte_print(pte)
 		t = (pte >> PG_TYPE_SHIFT) & 3;
 		db_printf(" %s", pgt_names[t]);
 		db_printf(" PA=0x%x\n", PG_PA(pte));
-	}
-	else db_printf(" INVALID\n");
+	} else
+		db_printf(" INVALID\n");
 }
 #endif	/* SUN3 */
 
@@ -191,7 +185,7 @@ pte_print(pte)
 		if (pte & MMU_SHORT_PTE_WP)
 			db_printf(" WP");
 		db_printf(" DT%d\n", pte & MMU_SHORT_PTE_DT);
-	}
-	else db_printf(" INVALID\n");
+	} else
+		db_printf(" INVALID\n");
 }
 #endif	/* SUN3X */

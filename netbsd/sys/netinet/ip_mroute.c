@@ -1,4 +1,43 @@
-/*	$NetBSD: ip_mroute.c,v 1.50.4.1 2001/04/06 00:25:03 he Exp $	*/
+/*	$NetBSD: ip_mroute.c,v 1.59.8.1 2002/08/02 00:39:23 lukem Exp $	*/
+
+/*
+ * Copyright (c) 1989 Stephen Deering
+ * Copyright (c) 1992, 1993
+ *      The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Stephen Deering of Stanford University.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by the University of
+ *      California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *      @(#)ip_mroute.c 8.2 (Berkeley) 11/15/93
+ */
 
 /*
  * IP multicast forwarding procedures
@@ -13,6 +52,9 @@
  *
  * MROUTING Revision: 1.2
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.59.8.1 2002/08/02 00:39:23 lukem Exp $");
 
 #include "opt_ipsec.h"
 
@@ -41,6 +83,7 @@
 #include <netinet/igmp.h>
 #include <netinet/igmp_var.h>
 #include <netinet/ip_mroute.h>
+#include <netinet/ip_encap.h>
 
 #include <machine/stdarg.h>
 
@@ -81,6 +124,17 @@ u_int		rsvpdebug = 0;	  /* rsvp debug level   */
 extern struct socket *ip_rsvpd;
 extern int rsvp_on;
 #endif /* RSVP_ISI */
+
+/* vif attachment using sys/netinet/ip_encap.c */
+extern struct domain inetdomain;
+static void vif_input __P((struct mbuf *, ...));
+static int vif_encapcheck __P((const struct mbuf *, int, int, void *));
+static struct protosw vif_protosw =
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
+  vif_input,	rip_output,	0,		rip_ctloutput,
+  rip_usrreq,
+  0,            0,              0,              0,
+};
 
 #define		EXPIRE_TIMEOUT	(hz / 4)	/* 4x / second */
 #define		UPCALL_EXPIRE	6		/* number of timeouts */
@@ -160,12 +214,11 @@ struct ip multicast_encap_iphdr = {
  * Private variables.
  */
 static vifi_t	   numvifs = 0;
-static int have_encap_tunnel = 0;
 
 static struct callout expire_upcalls_ch;
 
 /*
- * one-back cache used by mrt_ipip_input to locate a tunnel's vif
+ * one-back cache used by vif_encapcheck to locate a tunnel's vif
  * given a datagram's src ip address.
  */
 static struct in_addr last_encap_src;
@@ -189,8 +242,7 @@ static int pim_assert;
 	struct mfc *_rt; \
 	(rt) = 0; \
 	++mrtstat.mrts_mfc_lookups; \
-	for (_rt = mfchashtbl[MFCHASH(o, g)].lh_first; \
-	     _rt; _rt = _rt->mfc_hash.le_next) { \
+	LIST_FOREACH(_rt, &mfchashtbl[MFCHASH(o, g)], mfc_hash) { \
 		if (in_hosteq(_rt->mfc_origin, (o)) && \
 		    in_hosteq(_rt->mfc_mcastgrp, (g)) && \
 		    _rt->mfc_stall == 0) { \
@@ -413,7 +465,8 @@ ip_mrouter_init(so, m)
 
 	ip_mrouter = so;
 
-	mfchashtbl = hashinit(MFCTBLSIZ, M_MRTABLE, M_WAITOK, &mfchash);
+	mfchashtbl =
+	    hashinit(MFCTBLSIZ, HASH_LIST, M_MRTABLE, M_WAITOK, &mfchash);
 	bzero((caddr_t)nexpire, sizeof(nexpire));
 
 	pim_assert = 0;
@@ -459,8 +512,8 @@ ip_mrouter_done()
 	for (i = 0; i < MFCTBLSIZ; i++) {
 		struct mfc *rt, *nrt;
 
-		for (rt = mfchashtbl[i].lh_first; rt; rt = nrt) {
-			nrt = rt->mfc_hash.le_next;
+		for (rt = LIST_FIRST(&mfchashtbl[i]); rt; rt = nrt) {
+			nrt = LIST_NEXT(rt, mfc_hash);
 			
 			expire_mfc(rt);
 		}
@@ -470,7 +523,6 @@ ip_mrouter_done()
 	mfchashtbl = 0;
 	
 	/* Reset de-encapsulation cache. */
-	have_encap_tunnel = 0;
 	
 	ip_mrouter = 0;
 	
@@ -563,6 +615,12 @@ add_vif(m)
 			return (EOPNOTSUPP);
 		}
 
+		/* attach this vif to decapsulator dispatch table */
+		vifp->v_encap_cookie = encap_attach_func(AF_INET, IPPROTO_IPV4,
+		    vif_encapcheck, &vif_protosw, vifp);
+		if (!vifp->v_encap_cookie)
+			return (EINVAL);
+
 		/* Create a fake encapsulation interface. */
 		ifp = (struct ifnet *)malloc(sizeof(*ifp), M_MRTABLE, M_WAITOK);
 		bzero(ifp, sizeof(*ifp));
@@ -570,9 +628,6 @@ add_vif(m)
 
 		/* Prepare cached route entry. */
 		bzero(&vifp->v_route, sizeof(vifp->v_route));
-
-		/* Tell mrt_ipip_input() to start looking at encapsulated packets. */
-		have_encap_tunnel = 1;
 	} else {
 		/* Use the physical interface associated with the address. */
 		ifp = ifa->ifa_ifp;
@@ -647,6 +702,10 @@ reset_vif(vifp)
 	struct ifreq ifr;
 
 	callout_stop(&vifp->v_repq_ch);
+
+	/* detach this vif from decapsulator dispatch table */
+	encap_detach(vifp->v_encap_cookie);
+	vifp->v_encap_cookie = NULL;
 
 	for (m = vifp->tbf_q; m != 0; m = n) {
 		n = m->m_nextpkt;
@@ -784,7 +843,7 @@ add_mfc(m)
 	 */
 	nstl = 0;
 	hash = MFCHASH(mfccp->mfcc_origin, mfccp->mfcc_mcastgrp);
-	for (rt = mfchashtbl[hash].lh_first; rt; rt = rt->mfc_hash.le_next) {
+	LIST_FOREACH(rt, &mfchashtbl[hash], mfc_hash) {
 		if (in_hosteq(rt->mfc_origin, mfccp->mfcc_origin) &&
 		    in_hosteq(rt->mfc_mcastgrp, mfccp->mfcc_mcastgrp) &&
 		    rt->mfc_stall != 0) {
@@ -971,6 +1030,11 @@ ip_mforward(m, ifp)
     vifi_t vifi;
 #endif /* RSVP_ISI */
 
+    /*
+     * Clear any in-bound checksum flags for this packet.
+     */
+    m->m_pkthdr.csum_flags = 0;
+
     if (mrtdebug & DEBUG_FORWARD)
 	log(LOG_DEBUG, "ip_mforward: src %x, dst %x, ifp %p\n",
 	    ntohl(ip->ip_src.s_addr), ntohl(ip->ip_dst.s_addr), ifp);
@@ -1077,7 +1141,7 @@ ip_mforward(m, ifp)
 	    
 	/* is there an upcall waiting for this packet? */
 	hash = MFCHASH(ip->ip_src, ip->ip_dst);
-	for (rt = mfchashtbl[hash].lh_first; rt; rt = rt->mfc_hash.le_next) {
+	LIST_FOREACH(rt, &mfchashtbl[hash], mfc_hash) {
 	    if (in_hosteq(ip->ip_src, rt->mfc_origin) &&
 		in_hosteq(ip->ip_dst, rt->mfc_mcastgrp) &&
 		rt->mfc_stall != 0)
@@ -1194,8 +1258,8 @@ expire_upcalls(v)
 		if (nexpire[i] == 0)
 			continue;
 
-		for (rt = mfchashtbl[i].lh_first; rt; rt = nrt) {
-			nrt = rt->mfc_hash.le_next;
+		for (rt = LIST_FIRST(&mfchashtbl[i]); rt; rt = nrt) {
+			nrt = LIST_NEXT(rt, mfc_hash);
 
 			if (rt->mfc_expire == 0 ||
 			    --rt->mfc_expire > 0)
@@ -1242,7 +1306,7 @@ ip_mdq(m, ifp, rt)
 /*
  * Macro to send packet on vif.  Since RSVP packets don't get counted on
  * input, they shouldn't get counted on output, so statistics keeping is
- * seperate.
+ * separate.
  */
 #define MC_SEND(ip,vifp,m) {                             \
                 if ((vifp)->v_flags & VIFF_TUNNEL)	 \
@@ -1445,67 +1509,42 @@ encap_send(ip, vifp, m)
 }
 
 /*
- * De-encapsulate a packet and feed it back through ip input (this
- * routine is called whenever IP gets a packet with proto type
- * ENCAP_PROTO and a local destination address).
- *
- * Return 1 if we handled the packet, 0 if we did not.
- *
- * Called from encap4_input() in sys/netinet/ip_encap.c.
+ * De-encapsulate a packet and feed it back through ip input.
  */
-int
-mrt_ipip_input(m, hlen)
+static void
+#if __STDC__
+vif_input(struct mbuf *m, ...)
+#else
+vif_input(m, va_alist)
 	struct mbuf *m;
-	int hlen;
+	va_dcl
+#endif
 {
-	struct ip *ip = mtod(m, struct ip *);
+	int off, proto;
+	va_list ap;
+	struct ip *ip;
+	struct vif *vifp;
 	int s;
 	struct ifqueue *ifq;
-	struct vif *vifp;
 
-	if (!have_encap_tunnel)
-		return (0);
+	va_start(ap, m);
+	off = va_arg(ap, int);
+	proto = va_arg(ap, int);
+	va_end(ap);
 
-	/*
-	 * dump the packet if it's not to a multicast destination or if
-	 * we don't have an encapsulating tunnel with the source.
-	 * Note:  This code assumes that the remote site IP address
-	 * uniquely identifies the tunnel (i.e., that this site has
-	 * at most one tunnel with the remote site).
-	 */
-	if (!IN_MULTICAST(((struct ip *)((char *)ip + hlen))->ip_dst.s_addr)) {
-		++mrtstat.mrts_bad_tunnel;
-		return (0);
+	vifp = (struct vif *)encap_getarg(m);
+	if (!vifp || proto != AF_INET) {
+		m_freem(m);
+		mrtstat.mrts_bad_tunnel++;
+		return;
 	}
 
-	if (!in_hosteq(ip->ip_src, last_encap_src)) {
-		struct vif *vife;
-	
-		vifp = viftable;
-		vife = vifp + numvifs;
-		for (; vifp < vife; vifp++)
-			if (vifp->v_flags & VIFF_TUNNEL &&
-			    in_hosteq(vifp->v_rmt_addr, ip->ip_src))
-				break;
-		if (vifp == vife) {
-			mrtstat.mrts_cant_tunnel++; /*XXX*/
-			if (mrtdebug)
-				log(LOG_DEBUG,
-				    "ip_mforward: no tunnel with %x\n",
-				    ntohl(ip->ip_src.s_addr));
-			return (0);
-		}
-		last_encap_vif = vifp;
-		last_encap_src = ip->ip_src;
-	} else
-		vifp = last_encap_vif;
+	ip = mtod(m, struct ip *);
 
-	m->m_data += hlen;
-	m->m_len -= hlen;
-	m->m_pkthdr.len -= hlen;
+	m_adj(m, off);
 	m->m_pkthdr.rcvif = vifp->v_ifp;
 	ifq = &ipintrq;
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);
@@ -1520,7 +1559,55 @@ mrt_ipip_input(m, hlen)
 		 */
 	}
 	splx(s);
-	return (1);
+}
+
+/*
+ * Check if the packet should be grabbed by us.
+ */
+static int
+vif_encapcheck(m, off, proto, arg)
+	const struct mbuf *m;
+	int off;
+	int proto;
+	void *arg;
+{
+	struct vif *vifp;
+	struct ip ip;
+
+#ifdef DIAGNOSTIC
+	if (!arg || proto != IPPROTO_IPV4)
+		panic("unexpected arg in vif_encapcheck");
+#endif
+
+	/*
+	 * do not grab the packet if it's not to a multicast destination or if
+	 * we don't have an encapsulating tunnel with the source.
+	 * Note:  This code assumes that the remote site IP address
+	 * uniquely identifies the tunnel (i.e., that this site has
+	 * at most one tunnel with the remote site).
+	 */
+
+	/* LINTED const cast */
+	m_copydata((struct mbuf *)m, off, sizeof(ip), (caddr_t)&ip);
+	if (!IN_MULTICAST(ip.ip_dst.s_addr))
+		return 0;
+
+	/* LINTED const cast */
+	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
+	if (!in_hosteq(ip.ip_src, last_encap_src)) {
+		vifp = (struct vif *)arg;
+		if (vifp->v_flags & VIFF_TUNNEL &&
+		    in_hosteq(vifp->v_rmt_addr, ip.ip_src))
+			;
+		else
+			return 0;
+		last_encap_vif = vifp;
+		last_encap_src = ip.ip_src;
+	} else
+		vifp = last_encap_vif;
+
+	/* 32bit match, since we have checked ip_src only */
+	return 32;
 }
 
 /*

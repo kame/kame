@@ -1,4 +1,4 @@
-/* $NetBSD: disksubr.c,v 1.9 2000/05/19 18:54:24 thorpej Exp $ */
+/* $NetBSD: disksubr.c,v 1.12 2002/02/19 17:09:44 wiz Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Gordon W. Ross
@@ -80,13 +80,16 @@
  * It is found that LUNA Mach2.5 has BSD label embedded at offset 64
  * retaining UniOS/ISI label at the end of label block.  LUNA Mach
  * manipulates BSD disklabel in the same manner as 4.4BSD.  It's
- * uncertain LUNA Mach can create a disklabel on fresh disks;
- * writedisklabel fails when no BSD label is found.
+ * uncertain LUNA Mach can create a disklabel on fresh disks since
+ * Mach writedisklabel logic seems to fail when no BSD label is found.
  *
- * NetBSD/luna68k (1) creates UniOS/ISI label with BSD label
- * embedded at offset 64, (2) reads BSD label if found, (3) falls
- * back to reading UniOS/ISI label when no BSD label is found.  Plus,
- * (4) reads SunOS label if found in place of UniOS/ISI label.
+ * Kernel handles disklabel in this way;
+ *	- searchs BSD label at offset 64
+ *	- if not found, searchs UniOS/ISI label at the end of block
+ *	- kernel can distinguish whether it was SunOS label or UniOS/ISI
+ *	  label and understand both
+ *	- kernel writes UniOS/ISI label combined with BSD label to update
+ *	  the label block
  */
 
 #if LABELSECTOR != 0
@@ -98,7 +101,7 @@ static int disklabel_bsd_to_om __P((struct disklabel *, char *));
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl, secsize and anything required for a block i/o read
  * operation in the driver's strategy/start routines
@@ -136,7 +139,7 @@ readdisklabel(dev, strat, lp, clp)
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 
 	/* if successful, locate disk label within block and validate */
@@ -145,7 +148,6 @@ readdisklabel(dev, strat, lp, clp)
 		/* Save the whole block in case it has info we need. */
 		bcopy(bp->b_data, clp->cd_block, sizeof(clp->cd_block));
 	}
-	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 	if (error)
 		return ("disk label read error");
@@ -249,7 +251,7 @@ writedisklabel(dev, strat, lp, clp)
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_WRITE;
+	bp->b_flags |= B_WRITE;
 	(*strat)(bp);
 	error = biowait(bp);
 	brelse(bp);

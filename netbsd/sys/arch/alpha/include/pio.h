@@ -1,4 +1,4 @@
-/*	$NetBSD: pio.h,v 1.5.2.1 2001/01/25 20:45:39 jhawk Exp $	*/
+/*	$NetBSD: pio.h,v 1.6 2001/01/07 03:59:31 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

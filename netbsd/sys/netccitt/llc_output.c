@@ -1,4 +1,4 @@
-/*	$NetBSD: llc_output.c,v 1.5 2000/03/30 13:53:34 augustss Exp $	*/
+/*	$NetBSD: llc_output.c,v 1.8 2001/12/04 17:56:37 wiz Exp $	*/
 
 /* 
  * Copyright (c) 1990, 1991, 1992
@@ -42,6 +42,9 @@
  *	@(#)llc_output.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: llc_output.c,v 1.8 2001/12/04 17:56:37 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -78,7 +81,7 @@ llc_output(m, va_alist)
 #endif
 {
 	struct llc_linkcb *linkp;
-	int    i = splimp();
+	int    i = splnet();
 	va_list ap;
 
 	va_start(ap, m);
@@ -249,7 +252,7 @@ llc_rawsend(linkp, m, frame, frame_kind, vs, cmdrsp, pollfinal)
 		break;
 	case LLCFT_FRMR:
 		frame->llc_control = LLC_FRMR;
-		/* get more space --- FRMR frame are longer then usual */
+		/* get more space --- FRMR frame are longer than usual */
 		LLC_SETLEN(m, LLC_FRMRLEN);
 		bcopy((caddr_t) & linkp->llcl_frmrinfo,
 		      (caddr_t) & frame->llc_frmrinfo,

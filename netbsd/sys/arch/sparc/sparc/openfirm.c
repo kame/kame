@@ -1,4 +1,4 @@
-/*	$NetBSD: openfirm.c,v 1.1 1999/02/14 12:23:03 pk Exp $	*/
+/*	$NetBSD: openfirm.c,v 1.6 2001/12/11 03:35:02 uwe Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -188,7 +188,7 @@ int
 OF_setprop(handle, prop, buf, buflen)
 	int handle;
 	char *prop;
-	void *buf;
+	const void *buf;
 	int buflen;
 {
 	struct {
@@ -358,10 +358,14 @@ OF_call_method(method, ihandle, nargs, nreturns, va_alist)
 	va_start(ap, nreturns);
 	for (ip = (long*)(args.args_n_results + (n = nargs)); --n >= 0;)
 		*--ip = va_arg(ap, unsigned long);
-	if (openfirmware(&args) == -1)
+	if (openfirmware(&args) == -1) {
+		va_end(ap);
 		return -1;
-	if (args.args_n_results[nargs])
+	}
+	if (args.args_n_results[nargs]) {
+		va_end(ap);
 		return args.args_n_results[nargs];
+	}
 	for (ip = (long*)(args.args_n_results + nargs + (n = args.nreturns)); --n > 0;)
 		*va_arg(ap, unsigned long *) = *--ip;
 	va_end(ap);
@@ -635,7 +639,13 @@ OF_enter()
 	args.name = ADR2CELL("enter");
 	args.nargs = 0;
 	args.nreturns = 0;
+#if defined(MSIIEP)
+	msiiep_swap_endian(0);
+#endif
 	openfirmware(&args);
+#if defined(MSIIEP)
+	msiiep_swap_endian(1);
+#endif
 }
 
 void
@@ -650,7 +660,13 @@ OF_exit()
 	args.name = ADR2CELL("exit");
 	args.nargs = 0;
 	args.nreturns = 0;
+#if defined(MSIIEP)
+	msiiep_swap_endian(0);
+#endif
 	openfirmware(&args);
+#if defined(MSIIEP)
+	msiiep_swap_endian(1);
+#endif
 	panic("OF_exit failed");
 }
 
@@ -749,7 +765,7 @@ OF_milliseconds()
 	return (args.ticks);
 }
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -757,6 +773,8 @@ OF_milliseconds()
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
+
+int obp_symbol_debug = 0;
 
 void OF_sym2val(cells)
 	void *cells;
@@ -786,8 +804,11 @@ void OF_sym2val(cells)
 		return;
 	} 
 	symbol = (db_sym_t)args->symbol;
-prom_printf("looking up symbol %s\n", symbol);
+	if (obp_symbol_debug)
+		prom_printf("looking up symbol %s\n", symbol);
 	db_symbol_values(symbol, (char**)NULL, &value);
+	if (obp_symbol_debug)
+		prom_printf("%s is %lx\r\n", symbol, value);
 	args->result = 0;
 	args->value = ADR2CELL(value);
 }
@@ -810,6 +831,9 @@ void OF_val2sym(cells)
 	/* Set data segment pointer */
 	__asm __volatile("clr %%g4" : :);
 
+	if (obp_symbol_debug)
+		prom_printf("OF_val2sym: nargs %lx nreturns %lx\r\n",
+			args->nargs, args->nreturns);
 	/* No args?  Nothing to do. */
 	if (!args->nargs || 
 	    !args->nreturns) return;
@@ -822,9 +846,12 @@ void OF_val2sym(cells)
 	} 
 	
 	value = args->value;
-prom_printf("looking up value %ld\n", value);
+	if (obp_symbol_debug)
+		prom_printf("looking up value %ld\n", value);
 	symbol = db_search_symbol(value, 0, &offset);
 	if (symbol == DB_SYM_NULL) {
+		if (obp_symbol_debug)
+			prom_printf("OF_val2sym: not found\r\n");
 		args->nreturns = 1;
 		args->offset = -1;
 		return;		

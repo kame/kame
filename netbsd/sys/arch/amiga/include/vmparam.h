@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.26 2000/02/14 20:23:20 is Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.30 2001/11/15 18:06:12 soren Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -49,6 +49,15 @@
 /*
  * Machine dependent constants for HP300
  */
+
+/*
+ * We use 8K pages on the Amiga.  Override the PAGE_* definitions
+ * to be compie-time constants.
+ */
+#define	PAGE_SHIFT	13
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 /*
  * USRTEXT is the start of the user text/data space, while USRSTACK
  * is the top (end) of the user stack.  LOWPAGES and HIGHPAGES are
@@ -110,17 +119,6 @@
 #endif
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * user/kernel map constants
  */
 #define VM_MIN_ADDRESS		((vaddr_t)0)		/* user min */
@@ -153,6 +151,8 @@
 #define VM_NFREELIST		2
 #define VM_FREELIST_DEFAULT	0
 #define VM_FREELIST_ZORROII	1
+
+#define	__HAVE_PMAP_PHYSSEG
 
 /* 
  * pmap-specific data stored in the vm_physmem[] array.

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.16.4.1 2000/10/17 19:59:25 scw Exp $	*/
+/*	$NetBSD: cpu.h,v 1.25 2002/02/12 20:38:35 scw Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -49,7 +49,7 @@
  * Exported definitions unique to mvme68k/68k cpu support.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -90,19 +90,22 @@ extern struct cpu_info cpu_info_store;
 struct clockframe {
 	u_short	sr;		/* sr at time of interrupt */
 	u_long	pc;		/* pc at time of interrupt */
-	u_short	vo;		/* vector offset (4-word frame) */
-};
+	u_short	fmt:4,
+		vec:12;		/* vector offset (4-word frame) */
+} __attribute__((packed));
 
 #define	CLKF_USERMODE(framep)	(((framep)->sr & PSL_S) == 0)
 #define	CLKF_BASEPRI(framep)	(((framep)->sr & PSL_IPL) == 0)
 #define	CLKF_PC(framep)		((framep)->pc)
-#if 0
-/* We would like to do it this way... */
-#define	CLKF_INTR(framep)	(((framep)->sr & PSL_M) == 0)
-#else
-/* but until we start using PSL_M, we have to do this instead */
-#define	CLKF_INTR(framep)	(0)	/* XXX */
-#endif
+
+/*
+ * The clock interrupt handler can determine if it's a nested
+ * interrupt by checking for interrupt_depth > 1.
+ * (Remember, the clock interrupt handler itself will cause the
+ * depth counter to be incremented).
+ */
+extern volatile unsigned int interrupt_depth;
+#define	CLKF_INTR(framep)	(interrupt_depth > 1)
 
 
 /*
@@ -110,7 +113,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define	need_resched()	{ want_resched++; aston(); }
+#define	need_resched(ci)	{ want_resched++; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -145,6 +148,7 @@ extern int astpending;		/* need to trap before returning to user mode */
 /*
  * Associate MVME models with CPU types.
  */
+#define	MVME68K		1	
 
 /*
  * MVME-147; 68030 CPU
@@ -161,9 +165,9 @@ extern int astpending;		/* need to trap before returning to user mode */
 #endif
 
 /*
- * MVME-177 (what about 172?); 68060 CPU
+ * MVME-172/177; 68060 CPU
  */
-#if defined(MVME177) && !defined(M68060)
+#if (defined(MVME172) || defined(MVME177)) && !defined(M68060)
 #define M68060
 #endif
 #endif /* _KERNEL */
@@ -189,7 +193,6 @@ extern	u_char mvme_ea[6];
 struct frame;
 void	doboot __P((int)) 
 	__attribute__((__noreturn__));
-int	badaddr __P((caddr_t, int));
 int	nmihand __P((void *));
 void	mvme68k_abort __P((const char *));
 void	physaccess __P((caddr_t, caddr_t, int, int));
@@ -198,32 +201,18 @@ void	*iomap __P((u_long, size_t));
 void	iounmap __P((void *, size_t));
 paddr_t	kvtop __P((caddr_t));
 void	loadustp __P((paddr_t));
-void	child_return __P((void *));
 
 /* Prototypes from sys_machdep.c: */
 int	cachectl1 __P((unsigned long, vaddr_t, size_t, struct proc *));
 int	dma_cachectl __P((caddr_t, int));
 
-/* physical memory sections for mvme147 */
+/* physical memory addresses where mvme147's onboard devices live */
 #define	INTIOBASE147	(0xfffe0000u)
 #define	INTIOTOP147	(0xfffe5000u)
 
-/* ditto for mvme1[67]7 */
-#define	INTIOBASE167	(0xfff40000u)
-#define	INTIOTOP167	(0xfffd0000u)
-
-/*
- * Internal IO space:
- *
- * Internal IO space is mapped in the kernel from ``intiobase'' to
- * ``intiolimit'' (defined in locore.s).  Since it is always mapped,
- * conversion between physical and kernel virtual addresses is easy.
- */
-#define	ISIIOVA(va) \
-	((char *)(va) >= intiobase && (char *)(va) < intiolimit)
-#define	IIOV(pa)	(((u_int)(pa) - intiobase_phys) + (u_int)intiobase)
-#define	IIOP(va)	(((u_int)(va) - (u_int)intiobase) + intiobase_phys)
-#define	IIOPOFF(pa)	((u_int)(pa) - intiobase_phys)
+/* ditto for mvme1[67][27] */
+#define	INTIOBASE1xx	(0xfff40000u)
+#define	INTIOTOP1xx	(0xfffd0000u)
 
 #endif /* _KERNEL */
 

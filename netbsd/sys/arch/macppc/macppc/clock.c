@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.9.4.1 2000/11/01 16:01:50 tv Exp $	*/
+/*	$NetBSD: clock.c,v 1.18 2001/11/10 15:37:40 augustss Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -35,22 +35,35 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <dev/ofw/openfirm.h>
 #include <machine/cpu.h>
+#include <machine/autoconf.h>
 
 #include "adb.h"
 
 /*
- * Initially we assume a processor with a bus frequency of 12.5 MHz.
+ * Initially we assume a processor with a bus frequency of 50 MHz.
  */
-static u_long ticks_per_sec = 12500000;
+static u_long ticks_per_sec = 50*1000*1000/4;
 static u_long ns_per_tick = 80;
-static long ticks_per_intr;
+long ticks_per_intr;
+static int clockinitted;
+
+#ifdef MULTIPROCESSOR
+#define lasttb (curcpu()->ci_lasttb)
+#define tickspending (curcpu()->ci_tickspending)
+#else
 static volatile u_long lasttb;
+volatile int tickspending;
+#endif
+
+#ifdef TIMEBASE_FREQ
+u_int timebase_freq = TIMEBASE_FREQ;
+#else
+u_int timebase_freq = 0;
+#endif
 
 #define SECDAY 86400
 #define DIFF19041970 2082844800
@@ -59,8 +72,6 @@ static volatile u_long lasttb;
 extern int adb_read_date_time __P((int *));
 extern int adb_set_date_time __P((int));
 #endif
-
-static int clockinitted = 0;
 
 void
 inittodr(base)
@@ -80,7 +91,7 @@ inittodr(base)
 		return;
 	}
 	clockinitted = 1;
-	time.tv_sec = rtc_time - DIFF19041970;
+	time.tv_sec = rtc_time - DIFF19041970 + rtc_offset * 60;
 
 	deltat = time.tv_sec - base;
 	if (deltat < 0)
@@ -90,7 +101,10 @@ inittodr(base)
 
 	printf("WARNING: clock %s %d days",
 	    time.tv_sec < base ? "lost" : "gained", (int)(deltat / SECDAY));
-
+	if (time.tv_sec < base && deltat > 1000 * SECDAY) {
+		printf(", using FS time");
+		time.tv_sec = base;
+	}
 	printf(" -- CHECK AND RESET THE DATE!\n");
 }
 
@@ -104,15 +118,14 @@ resettodr()
 	u_int rtc_time;
 
 	if (clockinitted) {
-		rtc_time = time.tv_sec + DIFF19041970;
+		rtc_time = time.tv_sec + DIFF19041970 - rtc_offset * 60;
 		adb_set_date_time(rtc_time);
 	}
 #endif
 }
 
 void
-decr_intr(frame)
-	struct clockframe *frame;
+decr_intr(struct clockframe *frame)
 {
 	u_long tb;
 	long tick;
@@ -171,36 +184,31 @@ decr_intr(frame)
 }
 
 void
-cpu_initclocks()
+cpu_initclocks(void)
 {
 }
 
 void
-calc_delayconst()
+calc_delayconst(void)
 {
 	int qhandle, phandle;
-	char name[32];
+	char type[32];
 	int msr, scratch;
 	
 	/*
 	 * Get this info during autoconf?				XXX
 	 */
+	if (timebase_freq != 0) {
+		ticks_per_sec = timebase_freq;
+		goto found;
+	}
+
 	for (qhandle = OF_peer(0); qhandle; qhandle = phandle) {
-		if (OF_getprop(qhandle, "device_type", name, sizeof name) >= 0
-		    && !strcmp(name, "cpu")
+		if (OF_getprop(qhandle, "device_type", type, sizeof type) > 0
+		    && strcmp(type, "cpu") == 0
 		    && OF_getprop(qhandle, "timebase-frequency",
-				  &ticks_per_sec, sizeof ticks_per_sec) >= 0) {
-			/*
-			 * Should check for correct CPU here?		XXX
-			 */
-			asm volatile ("mfmsr %0; andi. %1, %0, %2; mtmsr %1"
-				      : "=r"(msr), "=r"(scratch) : "K"((u_short)~PSL_EE));
-			ns_per_tick = 1000000000 / ticks_per_sec;
-			ticks_per_intr = ticks_per_sec / hz;
-			asm volatile ("mftb %0" : "=r"(lasttb));
-			asm volatile ("mtdec %0" :: "r"(ticks_per_intr));
-			asm volatile ("mtmsr %0" :: "r"(msr));
-			break;
+			   &ticks_per_sec, sizeof ticks_per_sec) > 0) {
+			goto found;
 		}
 		if ((phandle = OF_child(qhandle)))
 			continue;
@@ -210,12 +218,23 @@ calc_delayconst()
 			qhandle = OF_parent(qhandle);
 		}
 	}
-	if (!phandle)
-		panic("no cpu node");
+	panic("no cpu node");
+
+found:
+	/*
+	 * Should check for correct CPU here?		XXX
+	 */
+	asm volatile ("mfmsr %0; andi. %1,%0,%2; mtmsr %1"
+		      : "=r"(msr), "=r"(scratch) : "K"((u_short)~PSL_EE));
+	ns_per_tick = 1000000000 / ticks_per_sec;
+	ticks_per_intr = ticks_per_sec / hz;
+	asm volatile ("mftb %0" : "=r"(lasttb));
+	asm volatile ("mtdec %0" :: "r"(ticks_per_intr));
+	asm volatile ("mtmsr %0" :: "r"(msr));
 }
 
-static inline u_quad_t
-mftb()
+static __inline u_quad_t
+mftb(void)
 {
 	u_long scratch;
 	u_quad_t tb;
@@ -255,7 +274,7 @@ microtime(tvp)
  */
 void
 delay(n)
-	unsigned n;
+	unsigned int n;
 {
 	u_quad_t tb;
 	u_long tbh, tbl, scratch;

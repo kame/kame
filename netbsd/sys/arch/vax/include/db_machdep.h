@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.7 2000/03/04 07:27:48 matt Exp $	*/
+/*	$NetBSD: db_machdep.h,v 1.11 2002/05/13 20:30:12 matt Exp $	*/
 
 /* 
  * Mach Operating System
@@ -35,7 +35,7 @@
  */
 
 #include <sys/param.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/trap.h>
 #include <machine/psl.h>
 
@@ -43,7 +43,7 @@ typedef	vaddr_t		db_addr_t;	/* address - unsigned */
 typedef	long		db_expr_t;	/* expression - signed */
 
 typedef struct trapframe db_regs_t;
-db_regs_t	ddb_regs;	/* register state */
+extern	db_regs_t	ddb_regs;	/* register state */
 #define	DDB_REGS	(&ddb_regs)
 
 #define	PC_REGS(regs)	((db_addr_t)(regs)->pc)
@@ -71,12 +71,19 @@ db_regs_t	ddb_regs;	/* register state */
 #define inst_load(ins)		0
 #define inst_store(ins)		0
 
+#define DB_MACHINE_COMMANDS
+
 /* Prototypes */
 void	kdb_trap __P((struct trapframe *));
 
 /*
- * We use a.out symbols in DDB.
+ * We use a.out symbols in DDB (unless we are ELF then we use ELF symbols).
  */
+#ifdef __ELF__
+#define	DB_ELF_SYMBOLS
+#define	DB_ELFSIZE		32
+#else
 #define	DB_AOUT_SYMBOLS
+#endif
 
 #endif	/* _VAX_DB_MACHDEP_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: pccons.c,v 1.140.2.2 2000/10/16 21:39:41 tv Exp $	*/
+/*	$NetBSD: pccons.c,v 1.153 2002/04/14 14:20:33 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -82,6 +82,9 @@
  * XXX Only one of these attachments can be used in one kernel configuration.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.153 2002/04/14 14:20:33 lukem Exp $");
+
 #include "opt_ddb.h"
 #include "opt_xserver.h"
 #include "opt_compat_netbsd.h"
@@ -124,12 +127,12 @@
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/pio.h>
-#include <machine/pc/display.h>
 #include <machine/pccons.h>
 #include <machine/conf.h>
 
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
+#include <dev/ic/pcdisplay.h>
 #include <dev/ic/i8042reg.h>
 #include <dev/pckbc/pckbdreg.h>
 
@@ -157,6 +160,7 @@ static u_short *Crtat;			/* pointer to backing store */
 static u_short *crtat;			/* pointer to current char */
 #if (NPCCONSKBD == 0)
 static volatile u_char ack, nak;	/* Don't ask. */
+static int poll_data = -1;
 #endif
 static u_char async, kernel, polling;	/* Really, you don't want to know. */
 static u_char lock_state = 0x00;	/* all off */
@@ -570,6 +574,18 @@ pcprobe(parent, match, aux)
 	int res;
 #endif
 
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	/*
+	 * XXXJRT This is probably wrong, but then again, pccons is a
+	 * XXXJRT total hack to begin with.
+	 */
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
 #if (NPCCONSKBD == 0)
 	/* Enable interrupts and keyboard, etc. */
 	if (!kbc_put8042cmd(CMDBYTE)) {
@@ -705,11 +721,17 @@ lose:
 #endif /* 1 */
 
 #if (NPCCONSKBD > 0)
-	ia->ia_iosize = 0;
+	ia->ia_nio = 0;
+	ia->ia_nirq = 0;
 #else
-	ia->ia_iosize = 16;
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_size = 16;
+	ia->ia_nirq = 1;
 #endif
-	ia->ia_msize = 0;
+
+	ia->ia_niomem = 0;
+	ia->ia_ndrq = 0;
+
 	return (1);
 }
 
@@ -732,8 +754,8 @@ pcattach(parent, self, aux)
 #if (NPCCONSKBD > 0)
 	pckbc_set_inputhandler(kbctag, kbcslot, pcinput, sc, sc->sc_dev.dv_xname);
 #else
-	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_TTY, pcintr, sc);
+	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_TTY, pcintr, sc);
 
 	/*
 	 * Look for children of the keyboard controller.
@@ -839,7 +861,7 @@ pcopen(dev, flag, mode, p)
 		return (EBUSY);
 	tp->t_state |= TS_CARR_ON;
 
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return ((*tp->t_linesw->l_open)(dev, tp));
 }
 
 int
@@ -853,7 +875,7 @@ pcclose(dev, flag, mode, p)
 
 	if (tp == NULL)
 		return (0);
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 #ifdef notyet /* XXX */
 	ttyfree(tp);
@@ -870,7 +892,7 @@ pcread(dev, uio, flag)
 	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -882,7 +904,19 @@ pcwrite(dev, uio, flag)
 	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+pcpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -916,7 +950,7 @@ pcinput(arg, data)
 	cp = strans(data);
 	if (cp)
 		do
-			(*linesw[tp->t_line].l_rint)(*cp++, tp);
+			(*tp->t_linesw->l_rint)(*cp++, tp);
 		while (*cp);
 }
 #else
@@ -930,15 +964,18 @@ pcintr(arg)
 
 	if ((inb(IO_KBD + KBSTATP) & KBS_DIB) == 0)
 		return (0);
-	if (polling)
-		return (1);
 	do {
 		cp = sget();
+
+		if (polling) {
+			poll_data = *cp;
+			return (1);
+		}
 		if (!tp || (tp->t_state & TS_ISOPEN) == 0)
 			return (1);
 		if (cp)
 			do
-				(*linesw[tp->t_line].l_rint)(*cp++, tp);
+				(*tp->t_linesw->l_rint)(*cp++, tp);
 			while (*cp);
 	} while (inb(IO_KBD + KBSTATP) & KBS_DIB);
 	return (1);
@@ -957,11 +994,12 @@ pcioctl(dev, cmd, data, flag, p)
 	struct tty *tp = sc->sc_tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -1016,7 +1054,7 @@ pcioctl(dev, cmd, data, flag, p)
 #endif
  	}
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 
 #ifdef DIAGNOSTIC
@@ -1107,6 +1145,11 @@ pccnputc(dev, c)
 	kernel = oldkernel;
 }
 
+/*
+ * Note: the spl games here are to deal with some strange PC kbd controllers
+ * in some system configurations.
+ * This is not canonical way to handle polling input.
+ */
 /* ARGSUSED */
 int
 pccngetc(dev)
@@ -1122,9 +1165,20 @@ pccngetc(dev)
 	do {
 		/* wait for byte */
 #if (NPCCONSKBD == 0)
+		int s = splhigh();
+
+		if (poll_data != -1) {
+			int data = poll_data;
+			poll_data = -1;
+			splx(s);
+			return (data);
+		}
+
 		while ((inb(IO_KBD + KBSTATP) & KBS_DIB) == 0);
+
 		/* see if it's worthwhile */
 		cp = sget();
+		splx(s);
 #else
 		int data;
 		do {
@@ -1148,7 +1202,9 @@ pccnpollc(dev, on)
 #if (NPCCONSKBD > 0)
 	pckbc_set_poll(kbctag, kbcslot, on);
 #else
-	if (!on) {
+	if (on)
+		poll_data = -1;
+	else {
 		int unit;
 		struct pc_softc *sc;
 		int s;
@@ -1186,6 +1242,20 @@ pcparam(tp, t)
 	tp->t_cflag = t->c_cflag;
 	return (0);
 }
+
+#ifndef	PCCONS_DEFAULT_FG
+#define	PCCONS_DEFAULT_FG	FG_LIGHTGREY
+#endif
+#ifndef	PCCONS_DEFAULT_SO_FG
+#define	PCCONS_DEFAULT_SO_FG	FG_YELLOW
+#endif
+
+#ifndef	PCCONS_DEFAULT_BG
+#define	PCCONS_DEFAULT_BG	BG_BLACK
+#endif
+#ifndef	PCCONS_DEFAULT_SO_BG
+#define	PCCONS_DEFAULT_SO_BG	BG_BLACK
+#endif
 
 void
 pcinit()
@@ -1226,12 +1296,12 @@ pcinit()
 	vs.ncol = COL;
 	vs.nrow = ROW;
 	vs.nchr = COL * ROW;
-	vs.at = FG_LIGHTGREY | BG_BLACK;
 
+	vs.at = PCCONS_DEFAULT_FG | PCCONS_DEFAULT_BG;
 	if (vs.color == 0)
 		vs.so_at = FG_BLACK | BG_LIGHTGREY;
 	else
-		vs.so_at = FG_YELLOW | BG_BLACK;
+		vs.so_at = PCCONS_DEFAULT_SO_FG | PCCONS_DEFAULT_SO_BG;
 
 	fillw((vs.at << 8) | ' ', crtat, vs.nchr - cursorat);
 }
@@ -1533,8 +1603,8 @@ sput(cp, n)
 					else if (cx > nrow)
 						cx = nrow;
 					if (cx < nrow)
-						memcpy(crtAt,
-						     crtAt + vs.ncol * cx,
+						memmove(crtAt,
+						    crtAt + vs.ncol * cx,
 						    vs.ncol *
 						    (nrow - cx) * CHR);
 					fillw((vs.at << 8) | ' ',
@@ -1550,7 +1620,7 @@ sput(cp, n)
 					else if (cx > vs.nrow)
 						cx = vs.nrow;
 					if (cx < vs.nrow)
-						memcpy(Crtat,
+						memmove(Crtat,
 						    Crtat + vs.ncol * cx,
 						    vs.ncol *
 						    (vs.nrow - cx) * CHR);
@@ -1573,7 +1643,7 @@ sput(cp, n)
 					else if (cx > nrow)
 						cx = nrow;
 					if (cx < nrow)
-						memcpy(crtAt + vs.ncol * cx,
+						memmove(crtAt + vs.ncol * cx,
 						    crtAt,
 						    vs.ncol * (nrow - cx) *
 						    CHR);
@@ -1589,7 +1659,7 @@ sput(cp, n)
 					else if (cx > vs.nrow)
 						cx = vs.nrow;
 					if (cx < vs.nrow)
-						memcpy(Crtat + vs.ncol * cx,
+						memmove(Crtat + vs.ncol * cx,
 						    Crtat,
 						    vs.ncol * (vs.nrow - cx) *
 						    CHR);
@@ -1612,7 +1682,8 @@ sput(cp, n)
 				case 'x': /* set attributes */
 					switch (vs.cx) {
 					case 0:
-						vs.at = FG_LIGHTGREY | BG_BLACK;
+						vs.at = PCCONS_DEFAULT_FG |
+						    PCCONS_DEFAULT_BG;
 						break;
 					case 1:
 						/* ansi background */
@@ -1657,7 +1728,7 @@ sput(cp, n)
 			scroll = 0;
 			/* scroll check */
 			if (crtat >= Crtat + vs.nchr) {
-				memcpy(Crtat, Crtat + vs.ncol,
+				memmove(Crtat, Crtat + vs.ncol,
 				    (vs.nchr - vs.ncol) * CHR);
 				fillw((vs.at << 8) | ' ',
 				    Crtat + vs.nchr - vs.ncol,

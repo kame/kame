@@ -1,4 +1,4 @@
-/*	$NetBSD: icu.s,v 1.62 2000/02/21 20:38:48 erh Exp $	*/
+/*	$NetBSD: icu.s,v 1.65 2001/09/21 14:12:52 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,11 +36,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
 #include "opt_vm86.h"
 
 #include <net/netisr.h>
@@ -143,12 +138,13 @@ IDTVEC(doreti)
 IDTVEC(softserial)
 	movl	_C_LABEL(imask) + IPL_SOFTSERIAL * 4,%eax
 	movl	%eax,_C_LABEL(cpl)
-#include "com.h"
-#if NCOM > 0
-	call	_C_LABEL(comsoft)
-#endif
+
+	pushl	$I386_SOFTINTR_SOFTSERIAL
+	call	_C_LABEL(softintr_dispatch)
+	addl	$4,%esp
+
 	movl	%ebx,_C_LABEL(cpl)
-	jmp	%esi
+	jmp	*%esi
 
 IDTVEC(softnet)
 	movl	_C_LABEL(imask) + IPL_SOFTNET * 4,%eax
@@ -156,6 +152,7 @@ IDTVEC(softnet)
 	xorl	%edi,%edi
 	xchgl	_C_LABEL(netisr),%edi
 
+	/* XXX Do the legacy netisrs here for now. */
 #define DONETISR(s, c) \
 	.globl  _C_LABEL(c)	;\
 	testl	$(1 << s),%edi	;\
@@ -163,16 +160,24 @@ IDTVEC(softnet)
 	call	_C_LABEL(c)	;\
 1:
 
-#include "net/netisr_dispatch.h"
+#include <net/netisr_dispatch.h>
 
 #undef DONETISR
 
+	pushl	$I386_SOFTINTR_SOFTNET
+	call	_C_LABEL(softintr_dispatch)
+	addl	$4,%esp
+
 	movl	%ebx,_C_LABEL(cpl)
-	jmp	%esi
+	jmp	*%esi
 
 IDTVEC(softclock)
 	movl	_C_LABEL(imask) + IPL_SOFTCLOCK * 4,%eax
 	movl	%eax,_C_LABEL(cpl)
-	call	_C_LABEL(softclock)
+
+	pushl	$I386_SOFTINTR_SOFTCLOCK
+	call	_C_LABEL(softintr_dispatch)
+	addl	$4,%esp
+
 	movl	%ebx,_C_LABEL(cpl)
-	jmp	%esi
+	jmp	*%esi

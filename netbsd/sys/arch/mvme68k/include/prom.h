@@ -1,4 +1,4 @@
-/*	$NetBSD: prom.h,v 1.5 1998/08/01 11:22:51 scw Exp $	*/
+/*	$NetBSD: prom.h,v 1.12 2001/11/09 18:18:19 scw Exp $	*/
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -146,10 +146,10 @@ struct mvmeprom_args {
         u_int	ctrl_addr;
         u_int	entry;
         u_int	conf_blk;
-        char	*arg_start;
-        char	*arg_end;
 	char	*nbarg_start;
 	char	*nbarg_end;
+        char	*arg_start;
+        char	*arg_end;
 	u_int	cputyp;
 };
 
@@ -158,13 +158,15 @@ struct mvmeprom_args {
 #define MVMEPROM_CALL(x) \
 	__asm__ __volatile (__CONCAT("trap #15; .short ", __STRING(x)) )
 #define MVMEPROM_NOARG() \
-	__asm__ __volatile ("clrl sp@-")
+	__asm__ __volatile ("clrl %sp@-")
 #define MVMEPROM_ARG1(arg) \
-	__asm__ __volatile ("movel %0, sp@-"::"d" (arg))
+	__asm__ __volatile ("movel %0, %%sp@-"::"d" (arg))
 #define MVMEPROM_ARG2(arg) \
-	__asm__ __volatile ("movel %0, sp@-"::"d" (arg))
+	__asm__ __volatile ("movel %0, %%sp@-"::"d" (arg))
 #define MVMEPROM_GETRES(ret) \
-	__asm__ __volatile ("movel sp@+,%0": "=d" (ret):)
+	__asm__ __volatile ("movel %%sp@+,%0": "=d" (ret):)
+#define MVMEPROM_GETSR(ret) \
+	__asm__ __volatile ("movew %%sr,%0": "=d" (ret):)
 #define MVMEPROM_RETURN(ret) \
 	MVMEPROM_GETRES(ret); \
 	return (ret);			/* return a value (int) */
@@ -173,19 +175,33 @@ struct mvmeprom_args {
 	MVMEPROM_GETRES(ret); \
 	return(int)((((unsigned int)(ret)) >> 24) & 0xff);
 #define MVMEPROM_STATRET(ret) \
-	MVMEPROM_GETRES(ret); \
-	return (!(ret & 0x4));		/* return a 'status' */
+	MVMEPROM_GETSR(ret); \
+	return ((ret & 0x4) == 0);	/* return a 'status' in the Z flag */
 
-#define MVMEPROM_REG_DEVLUN	"d0"
-#define MVMEPROM_REG_CTRLLUN	"d1"
-#define MVMEPROM_REG_FLAGS	"d4"
-#define MVMEPROM_REG_CTRLADDR	"a0"
-#define MVMEPROM_REG_ENTRY	"a1"
-#define MVMEPROM_REG_CONFBLK	"a2"
-#define MVMEPROM_REG_NBARGSTART	"a3"
-#define MVMEPROM_REG_NBARGEND	"a4"
-#define MVMEPROM_REG_ARGSTART	"a5"
-#define MVMEPROM_REG_ARGEND	"a6"
+#define MVMEPROM_REG_DEVLUN	%d0
+#define MVMEPROM_REG_CTRLLUN	%d1
+#define MVMEPROM_REG_FLAGS	%d4
+#define MVMEPROM_REG_CTRLADDR	%a0
+#define MVMEPROM_REG_ENTRY	%a1
+#define MVMEPROM_REG_CONFBLK	%a2
+#define MVMEPROM_REG_NBARGSTART	%a3
+#define MVMEPROM_REG_NBARGEND	%a4
+#define MVMEPROM_REG_ARGSTART	%a5
+#define MVMEPROM_REG_ARGEND	%a6
+
+#define MVMEPROM_ARGS_DEVLUN	0x00
+#define MVMEPROM_ARGS_CTRLLUN	0x04
+#define MVMEPROM_ARGS_FLAGS	0x08
+#define MVMEPROM_ARGS_CTRLADDR	0x0c
+#define MVMEPROM_ARGS_ENTRY	0x10
+#define MVMEPROM_ARGS_CONFBLK	0x14
+#define MVMEPROM_ARGS_NBARGSTART 0x18
+#define MVMEPROM_ARGS_NBARGEND	0x1c
+#define MVMEPROM_ARGS_ARGSTART	0x20
+#define MVMEPROM_ARGS_ARGEND	0x24
+#define MVMEPROM_ARGS_CPUTYP	0x28
+#define MVMEPROM_ARGS_MAX	0x2c
+
 
 #ifndef RB_NOSYM
 #define RB_NOSYM 0x400

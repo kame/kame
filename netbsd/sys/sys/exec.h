@@ -1,4 +1,4 @@
-/*	$NetBSD: exec.h,v 1.68.4.4 2001/02/03 20:00:02 he Exp $	*/
+/*	$NetBSD: exec.h,v 1.86 2002/04/02 20:20:00 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -61,30 +61,10 @@ struct ps_strings {
 };
 
 /*
- * Address of ps_strings structure.  We only use this as a default in user
- * space; normal access is done through __ps_strings.
- *
- * XXXX PS_STRINGS is deprecated since it can move around for different
- * processes or emulations.
- * In the kernel use p->p_psstr.
- * In userland you should use what's passed in to crt0.s or system calls.
- *
- */
-#define	PS_STRINGS \
-	((struct ps_strings *)(USRSTACK - sizeof(struct ps_strings)))
-
-/*
- * Below the PS_STRINGS and sigtramp, we may require a gap on the stack
+ * Below the ps_strings and sigtramp, we may require a gap on the stack
  * (used to copyin/copyout various emulation data structures).
  */
-#define	STACKGAPLEN	400	/* plenty enough for now */
-/*
- * XXXX The following are deprecated.  Use p->p_psstr instead of PS_STRINGS.
- */
-#define	STACKGAPBASE_UNALIGNED	\
-	((caddr_t)PS_STRINGS - szsigcode - STACKGAPLEN)
-#define	STACKGAPBASE		\
-	((caddr_t)(((unsigned long) STACKGAPBASE_UNALIGNED) & ~ALIGNBYTES))
+#define	STACKGAPLEN	512	/* plenty enough for now */
 
 /*
  * the following structures allow execve() to put together processes
@@ -101,13 +81,38 @@ struct ps_strings {
 
 struct proc;
 struct exec_package;
+struct vnode;
+struct ucred;
 
 typedef int (*exec_makecmds_fcn) __P((struct proc *, struct exec_package *));
 
 struct execsw {
 	u_int	es_hdrsz;		/* size of header for this format */
 	exec_makecmds_fcn es_check;	/* function to check exec format */
+	union {				/* probe function */
+		int (*elf_probe_func) __P((struct proc *,
+			struct exec_package *, void *, char *, vaddr_t *));
+		int (*ecoff_probe_func) __P((struct proc *,
+			struct exec_package *));
+		int (*mach_probe_func) __P((char **));
+	} u;
+	const struct  emul *es_emul;	/* os emulation */
+	int	es_prio;		/* entry priority */
+	int	es_arglen;		/* Extra argument size in words */
+					/* Copy arguments on the new stack */
+	int	(*es_copyargs) __P((struct exec_package *, struct ps_strings *,
+				    char **, void *));
+					/* Set registers before execution */
+	void	(*es_setregs) __P((struct proc *, struct exec_package *,
+				   u_long));
+					/* Dump core */
+	int	(*es_coredump) __P((struct proc *, struct vnode *,
+				    struct ucred *));
 };
+
+#define EXECSW_PRIO_ANY		0x000	/* default, no preference */
+#define EXECSW_PRIO_FIRST	0x001	/* this should be among first */
+#define EXECSW_PRIO_LAST	0x002	/* this should be among last */
 
 /* exec vmspace-creation command set; see below */
 struct exec_vmcmd_set {
@@ -135,11 +140,14 @@ struct exec_package {
 	u_long	ep_minsaddr;		/* proc's min stack addr ("bottom") */
 	u_long	ep_ssize;		/* size of process's stack */
 	u_long	ep_entry;		/* process's entry point */
+	vaddr_t	ep_vm_minaddr;		/* bottom of process address space */
+	vaddr_t	ep_vm_maxaddr;		/* top of process address space */
 	u_int	ep_flags;		/* flags; see below. */
 	char	**ep_fa;		/* a fake args vector for scripts */
 	int	ep_fd;			/* a file descriptor we're holding */
-	struct  emul *ep_emul;		/* os emulation */
 	void	*ep_emul_arg;		/* emulation argument */
+	const struct	execsw *ep_es;	/* appropriate execsw entry */
+	const struct	execsw *ep_esch;/* checked execsw entry */
 };
 #define	EXEC_INDIR	0x0001		/* script handling already done */
 #define	EXEC_HASFD	0x0002		/* holding a shell script */
@@ -147,6 +155,7 @@ struct exec_package {
 #define	EXEC_SKIPARG	0x0008		/* don't copy user-supplied argv[0] */
 #define	EXEC_DESTR	0x0010		/* destructive ops performed */
 #define	EXEC_32		0x0020		/* 32-bit binary emulation */
+#define	EXEC_HASES	0x0040		/* don't update exec switch pointer */
 
 struct exec_vmcmd {
 	int	(*ev_proc) __P((struct proc *p, struct exec_vmcmd *cmd));
@@ -175,11 +184,23 @@ int	vmcmd_map_pagedvn	__P((struct proc *, struct exec_vmcmd *));
 int	vmcmd_map_readvn	__P((struct proc *, struct exec_vmcmd *));
 int	vmcmd_readvn		__P((struct proc *, struct exec_vmcmd *));
 int	vmcmd_map_zero		__P((struct proc *, struct exec_vmcmd *));
-void	*copyargs		__P((struct exec_package *, struct ps_strings *,
-				     void *, void *));
+int	copyargs		__P((struct exec_package *, struct ps_strings *,
+    char **, void *));
 void	setregs			__P((struct proc *, struct exec_package *,
 				     u_long));
 int	check_exec		__P((struct proc *, struct exec_package *));
+int	exec_init		__P((int));
+int	exec_read_from		__P((struct proc *, struct vnode *, u_long off,
+    void *, size_t));
+
+#ifdef LKM
+int	emul_register		__P((const struct emul *, int));
+int	emul_unregister		__P((const char *));
+const struct emul *emul_search	__P((const char *));
+
+int	exec_add		__P((struct execsw *, const char *));
+int	exec_remove		__P((const struct execsw *));
+#endif /* LKM */
 
 #ifdef DEBUG
 void	new_vmcmd __P((struct exec_vmcmd_set *evsp,
@@ -206,22 +227,8 @@ void	new_vmcmd __P((struct exec_vmcmd_set *evsp,
         vcp->ev_offset = (offset); \
         vcp->ev_prot = (prot); \
 	vcp->ev_flags = (flags); \
-} while (0)
+} while (/* CONSTCOND */ 0)
 #endif /* EXEC_DEBUG */
-
-/*
- * Exec function switch:
- *
- * Note that each makecmds function is responsible for loading the
- * exec package with the necessary functions for any exec-type-specific
- * handling.
- *
- * Functions for specific exec types should be defined in their own
- * header file.
- */
-extern struct	execsw execsw[];
-extern int	nexecs;
-extern int	exec_maxhdrsz;
 
 #endif /* _KERNEL */
 

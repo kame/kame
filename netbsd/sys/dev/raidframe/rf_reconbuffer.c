@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_reconbuffer.c,v 1.4 2000/03/13 23:52:36 soren Exp $	*/
+/*	$NetBSD: rf_reconbuffer.c,v 1.7 2002/01/09 03:10:20 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -32,6 +32,9 @@
  *
  ***************************************************/
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_reconbuffer.c,v 1.7 2002/01/09 03:10:20 oster Exp $");
+
 #include "rf_raid.h"
 #include "rf_reconbuffer.h"
 #include "rf_acctrace.h"
@@ -42,30 +45,38 @@
 #include "rf_reconutil.h"
 #include "rf_nwayxor.h"
 
+#ifdef DEBUG
+
 #define Dprintf1(s,a) if (rf_reconbufferDebug) printf(s,a)
 #define Dprintf2(s,a,b) if (rf_reconbufferDebug) printf(s,a,b)
 #define Dprintf3(s,a,b,c) if (rf_reconbufferDebug) printf(s,a,b,c)
 #define Dprintf4(s,a,b,c,d) if (rf_reconbufferDebug) printf(s,a,b,c,d)
 #define Dprintf5(s,a,b,c,d,e) if (rf_reconbufferDebug) printf(s,a,b,c,d,e)
 
-/*****************************************************************************************
+#else /* DEBUG */
+
+#define Dprintf1(s,a) {}
+#define Dprintf2(s,a,b) {}
+#define Dprintf3(s,a,b,c) {}
+#define Dprintf4(s,a,b,c,d) {}
+#define Dprintf5(s,a,b,c,d,e) {}
+
+#endif
+
+/*****************************************************************************
  *
- * Submit a reconstruction buffer to the manager for XOR.
- * We can only submit a buffer if (1) we can xor into an existing buffer, which means
- * we don't have to acquire a new one, (2) we can acquire a floating
- * recon buffer, or (3) the caller has indicated that we are allowed to keep the
- * submitted buffer.
+ * Submit a reconstruction buffer to the manager for XOR.  We can only
+ * submit a buffer if (1) we can xor into an existing buffer, which
+ * means we don't have to acquire a new one, (2) we can acquire a
+ * floating recon buffer, or (3) the caller has indicated that we are
+ * allowed to keep the submitted buffer.
  *
  * Returns non-zero if and only if we were not able to submit.
- * In this case, we append the current disk ID to the wait list on the indicated
- * RU, so that it will be re-enabled when we acquire a buffer for this RU.
+ * In this case, we append the current disk ID to the wait list on the
+ * indicated RU, so that it will be re-enabled when we acquire a buffer 
+ * for this RU.
  *
- ****************************************************************************************/
-
-/* just to make the code below more readable */
-#define BUFWAIT_APPEND(_cb_, _pssPtr_, _row_, _col_) \
-  _cb_ = rf_AllocCallbackDesc();                    \
-  (_cb_)->row = (_row_); (_cb_)->col = (_col_); (_cb_)->next = (_pssPtr_)->bufWaitList; (_pssPtr_)->bufWaitList = (_cb_);
+ ****************************************************************************/
 
 /*
  * nWayXorFuncs[i] is a pointer to a function that will xor "i"
@@ -339,11 +350,10 @@ out:
 }
 
 
-/* if the reconstruction buffer is full, move it to the full list, which is maintained
- * sorted by failed disk sector offset
+/* if the reconstruction buffer is full, move it to the full list,
+ * which is maintained sorted by failed disk sector offset
  *
- * ASSUMES THE RB_MUTEX IS LOCKED AT ENTRY.
- */
+ * ASSUMES THE RB_MUTEX IS LOCKED AT ENTRY.  */
 int 
 rf_CheckForFullRbuf(raidPtr, reconCtrl, pssPtr, numDataCol)
 	RF_Raid_t *raidPtr;

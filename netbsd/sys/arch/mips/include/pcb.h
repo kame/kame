@@ -1,4 +1,4 @@
-/*	$NetBSD: pcb.h,v 1.10 2000/03/28 01:06:04 simonb Exp $	*/
+/*	$NetBSD: pcb.h,v 1.13 2002/01/12 01:40:36 enami Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -52,7 +52,7 @@ struct pcb
 	struct fpreg pcb_fpregs;	/* saved floating point registers */
 	mips_reg_t pcb_context[12];	/* kernel context for resume */
 	caddr_t	pcb_onfault;		/* for copyin/copyout faults */
-	void	*pcb_segtab;		/* XXX copy of pmap pm_segtab */
+	u_int32_t pcb_ppl;		/* previous priority level */
 };
 
 /*
@@ -66,4 +66,7 @@ struct md_coredump {
 
 #ifdef _KERNEL
 extern struct pcb *curpcb;			/* the current running pcb */
+extern struct segtab *segbase;			/* current segtab base */
+
+#define	PCB_FSR(pcb)	((pcb)->pcb_fpregs.r_regs[FSR - FPBASE])
 #endif

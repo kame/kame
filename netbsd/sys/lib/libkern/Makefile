@@ -1,9 +1,22 @@
-#	$NetBSD: Makefile,v 1.54 2000/03/02 07:41:51 itojun Exp $
+#	$NetBSD: Makefile,v 1.63.10.1 2002/06/19 00:03:25 lukem Exp $
 
 LIB=	kern
-MKPIC=	no
+NOPIC=	# defined
 
-ARCHSUBDIR= ${MACHINE_ARCH:C/mipse[bl]/mips/}
+.include <bsd.own.mk>
+
+.if defined(MACHINE_ARCH) && !empty(MACHINE_ARCH) && \
+    exists(${KERNDIR}/arch/${MACHINE_ARCH})
+ARCHSUBDIR=     ${MACHINE_ARCH}
+.elif defined(MACHINE_CPU) && !empty(MACHINE_CPU) && \
+    exists(${KERNDIR}/arch/${MACHINE_CPU}) 
+ARCHSUBDIR=     ${MACHINE_CPU}
+.else
+.BEGIN:
+	@echo no ARCHSUBDIR for ${MACHINE_ARCH} nor ${MACHINE_CPU}
+	@false
+.endif
+
 M= ${KERNDIR}/arch/${ARCHSUBDIR}
 
 CPPFLAGS=	-I$M ${KERNCPPFLAGS} ${KERNMISCCPPFLAGS}
@@ -23,7 +36,8 @@ SRCS+=	adddi3.c anddi3.c ashldi3.c ashrdi3.c cmpdi2.c divdi3.c iordi3.c \
 .endif
 
 # Other stuff
-SRCS+=	__cmsg_alignbytes.c inet_addr.c intoa.c md5c.c sha1.c pmatch.c
+SRCS+=	__cmsg_alignbytes.c inet_addr.c intoa.c md4c.c md5c.c sha1.c pmatch.c
+SRCS+=	_que.c
 
 # Files to clean up
 CLEANFILES+= lib${LIB}.o lib${LIB}.po
@@ -63,6 +77,7 @@ POBJS+=	mcount.po
 # only needed during build
 libinstall::
 
+.undef DESTDIR
 .include <bsd.lib.mk>
 
 lib${LIB}.o:: ${OBJS}
@@ -74,3 +89,6 @@ lib${LIB}.po:: ${POBJS}
 	@echo building profiled ${LIB} library
 	@rm -f lib${LIB}.po
 	@${LD} -r -o lib${LIB}.po `NM=${NM} ${LORDER} ${POBJS} | ${TSORT}`
+
+showsources: ${SRCS}
+	@echo ${.ALLSRC}

@@ -1,6 +1,8 @@
-# 	$NetBSD: TADPOLE3GX,v 1.6 2000/02/25 18:24:40 jdc Exp $
+# 	$NetBSD: TADPOLE3GX,v 1.15.4.1 2002/08/01 04:32:20 lukem Exp $
 
 include "arch/sparc/conf/std.sparc"
+
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
 maxusers	32
 
@@ -50,10 +52,13 @@ options 	SYSVSHM		# System V shared memory
 ## Loadable kernel module support; still under development.
 options 	LKM
 
-## NFS boot options; default on sparc is the bootparam protocol
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
+## NFS boot options; tries DHCP/BOOTP then BOOTPARAM
 options 	NFS_BOOT_BOOTPARAM
 #options 	NFS_BOOT_BOOTP
-#options 	NFS_BOOT_DHCP
+options 	NFS_BOOT_DHCP
 
 #### Debugging options
 
@@ -65,18 +70,18 @@ options 	NFS_BOOT_BOOTPARAM
 #options 	DDB_ONPANIC=1		# see also sysctl(8): `ddb.onpanic'
 
 ## You may also use gdb, on another computer connected to this machine over
-## a serial port.  Both KGDBDEV and KGDBRATE should be specified; KGDBDEV is
-## a dev_t encoded device number of the serial port to use.
+## a serial port.  Both KGDB_DEV and KGDB_DEVRATE should be specified;
+## KGDB_DEV is a dev_t encoded device number of the serial port to use.
 ## (0xc01 = ttya, 0xc02 = ttyb.)
-#options 	KGDB		# support for kernel gdb
-#options 	KGDBDEV=0xc01	# kgdb device number (this sample is `ttyb')
-#options 	KGDBRATE=38400	# baud rate
+#options 	KGDB			# support for kernel gdb
+#options 	KGDB_DEV=0xc01		# kgdb device number (this is `ttyb')
+#options 	KGDB_DEVRATE=38400	# baud rate
 
 
 ## Compile the kernel with debugging symbols (`netbsd.gdb' is the debug file),
 ## such that gdb(1) can be used on a kernel coredump.
 
-makeoptions 	DEBUG="-g"
+makeoptions	DEBUG="-g"
 
 
 ## Adds code to the kernel that does internal consistency checks, and will
@@ -119,10 +124,10 @@ options 	COMPAT_10	# NetBSD 1.0 binary compatibility
 options 	COMPAT_11	# NetBSD 1.1 binary compatibility
 options 	COMPAT_12	# NetBSD 1.2 binary compatibility
 options 	COMPAT_13	# NetBSD 1.3 binary compatibility
-options		COMPAT_14	# NetBSD 1.4 binary compatibility
+options 	COMPAT_14	# NetBSD 1.4 binary compatibility
 options 	COMPAT_SUNOS	# SunOS 4.x binary compatibility
 options 	COMPAT_SVR4	# SunOS 5.x binary compatibility
-options 	COMPAT_AOUT	# NetBSD a.out compatibility
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 ## File systems.  You probably need at least one of FFS or NFS.
 file-system	FFS		# Berkeley Fast Filesystem
@@ -146,7 +151,6 @@ options 	QUOTA		# FFS quotas
 
 ## Network protocol support.  In most environments, INET is required.
 options 	INET		# IP (Internet Protocol) v4
-#options 	TCP_COMPAT_42	# 4.2BSD IP implementation compatibility
 #options 	GATEWAY		# packet forwarding ("router switch")
 #options 	MROUTING	# packet forwarding of multicast packets
 #options 	DIRECTED_BROADCAST	# allow broadcasts through routers
@@ -163,7 +167,7 @@ options 	IPFILTER_LOG	# Add ipmon(8) logging for ipfilter device
 options 	PPP_BSDCOMP	# Add BSD compression to ppp device
 options 	PPP_DEFLATE	# Add deflate (libz) compression to ppp device
 options 	PPP_FILTER	# Add active filters for ppp (via bpf)
-
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 
 #### Main bus and CPU .. all systems.
@@ -206,7 +210,7 @@ zstty1	at zs0 channel 1	# ttyb
 zs1	at obio0					# sun4m
 kbd0	at zs1 channel 0	# keyboard
 ms0	at zs1 channel 1	# mouse
-zstty*  at zs? channel ?	# mouse
+zstty*	at zs? channel ?	# mouse
 
 ## Tadpole 3GX/3XL have a builtin modem that emulates a NS16450.
 com*	at obio0					# sun4m (tadpole)
@@ -319,14 +323,12 @@ pnozz0 at sbus? slot ? offset ?
 tctrl0 at obio0
 
 ## Pseudo ttys, required for network logins and programs like screen.
-## 32 is a good number for average systems; you may have as many as you
-## like, though 256 is more or less the upper limit.  Increasing this
-## number still requires you to run /dev/MAKEDEV to create the files
-## for the ptys.
 
-pseudo-device	pty		32	# pseudo-ttys (for network, etc.)
+pseudo-device	pty			# pseudo-ttys (for network, etc.)
 
 ## Random device, used to implement /dev/random (a source of random noise),
 ## and generate randomness for some kernel formulae.
 
 pseudo-device	rnd
+
+pseudo-device	clockctl		# user control of clock subsystem

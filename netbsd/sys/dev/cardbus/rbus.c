@@ -1,4 +1,4 @@
-/*	$NetBSD: rbus.c,v 1.8 2000/05/30 09:18:06 haya Exp $	*/
+/*	$NetBSD: rbus.c,v 1.14 2002/04/22 19:29:55 matt Exp $	*/
 /*
  * Copyright (c) 1999 and 2000
  *     HAYAKAWA Koichi.  All rights reserved.
@@ -29,9 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rbus.c,v 1.14 2002/04/22 19:29:55 matt Exp $");
 
-
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -131,7 +131,7 @@ rbus_space_alloc_subregion(rbt, substart, subend, addr, size, mask, align, flags
 			/* maybe, the resister is overflowed. */
       
 			if (extent_alloc_subregion(rbt->rb_ext, addr,
-			    addr + size, size, 0, 0, exflags, (u_long *)&result)) {
+			    addr + size, size, 1, 0, exflags, (u_long *)&result)) {
 				return 1;
 			}
 		} else {
@@ -294,7 +294,6 @@ rbus_new(parent, start, size, offset, flags)
 	} else if (flags == RBUS_SPACE_DEDICATE) {
 		if (NULL == (ex = extent_create("rbus", start, end, M_DEVBUF,
 		    NULL, 0, EX_NOCOALESCE|EX_NOWAIT))) {
-			free(rb, M_DEVBUF);
 			return NULL;
 		}
 	} else if (flags == RBUS_SPACE_ASK_PARENT) {

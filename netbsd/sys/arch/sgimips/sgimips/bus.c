@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.c,v 1.1.2.1 2000/06/30 16:27:36 simonb Exp $	*/
+/*	$NetBSD: bus.c,v 1.13 2002/03/13 13:12:29 simonb Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,13 +51,11 @@
 #include <machine/bus.h>
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <mips/cpuregs.h>
 #include <mips/locore.h>
+#include <mips/cache.h>
 
 static int	_bus_dmamap_load_buffer(bus_dmamap_t, void *, bus_size_t,
 				struct proc *, int, vaddr_t *, int *, int);
@@ -201,11 +199,10 @@ bus_space_map(t, bpa, size, flags, bshp)
 #define PCI_LOW_IO		0x18000000
 
 	/* XXX O2 */
-        if (bpa > 0x80000000 && bpa < 0x82000000)
-                *bshp = MIPS_PHYS_TO_KSEG1(PCI_LOW_MEMORY + (bpa & 0xfffffff));
-        if (bpa < 0x00010000)
-                *bshp = MIPS_PHYS_TO_KSEG1(PCI_LOW_IO + bpa);
-
+	if (bpa > 0x80000000 && bpa < 0x82000000)
+		*bshp = MIPS_PHYS_TO_KSEG1(PCI_LOW_MEMORY + (bpa & 0xfffffff));
+	if (bpa < 0x00010000)
+		*bshp = MIPS_PHYS_TO_KSEG1(PCI_LOW_IO + bpa);
 
 	return 0;
 }
@@ -288,7 +285,7 @@ _bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	    (flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK)) == NULL)
 		return ENOMEM;
 
-	bzero(mapstore, mapsize);
+	memset(mapstore, 0, mapsize);
 	map = (struct sgimips_bus_dmamap *)mapstore;
 	map->_dm_size = size;
 	map->_dm_segcnt = nsegments;
@@ -323,8 +320,7 @@ extern	paddr_t kvtophys(vaddr_t);		/* XXX */
  * first indicates if this is the first invocation of this function.
  */
 int
-_bus_dmamap_load_buffer(map, buf, buflen, p, flags,
-    lastaddrp, segp, first)
+_bus_dmamap_load_buffer(map, buf, buflen, p, flags, lastaddrp, segp, first)
 	bus_dmamap_t map;
 	void *buf;
 	bus_size_t buflen;
@@ -340,7 +336,7 @@ _bus_dmamap_load_buffer(map, buf, buflen, p, flags,
 	int seg;
 
 	lastaddr = *lastaddrp;
-	bmask  = ~(map->_dm_boundary - 1);
+	bmask = ~(map->_dm_boundary - 1);
 
 	for (seg = *segp; buflen > 0 ; ) {
 		/*
@@ -673,14 +669,14 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 
 #ifdef BUS_DMA_DEBUG
 		printf("bus_dmamap_sync: flushing segment %d "
-		    "(0x%lx..0x%lx) ...", i, addr + offset,
-		    addr + offset + minlen - 1);
-#endif
-#if 1
-		MachFlushDCache(addr + offset, minlen);
+		    "(0x%lx+%lx, 0x%lx+0x%lx) (olen = %ld)...", i,
+		    addr, offset, addr, offset + minlen - 1, len);
 #endif
 #if 0
-		mips3_HitFlushDCache(map->dm_segs[i]._ds_vaddr + offset, len);
+		MachFlushDCache(addr + offset, minlen);
+#endif
+#if 1
+		mips_dcache_wbinv_range(addr + offset, minlen);
 #endif
 #if 0
 		MachFlushCache();
@@ -710,7 +706,7 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 	extern paddr_t avail_start, avail_end;
 	vaddr_t curaddr, lastaddr;
 	psize_t high;
-	vm_page_t m;
+	struct vm_page *m;
 	struct pglist mlist;
 	int curseg, error;
 
@@ -742,7 +738,7 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 		curaddr = VM_PAGE_TO_PHYS(m);
 #ifdef DIAGNOSTIC
 		if (curaddr < avail_start || curaddr >= high) {
-			printf("vm_page_alloc_memory returned non-sensical"
+			printf("uvm_pglistalloc returned non-sensical"
 			    " address 0x%lx\n", curaddr);
 			panic("_bus_dmamem_alloc");
 		}
@@ -772,7 +768,7 @@ _bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -844,6 +840,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			/* XXX Do something about COHERENT here. */
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return 0;
 }

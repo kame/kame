@@ -1,4 +1,4 @@
-/*	$NetBSD: pccbbvar.h,v 1.13 2000/06/08 10:28:29 haya Exp $	*/
+/*	$NetBSD: pccbbvar.h,v 1.17 2001/11/02 03:32:34 haya Exp $	*/
 /*
  * Copyright (c) 1999 HAYAKAWA Koichi.  All rights reserved.
  *
@@ -120,9 +120,7 @@ struct pccbb_softc {
 	struct callout sc_insert_ch;
 
 	void *sc_ih;			/* interrupt handler */
-	int sc_intrline;		/* interrupt line */
-	pcitag_t sc_intrtag;		/* copy of pa->pa_intrtag */
-	pci_intr_pin_t sc_intrpin;	/* copy of pa->pa_intrpin */
+	struct pci_attach_args sc_pa;	/* copy of our attach args */
 	int sc_function;
 	u_int32_t sc_flags;
 #define	CBB_CARDEXIST	0x01
@@ -138,6 +136,9 @@ struct pccbb_softc {
 	bus_addr_t sc_mem_end;		/* CardBus/PCMCIA memory end */
 	bus_addr_t sc_io_start;		/* CardBus/PCMCIA io start */
 	bus_addr_t sc_io_end;		/* CardBus/PCMCIA io end */
+
+	pcireg_t sc_sockbase;		/* Socket base register */
+	pcireg_t sc_busnum;		/* bus number */
 
 	/* CardBus stuff */
 	struct cardslot_softc *sc_csc;
@@ -159,6 +160,8 @@ struct pccbb_softc {
 	/* interrupt handler list on the bridge */
 	struct pccbb_intrhand_list *sc_pil;
 	int sc_pil_intr_enable;	/* can i call intr handler for child device? */
+
+	int sc_pwrmgt_offs;	/* Offset for power management capability */
 };
 
 /*
@@ -172,5 +175,8 @@ struct pccbb_intrhand_list {
 	int pil_level;
 	struct pccbb_intrhand_list *pil_next;
 };
+
+void pccbb_intr_route __P((struct pccbb_softc *sc));
+
 
 #endif /* _DEV_PCI_PCCBBREG_H_ */

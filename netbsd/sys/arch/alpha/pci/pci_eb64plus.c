@@ -1,4 +1,4 @@
-/* $NetBSD: pci_eb64plus.c,v 1.7 2000/06/05 21:47:25 thorpej Exp $ */
+/* $NetBSD: pci_eb64plus.c,v 1.11 2002/05/15 16:57:42 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -66,7 +66,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pci_eb64plus.c,v 1.7 2000/06/05 21:47:25 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_eb64plus.c,v 1.11 2002/05/15 16:57:42 thorpej Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -77,7 +77,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_eb64plus.c,v 1.7 2000/06/05 21:47:25 thorpej Exp
 #include <sys/device.h>
 #include <sys/syslog.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 
@@ -94,7 +94,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_eb64plus.c,v 1.7 2000/06/05 21:47:25 thorpej Exp
 #include <alpha/pci/siovar.h>
 #endif
 
-int	dec_eb64plus_intr_map __P((void *, pcitag_t, int, int,
+int	dec_eb64plus_intr_map __P((struct pci_attach_args *,
 	    pci_intr_handle_t *));
 const char *dec_eb64plus_intr_string __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_eb64plus_intr_evcnt __P((void *, pci_intr_handle_t));
@@ -110,7 +110,7 @@ struct alpha_shared_intr *eb64plus_pci_intr;
 bus_space_tag_t eb64plus_intrgate_iot;
 bus_space_handle_t eb64plus_intrgate_ioh;
 
-void	eb64plus_iointr __P((void *framep, unsigned long vec));
+void	eb64plus_iointr __P((void *arg, unsigned long vec));
 extern void	eb64plus_intr_enable __P((int irq));  /* pci_eb64plus_intr.S */
 extern void	eb64plus_intr_disable __P((int irq)); /* pci_eb64plus_intr.S */
 
@@ -155,19 +155,16 @@ pci_eb64plus_pickintr(acp)
 #if NSIO
 	sio_intr_setup(pc, iot);
 #endif
-
-	set_iointr(eb64plus_iointr);
 }
 
 int     
-dec_eb64plus_intr_map(acv, bustag, buspin, line, ihp)
-        void *acv;
-        pcitag_t bustag; 
-        int buspin, line;
+dec_eb64plus_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
         pci_intr_handle_t *ihp;
 {
-	struct apecs_config *acp = acv;
-	pci_chipset_tag_t pc = &acp->ac_pc;
+	pcitag_t bustag = pa->pa_intrtag;
+	int buspin = pa->pa_intrpin, line = pa->pa_intrline;
+	pci_chipset_tag_t pc = pa->pa_pc;
 	int bus, device, function;
 
 	if (buspin == 0) {
@@ -179,7 +176,7 @@ dec_eb64plus_intr_map(acv, bustag, buspin, line, ihp)
 		return 1;
 	}
 
-	alpha_pci_decompose_tag(pc, bustag, &bus, &device, &function);
+	pci_decompose_tag(pc, bustag, &bus, &device, &function);
 
 	/*
 	 * The console places the interrupt mapping in the "line" value.
@@ -239,8 +236,11 @@ dec_eb64plus_intr_establish(acv, ih, level, func, arg)
 	cookie = alpha_shared_intr_establish(eb64plus_pci_intr, ih, IST_LEVEL,
 	    level, func, arg, "eb64+ irq");
 
-	if (cookie != NULL && alpha_shared_intr_isactive(eb64plus_pci_intr, ih))
+	if (cookie != NULL &&
+	    alpha_shared_intr_firstactive(eb64plus_pci_intr, ih)) {
+		scb_set(0x900 + SCB_IDXTOVEC(ih), eb64plus_iointr, NULL);
 		eb64plus_intr_enable(ih);
+	}
 	return (cookie);
 }
 
@@ -260,38 +260,27 @@ dec_eb64plus_intr_disestablish(acv, cookie)
 		eb64plus_intr_disable(irq);
 		alpha_shared_intr_set_dfltsharetype(eb64plus_pci_intr, irq,
 		    IST_NONE);
+		scb_free(0x900 + SCB_IDXTOVEC(irq));
 	}
  
 	splx(s);
 }
 
 void
-eb64plus_iointr(framep, vec)
-	void *framep;
+eb64plus_iointr(arg, vec)
+	void *arg;
 	unsigned long vec;
 {
 	int irq; 
 
-	if (vec >= 0x900) {
-		if (vec >= 0x900 + (EB64PLUS_MAX_IRQ << 4))
-			panic("eb64plus_iointr: vec 0x%lx out of range\n", vec);
-		irq = (vec - 0x900) >> 4;
+	irq = SCB_VECTOIDX(vec - 0x900);
 
-		if (!alpha_shared_intr_dispatch(eb64plus_pci_intr, irq)) {
-			alpha_shared_intr_stray(eb64plus_pci_intr, irq,
-			    "eb64+ irq");
-			if (ALPHA_SHARED_INTR_DISABLE(eb64plus_pci_intr, irq))
-				eb64plus_intr_disable(irq);
-		}
-		return;
+	if (!alpha_shared_intr_dispatch(eb64plus_pci_intr, irq)) {
+		alpha_shared_intr_stray(eb64plus_pci_intr, irq,
+		    "eb64+ irq");
+		if (ALPHA_SHARED_INTR_DISABLE(eb64plus_pci_intr, irq))
+			eb64plus_intr_disable(irq);
 	}
-#if NSIO
-	if (vec >= 0x800) {
-		sio_iointr(framep, vec);
-		return;
-	}
-#endif
-	panic("eb64plus_iointr: weird vec 0x%lx\n", vec);
 }
 
 #if 0		/* THIS DOES NOT WORK!  see pci_eb64plus_intr.S. */

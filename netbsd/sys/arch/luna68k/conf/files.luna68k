@@ -1,5 +1,5 @@
 #
-#	$NetBSD: files.luna68k,v 1.3 2000/03/15 17:08:40 soren Exp $
+#	$NetBSD: files.luna68k,v 1.6 2002/01/21 21:57:04 jdolecek Exp $
 #
 maxpartitions 8
 maxusers 2 8 64
@@ -14,6 +14,7 @@ file arch/luna68k/luna68k/machdep.c
 file arch/luna68k/luna68k/mem.c
 file arch/luna68k/luna68k/pmap.c
 file arch/luna68k/luna68k/pmap_bootstrap.c
+file arch/luna68k/luna68k/procfs_machdep.c	procfs
 file arch/luna68k/luna68k/sys_machdep.c
 file arch/luna68k/luna68k/trap.c
 file arch/luna68k/luna68k/vm_machdep.c
@@ -60,7 +61,7 @@ major	{sd = 2}	# SCSI disk
 major	{cd = 4}	# SCSI CD-ROM
 
 # Memory Disk for boot tape
-file arch/luna68k/dev/md_root.c		memory_disk_hooks
+file	dev/md_root.c			memory_disk_hooks
 major	{md = 7}	# Memory disk (for mini-kernel)
 
 # RAIDframe
@@ -68,3 +69,9 @@ major	{raid = 14}
 
 # "Workstation Console" glue.
 include "dev/wscons/files.wscons"
+
+
+# Compatibility modules
+
+# NetBSD m68k a.out Binary Compatibility (COMPAT_AOUT_M68K)
+include "compat/aoutm68k/files.aoutm68k"

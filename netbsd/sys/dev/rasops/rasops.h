@@ -1,4 +1,4 @@
-/* 	$NetBSD: rasops.h,v 1.13 2000/06/13 13:36:54 ad Exp $ */
+/* 	$NetBSD: rasops.h,v 1.15 2001/09/18 18:15:53 wiz Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -123,11 +123,12 @@ struct rasops_info {
  */
 
 /*
- * Per-depth initalization functions. These should not be called outside
+ * Per-depth initialization functions. These should not be called outside
  * the rasops code.
  */
 void	rasops1_init __P((struct rasops_info *));
 void	rasops2_init __P((struct rasops_info *));
+void	rasops4_init __P((struct rasops_info *));
 void	rasops8_init __P((struct rasops_info *));
 void	rasops15_init __P((struct rasops_info *));
 void	rasops24_init __P((struct rasops_info *));

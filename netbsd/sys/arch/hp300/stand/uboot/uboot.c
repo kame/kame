@@ -1,4 +1,4 @@
-/*	$NetBSD: uboot.c,v 1.3 1997/04/27 21:17:13 thorpej Exp $	*/
+/*	$NetBSD: uboot.c,v 1.9 2002/03/16 06:20:08 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -36,8 +36,7 @@
  */
 
 #include <sys/param.h>
-#include <sys/reboot.h>
-#include <a.out.h>
+#include <sys/boot_flag.h>
 
 #include <lib/libsa/stand.h>
 
@@ -70,6 +69,10 @@ char *names[] = {
 
 static int bdev, badapt, bctlr, bunit, bpart;
 
+void main __P((void));
+void getbootdev __P((int *));
+
+void
 main()
 {
 	int currname = 0;
@@ -96,18 +99,18 @@ main()
 			getbootdev(&howto);
 		} else
 			printf(": %s\n", name);
-
-		exec(name, lowram, howto);
+		exec_hp300(name, (u_long)lowram, howto);
 		printf("boot: %s\n", strerror(errno));
 	}
 }
 
+void
 getbootdev(howto)
 	int *howto;
 {
 	char c, *ptr = line;
 
-	printf("Boot: [[[%s%d%c:]%s][-s][-a][-d]] :- ",
+	printf("Boot: [[[%s%d%c:]%s][-a][-c][-d][-s][-v][-q]] :- ",
 	    devsw[bdev].dv_name, bctlr + (8 * badapt), 'a' + bpart, name);
 
 	if (tgets(line)) {
@@ -116,27 +119,14 @@ getbootdev(howto)
 			printf("panic: can't reboot, halting\n");
 			asm("stop #0x2700");
 		}
-		while (c = *ptr) {
+		while ((c = *ptr) != '\0') {
 			while (c == ' ')
 				c = *++ptr;
 			if (!c)
 				return;
 			if (c == '-')
 				while ((c = *++ptr) && c != ' ')
-					switch (c) {
-					case 'a':
-						*howto |= RB_ASKNAME;
-						continue;
-					case 's':
-						*howto |= RB_SINGLE;
-						continue;
-					case 'd':
-						*howto |= RB_KDB;
-						continue;
-					case 'b':
-						*howto |= RB_HALT;
-						continue;
-					}
+					BOOT_FLAG(c, *howto);
 			else {
 				name = ptr;
 				while ((c = *++ptr) && c != ' ');

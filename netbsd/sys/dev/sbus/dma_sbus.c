@@ -1,4 +1,4 @@
-/*	$NetBSD: dma_sbus.c,v 1.4.4.1 2000/07/19 02:53:04 mrg Exp $ */
+/*	$NetBSD: dma_sbus.c,v 1.11 2002/03/21 00:16:15 eeh Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -65,7 +65,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dma_sbus.c,v 1.11 2002/03/21 00:16:15 eeh Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -152,7 +154,6 @@ dmaattach_sbus(parent, self, aux)
 	struct sbus_attach_args *sa = aux;
 	struct dma_softc *dsc = (void *)self;
 	struct lsi64854_softc *sc = &dsc->sc_lsi64854;
-	bus_space_handle_t bh;
 	bus_space_tag_t sbt;
 	int sbusburst, burst;
 	int node;
@@ -163,17 +164,16 @@ dmaattach_sbus(parent, self, aux)
 	sc->sc_dmatag = sa->sa_dmatag;
 
 	/* Map registers */
-	if (sa->sa_npromvaddrs != 0)
-		sc->sc_regs = (bus_space_handle_t)sa->sa_promvaddrs[0];
-	else {
-		if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
-				 sa->sa_offset,
-				 sa->sa_size,
-				 0, 0, &bh) != 0) {
+	if (sa->sa_npromvaddrs) {
+		sbus_promaddr_to_handle(sa->sa_bustag,
+			sa->sa_promvaddrs[0], &sc->sc_regs);
+	} else {
+		if (sbus_bus_map(sa->sa_bustag,
+			sa->sa_slot, sa->sa_offset, sa->sa_size,
+			0, &sc->sc_regs) != 0) {
 			printf("%s: cannot map registers\n", self->dv_xname);
 			return;
 		}
-		sc->sc_regs = bh;
 	}
 
 	/*
@@ -185,7 +185,7 @@ dmaattach_sbus(parent, self, aux)
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-	burst = getpropint(node,"burst-sizes", -1);
+	burst = PROM_getpropint(node,"burst-sizes", -1);
 	if (burst == -1)
 		/* take SBus burst sizes */
 		burst = sbusburst;
@@ -205,7 +205,7 @@ dmaattach_sbus(parent, self, aux)
 		 * the "cable-selection" property; default to TP and then
 		 * the user can change it via a "media" option to ifconfig.
 		 */
-		cabletype = getpropstring(node, "cable-selection");
+		cabletype = PROM_getpropstring(node, "cable-selection");
 		csr = L64854_GCSR(sc);
 		if (strcmp(cabletype, "tpe") == 0) {
 			csr |= E_TP_AUI;
@@ -264,12 +264,11 @@ dma_alloc_bustag(sc)
 {
 	bus_space_tag_t sbt;
 
-	sbt = (bus_space_tag_t)
-		malloc(sizeof(struct sparc_bus_space_tag), M_DEVBUF, M_NOWAIT);
+	sbt = (bus_space_tag_t) malloc(sizeof(struct sparc_bus_space_tag),
+	    M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (sbt == NULL)
 		return (NULL);
 
-	bzero(sbt, sizeof *sbt);
 	sbt->cookie = sc;
 	sbt->parent = sc->sc_lsi64854.sc_bustag;
 	sbt->sparc_intr_establish = dmabus_intr_establish;

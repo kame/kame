@@ -1,4 +1,4 @@
-/*	$NetBSD: stand.h,v 1.40 2000/02/03 02:00:31 cgd Exp $	*/
+/*	$NetBSD: stand.h,v 1.43 2001/09/02 07:04:16 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -75,6 +75,15 @@
 #define	NULL	0
 #endif
 
+#ifdef LIBSA_RENAME_PRINTF
+#define getchar		libsa_getchar
+#define gets		libsa_gets
+#define printf		libsa_printf
+#define putchar		libsa_putchar
+#define sprintf		libsa_sprintf
+#define vprintf		libsa_vprintf
+#define vsprintf	libsa_vsprintf
+#endif
 #ifdef LIBSA_USE_MEMSET
 #define	bzero(s, l)	memset(s, 0, l)
 #endif
@@ -199,11 +208,6 @@ extern struct open_file files[];
 #endif
 #define F_NODEV		0x0008	/* network open - no device */
 
-#define isupper(c)	((c) >= 'A' && (c) <= 'Z')
-#define tolower(c)	((c) - 'A' + 'a')
-#define isspace(c)	((c) == ' ' || (c) == '\t')
-#define isdigit(c)	((c) >= '0' && (c) <= '9')
-
 int	devopen __P((struct open_file *, const char *, char **));
 #ifdef HEAP_VARIABLE
 void	setheap __P((void *, void *));
@@ -228,6 +232,7 @@ __dead void	panic __P((const char *, ...)) __attribute__((noreturn));
 __dead void	_rtt __P((void)) __attribute__((noreturn));
 void	bcopy __P((const void *, void *, size_t));
 void	*memcpy __P((void *, const void *, size_t));
+void	*memmove __P((void *, const void *, size_t));
 int	memcmp __P((const void *, const void *, size_t));
 void	exec __P((char *, char *, int));
 int	open __P((const char *, int));

@@ -1,4 +1,4 @@
-/*	$NetBSD: mgnsc.c,v 1.30 1999/01/10 13:28:34 tron Exp $	*/
+/*	$NetBSD: mgnsc.c,v 1.33 2002/01/28 09:57:01 aymeric Exp $ */
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -36,6 +36,9 @@
  *	@(#)dma.c
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mgnsc.c,v 1.33 2002/01/28 09:57:01 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -51,19 +54,12 @@
 #include <amiga/dev/siopvar.h>
 #include <amiga/dev/zbusvar.h>
 
-void mgnscattach __P((struct device *, struct device *, void *));
-int mgnscmatch __P((struct device *, struct cfdata *, void *));
-int mgnsc_dmaintr __P((void *));
+void mgnscattach(struct device *, struct device *, void *);
+int mgnscmatch(struct device *, struct cfdata *, void *);
+int mgnsc_dmaintr(void *);
 #ifdef DEBUG
-void mgnsc_dump __P((void));
+void mgnsc_dump(void);
 #endif
-
-struct scsipi_device mgnsc_scsidev = {
-	NULL,		/* use default error handler */
-	NULL,		/* do not have a start functio */
-	NULL,		/* have no async handler */
-	NULL,		/* Use default done routine */
-};
 
 
 #ifdef DEBUG
@@ -77,10 +73,7 @@ struct cfattach mgnsc_ca = {
  * if we are a CSA Magnum 40 SCSI
  */
 int
-mgnscmatch(pdp, cfp, auxp)
-	struct device *pdp;
-	struct cfdata *cfp;
-	void *auxp;
+mgnscmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 {
 	struct zbus_args *zap;
 
@@ -91,18 +84,17 @@ mgnscmatch(pdp, cfp, auxp)
 }
 
 void
-mgnscattach(pdp, dp, auxp)
-	struct device *pdp, *dp;
-	void *auxp;
+mgnscattach(struct device *pdp, struct device *dp, void *auxp)
 {
-	struct siop_softc *sc;
+	struct siop_softc *sc = (struct siop_softc *)dp;
 	struct zbus_args *zap;
 	siop_regmap_p rp;
+	struct scsipi_adapter *adapt = &sc->sc_adapter;
+	struct scsipi_channel *chan = &sc->sc_channel;
 
 	printf("\n");
 	zap = auxp;
 
-	sc = (struct siop_softc *)dp;
 	sc->sc_siopp = rp = (siop_regmap_p)((caddr_t)zap->va + 0x8000);
 
 	/*
@@ -114,18 +106,27 @@ mgnscattach(pdp, dp, auxp)
 
 	alloc_sicallback();
 
-	sc->sc_adapter.scsipi_cmd = siop_scsicmd;
-	sc->sc_adapter.scsipi_minphys = siop_minphys;
+	/*
+	 * Fill in the scsipi_adapter.
+	 */
+	memset(adapt, 0, sizeof(*adapt));
+	adapt->adapt_dev = &sc->sc_dev;
+	adapt->adapt_nchannels = 1;
+	adapt->adapt_openings = 7;
+	adapt->adapt_max_periph = 1;
+	adapt->adapt_request = siop_scsipi_request;
+	adapt->adapt_minphys = siop_minphys;
 
-	sc->sc_link.scsipi_scsi.channel = SCSI_CHANNEL_ONLY_ONE;
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.scsipi_scsi.adapter_target = 7;
-	sc->sc_link.adapter = &sc->sc_adapter;
-	sc->sc_link.device = &mgnsc_scsidev;
-	sc->sc_link.openings = 2;
-	sc->sc_link.scsipi_scsi.max_target = 7;
-	sc->sc_link.scsipi_scsi.max_lun = 7;
-	sc->sc_link.type = BUS_SCSI;
+	/*
+	 * Fill in the scsipi_channel.
+	 */
+	memset(chan, 0, sizeof(*chan));
+	chan->chan_adapter = adapt;
+	chan->chan_bustype = &scsi_bustype;
+	chan->chan_channel = 0;
+	chan->chan_ntargets = 8;
+	chan->chan_nluns = 8;
+	chan->chan_id = 7;
 
 	siopinitialize(sc);
 
@@ -137,7 +138,7 @@ mgnscattach(pdp, dp, auxp)
 	/*
 	 * attach all scsi units on us
 	 */
-	config_found(dp, &sc->sc_link, scsiprint);
+	config_found(dp, chan, scsiprint);
 }
 
 /*
@@ -149,8 +150,7 @@ mgnscattach(pdp, dp, auxp)
  */
 
 int
-mgnsc_dmaintr(arg)
-	void *arg;
+mgnsc_dmaintr(void *arg)
 {
 	struct siop_softc *sc = arg;
 	siop_regmap_p rp;
@@ -182,7 +182,7 @@ mgnsc_dmaintr(arg)
 
 #ifdef DEBUG
 void
-mgnsc_dump()
+mgnsc_dump(void)
 {
 	extern struct cfdriver mgnsc_cd;
 	int i;

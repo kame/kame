@@ -1,4 +1,4 @@
-/*	$NetBSD: audioamd.c,v 1.5.2.1 2000/07/19 02:53:10 mrg Exp $	*/
+/*	$NetBSD: audioamd.c,v 1.8.6.1 2002/06/24 12:08:28 lukem Exp $	*/
 /*	NetBSD: am7930_sparc.c,v 1.44 1999/03/14 22:29:00 jonathan Exp 	*/
 
 /*
@@ -182,6 +182,9 @@ struct audio_hw_if sa_hw_if = {
 	0,
         0,
 	am7930_get_props,
+	0,
+	0,
+        0,
 };
 
 struct audio_device audioamd_device = {
@@ -226,13 +229,11 @@ audioamd_mainbus_attach(parent, self, aux)
 
 	sc->sc_bt = ma->ma_bustag;
 
-	if (bus_space_map2(
+	if (bus_space_map(
 			ma->ma_bustag,
-			ma->ma_iospace,
 			ma->ma_paddr,
 			AM7930_DREG_SIZE,
 			BUS_SPACE_MAP_LINEAR,
-			0,
 			&bh) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
@@ -253,13 +254,10 @@ audioamd_sbus_attach(parent, self, aux)
 
 	sc->sc_bt = sa->sa_bustag;
 
-	if (sbus_bus_map(
-			sa->sa_bustag,
-			sa->sa_slot,
-			sa->sa_offset,
-			AM7930_DREG_SIZE,
-			0, 0,
-			&bh) != 0) {
+	if (sbus_bus_map(sa->sa_bustag,
+			 sa->sa_slot, sa->sa_offset,
+			 AM7930_DREG_SIZE,
+			 0, &bh) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -393,9 +391,10 @@ audioamd_start_input(addr, p, cc, intr, arg)
 
 #ifdef AUDIO_C_HANDLER
 int
-am7930hwintr(sc)
-	struct audioamd_softc *au0;
+am7930hwintr(v)
+	void *v;
 {
+	struct audioamd_softc *sc = v;
 	struct auio *au = &sc->sc_au;
 	u_int8_t *d, *e;
 	int k;
@@ -427,7 +426,7 @@ am7930hwintr(sc)
 		}
 	}
 
-	*(au->au_intrcnt)++;
+	au->au_intrcnt.ev_count++;
 	return (1);
 }
 #endif /* AUDIO_C_HANDLER */

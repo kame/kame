@@ -1,4 +1,4 @@
-/*	$NetBSD: ka46.c,v 1.13 2000/04/22 18:11:27 ragge Exp $ */
+/*	$NetBSD: ka46.c,v 1.17 2001/06/05 11:25:11 ragge Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -38,8 +38,7 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <machine/cpu.h>
@@ -54,13 +53,13 @@
 #include <machine/clock.h>
 #include <machine/vsbus.h>
 
-static	void	ka46_conf __P((void));
-static	void	ka46_steal_pages __P((void));
-static	void	ka46_memerr __P((void));
-static	int	ka46_mchk __P((caddr_t));
-static	void	ka46_halt __P((void));
-static	void	ka46_reboot __P((int));
-static	void	ka46_cache_enable __P((void));
+static	void	ka46_conf(void);
+static	void	ka46_steal_pages(void);
+static	void	ka46_memerr(void);
+static	int	ka46_mchk(caddr_t);
+static	void	ka46_halt(void);
+static	void	ka46_reboot(int);
+static	void	ka46_cache_enable(void);
 
 struct	vs_cpu *ka46_cpu;
 
@@ -87,7 +86,11 @@ struct	cpu_dep ka46_calls = {
 void
 ka46_conf()
 {
-	printf("cpu: KA46\n");
+	switch(vax_siedata & 0x3) {
+		case 1: printf("cpu0: KA47\n"); break;
+		case 2: printf("cpu0: KA46\n"); break;
+		default: printf("cpu0: unknown KA46-type\n"); break;
+	}
 	ka46_cpu = (void *)vax_map_physmem(VS_REGS, 1);
 	printf("cpu: turning on floating point chip\n");
 	mtpr(2, PR_ACCS); /* Enable floating points */
@@ -138,8 +141,7 @@ ka46_memerr()
 }
 
 int
-ka46_mchk(addr)
-	caddr_t addr;
+ka46_mchk(caddr_t addr)
 {
 	panic("Machine check");
 	return 0;
@@ -153,15 +155,20 @@ ka46_steal_pages()
 	ka46_cache_enable();
 }
 
+#define	KA46_CPMBX	0x38
+#define KA46_HLT_HALT	0xcf
+#define KA46_HLT_BOOT	0x8b
+
 static void
 ka46_halt()
 {
+	((u_int8_t *) clk_page)[KA46_CPMBX] = KA46_HLT_HALT;
 	asm("halt");
 }
 
 static void
-ka46_reboot(arg)
-	int arg;
+ka46_reboot(int arg)
 {
+	((u_int8_t *) clk_page)[KA46_CPMBX] = KA46_HLT_BOOT;
 	asm("halt");
 }

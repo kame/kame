@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.13 2000/05/26 00:36:51 thorpej Exp $
+#	$NetBSD: genassym.cf,v 1.19 2002/05/11 09:39:28 jdolecek Exp $
 
 #
 # Copyright (c) 1982, 1990, 1993
@@ -35,7 +35,9 @@
 #	@(#)genassym.c	8.3 (Berkeley) 1/4/94
 #
 
+if defined(_KERNEL_OPT)
 include "opt_compat_svr4.h"
+endif
 
 include <sys/param.h>
 include <sys/buf.h>
@@ -46,10 +48,7 @@ include <sys/msgbuf.h>
 include <sys/syscall.h>
 include <sys/user.h>
 
-include <vm/vm.h>
-
 include <uvm/uvm.h>
-include <uvm/uvm_extern.h>
 
 ifdef COMPAT_SVR4
 include <compat/svr4/svr4_syscall.h>
@@ -60,6 +59,8 @@ include <machine/cpu.h>
 include <machine/psl.h>
 include <machine/reg.h>
 include <machine/pte.h>
+
+include <machine/bootinfo.h>
 
 # values for mmutype
 define	MMU_68060		MMU_68060
@@ -198,6 +199,12 @@ define	FR_HW			offsetof(struct frame, f_sr)
 define	FR_ADJ			offsetof(struct frame, f_stackadj)
 define	FR_SIZE			sizeof(struct trapframe)
 
+# FP frame offsets
+define	FPF_REGS		offsetof(struct fpframe, fpf_regs[0])
+define	FPF_FPCR		offsetof(struct fpframe, fpf_fpcr)
+define	FPF_FPSR		offsetof(struct fpframe, fpf_fpsr)
+define	FPF_FPI			offsetof(struct fpframe, fpf_fpiar)
+
 # system calls
 define	SYS_exit		SYS_exit
 define	SYS_execve		SYS_execve
@@ -219,3 +226,6 @@ define SVR4_SYS_context		SVR4_SYS_context
 define SVR4_SYS_exit		SVR4_SYS_exit
 define SVR4_SETCONTEXT		SVR4_SETCONTEXT
 endif
+
+# Bootloader / kernel interface
+define X68K_BOOTIF_VERS		X68K_BOOTIF_VERS

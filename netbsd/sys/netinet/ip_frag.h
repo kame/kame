@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_frag.h,v 1.14.4.2 2002/02/09 16:56:27 he Exp $	*/
+/*	$NetBSD: ip_frag.h,v 1.17 2002/01/24 08:23:12 martti Exp $	*/
 
 /*
  * Copyright (C) 1993-2001 by Darren Reed.

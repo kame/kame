@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_pci.c,v 1.26 1998/10/02 00:20:52 fvdl Exp $	*/
+/*	$NetBSD: if_le_pci.c,v 1.36 2001/11/21 17:33:28 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -75,8 +75,8 @@
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
 
-#include "opt_inet.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le_pci.c,v 1.36 2001/11/21 17:33:28 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,20 +85,11 @@
 #include <sys/socket.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#include <vm/vm.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -123,7 +114,7 @@ struct cfattach le_pci_ca = {
 	sizeof(struct le_softc), le_pci_match, le_pci_attach
 };
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -209,7 +200,7 @@ le_pci_mediachange(sc)
 				sc->sc_initmodemedia = 1; /* UTP */
 			else
 				sc->sc_initmodemedia = 0; /* AUI */
-			lance_init(sc);
+			lance_init(&sc->sc_ethercom.ec_if);
 
 			if (IFM_SUBTYPE(lesc->sc_currentmedia) == IFM_AUTO) {
 				/* take away autoselect - BCR2 bit 1 */
@@ -230,7 +221,7 @@ le_pci_mediachange(sc)
 		reg = bus_space_read_2(iot, ioh, PCNET_PCI_BDP);
 		if (IFM_OPTIONS(newmedia) & IFM_FDX) {
 			reg |= 1; /* FDEN */
-			/* allow FDX on AUI only if explicitely chosen,
+			/* allow FDX on AUI only if explicitly chosen,
 			 not in autoselect mode */
 			if (IFM_SUBTYPE(newmedia) == IFM_10_5)
 				reg |= 2; /* AUIFD */
@@ -315,7 +306,7 @@ le_pci_attach(parent, self, aux)
 	/*
 	 * Allocate a DMA area for the card.
 	 */
-	if (bus_dmamem_alloc(dmat, LE_PCI_MEMSIZE, NBPG, 0, &seg, 1,
+	if (bus_dmamem_alloc(dmat, LE_PCI_MEMSIZE, PAGE_SIZE, 0, &seg, 1,
 	    &rseg, BUS_DMA_NOWAIT)) {
 		printf("%s: couldn't allocate memory for card\n",
 		    sc->sc_dev.dv_xname);
@@ -381,8 +372,7 @@ le_pci_attach(parent, self, aux)
 	    csr | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: fdesc_vnops.c,v 1.55 2000/05/27 04:52:39 thorpej Exp $	*/
+/*	$NetBSD: fdesc_vnops.c,v 1.69 2002/04/02 17:46:06 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -44,9 +44,11 @@
  * /dev/fd Filesystem
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fdesc_vnops.c,v 1.69 2002/04/02 17:46:06 jdolecek Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>	/* boottime */
@@ -128,11 +130,12 @@ int	fdesc_pathconf	__P((void *));
 #define	fdesc_update	genfs_nullop
 #define	fdesc_bwrite	genfs_eopnotsupp
 #define fdesc_revoke	genfs_revoke
+#define fdesc_putpages	genfs_null_putpages
 
 static int fdesc_attr __P((int, struct vattr *, struct ucred *, struct proc *));
 
 int (**fdesc_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc fdesc_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc fdesc_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, fdesc_lookup },		/* lookup */
 	{ &vop_create_desc, fdesc_create },		/* create */
@@ -176,10 +179,11 @@ struct vnodeopv_entry_desc fdesc_vnodeop_entries[] = {
 	{ &vop_truncate_desc, fdesc_truncate },		/* truncate */
 	{ &vop_update_desc, fdesc_update },		/* update */
 	{ &vop_bwrite_desc, fdesc_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, fdesc_putpages },		/* putpages */
+	{ NULL, NULL }
 };
 
-struct vnodeopv_desc fdesc_vnodeop_opv_desc =
+const struct vnodeopv_desc fdesc_vnodeop_opv_desc =
 	{ &fdesc_vnodeop_p, fdesc_vnodeop_entries };
 
 /*
@@ -195,7 +199,7 @@ fdesc_init()
 		if (cdevsw[cttymajor].d_open == cttyopen)
 			break;
 	devctty = makedev(cttymajor, 0);
-	fdhashtbl = hashinit(NFDCACHE, M_CACHE, M_NOWAIT, &fdhash);
+	fdhashtbl = hashinit(NFDCACHE, HASH_LIST, M_CACHE, M_NOWAIT, &fdhash);
 }
 
 /*
@@ -393,7 +397,8 @@ fdesc_lookup(v)
 			goto bad;
 		}
 
-		if (fd >= nfiles || p->p_fd->fd_ofiles[fd] == NULL) {
+		if (fd >= nfiles || p->p_fd->fd_ofiles[fd] == NULL ||
+		    FILE_IS_USABLE(p->p_fd->fd_ofiles[fd]) == 0) {
 			error = EBADF;
 			goto bad;
 		}
@@ -472,7 +477,7 @@ fdesc_attr(fd, vap, cred, p)
 	struct stat stb;
 	int error;
 
-	if (fd >= fdp->fd_nfiles || (fp = fdp->fd_ofiles[fd]) == NULL)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return (EBADF);
 
 	switch (fp->f_type) {
@@ -487,31 +492,42 @@ fdesc_attr(fd, vap, cred, p)
 		}
 		break;
 
-	case DTYPE_SOCKET:
-		error = soo_stat((struct socket *)fp->f_data, &stb);
-		if (error == 0) {
-			vattr_null(vap);
-			vap->va_type = VSOCK;
-			vap->va_mode = stb.st_mode;
-			vap->va_nlink = stb.st_nlink;
-			vap->va_uid = stb.st_uid;
-			vap->va_gid = stb.st_gid;
-			vap->va_fsid = stb.st_dev;
-			vap->va_fileid = stb.st_ino;
-			vap->va_size = stb.st_size;
-			vap->va_blocksize = stb.st_blksize;
-			vap->va_atime = stb.st_atimespec;
-			vap->va_mtime = stb.st_mtimespec;
-			vap->va_ctime = stb.st_ctimespec;
-			vap->va_gen = stb.st_gen;
-			vap->va_flags = stb.st_flags;
-			vap->va_rdev = stb.st_rdev;
-			vap->va_bytes = stb.st_blocks * stb.st_blksize;
-		}
-		break;
-
 	default:
-		panic("fdesc attr");
+		FILE_USE(fp);
+		memset(&stb, 0, sizeof(stb));
+		error = (*fp->f_ops->fo_stat)(fp, &stb, p);
+		FILE_UNUSE(fp, p);
+		if (error)
+			break;
+
+		vattr_null(vap);
+		switch(fp->f_type) {
+		case DTYPE_SOCKET:
+			vap->va_type = VSOCK;
+			break;
+		case DTYPE_PIPE:
+			vap->va_type = VFIFO;
+			break;
+		default:
+			/* use VNON perhaps? */
+			vap->va_type = VBAD;
+			break;
+		}
+		vap->va_mode = stb.st_mode;
+		vap->va_nlink = stb.st_nlink;
+		vap->va_uid = stb.st_uid;
+		vap->va_gid = stb.st_gid;
+		vap->va_fsid = stb.st_dev;
+		vap->va_fileid = stb.st_ino;
+		vap->va_size = stb.st_size;
+		vap->va_blocksize = stb.st_blksize;
+		vap->va_atime = stb.st_atimespec;
+		vap->va_mtime = stb.st_mtimespec;
+		vap->va_ctime = stb.st_ctimespec;
+		vap->va_gen = stb.st_gen;
+		vap->va_flags = stb.st_flags;
+		vap->va_rdev = stb.st_rdev;
+		vap->va_bytes = stb.st_blocks * stb.st_blksize;
 		break;
 	}
 
@@ -612,7 +628,6 @@ fdesc_setattr(v)
 	struct filedesc *fdp = ap->a_p->p_fd;
 	struct file *fp;
 	unsigned fd;
-	int error;
 
 	/*
 	 * Can't mess with the root vnode
@@ -629,28 +644,15 @@ fdesc_setattr(v)
 	}
 
 	fd = VTOFDESC(ap->a_vp)->fd_fd;
-	if (fd >= fdp->fd_nfiles || (fp = fdp->fd_ofiles[fd]) == NULL) {
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return (EBADF);
-	}
 
 	/*
-	 * Can setattr the underlying vnode, but not sockets!
+	 * XXX: Can't reasonably set the attr's on any types currently.
+	 *      On vnode's this will cause truncation and socket/pipes make
+	 *      no sense.
 	 */
-	switch (fp->f_type) {
-	case DTYPE_VNODE:
-		error = VOP_SETATTR((struct vnode *) fp->f_data, ap->a_vap, ap->a_cred, ap->a_p);
-		break;
-
-	case DTYPE_SOCKET:
-		error = 0;
-		break;
-
-	default:
-		panic("fdesc setattr");
-		break;
-	}
-
-	return (error);
+	return (0);
 }
 
 #define UIO_MX 32
@@ -725,7 +727,7 @@ fdesc_readdir(v)
 
 		if (ap->a_ncookies) {
 			ncookies = min(ncookies, (nfdesc_targets - i));
-			MALLOC(cookies, off_t *, ncookies * sizeof(off_t),
+			cookies = malloc(ncookies * sizeof(off_t),
 			    M_TEMP, M_WAITOK);
 			*ap->a_cookies = cookies;
 			*ap->a_ncookies = ncookies;
@@ -744,7 +746,8 @@ fdesc_readdir(v)
 			case FD_STDERR:
 				if ((ft->ft_fileno - FD_STDIN) >= fdp->fd_nfiles)
 					continue;
-				if (fdp->fd_ofiles[ft->ft_fileno - FD_STDIN] == NULL)
+				if (fdp->fd_ofiles[ft->ft_fileno - FD_STDIN] == NULL
+				    || FILE_IS_USABLE(fdp->fd_ofiles[ft->ft_fileno - FD_STDIN]) == 0)
 					continue;
 				break;
 			}
@@ -762,7 +765,8 @@ fdesc_readdir(v)
 	} else {
 		if (ap->a_ncookies) {
 			ncookies = min(ncookies, (fdp->fd_nfiles + 2));
-			MALLOC(cookies, off_t *, ncookies * sizeof(off_t),				    M_TEMP, M_WAITOK);
+			cookies = malloc(ncookies * sizeof(off_t),
+			    M_TEMP, M_WAITOK);
 			*ap->a_cookies = cookies;
 			*ap->a_ncookies = ncookies;
 		}
@@ -779,7 +783,8 @@ fdesc_readdir(v)
 				break;
 	
 			default:
-				if (fdp->fd_ofiles[i - 2] == NULL)
+				if (fdp->fd_ofiles[i - 2] == NULL ||
+				    FILE_IS_USABLE(fdp->fd_ofiles[i - 2]) == 0)
 					continue;
 				d.d_fileno = i - 2 + FD_STDIN;
 				d.d_namlen = sprintf(d.d_name, "%d", (int) i - 2);
@@ -795,7 +800,7 @@ fdesc_readdir(v)
 	}
 
 	if (ap->a_ncookies && error) {
-		FREE(*ap->a_cookies, M_TEMP);
+		free(*ap->a_cookies, M_TEMP);
 		*ap->a_ncookies = 0;
 		*ap->a_cookies = NULL;
 	}

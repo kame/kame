@@ -1,4 +1,4 @@
-/* $NetBSD: lunafb.c,v 1.4.4.1 2000/06/30 16:27:27 simonb Exp $ */
+/* $NetBSD: lunafb.c,v 1.7.6.1 2002/08/07 01:48:34 lukem Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: lunafb.c,v 1.4.4.1 2000/06/30 16:27:27 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lunafb.c,v 1.7.6.1 2002/08/07 01:48:34 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,7 +51,7 @@ __KERNEL_RCSID(0, "$NetBSD: lunafb.c,v 1.4.4.1 2000/06/30 16:27:27 simonb Exp $"
 #include <sys/tty.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
-#include <vm/vm.h>
+
 #include <uvm/uvm_extern.h>
 
 #include <dev/rcons/raster.h>
@@ -270,7 +270,7 @@ omfbioctl(v, cmd, data, flag, p)
 	case WSDISPLAYIO_SCURSOR:
 		break;
 	}
-	return (ENOTTY);
+	return (EPASSTHROUGH);
 }
 
 /*
@@ -299,7 +299,7 @@ omgetcmap(sc, p)
         int cmsize;
 
 	cmsize = sc->sc_dc->dc_cmsize;
-	if (index >= cmsize || (index + count) > cmsize)
+	if (index >= cmsize || count > cmsize - index)
 		return (EINVAL);
 
 	if (!uvm_useracc(p->red, count, B_WRITE) ||

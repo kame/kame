@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.3 2000/02/11 19:30:28 thorpej Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.8 2001/11/15 18:06:15 soren Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -48,6 +48,14 @@
 /*
  * Machine dependent constants for news68k
  */
+
+/*
+ * We use 4K pages on the news68k.  Override the PAGE_* definitions
+ * to be compile time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
 
 /*
  * USRTEXT is the start of the user text/data space, while USRSTACK
@@ -111,17 +119,6 @@
 #endif
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
@@ -138,9 +135,6 @@
 /* # of kernel PT pages (initial only, can grow dynamically) */
 #define VM_KERNEL_PT_PAGES	((vsize_t)2)		/* XXX: SYSPTSIZE */
 
-/* pcb base */
-#define	pcbb(p)		((u_int)(p)->p_addr)
-
 /*
  * Constants which control the way the VM system deals with memory segments.
  * The news68k only has one physical memory segment?
@@ -151,6 +145,8 @@
 
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
+
+#define	__HAVE_PMAP_PHYSSEG
 
 /*
  * pmap-specific data stored in the vm_physmem[] array.

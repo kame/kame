@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.7.4.1 2000/07/23 03:49:33 itojun Exp $	*/
+/*	$NetBSD: param.h,v 1.13 2002/03/09 23:35:59 chs Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,6 +31,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _POWERPC_PARAM_H
+#define	_POWERPC_PARAM_H
+
 #ifdef	_KERNEL
 #ifndef	_LOCORE
 #include <machine/cpu.h>
@@ -40,7 +43,9 @@
 /*
  * Machine dependent constants for PowerPC (32-bit only currently)
  */
+#ifndef MACHINE
 #define	MACHINE		"powerpc"
+#endif
 #define	MACHINE_ARCH	"powerpc"
 #define	MID_MACHINE	MID_POWERPC
 
@@ -64,7 +69,9 @@
 #define	MSGBUFSIZE	NBPG		/* default message buffer size */
 #endif
 
+#ifndef KERNBASE
 #define	KERNBASE	0x100000
+#endif
 
 /*
  * Constants related to network buffer management.
@@ -79,14 +86,14 @@
 
 #ifndef NMBCLUSTERS
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#endif
 
 #ifdef GATEWAY
-#define	NMBCLUSTERS	512		/* map size, max cluster allocation */
+#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
 #else
-#define	NMBCLUSTERS	256		/* map size, max cluster allocation */
+#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
 #endif
 #endif
 
@@ -94,8 +101,12 @@
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
  * logical pages.
  */
-#define	NKMEMPAGES_MIN_DEFAULT	((128 * 1024 * 1024) >> PAGE_SHIFT)
+#ifndef NKMEMPAGES_MIN_DEFAULT
+#define	NKMEMPAGES_MIN_DEFAULT	((16 * 1024 * 1024) >> PAGE_SHIFT)
+#endif
+#ifndef NKMEMPAGES_MAX_DEFAULT
 #define	NKMEMPAGES_MAX_DEFAULT	((128 * 1024 * 1024) >> PAGE_SHIFT)
+#endif
 
 /*
  * pages ("clicks") to disk blocks
@@ -114,6 +125,7 @@
 #define	dbtob(x)	((x) << DEV_BSHIFT)
 #define	btodb(x)	((x) >> DEV_BSHIFT)
 
+#ifdef OLDPMAP
 /*
  * Segment handling stuff
  */
@@ -125,7 +137,7 @@
  */
 #define	USER_SR		13
 #define	KERNEL_SR	14
-#define	KERNEL_SEGMENT	(0xfffff0 + KERNEL_SR)
+#define	KERNEL_SEGMENT	(0xf00000 + KERNEL_SR)
 #define	EMPTY_SEGMENT	0xfffff0
 #define	USER_ADDR	((void *)(USER_SR << ADDR_SR_SHFT))
 
@@ -135,3 +147,7 @@
 #ifndef	NPMAPS
 #define	NPMAPS		32768	/* Number of pmaps in system */
 #endif
+
+#endif /* OLDPMAP */
+
+#endif /* _POWERPC_PARAM_H_ */

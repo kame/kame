@@ -1,4 +1,4 @@
-/* $NetBSD: pci_kn300.c,v 1.20 2000/06/05 21:47:27 thorpej Exp $ */
+/* $NetBSD: pci_kn300.c,v 1.24 2002/05/15 16:57:42 thorpej Exp $ */
 
 /*
  * Copyright (c) 1998 by Matthew Jacob
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pci_kn300.c,v 1.20 2000/06/05 21:47:27 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_kn300.c,v 1.24 2002/05/15 16:57:42 thorpej Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -43,7 +43,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_kn300.c,v 1.20 2000/06/05 21:47:27 thorpej Exp $
 #include <sys/device.h>
 #include <sys/syslog.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 
@@ -61,7 +61,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_kn300.c,v 1.20 2000/06/05 21:47:27 thorpej Exp $
 #include <alpha/pci/siovar.h>
 #endif
 
-int	dec_kn300_intr_map __P((void *, pcitag_t, int, int,
+int	dec_kn300_intr_map __P((struct pci_attach_args *,
 	    pci_intr_handle_t *));
 const char *dec_kn300_intr_string __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_kn300_intr_evcnt __P((void *, pci_intr_handle_t));
@@ -104,7 +104,6 @@ pci_kn300_pickintr(ccp, first)
 			    "kn300", cp);
 			savirqs[g] = (char) -1;
 		}
-		set_iointr(kn300_iointr);
 	}
 
 	pc->pc_intr_v = ccp;
@@ -127,14 +126,14 @@ pci_kn300_pickintr(ccp, first)
 }
 
 int     
-dec_kn300_intr_map(ccv, bustag, buspin, line, ihp)
-	void *ccv;
-	pcitag_t bustag; 
-	int buspin, line;
+dec_kn300_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
-	struct mcpcia_config *ccp = ccv;
-	pci_chipset_tag_t pc = &ccp->cc_pc;
+	pcitag_t bustag = pa->pa_intrtag;
+	int buspin = pa->pa_intrpin;
+	pci_chipset_tag_t pc = pa->pa_pc;
+	struct mcpcia_config *ccp = (struct mcpcia_config *)pc->pc_intr_v;
 	int device;
 	int mcpcia_irq;
 
@@ -147,7 +146,7 @@ dec_kn300_intr_map(ccv, bustag, buspin, line, ihp)
 		return 1;
 	}
 
-	alpha_pci_decompose_tag(pc, bustag, NULL, &device, NULL);
+	pci_decompose_tag(pc, bustag, NULL, &device, NULL);
 
 	/*
 	 * On MID 5 device 1 is the internal NCR 53c810.
@@ -218,7 +217,10 @@ dec_kn300_intr_establish(ccv, ih, level, func, arg)
 	cookie = alpha_shared_intr_establish(kn300_pci_intr, irq, IST_LEVEL,
 	    level, func, arg, "kn300 irq");
 
-	if (cookie != NULL && alpha_shared_intr_isactive(kn300_pci_intr, irq)) {
+	if (cookie != NULL &&
+	    alpha_shared_intr_firstactive(kn300_pci_intr, irq)) {
+		scb_set(MCPCIA_VEC_PCI + SCB_IDXTOVEC(irq),
+		    kn300_iointr, NULL);
 		alpha_shared_intr_set_private(kn300_pci_intr, irq, ccp);
 		savirqs[irq] = (ih >> 11) & 0x1f;
 		kn300_enable_intr(ccp, savirqs[irq]);
@@ -235,44 +237,14 @@ dec_kn300_intr_disestablish(ccv, cookie)
 }
 
 void
-kn300_iointr(framep, vec)
-	void *framep;
+kn300_iointr(arg, vec)
+	void *arg;
 	unsigned long vec;
 {
 	struct mcpcia_softc *mcp;
 	u_long irq;
 
-	if (vec >= MCPCIA_VEC_EISA && vec < MCPCIA_VEC_PCI) {
-#if NSIO > 0 || NPCEB > 0
-		sio_iointr(framep, vec);
-		return;
-#else
-		static const char *plaint = "kn300_iointr: (E)ISA interrupt "
-		    "support not configured for vector 0x%x";
-		if (mcpcia_eisaccp) {
-			kn300_disable_intr(mcpcia_eisaccp, KN300_PCEB_IRQ);
-			printf(plaint, vec);
-		} else {
-			panic(plaint, vec);
-		}
-#endif
-	} 
-
-	irq = (vec - MCPCIA_VEC_PCI) >> 4;
-
-	/*
-	 * Check for I2C interrupts.  These are technically within
-	 * the PCI vector range, but no PCI device should ever map
-	 * to them.
-	 */
-	if (vec == MCPCIA_I2C_CVEC) {
-		printf("i2c: controller interrupt\n");
-		return;
-	}
-	if (vec == MCPCIA_I2C_BVEC) {
-		printf("i2c: bus interrupt\n");
-		return;
-	}
+	irq = SCB_VECTOIDX(vec - MCPCIA_VEC_PCI);
 
 	if (alpha_shared_intr_dispatch(kn300_pci_intr, irq)) {
 		/*

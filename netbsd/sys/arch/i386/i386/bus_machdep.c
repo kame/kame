@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_machdep.c,v 1.1.6.1 2000/06/30 16:27:25 simonb Exp $	*/
+/*	$NetBSD: bus_machdep.c,v 1.15 2002/04/10 10:09:31 haya Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,14 +37,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_machdep.c,v 1.15 2002/04/10 10:09:31 haya Exp $");
+
+#include "opt_largepages.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/extent.h>
+#include <sys/proc.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define _I386_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -291,7 +296,7 @@ i386_mem_add_mapping(bpa, size, cacheable, bshp)
 
 	*bshp = (bus_space_handle_t)(va + (bpa & PGOFSET));
 
-	for (; pa < endpa; pa += NBPG, va += NBPG) {
+	for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
 
 		/*
@@ -305,11 +310,80 @@ i386_mem_add_mapping(bpa, size, cacheable, bshp)
 				*pte &= ~PG_N;
 			else
 				*pte |= PG_N;
-			pmap_update_pg(va);
+#ifdef LARGEPAGES
+			if (*pte & PG_PS)
+				pmap_update_pg(va & PG_LGFRAME);
+			else
+#endif
+				pmap_update_pg(va);
 		}
 	}
+	pmap_update(pmap_kernel());
  
 	return 0;
+}
+
+/*
+ * void _i386_memio_unmap(bus_space_tag bst, bus_space_handle bsh,
+ *                        bus_size_t size, bus_addr_t *adrp)
+ *
+ *   This function unmaps memory- or io-space mapped by the function
+ *   _i386_memio_map().  This function works nearly as same as
+ *   i386_memio_unmap(), but this function does not ask kernel
+ *   built-in extents and returns physical address of the bus space,
+ *   for the convenience of the extra extent manager.
+ */
+void
+_i386_memio_unmap(t, bsh, size, adrp)
+	bus_space_tag_t t;
+	bus_space_handle_t bsh;
+	bus_size_t size;
+	bus_addr_t *adrp;
+{
+	u_long va, endva;
+	bus_addr_t bpa;
+
+	/*
+	 * Find the correct extent and bus physical address.
+	 */
+	if (t == I386_BUS_SPACE_IO) {
+		bpa = bsh;
+	} else if (t == I386_BUS_SPACE_MEM) {
+		if (bsh >= atdevbase && (bsh + size) <= (atdevbase + IOM_SIZE)) {
+			bpa = (bus_addr_t)ISA_PHYSADDR(bsh);
+		} else {
+
+			va = i386_trunc_page(bsh);
+			endva = i386_round_page(bsh + size);
+
+#ifdef DIAGNOSTIC
+			if (endva <= va) {
+				panic("_i386_memio_unmap: overflow");
+			}
+#endif
+
+#if __NetBSD_Version__ > 104050000
+			if (pmap_extract(pmap_kernel(), va, &bpa) == FALSE) {
+				panic("_i386_memio_unmap:"
+				    " wrong virtual address");
+			}
+			bpa += (bsh & PGOFSET);
+#else
+			bpa = pmap_extract(pmap_kernel(), va) + (bsh & PGOFSET);
+#endif
+
+			/*
+			 * Free the kernel virtual mapping.
+			 */
+			uvm_km_free(kernel_map, va, endva - va);
+		}
+	} else {
+		panic("_i386_memio_unmap: bad bus space tag");
+	}
+
+	if (adrp != NULL) {
+		*adrp = bpa;
+	}
 }
 
 void
@@ -385,6 +459,29 @@ i386_memio_subregion(t, bsh, offset, size, nbshp)
 
 	*nbshp = bsh + offset;
 	return (0);
+}
+
+paddr_t
+i386_memio_mmap(t, addr, off, prot, flags)
+	bus_space_tag_t t;
+	bus_addr_t addr;
+	off_t off;
+	int prot;
+	int flags;
+{
+
+	/* Can't mmap I/O space. */
+	if (t == I386_BUS_SPACE_IO)
+		return (-1);
+
+	/*
+	 * "addr" is the base address of the device we're mapping.
+	 * "off" is the offset into that device.
+	 *
+	 * Note we are called for each "page" in the device that
+	 * the upper layers want to map.
+	 */
+	return (i386_btop(addr + off));
 }
 
 /*
@@ -667,7 +764,7 @@ _bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -717,7 +814,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	for (curseg = 0; curseg < nsegs; curseg++) {
 		for (addr = segs[curseg].ds_addr;
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,
@@ -725,6 +822,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			    PMAP_WIRED | VM_PROT_READ | VM_PROT_WRITE);
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }
@@ -839,7 +937,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -909,7 +1007,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	paddr_t high;
 {
 	paddr_t curaddr, lastaddr;
-	vm_page_t m;
+	struct vm_page *m;
 	struct pglist mlist;
 	int curseg, error;
 

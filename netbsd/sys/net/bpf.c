@@ -1,4 +1,4 @@
-/*	$NetBSD: bpf.c,v 1.57.2.1 2001/01/25 16:29:56 jhawk Exp $	*/
+/*	$NetBSD: bpf.c,v 1.64 2002/03/23 15:55:21 darrenr Exp $	*/
 
 /*
  * Copyright (c) 1990, 1991, 1993
@@ -41,6 +41,9 @@
  * static char rcsid[] =
  * "Header: bpf.c,v 1.67 96/09/26 22:00:52 leres Exp ";
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bpf.c,v 1.64 2002/03/23 15:55:21 darrenr Exp $");
 
 #include "bpfilter.h"
 
@@ -169,6 +172,12 @@ bpf_movein(uio, linktype, mtu, mp, sockp)
 		align = 0;
 		break;
 
+	case DLT_ECONET:
+		sockp->sa_family = AF_UNSPEC;
+		hlen = 6;
+		align = 2;
+		break;
+
 	case DLT_NULL:
 		sockp->sa_family = AF_UNSPEC;
 		hlen = 0;
@@ -233,7 +242,7 @@ bad:
 
 /*
  * Attach file to the bpf interface, i.e. make d listen on bp.
- * Must be called at splimp.
+ * Must be called at splnet.
  */
 static void
 bpf_attachd(d, bp)
@@ -371,7 +380,7 @@ bpfclose(dev, flag, mode, p)
 	struct bpf_d *d = &bpf_dtab[minor(dev)];
 	int s;
 
-	s = splimp();
+	s = splnet();
 	if (d->bd_bif)
 		bpf_detachd(d);
 	splx(s);
@@ -411,7 +420,7 @@ bpfread(dev, uio, ioflag)
 	if (uio->uio_resid != d->bd_bufsize)
 		return (EINVAL);
 
-	s = splimp();
+	s = splnet();
 	/*
 	 * If the hold buffer is empty, then do a timed sleep, which
 	 * ends when the timeout expires or when enough packets
@@ -481,7 +490,7 @@ bpfread(dev, uio, ioflag)
 	 */
 	error = uiomove(d->bd_hbuf, d->bd_hlen, uio);
 
-	s = splimp();
+	s = splnet();
 	d->bd_fbuf = d->bd_hbuf;
 	d->bd_hbuf = 0;
 	d->bd_hlen = 0;
@@ -555,7 +564,7 @@ bpfwrite(dev, uio, ioflag)
 
 /*
  * Reset a descriptor by flushing its packet buffer and clearing the
- * receive and drop counts.  Should be called at splimp.
+ * receive and drop counts.  Should be called at splnet.
  */
 static void
 reset_d(d)
@@ -622,7 +631,7 @@ bpfioctl(dev, cmd, addr, flag, p)
 		{
 			int n;
 
-			s = splimp();
+			s = splnet();
 			n = d->bd_slen;
 			if (d->bd_hbuf)
 				n += d->bd_hlen;
@@ -686,7 +695,7 @@ bpfioctl(dev, cmd, addr, flag, p)
 			free((caddr_t)*p, M_DEVBUF);
 
 		/* Steal new filter (noop if error) */
-		s = splimp();
+		s = splnet();
 		*p = d->bd_filter;
 		d->bd_filter = NULL;
 		splx(s);
@@ -697,7 +706,7 @@ bpfioctl(dev, cmd, addr, flag, p)
 	 * Flush read packet buffer.
 	 */
 	case BIOCFLUSH:
-		s = splimp();
+		s = splnet();
 		reset_d(d);
 		splx(s);
 		break;
@@ -713,7 +722,7 @@ bpfioctl(dev, cmd, addr, flag, p)
 			error = EINVAL;
 			break;
 		}
-		s = splimp();
+		s = splnet();
 		if (d->bd_promisc == 0) {
 			error = ifpromisc(d->bd_bif->bif_ifp, 1);
 			if (error == 0)
@@ -858,7 +867,7 @@ bpf_setf(d, fp)
 	if (fp->bf_insns == 0) {
 		if (fp->bf_len != 0)
 			return (EINVAL);
-		s = splimp();
+		s = splnet();
 		d->bd_filter = 0;
 		reset_d(d);
 		splx(s);
@@ -874,7 +883,7 @@ bpf_setf(d, fp)
 	fcode = (struct bpf_insn *)malloc(size, M_DEVBUF, M_WAITOK);
 	if (copyin((caddr_t)fp->bf_insns, (caddr_t)fcode, size) == 0 &&
 	    bpf_validate(fcode, (int)flen)) {
-		s = splimp();
+		s = splnet();
 		d->bd_filter = fcode;
 		reset_d(d);
 		splx(s);
@@ -948,7 +957,7 @@ bpf_setif(d, ifr)
 			if (error != 0)
 				return (error);
 		}
-		s = splimp();
+		s = splnet();
 		if (bp != d->bd_bif) {
 			if (d->bd_bif)
 				/*
@@ -981,7 +990,9 @@ bpf_ifname(ifp, ifr)
 /*
  * Support for poll() system call
  *
- * Return true iff the specific operation will not block indefinitely.
+ * Return true iff the specific operation will not block indefinitely - with
+ * the assumption that it is safe to positively acknowledge a request for the
+ * ability to write to the BPF device.
  * Otherwise, return false but make a note that a selwakeup() must be done.
  */
 int
@@ -991,13 +1002,14 @@ bpfpoll(dev, events, p)
 	struct proc *p;
 {
 	struct bpf_d *d = &bpf_dtab[minor(dev)];
-	int revents = 0;
-	int s = splimp();
+	int s = splnet();
+	int revents;
 
-	/*
-	 * An imitation of the FIONREAD ioctl code.
-	 */
+	revents = events & (POLLOUT | POLLWRNORM);
 	if (events & (POLLIN | POLLRDNORM)) {
+		/*
+		 * An imitation of the FIONREAD ioctl code.
+		 */
 		if (d->bd_hlen != 0 || (d->bd_immediate && d->bd_slen != 0))
 			revents |= events & (POLLIN | POLLRDNORM);
 		else
@@ -1207,8 +1219,7 @@ bpf_freed(d)
  * fixed size of the link header (variable length headers not yet supported).
  */
 void
-bpfattach(driverp, ifp, dlt, hdrlen)
-	caddr_t *driverp;
+bpfattach(ifp, dlt, hdrlen)
 	struct ifnet *ifp;
 	u_int dlt, hdrlen;
 {
@@ -1218,7 +1229,7 @@ bpfattach(driverp, ifp, dlt, hdrlen)
 		panic("bpfattach");
 
 	bp->bif_dlist = 0;
-	bp->bif_driverp = (struct bpf_if **)driverp;
+	bp->bif_driverp = (struct bpf_if **)&ifp->if_bpf;
 	bp->bif_ifp = ifp;
 	bp->bif_dlt = dlt;
 
@@ -1265,7 +1276,7 @@ bpfdetach(ifp)
 			 * Detach the descriptor from an interface now.
 			 * It will be free'ed later by close routine.
 			 */
-			s = splimp();
+			s = splnet();
 			d->bd_promisc = 0;	/* we can't touch device. */
 			bpf_detachd(d);
 			splx(s);
@@ -1287,14 +1298,14 @@ bpfdetach(ifp)
  * Change the data link type of a BPF instance.
  */
 void
-bpf_change_type(driverp, dlt, hdrlen)
-	caddr_t *driverp;
+bpf_change_type(ifp, dlt, hdrlen)
+	struct ifnet *ifp;
 	u_int dlt, hdrlen;
 {
 	struct bpf_if *bp;
 
 	for (bp = bpf_iflist; bp != NULL; bp = bp->bif_next) {
-		if (bp->bif_driverp == (struct bpf_if **)driverp)
+		if (bp->bif_driverp == (struct bpf_if **)&ifp->if_bpf)
 			break;
 	}
 	if (bp == NULL)
@@ -1309,56 +1320,4 @@ bpf_change_type(driverp, dlt, hdrlen)
 	 * performance reasons and to alleviate alignment restrictions).
 	 */
 	bp->bif_hdrlen = BPF_WORDALIGN(hdrlen + SIZEOF_BPF_HDR) - hdrlen;
-}
-
-/* XXX This routine belongs in net/if.c. */
-/*
- * Set/clear promiscuous mode on interface ifp based on the truth value
- * of pswitch.  The calls are reference counted so that only the first
- * "on" request actually has an effect, as does the final "off" request.
- * Results are undefined if the "off" and "on" requests are not matched.
- */
-int
-ifpromisc(ifp, pswitch)
-	struct ifnet *ifp;
-	int pswitch;
-{
-	int pcount, ret;
-	short flags;
-	struct ifreq ifr;
-
-	pcount = ifp->if_pcount;
-	flags = ifp->if_flags;
-	if (pswitch) {
-		/*
-		 * If the device is not configured up, we cannot put it in
-		 * promiscuous mode.
-		 */
-		if ((ifp->if_flags & IFF_UP) == 0)
-			return (ENETDOWN);
-		if (ifp->if_pcount++ != 0)
-			return (0);
-		ifp->if_flags |= IFF_PROMISC;
-	} else {
-		if (--ifp->if_pcount > 0)
-			return (0);
-		ifp->if_flags &= ~IFF_PROMISC;
-		/*
-		 * If the device is not configured up, we should not need to
-		 * turn off promiscuous mode (device should have turned it
-		 * off when interface went down; and will look at IFF_PROMISC
-		 * again next time interface comes up).
-		 */
-		if ((ifp->if_flags & IFF_UP) == 0)
-			return (0);
-	}
-	memset((caddr_t)&ifr, 0, sizeof(ifr));
-	ifr.ifr_flags = ifp->if_flags;
-	ret = (*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
-	/* Restore interface state if not successful */
-	if (ret != 0) {
-		ifp->if_pcount = pcount;
-		ifp->if_flags = flags;
-	}
-	return (ret);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.5 2000/05/16 05:45:46 thorpej Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.7 2002/02/19 17:09:43 wiz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -82,7 +82,7 @@ mbr_findslice(dp, bp)
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl, secsize and anything required for a block i/o read
  * operation in the driver's strategy/start routines
@@ -147,7 +147,7 @@ readdisklabel(dev, strat, lp, osdep)
 	/* read master boot record */
 	bp->b_blkno = MBR_BBSECTOR;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = MBR_BBSECTOR / lp->d_secpercyl;
 	(*strat)(bp);
 
@@ -195,7 +195,8 @@ nombrpart:
 	bp->b_blkno = dospartoff + LABELSECTOR;
 	bp->b_cylinder = cyl;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags &= ~(B_DONE);
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 
 	/* if successful, locate disk label within block and validate */
@@ -230,7 +231,8 @@ nombrpart:
 		i = 0;
 		do {
 			/* read a bad sector table */
-			bp->b_flags = B_BUSY | B_READ;
+			bp->b_flags &= ~(B_DONE);
+			bp->b_flags |= B_READ;
 			bp->b_blkno = lp->d_secperunit - lp->d_nsectors + i;
 			if (lp->d_secsize > DEV_BSIZE)
 				bp->b_blkno *= lp->d_secsize / DEV_BSIZE;
@@ -259,7 +261,6 @@ nombrpart:
 	}
 
 done:
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
 	return (msg);
 }
@@ -350,7 +351,7 @@ writedisklabel(dev, strat, lp, osdep)
 	/* read master boot record */
 	bp->b_blkno = MBR_BBSECTOR;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = MBR_BBSECTOR / lp->d_secpercyl;
 	(*strat)(bp);
 
@@ -374,7 +375,8 @@ nombrpart:
 	bp->b_blkno = dospartoff + LABELSECTOR;
 	bp->b_cylinder = cyl;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags &= ~(B_DONE);
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 
 	/* if successful, locate disk label within block and validate */
@@ -386,7 +388,8 @@ nombrpart:
 		if (dlp->d_magic == DISKMAGIC && dlp->d_magic2 == DISKMAGIC &&
 		    dkcksum(dlp) == 0) {
 			*dlp = *lp;
-			bp->b_flags = B_BUSY | B_WRITE;
+			bp->b_flags &= ~(B_READ|B_DONE);
+			bp->b_flags |= B_WRITE;
 			(*strat)(bp);
 			error = biowait(bp);
 			goto done;
@@ -395,7 +398,6 @@ nombrpart:
 	error = ESRCH;
 
 done:
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cs4281reg.h,v 1.3.6.1 2001/05/06 15:12:25 he Exp $	*/
+/*	$NetBSD: cs4281reg.h,v 1.3 2001/02/07 14:41:11 tacha Exp $	*/
 
 /*
  * Copyright (c) 2000 Tatoku Ogaito.  All rights reserved.

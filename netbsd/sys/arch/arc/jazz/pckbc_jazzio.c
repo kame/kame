@@ -1,4 +1,4 @@
-/* $NetBSD: pckbc_jazzio.c,v 1.1 2000/06/17 07:17:38 soda Exp $ */
+/* $NetBSD: pckbc_jazzio.c,v 1.4 2001/07/23 21:03:19 jdolecek Exp $ */
 /* NetBSD: pckbc_isa.c,v 1.2 2000/03/23 07:01:35 thorpej Exp  */
 
 /*
@@ -44,12 +44,14 @@
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
-#include <arc/pica/pica.h>
+#include <arc/jazz/pica.h>
+#include <arc/jazz/jazziovar.h>
 
 #include <dev/ic/i8042reg.h>
 #include <dev/ic/pckbcvar.h>
 #include <arc/jazz/pckbc_jazzioreg.h>
 
+#define PMS_INTR 7	/* XXX - should be obtained from firmware */
 #define PICA_KBCMDP	(PICA_SYS_KBD + JAZZIO_KBCMDP)
 
 int	pckbc_jazzio_match __P((struct device *, struct cfdata *, void *));
@@ -59,7 +61,7 @@ void	pckbc_jazzio_intr_establish __P((struct pckbc_softc *, pckbc_slot_t));
 struct pckbc_jazzio_softc {
 	struct pckbc_softc sc_pckbc;
 
-	struct confargs *sc_ca[PCKBC_NSLOTS];
+	int sc_intr[PCKBC_NSLOTS];
 };
 
 struct cfattach pckbc_jazzio_ca = {
@@ -67,25 +69,24 @@ struct cfattach pckbc_jazzio_ca = {
 	pckbc_jazzio_match, pckbc_jazzio_attach,
 };
 
-extern struct arc_bus_space pica_bus; /* XXX */
-
 int
 pckbc_jazzio_match(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
 	void *aux;
 {
-	struct confargs *ca = aux;
-	bus_space_tag_t iot = &pica_bus;
+	struct jazzio_attach_args *ja = aux;
+	bus_space_tag_t iot = ja->ja_bust;
 	bus_space_handle_t ioh_d, ioh_c;
-	bus_addr_t addr;
+	bus_addr_t addr = ja->ja_addr;
 	int res, ok = 1;
 
-	if(!BUS_MATCHNAME(ca, "pckbd"))
+	if (strcmp(ja->ja_name, "pckbd") != 0)
 		return(0);
 
-	addr = (bus_addr_t)BUS_CVTADDR(ca);
 	if (pckbc_is_console(iot, addr) == 0) {
+		struct pckbc_internal t;
+
 		if (bus_space_map(iot, addr + KBDATAP, 1, 0, &ioh_d))
 			return (0);
 		if (bus_space_map(iot, PICA_KBCMDP, 1, 0, &ioh_c)) {
@@ -93,15 +94,20 @@ pckbc_jazzio_match(parent, match, aux)
 			return (0);
 		}
 
+		memset(&t, 0, sizeof(t));
+		t.t_iot = iot;
+		t.t_ioh_d = ioh_d;
+		t.t_ioh_c = ioh_c;
+
 		/* flush KBC */
-		(void) pckbc_poll_data1(iot, ioh_d, ioh_c, PCKBC_KBD_SLOT, 0);
+		(void) pckbc_poll_data1(&t, PCKBC_KBD_SLOT, 0);
 
 		/* KBC selftest */
 		if (pckbc_send_cmd(iot, ioh_c, KBC_SELFTEST) == 0) {
 			ok = 0;
 			goto out;
 		}
-		res = pckbc_poll_data1(iot, ioh_d, ioh_c, PCKBC_KBD_SLOT, 0);
+		res = pckbc_poll_data1(&t, PCKBC_KBD_SLOT, 0);
 		if (res != 0x55) {
 			printf("kbc selftest: %x\n", res);
 			ok = 0;
@@ -119,14 +125,13 @@ pckbc_jazzio_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
-	struct confargs *ca = aux;
+	struct jazzio_attach_args *ja = aux;
 	struct pckbc_jazzio_softc *jsc = (void *)self;
 	struct pckbc_softc *sc = &jsc->sc_pckbc;
 	struct pckbc_internal *t;
-	bus_space_tag_t iot = &pica_bus;
+	bus_space_tag_t iot = ja->ja_bust;
 	bus_space_handle_t ioh_d, ioh_c;
-	bus_addr_t addr;
-	static struct confargs pms_ca = { "pms", 8, NULL, }; /* XXX */
+	bus_addr_t addr = ja->ja_addr;
 
 	sc->intr_establish = pckbc_jazzio_intr_establish;
 
@@ -135,11 +140,9 @@ pckbc_jazzio_attach(parent, self, aux)
 	 *
 	 * XXX handcrafting "aux" slot...
 	 */
-	pms_ca.ca_bus = ca->ca_bus;
-	jsc->sc_ca[PCKBC_KBD_SLOT] = ca;
-	jsc->sc_ca[PCKBC_AUX_SLOT] = &pms_ca;
+	jsc->sc_intr[PCKBC_KBD_SLOT] = ja->ja_intr;
+	jsc->sc_intr[PCKBC_AUX_SLOT] = PMS_INTR;		/* XXX */
 
-	addr = (bus_addr_t)BUS_CVTADDR(ca);
 	if (pckbc_is_console(iot, addr)) {
 		t = &pckbc_consdata;
 		ioh_d = t->t_ioh_d;
@@ -177,5 +180,5 @@ pckbc_jazzio_intr_establish(sc, slot)
 {
 	struct pckbc_jazzio_softc *jsc = (void *) sc;
 
-	BUS_INTR_ESTABLISH(jsc->sc_ca[slot], pckbcintr, sc);
+	jazzio_intr_establish(jsc->sc_intr[slot], pckbcintr, sc);
 }

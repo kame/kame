@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.3.2.2 2002/02/09 20:51:40 he Exp $	*/
+/*	$NetBSD: conf.c,v 1.13 2002/03/16 16:55:54 martin Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -73,6 +73,19 @@ cdev_decl(scsibus);
 cdev_decl(ses);
 #include "ld.h"
 
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
+#include "clockctl.h"
+cdev_decl(clockctl);
+
 struct bdevsw bdevsw[] =
 {
 	bdev_notdef(),			/* 0 */
@@ -134,6 +147,13 @@ struct cdevsw cdevsw[] =
 	cdev_ses_init(NSES,ses),	/* 25: SCSI SES/SAF-TE */
 	cdev_tty_init(NCOM,com),        /* 26: com serial port */
 	cdev_disk_init(NLD,ld),         /* 27: logical disk driver */
+	cdev_isdn_init(NISDN, isdn),	/* 28: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 29: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 30: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 31: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 32: isdn phone device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 33: clockctl pseudo device */
+
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -184,6 +204,12 @@ static int chrtoblktbl[] =  {
 	/* 25 */	NODEV,
 	/* 26 */	NODEV,
 	/* 27 */	NODEV,
+	/* 28 */	NODEV,
+	/* 29 */	NODEV,
+	/* 30 */	NODEV,
+	/* 31 */	NODEV,
+	/* 32 */	NODEV,
+	/* 33 */	NODEV,
 };
 
 dev_t

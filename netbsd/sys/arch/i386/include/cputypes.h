@@ -1,4 +1,4 @@
-/*	$NetBSD: cputypes.h,v 1.11 1998/10/15 13:40:33 bad Exp $	*/
+/*	$NetBSD: cputypes.h,v 1.13 2001/11/17 08:21:43 christos Exp $	*/
 
 /*
  * Copyright (c) 1993 Christopher G. Demetriou
@@ -55,6 +55,7 @@
 #define CPU_K6		10	/* NexGen 686 aka AMD K6 */
 #define CPU_686		11	/* Intel Pentium Pro */
 #define CPU_C6		12	/* IDT WinChip C6 */
+#define CPU_TMX86	13	/* Transmeta TMx86 */
 
 /*
  * CPU vendors
@@ -66,6 +67,7 @@
 #define CPUVENDOR_NEXGEN	2
 #define CPUVENDOR_AMD		3
 #define CPUVENDOR_IDT		4
+#define CPUVENDOR_TRANSMETA	5
 
 /*
  * Some other defines, dealing with values returned by cpuid.
@@ -74,4 +76,5 @@
 #define CPU_MAXMODEL	15	/* Models within family range 0-15 */
 #define CPU_DEFMODEL	16	/* Value for unknown model -> default  */
 #define CPU_MINFAMILY	 4	/* Lowest that cpuid can return (486) */
-#define CPU_MAXFAMILY	 6	/* Highest we know (686) */
+#define CPU_MAXFAMILY	 7	/* Highest consequetive # we know (fake P4) */
+#define CPU_FAMILY_P4	15	/* Family number for Pentium 4 */

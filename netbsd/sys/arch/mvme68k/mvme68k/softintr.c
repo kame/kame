@@ -1,4 +1,4 @@
-/*	$NetBSD: softintr.c,v 1.1.2.2 2000/07/29 20:43:20 scw Exp $	*/
+/*	$NetBSD: softintr.c,v 1.5 2001/07/06 19:00:14 scw Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -48,7 +48,6 @@
 #include <sys/sched.h>
 #include <sys/vmmeter.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -56,26 +55,42 @@
 
 #include <mvme68k/mvme68k/isr.h>
 
-void netintr __P((void));
+
+void (*_softintr_chipset_assert)(void);
 struct mvme68k_soft_intrhand	*softnet_intrhand;
-struct mvme68k_soft_intrhand	*softclock_intrhand;
 
 static struct mvme68k_soft_intr mvme68k_soft_intrs[IPL_NSOFT];
+
+#ifdef DEBUG
+static void dummy_softintr_assert(void);
+#endif
 
 static __inline int
 ssir_pending(volatile unsigned char *ssptr)
 {
-	int __rv = 0;
+	int __rv;
 
 	__asm __volatile(
-		"	tas	%0	\n"
+		"	moveq	#0, %0	\n"
+		"	tas	%1	\n"
 		"	jne	1f	\n"
-		"	moveq	#1, %1	\n"
+		"	moveq	#1, %0	\n"
 		"1:			\n"
-		: "=m" (*ssptr), "=d" (__rv));
+		: "=d" (__rv)
+		: "m" (*ssptr));
 
 	return (__rv);
 }
+
+#ifdef DEBUG
+static void
+dummy_softintr_assert(void)
+{
+
+	panic("softintr_schedule: Called before soft interrupts configured!");
+	/* NOTREACHED */
+}
+#endif
 
 /*
  * softintr_init()
@@ -89,6 +104,10 @@ softintr_init()
 	struct mvme68k_soft_intr *msi;
 	int i;
 
+#ifdef DEBUG
+	_softintr_chipset_assert = dummy_softintr_assert;
+#endif
+
 	for (i = 0; i < IPL_NSOFT; i++) {
 		msi = &mvme68k_soft_intrs[i];
 		LIST_INIT(&msi->msi_q);
@@ -100,12 +119,9 @@ softintr_init()
 	/* Establish legacy software interrupt handlers */
 	softnet_intrhand = softintr_establish(IPL_SOFTNET,
 	    (void (*)(void *)) netintr, NULL);
-	softclock_intrhand = softintr_establish(IPL_SOFTCLOCK,
-	    (void (*)(void *)) softclock, NULL);
 
 #ifdef DEBUG
 	assert(softnet_intrhand != NULL);
-	assert(softclock_intrhand != NULL);
 #endif
 }
 
@@ -119,16 +135,18 @@ softintr_dispatch()
 {
 	struct mvme68k_soft_intr *msi;
 	struct mvme68k_soft_intrhand *sih;
-	int i;
+	int handled;
 
-	while (ssir_pending(&ssir)) {
-		for (i = 0; i < IPL_NSOFT; i++) {
-			if (ssir_pending(&mvme68k_soft_intrs[i].msi_ssir) == 0)
+	do {
+		for (msi = mvme68k_soft_intrs, handled = 0;
+		    msi < &mvme68k_soft_intrs[IPL_NSOFT];
+		    msi++) {
+
+			if (ssir_pending(&msi->msi_ssir) == 0)
 				continue;
 
-			msi = &mvme68k_soft_intrs[i];
-
 			msi->msi_evcnt.ev_count++;
+			handled++;
 
 			for (sih = LIST_FIRST(&msi->msi_q);
 			     sih != NULL;
@@ -140,7 +158,7 @@ softintr_dispatch()
 				}
 			}
 		}
-	}
+	} while (handled);
 }
 
 /*

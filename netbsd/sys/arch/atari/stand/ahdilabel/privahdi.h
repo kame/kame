@@ -1,4 +1,4 @@
-/*	$NetBSD: privahdi.h,v 1.1.2.1 2000/08/14 07:59:59 leo Exp $	*/
+/*	$NetBSD: privahdi.h,v 1.1 2000/08/07 09:23:41 leo Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ns.c,v 1.20 2000/03/30 13:02:56 augustss Exp $	*/
+/*	$NetBSD: ns.c,v 1.23 2002/05/12 19:09:12 matt Exp $	*/
 
 /*
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
@@ -35,6 +35,9 @@
  *	@(#)ns.c	8.5 (Berkeley) 2/9/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ns.c,v 1.23 2002/05/12 19:09:12 matt Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -54,7 +57,6 @@
 
 struct ns_ifaddrhead ns_ifaddr;
 int ns_interfaces;
-extern struct sockaddr_ns ns_netmask, ns_hostmask;
 
 /*
  * Generic internet control operations (ioctl's).
@@ -270,7 +272,7 @@ ns_ifinit(ifp, ia, sns, scrub)
 {
 	struct sockaddr_ns oldaddr;
 	union ns_host *h = &ia->ia_addr.sns_addr.x_host;
-	int s = splimp(), error;
+	int s = splnet(), error;
 
 	/*
 	 * Set up new addresses.

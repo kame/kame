@@ -1,4 +1,4 @@
-/*	$NetBSD: libkern.h,v 1.30.4.1 2000/11/05 00:50:21 tv Exp $	*/
+/*	$NetBSD: libkern.h,v 1.39 2001/12/28 07:37:06 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -54,6 +54,16 @@ LIBKERN_INLINE long lmin __P((long, long)) __attribute__ ((unused));
 LIBKERN_INLINE u_long ulmax __P((u_long, u_long)) __attribute__ ((unused));
 LIBKERN_INLINE u_long ulmin __P((u_long, u_long)) __attribute__ ((unused));
 LIBKERN_INLINE int abs __P((int)) __attribute__ ((unused));
+
+LIBKERN_INLINE int isspace __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int isascii __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int isupper __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int islower __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int isalpha __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int isdigit __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int isxdigit __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int toupper __P((int)) __attribute__((__unused__));
+LIBKERN_INLINE int tolower __P((int)) __attribute__((__unused__));
 
 #ifdef LIBKERN_BODY
 LIBKERN_INLINE int
@@ -111,6 +121,84 @@ abs(j)
 {
 	return(j < 0 ? -j : j);
 }
+
+LIBKERN_INLINE int
+isspace(ch)
+	int ch;
+{
+
+	return (ch == ' ' || (ch >= '\t' && ch <= '\r'));
+}
+
+LIBKERN_INLINE int
+isascii(ch)
+	int ch;
+{
+
+	return ((ch & ~0x7f) == 0);
+}
+
+LIBKERN_INLINE int
+isupper(ch)
+	int ch;
+{
+
+	return (ch >= 'A' && ch <= 'Z');
+}
+
+LIBKERN_INLINE int
+islower(ch)
+	int ch;
+{
+
+	return (ch >= 'a' && ch <= 'z');
+}
+
+LIBKERN_INLINE int
+isalpha(ch)
+	int ch;
+{
+
+	return (isupper(ch) || islower(ch));
+}
+
+LIBKERN_INLINE int
+isdigit(ch)
+	int ch;
+{
+
+	return (ch >= '0' && ch <= '9');
+}
+
+LIBKERN_INLINE int
+isxdigit(ch)
+	int ch;
+{
+
+	return (isdigit(ch) ||
+	    (ch >= 'A' && ch <= 'F') ||
+	    (ch >= 'a' && ch <= 'f'));
+}
+
+LIBKERN_INLINE int
+toupper(ch)
+	int ch;
+{
+
+	if (islower(ch))
+		return (ch - 0x20);
+	return (ch);
+}
+
+LIBKERN_INLINE int
+tolower(ch)
+	int ch;
+{
+
+	if (isupper(ch))
+		return (ch + 0x20);
+	return (ch);
+}
 #endif
 
 #ifdef NDEBUG						/* tradition! */
@@ -126,7 +214,11 @@ abs(j)
 #endif
 
 #ifndef DIAGNOSTIC
+#ifdef lint
+#define	KASSERT(e)	/* NOTHING */
+#else /* !lint */
 #define	KASSERT(e)	((void)0)
+#endif /* !lint */
 #else
 #ifdef __STDC__
 #define	KASSERT(e)	(__predict_true((e)) ? (void)0 :		    \
@@ -138,7 +230,11 @@ abs(j)
 #endif
 
 #ifndef DEBUG
+#ifdef lint
+#define	KDASSERT(e)	/* NOTHING */
+#else /* lint */
 #define	KDASSERT(e)	((void)0)
+#endif /* lint */
 #else
 #ifdef __STDC__
 #define	KDASSERT(e)	(__predict_true((e)) ? (void)0 :		    \
@@ -154,32 +250,58 @@ abs(j)
 #endif
 
 /* Prototypes for non-quad routines. */
-void	 __assert __P((const char *, const char *, int, const char *))
-	    __attribute__((__noreturn__));
+/* XXX notyet #ifdef _STANDALONE */
 int	 bcmp __P((const void *, const void *, size_t));
 void	 bzero __P((void *, size_t));
+/* #endif */
+
+/* Prototypes for which GCC built-ins exist. */
+void	*memcpy __P((void *, const void *, size_t));
+int	 memcmp __P((const void *, const void *, size_t));
+void	*memset __P((void *, int, size_t));
+#if __GNUC_PREREQ__(2, 95)
+#define	memcpy(d, s, l)		__builtin_memcpy(d, s, l)
+#define	memcmp(a, b, l)		__builtin_memcmp(a, b, l)
+#define	memset(d, v, l)		__builtin_memset(d, v, l)
+#endif
+
+char	*strcpy __P((char *, const char *));
+int	 strcmp __P((const char *, const char *));
+size_t	 strlen __P((const char *));
+#if __GNUC_PREREQ__(2, 95)
+#define	strcpy(d, s)		__builtin_strcpy(d, s)
+#define	strcmp(a, b)		__builtin_strcmp(a, b)
+#define	strlen(a)		__builtin_strlen(a)
+#endif
+
+/* Functions for which we always use built-ins. */
+#ifdef __GNUC__
+#define	alloca(s)		__builtin_alloca(s)
+#endif
+
+/* These exist in GCC 3.x, but we don't bother. */
+char	*strcat __P((char *, const char *));
+char	*strncpy __P((char *, const char *, size_t));
+int	 strncmp __P((const char *, const char *, size_t));
+char	*strchr __P((const char *, int));
+char	*strrchr __P((const char *, int));
+
+/* This exists in GCC 3.x, but we don't bother (yet). */
 int	 ffs __P((int));
+
+void	 __assert __P((const char *, const char *, int, const char *))
+	    __attribute__((__noreturn__));
 u_int32_t
 	 inet_addr __P((const char *));
 char	*intoa __P((u_int32_t));
 #define inet_ntoa(a) intoa((a).s_addr)
 void	*memchr __P((const void *, int, size_t));
-int	 memcmp __P((const void *, const void *, size_t));
-void	*memcpy __P((void *, const void *, size_t));
 void	*memmove __P((void *, const void *, size_t));
-void	*memset __P((void *, int, size_t));
 int	 pmatch __P((const char *, const char *, const char **));
 u_long	 random __P((void));
 int	 scanc __P((u_int, const u_char *, const u_char *, int));
 int	 skpc __P((int, size_t, u_char *));
-char	*strcat __P((char *, const char *));
-char	*strchr __P((const char *, int));
-int	 strcmp __P((const char *, const char *));
-char	*strcpy __P((char *, const char *));
-size_t	 strlen __P((const char *));
+int	 strcasecmp __P((const char *, const char *));
 int	 strncasecmp __P((const char *, const char *, size_t));
-int	 strncmp __P((const char *, const char *, size_t));
-char	*strncpy __P((char *, const char *, size_t));
-char	*strrchr __P((const char *, int));
 u_long	 strtoul __P((const char *, char **, int));
 #endif /* !_LIB_LIBKERN_LIBKERN_H_ */

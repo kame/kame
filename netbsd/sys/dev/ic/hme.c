@@ -1,4 +1,4 @@
-/*	$NetBSD: hme.c,v 1.14.2.2 2000/10/25 16:38:55 tv Exp $	*/
+/*	$NetBSD: hme.c,v 1.29 2002/05/05 03:02:38 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * HME Ethernet module driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hme.c,v 1.29 2002/05/05 03:02:38 thorpej Exp $");
 
 #define HMEDEBUG
 
@@ -183,7 +186,7 @@ hme_config(sc)
 	 * Also, apparently, the buffers must extend to a DMA burst
 	 * boundary beyond the maximum packet size.
 	 */
-#define _HME_NDESC	32
+#define _HME_NDESC	128
 #define _HME_BUFSZ	1600
 
 	/* Note: the # of descriptors must be a multiple of 16 */
@@ -240,16 +243,18 @@ hme_config(sc)
 	}
 	sc->sc_rb.rb_dmabase = sc->sc_dmamap->dm_segs[0].ds_addr;
 
-	printf(": address %s\n", ether_sprintf(sc->sc_enaddr));
+	printf("%s: Ethernet address %s\n", sc->sc_dev.dv_xname,
+	    ether_sprintf(sc->sc_enaddr));
 
 	/* Initialize ifnet structure. */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = hme_start;
 	ifp->if_ioctl = hme_ioctl;
 	ifp->if_watchdog = hme_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Initialize ifmedia structures and MII info */
 	mii->mii_ifp = ifp;
@@ -302,13 +307,12 @@ hme_config(sc)
 		ifmedia_set(&sc->sc_media, IFM_ETHER|IFM_AUTO);
 	}
 
+	/* claim 802.1q capability */
+	sc->sc_ethercom.ec_capabilities |= ETHERCAP_VLAN_MTU;
+
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 
 	sc->sc_sh = shutdownhook_establish(hme_shutdown, sc);
 	if (sc->sc_sh == NULL)
@@ -506,6 +510,10 @@ hme_init(sc)
 	bus_space_write_4(t, mac, HME_MACI_FCCNT, 0);
 	bus_space_write_4(t, mac, HME_MACI_EXCNT, 0);
 	bus_space_write_4(t, mac, HME_MACI_LTCNT, 0);
+	bus_space_write_4(t, mac, HME_MACI_TXSIZE,
+	    (sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU) ?
+	    ETHER_VLAN_ENCAP_LEN + ETHER_MAX_LEN :
+            ETHER_MAX_LEN);
 
 	/* Load station MAC address */
 	ea = sc->sc_enaddr;
@@ -532,6 +540,10 @@ hme_init(sc)
 	bus_space_write_4(t, etx, HME_ETXI_RSIZE, sc->sc_rb.rb_ntbuf);
 
 	bus_space_write_4(t, erx, HME_ERXI_RING, sc->sc_rb.rb_rxddma);
+	bus_space_write_4(t, mac, HME_MACI_RXSIZE,
+	    (sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU) ?
+	    ETHER_VLAN_ENCAP_LEN + ETHER_MAX_LEN :
+            ETHER_MAX_LEN);
 
 
 	/* step 8. Global Configuration & Interrupt Mask */
@@ -623,6 +635,9 @@ hme_init(sc)
 	if (sc->sc_hwinit)
 		(*sc->sc_hwinit)(sc);
 
+	/* Set the current media. */
+	mii_mediachg(&sc->sc_mii);
+
 	/* Start the one second timer. */
 	callout_reset(&sc->sc_tick_ch, hz, hme_tick, sc);
 
@@ -670,7 +685,7 @@ hme_put(sc, ri, m)
 			MFREE(m, n);
 			continue;
 		}
-		bcopy(mtod(m, caddr_t), bp, len);
+		memcpy(bp, mtod(m, caddr_t), len);
 		bp += len;
 		tlen += len;
 		MFREE(m, n);
@@ -721,7 +736,7 @@ hme_get(sc, ri, totlen)
 		}
 
 		m->m_len = len = min(totlen, len);
-		bcopy(bp, mtod(m, caddr_t), len);
+		memcpy(mtod(m, caddr_t), bp, len);
 		bp += len;
 
 		totlen -= len;
@@ -753,7 +768,9 @@ hme_read(sc, ix, len)
 	struct mbuf *m;
 
 	if (len <= sizeof(struct ether_header) ||
-	    len > ETHERMTU + sizeof(struct ether_header)) {
+	    len > ((sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU) ?
+	    ETHER_VLAN_ENCAP_LEN + ETHERMTU + sizeof(struct ether_header) :
+	    ETHERMTU + sizeof(struct ether_header))) {
 #ifdef HMEDEBUG
 		printf("%s: invalid packet size %d; dropping\n",
 		    sc->sc_dev.dv_xname, len);
@@ -776,27 +793,8 @@ hme_read(sc, ix, len)
 	 * Check if there's a BPF listener on this interface.
 	 * If so, hand off the raw packet to BPF.
 	 */
-	if (ifp->if_bpf) {
-		struct ether_header *eh;
-
+	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
-
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-
-		/* We assume that the header fit entirely in one mbuf. */
-		eh = mtod(m, struct ether_header *);
-
-		if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    ether_cmp(eh->ether_dhost, sc->sc_enaddr) == 0) {
-			m_freem(m);
-			return;
-		}
-	}
 #endif
 
 	/* Pass the packet up. */
@@ -819,7 +817,7 @@ hme_start(ifp)
 	ri = sc->sc_rb.rb_tdhead;
 
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 
@@ -1220,9 +1218,8 @@ hme_ioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else {
-				bcopy(ina->x_host.c_host,
-				    LLADDR(ifp->if_sadl),
-				    sizeof(sc->sc_enaddr));
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host, sizeof(sc->sc_enaddr));
 			}	
 			/* Set new address. */
 			hme_init(sc);
@@ -1426,9 +1423,9 @@ hme_copytobuf_contig(sc, from, ri, len)
 	volatile caddr_t buf = sc->sc_rb.rb_txbuf + (ri * _HME_BUFSZ);
 
 	/*
-	 * Just call bcopy() to do the work.
+	 * Just call memcpy() to do the work.
 	 */
-	bcopy(from, buf, len);
+	memcpy(buf, from, len);
 }
 
 void
@@ -1440,8 +1437,8 @@ hme_copyfrombuf_contig(sc, to, boff, len)
 	volatile caddr_t buf = sc->sc_rb.rb_rxbuf + (ri * _HME_BUFSZ);
 
 	/*
-	 * Just call bcopy() to do the work.
+	 * Just call memcpy() to do the work.
 	 */
-	bcopy(buf, to, len);
+	memcpy(to, buf, len);
 }
 #endif

@@ -1,4 +1,4 @@
-/* $NetBSD: lca_dma.c,v 1.12 1998/08/14 16:50:04 thorpej Exp $ */
+/* $NetBSD: lca_dma.c,v 1.15 2001/07/19 18:47:38 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -39,14 +39,15 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: lca_dma.c,v 1.12 1998/08/14 16:50:04 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lca_dma.c,v 1.15 2001/07/19 18:47:38 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #define _ALPHA_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -57,11 +58,6 @@ __KERNEL_RCSID(0, "$NetBSD: lca_dma.c,v 1.12 1998/08/14 16:50:04 thorpej Exp $")
 #include <alpha/pci/lcavar.h>
 
 bus_dma_tag_t lca_dma_get_tag __P((bus_dma_tag_t, alpha_bus_t));
-
-int	lca_bus_dmamap_create_sgmap __P((bus_dma_tag_t, bus_size_t, int,
-	    bus_size_t, bus_size_t, int, bus_dmamap_t *));
-
-void	lca_bus_dmamap_destroy_sgmap __P((bus_dma_tag_t, bus_dmamap_t));
 
 int	lca_bus_dmamap_load_sgmap __P((bus_dma_tag_t, bus_dmamap_t, void *,
 	    bus_size_t, struct proc *, int));
@@ -88,6 +84,12 @@ void	lca_bus_dmamap_unload_sgmap __P((bus_dma_tag_t, bus_dmamap_t));
  */
 #define	LCA_SGMAP_MAPPED_BASE	(8*1024*1024)
 #define	LCA_SGMAP_MAPPED_SIZE	(8*1024*1024)
+
+/*
+ * The LCA doesn't have a DMA prefetch threshold.  However, it is known
+ * to lose if we don't allocate a spill page.  So initialize it to 256.
+ */
+#define	LCA_SGMAP_PFTHRESH	256
 
 /*
  * Macro to flush LCA scatter/gather TLB.
@@ -141,9 +143,10 @@ lca_dma_init(lcp)
 	t->_next_window = NULL;
 	t->_boundary = 0;
 	t->_sgmap = &lcp->lc_sgmap;
+	t->_pfthresh = LCA_SGMAP_PFTHRESH;
 	t->_get_tag = lca_dma_get_tag;
-	t->_dmamap_create = lca_bus_dmamap_create_sgmap;
-	t->_dmamap_destroy = lca_bus_dmamap_destroy_sgmap;
+	t->_dmamap_create = alpha_sgmap_dmamap_create;
+	t->_dmamap_destroy = alpha_sgmap_dmamap_destroy;
 	t->_dmamap_load = lca_bus_dmamap_load_sgmap;
 	t->_dmamap_load_mbuf = lca_bus_dmamap_load_mbuf_sgmap;
 	t->_dmamap_load_uio = lca_bus_dmamap_load_uio_sgmap;
@@ -235,55 +238,6 @@ lca_dma_get_tag(t, bustype)
 	default:
 		panic("lca_dma_get_tag: shouldn't be here, really...");
 	}
-}
-
-/*
- * Create an LCA SGMAP-mapped DMA map.
- */
-int
-lca_bus_dmamap_create_sgmap(t, size, nsegments, maxsegsz, boundary,
-    flags, dmamp)
-	bus_dma_tag_t t;
-	bus_size_t size;
-	int nsegments;
-	bus_size_t maxsegsz;
-	bus_size_t boundary;
-	int flags;
-	bus_dmamap_t *dmamp;
-{
-	bus_dmamap_t map;
-	int error;
-
-	error = _bus_dmamap_create(t, size, nsegments, maxsegsz,
-	    boundary, flags, dmamp);
-	if (error)
-		return (error);
-
-	map = *dmamp;
-
-	if (flags & BUS_DMA_ALLOCNOW) {
-		error = alpha_sgmap_alloc(map, round_page(size),
-		    t->_sgmap, flags);
-		if (error)
-			lca_bus_dmamap_destroy_sgmap(t, map);
-	}
-
-	return (error);
-}
-
-/*
- * Destroy an LCA SGMAP-mapped DMA map.
- */
-void
-lca_bus_dmamap_destroy_sgmap(t, map)
-	bus_dma_tag_t t;
-	bus_dmamap_t map;
-{
-
-	if (map->_dm_flags & DMAMAP_HAS_SGMAP)
-		alpha_sgmap_free(map, t->_sgmap);
-
-	_bus_dmamap_destroy(t, map);
 }
 
 /*

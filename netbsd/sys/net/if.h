@@ -1,7 +1,7 @@
-/*	$NetBSD: if.h,v 1.50.4.1 2000/12/31 17:57:43 jhawk Exp $	*/
+/*	$NetBSD: if.h,v 1.75 2002/03/17 10:21:42 simonb Exp $	*/
 
 /*-
- * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -77,6 +77,16 @@
 #if !defined(_XOPEN_SOURCE)
 
 #include <sys/queue.h>
+#include <net/dlt.h>
+#include <net/pfil.h>
+
+/*
+ * Always include ALTQ glue here -- we use the ALTQ interface queue
+ * structure even when ALTQ is not configured into the kernel so that
+ * the size of struct ifnet does not changed based on the option.  The
+ * ALTQ queue structure is API-compatible with the legacy ifqueue.
+ */
+#include <altq/if_altq.h>
 
 /*
  * Structures defining a network interface, providing a packet
@@ -105,7 +115,7 @@
 /*  XXX fast fix for SNMP, going away soon */
 #include <sys/time.h>
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
@@ -115,6 +125,7 @@ struct rtentry;
 struct socket;
 struct ether_header;
 struct ifnet;
+struct rt_addrinfo;
 
 /*
  * Length of interface external name, including terminating '\0'.
@@ -172,7 +183,7 @@ struct if_data {
 	u_quad_t ifi_omcasts;		/* packets sent via multicast */
 	u_quad_t ifi_iqdrops;		/* dropped on input, this interface */
 	u_quad_t ifi_noproto;		/* destined for unsupported protocol */
-	struct	timeval ifi_lastchange;	/* last updated */
+	struct	timeval ifi_lastchange;	/* last operational state change */
 };
 
 /*
@@ -204,9 +215,20 @@ struct if_data14 {
 	u_long	ifi_omcasts;		/* packets sent via multicast */
 	u_long	ifi_iqdrops;		/* dropped on input, this interface */
 	u_long	ifi_noproto;		/* destined for unsupported protocol */
-	struct	timeval ifi_lastchange;	/* last updated */
+	struct	timeval ifi_lastchange;	/* last operational state change */
 };
 #endif /* _KERNEL && COMPAT_14 */
+
+/*
+ * Structure defining a queue for a network interface.
+ */
+struct ifqueue {
+	struct	mbuf *ifq_head;
+	struct	mbuf *ifq_tail;
+	int	ifq_len;
+	int	ifq_maxlen;
+	int	ifq_drops;
+};
 
 /*
  * Structure defining a queue for a network interface.
@@ -240,22 +262,30 @@ struct ifnet {				/* and the entries */
 		__P((struct ifnet *));
 	int	(*if_ioctl)		/* ioctl routine */
 		__P((struct ifnet *, u_long, caddr_t));
-	int	(*if_reset)		/* XXX bus reset routine */
+	int	(*if_init)		/* init routine */
 		__P((struct ifnet *));
+	void	(*if_stop)		/* stop routine */
+		__P((struct ifnet *, int));
 	void	(*if_watchdog)		/* timer routine */
 		__P((struct ifnet *));
 	void	(*if_drain)		/* routine to release resources */
 		__P((struct ifnet *));
-	struct	ifqueue {
-		struct	mbuf *ifq_head;
-		struct	mbuf *ifq_tail;
-		int	ifq_len;
-		int	ifq_maxlen;
-		int	ifq_drops;
-	} if_snd;			/* output queue */
+	struct ifaltq if_snd;		/* output queue (includes altq) */
 	struct	sockaddr_dl *if_sadl;	/* pointer to our sockaddr_dl */
 	u_int8_t *if_broadcastaddr;	/* linklevel broadcast bytestring */
 	struct ifprefix *if_prefixlist; /* linked list of prefixes per if */
+	void	*if_bridge;		/* bridge glue */
+	int	if_dlt;			/* data link type (<net/dlt.h>) */
+	struct pfil_head if_pfil;	/* filtering point */
+	uint64_t if_capabilities;	/* interface capabilities */
+	uint64_t if_capenable;		/* capabilities enabled */
+
+	/*
+	 * These are pre-computed based on an interfaces enabled
+	 * capabilities, for speed elsewhere.
+	 */
+	int	if_csum_flags_tx;	/* M_CSUM_* flags for Tx */
+	int	if_csum_flags_rx;	/* M_CSUM_* flags for Rx */
 };
 #define	if_mtu		if_data.ifi_mtu
 #define	if_type		if_data.ifi_type
@@ -277,18 +307,18 @@ struct ifnet {				/* and the entries */
 #define	if_noproto	if_data.ifi_noproto
 #define	if_lastchange	if_data.ifi_lastchange
 
-#define	IFF_UP		0x1		/* interface is up */
-#define	IFF_BROADCAST	0x2		/* broadcast address valid */
-#define	IFF_DEBUG	0x4		/* turn on debugging */
-#define	IFF_LOOPBACK	0x8		/* is a loopback net */
-#define	IFF_POINTOPOINT	0x10		/* interface is point-to-point link */
-#define	IFF_NOTRAILERS	0x20		/* avoid use of trailers */
-#define	IFF_RUNNING	0x40		/* resources allocated */
-#define	IFF_NOARP	0x80		/* no address resolution protocol */
-#define	IFF_PROMISC	0x100		/* receive all packets */
-#define	IFF_ALLMULTI	0x200		/* receive all multicast packets */
-#define	IFF_OACTIVE	0x400		/* transmission in progress */
-#define	IFF_SIMPLEX	0x800		/* can't hear own transmissions */
+#define	IFF_UP		0x0001		/* interface is up */
+#define	IFF_BROADCAST	0x0002		/* broadcast address valid */
+#define	IFF_DEBUG	0x0004		/* turn on debugging */
+#define	IFF_LOOPBACK	0x0008		/* is a loopback net */
+#define	IFF_POINTOPOINT	0x0010		/* interface is point-to-point link */
+#define	IFF_NOTRAILERS	0x0020		/* avoid use of trailers */
+#define	IFF_RUNNING	0x0040		/* resources allocated */
+#define	IFF_NOARP	0x0080		/* no address resolution protocol */
+#define	IFF_PROMISC	0x0100		/* receive all packets */
+#define	IFF_ALLMULTI	0x0200		/* receive all multicast packets */
+#define	IFF_OACTIVE	0x0400		/* transmission in progress */
+#define	IFF_SIMPLEX	0x0800		/* can't hear own transmissions */
 #define	IFF_LINK0	0x1000		/* per link layer defined bit */
 #define	IFF_LINK1	0x2000		/* per link layer defined bit */
 #define	IFF_LINK2	0x4000		/* per link layer defined bit */
@@ -297,7 +327,7 @@ struct ifnet {				/* and the entries */
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST|IFF_POINTOPOINT|IFF_RUNNING|IFF_OACTIVE|\
-	    IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI)
+	    IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI|IFF_PROMISC)
 
 /*
  * Some convenience macros used for setting ifi_baudrate.
@@ -306,6 +336,15 @@ struct ifnet {				/* and the entries */
 #define	IF_Kbps(x)	((x) * 1000)		/* kilobits/sec. */
 #define	IF_Mbps(x)	(IF_Kbps((x) * 1000))	/* megabits/sec. */
 #define	IF_Gbps(x)	(IF_Mbps((x) * 1000))	/* gigabits/sec. */
+
+/* Capabilities that interfaces can advertise. */
+#define	IFCAP_CSUM_IPv4		0x0001	/* can do IPv4 header checksums */
+#define	IFCAP_CSUM_TCPv4	0x0002	/* can do IPv4/TCP checksums */
+#define	IFCAP_CSUM_UDPv4	0x0004	/* can do IPv4/UDP checksums */
+#define	IFCAP_CSUM_TCPv6	0x0008	/* can do IPv6/TCP checksums */
+#define	IFCAP_CSUM_UDPv6	0x0010	/* can do IPv6/UDP checksums */
+#define	IFCAP_CSUM_TCPv4_Rx	0x0020	/* can do IPv4/TCP (Rx only) */
+#define	IFCAP_CSUM_UDPv4_Rx	0x0040	/* can do IPv4/UDP (Rx only) */
 
 /*
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)
@@ -340,6 +379,20 @@ struct ifnet {				/* and the entries */
 		(ifq)->ifq_len--; \
 	} \
 }
+#define	IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
+#define	IF_PURGE(ifq)							\
+do {									\
+	struct mbuf *__m0;						\
+									\
+	for (;;) {							\
+		IF_DEQUEUE((ifq), __m0);				\
+		if (__m0 == NULL)					\
+			break;						\
+		else							\
+			m_freem(__m0);					\
+	}								\
+} while (0)
+#define	IF_IS_EMPTY(ifq)	((ifq)->ifq_len == 0)
 
 #define	IFQ_MAXLEN	50
 #define	IFNET_SLOWHZ	1		/* granularity is 1 second */
@@ -368,12 +421,12 @@ struct ifaddr {
 	TAILQ_ENTRY(ifaddr) ifa_list;	/* list of addresses for interface */
 	struct	ifaddr_data	ifa_data;	/* statistics on the address */
 	void	(*ifa_rtrequest)	/* check or clean routes (+ or -)'d */
-		    __P((int, struct rtentry *, struct sockaddr *));
+		    __P((int, struct rtentry *, struct rt_addrinfo *));
 	u_int	ifa_flags;		/* mostly rt_flags for cloning */
 	int	ifa_refcnt;		/* count of references */
 	int	ifa_metric;		/* cost of going out this interface */
 };
-#define	IFA_ROUTE	RTF_UP		/* route installed */
+#define	IFA_ROUTE	RTF_UP /* 0x01 *//* route installed */
 
 /*
  * The prefix structure contains information about one prefix
@@ -395,7 +448,7 @@ struct ifprefix {
  */
 struct if_msghdr {
 	u_short	ifm_msglen;	/* to skip over non-understood messages */
-	u_char	ifm_version;	/* future binary compatability */
+	u_char	ifm_version;	/* future binary compatibility */
 	u_char	ifm_type;	/* message type */
 	int	ifm_addrs;	/* like rtm_addrs */
 	int	ifm_flags;	/* value of if_flags */
@@ -407,7 +460,7 @@ struct if_msghdr {
 /* pre-1.5 if_msghdr (ifm_data changed) */
 struct if_msghdr14 {
 	u_short	ifm_msglen;	/* to skip over non-understood messages */
-	u_char	ifm_version;	/* future binary compatability */
+	u_char	ifm_version;	/* future binary compatibility */
 	u_char	ifm_type;	/* message type */
 	int	ifm_addrs;	/* like rtm_addrs */
 	int	ifm_flags;	/* value of if_flags */
@@ -422,7 +475,7 @@ struct if_msghdr14 {
  */
 struct ifa_msghdr {
 	u_short	ifam_msglen;	/* to skip over non-understood messages */
-	u_char	ifam_version;	/* future binary compatability */
+	u_char	ifam_version;	/* future binary compatibility */
 	u_char	ifam_type;	/* message type */
 	int	ifam_addrs;	/* like rtm_addrs */
 	int	ifam_flags;	/* value of ifa_flags */
@@ -460,6 +513,7 @@ struct	ifreq {
 		short	ifru_flags;
 		int	ifru_metric;
 		int	ifru_mtu;
+		int	ifru_dlt;
 		u_int	ifru_value;
 		caddr_t	ifru_data;
 	} ifr_ifru;
@@ -469,9 +523,16 @@ struct	ifreq {
 #define	ifr_flags	ifr_ifru.ifru_flags	/* flags */
 #define	ifr_metric	ifr_ifru.ifru_metric	/* metric */
 #define	ifr_mtu		ifr_ifru.ifru_mtu	/* mtu */
+#define	ifr_dlt		ifr_ifru.ifru_dlt	/* data link type (DLT_*) */
 #define	ifr_value	ifr_ifru.ifru_value	/* generic value */
 #define	ifr_media	ifr_ifru.ifru_metric	/* media options (overload) */
 #define	ifr_data	ifr_ifru.ifru_data	/* for use by interface */
+};
+
+struct ifcapreq {
+	char		ifcr_name[IFNAMSIZ];	/* if name, e.g. "en0" */
+	uint64_t	ifcr_capabilities;	/* supported capabiliites */
+	uint64_t	ifcr_capenable;		/* capabilities enabled */
 };
 
 struct ifaliasreq {
@@ -572,22 +633,118 @@ do {									\
 #endif /* DIAGNOSTIC */
 #endif /* IFAREF_DEBUG */
 
-struct ifnet_head ifnet;
+#ifdef ALTQ
+#define	ALTQ_DECL(x)		x
+
+#define IFQ_ENQUEUE(ifq, m, pattr, err)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_ENQUEUE((ifq), (m), (pattr), (err));		\
+	else {								\
+		if (IF_QFULL((ifq))) {					\
+			m_freem((m));					\
+			(err) = ENOBUFS;				\
+		} else {						\
+			IF_ENQUEUE((ifq), (m));				\
+			(err) = 0;					\
+		}							\
+	}								\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define IFQ_DEQUEUE(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_REMOVE);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_DEQUEUE((ifq), (m));				\
+	else								\
+		IF_DEQUEUE((ifq), (m));					\
+} while (0)
+
+#define	IFQ_POLL(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_POLL);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_POLL((ifq), (m));					\
+	else								\
+		IF_POLL((ifq), (m));					\
+} while (0)
+
+#define	IFQ_PURGE(ifq)							\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_PURGE((ifq));					\
+	else								\
+		IF_PURGE((ifq));					\
+} while (0)
+
+#define	IFQ_SET_READY(ifq)						\
+do {									\
+	(ifq)->altq_flags |= ALTQF_READY;				\
+} while (0)
+
+#define	IFQ_CLASSIFY(ifq, m, af, pa)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq))) {					\
+		if (ALTQ_NEEDS_CLASSIFY((ifq)))				\
+			(pa)->pattr_class = (*(ifq)->altq_classify)	\
+				((ifq)->altq_clfier, (m), (af));	\
+		(pa)->pattr_af = (af);					\
+		(pa)->pattr_hdr = mtod((m), caddr_t);			\
+	}								\
+} while (0)
+#else /* ! ALTQ */
+#define	ALTQ_DECL(x)		/* nothing */
+
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
+do {									\
+	if (IF_QFULL((ifq))) {						\
+		m_freem((m));						\
+		(err) = ENOBUFS;					\
+	} else {							\
+		IF_ENQUEUE((ifq), (m));					\
+		(err) = 0;						\
+	}								\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)	IF_DEQUEUE((ifq), (m))
+
+#define	IFQ_POLL(ifq, m)	IF_POLL((ifq), (m))
+
+#define	IFQ_PURGE(ifq)		IF_PURGE((ifq))
+
+#define	IFQ_SET_READY(ifq)	/* nothing */
+
+#define	IFQ_CLASSIFY(ifq, m, af, pa) /* nothing */
+
+#endif /* ALTQ */
+
+#define	IFQ_IS_EMPTY(ifq)		IF_IS_EMPTY((ifq))
+#define	IFQ_INC_LEN(ifq)		((ifq)->ifq_len++)
+#define	IFQ_DEC_LEN(ifq)		(--(ifq)->ifq_len)
+#define	IFQ_INC_DROPS(ifq)		((ifq)->ifq_drops++)
+#define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
+
+extern struct ifnet_head ifnet;
 extern struct ifnet **ifindex2ifnet;
 #if 0
 struct ifnet loif[];
 #endif
 extern int if_index;
 
-void	ether_ifattach __P((struct ifnet *, const u_int8_t *));
-void	ether_ifdetach __P((struct ifnet *));
 char	*ether_sprintf __P((const u_char *));
 
+void	if_alloc_sadl __P((struct ifnet *));
+void	if_free_sadl __P((struct ifnet *));
 void	if_attach __P((struct ifnet *));
 void	if_deactivate __P((struct ifnet *));
 void	if_detach __P((struct ifnet *));
 void	if_down __P((struct ifnet *));
-void	if_qflush __P((struct ifqueue *));
 void	if_slowtimo __P((void *));
 void	if_up __P((struct ifnet *));
 int	ifconf __P((u_long, caddr_t));
@@ -605,7 +762,7 @@ struct	ifaddr *ifa_ifwithroute __P((int, struct sockaddr *,
 					struct sockaddr *));
 struct	ifaddr *ifaof_ifpforaddr __P((struct sockaddr *, struct ifnet *));
 void	ifafree __P((struct ifaddr *));
-void	link_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+void	link_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 
 void	if_clone_attach __P((struct if_clone *));
 void	if_clone_detach __P((struct if_clone *));
@@ -617,7 +774,7 @@ int	loioctl __P((struct ifnet *, u_long, caddr_t));
 void	loopattach __P((int));
 int	looutput __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
-void	lortrequest __P((int, struct rtentry *, struct sockaddr *));
+void	lortrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 
 /*
  * These are exported because they're an easy way to tell if
@@ -628,7 +785,8 @@ int	if_nulloutput __P((struct ifnet *, struct mbuf *,
 void	if_nullinput __P((struct ifnet *, struct mbuf *));
 void	if_nullstart __P((struct ifnet *));
 int	if_nullioctl __P((struct ifnet *, u_long, caddr_t));
-int	if_nullreset __P((struct ifnet *));
+int	if_nullinit __P((struct ifnet *));
+void	if_nullstop __P((struct ifnet *, int));
 void	if_nullwatchdog __P((struct ifnet *));
 void	if_nulldrain __P((struct ifnet *));
 #else

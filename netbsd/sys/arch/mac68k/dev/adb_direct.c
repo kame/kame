@@ -1,4 +1,4 @@
-/*	$NetBSD: adb_direct.c,v 1.42.4.2 2000/09/28 19:02:03 scottr Exp $	*/
+/*	$NetBSD: adb_direct.c,v 1.46 2002/03/05 17:39:25 shiba Exp $	*/
 
 /* From: adb_direct.c 2.02 4/18/97 jpw */
 
@@ -1782,13 +1782,13 @@ adb_soft_intr(void)
 		/* call default completion routine if it's valid */
 		if (comprout) {
 #ifdef __NetBSD__
-			asm("	movml #0xffff,sp@-	| save all registers
-				movl %0,a2 		| compdata
-				movl %1,a1 		| comprout
-				movl %2,a0 		| buffer
-				movl %3,d0 		| cmd
-				jbsr a1@ 		| go call the routine
-				movml sp@+,#0xffff	| restore all registers"
+			asm("	movml #0xffff,%%sp@-	| save all registers
+				movl %0,%%a2 		| compdata
+				movl %1,%%a1 		| comprout
+				movl %2,%%a0 		| buffer
+				movl %3,%%d0 		| cmd
+				jbsr %%a1@ 		| go call the routine
+				movml %%sp@+,#0xffff	| restore all registers"
 			    :
 			    : "g"(compdata), "g"(comprout),
 				"g"(buffer), "g"(cmd)
@@ -2355,13 +2355,13 @@ adb_comp_exec(void)
 {
 	if ((long)0 != adbCompRout) /* don't call if empty return location */
 #ifdef __NetBSD__
-		asm("	movml #0xffff,sp@-	| save all registers
-			movl %0,a2		| adbCompData
-			movl %1,a1		| adbCompRout
-			movl %2,a0		| adbBuffer
-			movl %3,d0		| adbWaitingCmd
-			jbsr a1@		| go call the routine
-			movml sp@+,#0xffff	| restore all registers"
+		asm("	movml #0xffff,%%sp@-	| save all registers
+			movl %0,%%a2		| adbCompData
+			movl %1,%%a1		| adbCompRout
+			movl %2,%%a0		| adbBuffer
+			movl %3,%%d0		| adbWaitingCmd
+			jbsr %%a1@		| go call the routine
+			movml %%sp@+,#0xffff	| restore all registers"
 		    :
 		    : "g"(adbCompData), "g"(adbCompRout),
 			"g"(adbBuffer), "g"(adbWaitingCmd)
@@ -2506,7 +2506,6 @@ adb_setup_hw_type(void)
 
 	case MACH_MACPB140:		/* PowerBook 140 */
 	case MACH_MACPB145:		/* PowerBook 145 */
-	case MACH_MACPB150:		/* PowerBook 150 */
 	case MACH_MACPB160:		/* PowerBook 160 */
 	case MACH_MACPB165:		/* PowerBook 165 */
 	case MACH_MACPB165C:		/* PowerBook 165c */
@@ -2521,6 +2520,7 @@ adb_setup_hw_type(void)
 #endif
 		break;
 
+	case MACH_MACPB150:		/* PowerBook 150 */
 	case MACH_MACPB210:		/* PowerBook Duo 210 */
 	case MACH_MACPB230:		/* PowerBook Duo 230 */
 	case MACH_MACPB250:		/* PowerBook Duo 250 */

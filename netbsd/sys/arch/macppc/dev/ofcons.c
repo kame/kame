@@ -1,4 +1,4 @@
-/*	$NetBSD: ofcons.c,v 1.4 2000/03/23 06:40:34 thorpej Exp $	*/
+/*	$NetBSD: ofcons.c,v 1.8 2002/03/17 19:40:44 atatat Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -141,7 +141,7 @@ ofcopen(dev, flag, mode, p)
 		return EBUSY;
 	tp->t_state |= TS_CARR_ON;
 	
-	return (*linesw[tp->t_line].l_open)(dev, tp);
+	return (*tp->t_linesw->l_open)(dev, tp);
 }
 
 int
@@ -153,7 +153,7 @@ ofcclose(dev, flag, mode, p)
 	struct ofcons_softc *sc = macofcons_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->of_tty;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 	return 0;
 }
@@ -167,7 +167,7 @@ ofcread(dev, uio, flag)
 	struct ofcons_softc *sc = macofcons_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->of_tty;
 	
-	return (*linesw[tp->t_line].l_read)(tp, uio, flag);
+	return (*tp->t_linesw->l_read)(tp, uio, flag);
 }
 
 int
@@ -179,7 +179,19 @@ ofcwrite(dev, uio, flag)
 	struct ofcons_softc *sc = macofcons_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->of_tty;
 	
-	return (*linesw[tp->t_line].l_write)(tp, uio, flag);
+	return (*tp->t_linesw->l_write)(tp, uio, flag);
+}
+
+int
+ofcpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct ofcons_softc *sc = macofcons_cd.cd_devs[minor(dev)];
+	struct tty *tp = sc->of_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -194,11 +206,9 @@ ofcioctl(dev, cmd, data, flag, p)
 	struct tty *tp = sc->of_tty;
 	int error;
 	
-	if ((error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p)) >= 0)
+	if ((error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p)) != EPASSTHROUGH)
 		return error;
-	if ((error = ttioctl(tp, cmd, data, flag, p)) >= 0)
-		return error;
-	return ENOTTY;
+	return ttioctl(tp, cmd, data, flag, p);
 }
 
 struct tty *
@@ -433,7 +443,7 @@ kbd_intr(event)
 			polledkey = str[0];
 		else
 			for (s = str; *s; s++)
-				(*linesw[ite_tty->t_line].l_rint)(*s, ite_tty);
+				(*ite_tty->t_linesw->l_rint)(*s, ite_tty);
 	}
 	return 0;
 }

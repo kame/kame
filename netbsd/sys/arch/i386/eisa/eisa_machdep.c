@@ -1,4 +1,4 @@
-/*	$NetBSD: eisa_machdep.c,v 1.11.2.1 2000/08/11 18:00:07 thorpej Exp $	*/
+/*	$NetBSD: eisa_machdep.c,v 1.14 2001/11/15 07:03:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -70,6 +70,9 @@
 /*
  * Machine-specific functions for EISA autoconfiguration.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: eisa_machdep.c,v 1.14 2001/11/15 07:03:28 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -199,7 +202,7 @@ eisa_intr_disestablish(ec, cookie)
 	void *cookie;
 {
 
-	return isa_intr_disestablish(NULL, cookie);
+	isa_intr_disestablish(NULL, cookie);
 }
 
 int

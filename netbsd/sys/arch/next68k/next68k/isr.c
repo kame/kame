@@ -1,4 +1,4 @@
-/*	$NetBSD: isr.c,v 1.11 2000/02/21 20:38:50 erh Exp $ */
+/*	$NetBSD: isr.c,v 1.15 2001/05/13 16:55:39 chs Exp $ */
 
 /*
  * This file was taken from mvme68k/mvme68k/isr.c
@@ -47,18 +47,10 @@
  * Link and dispatch interrupts.
  */
 
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/vmmeter.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -254,12 +246,17 @@ isrdispatch_autovec(pc, evec, frame)
 	else if (++straycount > 50)
 		panic("isr_dispatch_autovec: too many stray interrupts");
 	else {
+		char sbuf[256];
+
 		printf("isrdispatch_autovec: stray level %d interrupt\n", ipl);
 
-		printf("  *intrstat = 0x%b\n",
-				(*(volatile u_long *)IIOV(NEXT_P_INTRSTAT)),NEXT_INTR_BITS);
-		printf("  *intrmask = 0x%b\n",
-				(*(volatile u_long *)IIOV(NEXT_P_INTRMASK)),NEXT_INTR_BITS);
+		bitmask_snprintf((*(volatile u_long *)IIOV(NEXT_P_INTRSTAT)),
+				 NEXT_INTR_BITS, sbuf, sizeof(sbuf));
+		printf("  *intrstat = 0x%s\n", sbuf);
+
+		bitmask_snprintf((*(volatile u_long *)IIOV(NEXT_P_INTRMASK)),
+				 NEXT_INTR_BITS, sbuf, sizeof(sbuf));
+		printf("  *intrmask = 0x%s\n", sbuf);
 	}
 }
 
@@ -298,18 +295,7 @@ isrdispatch_vectored(pc, evec, frame)
 		printf("isrdispatch_vectored: vec 0x%x not claimed\n", vec);
 }
 
-/*
- * XXX Why on earth isn't this in a common file?!
- */
-void	netintr __P((void));
-void	arpintr __P((void));
-void	atintr __P((void));
-void	ipintr __P((void));
-void	ip6intr __P((void));
-void	nsintr __P((void));
-void	clnlintr __P((void));
-void	ccittintr __P((void));
-void	pppintr __P((void));
+void netintr __P((void));
 
 void
 netintr()

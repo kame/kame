@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmciavar.h,v 1.12 2000/02/08 12:51:31 enami Exp $	*/
+/*	$NetBSD: pcmciavar.h,v 1.15 2001/12/15 13:23:23 soren Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -31,8 +31,6 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
-
-#include <machine/bus.h>
 
 #include <dev/pcmcia/pcmciachip.h>
 
@@ -105,6 +103,22 @@ struct pcmcia_config_entry {
 	SIMPLEQ_ENTRY(pcmcia_config_entry) cfe_list;
 };
 
+
+struct pcmcia_funce_disk {
+	int pfd_interface;
+};
+
+struct pcmcia_funce_lan {
+	int pfl_nidlen;
+	u_int8_t pfl_nid[8];
+};
+
+union pcmcia_funce {
+	struct pcmcia_funce_disk pfv_disk;
+	struct pcmcia_funce_lan pfv_lan;
+};
+
+
 struct pcmcia_function {
 	/* read off the card */
 	int		number;
@@ -123,7 +137,7 @@ struct pcmcia_function {
 #define	pf_ccrh		pf_pcmh.memh
 #define	pf_ccr_mhandle	pf_pcmh.mhandle
 #define	pf_ccr_realsize	pf_pcmh.realsize
-	bus_addr_t	pf_ccr_offset;
+	bus_size_t	pf_ccr_offset;
 	int		pf_ccr_window;
 	long		pf_mfc_iobase;
 	long		pf_mfc_iomax;
@@ -131,6 +145,11 @@ struct pcmcia_function {
 	void		*ih_arg;
 	int		ih_ipl;
 	int		pf_flags;
+
+	union pcmcia_funce pf_funce; /* CISTPL_FUNCE */
+#define pf_funce_disk_interface pf_funce.pfv_disk.pfd_interface
+#define pf_funce_lan_nid pf_funce.pfv_lan.pfl_nid
+#define pf_funce_lan_nidlen pf_funce.pfv_lan.pfl_nidlen
 };
 
 /* pf_flags */
@@ -181,9 +200,9 @@ struct pcmcia_softc {
 struct pcmcia_cis_quirk {
 	int32_t manufacturer;
 	int32_t product;
-	char *cis1_info[4];
-	struct pcmcia_function *pf;
-	struct pcmcia_config_entry *cfe;
+	const char *cis1_info[4];
+	const struct pcmcia_function *pf;
+	const struct pcmcia_config_entry *cfe;
 };
 
 struct pcmcia_attach_args {
@@ -197,7 +216,7 @@ struct pcmcia_tuple {
 	unsigned int	code;
 	unsigned int	length;
 	u_long		mult;
-	bus_addr_t	ptr;
+	bus_size_t	ptr;
 	bus_space_tag_t	memt;
 	bus_space_handle_t memh;
 };

@@ -1,4 +1,4 @@
-/*	$NetBSD: iop.c,v 1.19.4.3 2002/03/09 19:38:16 he Exp $	*/
+/*	$NetBSD: iop.c,v 1.24 2002/04/05 18:27:48 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Support for I2O IOPs (intelligent I/O processors).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iop.c,v 1.24 2002/04/05 18:27:48 bouyer Exp $");
+
 #include "opt_i2o.h"
 #include "iop.h"
 
@@ -55,10 +58,9 @@
 #include <sys/conf.h>
 #include <sys/kthread.h>
 
-#include <machine/vmparam.h>
-#include <machine/bus.h>
+#include <uvm/uvm_extern.h>
 
-#include <vm/vm.h>
+#include <machine/bus.h>
 
 #include <dev/i2o/i2o.h>
 #include <dev/i2o/iopio.h>
@@ -92,7 +94,7 @@ do {						\
 #define IOP_ICTXHASH_NBUCKETS	16
 #define	IOP_ICTXHASH(ictx)	(&iop_ictxhashtbl[(ictx) & iop_ictxhash])
 
-#define	IOP_MAX_SEGS	(((IOP_MAX_XFER + NBPG - 1) / NBPG) + 1)
+#define	IOP_MAX_SEGS	(((IOP_MAX_XFER + PAGE_SIZE - 1) / PAGE_SIZE) + 1)
 
 #define	IOP_TCTX_SHIFT	12
 #define	IOP_TCTX_MASK	((1 << IOP_TCTX_SHIFT) - 1)
@@ -274,7 +276,7 @@ iop_init(struct iop_softc *sc, const char *intrstr)
 	printf("I2O adapter");
 
 	if (iop_ictxhashtbl == NULL)
-		iop_ictxhashtbl = hashinit(IOP_ICTXHASH_NBUCKETS,
+		iop_ictxhashtbl = hashinit(IOP_ICTXHASH_NBUCKETS, HASH_LIST,
 		    M_DEVBUF, M_NOWAIT, &iop_ictxhash);
 
 	/* Disable interrupts at the IOP. */
@@ -282,14 +284,14 @@ iop_init(struct iop_softc *sc, const char *intrstr)
 	iop_outl(sc, IOP_REG_INTR_MASK, mask | IOP_INTR_OFIFO);
 
 	/* Allocate a scratch DMA map for small miscellaneous shared data. */
-	if (bus_dmamap_create(sc->sc_dmat, NBPG, 1, NBPG, 0,
+	if (bus_dmamap_create(sc->sc_dmat, PAGE_SIZE, 1, PAGE_SIZE, 0,
 	    BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW, &sc->sc_scr_dmamap) != 0) {
 		printf("%s: cannot create scratch dmamap\n",
 		    sc->sc_dv.dv_xname);
 		return;
 	}
 
-	if (bus_dmamem_alloc(sc->sc_dmat, NBPG, NBPG, 0,
+	if (bus_dmamem_alloc(sc->sc_dmat, PAGE_SIZE, PAGE_SIZE, 0,
 	    sc->sc_scr_seg, 1, &nsegs, BUS_DMA_NOWAIT) != 0) {
 		printf("%s: cannot alloc scratch dmamem\n",
 		    sc->sc_dv.dv_xname);
@@ -297,7 +299,7 @@ iop_init(struct iop_softc *sc, const char *intrstr)
 	}
 	state++;
 
-	if (bus_dmamem_map(sc->sc_dmat, sc->sc_scr_seg, nsegs, NBPG,
+	if (bus_dmamem_map(sc->sc_dmat, sc->sc_scr_seg, nsegs, PAGE_SIZE,
 	    &sc->sc_scr, 0)) {
 		printf("%s: cannot map scratch dmamem\n", sc->sc_dv.dv_xname);
 		goto bail_out;
@@ -305,7 +307,7 @@ iop_init(struct iop_softc *sc, const char *intrstr)
 	state++;
 
 	if (bus_dmamap_load(sc->sc_dmat, sc->sc_scr_dmamap, sc->sc_scr,
-	    NBPG, NULL, BUS_DMA_NOWAIT)) {
+	    PAGE_SIZE, NULL, BUS_DMA_NOWAIT)) {
 		printf("%s: cannot load scratch dmamap\n", sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
@@ -362,18 +364,17 @@ iop_init(struct iop_softc *sc, const char *intrstr)
 	if (sc->sc_framesize < IOP_MIN_MSG_SIZE) {
 		printf("%s: frame size too small (%d)\n",
 		    sc->sc_dv.dv_xname, sc->sc_framesize);
-		return;
+		goto bail_out;
 	}
 #endif
 
 	/* Allocate message wrappers. */
-	im = malloc(sizeof(*im) * sc->sc_maxib, M_DEVBUF, M_NOWAIT);
+	im = malloc(sizeof(*im) * sc->sc_maxib, M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (im == NULL) {
 		printf("%s: memory allocation failure\n", sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
 	state++;
-	memset(im, 0, sizeof(*im) * sc->sc_maxib);
 	sc->sc_ims = im;
 	SLIST_INIT(&sc->sc_im_freelist);
 
@@ -437,7 +438,7 @@ iop_init(struct iop_softc *sc, const char *intrstr)
 	if (state > 2)
 		bus_dmamap_unload(sc->sc_dmat, sc->sc_scr_dmamap);
 	if (state > 1)
-		bus_dmamem_unmap(sc->sc_dmat, sc->sc_scr, NBPG);
+		bus_dmamem_unmap(sc->sc_dmat, sc->sc_scr, PAGE_SIZE);
 	if (state > 0)
 		bus_dmamem_free(sc->sc_dmat, sc->sc_scr_seg, nsegs);
 	bus_dmamap_destroy(sc->sc_dmat, sc->sc_scr_dmamap);
@@ -487,9 +488,8 @@ iop_config_interrupts(struct device *self)
 		i = sizeof(struct i2o_systab_entry) * (niop - 1) +
 		    sizeof(struct i2o_systab);
 		iop_systab_size = i;
-		iop_systab = malloc(i, M_DEVBUF, M_NOWAIT);
+		iop_systab = malloc(i, M_DEVBUF, M_NOWAIT|M_ZERO);
 
-		memset(iop_systab, 0, i);
 		iop_systab->numentries = niop;
 		iop_systab->version = I2O_VERSION_11;
 
@@ -704,8 +704,7 @@ iop_reconfigure(struct iop_softc *sc, u_int chgind)
 	if (sc->sc_tidmap != NULL)
 		free(sc->sc_tidmap, M_DEVBUF);
 	sc->sc_tidmap = malloc(sc->sc_nlctent * sizeof(struct iop_tidmap),
-	    M_DEVBUF, M_NOWAIT);
-	memset(sc->sc_tidmap, 0, sizeof(sc->sc_tidmap));
+	    M_DEVBUF, M_NOWAIT|M_ZERO);
 
 	/* Allow 1 queued command per device while we're configuring. */
 	iop_adjqparam(sc, 1);
@@ -979,7 +978,7 @@ iop_ofifo_init(struct iop_softc *sc)
 	mf->msgfunc = I2O_MSGFUNC(I2O_TID_IOP, I2O_EXEC_OUTBOUND_INIT);
 	mf->msgictx = IOP_ICTX;
 	mf->msgtctx = 0;
-	mf->pagesize = NBPG;
+	mf->pagesize = PAGE_SIZE;
 	mf->flags = IOP_INIT_CODE | ((sc->sc_framesize >> 2) << 16);
 
 	/*
@@ -1016,7 +1015,7 @@ iop_ofifo_init(struct iop_softc *sc)
 	if (sc->sc_rep_phys == 0) {
 		sc->sc_rep_size = sc->sc_maxob * sc->sc_framesize;
 
-		rv = bus_dmamem_alloc(sc->sc_dmat, sc->sc_rep_size, NBPG,
+		rv = bus_dmamem_alloc(sc->sc_dmat, sc->sc_rep_size, PAGE_SIZE,
 		    0, &seg, 1, &rseg, BUS_DMA_NOWAIT);
 		if (rv != 0) {
 			printf("%s: dma alloc = %d\n", sc->sc_dv.dv_xname,
@@ -1468,7 +1467,7 @@ iop_systab_set(struct iop_softc *sc)
 
 	if (mema[1] != 0) {
 		rv = bus_space_alloc(sc->sc_bus_memt, 0, 0xffffffff,
-		    le32toh(mema[1]), NBPG, 0, 0, &boo, &bsh);
+		    le32toh(mema[1]), PAGE_SIZE, 0, 0, &boo, &bsh);
 		mema[0] = htole32(boo);
 		if (rv != 0) {
 			printf("%s: can't alloc priv mem space, err = %d\n",
@@ -1965,7 +1964,7 @@ iop_msg_map_bio(struct iop_softc *sc, struct iop_msg *im, u_int32_t *mb,
 	ix = im->im_xfer;
 	dm = ix->ix_map;
 	rv = bus_dmamap_load(sc->sc_dmat, dm, xferaddr, xfersize, NULL,
-	    BUS_DMA_NOWAIT);
+	    BUS_DMA_NOWAIT | BUS_DMA_STREAMING);
 	if (rv != 0)
 		return (rv);
 
@@ -1987,7 +1986,7 @@ iop_msg_map_bio(struct iop_softc *sc, struct iop_msg *im, u_int32_t *mb,
 			saddr = ds->ds_addr;
 
 			while (slen > 0) {
-				eaddr = (saddr + NBPG) & ~(NBPG - 1);
+				eaddr = (saddr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
 				tlen = min(eaddr - saddr, slen);
 				slen -= tlen;
 				*p++ = le32toh(saddr);
@@ -2209,7 +2208,7 @@ iop_msg_wait(struct iop_softc *sc, struct iop_msg *im, int timo)
 		splx(s);
 		return;
 	}
-	rv = tsleep(im, PRIBIO, "iopmsg", timo * hz / 1000);
+	rv = tsleep(im, PRIBIO, "iopmsg", mstohz(timo));
 	splx(s);
 
 #ifdef I2ODEBUG

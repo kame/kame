@@ -1,4 +1,4 @@
-/*	$NetBSD: ns_ip.c,v 1.26 2000/03/30 13:02:58 augustss Exp $	*/
+/*	$NetBSD: ns_ip.c,v 1.29 2001/11/13 01:08:11 lukem Exp $	*/
 
 /*
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
@@ -38,6 +38,9 @@
 /*
  * Software interface driver for encapsulating ns in ip.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ns_ip.c,v 1.29 2001/11/13 01:08:11 lukem Exp $");
 
 #include "opt_ns.h"		/* options NSIP, needed by ns_if.h */
 
@@ -119,6 +122,7 @@ nsipattach()
 	ifp->if_start = nsipstart;
 	ifp->if_flags = IFF_POINTOPOINT;
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 
 	/*
 	 * XXX Emulate the side effect of incrementing nsipif.if_unit
@@ -253,7 +257,7 @@ idpip_input(va_alist)
 	/*
 	 * Deliver to NS
 	 */
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);

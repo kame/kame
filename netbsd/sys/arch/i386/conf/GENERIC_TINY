@@ -1,12 +1,14 @@
-#	$NetBSD: GENERIC_TINY,v 1.16.2.6 2001/05/01 12:37:27 he Exp $
+#	$NetBSD: GENERIC_TINY,v 1.40.4.1 2002/08/01 04:23:08 lukem Exp $
 #
 #	GENERIC_TINY -- suitable default for 4M machines
-#			No EISA, PCI or SCSI.
+#			No EISA, PCI, or SCSI.
 #
 
 include "arch/i386/conf/std.i386"
 
-makeoptions 	COPTS="-Os"
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+makeoptions	COPTS="-Os"
 
 maxusers	8		# estimated number of users
 
@@ -28,7 +30,7 @@ options 	MATH_EMULATE	# floating point emulation
 
 # This option allows you to force a serial console at the specified
 # I/O address.   see console(4) for details.
-#options 	"CONSDEVNAME=\"com\""
+#options 	CONSDEVNAME="\"com\""
 
 # The following options override the memory sizes passed in from the boot
 # block.  Use them *only* if the boot block is unable to determine the correct
@@ -57,6 +59,9 @@ options 	NMBCLUSTERS=256
 
 #options 	LKM		# loadable kernel modules
 
+#options 	USERCONF	# userconf(4) support
+options		PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Diagnostic/debugging support options
 #options 	DIAGNOSTIC	# expensive kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
@@ -64,7 +69,7 @@ options 	NMBCLUSTERS=256
 #options 	DDB		# in-kernel debugger
 #options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 #options 	KGDB		# remote debugger
-#options 	"KGDB_DEVNAME=\"com\"",KGDBADDR=0x3f8,KGDBRATE=9600
+#options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
 #makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
@@ -77,6 +82,7 @@ options 	COMPAT_13	# NetBSD 1.3,
 options 	COMPAT_14	# NetBSD 1.4,
 #options 	COMPAT_43	# and 4.3BSD
 options 	COMPAT_386BSD_MBRPART # recognize old partition ID
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 #options 	COMPAT_SVR4	# binary compatibility with SVR4
 #options 	COMPAT_IBCS2	# binary compatibility with SCO and ISC
@@ -105,6 +111,8 @@ file-system 	KERNFS		# /kern
 #options 	NFSSERVER	# Network File System server
 #options 	EXT2FS_SYSTEM_FLAGS # makes ext2fs file flags (append and
 				# immutable) behave as system flags.
+options 	VNODE_OP_NOINLINE # don't inline vnode op calls
+
 # Networking options
 #options 	GATEWAY		# packet forwarding
 options 	INET		# IP + ICMP + TCP + UDP
@@ -120,9 +128,7 @@ options 	INET		# IP + ICMP + TCP + UDP
 #options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
 #options 	IPFILTER_LOG	# ipmon(8) log support
-
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not recommended.
-#options 	TCP_COMPAT_42
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 # These options enable verbose messages for several subsystems.
 # Warning, these may compile large string tables into the kernel!
@@ -144,20 +150,20 @@ config		netbsd	root on ? type ?
 # wscons options
 #
 # builtin terminal emulations
-#options	WSEMUL_SUN              # sun terminal emulation
-options 	WSEMUL_VT100            # VT100 / VT220 emulation
+#options 	WSEMUL_SUN		# sun terminal emulation
+options 	WSEMUL_VT100		# VT100 / VT220 emulation
 # different kernel output - see dev/wscons/wsdisplayvar.h
 options 	WS_KERNEL_FG=WSCOL_GREEN
 #options 	WS_KERNEL_BG=WSCOL_BLACK
 # compatibility to other console drivers
-options 	WSDISPLAY_COMPAT_PCVT           # emulate some ioctls
-options 	WSDISPLAY_COMPAT_SYSCONS        # emulate some ioctls
-options 	WSDISPLAY_COMPAT_USL            # VT handling
-options 	WSDISPLAY_COMPAT_RAWKBD         # can get raw scancodes
+options 	WSDISPLAY_COMPAT_PCVT		# emulate some ioctls
+options 	WSDISPLAY_COMPAT_SYSCONS	# emulate some ioctls
+options 	WSDISPLAY_COMPAT_USL		# VT handling
+options 	WSDISPLAY_COMPAT_RAWKBD		# can get raw scancodes
 # see dev/pckbc/wskbdmap_mfii.c for implemented layouts
 #options 	PCKBD_LAYOUT="(KB_DE | KB_NODEAD)"
 # allocate a number of virtual screens at autoconfiguration time
-#options	WSDISPLAY_DEFAULTSCREENS=4
+#options 	WSDISPLAY_DEFAULTSCREENS=4
 # use a large software cursor that doesn't blink
 options 	PCDISPLAY_SOFTCURSOR
 
@@ -186,13 +192,13 @@ mainbus0 at root
 #puc*	at pci? dev ? function ?	# PCI "universal" comm. cards
 
 # EISA bus support
-#eisa*	at mainbus?
-#eisa*	at pceb?
+#eisa0	at mainbus?
+#eisa0	at pceb?
 
 # ISA bus support
-isa*	at mainbus?
-#isa*	at pceb?
-#isa*	at pcib?
+isa0	at mainbus?
+#isa0	at pceb?
+#isa0	at pcib?
 
 # PCMCIA bus support
 pcmcia*	at pcic? controller ? socket ?
@@ -218,20 +224,16 @@ npx0	at isa? port 0xf0 irq 13	# x86 math coprocessor
 #pc0	at isa? port 0x60 irq 1		# pccons generic PC console driver
 
 # wscons
-pckbc0 		at isa?                 # pc keyboard controller
-pckbd* 		at pckbc?               # PC keyboard
-# "opms" should not be enabled together with "pms" or "pmsi"
-#pms*		at pckbc?               # PS/2 mouse for wsmouse
-#pmsi*		at pckbc?               # PS/2 "Intelli"mouse for wsmouse
-#opms*		at pckbc?               # backwards compatible PS/2 mouse
+pckbc0 		at isa?			# pc keyboard controller
+pckbd* 		at pckbc?		# PC keyboard
+#pms*		at pckbc?		# PS/2 mouse for wsmouse
 vga0		at isa?
-#vga*            at pci? dev ? function ?
-pcdisplay0 	at isa?                 # CGA, MDA, EGA, HGA
+#vga*		at pci? dev ? function ?
+pcdisplay0 	at isa?			# CGA, MDA, EGA, HGA
 wsdisplay*	at vga? console ?
 wsdisplay* 	at pcdisplay? console ?
 wskbd* 		at pckbd? console ?
 #wsmouse*	at pms? mux 0
-#wsmouse*	at pmsi? mux 0
 
 
 #pcppi0	at isa?
@@ -282,7 +284,8 @@ lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 #dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID
 #bha*	at pci? dev ? function ?	# BusLogic 9xx SCSI
 #isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
-#ncr*	at pci? dev ? function ?	# NCR 53c8xx SCSI
+#siop*	at pci? dev ? function ?	# NCR 53c8xx SCSI
+#options 	SIOP_SYMLED		# drive the act. LED in software
 
 # EISA SCSI controllers
 #ahb*	at eisa? slot ?			# Adaptec 174[02] SCSI
@@ -318,8 +321,8 @@ lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 #scsibus* at bha?
 #scsibus* at dpt?
 #scsibus* at isp?
-#scsibus* at ncr?
 #scsibus* at sea?
+#scsibus* at siop?
 #scsibus* at uha?
 #scsibus* at wds?
 
@@ -377,7 +380,6 @@ fd*	at fdc? drive ?			# the drives themselves
 # Network Interfaces
 
 # PCI network interfaces
-#de*	at pci? dev ? function ?	# DEC 21x4x-based Ethernet
 #en*	at pci? dev ? function ?	# ENI/Adaptec ATM
 #ep*	at pci? dev ? function ?	# 3Com 3c59x/3c90x Ethernet
 #epic*	at pci? dev ? function ?	# SMC EPIC/100 Ethernet
@@ -387,6 +389,7 @@ fd*	at fdc? drive ?			# the drives themselves
 #le*	at pci? dev ? function ?	# PCnet-PCI Ethernet
 #ne*	at pci? dev ? function ?	# NE2000-compatible Ethernet
 #tl*	at pci? dev ? function ?	# ThunderLAN-based Ethernet
+#tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
 
 # EISA network interfaces
 #ep*	at eisa? slot ?			# 3Com 3c579 Ethernet
@@ -432,6 +435,7 @@ we1	at isa? port 0x300 iomem 0xcc000 irq 10
 # MII PHY network interfaces
 #tlphy*	at mii? dev ?			# ThunderLAN PHYs
 #nsphy*	at mii? dev ?			# NS and compatible PHYs
+#ukphy*	at mii? phy ?			# generic unknown PHYs
 
 
 # USB Controller and Devices
@@ -470,6 +474,9 @@ we1	at isa? port 0x300 iomem 0xcc000 irq 10
 #cue*	at uhub? port ?		# CATC USB-EL1201A based adapters
 #kue*	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
 
+# Y@P firmware loader
+#uyap* at uhub? port ?
+
 # USB Generic driver
 #ugen*	at uhub? port ?
 
@@ -487,7 +494,7 @@ we1	at isa? port 0x300 iomem 0xcc000 irq 10
 #aria0	at isa? port 0x290 irq 10 		# Aria
 #gus0	at isa? port 0x220 irq 7 drq 1 drq2 6	# Gravis Ultra Sound
 #pas0	at isa? port 0x220 irq 7 drq 1		# ProAudio Spectrum
-#pss0	at isa? port 0x220 irq 7 drq 6  	# Personal Sound System
+#pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
 #sp0	at pss0 port 0x530 irq 10 drq 0		# 	sound port driver
 #sb0	at isa? port 0x220 irq 5 drq 1 drq2 5	# SoundBlaster
 #wss0	at isa? port 0x530 irq 10 drq 0	drq2 1	# Windows Sound System
@@ -514,7 +521,6 @@ we1	at isa? port 0x300 iomem 0xcc000 irq 10
 #olms1	at isa? port 0x238 irq 5
 #omms0	at isa? port 0x23c irq 5	# Microsoft InPort mouse
 #omms1	at isa? port 0x238 irq 5
-#opms0	at pc? irq 12		# PS/2 auxiliary port mouse
 
 
 # Joysticks
@@ -545,15 +551,18 @@ pseudo-device	vnd		4	# disk-like interface to files
 
 # network pseudo-devices
 pseudo-device	bpfilter	8	# Berkeley packet filter
+pseudo-device	bridge			# simple inter-network bridging
 pseudo-device	ipfilter		# IP filter (firewall) and NAT
 pseudo-device	loop			# network loopback
 pseudo-device	ppp		2	# Point-to-Point Protocol
+pseudo-device	pppoe			# PPP over Ethernet (RFC 2516)
 #pseudo-device	sl		2	# Serial Line IP
 #pseudo-device	strip		2	# Starmode Radio IP (Metricom)
 pseudo-device	tun		2	# network tunneling over tty
 
 # miscellaneous pseudo-devices
-pseudo-device	pty		64	# pseudo-terminals
+pseudo-device	pty			# pseudo-terminals
 #pseudo-device	tb		1	# tablet line discipline
 pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness as well (BROKEN)
+pseudo-device	clockctl		# user control of clock subsystem

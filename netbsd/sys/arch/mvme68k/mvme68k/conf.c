@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.20.4.1 2000/10/17 19:56:18 scw Exp $	*/
+/*	$NetBSD: conf.c,v 1.24 2002/01/19 21:13:45 scw Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -133,17 +133,15 @@ cdev_decl(tun);
 
 #include "lpt.h"
 cdev_decl(lpt);
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*)))enodev,  \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*)))enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev, 0}
 
 #include "ipfilter.h" 
 #include "rnd.h"
 
 #include "scsibus.h"
 cdev_decl(scsibus);
+
+#include "clockctl.h"
+cdev_decl(clockctl);
 
 struct cdevsw	cdevsw[] =
 {
@@ -185,7 +183,8 @@ struct cdevsw	cdevsw[] =
 	cdev_rnd_init(NRND,rnd),	/* 35: random source pseudo-device */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 36: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 37: RAIDframe disk driver */
-	cdev_svr4_net_init(NSVR4_NET,svr4_net) /* 38: svr4 net pseudo-device */
+	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 38: svr4 net pseudo-device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 39: clockctl pseudo device */
 };
 
 int	nchrdev = sizeof (cdevsw) / sizeof (cdevsw[0]);
@@ -266,6 +265,8 @@ static int chrtoblktbl[] = {
 	/* 35 */	NODEV,
 	/* 36 */	NODEV,
 	/* 37 */	16,		/* RAIDframe */
+	/* 38 */	NODEV,
+	/* 39 */	NODEV,
 };
 
 /*

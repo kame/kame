@@ -1,4 +1,4 @@
-/*	$NetBSD: signal.h,v 1.8 1999/03/26 04:29:21 eeh Exp $ */
+/*	$NetBSD: signal.h,v 1.10 2001/05/09 19:50:49 kleink Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -75,7 +75,7 @@ struct sigcontext13 {
 #ifdef __arch64__
 	long	sc_tstate;		/* tstate to restore */
 #else
-	long	sc_psr;			/* pstate to restore */
+	long	sc_psr;			/* psr portion to restore */
 #endif
 	long	sc_g1;			/* %g1 to restore */
 	long	sc_o0;			/* %o0 to restore */
@@ -88,7 +88,11 @@ struct sigcontext {
 	long		sc_sp;		/* %sp to restore */
 	long		sc_pc;		/* pc to restore */
 	long		sc_npc;		/* npc to restore */
-	long		sc_tstate;	/* pstate to restore */
+#ifdef __arch64__
+	long		sc_tstate;	/* tstate to restore */
+#else
+	long		sc_psr;		/* psr portion to restore */
+#endif
 	long		sc_g1;		/* %g1 to restore */
 	long		sc_o0;		/* %o0 to restore */
 	sigset_t	sc_mask;	/* signal mask to restore (new style) */

@@ -1,4 +1,4 @@
-/*	$NetBSD: wdc_obio.c,v 1.9 2000/05/23 13:20:58 tsubai Exp $	*/
+/*	$NetBSD: wdc_obio.c,v 1.19.10.1 2002/07/19 01:28:06 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
 #include <sys/device.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/autoconf.h>
@@ -49,6 +49,8 @@
 #include <dev/ata/atareg.h>
 #include <dev/ata/atavar.h>
 #include <dev/ic/wdcvar.h>
+
+#include <dev/ofw/openfirm.h>
 
 #include <macppc/dev/dbdma.h>
 
@@ -106,7 +108,7 @@ wdc_obio_probe(parent, match, aux)
 	    strcmp(ca->ca_name, "ide") == 0)
 		return 1;
 
-	bzero(compat, sizeof(compat));
+	memset(compat, 0, sizeof(compat));
 	OF_getprop(ca->ca_node, "compatible", compat, sizeof(compat));
 	if (strcmp(compat, "heathrow-ata") == 0 ||
 	    strcmp(compat, "keylargo-ata") == 0)
@@ -212,7 +214,7 @@ wdc_obio_attach(parent, self, aux)
 #define OHARE_FEATURE_REG	0xf3000038
 
 	/* XXX Enable wdc1 by feature reg. */
-	bzero(path, sizeof(path));
+	memset(path, 0, sizeof(path));
 	OF_package_to_path(ca->ca_node, path, sizeof(path));
 	if (strcmp(path, "/bandit@F2000000/ohare@10/ata@21000") == 0) {
 		u_int x;
@@ -321,10 +323,12 @@ adjust_timing(chp)
 					(half_tick << 21) |
 					(inact_tick << 16) | (act_tick << 11);
 		}
+#ifdef DEBUG
 		if (conf) {
 			printf("conf[%d] = 0x%x, cyc = %d (%d ns), act = %d (%d ns), inact = %d\n",
 					drive, conf, cycle_tick, min_cycle, act_tick, min_active, inact_tick);
 		}
+#endif
 		sc->sc_dmaconf[drive] = conf;
 	}
 	sc->sc_wdcdev.cap &= ~WDC_CAPABILITY_SELECT;
@@ -338,6 +342,7 @@ adjust_timing(chp)
 	} else if (sc->sc_dmaconf[1]) {
 		wdc_obio_select(chp,1);
 	}
+	wdc_print_modes(chp);
 }
 
 void
@@ -388,10 +393,12 @@ ata4_adjust_timing(chp)
 			/* mask: 0x1ff00000 */
 			conf |= (cycle_tick << 21) | (act_tick << 25) | 0x100000;
 		}
+#ifdef DEBUG
 		if (conf) {
 			printf("ata4 conf[%d] = 0x%x, cyc = %d (%d ns), act = %d (%d ns), inact = %d\n",
 					drive, conf, cycle_tick, min_cycle, act_tick, min_active, inact_tick);
 		}
+#endif
 		sc->sc_dmaconf[drive] = conf;
 	}
 	sc->sc_wdcdev.cap &= ~WDC_CAPABILITY_SELECT;
@@ -405,6 +412,7 @@ ata4_adjust_timing(chp)
 	} else if (sc->sc_dmaconf[1]) {
 		wdc_obio_select(chp,1);
 	}
+	wdc_print_modes(chp);
 }
 
 int
@@ -413,7 +421,6 @@ wdc_obio_detach(self, flags)
 	int flags;
 {
 	struct wdc_obio_softc *sc = (void *)self;
-	struct channel_softc *chp = &sc->wdc_channel;
 	int error;
 
 	if ((error = wdcdetach(self, flags)) != 0)

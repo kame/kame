@@ -1,4 +1,4 @@
-/*	$NetBSD: if_mcvar.h,v 1.3 1998/09/03 14:06:07 tsubai Exp $	*/
+/*	$NetBSD: if_mcvar.h,v 1.6 2001/07/26 11:23:37 tsubai Exp $	*/
 
 /*-
  * Copyright (c) 1997 David Huang <khym@bga.com>
@@ -25,17 +25,13 @@
  *
  */
 
-#if defined(_KERNEL)  && !defined(_LKM)
-#include "opt_ddb.h"
-#endif
-
 #include <macppc/dev/dbdma.h>
 
-#ifdef DDB
-#define	integrate
+#if 1
+#define integrate
 #define hide
 #else
-#define	integrate	static /*__inline*/
+#define integrate	static /*__inline*/
 #define hide		static
 #endif
 

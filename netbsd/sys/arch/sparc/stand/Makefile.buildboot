@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.buildboot,v 1.12.4.2 2000/11/01 03:24:23 tv Exp $
+#	$NetBSD: Makefile.buildboot,v 1.17 2001/12/12 01:49:51 tv Exp $
 
 S=	${.CURDIR}/../../../..
 
@@ -7,7 +7,7 @@ S=	${.CURDIR}/../../../..
 COMMONSOURCE=	srt0.S promdev.c dvma.c promlib.c
 
 SRCS=		${COMMONSOURCE} ${PROGSOURCE}
-MKMAN=		no
+NOMAN=		# defined
 BINMODE=	444
 
 #
@@ -52,9 +52,9 @@ SAMISCMAKEFLAGS+="SA_USE_LOADFILE=yes"
 .include "${S}/lib/libsa/Makefile.inc"
 LIBSA=		${SALIB}
 
-.if !make(obj)
+.if !make(obj) && !make(clean) && !make(cleandir)
 .BEGIN:
 	@([ -h machine ] || ln -s ${S}/arch/${MACHINE}/include machine)
 .NOPATH: machine
-CLEANFILES+= machine
 .endif
+CLEANFILES+= machine

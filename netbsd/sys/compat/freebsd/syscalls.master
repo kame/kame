@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.27.4.1 2002/03/06 22:04:25 he Exp $
+	$NetBSD: syscalls.master,v 1.37 2002/05/03 00:20:57 eeh Exp $
 
 ;	from: @(#)syscalls.master	8.2 (Berkeley) 1/13/94
 
@@ -31,6 +31,7 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 ; #include's are copied to the syscall names and switch definition files only.
 
+#if defined(_KERNEL_OPT)
 #include "opt_ktrace.h"
 #include "opt_nfsserver.h"
 #include "opt_ntp.h"
@@ -39,6 +40,7 @@
 
 #include "fs_lfs.h"
 #include "fs_nfs.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +51,8 @@
 #include <compat/freebsd/freebsd_syscallargs.h>
 
 #include <machine/freebsd_machdep.h>
+
+%%
 
 ; Reserved/unimplemented system calls in the range 0-150 inclusive
 ; are reserved for use in future Berkeley releases.
@@ -84,13 +88,13 @@
 			    int flags); }
 19	NOARGS		{ long compat_43_sys_lseek(int fd, long offset, \
 			    int whence); } olseek
-20	NOARGS		{ pid_t sys_getpid(void); }
+20	NOARGS		{ pid_t sys_getpid_with_ppid(void); }
 21	STD		{ int freebsd_sys_mount(int type, const char *path, \
 			    int flags, caddr_t data); }
 22	STD		{ int freebsd_sys_unmount(const char *path, \
 			    int flags); }
 23	NOARGS		{ int sys_setuid(uid_t uid); }
-24	NOARGS		{ uid_t sys_getuid(void); }
+24	NOARGS		{ uid_t sys_getuid_with_euid(void); }
 25	NOARGS		{ uid_t sys_geteuid(void); }
 26	STD		{ int freebsd_sys_ptrace(int req, pid_t pid, \
 			    caddr_t addr, int data); }
@@ -124,12 +128,12 @@
 45	NOARGS		{ int sys_ktrace(char *fname, int ops, int facs, \
 			    int pid); }
 #else
-45	UNIMPL		ktrace
+45	EXCL		ktrace
 #endif
 46	NOARGS		{ int compat_13_sys_sigaction(int signum, \
 			    const struct sigaction13 *nsa, \
 			    struct sigaction13 *osa); }
-47	NOARGS		{ gid_t sys_getgid(void); }
+47	NOARGS		{ gid_t sys_getgid_with_egid(void); }
 48	NOARGS		{ int compat_13_sys_sigprocmask(int how, \
 			    int mask); }
 49	NOARGS		{ int sys___getlogin(char *namebuf, u_int namelen); }
@@ -323,21 +327,21 @@
 167	UNIMPL
 168	UNIMPL
 ; XXX more generally, never on machines where sizeof(void *) != sizeof(int)
-#if defined(SYSVSEM) && !defined(alpha)
+#if defined(SYSVSEM) && !defined(_LP64)
 169	STD		{ int freebsd_sys_semsys(int which, int a2, int a3, \
 			    int a4, int a5); }
 #else
 169	UNIMPL		1.0 semsys
 #endif
 ; XXX more generally, never on machines where sizeof(void *) != sizeof(int)
-#if defined(SYSVMSG) && !defined(alpha)
+#if defined(SYSVMSG) && !defined(_LP64)
 170	STD		{ int freebsd_sys_msgsys(int which, int a2, int a3, \
 			    int a4, int a5, int a6); }
 #else
 170	UNIMPL		1.0 msgsys
 #endif
 ; XXX more generally, never on machines where sizeof(void *) != sizeof(int)
-#if defined(SYSVSHM) && !defined(alpha)
+#if defined(SYSVSHM) && !defined(_LP64)
 171	STD		{ int freebsd_sys_shmsys(int which, int a2, int a3, \
 			    int a4); }
 #else
@@ -497,7 +501,8 @@
 248	UNIMPL
 249	UNIMPL
 ; syscall numbers initially used in OpenBSD
-250	UNIMPL		minherit
+250	NOARGS		{ int sys_minherit(void *addr, size_t len, \
+			    int inherit); }
 251	UNIMPL		rfork
 252	UNIMPL		openbsd_poll
 253	NOARGS		{ int sys_issetugid(void); }
@@ -547,9 +552,11 @@
 294	UNIMPL
 295	UNIMPL
 296	UNIMPL
-297	UNIMPL		fhstatfs
-298	UNIMPL		fhopen
-299	UNIMPL		fhstat
+297	NOARGS		{ int sys_fhstatfs(const fhandle_t *fhp, \
+			    struct statfs *buf); }
+298	NOARGS		{ int sys_fhopen(const fhandle_t *fhp, int flags); }
+299	NOARGS		{ int sys_fhstat(const fhandle_t *fhp, \
+			    struct stat *sb); }
 ; syscall numbers for FreeBSD
 300	UNIMPL		modnext
 301	UNIMPL		modstat
@@ -586,7 +593,7 @@
 332	UNIMPL		sched_get_priority_max
 333	UNIMPL		sched_get_priority_min
 334	UNIMPL		sched_rr_get_interval
-335	UNIMPL		utrace
+335	STD		{ int freebsd_sys_utrace(void *addr, size_t len); }
 336	UNIMPL		sendfile
 337	UNIMPL		kldsym
 338	UNIMPL		jail

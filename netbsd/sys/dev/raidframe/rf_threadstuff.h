@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_threadstuff.h,v 1.8 2000/06/11 03:35:38 oster Exp $	*/
+/*	$NetBSD: rf_threadstuff.h,v 1.11 2001/10/04 15:58:56 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -43,14 +43,13 @@
 #ifndef _RF__RF_THREADSTUFF_H_
 #define _RF__RF_THREADSTUFF_H_
 
-#include "rf_types.h"
 #include <sys/types.h>
 #include <sys/param.h>
-#ifdef _KERNEL
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/kthread.h>
-#endif
+
+#include <dev/raidframe/raidframevar.h>
 
 #define rf_create_managed_mutex(a,b) _rf_create_managed_mutex(a,b,__FILE__,__LINE__)
 #define rf_create_managed_cond(a,b) _rf_create_managed_cond(a,b,__FILE__,__LINE__)
@@ -86,15 +85,12 @@ typedef void *RF_ThreadArg_t;
  * In NetBSD, kernel threads are simply processes which share several
  * substructures and never run in userspace.
  */
-#define RF_WAIT_COND(_c_,_m_)           { \
-	RF_UNLOCK_MUTEX(_m_); \
-	tsleep(&_c_, PRIBIO, "rfwcond", 0); \
-	RF_LOCK_MUTEX(_m_); \
-}
-#define RF_SIGNAL_COND(_c_)            wakeup(&(_c_))
+#define RF_WAIT_COND(_c_,_m_)		\
+	ltsleep(&(_c_), PRIBIO, "rfwcond", 0, &(_m_))
+#define RF_SIGNAL_COND(_c_)            wakeup_one(&(_c_))
 #define RF_BROADCAST_COND(_c_)         wakeup(&(_c_))
 #define	RF_CREATE_THREAD(_handle_, _func_, _arg_, _name_) \
-	kthread_create1((void (*) __P((void *)))(_func_), (void *)(_arg_), \
+	kthread_create1((void (*)(void *))(_func_), (void *)(_arg_), \
 	    (struct proc **)&(_handle_), _name_)
 
 struct RF_ThreadGroup_s {

@@ -1,4 +1,4 @@
-/*	$NetBSD: cd9660_vfsops.c,v 1.48.2.3 2002/06/06 20:07:53 he Exp $	*/
+/*	$NetBSD: cd9660_vfsops.c,v 1.60 2002/03/26 19:04:23 drochner Exp $	*/
 
 /*-
  * Copyright (c) 1994
@@ -40,7 +40,10 @@
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cd9660_vfsops.c,v 1.60 2002/03/26 19:04:23 drochner Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
@@ -69,11 +72,11 @@
 #include <isofs/cd9660/cd9660_node.h>
 #include <isofs/cd9660/cd9660_mount.h>
 
-extern struct vnodeopv_desc cd9660_vnodeop_opv_desc;
-extern struct vnodeopv_desc cd9660_specop_opv_desc;
-extern struct vnodeopv_desc cd9660_fifoop_opv_desc;
+extern const struct vnodeopv_desc cd9660_vnodeop_opv_desc;
+extern const struct vnodeopv_desc cd9660_specop_opv_desc;
+extern const struct vnodeopv_desc cd9660_fifoop_opv_desc;
 
-struct vnodeopv_desc *cd9660_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const cd9660_vnodeopv_descs[] = {
 	&cd9660_vnodeop_opv_desc,
 	&cd9660_specop_opv_desc,
 	&cd9660_fifoop_opv_desc,
@@ -93,11 +96,16 @@ struct vfsops cd9660_vfsops = {
 	cd9660_fhtovp,
 	cd9660_vptofh,
 	cd9660_init,
+	cd9660_reinit,
 	cd9660_done,
 	cd9660_sysctl,
 	cd9660_mountroot,
 	cd9660_check_export,
 	cd9660_vnodeopv_descs,
+};
+
+struct genfs_ops cd9660_genfsops = {
+	genfs_size,
 };
 
 /*
@@ -147,6 +155,7 @@ cd9660_mountroot()
 	simple_unlock(&mountlist_slock);
 	(void)cd9660_statfs(mp, &mp->mnt_stat, p);
 	vfs_unbusy(mp);
+	inittodr(0);
 	return (0);
 }
 
@@ -401,13 +410,15 @@ iso_mountfs(devvp, mp, p, argp)
 	mp->mnt_stat.f_fsid.val[1] = makefstype(MOUNT_CD9660);
 	mp->mnt_maxsymlinklen = 0;
 	mp->mnt_flag |= MNT_LOCAL;
+	mp->mnt_dev_bshift = iso_bsize;
+	mp->mnt_fs_bshift = isomp->im_bshift;
 	isomp->im_mountp = mp;
 	isomp->im_dev = dev;
 	isomp->im_devvp = devvp;
 	
 	devvp->v_specmountpoint = mp;
 	
-	/* Check the Rock Ridge Extention support */
+	/* Check the Rock Ridge Extension support */
 	if (!(argp->flags & ISOFSMNT_NORRIP)) {
 		struct iso_directory_record *rootp;
 
@@ -741,6 +752,9 @@ cd9660_vget_internal(mp, ino, vpp, relocated, isodir)
 {
 	struct iso_mnt *imp;
 	struct iso_node *ip;
+#ifdef ISODEVMAP
+	struct iso_dnode *dp;
+#endif
 	struct buf *bp;
 	struct vnode *vp, *nvp;
 	dev_t dev;
@@ -890,7 +904,7 @@ cd9660_vget_internal(mp, ino, vpp, relocated, isodir)
 		 * if device, look at device number table for translation
 		 */
 #ifdef	ISODEVMAP
-		if (dp = iso_dmap(dev, ino, 0))
+		if ((dp = iso_dmap(dev, ino, 0)) != NULL)
 			ip->inode.iso_rdev = dp->d_dev;
 #endif
 		vp->v_op = cd9660_specop_p;
@@ -919,7 +933,9 @@ cd9660_vget_internal(mp, ino, vpp, relocated, isodir)
 	case VSOCK:
 	case VDIR:
 	case VBAD:
+		break;
 	case VREG:
+		uvm_vnp_setsize(vp, ip->i_size);
 		break;
 	}
 	
@@ -930,6 +946,7 @@ cd9660_vget_internal(mp, ino, vpp, relocated, isodir)
 	 * XXX need generation number?
 	 */
 	
+	genfs_node_init(vp, &cd9660_genfsops);
 	*vpp = vp;
 	return (0);
 }

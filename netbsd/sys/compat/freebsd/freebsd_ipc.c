@@ -1,4 +1,4 @@
-/*	$NetBSD: freebsd_ipc.c,v 1.5 1999/08/25 04:48:21 thorpej Exp $	*/
+/*	$NetBSD: freebsd_ipc.c,v 1.10 2001/11/13 02:08:08 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Adam Glass and Charles M. Hannum.  All rights reserved.
@@ -30,7 +30,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: freebsd_ipc.c,v 1.10 2001/11/13 02:08:08 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_sysv.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,11 +46,6 @@
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
-
-#include <vm/vm.h>
-#include <vm/vm_map.h>
-#include <vm/vm_map.h>
-#include <vm/vm_kern.h>
 
 #include <compat/freebsd/freebsd_syscallargs.h>
 

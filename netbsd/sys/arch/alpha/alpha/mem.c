@@ -1,4 +1,4 @@
-/* $NetBSD: mem.c,v 1.26.4.2 2001/01/25 20:48:06 jhawk Exp $ */
+/* $NetBSD: mem.c,v 1.31 2002/02/27 01:20:51 christos Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -46,7 +46,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.26.4.2 2001/01/25 20:48:06 jhawk Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.31 2002/02/27 01:20:51 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -60,13 +60,7 @@ __KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.26.4.2 2001/01/25 20:48:06 jhawk Exp $");
 #include <machine/conf.h>
 #include <machine/alpha.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
-
-#define mmread  mmrw
-#define mmwrite mmrw
-cdev_decl(mm);
 
 caddr_t zeropage;
 extern int firstusablepage, lastusablepage;
@@ -117,8 +111,7 @@ mmrw(dev, uio, flags)
 		}
 		switch (minor(dev)) {
 
-/* minor device 0 is physical memory */
-		case 0:
+		case DEV_MEM:
 			v = uio->uio_offset;
 kmemphys:
 			if (v >= ALPHA_K0SEG_TO_PHYS((vaddr_t)msgbufaddr)) {
@@ -142,8 +135,7 @@ kmemphys:
 			    uiomove((caddr_t)ALPHA_PHYS_TO_K0SEG(v), c, uio);
 			break;
 
-/* minor device 1 is kernel memory */
-		case 1:
+		case DEV_KMEM:
 			v = uio->uio_offset;
 
 			if (v >= ALPHA_K0SEG_BASE && v <= ALPHA_K0SEG_END) {
@@ -158,14 +150,12 @@ kmemphys:
 			error = uiomove((caddr_t)v, c, uio);
 			break;
 
-/* minor device 2 is EOF/rathole */
-		case 2:
+		case DEV_NULL:
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
 			return (0);
 
-/* minor device 12 (/dev/zero) is source of nulls on read, rathole on write */
-		case 12:
+		case DEV_ZERO:
 			if (uio->uio_rw == UIO_WRITE) {
 				uio->uio_resid = 0;
 				return (0);
@@ -177,7 +167,7 @@ kmemphys:
 			if (zeropage == NULL) {
 				zeropage = (caddr_t)
 				    malloc(NBPG, M_TEMP, M_WAITOK);
-				bzero(zeropage, NBPG);
+				memset(zeropage, 0, NBPG);
 			}
 			c = min(iov->iov_len, NBPG);
 			error = uiomove(zeropage, c, uio);
@@ -204,7 +194,7 @@ mmmmap(dev, off, prot)
 	 * and /dev/zero is a hack that is handled via the default
 	 * pager in mmap().
 	 */
-	if (minor(dev) != 0)
+	if (minor(dev) != DEV_MEM)
 		return (-1);
 
 	/*

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_nqlease.c,v 1.32.2.1 2000/12/14 23:36:51 he Exp $	*/
+/*	$NetBSD: nfs_nqlease.c,v 1.40 2002/05/12 23:04:35 matt Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -52,7 +52,11 @@
  *		Equipment Corporation WRL Research Report 89/5, May 1989.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_nqlease.c,v 1.40 2002/05/12 23:04:35 matt Exp $");
+
 #include "fs_nfs.h"
+#include "opt_nfs.h"
 #include "opt_nfsserver.h"
 #include "opt_inet.h"
 
@@ -72,6 +76,8 @@
 #include <sys/protosw.h>
 #include <sys/signalvar.h>
 
+#include <miscfs/syncfs/syncfs.h>
+
 #include <netinet/in.h>
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -89,10 +95,14 @@ int nqsrv_writeslack = NQ_WRITESLACK;
 int nqsrv_maxlease = NQ_MAXLEASE;
 int nqsrv_maxnumlease = NQ_MAXNUMLEASE;
 
+struct nqleasehead nqtimerhead;
+struct nqfhhashhead *nqfhhashtbl;
+u_long nqfhhash;
+
 /*
  * Signifies which rpcs can have piggybacked lease requests
  */
-int nqnfs_piggy[NFS_NPROCS] = {
+const int nqnfs_piggy[NFS_NPROCS] = {
 	0,
 	0,
 	ND_WRITE,
@@ -123,7 +133,10 @@ int nqnfs_piggy[NFS_NPROCS] = {
 
 extern nfstype nfsv2_type[9];
 extern nfstype nfsv3_type[9];
-extern struct nfssvc_sock *nfs_udpsock, *nfs_cltpsock;
+extern struct nfssvc_sock *nfs_udpsock;
+#ifdef ISO
+extern struct nfssvc_sock *nfs_cltpsock
+#endif
 #ifdef INET6
 extern struct nfssvc_sock *nfs_udp6sock;
 #endif
@@ -134,6 +147,7 @@ extern struct nfsstats nfsstats;
 #define TRUE	1
 #define	FALSE	0
 
+#if defined(NFSSERVER) || (defined(NFS) && !defined(NFS_V2_ONLY))
 /*
  * Get or check for a lease for "vp", based on ND_CHECK flag.
  * The rules are as follows:
@@ -340,9 +354,11 @@ nqsrv_addhost(lph, slp, nam)
 		lph->lph_nam = m_copym(nam, 0, M_COPYALL, M_WAIT);
 		lph->lph_flag |= (LC_VALID | LC_UDP6);
 #endif
+#ifdef ISO
 	} else if (slp == nfs_cltpsock) {
 		lph->lph_nam = m_copym(nam, 0, M_COPYALL, M_WAIT);
 		lph->lph_flag |= (LC_VALID | LC_CLTP);
+#endif
 	} else {
 		lph->lph_flag |= (LC_VALID | LC_SREF);
 		lph->lph_slp = slp;
@@ -408,7 +424,10 @@ nqsrv_cmpnam(slp, nam, lph)
 		else
 			return (0);
 	}
-	if (slp == nfs_udpsock || slp == nfs_cltpsock
+	if (slp == nfs_udpsock
+#ifdef ISO
+	    || slp == nfs_cltpsock
+#endif
 #ifdef INET6
 	    || slp == nfs_udp6sock
 #endif
@@ -471,9 +490,11 @@ nqsrv_send_eviction(vp, lp, slp, nam, cred)
 				saddr->sin_addr.s_addr = lph->lph_inetaddr;
 				saddr->sin_port = lph->lph_port;
 				so = nfs_udpsock->ns_so;
+#ifdef ISO
 			} else if (lph->lph_flag & LC_CLTP) {
 				nam2 = lph->lph_nam;
 				so = nfs_cltpsock->ns_so;
+#endif
 #ifdef INET6
 			} else if (lph->lph_flag & LC_UDP6) {
 				nam2 = lph->lph_nam;
@@ -592,6 +613,7 @@ tryagain:
 			lph++;
 	}
 }
+#endif /* NFSSERVER || (NFS && !NFS_V2_ONLY) */
 
 #ifdef NFSSERVER
 /*
@@ -819,7 +841,7 @@ nfsmout:
 }
 #endif /* NFSSERVER */
 
-#ifdef NFS
+#if defined(NFS) && !defined(NFS_V2_ONLY)
 /*
  * Client get lease rpc function.
  */
@@ -968,10 +990,12 @@ nqnfs_callback(nmp, mrep, md, dpos)
 			CIRCLEQ_INSERT_HEAD(&nmp->nm_timerhead, np, n_timer);
 		}
 	}
-	vrele(vp);
+	vput(vp);
 	nfsm_srvdone;
 }
+#endif /* NFS && !NFS_V2_ONLY */
 
+#ifdef NFS /* Needed in V2_ONLY case for Kerberos stuff */
 /*
  * Nqnfs client helper daemon. Runs once a second to expire leases.
  * It also get authorization strings for "kerb" mounts.
@@ -988,11 +1012,14 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 	caddr_t argp;
 	struct proc *p;
 {
+#ifndef NFS_V2_ONLY
 	struct nfsnode *np;
 	struct vnode *vp;
 	struct nfsreq myrep;
+	int vpid;
+#endif
+	int error = 0, sleepreturn;
 	struct nfsuid *nuidp, *nnuidp;
-	int error = 0, vpid, sleepreturn;
 
 	/*
 	 * First initialize some variables
@@ -1031,12 +1058,19 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 	sleepreturn = 0;
 	while ((nmp->nm_iflag & NFSMNT_DISMNT) == 0) {
 	    if (sleepreturn == EINTR || sleepreturn == ERESTART) {
-		if (vfs_busy(nmp->nm_mountp, LK_NOWAIT, 0) == 0 &&
-		    dounmount(nmp->nm_mountp, 0, p) != 0)
+		/*
+		 * XXX Freeze syncer.  Must do this before locking
+		 * the mount point.  See dounmount() for details.
+		 */
+		lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
+		if (vfs_busy(nmp->nm_mountp, LK_NOWAIT, 0) != 0)
+			lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
+		else if (dounmount(nmp->nm_mountp, 0, p) != 0)
 			CLRSIG(p, CURSIG(p));
 		sleepreturn = 0;
 		continue;
 	    }
+#ifndef NFS_V2_ONLY
 	    if (nmp->nm_flag & NFSMNT_NQNFS) {
 		/*
 		 * If there are no outstanding requests (and therefore no
@@ -1082,7 +1116,7 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 					}
 				}
 			      }
-			      vrele(vp);
+			      vput(vp);
 			      nmp->nm_inprog = NULLVP;
 			    }
 			} else if ((np->n_expiry - NQ_RENEWAL) < time.tv_sec) {
@@ -1093,7 +1127,7 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 				 if (vpid == vp->v_id &&
 				     nqnfs_getlease(vp, ND_WRITE, cred, p)==0)
 					np->n_brev = np->n_lrev;
-				 vrele(vp);
+				 vput(vp);
 				 nmp->nm_inprog = NULLVP;
 			    }
 			} else
@@ -1103,6 +1137,7 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 			np = nmp->nm_timerhead.cqh_first;
 		}
 	    }
+#endif /* !NFS_V2_ONLY */
 
 	    /*
 	     * Get an authorization string, if required.
@@ -1139,7 +1174,9 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 		error = 0;
 	return (error);
 }
+#endif /* NFS */
 
+#if defined(NFS) && !defined(NFS_V2_ONLY)
 /*
  * Update a client lease.
  */
@@ -1176,8 +1213,9 @@ nqnfs_clientlease(nmp, np, rwflag, cachable, expiry, frev)
 		CIRCLEQ_INSERT_AFTER(&nmp->nm_timerhead, tp, np, n_timer);
 	}
 }
-#endif /* NFS */
+#endif /* NFS && !NFS_V2_ONLY */
 
+#if defined(NFSSERVER) || (defined(NFS) && !defined(NFS_V2_ONLY))
 /*
  * Adjust all timer queue expiry times when the time of day clock is changed.
  * Called from the settimeofday() syscall.
@@ -1257,3 +1295,4 @@ nqsrv_unlocklease(lp)
 	if (lp->lc_flag & LC_WANTED)
 		wakeup((caddr_t)lp);
 }
+#endif /* NFSSERVER || NFS && !NFS_V2_ONLY */

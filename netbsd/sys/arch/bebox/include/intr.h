@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.9 1999/08/05 18:08:10 thorpej Exp $	*/
+/*	$NetBSD: intr.h,v 1.16 2002/02/11 11:19:28 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -84,6 +84,17 @@ int  splsoftnet   __P((void));
 
 void do_pending_int __P((void));
 
+void ext_intr __P((void));
+void *intr_establish __P((int, int, int, int (*)(void *), void *));
+void intr_disestablish __P((void *));
+void intr_calculatemasks __P((void));
+int  isa_intr __P((void));
+void isa_intr_mask __P((int));
+void isa_intr_clr __P((int));
+
+void enable_intr __P((void));
+void disable_intr __P((void));
+
 static __inline int splraise __P((int));
 static __inline int spllower __P((int));
 static __inline void splx __P((int));
@@ -95,8 +106,8 @@ extern long intrcnt[];
 
 /*
  *  Reorder protection in the following inline functions is
- * achived with the "eieio" instruction which the assembler
- * seems to detect and then doen't move instructions past....
+ * achieved with the "eieio" instruction which the assembler
+ * seems to detect and then doesn't move instructions past....
  */
 static __inline int
 splraise(newcpl)
@@ -175,7 +186,7 @@ set_sint(pending)
 #define splnet()	splraise(imask[IPL_NET])
 #define spltty()	splraise(imask[IPL_TTY])
 #define splclock()	splraise(imask[IPL_CLOCK])
-#define splimp()	splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_IMP])
 #define	splserial()	splraise(imask[IPL_SERIAL])
 #define splstatclock()	splclock()
 #define	spllowersoftclock() spllower(imask[IPL_SOFTCLOCK])
@@ -191,6 +202,9 @@ set_sint(pending)
 
 #define	splhigh()	splraise(imask[IPL_HIGH])
 #define	spl0()		spllower(0)
+
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
 
 #endif /* !_LOCORE */
 

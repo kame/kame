@@ -1,4 +1,4 @@
-/*	$NetBSD: extintr.c,v 1.2 2000/05/01 10:52:29 kleink Exp $	*/
+/*	$NetBSD: extintr.c,v 1.12 2002/05/13 06:17:36 matt Exp $	*/
 /*	$OpenBSD: isabus.c,v 1.12 1999/06/15 02:40:05 rahnds Exp $	*/
 
 /*-
@@ -88,32 +88,31 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include <sys/param.h>
-#include <sys/malloc.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/intr.h>
 #include <machine/psl.h>
 
 #include <dev/isa/isavar.h>
 
-void intr_calculatemasks __P((void));
-int fakeintr __P((void *));
-void ext_intr __P((void));
+void intr_calculatemasks(void);
+int fakeintr(void *);
+void ext_intr(void);
 
-extern paddr_t prep_intr_reg;
-extern int cold;
 int imen = 0xffffffff;
-volatile int cpl, ipending, astpending, tickspending;
+volatile int cpl, ipending, tickspending;
 int imask[NIPL];
 int intrtype[ICU_LEN], intrmask[ICU_LEN], intrlevel[ICU_LEN];
 struct intrhand *intrhand[ICU_LEN];
+unsigned intrcnt2[ICU_LEN];
 
 int
-fakeintr(arg)
-	void *arg;
+fakeintr(void *arg)
 {
 
 	return 0;
@@ -128,18 +127,59 @@ fakeintr(arg)
  *  times the spl level is changed.
  */
 void
-ext_intr()
+ext_intr(void)
 {
 	u_int8_t irq;
 	int r_imen;
 	int pcpl;
 	struct intrhand *ih;
-	extern long intrcnt[];
 
 	/* what about enabling external interrupt in here? */
 	pcpl = splhigh();	/* Turn off all */
 
 	irq = isa_intr();
+	intrcnt2[irq]++;
+
+	r_imen = 1 << irq;
+
+	if ((pcpl & r_imen) != 0) {
+		ipending |= r_imen;	/* Masked! Mark this as pending */
+		imen |= r_imen;
+		isa_intr_mask(imen);
+	} else {
+		ih = intrhand[irq];
+		if (ih == NULL)
+			printf("spurious interrupt %d\n", irq);
+		while (ih) {
+			(*ih->ih_fun)(ih->ih_arg);
+			ih = ih->ih_next;
+		}
+
+		isa_intr_clr(irq);
+
+		uvmexp.intrs++;
+		intrcnt[irq]++;
+	}
+
+	splx(pcpl);	/* Process pendings. */
+}
+
+/*
+ * Same as the above, but using the board's interrupt vector register.
+ */
+void
+ext_intr_ivr(void)
+{
+	u_int8_t irq;
+	int r_imen;
+	int pcpl;
+	struct intrhand *ih;
+
+	/* what about enabling external interrupt in here? */
+	pcpl = splhigh();	/* Turn off all */
+
+	irq = *((u_char *)prep_intr_reg + INTR_VECTOR_REG);
+	intrcnt2[irq]++;
 
 	r_imen = 1 << irq;
 
@@ -166,12 +206,7 @@ ext_intr()
 }
 
 void *
-intr_establish(irq, type, level, ih_fun, ih_arg)
-        int irq;
-        int type;
-        int level;
-        int (*ih_fun) __P((void *));
-        void *ih_arg;
+intr_establish(int irq, int type, int level, int (*ih_fun)(void *), void *ih_arg)
 {
 	struct intrhand **p, *q, *ih;
 	static struct intrhand fakehand = {fakeintr};
@@ -185,8 +220,11 @@ intr_establish(irq, type, level, ih_fun, ih_arg)
 		panic("intr_establish: bogus irq or type");
 
 	switch (intrtype[irq]) {
-	case IST_EDGE:
+	case IST_NONE:
+		intrtype[irq] = type;
+		break;
 	case IST_LEVEL:
+	case IST_EDGE:
 		if (type == intrtype[irq])
 			break;
 	case IST_PULSE:
@@ -203,7 +241,7 @@ intr_establish(irq, type, level, ih_fun, ih_arg)
 	 * generally small.
 	 */
 	for (p = &intrhand[irq]; (q = *p) != NULL; p = &q->ih_next)
-		;
+		continue;
 
 	/*
 	 * Actually install a fake handler momentarily, since we might be doing
@@ -232,8 +270,7 @@ intr_establish(irq, type, level, ih_fun, ih_arg)
 }
 
 void
-intr_disestablish(arg)
-        void *arg;      
+intr_disestablish(void *arg)
 {
 	struct intrhand *ih = arg;
 	int irq = ih->ih_irq;
@@ -269,7 +306,7 @@ intr_disestablish(arg)
  * happen very much anyway.
  */
 void
-intr_calculatemasks()
+intr_calculatemasks(void)
 {
 	int irq, level;
 	struct intrhand *q;
@@ -362,7 +399,7 @@ intr_calculatemasks()
 }
 
 void
-do_pending_int()
+do_pending_int(void)
 {
 	struct intrhand *ih;
 	int irq;
@@ -370,7 +407,6 @@ do_pending_int()
 	int hwpend;
 	int emsr, dmsr;
 	static int processing;
-	extern long intrcnt[];
 
 	if (processing)
 		return;
@@ -400,7 +436,7 @@ do_pending_int()
 	}
 	if ((ipending & ~pcpl) & SINT_CLOCK) {
 		ipending &= ~SINT_CLOCK;
-		softclock();
+		softclock(NULL);
 	}
 	if ((ipending & ~pcpl) & SINT_NET) {
 		ipending &= ~SINT_NET;

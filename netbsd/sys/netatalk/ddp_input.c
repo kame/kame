@@ -1,4 +1,4 @@
-/*	$NetBSD: ddp_input.c,v 1.4 1999/03/27 01:24:50 aidan Exp $	 */
+/*	$NetBSD: ddp_input.c,v 1.7 2001/11/15 09:48:26 lukem Exp $	 */
 
 /*
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
@@ -26,7 +26,9 @@
  *	netatalk@umich.edu
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ddp_input.c,v 1.7 2001/11/15 09:48:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -65,7 +67,7 @@ atintr()
 	int             s;
 
 	for (;;) {
-		s = splimp();
+		s = splnet();
 
 		IF_DEQUEUE(&atintrq2, m);
 
@@ -87,7 +89,7 @@ atintr()
 	}
 
 	for (;;) {
-		s = splimp();
+		s = splnet();
 
 		IF_DEQUEUE(&atintrq1, m);
 

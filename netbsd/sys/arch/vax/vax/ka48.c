@@ -39,8 +39,7 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <machine/cpu.h>
@@ -143,9 +142,14 @@ ka48_steal_pages()
 	ka48_cache_enable();
 }
 
+#define	KA48_CPMBX	0x38
+#define	KA48_HLT_HALT	0xcf	/* 11001111 */
+#define	KA48_HLT_BOOT	0x8b	/* 10001011 */
+
 static void
 ka48_halt()
 {
+	((u_int8_t *) clk_page)[KA48_CPMBX] = KA48_HLT_HALT;
 	asm("halt");
 }
 
@@ -153,5 +157,6 @@ static void
 ka48_reboot(arg)
 	int arg;
 {
+	((u_int8_t *) clk_page)[KA48_CPMBX] = KA48_HLT_BOOT;
 	asm("halt");
 }

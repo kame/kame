@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.sh,v 1.9 1998/04/25 19:48:27 matthias Exp $
+#	$NetBSD: genassym.sh,v 1.11 2001/09/24 00:20:11 sommerfeld Exp $
 
 #
 # Copyright (c) 1997 Matthias Pfaller.
@@ -35,12 +35,27 @@
 
 awk=${AWK:-awk}
 
-if [ $1 = '-c' ] ; then
+if [ "$1" = '-c' ] ; then
 	shift
 	ccode=1
 else
 	ccode=0
 fi
+
+# Deal with any leading environment settings..
+
+while [ "$1" ]
+do
+	case "$1" in
+	*=*)
+		eval export "$1"
+		shift
+		;;
+	*)	
+		break
+		;;
+	esac
+done
 
 trap "rm -f /tmp/$$.c /tmp/genassym.$$" 0 1 2 3 15
 
@@ -149,6 +164,7 @@ if [ $ccode = 1 ] ; then
 else
 	# Kill all of the "#" and "$" modifiers; locore.s already
 	# prepends the correct "constant" modifier.
-	"$@" -S /tmp/$$.c -o -| sed -e 's/#//g' -e 's/\$//g' | \
+	"$@" -S /tmp/$$.c -o - > /tmp/genassym.$$ && \
+	    sed -e 's/#//g' -e 's/\$//g' < /tmp/genassym.$$ | \
 	    sed -n 's/.*XYZZY/#define/gp'
 fi

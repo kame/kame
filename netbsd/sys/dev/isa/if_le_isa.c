@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_isa.c,v 1.23 1998/08/15 10:51:19 mycroft Exp $	*/
+/*	$NetBSD: if_le_isa.c,v 1.29.10.2 2002/06/29 08:34:53 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -75,8 +75,8 @@
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
 
-#include "opt_inet.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le_isa.c,v 1.29.10.2 2002/06/29 08:34:53 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,16 +85,11 @@
 #include <sys/socket.h>
 #include <sys/device.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#include <vm/vm.h>
 
 #include <machine/cpu.h>
 #include <machine/intr.h>
@@ -142,13 +137,14 @@ struct le_isa_params {
 	0, 2
 };
 
-int lance_isa_probe __P((struct isa_attach_args *, struct le_isa_params *));
+int lance_isa_probe __P((struct isa_attach_args *, 
+			 struct le_isa_params *, int));
 void le_isa_attach __P((struct device *, struct le_softc *,
 			struct isa_attach_args *, struct le_isa_params *));
 
 int le_isa_intredge __P((void *));
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -199,7 +195,7 @@ ne2100_isa_probe(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	return (lance_isa_probe(aux, &ne2100_params));
+	return (lance_isa_probe(aux, &ne2100_params, match->cf_flags));
 }
 
 int
@@ -208,28 +204,44 @@ bicc_isa_probe(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	return (lance_isa_probe(aux, &bicc_params));
+	return (lance_isa_probe(aux, &bicc_params, match->cf_flags));
 }
 
 /*
  * Determine which chip is present on the card.
  */
 int
-lance_isa_probe(ia, p)
+lance_isa_probe(ia, p, flags)
 	struct isa_attach_args *ia;
 	struct le_isa_params *p;
+	int flags;
 {
 	bus_space_tag_t iot = ia->ia_iot;
 	bus_space_handle_t ioh;
 	int rap, rdp;
 	int rv = 0;
 
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+	if (ia->ia_ndrq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
 	/* Disallow wildcarded i/o address. */
-	if (ia->ia_iobase == ISACF_PORT_DEFAULT)
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
+		return (0);
+	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
+		return (0);
+	if ((flags & LANCEISA_FLAG_LOCALBUS) == 0 && 
+	    ia->ia_drq[0].ir_drq == ISACF_DRQ_DEFAULT)
 		return (0);
 
 	/* Map i/o space. */
-	if (bus_space_map(iot, ia->ia_iobase, p->iosize, 0, &ioh))
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, p->iosize, 0, &ioh))
 		return (0);
 
 	rap = p->rap;
@@ -247,7 +259,19 @@ lance_isa_probe(ia, p)
 	bus_space_write_2(iot, ioh, rap, LE_CSR3);
 	bus_space_write_2(iot, ioh, rdp, 0);
 
-	ia->ia_iosize = p->iosize;
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_size = p->iosize;
+
+	ia->ia_nirq = 1;
+
+	if ((flags & LANCEISA_FLAG_LOCALBUS) != 0 &&
+	    ia->ia_drq[0].ir_drq == ISACF_DRQ_DEFAULT)
+	    ia->ia_ndrq = 0;
+	else
+	    ia->ia_ndrq = 1;
+
+	ia->ia_niomem = 0;
+
 	rv = 1;
 
 bad:
@@ -306,7 +330,7 @@ le_isa_attach(parent, lesc, ia, p)
 
 	printf(": %s Ethernet\n", p->name);
 
-	if (bus_space_map(iot, ia->ia_iobase, p->iosize, 0, &ioh))
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, p->iosize, 0, &ioh))
 		panic("%s: can't map io", sc->sc_dev.dv_xname);
 
 	/*
@@ -325,7 +349,7 @@ le_isa_attach(parent, lesc, ia, p)
 	/*
 	 * Allocate a DMA area for the card.
 	 */
-	if (bus_dmamem_alloc(dmat, LE_ISA_MEMSIZE, NBPG, 0, &seg, 1,
+	if (bus_dmamem_alloc(dmat, LE_ISA_MEMSIZE, PAGE_SIZE, 0, &seg, 1,
 			     &rseg, BUS_DMA_NOWAIT)) {
 		printf("%s: couldn't allocate memory for card\n",
 		       sc->sc_dev.dv_xname);
@@ -371,16 +395,17 @@ le_isa_attach(parent, lesc, ia, p)
 	sc->sc_wrcsr = le_isa_wrcsr;
 	sc->sc_hwinit = NULL;
 
-	if (ia->ia_drq != DRQUNK) {
-		if ((error = isa_dmacascade(ia->ia_ic, ia->ia_drq)) != 0) {
+	if (ia->ia_ndrq > 0) {
+		if ((error = isa_dmacascade(ia->ia_ic, 
+					    ia->ia_drq[0].ir_drq)) != 0) {
 			printf("%s: unable to cascade DRQ, error = %d\n",
-			    sc->sc_dev.dv_xname, error);
+				    sc->sc_dev.dv_xname, error);
 			return;
 		}
 	}
 
-	lesc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_NET, le_isa_intredge, sc);
+	lesc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_NET, le_isa_intredge, sc);
 
 	printf("%s", sc->sc_dev.dv_xname);
 	am7990_config(&lesc->sc_am7990);

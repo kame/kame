@@ -1,8 +1,11 @@
-/*	$NetBSD: tp_driver.c,v 1.12 2000/03/30 13:10:12 augustss Exp $	*/
+/*	$NetBSD: tp_driver.c,v 1.15 2001/11/13 01:10:49 lukem Exp $	*/
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tp_driver.c,v 1.15 2001/11/13 01:10:49 lukem Exp $");
 
 #include "tp_states.h"
 
-static struct act_ent {
+static const struct act_ent {
 	int             a_newstate;
 	int             a_action;
 } statetable[] = {{
@@ -460,8 +463,8 @@ _Xebec_action(a, e, p)
 		}
 #ifdef TPPT
 		if (tp_traceflags[D_XPD]) {
-			tptrace(TPPTmisc, "XPD tpdu accepted Xrcvnxt,
-				e_seq datalen m_len\n", p->tp_Xrcvnxt,
+			tptrace(TPPTmisc, "XPD tpdu accepted Xrcvnxt, "
+				"e_seq datalen m_len\n", p->tp_Xrcvnxt,
 				e->ev_union.EV_XPD_TPDU.e_seq,
 				e->ev_union.EV_XPD_TPDU.e_datalen,
 				e->ev_union.EV_XPD_TPDU.e_data->m_len);
@@ -725,8 +728,8 @@ _Xebec_action(a, e, p)
 	case 0x31:
 #ifdef TPPT
 		if (tp_traceflags[D_ACKRECV])
-			tptrace(TPPTmisc, "BOGUS ACK fcc_present,
-				tp_r_subseq e_subseq",
+			tptrace(TPPTmisc,
+				"BOGUS ACK fcc_present, tp_r_subseq e_subseq",
 				e->ev_union.EV_AK_TPDU.e_fcc_present,
 				p->tp_r_subseq,
 				e->ev_union.EV_AK_TPDU.e_subseq, 0);
@@ -950,7 +953,7 @@ _Xebec_index(e, p)
 		return 0;
 	}			/* end switch */
 }				/* _Xebec_index() */
-static int      inx[26][9] =
+static const int      inx[26][9] =
 {
     {0, 0, 0, 0, 0, 0, 0, 0, 0,},
     {0x0, 0x0, 0x0, 0x0, 0x31, 0x0, 0x0, 0x0, 0x0,},
@@ -985,7 +988,7 @@ tp_driver(p, e)
 	struct tp_event *e;
 {
 	int    index, error = 0;
-	struct act_ent *a;
+	const struct act_ent *a;
 	static struct act_ent erroraction = {0, -1};
 
 	index = inx[1 + e->ev_number][p->tp_state];

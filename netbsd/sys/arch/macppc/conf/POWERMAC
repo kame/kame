@@ -1,21 +1,25 @@
-#	$NetBSD: POWERMAC,v 1.22 2000/03/22 00:58:21 cgd Exp $
+#	$NetBSD: POWERMAC,v 1.36.4.1 2002/08/01 04:25:08 lukem Exp $
 #
 # POWERMAC config file
 #
 
 include		"arch/macppc/conf/std.macppc"
 
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
 maxusers	32
 
 # Standard system options
-options 	BUFPAGES=1280
 options 	KTRACE		# system call tracing via ktrace(1)
+options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
 
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC	# cheap kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
 options 	DDB		# in-kernel debugger
-#options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
+options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 options 	TRAP_PANICWAIT
 
 #makeoptions	DEBUG="-g"	# compile full symbol table
@@ -39,7 +43,6 @@ file-system 	PROCFS		# /proc
 # Networking options
 options 	INET		# IP + ICMP + TCP + UDP
 options 	IPFILTER_LOG	# ipmon(8) log support
-options 	NMBCLUSTERS=1024
 
 # These options enable verbose messages for several subsystems.
 options 	SCSIVERBOSE	# Verbose SCSI errors
@@ -67,12 +70,14 @@ pci*	at ppb? bus ?
 
 pchb*	at pci? dev ? function ?	# PCI-Host bridges
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
-de*	at pci? dev ? function ?	# DEC 21x4x-based Ethernet
 ep*	at pci? dev ? function ?	# 3Com 3c59x
+tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
 ofb*	at pci? dev ? function ?	# Generic Open Firmware Framebuffer
+#options 	OFB_ENABLE_CACHE	# Speed up console
 obio0	at pci? dev ? function ?
 
 nsphy*	at mii? phy ?			# NS83840 PHYs
+ukphy*	at mii? phy ?			# generic unknown PHYs
 
 mc*	at obio?			# MACE ethernet
 esp*	at obio? flags 0x0		# 53c9x SCSI
@@ -95,6 +100,9 @@ sd*	at scsibus? target ? lun ?	# SCSI disks
 pseudo-device	loop			# network loopback
 pseudo-device	bpfilter	8	# packet filter
 pseudo-device	ipfilter		# IP filter (firewall) and NAT
-pseudo-device	pty		64	# pseudo-terminals
+pseudo-device	pty			# pseudo-terminals
 pseudo-device	vnd		4	# disk-like interface to files
 pseudo-device	ccd		4	# concatenated/striped disk devices
+pseudo-device	rnd			# /dev/random and in-kernel generator
+pseudo-device	openfirm		# /dev/openfirm
+pseudo-device	clockctl		# user control of clock subsystem

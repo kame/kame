@@ -1,4 +1,4 @@
-/*	$NetBSD: mscp.c,v 1.13 2000/05/27 04:52:35 thorpej Exp $	*/
+/*	$NetBSD: mscp.c,v 1.18 2002/03/04 02:19:10 simonb Exp $	*/
 
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
@@ -43,8 +43,12 @@
  * MSCP generic driver routines
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mscp.c,v 1.18 2002/03/04 02:19:10 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/buf.h>
+#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/proc.h>
@@ -71,7 +75,7 @@ mscp_getcp(mi, canwait)
 #define mri	(&mi->mi_cmd)
 	struct mscp *mp;
 	int i;
-	int s = splimp();
+	int s = spluba();
 
 again:
 	/*
@@ -139,7 +143,6 @@ mscp_dorsp(mi)
 	struct mscp_xi *mxi;
 	int nextrsp;
 	int st, error;
-	extern int cold;
 	extern struct mscp slavereply;
 
 	nextrsp = mi->mi_rsp.mri_next;
@@ -182,8 +185,7 @@ loop:
 	if (mp->mscp_unit >= mi->mi_driveno) { /* Must expand drive table */
 		int tmpno = ((mp->mscp_unit + 32) & 0xffe0) * sizeof(void *);
 		struct device **tmp = (struct device **)
-		    malloc(tmpno, M_DEVBUF, M_NOWAIT);
-		bzero(tmp, tmpno);
+		    malloc(tmpno, M_DEVBUF, M_NOWAIT|M_ZERO);
 		if (mi->mi_driveno) {
 			bcopy(mi->mi_dp, tmp, mi->mi_driveno);
 			free(mi->mi_dp, mi->mi_driveno);

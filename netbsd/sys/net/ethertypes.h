@@ -1,4 +1,4 @@
-/*	$NetBSD: ethertypes.h,v 1.10 1999/09/29 23:00:21 ad Exp $	*/
+/*	$NetBSD: ethertypes.h,v 1.13 2002/02/10 01:28:32 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -75,7 +75,7 @@
 #define	ETHERTYPE_CHAOS 	0x0804	/* CHAOSnet */
 #define	ETHERTYPE_X25		0x0805	/* X.25 Level 3 */
 #define	ETHERTYPE_ARP		0x0806	/* Address resolution protocol */
-#define	ETHERTYPE_NSCOMPAT	0x0807	/* XNS Compatability */
+#define	ETHERTYPE_NSCOMPAT	0x0807	/* XNS Compatibility */
 #define	ETHERTYPE_FRARP 	0x0808	/* Frame Relay ARP (RFC1701) */
 			     /* 0x081C	   Symbolics Private */
 		    /* 0x0888 - 0x088A	   Xyplex */
@@ -291,8 +291,11 @@
 #define	ETHERTYPE_TCPCOMP	0x876B	/* TCP/IP Compression (RFC1701) */
 #define	ETHERTYPE_IPAS		0x876C	/* IP Autonomous Systems (RFC1701) */
 #define	ETHERTYPE_SECUREDATA	0x876D	/* Secure Data (RFC1701) */
+#define	ETHERTYPE_FLOWCONTROL	0x8808	/* 802.3x flow control packet */
 #define	ETHERTYPE_PPP		0x880B	/* PPP (obsolete by PPPOE) */
 #define	ETHERTYPE_HITACHI	0x8820	/* Hitachi Cable (Optoelectronic Systems Laboratory) */
+#define	ETHERTYPE_MPLS		0x8847	/* MPLS Unicast */
+#define	ETHERTYPE_MPLS_MCAST	0x8848	/* MPLS Multicast */
 #define	ETHERTYPE_AXIS		0x8856	/* Axis Communications AB proprietary bootstrap/config */
 #define	ETHERTYPE_PPPOEDISC	0x8863	/* PPP Over Ethernet Discovery Stage */
 #define	ETHERTYPE_PPPOE		0x8864	/* PPP Over Ethernet Session Stage */

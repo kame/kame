@@ -1,6 +1,7 @@
-/*	$NetBSD: vm_machdep.c,v 1.27.2.1 2000/08/07 01:04:43 mrg Exp $ */
+/*	$NetBSD: vm_machdep.c,v 1.42.4.1 2002/09/04 13:57:34 lukem Exp $ */
 
 /*
+ * Copyright (c) 1996-2002 Eduardo Horvath.  All rights reserved.
  * Copyright (c) 1996
  *	The President and Fellows of Harvard College. All rights reserved.
  * Copyright (c) 1992, 1993
@@ -59,8 +60,7 @@
 #include <sys/vnode.h>
 #include <sys/map.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/frame.h>
@@ -68,11 +68,6 @@
 #include <machine/bus.h>
 
 #include <sparc64/sparc64/cache.h>
-
-/* XXX These are in sbusvar.h, but including that would be problematical */
-struct sbus_softc *sbus0;
-void    sbus_enter __P((struct sbus_softc *, vaddr_t va, int64_t pa, int flags));
-void    sbus_remove __P((struct sbus_softc *, vaddr_t va, int len));
 
 /*
  * Move pages from one kernel virtual address to another.
@@ -86,24 +81,17 @@ pagemove(from, to, size)
 
 	if (size & PGOFSET || (long)from & PGOFSET || (long)to & PGOFSET)
 		panic("pagemove 1");
-#if 1
-	cache_flush((caddr_t)from, size);
-#endif
+
 	while (size > 0) {
 		if (pmap_extract(pmap_kernel(), (vaddr_t)from, &pa) == FALSE)
 			panic("pagemove 2");
-		pmap_remove(pmap_kernel(),
-		    (vaddr_t)from, (vaddr_t)from + PAGE_SIZE);
-		pmap_enter(pmap_kernel(),
-		    (vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE,
-		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+		pmap_kremove((vaddr_t)from, PAGE_SIZE);
+		pmap_kenter_pa((vaddr_t)to, pa, VM_PROT_READ | VM_PROT_WRITE);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
-#if 1
-	cache_flush((caddr_t)to, size);
-#endif
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -141,7 +129,7 @@ vmapbuf(bp, len)
 	 * user-space mappings so our new mappings will
 	 * have the correct contents.
 	 */
-	cache_flush((caddr_t)uva, len);
+	cache_flush(uva, len);
 
 	upmap = vm_map_pmap(&bp->b_proc->p_vmspace->vm_map);
 	kpmap = vm_map_pmap(kernel_map);
@@ -150,13 +138,15 @@ vmapbuf(bp, len)
 			panic("vmapbuf: null page frame");
 		/* Now map the page into kernel space. */
 		pmap_enter(pmap_kernel(), kva,
-			   pa /* | PMAP_NC */,
-			   VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+			pa /* | PMAP_NC */,
+			VM_PROT_READ|VM_PROT_WRITE,
+			VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 
 		uva += PAGE_SIZE;
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	} while (len);
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -176,8 +166,7 @@ vunmapbuf(bp, len)
 	kva = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - kva;
 	len = round_page(off + len);
-
-	/* This will call pmap_remove() for us. */
+	pmap_remove(pmap_kernel(), kva, kva + len);
 	uvm_km_free_wakeup(kernel_map, kva, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = NULL;
@@ -251,9 +240,6 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	 * the FPU user, we must save the FPU state first.
 	 */
 
-#ifdef NOTDEF_DEBUG
-	printf("cpu_fork()\n");
-#endif
 	if (p1 == curproc) {
 		write_user_windows();
 
@@ -271,11 +257,15 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 #ifdef DEBUG
 	/* prevent us from having NULL lastcall */
 	opcb->lastcall = cpu_forkname;
+#else
+	opcb->lastcall = NULL;
 #endif
 	bcopy((caddr_t)opcb, (caddr_t)npcb, sizeof(struct pcb));
        	if (p1->p_md.md_fpstate) {
-		if (p1 == fpproc)
+		if (p1 == fpproc) {
 			savefpstate(p1->p_md.md_fpstate);
+			fpproc = NULL;
+		}
 		p2->p_md.md_fpstate = malloc(sizeof(struct fpstate64),
 		    M_SUBPROC, M_WAITOK);
 		bcopy(p1->p_md.md_fpstate, p2->p_md.md_fpstate,
@@ -325,11 +315,13 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 
 	npcb->pcb_pc = (long)proc_trampoline - 8;
 	npcb->pcb_sp = (long)rp - STACK_OFFSET;
+
 	/* Need to create a %tstate if we're forking from proc0 */
 	if (p1 == &proc0)
 		tf2->tf_tstate = (ASI_PRIMARY_NO_FAULT<<TSTATE_ASI_SHIFT) |
 			((PSTATE_USER)<<TSTATE_PSTATE_SHIFT);
-
+	else
+		tf2->tf_tstate &= ~(PSTATE_PEF<<TSTATE_PSTATE_SHIFT);
 
 #ifdef NOTDEF_DEBUG
 	printf("cpu_fork: Copying over trapframe: otf=%p ntf=%p sp=%p opcb=%p npcb=%p\n", 
@@ -388,10 +380,57 @@ cpu_coredump(p, vp, cred, chdr)
 	chdr->c_seghdrsize = ALIGN(sizeof(cseg));
 	chdr->c_cpusize = sizeof(md_core);
 
-	md_core.md_tf = *p->p_md.md_tf;
+	/* Copy important fields over. */
+	md_core.md_tf.tf_tstate = p->p_md.md_tf->tf_tstate;
+	md_core.md_tf.tf_pc = p->p_md.md_tf->tf_pc;
+	md_core.md_tf.tf_npc = p->p_md.md_tf->tf_npc;
+	md_core.md_tf.tf_y = p->p_md.md_tf->tf_y;
+	md_core.md_tf.tf_tt = p->p_md.md_tf->tf_tt;
+	md_core.md_tf.tf_pil = p->p_md.md_tf->tf_pil;
+	md_core.md_tf.tf_oldpil = p->p_md.md_tf->tf_oldpil;
+
+	md_core.md_tf.tf_global[0] = p->p_md.md_tf->tf_global[0];
+	md_core.md_tf.tf_global[1] = p->p_md.md_tf->tf_global[1];
+	md_core.md_tf.tf_global[2] = p->p_md.md_tf->tf_global[2];
+	md_core.md_tf.tf_global[3] = p->p_md.md_tf->tf_global[3];
+	md_core.md_tf.tf_global[4] = p->p_md.md_tf->tf_global[4];
+	md_core.md_tf.tf_global[5] = p->p_md.md_tf->tf_global[5];
+	md_core.md_tf.tf_global[6] = p->p_md.md_tf->tf_global[6];
+	md_core.md_tf.tf_global[7] = p->p_md.md_tf->tf_global[7];
+
+	md_core.md_tf.tf_out[0] = p->p_md.md_tf->tf_out[0];
+	md_core.md_tf.tf_out[1] = p->p_md.md_tf->tf_out[1];
+	md_core.md_tf.tf_out[2] = p->p_md.md_tf->tf_out[2];
+	md_core.md_tf.tf_out[3] = p->p_md.md_tf->tf_out[3];
+	md_core.md_tf.tf_out[4] = p->p_md.md_tf->tf_out[4];
+	md_core.md_tf.tf_out[5] = p->p_md.md_tf->tf_out[5];
+	md_core.md_tf.tf_out[6] = p->p_md.md_tf->tf_out[6];
+	md_core.md_tf.tf_out[7] = p->p_md.md_tf->tf_out[7];
+
+#ifdef DEBUG
+	md_core.md_tf.tf_local[0] = p->p_md.md_tf->tf_local[0];
+	md_core.md_tf.tf_local[1] = p->p_md.md_tf->tf_local[1];
+	md_core.md_tf.tf_local[2] = p->p_md.md_tf->tf_local[2];
+	md_core.md_tf.tf_local[3] = p->p_md.md_tf->tf_local[3];
+	md_core.md_tf.tf_local[4] = p->p_md.md_tf->tf_local[4];
+	md_core.md_tf.tf_local[5] = p->p_md.md_tf->tf_local[5];
+	md_core.md_tf.tf_local[6] = p->p_md.md_tf->tf_local[6];
+	md_core.md_tf.tf_local[7] = p->p_md.md_tf->tf_local[7];
+
+	md_core.md_tf.tf_in[0] = p->p_md.md_tf->tf_in[0];
+	md_core.md_tf.tf_in[1] = p->p_md.md_tf->tf_in[1];
+	md_core.md_tf.tf_in[2] = p->p_md.md_tf->tf_in[2];
+	md_core.md_tf.tf_in[3] = p->p_md.md_tf->tf_in[3];
+	md_core.md_tf.tf_in[4] = p->p_md.md_tf->tf_in[4];
+	md_core.md_tf.tf_in[5] = p->p_md.md_tf->tf_in[5];
+	md_core.md_tf.tf_in[6] = p->p_md.md_tf->tf_in[6];
+	md_core.md_tf.tf_in[7] = p->p_md.md_tf->tf_in[7];
+#endif
 	if (p->p_md.md_fpstate) {
-		if (p == fpproc)
+		if (p == fpproc) {
 			savefpstate(p->p_md.md_fpstate);
+			fpproc = NULL;
+		}
 		md_core.md_fpstate = *p->p_md.md_fpstate;
 	} else
 		bzero((caddr_t)&md_core.md_fpstate, 

@@ -1,4 +1,4 @@
-/* 	$NetBSD: linux_signal.h,v 1.8 1999/10/04 17:46:37 fvdl Exp $	*/
+/* 	$NetBSD: linux_signal.h,v 1.11 2002/03/19 20:51:59 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -70,8 +70,13 @@
 #define LINUX_SIGWINCH	28
 #define LINUX_SIGIO	29
 #define LINUX_SIGPWR	30
+#define LINUX_SIGSYS	31
 #define LINUX_SIGUNUSED	31
 #define LINUX_NSIG	32
+
+/* Min/max real-time linux signal */
+#define LINUX_SIGRTMIN		32
+#define LINUX_SIGRTMAX		(LINUX__NSIG - 1)
 
 #define LINUX__NSIG 		64
 #define LINUX__NSIG_BPW		32
@@ -83,32 +88,34 @@
 
 /* sa_flags */
 #define LINUX_SA_NOCLDSTOP	0x00000001
+#define LINUX_SA_NOCLDWAIT	0x00000002
 #define LINUX_SA_SIGINFO	0x00000004
+#define LINUX_SA_RESTORER	0x04000000
 #define LINUX_SA_ONSTACK	0x08000000
 #define LINUX_SA_RESTART	0x10000000
 #define LINUX_SA_INTERRUPT	0x20000000
 #define LINUX_SA_NOMASK		0x40000000
 #define LINUX_SA_ONESHOT	0x80000000
-#define LINUX_SA_ALLBITS	0xf8000001
+#define LINUX_SA_ALLBITS	0xfc000007
 
 typedef void	(*linux_handler_t) __P((int));
 
-typedef u_long	linux_old_sigset_t;
+typedef unsigned long	linux_old_sigset_t;
 typedef struct {
-	u_long sig[LINUX__NSIG_WORDS];
+	unsigned long sig[LINUX__NSIG_WORDS];
 } linux_sigset_t;
 
 struct linux_old_sigaction {
 	linux_handler_t		sa_handler;
 	linux_old_sigset_t	sa_mask;
-	u_long			sa_flags;
+	unsigned long		sa_flags;
 	void			(*sa_restorer) __P((void));
 };
 
 /* Used in rt_* calls */
 struct linux_sigaction {
 	linux_handler_t		sa_handler;
-	u_long			sa_flags;
+	unsigned long		sa_flags;
 	void			(*sa_restorer) __P((void));
 	linux_sigset_t		sa_mask;
 };
@@ -116,6 +123,18 @@ struct linux_sigaction {
 struct linux_k_sigaction {
 	struct linux_sigaction sa;
 #define k_sa_restorer	sa.sa_restorer
+};
+
+#define	LINUX_SS_ONSTACK	1
+#define	LINUX_SS_DISABLE	2
+
+#define	LINUX_MINSIGSTKSZ	2048
+#define	LINUX_SIGSTKSZ		8192
+
+struct linux_sigaltstack {
+	void *ss_sp;
+	int ss_flags;
+	size_t ss_size;
 };
 
 #endif /* !_I386_LINUX_SIGNAL_H */

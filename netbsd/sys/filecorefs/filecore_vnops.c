@@ -1,4 +1,4 @@
-/*	$NetBSD: filecore_vnops.c,v 1.8 1999/08/03 20:19:18 wrstuden Exp $	*/
+/*	$NetBSD: filecore_vnops.c,v 1.16 2001/11/12 23:04:11 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 Andrew McMurry
@@ -35,6 +35,9 @@
  *
  *	filecore_vnops.c	1.2	1998/8/18
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: filecore_vnops.c,v 1.16 2001/11/12 23:04:11 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -153,20 +156,43 @@ filecore_read(v)
 	struct buf *bp;
 	daddr_t lbn, rablock;
 	off_t diff;
-	int rasize, error = 0;
+	int error = 0;
 	long size, n, on;
 
 	if (uio->uio_resid == 0)
 		return (0);
 	if (uio->uio_offset < 0)
 		return (EINVAL);
+	if (uio->uio_offset >= ip->i_size)
+		return (0);
 	ip->i_flag |= IN_ACCESS;
 	fcmp = ip->i_mnt;
+
+	if (vp->v_type == VREG) {
+		error = 0;
+		while (uio->uio_resid > 0) {
+			void *win;
+			vsize_t bytelen = MIN(ip->i_size - uio->uio_offset,
+					      uio->uio_resid);
+
+			if (bytelen == 0) {
+				break;
+			}
+			win = ubc_alloc(&vp->v_uobj, uio->uio_offset,
+					&bytelen, UBC_READ);
+			error = uiomove(win, bytelen, uio);
+			ubc_release(win, 0);
+			if (error) {
+				break;
+			}
+		}
+		goto out;
+	}
+
 	do {
 		lbn = lblkno(fcmp, uio->uio_offset);
 		on = blkoff(fcmp, uio->uio_offset);
-		n = min((u_int)(blksize(fcmp, ip, lbn) - on),
-			uio->uio_resid);
+		n = MIN(blksize(fcmp, ip, lbn) - on, uio->uio_resid);
 		diff = (off_t)ip->i_size - uio->uio_offset;
 		if (diff <= 0)
 			return (0);
@@ -177,28 +203,16 @@ filecore_read(v)
 		if (ip->i_dirent.attr & FILECORE_ATTR_DIR) {
 			error = filecore_dbread(ip, &bp);
 			on = uio->uio_offset;
-			n = min(FILECORE_DIR_SIZE-on, uio->uio_resid);
+			n = MIN(FILECORE_DIR_SIZE - on, uio->uio_resid);
 			size = FILECORE_DIR_SIZE;
 		} else {
-			if (vp->v_lastr + 1 == lbn &&
-			    lblktosize(fcmp, rablock) < ip->i_size) {
-				rasize = blksize(fcmp, ip, rablock);
-				error = breadn(vp, lbn, size, &rablock,
-					       &rasize, 1, NOCRED, &bp);
+			error = bread(vp, lbn, size, NOCRED, &bp);
 #ifdef FILECORE_DEBUG_BR
-				printf("breadn(%p, %x, %ld, CRED, %p)=%d\n",
-				    vp, lbn, size, bp, error);
+			printf("bread(%p, %x, %ld, CRED, %p)=%d\n",
+			    vp, lbn, size, bp, error);
 #endif
-			} else {
-				error = bread(vp, lbn, size, NOCRED, &bp);
-#ifdef FILECORE_DEBUG_BR
-				printf("bread(%p, %x, %ld, CRED, %p)=%d\n",
-				    vp, lbn, size, bp, error);
-#endif
-			}
 		}
-		vp->v_lastr = lbn;
-		n = min(n, size - bp->b_resid);
+		n = MIN(n, size - bp->b_resid);
 		if (error) {
 #ifdef FILECORE_DEBUG_BR
 			printf("brelse(%p) vn1\n", bp);
@@ -213,21 +227,9 @@ filecore_read(v)
 #endif
 		brelse(bp);
 	} while (error == 0 && uio->uio_resid > 0 && n != 0);
+
+out:
 	return (error);
-}
-
-/*
- * Mmap a file
- *
- * NB Currently unsupported.
- */
-/* ARGSUSED */
-int
-filecore_mmap(v)
-	void *v;
-{
-
-	return (EINVAL);
 }
 
 /*
@@ -282,8 +284,7 @@ filecore_readdir(v)
 	else {
 		*ap->a_ncookies = 0;
 		ncookies = uio->uio_resid/16;
-		MALLOC(cookies, off_t *, ncookies * sizeof(off_t), M_TEMP,
-		    M_WAITOK);
+		cookies = malloc(ncookies * sizeof(off_t), M_TEMP, M_WAITOK);
 	}
 
 	for (; ; i++) {
@@ -335,7 +336,7 @@ out:
 	if (cookies) {
 		*ap->a_cookies = cookies;
 		if (error) {
-			FREE(cookies, M_TEMP);
+			free(cookies, M_TEMP);
 			*ap->a_ncookies = 0;
 			*ap->a_cookies = NULL;
 		}
@@ -527,7 +528,7 @@ int	lease_check	__P((void *));
  * Global vfs data structures for filecore
  */
 int (**filecore_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc filecore_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc filecore_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, filecore_lookup },		/* lookup */
 	{ &vop_create_desc, filecore_create },		/* create */
@@ -572,7 +573,9 @@ struct vnodeopv_entry_desc filecore_vnodeop_entries[] = {
 	{ &vop_truncate_desc, filecore_truncate },	/* truncate */
 	{ &vop_update_desc, filecore_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_getpages_desc, genfs_getpages },		/* getpages */
+	{ &vop_putpages_desc, genfs_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc filecore_vnodeop_opv_desc =
+const struct vnodeopv_desc filecore_vnodeop_opv_desc =
 	{ &filecore_vnodeop_p, filecore_vnodeop_entries };

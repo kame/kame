@@ -1,6 +1,7 @@
-/*	$NetBSD: genassym.c,v 1.13.2.3 2000/10/18 03:39:11 tv Exp $ */
+/*	$NetBSD: genassym.c,v 1.23 2002/05/14 02:34:15 eeh Exp $ */
 
 /*
+ * Copyright (c) 1996-2002 Eduardo Horvath.  All rights reserved.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,14 +58,12 @@
 #include <sys/disklabel.h>
 #include <sys/disk.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm.h>
 
 #include <machine/db_machdep.h>
 #include <machine/pmap.h>
 #include <machine/cpu.h>
 
-#include <machine/bsd_openprom.h>
 #include <machine/reg.h>
 
 #ifdef notyet
@@ -74,10 +73,10 @@
 
 #include <dev/ic/am7930reg.h>
 #include <dev/ic/am7930var.h>
-#endif
 
-#include <sparc64/dev/fdreg.h>
-#include <sparc64/dev/fdvar.h>
+#include <dev/sun/fdreg.h>
+#include <dev/sun/fdvar.h>
+#endif
 
 #include <stdio.h>
 #include <stddef.h>
@@ -198,20 +197,16 @@ main()
 	off("TF_PC", struct trapframe64, tf_pc);
 	off("TF_NPC", struct trapframe64, tf_npc);
 	off("TF_FAULT", struct trapframe64, tf_fault);
-	off("TF_KSTACK", struct trapframe64, tf_kstack);
 	off("TF_Y", struct trapframe64, tf_y);
 	off("TF_PIL", struct trapframe64, tf_pil);
 	off("TF_OLDPIL", struct trapframe64, tf_oldpil);
 	off("TF_TT", struct trapframe64, tf_tt);
 	off("TF_GLOBAL", struct trapframe64, tf_global);
 	off("TF_OUT", struct trapframe64, tf_out);
+#ifdef DEBUG
 	off("TF_LOCAL", struct trapframe64, tf_local);
 	off("TF_IN", struct trapframe64, tf_in);
-	/* shortened versions */
-	off("TF_G", struct trapframe64, tf_global);
-	off("TF_O", struct trapframe64, tf_out);
-	off("TF_L", struct trapframe64, tf_local);
-	off("TF_I", struct trapframe64, tf_in);
+#endif
 	siz("TF_SIZE", struct trapframe64);
 
 #if 0
@@ -238,6 +233,12 @@ main()
 	off("NO_NEXTNODE", struct nodeops, no_nextnode);
 	off("NO_GETPROP", struct nodeops, no_getprop);
 
+	/* mbuf fields of import */
+	off("M_NEXT", struct mbuf, m_next);
+	off("M_DATA", struct mbuf, m_data);
+	off("M_LEN", struct mbuf, m_len);
+
+#if 0
 	/* floppy trap handler fields */
 	off("FDC_REG_MSR", struct fdcio, fdcio_reg_msr);
 	off("FDC_REG_FIFO", struct fdcio, fdcio_reg_fifo);
@@ -248,7 +249,6 @@ main()
 	off("FDC_TC", struct fdcio, fdcio_tc);
 	off("FDC_EVCNT", struct fdcio, fdcio_intrcnt.ev_count);
 
-#if 0
 	/* db_regs structure so we can save all registers */
 	off("DBR_TRAPS", struct db_regs, dbr_traps);
 	off("DBR_Y", struct db_regs, dbr_y);

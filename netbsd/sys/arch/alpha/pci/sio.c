@@ -1,4 +1,4 @@
-/* $NetBSD: sio.c,v 1.30.2.2 2000/08/11 18:00:06 thorpej Exp $ */
+/* $NetBSD: sio.c,v 1.33 2000/07/29 23:18:47 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -69,7 +69,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: sio.c,v 1.30.2.2 2000/08/11 18:00:06 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sio.c,v 1.33 2000/07/29 23:18:47 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ex_pci.c,v 1.12.4.2 2001/03/20 17:25:33 he Exp $	*/
+/*	$NetBSD: if_ex_pci.c,v 1.20 2002/02/07 01:32:19 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,10 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h" 
- 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ex_pci.c,v 1.20 2002/02/07 01:32:19 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h> 
@@ -55,24 +54,6 @@
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h> 
-#include <netinet/if_inarp.h>
-#endif
- 
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-  
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -153,7 +134,7 @@ const struct ex_pci_product {
 	/* XXX Internal PHY? */
 	{ PCI_PRODUCT_3COM_3C980SRV,	EX_CONF_90XB,
 	  "3c980 Server Adapter 10/100 Ethernet" },
-	{ PCI_PRODUCT_3COM_3C980CTXM,	EX_CONF_90XB,
+	{ PCI_PRODUCT_3COM_3C980CTXM,	EX_CONF_90XB|EX_CONF_MII,
 	  "3c980C-TXM 10/100 Ethernet" },
 
 	{ PCI_PRODUCT_3COM_3C905CTX,	EX_CONF_90XB|EX_CONF_MII,
@@ -293,8 +274,7 @@ ex_pci_attach(parent, self, aux)
 	}
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: asc_vsbus.c,v 1.18.2.1 2000/11/16 20:38:55 tv Exp $	*/
+/*	$NetBSD: asc_vsbus.c,v 1.24 2001/05/16 05:36:56 matt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,7 +40,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: asc_vsbus.c,v 1.18.2.1 2000/11/16 20:38:55 tv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: asc_vsbus.c,v 1.24 2001/05/16 05:36:56 matt Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -102,8 +102,8 @@ struct asc_vsbus_softc {
 #define	ASC_MAXXFERSIZE		65536
 #define	ASC_FREQUENCY		25000000
 
-static int asc_vsbus_match __P((struct device *, struct cfdata *, void *));
-static void asc_vsbus_attach __P((struct device *, struct device *, void *));
+static int asc_vsbus_match(struct device *, struct cfdata *, void *);
+static void asc_vsbus_attach(struct device *, struct device *, void *);
 
 struct cfattach asc_vsbus_ca = {
 	sizeof(struct asc_vsbus_softc), asc_vsbus_match, asc_vsbus_attach
@@ -112,16 +112,16 @@ struct cfattach asc_vsbus_ca = {
 /*
  * Functions and the switch for the MI code
  */
-static u_char	asc_vsbus_read_reg __P((struct ncr53c9x_softc *, int));
-static void	asc_vsbus_write_reg __P((struct ncr53c9x_softc *, int, u_char));
-static int	asc_vsbus_dma_isintr __P((struct ncr53c9x_softc *));
-static void	asc_vsbus_dma_reset __P((struct ncr53c9x_softc *));
-static int	asc_vsbus_dma_intr __P((struct ncr53c9x_softc *));
-static int	asc_vsbus_dma_setup __P((struct ncr53c9x_softc *, caddr_t *,
-		    size_t *, int, size_t *));
-static void	asc_vsbus_dma_go __P((struct ncr53c9x_softc *));
-static void	asc_vsbus_dma_stop __P((struct ncr53c9x_softc *));
-static int	asc_vsbus_dma_isactive __P((struct ncr53c9x_softc *));
+static u_char	asc_vsbus_read_reg(struct ncr53c9x_softc *, int);
+static void	asc_vsbus_write_reg(struct ncr53c9x_softc *, int, u_char);
+static int	asc_vsbus_dma_isintr(struct ncr53c9x_softc *);
+static void	asc_vsbus_dma_reset(struct ncr53c9x_softc *);
+static int	asc_vsbus_dma_intr(struct ncr53c9x_softc *);
+static int	asc_vsbus_dma_setup(struct ncr53c9x_softc *, caddr_t *,
+		    size_t *, int, size_t *);
+static void	asc_vsbus_dma_go(struct ncr53c9x_softc *);
+static void	asc_vsbus_dma_stop(struct ncr53c9x_softc *);
+static int	asc_vsbus_dma_isactive(struct ncr53c9x_softc *);
 
 static struct ncr53c9x_glue asc_vsbus_glue = {
 	asc_vsbus_read_reg,
@@ -151,11 +151,10 @@ asc_vsbus_match( struct device *parent, struct cfdata *cf, void *aux)
 	if (vax_boardtype == VAX_BTYP_46 || vax_boardtype == VAX_BTYP_48) {
 		if (cf->cf_loc[0] != 0x200c0080)
 			return 0;
-#if 1
-	} else if (vax_boardtype == VAX_BTYP_49) {
+	} else if (vax_boardtype == VAX_BTYP_49 ||
+	    vax_boardtype == VAX_BTYP_53) {
 		if (cf->cf_loc[0] != 0x26000080)
 			return 0;
-#endif
 	} else {
 		return 0;
 	}
@@ -251,7 +250,7 @@ asc_vsbus_attach(struct device *parent, struct device *self, void *aux)
 	    ASC_MAXXFERSIZE, 0, BUS_DMA_NOWAIT, &asc->sc_dmamap);
 
 	switch (vax_boardtype) {
-#if defined(VAX46)
+#if VAX46 || VAXANY
 	case VAX_BTYP_46:
 		sc->sc_id = (clk_page[0xbc/2] >> clk_tweak) & 7;
 		break;
@@ -306,7 +305,9 @@ asc_vsbus_attach(struct device *parent, struct device *self, void *aux)
 	printf("\n%s", self->dv_xname);	/* Pretty print */
 
 	/* Do the common parts of attachment. */
-	ncr53c9x_attach(sc, NULL, NULL);
+	sc->sc_adapter.adapt_minphys = minphys;
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	ncr53c9x_attach(sc);
 }
 
 /*
@@ -396,8 +397,8 @@ asc_vsbus_dma_intr(sc)
 
 	trans = asc->sc_dmasize - resid;
 	if (trans < 0) {			/* transferred < 0 ? */
-		printf("asc_vsbus_intr: xfer (%d) > req (%d)\n",
-		    trans, asc->sc_dmasize);
+		printf("asc_vsbus_intr: xfer (%d) > req (%lu)\n",
+		    trans, (u_long) asc->sc_dmasize);
 		trans = asc->sc_dmasize;
 	}
 	NCR_DMA(("asc_vsbus_intr: tcl=%d, tcm=%d; trans=%d, resid=%d\n",

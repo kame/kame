@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_vfsops.c,v 1.34.2.1 2001/03/30 21:49:49 he Exp $	*/
+/*	$NetBSD: procfs_vfsops.c,v 1.41 2001/11/10 13:33:44 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -43,7 +43,10 @@
  * procfs VFS interface
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: procfs_vfsops.c,v 1.41 2001/11/10 13:33:44 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
@@ -58,10 +61,13 @@
 #include <sys/signalvar.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
+
 #include <miscfs/procfs/procfs.h>
-#include <vm/vm.h>			/* for PAGE_SIZE */
+
+#include <uvm/uvm_extern.h>			/* for PAGE_SIZE */
 
 void	procfs_init __P((void));
+void	procfs_reinit __P((void));
 void	procfs_done __P((void));
 int	procfs_mount __P((struct mount *, const char *, void *,
 			  struct nameidata *, struct proc *));
@@ -128,7 +134,6 @@ procfs_mount(mp, path, data, ndp, p)
 	memcpy(mp->mnt_stat.f_mntfromname, "procfs", sizeof("procfs"));
 
 	pmnt->pmnt_exechook = exechook_establish(procfs_revoke_vnodes, mp);
-	pmnt->pmnt_mp = mp;
 	pmnt->pmnt_flags = args.flags;
 
 	return (0);
@@ -287,6 +292,12 @@ procfs_init()
 }
 
 void
+procfs_reinit()
+{
+	procfs_hashreinit();
+}
+
+void
 procfs_done()
 {
 	procfs_hashdone();
@@ -305,9 +316,9 @@ procfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	return (EOPNOTSUPP);
 }
 
-extern struct vnodeopv_desc procfs_vnodeop_opv_desc;
+extern const struct vnodeopv_desc procfs_vnodeop_opv_desc;
 
-struct vnodeopv_desc *procfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const procfs_vnodeopv_descs[] = {
 	&procfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -325,6 +336,7 @@ struct vfsops procfs_vfsops = {
 	procfs_fhtovp,
 	procfs_vptofh,
 	procfs_init,
+	procfs_reinit,
 	procfs_done,
 	procfs_sysctl,
 	NULL,				/* vfs_mountroot */

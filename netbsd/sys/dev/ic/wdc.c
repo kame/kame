@@ -1,8 +1,8 @@
-/*	$NetBSD: wdc.c,v 1.109 2002/01/14 21:51:35 bouyer Exp $ */
+/*	$NetBSD: wdc.c,v 1.114.4.1 2002/06/13 02:35:20 lukem Exp $ */
 
 
 /*
- * Copyright (c) 1998 Manuel Bouyer.  All rights reserved.
+ * Copyright (c) 1998, 2001 Manuel Bouyer.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,6 +71,9 @@
  *   
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wdc.c,v 1.114.4.1 2002/06/13 02:35:20 lukem Exp $");
+
 #ifndef WDCDEBUG
 #define WDCDEBUG
 #endif /* WDCDEBUG */
@@ -86,8 +89,6 @@
 #include <sys/syslog.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
-
 #include <machine/intr.h>
 #include <machine/bus.h>
 
@@ -99,11 +100,13 @@
 #endif /* __BUS_SPACE_HAS_STREAM_METHODS */
 
 #include <dev/ata/atavar.h>
+#include <dev/ata/wdvar.h>
 #include <dev/ata/atareg.h>
 #include <dev/ic/wdcreg.h>
 #include <dev/ic/wdcvar.h>
 
 #include "atapibus.h"
+#include "wd.h"
 
 #define WDCDELAY  100 /* 100 microseconds */
 #define WDCNDELAY_RST (WDC_RESET_WAIT * 1000 / WDCDELAY)
@@ -114,13 +117,28 @@
 
 struct pool wdc_xfer_pool;
 
+#if NWD > 0
+extern const struct ata_bustype wdc_ata_bustype; /* in ata_wdc.c */
+#else
+/* A fake one, the autoconfig will print "wd at foo ... not configured */
+const struct ata_bustype wdc_ata_bustype = {
+	SCSIPI_BUSTYPE_ATA,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+#endif
+
 static void  __wdcerror	  __P((struct channel_softc*, char *));
 static int   __wdcwait_reset  __P((struct channel_softc *, int));
 void  __wdccommand_done __P((struct channel_softc *, struct wdc_xfer *));
 void  __wdccommand_start __P((struct channel_softc *, struct wdc_xfer *));	
 int   __wdccommand_intr __P((struct channel_softc *, struct wdc_xfer *, int));
 int   wdprint __P((void *, const char *));
-
 
 #define DEBUG_INTR   0x01
 #define DEBUG_XFERS  0x02
@@ -142,23 +160,11 @@ wdprint(aux, pnp)
 	void *aux;
 	const char *pnp;
 {
-	struct ata_atapi_attach *aa_link = aux;
+	struct ata_device *adev = aux;
 	if (pnp)
-		printf("drive at %s", pnp);
-	printf(" channel %d drive %d", aa_link->aa_channel,
-	    aa_link->aa_drv_data->drive);
-	return (UNCONF);
-}
-
-int
-atapi_print(aux, pnp)
-	void *aux;
-	const char *pnp;
-{
-	struct ata_atapi_attach *aa_link = aux;
-	if (pnp)
-		printf("atapibus at %s", pnp);
-	printf(" channel %d", aa_link->aa_channel);
+		printf("wd at %s", pnp);
+	printf(" channel %d drive %d", adev->adev_channel,
+	    adev->adev_drv_data->drive);
 	return (UNCONF);
 }
 
@@ -167,7 +173,9 @@ atapi_print(aux, pnp)
  * 0x02 for drive 1).
  * Logic:
  * - If a status register is at 0xff, assume there is no drive here
- *   (ISA has pull-up resistors). If no drive at all -> return.
+ *   (ISA has pull-up resistors).  Similarly if the status register has
+ *   the value we last wrote to the bus (for IDE interfaces without pullups).
+ *   If no drive at all -> return.
  * - reset the controller, wait for it to complete (may take up to 31s !).
  *   If timeout -> return.
  * - test ATA/ATAPI signatures. If at last one drive found -> return.
@@ -181,6 +189,7 @@ wdcprobe(chp)
 	u_int8_t st0, st1, sc, sn, cl, ch;
 	u_int8_t ret_value = 0x03;
 	u_int8_t drive;
+	int found;
 
 	/*
 	 * Sanity check to see if the wdc channel responds at all.
@@ -209,9 +218,9 @@ wdcprobe(chp)
 		    chp->wdc ? chp->wdc->sc_dev.dv_xname : "wdcprobe",
 		    chp->channel, st0, st1), DEBUG_PROBE);
 
-		if (st0 == 0xff)
+		if (st0 == 0xff || st0 == WDSD_IBM)
 			ret_value &= ~0x01;
-		if (st1 == 0xff)
+		if (st1 == 0xff || st1 == (WDSD_IBM | 0x10))
 			ret_value &= ~0x02;
 		if (ret_value == 0)
 			return 0;
@@ -248,9 +257,25 @@ wdcprobe(chp)
 	 * something here assume it's ATA or OLD. Ghost will be killed later in
 	 * attach routine.
 	 */
+	found = 0;
 	for (drive = 0; drive < 2; drive++) {
 		if ((ret_value & (0x01 << drive)) == 0)
 			continue;
+		if (1 < ++found && chp->wdc != NULL &&
+		    (chp->wdc->cap & WDC_CAPABILITY_SINGLE_DRIVE)) {
+			/*
+			 * Ignore second drive if WDC_CAPABILITY_SINGLE_DRIVE
+			 * is set.
+			 *
+			 * Some CF Card (for ex. IBM MicroDrive and SanDisk) 
+			 * doesn't seem to implement drive select command. In
+			 * this case, you can't eliminate ghost drive properly.
+			 */
+			WDCDEBUG_PRINT(("%s:%d:%d: ignored.\n",
+			    chp->wdc->sc_dev.dv_xname,
+			    chp->channel, drive), DEBUG_PROBE);
+			break;
+		}
 		if (chp->wdc && chp->wdc->cap & WDC_CAPABILITY_SELECT)
 			chp->wdc->select(chp,drive);
 		bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_sdh,
@@ -287,7 +312,6 @@ wdcattach(chp)
 	struct channel_softc *chp;
 {
 	int channel_flags, ctrl_flags, i, error;
-	struct ata_atapi_attach aa_link;
 	struct ataparams params;
 	static int inited = 0;
 
@@ -307,7 +331,7 @@ wdcattach(chp)
 	if (inited == 0) {
 		/* Initialize the wdc_xfer pool. */
 		pool_init(&wdc_xfer_pool, sizeof(struct wdc_xfer), 0,
-		    0, 0, "wdcspl", 0, NULL, NULL, M_DEVBUF);
+		    0, 0, "wdcspl", NULL);
 		inited++;
 	}
 	TAILQ_INIT(&chp->ch_queue->sc_xfer);
@@ -333,7 +357,7 @@ wdcattach(chp)
 		 * Wait a bit, some devices are weird just after a reset.
 		 * Then issue a IDENTIFY command, to try to detect slave ghost
 		 */
-		delay(100);
+		delay(5000);
 		error = ata_get_params(&chp->ch_drive[i], AT_POLL, &params);
 		if (error != CMD_OK) {
 			delay(1000000);
@@ -419,32 +443,26 @@ wdcattach(chp)
 		wdc_atapibus_attach(chp);
 #else
 		/*
-		 * Fills in a fake aa_link and call config_found, so that
-		 * the config machinery will print
-		 * "atapibus at xxx not configured"
+		 * Fake the autoconfig "not configured" message
 		 */
-		memset(&aa_link, 0, sizeof(struct ata_atapi_attach));
-		aa_link.aa_type = T_ATAPI;
-		aa_link.aa_channel = chp->channel;
-		aa_link.aa_openings = 1;
-		aa_link.aa_drv_data = 0;
-		aa_link.aa_bus_private = NULL;
-		chp->atapibus = config_found(&chp->wdc->sc_dev,
-		    (void *)&aa_link, atapi_print);
+		printf("atapibus at %s channel %d not configured\n",
+		    chp->wdc->sc_dev.dv_xname, chp->channel);
+		chp->atapibus = NULL;
 #endif
 	}
 
 	for (i = 0; i < 2; i++) {
+		struct ata_device adev;
 		if ((chp->ch_drive[i].drive_flags &
 		    (DRIVE_ATA | DRIVE_OLD)) == 0) {
 			continue;
 		}
-		memset(&aa_link, 0, sizeof(struct ata_atapi_attach));
-		aa_link.aa_type = T_ATA;
-		aa_link.aa_channel = chp->channel;
-		aa_link.aa_openings = 1;
-		aa_link.aa_drv_data = &chp->ch_drive[i];
-		if (config_found(&chp->wdc->sc_dev, (void *)&aa_link, wdprint))
+		memset(&adev, 0, sizeof(struct ata_device));
+		adev.adev_bustype = &wdc_ata_bustype;
+		adev.adev_channel = chp->channel;
+		adev.adev_openings = 1;
+		adev.adev_drv_data = &chp->ch_drive[i];
+		if (config_found(&chp->wdc->sc_dev, (void *)&adev, wdprint))
 			wdc_probe_caps(&chp->ch_drive[i]);
 	}
 
@@ -465,6 +483,7 @@ wdcattach(chp)
 	 * led on)
 	 */
 	if ((chp->wdc->cap & WDC_CAPABILITY_NO_EXTRA_RESETS) == 0) {
+		delay(50);
 		wdcreset(chp, VERBOSE);
 		/*
 		 * Read status registers to avoid spurious interrupts.
@@ -580,6 +599,8 @@ wdcdetach(self, flags)
 		 * Detach our other children.
 		 */
 		for (j = 0; j < 2; j++) {
+			if (chp->ch_drive[j].drive_flags & DRIVE_ATAPI)
+				continue;
 			sc = chp->ch_drive[j].drv_softc;
 			WDCDEBUG_PRINT(("wdcdetach: %s: detaching %s\n",
 			    wdc->sc_dev.dv_xname,
@@ -653,6 +674,8 @@ wdcstart(chp)
 		chp->ch_drive[xfer->drive].drive_flags &= ~DRIVE_RESET;
 		chp->ch_drive[xfer->drive].state = 0;
 	}
+	if (chp->wdc->cap & WDC_CAPABILITY_NOIRQ)
+		KASSERT(xfer->c_flags & C_POLL);
 	xfer->c_start(chp, xfer);
 }
 
@@ -691,6 +714,8 @@ wdcintr(arg)
 	}
 	if ((chp->ch_flags & WDCF_IRQ_WAIT) == 0) {
 		WDCDEBUG_PRINT(("wdcintr: inactive controller\n"), DEBUG_INTR);
+		/* try to clear the pending interrupt anyway */
+		(void)bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_status);
 		return (0);
 	}
 
@@ -776,7 +801,7 @@ __wdcwait_reset(chp, drv_mask)
 	u_int8_t sc1, sn1, cl1, ch1;
 #endif
 	/* wait for BSY to deassert */
-	for (timeout = 0; timeout < WDCNDELAY_RST;timeout++) {
+	for (timeout = 0; timeout < WDCNDELAY_RST; timeout++) {
 		if (chp->wdc && chp->wdc->cap & WDC_CAPABILITY_SELECT)
 			chp->wdc->select(chp,0);
 		bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_sdh,
@@ -855,9 +880,6 @@ wdcwait(chp, mask, bits, timeout)
 {
 	u_char status;
 	int time = 0;
-#ifdef WDCNDELAY_DEBUG
-	extern int cold;
-#endif
 
 	WDCDEBUG_PRINT(("wdcwait %s:%d\n", chp->wdc ?chp->wdc->sc_dev.dv_xname
 	    :"none", chp->channel), DEBUG_STATUS);
@@ -1120,6 +1142,12 @@ wdc_probe_caps(drvp)
 						continue;
 				if (!printed) {
 					printf("%s Ultra-DMA mode %d", sep, i);
+					if (i == 2)
+						printf(" (Ultra/33)");
+					else if (i == 4)
+						printf(" (Ultra/66)");
+					else if (i == 5)
+						printf(" (Ultra/100)");
 					sep = ",";
 					printed = 1;
 				}
@@ -1262,6 +1290,8 @@ wdc_exec_command(drvp, wdc_c)
 		return WDC_TRY_AGAIN;
 	 }
 
+	if (chp->wdc->cap & WDC_CAPABILITY_NOIRQ)
+		wdc_c->flags |= AT_POLL;
 	if (wdc_c->flags & AT_POLL)
 		xfer->c_flags |= C_POLL;
 	xfer->drive = drvp->drive;
@@ -1344,8 +1374,26 @@ __wdccommand_intr(chp, xfer, irq)
 	int bcount = wdc_c->bcount;
 	char *data = wdc_c->data;
 
+again:
 	WDCDEBUG_PRINT(("__wdccommand_intr %s:%d:%d\n",
 	    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive), DEBUG_INTR);
+	if ((wdc_c->flags & AT_XFDONE) != 0) {
+		/*
+		 * We have completed a data xfer. The drive should now be
+		 * in its initial state
+		 */
+		if (wdcwait(chp, wdc_c->r_st_bmask | WDCS_DRQ,
+		    wdc_c->r_st_bmask, (irq == 0)  ? wdc_c->timeout : 0) != 0) {
+			if (irq && (xfer->c_flags & C_TIMEOU) == 0) 
+				return 0; /* IRQ was not for us */
+			wdc_c->flags |= AT_TIMEOU;
+			__wdccommand_done(chp, xfer);
+			return 1;
+		}
+		wdc_c->flags |= AT_DONE;
+		__wdccommand_done(chp, xfer);
+		return 1;
+	}
 	if (wdcwait(chp, wdc_c->r_st_pmask, wdc_c->r_st_pmask,
 	     (irq == 0)  ? wdc_c->timeout : 0)) {
 		if (irq && (xfer->c_flags & C_TIMEOU) == 0) 
@@ -1366,6 +1414,11 @@ __wdccommand_intr(chp, xfer, irq)
 		if (bcount > 0)
 			bus_space_read_multi_2(chp->cmd_iot, chp->cmd_ioh,
 			    wd_data, (u_int16_t *)data, bcount >> 1);
+		/* at this point the drive should be in its initial state */
+		wdc_c->flags |= AT_XFDONE;
+		if (wdcwait(chp, wdc_c->r_st_bmask | WDCS_DRQ,
+		    wdc_c->r_st_bmask, 100) != 0)
+			wdc_c->flags |= AT_TIMEOU;
 	} else if (wdc_c->flags & AT_WRITE) {
 		if (chp->ch_drive[xfer->drive].drive_flags & DRIVE_CAP32) {
 			bus_space_write_multi_4(chp->data32iot, chp->data32ioh,
@@ -1376,6 +1429,15 @@ __wdccommand_intr(chp, xfer, irq)
 		if (bcount > 0)
 			bus_space_write_multi_2(chp->cmd_iot, chp->cmd_ioh,
 			    wd_data, (u_int16_t *)data, bcount >> 1);
+		wdc_c->flags |= AT_XFDONE;
+		if ((wdc_c->flags & AT_POLL) == 0) {
+			chp->ch_flags |= WDCF_IRQ_WAIT; /* wait for interrupt */
+			callout_reset(&chp->ch_callout,
+			    wdc_c->timeout / 1000 * hz, wdctimeout, chp);
+			return 1;
+		} else {
+			goto again;
+		}
 	}
 	__wdccommand_done(chp, xfer);
 	return 1;
@@ -1464,6 +1526,49 @@ wdccommand(chp, drive, command, cylin, head, sector, count, precomp)
 }
 
 /*
+ * Send a 48-bit addressing command. The drive should be ready.
+ * Assumes interrupts are blocked.
+ */
+void
+wdccommandext(chp, drive, command, blkno, count)
+	struct channel_softc *chp;
+	u_int8_t drive;
+	u_int8_t command;
+	u_int64_t blkno;
+	u_int16_t count;
+{
+	WDCDEBUG_PRINT(("wdccommandext %s:%d:%d: command=0x%x blkno=%d "
+	    "count=%d\n", chp->wdc->sc_dev.dv_xname,
+	    chp->channel, drive, command, (u_int32_t) blkno, count),
+	    DEBUG_FUNCS);
+
+	if (chp->wdc->cap & WDC_CAPABILITY_SELECT)
+		chp->wdc->select(chp,drive);
+
+	/* Select drive, head, and addressing mode. */
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_sdh,
+	    (drive << 4) | WDSD_LBA);
+
+	/* previous */
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_features, 0);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_seccnt, count >> 8);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_lba_hi, blkno >> 40);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_lba_mi, blkno >> 32);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_lba_lo, blkno >> 24);
+
+	/* current */
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_features, 0);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_seccnt, count);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_lba_hi, blkno >> 16);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_lba_mi, blkno >> 8);
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_lba_lo, blkno);
+
+	/* Send command. */
+	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_command, command);
+	return;
+}
+
+/*
  * Simplified version of wdccommand().  Unbusy/ready/drq must be
  * tested by the caller.
  */
@@ -1528,7 +1633,9 @@ wdc_get_xfer(flags)
 	xfer = pool_get(&wdc_xfer_pool,
 	    ((flags & WDC_NOSLEEP) != 0 ? PR_NOWAIT : PR_WAITOK));
 	splx(s);
-	memset(xfer, 0, sizeof(struct wdc_xfer));
+	if (xfer != NULL) {
+		memset(xfer, 0, sizeof(struct wdc_xfer));
+	}
 	return xfer;
 }
 
@@ -1601,15 +1708,15 @@ wdc_addref(chp)
 	struct channel_softc *chp;
 {
 	struct wdc_softc *wdc = chp->wdc; 
-	struct atapi_adapter *adapter = &wdc->sc_atapi_adapter;
+	struct scsipi_adapter *adapt = &wdc->sc_atapi_adapter._generic;
 	int s, error = 0;
 
 	s = splbio();
-	if (adapter->_generic.scsipi_refcnt++ == 0 &&
-	    adapter->_generic.scsipi_enable != NULL) {
-		error = (*adapter->_generic.scsipi_enable)(wdc, 1);
+	if (adapt->adapt_refcnt++ == 0 &&
+	    adapt->adapt_enable != NULL) {
+		error = (*adapt->adapt_enable)(&wdc->sc_dev, 1);
 		if (error)
-			adapter->_generic.scsipi_refcnt--;
+			adapt->adapt_refcnt--;
 	}
 	splx(s);
 	return (error);
@@ -1620,12 +1727,43 @@ wdc_delref(chp)
 	struct channel_softc *chp;
 {
 	struct wdc_softc *wdc = chp->wdc;
-	struct atapi_adapter *adapter = &wdc->sc_atapi_adapter;
+	struct scsipi_adapter *adapt = &wdc->sc_atapi_adapter._generic;
 	int s;
 
 	s = splbio();
-	if (adapter->_generic.scsipi_refcnt-- == 1 &&
-	    adapter->_generic.scsipi_enable != NULL)
-		(void) (*adapter->_generic.scsipi_enable)(wdc, 0);
+	if (adapt->adapt_refcnt-- == 1 &&
+	    adapt->adapt_enable != NULL)
+		(void) (*adapt->adapt_enable)(&wdc->sc_dev, 0);
 	splx(s);
+}
+
+void
+wdc_print_modes(struct channel_softc *chp)
+{
+	int drive;
+	struct ata_drive_datas *drvp;
+
+	for (drive = 0; drive < 2; drive++) {
+		drvp = &chp->ch_drive[drive];
+		if ((drvp->drive_flags & DRIVE) == 0)
+			continue;
+		printf("%s(%s:%d:%d): using PIO mode %d",
+			drvp->drv_softc->dv_xname,
+			chp->wdc->sc_dev.dv_xname,
+			chp->channel, drive, drvp->PIO_mode);
+		if (drvp->drive_flags & DRIVE_DMA)
+			printf(", DMA mode %d", drvp->DMA_mode);
+		if (drvp->drive_flags & DRIVE_UDMA) {
+			printf(", Ultra-DMA mode %d", drvp->UDMA_mode);
+			if (drvp->UDMA_mode == 2)
+				printf(" (Ultra/33)");
+			else if (drvp->UDMA_mode == 4)
+				printf(" (Ultra/66)");
+			else if (drvp->UDMA_mode == 5)
+				printf(" (Ultra/100)");
+		}
+		if (drvp->drive_flags & (DRIVE_DMA | DRIVE_UDMA))
+			printf(" (using DMA data transfers)");
+		printf("\n");
+	}
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ofcons.c,v 1.11 2000/04/14 19:31:50 scw Exp $	*/
+/*	$NetBSD: ofcons.c,v 1.16 2002/03/17 19:40:59 atatat Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,6 +31,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ofcons.c,v 1.16 2002/03/17 19:40:59 atatat Exp $");
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/device.h>
@@ -53,6 +56,9 @@ struct ofcons_softc {
 #define	OFPOLL		1
 
 #define	OFBURSTLEN	128	/* max number of bytes to write in one chunk */
+
+cdev_decl(ofcons_);
+cons_decl(ofcons_);
 
 static int stdin, stdout;
 
@@ -97,7 +103,7 @@ ofcons_attach(parent, self, aux)
 
 static void ofcons_start __P((struct tty *));
 static int ofcons_param __P((struct tty *, struct termios *));
-static void ofcons_poll __P((void *));
+static void ofcons_pollin __P((void *));
 
 int
 ofcons_open(dev, flag, mode, p)
@@ -134,10 +140,10 @@ ofcons_open(dev, flag, mode, p)
 	
 	if (!(sc->of_flags & OFPOLL)) {
 		sc->of_flags |= OFPOLL;
-		callout_reset(&sc->sc_poll_ch, 1, ofcons_poll, sc);
+		callout_reset(&sc->sc_poll_ch, 1, ofcons_pollin, sc);
 	}
 
-	return (*linesw[tp->t_line].l_open)(dev, tp);
+	return (*tp->t_linesw->l_open)(dev, tp);
 }
 
 int
@@ -151,7 +157,7 @@ ofcons_close(dev, flag, mode, p)
 
 	callout_stop(&sc->sc_poll_ch);
 	sc->of_flags &= ~OFPOLL;
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 	return 0;
 }
@@ -165,7 +171,7 @@ ofcons_read(dev, uio, flag)
 	struct ofcons_softc *sc = ofcons_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->of_tty;
 	
-	return (*linesw[tp->t_line].l_read)(tp, uio, flag);
+	return (*tp->t_linesw->l_read)(tp, uio, flag);
 }
 
 int
@@ -177,9 +183,20 @@ ofcons_write(dev, uio, flag)
 	struct ofcons_softc *sc = ofcons_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->of_tty;
 	
-	return (*linesw[tp->t_line].l_write)(tp, uio, flag);
+	return (*tp->t_linesw->l_write)(tp, uio, flag);
 }
 
+int
+ofcons_poll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct ofcons_softc *sc = ofcons_cd.cd_devs[minor(dev)];
+	struct tty *tp = sc->of_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
+}
 int
 ofcons_ioctl(dev, cmd, data, flag, p)
 	dev_t dev;
@@ -192,11 +209,9 @@ ofcons_ioctl(dev, cmd, data, flag, p)
 	struct tty *tp = sc->of_tty;
 	int error;
 	
-	if ((error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p)) >= 0)
+	if ((error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p)) != EPASSTHROUGH)
 		return error;
-	if ((error = ttioctl(tp, cmd, data, flag, p)) >= 0)
-		return error;
-	return ENOTTY;
+	return ttioctl(tp, cmd, data, flag, p);
 }
 
 struct tty *
@@ -261,7 +276,7 @@ ofcons_param(tp, t)
 }
 
 static void
-ofcons_poll(aux)
+ofcons_pollin(aux)
 	void *aux;
 {
 	struct ofcons_softc *sc = aux;
@@ -270,9 +285,9 @@ ofcons_poll(aux)
 	
 	while (OF_read(stdin, &ch, 1) > 0) {
 		if (tp && (tp->t_state & TS_ISOPEN))
-			(*linesw[tp->t_line].l_rint)(ch, tp);
+			(*tp->t_linesw->l_rint)(ch, tp);
 	}
-	callout_reset(&sc->sc_poll_ch, 1, ofcons_poll, sc);
+	callout_reset(&sc->sc_poll_ch, 1, ofcons_pollin, sc);
 }
 
 static int
@@ -359,7 +374,7 @@ ofcons_cnpollc(dev, on)
 	} else {
 		if (!(sc->of_flags & OFPOLL)) {
 			sc->of_flags |= OFPOLL;
-			callout_reset(&sc->sc_poll_ch, 1, ofcons_poll, sc);
+			callout_reset(&sc->sc_poll_ch, 1, ofcons_pollin, sc);
 		}
 	}
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: scn.c,v 1.43 1998/07/04 22:18:35 jonathan Exp $ */
+/*	$NetBSD: scn.c,v 1.52 2002/03/17 19:40:47 atatat Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Philip L. Budne.
@@ -47,6 +47,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "scn.h"
 
 #include <sys/param.h>
@@ -84,7 +85,7 @@ int     scnparam __P((struct tty *, struct termios *));
 void    scnstart __P((struct tty *));
 int     scnopen __P((dev_t, int, int, struct proc *));
 int     scnclose __P((dev_t, int, int, struct proc *));
-int	scncnprobe __P((struct consdev *));
+void	scncnprobe __P((struct consdev *));
 void	scncninit __P((struct consdev *));
 int     scncngetc __P((dev_t));
 void    scncnputc __P((dev_t, int));
@@ -655,7 +656,7 @@ scn_config(unit, ispeed, ospeed, mr1, mr2)
 			}
 		}
 	}
-	return EINVAL;	
+	return EINVAL;
 
     gotit:
 	s = spltty();
@@ -687,7 +688,7 @@ scnprobe(parent, cf, aux)
 	int mr1;
 	register volatile u_char *ch_base;
 
-	/* The pc532 doesn't have more then 8 lines. */
+	/* The pc532 doesn't have more than 8 lines. */
 	if (unit >= 8) return(0);
 
 	/* Now some black magic that should detect a scc26x2 channel. */
@@ -1005,7 +1006,7 @@ scnattach(parent, self, aux)
 		printf("%c flags %d", delim, sc->sc_swflags);
 		delim = ',';
 	}
-		
+
 #ifdef KGDB
 	if (kgdb_dev == makedev(scnmajor, unit)) {
 		if (scnconsole == unit)
@@ -1085,7 +1086,7 @@ scnopen(dev, flag, mode, p)
 		/* Turn on DTR and RTS. */
 		SCN_OP_BIS(sc, sc->sc_op_rts | sc->sc_op_dtr);
 
-		/* enable reciever interrupts */
+		/* enable receiver interrupts */
 		scn_rxenable(sc);
 		hwset = 1;
 
@@ -1127,7 +1128,7 @@ scnopen(dev, flag, mode, p)
 		 *
 		 * This used to be more compact (while loop with lots of nots)
 		 * but it was incomprehensible.
-		 * 
+		 *
 		 * "getty" is the classic case of a program that waits here...
 		 */
 		for (;;) {
@@ -1166,7 +1167,7 @@ scnopen(dev, flag, mode, p)
 	}
 	splx(s);
 
-	error = (*linesw[tp->t_line].l_open) (dev, tp);
+	error = (*tp->t_linesw->l_open) (dev, tp);
 	if (error && hwset) {
 		scn_rxdisable(sc);
 		SCN_OP_BIC(sc, sc->sc_op_rts | sc->sc_op_dtr);
@@ -1190,7 +1191,7 @@ scnclose(dev, flag, mode, p)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return 0;
 
-	(*linesw[tp->t_line].l_close) (tp, flag);
+	(*tp->t_linesw->l_close) (tp, flag);
 
 #ifdef KGDB
 	/* do not disable interrupts if debugging */
@@ -1226,7 +1227,7 @@ scnread(dev, uio, flag)
 	register struct scn_softc *sc = SOFTC(DEV_UNIT(dev));
 	register struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_read) (tp, uio, flag));
+	return ((*tp->t_linesw->l_read) (tp, uio, flag));
 }
 
 int
@@ -1238,7 +1239,19 @@ scnwrite(dev, uio, flag)
 	register struct scn_softc *sc = SOFTC(DEV_UNIT(dev));
 	register struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_write) (tp, uio, flag));
+	return ((*tp->t_linesw->l_write) (tp, uio, flag));
+}
+
+int
+scnpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	register struct scn_softc *sc = SOFTC(DEV_UNIT(dev));
+	register struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -1271,7 +1284,7 @@ dcd_int(sc, tp, new)
 #endif
 
 /* XXX set some flag to have some lower (soft) int call line discipline? */
-	if (!(*linesw[(u_char) tp->t_line].l_modem) (tp, new == 0? 1: 0)) {
+	if (!(*tp->t_linesw->l_modem) (tp, new == 0? 1: 0)) {
 		SCN_OP_BIC(sc, sc->sc_op_rts | sc->sc_op_dtr);
 	}
 }
@@ -1351,7 +1364,7 @@ scnintr(arg)
 					scn_setchip(sc0);
 				}
 
-				(*linesw[tp0->t_line].l_start) (tp0);
+				(*tp0->t_linesw->l_start) (tp0);
 				rs_work = TRUE;
 			}
 		}
@@ -1369,7 +1382,7 @@ scnintr(arg)
 					scn_setchip(sc1);
 				}
 
-				(*linesw[tp1->t_line].l_start) (tp1);
+				(*tp1->t_linesw->l_start) (tp1);
 				rs_work = TRUE;
 			}
 		}
@@ -1484,7 +1497,7 @@ scnrxintr(arg)
 /*
  * Here on soft interrupt (at spltty) to empty ring buffers.
  *
- * Dave's original scheme was to use the DUART reciever timeout
+ * Dave's original scheme was to use the DUART receiver timeout
  * interrupt. This requires 2692's (which my board doesn't have), and
  * I also liked the idea of using the C/T to generate alternate and/or
  * arbitrary bauds. -plb
@@ -1493,7 +1506,7 @@ scnrxintr(arg)
  * (hence the LBL notice on top of this file), DOES NOT require
  * interlocking with interrupt levels!
  *
- * The 44bsd sparc/zs driver reads the ring buffer from a seperate
+ * The 44bsd sparc/zs driver reads the ring buffer from a separate
  * zssoftint, while the SunOS 4.x zs driver appears to use
  * timeout()'s.  timeouts seem to be too slow to deal with high data
  * rates.  I know, I tried them.
@@ -1595,7 +1608,7 @@ scnsoft(arg)
 					c = TTY_FE | 0;
 					sc->sc_breaks++;
 				}
-				(*linesw[tp->t_line].l_rint) (c, tp);
+				(*tp->t_linesw->l_rint) (c, tp);
 
 				if (sc->sc_rx_blocked && n < SCN_RING_THRESH) {
 					int s = splrtty();
@@ -1603,7 +1616,7 @@ scnsoft(arg)
 					SCN_OP_BIS(sc, sc->sc_op_rts);
 					splx(s);
 				}
-					
+
 			}
 			sc->sc_rbget = get;
 		}
@@ -1634,11 +1647,12 @@ scnioctl(dev, cmd, data, flag, p)
 	register struct tty *tp = sc->sc_tty;
 	register int error;
 
-	error = (*linesw[tp->t_line].l_ioctl) (tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl) (tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -1755,7 +1769,7 @@ scnioctl(dev, cmd, data, flag, p)
 		}
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -1898,7 +1912,7 @@ extern int _mapped;
 #define	DUADDR(dev)	(u_char *)(SCN_BASE + (DEV_UNIT(dev) >> 1) * DUART_SZ)
 #define	CHADDR(dev)	(u_char *)(SCN_BASE + DEV_UNIT(dev) * CH_SZ)
 
-int
+void
 scncnprobe(cp)
 	struct consdev *cp;
 {
@@ -1910,7 +1924,6 @@ scncnprobe(cp)
 	/* initialize required fields */
 	cp->cn_dev = makedev(scnmajor, SCN_CONSOLE);
 	cp->cn_pri = CN_NORMAL;
-	return 1;
 }
 
 void
@@ -1978,7 +1991,7 @@ scncnpollc(dev, on)
 void
 scncnputc(dev, c)
 	dev_t dev;
-	char c;
+	int c;
 {
 	volatile u_char *ch_base = CHADDR(dev);
 	volatile u_char *du_base = DUADDR(dev);

@@ -1,4 +1,4 @@
-/*	$NetBSD: satlink.c,v 1.10 2000/05/15 23:56:49 thorpej Exp $	*/
+/*	$NetBSD: satlink.c,v 1.15 2002/01/07 21:47:12 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * which the user then reads from, and provide an ioctl interface to
  * reset the card, etc.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: satlink.c,v 1.15 2002/01/07 21:47:12 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -120,13 +123,21 @@ satlinkprobe(parent, match, aux)
 	bus_space_handle_t ioh;
 	int rv = 0;
 
-	/* Don't allow wildcarding of iobase or drq. */
-	if (ia->ia_iobase == ISACF_PORT_DEFAULT)
+	if (ia->ia_nio < 1)
 		return (0);
-	if (ia->ia_drq == ISACF_DRQ_DEFAULT)
+	if (ia->ia_ndrq < 1)
 		return (0);
 
-	if (bus_space_map(iot, ia->ia_iobase, SATLINK_IOSIZE, 0, &ioh))
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
+	/* Don't allow wildcarding of iobase or drq. */
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
+		return (0);
+	if (ia->ia_drq[0].ir_drq == ISACF_DRQ_DEFAULT)
+		return (0);
+
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, SATLINK_IOSIZE, 0, &ioh))
 		return (0);
 
 	/*
@@ -134,8 +145,14 @@ satlinkprobe(parent, match, aux)
 	 */
 
 	rv = 1;
-	ia->ia_iosize = SATLINK_IOSIZE;
-	ia->ia_msize = 0;
+
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_size = SATLINK_IOSIZE;
+
+	ia->ia_ndrq = 1;
+
+	ia->ia_nirq = 0;
+	ia->ia_niomem = 0;
 
 	bus_space_unmap(iot, ioh, SATLINK_IOSIZE);
 	return (rv);
@@ -155,7 +172,7 @@ satlinkattach(parent, self, aux)
 	printf("\n");
 
 	/* Map the card. */
-	if (bus_space_map(iot, ia->ia_iobase, ia->ia_iosize, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, SATLINK_IOSIZE, 0, &ioh)) {
 		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -163,7 +180,7 @@ satlinkattach(parent, self, aux)
 	sc->sc_iot = iot;
 	sc->sc_ioh = ioh;
 	sc->sc_ic = ia->ia_ic;
-	sc->sc_drq = ia->ia_drq;
+	sc->sc_drq = ia->ia_drq[0].ir_drq;
 
 	/* Reset the card. */
 	bus_space_write_1(iot, ioh, SATLINK_COMMAND, SATLINK_CMD_RESET);
@@ -224,11 +241,11 @@ satlinkopen(dev, flags, fmt, p)
 	int flags, fmt;
 	struct proc *p;
 {
-	int error, unit = minor(dev);
 	struct satlink_softc *sc;
+	int error;
 
-	if (unit >= satlink_cd.cd_ndevs ||
-	    (sc = satlink_cd.cd_devs[unit]) == NULL)
+	sc = device_lookup(&satlink_cd, minor(dev));
+	if (sc == NULL)
 		return (ENXIO);
 
 	if (sc->sc_flags & SATF_ISOPEN)
@@ -241,7 +258,7 @@ satlinkopen(dev, flags, fmt, p)
 	sc->sc_uptr = 0; 
 	sc->sc_sptr = 0; 
 	sc->sc_lastresid = sc->sc_bufsize;
-	bzero(sc->sc_buf, sc->sc_bufsize);
+	memset(sc->sc_buf, 0, sc->sc_bufsize);
 	error = isa_dmastart(sc->sc_ic, sc->sc_drq, sc->sc_buf,
 	    sc->sc_bufsize, NULL, DMAMODE_READ|DMAMODE_LOOP, BUS_DMA_WAITOK);
 	if (error)
@@ -260,8 +277,7 @@ satlinkclose(dev, flags, fmt, p)
 	int flags, fmt;
 	struct proc *p;
 {
-	int unit = minor(dev);
-	struct satlink_softc *sc = satlink_cd.cd_devs[unit];
+	struct satlink_softc *sc = device_lookup(&satlink_cd, minor(dev));
 	int s;
 
 	s = splsoftclock();
@@ -280,8 +296,7 @@ satlinkread(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	int unit = minor(dev);
-	struct satlink_softc *sc = satlink_cd.cd_devs[unit];
+	struct satlink_softc *sc = device_lookup(&satlink_cd, minor(dev));
 	int error, s, count, sptr;
 	int wrapcnt, oresid;
 
@@ -366,8 +381,7 @@ satlinkioctl(dev, cmd, data, flags, p)
 	int flags;
 	struct proc *p;
 {
-	int unit = minor(dev);
-	struct satlink_softc *sc = satlink_cd.cd_devs[unit];
+	struct satlink_softc *sc = device_lookup(&satlink_cd, minor(dev));
 
 	switch (cmd) {
 	case SATIORESET:
@@ -378,7 +392,7 @@ satlinkioctl(dev, cmd, data, flags, p)
 		break;
 
 	case SATIOGID:
-		bcopy(&sc->sc_id, data, sizeof(sc->sc_id));
+		memcpy(data, &sc->sc_id, sizeof(sc->sc_id));
 		break;
 
 	default:
@@ -394,8 +408,7 @@ satlinkpoll(dev, events, p)
 	int events;
 	struct proc *p;
 {
-	int unit = minor(dev);
-	struct satlink_softc *sc = satlink_cd.cd_devs[unit];
+	struct satlink_softc *sc = device_lookup(&satlink_cd, minor(dev));
 	int s, revents;
 
 	revents = events & (POLLOUT | POLLWRNORM);

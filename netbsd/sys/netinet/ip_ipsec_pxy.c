@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_ipsec_pxy.c,v 1.1.2.1 2002/02/09 16:55:22 he Exp $	*/
+/*	$NetBSD: ip_ipsec_pxy.c,v 1.2 2002/04/01 16:47:46 jdolecek Exp $	*/
 
 /*
  * Simple ISAKMP transparent proxy for in-kernel use.  For use with the NAT
@@ -7,6 +7,9 @@
  * Id: ip_ipsec_pxy.c,v 1.1.2.10 2002/01/13 04:58:29 darrenr Exp
  *
  */
+
+__KERNEL_RCSID(1, "$NetBSD: ip_ipsec_pxy.c,v 1.2 2002/04/01 16:47:46 jdolecek Exp $");
+
 #define	IPF_IPSEC_PROXY
 
 

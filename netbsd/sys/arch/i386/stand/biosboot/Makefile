@@ -1,11 +1,13 @@
-#	$NetBSD: Makefile,v 1.31.2.2 2001/04/01 16:29:43 he Exp $
+#	$NetBSD: Makefile,v 1.39 2002/02/17 20:03:08 thorpej Exp $
 
 S=	${.CURDIR}/../../../../
 
 BASE?= biosboot
 PROG= ${BASE}.sym
-MKMAN=	no
+NOMAN=	# defined
 NEWVERSWHAT=	"BIOS Boot"
+STARTFILE=	${BSSTART}
+RELOC=		0x0
 
 .if (${BASE} != "biosboot")
 .PATH.c: ${.CURDIR}/../biosboot/
@@ -13,9 +15,7 @@ NEWVERSWHAT=	"BIOS Boot"
 
 SRCS= main.c devopen.c conf.c exec.c
 
-CLEANFILES+= ${BSSTART}
-
-CPPFLAGS+= -DCOMPAT_OLDBOOT -DCOMPAT_386BSD_MBRPART
+CPPFLAGS+= -DCOMPAT_386BSD_MBRPART -DSUPPORT_PS2
 
 .if (${BASE} == "biosboot")
 # Various serial line configurations
@@ -37,12 +37,8 @@ CPPFLAGS+= -DRESET_VIDEO
 CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_PC -DDIRECT_SERIAL
 .endif
 
-.if (${BASE} == "biosboot_ps2")
-CPPFLAGS+= -DIBM_L40
-CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_PC -DDIRECT_SERIAL
-.endif
-
 CPPFLAGS+= -DSUPPORT_USTARFS
+#CPPFLAGS+= -DSUPPORT_DOSFS
 CPPFLAGS+= -DPASS_BIOSGEOM
 CPPFLAGS+= -DPASS_MEMMAP
 #CPPFLAGS+= -DBOOTPASSWD

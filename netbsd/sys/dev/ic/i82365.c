@@ -1,6 +1,4 @@
-/*	$NetBSD: i82365.c,v 1.59.4.1 2000/07/27 02:31:03 mycroft Exp $	*/
-
-#define	PCICDEBUG
+/*	$NetBSD: i82365.c,v 1.65 2001/12/15 13:23:21 soren Exp $	*/
 
 /*
  * Copyright (c) 2000 Christian E. Hopps.  All rights reserved.
@@ -32,7 +30,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i82365.c,v 1.65 2001/12/15 13:23:21 soren Exp $");
+
+#define	PCICDEBUG
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -40,8 +42,6 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/kthread.h>
-
-#include <vm/vm.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -889,7 +889,7 @@ pcic_chip_mem_free(pch, pcmhp)
 	sc->subregionmask |= pcmhp->mhandle;
 }
 
-static struct mem_map_index_st {
+static const struct mem_map_index_st {
 	int	sysmem_start_lsb;
 	int	sysmem_start_msb;
 	int	sysmem_stop_lsb;
@@ -1013,7 +1013,7 @@ pcic_chip_mem_map(pch, kind, card_addr, size, pcmhp, offsetp, windowp)
 	bus_addr_t card_addr;
 	bus_size_t size;
 	struct pcmcia_mem_handle *pcmhp;
-	bus_addr_t *offsetp;
+	bus_size_t *offsetp;
 	int *windowp;
 {
 	struct pcic_handle *h = (struct pcic_handle *) pch;
@@ -1156,7 +1156,7 @@ pcic_chip_io_free(pch, pcihp)
 }
 
 
-static struct io_map_index_st {
+static const struct io_map_index_st {
 	int	start_lsb;
 	int	start_msb;
 	int	stop_lsb;

@@ -1,4 +1,4 @@
-/*	$NetBSD: tulipvar.h,v 1.36.4.3 2001/04/23 22:05:29 he Exp $	*/
+/*	$NetBSD: tulipvar.h,v 1.47 2002/04/09 05:57:21 chs Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -153,7 +153,7 @@ typedef enum {
 	TULIP_CHIP_AN985     = 22,	/* ADMtek AN985 */
 	TULIP_CHIP_AX88140   = 23,	/* ASIX AX88140 */
 	TULIP_CHIP_AX88141   = 24,	/* ASIX AX88141 */
-	TULIP_CHIP_X3201_3   = 25,	/* Xircom X3201-3 */
+	TULIP_CHIP_X3201_3   = 25	/* Xircom X3201-3 */
 } tulip_chip_t;
 
 #define	TULIP_CHIP_NAMES						\
@@ -370,6 +370,7 @@ struct tulip_softc {
 	int		sc_flags;	/* misc flags. */
 	char		sc_name[16];	/* board name */
 	u_int32_t	sc_cacheline;	/* cache line size */
+	u_int32_t	sc_maxburst;	/* maximum burst length */
 	int		sc_devno;	/* PCI device # */
 
 	struct mii_data sc_mii;		/* MII/media information */
@@ -470,15 +471,15 @@ struct tulip_softc {
 #define	TULIPF_DOINGAUTO	0x00000400	/* doing autoneg (non-MII) */
 #define	TULIPF_ATTACHED		0x00000800	/* attach has succeeded */
 #define	TULIPF_ENABLED		0x00001000	/* chip is enabled */
+#define	TULIPF_BLE		0x00002000	/* data is big endian */
+#define	TULIPF_DBO		0x00004000	/* descriptor is big endian */
 
 #define	TULIP_IS_ENABLED(sc)	((sc)->sc_flags & TULIPF_ENABLED)
 
 /*
- * This macro returns the current media entry for *non-MII* media.
+ * This macro returns the current media entry.
  */
-#define	TULIP_CURRENT_MEDIA(sc)						\
-	(IFM_SUBTYPE((sc)->sc_mii.mii_media.ifm_cur->ifm_media) != IFM_AUTO ? \
-	 (sc)->sc_mii.mii_media.ifm_cur : (sc)->sc_nway_active)
+#define	TULIP_CURRENT_MEDIA(sc) ((sc)->sc_mii.mii_media.ifm_cur)
 
 /*
  * This macro determines if a change to media-related OPMODE bits requires
@@ -577,7 +578,7 @@ do {									\
 #define	TULIP_SP_FIELD(x, f)	TULIP_SP_FIELD_C(((u_int16_t *)(x))[(f)])
 
 #ifdef _KERNEL
-extern const char *tlp_chip_names[];
+extern const char * const tlp_chip_names[];
 
 extern const struct tulip_mediasw tlp_21040_mediasw;
 extern const struct tulip_mediasw tlp_21040_tp_mediasw;
@@ -600,9 +601,15 @@ int	tlp_srom_crcok __P((const u_int8_t *));
 int	tlp_isv_srom __P((const u_int8_t *));
 int	tlp_isv_srom_enaddr __P((struct tulip_softc *, u_int8_t *));
 int	tlp_parse_old_srom __P((struct tulip_softc *, u_int8_t *));
+void	tlp_reset __P((struct tulip_softc *));
 
 int	tlp_mediachange __P((struct ifnet *));
 void	tlp_mediastatus __P((struct ifnet *, struct ifmediareq *));
+
+void	tlp_21140_gpio_get __P((struct tulip_softc *sc,
+	    struct ifmediareq *ifmr));
+int	tlp_21140_gpio_set __P((struct tulip_softc *sc));
+
 #endif /* _KERNEL */
 
 #endif /* _DEV_IC_TULIPVAR_H_ */

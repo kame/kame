@@ -42,11 +42,11 @@ RSC=rc.exe
 # PROP Output_Dir "WMIPSRel"
 # PROP Intermediate_Dir "WMIPSRel"
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /MT /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /Yu"stdafx.h" /QMRWCE /c
-# ADD CPP /nologo /MT /W3 /O2 /I "." /I "../../../.." /I "../include" /I "..\libsa" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_STANDALONE" /D "__STDC__" /QMRWCE /c
+# ADD BASE CPP /nologo /MT /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D "hpcmips" /D UNDER_CE=$(CEVersion) /D "UNICODE" /Yu"stdafx.h" /QMRWCE /c
+# ADD CPP /nologo /MT /W3 /O2 /I "." /I "../../../../sys" /I "../../../.." /I "../include" /I "..\libsa" /I "..\libz" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D "hpcmips" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D _STANDALONE /D __STDC__ /D __signed=signed /D LIBSA_RENAME_PRINTF /D __COMPILER_INT64__=__int64 /D __COMPILER_UINT64__="unsigned __int64" /QMRWCE /c
 # SUBTRACT CPP /YX
-# ADD BASE RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
-# ADD RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
+# ADD BASE RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /D "hpcmips" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
+# ADD RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /D "hpcmips" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
 # ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /o NUL /win32
 # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /o NUL /win32
 BSC32=bscmake.exe
@@ -55,7 +55,7 @@ BSC32=bscmake.exe
 LINK32=link.exe
 # ADD BASE LINK32 /nologo /entry:"wWinMainCRTStartup" /machine:MIPS /subsystem:$(CESubsystem)
 # SUBTRACT BASE LINK32 /pdb:none /nodefaultlib
-# ADD LINK32 commctrl.lib coredll.lib winsock.lib libsa.lib /nologo /incremental:no /machine:MIPS /subsystem:$(CESubsystem) /libpath:"..\libsa\WMIPSRel"
+# ADD LINK32 commctrl.lib coredll.lib winsock.lib libsa.lib libz.lib /nologo /incremental:no /machine:MIPS /subsystem:$(CESubsystem)  /libpath:"..\libsa\WMIPSRel" /libpath:"..\libz\WMIPSRel"
 # SUBTRACT LINK32 /pdb:none /nodefaultlib
 PFILE=pfile.exe
 # ADD BASE PFILE COPY
@@ -74,11 +74,11 @@ PFILE=pfile.exe
 # PROP Intermediate_Dir "WMIPSDbg"
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /MTd /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /Yu"stdafx.h" /QMRWCE /c
-# ADD CPP /nologo /MLd /W3 /Zi /Od /I "." /I "../../../.." /I "../include" /I "..\libsa" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_STANDALONE" /D "__STDC__" /QMRWCE /c
+# ADD BASE CPP /nologo /MTd /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D "hpcmips" /D UNDER_CE=$(CEVersion) /D "UNICODE" /Yu"stdafx.h" /QMRWCE /c
+# ADD CPP /nologo /MLd /W3 /Zi /Od /I "." /I "../../../../sys" /I "../../../.." /I "../include" /I "..\libsa" /I "..\libz" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D "hpcmips" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D _STANDALONE /D __STDC__ /D __signed=signed /D LIBSA_RENAME_PRINTF /D __COMPILER_INT64__=__int64 /D __COMPILER_UINT64__="unsigned __int64" /QMRWCE /c
 # SUBTRACT CPP /YX
-# ADD BASE RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
-# ADD RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
+# ADD BASE RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /D "hpcmips" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
+# ADD RSC /l 0x411 /r /d "MIPS" /d "_MIPS_" /D "hpcmips" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
 # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /o NUL /win32
 # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /o NUL /win32
 BSC32=bscmake.exe
@@ -87,7 +87,7 @@ BSC32=bscmake.exe
 LINK32=link.exe
 # ADD BASE LINK32 /nologo /entry:"wWinMainCRTStartup" /debug /machine:MIPS /subsystem:$(CESubsystem)
 # SUBTRACT BASE LINK32 /pdb:none /nodefaultlib
-# ADD LINK32 commctrl.lib coredll.lib winsock.lib libsa.lib /nologo /incremental:no /debug /machine:MIPS /subsystem:$(CESubsystem) /libpath:"..\libsa\WMIPSDbg"
+# ADD LINK32 commctrl.lib coredll.lib winsock.lib libsa.lib libz.lib /nologo /incremental:no /debug /machine:MIPS /subsystem:$(CESubsystem)  /libpath:"..\libsa\WMIPSDbg" /libpath:"..\libz\WMIPSDbg"
 # SUBTRACT LINK32 /verbose /profile /pdb:none /map /nodefaultlib
 PFILE=pfile.exe
 # ADD BASE PFILE COPY

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_types.h,v 1.7 1998/10/04 00:02:29 fvdl Exp $	*/
+/*	$NetBSD: linux_types.h,v 1.10 2002/05/19 18:03:15 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -93,6 +93,41 @@ struct linux_stat {
 	unsigned long		unused3;
 	unsigned long		unused4;
 	unsigned long		unused5;
+};
+
+/* This matches struct stat64 in glibc2.1, hence the absolutely
+ * insane amounts of padding around dev_t's.
+ */
+struct linux_stat64 {
+	unsigned long long lst_dev;
+	unsigned int	__pad1;
+
+#define LINUX_STAT64_HAS_BROKEN_ST_INO	1
+	unsigned int	__lst_ino;
+	unsigned int	lst_mode;
+	unsigned int	lst_nlink;
+
+	unsigned int	lst_uid;
+	unsigned int	lst_gid;
+
+	unsigned long long	lst_rdev;
+	unsigned int	__pad2;
+
+	long long	lst_size;
+	unsigned int	lst_blksize;
+
+	unsigned long long lst_blocks;	/* Number 512-byte blocks allocated. */
+
+	unsigned int	lst_atime;
+	unsigned int	__unused1;
+
+	unsigned int	lst_mtime;
+	unsigned int	__unused2;
+
+	unsigned int	lst_ctime;
+	unsigned int	__unused3;	/* will be high 32 bits of ctime someday */
+
+	unsigned long long lst_ino;
 };
 
 #endif /* !_I386_LINUX_TYPES_H */

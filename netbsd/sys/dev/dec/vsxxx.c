@@ -1,4 +1,4 @@
-/* $NetBSD: vsxxx.c,v 1.2 2000/01/08 02:57:22 takemura Exp $ */
+/* $NetBSD: vsxxx.c,v 1.4 2002/03/17 19:40:55 atatat Exp $ */
 
 /*
  * Copyright (c) 1999 Tohru Nishimura.  All rights reserved.
@@ -30,9 +30,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-
-__KERNEL_RCSID(0, "$NetBSD: vsxxx.c,v 1.2 2000/01/08 02:57:22 takemura Exp $");
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vsxxx.c,v 1.4 2002/03/17 19:40:55 atatat Exp $");
 
 /*
  * Common machinary for VSXXX mice and tablet
@@ -116,7 +115,7 @@ vsxxx_ioctl(v, cmd, data, flag, p)
 		*(u_int *)data = WSMOUSE_TYPE_VSXXX;
 		return 0;
 	}
-	return ENOTTY;
+	return EPASSTHROUGH;
 }
 
 /* EXPORT */ void

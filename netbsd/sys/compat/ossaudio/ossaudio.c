@@ -1,4 +1,4 @@
-/*	$NetBSD: ossaudio.c,v 1.30.4.3 2001/08/16 17:48:00 tv Exp $	*/
+/*	$NetBSD: ossaudio.c,v 1.39 2001/12/24 00:10:49 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -32,6 +32,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ossaudio.c,v 1.39 2001/12/24 00:10:49 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -92,9 +95,7 @@ oss_ioctl_audio(p, uap, retval)
 	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -595,14 +596,15 @@ getdevinfo(fp, p)
 {
 	mixer_devinfo_t mi;
 	int i, j, e;
-	static struct {
-		char *name;
+	static const struct {
+		const char *name;
 		int code;
 	} *dp, devs[] = {
 		{ AudioNmicrophone,	OSS_SOUND_MIXER_MIC },
 		{ AudioNline,		OSS_SOUND_MIXER_LINE },
 		{ AudioNcd,		OSS_SOUND_MIXER_CD },
 		{ AudioNdac,		OSS_SOUND_MIXER_PCM },
+		{ AudioNaux,		OSS_SOUND_MIXER_LINE1 },
 		{ AudioNrecord,		OSS_SOUND_MIXER_IMIX },
 		{ AudioNmaster,		OSS_SOUND_MIXER_VOLUME },
 		{ AudioNtreble,		OSS_SOUND_MIXER_TREBLE },
@@ -730,9 +732,7 @@ oss_ioctl_mixer(p, uap, retval)
 	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -931,9 +931,7 @@ oss_ioctl_sequencer(p, uap, retval)
 	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -1132,7 +1130,8 @@ oss_ioctl_sequencer(p, uap, retval)
  * Check that the blocksize is a power of 2 as OSS wants.
  * If not, set it to be.
  */
-static void setblocksize(fp, info, p)
+static void
+setblocksize(fp, info, p)
 	struct file *fp;
 	struct audio_info *info;
 	struct proc *p;

@@ -1,4 +1,4 @@
-/*	$NetBSD: cdefs_elf.h,v 1.7 1999/12/13 08:25:16 itohy Exp $	*/
+/*	$NetBSD: cdefs_elf.h,v 1.11 2002/01/27 07:19:25 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -30,16 +30,18 @@
 #ifndef _SYS_CDEFS_ELF_H_
 #define	_SYS_CDEFS_ELF_H_
 
-#if defined(__sh3__)
+#ifdef __LEADING_UNDERSCORE
 #define	_C_LABEL(x)	__CONCAT(_,x)
+#define _C_LABEL_STRING(x)	"_"x
 #else
 #define	_C_LABEL(x)	x
+#define _C_LABEL_STRING(x)	x
 #endif
 
-#ifdef __STDC__
+#if __STDC__
 #define	___RENAME(x)	__asm__(___STRING(_C_LABEL(x)))
 #else
-#if defined(__sh3__)
+#ifdef __LEADING_UNDERSCORE
 #define	___RENAME(x)	____RENAME(_/**/x)
 #define	____RENAME(x)	__asm__(___STRING(x))
 #else
@@ -47,37 +49,50 @@
 #endif
 #endif
 
-#undef	__DO_NOT_DO_WEAK__		/* NO WEAK SYMS IN LIBC YET */
+#undef	__DO_NOT_DO_WEAK__		/* we use weak syms */
 
 #ifndef __DO_NOT_DO_WEAK__
 #define	__indr_reference(sym,alias)	/* nada, since we do weak refs */
 #endif /* !__DO_NOT_DO_WEAK__ */
 
-#ifdef __STDC__
+#if __STDC__
 
 #ifndef __DO_NOT_DO_WEAK__
 #define	__weak_alias(alias,sym)						\
-    __asm__(".weak " #alias " ; " #alias " = " #sym);
+    __asm__(".weak " _C_LABEL_STRING(#alias) " ; "			\
+	    _C_LABEL_STRING(#alias) " = " _C_LABEL_STRING(#sym));
 #endif /* !__DO_NOT_DO_WEAK__ */
 #define	__weak_extern(sym)						\
-    __asm__(".weak " #sym);
+    __asm__(".weak " _C_LABEL_STRING(#sym));
 #define	__warn_references(sym,msg)					\
     __asm__(".section .gnu.warning." #sym " ; .ascii \"" msg "\" ; .text");
 
 #else /* !__STDC__ */
 
 #ifndef __DO_NOT_DO_WEAK__
+#ifdef __LEADING_UNDERSCORE
+#define __weak_alias(alias,sym) ___weak_alias(_/**/alias,_/**/sym)
+#define	___weak_alias(alias,sym)					\
+    __asm__(".weak alias ; alias = sym");
+#else
 #define	__weak_alias(alias,sym)						\
     __asm__(".weak alias ; alias = sym");
+#endif
 #endif /* !__DO_NOT_DO_WEAK__ */
+#ifdef __LEADING_UNDERSCORE
+#define __weak_extern(sym) ___weak_extern(_/**/sym)
+#define	___weak_extern(sym)						\
+    __asm__(".weak sym");
+#else
 #define	__weak_extern(sym)						\
     __asm__(".weak sym");
+#endif
 #define	__warn_references(sym,msg)					\
     __asm__(".section .gnu.warning.sym ; .ascii msg ; .text");
 
 #endif /* !__STDC__ */
 
-#ifdef __STDC__
+#if __STDC__
 #define	__SECTIONSTRING(_sec, _str)					\
 	__asm__(".section " #_sec " ; .asciz \"" _str "\" ; .text")
 #else

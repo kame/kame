@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.30 2000/05/26 21:20:06 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.34 2001/06/14 22:56:57 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -41,7 +41,7 @@
 #ifndef _NS532_CPU_H_
 #define _NS532_CPU_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -94,8 +94,8 @@ extern struct cpu_info cpu_info_store;
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-int	want_resched;	/* resched() was called */
-#define	need_resched()	(want_resched = 1, setsoftast())
+int	want_resched;		/* resched() was called */
+#define	need_resched(ci)	(want_resched = 1, setsoftast())
 
 /*
  * Give a profiling tick to the current process from the softclock
@@ -130,14 +130,10 @@ void	save_fpu_context __P((struct pcb *));
 
 /* machdep.c */
 void	dumpconf __P((void));
-void	do_softclock __P((void *));
 void	softnet __P((void *));
 
 /* mainbus.c */
 void	icu_init __P((u_char *));
-
-/* trap.c */
-void	child_return __P((void *));
 
 /* vm_machdep.c */
 int	kvtop __P((caddr_t));

@@ -1,4 +1,4 @@
-/* $NetBSD: machdep.c,v 1.102 2000/06/05 23:45:02 jhawk Exp $	 */
+/* $NetBSD: machdep.c,v 1.123 2002/03/31 00:11:13 matt Exp $	 */
 
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
@@ -46,12 +46,10 @@
  */
 
 #include "opt_ddb.h"
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ns.h"
 #include "opt_compat_netbsd.h"
 #include "opt_compat_ultrix.h"
 #include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,32 +69,11 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 #include <sys/ptrace.h>
-#include <vm/vm.h>
-#include <sys/sysctl.h>
 
 #include <dev/cons.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#include <net/netisr.h>
-#include <net/if.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/ip_var.h>
-#endif
-#ifdef NETATALK
-#include <netatalk/at_extern.h>
-#endif
-#ifdef NS
-#include <netns/ns_var.h>
-#endif
-#include "ppp.h"	/* For NERISR_PPP */
-#if NPPP > 0
-#include <net/ppp_defs.h>
-#include <net/if_ppp.h>
-#endif
+#include <uvm/uvm_extern.h>
+#include <sys/sysctl.h>
 
 #include <machine/sid.h>
 #include <machine/pte.h>
@@ -107,6 +84,7 @@
 #include <machine/trap.h>
 #include <machine/reg.h>
 #include <machine/db_machdep.h>
+#include <machine/scb.h>
 #include <vax/vax/gencons.h>
 
 #ifdef DDB
@@ -126,19 +104,22 @@ char		machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
 char		cpu_model[100];
 caddr_t		msgbufaddr;
 int		physmem;
-int		dumpsize = 0;
+int		*symtab_start;
+int		*symtab_end;
+int		symtab_nsyms;
 
 #define	IOMAPSZ	100
 static	struct map iomap[IOMAPSZ];
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 #ifdef DEBUG
 int iospace_inited = 0;
 #endif
 
+struct softintr_head softclock_head = { IPL_SOFTCLOCK };
 struct softintr_head softnet_head = { IPL_SOFTNET };
 struct softintr_head softserial_head = { IPL_SOFTSERIAL };
 
@@ -189,9 +170,9 @@ cpu_startup()
 
 	/* allocate VM for buffers... area is not managed by VM system */
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("cpu_startup: cannot allocate VM for buffers");
 
 	minaddr = (vaddr_t) buffers;
@@ -221,13 +202,13 @@ cpu_startup()
 			if (pg == NULL)
 				panic("cpu_startup: "
 				    "not enough RAM for buffer cache");
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ | VM_PROT_WRITE);
 			curbuf += NBPG;
 			curbufsize -= NBPG;
 		}
 	}
+	pmap_update(kernel_map->pmap);
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively limits
@@ -237,12 +218,14 @@ cpu_startup()
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				 NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
+#if VAX46 || VAX48 || VAX49 || VAX53 || VAXANY
 	/*
 	 * Allocate a submap for physio.  This map effectively limits the
 	 * number of processes doing physio at any one time.
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				   VM_PHYS_SIZE, 0, FALSE, NULL);
+#endif
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
@@ -254,10 +237,15 @@ cpu_startup()
 	 */
 
 	bufinit();
+#ifdef DDB
+	if (boothowto & RB_KDB)
+		Debugger();
+#endif
 }
 
+u_int32_t dumpmag = 0x8fca0101;
+int	dumpsize = 0;
 long	dumplo = 0;
-long	dumpmag = 0x8fca0101;
 
 void
 cpu_dumpconf()
@@ -298,7 +286,6 @@ void
 setstatclockrate(hzrate)
 	int hzrate;
 {
-	panic("setstatclockrate");
 }
 
 void
@@ -313,20 +300,19 @@ consinit()
 	iospace_inited = 1;
 #endif
 	cninit();
-#ifdef DDB
-	{
+#if defined(DDB)
+	if (symtab_start != NULL && symtab_nsyms != 0 && symtab_end != NULL) {
+		ddb_init(symtab_nsyms, symtab_start, symtab_end);
+#ifndef __ELF__
+	} else {
 		extern int end; /* Contains pointer to symsize also */
-		extern int *esym;
-
-		ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
+		extern paddr_t esym;
+		ddb_init(*(int *)&end, ((int *)&end) + 1, (void *)esym);
+#endif
 	}
 #ifdef DEBUG
 	if (sizeof(struct user) > REDZONEADDR)
 		panic("struct user inside red zone");
-#endif
-#ifdef donotworkbyunknownreason
-	if (boothowto & RB_KDB)
-		Debugger();
 #endif
 #endif
 }
@@ -357,9 +343,9 @@ compat_13_sys_sigreturn(p, v, retval)
 		return (EINVAL);
 	}
 	if (cntx->sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	native_sigset13_to_sigset(&cntx->sc_mask, &mask);
 	(void) sigprocmask1(p, SIG_SETMASK, &mask, 0);
@@ -397,9 +383,9 @@ sys___sigreturn14(p, v, retval)
 		return (EINVAL);
 	}
 	if (cntx->sc_onstack & 01)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 	/* Restore signal mask. */
 	(void) sigprocmask1(p, SIG_SETMASK, &cntx->sc_mask, 0);
 
@@ -430,7 +416,6 @@ sendsig(catcher, sig, mask, code)
 	u_long		code;
 {
 	struct	proc	*p = curproc;
-	struct	sigacts *psp = p->p_sigacts;
 	struct	trapframe *syscf;
 	struct	sigcontext *sigctx, gsigctx;
 	struct	trampframe *trampf, gtrampf;
@@ -440,12 +425,12 @@ sendsig(catcher, sig, mask, code)
 	syscf = p->p_addr->u_pcb.framep;
 
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context. */
 	if (onstack)
-		cursp = ((int)psp->ps_sigstk.ss_sp + psp->ps_sigstk.ss_size);
+		cursp = ((int)p->p_sigctx.ps_sigstk.ss_sp + p->p_sigctx.ps_sigstk.ss_size);
 	else
 		cursp = syscf->sp;
 
@@ -459,6 +444,7 @@ sendsig(catcher, sig, mask, code)
 
 	gtrampf.arg = (int) sigctx;
 	gtrampf.pc = (unsigned) catcher;
+	/* r0..r5 are saved by the popr in the sigcode snippet */
 	gtrampf.scp = (int) sigctx;
 	gtrampf.code = code;
 	gtrampf.sig = sig;
@@ -468,7 +454,7 @@ sendsig(catcher, sig, mask, code)
 	gsigctx.sc_ap = syscf->ap;
 	gsigctx.sc_fp = syscf->fp; 
 	gsigctx.sc_sp = syscf->sp; 
-	gsigctx.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	gsigctx.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 	gsigctx.sc_mask = *mask;
 
 #if defined(COMPAT_13) || defined(COMPAT_ULTRIX)
@@ -479,13 +465,13 @@ sendsig(catcher, sig, mask, code)
 	    copyout(&gsigctx, sigctx, sizeof(gsigctx)))
 		sigexit(p, SIGILL);
 
-	syscf->pc = (int)psp->ps_sigcode;
+	syscf->pc = (int)p->p_sigctx.ps_sigcode;
 	syscf->psl = PSL_U | PSL_PREVU;
 	syscf->ap = cursp;
 	syscf->sp = cursp;
 
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 }
 
 int	waittime = -1;
@@ -539,12 +525,12 @@ cpu_reboot(howto, b)
 		 * rely on that.
 		 */
 #ifdef notyet
-		asm("	movl	sp, (0x80000200)
-			movl	0x80000200, sp
-			mfpr	$0x10, -(sp)	# PR_PCBB
-			mfpr	$0x11, -(sp)	# PR_SCBB
-			mfpr	$0xc, -(sp)	# PR_SBR
-			mfpr	$0xd, -(sp)	# PR_SLR
+		asm("	movl	%sp, (0x80000200)
+			movl	0x80000200, %sp
+			mfpr	$0x10, -(%sp)	# PR_PCBB
+			mfpr	$0x11, -(%sp)	# PR_SCBB
+			mfpr	$0xc, -(%sp)	# PR_SBR
+			mfpr	$0xd, -(%sp)	# PR_SLR
 			mtpr	$0, $0x38	# PR_MAPEN
 		");
 #endif
@@ -560,8 +546,8 @@ cpu_reboot(howto, b)
 
 		mtpr(GC_CONS|GC_BTFL, PR_TXDB);
 	}
-	asm("movl %0, r5":: "g" (showto)); /* How to boot */
-	asm("movl %0, r11":: "r"(showto)); /* ??? */
+	asm("movl %0, %%r5":: "g" (showto)); /* How to boot */
+	asm("movl %0, %%r11":: "r"(showto)); /* ??? */
 	asm("halt");
 	panic("Halt sket sej");
 }
@@ -760,6 +746,7 @@ softintr_establish(int ipl, void (*func)(void *), void *arg)
 	struct softintr_head *shd;
 
 	switch (ipl) {
+	case IPL_SOFTCLOCK: shd = &softclock_head; break;
 	case IPL_SOFTNET: shd = &softnet_head; break;
 	case IPL_SOFTSERIAL: shd = &softserial_head; break;
 	default: panic("softintr_establish: unsupported soft IPL");
@@ -785,3 +772,34 @@ softintr_disestablish(void *arg)
 	LIST_REMOVE(sh, sh_link);
 	free(sh, M_SOFTINTR);
 }
+
+#include <dev/bi/bivar.h>
+/*
+ * This should be somewhere else.
+ */
+void
+bi_intr_establish(void *icookie, int vec, void (*func)(void *), void *arg, 
+	struct evcnt *ev) 
+{  
+	scb_vecalloc(vec, func, arg, SCB_ISTACK, ev);
+}
+
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+/*
+ * Called from locore.
+ */
+void	krnlock(void);
+void	krnunlock(void);
+
+void
+krnlock()
+{
+	KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
+}
+
+void
+krnunlock()
+{
+	KERNEL_UNLOCK();
+}
+#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_ipccall.c,v 1.19 1999/01/10 15:05:36 tron Exp $	*/
+/*	$NetBSD: linux_ipccall.c,v 1.22 2001/11/15 09:48:01 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,11 +36,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_ipccall.c,v 1.22 2001/11/15 09:48:01 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_sysv.h"
 #endif
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/shm.h>
 #include <sys/sem.h>

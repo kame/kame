@@ -1,4 +1,4 @@
-/*	$NetBSD: hd_input.c,v 1.14 2000/03/30 13:53:33 augustss Exp $	*/
+/*	$NetBSD: hd_input.c,v 1.18 2002/05/12 21:30:35 matt Exp $	*/
 
 /*
  * Copyright (c) 1984 University of British Columbia.
@@ -40,6 +40,9 @@
  *	@(#)hd_input.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd_input.c,v 1.18 2002/05/12 21:30:35 matt Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -56,6 +59,10 @@
 #include <netccitt/hd_var.h>
 #include <netccitt/x25.h>
 #include <netccitt/pk_extern.h>
+
+struct	hdcb *hdcbhead;		/* head of linked list of hdcb's */
+struct	Frmr_frame hd_frmr;	/* rejected frame diagnostic info */
+struct	ifqueue hdintrq;	/* hdlc packet input queue */
 
 static void frame_reject __P((struct hdcb *, int, struct Hdlc_iframe *));
 static void rej_routine __P((struct hdcb *, int));
@@ -79,7 +86,7 @@ hdintr()
 	static struct hdcb *lasthdp;
 
 	for (;;) {
-		s = splimp();
+		s = splnet();
 		IF_DEQUEUE(&hdintrq, m);
 		splx(s);
 		if (m == 0)
@@ -394,14 +401,14 @@ process_iframe(hdp, fbuf, frame)
 		fbuf->m_pkthdr.len -= HDHEADERLN;
 		fbuf->m_pkthdr.rcvif = (struct ifnet *) hdp->hd_pkp;
 #ifdef BSD4_3
-		fbuf->m_act = 0;/* probably not necessary */
+		fbuf->m_nextpkt = 0;/* probably not necessary */
 #else
 		{
 			struct mbuf *m;
 
 			for (m = fbuf; m->m_next; m = m->m_next)
-				m->m_act = (struct mbuf *) 0;
-			m->m_act = (struct mbuf *) 1;
+				m->m_nextpkt = (struct mbuf *) 0;
+			m->m_nextpkt = (struct mbuf *) 1;
 		}
 #endif
 		pk_input(fbuf);

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.h,v 1.5 1998/09/05 15:28:07 christos Exp $	*/
+/*	$NetBSD: conf.h,v 1.10 2002/04/18 12:54:15 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,27 +36,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/conf.h>
+#define	DEV_IO		14	/* iopl for compat_10 */
 
-#define	mmread	mmrw
-#define	mmwrite	mmrw
-cdev_decl(mm);
+#include <sys/conf.h>
 
 bdev_decl(fd);
 cdev_decl(fd);
-
-/* open, close, read, write, ioctl, tty, mmap */
-#define cdev_pc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttpoll, dev_init(c,n,mmap), D_TTY }
 
 cdev_decl(pc);
 
 cdev_decl(mms);
 
 cdev_decl(lms);
-
-cdev_decl(pms);
 
 cdev_decl(joy);

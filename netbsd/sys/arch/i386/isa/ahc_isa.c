@@ -1,4 +1,4 @@
-/*	$NetBSD: ahc_isa.c,v 1.13 2000/03/15 02:05:19 fvdl Exp $	*/
+/*	$NetBSD: ahc_isa.c,v 1.16 2002/01/07 21:47:01 thorpej Exp $	*/
 
 /*
  * Product specific probe and attach routines for:
@@ -116,12 +116,16 @@
  *	   July 12, 1996
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ahc_isa.c,v 1.16 2002/01/07 21:47:01 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/queue.h>
 #include <sys/malloc.h>
+#include <sys/reboot.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -141,16 +145,6 @@
 #include <dev/ic/aic77xxreg.h>
 #include <dev/ic/aic77xxvar.h>
 #include <dev/ic/smc93cx6var.h>
-
-/*
- * Under normal circumstances, these messages are unnecessary
- * and not terribly cosmetic.
- */
-#ifdef DEBUG
-#define bootverbose	1
-#else
-#define bootverbose	1
-#endif
 
 /* IO port address setting range as EISA slot number */
 #define AHC_ISA_MIN_SLOT	0x1	/* from iobase = 0x1c00 */
@@ -294,18 +288,24 @@ ahc_isa_match(ia, iobase)
 	if (irq < 0)
 		return (0);
 
-	if (ia->ia_irq != IRQUNK &&
-	    ia->ia_irq != irq) {
+	if (ia->ia_irq[0].ir_irq != ISACF_IRQ_DEFAULT &&
+	    ia->ia_irq[0].ir_irq != irq) {
 		printf("ahc_isa_match: irq mismatch (kernel %d, card %d)\n",
-		    ia->ia_irq, irq);
+		    ia->ia_irq[0].ir_irq, irq);
 		return (0);
 	}
 
 	/* We have a match */
-	ia->ia_iobase = iobase;
-	ia->ia_irq = irq;
-	ia->ia_iosize = AHC_ISA_IOSIZE;
-	ia->ia_msize = 0;
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_addr = iobase;
+	ia->ia_io[0].ir_size = AHC_ISA_IOSIZE;
+
+	ia->ia_nirq = 1;
+	ia->ia_irq[0].ir_irq = irq;
+
+	ia->ia_ndrq = 0;
+	ia->ia_niomem = 0;
+
 	return (1);
 }
 
@@ -328,8 +328,16 @@ ahc_isa_probe(parent, match, aux)
 		ahc_isa_slot_initialized = 1;
 	}
 
-	if (ia->ia_iobase != IOBASEUNK)
-		return (ahc_isa_match(ia, ia->ia_iobase));
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
+	if (ia->ia_io[0].ir_addr != ISACF_PORT_DEFAULT)
+		return (ahc_isa_match(ia, ia->ia_io[0].ir_addr));
 
 	/*
 	 * Find this bus's state.  If we don't yet have a slot
@@ -379,7 +387,8 @@ ahc_isa_attach(parent, self, aux)
 	const char *intrtypestr;
 	char idstring[EISA_IDSTRINGLEN];
 
-	if (bus_space_map(iot, ia->ia_iobase, ia->ia_iosize, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, ia->ia_io[0].ir_size,
+	    0, &ioh)) {
 		printf(": can't map i/o space\n");
 		return;
 	}
@@ -460,7 +469,7 @@ ahc_isa_attach(parent, self, aux)
 free_ahc:
 	ahc_free(ahc);
 free_io:
-	bus_space_unmap(iot, ioh, ia->ia_iosize);
+	bus_space_unmap(iot, ioh, ia->ia_io[0].ir_size);
 }
 
 /*

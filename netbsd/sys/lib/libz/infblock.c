@@ -1,4 +1,4 @@
-/* $NetBSD: infblock.c,v 1.3.22.1 2002/03/20 23:18:23 he Exp $ */
+/* $NetBSD: infblock.c,v 1.4 2002/03/12 00:42:23 fvdl Exp $ */
 
 /* infblock.c -- interpret and process block types to last block
  * Copyright (C) 1995-2002 Mark Adler

@@ -1,4 +1,4 @@
-/*	$NetBSD: dmacvar.h,v 1.2 1999/03/16 16:30:17 minoura Exp $	*/
+/*	$NetBSD: dmacvar.h,v 1.4 2001/05/02 12:48:24 minoura Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -41,9 +41,30 @@
  */
 
 #include <dev/ic/mc68450reg.h>
+#include <machine/bus.h>
 
+#define DMAC_MAPSIZE 64
 
 typedef int (*dmac_intr_handler_t) __P((void*));
+
+/*
+ * Structure that describes a single transfer.
+ */
+struct dmac_channel_stat;
+struct dmac_dma_xfer {
+	struct dmac_channel_stat *dx_channel;
+	bus_dmamap_t	dx_dmamap;	/* dmamap tag */
+	bus_dma_tag_t	dx_tag;		/* dma tag for the transfer */
+	int		dx_ocr;		/* direction */
+	int		dx_scr;		/* SCR value */
+	void		*dx_device;	/* (initial) device address */
+#ifdef DMAC_ARRAYCHAIN
+	struct dmac_sg_array *dx_array;	/* DMAC array chain */
+	int		dx_done;
+#endif
+	int		dx_nextoff;	/* for continued operation */
+	int		dx_nextsize;
+};
 
 /*
  * Struct that holds the channel status.
@@ -61,8 +82,9 @@ struct dmac_channel_stat {
 	dmac_intr_handler_t	ch_error; /* error interrupt handler */
 	void			*ch_normalarg;
 	void			*ch_errorarg;
-	struct dmac_dma_xfer	*ch_xfer_in_progress;
-	void			*ch_map; /* transfer map for arraychain mode */
+	struct dmac_dma_xfer	ch_xfer;
+	struct dmac_sg_array	*ch_map; /* transfer map for arraychain mode */
+	bus_dma_segment_t	ch_seg[1];
 	struct device		*ch_softc; /* device softc link */
 };
 
@@ -76,19 +98,6 @@ struct dmac_softc {
 	bus_space_handle_t	sc_bht;
 
 	struct dmac_channel_stat sc_channels[DMAC_NCHAN];
-};
-
-/*
- * Structure that describes a single transfer.
- */
-struct dmac_dma_xfer {
-	struct dmac_channel_stat *dx_channel; /* channel structure */
-	bus_dmamap_t	dx_dmamap;	/* dmamap tag */
-	bus_dma_tag_t	dx_tag;		/* dma tag for the transfer */
-	int		dx_ocr;		/* direction */
-	int		dx_scr;		/* SCR value */
-	void		*dx_device;	/* (initial) device address */
-	int		dx_done;	/* transfer count */
 };
 
 
@@ -105,10 +114,17 @@ struct dmac_channel_stat *dmac_alloc_channel __P((struct device*, int, char*,
 		/* ch, name, normalv, normal, errorv, error */
 int dmac_free_channel __P((struct device*, int, void*));
 		/* ch, channel */
+struct dmac_dma_xfer *dmac_alloc_xfer __P((struct dmac_channel_stat*,
+					  bus_dma_tag_t, bus_dmamap_t));
+int dmac_load_xfer __P((struct device*, struct dmac_dma_xfer *));
+
+int dmac_start_xfer __P((struct device*, struct dmac_dma_xfer*));
+int dmac_start_xfer_offset __P((struct device*, struct dmac_dma_xfer*,
+				u_int, u_int));
+int dmac_abort_xfer __P((struct device*, struct dmac_dma_xfer*));
+/* Compatibility function: alloc, fill defaults, load */
 struct dmac_dma_xfer *dmac_prepare_xfer __P((struct dmac_channel_stat*,
 					     bus_dma_tag_t,
 					     bus_dmamap_t,
 					     int, int, void*));
 	/* chan, dmat, map, dir, sequence, dar */
-#define dmac_finish_xfer(xfer) free(xfer, M_DEVBUF)
-int dmac_start_xfer __P((struct device*, struct dmac_dma_xfer*));

@@ -1,4 +1,4 @@
-/* $NetBSD: pckbcvar.h,v 1.4 2000/06/09 04:58:35 soda Exp $ */
+/* $NetBSD: pckbcvar.h,v 1.6 2001/07/23 21:03:22 jdolecek Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -82,7 +82,7 @@ struct pckbc_attach_args {
 	pckbc_slot_t pa_slot;
 };
 
-extern const char *pckbc_slot_names[];
+extern const char * const pckbc_slot_names[];
 extern struct pckbc_internal pckbc_consdata;
 extern int pckbc_console_attached;
 
@@ -96,8 +96,7 @@ int pckbc_enqueue_cmd __P((pckbc_tag_t, pckbc_slot_t, u_char *, int,
 			   int, int, u_char *));
 int pckbc_send_cmd __P((bus_space_tag_t, bus_space_handle_t, u_char));
 int pckbc_poll_data __P((pckbc_tag_t, pckbc_slot_t));
-int pckbc_poll_data1 __P((bus_space_tag_t, bus_space_handle_t,
-			  bus_space_handle_t, pckbc_slot_t, int));
+int pckbc_poll_data1 __P((pckbc_tag_t, pckbc_slot_t, int));
 void pckbc_set_poll __P((pckbc_tag_t, pckbc_slot_t, int));
 int pckbc_xt_translation __P((pckbc_tag_t, pckbc_slot_t, int));
 void pckbc_slot_enable __P((pckbc_tag_t, pckbc_slot_t, int));

@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.12 2000/02/05 00:13:25 cgd Exp $ */
+/*	$NetBSD: types.h,v 1.21 2002/05/03 17:55:55 thorpej Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -51,7 +51,12 @@
 #undef sun
 #endif
 
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
+
 #include <sys/cdefs.h>
+#include <machine/int_types.h>
 
 #if defined(_KERNEL)
 typedef struct label_t {
@@ -59,48 +64,33 @@ typedef struct label_t {
 } label_t;
 #endif
 
-/*
- * Basic integral types.  Omit the typedef if
- * not possible for a machine/compiler combination.
- */
-#define	__BIT_TYPES_DEFINED__
-typedef	__signed char		   int8_t;
-typedef	unsigned char		 u_int8_t;
-typedef	short			  int16_t;
-typedef	unsigned short		u_int16_t;
-typedef	int			  int32_t;
-typedef	unsigned int		u_int32_t;
-
-#ifdef __arch64__
-/* 64-bit compiler */
-typedef	long			  int64_t;
-typedef unsigned long		u_int64_t;
-#else
-/* 32-bit compiler */
-/* LONGLONG */
-typedef	long long		  int64_t;
-/* LONGLONG */
-typedef	unsigned long long	u_int64_t;
-#endif
-
 /* The following are unsigned to prevent annoying sign extended pointers. */
-typedef unsigned long		register_t;
-typedef u_int32_t		register32_t;
-typedef u_int64_t		register64_t;
+typedef unsigned long int	register_t;
+typedef unsigned int		register32_t;
+#ifdef __arch64__
+typedef unsigned long int	register64_t;
+#else
+/* LONGLONG */
+typedef unsigned long long int	register64_t;
+#endif
 
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
-typedef unsigned long		vaddr_t;
+typedef unsigned long int	vaddr_t;
 typedef vaddr_t			vsize_t;
 #ifdef SUN4U
-typedef u_int64_t		paddr_t;
+#ifdef __arch64__
+typedef unsigned long int	paddr_t;
 #else
-typedef unsigned long		paddr_t;
-#endif
+/* LONGLONG */
+typedef unsigned long long int	paddr_t;
+#endif /* __arch64__ */
+#else
+typedef unsigned long int	paddr_t;
+#endif /* SUN4U */
 typedef paddr_t			psize_t;
 #endif
 
-#define __HAVE_DEVICE_REGISTER
-
-#define __BROKEN_CONFIG_UNIT_USAGE
+#define	__HAVE_DEVICE_REGISTER
+#define	__HAVE_GENERIC_SOFT_INTERRUPTS
 
 #endif	/* _MACHTYPES_H_ */

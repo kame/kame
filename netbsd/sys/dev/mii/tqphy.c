@@ -1,4 +1,4 @@
-/*	$NetBSD: tqphy.c,v 1.10.4.1 2000/07/04 04:11:13 thorpej Exp $	*/
+/*	$NetBSD: tqphy.c,v 1.18 2002/04/15 16:50:52 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -72,6 +72,9 @@
  * Documentation available at http://www.tsc.tdk.com/lan/78Q2120.pdf .
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tqphy.c,v 1.18 2002/04/15 16:50:52 mycroft Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -88,56 +91,65 @@
 
 #include <dev/mii/tqphyreg.h>
 
-int	tqphymatch __P((struct device *, struct cfdata *, void *));
-void	tqphyattach __P((struct device *, struct device *, void *));
+int	tqphymatch(struct device *, struct cfdata *, void *);
+void	tqphyattach(struct device *, struct device *, void *);
 
 struct cfattach tqphy_ca = {
 	sizeof(struct mii_softc), tqphymatch, tqphyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	tqphy_service __P((struct mii_softc *, struct mii_data *, int));
-void	tqphy_status __P((struct mii_softc *));
+int	tqphy_service(struct mii_softc *, struct mii_data *, int);
+void	tqphy_status(struct mii_softc *);
 
 const struct mii_phy_funcs tqphy_funcs = {
 	tqphy_service, tqphy_status, mii_phy_reset,
 };
 
+const struct mii_phydesc tqphys[] = {
+	{ MII_OUI_xxTSC,		MII_MODEL_xxTSC_78Q2120,
+	  MII_STR_xxTSC_78Q2120 },
+#if 0
+	{ MII_OUI_xxTSC,		MII_MODEL_TSC_78Q2121,
+	  MII_STR_TSC_78Q2121 },
+#endif
+	{ 0,				0,
+	  NULL },
+};
+
 int
-tqphymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+tqphymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;
 
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_TSC)
-		switch MII_MODEL(ma->mii_id2) {
-		case MII_MODEL_TSC_78Q2120:
-		/* case MII_MODEL_TSC_78Q2121: */
-			return (10);
+	if (mii_phy_match(ma, tqphys) != NULL) {
+		/* The DIAG register is unreliable on early revisions. */
+		if (MII_MODEL(ma->mii_id2) == MII_MODEL_xxTSC_78Q2120 &&
+		    MII_REV(ma->mii_id2) <= 3)
+			return (0);
+		return (10);
 	}
 
 	return (0);
 }
 
 void
-tqphyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+tqphyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 
-	printf(": %s, rev. %d\n", MII_STR_TSC_78Q2120,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, tqphys);
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &tqphy_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	/*
 	 * Apparently, we can't do loopback on this PHY.
@@ -157,10 +169,7 @@ tqphyattach(parent, self, aux)
 }
 
 int
-tqphy_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+tqphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;
@@ -222,8 +231,7 @@ tqphy_service(sc, mii, cmd)
 }
 
 void
-tqphy_status(sc)
-	struct mii_softc *sc;
+tqphy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;

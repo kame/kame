@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_prf.c,v 1.74.2.1 2000/07/04 16:05:34 jdolecek Exp $	*/
+/*	$NetBSD: subr_prf.c,v 1.83 2001/11/21 00:55:39 enami Exp $	*/
 
 /*-
  * Copyright (c) 1986, 1988, 1991, 1993
@@ -40,11 +40,16 @@
  *	@(#)subr_prf.c	8.4 (Berkeley) 5/4/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: subr_prf.c,v 1.83 2001/11/21 00:55:39 enami Exp $");
+
 #include "opt_ddb.h"
 #include "opt_ipkdb.h"
+#include "opt_kgdb.h"
 #include "opt_multiprocessor.h"
 
 #include <sys/param.h>
+#include <sys/stdint.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
@@ -121,7 +126,7 @@ do {									\
 #define TOCONS		0x01	/* to the console */
 #define TOTTY		0x02	/* to the process' tty */
 #define TOLOG		0x04	/* to the kernel message buffer */
-#define TOBUFONLY	0x08	/* to the buffer (only) [for sprintf] */
+#define TOBUFONLY	0x08	/* to the buffer (only) [for snprintf] */
 #define TODDB		0x10	/* to ddb console */
 
 /* max size buffer kprintf needs to print quad_t [size in base 8 + \0] */
@@ -142,10 +147,12 @@ static void	 klogpri __P((int));
  * globals
  */
 
-struct	tty *constty;	/* pointer to console "window" tty */
+extern	struct tty *constty;	/* pointer to console "window" tty */
 extern	int log_open;	/* subr_log: is /dev/klog open? */
 const	char *panicstr; /* arg to first call to panic (used as a flag
 			   to indicate that panic has already been called). */
+long	panicstart, panicend;	/* position in the msgbuf of the start and
+				   end of the formatted panicstr. */
 int	doing_shutdown;	/* set to indicate shutdown in progress */
 
 /*
@@ -202,12 +209,18 @@ panic(fmt, va_alist)
 	if (!panicstr)
 		panicstr = fmt;
 	doing_shutdown = 1;
+
+	if (msgbufenabled && msgbufp->msg_magic == MSG_MAGIC)
+		panicstart = msgbufp->msg_bufx;
 	
 	va_start(ap, fmt);
 	printf("panic: ");
 	vprintf(fmt, ap);
 	printf("\n");
 	va_end(ap);
+
+	if (msgbufenabled && msgbufp->msg_magic == MSG_MAGIC)
+		panicend = msgbufp->msg_bufx;
 
 #ifdef IPKDB
 	ipkdb_panic();
@@ -331,7 +344,7 @@ klogpri(level)
 	char snbuf[KPRINTF_BUFSIZE];
 
 	putchar('<', TOLOG, NULL);
-	sprintf(snbuf, "%d", level);
+	snprintf(snbuf, sizeof(snbuf), "%d", level);
 	for (p = snbuf ; *p ; p++)
 		putchar(*p, TOLOG, NULL);
 	putchar('>', TOLOG, NULL);
@@ -587,7 +600,7 @@ db_printf(fmt, va_alist)
 
 
 /*
- * normal kernel printf functions: printf, vprintf, sprintf
+ * normal kernel printf functions: printf, vprintf, snprintf, vsnprintf
  */
 
 /*
@@ -729,10 +742,9 @@ vsnprintf(buf, size, fmt, ap)
 }
 
 /*
- * bitmask_snprintf: print a kernel-printf "%b" message to a buffer
+ * bitmask_snprintf: print an interpreted bitmask to a buffer
  *
  * => returns pointer to the buffer
- * => XXX: useful vs. kernel %b?
  */
 char *
 bitmask_snprintf(val, p, buf, buflen)
@@ -768,7 +780,7 @@ bitmask_snprintf(val, p, buf, buflen)
 	if (sbase == 0)
 		return (buf);	/* punt if not oct, dec, or hex */
 
-	sprintf(snbuf, sbase, val);
+	snprintf(snbuf, sizeof(snbuf), sbase, val);
 	for (q = snbuf ; *q ; q++) {
 		*bp++ = *q;
 		left--;
@@ -781,10 +793,11 @@ bitmask_snprintf(val, p, buf, buflen)
 	if (((val == 0) && (ch != '\177')) || left < 3)
 		return (buf);
 
-#define PUTBYTE(b, c, l)	\
+#define PUTBYTE(b, c, l) do {	\
 	*(b)++ = (c);		\
 	if (--(l) == 0)		\
-		goto out;
+		goto out;	\
+} while (0)
 #define PUTSTR(b, p, l) do {		\
 	int c;				\
 	while ((c = *(p)++) != 0) {	\
@@ -795,11 +808,11 @@ bitmask_snprintf(val, p, buf, buflen)
 } while (0)
 
 	/*
-	 * Chris Torek's new style %b format is identified by a leading \177
+	 * Chris Torek's new bitmask format is identified by a leading \177
 	 */
 	sep = '<';
 	if (ch != '\177') {
-		/* old (standard) %b format. */
+		/* old (standard) format. */
 		for (;(bit = *p++) != 0;) {
 			if (val & (1 << (bit - 1))) {
 				PUTBYTE(bp, sep, left);
@@ -812,7 +825,7 @@ bitmask_snprintf(val, p, buf, buflen)
 					continue;
 		}
 	} else {
-		/* new quad-capable %b format; also does fields. */
+		/* new quad-capable format; also does fields. */
 		field = val;
 		while ((ch = *p++) != '\0') {
 			bit = *p++;	/* now 0-origin */
@@ -875,41 +888,7 @@ out:
  * this version based on vfprintf() from libc which was derived from 
  * software contributed to Berkeley by Chris Torek.
  *
- * Two additional formats:
- *
- * The format %b is supported to decode error registers.
- * Its usage is:
- *
- *	printf("reg=%b\n", regval, "<base><arg>*");
- *
- * where <base> is the output base expressed as a control character, e.g.
- * \10 gives octal; \20 gives hex.  Each arg is a sequence of characters,
- * the first of which gives the bit number to be inspected (origin 1), and
- * the next characters (up to a control character, i.e. a character <= 32),
- * give the name of the register.  Thus:
- *
- *	kprintf("reg=%b\n", 3, "\10\2BITTWO\1BITONE\n");
- *
- * would produce output:
- *
- *	reg=3<BITTWO,BITONE>
- *
- * The format %: passes an additional format string and argument list
- * recursively.  Its usage is:
- *
- * fn(char *fmt, ...)
- * {
- *	va_list ap;
- *	va_start(ap, fmt);
- *	printf("prefix: %: suffix\n", fmt, ap);
- *	va_end(ap);
- * }
- *
- * this is the actual printf innards
- *
- * This code is large and complicated...
- *
- * NOTE: The kprintf mutex must be held of we're going TOBUF or TOCONS!
+ * NOTE: The kprintf mutex must be held if we're going TOBUF or TOCONS!
  */
 
 /*
@@ -929,20 +908,29 @@ out:
 #define	LONGINT		0x010		/* long integer */
 #define	QUADINT		0x020		/* quad integer */
 #define	SHORTINT	0x040		/* short integer */
-#define	ZEROPAD		0x080		/* zero (as opposed to blank) pad */
-#define FPT		0x100		/* Floating point number */
+#define	MAXINT		0x080		/* intmax_t */
+#define	PTRINT		0x100		/* intptr_t */
+#define	SIZEINT		0x200		/* size_t */
+#define	ZEROPAD		0x400		/* zero (as opposed to blank) pad */
+#define FPT		0x800		/* Floating point number */
 
 	/*
 	 * To extend shorts properly, we need both signed and unsigned
 	 * argument extraction methods.
 	 */
 #define	SARG() \
-	(flags&QUADINT ? va_arg(ap, quad_t) : \
+	(flags&MAXINT ? va_arg(ap, intmax_t) : \
+	    flags&PTRINT ? va_arg(ap, intptr_t) : \
+	    flags&SIZEINT ? va_arg(ap, ssize_t) : /* XXX */ \
+	    flags&QUADINT ? va_arg(ap, quad_t) : \
 	    flags&LONGINT ? va_arg(ap, long) : \
 	    flags&SHORTINT ? (long)(short)va_arg(ap, int) : \
 	    (long)va_arg(ap, int))
 #define	UARG() \
-	(flags&QUADINT ? va_arg(ap, u_quad_t) : \
+	(flags&MAXINT ? va_arg(ap, uintmax_t) : \
+	    flags&PTRINT ? va_arg(ap, uintptr_t) : \
+	    flags&SIZEINT ? va_arg(ap, size_t) : \
+	    flags&QUADINT ? va_arg(ap, u_quad_t) : \
 	    flags&LONGINT ? va_arg(ap, u_long) : \
 	    flags&SHORTINT ? (u_long)(u_short)va_arg(ap, int) : \
 	    (u_long)va_arg(ap, u_int))
@@ -1022,94 +1010,6 @@ kprintf(fmt0, oflags, vp, sbuf, ap)
 
 rflag:		ch = *fmt++;
 reswitch:	switch (ch) {
-		/* XXX: non-standard '%:' format */
-#ifndef __powerpc__
-		case ':': 
-			if (oflags != TOBUFONLY) {
-				cp = va_arg(ap, char *);
-				kprintf(cp, oflags, vp, 
-					NULL, va_arg(ap, va_list));
-			}
-			continue;	/* no output */
-#endif
-		/* XXX: non-standard '%b' format */
-		case 'b': {
-			char *b, *z;
-			int tmp;
-			_uquad = va_arg(ap, int);
-			b = va_arg(ap, char *);
-			if (*b == 8)
-				sprintf(buf, "%qo", (unsigned long long)_uquad);
-			else if (*b == 10)
-				sprintf(buf, "%qd", (unsigned long long)_uquad);
-			else if (*b == 16)
-				sprintf(buf, "%qx", (unsigned long long)_uquad);
-			else
-				break;
-			b++;
-
-			z = buf;
-			while (*z) {
-				ret++;
-				KPRINTF_PUTCHAR(*z++);
-			}
-
-			if (_uquad) {
-				tmp = 0;
-				while ((n = *b++) != 0) {
-					if (_uquad & (1 << (n - 1))) {
-						ret++;
-						KPRINTF_PUTCHAR(tmp ? ',':'<');
-						while ((n = *b) > ' ') {
-							ret++;
-							KPRINTF_PUTCHAR(n);
-							b++;
-						}
-						tmp = 1;
-					} else {
-						while(*b > ' ')
-							b++;
-					}
-				}
-				if (tmp) {
-					ret++;
-					KPRINTF_PUTCHAR('>');
-				}
-			}
-			continue;	/* no output */
-		}
-
-#ifdef DDB
-		/* XXX: non-standard '%r' format (print int in db_radix) */
-		case 'r':
-			if (db_radix == 16)
-				goto case_z;	/* signed hex */
-			_uquad = SARG();
-			if ((quad_t)_uquad < 0) {
-				_uquad = -_uquad;
-				sign = '-';
-			}
-			base = (db_radix == 8) ? OCT : DEC;
-			goto number;
-
-
-		/* XXX: non-standard '%z' format ("signed hex", a "hex %i")*/
-		case 'z':
-		case_z:
-			xdigs = "0123456789abcdef";
-			ch = 'x';	/* the 'x' in '0x' (below) */
-			_uquad = SARG();
-			base = HEX;
-			/* leading 0x/X only if non-zero */
-			if (flags & ALT && _uquad != 0)
-				flags |= HEXPREFIX;
-			if ((quad_t)_uquad < 0) {
-				_uquad = -_uquad;
-				sign = '-';
-			}
-			goto number;
-#endif
-
 		case ' ':
 			/*
 			 * ``If the space and + flags both appear, the space
@@ -1172,6 +1072,9 @@ reswitch:	switch (ch) {
 		case 'h':
 			flags |= SHORTINT;
 			goto rflag;
+		case 'j':
+			flags |= MAXINT;
+			goto rflag;
 		case 'l':
 			if (*fmt == 'l') {
 				fmt++;
@@ -1182,6 +1085,12 @@ reswitch:	switch (ch) {
 			goto rflag;
 		case 'q':
 			flags |= QUADINT;
+			goto rflag;
+		case 't':
+			flags |= PTRINT;
+			goto rflag;
+		case 'z':
+			flags |= SIZEINT;
 			goto rflag;
 		case 'c':
 			*(cp = buf) = va_arg(ap, int);
@@ -1201,29 +1110,13 @@ reswitch:	switch (ch) {
 			base = DEC;
 			goto number;
 		case 'n':
-#ifdef DDB
-		/* XXX: non-standard '%n' format */
-		/*
-		 * XXX: HACK!   DDB wants '%n' to be a '%u' printed
-		 * in db_radix format.   this should die since '%n'
-		 * is already defined in standard printf to write
-		 * the number of chars printed so far to the arg (which
-		 * should be a pointer.
-		 */
-			if (oflags & TODDB) {
-				if (db_radix == 16)
-					ch = 'x';	/* convert to %x */
-				else if (db_radix == 8)
-					ch = 'o';	/* convert to %o */
-				else
-					ch = 'u';	/* convert to %u */
-
-				/* ... and start again */
-				goto reswitch;
-			}
-
-#endif
-			if (flags & QUADINT)
+			if (flags & MAXINT)
+				*va_arg(ap, intmax_t *) = ret;
+			else if (flags & PTRINT)
+				*va_arg(ap, intptr_t *) = ret;
+			else if (flags & SIZEINT)
+				*va_arg(ap, ssize_t *) = ret;
+			else if (flags & QUADINT)
 				*va_arg(ap, quad_t *) = ret;
 			else if (flags & LONGINT)
 				*va_arg(ap, long *) = ret;

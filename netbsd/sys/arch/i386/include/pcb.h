@@ -1,4 +1,4 @@
-/*	$NetBSD: pcb.h,v 1.26.14.2 2001/06/17 22:27:17 he Exp $	*/
+/*	$NetBSD: pcb.h,v 1.31 2002/05/12 23:16:52 matt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -97,7 +97,8 @@ struct pcb {
 #define	pcb_ebp	pcb_tss.tss_ebp
 #define	pcb_ldt_sel	pcb_tss.tss_ldt
 	int	pcb_cr0;		/* saved image of CR0 */
-	struct	save87 pcb_savefpu;	/* floating point state for 287/387 */
+	int	pcb_cr2;		/* page fault address (CR2) */
+	union	savefpu pcb_savefpu;	/* floating point state for FPU */
 	struct	emcsts pcb_saveemc;	/* Cyrix EMC state */
 /*
  * Software pcb (extension)
@@ -121,7 +122,7 @@ struct md_coredump {
 };    
 
 #ifdef _KERNEL
-struct pcb *curpcb;		/* our current running pcb */
+extern	struct pcb *curpcb;		/* our current running pcb */
 #endif
 
 #endif /* _I386_PCB_H_ */

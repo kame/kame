@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_syscalls.c,v 1.158.2.3 2002/06/06 19:53:07 he Exp $	*/
+/*	$NetBSD: vfs_syscalls.c,v 1.174 2002/05/11 00:45:06 enami Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -40,6 +40,9 @@
  *	@(#)vfs_syscalls.c	8.42 (Berkeley) 7/31/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vfs_syscalls.c,v 1.174 2002/05/11 00:45:06 enami Exp $");
+
 #include "opt_compat_netbsd.h"
 #include "opt_compat_43.h"
 
@@ -56,18 +59,14 @@
 #include <sys/uio.h>
 #include <sys/malloc.h>
 #include <sys/dirent.h>
-
-#include <sys/syscallargs.h>
-
-#include <vm/vm.h>
 #include <sys/sysctl.h>
+#include <sys/syscallargs.h>
 
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/syncfs/syncfs.h>
 
-#include <uvm/uvm_extern.h>
-
 static int change_dir __P((struct nameidata *, struct proc *));
+static int change_flags __P((struct vnode *, u_long, struct proc *));
 static int change_mode __P((struct vnode *, int, struct proc *p));
 static int change_owner __P((struct vnode *, uid_t, gid_t, struct proc *,
     int));
@@ -87,38 +86,29 @@ int dovfsusermount = 0;
  * Mount a file system.
  */
 
+#if defined(COMPAT_09) || defined(COMPAT_43)
 /*
  * This table is used to maintain compatibility with 4.3BSD
  * and NetBSD 0.9 mount syscalls.  Note, the order is important!
  *
- * Also note that not all of these had actual numbers in 4.3BSD
- * or NetBSD 0.9!
+ * Do not modify this table. It should only contain filesystems
+ * supported by NetBSD 0.9 and 4.3BSD.
  */
-const char *mountcompatnames[] = {
+const char * const mountcompatnames[] = {
 	NULL,		/* 0 = MOUNT_NONE */
-	MOUNT_FFS,	/* 1 */
+	MOUNT_FFS,	/* 1 = MOUNT_UFS */
 	MOUNT_NFS,	/* 2 */
 	MOUNT_MFS,	/* 3 */
 	MOUNT_MSDOS,	/* 4 */
-	MOUNT_LFS,	/* 5 */
-	NULL,		/* 6 = MOUNT_LOFS */
-	MOUNT_FDESC,	/* 7 */
-	MOUNT_PORTAL,	/* 8 */
-	MOUNT_NULL,	/* 9 */
-	MOUNT_UMAP,	/* 10 */
-	MOUNT_KERNFS,	/* 11 */
-	MOUNT_PROCFS,	/* 12 */
-	MOUNT_AFS,	/* 13 */
-	MOUNT_CD9660,	/* 14 = MOUNT_ISOFS */
-	MOUNT_UNION,	/* 15 */
-	MOUNT_ADOSFS,	/* 16 */
-	MOUNT_EXT2FS,	/* 17 */
-	MOUNT_CODA,	/* 18 */
-	MOUNT_FILECORE,	/* 19 */
-	MOUNT_NTFS,	/* 20 */
+	MOUNT_CD9660,	/* 5 = MOUNT_ISOFS */
+	MOUNT_FDESC,	/* 6 */
+	MOUNT_KERNFS,	/* 7 */
+	NULL,		/* 8 = MOUNT_DEVFS */
+	MOUNT_AFS,	/* 9 */
 };
 const int nmountcompatnames = sizeof(mountcompatnames) /
     sizeof(mountcompatnames[0]);
+#endif /* COMPAT_09 || COMPAT_43 */
 
 /* ARGSUSED */
 int
@@ -312,8 +302,8 @@ update:
 	    MNT_NOATIME | MNT_NODEVMTIME | MNT_SYMPERM | MNT_SOFTDEP);
 	mp->mnt_flag |= SCARG(uap, flags) & (MNT_NOSUID | MNT_NOEXEC |
 	    MNT_NODEV | MNT_SYNCHRONOUS | MNT_UNION | MNT_ASYNC |
-	    MNT_NOCOREDUMP | MNT_NOATIME | MNT_NODEVMTIME | MNT_SYMPERM |
-	    MNT_SOFTDEP);
+	    MNT_NOCOREDUMP | MNT_IGNORE | MNT_NOATIME | MNT_NODEVMTIME |
+	    MNT_SYMPERM | MNT_SOFTDEP);
 	/*
 	 * Mount the filesystem.
 	 */
@@ -460,8 +450,16 @@ sys_unmount(p, v, retval)
 	}
 	vput(vp);
 
-	if (vfs_busy(mp, 0, 0))
+	/*
+	 * XXX Freeze syncer.  Must do this before locking the
+	 * mount point.  See dounmount() for details.
+	 */
+	lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
+
+	if (vfs_busy(mp, 0, 0)) {
+		lockmgr(&syncer_lock, LK_RELEASE, NULL);
 		return (EBUSY);
+	}
 
 	return (dounmount(mp, SCARG(uap, flags), p));
 }
@@ -486,13 +484,21 @@ dounmount(mp, flags, p)
 	used_syncer = (mp->mnt_syncer != NULL);
 
 	/*
-	 * XXX Freeze syncer. This should really be done on a mountpoint
-	 * basis, but especially the softdep code possibly called from
-	 * the syncer doesn't exactly work on a per-mountpoint basis,
-	 * so the softdep code would become a maze of vfs_busy calls.
+	 * XXX Syncer must be frozen when we get here.  This should really
+	 * be done on a per-mountpoint basis, but especially the softdep
+	 * code possibly called from the syncer doens't exactly work on a
+	 * per-mountpoint basis, so the softdep code would become a maze
+	 * of vfs_busy() calls.
+	 *
+	 * The caller of dounmount() must acquire syncer_lock because
+	 * the syncer itself acquires locks in syncer_lock -> vfs_busy
+	 * order, and we must preserve that order to avoid deadlock.
+	 *
+	 * So, if the file system did not use the syncer, now is
+	 * the time to release the syncer_lock.
 	 */
-	if (used_syncer)
-		lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
+	if (used_syncer == 0)
+		lockmgr(&syncer_lock, LK_RELEASE, NULL);
 
 	mp->mnt_flag |= MNT_UNMOUNT;
 	mp->mnt_unmounter = p;
@@ -572,7 +578,6 @@ sys_sync(p, v, retval)
 		if ((mp->mnt_flag & MNT_RDONLY) == 0) {
 			asyncflag = mp->mnt_flag & MNT_ASYNC;
 			mp->mnt_flag &= ~MNT_ASYNC;
-			uvm_vnp_sync(mp);
 			VFS_SYNC(mp, MNT_NOWAIT, p->p_ucred, p);
 			if (asyncflag)
 				 mp->mnt_flag |= MNT_ASYNC;
@@ -1052,6 +1057,7 @@ sys_open(p, v, retval)
 	}
 	VOP_UNLOCK(vp, 0);
 	*retval = indx;
+	FILE_SET_MATURE(fp);
 	FILE_UNUSE(fp, p);
 	return (0);
 }
@@ -1182,6 +1188,11 @@ sys_fhopen(p, v, retval)
 	}
 	if ((error = VOP_OPEN(vp, flags, cred, p)) != 0)
 		goto bad;
+	if (vp->v_type == VREG &&
+	    uvn_attach(vp, flags & FWRITE ? VM_PROT_WRITE : 0) == NULL) {
+		error = EIO;
+		goto bad;
+	}
 	if (flags & FWRITE)
 		vp->v_writecount++;
 
@@ -1216,6 +1227,7 @@ sys_fhopen(p, v, retval)
 	}
 	VOP_UNLOCK(vp, 0);
 	*retval = indx;
+	FILE_SET_MATURE(fp);
 	FILE_UNUSE(fp, p);
 	return (0);
 
@@ -1369,6 +1381,8 @@ sys_mknod(p, v, retval)
 		} else {
 			error = VOP_MKNOD(nd.ni_dvp, &nd.ni_vp,
 						&nd.ni_cnd, &vattr);
+			if (error == 0)
+				vput(nd.ni_vp);
 		}
 	} else {
 		VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
@@ -1416,7 +1430,10 @@ sys_mkfifo(p, v, retval)
 	vattr.va_type = VFIFO;
 	vattr.va_mode = (SCARG(uap, mode) & ALLPERMS) &~ p->p_cwdi->cwdi_cmask;
 	VOP_LEASE(nd.ni_dvp, p, p->p_ucred, LEASE_WRITE);
-	return (VOP_MKNOD(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr));
+	error = VOP_MKNOD(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr);
+	if (error == 0)
+		vput(nd.ni_vp);
+	return (error);
 }
 
 /*
@@ -1481,7 +1498,7 @@ sys_symlink(p, v, retval)
 	int error;
 	struct nameidata nd;
 
-	MALLOC(path, char *, MAXPATHLEN, M_NAMEI, M_WAITOK);
+	path = PNBUF_GET();
 	error = copyinstr(SCARG(uap, path), path, MAXPATHLEN, NULL);
 	if (error)
 		goto out;
@@ -1502,8 +1519,10 @@ sys_symlink(p, v, retval)
 	vattr.va_mode = ACCESSPERMS &~ p->p_cwdi->cwdi_cmask;
 	VOP_LEASE(nd.ni_dvp, p, p->p_ucred, LEASE_WRITE);
 	error = VOP_SYMLINK(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr, path);
+	if (error == 0)
+		vput(nd.ni_vp);
 out:
-	FREE(path, M_NAMEI);
+	PNBUF_PUT(path);
 	return (error);
 }
 
@@ -1584,8 +1603,6 @@ sys_unlink(p, v, retval)
 		goto out;
 	}
 
-	(void)uvm_vnp_uncache(vp);
-
 	VOP_LEASE(nd.ni_dvp, p, p->p_ucred, LEASE_WRITE);
 	VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
 	error = VOP_REMOVE(nd.ni_dvp, nd.ni_vp, &nd.ni_cnd);
@@ -1616,9 +1633,7 @@ sys_lseek(p, v, retval)
 	off_t newoff;
 	int error;
 
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -1676,10 +1691,10 @@ sys_pread(p, v, retval)
 	off_t offset;
 	int error, fd = SCARG(uap, fd);
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-	    (fp->f_flag & FREAD) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+
+	if ((fp->f_flag & FREAD) == 0)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -1729,10 +1744,10 @@ sys_preadv(p, v, retval)
 	off_t offset;
 	int error, fd = SCARG(uap, fd);
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-	    (fp->f_flag & FREAD) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+
+	if ((fp->f_flag & FREAD) == 0)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -1782,10 +1797,10 @@ sys_pwrite(p, v, retval)
 	off_t offset;
 	int error, fd = SCARG(uap, fd);
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-	    (fp->f_flag & FWRITE) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+
+	if ((fp->f_flag & FWRITE) == 0)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -1835,10 +1850,10 @@ sys_pwritev(p, v, retval)
 	off_t offset;
 	int error, fd = SCARG(uap, fd);
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-	    (fp->f_flag & FWRITE) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+
+	if ((fp->f_flag & FWRITE) == 0)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -1880,19 +1895,21 @@ sys_access(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(int) flags;
 	} */ *uap = v;
-	struct ucred *cred = p->p_ucred;
+	struct ucred *cred = crget();
 	struct vnode *vp;
-	int error, flags, t_gid, t_uid;
+	int error, flags;
 	struct nameidata nd;
 
-	t_uid = cred->cr_uid;
-	t_gid = cred->cr_gid;
+	(void)memcpy(cred, p->p_ucred, sizeof(*cred));
+	cred->cr_ref = 1;
 	cred->cr_uid = p->p_cred->p_ruid;
 	cred->cr_gid = p->p_cred->p_rgid;
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
 	    SCARG(uap, path), p);
+	/* Override default credentials */
+	nd.ni_cnd.cn_cred = cred;
 	if ((error = namei(&nd)) != 0)
-		goto out1;
+		goto out;
 	vp = nd.ni_vp;
 
 	/* Flags == 0 means only check for existence. */
@@ -1910,9 +1927,8 @@ sys_access(p, v, retval)
 			error = vn_writechk(vp);
 	}
 	vput(vp);
-out1:
-	cred->cr_uid = t_uid;
-	cred->cr_gid = t_gid;
+out:
+	crfree(cred);
 	return (error);
 }
 
@@ -2063,7 +2079,6 @@ sys_chflags(p, v, retval)
 		syscallarg(u_long) flags;
 	} */ *uap = v;
 	struct vnode *vp;
-	struct vattr vattr;
 	int error;
 	struct nameidata nd;
 
@@ -2071,22 +2086,7 @@ sys_chflags(p, v, retval)
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	vp = nd.ni_vp;
-	VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-	/* Non-superusers cannot change the flags on devices, even if they
-	   own them. */
-	if (suser(p->p_ucred, &p->p_acflag)) {
-		if ((error = VOP_GETATTR(vp, &vattr, p->p_ucred, p)) != 0)
-			goto out;
-		if (vattr.va_type == VCHR || vattr.va_type == VBLK) {
-			error = EINVAL;
-			goto out;
-		}
-	}
-	VATTR_NULL(&vattr);
-	vattr.va_flags = SCARG(uap, flags);
-	error = VOP_SETATTR(vp, &vattr, p->p_ucred, p);
-out:
+	error = change_flags(vp, SCARG(uap, flags), p);
 	vput(vp);
 	return (error);
 }
@@ -2105,7 +2105,6 @@ sys_fchflags(p, v, retval)
 		syscallarg(int) fd;
 		syscallarg(u_long) flags;
 	} */ *uap = v;
-	struct vattr vattr;
 	struct vnode *vp;
 	struct file *fp;
 	int error;
@@ -2114,30 +2113,14 @@ sys_fchflags(p, v, retval)
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	vp = (struct vnode *)fp->f_data;
-	VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-	/* Non-superusers cannot change the flags on devices, even if they
-	   own them. */
-	if (suser(p->p_ucred, &p->p_acflag)) {
-		if ((error = VOP_GETATTR(vp, &vattr, p->p_ucred, p))
-		    != 0)
-			goto out;
-		if (vattr.va_type == VCHR || vattr.va_type == VBLK) {
-			error = EINVAL;
-			goto out;
-		}
-	}
-	VATTR_NULL(&vattr);
-	vattr.va_flags = SCARG(uap, flags);
-	error = VOP_SETATTR(vp, &vattr, p->p_ucred, p);
-out:
+	error = change_flags(vp, SCARG(uap, flags), p);
 	VOP_UNLOCK(vp, 0);
 	FILE_UNUSE(fp, p);
 	return (error);
 }
 
 /*
- * Change flags of a file given a file descriptor; this version does
+ * Change flags of a file given a path name; this version does
  * not follow links.
  */
 int
@@ -2146,12 +2129,11 @@ sys_lchflags(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_chflags_args /* {
+	struct sys_lchflags_args /* {
 		syscallarg(const char *) path;
 		syscallarg(u_long) flags;
 	} */ *uap = v;
-	register struct vnode *vp;
-	struct vattr vattr;
+	struct vnode *vp;
 	int error;
 	struct nameidata nd;
 
@@ -2159,11 +2141,30 @@ sys_lchflags(p, v, retval)
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	vp = nd.ni_vp;
+	error = change_flags(vp, SCARG(uap, flags), p);
+	vput(vp);
+	return (error);
+}
+
+/*
+ * Common routine to change flags of a file.
+ */
+int
+change_flags(vp, flags, p)
+	struct vnode *vp;
+	u_long flags;
+	struct proc *p;
+{
+	struct vattr vattr;
+	int error;
+
 	VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-	/* Non-superusers cannot change the flags on devices, even if they
-	   own them. */
-	if (suser(p->p_ucred, &p->p_acflag)) {
+	/*
+	 * Non-superusers cannot change the flags on devices, even if they
+	 * own them.
+	 */
+	if (suser(p->p_ucred, &p->p_acflag) != 0) {
 		if ((error = VOP_GETATTR(vp, &vattr, p->p_ucred, p)) != 0)
 			goto out;
 		if (vattr.va_type == VCHR || vattr.va_type == VBLK) {
@@ -2172,10 +2173,9 @@ sys_lchflags(p, v, retval)
 		}
 	}
 	VATTR_NULL(&vattr);
-	vattr.va_flags = SCARG(uap, flags);
+	vattr.va_flags = flags;
 	error = VOP_SETATTR(vp, &vattr, p->p_ucred, p);
 out:
-	vput(vp);
 	return (error);
 }
 
@@ -2869,7 +2869,6 @@ out:
 		if (fromnd.ni_dvp != tdvp)
 			VOP_LEASE(fromnd.ni_dvp, p, p->p_ucred, LEASE_WRITE);
 		if (tvp) {
-			(void)uvm_vnp_uncache(tvp);
 			VOP_LEASE(tvp, p, p->p_ucred, LEASE_WRITE);
 		}
 		error = VOP_RENAME(fromnd.ni_dvp, fromnd.ni_vp, &fromnd.ni_cnd,
@@ -2887,11 +2886,11 @@ out:
 		vrele(fvp);
 	}
 	vrele(tond.ni_startdir);
-	FREE(tond.ni_cnd.cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(tond.ni_cnd.cn_pnbuf);
 out1:
 	if (fromnd.ni_startdir)
 		vrele(fromnd.ni_startdir);
-	FREE(fromnd.ni_cnd.cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(fromnd.ni_cnd.cn_pnbuf);
 	return (error == -1 ? 0 : error);
 }
 
@@ -3091,9 +3090,7 @@ getvnode(fdp, fd, fpp)
 	struct vnode *vp;
 	struct file *fp;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);

@@ -1,4 +1,4 @@
-/*	$NetBSD: natm_pcb.c,v 1.5 1998/07/04 22:18:52 jonathan Exp $	*/
+/*	$NetBSD: natm_pcb.c,v 1.7 2001/11/13 01:37:45 lukem Exp $	*/
 
 /*
  *
@@ -36,6 +36,9 @@
  * atm_pcb.c: manage atm protocol control blocks and keep IP and NATM
  * from trying to use each other's VCs.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: natm_pcb.c,v 1.7 2001/11/13 01:37:45 lukem Exp $");
 
 #include "opt_ddb.h"
 
@@ -91,7 +94,7 @@ struct natmpcb *npcb;
 int op;
 
 {
-  int s = splimp();
+  int s = splnet();
 
   if ((npcb->npcb_flags & NPCB_FREE) == 0) {
     LIST_REMOVE(npcb, pcblist);
@@ -123,7 +126,7 @@ u_int8_t vpi;
 
 {
   struct natmpcb *cpcb = NULL;		/* current pcb */
-  int s = splimp();
+  int s = splnet();
 
 
   /*

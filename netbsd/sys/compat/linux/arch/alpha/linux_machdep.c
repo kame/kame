@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.c,v 1.9 2000/03/30 11:27:16 augustss Exp $	*/
+/*	$NetBSD: linux_machdep.c,v 1.23 2002/03/31 22:22:45 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.23 2002/03/31 22:22:45 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/signalvar.h>
@@ -63,8 +66,7 @@
 #include <sys/syscallargs.h>
 #include <sys/filedesc.h>
 #include <sys/exec_elf.h>
-
-#include <vm/vm.h>
+#include <sys/ioctl.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -82,10 +84,14 @@
 #include <machine/alpha.h>
 #include <machine/reg.h>
 
+#if defined(_KERNEL_OPT)
 #include "wsdisplay.h"
+#endif
 #if (NWSDISPLAY >0)
-#include <sys/ioctl.h>
 #include <dev/wscons/wsdisplay_usl_io.h>
+#endif
+#ifdef DEBUG
+#include <machine/sigdebug.h>
 #endif
 
 /*
@@ -98,8 +104,18 @@ linux_setregs(p, epp, stack)
 	struct exec_package *epp;
 	u_long stack;
 {
-/* XXX XAX I think this is ok. not sure though. */
+#ifdef DEBUG
+	struct trapframe *tfp = p->p_md.md_tf;
+#endif
+
 	setregs(p, epp, stack);
+#ifdef DEBUG
+	/*
+	 * Linux has registers set to zero on entry; for DEBUG kernels
+	 * the alpha setregs() fills registers with 0xbabefacedeadbeef.
+	 */
+	memset(tfp->tf_regs, 0, FRAME_SIZE * sizeof tfp->tf_regs[0]);
+#endif
 }
 
 void setup_linux_rt_sigframe(tf, sig, mask)
@@ -109,14 +125,13 @@ void setup_linux_rt_sigframe(tf, sig, mask)
 {
 	struct proc *p = curproc;
 	struct linux_rt_sigframe *sfp, sigframe;
-	struct sigacts *psp = p->p_sigacts;
 	int onstack;
 	int fsize, rndfsize;
 	extern char linux_rt_sigcode[], linux_rt_esigcode[];
 
 	/* Do we need to jump onto the signal stack? */
-	onstack = (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-		  (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	onstack = (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+		  (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context.  */
 	fsize = sizeof(struct linux_rt_sigframe);
@@ -124,14 +139,14 @@ void setup_linux_rt_sigframe(tf, sig, mask)
 
 	if (onstack)
 		sfp = (struct linux_rt_sigframe *)
-					((caddr_t)psp->ps_sigstk.ss_sp +
-						  psp->ps_sigstk.ss_size);
+					((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+						p->p_sigctx.ps_sigstk.ss_size);
 	else
 		sfp = (struct linux_rt_sigframe *)(alpha_pal_rdusp());
 	sfp = (struct linux_rt_sigframe *)((caddr_t)sfp - rndfsize);
 
 #ifdef DEBUG
-	if ((sigdebug & SDB_KSTACK) && p->p_pid = sigpid)
+	if ((sigdebug & SDB_KSTACK) && (p->p_pid == sigpid))
 		printf("linux_sendsig(%d): sig %d ssp %p usp %p\n", p->p_pid,
 		    sig, &onstack, sfp);
 #endif /* DEBUG */
@@ -144,22 +159,18 @@ void setup_linux_rt_sigframe(tf, sig, mask)
 
 	/* Setup potentially partial signal mask in sc_mask. */
 	/* But get all of it in uc_sigmask */
-	native_to_linux_old_sigset(mask, &sigframe.uc.uc_mcontext.sc_mask);
-	native_to_linux_sigset(mask, &sigframe.uc.uc_sigmask);
+	native_to_linux_old_sigset(&sigframe.uc.uc_mcontext.sc_mask, mask);
+	native_to_linux_sigset(&sigframe.uc.uc_sigmask, mask);
 
 	sigframe.uc.uc_mcontext.sc_pc = tf->tf_regs[FRAME_PC];
 	sigframe.uc.uc_mcontext.sc_ps = ALPHA_PSL_USERMODE;
 	frametoreg(tf, (struct reg *)sigframe.uc.uc_mcontext.sc_regs);
 	sigframe.uc.uc_mcontext.sc_regs[R_SP] = alpha_pal_rdusp();
 
-	if (p == fpcurproc) {
-	    alpha_pal_wrfen(1);
-	    savefpstate(&p->p_addr->u_pcb.pcb_fp);
-	    alpha_pal_wrfen(0);
-	    sigframe.uc.uc_mcontext.sc_fpcr = p->p_addr->u_pcb.pcb_fp.fpr_cr;
-	    fpcurproc = NULL;
-	}
-	/* XXX ownedfp ? etc...? */
+	alpha_enable_fp(p, 1);
+	sigframe.uc.uc_mcontext.sc_fpcr = alpha_read_fpcr();
+	sigframe.uc.uc_mcontext.sc_fp_control = alpha_read_fp_c(p);
+	alpha_pal_wrfen(0);
 
 	sigframe.uc.uc_mcontext.sc_traparg_a0 = tf->tf_regs[FRAME_A0];
 	sigframe.uc.uc_mcontext.sc_traparg_a1 = tf->tf_regs[FRAME_A1];
@@ -197,14 +208,14 @@ void setup_linux_rt_sigframe(tf, sig, mask)
 
 	/* Address of trampoline code.  End up at this PC after mi_switch */
 	tf->tf_regs[FRAME_PC] =
-	    (u_int64_t)(PS_STRINGS - (linux_rt_esigcode - linux_rt_sigcode));
+	    (u_int64_t)(p->p_psstr - (linux_rt_esigcode - linux_rt_sigcode));
 
 	/* Adjust the stack */
 	alpha_pal_wrusp((unsigned long)sfp);
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 }
 
 void setup_linux_sigframe(tf, sig, mask)
@@ -214,14 +225,13 @@ void setup_linux_sigframe(tf, sig, mask)
 {
 	struct proc *p = curproc;
 	struct linux_sigframe *sfp, sigframe;
-	struct sigacts *psp = p->p_sigacts;
 	int onstack;
 	int fsize, rndfsize;
 	extern char linux_sigcode[], linux_esigcode[];
 
 	/* Do we need to jump onto the signal stack? */
-	onstack = (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-		  (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	onstack = (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+		  (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context.  */
 	fsize = sizeof(struct linux_sigframe);
@@ -229,14 +239,14 @@ void setup_linux_sigframe(tf, sig, mask)
 
 	if (onstack)
 		sfp = (struct linux_sigframe *)
-					((caddr_t)psp->ps_sigstk.ss_sp +
-						  psp->ps_sigstk.ss_size);
+					((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+						p->p_sigctx.ps_sigstk.ss_size);
 	else
 		sfp = (struct linux_sigframe *)(alpha_pal_rdusp());
 	sfp = (struct linux_sigframe *)((caddr_t)sfp - rndfsize);
 
 #ifdef DEBUG
-	if ((sigdebug & SDB_KSTACK) && p->p_pid = sigpid)
+	if ((sigdebug & SDB_KSTACK) && (p->p_pid == sigpid))
 		printf("linux_sendsig(%d): sig %d ssp %p usp %p\n", p->p_pid,
 		    sig, &onstack, sfp);
 #endif /* DEBUG */
@@ -246,7 +256,7 @@ void setup_linux_sigframe(tf, sig, mask)
 	 */
 	bzero(&sigframe.sf_sc, sizeof(struct linux_ucontext));
 	sigframe.sf_sc.sc_onstack = onstack;
-	native_to_linux_old_sigset(mask, &sigframe.sf_sc.sc_mask);
+	native_to_linux_old_sigset(&sigframe.sf_sc.sc_mask, mask);
 	sigframe.sf_sc.sc_pc = tf->tf_regs[FRAME_PC];
 	sigframe.sf_sc.sc_ps = ALPHA_PSL_USERMODE;
 	frametoreg(tf, (struct reg *)sigframe.sf_sc.sc_regs);
@@ -285,14 +295,14 @@ void setup_linux_sigframe(tf, sig, mask)
 
 	/* Address of trampoline code.  End up at this PC after mi_switch */
 	tf->tf_regs[FRAME_PC] =
-	    (u_int64_t)(PS_STRINGS - (linux_esigcode - linux_sigcode));
+	    (u_int64_t)(p->p_psstr - (linux_esigcode - linux_sigcode));
 
 	/* Adjust the stack */
 	alpha_pal_wrusp((unsigned long)sfp);
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 }
 
 /*
@@ -314,6 +324,7 @@ linux_sendsig(catcher, sig, mask, code)
 {
 	struct proc *p = curproc;
 	struct trapframe *tf = p->p_md.md_tf;
+#ifdef notyet
 	struct linux_emuldata *edp;
 
 	/* Setup the signal frame (and part of the trapframe) */
@@ -328,11 +339,12 @@ linux_sendsig(catcher, sig, mask, code)
 	if (edp && sigismember(&edp->ps_siginfo, sig))
 		setup_linux_rt_sigframe(tf, sig, mask);
 	else
+#endif /* notyet */
 		setup_linux_sigframe(tf, sig, mask);
 
 	/* Signal handler for trampoline code */
 	tf->tf_regs[FRAME_T12] = (u_int64_t)catcher;
-	tf->tf_regs[FRAME_A0] = native_to_linux_sig[sig];
+	tf->tf_regs[FRAME_A0] = native_to_linux_signo[sig];
 
 	/*
 	 * Linux has a custom restorer option.  To support it we would
@@ -371,9 +383,9 @@ linux_restore_sigcontext(struct proc *p, struct linux_sigcontext context,
 	 * an onstack member.  This could be needed in the future.
 	 */
 	if (context.sc_onstack & LINUX_SA_ONSTACK)
-	    p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+	    p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-	    p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+	    p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Reset the signal mask */
 	(void) sigprocmask1(p, SIG_SETMASK, mask, 0);
@@ -402,7 +414,7 @@ linux_restore_sigcontext(struct proc *p, struct linux_sigcontext context,
 
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW)
-		printf("linux_rt_sigreturn(%d): returns\n", p->pid);
+		printf("linux_rt_sigreturn(%d): returns\n", p->p_pid);
 #endif
 	return (EJUSTRETURN);
 }
@@ -438,7 +450,7 @@ linux_sys_rt_sigreturn(p, v, retval)
 		return (EFAULT);
 
 	/* Grab the signal mask */
-	linux_to_native_sigset(&sigframe.uc.uc_sigmask, &mask);
+	linux_to_native_sigset(&mask, &sigframe.uc.uc_sigmask);
 
 	return(linux_restore_sigcontext(p, sigframe.uc.uc_mcontext, &mask));
 }
@@ -474,7 +486,7 @@ linux_sys_sigreturn(p, v, retval)
 
 	/* Grab the signal mask. */
 	/* XXX use frame.extramask */
-	linux_old_to_native_sigset(frame.sf_sc.sc_mask, &mask);
+	linux_old_to_native_sigset(&mask, frame.sf_sc.sc_mask);
 
 	return(linux_restore_sigcontext(p, frame.sf_sc, &mask));
 }
@@ -512,8 +524,9 @@ linux_machdepioctl(p, v, retval)
 
 /* XXX XAX fix this */
 dev_t
-linux_fakedev(dev)
+linux_fakedev(dev, raw)
 	dev_t dev;
+	int raw;
 {
 	return dev;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sm_pcmcia.c,v 1.22.4.1 2000/08/06 02:12:17 briggs Exp $	*/
+/*	$NetBSD: if_sm_pcmcia.c,v 1.26 2001/11/13 07:26:33 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -37,9 +37,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_sm_pcmcia.c,v 1.26 2001/11/13 07:26:33 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,24 +54,6 @@
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
 
 #include <machine/intr.h>
 #include <machine/bus.h>
@@ -125,6 +106,8 @@ const struct pcmcia_product sm_pcmcia_products[] = {
 	{ PCMCIA_STR_SMC_8020BT,		PCMCIA_VENDOR_SMC,
 	  PCMCIA_PRODUCT_SMC_8020BT,		0, },
 #endif
+	{ PCMCIA_STR_PSION_GOLDCARD,		PCMCIA_VENDOR_PSION,
+	  PCMCIA_PRODUCT_PSION_GOLDCARD,	0, },
 
 	{ NULL }
 };
@@ -317,7 +300,8 @@ sm_pcmcia_lannid_ciscallback(tuple, arg)
 	u_int8_t *myla = arg;
 	int i;
 
-	if (tuple->code == PCMCIA_CISTPL_FUNCE) {
+	if (tuple->code == PCMCIA_CISTPL_FUNCE
+	    || tuple->code == PCMCIA_CISTPL_SPCL) {
 		/* subcode, length */
 		if (tuple->length < 2)
 			return (0);
@@ -341,6 +325,10 @@ sm_pcmcia_enable(sc)
 	struct sm_pcmcia_softc *psc = (struct sm_pcmcia_softc *)sc;
 	int rv;
 
+	rv = pcmcia_function_enable(psc->sc_pf);
+	if (rv != 0)
+		return (rv);
+
 	/* Establish the interrupt handler. */
 	psc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, smc91cxx_intr,
 	    sc);
@@ -349,11 +337,7 @@ sm_pcmcia_enable(sc)
 		    sc->sc_dev.dv_xname);
 		return (1);
 	}
-
-	rv = pcmcia_function_enable(psc->sc_pf);
-	if (rv != 0)
-		pcmcia_intr_disestablish(psc->sc_pf, psc->sc_ih);
-	return (rv);
+	return (0);
 }
 
 void
@@ -362,6 +346,6 @@ sm_pcmcia_disable(sc)
 {
 	struct sm_pcmcia_softc *psc = (struct sm_pcmcia_softc *)sc;
 
-	pcmcia_function_disable(psc->sc_pf);
 	pcmcia_intr_disestablish(psc->sc_pf, psc->sc_ih);
+	pcmcia_function_disable(psc->sc_pf);
 }

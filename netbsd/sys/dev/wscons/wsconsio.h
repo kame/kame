@@ -1,4 +1,4 @@
-/* $NetBSD: wsconsio.h,v 1.31.2.1 2000/07/07 09:49:17 hannken Exp $ */
+/* $NetBSD: wsconsio.h,v 1.50 2002/04/07 09:25:47 hannken Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -40,7 +40,8 @@
  *	0-31	keyboard ioctls (WSKBDIO)
  *	32-63	mouse ioctls (WSMOUSEIO)
  *	64-95	display ioctls (WSDISPLAYIO)
- *	96-255	reserved for future use
+ *	96-127	mux ioctls (WSMUXIO)
+ *	128-255	reserved for future use
  */
 
 #include <sys/types.h>
@@ -86,6 +87,10 @@ struct wscons_event {
 #define		WSKBD_TYPE_HPC_KBD	7	/* HPC bultin keyboard */
 #define		WSKBD_TYPE_HPC_BTN	8	/* HPC/PsPC buttons */
 #define		WSKBD_TYPE_ARCHIMEDES	9	/* Archimedes keyboard */
+#define		WSKBD_TYPE_RISCPC	10	/* RiscPC keyboard, resembling AT codes */
+#define		WSKBD_TYPE_ADB		11	/* ADB */
+#define		WSKBD_TYPE_HIL		12	/* HIL keyboard */
+#define		WSKBD_TYPE_AMIGA	13	/* Amiga keyboard */
 
 /* Manipulate the keyboard bell. */
 struct wskbd_bell_data {
@@ -149,6 +154,9 @@ struct wskbd_map_data {
 #define		WSKBD_TRANSLATED	0
 #define		WSKBD_RAW		1
 
+#define	WSKBDIO_SETKEYCLICK	_IOW('W', 21, int)
+#define	WSKBDIO_GETKEYCLICK	_IOR('W', 22, int)
+
 /*
  * Mouse ioctls (32 - 63)
  */
@@ -163,18 +171,21 @@ struct wskbd_map_data {
 #define		WSMOUSE_TYPE_TPANEL	6	/* Generic Touch Panel */
 #define 	WSMOUSE_TYPE_NEXT	7	/* NeXT mouse */
 #define		WSMOUSE_TYPE_ARCHIMEDES	8	/* Archimedes mouse */
+#define		WSMOUSE_TYPE_HIL	9	/* HIL mouse */
+#define		WSMOUSE_TYPE_AMIGA	10	/* Amiga mouse */      
+#define		WSMOUSE_TYPE_MAXINE	11	/* DEC maxine mouse */
 
 /* Set resolution.  Not applicable to all mouse types. */
-#define	WSMOUSEIO_SRES		_IOR('W', 33, u_int)
+#define	WSMOUSEIO_SRES		_IOW('W', 33, u_int)
 #define		WSMOUSE_RES_MIN		0
 #define		WSMOUSE_RES_DEFAULT	75
 #define		WSMOUSE_RES_MAX		100
 
 /* Set scale factor (num / den).  Not applicable to all mouse types. */
-#define	WSMOUSEIO_SSCALE	_IOR('W', 34, u_int[2])
+#define	WSMOUSEIO_SSCALE	_IOW('W', 34, u_int[2])
 
 /* Set sample rate.  Not applicable to all mouse types. */
-#define	WSMOUSEIO_SRATE		_IOR('W', 35, u_int)
+#define	WSMOUSEIO_SRATE		_IOW('W', 35, u_int)
 #define		WSMOUSE_RATE_MIN	0
 #define		WSMOUSE_RATE_DEFAULT	50
 #define		WSMOUSE_RATE_MAX	100
@@ -225,6 +236,15 @@ struct wsmouse_calibcoords {
 #define		WSDISPLAY_TYPE_VAX_MONO	21	/* DEC VS2K/VS3100 mono */
 #define		WSDISPLAY_TYPE_SB_P9100	22	/* Tadpole SPARCbook P9100 */
 #define		WSDISPLAY_TYPE_EGA	23	/* (generic) EGA */
+#define		WSDISPLAY_TYPE_DCPVR	24	/* Dreamcast PowerVR */
+#define		WSDISPLAY_TYPE_GATOR	25	/* HP Gator */
+#define		WSDISPLAY_TYPE_TOPCAT	26	/* HP TopCat */
+#define		WSDISPLAY_TYPE_RENAISSANCE	27	/* HP Renaissance */
+#define		WSDISPLAY_TYPE_CATSEYE	28	/* HP CatsEye */
+#define		WSDISPLAY_TYPE_DAVINCI	29	/* HP DaVinci */
+#define		WSDISPLAY_TYPE_TIGER	30	/* HP Tiger */
+#define		WSDISPLAY_TYPE_HYPERION	31	/* HP Hyperion */
+#define		WSDISPLAY_TYPE_AMIGACC	32	/* Amiga custom chips */
 
 /* Basic display information.  Not applicable to all display types. */
 struct wsdisplay_fbinfo {
@@ -303,6 +323,8 @@ struct wsdisplay_font {
 #define WSDISPLAY_FONTENC_ISO 0
 #define WSDISPLAY_FONTENC_IBM 1
 #define WSDISPLAY_FONTENC_PCVT 2
+#define WSDISPLAY_FONTENC_ISO7 3 /* greek */
+#define WSDISPLAY_FONTENC_ISO2 4 /* east european */
 	u_int fontwidth, fontheight, stride;
 #define WSDISPLAY_MAXFONTSZ	(512*1024)
 	int bitorder, byteorder;
@@ -330,9 +352,9 @@ struct wsdisplay_delscreendata {
 struct wsdisplay_usefontdata {
 	char *name;
 };
-#define WSDISPLAYIO_USEFONT	_IOW('W', 80, struct wsdisplay_usefontdata)
+#define WSDISPLAYIO_SFONT	_IOW('W', 80, struct wsdisplay_usefontdata)
 
-/* Replaced by WSMUX_{ADD,REMOVE}_DEVICE */
+/* Obsolete, replaced by WSMUXIO_{ADD,REMOVE}_DEVICE */
 struct wsdisplay_kbddata {
 	int op;
 #define _O_WSDISPLAY_KBD_ADD 0
@@ -341,11 +363,24 @@ struct wsdisplay_kbddata {
 };
 #define _O_WSDISPLAYIO_SETKEYBOARD _IOWR('W', 81, struct wsdisplay_kbddata)
 
+/* Misc control.  Not applicable to all display types. */
+struct wsdisplay_param {
+        int param;
+#define	WSDISPLAYIO_PARAM_BACKLIGHT	1
+#define	WSDISPLAYIO_PARAM_BRIGHTNESS	2
+#define	WSDISPLAYIO_PARAM_CONTRAST	3
+        int min, max, curval;
+        int reserved[4];
+};
+#define	WSDISPLAYIO_GETPARAM	_IOWR('W', 82, struct wsdisplay_param)
+#define	WSDISPLAYIO_SETPARAM	_IOWR('W', 83, struct wsdisplay_param)
+
 /* XXX NOT YET DEFINED */
 /* Mapping information retrieval. */
 
 /* Mux ioctls (96 - 127) */
-#define WSMUX_INJECTEVENT	_IOW('W', 96, struct wscons_event)
+#define WSMUXIO_INJECTEVENT	_IOW('W', 96, struct wscons_event)
+#define WSMUX_INJECTEVENT WSMUXIO_INJECTEVENT /* XXX compat */
 
 struct wsmux_device {
 	int type;
@@ -354,14 +389,17 @@ struct wsmux_device {
 #define WSMUX_MUX	3
 	int idx;
 };
-#define WSMUX_ADD_DEVICE	_IOW('W', 97, struct wsmux_device)
-#define WSMUX_REMOVE_DEVICE	_IOW('W', 98, struct wsmux_device)
+#define WSMUXIO_ADD_DEVICE	_IOW('W', 97, struct wsmux_device)
+#define WSMUX_ADD_DEVICE WSMUXIO_ADD_DEVICE /* XXX compat */
+#define WSMUXIO_REMOVE_DEVICE	_IOW('W', 98, struct wsmux_device)
+#define WSMUX_REMOVE_DEVICE WSMUXIO_REMOVE_DEVICE /* XXX compat */
 
 #define WSMUX_MAXDEV 32
 struct wsmux_device_list {
 	int ndevices;
 	struct wsmux_device devices[WSMUX_MAXDEV];
 };
-#define WSMUX_LIST_DEVICES	_IOWR('W', 99, struct wsmux_device_list)
+#define WSMUXIO_LIST_DEVICES	_IOWR('W', 99, struct wsmux_device_list)
+#define WSMUX_LIST_DEVICES WSMUXIO_LIST_DEVICES /* XXX compat */
 
 #endif /* _DEV_WSCONS_WSCONSIO_H_ */

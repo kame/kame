@@ -1,11 +1,11 @@
-/*	$NetBSD: layer_vfsops.c,v 1.2 2000/03/13 23:52:40 soren Exp $	*/
+/*	$NetBSD: layer_vfsops.c,v 1.5 2001/11/15 09:48:21 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
  * All rights reserved.
  *
  * This software was written by William Studenmund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -76,11 +76,13 @@
  * generic layer vfs ops.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: layer_vfsops.c,v 1.5 2001/11/15 09:48:21 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/proc.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.54 2000/02/14 07:01:48 scottr Exp $	*/
+/*	$NetBSD: conf.c,v 1.56 2002/04/27 19:29:09 shiba Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -58,6 +58,7 @@
 #include "st.h"
 #include "vcoda.h"
 #include "vnd.h"
+#include "wd.h"
 
 /* No cdev for md */
 
@@ -71,6 +72,7 @@ bdev_decl(sd);
 bdev_decl(st);
 bdev_decl(sw);
 bdev_decl(vnd);
+bdev_decl(wd);
 
 struct bdevsw	bdevsw[] =
 {
@@ -96,6 +98,7 @@ struct bdevsw	bdevsw[] =
 	bdev_lkm_dummy(),		/* 19 */
 	bdev_disk_init(NRAID,raid),	/* 20: RAIDframe disk driver */
 	bdev_disk_init(NFD, fd),	/* 21: Sony floppy disk */
+	bdev_disk_init(NWD, wd),	/* 22: IDE disk */
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
@@ -119,6 +122,7 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #include "zsc.h"
 #include "zstty.h"
 #include "scsibus.h"
+#include "clockctl.h"
 
 cdev_decl(aed);
 cdev_decl(asc);
@@ -161,6 +165,8 @@ cdev_decl(zs);
 cdev_decl(zsc);
 cdev_decl(scsibus);
 cdev_decl(vc_nb_);
+cdev_decl(clockctl);
+cdev_decl(wd);
 
 dev_decl(filedesc,open);
 
@@ -214,6 +220,8 @@ struct cdevsw	cdevsw[] =
 	cdev_mouse_init(NWSMUX, wsmux),	/* 45: ws multiplexor */
 	cdev_wsdisplay_init(NWSDISPLAY,wsdisplay), /* 46: frame buffers, etc. */
 	cdev_vc_nb_init(NVCODA,vc_nb_),	/* 47: Venus cache driver (Coda) */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 48: clockctl pseudo device */
+	cdev_disk_init(NWD, wd),	/* 49: IDE disk */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -303,6 +311,8 @@ static int chrtoblktab[] = {
 	/* 45 */	NODEV,
 	/* 46 */	NODEV,
 	/* 47 */	NODEV,
+	/* 48 */	NODEV,
+	/* 49 */	22,
 };
 
 dev_t

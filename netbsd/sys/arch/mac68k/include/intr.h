@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.17 1999/11/06 23:05:40 scottr Exp $	*/
+/*	$NetBSD: intr.h,v 1.20 2001/04/13 23:30:00 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds
@@ -71,13 +71,14 @@ extern unsigned short mac68k_ipls[];
 #define	spltty()	_splraise(mac68k_ipls[MAC68K_IPL_TTY])
 #define	splbio()	_splraise(mac68k_ipls[MAC68K_IPL_BIO])
 #define	splnet()	_splraise(mac68k_ipls[MAC68K_IPL_NET])
-#define	splimp()	_splraise(mac68k_ipls[MAC68K_IPL_IMP])
+#define	splvm()		_splraise(mac68k_ipls[MAC68K_IPL_IMP])
 #define	splaudio()	_splraise(mac68k_ipls[MAC68K_IPL_AUDIO])
 #define	splclock()	_splraise(mac68k_ipls[MAC68K_IPL_CLOCK])
 #define	splstatclock()	_splraise(mac68k_ipls[MAC68K_IPL_STATCLOCK])
 #define	splsched()	_splraise(mac68k_ipls[MAC68K_IPL_SCHED])
 #define	splserial()	_splraise(mac68k_ipls[MAC68K_IPL_SERIAL])
 #define	splhigh()	spl7()
+#define	spllock()	spl7()
 
 /* watch out for side effects */
 #define splx(s)         ((s) & PSL_IPL ? _spl(s) : spl0())

@@ -1,4 +1,4 @@
-/*	$NetBSD: openfirm.h,v 1.12 1999/03/10 02:19:04 mrg Exp $	*/
+/*	$NetBSD: openfirm.h,v 1.17 2001/06/19 08:24:07 simonb Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -64,7 +64,7 @@ struct ofbus_attach_args {
  * The softc structure for devices we might be booted from (i.e. we might
  * want to set root/swap to) needs to start with these fields:		XXX
  */
-struct ofb_softc {
+struct ofbus_softc {
 	struct device sc_dev;
 	int sc_phandle;
 	int sc_unit;		/* Might be missing for non-disk devices */
@@ -76,34 +76,35 @@ struct ofb_softc {
  */
 extern char *OF_buf;
 
-int	OF_peer __P((int phandle));
-int	OF_child __P((int phandle));
-int	OF_parent __P((int phandle));
-int	OF_instance_to_package __P((int ihandle));
-int	OF_getproplen __P((int handle, char *prop));
-int	OF_getprop __P((int handle, char *prop, void *buf, int buflen));
-int	OF_finddevice __P((char *name));
-int	OF_instance_to_path __P((int ihandle, char *buf, int buflen));
-int	OF_package_to_path __P((int phandle, char *buf, int buflen));
-int	OF_call_method_1 __P((char *method, int ihandle, int nargs, ...));
-int	OF_call_method __P((char *method, int ihandle, int nargs,
-	    int nreturns, ...));
-int	OF_open __P((char *dname));
-void	OF_close __P((int handle));
-int	OF_read __P((int handle, void *addr, int len));
-int	OF_write __P((int handle, void *addr, int len));
-int	OF_seek __P((int handle, u_quad_t pos));
-void	OF_boot __P((char *bootspec)) __attribute__((__noreturn__));
-void	OF_enter __P((void));
-void	OF_exit __P((void)) __attribute__((__noreturn__));
-void	(*OF_set_callback __P((void (*newfunc)(void *)))) __P((void *));
-int	openfirmware __P((void *));
+int	OF_peer(int);
+int	OF_child(int);
+int	OF_parent(int);
+int	OF_instance_to_package(int);
+int	OF_getproplen(int, char *);
+int	OF_getprop(int, char *, void *, int);
+int	OF_nextprop(int, char *, void *);
+int	OF_setprop(int, char *, const void *, int);
+int	OF_finddevice(char *);
+int	OF_instance_to_path(int, char *, int);
+int	OF_package_to_path(int, char *, int);
+int	OF_call_method_1(char *, int, int, ...);
+int	OF_call_method(char *, int, int, int, ...);
+int	OF_open(char *);
+void	OF_close(int);
+int	OF_read(int, void *, int);
+int	OF_write(int, void *, int);
+int	OF_seek(int, u_quad_t);
+void	OF_boot(char *) __attribute__((__noreturn__));
+void	OF_enter(void);
+void	OF_exit(void) __attribute__((__noreturn__));
+void	(*OF_set_callback(void(*)(void *)))(void *);
+int	openfirmware(void *);
 
 /*
  * Functions and variables provided by machine-independent code.
  */
-int	of_compatible __P((int, const char * const *));
-int	of_decode_int __P((const unsigned char *buf));
-int	of_packagename __P((int, char *, int));
+int	of_compatible(int, const char * const *);
+int	of_decode_int(const unsigned char *buf);
+int	of_packagename(int, char *, int);
 
-int	*of_network_decode_media __P((int, int *, int *));
+int	*of_network_decode_media(int, int *, int *);

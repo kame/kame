@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.7.2.1 2001/06/17 00:26:29 cyber Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.8 2001/06/17 00:11:40 cyber Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_exit_43.c,v 1.4 1997/09/03 21:06:50 jonathan Exp $	*/
+/*	$NetBSD: kern_exit_43.c,v 1.8 2002/03/16 20:43:49 christos Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
@@ -40,6 +40,9 @@
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_exit_43.c,v 1.8 2002/03/16 20:43:49 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/map.h>
@@ -67,8 +70,6 @@
 #include <machine/reg.h>
 #include <compat/common/compat_util.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 #ifdef m68k
 #include <machine/psl.h>		/* only m68k ports use PSL_ALLCC */
 #include <machine/frame.h>
@@ -83,7 +84,7 @@ compat_43_sys_wait(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 	int error;
 
 	struct sys_wait4_args /* {
@@ -106,7 +107,7 @@ compat_43_sys_wait(p, v, retval)
 	SCARG(&a, rusage) = NULL;
 #endif
 	SCARG(&a, pid) = WAIT_ANY;
-	SCARG(&a, status) = stackgap_alloc(&sg, sizeof(SCARG(&a, status)));
+	SCARG(&a, status) = stackgap_alloc(p, &sg, sizeof(SCARG(&a, status)));
 	if ((error = sys_wait4(p, &a, retval)) != 0)
 		return error;
 	return copyin(SCARG(&a, status), &retval[1], sizeof(retval[1]));

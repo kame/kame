@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.41 2000/06/06 18:52:44 soren Exp $	*/
+/*	$NetBSD: trap.c,v 1.47 2002/02/14 07:08:12 chs Exp $	*/
 
 /*-
  * Copyright (c) 1996 Matthias Pfaller. All rights reserved.
@@ -45,6 +45,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_syscall_debug.h"
 #include "opt_ktrace.h"
 
@@ -62,8 +63,6 @@
 #ifdef KGDB
 #include <sys/kgdb.h>
 #endif
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -357,10 +356,10 @@ trap(frame)
 	case T_ABT | T_USER: {		/* page fault */
 		vaddr_t va;
 		struct vmspace *vm = p->p_vmspace;
-		vm_map_t map;
+		struct vm_map *map;
 		int rv;
 		vm_prot_t ftype;
-		extern vm_map_t kernel_map;
+		extern struct vm_map *kernel_map;
 		unsigned nss;
 
 		va = trunc_page((vaddr_t)frame.tf_tear);
@@ -378,7 +377,7 @@ trap(frame)
 			map = &vm->vm_map;
 		if ((frame.tf_msr & MSR_DDT) == DDT_WRITE ||
 		    (frame.tf_msr & MSR_STT) == STT_RMW)
-			ftype = VM_PROT_READ | VM_PROT_WRITE;
+			ftype = VM_PROT_WRITE;
 		else
 			ftype = VM_PROT_READ;
 
@@ -395,14 +394,13 @@ trap(frame)
 		    && map != kernel_map) {
 			nss = btoc(USRSTACK-(unsigned)va);
 			if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
-				rv = KERN_FAILURE;
-				goto nogo;
+				nss = 0;
 			}
 		}
 
 		/* Fault the original page in. */
 		rv = uvm_fault(map, va, 0, ftype);
-		if (rv == KERN_SUCCESS) {
+		if (rv == 0) {
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 
@@ -411,7 +409,6 @@ trap(frame)
 			goto out;
 		}
 
-	nogo:
 		if (type == T_ABT) {
 			if (pcb->pcb_onfault != 0) {
 			copyfault:
@@ -422,7 +419,7 @@ trap(frame)
 			    map, va, ftype, rv);
 			goto we_re_toast;
 		}
-		if (rv == KERN_RESOURCE_SHORTAGE) {
+		if (rv == ENOMEM) {
 			printf("UVM: pid %d (%s), uid %d killed: out of swap\n",
 			       p->p_pid, p->p_comm,
 			       p->p_cred && p->p_ucred ?
@@ -475,7 +472,7 @@ syscall(frame)
 	struct syscframe frame;
 {
 	caddr_t params;
-	struct sysent *callp;
+	const struct sysent *callp;
 	struct proc *p;
 	int error, opc, nsys;
 	size_t argsize;

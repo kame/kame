@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_clock.c,v 1.60.2.1 2000/07/13 20:12:18 thorpej Exp $	*/
+/*	$NetBSD: kern_clock.c,v 1.79 2002/03/17 11:10:43 simonb Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -77,6 +77,10 @@
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_clock.c,v 1.79 2002/03/17 11:10:43 simonb Exp $");
+
+#include "opt_callout.h"
 #include "opt_ntp.h"
 
 #include <sys/param.h>
@@ -87,12 +91,17 @@
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 #include <sys/timex.h>
 #include <sys/sched.h>
+#ifdef CALLWHEEL_STATS
+#include <sys/device.h>
+#endif
 
 #include <machine/cpu.h>
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+#include <machine/intr.h>
+#endif
 
 #ifdef GPROF
 #include <sys/gmon.h>
@@ -311,10 +320,10 @@ long clock_cpu = 0;		/* CPU clock adjust */
 
 int	stathz;
 int	profhz;
+int	schedhz;
 int	profprocs;
-u_int64_t hardclock_ticks, softclock_ticks;
 int	softclock_running;		/* 1 => softclock() is running */
-static int psdiv, pscnt;		/* prof => stat divider */
+static int psdiv;			/* prof => stat divider */
 int	psratio;			/* ratio: prof / stat */
 int	tickfix, tickfixinterval;	/* used if tick not really integral */
 #ifndef NTP
@@ -351,17 +360,18 @@ int	callwheelsize, callwheelbits, callwheelmask;
 static struct callout *nextsoftcheck;	/* next callout to be checked */
 
 #ifdef CALLWHEEL_STATS
-int	callwheel_collisions;		/* number of hash collisions */
-int	callwheel_maxlength;		/* length of the longest hash chain */
-int	*callwheel_sizes;		/* per-bucket length count */
-u_int64_t callwheel_count;		/* # callouts currently */
-u_int64_t callwheel_established;	/* # callouts established */
-u_int64_t callwheel_fired;		/* # callouts that fired */
-u_int64_t callwheel_disestablished;	/* # callouts disestablished */
-u_int64_t callwheel_changed;		/* # callouts changed */
-u_int64_t callwheel_softclocks;		/* # times softclock() called */
-u_int64_t callwheel_softchecks;		/* # checks per softclock() */
-u_int64_t callwheel_softempty;		/* # empty buckets seen */
+int	     *callwheel_sizes;		/* per-bucket length count */
+struct evcnt callwheel_collisions;	/* number of hash collisions */
+struct evcnt callwheel_maxlength;	/* length of the longest hash chain */
+struct evcnt callwheel_count;		/* # callouts currently */
+struct evcnt callwheel_established;	/* # callouts established */
+struct evcnt callwheel_fired;		/* # callouts that fired */
+struct evcnt callwheel_disestablished;	/* # callouts disestablished */
+struct evcnt callwheel_changed;		/* # callouts changed */
+struct evcnt callwheel_softclocks;	/* # times softclock() called */
+struct evcnt callwheel_softchecks;	/* # checks per softclock() */
+struct evcnt callwheel_softempty;	/* # empty buckets seen */
+struct evcnt callwheel_hintworked;	/* # times hint saved scan */
 #endif /* CALLWHEEL_STATS */
 
 /*
@@ -373,28 +383,62 @@ u_int64_t callwheel_softempty;		/* # empty buckets seen */
 #define	MAX_SOFTCLOCK_STEPS	100
 #endif
 
+struct simplelock callwheel_slock;
+
+#define	CALLWHEEL_LOCK(s)						\
+do {									\
+	s = splclock();							\
+	simple_lock(&callwheel_slock);					\
+} while (0)
+
+#define	CALLWHEEL_UNLOCK(s)						\
+do {									\
+	simple_unlock(&callwheel_slock);				\
+	splx(s);							\
+} while (0)
+
+static void callout_stop_locked(struct callout *);
+
+/*
+ * These are both protected by callwheel_lock.
+ * XXX SHOULD BE STATIC!!
+ */
+u_int64_t hardclock_ticks, softclock_ticks;
+
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+void	softclock(void *);
+void	*softclock_si;
+#endif
+
 /*
  * Initialize clock frequencies and start both clocks running.
  */
 void
-initclocks()
+initclocks(void)
 {
 	int i;
+
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	softclock_si = softintr_establish(IPL_SOFTCLOCK, softclock, NULL);
+	if (softclock_si == NULL)
+		panic("initclocks: unable to register softclock intr");
+#endif
 
 	/*
 	 * Set divisors to 1 (normal case) and let the machine-specific
 	 * code do its bit.
 	 */
-	psdiv = pscnt = 1;
+	psdiv = 1;
 	cpu_initclocks();
 
 	/*
-	 * Compute profhz/stathz, and fix profhz if needed.
+	 * Compute profhz/stathz/rrticks, and fix profhz if needed.
 	 */
 	i = stathz ? stathz : hz;
 	if (profhz == 0)
 		profhz = i;
 	psratio = profhz / i;
+	rrticks = hz / 10;
 
 #ifdef NTP
 	switch (hz) {
@@ -471,13 +515,13 @@ initclocks()
  * The real-time timer, interrupting hz times per second.
  */
 void
-hardclock(frame)
-	struct clockframe *frame;
+hardclock(struct clockframe *frame)
 {
 	struct proc *p;
 	int delta;
 	extern int tickdelta;
 	extern long timedelta;
+	struct cpu_info *ci = curcpu();
 #ifdef NTP
 	int time_update;
 	int ltemp;
@@ -505,13 +549,15 @@ hardclock(frame)
 	 */
 	if (stathz == 0)
 		statclock(frame);
-
+	if ((--ci->ci_schedstate.spc_rrticks) <= 0)
+		roundrobin(ci);
+	
 #if defined(MULTIPROCESSOR)
 	/*
 	 * If we are not the primary CPU, we're not allowed to do
 	 * any more work.
 	 */
-	if (CPU_IS_PRIMARY(curcpu()) == 0)
+	if (CPU_IS_PRIMARY(ci) == 0)
 		return;
 #endif
 
@@ -523,7 +569,6 @@ hardclock(frame)
 	 * if we are still adjusting the time (see adjtime()),
 	 * ``tickdelta'' may also be added in.
 	 */
-	hardclock_ticks++;
 	delta = tick;
 
 #ifndef NTP
@@ -841,7 +886,10 @@ hardclock(frame)
 	 * Process callouts at a very low cpu priority, so we don't keep the
 	 * relatively high clock interrupt priority any longer than necessary.
 	 */
-	if (TAILQ_FIRST(&callwheel[hardclock_ticks & callwheelmask]) != NULL) {
+	simple_lock(&callwheel_slock);	/* already at splclock() */
+	hardclock_ticks++;
+	if (! TAILQ_EMPTY(&callwheel[hardclock_ticks & callwheelmask].cq_q)) {
+		simple_unlock(&callwheel_slock);
 		if (CLKF_BASEPRI(frame)) {
 			/*
 			 * Save the overhead of a software interrupt;
@@ -851,13 +899,23 @@ hardclock(frame)
 			 * NOTE: If we're at ``base priority'', softclock()
 			 * was not already running.
 			 */
-			(void)spllowersoftclock();
-			softclock();
-		} else
+			spllowersoftclock();
+			KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
+			softclock(NULL);
+			KERNEL_UNLOCK();
+		} else {
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+			softintr_schedule(softclock_si);
+#else
 			setsoftclock();
+#endif
+		}
+		return;
 	} else if (softclock_running == 0 &&
-		   (softclock_ticks + 1) == hardclock_ticks)
+		   (softclock_ticks + 1) == hardclock_ticks) {
 		softclock_ticks++;
+	}
+	simple_unlock(&callwheel_slock);
 }
 
 /*
@@ -866,68 +924,82 @@ hardclock(frame)
  */
 /*ARGSUSED*/
 void
-softclock()
+softclock(void *v)
 {
 	struct callout_queue *bucket;
 	struct callout *c;
-	void (*func) __P((void *));
+	void (*func)(void *);
 	void *arg;
 	int s, idx;
 	int steps = 0;
 
-	s = splhigh();
+	CALLWHEEL_LOCK(s);
+
 	softclock_running = 1;
 
 #ifdef CALLWHEEL_STATS
-	callwheel_softclocks++;
+	callwheel_softclocks.ev_count++;
 #endif
 
 	while (softclock_ticks != hardclock_ticks) {
 		softclock_ticks++;
 		idx = (int)(softclock_ticks & callwheelmask);
 		bucket = &callwheel[idx];
-		c = TAILQ_FIRST(bucket);
+		c = TAILQ_FIRST(&bucket->cq_q);
+		if (c == NULL) {
 #ifdef CALLWHEEL_STATS
-		if (c == NULL)
-			callwheel_softempty++;
+			callwheel_softempty.ev_count++;
 #endif
+			continue;
+		}
+		if (softclock_ticks < bucket->cq_hint) {
+#ifdef CALLWHEEL_STATS
+			callwheel_hintworked.ev_count++;
+#endif
+			continue;
+		}
+		bucket->cq_hint = UQUAD_MAX;
 		while (c != NULL) {
 #ifdef CALLWHEEL_STATS
-			callwheel_softchecks++;
+			callwheel_softchecks.ev_count++;
 #endif
 			if (c->c_time != softclock_ticks) {
+				if (c->c_time < bucket->cq_hint)
+					bucket->cq_hint = c->c_time;
 				c = TAILQ_NEXT(c, c_link);
 				if (++steps >= MAX_SOFTCLOCK_STEPS) {
 					nextsoftcheck = c;
 					/* Give interrupts a chance. */
-					splx(s);
-					(void) splhigh();
+					CALLWHEEL_UNLOCK(s);
+					CALLWHEEL_LOCK(s);
 					c = nextsoftcheck;
 					steps = 0;
 				}
 			} else {
 				nextsoftcheck = TAILQ_NEXT(c, c_link);
-				TAILQ_REMOVE(bucket, c, c_link);
+				TAILQ_REMOVE(&bucket->cq_q, c, c_link);
 #ifdef CALLWHEEL_STATS
 				callwheel_sizes[idx]--;
-				callwheel_fired++;
-				callwheel_count--;
+				callwheel_fired.ev_count++;
+				callwheel_count.ev_count--;
 #endif
 				func = c->c_func;
 				arg = c->c_arg;
 				c->c_func = NULL;
 				c->c_flags &= ~CALLOUT_PENDING;
-				splx(s);
+				CALLWHEEL_UNLOCK(s);
 				(*func)(arg);
-				(void) splhigh();
+				CALLWHEEL_LOCK(s);
 				steps = 0;
 				c = nextsoftcheck;
 			}
 		}
+		if (TAILQ_EMPTY(&bucket->cq_q))
+			bucket->cq_hint = UQUAD_MAX;
 	}
 	nextsoftcheck = NULL;
 	softclock_running = 0;
-	splx(s);
+	CALLWHEEL_UNLOCK(s);
 }
 
 /*
@@ -937,7 +1009,7 @@ softclock()
  *	set hash mask.  Called from allocsys().
  */
 void
-callout_setsize()
+callout_setsize(void)
 {
 
 	for (callwheelsize = 1; callwheelsize < ncallout; callwheelsize <<= 1)
@@ -951,12 +1023,39 @@ callout_setsize()
  *	Initialize the callwheel buckets.
  */
 void
-callout_startup()
+callout_startup(void)
 {
 	int i;
 
-	for (i = 0; i < callwheelsize; i++)
-		TAILQ_INIT(&callwheel[i]);
+	for (i = 0; i < callwheelsize; i++) {
+		callwheel[i].cq_hint = UQUAD_MAX;
+		TAILQ_INIT(&callwheel[i].cq_q);
+	}
+
+	simple_lock_init(&callwheel_slock);
+
+#ifdef CALLWHEEL_STATS
+	evcnt_attach_dynamic(&callwheel_collisions, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "collisions");
+	evcnt_attach_dynamic(&callwheel_maxlength, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "maxlength");
+	evcnt_attach_dynamic(&callwheel_count, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "count");
+	evcnt_attach_dynamic(&callwheel_established, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "established");
+	evcnt_attach_dynamic(&callwheel_fired, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "fired");
+	evcnt_attach_dynamic(&callwheel_disestablished, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "disestablished");
+	evcnt_attach_dynamic(&callwheel_changed, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "changed");
+	evcnt_attach_dynamic(&callwheel_softclocks, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "softclocks");
+	evcnt_attach_dynamic(&callwheel_softempty, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "softempty");
+	evcnt_attach_dynamic(&callwheel_hintworked, EVCNT_TYPE_MISC,
+	    NULL, "callwheel", "hintworked");
+#endif /* CALLWHEEL_STATS */
 }
 
 /*
@@ -966,8 +1065,7 @@ callout_startup()
  *	by callout_reset() and callout_stop().
  */
 void
-callout_init(c)
-	struct callout *c;
+callout_init(struct callout *c)
 {
 
 	memset(c, 0, sizeof(*c));
@@ -979,11 +1077,7 @@ callout_init(c)
  *	Establish or change a timeout.
  */
 void
-callout_reset(c, ticks, func, arg)
-	struct callout *c;
-	int ticks;
-	void (*func) __P((void *));
-	void *arg;
+callout_reset(struct callout *c, int ticks, void (*func)(void *), void *arg)
 {
 	struct callout_queue *bucket;
 	int s;
@@ -991,17 +1085,16 @@ callout_reset(c, ticks, func, arg)
 	if (ticks <= 0)
 		ticks = 1;
 
-	/* Lock out the clock. */
-	s = splhigh();
+	CALLWHEEL_LOCK(s);
 
 	/*
 	 * If this callout's timer is already running, cancel it
 	 * before we modify it.
 	 */
 	if (c->c_flags & CALLOUT_PENDING) {
-		callout_stop(c);
+		callout_stop_locked(c);	/* Already locked */
 #ifdef CALLWHEEL_STATS
-		callwheel_changed++;
+		callwheel_changed.ev_count++;
 #endif
 	}
 
@@ -1013,43 +1106,41 @@ callout_reset(c, ticks, func, arg)
 	bucket = &callwheel[c->c_time & callwheelmask];
 
 #ifdef CALLWHEEL_STATS
-	if (TAILQ_FIRST(bucket) != NULL)
-		callwheel_collisions++;
+	if (! TAILQ_EMPTY(&bucket->cq_q))
+		callwheel_collisions.ev_count++;
 #endif
 
-	TAILQ_INSERT_TAIL(bucket, c, c_link);
+	TAILQ_INSERT_TAIL(&bucket->cq_q, c, c_link);
+	if (c->c_time < bucket->cq_hint)
+		bucket->cq_hint = c->c_time;
 
 #ifdef CALLWHEEL_STATS
-	callwheel_count++;
-	callwheel_established++;
-	if (++callwheel_sizes[c->c_time & callwheelmask] > callwheel_maxlength)
-		callwheel_maxlength =
+	callwheel_count.ev_count++;
+	callwheel_established.ev_count++;
+	if (++callwheel_sizes[c->c_time & callwheelmask] >
+	    callwheel_maxlength.ev_count)
+		callwheel_maxlength.ev_count =
 		    callwheel_sizes[c->c_time & callwheelmask];
 #endif
 
-	splx(s);
+	CALLWHEEL_UNLOCK(s);
 }
 
 /*
- * callout_stop:
+ * callout_stop_locked:
  *
- *	Disestablish a timeout.
+ *	Disestablish a timeout.  Callwheel is locked.
  */
-void
-callout_stop(c)
-	struct callout *c;
+static void
+callout_stop_locked(struct callout *c)
 {
-	int s;
-
-	/* Lock out the clock. */
-	s = splhigh();
+	struct callout_queue *bucket;
 
 	/*
 	 * Don't attempt to delete a callout that's not on the queue.
 	 */
 	if ((c->c_flags & CALLOUT_PENDING) == 0) {
 		c->c_flags &= ~CALLOUT_ACTIVE;
-		splx(s);
 		return;
 	}
 
@@ -1058,16 +1149,33 @@ callout_stop(c)
 	if (nextsoftcheck == c)
 		nextsoftcheck = TAILQ_NEXT(c, c_link);
 
-	TAILQ_REMOVE(&callwheel[c->c_time & callwheelmask], c, c_link);
+	bucket = &callwheel[c->c_time & callwheelmask];
+	TAILQ_REMOVE(&bucket->cq_q, c, c_link);
+	if (TAILQ_EMPTY(&bucket->cq_q))
+		bucket->cq_hint = UQUAD_MAX;
 #ifdef CALLWHEEL_STATS
-	callwheel_count--;
-	callwheel_disestablished++;
+	callwheel_count.ev_count--;
+	callwheel_disestablished.ev_count++;
 	callwheel_sizes[c->c_time & callwheelmask]--;
 #endif
 
 	c->c_func = NULL;
+}
 
-	splx(s);
+/*
+ * callout_stop:
+ *
+ *	Disestablish a timeout.  Callwheel is unlocked.  This is
+ *	the standard entry point.
+ */
+void
+callout_stop(struct callout *c)
+{
+	int s;
+
+	CALLWHEEL_LOCK(s);
+	callout_stop_locked(c);
+	CALLWHEEL_UNLOCK(s);
 }
 
 #ifdef CALLWHEEL_STATS
@@ -1077,7 +1185,7 @@ callout_stop(c)
  *	Display callout statistics.  Call it from DDB.
  */
 void
-callout_showstats()
+callout_showstats(void)
 {
 	u_int64_t curticks;
 	int s;
@@ -1087,18 +1195,29 @@ callout_showstats()
 	splx(s);
 
 	printf("Callwheel statistics:\n");
-	printf("\tCallouts currently queued: %llu\n", callwheel_count);
-	printf("\tCallouts established: %llu\n", callwheel_established);
-	printf("\tCallouts disestablished: %llu\n", callwheel_disestablished);
-	if (callwheel_changed != 0)
-		printf("\t\tOf those, %llu were changes\n", callwheel_changed);
-	printf("\tCallouts that fired: %llu\n", callwheel_fired);
+	printf("\tCallouts currently queued: %llu\n",
+	    (long long) callwheel_count.ev_count);
+	printf("\tCallouts established: %llu\n",
+	    (long long) callwheel_established.ev_count);
+	printf("\tCallouts disestablished: %llu\n",
+	    (long long) callwheel_disestablished.ev_count);
+	if (callwheel_changed.ev_count != 0)
+		printf("\t\tOf those, %llu were changes\n",
+		    (long long) callwheel_changed.ev_count);
+	printf("\tCallouts that fired: %llu\n",
+	    (long long) callwheel_fired.ev_count);
 	printf("\tNumber of buckets: %d\n", callwheelsize);
-	printf("\tNumber of hash collisions: %d\n", callwheel_collisions);
-	printf("\tMaximum hash chain length: %d\n", callwheel_maxlength);
+	printf("\tNumber of hash collisions: %llu\n",
+	    (long long) callwheel_collisions.ev_count);
+	printf("\tMaximum hash chain length: %llu\n",
+	    (long long) callwheel_maxlength.ev_count);
 	printf("\tSoftclocks: %llu, Softchecks: %llu\n",
-	    callwheel_softclocks, callwheel_softchecks);
-	printf("\t\tEmpty buckets seen: %llu\n", callwheel_softempty);
+	    (long long) callwheel_softclocks.ev_count,
+	    (long long) callwheel_softchecks.ev_count);
+	printf("\t\tEmpty buckets seen: %llu\n",
+	    (long long) callwheel_softempty.ev_count);
+	printf("\t\tTimes hint saved scan: %llu\n",
+	    (long long) callwheel_hintworked.ev_count);
 }
 #endif
 
@@ -1107,8 +1226,7 @@ callout_showstats()
  * argument to callout_reset() from an absolute time.
  */
 int
-hzto(tv)
-	struct timeval *tv;
+hzto(struct timeval *tv)
 {
 	unsigned long ticks;
 	long sec, usec;
@@ -1173,19 +1291,13 @@ hzto(tv)
  * keeps the profile clock running constantly.
  */
 void
-startprofclock(p)
-	struct proc *p;
+startprofclock(struct proc *p)
 {
-	int s;
 
 	if ((p->p_flag & P_PROFIL) == 0) {
 		p->p_flag |= P_PROFIL;
-		if (++profprocs == 1 && stathz != 0) {
-			s = splstatclock();
-			psdiv = pscnt = psratio;
-			setstatclockrate(profhz);
-			splx(s);
-		}
+		if (++profprocs == 1 && stathz != 0)
+			psdiv = psratio;
 	}
 }
 
@@ -1193,19 +1305,13 @@ startprofclock(p)
  * Stop profiling on a process.
  */
 void
-stopprofclock(p)
-	struct proc *p;
+stopprofclock(struct proc *p)
 {
-	int s;
 
 	if (p->p_flag & P_PROFIL) {
 		p->p_flag &= ~P_PROFIL;
-		if (--profprocs == 0 && stathz != 0) {
-			s = splstatclock();
-			psdiv = pscnt = 1;
-			setstatclockrate(stathz);
-			splx(s);
-		}
+		if (--profprocs == 0 && stathz != 0)
+			psdiv = 1;
 	}
 }
 
@@ -1214,22 +1320,34 @@ stopprofclock(p)
  * do process and kernel statistics.
  */
 void
-statclock(frame)
-	struct clockframe *frame;
+statclock(struct clockframe *frame)
 {
 #ifdef GPROF
 	struct gmonparam *g;
-	int i;
+	intptr_t i;
 #endif
 	struct cpu_info *ci = curcpu();
 	struct schedstate_percpu *spc = &ci->ci_schedstate;
 	struct proc *p;
 
+	/*
+	 * Notice changes in divisor frequency, and adjust clock
+	 * frequency accordingly.
+	 */
+	if (spc->spc_psdiv != psdiv) {
+		spc->spc_psdiv = psdiv;
+		spc->spc_pscnt = psdiv;
+		if (psdiv == 1) {
+			setstatclockrate(stathz);
+		} else {
+			setstatclockrate(profhz);			
+		}
+	}
+	p = curproc;
 	if (CLKF_USERMODE(frame)) {
-		p = curproc;
 		if (p->p_flag & P_PROFIL)
-			addupc_intr(p, CLKF_PC(frame), 1);
-		if (--pscnt > 0)
+			addupc_intr(p, CLKF_PC(frame));
+		if (--spc->spc_pscnt > 0)
 			return;
 		/*
 		 * Came from user mode; CPU was in user state.
@@ -1254,7 +1372,11 @@ statclock(frame)
 			}
 		}
 #endif
-		if (--pscnt > 0)
+#ifdef PROC_PC
+		if (p && p->p_flag & P_PROFIL)
+			addupc_intr(p, PROC_PC(p));
+#endif
+		if (--spc->spc_pscnt > 0)
 			return;
 		/*
 		 * Came from kernel mode, so we were:
@@ -1268,7 +1390,6 @@ statclock(frame)
 		 * so that we know how much of its real time was spent
 		 * in ``non-process'' (i.e., interrupt) work.
 		 */
-		p = curproc;
 		if (CLKF_INTR(frame)) {
 			if (p != NULL)
 				p->p_iticks++;
@@ -1279,7 +1400,7 @@ statclock(frame)
 		} else
 			spc->spc_cp_time[CP_IDLE]++;
 	}
-	pscnt = psdiv;
+	spc->spc_pscnt = psdiv;
 
 	if (p != NULL) {
 		++p->p_cpticks;
@@ -1319,8 +1440,7 @@ statclock(frame)
  * Note: splclock() is in effect.
  */
 void
-hardupdate(offset)
-	long offset;
+hardupdate(long offset)
 {
 	long ltemp, mtemp;
 
@@ -1404,9 +1524,8 @@ hardupdate(offset)
  * routine.
  */
 void
-hardpps(tvp, usec)
-	struct timeval *tvp;		/* time at PPS */
-	long usec;			/* hardware counter at PPS */
+hardpps(struct timeval *tvp,		/* time at PPS */
+	long usec			/* hardware counter at PPS */)
 {
 	long u_usec, v_usec, bigtick;
 	long cal_sec, cal_usec;
@@ -1626,14 +1745,11 @@ hardpps(tvp, usec)
 #endif /* PPS_SYNC */
 #endif /* NTP  */
 
-
 /*
  * Return information about system clocks.
  */
 int
-sysctl_clockrate(where, sizep)
-	void *where;
-	size_t *sizep;
+sysctl_clockrate(void *where, size_t *sizep)
 {
 	struct clockinfo clkinfo;
 

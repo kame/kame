@@ -1,4 +1,4 @@
-/*	$NetBSD: shm.h,v 1.26.2.2 2001/04/01 16:55:52 he Exp $	*/
+/*	$NetBSD: shm.h,v 1.30 2002/04/03 11:50:51 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -81,7 +81,14 @@
 
 #define	SHM_RDONLY	010000	/* Attach read-only (else read-write) */
 #define	SHM_RND		020000	/* Round attach address to SHMLBA */
-#define	SHMLBA		NBPG	/* Segment low boundry address multiple XXX */
+/* Segment low boundry address multiple */
+#if defined(_KERNEL) || defined(_STANDALONE) || defined(_LKM)
+#define	SHMLBA		PAGE_SIZE
+#else
+/* Use libc's internal __sysconf() to retrieve the machine's page size */
+long			__sysconf __P((int));
+#define	SHMLBA		(__sysconf(_SC_PAGESIZE))
+#endif
 
 typedef unsigned int	shmatt_t;
 
@@ -173,6 +180,7 @@ void	shminit __P((void));
 void	shmfork __P((struct vmspace *, struct vmspace *));
 void	shmexit __P((struct vmspace *));
 int	shmctl1 __P((struct proc *, int, int, struct shmid_ds *));
+int	shmat1 __P((struct proc *, int, const void *, int, vaddr_t *, int));
 #else /* !_KERNEL */
 
 #include <sys/cdefs.h>

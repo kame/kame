@@ -1,4 +1,4 @@
-/*	$NetBSD: z8530var.h,v 1.2.4.1 2000/07/18 16:23:24 mrg Exp $	*/
+/*	$NetBSD: z8530var.h,v 1.5 2002/03/11 07:11:26 chs Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -47,6 +47,16 @@
 #include <machine/bus.h>
 #include <dev/ic/z8530sc.h>
 
+/*
+ * Need to override cn_console_dev() for zstty and zskbd.
+ */
+#ifdef cn_isconsole
+#undef cn_isconsole
+#endif
+extern struct consdev *cn_hw;
+extern struct consdev *cn_tab;
+#define cn_isconsole(d)	((d) == cn_tab->cn_dev || (d) == cn_hw->cn_dev)
+
 struct zsc_softc {
 	struct device		zsc_dev;	/* base device */
 	bus_space_tag_t		zsc_bustag;	/* bus space/dma tags */
@@ -90,3 +100,6 @@ void  zs_write_data __P((struct zs_chanstate *cs, u_char val));
 #define ZSCCF_CHANNEL 0
 #define ZSCCF_CHANNEL_DEFAULT -1
 #endif
+
+#undef cn_trap
+#define cn_trap() zs_abort(NULL)

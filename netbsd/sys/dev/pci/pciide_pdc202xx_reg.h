@@ -1,4 +1,4 @@
-/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.3.4.1 2001/03/13 21:23:53 he Exp $ */
+/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.7 2002/04/23 20:41:18 bouyer Exp $ */
 
 /*
  * Copyright (c) 1999 Manuel Bouyer.
@@ -13,8 +13,7 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *	This product includes software developed by Manuel Bouyer.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -67,7 +66,7 @@
 #define PDC2xx_TIM_IORDYp	0x00400000
 #define PDC2xx_TIM_DMARQp	0x00800000
 
-/* The following are extentions of the DMA registers */
+/* The following are extensions of the DMA registers */
 
 /* Ultra-DMA mode 3/4 control (PDC20262 only, 1 byte) */
 #define PDC262_U66	0x11
@@ -106,9 +105,15 @@
  * rigth for the PDC20246 too ...
  */
 
-static int8_t pdc2xx_pa[] = {0x9, 0x5, 0x3, 0x2, 0x1};
-static int8_t pdc2xx_pb[] = {0x13, 0xc, 0x8, 0x6, 0x4};
-static int8_t pdc2xx_dma_mb[] = {0x3, 0x3, 0x3};
-static int8_t pdc2xx_dma_mc[] = {0x5, 0x4, 0x3};
-static int8_t pdc2xx_udma_mb[] = {0x3, 0x2, 0x1, 0x2, 0x1, 0x1};
-static int8_t pdc2xx_udma_mc[] = {0x3, 0x2, 0x1, 0x2, 0x1, 0x1};
+static const int8_t pdc2xx_pa[] __attribute__((__unused__)) =
+    {0x9, 0x5, 0x3, 0x2, 0x1};
+static const int8_t pdc2xx_pb[] __attribute__((__unused__)) =
+    {0x13, 0xc, 0x8, 0x6, 0x4};
+static const int8_t pdc2xx_dma_mb[] __attribute__((__unused__)) =
+    {0x3, 0x3, 0x3};
+static const int8_t pdc2xx_dma_mc[] __attribute__((__unused__)) =
+    {0x5, 0x4, 0x3};
+static const int8_t pdc2xx_udma_mb[] __attribute__((__unused__)) =
+    {0x3, 0x2, 0x1, 0x2, 0x1, 0x1};
+static const int8_t pdc2xx_udma_mc[] __attribute__((__unused__)) =
+    {0x3, 0x2, 0x1, 0x2, 0x1, 0x1};

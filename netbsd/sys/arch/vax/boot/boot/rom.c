@@ -1,4 +1,4 @@
-/*	$NetBSD: rom.c,v 1.2 2000/05/20 13:30:04 ragge Exp $ */
+/*	$NetBSD: rom.c,v 1.3.18.1 2002/06/26 11:06:11 lukem Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -37,6 +37,8 @@
 #include "sys/reboot.h"
 #include "sys/disklabel.h"
 
+#define RF_PROTECTED_SECTORS	64	/* XXX <dev/raidframe/raidframevar.h> */
+
 #include "lib/libsa/stand.h"
 #include "lib/libsa/ufs.h"
 
@@ -61,7 +63,8 @@ romopen(struct open_file *f, int adapt, int ctlr, int unit, int part)
 {
 	char *msg;
 	struct disklabel *lp = &romlabel;
-	int i,err;
+	size_t i;
+	int err;
 
 	bqo = (void *)bootrpb.iovec;
 
@@ -105,6 +108,8 @@ romstrategy (f, func, dblk, size, buf, rsize)
 	block = dblk + lp->d_partitions[dpart].p_offset;
 	if (dunit >= 0 && dunit < 10)
 		bootrpb.unit = dunit;
+	if (lp->d_partitions[dpart].p_fstype == FS_RAID)
+		block += RF_PROTECTED_SECTORS;
 
 	if (func == F_WRITE)
 		romwrite_uvax(block, size, buf, &bootrpb);

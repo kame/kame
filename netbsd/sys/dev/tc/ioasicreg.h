@@ -1,4 +1,4 @@
-/* $NetBSD: ioasicreg.h,v 1.3.2.3 2000/07/18 06:19:04 thorpej Exp $ */
+/* $NetBSD: ioasicreg.h,v 1.6 2000/07/17 02:18:17 thorpej Exp $ */
 
 /* 
  * Copyright (c) 1991,1990,1989,1994,1995 Carnegie Mellon University

@@ -1,7 +1,6 @@
-/*	$NetBSD: netbsd32_machdep.c,v 1.5.4.4 2001/05/09 20:41:31 he Exp $	*/
 
 /*
- * Copyright (c) 1998 Matthew R. Green
+ * Copyright (c) 1998, 2001 Matthew R. Green
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,11 +27,15 @@
  * SUCH DAMAGE.
  */
 
+#ifdef _KERNEL_OPT
 #include "opt_compat_netbsd.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/exec.h>
 #include <sys/malloc.h>
+#include <sys/filedesc.h>
+#include <sys/file.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/systm.h>
@@ -42,17 +45,34 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/map.h>
+#include <sys/select.h>
+#include <sys/ioctl.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <dev/sun/event_var.h>
+
+#include <net/if.h>
+#include <net/route.h>
+
+#include <netinet/in.h>
+#include <netinet/in_var.h>
+#include <netinet/igmp.h>
+#include <netinet/igmp_var.h>
+#include <netinet/ip_mroute.h>
+
+#include <compat/netbsd32/netbsd32.h>
+#include <compat/netbsd32/netbsd32_ioctl.h>
+#include <compat/netbsd32/netbsd32_syscallargs.h>
 
 #include <machine/frame.h>
 #include <machine/reg.h>
 #include <machine/vmparam.h>
+#include <machine/vuid_event.h>
 #include <machine/netbsd32_machdep.h>
 
-#include <compat/netbsd32/netbsd32.h>
-#include <compat/netbsd32/netbsd32_syscallargs.h>
+/* Provide a the name of the architecture we're emulating */
+char	machine_arch32[] = "sparc";	
+
+static int ev_out32 __P((struct firm_event *, int, struct uio *));
 
 /*
  * Set up registers on exec.
@@ -76,11 +96,15 @@ netbsd32_setregs(p, pack, stack)
 	/* Mark this as a 32-bit emulation */
 	p->p_flag |= P_32;
 
+	/* Setup the ev_out32 hook */
+	if (ev_out32_hook == NULL)
+		ev_out32_hook = ev_out32;
+
 	/*
 	 * Set the registers to 0 except for:
 	 *	%o6: stack pointer, built in exec())
 	 *	%tstate: (retain icc and xcc and cwp bits)
-	 *	%g1: address of PS_STRINGS (used by crt0)
+	 *	%g1: address of p->p_psstr (used by crt0)
 	 *	%tpc,%tnpc: entry point of program
 	 */
 	tstate = ((PSTATE_USER32)<<TSTATE_PSTATE_SHIFT) 
@@ -100,7 +124,7 @@ netbsd32_setregs(p, pack, stack)
 	}
 	bzero((caddr_t)tf, sizeof *tf);
 	tf->tf_tstate = tstate;
-	tf->tf_global[1] = (int)(long)p->p_psstr;
+	tf->tf_global[1] = (u_int)(u_long)p->p_psstr;
 	tf->tf_pc = pack->ep_entry & ~3;
 	tf->tf_npc = tf->tf_pc + 4;
 
@@ -134,7 +158,6 @@ netbsd32_sendsig(catcher, sig, mask, code)
 	u_long code;
 {
 	register struct proc *p = curproc;
-	register struct sigacts *psp = p->p_sigacts;
 	register struct sparc32_sigframe *fp;
 	register struct trapframe64 *tf;
 	register int addr, onstack; 
@@ -148,15 +171,15 @@ netbsd32_sendsig(catcher, sig, mask, code)
 	oldsp = (struct rwindow32 *)(u_long)(u_int)tf->tf_out[6];
 	/* Do we need to jump onto the signal stack? */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 	if (onstack) {
-		fp = (struct sparc32_sigframe *)((char *)psp->ps_sigstk.ss_sp +
-					 psp->ps_sigstk.ss_size);
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		fp = (struct sparc32_sigframe *)((char *)p->p_sigctx.ps_sigstk.ss_sp +
+					p->p_sigctx.ps_sigstk.ss_size);
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	} else
 		fp = (struct sparc32_sigframe *)oldsp;
-	fp = (struct sparc32_sigframe *)((long)(fp - 1) & ~7);
+	fp = (struct sparc32_sigframe *)((u_long)(fp - 1) & ~7);
 
 #ifdef DEBUG
 	sigpid = p->p_pid;
@@ -173,7 +196,7 @@ netbsd32_sendsig(catcher, sig, mask, code)
 	 */
 	sf.sf_signo = sig;
 	sf.sf_code = (u_int)code;
-#ifdef COMPAT_SUNOS
+#if defined(COMPAT_SUNOS) || defined(LKM)
 	sf.sf_scp = (u_long)&fp->sf_sc;
 #endif
 	sf.sf_addr = 0;			/* XXX */
@@ -183,10 +206,10 @@ netbsd32_sendsig(catcher, sig, mask, code)
 	 */
 	sf.sf_sc.sc_onstack = onstack;
 	sf.sf_sc.sc_mask = *mask;
-	sf.sf_sc.sc_sp = (long)oldsp;
+	sf.sf_sc.sc_sp = (u_long)oldsp;
 	sf.sf_sc.sc_pc = tf->tf_pc;
 	sf.sf_sc.sc_npc = tf->tf_npc;
-	sf.sf_sc.sc_tstate = TSTATECCR_TO_PSR(tf->tf_tstate); /* XXX */
+	sf.sf_sc.sc_psr = TSTATECCR_TO_PSR(tf->tf_tstate); /* XXX */
 	sf.sf_sc.sc_g1 = tf->tf_global[1];
 	sf.sf_sc.sc_o0 = tf->tf_out[0];
 
@@ -242,7 +265,7 @@ netbsd32_sendsig(catcher, sig, mask, code)
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 
 #ifdef DEBUG
 	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid) {
@@ -331,9 +354,9 @@ compat_13_netbsd32_sigreturn(p, v, retval)
 	}
 #endif
 	if (scp->sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask */
 	native_sigset13_to_sigset(&scp->sc_mask, &mask);
@@ -341,6 +364,7 @@ compat_13_netbsd32_sigreturn(p, v, retval)
 	return (EJUSTRETURN);
 }
 #endif
+
 /*
  * System call to cleanup state after a signal
  * has been taken.  Reset signal mask and
@@ -409,7 +433,7 @@ netbsd32___sigreturn14(p, v, retval)
 		return (EINVAL);
 #endif
 	/* take only psr ICC field */
-	tf->tf_tstate = (int64_t)(tf->tf_tstate & ~TSTATE_CCR) | PSRCC_TO_TSTATE(sc.sc_tstate);
+	tf->tf_tstate = (int64_t)(tf->tf_tstate & ~TSTATE_CCR) | PSRCC_TO_TSTATE(sc.sc_psr);
 	tf->tf_pc = (int64_t)scp->sc_pc;
 	tf->tf_npc = (int64_t)scp->sc_npc;
 	tf->tf_global[1] = (int64_t)scp->sc_g1;
@@ -425,9 +449,9 @@ netbsd32___sigreturn14(p, v, retval)
 
 	/* Restore signal stack. */
 	if (sc.sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask. */
 	(void) sigprocmask1(p, SIG_SETMASK, &sc.sc_mask, 0);
@@ -562,8 +586,10 @@ cpu_coredump32(p, vp, cred, chdr)
 	}
 
 	if (p->p_md.md_fpstate) {
-		if (p == fpproc)
+		if (p == fpproc) {
 			savefpstate(p->p_md.md_fpstate);
+			fpproc = NULL;
+		}
 		/* Copy individual fields */
 		for (i=0; i<32; i++)
 			md_core.md_fpstate.fs_regs[i] = 
@@ -594,4 +620,228 @@ cpu_coredump32(p, vp, cred, chdr)
 		chdr->c_nseg++;
 
 	return error;
+}
+
+/*
+ * Write out a series of 32-bit firm_events.
+ */
+int
+ev_out32(e, n, uio)
+	struct firm_event *e;
+	int n;
+	struct uio *uio;
+{
+	struct firm_event32 e32;
+	int error = 0;
+
+	while (n-- && error == 0) {
+		e32.id = e->id;
+		e32.value = e->value;
+		e32.time.tv_sec = e->time.tv_sec;
+		e32.time.tv_usec = e->time.tv_usec;
+		error = uiomove((caddr_t)&e32, sizeof(e32), uio);
+		e++;
+	}
+	return (error);
+}
+
+/*
+ * ioctl code
+ */
+
+#include <dev/sun/fbio.h>
+#include <machine/openpromio.h>
+
+/* from arch/sparc/include/fbio.h */
+#if 0
+/* unused */
+#define	FBIOGINFO	_IOR('F', 2, struct fbinfo)
+#endif
+
+struct netbsd32_fbcmap {
+	int	index;		/* first element (0 origin) */
+	int	count;		/* number of elements */
+	netbsd32_u_charp	red;		/* red color map elements */
+	netbsd32_u_charp	green;		/* green color map elements */
+	netbsd32_u_charp	blue;		/* blue color map elements */
+};
+#if 1
+#define	FBIOPUTCMAP32	_IOW('F', 3, struct netbsd32_fbcmap)
+#define	FBIOGETCMAP32	_IOW('F', 4, struct netbsd32_fbcmap)
+#endif
+
+struct netbsd32_fbcursor {
+	short set;		/* what to set */
+	short enable;		/* enable/disable cursor */
+	struct fbcurpos pos;	/* cursor's position */
+	struct fbcurpos hot;	/* cursor's hot spot */
+	struct netbsd32_fbcmap cmap;	/* color map info */
+	struct fbcurpos size;	/* cursor's bit map size */
+	netbsd32_charp image;	/* cursor's image bits */
+	netbsd32_charp mask;	/* cursor's mask bits */
+};
+#if 1
+#define FBIOSCURSOR32	_IOW('F', 24, struct netbsd32_fbcursor)
+#define FBIOGCURSOR32	_IOWR('F', 25, struct netbsd32_fbcursor)
+#endif
+
+/* from arch/sparc/include/openpromio.h */
+struct netbsd32_opiocdesc {
+	int	op_nodeid;		/* passed or returned node id */
+	int	op_namelen;		/* length of op_name */
+	netbsd32_charp op_name;		/* pointer to field name */
+	int	op_buflen;		/* length of op_buf (value-result) */
+	netbsd32_charp op_buf;		/* pointer to field value */
+};
+#if 1
+#define	OPIOCGET32	_IOWR('O', 1, struct netbsd32_opiocdesc) /* get openprom field */
+#define	OPIOCSET32	_IOW('O', 2, struct netbsd32_opiocdesc) /* set openprom field */
+#define	OPIOCNEXTPROP32	_IOWR('O', 3, struct netbsd32_opiocdesc) /* get next property */
+#endif
+
+/* prototypes for the converters */
+static __inline void
+netbsd32_to_fbcmap(struct netbsd32_fbcmap *, struct fbcmap *, u_long);
+static __inline void
+netbsd32_to_fbcursor(struct netbsd32_fbcursor *, struct fbcursor *, u_long);
+static __inline void
+netbsd32_to_opiocdesc(struct netbsd32_opiocdesc *, struct opiocdesc *, u_long);
+
+static __inline void
+netbsd32_from_fbcmap(struct fbcmap *, struct netbsd32_fbcmap *);
+static __inline void
+netbsd32_from_fbcursor(struct fbcursor *, struct netbsd32_fbcursor *);
+static __inline void
+netbsd32_from_opiocdesc(struct opiocdesc *, struct netbsd32_opiocdesc *);
+
+/* convert to/from different structures */
+static __inline void
+netbsd32_to_fbcmap(s32p, p, cmd)
+	struct netbsd32_fbcmap *s32p;
+	struct fbcmap *p;
+	u_long cmd;
+{
+
+	p->index = s32p->index;
+	p->count = s32p->count;
+	p->red = (u_char *)(u_long)s32p->red;
+	p->green = (u_char *)(u_long)s32p->green;
+	p->blue = (u_char *)(u_long)s32p->blue;
+}
+
+static __inline void
+netbsd32_to_fbcursor(s32p, p, cmd)
+	struct netbsd32_fbcursor *s32p;
+	struct fbcursor *p;
+	u_long cmd;
+{
+
+	p->set = s32p->set;
+	p->enable = s32p->enable;
+	p->pos = s32p->pos;
+	p->hot = s32p->hot;
+	netbsd32_to_fbcmap(&s32p->cmap, &p->cmap, cmd);
+	p->size = s32p->size;
+	p->image = (char *)(u_long)s32p->image;
+	p->mask = (char *)(u_long)s32p->mask;
+}
+
+static __inline void
+netbsd32_to_opiocdesc(s32p, p, cmd)
+	struct netbsd32_opiocdesc *s32p;
+	struct opiocdesc *p;
+	u_long cmd;
+{
+
+	p->op_nodeid = s32p->op_nodeid;
+	p->op_namelen = s32p->op_namelen;
+	p->op_name = (char *)(u_long)s32p->op_name;
+	p->op_buflen = s32p->op_buflen;
+	p->op_buf = (char *)(u_long)s32p->op_buf;
+}
+
+static __inline void
+netbsd32_from_fbcmap(p, s32p)
+	struct fbcmap *p;
+	struct netbsd32_fbcmap *s32p;
+{
+
+	s32p->index = p->index;
+	s32p->count = p->count;
+/* filled in */
+#if 0
+	s32p->red = (netbsd32_u_charp)p->red;
+	s32p->green = (netbsd32_u_charp)p->green;
+	s32p->blue = (netbsd32_u_charp)p->blue;
+#endif
+}
+
+static __inline void
+netbsd32_from_fbcursor(p, s32p)
+	struct fbcursor *p;
+	struct netbsd32_fbcursor *s32p;
+{
+
+	s32p->set = p->set;
+	s32p->enable = p->enable;
+	s32p->pos = p->pos;
+	s32p->hot = p->hot;
+	netbsd32_from_fbcmap(&p->cmap, &s32p->cmap);
+	s32p->size = p->size;
+/* filled in */
+#if 0
+	s32p->image = (netbsd32_charp)p->image;
+	s32p->mask = (netbsd32_charp)p->mask;
+#endif
+}
+
+static __inline void
+netbsd32_from_opiocdesc(p, s32p)
+	struct opiocdesc *p;
+	struct netbsd32_opiocdesc *s32p;
+{
+
+	s32p->op_nodeid = p->op_nodeid;
+	s32p->op_namelen = p->op_namelen;
+	s32p->op_name = (netbsd32_charp)(u_long)p->op_name;
+	s32p->op_buflen = p->op_buflen;
+	s32p->op_buf = (netbsd32_charp)(u_long)p->op_buf;
+}
+
+int
+netbsd32_md_ioctl(fp, com, data32, p)
+	struct file *fp;
+	netbsd32_u_long com;
+	caddr_t data32;
+	struct proc *p;
+{
+	u_int size;
+	caddr_t data, memp = NULL;
+#define STK_PARAMS	128
+	u_long stkbuf[STK_PARAMS/sizeof(u_long)];
+	int error;
+
+	switch (com) {
+	case FBIOPUTCMAP32:
+		IOCTL_STRUCT_CONV_TO(FBIOPUTCMAP, fbcmap);
+	case FBIOGETCMAP32:
+		IOCTL_STRUCT_CONV_TO(FBIOGETCMAP, fbcmap);
+
+	case FBIOSCURSOR32:
+		IOCTL_STRUCT_CONV_TO(FBIOSCURSOR, fbcursor);
+	case FBIOGCURSOR32:
+		IOCTL_STRUCT_CONV_TO(FBIOGCURSOR, fbcursor);
+
+	case OPIOCGET32:
+		IOCTL_STRUCT_CONV_TO(OPIOCGET, opiocdesc);
+	case OPIOCSET32:
+		IOCTL_STRUCT_CONV_TO(OPIOCSET, opiocdesc);
+	case OPIOCNEXTPROP32:
+		IOCTL_STRUCT_CONV_TO(OPIOCNEXTPROP, opiocdesc);
+	default:
+		error = (*fp->f_ops->fo_ioctl)(fp, com, data32, p);
+	}
+	if (memp)
+		free(memp, M_IOCTLOPS);
+	return (error);
 }

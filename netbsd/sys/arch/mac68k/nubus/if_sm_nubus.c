@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sm_nubus.c,v 1.2.2.1 2000/08/06 12:56:19 briggs Exp $	*/
+/*	$NetBSD: if_sm_nubus.c,v 1.2 2000/08/01 13:08:39 briggs Exp $	*/
 
 /*
  * Copyright (c) 2000 Allen Briggs.

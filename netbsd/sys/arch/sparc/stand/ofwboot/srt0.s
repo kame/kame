@@ -1,4 +1,4 @@
-/*	$NetBSD: srt0.s,v 1.1.2.1 2000/08/26 00:05:19 mrg Exp $	*/
+/*	$NetBSD: srt0.s,v 1.1 2000/08/20 14:58:42 mrg Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.

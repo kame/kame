@@ -1,5 +1,5 @@
 |#
-|# $NetBSD: copyright.S,v 1.2.40.1 2001/04/24 22:31:22 he Exp $
+|# $NetBSD: copyright.S,v 1.3 2000/11/30 21:00:51 scw Exp $
 |#
 
  .ascii "MOTOROLA MICROPROCESSOR & MEMORY TECHNOLOGY GROUP\n"

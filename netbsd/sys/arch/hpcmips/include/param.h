@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.2.4.1 2000/07/23 03:49:30 itojun Exp $	*/
+/*	$NetBSD: param.h,v 1.8 2002/02/26 15:13:22 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -61,7 +61,7 @@
 #define MID_MACHINE MID_HPCMIPS
 
 #define	KERNBASE	0x80000000	/* start of kernel virtual */
-#define KERNTEXTOFF	0x80030000	/* start of kernel text for kvm_mkdb */
+#define KERNTEXTOFF	0x80001000	/* start of kernel text for kvm_mkdb */
 #define	BTOPKERNBASE	((u_long)KERNBASE >> PGSHIFT)
 
 #define	DEV_BSIZE	512
@@ -79,19 +79,16 @@
 #define	MSIZE		256		/* size of an mbuf */
 
 #ifndef MCLSHIFT
-
-# define	MCLSHIFT	11	/* convert bytes to m_buf clusters */
+#define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
 					/* 2K cluster can hold Ether frame */
 #endif	/* MCLSHIFT */
 
 #define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
-#define	MCLOFSET	(MCLBYTES - 1)
 
 #ifndef NMBCLUSTERS
-
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#endif
 
 #ifdef GATEWAY
 #define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
@@ -100,14 +97,14 @@
 #endif
 #endif
 
-#include <machine/intr.h>
-
 #ifdef _KERNEL
 #ifndef _LOCORE
 
-extern void delay __P((int n));
+extern void delay(int);
 extern int cpuspeed;
 #define	DELAY(n)	{ register int N = cpuspeed * (n); while (--N > 0); }
+
+#include <machine/intr.h>
 
 #endif	/* !_LOCORE */
 #endif	/* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$NetBSD: kd.c,v 1.12.4.1 2000/07/05 18:27:32 thorpej Exp $	*/
+/*	$NetBSD: kd.c,v 1.21 2002/03/17 19:40:50 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -45,6 +45,9 @@
  * be a keyboard driver (see sys/dev/sun/kbd.c)
  */
 
+#include "opt_kgdb.h"
+#include "fb.h"
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -64,9 +67,9 @@
 #include <machine/autoconf.h>
 #include <machine/conf.h>
 
-#ifdef RASTERCONSOLE
-#include <machine/fbio.h>
-#include <machine/fbvar.h>
+#if defined(RASTERCONSOLE) && NFB > 0
+#include <dev/sun/fbio.h>
+#include <dev/sun/fbvar.h>
 #endif
 
 #include <dev/cons.h>
@@ -119,7 +122,7 @@ kd_init(kd)
 	/*
 	 * Get the console struct winsize.
 	 */
-#ifdef RASTERCONSOLE
+#if defined(RASTERCONSOLE) && NFB > 0
 	/* If the raster console driver is attached, copy its size */
 	kd->rows = fbrcons_rows();
 	kd->cols = fbrcons_cols();
@@ -144,7 +147,7 @@ kd_init(kd)
 	case PROM_OPENFIRM:
 
 		if (kd->rows == 0 &&
-		    (prop = getpropstring(optionsnode, "screen-#rows"))) {
+		    (prop = PROM_getpropstring(optionsnode, "screen-#rows"))) {
 			int i = 0;
 
 			while (*prop != '\0')
@@ -152,7 +155,7 @@ kd_init(kd)
 			kd->rows = (unsigned short)i;
 		}
 		if (kd->cols == 0 &&
-		    (prop = getpropstring(optionsnode, "screen-#columns"))) {
+		    (prop = PROM_getpropstring(optionsnode, "screen-#columns"))) {
 			int i = 0;
 
 			while (*prop != '\0')
@@ -234,7 +237,7 @@ static	int firstopen = 1;
 
 	splx(s);
 
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return ((*tp->t_linesw->l_open)(dev, tp));
 }
 
 int
@@ -254,7 +257,7 @@ kdclose(dev, flag, mode, p)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 
 	if ((cc = kd->kd_in) != NULL)
@@ -275,7 +278,7 @@ kdread(dev, uio, flag)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -290,7 +293,22 @@ kdwrite(dev, uio, flag)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+kdpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct kd_softc *kd;
+	struct tty *tp;
+
+	kd = &kd_softc; 	/* XXX */
+	tp = kd->kd_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -308,18 +326,19 @@ kdioctl(dev, cmd, data, flag, p)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return error;
 
 	/* Handle any ioctl commands specific to kbd/display. */
 	/* XXX - Send KB* ioctls to kbd module? */
 	/* XXX - Send FB* ioctls to fb module?  */
 
-	return ENOTTY;
+	return EPASSTHROUGH;
 }
 
 void
@@ -398,7 +417,7 @@ kd_later(arg)
 
 	s = spltty();
 	tp->t_state &= ~TS_BUSY;
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 	splx(s);
 }
 
@@ -446,7 +465,7 @@ kd_cons_input(c)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return;
 
-	(*linesw[tp->t_line].l_rint)(c, tp);
+	(*tp->t_linesw->l_rint)(c, tp);
 }
 
 void
@@ -460,6 +479,16 @@ cons_attach_input(cc, cn)
 	cc->cc_upstream = kd_cons_input;
 }
 
+void kd_attach_input(struct cons_channel *);
+void
+kd_attach_input(cc)
+	struct cons_channel *cc;
+{
+	struct kd_softc *kd = &kd_softc;
+
+	kd->kd_in = cc;
+	cc->cc_upstream = kd_cons_input;
+}
 
 /*
  * Default PROM-based console input stream
@@ -613,7 +642,7 @@ prom_get_device_args(prop, args, sz)
 {
 	char *cp, buffer[128];
 
-	cp = getpropstringA(findroot(), (char *)prop, buffer, sizeof buffer);
+	cp = PROM_getpropstringA(findroot(), (char *)prop, buffer, sizeof buffer);
 
 	/*
 	 * Extract device-specific arguments from a PROM device path (if any)

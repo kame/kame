@@ -1,4 +1,4 @@
-/* $NetBSD: lkminit_emul.c,v 1.2 1997/05/19 22:11:12 jtc Exp $ */
+/* $NetBSD: lkminit_emul.c,v 1.6 2001/11/12 23:23:02 lukem Exp $ */
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lkminit_emul.c,v 1.6 2001/11/12 23:23:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/systm.h>
@@ -46,18 +49,13 @@
 #include <sys/file.h>
 #include <sys/errno.h>
 
-#include <compat/freebsd/freebsd_exec.h>
-
-extern int exec_freebsd_aout_makecmds();
-
-struct execsw freebsd_lkm_execsw = {
-  FREEBSD_AOUT_HDR_SIZE, exec_freebsd_aout_makecmds,
-};
+extern const struct emul emul_freebsd;
+int compat_freebsd_lkmentry __P((struct lkm_table *, int, int));
 
 /*
- * declare the filesystem
+ * declare the emulation
  */
-MOD_EXEC("freebsd", -1, &freebsd_lkm_execsw);
+MOD_COMPAT("compat_freebsd", -1, &emul_freebsd);
 
 /*
  * entry point
@@ -68,5 +66,6 @@ compat_freebsd_lkmentry(lkmtp, cmd, ver)
 	int cmd;
 	int ver;
 {
+
 	DISPATCH(lkmtp, cmd, ver, lkm_nofunc, lkm_nofunc, lkm_nofunc);
 }

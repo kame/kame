@@ -1,7 +1,14 @@
-#	$NetBSD: files.sparc,v 1.92.4.1 2000/07/22 21:17:07 pk Exp $
+#	$NetBSD: files.sparc,v 1.112 2002/04/22 09:41:21 augustss Exp $
 
 # @(#)files.sparc	8.1 (Berkeley) 7/19/93
 # sparc-specific configuration info
+
+defflag	opt_sparc_arch.h	SUN4
+defflag	opt_sparc_arch.h	SUN4_MMU3L
+defflag	opt_sparc_arch.h	SUN4C
+defflag	opt_sparc_arch.h	SUN4M
+defflag	opt_sparc_arch.h	SUN4U
+defflag	opt_sparc_arch.h	MSIIEP
 
 # maxpartitions must be first item in files.${ARCH}
 maxpartitions 8
@@ -10,6 +17,24 @@ maxusers 2 8 1024
 
 device mainbus {}
 attach mainbus at root
+
+device msiiep {}
+attach msiiep at mainbus
+
+include "dev/i2o/files.i2o"
+include "dev/pci/files.pci"
+device mspcic {}: pcibus
+attach mspcic at msiiep
+file	arch/sparc/sparc/msiiep.c		msiiep | mspcic
+file	arch/sparc/sparc/pci_machdep.c		msiiep | mspcic
+
+device ebus {[addr = -1]}: pcibus
+attach ebus at pci
+file	arch/sparc/dev/ebus.c			ebus
+
+device rtc
+attach rtc at ebus with rtc_ebus
+file	arch/sparc/dev/rtc.c			rtc_ebus
 
 device iommu {}
 attach iommu at mainbus
@@ -31,24 +56,33 @@ attach auxreg at mainbus with auxreg_mainbus
 attach auxreg at obio with auxreg_obio
 file	arch/sparc/sparc/auxreg.c
 
+defflag	BLINK
+
 device auxiotwo
 attach auxiotwo at obio with auxiotwo_obio
 file	arch/sparc/sparc/auxiotwo.c
 
-device clock
+device clock: mk48txx
 attach clock at mainbus with clock_mainbus
 attach clock at obio with clock_obio
+file	arch/sparc/sparc/mkclock.c		clock
 
-device oclock
+device oclock: intersil7170
 attach oclock at obio
+file	arch/sparc/sparc/oclock.c		oclock
 
 device timer
 attach timer at mainbus with timer_mainbus
 attach timer at obio with timer_obio
+attach timer at msiiep with timer_msiiep
+file	arch/sparc/sparc/timer.c		timer
 
 device eeprom
 attach eeprom at obio
+file	arch/sparc/sparc/eeprom.c		eeprom
+
 file	arch/sparc/sparc/clock.c
+file	dev/clock_subr.c
 
 device power
 attach power at obio
@@ -71,6 +105,8 @@ device tctrl
 attach tctrl at obio
 file	arch/sparc/dev/tctrl.c			tctrl needs-flag
 
+include "dev/sun/files.sun"
+
 device zs {channel = -1}
 attach zs at mainbus with zs_mainbus
 attach zs at obio with zs_obio
@@ -90,12 +126,12 @@ attach sbus at mainbus with sbus_mainbus
 attach sbus at iommu with sbus_iommu
 file	arch/sparc/dev/sbus.c			sbus needs-flag
 
+attach	audiocs at ebus with audiocs_ebus
+file	dev/ebus/cs4231_ebus.c			audiocs_ebus
+
 device tpcic: pcmciabus
 attach tpcic at sbus
 file	arch/sparc/dev/ts102.c			tpcic
-
-# network devices MII bus
-include "dev/mii/files.mii"
 
 # PCMCIA bus
 include "dev/pcmcia/files.pcmcia"
@@ -111,19 +147,21 @@ file dev/ic/z8530tty.c			zstty needs-flag
 file arch/sparc/dev/zs_kgdb.c		kgdb
 
 define zsevent
-file dev/sun/event.c			zsevent
+#file dev/sun/event.c			zsevent
 
 device kbd: zsevent
 attach kbd at zs with kbd_zs
 file dev/sun/kbd_zs.c			kbd_zs
 file dev/sun/kbd.c			kbd needs-flag
 file dev/sun/kbd_tables.c 		kbd
+file dev/sun/sunkbd.c			kbd
 file arch/sparc/dev/kd.c
 
 device ms: zsevent
 attach ms at zs with ms_zs
 file dev/sun/ms_zs.c			ms_zs
 file dev/sun/ms.c			ms needs-flag
+file dev/sun/sunms.c			ms
 
 #
 # Machine-independent SCSI drivers
@@ -146,66 +184,36 @@ file	arch/sparc/dev/dma_obio.c	dma_obio
 attach esp at obio with esp_obio
 file	arch/sparc/dev/esp_obio.c	esp_obio
 
-device	audioamd: audio, am7930
+device	audioamd: audiobus, am7930
 attach	audioamd at mainbus with audioamd_mainbus
 attach	audioamd at sbus with audioamd_sbus
 file	arch/sparc/dev/audioamd.c		audioamd
 file	arch/sparc/sparc/amd7930intr.s		audioamd
 
-# Brooktree DAC attribute
-define bt_dac
-
-# Raster operations for RASTERCONSOLE (this is here so dependancies work).
-include "dev/rasops/files.rasops"
-
-# Include /dev/fb driver only if a framebuffer card is included
-define fb
-
-device bwtwo: fb, rasops1
-attach bwtwo at sbus with bwtwo_sbus
 attach bwtwo at obio with bwtwo_obio
-file	arch/sparc/dev/bwtwo.c		bwtwo needs-flag
-file	arch/sparc/dev/bwtwo_sbus.c	bwtwo_sbus & sbus
 file	arch/sparc/dev/bwtwo_obio.c	bwtwo_obio & obio
 
 device cgtwo: fb, rasops8
 attach cgtwo at vme
 file	arch/sparc/dev/cgtwo.c		cgtwo needs-flag
 
-device cgthree: bt_dac, fb, rasops8
-attach cgthree at sbus with cgthree_sbus
 attach cgthree at obio with cgthree_obio
-file	arch/sparc/dev/cgthree.c	cgthree needs-flag
+file	arch/sparc/dev/cgthree_obio.c	cgthree_obio & obio
 
-device cgfour: bt_dac, fb, rasops8
+device cgfour: bt_dac, fb, rasops8, pfour
 attach cgfour at obio
 file	arch/sparc/dev/cgfour.c		cgfour needs-flag
 
-device cgsix: bt_dac, fb, rasops8
-attach cgsix at sbus with cgsix_sbus
 attach cgsix at obio with cgsix_obio
-file	arch/sparc/dev/cgsix.c		cgsix needs-flag
-file	arch/sparc/dev/cgsix_sbus.c	cgsix_sbus & sbus
 file	arch/sparc/dev/cgsix_obio.c	cgsix_obio & obio
 
-device cgeight: bt_dac, fb, rasops24
+device cgeight: bt_dac, fb, rasops24, pfour
 attach cgeight at obio
 file	arch/sparc/dev/cgeight.c	cgeight needs-flag
-
-device tcx: bt_dac, fb, rasops8, rasops24
-attach tcx at sbus
-file	arch/sparc/dev/tcx.c		tcx needs-flag
 
 device cgfourteen: fb, rasops32
 attach cgfourteen at obio
 file	arch/sparc/dev/cgfourteen.c	cgfourteen needs-flag
-
-device pnozz: fb, bt_dac, rasops8, rasops16, rasops32
-attach pnozz at sbus
-file	arch/sparc/dev/p9100.c		pnozz needs-flag
-
-file	arch/sparc/dev/bt_subr.c	bt_dac
-file	arch/sparc/dev/fb.c		fb needs-flag
 
 # device definition in sys/conf/files
 attach le at obio with le_obio: le24
@@ -216,6 +224,9 @@ file	arch/sparc/dev/if_ie_obio.c	ie_obio
 
 attach com at obio with com_obio
 file	arch/sparc/dev/com_obio.c	com_obio
+
+attach com at ebus with com_ebus
+file	arch/sparc/dev/com_ebus.c	com_ebus
 
 device sw: scsi, ncr5380sbc
 attach sw at obio
@@ -242,7 +253,6 @@ file	arch/sparc/sparc/cache.c
 file	arch/sparc/sparc/conf.c
 file	arch/sparc/sparc/emul.c
 file	arch/sparc/sparc/in_cksum.c
-file	netinet/in4_cksum.c		inet
 file	arch/sparc/sparc/intr.c
 file	arch/sparc/sparc/kgdb_machdep.c	kgdb
 # sparc/sparc/locore.s is handled specially in the makefile,
@@ -254,6 +264,7 @@ file	arch/sparc/sparc/mem.c
 file	arch/sparc/sparc/promlib.c
 file	arch/sparc/sparc/openfirm.c
 file	arch/sparc/sparc/openprom.c
+file	arch/sparc/sparc/procfs_machdep.c	procfs
 file	arch/sparc/sparc/pmap.c
 # the following overrides the generic "sys_process.c"
 # commented out by deraadt
@@ -279,10 +290,12 @@ include "dev/wsfont/files.wsfont"
 
 # SVR4 Binary Compatibility (COMPAT_SVR4)
 include "compat/svr4/files.svr4"
+file	arch/sparc/sparc/svr4_sigcode.s	compat_svr4
 file	arch/sparc/sparc/svr4_machdep.c	compat_svr4
 
 # SunOS Binary Compatibility (COMPAT_SUNOS)
 include "compat/sunos/files.sunos"
+file	arch/sparc/sparc/sunos_sigcode.s compat_sunos
 file	arch/sparc/sparc/sunos_machdep.c compat_sunos
 
 # NetBSD a.out Binary Compatibility (COMPAT_AOUT)
@@ -295,4 +308,4 @@ file	arch/sparc/sparc/compat_13_machdep.c	compat_13 | compat_sunos
 # Miscellaneous
 file	netns/ns_cksum.c		ns
 
-file	arch/sparc/dev/md_root.c	memory_disk_hooks
+file	dev/md_root.c			memory_disk_hooks

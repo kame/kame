@@ -1,7 +1,7 @@
-/*	$NetBSD: ata_wdc.c,v 1.28 2000/06/12 21:10:40 bouyer Exp $	*/
+/*	$NetBSD: ata_wdc.c,v 1.36 2002/04/23 20:41:13 bouyer Exp $	*/
 
 /*
- * Copyright (c) 1998 Manuel Bouyer.
+ * Copyright (c) 1998, 2001 Manuel Bouyer.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -13,8 +13,7 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *	This product includes software developed by Manuel Bouyer.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -68,6 +67,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ata_wdc.c,v 1.36 2002/04/23 20:41:13 bouyer Exp $");
+
 #ifndef WDCDEBUG
 #define WDCDEBUG
 #endif /* WDCDEBUG */
@@ -115,6 +117,7 @@ int wdcdebug_wd_mask = 0;
 
 #define ATA_DELAY 10000 /* 10s for a drive I/O */
 
+int wdc_ata_bio __P((struct ata_drive_datas*, struct ata_bio*));
 void  wdc_ata_bio_start  __P((struct channel_softc *,struct wdc_xfer *));
 void  _wdc_ata_bio_start  __P((struct channel_softc *,struct wdc_xfer *));
 int   wdc_ata_bio_intr   __P((struct channel_softc *, struct wdc_xfer *, int));
@@ -125,10 +128,50 @@ int   wdc_ata_err __P((struct ata_drive_datas *, struct ata_bio *));
 #define WDC_ATA_NOERR 0x00 /* Drive doesn't report an error */
 #define WDC_ATA_RECOV 0x01 /* There was a recovered error */
 #define WDC_ATA_ERR   0x02 /* Drive reports an error */
+int wdc_ata_addref __P((struct ata_drive_datas *));
+void wdc_ata_delref __P((struct ata_drive_datas *));
+void wdc_ata_kill_pending __P((struct ata_drive_datas *));
+
+const struct ata_bustype wdc_ata_bustype = {
+	SCSIPI_BUSTYPE_ATA,
+	wdc_ata_bio,
+	wdc_reset_channel,
+	wdc_exec_command,
+	ata_get_params,
+	wdc_ata_addref,
+	wdc_ata_delref,
+	wdc_ata_kill_pending,
+};
+
+
+/*
+ * Convert a 32 bit command to a 48 bit command.
+ */
+static __inline__
+int to48(int cmd32)
+{
+	switch (cmd32) {
+	case WDCC_READ:
+		return WDCC_READ_EXT;
+	case WDCC_WRITE:
+		return WDCC_WRITE_EXT;
+	case WDCC_READMULTI:
+		return WDCC_READMULTI_EXT;
+	case WDCC_WRITEMULTI:
+		return WDCC_WRITEMULTI_EXT;
+	case WDCC_READDMA:
+		return WDCC_READDMA_EXT;
+	case WDCC_WRITEDMA:
+		return WDCC_WRITEDMA_EXT;
+	default:
+		panic("ata_wdc: illegal 32 bit command %d", cmd32);
+		/*NOTREACHED*/
+	}
+}
 
 /*
  * Handle block I/O operation. Return WDC_COMPLETE, WDC_QUEUED, or
- * WDC_TRY_AGAIN. Must be called at splio().
+ * WDC_TRY_AGAIN. Must be called at splbio().
  */
 int
 wdc_ata_bio(drvp, ata_bio)
@@ -141,6 +184,8 @@ wdc_ata_bio(drvp, ata_bio)
 	xfer = wdc_get_xfer(WDC_NOSLEEP);
 	if (xfer == NULL)
 		return WDC_TRY_AGAIN;
+	if (chp->wdc->cap & WDC_CAPABILITY_NOIRQ)
+		ata_bio->flags |= ATA_POLL;
 	if (ata_bio->flags & ATA_POLL)
 		xfer->c_flags |= C_POLL;
 	if ((drvp->drive_flags & (DRIVE_DMA | DRIVE_UDMA)) &&
@@ -266,7 +311,11 @@ again:
 			}
 		/* Transfer is okay now. */
 		}
-		if (ata_bio->flags & ATA_LBA) {
+		if (ata_bio->flags & ATA_LBA48) {
+			sect = 0;
+			cyl =  0;
+			head = 0;
+		} else if (ata_bio->flags & ATA_LBA) {
 			sect = (ata_bio->blkno >> 0) & 0xff;
 			cyl = (ata_bio->blkno >> 8) & 0xffff;
 			head = (ata_bio->blkno >> 24) & 0x0f;
@@ -301,8 +350,13 @@ again:
 			    WDSD_IBM | (xfer->drive << 4));
 			if (wait_for_ready(chp, ata_delay) < 0)
 				goto timeout;
-			wdccommand(chp, xfer->drive, cmd, cyl,
-			    head, sect, nblks, 0);
+			if (ata_bio->flags & ATA_LBA48) {
+			    wdccommandext(chp, xfer->drive, to48(cmd),
+				(u_int64_t)ata_bio->blkno, nblks);
+			} else {
+			    wdccommand(chp, xfer->drive, cmd, cyl,
+				head, sect, nblks, 0);
+			}
 			/* start the DMA channel */
 			(*chp->wdc->dma_start)(chp->wdc->dma_arg,
 			    chp->channel, xfer->drive);
@@ -324,10 +378,15 @@ again:
 		    WDSD_IBM | (xfer->drive << 4));
 		if (wait_for_ready(chp, ata_delay) < 0)
 			goto timeout;
-		wdccommand(chp, xfer->drive, cmd, cyl,
-		    head, sect, nblks, 
-		    (ata_bio->lp->d_type == DTYPE_ST506) ?
-		    ata_bio->lp->d_precompcyl / 4 : 0);
+		if (ata_bio->flags & ATA_LBA48) {
+		    wdccommandext(chp, xfer->drive, to48(cmd),
+			(u_int64_t) ata_bio->blkno, nblks);
+		} else {
+		    wdccommand(chp, xfer->drive, cmd, cyl,
+			head, sect, nblks,
+			(ata_bio->lp->d_type == DTYPE_ST506) ?
+			ata_bio->lp->d_precompcyl / 4 : 0);
+		}
 	} else if (ata_bio->nblks > 1) {
 		/* The number of blocks in the last stretch may be smaller. */
 		nblks = xfer->c_bcount / ata_bio->lp->d_secsize;
@@ -592,10 +651,8 @@ wdc_ata_bio_kill_xfer(chp, xfer)
 	ata_bio->flags |= ATA_ITSDONE;
 	ata_bio->error = ERR_NODEV;
 	ata_bio->r_error = WDCE_ABRT;
-	if ((ata_bio->flags & ATA_POLL) == 0) {
-		WDCDEBUG_PRINT(("wdc_ata_done: wddone\n"), DEBUG_XFERS);
-		wddone(chp->ch_drive[drive].drv_softc);
-	}
+	WDCDEBUG_PRINT(("wdc_ata_done: wddone\n"), DEBUG_XFERS);
+	wddone(chp->ch_drive[drive].drv_softc);
 }
 
 void
@@ -620,10 +677,8 @@ wdc_ata_bio_done(chp, xfer)
 	wdc_free_xfer(chp, xfer);
 
 	ata_bio->flags |= ATA_ITSDONE;
-	if ((ata_bio->flags & ATA_POLL) == 0) {
-		WDCDEBUG_PRINT(("wdc_ata_done: wddone\n"), DEBUG_XFERS);
-		wddone(chp->ch_drive[drive].drv_softc);
-	}
+	WDCDEBUG_PRINT(("wdc_ata_done: wddone\n"), DEBUG_XFERS);
+	wddone(chp->ch_drive[drive].drv_softc);
 	WDCDEBUG_PRINT(("wdcstart from wdc_ata_done, flags 0x%x\n",
 	    chp->ch_flags), DEBUG_XFERS);
 	wdcstart(chp);

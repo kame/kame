@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_ledma.c,v 1.10.4.2 2000/10/25 16:38:35 tv Exp $	*/
+/*	$NetBSD: if_le_ledma.c,v 1.17 2002/03/20 20:39:15 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le_ledma.c,v 1.17 2002/03/20 20:39:15 eeh Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -114,7 +117,7 @@ struct cfattach le_ledma_ca = {
 
 extern struct cfdriver le_cd;
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -361,12 +364,11 @@ leattach_ledma(parent, self, aux)
 	lesc->sc_dma->sc_client = lesc;
 
 	/* Map device registers */
-	if (bus_space_map2(sa->sa_bustag,
-			   sa->sa_slot,
-			   sa->sa_offset,
-			   sa->sa_size,
-			   BUS_SPACE_MAP_LINEAR,
-			   0, &lesc->sc_reg) != 0) {
+	if (sbus_bus_map(sa->sa_bustag,
+			 sa->sa_slot,
+			 sa->sa_offset,
+			 sa->sa_size,
+			 0, &lesc->sc_reg) != 0) {
 		printf("%s @ ledma: cannot map registers\n", self->dv_xname);
 		return;
 	}

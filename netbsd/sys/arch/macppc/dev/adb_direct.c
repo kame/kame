@@ -1,4 +1,4 @@
-/*	$NetBSD: adb_direct.c,v 1.14.2.1 2001/04/01 16:59:02 he Exp $	*/
+/*	$NetBSD: adb_direct.c,v 1.24 2002/05/05 18:36:03 tsutsui Exp $	*/
 
 /* From: adb_direct.c 2.02 4/18/97 jpw */
 
@@ -71,6 +71,7 @@
 
 #include <macppc/dev/viareg.h>
 #include <macppc/dev/adbvar.h>
+#include <macppc/dev/pm_direct.h>
 
 #define printf_intr printf
 
@@ -285,7 +286,6 @@ int	adb_op_sync __P((Ptr, Ptr, Ptr, short));
 void	adb_read_II __P((u_char *));
 void	adb_hw_setup __P((void));
 void	adb_hw_setup_IIsi __P((u_char *));
-void	adb_comp_exec __P((void));
 int	adb_cmd_result __P((u_char *));
 int	adb_cmd_extra __P((u_char *));
 int	adb_guess_next_device __P((void));
@@ -293,6 +293,8 @@ int	adb_prog_switch_enable __P((void));
 int	adb_prog_switch_disable __P((void));
 /* we should create this and it will be the public version */
 int	send_adb __P((u_char *, void *, void *));
+
+int	setsoftadb __P((void));
 
 #ifdef ADB_DEBUG
 /*
@@ -574,6 +576,7 @@ switch_start:
 		if (adb_debug)
 			printf_intr("intr: unknown ADB state\n");
 #endif
+		break;
 	}
 
 	ADB_VIA_INTR_ENABLE();	/* enable ADB interrupt on IIs. */
@@ -1003,46 +1006,25 @@ adb_soft_intr(void)
 				print_single(adbInbound[adbInHead].data);
 			}
 #endif
-
-		/* call default completion routine if it's valid */
-		if (comprout) {
-			int (*f)() = (void *)comprout;
-
-			(*f)(buffer, compdata, cmd);
-#if 0
-#ifdef __NetBSD__
-			asm("	movml #0xffff,sp@-	| save all registers
-				movl %0,a2 		| compdata
-				movl %1,a1 		| comprout
-				movl %2,a0 		| buffer
-				movl %3,d0 		| cmd
-				jbsr a1@ 		| go call the routine
-				movml sp@+,#0xffff	| restore all registers"
-			    :
-			    : "g"(compdata), "g"(comprout),
-				"g"(buffer), "g"(cmd)
-			    : "d0", "a0", "a1", "a2");
-#else					/* for macos based testing */
-			asm
-			{
-				movem.l a0/a1/a2/d0, -(a7)
-				move.l compdata, a2
-				move.l comprout, a1
-				move.l buffer, a0
-				move.w cmd, d0
-				jsr(a1)
-				movem.l(a7)+, d0/a2/a1/a0
-			}
-#endif
-#endif
-		}
-
+		/* Remove the packet from the queue before calling
+		 * the completion routine, so that the completion
+		 * routine can reentrantly process the queue.  For
+		 * example, this happens when polling is turned on
+		 * by entering the debuger by keystroke.
+		 */
 		s = splhigh();
 		adbInCount--;
 		if (++adbInHead >= ADB_QUEUE)
 			adbInHead = 0;
 		splx(s);
 
+		/* call default completion routine if it's valid */
+		if (comprout) {
+			void (*f)(caddr_t, caddr_t, int) =
+			    (void (*)(caddr_t, caddr_t, int))comprout;
+
+			(*f)(buffer, compdata, cmd);
+		}
 	}
 	return;
 }
@@ -1280,8 +1262,14 @@ adb_reinit(void)
 	delay(1000);
 
 	/* send an ADB reset first */
-	adb_op_sync((Ptr)0, (Ptr)0, (Ptr)0, (short)0x00);
+	result = adb_op_sync((Ptr)0, (Ptr)0, (Ptr)0, (short)0x00);
 	delay(200000);
+
+#ifdef ADB_DEBUG
+	if (result && adb_debug) {
+		printf_intr("adb_reinit: failed to reset, result = %d\n",result);
+	}
+#endif
 
 	/*
 	 * Probe for ADB devices. Probe devices 1-15 quickly to determine
@@ -1306,6 +1294,13 @@ adb_reinit(void)
 		command = ADBTALK(i, 3);
 		result = adb_op_sync((Ptr)send_string, (Ptr)0,
 		    (Ptr)0, (short)command);
+
+#ifdef ADB_DEBUG
+		if (result && adb_debug) {
+			printf_intr("adb_reinit: scan of device %d, result = %d, str = 0x%x\n",
+					i,result,send_string[0]);
+		}
+#endif
 
 		if (send_string[0] != 0) {
 			/* check for valid device handler */
@@ -1493,46 +1488,6 @@ adb_reinit(void)
 		splx(s);
 }
 
-
-#if 0
-/*
- * adb_comp_exec
- * This is a general routine that calls the completion routine if there is one.
- * NOTE: This routine is now only used by pm_direct.c
- *       All the code in this file (adb_direct.c) uses 
- *       the adb_pass_up routine now.
- */
-void
-adb_comp_exec(void)
-{
-	if ((long)0 != adbCompRout) /* don't call if empty return location */
-#ifdef __NetBSD__
-		asm("	movml #0xffff,sp@-	| save all registers
-			movl %0,a2		| adbCompData
-			movl %1,a1		| adbCompRout
-			movl %2,a0		| adbBuffer
-			movl %3,d0		| adbWaitingCmd
-			jbsr a1@		| go call the routine
-			movml sp@+,#0xffff	| restore all registers"
-		    :
-		    : "g"(adbCompData), "g"(adbCompRout),
-			"g"(adbBuffer), "g"(adbWaitingCmd)
-		    : "d0", "a0", "a1", "a2");
-#else /* for Mac OS-based testing */
-		asm {
-			movem.l a0/a1/a2/d0, -(a7)
-			move.l adbCompData, a2
-			move.l adbCompRout, a1
-			move.l adbBuffer, a0
-			move.w adbWaitingCmd, d0
-			jsr(a1)
-			movem.l(a7) +, d0/a2/a1/a0
-		}
-#endif
-}
-#endif
-
-
 /*
  * adb_cmd_result
  *
@@ -1610,7 +1565,6 @@ adb_cmd_extra(u_char *in)
 	}
 }
 
-
 /*
  * adb_op_sync
  *
@@ -1625,18 +1579,40 @@ adb_cmd_extra(u_char *in)
 int
 adb_op_sync(Ptr buffer, Ptr compRout, Ptr data, short command)
 {
+	int tmout;
 	int result;
 	volatile int flag = 0;
 
 	result = adb_op(buffer, (void *)adb_op_comprout,
 	    (void *)&flag, command);	/* send command */
-	if (result == 0)		/* send ok? */
-		while (0 == flag)
-			/* wait for compl. routine */;
+	if (result == 0) {		/* send ok? */
+		/*
+		 * Total time to wait is calculated as follows:
+		 *  - Tlt (stop to start time): 260 usec
+		 *  - start bit: 100 usec
+		 *  - up to 8 data bytes: 64 * 100 usec = 6400 usec
+		 *  - stop bit (with SRQ): 140 usec
+		 * Total: 6900 usec
+		 *
+		 * This is the total time allowed by the specification.  Any
+		 * device that doesn't conform to this will fail to operate
+		 * properly on some Apple systems.  In spite of this we
+		 * double the time to wait; some Cuda-based apparently
+		 * queues some commands and allows the main CPU to continue
+		 * processing (radical concept, eh?).  To be safe, allow
+		 * time for two complete ADB transactions to occur.
+		 */
+		for (tmout = 13800; !flag && tmout >= 10; tmout -= 10)
+			delay(10);
+		if (!flag && tmout > 0)
+			delay(tmout);
+
+		if (!flag)
+			result = -2;
+	}
 
 	return result;
 }
-
 
 /*
  * adb_op_comprout
@@ -1916,6 +1892,9 @@ adb_read_date_time(unsigned long *time)
 		while (0 == flag)	/* wait for result */
 			;
 
+		/* XXX to avoid wrong reordering by gcc 2.95.x with -fgcse */
+		__asm volatile ("" ::: "memory");
+
 		memcpy(time, output + 1, 4);
 		return 0;
 
@@ -2138,14 +2117,13 @@ adb_cuda_autopoll()
 	volatile int flag = 0;
 	int result;
 	u_char output[16];
-	extern void adb_op_comprout();
 
 	output[0] = 0x03;	/* 3-byte message */
 	output[1] = 0x01;	/* to pram/rtc device */
 	output[2] = 0x01;	/* cuda autopoll */
 	output[3] = 0x01;
-	result = send_adb_cuda(output, output, adb_op_comprout,
-		(void *)&flag, 0);
+	result = send_adb_cuda(output, output, adb_op_comprout, (void *)&flag,
+			       0);
 	if (result != 0)	/* exit if not sent */
 		return;
 
@@ -2153,9 +2131,8 @@ adb_cuda_autopoll()
 }
 
 void
-adb_restart()
+adb_restart(void)
 {
-	volatile int flag = 0;
 	int result;
 	u_char output[16];
 
@@ -2166,8 +2143,7 @@ adb_restart()
 		output[0] = 0x02;	/* 2 byte message */
 		output[1] = 0x01;	/* to pram/rtc/soft-power device */
 		output[2] = 0x11;	/* restart */
-		result = send_adb_cuda((u_char *)output, (u_char *)0,
-				       (void *)0, (void *)0, (int)0);
+		result = send_adb_cuda(output, NULL, NULL, NULL, 0);
 		if (result != 0)	/* exit if not sent */
 			return;
 		while (1);		/* not return */

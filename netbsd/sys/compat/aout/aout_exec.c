@@ -1,7 +1,7 @@
-/*	$NetBSD: aout_exec.c,v 1.2 2000/06/06 19:04:16 soren Exp $	*/
+/*	$NetBSD: aout_exec.c,v 1.13 2001/11/13 02:07:52 lukem Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,7 +36,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: aout_exec.c,v 1.13 2001/11/13 02:07:52 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_syscall_debug.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,41 +49,45 @@
 #include <sys/exec.h>
 #include <sys/signalvar.h>
 
-#include <compat/aout/aout_exec.h>
 #include <compat/aout/aout_syscall.h>
  
-const char aout_emul_path[] = "/emul/aout";
 extern struct sysent aout_sysent[];
 #ifdef SYSCALL_DEBUG
-extern char *aout_syscallnames[];
+extern const char * const aout_syscallnames[];
 #endif
 extern char sigcode[], esigcode[];
-
+#ifdef __HAVE_SYSCALL_INTERN
+void syscall_intern __P((struct proc *));
+#else
+void syscall __P((void));
+#endif
 
 struct emul emul_netbsd_aout = {
 	"netbsd",
+	"/emul/aout",
+#ifndef __HAVE_MINIMAL_EMUL
+	EMUL_HAS_SYS___syscall,
 	NULL,
-	sendsig,
 	AOUT_SYS_syscall,
 	AOUT_SYS_MAXSYSCALL,
+#endif
 	aout_sysent,
 #ifdef SYSCALL_DEBUG
 	aout_syscallnames,
 #else
 	NULL,
 #endif
-	0,
-	copyargs,
-	setregs,
+	sendsig,
+	trapsignal,
 	sigcode,
 	esigcode,
+	setregs,
+	NULL,
+	NULL,
+	NULL,
+#ifdef __HAVE_SYSCALL_INTERN
+	syscall_intern,
+#else
+	syscall,
+#endif
 };
-
-int
-exec_aoutcompat_makecmds(p, epp)
-	struct proc *p;
-	struct exec_package *epp;
-{
-	epp->ep_emul = &emul_netbsd_aout;
-	return exec_aout_makecmds(p, epp);
-}

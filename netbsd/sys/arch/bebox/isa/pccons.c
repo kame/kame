@@ -1,4 +1,4 @@
-/*	$NetBSD: pccons.c,v 1.17.4.1 2000/06/30 16:27:21 simonb Exp $	*/
+/*	$NetBSD: pccons.c,v 1.22 2002/03/17 19:40:36 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -637,7 +637,7 @@ pcopen(dev, flag, mode, p)
 		return (EBUSY);
 	tp->t_state |= TS_CARR_ON;
 
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return ((*tp->t_linesw->l_open)(dev, tp));
 }
 
 int
@@ -649,7 +649,7 @@ pcclose(dev, flag, mode, p)
 	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 #ifdef notyet /* XXX */
 	ttyfree(tp);
@@ -666,7 +666,7 @@ pcread(dev, uio, flag)
 	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -678,7 +678,19 @@ pcwrite(dev, uio, flag)
 	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+pcpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -714,7 +726,7 @@ pcintr(arg)
 			return (1);
 		if (cp)
 			do
-				(*linesw[tp->t_line].l_rint)(*cp++, tp);
+				(*tp->t_linesw->l_rint)(*cp++, tp);
 			while (*cp);
 	} while (isa_inb(IO_KBD + KBSTATP) & KBS_DIB);
 	return (1);
@@ -732,11 +744,12 @@ pcioctl(dev, cmd, data, flag, p)
 	struct tty *tp = sc->sc_tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -779,7 +792,7 @@ pcioctl(dev, cmd, data, flag, p)
 		return (0);
  	}
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 
 #ifdef DIAGNOSTIC
@@ -1282,9 +1295,9 @@ sput(cp, n)
 					else if (cx > nrow)
 						cx = nrow;
 					if (cx < nrow)
-						bcopy(crtAt + vs.ncol * cx,
-						    crtAt, vs.ncol * (nrow -
-						    cx) * CHR);
+						memmove(crtAt, crtAt + vs.ncol *
+						    cx, vs.ncol * (nrow - cx) *
+						    CHR);
 					fillw((vs.at << 8) | ' ',
 					    crtAt + vs.ncol * (nrow - cx),
 					    vs.ncol * cx);
@@ -1298,8 +1311,8 @@ sput(cp, n)
 					else if (cx > vs.nrow)
 						cx = vs.nrow;
 					if (cx < vs.nrow)
-						bcopy(Crtat + vs.ncol * cx,
-						    Crtat, vs.ncol * (vs.nrow -
+						memmove(Crtat, Crtat + vs.ncol *
+						    cx, vs.ncol * (vs.nrow -
 						    cx) * CHR);
 					fillw((vs.at << 8) | ' ',
 					    Crtat + vs.ncol * (vs.nrow - cx),
@@ -1320,10 +1333,9 @@ sput(cp, n)
 					else if (cx > nrow)
 						cx = nrow;
 					if (cx < nrow)
-						bcopy(crtAt,
-						    crtAt + vs.ncol * cx,
-						    vs.ncol * (nrow - cx) *
-						    CHR);
+						memmove(crtAt + vs.ncol * cx,
+						    crtAt, vs.ncol * (nrow -
+						    cx) * CHR);
 					fillw((vs.at << 8) | ' ', 
 					    crtAt, vs.ncol * cx);
 					vs.state = 0;
@@ -1336,10 +1348,9 @@ sput(cp, n)
 					else if (cx > vs.nrow)
 						cx = vs.nrow;
 					if (cx < vs.nrow)
-						bcopy(Crtat,
-						    Crtat + vs.ncol * cx,
-						    vs.ncol * (vs.nrow - cx) *
-						    CHR);
+						memmove(Crtat + vs.ncol * cx,
+						    Crtat, vs.ncol * (vs.nrow -
+						    cx) * CHR);
 					fillw((vs.at << 8) | ' ', 
 					    Crtat, vs.ncol * cx);
 #if 0
@@ -1404,7 +1415,7 @@ sput(cp, n)
 			scroll = 0;
 			/* scroll check */
 			if (crtat >= Crtat + vs.nchr) {
-				bcopy(Crtat + vs.ncol, Crtat,
+				memmove(Crtat, Crtat + vs.ncol,
 				    (vs.nchr - vs.ncol) * CHR);
 				fillw((vs.at << 8) | ' ',
 				    Crtat + vs.nchr - vs.ncol,

@@ -1,4 +1,4 @@
-/*	$NetBSD: vsbus.c,v 1.26.2.1 2000/07/31 18:11:59 ragge Exp $ */
+/*	$NetBSD: vsbus.c,v 1.32 2001/05/16 05:36:56 matt Exp $ */
 /*
  * Copyright (c) 1996, 1999 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -47,8 +47,7 @@
 #include <sys/syslog.h>
 #include <sys/stat.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define _VAX_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -121,6 +120,11 @@ vsbus_match(parent, cf, aux)
 	struct cfdata	*cf;
 	void	*aux;
 {
+#if VAX53 || VAXANY
+	/* Kludge: VAX53 is... special */
+	if (vax_boardtype == VAX_BTYP_53 && (int)aux == 1)
+		return 1; /* Hack */
+#endif
 	if (vax_bustype == VAX_VSBUS)
 		return 1;
 	return 0;
@@ -139,7 +143,8 @@ vsbus_attach(parent, self, aux)
 	sc->sc_dmatag = vsbus_bus_dma_tag;
 
 	switch (vax_boardtype) {
-#if VAX49
+#if VAX49 || VAX53
+	case VAX_BTYP_53:
 	case VAX_BTYP_49:
 		sc->sc_vsregs = vax_map_physmem(0x25c00000, 1);
 		sc->sc_intreq = (char *)sc->sc_vsregs + 12;
@@ -249,7 +254,7 @@ vsbus_search(parent, cf, aux)
 	return 0;
 
 fail:
-	printf("%s%d at %s csr %x %s\n",
+	printf("%s%d at %s csr 0x%x %s\n",
 	    cf->cf_driver->cd_name, cf->cf_unit, parent->dv_xname,
 	    cf->cf_loc[0], (i ? "zero vector" : "didn't interrupt"));
 forgetit:
@@ -302,13 +307,13 @@ vsbus_copytoproc(struct proc *p, caddr_t from, caddr_t to, int len)
 	struct pte *pte;
 	paddr_t pa;
 
-	if ((long)to & KERNBASE) { /* In kernel space */
+	if ((vaddr_t)to & KERNBASE) { /* In kernel space */
 		bcopy(from, to, len);
 		return;
 	}
-	pte = uvtopte(TRUNC_PAGE(to), (&p->p_addr->u_pcb));
+	pte = uvtopte(trunc_page((vaddr_t)to), &p->p_addr->u_pcb);
 	if ((vaddr_t)to & PGOFSET) {
-		int cz = ROUND_PAGE(to) - (vaddr_t)to;
+		int cz = round_page((vaddr_t)to) - (vaddr_t)to;
 
 		pa = (pte->pg_pfn << VAX_PGSHIFT) | (NBPG - cz) | KERNBASE;
 		bcopy(from, (caddr_t)pa, min(cz, len));
@@ -333,13 +338,13 @@ vsbus_copyfromproc(struct proc *p, caddr_t from, caddr_t to, int len)
 	struct pte *pte;
 	paddr_t pa;
 
-	if ((long)from & KERNBASE) { /* In kernel space */
+	if ((vaddr_t)from & KERNBASE) { /* In kernel space */
 		bcopy(from, to, len);
 		return;
 	}
-	pte = uvtopte(TRUNC_PAGE(from), (&p->p_addr->u_pcb));
+	pte = uvtopte(trunc_page((vaddr_t)from), &p->p_addr->u_pcb);
 	if ((vaddr_t)from & PGOFSET) {
-		int cz = ROUND_PAGE(from) - (vaddr_t)from;
+		int cz = round_page((vaddr_t)from) - (vaddr_t)from;
 
 		pa = (pte->pg_pfn << VAX_PGSHIFT) | (NBPG - cz) | KERNBASE;
 		bcopy((caddr_t)pa, to, min(cz, len));

@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.42 2000/05/28 05:49:03 thorpej Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.52 2002/03/04 02:43:25 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1996 Matthias Pfaller.
@@ -53,9 +53,6 @@
 #include <sys/core.h>
 #include <sys/exec.h>
 #include <sys/ptrace.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -268,7 +265,7 @@ setredzone(pte, vaddr)
 /*
  * Move pages from one kernel virtual address to another.
  * Both addresses are assumed to reside in the Sysmap,
- * and size must be a multiple of CLSIZE.
+ * and size must be a multiple of NBPG.
  */
 void
 pagemove(from, to, size)
@@ -279,8 +276,8 @@ pagemove(from, to, size)
 
 	if (size % NBPG)
 		panic("pagemove");
-	fpte = kvtopte(from);
-	tpte = kvtopte(to);
+	fpte = kvtopte((vaddr_t)from);
+	tpte = kvtopte((vaddr_t)to);
 
 	if (size <= NBPG * 16) {
 		while (size > 0) {
@@ -304,7 +301,7 @@ pagemove(from, to, size)
 			to += NBPG;
 			size -= NBPG;
 		}
-		pmap_update();
+		tlbflush();
 	}
 }
 
@@ -321,8 +318,6 @@ kvtop(addr)
 		panic("kvtop: zero page frame");
 	return((int)pa);
 }
-
-extern vm_map_t phys_map;
 
 /*
  * Map a user I/O request into kernel virtual address space.
@@ -359,12 +354,12 @@ vmapbuf(bp, len)
 	while (len) {
 		(void) pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map),
 		    faddr, &fpa);
-		pmap_enter(vm_map_pmap(phys_map), taddr, fpa,
-			   VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+		pmap_kenter_pa(taddr, fpa, VM_PROT_READ | VM_PROT_WRITE);
 		faddr += PAGE_SIZE;
 		taddr += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	}
+	pmap_update(vm_map_pmap(phys_map));
 }
 
 /*
@@ -382,6 +377,8 @@ vunmapbuf(bp, len)
 	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - addr;
 	len = round_page(off + len);
+	pmap_kremove(addr, len);
+	pmap_update(pmap_kernel());
 	uvm_km_free_wakeup(phys_map, addr, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;

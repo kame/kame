@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.11.4.1 2000/10/17 02:07:11 tv Exp $	*/
+/*	$NetBSD: pmap.h,v 1.22 2002/04/16 23:11:20 eeh Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -157,14 +157,18 @@ extern struct pmap kernel_pmap_;
 #define	pmap_kernel()	(&kernel_pmap_)
 
 int pmap_count_res __P((pmap_t pmap));
-/* int pmap_change_wiring __P((pmap_t pm, vaddr_t va, boolean_t wired)); */
-#define pmap_resident_count(pm)		pmap_count_res((pm))
-#define pmap_from_phys_address(x,f)	((x)>>PGSHIFT)
-#define	pmap_phys_address(x)		((((paddr_t)(x))<<PGSHIFT)|PMAP_NC)
+int pmap_count_wired __P((pmap_t pmap));
+#define	pmap_resident_count(pm)		pmap_count_res((pm))
+#define	pmap_wired_count(pm)		pmap_count_wired((pm))
+#define	pmap_from_phys_address(x,f)	((x)&~PGOFSET)
+#define	pmap_phys_address(x)		(x)
+#define	pmap_update(pmap)		/* nothing (yet) */
 
 void pmap_bootstrap __P((u_long kernelstart, u_long kernelend, u_int numctx));
 /* make sure all page mappings are modulo 16K to prevent d$ aliasing */
-#define PMAP_PREFER(pa, va)	(*(va)+=(((*(va))^(pa))&(1<<(PGSHIFT+1))))
+#define	PMAP_PREFER(pa, va)	(*(va)+=(((*(va))^(pa))&(1<<(PGSHIFT))))
+
+#define	PMAP_GROWKERNEL         /* turn on pmap_growkernel interface */
 
 /* SPARC specific? */
 void		pmap_redzone __P((void));
@@ -181,5 +185,13 @@ void	ctx_free __P((struct pmap*));
 
 
 #endif	/* _KERNEL */
+
+/* This is only for compatibility with the SPARC */ 
+struct segmap {
+	int	*sg_pte;		/* points to NPTESG PTEs */
+	pmeg_t	sg_pmeg;		/* the MMU segment number (4c) */
+	u_char	sg_npte;		/* number of valid PTEs per seg */
+};
+
 #endif	/* _LOCORE */
 #endif	/* _MACHINE_PMAP_H_ */

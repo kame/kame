@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_pcctwo.c,v 1.1.2.1 2000/10/17 19:54:48 scw Exp $	*/
+/*	$NetBSD: zs_pcctwo.c,v 1.5 2002/02/12 20:38:34 scw Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -66,9 +66,10 @@
 #include <machine/cpu.h>
 #include <machine/bus.h>
 
+#include <dev/mvme/pcctworeg.h>
+#include <dev/mvme/pcctwovar.h>
+
 #include <mvme68k/dev/mainbus.h>
-#include <mvme68k/dev/pcctworeg.h>
-#include <mvme68k/dev/pcctwovar.h>
 #include <mvme68k/dev/zsvar.h>
 
 
@@ -96,7 +97,8 @@ zsc_pcctwo_match(parent, cf, aux)
 {
 	struct pcctwo_attach_args *pa = aux;
 
-	if (strcmp(pa->pa_name, zsc_cd.cd_name) || machineid != MVME_162)
+	if (strcmp(pa->pa_name, zsc_cd.cd_name) ||
+	    (machineid != MVME_162 && machineid != MVME_172))
 		return (0);
 
 	pa->pa_ipl = cf->pcctwocf_ipl;
@@ -135,10 +137,13 @@ zsc_pcctwo_attach(parent, self, aux)
 	/* Do common parts of SCC configuration. */
 	zs_config(zsc, &zs, vector + PCCTWO_VECBASE, PCLK_162);
 
+	evcnt_attach_dynamic(&zsc->zsc_evcnt, EVCNT_TYPE_INTR,
+	    pcctwointr_evcnt(zs_level), "rs232", zsc->zsc_dev.dv_xname);
+
 	/*
 	 * Now safe to install interrupt handlers.
 	 */
-	pcctwointr_establish(vector++, zshard_unshared, zs_level, zsc);
+	pcctwointr_establish(vector++, zshard_unshared, zs_level, zsc, NULL);
 
 	/*
 	 * Set master interrupt enable.
@@ -151,13 +156,13 @@ zsc_pcctwo_attach(parent, self, aux)
  ****************************************************************/
 
 /*
- * Check for SCC console.  The MVME-162 always uses unit 0 chan 0.
+ * Check for SCC console.  The MVME-1x2 always uses unit 0 chan 0.
  */
 void
 zsc_pcctwocnprobe(cp)
 	struct consdev *cp;
 {
-	if (machineid != MVME_162) {
+	if (machineid != MVME_162 && machineid != MVME_172) {
 		cp->cn_pri = CN_DEAD;
 		return;
 	}
@@ -171,11 +176,11 @@ void
 zsc_pcctwocninit(cp)
 	struct consdev *cp;
 {
-	bus_space_tag_t bust = MVME68K_INTIO_BUS_SPACE;
 	bus_space_handle_t bush;
 	struct zsdevice zs;
 
-	bus_space_map(bust, MAINBUS_PCCTWO_OFFSET + MCCHIP_ZS0_OFF, 8, 0,&bush);
+	bus_space_map(&_mainbus_space_tag,
+	    intiobase_phys + MAINBUS_PCCTWO_OFFSET + MCCHIP_ZS0_OFF, 8, 0,&bush);
 
 	/* XXX: This is a gross hack. I need to bus-space zs.c ... */
 	zs.zs_chan_b.zc_csr = (volatile u_char *) bush + 1;

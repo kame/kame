@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_dagutils.c,v 1.6 1999/12/09 02:26:09 oster Exp $	*/
+/*	$NetBSD: rf_dagutils.c,v 1.10 2002/03/04 01:38:32 wiz Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -32,8 +32,12 @@
  *
  *****************************************************************************/
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_dagutils.c,v 1.10 2002/03/04 01:38:32 wiz Exp $");
+
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_archs.h"
-#include "rf_types.h"
 #include "rf_threadstuff.h"
 #include "rf_raid.h"
 #include "rf_dag.h"
@@ -248,7 +252,7 @@ rf_AllocDAGHeader()
 
 	RF_FREELIST_GET(rf_dagh_freelist, dh, next, (RF_DagHeader_t *));
 	if (dh) {
-		bzero((char *) dh, sizeof(RF_DagHeader_t));
+		memset((char *) dh, 0, sizeof(RF_DagHeader_t));
 	}
 	return (dh);
 }
@@ -890,7 +894,7 @@ rf_PDAOverlap(
  *                to be read for recovery.
  */
  /* in: asm - ASM for the actual access, one stripe only */
- /* in: faildPDA - which component of the access has failed */
+ /* in: failedPDA - which component of the access has failed */
  /* in: dag_h - header of the DAG we're going to create */
  /* out: new_asm_h - the two new ASMs */
  /* out: nXorBufs - the total number of xor bufs required */

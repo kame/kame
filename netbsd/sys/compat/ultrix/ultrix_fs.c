@@ -1,4 +1,4 @@
-/*	$NetBSD: ultrix_fs.c,v 1.18 2000/03/30 11:27:21 augustss Exp $	*/
+/*	$NetBSD: ultrix_fs.c,v 1.22 2002/03/16 20:43:58 christos Exp $	*/
 
 /*
  * Copyright (c) 1995, 1997 Jonathan Stone
@@ -32,6 +32,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ultrix_fs.c,v 1.22 2002/03/16 20:43:58 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -53,8 +56,6 @@
 #include <sys/syscallargs.h>
 #include <compat/ultrix/ultrix_syscallargs.h>
 #include <compat/common/compat_util.h>
-
-#include <vm/vm.h>
 
 #define	ULTRIX_MAXPATHLEN	1024
 
@@ -359,7 +360,7 @@ ultrix_sys_mount(p, v, retval)
 	struct sys_mount_args nuap;
 	char *native_fstype;
 
-	caddr_t usp = stackgap_init(p->p_emul);
+	caddr_t usp = stackgap_init(p, 0);
 
 	memset(&nuap, 0, sizeof(nuap));
 	SCARG(&nuap, flags) = 0;
@@ -419,7 +420,7 @@ ultrix_sys_mount(p, v, retval)
 		 */
 		fsname[0] = 0;
 		if ((error = copyinstr((caddr_t)SCARG(&nuap, path), fsname,
-				      sizeof fsname, (u_int*)0)) != 0)
+				      sizeof fsname, NULL)) != 0)
 			return(error);
 		if (strcmp(fsname, "/") == 0) {
 			SCARG(&nuap, flags) |= MNT_UPDATE;

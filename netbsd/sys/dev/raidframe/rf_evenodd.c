@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_evenodd.c,v 1.4 2000/01/07 03:40:59 oster Exp $	*/
+/*	$NetBSD: rf_evenodd.c,v 1.7 2001/11/13 07:11:14 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -32,11 +32,15 @@
  *
  ****************************************************************************************/
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_evenodd.c,v 1.7 2001/11/13 07:11:14 lukem Exp $");
+
 #include "rf_archs.h"
 
 #if RF_INCLUDE_EVENODD > 0
 
-#include "rf_types.h"
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_raid.h"
 #include "rf_dag.h"
 #include "rf_dagffrd.h"
@@ -48,7 +52,6 @@
 #include "rf_etimer.h"
 #include "rf_general.h"
 #include "rf_evenodd.h"
-#include "rf_configure.h"
 #include "rf_parityscan.h"
 #include "rf_utils.h"
 #include "rf_map.h"
@@ -427,7 +430,7 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 	blockNode->succedents[layoutPtr->numDataCol + 1]->params[0].p = asmap->qInfo;
 
 	/* fire off the DAG */
-	bzero((char *) &tracerec, sizeof(tracerec));
+	memset((char *) &tracerec, 0, sizeof(tracerec));
 	rd_dag_h->tracerec = &tracerec;
 
 	if (rf_verifyParityDebug) {
@@ -488,7 +491,7 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 		wrBlock->succedents[0]->params[0].p = asmap->parityInfo;
 		wrBlock->succedents[0]->params[2].v = psID;
 		wrBlock->succedents[0]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0, 0, which_ru);
-		bzero((char *) &tracerec, sizeof(tracerec));
+		memset((char *) &tracerec, 0, sizeof(tracerec));
 		wr_dag_h->tracerec = &tracerec;
 		if (rf_verifyParityDebug) {
 			printf("Parity verify write dag:\n");
@@ -517,7 +520,7 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 		wrBlock->succedents[0]->params[0].p = asmap->qInfo;
 		wrBlock->succedents[0]->params[2].v = psID;
 		wrBlock->succedents[0]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0, 0, which_ru);
-		bzero((char *) &tracerec, sizeof(tracerec));
+		memset((char *) &tracerec, 0, sizeof(tracerec));
 		wr_dag_h->tracerec = &tracerec;
 		if (rf_verifyParityDebug) {
 			printf("Dag of write new second redundant information in parity verify :\n");

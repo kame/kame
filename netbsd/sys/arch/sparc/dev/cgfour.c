@@ -1,4 +1,4 @@
-/*	$NetBSD: cgfour.c,v 1.21.4.1 2000/06/30 16:27:37 simonb Exp $	*/
+/*	$NetBSD: cgfour.c,v 1.26 2002/03/11 16:27:01 pk Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -103,26 +103,22 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
-
-#include <machine/fbio.h>
 #include <machine/autoconf.h>
-#include <machine/pmap.h>
-#include <machine/fbvar.h>
 #include <machine/eeprom.h>
 #include <machine/conf.h>
 
-#include <sparc/dev/btreg.h>
-#include <sparc/dev/btvar.h>
-#include <sparc/dev/pfourreg.h>
+#include <dev/sun/fbio.h>
+#include <dev/sun/fbvar.h>
+#include <dev/sun/btreg.h>
+#include <dev/sun/btvar.h>
+#include <dev/sun/pfourreg.h>
 
 /* per-display variables */
 struct cgfour_softc {
 	struct device	sc_dev;		/* base device */
 	struct fbdevice	sc_fb;		/* frame buffer device */
 	bus_space_tag_t	sc_bustag;
-	bus_type_t	sc_btype;	/* phys address description */
-	bus_addr_t	sc_paddr;	/* for device mmap() */
+	bus_addr_t	sc_paddr;	/* phys address for device mmap() */
 
 	volatile struct fbcontrol *sc_fbc;	/* Brooktree registers */
 	union bt_cmap	sc_cmap;	/* Brooktree color map */
@@ -175,7 +171,7 @@ cgfourmatch(parent, cf, aux)
 		return (0);
 
 	oba = &uoba->uoba_oba4;
-	return (bus_space_probe(oba->oba_bustag, 0, oba->oba_paddr,
+	return (bus_space_probe(oba->oba_bustag, oba->oba_paddr,
 				4,	/* probe size */
 				0,	/* offset */
 				0,	/* flags */
@@ -209,15 +205,13 @@ cgfourattach(parent, self, aux)
 	int ramsize, i, isconsole;
 
 	sc->sc_bustag = oba->oba_bustag;
-	sc->sc_btype = (bus_type_t)0;
 	sc->sc_paddr = (bus_addr_t)oba->oba_paddr;
 
 	/* Map the pfour register. */
-	if (obio_bus_map(oba->oba_bustag, oba->oba_paddr,
-			 0,
-			 sizeof(u_int32_t),
-			 BUS_SPACE_MAP_LINEAR,
-			 0, &bh) != 0) {
+	if (bus_space_map(oba->oba_bustag, oba->oba_paddr,
+			  sizeof(u_int32_t),
+			  BUS_SPACE_MAP_LINEAR,
+			  &bh) != 0) {
 		printf("%s: cannot map control registers\n", self->dv_xname);
 		return;
 	}
@@ -276,11 +270,11 @@ cgfourattach(parent, self, aux)
 #endif
 
 	/* Map the Brooktree. */
-	if (obio_bus_map(oba->oba_bustag, oba->oba_paddr,
-			 PFOUR_COLOR_OFF_CMAP,
-			 sizeof(struct fbcontrol),
-			 BUS_SPACE_MAP_LINEAR,
-			 0, &bh) != 0) {
+	if (bus_space_map(oba->oba_bustag,
+			  oba->oba_paddr + PFOUR_COLOR_OFF_CMAP,
+			  sizeof(struct fbcontrol),
+			  BUS_SPACE_MAP_LINEAR,
+			  &bh) != 0) {
 		printf("%s: cannot map control registers\n", self->dv_xname);
 		return;
 	}
@@ -424,7 +418,6 @@ cgfourmmap(dev, off, prot)
 	int prot;
 {
 	struct cgfour_softc *sc = cgfour_cd.cd_devs[minor(dev)];
-	bus_space_handle_t bh;
 	off_t poff;
 
 #define START_ENABLE	(128*1024)
@@ -469,13 +462,9 @@ cgfourmmap(dev, off, prot)
 	} else
 		return (-1);
 
-	if (bus_space_mmap(sc->sc_bustag,
-			   sc->sc_btype,
-			   sc->sc_paddr + poff,
-			   BUS_SPACE_MAP_LINEAR, &bh))
-		return (-1);
-
-	return ((paddr_t)bh);
+	return (bus_space_mmap(sc->sc_bustag,
+		sc->sc_paddr, poff,
+		prot, BUS_SPACE_MAP_LINEAR));
 }
 
 #if defined(SUN4)

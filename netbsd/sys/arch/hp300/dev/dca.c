@@ -1,4 +1,4 @@
-/*	$NetBSD: dca.c,v 1.39 1998/07/20 17:35:17 thorpej Exp $	*/
+/*	$NetBSD: dca.c,v 1.49 2002/03/17 19:40:38 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -83,6 +83,12 @@
  *  machines.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dca.c,v 1.49 2002/03/17 19:40:38 atatat Exp $");                                                  
+
+#include "opt_ddb.h"
+#include "opt_kgdb.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -96,6 +102,7 @@
 #include <sys/device.h>
 
 #include <machine/autoconf.h>
+#include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
@@ -132,9 +139,6 @@ struct cfattach dca_ca = {
 
 extern struct cfdriver dca_cd;
 
-int	dcadefaultrate = TTYDEF_SPEED;
-int	dcamajor;
-
 cdev_decl(dca);
 
 int	dcaintr __P((void *));
@@ -147,17 +151,22 @@ void	dcastop __P((struct tty *, int));
 int	dcamctl __P((struct dca_softc *, int, int));
 void	dcainit __P((struct dcadevice *, int));
 
-int	dca_console_scan __P((int, caddr_t, void *));
-void	dcacnprobe __P((struct consdev *));
-void	dcacninit __P((struct consdev *));
+int	dcacnattach __P((bus_space_tag_t, bus_addr_t, int));
 int	dcacngetc __P((dev_t));
 void	dcacnputc __P((dev_t, int));
 
 /*
  * Stuff for DCA console support.
  */
-static	struct dcadevice *dca_cn = NULL;	/* pointer to hardware */
-static	int dcaconsinit;			/* has been initialized */
+
+static int dcadefaultrate = TTYDEF_SPEED;
+static struct consdev dca_cons = {
+       NULL, NULL, dcacngetc, dcacnputc, nullcnpollc, NULL, NODEV, CN_REMOTE
+};
+static int dcamajor;
+static struct dcadevice *dca_cn = NULL;        /* pointer to hardware */
+static int dcaconsinit;                        /* has been initialized */
+static int dcaconscode;
 
 struct speedtab dcaspeedtab[] = {
 	{	0,	0		},
@@ -230,8 +239,8 @@ dcaattach(parent, self, aux)
 	int scode = da->da_scode;
 	int ipl;
 
-	if (scode == conscode) {
-		dca = (struct dcadevice *)conaddr;
+	if (scode == dcaconscode) {
+		dca = dca_cn;
 		sc->sc_flags |= DCA_ISCONSOLE;
 		DELAY(100000);
 
@@ -255,8 +264,9 @@ dcaattach(parent, self, aux)
 	ipl = DIO_IPL(dca);
 	printf(" ipl %d", ipl);
 
+	DELAY(1000);
 	dca->dca_reset = 0xFF;
-	DELAY(100);
+	DELAY(1000);
 
 	/* look for a NS 16550AF UART with FIFOs */
 	dca->dca_fifo = FIFO_ENABLE|FIFO_RCV_RST|FIFO_XMT_RST|FIFO_TRIGGER_14;
@@ -396,7 +406,7 @@ dcaopen(dev, flag, mode, p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 
  bad:
 	return (error);
@@ -421,7 +431,7 @@ dcaclose(dev, flag, mode, p)
 
 	dca = sc->sc_dca;
 	tp = sc->sc_tty;
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 
 	s = spltty();
 
@@ -461,7 +471,7 @@ dcaread(dev, uio, flag)
  
 	tp = sc->sc_tty;
 	of = sc->sc_oflows;
-	error = (*linesw[tp->t_line].l_read)(tp, uio, flag);
+	error = (*tp->t_linesw->l_read)(tp, uio, flag);
 	/*
 	 * XXX hardly a reasonable thing to do, but reporting overflows
 	 * at interrupt time just exacerbates the problem.
@@ -480,7 +490,19 @@ dcawrite(dev, uio, flag)
 	struct dca_softc *sc = dca_cd.cd_devs[DCAUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+dcapoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct dca_softc *sc = dca_cd.cd_devs[DCAUNIT(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -534,12 +556,12 @@ dcaintr(arg)
 				    kgdb_dev == makedev(dcamajor, unit)) \
 					kgdb_connect(0); /* trap into kgdb */ \
 			} else \
-				(*linesw[tp->t_line].l_rint)(code, tp)
+				(*tp->t_linesw->l_rint)(code, tp)
 #else
 #define	RCVBYTE() \
 			code = dca->dca_data; \
 			if (tp != NULL && (tp->t_state & TS_ISOPEN) != 0) \
-				(*linesw[tp->t_line].l_rint)(code, tp)
+				(*tp->t_linesw->l_rint)(code, tp)
 #endif
 			RCVBYTE();
 			if (sc->sc_flags & DCA_HASFIFO) {
@@ -573,10 +595,7 @@ dcaintr(arg)
 			if (tp == NULL)
 				break;
 			tp->t_state &=~ (TS_BUSY|TS_FLUSH);
-			if (tp->t_line)
-				(*linesw[tp->t_line].l_start)(tp);
-			else
-				dcastart(tp);
+			(*tp->t_linesw->l_start)(tp);
 			break;
 		case IIR_RLS:
 			dcaeint(sc, dca->dca_lsr);
@@ -614,13 +633,19 @@ dcaeint(sc, stat)
 #endif
 		return;
 	}
+#ifdef DDB
+	if ((sc->sc_flags & DCA_ISCONSOLE) && (stat & LSR_BI)) {
+		Debugger();
+		return;
+	}
+#endif
 	if (stat & (LSR_BI | LSR_FE))
 		c |= TTY_FE;
 	else if (stat & LSR_PE)
 		c |= TTY_PE;
 	else if (stat & LSR_OE)
 		sc->sc_oflows++;
-	(*linesw[tp->t_line].l_rint)(c, tp);
+	(*tp->t_linesw->l_rint)(c, tp);
 }
 
 void
@@ -640,8 +665,8 @@ dcamint(sc)
 	if ((stat & MSR_DDCD) &&
 	    (sc->sc_flags & DCA_SOFTCAR) == 0) {
 		if (stat & MSR_DCD)
-			(void)(*linesw[tp->t_line].l_modem)(tp, 1);
-		else if ((*linesw[tp->t_line].l_modem)(tp, 0) == 0)
+			(void)(*tp->t_linesw->l_modem)(tp, 1);
+		else if ((*tp->t_linesw->l_modem)(tp, 0) == 0)
 			dca->dca_mcr &= ~(MCR_DTR | MCR_RTS);
 	}
 	/*
@@ -673,11 +698,12 @@ dcaioctl(dev, cmd, data, flag, p)
 	struct dcadevice *dca = sc->sc_dca;
 	int error;
  
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -746,7 +772,7 @@ dcaioctl(dev, cmd, data, flag, p)
 	}
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -799,7 +825,7 @@ dcaparam(tp, t)
 		(void) dcamctl(sc, 0, DMSET);	/* hang up line */
 
 	/*
-	 * Set the FIFO threshold based on the recieve speed, if we
+	 * Set the FIFO threshold based on the receive speed, if we
 	 * are changing it.
 	 */
 	if (tp->t_ispeed != t->c_ispeed) {
@@ -926,7 +952,7 @@ dcamctl(sc, bits, how)
 		bits = dca->dca_msr;
 		break;
 	}
-	(void) splx(s);
+	splx(s);
 	return (bits);
 }
 
@@ -963,96 +989,52 @@ dcainit(dca, rate)
  */
 
 int
-dca_console_scan(scode, va, arg)
-	int scode;
-	caddr_t va;
-	void *arg;
+dcacnattach(bus_space_tag_t bst, bus_addr_t addr, int scode)
 {
-	struct dcadevice *dca = (struct dcadevice *)va;
-	struct consdev *cp = arg;
-	u_char *dioiidev;
-	int force = 0, pri;
+        bus_space_handle_t bsh;
+        caddr_t va;
+        struct dcadevice *dca;
 
-	switch (dca->dca_id) {
-	case DCAID0:
-	case DCAID1:
-		pri = CN_NORMAL;
-		break;
+        if (bus_space_map(bst, addr, DIOCSIZE, 0, &bsh))
+                return (1);
 
-	case DCAREMID0:
-	case DCAREMID1:
-		pri = CN_REMOTE;
-		break;
+        va = bus_space_vaddr(bst, bsh);
+	dca = (struct dcadevice *)va;
 
-	default:
-		return (0);
-	}
-
+        switch (dca->dca_id) {
 #ifdef CONSCODE
-	/*
-	 * Raise our priority, if appropriate.
-	 */
-	if (scode == CONSCODE) {
-		pri = CN_REMOTE;
-		force = conforced = 1;
-	}
+        case DCAID0:
+        case DCAID1:
 #endif
+        case DCAREMID0:
+        case DCAREMID1:
+                break;
+        default:
+	        bus_space_unmap(bst, bsh, DIOCSIZE);
+	        return (1);
+        }
 
-	/* Only raise priority. */
-	if (pri > cp->cn_pri)
-		cp->cn_pri = pri;
+        dcainit(dca, dcadefaultrate);
+        dcaconsinit = 1;
+	dcaconscode = scode;
+        dca_cn = dca;
 
-	/*
-	 * If our priority is higher than the currently-remembered
-	 * console, stash our priority, for the benefit of dcacninit().
-	 */
-	if (((cn_tab == NULL) || (cp->cn_pri > cn_tab->cn_pri)) || force) {
-		cn_tab = cp;
-		if (scode >= 132) {
-			dioiidev = (u_char *)va;
-			return ((dioiidev[0x101] + 1) * 0x100000);
-		}
-		return (DIOCSIZE);
-	}
-	return (0);
-}
+        /* locate the major number */
+        for (dcamajor = 0; dcamajor < nchrdev; dcamajor++)
+                if (cdevsw[dcamajor].d_open == dcaopen)
+                        break;
 
-void
-dcacnprobe(cp)
-	struct consdev *cp;
-{
-
-	/* locate the major number */
-	for (dcamajor = 0; dcamajor < nchrdev; dcamajor++)
-		if (cdevsw[dcamajor].d_open == dcaopen)
-			break;
-
-	/* initialize required fields */
-	cp->cn_dev = makedev(dcamajor, 0);	/* XXX */
-	cp->cn_pri = CN_DEAD;
-
-	/* Abort early if console is already forced. */
-	if (conforced)
-		return;
-
-	console_scan(dca_console_scan, cp);
+        /* initialize required fields */
+        cn_tab = &dca_cons;
+        cn_tab->cn_dev = makedev(dcamajor, 0);
 
 #ifdef KGDB
 	/* XXX this needs to be fixed. */
 	if (major(kgdb_dev) == 1)			/* XXX */
 		kgdb_dev = makedev(dcamajor, minor(kgdb_dev));
 #endif
-}
 
-/* ARGSUSED */
-void
-dcacninit(cp)
-	struct consdev *cp;
-{
-
-	dca_cn = (struct dcadevice *)conaddr;
-	dcainit(dca_cn, dcadefaultrate);
-	dcaconsinit = 1;
+        return (0);
 }
 
 /* ARGSUSED */

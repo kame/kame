@@ -1,4 +1,4 @@
-/* $NetBSD: dwlpx_dma.c,v 1.13 1999/04/06 19:26:32 pk Exp $ */
+/* $NetBSD: dwlpx_dma.c,v 1.16 2001/07/19 18:59:41 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -39,14 +39,15 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dwlpx_dma.c,v 1.13 1999/04/06 19:26:32 pk Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dwlpx_dma.c,v 1.16 2001/07/19 18:59:41 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #define _ALPHA_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -61,11 +62,6 @@ __KERNEL_RCSID(0, "$NetBSD: dwlpx_dma.c,v 1.13 1999/04/06 19:26:32 pk Exp $");
 #include <alpha/pci/pci_kn8ae.h>
 
 bus_dma_tag_t dwlpx_dma_get_tag __P((bus_dma_tag_t, alpha_bus_t));
-
-int	dwlpx_bus_dmamap_create_sgmap __P((bus_dma_tag_t, bus_size_t, int,
-	    bus_size_t, bus_size_t, int, bus_dmamap_t *));
-
-void	dwlpx_bus_dmamap_destroy_sgmap __P((bus_dma_tag_t, bus_dmamap_t));
 
 int	dwlpx_bus_dmamap_load_sgmap __P((bus_dma_tag_t, bus_dmamap_t, void *,
 	    bus_size_t, struct proc *, int));
@@ -92,6 +88,9 @@ void	dwlpx_bus_dmamap_unload_sgmap __P((bus_dma_tag_t, bus_dmamap_t));
  */
 #define	DWLPx_SG_MAPPED_BASE		(1*1024*1024*1024)
 #define	DWLPx_SG_MAPPED_SIZE(x)		((x) * PAGE_SIZE)
+
+/* DWLPx has a 256-byte out-bound DMA prefetch threshold. */
+#define	DWLPx_SG_MAPPED_PFTHRESH	256
 
 /*
  * Set this to always use SGMAPs.
@@ -161,9 +160,10 @@ dwlpx_dma_init(ccp)
 	t->_next_window = NULL;
 	t->_boundary = 0;
 	t->_sgmap = &ccp->cc_sgmap;
+	t->_pfthresh = DWLPx_SG_MAPPED_PFTHRESH;
 	t->_get_tag = dwlpx_dma_get_tag;
-	t->_dmamap_create = dwlpx_bus_dmamap_create_sgmap;
-	t->_dmamap_destroy = dwlpx_bus_dmamap_destroy_sgmap;
+	t->_dmamap_create = alpha_sgmap_dmamap_create;
+	t->_dmamap_destroy = alpha_sgmap_dmamap_destroy;
 	t->_dmamap_load = dwlpx_bus_dmamap_load_sgmap;
 	t->_dmamap_load_mbuf = dwlpx_bus_dmamap_load_mbuf_sgmap;
 	t->_dmamap_load_uio = dwlpx_bus_dmamap_load_uio_sgmap;
@@ -297,55 +297,6 @@ dwlpx_dma_get_tag(t, bustype)
 	default:
 		panic("dwlpx_dma_get_tag: shouldn't be here, really...");
 	}
-}
-
-/*
- * Create a DWLPx SGMAP-mapped DMA map.
- */
-int
-dwlpx_bus_dmamap_create_sgmap(t, size, nsegments, maxsegsz, boundary,
-    flags, dmamp)
-	bus_dma_tag_t t;
-	bus_size_t size;
-	int nsegments;
-	bus_size_t maxsegsz;
-	bus_size_t boundary;
-	int flags;
-	bus_dmamap_t *dmamp;
-{
-	bus_dmamap_t map;
-	int error;
-
-	error = _bus_dmamap_create(t, size, nsegments, maxsegsz,
-	    boundary, flags, dmamp);
-	if (error)
-		return (error);
-
-	map = *dmamp;
-
-	if (flags & BUS_DMA_ALLOCNOW) {
-		error = alpha_sgmap_alloc(map, round_page(size),
-		    t->_sgmap, flags);
-		if (error)
-			dwlpx_bus_dmamap_destroy_sgmap(t, map);
-	}
-
-	return (error);
-}
-
-/*
- * Destroy a DWLPx SGMAP-mapped DMA map.
- */
-void
-dwlpx_bus_dmamap_destroy_sgmap(t, map)
-	bus_dma_tag_t t;
-	bus_dmamap_t map;
-{
-
-	if (map->_dm_flags & DMAMAP_HAS_SGMAP)
-		alpha_sgmap_free(map, t->_sgmap);
-
-	_bus_dmamap_destroy(t, map);
 }
 
 /*

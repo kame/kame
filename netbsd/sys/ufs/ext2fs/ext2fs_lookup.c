@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_lookup.c,v 1.15 2000/03/30 12:41:11 augustss Exp $	*/
+/*	$NetBSD: ext2fs_lookup.c,v 1.18.10.1 2002/05/30 21:15:46 tv Exp $	*/
 
 /* 
  * Modified for NetBSD 1.2E
@@ -51,6 +51,9 @@
  *	@(#)ufs_lookup.c	8.6 (Berkeley) 4/1/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_lookup.c,v 1.18.10.1 2002/05/30 21:15:46 tv Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -61,7 +64,6 @@
 #include <sys/malloc.h>
 #include <sys/dirent.h>
 
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/ufs_extern.h>
@@ -103,8 +105,10 @@ ext2fs_dirconv2ffs( e2dir, ffsdir)
 	 * XXX Rigth now this can't happen, but if one day
 	 * MAXNAMLEN != E2FS_MAXNAMLEN we should handle this more gracefully !
 	 */
+#if 0
 	if (e2dir->e2d_namlen > MAXNAMLEN)
 		panic("ext2fs: e2dir->e2d_namlen\n");
+#endif
 #endif
 	strncpy(ffsdir->d_name, e2dir->e2d_name, ffsdir->d_namlen);
 
@@ -172,8 +176,7 @@ ext2fs_readdir(v)
 	MALLOC(dirbuf, caddr_t, e2fs_count, M_TEMP, M_WAITOK);
 	if (ap->a_ncookies) {
 		nc = ncookies = e2fs_count / 16;
-		MALLOC(cookies, off_t *, sizeof (off_t) * ncookies, M_TEMP,
-		    M_WAITOK);
+		cookies = malloc(sizeof (off_t) * ncookies, M_TEMP, M_WAITOK);
 		*ap->a_cookies = cookies;
 	}
 	memset(dirbuf, 0, e2fs_count);
@@ -213,7 +216,7 @@ ext2fs_readdir(v)
 	*ap->a_eofflag = VTOI(ap->a_vp)->i_e2fs_size <= uio->uio_offset;
 	if (ap->a_ncookies) {
 		if (error) {
-			FREE(*ap->a_cookies, M_TEMP);
+			free(*ap->a_cookies, M_TEMP);
 			*ap->a_ncookies = 0;
 			*ap->a_cookies = NULL;
 		} else

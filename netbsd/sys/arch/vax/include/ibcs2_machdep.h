@@ -1,4 +1,4 @@
-/*	$NetBSD: ibcs2_machdep.h,v 1.2.4.1 2000/06/22 16:35:53 matt Exp $	*/
+/*	$NetBSD: ibcs2_machdep.h,v 1.3 2000/06/21 05:45:17 matt Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.

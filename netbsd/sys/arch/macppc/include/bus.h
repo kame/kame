@@ -1,7 +1,7 @@
-/*	$NetBSD: bus.h,v 1.9.4.1 2000/06/30 16:27:30 simonb Exp $	*/
+/*	$NetBSD: bus.h,v 1.14 2001/07/19 15:32:14 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -71,6 +71,7 @@
 #ifndef _MACPPC_BUS_H_
 #define _MACPPC_BUS_H_
 
+#include <machine/autoconf.h>
 #include <machine/pio.h>
 
 /*
@@ -109,7 +110,48 @@ typedef u_int32_t bus_space_handle_t;
 #define BUS_SPACE_MAP_LINEAR		0x02
 #define BUS_SPACE_MAP_PREFETCHABLE	0x04
 
-extern void * mapiodev __P((paddr_t, psize_t));
+static __inline int bus_space_map(bus_space_tag_t, bus_addr_t,
+    bus_size_t, int, bus_space_handle_t *);
+static __inline void bus_space_read_region_1(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t *, size_t);
+static __inline void bus_space_read_region_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int16_t *, size_t);
+static __inline void bus_space_read_region_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int32_t *, size_t);
+static __inline void bus_space_read_region_stream_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int16_t *, size_t);
+static __inline void bus_space_read_region_stream_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int32_t *, size_t);
+static __inline void bus_space_write_region_1(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, const u_int8_t *, size_t);
+static __inline void bus_space_write_region_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, const u_int16_t *, size_t);
+static __inline void bus_space_write_region_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, const u_int32_t *, size_t);
+static __inline void bus_space_write_region_stream_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, const u_int16_t *, size_t);
+static __inline void bus_space_write_region_stream_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, const u_int32_t *, size_t);
+static __inline void bus_space_set_multi_1(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t, size_t);
+static __inline void bus_space_set_multi_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int16_t, size_t);
+static __inline void bus_space_set_multi_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int32_t, size_t);
+static __inline void bus_space_set_multi_stream_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int16_t, size_t);
+static __inline void bus_space_set_multi_stream_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int32_t, size_t);
+static __inline void bus_space_set_region_1(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t, size_t);
+static __inline void bus_space_set_region_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int16_t, size_t);
+static __inline void bus_space_set_region_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int32_t, size_t);
+static __inline void bus_space_set_region_stream_2(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int16_t, size_t);
+static __inline void bus_space_set_region_stream_4(bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int32_t, size_t);
 
 static __inline int
 bus_space_map(t, addr, size, flags, bshp)
@@ -359,27 +401,31 @@ bus_space_read_region_stream_4(tag, bsh, offset, addr, count)
  */
 
 #define bus_space_write_multi_1(t, h, o, a, c) do {			\
-		outsb(__BA(t, h, o), (a), (c));				\
+		outs8(__BA(t, h, o), (a), (c));				\
 	} while (0)
 
 #define bus_space_write_multi_2(t, h, o, a, c) do {			\
-		outsw(__BA(t, h, o), (a), (c));				\
+		outs16rb(__BA(t, h, o), (a), (c));				\
 	} while (0)
 
 #define bus_space_write_multi_4(t, h, o, a, c) do {			\
-		outsl(__BA(t, h, o), (a), (c));				\
+		outs32rb(__BA(t, h, o), (a), (c));				\
 	} while (0)
 
 #if 0
 #define bus_space_write_multi_8		!!! unimplemented !!!
 #endif
 
+#define bus_space_write_multi_stream_1(t, h, o, a, c) do {		\
+		outs8(__BA(t, h, o), (a), (c));				\
+	} while (0)
+
 #define bus_space_write_multi_stream_2(t, h, o, a, c) do {		\
-		outsw(__BA(t, h, o), (a), (c));				\
+		outs16(__BA(t, h, o), (a), (c));				\
 	} while (0)
 
 #define bus_space_write_multi_stream_4(t, h, o, a, c) do {		\
-		outsl(__BA(t, h, o), (a), (c));				\
+		outs32(__BA(t, h, o), (a), (c));				\
 	} while (0)
 
 #if 0
@@ -705,14 +751,17 @@ bus_space_set_region_stream_4(tag, bsh, offset, val, count)
 /*
  * Flags used in various bus DMA methods.
  */
-#define BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
-#define BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
-#define BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
-#define BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
-#define BUS_DMA_BUS2		0x20
-#define BUS_DMA_BUS3		0x40
-#define BUS_DMA_BUS4		0x80
+#define BUS_DMA_WAITOK		0x000	/* safe to sleep (pseudo-flag) */
+#define BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
+#define BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
+#define BUS_DMA_COHERENT	0x004	/* hint: map memory DMA coherent */
+#define	BUS_DMA_STREAMING	0x008	/* hint: sequential, unidirectional */
+#define BUS_DMA_BUS1		0x010	/* placeholders for bus functions... */
+#define BUS_DMA_BUS2		0x020
+#define BUS_DMA_BUS3		0x040
+#define BUS_DMA_BUS4		0x080
+#define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
+#define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
 
 /* Forwards needed by prototypes below. */
 struct mbuf;

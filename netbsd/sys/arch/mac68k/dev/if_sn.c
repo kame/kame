@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sn.c,v 1.25 1999/12/12 08:18:48 scottr Exp $	*/
+/*	$NetBSD: if_sn.c,v 1.31 2002/01/16 06:02:56 thorpej Exp $	*/
 
 /*
  * National Semiconductor  DP8393X SONIC Driver
@@ -40,7 +40,7 @@
 #include <netinet/if_inarp.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include "bpfilter.h"
 #if NBPFILTER > 0
@@ -254,9 +254,7 @@ snsetup(sc, lladdr)
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
 	ifp->if_watchdog = snwatchdog;
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
+
 	if_attach(ifp);
 	ether_ifattach(ifp, lladdr);
 
@@ -432,7 +430,7 @@ sninit(sc)
 
 	s = splnet();
 
-	NIC_PUT(sc, SNR_CR, CR_RST);	/* DCR only accessable in reset mode! */
+	NIC_PUT(sc, SNR_CR, CR_RST);	/* DCR only accessible in reset mode! */
 
 	/* config it */
 	NIC_PUT(sc, SNR_DCR, (sc->snr_dcr |
@@ -713,7 +711,7 @@ camprogram(sc)
 			 * addresses. It has no way to specify a range.
 			 * (Well, thats not exactly true. If the
 			 * range is small one could program each addr
-			 * within the range as a seperate CAM entry)
+			 * within the range as a separate CAM entry)
 			 */
 			ifp->if_flags |= IFF_ALLMULTI;
 			break;
@@ -1098,13 +1096,7 @@ sonic_read(sc, pkt, len)
 	int len;
 {
 	struct ifnet *ifp = &sc->sc_if;
-	struct ether_header *eh;
 	struct mbuf *m;
-
-	/*
-	 * Get pointer to ethernet header (in input buffer).
-	 */
-	eh = (struct ether_header *)pkt;
 
 #ifdef SNDEBUG
 	{
@@ -1122,24 +1114,14 @@ sonic_read(sc, pkt, len)
 		return (0);
 	}
 
-#if NBPFILTER > 0
-	/*
-	 * Check if there's a bpf filter listening on this interface.
-	 * If so, hand off the raw packet to enet, then discard things
-	 * not destined for us (but be sure to keep broadcast/multicast).
-	 */
-	if (ifp->if_bpf) {
-		bpf_tap(ifp->if_bpf, pkt, len);
-		if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    bcmp(eh->ether_dhost, LLADDR(ifp->if_sadl),
-		    sizeof(eh->ether_dhost)) != 0)
-			return (0);
-	}
-#endif
 	m = sonic_get(sc, pkt, len);
 	if (m == NULL)
 		return (0);
+#if NBPFILTER > 0
+	/* Pass this up to any BPF listeners. */
+	if (ifp->if_bpf) 
+		bpf_mtap(ifp->if_bpf, m); 
+#endif
 	(*ifp->if_input)(ifp, m);
 	return (1);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_serv.c,v 1.54.4.1 2000/12/14 23:36:57 he Exp $	*/
+/*	$NetBSD: nfs_serv.c,v 1.62 2001/11/10 10:59:09 lukem Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -58,6 +58,9 @@
  *	most version 3 rpcs return more than the status for error cases.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_serv.c,v 1.62 2001/11/10 10:59:09 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -72,8 +75,6 @@
 #include <sys/stat.h>
 #include <sys/kernel.h>
 #include <ufs/ufs/dir.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -437,7 +438,7 @@ nfsrv_lookup(nfsd, slp, procp, mrq)
 
 	nqsrv_getl(ndp->ni_startdir, ND_READ);
 	vrele(ndp->ni_startdir);
-	FREE(nd.ni_cnd.cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(nd.ni_cnd.cn_pnbuf);
 	vp = ndp->ni_vp;
 	memset((caddr_t)fhp, 0, sizeof(nfh));
 	fhp->fh_fsid = vp->v_mount->mnt_stat.f_fsid;
@@ -672,8 +673,7 @@ nfsrv_read(nfsd, slp, procp, mrq)
 				m2 = m;
 			}
 		}
-		MALLOC(iv, struct iovec *, i * sizeof (struct iovec),
-		       M_TEMP, M_WAITOK);
+		iv = malloc(i * sizeof (struct iovec), M_TEMP, M_WAITOK);
 		uiop->uio_iov = iv2 = iv;
 		m = mb;
 		left = cnt;
@@ -699,7 +699,7 @@ nfsrv_read(nfsd, slp, procp, mrq)
 		uiop->uio_segflg = UIO_SYSSPACE;
 		error = VOP_READ(vp, uiop, IO_NODELOCKED, cred);
 		off = uiop->uio_offset;
-		FREE((caddr_t)iv2, M_TEMP);
+		free((caddr_t)iv2, M_TEMP);
 		if (error || (getret = VOP_GETATTR(vp, &va, cred, procp)) != 0){
 			if (!error)
 				error = getret;
@@ -846,8 +846,7 @@ nfsrv_write(nfsd, slp, procp, mrq)
 	}
 
 	if (len > 0) {
-	    MALLOC(ivp, struct iovec *, cnt * sizeof (struct iovec), M_TEMP,
-		M_WAITOK);
+	    ivp = malloc(cnt * sizeof (struct iovec), M_TEMP, M_WAITOK);
 	    uiop->uio_iov = iv = ivp;
 	    uiop->uio_iovcnt = cnt;
 	    mp = mrep;
@@ -880,7 +879,7 @@ nfsrv_write(nfsd, slp, procp, mrq)
 	    uiop->uio_offset = off;
 	    error = VOP_WRITE(vp, uiop, ioflags, cred);
 	    nfsstats.srvvop_writes++;
-	    FREE((caddr_t)iv, M_TEMP);
+	    free((caddr_t)iv, M_TEMP);
 	}
 	aftat_ret = VOP_GETATTR(vp, &va, cred, procp);
 	vput(vp);
@@ -1125,8 +1124,7 @@ loop1:
 			mp = mp->m_next;
 		    }
 		    uiop->uio_iovcnt = i;
-		    MALLOC(iov, struct iovec *, i * sizeof (struct iovec), 
-			M_TEMP, M_WAITOK);
+		    iov = malloc(i * sizeof (struct iovec), M_TEMP, M_WAITOK);
 		    uiop->uio_iov = ivp = iov;
 		    mp = mrep;
 		    while (mp) {
@@ -1141,7 +1139,7 @@ loop1:
 			error = VOP_WRITE(vp, uiop, ioflags, cred);
 			nfsstats.srvvop_writes++;
 		    }
-		    FREE((caddr_t)iov, M_TEMP);
+		    free((caddr_t)iov, M_TEMP);
 		}
 		m_freem(mrep);
 		if (vp) {
@@ -1317,7 +1315,7 @@ nfsrv_create(nfsd, slp, procp, mrq)
 	nfsm_srvnamesiz(len);
 	nd.ni_cnd.cn_cred = cred;
 	nd.ni_cnd.cn_nameiop = CREATE;
-	nd.ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF | SAVESTART;
+	nd.ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF;
 	error = nfs_namei(&nd, fhp, len, slp, nam, &md, &dpos,
 		&dirp, procp, (nfsd->nd_flag & ND_KERBAUTH), FALSE);
 	if (dirp) {
@@ -1387,11 +1385,9 @@ nfsrv_create(nfsd, slp, procp, mrq)
 	 */
 	if (nd.ni_vp == NULL) {
 		if (va.va_type == VREG || va.va_type == VSOCK) {
-			vrele(nd.ni_startdir);
 			nqsrv_getl(nd.ni_dvp, ND_WRITE);
 			error = VOP_CREATE(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &va);
 			if (!error) {
-				FREE(nd.ni_cnd.cn_pnbuf, M_NAMEI);
 				if (exclusive_flag) {
 					exclusive_flag = 0;
 					VATTR_NULL(&va);
@@ -1407,8 +1403,6 @@ nfsrv_create(nfsd, slp, procp, mrq)
 				va.va_type = VFIFO;
 			if (va.va_type != VFIFO &&
 			    (error = suser(cred, (u_short *)0))) {
-				vrele(nd.ni_startdir);
-				free(nd.ni_cnd.cn_pnbuf, M_NAMEI);
 				VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 				vput(nd.ni_dvp);
 				nfsm_reply(0);
@@ -1419,18 +1413,9 @@ nfsrv_create(nfsd, slp, procp, mrq)
 			error = VOP_MKNOD(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd,
 			    &va);
 			if (error) {
-				vrele(nd.ni_startdir);
 				nfsm_reply(0);
 			}
-			nd.ni_cnd.cn_nameiop = LOOKUP;
-			nd.ni_cnd.cn_flags &= ~(LOCKPARENT | SAVESTART);
-			nd.ni_cnd.cn_proc = procp;
-			nd.ni_cnd.cn_cred = cred;
-			if ((error = lookup(&nd)) != 0) {
-				free(nd.ni_cnd.cn_pnbuf, M_NAMEI);
-				nfsm_reply(0);
-			}
-			FREE(nd.ni_cnd.cn_pnbuf, M_NAMEI);
+			PNBUF_PUT(nd.ni_cnd.cn_pnbuf);
 			if (nd.ni_cnd.cn_flags & ISSYMLINK) {
 				vrele(nd.ni_dvp);
 				vput(nd.ni_vp);
@@ -1439,16 +1424,12 @@ nfsrv_create(nfsd, slp, procp, mrq)
 				nfsm_reply(0);
 			}
 		} else {
-			vrele(nd.ni_startdir);
-			free(nd.ni_cnd.cn_pnbuf, M_NAMEI);
 			VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 			vput(nd.ni_dvp);
 			error = ENXIO;
 		}
 		vp = nd.ni_vp;
 	} else {
-		vrele(nd.ni_startdir);
-		free(nd.ni_cnd.cn_pnbuf, M_NAMEI);
 		vp = nd.ni_vp;
 		if (nd.ni_dvp == vp)
 			vrele(nd.ni_dvp);
@@ -1501,10 +1482,6 @@ nfsrv_create(nfsd, slp, procp, mrq)
 nfsmout:
 	if (dirp)
 		vrele(dirp);
-	if (nd.ni_cnd.cn_nameiop) {
-		vrele(nd.ni_startdir);
-		free((caddr_t)nd.ni_cnd.cn_pnbuf, M_NAMEI);
-	}
 	VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 	if (nd.ni_dvp == nd.ni_vp)
 		vrele(nd.ni_dvp);
@@ -1550,7 +1527,7 @@ nfsrv_mknod(nfsd, slp, procp, mrq)
 	nfsm_srvnamesiz(len);
 	nd.ni_cnd.cn_cred = cred;
 	nd.ni_cnd.cn_nameiop = CREATE;
-	nd.ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF | SAVESTART;
+	nd.ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF;
 	error = nfs_namei(&nd, fhp, len, slp, nam, &md, &dpos,
 		&dirp, procp, (nfsd->nd_flag & ND_KERBAUTH), FALSE);
 	if (dirp)
@@ -1565,8 +1542,6 @@ nfsrv_mknod(nfsd, slp, procp, mrq)
 	nfsm_dissect(tl, u_int32_t *, NFSX_UNSIGNED);
 	vtyp = nfsv3tov_type(*tl);
 	if (vtyp != VCHR && vtyp != VBLK && vtyp != VSOCK && vtyp != VFIFO) {
-		vrele(nd.ni_startdir);
-		free((caddr_t)nd.ni_cnd.cn_pnbuf, M_NAMEI);
 		error = NFSERR_BADTYPE;
 		VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 		if (nd.ni_dvp == nd.ni_vp)
@@ -1590,8 +1565,6 @@ nfsrv_mknod(nfsd, slp, procp, mrq)
 	 * Iff doesn't exist, create it.
 	 */
 	if (nd.ni_vp) {
-		vrele(nd.ni_startdir);
-		free((caddr_t)nd.ni_cnd.cn_pnbuf, M_NAMEI);
 		error = EEXIST;
 		VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 		if (nd.ni_dvp == nd.ni_vp)
@@ -1603,16 +1576,11 @@ nfsrv_mknod(nfsd, slp, procp, mrq)
 	}
 	va.va_type = vtyp;
 	if (vtyp == VSOCK) {
-		vrele(nd.ni_startdir);
 		nqsrv_getl(nd.ni_dvp, ND_WRITE);
 		error = VOP_CREATE(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &va);
-		if (!error)
-			FREE(nd.ni_cnd.cn_pnbuf, M_NAMEI);
 	} else {
 		if (va.va_type != VFIFO &&
 		    (error = suser(cred, (u_short *)0))) {
-			vrele(nd.ni_startdir);
-			free((caddr_t)nd.ni_cnd.cn_pnbuf, M_NAMEI);
 			VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 			vput(nd.ni_dvp);
 			goto out;
@@ -1620,19 +1588,11 @@ nfsrv_mknod(nfsd, slp, procp, mrq)
 		nqsrv_getl(nd.ni_dvp, ND_WRITE);
 		error = VOP_MKNOD(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &va);
 		if (error) {
-			vrele(nd.ni_startdir);
 			goto out;
 		}
-		nd.ni_cnd.cn_nameiop = LOOKUP;
-		nd.ni_cnd.cn_flags &= ~(LOCKPARENT | SAVESTART);
-		nd.ni_cnd.cn_proc = procp;
-		nd.ni_cnd.cn_cred = procp->p_ucred;
-		error = lookup(&nd);
-		FREE(nd.ni_cnd.cn_pnbuf, M_NAMEI);
 		if (error)
 			goto out;
 		if (nd.ni_cnd.cn_flags & ISSYMLINK) {
-			vrele(nd.ni_dvp);
 			vput(nd.ni_vp);
 			VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 			error = EINVAL;
@@ -1660,10 +1620,6 @@ out:
 nfsmout:
 	if (dirp)
 		vrele(dirp);
-	if (nd.ni_cnd.cn_nameiop) {
-		vrele(nd.ni_startdir);
-		free((caddr_t)nd.ni_cnd.cn_pnbuf, M_NAMEI);
-	}
 	VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 	if (nd.ni_dvp == nd.ni_vp)
 		vrele(nd.ni_dvp);
@@ -1734,7 +1690,6 @@ nfsrv_remove(nfsd, slp, procp, mrq)
 		}
 out:
 		if (!error) {
-			(void)uvm_vnp_uncache(vp);
 			nqsrv_getl(nd.ni_dvp, ND_WRITE);
 			nqsrv_getl(vp, ND_WRITE);
 			error = VOP_REMOVE(nd.ni_dvp, nd.ni_vp, &nd.ni_cnd);
@@ -1909,7 +1864,6 @@ out:
 		nqsrv_getl(fromnd.ni_dvp, ND_WRITE);
 		nqsrv_getl(tdvp, ND_WRITE);
 		if (tvp) {
-			(void)uvm_vnp_uncache(tvp);
 			nqsrv_getl(tvp, ND_WRITE);
 		}
 		error = VOP_RENAME(fromnd.ni_dvp, fromnd.ni_vp, &fromnd.ni_cnd,
@@ -1929,7 +1883,7 @@ out:
 			error = 0;
 	}
 	vrele(tond.ni_startdir);
-	FREE(tond.ni_cnd.cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(tond.ni_cnd.cn_pnbuf);
 out1:
 	if (fdirp) {
 		fdiraft_ret = VOP_GETATTR(fdirp, &fdiraft, cred, procp);
@@ -1940,7 +1894,7 @@ out1:
 		vrele(tdirp);
 	}
 	vrele(fromnd.ni_startdir);
-	FREE(fromnd.ni_cnd.cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(fromnd.ni_cnd.cn_pnbuf);
 	nfsm_reply(2 * NFSX_WCCDATA(v3));
 	if (v3) {
 		nfsm_srvwcc_data(fdirfor_ret, &fdirfor, fdiraft_ret, &fdiraft);
@@ -1955,11 +1909,11 @@ nfsmout:
 		vrele(tdirp);
 	if (tond.ni_cnd.cn_nameiop) {
 		vrele(tond.ni_startdir);
-		FREE(tond.ni_cnd.cn_pnbuf, M_NAMEI);
+		PNBUF_PUT(tond.ni_cnd.cn_pnbuf);
 	}
 	if (fromnd.ni_cnd.cn_nameiop) {
 		vrele(fromnd.ni_startdir);
-		FREE(fromnd.ni_cnd.cn_pnbuf, M_NAMEI);
+		PNBUF_PUT(fromnd.ni_cnd.cn_pnbuf);
 		VOP_ABORTOP(fromnd.ni_dvp, &fromnd.ni_cnd);
 		vrele(fromnd.ni_dvp);
 		vrele(fvp);
@@ -2101,7 +2055,7 @@ nfsrv_symlink(nfsd, slp, procp, mrq)
 	nfsm_srvnamesiz(len);
 	nd.ni_cnd.cn_cred = cred;
 	nd.ni_cnd.cn_nameiop = CREATE;
-	nd.ni_cnd.cn_flags = LOCKPARENT | SAVESTART;
+	nd.ni_cnd.cn_flags = LOCKPARENT;
 	error = nfs_namei(&nd, fhp, len, slp, nam, &md, &dpos,
 		&dirp, procp, (nfsd->nd_flag & ND_KERBAUTH), FALSE);
 	if (dirp) {
@@ -2119,7 +2073,7 @@ nfsrv_symlink(nfsd, slp, procp, mrq)
 	if (v3)
 		nfsm_srvsattr(&va);
 	nfsm_strsiz(len2, NFS_MAXPATHLEN);
-	MALLOC(pathcp, caddr_t, len2 + 1, M_TEMP, M_WAITOK);
+	pathcp = malloc(len2 + 1, M_TEMP, M_WAITOK);
 	iv.iov_base = pathcp;
 	iv.iov_len = len2;
 	io.uio_resid = len2;
@@ -2136,8 +2090,6 @@ nfsrv_symlink(nfsd, slp, procp, mrq)
 	}
 	*(pathcp + len2) = '\0';
 	if (nd.ni_vp) {
-		vrele(nd.ni_startdir);
-		free(nd.ni_cnd.cn_pnbuf, M_NAMEI);
 		VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 		if (nd.ni_dvp == nd.ni_vp)
 			vrele(nd.ni_dvp);
@@ -2149,32 +2101,22 @@ nfsrv_symlink(nfsd, slp, procp, mrq)
 	}
 	nqsrv_getl(nd.ni_dvp, ND_WRITE);
 	error = VOP_SYMLINK(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &va, pathcp);
-	if (error)
-		vrele(nd.ni_startdir);
-	else {
+	if (!error) {
 	    if (v3) {
-		nd.ni_cnd.cn_nameiop = LOOKUP;
-		nd.ni_cnd.cn_flags &= ~(LOCKPARENT | SAVESTART | FOLLOW);
-		nd.ni_cnd.cn_flags |= (NOFOLLOW | LOCKLEAF);
-		nd.ni_cnd.cn_proc = procp;
-		nd.ni_cnd.cn_cred = cred;
-		error = lookup(&nd);
-		if (!error) {
-			memset((caddr_t)fhp, 0, sizeof(nfh));
-			fhp->fh_fsid = nd.ni_vp->v_mount->mnt_stat.f_fsid;
-			error = VFS_VPTOFH(nd.ni_vp, &fhp->fh_fid);
-			if (!error)
-				error = VOP_GETATTR(nd.ni_vp, &va, cred,
+		memset((caddr_t)fhp, 0, sizeof(nfh));
+		fhp->fh_fsid = nd.ni_vp->v_mount->mnt_stat.f_fsid;
+		error = VFS_VPTOFH(nd.ni_vp, &fhp->fh_fid);
+		if (!error)
+		    error = VOP_GETATTR(nd.ni_vp, &va, cred,
 					procp);
-			vput(nd.ni_vp);
-		}
-	    } else
-		vrele(nd.ni_startdir);
-	    FREE(nd.ni_cnd.cn_pnbuf, M_NAMEI);
+		vput(nd.ni_vp);
+	    } else {
+		vput(nd.ni_vp);
+	    }
 	}
 out:
 	if (pathcp)
-		FREE(pathcp, M_TEMP);
+		free(pathcp, M_TEMP);
 	if (dirp) {
 		diraft_ret = VOP_GETATTR(dirp, &diraft, cred, procp);
 		vrele(dirp);
@@ -2189,10 +2131,6 @@ out:
 	}
 	return (0);
 nfsmout:
-	if (nd.ni_cnd.cn_nameiop) {
-		vrele(nd.ni_startdir);
-		free(nd.ni_cnd.cn_pnbuf, M_NAMEI);
-	}
 	if (dirp)
 		vrele(dirp);
 	VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
@@ -2203,7 +2141,7 @@ nfsmout:
 	if (nd.ni_vp)
 		vrele(nd.ni_vp);
 	if (pathcp)
-		FREE(pathcp, M_TEMP);
+		free(pathcp, M_TEMP);
 	return (error);
 }
 
@@ -2539,7 +2477,7 @@ nfsrv_readdir(nfsd, slp, procp, mrq)
 		return (0);
 	}
 	VOP_UNLOCK(vp, 0);
-	MALLOC(rbuf, caddr_t, siz, M_TEMP, M_WAITOK);
+	rbuf = malloc(siz, M_TEMP, M_WAITOK);
 again:
 	iv.iov_base = rbuf;
 	iv.iov_len = fullsiz;
@@ -2567,7 +2505,7 @@ again:
 	VOP_UNLOCK(vp, 0);
 	if (error) {
 		vrele(vp);
-		FREE((caddr_t)rbuf, M_TEMP);
+		free((caddr_t)rbuf, M_TEMP);
 		if (cookies)
 			free((caddr_t)cookies, M_TEMP);
 		nfsm_reply(NFSX_POSTOPATTR(v3));
@@ -2594,8 +2532,8 @@ again:
 				nfsm_build(tl, u_int32_t *, 2 * NFSX_UNSIGNED);
 			*tl++ = nfs_false;
 			*tl = nfs_true;
-			FREE((caddr_t)rbuf, M_TEMP);
-			FREE((caddr_t)cookies, M_TEMP);
+			free((caddr_t)rbuf, M_TEMP);
+			free((caddr_t)cookies, M_TEMP);
 			return (0);
 		}
 	}
@@ -2714,8 +2652,8 @@ again:
 			mp->m_len = bp - mtod(mp, caddr_t);
 	} else
 		mp->m_len += bp - bpos;
-	FREE((caddr_t)rbuf, M_TEMP);
-	FREE((caddr_t)cookies, M_TEMP);
+	free((caddr_t)rbuf, M_TEMP);
+	free((caddr_t)cookies, M_TEMP);
 	nfsm_srvdone;
 }
 
@@ -2798,7 +2736,7 @@ nfsrv_readdirplus(nfsd, slp, procp, mrq)
 	}
 	VOP_UNLOCK(vp, 0);
 
-	MALLOC(rbuf, caddr_t, siz, M_TEMP, M_WAITOK);
+	rbuf = malloc(siz, M_TEMP, M_WAITOK);
 again:
 	iv.iov_base = rbuf;
 	iv.iov_len = fullsiz;
@@ -2842,8 +2780,8 @@ again:
 	if (error) {
 		vrele(vp);
 		if (cookies)
-			FREE((caddr_t)cookies, M_TEMP);
-		FREE((caddr_t)rbuf, M_TEMP);
+			free((caddr_t)cookies, M_TEMP);
+		free((caddr_t)rbuf, M_TEMP);
 		nfsm_reply(NFSX_V3POSTOPATTR);
 		nfsm_srvpostop_attr(getret, &at);
 		return (0);
@@ -2865,8 +2803,8 @@ again:
 			tl += 2;
 			*tl++ = nfs_false;
 			*tl = nfs_true;
-			FREE((caddr_t)cookies, M_TEMP);
-			FREE((caddr_t)rbuf, M_TEMP);
+			free((caddr_t)cookies, M_TEMP);
+			free((caddr_t)rbuf, M_TEMP);
 			return (0);
 		}
 	}
@@ -3023,8 +2961,8 @@ invalid:
 			mp->m_len = bp - mtod(mp, caddr_t);
 	} else
 		mp->m_len += bp - bpos;
-	FREE((caddr_t)cookies, M_TEMP);
-	FREE((caddr_t)rbuf, M_TEMP);
+	free((caddr_t)cookies, M_TEMP);
+	free((caddr_t)rbuf, M_TEMP);
 	nfsm_srvdone;
 }
 
@@ -3394,12 +3332,12 @@ nfsrv_access(vp, flags, cred, rdonly, p, override)
 				break;
 			}
 		}
+
 		/*
-		 * If there's shared text associated with
-		 * the inode, try to free it up once.  If
-		 * we fail, we can't allow writing.
+		 * If the vnode is in use as a process's text,
+		 * we can't allow writing.
 		 */
-		if ((vp->v_flag & VTEXT) && !uvm_vnp_uncache(vp))
+		if (vp->v_flag & VTEXT) 
 			return (ETXTBSY);
 	}
 	error = VOP_GETATTR(vp, &vattr, cred, p);

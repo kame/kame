@@ -1,6 +1,6 @@
 /*
 #
-# $NetBSD: inetbsd.S,v 1.3.30.1 2001/04/24 22:31:52 he Exp $
+# $NetBSD: inetbsd.S,v 1.4 2000/11/30 21:00:51 scw Exp $
 #
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # MOTOROLA MICROPROCESSOR & MEMORY TECHNOLOGY GROUP

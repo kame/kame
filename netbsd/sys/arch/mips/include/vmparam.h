@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.24 2000/06/09 04:18:19 soda Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.30 2001/11/15 18:06:15 soren Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -50,6 +50,14 @@
  */
 
 /*
+ * We use a 4K page on MIPS systems.  Override PAGE_* definitions
+ * to compile-time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
+/*
  * USRTEXT is the start of the user text/data space, while USRSTACK
  * is the top (end) of the user stack.
  *
@@ -60,20 +68,23 @@
 #define	USRTEXT		0x00001000		/* Start of user text */
 #define	USRSTACK	0x7ffff000		/* Start of user stack */
 
+/* alignment requirement for u-area space in bytes */
+#define	USPACE_ALIGN	USPACE
+
 /*
  * Virtual memory related constants, all in bytes
  */
 #ifndef MAXTSIZ
-#define	MAXTSIZ		(24*1024*1024)		/* max text size */
+#define	MAXTSIZ		(64*1024*1024)		/* max text size */
 #endif
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(32*1024*1024)		/* initial data size limit */
+#define	DFLDSIZ		(128*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		(256*1024*1024)		/* max data size */
+#define	MAXDSIZ		(512*1024*1024)		/* max data size */
 #endif
 #ifndef	DFLSSIZ
-#define	DFLSSIZ		(1024*1024)		/* initial stack size limit */
+#define	DFLSSIZ		(2*1024*1024)		/* initial stack size limit */
 #endif
 #ifndef	MAXSSIZ
 #define	MAXSSIZ		(32*1024*1024)		/* max stack size */
@@ -96,17 +107,6 @@
 #endif
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
@@ -127,6 +127,8 @@
 /* VM_PHYSSEG_MAX defined by platform-dependent code. */
 #define	VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
 #define	VM_PHYSSEG_NOADD	/* can add RAM after vm_mem_init */
+
+#define	__HAVE_PMAP_PHYSSEG
 
 /*
  * pmap-specific data stored in the vm_physmem[] array.

@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.252.2.2 2002/06/06 19:50:11 he Exp $	*/
+/*	$NetBSD: machdep.c,v 1.273 2002/05/21 07:05:31 scottr Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -78,6 +78,7 @@
 
 #include "opt_adb.h"
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_compat_netbsd.h"
 #include "akbd.h"
 #include "macfb.h"
@@ -109,6 +110,8 @@
 #ifdef	KGDB
 #include <sys/kgdb.h>
 #endif
+#define ELFSIZE 32
+#include <sys/exec_elf.h>
 
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
@@ -120,15 +123,11 @@
 #include <machine/psl.h>
 #include <machine/pte.h>
 #include <machine/kcore.h>	/* XXX should be pulled in by sys/kcore.h */
-#include <net/netisr.h>
 
 #define	MAXMEM	64*1024	/* XXX - from cmap.h */
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
 
-#include <sys/sysctl.h>		/* Requires vm/vm.h */
+#include <sys/sysctl.h>
 
 #include <dev/cons.h>
 
@@ -144,7 +143,8 @@
 #include <mac68k/dev/macfbvar.h>
 #endif
 #include <mac68k/dev/zs_cons.h>
-#include "arp.h"
+
+int symsize, end, *ssym, *esym;
 
 /* The following is used externally (sysctl_hw) */
 char	machine[] = MACHINE;	/* from <machine/param.h> */
@@ -188,9 +188,9 @@ u_int32_t mac68k_vidlen;	/* mem length */
 int	(*mac68k_bell_callback) __P((void *, int, int, int));
 caddr_t	mac68k_bell_cookie;
 
-vm_map_t exec_map = NULL;  
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;  
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 caddr_t	msgbufaddr;
 int	maxmem;			/* max memory per process */
@@ -225,6 +225,9 @@ void	initcpu __P((void));
 int	cpu_dumpsize __P((void));
 int	cpu_dump __P((int (*)(dev_t, daddr_t, caddr_t, size_t), daddr_t *));
 void	cpu_init_kcore_hdr __P((void));
+
+void		getenvvars __P((u_long, char *));
+static long	getenv __P((char *));
 
 /* functions called from locore.s */
 void	dumpsys __P((void));
@@ -291,6 +294,7 @@ mac68k_init()
 		    high[numranges - 1] + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -343,12 +347,8 @@ consinit(void)
 		/*
 		 * Initialize kernel debugger, if compiled in.
 		 */
-		{
-			extern int end;
-			extern int *esym;
 
-			ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
-		}
+		ddb_init(symsize, ssym, esym);
 #endif
 
 		if (boothowto & RB_KDB) {
@@ -375,6 +375,8 @@ consinit(void)
 void
 cpu_startup(void)
 {
+	extern char *start;
+	extern char *etext;
 	caddr_t v;
 	unsigned i;
 	int vers;
@@ -427,8 +429,9 @@ cpu_startup(void)
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-	    NULL, UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
-	    UVM_INH_NONE, UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+	    NULL, UVM_UNKNOWN_OFFSET, 0,
+	    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
+	    UVM_INH_NONE, UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	base = bufpages / nbuf;
@@ -452,13 +455,14 @@ cpu_startup(void)
 			if (pg == NULL) 
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(kernel_map->pmap);
+
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -482,6 +486,19 @@ cpu_startup(void)
 	printf("avail memory = %s\n", pbuf);
 	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
 	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
+
+	/*
+	 * Tell the VM system that writing to kernel text isn't allowed.
+	 * If we don't, we might end up COW'ing the text segment!
+	 *
+	 * XXX I'd like this to be m68k_trunc_page(&kernel_text) instead
+	 * XXX of the reference to &start, but we have to keep the
+	 * XXX interrupt vectors and such writable for the Mac toolbox.
+	 */
+	if (uvm_map_protect(kernel_map,
+	    m68k_trunc_page(&start + (NBPG - 1)), m68k_round_page(&etext),
+	    (UVM_PROT_READ | UVM_PROT_EXEC), TRUE) != 0)
+		panic("can't protect kernel text");
 
 	/*
 	 * Set up CPU-specific registers, cache, etc.
@@ -556,7 +573,7 @@ setregs(p, pack, stack)
 	frame->f_regs[D7] = 0;
 	frame->f_regs[A0] = 0;
 	frame->f_regs[A1] = 0;
-	frame->f_regs[A2] = (int)PS_STRINGS;
+	frame->f_regs[A2] = (int)p->p_psstr;
 	frame->f_regs[A3] = 0;
 	frame->f_regs[A4] = 0;
 	frame->f_regs[A5] = 0;
@@ -649,6 +666,7 @@ cpu_reboot(howto, bootstr)
 	/* Map the last physical page VA = PA for doboot() */
 	pmap_enter(pmap_kernel(), (vaddr_t)maxaddr, (vaddr_t)maxaddr,
 	    VM_PROT_ALL, VM_PROT_ALL|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 
 	printf("rebooting...\n");
 	DELAY(1000000);
@@ -763,7 +781,7 @@ cpu_dump(dump, blknop)
 /*
  * These variables are needed by /sbin/savecore
  */
-u_long	dumpmag = 0x8fca0101;	/* magic number */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number */
 int	dumpsize = 0;		/* pages */
 long	dumplo = 0;		/* blocks */
 
@@ -876,6 +894,7 @@ dumpsys()
 		}
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, maddr,
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
+		pmap_update(pmap_kernel());
 
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
  bad:
@@ -1050,8 +1069,6 @@ static char *envbuf = NULL;
 /*
  * getenvvars: Grab a few useful variables
  */
-void		getenvvars __P((u_long, char *));
-static long	getenv __P((char *));
 
 void
 getenvvars(flag, buf)
@@ -1061,9 +1078,14 @@ getenvvars(flag, buf)
 	extern u_long bootdev;
 	extern u_long macos_boottime, MacOSROMBase;
 	extern long macos_gmtbias;
-	extern int *esym;
-	extern int end;
 	int root_scsi_id;
+	u_long root_ata_dev;
+#ifdef	__ELF__
+	int i;
+	Elf_Ehdr *ehdr;
+	Elf_Shdr *shp;
+	vaddr_t minsym;
+#endif
 
 	/*
 	 * If flag & 0x80000000 == 0, then we're booting with the old booter
@@ -1114,9 +1136,30 @@ getenvvars(flag, buf)
 	 * bootdev using the SCSI ID passed in via the environment.
 	 */
 	root_scsi_id = getenv("ROOT_SCSI_ID");
+	root_ata_dev = getenv("ROOT_ATA_DEV");
 	if (((mac68k_machine.booter_version < CURRENTBOOTERVER) ||
-	    (flag & 0x40000)) && bootdev == 0)
-		bootdev = MAKEBOOTDEV(4, 0, 0, root_scsi_id, 0);
+	    (flag & 0x40000)) && bootdev == 0) {
+		if (root_ata_dev) {
+			/*
+			 * Consider only internal IDE drive.
+			 * Buses(=channel) will be always 0.
+			 * Because 68k Mac has only single channel.
+			 */
+			switch (root_ata_dev) {
+			default: /* fall through */
+			case 0xffffffe0: /* buses,drive = 0,0 */
+			case 0x20: /* buses,drive = 1,0 */
+			case 0x21: /* buses,drive = 1,1 */
+				bootdev = MAKEBOOTDEV(22, 0, 0, 0, 0);
+				break;
+			case 0xffffffe1: /* buses,drive = 0,1 */
+				bootdev = MAKEBOOTDEV(22, 0, 0, 1, 0);
+				break;
+			}
+		} else {
+			bootdev = MAKEBOOTDEV(4, 0, 0, root_scsi_id, 0);
+		}
+	}
 
 	/*
 	 * Booter 1.11.3 and later pass a BOOTHOWTO variable with the
@@ -1157,19 +1200,38 @@ getenvvars(flag, buf)
 	HwCfgFlags3 = getenv("HWCFGFLAG3");
  	ADBReInit_JTBL = getenv("ADBREINIT_JTBL");
  	mrg_ADBIntrPtr = (caddr_t)getenv("ADBINTERRUPT");
-}
 
-static char	toupper __P((char));
+#ifdef	__ELF__
+	/*
+	 * Check the ELF headers.
+	 */
 
-static char
-toupper(c)
-	char c;
-{
-	if (c >= 'a' && c <= 'z') {
-		return c - 'a' + 'A';
-	} else {
-		return c;
+	ehdr = (void *)getenv("MARK_SYM");
+	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0 ||
+	    ehdr->e_ident[EI_CLASS] != ELFCLASS32) {
+		return;
 	}
+
+	/*
+	 * Find the end of the symbols and strings.
+	 */
+
+	minsym = ~0;
+	shp = (Elf_Shdr *)(end + ehdr->e_shoff);
+	for (i = 0; i < ehdr->e_shnum; i++) {
+		if (shp[i].sh_type != SHT_SYMTAB &&
+		    shp[i].sh_type != SHT_STRTAB) {
+			continue;
+		}
+		minsym = MIN(minsym, (vaddr_t)end + shp[i].sh_offset);
+	}
+
+	symsize = 1;
+	ssym = (int *)ehdr;
+#else
+	symsize = *(int *)&end;
+	ssym = ((int *)&end) + 1;
+#endif
 }
 
 static long
@@ -1930,6 +1992,7 @@ struct cpu_model_info cpu_models[] = {
 	{MACH_MACPB180, "PowerBook", " 180 ", MACH_CLASSPB, &romvecs[5]},
 	{MACH_MACPB180C, "PowerBook", " 180c ", MACH_CLASSPB, &romvecs[5]},
 	{MACH_MACPB190, "PowerBook", " 190 ", MACH_CLASSPB, &romvecs[8]},
+	{MACH_MACPB190CS, "PowerBook", " 190cs ", MACH_CLASSPB, &romvecs[8]},
 	{MACH_MACPB500, "PowerBook", " 500 ", MACH_CLASSPB, &romvecs[8]},
 
 /* The Duos */
@@ -1978,6 +2041,12 @@ struct intvid_info_t {
 	{ MACH_MACPB160,	0x60000000,	0x0ffe0000,	128 * 1024 },
 	{ MACH_MACPB165,	0x60000000,	0x0ffe0000,	128 * 1024 },
 	{ MACH_MACPB180,	0x60000000,	0x0ffe0000,	128 * 1024 },
+	{ MACH_MACPB210,	0x60000000,	0x0,		128 * 1024 },
+	{ MACH_MACPB230,	0x60000000,	0x0,		128 * 1024 },
+	{ MACH_MACPB250,	0x60000000,	0x0,		128 * 1024 },
+	{ MACH_MACPB270,	0x60000000,	0x0,		128 * 1024 },
+	{ MACH_MACPB280,	0x60000000,	0x0,		128 * 1024 },
+	{ MACH_MACPB280C,	0x60000000,	0x0,		128 * 1024 },
 	{ MACH_MACIICI,		0x0,		0x0,		320 * 1024 },
 	{ MACH_MACIISI,		0x0,		0x0,		320 * 1024 },
 	{ MACH_MACCCLASSIC,	0x50f40000,	0x0,		512 * 1024 },
@@ -1985,6 +2054,7 @@ struct intvid_info_t {
 	{ MACH_MACPB165C,	0xfc040000,	0x0,		512 * 1024 },
 	{ MACH_MACPB180C,	0xfc040000,	0x0,		512 * 1024 },
 	{ MACH_MACPB190,	0x60000000,	0x0,		512 * 1024 },
+	{ MACH_MACPB190CS,	0x60000000,	0x0,		512 * 1024 },
 	{ MACH_MACPB500,	0x60000000,	0x0,		512 * 1024 },
 	{ MACH_MACLCIII,	0x60b00000,	0x0,		768 * 1024 },
 	{ MACH_MACLC520,	0x60000000,	0x0,		1024 * 1024 },
@@ -2253,7 +2323,9 @@ void
 mac68k_set_io_offsets(base)
 	vaddr_t base;
 {
+#if NZSC > 0
 	extern volatile u_char *sccA;
+#endif
 
 	switch (current_mac_model->class) {
 	case MACH_CLASSQ:
@@ -2351,10 +2423,10 @@ gray_bar()
    	3) restore regs
 */
 
-	__asm __volatile ("	movl a0,sp@-;
-				movl a1,sp@-;
-				movl d0,sp@-;
-				movl d1,sp@-");
+	__asm __volatile ("	movl %a0,%sp@-;
+				movl %a1,%sp@-;
+				movl %d0,%sp@-;
+				movl %d1,%sp@-");
 
 /* check to see if gray bars are turned off */
 	if (mac68k_machine.do_graybars) {
@@ -2366,10 +2438,10 @@ gray_bar()
 			((u_long *)videoaddr)[gray_nextaddr++] = 0x00000000;
 	}
 
-	__asm __volatile ("	movl sp@+,d1;
-				movl sp@+,d0;
-				movl sp@+,a1;
-				movl sp@+,a0");
+	__asm __volatile ("	movl %sp@+,%d1;
+				movl %sp@+,%d0;
+				movl %sp@+,%a1;
+				movl %sp@+,%a0");
 }
 #endif
 
@@ -2759,17 +2831,17 @@ printstar(void)
 	 * Be careful as we assume that no registers are clobbered
 	 * when we call this from assembly.
 	 */
-	__asm __volatile ("	movl a0,sp@-;
-				movl a1,sp@-;
-				movl d0,sp@-;
-				movl d1,sp@-");
+	__asm __volatile ("	movl %a0,%sp@-;
+				movl %a1,%sp@-;
+				movl %d0,%sp@-;
+				movl %d1,%sp@-");
 
 	/* printf("*"); */
 
-	__asm __volatile ("	movl sp@+,d1;
-				movl sp@+,d0;
-				movl sp@+,a1;
-				movl sp@+,a0");
+	__asm __volatile ("	movl %sp@+,%d1;
+				movl %sp@+,%d0;
+				movl %sp@+,%a1;
+				movl %sp@+,%a0");
 }
 
 /*

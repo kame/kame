@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.2 2000/01/23 21:02:00 soda Exp $
+#	$NetBSD: Makefile,v 1.4 2001/12/12 01:49:37 tv Exp $
 #	@(#)Makefile	8.2 (Berkeley) 2/16/94
 
 LIB=	sa
@@ -7,8 +7,10 @@ SRCS=	alloc.c bcopy.c bzero.c close.c dev.c disklabel.c getfile.c \
 	devopen.c getenv.c gets.c strcat.c strcmp.c strcpy.c strlen.c
 
 .PATH:	../../../../lib/libsa ../../../../lib/libkern
-NOPROFILE=noprofile
+NOPROFILE=# defined
 
+.include <bsd.own.mk>
+.undef DESTDIR
 .include <bsd.lib.mk>
 
 CFLAGS=-O2 -I../../include -I/sys -DSMALL

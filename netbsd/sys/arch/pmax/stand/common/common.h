@@ -1,4 +1,4 @@
-/*	$NetBSD: common.h,v 1.4 1999/11/27 07:02:24 simonb Exp $	*/
+/*	$NetBSD: common.h,v 1.6 2002/03/15 13:31:08 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -36,8 +36,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef NET_DEBUG
+extern int debug;	/* only used for network debugging for now */
+#endif
+
 /* startprog.S */
 void startprog __P((int, int, int, char **, int, const void *, int, int));
+
+/* clock.c */
+long getsecs __P((void));
 
 /* PROM callbacks */
 int bootinit __P((const char *));

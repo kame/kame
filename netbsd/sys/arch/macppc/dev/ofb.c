@@ -1,4 +1,4 @@
-/*	$NetBSD: ofb.c,v 1.13.2.2 2000/11/01 16:24:01 tv Exp $	*/
+/*	$NetBSD: ofb.c,v 1.26 2002/03/17 19:40:44 atatat Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -36,7 +36,7 @@
 #include <sys/malloc.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcireg.h>
@@ -46,12 +46,21 @@
 #include <dev/wscons/wsdisplayvar.h>
 #include <dev/rasops/rasops.h>
 
+#include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_pci.h>
 
+#include <machine/bat.h>
 #include <machine/bus.h>
+#include <machine/autoconf.h>
 #include <machine/grfioctl.h>
 
 #include <macppc/dev/ofbvar.h>
+
+#if OFB_ENABLE_CACHE
+int ofb_enable_cache = 1;
+#else
+int ofb_enable_cache = 0;
+#endif
 
 int	ofbmatch __P((struct device *, struct cfdata *, void *));
 void	ofbattach __P((struct device *, struct device *, void *));
@@ -87,6 +96,7 @@ static int ofb_alloc_screen __P((void *, const struct wsscreen_descr *,
 static void ofb_free_screen __P((void *, void *));
 static int ofb_show_screen __P((void *, void *, int,
 				void (*) (void *, int, int), void *));
+static int copy_rom_font __P((void));
 
 struct wsdisplay_accessops ofb_accessops = {
 	ofb_ioctl,
@@ -143,7 +153,7 @@ ofbattach(parent, self, aux)
 		int i, len, screenbytes;
 
 		dc = malloc(sizeof(struct ofb_devconfig), M_DEVBUF, M_WAITOK);
-		bzero(dc, sizeof(struct ofb_devconfig));
+		memset(dc, 0, sizeof(struct ofb_devconfig));
 		node = pcidev_to_ofdev(pa->pa_pc, pa->pa_tag);
 		if (node == 0) {
 			printf(": ofdev not found\n");
@@ -151,7 +161,7 @@ ofbattach(parent, self, aux)
 		}
 
 		/* XXX There are two child screens on PowerBook. */
-		bzero(devinfo, sizeof(devinfo));
+		memset(devinfo, 0, sizeof(devinfo));
 		OF_getprop(node, "device_type", devinfo, sizeof(devinfo));
 		len = strlen(devinfo);
 		if (strcmp(devinfo + len - 7, "-parent") == 0)
@@ -208,7 +218,7 @@ ofb_common_init(node, dc)
 	if (dc->dc_ih == 0) {
 		char name[64];
 
-		bzero(name, 64);
+		memset(name, 0, 64);
 		OF_package_to_path(node, name, sizeof(name));
 		dc->dc_ih = OF_open(name);
 	}
@@ -235,6 +245,14 @@ ofb_common_init(node, dc)
 	OF_call_method_1("color!", dc->dc_ih, 4, 0, 0, 0, 0);
 	OF_call_method_1("color!", dc->dc_ih, 4, 255, 255, 255, 255);
 
+	/* Enable write-through cache. */
+	if (ofb_enable_cache && battable[0xc].batu == 0) {
+		battable[0xc].batl = BATL(addr & 0xf0000000, BAT_W, BAT_PP_RW);
+		battable[0xc].batu = BATL(0xc0000000, BAT_BL_256M, BAT_Vs);
+		addr &= 0x0fffffff;
+		addr |= 0xc0000000;
+	}
+
 	/* initialize rasops */
 	ri->ri_width = width;
 	ri->ri_height = height;
@@ -258,8 +276,11 @@ ofb_common_init(node, dc)
 		ri->ri_yorigin = 3;
 		ri->ri_bits = (char *)addr + ri->ri_xorigin +
 			      ri->ri_stride * ri->ri_yorigin;
-	} else
-		rasops_init(ri, height/22, (width/12) & ~7);	/* XXX 12x22 */
+	} else {
+		rasops_init(ri, 24, 80);
+		rasops_reconfig(ri, (height - 2) / ri->ri_font->fontheight,
+		    ((width - 2) / ri->ri_font->fontwidth) & ~7);
+	}
 
 	/* black on white */
 	ri->ri_devcmap[0] = 0xffffffff;			/* bg */
@@ -322,12 +343,12 @@ ofb_ioctl(v, cmd, data, flag, p)
 	/* XXX There are no way to know framebuffer pa from a user program. */
 	case GRFIOCGINFO:
 		gm = (void *)data;
-		bzero(gm, sizeof(struct grfinfo));
+		memset(gm, 0, sizeof(struct grfinfo));
 		gm->gd_fbaddr = (caddr_t)dc->dc_paddr;
 		gm->gd_fbrowbytes = dc->dc_ri.ri_stride;
 		return 0;
 	}
-	return -1;
+	return EPASSTHROUGH;
 }
 
 paddr_t

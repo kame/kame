@@ -1,4 +1,4 @@
-/*	$NetBSD: iop_pci.c,v 1.6.4.1 2001/10/25 18:02:16 he Exp $	*/
+/*	$NetBSD: iop_pci.c,v 1.7 2001/11/13 07:48:45 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * PCI front-end for `iop' driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iop_pci.c,v 1.7 2001/11/13 07:48:45 lukem Exp $");
 
 #include "opt_i2o.h"
 
@@ -141,8 +144,7 @@ iop_pci_attach(struct device *parent, struct device *self, void *aux)
 		       reg | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt.  XXX IPL_BIO. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-	    &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("can't map interrupt\n");
 		return;
 	}

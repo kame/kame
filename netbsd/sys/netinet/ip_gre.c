@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_gre.c,v 1.10.4.2 2000/10/20 21:48:05 tv Exp $ */
+/*	$NetBSD: ip_gre.c,v 1.17 2001/11/13 00:32:37 lukem Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -42,6 +42,8 @@
  * This currently handles IPPROTO_GRE, IPPROTO_MOBILE
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ip_gre.c,v 1.17 2001/11/13 00:32:37 lukem Exp $");
 
 #include "gre.h"
 #if NGRE > 0
@@ -101,6 +103,8 @@ void gre_inet_ntoa(struct in_addr in); 	/* XXX */
 #endif
 
 struct gre_softc *gre_lookup __P((struct mbuf *, u_int8_t));
+
+int	gre_input2 __P((struct mbuf *, int, u_char));
 
 /*
  * De-encapsulate a packet and feed it back through ip input (this
@@ -210,8 +214,7 @@ gre_input2(struct mbuf *m ,int hlen,u_char proto)
 	m->m_pkthdr.len -= hlen;
 
 #if NBPFILTER > 0
-	if (sc->gre_bpf) {
-		/* see comment of other if_foo.c files */
+	if (sc->sc_if.if_bpf) {
 		struct mbuf m0;
 		u_int32_t af = AF_INET;
 
@@ -219,13 +222,13 @@ gre_input2(struct mbuf *m ,int hlen,u_char proto)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 
-		bpf_mtap(sc->gre_bpf, &m0);
+		bpf_mtap(sc->sc_if.if_bpf, &m0);
 		}
 #endif /*NBPFILTER > 0*/
 
 	m->m_pkthdr.rcvif = &sc->sc_if;
 
-	s = splimp();		/* possible */
+	s = splnet();		/* possible */
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);
@@ -301,21 +304,20 @@ gre_mobile_input(m, va_alist)
 	ip->ip_sum=in_cksum(m,(ip->ip_hl << 2));
 
 #if NBPFILTER > 0
-	if (sc->gre_bpf) {
-		/* see comment of other if_foo.c files */
+	if (sc->sc_if.if_bpf) {
 		struct mbuf m0;
-		u_int af = AF_INET;
+		u_int af = AF_INET; 
 
 		m0.m_next = m;
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 
-		bpf_mtap(sc->gre_bpf, &m0);
+		bpf_mtap(sc->sc_if.if_bpf, &m0);
 		}
 #endif /*NBPFILTER > 0*/
 
 	ifq = &ipintrq;
-	s = splimp();       /* possible */
+	s = splnet();       /* possible */
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);
@@ -335,10 +337,9 @@ gre_lookup(m, proto)
 {
 	struct ip *ip = mtod(m, struct ip *);
 	struct gre_softc *sc;
-	int i;
 
-	for (i = 0; i < NGRE; i++) {
-		sc = &gre_softc[i];
+	for (sc = LIST_FIRST(&gre_softc_list); sc != NULL;
+	     sc = LIST_NEXT(sc, sc_list)) {
 		if ((sc->g_dst.s_addr == ip->ip_src.s_addr) &&
 		    (sc->g_src.s_addr == ip->ip_dst.s_addr) &&
 		    (sc->g_proto == proto) &&

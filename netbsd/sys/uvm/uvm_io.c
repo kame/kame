@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_io.c,v 1.10 2000/06/02 12:02:44 pk Exp $	*/
+/*	$NetBSD: uvm_io.c,v 1.17 2001/11/10 07:37:00 lukem Exp $	*/
 
 /*
  *
@@ -38,16 +38,15 @@
  * uvm_io.c: uvm i/o ops
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uvm_io.c,v 1.17 2001/11/10 07:37:00 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/uio.h>
-
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm.h>
 
@@ -64,12 +63,12 @@
 
 int
 uvm_io(map, uio)
-	vm_map_t map;
+	struct vm_map *map;
 	struct uio *uio;
 {
 	vaddr_t baseva, endva, pageoffset, kva;
 	vsize_t chunksz, togo, sz;
-	vm_map_entry_t dead_entries;
+	struct vm_map_entry *dead_entries;
 	int error;
 
 	/*
@@ -95,7 +94,7 @@ uvm_io(map, uio)
 		togo = togo - (endva - VM_MAXUSER_ADDRESS + 1);
 	pageoffset = baseva & PAGE_MASK;
 	baseva = trunc_page(baseva);
-	chunksz = min(round_page(togo + pageoffset), MAXBSIZE);
+	chunksz = MIN(round_page(togo + pageoffset), MAXBSIZE);
 	error = 0;
 
 	/*
@@ -109,7 +108,7 @@ uvm_io(map, uio)
 		 */
 
 		error = uvm_map_extract(map, baseva, chunksz, kernel_map, &kva,
-			    UVM_EXTRACT_QREF | UVM_EXTRACT_CONTIG | 
+			    UVM_EXTRACT_QREF | UVM_EXTRACT_CONTIG |
 			    UVM_EXTRACT_FIXPROT);
 		if (error) {
 
@@ -143,17 +142,10 @@ uvm_io(map, uio)
 		 */
 
 		vm_map_lock(kernel_map);
-		(void)uvm_unmap_remove(kernel_map, kva, kva+chunksz,
-		    &dead_entries);
+		uvm_unmap_remove(kernel_map, kva, kva + chunksz, &dead_entries);
 		vm_map_unlock(kernel_map);
-
 		if (dead_entries != NULL)
 			uvm_unmap_detach(dead_entries, AMAP_REFALL);
 	}
-
-	/*
-	 * done
-	 */
-
 	return (error);
 }

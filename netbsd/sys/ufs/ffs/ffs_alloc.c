@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_alloc.c,v 1.35.4.3 2001/11/25 19:59:57 he Exp $	*/
+/*	$NetBSD: ffs_alloc.c,v 1.55 2002/05/14 02:46:22 matt Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -35,7 +35,10 @@
  *	@(#)ffs_alloc.c	8.19 (Berkeley) 7/13/95
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ffs_alloc.c,v 1.55 2002/05/14 02:46:22 matt Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_ffs.h"
 #include "opt_quota.h"
 #endif
@@ -49,10 +52,6 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 
-#include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
-
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/inode.h>
@@ -63,28 +62,30 @@
 #include <ufs/ffs/ffs_extern.h>
 
 static ufs_daddr_t ffs_alloccg __P((struct inode *, int, ufs_daddr_t, int));
-static ufs_daddr_t ffs_alloccgblk __P((struct inode *, struct buf *,
-					ufs_daddr_t));
+static ufs_daddr_t ffs_alloccgblk __P((struct inode *, struct buf *, ufs_daddr_t));
+#ifdef XXXUBC
 static ufs_daddr_t ffs_clusteralloc __P((struct inode *, int, ufs_daddr_t, int));
+#endif
 static ino_t ffs_dirpref __P((struct inode *));
 static ufs_daddr_t ffs_fragextend __P((struct inode *, int, long, int, int));
 static void ffs_fserr __P((struct fs *, u_int, char *));
-static u_long ffs_hashalloc
-		__P((struct inode *, int, long, int,
-		     ufs_daddr_t (*)(struct inode *, int, ufs_daddr_t, int)));
+static u_long ffs_hashalloc __P((struct inode *, int, long, int,
+    ufs_daddr_t (*)(struct inode *, int, ufs_daddr_t, int)));
 static ufs_daddr_t ffs_nodealloccg __P((struct inode *, int, ufs_daddr_t, int));
 static ufs_daddr_t ffs_mapsearch __P((struct fs *, struct cg *,
 				      ufs_daddr_t, int));
 #if defined(DIAGNOSTIC) || defined(DEBUG)
+#ifdef XXXUBC
 static int ffs_checkblk __P((struct inode *, ufs_daddr_t, long size));
+#endif
 #endif
 
 /* if 1, changes in optimalization strategy are logged */
 int ffs_log_changeopt = 0;
 
 /* in ffs_tables.c */
-extern int inside[], around[];
-extern u_char *fragtbl[];
+extern const int inside[], around[];
+extern const u_char * const fragtbl[];
 
 /*
  * Allocate a block in the file system.
@@ -98,7 +99,7 @@ extern u_char *fragtbl[];
  *   3) allocate a block in the same cylinder group.
  *   4) quadradically rehash into other cylinder groups, until an
  *      available block is located.
- * If no block preference is given the following heirarchy is used
+ * If no block preference is given the following hierarchy is used
  * to allocate a block:
  *   1) allocate a block in the cylinder group that contains the
  *      inode for the file.
@@ -113,15 +114,34 @@ ffs_alloc(ip, lbn, bpref, size, cred, bnp)
 	struct ucred *cred;
 	ufs_daddr_t *bnp;
 {
-	struct fs *fs;
+	struct fs *fs = ip->i_fs;
 	ufs_daddr_t bno;
 	int cg;
 #ifdef QUOTA
 	int error;
 #endif
 	
+#ifdef UVM_PAGE_TRKOWN
+	if (ITOV(ip)->v_type == VREG &&
+	    lblktosize(fs, (voff_t)lbn) < round_page(ITOV(ip)->v_size)) {
+		struct vm_page *pg;
+		struct uvm_object *uobj = &ITOV(ip)->v_uobj;
+		voff_t off = trunc_page(lblktosize(fs, lbn));
+		voff_t endoff = round_page(lblktosize(fs, lbn) + size);
+
+		simple_lock(&uobj->vmobjlock);
+		while (off < endoff) {
+			pg = uvm_pagelookup(uobj, off);
+			KASSERT(pg != NULL);
+			KASSERT(pg->owner == curproc->p_pid);
+			KASSERT((pg->flags & PG_CLEAN) == 0);
+			off += PAGE_SIZE;
+		}
+		simple_unlock(&uobj->vmobjlock);
+	}
+#endif
+
 	*bnp = 0;
-	fs = ip->i_fs;
 #ifdef DIAGNOSTIC
 	if ((u_int)size > fs->fs_bsize || fragoff(fs, size) != 0) {
 		printf("dev = 0x%x, bsize = %d, size = %d, fs = %s\n",
@@ -174,21 +194,39 @@ nospace:
  * invoked to get an appropriate block.
  */
 int
-ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
+ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp, blknop)
 	struct inode *ip;
 	ufs_daddr_t lbprev;
 	ufs_daddr_t bpref;
 	int osize, nsize;
 	struct ucred *cred;
 	struct buf **bpp;
+	ufs_daddr_t *blknop;
 {
-	struct fs *fs;
+	struct fs *fs = ip->i_fs;
 	struct buf *bp;
 	int cg, request, error;
 	ufs_daddr_t bprev, bno;
 
-	*bpp = 0;
-	fs = ip->i_fs;
+#ifdef UVM_PAGE_TRKOWN
+	if (ITOV(ip)->v_type == VREG) {
+		struct vm_page *pg;
+		struct uvm_object *uobj = &ITOV(ip)->v_uobj;
+		voff_t off = trunc_page(lblktosize(fs, lbprev));
+		voff_t endoff = round_page(lblktosize(fs, lbprev) + osize);
+
+		simple_lock(&uobj->vmobjlock);
+		while (off < endoff) {
+			pg = uvm_pagelookup(uobj, off);
+			KASSERT(pg != NULL);
+			KASSERT(pg->owner == curproc->p_pid);
+			KASSERT((pg->flags & PG_CLEAN) == 0);
+			off += PAGE_SIZE;
+		}
+		simple_unlock(&uobj->vmobjlock);
+	}
+#endif
+
 #ifdef DIAGNOSTIC
 	if ((u_int)osize > fs->fs_bsize || fragoff(fs, osize) != 0 ||
 	    (u_int)nsize > fs->fs_bsize || fragoff(fs, nsize) != 0) {
@@ -210,13 +248,16 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 	/*
 	 * Allocate the extra space in the buffer.
 	 */
-	if ((error = bread(ITOV(ip), lbprev, osize, NOCRED, &bp)) != 0) {
+	if (bpp != NULL &&
+	    (error = bread(ITOV(ip), lbprev, osize, NOCRED, &bp)) != 0) {
 		brelse(bp);
 		return (error);
 	}
 #ifdef QUOTA
 	if ((error = chkdq(ip, (long)btodb(nsize - osize), cred, 0)) != 0) {
-		brelse(bp);
+		if (bpp != NULL) {
+			brelse(bp);
+		}
 		return (error);
 	}
 #endif
@@ -225,14 +266,20 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 	 */
 	cg = dtog(fs, bprev);
 	if ((bno = ffs_fragextend(ip, cg, (long)bprev, osize, nsize)) != 0) {
-		if (bp->b_blkno != fsbtodb(fs, bno))
-			panic("bad blockno");
 		ip->i_ffs_blocks += btodb(nsize - osize);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
-		allocbuf(bp, nsize);
-		bp->b_flags |= B_DONE;
-		memset((char *)bp->b_data + osize, 0, (u_int)nsize - osize);
-		*bpp = bp;
+
+		if (bpp != NULL) {
+			if (bp->b_blkno != fsbtodb(fs, bno))
+				panic("bad blockno");
+			allocbuf(bp, nsize);
+			bp->b_flags |= B_DONE;
+			memset(bp->b_data + osize, 0, nsize - osize);
+			*bpp = bp;
+		}
+		if (blknop != NULL) {
+			*blknop = bno;
+		}
 		return (0);
 	}
 	/*
@@ -296,8 +343,6 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 	bno = (ufs_daddr_t)ffs_hashalloc(ip, cg, (long)bpref, request,
 	    			     ffs_alloccg);
 	if (bno > 0) {
-		bp->b_blkno = fsbtodb(fs, bno);
-		(void) uvm_vnp_uncache(ITOV(ip));
 		if (!DOINGSOFTDEP(ITOV(ip)))
 			ffs_blkfree(ip, bprev, (long)osize);
 		if (nsize < request)
@@ -305,10 +350,16 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 			    (long)(request - nsize));
 		ip->i_ffs_blocks += btodb(nsize - osize);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
-		allocbuf(bp, nsize);
-		bp->b_flags |= B_DONE;
-		memset((char *)bp->b_data + osize, 0, (u_int)nsize - osize);
-		*bpp = bp;
+		if (bpp != NULL) {
+			bp->b_blkno = fsbtodb(fs, bno);
+			allocbuf(bp, nsize);
+			bp->b_flags |= B_DONE;
+			memset(bp->b_data + osize, 0, (u_int)nsize - osize);
+			*bpp = bp;
+		}
+		if (blknop != NULL) {
+			*blknop = bno;
+		}
 		return (0);
 	}
 #ifdef QUOTA
@@ -317,7 +368,10 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 	 */
 	(void) chkdq(ip, (long)-btodb(nsize - osize), cred, FORCE);
 #endif
-	brelse(bp);
+	if (bpp != NULL) {
+		brelse(bp);
+	}
+
 nospace:
 	/*
 	 * no space available
@@ -334,26 +388,28 @@ nospace:
  * logical blocks to be made contiguous is given. The allocator attempts
  * to find a range of sequential blocks starting as close as possible to
  * an fs_rotdelay offset from the end of the allocation for the logical
- * block immediately preceeding the current range. If successful, the
+ * block immediately preceding the current range. If successful, the
  * physical block numbers in the buffer pointers and in the inode are
  * changed to reflect the new allocation. If unsuccessful, the allocation
  * is left unchanged. The success in doing the reallocation is returned.
  * Note that the error return is not reflected back to the user. Rather
  * the previous block allocation will be used.
  */
+#ifdef XXXUBC
 #ifdef DEBUG
 #include <sys/sysctl.h>
 int prtrealloc = 0;
 struct ctldebug debug15 = { "prtrealloc", &prtrealloc };
 #endif
+#endif
 
 int doasyncfree = 1;
-extern int doreallocblks;
 
 int
 ffs_reallocblks(v)
 	void *v;
 {
+#ifdef XXXUBC
 	struct vop_reallocblks_args /* {
 		struct vnode *a_vp;
 		struct cluster_save *a_buflist;
@@ -367,7 +423,12 @@ ffs_reallocblks(v)
 	ufs_daddr_t start_lbn, end_lbn, soff, newblk, blkno;
 	struct indir start_ap[NIADDR + 1], end_ap[NIADDR + 1], *idp;
 	int i, len, start_lvl, end_lvl, pref, ssize;
+#endif /* XXXUBC */
 
+	/* XXXUBC don't reallocblks for now */
+	return ENOSPC;
+
+#ifdef XXXUBC
 	vp = ap->a_vp;
 	ip = VTOI(vp);
 	fs = ip->i_fs;
@@ -551,6 +612,7 @@ fail:
 	if (sbap != &ip->i_ffs_db[0])
 		brelse(sbp);
 	return (ENOSPC);
+#endif /* XXXUBC */
 }
 
 /*
@@ -562,7 +624,7 @@ fail:
  *   2) allocate an inode in the same cylinder group.
  *   3) quadradically rehash into other cylinder groups, until an
  *      available inode is located.
- * If no inode preference is given the following heirarchy is used
+ * If no inode preference is given the following hierarchy is used
  * to allocate an inode:
  *   1) allocate an inode in cylinder group 0.
  *   2) quadradically rehash into other cylinder groups, until an
@@ -703,7 +765,7 @@ ffs_dirpref(pip)
 	minifree = avgifree - fs->fs_ipg / 4;
 	if (minifree < 0)
 		minifree = 0;
-	minbfree = avgbfree - fs->fs_fpg / fs->fs_frag / 4;
+	minbfree = avgbfree - fragstoblks(fs, fs->fs_fpg) / 4;
 	if (minbfree < 0)
 		minbfree = 0;
 	cgsize = fs->fs_fsize * fs->fs_fpg;
@@ -1193,6 +1255,7 @@ gotit:
 	return (blkno);
 }
 
+#ifdef XXXUBC
 /*
  * Determine whether a cluster can be allocated.
  *
@@ -1305,6 +1368,7 @@ fail:
 	brelse(bp);
 	return (0);
 }
+#endif /* XXXUBC */
 
 /*
  * Determine whether an inode can be allocated.
@@ -1506,6 +1570,7 @@ ffs_blkfree(ip, bno, size)
 }
 
 #if defined(DIAGNOSTIC) || defined(DEBUG)
+#ifdef XXXUBC
 /*
  * Verify allocation of a block or fragment. Returns true if block or
  * fragment is allocated, false if it is free.
@@ -1555,6 +1620,7 @@ ffs_checkblk(ip, bno, size)
 	brelse(bp);
 	return (!free);
 }
+#endif /* XXXUBC */
 #endif /* DIAGNOSTIC */
 
 /*
@@ -1674,14 +1740,14 @@ ffs_mapsearch(fs, cgp, bpref, allocsiz)
 	loc = scanc((u_int)len,
 		(const u_char *)&cg_blksfree(cgp, needswap)[start],
 		(const u_char *)fragtbl[fs->fs_frag],
-		(1 << (allocsiz - 1 + (fs->fs_frag % NBBY))));
+		(1 << (allocsiz - 1 + (fs->fs_frag & (NBBY - 1)))));
 	if (loc == 0) {
 		len = start + 1;
 		start = 0;
 		loc = scanc((u_int)len,
 			(const u_char *)&cg_blksfree(cgp, needswap)[0],
 			(const u_char *)fragtbl[fs->fs_frag],
-			(1 << (allocsiz - 1 + (fs->fs_frag % NBBY))));
+			(1 << (allocsiz - 1 + (fs->fs_frag & (NBBY - 1)))));
 		if (loc == 0) {
 			printf("start = %d, len = %d, fs = %s\n",
 			    ostart, olen, fs->fs_fsmnt);
@@ -1824,5 +1890,6 @@ ffs_fserr(fs, uid, cp)
 	char *cp;
 {
 
-	log(LOG_ERR, "uid %d on %s: %s\n", uid, fs->fs_fsmnt, cp);
+	log(LOG_ERR, "uid %d comm %s on %s: %s\n",
+	    uid, curproc->p_comm, fs->fs_fsmnt, cp);
 }

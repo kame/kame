@@ -1,4 +1,4 @@
-/*	$NetBSD: denode.h,v 1.31 1999/07/27 05:39:10 cgd Exp $	*/
+/*	$NetBSD: denode.h,v 1.34 2001/09/15 20:36:39 chs Exp $	*/
 
 /*-
  * Copyright (C) 1994, 1995, 1997 Wolfgang Solfrank.
@@ -46,6 +46,8 @@
  *
  * October 1992
  */
+
+#include <miscfs/genfs/genfs_node.h>
 
 /*
  * This is the pc filesystem specific portion of the vnode structure.
@@ -134,8 +136,8 @@ struct fatcache {
  * contained within a vnode.
  */
 struct denode {
-	struct denode *de_next;	/* Hash chain forward */
-	struct denode **de_prev; /* Hash chain back */
+	struct genfs_node de_gnode;
+	LIST_ENTRY(denode) de_hash;
 	struct vnode *de_vnode;	/* addr of vnode we are part of */
 	struct vnode *de_devvp;	/* vnode of blk dev we live on */
 	u_long de_flag;		/* flag bits */
@@ -266,7 +268,7 @@ int	msdosfs_write		__P((void *));
 #define	msdosfs_ioctl		genfs_enoioctl
 #define	msdosfs_poll		genfs_poll
 #define	msdosfs_revoke		genfs_revoke
-int	msdosfs_mmap		__P((void *));
+#define	msdosfs_mmap		genfs_mmap
 #define	msdosfs_fsync		genfs_fsync
 #define	msdosfs_seek		genfs_seek
 int	msdosfs_remove		__P((void *));
@@ -304,4 +306,5 @@ void reinsert __P((struct denode *));
 int removede __P((struct denode *, struct denode *));
 int uniqdosname __P((struct denode *, struct componentname *, u_char *));
 int findwin95 __P((struct denode *));
+int msdosfs_gop_alloc __P((struct vnode *, off_t, off_t, int, struct ucred *));
 #endif	/* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$NetBSD: netisr.h,v 1.19 2000/02/21 20:31:02 erh Exp $	*/
+/* $NetBSD: netisr.h,v 1.30 2002/05/12 20:40:12 matt Exp $ */
 
 /*
  * Copyright (c) 1980, 1986, 1989, 1993
@@ -36,7 +36,7 @@
  */
 
 #ifndef _NET_NETISR_H_
-#define _NET_NETISR_H_
+#define _NET_NETISR_H_		/* checked by netisr_dispatch.h */
 
 /*
  * The networking code runs off software interrupts.
@@ -49,6 +49,81 @@
  * The routine to request a network software interrupt, setsoftnet(),
  * is defined in the machine-specific include files.
  */
+
+#if defined(_KERNEL)
+
+#if !defined(_LKM)
+#include "opt_inet.h"    
+#include "opt_atalk.h"
+#include "opt_ccitt.h"   
+#include "opt_iso.h"
+#include "opt_ns.h"
+#include "opt_natm.h" 
+#include "arp.h"
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+#include "sl.h"
+#include "strip.h"
+#include "ppp.h"
+#endif
+#endif /* !defined(_LKM) */
+
+#if !defined(_LOCORE)
+
+/* XXX struct sockaddr defn for for if.h, if_arp.h */
+#include <sys/socket.h>
+
+/*
+ * XXX IFNAMSIZE for if_ppp.h, natm.h; struct ifnet decl for in6.h, in.h;
+ * XXX struct mbuf decl for in6.h, in.h, route.h (via in_var.h).
+ */
+#include <net/if.h>
+
+#ifdef INET
+#include <netinet/in.h>
+#include <netinet/ip_var.h>
+#if NARP > 0
+#include <netinet/if_inarp.h>
+#endif
+#endif
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet/ip6.h> 
+#include <netinet6/ip6_var.h>
+#endif
+#ifdef NS
+#include <netns/ns_var.h>
+#endif
+#ifdef ISO
+#include <netiso/iso.h>
+#include <netiso/clnp.h>
+#endif
+#ifdef CCITT
+#include <netccitt/x25isr.h>
+#endif
+#ifdef NATM
+#include <netnatm/natm.h>
+#endif
+#ifdef NETATALK
+#include <netatalk/at_extern.h>
+#endif
+
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS		/* XXX XXX XXX */
+#if NSL > 0
+extern void slnetisr(void);
+#endif
+#if NSTRIP > 0
+extern void stripnetisr(void);
+#endif
+#if NPPP > 0
+extern void pppnetisr(void);
+#endif
+#endif /* __HAVE_GENERIC_SOFT_INTERRUPTS */
+
+#endif /* !defined(_LOCORE) */
+#endif /* defined(_KERNEL) */
+
 
 /*
  * Each ``pup-level-1'' input queue has a bit in a ``netisr'' status
@@ -66,14 +141,18 @@
 #define	NETISR_ISDN	26		/* same as AF_E164 */
 #define	NETISR_NATM	27		/* same as AF_NATM */
 #define	NETISR_ARP	28		/* same as AF_ARP */
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+#define	NETISR_SLIP	29		/* for SLIP processing */
+#define	NETISR_STRIP	30		/* for STRIP processing */
 #define	NETISR_PPP	31		/* for PPP processing */
+#endif
+
+#if defined(_KERNEL) && !defined(_LOCORE)
 
 #define	schednetisr(anisr)	{ netisr |= 1<<(anisr); setsoftnet(); }
 
-#ifndef _LOCORE
-#ifdef _KERNEL
-int	netisr;				/* scheduling bits for network */
-#endif
-#endif
+extern	int netisr;			/* scheduling bits for network */
+
+#endif /* defined(_KERNEL) && !defined(_LOCORE) */
 
 #endif /* _NET_NETISR_H_ */

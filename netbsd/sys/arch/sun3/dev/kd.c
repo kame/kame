@@ -1,4 +1,4 @@
-/*	$NetBSD: kd.c,v 1.33 2000/05/21 14:36:16 eeh Exp $	*/
+/*	$NetBSD: kd.c,v 1.37 2002/03/17 19:40:51 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -180,7 +180,7 @@ static	int firstopen = 1;
 
 	splx(s);
 
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return ((*tp->t_linesw->l_open)(dev, tp));
 }
 
 int
@@ -200,7 +200,7 @@ kdclose(dev, flag, mode, p)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 	if ((cc = kd->kd_in) != NULL)
 		(void)(*cc->cc_iclose)(cc->cc_dev);
@@ -219,7 +219,7 @@ kdread(dev, uio, flag)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -234,7 +234,22 @@ kdwrite(dev, uio, flag)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+kdpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct kd_softc *kd;
+	struct tty *tp;
+
+	kd = &kd_softc; 	/* XXX */
+	tp = kd->kd_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -252,18 +267,19 @@ kdioctl(dev, cmd, data, flag, p)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return error;
 
 	/* Handle any ioctl commands specific to kbd/display. */
 	/* XXX - Send KB* ioctls to kbd module? */
 	/* XXX - Send FB* ioctls to fb module?  */
 
-	return ENOTTY;
+	return EPASSTHROUGH;
 }
 
 void
@@ -296,7 +312,7 @@ kdstart(tp)
 	struct tty *tp;
 {
 	struct clist *cl;
-	register int s;
+	int s;
 
 	s = spltty();
 	if (tp->t_state & (TS_BUSY|TS_TTSTOP|TS_TIMEOUT))
@@ -347,13 +363,13 @@ kd_later(tpaddr)
 	void *tpaddr;
 {
 	struct tty *tp = tpaddr;
-	register int s;
+	int s;
 
 	kd_putfb(tp);
 
 	s = spltty();
 	tp->t_state &= ~TS_BUSY;
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 	splx(s);
 }
 
@@ -434,7 +450,7 @@ kd_cons_input(c)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return;
 
-	(*linesw[tp->t_line].l_rint)(c, tp);
+	(*tp->t_linesw->l_rint)(c, tp);
 }
 
 

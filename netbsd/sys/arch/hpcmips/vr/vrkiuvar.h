@@ -1,4 +1,4 @@
-/*	$NetBSD: vrkiuvar.h,v 1.2 1999/10/24 08:37:30 takemura Exp $	*/
+/*	$NetBSD: vrkiuvar.h,v 1.4 2001/09/16 05:32:21 uch Exp $	*/
 
 /*-
  * Copyright (c) 1999 SASAKI Takesi All rights reserved.
@@ -34,5 +34,25 @@
  *
  */
 
-extern int vrkiu_getc __P((void));
-extern int vrkiu_cnattach __P((bus_space_tag_t iot, int iobase));
+/*
+ * structure and data types
+ */
+struct vrkiu_chip {
+	bus_space_tag_t kc_iot;
+	bus_space_handle_t kc_ioh;
+	unsigned short kc_scandata[KIU_NSCANLINE/2];
+	int kc_enabled;
+	struct vrkiu_softc *kc_sc;	/* back link */
+	struct hpckbd_ic_if kc_if;
+	struct hpckbd_if *kc_hpckbd;
+};
+
+struct vrkiu_softc {
+	struct device sc_dev;
+	struct vrkiu_chip *sc_chip;
+	struct vrkiu_chip sc_chip_body;
+	void *sc_handler;
+};
+
+extern int vrkiu_getc(void);
+extern int vrkiu_cnattach(bus_space_tag_t, int);

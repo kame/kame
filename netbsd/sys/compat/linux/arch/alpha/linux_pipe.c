@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_pipe.c,v 1.2 1998/10/03 20:17:37 christos Exp $	*/
+/*	$NetBSD: linux_pipe.c,v 1.6 2001/11/13 02:08:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,18 +36,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_pipe.c,v 1.6 2001/11/13 02:08:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#include <sys/mman.h> 
-#include <sys/mount.h> 
+#include <sys/mman.h>
+#include <sys/mount.h>
+#include <sys/proc.h>
   
 #include <sys/syscallargs.h> 
- 
-#include <vm/vm.h>
-#include <vm/vm_param.h> 
  
 #include <compat/linux/common/linux_types.h>
 #include <compat/linux/common/linux_mmap.h>

@@ -1,4 +1,4 @@
-/*	$NetBSD: dbdma.c,v 1.2 1998/08/21 16:13:28 tsubai Exp $	*/
+/*	$NetBSD: dbdma.c,v 1.4 2001/06/08 00:32:02 matt Exp $	*/
 
 /*
  * Copyright 1991-1998 by Open Software Foundation, Inc. 
@@ -26,7 +26,7 @@
 #include <sys/malloc.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pio.h>
 #include <macppc/dev/dbdma.h>
@@ -34,7 +34,6 @@
 #define eieio() __asm__ volatile("eieio")
 
 
-static int	dbdma_alloc_index = 0;
 dbdma_command_t	*dbdma_alloc_commands = NULL;
 
 void

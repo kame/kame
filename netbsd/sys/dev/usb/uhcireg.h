@@ -1,4 +1,4 @@
-/*	$NetBSD: uhcireg.h,v 1.11.4.1 2000/08/22 04:11:56 augustss Exp $	*/
+/*	$NetBSD: uhcireg.h,v 1.15 2002/02/11 11:41:30 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/uhcireg.h,v 1.12 1999/11/17 22:33:42 n_hibma Exp $ */
 
 /*
@@ -75,6 +75,7 @@
 #define  UHCI_STS_HSE		0x0008
 #define  UHCI_STS_HCPE		0x0010
 #define  UHCI_STS_HCH		0x0020
+#define  UHCI_STS_ALLINTRS	0x003f
 
 #define UHCI_INTR		0x04
 #define  UHCI_INTR_TOCRCIE	0x0001
@@ -106,6 +107,9 @@
 #define UHCI_PORTSC_OCIC	0x0800
 #define UHCI_PORTSC_SUSP	0x1000
 
+#define URWMASK(x) \
+  ((x) & (UHCI_PORTSC_SUSP | UHCI_PORTSC_PR | UHCI_PORTSC_RD | UHCI_PORTSC_PE))
+
 #define UHCI_FRAMELIST_COUNT	1024
 #define UHCI_FRAMELIST_ALIGN	4096
 
@@ -114,7 +118,8 @@
 
 typedef u_int32_t uhci_physaddr_t;
 #define UHCI_PTR_T		0x00000001
-#define UHCI_PTR_Q		0x00000002
+#define UHCI_PTR_TD		0x00000000
+#define UHCI_PTR_QH		0x00000002
 #define UHCI_PTR_VF		0x00000004
 
 /* 

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_ptrace.h,v 1.2 1999/12/16 15:09:49 tron Exp $	*/
+/*	$NetBSD: linux_ptrace.h,v 1.6 2002/01/27 15:11:38 bjh21 Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -49,15 +49,20 @@
 #define LINUX_PTRACE_CONT		 7
 #define LINUX_PTRACE_KILL		 8
 #define LINUX_PTRACE_SINGLESTEP		 9
+#define LINUX_PTRACE_GETREGS		12
+#define LINUX_PTRACE_SETREGS		13
+#define LINUX_PTRACE_GETFPREGS		14
+#define LINUX_PTRACE_SETFPREGS		15
 #define LINUX_PTRACE_ATTACH		16
 #define LINUX_PTRACE_DETACH		17
 #define LINUX_PTRACE_SYSCALL		24
 
-#if defined(__i386__)
+#if defined(__i386__) || defined (__powerpc__) || defined (__mips__) || \
+    defined(__arm__)
 int linux_sys_ptrace_arch __P((struct proc *, void *, register_t *));
 
 #define LINUX_SYS_PTRACE_ARCH(p,v,r)	linux_sys_ptrace_arch((p),(v),(r))
-#else
+#else 
 #define LINUX_SYS_PTRACE_ARCH(p,v,r)	EIO
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_blkio.c,v 1.3.4.1 2001/03/30 21:36:59 he Exp $	*/
+/*	$NetBSD: linux_blkio.c,v 1.5 2001/11/13 02:08:48 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_blkio.c,v 1.5 2001/11/13 02:08:48 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -68,9 +71,7 @@ linux_ioctl_blkio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	struct disklabel label;
 
         fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);

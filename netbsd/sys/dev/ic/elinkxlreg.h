@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxlreg.h,v 1.2.12.3 2001/05/03 21:23:10 he Exp $	*/
+/*	$NetBSD: elinkxlreg.h,v 1.10 2001/12/28 20:35:47 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -91,7 +91,7 @@
 
 /*
  * This is reset options for the other cards, media options for
- * the 90xB NICs. Reset options are in a seperate register for
+ * the 90xB NICs. Reset options are in a separate register for
  * the 90xB.
  */
 #define ELINK_W3_MEDIA_OPTIONS	0x08
@@ -124,7 +124,7 @@
  * Counter in window 4 for packets with a bad start-of-stream delimiter/
  */
 #define ELINK_W4_BADSSD		0x0c
-#define ELINK_W4_UBYTESOK	0x0c
+#define ELINK_W4_UBYTESOK	0x0d
 
 /*
  * Define for extra multicast hash filter bit implemented in the 90xB
@@ -134,13 +134,13 @@
 /*
  * Defines for the interrupt status register, only for the 90x[B]
  */
-#define S_HOST_ERROR		0x0002
-#define S_LINK_EVENT		0x0100
-#define S_DN_COMPLETE		0x0200
-#define S_UP_COMPLETE		0x0400
+#define HOST_ERROR		0x0002
+#define LINK_EVENT		0x0100
+#define DN_COMPLETE		0x0200
+#define UP_COMPLETE		0x0400
 
-#define S_MASK \
-    (S_HOST_ERROR | S_TX_COMPLETE | S_UPD_STATS | S_DN_COMPLETE | S_UP_COMPLETE)
+#define XL_WATCHED_INTERRUPTS \
+    (HOST_ERROR | TX_COMPLETE | UPD_STATS | DN_COMPLETE | UP_COMPLETE)
 
 
 /*
@@ -151,7 +151,7 @@
 #define ELINK_W7_VLANMASK	0x00	/* 90xB only */
 #define ELINK_W7_VLANTYPE	0x04	/* 90xB only */
 #define ELINK_W7_TIMER		0x0a	/* 90x only */
-#define ELINK_W7_TXSTATUS	0x0b	/* 90x only */
+#define ELINK_W7_TX_STATUS	0x0b	/* 90x only */
 #define ELINK_W7_POWEREVENT	0x0c	/* 90xB only */
 #define ELINK_W7_INTSTATUS	0x0e
 
@@ -304,6 +304,8 @@ struct ex_txdesc {
 
 /*
  * upd_pktstatus bitfields.
+ * The *CKSUMERR fields are only valid if the matching *CHECKED field
+ * is set.
  */
 #define EX_UPD_PKTLENMASK	0x00001fff	/* 12:0 -> packet length */
 #define EX_UPD_ERROR		0x00004000	/* rcv error */
@@ -318,6 +320,9 @@ struct ex_txdesc {
 #define EX_UPD_IPCKSUMERR	0x02000000	/* IP cksum error (90xB) */
 #define EX_UPD_TCPCKSUMERR	0x04000000	/* TCP cksum error (90xB) */
 #define EX_UPD_UDPCKSUMERR	0x08000000	/* UDP cksum error (90xB) */
+#define EX_UPD_IPCHECKED	0x20000000	/* IP cksum done */
+#define EX_UPD_TCPCHECKED	0x40000000	/* TCP cksum done */
+#define EX_UPD_UDPCHECKED	0x80000000	/* UDP cksum done */
 
 #define EX_UPD_ERR		0x001f4000	/* Errors we check for */
 #define EX_UPD_ERR_VLAN		0x000f0000	/* same for 802.1q */

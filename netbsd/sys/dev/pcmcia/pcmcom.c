@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmcom.c,v 1.6 2000/05/24 03:44:46 itojun Exp $	*/
+/*	$NetBSD: pcmcom.c,v 1.8 2002/01/12 16:25:16 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -49,6 +49,9 @@
  * be glued into this driver.  Rather, separate drivers should be written
  * for those devices, as we have in the ISA multi-port serial card case.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcmcom.c,v 1.8 2002/01/12 16:25:16 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -169,13 +172,12 @@ pcmcom_attach(parent, self, aux)
 	/* Allocate the slave info. */
 	sc->sc_nslaves = pp->pp_nslaves;
 	size = sizeof(struct pcmcom_slave_info) * sc->sc_nslaves;
-	sc->sc_slaves = malloc(size, M_DEVBUF, M_NOWAIT);
+	sc->sc_slaves = malloc(size, M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (sc->sc_slaves == NULL) {
 		printf("%s: unable to allocate slave info\n",
 		    sc->sc_dev.dv_xname);
 		return;
 	}
-	memset(sc->sc_slaves, 0, size);
 
 	/*
 	 * The address decoders on these cards are stupid.  They decode

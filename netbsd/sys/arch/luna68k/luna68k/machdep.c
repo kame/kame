@@ -1,4 +1,4 @@
-/* $NetBSD: machdep.c,v 1.8 2000/06/05 23:45:03 jhawk Exp $ */
+/* $NetBSD: machdep.c,v 1.21 2002/03/20 17:59:23 christos Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,9 +38,10 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.8 2000/06/05 23:45:03 jhawk Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.21 2002/03/20 17:59:23 christos Exp $");
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,11 +69,7 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.8 2000/06/05 23:45:03 jhawk Exp $");
 #ifdef	KGDB
 #include <sys/kgdb.h>
 #endif
-
-#include <vm/vm.h>
-#include <vm/vm_map.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
+#include <sys/boot_flag.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -104,9 +101,9 @@ struct cpu_info cpu_info_store;
 extern char kernel_text[];
 extern char etext[];
 
-vm_map_t exec_map = NULL;  
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;  
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 caddr_t	msgbufaddr;
 int	maxmem;			/* max memory per process */
@@ -158,7 +155,10 @@ int	delay_divisor = 300;	/* for delay() loop count */
 void
 luna68k_init()
 {
-	int i;
+	volatile unsigned char *pio0 = (void *)0x49000000;
+	int sw1, i;
+	char *cp;
+	extern char bootarg[64];
 
 	extern paddr_t avail_start, avail_end;
 
@@ -177,23 +177,12 @@ luna68k_init()
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
 		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
-}
 
-/*
- * Console initialization: called early on from main,
- */
-void
-consinit()
-{
-	volatile unsigned char *pio0 = (void *)0x49000000;
-	int sw1, i;
-	char *cp;
-	extern char bootarg[64];
 
 	pio0[3] = 0xb6;
 	pio0[2] = 1 << 6;		/* enable parity check */
-
 	pio0[3] = 0xb6;
 	sw1 = pio0[0];			/* dipssw1 value */
 	sw1 ^= 0xff;
@@ -211,17 +200,7 @@ consinit()
 	 * NetBSD/luna68k cares only the first argment; any of "sda".
 	 */
 	for (cp = bootarg; *cp != ' '; cp++) {
-		switch (*cp) {
-		case 's':
-			boothowto |= RB_SINGLE;
-			break;
-		case 'd':
-			boothowto |= RB_KDB;
-			break;
-		case 'a':
-			boothowto |= RB_ASKNAME;
-			break;
-		}
+		BOOT_FLAG(*cp, boothowto);
 		if (i++ >= sizeof(bootarg))
 			break;
 	}
@@ -229,7 +208,14 @@ consinit()
 	if (boothowto == 0)
 		boothowto = (sw1 & 0x1) ? RB_SINGLE : 0;
 #endif
+}
 
+/*
+ * Console initialization: called early on from main,
+ */
+void
+consinit()
+{
 	if (sysconsole == 0)
 		syscnattach(0);
 	else {
@@ -293,9 +279,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
@@ -329,6 +315,7 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -363,7 +350,7 @@ cpu_startup()
 	 * XXX but not right now.
 	 */
 	if (uvm_map_protect(kernel_map, 0, round_page((vaddr_t)&kernel_text),
-	    UVM_PROT_NONE, TRUE) != KERN_SUCCESS)
+	    UVM_PROT_NONE, TRUE) != 0)
 		panic("can't mark pre-text pages off-limits");
 
 	/*
@@ -372,7 +359,7 @@ cpu_startup()
 	 */
 	if (uvm_map_protect(kernel_map, trunc_page((vaddr_t)&kernel_text),
 	    trunc_page((vaddr_t)&etext), UVM_PROT_READ|UVM_PROT_EXEC, TRUE)
-	    != KERN_SUCCESS)
+	    != 0)
 		panic("can't protect kernel text");
 
 	/*
@@ -410,7 +397,7 @@ setregs(p, pack, stack)
 	frame->f_regs[D7] = 0;
 	frame->f_regs[A0] = 0;
 	frame->f_regs[A1] = 0;
-	frame->f_regs[A2] = (int)PS_STRINGS;
+	frame->f_regs[A2] = (int)p->p_psstr;
 	frame->f_regs[A3] = 0;
 	frame->f_regs[A4] = 0;
 	frame->f_regs[A5] = 0;
@@ -437,7 +424,7 @@ identifycpu()
 		cpuspeed = 20; delay_divisor = 102;	/* 20MHz 68030 */
 		hz = 60;
 		break;
-#ifdef M68040
+#if defined(M68040)
 	case CPU_68040:
 		cpu = "MC68040 CPU+MMU+FPU, 4k on-chip physical I/D caches";
 		machtype = LUNA_II;
@@ -654,7 +641,7 @@ cpu_dump(dump, blknop)
 /*
  * These variables are needed by /sbin/savecore
  */
-u_long	dumpmag = 0x8fca0101;	/* magic number */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number */
 int	dumpsize = 0;		/* pages */
 long	dumplo = 0;		/* blocks */
 
@@ -752,6 +739,7 @@ dumpsys()
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, maddr,
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 
+		pmap_update(pmap_kernel());
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
  bad:
 		switch (error) {
@@ -964,15 +952,15 @@ struct consdev *cn_tab = &romcons;
 ({					\
 	register _r;			\
 	asm volatile ("			\
-		movc	vbr,%0		; \
-		movel	%0,sp@-		; \
+		movc	%%vbr,%0	; \
+		movel	%0,%%sp@-	; \
 		clrl	%0		; \
-		movc	%0,vbr"		\
+		movc	%0,%%vbr"	\
 		: "=r" (_r));		\
 	PUTC(x);			\
 	asm volatile ("			\
-		movel	sp@+,%0		; \
-		movc	%0,vbr"		\
+		movel	%%sp@+,%0	; \
+		movc	%0,%%vbr"	\
 		: "=r" (_r));		\
 })
 
@@ -980,15 +968,15 @@ struct consdev *cn_tab = &romcons;
 ({					\
 	register _r, _c;		\
 	asm volatile ("			\
-		movc	vbr,%0		; \
-		movel	%0,sp@-		; \
+		movc	%%vbr,%0	; \
+		movel	%0,%%sp@-	; \
 		clrl	%0		; \
-		movc	%0,vbr"		\
+		movc	%0,%%vbr"	\
 		: "=r" (_r));		\
 	_c = GETC();			\
 	asm volatile ("			\
-		movel	sp@+,%0		; \
-		movc	%0,vbr"		\
+		movel	%%sp@+,%0	; \
+		movc	%0,%%vbr"	\
 		: "=r" (_r));		\
 	_c;				\
 })

@@ -1,4 +1,4 @@
-/* $NetBSD: bus_dma.h,v 1.2.4.1 2000/06/30 16:27:31 simonb Exp $	*/
+/* $NetBSD: bus_dma.h,v 1.10 2002/02/12 20:38:35 scw Exp $	*/
 
 /*
  * This file was extracted from from next68k/include/bus.h
@@ -7,7 +7,7 @@
  */
 
 /*-
- * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1997, 1998, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -80,14 +80,17 @@
 /*
  * Flags used in various bus DMA methods.
  */
-#define	BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
-#define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
-#define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define	BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
-#define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
-#define	BUS_DMA_BUS2		0x20
-#define	BUS_DMA_BUS3		0x40
-#define	BUS_DMA_BUS4		0x80
+#define	BUS_DMA_WAITOK		0x000	/* safe to sleep (pseudo-flag) */
+#define	BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
+#define	BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
+#define	BUS_DMA_COHERENT	0x004	/* hint: map memory DMA coherent */
+#define	BUS_DMA_STREAMING	0x008	/* hint: sequential, unidirectional */
+#define	BUS_DMA_BUS1		0x010	/* placeholders for bus functions... */
+#define	BUS_DMA_BUS2		0x020
+#define	BUS_DMA_BUS3		0x040
+#define	BUS_DMA_BUS4		0x080
+#define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
+#define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
 
 /*
  * Flags to constrain the physical memory allocated for DMA
@@ -119,6 +122,10 @@ typedef struct mvme68k_bus_dmamap *bus_dmamap_t;
 struct mvme68k_bus_dma_segment {
 	bus_addr_t	ds_addr;	/* DMA address */
 	bus_size_t	ds_len;		/* length of transfer */
+
+	/* PRIVATE */
+	bus_addr_t	_ds_cpuaddr;	/* CPU-relative phys addr of segment */
+	int		_ds_flags;
 };
 typedef struct mvme68k_bus_dma_segment	bus_dma_segment_t;
 
@@ -204,6 +211,7 @@ struct mvme68k_bus_dmamap {
 	bus_size_t	_dm_maxsegsz;	/* largest possible segment */
 	bus_size_t	_dm_boundary;	/* don't cross this */
 	int		_dm_flags;	/* misc. flags */
+	void		*_dm_cookie;	/* Bus-specific cookie */
 
 	/*
 	 * PUBLIC MEMBERS: these are used by machine-independent code.
@@ -226,11 +234,11 @@ int	_bus_dmamap_load_uio_direct __P((bus_dma_tag_t,
 	    bus_dmamap_t, struct uio *, int));
 int	_bus_dmamap_load_raw_direct __P((bus_dma_tag_t,
 	    bus_dmamap_t, bus_dma_segment_t *, int, bus_size_t, int));
-
 void	_bus_dmamap_unload __P((bus_dma_tag_t, bus_dmamap_t));
-void	_bus_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+void	_bus_dmamap_sync_030 __P((bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
 	    bus_size_t, int));
-
+void	_bus_dmamap_sync_0460 __P((bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+	    bus_size_t, int));
 int	_bus_dmamem_alloc __P((bus_dma_tag_t tag, bus_size_t size,
 	    bus_size_t alignment, bus_size_t boundary,
 	    bus_dma_segment_t *segs, int nsegs, int *rsegs, int flags));
@@ -243,5 +251,10 @@ void	_bus_dmamem_unmap __P((bus_dma_tag_t tag, caddr_t kva,
 paddr_t	_bus_dmamem_mmap __P((bus_dma_tag_t tag, bus_dma_segment_t *segs,
 	    int nsegs, off_t off, int prot, int flags));
 #endif /* _MVME68K_BUS_DMA_PRIVATE */
+
+/* Needed by mvmebus.c */
+int	_bus_dmamem_alloc_common __P((bus_dma_tag_t,
+	    bus_addr_t, bus_addr_t, bus_size_t, bus_size_t, bus_size_t,
+	    bus_dma_segment_t *, int, int *, int));
 
 #endif /* _MVME68K_BUS_DMA_H_ */

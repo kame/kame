@@ -1,4 +1,4 @@
-/* $NetBSD: tcasic.c,v 1.30 2000/06/05 21:47:32 thorpej Exp $ */
+/* $NetBSD: tcasic.c,v 1.36 2001/08/23 01:16:52 nisimura Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: tcasic.c,v 1.30 2000/06/05 21:47:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcasic.c,v 1.36 2001/08/23 01:16:52 nisimura Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -150,7 +150,9 @@ tcasicattach(parent, self, aux)
 	tc_dma_init();
 
 	(*intr_setup)();
-	set_iointr(iointr);
+
+	/* They all come in at 0x800. */
+	scb_set(0x800, iointr, NULL);
 
 	config_found(self, &tba, tcasicprint);
 }
@@ -171,12 +173,53 @@ tcasicprint(aux, pnp)
 
 #if NWSDISPLAY > 0
 
-#include "cfb.h"
 #include "sfb.h"
+#include "sfbp.h"
+#include "cfb.h"
+#include "mfb.h"
+#include "tfb.h"
+#include "px.h"
+#include "pxg.h"
 
-extern int	sfb_cnattach __P((tc_addr_t));
-extern int	cfb_cnattach __P((tc_addr_t));
+extern void	sfb_cnattach __P((tc_addr_t));
+extern void	sfbp_cnattach __P((tc_addr_t));
+extern void	cfb_cnattach __P((tc_addr_t));
+extern void	mfb_cnattach __P((tc_addr_t));
+extern void	tfb_cnattach __P((tc_addr_t));
+extern void	px_cnattach __P((tc_addr_t));
+extern void	pxg_cnattach __P((tc_addr_t));
 extern int	tc_checkslot __P((tc_addr_t, char *));
+
+struct cnboards {
+	const char	*cb_tcname;
+	void	(*cb_cnattach)(tc_addr_t);
+} static const cnboards[] = {
+#if NSFB > 0
+	{ "PMAGB-BA", sfb_cnattach },
+#endif
+#if NSFBP > 0
+	{ "PMAGD   ", sfbp_cnattach },
+#endif
+#if NCFB > 0
+	{ "PMAG-BA ", cfb_cnattach },
+#endif
+#if NMFB > 0
+	{ "PMAG-AA ", mfb_cnattach },
+#endif
+#if NTFB > 0
+	{ "PMAG-JA ", tfb_cnattach },
+#endif
+#if NPX > 0
+	{ "PMAG-CA ", px_cnattach },
+#endif
+#if NPXG > 0
+	{ "PMAG-DA ", pxg_cnattach },
+	{ "PMAG-FA ", pxg_cnattach },
+	{ "PMAG-FB ", pxg_cnattach },
+	{ "PMAGB-FA", pxg_cnattach },
+	{ "PMAGB-FB", pxg_cnattach },
+#endif
+};
 
 /*
  * tc_fb_cnattach --
@@ -188,23 +231,19 @@ tc_fb_cnattach(tcaddr)
 	tc_addr_t tcaddr;
 {
 	char tcname[TC_ROM_LLEN];
+	int i;
 
-	if (tc_badaddr(tcaddr) || (tc_checkslot(tcaddr, tcname) == 0)) {
-		return EINVAL;
-	}
+	if (tc_badaddr(tcaddr) || (tc_checkslot(tcaddr, tcname) == 0))
+		return (EINVAL);
 
-#if NSFB > 0
-	if (strncmp("PMAGB-BA", tcname, TC_ROM_LLEN) == 0) {
-		sfb_cnattach(tcaddr);
-		return 0;
-	}
-#endif
-#if NCFB > 0
-	if (strncmp("PMAG-BA ", tcname, TC_ROM_LLEN) == 0) {
-		cfb_cnattach(tcaddr);
-		return 0;
-	}
-#endif
-	return ENXIO;
+	for (i = 0; i < sizeof(cnboards) / sizeof(cnboards[0]); i++)
+		if (strncmp(tcname, cnboards[i].cb_tcname, TC_ROM_LLEN) == 0)
+			break;
+
+	if (i == sizeof(cnboards) / sizeof(cnboards[0]))
+		return (ENXIO);
+
+	(cnboards[i].cb_cnattach)(tcaddr);
+	return (0);
 }
 #endif /* if NWSDISPLAY > 0 */

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_ipc.c,v 1.21 1999/08/25 04:52:44 thorpej Exp $	*/
+/*	$NetBSD: linux_ipc.c,v 1.27 2002/04/03 11:54:37 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -36,9 +36,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_sysv.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_ipc.c,v 1.27 2002/04/03 11:54:37 fvdl Exp $");
 
-#include <sys/types.h>
+#if defined(_KERNEL_OPT)
+#include "opt_sysv.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
@@ -313,8 +317,8 @@ linux_sys_msgctl(p, v, retval)
 	SCARG(&nua, msqid) = SCARG(uap, msqid);
 	switch (SCARG(uap, cmd)) {
 	case LINUX_IPC_STAT:
-		sg = stackgap_init(p->p_emul);
-		bmp = stackgap_alloc(&sg, sizeof (struct msqid_ds));
+		sg = stackgap_init(p, 0);
+		bmp = stackgap_alloc(p, &sg, sizeof (struct msqid_ds));
 		SCARG(&nua, cmd) = IPC_STAT;
 		SCARG(&nua, buf) = bmp;
 		if ((error = sys___msgctl13(p, &nua, retval)))
@@ -327,8 +331,8 @@ linux_sys_msgctl(p, v, retval)
 		if ((error = copyin(SCARG(uap, buf), &lm, sizeof lm)))
 			return error;
 		linux_to_bsd_msqid_ds(&lm, &bm);
-		sg = stackgap_init(p->p_emul);
-		bmp = stackgap_alloc(&sg, sizeof bm);
+		sg = stackgap_init(p, 0);
+		bmp = stackgap_alloc(p, &sg, sizeof bm);
 		if ((error = copyout(&bm, bmp, sizeof bm)))
 			return error;
 		SCARG(&nua, cmd) = IPC_SET;
@@ -364,11 +368,16 @@ linux_sys_shmat(p, v, retval)
 		syscallarg(u_long *) raddr;
 	} */ *uap = v;
 	int error;
+	vaddr_t attach_va;
+	u_long raddr;
 
-	if ((error = sys_shmat(p, uap, retval)))
+	if ((error = shmat1(p, SCARG(uap, shmid), SCARG(uap, shmaddr),
+	     SCARG(uap, shmflg), &attach_va, 1)))
 		return error;
 
-	if ((error = copyout(&retval[0], (caddr_t) SCARG(uap, raddr),
+	raddr = (u_long)attach_va;
+
+	if ((error = copyout(&raddr, (caddr_t) SCARG(uap, raddr),
 	     sizeof retval[0])))
 		return error;
 	
@@ -445,8 +454,8 @@ linux_sys_shmctl(p, v, retval)
 	SCARG(&nua, shmid) = SCARG(uap, shmid);
 	switch (SCARG(uap, cmd)) {
 	case LINUX_IPC_STAT:
-		sg = stackgap_init(p->p_emul);
-		bsp = stackgap_alloc(&sg, sizeof(struct shmid_ds));
+		sg = stackgap_init(p, 0);
+		bsp = stackgap_alloc(p, &sg, sizeof(struct shmid_ds));
 		SCARG(&nua, cmd) = IPC_STAT;
 		SCARG(&nua, buf) = bsp;
 		if ((error = sys___shmctl13(p, &nua, retval)))
@@ -459,8 +468,8 @@ linux_sys_shmctl(p, v, retval)
 		if ((error = copyin(SCARG(uap, buf), &ls, sizeof ls)))
 			return error;
 		linux_to_bsd_shmid_ds(&ls, &bs);
-		sg = stackgap_init(p->p_emul);
-		bsp = stackgap_alloc(&sg, sizeof bs);
+		sg = stackgap_init(p, 0);
+		bsp = stackgap_alloc(p, &sg, sizeof bs);
 		if ((error = copyout(&bs, bsp, sizeof bs)))
 			return error;
 		SCARG(&nua, cmd) = IPC_SET;

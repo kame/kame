@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_info_43.c,v 1.11 2000/03/30 11:27:14 augustss Exp $	*/
+/*	$NetBSD: kern_info_43.c,v 1.13 2001/11/13 02:08:00 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -35,6 +35,9 @@
  *	@(#)subr_xxx.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_info_43.c,v 1.13 2001/11/13 02:08:00 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/filedesc.h>
@@ -52,10 +55,8 @@
 #include <sys/unistd.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
-#include <sys/sysctl.h>
-
 #include <uvm/uvm_extern.h>
+#include <sys/sysctl.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>

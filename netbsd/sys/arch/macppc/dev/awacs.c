@@ -1,4 +1,4 @@
-/*	$NetBSD: awacs.c,v 1.3.2.3 2001/03/22 02:32:01 he Exp $	*/
+/*	$NetBSD: awacs.c,v 1.12 2001/10/03 00:04:48 augustss Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -36,11 +36,12 @@
 #include <dev/audio_if.h>
 #include <dev/mulaw.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/pio.h>
+
+#include <dev/ofw/openfirm.h>
 #include <macppc/dev/dbdma.h>
 
 #ifdef AWACS_DEBUG
@@ -49,8 +50,12 @@
 # define DPRINTF while (0) printf
 #endif
 
+/* sc_flags values */
+#define AWACS_CAP_BSWAP		0x0001
+
 struct awacs_softc {
 	struct device sc_dev;
+	int sc_flags;
 
 	void (*sc_ointr)(void *);	/* dma completion intr handler */
 	void *sc_oarg;			/* arg for sc_ointr() */
@@ -106,6 +111,9 @@ void awacs_set_speaker_volume(struct awacs_softc *, int, int);
 void awacs_set_ext_volume(struct awacs_softc *, int, int);
 int awacs_set_rate(struct awacs_softc *, int);
 
+static void mono16_to_stereo16(void *, u_char *, int);
+static void swap_bytes_mono16_to_stereo16(void *, u_char *, int);
+
 struct cfattach awacs_ca = {
 	sizeof(struct awacs_softc), awacs_match, awacs_attach
 };
@@ -137,6 +145,7 @@ struct audio_hw_if awacs_hw_if = {
 	awacs_get_props,
 	awacs_trigger_output,
 	awacs_trigger_input,
+	NULL,
 };
 
 struct audio_device awacs_device = {
@@ -187,7 +196,8 @@ struct audio_device awacs_device = {
 /* cc0 */
 #define AWACS_DEFAULT_CD_GAIN	0x000000bb
 #define AWACS_INPUT_CD		0x00000200
-#define AWACS_INPUT_MIC		0x00000400
+#define AWACS_INPUT_LINE	0x00000400
+#define AWACS_INPUT_MICROPHONE	0x00000800
 #define AWACS_INPUT_MASK	0x00000e00
 
 /* cc1 */
@@ -220,6 +230,7 @@ awacs_attach(parent, self, aux)
 {
 	struct awacs_softc *sc = (struct awacs_softc *)self;
 	struct confargs *ca = aux;
+	int cirq, oirq, iirq, cirq_type, oirq_type, iirq_type;
 
 	ca->ca_reg[0] += ca->ca_baseaddr;
 	ca->ca_reg[2] += ca->ca_baseaddr;
@@ -232,12 +243,28 @@ awacs_attach(parent, self, aux)
 	sc->sc_odmacmd = dbdma_alloc(20 * sizeof(struct dbdma_command));
 	sc->sc_idmacmd = dbdma_alloc(20 * sizeof(struct dbdma_command));
 
-	intr_establish(ca->ca_intr[0], IST_LEVEL, IPL_AUDIO, awacs_intr, sc);
-	intr_establish(ca->ca_intr[1], IST_LEVEL, IPL_AUDIO, awacs_intr, sc);
-	intr_establish(ca->ca_intr[2], IST_LEVEL, IPL_AUDIO, awacs_intr, sc);
+	if (ca->ca_nintr == 24) {
+		cirq = ca->ca_intr[0];
+		oirq = ca->ca_intr[2];
+		iirq = ca->ca_intr[4];
+		cirq_type = ca->ca_intr[1] ? IST_LEVEL : IST_EDGE;
+		oirq_type = ca->ca_intr[3] ? IST_LEVEL : IST_EDGE;
+		iirq_type = ca->ca_intr[5] ? IST_LEVEL : IST_EDGE;
+	} else {
+		cirq = ca->ca_intr[0];
+		oirq = ca->ca_intr[1];
+		iirq = ca->ca_intr[2];
+		cirq_type = oirq_type = iirq_type = IST_LEVEL;
+	}
+	intr_establish(cirq, cirq_type, IPL_AUDIO, awacs_intr, sc);
+	intr_establish(oirq, oirq_type, IPL_AUDIO, awacs_intr, sc);
+	/* intr_establish(iirq, iirq_type, IPL_AUDIO, awacs_intr, sc); */
 
-	printf(": irq %d,%d,%d\n",
-		ca->ca_intr[0], ca->ca_intr[1], ca->ca_intr[2]);
+	printf(": irq %d,%d,%d\n", cirq, oirq, iirq);
+
+	/* XXX Uni-North based models don't have byteswap capability. */
+	if (OF_finddevice("/uni-n") == -1)
+		sc->sc_flags |= AWACS_CAP_BSWAP;
 
 	sc->sc_soundctl = AWACS_INPUT_SUBFRAME0 | AWACS_OUTPUT_SUBFRAME0 |
 		AWACS_RATE_44100;
@@ -255,14 +282,21 @@ awacs_attach(parent, self, aux)
 	awacs_set_speaker_volume(sc, 80, 80);
 
 	/* Set loopback (for CD?) */
-	sc->sc_codecctl1 |= 0x440;
+	/* sc->sc_codecctl1 |= 0x440; */
+	sc->sc_codecctl1 |= 0x40;
 	awacs_write_codec(sc, sc->sc_codecctl1);
 
+	/* default output to speakers */
 	sc->sc_output_mask = 1 << 0;
-
 	sc->sc_codecctl1 &= ~AWACS_MUTE_SPEAKER;
 	sc->sc_codecctl1 |= AWACS_MUTE_HEADPHONE;
 	awacs_write_codec(sc, sc->sc_codecctl1);
+
+	/* default input from CD */
+	sc->sc_record_source = 1 << 0;
+	sc->sc_codecctl0 &= ~AWACS_INPUT_MASK;
+	sc->sc_codecctl0 |= AWACS_INPUT_CD;
+	awacs_write_codec(sc, sc->sc_codecctl0);
 
 	/* Enable interrupts and looping mode. */
 	/* XXX ... */
@@ -270,7 +304,7 @@ awacs_attach(parent, self, aux)
 	audio_attach_mi(&awacs_hw_if, sc, &sc->sc_dev);
 }
 
-u_int
+static inline u_int
 awacs_read_reg(sc, reg)
 	struct awacs_softc *sc;
 	int reg;
@@ -280,7 +314,7 @@ awacs_read_reg(sc, reg)
 	return in32rb(addr + reg);
 }
 
-void
+static inline void
 awacs_write_reg(sc, reg, val)
 	struct awacs_softc *sc;
 	int reg, val;
@@ -353,6 +387,10 @@ awacs_query_encoding(h, ae)
 	void *h;
 	struct audio_encoding *ae;
 {
+	struct awacs_softc *sc = h;
+
+	ae->flags = AUDIO_ENCODINGFLAG_EMULATED;
+
 	switch (ae->index) {
 	case 0:
 		strcpy(ae->name, AudioEslinear);
@@ -370,31 +408,28 @@ awacs_query_encoding(h, ae)
 		strcpy(ae->name, AudioEslinear_le);
 		ae->encoding = AUDIO_ENCODING_SLINEAR_LE;
 		ae->precision = 16;
-		ae->flags = 0;
+		if (sc->sc_flags & AWACS_CAP_BSWAP)
+			ae->flags = 0;
 		return 0;
 	case 3:
 		strcpy(ae->name, AudioEulinear_be);
 		ae->encoding = AUDIO_ENCODING_ULINEAR_BE;
 		ae->precision = 16;
-		ae->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return 0;
 	case 4:
 		strcpy(ae->name, AudioEulinear_le);
 		ae->encoding = AUDIO_ENCODING_ULINEAR_LE;
 		ae->precision = 16;
-		ae->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return 0;
 	case 5:
 		strcpy(ae->name, AudioEmulaw);
 		ae->encoding = AUDIO_ENCODING_ULAW;
 		ae->precision = 8;
-		ae->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return 0;
 	case 6:
 		strcpy(ae->name, AudioEalaw);
 		ae->encoding = AUDIO_ENCODING_ALAW;
 		ae->precision = 8;
-		ae->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return 0;
 	default:
 		return EINVAL;
@@ -418,6 +453,16 @@ mono16_to_stereo16(v, p, cc)
 		*--dst = x;
 		cc -= 2;
 	}
+}
+
+static void
+swap_bytes_mono16_to_stereo16(v, p, cc)
+	void *v;
+	u_char *p;
+	int cc;
+{
+	swap_bytes(v, p, cc);
+	mono16_to_stereo16(v, p, cc);
 }
 
 int
@@ -464,48 +509,63 @@ awacs_set_params(h, setmode, usemode, play, rec)
 		switch (p->encoding) {
 
 		case AUDIO_ENCODING_SLINEAR_LE:
-			awacs_write_reg(sc, AWACS_BYTE_SWAP, 1);
+			if (sc->sc_flags & AWACS_CAP_BSWAP)
+				awacs_write_reg(sc, AWACS_BYTE_SWAP, 1);
+			else {
+				if (p->channels == 2 && p->precision == 16) {
+					p->sw_code = swap_bytes;
+					break;
+				}
+				if (p->channels == 1 && p->precision == 16) {
+					p->factor = 2;
+					p->sw_code =
+					    swap_bytes_mono16_to_stereo16;
+					break;
+				}
+				return EINVAL;
+			}
 		case AUDIO_ENCODING_SLINEAR_BE:
-			if (p->channels == 1) {
+			if (p->channels == 1 && p->precision == 16) {
 				p->factor = 2;
 				p->sw_code = mono16_to_stereo16;
 				break;
 			}
-			if (p->precision != 16)
-				return EINVAL;
-				/* p->sw_code = change_sign8; */
-			break;
+			if (p->channels == 2 && p->precision == 16)
+				break;
+
+			return EINVAL;
 
 		case AUDIO_ENCODING_ULINEAR_LE:
-			awacs_write_reg(sc, AWACS_BYTE_SWAP, 1);
-			if (p->channels == 2 && p->precision == 16)
-				p->sw_code = change_sign16_le;
-			else
-				return EINVAL;
-			break;
+			if (p->channels == 2 && p->precision == 16) {
+				p->sw_code = swap_bytes_change_sign16_be;
+				break;
+			}
+			return EINVAL;
 
 		case AUDIO_ENCODING_ULINEAR_BE:
-			if (p->channels == 2 && p->precision == 16)
+			if (p->channels == 2 && p->precision == 16) {
 				p->sw_code = change_sign16_be;
-			else
-				return EINVAL;
-			break;
+				break;
+			}
+			return EINVAL;
 
 		case AUDIO_ENCODING_ULAW:
 			if (mode == AUMODE_PLAY) {
 				p->factor = 2;
 				p->sw_code = mulaw_to_slinear16_be;
+				break;
 			} else
-				p->sw_code = ulinear8_to_mulaw;
-			break;
+				break;		/* XXX */
+
+			return EINVAL;
 
 		case AUDIO_ENCODING_ALAW:
 			if (mode == AUMODE_PLAY) {
 				p->factor = 2;
 				p->sw_code = alaw_to_slinear16_be;
-			} else
-				p->sw_code = ulinear8_to_alaw;
-			break;
+				break;
+			}
+			return EINVAL;
 
 		default:
 			return EINVAL;
@@ -563,11 +623,14 @@ awacs_getdev(h, retp)
 }
 
 enum {
+	AWACS_MONITOR_CLASS,
+	AWACS_OUTPUT_CLASS,
+	AWACS_RECORD_CLASS,
 	AWACS_OUTPUT_SELECT,
 	AWACS_VOL_SPEAKER,
 	AWACS_VOL_HEADPHONE,
-	AWACS_OUTPUT_CLASS,
-	AWACS_MONITOR_CLASS,
+	AWACS_INPUT_SELECT,
+	AWACS_VOL_INPUT,
 	AWACS_ENUM_LAST
 };
 
@@ -586,7 +649,17 @@ awacs_set_port(h, mc)
 
 	switch (mc->dev) {
 	case AWACS_OUTPUT_SELECT:
-		printf("output_select mask = 0x%x\n", mc->un.mask);
+		/* No change necessary? */
+		if (mc->un.mask == sc->sc_output_mask)
+			return 0;
+
+		sc->sc_codecctl1 |= AWACS_MUTE_SPEAKER | AWACS_MUTE_HEADPHONE;
+		if (mc->un.mask & 1 << 0)
+			sc->sc_codecctl1 &= ~AWACS_MUTE_SPEAKER;
+		if (mc->un.mask & 1 << 1)
+			sc->sc_codecctl1 &= ~AWACS_MUTE_HEADPHONE;
+
+		awacs_write_codec(sc, sc->sc_codecctl1);
 		sc->sc_output_mask = mc->un.mask;
 		return 0;
 
@@ -596,6 +669,38 @@ awacs_set_port(h, mc)
 
 	case AWACS_VOL_HEADPHONE:
 		awacs_set_ext_volume(sc, l, r);
+		return 0;
+
+	case AWACS_INPUT_SELECT:
+		/* no change necessary? */
+		if (mc->un.mask == sc->sc_record_source)
+			return 0;
+		switch (mc->un.mask) {
+		case 1 << 0: /* CD */
+			sc->sc_codecctl0 &= ~AWACS_INPUT_MASK;
+			sc->sc_codecctl0 |= AWACS_INPUT_CD;
+			awacs_write_codec(sc, sc->sc_codecctl0);
+			break;
+		case 1 << 1: /* microphone */
+			sc->sc_codecctl0 &= ~AWACS_INPUT_MASK;
+			sc->sc_codecctl0 |= AWACS_INPUT_MICROPHONE;
+			awacs_write_codec(sc, sc->sc_codecctl0);
+			break;
+		case 1 << 2: /* line in */
+			sc->sc_codecctl0 &= ~AWACS_INPUT_MASK;
+			sc->sc_codecctl0 |= AWACS_INPUT_LINE;
+			awacs_write_codec(sc, sc->sc_codecctl0);
+			break;
+		default: /* invalid argument */
+			return EINVAL;
+		}
+		sc->sc_record_source = mc->un.mask;
+		return 0;
+
+	case AWACS_VOL_INPUT:
+		sc->sc_codecctl0 &= ~0xff;
+		sc->sc_codecctl0 |= (l & 0xf0) | (r >> 4);
+		awacs_write_codec(sc, sc->sc_codecctl0);
 		return 0;
 	}
 
@@ -621,7 +726,6 @@ awacs_get_port(h, mc)
 		vol = sc->sc_codecctl4;
 		l = (15 - ((vol & 0x3c0) >> 6)) * 16;
 		r = (15 - (vol & 0x0f)) * 16;
-		mc->un.mask = 1 << 0;
 		mc->un.value.level[AUDIO_MIXER_LEVEL_LEFT] = l;
 		mc->un.value.level[AUDIO_MIXER_LEVEL_RIGHT] = r;
 		return 0;
@@ -630,7 +734,18 @@ awacs_get_port(h, mc)
 		vol = sc->sc_codecctl2;
 		l = (15 - ((vol & 0x3c0) >> 6)) * 16;
 		r = (15 - (vol & 0x0f)) * 16;
-		mc->un.mask = 1 << 1;
+		mc->un.value.level[AUDIO_MIXER_LEVEL_LEFT] = l;
+		mc->un.value.level[AUDIO_MIXER_LEVEL_RIGHT] = r;
+		return 0;
+
+	case AWACS_INPUT_SELECT:
+		mc->un.mask = sc->sc_record_source;
+		return 0;
+
+	case AWACS_VOL_INPUT:
+		vol = sc->sc_codecctl0 & 0xff;
+		l = (vol & 0xf0);
+		r = (vol & 0x0f) << 4;
 		mc->un.value.level[AUDIO_MIXER_LEVEL_LEFT] = l;
 		mc->un.value.level[AUDIO_MIXER_LEVEL_RIGHT] = r;
 		return 0;
@@ -682,6 +797,29 @@ awacs_query_devinfo(h, dip)
 		strcpy(dip->un.v.units.name, AudioNvolume);
 		return 0;
 
+	case AWACS_INPUT_SELECT:
+		dip->mixer_class = AWACS_RECORD_CLASS;
+		strcpy(dip->label.name, AudioNsource);
+		dip->type = AUDIO_MIXER_SET;
+		dip->prev = dip->next = AUDIO_MIXER_LAST;
+		dip->un.s.num_mem = 3;
+		strcpy(dip->un.s.member[0].label.name, AudioNcd);
+		dip->un.s.member[0].mask = 1 << 0;
+		strcpy(dip->un.s.member[1].label.name, AudioNmicrophone);
+		dip->un.s.member[1].mask = 1 << 1;
+		strcpy(dip->un.s.member[2].label.name, AudioNline);
+		dip->un.s.member[2].mask = 1 << 2;
+		return 0;
+
+	case AWACS_VOL_INPUT:
+		dip->mixer_class = AWACS_RECORD_CLASS;
+		strcpy(dip->label.name, AudioNrecord);
+		dip->type = AUDIO_MIXER_VALUE;
+		dip->prev = dip->next = AUDIO_MIXER_LAST;
+		dip->un.v.num_channels = 2;
+		strcpy(dip->un.v.units.name, AudioNvolume);
+		return 0;
+
 	case AWACS_MONITOR_CLASS:
 		dip->mixer_class = AWACS_MONITOR_CLASS;
 		strcpy(dip->label.name, AudioCmonitor);
@@ -692,6 +830,13 @@ awacs_query_devinfo(h, dip)
 	case AWACS_OUTPUT_CLASS:
 		dip->mixer_class = AWACS_OUTPUT_CLASS;
 		strcpy(dip->label.name, AudioCoutputs);
+		dip->type = AUDIO_MIXER_CLASS;
+		dip->next = dip->prev = AUDIO_MIXER_LAST;
+		return 0;
+
+	case AWACS_RECORD_CLASS:
+		dip->mixer_class = AWACS_RECORD_CLASS;
+		strcpy(dip->label.name, AudioCrecord);
 		dip->type = AUDIO_MIXER_CLASS;
 		dip->next = dip->prev = AUDIO_MIXER_LAST;
 		return 0;

@@ -1,4 +1,4 @@
-/* $NetBSD: cia_pci.c,v 1.24 1999/06/29 17:10:57 ross Exp $ */
+/* $NetBSD: cia_pci.c,v 1.26 2002/05/15 16:57:42 thorpej Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -29,13 +29,14 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: cia_pci.c,v 1.24 1999/06/29 17:10:57 ross Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cia_pci.c,v 1.26 2002/05/15 16:57:42 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -138,7 +139,7 @@ cia_conf_read(cpv, tag, offset)
 	alpha_pal_draina();	
 
 	/* secondary if bus # != 0 */
-	alpha_pci_decompose_tag(&ccp->cc_pc, tag, &secondary, 0, 0);
+	pci_decompose_tag(&ccp->cc_pc, tag, &secondary, 0, 0);
 	if (secondary) {
 		s = splhigh();
 		old_cfg = REGVAL(CIA_CSR_CFG);
@@ -222,7 +223,7 @@ cia_conf_write(cpv, tag, offset, data)
 #endif
 
 	/* secondary if bus # != 0 */
-	alpha_pci_decompose_tag(&ccp->cc_pc, tag, &secondary, 0, 0);
+	pci_decompose_tag(&ccp->cc_pc, tag, &secondary, 0, 0);
 	if (secondary) {
 		s = splhigh();
 		old_cfg = REGVAL(CIA_CSR_CFG);

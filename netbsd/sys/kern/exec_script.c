@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_script.c,v 1.23.4.1 2001/06/16 20:19:07 he Exp $	*/
+/*	$NetBSD: exec_script.c,v 1.30 2001/11/12 15:25:04 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1996 Christopher G. Demetriou
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: exec_script.c,v 1.30 2001/11/12 15:25:04 lukem Exp $");
+
 #if defined(SETUIDSCRIPTS) && !defined(FDSCRIPTS)
 #define FDSCRIPTS		/* Need this for safe set-id scripts. */
 #endif
@@ -47,7 +50,6 @@
 #include <sys/filedesc.h>
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
 
 #include <sys/exec_script.h>
 
@@ -64,9 +66,7 @@
  * into the exec package.
  */
 int
-exec_script_makecmds(p, epp)
-	struct proc *p;
-	struct exec_package *epp;
+exec_script_makecmds(struct proc *p, struct exec_package *epp)
 {
 	int error, hdrlinelen, shellnamelen, shellarglen;
 	char *hdrstr = epp->ep_hdr;
@@ -191,6 +191,7 @@ check_shell:
 		fp->f_ops = &vnops;
 		fp->f_data = (caddr_t) epp->ep_vp;
 		fp->f_flag = FREAD;
+		FILE_SET_MATURE(fp);
 		FILE_UNUSE(fp, p);
 	}
 #endif
@@ -241,7 +242,7 @@ check_shell:
 
 	if ((error = check_exec(p, epp)) == 0) {
 		/* note that we've clobbered the header */
-		epp->ep_flags |= EXEC_DESTR;
+		epp->ep_flags |= EXEC_DESTR|EXEC_HASES;
 
 		/*
 		 * It succeeded.  Unlock the script and
@@ -256,7 +257,7 @@ check_shell:
 		}
 
 		/* free the old pathname buffer */
-		FREE(oldpnbuf, M_NAMEI);
+		PNBUF_PUT(oldpnbuf);
 
 		epp->ep_flags |= (EXEC_HASARGL | EXEC_SKIPARG);
 		epp->ep_fa = shellargp;
@@ -294,7 +295,7 @@ fail:
 		vput(scriptvp);
 	}
 
-        FREE(epp->ep_ndp->ni_cnd.cn_pnbuf, M_NAMEI);
+        PNBUF_PUT(epp->ep_ndp->ni_cnd.cn_pnbuf);
 
 	/* free the fake arg list, because we're not returning it */
 	if ((tmpsap = shellargp) != NULL) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_paritylogDiskMgr.c,v 1.10 2000/01/15 01:57:57 oster Exp $	*/
+/*	$NetBSD: rf_paritylogDiskMgr.c,v 1.13 2001/11/13 07:11:15 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -29,11 +29,15 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_paritylogDiskMgr.c,v 1.13 2001/11/13 07:11:15 lukem Exp $");
+
 #include "rf_archs.h"
 
 #if RF_INCLUDE_PARITYLOGGING > 0
 
-#include "rf_types.h"
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_threadstuff.h"
 #include "rf_mcpair.h"
 #include "rf_raid.h"
@@ -141,7 +145,7 @@ ReadRegionLog(
 	}
 	/* initialize DAG parameters */
 	RF_Malloc(tracerec,sizeof(RF_AccTraceEntry_t), (RF_AccTraceEntry_t *));
-	bzero((char *) tracerec, sizeof(RF_AccTraceEntry_t));
+	memset((char *) tracerec, 0, sizeof(RF_AccTraceEntry_t));
 	(*rrd_dag_h)->tracerec = tracerec;
 	rrd_rdNode = (*rrd_dag_h)->succedents[0]->succedents[0];
 	rrd_rdNode->params[0].p = *rrd_pda;
@@ -194,7 +198,7 @@ WriteCoreLog(
 
 	/* initialize DAG parameters */
 	RF_Malloc(tracerec,sizeof(RF_AccTraceEntry_t), (RF_AccTraceEntry_t *));
-	bzero((char *) tracerec, sizeof(RF_AccTraceEntry_t));
+	memset((char *) tracerec, 0, sizeof(RF_AccTraceEntry_t));
 	(*fwr_dag_h)->tracerec = tracerec;
 	fwr_wrNode = (*fwr_dag_h)->succedents[0]->succedents[0];
 	fwr_wrNode->params[0].p = *fwr_pda;
@@ -250,7 +254,7 @@ ReadRegionParity(
 	}
 	/* initialize DAG parameters */
 	RF_Malloc(tracerec,sizeof(RF_AccTraceEntry_t), (RF_AccTraceEntry_t *));
-	bzero((char *) tracerec, sizeof(RF_AccTraceEntry_t));
+	memset((char *) tracerec, 0, sizeof(RF_AccTraceEntry_t));
 	(*prd_dag_h)->tracerec = tracerec;
 	prd_rdNode = (*prd_dag_h)->succedents[0]->succedents[0];
 	prd_rdNode->params[0].p = *prd_pda;
@@ -301,7 +305,7 @@ WriteRegionParity(
 
 	/* initialize DAG parameters */
 	RF_Malloc(tracerec,sizeof(RF_AccTraceEntry_t), (RF_AccTraceEntry_t *));
-	bzero((char *) tracerec, sizeof(RF_AccTraceEntry_t));
+	memset((char *) tracerec, 0, sizeof(RF_AccTraceEntry_t));
 	(*pwr_dag_h)->tracerec = tracerec;
 	pwr_wrNode = (*pwr_dag_h)->succedents[0]->succedents[0];
 	pwr_wrNode->params[0].p = *pwr_pda;

@@ -1,4 +1,4 @@
-/*	$NetBSD: profile.h,v 1.7 1999/11/06 17:42:33 thorpej Exp $	*/
+/*	$NetBSD: profile.h,v 1.12 2001/05/27 00:58:57 chs Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -37,13 +37,34 @@
 
 #define	_MCOUNT_DECL static __inline void _mcount
 
+#ifdef __ELF__
+#define	MCOUNT_ENTRY	"__mcount"
+#else
+#define	MCOUNT_ENTRY	"mcount"
+#endif
+
+#ifndef	__mc68010__
 #define	MCOUNT \
-extern void mcount __P((void)) __asm__("mcount"); void mcount() { \
+extern void mcount __P((void)) __asm__(MCOUNT_ENTRY); void mcount() { \
 	int selfpc, frompcindex; \
 	__asm__("movl %%a6@(4),%0" : "=r" (selfpc)); \
 	__asm__("movl %%a6@(0)@(4),%0" : "=r" (frompcindex)); \
 	_mcount(frompcindex, selfpc); \
 }
+#else	/* __mc68010__ */
+/*
+ * The 68010 doesn't have the memory indirect addressing mode
+ * that the above definition of mcount uses, so we're forced
+ * to do something different.
+ */
+#define	MCOUNT \
+extern void mcount __P((void)) __asm__("mcount"); void mcount() { \
+	int selfpc, frompcindex; \
+	__asm__("movl %%a6@(4),%0" : "=r" (selfpc)); \
+	__asm__("movl %%a6@(0),%%a0 ; movl %%a0@(4),%0" : "=r" (frompcindex) : /* no inputs */ : "a0"); \
+	_mcount(frompcindex, selfpc); \
+}
+#endif	/* __mc68010__ */
 
 #ifdef _KERNEL
 /*
@@ -54,7 +75,7 @@ extern void mcount __P((void)) __asm__("mcount"); void mcount() { \
  */
 #define MCOUNT_ENTER \
 	__asm__("movw	%%sr,%0" : "=g" (s)); \
-	__asm__("movw	#0x2700,%%sr")
+	__asm__("movw	#0x2700,%sr")
 
 #define MCOUNT_EXIT \
 	__asm__("movw	%0,%%sr" : : "g" (s))

@@ -1,4 +1,4 @@
-/*	$NetBSD: ofw_machdep.c,v 1.5.4.2 2000/12/13 22:13:41 he Exp $	*/
+/*	$NetBSD: ofw_machdep.c,v 1.11 2001/08/26 02:47:39 matt Exp $	*/
 
 /*
  * Copyright (C) 1996 Wolfgang Solfrank.
@@ -57,8 +57,7 @@ static struct mem_region OFmem[OFMEM_REGIONS + 1], OFavail[OFMEM_REGIONS + 3];
  * to provide space for two additional entry beyond the terminating one.
  */
 void
-mem_regions(memp, availp)
-	struct mem_region **memp, **availp;
+mem_regions(struct mem_region **memp, struct mem_region **availp)
 {
 	int phandle, i, cnt;
 
@@ -68,7 +67,7 @@ mem_regions(memp, availp)
 	if ((phandle = OF_finddevice("/memory")) == -1)
 		goto error;
 
-	bzero(OFmem, sizeof OFmem);
+	memset(OFmem, 0, sizeof OFmem);
 	cnt = OF_getprop(phandle, "reg",
 		OFmem, sizeof OFmem[0] * OFMEM_REGIONS);
 	if (cnt <= 0)
@@ -78,13 +77,13 @@ mem_regions(memp, availp)
 	cnt /= sizeof OFmem[0];
 	for (i = 0; i < cnt; )
 		if (OFmem[i].size == 0) {
-			bcopy(&OFmem[i + 1], &OFmem[i],
-			      (cnt - i) * sizeof OFmem[0]);
+			memmove(&OFmem[i], &OFmem[i + 1],
+				(cnt - i) * sizeof OFmem[0]);
 			cnt--;
 		} else
 			i++;
 
-	bzero(OFavail, sizeof OFavail);
+	memset(OFavail, 0, sizeof OFavail);
 	cnt = OF_getprop(phandle, "available",
 		OFavail, sizeof OFavail[0] * OFMEM_REGIONS);
 	if (cnt <= 0)
@@ -93,8 +92,8 @@ mem_regions(memp, availp)
 	cnt /= sizeof OFavail[0];
 	for (i = 0; i < cnt; )
 		if (OFavail[i].size == 0) {
-			bcopy(&OFavail[i + 1], &OFavail[i],
-			      (cnt - i) * sizeof OFavail[0]);
+			memmove(&OFavail[i], &OFavail[i + 1],
+				(cnt - i) * sizeof OFavail[0]);
 			cnt--;
 		} else
 			i++;
@@ -108,14 +107,13 @@ error:
 }
 
 void
-ppc_exit()
+ppc_exit(void)
 {
 	OF_exit();
 }
 
 void
-ppc_boot(str)
-	char *str;
+ppc_boot(char *str)
 {
 	OF_boot(str);
 }
@@ -133,15 +131,15 @@ struct ofb_disk {
 	int ofb_unit;
 };
 
+#include <machine/autoconf.h>
+
 static LIST_HEAD(ofb_list, ofb_disk) ofb_head;	/* LIST_INIT?		XXX */
 
 void
-dk_establish(dk, dev)
-	struct disk *dk;
-	struct device *dev;
+dk_establish(struct disk *dk, struct device *dev)
 {
 	struct ofb_disk *od;
-	struct ofb_softc *ofp = (void *)dev;
+	struct ofbus_softc *ofp = (void *)dev;
 
 	MALLOC(od, struct ofb_disk *, sizeof *od, M_TEMP, M_NOWAIT);
 	if (!od)
@@ -160,7 +158,7 @@ dk_establish(dk, dev)
  * Cleanup the list.
  */
 void
-dk_cleanup()
+dk_cleanup(void)
 {
 	struct ofb_disk *od, *nd;
 
@@ -172,9 +170,7 @@ dk_cleanup()
 }
 
 static void
-dk_setroot(od, part)
-	struct ofb_disk *od;
-	int part;
+dk_setroot(struct ofb_disk *od, int part)
 {
 	char type[8];
 	int maj, unit;
@@ -251,8 +247,7 @@ dk_setroot(od, part)
  * or the NetBSD device name, both with optional trailing partition.
  */
 int
-dk_match(name)
-	char *name;
+dk_match(char *name)
 {
 	struct ofb_disk *od;
 	char *cp;
@@ -265,7 +260,7 @@ dk_match(name)
 		 * First try the NetBSD name.
 		 */
 		l = strlen(od->ofb_dev->dv_xname);
-		if (!bcmp(name, od->ofb_dev->dv_xname, l)) {
+		if (!memcmp(name, od->ofb_dev->dv_xname, l)) {
 			if (name[l] == '\0') {
 				/* Default partition, (or none at all) */
 				dk_setroot(od, -1);

@@ -1,4 +1,4 @@
-/* $NetBSD: machdep.c,v 1.3 2000/06/19 19:49:51 is Exp $ */
+/* $NetBSD: machdep.c,v 1.18 2002/04/23 12:41:04 kleink Exp $ */
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -48,11 +48,11 @@
 #include <sys/kernel.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/powerpc.h>
 #include <machine/bat.h>
+#include <machine/mtpr.h>
 #include <machine/trap.h>
 #include <machine/hid.h>
 #include <machine/cpu.h>
@@ -75,12 +75,16 @@ char cpu_model[80];
 char machine[] = MACHINE;
 char machine_arch[] = MACHINE_ARCH;
 
+/* XXX: should be in extintr.c */
+volatile int cpl, ipending, astpending, tickspending;
+int imask[NIPL];
+
 /* Our exported CPU info; we can have only one. */
 struct cpu_info cpu_info_store;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 struct bat battable[16];
 extern int aga_enable, eclockfreq;
@@ -123,12 +127,12 @@ initppc(startkernel, endkernel)
 
 	PPCavail[0].start = 0x8000000;
 	PPCavail[0].size  = 0x5f80000;
-/*
 	PPCavail[1].start = (0x7c00000 + endkernel + PGOFSET) & ~PGOFSET;
 	PPCavail[1].size  = 0x8000000 - PPCavail[1].start;
-*/
+/*
 	PPCavail[1].start = 0x7c00000;
 	PPCavail[1].size  = 0x0400000;
+*/
 	PPCavail[2].start = 0x0;
 	PPCavail[2].size  = 0x0;
 
@@ -183,37 +187,37 @@ initppc(startkernel, endkernel)
 	for (exc = EXC_RSVD + EXC_UPPER; exc <= EXC_LAST + EXC_UPPER; exc += 0x100) {
 		switch (exc - EXC_UPPER) {
 		default:
-			bcopy(&trapcode, (void *)exc, (size_t)&trapsize);
+			memcpy((void *)exc, &trapcode, (size_t)&trapsize);
 			break;
 		case EXC_MCHK:
-			bcopy(&adamint, (void *)exc, (size_t)&adamintsize);
+			memcpy((void *)exc, &adamint, (size_t)&adamintsize);
 			break;
 		case EXC_EXI:
-			bcopy(&extint, (void *)exc, (size_t)&extsize);
+			memcpy((void *)exc, &extint, (size_t)&extsize);
 			/*
 			 * This one is (potentially) installed during autoconf
 			 */
 			break;
 		case EXC_ALI:
-			bcopy(&alitrap, (void *)exc, (size_t)&alisize);
+			memcpy((void *)exc, &alitrap, (size_t)&alisize);
 			break;
 		case EXC_DSI:
-			bcopy(&dsitrap, (void *)exc, (size_t)&dsisize);
+			memcpy((void *)exc, &dsitrap, (size_t)&dsisize);
 			break;
 		case EXC_ISI:
-			bcopy(&isitrap, (void *)exc, (size_t)&isisize);
+			memcpy((void *)exc, &isitrap, (size_t)&isisize);
 			break;
 		case EXC_DECR:
-			bcopy(&decrint, (void *)exc, (size_t)&decrsize);
+			memcpy((void *)exc, &decrint, (size_t)&decrsize);
 			break;
 		case EXC_IMISS:
-			bcopy(&tlbimiss, (void *)exc, (size_t)&tlbimsize);
+			memcpy((void *)exc, &tlbimiss, (size_t)&tlbimsize);
 			break;
 		case EXC_DLMISS:
-			bcopy(&tlbdlmiss, (void *)exc, (size_t)&tlbdlmsize);
+			memcpy((void *)exc, &tlbdlmiss, (size_t)&tlbdlmsize);
 			break;
 		case EXC_DSMISS:
-			bcopy(&tlbdsmiss, (void *)exc, (size_t)&tlbdsmsize);
+			memcpy((void *)exc, &tlbdsmiss, (size_t)&tlbdsmsize);
 			break;
 
 #if defined(DDB) || defined(IPKDB)
@@ -221,9 +225,9 @@ initppc(startkernel, endkernel)
 		case EXC_TRC:
 		case EXC_BPT:
 #if defined(DDB)
-			bcopy(&ddblow, (void *)exc, (size_t)&ddbsize);
+			memcpy((void *)exc, &ddblow, (size_t)&ddbsize);
 #else
-			bcopy(&ipkdblow, (void *)exc, (size_t)&ipkdbsize);
+			memcpy((void *)exc, &ipkdblow, (size_t)&ipkdbsize);
 #endif
 			break;
 #endif /* DDB || IPKDB */
@@ -238,8 +242,7 @@ initppc(startkernel, endkernel)
 	 * Enable translation and interrupts
 	 */
 	asm volatile ("mfmsr %0; ori %0,%0,%1; mtmsr %0; isync" :
-		"=r"(scratch) : "K"(PSL_IR|PSL_DR|PSL_ME|PSL_RI|PSL_EE));
-	custom.intreq = 0xc000;
+		"=r"(scratch) : "K"(PSL_EE|PSL_IR|PSL_DR|PSL_ME|PSL_RI));
 
 	/*
 	 * Set the page size
@@ -249,8 +252,106 @@ initppc(startkernel, endkernel)
 	/*
 	 * Initialize pmap module
 	 */
-	pmap_bootstrap(startkernel, endkernel);
+	pmap_bootstrap(startkernel, endkernel, NULL);
 }
+
+
+/* XXX: for a while here, from intr.h */
+volatile int
+splraise(ncpl)
+	int ncpl;
+{
+	int ocpl;
+	volatile unsigned char *p5_ipl = (void *)0xf60030;
+
+	ocpl = ~(*p5_ipl) & 7;
+
+	__asm__ volatile("sync; eieio\n");	/* don't reorder.... */
+
+	/*custom.intreq = 0x7fff;*/
+	if (ncpl > ocpl) {
+		/* disable int */
+		/*p5_ipl = 0xc0;*/
+		/* clear bits */
+		*p5_ipl = 7;
+		/* set new priority */
+		*p5_ipl = 0x80 | (~ncpl & 7);
+		/* enable int */
+		/*p5_ipl = 0x40;*/
+	}
+
+	__asm__ volatile("sync; eieio\n");	/* reorder protect */
+	return (ocpl);
+}
+
+volatile void
+splx(ncpl)
+	int ncpl;
+{
+	volatile unsigned char *p5_ipl = (void *)0xf60030;
+
+	__asm__ volatile("sync; eieio\n");	/* reorder protect */
+
+/*	if (ipending & ~ncpl)
+		do_pending_int();*/
+
+	custom.intreq = custom.intreqr;
+	/* disable int */
+	/*p5_ipl = 0xc0;*/
+	/* clear bits */
+	*p5_ipl = 0x07;
+	/* set new priority */
+	*p5_ipl = 0x80 | (~ncpl & 7);
+	/* enable int */
+	/*p5_ipl = 0x40;*/
+
+	__asm__ volatile("sync; eieio\n");	/* reorder protect */
+}
+
+volatile int
+spllower(ncpl)
+	int ncpl;
+{
+	int ocpl;
+	volatile unsigned char *p5_ipl = (void *)0xf60030;
+
+	ocpl = ~(*p5_ipl) & 7;
+
+	__asm__ volatile("sync; eieio\n");	/* reorder protect */
+
+/*	if (ipending & ~ncpl)
+		do_pending_int();*/
+
+	/*custom.intreq = 0x7fff;*/
+	if (ncpl < ocpl) {
+		/* disable int */
+		/*p5_ipl = 0xc0;*/
+		/* clear bits */
+		*p5_ipl = 7;
+		/* set new priority */
+		*p5_ipl = 0x80 | (~ncpl & 7);
+		/* enable int */
+		/*p5_ipl = 0x40;*/
+	}
+
+	__asm__ volatile("sync; eieio\n");	/* reorder protect */
+	return (ocpl);
+}
+
+/* Following code should be implemented with lwarx/stwcx to avoid
+ * the disable/enable. i need to read the manual once more.... */
+volatile void
+softintr(ipl)
+	int ipl;
+{
+	int msrsave;
+
+	__asm__ volatile("mfmsr %0" : "=r"(msrsave));
+	__asm__ volatile("mtmsr %0" :: "r"(msrsave & ~PSL_EE));
+	ipending |= 1 << ipl;
+	__asm__ volatile("mtmsr %0" :: "r"(msrsave));
+}
+/* XXX: end of intr.h */
 
 
 /* show PPC registers */
@@ -333,6 +434,12 @@ mem_regions(memp, availp)
 }
 
 
+/* XXX */
+void
+do_pending_int(void)
+{
+	asm volatile ("sync");
+}
 
 /*
  * Interrupt handler
@@ -368,6 +475,7 @@ intrhand()
 
 	/* ports */
 	if (ireq & INTF_PORTS) {
+		ciaa_intr();
 		custom.intreq = INTF_PORTS;
 	}
 
@@ -477,134 +585,6 @@ alloc_sicallback()
 }
 
 
-
-/* should be in clock.c */
-volatile int tickspending;
-
-/*
- * Initially we assume a processor with a bus frequency of 12.5 MHz.
- */
-static u_long ticks_per_sec = 12500000;
-static u_long ns_per_tick = 80;
-static long ticks_per_intr;
-static volatile u_long lasttb;
-
-void
-decr_intr(frame)
-	struct clockframe *frame;
-{
-	u_long tb;
-	long tick;
-	int nticks;
-
-	/*
-	 * Check whether we are initialized
-	 */
-	if (!ticks_per_intr) {
-		return;
-	}
-
-	/*
-	 * Based on the actual time delay since the last decrementer reload,
-	 * we arrange for earlier interrupt next time.
-	 */
-	asm ("mftb %0; mfdec %1" : "=r"(tb), "=r"(tick));
-	for (nticks = 0; tick < 0; nticks++) {
-		tick += ticks_per_intr;
-	}
-	asm volatile ("mtdec %0" :: "r"(tick));
-	/*
-	 * lasttb is used during microtime. Set it to the virtual
-	 * start of this tick interval.
-	 */
-	lasttb = tb + tick - ticks_per_intr;
-
-	uvmexp.intrs++;
-	intrcnt[CNT_CLOCK]++;
-	{
-	int pri, msr;
-
-	pri = splclock();
-	if (pri & (1 << SPL_CLOCK)) {
-		tickspending += nticks;
-	}
-	else {
-		nticks += tickspending;
-		tickspending = 0;
-
-		/*
-		 * Reenable interrupts
-		 */
-		asm volatile ("mfmsr %0; ori %0, %0, %1; mtmsr %0"
-				: "=r"(msr) : "K"(PSL_EE));
-
-		/*
-		 * Do standard timer interrupt stuff.
-		 * Do softclock stuff only on the last iteration.
-		 */
-		frame->pri = pri | (1 << SIR_CLOCK);
-		while (--nticks > 0) {
-			hardclock(frame);
-		}
-		frame->pri = pri;
-		hardclock(frame);
-	}
-	splx(pri);
-	}
-}
-
-
-static inline u_quad_t
-mftb()
-{
-	u_long scratch;
-	u_quad_t tb;
-
-	asm ("1: mftbu %0; mftb %0+1; mftbu %1; cmpw 0,%0,%1; bne 1b"
-		: "=r"(tb), "=r"(scratch));
-	return tb;
-}
-
-/*
- * Fill in *tvp with current time with microsecond resolution.
- */
-void
-microtime(tvp)
-        struct timeval *tvp;
-{
-	u_long tb, ticks;
-	int msr, scratch;
-
-	asm volatile ("mfmsr %0; andi. %1,%0,%2; mtmsr %1"
-			: "=r"(msr), "=r"(scratch) : "K"((u_short)~PSL_EE));
-	asm ("mftb %0" : "=r"(tb));
-	ticks = (tb - lasttb) * ns_per_tick;
-	*tvp = time;
-	asm volatile ("mtmsr %0" :: "r"(msr));
-	ticks /= 1000;
-	tvp->tv_usec += ticks;
-	while (tvp->tv_usec >= 1000000) {
-		tvp->tv_usec -= 1000000;
-		tvp->tv_sec++;
-	}
-}
-
-void
-delay(n)
-	unsigned n;
-{
-	u_quad_t tb;
-	u_long tbh, tbl, scratch;
-
-	tb = mftb();
-	tb += (n * 1000 + ns_per_tick - 1) / ns_per_tick;
-	tbh = tb >> 32;
-	tbl = tb;
-	asm ("1: mftbu %0; cmplw %0,%1; blt 1b; bgt 2f;"
-		"mftb %0; cmplw %0,%2; blt 1b; 2:"
-		:: "r"(scratch), "r"(tbh), "r"(tbl));
-}
-
 /*
 int
 sys_sysarch()
@@ -617,7 +597,8 @@ identifycpu()
 {
 	register int pvr, hid1;
 	char *mach, *pup, *cpu;
-
+	const char pll[] = {10, 10, 70, 0, 20, 65, 25, 45,
+			30, 55, 40, 50, 15, 60, 35, 0};
 	const char *p5type_p = (const char *)0xf00010;
 	int cpuclock, busclock;
 
@@ -625,11 +606,17 @@ identifycpu()
 	if (is_a4000()) {
 		mach = "Amiga 4000";
 	}
+	else if (is_a3000()) {
+		mach = "Amiga 3000";
+	}
 	else {
 		mach = "Amiga 1200";
 	}
+
+	asm ("mfpvr %0; mfspr %1,1009" : "=r"(pvr), "=r"(hid1));
+
 	/* XXX removethis */printf("p5serial = %8s\n", p5type_p);
-	switch(p5type_p[0]) {
+	switch (p5type_p[0]) {
 	case 'D':
 		pup = "[PowerUP]";
 		break;
@@ -647,30 +634,25 @@ identifycpu()
 		break;
 	}
 
-	switch(p5type_p[1]) {
+	switch (p5type_p[1]) {
 	case 'A':
-		cpuclock = 150;
 		busclock = 60000000/4;
+		cpuclock = 600;
 		break;
-	case 'B':
-		cpuclock = 180;
-		busclock = 66000000/4;
-		break;
-	case 'C':
-		cpuclock = 200;
-		busclock = 66000000/4;
-		break;
-	case 'D':
-		cpuclock = 233;
-		busclock = 66000000/4;
-		break;
+	/* case B, C, D */
 	default:
-		cpuclock = 0;
+		busclock = 66000000/4;
+		cpuclock = 666;
 		break;
 	}
+	/*
+	 * compute cpuclock based on PLL configuration in HID1
+	 * XXX: based on 604e, should work for 603e
+	 */
+	hid1 = hid1>>28 & 0xf;
+	cpuclock = cpuclock*pll[hid1]/100;
 
 	/* find CPU type */
-	asm ("mfpvr %0" : "=r"(pvr));
 	switch (pvr >> 16) {
 	case 1:
 		cpu = "601";
@@ -694,6 +676,7 @@ identifycpu()
 		cpu = "750";
 		break;
 	case 9:
+	case 10:
 		cpu = "604e";
 		break;
 	case 12:
@@ -708,8 +691,8 @@ identifycpu()
 	}
 
 	snprintf(cpu_model, sizeof(cpu_model), 
-	    "%s %s (%s rev.%x %d MHz, busclk %d kHz)",
-	    mach, pup, cpu, pvr & 0xffff, cpuclock, busclock / 1000);
+		"%s %s (%s v%d.%d %d MHz, busclk %d kHz)", mach, pup, cpu,
+		pvr>>8 & 0xff, pvr & 0xff, cpuclock, busclock / 1000);
 	printf("%s\n", cpu_model);
 }
 
@@ -754,8 +737,8 @@ cpu_startup()
 	size = MAXBSIZE * nbuf;
 	minaddr = 0;
 	if (uvm_map(kernel_map, (vaddr_t *)&minaddr, round_page(size), NULL,
-		UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
-		UVM_INH_NONE, UVM_ADV_NORMAL, 0)) != KERN_SUCCESS) {
+		UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
+		UVM_INH_NONE, UVM_ADV_NORMAL, 0)) != 0) {
 		panic("startup: cannot allocate VM for buffers");
 	}
 	buffers = (char *)minaddr;
@@ -786,13 +769,13 @@ cpu_startup()
 				panic("cpu_startup: not enough memory for "
 					"buffer cache");
 			}
-			pmap_enter(kernel_map->pmap, curbuf,
-				VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-				VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ | VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(kernel_map->pmap);
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -824,11 +807,6 @@ cpu_startup()
 	bufinit();
 }
 
-void
-cpu_dumpconf()
-{
-}
-
 /*
  * consinit
  * Initialize system console.
@@ -842,80 +820,6 @@ consinit()
 	*/
 	cninit();
 }
-
-/*
- * Set set up registers on exec.
- */
-void
-setregs(p, pack, stack)
-	struct proc *p;
-	struct exec_package *pack;
-	u_long stack;
-{
-	struct trapframe *tf = trapframe(p);
-	struct ps_strings arginfo;
-	paddr_t pa;
-
-	bzero(tf, sizeof *tf);
-	tf->fixreg[1] = -roundup(-stack + 8, 16);
-
-	/*
-	 * XXX Machine-independent code has already copied arguments and
-	 * XXX environment to userland.  Get them back here
-	 */
-	(void)copyin((char *)PS_STRINGS, &arginfo, sizeof(arginfo));
-
-	/*
-	 * Set up arguments for _start():
-	 *      _start(argc, argv, envp, obj, cleanup, ps_strings);
-	 * Notes:
-	 *      - obj and cleanup are the auxilliary and termination
-	 *        vectors.  They are fixed up by ld.elf_so.
-	 *      - ps_strings is a NetBSD extention, and will be
-	 *        ignored by executables which are strictly
-	 *        compliant with the SVR4 ABI.
-	 *
-	 * XXX We have to set both regs and retval here due to different
-	 * XXX calling convention in trap.c and init_main.c.
-	 */
-	tf->fixreg[3] = arginfo.ps_nargvstr;
-	tf->fixreg[4] = (register_t)arginfo.ps_argvstr;
-	tf->fixreg[5] = (register_t)arginfo.ps_envstr;
-	tf->fixreg[6] = 0;			/* auxillary vector */
-	tf->fixreg[7] = 0;			/* termination vector */
-	tf->fixreg[8] = (register_t)PS_STRINGS;	/* NetBSD extension */
-
-	tf->srr0 = pack->ep_entry;
-	tf->srr1 = PSL_MBO | PSL_USERSET | PSL_FE_DFLT;
-	p->p_addr->u_pcb.pcb_flags = 0;
-}
-
-/*
- * Machine dependent system variables
- */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
-{
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1) {
-		return ENOTDIR;
-	}
-
-	switch (name[0]) {
-	case CPU_CACHELINE:
-		return sysctl_rdint(oldp, oldlenp, newp, CACHELINESIZE);
-	default:
-		return EOPNOTSUPP;
-	}
-}
-
 
 /*
  * Halt or reboot the machine after syncing/dumping according to howto
@@ -936,4 +840,30 @@ lcsplx(ipl)
 	int ipl;
 {
 	return spllower(ipl);   /* XXX */
+}
+
+/*
+ * Convert kernel VA to physical address
+ */
+int
+kvtop(addr)
+	caddr_t addr;
+{
+	vaddr_t va;
+	paddr_t pa;
+	int off;
+	extern char end[];
+
+	if (addr < end)
+		return (int)addr;
+
+	va = trunc_page((vaddr_t)addr);
+	off = (int)addr - va;
+
+	if (pmap_extract(pmap_kernel(), va, &pa) == FALSE) {
+		/*printf("kvtop: zero page frame (va=0x%x)\n", addr);*/
+		return (int)addr;
+	}
+
+	return((int)pa + off);
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: promcons.c,v 1.14 2000/03/23 06:32:32 thorpej Exp $ */
+/* $NetBSD: promcons.c,v 1.19 2002/03/17 19:40:26 atatat Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: promcons.c,v 1.14 2000/03/23 06:32:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: promcons.c,v 1.19 2002/03/17 19:40:26 atatat Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,7 +44,8 @@ __KERNEL_RCSID(0, "$NetBSD: promcons.c,v 1.14 2000/03/23 06:32:32 thorpej Exp $"
 #include <sys/syslog.h>
 #include <sys/types.h>
 #include <sys/device.h>
-#include <vm/vm.h>		/* XXX for _PMAP_MAY_USE_PROM_CONSOLE */
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/conf.h>
 #include <machine/prom.h>
@@ -56,17 +57,14 @@ __KERNEL_RCSID(0, "$NetBSD: promcons.c,v 1.14 2000/03/23 06:32:32 thorpej Exp $"
 static struct  tty *prom_tty[1];
 static int polltime;
 
-void	promstart __P((struct tty *));
-void	promtimeout __P((void *));
-int	promparam __P((struct tty *, struct termios *));
+void	promstart(struct tty *);
+void	promtimeout(void *);
+int	promparam(struct tty *, struct termios *);
 
 struct callout prom_ch = CALLOUT_INITIALIZER;
 
 int
-promopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+promopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	int unit = minor(dev);
 	struct tty *tp;
@@ -105,7 +103,7 @@ promopen(dev, flag, mode, p)
 
 	splx(s);
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error == 0 && setuptimeout) {
 		polltime = hz / PROM_POLL_HZ;
 		if (polltime < 1)
@@ -116,76 +114,66 @@ promopen(dev, flag, mode, p)
 }
  
 int
-promclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+promclose(dev_t dev, int flag, int mode, struct proc *p)
 {
 	int unit = minor(dev);
 	struct tty *tp = prom_tty[unit];
 
 	callout_stop(&prom_ch);
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 	return 0;
 }
  
 int
-promread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+promread(dev_t dev, struct uio *uio, int flag)
 {
 	struct tty *tp = prom_tty[minor(dev)];
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
  
 int
-promwrite(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+promwrite(dev_t dev, struct uio *uio, int flag)
 {
 	struct tty *tp = prom_tty[minor(dev)];
  
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
 }
  
 int
-promioctl(dev, cmd, data, flag, p)
+prompoll(dev, events, p)
 	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
+	int events;
 	struct proc *p;
+{
+	struct tty *tp = prom_tty[minor(dev)];
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
+}
+
+int
+promioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	int unit = minor(dev);
 	struct tty *tp = prom_tty[unit];
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
-	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
-		return error;
-
-	return ENOTTY;
+	return ttioctl(tp, cmd, data, flag, p);
 }
 
 int
-promparam(tp, t)
-	struct tty *tp;
-	struct termios *t;
+promparam(struct tty *tp, struct termios *t)
 {
 
 	return 0;
 }
 
 void
-promstart(tp)
-	struct tty *tp;
+promstart(struct tty *tp)
 {
 	int s;
 
@@ -211,8 +199,7 @@ out:
  * Stop output on a line.
  */
 void
-promstop(tp, flag)
-	struct tty *tp;
+promstop(struct tty *tp, int flag)
 {
 	int s;
 
@@ -224,22 +211,20 @@ promstop(tp, flag)
 }
 
 void
-promtimeout(v)
-	void *v;
+promtimeout(void *v)
 {
 	struct tty *tp = v;
 	u_char c;
 
 	while (promcnlookc(tp->t_dev, &c)) {
 		if (tp->t_state & TS_ISOPEN)
-			(*linesw[tp->t_line].l_rint)(c, tp);
+			(*tp->t_linesw->l_rint)(c, tp);
 	}
 	callout_reset(&prom_ch, polltime, promtimeout, tp);
 }
 
 struct tty *
-promtty(dev)
-	dev_t dev;
+promtty(dev_t dev)
 {
 
 	if (minor(dev) != 0)

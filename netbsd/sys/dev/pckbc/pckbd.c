@@ -1,4 +1,4 @@
-/* $NetBSD: pckbd.c,v 1.24 2000/06/05 22:20:57 sommerfeld Exp $ */
+/* $NetBSD: pckbd.c,v 1.30 2002/03/17 19:41:00 atatat Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -78,6 +78,9 @@
  * code to work keyboard for PC-style console
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pckbd.c,v 1.30 2002/03/17 19:41:00 atatat Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -85,8 +88,6 @@
 #include <sys/ioctl.h>
 
 #include <machine/bus.h>
-
-#include <dev/isa/isavar.h>		/* XXX XXX XXX */
 
 #include <dev/ic/pckbcvar.h>
 
@@ -98,10 +99,6 @@
 #include <dev/wscons/wskbdvar.h>
 #include <dev/wscons/wsksymdef.h>
 #include <dev/wscons/wsksymvar.h>
-
-#if defined(__i386__) || defined(__alpha__)
-#include <sys/kernel.h> /* XXX for hz */
-#endif
 
 #include "locators.h"
 
@@ -376,8 +373,12 @@ pckbd_enable(v, on)
 	int res;
 
 	if (on) {
-		if (sc->sc_enabled)
+		if (sc->sc_enabled) {
+#ifdef DIAGNOSTIC
+			printf("pckbd_enable: bad enable\n");
+#endif
 			return (EBUSY);
+		}
 
 		pckbc_slot_enable(sc->id->t_kbctag, sc->id->t_kbcslot, 1);
 
@@ -473,7 +474,7 @@ pckbd_init(t, kbctag, kbcslot, console)
 	pckbc_slot_t kbcslot;
 	int console;
 {
-	bzero(t, sizeof(struct pckbd_internal));
+	memset(t, 0, sizeof(struct pckbd_internal));
 
 	t->t_isconsole = console;
 	t->t_kbctag = kbctag;
@@ -596,7 +597,7 @@ pckbd_ioctl(v, cmd, data, flag, p)
 		return (0);
 #endif
 	}
-	return -1;
+	return EPASSTHROUGH;
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_compat_14.c,v 1.2 1999/12/30 15:40:45 eeh Exp $	*/
+/*	$NetBSD: netbsd32_compat_14.c,v 1.7 2001/11/15 09:48:01 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999 Eduardo E. Horvath
@@ -28,9 +28,11 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <sys/ipc.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: netbsd32_compat_14.c,v 1.7 2001/11/15 09:48:01 lukem Exp $");
+
 #include <sys/param.h>
+#include <sys/ipc.h>
 #include <sys/systm.h>
 #include <sys/signal.h>
 #include <sys/proc.h>
@@ -39,15 +41,38 @@
 #include <sys/sem.h>
 #include <sys/shm.h>  
 
+#ifndef	SYSVMSG
 #define	SYSVMSG
+#endif
+#ifndef	SYSVSEM
 #define	SYSVSEM
+#endif
+#ifndef	SYSVSHM
 #define	SYSVSHM
+#endif
 
 #include <sys/syscallargs.h>
 #include <compat/netbsd32/netbsd32.h>
 #include <compat/netbsd32/netbsd32_syscallargs.h>
 
-void
+static __inline void
+netbsd32_ipc_perm14_to_native(struct netbsd32_ipc_perm14 *, struct ipc_perm *);
+static __inline void
+native_to_netbsd32_ipc_perm14(struct ipc_perm *, struct netbsd32_ipc_perm14 *);
+static __inline void
+native_to_netbsd32_msqid_ds14(struct msqid_ds *, struct netbsd32_msqid_ds14 *);
+static __inline void
+netbsd32_msqid_ds14_to_native(struct netbsd32_msqid_ds14 *, struct msqid_ds *);
+static __inline void
+native_to_netbsd32_semid_ds14(struct semid_ds *, struct netbsd32_semid_ds14 *);
+static __inline void
+netbsd32_semid_ds14_to_native(struct netbsd32_semid_ds14 *, struct semid_ds *);
+static __inline void
+netbsd32_shmid_ds14_to_native(struct netbsd32_shmid_ds14 *, struct shmid_ds *);
+static __inline void
+native_to_netbsd32_shmid_ds14(struct shmid_ds *, struct netbsd32_shmid_ds14 *);
+
+static __inline void
 netbsd32_ipc_perm14_to_native(operm, perm)
 	struct netbsd32_ipc_perm14 *operm;
 	struct ipc_perm *perm;
@@ -62,7 +87,7 @@ netbsd32_ipc_perm14_to_native(operm, perm)
 #undef CVT
 }
 
-void
+static __inline void
 native_to_netbsd32_ipc_perm14(perm, operm)
 	struct ipc_perm *perm;
 	struct netbsd32_ipc_perm14 *operm;
@@ -83,7 +108,7 @@ native_to_netbsd32_ipc_perm14(perm, operm)
 	operm->key = (key_t)perm->_key;
 }
 
-void
+static __inline void
 netbsd32_msqid_ds14_to_native(omsqbuf, msqbuf)
 	struct netbsd32_msqid_ds14 *omsqbuf;
 	struct msqid_ds *msqbuf;
@@ -102,7 +127,7 @@ netbsd32_msqid_ds14_to_native(omsqbuf, msqbuf)
 #undef CVT
 }
 
-void
+static __inline void
 native_to_netbsd32_msqid_ds14(msqbuf, omsqbuf)
 	struct msqid_ds *msqbuf;
 	struct netbsd32_msqid_ds14 *omsqbuf;
@@ -126,6 +151,77 @@ native_to_netbsd32_msqid_ds14(msqbuf, omsqbuf)
 	omsqbuf->msg_cbytes = msqbuf->_msg_cbytes;
 }
 
+static __inline void
+netbsd32_semid_ds14_to_native(osembuf, sembuf)
+	struct netbsd32_semid_ds14 *osembuf;
+	struct semid_ds *sembuf;
+{
+
+	netbsd32_ipc_perm14_to_native(&osembuf->sem_perm, &sembuf->sem_perm);
+
+#define	CVT(x)	sembuf->x = osembuf->x
+	CVT(sem_nsems);
+	CVT(sem_otime);
+	CVT(sem_ctime);
+#undef CVT
+}
+
+static __inline void
+native_to_netbsd32_semid_ds14(sembuf, osembuf)
+	struct semid_ds *sembuf;
+	struct netbsd32_semid_ds14 *osembuf;
+{
+
+	native_to_netbsd32_ipc_perm14(&sembuf->sem_perm, &osembuf->sem_perm);
+
+#define	CVT(x)	osembuf->x = sembuf->x
+	CVT(sem_nsems);
+	CVT(sem_otime);
+	CVT(sem_ctime);
+#undef CVT
+}
+
+static __inline void
+netbsd32_shmid_ds14_to_native(oshmbuf, shmbuf)
+	struct netbsd32_shmid_ds14 *oshmbuf;
+	struct shmid_ds *shmbuf;
+{
+
+	netbsd32_ipc_perm14_to_native(&oshmbuf->shm_perm, &shmbuf->shm_perm);
+
+#define	CVT(x)	shmbuf->x = oshmbuf->x
+	CVT(shm_segsz);
+	CVT(shm_lpid);
+	CVT(shm_cpid);
+	CVT(shm_nattch);
+	CVT(shm_atime);
+	CVT(shm_dtime);
+	CVT(shm_ctime);
+#undef CVT
+}
+
+static __inline void
+native_to_netbsd32_shmid_ds14(shmbuf, oshmbuf)
+	struct shmid_ds *shmbuf;
+	struct netbsd32_shmid_ds14 *oshmbuf;
+{
+
+	native_to_netbsd32_ipc_perm14(&shmbuf->shm_perm, &oshmbuf->shm_perm);
+
+#define	CVT(x)	oshmbuf->x = shmbuf->x
+	CVT(shm_segsz);
+	CVT(shm_lpid);
+	CVT(shm_cpid);
+	CVT(shm_nattch);
+	CVT(shm_atime);
+	CVT(shm_dtime);
+	CVT(shm_ctime);
+#undef CVT
+}
+
+/*
+ * the compat_14 system calls
+ */
 int
 compat_14_netbsd32_msgctl(p, v, retval)
 	struct proc *p;
@@ -144,7 +240,8 @@ compat_14_netbsd32_msgctl(p, v, retval)
 	cmd = SCARG(uap, cmd);
 
 	if (cmd == IPC_SET) {
-		error = copyin(SCARG(uap, buf), &omsqbuf, sizeof(omsqbuf));
+		error = copyin((caddr_t)(u_long)SCARG(uap, buf), &omsqbuf,
+		    sizeof(omsqbuf));
 		if (error) 
 			return (error);
 		netbsd32_msqid_ds14_to_native(&omsqbuf, &msqbuf);
@@ -155,41 +252,11 @@ compat_14_netbsd32_msgctl(p, v, retval)
 
 	if (error == 0 && cmd == IPC_STAT) {
 		native_to_netbsd32_msqid_ds14(&msqbuf, &omsqbuf);     
-		error = copyout(&omsqbuf, SCARG(uap, buf), sizeof(omsqbuf));
+		error = copyout(&omsqbuf, (caddr_t)(u_long)SCARG(uap, buf),
+		    sizeof(omsqbuf));
 	}
 
 	return (error);
-}
-
-
-void
-netbsd32_semid_ds14_to_native(osembuf, sembuf)
-	struct semid_ds14 *osembuf;
-	struct semid_ds *sembuf;
-{
-
-	netbsd32_ipc_perm14_to_native(&osembuf->sem_perm, &sembuf->sem_perm);
-
-#define	CVT(x)	sembuf->x = osembuf->x
-	CVT(sem_nsems);
-	CVT(sem_otime);
-	CVT(sem_ctime);
-#undef CVT
-}
-
-void
-native_to_netbsd32_semid_ds14(sembuf, osembuf)
-	struct semid_ds *sembuf;
-	struct semid_ds14 *osembuf;
-{
-
-	native_to_netbsd32_ipc_perm14(&sembuf->sem_perm, &osembuf->sem_perm);
-
-#define	CVT(x)	osembuf->x = sembuf->x
-	CVT(sem_nsems);
-	CVT(sem_otime);
-	CVT(sem_ctime);
-#undef CVT
 }
 
 int
@@ -226,7 +293,8 @@ compat_14_netbsd32___semctl(p, v, retval)
 	}
 
 	if (pass_arg != NULL) {
-		error = copyin(SCARG(uap, arg), &arg, sizeof(arg));
+		error = copyin((caddr_t)(u_long)SCARG(uap, arg), &arg,
+		    sizeof(arg));
 		if (error)
 			return (error);  
 		if (cmd == IPC_SET) { 
@@ -248,45 +316,6 @@ compat_14_netbsd32___semctl(p, v, retval)
 	return (error);
 }
 
-
-void
-netbsd32_shmid_ds14_to_native(oshmbuf, shmbuf)
-	struct shmid_ds14 *oshmbuf;
-	struct shmid_ds *shmbuf;
-{
-
-	netbsd32_ipc_perm14_to_native(&oshmbuf->shm_perm, &shmbuf->shm_perm);
-
-#define	CVT(x)	shmbuf->x = oshmbuf->x
-	CVT(shm_segsz);
-	CVT(shm_lpid);
-	CVT(shm_cpid);
-	CVT(shm_nattch);
-	CVT(shm_atime);
-	CVT(shm_dtime);
-	CVT(shm_ctime);
-#undef CVT
-}
-
-void
-native_to_netbsd32_shmid_ds14(shmbuf, oshmbuf)
-	struct shmid_ds *shmbuf;
-	struct shmid_ds14 *oshmbuf;
-{
-
-	native_to_ipc_perm14(&shmbuf->shm_perm, &oshmbuf->shm_perm);
-
-#define	CVT(x)	oshmbuf->x = shmbuf->x
-	CVT(shm_segsz);
-	CVT(shm_lpid);
-	CVT(shm_cpid);
-	CVT(shm_nattch);
-	CVT(shm_atime);
-	CVT(shm_dtime);
-	CVT(shm_ctime);
-#undef CVT
-}
-
 int
 compat_14_netbsd32_shmctl(p, v, retval)
 	struct proc *p;
@@ -296,16 +325,17 @@ compat_14_netbsd32_shmctl(p, v, retval)
 	struct compat_14_netbsd32_shmctl_args /* {
 		syscallarg(int) shmid;
 		syscallarg(int) cmd;
-		syscallarg(struct shmid_ds14 *) buf;
+		syscallarg(struct netbsd32_shmid_ds14 *) buf;
 	} */ *uap = v;
 	struct shmid_ds shmbuf;
-	struct shmid_ds14 oshmbuf;
+	struct netbsd32_shmid_ds14 oshmbuf;
 	int cmd, error;
 
 	cmd = SCARG(uap, cmd);
 
 	if (cmd == IPC_SET) {
-		error = copyin(SCARG(uap, buf), &oshmbuf, sizeof(oshmbuf));
+		error = copyin((caddr_t)(u_long)SCARG(uap, buf), &oshmbuf,
+		    sizeof(oshmbuf));
 		if (error) 
 			return (error);
 		netbsd32_shmid_ds14_to_native(&oshmbuf, &shmbuf);
@@ -316,7 +346,8 @@ compat_14_netbsd32_shmctl(p, v, retval)
 
 	if (error == 0 && cmd == IPC_STAT) {
 		native_to_netbsd32_shmid_ds14(&shmbuf, &oshmbuf);     
-		error = copyout(&oshmbuf, SCARG(uap, buf), sizeof(oshmbuf));
+		error = copyout(&oshmbuf, (caddr_t)(u_long)SCARG(uap, buf),
+		    sizeof(oshmbuf));
 	}
 
 	return (error);

@@ -1,4 +1,4 @@
-/* $NetBSD: tsp_bus_mem.c,v 1.2.4.1 2000/06/27 19:46:06 thorpej Exp $ */
+/* $NetBSD: tsp_bus_mem.c,v 1.6 2000/11/29 06:30:09 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999 by Ross Harvey.  All rights reserved.
@@ -36,7 +36,8 @@
 #include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/autoconf.h>
@@ -61,3 +62,34 @@
 __asm(".arch ev6");                                                      
 
 #include <alpha/pci/pci_bwx_bus_mem_chipdep.c>
+
+void
+tsp_bus_mem_init2(bus_space_tag_t t, void *v)
+{
+	struct tsp_config *pcp = v;
+	struct ts_pchip *pccsr = pcp->pc_csr;
+	int i, error;
+
+	/*
+	 * Allocate the DMA windows out of the extent map.
+	 */
+	for (i = 0; i < 4; i++) {
+		alpha_mb();
+		if ((pccsr->tsp_wsba[i].tsg_r & WSBA_ENA) == 0) {
+			/* Window not in use. */
+			continue;
+		}
+
+		error = extent_alloc_region(CHIP_MEM_EXTENT(v),
+		    WSBA_ADDR(pccsr->tsp_wsba[i].tsg_r),
+		    WSM_LEN(pccsr->tsp_wsm[i].tsg_r),
+		    EX_NOWAIT | (CHIP_EX_MALLOC_SAFE(v) ? EX_MALLOCOK : 0));
+		if (error) {
+			printf("WARNING: unable to reserve DMA window "
+			    "0x%lx - 0x%lx\n",
+			    WSBA_ADDR(pccsr->tsp_wsba[i].tsg_r),
+			    WSBA_ADDR(pccsr->tsp_wsba[i].tsg_r) +
+			    (WSM_LEN(pccsr->tsp_wsm[i].tsg_r) - 1));
+		}
+	}
+}

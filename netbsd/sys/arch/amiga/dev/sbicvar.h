@@ -1,4 +1,4 @@
-/*	$NetBSD: sbicvar.h,v 1.15 2000/03/23 06:33:13 thorpej Exp $	*/
+/*	$NetBSD: sbicvar.h,v 1.18 2002/05/14 00:08:22 matt Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -70,7 +70,6 @@ struct sbic_acb {
 #define ACB_FREE	0x00
 #define ACB_ACTIVE	0x01
 #define ACB_DONE	0x04
-#define ACB_CHKSENSE	0x08
 #define ACB_BBUF	0x10	/* DMA input needs to be copied from bounce */
 #define	ACB_DATAIN	0x20	/* DMA direction flag */
 	struct scsi_generic cmd;	/* SCSI command block */
@@ -95,13 +94,12 @@ struct sbic_tinfo {
 	int	dconns;		/* #disconnects */
 	int	touts;		/* #timeouts */
 	int	perrs;		/* #parity errors */
-	int	senses;		/* #request sense commands sent */
 	u_char*	bounce;		/* Bounce buffer for this device */
 	ushort	lubusy;		/* What local units/subr. are busy? */
 	u_char  flags;
 	u_char  period;		/* Period suggestion */
 	u_char  offset;		/* Offset suggestion */
-} tinfo_t;
+};
 
 struct	sbic_softc {
 	struct	device sc_dev;
@@ -114,8 +112,8 @@ struct	sbic_softc {
 	} sc_sync[8];
 	u_char	target;			/* Currently active target */
 	u_char  lun;
-	struct	scsipi_link sc_link;	/* proto for sub devices */
 	struct	scsipi_adapter sc_adapter;
+	struct	scsipi_channel sc_channel;
 	sbic_regmap_t	sc_sbic;	/* the two SBIC pointers */
 	volatile void 	*sc_cregs;	/* driver specific regs */
 
@@ -140,10 +138,10 @@ struct	sbic_softc {
 	u_long	sc_dmamask;		/* dma valid mem mask */
 	struct	dma_chain *sc_cur;
 	struct	dma_chain *sc_last;
-	int  (*sc_dmago)	__P((struct sbic_softc *, char *, int, int));
-	int  (*sc_dmanext)	__P((struct sbic_softc *));
-	void (*sc_enintr)	__P((struct sbic_softc *));
-	void (*sc_dmastop)	__P((struct sbic_softc *));
+	int  (*sc_dmago)(struct sbic_softc *, char *, int, int);
+	int  (*sc_dmanext)(struct sbic_softc *);
+	void (*sc_enintr)(struct sbic_softc *);
+	void (*sc_dmastop)(struct sbic_softc *);
 	u_short	gtsc_bankmask;		/* GVP specific bank selected */
 };
 
@@ -226,12 +224,12 @@ struct scsi_fmt_cdb {
 struct buf;
 struct scsipi_xfer;
 
-void sbic_minphys __P((struct buf *bp));
-int sbic_scsicmd __P((struct scsipi_xfer *));
-void sbicinit __P((struct sbic_softc *));
-int  sbicintr __P((struct sbic_softc *));
+void sbic_minphys(struct buf *bp);
+void sbic_scsipi_request(struct scsipi_channel *, scsipi_adapter_req_t, void *);
+void sbicinit(struct sbic_softc *);
+int  sbicintr(struct sbic_softc *);
 #ifdef DEBUG
-void sbic_dump __P((struct sbic_softc *dev));
+void sbic_dump(struct sbic_softc *dev);
 #endif
 
 #endif /* _SBICVAR_H_ */

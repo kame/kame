@@ -1,4 +1,4 @@
-/*	$NetBSD: clmpccvar.h,v 1.4.4.1 2000/07/22 15:28:47 scw Exp $ */
+/*	$NetBSD: clmpccvar.h,v 1.7 2001/06/10 08:27:42 scw Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -106,6 +106,7 @@ struct clmpcc_softc {
 	bus_space_handle_t sc_ioh;	/* Handle for chip's regs */
 	void		*sc_data;	/* MD-specific data */
 	int		sc_clk;		/* Clock-rate, in Hz */
+	struct evcnt	*sc_evcnt;	/* Parent Event Counter (or NULL) */
 	u_char		sc_vector_base;	/* Vector base reg, or 0 for auto */
 	u_char		sc_rpilr;	/* Receive Priority Interupt Level */
 	u_char		sc_tpilr;	/* Transmit Priority Interupt Level */
@@ -115,7 +116,7 @@ struct clmpcc_softc {
 #define CLMPCC_BYTESWAP_LOW	0x00	/* *byteswap pin is low */
 #define CLMPCC_BYTESWAP_HIGH	0x03	/* *byteswap pin is high */
 
-#ifndef __GENERIC_SOFT_INTERRUPTS
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 	/* Called to request a soft interrupt callback to clmpcc_softintr */
 	void		(*sc_softhook) __P((struct clmpcc_softc *));
 	volatile int	sc_soft_running;

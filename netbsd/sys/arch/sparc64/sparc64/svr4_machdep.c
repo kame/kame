@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_machdep.c,v 1.13 2000/05/26 21:20:21 thorpej Exp $	 */
+/*	$NetBSD: svr4_machdep.c,v 1.25 2002/03/31 22:21:04 christos Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -36,7 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _LKM
 #include "opt_ddb.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,6 +67,7 @@
 #include <machine/cpu.h>
 #include <machine/psl.h>
 #include <machine/reg.h>
+#include <machine/frame.h>
 #include <machine/trap.h>
 #include <machine/vmparam.h>
 #include <machine/svr4_machdep.h>
@@ -77,8 +80,12 @@ svr4_setregs(p, epp, stack)
 	struct exec_package *epp;
 	u_long stack;
 {
+	register struct trapframe64 *tf = p->p_md.md_tf;
 
 	setregs(p, epp, stack);
+	
+	/* This should be the exit function, not p->p_psstr. */
+	tf->tf_global[1] = (vaddr_t)0;
 }
 
 #ifdef DEBUG
@@ -98,25 +105,33 @@ svr4_printmcontext(fun, mc)
 	printf("%s at %p\n", fun, mc);
 
 	printf("Regs: ");
-	printf("TSTATE = 0x%x ", r[SVR4_SPARC_PSR]);
-	printf("PC = 0x%x ",  r[SVR4_SPARC_PC]);
-	printf("nPC = 0x%x ", r[SVR4_SPARC_nPC]);
-	printf("Y = 0x%x ",   r[SVR4_SPARC_Y]);
-	printf("G1 = 0x%x ",  r[SVR4_SPARC_G1]);
-	printf("G2 = 0x%x ",  r[SVR4_SPARC_G2]);
-	printf("G3 = 0x%x ",  r[SVR4_SPARC_G3]);
-	printf("G4 = 0x%x ",  r[SVR4_SPARC_G4]);
-	printf("G5 = 0x%x ",  r[SVR4_SPARC_G5]);
-	printf("G6 = 0x%x ",  r[SVR4_SPARC_G6]);
-	printf("G7 = 0x%x ",  r[SVR4_SPARC_G7]);
-	printf("O0 = 0x%x ",  r[SVR4_SPARC_O0]);
-	printf("O1 = 0x%x ",  r[SVR4_SPARC_O1]);
-	printf("O2 = 0x%x ",  r[SVR4_SPARC_O2]);
-	printf("O3 = 0x%x ",  r[SVR4_SPARC_O3]);
-	printf("O4 = 0x%x ",  r[SVR4_SPARC_O4]);
-	printf("O5 = 0x%x ",  r[SVR4_SPARC_O5]);
-	printf("O6 = 0x%x ",  r[SVR4_SPARC_O6]);
-	printf("O7 = 0x%x ",  r[SVR4_SPARC_O7]);
+#ifdef __arch64__
+	printf("CCR = 0x%lx ", r[SVR4_SPARC_CCR]);
+#else
+	printf("PSR = 0x%lx ", r[SVR4_SPARC_PSR]);
+#endif
+	printf("PC = 0x%lx ",  r[SVR4_SPARC_PC]);
+	printf("nPC = 0x%lx ", r[SVR4_SPARC_nPC]);
+	printf("Y = 0x%lx ",   r[SVR4_SPARC_Y]);
+	printf("G1 = 0x%lx ",  r[SVR4_SPARC_G1]);
+	printf("G2 = 0x%lx ",  r[SVR4_SPARC_G2]);
+	printf("G3 = 0x%lx ",  r[SVR4_SPARC_G3]);
+	printf("G4 = 0x%lx ",  r[SVR4_SPARC_G4]);
+	printf("G5 = 0x%lx ",  r[SVR4_SPARC_G5]);
+	printf("G6 = 0x%lx ",  r[SVR4_SPARC_G6]);
+	printf("G7 = 0x%lx ",  r[SVR4_SPARC_G7]);
+	printf("O0 = 0x%lx ",  r[SVR4_SPARC_O0]);
+	printf("O1 = 0x%lx ",  r[SVR4_SPARC_O1]);
+	printf("O2 = 0x%lx ",  r[SVR4_SPARC_O2]);
+	printf("O3 = 0x%lx ",  r[SVR4_SPARC_O3]);
+	printf("O4 = 0x%lx ",  r[SVR4_SPARC_O4]);
+	printf("O5 = 0x%lx ",  r[SVR4_SPARC_O5]);
+	printf("O6 = 0x%lx ",  r[SVR4_SPARC_O6]);
+	printf("O7 = 0x%lx ",  r[SVR4_SPARC_O7]);
+#ifdef __arch64__
+	printf("ASI = 0x%lx ",  r[SVR4_SPARC_ASI]);
+	printf("FPRS = 0x%lx ",  r[SVR4_SPARC_FPRS]);
+#endif
 	printf("\n");
 }
 #endif
@@ -148,7 +163,11 @@ svr4_getmcontext(p, mc, flags)
 	/*
 	 * Get the general purpose registers
 	 */
-	r[SVR4_SPARC_PSR] = tf->tf_tstate;
+#ifdef __arch64__
+	r[SVR4_SPARC_CCR] = (tf->tf_tstate & TSTATE_CCR) >> TSTATE_CCR_SHIFT;
+#else
+	r[SVR4_SPARC_PSR] = TSTATECCR_TO_PSR(tf->tf_tstate);
+#endif
 	r[SVR4_SPARC_PC] = tf->tf_pc;
 	r[SVR4_SPARC_nPC] = tf->tf_npc;
 	r[SVR4_SPARC_Y] = tf->tf_y;
@@ -167,6 +186,9 @@ svr4_getmcontext(p, mc, flags)
 	r[SVR4_SPARC_O5] = tf->tf_out[5];
 	r[SVR4_SPARC_O6] = tf->tf_out[6];
 	r[SVR4_SPARC_O7] = tf->tf_out[7];
+#ifdef __arch64__
+	r[SVR4_SPARC_ASI] = (tf->tf_tstate & TSTATE_ASI) >> TSTATE_ASI_SHIFT;
+#endif
 
 	*flags |= SVR4_UC_CPU;
 
@@ -174,7 +196,7 @@ svr4_getmcontext(p, mc, flags)
 	/*
 	 * Get the floating point registers
 	 */
-	bcopy(fps->fs_regs, f->fpu_regs, sizeof(fps->fs_regs));
+	bcopy(fps->fs_regs, f->fpu_regs, sizeof(f->fpu_regs));
 	f->fp_nqsize = sizeof(struct fp_qentry);
 	f->fp_nqel = fps->fs_qsize;
 	f->fp_fsr = fps->fs_fsr;
@@ -263,9 +285,16 @@ svr4_setmcontext(p, mc, flags)
 			return EINVAL;
 		}
 
-		/* take only psr ICC field */
-		tf->tf_tstate = (tf->tf_tstate & ~PSR_ICC) |
-		    (r[SVR4_SPARC_PSR] & PSR_ICC);
+#ifdef __arch64__
+		/* take only tstate ASI and CCR fields */
+		tf->tf_tstate = (tf->tf_tstate & ~(TSTATE_CCR | TSTATE_ASI)) |
+		    ((r[SVR4_SPARC_CCR] << TSTATE_CCR_SHIFT) & TSTATE_CCR) |
+		    ((r[SVR4_SPARC_ASI] << TSTATE_ASI_SHIFT) & TSTATE_ASI);
+#else
+		/* take only tstate CCR field */
+		tf->tf_tstate = (tf->tf_tstate & ~TSTATE_CCR) |
+		    PSRCC_TO_TSTATE(r[SVR4_SPARC_PSR]);
+#endif
 		tf->tf_pc = r[SVR4_SPARC_PC];
 		tf->tf_npc = r[SVR4_SPARC_nPC];
 		tf->tf_y = r[SVR4_SPARC_Y];
@@ -287,6 +316,8 @@ svr4_setmcontext(p, mc, flags)
 		tf->tf_out[5] = r[SVR4_SPARC_O5];
 		tf->tf_out[6] = r[SVR4_SPARC_O6];
 		tf->tf_out[7] = r[SVR4_SPARC_O7];
+
+		/* SVR4_SPARC_ASI restored above */
 	}
 
 
@@ -303,7 +334,8 @@ svr4_setmcontext(p, mc, flags)
 #endif
 			return EINVAL;
 		}
-		bcopy(f->fpu_regs, fps->fs_regs, sizeof(fps->fs_regs));
+		/* Note: only copy as much FP registers as in the mcontext. */
+		bcopy(f->fpu_regs, fps->fs_regs, sizeof(f->fpu_regs));
 		fps->fs_qsize = f->fp_nqel;
 		fps->fs_fsr = f->fp_fsr;
 		if (f->fp_q != NULL) {
@@ -331,7 +363,7 @@ svr4_getsiginfo(si, sig, code, addr)
 	u_long			 code;
 	caddr_t			 addr;
 {
-	si->si_signo = native_to_svr4_sig[sig];
+	si->si_signo = native_to_svr4_signo[sig];
 	si->si_errno = 0;
 	si->si_addr  = addr;
 	/*
@@ -453,6 +485,18 @@ svr4_getsiginfo(si, sig, code, addr)
  * with the user context we just set up, and we
  * will return to the user pc, psl.
  */
+#ifdef __arch64__
+#define STACK_OFFSET	BIAS
+#define CPOUTREG(l,v)	copyout(&(v), (l), sizeof(v))
+#undef CCFSZ
+#define CCFSZ	CC64FSZ
+#define rwindow	rwindow64
+#else
+#define STACK_OFFSET	0
+#define CPOUTREG(l,v)	copyout(&(v), (l), sizeof(v))
+#define rwindow	rwindow32
+#endif
+
 void
 svr4_sendsig(catcher, sig, mask, code)
 	sig_t catcher;
@@ -463,33 +507,32 @@ svr4_sendsig(catcher, sig, mask, code)
 	register struct proc *p = curproc;
 	register struct trapframe64 *tf;
 	struct svr4_sigframe *fp, frame;
-	struct sigacts *psp = p->p_sigacts;
 	int onstack;
 	vaddr_t oldsp, newsp, addr;
 
 	tf = (struct trapframe64 *)p->p_md.md_tf;
-	oldsp = tf->tf_out[6];
+	oldsp = tf->tf_out[6] + STACK_OFFSET;
 
 	/* Do we need to jump onto the signal stack? */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/*
 	 * Allocate space for the signal handler context.
 	 */
 	if (onstack)
-		fp = (struct svr4_sigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-						       psp->ps_sigstk.ss_size);
+		fp = (struct svr4_sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+						p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct svr4_sigframe *)oldsp;
-	fp = (struct svr4_sigframe *) ((long) (fp - 1) & ~7);
+	fp = (struct svr4_sigframe *) ((long) (fp - 1) & ~0x0f);
 
 #ifdef DEBUG
 	sigpid = p->p_pid;
 	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid) {
 		printf("svr4_sendsig: %s[%d] sig %d newusp %p scp %p oldsp %p\n",
-		    p->p_comm, p->p_pid, sig, fp, &fp->sf_uc, oldsp);
+		    p->p_comm, p->p_pid, sig, fp, &fp->sf_uc, (void *)(u_long)oldsp);
 #ifdef DDB
 		if (sigdebug & SDB_DDB) Debugger();
 #endif
@@ -513,18 +556,18 @@ svr4_sendsig(catcher, sig, mask, code)
 	/*
 	 * Modify the signal context to be used by sigreturn.
 	 */
-	frame.sf_uc.uc_mcontext.greg[SVR4_SPARC_SP] = oldsp;
+	frame.sf_uc.uc_mcontext.greg[SVR4_SPARC_SP] = (long)tf->tf_out[6];
 
-	newsp = (u_long)fp - sizeof(struct rwindow32);
+	newsp = (u_long)fp - sizeof(struct rwindow);
 	write_user_windows();
 
 #ifdef DEBUG
 	if ((sigdebug & SDB_KSTACK))
 	    printf("svr4_sendsig: saving sf to %p, setting stack pointer %p to %p\n",
-		   fp, &(((struct rwindow32 *)newsp)->rw_in[6]), oldsp);
+		   fp, &(((struct rwindow *)newsp)->rw_in[6]), (void *)(u_long)oldsp);
 #endif
 	if (rwindow_save(p) || copyout(&frame, fp, sizeof(frame)) != 0 ||
-	    copyout(&oldsp, &((struct rwindow32 *)newsp)->rw_in[6], sizeof(oldsp))) {
+	    CPOUTREG(&((struct rwindow *)newsp)->rw_in[6], oldsp)) {
 		/*
 		 * Process has trashed its stack; give it an illegal
 		 * instruction to halt it in its tracks.
@@ -550,7 +593,7 @@ svr4_sendsig(catcher, sig, mask, code)
 	/*
 	 * Build context to run handler in.
 	 */
-	addr = (vaddr_t)psp->ps_sigcode;
+	addr = (vaddr_t)p->p_sigctx.ps_sigcode;
 	tf->tf_pc = addr;
 	tf->tf_npc = addr + 4;
 	tf->tf_global[1] = (vaddr_t)catcher;
@@ -558,11 +601,11 @@ svr4_sendsig(catcher, sig, mask, code)
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 #ifdef DEBUG
 	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid) {
 		printf("svr4_sendsig: about to return to catcher %p thru %p\n", 
-		       catcher, addr);
+		       catcher, (void *)(u_long)addr);
 #ifdef DDB
 		if (sigdebug & SDB_DDB) Debugger();
 #endif
@@ -579,7 +622,6 @@ svr4_trap(type, p)
 {
 	int n;
 	struct trapframe64 *tf = p->p_md.md_tf;
-	extern struct emul emul_svr4;
 
 	if (p->p_emul != &emul_svr4)
 		return 0;
@@ -685,7 +727,7 @@ svr4_sys_sysarch(p, v, retval)
 
 	switch (SCARG(uap, op)) {
 	default:
-		printf("(sparc) svr4_sysarch(%d)\n", SCARG(uap, op));
+		printf("(sparc64) svr4_sysarch(%d)\n", SCARG(uap, op));
 		return EINVAL;
 	}
 }

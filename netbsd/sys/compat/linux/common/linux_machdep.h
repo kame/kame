@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.h,v 1.2 1998/12/15 19:31:39 itohy Exp $	*/
+/*	$NetBSD: linux_machdep.h,v 1.6 2002/02/15 16:48:02 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -45,8 +45,21 @@
 #include <compat/linux/arch/m68k/linux_machdep.h>
 #elif defined(__alpha__)
 #include <compat/linux/arch/alpha/linux_machdep.h>
+#elif defined(__powerpc__)
+#include <compat/linux/arch/powerpc/linux_machdep.h>
+#elif defined(__mips__)
+#include <compat/linux/arch/mips/linux_machdep.h>
+#elif defined(__arm__)
+#include <compat/linux/arch/arm/linux_machdep.h>
 #else
 #error Undefined linux_machdep.h machine type.
 #endif
+
+#ifdef _KERNEL
+__BEGIN_DECLS
+void linux_sendsig __P((sig_t, int, sigset_t *, u_long));
+dev_t linux_fakedev __P((dev_t, int));
+__END_DECLS
+#endif /* !_KERNEL */
 
 #endif /* !_LINUX_MACHDEP_H */

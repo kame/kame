@@ -1,4 +1,4 @@
-/*	$NetBSD: nfsproto.h,v 1.8.22.1 2000/12/14 23:37:33 he Exp $	*/
+/*	$NetBSD: nfsproto.h,v 1.9 2000/09/19 22:19:12 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993

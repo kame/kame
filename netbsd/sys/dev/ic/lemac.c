@@ -1,4 +1,4 @@
-/* $NetBSD: lemac.c,v 1.14 2000/05/12 16:45:42 thorpej Exp $ */
+/* $NetBSD: lemac.c,v 1.23 2001/11/13 13:14:40 lukem Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1997 Matt Thomas <matt@3am-software.com>
@@ -10,7 +10,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -32,6 +32,9 @@
  *
  *   This driver supports the LEMAC DE203/204/205 cards.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lemac.c,v 1.23 2001/11/13 13:14:40 lukem Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -78,7 +81,7 @@
 #include <i386/isa/decether.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include "bpfilter.h"
 #if NBPFILTER > 0
@@ -236,7 +239,7 @@ lemac_read_eeprom(
     if (sc->sc_eeprom[LEMAC_EEP_SWFLAGS] & LEMAC_EEP_SW_LAB)
 	sc->sc_txctl |= LEMAC_TX_LAB;
 
-    bcopy(&sc->sc_eeprom[LEMAC_EEP_PRDNM], sc->sc_prodname, LEMAC_EEP_PRDNMSZ);
+    memcpy(sc->sc_prodname, &sc->sc_eeprom[LEMAC_EEP_PRDNM], LEMAC_EEP_PRDNMSZ);
     sc->sc_prodname[LEMAC_EEP_PRDNMSZ] = '\0';
 
     return cksum % 256;
@@ -284,17 +287,6 @@ lemac_input(
 	LEMAC_GETBUF16(sc, offset, sizeof(eh) / 2, (void *) &eh);
     }
 
-    /*
-     * If this is single cast but not to us
-     * drop it!
-     */
-    if ((eh.ether_dhost[0] & 1) == 0
-#if NBPFILTER > 0
-	    && (sc->sc_if.if_flags & IFF_PROMISC) == 0
-#endif
-	    && !LEMAC_ADDREQUAL(eh.ether_dhost, sc->sc_enaddr))
-	return;
-
     MGETHDR(m, M_DONTWAIT, MT_DATA);
     if (m == NULL) {
 	sc->sc_if.if_ierrors++;
@@ -309,7 +301,7 @@ lemac_input(
 	}
     }
     m->m_data += 2;
-    bcopy((caddr_t)&eh, m->m_data, sizeof(eh));
+    memcpy(m->m_data, (caddr_t)&eh, sizeof(eh));
     if (LEMAC_USE_PIO_MODE(sc)) {
 	LEMAC_INSB(sc, LEMAC_REG_DAT, length - sizeof(eh),
 		   mtod(m, caddr_t) + sizeof(eh));
@@ -493,7 +485,7 @@ lemac_multicast_filter(
     struct ether_multistep step;
     struct ether_multi *enm;
 
-    bzero(sc->sc_mctbl, LEMAC_MCTBL_BITS / 8);
+    memset(sc->sc_mctbl, 0, LEMAC_MCTBL_BITS / 8);
 
     lemac_multicast_op(sc->sc_mctbl, etherbroadcastaddr, TRUE);
 
@@ -607,7 +599,8 @@ lemac_init(
 	    LEMAC_INTR_DISABLE(sc);
 	    lemac_multicast_filter(sc);
 	    if (sc->sc_flags & LEMAC_ALLMULTI)
-		bcopy(lemac_allmulti_mctbl, sc->sc_mctbl, sizeof(sc->sc_mctbl));
+		memcpy(sc->sc_mctbl, lemac_allmulti_mctbl,
+		       sizeof(sc->sc_mctbl));
 	    if (LEMAC_USE_PIO_MODE(sc)) {
 		LEMAC_OUTB(sc, LEMAC_REG_IOP, 0);
 		LEMAC_OUTB(sc, LEMAC_REG_PI1, LEMAC_MCTBL_OFF & 0xFF);
@@ -639,17 +632,20 @@ lemac_ifstart(
     struct ifnet *ifp)
 {
     lemac_softc_t * const sc = LEMAC_IFP_TO_SOFTC(ifp);
-    struct ifqueue * const ifq = &ifp->if_snd;
 
     if ((ifp->if_flags & IFF_RUNNING) == 0)
 	return;
 
     LEMAC_INTR_DISABLE(sc);
 
-    while (ifq->ifq_head != NULL) {
+    for (;;) {
 	struct mbuf *m;
 	struct mbuf *m0;
 	int tx_pg;
+
+	IFQ_POLL(&ifp->if_snd, m);
+	if (m == NULL)
+	    break;
 
 	if ((sc->sc_csr.csr_tqc = LEMAC_INB(sc, LEMAC_REG_TQC)) >= lemac_txmax) {
 	    sc->sc_cntrs.cntr_txfull++;
@@ -670,12 +666,12 @@ lemac_ifstart(
 	    break;
 	}
 
-	IF_DEQUEUE(ifq, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 
 	/*
 	 * The first four bytes of each transmit buffer are for
 	 * control information.  The first byte is the control
-	 * byte, then the length (why not word aligned??), then
+	 * byte, then the length (why not word aligned?), then
 	 * the offset to the buffer.
 	 */
 
@@ -785,7 +781,7 @@ lemac_ifioctl(
 		    if (ns_nullhost(*ina)) {
 			ina->x_host = *(union ns_host *)sc->sc_enaddr;
 		    } else {
-			bcopy((caddr_t)ina->x_host.c_host, sc->sc_enaddr,
+			memcpy(sc->sc_enaddr, (caddr_t)ina->x_host.c_host,
 			      ifp->if_addrlen);
 		    }
 		    break;
@@ -1017,7 +1013,7 @@ lemac_ifattach(
 {
     struct ifnet * const ifp = &sc->sc_if;
 
-    bcopy(sc->sc_dv.dv_xname, ifp->if_xname, IFNAMSIZ);
+    strcpy(ifp->if_xname, sc->sc_dv.dv_xname);
 
     lemac_reset(sc);
 
@@ -1045,12 +1041,10 @@ lemac_ifattach(
     if (sc->sc_flags & LEMAC_ALIVE) {
 	int media;
 
+	IFQ_SET_READY(&ifp->if_snd);
+
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dv.dv_xname,

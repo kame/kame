@@ -1,4 +1,4 @@
-/*	$NetBSD: locore_mips1.S,v 1.34 2000/05/29 23:40:04 simonb Exp $	*/
+/*	$NetBSD: locore_mips1.S,v 1.54 2002/03/05 16:03:22 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -54,6 +54,10 @@
  */
 #include "opt_cputype.h"
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
+
+#include <sys/cdefs.h>
+
 #include <mips/asm.h>
 #include <mips/cpuregs.h>
 #include <machine/param.h>
@@ -76,9 +80,8 @@ EXPORT(mips1_exceptionentry_start)
 VECTOR(mips1_UTLBMiss, unknown)
 	.set	noat
 	mfc0	k0, MIPS_COP_0_BAD_VADDR	# get the virtual address
-	lw	k1, _C_LABEL(curpcb)
+	lw	k1, _C_LABEL(segbase)		# get the current segment table
 	bltz	k0, 1f				# R3000 chip bug
-	lw	k1, U_PCB_SEGTAB(k1)		# get the current segment table
 	srl	k0, k0, SEGSHIFT		# compute segment table index
 	sll	k0, k0, 2
 	addu	k1, k1, k0
@@ -125,7 +128,7 @@ VECTOR(mips1_exception, unknown)
 	and	k1, k1, MIPS1_CR_EXC_CODE	# mask out the cause bits
 	or	k1, k1, k0			# change index to user table
 1:
-	la	k0, mips1_excausesw		# get base of the jump table
+	la	k0, mips1_excpt_sw		# get base of the jump table
 	addu	k0, k0, k1			# get the address of the
 						#  function entry.  Note that
 						#  the cause is already
@@ -179,7 +182,7 @@ mips1_SlowFault:
 NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, -4
-#ifdef DDB
+#if defined(DDB) || defined(KGDB)
 	la	k0, _C_LABEL(kdbaux)
 	sw	s0, SF_REG_S0(k0)
 	sw	s1, SF_REG_S1(k0)
@@ -232,7 +235,7 @@ NESTED_NOPROFILE(mips1_KernGenException, KERNFRAME_SIZ, ra)
 /*
  * Call the trap handler.
  */
-#if /* ifdef DDB */ defined(DDB) || defined(DEBUG)
+#if defined(DDB) || defined(DEBUG) || defined(KGDB)
 	addu	v0, sp, KERNFRAME_SIZ
 	sw	v0, KERNFRAME_SP(sp)
 #endif
@@ -350,7 +353,7 @@ NESTED_NOPROFILE(mips1_UserGenException, CALLFRAME_SIZ, ra)
 	.set	at
 	and	t0, a0, ~MIPS_SR_COP_1_BIT	# turn off the FPU
 	.set	noat
-#if /* ifdef DDB */ defined(DDB) || defined(DEBUG)
+#if defined(DDB) || defined(DEBUG) || defined(KGDB)
 	move	ra, a3
 	sw	ra, CALLFRAME_RA(sp)
 #endif
@@ -360,48 +363,23 @@ NESTED_NOPROFILE(mips1_UserGenException, CALLFRAME_SIZ, ra)
 	jal	_C_LABEL(trap)
 	mtc0	t0, MIPS_COP_0_STATUS
 /*
- * Restore user registers and return. NOTE: interrupts are enabled.
+ * Check pending asynchronous traps.
  */
-	addu	a1, sp, CALLFRAME_SIZ
-	lw	a0, FRAME_SR(a1)
-	lw	t0, FRAME_MULLO(a1)
-	lw	t1, FRAME_MULHI(a1)
-	mtc0	a0, MIPS_COP_0_STATUS	# this should disable interrupts
-	mtlo	t0
-	mthi	t1
-	move	k1, a1
-	lw	k0, FRAME_EPC(k1)	# might be changed in trap()
-	lw	AT, FRAME_AST(k1)
-	lw	v0, FRAME_V0(k1)
-	lw	v1, FRAME_V1(k1)
-	lw	a0, FRAME_A0(k1)
-	lw	a1, FRAME_A1(k1)
-	lw	a2, FRAME_A2(k1)
-	lw	a3, FRAME_A3(k1)
-	lw	t0, FRAME_T0(k1)
-	lw	t1, FRAME_T1(k1)
-	lw	t2, FRAME_T2(k1)
-	lw	t3, FRAME_T3(k1)
-	lw	t4, FRAME_T4(k1)
-	lw	t5, FRAME_T5(k1)
-	lw	t6, FRAME_T6(k1)
-	lw	t7, FRAME_T7(k1)
-	lw	s0, FRAME_S0(k1)
-	lw	s1, FRAME_S1(k1)
-	lw	s2, FRAME_S2(k1)
-	lw	s3, FRAME_S3(k1)
-	lw	s4, FRAME_S4(k1)
-	lw	s5, FRAME_S5(k1)
-	lw	s6, FRAME_S6(k1)
-	lw	s7, FRAME_S7(k1)
-	lw	t8, FRAME_T8(k1)
-	lw	t9, FRAME_T9(k1)
-	lw	gp, FRAME_GP(k1)
-	lw	sp, FRAME_SP(k1)
-	lw	s8, FRAME_S8(k1)
-	lw	ra, FRAME_RA(k1)
-	j	k0				# return to interrupted point
-	rfe
+	lw	t0, _C_LABEL(curproc)		# t0 = curproc
+	nop
+	lw	t0, P_MD_ASTPENDING(t0)		# any pending ast?
+	nop
+	beq	t0, zero, 1f			# if no, skip ast processing
+	nop
+/*
+ * We have pending asynchronous traps; all the state is already saved.
+ */
+	jal	_C_LABEL(ast)
+	lw	a0, CALLFRAME_SIZ + FRAME_EPC(sp)
+1:
+	la	ra, _C_LABEL(mips1_xcpt_return)
+	j	ra				# pretend function return
+	nop
 	.set	at
 END(mips1_UserGenException)
 
@@ -421,104 +399,80 @@ NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
 	lw	k1, _C_LABEL(curpcb)
 	nop
 	addu	k1, k1, USPACE - FRAME_SIZ
-	sw	AT, FRAME_AST(k1)
-	sw	v0, FRAME_V0(k1)
-	sw	v1, FRAME_V1(k1)
+	#sw	AT, FRAME_AST(k1)
+	.set	at
+	sw	v0, FRAME_V0(k1)		# syscall #
+	sw	v1, FRAME_V1(k1)		# used by syscall()
 	mflo	v0
 	sw	a0, FRAME_A0(k1)
 	sw	a1, FRAME_A1(k1)
 	sw	a2, FRAME_A2(k1)
 	sw	a3, FRAME_A3(k1)
+	lw	a0, _C_LABEL(curproc)		# 1st arg is curproc
 	mfhi	v1
-	sw	t0, FRAME_T0(k1)
-	sw	t1, FRAME_T1(k1)
-	sw	t2, FRAME_T2(k1)
-	sw	t3, FRAME_T3(k1)
-	mfc0	a0, MIPS_COP_0_STATUS		# 1st arg is STATUS
-	sw	t4, FRAME_T4(k1)
-	sw	t5, FRAME_T5(k1)
-	sw	t6, FRAME_T6(k1)
+	#sw	t0, FRAME_T0(k1)		# no need to save temp regs
+	#sw	t1, FRAME_T1(k1)
+	#sw	t2, FRAME_T2(k1)
+	#sw	t3, FRAME_T3(k1)
+	mfc0	a1, MIPS_COP_0_STATUS		# 2nd arg is STATUS
+	#sw	t4, FRAME_T4(k1)
+	#sw	t5, FRAME_T5(k1)
+	#sw	t6, FRAME_T6(k1)
 	sw	t7, FRAME_T7(k1)
-	mfc0	a1, MIPS_COP_0_CAUSE		# 2nd arg is CAUSE
+	mfc0	a2, MIPS_COP_0_CAUSE		# 3rd arg is CAUSE
 	sw	s0, FRAME_S0(k1)
 	sw	s1, FRAME_S1(k1)
 	sw	s2, FRAME_S2(k1)
 	sw	s3, FRAME_S3(k1)
-	mfc0	a2, MIPS_COP_0_EXC_PC		# 3rd arg is PC
+	mfc0	a3, MIPS_COP_0_EXC_PC		# 4th arg is PC
 	sw	s4, FRAME_S4(k1)
 	sw	s5, FRAME_S5(k1)
 	sw	s6, FRAME_S6(k1)
 	sw	s7, FRAME_S7(k1)
-	sw	t8, FRAME_T8(k1)
-	sw	t9, FRAME_T9(k1)
+	#sw	t8, FRAME_T8(k1)
+	#sw	t9, FRAME_T9(k1)
 	sw	gp, FRAME_GP(k1)
 	sw	sp, FRAME_SP(k1)
 	sw	s8, FRAME_S8(k1)
 	sw	ra, FRAME_RA(k1)
-	sw	a0, FRAME_SR(k1)
+	sw	a1, FRAME_SR(k1)
 	sw	v0, FRAME_MULLO(k1)
 	sw	v1, FRAME_MULHI(k1)
-	sw	a2, FRAME_EPC(k1)
+	sw	a3, FRAME_EPC(k1)
 	addu	sp, k1, -CALLFRAME_SIZ		# switch to kernel SP
 #ifdef __GP_SUPPORT__
 	la	gp, _C_LABEL(_gp)		# switch to kernel GP
 #endif
-	.set	at
-	and	t0, a0, ~MIPS_SR_COP_1_BIT	# turn off the FPU
-	.set	noat
-#if /* ifdef DDB */ defined(DDB) || defined(DEBUG)
-	move	ra, a2
+#if defined(DDB) || defined(DEBUG) || defined(KGDB)
+	move	ra, a3
 	sw	ra, CALLFRAME_RA(sp)
 #endif
+	lw	t1, P_MD_SYSCALL(a0)		# t1 = syscall
+	ori	t0, a1, MIPS_SR_INT_IE		# turn on IEc, enable intr.
+	and	t0, t0, ~MIPS_SR_COP_1_BIT	# turn off FPU
 /*
  * Call the system call handler.
  */
-	jal	_C_LABEL(syscall)
+	jal	t1
 	mtc0	t0, MIPS_COP_0_STATUS
 /*
- * Restore user registers and return. NOTE: interrupts are enabled.
+ * Check pending asynchronous traps.
  */
-	addu	a1, sp, CALLFRAME_SIZ
-	lw	a0, FRAME_SR(a1)
-	lw	t0, FRAME_MULLO(a1)
-	lw	t1, FRAME_MULHI(a1)
-	mtc0	a0, MIPS_COP_0_STATUS		# this should disable interrupts
-	mtlo	t0
-	mthi	t1
-	move	k1, a1
-	lw	k0, FRAME_EPC(k1)		# might be changed in syscall()
-	lw	AT, FRAME_AST(k1)
-	lw	v0, FRAME_V0(k1)
-	lw	v1, FRAME_V1(k1)
-	lw	a0, FRAME_A0(k1)
-	lw	a1, FRAME_A1(k1)
-	lw	a2, FRAME_A2(k1)
-	lw	a3, FRAME_A3(k1)
-	lw	t0, FRAME_T0(k1)
-	lw	t1, FRAME_T1(k1)
-	lw	t2, FRAME_T2(k1)
-	lw	t3, FRAME_T3(k1)
-	lw	t4, FRAME_T4(k1)
-	lw	t5, FRAME_T5(k1)
-	lw	t6, FRAME_T6(k1)
-	lw	t7, FRAME_T7(k1)
-	lw	s0, FRAME_S0(k1)
-	lw	s1, FRAME_S1(k1)
-	lw	s2, FRAME_S2(k1)
-	lw	s3, FRAME_S3(k1)
-	lw	s4, FRAME_S4(k1)
-	lw	s5, FRAME_S5(k1)
-	lw	s6, FRAME_S6(k1)
-	lw	s7, FRAME_S7(k1)
-	lw	t8, FRAME_T8(k1)
-	lw	t9, FRAME_T9(k1)
-	lw	gp, FRAME_GP(k1)
-	lw	sp, FRAME_SP(k1)
-	lw	s8, FRAME_S8(k1)
-	lw	ra, FRAME_RA(k1)
-	j	k0				# return to syscall point
-	rfe
-	.set	at
+	lw	t0, _C_LABEL(curproc)		# t0 = curproc
+	nop
+	lw	t0, P_MD_ASTPENDING(t0)		# any pending ast?
+	nop
+	beq	t0, zero, 1f
+	nop
+/*
+ * We have pending asynchronous traps; all the state is already saved.
+ */
+	jal	_C_LABEL(ast)
+	lw	a0, CALLFRAME_SIZ + FRAME_EPC(sp)
+1:
+	la	ra, _C_LABEL(mips1_xcpt_return)
+	j	ra				# pretend function return
+	nop
 END(mips1_SystemCall)
 
 /*
@@ -566,7 +520,7 @@ NESTED_NOPROFILE(mips1_KernIntr, KERNFRAME_SIZ, ra)
 	sw	v0, TF_BASE+TF_REG_MULLO(sp)
 	sw	v1, TF_BASE+TF_REG_MULHI(sp)
 	sw	a2, TF_BASE+TF_REG_EPC(sp)
-#if /* ifdef DDB */ defined(DDB) || defined(DEBUG)
+#if defined(DDB) || defined(DEBUG) || defined(KGDB)
 	move	ra, a2
 	sw	ra, KERNFRAME_RA(sp)		# for debugging
 #endif
@@ -675,7 +629,7 @@ NESTED_NOPROFILE(mips1_UserIntr, CALLFRAME_SIZ, ra)
 	.set	at
 	and	t0, a0, ~MIPS_SR_COP_1_BIT	# turn off the FPU
 	.set	noat
-#if /* ifdef DDB */ defined(DDB) || defined(DEBUG)
+#if defined(DDB) || defined(DEBUG) || defined(KGDB)
 	move	ra, a2
 	sw	ra, CALLFRAME_RA(sp)		# for debugging
 #endif
@@ -687,9 +641,10 @@ NESTED_NOPROFILE(mips1_UserIntr, CALLFRAME_SIZ, ra)
 /*
  * Check pending asynchoronous traps.
  */
+	lw	v0, _C_LABEL(curproc)		# v0 = curproc
 	addu	a1, sp, CALLFRAME_SIZ
 	lw	a0, FRAME_SR(a1)
-	lw	v0, _C_LABEL(astpending)	# any pending ast?
+	lw	v0, P_MD_ASTPENDING(v0)		# any pending ast?
 	mtc0	a0, MIPS_COP_0_STATUS		# restore SR, disable intrs
 	beq	v0, zero, 1f			# if no, skip ast processing
 	nop					# -delay slot-
@@ -962,289 +917,6 @@ END(mips1_TLBRead)
  *----------------------------------------------------------------------------
  */
 #ifndef ENABLE_MIPS_TX3900
-
-/*----------------------------------------------------------------------------
- *
- * mips1_ConfigCache --
- *
- *	Size the caches.
- *	NOTE: should only be called from mach_init().
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	The size of the data cache is stored into mips_L1DCacheSize and the
- *	size of instruction cache is stored into mips_L1ICacheSize.
- *
- *----------------------------------------------------------------------------
- */
-NESTED(mips1_ConfigCache, CALLFRAME_SIZ, ra)
-	subu	sp, sp, CALLFRAME_SIZ
-	sw	ra, CALLFRAME_RA(sp)		# Save return address.
-	.mask	0x80000000, -4
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
-	la	v0, 1f
-	or	v0, MIPS_KSEG1_START		# Run uncached.
-	j	v0
-	nop
-1:
-/*
- * This works because jal doesn't change pc[31..28] and the
- * linker still thinks SizeCache is in the cached region so it computes
- * the correct address without complaining.
- */
-	jal	_C_LABEL(mips1_SizeCache)	# Get the size of the d-cache.
-	nop
-	sw	v0, _C_LABEL(mips_L1DCacheSize)
-	nop					# Make sure sw out of pipe
-	nop
-	nop
-	nop
-	li	v0, MIPS_SR_SWAP_CACHES		# Swap caches
-	mtc0	v0, MIPS_COP_0_STATUS
-	nop					# Insure caches stable
-	nop
-	nop
-	nop
-	jal	_C_LABEL(mips1_SizeCache)	# Get the size of the i-cache.
-	nop
-	mtc0	zero, MIPS_COP_0_STATUS		# Swap back caches and enable.
-	nop
-	nop
-	nop
-	nop
-	sw	v0, _C_LABEL(mips_L1ICacheSize)
-	la	t0, 1f
-	j	t0				# Back to cached mode
-	nop
-1:
-	lw	ra, CALLFRAME_RA(sp)		# Restore return addr
-	addu	sp, sp, CALLFRAME_SIZ		# Restore sp.
-	j	ra
-	nop
-END(mips1_ConfigCache)
-
-/*----------------------------------------------------------------------------
- *
- * mips1_SizeCache --
- *
- *	Get the size of the cache.
- *
- * Results:
- *	The size of the cache.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------------
- */
-LEAF(mips1_SizeCache)
-	mfc0	t0, MIPS_COP_0_STATUS		# Save the current status reg.
-	nop
-	or	v0, t0, MIPS_SR_ISOL_CACHES	# Isolate the caches.
-	nop					# Make sure no stores in pipe
-	mtc0	v0, MIPS_COP_0_STATUS
-	nop					# Make sure isolated
-	nop
-	nop
-/*
- * Clear cache size boundaries.
- */
-	li	v0, MIPS_MIN_CACHE_SIZE
-	li	v1, MIPS_KSEG0_START
-	li	t2, MIPS_MAX_CACHE_SIZE
-1:
-	addu	t1, v0, v1			# Compute address to clear
-	sw	zero, 0(t1)			# Clear cache memory
-	bne	v0, t2, 1b
-	sll	v0, v0, 1
-
-	li	v0, -1
-	sw	v0, 0(v1)			# Store marker in cache
-	li	v0, MIPS_MIN_CACHE_SIZE
-2:
-	addu	t1, v0, v1			# Compute address
-	lw	t3, 0(t1)			# Look for marker
-	nop
-	bne	t3, zero, 3f			# Found marker.
-	nop
-	bne	v0, t2, 2b			# keep looking
-	sll	v0, v0, 1			# cache size * 2
-
-	move	v0, zero			# must be no cache
-3:
-	mtc0	t0, MIPS_COP_0_STATUS
-	nop					# Make sure unisolated
-	nop
-	nop
-	nop
-	j	ra
-	nop
-END(mips1_SizeCache)
-
-/*----------------------------------------------------------------------------
- *
- * mips1_FlushCache --
- *
- *	Flush the caches.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	The contents of the caches is flushed.
- *
- *----------------------------------------------------------------------------
- */
-LEAF(mips1_FlushCache)
-	lw	t1, _C_LABEL(mips_L1ICacheSize)	# Must load before isolating
-	lw	t2, _C_LABEL(mips_L1DCacheSize)	# Must load before isolating
-	mfc0	t3, MIPS_COP_0_STATUS 		# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
-	la	v0, 1f
-	or	v0, MIPS_KSEG1_START		# Run uncached.
-	j	v0
-	nop
-/*
- * Flush the instruction cache.
- */
-1:
-	li	v0, MIPS_SR_ISOL_CACHES | MIPS_SR_SWAP_CACHES
-	mtc0	v0, MIPS_COP_0_STATUS		# Isolate and swap caches.
-	li	t0, MIPS_KSEG1_START
-	subu	t0, t0, t1
-	li	t1, MIPS_KSEG1_START
-	la	v0, 1f				# Run cached
-	j	v0
-	nop
-1:
-	addu	t0, t0, 4
-	bne	t0, t1, 1b
-	sb	zero, -4(t0)
-
-	la	v0, 1f
-	or	v0, MIPS_KSEG1_START
-	j	v0				# Run uncached
-	nop
-/*
- * Flush the data cache.
- */
-1:
-	li	v0, MIPS_SR_ISOL_CACHES
-	mtc0	v0, MIPS_COP_0_STATUS		# Isolate and swap back caches
-	li	t0, MIPS_KSEG1_START
-	subu	t0, t0, t2
-	la	v0, 1f
-	j	v0				# Back to cached mode
-	nop
-1:
-	addu	t0, t0, 4
-	bne	t0, t1, 1b
-	sb	zero, -4(t0)
-
-	nop					# Insure isolated stores
-	nop					#   out of pipe.
-	nop
-	nop
-	mtc0	t3, MIPS_COP_0_STATUS		# Restore status reg.
-	nop					# Insure cache unisolated.
-	nop
-	nop
-	nop
-	j	ra
-	nop
-END(mips1_FlushCache)
-
-/*----------------------------------------------------------------------------
- *
- * mips1_FlushICache --
- *
- *	void mips1_FlushICache(addr, len)
- *		vaddr_t addr; vsize_t len;
- *
- *	Flush instruction cache for range of addr to addr + len - 1.
- *	The address can be any valid address so long as no TLB misses occur.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	The contents of the cache is flushed.
- *
- *----------------------------------------------------------------------------
- */
-LEAF(mips1_FlushICache)
-	mfc0	t0, MIPS_COP_0_STATUS		# Save SR
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
-
-	la	v1, 1f
-	or	v1, MIPS_KSEG1_START		# Run uncached.
-	j	v1
-	nop
-1:
-	li	v1, MIPS_SR_ISOL_CACHES | MIPS_SR_SWAP_CACHES	# DELAYSLOT
-
-	mtc0	v1, MIPS_COP_0_STATUS
-	nop
-	addu	a1, a1, a0			# compute ending address
-1:
-	addu	a0, a0, 4
-	bne	a0, a1, 1b
-	sb	zero, -4(a0)
-
-	mtc0	t0, MIPS_COP_0_STATUS		# enable interrupts
-	j	ra				# return and run cached
-	nop
-END(mips1_FlushICache)
-
-/*----------------------------------------------------------------------------
- *
- * mips1_FlushDCache --
- *
- *	void mips1_FlushDCache(addr, len)
- *		vaddr_t addr; vsize_t len;
- *
- *	Flush data cache for range of addr to addr + len - 1.
- *	The address can be any valid address so long as no TLB misses occur.
- *	(Be sure to use cached K0SEG kernel addresses)
- * Results:
- *	None.
- *
- * Side effects:
- *	The contents of the cache is flushed.
- *
- *----------------------------------------------------------------------------
- */
-LEAF(mips1_FlushDCache)
-	mfc0	t0, MIPS_COP_0_STATUS		# Save SR
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
-	nop
-
-	li	v1, MIPS_SR_ISOL_CACHES		# DELAYSLOT
-	mtc0	v1, MIPS_COP_0_STATUS
-	nop
-	addu	t1, a1, a0			# compute ending address
-1:
-	sb	zero, 0(a0)
-	sb	zero, 4(a0)
-	sb	zero, 8(a0)
-	sb	zero, 12(a0)
-	sb	zero, 16(a0)
-	sb	zero, 20(a0)
-	sb	zero, 24(a0)
-	addu	a0, 32
-	bltu	a0, t1, 1b
-	sb	zero, -4(a0)
-
-	nop					# drain pipeline
-	nop
-	mtc0	t0, MIPS_COP_0_STATUS		# enable interrupts
-	nop
-	j	ra				# return and run cached
-	nop
-END(mips1_FlushDCache)
-
 /*
  * void mips1_wbflush(void)
  *
@@ -1273,12 +945,20 @@ END(mips1_wbflush)
 #else /* !ENABLE_MIPS_TX3900 */
 /*
  *	The differences between R3900 and R3000.
- *	1. Cache system
- *		TX3912 I-cache 4KB/16B direct mapped
- *		       D-cache 1KB/4B 2-way sa
- *		TX3922 I-cache 16KB/16B 2-way sa
+ *	1. Cache system 
+ *		Physical-index physical-tag	
+ *		fixed line-size
+ *		refil-size 4/8/16/32 words (set in config register)
+ *		TX3912 
+ *		       Write-through
+ *		       I-cache 4KB/16B direct mapped (256line)
+ *		       D-cache 1KB/4B 2-way sa (128line)
+ *		       Cache snoop	
+ *		TX3922
+ *		       Write-through/write-back (set in config register)
+ *		       I-cache 16KB/16B 2-way sa 
  *		       D-cache 8KB/16B 2-way sa
- *		(mips/mips/locore_mips1.S)
+ *		       Cache snoop	
  *
  *	2. Coprocessor1
  *	2.1	cache operation.
@@ -1293,160 +973,24 @@ END(mips1_wbflush)
  *		kseg2 0xff000000-0xfffeffff is reserved.
  *		(mips/include/vmparam.h)
  *
- * If defined both MIPS1 and ENABLE_MIPS_TX3900, it generates kernel for
+ *  + If defined both MIPS1 and ENABLE_MIPS_TX3900, it generates kernel for
  * R3900. If defined MIPS1 only, No R3900 feature include.
+ *  + R3920 core has write-back mode. but it is always disabled in NetBSD.
  */
 
-/*
- * void mips1_ConfigCache(void)
- */
-LEAF(mips1_ConfigCache)
-	mfc0	t0, R3900_COP_0_CONFIG
-	li	t1, R3900_CONFIG_ICS_MASK
-	and	t1, t1, t0
-	srl	t1, t1, R3900_CONFIG_ICS_SHIFT
-	li	t2, R3900_MIN_CACHE_SIZE
-	sllv	t1, t2, t1
-	sw	t1, _C_LABEL(mips_L1ICacheSize)
-
-	li	t1, R3900_CONFIG_DCS_MASK
-	and	t1, t1, t0
-	srl	t1, t1, R3900_CONFIG_DCS_SHIFT
-	li	t2, R3900_MIN_CACHE_SIZE
-	sllv	t1, t2, t1
-	sw	t1, _C_LABEL(mips_L1DCacheSize)
-
+LEAF_NOPROFILE(tx3900_cp0_config_read)
+	mfc0	v0, R3900_COP_0_CONFIG
 	j	ra
 	nop
-END(mips1_ConfigCache)
-
-/*
- * R3900 2-way set-associative, line size 4byte(3900)/16byte(3920)
- *	void mips1_FlushDCache(vaddr_t addr, vsize_t len)
- */
-LEAF(mips1_FlushDCache)
-	lw	t0, mips_L1DCacheLSize
-	addu	a1, a1, a0			# compute ending address
-1:
-	R3900_CACHE(R3900_CACHE_D_HITINVALIDATE, 0, CPUREG_A0)
-	addu	a0, a0, t0
-	bne	a0, a1, 1b
-	nop
-
-	j	ra
-	nop
-END(mips1_FlushDCache)
-
-/*
- * R3900 direct-mapped/2-way set-associative line size 16byte
- *	void mips1_FlushICache(vaddr_t addr, vsize_t len)
- */
-LEAF(mips1_FlushICache)
-	mfc0	t0, MIPS_COP_0_STATUS		# Save SR
-	nop
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
-	nop
-	# Disable I-cache
-	li	t1, ~R3900_CONFIG_ICE
-	mfc0	t2, R3900_COP_0_CONFIG
-	and	t1, t1, t2
-	nop
-	mtc0	t1, R3900_COP_0_CONFIG
-	j	2f	# stop streaming
-	nop
-2:
-	# Flush I-cache
-	addu	a1, 127
-	srl	a1, a1, 7	# Number of unrolled loops
-3:
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 0,   CPUREG_A0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 16,  CPUREG_A0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 32,  CPUREG_A0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 48,  CPUREG_A0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 64,  CPUREG_A0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 80,  CPUREG_A0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 96,  CPUREG_A0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 112, CPUREG_A0)
-	addu	a1, -1
-	bne	a1, zero, 3b
-	addu	a0, 128
-
-	# Enable I-cache
-	nop
-	mtc0	t2, R3900_COP_0_CONFIG
-	nop
-	mtc0	t0, MIPS_COP_0_STATUS		# enable interrupts
-	j	ra				# return and run cached
-	nop
-END(mips1_FlushICache)
-
-/*
- *
- *	void mips_FlushCache(void)
- */
-LEAF(mips1_FlushCache)
-	lw	t1, mips_L1ICacheSize
-	lw	t2, mips_L1DCacheSize
-#	lw	t3, mips_L1ICacheLSize
-#	lw	t4, mips_L1DCacheLSize
-	nop
-	mfc0	t7, MIPS_COP_0_STATUS		# Save SR
-	nop
-	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts.
-	nop
-	# Disable I-cache
-	li	t5, ~R3900_CONFIG_ICE
-	mfc0	t6, R3900_COP_0_CONFIG
-	and	t5, t5, t6
-	nop
-	mtc0	t5, R3900_COP_0_CONFIG
-	j	2f	# stop streaming
-	nop
-2:
-	# Flush cache
-	li	t0, MIPS_KSEG0_START
-	addu	t1, t0, t1		# End address
-	subu	t1, t1, 128
-3:
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 0,   CPUREG_T0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 16,  CPUREG_T0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 32,  CPUREG_T0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 48,  CPUREG_T0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 64,  CPUREG_T0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 80,  CPUREG_T0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 96,  CPUREG_T0)
-	R3900_CACHE(R3900_CACHE_I_INDEXINVALIDATE, 112, CPUREG_T0)
-	bne	t0, t1, 3b
-	addu	t0, t0, 128
-
-	# Flush D-cache
-	la	t0, dummy_buffer
-	addu	t1, t0, t2		# End address
-4:
-	lw	t2, 0(t0)
-	bne	t1, t0, 4b
-	addu	t0, t0, 4
-
-	# Enable I-cache
-	nop
-	mtc0	t6, R3900_COP_0_CONFIG
-	nop
-	mtc0	t7, MIPS_COP_0_STATUS		# enable interrupts
-	j	ra				# return and run cached
-	nop
-END(mips1_FlushCache)
+END(tx3900_cp0_config_read)
 
 LEAF(mips1_wbflush)
-	nop
-	sync
-	nop
+	sync	
 	j	ra
 	nop
 END(mips1_wbflush)
-
-	.comm dummy_buffer, R3900_MAX_DCACHE_SIZE
-
 #endif /* !ENABLE_MIPS_TX3900 */
+
 /*
  * mips1_proc_trampoline
  *
@@ -1462,6 +1006,7 @@ LEAF(mips1_proc_trampoline)
 	jal	ra, s0
 	move	a0, s1
 	.set	noat
+XLEAF(mips1_xcpt_return)
 	addu	a1, sp, CALLFRAME_SIZ	# a1 points exception frame
 	lw	a0, FRAME_SR(a1)
 	lw	t0, FRAME_MULLO(a1)
@@ -1660,34 +1205,6 @@ LEAF(mips1_TBIA)
 	mtc0	v1, MIPS_COP_0_STATUS		# restore status register
 	END(mips1_TBIA)
 
-/*
- * void mips1_TBRPL(vpn1, vpn2, pte)
- *	probe TLB entry which has vpn1 address; if found, have it new
- *	entryHi and entryLo pair of [vpn2, pte]
- */
-LEAF(mips1_TBRPL)
-	mfc0	v1, MIPS_COP_0_STATUS
-	mtc0	zero, MIPS_COP_0_STATUS
-	mfc0	v0, MIPS_COP_0_TLB_HI
-	nop
-	mtc0	a0, MIPS_COP_0_TLB_HI
-	nop
-	tlbp
-	mfc0	t0, MIPS_COP_0_TLB_INDEX
-	nop
-	bltz	t0, 1f
-	nop
-	or	a2, a2, MIPS1_PG_G
-	mtc0	a1, MIPS_COP_0_TLB_HI
-	mtc0	a2, MIPS_COP_0_TLB_LOW
-	nop
-	tlbwi
-1:
-	mtc0	v0, MIPS_COP_0_TLB_HI
-	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS
-	END(mips1_TBRPL)
-
 	.data
 
 	.globl _C_LABEL(mips1_locoresw)
@@ -1696,7 +1213,7 @@ _C_LABEL(mips1_locoresw):
 	.word _C_LABEL(mips1_proc_trampoline)
 	.word _C_LABEL(mips_idle)
 
-mips1_excausesw:
+mips1_excpt_sw:
 	####
 	#### The kernel exception handlers.
 	####

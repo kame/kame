@@ -1,4 +1,4 @@
-/*	$NetBSD: sunos_ioctl.c,v 1.31 2000/03/30 11:27:19 augustss Exp $	*/
+/*	$NetBSD: sunos_ioctl.c,v 1.40.6.1 2002/05/30 21:13:17 tv Exp $	*/
 
 /*
  * Copyright (c) 1993 Markus Wild.
@@ -26,6 +26,13 @@
  * loosely from: Header: sunos_ioctl.c,v 1.7 93/05/28 04:40:43 torek Exp
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sunos_ioctl.c,v 1.40.6.1 2002/05/30 21:13:17 tv Exp $");
+
+#if defined(_KERNEL_OPT)
+#include "opt_execfmt.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -49,7 +56,7 @@
 
 #include <compat/sunos/sunos.h>
 #include <compat/sunos/sunos_syscallargs.h>
-#include <compat/sunos/sunos_util.h>
+#include <compat/common/compat_util.h>
 
 /*
  * SunOS ioctl calls.
@@ -410,8 +417,7 @@ sunos_sys_ioctl(p, v, retval)
 	int (*ctl) __P((struct file *, u_long, caddr_t, struct proc *));
 	int error;
 
-	if ((unsigned)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return EBADF;
 
 	if ((fp->f_flag & (FREAD|FWRITE)) == 0)
@@ -486,22 +492,37 @@ sunos_sys_ioctl(p, v, retval)
 
 		return copyout ((caddr_t)&ss, SCARG(uap, data), sizeof (ss));
 	    }
+	case _IOR('t', 119, int):	/* TIOCGPGRP */
+	    {
+		int pgrp;
+
+		error = (*ctl)(fp, TIOCGPGRP, (caddr_t)&pgrp, p);
+		if (error == 0 && pgrp == 0)
+			return (EIO);
+		if (error)
+			return (error);
+		return copyout((caddr_t)&pgrp, SCARG(uap, data), sizeof(pgrp));
+	    }
 	case _IOW('t', 130, int):	/* TIOCSETPGRP: posix variant */
 		SCARG(uap, com) = TIOCSPGRP;
 		break;
 	case _IOR('t', 131, int):	/* TIOCGETPGRP: posix variant */
 	    {
 		/*
-		 * sigh, must do error translation on pty devices
-		 * (see also kern/tty_pty.c)
+		 * sigh, must do error translation on pty devices.  if the pgrp
+		 * returned is 0 (and no error), we convert this to EIO, if it
+		 * is on a pty.
 		 */
 		int pgrp;
 		struct vnode *vp;
+
 		error = (*ctl)(fp, TIOCGPGRP, (caddr_t)&pgrp, p);
 		if (error) {
 			vp = (struct vnode *)fp->f_data;
-			if (error == EIO && vp != NULL &&
-			    vp->v_type == VCHR && major(vp->v_rdev) == 21)
+			if ((error == EIO || (error == 0 && pgrp == 0)) &&
+			    vp != NULL &&
+			    vp->v_type == VCHR &&
+			    major(vp->v_rdev) == 21)
 				error = ENOTTY;
 			return (error);
 		}
@@ -804,7 +825,7 @@ sunos_sys_ioctl(p, v, retval)
 	case _IO('S', 5):	/* I_FLUSH */
 	    {
 		int tmp = 0;
-		switch ((int)SCARG(uap, data)) {
+		switch ((int)(u_long)SCARG(uap, data)) {
 		case SUNOS_S_FLUSHR:	tmp = FREAD;
 		case SUNOS_S_FLUSHW:	tmp = FWRITE;
 		case SUNOS_S_FLUSHRW:	tmp = FREAD|FWRITE;
@@ -814,7 +835,8 @@ sunos_sys_ioctl(p, v, retval)
 	case _IO('S', 9):	/* I_SETSIG */
 	    {
 		int on = 1;
-		if (((int)SCARG(uap, data) & (SUNOS_S_HIPRI|SUNOS_S_INPUT)) ==
+		if (((int)(u_long)SCARG(uap, data) &
+			(SUNOS_S_HIPRI|SUNOS_S_INPUT)) ==
 		    SUNOS_S_HIPRI)
 			return EOPNOTSUPP;
                 return (*ctl)(fp, FIOASYNC, (caddr_t)&on, p);
@@ -1003,13 +1025,13 @@ sunos_sys_fcntl(p, v, retval)
 			int error;
 			struct sunos_flock	 ifl;
 			struct flock		*flp, fl;
-			caddr_t sg = stackgap_init(p->p_emul);
+			caddr_t sg = stackgap_init(p, 0);
 			struct sys_fcntl_args		fa;
 
 			SCARG(&fa, fd) = SCARG(uap, fd);
 			SCARG(&fa, cmd) = SCARG(uap, cmd);
 
-			flp = stackgap_alloc(&sg, sizeof(struct flock));
+			flp = stackgap_alloc(p, &sg, sizeof(struct flock));
 			SCARG(&fa, arg) = (void *) flp;
 
 			error = copyin(SCARG(uap, arg), &ifl, sizeof ifl);
@@ -1042,6 +1064,7 @@ sunos_sys_fcntl(p, v, retval)
 		return (EOPNOTSUPP);
 
 	default:
+		break;
 	}
 
 	ret = sys_fcntl(p, uap, retval);
@@ -1057,6 +1080,7 @@ sunos_sys_fcntl(p, v, retval)
 		}
 		break;
 	default:
+		break;
 	}
 
 	return (ret);

@@ -1,4 +1,4 @@
-/*	$NetBSD: in_proto.c,v 1.39.4.2 2001/03/11 21:09:55 he Exp $	*/
+/*	$NetBSD: in_proto.c,v 1.55 2002/03/04 13:24:12 sommerfeld Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,6 +64,9 @@
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.55 2002/03/04 13:24:12 sommerfeld Exp $");
+
 #include "opt_mrouting.h"
 #include "opt_eon.h"			/* ISO CLNL over IP */
 #include "opt_iso.h"			/* ISO TP tunneled over IP */
@@ -118,11 +121,6 @@
 #include <netinet6/ipcomp.h>
 #endif /* IPSEC */
 
-#include "gif.h"
-#if NGIF > 0
-#include <netinet/in_gif.h>
-#endif
-
 #ifdef NSIP
 #include <netns/ns_var.h>
 #include <netns/idp_var.h>
@@ -137,19 +135,9 @@
 #include <netiso/eonvar.h>
 #endif /* EON */
 
-#include "ipip.h"
-#if NIPIP > 0 || defined(MROUTING)
-#include <netinet/ip_ipip.h>
-#endif /* NIPIP > 0 || MROUTING */
-
 #include "gre.h"
 #if NGRE > 0
 #include <netinet/ip_gre.h>
-#endif
-
-#include "stf.h"
-#if NSTF > 0
-#include <net/if_stf.h>
 #endif
 
 extern	struct domain inetdomain;
@@ -165,30 +153,30 @@ struct protosw inetsw[] = {
   udp_usrreq,
   udp_init,	0,		0,		0,		udp_sysctl
 },
-{ SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN,
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_ABRTACPTDIS,
   tcp_input,	0,		tcp_ctlinput,	tcp_ctloutput,
   tcp_usrreq,
-  tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
+  tcp_init,	0,		tcp_slowtimo,	tcp_drain,	tcp_sysctl
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
-  rip_input,	rip_output,	0,		rip_ctloutput,
+  rip_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
   0,		0,		0,		0,
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  icmp_input,	rip_output,	0,		rip_ctloutput,
+  icmp_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
-  0,		0,		0,		0,		icmp_sysctl
+  icmp_init,	0,		0,		0,		icmp_sysctl
 },
 #ifdef IPSEC
 { SOCK_RAW,	&inetdomain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
-  ah4_input,	0,	 	0,		0,
+  ah4_input,	0,	 	ah4_ctlinput,	0,
   0,	  
   0,		0,		0,		0,		ipsec_sysctl
 },
 #ifdef IPSEC_ESP
 { SOCK_RAW,	&inetdomain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
-  esp4_input,	0,	 	0,		0,
+  esp4_input,	0,	 	esp4_ctlinput,	0,
   0,	  
   0,		0,		0,		0,		ipsec_sysctl
 },
@@ -200,49 +188,57 @@ struct protosw inetsw[] = {
 },
 #endif /* IPSEC */
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  encap4_input,	rip_output, 	0,		rip_ctloutput,
+  encap4_input,	rip_output, 	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,	/*XXX*/
   encap_init,	0,		0,		0,
 },
 #ifdef INET6
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  encap4_input,	rip_output, 	0,		rip_ctloutput,
+  encap4_input,	rip_output, 	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,	/*XXX*/
-  0,		0,		0,		0,
+  encap_init,		0,		0,		0,
 },
 #endif /* INET6 */
 #if NGRE > 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_GRE,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  gre_input,	rip_output,	0,		rip_ctloutput,
+  gre_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
   0,		0,		0,		0,
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_MOBILE,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  gre_mobile_input,	rip_output,	0,		rip_ctloutput,
+  gre_mobile_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
   0,		0,		0,		0,
 },
 #endif /* NGRE > 0 */
 { SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  igmp_input,	rip_output,	0,		rip_ctloutput,
+  igmp_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
   igmp_init,	igmp_fasttimo,	igmp_slowtimo,	0,
 },
 #ifdef TPIP
-{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_LASTHDR,
+{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_LASTHDR|PR_ABRTACPTDIS,
   tpip_input,	0,		tpip_ctlinput,	tp_ctloutput,
   tp_usrreq,
   tp_init,	0,		tp_slowtimo,	tp_drain,
 },
 #endif /* TPIP */
+#ifdef ISO
 /* EON (ISO CLNL over IP) */
 #ifdef EON
 { SOCK_RAW,	&inetdomain,	IPPROTO_EON,	PR_LASTHDR,
-  eoninput,	0,		eonctlinput,		0,
+  eoninput,	0,		eonctlinput,	0,
   0,
   eonprotoinit,	0,		0,		0,
 },
+#else
+{ SOCK_RAW,	&inetdomain,	IPPROTO_EON,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
+  encap4_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
+  rip_usrreq,	/*XXX*/
+  encap_init,	0,		0,		0,
+},
 #endif /* EON */
+#endif /* ISO */
 #ifdef NSIP
 { SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   idpip_input,	NULL,		nsip_ctlinput,	0,
@@ -252,38 +248,11 @@ struct protosw inetsw[] = {
 #endif /* NSIP */
 /* raw wildcard */
 { SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR,
-  rip_input,	rip_output,	0,		rip_ctloutput,
+  rip_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
   rip_init,	0,		0,		0,
 },
 };
-
-#if NIPIP > 0
-struct protosw ipip_protosw =
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
-  ipip_input,	rip_output,	0,		rip_ctloutput,
-  rip_usrreq,	/* XXX */
-  0,		0,		0,		0,
-};
-#endif /* NIPIP */
-
-#if NGIF > 0
-struct protosw in_gif_protosw =
-{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
-  in_gif_input, rip_output,	0,		rip_ctloutput,
-  rip_usrreq,
-  0,            0,              0,              0,
-};
-#endif /*NGIF*/
-
-#if NSTF > 0
-struct protosw in_stf_protosw =
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_stf_input, rip_output,	0,		rip_ctloutput,
-  rip_usrreq,
-  0,            0,              0,              0
-};
-#endif /*NSTF*/
 
 struct domain inetdomain =
     { PF_INET, "internet", 0, 0, 0, 
@@ -291,16 +260,5 @@ struct domain inetdomain =
       rn_inithead, 32, sizeof(struct sockaddr_in) };
 
 u_char	ip_protox[IPPROTO_MAX];
-
-#define	TCP_SYN_HASH_SIZE	293
-#define	TCP_SYN_BUCKET_SIZE	35
-
-int	tcp_syn_cache_size = TCP_SYN_HASH_SIZE;
-int	tcp_syn_cache_limit = TCP_SYN_HASH_SIZE*TCP_SYN_BUCKET_SIZE;
-int	tcp_syn_bucket_limit = 3*TCP_SYN_BUCKET_SIZE;
-struct	syn_cache_head tcp_syn_cache[TCP_SYN_HASH_SIZE];
-int	tcp_syn_cache_interval = 1;	/* runs timer twice a second */
-
-int tcp_rst_ppslim = 100;			/* 100pps */
 
 int icmperrppslim = 100;			/* 100pps */

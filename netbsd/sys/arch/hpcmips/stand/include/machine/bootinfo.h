@@ -1,1 +1,1 @@
-#include "../../../include/bootinfo.h"
+#include "../../../../hpc/include/bootinfo.h"

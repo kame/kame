@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.47 2000/06/12 11:13:15 ragge Exp $	*/
+/*	$NetBSD: conf.c,v 1.57 2002/01/12 15:17:17 manu Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
@@ -42,6 +42,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 #include <sys/vnode.h>
+#include <machine/cpu.h>
 
 #include "opt_cputype.h"
 
@@ -68,7 +69,7 @@ bdev_decl(ts);
 #include "mu.h"
 bdev_decl(mu);
 
-#if VAX750
+#if VAX750 || VAXANY
 #define NCTU	1
 #else
 #define NCTU	0
@@ -155,15 +156,22 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
  */
 #include <dev/cons.h>
 
-#include "lkc.h"
-#if NLKC
-#define	smgcngetc lkccngetc
+#include "smg.h"
+#include "wskbd.h"
+#if NSMG > 0
+#if NWSKBD > 0
+#define smgcngetc wskbd_cngetc
 #else
-#define	smgcngetc nullcngetc
+static int
+smgcngetc(dev_t dev)
+{
+	return 0;
+}
 #endif
 
 #define smgcnputc wsdisplay_cnputc
 #define	smgcnpollc nullcnpollc
+#endif
 
 cons_decl(gen);
 cons_decl(dz);
@@ -171,20 +179,19 @@ cons_decl(qd);
 cons_decl(smg);
 #include "qv.h"
 #include "qd.h"
-#include "smg.h"
 
 struct	consdev constab[]={
 #if VAX8600 || VAX8200 || VAX780 || VAX750 || VAX650 || VAX630 || VAX660 || \
-	VAX670 || VAX680
+	VAX670 || VAX680 || VAX8800 || VAXANY
 #define NGEN	1
 	cons_init(gen), /* Generic console type; mtpr/mfpr */
 #else
 #define NGEN	0
 #endif
-#if VAX410 || VAX43 || VAX46 || VAX48 || VAX49 || VAX53
+#if VAX410 || VAX43 || VAX46 || VAX48 || VAX49 || VAX53 || VAXANY
 	cons_init(dz),	/* DZ11-like serial console on VAXstations */
 #endif
-#if VAX650 || VAX630
+#if VAX650 || VAX630 || VAXANY
 #if NQV
 	cons_init(qv),	/* QVSS/QDSS bit-mapped console driver */
 #endif
@@ -206,36 +213,36 @@ struct	consdev constab[]={
 /* Special for console storage */
 #define dev_type_rw(n)	int n __P((dev_t, int, int, struct proc *))
 
-/* plotters - open, close, write, ioctl, poll */
+/* plotters */
+/* open, close, write, ioctl, poll */
 #define cdev_plotter_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, dev_init(c,n,poll), (dev_type_mmap((*))) enodev }
+	dev_init(c,n,open), dev_init(c,n,close), dev_noimpl(read,enodev), \
+	dev_init(c,n,write), dev_init(c,n,ioctl), dev_noimpl(stop,enodev), \
+	0, dev_init(c,n,poll), dev_noimpl(mmap,enodev) }
 
-/* console mass storage - open, close, read/write */
+/* console mass storage */
+/* open, close, read, write */
 #define cdev_cnstore_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), (dev_type_ioctl((*))) enodev, \
-	(dev_type_stop((*))) enodev, 0, (dev_type_poll((*))) enodev, \
-	(dev_type_mmap((*))) enodev }
+	dev_init(c,n,write), dev_noimpl(ioctl,enodev), \
+	dev_noimpl(stop,enodev), 0, seltrue, dev_noimpl(mmap,enodev) }
 
+/* open, close, write */
 #define cdev_lp_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), (dev_type_ioctl((*))) enodev, \
-	(dev_type_stop((*))) enodev, 0, seltrue, (dev_type_mmap((*))) enodev }
+	dev_init(c,n,open), dev_init(c,n,close), dev_noimpl(read,enodev), \
+	dev_init(c,n,write), dev_noimpl(ioctl,enodev), \
+	dev_noimpl(stop,enodev), 0, seltrue, dev_noimpl(mmap,enodev) }
 
 /* graphic display adapters */
-#define cdev_graph_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	0, dev_init(c,n,poll), (dev_type_mmap((*))) enodev }
+/* open, close, read, write, ioctl, stop, poll */
+#define cdev_graph_init(c,n)	cdev__ocrwisp_init(c,n)
 
 /* Ingres */
+/* open, close, (read), (write), ioctl */
 #define cdev_ingres_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) nullop, \
-	(dev_type_write((*))) nullop, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) nullop, 0, (dev_type_poll((*))) nullop, \
-	(dev_type_mmap((*))) enodev }
+	dev_init(c,n,open), dev_init(c,n,close), dev_noimpl(read,nullop), \
+	dev_noimpl(write,nullop), dev_init(c,n,ioctl), \
+	dev_noimpl(stop,enodev), 0, seltrue, dev_noimpl(mmap,enodev) }
 
 
 
@@ -282,10 +289,7 @@ cdev_decl(dh);
 #include "dmf.h"
 cdev_decl(dmf);
 
-#include "np.h"
-cdev_decl(np);
-
-#if VAX8600
+#if VAX8600 || VAXANY
 #define NCRL 1
 #else
 #define NCRL 0
@@ -294,7 +298,7 @@ cdev_decl(np);
 #define crlwrite crlrw
 cdev_decl(crl);
 
-#if VAX8200
+#if VAX8200 || VAXANY
 #define NCRX 1
 #else
 #define NCRX 0
@@ -303,7 +307,7 @@ cdev_decl(crl);
 #define crxwrite crxrw
 cdev_decl(crx);
 
-#if VAX780
+#if VAX780 || VAXANY
 #define NCFL 1
 #else
 #define NCFL 0
@@ -393,6 +397,9 @@ cdev_decl(wsmux);
 #include "scsibus.h"
 cdev_decl(scsibus);
 
+#include "clockctl.h"
+cdev_decl(clockctl);
+
 struct cdevsw	cdevsw[] =
 {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -434,7 +441,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 36 */
 	cdev_tty_init(NDMZ,dmz),	/* 37: DMZ32 */
 	cdev_tape_init(NMT,mt),		/* 38: MSCP tape */
-	cdev_audio_init(NNP,np),	/* 39: NP Intelligent Board */
+	cdev_notdef(),			/* 39  was NP Intelligent Board */
 	cdev_graph_init(NQV,qv),	/* 40: QVSS graphic display */
 	cdev_graph_init(NQD,qd),	/* 41: QDSS graphic display */
 	cdev_ipf_init(NIPFILTER,ipl),	/* 42: Packet filter */
@@ -473,6 +480,7 @@ struct cdevsw	cdevsw[] =
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 72: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 73: RAIDframe disk driver */
 	cdev_mouse_init(NWSMUX, wsmux),	/* 74: ws multiplexor */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 75: clockctl pseudo device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -565,6 +573,7 @@ int	chrtoblktbl[] = {
 	NODEV,	/* 72 */
 	25,	/* 73 */
 	NODEV,	/* 74 */
+	NODEV,	/* 75 */
 };
 
 dev_t
@@ -597,4 +606,15 @@ iszerodev(dev)
 {
 
 	return (major(dev) == 3 && minor(dev) == 12);
+}
+
+int
+getmajor(void *ptr)
+{
+	int i;
+
+	for (i = 0; i < nchrdev; i++)
+		if (cdevsw[i].d_open == ptr)
+			return i;
+	panic("getmajor");
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.12.4.1 2000/10/06 23:18:48 deberg Exp $	*/
+/*	$NetBSD: cpu.h,v 1.19 2002/05/14 02:03:02 matt Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -46,7 +46,7 @@
 #ifndef _CPU_MACHINE_
 #define _CPU_MACHINE_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -98,7 +98,7 @@ struct clockframe {
 	u_short	sr;		/* sr at time of interrupt */
 	u_long	pc;		/* pc at time of interrupt */
 	u_short	vo;		/* vector offset (4-word frame) */
-};
+} __attribute__((packed));
 
 #define	CLKF_USERMODE(framep)	(((framep)->sr & PSL_S) == 0)
 #define	CLKF_BASEPRI(framep)	(((framep)->sr & PSL_IPL) == 0)
@@ -115,8 +115,8 @@ struct clockframe {
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-extern int want_resched; /* resched() was called */
-#define	need_resched()	{ want_resched = 1; aston(); }
+extern int want_resched; 	/* resched() was called */
+#define	need_resched(ci)	{ want_resched = 1; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -133,8 +133,8 @@ extern int want_resched; /* resched() was called */
 
 #define aston() (astpending++)
 
-int	astpending;	/* need to trap before returning to user mode */
-int	want_resched;	/* resched() was called */
+extern	int	astpending;	/* need to trap before returning to user mode */
+extern	int	want_resched;	/* resched() was called */
 
 extern	volatile char *intiobase;
 extern  volatile char *intiolimit;
@@ -190,16 +190,8 @@ void	doboot __P((void)) __attribute__((__noreturn__));
 /* sys_machdep.c functions */
 int	cachectl1 __P((unsigned long, vaddr_t, size_t, struct proc *));
 
-/* vm_machdep.c functions */
-void	physaccess __P((caddr_t, caddr_t, int, int));
-void	physunaccess __P((caddr_t, int));
-int	kvtop __P((caddr_t));
-
 /* clock.c functions */
 void	next68k_calibrate_delay __P((void));
-
-/* trap.c function */
-void	child_return __P((void *));
 
 #endif /* _KERNEL */
 
@@ -211,7 +203,7 @@ void	child_return __P((void *));
 #define	NEXT_SLOT_ID		0x0
 #ifdef	M68030
 #define	NEXT_SLOT_ID_BMAP	0x0
-#endif	M68030
+#endif	/* M68030 */
 #endif
 #ifdef	M68040
 #ifdef DISABLE_NEXT_BMAP_CHIP		/* @@@ For turbo testing */
@@ -220,7 +212,7 @@ void	child_return __P((void *));
 #define	NEXT_SLOT_ID_BMAP	0x00100000
 #endif
 #define NEXT_SLOT_ID            0x0
-#endif	M68040
+#endif	/* M68040 */
 
 /****************************************************************/
 

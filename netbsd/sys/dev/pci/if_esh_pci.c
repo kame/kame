@@ -1,4 +1,4 @@
-/*	$NetBSD: if_esh_pci.c,v 1.6 2000/01/21 23:39:59 thorpej Exp $	*/
+/*	$NetBSD: if_esh_pci.c,v 1.10 2001/11/13 07:48:43 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -40,11 +40,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_esh_pci.c,v 1.10 2001/11/13 07:48:43 lukem Exp $");
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h" 
- 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h> 
@@ -60,24 +58,6 @@
 #include <net/if_dl.h>
 #include <net/if_hippi.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h> 
-#include <netinet/if_inarp.h>
-#endif
- 
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-  
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -176,8 +156,7 @@ esh_pci_attach(parent, self, aux)
 	    PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.h,v 1.4 1998/10/10 02:00:50 thorpej Exp $	*/
+/*	$NetBSD: conf.h,v 1.6 2002/02/27 01:19:06 christos Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -37,17 +37,6 @@
  */
 
 #include <sys/conf.h>
-
-#define	mmread	mmrw
-#define	mmwrite	mmrw
-cdev_decl(mm);
-
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), \
-	(dev_type_read((*))) enodev, dev_init(c,n,write), \
-	dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev, 0}
 
 cdev_decl(lpt);
 

@@ -1,4 +1,4 @@
-; $NetBSD: grf_ultms.g,v 1.4 1998/01/05 20:51:25 perry Exp $
+; $NetBSD: grf_ultms.g,v 1.6.10.1 2002/05/28 19:38:27 tv Exp $
 ;
 ; ite support for A2410.
 
@@ -19,7 +19,7 @@
 ;	This product contains software developed by Ignatios Souvatzis
 ;	for the NetBSD project.
 ; 4. The name of the author may not be used to endorse or promote products
-;    derived from this software withough specific prior written permission
+;    derived from this software without specific prior written permission
 ;
 ; THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
 ; IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -32,14 +32,13 @@
 ; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ; THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-; This file contains the source code for grf_ultmscode.h. It is
-; assembler code for the TMS34010 CPU/graphics processor. 
+; This file contains the source code for grf_ultmscode.c. It is
+; assembler code for the TMS34010 CPU/graphics processor.
 ;
 ; Use Paul Mackerras' gspa assembler to transfer it to hex format, then
-; Ignatios Souvatzis' gpsahextoc utility to convert it to grf_ultmscode.h. 
-; 
-; This has been integrated into the NetBSD/Amiga kernel build procedure.
+; Ignatios Souvatzis' gpsahextoc utility to convert it to grf_ultmscode.c.
 ;
+; Use 'make grf_ultms.c' to generate the .c file.
 
 ; memory map:
 ; FF800000 .. FF9FFFFF	overlay planes
@@ -249,7 +248,7 @@ continue:
 	move	@font_lmo,b0
 	move	b0,@convsp,0
 	move	@font_area,b11
-	
+
 	mpyu	b12,b11		; times char offset
 	move	@font_adr,b0,1	; font bitmaps base
 	add	b11,b0		; character bitmap start addr. linear
@@ -329,7 +328,7 @@ yok:	jrv	xok
 	ori	PBH,b11
 xok:	move	b11,@control,0
 	move	@control,b11,0
-	
+
 	pixblt	xy,xy
 	jruc	loop_end,l
 
@@ -433,14 +432,14 @@ smearlp:
 ;;
 	jruc	loop_end,l
 
-	
+
 testfor5:
 	dec	a2
 	jrne	testfor6
 ; loadclut --- load clut entry.
 ;	1==overlay index red green blue
 ;	for speed reasons, the host will load the image clut directly rather
-;	than through us, but its not that expensive to support both here 
+;	than through us, but its not that expensive to support both here
 ;	just in case
 	move	a0,a4
 	addk	$10,a4
@@ -457,7 +456,7 @@ t5l1:	move	*a4+,a5,0
 	move	*a4+,a5,0
 	move	a5,*a6,0
 	jruc	loop_end,l
-	
+
 testfor6:
 	dec	a2
 	jrne	testfor7
@@ -478,7 +477,7 @@ testfor6:
 	move	b0,@pixel_size,0	; this syncs the psize write, too
 
 	jruc	loop_end,l
-	
+
 testfor7:
 	jruc	loop_end,l
 ;;;

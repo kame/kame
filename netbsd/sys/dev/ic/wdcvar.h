@@ -1,4 +1,4 @@
-/*	$NetBSD: wdcvar.h,v 1.25.2.1 2001/12/27 12:28:39 he Exp $	*/
+/*	$NetBSD: wdcvar.h,v 1.34 2002/01/13 17:24:29 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,7 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* XXX for atapi_adapter */
+/* XXX For scsipi_adapter and scsipi_channel. */
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/atapiconf.h>
 
@@ -75,6 +75,7 @@ struct channel_softc { /* Per channel data */
 	struct ata_drive_datas ch_drive[2];
 
 	struct device *atapibus;
+	struct scsipi_channel ch_atapi_channel;
 
 	/*
 	 * channel queues. May be the same for all channels, if hw channels
@@ -99,6 +100,8 @@ struct wdc_softc { /* Per controller state */
 #define WDC_CAPABILITY_NO_EXTRA_RESETS 0x0100 /* only reset once */
 #define WDC_CAPABILITY_PREATA 0x0200 /* ctrl can be a pre-ata one */
 #define WDC_CAPABILITY_IRQACK 0x0400 /* callback to ack interrupt */
+#define WDC_CAPABILITY_SINGLE_DRIVE 0x0800 /* Don't probe second drive */
+#define WDC_CAPABILITY_NOIRQ  0x1000	/* Controller never interrupts */
 #define WDC_CAPABILITY_SELECT  0x2000	/* Controller selects target */
 	u_int8_t      PIO_cap; /* highest PIO mode supported */
 	u_int8_t      DMA_cap; /* highest DMA mode supported */
@@ -161,6 +164,7 @@ struct wdc_xfer {
 	void *databuf;
 	int c_bcount;      /* byte count left */
 	int c_skip;        /* bytes already transferred */
+	int c_dscpoll;	   /* counter for dsc polling (ATAPI) */
 	TAILQ_ENTRY(wdc_xfer) c_xferchain;
 	void (*c_start) __P((struct channel_softc *, struct wdc_xfer *));
 	int  (*c_intr)  __P((struct channel_softc *, struct wdc_xfer *, int));
@@ -191,13 +195,23 @@ int   wdcwait __P((struct channel_softc *, int, int, int));
 int   wdc_dmawait __P((struct channel_softc *, struct wdc_xfer *, int));
 void  wdcbit_bucket __P(( struct channel_softc *, int));
 void  wdccommand __P((struct channel_softc *, u_int8_t, u_int8_t, u_int16_t,
-	                  u_int8_t, u_int8_t, u_int8_t, u_int8_t));
+    u_int8_t, u_int8_t, u_int8_t, u_int8_t));
+void  wdccommandext __P((struct channel_softc *, u_int8_t, u_int8_t, u_int64_t,
+    u_int16_t));
 void   wdccommandshort __P((struct channel_softc *, int, int));
 void  wdctimeout	__P((void *arg));
+void wdc_reset_channel __P((struct ata_drive_datas *));
+int wdc_exec_command __P((struct ata_drive_datas *, struct wdc_command*));
+#define WDC_COMPLETE 0x01
+#define WDC_QUEUED   0x02
+#define WDC_TRY_AGAIN 0x03
 
 int	wdc_addref __P((struct channel_softc *));
 void	wdc_delref __P((struct channel_softc *));
 void	wdc_kill_pending __P((struct channel_softc *));
+
+void	wdc_print_modes (struct channel_softc *);
+void	wdc_probe_caps __P((struct ata_drive_datas*));
 
 /*	
  * ST506 spec says that if READY or SEEKCMPLT go off, then the read or write
@@ -211,4 +225,3 @@ void	wdc_kill_pending __P((struct channel_softc *));
 #define WDC_RESET_WAIT 31000
 
 void wdc_atapibus_attach __P((struct channel_softc *));
-int   atapi_print       __P((void *, const char *));

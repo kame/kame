@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.41.6.1 2001/05/01 10:42:03 he Exp $	*/
+/*	$NetBSD: conf.c,v 1.52 2002/03/16 16:55:54 martin Exp $	*/
 
 /*
  * Copyright (c) 1991 The Regents of the University of California.
@@ -52,15 +52,19 @@
 
 #define	bdev_md_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,strategy), \
-	dev_init(c,n,ioctl), (dev_type_dump((*))) enxio, dev_size_init(c,n), 0 }
+	dev_init(c,n,ioctl), dev_noimpl(dump,enxio), dev_size_init(c,n), 0 }
 
 #include "vnd.h"
 bdev_decl(vnd);
 #include "md.h"
 bdev_decl(md);
+
 #include "fd.h"
 #include "hdfd.h"
+#include "fdisa.h"
+#define	NFLOPPY		(NFD+NHDFD+NFDISA)
 bdev_decl(fd);
+
 bdev_decl(sw);
 #include "sd.h"
 bdev_decl(sd);
@@ -79,7 +83,7 @@ struct bdevsw	bdevsw[] =
 {
 	bdev_disk_init(NVND,vnd),	/* 0: vnode disk driver */
 	bdev_md_init(NMD,md),		/* 1: memory disk - for install disk */
-	bdev_disk_init(NFD+NHDFD,fd),	/* 2: floppy disk */
+	bdev_disk_init(NFLOPPY,fd),	/* 2: floppy disk */
 	bdev_swap_init(1,sw),		/* 3: swap pseudo-device */
 	bdev_disk_init(NSD,sd),		/* 4: SCSI disk */
 	bdev_tape_init(NST,st),		/* 5: SCSI tape */
@@ -96,100 +100,29 @@ struct bdevsw	bdevsw[] =
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
-/* open, close, ioctl, poll, mmap -- XXX should be a map device */
-#define	cdev_grf_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) nullop, \
-	(dev_type_write((*))) nullop, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, (dev_type_tty((*))) nullop, \
-	dev_init(c,n,poll), dev_init(c,n,mmap) }
-
-/* open, close, ioctl, poll, mmap -- XXX should be a map device */
-#define	cdev_view_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) nullop, \
-	(dev_type_write((*))) nullop, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, (dev_type_tty((*))) nullop, \
-	dev_init(c,n,poll), dev_init(c,n,mmap) }
-
 /* open, close, write, ioctl */
-#define	cdev_lp_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), \
-	(dev_type_read((*))) enodev, dev_init(c,n,write), \
-	dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev, 0}
+#define	cdev_lp_init(c,n)	cdev__ocwi_init(c,n)
 
 /* open, close, read, ioctl */
-#define	cdev_ss_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, seltrue, \
-	(dev_type_mmap((*))) enodev }
+#define	cdev_ss_init(c,n)	cdev__ocri_init(c,n)
 
 /* open, close, read, write */
-#define	cdev_rtc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write),(dev_type_ioctl((*))) enodev, \
-	(dev_type_stop((*))) enodev, 0, seltrue, \
-	(dev_type_mmap((*))) enodev }
+#define	cdev_rtc_init(c,n)	cdev__ocrw_init(c,n)
 
 /* open, close, read, write, ioctl, mmap */
-#define cdev_et_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, seltrue, \
-	dev_init(c,n,mmap) }
+#define cdev_et_init(c,n)	cdev__ocrwim_init(c,n)
+#define cdev_leo_init(c,n)	cdev__ocrwim_init(c,n)
 
-#ifdef __I4B_IS_INTEGRATED
-/* open, close, ioctl */
-#define cdev_i4bctl_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, seltrue, \
-	(dev_type_mmap((*))) enodev }
-
-/* open, close, read, write */
-#define	cdev_i4brbch_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, (dev_type_poll((*))) enodev, (dev_type_mmap((*))) enodev }
-
-/* open, close, read, write */
-#define	cdev_i4btel_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), (dev_type_ioctl((*))) enodev, (dev_type_stop((*))) enodev, \
-	0, (dev_type_poll((*))) enodev, (dev_type_mmap((*))) enodev, D_TTY }
-
-/* open, close, read, ioctl */
-#define cdev_i4btrc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, (dev_type_poll((*))) enodev, \
-	(dev_type_mmap((*))) enodev }
-
-/* open, close, read, poll, ioctl */
-#define cdev_i4b_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
-	(dev_type_mmap((*))) enodev }
-	
-#include "i4b.h"
-#include "i4bctl.h"
-#include "i4btrc.h"
-#include "i4brbch.h"
-#include "i4btel.h"
-cdev_decl(i4b);
-cdev_decl(i4bctl);
-cdev_decl(i4btrc);
-cdev_decl(i4brbch);
-cdev_decl(i4btel);
-#endif /* __I4B_IS_INTEGRATED */
-
-/* open, close, read, write, ioctl, mmap */
-#define cdev_leo_init(c,n) { \
-       dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-       dev_init(c,n,write), dev_init(c,n,ioctl), \
-       (dev_type_stop((*))) enodev, 0, seltrue, \
-       dev_init(c,n,mmap) }
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
 
 #include "audio.h"
 #include "bpfilter.h"
@@ -209,10 +142,13 @@ cdev_decl(i4btel);
 #include "ss.h"
 #include "tun.h"
 #include "uk.h"
+#include "vga_pci.h"
 #include "view.h"
+#include "wsdisplay.h"
 #include "zs.h"
 #include "leo.h"
 #include "scsibus.h"
+#include "clockctl.h"
 
 cdev_decl(audio);
 cdev_decl(bpf);
@@ -250,10 +186,12 @@ cdev_decl(tun);
 cdev_decl(uk);
 cdev_decl(view);
 cdev_decl(wd);
+cdev_decl(wsdisplay);
 cdev_decl(zs);
 cdev_decl(et);
 cdev_decl(leo);
 cdev_decl(scsibus);
+cdev_decl(clockctl);
 
 struct cdevsw	cdevsw[] =
 {
@@ -298,26 +236,19 @@ struct cdevsw	cdevsw[] =
 	cdev_rnd_init(NRND,rnd),	/* 38: random source pseudo-device */
   	cdev_leo_init(NLEO,leo),	/* 39: Circad Leonardo video */
 	cdev_et_init(NET,et),		/* 40: ET4000 color video */
-        cdev_notdef(),			/* 41: wscons placeholder	*/
+        cdev_wsdisplay_init(NWSDISPLAY,
+			wsdisplay),	/* 41: wscons placeholder	*/
   	cdev_audio_init(NAUDIO,audio),	/* 42 */
   	cdev_notdef(),			/* 43 */
-#ifdef __I4B_IS_INTEGRATED
-	/* i4b character devices */
-	cdev_i4b_init(NI4B, i4b),		/* 44: i4b main device */
-	cdev_i4bctl_init(NI4BCTL, i4bctl),	/* 45: i4b control device */
-	cdev_i4brbch_init(NI4BRBCH, i4brbch),	/* 46: i4b raw b-channel access */
-	cdev_i4btrc_init(NI4BTRC, i4btrc),	/* 47: i4b trace device */
-	cdev_i4btel_init(NI4BTEL, i4btel),	/* 48: i4b phone device */
-#else
-	cdev_notdef(),			/* 44 */
-	cdev_notdef(),			/* 45 */
-	cdev_notdef(),			/* 46 */
-	cdev_notdef(),			/* 47 */
-	cdev_notdef(),			/* 48 */
-#endif /* __I4B_IS_INTEGRATED */
+	cdev_isdn_init(NISDN, isdn),		/* 44: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 45: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 46: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 47: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 48: isdn phone device */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 49: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 50: RAIDframe disk driver */
 	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 51: svr4 net pseudo-device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 52: clockctl pseudo device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -431,6 +362,8 @@ static int chrtoblktab[] = {
 	/* 48 */	NODEV,
 	/* 49 */	NODEV,
 	/* 50 */	15,
+	/* 51 */	NODEV,
+	/* 52 */	NODEV,
 };
 
 /*
@@ -459,6 +392,7 @@ chrtoblk(dev)
 cons_decl(ser);
 #define	itecnpollc	nullcnpollc
 cons_decl(ite);
+cons_decl(vga);
 
 struct	consdev constab[] = {
 #if NSER > 0
@@ -466,6 +400,9 @@ struct	consdev constab[] = {
 #endif
 #if NITE > 0
 	cons_init(ite),
+#endif
+#if NVGA_PCI > 0
+	{ dev_init(1,vga,cnprobe), dev_init(1,vga,cninit) },
 #endif
 	{ 0 },
 };

@@ -1,4 +1,4 @@
-/*	$NetBSD: xbox.c,v 1.3 2000/01/11 12:59:44 pk Exp $ */
+/*	$NetBSD: xbox.c,v 1.6 2001/11/13 06:58:18 lukem Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,11 +40,13 @@
  * Sbus expansion box.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: xbox.c,v 1.6 2001/11/13 06:58:18 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <vm/vm.h>
 
 #include <machine/bus.h>
 #include <dev/sbus/sbusvar.h>
@@ -142,12 +144,12 @@ xbox_attach(parent, self, aux)
 	struct xbox_attach_args xa;
 	char *cp;
 
-	sc->sc_key = getpropint(node, "write0-key", -1);
+	sc->sc_key = PROM_getpropint(node, "write0-key", -1);
 
-	cp = getpropstring(node, "model");
+	cp = PROM_getpropstring(node, "model");
 	printf(": model %s", cp);
 
-	cp = getpropstring(node, "child-present");
+	cp = PROM_getpropstring(node, "child-present");
 	if (strcmp(cp, "true") != 0) {
 		printf(": no sbus devices\n");
 		return;

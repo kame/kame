@@ -1,4 +1,4 @@
-/*	$NetBSD: ser.c,v 1.11 2000/03/29 14:19:23 leo Exp $	*/
+/*	$NetBSD: ser.c,v 1.15.6.1 2002/05/30 21:25:19 tv Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -104,6 +104,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_mbtype.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,8 +126,24 @@
 #include <machine/iomap.h>
 #include <machine/mfp.h>
 #include <atari/atari/intr.h>
-#include <atari/dev/ym2149reg.h>
 #include <atari/dev/serreg.h>
+
+#if !defined(_MILANHW_)
+#include <atari/dev/ym2149reg.h>
+#else
+	/* MILAN has no ym2149 */
+#define ym2149_dtr(set) {					\
+	if (set)						\
+		single_inst_bset_b(MFP->mf_gpip, 0x08);		\
+	else single_inst_bclr_b(MFP->mf_gpip, 0x08);		\
+}
+
+#define ym2149_rts(set) {					\
+	if (set)						\
+		single_inst_bset_b(MFP->mf_gpip, 0x01);		\
+	else single_inst_bclr_b(MFP->mf_gpip, 0x01);		\
+}
+#endif /* _MILANHW_ */
 
 /* #define SER_DEBUG */
 
@@ -453,7 +470,7 @@ seropen(dev, flag, mode, p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
         if (error)
 		goto bad;
 
@@ -485,7 +502,7 @@ serclose(dev, flag, mode, p)
 	if (!ISSET(tp->t_state, TS_ISOPEN))
 		return (0);
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 
 	if (!ISSET(tp->t_state, TS_ISOPEN) && tp->t_wopen == 0) {
@@ -509,7 +526,7 @@ serread(dev, uio, flag)
 	struct ser_softc *sc = ser_cd.cd_devs[SERUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
  
 int
@@ -521,7 +538,19 @@ serwrite(dev, uio, flag)
 	struct ser_softc *sc = ser_cd.cd_devs[SERUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+serpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct ser_softc *sc = ser_cd.cd_devs[SERUNIT(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -547,12 +576,12 @@ serioctl(dev, cmd, data, flag, p)
 	struct tty *tp = sc->sc_tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -588,7 +617,7 @@ serioctl(dev, cmd, data, flag, p)
 	case TIOCMBIC:
 	case TIOCMGET:
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 
 #ifdef SER_DEBUG
@@ -778,7 +807,7 @@ serparam(tp, t)
 	 * CLOCAL or MDMBUF.  We don't hang up here; we only do that if we
 	 * lose carrier while carrier detection is on.
 	 */
-	(void) (*linesw[tp->t_line].l_modem)(tp, ISSET(sc->sc_msr, MCR_DCD));
+	(void) (*tp->t_linesw->l_modem)(tp, ISSET(sc->sc_msr, MCR_DCD));
 
 #ifdef SER_DEBUG
 	serstatus(sc, "serparam ");
@@ -1108,7 +1137,7 @@ serrxint(sc, tp)
 		}
 		code = sc->sc_rbuf[get] |
 		    lsrmap[(rsr & (RSR_BREAK|RSR_FERR|RSR_PERR)) >> 3];
-		(*linesw[tp->t_line].l_rint)(code, tp);
+		(*tp->t_linesw->l_rint)(code, tp);
 		get = (get + 1) & RXBUFMASK;
 	}
 
@@ -1137,7 +1166,7 @@ sertxint(sc, tp)
 		CLR(tp->t_state, TS_FLUSH);
 	else
 		ndflush(&tp->t_outq, (int)(sc->sc_tba - tp->t_outq.c_cf));
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 }
 
 static void
@@ -1158,14 +1187,14 @@ sermsrint(sc, tp)
 		/*
 		 * Inform the tty layer that carrier detect changed.
 		 */
-		(void) (*linesw[tp->t_line].l_modem)(tp, ISSET(msr, MCR_DCD));
+		(void) (*tp->t_linesw->l_modem)(tp, ISSET(msr, MCR_DCD));
 	}
 
 	if (ISSET(delta, sc->sc_msr_cts)) {
 		/* Block or unblock output according to flow control. */
 		if (ISSET(msr, sc->sc_msr_cts)) {
 			sc->sc_tx_stopped = 0;
-			(*linesw[tp->t_line].l_start)(tp);
+			(*tp->t_linesw->l_start)(tp);
 		} else {
 			sc->sc_tx_stopped = 1;
 			serstop(tp, 0);
@@ -1374,7 +1403,7 @@ serspeed(speed)
 	}
 	return (-1);
 
-#undef	divrnd(n, q)
+#undef	divrnd
 }
 
 /*

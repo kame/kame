@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.24 2000/05/19 18:54:28 thorpej Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.29 2002/02/19 17:09:49 wiz Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Gordon W. Ross
@@ -62,7 +62,7 @@ static int disklabel_bsd_to_sun(struct disklabel *, char *);
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl, secsize and anything required for a block i/o read
  * operation in the driver's strategy/start routines
@@ -100,16 +100,15 @@ readdisklabel(dev, strat, lp, clp)
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 
 	/* if successful, locate disk label within block and validate */
 	error = biowait(bp);
 	if (!error) {
 		/* Save the whole block in case it has info we need. */
-		bcopy(bp->b_data, clp->cd_block, sizeof(clp->cd_block));
+		memcpy(clp->cd_block, bp->b_data, sizeof(clp->cd_block));
 	}
-	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 	if (error)
 		return("disk label read error");
@@ -121,6 +120,22 @@ readdisklabel(dev, strat, lp, clp)
 	}
 
 	/* Check for a NetBSD disk label (PROM can not boot it). */
+	for (dlp = (struct disklabel *)clp->cd_block;
+	    dlp <= (struct disklabel *)((char *)clp->cd_block +
+	    DEV_BSIZE - sizeof(*dlp));
+	    dlp = (struct disklabel *)((char *)dlp + sizeof(long))) {
+		if (dlp->d_magic != DISKMAGIC || dlp->d_magic2 != DISKMAGIC) {
+			continue;
+		}
+		if (dlp->d_npartitions > MAXPARTITIONS || dkcksum(dlp) != 0)
+			return("BSD disk label corrupted");
+		else {
+			*lp = *dlp;
+			return(NULL); 
+		}
+	}
+
+#if 0
 	dlp = (struct disklabel *) (clp->cd_block + LABELOFFSET);
 	if (dlp->d_magic == DISKMAGIC) {
 		if (dkcksum(dlp))
@@ -128,8 +143,9 @@ readdisklabel(dev, strat, lp, clp)
 		*lp = *dlp; 	/* struct assignment */
 		return(NULL);
 	}
+#endif
 
-	bzero(clp->cd_block, sizeof(clp->cd_block));
+	memset(clp->cd_block, 0, sizeof(clp->cd_block));
 	return("no disk label");
 }
 
@@ -208,14 +224,14 @@ writedisklabel(dev, strat, lp, clp)
 
 	/* Get a buffer and copy the new label into it. */
 	bp = geteblk((int)lp->d_secsize);
-	bcopy(clp->cd_block, bp->b_data, sizeof(clp->cd_block));
+	memcpy(bp->b_data, clp->cd_block, sizeof(clp->cd_block));
 
 	/* Write out the updated label. */
 	bp->b_dev = dev;
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_WRITE;
+	bp->b_flags |= B_WRITE;
 	(*strat)(bp);
 	error = biowait(bp);
 	brelse(bp);

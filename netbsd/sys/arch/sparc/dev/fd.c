@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.82.2.1 2000/07/19 02:53:11 mrg Exp $	*/
+/*	$NetBSD: fd.c,v 1.89 2002/03/11 16:27:02 pk Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -101,8 +101,6 @@
 
 #include <dev/cons.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
@@ -179,10 +177,7 @@ struct fdc_softc {
 #define sc_intrcnt	sc_io.fdcio_intrcnt
 };
 
-#undef FDC_C_HANDLER
-#ifndef FDC_C_HANDLER
-extern	struct fdcio	*fdciop;
-#endif
+extern	struct fdcio	*fdciop;	/* I/O descriptor used in fdintr.s */
 
 /* controller driver configuration */
 int	fdcmatch_mainbus __P((struct device *, struct cfdata *, void *));
@@ -245,8 +240,8 @@ struct fd_softc {
 	daddr_t	sc_blkno;	/* starting block number */
 	int sc_bcount;		/* byte count left */
 	int sc_skip;		/* bytes already transferred */
-	int sc_nblks;		/* number of blocks currently tranferring */
-	int sc_nbytes;		/* number of bytes currently tranferring */
+	int sc_nblks;		/* number of blocks currently transferring */
+	int sc_nbytes;		/* number of bytes currently transferring */
 
 	int sc_drive;		/* physical unit number */
 	int sc_flags;
@@ -293,11 +288,8 @@ void	fdcstatus __P((struct fdc_softc *fdc, char *s));
 void	fdc_reset __P((struct fdc_softc *fdc));
 void	fdctimeout __P((void *arg));
 void	fdcpseudointr __P((void *arg));
-#ifdef FDC_C_HANDLER
 int	fdc_c_hwintr __P((void *));
-#else
 void	fdchwintr __P((void));
-#endif
 int	fdcswintr __P((void *));
 int	fdcstate __P((struct fdc_softc *));
 void	fdcretry __P((struct fdc_softc *fdc));
@@ -309,7 +301,6 @@ static int fdconf __P((struct fdc_softc *));
 static void establish_chip_type __P((
 		struct fdc_softc *,
 		bus_space_tag_t,
-		bus_type_t,
 		bus_addr_t,
 		bus_size_t,
 		bus_space_handle_t));
@@ -321,7 +312,6 @@ static void establish_chip_type __P((
 #error 4
 #endif
 
-#ifdef FDC_C_HANDLER
 #if defined(SUN4M)
 #define FD_SET_SWINTR do {		\
 	if (CPU_ISSUN4M)		\
@@ -332,7 +322,6 @@ static void establish_chip_type __P((
 #else
 #define FD_SET_SWINTR ienab_bis(IE_FDSOFT)
 #endif /* defined(SUN4M) */
-#endif /* FDC_C_HANDLER */
 
 #define OBP_FDNAME	(CPU_ISSUN4M ? "SUNW,fdtwo" : "fd")
 
@@ -355,7 +344,6 @@ fdcmatch_mainbus(parent, match, aux)
 		return (0);
 
 	return (bus_space_probe(ma->ma_bustag,
-				ma->ma_iospace,
 				ma->ma_paddr,
 				1,	/* probe size */
 				0,	/* offset */
@@ -384,18 +372,19 @@ fdcmatch_obio(parent, match, aux)
 	if (strcmp("SUNW,fdtwo", sa->sa_name) != 0)
 		return (0);
 
-	return (bus_space_probe(sa->sa_bustag, sa->sa_slot, sa->sa_offset,
-				1,	/* probe size */
-				0,	/* offset */
-				0,	/* flags */
-				NULL, NULL));
+	return (bus_space_probe(sa->sa_bustag,
+			sbus_bus_addr(sa->sa_bustag,
+					sa->sa_slot, sa->sa_offset),
+			1,	/* probe size */
+			0,	/* offset */
+			0,	/* flags */
+			NULL, NULL));
 }
 
 static void
-establish_chip_type(fdc, tag, type, addr, size, handle)
+establish_chip_type(fdc, tag, addr, size, handle)
 	struct fdc_softc	*fdc;
 	bus_space_tag_t		tag;
-	bus_type_t		type;
 	bus_addr_t		addr;
 	bus_size_t		size;
 	bus_space_handle_t	handle;
@@ -415,7 +404,7 @@ establish_chip_type(fdc, tag, type, addr, size, handle)
 		return;
 
 	/* Then probe the DOR register offset */
-	if (bus_space_probe(tag, type, addr,
+	if (bus_space_probe(tag, addr,
 			    1,			/* probe size */
 			    FDREG77_DOR,	/* offset */
 			    0,			/* flags */
@@ -533,13 +522,11 @@ fdcattach_mainbus(parent, self, aux)
 
 	fdc->sc_bustag = ma->ma_bustag;
 
-	if (bus_space_map2(
+	if (bus_space_map(
 			ma->ma_bustag,
-			ma->ma_iospace,
 			ma->ma_paddr,
 			ma->ma_size,
 			BUS_SPACE_MAP_LINEAR,
-			0,
 			&fdc->sc_handle) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
@@ -547,7 +534,6 @@ fdcattach_mainbus(parent, self, aux)
 
 	establish_chip_type(fdc,
 			    ma->ma_bustag,
-			    ma->ma_iospace,
 			    ma->ma_paddr,
 			    ma->ma_size,
 			    fdc->sc_handle);
@@ -572,25 +558,21 @@ fdcattach_obio(parent, self, aux)
 
 	fdc->sc_bustag = sa->sa_bustag;
 
-	if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
-			 sa->sa_offset,
-			 sa->sa_size,
-			 BUS_SPACE_MAP_LINEAR,
-			 0,
-			 &fdc->sc_handle) != 0) {
+	if (sbus_bus_map(sa->sa_bustag,
+			 sa->sa_slot, sa->sa_offset, sa->sa_size,
+			 BUS_SPACE_MAP_LINEAR, &fdc->sc_handle) != 0) {
 		printf("%s: cannot map control registers\n",
 			self->dv_xname);
 		return;
 	}
 
 	establish_chip_type(fdc,
-			    sa->sa_bustag,
-			    sa->sa_slot,
-			    sa->sa_offset,
-			    sa->sa_size,
-			    fdc->sc_handle);
+		sa->sa_bustag,
+		sbus_bus_addr(sa->sa_bustag, sa->sa_slot, sa->sa_offset),
+		sa->sa_size,
+		fdc->sc_handle);
 
-	if (strcmp(getpropstring(sa->sa_node, "status"), "disabled") == 0) {
+	if (strcmp(PROM_getpropstring(sa->sa_node, "status"), "disabled") == 0) {
 		printf(": no drives attached\n");
 		return;
 	}
@@ -642,18 +624,28 @@ fdcattach(fdc, pri)
 		return (-1);
 	}
 
-#ifdef FDC_C_HANDLER
-	(void)bus_intr_establish(fdc->sc_bustag, pri, IPL_BIO, 0,
-				 fdc_c_hwintr, fdc);
-#else
 	fdciop = &fdc->sc_io;
-	(void)bus_intr_establish(fdc->sc_bustag, pri, IPL_BIO,
-				 BUS_INTR_ESTABLISH_FASTTRAP,
-				 (int (*) __P((void *)))fdchwintr, NULL);
-#endif
-	(void)bus_intr_establish(fdc->sc_bustag, PIL_FDSOFT, IPL_BIO,
-				 BUS_INTR_ESTABLISH_SOFTINTR,
-				 fdcswintr, fdc);
+	if (bus_intr_establish(fdc->sc_bustag, pri, IPL_BIO,
+			 BUS_INTR_ESTABLISH_FASTTRAP,
+			 (int (*) __P((void *)))fdchwintr, NULL) == NULL) {
+
+		printf("%s: notice: no fast trap handler slot available\n",
+			fdc->sc_dev.dv_xname);
+		if (bus_intr_establish(fdc->sc_bustag, pri, IPL_BIO, 0,
+				 fdc_c_hwintr, fdc) == NULL) {
+			printf("%s: cannot register interrupt handler\n",
+				fdc->sc_dev.dv_xname);
+			return (-1);
+		}
+	}
+
+	if (bus_intr_establish(fdc->sc_bustag, PIL_FDSOFT, IPL_BIO,
+			 BUS_INTR_ESTABLISH_SOFTINTR,
+			 fdcswintr, fdc) == NULL) {
+		printf("%s: cannot register interrupt handler\n",
+			fdc->sc_dev.dv_xname);
+		return (-1);
+	}
 
 	evcnt_attach_dynamic(&fdc->sc_intrcnt, EVCNT_TYPE_INTR, NULL,
 	    fdc->sc_dev.dv_xname, "intr");
@@ -1293,10 +1285,12 @@ fdcpseudointr(arg)
 }
 
 
-#ifdef FDC_C_HANDLER
 /*
- * hardware interrupt entry point: must be converted to `fast'
- * (in-window) handler.
+ * hardware interrupt entry point: used only if no `fast trap' * (in-window)
+ * handler is available. Unfortunately, we have no reliable way to
+ * determine that the interrupt really came from the floppy controller;
+ * just hope that the other devices that share this interrupt level
+ * can do better..
  */
 int
 fdc_c_hwintr(arg)
@@ -1309,8 +1303,8 @@ fdc_c_hwintr(arg)
 	switch (fdc->sc_itask) {
 	case FDC_ITASK_NONE:
 		return (0);
-	case FDC_ITASK_SENSI:
-		if (fdc_wrfifo(fdc, NE7CMD_SENSEI) != 0 || fdcresult(fdc) != 0)
+	case FDC_ITASK_SENSEI:
+		if (fdc_wrfifo(fdc, NE7CMD_SENSEI) != 0 || fdcresult(fdc) == -1)
 			fdc->sc_istatus = FDC_ISTATUS_ERROR;
 		else
 			fdc->sc_istatus = FDC_ISTATUS_DONE;
@@ -1342,7 +1336,10 @@ fdc_c_hwintr(arg)
 			fdcresult(fdc);
 			fdc->sc_istatus = FDC_ISTATUS_DONE;
 			FD_SET_SWINTR;
-			printf("fdc: overrun: tc = %d\n", fdc->sc_tc);
+#ifdef FD_DEBUG
+			if (fdc_debug > 1)
+				printf("fdc: overrun: tc = %d\n", fdc->sc_tc);
+#endif
 			break;
 		}
 
@@ -1365,7 +1362,6 @@ fdc_c_hwintr(arg)
 	}
 	return (1);
 }
-#endif
 
 int
 fdcswintr(arg)
@@ -1412,8 +1408,13 @@ fdcstate(fdc)
 	struct fd_type *type;
 	struct ne7_fd_formb *finfo = NULL;
 
-	if (fdc->sc_istatus == FDC_ISTATUS_ERROR)
-		fdc->sc_state = DORESET;
+	if (fdc->sc_istatus == FDC_ISTATUS_ERROR) {
+		/* Prevent loop if the reset sequence produces errors */
+		if (fdc->sc_state != RESETCOMPLETE &&
+		    fdc->sc_state != RECALWAIT &&
+		    fdc->sc_state != RECALCOMPLETE)
+			fdc->sc_state = DORESET;
+	}
 
 	/* Clear I task/status field */
 	fdc->sc_istatus = FDC_ISTATUS_NONE;
@@ -1899,7 +1900,7 @@ fdioctl(dev, cmd, addr, flag, p)
 	struct fdc_softc *fdc;
 	struct fdformat_parms *form_parms;
 	struct fdformat_cmd *form_cmd;
-	struct ne7_fd_formb fd_formb;
+	struct ne7_fd_formb *fd_formb;
 	int il[FD_MAX_NSEC + 1];
 	int unit;
 	int i, j;
@@ -2048,30 +2049,37 @@ fdioctl(dev, cmd, addr, flag, p)
 		    form_cmd->cylinder >= fd->sc_type->cylinders) {
 			return (EINVAL);
 		}
+		
+		fd_formb = malloc(sizeof(struct ne7_fd_formb),
+		    M_TEMP, M_NOWAIT);
+		if (fd_formb == 0)
+			return (ENOMEM);
 
-		fd_formb.head = form_cmd->head;
-		fd_formb.cyl = form_cmd->cylinder;
-		fd_formb.transfer_rate = fd->sc_type->rate;
-		fd_formb.fd_formb_secshift = fd->sc_type->secsize;
-		fd_formb.fd_formb_nsecs = fd->sc_type->sectrac;
-		fd_formb.fd_formb_gaplen = fd->sc_type->gap2;
-		fd_formb.fd_formb_fillbyte = fd->sc_type->fillbyte;
+		fd_formb->head = form_cmd->head;
+		fd_formb->cyl = form_cmd->cylinder;
+		fd_formb->transfer_rate = fd->sc_type->rate;
+		fd_formb->fd_formb_secshift = fd->sc_type->secsize;
+		fd_formb->fd_formb_nsecs = fd->sc_type->sectrac;
+		fd_formb->fd_formb_gaplen = fd->sc_type->gap2;
+		fd_formb->fd_formb_fillbyte = fd->sc_type->fillbyte;
 
 		bzero(il, sizeof il);
-		for (j = 0, i = 1; i <= fd_formb.fd_formb_nsecs; i++) {
-			while (il[(j%fd_formb.fd_formb_nsecs) + 1])
+		for (j = 0, i = 1; i <= fd_formb->fd_formb_nsecs; i++) {
+			while (il[(j%fd_formb->fd_formb_nsecs) + 1])
 				j++;
-			il[(j%fd_formb.fd_formb_nsecs) + 1] = i;
+			il[(j%fd_formb->fd_formb_nsecs) + 1] = i;
 			j += fd->sc_type->interleave;
 		}
-		for (i = 0; i < fd_formb.fd_formb_nsecs; i++) {
-			fd_formb.fd_formb_cylno(i) = form_cmd->cylinder;
-			fd_formb.fd_formb_headno(i) = form_cmd->head;
-			fd_formb.fd_formb_secno(i) = il[i+1];
-			fd_formb.fd_formb_secsize(i) = fd->sc_type->secsize;
+		for (i = 0; i < fd_formb->fd_formb_nsecs; i++) {
+			fd_formb->fd_formb_cylno(i) = form_cmd->cylinder;
+			fd_formb->fd_formb_headno(i) = form_cmd->head;
+			fd_formb->fd_formb_secno(i) = il[i+1];
+			fd_formb->fd_formb_secsize(i) = fd->sc_type->secsize;
 		}
 
-		return fdformat(dev, &fd_formb, p);
+		error = fdformat(dev, fd_formb, p);
+		free(fd_formb, M_TEMP);
+		return error;
 
 	case FDIOCGETOPTS:		/* get drive options */
 		*(int *)addr = fd->sc_opts;
@@ -2131,8 +2139,7 @@ fdformat(dev, finfo, p)
 	if (bp == 0)
 		return (ENOBUFS);
 
-	PHOLD(p);
-	bzero((void *)bp, sizeof(struct buf));
+	memset((void *)bp, 0, sizeof(struct buf));
 	bp->b_flags = B_BUSY | B_PHYS | B_FORMAT;
 	bp->b_proc = p;
 	bp->b_dev = dev;
@@ -2193,7 +2200,6 @@ fdformat(dev, finfo, p)
 	if (bp->b_flags & B_ERROR) {
 		rv = bp->b_error;
 	}
-	PRELE(p);
 	free(bp, M_TEMP);
 	return (rv);
 }

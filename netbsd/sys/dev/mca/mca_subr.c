@@ -1,4 +1,4 @@
-/*	$NetBSD: mca_subr.c,v 1.1 2000/05/11 15:42:05 jdolecek Exp $	*/
+/*	$NetBSD: mca_subr.c,v 1.5 2001/11/13 07:46:26 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * MCA Bus subroutines
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mca_subr.c,v 1.5 2001/11/13 07:46:26 lukem Exp $");
+
 #include "opt_mcaverbose.h"
 
 #include <sys/param.h>
@@ -63,31 +66,6 @@ struct mca_knowndev {
 
 #endif /* MCAVERBOSE */
 
-/* supported peripheals */
-const int mca_suppdevs[] = {
-	MCA_PRODUCT_AHA1640,
-	MCA_PRODUCT_3C523,
-	MCA_PRODUCT_ITR,
-	0
-};
-
-/*
- * Returns 1 if a device is supported (i.e. device driver exists for it)
- * 0 otherwise.
- */
-int
-mca_issupp(id)
-	int id;
-{
-	int i;
-	for(i=0; mca_suppdevs[i]; i++) {
-		if (id == mca_suppdevs[i])
-			return 1;
-	}
-
-	return 0;
-}
-
 void
 mca_devinfo(id, cp)
 	int id;
@@ -104,4 +82,21 @@ mca_devinfo(id, cp)
 	else
 #endif /* MCAVERBOSE */
 		sprintf(cp, "product 0x%04x", id);
+}
+
+/*
+ * Returns true if the device should be attempted to be matched
+ * even through it's disabled. Apparently, some devices were
+ * designed this way.
+ */
+int
+mca_match_disabled(id)
+	int id;
+{
+	switch (id) {
+	case MCA_PRODUCT_SKNETG:
+		return (1);
+	}
+
+	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_syscalls_12.c,v 1.6 2000/03/30 11:27:15 augustss Exp $	*/
+/*	$NetBSD: vfs_syscalls_12.c,v 1.10 2001/11/13 02:08:04 lukem Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -39,6 +39,9 @@
  *
  *	From: @(#)vfs_syscalls.c	8.28 (Berkeley) 12/10/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vfs_syscalls_12.c,v 1.10 2001/11/13 02:08:04 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -213,23 +216,13 @@ compat_12_sys_fstat(p, v, retval)
 	struct stat12 oub;
 	int error;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return (EBADF);
-	switch (fp->f_type) {
 
-	case DTYPE_VNODE:
-		error = vn_stat((struct vnode *)fp->f_data, &ub, p);
-		break;
+	FILE_USE(fp);
+	error = (*fp->f_ops->fo_stat)(fp, &ub, p);
+	FILE_UNUSE(fp, p);
 
-	case DTYPE_SOCKET:
-		error = soo_stat((struct socket *)fp->f_data, &ub);
-		break;
-
-	default:
-		panic("compat_12_sys_fstat");
-		/*NOTREACHED*/
-	}
 	if (error == 0) {
 		cvtstat(&ub, &oub);
 		error = copyout(&oub, SCARG(uap, sb), sizeof (oub));

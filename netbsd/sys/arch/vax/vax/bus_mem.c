@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_mem.c,v 1.6 2000/03/05 21:51:47 matt Exp $ */
+/*	$NetBSD: bus_mem.c,v 1.9 2001/09/16 20:39:02 ragge Exp $ */
 /*
  * Copyright (c) 1998 Matt Thomas
  * All rights reserved.
@@ -38,8 +38,7 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/pmap.h>
@@ -121,12 +120,22 @@ vax_mem_bus_space_free(
 {    
 	panic("vax_mem_bus_free not implemented");
 }
-	
+
+static paddr_t
+vax_mem_bus_space_mmap(void *v, bus_addr_t addr, off_t off, int prot, int flags)
+{
+	bus_addr_t rv;
+
+	rv = addr + off;
+	return btop(rv);
+}
+
 struct vax_bus_space vax_mem_bus_space = {
 	NULL,
 	vax_mem_bus_space_map,
 	vax_mem_bus_space_unmap,
 	vax_mem_bus_space_subregion,
 	vax_mem_bus_space_alloc,
-	vax_mem_bus_space_free
+	vax_mem_bus_space_free,
+	vax_mem_bus_space_mmap,
 };

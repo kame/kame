@@ -1,4 +1,4 @@
-/* $NetBSD: pci_6600.c,v 1.5 2000/06/06 00:50:15 thorpej Exp $ */
+/* $NetBSD: pci_6600.c,v 1.9 2002/05/15 16:57:42 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999 by Ross Harvey.  All rights reserved.
@@ -33,14 +33,15 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pci_6600.c,v 1.5 2000/06/06 00:50:15 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_6600.c,v 1.9 2002/05/15 16:57:42 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #define _ALPHA_BUS_DMA_PRIVATE
@@ -84,13 +85,13 @@ void *dec_6600_intr_establish __P((
     void *, pci_intr_handle_t, int, int (*func)(void *), void *));
 const char *dec_6600_intr_string __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_6600_intr_evcnt __P((void *, pci_intr_handle_t));
-int dec_6600_intr_map __P((void *, pcitag_t, int, int, pci_intr_handle_t *));
+int dec_6600_intr_map __P((struct pci_attach_args *, pci_intr_handle_t *));
 void *dec_6600_pciide_compat_intr_establish __P((void *, struct device *,
     struct pci_attach_args *, int, int (*)(void *), void *));
 
 struct alpha_shared_intr *dec_6600_pci_intr;
 
-void dec_6600_iointr __P((void *framep, unsigned long vec));
+void dec_6600_iointr __P((void *arg, unsigned long vec));
 extern void dec_6600_intr_enable __P((int irq));
 extern void dec_6600_intr_disable __P((int irq));
 
@@ -135,19 +136,17 @@ pci_6600_pickintr(pcp)
 		sio_intr_setup(pc, iot);
 		dec_6600_intr_enable(55);	/* irq line for sio */
 #endif
-		set_iointr(dec_6600_iointr);
 	}
 }
 
 int     
-dec_6600_intr_map(acv, bustag, buspin, line, ihp)
-        void *acv;
-        pcitag_t bustag; 
-        int buspin, line;
+dec_6600_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
         pci_intr_handle_t *ihp;
 {
-	struct tsp_config *pcp = acv;
-	pci_chipset_tag_t pc = &pcp->pc_pc;
+	pcitag_t bustag = pa->pa_intrtag;
+	int buspin = pa->pa_intrpin, line = pa->pa_intrline;
+	pci_chipset_tag_t pc = pa->pa_pc;
 	int bus, device, function;
 
 	if (buspin == 0) {
@@ -159,7 +158,7 @@ dec_6600_intr_map(acv, bustag, buspin, line, ihp)
 		return 1;
 	}
 
-	alpha_pci_decompose_tag(pc, bustag, &bus, &device, &function);
+	pci_decompose_tag(pc, bustag, &bus, &device, &function);
 
 	/*
 	 * The console places the interrupt mapping in the "line" value.
@@ -243,8 +242,11 @@ dec_6600_intr_establish(acv, ih, level, func, arg)
 	cookie = alpha_shared_intr_establish(dec_6600_pci_intr, ih, IST_LEVEL,
 	    level, func, arg, irqtype);
 
-	if (cookie != NULL && alpha_shared_intr_isactive(dec_6600_pci_intr, ih))
+	if (cookie != NULL &&
+	    alpha_shared_intr_firstactive(dec_6600_pci_intr, ih)) {
+		scb_set(0x900 + SCB_IDXTOVEC(ih), dec_6600_iointr, NULL);
 		dec_6600_intr_enable(ih);
+	}
 	return (cookie);
 }
 
@@ -276,39 +278,30 @@ dec_6600_intr_disestablish(acv, cookie)
 		dec_6600_intr_disable(irq);
 		alpha_shared_intr_set_dfltsharetype(dec_6600_pci_intr, irq,
 		    IST_NONE);
+		scb_free(0x900 + SCB_IDXTOVEC(irq));
 	}
  
 	splx(s);
 }
 
 void
-dec_6600_iointr(framep, vec)
-	void *framep;
+dec_6600_iointr(arg, vec)
+	void *arg;
 	unsigned long vec;
 {
 	int irq; 
 
-	if (vec >= 0x900) {
-		irq = (vec - 0x900) >> 4;
+	irq = SCB_VECTOIDX(vec - 0x900);
 
-		if (irq >= PCI_NIRQ)
-			panic("iointr: irq %d is too high", irq);
+	if (irq >= PCI_NIRQ)
+		panic("iointr: irq %d is too high", irq);
 
-		if (!alpha_shared_intr_dispatch(dec_6600_pci_intr, irq)) {
-			alpha_shared_intr_stray(dec_6600_pci_intr, irq,
-			    irqtype);
-			if (ALPHA_SHARED_INTR_DISABLE(dec_6600_pci_intr, irq))
-				dec_6600_intr_disable(irq);
-		}
-		return;
+	if (!alpha_shared_intr_dispatch(dec_6600_pci_intr, irq)) {
+		alpha_shared_intr_stray(dec_6600_pci_intr, irq,
+		    irqtype);
+		if (ALPHA_SHARED_INTR_DISABLE(dec_6600_pci_intr, irq))
+			dec_6600_intr_disable(irq);
 	}
-#if NSIO
-	if (vec >= 0x800) {
-		sio_iointr(framep, vec);
-		return;
-	}
-#endif
-	panic("iointr: weird vec 0x%lx\n", vec);
 }
 
 void
@@ -342,7 +335,7 @@ dec_6600_pciide_compat_intr_establish(v, dev, pa, chan, func, arg)
 	void *cookie = NULL;
 	int bus, irq;
 
-	alpha_pci_decompose_tag(pc, pa->pa_tag, &bus, NULL, NULL);
+	pci_decompose_tag(pc, pa->pa_tag, &bus, NULL, NULL);
 
 	/*
 	 * If this isn't PCI bus #0 on the TSP that holds the PCI-ISA

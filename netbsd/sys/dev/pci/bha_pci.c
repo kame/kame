@@ -1,4 +1,4 @@
-/*	$NetBSD: bha_pci.c,v 1.16 1998/08/15 10:10:53 mycroft Exp $	*/
+/*	$NetBSD: bha_pci.c,v 1.21 2001/11/15 09:48:11 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,7 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bha_pci.c,v 1.21 2001/11/15 09:48:11 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -44,7 +46,6 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 
-#include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 
@@ -91,7 +92,7 @@ bha_pci_match(parent, match, aux)
 	    NULL, &iosize))
 		return (0);
 
-	rv = bha_find(iot, ioh, NULL);
+	rv = bha_find(iot, ioh);
 
 	bus_space_unmap(iot, ioh, iosize);
 
@@ -110,7 +111,6 @@ bha_pci_attach(parent, self, aux)
 	struct bha_softc *sc = (void *)self;
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
-	struct bha_probe_data bpd;
 	pci_chipset_tag_t pc = pa->pa_pc;
 	pci_intr_handle_t ih;
 	pcireg_t csr;
@@ -134,7 +134,7 @@ bha_pci_attach(parent, self, aux)
 	sc->sc_iot = iot;
 	sc->sc_ioh = ioh;
 	sc->sc_dmat = pa->pa_dmat;
-	if (!bha_find(iot, ioh, &bpd))
+	if (!bha_find(iot, ioh))
 		panic("bha_pci_attach: bha_find failed");
 
 	sc->sc_dmaflags = 0;
@@ -143,8 +143,7 @@ bha_pci_attach(parent, self, aux)
 	pci_conf_write(pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
 	    csr | PCI_COMMAND_MASTER_ENABLE | PCI_COMMAND_IO_ENABLE);
 
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -160,7 +159,7 @@ bha_pci_attach(parent, self, aux)
 	}
 	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
-	bha_attach(sc, &bpd);
+	bha_attach(sc);
 
 	bha_disable_isacompat(sc);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: bootxx.c,v 1.1 1999/07/08 11:48:06 tsubai Exp $	*/
+/*	$NetBSD: bootxx.c,v 1.4 2002/05/20 14:12:24 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1999 Tsubai Masanari.  All rights reserved.
@@ -28,26 +28,38 @@
 
 #include <lib/libkern/libkern.h>
 #include <lib/libsa/stand.h>
+#include <machine/apcall.h>
 #include <machine/romcall.h>
 
-#define MAXBLOCKNUM 64
+#include <sys/bootblock.h>
 
-void (*entry_point)() = (void *)0;
-int block_size = 8192;
-int block_count = MAXBLOCKNUM;
-int block_table[MAXBLOCKNUM] = { 0 };
+struct shared_bbinfo bbinfo = {
+	{ NEWSMIPS_BBINFO_MAGIC },	/* bbi_magic[] */
+	0,				/* bbi_block_size */
+	SHARED_BBINFO_MAXBLOCKS,	/* bbi_block_count */
+	{ 0 }				/* bbi_block_tagle[] */
+};
+
+#ifndef DEFAULT_ENTRY_POINT
+#define DEFAULT_ENTRY_POINT	0xa0700000
+#endif
+
+void (*entry_point)(u_int32_t, u_int32_t, u_int32_t, u_int32_t, void *) =
+    (void *)DEFAULT_ENTRY_POINT;
 
 #ifdef BOOTXX_DEBUG
-# define DPRINTF printf
+# define DPRINTF(x) printf x
 #else
-# define DPRINTF while (0) printf
+# define DPRINTF(x)
 #endif
 
 char *devs[] = { "sd", "fh", "fd", NULL, NULL, "rd", "st" };
+struct apbus_sysinfo *_sip;
+int apbus = 0;
 
 void
 bootxx(a0, a1, a2, a3, a4, a5)
-	int a0, a1, a2, a3, a4, a5;
+	u_int32_t a0, a1, a2, a3, a4, a5;
 {
 	int fd, blk, bs;
 	int ctlr, unit, part, type;
@@ -56,56 +68,78 @@ bootxx(a0, a1, a2, a3, a4, a5)
 	char *addr;
 	char devname[32];
 
+	/*
+	 * XXX a3 contains:
+	 *     maxmem (nws-3xxx)
+	 *     argv   (apbus-based machine)
+	 */
+	if (a3 & 0x80000000)
+		apbus = 1;
+	else
+		apbus = 0;
+
 	printf("NetBSD/newsmips Primary Boot\n");
 
-	DPRINTF("\n");
-	DPRINTF("a0 %x\n", a0);
-	DPRINTF("a1 %x\n", a1);
-	DPRINTF("a2 %x (%s)\n", a2, (char *)a2);
-	DPRINTF("a3 %x\n", a3);
-	DPRINTF("a4 %x\n", a4);
-	DPRINTF("a5 %x\n", a5);
+	DPRINTF(("\n"));
+	DPRINTF(("a0 %x\n", a0));
+	DPRINTF(("a1 %x\n", a1));
+	DPRINTF(("a2 %x (%s)\n", a2, (char *)a2));
+	DPRINTF(("a3 %x\n", a3));
+	DPRINTF(("a4 %x\n", a4));
+	DPRINTF(("a5 %x\n", a5));
 
-	DPRINTF("block_size  = %d\n", block_size);
-	DPRINTF("block_count = %d\n", block_count);
-	DPRINTF("entry_point = %x\n", (int)entry_point);
+	DPRINTF(("block_size  = %d\n", bbinfo.bbi_block_size));
+	DPRINTF(("block_count = %d\n", bbinfo.bbi_block_count));
+	DPRINTF(("entry_point = %p\n", entry_point));
 
-	/* sd(ctlr, lun, part, bus?, host) */
+	if (apbus) {
+		strcpy(devname, (char *)a1);
+		fd = apcall_open(devname, 0);
+	} else {
+		/* sd(ctlr, lun, part, bus?, host) */
 
-	ctlr = BOOTDEV_CTLR(bootdev);
-	unit = BOOTDEV_UNIT(bootdev);
-	part = BOOTDEV_PART(bootdev);
-	type = BOOTDEV_TYPE(bootdev);
+		ctlr = BOOTDEV_CTLR(bootdev);
+		unit = BOOTDEV_UNIT(bootdev);
+		part = BOOTDEV_PART(bootdev);
+		type = BOOTDEV_TYPE(bootdev);
 
-	if (devs[type] == NULL) {
-		printf("unknown bootdev (0x%x)\n", bootdev);
-		return;
+		if (devs[type] == NULL) {
+			printf("unknown bootdev (0x%x)\n", bootdev);
+			return;
+		}
+		sprintf(devname, "%s(%d,%d,%d)", devs[type], ctlr, unit, part);
+
+		fd = rom_open(devname, 0);
 	}
-
-	sprintf(devname, "%s(%d,%d,%d)", devs[type], ctlr, unit, part);
-
-	fd = rom_open(devname, 0);
 	if (fd == -1) {
 		printf("cannot open %s\n", devname);
 		return;
 	}
 
 	addr = (char *)entry_point;
-	bs = block_size;
-	DPRINTF("reading block:");
-	for (i = 0; i < block_count; i++) {
-		blk = block_table[i];
+	bs = bbinfo.bbi_block_size;
+	DPRINTF(("reading block:"));
+	for (i = 0; i < bbinfo.bbi_block_count; i++) {
+		blk = bbinfo.bbi_block_table[i];
 
-		DPRINTF(" %d", blk);
+		DPRINTF((" %d", blk));
 
-		rom_lseek(fd, blk * 512, 0);
-		rom_read(fd, addr, bs);
+		if (apbus) {
+			apcall_lseek(fd, blk * 512, 0);
+			apcall_read(fd, addr, bs);
+		} else {
+			rom_lseek(fd, blk * 512, 0);
+			rom_read(fd, addr, bs);
+		}
 		addr += bs;
 	}
-	DPRINTF(" done\n");
-	rom_close(fd);
+	DPRINTF((" done\n"));
+	if (apbus)
+		apcall_close(fd);
+	else
+		rom_close(fd);
 
-	(*entry_point)(a0, a1, a2, a3);
+	(*entry_point)(a0, a1, a2, a3, _sip);
 }
 
 void
@@ -114,5 +148,8 @@ putchar(x)
 {
 	char c = x;
 
-	rom_write(1, &c, 1);
+	if (apbus)
+		apcall_write(1, &c, 1);
+	else
+		rom_write(1, &c, 1);
 }

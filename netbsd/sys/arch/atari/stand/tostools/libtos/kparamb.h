@@ -1,4 +1,4 @@
-/*	$NetBSD: kparamb.h,v 1.4 1999/02/19 21:51:26 leo Exp $	*/
+/*	$NetBSD: kparamb.h,v 1.7 2001/10/11 07:07:42 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 L. Weppelman
@@ -30,22 +30,28 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _LIBTOS_KPARAMB_H
+#define _LIBTOS_KPARAMB_H
 /*
  * Structure passed to bsd_startup().
  */
 struct kparamb {
-	u_char	*kp;		/* 00: Kernel load address		*/
-	long	ksize;		/* 04: Size of loaded kernel		*/
-	u_long	entry;		/* 08: Kernel entry point		*/
-	long	stmem_size;	/* 12: Size of st-ram			*/
-	long	ttmem_size;	/* 16: Size of tt-ram			*/
-	long	bootflags;	/* 20: Various boot flags		*/
-	long	boothowto;	/* 24: How to boot			*/
-	long	ttmem_start;	/* 28: Start of tt-ram			*/
-	long	esym_loc;	/* 32: End of symbol table		*/
+	u_int8_t	*kp;		/* 00: Kernel load address	*/
+	long		ksize;		/* 04: Size of loaded kernel	*/
+	u_int32_t	entry;		/* 08: Kernel entry point	*/
+	long		stmem_size;	/* 12: Size of st-ram		*/
+	long		ttmem_size;	/* 16: Size of tt-ram		*/
+	long		bootflags;	/* 20: Various boot flags	*/
+	long		boothowto;	/* 24: How to boot		*/
+	long		ttmem_start;	/* 28: Start of tt-ram		*/
+	long		esym_loc;	/* 32: End of symbol table	*/
 };
 
-#ifndef	_STANDALONE
+#ifdef TOSTOOLS
+/*
+ * XXX: We cannot reach over....
+ */
+
 /*
  * Values for 'bootflags'.
  * Note: These should match with the values NetBSD uses!
@@ -58,11 +64,14 @@ struct kparamb {
 #define	ATARI_68060	(1<<6)		/* 68060 CPU			*/
 #define	ATARI_TT	(1L<<11)	/* This is a TT030		*/
 #define	ATARI_FALCON	(1L<<12)	/* This is a Falcon		*/
+#define	ATARI_HADES	(1L<<13)	/* This is a Hades		*/
+#define	ATARI_MILAN	(1L<<14)	/* This is a Milan		*/
 
 #define	ATARI_CLKBROKEN	(1<<16)		/* GEMDOS has faulty year base	*/
 
 #define	ATARI_ANYCPU	(ATARI_68000|ATARI_68010|ATARI_68020|ATARI_68030 \
 			|ATARI_68040|ATARI_68060)
+#define	ATARI_ANYMACH	(ATARI_TT|ATARI_FALCON|ATARI_HADES|ATARI_MILAN)
 
 /*
  * Definitions for boothowto
@@ -73,4 +82,5 @@ struct kparamb {
 #define	RB_SINGLE	0x02
 #define	RB_KDB		0x40
 
-#endif	/* _STANDALONE */
+#endif	/* TOSTOOLS */
+#endif /* !_LIBTOS_KPARAMB_H */

@@ -1,4 +1,4 @@
-/*	$NetBSD: filecore_vfsops.c,v 1.11 2000/03/16 18:08:22 jdolecek Exp $	*/
+/*	$NetBSD: filecore_vfsops.c,v 1.18 2001/11/12 23:04:11 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 Andrew McMurry
@@ -36,7 +36,10 @@
  *	filecore_vfsops.c	1.1	1998/6/26
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: filecore_vfsops.c,v 1.18 2001/11/12 23:04:11 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
@@ -59,9 +62,9 @@
 #include <filecorefs/filecore_node.h>
 #include <filecorefs/filecore_mount.h>
 
-extern struct vnodeopv_desc filecore_vnodeop_opv_desc;
+extern const struct vnodeopv_desc filecore_vnodeop_opv_desc;
 
-struct vnodeopv_desc *filecore_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const filecore_vnodeopv_descs[] = {
 	&filecore_vnodeop_opv_desc,
 	NULL,
 };
@@ -79,11 +82,16 @@ struct vfsops filecore_vfsops = {
 	filecore_fhtovp,
 	filecore_vptofh,
 	filecore_init,
+	filecore_reinit,
 	filecore_done,
 	filecore_sysctl,
 	NULL,				/* filecore_mountroot */
 	filecore_checkexp,
 	filecore_vnodeopv_descs,
+};
+
+struct genfs_ops filecore_genfsops = {
+	genfs_size,
 };
 
 /*
@@ -324,6 +332,9 @@ filecore_mountfs(devvp, mp, p, argp)
 	mp->mnt_stat.f_fsid.val[1] = makefstype(MOUNT_FILECORE);
 	mp->mnt_maxsymlinklen = 0;
 	mp->mnt_flag |= MNT_LOCAL;
+	mp->mnt_dev_bshift = fcdr->log2secsize;
+	mp->mnt_fs_bshift = fcmp->log2bsize;
+
 	fcmp->fc_mountp = mp;
 	fcmp->fc_dev = dev;
 	fcmp->fc_devvp = devvp;
@@ -576,7 +587,7 @@ filecore_vget(mp, ino, vpp)
 		return (error);
 	}
 	ip = pool_get(&filecore_node_pool, PR_WAITOK);
-	memset((caddr_t)ip, 0, sizeof(struct filecore_node));
+	memset(ip, 0, sizeof(struct filecore_node));
 	vp->v_data = ip;
 	ip->i_vnode = vp;
 	ip->i_dev = dev;
@@ -663,6 +674,8 @@ filecore_vget(mp, ino, vpp)
 	 * XXX need generation number?
 	 */
 
+	genfs_node_init(vp, &filecore_genfsops);
+	vp->v_size = ip->i_size;
 	*vpp = vp;
 	return (0);
 }

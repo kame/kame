@@ -6,7 +6,7 @@ mkdir
 rmdir
 symlink
 */
-/*	$NetBSD: coda_vnops.c,v 1.18.4.1 2000/12/14 23:35:59 he Exp $	*/
+/*	$NetBSD: coda_vnops.c,v 1.30 2001/12/06 04:27:40 chs Exp $	*/
 
 /*
  * 
@@ -53,6 +53,9 @@ symlink
  * M. Satyanarayanan.  
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: coda_vnops.c,v 1.30 2001/12/06 04:27:40 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -66,7 +69,6 @@ symlink
 #include <sys/proc.h>
 #include <sys/select.h>
 #include <sys/user.h>
-#include <vm/vm.h>
 #include <miscfs/genfs/genfs.h>
 
 #include <coda/coda.h>
@@ -108,11 +110,11 @@ static int coda_lockdebug = 0;
  *   coda_init is called at boot time.
  */
 
-#define ENTRY if(coda_vnop_print_entry) myprintf(("Entered %s\n",__FUNCTION__))
+#define ENTRY if(coda_vnop_print_entry) myprintf(("Entered %s\n",__func__))
 
 /* Definition of the vnode operation vector */
 
-struct vnodeopv_entry_desc coda_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc coda_vnodeop_entries[] = {
     { &vop_default_desc, coda_vop_error },
     { &vop_lookup_desc, coda_lookup },		/* lookup */
     { &vop_create_desc, coda_create },		/* create */
@@ -127,7 +129,7 @@ struct vnodeopv_entry_desc coda_vnodeop_entries[] = {
     { &vop_fcntl_desc, genfs_fcntl },		/* fcntl */
     { &vop_ioctl_desc, coda_ioctl },		/* ioctl */
 /* 1.3    { &vop_select_desc, coda_select },	select */
-    { &vop_mmap_desc, coda_vop_error },		/* mmap */
+    { &vop_mmap_desc, genfs_mmap },		/* mmap */
     { &vop_fsync_desc, coda_fsync },		/* fsync */
     { &vop_remove_desc, coda_remove },		/* remove */
     { &vop_link_desc, coda_link },		/* link */
@@ -157,11 +159,12 @@ struct vnodeopv_entry_desc coda_vnodeop_entries[] = {
     { &vop_update_desc, coda_vop_error },	/* update */
     { &vop_seek_desc, genfs_seek },		/* seek */
     { &vop_poll_desc, genfs_poll },		/* poll */
-
-    { (struct vnodeop_desc*)NULL, (int(*)(void *))NULL }
+    { &vop_getpages_desc, coda_getpages },	/* getpages */
+    { &vop_putpages_desc, coda_putpages },	/* putpages */
+    { NULL, NULL }
 };
 
-struct vnodeopv_desc coda_vnodeop_opv_desc = 
+const struct vnodeopv_desc coda_vnodeop_opv_desc = 
         { &coda_vnodeop_p, coda_vnodeop_entries };
 
 /* Definitions of NetBSD vnodeop interfaces */
@@ -454,7 +457,7 @@ printf("coda_rdwr: Internally Opening %p\n", vp);
     }
 
     /* Have UFS handle the call. */
-    CODADEBUG(CODA_RDWR, myprintf(("indirect rdwr: fid = (%lx.%lx.%lx), refcnt = %ld\n",
+    CODADEBUG(CODA_RDWR, myprintf(("indirect rdwr: fid = (%lx.%lx.%lx), refcnt = %d\n",
 			      cp->c_fid.Volume, cp->c_fid.Vnode, 
 			      cp->c_fid.Unique, CTOV(cp)->v_usecount)); )
 
@@ -721,7 +724,7 @@ coda_abortop(v)
 /* locals */
 
     if ((ap->a_cnp->cn_flags & (HASBUF | SAVESTART)) == HASBUF)
-	FREE(ap->a_cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(ap->a_cnp->cn_pnbuf);
     return (0);
 }
 
@@ -874,9 +877,9 @@ coda_inactive(v)
 
     if (IS_UNMOUNTING(cp)) {
 #ifdef	DEBUG
-	printf("coda_inactive: IS_UNMOUNTING use %ld: vp %p, cp %p\n", vp->v_usecount, vp, cp);
+	printf("coda_inactive: IS_UNMOUNTING use %d: vp %p, cp %p\n", vp->v_usecount, vp, cp);
 	if (cp->c_ovp != NULL)
-	    printf("coda_inactive: cp->ovp != NULL use %ld: vp %p, cp %p\n",
+	    printf("coda_inactive: cp->ovp != NULL use %d: vp %p, cp %p\n",
 	    	   vp->v_usecount, vp, cp);
 #endif
 	lockmgr(&vp->v_lock, LK_RELEASE, &vp->v_interlock);
@@ -1170,7 +1173,7 @@ coda_create(v)
      * why it's here, but what the hey...
      */
     if ((cnp->cn_flags & SAVESTART) == 0) {
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
     }
     return(error);
 }
@@ -1245,7 +1248,7 @@ coda_remove(v)
     vput(dvp);
 
     if ((cnp->cn_flags & SAVESTART) == 0) {
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
     }
     return(error);
 }
@@ -1324,7 +1327,7 @@ exit:
 
     /* Drop the name buffer if we don't need to SAVESTART */
     if ((cnp->cn_flags & SAVESTART) == 0) {
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
     }
     return(error);
 }
@@ -1512,7 +1515,7 @@ coda_mkdir(v)
      * follow their lead, but this seems like it is probably
      * incorrect.  
      */
-    FREE(cnp->cn_pnbuf, M_NAMEI);
+    PNBUF_PUT(cnp->cn_pnbuf);
     return(error);
 }
 
@@ -1574,7 +1577,7 @@ coda_rmdir(v)
     vput(dvp);
 
     if ((cnp->cn_flags & SAVESTART) == 0) {
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
     }
     return(error);
 }
@@ -1655,25 +1658,10 @@ coda_symlink(v)
     }
 
     /* 
-     * Okay, now we have to drop locks on dvp.  vpp is unlocked, but
-     * ref'd.  It doesn't matter what happens in either symlink or
-     * lookup.  Furthermore, there isn't any way for (dvp == *vpp), so
-     * we don't bother checking.  
-     */
-/*  vput(ap->a_dvp);		released earlier */
-    if (*ap->a_vpp) {
-    	VOP_UNLOCK(*ap->a_vpp, 0);	/* this line is new!! It is necessary because lookup() calls
-				   VOP_LOOKUP (coda_lookup) which returns vpp locked.  cfs_nb_lookup
-				   merged with coda_lookup() to become coda_lookup so UNLOCK is
-				   necessary */
-    	vrele(*ap->a_vpp);
-    }
-
-    /* 
      * Free the name buffer 
      */
     if ((cnp->cn_flags & SAVESTART) == 0) {
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
     }
 
  exit:    
@@ -1728,7 +1716,7 @@ printf("coda_readdir: Internally Opening %p\n", vp);
 	}
 	
 	/* Have UFS handle the call. */
-	CODADEBUG(CODA_READDIR, myprintf(("indirect readdir: fid = (%lx.%lx.%lx), refcnt = %ld\n",cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique, vp->v_usecount)); )
+	CODADEBUG(CODA_READDIR, myprintf(("indirect readdir: fid = (%lx.%lx.%lx), refcnt = %d\n",cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique, vp->v_usecount)); )
 	error = VOP_READDIR(cp->c_ovp, uiop, cred, eofflag, cookies,
 			       ncookies);
 	if (error)
@@ -1825,7 +1813,7 @@ coda_reclaim(v)
     }
     cache_purge(vp);
     coda_free(VTOC(vp));
-    VTOC(vp) = NULL;
+    SET_VTOC(vp) = NULL;
     return (0);
 }
 
@@ -2013,4 +2001,67 @@ make_coda_node(fid, vfsp, type)
     }
 
     return cp;
+}
+
+int
+coda_getpages(v)
+	void *v;
+{
+	struct vop_getpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offset;
+		struct vm_page **a_m;
+		int *a_count;
+		int a_centeridx;
+		vm_prot_t a_access_type;
+		int a_advice;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	struct cnode *cp = VTOC(vp);
+	struct proc *p = curproc;
+	struct ucred *cred = p->p_ucred;
+	int error;
+
+	/* Check for control object. */
+	if (IS_CTL_VP(vp)) {
+		return(EINVAL);
+	}
+
+	error = VOP_OPEN(vp, FREAD, cred, p);
+	if (error) {
+		return error;
+	}
+	ap->a_vp = cp->c_ovp;
+	error = VOCALL(ap->a_vp->v_op, VOFFSET(vop_getpages), ap);
+	(void) VOP_CLOSE(vp, FREAD, cred, p);
+	return error;
+}
+
+int
+coda_putpages(v)
+	void *v;
+{
+	struct vop_putpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offlo;
+		voff_t a_offhi;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+
+	simple_unlock(&vp->v_interlock);
+
+	/* Check for control object. */
+	if (IS_CTL_VP(vp)) {
+		return(EINVAL);
+	}
+
+	/*
+	 * XXX
+	 * we'd like to do something useful here for msync(),
+	 * but that turns out to be hard.
+	 */
+
+	return 0;
 }

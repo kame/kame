@@ -1,4 +1,4 @@
-/*	$NetBSD: cbiiisc.c,v 1.5 1999/06/07 21:30:58 is Exp $	*/
+/*	$NetBSD: cbiiisc.c,v 1.8 2002/01/28 09:56:52 aymeric Exp $ */
 
 /*
  * Copyright (c) 1994,1998 Michael L. Hitch
@@ -36,6 +36,9 @@
  *	@(#)dma.c
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cbiiisc.c,v 1.8 2002/01/28 09:56:52 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -54,28 +57,12 @@
 #include <amiga/dev/siopvar.h>
 #include <amiga/dev/zbusvar.h>
 
-void cbiiiscattach __P((struct device *, struct device *, void *));
-int  cbiiiscmatch __P((struct device *, struct cfdata *, void *));
-int  cbiiisc_dmaintr __P((void *));
+void cbiiiscattach(struct device *, struct device *, void *);
+int  cbiiiscmatch(struct device *, struct cfdata *, void *);
+int  cbiiisc_dmaintr(void *);
 #ifdef DEBUG
-void cbiiisc_dump __P((void));
+void cbiiisc_dump(void);
 #endif
-
-#if 0
-struct scsipi_adapter cbiiisc_scsiswitch = {
-	siopng_scsicmd,
-	siopng_minphys,
-	NULL,			/* scsipi_ioctl */
-};
-#endif
-
-struct scsipi_device cbiiisc_scsidev = {
-	NULL,		/* use default error handler */
-	NULL,		/* do not have a start functio */
-	NULL,		/* have no async handler */
-	NULL,		/* Use default done routine */
-};
-
 
 #ifdef DEBUG
 #endif
@@ -88,11 +75,7 @@ struct cfattach cbiiisc_ca = {
  * if we are a CyberStorm MK III SCSI
  */
 int
-cbiiiscmatch(pdp, cfp, auxp)
-	struct device *pdp;
-	struct cfdata *cfp;
-
-	void *auxp;
+cbiiiscmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 {
 	struct zbus_args *zap;
 
@@ -103,19 +86,18 @@ cbiiiscmatch(pdp, cfp, auxp)
 }
 
 void
-cbiiiscattach(pdp, dp, auxp)
-	struct device *pdp, *dp;
-	void *auxp;
+cbiiiscattach(struct device *pdp, struct device *dp, void *auxp)
 {
-	struct siop_softc *sc;
+	struct siop_softc *sc = (struct siop_softc *)dp;
 	struct zbus_args *zap;
 	siop_regmap_p rp;
+        struct scsipi_adapter *adapt = &sc->sc_adapter;
+        struct scsipi_channel *chan = &sc->sc_channel;
 
 	printf("\n");
 
 	zap = auxp;
 
-	sc = (struct siop_softc *)dp;
 	sc->sc_siopp = rp = ztwomap(0xf40000);
 	/* siopng_dump_registers(sc); */
 
@@ -128,25 +110,31 @@ cbiiiscattach(pdp, dp, auxp)
 
 	alloc_sicallback();
 
-	sc->sc_adapter.scsipi_cmd = siopng_scsicmd;
-	sc->sc_adapter.scsipi_minphys = siopng_minphys;
+        /*
+         * Fill in the scsipi_adapter.
+         */
+        memset(adapt, 0, sizeof(*adapt));
+        adapt->adapt_dev = &sc->sc_dev;
+        adapt->adapt_nchannels = 1;
+        adapt->adapt_openings = 7;
+        adapt->adapt_max_periph = 1;
+        adapt->adapt_request = siopng_scsipi_request;
+        adapt->adapt_minphys = siopng_minphys;
 
-	sc->sc_link.scsipi_scsi.channel = SCSI_CHANNEL_ONLY_ONE;
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.scsipi_scsi.adapter_target = 7;
-#if 0
-	sc->sc_link.adapter = &cbiiisc_scsiswitch;
-#endif
-	sc->sc_link.adapter = &sc->sc_adapter;
-	sc->sc_link.device = &cbiiisc_scsidev;
-	sc->sc_link.openings = 2;
-	sc->sc_link.scsipi_scsi.max_target = 15;
-	sc->sc_link.scsipi_scsi.max_lun = 7;
-	sc->sc_link.type = BUS_SCSI;
+        /*
+         * Fill in the scsipi_channel.
+         */
+        memset(chan, 0, sizeof(*chan));
+        chan->chan_adapter = adapt;
+        chan->chan_bustype = &scsi_bustype;
+        chan->chan_channel = 0;
+        chan->chan_ntargets = 16;
+        chan->chan_nluns = 8;
+        chan->chan_id = 7;
 
 	siopnginitialize(sc);
 
-	if (sc->sc_link.scsipi_scsi.max_target < 0)
+	if (sc->sc_channel.chan_ntargets < 0)
 		return;
 
 	sc->sc_isr.isr_intr = cbiiisc_dmaintr;
@@ -157,12 +145,11 @@ cbiiiscattach(pdp, dp, auxp)
 	/*
 	 * attach all scsi units on us
 	 */
-	config_found(dp, &sc->sc_link, scsiprint);
+	config_found(dp, chan, scsiprint);
 }
 
 int
-cbiiisc_dmaintr(arg)
-	void *arg;
+cbiiisc_dmaintr(void *arg)
 {
 	struct siop_softc *sc = arg;
 	siop_regmap_p rp;
@@ -187,7 +174,7 @@ cbiiisc_dmaintr(arg)
 
 #ifdef DEBUG
 void
-cbiiisc_dump()
+cbiiisc_dump(void)
 {
 	extern struct cfdriver cbiiisc_cd;
 	int i;

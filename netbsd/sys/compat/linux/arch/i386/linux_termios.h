@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_termios.h,v 1.3 1998/10/01 01:52:59 erh Exp $	*/
+/*	$NetBSD: linux_termios.h,v 1.5 2001/08/26 17:26:31 manu Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,6 +38,9 @@
 
 #ifndef _I386_LINUX_TERMIOS_H
 #define _I386_LINUX_TERMIOS_H
+
+#define LINUX_NCC 8
+#define LINUX_NCCS 19
 
 #define LINUX_TCGETS		_LINUX_IO('T', 1)
 #define LINUX_TCSETS		_LINUX_IO('T', 2)

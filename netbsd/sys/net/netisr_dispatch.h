@@ -1,4 +1,4 @@
-/* $NetBSD: netisr_dispatch.h,v 1.1 2000/02/21 20:36:14 erh Exp $ */
+/* $NetBSD: netisr_dispatch.h,v 1.8 2001/10/06 15:46:33 thorpej Exp $ */
 
 /*
  * netisr_dispatch: This file is included by the 
@@ -14,15 +14,17 @@
  *	...do cleanup stuff.
  * }
  */
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-#include "opt_natm.h"
-#include "ppp.h"
+
+#ifndef _NET_NETISR_H_
+#error <net/netisr.h> must be included before <net/netisr_dispatch.h>
+#endif
+
+/*
+ * When adding functions to this list, be sure to add headers to provide
+ * their prototypes in <net/netisr.h> (if necessary).
+ */
+
 #ifdef INET
-#include "arp.h"
 #if NARP > 0
 	DONETISR(NETISR_ARP,arpintr);
 #endif
@@ -46,6 +48,12 @@
 #ifdef NATM
 	DONETISR(NETISR_NATM,natmintr);
 #endif
-#if NPPP > 0
-	DONETISR(NETISR_PPP,pppintr);
+#if NSL > 0 && !defined(__HAVE_GENERIC_SOFT_INTERRUPTS)
+	DONETISR(NETISR_SLIP,slnetisr);
+#endif
+#if NSTRIP > 0 && !defined(__HAVE_GENERIC_SOFT_INTERRUPTS)
+	DONETISR(NETISR_STRIP,stripnetisr);
+#endif
+#if NPPP > 0 && !defined(__HAVE_GENERIC_SOFT_INTERRUPTS)
+	DONETISR(NETISR_PPP,pppnetisr);
 #endif

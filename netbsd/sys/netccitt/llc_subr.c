@@ -1,4 +1,4 @@
-/*	$NetBSD: llc_subr.c,v 1.12 2000/03/30 13:53:34 augustss Exp $	*/
+/*	$NetBSD: llc_subr.c,v 1.15 2001/11/13 00:12:58 lukem Exp $	*/
 
 /* 
  * Copyright (c) 1990, 1991, 1992
@@ -41,6 +41,9 @@
  *
  *	@(#)llc_subr.c	8.1 (Berkeley) 6/10/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: llc_subr.c,v 1.15 2001/11/13 00:12:58 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -369,7 +372,7 @@ llc_seq2slot(linkp, seqn)
  * (32/64 bits, whatever is needed) that would suit her needs [I quite like
  * that idea, perhaps I'll get around to it].
  *
- * [Preceeding each state handler function is the description as taken from
+ * [Preceding each state handler function is the description as taken from
  * ISO 8802-2, section 7.9.2.1]
  */
 
@@ -2343,7 +2346,7 @@ llc_dellink(linkp)
 
 	/* drop queued packets */
 	for (m = linkp->llcl_writeqh; m;) {
-		n = m->m_act;
+		n = m->m_nextpkt;
 		m_freem(m);
 		m = n;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.21 2000/05/27 22:37:47 scw Exp $	*/
+/*	$NetBSD: param.h,v 1.24 2000/12/20 16:53:50 scw Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -62,13 +62,15 @@
 #define	SEGSHIFT	22		/* LOG2(NBSEG) */
 #if defined(M68030) && !defined(M68040) && !defined(M68060)
 #define NBSEG		(1 << SEGSHIFT)	/* bytes/segment */
+#elif (defined(M68040) || defined(M68060)) && !defined(M68030)
+#define	NBSEG		((32 * (1 << PGSHIFT)) : (256 * (1 << PGSHIFT)))
 #else
 #define	NBSEG		((mmutype == MMU_68040) ? \
 				(32 * (1 << PGSHIFT)) : (256 * (1 << PGSHIFT)))
 #endif
 #define	SEGOFSET	(NBSEG-1)	/* byte offset into segment */
 
-#define	UPAGES		3		/* pages of u-area */
+#define	UPAGES		2		/* pages of u-area */
 
 #include <m68k/param.h>
 
@@ -83,7 +85,7 @@
 
 #if defined(_KERNEL) && !defined(_LOCORE)
 extern void _delay __P((unsigned));
-#define delay(us)	_delay((us)<<8)
+#define delay(us)	_delay((us)<<10)
 #define DELAY(n)	delay(n)
 #endif	/* _KERNEL && !_LOCORE */
 

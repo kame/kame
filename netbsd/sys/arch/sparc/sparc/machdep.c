@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.165.4.4 2001/02/04 19:07:13 he Exp $ */
+/*	$NetBSD: machdep.c,v 1.193 2002/03/28 15:45:01 pk Exp $ */
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -83,6 +83,7 @@
 
 #include "opt_compat_netbsd.h"
 #include "opt_compat_sunos.h"
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/signal.h>
@@ -106,10 +107,6 @@
 #include <sys/syscallargs.h>
 #include <sys/exec.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-
 #include <uvm/uvm.h>		/* we use uvm.kernel_object */
 
 #include <sys/sysctl.h>
@@ -122,6 +119,7 @@
 #include <machine/pmap.h>
 #include <machine/oldmon.h>
 #include <machine/bsd_openprom.h>
+#include <machine/bootinfo.h>
 
 #include <sparc/sparc/asm.h>
 #include <sparc/sparc/cache.h>
@@ -140,8 +138,8 @@
 #include <sparc/dev/tctrlvar.h>
 #endif
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
 extern paddr_t avail_end;
 
 int	physmem;
@@ -178,6 +176,7 @@ cpu_startup()
 #endif
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
+	paddr_t pa;
 	char pbuf[9];
 
 #ifdef DEBUG
@@ -185,19 +184,84 @@ cpu_startup()
 #endif
 
 	/*
-	 * Map the message buffer (physical location 0).
+	 * Re-map the message buffer from its temporary address
+	 * at KERNBASE to MSGBUF_VA.
 	 */
-	pmap_enter(pmap_kernel(), MSGBUF_VA, 0x0,
-	    VM_PROT_READ|VM_PROT_WRITE,
-	    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+#if !defined(MSGBUFSIZE) || MSGBUFSIZE <= 8192
+	/*
+	 * We use the free page(s) in front of the kernel load address.
+	 */
+	size = 8192;
+
+	/* Get physical address of the message buffer */
+	pmap_extract(pmap_kernel(), (vaddr_t)KERNBASE, &pa);
+
+	/* Invalidate the current mapping at KERNBASE. */
+	pmap_kremove((vaddr_t)KERNBASE, size);
+	pmap_update(pmap_kernel());
+
+	/* Enter the new mapping */
+	pmap_map(MSGBUF_VA, pa, pa + size, VM_PROT_READ|VM_PROT_WRITE);
 
 	/*
-	 * XXX - sun4
-	 * Some boot programs mess up physical page 0, which
-	 * is where we want to put the msgbuf. There's some
-	 * room, so shift it over half a page.
+	 * Re-initialize the message buffer.
 	 */
-	initmsgbuf((caddr_t)(MSGBUF_VA + (CPU_ISSUN4 ? 4096 : 0)), MSGBUFSIZE);
+	initmsgbuf((caddr_t)MSGBUF_VA, size);
+#else /* MSGBUFSIZE */
+	{
+	struct pglist mlist;
+	struct vm_page *m;
+	vaddr_t va0, va;
+
+	/*
+	 * We use the free page(s) in front of the kernel load address,
+	 * and then allocate some more.
+	 */
+	size = round_page(MSGBUFSIZE);
+
+	/* Get physical address of first 8192 chunk of the message buffer */
+	pmap_extract(pmap_kernel(), (vaddr_t)KERNBASE, &pa);
+
+	/* Allocate additional physical pages */
+	TAILQ_INIT(&mlist);
+	if (uvm_pglistalloc(size - 8192,
+			    vm_first_phys, vm_first_phys+vm_num_phys,
+			    0, 0, &mlist, 1, 0) != 0)
+		panic("cpu_start: no memory for message buffer");
+
+	/* Invalidate the current mapping at KERNBASE. */
+	pmap_kremove((vaddr_t)KERNBASE, 8192);
+	pmap_update(pmap_kernel());
+
+	/* Allocate virtual memory space */
+	va0 = va = uvm_km_valloc(kernel_map, size);
+	if (va == 0)
+		panic("cpu_start: no virtual memory for message buffer");
+
+	/* Map first 8192 */
+	while (va < va0 + 8192) {
+		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
+		pa += PAGE_SIZE;
+		va += PAGE_SIZE;
+	}
+	pmap_update(pmap_kernel());
+
+	/* Map the rest of the pages */
+	TAILQ_FOREACH(m, &mlist ,pageq) {
+		if (va >= va0 + size)
+			panic("cpu_start: memory buffer size botch");
+		pa = VM_PAGE_TO_PHYS(m);
+		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
+		va += PAGE_SIZE;
+	}
+	pmap_update(pmap_kernel());
+
+	/*
+	 * Re-initialize the message buffer.
+	 */
+	initmsgbuf((caddr_t)va0, size);
+	}
+#endif /* MSGBUFSIZE */
 
 	/*
 	 * Good {morning,afternoon,evening,night}.
@@ -226,9 +290,9 @@ cpu_startup()
 
         /* allocate VM for buffers... area is not managed by VM system */
         if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-                    NULL, UVM_UNKNOWN_OFFSET,
+                    NULL, UVM_UNKNOWN_OFFSET, 0,
                     UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-                                UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+                                UVM_ADV_NORMAL, 0)) != 0)
         	panic("cpu_startup: cannot allocate VM for buffers");
 
         minaddr = (vaddr_t) buffers;
@@ -258,13 +322,13 @@ cpu_startup()
 			if (pg == NULL)
 				panic("cpu_startup: "
 				    "not enough RAM for buffer cache");
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ | VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -342,7 +406,7 @@ setregs(p, pack, stack)
 	 * Set the registers to 0 except for:
 	 *	%o6: stack pointer, built in exec())
 	 *	%psr: (retain CWP and PSR_S bits)
-	 *	%g1: address of PS_STRINGS (used by crt0)
+	 *	%g1: address of p->p_psstr (used by crt0)
 	 *	%pc,%npc: entry point of program
 	 */
 	psr = tf->tf_psr & (PSR_S | PSR_CWP);
@@ -364,7 +428,7 @@ setregs(p, pack, stack)
 	}
 	bzero((caddr_t)tf, sizeof *tf);
 	tf->tf_psr = psr;
-	tf->tf_global[1] = (int)PS_STRINGS;
+	tf->tf_global[1] = (int)p->p_psstr;
 	tf->tf_pc = pack->ep_entry & ~3;
 	tf->tf_npc = tf->tf_pc + 4;
 	stack -= sizeof(struct rwindow);
@@ -401,6 +465,7 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	struct proc *p;
 {
 	char *cp;
+	struct btinfo_kernelfile *bi_file;
 
 	/* all sysctl names are this level are terminal */
 	if (namelen != 1)
@@ -408,7 +473,22 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 
 	switch (name[0]) {
 	case CPU_BOOTED_KERNEL:
-		cp = prom_getbootfile();
+		if ((bi_file = lookup_bootinfo(BTINFO_KERNELFILE)) != NULL)
+			cp = bi_file->name;
+		else
+			cp = prom_getbootfile();
+		if (cp == NULL)
+			return (ENOENT);
+		if (*cp == '\0')
+			cp = "netbsd";
+		return (sysctl_rdstring(oldp, oldlenp, newp, cp));
+	case CPU_BOOTED_DEVICE:
+		cp = prom_getbootpath();
+		if (cp == NULL || cp[0] == '\0')
+			return (ENOENT);
+		return (sysctl_rdstring(oldp, oldlenp, newp, cp));
+	case CPU_BOOT_ARGS:
+		cp = prom_getbootargs();
 		if (cp == NULL || cp[0] == '\0')
 			return (ENOENT);
 		return (sysctl_rdstring(oldp, oldlenp, newp, cp));
@@ -429,7 +509,6 @@ sendsig(catcher, sig, mask, code)
 	u_long code;
 {
 	struct proc *p = curproc;
-	struct sigacts *psp = p->p_sigacts;
 	struct sigframe *fp;
 	struct trapframe *tf;
 	int addr, onstack, oldsp, newsp;
@@ -443,12 +522,12 @@ sendsig(catcher, sig, mask, code)
 	 * one signal frame, and align.
 	 */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	if (onstack)
-		fp = (struct sigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-		                                  psp->ps_sigstk.ss_size);
+		fp = (struct sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+		                               p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct sigframe *)oldsp;
 
@@ -472,7 +551,7 @@ sendsig(catcher, sig, mask, code)
 	/*
 	 * Build the signal context to be used by sigreturn.
 	 */
-	sf.sf_sc.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	sf.sf_sc.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 	sf.sf_sc.sc_mask = *mask;
 #ifdef COMPAT_13
 	/*
@@ -523,7 +602,7 @@ sendsig(catcher, sig, mask, code)
 	 * Arrange to continue execution at the code copied out in exec().
 	 * It needs the function to call in %g1, and a new stack pointer.
 	 */
-	addr = (int)psp->ps_sigcode;
+	addr = (int)p->p_sigctx.ps_sigcode;
 	tf->tf_global[1] = (int)catcher;
 	tf->tf_pc = addr;
 	tf->tf_npc = addr + 4;
@@ -531,7 +610,7 @@ sendsig(catcher, sig, mask, code)
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 
 #ifdef DEBUG
 	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
@@ -593,9 +672,9 @@ sys___sigreturn14(p, v, retval)
 	tf->tf_out[6] = scp->sc_sp;
 
 	if (scp->sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask */
 	(void) sigprocmask1(p, SIG_SETMASK, &scp->sc_mask, 0);
@@ -626,6 +705,7 @@ cpu_reboot(howto, user_boot_string)
 	boothowto = howto;
 	if ((howto & RB_NOSYNC) == 0 && waittime < 0) {
 		extern struct proc proc0;
+		extern int sparc_clock_time_is_ok;
 
 		/* XXX protect against curproc->p_stats.foo refs in sync() */
 		if (curproc == NULL)
@@ -636,8 +716,12 @@ cpu_reboot(howto, user_boot_string)
 		/*
 		 * If we've been adjusting the clock, the todr
 		 * will be out of synch; adjust it now.
+		 * Do this only if the TOD clock has already been read out
+		 * successfully by inittodr() or set by an explicit call
+		 * to resettodr() (e.g. from settimeofday()).
 		 */
-		resettodr();
+		if (sparc_clock_time_is_ok)
+			resettodr();
 	}
 
 	/* Disable interrupts. */
@@ -702,7 +786,7 @@ cpu_reboot(howto, user_boot_string)
 	/*NOTREACHED*/
 }
 
-u_long	dumpmag = 0x8fca0101;	/* magic number for savecore */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number for savecore */
 int	dumpsize = 0;		/* also for savecore */
 long	dumplo = 0;
 
@@ -821,6 +905,7 @@ dumpsys()
 			error = (*dump)(dumpdev, blkno,
 					(caddr_t)dumpspace, (int)n);
 			pmap_remove(pmap_kernel(), dumpspace, dumpspace + n);
+			pmap_update(pmap_kernel());
 			if (error)
 				break;
 			maddr += n;
@@ -885,7 +970,7 @@ cpu_exec_aout_makecmds(p, epp)
 	return (ENOEXEC);
 }
 
-#ifdef SUN4
+#if defined(SUN4)
 void
 oldmon_w_trace(va)
 	u_long va;
@@ -1122,7 +1207,7 @@ _bus_dmamap_load_mbuf(t, map, m, flags)
 	int flags;
 {
 
-	panic("_bus_dmamap_load: not implemented");
+	panic("_bus_dmamap_load_mbuf: not implemented");
 }
 
 /*
@@ -1379,7 +1464,7 @@ sun4_dmamap_load(t, map, buf, buflen, p, flags)
 	bus_size_t sgsize;
 	vaddr_t va = (vaddr_t)buf;
 	int pagesz = PAGE_SIZE;
-	bus_addr_t dva;
+	vaddr_t dva;
 	pmap_t pmap;
 
 	/*
@@ -1426,7 +1511,7 @@ no_fit:
 
 	if (extent_alloc(dvmamap24, sgsize, pagesz, map->_dm_boundary,
 			 (flags & BUS_DMA_NOWAIT) == 0 ? EX_WAITOK : EX_NOWAIT,
-			 (u_long *)&dva) != 0) {
+			 &dva) != 0) {
 		return (ENOMEM);
 	}
 
@@ -1445,6 +1530,7 @@ no_fit:
 
 	for (; buflen > 0; ) {
 		paddr_t pa;
+
 		/*
 		 * Get the physical address for this page.
 		 */
@@ -1463,14 +1549,14 @@ no_fit:
 			pa |= PG_IOC;
 #endif
 #endif
-		pmap_enter(pmap_kernel(), dva,
-			   (pa & -pagesz) | PMAP_NC,
-			   VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+		pmap_kenter_pa(dva, (pa & -pagesz) | PMAP_NC,
+		    VM_PROT_READ | VM_PROT_WRITE);
 
 		dva += pagesz;
 		va += sgsize;
 		buflen -= sgsize;
 	}
+	pmap_update(pmap_kernel());
 
 	map->dm_nsegs = 1;
 	return (0);
@@ -1489,9 +1575,9 @@ sun4_dmamap_load_raw(t, map, segs, nsegs, size, flags)
 	bus_size_t size;
 	int flags;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	paddr_t pa;
-	bus_addr_t dva;
+	vaddr_t dva;
 	bus_size_t sgsize;
 	struct pglist *mlist;
 	int pagesz = PAGE_SIZE;
@@ -1506,7 +1592,7 @@ sun4_dmamap_load_raw(t, map, segs, nsegs, size, flags)
 					map->_dm_boundary,
 					(flags & BUS_DMA_NOWAIT) == 0
 						? EX_WAITOK : EX_NOWAIT,
-					(u_long *)&dva);
+					&dva);
 		if (error)
 			return (error);
 	} else {
@@ -1533,13 +1619,13 @@ sun4_dmamap_load_raw(t, map, segs, nsegs, size, flags)
 			pa |= PG_IOC;
 #endif
 #endif
-		pmap_enter(pmap_kernel(), dva,
-			   (pa & -pagesz) | PMAP_NC,
-			   VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+		pmap_kenter_pa(dva, (pa & -pagesz) | PMAP_NC,
+		    VM_PROT_READ | VM_PROT_WRITE);
 
 		dva += pagesz;
 		sgsize -= pagesz;
 	}
+	pmap_update(pmap_kernel());
 
 	map->dm_nsegs = 1;
 	map->dm_mapsize = size;
@@ -1558,7 +1644,7 @@ sun4_dmamap_unload(t, map)
 	bus_dma_segment_t *segs = map->dm_segs;
 	int nsegs = map->dm_nsegs;
 	int flags = map->_dm_flags;
-	bus_addr_t dva;
+	vaddr_t dva;
 	bus_size_t len;
 	int i, s, error;
 
@@ -1574,7 +1660,7 @@ sun4_dmamap_unload(t, map)
 		dva = segs[i].ds_addr & -PAGE_SIZE;
 		len = segs[i]._ds_sgsize;
 
-		pmap_remove(pmap_kernel(), dva, dva + len);
+		pmap_kremove(dva, len);
 
 		if ((flags & BUS_DMA_24BIT) != 0) {
 			s = splhigh();
@@ -1586,6 +1672,7 @@ sun4_dmamap_unload(t, map)
 			uvm_unmap(kernel_map, dva, dva + len);
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/* Mark the mappings as invalid. */
 	map->dm_mapsize = 0;
@@ -1605,7 +1692,7 @@ sun4_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	caddr_t *kvap;
 	int flags;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	vaddr_t va;
 	struct pglist *mlist;
 
@@ -1622,20 +1709,19 @@ sun4_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	*kvap = (caddr_t)va;
 
 	mlist = segs[0]._ds_mlist;
-	for (m = TAILQ_FIRST(mlist); m != NULL; m = TAILQ_NEXT(m,pageq)) {
+	TAILQ_FOREACH(m, mlist, pageq) {
 		paddr_t pa;
 
 		if (size == 0)
 			panic("sun4_dmamem_map: size botch");
 
 		pa = VM_PAGE_TO_PHYS(m);
-		pmap_enter(pmap_kernel(), va, pa | PMAP_NC,
-			   VM_PROT_READ | VM_PROT_WRITE,
-			   VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
+		pmap_kenter_pa(va, pa | PMAP_NC, VM_PROT_READ | VM_PROT_WRITE);
 
 		va += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }
@@ -1663,7 +1749,7 @@ struct sparc_bus_dma_tag mainbus_dma_tag = {
 /*
  * Base bus space handlers.
  */
-static int	sparc_bus_map __P(( bus_space_tag_t, bus_type_t, bus_addr_t,
+static int	sparc_bus_map __P(( bus_space_tag_t, bus_addr_t,
 				    bus_size_t, int, vaddr_t,
 				    bus_space_handle_t *));
 static int	sparc_bus_unmap __P((bus_space_tag_t, bus_space_handle_t,
@@ -1671,8 +1757,8 @@ static int	sparc_bus_unmap __P((bus_space_tag_t, bus_space_handle_t,
 static int	sparc_bus_subregion __P((bus_space_tag_t, bus_space_handle_t,
 					 bus_size_t, bus_size_t,
 					 bus_space_handle_t *));
-static int	sparc_bus_mmap __P((bus_space_tag_t, bus_type_t,
-				    bus_addr_t, int, bus_space_handle_t *));
+static paddr_t	sparc_bus_mmap __P((bus_space_tag_t, bus_addr_t, off_t,
+				    int, int));
 static void	*sparc_mainbus_intr_establish __P((bus_space_tag_t, int, int,
 						   int, int (*) __P((void *)),
 						   void *));
@@ -1681,12 +1767,11 @@ static void     sparc_bus_barrier __P(( bus_space_tag_t, bus_space_handle_t,
 
 
 int
-sparc_bus_map(t, iospace, addr, size, flags, vaddr, hp)
+sparc_bus_map(t, ba, size, flags, va, hp)
 	bus_space_tag_t t;
-	bus_type_t	iospace;
-	bus_addr_t	addr;
+	bus_addr_t	ba;
 	bus_size_t	size;
-	vaddr_t		vaddr;
+	vaddr_t		va;
 	bus_space_handle_t *hp;
 {
 	vaddr_t v;
@@ -1704,8 +1789,8 @@ static	vaddr_t iobase;
 		return (EINVAL);
 	}
 
-	if (vaddr)
-		v = trunc_page(vaddr);
+	if (va)
+		v = trunc_page(va);
 	else {
 		v = iobase;
 		iobase += size;
@@ -1713,18 +1798,21 @@ static	vaddr_t iobase;
 			panic("sparc_bus_map: iobase=0x%lx", iobase);
 	}
 
+	pmtype = PMAP_IOENC(BUS_ADDR_IOSPACE(ba));
+	pa = BUS_ADDR_PADDR(ba);
+
 	/* note: preserve page offset */
-	*hp = (bus_space_handle_t)(v | ((u_long)addr & PGOFSET));
+	*hp = (bus_space_handle_t)(v | ((u_long)pa & PGOFSET));
 
-	pa = trunc_page(addr);
-	pmtype = PMAP_IOENC(iospace);
-
+	pa = trunc_page(pa);
 	do {
-		pmap_enter(pmap_kernel(), v, pa | pmtype | PMAP_NC,
-			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+		pmap_kenter_pa(v, pa | pmtype | PMAP_NC,
+		    VM_PROT_READ | VM_PROT_WRITE);
 		v += PAGE_SIZE;
 		pa += PAGE_SIZE;
 	} while ((size -= PAGE_SIZE) > 0);
+
+	pmap_update(pmap_kernel());
 	return (0);
 }
 
@@ -1735,9 +1823,9 @@ sparc_bus_unmap(t, bh, size)
 	bus_space_handle_t bh;
 {
 	vaddr_t va = trunc_page((vaddr_t)bh);
-	vaddr_t endva = va + round_page(size);
 
-	pmap_remove(pmap_kernel(), va, endva);
+	pmap_kremove(va, round_page(size));
+	pmap_update(pmap_kernel());
 	return (0);
 }
 
@@ -1753,25 +1841,25 @@ sparc_bus_subregion(tag, handle, offset, size, nhandlep)
 	return (0);
 }
 
-int
-sparc_bus_mmap(t, iospace, paddr, flags, hp)
+paddr_t
+sparc_bus_mmap(t, ba, off, prot, flags)
 	bus_space_tag_t t;
-	bus_type_t	iospace;
-	bus_addr_t	paddr;
+	bus_addr_t	ba;
+	off_t		off;
+	int		prot;
 	int		flags;
-	bus_space_handle_t *hp;
 {
-	*hp = (bus_space_handle_t)(paddr | PMAP_IOENC(iospace) | PMAP_NC);
-	return (0);
+	u_int pmtype = PMAP_IOENC(BUS_ADDR_IOSPACE(ba));
+	paddr_t pa = trunc_page(BUS_ADDR_PADDR(ba) + off);
+	return (paddr_t)(pa | pmtype | PMAP_NC);
 }
 
 /*
  * Establish a temporary bus mapping for device probing.
  */
 int
-bus_space_probe(tag, btype, paddr, size, offset, flags, callback, arg)
+bus_space_probe(tag, paddr, size, offset, flags, callback, arg)
 	bus_space_tag_t tag;
-	bus_type_t	btype;
 	bus_addr_t	paddr;
 	bus_size_t	size;
 	size_t		offset;
@@ -1783,7 +1871,7 @@ bus_space_probe(tag, btype, paddr, size, offset, flags, callback, arg)
 	caddr_t tmp;
 	int result;
 
-	if (bus_space_map2(tag, btype, paddr, size, flags, TMPMAP_VA, &bh) != 0)
+	if (bus_space_map2(tag, paddr, size, flags, TMPMAP_VA, &bh) != 0)
 		return (0);
 
 	tmp = (caddr_t)bh;

@@ -1,4 +1,4 @@
-/* $NetBSD: bba.c,v 1.6.2.3 2000/07/18 06:22:39 thorpej Exp $ */
+/* $NetBSD: bba.c,v 1.15 2001/11/13 06:26:09 lukem Exp $ */
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -34,6 +34,9 @@
  */
 
 /* maxine/alpha baseboard audio (bba) */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bba.c,v 1.15 2001/11/13 06:26:09 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -171,7 +174,8 @@ struct audio_hw_if sa_hw_if = {
 	bba_mappage,
 	bba_get_props,
 	bba_trigger_output,		/* md */
-	bba_trigger_input		/* md */
+	bba_trigger_input,		/* md */
+	0,
 };
 
 struct audio_device bba_device = {
@@ -478,7 +482,7 @@ bba_trigger_output(addr, start, end, blksize, intr, arg, param)
 	state |= 1;
 
 	if (bus_dmamap_load(sc->sc_dmat, d->dmam, start,
-	    (char *)end - (char *)start, NULL, BUS_DMA_NOWAIT)) {
+	    (char *)end - (char *)start, NULL, BUS_DMA_WRITE|BUS_DMA_NOWAIT)) {
 	    printf("bba_trigger_output: can't load DMA map\n");
 		goto bad;
 	}
@@ -547,7 +551,7 @@ bba_trigger_input(addr, start, end, blksize, intr, arg, param)
 	state |= 1;
 
 	if (bus_dmamap_load(sc->sc_dmat, d->dmam, start,
-	    (char *)end - (char *)start, NULL, BUS_DMA_NOWAIT)) {
+	    (char *)end - (char *)start, NULL, BUS_DMA_READ|BUS_DMA_NOWAIT)) {
 		printf("bba_trigger_input: can't load DMA map\n");
 		goto bad;
 	}

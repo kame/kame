@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_compat.c,v 1.3.2.1 2000/06/30 16:27:27 simonb Exp $	*/
+/*	$NetBSD: grf_compat.c,v 1.7 2001/04/30 17:12:03 wiz Exp $	*/
 
 /*
  * Copyright (C) 1999 Scott Reynolds
@@ -54,7 +54,6 @@
 
 #include <miscfs/specfs/specdev.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 #include <uvm/uvm_map.h>
 
@@ -388,7 +387,6 @@ grfunmap(dev, sc, addr, p)
 	struct proc *p;
 {
 	vm_size_t size;
-	int     rv;
 
 	addr -= sc->sc_dc->dc_offset;
 
@@ -396,9 +394,6 @@ grfunmap(dev, sc, addr, p)
 		return (-1);
 
 	size = m68k_round_page(sc->sc_dc->dc_offset + sc->sc_dc->dc_size);
-
-	rv = uvm_unmap(&p->p_vmspace->vm_map, (vaddr_t)addr,
-	    (vaddr_t)addr + size);
-
-	return (rv == KERN_SUCCESS ? 0 : EINVAL);
+	uvm_unmap(&p->p_vmspace->vm_map, (vaddr_t)addr, (vaddr_t)addr + size);
+	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ultrix_ioctl.c,v 1.14 2000/03/30 11:27:21 augustss Exp $ */
+/*	$NetBSD: ultrix_ioctl.c,v 1.18 2001/11/13 02:09:33 lukem Exp $ */
 /*	from : NetBSD: sunos_ioctl.c,v 1.21 1995/10/07 06:27:31 mycroft Exp */
 
 /*
@@ -27,8 +27,13 @@
  * loosely from: Header: sunos_ioctl.c,v 1.7 93/05/28 04:40:43 torek Exp 
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ultrix_ioctl.c,v 1.18 2001/11/13 02:09:33 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_ultrix.h"
 #include "opt_compat_sunos.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -49,7 +54,7 @@
 
 #include <compat/sunos/sunos.h>
 
-#include "ultrix_tty.h"
+#include <compat/ultrix/ultrix_tty.h>
 
 #define emul_termio	ultrix_termio
 #define emul_termios	ultrix_termios
@@ -454,8 +459,7 @@ ultrix_sys_ioctl(p, v, retval)
 	int (*ctl) __P((struct file *, u_long, caddr_t, struct proc *));
 	int error;
 
-	if ( (unsigned)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return EBADF;
 
 	if ((fp->f_flag & (FREAD|FWRITE)) == 0)

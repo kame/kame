@@ -1,4 +1,4 @@
-/*	$NetBSD: ofbvar.h,v 1.3 2000/06/19 19:35:21 tsubai Exp $	*/
+/*	$NetBSD: ofbvar.h,v 1.5 2001/06/10 13:56:13 tsubai Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.

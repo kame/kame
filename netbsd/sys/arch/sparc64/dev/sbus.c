@@ -1,12 +1,9 @@
-/*	$NetBSD: sbus.c,v 1.30.2.1 2000/07/18 16:23:21 mrg Exp $ */
+/*	$NetBSD: sbus.c,v 1.49.6.1 2002/06/21 06:26:42 lukem Exp $ */
 
-/*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+/*
+ * Copyright (c) 1999-2002 Eduardo Horvath
  * All rights reserved.
  *
- * This code is derived from software contributed to The NetBSD Foundation
- * by Paul Kranenburg.
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,92 +12,20 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
+ * 3. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
-
-/*
- * Copyright (c) 1992, 1993
- *	The Regents of the University of California.  All rights reserved.
- *
- * This software was developed by the Computer Systems Engineering group
- * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
- * contributed to Berkeley.
- *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)sbus.c	8.1 (Berkeley) 6/11/93
- */
-
-/*
- * Copyright (c) 1999 Eduardo Horvath
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR  ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR  BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
  */
 
 
@@ -114,14 +39,18 @@
 #include <sys/malloc.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+#include <sys/reboot.h>
 
 #include <machine/bus.h>
+#include <machine/openfirm.h>
+
 #include <sparc64/sparc64/cache.h>
 #include <sparc64/dev/iommureg.h>
 #include <sparc64/dev/iommuvar.h>
 #include <sparc64/dev/sbusreg.h>
 #include <dev/sbus/sbusvar.h>
+
+#include <uvm/uvm_prot.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -142,15 +71,13 @@ static bus_space_tag_t sbus_alloc_bustag __P((struct sbus_softc *));
 static bus_dma_tag_t sbus_alloc_dmatag __P((struct sbus_softc *));
 static int sbus_get_intr __P((struct sbus_softc *, int,
 			      struct sbus_intr **, int *, int));
-static int sbus_bus_mmap __P((bus_space_tag_t, bus_type_t, bus_addr_t,
-			      int, bus_space_handle_t *));
+static int sbus_overtemp __P((void *));
 static int _sbus_bus_map __P((
 		bus_space_tag_t,
-		bus_type_t,
 		bus_addr_t,		/*offset*/
 		bus_size_t,		/*size*/
 		int,			/*flags*/
-		vaddr_t,		/*preferred virtual address */
+		vaddr_t,			/* XXX unused -- compat w/sparc */
 		bus_space_handle_t *));
 static void *sbus_intr_establish __P((
 		bus_space_tag_t,
@@ -203,14 +130,6 @@ void sbus_dmamem_unmap __P((bus_dma_tag_t tag, caddr_t kva,
  * cannot be had from the PROM as an `interrupt' property. We then
  * fall back on the `intr' property which contains the CPU IPL.
  */
-
-/* Translate Sbus interrupt level to processor IPL */
-static int intr_sbus2ipl_4c[] = {
-	0, 1, 2, 3, 5, 7, 8, 9
-};
-static int intr_sbus2ipl_4m[] = {
-	0, 2, 3, 5, 7, 9, 11, 13
-};
 
 /*
  * This value is or'ed into the attach args' interrupt level cookie
@@ -270,28 +189,44 @@ sbus_attach(parent, self, aux)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)self;
 	struct mainbus_attach_args *ma = aux;
+	struct intrhand *ih;
+	int ipl;
 	char *name;
 	int node = ma->ma_node;
-
 	int node0, error;
 	bus_space_tag_t sbt;
 	struct sbus_attach_args sa;
 
 	sc->sc_bustag = ma->ma_bustag;
 	sc->sc_dmatag = ma->ma_dmatag;
-	sc->sc_sysio = (struct sysioreg*)(u_long)ma->ma_address[0];	/* Use prom mapping for sysio. */
-	sc->sc_ign = ma->ma_interrupts[0] & INTMAP_IGN;		/* Find interrupt group no */
+	sc->sc_ign = ma->ma_interrupts[0] & INTMAP_IGN;		
 
-	/* Setup interrupt translation tables */
-	sc->sc_intr2ipl = CPU_ISSUN4C
-				? intr_sbus2ipl_4c
-				: intr_sbus2ipl_4m;
+	/* XXXX Use sysio PROM mappings for interrupt vector regs. */
+	sparc_promaddr_to_handle(sc->sc_bustag,	ma->ma_address[0], &sc->sc_bh);
+	sc->sc_sysio = (struct sysioreg *)bus_space_vaddr(sc->sc_bustag, 
+		sc->sc_bh);
+
+#ifdef _LP64
+	/* 
+	 * 32-bit kernels use virtual addresses for bus space operations
+	 * so we may as well use the prom VA.
+	 *
+	 * 64-bit kernels use physical addresses for bus space operations
+	 * so mapping this in again will reduce TLB thrashing.
+	 */
+	if (bus_space_map(sc->sc_bustag, ma->ma_reg[0].ur_paddr, 
+		ma->ma_reg[0].ur_len, 0, &sc->sc_bh) != 0) {
+		printf("%s: cannot map registers\n", self->dv_xname);
+		return;
+	}
+#endif
 
 	/*
 	 * Record clock frequency for synchronous SCSI.
 	 * IS THIS THE CORRECT DEFAULT??
 	 */
-	sc->sc_clockfreq = getpropint(node, "clock-frequency", 25*1000*1000);
+	sc->sc_clockfreq = PROM_getpropint(node, "clock-frequency", 
+		25*1000*1000);
 	printf(": clock = %s MHz\n", clockfreq(sc->sc_clockfreq));
 
 	sbt = sbus_alloc_bustag(sc);
@@ -300,22 +235,32 @@ sbus_attach(parent, self, aux)
 	/*
 	 * Get the SBus burst transfer size if burst transfers are supported
 	 */
-	sc->sc_burst = getpropint(node, "burst-sizes", 0);
+	sc->sc_burst = PROM_getpropint(node, "burst-sizes", 0);
 
 	/*
 	 * Collect address translations from the OBP.
 	 */
-	error = getprop(node, "ranges", sizeof(struct sbus_range),
+	error = PROM_getprop(node, "ranges", sizeof(struct sbus_range),
 			 &sc->sc_nrange, (void **)&sc->sc_range);
 	if (error)
 		panic("%s: error getting ranges property", sc->sc_dev.dv_xname);
 
-	/* initailise the IOMMU */
+	/* initialize the IOMMU */
 
 	/* punch in our copies */
 	sc->sc_is.is_bustag = sc->sc_bustag;
-	sc->sc_is.is_iommu = &sc->sc_sysio->sys_iommu;
-	sc->sc_is.is_sb = &sc->sc_sysio->sys_strbuf;
+	bus_space_subregion(sc->sc_bustag, sc->sc_bh, 
+		(vaddr_t)&((struct sysioreg *)NULL)->sys_iommu, 
+		sizeof (struct iommureg), &sc->sc_is.is_iommu);
+ 
+	/* initialize our strbuf_ctl */
+	sc->sc_is.is_sb[0] = &sc->sc_sb;
+	sc->sc_sb.sb_is = &sc->sc_is;
+	bus_space_subregion(sc->sc_bustag, sc->sc_bh, 
+		(vaddr_t)&((struct sysioreg *)NULL)->sys_strbuf, 
+		sizeof (struct iommu_strbuf), &sc->sc_sb.sb_sb);
+	/* Point sb_flush to our flush buffer. */
+	sc->sc_sb.sb_flush = &sc->sc_flush;
 
 	/* give us a nice name.. */
 	name = (char *)malloc(32, M_DEVBUF, M_NOWAIT);
@@ -323,7 +268,33 @@ sbus_attach(parent, self, aux)
 		panic("couldn't malloc iommu name");
 	snprintf(name, 32, "%s dvma", sc->sc_dev.dv_xname);
 
-	iommu_init(name, &sc->sc_is, 0);
+	iommu_init(name, &sc->sc_is, 0, -1);
+
+	/* Enable the over temp intr */
+	ih = (struct intrhand *)
+		malloc(sizeof(struct intrhand), M_DEVBUF, M_NOWAIT);
+	ih->ih_map = &sc->sc_sysio->therm_int_map;
+	ih->ih_clr = NULL; /* &sc->sc_sysio->therm_clr_int; */
+	ih->ih_fun = sbus_overtemp;
+	ipl = 1;
+	ih->ih_pil = (1<<ipl);
+	ih->ih_number = INTVEC(*(ih->ih_map));
+	intr_establish(ipl, ih);
+	*(ih->ih_map) |= INTMAP_V;
+	
+	/*
+	 * Note: the stupid SBUS IOMMU ignores the high bits of an address, so a
+	 * NULL DMA pointer will be translated by the first page of the IOTSB.
+	 * To avoid bugs we'll alloc and ignore the first entry in the IOTSB.
+	 */
+	{
+		u_long dummy;
+
+		if (extent_alloc_subregion(sc->sc_is.is_dvmamap,
+		    sc->sc_is.is_dvmabase, sc->sc_is.is_dvmabase + NBPG, NBPG,
+		    NBPG, 0, EX_NOWAIT|EX_BOUNDZERO, (u_long *)&dummy) != 0)
+			panic("sbus iommu: can't toss first dvma page");
+	}
 
 	/*
 	 * Loop through ROM children, fixing any relative addresses
@@ -331,9 +302,9 @@ sbus_attach(parent, self, aux)
 	 * `specials' is an array of device names that are treated
 	 * specially:
 	 */
-	node0 = firstchild(node);
-	for (node = node0; node; node = nextsibling(node)) {
-		char *name = getpropstring(node, "name");
+	node0 = OF_child(node);
+	for (node = node0; node; node = OF_peer(node)) {
+		char *name = PROM_getpropstring(node, "name");
 
 		if (sbus_setup_attach_args(sc, sbt, sc->sc_dmatag,
 					   node, &sa) != 0) {
@@ -359,7 +330,7 @@ sbus_setup_attach_args(sc, bustag, dmatag, node, sa)
 	int n;
 
 	bzero(sa, sizeof(struct sbus_attach_args));
-	error = getprop(node, "name", 1, &n, (void **)&sa->sa_name);
+	error = PROM_getprop(node, "name", 1, &n, (void **)&sa->sa_name);
 	if (error != 0)
 		return (error);
 	sa->sa_name[n] = '\0';
@@ -367,14 +338,15 @@ sbus_setup_attach_args(sc, bustag, dmatag, node, sa)
 	sa->sa_bustag = bustag;
 	sa->sa_dmatag = dmatag;
 	sa->sa_node = node;
+	sa->sa_frequency = sc->sc_clockfreq;
 
-	error = getprop(node, "reg", sizeof(struct sbus_reg),
+	error = PROM_getprop(node, "reg", sizeof(struct sbus_reg),
 			 &sa->sa_nreg, (void **)&sa->sa_reg);
 	if (error != 0) {
 		char buf[32];
 		if (error != ENOENT ||
 		    !node_has_property(node, "device_type") ||
-		    strcmp(getpropstringA(node, "device_type", buf),
+		    strcmp(PROM_getpropstringA(node, "device_type", buf),
 			   "hierarchical") != 0)
 			return (error);
 	}
@@ -391,7 +363,7 @@ sbus_setup_attach_args(sc, bustag, dmatag, node, sa)
 	    sa->sa_slot)) != 0)
 		return (error);
 
-	error = getprop(node, "address", sizeof(u_int32_t),
+	error = PROM_getprop(node, "address", sizeof(u_int32_t),
 			 &sa->sa_npromvaddrs, (void **)&sa->sa_promvaddrs);
 	if (error != 0 && error != ENOENT)
 		return (error);
@@ -420,17 +392,17 @@ sbus_destroy_attach_args(sa)
 
 
 int
-_sbus_bus_map(t, btype, offset, size, flags, vaddr, hp)
+_sbus_bus_map(t, addr, size, flags, v, hp)
 	bus_space_tag_t t;
-	bus_type_t btype;
-	bus_addr_t offset;
+	bus_addr_t addr;
 	bus_size_t size;
 	int	flags;
-	vaddr_t vaddr;
+	vaddr_t v;
 	bus_space_handle_t *hp;
 {
 	struct sbus_softc *sc = t->cookie;
-	int64_t slot = btype;
+	int64_t slot = BUS_ADDR_IOSPACE(addr);
+	int64_t offset = BUS_ADDR_PADDR(addr);
 	int i;
 
 	for (i = 0; i < sc->sc_nrange; i++) {
@@ -446,39 +418,33 @@ _sbus_bus_map(t, btype, offset, size, flags, vaddr, hp)
 ("\n_sbus_bus_map: mapping paddr slot %lx offset %lx poffset %lx paddr %lx\n",
 		    (long)slot, (long)offset, (long)sc->sc_range[i].poffset,
 		    (long)paddr));
-		return (bus_space_map2(sc->sc_bustag, 0, paddr,
-					size, flags, vaddr, hp));
+		return (bus_space_map(sc->sc_bustag, paddr, size, flags, hp));
 	}
 
 	return (EINVAL);
 }
 
-int
-sbus_bus_mmap(t, btype, paddr, flags, hp)
+
+bus_addr_t
+sbus_bus_addr(t, btype, offset)
 	bus_space_tag_t t;
-	bus_type_t btype;
-	bus_addr_t paddr;
-	int flags;
-	bus_space_handle_t *hp;
+	u_int btype;
+	u_int offset;
 {
-	bus_addr_t offset = paddr;
-	int slot = (paddr>>32);
+	bus_addr_t baddr;
+	int slot = btype;
 	struct sbus_softc *sc = t->cookie;
 	int i;
 
 	for (i = 0; i < sc->sc_nrange; i++) {
-		bus_addr_t paddr;
-
 		if (sc->sc_range[i].cspace != slot)
 			continue;
 
-		paddr = sc->sc_range[i].poffset + offset;
-		paddr |= ((bus_addr_t)sc->sc_range[i].pspace<<32);
-		return (bus_space_mmap(sc->sc_bustag, 0, paddr,
-				       flags, hp));
+		baddr = sc->sc_range[i].poffset + offset;
+		baddr |= ((bus_addr_t)sc->sc_range[i].pspace<<32);
 	}
 
-	return (-1);
+	return (baddr);
 }
 
 
@@ -518,7 +484,7 @@ sbus_establish(sd, dev)
 }
 
 /*
- * Reset the given sbus. (???)
+ * Reset the given sbus.
  */
 void
 sbusreset(sbus)
@@ -541,6 +507,24 @@ sbusreset(sbus)
 }
 
 /*
+ * Handle an overtemp situation.
+ *
+ * SPARCs have temperature sensors which generate interrupts
+ * if the machine's temperature exceeds a certain threshold.
+ * This handles the interrupt and powers off the machine.
+ * The same needs to be done to PCI controller drivers.
+ */
+int
+sbus_overtemp(arg)
+	void *arg;
+{
+	/* Should try a clean shutdown first */
+	printf("DANGER: OVER TEMPERATURE detected\nShutting down...\n");
+	delay(20);
+	cpu_reboot(RB_POWERDOWN|RB_HALT, NULL);
+}
+
+/*
  * Get interrupt attributes for an Sbus device.
  */
 int
@@ -559,7 +543,7 @@ sbus_get_intr(sc, node, ipp, np, slot)
 	 * The `interrupts' property contains the Sbus interrupt level.
 	 */
 	ipl = NULL;
-	if (getprop(node, "interrupts", sizeof(int), np, (void **)&ipl) == 0) {
+	if (PROM_getprop(node, "interrupts", sizeof(int), np, (void **)&ipl) == 0) {
 		struct sbus_intr *ip;
 		int pri;
 
@@ -577,9 +561,9 @@ sbus_get_intr(sc, node, ipp, np, slot)
 		 * somehow. Luckily, the interrupt vector has lots of free
 		 * space and we can easily stuff the IPL in there for a while.
 		 */
-		getpropstringA(node, "device_type", buf);
+		PROM_getpropstringA(node, "device_type", buf);
 		if (!buf[0])
-			getpropstringA(node, "name", buf);
+			PROM_getpropstringA(node, "name", buf);
 
 		for (i = 0; intrmap[i].in_class; i++) 
 			if (strcmp(intrmap[i].in_class, buf) == 0) {
@@ -646,7 +630,7 @@ sbus_intr_establish(t, pri, level, flags, handler, arg)
 		vec = INTVEC(vec);
 		DPRINTF(SDB_INTR,
 		    ("\nsbus: intr[%ld]%lx: %lx\nHunting for IRQ...\n",
-		    (long)ipl, (long)vec, intrlev[vec]));
+		    (long)ipl, (long)vec, (u_long)intrlev[vec]));
 		if ((vec & INTMAP_OBIO) == 0) {
 			/* We're in an SBUS slot */
 			/* Register the map and clear intr registers */
@@ -659,16 +643,18 @@ sbus_intr_establish(t, pri, level, flags, handler, arg)
 			if (sbus_debug & SDB_INTR) {
 				int64_t intrmap = *ih->ih_map;
 				
-				printf("Found SBUS %lx IRQ as %llx in slot %d\n", 
+				printf("SBUS %lx IRQ as %llx in slot %d\n", 
 				       (long)vec, (long long)intrmap, slot);
-				printf("\tmap addr %p clr addr %p\n", ih->ih_map, ih->ih_clr);
+				printf("\tmap addr %p clr addr %p\n",
+				    ih->ih_map, ih->ih_clr);
 			}
 #endif
 			/* Enable the interrupt */
 			vec |= INTMAP_V;
 			/* Insert IGN */
 			vec |= sc->sc_ign;
-			bus_space_write_8(sc->sc_bustag, ih->ih_map, 0, vec);
+			/* XXXX */
+			*(ih->ih_map) = vec;
 		} else {
 			int64_t *intrptr = &sc->sc_sysio->scsi_int_map;
 			int64_t intrmap = 0;
@@ -682,7 +668,7 @@ sbus_intr_establish(t, pri, level, flags, handler, arg)
 				;
 			if (INTVEC(intrmap) == INTVEC(vec)) {
 				DPRINTF(SDB_INTR,
-				    ("Found OBIO %lx IRQ as %lx in slot %d\n", 
+				    ("OBIO %lx IRQ as %lx in slot %d\n", 
 				    vec, (long)intrmap, i));
 				/* Register the map and clear intr registers */
 				ih->ih_map = &intrptr[i];
@@ -690,7 +676,8 @@ sbus_intr_establish(t, pri, level, flags, handler, arg)
 				ih->ih_clr = &intrptr[i];
 				/* Enable the interrupt */
 				intrmap |= INTMAP_V;
-				bus_space_write_8(sc->sc_bustag, ih->ih_map, 0, (u_long)intrmap);
+				/* XXXX */
+				*(ih->ih_map) = intrmap;
 			} else
 				panic("IRQ not found!");
 		}
@@ -723,7 +710,7 @@ sbus_alloc_bustag(sc)
 	sbt->parent = sc->sc_bustag;
 	sbt->type = SBUS_BUS_SPACE;
 	sbt->sparc_bus_map = _sbus_bus_map;
-	sbt->sparc_bus_mmap = sbus_bus_mmap;
+	sbt->sparc_bus_mmap = sc->sc_bustag->sparc_bus_mmap;
 	sbt->sparc_intr_establish = sbus_intr_establish;
 	return (sbt);
 }
@@ -773,7 +760,7 @@ sbus_dmamap_load(tag, map, buf, buflen, p, flags)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)tag->_cookie;
 
-	return (iommu_dvmamap_load(tag, &sc->sc_is, map, buf, buflen, p, flags));
+	return (iommu_dvmamap_load(tag, &sc->sc_sb, map, buf, buflen, p, flags));
 }
 
 int
@@ -787,7 +774,7 @@ sbus_dmamap_load_raw(tag, map, segs, nsegs, size, flags)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)tag->_cookie;
 
-	return (iommu_dvmamap_load_raw(tag, &sc->sc_is, map, segs, nsegs, flags, size));
+	return (iommu_dvmamap_load_raw(tag, &sc->sc_sb, map, segs, nsegs, flags, size));
 }
 
 void
@@ -797,7 +784,7 @@ sbus_dmamap_unload(tag, map)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)tag->_cookie;
 
-	iommu_dvmamap_unload(tag, &sc->sc_is, map);
+	iommu_dvmamap_unload(tag, &sc->sc_sb, map);
 }
 
 void
@@ -813,11 +800,11 @@ sbus_dmamap_sync(tag, map, offset, len, ops)
 	if (ops & (BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE)) {
 		/* Flush the CPU then the IOMMU */
 		bus_dmamap_sync(tag->_parent, map, offset, len, ops);
-		iommu_dvmamap_sync(tag, &sc->sc_is, map, offset, len, ops);
+		iommu_dvmamap_sync(tag, &sc->sc_sb, map, offset, len, ops);
 	}
 	if (ops & (BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE)) {
 		/* Flush the IOMMU then the CPU */
-		iommu_dvmamap_sync(tag, &sc->sc_is, map, offset, len, ops);
+		iommu_dvmamap_sync(tag, &sc->sc_sb, map, offset, len, ops);
 		bus_dmamap_sync(tag->_parent, map, offset, len, ops);
 	}
 }
@@ -835,7 +822,7 @@ sbus_dmamem_alloc(tag, size, alignment, boundary, segs, nsegs, rsegs, flags)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)tag->_cookie;
 
-	return (iommu_dvmamem_alloc(tag, &sc->sc_is, size, alignment, boundary,
+	return (iommu_dvmamem_alloc(tag, &sc->sc_sb, size, alignment, boundary,
 	    segs, nsegs, rsegs, flags));
 }
 
@@ -847,7 +834,7 @@ sbus_dmamem_free(tag, segs, nsegs)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)tag->_cookie;
 
-	iommu_dvmamem_free(tag, &sc->sc_is, segs, nsegs);
+	iommu_dvmamem_free(tag, &sc->sc_sb, segs, nsegs);
 }
 
 int
@@ -861,7 +848,7 @@ sbus_dmamem_map(tag, segs, nsegs, size, kvap, flags)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)tag->_cookie;
 
-	return (iommu_dvmamem_map(tag, &sc->sc_is, segs, nsegs, size, kvap, flags));
+	return (iommu_dvmamem_map(tag, &sc->sc_sb, segs, nsegs, size, kvap, flags));
 }
 
 void
@@ -872,5 +859,5 @@ sbus_dmamem_unmap(tag, kva, size)
 {
 	struct sbus_softc *sc = (struct sbus_softc *)tag->_cookie;
 
-	iommu_dvmamem_unmap(tag, &sc->sc_is, kva, size);
+	iommu_dvmamem_unmap(tag, &sc->sc_sb, kva, size);
 }

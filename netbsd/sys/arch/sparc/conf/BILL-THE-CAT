@@ -1,7 +1,9 @@
-# 	$NetBSD: BILL-THE-CAT,v 1.9 1999/11/07 01:09:12 mycroft Exp $
+# 	$NetBSD: BILL-THE-CAT,v 1.20.4.1 2002/08/01 04:31:52 lukem Exp $
 # 	From: NetBSD: GENERIC,v 1.84 1999/06/06 13:00:03 mrg Exp
 
 include "arch/sparc/conf/std.sparc"
+
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
 maxusers	32
 
@@ -14,7 +16,7 @@ maxusers	32
 #options 	SUN4C		# sun4c - SS1, 1+, 2, ELC, SLC, IPC, IPX, etc.
 options 	SUN4M		# sun4m - SS10, SS20, Classic, etc.
 
-#options 	SUN4_MMU3L	# 3-level MMU on sun4/400; (incomplete)
+#options 	SUN4_MMU3L	# 3-level MMU on sun4/400
 
 ## System options specific to the sparc machine type
 
@@ -26,8 +28,8 @@ options 	SUN4M		# sun4m - SS10, SS20, Classic, etc.
 options 	RASTERCONSOLE		# fast rasterop console
 options 	FONT_GALLANT12x22	# the console font
 options 	FONT_BOLD8x16		# a somewhat smaller font
-#options	RASTERCONSOLE_FGCOL=WSCOL_BLACK
-#options	RASTERCONSOLE_BGCOL=WSCOL_WHITE
+#options 	RASTERCONSOLE_FGCOL=WSCOL_BLACK
+#options 	RASTERCONSOLE_BGCOL=WSCOL_WHITE
 
 #### System options that are the same for all ports
 
@@ -55,7 +57,10 @@ options 	SYSVSHM		# System V shared memory
 ## Loadable kernel module support; still under development.
 options 	LKM
 
-## NFS boot options; default on sparc is the bootparam protocol
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
+## NFS boot options; tries DHCP/BOOTP then BOOTPARAM
 #options 	NFS_BOOT_BOOTPARAM
 #options 	NFS_BOOT_BOOTP
 #options 	NFS_BOOT_DHCP
@@ -70,18 +75,18 @@ options 	LKM
 #options 	DDB_ONPANIC=1		# see also sysctl(8): `ddb.onpanic'
 
 ## You may also use gdb, on another computer connected to this machine over
-## a serial port.  Both KGDBDEV and KGDBRATE should be specified; KGDBDEV is
-## a dev_t encoded device number of the serial port to use.
+## a serial port.  Both KGDB_DEV and KGDB_DEVRATE should be specified;
+## KGDB_DEV is a dev_t encoded device number of the serial port to use.
 ## (0xc01 = ttya, 0xc02 = ttyb.)
-#options 	KGDB		# support for kernel gdb
-#options 	KGDBDEV=0xc01	# kgdb device number (this sample is `ttyb')
-#options 	KGDBRATE=38400	# baud rate
+#options 	KGDB			# support for kernel gdb
+#options 	KGDB_DEV=0xc01		# kgdb device number (this is `ttyb')
+#options 	KGDB_DEVRATE=38400	# baud rate
 
 
 ## Compile the kernel with debugging symbols (`netbsd.gdb' is the debug file),
 ## such that gdb(1) can be used on a kernel coredump.
 
-#makeoptions 	DEBUG="-g"
+#makeoptions	DEBUG="-g"
 
 
 ## Adds code to the kernel that does internal consistency checks, and will
@@ -127,7 +132,7 @@ options 	COMPAT_13	# NetBSD 1.3 binary compatibility
 options 	COMPAT_14	# NetBSD 1.4 binary compatibility
 options 	COMPAT_SUNOS	# SunOS 4.x binary compatibility
 options 	COMPAT_SVR4	# SunOS 5.x binary compatibility
-options 	COMPAT_AOUT	# NetBSD a.out compatibility
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 ## File systems.  You probably need at least one of FFS or NFS.
 file-system	FFS		# Berkeley Fast Filesystem
@@ -151,7 +156,6 @@ file-system	MSDOSFS		# MS-DOS FAT filesystem(s).
 
 ## Network protocol support.  In most environments, INET is required.
 options 	INET		# IP (Internet Protocol) v4
-#options 	TCP_COMPAT_42	# 4.2BSD IP implementation compatibility
 #options 	GATEWAY		# packet forwarding ("router switch")
 #options 	MROUTING	# packet forwarding of multicast packets
 #options 	DIRECTED_BROADCAST	# allow broadcasts through routers
@@ -168,7 +172,7 @@ options 	INET		# IP (Internet Protocol) v4
 #options 	PPP_BSDCOMP	# Add BSD compression to ppp device
 #options 	PPP_DEFLATE	# Add deflate (libz) compression to ppp device
 #options 	PPP_FILTER	# Add active filters for ppp (via bpf)
-
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 
 #### Main bus and CPU .. all systems.
@@ -431,7 +435,7 @@ le0		at ledma0				# sun4m on-board
 
 # MII/PHY support
 #exphy*	at mii? phy ?			# 3Com internal PHYs
-#icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS1890
+#icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS189x
 #inphy*	at mii? phy ?			# Intel 82555 PHYs
 #lxtphy*	at mii? phy ?			# Level One LXT-970 PHYs
 #nsphy*	at mii? phy ?			# NS83840 PHYs
@@ -526,14 +530,12 @@ cgthree*	at sbus? slot ? offset ?
 #### Other device configuration
 
 ## Pseudo ttys, required for network logins and programs like screen.
-## 32 is a good number for average systems; you may have as many as you
-## like, though 256 is more or less the upper limit.  Increasing this
-## number still requires you to run /dev/MAKEDEV to create the files
-## for the ptys.
 
-pseudo-device	pty		32	# pseudo-ttys (for network, etc.)
+pseudo-device	pty			# pseudo-ttys (for network, etc.)
 
 ## Random device, used to implement /dev/random (a source of random noise),
 ## and generate randomness for some kernel formulae.
 
 pseudo-device	rnd
+
+pseudo-device	clockctl		# user control of clock subsystem

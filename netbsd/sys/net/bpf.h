@@ -1,4 +1,4 @@
-/*	$NetBSD: bpf.h,v 1.25.4.1 2000/11/03 19:24:08 tv Exp $	*/
+/*	$NetBSD: bpf.h,v 1.29 2001/12/14 23:30:02 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1990, 1991, 1993
@@ -43,6 +43,8 @@
 
 #ifndef _NET_BPF_H_
 #define _NET_BPF_H_
+
+#include <sys/time.h>
 
 /* BSD style release date */
 #define BPF_RELEASE 199606
@@ -162,37 +164,15 @@ struct bpf_hdr {
 #ifdef _KERNEL
 #if defined(__arm32__) || defined(__i386__) || defined(__m68k__) || \
     defined(__mips__) || defined(__ns32k__) || defined(__vax__) || \
-    defined(__sh3__) || (defined(__sparc__) && !defined(__sparc64__))
+    defined(__sh__) || (defined(__sparc__) && !defined(__sparc64__))
 #define SIZEOF_BPF_HDR 18
 #else
 #define SIZEOF_BPF_HDR sizeof(struct bpf_hdr)
 #endif
 #endif
 
-/*
- * Data-link level type codes.
- */
-#define DLT_NULL	0	/* no link-layer encapsulation */
-#define DLT_EN10MB	1	/* Ethernet (10Mb) */
-#define DLT_EN3MB	2	/* Experimental Ethernet (3Mb) */
-#define DLT_AX25	3	/* Amateur Radio AX.25 */
-#define DLT_PRONET	4	/* Proteon ProNET Token Ring */
-#define DLT_CHAOS	5	/* Chaos */
-#define DLT_IEEE802	6	/* IEEE 802 Networks */
-#define DLT_ARCNET	7	/* ARCNET */
-#define DLT_SLIP	8	/* Serial Line IP */
-#define DLT_PPP		9	/* Point-to-point Protocol */
-#define DLT_FDDI	10	/* FDDI */
-#define DLT_ATM_RFC1483	11	/* LLC/SNAP encapsulated atm */
-#define DLT_RAW		12	/* raw IP */
-#define DLT_SLIP_BSDOS	13	/* BSD/OS Serial Line IP */
-#define DLT_PPP_BSDOS	14	/* BSD/OS Point-to-point Protocol */
-#define DLT_HIPPI	15	/* HIPPI */
-#define DLT_HDLC	16	/* HDLC framing */
-
-/* NetBSD-specific types */
-#define	DLT_PPP_SERIAL	50	/* PPP over serial (async and sync) */
-#define	DLT_PPP_ETHER	51	/* PPP over Ethernet */
+/* Pull in data-link level type codes. */
+#include <net/dlt.h>
 
 /*
  * The instruction encondings.
@@ -270,9 +250,9 @@ struct bpf_insn {
 int	 bpf_validate __P((struct bpf_insn *, int));
 void	 bpf_tap __P((caddr_t, u_char *, u_int));
 void	 bpf_mtap __P((caddr_t, struct mbuf *));
-void	 bpfattach __P((caddr_t *, struct ifnet *, u_int, u_int));
+void	 bpfattach __P((struct ifnet *, u_int, u_int));
 void	 bpfdetach __P((struct ifnet *));
-void	 bpf_change_type __P((caddr_t *, u_int, u_int));
+void	 bpf_change_type __P((struct ifnet *, u_int, u_int));
 void	 bpfilterattach __P((int));
 #endif
 

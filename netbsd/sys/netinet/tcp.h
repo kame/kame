@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp.h,v 1.11 1999/11/20 00:38:00 thorpej Exp $	*/
+/*	$NetBSD: tcp.h,v 1.13 2001/05/26 21:40:55 matt Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -49,10 +49,12 @@ struct tcphdr {
 	tcp_seq	  th_seq;		/* sequence number */
 	tcp_seq	  th_ack;		/* acknowledgement number */
 #if BYTE_ORDER == LITTLE_ENDIAN
+	/*LINTED non-portable bitfields*/
 	u_int8_t  th_x2:4,		/* (unused) */
 		  th_off:4;		/* data offset */
 #endif
 #if BYTE_ORDER == BIG_ENDIAN
+	/*LINTED non-portable bitfields*/
 	u_int8_t  th_off:4,		/* data offset */
 		  th_x2:4;		/* (unused) */
 #endif
@@ -80,6 +82,8 @@ struct tcphdr {
 #define	TCPOPT_TIMESTAMP	8
 #define	   TCPOLEN_TIMESTAMP		10
 #define	   TCPOLEN_TSTAMP_APPA		(TCPOLEN_TIMESTAMP+2) /* appendix A */
+#define	TCPOPT_MD5SIGNATURE	19		/* RFC 2385 */
+#define    TCPOLEN_MD5SIGNATURE		18
 
 #define TCPOPT_TSTAMP_HDR	\
     (TCPOPT_NOP<<24|TCPOPT_NOP<<16|TCPOPT_TIMESTAMP<<8|TCPOLEN_TIMESTAMP)

@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.21 2000/02/11 19:30:29 thorpej Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.26 2001/11/15 18:06:16 soren Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -44,6 +44,14 @@
 /*
  * Machine dependent constants for 532.
  */
+
+/*
+ * The NS32532 has 4K pages.  Override the PAGE_* definitions to
+ * be compile-time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
 
 /*
  * Virtual address space arrangement. On 532, both user and kernel
@@ -97,35 +105,24 @@
 #endif
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
 /* user/kernel map constants */
 #define VM_MIN_ADDRESS		((vaddr_t)0)
-/* PTDPTDI << PDSHIFT */
-#define VM_MAXUSER_ADDRESS	((vaddr_t)0xF7C00000)
-/* PTDPTDI << PDSHIFT + PTDPTDI << PGSHIFT */
-#define VM_MAX_ADDRESS		((vaddr_t)0xF7FDF000)
-/* KPTDI << PDSHIFT */
-#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xF8000000)
-/* APTDPTDI << PDSHIFT */
+/* (PDSLOT_PTE << PDSHIFT) */
+#define VM_MAXUSER_ADDRESS	((vaddr_t)0xDFC00000)
+/* (PDSLOT_PTE << PDSHIFT) + (PDSLOT_PTE << PGSHIFT) */
+#define VM_MAX_ADDRESS		((vaddr_t)0xDFFDF000)
+/* PDSLOT_KERN << PDSHIFT */
+#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xE0000000)
+/* PDSLOT_APTE << PDSHIFT */
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xFF800000)
 
 /* XXX max. amount of KVM to be used by buffers. */
 #ifndef VM_MAX_KERNEL_BUF
 #define VM_MAX_KERNEL_BUF \
-	((VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) * 7 / 10)
+	((VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) / 1024 * 7 / 10 * 1024)
 #endif
 
 /* virtual sizes (bytes) for various kernel submaps */
@@ -137,6 +134,8 @@
 
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
+
+#define	__HAVE_PMAP_PHYSSEG
 
 /*
  * pmap specific data stored in the vm_physmem[] array

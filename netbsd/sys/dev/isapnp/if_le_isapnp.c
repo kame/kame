@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_isapnp.c,v 1.17 1999/03/22 10:00:11 mycroft Exp $	*/
+/*	$NetBSD: if_le_isapnp.c,v 1.20 2001/11/13 07:56:40 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -67,10 +67,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h" 
- 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le_isapnp.c,v 1.20 2001/11/13 07:56:40 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -81,27 +80,12 @@
 #include <sys/select.h>
 #include <sys/device.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h> 
-#endif
- 
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-  
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -212,7 +196,7 @@ le_isapnp_attach(parent, self, aux)
 	/*
 	 * Allocate a DMA area for the card.
 	 */
-	if (bus_dmamem_alloc(dmat, LE_ISAPNP_MEMSIZE, NBPG, 0, &seg, 1,
+	if (bus_dmamem_alloc(dmat, LE_ISAPNP_MEMSIZE, PAGE_SIZE, 0, &seg, 1,
 	    &rseg, BUS_DMA_NOWAIT)) {
 		printf("%s: couldn't allocate memory for card\n",
 		    sc->sc_dev.dv_xname);

@@ -1,4 +1,4 @@
-/*	$NetBSD: sync_subr.c,v 1.3.6.2 2000/12/14 23:36:16 he Exp $	*/
+/*	$NetBSD: sync_subr.c,v 1.11 2001/12/06 04:29:55 chs Exp $	*/
 
 /*
  * Copyright 1997 Marshall Kirk McKusick. All Rights Reserved.
@@ -31,6 +31,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sync_subr.c,v 1.11 2001/12/06 04:29:55 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -51,7 +54,7 @@
 int syncer_maxdelay = SYNCER_MAXDELAY;	/* maximum delay time */
 time_t syncdelay = 30;			/* max time to delay syncing data */ 
 time_t filedelay = 30;			/* time to delay syncing files */
-time_t dirdelay  = 15;			/* time to dely syncing directories */
+time_t dirdelay  = 15;			/* time to delay syncing directories */
 time_t metadelay = 10;			/* time to delay syncing metadata */
 
 struct lock syncer_lock;		/* used to freeze syncer */
@@ -143,6 +146,7 @@ vn_syncer_remove_from_worklist(vp)
 	s = splbio();
 
 	if (vp->v_flag & VONWORKLST) {
+		vp->v_flag &= ~VONWORKLST;
 		LIST_REMOVE(vp, v_synclist);
 	}
 
@@ -180,24 +184,21 @@ sched_sync(v)
 		lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
 
 		while ((vp = LIST_FIRST(slp)) != NULL) {
-			if (VOP_ISLOCKED(vp) == 0) {
-				vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+			if (vn_lock(vp, LK_EXCLUSIVE | LK_NOWAIT) == 0) {
 				(void) VOP_FSYNC(vp, curproc->p_ucred,
 				    FSYNC_LAZY, 0, 0, curproc);
 				VOP_UNLOCK(vp, 0);
 			}
 			s = splbio();
 			if (LIST_FIRST(slp) == vp) {
-				if (LIST_FIRST(&vp->v_dirtyblkhd) == NULL &&
-				    vp->v_type != VBLK)
-					panic("sched_sync: fsync failed vp %p tag %d",
-					      vp, vp->v_tag);
+
 				/*
 				 * Put us back on the worklist.  The worklist
 				 * routine will remove us from our current
 				 * position and then add us back in at a later
 				 * position.
 				 */
+
 				vn_syncer_add_to_worklist(vp, syncdelay);
 			}
 			splx(s);
@@ -235,7 +236,7 @@ sched_sync(v)
 		 * filesystem activity.
 		 */
 		if (time.tv_sec == starttime)
-			tsleep(&lbolt, PPAUSE, "syncer", 0);
+			tsleep(&rushjob, PPAUSE, "syncer", hz);
 	}
 }
 
@@ -247,16 +248,12 @@ sched_sync(v)
 int
 speedup_syncer()
 {
-	int s;
-	
-	s = splhigh();
-	if (updateproc && updateproc->p_wchan == &lbolt)
-		setrunnable(updateproc);
-	splx(s);
-	if (rushjob < syncdelay / 2) {
-		rushjob += 1;
-		stat_rush_requests += 1;
-		return (1);
+	if (rushjob >= syncdelay / 2) {
+		return (0);
 	}
-	return(0);
+
+	rushjob++;
+	wakeup(&rushjob);
+	stat_rush_requests += 1;
+	return (1);
 }

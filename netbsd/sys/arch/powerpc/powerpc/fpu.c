@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.c,v 1.3 2000/06/08 07:30:47 kleink Exp $	*/
+/*	$NetBSD: fpu.c,v 1.5 2001/07/22 11:29:46 wiz Exp $	*/
 
 /*
  * Copyright (C) 1996 Wolfgang Solfrank.
@@ -48,7 +48,7 @@ enable_fpu(p)
 	
 	tf->srr1 |= PSL_FP;
 	if (!(pcb->pcb_flags & PCB_FPU)) {
-		bzero(&pcb->pcb_fpu, sizeof pcb->pcb_fpu);
+		memset(&pcb->pcb_fpu, 0, sizeof pcb->pcb_fpu);
 		pcb->pcb_flags |= PCB_FPU;
 	}
 	asm volatile ("mfmsr %0; ori %1,%0,%2; mtmsr %1; isync"
@@ -132,4 +132,6 @@ save_fpu(p)
 	     "stfd 31,248(%0)" :: "b"(&pcb->pcb_fpu.fpr[0]));
 	asm volatile ("mffs 0; stfd 0,0(%0)" :: "b"(&pcb->pcb_fpu.fpscr));
 	asm volatile ("mtmsr %0; isync" :: "r"(msr));
+	pcb->pcb_fpcpu = NULL;
+	fpuproc = NULL;
 }

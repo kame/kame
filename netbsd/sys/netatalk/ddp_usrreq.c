@@ -1,4 +1,4 @@
-/*	$NetBSD: ddp_usrreq.c,v 1.4 2000/02/02 23:28:09 thorpej Exp $	 */
+/*	$NetBSD: ddp_usrreq.c,v 1.7 2002/05/12 21:43:23 matt Exp $	 */
 
 /*
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
@@ -26,9 +26,11 @@
  *	netatalk@umich.edu
  */
 
-#include <sys/errno.h>
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ddp_usrreq.c,v 1.7 2002/05/12 21:43:23 matt Exp $");
+
 #include <sys/param.h>
+#include <sys/errno.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/mbuf.h>
@@ -54,8 +56,10 @@ static int at_pcbconnect __P((struct ddpcb *, struct mbuf *, struct proc *));
 static void at_pcbdetach __P((struct socket *, struct ddpcb *));
 static int at_pcballoc __P((struct socket *));
 
+struct ifqueue atintrq1, atintrq2;
 struct ddpcb   *ddp_ports[ATPORT_LAST];
 struct ddpcb   *ddpcb = NULL;
+struct ddpstat	ddpstat;
 struct at_ifaddrhead at_ifaddr;		/* Here as inited in this file */
 u_long ddp_sendspace = DDP_MAXSZ;	/* Max ddp size + 1 (ddp_type) */
 u_long ddp_recvspace = 25 * (587 + sizeof(struct sockaddr_at));

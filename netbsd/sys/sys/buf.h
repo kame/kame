@@ -1,4 +1,4 @@
-/*	$NetBSD: buf.h,v 1.43 2000/04/10 02:22:15 chs Exp $	*/
+/*	$NetBSD: buf.h,v 1.49 2002/05/12 23:06:28 matt Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -154,7 +154,7 @@ do {									\
 struct buf;
 struct mount;
 struct vnode;
-extern struct bio_ops {
+struct bio_ops {
  	void	(*io_start) __P((struct buf *));
  	void	(*io_complete) __P((struct buf *));
  	void	(*io_deallocate) __P((struct buf *));
@@ -162,7 +162,8 @@ extern struct bio_ops {
  	int	(*io_sync) __P((struct mount *));
 	void	(*io_movedeps) __P((struct buf *, struct buf *));
 	int	(*io_countdeps) __P((struct buf *, int));
-} bioops;
+	void	(*io_pageiodone) __P((struct buf *));
+};
 
 /*
  * The buffer header describes an I/O operation in the kernel.
@@ -172,7 +173,7 @@ struct buf {
 	LIST_ENTRY(buf) b_vnbufs;	/* Buffer's associated vnode. */
 	TAILQ_ENTRY(buf) b_freelist;	/* Free list position if not active. */
 	TAILQ_ENTRY(buf) b_actq;	/* Device driver queue when active. */
-	struct  proc *b_proc;		/* Associated proc; NULL if kernel. */
+	struct  proc *b_proc;		/* Associated proc if B_PHYS set. */
 	volatile long	b_flags;	/* B_* flags. */
 	int	b_error;		/* Errno value. */
 	long	b_bufsize;		/* Allocated buffer size. */
@@ -190,13 +191,8 @@ struct buf {
 					   number (not partition relative) */
 					/* Function to call upon completion. */
 	void	(*b_iodone) __P((struct buf *));
-	struct	vnode *b_vp;		/* Device vnode. */
-	int	b_dirtyoff;		/* Offset in buffer of dirty region. */
-	int	b_dirtyend;		/* Offset of end of dirty region. */
-	struct	ucred *b_rcred;		/* Read credentials reference. */
-	struct	ucred *b_wcred;		/* Write credentials reference. */
-	int	b_validoff;		/* Offset in buffer of valid region. */
-	int	b_validend;		/* Offset of end of valid region. */
+	struct	vnode *b_vp;		/* File vnode. */
+	void	*b_private;		/* Private data for owner */
 	off_t	b_dcookie;		/* Offset cookie if dir block */
 	struct  workhead b_dep;		/* List of filesystem dependencies. */
 };
@@ -230,13 +226,13 @@ struct buf {
 #define	B_LOCKED	0x00004000	/* Locked in core (not reusable). */
 #define	B_NOCACHE	0x00008000	/* Do not cache block after use. */
 #define	B_ORDERED	0x00010000	/* ordered I/O request */
+#define	B_CACHE		0x00020000	/* Bread found us in the cache. */
 #define	B_PHYS		0x00040000	/* I/O to user memory. */
 #define	B_RAW		0x00080000	/* Set by physio for raw transfers. */
 #define	B_READ		0x00100000	/* Read buffer. */
 #define	B_TAPE		0x00200000	/* Magnetic tape I/O. */
 #define	B_WANTED	0x00800000	/* Process wants this buffer. */
 #define	B_WRITE		0x00000000	/* Write buffer (pseudo flag). */
-#define	B_WRITEINPROG	0x01000000	/* Write in progress. */
 #define	B_XXX		0x02000000	/* Debugging flag. */
 #define	B_VFLUSH	0x04000000	/* Buffer is being synced. */
 
@@ -261,20 +257,22 @@ struct cluster_save {
 do {									\
 	memset((bp)->b_data, 0, (u_int)(bp)->b_bcount);			\
 	(bp)->b_resid = 0;						\
-} while (0)
+} while (/* CONSTCOND */ 0)
 
 /* Flags to low-level allocation routines. */
 #define B_CLRBUF	0x01	/* Request allocated buffer be cleared. */
 #define B_SYNC		0x02	/* Do all allocations synchronously. */
 
 #ifdef _KERNEL
+
+extern	struct bio_ops bioops;
 extern	int nbuf;		/* The number of buffer headers */
 extern	struct buf *buf;	/* The buffer headers. */
 extern	char *buffers;		/* The buffer contents. */
 extern	int bufpages;		/* Number of memory pages in the buffer pool. */
 extern	int nswbuf;		/* Number of swap I/O buffer headers. */
 
-extern struct pool bufpool;	/* I/O buf pool */
+extern	struct pool bufpool;	/* I/O buf pool */
 
 __BEGIN_DECLS
 void	allocbuf __P((struct buf *, int));

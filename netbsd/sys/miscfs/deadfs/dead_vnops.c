@@ -1,4 +1,4 @@
-/*	$NetBSD: dead_vnops.c,v 1.29 2000/05/27 04:52:37 thorpej Exp $	*/
+/*	$NetBSD: dead_vnops.c,v 1.32 2001/12/06 04:27:40 chs Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -34,6 +34,9 @@
  *
  *	@(#)dead_vnops.c	8.2 (Berkeley) 11/21/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dead_vnops.c,v 1.32 2001/12/06 04:27:40 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -92,12 +95,13 @@ int	dead_print	__P((void *));
 #define dead_update	genfs_nullop
 #define dead_bwrite	genfs_nullop
 #define dead_revoke	genfs_nullop
+#define dead_putpages	genfs_null_putpages
 
 int	chkvnlock __P((struct vnode *));
 
 int (**dead_vnodeop_p) __P((void *));
 
-struct vnodeopv_entry_desc dead_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc dead_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, dead_lookup },		/* lookup */
 	{ &vop_create_desc, dead_create },		/* create */
@@ -142,9 +146,10 @@ struct vnodeopv_entry_desc dead_vnodeop_entries[] = {
 	{ &vop_truncate_desc, dead_truncate },		/* truncate */
 	{ &vop_update_desc, dead_update },		/* update */
 	{ &vop_bwrite_desc, dead_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, dead_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc dead_vnodeop_opv_desc =
+const struct vnodeopv_desc dead_vnodeop_opv_desc =
 	{ &dead_vnodeop_p, dead_vnodeop_entries };
 
 /*

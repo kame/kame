@@ -1,4 +1,4 @@
-/*	$NetBSD: socket.h,v 1.55.2.2 2001/05/01 10:29:06 he Exp $	*/
+/*	$NetBSD: socket.h,v 1.65 2001/10/22 20:59:04 kleink Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,10 +75,30 @@
  * Data types.
  */
 #include <sys/ansi.h>
+
+#ifndef sa_family_t
+typedef __sa_family_t	sa_family_t;
+#define sa_family_t	__sa_family_t
+#endif
+
 #ifndef socklen_t
 typedef __socklen_t	socklen_t;
 #define socklen_t	__socklen_t
 #endif
+
+#include <machine/ansi.h>
+
+#ifdef	_BSD_SIZE_T_
+typedef	_BSD_SIZE_T_	size_t;
+#undef	_BSD_SIZE_T_
+#endif
+
+#ifdef	_BSD_SSIZE_T_
+typedef	_BSD_SSIZE_T_	ssize_t;
+#undef	_BSD_SSIZE_T_
+#endif
+
+#include <sys/uio.h>
 
 /*
  * Socket types.
@@ -183,9 +203,9 @@ struct	linger {
  * addresses.
  */
 struct sockaddr {
-	u_char	sa_len;			/* total length */
-	u_char	sa_family;		/* address family */
-	char	sa_data[14];		/* actually longer; address value */
+	__uint8_t	sa_len;		/* total length */
+	sa_family_t	sa_family;	/* address family */
+	char		sa_data[14];	/* actually longer; address value */
 };
 
 #if defined(_KERNEL)
@@ -204,18 +224,18 @@ struct sockproto {
  * RFC 2553: protocol-independent placeholder for socket addresses
  */
 #define _SS_MAXSIZE	128
-#define _SS_ALIGNSIZE	(sizeof(int64_t))
-#define _SS_PAD1SIZE	(_SS_ALIGNSIZE - sizeof(u_char) * 2)
-#define _SS_PAD2SIZE	(_SS_MAXSIZE - sizeof(u_char) * 2 - \
+#define _SS_ALIGNSIZE	(sizeof(__int64_t))
+#define _SS_PAD1SIZE	(_SS_ALIGNSIZE - 2)
+#define _SS_PAD2SIZE	(_SS_MAXSIZE - 2 - \
 				_SS_PAD1SIZE - _SS_ALIGNSIZE)
 
 #if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
 struct sockaddr_storage {
-	u_char	ss_len;		/* address length */
-	u_char	ss_family;	/* address family */
-	char	__ss_pad1[_SS_PAD1SIZE];
-	int64_t	__ss_align;	/* force desired structure storage alignment */
-	char	__ss_pad2[_SS_PAD2SIZE];
+	__uint8_t	ss_len;		/* address length */
+	sa_family_t	ss_family;	/* address family */
+	char		__ss_pad1[_SS_PAD1SIZE];
+	__int64_t     __ss_align;/* force desired structure storage alignment */
+	char		__ss_pad2[_SS_PAD2SIZE];
 };
 #endif /* !_XOPEN_SOURCE || ... */
 #endif /* 1 */
@@ -266,6 +286,17 @@ struct sockaddr_storage {
 #define	PF_MAX		AF_MAX
 
 #if !defined(_XOPEN_SOURCE)
+
+#ifndef	gid_t
+typedef	__gid_t		gid_t;		/* group id */
+#define	gid_t		__gid_t
+#endif
+
+#ifndef	uid_t
+typedef	__uid_t		uid_t;		/* user id */
+#define	uid_t		__uid_t
+#endif
+
 /*
  * Socket credentials.
  */
@@ -401,7 +432,7 @@ struct cmsghdr {
 
 /* given pointer to struct cmsghdr, return pointer to data */
 #define	CMSG_DATA(cmsg) \
-	((u_char *)(cmsg) + __CMSG_ALIGN(sizeof(struct cmsghdr)))
+	((u_char *)(void *)(cmsg) + __CMSG_ALIGN(sizeof(struct cmsghdr)))
 
 /*
  * Alignment requirement for CMSG struct manipulation.
@@ -419,13 +450,21 @@ struct cmsghdr {
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
-	(((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len) + \
+	(((__caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len) + \
 			    __CMSG_ALIGN(sizeof(struct cmsghdr)) > \
-	    (((caddr_t)(mhdr)->msg_control) + (mhdr)->msg_controllen)) ? \
+	    (((__caddr_t)(mhdr)->msg_control) + (mhdr)->msg_controllen)) ? \
 	    (struct cmsghdr *)NULL : \
-	    (struct cmsghdr *)((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len)))
+	    (struct cmsghdr *)((__caddr_t)(cmsg) + \
+	        __CMSG_ALIGN((cmsg)->cmsg_len)))
 
-#define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
+/*
+ * RFC 2292 requires to check msg_controllen, in case that the kernel returns
+ * an empty list for some reasons.
+ */
+#define	CMSG_FIRSTHDR(mhdr) \
+	((mhdr)->msg_controllen >= sizeof(struct cmsghdr) ? \
+	 (struct cmsghdr *)(mhdr)->msg_control : \
+	 (struct cmsghdr *)NULL)
 
 #define CMSG_SPACE(l)	(__CMSG_ALIGN(sizeof(struct cmsghdr)) + __CMSG_ALIGN(l))
 #define CMSG_LEN(l)	(__CMSG_ALIGN(sizeof(struct cmsghdr)) + (l))
@@ -449,20 +488,20 @@ struct cmsghdr {
  * 4.3 compat sockaddr, move to compat file later
  */
 struct osockaddr {
-	u_short	sa_family;		/* address family */
-	char	sa_data[14];		/* up to 14 bytes of direct address */
+	__uint16_t	sa_family;	/* address family */
+	char		sa_data[14];	/* up to 14 bytes of direct address */
 };
 
 /*
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
-	caddr_t	msg_name;		/* optional address */
-	int	msg_namelen;		/* size of address */
-	struct	iovec *msg_iov;		/* scatter/gather array */
-	int	msg_iovlen;		/* # elements in msg_iov */
-	caddr_t	msg_accrights;		/* access rights sent/received */
-	int	msg_accrightslen;
+	__caddr_t	msg_name;	/* optional address */
+	int		msg_namelen;	/* size of address */
+	struct iovec	*msg_iov;	/* scatter/gather array */
+	int		msg_iovlen;	/* # elements in msg_iov */
+	__caddr_t	msg_accrights;	/* access rights sent/received */
+	int		msg_accrightslen;
 };
 #endif
 
@@ -475,16 +514,19 @@ __END_DECLS
 #ifndef	_KERNEL
 
 __BEGIN_DECLS
-int	accept __P((int, struct sockaddr *, socklen_t *));
+int	accept __P((int, struct sockaddr * __restrict, socklen_t * __restrict));
 int	bind __P((int, const struct sockaddr *, socklen_t));
 int	connect __P((int, const struct sockaddr *, socklen_t));
-int	getpeername __P((int, struct sockaddr *, socklen_t *));
-int	getsockname __P((int, struct sockaddr *, socklen_t *));
-int	getsockopt __P((int, int, int, void *, socklen_t *));
+int	getpeername __P((int, struct sockaddr * __restrict,
+	    socklen_t * __restrict));
+int	getsockname __P((int, struct sockaddr * __restrict,
+	    socklen_t * __restrict));
+int	getsockopt __P((int, int, int, void * __restrict,
+	    socklen_t * __restrict));
 int	listen __P((int, int));
 ssize_t	recv __P((int, void *, size_t, int));
-ssize_t	recvfrom __P((int, void *, size_t, int, struct sockaddr *,
-	    socklen_t *));
+ssize_t	recvfrom __P((int, void * __restrict, size_t, int,
+	    struct sockaddr * __restrict, socklen_t * __restrict));
 ssize_t	recvmsg __P((int, struct msghdr *, int));
 ssize_t	send __P((int, const void *, size_t, int));
 ssize_t	sendto __P((int, const void *,
@@ -492,13 +534,10 @@ ssize_t	sendto __P((int, const void *,
 ssize_t	sendmsg __P((int, const struct msghdr *, int));
 int	setsockopt __P((int, int, int, const void *, socklen_t));
 int	shutdown __P((int, int));
+int	sockatmark __P((int));
 int	socket __P((int, int, int));
 int	socketpair __P((int, int, int, int *));
 __END_DECLS
-#else
-#ifdef COMPAT_OLDSOCK
-#define MSG_COMPAT	0x8000
-#endif
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_SOCKET_H_ */

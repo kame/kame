@@ -1,4 +1,4 @@
-/* $NetBSD: pcdisplay_chars.c,v 1.5 2000/06/08 07:01:19 cgd Exp $ */
+/* $NetBSD: pcdisplay_chars.c,v 1.7 2001/11/13 13:14:43 lukem Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -32,6 +32,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcdisplay_chars.c,v 1.7 2001/11/13 13:14:43 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -45,7 +48,7 @@
 #define CONTROL 1 /* XXX smiley */
 #define NOTPRINTABLE 4 /* diamond XXX watch out - not in ISO part! */
 
-static u_char isomappings[128] = {
+static const u_char isomappings[128] = {
 	CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
 	CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
 	CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
@@ -148,7 +151,7 @@ static u_char isomappings[128] = {
 	0x98, /* 0x00ff LATIN SMALL LETTER Y WITH DIAERESIS */
 };
 
-static struct {
+static const struct {
 	u_int16_t uni;
 	u_char ibm;
 } unimappings[] = {
@@ -262,7 +265,7 @@ static struct {
 	{0x266b, 0x0e}, /* BEAMED EIGHTH NOTES */
 };
 
-static struct {
+static const struct {
 	u_int16_t uni;
 	u_char ibm;
 	int quality;

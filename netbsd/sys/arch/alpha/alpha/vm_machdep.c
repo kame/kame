@@ -1,4 +1,4 @@
-/* $NetBSD: vm_machdep.c,v 1.57.2.1 2001/04/21 21:49:43 he Exp $ */
+/* $NetBSD: vm_machdep.c,v 1.76 2002/02/26 15:13:28 simonb Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.57.2.1 2001/04/21 21:49:43 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.76 2002/02/26 15:13:28 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,9 +41,6 @@ __KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.57.2.1 2001/04/21 21:49:43 he Exp $
 #include <sys/core.h>
 #include <sys/exec.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -51,16 +48,12 @@ __KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.57.2.1 2001/04/21 21:49:43 he Exp $
 #include <machine/pmap.h>
 #include <machine/reg.h>
 
-
 /*
  * Dump the machine specific header information at the start of a core dump.
  */
 int
-cpu_coredump(p, vp, cred, chdr)
-	struct proc *p;
-	struct vnode *vp;
-	struct ucred *cred;
-	struct core *chdr;
+cpu_coredump(struct proc *p, struct vnode *vp, struct ucred *cred,
+    struct core *chdr)
 {
 	int error;
 	struct md_coredump cpustate;
@@ -73,15 +66,12 @@ cpu_coredump(p, vp, cred, chdr)
 
 	cpustate.md_tf = *p->p_md.md_tf;
 	cpustate.md_tf.tf_regs[FRAME_SP] = alpha_pal_rdusp();	/* XXX */
-	if (p->p_md.md_flags & MDP_FPUSED)
-		if (p == fpcurproc) {
-			alpha_pal_wrfen(1);
-			savefpstate(&cpustate.md_fpstate);
-			alpha_pal_wrfen(0);
-		} else
-			cpustate.md_fpstate = p->p_addr->u_pcb.pcb_fp;
-	else
-		bzero(&cpustate.md_fpstate, sizeof(cpustate.md_fpstate));
+	if (p->p_md.md_flags & MDP_FPUSED) {
+		if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+			fpusave_proc(p, 1);
+		cpustate.md_fpstate = p->p_addr->u_pcb.pcb_fp;
+	} else
+		memset(&cpustate.md_fpstate, 0, sizeof(cpustate.md_fpstate));
 
 	CORE_SETMAGIC(cseg, CORESEGMAGIC, MID_MACHINE, CORE_CPU);
 	cseg.c_addr = 0;
@@ -110,12 +100,11 @@ cpu_coredump(p, vp, cred, chdr)
  * as if it were switching from proc0.
  */
 void
-cpu_exit(p)
-	struct proc *p;
+cpu_exit(struct proc *p)
 {
 
-	if (p == fpcurproc)
-		fpcurproc = NULL;
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p, 0);
 
 	/*
 	 * Deactivate the exiting address space before the vmspace
@@ -134,7 +123,7 @@ cpu_exit(p)
  * Copy and update the pcb and trap frame, making the child ready to run.
  * 
  * Rig the child's kernel stack so that it will start out in
- * switch_trampoline() and call child_return() with p2 as an
+ * proc_trampoline() and call child_return() with p2 as an
  * argument. This causes the newly-created child process to go
  * directly to user level with an apparent return value of 0 from
  * fork(), while the parent process returns normally.
@@ -148,17 +137,14 @@ cpu_exit(p)
  * accordingly.
  */
 void
-cpu_fork(p1, p2, stack, stacksize, func, arg)
-	register struct proc *p1, *p2;
-	void *stack;
-	size_t stacksize;
-	void (*func) __P((void *));
-	void *arg;
+cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize,
+    void (*func)(void *), void *arg)
 {
 	struct user *up = p2->p_addr;
 
 	p2->p_md.md_tf = p1->p_md.md_tf;
-	p2->p_md.md_flags = p1->p_md.md_flags & MDP_FPUSED;
+
+	p2->p_md.md_flags = p1->p_md.md_flags & (MDP_FPUSED | MDP_FP_C);
 
 	/*
 	 * Cache the physical address of the pcb, so we can
@@ -170,17 +156,19 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	 * Copy floating point state from the FP chip to the PCB
 	 * if this process has state stored there.
 	 */
-	if (p1 == fpcurproc) {
-		alpha_pal_wrfen(1);
-		savefpstate(&fpcurproc->p_addr->u_pcb.pcb_fp);
-		alpha_pal_wrfen(0);
-	}
+	if (p1->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p1, 1);
 
 	/*
 	 * Copy pcb and user stack pointer from proc p1 to p2.
+	 * If specificed, give the child a different stack.
 	 */
 	p2->p_addr->u_pcb = p1->p_addr->u_pcb;
-	p2->p_addr->u_pcb.pcb_hw.apcb_usp = alpha_pal_rdusp();
+	if (stack != NULL)
+		p2->p_addr->u_pcb.pcb_hw.apcb_usp = (u_long)stack + stacksize;
+	else
+		p2->p_addr->u_pcb.pcb_hw.apcb_usp = alpha_pal_rdusp();
+	simple_lock_init(&p2->p_addr->u_pcb.pcb_fpcpu_slock);
 
 	/*
 	 * Arrange for a non-local goto when the new process
@@ -193,8 +181,6 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	 */
 	if (p1 != curproc && p1 != &proc0)
 		panic("cpu_fork: curproc");
-	if ((up->u_pcb.pcb_hw.apcb_flags & ALPHA_PCB_FLAGS_FEN) != 0)
-		printf("DANGER WILL ROBINSON: FEN SET IN cpu_fork!\n");
 #endif
 
 	/*
@@ -210,7 +196,7 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 		 */
 		p2tf = p2->p_md.md_tf = (struct trapframe *)
 		    ((char *)p2->p_addr + USPACE - sizeof(struct trapframe));
-		bcopy(p1->p_md.md_tf, p2->p_md.md_tf,
+		memcpy(p2->p_md.md_tf, p1->p_md.md_tf,
 		    sizeof(struct trapframe));
 
 		/*
@@ -220,12 +206,6 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 		p2tf->tf_regs[FRAME_A3] = 0;		/* no error */
 		p2tf->tf_regs[FRAME_A4] = 1;		/* is child */
 
-		/*
-		 * If specificed, give the child a different stack.
-		 */
-		if (stack != NULL)
-			p2tf->tf_regs[FRAME_SP] = (u_long)stack + stacksize;
-
 		up->u_pcb.pcb_hw.apcb_ksp = (u_int64_t)p2tf;	
 		up->u_pcb.pcb_context[0] =
 		    (u_int64_t)func;			/* s0: pc */
@@ -234,7 +214,7 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 		up->u_pcb.pcb_context[2] =
 		    (u_int64_t)arg;			/* s2: arg */
 		up->u_pcb.pcb_context[7] =
-		    (u_int64_t)switch_trampoline;	/* ra: assembly magic */
+		    (u_int64_t)proc_trampoline;		/* ra: assembly magic */
 		up->u_pcb.pcb_context[8] = ALPHA_PSL_IPL_0; /* ps: IPL */
 	}
 }
@@ -246,8 +226,7 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
  * swap context to it easily.
  */
 void
-cpu_swapin(p)
-	register struct proc *p;
+cpu_swapin(struct proc *p)
 {
 	struct user *up = p->p_addr;
 
@@ -262,34 +241,27 @@ cpu_swapin(p)
  * saved, so that it goes out with the pcb, which is in the user area.
  */
 void
-cpu_swapout(p)
-	struct proc *p;
+cpu_swapout(struct proc *p)
 {
 
-	if (p != fpcurproc)
-		return;
-
-	alpha_pal_wrfen(1);
-	savefpstate(&fpcurproc->p_addr->u_pcb.pcb_fp);
-	alpha_pal_wrfen(0);
-	fpcurproc = NULL;
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p, 1);
 }
 
 /*
  * Move pages from one kernel virtual address to another.
- * Both addresses are assumed to have valid page table pages
- * and size must be a multiple of CLSIZE.
+ * Both addresses are assumed to have valid page table pages.
+ * and size must be a multiple of NBPG.
  *
  * Note that since all kernel page table pages are pre-allocated
  * and mapped in, we can use the Virtual Page Table.
  */
 void
-pagemove(from, to, size)
-	register caddr_t from, to;
-	size_t size;
+pagemove(caddr_t from, caddr_t to, size_t size)
 {
 	long fidx, tidx;
 	ssize_t todo;
+	PMAP_TLB_SHOOTDOWN_CPUSET_DECL
 
 	if (size % NBPG)
 		panic("pagemove");
@@ -305,15 +277,15 @@ pagemove(from, to, size)
 		ALPHA_TBIS((vaddr_t)from);
 		ALPHA_TBIS((vaddr_t)to);
 
-#if defined(MULTIPROCESSOR) && 0
-		pmap_tlb_shootdown(pmap_kernel(), (vaddr_t)from, PG_ASM);
-		pmap_tlb_shootdown(pmap_kernel(), (vaddr_t)to, PG_ASM);
-#endif
+		PMAP_TLB_SHOOTDOWN(pmap_kernel(), (vaddr_t)from, PG_ASM);
+		PMAP_TLB_SHOOTDOWN(pmap_kernel(), (vaddr_t)to, PG_ASM);
 
 		todo -= NBPG;
 		from += NBPG;
 		to += NBPG;
 	}
+
+	PMAP_TLB_SHOOTNOW();
 }
 
 /*
@@ -322,9 +294,7 @@ pagemove(from, to, size)
  * do not need to pass an access_type to pmap_enter().
  */
 void
-vmapbuf(bp, len)
-	struct buf *bp;
-	vsize_t len;
+vmapbuf(struct buf *bp, vsize_t len)
 {
 	vaddr_t faddr, taddr, off;
 	paddr_t pa;
@@ -348,15 +318,14 @@ vmapbuf(bp, len)
 		faddr += PAGE_SIZE;
 		taddr += PAGE_SIZE;
 	}
+	pmap_update(vm_map_pmap(phys_map));
 }
 
 /*
  * Unmap a previously-mapped user I/O request.
  */
 void
-vunmapbuf(bp, len)
-	struct buf *bp;
-	vsize_t len;
+vunmapbuf(struct buf *bp, vsize_t len)
 {
 	vaddr_t addr, off;
 
@@ -365,6 +334,8 @@ vunmapbuf(bp, len)
 	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - addr;
 	len = round_page(off + len);
+	pmap_remove(vm_map_pmap(phys_map), addr, addr + len);
+	pmap_update(vm_map_pmap(phys_map));
 	uvm_km_free_wakeup(phys_map, addr, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = NULL;

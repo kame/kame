@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.4.12.1 2000/08/28 16:16:24 wrstuden Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.8 2002/03/23 01:29:35 wrstuden Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -174,11 +174,14 @@ struct part_map_entry {
 #define PART_TYPE_DRIVER43	"APPLE_DRIVER43"
 #define PART_TYPE_DRIVERATA	"APPLE_DRIVER_ATA"
 #define PART_TYPE_DRIVERIOKIT	"APPLE_DRIVER_IOKIT"
+#define PART_TYPE_FWDRIVER	"APPLE_FWDRIVER"
 #define PART_TYPE_FWB_COMPONENT	"FWB DRIVER COMPONENTS"
 #define PART_TYPE_FREE		"APPLE_FREE"
 #define PART_TYPE_MAC		"APPLE_HFS"
 #define PART_TYPE_NETBSD	"NETBSD"
 #define PART_TYPE_NBSD_PPCBOOT	"NETBSD/MACPPC"
+#define PART_TYPE_NBSD_68KBOOT	"NETBSD/MAC68K"
+#define PART_TYPE_PATCHES	"APPLE_PATCHES"
 #define PART_TYPE_PARTMAP	"APPLE_PARTITION_MAP"
 #define PART_TYPE_PATCHES	"APPLE_PATCHES"
 #define PART_TYPE_SCRATCH	"APPLE_SCRATCH"
@@ -199,6 +202,10 @@ struct blockzeroblock {
 	u_int32_t       bzbMountTime;
 	u_int32_t       bzbUMountTime;
 };
+#define bzbFSType	bzbType
+#define bzbFrag		bzbCluster
+#define bzbCPG		bzbBadBlockInode	/* Also sgs for LFS */
+#define bzbFSize	bzbCreationTime
 
 /* Apple occasionally changes these */
 #define BZB_MAGIC	0xABADBABE

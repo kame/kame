@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_subr.c,v 1.18.2.2 2000/11/05 22:43:40 tv Exp $	*/
+/*	$NetBSD: exec_subr.c,v 1.29 2001/11/12 15:25:04 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1996 Christopher G. Demetriou
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: exec_subr.c,v 1.29 2001/11/12 15:25:04 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -38,8 +41,6 @@
 #include <sys/filedesc.h>
 #include <sys/exec.h>
 #include <sys/mman.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm.h>
 
@@ -59,15 +60,10 @@
  */
 
 void
-new_vmcmd(evsp, proc, len, addr, vp, offset, prot, flags)
-	struct	exec_vmcmd_set *evsp;
-	int	(*proc) __P((struct proc * p, struct exec_vmcmd *));
-	u_long	len;
-	u_long	addr;
-	struct	vnode *vp;
-	u_long	offset;
-	u_int	prot;
-	int	flags;
+new_vmcmd(struct exec_vmcmd_set *evsp,
+    int (*proc)(struct proc * p, struct exec_vmcmd *),
+    u_long len, u_long addr, struct vnode *vp, u_long offset,
+    u_int prot, int flags)
 {
 	struct exec_vmcmd    *vcp;
 
@@ -86,8 +82,7 @@ new_vmcmd(evsp, proc, len, addr, vp, offset, prot, flags)
 #endif /* DEBUG */
 
 void
-vmcmdset_extend(evsp)
-	struct	exec_vmcmd_set *evsp;
+vmcmdset_extend(struct exec_vmcmd_set *evsp)
 {
 	struct exec_vmcmd *nvcp;
 	u_int ocnt;
@@ -102,20 +97,20 @@ vmcmdset_extend(evsp)
 	evsp->evs_cnt += ocnt ? ocnt : EXEC_DEFAULT_VMCMD_SETSIZE;
 
 	/* allocate it */
-	MALLOC(nvcp, struct exec_vmcmd *, 
-	    (evsp->evs_cnt * sizeof(struct exec_vmcmd)), M_EXEC, M_WAITOK);
+	nvcp = malloc(evsp->evs_cnt * sizeof(struct exec_vmcmd),
+	    M_EXEC, M_WAITOK);
 
 	/* free the old struct, if there was one, and record the new one */
 	if (ocnt) {
-		memcpy(nvcp, evsp->evs_cmds, (ocnt * sizeof(struct exec_vmcmd)));
-		FREE(evsp->evs_cmds, M_EXEC);
+		memcpy(nvcp, evsp->evs_cmds,
+		    (ocnt * sizeof(struct exec_vmcmd)));
+		free(evsp->evs_cmds, M_EXEC);
 	}
 	evsp->evs_cmds = nvcp;
 }
 
 void
-kill_vmcmds(evsp)
-	struct	exec_vmcmd_set *evsp;
+kill_vmcmds(struct exec_vmcmd_set *evsp)
 {
 	struct exec_vmcmd *vcp;
 	int i;
@@ -129,7 +124,7 @@ kill_vmcmds(evsp)
 			vrele(vcp->ev_vp);
 	}
 	evsp->evs_used = evsp->evs_cnt = 0;
-	FREE(evsp->evs_cmds, M_EXEC);
+	free(evsp->evs_cmds, M_EXEC);
 }
 
 /*
@@ -139,24 +134,20 @@ kill_vmcmds(evsp)
  */
 
 int
-vmcmd_map_pagedvn(p, cmd)
-	struct proc *p;
-	struct exec_vmcmd *cmd;
+vmcmd_map_pagedvn(struct proc *p, struct exec_vmcmd *cmd)
 {
-	/*
-	 * note that if you're going to map part of an process as being
-	 * paged from a vnode, that vnode had damn well better be marked as
-	 * VTEXT.  that's handled in the routine which sets up the vmcmd to
-	 * call this routine.
-	 */
-        struct uvm_object *uobj;
-	int retval;
+	struct uvm_object *uobj;
+	int error;
+
+#if 0
+	/* XXX not true for eg. ld.elf_so */
+	KASSERT(cmd->ev_vp->v_flag & VTEXT);
+#endif
 
 	/*
 	 * map the vnode in using uvm_map.
 	 */
 
-	/* checks imported from uvm_mmap, needed? */
         if (cmd->ev_len == 0)
                 return(0);
         if (cmd->ev_offset & PAGE_MASK)
@@ -170,32 +161,23 @@ vmcmd_map_pagedvn(p, cmd)
 	 * first, attach to the object
 	 */
 
-        uobj = uvn_attach((void *) cmd->ev_vp, VM_PROT_READ|VM_PROT_EXECUTE);
+        uobj = uvn_attach(cmd->ev_vp, VM_PROT_READ|VM_PROT_EXECUTE);
         if (uobj == NULL)
                 return(ENOMEM);
+	VREF(cmd->ev_vp);
 
 	/*
 	 * do the map
 	 */
 
-	retval = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr, cmd->ev_len, 
-		uobj, cmd->ev_offset, 
+	error = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr, cmd->ev_len, 
+		uobj, cmd->ev_offset, 0,
 		UVM_MAPFLAG(cmd->ev_prot, VM_PROT_ALL, UVM_INH_COPY, 
 			UVM_ADV_NORMAL, UVM_FLAG_COPYONW|UVM_FLAG_FIXED));
-
-	/*
-	 * check for error
-	 */
-
-	if (retval == KERN_SUCCESS)
-		return(0);
-
-	/*
-	 * error: detach from object
-	 */
-
-	uobj->pgops->pgo_detach(uobj);
-	return (EINVAL);
+	if (error) {
+		uobj->pgops->pgo_detach(uobj);
+	}
+	return error;
 }
 
 /*
@@ -205,23 +187,21 @@ vmcmd_map_pagedvn(p, cmd)
  *	objects (a la OMAGIC and NMAGIC).
  */
 int
-vmcmd_map_readvn(p, cmd)
-	struct proc *p;
-	struct exec_vmcmd *cmd;
+vmcmd_map_readvn(struct proc *p, struct exec_vmcmd *cmd)
 {
 	int error;
 	long diff;
 
 	if (cmd->ev_len == 0)
-		return(KERN_SUCCESS); /* XXXCDC: should it happen? */
-	
+		return 0;
+
 	diff = cmd->ev_addr - trunc_page(cmd->ev_addr);
 	cmd->ev_addr -= diff;			/* required by uvm_map */
 	cmd->ev_offset -= diff;
 	cmd->ev_len += diff;
 
 	error = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr, 
-			round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 
+			round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 0,
 			UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 			UVM_ADV_NORMAL,
 			UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
@@ -233,9 +213,7 @@ vmcmd_map_readvn(p, cmd)
 }
 
 int
-vmcmd_readvn(p, cmd)
-	struct proc *p;
-	struct exec_vmcmd *cmd;
+vmcmd_readvn(struct proc *p, struct exec_vmcmd *cmd)
 {
 	int error;
 
@@ -246,19 +224,20 @@ vmcmd_readvn(p, cmd)
 		return error;
 
 	if (cmd->ev_prot != (VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE)) {
+
 		/*
 		 * we had to map in the area at PROT_ALL so that vn_rdwr()
 		 * could write to it.   however, the caller seems to want
 		 * it mapped read-only, so now we are going to have to call
 		 * uvm_map_protect() to fix up the protection.  ICK.
 		 */
-		return(uvm_map_protect(&p->p_vmspace->vm_map, 
+
+		return uvm_map_protect(&p->p_vmspace->vm_map, 
 				trunc_page(cmd->ev_addr),
 				round_page(cmd->ev_addr + cmd->ev_len),
-				cmd->ev_prot, FALSE));
-	} else {
-		return (KERN_SUCCESS);
+				cmd->ev_prot, FALSE);
 	}
+	return 0;
 }
 
 /*
@@ -268,27 +247,43 @@ vmcmd_readvn(p, cmd)
  */
 
 int
-vmcmd_map_zero(p, cmd)
-	struct proc *p;
-	struct exec_vmcmd *cmd;
+vmcmd_map_zero(struct proc *p, struct exec_vmcmd *cmd)
 {
 	int error;
 	long diff;
 
-	if (cmd->ev_len == 0)
-		return(KERN_SUCCESS); /* XXXCDC: should it happen? */
-	
 	diff = cmd->ev_addr - trunc_page(cmd->ev_addr);
 	cmd->ev_addr -= diff;			/* required by uvm_map */
 	cmd->ev_len += diff;
 
 	error = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr, 
-			round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 
+			round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 0,
 			UVM_MAPFLAG(cmd->ev_prot, UVM_PROT_ALL, UVM_INH_COPY,
 			UVM_ADV_NORMAL,
 			UVM_FLAG_FIXED|UVM_FLAG_COPYONW));
-
-	if (error)
-		return error;
-	return (KERN_SUCCESS);
+	return error;
 }
+
+/*
+ * exec_read_from():
+ *
+ *	Read from vnode into buffer at offset.
+ */
+int
+exec_read_from(struct proc *p, struct vnode *vp, u_long off, void *buf,
+    size_t size)
+{
+	int error;
+	size_t resid;
+
+	if ((error = vn_rdwr(UIO_READ, vp, buf, size, off, UIO_SYSSPACE,
+	    0, p->p_ucred, &resid, p)) != 0)
+		return error;
+	/*
+	 * See if we got all of it
+	 */
+	if (resid != 0)
+		return ENOEXEC;
+	return 0;
+}
+

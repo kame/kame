@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_general.h,v 1.5 2000/03/03 02:04:48 oster Exp $	*/
+/*	$NetBSD: rf_general.h,v 1.9 2001/10/04 15:58:53 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -30,44 +30,40 @@
  * rf_general.h -- some general-use definitions
  */
 
-/*#define NOASSERT*/
+/* #define NOASSERT */
 
 #ifndef _RF__RF_GENERAL_H_
 #define _RF__RF_GENERAL_H_
 
+#ifdef _KERNEL_OPT
+#include "opt_raid_diagnostic.h"
+#endif /* _KERNEL_OPT */
+
 /* error reporting and handling */
 
-#ifdef _KERNEL
 #include<sys/systm.h>		/* printf, sprintf, and friends */
-#endif
 
 #define RF_ERRORMSG(s)            printf((s))
 #define RF_ERRORMSG1(s,a)         printf((s),(a))
 #define RF_ERRORMSG2(s,a,b)       printf((s),(a),(b))
 #define RF_ERRORMSG3(s,a,b,c)     printf((s),(a),(b),(c))
 
-extern char rf_panicbuf[];
-#define RF_PANIC() {sprintf(rf_panicbuf,"raidframe error at line %d file %s",__LINE__,__FILE__); panic(rf_panicbuf);}
+void rf_print_panic_message(int, char *);
+void rf_print_assert_panic_message(int, char *, char *);
 
-#ifdef _KERNEL
-#ifdef RF_ASSERT
-#undef RF_ASSERT
-#endif				/* RF_ASSERT */
-#ifndef NOASSERT
+extern char rf_panicbuf[];
+#define RF_PANIC() {rf_print_panic_message(__LINE__,__FILE__); panic(rf_panicbuf);}
+
+#ifdef RAID_DIAGNOSTIC
 #define RF_ASSERT(_x_) { \
   if (!(_x_)) { \
-    sprintf(rf_panicbuf, \
-        "raidframe error at line %d file %s (failed asserting %s)\n", \
-        __LINE__, __FILE__, #_x_); \
+    rf_print_assert_panic_message(__LINE__, __FILE__, #_x_); \
     panic(rf_panicbuf); \
   } \
 }
-#else				/* !NOASSERT */
+#else /* RAID_DIAGNOSTIC */
 #define RF_ASSERT(x) {/*noop*/}
-#endif				/* !NOASSERT */
-#else				/* _KERNEL */
-#define RF_ASSERT(x) {/*noop*/}
-#endif				/* _KERNEL */
+#endif /* RAID_DIAGNOSTIC */
 
 /* random stuff */
 #define RF_MAX(a,b) (((a) > (b)) ? (a) : (b))
@@ -80,11 +76,11 @@ extern char rf_panicbuf[];
 #define RF_GETTIME(_t) microtime(&(_t))
 
 /*
- * zero memory- not all bzero calls go through here, only
+ * zero memory- not all memset calls go through here, only
  * those which in the kernel may have a user address
  */
 
-#define RF_BZERO(_bp,_b,_l)  bzero(_b,_l)	/* XXX This is likely
+#define RF_BZERO(_bp,_b,_l)  memset(_b,0,_l)	/* XXX This is likely
 						 * incorrect. GO */
 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: pciide_cmd_reg.h,v 1.11 2001/11/15 20:48:17 bouyer Exp $	*/
+/*	$NetBSD: pciide_cmd_reg.h,v 1.12 2002/04/23 20:41:18 bouyer Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -13,8 +13,7 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *	This product includes software developed by Manuel Bouyer.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -97,12 +96,15 @@
 #define CMD_UDMATIM_UDMA33(drive) (0x04 << (drive))
 #define CMD_UDMATIM_TIM_MASK	0x3
 #define CMD_UDMATIM_TIM_OFF(drive) (4 + ((drive) * 2))
-static int8_t cmd0646_9_tim_udma[] = {0x03, 0x02, 0x01, 0x02, 0x01, 0x00};
+static const int8_t cmd0646_9_tim_udma[] __attribute__((__unused__)) =
+    {0x03, 0x02, 0x01, 0x02, 0x01, 0x00};
 
 /*
  * timings values for the 0643/6/8/9
  * for all dma_mode we have to have
  * DMA_timings(dma_mode) >= PIO_timings(dma_mode + 2)
  */
-static int8_t cmd0643_9_data_tim_pio[] = {0xA9, 0x57, 0x44, 0x32, 0x3F};
-static int8_t cmd0643_9_data_tim_dma[] = {0x87, 0x32, 0x3F};
+static const int8_t cmd0643_9_data_tim_pio[] __attribute__((__unused__)) =
+    {0xA9, 0x57, 0x44, 0x32, 0x3F};
+static const int8_t cmd0643_9_data_tim_dma[] __attribute__((__unused__)) =
+    {0x87, 0x32, 0x3F};

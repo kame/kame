@@ -1,8 +1,8 @@
-/*	$NetBSD: uvm_page_i.h,v 1.13 2000/05/08 23:11:53 thorpej Exp $	*/
+/*	$NetBSD: uvm_page_i.h,v 1.20 2001/09/15 20:36:47 chs Exp $	*/
 
-/* 
+/*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
- * Copyright (c) 1991, 1993, The Regents of the University of California.  
+ * Copyright (c) 1991, 1993, The Regents of the University of California.
  *
  * All rights reserved.
  *
@@ -20,7 +20,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *	This product includes software developed by Charles D. Cranor,
- *      Washington University, the University of California, Berkeley and 
+ *      Washington University, the University of California, Berkeley and
  *      its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
@@ -44,17 +44,17 @@
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and
  * its documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
- * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" 
- * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND 
+ *
+ * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+ * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
  *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
@@ -92,7 +92,7 @@ uvm_lock_fpageq()
 {
 	int s;
 
-	s = splimp();
+	s = splvm();
 	simple_lock(&uvm.fpageqlock);
 	return (s);
 }
@@ -127,22 +127,19 @@ uvm_pagelookup(obj, off)
 {
 	struct vm_page *pg;
 	struct pglist *buck;
-	int s;
 
 	buck = &uvm.page_hash[uvm_pagehash(obj,off)];
-
-	s = splimp();
 	simple_lock(&uvm.hashlock);
-	for (pg = buck->tqh_first ; pg != NULL ; pg = pg->hashq.tqe_next) {
+	TAILQ_FOREACH(pg, buck, hashq) {
 		if (pg->uobject == obj && pg->offset == off) {
-			simple_unlock(&uvm.hashlock);
-			splx(s);
-			return(pg);
+			break;
 		}
 	}
 	simple_unlock(&uvm.hashlock);
-	splx(s);
-	return(NULL);
+	KASSERT(pg == NULL || obj->uo_npages != 0);
+	KASSERT(pg == NULL || (pg->flags & (PG_RELEASED|PG_PAGEOUT)) == 0 ||
+		(pg->flags & PG_BUSY) != 0);
+	return(pg);
 }
 
 /*
@@ -155,38 +152,24 @@ PAGE_INLINE void
 uvm_pagewire(pg)
 	struct vm_page *pg;
 {
-
 	if (pg->wire_count == 0) {
-		if (pg->pqflags & PQ_ACTIVE) {
-			TAILQ_REMOVE(&uvm.page_active, pg, pageq);
-			pg->pqflags &= ~PQ_ACTIVE;
-			uvmexp.active--;
-		}
-		if (pg->pqflags & PQ_INACTIVE) {
-			if (pg->pqflags & PQ_SWAPBACKED)
-				TAILQ_REMOVE(&uvm.page_inactive_swp, pg, pageq);
-			else
-				TAILQ_REMOVE(&uvm.page_inactive_obj, pg, pageq);
-			pg->pqflags &= ~PQ_INACTIVE;
-			uvmexp.inactive--;
-		}
+		uvm_pagedequeue(pg);
 		uvmexp.wired++;
 	}
 	pg->wire_count++;
 }
 
 /*
- * uvm_pageunwire: unwire the page.   
+ * uvm_pageunwire: unwire the page.
  *
  * => activate if wire count goes to zero.
  * => caller must lock page queues
  */
- 
+
 PAGE_INLINE void
 uvm_pageunwire(pg)
 	struct vm_page *pg;
 {
-
 	pg->wire_count--;
 	if (pg->wire_count == 0) {
 		TAILQ_INSERT_TAIL(&uvm.page_active, pg, pageq);
@@ -197,11 +180,12 @@ uvm_pageunwire(pg)
 }
 
 /*
- * uvm_pagedeactivate: deactivate page -- no pmaps have access to page
+ * uvm_pagedeactivate: deactivate page
  *
  * => caller must lock page queues
  * => caller must check to make sure page is not wired
  * => object that page belongs to must be locked (so we can adjust pg->flags)
+ * => caller must clear the reference on the page before calling
  */
 
 PAGE_INLINE void
@@ -214,20 +198,10 @@ uvm_pagedeactivate(pg)
 		uvmexp.active--;
 	}
 	if ((pg->pqflags & PQ_INACTIVE) == 0) {
-#ifdef DIAGNOSTIC 
-		if (__predict_false(pg->wire_count))
-			panic("uvm_pagedeactivate: caller did not check "
-			    "wire count");
-#endif
-		if (pg->pqflags & PQ_SWAPBACKED)
-			TAILQ_INSERT_TAIL(&uvm.page_inactive_swp, pg, pageq);
-		else
-			TAILQ_INSERT_TAIL(&uvm.page_inactive_obj, pg, pageq);
+		KASSERT(pg->wire_count == 0);
+		TAILQ_INSERT_TAIL(&uvm.page_inactive, pg, pageq);
 		pg->pqflags |= PQ_INACTIVE;
 		uvmexp.inactive++;
-		pmap_clear_reference(pg);
-		if (pmap_is_modified(pg))
-			pg->flags &= ~PG_CLEAN;
 	}
 }
 
@@ -241,29 +215,30 @@ PAGE_INLINE void
 uvm_pageactivate(pg)
 	struct vm_page *pg;
 {
-	if (pg->pqflags & PQ_INACTIVE) {
-		if (pg->pqflags & PQ_SWAPBACKED)
-			TAILQ_REMOVE(&uvm.page_inactive_swp, pg, pageq);
-		else
-			TAILQ_REMOVE(&uvm.page_inactive_obj, pg, pageq);
+	uvm_pagedequeue(pg);
+	if (pg->wire_count == 0) {
+		TAILQ_INSERT_TAIL(&uvm.page_active, pg, pageq);
+		pg->pqflags |= PQ_ACTIVE;
+		uvmexp.active++;
+	}
+}
+
+/*
+ * uvm_pagedequeue: remove a page from any paging queue
+ */
+
+PAGE_INLINE void
+uvm_pagedequeue(pg)
+	struct vm_page *pg;
+{
+	if (pg->pqflags & PQ_ACTIVE) {
+		TAILQ_REMOVE(&uvm.page_active, pg, pageq);
+		pg->pqflags &= ~PQ_ACTIVE;
+		uvmexp.active--;
+	} else if (pg->pqflags & PQ_INACTIVE) {
+		TAILQ_REMOVE(&uvm.page_inactive, pg, pageq);
 		pg->pqflags &= ~PQ_INACTIVE;
 		uvmexp.inactive--;
-	}
-	if (pg->wire_count == 0) {
-
-		/*
-		 * if page is already active, remove it from list so we
-		 * can put it at tail.  if it wasn't active, then mark
-		 * it active and bump active count
-		 */
-		if (pg->pqflags & PQ_ACTIVE) 
-			TAILQ_REMOVE(&uvm.page_active, pg, pageq);
-		else {
-			pg->pqflags |= PQ_ACTIVE;
-			uvmexp.active++;
-		}
-
-		TAILQ_INSERT_TAIL(&uvm.page_active, pg, pageq);
 	}
 }
 
@@ -278,7 +253,6 @@ PAGE_INLINE void
 uvm_pagezero(pg)
 	struct vm_page *pg;
 {
-
 	pg->flags &= ~PG_CLEAN;
 	pmap_zero_page(VM_PAGE_TO_PHYS(pg));
 }
@@ -310,10 +284,7 @@ uvm_page_lookup_freelist(pg)
 	int lcv;
 
 	lcv = vm_physseg_find(atop(VM_PAGE_TO_PHYS(pg)), NULL);
-#ifdef DIAGNOSTIC
-	if (__predict_false(lcv == -1))
-		panic("uvm_page_lookup_freelist: unable to locate physseg");
-#endif
+	KASSERT(lcv != -1);
 	return (vm_physmem[lcv].free_list);
 }
 

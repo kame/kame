@@ -1,4 +1,4 @@
-/*	$NetBSD: termios.h,v 1.22 1999/08/22 13:12:41 kleink Exp $	*/
+/*	$NetBSD: termios.h,v 1.24 2001/11/11 00:00:16 perry Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1993, 1994
@@ -38,6 +38,7 @@
 #ifndef _SYS_TERMIOS_H_
 #define _SYS_TERMIOS_H_
 
+#include <sys/ansi.h>
 #include <sys/featuretest.h>
 
 /*
@@ -180,13 +181,13 @@
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #define EXTPROC         0x00000800      /* external processing */
 #endif  /* !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) */
-#define TOSTOP		0x00400000	/* stop background jobs from output */
+#define TOSTOP		0x00400000	/* stop background jobs on output */
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #define FLUSHO		0x00800000	/* output being flushed (state) */
 #define	NOKERNINFO	0x02000000	/* no kernel output from VSTATUS */
-#define PENDIN		0x20000000	/* XXX retype pending input (state) */
+#define PENDIN		0x20000000	/* re-echo input buffer at next read */
 #endif  /* !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) */
-#define	NOFLSH		0x80000000	/* don't flush after interrupt */
+#define	NOFLSH		0x80000000	/* don't flush output on signal */
 
 typedef unsigned int	tcflag_t;
 typedef unsigned char	cc_t;
@@ -254,8 +255,11 @@ struct termios {
 #define TCION		4
 
 #if !defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE)
-#include <sys/types.h>		/* XXX for pid_t */
+#ifndef	pid_t
+typedef	__pid_t		pid_t;
+#define	pid_t		__pid_t
 #endif
+#endif /* !_POSIX_C_SOURCE || _XOPEN_SOURCE */
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS

@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_intr_fixup.h,v 1.1 1999/11/17 01:20:38 thorpej Exp $	*/
+/*	$NetBSD: pci_intr_fixup.h,v 1.3 2001/08/27 08:21:21 haya Exp $	*/
 
 /*
  * Copyright (c) 1999, by UCHIYAMA Yasushi
@@ -62,6 +62,8 @@ int	opti82c700_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
 int	via82c586_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
 	    pciintr_icu_tag_t *, pciintr_icu_handle_t *));
 int	sis85c503_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
+	    pciintr_icu_tag_t *, pciintr_icu_handle_t *));
+int	amd756_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
 	    pciintr_icu_tag_t *, pciintr_icu_handle_t *));
 int	ali1543_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
 	    pciintr_icu_tag_t *, pciintr_icu_handle_t *));

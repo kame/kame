@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.10 1998/06/09 01:57:45 tv Exp $	*/
+/*	$NetBSD: db_machdep.h,v 1.14 2002/05/13 20:30:12 matt Exp $	*/
 
 /*
  * Mach Operating System
@@ -34,18 +34,16 @@
  */
 
 #include <m68k/db_machdep.h>
+#define DB_ELF_SYMBOLS
+#define DB_ELFSIZE 32
 
 /* This enables some code in db_command.c */
 #define DB_MACHINE_COMMANDS
 
-/* XXX - Put this in db_extern.h instead? -gwr */
-extern label_t	*db_recover;	/* db_command.c */
-
 extern char	*esym;	/* end of symbols */
-void db_machine_init __P((void));
 
 /* These are in db_memrw.c */
-extern void db_read_bytes  __P((vm_offset_t addr, size_t size, char *data));
-extern void db_write_bytes __P((vm_offset_t addr, size_t size, char *data));
+extern void db_read_bytes  __P((db_addr_t addr, size_t size, char *data));
+extern void db_write_bytes __P((db_addr_t addr, size_t size, char *data));
 
 #endif	/* _SUN3_DB_MACHDEP_H_ */

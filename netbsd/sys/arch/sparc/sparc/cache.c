@@ -1,4 +1,4 @@
-/*	$NetBSD: cache.c,v 1.53 2000/06/08 14:45:18 pk Exp $ */
+/*	$NetBSD: cache.c,v 1.61 2002/01/25 19:19:46 tsutsui Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -59,9 +59,11 @@
  */
 
 #include "opt_multiprocessor.h"
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 
 #include <machine/ctlreg.h>
 #include <machine/pte.h>
@@ -74,6 +76,7 @@ struct cachestats cachestats;
 
 int cache_alias_dist;		/* Cache anti-aliasing constants */
 int cache_alias_bits;
+u_long dvma_cachealign;
 
 /*
  * Enable the cache.
@@ -187,7 +190,6 @@ hypersparc_cache_enable()
 {
 	int i, ls, ts;
 	u_int pcr, v;
-	extern u_long dvma_cachealign;
 
 	ls = CACHEINFO.c_linesize;
 	ts = CACHEINFO.c_totalsize;
@@ -428,14 +430,32 @@ sun4_vcache_flush_page(va)
 
 	cachestats.cs_npgflush++;
 	p = (char *)va;
-	if (CACHEINFO.c_hwflush)
-		sta(p, ASI_HWFLUSHPG, 0);
-	else {
-		ls = CACHEINFO.c_linesize;
-		i = NBPG >> CACHEINFO.c_l2linesize;
-		for (; --i >= 0; p += ls)
-			sta(p, ASI_FLUSHPG, 0);
-	}
+	ls = CACHEINFO.c_linesize;
+	i = NBPG >> CACHEINFO.c_l2linesize;
+	for (; --i >= 0; p += ls)
+		sta(p, ASI_FLUSHPG, 0);
+}
+
+/*
+ * Flush the given virtual page from the cache.
+ * (va is the actual address, and must be aligned on a page boundary.)
+ * This version uses hardware-assisted flush operation and just needs
+ * one write into ASI_HWFLUSHPG space to flush all cache lines.
+ */
+void
+sun4_vcache_flush_page_hw(va)
+	int va;
+{
+	char *p;
+
+#ifdef DEBUG
+	if (va & PGOFSET)
+		panic("cache_flush_page: asked to flush misaligned va 0x%x",va);
+#endif
+
+	cachestats.cs_npgflush++;
+	p = (char *)va;
+	sta(p, ASI_HWFLUSHPG, 0);
 }
 
 /*
@@ -918,6 +938,9 @@ viking_pcache_flush_page(pa, invalidate_only)
  * message. This assumes the allocation of CPU contextses is a global
  * operation (remember that the actual context tables for the CPUs
  * are distinct).
+ *
+ * We don't do cross calls if we're cold or we're accepting them
+ * ourselves (CPUFLG_READY).
  */
 
 void
@@ -927,19 +950,25 @@ smp_vcache_flush_page(va)
 	int n, s;
 
 	cpuinfo.sp_vcache_flush_page(va);
+	if (cold || (cpuinfo.flags & CPUFLG_READY) == 0)
+		return;
+	LOCK_XPMSG();
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
-		struct xpmsg_flush_page *p = &cpi->msg.u.xpmsg_flush_page;
-		if (cpuinfo.mid == cpi->mid)
+		struct xpmsg_flush_page *p;
+
+		if (CPU_READY(cpi))
 			continue;
+		p = &cpi->msg.u.xpmsg_flush_page;
 		s = splhigh();
 		simple_lock(&cpi->msg.lock);
 		cpi->msg.tag = XPMSG_VCACHE_FLUSH_PAGE;
 		p->ctx = getcontext4m();
 		p->va = va;
-		raise_ipi(cpi);
+		raise_ipi_wait_and_unlock(cpi);
 		splx(s);
 	}
+	UNLOCK_XPMSG();
 }
 
 void
@@ -949,20 +978,26 @@ smp_vcache_flush_segment(vr, vs)
 	int n, s;
 
 	cpuinfo.sp_vcache_flush_segment(vr, vs);
+	if (cold || (cpuinfo.flags & CPUFLG_READY) == 0)
+		return;
+	LOCK_XPMSG();
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
-		struct xpmsg_flush_segment *p = &cpi->msg.u.xpmsg_flush_segment;
-		if (cpuinfo.mid == cpi->mid)
+		struct xpmsg_flush_segment *p;
+
+		if (CPU_READY(cpi))
 			continue;
+		p = &cpi->msg.u.xpmsg_flush_segment;
 		s = splhigh();
 		simple_lock(&cpi->msg.lock);
 		cpi->msg.tag = XPMSG_VCACHE_FLUSH_SEGMENT;
 		p->ctx = getcontext4m();
 		p->vr = vr;
 		p->vs = vs;
-		raise_ipi(cpi);
+		raise_ipi_wait_and_unlock(cpi);
 		splx(s);
 	}
+	UNLOCK_XPMSG();
 }
 
 void
@@ -972,19 +1007,25 @@ smp_vcache_flush_region(vr)
 	int n, s;
 
 	cpuinfo.sp_vcache_flush_region(vr);
+	if (cold || (cpuinfo.flags & CPUFLG_READY) == 0)
+		return;
+	LOCK_XPMSG();
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
-		struct xpmsg_flush_region *p = &cpi->msg.u.xpmsg_flush_region;
-		if (cpuinfo.mid == cpi->mid)
+		struct xpmsg_flush_region *p;
+
+		if (CPU_READY(cpi))
 			continue;
+		p = &cpi->msg.u.xpmsg_flush_region;
 		s = splhigh();
 		simple_lock(&cpi->msg.lock);
 		cpi->msg.tag = XPMSG_VCACHE_FLUSH_REGION;
 		p->ctx = getcontext4m();
 		p->vr = vr;
-		raise_ipi(cpi);
+		raise_ipi_wait_and_unlock(cpi);
 		splx(s);
 	}
+	UNLOCK_XPMSG();
 }
 
 void
@@ -993,18 +1034,24 @@ smp_vcache_flush_context()
 	int n, s;
 
 	cpuinfo.sp_vcache_flush_context();
+	if (cold || (cpuinfo.flags & CPUFLG_READY) == 0)
+		return;
+	LOCK_XPMSG();
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
-		struct xpmsg_flush_context *p = &cpi->msg.u.xpmsg_flush_context;
-		if (cpuinfo.mid == cpi->mid)
+		struct xpmsg_flush_context *p;
+
+		if (CPU_READY(cpi))
 			continue;
+		p = &cpi->msg.u.xpmsg_flush_context;
 		s = splhigh();
 		simple_lock(&cpi->msg.lock);
 		cpi->msg.tag = XPMSG_VCACHE_FLUSH_CONTEXT;
 		p->ctx = getcontext4m();
-		raise_ipi(cpi);
+		raise_ipi_wait_and_unlock(cpi);
 		splx(s);
 	}
+	UNLOCK_XPMSG();
 }
 
 void
@@ -1015,19 +1062,25 @@ smp_cache_flush(va, size)
 	int n, s;
 
 	cpuinfo.sp_cache_flush(va, size);
+	if (cold || (cpuinfo.flags & CPUFLG_READY) == 0)
+		return;
+	LOCK_XPMSG();
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
-		struct xpmsg_flush_range *p = &cpi->msg.u.xpmsg_flush_range;
-		if (cpuinfo.mid == cpi->mid)
+		struct xpmsg_flush_range *p;
+
+		if (CPU_READY(cpi))
 			continue;
+		p = &cpi->msg.u.xpmsg_flush_range;
 		s = splhigh();
 		simple_lock(&cpi->msg.lock);
 		cpi->msg.tag = XPMSG_VCACHE_FLUSH_RANGE;
 		p->ctx = getcontext4m();
 		p->va = va;
 		p->size = size;
-		raise_ipi(cpi);
+		raise_ipi_wait_and_unlock(cpi);
 		splx(s);
 	}
+	UNLOCK_XPMSG();
 }
 #endif /* MULTIPROCESSOR */

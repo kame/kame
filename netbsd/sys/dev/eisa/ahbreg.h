@@ -1,4 +1,4 @@
-/*	$NetBSD: ahbreg.h,v 1.9.22.1 2000/07/12 21:16:48 thorpej Exp $	*/
+/*	$NetBSD: ahbreg.h,v 1.10 2000/07/12 21:15:33 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.

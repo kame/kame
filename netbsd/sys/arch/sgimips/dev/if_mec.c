@@ -1,9 +1,9 @@
-/*	$NetBSD: if_mec.c,v 1.1 2000/06/14 16:13:57 soren Exp $	*/
+/*	$NetBSD: if_mec.c,v 1.6 2002/03/13 13:12:26 simonb Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -19,7 +19,7 @@
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -41,10 +41,10 @@
 #include "bpfilter.h"
 
 #include <sys/param.h>
-#include <sys/systm.h> 
+#include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/callout.h>
-#include <sys/mbuf.h>   
+#include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
@@ -53,19 +53,17 @@
 
 #include <machine/endian.h>
 
-#include <vm/vm.h>		/* for PAGE_SIZE */
- 
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_ether.h>
 
-#if NBPFILTER > 0 
+#if NBPFILTER > 0
 #include <net/bpf.h>
-#endif 
+#endif
 
 #ifdef INET
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <netinet/if_inarp.h>
 #endif
 
@@ -93,7 +91,7 @@ struct mec_softc {
 
 	struct ethercom sc_ethercom;
 
-	unsigned char sc_enaddr[6];
+	unsigned char sc_enaddr[ETHER_ADDR_LEN];
 
 	void *sc_sdhook;
 
@@ -108,9 +106,9 @@ struct mec_softc {
 static int	mec_match(struct device *, struct cfdata *, void *);
 static void	mec_attach(struct device *, struct device *, void *);
 #if 0
-static void	epic_start(struct ifnet *);
-static void	epic_watchdog(struct ifnet *);
-static int	epic_ioctl(struct ifnet *, u_long, caddr_t);
+static void	mec_start(struct ifnet *);
+static void	mec_watchdog(struct ifnet *);
+static int	mec_ioctl(struct ifnet *, u_long, caddr_t);
 #endif
 static int	mec_mii_readreg(struct device *, int, int);
 static void	mec_mii_writereg(struct device *, int, int, int);
@@ -140,58 +138,66 @@ mec_attach(parent, self, aux)
 {
 	struct mec_softc *sc = (void *)self;
 	struct mace_attach_args *maa = aux;
-	struct ifnet *ifp = &sc->sc_ethercom.ec_if; 
-	u_int64_t command;
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+	u_int64_t address, command;
+	int i;
 
 	sc->sc_st = maa->maa_st;
 	sc->sc_sh = maa->maa_sh;
+
+	printf(": MAC-110 Ethernet, ");
+	command = bus_space_read_8(sc->sc_st, sc->sc_sh, MEC_MAC_CONTROL);
+	printf("rev %lld\n", (command & MAC_REVISION) >> MAC_REVISION_SHIFT);
+
+	/*
+	 * The firmware has left us the station address.
+	 */
+	address = bus_space_read_8(sc->sc_st, sc->sc_sh, MEC_STATION);
+	for (i = 0; i < ETHER_ADDR_LEN; i++) {
+		sc->sc_enaddr[ETHER_ADDR_LEN - 1 - i] = address & 0xff;
+		address >>= 8;
+	}
+
+	printf("%s: station address %s\n", sc->sc_dev.dv_xname,
+	    ether_sprintf(sc->sc_enaddr));
 
 	/*
 	 * Reset device.
 	 */
 	bus_space_write_8(sc->sc_st, sc->sc_sh, MEC_MAC_CONTROL, 0);
-
-	command = bus_space_read_8(sc->sc_st, sc->sc_sh, MEC_MAC_CONTROL);
-
-	printf(": rev %lld\n", (command & MAC_REVISION) >> MAC_REVISION_SHIFT);
+	delay(1000);
 
 	printf("%s: sorry, this is not a real driver\n", sc->sc_dev.dv_xname);
 
+#if 0
 	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-#if 0
 	ifp->if_ioctl = mec_ioctl;
 	ifp->if_start = mec_start;
 	ifp->if_watchdog = mec_watchdog;
 #endif
 
-        sc->sc_mii.mii_ifp = ifp;
-        sc->sc_mii.mii_readreg = mec_mii_readreg;
-        sc->sc_mii.mii_writereg = mec_mii_writereg;
-        sc->sc_mii.mii_statchg = mec_statchg;
+	sc->sc_mii.mii_ifp = ifp;
+	sc->sc_mii.mii_readreg = mec_mii_readreg;
+	sc->sc_mii.mii_writereg = mec_mii_writereg;
+	sc->sc_mii.mii_statchg = mec_statchg;
 
-        ifmedia_init(&sc->sc_mii.mii_media, 0, mec_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, 0, mec_mediachange,
 	    mec_mediastatus);
-        mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
-            MII_OFFSET_ANY, 0);
-        if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
-                ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
-                ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
-        } else
-                ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_AUTO);
+	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
+	    MII_OFFSET_ANY, 0);
+	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
+		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
+		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
+	} else
+		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_AUTO);
 
-return;
+return; /* XXX */
 
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_ethercom.ec_if.if_bpf,
-	    ifp, DLT_EN10MB, sizeof (struct ether_header));
-#endif  
-
 }
 
 int
@@ -202,6 +208,7 @@ mec_mii_readreg(self, phy, reg)
 {
 	struct mec_softc *sc = (struct mec_softc *)self;
 	u_int64_t val;
+	int i;
 
 	if (mec_mii_wait(sc) != 0)
 		return 0;
@@ -211,15 +218,16 @@ mec_mii_readreg(self, phy, reg)
 
 	bus_space_write_8(sc->sc_st, sc->sc_sh, MEC_PHY_READ_INITATE, 1);
 
-	if (mec_mii_wait(sc) != 0)
-		return 0;
+	for (i = 0; i < 20; i++) {
+		delay(30);
 
-	val = bus_space_read_8(sc->sc_st, sc->sc_sh, MEC_PHY_DATA);
+		val = bus_space_read_8(sc->sc_st, sc->sc_sh, MEC_PHY_DATA);
 
-	if (val == 0xffff)
-		val = 0;
+		if ((val & PHY_DATA_BUSY) == 0)
+			return (int)val & PHY_DATA_VALUE;
+	}
 
-	return (int)val & PHY_DATA_VALUE;
+	return 0;
 }
 
 void
@@ -249,21 +257,21 @@ mec_mii_wait(sc)
 {
 	int i;
 
-	delay(1000);			/* XXX */
-	return 0;
-
 	for (i = 0; i < 100; i++) {
-		delay(10);
-		if ((bus_space_read_8(sc->sc_st, sc->sc_sh, MEC_PHY_DATA) &
-		    PHY_DATA_BUSY) == 0)
-			break;
-	}
-	if (i == 100) {
-		printf("%s: MII timed out\n", sc->sc_dev.dv_xname);
-		return 1;
+		u_int64_t busy;
+
+		delay(30);
+
+		busy = bus_space_read_8(sc->sc_st, sc->sc_sh, MEC_PHY_DATA);
+
+		if ((busy & PHY_DATA_BUSY) == 0)
+			return 0;
+		if (busy == 0xffff)
+			return 0;
 	}
 
-	return 0;
+	printf("%s: MII timed out\n", sc->sc_dev.dv_xname);
+	return 1;
 }
 
 void

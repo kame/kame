@@ -1,4 +1,4 @@
-/*	$NetBSD: wdc_isa.c,v 1.19 2000/04/02 02:07:52 itojun Exp $ */
+/*	$NetBSD: wdc_isa.c,v 1.25 2002/04/19 05:27:04 gmcgarry Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,7 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wdc_isa.c,v 1.25 2002/04/19 05:27:04 gmcgarry Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -56,7 +58,10 @@
 #define	WDC_ISA_AUXREG_NPORTS	1 /* XXX "fdc" owns ports 0x3f7/0x377 */
 
 /* options passed via the 'flags' config keyword */
-#define WDC_OPTIONS_32	0x01 /* try to use 32bit data I/O */
+#define WDC_OPTIONS_32			0x01 /* try to use 32bit data I/O */
+#define WDC_OPTIONS_SINGLE_DRIVE	0x02 /* Don't probe second drive */
+#define WDC_OPTIONS_ATA_NOSTREAM	0x04
+#define WDC_OPTIONS_ATAPI_NOSTREAM	0x08
 
 struct wdc_isa_softc {
 	struct	wdc_softc sc_wdcdev;
@@ -89,22 +94,42 @@ wdc_isa_probe(parent, match, aux)
 	struct isa_attach_args *ia = aux;
 	int result = 0;
 
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
+		return (0);
+	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
+		return (0);
+	if (ia->ia_ndrq > 0 && ia->ia_drq[0].ir_drq == ISACF_DRQ_DEFAULT)
+		ia->ia_ndrq = 0;
+
 	memset(&ch, 0, sizeof(ch));
 
 	ch.cmd_iot = ia->ia_iot;
-	if (bus_space_map(ch.cmd_iot, ia->ia_iobase, WDC_ISA_REG_NPORTS, 0,
-	    &ch.cmd_ioh))
+
+	if (bus_space_map(ch.cmd_iot, ia->ia_io[0].ir_addr,
+	    WDC_ISA_REG_NPORTS, 0, &ch.cmd_ioh))
 		goto out;
 
 	ch.ctl_iot = ia->ia_iot;
-	if (bus_space_map(ch.ctl_iot, ia->ia_iobase + WDC_ISA_AUXREG_OFFSET,
-	    WDC_ISA_AUXREG_NPORTS, 0, &ch.ctl_ioh))
+	if (bus_space_map(ch.ctl_iot, ia->ia_io[0].ir_addr +
+	    WDC_ISA_AUXREG_OFFSET, WDC_ISA_AUXREG_NPORTS, 0, &ch.ctl_ioh))
 		goto outunmap;
 
 	result = wdcprobe(&ch);
 	if (result) {
-		ia->ia_iosize = WDC_ISA_REG_NPORTS;
-		ia->ia_msize = 0;
+		ia->ia_nio = 1;
+		ia->ia_io[0].ir_size = WDC_ISA_REG_NPORTS;
+
+		ia->ia_nirq = 1;
+
+		ia->ia_niomem = 0;
 	}
 
 	bus_space_unmap(ch.ctl_iot, ch.ctl_ioh, WDC_ISA_AUXREG_NPORTS);
@@ -127,22 +152,22 @@ wdc_isa_attach(parent, self, aux)
 	sc->wdc_channel.cmd_iot = ia->ia_iot;
 	sc->wdc_channel.ctl_iot = ia->ia_iot;
 	sc->sc_ic = ia->ia_ic;
-	if (bus_space_map(sc->wdc_channel.cmd_iot, ia->ia_iobase,
+	if (bus_space_map(sc->wdc_channel.cmd_iot, ia->ia_io[0].ir_addr,
 	    WDC_ISA_REG_NPORTS, 0, &sc->wdc_channel.cmd_ioh) ||
 	    bus_space_map(sc->wdc_channel.ctl_iot,
-	      ia->ia_iobase + WDC_ISA_AUXREG_OFFSET, WDC_ISA_AUXREG_NPORTS,
-	      0, &sc->wdc_channel.ctl_ioh)) {
+	      ia->ia_io[0].ir_addr + WDC_ISA_AUXREG_OFFSET,
+	      WDC_ISA_AUXREG_NPORTS, 0, &sc->wdc_channel.ctl_ioh)) {
 		printf("%s: couldn't map registers\n",
 		    sc->sc_wdcdev.sc_dev.dv_xname);
 	}
 	sc->wdc_channel.data32iot = sc->wdc_channel.cmd_iot;
 	sc->wdc_channel.data32ioh = sc->wdc_channel.cmd_ioh;
 
-	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_BIO, wdcintr, &sc->wdc_channel);
+	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_BIO, wdcintr, &sc->wdc_channel);
 
-	if (ia->ia_drq != DRQUNK) {
-		sc->sc_drq = ia->ia_drq;
+	if (ia->ia_ndrq > 0 && ia->ia_drq[0].ir_drq != ISACF_DRQ_DEFAULT) {
+		sc->sc_drq = ia->ia_drq[0].ir_drq;
 
 		sc->sc_wdcdev.cap |= WDC_CAPABILITY_DMA;
 		sc->sc_wdcdev.dma_arg = sc;
@@ -154,6 +179,13 @@ wdc_isa_attach(parent, self, aux)
 	sc->sc_wdcdev.cap |= WDC_CAPABILITY_DATA16 | WDC_CAPABILITY_PREATA;
 	if (sc->sc_wdcdev.sc_dev.dv_cfdata->cf_flags & WDC_OPTIONS_32)
 		sc->sc_wdcdev.cap |= WDC_CAPABILITY_DATA32;
+	if (sc->sc_wdcdev.sc_dev.dv_cfdata->cf_flags & WDC_OPTIONS_SINGLE_DRIVE)
+		sc->sc_wdcdev.cap |= WDC_CAPABILITY_SINGLE_DRIVE;
+	if (sc->sc_wdcdev.sc_dev.dv_cfdata->cf_flags & WDC_OPTIONS_ATA_NOSTREAM)
+		sc->sc_wdcdev.cap |= WDC_CAPABILITY_ATA_NOSTREAM;
+	if (sc->sc_wdcdev.sc_dev.dv_cfdata->cf_flags
+						& WDC_OPTIONS_ATAPI_NOSTREAM)
+		sc->sc_wdcdev.cap |= WDC_CAPABILITY_ATAPI_NOSTREAM;
 	sc->sc_wdcdev.PIO_cap = 0;
 	sc->wdc_chanptr = &sc->wdc_channel;
 	sc->sc_wdcdev.channels = &sc->wdc_chanptr;

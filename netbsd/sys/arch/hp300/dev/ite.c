@@ -1,4 +1,4 @@
-/*	$NetBSD: ite.c,v 1.43.4.1 2000/08/04 18:53:23 tsutsui Exp $	*/
+/*	$NetBSD: ite.c,v 1.52.6.1 2002/07/06 03:21:21 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -84,6 +84,11 @@
  * the hardware dependent routines.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ite.c,v 1.52.6.1 2002/07/06 03:21:21 lukem Exp $");                                                  
+
+#include "hil.h"
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
@@ -94,6 +99,7 @@
 #include <sys/device.h>
 
 #include <machine/autoconf.h>
+#include <machine/bus.h>
 
 #include <dev/cons.h>
 
@@ -118,8 +124,6 @@ cdev_decl(ite);
  */
 int	iteburst = 64;
 
-struct  ite_data *kbd_ite = NULL;
-
 int	itematch __P((struct device *, struct cfdata *, void *));
 void	iteattach __P((struct device *, struct device *, void *));
 
@@ -127,13 +131,27 @@ struct cfattach ite_ca = {
 	sizeof(struct ite_softc), itematch, iteattach
 };
 
+/* XXX this has always been global, but shouldn't be */
+static struct kbdmap *ite_km;
+
 extern struct cfdriver ite_cd;
 
 /*
  * Terminal emulator state information, statically allocated
  * for the benefit of the console.
  */
-struct	ite_data ite_cn;
+static struct	ite_data ite_cn;
+
+/*
+ * console stuff
+ */
+static struct consdev ite_cons = {
+	NULL, NULL, itecngetc, itecnputc, nullcnpollc, NULL, NODEV, CN_NORMAL
+};
+static int console_kbd_attached;
+static int console_display_attached;
+static struct ite_kbdops *console_kbdops;
+static struct ite_kbdmap *console_kbdmap;
 
 void	iteinit __P((struct ite_data *));
 void	iteputchar __P((int, struct ite_data *));
@@ -196,15 +214,13 @@ iteattach(parent, self, aux)
 		 */
 		cn_tab->cn_dev = makedev(ite_major(), self->dv_unit);
 	} else {
-		ite->sc_data =
-		    (struct ite_data *)malloc(sizeof(struct ite_data),
-		    M_DEVBUF, M_NOWAIT);
+		MALLOC(ite->sc_data, struct ite_data *,
+		    sizeof(struct ite_data), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (ite->sc_data == NULL) {
 			printf("\n%s: malloc for ite_data failed\n",
 			    ite->sc_dev.dv_xname);
 			return;
 		}
-		bzero(ite->sc_data, sizeof(struct ite_data));
 		ite->sc_data->flags = ITE_ALIVE;
 	}
 
@@ -215,6 +231,13 @@ iteattach(parent, self, aux)
 	grf->sc_ite = ite;
 
 	printf("\n");
+}
+
+void
+iteinstallkeymap(v)
+	void *v;
+{
+	ite_km = (struct kbdmap *)v;
 }
 
 /*
@@ -246,10 +269,8 @@ iteon(ip, flag)
 	if (ip->flags & ITE_INGRF)
 		return(0);
 
-	if (kbd_ite == NULL || kbd_ite == ip) {
-		kbd_ite = ip;
-		kbdenable(0);		/* XXX */
-	}
+	if (console_kbdops != NULL)
+		(*console_kbdops->enable)(console_kbdops->arg);
 
 	iteinit(ip);
 	return(0);
@@ -274,9 +295,8 @@ iteinit(ip)
 
 	ip->attribute = 0;
 	if (ip->attrbuf == NULL)
-		ip->attrbuf = (u_char *)
-			malloc(ip->rows * ip->cols, M_DEVBUF, M_WAITOK);
-	bzero(ip->attrbuf, (ip->rows * ip->cols));
+		ip->attrbuf = (u_char *)malloc(ip->rows * ip->cols,
+		    M_DEVBUF, M_WAITOK | M_ZERO);
 
 	ip->imode = 0;
 	ip->flags |= ITE_INITED;
@@ -361,7 +381,7 @@ iteopen(dev, mode, devtype, p)
 		tp->t_state = TS_ISOPEN|TS_CARR_ON;
 		ttsetwater(tp);
 	}
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error == 0) {
 		tp->t_winsize.ws_row = ip->rows;
 		tp->t_winsize.ws_col = ip->cols;
@@ -381,7 +401,7 @@ iteclose(dev, flag, mode, p)
 	struct ite_data *ip = sc->sc_data;
 	struct tty *tp = ip->tty;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 	iteoff(ip, 0);
 #if 0
@@ -401,7 +421,7 @@ iteread(dev, uio, flag)
 	struct ite_softc *sc = ite_cd.cd_devs[ITEUNIT(dev)];
 	struct tty *tp = sc->sc_data->tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -413,7 +433,19 @@ itewrite(dev, uio, flag)
 	struct ite_softc *sc = ite_cd.cd_devs[ITEUNIT(dev)];
 	struct tty *tp = sc->sc_data->tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+itepoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct ite_softc *sc = ite_cd.cd_devs[ITEUNIT(dev)];
+	struct tty *tp = sc->sc_data->tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -438,13 +470,10 @@ iteioctl(dev, cmd, addr, flag, p)
 	struct tty *tp = ip->tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, addr, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, addr, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
-	error = ttioctl(tp, cmd, addr, flag, p);
-	if (error >= 0)
-		return (error);
-	return (ENOTTY);
+	return ttioctl(tp, cmd, addr, flag, p);
 }
 
 void
@@ -528,10 +557,10 @@ itefilter(stat, c)
 	char code, *str;
 	struct tty *kbd_tty;
 
-	if (kbd_ite == NULL || kbd_ite->tty == NULL)
+	if (ite_cn.tty == NULL)
 		return;
 
-	kbd_tty = kbd_ite->tty;
+	kbd_tty = ite_cn.tty;
 
 	switch (c & 0xFF) {
 	case KBD_CAPSLOCK:
@@ -554,31 +583,31 @@ itefilter(stat, c)
 	default:
 	case KBD_KEY:
 	        if (!capsmode) {
-			code = kbd_keymap[(int)c];
+			code = ite_km->kbd_keymap[(int)c];
 			break;
 		}
 		/* FALLTHROUGH */
 
 	case KBD_SHIFT:
-		code = kbd_shiftmap[(int)c];
+		code = ite_km->kbd_shiftmap[(int)c];
 		break;
 
 	case KBD_CTRL:
-		code = kbd_ctrlmap[(int)c];
+		code = ite_km->kbd_ctrlmap[(int)c];
 		break;
 		
 	case KBD_CTRLSHIFT:	
-		code = kbd_ctrlshiftmap[(int)c];
+		code = ite_km->kbd_ctrlshiftmap[(int)c];
 		break;
         }
 
-	if (code == '\0' && (str = kbd_stringmap[(int)c]) != '\0') {
+	if (code == '\0' && (str = ite_km->kbd_stringmap[(int)c]) != '\0') {
 		while (*str)
-			(*linesw[kbd_tty->t_line].l_rint)(*str++, kbd_tty);
+			(*kbd_tty->t_linesw->l_rint)(*str++, kbd_tty);
 	} else {
 		if (metamode)
 			code |= 0x80;
-		(*linesw[kbd_tty->t_line].l_rint)(code, kbd_tty);
+		(*kbd_tty->t_linesw->l_rint)(code, kbd_tty);
 	}
 }
 
@@ -827,8 +856,8 @@ ignore:
 		break;
 
 	case CTRL('G'):
-		if (ip == kbd_ite)
-			kbdbell(0);	/* XXX */
+		if (console_kbdops != NULL)
+			(*console_kbdops->bell)(console_kbdops->arg);
 		break;
 
 	case ESC:
@@ -969,13 +998,15 @@ ite_major()
 	return (itemaj);
 }
 
+
+
 /*
  * Console functions.  Console probes are done by the individual
  * framebuffer drivers.
  */
 
 void
-itecninit(gp, isw)
+itedisplaycnattach(gp, isw)
 	struct grf_data *gp;
 	struct itesw *isw;
 {
@@ -989,13 +1020,32 @@ itecninit(gp, isw)
 	ip->flags = ITE_ALIVE|ITE_CONSOLE|ITE_ACTIVE|ITE_ISCONS;
 	ip->attrbuf = ite_console_attributes;
 	iteinit(ip);
+	console_display_attached = 1;
 
-	/*
-	 * Initialize the console keyboard.
-	 */
-	kbdcninit();
+	if (console_kbd_attached && console_display_attached)
+		itecninit();
+}
 
-	kbd_ite = ip;		/* XXX */
+void
+itekbdcnattach(ops, map)
+	struct ite_kbdops *ops;
+	struct ite_kbdmap *map;
+{
+
+	console_kbdops = ops;
+	console_kbdmap = map;
+	console_kbd_attached = 1;
+
+	if (console_kbd_attached && console_display_attached)
+		itecninit();
+}
+
+void
+itecninit(void)
+{
+
+	cn_tab = &ite_cons;
+	cn_tab->cn_dev = makedev(ite_major(), 0);
 }
 
 /*ARGSUSED*/
@@ -1003,19 +1053,22 @@ int
 itecngetc(dev)
 	dev_t dev;
 {
-	int c;
+	int c = 0;
 	int stat;
 
-	c = kbdgetc(&stat);
+	if (console_kbdops == NULL)
+		return (-1);
+
+	c = (*console_kbdops->getc)(&stat);
 	switch ((stat >> KBD_SSHIFT) & KBD_SMASK) {
 	case KBD_SHIFT:
-		c = kbd_cn_shiftmap[c & KBD_CHARMASK];
+		c = console_kbdmap->shiftmap[c & KBD_CHARMASK];
 		break;
 	case KBD_CTRL:
-		c = kbd_cn_ctrlmap[c & KBD_CHARMASK];
+		c = console_kbdmap->ctrlmap[c & KBD_CHARMASK];
 		break;
 	case KBD_KEY:
-		c = kbd_cn_keymap[c & KBD_CHARMASK];
+		c = console_kbdmap->keymap[c & KBD_CHARMASK];
 		break;
 	default:
 		c = 0;

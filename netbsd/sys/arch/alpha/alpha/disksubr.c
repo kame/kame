@@ -1,4 +1,4 @@
-/* $NetBSD: disksubr.c,v 1.20 2000/05/19 18:54:24 thorpej Exp $ */
+/* $NetBSD: disksubr.c,v 1.25 2002/03/05 09:40:39 simonb Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -29,18 +29,15 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.20 2000/05/19 18:54:24 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.25 2002/03/05 09:40:39 simonb Exp $");
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/ioccom.h>
 #include <sys/device.h>
 #include <sys/disklabel.h>
 #include <sys/disk.h>
-
-#include <dev/scsipi/scsi_all.h>
-#include <dev/scsipi/scsipi_all.h>
-#include <dev/scsipi/scsiconf.h>
 
 #include <machine/cpu.h>
 #include <machine/autoconf.h>
@@ -49,7 +46,7 @@ extern struct device *bootdv;
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl and anything required in the strategy routine
  * (e.g., sector size) must be filled in before calling us.
@@ -87,7 +84,7 @@ readdisklabel(dev, strat, lp, clp)
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	(*strat)(bp);  
 
 	/* if successful, locate disk label within block and validate */
@@ -114,7 +111,8 @@ readdisklabel(dev, strat, lp, clp)
 		i = 0;
 		do {
 			/* read a bad sector table */
-			bp->b_flags = B_BUSY | B_READ;
+			bp->b_flags &= ~(B_DONE);
+			bp->b_flags |= B_READ;
 			bp->b_blkno = lp->d_secperunit - lp->d_nsectors + i;
 			if (lp->d_secsize > DEV_BSIZE)
 				bp->b_blkno *= lp->d_secsize / DEV_BSIZE;
@@ -143,7 +141,6 @@ readdisklabel(dev, strat, lp, clp)
 	}
 
 done:
-	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 	return (msg);
 }
@@ -178,7 +175,7 @@ setdisklabel(olp, nlp, openmask, clp)
 		dkcksum(nlp) != 0)
 		return (EINVAL);
 
-	while ((i = ffs((long)openmask)) != 0) {
+	while ((i = ffs(openmask)) != 0) {
 		i--;
 		openmask &= ~(1 << i);
 		if (nlp->d_npartitions <= i)
@@ -225,7 +222,7 @@ writedisklabel(dev, strat, lp, clp)
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_READ;           /* get current label */
+	bp->b_flags |= B_READ;           /* get current label */
 	(*strat)(bp);
 	if ((error = biowait(bp)) != 0)
 		goto done;
@@ -248,7 +245,8 @@ writedisklabel(dev, strat, lp, clp)
 		dp[63] = sum;
 	}
 
-	bp->b_flags = B_WRITE;
+	bp->b_flags &= ~(B_READ|B_DONE);
+	bp->b_flags |= B_WRITE;
 	(*strat)(bp);
 	error = biowait(bp);
 

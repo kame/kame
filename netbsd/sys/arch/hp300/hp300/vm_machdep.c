@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.55 2000/05/28 05:49:01 thorpej Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.65 2002/03/15 05:55:39 gmcgarry Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -42,6 +42,9 @@
  *	@(#)vm_machdep.c	8.6 (Berkeley) 1/12/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.65 2002/03/15 05:55:39 gmcgarry Exp $");                                                  
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -56,9 +59,6 @@
 #include <machine/cpu.h>
 #include <machine/pte.h>
 #include <machine/reg.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -178,7 +178,7 @@ cpu_coredump(p, vp, cred, chdr)
 			return error;
 	} else {
 		/* Make sure these are clear. */
-		bzero((caddr_t)&md_core.freg, sizeof(md_core.freg));
+		memset((caddr_t)&md_core.freg, 0, sizeof(md_core.freg));
 	}
 
 	CORE_SETMAGIC(cseg, CORESEGMAGIC, MID_MACHINE, CORE_CPU);
@@ -204,7 +204,7 @@ cpu_coredump(p, vp, cred, chdr)
 /*
  * Move pages from one kernel virtual address to another.
  * Both addresses are assumed to reside in the Sysmap,
- * and size must be a multiple of CLSIZE.
+ * and size must be a multiple of PAGE_SIZE.
  */
 void
 pagemove(from, to, size)
@@ -226,15 +226,13 @@ pagemove(from, to, size)
 		if (pmap_extract(pmap_kernel(), (vaddr_t)to, NULL) == TRUE)
 			panic("pagemove 3");
 #endif
-		pmap_remove(pmap_kernel(),
-			    (vaddr_t)from, (vaddr_t)from + PAGE_SIZE);
-		pmap_enter(pmap_kernel(),
-			   (vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE,
-			   VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+		pmap_kremove((vaddr_t)from, PAGE_SIZE);
+		pmap_kenter_pa((vaddr_t)to, pa, VM_PROT_READ | VM_PROT_WRITE);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -286,8 +284,6 @@ kvtop(addr)
 	return((int)pa);
 }
 
-extern vm_map_t phys_map;
-
 /*
  * Map a user I/O request into kernel virtual address space.
  * Note: the pages are already locked by uvm_vslock(), so we
@@ -324,6 +320,7 @@ vmapbuf(bp, len)
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	} while (len);
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -344,10 +341,8 @@ vunmapbuf(bp, len)
 	off = (vaddr_t)bp->b_data - kva;
 	len = m68k_round_page(off + len);
 
-	/*
-	 * pmap_remove() is unnecessary here, as kmem_free_wakeup()
-	 * will do it for us.
-	 */
+	pmap_remove(vm_map_pmap(phys_map), kva, kva + len);
+	pmap_update(pmap_kernel());
 	uvm_km_free_wakeup(phys_map, kva, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;

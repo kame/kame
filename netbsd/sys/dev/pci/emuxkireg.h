@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: emuxkireg.h,v 1.2 2001/12/23 22:52:49 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

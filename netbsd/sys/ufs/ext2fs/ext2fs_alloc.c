@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_alloc.c,v 1.8 2000/05/19 04:34:44 thorpej Exp $	*/
+/*	$NetBSD: ext2fs_alloc.c,v 1.13 2001/11/08 02:39:06 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.
@@ -37,6 +37,9 @@
  *  Modified for ext2fs by Manuel Bouyer.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_alloc.c,v 1.13 2001/11/08 02:39:06 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -46,9 +49,6 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 
-#include <vm/vm.h>
-
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufs_extern.h>
 
@@ -76,7 +76,7 @@ static ufs_daddr_t	ext2fs_mapsearch __P((struct m_ext2fs *, char *, ufs_daddr_t)
  *   3) allocate a block in the same cylinder group.
  *   4) quadradically rehash into other cylinder groups, until an
  *	  available block is located.
- * If no block preference is given the following heirarchy is used
+ * If no block preference is given the following hierarchy is used
  * to allocate a block:
  *   1) allocate a block in the cylinder group that contains the
  *	  inode for the file.
@@ -133,7 +133,7 @@ nospace:
  *   2) allocate an inode in the same cylinder group.
  *   3) quadradically rehash into other cylinder groups, until an
  *	  available inode is located.
- * If no inode preference is given the following heirarchy is used
+ * If no inode preference is given the following hierarchy is used
  * to allocate an inode:
  *   1) allocate an inode in cylinder group 0.
  *   2) quadradically rehash into other cylinder groups, until an
@@ -232,7 +232,7 @@ ext2fs_dirpref(fs)
  * If no blocks have been allocated in the first section, the policy is to
  * request a block in the same cylinder group as the inode that describes
  * the file. Otherwise, the policy is to try to allocate the blocks
- * contigously. The two fields of the ext2 inode extention (see
+ * contigously. The two fields of the ext2 inode extension (see
  * ufs/ufs/inode.h) help this.
  */
 ufs_daddr_t

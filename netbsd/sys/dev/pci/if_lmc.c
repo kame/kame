@@ -1,4 +1,4 @@
-/*	$NetBSD: if_lmc.c,v 1.3 2000/05/03 21:08:02 thorpej Exp $	*/
+/*	$NetBSD: if_lmc.c,v 1.18 2002/01/04 12:21:24 martin Exp $	*/
 
 /*-
  * Copyright (c) 1997-1999 LAN Media Corporation (LMC)
@@ -48,7 +48,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -61,6 +61,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_lmc.c,v 1.18 2002/01/04 12:21:24 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,12 +99,11 @@
 #include <net/bpfdesc.h>
 #endif
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_kern.h>
 
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__)
 #include <net/if_sppp.h>
+#elif defined(__NetBSD__)
+#include <net/if_spppvar.h>
 #endif
 
 #if defined(__bsdi__)
@@ -119,7 +121,12 @@
 #include <net/if_c_hdlc.h>
 #endif
 
+#if defined(__NetBSD__)
+#include <uvm/uvm_extern.h>
+#endif
+
 #if defined(__FreeBSD__)
+#include <vm/vm.h>
 #include <vm/pmap.h>
 #include <pci.h>
 #if NPCI > 0
@@ -129,6 +136,7 @@
 #endif /* __FreeBSD__ */
 
 #if defined(__bsdi__)
+#include <vm/vm.h>
 #include <i386/pci/ic/dc21040.h>
 #include <i386/isa/isa.h>
 #include <i386/isa/icu.h>
@@ -370,7 +378,7 @@ lmc_read_macaddr(lmc_softc_t * const sc)
 {
 	lmc_srom_read(sc);
 
-	bcopy(sc->lmc_rombuf + 20, sc->lmc_enaddr, 6);
+	memcpy(sc->lmc_enaddr, sc->lmc_rombuf + 20, 6);
 
 	return 0;
 }
@@ -402,6 +410,35 @@ lmc_watchdog(int unit)
 
 	state = 0;
 
+	/*
+	 * Make sure the tx jabber and rx watchdog are off,
+	 * and the transmit and receive processes are running.
+	 */
+	LMC_CSR_WRITE (sc, csr_15, 0x00000011);
+	sc->lmc_cmdmode |= TULIP_CMD_TXRUN | TULIP_CMD_RXRUN;
+	LMC_CSR_WRITE (sc, csr_command, sc->lmc_cmdmode);
+
+	/* Is the transmit clock still available? */
+	ticks = LMC_CSR_READ (sc, csr_gp_timer);
+	ticks = 0x0000ffff - (ticks & 0x0000ffff);
+	if (ticks == 0)
+	{
+		/* no clock found ? */
+		if (sc->tx_clockState != 0)
+		{
+			sc->tx_clockState = 0;
+			if (sc->lmc_cardtype == LMC_CARDTYPE_SSI)
+				lmc_led_on (sc, LMC_MII16_LED3); /* ON red */
+		}
+	else
+		if (sc->tx_clockState == 0)
+		{
+			sc->tx_clockState = 1;
+			if (sc->lmc_cardtype == LMC_CARDTYPE_SSI)
+				lmc_led_off (sc, LMC_MII16_LED3); /* OFF red */
+		}
+	}
+
 	link_status = sc->lmc_media->get_link_status(sc);
 	ostatus = ((sc->lmc_flags & LMC_MODEMOK) == LMC_MODEMOK);
 
@@ -409,26 +446,62 @@ lmc_watchdog(int unit)
 	 * hardware level link lost, but the interface is marked as up.
 	 * Mark it as down.
 	 */
-        if (link_status == 0 && ostatus) {
+	if (link_status == LMC_LINK_DOWN && ostatus) {
 		printf(LMC_PRINTF_FMT ": physical link down\n",
 		       LMC_PRINTF_ARGS);
 		sc->lmc_flags &= ~LMC_MODEMOK;
-		lmc_led_off(sc, LMC_MII16_LED1);
+		if (sc->lmc_cardtype == LMC_CARDTYPE_DS3 ||
+		    sc->lmc_cardtype == LMC_CARDTYPE_T1)
+			lmc_led_on (sc, LMC_DS3_LED3 | LMC_DS3_LED2);
+							/* turn on red LED */
+		else {
+			lmc_led_off (sc, LMC_MII16_LED1);
+			lmc_led_on (sc, LMC_MII16_LED0);
+			if (sc->lmc_timing == LMC_CTL_CLOCK_SOURCE_EXT)
+				lmc_led_on (sc, LMC_MII16_LED3);
+		}
+
 	}
 
 	/*
 	 * hardware link is up, but the interface is marked as down.
 	 * Bring it back up again.
 	 */
-	if (link_status != 0 && !ostatus) {
+	if (link_status != LMC_LINK_DOWN && !ostatus) {
 		printf(LMC_PRINTF_FMT ": physical link up\n",
 		       LMC_PRINTF_ARGS);
-		if (sc->lmc_flags & LMC_IFUP)
+		if (sc->lmc_flags & LMC_IFUP) {
 			lmc_ifup(sc);
+#if 0 && (defined(__NetBSD__) || defined(__FreeBSD__))
+			if (sc->lmc_if.if_flags & IFF_UP) {
+				struct sppp *sp = &sc->lmc_sppp;
+
+				/* re-connect LCP */
+				(sp->pp_down)(sp);
+				(sp->pp_up)(sp);
+			}
+#endif
+		}
 		sc->lmc_flags |= LMC_MODEMOK;
-		lmc_led_on(sc, LMC_MII16_LED1); 
+		if (sc->lmc_cardtype == LMC_CARDTYPE_DS3 ||
+		    sc->lmc_cardtype == LMC_CARDTYPE_T1)
+		{
+			sc->lmc_miireg16 |= LMC_DS3_LED3;
+			lmc_led_off (sc, LMC_DS3_LED3);
+							/* turn off red LED */
+			lmc_led_on (sc, LMC_DS3_LED2);
+		} else {
+			lmc_led_on (sc, LMC_MII16_LED0 | LMC_MII16_LED1
+				    | LMC_MII16_LED2);
+			if (sc->lmc_timing != LMC_CTL_CLOCK_SOURCE_EXT)
+				lmc_led_off (sc, LMC_MII16_LED3);
+		}
+
 		return;
 	}
+
+	/* Call media specific watchdog functions */
+	sc->lmc_media->watchdog(sc);
 
 	/*
 	 * remember the timer value
@@ -452,18 +525,26 @@ lmc_ifup(lmc_softc_t * const sc)
 	lmc_dec_reset(sc);
 	lmc_reset(sc);
 
-	sc->lmc_media->set_link_status(sc, 1);
+	sc->lmc_media->set_link_status(sc, LMC_LINK_UP);
 	sc->lmc_media->set_status(sc, NULL);
 
 	sc->lmc_flags |= LMC_IFUP;
 
-	lmc_led_on(sc, LMC_MII16_LED1);
+	/*
+	 * for DS3 & DS1 adapters light the green light, led2
+	 */
+	if (sc->lmc_cardtype == LMC_CARDTYPE_DS3 ||
+	    sc->lmc_cardtype == LMC_CARDTYPE_T1)
+		lmc_led_on (sc, LMC_MII16_LED2);
+	else
+		lmc_led_on (sc, LMC_MII16_LED0 | LMC_MII16_LED2);
 
 	/*
 	 * select what interrupts we want to get
 	 */
 	sc->lmc_intrmask |= (TULIP_STS_NORMALINTR
 			       | TULIP_STS_RXINTR
+			       | TULIP_STS_RXNOBUF
 			       | TULIP_STS_TXINTR
 			       | TULIP_STS_ABNRMLINTR
 			       | TULIP_STS_SYSERROR
@@ -487,11 +568,21 @@ lmc_ifup(lmc_softc_t * const sc)
 static void
 lmc_ifdown(lmc_softc_t * const sc)
 {
+
+#if 0 && (defined(__NetBSD__) || defined(__FreeBSD__))
+	if (sc->lmc_if.if_flags & IFF_UP) {
+		struct sppp *sp = &sc->lmc_sppp;
+
+		/* disconnect LCP */
+		(sp->pp_down)(sp);
+	}
+#endif
+
 	sc->lmc_if.if_timer = 0;
 	sc->lmc_flags &= ~LMC_IFUP;
 
-	sc->lmc_media->set_link_status(sc, 0);
-	lmc_led_off(sc, LMC_MII16_LED1);
+	sc->lmc_media->set_link_status(sc, LMC_LINK_DOWN);
+	lmc_led_off(sc, LMC_MII16_LED_ALL);
 
 	lmc_dec_reset(sc);
 	lmc_reset(sc);
@@ -503,15 +594,20 @@ lmc_rx_intr(lmc_softc_t * const sc)
 {
 	lmc_ringinfo_t * const ri = &sc->lmc_rxinfo;
 	struct ifnet * const ifp = &sc->lmc_if;
+	u_int32_t status;
 	int fillok = 1;
 
 	sc->lmc_rxtick++;
 
 	for (;;) {
-		tulip_desc_t *eop = ri->ri_nextin;
+		lmc_desc_t *eop = ri->ri_nextin;
 		int total_len = 0, last_offset = 0;
 		struct mbuf *ms = NULL, *me = NULL;
 		int accept = 0;
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NORX)
+		bus_dmamap_t map;
+		int error;
+#endif
 
 		if (fillok && sc->lmc_rxq.ifq_len < LMC_RXQ_TARGET)
 			goto queue_mbuf;
@@ -527,14 +623,18 @@ lmc_rx_intr(lmc_softc_t * const sc)
 		 * 90% of the packets will fit in one descriptor.  So we
 		 * optimize for that case.
 		 */
-		if ((((volatile tulip_desc_t *) eop)->d_status & (TULIP_DSTS_OWNER|TULIP_DSTS_RxFIRSTDESC|TULIP_DSTS_RxLASTDESC)) == (TULIP_DSTS_RxFIRSTDESC|TULIP_DSTS_RxLASTDESC)) {
+		LMC_RXDESC_POSTSYNC(sc, eop, sizeof(*eop));
+		status = le32toh(((volatile lmc_desc_t *) eop)->d_status);
+		if ((status &
+			(TULIP_DSTS_OWNER|TULIP_DSTS_RxFIRSTDESC|TULIP_DSTS_RxLASTDESC)) == 
+			(TULIP_DSTS_RxFIRSTDESC|TULIP_DSTS_RxLASTDESC)) {
 			IF_DEQUEUE(&sc->lmc_rxq, ms);
 			me = ms;
 		} else {
 			/*
 			 * If still owned by the TULIP, don't touch it.
 			 */
-			if (((volatile tulip_desc_t *)eop)->d_status & TULIP_DSTS_OWNER)
+			if (status & TULIP_DSTS_OWNER)
 				break;
 
 			/*
@@ -543,10 +643,14 @@ lmc_rx_intr(lmc_softc_t * const sc)
 			 * for a received packet to cross more than one
 			 * receive descriptor.
 			 */
-			while ((((volatile tulip_desc_t *) eop)->d_status & TULIP_DSTS_RxLASTDESC) == 0) {
+			while ((status & TULIP_DSTS_RxLASTDESC) == 0) {
 				if (++eop == ri->ri_last)
 					eop = ri->ri_first;
-				if (eop == ri->ri_nextout || ((((volatile tulip_desc_t *) eop)->d_status & TULIP_DSTS_OWNER))) {
+				LMC_RXDESC_POSTSYNC(sc, eop, sizeof(*eop));
+				status = le32toh(((volatile lmc_desc_t *)
+					eop)->d_status);
+				if (eop == ri->ri_nextout || 
+					(status & TULIP_DSTS_OWNER)) {
 					return;
 				}
 				total_len++;
@@ -567,6 +671,15 @@ lmc_rx_intr(lmc_softc_t * const sc)
 			 */
 			IF_DEQUEUE(&sc->lmc_rxq, ms);
 			for (me = ms; total_len > 0; total_len--) {
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NORX)
+				map = M_GETCTX(me, bus_dmamap_t);
+				LMC_RXMAP_POSTSYNC(sc, map);
+				bus_dmamap_unload(sc->lmc_dmatag, map);
+				sc->lmc_rxmaps[sc->lmc_rxmaps_free++] = map;
+#if defined(DIAGNOSTIC)
+				M_SETCTX(me, NULL);
+#endif
+#endif /* LMC_BUS_DMA */
 				me->m_len = LMC_RX_BUFLEN;
 				last_offset += LMC_RX_BUFLEN;
 				IF_DEQUEUE(&sc->lmc_rxq, me->m_next);
@@ -577,19 +690,31 @@ lmc_rx_intr(lmc_softc_t * const sc)
 		/*
 		 *  Now get the size of received packet (minus the CRC).
 		 */
-		total_len = ((eop->d_status >> 16) & 0x7FFF);
+		total_len = ((status >> 16) & 0x7FFF);
 		if (sc->ictl.crc_length == 16)
 			total_len -= 2;
 		else
 			total_len -= 4;
 
 		if ((sc->lmc_flags & LMC_RXIGNORE) == 0
-		    && ((eop->d_status & LMC_DSTS_ERRSUM) == 0
+		    && ((status & LMC_DSTS_ERRSUM) == 0
 #ifdef BIG_PACKET
 			|| (total_len <= sc->lmc_if.if_mtu + PPP_HEADER_LEN
-			    && (eop->d_status & TULIP_DSTS_RxOVERFLOW) == 0)
+			    && (status & TULIP_DSTS_RxOVERFLOW) == 0)
 #endif
 			)) {
+
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NORX)
+			map = M_GETCTX(me, bus_dmamap_t);
+			bus_dmamap_sync(sc->lmc_dmatag, map, 0, me->m_len,
+				BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->lmc_dmatag, map);
+			sc->lmc_rxmaps[sc->lmc_rxmaps_free++] = map;
+#if defined(DIAGNOSTIC)
+			M_SETCTX(me, NULL);
+#endif
+#endif /* LMC_BUS_DMA */
+
 			me->m_len = total_len - last_offset;
 #if NBPFILTER > 0
 			if (sc->lmc_bpf != NULL) {
@@ -603,9 +728,17 @@ lmc_rx_intr(lmc_softc_t * const sc)
 			accept = 1;
 		} else {
 			ifp->if_ierrors++;
-			if (eop->d_status & TULIP_DSTS_RxOVERFLOW) {
+			if (status & TULIP_DSTS_RxOVERFLOW) {
 				sc->lmc_dot3stats.dot3StatsInternalMacReceiveErrors++;
 			}
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NORX)
+			map = M_GETCTX(me, bus_dmamap_t);
+			bus_dmamap_unload(sc->lmc_dmatag, map);
+			sc->lmc_rxmaps[sc->lmc_rxmaps_free++] = map;
+#if defined(DIAGNOSTIC)
+			M_SETCTX(me, NULL);
+#endif
+#endif /* LMC_BUS_DMA */
 		}
 
 		ifp->if_ipackets++;
@@ -663,9 +796,60 @@ lmc_rx_intr(lmc_softc_t * const sc)
 		 * receive queue.
 		 */
 		do {
-			ri->ri_nextout->d_length1 = LMC_RX_BUFLEN;
-			ri->ri_nextout->d_addr1 = LMC_KVATOPHYS(sc, mtod(ms, caddr_t));
-			ri->ri_nextout->d_status = TULIP_DSTS_OWNER;
+			u_int32_t ctl;
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NORX)
+			lmc_desc_t * const nextout = ri->ri_nextout;
+
+			if (sc->lmc_rxmaps_free > 0) {
+				map = sc->lmc_rxmaps[--sc->lmc_rxmaps_free];
+			} else {
+				m_freem(ms);
+				sc->lmc_flags |= LMC_RXBUFSLOW;
+#if defined(LMC_DEBUG)
+				sc->lmc_dbg.dbg_rxlowbufs++;
+#endif
+				break;
+			}
+			M_SETCTX(ms, map);
+			error = bus_dmamap_load(sc->lmc_dmatag, map,
+				mtod(ms, void *), LMC_RX_BUFLEN, 
+				NULL, BUS_DMA_NOWAIT);
+			if (error) {
+				printf(LMC_PRINTF_FMT
+					": unable to load rx map, "
+					"error = %d\n",
+					LMC_PRINTF_ARGS, error);
+				panic("lmc_rx_intr");		/* XXX */
+			}
+
+			ctl = le32toh(nextout->d_ctl);
+			/* For some weird reason we lose TULIP_DFLAG_ENDRING */
+			if ((nextout+1) == ri->ri_last)
+				ctl = LMC_CTL(LMC_CTL_FLGS(ctl)|
+					TULIP_DFLAG_ENDRING, 0, 0);
+			nextout->d_addr1 = htole32(map->dm_segs[0].ds_addr);
+			if (map->dm_nsegs == 2) {
+				nextout->d_addr2 = htole32(map->dm_segs[1].ds_addr);
+				nextout->d_ctl = 
+					htole32(LMC_CTL(LMC_CTL_FLGS(ctl),
+						map->dm_segs[0].ds_len,
+						map->dm_segs[1].ds_len));
+			} else {
+				nextout->d_addr2 = 0;
+				nextout->d_ctl = 
+					htole32(LMC_CTL(LMC_CTL_FLGS(ctl),
+						map->dm_segs[0].ds_len, 0));
+			}
+			LMC_RXDESC_POSTSYNC(sc, nextout, sizeof(*nextout));
+#else /* LMC_BUS_DMA */
+			ctl = le32toh(ri->ri_nextout->d_ctl);
+			ri->ri_nextout->d_addr1 = htole32(LMC_KVATOPHYS(sc, 
+				mtod(ms, caddr_t)));
+			ri->ri_nextout->d_ctl = htole32(LMC_CTL(LMC_CTL_FLGS(ctl), 
+				LMC_RX_BUFLEN, 0));
+#endif /* LMC_BUS_DMA */
+			ri->ri_nextout->d_status = htole32(TULIP_DSTS_OWNER);
+			LMC_RXDESC_POSTSYNC(sc, nextout, sizeof(u_int32_t));
 			if (++ri->ri_nextout == ri->ri_last)
 				ri->ri_nextout = ri->ri_first;
 			me = ms->m_next;
@@ -685,19 +869,27 @@ lmc_tx_intr(lmc_softc_t * const sc)
     struct mbuf *m;
     int xmits = 0;
     int descs = 0;
+    u_int32_t d_status;
 
     sc->lmc_txtick++;
 
     while (ri->ri_free < ri->ri_max) {
-	u_int32_t d_flag;
-	if (((volatile tulip_desc_t *) ri->ri_nextin)->d_status & TULIP_DSTS_OWNER)
+	u_int32_t flag;
+
+	LMC_TXDESC_POSTSYNC(sc, ri->ri_nextin, sizeof(*ri->ri_nextin));
+	d_status = le32toh(((volatile lmc_desc_t *) ri->ri_nextin)->d_status);
+	if (d_status & TULIP_DSTS_OWNER)
 	    break;
 
-	d_flag = ri->ri_nextin->d_flag;
-	if (d_flag & TULIP_DFLAG_TxLASTSEG) {
-		const u_int32_t d_status = ri->ri_nextin->d_status;
+	flag = LMC_CTL_FLGS(le32toh(ri->ri_nextin->d_ctl));
+	if (flag & TULIP_DFLAG_TxLASTSEG) {
 		IF_DEQUEUE(&sc->lmc_txq, m);
 		if (m != NULL) {
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NOTX)
+		    bus_dmamap_t map = M_GETCTX(m, bus_dmamap_t);
+		    LMC_TXMAP_POSTSYNC(sc, map);
+		    sc->lmc_txmaps[sc->lmc_txmaps_free++] = map;
+#endif /* LMC_BUS_DMA */
 #if NBPFILTER > 0
 		    if (sc->lmc_bpf != NULL)
 			LMC_BPF_MTAP(sc, m);
@@ -711,11 +903,13 @@ lmc_tx_intr(lmc_softc_t * const sc)
 		    xmits++;
 		    if (d_status & LMC_DSTS_ERRSUM) {
 			sc->lmc_if.if_oerrors++;
-			if (d_status & TULIP_DSTS_TxUNDERFLOW)
+			if (d_status & TULIP_DSTS_TxUNDERFLOW) {
 			    sc->lmc_dot3stats.dot3StatsInternalTransmitUnderflows++;
+			}
 		    } else {
-			if (d_status & TULIP_DSTS_TxDEFERRED)
+			if (d_status & TULIP_DSTS_TxDEFERRED) {
 			    sc->lmc_dot3stats.dot3StatsDeferredTransmissions++;
+			}
 		    }
 	}
 
@@ -905,10 +1099,15 @@ static struct mbuf *
 lmc_txput(lmc_softc_t * const sc, struct mbuf *m)
 {
 	lmc_ringinfo_t * const ri = &sc->lmc_txinfo;
-	tulip_desc_t *eop, *nextout;
+	lmc_desc_t *eop, *nextout;
 	int segcnt, free;
-	u_int32_t d_status;
+	u_int32_t d_status, ctl;
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NOTX)
+	bus_dmamap_t map;
+	int error;
+#else
 	struct mbuf *m0;
+#endif
 
 #if defined(LMC_DEBUG)
 	if ((sc->lmc_cmdmode & TULIP_CMD_TXRUN) == 0) {
@@ -936,16 +1135,125 @@ lmc_txput(lmc_softc_t * const sc, struct mbuf *m)
 	 * case we will just wait for the ring to empty.  In the
 	 * latter case we have to recopy.
 	 */
- again:
+#if !defined(LMC_BUS_DMA) || defined(LMC_BUS_DMA_NOTX)
+again:
+	m0 = m;
+#endif
 	d_status = 0;
 	eop = nextout = ri->ri_nextout;
-	m0 = m;
 	segcnt = 0;
 	free = ri->ri_free;
+#if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NOTX)
+	/*
+	 * Reclaim some dma maps from if we are out.
+	 */
+	if (sc->lmc_txmaps_free == 0) {
+#if defined(LMC_DEBUG)
+		sc->lmc_dbg.dbg_no_txmaps++;
+#endif
+		free += lmc_tx_intr(sc);
+	}
+	if (sc->lmc_txmaps_free > 0) {
+		map = sc->lmc_txmaps[sc->lmc_txmaps_free-1];
+	} else {
+		sc->lmc_flags |= LMC_WANTTXSTART;
+#if defined(LMC_DEBUG)
+		sc->lmc_dbg.dbg_txput_finishes[1]++;
+#endif
+		goto finish;
+	}
+	error = bus_dmamap_load_mbuf(sc->lmc_dmatag, map, m, BUS_DMA_NOWAIT);
+	if (error != 0) {
+		if (error == EFBIG) {
+			/*
+			 * The packet exceeds the number of transmit buffer
+			 * entries that we can use for one packet, so we have
+			 * to recopy it into one mbuf and then try again.
+			 */
+			m = lmc_mbuf_compress(m);
+			if (m == NULL) {
+#if defined(LMC_DEBUG)
+				sc->lmc_dbg.dbg_txput_finishes[2]++;
+#endif
+				goto finish;
+			}
+			error = bus_dmamap_load_mbuf(sc->lmc_dmatag, map, m,
+				BUS_DMA_NOWAIT);
+		}
+		if (error != 0) {
+			printf(LMC_PRINTF_FMT ": unable to load tx map, "
+				"error = %d\n", LMC_PRINTF_ARGS, error);
+#if defined(LMC_DEBUG)
+			sc->lmc_dbg.dbg_txput_finishes[3]++;
+#endif
+			goto finish;
+		}
+	}
+	if ((free -= (map->dm_nsegs + 1) / 2) <= 0
+		/*
+		 * See if there's any unclaimed space in the transmit ring.
+		 */
+		&& (free += lmc_tx_intr(sc)) <= 0) {
+		/*
+		 * There's no more room but since nothing
+		 * has been committed at this point, just
+		 * show output is active, put back the
+		 * mbuf and return.
+		 */
+		sc->lmc_flags |= LMC_WANTTXSTART;
+#if defined(LMC_DEBUG)
+		sc->lmc_dbg.dbg_txput_finishes[4]++;
+#endif
+		bus_dmamap_unload(sc->lmc_dmatag, map);
+		goto finish;
+	}
+	for (; map->dm_nsegs - segcnt > 1; segcnt += 2) {
+		int flg;
+
+		eop = nextout;
+		flg	       = LMC_CTL_FLGS(le32toh(eop->d_ctl));
+		flg	      &= TULIP_DFLAG_ENDRING;
+		flg	      |= TULIP_DFLAG_TxNOPADDING;
+		if (sc->ictl.crc_length == 16)
+			flg |= TULIP_DFLAG_TxHASCRC;
+		eop->d_status  = htole32(d_status);
+		eop->d_addr1   = htole32(map->dm_segs[segcnt].ds_addr);
+		eop->d_addr2   = htole32(map->dm_segs[segcnt+1].ds_addr);
+		eop->d_ctl     = htole32(LMC_CTL(flg, 
+				 map->dm_segs[segcnt].ds_len,
+				 map->dm_segs[segcnt+1].ds_len));
+		d_status = TULIP_DSTS_OWNER;
+		if (++nextout == ri->ri_last)
+			nextout = ri->ri_first;
+	}
+	if (segcnt < map->dm_nsegs) {
+		int flg;
+
+		eop = nextout;
+		flg	       = LMC_CTL_FLGS(le32toh(eop->d_ctl));
+		flg	      &= TULIP_DFLAG_ENDRING;
+		flg	      |= TULIP_DFLAG_TxNOPADDING;
+		if (sc->ictl.crc_length == 16)
+			flg |= TULIP_DFLAG_TxHASCRC;
+		eop->d_status  = htole32(d_status);
+		eop->d_addr1   = htole32(map->dm_segs[segcnt].ds_addr);
+		eop->d_addr2   = 0;
+		eop->d_ctl     = htole32(LMC_CTL(flg, 
+				 map->dm_segs[segcnt].ds_len, 0));
+		if (++nextout == ri->ri_last)
+			nextout = ri->ri_first;
+	}
+	LMC_TXMAP_PRESYNC(sc, map);
+	M_SETCTX(m, map);
+	map = NULL;
+	--sc->lmc_txmaps_free;		/* commit to using the dmamap */
+
+#else /* !LMC_BUS_DMA */
+
 	do {
 		int len = m0->m_len;
 		caddr_t addr = mtod(m0, caddr_t);
-		unsigned clsize = NBPG - (((u_long) addr) & PGOFSET);
+		unsigned clsize = PAGE_SIZE - (((u_long) addr) & PAGE_MASK);
 
 		while (len > 0) {
 			unsigned slen = min(len, clsize);
@@ -1010,9 +1318,10 @@ lmc_txput(lmc_softc_t * const sc, struct mbuf *m)
 			if (partial)
 				continue;
 #endif
-			clsize = NBPG;
+			clsize = PAGE_SIZE;
 		}
 	} while ((m0 = m0->m_next) != NULL);
+#endif /* LMC_BUS_DMA */
 
 
 	/*
@@ -1028,7 +1337,9 @@ lmc_txput(lmc_softc_t * const sc, struct mbuf *m)
 	 * of room in the ring.
 	 */
 	nextout->d_status = 0;
+	LMC_TXDESC_PRESYNC(sc, nextout, sizeof(u_int32_t));
 
+#if !defined(LMC_BUS_DMA) || defined(LMC_BUS_DMA_NOTX)
 	/*
 	 * If we only used the first segment of the last descriptor,
 	 * make sure the second segment will not be used.
@@ -1037,20 +1348,41 @@ lmc_txput(lmc_softc_t * const sc, struct mbuf *m)
 		eop->d_addr2 = 0;
 		eop->d_length2 = 0;
 	}
+#endif /* LMC_BUS_DMA */
 
 	/*
 	 * Mark the last and first segments, indicate we want a transmit
 	 * complete interrupt, and tell it to transmit!
 	 */
-	eop->d_flag |= TULIP_DFLAG_TxLASTSEG | TULIP_DFLAG_TxWANTINTR;
+	ctl = le32toh(eop->d_ctl);
+	eop->d_ctl = htole32(LMC_CTL(
+		LMC_CTL_FLGS(ctl)|TULIP_DFLAG_TxLASTSEG|TULIP_DFLAG_TxWANTINTR,
+		LMC_CTL_LEN1(ctl),
+		LMC_CTL_LEN2(ctl)));
 
 	/*
 	 * Note that ri->ri_nextout is still the start of the packet
 	 * and until we set the OWNER bit, we can still back out of
 	 * everything we have done.
 	 */
-	ri->ri_nextout->d_flag |= TULIP_DFLAG_TxFIRSTSEG;
-	ri->ri_nextout->d_status = TULIP_DSTS_OWNER;
+	ctl = le32toh(ri->ri_nextout->d_ctl);
+	ri->ri_nextout->d_ctl = htole32(LMC_CTL(
+		LMC_CTL_FLGS(ctl)|TULIP_DFLAG_TxFIRSTSEG,
+		LMC_CTL_LEN1(ctl),
+		LMC_CTL_LEN2(ctl)));
+#if defined(LMC_BUS_MAP) && !defined(LMC_BUS_DMA_NOTX)
+	if (eop < ri->ri_nextout) {
+		LMC_TXDESC_PRESYNC(sc, ri->ri_nextout,
+			(caddr_t) ri->ri_last - (caddr_t) ri->ri_nextout);
+		LMC_TXDESC_PRESYNC(sc, ri->ri_first,
+			(caddr_t) (eop + 1) - (caddr_t) ri->ri_first);
+	} else {
+		LMC_TXDESC_PRESYNC(sc, ri->ri_nextout,
+			(caddr_t) (eop + 1) - (caddr_t) ri->ri_nextout);
+	}
+#endif
+	ri->ri_nextout->d_status = htole32(TULIP_DSTS_OWNER);
+	LMC_TXDESC_PRESYNC(sc, ri->ri_nextout, sizeof(u_int32_t));
 
 	LMC_CSR_WRITE(sc, csr_txpoll, 1);
 
@@ -1136,7 +1468,10 @@ lmc_ifioctl(struct ifnet * ifp, ioctl_cmd_t cmd, caddr_t data)
 		if (ifr->ifr_mtu > LMC_MTU) {
 			error = EINVAL;
 			goto out;
+		} else {
+			ifp->if_mtu = ifr->ifr_mtu;
 		}
+		break;
 #endif
 	}
 
@@ -1189,6 +1524,8 @@ lmc_ifstart(struct ifnet * const ifp)
 	if (sc->lmc_flags & LMC_IFUP) {
 		while (sppp_isempty(ifp) == 0) {
 			m = sppp_dequeue(ifp);
+			if (!m)
+				break;
 			if ((m = lmc_txput(sc, m)) != NULL) {
 				IF_PREPEND(&((struct sppp *)ifp)->pp_fastq, m);
 				break;
@@ -1206,8 +1543,9 @@ lmc_ifstart_one(struct ifnet * const ifp)
 
 	if ((sc->lmc_flags & LMC_IFUP) && (sppp_isempty(ifp) == 0)) {
 		m = sppp_dequeue(ifp);
-		if ((m = lmc_txput(sc, m)) != NULL) {
-			IF_PREPEND(&((struct sppp *)ifp)->pp_fastq, m);
+		if (m) {
+			if ((m = lmc_txput(sc, m)) != NULL)
+				IF_PREPEND(&((struct sppp *)ifp)->pp_fastq, m);
 		}
 		LMC_CSR_WRITE(sc, csr_txpoll, 1);
 	}
@@ -1333,6 +1671,7 @@ lmc_attach(lmc_softc_t * const sc)
 	if_attach(ifp);
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
+	sc->lmc_sppp.pp_framebytes = 3;	/* 1 flag byte, 2 byte FCS */
 	sppp_attach((struct ifnet *)&sc->lmc_sppp);
 	sc->lmc_sppp.pp_flags = PP_CISCO | PP_KEEPALIVE;
 #endif
@@ -1360,11 +1699,11 @@ lmc_attach(lmc_softc_t * const sc)
 
 void
 lmc_initring(lmc_softc_t * const sc, lmc_ringinfo_t * const ri,
-	       tulip_desc_t *descs, int ndescs)
+	       lmc_desc_t *descs, int ndescs)
 {
 	ri->ri_max = ndescs;
 	ri->ri_first = descs;
 	ri->ri_last = ri->ri_first + ri->ri_max;
-	bzero((caddr_t) ri->ri_first, sizeof(ri->ri_first[0]) * ri->ri_max);
-	ri->ri_last[-1].d_flag = TULIP_DFLAG_ENDRING;
+	memset((caddr_t) ri->ri_first, 0, sizeof(ri->ri_first[0]) * ri->ri_max);
+	ri->ri_last[-1].d_ctl = htole32(LMC_CTL(TULIP_DFLAG_ENDRING, 0, 0));
 }

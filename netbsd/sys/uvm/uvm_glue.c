@@ -1,8 +1,8 @@
-/*	$NetBSD: uvm_glue.c,v 1.36 2000/06/18 05:20:27 simonb Exp $	*/
+/*	$NetBSD: uvm_glue.c,v 1.58 2002/05/15 06:57:49 matt Exp $	*/
 
-/* 
+/*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
- * Copyright (c) 1991, 1993, The Regents of the University of California.  
+ * Copyright (c) 1991, 1993, The Regents of the University of California.
  *
  * All rights reserved.
  *
@@ -20,7 +20,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *	This product includes software developed by Charles D. Cranor,
- *      Washington University, the University of California, Berkeley and 
+ *      Washington University, the University of California, Berkeley and
  *      its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
@@ -44,17 +44,17 @@
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and
  * its documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
- * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" 
- * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND 
+ *
+ * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+ * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
  *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
@@ -66,8 +66,12 @@
  * rights to redistribute these changes.
  */
 
-#include "opt_uvmhist.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uvm_glue.c,v 1.58 2002/05/15 06:57:49 matt Exp $");
+
+#include "opt_kgdb.h"
 #include "opt_sysv.h"
+#include "opt_uvmhist.h"
 
 /*
  * uvm_glue.c: glue functions
@@ -83,10 +87,6 @@
 #include <sys/shm.h>
 #endif
 
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm.h>
 
 #include <machine/cpu.h>
@@ -100,9 +100,6 @@ static void uvm_swapout __P((struct proc *));
 /*
  * XXXCDC: do these really belong here?
  */
-
-unsigned maxdmap = MAXDSIZ;	/* kern_resource.c: RLIMIT_DATA max */
-unsigned maxsmap = MAXSSIZ;	/* kern_resource.c: RLIMIT_STACK max */
 
 int readbuffers = 0;		/* allow KGDB to read kern buffer pool */
 				/* XXX: see uvm_kernacc */
@@ -125,7 +122,7 @@ uvm_kernacc(addr, len, rw)
 	vm_prot_t prot = rw == B_READ ? VM_PROT_READ : VM_PROT_WRITE;
 
 	saddr = trunc_page((vaddr_t)addr);
-	eaddr = round_page((vaddr_t)addr+len);
+	eaddr = round_page((vaddr_t)addr + len);
 	vm_map_lock_read(kernel_map);
 	rv = uvm_map_checkprot(kernel_map, saddr, eaddr, prot);
 	vm_map_unlock_read(kernel_map);
@@ -157,7 +154,7 @@ uvm_useracc(addr, len, rw)
 	size_t len;
 	int rw;
 {
-	vm_map_t map;
+	struct vm_map *map;
 	boolean_t rv;
 	vm_prot_t prot = rw == B_READ ? VM_PROT_READ : VM_PROT_WRITE;
 
@@ -166,7 +163,7 @@ uvm_useracc(addr, len, rw)
 
 	vm_map_lock_read(map);
 	rv = uvm_map_checkprot(map, trunc_page((vaddr_t)addr),
-	    round_page((vaddr_t)addr+len), prot);
+	    round_page((vaddr_t)addr + len), prot);
 	vm_map_unlock_read(map);
 
 	return(rv);
@@ -200,19 +197,17 @@ uvm_chgkprot(addr, len, rw)
 	for (sva = trunc_page((vaddr_t)addr); sva < eva; sva += PAGE_SIZE) {
 		/*
 		 * Extract physical address for the page.
-		 * We use a cheezy hack to differentiate physical
-		 * page 0 from an invalid mapping, not that it
-		 * really matters...
 		 */
 		if (pmap_extract(pmap_kernel(), sva, &pa) == FALSE)
 			panic("chgkprot: invalid page");
 		pmap_enter(pmap_kernel(), sva, pa, prot, PMAP_WIRED);
 	}
+	pmap_update(pmap_kernel());
 }
 #endif
 
 /*
- * vslock: wire user memory for I/O
+ * uvm_vslock: wire user memory for I/O
  *
  * - called from physio and sys___sysctl
  * - XXXCDC: consider nuking this (or making it a macro?)
@@ -225,21 +220,19 @@ uvm_vslock(p, addr, len, access_type)
 	size_t	len;
 	vm_prot_t access_type;
 {
-	vm_map_t map;
+	struct vm_map *map;
 	vaddr_t start, end;
-	int rv;
+	int error;
 
 	map = &p->p_vmspace->vm_map;
 	start = trunc_page((vaddr_t)addr);
 	end = round_page((vaddr_t)addr + len);
-
-	rv = uvm_fault_wire(map, start, end, access_type);
-
-	return (rv);
+	error = uvm_fault_wire(map, start, end, VM_FAULT_WIRE, access_type);
+	return error;
 }
 
 /*
- * vslock: wire user memory for I/O
+ * uvm_vsunlock: unwire user memory wired by uvm_vslock()
  *
  * - called from physio and sys___sysctl
  * - XXXCDC: consider nuking this (or making it a macro?)
@@ -251,8 +244,8 @@ uvm_vsunlock(p, addr, len)
 	caddr_t	addr;
 	size_t	len;
 {
-	uvm_fault_unwire(&p->p_vmspace->vm_map, trunc_page((vaddr_t)addr), 
-		round_page((vaddr_t)addr+len));
+	uvm_fault_unwire(&p->p_vmspace->vm_map, trunc_page((vaddr_t)addr),
+		round_page((vaddr_t)addr + len));
 }
 
 /*
@@ -280,12 +273,13 @@ uvm_fork(p1, p2, shared, stack, stacksize, func, arg)
 	void *arg;
 {
 	struct user *up = p2->p_addr;
-	int rv;
+	int error;
 
-	if (shared == TRUE)
-		uvmspace_share(p1, p2);			/* share vmspace */
-	else
-		p2->p_vmspace = uvmspace_fork(p1->p_vmspace); /* fork vmspace */
+	if (shared == TRUE) {
+		p2->p_vmspace = NULL;
+		uvmspace_share(p1, p2);
+	} else
+		p2->p_vmspace = uvmspace_fork(p1->p_vmspace);
 
 	/*
 	 * Wire down the U-area for the process, which contains the PCB
@@ -296,10 +290,10 @@ uvm_fork(p1, p2, shared, stack, stacksize, func, arg)
 	 * Note the kernel stack gets read/write accesses right off
 	 * the bat.
 	 */
-	rv = uvm_fault_wire(kernel_map, (vaddr_t)up,
-	    (vaddr_t)up + USPACE, VM_PROT_READ | VM_PROT_WRITE);
-	if (rv != KERN_SUCCESS)
-		panic("uvm_fork: uvm_fault_wire failed: %d", rv);
+	error = uvm_fault_wire(kernel_map, (vaddr_t)up, (vaddr_t)up + USPACE,
+	    VM_FAULT_WIRE, VM_PROT_READ | VM_PROT_WRITE);
+	if (error)
+		panic("uvm_fork: uvm_fault_wire failed: %d", error);
 
 	/*
 	 * p_stats currently points at a field in the user struct.  Copy
@@ -307,12 +301,12 @@ uvm_fork(p1, p2, shared, stack, stacksize, func, arg)
 	 */
 	p2->p_stats = &up->u_stats;
 	memset(&up->u_stats.pstat_startzero, 0,
-	(unsigned) ((caddr_t)&up->u_stats.pstat_endzero -
-		    (caddr_t)&up->u_stats.pstat_startzero));
+	       ((caddr_t)&up->u_stats.pstat_endzero -
+		(caddr_t)&up->u_stats.pstat_startzero));
 	memcpy(&up->u_stats.pstat_startcopy, &p1->p_stats->pstat_startcopy,
-	((caddr_t)&up->u_stats.pstat_endcopy -
-	 (caddr_t)&up->u_stats.pstat_startcopy));
-	
+	       ((caddr_t)&up->u_stats.pstat_endcopy -
+		(caddr_t)&up->u_stats.pstat_startcopy));
+
 	/*
 	 * cpu_fork() copy and update the pcb, and make the child ready
 	 * to run.  If this is a normal user fork, the child will exit
@@ -335,9 +329,11 @@ void
 uvm_exit(p)
 	struct proc *p;
 {
+	vaddr_t va = (vaddr_t)p->p_addr;
 
 	uvmspace_free(p->p_vmspace);
-	uvm_km_free(kernel_map, (vaddr_t)p->p_addr, USPACE);
+	p->p_flag &= ~P_INMEM;
+	uvm_km_free(kernel_map, va, USPACE);
 	p->p_addr = NULL;
 }
 
@@ -382,23 +378,26 @@ uvm_swapin(p)
 	struct proc *p;
 {
 	vaddr_t addr;
-	int s;
+	int s, error;
 
 	addr = (vaddr_t)p->p_addr;
 	/* make P_INMEM true */
-	uvm_fault_wire(kernel_map, addr, addr + USPACE,
+	error = uvm_fault_wire(kernel_map, addr, addr + USPACE, VM_FAULT_WIRE,
 	    VM_PROT_READ | VM_PROT_WRITE);
+	if (error) {
+		panic("uvm_swapin: rewiring stack failed: %d", error);
+	}
 
 	/*
 	 * Some architectures need to be notified when the user area has
 	 * moved to new physical page(s) (e.g.  see mips/mips/vm_machdep.c).
 	 */
 	cpu_swapin(p);
-	s = splstatclock();
+	SCHED_LOCK(s);
 	if (p->p_stat == SRUN)
 		setrunqueue(p);
 	p->p_flag |= P_INMEM;
-	splx(s);
+	SCHED_UNLOCK(s);
 	p->p_swtime = 0;
 	++uvmexp.swapins;
 }
@@ -418,17 +417,16 @@ uvm_scheduler()
 	int pri;
 	struct proc *pp;
 	int ppri;
-	UVMHIST_FUNC("uvm_scheduler"); UVMHIST_CALLED(maphist);
 
 loop:
 #ifdef DEBUG
 	while (!enableswap)
-		tsleep((caddr_t)&proc0, PVM, "noswap", 0);
+		tsleep(&proc0, PVM, "noswap", 0);
 #endif
 	pp = NULL;		/* process to choose */
 	ppri = INT_MIN;	/* its priority */
 	proclist_lock_read();
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	LIST_FOREACH(p, &allproc, p_list) {
 
 		/* is it a runnable swapped out process? */
 		if (p->p_stat == SRUN && (p->p_flag & P_INMEM) == 0) {
@@ -440,6 +438,10 @@ loop:
 			}
 		}
 	}
+	/*
+	 * XXXSMP: possible unlock/sleep race between here and the
+	 * "scheduler" tsleep below..
+	 */
 	proclist_unlock_read();
 
 #ifdef DEBUG
@@ -450,7 +452,7 @@ loop:
 	 * Nothing to do, back to sleep
 	 */
 	if ((p = pp) == NULL) {
-		tsleep((caddr_t)&proc0, PVM, "scheduler", 0);
+		tsleep(&proc0, PVM, "scheduler", 0);
 		goto loop;
 	}
 
@@ -479,9 +481,7 @@ loop:
 		printf("scheduler: no room for pid %d(%s), free %d\n",
 	   p->p_pid, p->p_comm, uvmexp.free);
 #endif
-	(void) splhigh();
 	uvm_wait("schedpwait");
-	(void) spl0();
 #ifdef DEBUG
 	if (swapdebug & SDB_FOLLOW)
 		printf("scheduler: room again, free %d\n", uvmexp.free);
@@ -514,7 +514,7 @@ uvm_swapout_threads()
 	struct proc *outp, *outp2;
 	int outpri, outpri2;
 	int didswap = 0;
-	extern int maxslp; 
+	extern int maxslp;
 	/* XXXCDC: should move off to uvmexp. or uvm., also in uvm_meter */
 
 #ifdef DEBUG
@@ -529,7 +529,7 @@ uvm_swapout_threads()
 	outp = outp2 = NULL;
 	outpri = outpri2 = 0;
 	proclist_lock_read();
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	LIST_FOREACH(p, &allproc, p_list) {
 		if (!swappable(p))
 			continue;
 		switch (p->p_stat) {
@@ -540,11 +540,11 @@ uvm_swapout_threads()
 				outpri2 = p->p_swtime;
 			}
 			continue;
-			
+
 		case SSLEEP:
 		case SSTOP:
 			if (p->p_slptime >= maxslp) {
-				uvm_swapout(p);			/* zap! */
+				uvm_swapout(p);
 				didswap++;
 			} else if (p->p_slptime > outpri) {
 				outp = p;
@@ -576,7 +576,7 @@ uvm_swapout_threads()
 /*
  * uvm_swapout: swap out process "p"
  *
- * - currently "swapout" means "unwire U-area" and "pmap_collect()" 
+ * - currently "swapout" means "unwire U-area" and "pmap_collect()"
  *   the pmap.
  * - XXXCDC: should deactivate all process' private anonymous memory
  */
@@ -602,21 +602,86 @@ uvm_swapout(p)
 	cpu_swapout(p);
 
 	/*
+	 * Mark it as (potentially) swapped out.
+	 */
+	SCHED_LOCK(s);
+	p->p_flag &= ~P_INMEM;
+	if (p->p_stat == SRUN)
+		remrunqueue(p);
+	SCHED_UNLOCK(s);
+	p->p_swtime = 0;
+	p->p_stats->p_ru.ru_nswap++;
+	++uvmexp.swapouts;
+
+	/*
 	 * Unwire the to-be-swapped process's user struct and kernel stack.
 	 */
 	addr = (vaddr_t)p->p_addr;
 	uvm_fault_unwire(kernel_map, addr, addr + USPACE); /* !P_INMEM */
 	pmap_collect(vm_map_pmap(&p->p_vmspace->vm_map));
-
-	/*
-	 * Mark it as (potentially) swapped out.
-	 */
-	s = splstatclock();
-	p->p_flag &= ~P_INMEM;
-	if (p->p_stat == SRUN)
-		remrunqueue(p);
-	splx(s);
-	p->p_swtime = 0;
-	++uvmexp.swapouts;
 }
 
+/*
+ * uvm_coredump_walkmap: walk a process's map for the purpose of dumping
+ * a core file.
+ */
+
+int
+uvm_coredump_walkmap(p, vp, cred, func, cookie)
+	struct proc *p;
+	struct vnode *vp;
+	struct ucred *cred;
+	int (*func)(struct proc *, struct vnode *, struct ucred *,
+	    struct uvm_coredump_state *);
+	void *cookie;
+{
+	struct uvm_coredump_state state;
+	struct vmspace *vm = p->p_vmspace;
+	struct vm_map *map = &vm->vm_map;
+	struct vm_map_entry *entry;
+	vaddr_t maxstack;
+	int error;
+
+	maxstack = trunc_page(USRSTACK - ctob(vm->vm_ssize));
+
+	for (entry = map->header.next; entry != &map->header;
+	     entry = entry->next) {  
+		/* Should never happen for a user process. */
+		if (UVM_ET_ISSUBMAP(entry))
+			panic("uvm_coredump_walkmap: user process with "
+			    "submap?");
+
+		state.cookie = cookie;
+		state.start = entry->start;
+		state.end = entry->end;
+		state.prot = entry->protection;
+		state.flags = 0;
+
+		if (state.start >= VM_MAXUSER_ADDRESS)  
+			continue;
+
+		if (state.end > VM_MAXUSER_ADDRESS)
+			state.end = VM_MAXUSER_ADDRESS;
+
+		if (state.start >= (vaddr_t)vm->vm_maxsaddr) {
+			if (state.end <= maxstack)
+				continue;
+			if (state.start < maxstack)
+				state.start = maxstack;
+			state.flags |= UVM_COREDUMP_STACK;
+		}
+
+		if ((entry->protection & VM_PROT_WRITE) == 0)
+			state.flags |= UVM_COREDUMP_NODUMP;
+
+		if (entry->object.uvm_obj != NULL &&
+		    entry->object.uvm_obj->pgops == &uvm_deviceops)
+			state.flags |= UVM_COREDUMP_NODUMP;
+
+		error = (*func)(p, vp, cred, &state);
+		if (error)
+			return (error);
+	}
+
+	return (0);
+}

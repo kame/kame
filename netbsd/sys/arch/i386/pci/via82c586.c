@@ -1,4 +1,4 @@
-/*	$NetBSD: via82c586.c,v 1.1.8.1 2000/08/10 22:25:58 soda Exp $	*/
+/*	$NetBSD: via82c586.c,v 1.4 2001/11/15 07:03:35 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -66,6 +66,9 @@
  * Support for the VIA 82c586 PCI-ISA bridge interrupt controller.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: via82c586.c,v 1.4 2001/11/15 07:03:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -112,7 +115,7 @@ const int vp3_cfg_intr_shift[] = {
 	VP3_CFG_INTR_SHIFT_PIRQD,
 };
 
-#define	VP3_PIRQ(req, pirq)	(((reg) >> vp3_cfg_intr_shift[(pirq)]) & \
+#define	VP3_PIRQ(reg, pirq)	(((reg) >> vp3_cfg_intr_shift[(pirq)]) & \
 				 VP3_CFG_INTR_MASK)
 
 int

@@ -1,4 +1,4 @@
-/* $NetBSD: pcdisplay.c,v 1.9.4.1 2000/06/30 16:27:48 simonb Exp $ */
+/* $NetBSD: pcdisplay.c,v 1.17 2002/03/17 19:40:59 atatat Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -32,6 +32,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcdisplay.c,v 1.17 2002/03/17 19:40:59 atatat Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -50,6 +53,12 @@
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsdisplayvar.h>
 
+#include "pcweasel.h"
+#if NPCWEASEL > 0
+#include <dev/isa/weaselreg.h>
+#include <dev/isa/weaselvar.h>
+#endif
+
 struct pcdisplay_config {
 	struct pcdisplayscreen pcs;
 	struct pcdisplay_handle dc_ph;
@@ -60,6 +69,9 @@ struct pcdisplay_softc {
 	struct device sc_dev;
 	struct pcdisplay_config *sc_dc;
 	int nscreens;
+#if NPCWEASEL > 0
+	struct weasel_handle sc_weasel;
+#endif
 };
 
 static int pcdisplayconsole, pcdisplay_console_attached;
@@ -223,33 +235,57 @@ pcdisplay_match(parent, match, aux)
 	struct isa_attach_args *ia = aux;
 	int mono;
 
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
 	/* If values are hardwired to something that they can't be, punt. */
-	if ((ia->ia_iobase != IOBASEUNK &&
-	     ia->ia_iobase != 0x3d0 &&
-	     ia->ia_iobase != 0x3b0) ||
-	    /* ia->ia_iosize != 0 || XXX isa.c */
-	    (ia->ia_maddr != MADDRUNK &&
-	     ia->ia_maddr != 0xb8000 &&
-	     ia->ia_maddr != 0xb0000) ||
-	    (ia->ia_msize != 0 && ia->ia_msize != 0x8000) ||
-	    ia->ia_irq != IRQUNK || ia->ia_drq != DRQUNK)
+	if (ia->ia_nio < 1 ||
+	    (ia->ia_io[0].ir_addr != ISACF_PORT_DEFAULT &&
+	     ia->ia_io[0].ir_addr != 0x3d0 &&
+	     ia->ia_io[0].ir_addr != 0x3b0))
+		return (0);
+
+	if (ia->ia_niomem < 1 ||
+	    (ia->ia_iomem[0].ir_addr != ISACF_IOMEM_DEFAULT &&
+	     ia->ia_iomem[0].ir_addr != 0xb8000 &&
+	     ia->ia_iomem[0].ir_addr != 0xb0000))
+		return (0);
+	if (ia->ia_iomem[0].ir_size != 0 &&
+	    ia->ia_iomem[0].ir_size != 0x8000)
+		return (0);
+
+	if (ia->ia_nirq > 0 &&
+	    ia->ia_irq[0].ir_irq != ISACF_IRQ_DEFAULT)
+		return (0);
+
+	if (ia->ia_ndrq > 0 &&
+	    ia->ia_drq[0].ir_drq != ISACF_DRQ_DEFAULT)
 		return (0);
 
 	if (pcdisplay_is_console(ia->ia_iot))
 		mono = pcdisplay_console_dc.mono;
-	else if (ia->ia_iobase != 0x3b0 && ia->ia_maddr != 0xb0000 &&
+	else if (ia->ia_io[0].ir_addr != 0x3b0 &&
+		 ia->ia_iomem[0].ir_addr != 0xb0000 &&
 		 pcdisplay_probe_col(ia->ia_iot, ia->ia_memt))
 		mono = 0;
-	else if (ia->ia_iobase != 0x3d0 && ia->ia_maddr != 0xb8000 &&
+	else if (ia->ia_io[0].ir_addr != 0x3d0 &&
+		 ia->ia_iomem[0].ir_addr != 0xb8000 &&
 		 pcdisplay_probe_mono(ia->ia_iot, ia->ia_memt))
 		mono = 1;
 	else
 		return (0);
 
-	ia->ia_iobase = mono ? 0x3b0 : 0x3d0;
-	ia->ia_iosize = 0x10;
-	ia->ia_maddr = mono ? 0xb0000 : 0xb8000;
-	ia->ia_msize = 0x8000;
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_addr = mono ? 0x3b0 : 0x3d0;
+	ia->ia_io[0].ir_size = 0x10;
+
+	ia->ia_niomem = 1;
+	ia->ia_iomem[0].ir_size = mono ? 0xb0000 : 0xb8000;
+	ia->ia_iomem[0].ir_size = 0x8000;
+
+	ia->ia_nirq = 0;
+	ia->ia_ndrq = 0;
+
 	return (1);
 }
 
@@ -275,16 +311,31 @@ pcdisplay_attach(parent, self, aux)
 	} else {
 		dc = malloc(sizeof(struct pcdisplay_config),
 			    M_DEVBUF, M_WAITOK);
-		if (ia->ia_iobase != 0x3b0 && ia->ia_maddr != 0xb0000 &&
+		if (ia->ia_io[0].ir_addr != 0x3b0 &&
+		    ia->ia_iomem[0].ir_addr != 0xb0000 &&
 		    pcdisplay_probe_col(ia->ia_iot, ia->ia_memt))
 			pcdisplay_init(dc, ia->ia_iot, ia->ia_memt, 0);
-		else if (ia->ia_iobase != 0x3d0 && ia->ia_maddr != 0xb8000 &&
+		else if (ia->ia_io[0].ir_addr != 0x3d0 &&
+			 ia->ia_iomem[0].ir_addr != 0xb8000 &&
 			 pcdisplay_probe_mono(ia->ia_iot, ia->ia_memt))
 			pcdisplay_init(dc, ia->ia_iot, ia->ia_memt, 1);
 		else
 			panic("pcdisplay_attach: display disappeared");
 	}
 	sc->sc_dc = dc;
+
+#if NPCWEASEL > 0
+	/*
+	 * If the display is monochrome, check to see if we have
+	 * a PC-Weasel, and initialize its special features.
+	 */
+	if (dc->mono) {
+		sc->sc_weasel.wh_st = dc->dc_ph.ph_memt;
+		sc->sc_weasel.wh_sh = dc->dc_ph.ph_memh;
+		sc->sc_weasel.wh_parent = &sc->sc_dev;
+		weasel_isa_init(&sc->sc_weasel);
+	}
+#endif /* NPCWEASEL > 0 */
 
 	aa.console = console;
 	aa.scrdata = &pcdisplay_screenlist;
@@ -341,7 +392,7 @@ pcdisplay_ioctl(v, cmd, data, flag, p)
 	/*
 	 * XXX "do something!"
 	 */
-	return (-1);
+	return (EPASSTHROUGH);
 }
 
 static paddr_t

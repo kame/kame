@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.51 2000/02/11 19:30:30 thorpej Exp $	*/
+/*	$NetBSD: param.h,v 1.53.18.1 2002/06/01 22:45:33 tv Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -56,18 +56,18 @@
 #ifdef MSGBUFSIZE
 #error "MSGBUFSIZE is not user-adjustable for this arch"
 #endif
-#define MSGBUFOFF	0x200
-#define MSGBUFSIZE	(NBPG - MSGBUFOFF)
+#define MSGBUFOFF	0
+#define MSGBUFSIZE	(NBPG)
 
 /* This is needed by ps (actually USPACE). */
 #define	UPAGES		2		/* pages of u-area */
 
 #if defined(_KERNEL) || defined(_STANDALONE)
 #ifdef	_SUN3_
-#include <machine/param3.h>
+#include <arch/sun3/include/param3.h>
 #endif	/* SUN3 */
 #ifdef	_SUN3X_
-#include <machine/param3x.h>
+#include <arch/sun3/include/param3x.h>
 #endif	/* SUN3X */
 #endif	/* _KERNEL */
 
@@ -82,8 +82,7 @@
 
 #if defined(_KERNEL) && !defined(_LOCORE)
 
-/* XXX - Does this really belong here? -gwr */
-#include <machine/psl.h>
+#include <machine/intr.h>
 
 extern void _delay __P((unsigned));
 #define delay(us)	_delay((us)<<8)

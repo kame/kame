@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_olduname.c,v 1.53.4.1 2001/03/30 21:42:57 he Exp $	*/
+/*	$NetBSD: linux_olduname.c,v 1.57 2001/11/13 02:08:57 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_olduname.c,v 1.57 2001/11/13 02:08:57 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -44,9 +47,6 @@
 #include <sys/mount.h>
 
 #include <sys/syscallargs.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
 
 #include <compat/linux/common/linux_types.h>
 #include <compat/linux/common/linux_mmap.h>

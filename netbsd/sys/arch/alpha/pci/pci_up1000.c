@@ -1,4 +1,4 @@
-/* $NetBSD: pci_up1000.c,v 1.4 2000/06/06 00:50:15 thorpej Exp $ */
+/* $NetBSD: pci_up1000.c,v 1.8 2002/05/15 16:57:43 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pci_up1000.c,v 1.4 2000/06/06 00:50:15 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_up1000.c,v 1.8 2002/05/15 16:57:43 thorpej Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -46,7 +46,8 @@ __KERNEL_RCSID(0, "$NetBSD: pci_up1000.c,v 1.4 2000/06/06 00:50:15 thorpej Exp $
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
@@ -67,7 +68,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_up1000.c,v 1.4 2000/06/06 00:50:15 thorpej Exp $
 
 #include "sio.h"
 
-int     api_up1000_intr_map(void *, pcitag_t, int, int, pci_intr_handle_t *);
+int     api_up1000_intr_map(struct pci_attach_args *, pci_intr_handle_t *);
 const char *api_up1000_intr_string(void *, pci_intr_handle_t);
 const struct evcnt *api_up1000_intr_evcnt(void *, pci_intr_handle_t);
 void    *api_up1000_intr_establish(void *, pci_intr_handle_t,
@@ -95,18 +96,18 @@ pci_up1000_pickintr(struct irongate_config *icp)
 
 #if NSIO
 	sio_intr_setup(pc, iot);
-	set_iointr(&sio_iointr);
 #else
 	panic("pci_up1000_pickintr: no I/O interrupt handler (no sio)");
 #endif
 }
 
 int
-api_up1000_intr_map(void *icv, pcitag_t bustag, int buspin, int line,
-    pci_intr_handle_t *ihp)
+api_up1000_intr_map(struct pci_attach_args *pa, pci_intr_handle_t *ihp)
 {
-	struct irongate_config *icp = icv;
-	pci_chipset_tag_t pc = &icp->ic_pc;
+	pci_chipset_tag_t pc = pa->pa_pc;
+	int buspin = pa->pa_intrpin;
+	int bustag = pa->pa_intrtag;
+	int line = pa->pa_intrline;
 	int bus, device, function;
 
 	if (buspin == 0) {
@@ -119,7 +120,7 @@ api_up1000_intr_map(void *icv, pcitag_t bustag, int buspin, int line,
 		return 1;
 	}
 
-	alpha_pci_decompose_tag(pc, bustag, &bus, &device, &function);
+	pci_decompose_tag(pc, bustag, &bus, &device, &function);
 
 	/*
 	 * The console places the interrupt mapping in the "line" value.
@@ -196,7 +197,7 @@ api_up1000_pciide_compat_intr_establish(void *icv, struct device *dev,
 	void *cookie = NULL;
 	int bus, irq;
 
-	alpha_pci_decompose_tag(pc, pa->pa_tag, &bus, NULL, NULL);
+	pci_decompose_tag(pc, pa->pa_tag, &bus, NULL, NULL);
 
 	/*
 	 * If this isn't PCI bus #0, all bets are off.

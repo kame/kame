@@ -1,4 +1,4 @@
-/* 	$NetBSD: linux_signal.h,v 1.11 1998/12/15 19:31:40 itohy Exp $	*/
+/* 	$NetBSD: linux_signal.h,v 1.19 2002/04/02 23:25:07 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -45,47 +45,53 @@
 #include <compat/linux/arch/m68k/linux_signal.h>
 #elif defined(__alpha__)
 #include <compat/linux/arch/alpha/linux_signal.h>
-#else
-#error Undefined linux_signal.h machine type.
+#elif defined(__powerpc__)
+#include <compat/linux/arch/powerpc/linux_signal.h>
+#elif defined(__mips__)
+#include <compat/linux/arch/mips/linux_signal.h>
+#elif defined(__arm__)
+#include <compat/linux/arch/arm/linux_signal.h>
 #endif
 
 #ifdef _KERNEL
-extern int native_to_linux_sig[];
-extern int linux_to_native_sig[];
+extern const int native_to_linux_signo[];
+extern const int linux_to_native_signo[];
 __BEGIN_DECLS
 int linux_sigprocmask1 __P((struct proc *, int, const linux_old_sigset_t *,
 						linux_old_sigset_t *));
 
 #if LINUX__NSIG_WORDS > 1
-void linux_old_extra_to_native_sigset __P((const linux_old_sigset_t *,
-    const unsigned long *, sigset_t *));
-void native_to_linux_old_extra_sigset __P((const sigset_t *,
-    linux_old_sigset_t *, unsigned long *));
+void linux_old_extra_to_native_sigset __P((sigset_t *,
+    const linux_old_sigset_t *, const unsigned long *));
+void native_to_linux_old_extra_sigset __P((linux_old_sigset_t *,
+    unsigned long *, const sigset_t *));
 #define linux_old_to_native_sigset(x,y) \
-    linux_old_extra_to_native_sigset(x, (const unsigned long *) 0, y)
+    linux_old_extra_to_native_sigset(x, y, (const unsigned long *)0)
 #define native_to_linux_old_sigset(x,y) \
-    native_to_linux_old_extra_sigset(x, y, (unsigned long *) 0)
+    native_to_linux_old_extra_sigset(x, (unsigned long *)0, y)
 
 #else	/* LINUX__NSIG_WORDS == 1 */
 
 #define linux_old_to_native_sigset(x,y) \
-    linux_to_native_sigset((const linux_sigset_t *) x, y)
+    linux_to_native_sigset(x, (const linux_sigset_t *)y)
 #define native_to_linux_old_sigset(x,y) \
-    native_to_linux_sigset(x, (linux_sigset_t *) y)
+    native_to_linux_sigset((linux_sigset_t *)x, y)
 #endif
 
-void linux_to_native_sigset __P((const linux_sigset_t *, sigset_t *));
-void native_to_linux_sigset __P((const sigset_t *, linux_sigset_t *));
+void linux_to_native_sigset __P((sigset_t *, const linux_sigset_t *));
+void native_to_linux_sigset __P((linux_sigset_t *, const sigset_t *));
+int linux_to_native_sigflags __P((const unsigned long));
+unsigned int native_to_linux_sigflags __P((const int));
 
-void linux_old_to_native_sigaction __P((struct linux_old_sigaction *,
-    struct sigaction *));
-void native_to_linux_old_sigaction __P((struct sigaction *,
-    struct linux_old_sigaction *));
+void linux_old_to_native_sigaction __P((struct sigaction *,
+    const struct linux_old_sigaction *));
+void native_to_linux_old_sigaction __P((struct linux_old_sigaction *,
+    const struct sigaction *));
 
-void linux_to_native_sigaction __P((struct linux_sigaction *,
-    struct sigaction *));
-void native_to_linux_sigaction __P((struct sigaction *,
-    struct linux_sigaction *));
+void linux_to_native_sigaction __P((struct sigaction *,
+    const struct linux_sigaction *));
+void native_to_linux_sigaction __P((struct linux_sigaction *,
+    const struct sigaction *));
 
 __END_DECLS
 #endif /* !_KERNEL */

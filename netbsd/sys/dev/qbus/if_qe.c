@@ -1,4 +1,4 @@
-/*      $NetBSD: if_qe.c,v 1.42 2000/06/05 00:09:18 matt Exp $ */
+/*      $NetBSD: if_qe.c,v 1.49.10.1 2002/06/10 16:21:52 tv Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -32,11 +32,13 @@
 /*
  * Driver for DEQNA/DELQA ethernet cards.
  * Things that is still to do:
- *	Have a timeout check for hang transmit logic.
  *	Handle ubaresets. Does not work at all right now.
  *	Fix ALLMULTI reception. But someone must tell me how...
  *	Collect statistics.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_qe.c,v 1.49.10.1 2002/06/10 16:21:52 tv Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -89,11 +91,11 @@ struct	qe_softc {
 	bus_dma_tag_t	sc_dmat;
 	struct qe_cdata *sc_qedata;	/* Descriptor struct		*/
 	struct qe_cdata *sc_pqedata;	/* Unibus address of above	*/
-	bus_dmamap_t	sc_cmap;	/* Map for control structures	*/
 	struct mbuf*	sc_txmbuf[TXDESCS];
 	struct mbuf*	sc_rxmbuf[RXDESCS];
 	bus_dmamap_t	sc_xmtmap[TXDESCS];
 	bus_dmamap_t	sc_rcvmap[RXDESCS];
+	struct ubinfo	sc_ui;
 	int		sc_intvec;	/* Interrupt vector		*/
 	int		sc_nexttx;
 	int		sc_inq;
@@ -102,15 +104,15 @@ struct	qe_softc {
 	int		sc_setup;	/* Setup packet in queue	*/
 };
 
-static	int	qematch __P((struct device *, struct cfdata *, void *));
-static	void	qeattach __P((struct device *, struct device *, void *));
-static	void	qeinit __P((struct qe_softc *));
-static	void	qestart __P((struct ifnet *));
-static	void	qeintr __P((void *));
-static	int	qeioctl __P((struct ifnet *, u_long, caddr_t));
-static	int	qe_add_rxbuf __P((struct qe_softc *, int));
-static	void	qe_setup __P((struct qe_softc *));
-static	void	qetimeout __P((struct ifnet *));
+static	int	qematch(struct device *, struct cfdata *, void *);
+static	void	qeattach(struct device *, struct device *, void *);
+static	void	qeinit(struct qe_softc *);
+static	void	qestart(struct ifnet *);
+static	void	qeintr(void *);
+static	int	qeioctl(struct ifnet *, u_long, caddr_t);
+static	int	qe_add_rxbuf(struct qe_softc *, int);
+static	void	qe_setup(struct qe_softc *);
+static	void	qetimeout(struct ifnet *);
 
 struct	cfattach qe_ca = {
 	sizeof(struct qe_softc), qematch, qeattach
@@ -129,22 +131,20 @@ struct	cfattach qe_ca = {
  * and wait for interrupt.
  */
 int
-qematch(parent, cf, aux)
-	struct	device *parent;
-	struct	cfdata *cf;
-	void	*aux;
+qematch(struct device *parent, struct cfdata *cf, void *aux)
 {
-	bus_dmamap_t	cmap;
 	struct	qe_softc ssc;
 	struct	qe_softc *sc = &ssc;
 	struct	uba_attach_args *ua = aux;
 	struct	uba_softc *ubasc = (struct uba_softc *)parent;
+	struct ubinfo ui;
 
-#define	PROBESIZE	(sizeof(struct qe_ring) * 4 + 128)
-	struct	qe_ring ring[15]; /* For diag purposes only */
+#define	PROBESIZE	4096
+	struct qe_ring *ring;
 	struct	qe_ring *rp;
 	int error;
 
+	ring = malloc(PROBESIZE, M_TEMP, M_WAITOK);
 	bzero(sc, sizeof(struct qe_softc));
 	bzero(ring, PROBESIZE);
 	sc->sc_iot = ua->ua_iot;
@@ -160,32 +160,25 @@ qematch(parent, cf, aux)
 	 * send and receive a internal packet; some junk is loopbacked
 	 * so that the DEQNA has a reason to interrupt.
 	 */
-	if ((error = bus_dmamap_create(sc->sc_dmat, PROBESIZE, 1, PROBESIZE, 0,
-	    BUS_DMA_NOWAIT, &cmap))) {
-		printf("qematch: bus_dmamap_create failed = %d\n", error);
+	ui.ui_size = PROBESIZE;
+	ui.ui_vaddr = (caddr_t)&ring[0];
+	if ((error = uballoc((void *)parent, &ui, UBA_CANTWAIT)))
 		return 0;
-	}
-	if ((error = bus_dmamap_load(sc->sc_dmat, cmap, ring, PROBESIZE, 0,
-	    BUS_DMA_NOWAIT))) {
-		printf("qematch: bus_dmamap_load failed = %d\n", error);
-		bus_dmamap_destroy(sc->sc_dmat, cmap);
-		return 0;
-	}
 
 	/*
 	 * Init a simple "fake" receive and transmit descriptor that
 	 * points to some unused area. Send a fake setup packet.
 	 */
-	rp = (void *)cmap->dm_segs[0].ds_addr;
+	rp = (void *)ui.ui_baddr;
 	ring[0].qe_flag = ring[0].qe_status1 = QE_NOTYET;
 	ring[0].qe_addr_lo = LOWORD(&rp[4]);
 	ring[0].qe_addr_hi = HIWORD(&rp[4]) | QE_VALID | QE_EOMSG | QE_SETUP;
-	ring[0].qe_buf_len = 128;
+	ring[0].qe_buf_len = -64;
 
 	ring[2].qe_flag = ring[2].qe_status1 = QE_NOTYET;
 	ring[2].qe_addr_lo = LOWORD(&rp[4]);
 	ring[2].qe_addr_hi = HIWORD(&rp[4]) | QE_VALID;
-	ring[2].qe_buf_len = 128;
+	ring[2].qe_buf_len = -(1500/2);
 
 	QE_WCSR(QE_CSR_CSR, QE_RCSR(QE_CSR_CSR) & ~QE_RESET);
 	DELAY(1000);
@@ -203,8 +196,8 @@ qematch(parent, cf, aux)
 	/*
 	 * All done with the bus resources.
 	 */
-	bus_dmamap_unload(sc->sc_dmat, cmap);
-	bus_dmamap_destroy(sc->sc_dmat, cmap);
+	ubfree((void *)parent, &ui);
+	free(ring, M_TEMP);
 	return 1;
 }
 
@@ -214,9 +207,7 @@ qematch(parent, cf, aux)
  * to accept packets.
  */
 void
-qeattach(parent, self, aux)
-	struct	device *parent, *self;
-	void	*aux;
+qeattach(struct device *parent, struct device *self, void *aux)
 {
 	struct	uba_attach_args *ua = aux;
 	struct	uba_softc *ubasc = (struct uba_softc *)parent;
@@ -224,8 +215,7 @@ qeattach(parent, self, aux)
 	struct	ifnet *ifp = (struct ifnet *)&sc->sc_if;
 	struct	qe_ring *rp;
 	u_int8_t enaddr[ETHER_ADDR_LEN];
-	bus_dma_segment_t seg;
-	int i, rseg, error;
+	int i, error;
 
 	sc->sc_iot = ua->ua_iot;
 	sc->sc_ioh = ua->ua_ioh;
@@ -234,37 +224,14 @@ qeattach(parent, self, aux)
         /*
          * Allocate DMA safe memory for descriptors and setup memory.
          */
-	if ((error = bus_dmamem_alloc(sc->sc_dmat,
-	    sizeof(struct qe_cdata), NBPG, 0, &seg, 1, &rseg,
-	    BUS_DMA_NOWAIT)) != 0) {
-		printf(": unable to allocate control data, error = %d\n",
-		    error);
-		goto fail_0;
-	}
 
-	if ((error = bus_dmamem_map(sc->sc_dmat, &seg, rseg,
-	    sizeof(struct qe_cdata), (caddr_t *)&sc->sc_qedata,
-	    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
-		printf(": unable to map control data, error = %d\n", error);
-		goto fail_1;
+	sc->sc_ui.ui_size = sizeof(struct qe_cdata);
+	if ((error = ubmemalloc((struct uba_softc *)parent, &sc->sc_ui, 0))) {
+		printf(": unable to ubmemalloc(), error = %d\n", error);
+		return;
 	}
-
-	if ((error = bus_dmamap_create(sc->sc_dmat,
-	    sizeof(struct qe_cdata), 1,
-	    sizeof(struct qe_cdata), 0, BUS_DMA_NOWAIT,
-	    &sc->sc_cmap)) != 0) {
-		printf(": unable to create control data DMA map, error = %d\n",
-		    error);
-		goto fail_2;
-	}
-
-	if ((error = bus_dmamap_load(sc->sc_dmat, sc->sc_cmap,
-	    sc->sc_qedata, sizeof(struct qe_cdata), NULL,
-	    BUS_DMA_NOWAIT)) != 0) {
-		printf(": unable to load control data DMA map, error = %d\n",
-		    error);
-		goto fail_3;
-	}
+	sc->sc_pqedata = (struct qe_cdata *)sc->sc_ui.ui_baddr;
+	sc->sc_qedata = (struct qe_cdata *)sc->sc_ui.ui_vaddr;
 
 	/*
 	 * Zero the newly allocated memory.
@@ -313,7 +280,6 @@ qeattach(parent, self, aux)
 	 * Create ring loops of the buffer chains.
 	 * This is only done once.
 	 */
-	sc->sc_pqedata = (struct qe_cdata *)sc->sc_cmap->dm_segs[0].ds_addr;
 
 	rp = sc->sc_qedata->qc_recv;
 	rp[RXDESCS].qe_addr_lo = LOWORD(&sc->sc_pqedata->qc_recv[0]);
@@ -359,6 +325,7 @@ qeattach(parent, self, aux)
 	ifp->if_start = qestart;
 	ifp->if_ioctl = qeioctl;
 	ifp->if_watchdog = qetimeout;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Attach the interface.
@@ -366,9 +333,6 @@ qeattach(parent, self, aux)
 	if_attach(ifp);
 	ether_ifattach(ifp, enaddr);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	return;
 
 	/*
@@ -392,24 +356,13 @@ qeattach(parent, self, aux)
 		if (sc->sc_rcvmap[i] != NULL)
 			bus_dmamap_destroy(sc->sc_dmat, sc->sc_rcvmap[i]);
 	}
-	bus_dmamap_unload(sc->sc_dmat, sc->sc_cmap);
- fail_3:
-	bus_dmamap_destroy(sc->sc_dmat, sc->sc_cmap);
- fail_2:
-	bus_dmamem_unmap(sc->sc_dmat, (caddr_t)sc->sc_qedata,
-	    sizeof(struct qe_cdata));
- fail_1:
-	bus_dmamem_free(sc->sc_dmat, &seg, rseg);
- fail_0:
-	return;
 }
 
 /*
  * Initialization of interface.
  */
 void
-qeinit(sc)
-	struct qe_softc *sc;
+qeinit(struct qe_softc *sc)
 {
 	struct ifnet *ifp = (struct ifnet *)&sc->sc_if;
 	struct qe_cdata *qc = sc->sc_qedata;
@@ -469,20 +422,19 @@ qeinit(sc)
  * Start output on interface.
  */
 void
-qestart(ifp)
-	struct ifnet *ifp;
+qestart(struct ifnet *ifp)
 {
 	struct qe_softc *sc = ifp->if_softc;
 	struct qe_cdata *qc = sc->sc_qedata;
 	paddr_t	buffer;
 	struct mbuf *m, *m0;
 	int idx, len, s, i, totlen, error;
-	short orword;
+	short orword, csr;
 
 	if ((QE_RCSR(QE_CSR_CSR) & QE_RCV_ENABLE) == 0)
 		return;
 
-	s = splimp();
+	s = splnet();
 	while (sc->sc_inq < (TXDESCS - 1)) {
 
 		if (sc->sc_setup) {
@@ -490,7 +442,7 @@ qestart(ifp)
 			continue;
 		}
 		idx = sc->sc_nexttx;
-		IF_DEQUEUE(&sc->sc_if.if_snd, m);
+		IFQ_POLL(&ifp->if_snd, m);
 		if (m == 0)
 			goto out;
 		/*
@@ -505,11 +457,12 @@ qestart(ifp)
 			panic("qestart");
 
 		if ((i + sc->sc_inq) >= (TXDESCS - 1)) {
-			IF_PREPEND(&sc->sc_if.if_snd, m);
 			ifp->if_flags |= IFF_OACTIVE;
 			goto out;
 		}
-		
+
+		IFQ_DEQUEUE(&ifp->if_snd, m);
+
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
@@ -560,7 +513,8 @@ qestart(ifp)
 		/*
 		 * Kick off the transmit logic, if it is stopped.
 		 */
-		if (QE_RCSR(QE_CSR_CSR) & QE_XL_INVALID) {
+		csr = QE_RCSR(QE_CSR_CSR);
+		if (csr & QE_XL_INVALID) {
 			QE_WCSR(QE_CSR_XMTL,
 			    LOWORD(&sc->sc_pqedata->qc_xmit[sc->sc_nexttx]));
 			QE_WCSR(QE_CSR_XMTH,
@@ -577,13 +531,11 @@ out:	if (sc->sc_inq)
 }
 
 static void
-qeintr(arg)
-	void *arg;
+qeintr(void *arg)
 {
 	struct qe_softc *sc = arg;
 	struct qe_cdata *qc = sc->sc_qedata;
 	struct ifnet *ifp = &sc->sc_if;
-	struct ether_header *eh;
 	struct mbuf *m;
 	int csr, status1, status2, len;
 
@@ -596,6 +548,7 @@ qeintr(arg)
 		while (qc->qc_recv[sc->sc_nextrx].qe_status1 != QE_NOTYET) {
 			status1 = qc->qc_recv[sc->sc_nextrx].qe_status1;
 			status2 = qc->qc_recv[sc->sc_nextrx].qe_status2;
+
 			m = sc->sc_rxmbuf[sc->sc_nextrx];
 			len = ((status1 & QE_RBL_HI) |
 			    (status2 & QE_RBL_LO)) + 60;
@@ -604,33 +557,17 @@ qeintr(arg)
 			m->m_pkthdr.len = m->m_len = len;
 			if (++sc->sc_nextrx == RXDESCS)
 				sc->sc_nextrx = 0;
-			eh = mtod(m, struct ether_header *);
 #if NBPFILTER > 0
-			if (ifp->if_bpf) {
+			if (ifp->if_bpf)
 				bpf_mtap(ifp->if_bpf, m);
-				if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-				    bcmp(LLADDR(ifp->if_sadl), eh->ether_dhost,
-				    ETHER_ADDR_LEN) != 0 &&
-				    ((eh->ether_dhost[0] & 1) == 0)) {
-					m_freem(m);
-					continue;
-				}
-			}
 #endif
-			/*
-			 * ALLMULTI means PROMISC in this driver.
-			 */
-			if ((ifp->if_flags & IFF_ALLMULTI) &&
-			    ((eh->ether_dhost[0] & 1) == 0) &&
-			    bcmp(LLADDR(ifp->if_sadl), eh->ether_dhost,
-			    ETHER_ADDR_LEN)) {
+			if ((status1 & QE_ESETUP) == 0)
+				(*ifp->if_input)(ifp, m);
+			else
 				m_freem(m);
-				continue;
-			}
-			(*ifp->if_input)(ifp, m);
 		}
 
-	if (csr & QE_XMIT_INT) {
+	if (csr & (QE_XMIT_INT|QE_XL_INVALID)) {
 		while (qc->qc_xmit[sc->sc_lastack].qe_status1 != QE_NOTYET) {
 			int idx = sc->sc_lastack;
 
@@ -672,10 +609,7 @@ qeintr(arg)
  * Process an ioctl request.
  */
 int
-qeioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+qeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct qe_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
@@ -753,9 +687,7 @@ qeioctl(ifp, cmd, data)
  * Add a receive buffer to the indicated descriptor.
  */
 int
-qe_add_rxbuf(sc, i) 
-	struct qe_softc *sc;
-	int i;
+qe_add_rxbuf(struct qe_softc *sc, int i) 
 {
 	struct mbuf *m;
 	struct qe_ring *rp;
@@ -804,8 +736,7 @@ qe_add_rxbuf(sc, i)
  * Create a setup packet and put in queue for sending.
  */
 void
-qe_setup(sc)
-	struct qe_softc *sc;
+qe_setup(struct qe_softc *sc)
 {
 	struct ether_multi *enm;
 	struct ether_multistep step;
@@ -814,7 +745,7 @@ qe_setup(sc)
 	u_int8_t *enaddr = LLADDR(ifp->if_sadl);
 	int i, j, k, idx, s;
 
-	s = splimp();
+	s = splnet();
 	if (sc->sc_inq == (TXDESCS - 1)) {
 		sc->sc_setup = 1;
 		splx(s);
@@ -860,7 +791,11 @@ qe_setup(sc)
 	 * Until someone tells me, fall back to PROMISC when more than
 	 * 12 ethernet addresses.
 	 */
-	if (ifp->if_flags & (IFF_PROMISC|IFF_ALLMULTI))
+	if (ifp->if_flags & IFF_ALLMULTI)
+		ifp->if_flags |= IFF_PROMISC;
+	else if (ifp->if_pcount == 0)
+		ifp->if_flags &= ~IFF_PROMISC;
+	if (ifp->if_flags & IFF_PROMISC)
 		qc->qc_xmit[idx].qe_buf_len = -65;
 
 	qc->qc_xmit[idx].qe_addr_lo = LOWORD(sc->sc_pqedata->qc_setup);
@@ -886,8 +821,7 @@ qe_setup(sc)
  * Check for dead transmit logic. Not uncommon.
  */
 void
-qetimeout(ifp)
-	struct ifnet *ifp;
+qetimeout(struct ifnet *ifp)
 {
 	struct qe_softc *sc = ifp->if_softc;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: vax1k_exec.c,v 1.1 1998/08/21 13:25:47 ragge Exp $	*/
+/*	$NetBSD: vax1k_exec.c,v 1.6 2001/11/13 02:09:35 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -39,6 +39,9 @@
  * bit more memory, but otherwise won't affect the execution speed.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vax1k_exec.c,v 1.6 2001/11/13 02:09:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -47,11 +50,13 @@
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
-
 #include <compat/vax1k/vax1k_exec.h>
 
+#if defined(_KERNEL_OPT)
 #include "opt_compat_43.h"
+#else
+#define COMPAT_43	/* enable 4.3BSD binaries for lkm */
+#endif
 
 int	exec_vax1k_prep_anymagic __P((struct proc *p, struct exec_package *epp,
 				      int, int));

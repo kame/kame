@@ -1,4 +1,4 @@
-/*	$NetBSD: yds.c,v 1.3.6.2 2001/05/26 17:13:55 he Exp $	*/
+/*	$NetBSD: yds.c,v 1.11 2002/01/10 10:17:55 someya Exp $	*/
 
 /*
  * Copyright (c) 2000, 2001 Kazuki Sakamoto and Minoura Makoto.
@@ -37,6 +37,9 @@
  * - Digital in/out (SPDIF) support
  * - Effect??
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: yds.c,v 1.11 2002/01/10 10:17:55 someya Exp $");
 
 #include "mpu.h"
 
@@ -186,6 +189,9 @@ static u_int32_t yds_get_lpfq __P((u_int));
 static u_int32_t yds_get_lpfk __P((u_int));
 static struct yds_dma *yds_find_dma __P((struct yds_softc *, void *));
 
+static int yds_init __P((struct yds_softc *));
+static void yds_powerhook __P((int, void *));
+
 #ifdef AUDIO_DEBUG
 static void yds_dump_play_slot __P((struct yds_softc *, int));
 #define	YDS_DUMP_PLAY_SLOT(n,sc,bank) \
@@ -221,6 +227,7 @@ static struct audio_hw_if yds_hw_if = {
 	yds_get_props,
 	yds_trigger_output,
 	yds_trigger_input,
+	NULL,
 };
 
 struct audio_device yds_device = {
@@ -423,12 +430,14 @@ yds_allocate_slots(sc)
 	memsize += (N_PLAY_SLOTS+1)*sizeof(u_int32_t);
 
 	p = &sc->sc_ctrldata;
-	i = yds_allocmem(sc, memsize, 16, p);
-	if (i) {
-		printf("%s: couldn't alloc/map DSP DMA buffer, reason %d\n",
-		       sc->sc_dev.dv_xname, i);
-		free(p, M_DEVBUF);
-		return 1;
+	if (KERNADDR(p) == NULL) {
+		i = yds_allocmem(sc, memsize, 16, p);
+		if (i) {
+			printf("%s: couldn't alloc/map DSP DMA buffer, reason %d\n",
+				sc->sc_dev.dv_xname, i);
+			free(p, M_DEVBUF);
+			return 1;
+		}
 	}
 	mp = KERNADDR(p);
 	da = DMAADDR(p);
@@ -436,7 +445,7 @@ yds_allocate_slots(sc)
 	DPRINTF(("mp:%p, DMA addr:%p\n",
 		 mp, (void *)sc->sc_ctrldata.map->dm_segs[0].ds_addr));
 
-	bzero(mp, memsize);
+	memset(mp, 0, memsize);
 
 	/* Work space */
         cb = 0;
@@ -634,6 +643,52 @@ yds_configure_legacy (arg)
 #undef FLEXIBLE
 #undef SELECTABLE
 
+static int
+yds_init(sc)
+	struct yds_softc *sc;
+{
+	u_int32_t reg;
+
+	DPRINTF(("yds_init()\n"));
+
+	/* Download microcode */
+	if (yds_download_mcode(sc)) {
+		printf("%s: download microcode failed\n", sc->sc_dev.dv_xname);
+		return 1;
+	}
+
+	/* Allocate DMA buffers */
+	if (yds_allocate_slots(sc)) {
+		printf("%s: could not allocate slots\n", sc->sc_dev.dv_xname);
+		return 1;
+	}
+
+	/* Warm reset */
+	reg = pci_conf_read(sc->sc_pc, sc->sc_pcitag, YDS_PCI_DSCTRL);
+	pci_conf_write(sc->sc_pc, sc->sc_pcitag, YDS_PCI_DSCTRL,
+		reg | YDS_DSCTRL_WRST);
+	delay(50000);
+
+	return 0;
+}
+
+static void
+yds_powerhook(why, addr)
+	int why;
+	void *addr;
+{
+	struct yds_softc *sc = addr;
+
+	if (why == PWR_RESUME) {
+		if (yds_init(sc)) {
+			printf("%s: reinitialize failed\n",
+				sc->sc_dev.dv_xname);
+			return;
+		}
+		sc->sc_codec[0].codec_if->vtbl->restore_ports(sc->sc_codec[0].codec_if);
+	}
+}
+
 void
 yds_attach(parent, self, aux)
 	struct device *parent;
@@ -665,8 +720,7 @@ yds_attach(parent, self, aux)
 	}
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -685,6 +739,7 @@ yds_attach(parent, self, aux)
 	sc->sc_pc = pc;
 	sc->sc_pcitag = pa->pa_tag;
 	sc->sc_id = pa->pa_id;
+	sc->sc_revision = revision;
 	sc->sc_flags = yds_get_dstype(sc->sc_id);
 #ifdef AUDIO_DEBUG
 	if (ydsdebug) {
@@ -712,21 +767,11 @@ yds_attach(parent, self, aux)
 	for (i = 0x80; i < 0xc0; i += 2)
 		YWRITE2(sc, i, 0);
 
-	/* Download microcode */
-	if (yds_download_mcode(sc)) {
-		printf("%s: download microcode failed\n", sc->sc_dev.dv_xname);
+	/* Initialize the device */
+	if (yds_init(sc)) {
+		printf("%s: initialize failed\n", sc->sc_dev.dv_xname);
 		return;
 	}
-	/* Allocate DMA buffers */
-	if (yds_allocate_slots(sc)) {
-		printf("%s: could not allocate slots\n", sc->sc_dev.dv_xname);
-		return;
-	}
-
-	/* Warm reset */
-	reg = pci_conf_read(pc, pa->pa_tag, YDS_PCI_DSCTRL);
-	pci_conf_write(pc, pa->pa_tag, YDS_PCI_DSCTRL, reg | YDS_DSCTRL_WRST);
-	delay(50000);
 
 	/*
 	 * Detect primary/secondary AC97
@@ -779,6 +824,7 @@ yds_attach(parent, self, aux)
 		if (ac97_id2 == 4)
 			ac97_id2 = -1;
 detected:
+		;
 	}
 
 	pci_conf_write(pc, pa->pa_tag, YDS_PCI_DSCTRL, reg | YDS_DSCTRL_CRST);
@@ -861,6 +907,8 @@ detected:
 
 	sc->sc_legacy_iot = pa->pa_iot;
 	config_defer((struct device*) sc, yds_configure_legacy);
+
+	powerhook_establish(yds_powerhook, sc);
 }
 
 int
@@ -903,6 +951,13 @@ yds_read_codec(sc_, reg, data)
 		printf("%s: yds_read_codec timeout\n",
 		       sc->sc->sc_dev.dv_xname);
 		return EIO;
+	}
+
+	if (PCI_PRODUCT(sc->sc->sc_id) == PCI_PRODUCT_YAMAHA_YMF744B &&
+	    sc->sc->sc_revision < 2) {
+		int i;
+		for (i=0; i<600; i++)
+			YREAD2(sc->sc, sc->status_data);
 	}
 
 	*data = YREAD2(sc->sc, sc->status_data);

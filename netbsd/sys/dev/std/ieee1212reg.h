@@ -1,3 +1,5 @@
+/*        $NetBSD: ieee1212reg.h,v 1.7 2002/04/02 10:10:54 jmc Exp $ */
+
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -113,9 +115,13 @@
  */
 #define	P1212_ROMFMT_GET_CRCLEN(quadlet)	(((quadlet) >> 16) & 0xff)
 
-/*	size_t P1212_ROMGET_GET_INFOLEN(uint32_t quadlet);
+/*	size_t P1212_ROMGET_GET_CRC(uint32_t quadlet);
  */
 #define	P1212_ROMFMT_GET_CRC(quadlet)		((uint16_t)(quadlet))
+
+/*      uint8_t      P1212_DIRENT_GET_KEY(uint32_t quadlet);
+ */
+#define P1212_DIRENT_GET_KEY(quadlet)           (((quadlet) >> 24) & 0xff)
 
 /*	unsigned int P1212_DIRENT_GET_KEYTYPE(uint32_t quadlet);
  */
@@ -125,17 +131,21 @@
  */
 #define	P1212_DIRENT_GET_KEYVALUE(quadlet)	(((quadlet) >> 24) & 0x3f)
 
-/*	unsigned int P1212_DIRECT_GET_OFFSET(uint32_t quadlet);
+/*	unsigned int P1212_DIRENT_GET_OFFSET(uint32_t quadlet);
  */
 #define	P1212_DIRENT_GET_OFFSET(quadlet)	((quadlet) & 0xffffff)
 
-/*	unsigned int P1212_DIRECT_GET_OFFSET(uint32_t quadlet);
- */
-#define	P1212_DIRENT_GET_OFFSET(quadlet)	((quadlet) & 0xffffff)
-
-/*	unsigned int P1212_DIRECT_GET_VALUE(uint32_t quadlet);
+/*	unsigned int P1212_DIRENT_GET_VALUE(uint32_t quadlet);
  */
 #define	P1212_DIRENT_GET_VALUE(quadlet)		((quadlet) & 0xffffff)
+
+/*      u_int16_t P1212_DIRENT_GET_LEN(quadlet);
+ */
+#define P1212_DIRENT_GET_LEN(quadlet)           (((quadlet) >> 16) & 0xffff)
+
+/*      u_int16_t P1212_DIRENT_GET_CRC(quadlet);
+ */
+#define P1212_DIRENT_GET_CRC(quadlet)           ((uint16_t)(quadlet))
 
 /* Key Types are stored in bits 31-30 of a directory entry.
  */
@@ -153,7 +163,7 @@
 #define	P1212_KEYVALUE_Module_Hw_Version	0x04	/* immediate */
 #define	P1212_KEYVALUE_Module_Spec_Id		0x05	/* immediate */
 #define	P1212_KEYVALUE_Module_Sw_Version	0x06	/* immediate */
-#define	P1212_KEYVALUE_Module_Dependent_info	0x07	/* leaf | directory */
+#define	P1212_KEYVALUE_Module_Dependent_Info	0x07	/* leaf | directory */
 #define	P1212_KEYVALUE_Node_Vendor_Id		0x08	/* immediate */
 #define	P1212_KEYVALUE_Node_Hw_Version		0x09	/* immediate */
 #define	P1212_KEYVALUE_Node_Spec_Id		0x0a	/* immediate */
@@ -170,9 +180,25 @@
 #define	P1212_KEYVALUE_Unit_Location		0x15	/* leaf */
 #define	P1212_KEYVALUE_Unit_Poll_Mask		0x16	/* immediate */
 
+/*
+ * Items not in original p1212 standard but are in proposed drafts and in use
+ * already in some roms.
+ */
+
+#define P1212_KEYVALUE_Model                    0x17    /* immediate */
+#define P1212_KEYVALUR_Instance_Directory       0x18    /* directory */
+#define P1212_KEYVALUE_Keyword                  0x19    /* leaf */
+#define P1212_KEYVALUE_Feature_Directory        0x1A    /* directory */
+#define P1212_KEYVALUE_Extended_ROM             0x1B    /* leaf */
+#define P1212_KEYVALUE_Extended_Key_Spec_Id     0x1C    /* immediate */
+#define P1212_KEYVALUE_Extended_Key             0x1D    /* immediate */
+#define P1212_KEYVALUE_Extended_Data            0x1E    /* imm|leaf|dir|offset */
+#define P1212_KEYVALUE_Modifiable_Descriptor    0x1F    /* leaf */
+#define P1212_KEYVALUE_Directory_Id             0x20    /* immediate */
+
 #define	P1212_KEYTYPE_STRINGS { "Immediate", "Offset", "Leaf", "Directory" }
 
-#define P1212_KEYVALUE_STRINGS { NULL, \
+#define P1212_KEYVALUE_STRINGS { "Root-Directory", \
 	"Textual-Descriptor", "Bus-Dependent-Info", "Module-Vendor-Id", \
 	"Module-Hw-Version", "Module-Spec-Id", "Module-Sw-Version", \
 	"Module-Dependent-Info", "Node-Vendor-Id", "Node-Hw_Version", \
@@ -180,7 +206,10 @@
 	"Node-Unique-Id", "Node-Units-Extent", "Node-Memory-Extent", \
 	"Node-Dependent-Info", "Unit-Directory", "Unit-Spec-Id", \
 	"Unit-Sw-Version", "Unit-Dependent-Info", "Unit-Location", \
-	"Unit-Poll-Mask", }
+	"Unit-Poll-Mask", "Model", "Instance-Directory", "Keyword", \
+        "Feature-Directory", "Extended-ROM", "Extended-Key-Spec-Id", \
+        "Extended-Key", "Extended-Data", "Modifiable-Descriptor", \
+        "Directory-Id" }
 
 /* Leaf nodes look like:
  *
@@ -193,10 +222,35 @@
  *	[2]	0xllllllll		language id
  */
 
+#define	P1212_TEXT_Min_Leaf_Length 0x3
+#define P1212_TEXT_GET_Spec_Type(quadlet)	(((quadlet) & 0xff000000) >> 24)
+#define P1212_TEXT_GET_Spec_Id(quadlet)		((quadlet) & 0xffffff)
+
 /*
  * Directory nodes look like:
  *	[0]	0xnnnn-0xcccc		length, crc16
  *	[1]	direntry
  *	[n]	direntry
  */
+
+/* Some definitions for the p1212_find routines. */
+
+#define P1212_FIND_SEARCHALL          0x1
+#define P1212_FIND_RETURNALL          0x2
+
+/* Mask definitions for overriding the p1212 standard checks. */
+
+/*
+ * XXX: Note that some of these go away if full p1212r support is done as
+ * a lot of the restrictions were lifted there in what can go where. 
+ */
+
+
+/* Normally dependent info can only be leaf or directory. Allow offsets also */
+#define P1212_ALLOW_DEPENDENT_INFO_OFFSET_TYPE	0x1
+
+/* Same thing applies for immediate types. */
+#define P1212_ALLOW_DEPENDENT_INFO_IMMED_TYPE	0x2
+#define P1212_ALLOW_VENDOR_DIRECTORY_TYPE	0x4
+
 #endif	/* _DEV_STD_IEEE1212REG_H_ */

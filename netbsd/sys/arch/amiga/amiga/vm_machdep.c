@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.54 2000/05/28 05:49:00 thorpej Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.64 2002/03/04 02:43:22 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -42,6 +42,9 @@
  *	@(#)vm_machdep.c	7.10 (Berkeley) 5/7/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.64 2002/03/04 02:43:22 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -55,9 +58,7 @@
 #include <machine/cpu.h>
 #include <m68k/cacheops.h>
 
-#include <vm/vm.h>
 #include <sys/user.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -66,7 +67,7 @@
 /*
  * Finish a fork operation, with process p2 nearly set up.
  * Copy and update the pcb and trap frame, making the child ready to run.
- * 
+ *
  * Rig the child's kernel stack so that it will start out in
  * proc_trampoline() and call child_return() with p2 as an
  * argument. This causes the newly-created child process to go
@@ -86,7 +87,7 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	register struct proc *p1, *p2;
 	void *stack;
 	size_t stacksize;
-	void (*func) __P((void *));
+	void (*func)(void *);
 	void *arg;
 {
 	register struct pcb *pcb = &p2->p_addr->u_pcb;
@@ -168,22 +169,20 @@ pagemove(from, to, size)
 		if (pmap_extract(pmap_kernel(), (vaddr_t)to, NULL) == TRUE)
 			panic("pagemove 3");
 #endif
-		pmap_remove(pmap_kernel(),
-			    (vaddr_t)from, (vaddr_t)from + PAGE_SIZE);
-		pmap_enter(pmap_kernel(),
-			   (vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE,
-			   VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+		pmap_kremove((vaddr_t)from, PAGE_SIZE);
+		pmap_kenter_pa((vaddr_t)to, pa, VM_PROT_READ | VM_PROT_WRITE);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
  * Map `size' bytes of physical memory starting at `paddr' into
  * kernel VA space at `vaddr'.  Read/write and cache-inhibit status
  * are specified by `prot'.
- */ 
+ */
 void
 physaccess(vaddr, paddr, size, prot)
 	caddr_t vaddr, paddr;
@@ -327,8 +326,6 @@ kvtop(addr)
 	return (pa);
 }
 
-extern vm_map_t phys_map;
-
 /*
  * Map a user I/O request into kernel virtual address space.
  * Note: the pages are already locked by uvm_vslock(), so we
@@ -339,7 +336,7 @@ vmapbuf(bp, len)
 	struct buf *bp;
 	vm_size_t len;
 {
-	struct pmap *upmap, *kpmap;
+	struct pmap *upmap;
 	vaddr_t uva;	/* User VA (map from) */
 	vaddr_t kva;	/* Kernel VA (new to) */
 	paddr_t pa; 	/* physical address */
@@ -355,16 +352,15 @@ vmapbuf(bp, len)
 	bp->b_data = (caddr_t)(kva + off);
 
 	upmap = vm_map_pmap(&bp->b_proc->p_vmspace->vm_map);
-	kpmap = vm_map_pmap(phys_map);
 	do {
 		if (pmap_extract(upmap, uva, &pa) == FALSE)
 			panic("vmapbuf: null page frame");
-		pmap_enter(kpmap, kva, pa, VM_PROT_READ|VM_PROT_WRITE,
-		    PMAP_WIRED);
+		pmap_kenter_pa(kva, pa, VM_PROT_READ | VM_PROT_WRITE);
 		uva += PAGE_SIZE;
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	} while (len);
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -384,11 +380,8 @@ vunmapbuf(bp, len)
 	kva = m68k_trunc_page(bp->b_data);
 	off = (vaddr_t)bp->b_data - kva;
 	len = m68k_round_page(off + len);
-
-	/*
-	 * pmap_remove() is unnecessary here, as kmem_free_wakeup()
-	 * will do it for us.
-	 */
+	pmap_kremove(kva, len);
+	pmap_update(pmap_kernel());
 	uvm_km_free_wakeup(phys_map, kva, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_lebuffer.c,v 1.5.4.1 2000/07/19 02:53:06 mrg Exp $	*/
+/*	$NetBSD: if_le_lebuffer.c,v 1.11 2002/03/20 20:39:15 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,6 +37,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le_lebuffer.c,v 1.11 2002/03/20 20:39:15 eeh Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -102,7 +104,7 @@ struct cfattach le_lebuffer_ca = {
 
 extern struct cfdriver le_cd;
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -179,12 +181,11 @@ leattach_lebuffer(parent, self, aux)
 	lesc->sc_bustag = sa->sa_bustag;
 	lesc->sc_dmatag = sa->sa_dmatag;
 
-	if (bus_space_map2(sa->sa_bustag,
-			   sa->sa_slot,
-			   sa->sa_offset,
-			   sa->sa_size,
-			   BUS_SPACE_MAP_LINEAR,
-			   0, &lesc->sc_reg)) {
+	if (sbus_bus_map(sa->sa_bustag,
+			 sa->sa_slot,
+			 sa->sa_offset,
+			 sa->sa_size,
+			 0, &lesc->sc_reg)) {
 		printf("%s @ lebuffer: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -195,7 +196,7 @@ leattach_lebuffer(parent, self, aux)
 	lebuf->attached = 1;
 
 	/* That old black magic... */
-	sc->sc_conf3 = getpropint(sa->sa_node, "busmaster-regval",
+	sc->sc_conf3 = PROM_getpropint(sa->sa_node, "busmaster-regval",
 				  LE_C3_BSWP | LE_C3_ACON | LE_C3_BCON);
 
 	/* Assume SBus is grandparent */

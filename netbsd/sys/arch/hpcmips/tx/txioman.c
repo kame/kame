@@ -1,318 +1,108 @@
-/*	$NetBSD: txioman.c,v 1.1 2000/01/16 21:47:00 uch Exp $ */
+/*	$NetBSD: txioman.c,v 1.4 2002/01/29 18:53:20 uch Exp $ */
 
-/*
- * Copyright (c) 2000, by UCHIYAMA Yasushi
+/*-
+ * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by UCHIYAMA Yasushi.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 2. The name of the developer may NOT be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *        This product includes software developed by the NetBSD
+ *        Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "opt_tx39_debug.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 
 #include <machine/bus.h>
-#include <machine/intr.h>
-
-#include <machine/config_hook.h>
-#include <machine/platid.h>
-#include <machine/platid_mask.h>
-
 #include <hpcmips/tx/tx39var.h>
-#include <hpcmips/tx/tx39iovar.h>
 
-#include <hpcmips/tx/txiomanvar.h>
-#include <hpcmips/tx/txsnd.h>
+#include <dev/hpc/hpciovar.h>
 
-#include "locators.h"
-
-int	txioman_match __P((struct device*, struct cfdata*, void*));
-void	txioman_attach __P((struct device*, struct device*, void*));
-
-struct txioman_softc {
-	struct	device sc_dev;
-	tx_chipset_tag_t sc_tc;
-};
+int txioman_match(struct device *, struct cfdata *, void *);
+void txioman_attach(struct device *, struct device *, void *);
+void txioman_callback(struct device *);
+int txioman_print(void *, const char *);
+hpcio_chip_t tx_conf_reference_ioman(void *, int);
 
 struct cfattach txioman_ca = {
-	sizeof(struct txioman_softc), txioman_match, txioman_attach
+	sizeof(struct device), txioman_match, txioman_attach
 };
-
-void	__txioman_led		__P((txioman_tag_t, int, int));
-void	__txioman_backlight	__P((txioman_tag_t, int));
-void	__txioman_uart_init	__P((txioman_tag_t));
-void	__txioman_uarta_init	__P((txioman_tag_t, void*));
-
-struct txioman_tag txioman_null_tag = {
-	NULL,
-	__txioman_led,
-	__txioman_backlight,
-	__txioman_uart_init,
-	__txioman_uarta_init,
-};
-
-void	__mobilon_backlight	__P((txioman_tag_t, int));
-void	__mobilon_uart_init	__P((txioman_tag_t));
-void	__mobilon_uarta_init	__P((txioman_tag_t, void*));
-
-struct txioman_tag txioman_mobilon_tag = {
-	NULL,
-	__txioman_led,
-	__mobilon_backlight,
-	__mobilon_uart_init,
-	__mobilon_uarta_init,
-};
-
-void	__compaq_led		__P((txioman_tag_t, int, int));
-void	__compaq_uarta_init	__P((txioman_tag_t, void*));
-
-struct txioman_tag txioman_compaq_tag = {
-	NULL,
-	__compaq_led,
-	__txioman_backlight,
-	__txioman_uart_init,
-	__compaq_uarta_init,
-};
-
-const struct txioman_platform_table {
-	platid_t	tp_platform;
-	char*		tp_name;
-	txioman_tag_t	tp_tag;
-} txioman_platform_table[] = {
-	{{{PLATID_WILD, PLATID_MACH_COMPAQ_C}},
-	 "Compaq-C",
-	 &txioman_compaq_tag},
-
-	{{{PLATID_WILD, PLATID_MACH_SHARP_MOBILON}},
-	 "Mobilon HC",
-	 &txioman_mobilon_tag},
-
-	{{{0, 0}}, "", &txioman_null_tag}
-};
-
-txioman_tag_t	txioman_tag_lookup __P((void));
-
-int	__config_hook_backlight __P((void*, int, long, void*));
 
 int
-txioman_match(parent, cf, aux)
-	struct device *parent;
-	struct cfdata *cf;
-	void *aux;
+txioman_match(struct device *parent, struct cfdata *cf, void *aux)
 {
-	platid_mask_t mask;
-
-	if (cf->cf_loc[TXIOMANIFCF_PLATFORM] == 
-	    TXIOMANIFCF_PLATFORM_DEFAULT) {
-		return 1;
-	}
-
-	mask = PLATID_DEREF(cf->cf_loc[TXIOMANIFCF_PLATFORM]);
-	if (platid_match(&platid, &mask)) {
-		return 2;
-	}
-
-	return 0;
+	return (1);
 }
 
 void
-txioman_attach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+txioman_attach(struct device *parent, struct device *self, void *aux)
 {
-	struct txioman_attach_args *tia = aux;
-	struct txioman_softc *sc = (void*)self;
-	txioman_tag_t tag;
+	printf("\n");
 
-	sc->sc_tc = tia->tia_tc;
-
-	tag = txioman_tag_lookup();
-	tag->ti_v = sc;
-
-	/*
-	 * register myself to tx_chipset.
-	 */
-	tx_conf_register_ioman(sc->sc_tc, tag);
-
-	/*
-	 * register backlight config_hook if any.
-	 */
-	config_hook(CONFIG_HOOK_BUTTONEVENT,
-		    CONFIG_HOOK_BUTTONEVENT_LIGHT, 
-		    CONFIG_HOOK_SHARE, /* btnmgr */
-		    __config_hook_backlight, sc->sc_tc);
-
+	config_defer(self, txioman_callback);
 }
 
-txioman_tag_t
-txioman_tag_lookup()
+void
+txioman_callback(struct device *self)
 {
-	const struct txioman_platform_table *tab;
-	platid_mask_t mask;
-	
-	for (tab = txioman_platform_table; 
-	     tab->tp_tag != &txioman_null_tag; tab++) {
-		
-		mask = PLATID_DEREF(&tab->tp_platform);
-		
-		if (platid_match(&platid, &mask))
-			goto out;
-	}
-out:	
-	printf(": %s\n", tab->tp_name);
+	struct hpcio_attach_args haa;
 
-	return tab->tp_tag;
+	haa.haa_busname = HPCIO_BUSNAME;
+	haa.haa_sc = tx_conf_get_tag();
+	haa.haa_getchip = tx_conf_reference_ioman;
+	haa.haa_iot = 0; /* not needed for TX */
+
+	config_found(self, &haa, txioman_print);
 }
 
-/*
- * default functions.
- */
-void	
-__txioman_led(ti, type, onoff)
-	txioman_tag_t ti;
-	int type, onoff;
-{
-}
-
-void	
-__txioman_backlight(ti, onoff)
-	txioman_tag_t ti;
-	int onoff;
-{
-}
-
-void	
-__txioman_uart_init(ti)
-	txioman_tag_t ti;
-{
-}
-
-void	
-__txioman_uarta_init(ti, cookie)
-	txioman_tag_t ti;
-	void *cookie;
-{
-}
-
-/*
- * Compaq-C functions.
- */
-void	
-__compaq_led(ti, type, onoff)
-	txioman_tag_t ti;
-	int type, onoff;
-{
-	struct txioman_softc *sc = (void*)ti;
-
-	/* Green LED */
-	tx39io_portout(sc->sc_tc, TXPORT(TXMFIO, 3), 
-		       onoff ? TXOFF : TXON);
-}
-
-extern int	__compaq_uart_dcd	__P((void*));
-extern int	__mobilon_uart_dcd	__P((void*));
-
-void	
-__compaq_uarta_init(ti, cookie)
-	txioman_tag_t ti;
-	void *cookie;
-{
-	struct txioman_softc *sc = (void*)ti;
-	tx_chipset_tag_t tc = sc->sc_tc;
-
-	tx_intr_establish(tc, MAKEINTR(3, (1<<30)), IST_EDGE, IPL_TTY,
-			  __compaq_uart_dcd, cookie);	
-	tx_intr_establish(tc, MAKEINTR(4, (1<<30)), IST_EDGE, IPL_TTY,
-			  __compaq_uart_dcd, cookie);	
-	tx_intr_establish(tc, MAKEINTR(3, (1<<5)), IST_EDGE, IPL_TTY,
-			  __compaq_uart_dcd, cookie);	
-	tx_intr_establish(tc, MAKEINTR(4, (1<<5)), IST_EDGE, IPL_TTY,
-			  __compaq_uart_dcd, cookie);
-}
-
-/*
- * Mobilon HC functions
- */
-void	
-__mobilon_backlight(ti, onoff)
-	txioman_tag_t ti;
-	int onoff;
-{
-	struct txioman_softc *sc = (void*)ti;
-
-	tx39io_portout(sc->sc_tc, TXPORT(TXMFIO, 14), 
-		       onoff ? TXON : TXOFF);
-}
-
-void	
-__mobilon_uart_init(ti)
-	txioman_tag_t ti;
-{
-	struct txioman_softc *sc = (void*)ti;
-	
-	tx39io_portout(sc->sc_tc, TXPORT(TXIO, 5), TXON);
-	tx39io_portout(sc->sc_tc, TXPORT(TXMFIO, 15), TXON);
-}
-
-void	
-__mobilon_uarta_init(ti, cookie)
-	txioman_tag_t ti;
-	void *cookie;
-{
-#if not_required /* ??? this is harmful... */
-	struct txioman_softc *sc = (void*)ti;
-	tx_chipset_tag_t tc = sc->sc_tc;
-
-	tx_intr_establish(tc, MAKEINTR(5, (1<<4)), IST_EDGE, IPL_TTY,
-			  __mobilon_uart_dcd, cookie);	
-	tx_intr_establish(tc, MAKEINTR(5, (1<<11)), IST_EDGE, IPL_TTY,
-			  __mobilon_uart_dcd, cookie);	
-	tx_intr_establish(tc, MAKEINTR(5, (1<<6)), IST_EDGE, IPL_TTY,
-			  __mobilon_uart_dcd, cookie);	
-	tx_intr_establish(tc, MAKEINTR(5, (1<<13)), IST_EDGE, IPL_TTY,
-			  __mobilon_uart_dcd, cookie);
-#endif
-}
-
-/*
- * config_hook.
- */
 int
-__config_hook_backlight(arg, type, id, msg)
-	void*	arg;
-	int	type;
-	long	id;
-	void*	msg;
+txioman_print(void *aux, const char *pnp)
 {
-	static int onoff; /* XXX */
-	tx_chipset_tag_t tc = arg;
-	
-	onoff ^= 1;
 
-	txioman_backlight(tc, onoff);
-	txioman_led(tc, 0, onoff); /* test */
-	tx_sound_mute(tc, !onoff); /* test */
+	return (QUIET);
+}
 
-	return 0;
+void
+tx_conf_register_ioman(tx_chipset_tag_t t, struct hpcio_chip *hc)
+{
+	KASSERT(t == tx_conf_get_tag());
+	KASSERT(hc);
+
+	t->tc_iochip[hc->hc_chipid] = hc;
+}
+
+hpcio_chip_t
+tx_conf_reference_ioman(void *ctx, int iochip)
+{
+	struct tx_chipset_tag *t = tx_conf_get_tag();
+	KASSERT(iochip >= 0 && iochip < NTXIO_GROUP);
+
+	return (t->tc_iochip[iochip]);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_fcntl.c,v 1.34 2000/03/30 11:27:19 augustss Exp $	 */
+/*	$NetBSD: svr4_fcntl.c,v 1.41 2002/03/24 15:32:51 jdolecek Exp $	 */
 
 /*-
  * Copyright (c) 1994, 1997 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: svr4_fcntl.c,v 1.41 2002/03/24 15:32:51 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -265,20 +268,13 @@ fd_revoke(p, fd, retval)
 	struct vattr vattr;
 	int error;
 
-	if ((u_int)fd >= fdp->fd_nfiles || (fp = fdp->fd_ofiles[fd]) == NULL)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return EBADF;
 
-	switch (fp->f_type) {
-	case DTYPE_VNODE:
-		vp = (struct vnode *) fp->f_data;
-
-	case DTYPE_SOCKET:
+	if (fp->f_type != DTYPE_VNODE)
 		return EINVAL;
 
-	default:
-		panic("svr4_fcntl(F_REVOKE)");
-		/*NOTREACHED*/
-	}
+	vp = (struct vnode *) fp->f_data;
 
 	if (vp->v_type != VCHR && vp->v_type != VBLK) {
 		error = EINVAL;
@@ -318,7 +314,7 @@ fd_truncate(p, fd, flp, retval)
 	/*
 	 * We only support truncating the file.
 	 */
-	if ((u_int)fd >= fdp->fd_nfiles || (fp = fdp->fd_ofiles[fd]) == NULL)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return EBADF;
 
 	vp = (struct vnode *)fp->f_data;
@@ -369,14 +365,14 @@ svr4_sys_open(p, v, retval)
 	int			error;
 	struct sys_open_args	cup;
 
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
 	SCARG(&cup, flags) = svr4_to_bsd_flags(SCARG(uap, flags));
 
 	if (SCARG(&cup, flags) & O_CREAT)
-		SVR4_CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
+		CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
 	else
-		SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+		CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&cup, path) = SCARG(uap, path);
 	SCARG(&cup, mode) = SCARG(uap, mode);
@@ -388,10 +384,12 @@ svr4_sys_open(p, v, retval)
 	if (!(SCARG(&cup, flags) & O_NOCTTY) && SESS_LEADER(p) &&
 	    !(p->p_flag & P_CONTROLT)) {
 		struct filedesc	*fdp = p->p_fd;
-		struct file	*fp = fdp->fd_ofiles[*retval];
+		struct file	*fp;
+
+		fp = fd_getfile(fdp, *retval);
 
 		/* ignore any error, just give it a try */
-		if (fp->f_type == DTYPE_VNODE)
+		if (fp != NULL && fp->f_type == DTYPE_VNODE)
 			(fp->f_ops->fo_ioctl) (fp, TIOCSCTTY, (caddr_t) 0, p);
 	}
 	return 0;
@@ -417,8 +415,8 @@ svr4_sys_creat(p, v, retval)
 	struct svr4_sys_creat_args *uap = v;
 	struct sys_open_args cup;
 
-	caddr_t sg = stackgap_init(p->p_emul);
-	SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	caddr_t sg = stackgap_init(p, 0);
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&cup, path) = SCARG(uap, path);
 	SCARG(&cup, mode) = SCARG(uap, mode);
@@ -470,8 +468,8 @@ svr4_sys_access(p, v, retval)
 	struct svr4_sys_access_args *uap = v;
 	struct sys_access_args cup;
 
-	caddr_t sg = stackgap_init(p->p_emul);
-	SVR4_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	caddr_t sg = stackgap_init(p, 0);
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&cup, path) = SCARG(uap, path);
 	SCARG(&cup, flags) = SCARG(uap, flags);
@@ -624,9 +622,9 @@ svr4_sys_fcntl(p, v, retval)
 		{
 			struct svr4_flock	 ifl;
 			struct flock		*flp, fl;
-			caddr_t sg = stackgap_init(p->p_emul);
+			caddr_t sg = stackgap_init(p, 0);
 
-			flp = stackgap_alloc(&sg, sizeof(struct flock));
+			flp = stackgap_alloc(p, &sg, sizeof(struct flock));
 			SCARG(&fa, arg) = (void *) flp;
 
 			error = copyin(SCARG(uap, arg), &ifl, sizeof ifl);
@@ -658,7 +656,7 @@ svr4_sys_fcntl(p, v, retval)
 				struct sys_dup2_args du;
 
 				SCARG(&du, from) = SCARG(uap, fd);
-				SCARG(&du, to) = (int)SCARG(uap, arg);
+				SCARG(&du, to) = (int)(u_long)SCARG(uap, arg);
 				error = sys_dup2(p, &du, retval);
 				if (error)
 					return error;
@@ -686,9 +684,10 @@ svr4_sys_fcntl(p, v, retval)
 			{
 				struct svr4_flock64	 ifl;
 				struct flock		*flp, fl;
-				caddr_t sg = stackgap_init(p->p_emul);
+				caddr_t sg = stackgap_init(p, 0);
 
-				flp = stackgap_alloc(&sg, sizeof(struct flock));
+				flp = stackgap_alloc(p, &sg, 
+				    sizeof(struct flock));
 				SCARG(&fa, arg) = (void *) flp;
 
 				error = copyin(SCARG(uap, arg), &ifl,

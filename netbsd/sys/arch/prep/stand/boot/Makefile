@@ -1,9 +1,11 @@
-#	$NetBSD: Makefile,v 1.1 2000/02/29 15:21:48 nonaka Exp $
+#	$NetBSD: Makefile,v 1.8 2001/12/12 12:24:25 lukem Exp $
+
+NOMAN= # defined
+
+.include <bsd.own.mk>
 
 COMMON= ${.CURDIR}/../common
-.ifnmake(print-objdir)
-COMMONOBJ!=	cd ${COMMON}; ${MAKE} print-objdir
-.endif
+COMMONOBJ!=	cd ${COMMON} && ${PRINTOBJDIR}
 
 .PATH: ${.CURDIR}/../boot ${COMMONOBJ}
 
@@ -17,7 +19,7 @@ NEWVERSWHAT=	"BOOT"
 SRCS= srt0.s
 SRCS+= boot.c clock.c com.c conf.c cons.c devopen.c fd.c
 SRCS+= filesystem.c inkernel.c io.c tgets.c prf.c monitor.c
-SRCS+= kbd.c ns16550.c vreset.c vga.c video.c
+SRCS+= kbd.c ns16550.c vers.c vreset.c vga.c video.c
 
 AFLAGS= -x assembler-with-cpp -traditional-cpp
 
@@ -33,7 +35,6 @@ CPPFLAGS+= -DCONS_SERIAL -DCOMSPEED=9600 -DCOMPORT=0x3f8
 .endif
 
 OBJDUMP?= objdump
-MKMAN= no
 STRIPFLAG=
 BINMODE= 444
 
@@ -41,7 +42,7 @@ RELOC= 0x800000
 HEAD_SIZE= `${OBJDUMP} -h ${.OBJDIR}/${PROG} | grep \.text | awk '{print $$6}'`
 KERN_OFFSET= `ls -l ${.OBJDIR}/${PROG} | awk '{print $$5}'`
 
-CLEANFILES+= vers.c vers.o machine powerpc
+CLEANFILES+= vers.c machine powerpc
 
 LIBS= ${L}/sa/libsa.a ${L}/kern/libkern.a ${L}/z/libz.a
 
@@ -57,14 +58,15 @@ powerpc::
 	-rm -f $@
 	ln -s ${S}/arch/powerpc/include $@
 
+vers.c: ${.CURDIR}/../boot/version
+	sh ${S}/conf/newvers_stand.sh ${.CURDIR}/../boot/version "prep" ${NEWVERSWHAT}
+
 ${PROG}: ${OBJS} machine powerpc
-	sh ${.CURDIR}/../newvers.sh ${.CURDIR}/../boot/version ${NEWVERSWHAT}
-	${COMPILE.c} vers.c
 	${LD} -o ${PROG} -s -N -T ${.CURDIR}/../boot/ld.script \
-		-Ttext ${RELOC} ${OBJS} ${LIBS} vers.o
+		-Ttext ${RELOC} ${OBJS} ${LIBS}
 	${COMPILE.c} -DKERN_OFFSET=${KERN_OFFSET} -DHEAD_SIZE=0x${HEAD_SIZE} \
 		${.CURDIR}/../boot/inkernel.c
 	${LD} -o ${PROG} -s -N -T ${.CURDIR}/../boot/ld.script \
-		-Ttext ${RELOC} ${OBJS} ${LIBS} vers.o
+		-Ttext ${RELOC} ${OBJS} ${LIBS}
 
 .include <bsd.prog.mk>

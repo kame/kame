@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.64 2000/04/14 13:29:59 tsutsui Exp $	*/
+/*	$NetBSD: conf.c,v 1.66 2002/01/12 15:15:59 manu Exp $	*/
 
 /*-
  * Copyright (c) 1994 Adam Glass, Gordon W. Ross
@@ -45,14 +45,6 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 #include <sys/vnode.h>
-
-/* XXX: Move this to sys/conf.h? */
-/* open, close, write, ioctl (not a tty) */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), \
-	(dev_type_read((*))) enodev, dev_init(c,n,write), \
-	dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev, 0 }
 
 /*
  * Device headers and declarations:
@@ -177,6 +169,9 @@ cdev_decl(zs);
 #include "scsibus.h"
 cdev_decl(scsibus);
 
+#include "clockctl.h"
+cdev_decl(clockctl);
+
 /* Block devices */
 struct bdevsw	bdevsw[] =
 {
@@ -296,6 +291,7 @@ struct cdevsw	cdevsw[] =
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 81: SCSI bus */
 	cdev_disk_init(NRAID,raid), 	/* 82: RAIDframe disk driver */
 	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 83: svr4 net pseudo-device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 84: clockctl pseudo device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -420,6 +416,8 @@ static int chrtoblktbl[] = {
 	/* 80 */	NODEV,
 	/* 81 */	NODEV,
 	/* 82 */	25,
+	/* 83 */	NODEV,
+	/* 84 */	NODEV,
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: arc_trap.c,v 1.13.2.1 2000/08/10 21:59:43 soda Exp $	*/
+/*	$NetBSD: arc_trap.c,v 1.20 2001/06/13 15:08:05 soda Exp $	*/
 /*	$OpenBSD: trap.c,v 1.22 1999/05/24 23:08:59 jason Exp $	*/
 
 /*
@@ -47,7 +47,6 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <mips/locore.h>
@@ -56,9 +55,8 @@
 #include <machine/intr.h>
 #include <machine/pio.h>
 
-#include <arc/pica/pica.h>
-#include <arc/pica/rd94.h>
-#include <arc/arc/arctype.h>
+#include <arc/jazz/pica.h>
+#include <arc/jazz/rd94.h>
 
 int arc_hardware_intr __P((u_int32_t, u_int32_t, u_int32_t, u_int32_t));
 
@@ -105,7 +103,7 @@ arc_hardware_intr(status, cause, pc, ipending)
  *	Events are checked in priority order.
  */
 void
-set_intr(mask, int_hand, prio)
+arc_set_intr(mask, int_hand, prio)
 	int	mask;
 	int	(*int_hand)(u_int, struct clockframe *);
 	int	prio;
@@ -122,31 +120,6 @@ set_intr(mask, int_hand, prio)
 	cpu_int_tab[prio].int_hand = int_hand;
 	cpu_int_tab[prio].int_mask = mask;
 	cpu_int_mask |= mask >> 10;
-
-	/*
-	 *  Update external interrupt mask but don't enable clock.
-	 */
-	switch(cputype) {
-	case ACER_PICA_61:
-	case MAGNUM:
-		out32(R4030_SYS_EXT_IMASK,
-		    cpu_int_mask & (~MIPS_INT_MASK_4 >> 10));
-		break;
-	case NEC_R94:
-	case NEC_RAx94:
-	case NEC_RD94:
-	case NEC_R96:
-		out32(RD94_SYS_EXT_IMASK,
-		    cpu_int_mask & (~MIPS_INT_MASK_3 >> 10));
-		break;
-	case DESKSTATION_TYNE:
-		break;
-	case DESKSTATION_RPC44:
-		break;
-	case ALGOR_P4032:
-	case ALGOR_P5064:
-		break;
-	}
 }
 
 /*
@@ -166,7 +139,7 @@ cpu_intr(status, cause, pc, ipending)
 		 *  Writing a value to the Compare register,
 		 *  as a side effect, clears the timer interrupt request.
 		 */
-		mips3_write_compare(mips3_cycle_count());
+		mips3_cp0_compare_write(mips3_cp0_count_read());
 	}
 #endif
 
@@ -198,6 +171,6 @@ cpu_intr(status, cause, pc, ipending)
 		clearsoftclock();
 		uvmexp.softs++;
 		intrcnt[SOFTCLOCK_INTR]++;
-		softclock();
+		softclock(NULL);
 	}
 }

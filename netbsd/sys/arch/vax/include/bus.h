@@ -1,7 +1,7 @@
-/*	$NetBSD: bus.h,v 1.13.2.1 2000/06/30 16:27:43 simonb Exp $	*/
+/*	$NetBSD: bus.h,v 1.18 2001/09/16 20:39:04 ragge Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -127,6 +127,8 @@ struct vax_bus_space {
 			    bus_addr_t *, bus_space_handle_t *));
 	void		(*vbs_free) __P((void *, bus_space_handle_t,
 			    bus_size_t));
+	/* mmap bus space for user */
+	paddr_t		(*vbs_mmap)(void *, bus_addr_t, off_t, int, int);
 };
 
 /*
@@ -190,6 +192,13 @@ struct vax_bus_space {
 
 #define bus_space_free(t, h, s)						\
 	(*(t)->vbs_free)((t)->vbs_cookie, (h), (s))
+
+/*
+ * Mmap bus space for a user application.
+ */
+#define bus_space_mmap(t, a, o, p, f)					\
+	(*(t)->vbs_mmap)((t)->vbs_cookie, (a), (o), (p), (f))
+
 
 /*
  *	u_intN_t bus_space_read_N __P((bus_space_tag_t tag,
@@ -858,14 +867,17 @@ vax_mem_copy_region_4(t, h1, o1, h2, o2, c)
 /*
  * Flags used in various bus DMA methods.
  */
-#define	BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
-#define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
-#define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define	BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
-#define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
-#define	BUS_DMA_BUS2		0x20
-#define	BUS_DMA_BUS3		0x40
-#define	BUS_DMA_BUS4		0x80
+#define	BUS_DMA_WAITOK		0x000	/* safe to sleep (pseudo-flag) */
+#define	BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
+#define	BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
+#define	BUS_DMA_COHERENT	0x004	/* hint: map memory DMA coherent */
+#define	BUS_DMA_STREAMING	0x008	/* hint: sequential, unidirectional */
+#define	BUS_DMA_BUS1		0x010	/* placeholders for bus functions... */
+#define	BUS_DMA_BUS2		0x020
+#define	BUS_DMA_BUS3		0x040
+#define	BUS_DMA_BUS4		0x080
+#define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
+#define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
 
 #define	VAX_BUS_DMA_SPILLPAGE	BUS_DMA_BUS1	/* VS4000 kludge */
 /*
@@ -934,7 +946,7 @@ struct vax_bus_dma_tag {
 	/*
 	 * Some chipsets have a built-in boundary constraint, independent
 	 * of what the device requests.  This allows that boundary to
-	 * be specified.  If the device has a more restrictive contraint,
+	 * be specified.  If the device has a more restrictive constraint,
 	 * the map will use that, otherwise this boundary will be used.
 	 * This value is ignored if 0.
 	 */

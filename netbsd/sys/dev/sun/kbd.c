@@ -1,4 +1,4 @@
-/*	$NetBSD: kbd.c,v 1.26.4.1 2002/06/06 17:08:33 he Exp $	*/
+/*	$NetBSD: kbd.c,v 1.30 2002/05/13 09:42:12 pk Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -50,6 +50,11 @@
  * passes them up to the appropriate reader.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kbd.c,v 1.30 2002/05/13 09:42:12 pk Exp $");
+
+#include "opt_ddb.h"
+
 /*
  * This is the "slave" driver that will be attached to
  * the "zsc" driver for a Sun keyboard.
@@ -68,6 +73,7 @@
 #include <sys/syslog.h>
 #include <sys/select.h>
 #include <sys/poll.h>
+#include <sys/file.h>
 
 #include <dev/ic/z8530reg.h>
 #include <machine/z8530var.h>
@@ -135,7 +141,7 @@ kbdopen(dev, flags, mode, p)
 		return (error);
 	}
 	ev_init(&k->k_events);
-	k->k_evmode = 1;	/* XXX: OK? */
+	k->k_evmode = 0;	/* XXX: OK? */
 
 	if (k->k_repeating) {
 		k->k_repeating = 0;
@@ -243,7 +249,7 @@ kbdioctl(dev, cmd, data, flag, p)
 	case KIOCGETKEY:	/* Get keymap entry (old format) */
 		error = kbd_oldkeymap(ks, cmd, (struct okiockey *)data);
 		break;
-#endif	KIOCGETKEY */
+#endif	/* KIOCGETKEY */
 
 	case KIOCSKEY:  	/* Set keymap entry */
 		/* fallthrough */
@@ -728,7 +734,7 @@ kbd_input_raw(k, c)
 	 * If /dev/kbd is not connected in event mode, 
 	 * translate and send upstream (to console).
 	 */
-	if (!k->k_evmode && k->k_isconsole) {
+	if (!k->k_evmode) {
 
 		/* Any input stops auto-repeat (i.e. key release). */
 		if (k->k_repeating) {
@@ -832,6 +838,10 @@ kbd_iopen(k)
 	/* Tolerate extra calls. */
 	if (k->k_isopen)
 		return (0);
+
+	/* Open internal device */
+	if (k->k_deviopen)
+		(*k->k_deviopen)((struct device *)k, FREAD|FWRITE);
 
 	s = spltty();
 
@@ -966,7 +976,7 @@ kbd_drain_tx(k)
 
 	error = 0;
 
-	while (k->k_txflags & K_TXBUSY) {
+	while (k->k_txflags & K_TXBUSY && !error) {
 		k->k_txflags |= K_TXWANT;
 		error = tsleep((caddr_t)&k->k_txflags,
 					   PZERO | PCATCH, "kbdout", 0);

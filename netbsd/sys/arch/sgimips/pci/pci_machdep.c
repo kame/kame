@@ -1,9 +1,9 @@
-/*	$NetBSD: pci_machdep.c,v 1.1 2000/06/14 16:06:59 soren Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.5 2002/03/13 13:12:28 simonb Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -19,7 +19,7 @@
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -39,8 +39,7 @@
 #include <sys/errno.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define _SGIMIPS_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -55,7 +54,7 @@
  * the generic versions of these functions.
  */
 struct sgimips_bus_dma_tag pci_bus_dma_tag = {
-	_bus_dmamap_create, 
+	_bus_dmamap_create,
 	_bus_dmamap_destroy,
 	_bus_dmamap_load,
 	_bus_dmamap_load_mbuf,
@@ -134,15 +133,19 @@ pci_conf_write(pc, tag, reg, data)
 }
 
 int
-pci_intr_map(pc, intrtag, pin, line, ihp)
-	pci_chipset_tag_t pc;
-	pcitag_t intrtag;
-	int pin, line;
+pci_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
+	int line = pa->pa_intrline;
+#if 0
+	pci_chipset_tag_t pc = pa->pa_pc;
+	pcitag_t intrtag = pa->pa_intrtag;
+	int pin = pa->pa_intrpin;
 	int bus, dev, func;
 
 	pci_decompose_tag(pc, intrtag, &bus, &dev, &func);
+#endif
 
 	*ihp = line;
 

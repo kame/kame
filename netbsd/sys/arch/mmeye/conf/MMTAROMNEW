@@ -1,28 +1,31 @@
-#	$NetBSD: MMTAROMNEW,v 1.3.4.1 2000/11/05 01:03:14 tv Exp $
+#	$NetBSD: MMTAROMNEW,v 1.15.4.1 2002/08/01 04:26:21 lukem Exp $
 #
 #	GENERIC -- everything that's currently supported
 #
 
 include "arch/mmeye/conf/std.mmeye"
 
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
 # Enable the hooks used for initializing the root memory-disk.
 #options 	MEMORY_DISK_HOOKS
 #options 	MEMORY_DISK_IS_ROOT	# force root on memory disk
 #options 	MEMORY_DISK_SERVER=0	# no userspace memory disk support
-#options 	MINIROOTSIZE=3074	# size of memory disk, in blocks
+#options 	MEMORY_DISK_ROOT_SIZE=3074	# size of memory disk, in blocks
 
 options 	ROMIMAGE
 
 maxusers	32		# estimated number of users
 
-options		PCLOCK=33330000		# 33.33MHz
+options		SH3
+options 	PCLOCK=33330000		# 33.33MHz
 options 	MMEYE_NEW_INT
-#options		MMEYE_NO_CACHE
-options		INITTODR_ALWAYS_USE_RTC
+#options 	MMEYE_NO_CACHE
+options 	INITTODR_ALWAYS_USE_RTC
 
 # This option allows you to force a serial console at the specified
 # I/O address.   see console(4) for details.
-#options 	"CONSDEVNAME=\"com\""
+#options 	CONSDEVNAME="\"com\""
 
 # Standard system options
 
@@ -30,7 +33,7 @@ options		INITTODR_ALWAYS_USE_RTC
 options 	INSECURE	# disable kernel security levels
 
 options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
-options 	HZ=10		# clock interrupt generates every 1/10 sec 
+options 	HZ=10		# clock interrupt generates every 1/10 sec
 				# for Debug
 #options 	NTP		# NTP phase/frequency locked loop
 
@@ -43,19 +46,23 @@ options 	HZ=10		# clock interrupt generates every 1/10 sec
 
 #options 	LKM		# loadable kernel modules
 
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Diagnostic/debugging support options
 #options 	DIAGNOSTIC	# cheap kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
 #options 	KMEMSTATS	# kernel memory statistics (vmstat -m)
 #options 	DDB		# in-kernel debugger
 #options 	KGDB		# remote debugger
-#options 	"KGDB_DEVNAME=\"com\"",KGDBADDR=0x3f8,KGDBRATE=9600
+#options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
 #makeoptions	DEBUG="-g"	# compile full symbol table
-#options		SYSCALL_DEBUG
+#options 	SYSCALL_DEBUG
 
 # Compatibility options
 options 	COMPAT_13	# NetBSD 1.3
 options 	COMPAT_43	# and 4.3BSD
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 # Executable format options
 #options 	EXEC_ELF32	# 32-bit ELF executables (SVR4, Linux)
@@ -98,9 +105,7 @@ file-system 	UMAPFS		# NULLFS + uid and gid remapping
 #options 	PPP_DEFLATE	# Deflate compression support for PPP
 #options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
-
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not recommended.
-#options 	TCP_COMPAT_42
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 # These options enable verbose messages for several subsystems.
 # Warning, these may compile large string tables into the kernel!
@@ -128,7 +133,7 @@ shb* at mainbus?
 
 # PCMCIA bus support
 pcmcia*	at shpcic? controller ? socket ?
-#pcmcia*	at shb? 
+#pcmcia*	at shb?
 
 # SH PCMCIA controllers
 shpcic0	at shb? port 0xb000000a iomem 0xb8000000 iosiz 0x1000000
@@ -189,7 +194,7 @@ wd*	at wdc? drive ?			# the drives themselves
 
 # MII/PHY support
 exphy*	at mii? phy ?			# 3Com internal PHYs
-icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS1890
+icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS189x
 inphy*	at mii? phy ?			# Intel 82555 PHYs
 lxtphy*	at mii? phy ?			# Level One LXT-970 PHYs
 nsphy*	at mii? phy ?			# NS83840 PHYs
@@ -220,8 +225,9 @@ include	"arch/mmeye/conf/GENERIC.local"
 #pseudo-device	tun		2	# network tunneling over tty
 
 # miscellaneous pseudo-devices
-#pseudo-device	pty		64	# pseudo-terminals
+#pseudo-device	pty			# pseudo-terminals
 #pseudo-device	tb		1	# tablet line discipline
+pseudo-device	clockctl		# user control of clock subsystem
 
 # rnd is EXPERIMENTAL at this point.
 #pseudo-device	rnd			# /dev/random and in-kernel generator

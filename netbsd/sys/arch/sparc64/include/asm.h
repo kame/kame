@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.9.12.4 2000/08/07 01:26:24 mrg Exp $ */
+/*	$NetBSD: asm.h,v 1.17 2002/01/14 16:37:36 eeh Exp $ */
 
 /*
  * Copyright (c) 1994 Allen Briggs
@@ -76,14 +76,23 @@
 /*
  * PIC_PROLOGUE() is akin to the compiler generated function prologue for
  * PIC code. It leaves the address of the Global Offset Table in DEST,
- * clobbering register TMP in the process. Using the temporary enables us
- * to work without a stack frame (doing so requires saving %o7) .
+ * clobbering register TMP in the process.
+ *
+ * We can use two code sequences.  We can read the %pc or use the call
+ * instruction that saves the pc in %o7.  Call requires the branch unit and
+ * IEU1, and clobbers %o7 which needs to be restored.  This instruction
+ * sequence takes about 4 cycles due to instruction interdependence.  Reading
+ * the pc takes 4 cycles to dispatch and is always dispatched alone.  That
+ * sequence takes 7 cycles.
  */
 #define PIC_PROLOGUE(dest,tmp) \
+	mov %o7, tmp; \
 	sethi %hi(_GLOBAL_OFFSET_TABLE_-4),dest; \
-	rd %pc, tmp; \
-	or dest,%lo(_GLOBAL_OFFSET_TABLE_+4),dest; \
-	add dest,tmp,dest
+	call 0f; \
+	 or dest,%lo(_GLOBAL_OFFSET_TABLE_+4),dest; \
+0: \
+	add dest,%o7,dest; \
+	mov tmp, %o7
 
 /*
  * PICCY_SET() does the equivalent of a `set var, %dest' instruction in
@@ -104,10 +113,18 @@
 	.align 4; .globl name; .proc 1; FTYPE(name); name:
 
 #ifdef GPROF
+/* see _MCOUNT_ENTRY in profile.h */
+#ifdef __ELF__
 #define _PROF_PROLOGUE \
 	.data; .align 8; 1: .uaword 0; .uaword 0; \
 	.text; save %sp,-CC64FSZ,%sp; sethi %hi(1b),%o0; call _mcount; \
 	or %o0,%lo(1b),%o0; restore
+#else
+#define _PROF_PROLOGUE \
+	.data; .align 8; 1: .uaword 0; .uaword 0; \
+	.text; save %sp,-CC64FSZ,%sp; sethi %hi(1b),%o0; call mcount; \
+	or %o0,%lo(1b),%o0; restore
+#endif
 #else
 #define _PROF_PROLOGUE
 #endif

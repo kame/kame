@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_misc.c,v 1.54.2.1 2000/07/17 22:47:56 enami Exp $ */
+/* $NetBSD: osf1_misc.c,v 1.68 2002/04/08 14:51:18 christos Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -57,7 +57,12 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: osf1_misc.c,v 1.68 2002/04/08 14:51:18 christos Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_syscall_debug.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,19 +84,22 @@
 #include <sys/socketvar.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
+#include <sys/user.h>
 #include <sys/wait.h>
-#include <vm/vm.h>
+
+#include <machine/alpha.h>
+#include <machine/cpuconf.h>
+#include <machine/rpb.h>
+#include <machine/fpu.h>
 
 #include <compat/osf1/osf1.h>
 #include <compat/osf1/osf1_syscallargs.h>
-#include <compat/osf1/osf1_util.h>
+#include <compat/common/compat_util.h>
 #include <compat/osf1/osf1_cvt.h>
 
 #ifdef SYSCALL_DEBUG
 extern int scdebug;
 #endif
-
-const char osf1_emul_path[] = "/emul/osf1";
 
 int
 osf1_sys_classcntl(p, v, retval)
@@ -151,14 +159,139 @@ osf1_sys_set_program_attributes(p, v, retval)
 }
 
 int
+osf1_sys_getsysinfo(struct proc *p, void *v, register_t *retval)
+{
+	extern int ncpus;
+	struct osf1_sys_getsysinfo_args *uap = v;
+	int error;
+	int unit;
+	long percpu;
+	long proctype;
+	u_int64_t fpflags;
+	struct osf1_cpu_info cpuinfo;
+
+	error = 0;
+
+	switch(SCARG(uap, op))
+	{
+	case OSF_GET_MAX_UPROCS:
+		error = copyout(&maxproc, SCARG(uap, buffer), sizeof(maxproc));
+		retval[0] = 1;
+		break;
+	case OSF_GET_PHYSMEM:
+		error = copyout(&physmem, SCARG(uap, buffer),
+		    sizeof(physmem));
+		retval[0] = 1;
+		break;
+	case OSF_GET_MAX_CPU:
+	case OSF_GET_CPUS_IN_BOX:
+		error = copyout(&ncpus, SCARG(uap, buffer), sizeof(ncpus));
+		retval[0] = 1;
+		break;
+	case OSF_GET_IEEE_FP_CONTROL:
+		if (((fpflags = alpha_read_fp_c(p)) & IEEE_INHERIT) != 0) {
+			fpflags |= 1ULL << 63;
+			fpflags &= ~IEEE_INHERIT;
+		}
+		error = copyout(&fpflags, SCARG(uap, buffer), sizeof fpflags);
+		retval[0] = 1;
+		break;
+	case OSF_GET_CPU_INFO:
+
+		if (SCARG(uap, nbytes) < sizeof(cpuinfo))
+			error = EINVAL;
+		else {
+			memset(&cpuinfo, 0, sizeof(cpuinfo));
+#ifdef __alpha__
+			unit = alpha_pal_whami();
+#else
+			unit = 0; /* XXX */
+#endif
+			cpuinfo.current_cpu = unit;
+			cpuinfo.cpus_in_box = ncpus;
+			cpuinfo.cpu_type = 
+			    LOCATE_PCS(hwrpb, unit)->pcs_proc_type;
+			cpuinfo.ncpus = ncpus;
+			cpuinfo.cpus_present = ncpus;
+			cpuinfo.cpus_running = ncpus;
+			cpuinfo.cpu_binding = 1;
+			cpuinfo.cpu_ex_binding = 0;
+			cpuinfo.mhz = hwrpb->rpb_cc_freq / 1000000;
+			error = copyout(&cpuinfo, SCARG(uap, buffer),
+			    sizeof(cpuinfo));
+			retval[0] = 1;
+		}
+		break;
+	case OSF_GET_PROC_TYPE:
+		if(SCARG(uap, nbytes) < sizeof(proctype))
+			error = EINVAL;
+		else {
+#ifdef __alpha__
+			unit = alpha_pal_whami();
+			proctype = LOCATE_PCS(hwrpb, unit)->pcs_proc_type;
+#else
+			proctype = 0;	/* XXX */
+#endif
+			error = copyout (&proctype, SCARG(uap, buffer),
+			    sizeof(percpu));
+			retval[0] = 1;
+		}
+	break;
+	case OSF_GET_HWRPB: {  /* note -- osf/1 doesn't have rpb_tbhint[8] */
+		unsigned long rpb_size;
+		rpb_size = (unsigned long)hwrpb->rpb_size;
+		if (SCARG(uap, nbytes) < rpb_size){
+			uprintf("nbytes = %ld, sizeof(struct rpb) = %ld\n",
+			    SCARG(uap, nbytes), rpb_size);
+			error = EINVAL;
+		}
+		else {
+			error = copyout(hwrpb, SCARG(uap, buffer), rpb_size);
+			retval[0] = 1;
+		}
+	}
+		break;
+	case OSF_GET_PLATFORM_NAME:
+		error = copyout(platform.model, SCARG(uap, buffer),
+		    strlen(platform.model));
+		retval[0] = 1;
+		break;
+	default:
+		printf("osf1_getsysinfo called with unknown op=%ld\n",
+		       SCARG(uap, op));
+		//return EINVAL;
+		return 0;
+	}
+	return(error);
+}
+
+int
 osf1_sys_setsysinfo(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
+	struct osf1_sys_setsysinfo_args *uap = v;
+	u_int64_t temp;
+	int error;
 
-	/* XXX */
-	return (0);
+	error = 0;
+
+	switch(SCARG(uap, op)) {
+	case OSF_SET_IEEE_FP_CONTROL:
+
+		if ((error = copyin(SCARG(uap, buffer), &temp, sizeof(temp))))
+			break;
+		if (temp >> 63 != 0)
+			temp |= IEEE_INHERIT;
+		alpha_write_fp_c(p, temp);
+		break;
+	default:
+		uprintf("osf1_setsysinfo called with op=%ld\n", SCARG(uap, op));
+		//error = EINVAL;
+	}
+	retval[0] = 0;
+	return (error);
 }
 
 int
@@ -330,8 +463,8 @@ osf1_sys_wait4(p, v, retval)
 	if (SCARG(uap, rusage) == NULL)
 		SCARG(&a, rusage) = NULL;
 	else {
-		sg = stackgap_init(p->p_emul);
-		SCARG(&a, rusage) = stackgap_alloc(&sg, sizeof netbsd_rusage);
+		sg = stackgap_init(p, 0);
+		SCARG(&a, rusage) = stackgap_alloc(p, &sg, sizeof netbsd_rusage);
 	}
 
 	error = sys_wait4(p, &a, retval);

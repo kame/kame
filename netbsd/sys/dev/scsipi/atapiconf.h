@@ -1,7 +1,7 @@
-/*	$NetBSD: atapiconf.h,v 1.10 2000/04/02 23:38:19 augustss Exp $	*/
+/*	$NetBSD: atapiconf.h,v 1.14 2001/12/03 00:20:24 bouyer Exp $	*/
 
 /*
- * Copyright (c) 1996 Manuel Bouyer.  All rights reserved.
+ * Copyright (c) 1996, 2001 Manuel Bouyer.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,35 +31,29 @@
 
 #include <dev/scsipi/scsipiconf.h>
 
-struct atapi_mode_header;
 struct atapibus_softc {
 	struct device sc_dev;
-	struct scsipi_link *adapter_link;	/* proto supplied by adapter */
-	struct scsipi_link **sc_link;		/* dynamically allocated */
-	struct ata_drive_datas *sc_drvs;	/* array supplied by adapter */
+	struct scsipi_channel *sc_channel;	/* our scsipi_channel */
 };
+
+extern const struct scsipi_periphsw atapi_probe_periphsw;
+
 
 /*
- * We need some more callbacks than in scsipi_adapter. 
- * So define a new atapi_adapter, we'll cast sc_link->adapter to
- * atapi_adapter* when we need the extra callback (only in ATAPI code)
+ * We need some more data than in scsipi_adapter.
+ * So define a new atapi_adapter, we'll cast channel->chan_adapter to
+ * atapi_adapter when we need the extra data (only in ATAPI code)
  */
-
 struct atapi_adapter {
 	struct scsipi_adapter _generic;
-	void (*atapi_probedev) __P((struct atapibus_softc *, int));
-	void (*atapi_kill_pending) __P((struct scsipi_link *));
+	void (*atapi_probe_device) __P((struct atapibus_softc *, int));
 };
 
-
-void *	atapi_probedev __P((struct atapibus_softc *, int,
-		struct scsipi_link *, struct scsipibus_attach_args *));
-void	atapi_print_addr __P((struct scsipi_link *));
+void 	*atapi_probe_device __P((struct atapibus_softc *, int,
+	    struct scsipi_periph *, struct scsipibus_attach_args *));
+int	atapiprint __P((void *, const char *));
+void	atapi_print_addr __P((struct scsipi_periph *));
 int	atapi_interpret_sense __P((struct scsipi_xfer *));
-int	atapi_scsipi_cmd __P((struct scsipi_link *, struct scsipi_generic *,
-	    int, u_char *, int, int, int, struct buf *, int));
-int	atapi_mode_select __P((struct scsipi_link *,
-	    struct atapi_mode_header *, int, int, int, int));
-int	atapi_mode_sense __P((struct scsipi_link *, int,
-	    struct atapi_mode_header *, int, int, int, int));
-void	atapi_kill_pending __P((struct scsipi_link *));
+int	atapi_scsipi_cmd __P((struct scsipi_periph *, struct scsipi_generic *,
+	    int, void *, size_t, int, int, struct buf *, int));
+void	atapi_kill_pending __P((struct scsipi_periph *));

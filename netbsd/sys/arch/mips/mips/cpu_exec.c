@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu_exec.c,v 1.23 2000/04/11 04:37:47 chs Exp $	*/
+/*	$NetBSD: cpu_exec.c,v 1.32 2002/03/06 00:22:09 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -40,6 +40,7 @@
 
 #include "opt_compat_netbsd.h"
 #include "opt_compat_ultrix.h"
+#include "opt_execfmt.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,17 +49,20 @@
 #include <sys/vnode.h>
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
 
+#include <uvm/uvm_extern.h>
+
+#ifdef EXEC_ECOFF
 #include <sys/exec_ecoff.h>
-#include <sys/exec_elf.h>
+#endif
+#include <sys/exec_elf.h>			/* mandatory */
 #ifdef COMPAT_09
 #include <machine/bsd-aout.h>
 #endif
 #include <machine/reg.h>
 #include <mips/regnum.h>			/* symbolic register indices */
 
-int	mips_elf_makecmds __P((struct proc *, struct exec_package *));
+int	mips_elf_makecmds(struct proc *, struct exec_package *);
 
 
 /*
@@ -112,7 +116,7 @@ cpu_exec_aout_makecmds(p, epp)
 #endif
 		return ETXTBSY;
 	}
-	vn_marktext(epp->ep_vp);
+	epp->ep_vp->v_flag |= VTEXT;
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, hdr->a_text,
@@ -132,9 +136,7 @@ cpu_exec_aout_makecmds(p, epp)
 #endif
 }
 
-#ifdef COMPAT_ULTRIX
-extern struct emul emul_ultrix;
-
+#ifdef EXEC_ECOFF
 void
 cpu_exec_ecoff_setregs(p, epp, stack)
 	struct proc *p;
@@ -144,27 +146,25 @@ cpu_exec_ecoff_setregs(p, epp, stack)
 	struct ecoff_exechdr *execp = (struct ecoff_exechdr *)epp->ep_hdr;
 	struct frame *f = (struct frame *)p->p_md.md_regs;
 
-	setregs(p, epp, stack);
 	f->f_regs[GP] = (register_t)execp->a.gp_value;
 }
 
 /*
- * cpu_exec_ecoff_hook():
+ * cpu_exec_ecoff_probe()
  *	cpu-dependent ECOFF format hook for execve().
  *
  * Do any machine-dependent diddling of the exec package when doing ECOFF.
- *
  */
 int
-cpu_exec_ecoff_hook(p, epp)
+cpu_exec_ecoff_probe(p, epp)
 	struct proc *p;
 	struct exec_package *epp;
 {
 
-	epp->ep_emul = &emul_ultrix;
-	return 0;
+	/* NetBSD/mips does not have native ECOFF binaries. */
+	return ENOEXEC;
 }
-#endif
+#endif /* EXEC_ECOFF */
 
 /*
  * mips_elf_makecmds (p, epp)
@@ -193,7 +193,7 @@ mips_elf_makecmds (p, epp)
 	}
 
 	/* See if it's got the basic elf magic number leadin... */
-	if (bcmp(ex->e_ident, ELFMAG, SELFMAG) != 0) {
+	if (memcmp(ex->e_ident, ELFMAG, SELFMAG) != 0) {
 		return ENOEXEC;
 	}
 
@@ -221,7 +221,7 @@ mips_elf_makecmds (p, epp)
 #endif
 		return ETXTBSY;
 	}
-	vn_marktext(epp->ep_vp);
+	epp->ep_vp->v_flag |= VTEXT;
 
 	epp->ep_taddr = 0;
 	epp->ep_tsize = 0;

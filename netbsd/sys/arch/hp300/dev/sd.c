@@ -1,4 +1,4 @@
-/*	$NetBSD: sd.c,v 1.42.4.3 2001/06/07 15:43:33 he Exp $	*/
+/*	$NetBSD: sd.c,v 1.50 2002/03/15 05:52:54 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -77,6 +77,9 @@
 /*
  * SCSI CCS (Command Command Set) disk driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sd.c,v 1.50 2002/03/15 05:52:54 gmcgarry Exp $");                                                  
 
 #include "rnd.h"
 #include "opt_useleds.h"
@@ -171,10 +174,11 @@ void	sdstrategy __P((struct buf *));
 int	sddump __P((dev_t, daddr_t, caddr_t, size_t));
 int	sdsize __P((dev_t));
 
-static void 	sdgetgeom __P((struct sd_softc *));
-static void	sdlblkstrat __P((struct buf *, int));
 static int	sderror __P((struct sd_softc *, int));
 static void	sdfinish __P((struct sd_softc *, struct buf *));
+static void	sdgetdefaultlabel __P((struct sd_softc *, struct disklabel *));
+static void 	sdgetgeom __P((struct sd_softc *));
+static void	sdlblkstrat __P((struct buf *, int));
 
 /*
  * Perform a mode-sense on page 0x04 (rigid geometry).
@@ -314,6 +318,7 @@ void
 sdreset(sc)
 	struct sd_softc *sc;
 {
+
 	sc->sc_stats.sdresets++;
 }
 
@@ -358,7 +363,7 @@ sdgetcapacity(sc, dev)
 			panic("sdgetcapacity");
 		bp = malloc(sizeof *bp, M_DEVBUF, M_WAITOK);
 		sc->sc_format_pid = curproc->p_pid;
-		bcopy(&cap, &sc->sc_cmdstore, sizeof cap);
+		memcpy(&sc->sc_cmdstore, &cap, sizeof cap);
 		bp->b_dev = dev;
 		bp->b_flags = B_READ | B_BUSY;
 		bp->b_data = (caddr_t)capbuf;
@@ -380,7 +385,7 @@ sdgetcapacity(sc, dev)
 			return (-1);
 		}
 		/*
-		 * XXX assume unformatted or non-existant media
+		 * XXX assume unformatted or non-existent media
 		 */
 		sc->sc_blks = 0;
 		sc->sc_blksize = DEV_BSIZE;
@@ -443,7 +448,7 @@ sdgetinfo(dev)
 		usedefault = 0;
 #endif
 
-	bzero((caddr_t)lp, sizeof *lp);
+	memset((caddr_t)lp, 0, sizeof *lp);
 	msg = NULL;
 
 	/*
@@ -629,13 +634,15 @@ sdlblkstrat(bp, bsize)
 	int bsize;
 {
 	struct sd_softc *sc = sd_cd.cd_devs[sdunit(bp->b_dev)];
-	struct buf *cbp = (struct buf *)malloc(sizeof(struct buf),
-							M_DEVBUF, M_WAITOK);
-	caddr_t cbuf = (caddr_t)malloc(bsize, M_DEVBUF, M_WAITOK);
+	struct buf *cbp;
+	caddr_t cbuf;
 	int bn, resid;
 	caddr_t addr;
 
-	bzero((caddr_t)cbp, sizeof(*cbp));
+	MALLOC(cbp, struct buf *, sizeof(struct buf), M_DEVBUF,
+	    M_WAITOK | M_ZERO);
+	cbuf = (caddr_t)malloc(bsize, M_DEVBUF, M_WAITOK);
+
 	cbp->b_proc = curproc;		/* XXX */
 	cbp->b_dev = bp->b_dev;
 	bn = bp->b_blkno;
@@ -672,10 +679,10 @@ sdlblkstrat(bp, bsize)
 				break;
 			}
 			if (bp->b_flags & B_READ) {
-				bcopy(&cbuf[boff], addr, count);
+				memcpy(addr, &cbuf[boff], count);
 				goto done;
 			}
-			bcopy(addr, &cbuf[boff], count);
+			memcpy(&cbuf[boff], addr, count);
 #ifdef DEBUG
 			if (sddebug & SDB_PARTIAL)
 				printf(" writeback: bn %x cnt %x off %x addr %p\n",
@@ -1123,6 +1130,10 @@ sdioctl(dev, cmd, data, flag, p)
 		sc->sc_flags = flags;
 		return (error);
 
+	case DIOCGDEFLABEL:
+		sdgetdefaultlabel(sc, (struct disklabel *)data);
+		return (0);
+
 	case SDIOCSFORMAT:
 		/* take this device into or out of "format" mode */
 		if (suser(p->p_ucred, &p->p_acflag))
@@ -1150,7 +1161,7 @@ sdioctl(dev, cmd, data, flag, p)
 			return (EPERM);
 		if (legal_cmds[((struct scsi_fmt_cdb *)data)->cdb[0]] == 0)
 			return (EINVAL);
-		bcopy(data, &sc->sc_cmdstore, sizeof(struct scsi_fmt_cdb));
+		memcpy(&sc->sc_cmdstore, data, sizeof(struct scsi_fmt_cdb));
 		return (0);
 
 	case SDIOCSENSE:
@@ -1158,11 +1169,47 @@ sdioctl(dev, cmd, data, flag, p)
 		 * return the SCSI sense data saved after the last
 		 * operation that completed with "check condition" status.
 		 */
-		bcopy(&sc->sc_sensestore, data, sizeof(sc->sc_sensestore));
+		memcpy(data, &sc->sc_sensestore, sizeof(sc->sc_sensestore));
 		return (0);
 		
 	}
 	/*NOTREACHED*/
+}
+
+static void
+sdgetdefaultlabel(sc, lp)
+	struct sd_softc *sc;
+	struct disklabel *lp;
+{
+
+	memset((caddr_t)lp, 0, sizeof(struct disklabel));
+
+	lp->d_type = sc->sc_type;
+	lp->d_secsize = DEV_BSIZE;
+	lp->d_ntracks = sc->sc_heads;
+	lp->d_nsectors = sc->sc_blks;
+	lp->d_ncylinders = sc->sc_cyls;
+	lp->d_secpercyl = lp->d_ntracks * lp->d_nsectors;
+
+	strncpy(lp->d_typename, sc->sc_dev.dv_xname, 16);
+	strncpy(lp->d_packname, "fictitious", 16);
+	lp->d_secperunit = lp->d_ncylinders * lp->d_secpercyl;
+	lp->d_rpm = 3600;
+	lp->d_interleave = 1;
+	lp->d_flags = 0;
+
+        if (sc->sc_flags & SDF_RMEDIA)
+                lp->d_flags |= D_REMOVABLE;
+
+	lp->d_partitions[RAW_PART].p_offset = 0;
+	lp->d_partitions[RAW_PART].p_size =
+	    lp->d_secperunit * (lp->d_secsize / DEV_BSIZE);
+	lp->d_partitions[RAW_PART].p_fstype = FS_UNUSED;
+	lp->d_npartitions = RAW_PART + 1;
+
+	lp->d_magic = DISKMAGIC;
+	lp->d_magic2 = DISKMAGIC;
+	lp->d_checksum = dkcksum(lp);
 }
 
 int

@@ -1,4 +1,4 @@
-/* $NetBSD: mcpcia_dma.c,v 1.12 1999/04/15 23:47:52 thorpej Exp $ */
+/* $NetBSD: mcpcia_dma.c,v 1.15 2001/07/19 18:55:40 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998, 1999 The NetBSD Foundation, Inc.
@@ -39,14 +39,15 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mcpcia_dma.c,v 1.12 1999/04/15 23:47:52 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mcpcia_dma.c,v 1.15 2001/07/19 18:55:40 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #define _ALPHA_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -58,11 +59,6 @@ __KERNEL_RCSID(0, "$NetBSD: mcpcia_dma.c,v 1.12 1999/04/15 23:47:52 thorpej Exp 
 #include <alpha/pci/pci_kn300.h>
 
 bus_dma_tag_t mcpcia_dma_get_tag __P((bus_dma_tag_t, alpha_bus_t));
-
-int	mcpcia_bus_dmamap_create_sgmap __P((bus_dma_tag_t, bus_size_t, int,
-	    bus_size_t, bus_size_t, int, bus_dmamap_t *));
-
-void	mcpcia_bus_dmamap_destroy_sgmap __P((bus_dma_tag_t, bus_dmamap_t));
 
 int	mcpcia_bus_dmamap_load_sgmap __P((bus_dma_tag_t, bus_dmamap_t, void *,
 	    bus_size_t, struct proc *, int));
@@ -95,6 +91,9 @@ void	mcpcia_bus_dmamap_unload_sgmap __P((bus_dma_tag_t, bus_dmamap_t));
  */
 #define	MCPCIA_ISA_SG_MAPPED_BASE	(8*1024*1024)
 #define	MCPCIA_ISA_SG_MAPPED_SIZE	(8*1024*1024)
+
+/* MCPCIA has a 256-byte out-bound DMA prefetch threshold. */
+#define	MCPCIA_SG_MAPPED_PFTHRESH	256
 
 #define	MCPCIA_SGTLB_INVALIDATE(ccp)					\
 do {									\
@@ -145,9 +144,10 @@ mcpcia_dma_init(ccp)
 	t->_next_window = NULL;
 	t->_boundary = 0;
 	t->_sgmap = &ccp->cc_pci_sgmap;
+	t->_pfthresh = MCPCIA_SG_MAPPED_PFTHRESH;
 	t->_get_tag = mcpcia_dma_get_tag;
-	t->_dmamap_create = mcpcia_bus_dmamap_create_sgmap;
-	t->_dmamap_destroy = mcpcia_bus_dmamap_destroy_sgmap;
+	t->_dmamap_create = alpha_sgmap_dmamap_create;
+	t->_dmamap_destroy = alpha_sgmap_dmamap_destroy;
 	t->_dmamap_load = mcpcia_bus_dmamap_load_sgmap;
 	t->_dmamap_load_mbuf = mcpcia_bus_dmamap_load_mbuf_sgmap;
 	t->_dmamap_load_uio = mcpcia_bus_dmamap_load_uio_sgmap;
@@ -171,9 +171,10 @@ mcpcia_dma_init(ccp)
 	t->_next_window = NULL;
 	t->_boundary = 0;
 	t->_sgmap = &ccp->cc_isa_sgmap;
+	t->_pfthresh = MCPCIA_SG_MAPPED_PFTHRESH;
 	t->_get_tag = mcpcia_dma_get_tag;
-	t->_dmamap_create = mcpcia_bus_dmamap_create_sgmap;
-	t->_dmamap_destroy = mcpcia_bus_dmamap_destroy_sgmap;
+	t->_dmamap_create = alpha_sgmap_dmamap_create;
+	t->_dmamap_destroy = alpha_sgmap_dmamap_destroy;
 	t->_dmamap_load = mcpcia_bus_dmamap_load_sgmap;
 	t->_dmamap_load_mbuf = mcpcia_bus_dmamap_load_mbuf_sgmap;
 	t->_dmamap_load_uio = mcpcia_bus_dmamap_load_uio_sgmap;
@@ -290,55 +291,6 @@ mcpcia_dma_get_tag(t, bustype)
 	default:
 		panic("mcpcia_dma_get_tag: shouldn't be here, really...");
 	}
-}
-
-/*
- * Create a MCPCIA SGMAP-mapped DMA map.
- */
-int
-mcpcia_bus_dmamap_create_sgmap(t, size, nsegments, maxsegsz, boundary,
-    flags, dmamp)
-	bus_dma_tag_t t;
-	bus_size_t size;
-	int nsegments;
-	bus_size_t maxsegsz;
-	bus_size_t boundary;
-	int flags;
-	bus_dmamap_t *dmamp;
-{
-	bus_dmamap_t map;
-	int error;
-
-	error = _bus_dmamap_create(t, size, nsegments, maxsegsz,
-	    boundary, flags, dmamp);
-	if (error)
-		return (error);
-
-	map = *dmamp;
-
-	if (flags & BUS_DMA_ALLOCNOW) {
-		error = alpha_sgmap_alloc(map, round_page(size),
-		    t->_sgmap, flags);
-		if (error)
-			mcpcia_bus_dmamap_destroy_sgmap(t, map);
-	}
-
-	return (error);
-}
-
-/*
- * Destroy a MCPCIA SGMAP-mapped DMA map.
- */
-void
-mcpcia_bus_dmamap_destroy_sgmap(t, map)
-	bus_dma_tag_t t;
-	bus_dmamap_t map;
-{
-
-	if (map->_dm_flags & DMAMAP_HAS_SGMAP)
-		alpha_sgmap_free(map, t->_sgmap);
-
-	_bus_dmamap_destroy(t, map);
 }
 
 /*

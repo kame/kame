@@ -1,4 +1,4 @@
-/* $NetBSD: btvmei.c,v 1.1 1999/06/30 17:45:38 drochner Exp $ */
+/* $NetBSD: btvmei.c,v 1.7 2002/03/04 02:19:10 simonb Exp $ */
 
 /*
  * Copyright (c) 1999
@@ -28,8 +28,12 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: btvmei.c,v 1.7 2002/03/04 02:19:10 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
@@ -138,8 +142,7 @@ b3_617_attach(parent, self, aux)
 	sc->sc_vmet = pa->pa_memt; /* XXX needed for VME mappings */
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -282,8 +285,11 @@ b3_617_reset(sc)
 	write_csr_byte(sc, LOC_CMD1, LC1_CLR_ERROR);
 	status = read_csr_byte(sc, LOC_STATUS);
 	if (status & LSR_CERROR_MASK) {
-		printf("%s: interface error, lsr=%b\n", sc->sc_dev.dv_xname,
-		       status, BIT3_LSR_BITS);
+		char sbuf[sizeof(BIT3_LSR_BITS) + 64];
+
+		bitmask_snprintf(status, BIT3_LSR_BITS, sbuf, sizeof(sbuf));
+		printf("%s: interface error, lsr=%s\n", sc->sc_dev.dv_xname,
+		       sbuf);
 		return (-1);
 	}
 	return (0);
@@ -589,7 +595,6 @@ b3_617_establish_vmeint(vsc, handle, prior, func, arg)
 	struct b3_617_vmeintrhand *ih;
 	long lv;
 	int s;
-	extern int cold;
 
 	/* no point in sleeping unless someone can free memory. */
 	ih = malloc(sizeof *ih, M_DEVBUF, cold ? M_NOWAIT : M_WAITOK);
@@ -666,7 +671,7 @@ b3_617_intr(vsc)
 
 		lstat = read_csr_byte(sc, LOC_STATUS);
 		if (lstat & LSR_PR_STATUS) {
-			/* PR interrupt recieved from REMOTE  */
+			/* PR interrupt received from REMOTE  */
 			write_csr_byte(sc, LOC_CMD1, LC1_CLR_PR_INT);
 			continue;
 		}

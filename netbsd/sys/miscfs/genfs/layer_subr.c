@@ -1,11 +1,11 @@
-/*	$NetBSD: layer_subr.c,v 1.6 2000/03/16 18:08:24 jdolecek Exp $	*/
+/*	$NetBSD: layer_subr.c,v 1.11 2002/02/20 06:16:22 enami Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
  * All rights reserved.
  *
  * This software was written by William Studenmund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,11 +71,13 @@
  *	@(#)null_subr.c	8.7 (Berkeley) 5/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: layer_subr.c,v 1.11 2002/02/20 06:16:22 enami Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -196,7 +198,7 @@ layer_node_alloc(mp, lowervp, vpp)
 	vp->v_type = lowervp->v_type;
 	vp->v_flag |= VLAYER;
 
-	MALLOC(xp, struct layer_node *, lmp->layerm_size, M_TEMP, M_WAITOK);
+	xp = malloc(lmp->layerm_size, M_TEMP, M_WAITOK);
 	if (vp->v_type == VBLK || vp->v_type == VCHR) {
 		MALLOC(vp->v_specinfo, struct specinfo *,
 		    sizeof(struct specinfo), M_VNODE, M_WAITOK);
@@ -272,6 +274,7 @@ layer_node_alloc(mp, lowervp, vpp)
 	VREF(lowervp);	/* Take into account reference held in layer_node */
 	hd = LAYER_NHASH(lmp, lowervp);
 	LIST_INSERT_HEAD(hd, xp, layer_hash);
+	uvm_vnp_setsize(vp, 0);
 	simple_unlock(&lmp->layerm_hashlock);
 	return (0);
 }

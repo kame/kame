@@ -1,9 +1,9 @@
-/*	$NetBSD: mace.c,v 1.1 2000/06/14 16:14:00 soren Exp $	*/
+/*	$NetBSD: mace.c,v 1.4 2002/03/13 13:12:26 simonb Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -19,7 +19,7 @@
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -44,6 +44,7 @@
 #include <machine/locore.h>
 #include <machine/autoconf.h>
 #include <machine/bus.h>
+#include <machine/machtype.h>
 
 #include <sgimips/dev/macereg.h>
 #include <sgimips/dev/macevar.h>
@@ -69,17 +70,14 @@ mace_match(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	struct mainbus_attach_args *ma = aux;
 
 	/*
 	 * The MACE is in the O2.
 	 */
-	switch (ma->ma_arch) {
-	case 32:
-		return 1;
-	default:
-		return 0;
-	}
+	if (mach_type == MACH_SGI_IP32)
+		return (1);
+
+	return (0);
 }
 
 static void
@@ -98,8 +96,10 @@ mace_attach(parent, self, aux)
 	printf("mace0: isa msk %llx\n", *(volatile u_int64_t *)0xbf310018);
 	*(volatile u_int64_t *)0xbf310018 = 0xffffffff;
 #endif
-	printf("mace0: isa sts %llx\n", *(volatile u_int64_t *)0xbf310010);
-	printf("mace0: isa msk %llx\n", *(volatile u_int64_t *)0xbf310018);
+	printf("%s: isa sts %llx\n", self->dv_xname,
+	    *(volatile u_int64_t *)0xbf310010);
+	printf("%s: isa msk %llx\n", self->dv_xname,
+	    *(volatile u_int64_t *)0xbf310018);
 
 	config_search(mace_search, self, NULL);
 }
@@ -117,7 +117,7 @@ mace_print(aux, pnp)
 
 	if (maa->maa_offset != MACECF_OFFSET_DEFAULT)
 		printf(" offset 0x%lx", maa->maa_offset);
-	if (maa->maa_offset != MACECF_INTR_DEFAULT)
+	if (maa->maa_intr != MACECF_INTR_DEFAULT)
 		printf(" intr %d", maa->maa_intr);
 #if 0
 	if (maa->maa_offset != MACECF_STRIDE_DEFAULT)
@@ -130,9 +130,9 @@ mace_print(aux, pnp)
 static int
 mace_search(parent, cf, aux)
 	struct device *parent;
-	struct cfdata *cf; 
+	struct cfdata *cf;
 	void *aux;
-{ 
+{
 	struct mace_attach_args maa;
 	int tryagain;
 
@@ -161,8 +161,8 @@ void *
 mace_intr_establish(intr, level, func, arg)
 	int intr;
 	int level;
-        int (*func)(void *);
-        void *arg;
+	int (*func)(void *);
+	void *arg;
 {
 	/* XXX */
 

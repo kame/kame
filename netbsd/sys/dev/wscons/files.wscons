@@ -1,4 +1,4 @@
-# $NetBSD: files.wscons,v 1.19 1999/12/12 08:17:28 scottr Exp $
+# $NetBSD: files.wscons,v 1.25.10.1 2002/07/03 02:31:10 lukem Exp $
 
 #
 # "Workstation Console" glue; attaches frame buffer to emulator & keyboard,
@@ -12,15 +12,17 @@
 # trouble.
 #
 
-defopt	opt_wsemul.h	WSEMUL_DEFAULT WSEMUL_NO_DUMB
-	WSEMUL_SUN WSEMUL_VT100
-defopt	opt_wskernattr.h WS_KERNEL_FG WS_KERNEL_BG
-	WS_KERNEL_COLATTR WS_KERNEL_MONOATTR
-defopt	opt_wsdisplay_compat.h WSDISPLAY_COMPAT_USL WSCOMPAT_USL_SYNCTIMEOUT
-	WSDISPLAY_COMPAT_RAWKBD
-	WSDISPLAY_COMPAT_PCVT WSDISPLAY_COMPAT_SYSCONS
-	WSDISPLAY_DEFAULTSCREENS
-	WSCONS_SUPPORT_PCVTFONTS
+defparam opt_wsemul.h		WSEMUL_DEFAULT
+defflag	opt_wsemul.h		WSEMUL_NO_DUMB WSEMUL_SUN WSEMUL_VT100
+defparam opt_wskernattr.h	WS_KERNEL_FG WS_KERNEL_BG
+				WS_KERNEL_COLATTR WS_KERNEL_MONOATTR
+defflag	opt_wsdisplay_compat.h	WSDISPLAY_COMPAT_USL
+				WSDISPLAY_COMPAT_RAWKBD
+				WSDISPLAY_COMPAT_PCVT WSDISPLAY_COMPAT_SYSCONS
+				WSCONS_SUPPORT_PCVTFONTS
+				WSCONS_SUPPORT_ISO7FONTS
+defparam opt_wsdisplay_compat.h	WSCOMPAT_USL_SYNCTIMEOUT
+				WSDISPLAY_DEFAULTSCREENS
 
 # this loses, but there's no way to define attributes which have attributes
 device	wsdisplay #tty?
@@ -31,8 +33,8 @@ attach	wskbd at wskbddev
 device	wsmouse
 attach	wsmouse at wsmousedev
 
-file	dev/wscons/wsdisplay.c		wsdisplay	needs-flag
-file	dev/wscons/wsdisplay_compat_usl.c	wsdisplay & wsdisplay_compat_usl
+file	dev/wscons/wsdisplay.c		wsdisplay		needs-flag
+file	dev/wscons/wsdisplay_compat_usl.c wsdisplay & wsdisplay_compat_usl
 file	dev/wscons/wsemulconf.c		wsdisplay
 file	dev/wscons/wsemul_dumb.c	wsdisplay & !wsemul_no_dumb
 file	dev/wscons/wsemul_sun.c		wsdisplay & wsemul_sun
@@ -40,18 +42,16 @@ file	dev/wscons/wsemul_vt100.c	wsdisplay & wsemul_vt100
 file	dev/wscons/wsemul_vt100_subr.c	wsdisplay & wsemul_vt100
 file	dev/wscons/wsemul_vt100_chars.c	wsdisplay & wsemul_vt100
 file	dev/wscons/wsemul_vt100_keys.c	wsdisplay & wsemul_vt100
-file	dev/wscons/wsevent.c	wskbd | wsmouse
-file	dev/wscons/wskbd.c	wskbd needs-flag
-file	dev/wscons/wskbdutil.c	wskbd needs-flag
-file	dev/wscons/wsmouse.c	wsmouse needs-flag
+file	dev/wscons/wsevent.c		wsdisplay | wskbd | wsmouse | wsmux
+file	dev/wscons/wskbd.c		wskbd			needs-flag
+file	dev/wscons/wskbdutil.c		wskbd			needs-flag
+file	dev/wscons/wsmouse.c		wsmouse			needs-flag
 
 # rcons bit-depth options
-defopt opt_rcons.h RCONS_2BPP RCONS_4BPP RCONS_16BPP
+include "dev/rcons/files.rcons"
 
-file	dev/rcons/raster_op.c			wsrasteremulops
-file	dev/rcons/raster_text.c			wsrasteremulops
-file	dev/wscons/wscons_rinit.c		wsrasteremulops
-file	dev/wscons/wscons_rops.c		wsrasteremulops
+file	dev/wscons/wscons_rinit.c	wsrasteremulops
+file	dev/wscons/wscons_rops.c	wsrasteremulops
 
 defpseudo	wsmux
-file	dev/wscons/wsmux.c			wsmux | wsdisplay needs-flag
+file	dev/wscons/wsmux.c		wsmux			needs-flag

@@ -1,4 +1,4 @@
-/*	$NetBSD: eisa_machdep.h,v 1.7.2.1 2000/08/11 18:00:08 thorpej Exp $	*/
+/*	$NetBSD: eisa_machdep.h,v 1.8 2000/08/11 00:43:21 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.

@@ -1,11 +1,11 @@
-/*	$NetBSD: overlay_vnops.c,v 1.2 2000/03/13 23:52:41 soren Exp $	*/
+/*	$NetBSD: overlay_vnops.c,v 1.9 2002/01/04 07:19:34 chs Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 National Aeronautics & Space Administration
  * All rights reserved.
  *
  * This software was written by William Studenmund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,7 +71,7 @@
  *
  * Ancestors:
  *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
- *	$Id: overlay_vnops.c,v 1.1.1.1 2000/12/01 16:18:06 itojun Exp $
+ *	$Id: overlay_vnops.c,v 1.1.1.2 2002/09/25 05:32:44 itojun Exp $
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  */
@@ -82,11 +82,11 @@
  * (See mount_overlay(8) for more information.)
  *
  * The overlay layer has two purposes.  First, it serves as a demonstration
- * of layering by proving a layer which really does nothing.  (the null
- * layer makes the underlying files appear elsewhere in the file hierarchy)
+ * of layering by providing a layer which really does nothing (the null
+ * layer makes the underlying files appear elsewhere in the file hierarchy).
  * Second, the overlay layer can serve as a prototype layer. Since it
  * provides all necessary layer framework, new file system layers can be
- * created very easily be starting with an overlay layer.
+ * created very easily by starting with an overlay layer.
  *
  * The remainder of this comment examines the overlay layer as a basis
  * for constructing new layers.
@@ -94,11 +94,11 @@
  *
  * INSTANTIATING NEW OVERLAY LAYERS
  *
- * New null layers are created with mount_overlay(8).
- * Mount_overlay(8) takes two arguments, an ignored string
+ * New overlay layers are created with mount_overlay(8).
+ * mount_overlay(8) takes two arguments, an ignored string
  * and the pathname which the overlay will mount over. After
  * the overlay layer is put into place, all access to the mount
- * point path will proceede through the overlay layer.
+ * point path will proceed through the overlay layer.
  *
  *
  * OPERATION OF AN OVERLAY LAYER
@@ -111,14 +111,14 @@
  *
  * One of the easiest ways to construct new file system layers is to make
  * a copy of either the null layer or the overlay layer, rename all files
- * and variables, and then begin modifing the copy.  Sed can be used to
+ * and variables, and then begin modifying the copy.  sed(1) can be used to
  * easily rename all variables.
  *
  * The choice between using a null and an overlay layer depends on
  * the desirability of retaining access to the underlying filestore.
  * For instance, the umap filesystem presents both a uid-translated and an
- * untranslaged view of the underlying files, and so it is based off of
- * the null layer. However a layer implimenting Access Controll Lists
+ * untranslated view of the underlying files, and so it is based off of
+ * the null layer. However a layer implementing Access Control Lists
  * might prefer to block access to the underlying filestore, for which
  * the overlay layer is a better basis.
  *
@@ -129,11 +129,13 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: overlay_vnops.c,v 1.9 2002/01/04 07:19:34 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -147,7 +149,7 @@
  * Global vfs data structures
  */
 int (**overlay_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc overlay_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc overlay_vnodeop_entries[] = {
 	{ &vop_default_desc,  layer_bypass },
 
 	{ &vop_lookup_desc,   layer_lookup },
@@ -167,8 +169,10 @@ struct vnodeopv_entry_desc overlay_vnodeop_entries[] = {
 	{ &vop_strategy_desc, layer_strategy },
 	{ &vop_bwrite_desc,   layer_bwrite },
 	{ &vop_bmap_desc,     layer_bmap },
+	{ &vop_getpages_desc, layer_getpages },
+	{ &vop_putpages_desc, layer_putpages },
 
-	{ (struct vnodeop_desc*)NULL, (int(*)__P((void *)))NULL }
+	{ NULL, NULL }
 };
-struct vnodeopv_desc overlay_vnodeop_opv_desc =
+const struct vnodeopv_desc overlay_vnodeop_opv_desc =
 	{ &overlay_vnodeop_p, overlay_vnodeop_entries };

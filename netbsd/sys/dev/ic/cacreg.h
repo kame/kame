@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: cacreg.h,v 1.5 2001/01/10 16:48:04 ad Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

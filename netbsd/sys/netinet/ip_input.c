@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.114.4.8 2002/02/26 21:07:56 he Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.150.4.1 2002/06/07 19:39:21 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,10 +101,14 @@
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.150.4.1 2002/06/07 19:39:21 thorpej Exp $");
+
 #include "opt_gateway.h"
 #include "opt_pfil_hooks.h"
 #include "opt_ipsec.h"
 #include "opt_mrouting.h"
+#include "opt_inet_csum.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -117,10 +121,7 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
-#include <sys/proc.h>
 #include <sys/pool.h>
-
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -148,7 +149,6 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#include <netkey/key_debug.h>
 #endif
 
 #ifndef	IPFORWARDING
@@ -201,11 +201,17 @@ struct rttimer_queue *ip_mtudisc_timeout_q = NULL;
 
 extern	struct domain inetdomain;
 int	ipqmaxlen = IFQ_MAXLEN;
+u_long	in_ifaddrhash;				/* size of hash table - 1 */
+int	in_ifaddrentries;			/* total number of addrs */
 struct	in_ifaddrhead in_ifaddr;
 struct	in_ifaddrhashhead *in_ifaddrhashtbl;
 struct	ifqueue ipintrq;
 struct	ipstat	ipstat;
 u_int16_t	ip_id;
+
+#ifdef PFIL_HOOKS
+struct pfil_head inet_pfil_hook;
+#endif
 
 struct ipqhead ipq;
 int	ipq_locked;
@@ -220,7 +226,11 @@ ipq_lock_try()
 {
 	int s;
 
-	s = splimp();
+	/*
+	 * Use splvm() -- we're blocking things that would cause
+	 * mbuf allocation.
+	 */
+	s = splvm();
 	if (ipq_locked) {
 		splx(s);
 		return (0);
@@ -235,7 +245,7 @@ ipq_unlock()
 {
 	int s;
 
-	s = splimp();
+	s = splvm();
 	ipq_locked = 0;
 	splx(s);
 }
@@ -263,6 +273,24 @@ do {									\
 #define	IPQ_UNLOCK()		ipq_unlock()
 
 struct pool ipqent_pool;
+
+#ifdef INET_CSUM_COUNTERS
+#include <sys/device.h>
+
+struct evcnt ip_hwcsum_bad = EVCNT_INITIALIZER(EVCNT_TYPE_MISC,
+    NULL, "inet", "hwcsum bad");
+struct evcnt ip_hwcsum_ok = EVCNT_INITIALIZER(EVCNT_TYPE_MISC,
+    NULL, "inet", "hwcsum ok");
+struct evcnt ip_swcsum = EVCNT_INITIALIZER(EVCNT_TYPE_MISC,
+    NULL, "inet", "swcsum");
+
+#define	INET_CSUM_COUNTER_INCR(ev)	(ev)->ev_count++
+
+#else
+
+#define	INET_CSUM_COUNTER_INCR(ev)	/* nothing */
+
+#endif /* INET_CSUM_COUNTERS */
 
 /*
  * We need to save the IP options in case a protocol wants to respond
@@ -292,7 +320,7 @@ ip_init()
 	int i;
 
 	pool_init(&ipqent_pool, sizeof(struct ipqent), 0, 0, 0, "ipqepl",
-	    0, NULL, NULL, M_IPQ);
+	    NULL);
 
 	pr = pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
 	if (pr == 0)
@@ -308,14 +336,30 @@ ip_init()
 	ip_id = time.tv_sec & 0xffff;
 	ipintrq.ifq_maxlen = ipqmaxlen;
 	TAILQ_INIT(&in_ifaddr);
-	in_ifaddrhashtbl = 
-	    hashinit(IN_IFADDR_HASH_SIZE, M_IFADDR, M_WAITOK, &in_ifaddrhash);
+	in_ifaddrhashtbl = hashinit(IN_IFADDR_HASH_SIZE, HASH_LIST, M_IFADDR,
+	    M_WAITOK, &in_ifaddrhash);
 	if (ip_mtudisc != 0)
 		ip_mtudisc_timeout_q = 
 		    rt_timer_queue_create(ip_mtudisc_timeout);
 #ifdef GATEWAY
 	ipflow_init();
 #endif
+
+#ifdef PFIL_HOOKS
+	/* Register our Packet Filter hook. */
+	inet_pfil_hook.ph_type = PFIL_TYPE_AF;
+	inet_pfil_hook.ph_af   = AF_INET;
+	i = pfil_head_register(&inet_pfil_hook);
+	if (i != 0)
+		printf("ip_init: WARNING: unable to register pfil hook, "
+		    "error %d\n", i);
+#endif /* PFIL_HOOKS */
+
+#ifdef INET_CSUM_COUNTERS
+	evcnt_attach_static(&ip_hwcsum_bad);
+	evcnt_attach_static(&ip_hwcsum_ok);
+	evcnt_attach_static(&ip_swcsum);
+#endif /* INET_CSUM_COUNTERS */
 }
 
 struct	sockaddr_in ipaddr = { sizeof(ipaddr), AF_INET };
@@ -331,7 +375,7 @@ ipintr()
 	struct mbuf *m;
 
 	while (1) {
-		s = splimp();
+		s = splnet();
 		IF_DEQUEUE(&ipintrq, m);
 		splx(s);
 		if (m == 0)
@@ -354,11 +398,6 @@ ip_input(struct mbuf *m)
 	struct ipqent *ipqe;
 	int hlen = 0, mff, len;
 	int downmatch;
-#ifdef PFIL_HOOKS
-	struct packet_filter_hook *pfh;
-	struct mbuf *m0;
-	int rv;
-#endif /* PFIL_HOOKS */
 
 #ifdef	DIAGNOSTIC
 	if ((m->m_flags & M_PKTHDR) == 0)
@@ -378,7 +417,7 @@ ip_input(struct mbuf *m)
 	 * If no IP addresses have been set yet but the interfaces
 	 * are receiving, can't do anything with incoming packets yet.
 	 */
-	if (in_ifaddr.tqh_first == 0)
+	if (TAILQ_FIRST(&in_ifaddr) == 0)
 		goto bad;
 	ipstat.ips_total++;
 	if (m->m_len < sizeof (struct ip) &&
@@ -409,21 +448,41 @@ ip_input(struct mbuf *m)
 	 * not allowed.
 	 */
 	if (IN_MULTICAST(ip->ip_src.s_addr)) {
-		/* XXX stat */
+		ipstat.ips_badaddr++;
 		goto bad;
 	}
 
-	if (in_cksum(m, hlen) != 0) {
-		ipstat.ips_badsum++;
-		goto bad;
+	/* 127/8 must not appear on wire - RFC1122 */
+	if ((ntohl(ip->ip_dst.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
+	    (ntohl(ip->ip_src.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) {
+		if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
+			ipstat.ips_badaddr++;
+			goto bad;
+		}
 	}
 
-	/*
-	 * Convert fields to host representation.
-	 */
-	NTOHS(ip->ip_len);
-	NTOHS(ip->ip_off);
-	len = ip->ip_len;
+	switch (m->m_pkthdr.csum_flags &
+		((m->m_pkthdr.rcvif->if_csum_flags_rx & M_CSUM_IPv4) |
+		 M_CSUM_IPv4_BAD)) {
+	case M_CSUM_IPv4|M_CSUM_IPv4_BAD:
+		INET_CSUM_COUNTER_INCR(&ip_hwcsum_bad);
+		goto badcsum;
+
+	case M_CSUM_IPv4:
+		/* Checksum was okay. */
+		INET_CSUM_COUNTER_INCR(&ip_hwcsum_ok);
+		break;
+
+	default:
+		/* Must compute it ourselves. */
+		INET_CSUM_COUNTER_INCR(&ip_swcsum);
+		if (in_cksum(m, hlen) != 0)
+			goto bad;
+		break;
+	}
+
+	/* Retrieve the packet length. */
+	len = ntohs(ip->ip_len);
 
 	/*
 	 * Check for additional length bogosity
@@ -452,7 +511,7 @@ ip_input(struct mbuf *m)
 	}
 
 #ifdef IPSEC
-	/* ipflow (IP fast fowarding) is not compatible with IPsec. */
+	/* ipflow (IP fast forwarding) is not compatible with IPsec. */
 	m->m_flags &= ~M_CANFASTFWD;
 #else
 	/*
@@ -463,14 +522,6 @@ ip_input(struct mbuf *m)
 #endif
 
 #ifdef PFIL_HOOKS
-#ifdef IPSEC
-	/*
-	 * let ipfilter look at packet on the wire,
-	 * not the decapsulated packet.
-	 */
-	if (ipsec_gethist(m, NULL))
-		goto nofilt;
-#endif
 	/*
 	 * Run through list of hooks for input packets.  If there are any
 	 * filters which require that additional packets in the flow are
@@ -478,23 +529,39 @@ ip_input(struct mbuf *m)
 	 * Note that filters must _never_ set this flag, as another filter
 	 * in the list may have previously cleared it.
 	 */
-	m0 = m;
-	pfh = pfil_hook_get(PFIL_IN, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
-	for (; pfh; pfh = pfh->pfil_link.tqe_next)
-		if (pfh->pfil_func) {
-			rv = pfh->pfil_func(ip, hlen,
-					    m->m_pkthdr.rcvif, 0, &m0);
-			if (rv)
-				return;
-			m = m0;
-			if (m == NULL)
-				return;
-			ip = mtod(m, struct ip *);
-		}
+	/*
+	 * let ipfilter look at packet on the wire,
+	 * not the decapsulated packet.
+	 */
 #ifdef IPSEC
-nofilt:;
+	if (!ipsec_getnhist(m))
+#else
+	if (1)
 #endif
+	{
+		if (pfil_run_hooks(&inet_pfil_hook, &m, m->m_pkthdr.rcvif,
+				   PFIL_IN) != 0)
+		return;
+		if (m == NULL)
+			return;
+		ip = mtod(m, struct ip *);
+		hlen = ip->ip_hl << 2;
+	}
 #endif /* PFIL_HOOKS */
+
+#ifdef ALTQ
+	/* XXX Temporary until ALTQ is changed to use a pfil hook */
+	if (altq_input != NULL && (*altq_input)(m, AF_INET) == 0) {
+		/* packet dropped by traffic conditioner */
+		return;
+	}
+#endif
+
+	/*
+	 * Convert fields to host representation.
+	 */
+	NTOHS(ip->ip_len);
+	NTOHS(ip->ip_off);
 
 	/*
 	 * Process options and, if not destined for us,
@@ -514,9 +581,7 @@ nofilt:;
 	 * as not mine.
 	 */
 	downmatch = 0;
-	for (ia = IN_IFADDR_HASH(ip->ip_dst.s_addr).lh_first;
-	     ia != NULL;
-	     ia = ia->ia_hash.le_next) {
+	LIST_FOREACH(ia, &IN_IFADDR_HASH(ip->ip_dst.s_addr), ia_hash) {
 		if (in_hosteq(ia->ia_addr.sin_addr, ip->ip_dst)) {
 			if ((ia->ia_ifp->if_flags & IFF_UP) != 0)
 				break;
@@ -527,9 +592,9 @@ nofilt:;
 	if (ia != NULL)
 		goto ours;
 	if (m->m_pkthdr.rcvif->if_flags & IFF_BROADCAST) {
-		for (ifa = m->m_pkthdr.rcvif->if_addrlist.tqh_first;
-		    ifa != NULL; ifa = ifa->ifa_list.tqe_next) {
-			if (ifa->ifa_addr->sa_family != AF_INET) continue;
+		TAILQ_FOREACH(ifa, &m->m_pkthdr.rcvif->if_addrlist, ifa_list) {
+			if (ifa->ifa_addr->sa_family != AF_INET)
+				continue;
 			ia = ifatoia(ifa);
 			if (in_hosteq(ip->ip_dst, ia->ia_broadaddr.sin_addr) ||
 			    in_hosteq(ip->ip_dst, ia->ia_netbroadcast) ||
@@ -553,7 +618,7 @@ nofilt:;
 #ifdef MROUTING
 		extern struct socket *ip_mrouter;
 
-		if (m->m_flags & M_EXT) {
+		if (M_READONLY(m)) {
 			if ((m = m_pullup(m, hlen)) == 0) {
 				ipstat.ips_toosmall++;
 				return;
@@ -649,7 +714,7 @@ ours:
 		 * of this datagram.
 		 */
 		IPQ_LOCK();
-		for (fp = ipq.lh_first; fp != NULL; fp = fp->ipq_q.le_next)
+		LIST_FOREACH(fp, &ipq, ipq_q)
 			if (ip->ip_id == fp->ipq_id &&
 			    in_hosteq(ip->ip_src, fp->ipq_src) &&
 			    in_hosteq(ip->ip_dst, fp->ipq_dst) &&
@@ -726,7 +791,8 @@ found:
 	 * Switch out to protocol's input routine.
 	 */
 #if IFA_STATS
-	ia->ia_ifa.ifa_data.ifad_inbytes += ip->ip_len;
+	if (ia && ip)
+		ia->ia_ifa.ifa_data.ifad_inbytes += ip->ip_len;
 #endif
 	ipstat.ips_delivered++;
     {
@@ -736,6 +802,11 @@ found:
 	return;
     }
 bad:
+	m_freem(m);
+	return;
+
+badcsum:
+	ipstat.ips_badsum++;
 	m_freem(m);
 }
 
@@ -789,7 +860,7 @@ ip_reass(ipqe, fp)
 		fp->ipq_ttl = IPFRAGTTL;
 		fp->ipq_p = ipqe->ipqe_ip->ip_p;
 		fp->ipq_id = ipqe->ipqe_ip->ip_id;
-		LIST_INIT(&fp->ipq_fragq);
+		TAILQ_INIT(&fp->ipq_fragq);
 		fp->ipq_src = ipqe->ipqe_ip->ip_src;
 		fp->ipq_dst = ipqe->ipqe_ip->ip_dst;
 		p = NULL;
@@ -799,8 +870,8 @@ ip_reass(ipqe, fp)
 	/*
 	 * Find a segment which begins after this one does.
 	 */
-	for (p = NULL, q = fp->ipq_fragq.lh_first; q != NULL;
-	    p = q, q = q->ipqe_q.le_next)
+	for (p = NULL, q = TAILQ_FIRST(&fp->ipq_fragq); q != NULL;
+	    p = q, q = TAILQ_NEXT(q, ipqe_q))
 		if (q->ipqe_ip->ip_off > ipqe->ipqe_ip->ip_off)
 			break;
 
@@ -835,9 +906,9 @@ ip_reass(ipqe, fp)
 			m_adj(q->ipqe_m, i);
 			break;
 		}
-		nq = q->ipqe_q.le_next;
+		nq = TAILQ_NEXT(q, ipqe_q);
 		m_freem(q->ipqe_m);
-		LIST_REMOVE(q, ipqe_q);
+		TAILQ_REMOVE(&fp->ipq_fragq, q, ipqe_q);
 		pool_put(&ipqent_pool, q);
 	}
 
@@ -847,13 +918,13 @@ insert:
 	 * check for complete reassembly.
 	 */
 	if (p == NULL) {
-		LIST_INSERT_HEAD(&fp->ipq_fragq, ipqe, ipqe_q);
+		TAILQ_INSERT_HEAD(&fp->ipq_fragq, ipqe, ipqe_q);
 	} else {
-		LIST_INSERT_AFTER(p, ipqe, ipqe_q);
+		TAILQ_INSERT_AFTER(&fp->ipq_fragq, p, ipqe, ipqe_q);
 	}
 	next = 0;
-	for (p = NULL, q = fp->ipq_fragq.lh_first; q != NULL;
-	    p = q, q = q->ipqe_q.le_next) {
+	for (p = NULL, q = TAILQ_FIRST(&fp->ipq_fragq); q != NULL;
+	    p = q, q = TAILQ_NEXT(q, ipqe_q)) {
 		if (q->ipqe_ip->ip_off != next)
 			return (0);
 		next += q->ipqe_ip->ip_len;
@@ -865,7 +936,7 @@ insert:
 	 * Reassembly is complete.  Check for a bogus message size and
 	 * concatenate fragments.
 	 */
-	q = fp->ipq_fragq.lh_first;
+	q = TAILQ_FIRST(&fp->ipq_fragq);
 	ip = q->ipqe_ip;
 	if ((next + (ip->ip_hl << 2)) > IP_MAXPACKET) {
 		ipstat.ips_toolong++;
@@ -876,11 +947,11 @@ insert:
 	t = m->m_next;
 	m->m_next = 0;
 	m_cat(m, t);
-	nq = q->ipqe_q.le_next;
+	nq = TAILQ_NEXT(q, ipqe_q);
 	pool_put(&ipqent_pool, q);
 	for (q = nq; q != NULL; q = nq) {
 		t = q->ipqe_m;
-		nq = q->ipqe_q.le_next;
+		nq = TAILQ_NEXT(q, ipqe_q);
 		pool_put(&ipqent_pool, q);
 		m_cat(m, t);
 	}
@@ -927,10 +998,10 @@ ip_freef(fp)
 
 	IPQ_LOCK_CHECK();
 
-	for (q = fp->ipq_fragq.lh_first; q != NULL; q = p) {
-		p = q->ipqe_q.le_next;
+	for (q = TAILQ_FIRST(&fp->ipq_fragq); q != NULL; q = p) {
+		p = TAILQ_NEXT(q, ipqe_q);
 		m_freem(q->ipqe_m);
-		LIST_REMOVE(q, ipqe_q);
+		TAILQ_REMOVE(&fp->ipq_fragq, q, ipqe_q);
 		pool_put(&ipqent_pool, q);
 	}
 	LIST_REMOVE(fp, ipq_q);
@@ -950,8 +1021,8 @@ ip_slowtimo()
 	int s = splsoftnet();
 
 	IPQ_LOCK();
-	for (fp = ipq.lh_first; fp != NULL; fp = nfp) {
-		nfp = fp->ipq_q.le_next;
+	for (fp = LIST_FIRST(&ipq); fp != NULL; fp = nfp) {
+		nfp = LIST_NEXT(fp, ipq_q);
 		if (--fp->ipq_ttl == 0) {
 			ipstat.ips_fragtimeout++;
 			ip_freef(fp);
@@ -965,8 +1036,8 @@ ip_slowtimo()
 	if (ip_maxfragpackets < 0)
 		;
 	else {
-		while (ip_nfragpackets > ip_maxfragpackets && ipq.lh_first)
-			ip_freef(ipq.lh_first);
+		while (ip_nfragpackets > ip_maxfragpackets && LIST_FIRST(&ipq))
+			ip_freef(LIST_FIRST(&ipq));
 	}
 	IPQ_UNLOCK();
 #ifdef GATEWAY
@@ -989,9 +1060,9 @@ ip_drain()
 	if (ipq_lock_try() == 0)
 		return;
 
-	while (ipq.lh_first != NULL) {
+	while (LIST_FIRST(&ipq) != NULL) {
 		ipstat.ips_fragdropped++;
-		ip_freef(ipq.lh_first);
+		ip_freef(LIST_FIRST(&ipq));
 	}
 
 	IPQ_UNLOCK();
@@ -1378,7 +1449,7 @@ ip_stripoptions(m, mopt)
 	ip->ip_hl = sizeof (struct ip) >> 2;
 }
 
-int inetctlerrmap[PRC_NCMDS] = {
+const int inetctlerrmap[PRC_NCMDS] = {
 	0,		0,		0,		0,
 	0,		EMSGSIZE,	EHOSTDOWN,	EHOSTUNREACH,
 	EHOSTUNREACH,	EHOSTUNREACH,	ECONNREFUSED,	ECONNREFUSED,
@@ -1416,6 +1487,11 @@ ip_forward(m, srcrt)
 #ifdef IPSEC
 	struct ifnet dummyifp;
 #endif
+
+	/*
+	 * Clear any in-bound checksum flags for this packet.
+	 */
+	m->m_pkthdr.csum_flags = 0;
 
 	dest = 0;
 #ifdef DIAGNOSTIC
@@ -1497,7 +1573,7 @@ ip_forward(m, srcrt)
 	}
 
 #ifdef IPSEC
-	/* Don't lookup socket in forwading case */
+	/* Don't lookup socket in forwarding case */
 	(void)ipsec_setsocket(m, NULL);
 #endif
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,
@@ -1586,6 +1662,8 @@ ip_forward(m, srcrt)
 					ro = &sp->req->sav->sah->sa_route;
 					if (ro->ro_rt && ro->ro_rt->rt_ifp) {
 						dummyifp.if_mtu =
+						    ro->ro_rt->rt_rmx.rmx_mtu ?
+						    ro->ro_rt->rt_rmx.rmx_mtu :
 						    ro->ro_rt->rt_ifp->if_mtu;
 						dummyifp.if_mtu -= ipsechdr;
 						destifp = &dummyifp;
@@ -1600,9 +1678,21 @@ ip_forward(m, srcrt)
 		break;
 
 	case ENOBUFS:
+#if 1
+		/*
+		 * a router should not generate ICMP_SOURCEQUENCH as
+		 * required in RFC1812 Requirements for IP Version 4 Routers.
+		 * source quench could be a big problem under DoS attacks,
+		 * or if the underlying interface is rate-limited.
+		 */
+		if (mcopy)
+			m_freem(mcopy);
+		return;
+#else
 		type = ICMP_SOURCEQUENCH;
 		code = 0;
 		break;
+#endif
 	}
 	icmp_error(mcopy, type, code, dest, destifp);
 }

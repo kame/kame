@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.1 2000/05/25 22:12:00 is Exp $	*/
+/*	$NetBSD: intr.h,v 1.10 2002/02/11 11:19:29 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -48,7 +48,6 @@
 #include <amiga/amiga/isr.h>
 #include <amiga/include/mtpr.h>
 
-#define __GENERIC_SOFT_INTERRUPTS
 /* ADAM: commented out
 #define IPL_SOFTSERIAL 1
 #define IPL_SOFTNET 1
@@ -98,9 +97,6 @@ struct intrhand {
 	int	ih_irq;
 };
 
-/*
-void setsoftclock __P((void));
-*/
 void clearsoftclock __P((void));
 int  splsoftclock __P((void));
 /*
@@ -116,15 +112,13 @@ static __inline int spllower __P((int));
 static __inline void splx __P((int));
 static __inline void softintr __P((int));
 
-/*
 extern volatile int cpl, ipending, astpending, tickspending;
-*/
 extern int imask[];
 
 /*
  *  Reorder protection in the following inline functions is
- * achived with the "eieio" instruction which the assembler
- * seems to detect and then doen't move instructions past....
+ * achieved with the "eieio" instruction which the assembler
+ * seems to detect and then doesn't move instructions past....
  */
 static __inline int
 splraise(ncpl)
@@ -133,10 +127,8 @@ splraise(ncpl)
 	int ocpl;
 
 	__asm__ volatile("sync; eieio\n");	/* don't reorder.... */
-/*
 	ocpl = cpl;
 	cpl = ocpl | ncpl;
-*/
 	__asm__ volatile("sync; eieio\n");	/* reorder protect */
 	return (ocpl);
 }
@@ -145,13 +137,10 @@ static __inline void
 splx(ncpl)
 	int ncpl;
 {
-
 	__asm__ volatile("sync; eieio\n");	/* reorder protect */
-/*
 	cpl = ncpl;
 	if (ipending & ~ncpl)
 		do_pending_int();
-*/
 	__asm__ volatile("sync; eieio\n");	/* reorder protect */
 }
 
@@ -162,12 +151,10 @@ spllower(ncpl)
 	int ocpl;
 
 	__asm__ volatile("sync; eieio\n");	/* reorder protect */
-/*
 	ocpl = cpl;
 	cpl = ncpl;
 	if (ipending & ~ncpl)
 		do_pending_int();
-*/
 	__asm__ volatile("sync; eieio\n");	/* reorder protect */
 	return (ocpl);
 }
@@ -182,7 +169,7 @@ softintr(ipl)
 
 	__asm__ volatile("mfmsr %0" : "=r"(msrsave));
 	__asm__ volatile("mtmsr %0" :: "r"(msrsave & ~PSL_EE));
-//	ipending |= 1 << ipl;
+	ipending |= 1 << ipl;
 	__asm__ volatile("mtmsr %0" :: "r"(msrsave));
 }
 
@@ -225,12 +212,13 @@ softintr(ipl)
 /*
  * Miscellaneous
  */
-#define splimp()	splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_IMP])
 #define	splhigh()	splraise(imask[IPL_HIGH])
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
 #define	spl0()		spllower(0)
 
 /*
-#define	setsoftclock()	softintr(SIR_CLOCK)
 #define	setsoftnet()	softintr(SIR_NET)
 #define	setsoftserial()	softintr(SIR_SERIAL)
 */

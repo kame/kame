@@ -1,4 +1,4 @@
-/*	$NetBSD: tcbus.c,v 1.12 2000/06/06 00:27:58 nisimura Exp $	*/
+/*	$NetBSD: tcbus.c,v 1.14 2001/09/19 19:04:17 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Tohru Nishimura.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: tcbus.c,v 1.12 2000/06/06 00:27:58 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcbus.c,v 1.14 2001/09/19 19:04:17 thorpej Exp $");
 
 /*
  * Which system models were configured?
@@ -149,11 +149,11 @@ tc_ds_intr_establish(dev, cookie, level, handler, val)
 	struct device *dev;
 	void *cookie;
 	int level;
-        int (*handler) __P((void *));
+	int (*handler) __P((void *));
 	void *val;
 {
 
-	 (*platform.intr_establish)(dev, cookie, level, handler, val);
+	(*platform.intr_establish)(dev, cookie, level, handler, val);
 }
 
 static void
@@ -162,7 +162,7 @@ tc_ds_intr_disestablish(dev, arg)
 	void *arg;
 {
 
-    	printf("cannot disestablish TC interrupts\n");
+	printf("cannot disestablish TC interrupts\n");
 }
 
 /*
@@ -188,7 +188,7 @@ tc_ds_get_dma_tag(slot)
 #include "px.h"
 
 #include <machine/pmioctl.h>	/* XXX */
-#include <machine/fbio.h>	/* XXX */
+#include <dev/sun/fbio.h>	/* XXX */
 #include <machine/fbvar.h>	/* XXX */
 #include <pmax/dev/fbreg.h>	/* XXX */
 #include <pmax/dev/cfbvar.h>

@@ -1,4 +1,4 @@
-/* $NetBSD: sysarch.h,v 1.5.2.1 2000/07/03 22:38:13 thorpej Exp $ */
+/* $NetBSD: sysarch.h,v 1.9 2002/01/14 00:53:16 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -49,17 +49,26 @@
 #define	ALPHA_FPGETMASK			0
 #define	ALPHA_FPSETMASK			1
 #define	ALPHA_FPSETSTICKY		2
+#define	ALPHA_BUS_GET_WINDOW_COUNT	3
+#define	ALPHA_BUS_GET_WINDOW		4
+#define	ALPHA_PCI_CONF_READWRITE	5
+#define	ALPHA_FPGETSTICKY		6
+#define	ALPHA_GET_FP_C			7
+#define	ALPHA_SET_FP_C			8
+
 struct alpha_fp_except_args {
 	fp_except mask;
 };
 
-#define	ALPHA_BUS_GET_WINDOW_COUNT	3
+struct alpha_fp_c_args {
+	uint64_t fp_c;
+};
+
 struct alpha_bus_get_window_count_args {
 	u_int type;
 	u_int count;	/* output */
 };
 
-#define	ALPHA_BUS_GET_WINDOW		4
 struct alpha_bus_get_window_args {
 	u_int type;
 	u_int window;
@@ -70,7 +79,6 @@ struct alpha_bus_get_window_args {
 #define	ALPHA_BUS_TYPE_PCI_MEM		1
 #define	ALPHA_BUS_TYPE_MAX		1
 
-#define	ALPHA_PCI_CONF_READWRITE	5
 struct alpha_pci_conf_readwrite_args {
 	int write;
 	u_int bus;

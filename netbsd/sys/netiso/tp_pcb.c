@@ -1,4 +1,4 @@
-/*	$NetBSD: tp_pcb.c,v 1.20 2000/03/30 13:10:14 augustss Exp $	*/
+/*	$NetBSD: tp_pcb.c,v 1.23 2002/05/12 21:30:37 matt Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -70,6 +70,9 @@ SOFTWARE.
  * tp_soisdisconnected() are tp-specific versions of soisconnect* and are
  * called (obviously) during the closing phase.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tp_pcb.c,v 1.23 2002/05/12 21:30:37 matt Exp $");
 
 #include "opt_inet.h"
 #include "opt_iso.h"
@@ -257,6 +260,8 @@ struct isopcb   tp_isopcb;
 struct isopcb   tp_isopcb;
 #endif				/* TPCONS */
 
+struct tp_stat tp_stat;
+u_int tp_start_win;
 
 struct nl_protosw nl_protosw[] = {
 	/* ISO_CLNS */
@@ -961,8 +966,8 @@ tp_pcbbind(v, nam, p)
 				tlen = 2;
 			if (satosin(siso)->sin_addr.s_addr == 0)
 				siso = 0;
-		}
 #endif
+		}
 	}
 	if (tpcb->tp_lsuffixlen == 0) {
 		if (tlen) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: iso_pcb.c,v 1.19 2000/03/30 13:10:11 augustss Exp $	*/
+/*	$NetBSD: iso_pcb.c,v 1.22 2002/05/12 21:30:36 matt Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -65,6 +65,9 @@ SOFTWARE.
  * Iso address family net-layer(s) pcb stuff. NEH 1/29/87
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iso_pcb.c,v 1.22 2002/05/12 21:30:36 matt Exp $");
+
 #include "opt_iso.h"
 
 #ifdef ISO
@@ -99,6 +102,9 @@ struct iso_addr zeroiso_addr = {
 	0
 };
 
+#ifdef ARGO_DEBUG
+unsigned char   argo_debug[128];
+#endif
 
 /*
  * FUNCTION:		iso_pcballoc
@@ -582,7 +588,7 @@ iso_pcbdetach(v)
  *
  * SIDE EFFECTS:
  *
- * NOTES:		(notify) is called at splimp!
+ * NOTES:		(notify) is called at splnet!
  */
 void
 iso_pcbnotify(head, siso, errno, notify)
@@ -592,7 +598,7 @@ iso_pcbnotify(head, siso, errno, notify)
 	void (*notify) __P((struct isopcb *));
 {
 	struct isopcb *isop;
-	int             s = splimp();
+	int             s = splnet();
 
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_ISO]) {

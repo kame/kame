@@ -1,7 +1,7 @@
-/* $NetBSD: bus.h,v 1.39.2.3 2002/04/27 10:25:42 he Exp $ */
+/* $NetBSD: bus.h,v 1.47 2002/04/26 04:15:19 thorpej Exp $ */
 
 /*-
- * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1997, 1998, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -146,6 +146,9 @@ struct alpha_bus_space {
 
 	/* get kernel virtual address */
 	void *		(*abs_vaddr)(void *, bus_space_handle_t);
+
+	/* mmap bus space for user */
+	paddr_t		(*abs_mmap)(void *, bus_addr_t, off_t, int, int);
 
 	/* barrier */
 	void		(*abs_barrier)(void *, bus_space_handle_t,
@@ -337,6 +340,12 @@ do {									\
 	(*(t)->abs_vaddr)((t)->abs_cookie, (h))
 
 /*
+ * Mmap bus space for a user application.
+ */
+#define	bus_space_mmap(t, a, o, p, f)					\
+	(*(t)->abs_mmap)((t)->abs_cookie, (a), (o), (p), (f))
+
+/*
  * Bus barrier operations.
  */
 #define	bus_space_barrier(t, h, o, l, f)				\
@@ -491,21 +500,23 @@ do {									\
 /*
  * Flags used in various bus DMA methods.
  */
-#define	BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
-#define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
-#define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define	BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
-#define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
-#define	BUS_DMA_BUS2		0x20
-#define	BUS_DMA_BUS3		0x40
-#define	BUS_DMA_BUS4		0x80
+#define	BUS_DMA_WAITOK		0x000	/* safe to sleep (pseudo-flag) */
+#define	BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
+#define	BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
+#define	BUS_DMA_COHERENT	0x004	/* hint: map memory DMA coherent */
+#define	BUS_DMA_STREAMING	0x008	/* hint: sequential, unidirectional */
+#define	BUS_DMA_BUS1		0x010	/* placeholders for bus functions... */
+#define	BUS_DMA_BUS2		0x020
+#define	BUS_DMA_BUS3		0x040
+#define	BUS_DMA_BUS4		0x080
+#define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
+#define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
 
 /*
  * Private flags stored in the DMA map.
  */
 #define	DMAMAP_NO_COALESCE	0x40000000	/* don't coalesce adjacent
 						   segments */
-#define	DMAMAP_HAS_SGMAP	0x80000000	/* sgva/len are valid */
 
 /* Forwards needed by prototypes below. */
 struct mbuf;
@@ -582,7 +593,7 @@ struct alpha_bus_dma_tag {
 	/*
 	 * Some chipsets have a built-in boundary constraint, independent
 	 * of what the device requests.  This allows that boundary to
-	 * be specified.  If the device has a more restrictive contraint,
+	 * be specified.  If the device has a more restrictive constraint,
 	 * the map will use that, otherwise this boundary will be used.
 	 * This value is ignored if 0.
 	 */
@@ -593,6 +604,16 @@ struct alpha_bus_dma_tag {
 	 * windows also get a pointer to their SGMAP state.
 	 */
 	struct alpha_sgmap *_sgmap;
+
+	/*
+	 * The SGMAP MMU implements a prefetch FIFO to keep data
+	 * moving down the pipe, when doing host->bus DMA writes.
+	 * The threshold (distance until the next page) used to
+	 * trigger the prefetch is differnet on different chipsets,
+	 * and we need to know what it is in order to know whether
+	 * or not to allocate a spill page.
+	 */
+	bus_size_t _pfthresh;
 
 	/*
 	 * Internal-use only utility methods.  NOT TO BE USED BY
@@ -678,15 +699,6 @@ struct alpha_bus_dmamap {
 	bus_size_t	_dm_maxsegsz;	/* largest possible segment */
 	bus_size_t	_dm_boundary;	/* don't cross this */
 	int		_dm_flags;	/* misc. flags */
-
-	/*
-	 * This is used only for SGMAP-mapped DMA, but we keep it
-	 * here to avoid pointless indirection.
-	 */
-	int		_dm_pteidx;	/* PTE index */
-	int		_dm_ptecnt;	/* PTE count */
-	u_long		_dm_sgva;	/* allocated sgva */
-	bus_size_t	_dm_sgvalen;	/* svga length */
 
 	/*
 	 * Private cookie to be used by the DMA back-end.

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_bootstrap.c,v 1.53 2000/02/14 07:01:49 scottr Exp $	*/
+/*	$NetBSD: pmap_bootstrap.c,v 1.55 2001/05/30 15:24:32 lukem Exp $	*/
 
 /* 
  * Copyright (c) 1991, 1993
@@ -40,13 +40,14 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "zsc.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/reboot.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <mac68k/mac68k/clockreg.h>

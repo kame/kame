@@ -1,4 +1,4 @@
-/*	$NetBSD: pcibios.c,v 1.3.6.1 2000/08/10 22:42:04 soda Exp $	*/
+/*	$NetBSD: pcibios.c,v 1.9 2002/01/28 23:53:08 christos Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -66,6 +66,9 @@
  * Interface to the PCI BIOS and PCI Interrupt Routing table.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcibios.c,v 1.9 2002/01/28 23:53:08 christos Exp $");
+
 #include "opt_pcibios.h"
 
 #include <sys/param.h>
@@ -122,6 +125,12 @@ void	pcibios_print_pir_table __P((void));
 
 #define	PCI_IRQ_TABLE_START	0xf0000
 #define	PCI_IRQ_TABLE_END	0xfffff
+
+static void pci_bridge_hook(pci_chipset_tag_t, pcitag_t, void *);
+struct pci_bridge_hook_arg {
+	void (*func)(pci_chipset_tag_t, pcitag_t, void *);
+	void *arg;
+};
 
 void
 pcibios_init()
@@ -231,8 +240,14 @@ pcibios_pir_init()
 
 	for (pa = PCI_IRQ_TABLE_START; pa < PCI_IRQ_TABLE_END; pa += 16) {
 		p = (caddr_t)ISA_HOLE_VADDR(pa);
-		if (*(int *)p != BIOS32_MAKESIG('$', 'P', 'I', 'R'))
-			continue;
+		if (*(int *)p != BIOS32_MAKESIG('$', 'P', 'I', 'R')) {
+			/*
+			 * XXX: Some laptops (Toshiba/Libretto L series
+			 * use _PIR instead of $PIR. So we try that too.
+			 */
+			if (*(int *)p != BIOS32_MAKESIG('_', 'P', 'I', 'R'))
+				continue;
+		}
 		
 		rev_min = *(p + 4);
 		rev_maj = *(p + 5);
@@ -484,18 +499,30 @@ pcibios_print_pir_table()
 }
 #endif
 
-void
-pci_device_foreach(pc, maxbus, func)
+void 
+pci_device_foreach(pc, maxbus, func, context)
 	pci_chipset_tag_t pc;
 	int maxbus;
-	void (*func) __P((pci_chipset_tag_t, pcitag_t));
+	void (*func) __P((pci_chipset_tag_t, pcitag_t, void *));
+	void *context;
+{
+  pci_device_foreach_min(pc, 0, maxbus, func, context);
+}
+
+void
+pci_device_foreach_min(pc, minbus, maxbus, func, context)
+	pci_chipset_tag_t pc;
+	int minbus;
+	int maxbus;
+	void (*func) __P((pci_chipset_tag_t, pcitag_t, void *));
+	void *context;
 {
 	const struct pci_quirkdata *qd;
 	int bus, device, function, maxdevs, nfuncs;
 	pcireg_t id, bhlcr;
 	pcitag_t tag;
 
-	for (bus = 0; bus <= maxbus; bus++) {
+	for (bus = minbus; bus <= maxbus; bus++) {
 		maxdevs = pci_bus_maxdevs(pc, bus);
 		for (device = 0; device < maxdevs; device++) {
 			tag = pci_make_tag(pc, bus, device, 0);
@@ -532,8 +559,35 @@ pci_device_foreach(pc, maxbus, func)
 				 */
 				if (PCI_VENDOR(id) == 0)
 					continue;
-				(*func)(pc, tag);
+				(*func)(pc, tag, context);
 			}
 		}
+	}
+}
+
+void
+pci_bridge_foreach(pci_chipset_tag_t pc, int minbus, int maxbus,
+    void (*func)(pci_chipset_tag_t, pcitag_t, void *), void *ctx)
+{
+	struct pci_bridge_hook_arg bridge_hook;
+
+	bridge_hook.func = func;
+	bridge_hook.arg = ctx;
+	
+	pci_device_foreach_min(pc, minbus, maxbus, pci_bridge_hook,
+	    &bridge_hook);
+}
+
+void
+pci_bridge_hook(pci_chipset_tag_t pc, pcitag_t tag, void *ctx)
+{
+	struct pci_bridge_hook_arg *bridge_hook = (void *)ctx;
+	pcireg_t reg;
+
+	reg = pci_conf_read(pc, tag, PCI_CLASS_REG);
+	if (PCI_CLASS(reg) == PCI_CLASS_BRIDGE &&
+	    (PCI_SUBCLASS(reg) == PCI_SUBCLASS_BRIDGE_PCI ||
+		PCI_SUBCLASS(reg) == PCI_SUBCLASS_BRIDGE_CARDBUS)) {
+		(*bridge_hook->func)(pc, tag, bridge_hook->arg);
 	}
 }

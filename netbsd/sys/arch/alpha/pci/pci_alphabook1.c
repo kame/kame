@@ -1,4 +1,4 @@
-/* $NetBSD: pci_alphabook1.c,v 1.4 2000/06/05 21:47:23 thorpej Exp $ */
+/* $NetBSD: pci_alphabook1.c,v 1.8 2002/05/15 16:57:42 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -66,7 +66,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pci_alphabook1.c,v 1.4 2000/06/05 21:47:23 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_alphabook1.c,v 1.8 2002/05/15 16:57:42 thorpej Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -74,7 +74,8 @@ __KERNEL_RCSID(0, "$NetBSD: pci_alphabook1.c,v 1.4 2000/06/05 21:47:23 thorpej E
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
@@ -92,8 +93,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_alphabook1.c,v 1.4 2000/06/05 21:47:23 thorpej E
 
 #include "sio.h"
 
-int     dec_alphabook1_intr_map __P((void *, pcitag_t, int, int,
-	    pci_intr_handle_t *));
+int     dec_alphabook1_intr_map __P((struct pci_attach_args *, pci_intr_handle_t *));
 const char *dec_alphabook1_intr_string __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_alphabook1_intr_evcnt __P((void *, pci_intr_handle_t));
 void    *dec_alphabook1_intr_establish __P((void *, pci_intr_handle_t,
@@ -131,21 +131,19 @@ pci_alphabook1_pickintr(lcp)
 
 #if NSIO
 	sio_intr_setup(pc, iot);
-	set_iointr(&sio_iointr);
 #else
 	panic("pci_alphabook1_pickintr: no I/O interrupt handler (no sio)");
 #endif
 }
 
 int
-dec_alphabook1_intr_map(lcv, bustag, buspin, line, ihp)
-	void *lcv;
-	pcitag_t bustag;
-	int buspin, line;
+dec_alphabook1_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
-	struct lca_config *lcp = lcv;
-	pci_chipset_tag_t pc = &lcp->lc_pc;
+	pcitag_t bustag = pa->pa_intrtag;
+	int buspin = pa->pa_intrpin;
+	pci_chipset_tag_t pc = pa->pa_pc;
 	int device, irq;
 
 	if (buspin == 0) {
@@ -158,7 +156,7 @@ dec_alphabook1_intr_map(lcv, bustag, buspin, line, ihp)
 		return 1;
 	}
 
-	alpha_pci_decompose_tag(pc, bustag, NULL, &device, NULL);
+	pci_decompose_tag(pc, bustag, NULL, &device, NULL);
 
 	/*
 	 * There is only one interrupting PCI device on the AlphaBook: an

@@ -1,4 +1,4 @@
-/*	$NetBSD: leds.c,v 1.6 1999/11/13 00:30:31 thorpej Exp $	*/
+/*	$NetBSD: leds.c,v 1.11 2002/03/15 05:55:38 gmcgarry Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -42,11 +42,14 @@
  *	@(#)machdep.c	8.10 (Berkeley) 4/20/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: leds.c,v 1.11 2002/03/15 05:55:38 gmcgarry Exp $");                                                  
+
 #include <sys/param.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
-#include <arch/hp300/hp300/leds.h>
+#include <hp300/hp300/leds.h>
 
 extern caddr_t	ledbase;	/* kva of LED page */
 u_int8_t	*ledaddr;	/* actual address of LEDs */
@@ -61,6 +64,7 @@ ledinit()
 
 	pmap_enter(pmap_kernel(), (vaddr_t)ledbase, (paddr_t)LED_ADDR,
 	    VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	ledaddr = (u_int8_t *) ((long)ledbase | (LED_ADDR & PGOFSET));
 }
 
@@ -78,10 +82,11 @@ ledcontrol(ons, offs, togs)
 	int ons, offs, togs;
 {
 
-	__asm __volatile ("	orb	%1,%0;
-				andb	%2,%0;
-				eorb	%3,%0"
-				    : "=m" (currentleds)
-				    : "d" (ons), "d" (~offs), "d" (togs));
+	__asm __volatile (
+		"orb	%1,%0	;\n"
+		"andb	%2,%0	;\n"
+		"eorb	%3,%0"
+	    : "=m" (currentleds)
+	    : "d" (ons), "d" (~offs), "d" (togs));
 	*ledaddr = ~currentleds;
 }

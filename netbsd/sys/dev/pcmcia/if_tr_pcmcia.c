@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tr_pcmcia.c,v 1.2 2000/06/14 22:54:37 soren Exp $	*/
+/*	$NetBSD: if_tr_pcmcia.c,v 1.7 2001/12/15 13:23:22 soren Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -14,7 +14,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *  This product includes software developed by Manuel Bouyer.
+ *  This product includes software developed by Soren S. Jorvang.
+ *  This product includes software developed by Onno van der Linden.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
@@ -36,11 +37,11 @@
  * o IBM Token Ring 16/4 Credit Card Adapter
  * o IBM Token Ring Auto 16/4 Credit Card Adapter
  * o IBM Turbo 16/4 Token Ring PC Card
+ * o 3Com TokenLink Velocity PC Card
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_tr_pcmcia.c,v 1.7 2001/12/15 13:23:22 soren Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,23 +58,6 @@
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -153,7 +137,7 @@ tr_pcmcia_attach(parent, self, aux)
 	struct tr_softc *sc = &psc->sc_tr;
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_config_entry *cfe;
-	bus_addr_t offset;
+	bus_size_t offset;
 
 	psc->sc_pf = pa->pf;
 	cfe = pa->pf->cfe_head.sqh_first;

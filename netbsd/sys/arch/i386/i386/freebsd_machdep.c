@@ -1,7 +1,7 @@
-/*	$NetBSD: freebsd_machdep.c,v 1.22.24.1 2002/04/03 22:10:58 he Exp $	*/
+/*	$NetBSD: freebsd_machdep.c,v 1.32 2002/04/02 22:33:19 christos Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,45 +36,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*-
- * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
- * All rights reserved.
- *
- * This code is derived from software contributed to Berkeley by
- * William Jolitz.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- *	@(#)machdep.c	7.4 (Berkeley) 6/3/91
- */
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: freebsd_machdep.c,v 1.32 2002/04/02 22:33:19 christos Exp $");
 
+#if defined(_KERNEL_OPT)
 #include "opt_vm86.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,7 +71,10 @@ freebsd_setregs(p, epp, stack)
 	register struct pcb *pcb = &p->p_addr->u_pcb;
 
 	setregs(p, epp, stack);
-	pcb->pcb_savefpu.sv_env.en_cw = __FreeBSD_NPXCW__;
+	if (i386_use_fxsave)
+		pcb->pcb_savefpu.sv_xmm.sv_env.en_cw = __FreeBSD_NPXCW__;
+	else
+		pcb->pcb_savefpu.sv_87.sv_env.en_cw = __FreeBSD_NPXCW__;
 }
 
 /*
@@ -131,20 +101,19 @@ freebsd_sendsig(catcher, sig, mask, code)
 	register struct proc *p = curproc;
 	register struct trapframe *tf;
 	struct freebsd_sigframe *fp, frame;
-	struct sigacts *psp = p->p_sigacts;
 	int onstack;
 
 	tf = p->p_md.md_regs;
 
 	/* Do we need to jump onto the signal stack? */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context. */
 	if (onstack)
-		fp = (struct freebsd_sigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-		    psp->ps_sigstk.ss_size);
+		fp = (struct freebsd_sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+		    p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct freebsd_sigframe *)tf->tf_esp;
 	fp--;
@@ -159,15 +128,20 @@ freebsd_sendsig(catcher, sig, mask, code)
 	/* Save register context. */
 #ifdef VM86
 	if (tf->tf_eflags & PSL_VM) {
+		frame.sf_sc.sc_gs = tf->tf_vm86_gs;
+		frame.sf_sc.sc_fs = tf->tf_vm86_fs;
 		frame.sf_sc.sc_es = tf->tf_vm86_es;
 		frame.sf_sc.sc_ds = tf->tf_vm86_ds;
-		frame.sf_sc.sc_eflags = get_vflags(p);
+		frame.sf_sc.sc_efl = get_vflags(p);
+		(*p->p_emul->e_syscall_intern)(p);
 	} else
 #endif
 	{
+		frame.sf_sc.sc_gs = tf->tf_gs;
+		frame.sf_sc.sc_fs = tf->tf_fs;
 		frame.sf_sc.sc_es = tf->tf_es;
 		frame.sf_sc.sc_ds = tf->tf_ds;
-		frame.sf_sc.sc_eflags = tf->tf_eflags;
+		frame.sf_sc.sc_efl = tf->tf_eflags;
 	}
 	frame.sf_sc.sc_edi = tf->tf_edi;
 	frame.sf_sc.sc_esi = tf->tf_esi;
@@ -183,10 +157,11 @@ freebsd_sendsig(catcher, sig, mask, code)
 	frame.sf_sc.sc_ss = tf->tf_ss;
 
 	/* Save signal stack. */
-	frame.sf_sc.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	frame.sf_sc.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 
 	/* Save signal mask. */
-	native_sigset_to_sigset13(mask, &frame.sf_sc.sc_mask);
+	/* XXX freebsd_osigcontext compat? */
+	frame.sf_sc.sc_mask = *mask;
 
 	if (copyout(&frame, fp, sizeof(frame)) != 0) {
 		/*
@@ -204,7 +179,7 @@ freebsd_sendsig(catcher, sig, mask, code)
 	tf->tf_fs = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_es = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_ds = GSEL(GUDATA_SEL, SEL_UPL);
-	tf->tf_eip = (int)psp->ps_sigcode;
+	tf->tf_eip = (int)p->p_sigctx.ps_sigcode;
 	tf->tf_cs = GSEL(GUCODE_SEL, SEL_UPL);
 	tf->tf_eflags &= ~(PSL_T|PSL_VM|PSL_AC);
 	tf->tf_esp = (int)fp;
@@ -212,7 +187,7 @@ freebsd_sendsig(catcher, sig, mask, code)
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 }
 
 /*
@@ -250,10 +225,15 @@ freebsd_sys_sigreturn(p, v, retval)
 	/* Restore register context. */
 	tf = p->p_md.md_regs;
 #ifdef VM86
-	if (context.sc_eflags & PSL_VM) {
+	if (context.sc_efl & PSL_VM) {
+		void syscall_vm86 __P((struct trapframe));
+
+		tf->tf_vm86_gs = context.sc_gs;
+		tf->tf_vm86_fs = context.sc_fs;
 		tf->tf_vm86_es = context.sc_es;
 		tf->tf_vm86_ds = context.sc_ds;
-		set_vflags(p, context.sc_eflags);
+		set_vflags(p, context.sc_efl);
+		p->p_md.md_syscall = syscall_vm86;
 	} else
 #endif
 	{
@@ -263,13 +243,15 @@ freebsd_sys_sigreturn(p, v, retval)
 		 * automatically and generate a trap on violations.  We handle
 		 * the trap, rather than doing all of the checking here.
 		 */
-		if (((context.sc_eflags ^ tf->tf_eflags) & PSL_USERSTATIC) != 0 ||
-		    !USERMODE(context.sc_cs, context.sc_eflags))
+		if (((context.sc_efl ^ tf->tf_eflags) & PSL_USERSTATIC) != 0 ||
+		    !USERMODE(context.sc_cs, context.sc_efl))
 			return (EINVAL);
 
+		tf->tf_gs = context.sc_gs;
+		tf->tf_fs = context.sc_fs;
 		tf->tf_es = context.sc_es;
 		tf->tf_ds = context.sc_ds;
-		tf->tf_eflags = context.sc_eflags;
+		tf->tf_eflags = context.sc_efl;
 	}
 	tf->tf_edi = context.sc_edi;
 	tf->tf_esi = context.sc_esi;
@@ -286,12 +268,13 @@ freebsd_sys_sigreturn(p, v, retval)
 
 	/* Restore signal stack. */
 	if (context.sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask. */
-	native_sigset13_to_sigset(&context.sc_mask, &mask);
+	/* XXX freebsd_osigcontext compat? */
+	mask = context.sc_mask;
 	(void) sigprocmask1(p, SIG_SETMASK, &mask, 0);
 
 	return (EJUSTRETURN);

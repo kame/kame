@@ -1,4 +1,4 @@
-/*	$NetBSD: grf.c,v 1.22.18.1 2000/06/30 16:27:20 simonb Exp $	*/
+/*	$NetBSD: grf.c,v 1.26 2002/03/17 19:40:35 atatat Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman
@@ -60,11 +60,11 @@
 #include <sys/vnode.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_pager.h>
+
 #include <machine/cpu.h>
+
+#include <uvm/uvm_extern.h>
+
 #include <atari/atari/device.h>
 #include <atari/dev/grfioctl.h>
 #include <atari/dev/grfabs_reg.h>
@@ -456,6 +456,6 @@ void			*arg;
 	default:
 			break;
 	}
-	return(EINVAL);
+	return(EPASSTHROUGH);
 }
 #endif	/* NGRF > 0 */

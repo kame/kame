@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.19 2000/05/26 00:36:45 thorpej Exp $
+#	$NetBSD: genassym.cf,v 1.24 2002/05/11 09:39:26 jdolecek Exp $
 
 #
 # Copyright (c) 1982, 1990, 1993
@@ -35,7 +35,9 @@
 #	@(#)genassym.c	8.3 (Berkeley) 1/4/94
 #
 
+if defined(_KERNEL_OPT)
 include "opt_compat_svr4.h"
+endif
 
 include <sys/param.h>
 include <sys/buf.h>
@@ -46,7 +48,6 @@ include <sys/msgbuf.h>
 include <sys/syscall.h>
 include <sys/user.h>
 
-include <vm/vm.h>
 include <uvm/uvm_extern.h>
 
 ifdef COMPAT_SVR4
@@ -56,6 +57,7 @@ endif
 
 include <machine/hp300spu.h>
 include <machine/cpu.h>
+include <machine/intr.h>
 include <machine/psl.h>
 include <machine/reg.h>
 include <machine/pte.h>
@@ -160,6 +162,10 @@ define	SSLEEP			SSLEEP
 define	SRUN			SRUN
 define	SONPROC			SONPROC
 
+# interrupt event counters
+define	HI_EVCNT		offsetof(struct hp300_intr, hi_evcnt)
+define	SIZEOF_HI		sizeof(struct hp300_intr)
+
 # interrupt/fault metering
 define	UVMEXP_INTRS		offsetof(struct uvmexp, intrs)
 
@@ -226,6 +232,10 @@ define	FR_SP			offsetof(struct frame, f_regs[15])
 define	FR_HW			offsetof(struct frame, f_sr)
 define	FR_ADJ			offsetof(struct frame, f_stackadj)
 define	FR_SIZE			sizeof(struct trapframe)
+
+# FP frame offsets
+define	FPF_REGS		offsetof(struct fpframe, fpf_regs[0])
+define	FPF_FPCR		offsetof(struct fpframe, fpf_fpcr)
 
 # system calls
 define	SYS_exit		SYS_exit

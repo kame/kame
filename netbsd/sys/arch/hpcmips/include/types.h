@@ -1,6 +1,6 @@
-/*	$NetBSD: types.h,v 1.2 2000/02/05 00:13:23 cgd Exp $	*/
+/*	$NetBSD: types.h,v 1.5 2002/03/23 03:14:54 shin Exp $	*/
 
 #include <mips/types.h>
 
-#define __BROKEN_CONFIG_UNIT_USAGE
-
+#define	__HAVE_GENERIC_SOFT_INTERRUPTS
+#define	__HAVE_OLD_DISKLABEL

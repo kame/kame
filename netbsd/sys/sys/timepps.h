@@ -1,4 +1,4 @@
-/*	$NetBSD: timepps.h,v 1.3.4.1 2000/07/26 23:09:33 mycroft Exp $	*/
+/*	$NetBSD: timepps.h,v 1.4 2000/07/23 22:56:14 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1998 Jonathan Stone

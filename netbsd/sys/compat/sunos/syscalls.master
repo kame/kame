@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.54 2000/04/09 06:47:39 mrg Exp $
+	$NetBSD: syscalls.master,v 1.59 2002/01/03 00:59:00 mrg Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -31,10 +31,12 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 ; #include's are copied to the syscall names and switch definition files only.
 
+#if defined(_KERNEL_OPT)
 #include "opt_nfsserver.h"
 #include "opt_sysv.h"
 
 #include "fs_nfs.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,6 +47,8 @@
 
 #include <compat/sunos/sunos.h>
 #include <compat/sunos/sunos_syscallargs.h>
+
+%%
 
 0	NOARGS		{ int sys_nosys(void); } syscall
 1	NOARGS		{ int sys_exit(int rval); }
@@ -69,11 +73,11 @@
 17	NOARGS		{ int sys_obreak(char *nsize); } break
 18	OBSOL		old_stat
 19	NOARGS		{ long compat_43_sys_lseek(int fd, long offset, int whence); }
-20	NOARGS		{ pid_t sys_getpid(void); }
+20	NOARGS		{ pid_t sys_getpid_with_ppid(void); }
 21	OBSOL		sunos_old_mount
 22	UNIMPL		System V umount
 23	NOARGS		{ int sys_setuid(uid_t uid); }
-24	NOARGS		{ uid_t sys_getuid(void); }
+24	NOARGS		{ uid_t sys_getuid_with_euid(void); }
 25	STD		{ int sunos_sys_stime(time_t *tp); }
 26	STD		{ long sunos_sys_ptrace(int req, pid_t pid, \
 			    caddr_t addr, int data, char *addr2); }
@@ -100,7 +104,7 @@
 			    u_int offset, u_int scale); }
 45	UNIMPL		
 46	NOARGS		{ int sys_setgid(uid_t gid); }
-47	NOARGS		{ gid_t sys_getgid(void); }
+47	NOARGS		{ gid_t sys_getgid_with_egid(void); }
 48	UNIMPL		sunos_ssig
 49	UNIMPL		reserved for USG
 50	UNIMPL		reserved for USG
@@ -163,7 +167,7 @@
 94	UNIMPL		setdopt
 95	NOARGS		{ int sys_fsync(int fd); }
 96	NOARGS		{ int sys_setpriority(int which, int who, int prio); }
-97	NOARGS		{ int sys_socket(int domain, int type, int protocol); }
+97	STD		{ int sunos_sys_socket(int domain, int type, int protocol); }
 98	NOARGS		{ int sys_connect(int s, caddr_t name, int namelen); }
 99	NOARGS		{ int compat_43_sys_accept(int s, caddr_t name, \
 			    int *anamelen); }
@@ -217,7 +221,7 @@
 133	NOARGS		{ int sys_sendto(int s, caddr_t buf, size_t len, \
 			    int flags, caddr_t to, int tolen); }
 134	NOARGS		{ int sys_shutdown(int s, int how); }
-135	NOARGS		{ int sys_socketpair(int domain, int type, \
+135	STD		{ int sunos_sys_socketpair(int domain, int type, \
 			    int protocol, int *rsv); }
 136	NOARGS		{ int sys_mkdir(char *path, int mode); }
 137	NOARGS		{ int sys_rmdir(char *path); }

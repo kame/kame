@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.37.2.1 2001/03/30 21:31:48 he Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.45 2001/11/15 18:06:14 soren Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -46,6 +46,14 @@
  */
 
 /*
+ * Page size on the IA-32 is not variable in the traditional sense.
+ * We override the PAGE_* definitions to compile-time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
+/*
  * Virtual address space arrangement. On 386, both user and kernel
  * share the address space, not unlike the vax.
  * USRTEXT is the start of the user text/data space, while USRSTACK
@@ -89,47 +97,35 @@
 #define	USRIOSIZE 	300
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
 /* user/kernel map constants */
 #define VM_MIN_ADDRESS		((vaddr_t)0)
-/* (PDSLOT_PTE << PDSHIFT) - UPAGES*NBPG */
-#define VM_MAXUSER_ADDRESS	((vaddr_t)0xbfbfe000)
-/* (PDSLOT_PTE << PDSHIFT) + (PDSLOT_PTE << PGSHIFT) */
-#define VM_MAX_ADDRESS		((vaddr_t)0xbfeff000)
-/* PDSLOT_KERN << PDSHIFT */
-#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xc0000000)
-/* PDSLOT_APTE << PDSHIFT */
-#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xffc00000)
+#define	VM_MAXUSER_ADDRESS	\
+			((vaddr_t)((PDSLOT_PTE << PDSHIFT) - (UPAGES * NBPG)))
+#define	VM_MAX_ADDRESS		\
+		((vaddr_t)((PDSLOT_PTE << PDSHIFT) + (PDSLOT_PTE << PGSHIFT)))
+#define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)(PDSLOT_KERN << PDSHIFT))
+#define	VM_MAX_KERNEL_ADDRESS	((vaddr_t)(PDSLOT_APTE << PDSHIFT))
 
 /* XXX max. amount of KVM to be used by buffers. */
 #ifndef VM_MAX_KERNEL_BUF
-#define VM_MAX_KERNEL_BUF \
-	((VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) / 1024 * 7 / 10 * 1024)
+#define VM_MAX_KERNEL_BUF	(384 * 1024 * 1024)
 #endif
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
 
-#define VM_PHYSSEG_MAX		3	/* 1 "hole" + 2 free lists */
+#define VM_PHYSSEG_MAX		5	/* 1 "hole" + 4 free lists */
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_BIGFIRST
 #define VM_PHYSSEG_NOADD		/* can't add RAM after vm_mem_init */
 
 #define	VM_NFREELIST		2
 #define	VM_FREELIST_DEFAULT	0
 #define	VM_FREELIST_FIRST16	1
+
+#define	__HAVE_PMAP_PHYSSEG
 
 /*
  * pmap specific data stored in the vm_physmem[] array

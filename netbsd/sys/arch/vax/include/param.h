@@ -1,4 +1,4 @@
-/*      $NetBSD: param.h,v 1.43.2.1 2000/07/23 03:49:34 itojun Exp $    */
+/*      $NetBSD: param.h,v 1.50 2002/04/21 21:00:29 ragge Exp $    */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -68,7 +68,7 @@
 
 #define	PGSHIFT		12			/* LOG2(NBPG) */
 #define	NBPG		(1 << PGSHIFT)		/* (1 << PGSHIFT) bytes/page */
-#define	PGOFSET		(NBPG - 1)               /* byte offset into page */
+#define	PGOFSET		(NBPG - 1)		/* byte offset into page */
 
 #define	VAX_PGSHIFT	9
 #define	VAX_NBPG	(1 << VAX_PGSHIFT)
@@ -81,7 +81,7 @@
 #define	DEV_BSIZE	(1 << DEV_BSHIFT)
 
 #define BLKDEV_IOSIZE	2048
-#define	MAXPHYS		(63 * 1024)	/* max raw I/O transfer size */
+#define	MAXPHYS		(64 * 1024)	/* max raw I/O transfer size */
 #define	MAXBSIZE	0x4000		/* max FS block size - XXX */
 
 #define	UPAGES		2		/* pages of u-area */
@@ -93,35 +93,40 @@
 #endif
 
 /*
+ * KVA is very tight on vax, reduce the amount of KVA used by pipe
+ * "direct" write code to reasonably low value.
+ */
+#ifndef PIPE_DIRECT_CHUNK
+#define PIPE_DIRECT_CHUNK	65536
+#endif
+
+/*
  * Constants related to network buffer management.
  * MCLBYTES must be no larger than NBPG (the software page size), and,
  * on machines that exchange pages of input or output buffers with mbuf
  * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
  * of the hardware page size.
  */
-
-#ifndef	MSIZE
 #define	MSIZE		256		/* size of an mbuf */
-#endif	/* MSIZE */
 
 #ifndef	MCLSHIFT
 #define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
+					/* 2K cluster can hold Ether frame */
 #endif	/* MCLSHIFT */
-#define	MCLBYTES	(1 << MCLSHIFT)	/* size of an m_buf cluster */
-#define	MCLOFSET	(MCLBYTES - 1)	/* offset within an m_buf cluster */
+
+#define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
 
 #ifndef NMBCLUSTERS
-
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#endif
 
 #ifdef GATEWAY
 #define	NMBCLUSTERS	512		/* map size, max cluster allocation */
 #else
 #define	NMBCLUSTERS	256		/* map size, max cluster allocation */
-#endif	/* GATEWAY */
-#endif	/* NMBCLUSTERS */
+#endif
+#endif
 
 /*
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
@@ -144,8 +149,8 @@
 #define	btop(x)		(((unsigned)(x)) >> PGSHIFT)
 
 /* bytes to disk blocks */
-#define	btodb(x)	((x) >> DEV_BSHIFT)
-#define	dbtob(x)	((x) << DEV_BSHIFT)
+#define	btodb(x)	((unsigned long)(x) >> DEV_BSHIFT)
+#define	dbtob(x)	((unsigned long)(x) << DEV_BSHIFT)
 
 /* MD conversion macros */
 #define	vax_btoc(x)	(((unsigned)(x) + VAX_PGOFSET) >> VAX_PGSHIFT)

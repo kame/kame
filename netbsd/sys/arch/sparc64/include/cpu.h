@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.20.2.2 2000/10/18 16:31:28 tv Exp $ */
+/*	$NetBSD: cpu.h,v 1.31 2002/05/14 21:21:45 eeh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -146,11 +146,35 @@ struct clockframe {
 };
 
 #define	CLKF_USERMODE(framep)	(((framep)->t.tf_tstate & TSTATE_PRIV) == 0)
+/*
+ * XXX Disable CLKF_BASEPRI() for now.  If we use a counter-timer for
+ * the clock, the interrupt remains blocked until the interrupt handler
+ * returns and we write to the clear interrupt register.  If we use 
+ * %tick for the clock, we could get multiple interrupts, but the 
+ * currently enabled INTR_INTERLOCK will prevent the interrupt from being
+ * posted twice anyway.
+ * 
+ * Switching to %tick for all machines and disabling INTR_INTERLOCK
+ * in locore.s would allow us to take advantage of CLKF_BASEPRI().
+ */
+#if 0
 #define	CLKF_BASEPRI(framep)	(((framep)->t.tf_oldpil) == 0)
+#else
+#define	CLKF_BASEPRI(framep)	(0)
+#endif
 #define	CLKF_PC(framep)		((framep)->t.tf_pc)
-#define	CLKF_INTR(framep)	((!CLKF_USERMODE(framep))&&\
-				(((framep)->t.tf_kstack < (vaddr_t)EINTSTACK)&&\
-				((framep)->t.tf_kstack > (vaddr_t)INTSTACK)))
+/* Since some files in sys/kern do not know BIAS, I'm using 0x7ff here */
+#define	CLKF_INTR(framep)						\
+	((!CLKF_USERMODE(framep))&&					\
+		(((framep)->t.tf_out[6] & 1 ) ?				\
+			(((vaddr_t)(framep)->t.tf_out[6] <		\
+				(vaddr_t)EINTSTACK-0x7ff) &&		\
+			((vaddr_t)(framep)->t.tf_out[6] >		\
+				(vaddr_t)INTSTACK-0x7ff)) :		\
+			(((vaddr_t)(framep)->t.tf_out[6] <		\
+				(vaddr_t)EINTSTACK) &&			\
+			((vaddr_t)(framep)->t.tf_out[6] >		\
+				(vaddr_t)INTSTACK))))
 
 /*
  * Software interrupt request `register'.
@@ -170,11 +194,9 @@ extern struct intrhand soft01intr, soft01net, soft01clock;
 #if 0
 #define setsoftint()	send_softint(-1, IPL_SOFTINT, &soft01intr)
 #define setsoftnet()	send_softint(-1, IPL_SOFTNET, &soft01net)
-#define setsoftclock()	send_softint(-1, IPL_SOFTCLOCK, &soft01clock)
 #else
 void setsoftint __P((void));
 void setsoftnet __P((void));
-void setsoftclock __P((void));
 #endif
 
 int	want_ast;
@@ -184,7 +206,7 @@ int	want_ast;
  * or after the current trap/syscall if in system mode.
  */
 int	want_resched;		/* resched() was called */
-#define	need_resched()		(want_resched = 1, want_ast = 1)
+#define	need_resched(ci)	(want_resched = 1, want_ast = 1)
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -224,7 +246,7 @@ struct intrhand {
 	volatile u_int64_t	*ih_map;	/* Interrupt map reg */
 	volatile u_int64_t	*ih_clr;	/* clear interrupt reg */
 };
-extern struct intrhand *intrhand[15];
+extern struct intrhand *intrhand[];
 extern struct intrhand *intrlev[MAXINTNUM];
 
 void	intr_establish __P((int level, struct intrhand *));
@@ -248,7 +270,7 @@ int	statintr __P((void *));	/* level 14 (statclock) interrupt code */
 struct fpstate64;
 void	savefpstate __P((struct fpstate64 *));
 void	loadfpstate __P((struct fpstate64 *));
-int	probeget __P((paddr_t, int, int));
+u_int64_t	probeget __P((paddr_t, int, int));
 int	probeset __P((paddr_t, int, int, u_int64_t));
 #if 0
 void	write_all_windows __P((void));
@@ -271,7 +293,6 @@ void	remrq __P((struct proc *));
 /* trap.c */
 void	kill_user_windows __P((struct proc *));
 int	rwindow_save __P((struct proc *));
-void	child_return __P((void *));
 /* amd7930intr.s */
 void	amd7930_trap __P((void));
 /* cons.c */

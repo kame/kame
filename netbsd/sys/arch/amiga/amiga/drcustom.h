@@ -1,13 +1,13 @@
-/* 
- * $NetBSD: drcustom.h,v 1.4 1999/09/25 21:47:04 is Exp $
- * 
+/*
+ * $NetBSD: drcustom.h,v 1.7 2002/05/14 00:08:21 matt Exp $
+ *
  * Motherboard addresses for the DraCo.
  *
  */
 
 #ifndef _DRACO_HARDWARE
 #define _DRACO_HARDWARE
- 
+
 /*
  * CIA-B is available only in very early models.
  * CIA-A is available only up to revision 3.
@@ -53,11 +53,11 @@
 #ifdef _KERNEL
 #ifndef _LOCORE
 
-vaddr_t DRCCADDR;
+extern vaddr_t DRCCADDR;
 
-volatile u_int8_t *draco_intena, *draco_intpen, *draco_intfrc;
-volatile u_int8_t *draco_misc;
-volatile struct drioct *draco_ioct;
+extern volatile u_int8_t *draco_intena, *draco_intpen, *draco_intfrc;
+extern volatile u_int8_t *draco_misc;
+extern volatile struct drioct *draco_ioct;
 
 struct drioct {
 	u_int8_t dum0;
@@ -128,4 +128,4 @@ struct drioct {
 #endif
 #endif
 
-#endif
+#endif /* _DRACO_HARDWARE */

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.h,v 1.12.2.1 2001/03/30 21:34:58 he Exp $	*/
+/*	$NetBSD: linux_machdep.h,v 1.21 2002/02/15 16:48:00 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 2000 The NetBSD Foundation, Inc.
@@ -38,6 +38,8 @@
 
 #ifndef _I386_LINUX_MACHDEP_H
 #define _I386_LINUX_MACHDEP_H
+
+#include <compat/linux/common/linux_signal.h>
 
 /*
  * The Linux sigcontext, pretty much a standard 386 trapframe.
@@ -85,7 +87,6 @@ struct linux_sigframe {
 #ifdef _KERNEL
 __BEGIN_DECLS
 void linux_sendsig __P((sig_t, int, sigset_t *, u_long));
-dev_t linux_fakedev __P((dev_t));
 __END_DECLS
 #endif /* _KERNEL */
 
@@ -127,12 +128,11 @@ __END_DECLS
 #define LINUX_VT_RELDISP    0x5605
 #define LINUX_VT_ACTIVATE   0x5606
 #define LINUX_VT_WAITACTIVE 0x5607
-#define LINUX_VT_DISALLOCATE 0x5608
+#define LINUX_VT_DISALLOCATE	0x5608
 
 /*
  * This range used by VMWare (XXX)
  */
-
 #define LINUX_VMWARE_NONE 200
 #define LINUX_VMWARE_LAST 237
 
@@ -140,7 +140,13 @@ __END_DECLS
  * Range of ioctls to just pass on, so that LKMs (like VMWare) can
  * handle them.
  */
-#define LINUX_IOCTL_MIN_PASS  LINUX_VMWARE_NONE
-#define LINUX_IOCTL_MAX_PASS  (LINUX_VMWARE_LAST+8)
+#define LINUX_IOCTL_MIN_PASS	LINUX_VMWARE_NONE
+#define LINUX_IOCTL_MAX_PASS	(LINUX_VMWARE_LAST+8)
+
+#ifdef _KERNEL
+__BEGIN_DECLS
+void linux_syscall_intern __P((struct proc *));
+__END_DECLS
+#endif /* !_KERNEL */
 
 #endif /* _I386_LINUX_MACHDEP_H */

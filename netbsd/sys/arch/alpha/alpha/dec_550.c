@@ -1,4 +1,4 @@
-/* $NetBSD: dec_550.c,v 1.10 2000/06/20 03:48:53 matt Exp $ */
+/* $NetBSD: dec_550.c,v 1.16 2001/12/02 22:54:26 bouyer Exp $ */
 
 /*
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
@@ -30,15 +30,19 @@
  * Additional Copyright (c) 1997 by Matthew Jacob for NASA/Ames Research Center
  */
 
+#include "opt_kgdb.h"
+
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_550.c,v 1.10 2000/06/20 03:48:53 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_550.c,v 1.16 2001/12/02 22:54:26 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/termios.h>
 #include <dev/cons.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/rpb.h>
 #include <machine/autoconf.h>
@@ -62,6 +66,7 @@ __KERNEL_RCSID(0, "$NetBSD: dec_550.c,v 1.10 2000/06/20 03:48:53 matt Exp $");
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 #include <dev/ata/atavar.h>
+#include <dev/ata/wdvar.h>
 
 /* Write this to Pyxis General Purpose Output to turn off the power. */
 #define	DEC_550_PYXIS_GPO_POWERDOWN	0x00000400
@@ -80,6 +85,15 @@ static void dec_550_cons_init __P((void));
 static void dec_550_device_register __P((struct device *, void *));
 static void dec_550_powerdown __P((void));
 
+#ifdef KGDB
+#include <machine/db_machdep.h>
+
+static const char *kgdb_devlist[] = {
+	"com",
+	NULL,
+};
+#endif /* KGDB */
+
 void
 dec_550_init()
 {
@@ -95,6 +109,11 @@ dec_550_init()
 	platform.cons_init = dec_550_cons_init;
 	platform.device_register = dec_550_device_register;
 	platform.powerdown = dec_550_powerdown;
+
+	/*
+	 * If Miata systems have a secondary cache, it's 2MB.
+	 */
+	uvmexp.ncolors = atop(2 * 1024 * 1024);
 }
 
 static void
@@ -110,7 +129,7 @@ dec_550_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case CTB_PRINTERPORT: 
 		/* serial console ... */
 		/* XXX */
 		{
@@ -129,7 +148,7 @@ dec_550_cons_init()
 			break;
 		}
 
-	case 3:
+	case CTB_GRAPHICS:
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
@@ -155,6 +174,10 @@ dec_550_cons_init()
 		panic("consinit: unknown console type %ld\n",
 		    ctb->ctb_term_type);
 	}
+#ifdef KGDB
+	/* Attach the KGDB device. */
+	alpha_kgdb_init(kgdb_devlist, &ccp->cc_iot);
+#endif /* KGDB */
 }
 
 static void
@@ -230,11 +253,11 @@ dec_550_device_register(dev, aux)
 		if (parent->dv_parent != scsipidev)
 			return;
 
-		if (sa->sa_sc_link->type == BUS_SCSI
-		    && b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
-			return;
-		if (sa->sa_sc_link->type == BUS_ATAPI
-		    && b->unit / 100 != sa->sa_sc_link->scsipi_atapi.drive) 
+		if ((sa->sa_periph->periph_channel->chan_bustype->bustype_type
+		     == SCSIPI_BUSTYPE_SCSI ||
+		     sa->sa_periph->periph_channel->chan_bustype->bustype_type
+		     == SCSIPI_BUSTYPE_ATAPI)
+		    && b->unit / 100 != sa->sa_periph->periph_target)
 			return;
 
 		/* XXX LUN! */
@@ -264,7 +287,7 @@ dec_550_device_register(dev, aux)
 	 * Support to boot from IDE drives.
 	 */
 	if ((ideboot || scsiboot) && !strcmp(cd->cd_name, "wd")) {
-		struct ata_atapi_attach *aa_link = aux;
+		struct ata_device *adev = aux;
 		if ((strncmp("pciide", parent->dv_xname, 6) != 0)) {
 			return;
 		} else {
@@ -272,11 +295,11 @@ dec_550_device_register(dev, aux)
 				return;
 		}
 		DR_VERBOSE(printf("\nAtapi info: drive: %d, channel %d\n",
-		    aa_link->aa_drv_data->drive, aa_link->aa_channel));
+		    adev->adev_drv_data->drive, adev->adev_channel));
 		DR_VERBOSE(printf("Bootdev info: unit: %d, channel: %d\n",
 		    b->unit, b->channel));
-		if (b->unit != aa_link->aa_drv_data->drive ||
-		    b->channel != aa_link->aa_channel)
+		if (b->unit != adev->adev_drv_data->drive ||
+		    b->channel != adev->adev_channel)
 			return;
 
 		/* we've found it! */

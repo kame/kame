@@ -1,4 +1,4 @@
-/*	$NetBSD: scanc.c,v 1.5 2000/03/30 12:19:46 augustss Exp $	*/
+/*	$NetBSD: scanc.c,v 1.6 2001/08/09 08:03:34 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989 Regents of the University of California.

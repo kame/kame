@@ -1,10 +1,12 @@
-#	$NetBSD: MINBAR,v 1.17.2.2 2001/04/25 09:09:21 he Exp $
+#	$NetBSD: MINBAR,v 1.38.4.1 2002/08/01 04:23:45 lukem Exp $
 #	From: GENERIC,v 1.212 1999/01/06 23:30:53 thorpej Exp
 #
 #	MINBAR -- offshore CVS server
 #
 
 include "arch/i386/conf/std.i386"
+
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
 maxusers	32		# estimated number of users
 
@@ -17,20 +19,20 @@ options 	I686_CPU
 # CPU-related options.
 #options 	MATH_EMULATE	# floating point emulation
 #options 	VM86		# virtual 8086 emulation
-options 	USER_LDT	# user-settable LDT; used by WINE
+#options 	USER_LDT	# user-settable LDT; used by WINE
 # eliminate delay no-ops in I/O; recommended on all but very old machines
-#options 	DUMMY_NOPS
+options 	DUMMY_NOPS
 
 # delay between "rebooting ..." message and hardware reset, in milliseconds
 #options 	CPURESET_DELAY=2000
 
 # Misc. i386-specific options
-options 	XSERVER		# X server support in console drivers
+#options 	XSERVER		# X server support in console drivers
 #options 	XSERVER_DDB	# PF12 gets you into DDB when X is running
 
 # This option allows you to force a serial console at the specified
 # I/O address.   see console(4) for details.
-#options 	"CONSDEVNAME=\"com\"",CONADDR=0x2f8,CONSPEED=57600
+#options 	CONSDEVNAME="\"com\"",CONADDR=0x2f8,CONSPEED=57600
 #	you don't want the option below ON iff you are using the
 #	serial console option of the new boot strap code.
 #options 	CONS_OVERRIDE	# Always use above! independent of boot info
@@ -45,20 +47,26 @@ options 	XSERVER		# X server support in console drivers
 
 # Standard system options
 
-options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
-options 	INSECURE	# disable kernel security levels
+#options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
+#options 	INSECURE	# disable kernel security levels
 
 options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 options 	NTP		# NTP phase/frequency locked loop
 
 options 	KTRACE		# system call tracing via ktrace(1)
 
-options 	SYSVMSG		# System V-like message queues
+#options 	SYSVMSG		# System V-like message queues
 options 	SYSVSEM		# System V-like semaphores
 options 	SYSVSHM		# System V-like memory sharing
 #options 	SHMMAXPGS=1024	# 1024 pages is the default
 
+options 	NMBCLUSTERS=2048
+options 	BUFCACHE=10
+
 #options 	LKM		# loadable kernel modules
+
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
 
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC	# expensive kernel consistency checks
@@ -67,7 +75,7 @@ options 	DIAGNOSTIC	# expensive kernel consistency checks
 options 	DDB		# in-kernel debugger
 options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 #options 	KGDB		# remote debugger
-#options 	"KGDB_DEVNAME=\"com\"",KGDBADDR=0x3f8,KGDBRATE=9600
+#options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
 #makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
@@ -80,6 +88,7 @@ options 	COMPAT_13	# NetBSD 1.3,
 options 	COMPAT_14	# NetBSD 1.4,
 options 	COMPAT_43	# and 4.3BSD
 options 	COMPAT_386BSD_MBRPART # recognize old partition ID
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 #options 	COMPAT_SVR4	# binary compatibility with SVR4
 #options 	COMPAT_IBCS2	# binary compatibility with SCO and ISC
@@ -92,8 +101,8 @@ file-system 	FFS		# UFS
 #file-system 	LFS		# log-structured file system
 file-system 	MFS		# memory file system
 #file-system 	NFS		# Network File System client
-file-system 	CD9660		# ISO 9660 + Rock Ridge file system
-file-system 	MSDOSFS		# MS-DOS file system
+#file-system 	CD9660		# ISO 9660 + Rock Ridge file system
+#file-system 	MSDOSFS		# MS-DOS file system
 file-system 	FDESC		# /dev/fd
 #file-system 	KERNFS		# /kern
 #file-system 	NULLFS		# loopback file system
@@ -113,6 +122,7 @@ file-system 	FDESC		# /dev/fd
 # Networking options
 #options 	GATEWAY		# packet forwarding
 options 	INET		# IP + ICMP + TCP + UDP
+options 	INET6		# IPV6
 #options 	MROUTING	# IP multicast routing
 #options 	NS		# XNS
 #options 	NSIP		# XNS tunneling over IP
@@ -125,9 +135,7 @@ options 	INET		# IP + ICMP + TCP + UDP
 #options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
 #options 	IPFILTER_LOG	# ipmon(8) log support
-
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not recommended.
-#options 	TCP_COMPAT_42
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 # These options enable verbose messages for several subsystems.
 # Warning, these may compile large string tables into the kernel!
@@ -214,10 +222,7 @@ npx0	at isa? port 0xf0 irq 13	# x86 math coprocessor
 # wscons
 pckbc0	at isa?			# pc keyboard controller
 pckbd*	at pckbc?		# PC keyboard
-# "opms" should not be enabled together with "pms" or "pmsi"
 #pms*		at pckbc?		# PS/2 mouse for wsmouse
-#pmsi*		at pckbc?	# PS/2 "Intelli"mouse for wsmouse
-#opms*		at pckbc?		# backwards compatible PS/2 mouse
 #vga0		at isa?
 vga*		at pci?
 #pcdisplay0	at isa?			# CGA, MDA, EGA, HGA
@@ -225,7 +230,6 @@ wsdisplay*	at vga? console ?
 #wsdisplay*	at pcdisplay? console ?
 wskbd*	at pckbd? console ?
 #wsmouse*	at pms?
-#wsmouse*	at pmsi?
 
 pcppi0	at isa?
 sysbeep0	at pcppi?
@@ -282,7 +286,6 @@ ahc*	at pci? dev ? function ?	# Adaptec [23]94x, aic78x0 SCSI
 #bha*	at pci? dev ? function ?	# BusLogic 9xx SCSI
 #dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID
 #isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
-#ncr*	at pci? dev ? function ?	# NCR 53c8xx SCSI
 #pcscp*	at pci? dev ? function ?	# AMD 53c974 PCscsi-PCI SCSI
 
 # EISA SCSI controllers
@@ -306,7 +309,7 @@ ahc*	at pci? dev ? function ?	# Adaptec [23]94x, aic78x0 SCSI
 #aic0	at isa? port 0x340 irq 11	# Adaptec 152[02] SCSI
 #bha0	at isa? port 0x330 irq ? drq ?	# BusLogic [457]4X SCSI
 #bha1	at isa? port 0x334 irq ? drq ?
-#nca0	at isa? port 0x360 irq 15	# Port-mapped NCR 53C80 contoller
+#nca0	at isa? port 0x360 irq 15	# Port-mapped NCR 53C80 controller
 #nca1	at isa? iomem 0xd8000 irq 5	# Memory-mapped controller (T128, etc.)
 #sea0	at isa? iomem 0xc8000 irq 5	# Seagate/Future Domain SCSI
 #uha0	at isa? port 0x330 irq ? drq ?	# UltraStor [13]4f SCSI
@@ -404,10 +407,9 @@ fd*	at fdc? drive ?			# the drives themselves
 # Network Interfaces
 
 # PCI network interfaces
-#de*	at pci? dev ? function ?	# DEC 21x4x-based Ethernet
 #en*	at pci? dev ? function ?	# ENI/Adaptec ATM
 #ep*	at pci? dev ? function ?	# 3Com 3c59x
-#ex*	at pci? dev ? function ?	# 3Com 90x[B]
+#ex*	at pci? dev ? function ?	# 3Com 90x[BC]
 #epic*	at pci? dev ? function ?	# SMC EPIC/100 Ethernet
 #esh*	at pci? dev ? function ?	# Essential HIPPI card
 #fpa*	at pci? dev ? function ?	# DEC DEFPA FDDI
@@ -415,6 +417,7 @@ fxp*	at pci? dev ? function ?	# Intel EtherExpress PRO 10+/100B
 #le*	at pci? dev ? function ?	# PCnet-PCI Ethernet
 #ne*	at pci? dev ? function ?	# NE2000-compatible Ethernet
 #tl*	at pci? dev ? function ?	# ThunderLAN-based Ethernet
+#tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
 
 # EISA network interfaces
 #ep*	at eisa? slot ?			# 3Com 3c579 Ethernet
@@ -457,7 +460,7 @@ fxp*	at pci? dev ? function ?	# Intel EtherExpress PRO 10+/100B
 
 # MII/PHY support
 #exphy*	at mii? phy ?			# 3Com internal PHYs
-#icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS1890
+#icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS189x
 inphy*	at mii? phy ?			# Intel 82555 PHYs
 #lxtphy*	at mii? phy ?			# Level One LXT-970 PHYs
 #nsphy*	at mii? phy ?			# NS83840 PHYs
@@ -469,27 +472,30 @@ inphy*	at mii? phy ?			# Intel 82555 PHYs
 # USB Controller and Devices
 
 # PCI USB controllers
-uhci*	at pci?				# Universal Host Controller (Intel)
+#uhci*	at pci?				# Universal Host Controller (Intel)
 #ohci*	at pci?				# Open Host Controller
 
 # USB bus support
-usb*	at uhci?
+#usb*	at uhci?
 #usb*	at ohci?
 
 # USB Hubs
-uhub*	at usb?
-uhub*	at uhub? port ? configuration ? interface ?
+#uhub*	at usb?
+#uhub*	at uhub? port ? configuration ? interface ?
+
+# USB HID device
+#uhidev*	at uhub? port ? configuration ? interface ?
 
 # USB Mice
-#ums*	at uhub? port ? configuration ? interface ?
+#ums*	at uhidev? reportid ?
 #wsmouse*	at ums?
 
 # USB Keyboards
-#ukbd*	at uhub? port ? configuration ? interface ?
+#ukbd*	at uhidev? reportid ?
 #wskbd*	at ukbd? console ?
 
 # USB Generic HID devices
-#uhid*	at uhub? port ? configuration ? interface ?
+#uhid*	at uhidev? reportid ?
 
 # USB Printer
 #ulpt*	at uhub? port ? configuration ? interface ?
@@ -519,12 +525,12 @@ uhub*	at uhub? port ? configuration ? interface ?
 #aria0	at isa? port 0x290 irq 10 		# Aria
 #gus0	at isa? port 0x220 irq 7 drq 1 drq2 6	# Gravis Ultra Sound
 #pas0	at isa? port 0x220 irq 7 drq 1		# ProAudio Spectrum
-#pss0	at isa? port 0x220 irq 7 drq 6  	# Personal Sound System
+#pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
 #sp0	at pss0 port 0x530 irq 10 drq 0		# 	sound port driver
 #sb0	at isa? port 0x220 irq 5 drq 1 drq2 5	# SoundBlaster
 #wss0	at isa? port 0x530 irq 10 drq 0	drq2 1	# Windows Sound System
 
-# OPL[23] FM syntheziers
+# OPL[23] FM synthesizers
 #opl0	at isa? port 0x388	# use only if not attached to sound card
 #opl*	at ess?
 #opl*	at sb?
@@ -563,7 +569,6 @@ uhub*	at uhub? port ? configuration ? interface ?
 #olms1	at isa? port 0x238 irq 5
 #omms0	at isa? port 0x23c irq 5	# Microsoft InPort mouse
 #omms1	at isa? port 0x238 irq 5
-#opms0	at pc? irq 12		# PS/2 auxiliary port mouse
 
 
 # Joysticks
@@ -595,20 +600,22 @@ pseudo-device	vnd		4	# disk-like interface to files
 
 # network pseudo-devices
 pseudo-device	bpfilter	8	# Berkeley packet filter
-#pseudo-device	ipfilter		# IP filter (firewall) and NAT
+pseudo-device	ipfilter		# IP filter (firewall) and NAT
 pseudo-device	loop			# network loopback
 #pseudo-device	ppp		2	# Point-to-Point Protocol
 #pseudo-device	sl		2	# Serial Line IP
 #pseudo-device	strip		2	# Starmode Radio IP (Metricom)
 #pseudo-device	tun		2	# network tunneling over tty
 #pseudo-device	gre		2	# generic L3 over IP tunnel
+pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 
 # miscellaneous pseudo-devices
-pseudo-device	pty		64	# pseudo-terminals
+pseudo-device	pty			# pseudo-terminals
 #pseudo-device	tb		1	# tablet line discipline
 #pseudo-device	sequencer	1	# MIDI sequencer
-#pseudo-device	rnd			# /dev/random and in-kernel generator
+pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness as well (BROKEN)
+pseudo-device	clockctl		# user control of clock subsystem
 
 # a pseudo device needed for Coda	# also needs CODA (above)
 #pseudo-device	vcoda		4	# coda minicache <-> venus comm.

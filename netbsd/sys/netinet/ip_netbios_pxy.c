@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_netbios_pxy.c,v 1.1.2.1 2002/02/09 16:55:22 he Exp $	*/
+/*	$NetBSD: ip_netbios_pxy.c,v 1.2 2002/04/01 16:44:28 jdolecek Exp $	*/
 
 /*
  * Simple netbios-dgm transparent proxy for in-kernel use.
@@ -33,6 +33,8 @@
  *
  * Id: ip_netbios_pxy.c,v 1.1.2.3 2002/01/09 09:28:37 darrenr Exp
  */
+
+__KERNEL_RCSID(1, "$NetBSD: ip_netbios_pxy.c,v 1.2 2002/04/01 16:44:28 jdolecek Exp $");
 
 #define	IPF_NETBIOS_PROXY
 

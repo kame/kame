@@ -1,4 +1,4 @@
-/*  $NetBSD: yds_hwmcode.h,v 1.1.6.1 2001/05/01 11:44:28 he Exp $    */
+/*  $NetBSD: yds_hwmcode.h,v 1.1 2001/03/30 14:32:08 minoura Exp $    */
 
 /*=============================================================================
  Copyright (c) 1997-1999  Yamaha Corporation. All Rights Reserved.

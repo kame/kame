@@ -1,4 +1,4 @@
-/*	$NetBSD: start.S,v 1.1.6.1 2000/12/24 07:48:46 jhawk Exp $	*/
+/*	$NetBSD: start.S,v 1.2 2000/11/25 04:42:07 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Izumi Tsutsui. All rights reserved.

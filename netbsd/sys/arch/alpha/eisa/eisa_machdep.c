@@ -1,4 +1,4 @@
-/* $NetBSD: eisa_machdep.c,v 1.4.2.1 2000/08/11 18:00:05 thorpej Exp $ */
+/* $NetBSD: eisa_machdep.c,v 1.4 2000/08/11 01:02:39 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: eisa_machdep.c,v 1.4.2.1 2000/08/11 18:00:05 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: eisa_machdep.c,v 1.4 2000/08/11 01:02:39 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

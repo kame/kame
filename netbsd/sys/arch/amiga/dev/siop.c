@@ -1,4 +1,4 @@
-/*	$NetBSD: siop.c,v 1.43 1999/09/30 22:59:53 thorpej Exp $	*/
+/*	$NetBSD: siop.c,v 1.47 2002/02/24 15:20:05 is Exp $ */
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -45,6 +45,9 @@
 
 #include "opt_ddb.h"
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: siop.c,v 1.47 2002/02/24 15:20:05 is Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -72,20 +75,20 @@
 #define	SCSI_DATA_WAIT	500000	/* wait per data in/out step */
 #define	SCSI_INIT_WAIT	500000	/* wait per step (both) during init */
 
-void siop_select __P((struct siop_softc *));
-void siopabort __P((struct siop_softc *, siop_regmap_p, char *));
-void sioperror __P((struct siop_softc *, siop_regmap_p, u_char));
-void siopstart __P((struct siop_softc *));
-int  siop_checkintr __P((struct siop_softc *, u_char, u_char, u_char, int *));
-void siopreset __P((struct siop_softc *));
-void siopsetdelay __P((int));
-void siop_scsidone __P((struct siop_acb *, int));
-void siop_sched __P((struct siop_softc *));
-int  siop_poll __P((struct siop_softc *, struct siop_acb *));
-void siopintr __P((struct siop_softc *));
-void scsi_period_to_siop __P((struct siop_softc *, int));
-void siop_start __P((struct siop_softc *, int, int, u_char *, int, u_char *, int)); 
-void siop_dump_acb __P((struct siop_acb *));
+void siop_select(struct siop_softc *);
+void siopabort(struct siop_softc *, siop_regmap_p, char *);
+void sioperror(struct siop_softc *, siop_regmap_p, u_char);
+void siopstart(struct siop_softc *);
+int  siop_checkintr(struct siop_softc *, u_char, u_char, u_char, int *);
+void siopreset(struct siop_softc *);
+void siopsetdelay(int);
+void siop_scsidone(struct siop_acb *, int);
+void siop_sched(struct siop_softc *);
+void siop_poll(struct siop_softc *, struct siop_acb *);
+void siopintr(struct siop_softc *);
+void scsi_period_to_siop(struct siop_softc *, int);
+void siop_start(struct siop_softc *, int, int, u_char *, int, u_char *, int);
+void siop_dump_acb(struct siop_acb *);
 
 /* 53C710 script */
 const
@@ -164,8 +167,8 @@ int	siopphmm = 0;
 	siop_trix = (siop_trix + 4) & (SIOP_TRACE_SIZE - 1);
 u_char	siop_trbuf[SIOP_TRACE_SIZE];
 int	siop_trix;
-void siop_dump __P((struct siop_softc *));
-void siop_dump_trace __P((void));
+void siop_dump(struct siop_softc *);
+void siop_dump_trace(void);
 #else
 #define SIOP_TRACE(a,b,c,d)
 #endif
@@ -175,8 +178,7 @@ void siop_dump_trace __P((void));
  * default minphys routine for siop based controllers
  */
 void
-siop_minphys(bp)
-	struct buf *bp;
+siop_minphys(struct buf *bp)
 {
 
 	/*
@@ -189,64 +191,79 @@ siop_minphys(bp)
  * used by specific siop controller
  *
  */
-int
-siop_scsicmd(xs)
-	struct scsipi_xfer *xs;
+void
+siop_scsipi_request(struct scsipi_channel *chan, scsipi_adapter_req_t req,
+                    void *arg)
 {
+	struct scsipi_xfer *xs;
+	struct scsipi_periph *periph;
 	struct siop_acb *acb;
-	struct siop_softc *sc;
-	struct scsipi_link *slp;
+	struct siop_softc *sc = (void *)chan->chan_adapter->adapt_dev;
 	int flags, s;
 
-	slp = xs->sc_link;
-	sc = slp->adapter_softc;
-	flags = xs->xs_control;
+	switch (req) {
+	case ADAPTER_REQ_RUN_XFER:
+		xs = arg;
+		periph = xs->xs_periph;
+		flags = xs->xs_control;
 
-	/* XXXX ?? */
-	if (flags & XS_CTL_DATA_UIO)
-		panic("siop: scsi data uio requested");
+		/* XXXX ?? */
+		if (flags & XS_CTL_DATA_UIO)
+			panic("siop: scsi data uio requested");
 
-	/* XXXX ?? */
-	if (sc->sc_nexus && flags & XS_CTL_POLL)
-/*		panic("siop_scsicmd: busy");*/
-		printf("siop_scsicmd: busy\n");
+		/* XXXX ?? */
+		if (sc->sc_nexus && flags & XS_CTL_POLL)
+/*			panic("siop_scsicmd: busy");*/
+			printf("siop_scsicmd: busy\n");
 
-	s = splbio();
-	acb = sc->free_list.tqh_first;
-	if (acb) {
-		TAILQ_REMOVE(&sc->free_list, acb, chain);
+		s = splbio();
+		acb = sc->free_list.tqh_first;
+		if (acb) {
+			TAILQ_REMOVE(&sc->free_list, acb, chain);
+		}
+		splx(s);
+
+#ifdef DIAGNOSTIC
+		/*
+		 * This should never happen as we track the resources
+		 * in the mid-layer.
+		 */
+		if (acb == NULL) {
+			scsipi_printaddr(periph);
+			printf("unable to allocate acb\n");
+			panic("siop_scsipi_request");
+		}
+#endif
+
+		acb->flags = ACB_ACTIVE;
+		acb->xs = xs;
+		bcopy(xs->cmd, &acb->cmd, xs->cmdlen);
+		acb->clen = xs->cmdlen;
+		acb->daddr = xs->data;
+		acb->dleft = xs->datalen;
+
+		s = splbio();
+		TAILQ_INSERT_TAIL(&sc->ready_list, acb, chain);
+
+		if (sc->sc_nexus == NULL)
+			siop_sched(sc);
+
+		splx(s);
+
+		if (flags & XS_CTL_POLL || siop_no_dma)
+			siop_poll(sc, acb);
+		return;
+
+	case ADAPTER_REQ_GROW_RESOURCES:
+		return;
+
+	case ADAPTER_REQ_SET_XFER_MODE:
+		return;
 	}
-	splx(s);
-
-	if (acb == NULL) {
-		xs->error = XS_DRIVER_STUFFUP;
-		return(TRY_AGAIN_LATER);
-	}
-
-	acb->flags = ACB_ACTIVE;
-	acb->xs = xs;
-	bcopy(xs->cmd, &acb->cmd, xs->cmdlen);
-	acb->clen = xs->cmdlen;
-	acb->daddr = xs->data;
-	acb->dleft = xs->datalen;
-
-	s = splbio();
-	TAILQ_INSERT_TAIL(&sc->ready_list, acb, chain);
-
-	if (sc->sc_nexus == NULL)
-		siop_sched(sc);
-
-	splx(s);
-
-	if (flags & XS_CTL_POLL || siop_no_dma)
-		return(siop_poll(sc, acb));
-	return(SUCCESSFULLY_QUEUED);
 }
 
-int
-siop_poll(sc, acb)
-	struct siop_softc *sc;
-	struct siop_acb *acb;
+void
+siop_poll(struct siop_softc *sc, struct siop_acb *acb)
 {
 	siop_regmap_p rp = sc->sc_siopp;
 	struct scsipi_xfer *xs = acb->xs;
@@ -272,7 +289,7 @@ siop_poll(sc, acb)
 			if (--i <= 0) {
 #ifdef DEBUG
 				printf ("waiting: tgt %d cmd %02x sbcl %02x dsp %lx (+%lx) dcmd %lx ds %p timeout %d\n",
-				    xs->sc_link->scsipi_scsi.target, acb->cmd.opcode,
+				    xs->xs_periph->periph_target, acb->cmd.opcode,
 				    rp->siop_sbcl, rp->siop_dsp,
 				    rp->siop_dsp - sc->sc_scriptspa,
 				    *((long *)&rp->siop_dcmd), &acb->ds, acb->xs->timeout);
@@ -281,7 +298,7 @@ siop_poll(sc, acb)
 				--to;
 				if (to <= 0) {
 					siopreset(sc);
-					return(COMPLETE);
+					return;
 				}
 			}
 			delay(20);
@@ -304,17 +321,15 @@ siop_poll(sc, acb)
 			break;
 	}
 	splx(s);
-	return (COMPLETE);
 }
 
 /*
  * start next command that's ready
  */
 void
-siop_sched(sc)
-	struct siop_softc *sc;
+siop_sched(struct siop_softc *sc)
 {
-	struct scsipi_link *slp;
+	struct scsipi_periph *periph;
 	struct siop_acb *acb;
 	int i;
 
@@ -322,23 +337,23 @@ siop_sched(sc)
 	if (sc->sc_nexus) {
 		printf("%s: siop_sched- nexus %p/%d ready %p/%d\n",
 		    sc->sc_dev.dv_xname, sc->sc_nexus,
-		    sc->sc_nexus->xs->sc_link->scsipi_scsi.target,
+		    sc->sc_nexus->xs->xs_periph->periph_target,
 		    sc->ready_list.tqh_first,
-		    sc->ready_list.tqh_first->xs->sc_link->scsipi_scsi.target);
+		    sc->ready_list.tqh_first->xs->xs_periph->periph_target);
 		return;
 	}
 #endif
 	for (acb = sc->ready_list.tqh_first; acb; acb = acb->chain.tqe_next) {
-		slp = acb->xs->sc_link;
-		i = slp->scsipi_scsi.target;
-		if(!(sc->sc_tinfo[i].lubusy & (1 << slp->scsipi_scsi.lun))) {
+		periph = acb->xs->xs_periph;
+		i = periph->periph_target;
+		if(!(sc->sc_tinfo[i].lubusy & (1 << periph->periph_lun))) {
 			struct siop_tinfo *ti = &sc->sc_tinfo[i];
 
 			TAILQ_REMOVE(&sc->ready_list, acb, chain);
 			sc->sc_nexus = acb;
-			slp = acb->xs->sc_link;
-			ti = &sc->sc_tinfo[slp->scsipi_scsi.target];
-			ti->lubusy |= (1 << slp->scsipi_scsi.lun);
+			periph = acb->xs->xs_periph;
+			ti = &sc->sc_tinfo[periph->periph_target];
+			ti->lubusy |= (1 << periph->periph_lun);
 			break;
 		}
 	}
@@ -362,12 +377,10 @@ siop_sched(sc)
 }
 
 void
-siop_scsidone(acb, stat)
-	struct siop_acb *acb;
-	int stat;
+siop_scsidone(struct siop_acb *acb, int stat)
 {
 	struct scsipi_xfer *xs;
-	struct scsipi_link *slp;
+	struct scsipi_periph *periph;
 	struct siop_softc *sc;
 	int dosched = 0;
 
@@ -380,48 +393,16 @@ siop_scsidone(acb, stat)
 #endif
 		return;
 	}
-	slp = xs->sc_link;
-	sc = slp->adapter_softc;
-	/*
-	 * is this right?
-	 */
-	xs->status = stat;
+	periph = xs->xs_periph;
+	sc = (void *)periph->periph_channel->chan_adapter->adapt_dev;
 
-	if (xs->error == XS_NOERROR && !(acb->flags & ACB_CHKSENSE)) {
-		if (stat == SCSI_CHECK) {
-			struct scsipi_sense *ss = (void *)&acb->cmd;
-			bzero(ss, sizeof(*ss));
-			ss->opcode = REQUEST_SENSE;
-			ss->byte2 = slp->scsipi_scsi.lun << 5;
-			ss->length = sizeof(struct scsipi_sense_data);
-			acb->clen = sizeof(*ss);
-			acb->daddr = (char *)&xs->sense.scsi_sense;
-			acb->dleft = sizeof(struct scsipi_sense_data);
-			acb->flags = ACB_ACTIVE | ACB_CHKSENSE;
-			TAILQ_INSERT_HEAD(&sc->ready_list, acb, chain);
-			--sc->sc_active;
-			sc->sc_tinfo[slp->scsipi_scsi.target].lubusy &=
-			    ~(1 << slp->scsipi_scsi.lun);
-			sc->sc_tinfo[slp->scsipi_scsi.target].senses++;
-			if (sc->sc_nexus == acb) {
-				sc->sc_nexus = NULL;
-				siop_sched(sc);
-			}
-			SIOP_TRACE('d','s',0,0)
-			return;
-		}
-	}
-	if (xs->error == XS_NOERROR && (acb->flags & ACB_CHKSENSE)) {
-		xs->error = XS_SENSE;
-	} else {
-		xs->resid = 0;		/* XXXX */
-	}
-#if whataboutthisone
-		case SCSI_BUSY:
+	xs->status = stat;
+	xs->resid = 0;		/* XXXX */
+
+	if (xs->error == XS_NOERROR) {
+		if (stat == SCSI_CHECK || stat == SCSI_BUSY)
 			xs->error = XS_BUSY;
-			break;
-#endif
-	xs->xs_status |= XS_STS_DONE;
+	}
 
 	/*
 	 * Remove the ACB from whatever queue it's on.  We have to do a bit of
@@ -432,8 +413,8 @@ siop_scsidone(acb, stat)
 	 */
 	if (acb == sc->sc_nexus) {
 		sc->sc_nexus = NULL;
-		sc->sc_tinfo[slp->scsipi_scsi.target].lubusy &=
-			~(1<<slp->scsipi_scsi.lun);
+		sc->sc_tinfo[periph->periph_target].lubusy &=
+			~(1<<periph->periph_lun);
 		if (sc->ready_list.tqh_first)
 			dosched = 1;	/* start next command */
 		--sc->sc_active;
@@ -447,8 +428,8 @@ siop_scsidone(acb, stat)
 		    acb2 = acb2->chain.tqe_next)
 			if (acb2 == acb) {
 				TAILQ_REMOVE(&sc->nexus_list, acb, chain);
-				sc->sc_tinfo[slp->scsipi_scsi.target].lubusy
-					&= ~(1<<slp->scsipi_scsi.lun);
+				sc->sc_tinfo[periph->periph_target].lubusy
+					&= ~(1<<periph->periph_lun);
 				--sc->sc_active;
 				break;
 			}
@@ -470,7 +451,7 @@ siop_scsidone(acb, stat)
 	acb->flags = ACB_FREE;
 	TAILQ_INSERT_HEAD(&sc->free_list, acb, chain);
 
-	sc->sc_tinfo[slp->scsipi_scsi.target].cmds++;
+	sc->sc_tinfo[periph->periph_target].cmds++;
 
 	scsipi_done(xs);
 
@@ -479,10 +460,7 @@ siop_scsidone(acb, stat)
 }
 
 void
-siopabort(sc, rp, where)
-	register struct siop_softc *sc;
-	siop_regmap_p rp;
-	char *where;
+siopabort(register struct siop_softc *sc, siop_regmap_p rp, char *where)
 {
 #ifdef fix_this
 	int i;
@@ -534,8 +512,7 @@ siopabort(sc, rp, where)
 }
 
 void
-siopinitialize(sc)
-	struct siop_softc *sc;
+siopinitialize(struct siop_softc *sc)
 {
 	int i;
 	u_int inhibit_sync;
@@ -553,9 +530,9 @@ siopinitialize(sc)
 	 * malloc sc_acb to ensure that DS is on a long word boundary.
 	 */
 
-	MALLOC(sc->sc_acb, struct siop_acb *, 
+	MALLOC(sc->sc_acb, struct siop_acb *,
 		sizeof(struct siop_acb) * SIOP_NACB, M_DEVBUF, M_NOWAIT);
-	if (sc->sc_acb == NULL) 
+	if (sc->sc_acb == NULL)
 		panic("siopinitialize: ACB malloc failed!");
 
 	sc->sc_tcp[1] = 1000 / sc->sc_clock_freq;
@@ -595,8 +572,7 @@ siopinitialize(sc)
 }
 
 void
-siopreset(sc)
-	struct siop_softc *sc;
+siopreset(struct siop_softc *sc)
 {
 	siop_regmap_p rp;
 	u_int i, s;
@@ -636,7 +612,7 @@ siopreset(sc)
 	rp->siop_dmode = 0x80;	/* burst length = 4 */
 	rp->siop_sien = 0x00;	/* don't enable interrupts yet */
 	rp->siop_dien = 0x00;	/* don't enable interrupts yet */
-	rp->siop_scid = 1 << sc->sc_link.scsipi_scsi.adapter_target;
+	rp->siop_scid = 1 << sc->sc_channel.chan_id;
 	rp->siop_dwt = 0x00;
 	rp->siop_ctest0 |= SIOP_CTEST0_BTD | SIOP_CTEST0_EAN;
 	rp->siop_ctest7 |= sc->sc_ctest7;
@@ -653,7 +629,7 @@ siopreset(sc)
 	splx (s);
 
 	delay (siop_reset_delay * 1000);
-	printf("siop id %d reset V%d\n", sc->sc_link.scsipi_scsi.adapter_target,
+	printf("siop id %d reset V%d\n", sc->sc_channel.chan_id,
 	    rp->siop_ctest8 >> 4);
 
 	if ((sc->sc_flags & SIOP_ALIVE) == 0) {
@@ -670,11 +646,11 @@ siopreset(sc)
 		bzero(sc->sc_tinfo, sizeof(sc->sc_tinfo));
 	} else {
 		if (sc->sc_nexus != NULL) {
-			sc->sc_nexus->xs->error = XS_DRIVER_STUFFUP;
+			sc->sc_nexus->xs->error = XS_RESET;
 			siop_scsidone(sc->sc_nexus, sc->sc_nexus->stat[0]);
 		}
 		while ((acb = sc->nexus_list.tqh_first) > 0) {
-			acb->xs->error = XS_DRIVER_STUFFUP;
+			acb->xs->error = XS_RESET;
 			siop_scsidone(acb, acb->stat[0]);
 		}
 	}
@@ -695,14 +671,8 @@ siopreset(sc)
  */
 
 void
-siop_start (sc, target, lun, cbuf, clen, buf, len)
-	struct siop_softc *sc;
-	int target;
-	int lun;
-	u_char *cbuf;
-	int clen;
-	u_char *buf;
-	int len;
+siop_start(struct siop_softc *sc, int target, int lun, u_char *cbuf, int clen,
+           u_char *buf, int len)
 {
 	siop_regmap_p rp = sc->sc_siopp;
 	int nchain;
@@ -873,12 +843,8 @@ siop_start (sc, target, lun, cbuf, clen, buf, len)
  */
 
 int
-siop_checkintr(sc, istat, dstat, sstat0, status)
-	struct	siop_softc *sc;
-	u_char	istat;
-	u_char	dstat;
-	u_char	sstat0;
-	int	*status;
+siop_checkintr(struct siop_softc *sc, u_char istat, u_char dstat,
+               u_char sstat0, int *status)
 {
 	siop_regmap_p rp = sc->sc_siopp;
 	struct siop_acb *acb = sc->sc_nexus;
@@ -926,7 +892,7 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 			panic("*** siop DSA invalid ***");
 		}
 #endif
-		target = acb->xs->sc_link->scsipi_scsi.target;
+		target = acb->xs->xs_periph->periph_target;
 		if (sc->sc_sync[target].state == NEG_WAITS) {
 			if (acb->msg[1] == 0xff)
 				printf ("%s: target %d ignored sync request\n",
@@ -960,7 +926,7 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 		return 1;
 	}
 	if (dstat & SIOP_DSTAT_SIR && rp->siop_dsps == 0xff0b) {
-		target = acb->xs->sc_link->scsipi_scsi.target;
+		target = acb->xs->xs_periph->periph_target;
 		if (acb->msg[1] == MSG_EXT_MESSAGE && acb->msg[2] == 3 &&
 		    acb->msg[3] == MSG_SYNC_REQ) {
 #ifdef DEBUG
@@ -1109,7 +1075,7 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 		return 1;
 	}
 	if (acb)
-		target = acb->xs->sc_link->scsipi_scsi.target;
+		target = acb->xs->xs_periph->periph_target;
 	else
 		target = 7;
 	if (sstat0 & SIOP_SSTAT0_UDC) {
@@ -1194,6 +1160,8 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 				printf ("%s: ID %02x disconnected without Save Data Pointers\n",
 				    sc->sc_dev.dv_xname, 1 << target);
 #endif
+/* XXX is: 		if (rp->siop_dsps != 0xff02) { */
+				/* not disconnected without save data ptr */
 			for (i = 0; i < DMAMAXIO; ++i) {
 				if (acb->ds.chain[i].datalen == 0)
 					break;
@@ -1210,6 +1178,7 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 				Debugger();
 #endif
 			}
+/* XXX is: 		}			*/
 #ifdef DEBUG
 			if (siop_debug & 0x100)
 				printf("  chain[0]: %p/%lx -> %lx/%lx\n",
@@ -1274,8 +1243,8 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 				    sc->sc_dev.dv_xname, reselid);
 #endif
 			TAILQ_INSERT_HEAD(&sc->ready_list, sc->sc_nexus, chain);
-			sc->sc_tinfo[sc->sc_nexus->xs->sc_link->scsipi_scsi.target].lubusy
-			    &= ~(1 << sc->sc_nexus->xs->sc_link->scsipi_scsi.lun);
+			sc->sc_tinfo[sc->sc_nexus->xs->xs_periph->periph_target].lubusy
+			    &= ~(1 << sc->sc_nexus->xs->xs_periph->periph_lun);
 			--sc->sc_active;
 		}
 		/*
@@ -1294,9 +1263,9 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 			DCIAS(kvtop(&acb->stat[0]));
 			rp->siop_dsa = kvtop((caddr_t)&acb->ds);
 			rp->siop_sxfer =
-				sc->sc_sync[acb->xs->sc_link->scsipi_scsi.target].sxfer;
+				sc->sc_sync[acb->xs->xs_periph->periph_target].sxfer;
 			rp->siop_sbcl =
-				sc->sc_sync[acb->xs->sc_link->scsipi_scsi.target].sbcl;
+				sc->sc_sync[acb->xs->xs_periph->periph_target].sbcl;
 			break;
 		}
 		if (acb == NULL) {
@@ -1336,7 +1305,7 @@ siop_checkintr(sc, istat, dstat, sstat0, status)
 			rp->siop_dcntl |= SIOP_DCNTL_STD;
 			return(0);
 		}
-		target = sc->sc_nexus->xs->sc_link->scsipi_scsi.target;
+		target = sc->sc_nexus->xs->xs_periph->periph_target;
 		rp->siop_temp = 0;
 		rp->siop_dsa = kvtop((caddr_t)&sc->sc_nexus->ds);
 		rp->siop_sxfer = sc->sc_sync[target].sxfer;
@@ -1410,8 +1379,7 @@ bad_phase:
 }
 
 void
-siop_select(sc)
-	struct siop_softc *sc;
+siop_select(struct siop_softc *sc)
 {
 	siop_regmap_p rp;
 	struct siop_acb *acb = sc->sc_nexus;
@@ -1441,12 +1409,12 @@ siop_select(sc)
 #ifdef DEBUG
 	if (siop_debug & 1)
 		printf ("siop_select: target %x cmd %02x ds %p\n",
-		    acb->xs->sc_link->scsipi_scsi.target, acb->cmd.opcode,
+		    acb->xs->xs_periph->periph_target, acb->cmd.opcode,
 		    &sc->sc_nexus->ds);
 #endif
 
-	siop_start(sc, acb->xs->sc_link->scsipi_scsi.target,
-		acb->xs->sc_link->scsipi_scsi.lun,
+	siop_start(sc, acb->xs->xs_periph->periph_target,
+		acb->xs->xs_periph->periph_lun,
 	    (u_char *)&acb->cmd, acb->clen, acb->daddr, acb->dleft);
 
 	return;
@@ -1457,8 +1425,7 @@ siop_select(sc)
  */
 
 void
-siopintr (sc)
-	register struct siop_softc *sc;
+siopintr(register struct siop_softc *sc)
 {
 	siop_regmap_p rp;
 	register u_char istat, dstat, sstat0;
@@ -1514,7 +1481,7 @@ siopintr (sc)
 				printf ("%s: SCSI bus busy at completion",
 					sc->sc_dev.dv_xname);
 				printf(" targ %d sbcl %02x sfbr %x lcrc %02x dsp +%x\n",
-				    sc->sc_nexus->xs->sc_link->scsipi_scsi.target,
+				    sc->sc_nexus->xs->xs_periph->periph_target,
 				    rp->siop_sbcl, rp->siop_sfbr, rp->siop_lcrc,
 				    rp->siop_dsp - sc->sc_scriptspa);
 			}
@@ -1532,9 +1499,7 @@ siopintr (sc)
  *
  */
 void
-scsi_period_to_siop (sc, target)
-	struct siop_softc *sc;
-	int target;
+scsi_period_to_siop(struct siop_softc *sc, int target)
 {
 	int period, offset, sxfer, sbcl = 0;
 #ifdef DEBUG_SYNC
@@ -1589,7 +1554,7 @@ scsi_period_to_siop (sc, target)
 
 #if SIOP_TRACE_SIZE
 void
-siop_dump_trace()
+siop_dump_trace(void)
 {
 	int i;
 
@@ -1604,8 +1569,7 @@ siop_dump_trace()
 #endif
 
 void
-siop_dump_acb(acb)
-	struct siop_acb *acb;
+siop_dump_acb(struct siop_acb *acb)
 {
 	u_char *b = (u_char *) &acb->cmd;
 	int i;
@@ -1616,8 +1580,8 @@ siop_dump_acb(acb)
 		return;
 	}
 	printf("(%d:%d) flags %2x clen %2d cmd ",
-		acb->xs->sc_link->scsipi_scsi.target,
-	    acb->xs->sc_link->scsipi_scsi.lun, acb->flags, acb->clen);
+		acb->xs->xs_periph->periph_target,
+	    acb->xs->xs_periph->periph_lun, acb->flags, acb->clen);
 	for (i = acb->clen; i; --i)
 		printf(" %02x", *b++);
 	printf("\n");
@@ -1628,8 +1592,7 @@ siop_dump_acb(acb)
 }
 
 void
-siop_dump(sc)
-	struct siop_softc *sc;
+siop_dump(struct siop_softc *sc)
 {
 	struct siop_acb *acb;
 	siop_regmap_p rp = sc->sc_siopp;
@@ -1669,10 +1632,9 @@ siop_dump(sc)
 	}
 	for (i = 0; i < 8; ++i) {
 		if (sc->sc_tinfo[i].cmds > 2) {
-			printf("tgt %d: cmds %d disc %d senses %d lubusy %x\n",
+			printf("tgt %d: cmds %d disc %d lubusy %x\n",
 			    i, sc->sc_tinfo[i].cmds,
 			    sc->sc_tinfo[i].dconns,
-			    sc->sc_tinfo[i].senses,
 			    sc->sc_tinfo[i].lubusy);
 		}
 	}

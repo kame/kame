@@ -1,4 +1,4 @@
-/* $NetBSD: btvmeii.c,v 1.2 2000/03/12 11:23:06 drochner Exp $ */
+/* $NetBSD: btvmeii.c,v 1.5 2002/03/04 02:19:10 simonb Exp $ */
 
 /*
  * Copyright (c) 1999
@@ -31,8 +31,12 @@
  * Uses the common Tundra Universe code.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: btvmeii.c,v 1.5 2002/03/04 02:19:10 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/device.h>
 
 #include <dev/pci/pcireg.h>
@@ -203,7 +207,7 @@ b3_2706_attach(parent, self, aux)
 	secbus = PPB_BUSINFO_SECONDARY(pci_conf_read(pc, pa->pa_tag,
 						     PPB_REG_BUSINFO));
 
-	bcopy(pa, &aa, sizeof(struct pci_attach_args));
+	memcpy(&aa, pa, sizeof(struct pci_attach_args));
 	aa.pa_device = 4;
 	aa.pa_function = 0;
 	aa.pa_tag = pci_make_tag(pc, secbus, 4, 0);
@@ -463,7 +467,6 @@ b3_2706_establish_vmeint(vsc, handle, prior, func, arg)
 	struct b3_2706_vmeintrhand *ih;
 	long lv;
 	int s;
-	extern int cold;
 
 	/* no point in sleeping unless someone can free memory. */
 	ih = malloc(sizeof *ih, M_DEVBUF, cold ? M_NOWAIT : M_WAITOK);

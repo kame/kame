@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.64.2.1 2000/06/28 13:33:43 ragge Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.71 2002/03/23 18:13:04 ragge Exp $	*/
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -37,10 +37,11 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/reboot.h>
+#include <sys/disk.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/sid.h>
@@ -60,11 +61,11 @@
 #include <dev/bi/bireg.h>
 
 #include "locators.h"
+#include "opt_cputype.h"
 
 void	gencnslask __P((void));
 
 struct cpu_dep *dep_call;
-int mastercpu;	/* chief of the system */
 struct device *booted_device;
 int booted_partition;	/* defaults to 0 (aka 'a' partition */
 
@@ -150,6 +151,12 @@ mainbus_attach(parent, self, hej)
 	 * Maybe should have this as master instead of mainbus.
 	 */
 	config_found(self, NULL, mainbus_print);
+
+#if VAX53 || VAXANY
+	/* Kludge: To have two master buses */
+	if (vax_boardtype == VAX_BTYP_53)
+		config_found(self, (void *)1, mainbus_print);
+#endif
 
 	if (dep_call->cpu_subconf)
 		(*dep_call->cpu_subconf)(self);
@@ -328,10 +335,11 @@ booted_sd(struct device *dev, void *aux)
 	if (jmfr("sd", dev, BDEV_SD) && jmfr("cd", dev, BDEV_SD))
 		return 0;
 
-	if (sa->sa_sc_link->type != BUS_SCSI)
+	if (sa->sa_periph->periph_channel->chan_bustype->bustype_type !=
+	    SCSIPI_BUSTYPE_SCSI)
 		return 0; /* ``Cannot happen'' */
 
-	if (sa->sa_sc_link->scsipi_scsi.target != rpb.unit)
+	if (sa->sa_periph->periph_target != rpb.unit)
 		return 0; /* Wrong unit */
 
 	ppdev = dev->dv_parent->dv_parent;
@@ -346,9 +354,11 @@ booted_sd(struct device *dev, void *aux)
 }
 #endif
 #if NRL > 0
+#include <dev/qbus/rlvar.h>
 int
 booted_rl(struct device *dev, void *aux)
 {
+	struct rlc_attach_args *raa = aux;
 	static int ub;
 
 	if (jmfr("rlc", dev, BDEV_RL) == 0)
@@ -356,7 +366,9 @@ booted_rl(struct device *dev, void *aux)
 	if (ub)
 		return 0;
 	if (jmfr("rl", dev, BDEV_RL))
-		return 0; /* XXX should check unit number also */
+		return 0;
+	if (raa->hwid != rpb.unit)
+		return 0; /* Wrong unit number */
 	return 1;
 }
 #endif

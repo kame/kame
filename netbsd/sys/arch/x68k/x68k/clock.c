@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.8 2000/01/19 02:52:21 msaitoh Exp $	*/
+/*	$NetBSD: clock.c,v 1.11 2001/03/15 06:10:53 chs Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -54,6 +54,8 @@
 #include <machine/psl.h>
 #include <machine/cpu.h>
 #include <machine/bus.h>
+
+#include <dev/clock_subr.h>
 
 #include <arch/x68k/dev/mfp.h>
 #include <arch/x68k/dev/rtclock_var.h>
@@ -209,7 +211,7 @@ DELAY(mic)
 #include <sys/resourcevar.h>
 #include <sys/ioctl.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>	/* XXX needed? */
 #include <x68k/x68k/clockioctl.h>
 #include <sys/specdev.h>
 #include <sys/vnode.h>
@@ -326,8 +328,8 @@ clockunmmap(dev, addr, p)
 
 	if (addr == 0)
 		return(EINVAL);		/* XXX: how do we deal with this? */
-	rv = vm_deallocate(p->p_vmspace->vm_map, (vaddr_t)addr, PAGE_SIZE);
-	return(rv == KERN_SUCCESS ? 0 : EINVAL);
+	uvm_deallocate(p->p_vmspace->vm_map, (vaddr_t)addr, PAGE_SIZE);
+	return 0;
 }
 
 startclock()
@@ -491,8 +493,8 @@ microtime(tvp)
 
 /* this is a hook set by a clock driver for the configured realtime clock,
    returning plain current unix-time */
-long (*gettod) __P((void)) = 0;
-long (*settod) __P((long)) = 0;
+time_t (*gettod) __P((void)) = 0;
+int    (*settod) __P((long)) = 0;
 
 /*
  * Initialize the time of day register, based on the time base which is, e.g.

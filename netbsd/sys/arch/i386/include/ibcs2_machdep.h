@@ -1,7 +1,7 @@
-/*	$NetBSD: ibcs2_machdep.h,v 1.5.6.1 2000/06/22 16:35:55 matt Exp $	*/
+/*	$NetBSD: ibcs2_machdep.h,v 1.10 2000/12/11 05:29:00 mycroft Exp $	*/
 
 /*-
- * Copyright (c) 1997 The NetBSD Foundation, Inc.
+ * Copyright (c) 1997, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -51,6 +51,7 @@ void	ibcs2_setregs __P((struct proc *, struct exec_package *, u_long));
 void	ibcs2_sendsig __P((sig_t, int, sigset_t *, u_long));
 int	ibcs2_sys_sysmachine __P((struct proc *, void *, register_t *retval));
 
+void	ibcs2_syscall_intern __P((struct proc *));
 #endif /* _KERNEL */
 
 #endif /* !_I386_IBCS2_MACHDEP_H_ */

@@ -1,13 +1,16 @@
-#	$NetBSD: Makefile,v 1.7 2000/02/19 02:03:29 tsutsui Exp $
+#	$NetBSD: Makefile,v 1.20.4.1 2002/05/28 23:08:59 tv Exp $
 
 # For now, we install the machine and arch includes, and symlink 'machine'
-# to the location of the machine includes.
+# to the location of the machine includes (usually).
 #
 # Eventually, we should install everything.
 
+.include <bsd.own.mk>
+
 SUBDIR=	${MACHINE}
-.if ${MACHINE} != ${MACHINE_ARCH}
-ARCHSUBDIR= ${MACHINE_ARCH:C/mipse[bl]/mips/}
+ARCHSUBDIR= ${MACHINE_CPU}
+
+.if ${MACHINE} != ${ARCHSUBDIR}
 .if exists(${ARCHSUBDIR})
 SUBDIR+= ${ARCHSUBDIR}
 .endif
@@ -15,10 +18,29 @@ SUBDIR+= ${ARCHSUBDIR}
 .if ${MACHINE} == sparc
 SUBDIR+= sparc64
 .endif
+.if (${MACHINE} == hpcmips || ${MACHINE} == hpcsh)
+SUBDIR+= hpc
+.endif
+.if (${MACHINE} == sun2 || ${MACHINE} == sun3)
+SUBDIR+= sun68k
+.endif
 
-#SUBDIR= alpha amiga arc arm32 atari bebox evbsh3 hp300 hpcmips i386 luna68k \
-#	m68k mac68k macppc mips mmeye mvme68k news68k newsmips next68k ofppc \
-#	pc532 pmax powerpc sh3 sparc sparc64 sun3 vax x68k
+#SUBDIR=acorn26 acorn32 algor alpha amiga amigappc arm arc atari \
+#	bebox \
+#	cats cesfic cobalt \
+#	dreamcast \
+#	evbarm evbsh3 \
+#	hp300 hpc hpcarm hpcmips hpcsh \
+#	i386 \
+#	luna68k \
+#	m68k mac68k macppc mips mipsco mmeye mvme68k \
+#	netwinder news68k newsmips next68k \
+#	ofppc \
+#	pc532 playstation2 pmax powerpc prep \
+#	sandpoint sgimips sh3 shark sparc sparc64 sun2 sun3 sun68k \
+#	vax \
+#	walnut \
+#	x68k x86_64
 
 SYMLINKS= ${MACHINE} /usr/include/machine
 

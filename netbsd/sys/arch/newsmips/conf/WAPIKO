@@ -1,9 +1,11 @@
 #
 # NEWS3400 config file
 #
-# 	$NetBSD: WAPIKO,v 1.10 2000/02/12 03:35:13 thorpej Exp $
+# 	$NetBSD: WAPIKO,v 1.17.4.1 2002/08/01 04:28:42 lukem Exp $
 #
 include		"arch/newsmips/conf/std.newsmips"
+
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
 maxusers	16
 
@@ -12,11 +14,12 @@ makeoptions	COPTS="-O2 -pipe"
 options 	news3400
 options 	MIPS1			# R2000/R3000 support
 options 	CPU_SINGLE
-options 	BUFPAGES=2048
 
 # Standard system options
 options 	KTRACE			# system call tracing support
 #options 	UCONSOLE		# users can redirect console (unsafe)
+#options 	USERCONF		# userconf(4) support
+#options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
 
 # Debugging options
 options 	DDB			# kernel dynamic debugger
@@ -77,9 +80,18 @@ sd*	at scsibus? target ? lun ?	# SCSI disks
 #st*	at scsibus? target ? lun ?	# SCSI tapes
 #cd*	at scsibus? target ? lun ?	# SCSI CD-ROMs
 
+options 	WSEMUL_VT100		# VT100 / VT220 emulation
+options 	FONT_GALLANT12x22
+
+wsdisplay0 at fb? console ?
+wskbd0	at kb? console ?
+wsmouse0 at ms?
+
 pseudo-device	vnd		4	# disk-like interface to files
 #pseudo-device	ccd		4	# concatenated and striped disks
 pseudo-device	loop			# loopback interface; required
-pseudo-device	pty		32	# pseudo-terminals
+pseudo-device	pty			# pseudo-terminals
 pseudo-device	bpfilter	16	# Berkeley Packet Filter
 pseudo-device	ipfilter		# ip filter
+pseudo-device	rnd			# /dev/random and in-kernel generator
+pseudo-device	clockctl		# user control of clock subsystem

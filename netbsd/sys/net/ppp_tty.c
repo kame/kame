@@ -1,4 +1,4 @@
-/*	$NetBSD: ppp_tty.c,v 1.20 2000/03/30 09:45:37 augustss Exp $	*/
+/*	$NetBSD: ppp_tty.c,v 1.30 2002/03/17 19:41:11 atatat Exp $	*/
 /*	Id: ppp_tty.c,v 1.3 1996/07/01 01:04:11 paulus Exp 	*/
 
 /*
@@ -76,8 +76,10 @@
 /* from if_sl.c,v 1.11 84/10/04 12:54:47 rick Exp */
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ppp_tty.c,v 1.30 2002/03/17 19:41:11 atatat Exp $");
+
 #include "ppp.h"
-#if NPPP > 0
 
 #include "opt_ppp.h"
 #define VJC
@@ -184,7 +186,7 @@ pppopen(dev, tp)
 
     s = spltty();
 
-    if (tp->t_line == PPPDISC) {
+    if (tp->t_linesw->l_no == PPPDISC) {
 	sc = (struct ppp_softc *) tp->t_sc;
 	if (sc != NULL && sc->sc_devp == (void *) tp) {
 	    splx(s);
@@ -202,12 +204,12 @@ pppopen(dev, tp)
 
 #if NBPFILTER > 0
     /* Switch DLT to PPP-over-serial. */
-    bpf_change_type(&sc->sc_bpf, DLT_PPP_SERIAL, PPP_HDRLEN);
+    bpf_change_type(&sc->sc_if, DLT_PPP_SERIAL, PPP_HDRLEN);
 #endif
 
     sc->sc_ilen = 0;
     sc->sc_m = NULL;
-    bzero(sc->sc_asyncmap, sizeof(sc->sc_asyncmap));
+    memset(sc->sc_asyncmap, 0, sizeof(sc->sc_asyncmap));
     sc->sc_asyncmap[0] = 0xffffffff;
     sc->sc_asyncmap[3] = 0x60000000;
     sc->sc_rasyncmap = 0;
@@ -243,7 +245,7 @@ pppclose(tp, flag)
 
     s = spltty();
     ttyflush(tp, FREAD|FWRITE);
-    tp->t_line = 0;
+    tp->t_linesw = linesw[0]; /* default line discipline */
     sc = (struct ppp_softc *) tp->t_sc;
     if (sc != NULL) {
 	tp->t_sc = NULL;
@@ -267,7 +269,7 @@ pppasyncrelinq(sc)
 
 #if NBPFILTER > 0
     /* Change DLT to back none. */
-    bpf_change_type(&sc->sc_bpf, DLT_NULL, 0);
+    bpf_change_type(&sc->sc_if, DLT_NULL, 0);
 #endif
 
     s = spltty();
@@ -308,7 +310,8 @@ pppread(tp, uio, flag)
      */
     s = spltty();
     for (;;) {
-	if (tp != (struct tty *) sc->sc_devp || tp->t_line != PPPDISC) {
+	if (tp != (struct tty *) sc->sc_devp ||
+	    tp->t_linesw->l_no != PPPDISC) {
 	    splx(s);
 	    return 0;
 	}
@@ -360,7 +363,7 @@ pppwrite(tp, uio, flag)
 
     if ((tp->t_state & TS_CARR_ON) == 0 && (tp->t_cflag & CLOCAL) == 0)
 	return 0;		/* wrote 0 bytes */
-    if (tp->t_line != PPPDISC)
+    if (tp->t_linesw->l_no != PPPDISC)
 	return (EINVAL);
     if (sc == NULL || tp != (struct tty *) sc->sc_devp)
 	return EIO;
@@ -410,7 +413,7 @@ ppptioctl(tp, cmd, data, flag, p)
     int error, s;
 
     if (sc == NULL || tp != (struct tty *) sc->sc_devp)
-	return -1;
+	return (EPASSTHROUGH);
 
     error = 0;
     switch (cmd) {
@@ -574,7 +577,7 @@ bail:
 /*
  * FCS lookup table as calculated by genfcstab.
  */
-static u_int16_t fcstab[256] = {
+static const u_int16_t fcstab[256] = {
 	0x0000,	0x1189,	0x2312,	0x329b,	0x4624,	0x57ad,	0x6536,	0x74bf,
 	0x8c48,	0x9dc1,	0xaf5a,	0xbed3,	0xca6c,	0xdbe5,	0xe97e,	0xf8f7,
 	0x1081,	0x0108,	0x3393,	0x221a,	0x56a5,	0x472c,	0x75b7,	0x643e,
@@ -642,7 +645,6 @@ pppsyncstart(sc)
 			if (sc->sc_flags & SC_DEBUG)
 				pppdumpframe(sc,m,1);
 		}
-		microtime(&sc->sc_if.if_lastchange);
 		for(n=m,len=0;n!=NULL;n=n->m_next)
 			len += n->m_len;
 			
@@ -708,7 +710,6 @@ pppasyncstart(sc)
 
 	    /* Calculate the FCS for the first mbuf's worth. */
 	    sc->sc_outfcs = pppfcs(PPP_INITFCS, mtod(m, u_char *), m->m_len);
-	    sc->sc_if.if_lastchange = time;
 	}
 
 	for (;;) {
@@ -894,6 +895,15 @@ pppstart(tp)
     if ((CCOUNT(&tp->t_outq) >= PPP_LOWAT)
 	&& ((sc == NULL) || (sc->sc_flags & SC_TIMEOUT)))
 	return 0;
+#ifdef ALTQ
+    /*
+     * if ALTQ is enabled, don't invoke NETISR_PPP.
+     * pppintr() could loop without doing anything useful
+     * under rate-limiting.
+     */
+    if (ALTQ_IS_ENABLED(&sc->sc_if.if_snd))
+	return 0;
+#endif
     if (!((tp->t_state & TS_CARR_ON) == 0 && (tp->t_cflag & CLOCAL) == 0)
 	&& sc != NULL && tp == (struct tty *) sc->sc_devp) {
 	ppp_restart(sc);
@@ -946,7 +956,7 @@ pppgetm(sc)
 /*
  * tty interface receiver interrupt.
  */
-static unsigned paritytab[8] = {
+static const unsigned paritytab[8] = {
     0x96696996, 0x69969669, 0x69969669, 0x96696996,
     0x69969669, 0x96696996, 0x96696996, 0x69969669
 };
@@ -1278,5 +1288,3 @@ pppdumpframe(sc, m, xmit)
 		printf("\n");
 	}
 }
-
-#endif	/* NPPP > 0 */

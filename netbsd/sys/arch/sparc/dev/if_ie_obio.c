@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie_obio.c,v 1.15.2.1 2000/07/19 02:53:12 mrg Exp $	*/
+/*	$NetBSD: if_ie_obio.c,v 1.24 2002/03/11 16:27:02 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -98,10 +98,8 @@
 #include <net/if_media.h>
 #include <net/if_ether.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
-#include <machine/cpu.h>
-#include <machine/pmap.h>
 #include <machine/bus.h>
 #include <machine/intr.h>
 #include <machine/autoconf.h>
@@ -128,7 +126,7 @@ struct ieob {
 
 
 static void ie_obreset __P((struct ie_softc *, int));
-static void ie_obattend __P((struct ie_softc *));
+static void ie_obattend __P((struct ie_softc *, int));
 static void ie_obrun __P((struct ie_softc *));
 
 int ie_obio_match __P((struct device *, struct cfdata *, void *));
@@ -158,8 +156,9 @@ ie_obreset(sc, what)
 	ieo->obctrl = IEOB_NORSET;
 }
 void
-ie_obattend(sc)
+ie_obattend(sc, why)
 	struct ie_softc *sc;
+	int why;
 {
 	volatile struct ieob *ieo = (struct ieob *) sc->sc_reg;
 
@@ -264,7 +263,7 @@ ie_obio_match(parent, cf, aux)
 		return (0);
 
 	oba = &uoba->uoba_oba4;
-	return (bus_space_probe(oba->oba_bustag, 0, oba->oba_paddr,
+	return (bus_space_probe(oba->oba_bustag, oba->oba_paddr,
 				1,	/* probe size */
 				0,	/* offset */
 				0,	/* flags */
@@ -299,16 +298,17 @@ extern	void myetheraddr(u_char *);	/* should be elsewhere */
 	sc->hwinit = ie_obrun;
 	sc->memcopyout = ie_obio_memcopyout;
 	sc->memcopyin = ie_obio_memcopyin;
+
+	sc->ie_bus_barrier = NULL;
 	sc->ie_bus_read16 = ie_obio_read16;
 	sc->ie_bus_write16 = ie_obio_write16;
 	sc->ie_bus_write24 = ie_obio_write24;
 	sc->sc_msize = msize = 65536; /* XXX */
 
-	if (obio_bus_map(oba->oba_bustag, oba->oba_paddr,
-			 0,
-			 sizeof(struct ieob),
-			 BUS_SPACE_MAP_LINEAR,
-			 0, &bh) != 0) {
+	if (bus_space_map(oba->oba_bustag, oba->oba_paddr,
+			  sizeof(struct ieob),
+			  BUS_SPACE_MAP_LINEAR,
+			  &bh) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -343,8 +343,9 @@ extern	void myetheraddr(u_char *);	/* should be elsewhere */
 	}
 
 	/* Load the segment */
-	if ((error = bus_dmamap_load_raw(dmatag, sc->sc_dmamap,
-				&seg, rseg, msize, BUS_DMA_NOWAIT)) != 0) {
+	if ((error = bus_dmamap_load(dmatag, sc->sc_dmamap,
+				     sc->sc_maddr, msize, NULL,
+				     BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: DMA buffer map load error %d\n",
 			sc->sc_dev.dv_xname, error);
 		bus_dmamem_unmap(dmatag, sc->sc_maddr, msize);
@@ -388,6 +389,7 @@ extern	void myetheraddr(u_char *);	/* should be elsewhere */
 	pmap_enter(pmap_kernel(), trunc_page(IEOB_ADBASE+IE_SCP_ADDR),
 	    pa | PMAP_NC /*| PMAP_IOC*/,
 	    VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+	pmap_update(pmap_kernel());
 
 	/* Map iscp at location 0 (relative to `maddr') */
 	sc->iscp = 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.1.12.1 2000/07/25 08:37:44 kleink Exp $	*/
+/*	$NetBSD: asm.h,v 1.10 2002/04/28 17:10:33 uch Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -39,20 +39,28 @@
  */
 
 #ifndef _SH3_ASM_H_
-#define _SH3_ASM_H_
+#define	_SH3_ASM_H_
 
+#define	PIC_PROLOGUE
+#define	PIC_EPILOGUE
+#define	PIC_PLT(x)	x
+#define	PIC_GOT(x)	x
+#define	PIC_GOTOFF(x)	x
 
-#define PIC_PROLOGUE
-#define PIC_EPILOGUE
-#define PIC_PLT(x)	x
-#define PIC_GOT(x)	x
-#define PIC_GOTOFF(x)	x
+/*
+ * The old NetBSD/sh3 ELF toolchain used underscores.  The new
+ * NetBSD/sh3 ELF toolchain does not.  The C pre-processor
+ * defines __NO_LEADING_UNDERSCORES__ for the new ELF toolchain.
+ */
 
-
+#if (defined(__ELF__) && defined(__NO_LEADING_UNDERSCORES__))
+# define _C_LABEL(x)	x
+#else
 #ifdef __STDC__
 # define _C_LABEL(x)	_ ## x
 #else
 # define _C_LABEL(x)	_/**/x
+#endif
 #endif
 #define	_ASM_LABEL(x)	x
 
@@ -61,31 +69,46 @@
 # define _ALIGN_TEXT .align 2
 #endif
 
-#define _ENTRY(x) \
-	.text ;\
-	_ALIGN_TEXT; \
-	.globl x; \
+#ifdef __ELF__
+#define	_ENTRY(x)							\
+	.text								;\
+	_ALIGN_TEXT							;\
+	.globl x							;\
+	.type x,@function						;\
 	x:
+#else /* __ELF__ */
+#define	_ENTRY(x)							\
+	.text								;\
+	_ALIGN_TEXT							;\
+	.globl x							;\
+	x:
+#endif /* __ELF__ */
 
-# define _PROF_PROLOGUE
+#define	_PROF_PROLOGUE
 
-#define	ENTRY(y)	_ENTRY(_C_LABEL(y)); \
+#define	ENTRY(y)	_ENTRY(_C_LABEL(y))				;\
 	_PROF_PROLOGUE
 #define	NENTRY(y)	_ENTRY(_C_LABEL(y))
-#define	ASENTRY(y)	_ENTRY(_ASM_LABEL(y));\
+#define	ASENTRY(y)	_ENTRY(_ASM_LABEL(y))				;\
 	_PROF_PROLOGUE
 
-#define	ALTENTRY(name)	.globl _C_LABEL(name); \
+#ifdef __ELF__
+#define	ALTENTRY(name)	.globl _C_LABEL(name)				;\
+	.type _C_LABEL(name),@function					;\
 	_C_LABEL(name):
+#else
+#define	ALTENTRY(name)	.globl _C_LABEL(name)				;\
+	_C_LABEL(name):
+#endif
 
 #define	ASMSTR		.asciz
 
-#define RCSID(x)	.text; .asciz x
+#define	RCSID(x)	.text; .asciz x
 
 #ifdef __ELF__
 #define	WEAK_ALIAS(alias,sym)						\
-	.weak alias;							\
-	alias = sym
+	.weak _C_LABEL(alias);						\
+	_C_LABEL(alias) = _C_LABEL(sym)
 #endif
 
 #ifdef __STDC__

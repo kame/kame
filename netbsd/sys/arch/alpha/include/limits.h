@@ -1,4 +1,4 @@
-/* $NetBSD: limits.h,v 1.6.4.1 2000/08/09 17:41:51 tshiozak Exp $ */
+/* $NetBSD: limits.h,v 1.7 2000/08/08 22:31:13 tshiozak Exp $ */
 
 /*
  * Copyright (c) 1988, 1993

@@ -1,4 +1,4 @@
-#	$NetBSD: files.sun3,v 1.57 2000/03/27 21:47:47 scottr Exp $
+#	$NetBSD: files.sun3,v 1.62 2001/11/20 12:56:41 lukem Exp $
 
 #
 # sun3-specific configuration info
@@ -34,12 +34,13 @@ file arch/sun3/sun3x/pmap.c			_sun3x_
 file arch/sun3/sun3/autoconf.c
 file arch/sun3/sun3/conf.c
 file arch/sun3/sun3/db_machdep.c		ddb
-file arch/sun3/sun3/db_memrw.c  		ddb | kgdb
+file arch/sun3/sun3/db_memrw.c			ddb | kgdb
 file arch/sun3/sun3/disksubr.c
 file arch/sun3/sun3/fpu.c
 file arch/sun3/sun3/isr.c
 file arch/sun3/sun3/kgdb_machdep.c 		kgdb
 file arch/sun3/sun3/leds.c
+file arch/sun3/sun3/procfs_machdep.c		procfs
 file arch/sun3/sun3/stub.c
 file arch/sun3/sun3/sunmon.c
 file arch/sun3/sun3/sys_machdep.c
@@ -250,9 +251,12 @@ file dev/sun/ms.c			ms needs-flag
 
 
 # Memory Disk for boot tape
-file arch/sun3/dev/md_root.c		memory_disk_hooks
+file dev/md_root.c			memory_disk_hooks
 
 # Compatibility modules
+
+# NetBSD m68k a.out Binary Compatibility (COMPAT_AOUT_M68K)
+include "compat/aoutm68k/files.aoutm68k"
 
 # SunOS Binary Compatibility (COMPAT_SUNOS)
 include "compat/sunos/files.sunos"
@@ -264,6 +268,7 @@ include "compat/svr4/files.svr4"
 # Linux binary compatibility (COMPAT_LINUX)
 include "compat/linux/files.linux"
 include "compat/linux/arch/m68k/files.linux_m68k"
+file arch/m68k/m68k/linux_trap.c	compat_linux
 
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"

@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.91 2000/06/06 18:52:46 soren Exp $	*/
+/*	$NetBSD: trap.c,v 1.105 2002/05/14 02:58:34 matt Exp $	*/
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
@@ -44,12 +44,10 @@
  */
 
 #include "opt_ddb.h"
-#include "opt_syscall_debug.h"
 #include "opt_execfmt.h"
-#include "opt_ktrace.h"
-#include "opt_compat_netbsd.h"
+#include "opt_kgdb.h"
+#include "opt_compat_aout_m68k.h"
 #include "opt_compat_sunos.h"
-#include "opt_compat_linux.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,20 +59,13 @@
 #include <sys/syscall.h>
 #include <sys/syslog.h>
 #include <sys/user.h>
-#ifdef KTRACE
-#include <sys/ktrace.h>
-#endif
 #ifdef	KGDB
 #include <sys/kgdb.h>
 #endif
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
-#include <machine/db_machdep.h>
 #include <machine/endian.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
@@ -83,21 +74,18 @@
 #include <sun3/sun3/fc.h>
 #include <sun3/sun3/machdep.h>
 
-/* XXX - Later, get this from <m68k/m68k.h> */
-void	regdump __P((struct trapframe *, int));
+#ifdef DDB
+#include <machine/db_machdep.h>
+#include <ddb/db_extern.h>
+#endif
 
 #ifdef COMPAT_SUNOS
 #include <compat/sunos/sunos_syscall.h>
 extern struct emul emul_sunos;
 #endif
 
-#ifdef COMPAT_LINUX
-#ifdef EXEC_AOUT
-extern struct emul emul_linux_aout;
-#endif
-#ifdef EXEC_ELF32
-extern struct emul emul_linux_elf32;
-#endif
+#ifdef COMPAT_AOUT_M68K
+extern struct emul emul_netbsd_aoutm68k;
 #endif
 
 /*
@@ -113,7 +101,6 @@ extern struct emul emul_linux_elf32;
 extern char fubail[], subail[];
 
 /* These are called from locore.s */
-void syscall __P((register_t code, struct trapframe));
 void trap __P((int type, u_int code, u_int v, struct trapframe));
 void trap_kdebug __P((int type, struct trapframe tf));
 int _nodb_trap __P((int type, struct trapframe *));
@@ -185,8 +172,8 @@ int mmupid = -1;
  */
 static void
 userret(p, tf, oticks)
-	register struct proc *p;
-	register struct trapframe *tf;
+	struct proc *p;
+	struct trapframe *tf;
 	u_quad_t oticks;
 {
 	int sig;
@@ -219,6 +206,22 @@ userret(p, tf, oticks)
 }
 
 /*
+ * Used by the common m68k syscall() and child_return() functions.
+ * XXX: Temporary until all m68k ports share common trap()/userret() code.
+ */
+void machine_userret(struct proc *, struct frame *, u_quad_t);
+
+void
+machine_userret(p, f, t)
+	struct proc *p;
+	struct frame *f;
+	u_quad_t t;
+{
+
+	userret(p, &f->F_t, t);
+}
+
+/*
  * Trap is called from locore to handle most types of processor traps,
  * including events such as simulated software interrupts/AST's.
  * System calls are broken out for efficiency.
@@ -230,10 +233,11 @@ trap(type, code, v, tf)
 	u_int code, v;
 	struct trapframe tf;
 {
-	register struct proc *p;
-	register int sig, tmp;
+	struct proc *p;
+	int sig, tmp;
 	u_int ucode;
 	u_quad_t sticks;
+	caddr_t onfault;
 
 	uvmexp.traps++;
 	p = curproc;
@@ -326,10 +330,10 @@ trap(type, code, v, tf)
 		printf("pid %d: kernel %s exception\n", p->p_pid,
 		       type==T_COPERR ? "coprocessor" : "format");
 		type |= T_USER;
-		p->p_sigacts->ps_sigact[SIGILL].sa_handler = SIG_DFL;
-		sigdelset(&p->p_sigignore, SIGILL);
-		sigdelset(&p->p_sigcatch, SIGILL);
-		sigdelset(&p->p_sigmask, SIGILL);
+		SIGACTION(p, SIGILL).sa_handler = SIG_DFL;
+		sigdelset(&p->p_sigctx.ps_sigignore, SIGILL);
+		sigdelset(&p->p_sigctx.ps_sigcatch, SIGILL);
+		sigdelset(&p->p_sigctx.ps_sigmask, SIGILL);
 		sig = SIGILL;
 		ucode = tf.tf_format;
 		break;
@@ -465,12 +469,12 @@ trap(type, code, v, tf)
 		/*FALLTHROUGH*/
 
 	case T_MMUFLT|T_USER: { 	/* page fault */
-		register vm_offset_t va;
-		register struct vmspace *vm = p->p_vmspace;
-		register vm_map_t map;
+		vaddr_t va;
+		struct vmspace *vm = p->p_vmspace;
+		struct vm_map *map;
 		int rv;
 		vm_prot_t ftype;
-		extern vm_map_t kernel_map;
+		extern struct vm_map *kernel_map;
 
 #ifdef DEBUG
 		if ((mmudebug & MDB_WBFOLLOW) || MDB_ISPID(p->p_pid))
@@ -494,10 +498,10 @@ trap(type, code, v, tf)
 		}
 
 		if (WRFAULT(code))
-			ftype = VM_PROT_READ | VM_PROT_WRITE;
+			ftype = VM_PROT_WRITE;
 		else
 			ftype = VM_PROT_READ;
-		va = m68k_trunc_page((vm_offset_t)v);
+		va = m68k_trunc_page((vaddr_t)v);
 
 		/*
 		 * Need to resolve the fault.
@@ -509,7 +513,11 @@ trap(type, code, v, tf)
 		 * This function may also, for example, disallow any
 		 * faults in the kernel text segment, etc.
 		 */
+
+		onfault = p->p_addr->u_pcb.pcb_onfault;
+		p->p_addr->u_pcb.pcb_onfault = NULL;
 		rv = _pmap_fault(map, va, ftype);
+		p->p_addr->u_pcb.pcb_onfault = onfault;
 
 #ifdef	DEBUG
 		if (rv && MDB_ISPID(p->p_pid)) {
@@ -528,16 +536,16 @@ trap(type, code, v, tf)
 		 * error.
 		 */
 		if ((map != kernel_map) && ((caddr_t)va >= vm->vm_maxsaddr)) {
-			if (rv == KERN_SUCCESS) {
+			if (rv == 0) {
 				unsigned nss;
 
 				nss = btoc((u_int)(USRSTACK-va));
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
-			} else if (rv == KERN_PROTECTION_FAILURE)
-				rv = KERN_INVALID_ADDRESS;
+			} else if (rv == EACCES)
+				rv = EFAULT;
 		}
-		if (rv == KERN_SUCCESS)
+		if (rv == 0)
 			goto finish;
 
 		if ((type & T_USER) == 0) {
@@ -556,7 +564,7 @@ trap(type, code, v, tf)
 			goto dopanic;
 		}
 		ucode = v;
-		if (rv == KERN_RESOURCE_SHORTAGE) {
+		if (rv == ENOMEM) {
 			printf("UVM: pid %d (%s), uid %d killed: out of swap\n",
 			       p->p_pid, p->p_comm,
 			       p->p_cred && p->p_ucred ?
@@ -581,230 +589,6 @@ douret:
 
 done:;
 	/* XXX: Detect trap recursion? */
-}
-
-/*
- * Process a system call.
- */
-void
-syscall(code, tf)
-	register_t code;
-	struct trapframe tf;
-{
-	register caddr_t params;
-	register struct sysent *callp;
-	register struct proc *p;
-	int error, opc, nsys;
-	size_t argsize;
-	register_t args[8], rval[2];
-	u_quad_t sticks;
-
-	uvmexp.syscalls++;
-	if (!USERMODE(tf.tf_sr))
-		panic("syscall");
-	p = curproc;
-	sticks = p->p_sticks;
-	p->p_md.md_regs = tf.tf_regs;
-	opc = tf.tf_pc;
-
-	nsys = p->p_emul->e_nsysent;
-	callp = p->p_emul->e_sysent;
-
-#ifdef COMPAT_SUNOS
-	if (p->p_emul == &emul_sunos) {
-		/*
-		 * SunOS passes the syscall-number on the stack, whereas
-		 * BSD passes it in D0. So, we have to get the real "code"
-		 * from the stack, and clean up the stack, as SunOS glue
-		 * code assumes the kernel pops the syscall argument the
-		 * glue pushed on the stack. Sigh...
-		 */
-		code = fuword((caddr_t)tf.tf_regs[SP]);
-
-		/*
-		 * XXX
-		 * Don't do this for sunos_sigreturn, as there's no stored pc
-		 * on the stack to skip, the argument follows the syscall
-		 * number without a gap.
-		 */
-		if (code != SUNOS_SYS_sigreturn) {
-			tf.tf_regs[SP] += sizeof (int);
-			/*
-			 * remember that we adjusted the SP,
-			 * might have to undo this if the system call
-			 * returns ERESTART.
-			 * XXX - Use a local variable for this? -gwr
-			 */
-			p->p_md.md_flags |= MDP_STACKADJ;
-		} else {
-			/* XXX - This may be redundant (see below). */
-			p->p_md.md_flags &= ~MDP_STACKADJ;
-		}
-	}
-#endif
-
-	params = (caddr_t)tf.tf_regs[SP] + sizeof(int);
-
-	switch (code) {
-	case SYS_syscall:
-		/*
-		 * Code is first argument, followed by actual args.
-		 */
-		code = fuword(params);
-		params += sizeof(int);
-		/*
-		 * XXX sigreturn requires special stack manipulation
-		 * that is only done if entered via the sigreturn
-		 * trap.  Cannot allow it here so make sure we fail.
-		 */
-		switch (code) {
-#ifdef COMPAT_13
-		case SYS_compat_13_sigreturn13:
-#endif
-		case SYS___sigreturn14:
-			code = nsys;
-			break;
-		}
-		break;
-	case SYS___syscall:
-		/*
-		 * Like syscall, but code is a quad, so as to maintain
-		 * quad alignment for the rest of the arguments.
-		 */
-		if (callp != sysent)
-			break;
-		code = fuword(params + _QUAD_LOWWORD * sizeof(int));
-		params += sizeof(quad_t);
-		break;
-	default:
-		break;
-	}
-	if (code < 0 || code >= nsys)
-		callp += p->p_emul->e_nosys;		/* illegal */
-	else
-		callp += code;
-	argsize = callp->sy_argsize;
-#ifdef COMPAT_LINUX
-	if (0
-# ifdef EXEC_AOUT
-	    || p->p_emul == &emul_linux_aout
-# endif
-# ifdef EXEC_ELF32
-	    || p->p_emul == &emul_linux_elf32
-# endif
-	     ) {
-		/*
-		 * Linux passes the args in d1-d5
-		 */
-		switch (argsize) {
-		case 20:
-			args[4] = frame.f_regs[D5];
-		case 16:
-			args[3] = frame.f_regs[D4];
-		case 12:
-			args[2] = frame.f_regs[D3];
-		case 8:
-			args[1] = frame.f_regs[D2];
-		case 4:
-			args[0] = frame.f_regs[D1];
-		case 0:
-			error = 0;
-			break;
-		default:
-#ifdef DEBUG
-			panic("linux syscall %d weird argsize %d",
-				code, argsize);
-#else
-			error = EINVAL;
-#endif
-			break;
-		}
-	} else
-#endif
-	if (argsize)
-		error = copyin(params, (caddr_t)args, argsize);
-	else
-		error = 0;
-#ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
-#endif
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, code, argsize, args);
-#endif
-	if (error)
-		goto bad;
-	rval[0] = 0;
-	rval[1] = tf.tf_regs[D1];
-	error = (*callp->sy_call)(p, args, rval);
-	switch (error) {
-	case 0:
-		tf.tf_regs[D0] = rval[0];
-		tf.tf_regs[D1] = rval[1];
-		tf.tf_sr &= ~PSL_C;	/* carry bit */
-		break;
-	case ERESTART:
-		/*
-		 * We always enter through a `trap' instruction, which is 2
-		 * bytes, so adjust the pc by that amount.
-		 */
-		tf.tf_pc = opc - 2;
-		break;
-	case EJUSTRETURN:
-		/* nothing to do */
-		break;
-	default:
-	bad:
-		if (p->p_emul->e_errno)
-			error = p->p_emul->e_errno[error];
-		tf.tf_regs[D0] = error;
-		tf.tf_sr |= PSL_C;	/* carry bit */
-		break;
-	}
-
-#ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
-#endif
-#ifdef COMPAT_SUNOS
-	/* need new p-value for this */
-	if (p->p_md.md_flags & MDP_STACKADJ) {
-		p->p_md.md_flags &= ~MDP_STACKADJ;
-		if (error == ERESTART)
-			tf.tf_regs[SP] -= sizeof (int);
-	}
-#endif
-	userret(p, &tf, sticks);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, code, error, rval[0]);
-#endif
-}
-
-/*
- * Set up return-value registers as fork() libc stub expects,
- * and do normal return-to-user-mode stuff.
- */
-void
-child_return(arg)
-	void *arg;
-{
-	struct proc *p = arg;
-	struct trapframe *tf;
-
-	tf = (struct trapframe *)p->p_md.md_regs;
-	tf->tf_regs[D0] = 0;
-	tf->tf_sr &= ~PSL_C;
-	tf->tf_format = FMT0;
-
-	/*
-	 * Old ticks (3rd arg) is zero so we will charge the child
-	 * for any clock ticks that might happen before this point.
-	 */
-	userret(p, tf, 0);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, SYS_fork, 0, 0);
-#endif
 }
 
 /*

@@ -1,4 +1,4 @@
-/* $NetBSD: tga.c,v 1.25.2.3 2001/06/25 16:27:54 he Exp $ */
+/* $NetBSD: tga.c,v 1.41 2002/03/17 19:41:00 atatat Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -27,6 +27,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tga.c,v 1.41 2002/03/17 19:41:00 atatat Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -35,8 +38,6 @@
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/ioctl.h>
-
-#include <vm/vm.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -50,11 +51,13 @@
 #include <dev/ic/bt485var.h>
 #include <dev/ic/bt463reg.h>
 #include <dev/ic/bt463var.h>
+#include <dev/ic/ibm561var.h>
 
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wscons_raster.h>
 #include <dev/rasops/rasops.h>
 #include <dev/wsfont/wsfont.h>
+#include <uvm/uvm_extern.h>
 
 #ifdef __alpha__
 #include <machine/pte.h>
@@ -73,8 +76,13 @@ struct cfattach tga_ca = {
 
 int	tga_identify __P((struct tga_devconfig *));
 const struct tga_conf *tga_getconf __P((int));
-static void	tga_getdevconfig __P((bus_space_tag_t memt, pci_chipset_tag_t pc,
+static void	tga_init __P((bus_space_tag_t memt, pci_chipset_tag_t pc,
 	    pcitag_t tag, struct tga_devconfig *dc));
+
+static int tga_matchcommon __P((bus_space_tag_t, pci_chipset_tag_t, pcitag_t));
+static void tga_mapaddrs __P((bus_space_tag_t memt, pci_chipset_tag_t pc,
+	pcitag_t, bus_size_t *pcisize, struct tga_devconfig *dc));
+unsigned tga_getdotclock __P((struct tga_devconfig *dc));
 
 struct tga_devconfig tga_console_dc;
 
@@ -95,7 +103,7 @@ static void tga_putchar __P((void *c, int row, int col,
 				u_int uc, long attr));
 static void tga_eraserows __P((void *, int, int, long));
 static void	tga_erasecols __P((void *, int, int, int, long));
-void tga2_init __P((struct tga_devconfig *, int));
+void tga2_init __P((struct tga_devconfig *));
 
 static void tga_config_interrupts __P((struct device *));
 
@@ -155,6 +163,15 @@ static void	tga_blank __P((struct tga_devconfig *));
 static void	tga_unblank __P((struct tga_devconfig *));
 
 int
+tga_cnmatch(iot, memt, pc, tag)
+	bus_space_tag_t iot, memt;
+	pci_chipset_tag_t pc;
+	pcitag_t tag;
+{
+	return tga_matchcommon(memt, pc, tag);
+}
+
+int
 tgamatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
@@ -168,15 +185,75 @@ tgamatch(parent, match, aux)
 	switch (PCI_PRODUCT(pa->pa_id)) {
 	case PCI_PRODUCT_DEC_21030:
 	case PCI_PRODUCT_DEC_PBXGB:
-		return 10;
+		break;
 	default:
 		return 0;
 	}
-	return (0);
+
+	/* short-circuit the following test, as we
+	 * already have the memory mapped and hence
+	 * cannot perform it---and we are the console
+	 * anyway.
+	 */
+	if (pa->pa_tag == tga_console_dc.dc_pcitag)
+		return 10;
+
+	return tga_matchcommon(pa->pa_memt, pa->pa_pc, pa->pa_tag);
+}
+
+static int
+tga_matchcommon(memt, pc, tag)
+	bus_space_tag_t memt;
+	pci_chipset_tag_t pc;
+	pcitag_t tag;
+{
+	struct tga_devconfig tmp_dc;
+	struct tga_devconfig *dc = &tmp_dc;
+	bus_size_t pcisize;
+
+	tga_mapaddrs(memt, pc, tag, &pcisize, dc);
+	dc->dc_tga_type = tga_identify(dc);
+
+	dc->dc_tgaconf = tga_getconf(dc->dc_tga_type);
+	bus_space_unmap(memt, dc->dc_memh, pcisize);
+	if (dc->dc_tgaconf)
+		return 10;
+	return 0;
 }
 
 static void
-tga_getdevconfig(memt, pc, tag, dc)
+tga_mapaddrs(memt, pc, tag, pcisize, dc)
+	bus_space_tag_t memt;
+	pci_chipset_tag_t pc;
+	pcitag_t tag;
+	bus_size_t *pcisize;
+	struct tga_devconfig *dc;
+{
+	int flags;
+
+	dc->dc_memt = memt;
+	dc->dc_tgaconf = NULL;
+
+	/* XXX magic number */
+	if (pci_mapreg_info(pc, tag, 0x10,
+	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT,
+	    &dc->dc_pcipaddr, pcisize, &flags))
+		panic("tga_mapaddrs: pci_mapreg_info() failed");
+	if ((flags & BUS_SPACE_MAP_PREFETCHABLE) == 0)		/* XXX */
+		panic("tga memory not prefetchable");
+
+	if (bus_space_map(memt, dc->dc_pcipaddr, *pcisize,
+	    BUS_SPACE_MAP_PREFETCHABLE | BUS_SPACE_MAP_LINEAR, &dc->dc_memh))
+		panic("tga_mapaddrs: could not map TGA address space");
+	dc->dc_vaddr = (vaddr_t) bus_space_vaddr(memt, dc->dc_memh);
+
+	bus_space_subregion(dc->dc_memt, dc->dc_memh, 
+						TGA_MEM_CREGS, TGA_CREGS_SIZE,
+						&dc->dc_regs);
+}
+
+static void
+tga_init(memt, pc, tag, dc)
 	bus_space_tag_t memt;
 	pci_chipset_tag_t pc;
 	pcitag_t tag;
@@ -186,44 +263,16 @@ tga_getdevconfig(memt, pc, tag, dc)
 	struct rasops_info *rip;
 	int cookie;
 	bus_size_t pcisize;
-	int i, flags;
-
-	dc->dc_memt = memt;
+	int i;
 
 	dc->dc_pcitag = tag;
-
-	/* XXX magic number */
-	if (pci_mapreg_info(pc, tag, 0x10,
-	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT,
-	    &dc->dc_pcipaddr, &pcisize, &flags))
-		return;
-	if ((flags & BUS_SPACE_MAP_PREFETCHABLE) == 0)		/* XXX */
-		panic("tga memory not prefetchable");
-
-	if (bus_space_map(memt, dc->dc_pcipaddr, pcisize,
-	    BUS_SPACE_MAP_PREFETCHABLE | BUS_SPACE_MAP_LINEAR, &dc->dc_memh))
-		return;
-	dc->dc_vaddr = (vaddr_t) bus_space_vaddr(memt, dc->dc_memh);
-#ifdef __alpha__
-	dc->dc_paddr = ALPHA_K0SEG_TO_PHYS(dc->dc_vaddr);	/* XXX */
-#endif
-#ifdef arc
-	bus_space_paddr(memt, dc->dc_memh, &dc->dc_paddr);
-#endif
-
-	bus_space_subregion(dc->dc_memt, dc->dc_memh, 
-						TGA_MEM_CREGS, TGA_CREGS_SIZE,
-						&dc->dc_regs);
+	tga_mapaddrs(memt, pc, tag, &pcisize, dc);
 	dc->dc_tga_type = tga_identify(dc);
-
 	tgac = dc->dc_tgaconf = tga_getconf(dc->dc_tga_type);
-	if (tgac == NULL)
-		return;
-
 #if 0
 	/* XXX on the Alpha, pcisize = 4 * cspace_size. */
 	if (tgac->tgac_cspace_size != pcisize)			/* sanity */
-		panic("tga_getdevconfig: memory size mismatch?");
+		panic("tga_init: memory size mismatch?");
 #endif
 
 	switch (TGARREG(dc, TGA_REG_GREV) & 0xff) {
@@ -239,15 +288,11 @@ tga_getdevconfig(memt, pc, tag, dc)
 		dc->dc_tga2 = 1;
 		break;
 	default:
-		panic("tga_getdevconfig: TGA Revision not recognized");
+		panic("tga_init: TGA Revision not recognized");
 	}
 
-	if (dc->dc_tga2) {
-		int	monitor;
-
-		monitor = (~TGARREG(dc, TGA_REG_GREV) >> 16) & 0x0f;
-		tga2_init(dc, monitor);
-	}
+	if (dc->dc_tga2)
+		tga2_init(dc);
 	
 	switch (TGARREG(dc, TGA_REG_VHCR) & 0x1ff) {		/* XXX */
 	case 0:
@@ -317,16 +362,18 @@ tga_getdevconfig(memt, pc, tag, dc)
 
 	wsfont_init();
 	/* prefer 8 pixel wide font */
-	if ((cookie = wsfont_find(NULL, 8, 0, 0)) <= 0)
-		cookie = wsfont_find(NULL, 0, 0, 0);
+	cookie = wsfont_find(NULL, 8, 0, 0, WSDISPLAY_FONTORDER_R2L,
+	    WSDISPLAY_FONTORDER_L2R);
+	if (cookie <= 0)
+		cookie = wsfont_find(NULL, 0, 0, 0, WSDISPLAY_FONTORDER_R2L,
+		    WSDISPLAY_FONTORDER_L2R);
 	if (cookie <= 0) {
 		printf("tga: no appropriate fonts.\n");
 		return;
 	}
 
 	/* the accelerated tga_putchar() needs LSbit left */
-	if (wsfont_lock(cookie, &dc->dc_rinfo.ri_font,
-	    WSDISPLAY_FONTORDER_R2L, WSDISPLAY_FONTORDER_L2R) <= 0) {
+	if (wsfont_lock(cookie, &dc->dc_rinfo.ri_font)) {
 		printf("tga: couldn't lock font\n");
 		return;
 	}
@@ -376,10 +423,9 @@ tgaattach(parent, self, aux)
 		sc->nscreens = 1;
 	} else {
 		sc->sc_dc = (struct tga_devconfig *)
-		    malloc(sizeof(struct tga_devconfig), M_DEVBUF, M_WAITOK);
-		bzero(sc->sc_dc, sizeof(struct tga_devconfig));
-		tga_getdevconfig(pa->pa_memt, pa->pa_pc, pa->pa_tag,
-		    sc->sc_dc);
+		    malloc(sizeof(struct tga_devconfig), M_DEVBUF,
+		    M_WAITOK|M_ZERO);
+		tga_init(pa->pa_memt, pa->pa_pc, pa->pa_tag, sc->sc_dc);
 	}
 	if (sc->sc_dc->dc_vaddr == NULL) {
 		printf(": couldn't map memory space; punt!\n");
@@ -388,8 +434,7 @@ tgaattach(parent, self, aux)
 
 	/* XXX say what's going on. */
 	intrstr = NULL;
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &intrh)) {
+	if (pci_intr_map(pa, &intrh)) {
 		printf(": couldn't map interrupt");
 		return;
 	}
@@ -444,11 +489,18 @@ tgaattach(parent, self, aux)
 		sc->sc_dc->dc_ramdac_cookie = 
 			sc->sc_dc->dc_ramdac_funcs->ramdac_register(sc->sc_dc, 
 			tga_sched_update, tga2_ramdac_wr, tga2_ramdac_rd);
+
+		/* XXX this is a bit of a hack, setting the dotclock here */
+		if (sc->sc_dc->dc_tgaconf->ramdac_funcs != bt485_funcs)
+			(*sc->sc_dc->dc_ramdac_funcs->ramdac_set_dotclock)
+			    (sc->sc_dc->dc_ramdac_cookie,
+			    tga_getdotclock(sc->sc_dc));
 	}
 
 	/*
 	 * Initialize the RAMDAC.  Initialization includes disabling
-	 * cursor, setting a sane colormap, etc.
+	 * cursor, setting a sane colormap, etc.  We presume that we've
+	 * filled in the necessary dot clock for PowerStorm 4d20.
 	 */
 	(*sc->sc_dc->dc_ramdac_funcs->ramdac_init)(sc->sc_dc->dc_ramdac_cookie);
 	TGAWREG(sc->sc_dc, TGA_REG_SISR, 0x00000001); /* XXX */
@@ -484,7 +536,6 @@ tga_config_interrupts (d)
 	struct tga_softc *sc = (struct tga_softc *)d;
 	sc->sc_dc->dc_intrenabled = 1;
 }
-	
 
 int
 tga_ioctl(v, cmd, data, flag, p)
@@ -509,7 +560,11 @@ tga_ioctl(v, cmd, data, flag, p)
 		wsd_fbip->height = sc->sc_dc->dc_ht;
 		wsd_fbip->width = sc->sc_dc->dc_wid;
 		wsd_fbip->depth = sc->sc_dc->dc_tgaconf->tgac_phys_depth;
+#if 0
 		wsd_fbip->cmsize = 256;		/* XXX ??? */
+#else
+		wsd_fbip->cmsize = 1024;	/* XXX ??? */
+#endif
 #undef wsd_fbip
 		return (0);
 
@@ -553,7 +608,7 @@ tga_ioctl(v, cmd, data, flag, p)
 		return (*dcrf->ramdac_set_cursor)(dcrc,
 		    (struct wsdisplay_cursor *)data);
 	}
-	return (-1);
+	return (EPASSTHROUGH);
 }
 
 static int
@@ -622,24 +677,13 @@ tga_mmap(v, offset, prot)
 	off_t offset;
 	int prot;
 {
-
-	/* XXX NEW MAPPING CODE... */
-
-#if defined(__alpha__)
 	struct tga_softc *sc = v;
 
 	if (offset >= sc->sc_dc->dc_tgaconf->tgac_cspace_size || offset < 0)
 		return -1;
-	return alpha_btop(sc->sc_dc->dc_paddr + offset);
-#elif defined(__mips__)
-	struct tga_softc *sc = v;
 
-	if (offset >= sc->sc_dc->dc_tgaconf->tgac_cspace_size || offset < 0)
-		return -1;
-	return mips_btop(sc->sc_dc->dc_paddr + offset);
-#else
-	return (-1);
-#endif
+	return (bus_space_mmap(sc->sc_dc->dc_memt, sc->sc_dc->dc_pcipaddr,
+	    offset, prot, BUS_SPACE_MAP_LINEAR));
 }
 
 static int
@@ -700,8 +744,7 @@ tga_cnattach(iot, memt, pc, bus, device, function)
 	struct tga_devconfig *dcp = &tga_console_dc;
 	long defattr;
 
-	tga_getdevconfig(memt, pc,
-	    pci_make_tag(pc, bus, device, function), dcp);
+	tga_init(memt, pc, pci_make_tag(pc, bus, device, function), dcp);
 
 	/* sanity checks */
 	if (dcp->dc_vaddr == NULL)
@@ -716,10 +759,14 @@ tga_cnattach(iot, memt, pc, bus, device, function)
 	 * Initialization includes disabling cursor, setting a sane
 	 * colormap, etc.  It will be reinitialized in tgaattach().
 	 */
-	if (dcp->dc_tga2)
-		bt485_cninit(dcp, tga_sched_update, tga2_ramdac_wr,
-		    tga2_ramdac_rd);
-	else {
+	if (dcp->dc_tga2) {
+		if (dcp->dc_tgaconf->ramdac_funcs == bt485_funcs)
+			bt485_cninit(dcp, tga_sched_update, tga2_ramdac_wr,
+			    tga2_ramdac_rd);
+		else
+			ibm561_cninit(dcp, tga_sched_update, tga2_ramdac_wr,
+			    tga2_ramdac_rd, tga_getdotclock(dcp));
+	} else {
 		if (dcp->dc_tgaconf->ramdac_funcs == bt485_funcs)
 			bt485_cninit(dcp, tga_sched_update, tga_ramdac_wr,
 				tga_ramdac_rd);
@@ -1006,10 +1053,11 @@ tga_rop_vtov(dst, dx, dy, w, h, rop, src, sx, sy)
 	int sx, sy;
 {
 	struct tga_devconfig *dc = (struct tga_devconfig *)dst->ri_hw;
-	int srcb, dstb;
-	int x, y;
-	int xstart, xend, xdir, xinc;
+	int srcb, dstb, tga_srcb, tga_dstb;
+	int x, y, wb;
+	int xstart, xend, xdir;
 	int ystart, yend, ydir, yinc;
+	int xleft, lastx, lastleft;
 	int offset = 1 * dc->dc_tgaconf->tgac_vvbr_units;
 
 	/*
@@ -1024,6 +1072,7 @@ tga_rop_vtov(dst, dx, dy, w, h, rop, src, sx, sy)
 		return -1;
 	}
 
+        wb = w * (dst->ri_depth / 8);
 	if (sy >= dy) {
 		ystart = 0;
 		yend = h;
@@ -1033,45 +1082,135 @@ tga_rop_vtov(dst, dx, dy, w, h, rop, src, sx, sy)
 		yend = 0;
 		ydir = -1;
 	}
-	if (sx >= dx) {
+	if (sx >= dx) {      /* moving to the left */
 		xstart = 0;
-		xend = w * (dst->ri_depth / 8);
+		xend = w * (dst->ri_depth / 8) - 4;
 		xdir = 1;
-	} else {
-		xstart = w * (dst->ri_depth / 8);
+	} else {             /* moving to the right */
+		xstart = wb - ( wb >= 4*64 ? 4*64 : wb >= 64 ? 64 : 4 );
 		xend = 0;
 		xdir = -1;
 	}
-	xinc = xdir * 4 * 64;
+#define XINC4   4
+#define XINC64  64
+#define XINC256 (64*4)
 	yinc = ydir * dst->ri_stride;
 	ystart *= dst->ri_stride;
 	yend *= dst->ri_stride;
-	srcb = offset + (sy + src->ri_yorigin) * src->ri_stride + 
-		            (sx + src->ri_xorigin) * (src->ri_depth/8);
-	dstb = offset + (dy + dst->ri_yorigin) * dst->ri_stride + 
-		            (dx + dst->ri_xorigin ) * (dst->ri_depth/8);
+
+	srcb = sy * src->ri_stride + sx * (src->ri_depth/8);
+	dstb = dy * dst->ri_stride + dx * (dst->ri_depth/8);
+	tga_srcb = offset + (sy + src->ri_yorigin) * src->ri_stride + 
+		(sx + src->ri_xorigin) * (src->ri_depth/8);
+	tga_dstb = offset + (dy + dst->ri_yorigin) * dst->ri_stride + 
+		(dx + dst->ri_xorigin) * (dst->ri_depth/8);
+
 	TGAWALREG(dc, TGA_REG_GMOR, 3, 0x0007); /* Copy mode */
-	TGAWALREG(dc, TGA_REG_GOPR, 3, map_rop[rop]);	/* Set up the op */
-	for (y = ystart; (ydir * y) < (ydir * yend); y += yinc) {
-		for (x = xstart; (xdir * x) < (xdir * xend); x += xinc) {
-		  /* XXX XXX Eight writes to different addresses should fill 
-		   * XXX XXX up the write buffers on 21064 and 21164 chips,
-		   * XXX XXX but later CPUs might have larger write buffers which
-		   * XXX XXX require further unrolling of this loop, or the
-		   * XXX XXX insertion of memory barriers.
-		   */
-			TGAWALREG(dc, TGA_REG_GCSR, 0, srcb + y + x + 3 * 64);
-			TGAWALREG(dc, TGA_REG_GCDR, 0, dstb + y + x + 3 * 64);
-			TGAWALREG(dc, TGA_REG_GCSR, 1, srcb + y + x + 2 * 64);
-			TGAWALREG(dc, TGA_REG_GCDR, 1, dstb + y + x + 2 * 64);
-			TGAWALREG(dc, TGA_REG_GCSR, 2, srcb + y + x + 1 * 64);
-			TGAWALREG(dc, TGA_REG_GCDR, 2, dstb + y + x + 1 * 64);
-			TGAWALREG(dc, TGA_REG_GCSR, 3, srcb + y + x + 0 * 64);
-			TGAWALREG(dc, TGA_REG_GCDR, 3, dstb + y + x + 0 * 64);
+	TGAWALREG(dc, TGA_REG_GOPR, 3, map_rop[rop]);   /* Set up the op */
+
+	/*
+	 * we have 3 sizes of pixels to move in X direction:
+	 * 4 * 64   (unrolled TGA ops)
+	 *     64   (single TGA op)
+	 *      4   (CPU, using long word)
+	 */
+
+	if (xdir == 1) {   /* move to the left */
+
+		for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
+
+			/* 4*64 byte chunks */
+			for (xleft = wb, x = xstart;
+			     x <= xend && xleft >= 4*64;
+			     x += XINC256, xleft -= XINC256) {
+
+				/* XXX XXX Eight writes to different addresses should fill 
+				 * XXX XXX up the write buffers on 21064 and 21164 chips,
+				 * XXX XXX but later CPUs might have larger write buffers which
+				 * XXX XXX require further unrolling of this loop, or the
+				 * XXX XXX insertion of memory barriers.
+				 */
+				TGAWALREG(dc, TGA_REG_GCSR, 0, tga_srcb + y + x + 0 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 0, tga_dstb + y + x + 0 * 64);
+				TGAWALREG(dc, TGA_REG_GCSR, 1, tga_srcb + y + x + 1 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 1, tga_dstb + y + x + 1 * 64);
+				TGAWALREG(dc, TGA_REG_GCSR, 2, tga_srcb + y + x + 2 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 2, tga_dstb + y + x + 2 * 64);
+				TGAWALREG(dc, TGA_REG_GCSR, 3, tga_srcb + y + x + 3 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 3, tga_dstb + y + x + 3 * 64);
+			}
+
+			/* 64 byte chunks */
+			for ( ; x <= xend && xleft >= 64;
+			      x += XINC64, xleft -= XINC64) {
+				TGAWALREG(dc, TGA_REG_GCSR, 0, tga_srcb + y + x + 0 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 0, tga_dstb + y + x + 0 * 64);
+			}
+			lastx = x; lastleft = xleft;  /* remember for CPU loop */
+
+		}
+		TGAWALREG(dc, TGA_REG_GOPR, 0, 0x0003); /* op -> dst = src */
+		TGAWALREG(dc, TGA_REG_GMOR, 0, 0x0000); /* Simple mode */
+
+		for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
+			/* 4 byte granularity */
+			for (x = lastx, xleft = lastleft;
+			     x <= xend && xleft >= 4;
+			     x += XINC4, xleft -= XINC4) {
+				*(uint32_t *)(dst->ri_bits + dstb + y + x) =
+					*(uint32_t *)(dst->ri_bits + srcb + y + x);
+			}
 		}
 	}
-	TGAWALREG(dc, TGA_REG_GOPR, 0, 0x0003); /* op -> dst = src */
-	TGAWALREG(dc, TGA_REG_GMOR, 0, 0x0000); /* Simple mode */
+	else {    /* above move to the left, below move to the right */
+
+		for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
+
+			/* 4*64 byte chunks */
+			for (xleft = wb, x = xstart;
+			     x >= xend && xleft >= 4*64;
+			     x -= XINC256, xleft -= XINC256) {
+
+				/* XXX XXX Eight writes to different addresses should fill 
+				 * XXX XXX up the write buffers on 21064 and 21164 chips,
+				 * XXX XXX but later CPUs might have larger write buffers which
+				 * XXX XXX require further unrolling of this loop, or the
+				 * XXX XXX insertion of memory barriers.
+				 */
+				TGAWALREG(dc, TGA_REG_GCSR, 0, tga_srcb + y + x + 3 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 0, tga_dstb + y + x + 3 * 64);
+				TGAWALREG(dc, TGA_REG_GCSR, 1, tga_srcb + y + x + 2 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 1, tga_dstb + y + x + 2 * 64);
+				TGAWALREG(dc, TGA_REG_GCSR, 2, tga_srcb + y + x + 1 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 2, tga_dstb + y + x + 1 * 64);
+				TGAWALREG(dc, TGA_REG_GCSR, 3, tga_srcb + y + x + 0 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 3, tga_dstb + y + x + 0 * 64);
+			}
+
+			if (xleft) x += XINC256 - XINC64;
+
+			/* 64 byte chunks */
+			for ( ; x >= xend && xleft >= 64;
+			      x -= XINC64, xleft -= XINC64) {
+				TGAWALREG(dc, TGA_REG_GCSR, 0, tga_srcb + y + x + 0 * 64);
+				TGAWALREG(dc, TGA_REG_GCDR, 0, tga_dstb + y + x + 0 * 64);
+			}
+			if (xleft) x += XINC64 - XINC4;
+			lastx = x; lastleft = xleft;  /* remember for CPU loop */
+		}
+		TGAWALREG(dc, TGA_REG_GOPR, 0, 0x0003); /* op -> dst = src */
+		TGAWALREG(dc, TGA_REG_GMOR, 0, 0x0000); /* Simple mode */
+
+		for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
+			/* 4 byte granularity */
+			for (x = lastx, xleft = lastleft;
+			     x >= xend && xleft >= 4;
+			     x -= XINC4, xleft -= XINC4) {
+				*(uint32_t *)(dst->ri_bits + dstb + y + x) =
+					*(uint32_t *)(dst->ri_bits + srcb + y + x);
+			}
+		}
+	}
 	return 0;
 }
 
@@ -1378,31 +1517,46 @@ void tga2_ics9110_wr __P((
 	int dotclock
 ));
 
-void
-tga2_init(dc, m)
-	struct tga_devconfig *dc;
-	int m;
-{
+struct monitor *tga_getmonitor __P((struct tga_devconfig *dc));
 
-	tga2_ics9110_wr(dc, decmonitors[m].dotclock);
+void
+tga2_init(dc)
+	struct tga_devconfig *dc;
+{
+	struct	monitor *m = tga_getmonitor(dc);
+
+	/* Deal with the dot clocks.
+	 */
+	if (dc->dc_tga_type == TGA_TYPE_POWERSTORM_4D20) {
+		/* Set this up as a reference clock for the
+		 * ibm561's PLL.
+		 */
+		tga2_ics9110_wr(dc, 14300000);
+		/* XXX Can't set up the dotclock properly, until such time
+		 * as the RAMDAC is configured.
+		 */
+	} else {
+		/* otherwise the ics9110 is our clock. */
+		tga2_ics9110_wr(dc, m->dotclock);
+	}
 #if 0
 	TGAWREG(dc, TGA_REG_VHCR, 
-	     ((decmonitors[m].hbp / 4) << 21) |
-	     ((decmonitors[m].hsync / 4) << 14) |
-	    (((decmonitors[m].hfp - 4) / 4) << 9) |
-	     ((decmonitors[m].cols + 4) / 4));
+	     ((m->hbp / 4) << 21) |
+	     ((m->hsync / 4) << 14) |
+	    (((m->hfp - 4) / 4) << 9) |
+	     ((m->cols + 4) / 4));
 #else
 	TGAWREG(dc, TGA_REG_VHCR, 
-	     ((decmonitors[m].hbp / 4) << 21) |
-	     ((decmonitors[m].hsync / 4) << 14) |
-	    (((decmonitors[m].hfp) / 4) << 9) |
-	     ((decmonitors[m].cols) / 4));
+	     ((m->hbp / 4) << 21) |
+	     ((m->hsync / 4) << 14) |
+	    (((m->hfp) / 4) << 9) |
+	     ((m->cols) / 4));
 #endif
 	TGAWREG(dc, TGA_REG_VVCR, 
-	    (decmonitors[m].vbp << 22) |
-	    (decmonitors[m].vsync << 16) |
-	    (decmonitors[m].vfp << 11) |
-	    (decmonitors[m].rows));
+	    (m->vbp << 22) |
+	    (m->vsync << 16) |
+	    (m->vfp << 11) |
+	    (m->rows));
 	TGAWREG(dc, TGA_REG_VVBR, 1);
 	TGAREGRWB(dc, TGA_REG_VHCR, 3);
 	TGAWREG(dc, TGA_REG_VVVR, TGARREG(dc, TGA_REG_VVVR) | 1);
@@ -1454,6 +1608,8 @@ tga2_ics9110_wr(dc, dotclock)
 		N = 0x60; M = 0x32; V = 0x1; X = 0x1; R = 0x2; break;
 	case 202500000:
 		N = 0x60; M = 0x32; V = 0x1; X = 0x1; R = 0x2; break;
+	case  14300000:		/* this one is just a ref clock */
+		N = 0x03; M = 0x03; V = 0x1; X = 0x1; R = 0x3; break;
 	default:
 		panic("unrecognized clock rate %d\n", dotclock);
 	}
@@ -1481,4 +1637,18 @@ tga2_ics9110_wr(dc, dotclock)
 		&clock); /* XXX */
 	bus_space_write_4(dc->dc_memt, clock, 0, 0x0);
 	bus_space_barrier(dc->dc_memt, clock, 0, 0, BUS_SPACE_BARRIER_WRITE);
+}
+
+struct monitor *
+tga_getmonitor(dc)
+	struct tga_devconfig *dc;
+{
+	return &decmonitors[(~TGARREG(dc, TGA_REG_GREV) >> 16) & 0x0f];
+}
+
+unsigned
+tga_getdotclock(dc)
+	struct tga_devconfig *dc;
+{
+	return tga_getmonitor(dc)->dotclock;
 }

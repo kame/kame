@@ -1,4 +1,4 @@
-/*      $NetBSD: adwmcode.h,v 1.5 2000/05/27 18:24:51 dante Exp $        */
+/*      $NetBSD: adwmcode.h,v 1.7 2001/08/29 17:25:04 briggs Exp $        */
 
 /*
  * Generic driver definitions and exported functions for the Advanced
@@ -77,27 +77,27 @@ typedef struct adw_carrier ADW_CARRIER;
  * Mask used to eliminate low 4 bits of carrier 'next_ba' field.
  */
 #define ASC_NEXT_BA_MASK	0xFFFFFFF0
-#define ASC_GET_CARRP(carrp)	((carrp) & ASC_NEXT_BA_MASK)
+#define ASC_GET_CARRP(carrp)	htole32((le32toh(carrp)) & ASC_NEXT_BA_MASK)
 
 /*
  * Bus Address of a Carrier.
  * ba = base_ba + v_address - base_va
  */
-#define	ADW_CARRIER_BADDR(dmamap, carriers, x)	((dmamap)->dm_segs[0].ds_addr +\
-			(((u_long)x) - ((u_long)(carriers))))
+#define	ADW_CARRIER_BADDR(dmamap, carriers, x)	\
+	htole32((dmamap)->dm_segs[0].ds_addr + ((u_long)x - (u_long)(carriers)))
 /*
  * Virtual Address of a Carrier.
  * va = base_va + bus_address - base_ba
  */
 #define	ADW_CARRIER_VADDR(sc, x)	((ADW_CARRIER *) \
 			(((u_int8_t *)(sc)->sc_control->carriers) + \
-			((u_long)x) - \
+			le32toh((u_long)x) - \
 			(sc)->sc_dmamap_carrier->dm_segs[0].ds_addr))
 
 /******************************************************************************/
 
 struct adw_mcode {
-	const u_int8_t	*mcode_data;
+	const u_int8_t	* const mcode_data;
 	const u_int32_t	 mcode_chksum;
 	const u_int16_t	 mcode_size;
 };

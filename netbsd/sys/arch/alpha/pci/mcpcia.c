@@ -1,4 +1,4 @@
-/* $NetBSD: mcpcia.c,v 1.9.2.1 2000/06/27 19:46:01 thorpej Exp $ */
+/* $NetBSD: mcpcia.c,v 1.13 2002/05/16 01:01:32 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -74,7 +74,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mcpcia.c,v 1.9.2.1 2000/06/27 19:46:01 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mcpcia.c,v 1.13 2002/05/16 01:01:32 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -215,6 +215,7 @@ mcpciaattach(parent, self, aux)
 	    alphabus_dma_get_tag(&ccp->cc_dmat_direct, ALPHA_BUS_PCI);
 	pba.pba_pc = &ccp->cc_pc;
 	pba.pba_bus = 0;
+	pba.pba_bridgetag = NULL;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED |
 	    PCI_FLAGS_MRL_OKAY | PCI_FLAGS_MRM_OKAY | PCI_FLAGS_MWI_OKAY;
 	(void) config_found(self, &pba, mcpciaprint);
@@ -297,19 +298,21 @@ mcpcia_init0(ccp, mallocsafe)
 	REGVAL(MCPCIA_CAP_ERR(ccp)) = 0xFFFFFFFF;
 	alpha_mb();
 
-	/*
-	 * Use this opportunity to also find out the MID and CPU
-	 * type of the currently running CPU (that's us, billybob....)
-	 */
-	ctl = REGVAL(MCPCIA_WHOAMI(ccp));
-	mcbus_primary.mcbus_cpu_mid = MCBUS_CPU_MID(ctl);
-	if ((MCBUS_CPU_INFO(ctl) & CPU_Fill_Err) == 0 &&
-	    mcbus_primary.mcbus_valid == 0) {
-		mcbus_primary.mcbus_bcache =
-		    MCBUS_CPU_INFO(ctl) & CPU_BCacheMask;
-		mcbus_primary.mcbus_valid = 1;
+	if (ccp == &mcpcia_console_configuration) {
+		/*
+		 * Use this opportunity to also find out the MID and CPU
+		 * type of the currently running CPU (that's us, billybob....)
+		 */
+		ctl = REGVAL(MCPCIA_WHOAMI(ccp));
+		mcbus_primary.mcbus_cpu_mid = MCBUS_CPU_MID(ctl);
+		if ((MCBUS_CPU_INFO(ctl) & CPU_Fill_Err) == 0 &&
+		    mcbus_primary.mcbus_valid == 0) {
+			mcbus_primary.mcbus_bcache =
+			    MCBUS_CPU_INFO(ctl) & CPU_BCacheMask;
+			mcbus_primary.mcbus_valid = 1;
+		}
+		alpha_mb();
 	}
-	alpha_mb();
 
 	ccp->cc_initted = 1;
 }

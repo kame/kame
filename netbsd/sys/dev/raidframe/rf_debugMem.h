@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_debugMem.h,v 1.7 1999/09/05 01:58:11 oster Exp $	*/
+/*	$NetBSD: rf_debugMem.h,v 1.9 2001/10/04 15:58:52 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -39,14 +39,13 @@
 
 #include "rf_alloclist.h"
 
-#ifdef _KERNEL
 #include <sys/types.h>
 #include <sys/malloc.h>
 
 #define RF_Malloc(_p_, _size_, _cast_)                                      \
   {                                                                         \
      _p_ = _cast_ malloc((u_long)_size_, M_RAIDFRAME, M_WAITOK);            \
-     bzero((char *)_p_, _size_);                                            \
+     memset((char *)_p_, 0, _size_);                                        \
      if (rf_memDebug) rf_record_malloc(_p_, _size_, __LINE__, __FILE__);    \
   }
 
@@ -72,8 +71,6 @@
      free((void *)(_p_), M_RAIDFRAME);                                      \
      if (rf_memDebug) rf_unrecord_malloc(_p_, (u_int32_t) (_sz_));          \
   }
-
-#endif				/* _KERNEL */
 
 void    rf_record_malloc(void *p, int size, int line, char *filen);
 void    rf_unrecord_malloc(void *p, int sz);

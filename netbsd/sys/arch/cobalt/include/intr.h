@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.6 2000/05/05 03:27:22 soren Exp $	*/
+/*	$NetBSD: intr.h,v 1.11 2002/01/13 23:02:34 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -78,18 +78,18 @@ extern void		_clrsoftintr(int);
 #define splnet()        _splraise(SPLNET)
 #define spltty()        _splraise(SPLTTY)
 #define splclock()      _splraise(SPLCLOCK)
-#define splimp()	splclock()
+#define splvm()		splclock()
 #define splstatclock()  splclock()
 #define splsoftclock()	_splraise(MIPS_SOFT_INT_MASK_0)
 #define splsoftnet()	_splraise(MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
 #define spllowersoftclock() _spllower(MIPS_SOFT_INT_MASK_0)
 
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
+
 extern unsigned int	intrcnt[];
 #define SOFTCLOCK_INTR	0
 #define SOFTNET_INTR	1  
-
-extern void *	cpu_intr_establish(int, int, int (*)(void *), void *);
-extern void *	icu_intr_establish(int, int, int, int (*)(void *), void *);
 
 #endif /* !_LOCORE */
 #endif /* _LOCORE */

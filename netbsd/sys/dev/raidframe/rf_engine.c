@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_engine.c,v 1.9 2000/01/08 22:57:31 oster Exp $	*/
+/*	$NetBSD: rf_engine.c,v 1.12 2001/11/13 07:11:14 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -48,11 +48,14 @@
  *   If a node fails, the dag either rolls forward to the completion or     *
  *   rolls back, undoing previously-completed nodes and fails atomically.   *
  *   The direction of recovery is determined by the location of the failed  *
- *   node in the graph.  If the failure occured before the commit node in   *
+ *   node in the graph.  If the failure occurred before the commit node in   *
  *   the graph, backward recovery is used.  Otherwise, forward recovery is  *
  *   used.                                                                  *
  *                                                                          *
  ****************************************************************************/
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_engine.c,v 1.12 2001/11/13 07:11:14 lukem Exp $");
 
 #include "rf_threadstuff.h"
 
@@ -85,10 +88,23 @@ static void DAGExecutionThread(RF_ThreadArg_t arg);
 /*
  * XXX Is this spl-ing really necessary?
  */
-#define DO_LOCK(_r_)      { ks = splbio(); RF_LOCK_MUTEX((_r_)->node_queue_mutex); }
-#define DO_UNLOCK(_r_)    { RF_UNLOCK_MUTEX((_r_)->node_queue_mutex); splx(ks); }
-#define DO_WAIT(_r_)   tsleep(&(_r_)->node_queue, PRIBIO, "raidframe nq",0)
-#define DO_SIGNAL(_r_)    wakeup(&(_r_)->node_queue)
+#define DO_LOCK(_r_) \
+do { \
+	ks = splbio(); \
+	RF_LOCK_MUTEX((_r_)->node_queue_mutex); \
+} while (0)
+
+#define DO_UNLOCK(_r_) \
+do { \
+	RF_UNLOCK_MUTEX((_r_)->node_queue_mutex); \
+	splx(ks); \
+} while (0)
+
+#define	DO_WAIT(_r_) \
+	RF_WAIT_COND((_r_)->node_queue, (_r_)->node_queue_mutex)
+
+#define	DO_SIGNAL(_r_) \
+	RF_BROADCAST_COND((_r_)->node_queue)	/* XXX RF_SIGNAL_COND? */
 
 static void rf_ShutdownEngine(void *);
 

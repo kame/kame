@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_43.c,v 1.4 2000/03/30 11:27:15 augustss Exp $	*/
+/*	$NetBSD: vm_43.c,v 1.7 2001/11/13 02:08:06 lukem Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -46,6 +46,9 @@
  * Mapped file (mmap) interface to VM
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm_43.c,v 1.7 2001/11/13 02:08:06 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/filedesc.h>
@@ -59,9 +62,6 @@
 #include <sys/syscallargs.h>
 
 #include <miscfs/specfs/specdev.h>
-
-#include <vm/vm.h>
-#include <vm/vm_prot.h>
 
 /* ARGSUSED */
 int

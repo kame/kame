@@ -1,4 +1,4 @@
-/*	$NetBSD: qvss_compat.c,v 1.25 2000/01/10 03:24:33 simonb Exp $	*/
+/*	$NetBSD: qvss_compat.c,v 1.28 2001/09/19 19:04:17 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -72,12 +72,12 @@
 #include <sys/vnode.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <miscfs/specfs/specdev.h>
 
 #include <dev/dec/lk201.h>		/* LK-201 keycodes */
 
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 #include <machine/fbvar.h>
 #include <machine/pmioctl.h>		/* X11R5 Xserver ioctls */
 
@@ -466,8 +466,8 @@ fbmmap_fb(fi, dev, data, p)
 	 * user space.
 	 */
 	error = uvm_mmap(&p->p_vmspace->vm_map, &addr, len,
-		VM_PROT_ALL, VM_PROT_ALL, MAP_SHARED, (caddr_t)&vn,
-		(vaddr_t)0, p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
+		VM_PROT_ALL, VM_PROT_ALL, MAP_SHARED, &vn, 0,
+		p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 	if (error)
 		return (error);
 	fbp = (struct fbuaccess *)(addr + ((vaddr_t)fbu & PGOFSET));

@@ -1,4 +1,4 @@
-/*	$NetBSD: mfs_vnops.c,v 1.24 2000/06/11 03:09:55 sommerfeld Exp $	*/
+/*	$NetBSD: mfs_vnops.c,v 1.29 2001/12/06 04:27:43 chs Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -35,6 +35,9 @@
  *	@(#)mfs_vnops.c	8.11 (Berkeley) 5/22/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mfs_vnops.c,v 1.29 2001/12/06 04:27:43 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -57,7 +60,7 @@
  * mfs vnode operations.
  */
 int (**mfs_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc mfs_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc mfs_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, mfs_lookup },		/* lookup */
 	{ &vop_create_desc, mfs_create },		/* create */
@@ -100,9 +103,10 @@ struct vnodeopv_entry_desc mfs_vnodeop_entries[] = {
 	{ &vop_truncate_desc, mfs_truncate },		/* truncate */
 	{ &vop_update_desc, mfs_update },		/* update */
 	{ &vop_bwrite_desc, mfs_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, mfs_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc mfs_vnodeop_opv_desc =
+const struct vnodeopv_desc mfs_vnodeop_opv_desc =
 	{ &mfs_vnodeop_p, mfs_vnodeop_entries };
 
 /*
@@ -158,6 +162,7 @@ mfs_strategy(v)
 			memcpy(bp->b_data, base, bp->b_bcount);
 		else
 			memcpy(base, bp->b_data, bp->b_bcount);
+		bp->b_resid = 0;
 		biodone(bp);
 	} else if (mfsp->mfs_proc == p) {
 		mfs_doio(bp, mfsp->mfs_baseoff);
@@ -168,6 +173,7 @@ mfs_strategy(v)
 		 */
 		if (bp->b_flags & B_READ)
 			printf("warning: mfs read during shutdown\n");
+		bp->b_resid = 0;
 		biodone(bp);
 	} else {
 		BUFQ_INSERT_TAIL(&mfsp->mfs_buflist, bp);
@@ -261,7 +267,7 @@ mfs_close(v)
 	 * vnode, so if we find any other uses, it is a panic.
 	 */
 	if (vp->v_usecount > 1)
-		printf("mfs_close: ref count %ld > 1\n", vp->v_usecount);
+		printf("mfs_close: ref count %d > 1\n", vp->v_usecount);
 	if (vp->v_usecount > 1 || BUFQ_FIRST(&mfsp->mfs_buflist) != NULL)
 		panic("mfs_close");
 	/*

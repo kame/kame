@@ -1,4 +1,4 @@
-/*	$NetBSD: dvma.c,v 1.8.2.1 2000/11/01 03:25:10 tv Exp $	*/
+/*	$NetBSD: dvma.c,v 1.9 2000/10/31 23:28:11 pk Exp $	*/
 /*
  * Copyright (c) 1995 Gordon W. Ross
  * All rights reserved.

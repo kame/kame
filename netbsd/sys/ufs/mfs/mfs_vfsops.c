@@ -1,4 +1,4 @@
-/*	$NetBSD: mfs_vfsops.c,v 1.28.4.1 2000/10/17 00:53:35 tv Exp $	*/
+/*	$NetBSD: mfs_vfsops.c,v 1.38 2002/03/04 02:25:24 simonb Exp $	*/
 
 /*
  * Copyright (c) 1989, 1990, 1993, 1994
@@ -35,7 +35,10 @@
  *	@(#)mfs_vfsops.c	8.11 (Berkeley) 6/19/95
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mfs_vfsops.c,v 1.38 2002/03/04 02:25:24 simonb Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
@@ -49,6 +52,8 @@
 #include <sys/signalvar.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
+
+#include <miscfs/syncfs/syncfs.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -72,9 +77,9 @@ extern int (**mfs_vnodeop_p) __P((void *));
  * mfs vfs operations.
  */
 
-extern struct vnodeopv_desc mfs_vnodeop_opv_desc;  
+extern const struct vnodeopv_desc mfs_vnodeop_opv_desc;  
 
-struct vnodeopv_desc *mfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const mfs_vnodeopv_descs[] = {
 	&mfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -92,6 +97,7 @@ struct vfsops mfs_vfsops = {
 	ffs_fhtovp,
 	ffs_vptofh,
 	mfs_init,
+	mfs_reinit,
 	mfs_done,
 	ffs_sysctl,
 	NULL,
@@ -110,6 +116,12 @@ mfs_init()
 	 * only once.
 	 */
 	ffs_init();
+}
+
+void
+mfs_reinit()
+{
+	ffs_reinit();
 }
 
 void
@@ -188,7 +200,6 @@ mfs_initminiroot(base)
 	caddr_t base;
 {
 	struct fs *fs = (struct fs *)(base + SBOFF);
-	extern int (*mountroot) __P((void));
 
 	/* check for valid super block */
 	if (fs->fs_magic != FS_MAGIC || fs->fs_bsize > MAXBSIZE ||
@@ -197,7 +208,8 @@ mfs_initminiroot(base)
 	mountroot = mfs_mountroot;
 	mfs_rootbase = base;
 	mfs_rootsize = fs->fs_fsize * fs->fs_size;
-	rootdev = makedev(255, mfs_minor++);
+	rootdev = makedev(255, mfs_minor);
+	mfs_minor++;
 	return (mfs_rootsize);
 }
 
@@ -222,6 +234,14 @@ mfs_mount(mp, path, data, ndp, p)
 	struct mfsnode *mfsp;
 	size_t size;
 	int flags, error;
+
+	/*
+	 * XXX turn off async to avoid hangs when writing lots of data.
+	 * the problem is that MFS needs to allocate pages to clean pages,
+	 * so if we wait until the last minute to clean pages then there
+	 * may not be any pages available to do the cleaning.
+	 */
+	mp->mnt_flag &= ~MNT_ASYNC;
 
 	error = copyin(data, (caddr_t)&args, sizeof (struct mfs_args));
 	if (error)
@@ -252,8 +272,9 @@ mfs_mount(mp, path, data, ndp, p)
 	if (error)
 		return (error);
 	devvp->v_type = VBLK;
-	if (checkalias(devvp, makedev(255, mfs_minor++), (struct mount *)0))
+	if (checkalias(devvp, makedev(255, mfs_minor), (struct mount *)0))
 		panic("mfs_mount: dup dev");
+	mfs_minor++;
 	mfsp = (struct mfsnode *)malloc(sizeof *mfsp, M_MFSNODE, M_WAITOK);
 	devvp->v_data = mfsp;
 	mfsp->mfs_baseoff = args.base;
@@ -315,8 +336,14 @@ mfs_start(mp, flags, p)
 		 * will always return EINTR/ERESTART.
 		 */
 		if (sleepreturn != 0) {
-			if (vfs_busy(mp, LK_NOWAIT, 0) ||
-			    dounmount(mp, 0, p) != 0)
+			/*
+			 * XXX Freeze syncer.  Must do this before locking
+			 * the mount point.  See dounmount() for details.
+			 */
+			lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
+			if (vfs_busy(mp, LK_NOWAIT, 0) != 0)
+				lockmgr(&syncer_lock, LK_RELEASE, NULL);
+			else if (dounmount(mp, 0, p) != 0)
 				CLRSIG(p, CURSIG(p));
 			sleepreturn = 0;
 			continue;

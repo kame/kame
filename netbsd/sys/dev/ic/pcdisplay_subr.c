@@ -1,4 +1,4 @@
-/* $NetBSD: pcdisplay_subr.c,v 1.16 2000/06/08 07:01:19 cgd Exp $ */
+/* $NetBSD: pcdisplay_subr.c,v 1.20 2001/11/13 13:14:43 lukem Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -27,6 +27,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcdisplay_subr.c,v 1.20 2001/11/13 13:14:43 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -52,9 +55,9 @@ pcdisplay_cursor_init(scr, existing)
 	
 	if (existing) {
 		/*
-		 * This is the first screen. At this point, scr->active is
-		 * false and scr->mem is NULL (no backing store), so we
-		 * can't use pcdisplay_cursor() to do this.
+		 * This is the first screen. At this point, scr->mem is NULL
+		 * (no backing store), so we can't use pcdisplay_cursor() to
+		 * do this.
 		 */
 		memt = scr->hdl->ph_memt;
 		memh = scr->hdl->ph_memh;
@@ -65,6 +68,18 @@ pcdisplay_cursor_init(scr, existing)
 		bus_space_write_2(memt, memh, off, scr->cursortmp ^ 0x7700);
 	} else
 		scr->cursortmp = 0;
+#else
+	/*
+	 * Firmware might not have initialized the cursor shape.  Make
+	 * sure there's something we can see.
+	 * Don't touch the hardware if this is not the first screen.
+	 */
+	if (existing) {
+		pcdisplay_6845_write(scr->hdl, curstart,
+				     scr->type->fontheight - 2);
+		pcdisplay_6845_write(scr->hdl, curend,
+				     scr->type->fontheight - 1);
+	}
 #endif
 	scr->cursoron = 1;
 }
@@ -115,7 +130,7 @@ pcdisplay_cursor(id, on, row, col)
 
 	if (scr->active) {
 		if (!on)
-			pos = 0x1010;
+			pos = 0x3fff;
 		else
 			pos = scr->dispoffset / 2
 				+ row * scr->type->ncols + col;
@@ -180,7 +195,7 @@ pcdisplay_copycols(id, row, srccol, dstcol, ncols)
 					memh, scr->dispoffset + dstoff * 2,
 					ncols);
 	else
-		bcopy(&scr->mem[srcoff], &scr->mem[dstoff], ncols * 2);
+		memcpy(&scr->mem[dstoff], &scr->mem[srcoff], ncols * 2);
 }
 
 void
@@ -228,7 +243,7 @@ pcdisplay_copyrows(id, srcrow, dstrow, nrows)
 					memh, scr->dispoffset + dstoff * 2,
 					nrows * ncols);
 	else
-		bcopy(&scr->mem[srcoff], &scr->mem[dstoff],
+		memcpy(&scr->mem[dstoff], &scr->mem[srcoff],
 		      nrows * ncols * 2);
 }
 

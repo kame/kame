@@ -1,11 +1,28 @@
-#	$NetBSD: GENERIC,v 1.28.2.4 2001/05/01 15:47:46 he Exp $
+# $NetBSD: GENERIC,v 1.55.4.1 2002/08/01 04:17:57 lukem Exp $
 #
-# First try for BEBOX config file
+# GENERIC machine description file
+# 
+# This machine description file is used to generate the default NetBSD
+# kernel.  The generic kernel does not include all options, subsystems
+# and device drivers, but should be useful for most applications.
 #
+# The machine description file can be customised for your specific
+# machine to reduce the kernel size and improve its performance.
+#
+# For further information on compiling NetBSD kernels, see the config(8)
+# man page.
+#
+# For further information on hardware support for this architecture, see
+# the intro(4) man page.  For further information about kernel options
+# for this architecture, see the options(4) man page.  For an explanation
+# of each device driver in this file see the section 4 man page for the
+# device.
 
-include "arch/bebox/conf/std.bebox"
+include 	"arch/bebox/conf/std.bebox"
 
-#ident 		"GENERIC-$Revision: 1.28.2.4 $"
+options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+#ident 		"GENERIC-$Revision: 1.55.4.1 $"
 
 maxusers	32
 
@@ -22,8 +39,10 @@ options 	TRAP_PANICWAIT
 options 	DDB
 #options 	DDB_HISTORY_SIZE=100	# Enable history editing in DDB
 options 	KTRACE
+#options 	USERCONF		# userconf(4) support
+#options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
 
-options 	TCP_COMPAT_42
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 options 	COMPAT_43
 options 	COMPAT_09
 options 	COMPAT_10
@@ -31,6 +50,7 @@ options 	COMPAT_12
 options 	COMPAT_13
 options 	COMPAT_14
 options 	COMPAT_386BSD_MBRPART	# recognize old partition ID
+#options 	COMPAT_LINUX		# Linux binary compatibility
 
 file-system 	FFS
 file-system 	MFS
@@ -47,7 +67,7 @@ file-system 	UMAPFS
 file-system 	UNION
 
 #options 	FFS_EI		# FFS Endian Independant support
-options 	SOFTDEP         # FFS soft updates support.
+options 	SOFTDEP		# FFS soft updates support.
 #options 	NFSSERVER
 
 options 	INET
@@ -56,7 +76,9 @@ options 	INET6		# IPV6
 #options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 #options 	IPSEC_DEBUG	# debug for IP security
 
-options		NFS_BOOT_BOOTPARAM,NFS_BOOT_BOOTP
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
+
+options 	NFS_BOOT_BOOTPARAM,NFS_BOOT_BOOTP
 
 config		netbsd	root on ? type ?
 
@@ -66,12 +88,23 @@ pseudo-device	bpfilter	8	# packet filter
 pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
-pseudo-device	pty		64	# pseudo-terminals
 pseudo-device	vlan			# IEEE 802.1q encapsulation
-#pseudo-device	raid		4	# RAIDframe disk driver
-#options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
+pseudo-device	pppoe			# PPP over Ethernet (RFC 2516)
+pseudo-device	bridge			# simple inter-network bridging
+pseudo-device	pty			# pseudo-terminals
+pseudo-device	raid		8	# RAIDframe disk driver
+options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
+# Options to enable various other RAIDframe RAID types.
+# options	RF_INCLUDE_EVENODD=1
+# options	RF_INCLUDE_RAID5_RS=1
+# options	RF_INCLUDE_PARITYLOGGING=1
+# options	RF_INCLUDE_CHAINDECLUSTER=1
+# options	RF_INCLUDE_INTERDECLUSTER=1
+# options 	RF_INCLUDE_PARITY_DECLUSTERING=1
+# options	RF_INCLUDE_PARITY_DECLUSTERING_DS=1
 #pseudo-device	gre		2	# generic L3 over IP tunnel
-pseudo-device	wsmux		2
+pseudo-device	wsmux
+pseudo-device	clockctl		# user control of clock subsystem
 
 # random number generator pseudo-device
 pseudo-device	rnd			# /dev/random and in-kernel generator
@@ -84,9 +117,11 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 
 options 	PCIVERBOSE	# verbose PCI device messages
 #options 	PCI_CONFIG_DUMP	# verbosely dump PCI config space
+options 	PCI_NETBSD_CONFIGURE
 
 mainbus0 at root
 
+cpu*	at mainbus0
 pci0	at mainbus0 bus ?
 
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
@@ -102,7 +137,7 @@ com0	at isa? port 0x3f8 irq 4	# standard PC serial ports
 com1	at isa? port 0x2f8 irq 3
 #com2	at isa? port 0x380 irq 16
 #com3	at isa? port 0x388 irq 17
-  
+
 lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 #lpt1	at isa? port 0x278
 #lpt2	at isa? port 0x3bc
@@ -111,7 +146,6 @@ lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 #lms1	at isa? port 0x238 irq 5
 #mms0	at isa? port 0x23c irq 5	# Microsoft InPort mouse
 #mms1	at isa? port 0x238 irq 5
-#pms0	at pckbd? irq 12		# PS/2 auxiliary port mouse
 
 pckbc0	at isa?
 pckbd*	at pckbc?
@@ -124,8 +158,8 @@ wsdisplay*	at pfb? console ?
 wskbd*		at pckbd? console ?
 #wsmouse*	at pms? mux 0
 
-#ncr*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
-#scsibus* at ncr?
+#siop*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
+#scsibus* at siop?
 
 #sd*	at scsibus? target ? lun ?	# SCSI disk drives
 #st*	at scsibus? target ? lun ?	# SCSI tape drives

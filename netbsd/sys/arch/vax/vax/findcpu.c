@@ -1,4 +1,4 @@
-/*	$NetBSD: findcpu.c,v 1.8 2000/05/22 15:41:31 matt Exp $	*/
+/*	$NetBSD: findcpu.c,v 1.11 2001/05/01 13:18:27 ragge Exp $	*/
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -73,6 +73,10 @@ findcpu(void)
 		vax_bustype = VAX_ABUS;
 		break;
 
+	case VAX_TYP_UV1:
+		vax_bustype = VAX_IBUS;
+		break;
+
 	case VAX_TYP_UV2:
 	case VAX_TYP_CVAX:
 	case VAX_TYP_RIGEL:
@@ -105,6 +109,7 @@ findcpu(void)
 		case VAX_BTYP_660:
 		case VAX_BTYP_60:
 		case VAX_BTYP_680:
+		case VAX_BTYP_681:
 		case VAX_BTYP_630:
 		case VAX_BTYP_650:
 		case VAX_BTYP_53:
@@ -120,8 +125,12 @@ findcpu(void)
 		break;
 
 	case VAX_TYP_8NN:
+		vax_boardtype = VAX_BTYP_8800; /* subversion later */
+		vax_bustype = VAX_NBIBUS;
+		break;
+
 	case VAX_TYP_8PS:
-		vax_boardtype = VAX_BTYP_8800;
+		vax_boardtype = VAX_BTYP_8PS;
 		vax_bustype = VAX_NBIBUS;
 		break;
 

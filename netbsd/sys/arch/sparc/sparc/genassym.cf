@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.29 2000/05/31 05:28:29 thorpej Exp $
+#	$NetBSD: genassym.cf,v 1.34 2002/05/07 02:38:44 uwe Exp $
 
 #
 # Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -90,17 +90,15 @@ include <sys/device.h>
 include <sys/disklabel.h>
 include <sys/disk.h>
 
-include <vm/vm.h>
 include <uvm/uvm.h>
-include <uvm/uvm_extern.h>
 
-include <machine/pmap.h>
 include <machine/cpu.h>
-
 include <machine/oldmon.h>
 include <machine/bsd_openprom.h>
 
 include <sparc/sparc/cpuvar.h>
+
+include <sparc/sparc/msiiepreg.h>
 
 ifdef notyet
 include <sparc/dev/zsreg.h>
@@ -115,8 +113,6 @@ include <sparc/dev/fdvar.h>
 
 # general constants
 define	BSD		BSD
-define	SUN4_PGSHIFT	SUN4_PGSHIFT
-define	SUN4CM_PGSHIFT	SUN4CM_PGSHIFT
 define	USRSTACK	USRSTACK
 
 # proc fields and values
@@ -142,7 +138,7 @@ define	V_FAULTS	offsetof(struct uvmexp, faults)
 
 # CPU info structure
 define	CPUINFO_STRUCTSIZE	sizeof(struct cpu_info)
-define	CPUINFO_CPUNO		offsetof(struct cpu_info, cpu_no)
+define	CPUINFO_CPUNO		offsetof(struct cpu_info, ci_cpuid)
 define	CPUINFO_GETSYNCFLT	offsetof(struct cpu_info, get_syncflt)
 define	CPUINFO_GETASYNCFLT	offsetof(struct cpu_info, get_asyncflt)
 define	CPUINFO_PURE_VCACHE_FLS	offsetof(struct cpu_info, pure_vcache_flush)
@@ -156,6 +152,7 @@ define	CPUINFO_IDLE_U		offsetof(struct cpu_info, idle_u)
 define	CPUINFO_CURPCB		offsetof(struct cpu_info, curpcb)
 define	CPUINFO_CURPROC		offsetof(struct cpu_info, ci_curproc)
 define	CPUINFO_SELF		offsetof(struct cpu_info, ci_self)
+define	CPUINFO_FLAGS		offsetof(struct cpu_info, flags)
 
 # PTE bits and related information
 define	PG_W		PG_W
@@ -179,6 +176,12 @@ define	FS_FSR		offsetof(struct fpstate, fs_fsr)
 define	FS_QSIZE	offsetof(struct fpstate, fs_qsize)
 define	FS_QUEUE	offsetof(struct fpstate, fs_queue)
 define	FSR_QNE		FSR_QNE
+
+# microSPARC-IIep PCI controller registers
+define PCIC_PROC_IPR_REG	offsetof(struct msiiep_pcic_reg, pcic_proc_ipr)
+define PCIC_SOFT_INTR_CLEAR_REG	offsetof(struct msiiep_pcic_reg, pcic_soft_intr_clear)
+define PCIC_SOFT_INTR_SET_REG	offsetof(struct msiiep_pcic_reg, pcic_soft_intr_set)
+define PCIC_SCCR_REG		offsetof(struct msiiep_pcic_reg, pcic_sccr)
 
 # errno
 define	EFAULT		EFAULT

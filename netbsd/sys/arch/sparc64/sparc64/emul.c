@@ -1,7 +1,7 @@
-/*	$NetBSD: emul.c,v 1.6 2000/04/06 12:49:00 mrg Exp $	*/
+/*	$NetBSD: emul.c,v 1.9 2002/04/18 16:37:26 eeh Exp $	*/
 
 /*-
- * Copyright (c) 1997 The NetBSD Foundation, Inc.
+ * Copyright (c) 1997, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -43,7 +43,6 @@
 #include <machine/instr.h>
 #include <machine/cpu.h>
 #include <machine/psl.h>
-#include <sparc64/sparc64/cpuvar.h>
 
 #define DEBUG_EMUL
 #ifdef DEBUG_EMUL
@@ -309,7 +308,7 @@ fixalign(p, tf)
 	    "w*hd"[op.bits.sz], op.bits.fl ? 'f' : REGNAME(code.i_op3.i_rd),
 	    REGNAME(code.i_op3.i_rs1));
 	if (code.i_loadstore.i_i)
-		uprintf("0x%x\n", rs2);
+		uprintf("0x%llx\n", (unsigned long long)rs2);
 	else
 		uprintf("%c%d\n", REGNAME(code.i_asi.i_rs2));
 #endif
@@ -320,7 +319,10 @@ fixalign(p, tf)
 
 	if (op.bits.st) {
 		if (op.bits.fl) {
-			savefpstate(p->p_md.md_fpstate);
+			if (p == fpproc) {
+				savefpstate(p->p_md.md_fpstate);
+				fpproc = NULL;
+			}
 
 			error = readfpreg(p, code.i_op3.i_rd, &data.i[0]);
 			if (error)
@@ -378,6 +380,7 @@ fixalign(p, tf)
 					return error;
 			}
 			loadfpstate(p->p_md.md_fpstate);
+			fpproc = p;
 		}
 		else {
 			error = writegpreg(tf, code.i_op3.i_rd, &data.i[0]);
@@ -430,6 +433,7 @@ emulinstr(pc, tf)
 
 	switch (code.i_op3.i_op3) {
 	case IOP3_FLUSH:
+		printf("emulinstr: we can't execute a cache flush???");
 /*		cpuinfo.cache_flush((caddr_t)(rs1 + rs2), 4); XXX */
 		return 0;
 

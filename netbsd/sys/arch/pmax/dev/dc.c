@@ -1,4 +1,4 @@
-/*	$NetBSD: dc.c,v 1.63 2000/03/23 06:43:01 thorpej Exp $	*/
+/*	$NetBSD: dc.c,v 1.69 2002/03/17 19:40:48 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: dc.c,v 1.63 2000/03/23 06:43:01 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dc.c,v 1.69 2002/03/17 19:40:48 atatat Exp $");
 
 /*
  * devDC7085.c --
@@ -502,8 +502,7 @@ dcopen(dev, flag, mode, p)
 	while (!(flag & O_NONBLOCK) && !(tp->t_cflag & CLOCAL) &&
 	       !(tp->t_state & TS_CARR_ON)) {
 		tp->t_wopen++;
-		error = ttysleep(tp, (caddr_t)&tp->t_rawq,
-		    TTIPRI | PCATCH, ttopen, 0);
+		error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH, ttopen, 0);
 		tp->t_wopen--;
 		if (error != 0)
 			break;
@@ -511,7 +510,7 @@ dcopen(dev, flag, mode, p)
 	splx(s);
 	if (error)
 		return (error);
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	return (error);
 }
 
@@ -538,7 +537,7 @@ dcclose(dev, flag, mode, p)
 		ttyoutput(0, tp);
 	}
 	splx(s);
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	if ((tp->t_cflag & HUPCL) || tp->t_wopen ||
 	    !(tp->t_state & TS_ISOPEN))
 		(void) dcmctl(dev, 0, DMSET);
@@ -564,7 +563,7 @@ dcread(dev, uio, flag)
 	}
 #endif /* HW_FLOW_CONTROL */
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -577,7 +576,21 @@ dcwrite(dev, uio, flag)
 
 	sc = dc_cd.cd_devs[DCUNIT(dev)];
 	tp = sc->dc_tty[DCLINE(dev)];
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+dcpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct dc_softc *sc;
+	struct tty *tp;
+
+	sc = dc_cd.cd_devs[DCUNIT(dev)];
+	tp = sc->dc_tty[DCLINE(dev)];
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -613,11 +626,12 @@ dcioctl(dev, cmd, data, flag, p)
 	sc = dc_cd.cd_devs[unit];
 	tp = sc->dc_tty[line];
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -657,7 +671,7 @@ dcioctl(dev, cmd, data, flag, p)
 		break;
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -823,7 +837,7 @@ dcrint(sc)
 			}
 		}
 		if (!(tp->t_state & TS_ISOPEN)) {
-			wakeup((caddr_t)&tp->t_rawq);
+			wakeup(&tp->t_rawq);
 #ifdef PORTSELECTOR
 			if (tp->t_wopen == 0)
 #endif
@@ -846,7 +860,7 @@ dcrint(sc)
 			(void) dcmctl(tp->t_dev, DML_RTS, DMBIC);
 		}
 #endif /* HWW_FLOW_CONTROL */
-		(*linesw[tp->t_line].l_rint)(cc, tp);
+		(*tp->t_linesw->l_rint)(cc, tp);
 	}
 	DELAY(10);
 }
@@ -908,10 +922,7 @@ dcxint(tp)
 		ndflush(&tp->t_outq, dp->p_mem - (caddr_t) tp->t_outq.c_cf);
 		dp->p_end = dp->p_mem = tp->t_outq.c_cf;
 	}
-	if (tp->t_line)
-		(*linesw[tp->t_line].l_start)(tp);
-	else
-		dcstart(tp);
+	(*tp->t_linesw->l_start)(tp);
 	if (tp->t_outq.c_cc == 0 || !(tp->t_state & TS_BUSY)) {
 		dcaddr = (dcregs *)dp->p_addr;
 		dcaddr->dc_tcr &= ~(1 << line);
@@ -940,7 +951,7 @@ dcstart(tp)
 	if (tp->t_outq.c_cc <= tp->t_lowat) {
 		if (tp->t_state & TS_ASLEEP) {
 			tp->t_state &= ~TS_ASLEEP;
-			wakeup((caddr_t)&tp->t_outq);
+			wakeup(&tp->t_outq);
 		}
 		selwakeup(&tp->t_wsel);
 	}
@@ -1137,9 +1148,9 @@ dcscan(arg)
 		if ((dcaddr->dc_msr & dsr) || (sc->dcsoftCAR & (1 << unit))) {
 			/* carrier present */
 			if (!(tp->t_state & TS_CARR_ON))
-				(void)(*linesw[tp->t_line].l_modem)(tp, 1);
+				(void)(*tp->t_linesw->l_modem)(tp, 1);
 		} else if ((tp->t_state & TS_CARR_ON) &&
-		    (*linesw[tp->t_line].l_modem)(tp, 0) == 0)
+		    (*tp->t_linesw->l_modem)(tp, 0) == 0)
 			dcaddr->dc_tcr &= ~dtr;
 #ifdef HW_FLOW_CONTROL
 		/*

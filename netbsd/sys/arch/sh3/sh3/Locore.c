@@ -1,7 +1,7 @@
-/*	$NetBSD: Locore.c,v 1.3 2000/05/26 21:20:15 thorpej Exp $	*/
+/*	$NetBSD: Locore.c,v 1.12 2002/05/09 12:28:08 uch Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -78,124 +78,209 @@
  *	@(#)Locore.c
  */
 
+#include "opt_lockdebug.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/user.h>
 #include <sys/sched.h>
+#include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
-#include <machine/psl.h>
+#include <sh3/locore.h>
+#include <sh3/cpu.h>
+#include <sh3/pmap.h>
+#include <sh3/mmu_sh3.h>
+#include <sh3/mmu_sh4.h>
 
-#if 0
-/*
- * fillw(short pattern, caddr_t addr, size_t len);
- * Write len copies of pattern at addr.
- */
-void
-fillw(pattern, addr, len)
-	short pattern;
-	void *addr;
-	size_t len;
-{
-	unsigned long *p;
-	unsigned long pat;
-	int cnt;
+void (*__sh_switch_resume)(struct proc *);
+struct proc *cpu_switch_search(struct proc *);
+void idle(void);
+int want_resched;
 
-	p = addr;
-	pat = pattern;
-	pat = pat | (pat << 16);
-
-	cnt = len >> 1;
-	while (cnt--)
-		*p++ = pat;
-
-	if (len & 1)
-		*(short *)p = pattern;
-}
-
-/*
- * bcopyb(caddr_t from, caddr_t to, size_t len);
- * Copy len bytes, one byte at a time.
- */
-void
-bcopyb(from, to, len)
-	caddr_t from;
-	caddr_t to;
-	size_t len;
-{
-	char *s = (char *)from;
-	char *d = (char *)to;
-
-	if (from >= to) {
-		while (len--)
-			*d++ = *s++;
-	} else {
-		s += len - 1;
-		d += len - 1;
-		while (len--)
-			*d-- = *s--;
-	}
-}
-
-/*
- * bcopyw(caddr_t from, caddr_t to, size_t len);
- * Copy len bytes, two bytes at a time.
- */
-void
-bcopyw(from, to, len)
-	caddr_t from;
-	caddr_t to;
-	size_t len;
-{
-	short *s = (short *)from;
-	short *d = (short *)to;
-	int cnt;
-
-	cnt = len >> 1;
-
-	if (from >= to) {
-		while (cnt--)
-			*d++ = *s++;
-		if (len & 1)
-			*(char *)d = *(char *)s;
-	} else {
-		s += len - sizeof(short);
-		d += len - sizeof(short);
-		while (cnt--)
-			*d-- = *s--;
-		if (len & 1)
-			*(char *)d = *(char *)s;
-	}
-}
+#ifdef LOCKDEBUG
+#define	SCHED_LOCK_IDLE()	sched_lock_idle()
+#define	SCHED_UNLOCK_IDLE()	sched_unlock_idle()
+#else
+#define	SCHED_LOCK_IDLE()	((void)0)
+#define	SCHED_UNLOCK_IDLE()	((void)0)
 #endif
+
+/*
+ * struct proc *cpu_switch_search(struct proc *oldproc):
+ *	Find the highest priority process.
+ */
+struct proc *
+cpu_switch_search(struct proc *oldproc)
+{
+	struct prochd *q;
+	struct proc *p;
+
+	curproc = 0;
+
+	SCHED_LOCK_IDLE();
+	while (sched_whichqs == 0) {
+		SCHED_UNLOCK_IDLE();
+		idle();
+		SCHED_LOCK_IDLE();
+	}
+
+	q = &sched_qs[ffs(sched_whichqs) - 1];
+	p = q->ph_link;
+	remrunqueue(p);
+	want_resched = 0;
+	SCHED_UNLOCK_IDLE();
+
+	p->p_stat = SONPROC;
+
+	if (p != oldproc) {
+		curpcb = p->p_md.md_pcb;
+		pmap_activate(p);
+	}
+	curproc = p;
+
+	return (p);
+}
+
+/*
+ * void idle(void):
+ *	When no processes are on the run queue, wait for something to come
+ *	ready. Separated function for profiling.
+ */
+void
+idle()
+{
+
+	spl0();
+	uvm_pageidlezero();
+	__asm__ __volatile__("sleep");
+	splsched();
+}
+
+/*
+ * Put process p on the run queue indicated by its priority.
+ * Calls should be made at splstatclock(), and p->p_stat should be SRUN.
+ */
+void
+setrunqueue(struct proc *p)
+{
+	struct prochd *q;
+	struct proc *oldlast;
+	int which = p->p_priority >> 2;
+
+#ifdef DIAGNOSTIC
+	if (p->p_back || which >= 32 || which < 0)
+		panic("setrunqueue");
+#endif
+	q = &sched_qs[which];
+	sched_whichqs |= 0x00000001 << which;
+	if (sched_whichqs == 0) {
+		panic("setrunqueue[whichqs == 0 ]");
+	}
+	p->p_forw = (struct proc *)q;
+	p->p_back = oldlast = q->ph_rlink;
+	q->ph_rlink = p;
+	oldlast->p_forw = p;
+}
+
+/*
+ * Remove process p from its run queue, which should be the one
+ * indicated by its priority.
+ * Calls should be made at splstatclock().
+ */
+void
+remrunqueue(struct proc *p)
+{
+	int which = p->p_priority >> 2;
+	struct prochd *q;
+
+#ifdef DIAGNOSTIC
+	if (!(sched_whichqs & (0x00000001 << which)))
+		panic("remrunqueue");
+#endif
+	p->p_forw->p_back = p->p_back;
+	p->p_back->p_forw = p->p_forw;
+	p->p_back = NULL;
+	q = &sched_qs[which];
+	if (q->ph_link == (struct proc *)q)
+		sched_whichqs &= ~(0x00000001 << which);
+}
+
+/*
+ * void sh3_switch_setup(struct proc *p):
+ *	prepare kernel stack PTE table. TLB miss handler check these.
+ */
+void
+sh3_switch_setup(struct proc *p)
+{
+	pt_entry_t *pte;
+	struct md_upte *md_upte = p->p_md.md_upte;
+	u_int32_t vpn;
+	int i;
+
+	vpn = (u_int32_t)p->p_addr;
+	vpn &= ~PGOFSET;
+	for (i = 0; i < UPAGES; i++, vpn += NBPG, md_upte++) {
+		pte = __pmap_kpte_lookup(vpn);
+		KDASSERT(pte && *pte != 0);
+
+		md_upte->addr = vpn;
+		md_upte->data = (*pte & PG_HW_BITS) | PG_D | PG_V;
+	}
+}
+
+/*
+ * void sh4_switch_setup(struct proc *p):
+ *	prepare kernel stack PTE table. sh4_switch_resume wired this PTE.
+ */
+void
+sh4_switch_setup(struct proc *p)
+{
+	pt_entry_t *pte;
+	struct md_upte *md_upte = p->p_md.md_upte;
+	u_int32_t vpn;
+	int i, e;
+
+	vpn = (u_int32_t)p->p_addr;
+	vpn &= ~PGOFSET;
+	e = SH4_UTLB_ENTRY - UPAGES;
+	for (i = 0; i < UPAGES; i++, e++, vpn += NBPG) {
+		pte = __pmap_kpte_lookup(vpn);
+		KDASSERT(pte && *pte != 0);
+		/* Address array */
+		md_upte->addr = SH4_UTLB_AA | (e << SH4_UTLB_E_SHIFT);
+		md_upte->data = vpn | SH4_UTLB_AA_D | SH4_UTLB_AA_V;
+		md_upte++;
+		/* Data array */
+		md_upte->addr = SH4_UTLB_DA1 | (e << SH4_UTLB_E_SHIFT);
+		md_upte->data = (*pte & PG_HW_BITS) |
+		    SH4_UTLB_DA1_D | SH4_UTLB_DA1_V;
+		md_upte++;
+	}
+}
 
 /*
  * copyout(caddr_t from, caddr_t to, size_t len);
  * Copy len bytes into the user's address space.
  */
 int
-copyout(kaddr, uaddr, len)
-	const void *kaddr;
-	void *uaddr;
-	size_t len;
+copyout(const void *kaddr, void *uaddr, size_t len)
 {
 	const void *from = kaddr;
 	char *to = uaddr;
 
 	if (to + len < to || to + len > (char *)VM_MAXUSER_ADDRESS)
-		return EFAULT;
+		return (EFAULT);
 
 	curpcb->pcb_onfault = &&Err999;
 	memcpy(to, from, len);
 	curpcb->pcb_onfault = 0;
-	return 0;
+	return (0);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return EFAULT;
+	return (EFAULT);
 }
 
 /*
@@ -203,25 +288,22 @@ copyout(kaddr, uaddr, len)
  * Copy len bytes from the user's address space.
  */
 int
-copyin(uaddr, kaddr, len)
-	const void *uaddr;
-	void *kaddr;
-	size_t len;
+copyin(const void *uaddr, void *kaddr, size_t len)
 {
 	const char *from = uaddr;
 	void *to = kaddr;
 
 	if (from + len < from || from + len > (char *)VM_MAXUSER_ADDRESS)
-		return EFAULT;
+		return (EFAULT);
 
 	curpcb->pcb_onfault = &&Err999;
 	memcpy(to, from, len);
 	curpcb->pcb_onfault = 0;
-	return 0;
+	return (0);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return EFAULT;
+	return (EFAULT);
 }
 
 /*
@@ -232,11 +314,7 @@ copyin(uaddr, kaddr, len)
  * return 0 or EFAULT.
  */
 int
-copyoutstr(kaddr, uaddr, maxlen, lencopied)
-	const void *kaddr;
-	void *uaddr;
-	size_t maxlen;
-	size_t *lencopied;
+copyoutstr(const void *kaddr, void *uaddr, size_t maxlen, size_t *lencopied)
 {
 	const char *from = kaddr;
 	char *to = uaddr;
@@ -261,17 +339,17 @@ copyoutstr(kaddr, uaddr, maxlen, lencopied)
 	else
 		rc = ENAMETOOLONG;
 
-out:
+ out:
 	if (lencopied)
 		*lencopied = from - from_top;
 	curpcb->pcb_onfault = 0;
-	return rc;
+	return (rc);
 
  Err999:
 	if (lencopied)
 		*lencopied = from - from_top;
 	curpcb->pcb_onfault = 0;
-	return EFAULT;
+	return (EFAULT);
 }
 
 /*
@@ -282,11 +360,7 @@ out:
  * return 0 or EFAULT.
  */
 int
-copyinstr(uaddr, kaddr, maxlen, lencopied)
-	const void *uaddr;
-	void *kaddr;
-	size_t maxlen;
-	size_t *lencopied;
+copyinstr(const void *uaddr, void *kaddr, size_t maxlen, size_t *lencopied)
 {
 	const char *from = uaddr;
 	char *to = kaddr;
@@ -311,17 +385,17 @@ copyinstr(uaddr, kaddr, maxlen, lencopied)
 	else
 		rc = ENAMETOOLONG;
 
-out:
+ out:
 	if (lencopied)
 		*lencopied = from - from_top;
 	curpcb->pcb_onfault = 0;
-	return rc;
+	return (rc);
 
  Err999:
 	if (lencopied)
 		*lencopied = from - from_top;
 	curpcb->pcb_onfault = 0;
-	return EFAULT;
+	return (EFAULT);
 }
 
 /*
@@ -331,11 +405,7 @@ out:
  * string is too long, return ENAMETOOLONG; else return 0.
  */
 int
-copystr(kfaddr, kdaddr, maxlen, lencopied)
-	const void *kfaddr;
-	void *kdaddr;
-	size_t maxlen;
-	size_t *lencopied;
+copystr(const void *kfaddr, void *kdaddr, size_t maxlen, size_t *lencopied)
 {
 	const char *from = kfaddr;
 	char *to = kdaddr;
@@ -351,6 +421,7 @@ copystr(kfaddr, kdaddr, maxlen, lencopied)
 
 	if (lencopied)
 		*lencopied = i;
+
 	return (ENAMETOOLONG);
 }
 
@@ -359,25 +430,24 @@ copystr(kfaddr, kdaddr, maxlen, lencopied)
  * Fetch an int from the user's address space.
  */
 long
-fuword(base)
-	const void *base;
+fuword(const void *base)
 {
 	const char *uaddr = base;
 	long rc;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(long))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
 
 	rc = *(long *)uaddr;
 
 	curpcb->pcb_onfault = 0;
-	return rc;
+	return (rc);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return -1;
+	return (-1);
 }
 
 /*
@@ -385,25 +455,24 @@ fuword(base)
  * Fetch a short from the user's address space.
  */
 int
-fusword(base)
-	const void *base;
+fusword(const void *base)
 {
 	const char *uaddr = base;
 	int rc;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(short))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
 
 	rc = *(unsigned short *)uaddr;
 
 	curpcb->pcb_onfault = 0;
-	return rc;
+	return (rc);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return -1;
+	return (-1);
 }
 
 /*
@@ -412,28 +481,27 @@ fusword(base)
  * interrupt.
  */
 int
-fuswintr(base)
-	const void *base;
+fuswintr(const void *base)
 {
 	const char *uaddr = base;
 	int rc;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(short))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
-	curpcb->fusubail = 1;
+	curpcb->pcb_faultbail = 1;
 
 	rc = *(unsigned short *)uaddr;
 
 	curpcb->pcb_onfault = 0;
-	curpcb->fusubail = 0;
-	return rc;
+	curpcb->pcb_faultbail = 0;
+	return (rc);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	curpcb->fusubail = 0;
-	return -1;
+	curpcb->pcb_faultbail = 0;
+	return (-1);
 }
 
 /*
@@ -441,25 +509,24 @@ fuswintr(base)
  * Fetch a byte from the user's address space.
  */
 int
-fubyte(base)
-	const void *base;
+fubyte(const void *base)
 {
 	const char *uaddr = base;
 	int rc;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(char))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
 
 	rc = *(unsigned char *)uaddr;
 
 	curpcb->pcb_onfault = 0;
-	return rc;
+	return (rc);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return -1;
+	return (-1);
 }
 
 /*
@@ -467,25 +534,22 @@ fubyte(base)
  * Store an int in the user's address space.
  */
 int
-suword(base, x)
-	void *base;
-	long x;
+suword(void *base, long x)
 {
 	char *uaddr = base;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(long))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
-
 	*(int *)uaddr = x;
-
 	curpcb->pcb_onfault = 0;
-	return 0;
+
+	return (0);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return -1;
+	return (-1);
 }
 
 /*
@@ -493,25 +557,23 @@ suword(base, x)
  * Store a short in the user's address space.
  */
 int
-susword(base, x)
-	void *base;
-	short x;
+susword(void *base, short x)
 {
 	char *uaddr = base;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(short))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
 
 	*(short *)uaddr = x;
 
 	curpcb->pcb_onfault = 0;
-	return 0;
+	return (0);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return -1;
+	return (-1);
 }
 
 /*
@@ -520,28 +582,27 @@ susword(base, x)
  * interrupt.
  */
 int
-suswintr(base, x)
-	void *base;
-	short x;
+suswintr(void *base, short x)
 {
 	char *uaddr = base;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(short))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
-	curpcb->fusubail = 1;
+	curpcb->pcb_faultbail = 1;
 
 	*(short *)uaddr = x;
 
 	curpcb->pcb_onfault = 0;
-	curpcb->fusubail = 0;
-	return 0;
+	curpcb->pcb_faultbail = 0;
+	return (0);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	curpcb->fusubail = 0;
-	return -1;
+	curpcb->pcb_faultbail = 0;
+
+	return (-1);
 }
 
 /*
@@ -549,32 +610,27 @@ suswintr(base, x)
  * Store a byte in the user's address space.
  */
 int
-subyte(base, x)
-	void *base;
-	int x;
+subyte(void *base, int x)
 {
 	char *uaddr = base;
 
 	if (uaddr > (char *)VM_MAXUSER_ADDRESS - sizeof(char))
-		return -1;
+		return (-1);
 
 	curpcb->pcb_onfault = &&Err999;
 
 	*(char *)uaddr = x;
 
 	curpcb->pcb_onfault = 0;
-	return 0;
+	return (0);
 
  Err999:
 	curpcb->pcb_onfault = 0;
-	return -1;
+	return (-1);
 }
 
 int
-kcopy(src, dst, len)
-	const void *src;
-	void *dst;
-	size_t len;
+kcopy(const void *src, void *dst, size_t len)
 {
 	caddr_t oldfault;
 
@@ -584,101 +640,10 @@ kcopy(src, dst, len)
 	memcpy(dst, src, len);
 	curpcb->pcb_onfault = oldfault;
 
-	return 0;
+	return (0);
 
  Err999:
 	curpcb->pcb_onfault = oldfault;
 
-	return EFAULT;
+	return (EFAULT);
 }
-
-/*
- * Put process p on the run queue indicated by its priority.
- * Calls should be made at splstatclock(), and p->p_stat should be SRUN.
- */
-void
-setrunqueue(p)
-	struct proc *p;
-{
-	struct prochd *q;
-	struct proc *oldlast;
-	int which = p->p_priority >> 2;
-
-#ifdef sh3_debug
-	printf("setrunque[whichqs = 0x%x,which=%d]\n",
-	    sched_whichqs, which);
-#endif
-
-#define DIAGNOSTIC 1
-#ifdef DIAGNOSTIC
-	if (p->p_back || which >= 32 || which < 0)
-		panic("setrunqueue");
-#endif
-	q = &sched_qs[which];
-	sched_whichqs |= 0x00000001 << which;
-	if (sched_whichqs == 0) {
-		panic("setrunqueue[whichqs == 0 ]");
-	}
-	p->p_forw = (struct proc *)q;
-	p->p_back = oldlast = q->ph_rlink;
-	q->ph_rlink = p;
-	oldlast->p_forw = p;
-#ifdef sh3_debug
-	printf("setrunque[whichqs = 0x%x,which=%d]\n",
-	    sched_whichqs, which);
-#endif
-}
-
-/*
- * Remove process p from its run queue, which should be the one
- * indicated by its priority.
- * Calls should be made at splstatclock().
- */
-void
-remrunqueue(p)
-	struct proc *p;
-{
-	int which = p->p_priority >> 2;
-	struct prochd *q;
-
-#ifdef sh3_debug
-	printf("remrunque[whichqs = 0x%x,which=%d]\n",
-	    sched_whichqs, which);
-#endif
-#ifdef DIAGNOSTIC
-	if (!(sched_whichqs & (0x00000001 << which)))
-		panic("remrunqueue");
-#endif
-	p->p_forw->p_back = p->p_back;
-	p->p_back->p_forw = p->p_forw;
-	p->p_back = NULL;
-	q = &sched_qs[which];
-	if (q->ph_link == (struct proc *)q)
-		sched_whichqs &= ~(0x00000001 << which);
-#ifdef sh3_debug
-	printf("remrunque[whichqs = 0x%x,which=%d]\n",
-	    sched_whichqs, which);
-#endif
-}
-
-void
-setPageDirReg(int pgdir)
-{
-#if 0
-	PageDirReg = pgdir;
-#else
-	SHREG_TTB = pgdir;
-#endif
-	tlbflush();
-}
-
-#if 0
-u_long
-random()
-{
-	static u_long randseed;
-
-	randseed = randseed*1103515245 + 12345;
-	return randseed;
-}
-#endif

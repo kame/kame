@@ -1,4 +1,4 @@
-/*	$NetBSD: in_pcb.c,v 1.65.4.1 2000/08/26 16:38:32 tron Exp $	*/
+/*	$NetBSD: in_pcb.c,v 1.75 2002/03/08 20:48:43 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,6 +101,9 @@
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: in_pcb.c,v 1.75 2002/03/08 20:48:43 thorpej Exp $");
+
 #include "opt_ipsec.h"
 
 #include <sys/param.h>
@@ -129,7 +132,6 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#include <netkey/key_debug.h>
 #endif /* IPSEC */
 
 struct	in_addr zeroin_addr;
@@ -162,15 +164,15 @@ in_pcbinit(table, bindhashsize, connecthashsize)
 
 	if (inpcb_pool_initialized == 0) {
 		pool_init(&inpcb_pool, sizeof(struct inpcb), 0, 0, 0,
-		    "inpcbpl", 0, NULL, NULL, M_PCB);
+		    "inpcbpl", NULL);
 		inpcb_pool_initialized = 1;
 	}
 
 	CIRCLEQ_INIT(&table->inpt_queue);
-	table->inpt_bindhashtbl =
-	    hashinit(bindhashsize, M_PCB, M_WAITOK, &table->inpt_bindhash);
-	table->inpt_connecthashtbl =
-	    hashinit(connecthashsize, M_PCB, M_WAITOK, &table->inpt_connecthash);
+	table->inpt_bindhashtbl = hashinit(bindhashsize, HASH_LIST, M_PCB,
+	    M_WAITOK, &table->inpt_bindhash);
+	table->inpt_connecthashtbl = hashinit(connecthashsize, HASH_LIST,
+	    M_PCB, M_WAITOK, &table->inpt_connecthash);
 	table->inpt_lastlow = IPPORT_RESERVEDMAX;
 	table->inpt_lastport = (u_int16_t)anonportmax;
 }
@@ -183,6 +185,9 @@ in_pcballoc(so, v)
 	struct inpcbtable *table = v;
 	struct inpcb *inp;
 	int s;
+#ifdef IPSEC
+	int error;
+#endif
 
 	inp = pool_get(&inpcb_pool, PR_NOWAIT);
 	if (inp == NULL)
@@ -191,6 +196,13 @@ in_pcballoc(so, v)
 	inp->inp_table = table;
 	inp->inp_socket = so;
 	inp->inp_errormtu = -1;
+#ifdef IPSEC
+	error = ipsec_init_policy(so, &inp->inp_sp);
+	if (error != 0) {
+		pool_put(&inpcb_pool, inp);
+		return error;
+	}
+#endif
 	so->so_pcb = inp;
 	s = splnet();
 	CIRCLEQ_INSERT_HEAD(&table->inpt_queue, inp, inp_queue);
@@ -215,7 +227,7 @@ in_pcbbind(v, nam, p)
 	int error;
 #endif
 
-	if (in_ifaddr.tqh_first == 0)
+	if (TAILQ_FIRST(&in_ifaddr) == 0)
 		return (EADDRNOTAVAIL);
 	if (inp->inp_lport || !in_nullhost(inp->inp_laddr))
 		return (EINVAL);
@@ -350,7 +362,7 @@ in_pcbconnect(v, nam)
 		return (EAFNOSUPPORT);
 	if (sin->sin_port == 0)
 		return (EADDRNOTAVAIL);
-	if (in_ifaddr.tqh_first != 0) {
+	if (TAILQ_FIRST(&in_ifaddr) != 0) {
 		/*
 		 * If the destination address is INADDR_ANY,
 		 * use any local address (likely loopback).
@@ -359,15 +371,18 @@ in_pcbconnect(v, nam)
 		 * which supports broadcast. (loopback does not)
 		 */
 
-		if (in_nullhost(sin->sin_addr))
-			sin->sin_addr = in_ifaddr.tqh_first->ia_addr.sin_addr;
-		else if (sin->sin_addr.s_addr == INADDR_BROADCAST)
-		    for (ia = in_ifaddr.tqh_first; ia != NULL;
-		      ia = ia->ia_list.tqe_next)
-			if (ia->ia_ifp->if_flags & IFF_BROADCAST) {
-			    sin->sin_addr = ia->ia_broadaddr.sin_addr;
-			    break;
+		if (in_nullhost(sin->sin_addr)) {
+			sin->sin_addr =
+			    TAILQ_FIRST(&in_ifaddr)->ia_addr.sin_addr;
+		} else if (sin->sin_addr.s_addr == INADDR_BROADCAST) {
+			TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
+				if (ia->ia_ifp->if_flags & IFF_BROADCAST) {
+					sin->sin_addr =
+					    ia->ia_broadaddr.sin_addr;
+					break;
+				}
 			}
+		}
 	}
 	/*
 	 * If we haven't bound which network number to use as ours,
@@ -382,79 +397,6 @@ in_pcbconnect(v, nam)
 	 * destinations.
 	 */
 	if (in_nullhost(inp->inp_laddr)) {
-#if 0
-		struct route *ro;
-
-		ia = (struct in_ifaddr *)0;
-		/* 
-		 * If route is known or can be allocated now,
-		 * our src addr is taken from the i/f, else punt.
-		 */
-		ro = &inp->inp_route;
-		if (ro->ro_rt &&
-		    (!in_hosteq(satosin(&ro->ro_dst)->sin_addr,
-			sin->sin_addr) || 
-		    inp->inp_socket->so_options & SO_DONTROUTE)) {
-			RTFREE(ro->ro_rt);
-			ro->ro_rt = (struct rtentry *)0;
-		}
-		if ((inp->inp_socket->so_options & SO_DONTROUTE) == 0 && /*XXX*/
-		    (ro->ro_rt == (struct rtentry *)0 ||
-		    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
-			/* No route yet, so try to acquire one */
-			ro->ro_dst.sa_family = AF_INET;
-			ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
-			satosin(&ro->ro_dst)->sin_addr = sin->sin_addr;
-			rtalloc(ro);
-		}
-		/*
-		 * If we found a route, use the address
-		 * corresponding to the outgoing interface
-		 * unless it is the loopback (in case a route
-		 * to our address on another net goes to loopback).
-		 * 
-		 * XXX Is this still true?  Do we care?
-		 */
-		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
-			ia = ifatoia(ro->ro_rt->rt_ifa);
-		if (ia == NULL) {
-			u_int16_t fport = sin->sin_port;
-
-			sin->sin_port = 0;
-			ia = ifatoia(ifa_ifwithladdr(sintosa(sin)));
-			sin->sin_port = fport;
-			if (ia == 0) {
-				/* Find 1st non-loopback AF_INET address */
-				for (ia = in_ifaddr.tqh_first ; ia != NULL;
-				     ia = ia->ia_list.tqe_next) {
-					if ((ia->ia_ifp->if_flags &
-					     IFF_LOOPBACK) == 0)
-						break;
-				}
-			}
-			if (ia == NULL)
-				return (EADDRNOTAVAIL);
-		}
-		/*
-		 * If the destination address is multicast and an outgoing
-		 * interface has been set as a multicast option, use the
-		 * address of that interface as our source address.
-		 */
-		if (IN_MULTICAST(sin->sin_addr.s_addr) &&
-		    inp->inp_moptions != NULL) {
-			struct ip_moptions *imo;
-			struct ifnet *ifp;
-
-			imo = inp->inp_moptions;
-			if (imo->imo_multicast_ifp != NULL) {
-				ifp = imo->imo_multicast_ifp;
-				IFP_TO_IA(ifp, ia);		/* XXX */
-				if (ia == 0)
-					return (EADDRNOTAVAIL);
-			}
-		}
-		ifaddr = satosin(&ia->ia_addr);
-#else
 		int error;
 		ifaddr = in_selectsrc(sin, &inp->inp_route,
 			inp->inp_socket->so_options, inp->inp_moptions, &error);
@@ -463,7 +405,6 @@ in_pcbconnect(v, nam)
 				error = EADDRNOTAVAIL;
 			return error;
 		}
-#endif
 	}
 	if (in_pcblookup_connect(inp->inp_table, sin->sin_addr, sin->sin_port,
 	    !in_nullhost(inp->inp_laddr) ? inp->inp_laddr : ifaddr->sin_addr,
@@ -487,6 +428,10 @@ in_pcbconnect(v, nam)
 	inp->inp_faddr = sin->sin_addr;
 	inp->inp_fport = sin->sin_port;
 	in_pcbstate(inp, INP_CONNECTED);
+#ifdef IPSEC
+	if (inp->inp_socket->so_type == SOCK_STREAM)
+		ipsec_pcbconn(inp->inp_sp);
+#endif
 	return (0);
 }
 
@@ -501,6 +446,9 @@ in_pcbdisconnect(v)
 	in_pcbstate(inp, INP_BOUND);
 	if (inp->inp_socket->so_state & SS_NOFDREF)
 		in_pcbdetach(inp);
+#ifdef IPSEC
+	ipsec_pcbdisconn(inp->inp_sp);
+#endif
 }
 
 void
@@ -589,8 +537,8 @@ in_pcbnotify(table, faddr, fport_arg, laddr, lport_arg, errno, notify)
 
 	nmatch = 0;
 	head = INPCBHASH_CONNECT(table, faddr, fport, laddr, lport);
-	for (inp = head->lh_first; inp != NULL; inp = ninp) {
-		ninp = inp->inp_hash.le_next;
+	for (inp = LIST_FIRST(head); inp != NULL; inp = ninp) {
+		ninp = LIST_NEXT(inp, inp_hash);
 		if (in_hosteq(inp->inp_faddr, faddr) &&
 		    inp->inp_fport == fport &&
 		    inp->inp_lport == lport &&
@@ -614,17 +562,17 @@ in_pcbnotifyall(table, faddr, errno, notify)
 	if (in_nullhost(faddr) || notify == 0)
 		return;
 
-	for (inp = table->inpt_queue.cqh_first;
-	    inp != (struct inpcb *)&table->inpt_queue;
+	for (inp = CIRCLEQ_FIRST(&table->inpt_queue);
+	    inp != (void *)&table->inpt_queue;
 	    inp = ninp) {
-		ninp = inp->inp_queue.cqe_next;
+		ninp = CIRCLEQ_NEXT(inp, inp_queue);
 		if (in_hosteq(inp->inp_faddr, faddr))
 			(*notify)(inp, errno);
 	}
 }
 
 void
-in_pcbpurgeif(table, ifp)
+in_pcbpurgeif0(table, ifp)
 	struct inpcbtable *table;
 	struct ifnet *ifp;
 {
@@ -632,13 +580,10 @@ in_pcbpurgeif(table, ifp)
 	struct ip_moptions *imo;
 	int i, gap;
 
-	for (inp = table->inpt_queue.cqh_first;
-	    inp != (struct inpcb *)&table->inpt_queue;
+	for (inp = CIRCLEQ_FIRST(&table->inpt_queue);
+	    inp != (void *)&table->inpt_queue;
 	    inp = ninp) {
-		ninp = inp->inp_queue.cqe_next;
-		if (inp->inp_route.ro_rt != NULL &&
-		    inp->inp_route.ro_rt->rt_ifp == ifp)
-			in_rtchange(inp, 0);
+		ninp = CIRCLEQ_NEXT(inp, inp_queue);
 		imo = inp->inp_moptions;
 		if (imo != NULL) {
 			/*
@@ -663,6 +608,23 @@ in_pcbpurgeif(table, ifp)
 			}
 			imo->imo_num_memberships -= gap;
 		}
+	}
+}
+
+void
+in_pcbpurgeif(table, ifp)
+	struct inpcbtable *table;
+	struct ifnet *ifp;
+{
+	struct inpcb *inp, *ninp;
+
+	for (inp = CIRCLEQ_FIRST(&table->inpt_queue);
+	    inp != (void *)&table->inpt_queue;
+	    inp = ninp) {
+		ninp = CIRCLEQ_NEXT(inp, inp_queue);
+		if (inp->inp_route.ro_rt != NULL &&
+		    inp->inp_route.ro_rt->rt_ifp == ifp)
+			in_rtchange(inp, 0);
 	}
 }
 
@@ -731,9 +693,7 @@ in_pcblookup_port(table, laddr, lport_arg, lookup_wildcard)
 	int matchwild = 3, wildcard;
 	u_int16_t lport = lport_arg;
 
-	for (inp = table->inpt_queue.cqh_first;
-	    inp != (struct inpcb *)&table->inpt_queue;
-	    inp = inp->inp_queue.cqe_next) {
+	CIRCLEQ_FOREACH(inp, &table->inpt_queue, inp_queue) {
 		if (inp->inp_lport != lport)
 			continue;
 		wildcard = 0;
@@ -777,7 +737,7 @@ in_pcblookup_connect(table, faddr, fport_arg, laddr, lport_arg)
 	u_int16_t fport = fport_arg, lport = lport_arg;
 
 	head = INPCBHASH_CONNECT(table, faddr, fport, laddr, lport);
-	for (inp = head->lh_first; inp != NULL; inp = inp->inp_hash.le_next) {
+	LIST_FOREACH(inp, head, inp_hash) {
 		if (in_hosteq(inp->inp_faddr, faddr) &&
 		    inp->inp_fport == fport &&
 		    inp->inp_lport == lport &&
@@ -795,7 +755,7 @@ in_pcblookup_connect(table, faddr, fport_arg, laddr, lport_arg)
 
 out:
 	/* Move this PCB to the head of hash chain. */
-	if (inp != head->lh_first) {
+	if (inp != LIST_FIRST(head)) {
 		LIST_REMOVE(inp, inp_hash);
 		LIST_INSERT_HEAD(head, inp, inp_hash);
 	}
@@ -813,13 +773,13 @@ in_pcblookup_bind(table, laddr, lport_arg)
 	u_int16_t lport = lport_arg;
 
 	head = INPCBHASH_BIND(table, laddr, lport);
-	for (inp = head->lh_first; inp != NULL; inp = inp->inp_hash.le_next) {
+	LIST_FOREACH(inp, head, inp_hash) {
 		if (inp->inp_lport == lport &&
 		    in_hosteq(inp->inp_laddr, laddr))
 			goto out;
 	}
 	head = INPCBHASH_BIND(table, zeroin_addr, lport);
-	for (inp = head->lh_first; inp != NULL; inp = inp->inp_hash.le_next) {
+	LIST_FOREACH(inp, head, inp_hash) {
 		if (inp->inp_lport == lport &&
 		    in_hosteq(inp->inp_laddr, zeroin_addr))
 			goto out;
@@ -834,7 +794,7 @@ in_pcblookup_bind(table, laddr, lport_arg)
 
 out:
 	/* Move this PCB to the head of hash chain. */
-	if (inp != head->lh_first) {
+	if (inp != LIST_FIRST(head)) {
 		LIST_REMOVE(inp, inp_hash);
 		LIST_INSERT_HEAD(head, inp, inp_hash);
 	}
@@ -878,6 +838,7 @@ in_pcbrtentry(inp)
 		 * No route yet, so try to acquire one.
 		 */
 		if (!in_nullhost(inp->inp_faddr)) {
+			bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 			ro->ro_dst.sa_family = AF_INET;
 			ro->ro_dst.sa_len = sizeof(ro->ro_dst);
 			satosin(&ro->ro_dst)->sin_addr = inp->inp_faddr;
@@ -901,17 +862,21 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	/* 
 	 * If route is known or can be allocated now,
 	 * our src addr is taken from the i/f, else punt.
+	 * Note that we should check the address family of the cached
+	 * destination, in case of sharing the cache with IPv6.
 	 */
 	if (ro->ro_rt &&
-	    (!in_hosteq(satosin(&ro->ro_dst)->sin_addr, sin->sin_addr) ||
+	    (ro->ro_dst.sa_family != AF_INET ||
+	    !in_hosteq(satosin(&ro->ro_dst)->sin_addr, sin->sin_addr) ||
 	    soopts & SO_DONTROUTE)) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
 	if ((soopts & SO_DONTROUTE) == 0 && /*XXX*/
 	    (ro->ro_rt == (struct rtentry *)0 ||
-	    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
+	     ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
 		/* No route yet, so try to acquire one */
+		bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 		ro->ro_dst.sa_family = AF_INET;
 		ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
 		satosin(&ro->ro_dst)->sin_addr = sin->sin_addr;
@@ -935,9 +900,7 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 		sin->sin_port = fport;
 		if (ia == 0) {
 			/* Find 1st non-loopback AF_INET address */
-			for (ia = in_ifaddr.tqh_first;
-			     ia != NULL;
-			     ia = ia->ia_list.tqe_next) {
+			TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
 				if (!(ia->ia_ifp->if_flags & IFF_LOOPBACK))
 					break;
 			}

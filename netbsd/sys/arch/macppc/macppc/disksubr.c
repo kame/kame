@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.8.4.1 2000/08/28 16:16:25 wrstuden Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.20 2002/03/27 20:23:11 wrstuden Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -133,7 +133,7 @@ int fat_types[] = { MBR_PTYPE_FAT12, MBR_PTYPE_FAT16S,
 		    -1 };
 
 static int getFreeLabelEntry __P((struct disklabel *));
-static int whichType __P((struct part_map_entry *));
+static int whichType __P((struct part_map_entry *, u_int8_t *, int *));
 static void setpartition __P((struct part_map_entry *,
 		struct partition *, int));
 static int getNamedType __P((struct part_map_entry *, int,
@@ -168,12 +168,16 @@ getFreeLabelEntry(lp)
  * figure out what the type of the given part is and return it
  */
 static int
-whichType(part)
-	struct part_map_entry *part;
+whichType(struct part_map_entry *part, u_int8_t *fstype, int *clust)
 {
 	struct blockzeroblock *bzb;
 	char typestr[32], *s;
 	int type;
+
+	/* Set default unix partition type. Certain partition types can
+	 * specify a different partition type. */
+	*fstype = FS_BSDFFS;
+	*clust = 0;	/* only A/UX partitions not in cluster 0 */
 
 	if (part->pmSig != PART_ENTRY_MAGIC || part->pmPartType[0] == '\0')
 		return 0;
@@ -184,17 +188,32 @@ whichType(part)
 		if ((*s >= 'a') && (*s <= 'z'))
 			*s = (*s - 'a' + 'A');
 
-	if (strcmp(PART_TYPE_DRIVER, typestr) == 0 ||
+	if (strncmp(PART_TYPE_DRIVER, typestr, strlen(PART_TYPE_DRIVER)) == 0 ||
 	    strcmp(PART_TYPE_DRIVER43, typestr) == 0 ||
 	    strcmp(PART_TYPE_DRIVERATA, typestr) == 0 ||
 	    strcmp(PART_TYPE_DRIVERIOKIT, typestr) == 0 ||
+	    strcmp(PART_TYPE_FWDRIVER, typestr) == 0 ||
 	    strcmp(PART_TYPE_FWB_COMPONENT, typestr) == 0 ||
 	    strcmp(PART_TYPE_PARTMAP, typestr) == 0 ||
 	    strcmp(PART_TYPE_PATCHES, typestr) == 0)
 		type = 0;
-	else if (strcmp(PART_TYPE_UNIX, typestr) == 0) {
+	else if (strcmp(PART_TYPE_NBSD_PPCBOOT, typestr) == 0) {
+		type = ROOT_PART;
+		bzb = (struct blockzeroblock *)(&part->pmBootArgs);
+		if ((bzb->bzbMagic == BZB_MAGIC) &&
+		    (bzb->bzbType < FSMAXTYPES))
+			*fstype = bzb->bzbType;
+	} else if (strcmp(PART_TYPE_NETBSD, typestr) == 0 ||
+		 strcmp(PART_TYPE_NBSD_68KBOOT, typestr) == 0) {
+		type = UFS_PART;
+		bzb = (struct blockzeroblock *)(&part->pmBootArgs);
+		if ((bzb->bzbMagic == BZB_MAGIC) &&
+		    (bzb->bzbType < FSMAXTYPES))
+			*fstype = bzb->bzbType;
+	} else if (strcmp(PART_TYPE_UNIX, typestr) == 0) {
 		/* unix part, swap, root, usr */
 		bzb = (struct blockzeroblock *)(&part->pmBootArgs);
+		*clust = bzb->bzbCluster;
 		if (bzb->bzbMagic != BZB_MAGIC)
 			type = 0;
 		else if (bzb->bzbFlags & BZB_ROOTFS)
@@ -214,9 +233,7 @@ whichType(part)
 }
 
 static void
-setpartition(part, pp, fstype)
-	struct part_map_entry *part;
-	struct partition *pp;
+setpartition(struct part_map_entry *part, struct partition *pp, int fstype)
 {
 	pp->p_size = part->pmPartBlkCnt;
 	pp->p_offset = part->pmPyPartStart;
@@ -234,30 +251,35 @@ getNamedType(part, num_parts, lp, type, alt, maxslot)
 	int *maxslot;
 {
 	struct blockzeroblock *bzb;
-	int i = 0;
+	int i = 0, clust;
+	u_int8_t realtype;
 
 	for (i = 0; i < num_parts; i++) {
-		if (whichType(part + i) != type)
+		if (whichType(part + i, &realtype, &clust) != type)
 			continue;
 
 		if (type == ROOT_PART) {
 			bzb = (struct blockzeroblock *)
 			    (&(part + i)->pmBootArgs);
-			if (alt >= 0 && alt != bzb->bzbCluster)
+			if (alt >= 0 && alt != clust)
 				continue;
-			setpartition(part + i, &lp->d_partitions[0], FS_BSDFFS);
+			setpartition(part + i, &lp->d_partitions[0], realtype);
 		} else if (type == UFS_PART) {
 			bzb = (struct blockzeroblock *)
 			    (&(part + i)->pmBootArgs);
-			if (alt >= 0 && alt != bzb->bzbCluster)
+			if (alt >= 0 && alt != clust)
 				continue;
-			setpartition(part + i, &lp->d_partitions[6], FS_BSDFFS);
+			setpartition(part + i, &lp->d_partitions[6], realtype);
 			if (*maxslot < 6)
 				*maxslot = 6;
 		} else if (type == SWAP_PART) {
 			setpartition(part + i, &lp->d_partitions[1], FS_SWAP);
 			if (*maxslot < 1)
 				*maxslot = 1;
+		} else if (type == HFS_PART) {
+			setpartition(part + i, &lp->d_partitions[3], FS_HFS);
+			if (*maxslot < 3)
+				*maxslot = 3;
 		} else
 			printf("disksubr.c: can't do type %d\n", type);
 
@@ -301,7 +323,8 @@ read_mac_label(dev, strat, lp, osdep)
 	struct partition *pp;
 	struct buf *bp;
 	char *msg = NULL;
-	int i, slot, maxslot = 0;
+	int i, slot, maxslot = 0, clust;
+	u_int8_t realtype;
 
 	/* get buffer and initialize it */
 	bp = geteblk((int)lp->d_secsize * NUM_PARTS);
@@ -310,7 +333,7 @@ read_mac_label(dev, strat, lp, osdep)
 	/* read partition map */
 	bp->b_blkno = 1;	/* partition map starts at blk 1 */
 	bp->b_bcount = lp->d_secsize * NUM_PARTS;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = 1 / lp->d_secpercyl;
 	(*strat)(bp);
 
@@ -328,6 +351,7 @@ read_mac_label(dev, strat, lp, osdep)
 	if (getNamedType(part, NUM_PARTS, lp, UFS_PART, 0, &maxslot))
 		getNamedType(part, NUM_PARTS, lp, UFS_PART, -1, &maxslot);
 	getNamedType(part, NUM_PARTS, lp, SWAP_PART, -1, &maxslot);
+	getNamedType(part, NUM_PARTS, lp, HFS_PART, -1, &maxslot);
 
 	/* Now get as many of the rest of the partitions as we can */
 	for (i = 0; i < NUM_PARTS; i++) {
@@ -337,14 +361,14 @@ read_mac_label(dev, strat, lp, osdep)
 
 		pp = &lp->d_partitions[slot];
 
-		switch (whichType(part + i)) {
+		switch (whichType(part + i, &realtype, &clust)) {
 		case ROOT_PART:
 		/*
 		 * another root part will turn into a plain old
 		 * UFS_PART partition, live with it.
 		 */
 		case UFS_PART:
-			setpartition(part + i, pp, FS_BSDFFS);
+			setpartition(part + i, pp, realtype);
 			break;
 		case SWAP_PART:
 			setpartition(part + i, pp, FS_SWAP);
@@ -365,9 +389,7 @@ read_mac_label(dev, strat, lp, osdep)
 	lp->d_npartitions = ((maxslot >= RAW_PART) ? maxslot : RAW_PART) + 1;
 
 done:
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
-
 	return msg;
 }
 
@@ -399,7 +421,7 @@ read_dos_label(dev, strat, lp, osdep)
 	/* read master boot record */
 	bp->b_blkno = MBR_BBSECTOR;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = MBR_BBSECTOR / lp->d_secpercyl;
 	(*strat)(bp);
 
@@ -433,7 +455,6 @@ read_dos_label(dev, strat, lp, osdep)
 	lp->d_npartitions = ((maxslot >= RAW_PART) ? maxslot : RAW_PART) + 1;
 
  done:
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
 	return (msg);
 }
@@ -444,7 +465,7 @@ read_dos_label(dev, strat, lp, osdep)
 static int
 get_netbsd_label(dev, strat, lp, bno)
 	dev_t dev;
-	void (*strat)();
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	daddr_t bno;
 {
@@ -458,7 +479,7 @@ get_netbsd_label(dev, strat, lp, bno)
 	/* Now get the label block */
 	bp->b_blkno = bno + LABELSECTOR;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = bp->b_blkno / (lp->d_secsize / DEV_BSIZE) / lp->d_secpercyl;
 	(*strat)(bp);
 
@@ -478,13 +499,12 @@ get_netbsd_label(dev, strat, lp, bno)
 		}
 	}
 done:
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
 	return 0;
 }
 
 /*
- * Attempt to read a disk label from a device using the indicated stategy
+ * Attempt to read a disk label from a device using the indicated strategy
  * routine.  The label must be partly set up before this: secpercyl and
  * anything required in the strategy routine (e.g., sector size) must be
  * filled in before calling us.  Returns null on success and an error
@@ -504,7 +524,6 @@ readdisklabel(dev, strat, lp, osdep)
 {
 	struct buf *bp;
 	char *msg = NULL;
-	struct disklabel *dlp;
 
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
@@ -518,7 +537,7 @@ readdisklabel(dev, strat, lp, osdep)
 	bp->b_blkno = 0;
 	bp->b_resid = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = 1 / lp->d_secpercyl;
 	(*strat)(bp);
 
@@ -543,7 +562,6 @@ readdisklabel(dev, strat, lp, osdep)
 		}
 	}
 
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
 	return (msg);
 }
@@ -584,7 +602,7 @@ setdisklabel(olp, nlp, openmask, osdep)
 int
 writedisklabel(dev, strat, lp, osdep)
 	dev_t dev;
-	void (*strat)();
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	struct cpu_disklabel *osdep;
 {
@@ -608,21 +626,21 @@ writedisklabel(dev, strat, lp, osdep)
 	bp->b_cylinder = bp->b_blkno / (lp->d_secsize / DEV_BSIZE) / lp->d_secpercyl;
 	bp->b_bcount = lp->d_secsize;
 
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 	error = biowait(bp);
 	if (error != 0)
 		goto done;
 
-	bp->b_flags = B_BUSY | B_WRITE;
+	bp->b_flags &= ~(B_READ|B_DONE);
+	bp->b_flags |= B_WRITE;
 
-	bcopy((caddr_t)lp, (caddr_t)bp->b_data + LABELOFFSET, sizeof *lp);
+	memcpy((caddr_t)bp->b_data + LABELOFFSET, (caddr_t)lp, sizeof *lp);
 
 	(*strat)(bp);
 	error = biowait(bp);
 
 done:
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
 
 	return error;
@@ -670,41 +688,4 @@ bad:
 	bp->b_flags |= B_ERROR;
 done:
 	return 0;
-}
-
-/*
- * This is called by main to set dumplo and dumpsize.
- */
-void
-cpu_dumpconf()
-{
-	int nblks;		/* size of dump device */
-	int skip;
-	int maj;
-
-	if (dumpdev == NODEV)
-		return;
-	maj = major(dumpdev);
-	if (maj < 0 || maj >= nblkdev)
-		panic("dumpconf: bad dumpdev=0x%x", dumpdev);
-	if (bdevsw[maj].d_psize == NULL)
-		return;
-	nblks = (*bdevsw[maj].d_psize)(dumpdev);
-	if (nblks <= ctod(1))
-		return;
-
-	dumpsize = physmem;
-
-	/* Skip enough blocks at start of disk to preserve an eventual disklabel. */
-	skip = LABELSECTOR + 1;
-	skip += ctod(1) - 1;
-	skip = ctod(dtoc(skip));
-	if (dumplo < skip)
-		dumplo = skip;
-
-	/* Put dump at end of partition */
-	if (dumpsize > dtoc(nblks - dumplo))
-		dumpsize = dtoc(nblks - dumplo);
-	if (dumplo < nblks - ctod(dumpsize))
-		dumplo = nblks - ctod(dumpsize);
 }

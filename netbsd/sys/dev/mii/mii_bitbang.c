@@ -1,4 +1,4 @@
-/*	$NetBSD: mii_bitbang.c,v 1.1 1999/11/17 17:47:59 thorpej Exp $	*/
+/*	$NetBSD: mii_bitbang.c,v 1.5 2001/11/13 07:41:37 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -41,21 +41,24 @@
  * Common module for bit-bang'ing the MII.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mii_bitbang.c,v 1.5 2001/11/13 07:41:37 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/mii_bitbang.h>
 
-void	mii_bitbang_sync __P((struct device *, mii_bitbang_ops_t));
-void	mii_bitbang_sendbits __P((struct device *, mii_bitbang_ops_t,
-	    u_int32_t, int));
+void	mii_bitbang_sync(struct device *, mii_bitbang_ops_t);
+void	mii_bitbang_sendbits(struct device *, mii_bitbang_ops_t,
+	    u_int32_t, int);
 
 #define	WRITE(x)							\
 do {									\
 	ops->mbo_write(sc, (x));					\
 	delay(1);							\
-} while (0)
+} while (/* CONSTCOND */ 0)
 
 #define	READ		ops->mbo_read(sc)
 
@@ -71,11 +74,10 @@ do {									\
  *	Synchronize the MII.
  */
 void
-mii_bitbang_sync(sc, ops)
-	struct device *sc;
-	mii_bitbang_ops_t ops;
+mii_bitbang_sync(struct device *sc, mii_bitbang_ops_t ops)
 {
-	int i, v;
+	int i;
+	u_int32_t v;
 
 	v = MDIRPHY | MDO;
 
@@ -92,13 +94,11 @@ mii_bitbang_sync(sc, ops)
  *	Send a series of bits to the MII.
  */
 void
-mii_bitbang_sendbits(sc, ops, data, nbits)
-	struct device *sc;
-	mii_bitbang_ops_t ops;
-	u_int32_t data;
-	int nbits;
+mii_bitbang_sendbits(struct device *sc, mii_bitbang_ops_t ops, uint32_t data,
+    int nbits)
 {
-	int i, v;
+	int i;
+	u_int32_t v;
 
 	v = MDIRPHY;
 	WRITE(v);
@@ -120,10 +120,7 @@ mii_bitbang_sendbits(sc, ops, data, nbits)
  *	Read a PHY register by bit-bang'ing the MII.
  */
 int
-mii_bitbang_readreg(sc, ops, phy, reg)
-	struct device *sc;
-	mii_bitbang_ops_t ops;
-	int phy, reg;
+mii_bitbang_readreg(struct device *sc, mii_bitbang_ops_t ops, int phy, int reg)
 {
 	int val = 0, err = 0, i;
 
@@ -170,10 +167,8 @@ mii_bitbang_readreg(sc, ops, phy, reg)
  *	Write a PHY register by bit-bang'ing the MII.
  */
 void
-mii_bitbang_writereg(sc, ops, phy, reg, val)
-	struct device *sc;
-	mii_bitbang_ops_t ops;
-	int phy, reg, val;
+mii_bitbang_writereg(struct device *sc, mii_bitbang_ops_t ops, int phy,
+int reg, int val)
 {
 
 	mii_bitbang_sync(sc, ops);

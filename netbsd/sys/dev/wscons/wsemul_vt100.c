@@ -1,4 +1,4 @@
-/* $NetBSD: wsemul_vt100.c,v 1.13 2000/04/28 21:56:16 mycroft Exp $ */
+/* $NetBSD: wsemul_vt100.c,v 1.17 2002/01/12 16:41:02 tsutsui Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -32,6 +32,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wsemul_vt100.c,v 1.17 2002/01/12 16:41:02 tsutsui Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -46,14 +49,13 @@
 
 #include "opt_wskernattr.h"
 
-void	*wsemul_vt100_cnattach __P((const struct wsscreen_descr *, void *,
-				  int, int, long));
-void	*wsemul_vt100_attach __P((int console, const struct wsscreen_descr *,
-				  void *, int, int, void *, long));
-void	wsemul_vt100_output __P((void *cookie, const u_char *data, u_int count,
-				 int));
-void	wsemul_vt100_detach __P((void *cookie, u_int *crowp, u_int *ccolp));
-void	wsemul_vt100_resetop __P((void *, enum wsemul_resetops));
+void	*wsemul_vt100_cnattach(const struct wsscreen_descr *, void *,
+			       int, int, long);
+void	*wsemul_vt100_attach(int console, const struct wsscreen_descr *,
+			     void *, int, int, void *, long);
+void	wsemul_vt100_output(void *cookie, const u_char *data, u_int count, int);
+void	wsemul_vt100_detach(void *cookie, u_int *crowp, u_int *ccolp);
+void	wsemul_vt100_resetop(void *, enum wsemul_resetops);
 
 const struct wsemul_ops wsemul_vt100_ops = {
 	"vt100",
@@ -67,15 +69,15 @@ const struct wsemul_ops wsemul_vt100_ops = {
 
 struct wsemul_vt100_emuldata wsemul_vt100_console_emuldata;
 
-static void wsemul_vt100_init __P((struct wsemul_vt100_emuldata *,
-				   const struct wsscreen_descr *,
-				   void *, int, int, long));
+static void wsemul_vt100_init(struct wsemul_vt100_emuldata *,
+			      const struct wsscreen_descr *,
+			      void *, int, int, long);
 
-static void wsemul_vt100_output_normal __P((struct wsemul_vt100_emuldata *,
-					    u_char, int));
-static void wsemul_vt100_output_c0c1 __P((struct wsemul_vt100_emuldata *,
-					  u_char, int));
-typedef u_int vt100_handler __P((struct wsemul_vt100_emuldata *, u_char));
+static void wsemul_vt100_output_normal(struct wsemul_vt100_emuldata *,
+				       u_char, int);
+static void wsemul_vt100_output_c0c1(struct wsemul_vt100_emuldata *,
+				     u_char, int);
+typedef u_int vt100_handler(struct wsemul_vt100_emuldata *, u_char);
 static vt100_handler
 wsemul_vt100_output_esc,
 wsemul_vt100_output_csi,
@@ -120,12 +122,9 @@ vt100_handler *vt100_output[] = {
 };
 
 static void
-wsemul_vt100_init(edp, type, cookie, ccol, crow, defattr)
-	struct wsemul_vt100_emuldata *edp;
-	const struct wsscreen_descr *type;
-	void *cookie;
-	int ccol, crow;
-	long defattr;
+wsemul_vt100_init(struct wsemul_vt100_emuldata *edp, 
+	const struct wsscreen_descr *type, void *cookie, int ccol, int crow,
+	long defattr)
 {
 	edp->emulops = type->textops;
 	edp->emulcookie = cookie;
@@ -138,11 +137,8 @@ wsemul_vt100_init(edp, type, cookie, ccol, crow, defattr)
 }
 
 void *
-wsemul_vt100_cnattach(type, cookie, ccol, crow, defattr)
-	const struct wsscreen_descr *type;
-	void *cookie;
-	int ccol, crow;
-	long defattr;
+wsemul_vt100_cnattach(const struct wsscreen_descr *type, void *cookie,
+	int ccol, int crow, long defattr)
 {
 	struct wsemul_vt100_emuldata *edp;
 #if defined(WS_KERNEL_FG) || defined(WS_KERNEL_BG) || \
@@ -195,13 +191,8 @@ wsemul_vt100_cnattach(type, cookie, ccol, crow, defattr)
 }
 
 void *
-wsemul_vt100_attach(console, type, cookie, ccol, crow, cbcookie, defattr)
-	int console;
-	const struct wsscreen_descr *type;
-	void *cookie;
-	int ccol, crow;
-	void *cbcookie;
-	long defattr;
+wsemul_vt100_attach(int console, const struct wsscreen_descr *type,
+	void *cookie, int ccol, int crow, void *cbcookie, long defattr)
 {
 	struct wsemul_vt100_emuldata *edp;
 
@@ -220,8 +211,7 @@ wsemul_vt100_attach(console, type, cookie, ccol, crow, cbcookie, defattr)
 	edp->cbcookie = cbcookie;
 
 	edp->tabs = malloc(edp->ncols, M_DEVBUF, M_NOWAIT);
-	edp->dblwid = malloc(edp->nrows, M_DEVBUF, M_NOWAIT);
-	memset(edp->dblwid, 0, edp->nrows);
+	edp->dblwid = malloc(edp->nrows, M_DEVBUF, M_NOWAIT|M_ZERO);
 	edp->dw = 0;
 	edp->dcsarg = malloc(DCS_MAXLEN, M_DEVBUF, M_NOWAIT);
 	edp->isolatin1tab = malloc(128 * sizeof(int), M_DEVBUF, M_NOWAIT);
@@ -234,9 +224,7 @@ wsemul_vt100_attach(console, type, cookie, ccol, crow, cbcookie, defattr)
 }
 
 void
-wsemul_vt100_detach(cookie, crowp, ccolp)
-	void *cookie;
-	u_int *crowp, *ccolp;
+wsemul_vt100_detach(void *cookie, u_int *crowp, u_int *ccolp)
 {
 	struct wsemul_vt100_emuldata *edp = cookie;
 
@@ -256,9 +244,7 @@ wsemul_vt100_detach(cookie, crowp, ccolp)
 }
 
 void
-wsemul_vt100_resetop(cookie, op)
-	void *cookie;
-	enum wsemul_resetops op;
+wsemul_vt100_resetop(void *cookie, enum wsemul_resetops op)
 {
 	struct wsemul_vt100_emuldata *edp = cookie;
 
@@ -281,8 +267,7 @@ wsemul_vt100_resetop(cookie, op)
 }
 
 void
-wsemul_vt100_reset(edp)
-	struct wsemul_vt100_emuldata *edp;
+wsemul_vt100_reset(struct wsemul_vt100_emuldata *edp)
 {
 	int i;
 
@@ -315,10 +300,8 @@ wsemul_vt100_reset(edp)
  */
 
 static void
-wsemul_vt100_output_normal(edp, c, kernel)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
-	int kernel;
+wsemul_vt100_output_normal(struct wsemul_vt100_emuldata *edp, u_char c,
+	int kernel)
 {
 	u_int *ct, dc;
 
@@ -359,10 +342,8 @@ wsemul_vt100_output_normal(edp, c, kernel)
 }
 
 static void
-wsemul_vt100_output_c0c1(edp, c, kernel)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
-	int kernel;
+wsemul_vt100_output_c0c1(struct wsemul_vt100_emuldata *edp, u_char c, 
+	int kernel)
 {
 	u_int n;
 
@@ -403,10 +384,11 @@ wsemul_vt100_output_c0c1(edp, c, kernel)
 		edp->chartab0 = 0;
 		break;
 	    case ASCII_ESC:
-#ifdef DIAGNOSTIC
-		if (kernel)
-			panic("ESC in kernel output");
-#endif
+		if (kernel) {
+			printf("wsemul_vt100_output_c0c1: ESC in kernel output ignored\n");
+			break;	/* ignore the ESC */
+		}
+
 		if (edp->state == VT100_EMUL_STATE_STRING) {
 			/* might be a string end */
 			edp->state = VT100_EMUL_STATE_STRING_ESC;
@@ -447,9 +429,7 @@ wsemul_vt100_output_c0c1(edp, c, kernel)
 }
 
 static u_int
-wsemul_vt100_output_esc(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_esc(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	u_int newstate = VT100_EMUL_STATE_NORMAL;
 	int i;
@@ -580,9 +560,7 @@ wsemul_vt100_output_esc(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_scs94(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_scs94(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	u_int newstate = VT100_EMUL_STATE_NORMAL;
 
@@ -616,9 +594,7 @@ wsemul_vt100_output_scs94(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_scs94_percent(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_scs94_percent(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	switch (c) {
 	    case '5': /* DEC supplemental graphic */
@@ -635,9 +611,7 @@ wsemul_vt100_output_scs94_percent(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_scs96(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_scs96(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	u_int newstate = VT100_EMUL_STATE_NORMAL;
 	int nrc;
@@ -691,9 +665,7 @@ setnrc:
 }
 
 static u_int
-wsemul_vt100_output_scs96_percent(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_scs96_percent(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	switch (c) {
 	    case '6': /* portugese */
@@ -709,9 +681,7 @@ wsemul_vt100_output_scs96_percent(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_esc_spc(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_esc_spc(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	switch (c) {
 	    case 'F': /* 7-bit controls */
@@ -730,9 +700,7 @@ wsemul_vt100_output_esc_spc(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_string(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_string(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	if (edp->dcstype && edp->dcspos < DCS_MAXLEN)
 		edp->dcsarg[edp->dcspos++] = c;
@@ -740,9 +708,7 @@ wsemul_vt100_output_string(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_string_esc(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_string_esc(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	if (c == '\\') { /* ST complete */
 		wsemul_vt100_handle_dcs(edp);
@@ -752,9 +718,7 @@ wsemul_vt100_output_string_esc(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_dcs(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_dcs(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	u_int newstate = VT100_EMUL_STATE_DCS;
 
@@ -803,9 +767,7 @@ wsemul_vt100_output_dcs(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_dcs_dollar(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_dcs_dollar(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	switch (c) {
 	    case 'p': /* DECRSTS terminal state restore */
@@ -844,9 +806,7 @@ wsemul_vt100_output_dcs_dollar(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_esc_hash(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_esc_hash(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	int i;
 
@@ -903,9 +863,7 @@ wsemul_vt100_output_esc_hash(edp, c)
 }
 
 static u_int
-wsemul_vt100_output_csi(edp, c)
-	struct wsemul_vt100_emuldata *edp;
-	u_char c;
+wsemul_vt100_output_csi(struct wsemul_vt100_emuldata *edp, u_char c)
 {
 	u_int newstate = VT100_EMUL_STATE_CSI;
 
@@ -947,11 +905,7 @@ wsemul_vt100_output_csi(edp, c)
 }
 
 void
-wsemul_vt100_output(cookie, data, count, kernel)
-	void *cookie;
-	const u_char *data;
-	u_int count;
-	int kernel;
+wsemul_vt100_output(void *cookie, const u_char *data, u_int count, int kernel)
 {
 	struct wsemul_vt100_emuldata *edp = cookie;
 

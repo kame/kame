@@ -1,4 +1,4 @@
-/*	$NetBSD: loadfile_machdep.h,v 1.1 1999/12/09 14:53:12 tsutsui Exp $	*/
+/*	$NetBSD: loadfile_machdep.h,v 1.4 2001/10/31 17:20:47 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,17 +37,19 @@
  */
 
 #define BOOT_AOUT
-#define BOOT_ELF
-#define ELFSIZE 32
+#define BOOT_ELF32
 
-#define LOAD_KERNEL	(LOAD_ALL & ~LOAD_HDR)
-#define COUNT_KERNEL	(COUNT_ALL & ~COUNT_HDR)
+#define LOAD_KERNEL		LOAD_ALL
+#define COUNT_KERNEL		COUNT_ALL
 
 #define LOADADDR(a)		(((u_long)(a)) + offset)
 #define ALIGNENTRY(a)		((u_long)(a))
 #define READ(f, b, c)		read((f), (void *)LOADADDR(b), (c))
 #define BCOPY(s, d, c)		memcpy((void *)LOADADDR(d), (void *)(s), (c))
 #define BZERO(d, c)		memset((void *)LOADADDR(d), 0, (c))
+
+#ifdef _STANDALONE
+
 #define	WARN(a)			(void)(printf a, \
 				    printf((errno ? ": %s\n" : "\n"), \
 				    strerror(errno)))
@@ -55,3 +57,13 @@
 #define ALLOC(a)		alloc(a)
 #define FREE(a, b)		free(a, b)
 #define OKMAGIC(a)		((a) == NMAGIC)
+
+#else
+
+#define WARN(a)			warn a
+#define PROGRESS(a)		/* nothing */
+#define ALLOC(a)		malloc(a)
+#define FREE(a, b)		free(a)
+#define OKMAGIC(a)		((a) == NMAGIC || (a) == OMAGIC)
+
+#endif

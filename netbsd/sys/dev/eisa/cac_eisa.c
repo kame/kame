@@ -1,4 +1,4 @@
-/*	$NetBSD: cac_eisa.c,v 1.2.12.2 2002/01/29 23:30:45 he Exp $	*/
+/*	$NetBSD: cac_eisa.c,v 1.5 2002/01/25 16:10:37 ad Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -67,7 +67,9 @@
  * EISA front-end for cac(4) driver.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cac_eisa.c,v 1.5 2002/01/25 16:10:37 ad Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>

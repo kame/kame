@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.28 1999/11/28 20:30:58 is Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.31 2002/03/15 05:55:39 gmcgarry Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -35,6 +35,9 @@
  *	@(#)sys_machdep.c	8.2 (Berkeley) 1/13/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sys_machdep.c,v 1.31 2002/03/15 05:55:39 gmcgarry Exp $");                                                  
+
 #include "opt_compat_hpux.h"
 
 #include <machine/hp300spu.h>	/* XXX param.h includes cpu.h */
@@ -48,70 +51,11 @@
 #include <sys/uio.h>
 #include <sys/kernel.h>
 #include <sys/buf.h>
-#include <sys/trace.h>
 #include <sys/mount.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <sys/syscallargs.h>
-
-#ifdef TRACE
-int	nvualarm;
-
-sys_vtrace(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
-{
-	struct sys_vtrace_args /* {
-		syscallarg(int) request;
-		syscallarg(int) value;
-	} */ *uap = v;
-	int vdoualarm();
-
-	switch (SCARG(uap, request)) {
-
-	case VTR_DISABLE:		/* disable a trace point */
-	case VTR_ENABLE:		/* enable a trace point */
-		if (SCARG(uap, value) < 0 || SCARG(uap, value) >= TR_NFLAGS)
-			return (EINVAL);
-		*retval = traceflags[SCARG(uap, value)];
-		traceflags[SCARG(uap, value)] = SCARG(uap, request);
-		break;
-
-	case VTR_VALUE:		/* return a trace point setting */
-		if (SCARG(uap, value) < 0 || SCARG(uap, value) >= TR_NFLAGS)
-			return (EINVAL);
-		*retval = traceflags[SCARG(uap, value)];
-		break;
-
-	case VTR_UALARM:	/* set a real-time ualarm, less than 1 min */
-		if (SCARG(uap, value) <= 0 || SCARG(uap, value) > 60 * hz ||
-		    nvualarm > 5)
-			return (EINVAL);
-		nvualarm++;
-		timeout(vdoualarm, (void *)p->p_pid, SCARG(uap, value));
-		break;
-
-	case VTR_STAMP:
-		trace(TR_STAMP, SCARG(uap, value), p->p_pid);
-		break;
-	}
-	return (0);
-}
-
-vdoualarm(arg)
-	void *arg;
-{
-	int pid = (int)arg;
-	struct proc *p;
-
-	p = pfind(pid);
-	if (p)
-		psignal(p, 16);
-	nvualarm--;
-}
-#endif
 
 #include <machine/cpu.h>
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_file.c,v 1.28.4.2 2001/03/30 21:39:13 he Exp $	*/
+/*	$NetBSD: linux_file.c,v 1.52 2002/05/13 05:31:42 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  *	linux_sys_llseek	: linux_llseek.c
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_file.c,v 1.52 2002/05/13 05:31:42 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -54,7 +57,9 @@
 #include <sys/malloc.h>
 #include <sys/vnode.h>
 #include <sys/tty.h>
+#include <sys/socketvar.h>
 #include <sys/conf.h>
+#include <sys/pipe.h>
 
 #include <sys/syscallargs.h>
 
@@ -146,8 +151,8 @@ linux_sys_creat(p, v, retval)
 	struct sys_open_args oa;
 	caddr_t sg;
 
-	sg = stackgap_init(p->p_emul);
-	LINUX_CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
+	sg = stackgap_init(p, 0);
+	CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
 
 	SCARG(&oa, path) = SCARG(uap, path);
 	SCARG(&oa, flags) = O_CREAT | O_TRUNC | O_WRONLY;
@@ -177,14 +182,14 @@ linux_sys_open(p, v, retval)
 	struct sys_open_args boa;
 	caddr_t sg;
 
-	sg = stackgap_init(p->p_emul);
+	sg = stackgap_init(p, 0);
 
 	fl = linux_to_bsd_ioflags(SCARG(uap, flags));
 
 	if (fl & O_CREAT)
-		LINUX_CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
+		CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
 	else
-		LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+		CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&boa, path) = SCARG(uap, path);
 	SCARG(&boa, flags) = fl;
@@ -201,10 +206,12 @@ linux_sys_open(p, v, retval)
 	 */ 
         if (!(fl & O_NOCTTY) && SESS_LEADER(p) && !(p->p_flag & P_CONTROLT)) {
                 struct filedesc *fdp = p->p_fd;
-                struct file     *fp = fdp->fd_ofiles[*retval];
+                struct file     *fp;
+
+		fp = fd_getfile(fdp, *retval);
 
                 /* ignore any error, just give it a try */
-                if (fp->f_type == DTYPE_VNODE)
+                if (fp != NULL && fp->f_type == DTYPE_VNODE)
                         (fp->f_ops->fo_ioctl) (fp, TIOCSCTTY, (caddr_t) 0, p);
         }
 	return 0;
@@ -315,15 +322,62 @@ linux_sys_fcntl(p, v, retval)
 			return error;
 		retval[0] = bsd_to_linux_ioflags(retval[0]);
 		return 0;
-	case LINUX_F_SETFL:
+	case LINUX_F_SETFL: {
+		struct file	*fp = NULL;
+
 		val = linux_to_bsd_ioflags((unsigned long)SCARG(uap, arg));
+
+		/*
+		 * Linux seems to have same semantics for sending SIGIO to the
+		 * read side of socket, but slighly different semantics
+		 * for SIGIO to the write side.  Rather than sending the SIGIO
+		 * every time it's possible to write (directly) more data, it
+		 * only sends SIGIO if last write(2) failed due to insufficient
+		 * memory to hold the data. This is compatible enough
+		 * with NetBSD semantics to not do anything about the
+		 * difference.
+		 * 
+		 * Linux does NOT send SIGIO for pipes. Deal with socketpair
+		 * ones and DTYPE_PIPE ones. For these, we don't set
+		 * the underlying flags (we don't pass O_ASYNC flag down
+		 * to sys_fcntl()), but set the FASYNC flag for file descriptor,
+		 * so that F_GETFL would report the ASYNC i/o is on.
+		 */
+		if (val & O_ASYNC) {
+			if (((fp = fd_getfile(p->p_fd, fd)) == NULL))
+			    return (EBADF);
+
+			FILE_USE(fp);
+
+			if (((fp->f_type == DTYPE_SOCKET) && fp->f_data
+			      && ((struct socket *)fp->f_data)->so_state & SS_ISAPIPE)
+			    || (fp->f_type == DTYPE_PIPE))
+				val &= ~O_ASYNC;
+			else {
+				/* not a pipe, do not modify anything */
+				FILE_UNUSE(fp, p);
+				fp = NULL;
+			}
+		}
+
 		SCARG(&fca, fd) = fd;
 		SCARG(&fca, cmd) = F_SETFL;
 		SCARG(&fca, arg) = (caddr_t) val;
-		return sys_fcntl(p, &fca, retval);
+
+		error = sys_fcntl(p, &fca, retval);
+
+		/* Now set the FASYNC flag for pipes */
+		if (fp) {
+			if (!error)
+				fp->f_flag |= FASYNC;
+			FILE_UNUSE(fp, p);
+		}
+
+		return (error);
+	    }
 	case LINUX_F_GETLK:
-		sg = stackgap_init(p->p_emul);
-		bfp = (struct flock *) stackgap_alloc(&sg, sizeof *bfp);
+		sg = stackgap_init(p, 0);
+		bfp = (struct flock *) stackgap_alloc(p, &sg, sizeof *bfp);
 		if ((error = copyin(arg, &lfl, sizeof lfl)))
 			return error;
 		linux_to_bsd_flock(&lfl, &bfl);
@@ -338,46 +392,50 @@ linux_sys_fcntl(p, v, retval)
 			return error;
 		bsd_to_linux_flock(&bfl, &lfl);
 		return copyout(&lfl, arg, sizeof lfl);
-		break;
+
 	case LINUX_F_SETLK:
 	case LINUX_F_SETLKW:
 		cmd = (cmd == LINUX_F_SETLK ? F_SETLK : F_SETLKW);
 		if ((error = copyin(arg, &lfl, sizeof lfl)))
 			return error;
 		linux_to_bsd_flock(&lfl, &bfl);
-		sg = stackgap_init(p->p_emul);
-		bfp = (struct flock *) stackgap_alloc(&sg, sizeof *bfp);
+		sg = stackgap_init(p, 0);
+		bfp = (struct flock *) stackgap_alloc(p, &sg, sizeof *bfp);
 		if ((error = copyout(&bfl, bfp, sizeof bfl)))
 			return error;
-		SCARG(&fca, fd) = fd;
-		SCARG(&fca, cmd) = cmd;
-		SCARG(&fca, arg) = bfp;
-		return sys_fcntl(p, &fca, retval);
+		arg = (caddr_t)bfp;
 		break;
+
 	case LINUX_F_SETOWN:
 	case LINUX_F_GETOWN:	
 		/*
-		 * We need to route around the normal fcntl() for these calls,
-		 * since it uses TIOC{G,S}PGRP, which is too restrictive for
-		 * Linux F_{G,S}ETOWN semantics. For sockets, this problem
-		 * does not exist.
+		 * We need to route fcntl() for tty descriptors around normal
+		 * fcntl(), since NetBSD tty TIOC{G,S}PGRP semantics is too
+		 * restrictive for Linux F_{G,S}ETOWN. For non-tty descriptors,
+		 * this is not a problem.
 		 */
 		fdp = p->p_fd;
-		if ((u_int)fd >= fdp->fd_nfiles ||
-		    (fp = fdp->fd_ofiles[fd]) == NULL)
+		if ((fp = fd_getfile(fdp, fd)) == NULL)
 			return EBADF;
-		if (fp->f_type == DTYPE_SOCKET) {
+		/* FILE_USE() not needed here */
+		if (fp->f_type != DTYPE_VNODE) {
+	    notty:
+			/* Not a tty, proceed with common fcntl() */
 			cmd = cmd == LINUX_F_SETOWN ? F_SETOWN : F_GETOWN;
 			break;
 		}
+
+		/* check that the vnode is a tty */
 		vp = (struct vnode *)fp->f_data;
 		if (vp->v_type != VCHR)
-			return EINVAL;
+			goto notty;
 		if ((error = VOP_GETATTR(vp, &va, p->p_ucred, p)))
 			return error;
 		d_tty = cdevsw[major(va.va_rdev)].d_tty;
 		if (!d_tty || (!(tp = (*d_tty)(va.va_rdev))))
-			return EINVAL;
+			goto notty;
+
+		/* set tty pg_id appropriately */
 		if (cmd == LINUX_F_GETOWN) {
 			retval[0] = tp->t_pgrp ? tp->t_pgrp->pg_id : NO_PID;
 			return 0;
@@ -386,7 +444,7 @@ linux_sys_fcntl(p, v, retval)
 			pgid = -(long)arg;
 		} else {
 			struct proc *p1 = pfind((long)arg);
-			if (p1 == 0)
+			if (p1 == NULL)
 				return (ESRCH);
 			pgid = (long)p1->p_pgrp->pg_id;
 		}
@@ -395,6 +453,7 @@ linux_sys_fcntl(p, v, retval)
 			return EPERM;
 		tp->t_pgrp = pgrp;
 		return 0;
+
 	default:
 		return EOPNOTSUPP;
 	}
@@ -420,7 +479,7 @@ bsd_to_linux_stat(bsp, lsp)
 	struct linux_stat *lsp;
 {
 
-	lsp->lst_dev     = bsp->st_dev;
+	lsp->lst_dev     = linux_fakedev(bsp->st_dev, 0);
 	lsp->lst_ino     = bsp->st_ino;
 	lsp->lst_mode    = (linux_mode_t)bsp->st_mode;
 	if (bsp->st_nlink >= (1 << 15))
@@ -429,7 +488,7 @@ bsd_to_linux_stat(bsp, lsp)
 		lsp->lst_nlink = (linux_nlink_t)bsp->st_nlink;
 	lsp->lst_uid     = bsp->st_uid;
 	lsp->lst_gid     = bsp->st_gid;
-	lsp->lst_rdev    = linux_fakedev(bsp->st_rdev);
+	lsp->lst_rdev    = linux_fakedev(bsp->st_rdev, 1);
 	lsp->lst_size    = bsp->st_size;
 	lsp->lst_blksize = bsp->st_blksize;
 	lsp->lst_blocks  = bsp->st_blocks;
@@ -458,9 +517,9 @@ linux_sys_fstat(p, v, retval)
 	caddr_t sg;
 	int error;
 
-	sg = stackgap_init(p->p_emul);
+	sg = stackgap_init(p, 0);
 
-	st = stackgap_alloc(&sg, sizeof (struct stat));
+	st = stackgap_alloc(p, &sg, sizeof (struct stat));
 
 	SCARG(&fsa, fd) = SCARG(uap, fd);
 	SCARG(&fsa, sb) = st;
@@ -493,9 +552,12 @@ linux_stat1(p, v, retval, dolstat)
 	int error;
 	struct linux_sys_stat_args *uap = v;
 
-	sg = stackgap_init(p->p_emul);
-	st = stackgap_alloc(&sg, sizeof (struct stat));
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	sg = stackgap_init(p, 0);
+	st = stackgap_alloc(p, &sg, sizeof (struct stat));
+	if (dolstat)
+		CHECK_ALT_SYMLINK(p, &sg, SCARG(uap, path));
+	else
+		CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&sa, ub) = st;
 	SCARG(&sa, path) = SCARG(uap, path);
@@ -558,9 +620,9 @@ linux_sys_access(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(int) flags;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	return sys_access(p, uap, retval);
 }
@@ -575,9 +637,9 @@ linux_sys_unlink(p, v, retval)
 	struct linux_sys_unlink_args /* {
 		syscallarg(const char *) path;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	return sys_unlink(p, uap, retval);
 }
@@ -591,9 +653,9 @@ linux_sys_chdir(p, v, retval)
 	struct linux_sys_chdir_args /* {
 		syscallarg(const char *) path;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	return sys_chdir(p, uap, retval);
 }
@@ -609,13 +671,13 @@ linux_sys_mknod(p, v, retval)
 		syscallarg(int) mode;
 		syscallarg(int) dev;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 	struct sys_mkfifo_args bma;
 
-	LINUX_CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
+	CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
 
 	/*
-	 * BSD handles FIFOs seperately
+	 * BSD handles FIFOs separately
 	 */
 	if (SCARG(uap, mode) & S_IFIFO) {
 		SCARG(&bma, path) = SCARG(uap, path);
@@ -635,28 +697,29 @@ linux_sys_chmod(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(int) mode;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	return sys_chmod(p, uap, retval);
 }
 
+#if defined(__i386__) || defined(__m68k__) || defined(__arm__)
 int
-linux_sys_chown(p, v, retval)
+linux_sys_chown16(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_chown_args /* {
+	struct linux_sys_chown16_args /* {
 		syscallarg(const char *) path;
 		syscallarg(int) uid;
 		syscallarg(int) gid;
 	} */ *uap = v;
 	struct sys___posix_chown_args bca;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&bca, path) = SCARG(uap, path);
 	SCARG(&bca, uid) = ((linux_uid_t)SCARG(uap, uid) == (linux_uid_t)-1) ?
@@ -668,12 +731,12 @@ linux_sys_chown(p, v, retval)
 }
 
 int
-linux_sys_fchown(p, v, retval)
+linux_sys_fchown16(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_fchown_args /* {
+	struct linux_sys_fchown16_args /* {
 		syscallarg(int) fd;
 		syscallarg(int) uid;
 		syscallarg(int) gid;
@@ -690,6 +753,51 @@ linux_sys_fchown(p, v, retval)
 }
 
 int
+linux_sys_lchown16(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_lchown16_args /* {
+		syscallarg(char *) path;
+		syscallarg(int) uid;
+		syscallarg(int) gid;
+	} */ *uap = v;
+	struct sys___posix_lchown_args bla;
+	caddr_t sg = stackgap_init(p, 0);
+
+	CHECK_ALT_SYMLINK(p, &sg, SCARG(uap, path));
+
+	SCARG(&bla, path) = SCARG(uap, path);
+	SCARG(&bla, uid) = ((linux_uid_t)SCARG(uap, uid) == (linux_uid_t)-1) ?
+		(uid_t)-1 : SCARG(uap, uid);
+	SCARG(&bla, gid) = ((linux_gid_t)SCARG(uap, gid) == (linux_gid_t)-1) ?
+		(gid_t)-1 : SCARG(uap, gid);
+
+	return sys___posix_lchown(p, &bla, retval);
+}
+#endif /* __i386__ || __m68k__ || __arm__ */
+#if defined (__i386__) || defined (__m68k__) || \
+    defined (__powerpc__) || defined (__mips__) || defined(__arm__)
+int
+linux_sys_chown(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_chown_args /* {
+		syscallarg(char *) path;
+		syscallarg(int) uid;
+		syscallarg(int) gid;
+	} */ *uap = v;
+	caddr_t sg = stackgap_init(p, 0);
+
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+
+	return sys___posix_chown(p, uap, retval);
+}
+
+int
 linux_sys_lchown(p, v, retval)
 	struct proc *p;
 	void *v;
@@ -700,17 +808,14 @@ linux_sys_lchown(p, v, retval)
 		syscallarg(int) uid;
 		syscallarg(int) gid;
 	} */ *uap = v;
-	struct sys___posix_lchown_args bla;
+	caddr_t sg = stackgap_init(p, 0);
 
-	SCARG(&bla, path) = SCARG(uap, path);
-	SCARG(&bla, uid) = ((linux_uid_t)SCARG(uap, uid) == (linux_uid_t)-1) ?
-		(uid_t)-1 : SCARG(uap, uid);
-	SCARG(&bla, gid) = ((linux_gid_t)SCARG(uap, gid) == (linux_gid_t)-1) ?
-		(gid_t)-1 : SCARG(uap, gid);
+	CHECK_ALT_SYMLINK(p, &sg, SCARG(uap, path));
 
-	return sys___posix_lchown(p, &bla, retval);
+	return sys___posix_lchown(p, uap, retval);
 }
-	
+#endif /* __i386__ || __m68k__ || __powerpc__ || __mips__ || __arm__ */
+
 int
 linux_sys_rename(p, v, retval)
 	struct proc *p;
@@ -721,10 +826,10 @@ linux_sys_rename(p, v, retval)
 		syscallarg(const char *) from;
 		syscallarg(const char *) to;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, from));
-	LINUX_CHECK_ALT_CREAT(p, &sg, SCARG(uap, to));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, from));
+	CHECK_ALT_CREAT(p, &sg, SCARG(uap, to));
 
 	return sys___posix_rename(p, uap, retval);
 }
@@ -739,9 +844,9 @@ linux_sys_mkdir(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(int) mode;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
+	CHECK_ALT_CREAT(p, &sg, SCARG(uap, path));
 
 	return sys_mkdir(p, uap, retval);
 }
@@ -755,9 +860,9 @@ linux_sys_rmdir(p, v, retval)
 	struct linux_sys_rmdir_args /* {
 		syscallarg(const char *) path;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	return sys_rmdir(p, uap, retval);
 }
@@ -772,10 +877,10 @@ linux_sys_symlink(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(const char *) to;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
-	LINUX_CHECK_ALT_CREAT(p, &sg, SCARG(uap, to));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_CREAT(p, &sg, SCARG(uap, to));
 
 	return sys_symlink(p, uap, retval);
 }
@@ -790,10 +895,10 @@ linux_sys_link(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(const char *) link;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
-	LINUX_CHECK_ALT_CREAT(p, &sg, SCARG(uap, link));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_CREAT(p, &sg, SCARG(uap, link));
 
 	return sys_link(p, uap, retval);
 }
@@ -809,9 +914,9 @@ linux_sys_readlink(p, v, retval)
 		syscallarg(char *) buf;
 		syscallarg(int) count;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, name));
+	CHECK_ALT_SYMLINK(p, &sg, SCARG(uap, name));
 
 	return sys_readlink(p, uap, retval);
 }
@@ -826,9 +931,9 @@ linux_sys_truncate(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(long) length;
 	} */ *uap = v;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	return compat_43_sys_truncate(p, uap, retval);
 }
@@ -869,9 +974,6 @@ linux_sys_pread(p, v, retval)
 		syscallarg(linux_off_t) offset;
 	} */ *uap = v;
 	struct sys_pread_args pra;
-	caddr_t sg;
-
-	sg = stackgap_init(p->p_emul);
 
 	SCARG(&pra, fd) = SCARG(uap, fd);
 	SCARG(&pra, buf) = SCARG(uap, buf);
@@ -897,9 +999,6 @@ linux_sys_pwrite(p, v, retval)
 		syscallarg(linux_off_t) offset;
 	} */ *uap = v;
 	struct sys_pwrite_args pra;
-	caddr_t sg;
-
-	sg = stackgap_init(p->p_emul);
 
 	SCARG(&pra, fd) = SCARG(uap, fd);
 	SCARG(&pra, buf) = SCARG(uap, buf);

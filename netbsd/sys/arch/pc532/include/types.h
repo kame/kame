@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.23 2000/05/16 05:45:49 thorpej Exp $	*/
+/*	$NetBSD: types.h,v 1.26 2001/11/29 08:40:59 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -39,6 +39,7 @@
 #define	_MACHINE_TYPES_H_
 
 #include <sys/cdefs.h>
+#include <machine/int_types.h>
 
 #if defined(_KERNEL)
 typedef struct label_t {
@@ -54,25 +55,9 @@ typedef unsigned long	vaddr_t;
 typedef unsigned long	vsize_t;
 #endif
 
-/*
- * Basic integral types.  Omit the typedef if
- * not possible for a machine/compiler combination.
- */
-#define	__BIT_TYPES_DEFINED__
-typedef	__signed char		   int8_t;
-typedef	unsigned char		 u_int8_t;
-typedef	short			  int16_t;
-typedef	unsigned short		u_int16_t;
-typedef	int			  int32_t;
-typedef	unsigned int		u_int32_t;
-/* LONGLONG */
-typedef	long long		  int64_t;
-/* LONGLONG */
-typedef	unsigned long long	u_int64_t;
+typedef int		register_t;
 
-typedef int32_t			register_t;
-
-#define __BROKEN_CONFIG_UNIT_USAGE
-#define	__BROKEN_DK_ESTABLISH
+#define	__BROKEN_CONFIG_UNIT_USAGE
+#define	__HAVE_DEVICE_REGISTER
 
 #endif	/* _MACHTYPES_H_ */

@@ -1,4 +1,4 @@
-/* $NetBSD: clock.c,v 1.29 2000/06/05 21:47:10 thorpej Exp $ */
+/* $NetBSD: clock.c,v 1.31 2001/05/27 13:53:24 sommerfeld Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -44,7 +44,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.29 2000/06/05 21:47:10 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.31 2001/05/27 13:53:24 sommerfeld Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -74,10 +74,6 @@ __KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.29 2000/06/05 21:47:10 thorpej Exp $");
 #define UNIX_YEAR_OFFSET 52 /* 41=>1993, 12=>2064 */
 #else
 #define UNIX_YEAR_OFFSET 0
-#endif
-
-#ifdef NTP
-extern long time_precision;	/* kern_clock.c; clock resolution in microseconds. */
 #endif
 
 struct device *clockdev;
@@ -133,13 +129,6 @@ cpu_initclocks()
 		tickfix >>= (ftp - 1);
 		tickfixinterval = hz >> (ftp - 1);
         }
-#ifdef NTP
-	/*
-	 * Since we don't have a "real" microtime, our actual
-	 * precision is limited to the hardclock interrupt rate.
-	 */
-	time_precision = tick;
-#endif
 
 	/*
 	 * Establish the clock interrupt; it's a special case.
@@ -234,6 +223,8 @@ inittodr(base)
 #ifdef DEBUG
 	printf("=>%ld (%d)\n", time.tv_sec, base);
 #endif
+	microset_time = time;
+	microset(curcpu(), NULL);
 
 	if (!badbase) {
 		/*
@@ -269,6 +260,12 @@ resettodr()
 	if (!clockinitted)
 		return;
 
+	microset_time = time;
+#if defined(MULTIPROCESSOR)
+	alpha_multicast_ipi(cpus_running, ALPHA_IPI_MICROSET);
+#endif	
+	microset(curcpu(), NULL);
+	
 	clock_secs_to_ymdhms(time.tv_sec, &dt);
 
 	/* rt clock wants 2 digits */

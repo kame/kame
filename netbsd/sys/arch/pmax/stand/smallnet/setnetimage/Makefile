@@ -1,7 +1,7 @@
-# $NetBSD: Makefile,v 1.1 1999/05/13 08:38:05 simonb Exp $
+# $NetBSD: Makefile,v 1.5 2002/04/12 05:11:18 lukem Exp $
 
 PROG=	setnetimage
-MKMAN=	no
+NOMAN=	# defined
 WARNS?=	1
 
 MDSIDIR=${.CURDIR}/../../../../../../usr.sbin/mdsetimage
@@ -18,15 +18,16 @@ kernel:
 	@echo set KERNEL first!
 	@false
 .else
-SNDIR!=	cd ${.CURDIR}/.. ; make print-objdir
+.include <bsd.own.mk>
+
+SNDIR!=	cd ${.CURDIR}/.. && ${PRINTOBJDIR}
 
 smallnet.elf: ${SNDIR}/smallnet
 	cp -p ${.ALLSRC} ${.TARGET}
 
 kernel: smallnet.elf
 	./${PROG} ${KERNEL} ${.ALLSRC}
-	elf2ecoff smallnet.elf smallnet
+	${ELF2ECOFF} smallnet.elf smallnet
 .endif
-	
 
 .include <bsd.prog.mk>

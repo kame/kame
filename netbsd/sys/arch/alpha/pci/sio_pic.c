@@ -1,4 +1,4 @@
-/* $NetBSD: sio_pic.c,v 1.28 2000/06/06 03:10:13 thorpej Exp $ */
+/* $NetBSD: sio_pic.c,v 1.30 2001/07/27 00:25:21 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -66,7 +66,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: sio_pic.c,v 1.28 2000/06/06 03:10:13 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sio_pic.c,v 1.30 2001/07/27 00:25:21 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -121,8 +121,15 @@ static struct alpha_shared_intr *sio_intr;
  * If prom console is broken, must remember the initial interrupt
  * settings and enforce them.  WHEE!
  */
+#define	INITIALLY_ENABLED(irq)						\
+	((initial_ocw1[(irq) / 8] & (1 << ((irq) % 8))) == 0)
+#define	INITIALLY_LEVEL_TRIGGERED(irq)					\
+	((initial_elcr[(irq) / 8] & (1 << ((irq) % 8))) != 0)
 u_int8_t initial_ocw1[2];
 u_int8_t initial_elcr[2];
+#else
+#define	INITIALLY_ENABLED(irq)		((irq) == 2 ? 1 : 0)
+#define	INITIALLY_LEVEL_TRIGGERED(irq)	0
 #endif
 
 void		sio_setirqstat __P((int, int, int));
@@ -384,7 +391,10 @@ sio_intr_setup(pc, iot)
 			 * IRQs 0, 1, 8, and 13 must always be
 			 * edge-triggered.
 			 */
-			sio_setirqstat(i, 0, IST_EDGE);
+			if (INITIALLY_LEVEL_TRIGGERED(i))
+				printf("sio_intr_setup: %d level-triggered\n",
+				    i);
+			sio_setirqstat(i, INITIALLY_ENABLED(i), IST_EDGE);
 			alpha_shared_intr_set_dfltsharetype(sio_intr, i,
 			    IST_EDGE);
 			specific_eoi(i);
@@ -405,9 +415,12 @@ sio_intr_setup(pc, iot)
 			 * Otherwise, disable the IRQ and set its
 			 * type to (effectively) "unknown."
 			 */
-			sio_setirqstat(i, 0, IST_NONE);
+			sio_setirqstat(i, INITIALLY_ENABLED(i),
+			    INITIALLY_LEVEL_TRIGGERED(i) ?
+			    IST_LEVEL : IST_NONE);
 			alpha_shared_intr_set_dfltsharetype(sio_intr, i,
-			    IST_NONE);
+			    INITIALLY_LEVEL_TRIGGERED(i) ?
+			    IST_LEVEL : IST_NONE);
 			specific_eoi(i);
 			break;
 		}
@@ -471,9 +484,12 @@ sio_intr_establish(v, irq, type, level, fn, arg)
 	cookie = alpha_shared_intr_establish(sio_intr, irq, type, level, fn,
 	    arg, "isa irq");
 
-	if (cookie)
-		sio_setirqstat(irq, alpha_shared_intr_isactive(sio_intr, irq),
+	if (cookie != NULL &&
+	    alpha_shared_intr_firstactive(sio_intr, irq)) {
+		scb_set(0x800 + SCB_IDXTOVEC(irq), sio_iointr, NULL);
+		sio_setirqstat(irq, 1,
 		    alpha_shared_intr_get_sharetype(sio_intr, irq));
+	}
 
 	return (cookie);
 }
@@ -516,24 +532,29 @@ sio_intr_disestablish(v, cookie)
 			break;
 
 		default:
-			ist = IST_NONE;
+			ist = INITIALLY_LEVEL_TRIGGERED(irq) ?
+			    IST_LEVEL : IST_NONE;
 			break;
 		}
-		sio_setirqstat(irq, 0, ist);
+		sio_setirqstat(irq, INITIALLY_ENABLED(irq), ist);
 		alpha_shared_intr_set_dfltsharetype(sio_intr, irq, ist);
+
+		/* Release our SCB vector. */
+		scb_free(0x800 + SCB_IDXTOVEC(irq));
 	}
 
 	splx(s);
 }
 
 void
-sio_iointr(framep, vec)
-	void *framep;
+sio_iointr(arg, vec)
+	void *arg;
 	unsigned long vec;
 {
 	int irq;
 
-	irq = (vec - 0x800) >> 4;
+	irq = SCB_VECTOIDX(vec - 0x800);
+
 #ifdef DIAGNOSTIC
 	if (irq > ICU_LEN || irq < 0)
 		panic("sio_iointr: irq out of range (%d)", irq);

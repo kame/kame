@@ -1,4 +1,4 @@
-/*	$NetBSD: akbd.c,v 1.9.2.2 2000/09/22 11:37:54 scottr Exp $	*/
+/*	$NetBSD: akbd.c,v 1.13 2002/03/17 19:40:43 atatat Exp $	*/
 
 /*
  * Copyright (C) 1998	Colin Wood
@@ -40,6 +40,7 @@
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 
 #include "aed.h"
 #include "wskbd.h"
@@ -495,14 +496,14 @@ akbd_ioctl(v, cmd, data, flag, p)
 	case WSKBDIO_BELL:
 	case WSKBDIO_COMPLEXBELL:
 #define d ((struct wskbd_bell_data *)data)
-		mac68k_ring_bell(d->pitch, d->period * HZ / 1000, 100);
+		mac68k_ring_bell(d->pitch, d->period * hz / 1000, 100);
 		/* comes in as msec, goes out as ticks; volume ignored */
 #undef d
 		return (0);
 	}
 	/* kbdioctl(...); */
 
-	return -1;
+	return EPASSTHROUGH;
 }
 
 static int polledkey;

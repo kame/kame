@@ -1,4 +1,4 @@
-/*	$NetBSD: ascvar.h,v 1.5.4.1 2000/06/30 16:27:28 simonb Exp $	*/
+/*	$NetBSD: ascvar.h,v 1.6 2000/06/26 04:55:48 simonb Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds.  All rights reserved.

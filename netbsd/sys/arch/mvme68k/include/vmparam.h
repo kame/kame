@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.14 2000/02/11 19:30:28 thorpej Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.22 2001/11/15 18:06:15 soren Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -50,6 +50,24 @@
  */
 
 /*
+ * We use 4K pages on the mvme68k.  Override the PAGE_* definitions
+ * to be compile-time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
+/*
+ * Need a small pager map for the benefit of low-memory models.
+ * To avoid using a needlessly small value on larger memory models,
+ * this is calculated at runtime.
+ */
+#ifndef PAGER_MAP_SIZE
+extern int mvme68k_pager_map_size;
+#define PAGER_MAP_SIZE	((vsize_t) mvme68k_pager_map_size)
+#endif
+
+/*
  * USRTEXT is the start of the user text/data space, while USRSTACK
  * is the top (end) of the user stack.  LOWPAGES and HIGHPAGES are
  * the number of pages from the beginning of the P0 region to the
@@ -75,7 +93,7 @@
 #define	MAXTSIZ		(8*1024*1024)		/* max text size */
 #endif
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(16*1024*1024)		/* initial data size limit */
+#define	DFLDSIZ		(32*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
 #define	MAXDSIZ		(64*1024*1024)		/* max data size */
@@ -111,17 +129,6 @@
 #endif
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
@@ -138,9 +145,6 @@
 /* # of kernel PT pages (initial only, can grow dynamically) */
 #define VM_KERNEL_PT_PAGES	((vsize_t)2)		/* XXX: SYSPTSIZE */
 
-/* pcb base */
-#define	pcbb(p)		((u_int)(p)->p_addr)
-
 /*
  * Constants which control the way the VM system deals with memory segments.
  * The mvme68k port has two physical memory segments: 1 for onboard RAM
@@ -153,6 +157,8 @@
 #define	VM_NFREELIST		2
 #define	VM_FREELIST_DEFAULT	0
 #define	VM_FREELIST_VMEMEM	1
+
+#define	__HAVE_PMAP_PHYSSEG
 
 /*
  * pmap-specific data stored in the vm_physmem[] array.

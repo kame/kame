@@ -1,4 +1,4 @@
-/*	$NetBSD: vm86.c,v 1.22.24.2 2001/06/17 20:41:31 he Exp $	*/
+/*	$NetBSD: vm86.c,v 1.26 2002/03/29 17:07:06 christos Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm86.c,v 1.26 2002/03/29 17:07:06 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -195,14 +198,14 @@ vm86_return(p, retval)
 	 * since it's used to jump to the signal handler.  Instead we
 	 * let sendsig() pull in the vm86_eflags bits.
 	 */
-	if (sigismember(&p->p_sigmask, SIGURG)) {
+	if (sigismember(&p->p_sigctx.ps_sigmask, SIGURG)) {
 #ifdef DIAGNOSTIC
 		printf("pid %d killed on VM86 protocol screwup (SIGURG blocked)\n",
 		    p->p_pid);
 #endif
 		sigexit(p, SIGILL);
 		/* NOTREACHED */
-	} else if (sigismember(&p->p_sigignore, SIGURG)) {
+	} else if (sigismember(&p->p_sigctx.ps_sigignore, SIGURG)) {
 #ifdef DIAGNOSTIC
 		printf("pid %d killed on VM86 protocol screwup (SIGURG ignored)\n",
 		    p->p_pid);
@@ -210,7 +213,7 @@ vm86_return(p, retval)
 		sigexit(p, SIGILL);
 	}
 	
-	trapsignal(p, SIGURG, retval);
+	(*p->p_emul->e_trapsignal)(p, SIGURG, retval);
 }
 
 #define	CLI	0xFA
@@ -326,7 +329,7 @@ vm86_gpfault(p, type)
 	}
 
 	if (trace && tf->tf_eflags & PSL_VM)
-		trapsignal(p, SIGTRAP, T_TRCTRAP);
+		(*p->p_emul->e_trapsignal)(p, SIGTRAP, T_TRCTRAP);
 	return;
 
 bad:
@@ -397,7 +400,7 @@ i386_vm86(p, args, retval)
 #undef	DOREG
 
 	/* Going into vm86 mode jumps off the signal stack. */
-	p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+	p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	set_vflags(p, vm86s.regs.vmsc.sc_eflags | PSL_VM);
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_cdrom.h,v 1.4.6.1 2001/03/30 21:38:32 he Exp $	*/
+/*	$NetBSD: linux_cdrom.h,v 1.5 2000/12/10 14:12:16 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_node.c,v 1.33.4.1 2000/12/14 23:37:05 he Exp $	*/
+/*	$NetBSD: nfs_node.c,v 1.53 2002/03/16 23:05:25 chs Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -38,6 +38,10 @@
  *	@(#)nfs_node.c	8.6 (Berkeley) 5/22/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_node.c,v 1.53 2002/03/16 23:05:25 chs Exp $");
+
+#include "opt_nfs.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +53,7 @@
 #include <sys/malloc.h>
 #include <sys/pool.h>
 #include <sys/lock.h>
+#include <sys/hash.h>
 
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -65,8 +70,22 @@ struct lock nfs_hashlock;
 struct pool nfs_node_pool;		/* memory pool for nfs nodes */
 struct pool nfs_vattr_pool;		/* memory pool for nfs vattrs */
 
+extern int prtactive;
+
 #define TRUE	1
 #define	FALSE	0
+
+#define	nfs_hash(x,y)	hash32_buf((x), (y), HASH32_BUF_INIT)
+
+void nfs_gop_size(struct vnode *, off_t, off_t *);
+int nfs_gop_alloc(struct vnode *, off_t, off_t, int, struct ucred *);
+int nfs_gop_write(struct vnode *, struct vm_page **, int, int);
+
+struct genfs_ops nfs_genfsops = {
+	nfs_gop_size,
+	nfs_gop_alloc,
+	nfs_gop_write,
+};
 
 /*
  * Initialize hash links for nfsnodes
@@ -76,13 +95,45 @@ void
 nfs_nhinit()
 {
 
-	nfsnodehashtbl = hashinit(desiredvnodes, M_NFSNODE, M_WAITOK, &nfsnodehash);
+	nfsnodehashtbl = hashinit(desiredvnodes, HASH_LIST, M_NFSNODE,
+	    M_WAITOK, &nfsnodehash);
 	lockinit(&nfs_hashlock, PINOD, "nfs_hashlock", 0, 0);
 
 	pool_init(&nfs_node_pool, sizeof(struct nfsnode), 0, 0, 0, "nfsnodepl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_NFSNODE);
+	    &pool_allocator_nointr);
 	pool_init(&nfs_vattr_pool, sizeof(struct vattr), 0, 0, 0, "nfsvapl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_NFSNODE);
+	    &pool_allocator_nointr);
+}
+
+/*
+ * Reinitialize inode hash table.
+ */
+
+void
+nfs_nhreinit()
+{
+	struct nfsnode *np;
+	struct nfsnodehashhead *oldhash, *hash;
+	u_long oldmask, mask, val;
+	int i;
+
+	hash = hashinit(desiredvnodes, HASH_LIST, M_NFSNODE, M_WAITOK,
+	    &mask);
+	
+	lockmgr(&nfs_hashlock, LK_EXCLUSIVE, NULL);
+	oldhash = nfsnodehashtbl;
+	oldmask = nfsnodehash;
+	nfsnodehashtbl = hash;
+	nfsnodehash = mask;
+	for (i = 0; i <= oldmask; i++) {
+		while ((np = LIST_FIRST(&oldhash[i])) != NULL) {
+			LIST_REMOVE(np, n_hash);
+			val = NFSNOHASH(nfs_hash(np->n_fhp, np->n_fhsize));
+			LIST_INSERT_HEAD(&hash[val], np, n_hash);
+		}
+	}
+	lockmgr(&nfs_hashlock, LK_RELEASE, NULL);
+	hashdone(oldhash, M_NFSNODE);
 }
 
 /*
@@ -94,25 +145,6 @@ nfs_nhdone()
 	hashdone(nfsnodehashtbl, M_NFSNODE);
 	pool_destroy(&nfs_node_pool);
 	pool_destroy(&nfs_vattr_pool);
-}
-
-/*
- * Compute an entry in the NFS hash table structure
- */
-u_long
-nfs_hash(fhp, fhsize)
-	nfsfh_t *fhp;
-	int fhsize;
-{
-	u_char *fhpp;
-	u_long fhsum;
-	int i;
-
-	fhpp = &fhp->fh_bytes[0];
-	fhsum = 0;
-	for (i = 0; i < fhsize; i++)
-		fhsum += *fhpp++;
-	return (fhsum);
 }
 
 /*
@@ -134,11 +166,11 @@ nfs_nget(mntp, fhp, fhsize, npp)
 	struct vnode *nvp;
 	int error;
 
-	nhpp = NFSNOHASH(nfs_hash(fhp, fhsize));
+	nhpp = &nfsnodehashtbl[NFSNOHASH(nfs_hash(fhp, fhsize))];
 loop:
-	for (np = nhpp->lh_first; np != 0; np = np->n_hash.le_next) {
+	LIST_FOREACH(np, nhpp, n_hash) {
 		if (mntp != NFSTOV(np)->v_mount || np->n_fhsize != fhsize ||
-		    memcmp((caddr_t)fhp, (caddr_t)np->n_fhp, fhsize))
+		    memcmp(fhp, np->n_fhp, fhsize))
 			continue;
 		vp = NFSTOV(np);
 		if (vget(vp, LK_EXCLUSIVE))
@@ -154,27 +186,35 @@ loop:
 		lockmgr(&nfs_hashlock, LK_RELEASE, 0);
 		return (error);
 	}
-	nvp->v_vnlock = 0;	/* XXX At least untill we do locking */
 	vp = nvp;
 	np = pool_get(&nfs_node_pool, PR_WAITOK);
-	memset((caddr_t)np, 0, sizeof *np);
+	memset(np, 0, sizeof *np);
 	lockinit(&np->n_commitlock, PINOD, "nfsclock", 0, 0);
 	vp->v_data = np;
 	np->n_vnode = vp;
+	genfs_node_init(vp, &nfs_genfsops);
+
 	/*
 	 * Insert the nfsnode in the hash queue for its new file handle
 	 */
+
 	LIST_INSERT_HEAD(nhpp, np, n_hash);
 	if (fhsize > NFS_SMALLFH) {
-		MALLOC(np->n_fhp, nfsfh_t *, fhsize, M_NFSBIGFH, M_WAITOK);
+		np->n_fhp = malloc(fhsize, M_NFSBIGFH, M_WAITOK);
 	} else
 		np->n_fhp = &np->n_fh;
-	memcpy((caddr_t)np->n_fhp, (caddr_t)fhp, fhsize);
+	memcpy(np->n_fhp, fhp, fhsize);
 	np->n_fhsize = fhsize;
 	np->n_accstamp = -1;
 	np->n_vattr = pool_get(&nfs_vattr_pool, PR_WAITOK);
-	memset(np->n_vattr, 0, sizeof (struct vattr));
-	lockmgr(&nfs_hashlock, LK_RELEASE, 0);
+	lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
+	lockmgr(&nfs_hashlock, LK_RELEASE, NULL);
+	error = VOP_GETATTR(vp, np->n_vattr, curproc->p_ucred, curproc);
+	if (error) {
+		vput(vp);
+		return error;
+	}
+	uvm_vnp_setsize(vp, np->n_vattr->va_size);
 	*npp = np;
 	return (0);
 }
@@ -190,46 +230,33 @@ nfs_inactive(v)
 	struct nfsnode *np;
 	struct sillyrename *sp;
 	struct proc *p = ap->a_p;
-	extern int prtactive;
+	struct vnode *vp = ap->a_vp;
 
-	np = VTONFS(ap->a_vp);
-	if (prtactive && ap->a_vp->v_usecount != 0)
-		vprint("nfs_inactive: pushing active", ap->a_vp);
-	if (ap->a_vp->v_type != VDIR) {
+	np = VTONFS(vp);
+	if (prtactive && vp->v_usecount != 0)
+		vprint("nfs_inactive: pushing active", vp);
+	if (vp->v_type != VDIR) {
 		sp = np->n_sillyrename;
 		np->n_sillyrename = (struct sillyrename *)0;
 	} else
-		sp = (struct sillyrename *)0;
-	if (sp) {
-		/*
-		 * If the usecount is greater than zero, then we are
-		 * being inactivated by a forcible unmount and do not
-		 * have to get our own reference. In the normal case,
-		 * we need a reference to keep the vnode from being
-		 * recycled by getnewvnode while we do the I/O
-		 * associated with discarding the buffers.
-		 */
-		if (ap->a_vp->v_usecount > 0)
-			(void) nfs_vinvalbuf(ap->a_vp, 0, sp->s_cred, p, 1);
-		else if (vget(ap->a_vp, 0))
-                        panic("nfs_inactive: lost vnode");
-		else {
-			(void) nfs_vinvalbuf(ap->a_vp, 0, sp->s_cred, p, 1);
-			vrele(ap->a_vp);
-		}
-
+		sp = NULL;
+	if (sp != NULL)
+		nfs_vinvalbuf(vp, 0, sp->s_cred, p, 1);
+	np->n_flag &= (NMODIFIED | NFLUSHINPROG | NFLUSHWANT | NQNFSEVICTED |
+		NQNFSNONCACHE | NQNFSWRITE);
+	VOP_UNLOCK(vp, 0);
+	if (sp != NULL) {
 
 		/*
 		 * Remove the silly file that was rename'd earlier
 		 */
+
+		vn_lock(sp->s_dvp, LK_EXCLUSIVE | LK_RETRY);
 		nfs_removeit(sp);
 		crfree(sp->s_cred);
-		vrele(sp->s_dvp);
-		FREE((caddr_t)sp, M_NFSREQ);
+		vput(sp->s_dvp);
+		FREE(sp, M_NFSREQ);
 	}
-	np->n_flag &= (NMODIFIED | NFLUSHINPROG | NFLUSHWANT | NQNFSEVICTED |
-		NQNFSNONCACHE | NQNFSWRITE);
-	VOP_UNLOCK(ap->a_vp, 0);
 	return (0);
 }
 
@@ -246,7 +273,6 @@ nfs_reclaim(v)
 	struct vnode *vp = ap->a_vp;
 	struct nfsnode *np = VTONFS(vp);
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
-	extern int prtactive;
 
 	if (prtactive && vp->v_usecount != 0)
 		vprint("nfs_reclaim: pushing active", vp);
@@ -270,12 +296,42 @@ nfs_reclaim(v)
 		FREE(np->n_dircache, M_NFSDIROFF);
 	}
 	if (np->n_fhsize > NFS_SMALLFH) {
-		FREE((caddr_t)np->n_fhp, M_NFSBIGFH);
+		free(np->n_fhp, M_NFSBIGFH);
 	}
 
 	pool_put(&nfs_vattr_pool, np->n_vattr);
+	if (np->n_rcred) {
+		crfree(np->n_rcred);
+	}
+	if (np->n_wcred) {
+		crfree(np->n_wcred);
+	}
 	cache_purge(vp);
 	pool_put(&nfs_node_pool, vp->v_data);
-	vp->v_data = (void *)0;
+	vp->v_data = NULL;
 	return (0);
+}
+
+void
+nfs_gop_size(struct vnode *vp, off_t size, off_t *eobp)
+{
+	*eobp = MAX(size, vp->v_size);
+}
+
+int
+nfs_gop_alloc(struct vnode *vp, off_t off, off_t len, int flags,
+    struct ucred *cred)
+{
+	return 0;
+}
+
+int
+nfs_gop_write(struct vnode *vp, struct vm_page **pgs, int npages, int flags)
+{
+	int i;
+
+	for (i = 0; i < npages; i++) {
+		pmap_page_protect(pgs[i], VM_PROT_READ);
+	}
+	return genfs_gop_write(vp, pgs, npages, flags);
 }

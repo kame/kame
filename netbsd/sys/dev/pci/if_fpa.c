@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fpa.c,v 1.30 2000/03/30 12:45:34 augustss Exp $	*/
+/*	$NetBSD: if_fpa.c,v 1.38 2002/01/14 13:39:15 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1996 Matt Thomas <matt@3am-software.com>
@@ -10,7 +10,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -32,6 +32,9 @@
  *
  *   This module supports the DEC DEFPA PCI FDDI Controller
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_fpa.c,v 1.38 2002/01/14 13:39:15 tsutsui Exp $");
 
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -62,21 +65,14 @@
 #include <net/bpfdesc.h>
 #endif
 
-#ifdef INET
-#include <netinet/in.h>
-#endif
-
 #if defined(__FreeBSD__)
 #include <netinet/if_fddi.h>
 #else
 #include <net/if_fddi.h>
 #endif
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
-
 #if defined(__FreeBSD__)
+#include <vm/vm.h>
 #include "fpa.h"
 #include <netinet/if_ether.h>
 #include <pci/pcivar.h>
@@ -209,11 +205,10 @@ pdq_pci_attach(
 	pci_conf_write(config_id, PCI_CFLT, data);
     }
 
-    sc = (pdq_softc_t *) malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT);
+    sc = (pdq_softc_t *) malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT|M_ZERO);
     if (sc == NULL)
 	return;
 
-    bzero(sc, sizeof(pdq_softc_t));	/* Zero out the softc*/
     if (!pci_map_mem(config_id, PCI_CBMA, &va_csrs, &pa_csrs)) {
 	free((void *) sc, M_DEVBUF);
 	return;
@@ -434,7 +429,7 @@ pdq_pci_attach(
 	pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_CFLT, data);
     }
 
-    bcopy(sc->sc_dev.dv_xname, sc->sc_if.if_xname, IFNAMSIZ);
+    strcpy(sc->sc_if.if_xname, sc->sc_dev.dv_xname);
     sc->sc_if.if_flags = 0;
     sc->sc_if.if_softc = sc;
 
@@ -484,8 +479,7 @@ pdq_pci_attach(
 
     pdq_ifattach(sc, pdq_pci_ifwatchdog);
 
-    if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-		     pa->pa_intrline, &intrhandle)) {
+    if (pci_intr_map(pa, &intrhandle)) {
 	printf("%s: couldn't map interrupt\n", self->dv_xname);
 	return;
     }

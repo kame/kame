@@ -1,4 +1,4 @@
-/* $NetBSD: pci_machdep.h,v 1.1 2000/06/09 05:33:04 soda Exp $ */
+/* $NetBSD: pci_machdep.h,v 1.4 2002/05/15 19:23:52 thorpej Exp $ */
 /* NetBSD: pci_machdep.h,v 1.3 1999/03/19 03:40:46 cgd Exp  */
 
 /*
@@ -33,6 +33,11 @@
  */
 
 /*
+ * Forward declarations.
+ */
+struct pci_attach_args;
+
+/*
  * Types provided to machine-independent PCI code
  */
 typedef struct arc_pci_chipset *pci_chipset_tag_t;
@@ -48,12 +53,14 @@ struct arc_pci_chipset {
 			    struct device *, struct pcibus_attach_args *));
 	int		(*pc_bus_maxdevs) __P((pci_chipset_tag_t, int));
 	pcitag_t	(*pc_make_tag) __P((pci_chipset_tag_t, int, int, int));
+	void		(*pc_decompose_tag) __P((pci_chipset_tag_t, pcitag_t,
+			    int *, int *, int *));
 	pcireg_t	(*pc_conf_read) __P((pci_chipset_tag_t, pcitag_t,
 			    int));
 	void		(*pc_conf_write) __P((pci_chipset_tag_t, pcitag_t, int,
 			    pcireg_t));
-	int		(*pc_intr_map) __P((pci_chipset_tag_t, pcitag_t, int,
-			    int, pci_intr_handle_t *));
+	int		(*pc_intr_map) __P((struct pci_attach_args *,
+			    pci_intr_handle_t *));
 	const char	*(*pc_intr_string) __P((pci_chipset_tag_t,
 			    pci_intr_handle_t));
 	void		*(*pc_intr_establish) __P((pci_chipset_tag_t,
@@ -71,15 +78,20 @@ struct arc_pci_chipset {
     (*(c)->pc_bus_maxdevs)((c), (b))
 #define	pci_make_tag(c, b, d, f)					\
     (*(c)->pc_make_tag)((c), (b), (d), (f))
+#define	pci_decompose_tag(c, t, bp, dp, fp)				\
+    (*(c)->pc_decompose_tag)((c), (t), (bp), (dp), (fp))
 #define	pci_conf_read(c, t, r)						\
     (*(c)->pc_conf_read)((c), (t), (r))
 #define	pci_conf_write(c, t, r, v)					\
     (*(c)->pc_conf_write)((c), (t), (r), (v))
-#define	pci_intr_map(c, it, ip, il, ihp)				\
-    (*(c)->pc_intr_map)((c), (it), (ip), (il), (ihp))
+#define	pci_intr_map(pa, ihp)						\
+    (*(pa)->pa_pc->pc_intr_map)((pa), (ihp))
 #define	pci_intr_string(c, ih)						\
     (*(c)->pc_intr_string)((c), (ih))
 #define	pci_intr_establish(c, ih, l, h, a)				\
     (*(c)->pc_intr_establish)((c), (ih), (l), (h), (a))
 #define	pci_intr_disestablish(c, iv)					\
     (*(c)->pc_intr_disestablish)((c), (iv))
+
+#define	pci_enumerate_bus(sc, m, p)					\
+	pci_enumerate_bus_generic((sc), (m), (p))

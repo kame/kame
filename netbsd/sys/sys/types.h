@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.43 2000/04/16 23:12:13 christos Exp $	*/
+/*	$NetBSD: types.h,v 1.51 2002/03/09 23:57:25 chs Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993, 1994
@@ -47,6 +47,56 @@
 #include <machine/types.h>
 
 #include <machine/ansi.h>
+#include <machine/int_types.h>
+
+
+#include <sys/ansi.h>
+
+#ifndef	int8_t
+typedef	__int8_t	int8_t;
+#define	int8_t		__int8_t
+#endif
+
+#ifndef	uint8_t
+typedef	__uint8_t	uint8_t;
+#define	uint8_t		__uint8_t
+#endif
+
+#ifndef	int16_t
+typedef	__int16_t	int16_t;
+#define	int16_t		__int16_t
+#endif
+
+#ifndef	uint16_t
+typedef	__uint16_t	uint16_t;
+#define	uint16_t	__uint16_t
+#endif
+
+#ifndef	int32_t
+typedef	__int32_t	int32_t;
+#define	int32_t		__int32_t
+#endif
+
+#ifndef	uint32_t
+typedef	__uint32_t	uint32_t;
+#define	uint32_t	__uint32_t
+#endif
+
+#ifndef	int64_t
+typedef	__int64_t	int64_t;
+#define	int64_t		__int64_t
+#endif
+
+#ifndef	uint64_t
+typedef	__uint64_t	uint64_t;
+#define	uint64_t	__uint64_t
+#endif
+
+typedef	uint8_t		u_int8_t;
+typedef	uint16_t	u_int16_t;
+typedef	uint32_t	u_int32_t;
+typedef	uint64_t	u_int64_t;
+
 #include <machine/endian.h>
 
 #if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
@@ -67,27 +117,66 @@ typedef	u_int64_t	u_quad_t;	/* quads */
 typedef	int64_t		quad_t;
 typedef	quad_t *	qaddr_t;
 
-typedef	quad_t		longlong_t;	/* ANSI long long type */
-typedef	u_quad_t	u_longlong_t;	/* ANSI unsigned long long type */
+/*
+ * The types longlong_t and u_longlong_t exist for use with the
+ * Sun-derived XDR routines involving these types, and their usage
+ * in other contexts is discouraged.  Further note that these types
+ * may not be equivalent to "long long" and "unsigned long long",
+ * they are only guaranteed to be signed and unsigned 64-bit types
+ * respectively.  Portable programs that need 64-bit types should use
+ * the C99 types int64_t and uint64_t instead.
+ */
+
+typedef	quad_t		longlong_t;	/* for XDR */
+typedef	u_quad_t	u_longlong_t;	/* for XDR */
 
 typedef	int64_t		blkcnt_t;	/* fs block count */
 typedef	u_int32_t	blksize_t;	/* fs optimal block size */
-typedef	char *		caddr_t;	/* core address */
+
+#ifndef	caddr_t
+typedef	__caddr_t	caddr_t;	/* core address */
+#define	caddr_t		__caddr_t
+#endif
+
 typedef	int32_t		daddr_t;	/* disk address */
 typedef	u_int32_t	dev_t;		/* device number */
 typedef	u_int32_t	fixpt_t;	/* fixed point number */
-typedef	u_int32_t	gid_t;		/* group id */
+
+#ifndef	gid_t
+typedef	__gid_t		gid_t;		/* group id */
+#define	gid_t		__gid_t
+#endif
+
 typedef	u_int32_t	id_t;		/* group id, process id or user id */
 typedef	u_int32_t	ino_t;		/* inode number */
 typedef	long		key_t;		/* IPC key (for Sys V IPC) */
-typedef	u_int32_t	mode_t;		/* permissions */
+
+#ifndef	mode_t
+typedef	__mode_t	mode_t;		/* permissions */
+#define	mode_t		__mode_t
+#endif
+
 typedef	u_int32_t	nlink_t;	/* link count */
-typedef	quad_t		off_t;		/* file offset */
-typedef	int32_t		pid_t;		/* process id */
+
+#ifndef	off_t
+typedef	__off_t		off_t;		/* file offset */
+#define	off_t		__off_t
+#endif
+
+#ifndef	pid_t
+typedef	__pid_t		pid_t;		/* process id */
+#define	pid_t		__pid_t
+#endif
+
 typedef quad_t		rlim_t;		/* resource limit */
 typedef	int32_t		segsz_t;	/* segment size */
 typedef	int32_t		swblk_t;	/* swap offset */
-typedef	u_int32_t	uid_t;		/* user id */
+
+#ifndef	uid_t
+typedef	__uid_t		uid_t;		/* user id */
+#define	uid_t		__uid_t
+#endif
+
 typedef	int32_t		dtime_t;	/* on-disk time_t */
 
 #if defined(_KERNEL) || defined(_LIBC)
@@ -109,6 +198,8 @@ union __semun {
  * include that header or explicitly cast them to off_t.
  */
 #if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
+#ifndef __OFF_T_SYSCALLS_DECLARED
+#define __OFF_T_SYSCALLS_DECLARED
 #ifndef _KERNEL
 #include <sys/cdefs.h>
 __BEGIN_DECLS
@@ -117,6 +208,7 @@ int	 ftruncate __P((int, off_t));
 int	 truncate __P((const char *, off_t));
 __END_DECLS
 #endif /* !_KERNEL */
+#endif /* __OFF_T_SYSCALLS_DECLARED */
 #endif /* !defined(_POSIX_SOURCE) ... */
 
 #if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)

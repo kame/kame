@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_sig_notalpha.c,v 1.22 2000/03/30 11:27:17 augustss Exp $	*/
+/*	$NetBSD: linux_sig_notalpha.c,v 1.25 2002/03/31 22:22:47 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * heavily from: svr4_signal.c,v 1.7 1995/01/09 01:04:21 christos Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_sig_notalpha.c,v 1.25 2002/03/31 22:22:47 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,7 +90,7 @@ linux_sys_signal(p, v, retval)
 	nbsa.sa_handler = SCARG(uap, handler);
 	sigemptyset(&nbsa.sa_mask);
 	nbsa.sa_flags = SA_RESETHAND | SA_NODEFER;
-	error = sigaction1(p, linux_to_native_sig[sig],
+	error = sigaction1(p, linux_to_native_signo[sig],
 	    &nbsa, &obsa);
 	if (error == 0)
 		*retval = (int)obsa.sa_handler;
@@ -109,7 +112,7 @@ linux_sys_siggetmask(p, v, retval)
 	error = sigprocmask1(p, SIG_SETMASK, 0, &bss);
 	if (error)
 		return (error);
-	native_to_linux_old_sigset(&bss, &lss);
+	native_to_linux_old_sigset(&lss, &bss);
 	return (0);
 }
 
@@ -133,11 +136,11 @@ linux_sys_sigsetmask(p, v, retval)
 	int error;
 
 	nlss = SCARG(uap, mask);
-	linux_old_to_native_sigset(&nlss, &nbss);
+	linux_old_to_native_sigset(&nbss, &nlss);
 	error = sigprocmask1(p, SIG_SETMASK, &nbss, &obss);
 	if (error)
 		return (error);
-	native_to_linux_old_sigset(&obss, &olss);
+	native_to_linux_old_sigset(&olss, &obss);
 	*retval = olss;
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ufs_readwrite.c,v 1.26.4.1 2000/09/14 18:50:15 perseant Exp $	*/
+/*	$NetBSD: ufs_readwrite.c,v 1.42 2002/03/25 02:23:56 chs Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -35,6 +35,9 @@
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(1, "$NetBSD: ufs_readwrite.c,v 1.42 2002/03/25 02:23:56 chs Exp $");
+
 #ifdef LFS_READWRITE
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
 #define	FS			struct lfs
@@ -60,8 +63,7 @@
  */
 /* ARGSUSED */
 int
-READ(v)
-	void *v;
+READ(void *v)
 {
 	struct vop_read_args /* {
 		struct vnode *a_vp;
@@ -73,17 +75,19 @@ READ(v)
 	struct inode *ip;
 	struct uio *uio;
 	FS *fs;
+	void *win;
+	vsize_t bytelen;
 	struct buf *bp;
 	ufs_daddr_t lbn, nextlbn;
 	off_t bytesinfile;
 	long size, xfersize, blkoffset;
 	int error;
-	u_short mode;
+	boolean_t usepc = FALSE;
 
 	vp = ap->a_vp;
 	ip = VTOI(vp);
-	mode = ip->i_ffs_mode;
 	uio = ap->a_uio;
+	error = 0;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ)
@@ -102,39 +106,50 @@ READ(v)
 		return (EFBIG);
 	if (uio->uio_resid == 0)
 		return (0);
+	if (uio->uio_offset >= ip->i_ffs_size) {
+		goto out;
+	}
+
+#ifndef LFS_READWRITE
+	usepc = vp->v_type == VREG;
+#endif
+	if (usepc) {
+		while (uio->uio_resid > 0) {
+			bytelen = MIN(ip->i_ffs_size - uio->uio_offset,
+			    uio->uio_resid);
+			if (bytelen == 0)
+				break;
+
+			win = ubc_alloc(&vp->v_uobj, uio->uio_offset,
+					&bytelen, UBC_READ);
+			error = uiomove(win, bytelen, uio);
+			ubc_release(win, 0);
+			if (error)
+				break;
+		}
+		goto out;
+	}
 
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
-		if ((bytesinfile = ip->i_ffs_size - uio->uio_offset) <= 0)
+		bytesinfile = ip->i_ffs_size - uio->uio_offset;
+		if (bytesinfile <= 0)
 			break;
 		lbn = lblkno(fs, uio->uio_offset);
 		nextlbn = lbn + 1;
 		size = BLKSIZE(fs, ip, lbn);
 		blkoffset = blkoff(fs, uio->uio_offset);
-		xfersize = fs->fs_bsize - blkoffset;
-		if (uio->uio_resid < xfersize)
-			xfersize = uio->uio_resid;
-		if (bytesinfile < xfersize)
-			xfersize = bytesinfile;
+		xfersize = MIN(MIN(fs->fs_bsize - blkoffset, uio->uio_resid),
+		    bytesinfile);
 
-#ifdef LFS_READWRITE
-		(void)lfs_check(vp, lbn, 0);
-		error = cluster_read(vp, ip->i_ffs_size, lbn, size, NOCRED, &bp);
-#else
 		if (lblktosize(fs, nextlbn) >= ip->i_ffs_size)
 			error = bread(vp, lbn, size, NOCRED, &bp);
-		else if (doclusterread)
-			error = cluster_read(vp,
-			    ip->i_ffs_size, lbn, size, NOCRED, &bp);
-		else if (lbn - 1 == vp->v_lastr) {
+		else {
 			int nextsize = BLKSIZE(fs, ip, nextlbn);
 			error = breadn(vp, lbn,
 			    size, &nextlbn, &nextsize, 1, NOCRED, &bp);
-		} else
-			error = bread(vp, lbn, size, NOCRED, &bp);
-#endif
+		}
 		if (error)
 			break;
-		vp->v_lastr = lbn;
 
 		/*
 		 * We should only get non-zero b_resid when an I/O error
@@ -149,14 +164,15 @@ READ(v)
 				break;
 			xfersize = size;
 		}
-		error = uiomove((char *)bp->b_data + blkoffset, (int)xfersize,
-				uio);
+		error = uiomove((char *)bp->b_data + blkoffset, xfersize, uio);
 		if (error)
 			break;
 		brelse(bp);
 	}
 	if (bp != NULL)
 		brelse(bp);
+
+ out:
 	if (!(vp->v_mount->mnt_flag & MNT_NOATIME)) {
 		ip->i_flag |= IN_ACCESS;
 		if ((ap->a_ioflag & IO_SYNC) == IO_SYNC)
@@ -169,8 +185,7 @@ READ(v)
  * Vnode op for writing.
  */
 int
-WRITE(v)
-	void *v;
+WRITE(void *v)
 {
 	struct vop_write_args /* {
 		struct vnode *a_vp;
@@ -181,18 +196,29 @@ WRITE(v)
 	struct vnode *vp;
 	struct uio *uio;
 	struct inode *ip;
+	struct genfs_node *gp;
 	FS *fs;
 	struct buf *bp;
 	struct proc *p;
+	struct ucred *cred;
 	ufs_daddr_t lbn;
-	off_t osize;
+	off_t osize, origoff, oldoff, preallocoff, endallocoff, nsize;
 	int blkoffset, error, flags, ioflag, resid, size, xfersize;
+	int bsize, aflag;
+	int ubc_alloc_flags;
+	void *win;
+	vsize_t bytelen;
+	boolean_t async;
+	boolean_t usepc = FALSE;
 
+	cred = ap->a_cred;
 	ioflag = ap->a_ioflag;
 	uio = ap->a_uio;
 	vp = ap->a_vp;
 	ip = VTOI(vp);
+	gp = VTOG(vp);
 
+	KASSERT(vp->v_size == ip->i_ffs_size);
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_WRITE)
 		panic("%s: mode", WRITE_S);
@@ -237,17 +263,134 @@ WRITE(v)
 		psignal(p, SIGXFSZ);
 		return (EFBIG);
 	}
+	if (uio->uio_resid == 0)
+		return (0);
 
+	flags = ioflag & IO_SYNC ? B_SYNC : 0;
+	async = vp->v_mount->mnt_flag & MNT_ASYNC;
+	origoff = uio->uio_offset;
 	resid = uio->uio_resid;
 	osize = ip->i_ffs_size;
-	flags = ioflag & IO_SYNC ? B_SYNC : 0;
+	bsize = fs->fs_bsize;
+	error = 0;
 
-	for (error = 0; uio->uio_resid > 0;) {
+#ifndef LFS_READWRITE
+	usepc = vp->v_type == VREG;
+#endif
+	if (!usepc) {
+		goto bcache;
+	}
+
+	preallocoff = round_page(blkroundup(fs, MAX(osize, uio->uio_offset)));
+	aflag = ioflag & IO_SYNC ? B_SYNC : 0;
+	nsize = MAX(osize, uio->uio_offset + uio->uio_resid);
+	endallocoff = nsize - blkoff(fs, nsize);
+
+	/*
+	 * if we're increasing the file size, deal with expanding
+	 * the fragment if there is one.
+	 */
+
+	if (nsize > osize && lblkno(fs, osize) < NDADDR &&
+	    lblkno(fs, osize) != lblkno(fs, nsize) &&
+	    blkroundup(fs, osize) != osize) {
+		error = ufs_balloc_range(vp, osize, blkroundup(fs, osize) -
+		    osize, cred, aflag);
+		if (error) {
+			goto out;
+		}
+		if (flags & B_SYNC) {
+			vp->v_size = blkroundup(fs, osize);
+			simple_lock(&vp->v_interlock);
+			VOP_PUTPAGES(vp, trunc_page(osize & ~(bsize - 1)),
+			    round_page(vp->v_size), PGO_CLEANIT | PGO_SYNCIO);
+		}
+	}
+
+	ubc_alloc_flags = UBC_WRITE;
+	while (uio->uio_resid > 0) {
+		oldoff = uio->uio_offset;
+		blkoffset = blkoff(fs, uio->uio_offset);
+		bytelen = MIN(fs->fs_bsize - blkoffset, uio->uio_resid);
+
+		/*
+		 * if we're filling in a hole, allocate the blocks now and
+		 * initialize the pages first.  if we're extending the file,
+		 * we can safely allocate blocks without initializing pages
+		 * since the new blocks will be inaccessible until the write
+		 * is complete.
+		 */
+
+		if (uio->uio_offset < preallocoff ||
+		    uio->uio_offset >= endallocoff) {
+			error = ufs_balloc_range(vp, uio->uio_offset, bytelen,
+			    cred, aflag);
+			if (error) {
+				break;
+			}
+			ubc_alloc_flags &= ~UBC_FAULTBUSY;
+		} else {
+			lockmgr(&gp->g_glock, LK_EXCLUSIVE, NULL);
+			error = GOP_ALLOC(vp, uio->uio_offset, bytelen,
+			    aflag, cred);
+			lockmgr(&gp->g_glock, LK_RELEASE, NULL);
+			if (error) {
+				break;
+			}
+			ubc_alloc_flags |= UBC_FAULTBUSY;
+		}
+
+		/*
+		 * copy the data.
+		 */
+
+		win = ubc_alloc(&vp->v_uobj, uio->uio_offset, &bytelen,
+		    ubc_alloc_flags);
+		error = uiomove(win, bytelen, uio);
+		ubc_release(win, 0);
+		if (error) {
+			break;
+		}
+
+		/*
+		 * update UVM's notion of the size now that we've
+		 * copied the data into the vnode's pages.
+		 */
+
+		if (vp->v_size < uio->uio_offset) {
+			uvm_vnp_setsize(vp, uio->uio_offset);
+		}
+
+		/*
+		 * flush what we just wrote if necessary.
+		 * XXXUBC simplistic async flushing.
+		 */
+
+		if (!async && oldoff >> 16 != uio->uio_offset >> 16) {
+			simple_lock(&vp->v_interlock);
+			error = VOP_PUTPAGES(vp, (oldoff >> 16) << 16,
+			    (uio->uio_offset >> 16) << 16, PGO_CLEANIT);
+			if (error) {
+				break;
+			}
+		}
+	}
+	if (error == 0 && ioflag & IO_SYNC) {
+		simple_lock(&vp->v_interlock);
+		error = VOP_PUTPAGES(vp, trunc_page(origoff & ~(bsize - 1)),
+		    round_page(blkroundup(fs, uio->uio_offset)),
+		    PGO_CLEANIT | PGO_SYNCIO);
+	}
+	goto out;
+
+ bcache:
+	simple_lock(&vp->v_interlock);
+	VOP_PUTPAGES(vp, trunc_page(origoff), round_page(origoff + resid),
+	    PGO_CLEANIT | PGO_FREE | PGO_SYNCIO);
+	while (uio->uio_resid > 0) {
 		lbn = lblkno(fs, uio->uio_offset);
 		blkoffset = blkoff(fs, uio->uio_offset);
-		xfersize = fs->fs_bsize - blkoffset;
-		if (uio->uio_resid < xfersize)
-			xfersize = uio->uio_resid;
+		xfersize = MIN(fs->fs_bsize - blkoffset, uio->uio_resid);
 		if (fs->fs_bsize > xfersize)
 			flags |= B_CLRBUF;
 		else
@@ -262,50 +405,55 @@ WRITE(v)
 			ip->i_ffs_size = uio->uio_offset + xfersize;
 			uvm_vnp_setsize(vp, ip->i_ffs_size);
 		}
-		(void)uvm_vnp_uncache(vp);
-
 		size = BLKSIZE(fs, ip, lbn) - bp->b_resid;
-		if (size < xfersize)
+		if (xfersize > size)
 			xfersize = size;
 
-		error =
-		    uiomove((char *)bp->b_data + blkoffset, (int)xfersize, uio);
+		error = uiomove((char *)bp->b_data + blkoffset, xfersize, uio);
+
+		/*
+		 * if we didn't clear the block and the uiomove failed,
+		 * the buf will now contain part of some other file,
+		 * so we need to invalidate it.
+		 */
+		if (error && (flags & B_CLRBUF) == 0) {
+			bp->b_flags |= B_INVAL;
+			brelse(bp);
+			break;
+		}
 #ifdef LFS_READWRITE
 		if (!error)
-			error = lfs_reserve(fs, vp, fsbtodb(fs, NIADDR + 1));
+			error = lfs_reserve(fs, vp, btofsb(fs, (NIADDR + 1) << fs->lfs_bshift));
 		(void)VOP_BWRITE(bp);
 		if (!error)
-			lfs_reserve(fs, vp, fsbtodb(fs, -(NIADDR + 1)));
+			lfs_reserve(fs, vp, -btofsb(fs, (NIADDR + 1) << fs->lfs_bshift));
 #else
 		if (ioflag & IO_SYNC)
 			(void)bwrite(bp);
 		else if (xfersize + blkoffset == fs->fs_bsize)
-			if (doclusterwrite)
-				cluster_write(bp, ip->i_ffs_size);
-			else
-				bawrite(bp);
+			bawrite(bp);
 		else
 			bdwrite(bp);
 #endif
 		if (error || xfersize == 0)
 			break;
-		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
 	/*
 	 * If we successfully wrote any data, and we are not the superuser
 	 * we clear the setuid and setgid bits as a precaution against
 	 * tampering.
 	 */
+out:
+	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	if (resid > uio->uio_resid && ap->a_cred && ap->a_cred->cr_uid != 0)
 		ip->i_ffs_mode &= ~(ISUID | ISGID);
 	if (error) {
-		if (ioflag & IO_UNIT) {
-			(void)VOP_TRUNCATE(vp, osize,
-			    ioflag & IO_SYNC, ap->a_cred, uio->uio_procp);
-			uio->uio_offset -= resid - uio->uio_resid;
-			uio->uio_resid = resid;
-		}
+		(void) VOP_TRUNCATE(vp, osize, ioflag & IO_SYNC, ap->a_cred,
+		    uio->uio_procp);
+		uio->uio_offset -= resid - uio->uio_resid;
+		uio->uio_resid = resid;
 	} else if (resid > uio->uio_resid && (ioflag & IO_SYNC) == IO_SYNC)
 		error = VOP_UPDATE(vp, NULL, NULL, UPDATE_WAIT);
+	KASSERT(vp->v_size == ip->i_ffs_size);
 	return (error);
 }

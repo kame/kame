@@ -1,4 +1,4 @@
-/*	$NetBSD: tp_subr2.c,v 1.17 2000/03/30 13:10:15 augustss Exp $	*/
+/*	$NetBSD: tp_subr2.c,v 1.20 2001/11/13 01:10:51 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -68,6 +68,9 @@ SOFTWARE.
  * tp_getoptions: initializes variables that are affected by the options
  * chosen.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tp_subr2.c,v 1.20 2001/11/13 01:10:51 lukem Exp $");
 
 /*
  * this def'n is to cause the expansion of this macro in the routine
@@ -808,7 +811,7 @@ tp0_stash(tpcb, e)
 	if (E.e_eot) {
 		struct mbuf *n = E.e_data;
 		n->m_flags |= M_EOR;
-		n->m_act = NULL;	/* set on tp_input */
+		n->m_nextpkt = NULL;	/* set on tp_input */
 	}
 	sbappend(sb, E.e_data);
 #ifdef ARGO_DEBUG
@@ -817,7 +820,7 @@ tp0_stash(tpcb, e)
 	}
 #endif
 	if (tpcb->tp_netservice != ISO_CONS)
-		printf("tp0_stash: tp running over something wierd\n");
+		printf("tp0_stash: tp running over something weird\n");
 	else {
 		struct pklcd *lcp = (struct pklcd *) isop->isop_chan;
 		pk_flowcontrol(lcp, sbspace(sb) <= 0, 1);
@@ -830,7 +833,7 @@ tp0_openflow(tpcb)
 {
 	struct isopcb *isop = (struct isopcb *) tpcb->tp_npcb;
 	if (tpcb->tp_netservice != ISO_CONS)
-		printf("tp0_openflow: tp running over something wierd\n");
+		printf("tp0_openflow: tp running over something weird\n");
 	else {
 		struct pklcd *lcp = (struct pklcd *) isop->isop_chan;
 		if (lcp->lcd_rxrnr_condition)

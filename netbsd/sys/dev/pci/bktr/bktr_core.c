@@ -1,6 +1,6 @@
-/*	$NetBSD: bktr_core.c,v 1.5.4.1 2000/07/03 02:17:12 wiz Exp $	*/
+/*	$NetBSD: bktr_core.c,v 1.20 2001/11/13 07:29:36 lukem Exp $	*/
 
-/* FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.109 2000/06/28 15:09:12 roger Exp */
+/* FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.114 2000/10/31 13:09:56 roger Exp */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -96,11 +96,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bktr_core.c,v 1.20 2001/11/13 07:29:36 lukem Exp $");
+
 #include "opt_bktr.h"		/* Include any kernel config options */
 
 #ifdef __FreeBSD__
 #include "bktr.h"
-#include "opt_devfs.h"
 #endif /* __FreeBSD__ */
 
 #if (                                                            \
@@ -131,7 +133,10 @@
 #include <sys/bus.h>		/* used by smbus and newbus */
 #endif
 
-#include <machine/clock.h>      /* for DELAY */
+#if (__FreeBSD_version < 500000)
+#include <machine/clock.h>              /* for DELAY */
+#endif
+
 #include <pci/pcivar.h>
 
 #if (__FreeBSD_version >=300000)
@@ -148,8 +153,11 @@
 #include <dev/bktr/bktr_audio.h>
 #include <dev/bktr/bktr_os.h>
 #include <dev/bktr/bktr_core.h>
+#if defined(BKTR_FREEBSD_MODULE)
+#include <dev/bktr/bktr_mem.h>
+#endif
 
-#if (NSMBUS > 0)
+#if defined(BKTR_USE_FREEBSD_SMBUS)
 #include <dev/bktr/bktr_i2c.h>
 #include <dev/smbus/smbconf.h>
 #include <dev/iicbus/iiconf.h>
@@ -187,9 +195,12 @@ typedef unsigned int uintptr_t;
 #include <sys/kernel.h>
 #include <sys/signalvar.h>
 #include <sys/vnode.h>
+#include <sys/proc.h>
 
 #ifdef __NetBSD__
 #include <uvm/uvm_extern.h>
+#include <dev/pci/pcidevs.h>
+#include <dev/pci/pcireg.h>
 #else
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -272,7 +283,7 @@ typedef u_char bool_t;
  * Parameters describing size of transmitted image.
  */
 
-static struct format_params format_params[] = {
+static const struct format_params format_params[] = {
 /* # define BT848_IFORM_F_AUTO             (0x0) - don't matter. */
   { 525, 26, 480,  910, 135, 754, 640,  780, 30, 0x68, 0x5d, BT848_IFORM_X_AUTO,
     12,  1600 },
@@ -303,7 +314,7 @@ static struct format_params format_params[] = {
  * Table of supported Pixel Formats 
  */
 
-static struct meteor_pixfmt_internal {
+static const struct meteor_pixfmt_internal {
 	struct meteor_pixfmt public;
 	u_int                color_fmt;
 } pixfmt_table[] = {
@@ -332,7 +343,7 @@ static struct meteor_pixfmt_internal {
  */
 
 /*  FIXME:  Also add YUV_422 and YUV_PACKED as well  */
-static struct {
+static const struct {
 	u_long               meteor_format;
 	struct meteor_pixfmt public;
 } meteor_pixfmt_table[] = {
@@ -445,7 +456,7 @@ static void	remote_read(bktr_ptr_t bktr, struct bktr_remote *remote);
 static int	common_ioctl( bktr_ptr_t bktr, ioctl_cmd_t cmd, caddr_t arg );
 
 
-#if ((!defined(__FreeBSD__)) || (NSMBUS == 0) )
+#if !defined(BKTR_USE_FREEBSD_SMBUS)
 /*
  * i2c primitives for low level control of i2c bus. Added for MSP34xx control
  */
@@ -463,7 +474,11 @@ static int      i2c_read_byte( bktr_ptr_t bktr, unsigned char *data, int last );
 void 
 common_bktr_attach( bktr_ptr_t bktr, int unit, u_long pci_id, u_int rev )
 {
-	vm_offset_t	buf;
+#if defined(__NetBSD__)
+	vaddr_t		buf = 0;
+#else
+	vm_offset_t	buf = 0;
+#endif
 
 /***************************************/
 /* *** OS Specific memory routines *** */
@@ -489,24 +504,53 @@ common_bktr_attach( bktr_ptr_t bktr, int unit, u_long pci_id, u_int rev )
 #endif
 
 #if defined(__FreeBSD__) || defined(__bsdi__)
-	/* allocate space for dma program */
-	bktr->dma_prog     = get_bktr_mem(unit, DMA_PROG_ALLOC);
-	bktr->odd_dma_prog = get_bktr_mem(unit, DMA_PROG_ALLOC);
+	int		need_to_allocate_memory = 1;
 
-	/* allocte space for the VBI buffer */
-	bktr->vbidata  = get_bktr_mem(unit, VBI_DATA_SIZE);
-	bktr->vbibuffer = get_bktr_mem(unit, VBI_BUFFER_SIZE);
-
-	/* allocate space for pixel buffer */
-	if ( BROOKTREE_ALLOC )
-		buf = get_bktr_mem(unit, BROOKTREE_ALLOC);
-	else
-		buf = 0;
+/* If this is a module, check if there is any currently saved contiguous memory */
+#if defined(BKTR_FREEBSD_MODULE)
+	if (bktr_has_stored_addresses(unit) == 1) {
+		/* recover the addresses */
+		bktr->dma_prog     = bktr_retrieve_address(unit, BKTR_MEM_DMA_PROG);
+		bktr->odd_dma_prog = bktr_retrieve_address(unit, BKTR_MEM_ODD_DMA_PROG);
+		bktr->vbidata      = bktr_retrieve_address(unit, BKTR_MEM_VBIDATA);
+		bktr->vbibuffer    = bktr_retrieve_address(unit, BKTR_MEM_VBIBUFFER);
+		buf                = bktr_retrieve_address(unit, BKTR_MEM_BUF);
+		need_to_allocate_memory = 0;
+	}
 #endif
 
+	if (need_to_allocate_memory == 1) {
+		/* allocate space for dma program */
+		bktr->dma_prog     = get_bktr_mem(unit, DMA_PROG_ALLOC);
+		bktr->odd_dma_prog = get_bktr_mem(unit, DMA_PROG_ALLOC);
+
+		/* allocte space for the VBI buffer */
+		bktr->vbidata  = get_bktr_mem(unit, VBI_DATA_SIZE);
+		bktr->vbibuffer = get_bktr_mem(unit, VBI_BUFFER_SIZE);
+
+		/* allocate space for pixel buffer */
+		if ( BROOKTREE_ALLOC )
+			buf = get_bktr_mem(unit, BROOKTREE_ALLOC);
+		else
+			buf = 0;
+	}
+#endif	/* FreeBSD or BSDi */
+
+
+/* If this is a module, save the current contiguous memory */
+#if defined(BKTR_FREEBSD_MODULE)
+bktr_store_address(unit, BKTR_MEM_DMA_PROG,     bktr->dma_prog);
+bktr_store_address(unit, BKTR_MEM_ODD_DMA_PROG, bktr->odd_dma_prog);
+bktr_store_address(unit, BKTR_MEM_VBIDATA,      bktr->vbidata);
+bktr_store_address(unit, BKTR_MEM_VBIBUFFER,    bktr->vbibuffer);
+bktr_store_address(unit, BKTR_MEM_BUF,          buf);
+#endif
+
+
 	if ( bootverbose ) {
-		printf("%s: buffer size %d, addr 0x%x\n",
-			bktr_name(bktr), BROOKTREE_ALLOC, vtophys(buf));
+		printf("%s: buffer size %d, addr 0x%lx\n",
+			bktr_name(bktr), BROOKTREE_ALLOC,
+			(u_long) vtophys(buf));
 	}
 
 	if ( buf != 0 ) {
@@ -518,7 +562,7 @@ common_bktr_attach( bktr_ptr_t bktr, int unit, u_long pci_id, u_int rev )
 	}
 		
 
-	bktr->flags = METEOR_INITALIZED | METEOR_AUTOMODE |
+	bktr->flags = METEOR_INITIALIZED | METEOR_AUTOMODE |
 		      METEOR_DEV0 | METEOR_RGB16;
 	bktr->dma_prog_loaded = FALSE;
 	bktr->cols = 640;
@@ -537,26 +581,31 @@ common_bktr_attach( bktr_ptr_t bktr, int unit, u_long pci_id, u_int rev )
  
 	/* using the pci device id and revision id */
 	/* and determine the card type            */
-	switch (pci_id) {
-	case BROOKTREE_848_PCI_ID:
-		if (rev == 0x12) bktr->id = BROOKTREE_848A;
-		else             bktr->id = BROOKTREE_848;
-		break;
-        case BROOKTREE_849_PCI_ID:
-		bktr->id = BROOKTREE_849A;
-		break;
-        case BROOKTREE_878_PCI_ID:
-		bktr->id = BROOKTREE_878;
-		break;
-        case BROOKTREE_879_PCI_ID:
-		bktr->id = BROOKTREE_879;
-		break;
+	if (PCI_VENDOR(pci_id) == PCI_VENDOR_BROOKTREE)
+	{
+		switch (PCI_PRODUCT(pci_id)) {
+		case PCI_PRODUCT_BROOKTREE_BT848:
+			if (rev == 0x12)
+				bktr->id = BROOKTREE_848A;
+			else
+				bktr->id = BROOKTREE_848;
+			break;
+		case PCI_PRODUCT_BROOKTREE_BT849:
+			bktr->id = BROOKTREE_849A;
+			break;
+		case PCI_PRODUCT_BROOKTREE_BT878:
+			bktr->id = BROOKTREE_878;
+			break;
+		case PCI_PRODUCT_BROOKTREE_BT879:
+			bktr->id = BROOKTREE_879;
+			break;
+		}
 	};
 
 	bktr->clr_on_start = FALSE;
 
 	/* defaults for the tuner section of the card */
-	bktr->tflags = TUNER_INITALIZED;
+	bktr->tflags = TUNER_INITIALIZED;
 	bktr->tuner.frequency = 0;
 	bktr->tuner.channel = 0;
 	bktr->tuner.chnlset = DEFAULT_CHNLSET;
@@ -568,6 +617,9 @@ common_bktr_attach( bktr_ptr_t bktr, int unit, u_long pci_id, u_int rev )
 	bktr->bt848_tuner = -1;
 	bktr->reverse_mute = -1;
 	bktr->slow_msp_audio = 0;
+	bktr->msp_use_mono_source = 0;
+        bktr->msp_source_selected = -1;
+	bktr->audio_mux_present = 1;
 
 	probeCard( bktr, TRUE, unit );
 
@@ -1029,7 +1081,7 @@ vbi_open( bktr_ptr_t bktr )
 int
 tuner_open( bktr_ptr_t bktr )
 {
-	if ( !(bktr->tflags & TUNER_INITALIZED) )	/* device not found */
+	if ( !(bktr->tflags & TUNER_INITIALIZED) )	/* device not found */
 		return( ENXIO );	
 
 	if ( bktr->tflags & TUNER_OPEN )		/* already open */
@@ -1235,7 +1287,11 @@ video_ioctl( bktr_ptr_t bktr, int unit, ioctl_cmd_t cmd, caddr_t arg, struct pro
 	struct meteor_counts	*counts;
 	struct meteor_video	*video;
 	struct bktr_capture_area *cap_area;
+#if defined(__NetBSD__)
+	vaddr_t			buf;
+#else
 	vm_offset_t		buf;
+#endif
 	int                     i;
 	char                    char_temp;
 
@@ -2217,6 +2273,31 @@ tuner_ioctl( bktr_ptr_t bktr, int unit, ioctl_cmd_t cmd, caddr_t arg, struct pro
 		break;
 
 
+#ifdef BT848_MSP_READ
+	/* I2C ioctls to allow userland access to the MSP chip */
+	case BT848_MSP_READ:
+		{
+		struct bktr_msp_control *msp;
+		msp = (struct bktr_msp_control *) arg;
+		msp->data = msp_dpl_read(bktr, bktr->msp_addr,
+		                         msp->function, msp->address);
+		break;
+		}
+
+	case BT848_MSP_WRITE:
+		{
+		struct bktr_msp_control *msp;
+		msp = (struct bktr_msp_control *) arg;
+		msp_dpl_write(bktr, bktr->msp_addr, msp->function,
+		             msp->address, msp->data );
+		break;
+		}
+
+	case BT848_MSP_RESET:
+		msp_dpl_reset(bktr, bktr->msp_addr);
+		break;
+#endif
+
 	default:
 		return common_ioctl( bktr, cmd, arg );
 	}
@@ -2416,7 +2497,7 @@ dump_bt848( bktr_ptr_t bktr )
 		       r[i], INL(bktr, r[i]),
 		       r[i+1], INL(bktr, r[i+1]),
 		       r[i+2], INL(bktr, r[i+2]),
-		       r[i+3], INL(bktr, r[i+3]]));
+		       r[i+3], INL(bktr, r[i+3]));
 	}
 
 	printf("%s: INT STAT %x \n", bktr_name(bktr),
@@ -2550,7 +2631,7 @@ static bool_t split(bktr_reg_t * bktr, volatile u_long **dma_prog, int width ,
 		    volatile u_char ** target_buffer, int cols ) {
 
  u_long flag, flag2;
- struct meteor_pixfmt *pf = &pixfmt_table[ bktr->pixfmt ].public;
+ const struct meteor_pixfmt *pf = &pixfmt_table[ bktr->pixfmt ].public;
  u_int  skip, start_skip;
 
   /*  For RGB24, we need to align the component in FIFO Byte Lane 0         */
@@ -2640,7 +2721,7 @@ rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	volatile u_long		*dma_prog;	/* DMA prog is an array of 
 						32 bit RISC instructions */
 	volatile u_long		*loop_point;
-        struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
+        const struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 	u_int                   Bpp = pf_int->public.Bpp;
 	unsigned int            vbisamples;     /* VBI samples per line */
 	unsigned int            vbilines;       /* VBI lines per field */
@@ -2704,7 +2785,7 @@ rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	*dma_prog++ = 0;
 	for(i = 0; i < vbilines; i++) {
 		*dma_prog++ = OP_WRITE | OP_SOL | OP_EOL | vbisamples;
-		*dma_prog++ = (u_long) vtophys((caddr_t)bktr->vbidata +
+		*dma_prog++ = (u_long) vtophys(bktr->vbidata +
 					(i * VBI_LINE_SIZE));
 	}
 
@@ -2755,7 +2836,7 @@ rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	*dma_prog++ = 0;
 	for(i = 0; i < vbilines; i++) {
 		*dma_prog++ = OP_WRITE | OP_SOL | OP_EOL | vbisamples;
-		*dma_prog++ = (u_long) vtophys((caddr_t)bktr->vbidata +
+		*dma_prog++ = (u_long) vtophys(bktr->vbidata +
 				((i+MAX_VBI_LINES) * VBI_LINE_SIZE));
 	}
 
@@ -2805,7 +2886,7 @@ rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	*dma_prog++ = 0;  /* NULL WORD */
 
 	*dma_prog++ = OP_JUMP ;
-	*dma_prog++ = (u_long ) vtophys(loop_point) ;
+	*dma_prog++ = (u_long ) vtophys((vaddr_t)loop_point) ;
 	*dma_prog++ = 0;  /* NULL WORD */
 
 }
@@ -2820,7 +2901,7 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	volatile u_long		target_buffer, buffer, target,width;
 	volatile u_long		pitch;
 	volatile  u_long	*dma_prog;
-        struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
+        const struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 	u_int                   Bpp = pf_int->public.Bpp;
 
 	OUTB(bktr, BKTR_COLOR_FMT, pf_int->color_fmt);
@@ -2984,7 +3065,7 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 	volatile unsigned int	inst3;
 	volatile u_long		target_buffer, buffer;
 	volatile  u_long	*dma_prog;
-        struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
+        const struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 	int			b;
 
 	OUTB(bktr, BKTR_COLOR_FMT, pf_int->color_fmt);
@@ -3098,7 +3179,7 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 	volatile unsigned int	inst;
 	volatile u_long		target_buffer, t1, buffer;
 	volatile u_long		*dma_prog;
-        struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
+        const struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 
 	OUTB(bktr, BKTR_COLOR_FMT, pf_int->color_fmt);
 
@@ -3212,7 +3293,7 @@ yuv12_prog( bktr_ptr_t bktr, char i_flag,
 	volatile unsigned int	inst1;
 	volatile u_long		target_buffer, t1, buffer;
 	volatile u_long		*dma_prog;
-        struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
+        const struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 
 	OUTB(bktr, BKTR_COLOR_FMT, pf_int->color_fmt);
 
@@ -3320,8 +3401,8 @@ build_dma_prog( bktr_ptr_t bktr, char i_flag )
 	int			rows, cols,  interlace;
 	int			tmp_int;
 	unsigned int		temp;	
-	struct format_params	*fp;
-        struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
+	const struct format_params	*fp;
+        const struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 	
 
 	fp = &format_params[bktr->format_params];
@@ -3527,7 +3608,7 @@ static void
 start_capture( bktr_ptr_t bktr, unsigned type )
 {
 	u_char			i_flag;
-	struct format_params   *fp;
+	const struct format_params   *fp;
 
 	fp = &format_params[bktr->format_params];
 
@@ -3585,7 +3666,7 @@ start_capture( bktr_ptr_t bktr, unsigned type )
 static void
 set_fps( bktr_ptr_t bktr, u_short fps )
 {
-	struct format_params	*fp;
+	const struct format_params	*fp;
 	int i_flag;
 
 	fp = &format_params[bktr->format_params];
@@ -3637,7 +3718,7 @@ set_fps( bktr_ptr_t bktr, u_short fps )
 
 static u_int pixfmt_swap_flags( int pixfmt )
 {
-	struct meteor_pixfmt *pf = &pixfmt_table[ pixfmt ].public;
+	const struct meteor_pixfmt *pf = &pixfmt_table[ pixfmt ].public;
 	u_int		      swapf = 0;
 
 	switch ( pf->Bpp ) {
@@ -3666,7 +3747,7 @@ static u_int pixfmt_swap_flags( int pixfmt )
 static int oformat_meteor_to_bt( u_long format )
 {
 	int    i;
-        struct meteor_pixfmt *pf1, *pf2;
+        const struct meteor_pixfmt *pf1, *pf2;
 
 	/*  Find format in compatibility table  */
 	for ( i = 0; i < METEOR_PIXFMT_TABLE_SIZE; i++ )
@@ -3711,7 +3792,7 @@ static int oformat_meteor_to_bt( u_long format )
 				 BT848_DATA_CTL_I2CSDA)
 
 /* Select between old i2c code and new iicbus / smbus code */
-#if (defined(__FreeBSD__) && (NSMBUS > 0))
+#if defined(BKTR_USE_FREEBSD_SMBUS)
 
 /*
  * The hardware interface is actually SMB commands
@@ -3857,7 +3938,7 @@ static void remote_read(bktr_ptr_t bktr, struct bktr_remote *remote) {
 	return;
 }
 
-#else /* defined(__FreeBSD__) && (NSMBUS > 0) */
+#else /* defined(BKTR_USE_FREEBSD_SMBUS) */
 
 /*
  * Program the i2c bus directly
@@ -4113,7 +4194,7 @@ static void remote_read(bktr_ptr_t bktr, struct bktr_remote *remote) {
 	return;
 }
 
-#endif /* defined(__FreeBSD__) && (NSMBUS > 0) */
+#endif /* defined(BKTR_USE_FREEBSD_SMBUS) */
 
 
 #if defined( I2C_SOFTWARE_PROBE )

@@ -1,4 +1,4 @@
-/*	$NetBSD: rtl81x9.c,v 1.11.4.5 2001/05/06 15:05:17 he Exp $	*/
+/*	$NetBSD: rtl81x9.c,v 1.40 2001/11/13 13:14:43 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -85,8 +85,9 @@
  * to select which interface to use depending on the chip type.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rtl81x9.c,v 1.40 2001/11/13 13:14:43 lukem Exp $");
+
 #include "bpfilter.h"
 #include "rnd.h"
 
@@ -100,19 +101,13 @@
 #include <sys/kernel.h>
 #include <sys/socket.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/if_ether.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#endif
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
@@ -141,8 +136,9 @@ STATIC void rtk_rxeof		__P((struct rtk_softc *));
 STATIC void rtk_txeof		__P((struct rtk_softc *));
 STATIC void rtk_start		__P((struct ifnet *));
 STATIC int rtk_ioctl		__P((struct ifnet *, u_long, caddr_t));
-STATIC void rtk_init		__P((void *));
-STATIC void rtk_stop		__P((struct rtk_softc *));
+STATIC int rtk_init		__P((struct ifnet *));
+STATIC void rtk_stop		__P((struct ifnet *, int));
+
 STATIC void rtk_watchdog	__P((struct ifnet *));
 STATIC void rtk_shutdown	__P((void *));
 STATIC int rtk_ifmedia_upd	__P((struct ifnet *));
@@ -166,9 +162,6 @@ STATIC void rtk_power		__P((int, void *));
 
 STATIC void rtk_setmulti	__P((struct rtk_softc *));
 STATIC int rtk_list_tx_init	__P((struct rtk_softc *));
-
-STATIC int rtk_ether_ioctl __P((struct ifnet *, u_long, caddr_t));
-
 
 #define EE_SET(x)					\
 	CSR_WRITE_1(sc, RTK_EECMD,			\
@@ -661,7 +654,7 @@ rtk_attach(sc)
 	eaddr[5] = val >> 8;
 
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
-	    RTK_RXBUFLEN + 16, NBPG, 0, &sc->sc_dmaseg, 1, &sc->sc_dmanseg,
+	    RTK_RXBUFLEN + 16, PAGE_SIZE, 0, &sc->sc_dmaseg, 1, &sc->sc_dmanseg,
 	    BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: can't allocate recv buffer, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
@@ -686,7 +679,7 @@ rtk_attach(sc)
 
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->recv_dmamap,
 	    sc->rtk_rx_buf, RTK_RXBUFLEN + 16,
-	    NULL, BUS_DMA_NOWAIT)) != 0) {
+	    NULL, BUS_DMA_READ|BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: can't load recv buffer DMA map, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
 		goto fail_3;
@@ -726,15 +719,13 @@ rtk_attach(sc)
 	ifp = &sc->ethercom.ec_if;
 	ifp->if_softc = sc;
 	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
-	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = rtk_ioctl;
-#if 0
-	ifp->if_output = ether_output;
-#endif
 	ifp->if_start = rtk_start;
 	ifp->if_watchdog = rtk_watchdog;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	ifp->if_init = rtk_init;
+	ifp->if_stop = rtk_stop;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do ifmedia setup.
@@ -761,10 +752,6 @@ rtk_attach(sc)
 	if_attach(ifp);
 	ether_ifattach(ifp, eaddr);
 
-#if NBPFILTER > 0
-	bpfattach(&sc->ethercom.ec_if.if_bpf, ifp, DLT_EN10MB,
-		  sizeof(struct ether_header));
-#endif
 	/*
 	 * Make sure the interface is shutdown during reboot.
 	 */
@@ -862,7 +849,7 @@ rtk_detach(sc)
 	int i;
 
 	/*
-	 * Succeed now if thereisn't any work to do.
+	 * Succeed now if there isn't any work to do.
 	 */
 	if ((sc->sc_flags & RTK_ATTACHED) == 0)
 		return (0);
@@ -876,9 +863,6 @@ rtk_detach(sc)
 	/* Delete all remaining media. */
 	ifmedia_delete_instance(&sc->mii.mii_media, IFM_INST_ANY);
 
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
 	ether_ifdetach(ifp);
 	if_detach(ifp);
 
@@ -950,7 +934,7 @@ rtk_power(why, arg)
 	switch (why) {
 	case PWR_SUSPEND:
 	case PWR_STANDBY:
-		rtk_stop(sc);
+		rtk_stop(ifp, 0);
 		if (sc->sc_power != NULL)
 			(*sc->sc_power)(sc, why);
 		break;
@@ -958,7 +942,7 @@ rtk_power(why, arg)
 		if (ifp->if_flags & IFF_UP) {
 			if (sc->sc_power != NULL)
 				(*sc->sc_power)(sc, why);
-			rtk_init(sc);
+			rtk_init(ifp);
 		}
 		break;
 	case PWR_SOFTSUSPEND:
@@ -979,7 +963,7 @@ rtk_power(why, arg)
  * attempt to document it here. The driver provides a buffer area and
  * places its base address in the RX buffer start address register.
  * The chip then begins copying frames into the RX buffer. Each frame
- * is preceeded by a 32-bit RX status word which specifies the length
+ * is preceded by a 32-bit RX status word which specifies the length
  * of the frame and certain other status bits. Each frame (starting with
  * the status word) is also 32-bit aligned. The frame length is in the
  * first 16 bits of the status word; the lower 15 bits correspond with
@@ -992,9 +976,8 @@ rtk_power(why, arg)
 STATIC void rtk_rxeof(sc)
 	struct rtk_softc	*sc;
 {
-	struct ether_header	*eh;
-	struct mbuf		*m;
-	struct ifnet		*ifp;
+        struct mbuf		*m;
+        struct ifnet		*ifp;
 	caddr_t			rxbufpos, dst;
 	int			total_len, wrap = 0;
 	u_int32_t		rxstat;
@@ -1059,7 +1042,7 @@ STATIC void rtk_rxeof(sc)
 			}
 			break;
 #else
-			rtk_init(sc);
+			rtk_init(ifp);
 			return;
 #endif
 		}
@@ -1096,15 +1079,6 @@ STATIC void rtk_rxeof(sc)
 			new_rx = cur_rx + total_len;
 		/* Round up to 32-bit boundary. */
 		new_rx = (new_rx + 3) & ~3;
-
-		/*
-		 * XXX The RealTek chip includes the CRC with every
-		 * received frame, and there's no way to turn this
-		 * behavior off (at least, I can't find anything in
-	 	 * the manual that explains how to do it) so we have
-		 * to trim off the CRC manually.
-		 */
-		total_len -= ETHER_CRC_LEN;
 
 		/*
 		 * Now allocate an mbuf (and possibly a cluster) to hold
@@ -1165,26 +1139,17 @@ STATIC void rtk_rxeof(sc)
 		if (m == NULL)
 			continue;
 
-		eh = mtod(m, struct ether_header *);
+		/*
+		 * The RealTek chip includes the CRC with every
+		 * incoming packet.
+		 */
+		m->m_flags |= M_HASFCS;
+
 		ifp->if_ipackets++;
 
 #if NBPFILTER > 0
-		/*
-		 * Handle BPF listeners. Let the BPF user see the packet, but
-		 * don't pass it up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
+		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
-			if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-				ETHER_IS_MULTICAST(eh->ether_dhost) == 0 &&
-				memcmp(eh->ether_dhost, LLADDR(ifp->if_sadl),
-						ETHER_ADDR_LEN) != 0) {
-				m_freem(m);
-				continue;
-			}
-		}
 #endif
 		/* pass it on. */
 		(*ifp->if_input)(ifp, m);
@@ -1290,16 +1255,15 @@ int rtk_intr(arg)
 
 		if (status & RTK_ISR_SYSTEM_ERR) {
 			rtk_reset(sc);
-			rtk_init(sc);
+			rtk_init(ifp);
 		}
 	}
 
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, RTK_IMR, RTK_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL) {
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		rtk_start(ifp);
-	}
 
 	return (handled);
 }
@@ -1319,9 +1283,10 @@ STATIC void rtk_start(ifp)
 	sc = ifp->if_softc;
 
 	while ((txd = SIMPLEQ_FIRST(&sc->rtk_tx_free)) != NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
+		m_new = NULL;
 
 		/*
 		 * Load the DMA map.  If this fails, the packet didn't
@@ -1330,12 +1295,11 @@ STATIC void rtk_start(ifp)
 		 */
 		if ((mtod(m_head, uintptr_t) & 3) != 0 ||
 		    bus_dmamap_load_mbuf(sc->sc_dmat, txd->txd_dmamap,
-			m_head, BUS_DMA_NOWAIT) != 0) {
+			m_head, BUS_DMA_WRITE|BUS_DMA_NOWAIT) != 0) {
 			MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 			if (m_new == NULL) {
 				printf("%s: unable to allocate Tx mbuf\n",
 				    sc->sc_dev.dv_xname);
-				IF_PREPEND(&ifp->if_snd, m_new);
 				break;
 			}
 			if (m_head->m_pkthdr.len > MHLEN) {
@@ -1344,7 +1308,6 @@ STATIC void rtk_start(ifp)
 					printf("%s: unable to allocate Tx "
 					    "cluster\n", sc->sc_dev.dv_xname);
 					m_freem(m_new);
-					IF_PREPEND(&ifp->if_snd, m_head);
 					break;
 				}
 			}
@@ -1352,17 +1315,19 @@ STATIC void rtk_start(ifp)
 			    mtod(m_new, caddr_t));
 			m_new->m_pkthdr.len = m_new->m_len =
 			    m_head->m_pkthdr.len;
-			m_freem(m_head);
-			m_head = m_new;
 			error = bus_dmamap_load_mbuf(sc->sc_dmat,
 			    txd->txd_dmamap, m_new,
-			    BUS_DMA_NOWAIT);
+			    BUS_DMA_WRITE|BUS_DMA_NOWAIT);
 			if (error) {
 				printf("%s: unable to load Tx buffer, "
 				    "error = %d\n", sc->sc_dev.dv_xname, error);
-				IF_PREPEND(&ifp->if_snd, m_head);
 				break;
 			}
+		}
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		if (m_new != NULL) {
+			m_freem(m_head);
+			m_head = m_new;
 		}
 		txd->txd_mbuf = m_head;
 
@@ -1407,20 +1372,20 @@ STATIC void rtk_start(ifp)
 	ifp->if_timer = 5;
 }
 
-STATIC void rtk_init(xsc)
-	void			*xsc;
+STATIC int rtk_init(ifp)
+	struct ifnet *ifp;
 {
-	struct rtk_softc	*sc = xsc;
-	struct ifnet		*ifp = &sc->ethercom.ec_if;
-	int			s, i;
+	struct rtk_softc	*sc = ifp->if_softc;
+	int			error = 0, i;
 	u_int32_t		rxcfg;
 
-	s = splnet();
+	if ((error = rtk_enable(sc)) != 0)
+		goto out;
 
 	/*
-	 * Cancel pending I/O and free all RX/TX buffers.
+	 * Cancel pending I/O.
 	 */
-	rtk_stop(sc);
+	rtk_stop(ifp, 0);
 
 	/* Init our MAC address */
 	for (i = 0; i < ETHER_ADDR_LEN; i++) {
@@ -1498,9 +1463,15 @@ STATIC void rtk_init(xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	(void)splx(s);
-
 	callout_reset(&sc->rtk_tick_ch, hz, rtk_tick, sc);
+
+ out:
+	if (error) {
+		ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+		ifp->if_timer = 0;
+		printf("%s: interface not running\n", sc->sc_dev.dv_xname);
+	}
+	return (error);
 }
 
 /*
@@ -1532,58 +1503,6 @@ STATIC void rtk_ifmedia_sts(ifp, ifmr)
 	ifmr->ifm_active = sc->mii.mii_media_active;
 }
 
-STATIC int
-rtk_ether_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
-{
-	struct ifaddr *ifa = (struct ifaddr *) data;
-	struct rtk_softc *sc = ifp->if_softc;
-	int error = 0;
-
-	switch (cmd) {
-	case SIOCSIFADDR:
-		if ((error = rtk_enable(sc)) != 0)
-			break;
-		ifp->if_flags |= IFF_UP;
-
-		switch (ifa->ifa_addr->sa_family) {
-#ifdef INET
-		case AF_INET:
-			rtk_init(sc);
-			arp_ifinit(ifp, ifa);
-			break;
-#endif
-#ifdef NS
-		case AF_NS:
-		    {
-			 struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
-
-			 if (ns_nullhost(*ina))
-				ina->x_host = *(union ns_host *)
-				    LLADDR(ifp->if_sadl);
-			 else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
-				    ifp->if_addrlen);
-			 /* Set new address. */
-			 rtk_init(sc);
-			 break;
-		    }
-#endif
-		default:
-			rtk_init(sc);
-			break;
-		}
-		break;
-
-	default:
-		return (EINVAL);
-	}
-
-	return (error);
-}
-
 STATIC int rtk_ioctl(ifp, command, data)
 	struct ifnet		*ifp;
 	u_long			command;
@@ -1596,45 +1515,23 @@ STATIC int rtk_ioctl(ifp, command, data)
 	s = splnet();
 
 	switch (command) {
-	case SIOCSIFADDR:
-	case SIOCGIFADDR:
-	case SIOCSIFMTU:
-		error = rtk_ether_ioctl(ifp, command, data);
-		break;
-	case SIOCSIFFLAGS:
-		if (ifp->if_flags & IFF_UP) {
-			if ((error = rtk_enable(sc)) != 0)
-				break;
-			rtk_init(sc);
-		} else {
-			if (ifp->if_flags & IFF_RUNNING) {
-				rtk_stop(sc);
-				rtk_disable(sc);
-			}
-		}
-		error = 0;
-		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-		error = (command == SIOCADDMULTI) ?
-		    ether_addmulti(ifr, &sc->ethercom) :
-		    ether_delmulti(ifr, &sc->ethercom);
-
-		if (error == ENETRESET) { 
-			/*
-			 * Multicast list has changed; set the hardware filter
-			 * accordingly.
-			 */
-			rtk_setmulti(sc);
-			error = 0;
-		}
-		break;
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->mii.mii_media, command);
 		break;
+
 	default:
-		error = EINVAL;
+		error = ether_ioctl(ifp, command, data);
+		if (error == ENETRESET) {
+			if (RTK_IS_ENABLED(sc)) {
+				/*
+				 * Multicast list has changed.  Set the
+				 * hardware filter accordingly.
+				 */
+				rtk_setmulti(sc);
+			}
+			error = 0;
+		}
 		break;
 	}
 
@@ -1654,21 +1551,19 @@ STATIC void rtk_watchdog(ifp)
 	ifp->if_oerrors++;
 	rtk_txeof(sc);
 	rtk_rxeof(sc);
-	rtk_init(sc);
+	rtk_init(ifp);
 }
 
 /*
  * Stop the adapter and free any mbufs allocated to the
  * RX and TX lists.
  */
-STATIC void rtk_stop(sc)
-	struct rtk_softc	*sc;
+STATIC void rtk_stop(ifp, disable)
+	struct ifnet *ifp;
+	int disable;
 {
-	struct ifnet		*ifp;
+	struct rtk_softc *sc = ifp->if_softc;
 	struct rtk_tx_desc *txd;
-
-	ifp = &sc->ethercom.ec_if;
-	ifp->if_timer = 0;
 
 	callout_stop(&sc->rtk_tick_ch);
 
@@ -1688,9 +1583,11 @@ STATIC void rtk_stop(sc)
 		CSR_WRITE_4(sc, txd->txd_txaddr, 0);
 	}
 
-	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+	if (disable)
+		rtk_disable(sc);
 
-	return;
+	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+	ifp->if_timer = 0;
 }
 
 /*
@@ -1702,9 +1599,7 @@ STATIC void rtk_shutdown(vsc)
 {
 	struct rtk_softc	*sc = (struct rtk_softc *)vsc;
 
-	rtk_stop(sc);
-
-	return;
+	rtk_stop(&sc->ethercom.ec_if, 0);
 }
 
 STATIC void

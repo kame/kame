@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_exec.h,v 1.12 1998/12/15 19:31:39 itohy Exp $	*/
+/*	$NetBSD: linux_exec.h,v 1.21 2002/04/02 20:23:44 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -45,13 +45,18 @@
 #include <compat/linux/arch/m68k/linux_exec.h>
 #elif defined(__alpha__)
 #include <compat/linux/arch/alpha/linux_exec.h>
-#else
-#error Undefined linux_exec.h machine type.
+#elif defined(__powerpc__)
+#include <compat/linux/arch/powerpc/linux_exec.h>
+#elif defined(__mips__)
+#include <compat/linux/arch/mips/linux_exec.h>
+#elif defined(__arm__)
+#include <compat/linux/arch/arm/linux_exec.h>
 #endif
 
 
 /* Defines for a.out executables */
 #define LINUX_AOUT_HDR_SIZE (sizeof (struct exec))
+#define	LINUX_AOUT_AUX_ARGSIZ	2
 
 #define LINUX_N_MAGIC(ep)    ((ep)->a_midmag & 0xffff)
 #define LINUX_N_MACHTYPE(ep) (((ep)->a_midmag >> 16) & 0xff)
@@ -73,18 +78,59 @@
 
 #define LINUX_N_BSSADDR(x,m) (LINUX_N_DATADDR(x,m) + (x).a_data)
 
+/* 
+ * From Linux's include/linux/elf.h
+ */
+#define LINUX_AT_UID		11	/* real uid */
+#define LINUX_AT_EUID		12	/* effective uid */
+#define LINUX_AT_GID		13	/* real gid */
+#define LINUX_AT_EGID		14	/* effective gid */ 
+#define LINUX_AT_PLATFORM	15	/* CPU string for optimizations */
+#define LINUX_AT_HWCAP		16	/* arch dependent CPU capabilities */
+#define LINUX_AT_CLKTCK		17	/* frequency times() increments */
+
+/*
+ * Emulation specific sysctls.
+ */
+#define EMUL_LINUX_KERN			1
+#define EMUL_LINUX_MAXID		2
+
+#define EMUL_LINUX_NAMES { \
+	{ 0, 0 }, \
+	{ "kern", CTLTYPE_NODE }, \
+}
+
+#define EMUL_LINUX_KERN_OSTYPE		1
+#define EMUL_LINUX_KERN_OSRELEASE	2
+#define EMUL_LINUX_KERN_VERSION		3
+#define EMUL_LINUX_KERN_MAXID		4
+
+#define EMUL_LINUX_KERN_NAMES { \
+	{ 0, 0 }, \
+	{ "ostype", CTLTYPE_STRING }, \
+	{ "osrelease", CTLTYPE_STRING }, \
+	{ "osversion", CTLTYPE_STRING }, \
+}
+
 #ifdef _KERNEL
 __BEGIN_DECLS
+extern const struct emul emul_linux;
+
+int linux_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
+    struct proc *));
 void linux_setregs __P((struct proc *, struct exec_package *, u_long));
 int exec_linux_aout_makecmds __P((struct proc *, struct exec_package *));
+int linux_aout_copyargs __P((struct exec_package *, struct ps_strings *,
+    char **, void *));
+void linux_trapsignal __P((struct proc *, int, u_long));
 
 #ifdef EXEC_ELF32
-int linux_elf32_probe __P((struct proc *, struct exec_package *, Elf32_Ehdr *,
-    char *, Elf32_Addr *));
+int linux_elf32_probe __P((struct proc *, struct exec_package *, void *,
+    char *, vaddr_t *));
 #endif
 #ifdef EXEC_ELF64
-int linux_elf64_probe __P((struct proc *, struct exec_package *, Elf64_Ehdr *,
-    char *, Elf64_Addr *));
+int linux_elf64_probe __P((struct proc *, struct exec_package *, void *,
+    char *, vaddr_t *));
 #endif
 __END_DECLS
 #endif /* !_KERNEL */

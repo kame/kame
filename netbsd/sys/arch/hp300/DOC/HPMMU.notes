@@ -1,4 +1,4 @@
-$NetBSD: HPMMU.notes,v 1.2 1994/10/26 07:22:51 cgd Exp $
+$NetBSD: HPMMU.notes,v 1.5 2002/02/11 10:44:39 wiz Exp $
 
 Overview:
 --------
@@ -8,7 +8,7 @@ Overview:
 
 	Page and segment table entries mimic the Motorola 68851 PMMU,
 	in an effort at upward compatibility.  The HP MMU uses a two
-	level translation scheme.  There are seperate (but equal!)
+	level translation scheme.  There are separate (but equal!)
 	translation tables for both supervisor and user modes.  At the
 	lowest level are page tables.  Each page table consists of one
 	or more 4k pages of 1024x4 byte page table entries.  Each PTE
@@ -20,14 +20,14 @@ Overview:
 	unused valid bit in page and segment table entries must be
 	zero.
 
-	There are seperate translation lookaside buffers for the user
+	There are separate translation lookaside buffers for the user
 	and supervisor modes, each containing 1024 entries.
 
 	To augment the 68020's instruction cache, the HP CPU has an
 	external cache.  A direct-mapped, virtual cache implementation
 	is used with 16 Kbytes of cache on 320 systems and 32 Kbytes on
 	350 systems.  Each cache entry can contain instructions or data,
-	from either user or supervisor space.  Seperate valid bits are
+	from either user or supervisor space.  Separate valid bits are
 	kept for user and supervisor entries, allowing for descriminatory
 	flushing of the cache.
 
@@ -77,14 +77,14 @@ Hardware registers:
 		TLB.  More info below.
 	5F400C:	MMU command/status register.  Defined as follows:
 
-		bit 15:	If 1, indicates a page table fault occured
-		bit 14:	If 1, indicates a page fault occured
+		bit 15:	If 1, indicates a page table fault occurred
+		bit 14:	If 1, indicates a page fault occurred
 		bit 13: If 1, indicates a protection fault (write to RO page)
 		bit 6:	MC68881 enable.  Tied to chip enable line.
 			(set this bit to enable)
 		bit 5:	MC68020 instruction cache enable.  Tied to Insruction
 			cache disable line.  (set this bit to enable)
-		bit 3:	If 1, indicates an MMU related bus error occured.
+		bit 3:	If 1, indicates an MMU related bus error occurred.
 			Bits 13-15 are now valid.
 		bit 2:	External cache enable.  (set this bit to enable)
 		bit 1:	Supervisor mapping enable.  Enables translation of

@@ -1,7 +1,7 @@
-/*	$NetBSD: linux_machdep.h,v 1.2 2000/03/18 23:40:56 erh Exp $	*/
+/*	$NetBSD: linux_machdep.h,v 1.6 2002/02/15 16:47:58 christos Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -38,6 +38,8 @@
 
 #ifndef _ALPHA_LINUX_MACHDEP_H
 #define _ALPHA_LINUX_MACHDEP_H
+
+#include <compat/linux/common/linux_signal.h>
 
 /*
  * The Linux sigcontext, pretty much a standard alpha trapframe.
@@ -99,8 +101,7 @@ void setup_linux_rt_sigframe __P((struct trapframe *, int, sigset_t *));
 void setup_linux_sigframe __P((struct trapframe *, int, sigset_t *));
 int linux_restore_sigcontext __P((struct proc *, struct linux_sigcontext,
 				  sigset_t *));
-void linux_sendsig __P((sig_t, int, sigset_t *, u_long));
-dev_t linux_fakedev __P((dev_t));
+void linux_syscall_intern __P((struct proc *));
 __END_DECLS
 #endif /* !_KERNEL */
 

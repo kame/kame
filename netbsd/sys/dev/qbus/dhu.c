@@ -1,4 +1,4 @@
-/*	$NetBSD: dhu.c,v 1.20 2000/06/05 00:09:18 matt Exp $	*/
+/*	$NetBSD: dhu.c,v 1.26 2002/03/17 19:41:01 atatat Exp $	*/
 /*
  * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
  * Copyright (c) 1992, 1993
@@ -35,6 +35,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dhu.c,v 1.26 2002/03/17 19:41:01 atatat Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -144,13 +147,8 @@ static	void	dhustart __P((struct tty *));
 static	int	dhuparam __P((struct tty *, struct termios *));
 static	int	dhuiflow __P((struct tty *, int));
 static unsigned	dhumctl __P((struct dhu_softc *,int, int, int));
-	int	dhuopen __P((dev_t, int, int, struct proc *));
-	int	dhuclose __P((dev_t, int, int, struct proc *));
-	int	dhuread __P((dev_t, struct uio *, int));
-	int	dhuwrite __P((dev_t, struct uio *, int));
-	int	dhuioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
-	void	dhustop __P((struct tty *, int));
-struct tty *	dhutty __P((dev_t));
+
+cdev_decl(dhu);
 
 struct	cfattach dhu_ca = {
 	sizeof(struct dhu_softc), dhu_match, dhu_attach
@@ -287,10 +285,10 @@ dhurint(arg)
 			/* Do MDMBUF flow control, wakeup sleeping opens */
 			if (c & DHU_STAT_DCD) {
 				if (!(tp->t_state & TS_CARR_ON))
-				    (void)(*linesw[tp->t_line].l_modem)(tp, 1);
+				    (void)(*tp->t_linesw->l_modem)(tp, 1);
 			}
 			else if ((tp->t_state & TS_CARR_ON) &&
-				(*linesw[tp->t_line].l_modem)(tp, 0) == 0)
+				(*tp->t_linesw->l_modem)(tp, 0) == 0)
 					(void) dhumctl(sc, line, 0, DMSET);
 
 			/* Do CRTSCTS flow control */
@@ -326,7 +324,7 @@ dhurint(arg)
 		if (c & DHU_RBUF_PARITY_ERR)
 			cc |= TTY_PE;
 
-		(*linesw[tp->t_line].l_rint)(cc, tp);
+		(*tp->t_linesw->l_rint)(cc, tp);
 	}
 }
 
@@ -357,10 +355,7 @@ dhuxint(arg)
 
 	sc->sc_dhu[line].dhu_state = STATE_IDLE;
 
-	if (tp->t_line)
-		(*linesw[tp->t_line].l_start)(tp);
-	else
-		dhustart(tp);
+	(*tp->t_linesw->l_start)(tp);
 }
 
 int
@@ -425,7 +420,7 @@ dhuopen(dev, flag, mode, p)
 	(void) splx(s);
 	if (error)
 		return (error);
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return ((*tp->t_linesw->l_open)(dev, tp));
 }
 
 /*ARGSUSED*/
@@ -446,7 +441,7 @@ dhuclose(dev, flag, mode, p)
 
 	tp = sc->sc_dhu[line].dhu_tty;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 
 	/* Make sure a BREAK state is not left enabled. */
 
@@ -472,7 +467,7 @@ dhuread(dev, uio, flag)
 	sc = dhu_cd.cd_devs[DHU_M2U(minor(dev))];
 
 	tp = sc->sc_dhu[DHU_LINE(minor(dev))].dhu_tty;
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -486,7 +481,22 @@ dhuwrite(dev, uio, flag)
 	sc = dhu_cd.cd_devs[DHU_M2U(minor(dev))];
 
 	tp = sc->sc_dhu[DHU_LINE(minor(dev))].dhu_tty;
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+dhupoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct dhu_softc *sc;
+	struct tty *tp;
+
+	sc = dhu_cd.cd_devs[DHU_M2U(minor(dev))];
+
+	tp = sc->sc_dhu[DHU_LINE(minor(dev))].dhu_tty;
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 /*ARGSUSED*/
@@ -508,11 +518,12 @@ dhuioctl(dev, cmd, data, flag, p)
 	sc = dhu_cd.cd_devs[unit];
 	tp = sc->sc_dhu[line].dhu_tty;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -550,7 +561,7 @@ dhuioctl(dev, cmd, data, flag, p)
 		break;
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }

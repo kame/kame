@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.h,v 1.2 2000/05/26 21:19:48 thorpej Exp $ */
+/* $NetBSD: cpu.h,v 1.5 2001/05/30 12:28:45 mrg Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -45,7 +45,7 @@
 #ifndef _MACHINE_CPU_H
 #define _MACHINE_CPU_H
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -105,7 +105,7 @@ struct clockframe {
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-#define need_resched()	{ want_resched = 1; aston(); }
+#define need_resched(ci)	{ want_resched = 1; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -192,8 +192,6 @@ void	physaccess __P((caddr_t, caddr_t, int, int));
 void	physunaccess __P((caddr_t, int));
 int	kvtop __P((caddr_t));
 
-/* trap.c functions */
-void	child_return __P((void *));
 #endif
 
 #endif /* _MACHINE_CPU_H */

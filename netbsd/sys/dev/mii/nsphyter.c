@@ -1,7 +1,7 @@
-/*	$NetBSD: nsphyter.c,v 1.6.4.1 2000/07/04 04:11:13 thorpej Exp $	*/
+/*	$NetBSD: nsphyter.c,v 1.14 2002/03/25 20:51:25 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -69,7 +69,13 @@
 /*
  * driver for National Semiconductor's DP83843 `PHYTER' ethernet 10/100 PHY
  * Data Sheet available from www.national.com
+ *
+ * We also support the DP83815 MacPHYER internal PHY since, for our
+ * purposes, they are compatible.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nsphyter.c,v 1.14 2002/03/25 20:51:25 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,53 +94,60 @@
 
 #include <dev/mii/nsphyterreg.h>
 
-int	nsphytermatch __P((struct device *, struct cfdata *, void *));
-void	nsphyterattach __P((struct device *, struct device *, void *));
+int	nsphytermatch(struct device *, struct cfdata *, void *);
+void	nsphyterattach(struct device *, struct device *, void *);
 
 struct cfattach nsphyter_ca = {
 	sizeof(struct mii_softc), nsphytermatch, nsphyterattach,
 	    mii_phy_detach, mii_phy_activate
 };
 
-int	nsphyter_service __P((struct mii_softc *, struct mii_data *, int));
-void	nsphyter_status __P((struct mii_softc *));
+int	nsphyter_service(struct mii_softc *, struct mii_data *, int);
+void	nsphyter_status(struct mii_softc *);
 
 const struct mii_phy_funcs nsphyter_funcs = {
 	nsphyter_service, nsphyter_status, mii_phy_reset,
 };
 
+const struct mii_phydesc nsphyters[] = {
+	{ MII_OUI_xxNATSEMI,		MII_MODEL_xxNATSEMI_DP83843,
+	  MII_STR_xxNATSEMI_DP83843 },
+
+	{ MII_OUI_xxNATSEMI,		MII_MODEL_xxNATSEMI_DP83815,
+	  MII_STR_xxNATSEMI_DP83815 },
+
+	{ 0,				0,
+	  NULL },
+};
+
 int
-nsphytermatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+nsphytermatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;
 
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_NATSEMI &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_NATSEMI_DP83843)
+	if (mii_phy_match(ma, nsphyters) != NULL)
 		return (10);
 
 	return (0);
 }
 
 void
-nsphyterattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+nsphyterattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 
-	printf(": %s, rev. %d\n", MII_STR_NATSEMI_DP83843,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, nsphyters);
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &nsphyter_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	PHY_RESET(sc);
 
@@ -149,10 +162,7 @@ nsphyterattach(parent, self, aux)
 }
 
 int
-nsphyter_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+nsphyter_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;
@@ -211,8 +221,7 @@ nsphyter_service(sc, mii, cmd)
 }
 
 void
-nsphyter_status(sc)
-	struct mii_softc *sc;
+nsphyter_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;

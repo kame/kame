@@ -1,18 +1,17 @@
-/* $NetBSD: isp_target.h,v 1.4.4.1 2000/08/28 17:45:11 mjacob Exp $ */
+/* $NetBSD: isp_target.h,v 1.18 2002/05/17 18:49:43 mjacob Exp $ */
 /*
  * This driver, which is contained in NetBSD in the files:
  *
  *	sys/dev/ic/isp.c
- *	sys/dev/ic/ic/isp.c
- *	sys/dev/ic/ic/isp_inline.h
- *	sys/dev/ic/ic/isp_netbsd.c
- *	sys/dev/ic/ic/isp_netbsd.h
- *	sys/dev/ic/ic/isp_target.c
- *	sys/dev/ic/ic/isp_target.h
- *	sys/dev/ic/ic/isp_tpublic.h
- *	sys/dev/ic/ic/ispmbox.h
- *	sys/dev/ic/ic/ispreg.h
- *	sys/dev/ic/ic/ispvar.h
+ *	sys/dev/ic/isp_inline.h
+ *	sys/dev/ic/isp_netbsd.c
+ *	sys/dev/ic/isp_netbsd.h
+ *	sys/dev/ic/isp_target.c
+ *	sys/dev/ic/isp_target.h
+ *	sys/dev/ic/isp_tpublic.h
+ *	sys/dev/ic/ispmbox.h
+ *	sys/dev/ic/ispreg.h
+ *	sys/dev/ic/ispvar.h
  *	sys/microcode/isp/asm_sbus.h
  *	sys/microcode/isp/asm_1040.h
  *	sys/microcode/isp/asm_1080.h
@@ -36,7 +35,7 @@
  * pms@psconsult.com
  * All rights reserved.
  *
- * Additional Copyright (c) 1999
+ * Additional Copyright (c) 1999, 2000, 2001
  * Matthew Jacob
  * mjacob@feral.com
  * All rights reserved.
@@ -48,10 +47,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice immediately at the beginning of the file, without modification,
  *    this list of conditions, and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
+ * 2. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
@@ -65,8 +61,8 @@
  * SUCH DAMAGE.
  *
  */
-#ifndef	_ISPTARGET_H
-#define	_ISPTARGET_H
+#ifndef	_ISP_TARGET_H
+#define	_ISP_TARGET_H
 
 /*
  * Defines for all entry types
@@ -98,7 +94,7 @@ typedef struct {
 /*
  * le_flags values
  */
-#define LUN_TQAE	0x00000001	/* bit1  Tagged Queue Action Enable */
+#define LUN_TQAE	0x00000002	/* bit1  Tagged Queue Action Enable */
 #define LUN_DSSM	0x01000000	/* bit24 Disable Sending SDP Message */
 #define	LUN_DISAD	0x02000000	/* bit25 Disable autodisconnect */
 #define LUN_DM		0x40000000	/* bit30 Disconnects Mandatory */
@@ -244,7 +240,8 @@ typedef struct {
 
 typedef struct {
 	isphdr_t	at_header;
-	u_int32_t	at_reserved;
+	u_int16_t	at_reserved;
+	u_int16_t	at_handle;
 	u_int8_t	at_lun;		/* lun */
 	u_int8_t	at_iid;		/* initiator */
 	u_int8_t	at_cdblen; 	/* cdb length */
@@ -262,7 +259,7 @@ typedef struct {
  * at_flags values
  */
 #define AT_NODISC	0x00008000	/* disconnect disabled */
-#define AT_TQAE		0x00000001	/* Tagged Queue Action enabled */
+#define AT_TQAE		0x00000002	/* Tagged Queue Action enabled */
 
 /*
  * at_status values
@@ -273,6 +270,24 @@ typedef struct {
 #define AT_NOCAP	0x16	/* Requested capability not available */
 #define AT_BDR_MSG	0x17	/* Bus Device Reset msg received */
 #define AT_CDB		0x3D	/* CDB received */
+
+/*
+ * Macros to create and fetch and test concatenated handle and tag value macros
+ */
+
+#define	AT_MAKE_TAGID(tid, aep)						\
+	tid = ((aep)->at_handle << 16);					\
+	if ((aep)->at_flags & AT_TQAE)					\
+		(tid) |= ((aep)->at_tag_val + 1)
+
+#define	CT_MAKE_TAGID(tid, ct)						\
+	tid = ((ct)->ct_fwhandle << 16);				\
+	if ((ct)->ct_flags & CT_TQAE)					\
+		(tid) |= ((ct)->ct_tag_val + 1)
+
+#define	AT_HAS_TAG(val)		((val) & 0xffff)
+#define	AT_GET_TAG(val)		AT_HAS_TAG(val) - 1
+#define	AT_GET_HANDLE(val)	((val) >> 16)
 
 /*
  * Accept Target I/O Entry structure, Type 2
@@ -293,11 +308,14 @@ typedef struct {
 	u_int8_t	at_execodes;
 	u_int8_t	at_cdb[ATIO2_CDBLEN];	/* received CDB */
 	u_int32_t	at_datalen;		/* allocated data len */
-	u_int16_t	at_scclun;	/* SCC Lun or reserved */
-	u_int16_t	at_reserved2;
-	u_int16_t	at_scsi_status;
-	u_int8_t	at_sense[QLTM_SENSELEN];
+	u_int16_t	at_scclun;		/* SCC Lun or reserved */
+	u_int16_t	at_wwpn[4];		/* WWPN of initiator */
+	u_int16_t	at_reserved2[6];
+	u_int16_t	at_oxid;
 } at2_entry_t;
+
+#define	ATIO2_WWPN_OFFSET	0x2A
+#define	ATIO2_OXID_OFFSET	0x3E
 
 #define	ATIO2_TC_ATTR_MASK	0x7
 #define	ATIO2_TC_ATTR_SIMPLEQ	0
@@ -315,7 +333,9 @@ typedef struct {
  */
 typedef struct {
 	isphdr_t	ct_header;
-	u_int32_t	ct_reserved;
+	u_int16_t	ct_reserved;
+#define	ct_syshandle	ct_reserved	/* we use this */
+	u_int16_t	ct_fwhandle;	/* required by f/w */
 	u_int8_t	ct_lun;	/* lun */
 	u_int8_t	ct_iid;	/* initiator id */
 	u_int8_t	ct_reserved2;
@@ -329,7 +349,14 @@ typedef struct {
 	u_int32_t	ct_resid;	/* residual length */
 	u_int16_t	ct_timeout;
 	u_int16_t	ct_seg_count;
-	ispds_t		ct_dataseg[ISP_RQDSEG];
+	/*
+	 * This is so we can share tag name space with
+	 * CTIO{2,3,4} with the minimum of pain.
+	 */
+	union {
+		ispds_t		ct_a[ISP_RQDSEG];
+	} _u;
+#define	ct_dataseg	_u.ct_a
 } ct_entry_t;
 
 /*
@@ -342,13 +369,13 @@ typedef struct {
  */
 #define	GET_IID_VAL(x)		(x & 0x3f)
 #define	GET_BUS_VAL(x)		((x >> 7) & 0x1)
-#define	SET_IID_VAL(y, x)	(y | (x & 0x3f))
-#define	SET_BUS_VAL(y, x)	(y | ((x & 0x1) << 7))
+#define	SET_IID_VAL(y, x)	y = ((y & ~0x3f) | (x & 0x3f))
+#define	SET_BUS_VAL(y, x)	y = ((y & 0x3f) | ((x & 0x1) << 7))
 
 /*
  * ct_flags values
  */
-#define CT_TQAE		0x00000001	/* bit  1, Tagged Queue Action enable */
+#define CT_TQAE		0x00000002	/* bit  1, Tagged Queue Action enable */
 #define CT_DATA_IN	0x00000040	/* bits 6&7, Data direction */
 #define CT_DATA_OUT	0x00000080	/* bits 6&7, Data direction */
 #define CT_NO_DATA	0x000000C0	/* bits 6&7, Data direction */
@@ -370,13 +397,16 @@ typedef struct {
 #define CT_INVAL	0x06	/* request for disabled lun */
 #define CT_NOPATH	0x07	/* invalid ITL nexus */
 #define	CT_INVRXID	0x08	/* (FC only) Invalid RX_ID */
+#define	CT_DATA_OVER	0x09	/* (FC only) Data Overrun */
 #define CT_RSELTMO	0x0A	/* reselection timeout after 2 tries */
 #define CT_TIMEOUT	0x0B	/* timed out */
 #define CT_RESET	0x0E	/* SCSI Bus Reset occurred */
 #define	CT_PARITY	0x0F	/* Uncorrectable Parity Error */
+#define	CT_BUS_ERROR	0x10	/* (FC Only) DMA PCI Error */
 #define	CT_PANIC	0x13	/* Unrecoverable Error */
 #define CT_PHASE_ERROR	0x14	/* Bus phase sequence error */
 #define CT_BDR_MSG	0x17	/* Bus Device Reset msg received */
+#define	CT_DATA_UNDER	0x15	/* (FC only) Data Underrun */
 #define CT_TERMINATED	0x19	/* due to Terminate Transfer mbox cmd */
 #define	CT_PORTNOTAVAIL	0x28	/* port not available */
 #define	CT_LOGOUT	0x29	/* port logout */
@@ -405,10 +435,11 @@ typedef struct {
 #define	MAXRESPLEN	26
 typedef struct {
 	isphdr_t	ct_header;
-	u_int32_t	ct_reserved;
-	u_int8_t	ct_lun;	/* lun */
-	u_int8_t	ct_iid;	/* initiator id */
-	u_int16_t	ct_rxid; /* response ID */
+	u_int16_t	ct_reserved;
+	u_int16_t	ct_fwhandle;	/* just to match CTIO */
+	u_int8_t	ct_lun;		/* lun */
+	u_int8_t	ct_iid;		/* initiator id */
+	u_int16_t	ct_rxid;	/* response ID */
 	u_int16_t	ct_flags;
 	u_int16_t 	ct_status;	/* isp status */
 	u_int16_t	ct_timeout;
@@ -418,7 +449,7 @@ typedef struct {
 	union {
 		/*
 		 * The three different modes that the target driver
-		 * can set the CTIO2 up as.
+		 * can set the CTIO{2,3,4} up as.
 		 *
 		 * The first is for sending FCP_DATA_IUs as well as
 		 * (optionally) sending a terminal SCSI status FCP_RSP_IU.
@@ -434,7 +465,14 @@ typedef struct {
 			u_int16_t _reserved2;
 			u_int16_t ct_scsi_status;
 			u_int32_t ct_xfrlen;
-			ispds_t ct_dataseg[ISP_RQDSEG_T2];
+			union {
+				ispds_t ct_a[ISP_RQDSEG_T2];	/* CTIO2 */
+				ispds64_t ct_b[ISP_RQDSEG_T3];	/* CTIO3 */
+				ispdslist_t ct_c;		/* CTIO4 */
+			} _u;
+#define	ct_dataseg	_u.ct_a
+#define	ct_dataseg64	_u.ct_b
+#define	ct_dslist	_u.ct_c
 		} m0;
 		struct {
 			u_int16_t _reserved;
@@ -492,198 +530,57 @@ typedef struct {
 #define	CT2_DATA_UNDER		0x0800
 
 /*
- * Macros for packing/unpacking the above structures
- */
-
-#ifdef	__sparc__
-#define	ISP_SBUS_SWOZZLE(isp, src, dest, taga, tagb)	\
-	if (isp->isp_bus == ISP_SBUS) {	\
-		source -> taga =  dest -> tagb;	\
-		source -> tagb =  dest -> taga;	\
-	} else { \
-		source -> taga =  dest -> taga;	\
-		source -> tagb =  dest -> taga;	\
-	}
-#else
-#define	ISP_SBUS_SWOZZLE(isp, src, dest, taga, tagb)	\
-		source -> taga =  dest -> taga;	\
-		source -> tagb =  dest -> taga;
-#endif
-
-#define	MCIDF(d, s)	if ((void *) d != (void *)s) MEMCPY(d, s, QENTRY_LEN)
-
-/* This is really only for SBus cards on a sparc */
-#ifdef	__sparc__
-#define	ISP_SWIZ_ATIO(isp, dest, vsrc)					\
-{									\
-	at_entry_t *source = (at_entry_t *) vsrc;			\
-	at_entry_t local, *vdst;					\
-	if ((void *)dest == (void *)vsrc) {				\
-		MEMCPY(vsrc, &local, sizeof (at_entry_t));		\
-		vdst = &local;						\
-	} else {							\
-		vdst = dest;						\
-	}								\
-	vdst->at_header = source->at_header;				\
-	vdst->at_reserved2 = source->at_reserved2;			\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, at_lun, at_iid);		\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, at_cdblen, at_tgt);		\
-	vdst->at_flags = source->at_flags;				\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, at_status, at_scsi_status);	\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, at_tag_val, at_tag_type);	\
-	MEMCPY(vdst->at_cdb, source->at_cdb, ATIO_CDBLEN);		\
-	MEMCPY(vdst->at_sense, source->at_sense, QLTM_SENSELEN);	\
-}
-
-#define	ISP_SWIZ_CTIO(isp, dest, vsrc)					\
-{									\
-	ct_entry_t *source = (ct_entry_t *) vsrc;			\
-	ct_entry_t *local, *vdst;					\
-	if ((void *)dest == (void *)vsrc) {				\
-		MEMCPY(vsrc, &local, sizeof (ct_entry_t));		\
-		vdst = &local;						\
-	} else {							\
-		vdst = dest;						\
-	}								\
-	vdst->ct_header = source->ct_header;				\
-	vdst->ct_reserved = source->ct_reserved;			\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, ct_lun, ct_iid);		\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, ct_rsvd, ct_tgt);		\
-	vdst->ct_flags = source->ct_flags;				\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, ct_status, ct_scsi_status);	\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, ct_tag_val, ct_tag_type);	\
-	vdst->ct_xfrlen = source->ct_xfrlen;				\
-	vdst->ct_resid = source->ct_resid;				\
-	vdst->ct_timeout = source->ct_timeout;				\
-	vdst->ct_seg_count = source->ct_seg_count;			\
-	MEMCPY(vdst->ct_cdb, source->ct_cdb, ATIO_CDBLEN);		\
-	MEMCPY(vdst->ct_sense, source->ct_sense, QLTM_SENSELEN);	\
-	vdst->ct_dataseg = source->ct_dataseg;				\
-}
-#define	ISP_SWIZ_ENABLE_LUN(isp, dest, vsrc)				\
-{									\
-	lun_entry_t *source = (lun_entry_t *)vsrc;			\
-	lun_entry_t *local, *vdst;					\
-	if ((void *)dest == (void *)vsrc) {				\
-		MEMCPY(vsrc, &local, sizeof (lun_entry_t));		\
-		vdst = &local;						\
-	} else {							\
-		vdst = dest;						\
-	}								\
-	vdst->le_header = source->le_header;				\
-	vdst->le_reserved2 = source->le_reserved2;			\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, le_lun, le_rsvd);		\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, le_ops, le_tgt);		\
-	vdst->le_flags = source->le_flags;				\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, le_status, le_rsvd2);	\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, le_cmd_count, le_in_count);	\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, le_cdb6len, le_cdb7len);	\
-	vdst->le_timeout = source->le_timeout;				\
-	vdst->le_reserved = source->le_reserved;			\
-}
-#define	ISP_SWIZ_NOTIFY(isp, dest, vsrc)				\
-{									\
-	in_entry_type *source = (in_entry_t *)vsrc;			\
-	in_entry_t *local, *vdst;					\
-	if ((void *)dest == (void *)vsrc) {				\
-		MEMCPY(vsrc, &local, sizeof (in_entry_t));		\
-		vdst = &local;						\
-	} else {							\
-		vdst = dest;						\
-	}								\
-	vdst->in_header = source->in_header;				\
-	vdst->in_reserved2 = source->in_reserved2;			\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, in_lun, in_iid);		\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, in_rsvd, in_tgt);		\
-	vdst->in_flags = source->in_flags;				\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, in_status, in_rsvd2);	\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, in_tag_val, in_tag_type);	\
-	vdst->in_seqid = source->in_seqid;				\
-	MEMCPY(vdst->in_msg, source->in_msg, IN_MSGLEN);		\
-	MEMCPY(vdst->in_reserved, source->in_reserved, IN_RESERVED);	\
-	MEMCPY(vdst->in_sense, source->in_sense, QLTM_SENSELEN);	\
-}
-#define	ISP_SWIZ_NOT_ACK(isp, dest)					\
-{									\
-	na_entry_t *source = (na_entry_t *)vsrc;			\
-	na_entry_t *local, *vdst;					\
-	if ((void *)dest == (void *)vsrc) {				\
-		MEMCPY(vsrc, &local, sizeof (na_entry_t));		\
-		vdst = &local;						\
-	} else {							\
-		vdst = dest;						\
-	}								\
-	vdst->na_header = source->na_header;				\
-	vdst->na_reserved2 = source->na_reserved2;			\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, na_lun, na_iid);		\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, na_rsvd, na_tgt);		\
-	vdst->na_flags = source->na_flags;				\
-	ISP_SBUS_SWOZZLE(isp, source, vdst, na_status, na_event);	\
-	vdst->na_seqid = source->na_seqid;				\
-	MEMCPY(vdst->na_reserved, source->na_reserved, NA_RSVDLEN);	\
-}
-#define	ISP_SWIZ_NOT_ACK_FC(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_ATIO2(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_CTIO2(isp, d, s)	MCIDF(d, s)
-#else
-#define	ISP_SWIZ_ATIO(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_CTIO(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_ENABLE_LUN(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_NOTIFY(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_NOT_ACK(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_NOT_ACK_FC(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_ATIO2(isp, d, s)	MCIDF(d, s)
-#define	ISP_SWIZ_CTIO2(isp, d, s)	MCIDF(d, s)
-#endif
-
-/*
  * Debug macros
  */
 
 #define	ISP_TDQE(isp, msg, idx, arg)	\
     if (isp->isp_dblev & ISP_LOGTDEBUG2) isp_print_qentry(isp, msg, idx, arg)
 
+#ifdef	ISP_TARGET_FUNCTIONS
 /*
- * The functions below are target mode functions that
- * are generally internal to the Qlogic driver.
+ * The functions below are for the publicly available
+ * target mode functions that are internal to the Qlogic driver.
  */
 
 /*
  * This function handles new response queue entry appropriate for target mode.
  */
-int isp_target_notify __P((struct ispsoftc *, void *, u_int16_t *));
+int isp_target_notify(struct ispsoftc *, void *, u_int16_t *);
 
 /*
  * Enable/Disable/Modify a logical unit.
+ * (softc, cmd, bus, tgt, lun, cmd_cnt, inotify_cnt, opaque)
  */
-#define	DFLT_CMD_CNT	32	/* XX */
-#define	DFLT_INOTIFY	(4)
-int isp_lun_cmd __P((struct ispsoftc *, int, int, int, int, u_int32_t));
+#define	DFLT_CMND_CNT	32
+#define	DFLT_INOT_CNT	4
+int isp_lun_cmd(struct ispsoftc *, int, int, int, int, int, int, u_int32_t);
 
 /*
  * General request queue 'put' routine for target mode entries.
  */
-int isp_target_put_entry __P((struct ispsoftc *isp, void *));
+int isp_target_put_entry(struct ispsoftc *isp, void *);
 
 /*
  * General routine to put back an ATIO entry-
  * used for replenishing f/w resource counts.
+ * The argument is a pointer to a source ATIO
+ * or ATIO2.
  */
-int
-isp_target_put_atio __P((struct ispsoftc *, int, int, int, int, int));
+int isp_target_put_atio(struct ispsoftc *, void *);
 
 /*
  * General routine to send a final CTIO for a command- used mostly for
  * local responses.
  */
-int
-isp_endcmd __P((struct ispsoftc *, void *, u_int32_t, u_int32_t));
+int isp_endcmd(struct ispsoftc *, void *, u_int32_t, u_int16_t);
 #define	ECMD_SVALID	0x100
 
 /*
  * Handle an asynchronous event
+ *
+ * Return nonzero if the interrupt that generated this event has been dismissed.
  */
 
-void isp_target_async __P((struct ispsoftc *, int, int));
-
-#endif	/* _ISPTARGET_H */
+int isp_target_async(struct ispsoftc *, int, int);
+#endif
+#endif	/* _ISP_TARGET_H */

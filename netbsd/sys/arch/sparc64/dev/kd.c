@@ -1,4 +1,4 @@
-/*	$NetBSD: kd.c,v 1.12 2000/05/19 05:26:17 eeh Exp $	*/
+/*	$NetBSD: kd.c,v 1.20 2002/03/19 19:47:57 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -63,7 +63,7 @@
 #include <machine/conf.h>
 
 #ifdef RASTERCONSOLE
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 #include <machine/fbvar.h>
 #endif
 
@@ -138,14 +138,14 @@ kd_init(kd)
 	}
 
 	if (kd->rows == 0 &&
-	    (prop = getpropstring(optionsnode, "screen-#rows"))) {
+	    (prop = PROM_getpropstring(optionsnode, "screen-#rows"))) {
 		i = 0;
 		while (*prop != '\0')
 			i = i * 10 + *prop++ - '0';
 		kd->rows = (unsigned short)i;
 	}
 	if (kd->cols == 0 &&
-	    (prop = getpropstring(optionsnode, "screen-#columns"))) {
+	    (prop = PROM_getpropstring(optionsnode, "screen-#columns"))) {
 		i = 0;
 		while (*prop != '\0')
 			i = i * 10 + *prop++ - '0';
@@ -203,6 +203,7 @@ static	int firstopen = 1;
 		struct cons_channel *cc = kd->kd_in;
 		if (cc != NULL &&
 		    (error = (*cc->cc_iopen)(cc)) != 0) {
+			splx(s);
 			return (error);
 		}
 
@@ -223,7 +224,7 @@ static	int firstopen = 1;
 
 	splx(s);
 
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return ((*tp->t_linesw->l_open)(dev, tp));
 }
 
 int
@@ -243,7 +244,7 @@ kdclose(dev, flag, mode, p)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 
 	if ((cc = kd->kd_in) != NULL)
@@ -264,7 +265,7 @@ kdread(dev, uio, flag)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -279,7 +280,22 @@ kdwrite(dev, uio, flag)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+kdpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct kd_softc *kd;
+	struct tty *tp;
+
+	kd = &kd_softc; 	/* XXX */
+	tp = kd->kd_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -297,18 +313,19 @@ kdioctl(dev, cmd, data, flag, p)
 	kd = &kd_softc; 	/* XXX */
 	tp = kd->kd_tty;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return error;
 
 	/* Handle any ioctl commands specific to kbd/display. */
 	/* XXX - Send KB* ioctls to kbd module? */
 	/* XXX - Send FB* ioctls to fb module?  */
 
-	return ENOTTY;
+	return EPASSTHROUGH;
 }
 
 void
@@ -351,7 +368,7 @@ kdstart(tp)
 	if (cl->c_cc) {
 		if (kd_is_console) {
 			tp->t_state |= TS_BUSY;
-			if ((s & PSR_PIL) == 0) {
+			if (s == 0) {
 				/* called at level zero - update screen now. */
 				(void) spllowersoftclock();
 				kd_putfb(tp);
@@ -398,7 +415,7 @@ kd_later(tpaddr)
 
 	s = spltty();
 	tp->t_state &= ~TS_BUSY;
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 	splx(s);
 }
 
@@ -467,7 +484,7 @@ kd_cons_input(c)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return;
 
-	(*linesw[tp->t_line].l_rint)(c, tp);
+	(*tp->t_linesw->l_rint)(c, tp);
 }
 
 
@@ -511,6 +528,7 @@ cons_attach_input(cc, cn)
 	cc->cc_upstream = kd_cons_input;
 
 	/* Attach lower level. */
+	cn_hw->cn_dev = cn->cn_dev;
 	cn_hw->cn_pollc = cn->cn_pollc;
 	cn_hw->cn_getc = cn->cn_getc;
 
@@ -530,6 +548,19 @@ cons_attach_input(cc, cn)
 	/* Indicate that it is OK to use the PROM fbwrite */
 	kd_is_console = 1;
 }
+
+
+void kd_attach_input(struct cons_channel *);
+void
+kd_attach_input(cc)
+	struct cons_channel *cc;
+{
+	struct kd_softc *kd = &kd_softc;
+
+	kd->kd_in = cc;
+	cc->cc_upstream = kd_cons_input;
+}
+
 
 /* We never call this. */
 static void

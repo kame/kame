@@ -1,4 +1,4 @@
-/*	$NetBSD: sequencer.c,v 1.15 2000/03/23 07:01:27 thorpej Exp $	*/
+/*	$NetBSD: sequencer.c,v 1.19 2002/01/13 19:28:08 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,8 +36,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sequencer.c,v 1.19 2002/01/13 19:28:08 tsutsui Exp $");
+
 #include "sequencer.h"
-#if NSEQUENCER > 0
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -396,7 +398,7 @@ sequencerread(dev, uio, ioflag)
 	int error, s;
 
 	DPRINTFN(20, ("sequencerread: %p, count=%d, ioflag=%x\n", 
-		     sc, uio->uio_resid, ioflag));
+		     sc, (int) uio->uio_resid, ioflag));
 
 	if (sc->mode == SEQ_OLD) {
 		DPRINTFN(-1,("sequencerread: old read\n"));
@@ -434,7 +436,7 @@ sequencerwrite(dev, uio, ioflag)
 	seq_event_rec cmdbuf;
 	int size;
 
-	DPRINTFN(2, ("sequencerwrite: %p, count=%d\n", sc, uio->uio_resid));
+	DPRINTFN(2, ("sequencerwrite: %p, count=%d\n", sc, (int) uio->uio_resid));
 
 	error = 0;
 	size = sc->mode == SEQ_NEW ? sizeof cmdbuf : SEQOLD_CMDSIZE;
@@ -1100,9 +1102,8 @@ midiseq_open(unit, flags)
 		return (0);
 	sc = midi_cd.cd_devs[unit];
 	sc->seqopen = 1;
-	md = malloc(sizeof *md, M_DEVBUF, M_WAITOK);
+	md = malloc(sizeof *md, M_DEVBUF, M_WAITOK|M_ZERO);
 	sc->seq_md = md;
-	memset(md, 0, sizeof *md);
 	md->msc = sc;
 	midi_getinfo(makedev(0, unit), &mi);
 	md->unit = unit;
@@ -1380,6 +1381,3 @@ midi_writebytes(unit, buf, cc)
 	return (ENXIO);
 }
 #endif /* NMIDI == 0 */
-
-#endif /* NSEQUENCER > 0 */
-

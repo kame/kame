@@ -1,4 +1,4 @@
-/*	$NetBSD: cg2.c,v 1.11.26.1 2000/06/30 16:27:42 simonb Exp $	*/
+/*	$NetBSD: cg2.c,v 1.16.14.1 2002/08/07 01:29:42 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -62,9 +62,9 @@
 #include <sys/proc.h>
 #include <sys/tty.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 #include <machine/autoconf.h>
 #include <machine/pmap.h>
 #include <machine/cg2reg.h>
@@ -311,13 +311,13 @@ static int cg2getcmap(fb, data)
 	struct cg2_softc *sc = fb->fb_private;
 	u_char red[CMSIZE], green[CMSIZE], blue[CMSIZE];
 	int error, start, count, ecount;
-	register u_int i;
-	register u_short *p;
+	u_int i;
+	u_short *p;
 
 	start = cmap->index;
 	count = cmap->count;
 	ecount = start + count;
-	if (start >= CMSIZE || ecount > CMSIZE)
+	if (start >= CMSIZE || count > CMSIZE - start)
 		return (EINVAL);
 
 	/* XXX - Wait for retrace? */
@@ -354,13 +354,13 @@ static int cg2putcmap(fb, data)
 	u_char red[CMSIZE], green[CMSIZE], blue[CMSIZE];
 	int error;
 	u_int start, count, ecount;
-	register u_int i;
-	register u_short *p;
+	u_int i;
+	u_short *p;
 
 	start = cmap->index;
 	count = cmap->count;
 	ecount = start + count;
-	if (start >= CMSIZE || ecount > CMSIZE)
+	if (start >= CMSIZE || count > CMSIZE - start)
 		return (EINVAL);
 
 	/* Copy from user space to local arrays. */

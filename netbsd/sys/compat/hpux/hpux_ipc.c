@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_ipc.c,v 1.1 1999/08/25 04:50:08 thorpej Exp $	*/
+/*	$NetBSD: hpux_ipc.c,v 1.5 2001/11/15 09:47:59 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -47,9 +47,13 @@
  * calls.
  */
 
-#include "opt_sysv.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hpux_ipc.c,v 1.5 2001/11/15 09:47:59 lukem Exp $");
 
-#include <sys/types.h>
+#if defined(_KERNEL_OPT)
+#include "opt_sysv.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/shm.h>

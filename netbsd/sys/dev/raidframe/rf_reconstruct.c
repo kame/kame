@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_reconstruct.c,v 1.26.2.1 2001/02/03 19:12:40 he Exp $	*/
+/*	$NetBSD: rf_reconstruct.c,v 1.33 2002/01/09 03:10:19 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -32,19 +32,20 @@
  *
  ************************************************************/
 
-#include "rf_types.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_reconstruct.c,v 1.33 2002/01/09 03:10:19 oster Exp $");
+
 #include <sys/time.h>
 #include <sys/buf.h>
 #include <sys/errno.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/ioctl.h>
 #include <sys/fcntl.h>
 #include <sys/vnode.h>
-
+#include <dev/raidframe/raidframevar.h>
 
 #include "rf_raid.h"
 #include "rf_reconutil.h"
@@ -65,6 +66,7 @@
 
 /* setting these to -1 causes them to be set to their default values if not set by debug options */
 
+#ifdef DEBUG
 #define Dprintf(s)         if (rf_reconDebug) rf_debug_printf(s,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)
 #define Dprintf1(s,a)         if (rf_reconDebug) rf_debug_printf(s,(void *)((unsigned long)a),NULL,NULL,NULL,NULL,NULL,NULL,NULL)
 #define Dprintf2(s,a,b)       if (rf_reconDebug) rf_debug_printf(s,(void *)((unsigned long)a),(void *)((unsigned long)b),NULL,NULL,NULL,NULL,NULL,NULL)
@@ -76,6 +78,23 @@
 
 #define DDprintf1(s,a)         if (rf_reconDebug) rf_debug_printf(s,(void *)((unsigned long)a),NULL,NULL,NULL,NULL,NULL,NULL,NULL)
 #define DDprintf2(s,a,b)       if (rf_reconDebug) rf_debug_printf(s,(void *)((unsigned long)a),(void *)((unsigned long)b),NULL,NULL,NULL,NULL,NULL,NULL)
+
+#else /* DEBUG */
+
+#define Dprintf(s) {}
+#define Dprintf1(s,a) {}
+#define Dprintf2(s,a,b) {}
+#define Dprintf3(s,a,b,c) {}
+#define Dprintf4(s,a,b,c,d) {}
+#define Dprintf5(s,a,b,c,d,e) {}
+#define Dprintf6(s,a,b,c,d,e,f) {}
+#define Dprintf7(s,a,b,c,d,e,f,g) {}
+
+#define DDprintf1(s,a) {}
+#define DDprintf2(s,a,b) {}
+
+#endif /* DEBUG */
+
 
 static RF_FreeList_t *rf_recond_freelist;
 #define RF_MAX_FREE_RECOND  4
@@ -363,6 +382,14 @@ rf_ReconstructFailedDiskBasic(raidPtr, row, col)
 		c_label.status = rf_ds_optimal;
 		c_label.partitionSize = raidPtr->Disks[srow][scol].partitionSize;
 
+		/* We've just done a rebuild based on all the other
+		   disks, so at this point the parity is known to be
+		   clean, even if it wasn't before. */
+
+		/* XXX doesn't hold for RAID 6!!*/
+
+		raidPtr->parity_good = RF_RAID_CLEAN;
+
 		/* XXXX MORE NEEDED HERE */
 		
 		raidwrite_component_label(
@@ -595,7 +622,15 @@ rf_ReconstructInPlace(raidPtr, row, col)
 
 		c_label.row = row;
 		c_label.column = col;
-		
+
+		/* We've just done a rebuild based on all the other
+		   disks, so at this point the parity is known to be
+		   clean, even if it wasn't before. */
+
+		/* XXX doesn't hold for RAID 6!!*/
+
+		raidPtr->parity_good = RF_RAID_CLEAN;
+	
 		raidwrite_component_label(raidPtr->raid_cinfo[row][col].ci_dev,
 					  raidPtr->raid_cinfo[row][col].ci_vp,
 					  &c_label);
@@ -998,7 +1033,8 @@ IssueNextReadRequest(raidPtr, row, col)
 	 * only to see if we can actually do it now */
 	rbuf->parityStripeID = ctrl->curPSID;
 	rbuf->which_ru = ctrl->ru_count;
-	bzero((char *) &raidPtr->recon_tracerecs[col], sizeof(raidPtr->recon_tracerecs[col]));
+	memset((char *) &raidPtr->recon_tracerecs[col], 0,
+	    sizeof(raidPtr->recon_tracerecs[col]));
 	raidPtr->recon_tracerecs[col].reconacc = 1;
 	RF_ETIMER_START(raidPtr->recon_tracerecs[col].recon_timer);
 	retcode = TryToRead(raidPtr, row, col);

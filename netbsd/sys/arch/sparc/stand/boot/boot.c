@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.9 1999/11/08 23:29:56 pk Exp $ */
+/*	$NetBSD: boot.c,v 1.11 2002/03/28 15:46:20 pk Exp $ */
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -47,6 +47,8 @@
 
 #include "bootinfo.h"
 
+extern void	prom_patch __P((void));	/* prompatch.c */
+
 static int	bootoptions __P((char *));
 #if 0
 static void	promsyms __P((int, struct exec *));
@@ -63,7 +65,6 @@ char			fbuf[80], dbuf[128];
 
 int	main __P((void));
 typedef void (*entry_t)__P((caddr_t, int, int, int, long, long));
-
 
 /*
  * Boot device is derived from ROM provided information, or if there is none,
@@ -134,6 +135,9 @@ main()
 	printf(">> %s, Revision %s\n", bootprog_name, bootprog_rev);
 	printf(">> (%s, %s)\n", bootprog_maker, bootprog_date);
 
+	/* massage machine prom */
+	prom_patch();
+
 	/*
 	 * get default kernel.
 	 */
@@ -202,10 +206,26 @@ main()
 #else
 	/* Should work with both a.out and ELF, but somehow ELF is busted */
 	bootinfo = bi_init(marks[MARK_END]);
+
 	bi_sym.nsym = marks[MARK_NSYM];
 	bi_sym.ssym = marks[MARK_SYM];
 	bi_sym.esym = marks[MARK_END];
 	bi_add(&bi_sym, BTINFO_SYMTAB, sizeof(bi_sym));
+
+	/*
+	 * Add kernel path to bootinfo
+	 */
+	i = sizeof(struct btinfo_common) + strlen(kernel) + 1;
+	/* Impose limit (somewhat arbitrary) */
+	if (i < BOOTINFO_SIZE / 2) {
+		union {
+			struct btinfo_kernelfile bi_file;
+			char x[i];
+		} U;
+		strcpy(U.bi_file.name, kernel);
+		bi_add(&U.bi_file, BTINFO_KERNELFILE, i);
+	}
+
 	(*(entry_t)marks[MARK_ENTRY])(arg, 0, 0, 0, bootinfo, DDB_MAGIC2);
 #endif
 

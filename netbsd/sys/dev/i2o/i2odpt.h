@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: i2odpt.h,v 1.1 2001/09/21 23:44:21 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

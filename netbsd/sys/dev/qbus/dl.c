@@ -1,4 +1,4 @@
-/*	$NetBSD: dl.c,v 1.14 2000/06/05 00:09:18 matt Exp $	*/
+/*	$NetBSD: dl.c,v 1.20 2002/03/17 19:41:01 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -80,6 +80,9 @@
  * OS-interface code derived from the dz and dca (hp300) drivers.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dl.c,v 1.20 2002/03/17 19:41:01 atatat Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -119,12 +122,8 @@ static	void	dlstart (struct tty *);
 static	int	dlparam (struct tty *, struct termios *);
 static	void	dlbrk (struct dl_softc *, int);
 struct	tty *	dltty (dev_t);
-	int	dlopen (dev_t, int, int, struct proc *);
-	int	dlclose (dev_t, int, int, struct proc *);
-	int	dlread (dev_t, struct uio *, int);
-	int	dlwrite (dev_t, struct uio *, int);
-	int	dlioctl (dev_t, unsigned long, caddr_t, int, struct proc *);
-	void	dlstop (struct tty *, int);
+
+cdev_decl(dl);
 
 struct cfattach dl_ca = {
 	sizeof(struct dl_softc), dl_match, dl_attach
@@ -261,7 +260,7 @@ dlrint(void *arg)
 		if (c & DL_RBUF_PARITY_ERR)
 			cc |= TTY_PE;
 
-		(*linesw[tp->t_line].l_rint)(cc, tp);
+		(*tp->t_linesw->l_rint)(cc, tp);
 #if defined(DIAGNOSTIC)
 	} else {
 		log(LOG_WARNING, "%s: stray rx interrupt\n",
@@ -279,10 +278,7 @@ dlxint(void *arg)
 	struct tty *tp = sc->sc_tty;
 
 	tp->t_state &= ~(TS_BUSY | TS_FLUSH);
-	if (tp->t_line)
-		(*linesw[tp->t_line].l_start)(tp);
-	else
-		dlstart(tp);
+	(*tp->t_linesw->l_start)(tp);
        
 	return;
 }
@@ -322,7 +318,7 @@ dlopen(dev_t dev, int flag, int mode, struct proc *p)
 	} else if ((tp->t_state & TS_XCLUDE) && p->p_ucred->cr_uid != 0)
 		return EBUSY;
 
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return ((*tp->t_linesw->l_open)(dev, tp));
 }
 
 /*ARGSUSED*/
@@ -332,7 +328,7 @@ dlclose(dev_t dev, int flag, int mode, struct proc *p)
 	struct dl_softc *sc = dl_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 
 	/* Make sure a BREAK state is not left enabled. */
 	dlbrk(sc, 0);
@@ -346,7 +342,7 @@ dlread(dev_t dev, struct uio *uio, int flag)
 	struct dl_softc *sc = dl_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -355,7 +351,16 @@ dlwrite(dev_t dev, struct uio *uio, int flag)
 	struct dl_softc *sc = dl_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+dlpoll(dev_t dev, int events, struct proc *p)
+{
+	struct dl_softc *sc = dl_cd.cd_devs[minor(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -366,11 +371,12 @@ dlioctl(dev_t dev, unsigned long cmd, caddr_t data, int flag, struct proc *p)
         int error;
 
 
-        error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-        if (error >= 0)
+        error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+        if (error != EPASSTHROUGH)
                 return (error);
+
         error = ttioctl(tp, cmd, data, flag, p);
-        if (error >= 0)
+        if (error != EPASSTHROUGH)
                 return (error);
 
 	switch (cmd) {
@@ -389,7 +395,7 @@ dlioctl(dev_t dev, unsigned long cmd, caddr_t data, int flag, struct proc *p)
                 break;
 
         default:
-                return (ENOTTY);
+                return (EPASSTHROUGH);
         }
         return (0);
 }

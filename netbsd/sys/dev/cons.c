@@ -1,4 +1,4 @@
-/*	$NetBSD: cons.c,v 1.37 2000/06/12 05:02:22 mrg Exp $	*/
+/*	$NetBSD: cons.c,v 1.41 2001/11/13 05:32:50 lukem Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -41,6 +41,9 @@
  *
  *	@(#)cons.c	8.2 (Berkeley) 1/12/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cons.c,v 1.41 2001/11/13 05:32:50 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -225,7 +228,7 @@ cnpoll(dev, events, p)
 {
 
 	/*
-	 * Redirect the ioctl, if that's appropriate.
+	 * Redirect the poll, if that's appropriate.
 	 * I don't want to think of the possible side effects
 	 * of console redirection here.
 	 */
@@ -278,7 +281,7 @@ cngetsn(cp, size)
 			}
 			continue;
 		case '@':
-		case 'u'&037:
+		case 'u'&037:	/* CTRL-u */
 			len = 0;
 			lp = cp;
 			printf("\n");

@@ -1,4 +1,4 @@
-/*	$NetBSD: sysv_sem_14.c,v 1.2 2000/06/02 15:53:04 simonb Exp $	*/
+/*	$NetBSD: sysv_sem_14.c,v 1.4 2001/11/13 02:08:03 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sysv_sem_14.c,v 1.4 2001/11/13 02:08:03 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/signal.h>
@@ -44,7 +47,9 @@
 #include <sys/mount.h>
 #include <sys/sem.h>
 
+#ifndef SYSVSEM
 #define	SYSVSEM
+#endif
 
 #include <sys/syscallargs.h>
 

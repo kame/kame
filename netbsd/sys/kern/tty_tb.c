@@ -1,4 +1,4 @@
-/*	$NetBSD: tty_tb.c,v 1.22 2000/03/30 09:27:14 augustss Exp $	*/
+/*	$NetBSD: tty_tb.c,v 1.28 2002/03/17 19:41:08 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -35,6 +35,9 @@
  *	@(#)tty_tb.c	8.2 (Berkeley) 1/9/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tty_tb.c,v 1.28 2002/03/17 19:41:08 atatat Exp $");
+
 #include "tb.h"
 
 /*
@@ -44,6 +47,7 @@
 #include <sys/param.h>
 #include <sys/tablet.h>
 #include <sys/systm.h>
+#include <sys/conf.h>
 #include <sys/ioctl.h>
 #include <sys/ioctl_compat.h>
 #include <sys/tty.h>
@@ -63,7 +67,7 @@ struct	tbconf {
 	short	tbc_uiosize;	/* size of data record returned user */
 	int	tbc_sync;	/* mask for finding sync byte/bit */
 				/* decoding routine */
-    	void    (*tbc_decode) __P((struct tbconf *, char *, union tbpos *));
+    	void    (*tbc_decode) __P((const struct tbconf *, char *, union tbpos *));
 	u_char	*tbc_run;	/* enter run mode sequence */
 	u_char	*tbc_point;	/* enter point mode sequence */
 	u_char	*tbc_stop;	/* stop sequence */
@@ -73,14 +77,14 @@ struct	tbconf {
 #define	TBF_INPROX	0x2	/* tablet has proximity info */
 };
 
-static void gtcodecode __P((struct tbconf *, char *, union tbpos *));
-static void tbolddecode __P((struct tbconf *, char *, union tbpos *));
-static void tblresdecode __P((struct tbconf *, char *, union tbpos *));
-static void tbhresdecode __P((struct tbconf *, char *, union tbpos *));
-static void poldecode __P((struct tbconf *, char *, union tbpos *));
+static void gtcodecode __P((const struct tbconf *, char *, union tbpos *));
+static void tbolddecode __P((const struct tbconf *, char *, union tbpos *));
+static void tblresdecode __P((const struct tbconf *, char *, union tbpos *));
+static void tbhresdecode __P((const struct tbconf *, char *, union tbpos *));
+static void poldecode __P((const struct tbconf *, char *, union tbpos *));
 
 
-struct	tbconf tbconf[TBTYPE] = {
+static const struct	tbconf tbconf[TBTYPE] = {
 { 0 },
 { 5, sizeof(struct hitpos), 0200, tbolddecode, "6", "4" },
 { 5, sizeof(struct hitpos), 0200, tbolddecode, "\1CN", "\1RT", "\2", "\4" },
@@ -126,7 +130,7 @@ tbopen(dev, tp)
 {
 	struct tb *tbp;
 
-	if (tp->t_line == TABLDISC)
+	if (tp->t_linesw->l_no == TABLDISC)
 		return (ENODEV);
 	ttywflush(tp);
 	for (tbp = tb; tbp < &tb[NTB]; tbp++)
@@ -165,7 +169,7 @@ tbread(tp, uio)
 	struct uio *uio;
 {
 	struct tb *tbp = (struct tb *)tp->t_sc;
-	struct tbconf *tc = &tbconf[tbp->tbflags & TBTYPE];
+	const struct tbconf *tc = &tbconf[tbp->tbflags & TBTYPE];
 	int ret;
 
 	if ((tp->t_state&TS_CARR_ON) == 0)
@@ -190,7 +194,7 @@ tbinput(c, tp)
 	struct tty *tp;
 {
 	struct tb *tbp = (struct tb *)tp->t_sc;
-	struct tbconf *tc = &tbconf[tbp->tbflags & TBTYPE];
+	const struct tbconf *tc = &tbconf[tbp->tbflags & TBTYPE];
 
 	if (tc->tbc_recsize == 0 || tc->tbc_decode == 0)	/* paranoid? */
 		return;
@@ -214,7 +218,7 @@ tbinput(c, tp)
  */
 static void
 gtcodecode(tc, cp, u)
-	struct tbconf *tc;
+	const struct tbconf *tc;
 	char *cp;
 	union tbpos *u;
 {
@@ -237,7 +241,7 @@ gtcodecode(tc, cp, u)
  */
 static void
 tbolddecode(tc, cp, u)
-	struct tbconf *tc;
+	const struct tbconf *tc;
 	char *cp;
 	union tbpos *u;
 {
@@ -263,7 +267,7 @@ tbolddecode(tc, cp, u)
  */
 static void
 tblresdecode(tc, cp, u)
-	struct tbconf *tc;
+	const struct tbconf *tc;
 	char *cp;
 	union tbpos *u;
 {
@@ -285,7 +289,7 @@ tblresdecode(tc, cp, u)
  */
 static void
 tbhresdecode(tc, cp, u)
-	struct tbconf *tc;
+	const struct tbconf *tc;
 	char *cp;
 	union tbpos *u;
 {
@@ -310,7 +314,7 @@ tbhresdecode(tc, cp, u)
  */
 static void
 poldecode(tc, cp, u)
-	struct tbconf *tc;
+	const struct tbconf *tc;
 	char *cp;
 	union tbpos *u;
 {
@@ -353,7 +357,7 @@ tbtioctl(tp, cmd, data, flag, p)
 		/* fall thru... to set mode bits */
 
 	case BIOSMODE: {
-		struct tbconf *tc;
+		const struct tbconf *tc;
 		u_char *c;
 
 		tbp->tbflags &= ~TBMODE;
@@ -383,11 +387,15 @@ tbtioctl(tp, cmd, data, flag, p)
 
 	case TIOCSETD:
 	case TIOCGETD:
+	case TIOCSLINED:
+	case TIOCGLINED:
+	case TIOCGETA:
 	case TIOCGETP:
 	case TIOCGETC:
-		return (-1);		/* pass thru... */
+		return (EPASSTHROUGH);	/* pass thru... */
 
 	default:
+		/* specifically disallow any other ioctl commands */
 		return (ENOTTY);
 	}
 	return (0);

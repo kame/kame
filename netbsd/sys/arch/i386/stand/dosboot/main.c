@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.14.6.1 2000/08/13 09:09:27 jdolecek Exp $	 */
+/*	$NetBSD: main.c,v 1.18 2001/07/05 00:58:45 itojun Exp $	 */
 
 /*
  * Copyright (c) 1996, 1997
@@ -64,6 +64,8 @@ char *sprint_bootsel __P((const char *));
 static void bootit __P((const char *, int, int));
 void usage __P((void));
 int main __P((int, char **));
+int parsebootfile __P((const char *, char**, char**, unsigned int*,
+			      unsigned int*, const char**));
 
 void	command_help __P((char *));
 void	command_ls __P((char *));
@@ -72,7 +74,7 @@ void	command_boot __P((char *));
 void	command_mode __P((char *));
 void	command_dev __P((char *));
 
-struct bootblk_command commands[] = {
+const struct bootblk_command commands[] = {
 	{ "help",	command_help },
 	{ "?",		command_help },
 	{ "ls",		command_ls },
@@ -314,7 +316,7 @@ command_help(arg)
 	char *arg;
 {
 	printf("commands are:\n"
-	       "boot [xdNx:][filename] [-ads]\n"
+	       "boot [xdNx:][filename] [-acdqsv]\n"
 	       "     (ex. \"sd0a:netbsd.old -s\"\n"
 	       "ls [path]\n"
 	       "mode ufs|dos\n"

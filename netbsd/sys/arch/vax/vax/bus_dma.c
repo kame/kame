@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.6.4.1 2000/06/30 16:27:44 simonb Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.13 2001/09/10 21:19:29 chris Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -54,10 +54,6 @@
 #include <sys/mbuf.h>
 #include <sys/vnode.h>
 #include <sys/device.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -397,7 +393,7 @@ _bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -478,6 +474,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		}
 	}
+	pmap_update(pmap_kernel());
 	return (0);
 }
 
@@ -691,7 +688,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	vaddr_t high;
 {
 	vaddr_t curaddr, lastaddr;
-	vm_page_t m;
+	struct vm_page *m;
 	struct pglist mlist;
 	int curseg, error;
 
@@ -729,7 +726,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 		curaddr = VM_PAGE_TO_PHYS(m);
 #ifdef DIAGNOSTIC
 		if (curaddr < low || curaddr >= high) {
-			printf("vm_page_alloc_memory returned non-sensical"
+			printf("uvm_pglistalloc returned non-sensical"
 			    " address 0x%lx\n", curaddr);
 			panic("_bus_dmamem_alloc_range");
 		}

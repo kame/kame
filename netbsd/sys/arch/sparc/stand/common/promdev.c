@@ -1,4 +1,4 @@
-/*	$NetBSD: promdev.c,v 1.8.12.1 2001/02/03 17:51:49 he Exp $ */
+/*	$NetBSD: promdev.c,v 1.12 2001/09/26 20:53:10 eeh Exp $ */
 
 /*
  * Copyright (c) 1993 Paul Kranenburg
@@ -118,7 +118,7 @@ devopen(f, fname, file)
 	const char *fname;
 	char **file;
 {
-	int	error = 0, fd;
+	int	error = 0, fd = 0;
 	struct	promdata *pd;
 
 	pd = (struct promdata *)alloc(sizeof *pd);
@@ -480,7 +480,7 @@ static	struct idprom idprom;
 			void *buf = &idprom;
 			int len = sizeof(struct idprom);
 			int node = prom_findroot();
-			if (getprop(node, "idprom", 1, &len, &buf) != 0) {
+			if (PROM_getprop(node, "idprom", 1, &len, &buf) != 0) {
 				printf("`idprom' property cannot be read: "
 					"cannot get ethernet address");
 				/*
@@ -496,7 +496,9 @@ static	struct idprom idprom;
 		(void)(*obpvec->pv_enaddr)(fd, (char *)ea);
 		break;
 
-	case PROM_OBP_V3: {
+	case PROM_OPENFIRM:
+	case PROM_OBP_V3:
+		{
 		char buf[64];
 		sprintf(buf, "%lx mac-address drop swap 6 cmove", (u_long)ea);
 		prom_interpret(buf);
@@ -544,7 +546,8 @@ getdevtype(fd, name)
 
 	case PROM_OBP_V2:
 	case PROM_OBP_V3:
-		node = (*obpvec->pv_v2devops.v2_fd_phandle)(fd);
+	case PROM_OPENFIRM:
+		node = prom_instance_to_package(fd);
 		cp = mygetpropstring(node, "device_type");
 		if (strcmp(cp, "block") == 0)
 			return (DT_BLOCK);

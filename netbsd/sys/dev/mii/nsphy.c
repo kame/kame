@@ -1,4 +1,4 @@
-/*	$NetBSD: nsphy.c,v 1.26.4.2 2000/07/28 10:10:30 martin Exp $	*/
+/*	$NetBSD: nsphy.c,v 1.34 2002/03/25 20:51:25 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,6 +71,9 @@
  * Data Sheet available from www.national.com
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nsphy.c,v 1.34 2002/03/25 20:51:25 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -88,53 +91,57 @@
 
 #include <dev/mii/nsphyreg.h>
 
-int	nsphymatch __P((struct device *, struct cfdata *, void *));
-void	nsphyattach __P((struct device *, struct device *, void *));
+int	nsphymatch(struct device *, struct cfdata *, void *);
+void	nsphyattach(struct device *, struct device *, void *);
 
 struct cfattach nsphy_ca = {
 	sizeof(struct mii_softc), nsphymatch, nsphyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	nsphy_service __P((struct mii_softc *, struct mii_data *, int));
-void	nsphy_status __P((struct mii_softc *));
+int	nsphy_service(struct mii_softc *, struct mii_data *, int);
+void	nsphy_status(struct mii_softc *);
 
 const struct mii_phy_funcs nsphy_funcs = {
 	nsphy_service, nsphy_status, mii_phy_reset,
 };
 
+const struct mii_phydesc nsphys[] = {
+	{ MII_OUI_xxNATSEMI,		MII_MODEL_xxNATSEMI_DP83840,
+	  MII_STR_xxNATSEMI_DP83840 },
+
+	{ 0,				0,
+	  NULL },
+};
+
 int
-nsphymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+nsphymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;
 
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_NATSEMI &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_NATSEMI_DP83840)
+	if (mii_phy_match(ma, nsphys) != NULL)
 		return (10);
 
 	return (0);
 }
 
 void
-nsphyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+nsphyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 
-	printf(": %s, rev. %d\n", MII_STR_NATSEMI_DP83840,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, nsphys);
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &nsphy_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	PHY_RESET(sc);
 
@@ -149,10 +156,7 @@ nsphyattach(parent, self, aux)
 }
 
 int
-nsphy_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+nsphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;
@@ -249,8 +253,7 @@ nsphy_service(sc, mii, cmd)
 }
 
 void
-nsphy_status(sc)
-	struct mii_softc *sc;
+nsphy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;

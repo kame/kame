@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_generic.c,v 1.2 1999/05/05 01:51:32 cgd Exp $ */
+/* $NetBSD: osf1_generic.c,v 1.4 2002/03/16 20:43:55 christos Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -57,6 +57,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: osf1_generic.c,v 1.4 2002/03/16 20:43:55 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -87,7 +90,7 @@ osf1_sys_readv(p, v, retval)
 	struct sys_readv_args a;
 	struct osf1_iovec *oio;
 	struct iovec *nio;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 	int error, osize, nsize, i;
 
 	if (SCARG(uap, iovcnt) > (STACKGAPLEN / sizeof (struct iovec)))
@@ -108,7 +111,7 @@ osf1_sys_readv(p, v, retval)
 	}
 
 	SCARG(&a, fd) = SCARG(uap, fd);
-	SCARG(&a, iovp) = stackgap_alloc(&sg, nsize);
+	SCARG(&a, iovp) = stackgap_alloc(p, &sg, nsize);
 	SCARG(&a, iovcnt) = SCARG(uap, iovcnt);
 
 	if ((error = copyout(nio, (caddr_t)SCARG(&a, iovp), nsize)))
@@ -143,8 +146,8 @@ osf1_sys_select(p, v, retval)
 	if (SCARG(uap, tv) == NULL)
 		SCARG(&a, tv) = NULL;
 	else {
-		sg = stackgap_init(p->p_emul);
-		SCARG(&a, tv) = stackgap_alloc(&sg, sizeof tv);
+		sg = stackgap_init(p, 0);
+		SCARG(&a, tv) = stackgap_alloc(p, &sg, sizeof tv);
 
 		/* get the OSF/1 timeval argument */
 		error = copyin((caddr_t)SCARG(uap, tv),
@@ -177,7 +180,7 @@ osf1_sys_writev(p, v, retval)
 	struct sys_writev_args a;
 	struct osf1_iovec *oio;
 	struct iovec *nio;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 	int error, osize, nsize, i;
 
 	if (SCARG(uap, iovcnt) > (STACKGAPLEN / sizeof (struct iovec)))
@@ -198,7 +201,7 @@ osf1_sys_writev(p, v, retval)
 	}
 
 	SCARG(&a, fd) = SCARG(uap, fd);
-	SCARG(&a, iovp) = stackgap_alloc(&sg, nsize);
+	SCARG(&a, iovp) = stackgap_alloc(p, &sg, nsize);
 	SCARG(&a, iovcnt) = SCARG(uap, iovcnt);
 
 	if ((error = copyout(nio, (caddr_t)SCARG(&a, iovp), nsize)))

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.33 2000/05/26 21:19:34 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.38 2001/09/08 11:16:43 thomas Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -49,7 +49,7 @@
  * Exported definitions unique to atari/68k cpu support.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -92,7 +92,7 @@ struct clockframe {
 	u_short	cf_sr;		/* sr at time of interrupt	*/
 	u_long	cf_pc;		/* pc at time of interrupt	*/
 	u_short	cf_vo;		/* vector offset (4-word frame)	*/
-};
+} __attribute__((packed));
 
 #define	CLKF_USERMODE(framep)	(((framep)->cf_sr & PSL_S) == 0)
 #define	CLKF_BASEPRI(framep)	(((framep)->cf_sr & PSL_IPL) == 0)
@@ -110,7 +110,7 @@ struct clockframe {
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-#define	need_resched()	{want_resched = 1; setsoftast();}
+#define	need_resched(ci)	{want_resched = 1; setsoftast();}
 
 /*
  * Give a profiling tick to the current process from the softclock
@@ -151,16 +151,17 @@ extern int	want_resched;	/* resched() was called */
 #define ATARI_68030	(1L<<3)		/* 68030 CPU			*/
 #define ATARI_68040	(1L<<4)		/* 68040 CPU			*/
 #define ATARI_68060	(1L<<6)		/* 68060 CPU			*/
-#define	ATARI_TT	(1L<<11)
-#define	ATARI_FALCON	(1L<<12)
-#define	ATARI_HADES	(1L<<13)
+#define	ATARI_TT	(1L<<11)	/* This is a TT030		*/
+#define	ATARI_FALCON	(1L<<12)	/*           Falcon		*/
+#define	ATARI_HADES	(1L<<13)	/*           Hades		*/
+#define	ATARI_MILAN	(1L<<14)	/*           Milan		*/
 
 #define	ATARI_CLKBROKEN	(1L<<16)
 
 #define	ATARI_ANYCPU	(ATARI_68000|ATARI_68010|ATARI_68020|ATARI_68030 \
 			|ATARI_68040|ATARI_68060)
 
-#define	ATARI_ANYMACH	(ATARI_TT|ATARI_FALCON|ATARI_HADES)
+#define	ATARI_ANYMACH	(ATARI_TT|ATARI_FALCON|ATARI_HADES|ATARI_MILAN)
 
 #ifdef _KERNEL
 extern int machineid;
@@ -286,11 +287,6 @@ int	dma_cachectl __P((caddr_t, int));
  * Prototypes from pci_machdep.c
  */
 void init_pci_bus __P((void));
-
-/*
- * Prototypes from trap.c:
- */
-void  child_return __P((void *));
 
 #endif /* _KERNEL */
 #endif /* !_MACHINE_CPU_H_ */

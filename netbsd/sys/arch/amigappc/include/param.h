@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.1.4.1 2000/07/23 03:49:27 itojun Exp $	*/
+/*	$NetBSD: param.h,v 1.5 2002/05/16 19:56:13 wiz Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -55,12 +55,12 @@
  * Machine dependent constants for Amiga PowerPC (32-bit only currently)
  */
 #define	MACHINE		"amigappc"
-#define MACHINE_ARCH	"powerpc"
+#define	MACHINE_ARCH	"powerpc"
 #define	MID_MACHINE	MID_POWERPC
 
 #define	ALIGNBYTES		(sizeof(double) - 1)
 #define	ALIGN(p)		(((u_int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
-#define ALIGNED_POINTER(p,t)	((((u_long)(p)) & (sizeof(t)-1)) == 0)
+#define	ALIGNED_POINTER(p,t)	((((u_long)(p)) & (sizeof(t)-1)) == 0)
 
 #define	PGSHIFT		12
 #define	NBPG		(1 << PGSHIFT)	/* Page size */
@@ -93,9 +93,9 @@
 
 #ifndef NMBCLUSTERS
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#endif
 
 #ifdef GATEWAY
 #define	NMBCLUSTERS	512		/* map size, max cluster allocation */
@@ -108,8 +108,8 @@
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
  * logical pages.
  */
-#define NKMEMPAGES_MIN_DEFAULT  ((128 * 1024 * 1024) >> PAGE_SHIFT)
-#define NKMEMPAGES_MAX_DEFAULT  ((128 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MIN_DEFAULT  ((128 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT  ((128 * 1024 * 1024) >> PAGE_SHIFT)
 
 /*
  * pages ("clicks") to disk blocks
@@ -161,7 +161,7 @@ extern volatile unsigned short *amiga_intena_read, *amiga_intena_write;
 #ifndef	_LOCORE
 void delay __P((int));
 void DELAY __P((int));
-#endif*/	/* !_LOCORE */
+#endif	/* !_LOCORE */
 #endif	/* _KERNEL */
 
 #endif /* def _MACHINE_PARAM_H_ */

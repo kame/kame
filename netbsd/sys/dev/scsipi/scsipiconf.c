@@ -1,11 +1,12 @@
-/*	$NetBSD: scsipiconf.c,v 1.10 2000/06/09 08:54:25 enami Exp $	*/
+/*	$NetBSD: scsipiconf.c,v 1.17 2002/01/12 16:37:55 tsutsui Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Charles M. Hannum.
+ * by Charles M. Hannum; by Jason R. Thorpe of the Numerical Aerospace
+ * Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,22 +54,26 @@
  * Ported to run under 386BSD by Julian Elischer (julian@tfs.com) Sept 1992
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: scsipiconf.c,v 1.17 2002/01/12 16:37:55 tsutsui Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsipiconf.h>
 
+#define	STRVIS_ISWHITE(x) ((x) == ' ' || (x) == '\0' || (x) == (u_char)'\377')
+
 int
-scsipi_command(sc_link, cmd, cmdlen, data_addr, datalen, retries, timeout, bp,
-    flags)
-	struct scsipi_link *sc_link;
+scsipi_command(periph, cmd, cmdlen, data_addr, datalen, retries, timeout, bp,
+     flags)
+	struct scsipi_periph *periph;
 	struct scsipi_generic *cmd;
 	int cmdlen;
 	u_char *data_addr;
@@ -79,7 +84,7 @@ scsipi_command(sc_link, cmd, cmdlen, data_addr, datalen, retries, timeout, bp,
 	int flags;
 {
 	int error;
-
+ 
 	if ((flags & XS_CTL_DATA_ONSTACK) != 0) {
 		/*
 		 * If the I/O buffer is allocated on stack, the
@@ -88,11 +93,43 @@ scsipi_command(sc_link, cmd, cmdlen, data_addr, datalen, retries, timeout, bp,
 		 */
 		PHOLD(curproc);
 	}
-	error = (*sc_link->scsipi_cmd)(sc_link, cmd, cmdlen, data_addr,
-	    datalen, retries, timeout, bp, flags);
+	error = (*periph->periph_channel->chan_bustype->bustype_cmd)(periph,
+	    cmd, cmdlen, data_addr, datalen, retries, timeout, bp, flags);
 	if ((flags & XS_CTL_DATA_ONSTACK) != 0)
 		PRELE(curproc);
 	return (error);
+}
+
+/*
+ * allocate and init a scsipi_periph structure for a new device.
+ */
+struct scsipi_periph *
+scsipi_alloc_periph(malloc_flag)
+	int malloc_flag;
+{
+	struct scsipi_periph *periph;
+	int i;
+
+	periph = malloc(sizeof(*periph), M_DEVBUF, malloc_flag|M_ZERO);
+	if (periph == NULL)
+		return NULL;
+
+	periph->periph_dev = NULL;
+
+	/*
+	 * Start with one command opening.  The periph driver
+	 * will grow this if it knows it can take advantage of it.
+	 */
+	periph->periph_openings = 1; 
+	periph->periph_active = 0;   
+
+	for (i = 0; i < PERIPH_NTAGWORDS; i++)
+		periph->periph_freetags[i] = 0xffffffff;
+
+	TAILQ_INIT(&periph->periph_xferq);
+	callout_init(&periph->periph_callout);
+
+	return periph;
 }
 
 /*
@@ -122,19 +159,19 @@ scsipi_inqmatch(inqbuf, base, nmatches, matchsize, bestpriority)
 			continue;
 		priority = 2;
 		len = strlen(match->vendor);
-		if (bcmp(inqbuf->vendor, match->vendor, len))
+		if (memcmp(inqbuf->vendor, match->vendor, len))
 			continue;
 		priority += len;
 		len = strlen(match->product);
-		if (bcmp(inqbuf->product, match->product, len))
+		if (memcmp(inqbuf->product, match->product, len))
 			continue;
 		priority += len;
 		len = strlen(match->revision);
-		if (bcmp(inqbuf->revision, match->revision, len))
+		if (memcmp(inqbuf->revision, match->revision, len))
 			continue;
 		priority += len;
 
-#ifdef SCSIDEBUG
+#ifdef SCSIPI_DEBUG
 		printf("scsipi_inqmatch: %d/%d/%d <%s, %s, %s>\n",
 		    priority, match->type, match->removable,
 		    match->vendor, match->product, match->revision);
@@ -220,9 +257,9 @@ scsipi_strvis(dst, dlen, src, slen)
 {
 
 	/* Trim leading and trailing blanks and NULs. */
-	while (slen > 0 && (src[0] == ' ' || src[0] == '\0'))
+	while (slen > 0 && STRVIS_ISWHITE(src[0]))
 		++src, --slen;
-	while (slen > 0 && (src[slen-1] == ' ' || src[slen-1] == '\0'))
+	while (slen > 0 && STRVIS_ISWHITE(src[slen - 1]))
 		--slen;
 
 	while (slen > 0) {

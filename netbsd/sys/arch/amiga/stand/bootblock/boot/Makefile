@@ -1,43 +1,57 @@
-#	$NetBSD: Makefile,v 1.20.4.2 2002/02/09 17:35:23 he Exp $
+#	$NetBSD: Makefile,v 1.28 2002/04/15 08:38:55 mhitch Exp $
 
 ### what we need:
 
 DIR_TOP=	${.CURDIR}/../../../../..
 DIR_SA = 	${DIR_TOP}/lib/libsa
+DIR_LIBZ =	${DIR_TOP}/lib/libz
 DIR_KERN=	${DIR_TOP}/lib/libkern
 DIR_KERN_MD=	${DIR_TOP}/lib/libkern/arch/$(MACHINE_ARCH)
 
-.PATH:  $(DIR_SA) $(DIR_KERN) $(DIR_KERN_MD)
+.PATH:  $(DIR_SA) ${DIR_LIBZ} $(DIR_KERN) $(DIR_KERN_MD)
 
 # prefer our assembler versions over assembler, and assembler over C:
 
 .SUFFIXES:
 .SUFFIXES: .out .o .po .so .s .S .c .cc .C .f .y .l .ln .m4 .sh
 
-FILES= xxboot fdboot
+FILES= boot.amiga
 BINDIR=/usr/mdec
 
 COBJS = main.o console.o xd.o twiddle.o bzero.o gets.o
 COBJS+=  lseek.o open.o read.o close.o dev.o errno.o
-COBJS+=  ufs.o
+COBJS+=  ufs.o ustarfs.o panic.o vers.o files.o
 
 SOBJS = alloc.o ashrdi3.o ashldi3.o bcopy.o muldi3.o printf.o startit.o
-SOBJS += strlen.o strcmp.o
-SOBJS += libstubs.o 
+SOBJS += strlen.o strcmp.o memcmp.o strerror.o sprintf.o subr_prf.o
+SOBJS += libstubs.o memset.o strncmp.o
 
 OBJS=	$(SOBJS) $(COBJS)
 
 DEFS = -D_STANDALONE -DINSECURE
+DEFS += -D__INTERNAL_LIBSA_CREAD
+SOBJS += cread.o
+SOBJS += crc32.o inflate.o adler32.o infblock.o infcodes.o inftrees.o # XXX need libz!!!
+SOBJS += inffast.o infutil.o
+#DEFS += -DBOOT_ELF32 -DBOOT_AOUT
+SOBJS += loadfile.o loadfile_aout.o loadfile_elf32.o
+
+NETBSD_VERS!=	sh ${.CURDIR}/../../../../../conf/osrelease.sh
+DEFS+=	-DNETBSD_VERS='"${NETBSD_VERS}"'
 
 ### main target: ###
 
-realall: ${FILES}
+realall: machine m68k ${FILES}
+
+CLEANFILES += boot.amiga x.out xxstart.o libboot.a vers.c machine m68k
 
 .include <bsd.prog.mk>
 
 ### special  rules for bootblocks ###
 
-INCPATH = -nostdinc -I${DIR_TOP} -I${DIR_TOP}/lib/libsa -I${.CURDIR} -I${.CURDIR}/../../.. -I${.CURDIR}/../aout2bb -I${DESTDIR}/usr/include
+INCPATH = -nostdinc -I${DIR_TOP} -I${DIR_TOP}/lib/libsa -I${.CURDIR}
+INCPATH += -I${.CURDIR}/../../.. -I${.OBJDIR}
+INCPATH += -I${.CURDIR}/../aout2bb -I${DESTDIR}/usr/include
 
 AFLAGS += -m68030 -l
 CAFLAGS += -Wa,-l -Wa,-m68030 ${INCPATH}
@@ -54,36 +68,36 @@ CFLAGS= ${COPTIM} ${INCPATH} ${DEFS} -Wall #-Wstrict-prototypes
 
 .S.o: ; ${CC} ${CAFLAGS} ${COPTS} -x assembler-with-cpp -o $@ -c $<
 
-CLEANFILES += xxboot fdboot x.out f.out xxstart.o fdstart.o libboot.a
-
-xxboot: x.out
-	${AOUT2BB} x.out $@ || nm -u x.out
-
-fdboot: f.out
-	${AOUT2BB} f.out $@ || nm -u f.out
+boot.amiga: x.out
+	${RELOC2BB} -S x.out $@ || ${NM} -u x.out
 
 x.out: xxstart.o libboot.a
 	${LD} ${LDFLAGS} -r -dc -e _start -o $@ $>
-	size $@
-	nm -u $@
-
-f.out: fdstart.o libboot.a
-	${LD} ${LDFLAGS} -r -dc -e _start -o $@ $>
-	size $@
-	nm -u $@
+	${SIZE} $@
+	${NM} -u $@
 
 xxstart.o: ${.CURDIR}/bbstart.s
 	${CC} ${CAFLAGS} ${COPTS} -x assembler-with-cpp \
 		-o $@ -c $>
 
-fdstart.o: ${.CURDIR}/bbstart.s
-	${CC} -DAUTOLOAD=8192 ${CAFLAGS} ${COPTS} -x assembler-with-cpp \
-		-o $@ -c $>
-
 libboot.a: ${OBJS}
 	${AR} r $@ $> && ${RANLIB} $@
+
+.PHONY:	vers.c
+vers.c:	${.CURDIR}/version
+	sh ${DIR_TOP}/conf/newvers_stand.sh -N ${.CURDIR}/version "amiga"
+
+machine:
+	-rm -f $@
+	ln -s ${DIR_TOP}/arch/amiga/include $@
+
+m68k:
+	-rm -f $@
+	ln -s ${DIR_TOP}/arch/m68k/include $@
 
 # make sure these are built:
 
 ${COBJS}: ${TXLT}
-${FILES}: ${AOUT2BB}
+${FILES}: ${RELOC2BB}
+
+.include "${.CURDIR}/../Makefile.booters"

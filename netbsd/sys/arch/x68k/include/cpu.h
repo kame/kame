@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.23 2000/05/26 21:20:27 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.26 2001/05/30 12:28:52 mrg Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -49,7 +49,7 @@
  * Exported definitions unique to x68k/68k cpu support.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_m680x0.h"
 #include "opt_lockdebug.h"
 #endif
@@ -117,7 +117,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define	need_resched()	{ want_resched++; aston(); }
+#define	need_resched(ci)	{ want_resched++; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -190,9 +190,6 @@ int	dma_cachectl __P((caddr_t, int));
 void	physaccess __P((caddr_t, caddr_t, int, int));
 void	physunaccess __P((caddr_t, int));
 int	kvtop __P((caddr_t));
-
-/* trap.c functions */
-void	child_return __P((void *));
 
 #endif
 

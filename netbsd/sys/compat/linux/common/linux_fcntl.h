@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_fcntl.h,v 1.5 1998/12/15 19:31:39 itohy Exp $	*/
+/*	$NetBSD: linux_fcntl.h,v 1.9 2002/03/22 14:54:49 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -58,12 +58,25 @@ struct linux_flock {
 	linux_pid_t l_pid;
 };
 
+struct linux_flock64 {
+	short       l_type;
+	short       l_whence;
+	off_t	    l_start;
+	off_t	    l_len;
+	linux_pid_t l_pid;
+};
 #if defined(__i386__)
 #include <compat/linux/arch/i386/linux_fcntl.h>
 #elif defined(__m68k__)
 #include <compat/linux/arch/m68k/linux_fcntl.h>
 #elif defined(__alpha__)
 #include <compat/linux/arch/alpha/linux_fcntl.h>
+#elif defined(__powerpc__)
+#include <compat/linux/arch/powerpc/linux_fcntl.h>
+#elif defined(__mips__)
+#include <compat/linux/arch/mips/linux_fcntl.h>
+#elif defined(__arm__)
+#include <compat/linux/arch/arm/linux_fcntl.h>
 #else
 #error Undefined linux_fcntl.h machine type.
 #endif

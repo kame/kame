@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.54 1999/11/05 19:06:39 scottr Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.57 2002/05/16 02:50:54 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -115,7 +115,7 @@ static void
 findbootdev()
 {
 	struct device *dv;
-	int major, unit, i;
+	int major, unit, controller, i;
 	char buf[32];
 
 	booted_device = NULL;
@@ -130,9 +130,21 @@ findbootdev()
 
 	unit = B_UNIT(bootdev);
 
-	bootdev &= ~(B_UNITMASK << B_UNITSHIFT);
-	unit = target_to_unit(-1, unit, 0);
-	bootdev |= (unit << B_UNITSHIFT);
+	switch (major) {
+	case 4: /* SCSI drive */
+		bootdev &= ~(B_UNITMASK << B_UNITSHIFT); /* XXX */
+		unit = target_to_unit(-1, unit, 0);
+		bootdev |= (unit << B_UNITSHIFT); /* XXX */
+		break;
+	case 22: /* IDE drive */
+		/*
+		 * controller(=channel=buses) uses only IDE drive.
+		 * Here, controller always is 0.
+		 */
+		controller = B_CONTROLLER(bootdev);
+		unit = unit + (controller<<1);
+		break;
+	}
 
 	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
 	for (dv = alldevs.tqh_first; dv != NULL;
@@ -154,7 +166,7 @@ target_to_unit(bus, target, lun)
 	u_long bus, target, lun;
 {
 	struct scsibus_softc	*scsi;
-	struct scsipi_link	*sc_link;
+	struct scsipi_periph	*periph;
 	struct device		*sc_dev;
 extern	struct cfdriver		scsibus_cd;
 
@@ -169,10 +181,11 @@ extern	struct cfdriver		scsibus_cd;
 			if (scsibus_cd.cd_devs[bus]) {
 				scsi = (struct scsibus_softc *)
 						scsibus_cd.cd_devs[bus];
-				if (scsi->sc_link[target][lun]) {
-					sc_link = scsi->sc_link[target][lun];
+				periph = scsipi_lookup_periph(scsi->sc_channel,
+				    target, lun);
+				if (periph != NULL) {
 					sc_dev = (struct device *)
-							sc_link->device_softc;
+							periph->periph_dev;
 					return sc_dev->dv_unit;
 				}
 			}
@@ -185,9 +198,10 @@ extern	struct cfdriver		scsibus_cd;
 	}
 	if (scsibus_cd.cd_devs[bus]) {
 		scsi = (struct scsibus_softc *) scsibus_cd.cd_devs[bus];
-		if (scsi->sc_link[target][lun]) {
-			sc_link = scsi->sc_link[target][lun];
-			sc_dev = (struct device *) sc_link->device_softc;
+		periph = scsipi_lookup_periph(scsi->sc_channel,
+		    target, lun);
+		if (periph != NULL) {
+			sc_dev = (struct device *) periph->periph_dev;
 			return sc_dev->dv_unit;
 		}
 	}

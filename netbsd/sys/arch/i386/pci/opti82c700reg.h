@@ -1,4 +1,4 @@
-/*	$NetBSD: opti82c700reg.h,v 1.1.8.1 2000/08/10 22:29:58 soda Exp $	*/
+/*	$NetBSD: opti82c700reg.h,v 1.2 2000/07/18 11:07:21 soda Exp $	*/
 
 /*
  * Copyright (c) 1999, by UCHIYAMA Yasushi

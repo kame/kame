@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.3.2.1 2000/06/26 16:13:42 nonaka Exp $	*/
+/*	NetBSD: pci_machdep.c,v 1.12 2001/06/19 11:56:27 nonaka Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -43,32 +43,28 @@
 #include <sys/time.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
+#include <sys/extent.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
-#define _PREP_BUS_DMA_PRIVATE
+#define _POWERPC_BUS_DMA_PRIVATE
 #include <machine/bus.h>
-#include <machine/pio.h>
 #include <machine/intr.h>
+#include <machine/platform.h>
 
 #include <dev/isa/isavar.h>
+
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcidevs.h>
-
-#define	PCI_MODE1_ENABLE	0x80000000UL
-#define	PCI_MODE1_ADDRESS_REG	(PREP_BUS_SPACE_IO + 0xcf8)
-#define	PCI_MODE1_DATA_REG	(PREP_BUS_SPACE_IO + 0xcfc)
-
-#define	o2i(off)	((off)/sizeof(pcireg_t))
+#include <dev/pci/pciconf.h>
 
 /*
  * PCI doesn't have any special needs; just use the generic versions
  * of these functions.
  */
-struct prep_bus_dma_tag pci_bus_dma_tag = {
+struct powerpc_bus_dma_tag pci_bus_dma_tag = {
 	0,			/* _bounce_thresh */
 	_bus_dmamap_create,
 	_bus_dmamap_destroy,
@@ -85,170 +81,8 @@ struct prep_bus_dma_tag pci_bus_dma_tag = {
 	_bus_dmamem_mmap,
 };
 
-void
-pci_attach_hook(parent, self, pba)
-	struct device *parent, *self;
-	struct pcibus_attach_args *pba;
-{
-	pci_chipset_tag_t pc;
-	int bus, device, maxndevs, function, nfunctions;
-	int iq = 2;		/* fixup ioaddr: 0x02000000~ */
-	int mq = 1;		/* fixup memaddr: 0x01000000~ */
-
-	pc = pba->pba_pc;
-	bus = pba->pba_bus;
-
-	maxndevs = pci_bus_maxdevs(pba->pba_pc, pba->pba_bus);
-
-	for (device = 0; device < maxndevs; device++) {
-		pcitag_t tag;
-		pcireg_t id, intr, bhlcr, csr, adr;
-		int line;
-
-		tag = pci_make_tag(pc, bus, device, 0);
-		id = pci_conf_read(pc, tag, PCI_ID_REG);
-
-		/* Invalid vendor ID value? */
-		if (PCI_VENDOR(id) == PCI_VENDOR_INVALID)
-			continue;
-		/* XXX Not invalid, but we've done this ~forever. */
-		if (PCI_VENDOR(id) == 0)
-			continue;
-
-		bhlcr = pci_conf_read(pc, tag, PCI_BHLC_REG);
-		if (PCI_HDRTYPE_MULTIFN(bhlcr))
-			nfunctions = 8;
-		else
-			nfunctions = 1;
-
-		for (function = 0; function < nfunctions; function++) {
-			pcireg_t regs[256/sizeof(pcireg_t)];
-			pcireg_t mask;
-			pcireg_t rval;
-			int off;
-			int memfound, iofound;
-
-			tag = pci_make_tag(pc, bus, device, function);
-			id = pci_conf_read(pc, tag, PCI_ID_REG);
-
-			/* Invalid vendor ID value? */
-			if (PCI_VENDOR(id) == PCI_VENDOR_INVALID)
-                                continue;
-			/* XXX Not invalid, but we've done this ~forever. */
-			if (PCI_VENDOR(id) == 0)
-				continue;
-
-			/* Enable io/mem */
-			memfound = 0;
-			iofound = 0;
-			for (off = 0; off < 256; off += sizeof(pcireg_t))
-				regs[o2i(off)] = pci_conf_read(pc, tag, off);
-			/* is it a std device header? */
-			if (PCI_HDRTYPE_TYPE(regs[o2i(PCI_BHLC_REG)]) != 0)
-				continue;
-			for (off = PCI_MAPREG_START;
-			    off < PCI_MAPREG_END; off += sizeof(pcireg_t)) {
-				rval = regs[o2i(off)];
-				if (rval != 0) {
-					pci_conf_write(pc, tag, off, 0xffffffff);
-					mask = pci_conf_read(pc, tag, off);
-					pci_conf_write(pc, tag, off, rval);
-				} else
-					mask = 0;
-#ifdef DEBUG
-				printf("\n");
-				printf("dev %d func %d ", device, function);
-				printf("off %02x addr %08x mask %08x",
-				    off, rval, mask);
-#endif
-				if (rval == 0)
-					continue;
-				/* find IO or MEM space */
-				if (PCI_MAPREG_TYPE(rval) == PCI_MAPREG_TYPE_MEM)
-					memfound = 1;
-				else
-					iofound = 1;
-			}
-			if (memfound) {
-				csr = pci_conf_read(pc, tag,
-				    PCI_COMMAND_STATUS_REG);
-				csr |= PCI_COMMAND_MEM_ENABLE;
-				pci_conf_write(pc, tag,
-				    PCI_COMMAND_STATUS_REG, csr);
-#ifdef DEBUG
-				printf("\n");
-				printf("dev %d func %d: mem", device, function);
-#endif
-			}
-			if (iofound) {
-				csr = pci_conf_read(pc, tag,
-				    PCI_COMMAND_STATUS_REG);
-				csr |= PCI_COMMAND_IO_ENABLE;
-				pci_conf_write(pc, tag,
-				    PCI_COMMAND_STATUS_REG, csr);
-#ifdef DEBUG
-				printf("\n");
-				printf("dev %d func %d: io", device, function);
-#endif
-			}
-
-			/* Fixup insane address */
-			for (off = PCI_MAPREG_START;
-			    off < PCI_MAPREG_END; off += sizeof(pcireg_t)) {
-				int need_fixup;
-
-				need_fixup = 0;
-				adr = pci_conf_read(pc, tag, off);
-				if (adr > 0x10000000 ||
-				    (adr < 0x1000 && adr != 0))
-					need_fixup = 1;
-
-				if (need_fixup) {
-#ifdef DEBUG
-					printf("\n");
-					printf("dev %d func %d %saddr %08x -> ",
-					    device, function,
-					    PCI_MAPREG_TYPE(adr) ==
-					      PCI_MAPREG_TYPE_MEM ? "mem":"io",
-					    adr);
-#endif
-					adr &= 0x00ffffff;
-					adr |= 0x01000000 *
-					    (PCI_MAPREG_TYPE(adr) ==
-					      PCI_MAPREG_TYPE_MEM ? mq++:iq++);
-#ifdef DEBUG
-					printf("%08x", adr);
-#endif
-					pci_conf_write(pc, tag, off, adr);
-				}
-			}
-
-			/* Fixup intr */
-			/* XXX: ibm_machdep : ppc830 depend */
-			switch (device) {
-			case 12:
-			case 18:
-			case 22:
-				line = 15;
-				break;
-			default:
-				line = 0;
-				break;
-			}
-
-			if (line) {
-				intr = pci_conf_read(pc, tag, PCI_INTERRUPT_REG);
-				pci_conf_write(pc, tag, PCI_INTERRUPT_REG,
-				    (intr & ~0xff) | line);
-			}
-		}
-	}
-}
-
 int
-pci_bus_maxdevs(pc, busno)
-	pci_chipset_tag_t pc;
-	int busno;
+prep_pci_bus_maxdevs(void *v, int busno)
 {
 
 	/*
@@ -258,71 +92,12 @@ pci_bus_maxdevs(pc, busno)
 	return (32);
 }
 
-pcitag_t
-pci_make_tag(pc, bus, device, function)
-	pci_chipset_tag_t pc;
-	int bus, device, function;
-{
-	pcitag_t tag;
-
-	if (bus >= 256 || device >= 32 || function >= 8)
-		panic("pci_make_tag: bad request");
-
-	tag = PCI_MODE1_ENABLE |
-		    (bus << 16) | (device << 11) | (function << 8);
-	return tag;
-}
-
-void
-pci_decompose_tag(pc, tag, bp, dp, fp)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	int *bp, *dp, *fp;
-{
-
-	if (bp != NULL)
-		*bp = (tag >> 16) & 0xff;
-	if (dp != NULL)
-		*dp = (tag >> 11) & 0x1f;
-	if (fp != NULL)
-		*fp = (tag >> 8) & 0x7;
-	return;
-}
-
-pcireg_t
-pci_conf_read(pc, tag, reg)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	int reg;
-{
-	pcireg_t data;
-
-	out32rb(PCI_MODE1_ADDRESS_REG, tag | reg);
-	data = in32rb(PCI_MODE1_DATA_REG);
-	out32rb(PCI_MODE1_ADDRESS_REG, 0);
-	return data;
-}
-
-void
-pci_conf_write(pc, tag, reg, data)
-	pci_chipset_tag_t pc;
-	pcitag_t tag;
-	int reg;
-	pcireg_t data;
-{
-
-	out32rb(PCI_MODE1_ADDRESS_REG, tag | reg);
-	out32rb(PCI_MODE1_DATA_REG, data);
-	out32rb(PCI_MODE1_ADDRESS_REG, 0);
-}
 
 int
-pci_intr_map(pc, intrtag, pin, line, ihp)
-	pci_chipset_tag_t pc;
-	pcitag_t intrtag;
-	int pin, line;
-	pci_intr_handle_t *ihp;
+prep_pci_intr_map(struct pci_attach_args *pa, pci_intr_handle_t *ihp)
 {
+	int pin = pa->pa_intrpin;
+	int line = pa->pa_intrline;
 
 	if (pin == 0) {
 		/* No IRQ used. */
@@ -371,9 +146,7 @@ bad:
 }
 
 const char *
-pci_intr_string(pc, ih)
-	pci_chipset_tag_t pc;
-	pci_intr_handle_t ih;
+prep_pci_intr_string(void *v, pci_intr_handle_t ih)
 {
 	static char irqstr[8];		/* 4 + 2 + NULL + sanity */
 
@@ -386,9 +159,7 @@ pci_intr_string(pc, ih)
 }
 
 const struct evcnt *
-pci_intr_evcnt(pc, ih)
-	pci_chipset_tag_t pc;
-	pci_intr_handle_t ih;
+prep_pci_intr_evcnt(void *v, pci_intr_handle_t ih)
 {
 
 	/* XXX for now, no evcnt parent reported */
@@ -396,11 +167,8 @@ pci_intr_evcnt(pc, ih)
 }
 
 void *
-pci_intr_establish(pc, ih, level, func, arg)
-	pci_chipset_tag_t pc;
-	pci_intr_handle_t ih;
-	int level, (*func) __P((void *));
-	void *arg;
+prep_pci_intr_establish(void *v, pci_intr_handle_t ih, int level,
+    int (*func)(void *), void *arg)
 {
 
 	if (ih == 0 || ih >= ICU_LEN || ih == IRQ_SLAVE)
@@ -410,10 +178,31 @@ pci_intr_establish(pc, ih, level, func, arg)
 }
 
 void
-pci_intr_disestablish(pc, cookie)
-	pci_chipset_tag_t pc;
-	void *cookie;
+prep_pci_intr_disestablish(void *v, void *cookie)
 {
 
-	return isa_intr_disestablish(NULL, cookie);
+	isa_intr_disestablish(NULL, cookie);
+}
+
+void
+prep_pci_conf_interrupt(void *v, int bus, int dev, int pin,
+    int swiz, int *iline)
+{
+
+	(*platform->pci_intr_fixup)(bus, dev, iline);
+}
+
+int
+prep_pci_conf_hook(void *v, int bus, int dev, int func, pcireg_t id)
+{
+
+	/*
+	 * The P9100 board found in some IBM machines cannot be
+	 * over-configured.
+	 */
+	if (PCI_VENDOR(id) == PCI_VENDOR_WEITEK &&
+	    PCI_PRODUCT(id) == PCI_PRODUCT_WEITEK_P9100)
+		return 0;
+
+	return (PCI_CONF_ALL & ~PCI_CONF_MAP_ROM);
 }

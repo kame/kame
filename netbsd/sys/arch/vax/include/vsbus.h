@@ -1,4 +1,4 @@
-/*	$NetBSD: vsbus.h,v 1.12.4.1 2000/06/28 13:32:56 ragge Exp $ */
+/*	$NetBSD: vsbus.h,v 1.13 2000/06/25 16:00:46 ragge Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.

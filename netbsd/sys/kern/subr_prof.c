@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_prof.c,v 1.20 2000/03/30 09:27:13 augustss Exp $	*/
+/*	$NetBSD: subr_prof.c,v 1.25 2001/11/12 15:25:21 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -35,6 +35,9 @@
  *	@(#)subr_prof.c	8.4 (Berkeley) 2/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: subr_prof.c,v 1.25 2001/11/12 15:25:21 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -42,7 +45,6 @@
 #include <sys/user.h>
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 #include <machine/cpu.h>
@@ -119,6 +121,10 @@ sysctl_doprof(name, namelen, oldp, oldlenp, newp, newlen)
 	/* all sysctl names at this level are terminal */
 	if (namelen != 1)
 		return (ENOTDIR);		/* overloaded */
+
+	/* Check we got the necessary memory at startup. */
+	if (gp->kcount == NULL)
+		return (EOPNOTSUPP);
 
 	switch (name[0]) {
 	case GPROF_STATE:
@@ -213,27 +219,24 @@ sys_profil(p, v, retval)
  * inaccurate.
  */
 void
-addupc_intr(p, pc, ticks)
+addupc_intr(p, pc)
 	struct proc *p;
 	u_long pc;
-	u_int ticks;
 {
 	struct uprof *prof;
 	caddr_t addr;
 	u_int i;
 	int v;
 
-	if (ticks == 0)
-		return;
 	prof = &p->p_stats->p_prof;
 	if (pc < prof->pr_off ||
 	    (i = PC_TO_INDEX(pc, prof)) >= prof->pr_size)
 		return;			/* out of range; ignore */
 
 	addr = prof->pr_base + i;
-	if ((v = fuswintr(addr)) == -1 || suswintr(addr, v + ticks) == -1) {
+	if ((v = fuswintr(addr)) == -1 || suswintr(addr, v + 1) == -1) {
 		prof->pr_addr = pc;
-		prof->pr_ticks = ticks;
+		prof->pr_ticks++;
 		need_proftick(p);
 	}
 }

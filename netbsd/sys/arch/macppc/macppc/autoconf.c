@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.21.4.2 2001/04/01 16:59:35 he Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.29 2001/12/02 22:54:27 bouyer Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -48,10 +48,11 @@
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 #include <dev/ata/atavar.h>
+#include <dev/ata/wdvar.h>
 #include <dev/ic/wdcvar.h>
 
 void canonicalize_bootpath __P((void));
-int OF_interpret __P((char *cmd, int nreturns, ...));
+void ofw_stack __P((void));
 
 extern char bootpath[256];
 char cbootpath[256];
@@ -123,7 +124,7 @@ canonicalize_bootpath()
 	else
 		last[0] = 0;
 
-	bzero(cbootpath, sizeof(cbootpath));
+	memset(cbootpath, 0, sizeof(cbootpath));
 	OF_package_to_path(node, cbootpath, sizeof(cbootpath) - 1);
 
 	/*
@@ -240,17 +241,13 @@ device_register(dev, aux)
 		   DEVICE_IS(dev->dv_parent, "atapibus")) {
 		struct scsipibus_attach_args *sa = aux;
 
-		if (dev->dv_parent->dv_xname[0] == 's') {
-			if (addr != sa->sa_sc_link->scsipi_scsi.target)
-				return;
-		} else {
-			if (addr != sa->sa_sc_link->scsipi_atapi.drive)
-				return;
-		}
+		/* periph_target is target for scsi, drive # for atapi */
+		if (addr != sa->sa_periph->periph_target)
+			return;
 	} else if (DEVICE_IS(dev->dv_parent, "pciide")) {
-		struct ata_atapi_attach *aa = aux;
+		struct ata_device *adev = aux;
 
-		if (addr != aa->aa_channel)
+		if (addr != adev->adev_drv_data->drive)
 			return;
 
 		/*
@@ -262,12 +259,12 @@ device_register(dev, aux)
 		p = strchr(p, '@');
 		if (!p++)
 			return;
-		if (strtoul(p, &p, 16) != aa->aa_drv_data->drive)
+		if (strtoul(p, &p, 16) != adev->adev_drv_data->drive)
 			return;
 	} else if (DEVICE_IS(dev->dv_parent, "wdc")) {
-		struct ata_atapi_attach *aa = aux;
+		struct ata_device *adev = aux;
 
-		if (addr != aa->aa_channel)
+		if (addr != adev->adev_drv_data->drive)
 			return;
 	} else
 		return;
@@ -284,6 +281,9 @@ device_register(dev, aux)
 			bp++;
 		return;
 	} else {
+#ifdef DEBUG
+		printf("%s -> %s\n", bootpath, dev->dv_xname);
+#endif
 		booted_device = dev;
 		return;
 	}
@@ -384,7 +384,7 @@ pcidev_to_ofdev(pc, tag)
 int
 getnodebyname(start, target)
 	int start;
-	char *target;
+	const char *target;
 {
 	int node, next;
 	char name[64];
@@ -393,7 +393,7 @@ getnodebyname(start, target)
 		start = OF_peer(0);
 
 	for (node = start; node; node = next) {
-		bzero(name, sizeof name);
+		memset(name, 0, sizeof name);
 		OF_getprop(node, "name", name, sizeof name - 1);
 		if (strcmp(name, target) == 0)
 			break;

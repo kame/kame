@@ -1,4 +1,4 @@
-/*      $NetBSD: locore.S,v 1.4 2000/05/31 05:06:45 thorpej Exp $   */
+/*      $NetBSD: locore.S,v 1.8 2001/12/03 21:10:48 aymeric Exp $   */
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -40,6 +40,7 @@
 
 #include "opt_ddb.h"
 #include "opt_ipkdb.h"
+#include "opt_lockdebug.h"
 #include "assym.h"
 
 #include <sys/syscall.h>
@@ -96,7 +97,7 @@ _C_LABEL(kernel_text):
 /*
  * Startup entry
  * This is where bootloader jumps after successful kernel loading.
- * Must b the first address in text segment
+ * Must be the first address in text segment
  */
 	.text
 	.globl	__start
@@ -154,6 +155,14 @@ __start:
  * Clearing segment register
  */
 	xor	0,0,0
+	mtibatu	0,0
+	mtibatu	1,0
+	mtibatu	2,0
+	mtibatu	3,0
+	mtdbatu	0,0
+	mtdbatu	1,0
+	mtdbatu	2,0
+	mtdbatu	3,0
 	mtsr	0,0
 	mtsr	1,0
 	mtsr	2,0
@@ -206,18 +215,6 @@ __start:
 	ori	3,3,__start@l
 	bl	_C_LABEL(initppc)
 
-/*
- * Enable caches on 603e/604e
-	mfspr	3,1008
-	ori	3,3,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BHT
-	ori	4,3,HID0_ICFI|HID0_DCFI
-	sync
-	mtspr	1008,4
-	sync
-	mtspr	1008,3
-	sync
-	isync
- */
 
 /*
  * Jump to main() (from kern/init_main.c)
@@ -264,20 +261,21 @@ _C_LABEL(adamintsize) = .-_C_LABEL(adamint)
 /*
  * No processes are runnable, so loop waiting for one.
  * Separate label here for accounting purposes.
+ * When we get here, interrupts are off (MSR[EE]=0) and sched_lock is held.
  */
 	.text
 ASENTRY(Idle)
-	mfmsr	3
-	andi.	3,3,~PSL_EE@l		/* disable interrupts while
-					   manipulating runque */
-	mtmsr	3
-
 	lis	8,_C_LABEL(sched_whichqs)@ha
 	lwz	9,_C_LABEL(sched_whichqs)@l(8)
 
 	or.	9,9,9
 	bne-	.Lsw1			/* at least one queue non-empty */
 	
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+	bl	_C_LABEL(sched_unlock_idle)
+#endif
+
+	mfmsr	3
 	ori	3,3,PSL_EE@l		/* reenable ints again */
 	mtmsr	3
 	isync
@@ -294,6 +292,13 @@ ASENTRY(Idle)
 	mtmsr	3
 	isync
 1:
+	andi.	3,3,~PSL_EE@l		/* disable interrupts while
+					   manipulating runque */
+	mtmsr	3
+
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+	bl	_C_LABEL(sched_lock_idle)
+#endif
 	b	_ASM_LABEL(Idle)
 
 /*
@@ -311,6 +316,10 @@ ENTRY(switchexit)
 	 * already in r3).
 	 */
 	bl	_C_LABEL(exit2)
+
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+	bl	_C_LABEL(sched_lock_idle)
+#endif
 
 /* Fall through to cpu_switch to actually select another proc */
 	li	3,0			/* indicate exited process */
@@ -334,17 +343,26 @@ ENTRY(cpu_switch)
 	lis	3,_C_LABEL(curpcb)@ha
 	lwz	31,_C_LABEL(curpcb)@l(3)
 
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+/* Release the sched_lock before processing interrupts. */
+	bl	_C_LABEL(sched_unlock_idle)
+#endif
+
 	xor	3,3,3
 	bl	_C_LABEL(lcsplx)
 	stw	3,PCB_SPL(31)		/* save spl */
 
-/* Find a new process */
+/* Lock the scheduler. */
 	mfmsr	3
 	andi.	3,3,~PSL_EE@l		/* disable interrupts while
 					   manipulating runque */
 	mtmsr	3
 	isync
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+	bl	_C_LABEL(sched_lock_idle)
+#endif
 
+/* Find a new process */
 	lis	8,_C_LABEL(sched_whichqs)@ha
 	lwz	9,_C_LABEL(sched_whichqs)@l(8)
 
@@ -377,6 +395,11 @@ ENTRY(cpu_switch)
 	stw	3,_C_LABEL(want_resched)@l(4)
 
 	stw	3,P_BACK(31)		/* probably superfluous */
+
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+	/* Unlock the sched_lock, but leave interrupts off, for now. */
+	bl	_C_LABEL(sched_unlock_idle)
+#endif
 
 	/* p->p_cpu initialized in fork1() for single-processor */
 
@@ -1077,7 +1100,7 @@ s_dsitrap:
 	mfctr	31			/* & CTR */
 	mfdar	3
 s_pte_spill:
-	bl	_C_LABEL(pte_spill)	/* try a spill */
+	bl	_C_LABEL(pmap_pte_spill) /* try a spill */
 	or.	3,3,3
 	mtctr	31			/* restore CTR */
 	mtlr	30			/* and trap type */

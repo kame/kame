@@ -1,4 +1,4 @@
-/*	$NetBSD: db_memrw.c,v 1.2 1998/08/31 14:43:40 tsubai Exp $	*/
+/*	$NetBSD: db_memrw.c,v 1.5 2001/12/27 10:25:41 dbj Exp $	*/
 /*	$OpenBSD: db_memrw.c,v 1.2 1996/12/28 06:21:52 rahnds Exp $	*/
 
 /* 
@@ -41,7 +41,7 @@
 #include <sys/param.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
 
@@ -86,18 +86,22 @@ db_write_bytes(addr, size, data)
 	register char	*dst = (char *)addr;
 
 	if (size == 4) {
+
 		*((int*)dst) = *((int*)data);
-		return;
-	}
 
-	if (size == 2) {
+	} else 	if (size == 2) {
+
 		*((short*)dst) = *((short*)data);
-		return;
+
+	} else {
+
+		while (size > 0) {
+			--size;
+			*dst++ = *data++;
+		}
+
 	}
 
-	while (size > 0) {
-		--size;
-		*dst++ = *data++;
-	}
+	__syncicache((void *)addr, size);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.98.2.4 2001/07/29 04:05:11 jhawk Exp $	*/
+/*	$NetBSD: param.h,v 1.138.4.1 2002/05/22 03:32:03 tv Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -41,14 +41,14 @@
  */
 
 #ifndef _SYS_PARAM_H_
-#define _SYS_PARAM_H_
+#define	_SYS_PARAM_H_
 
 /*
  * Historic BSD #defines -- probably will remain untouched for all time.
  */
 #define	BSD	199506		/* System version (year & month). */
-#define BSD4_3	1
-#define BSD4_4	1
+#define	BSD4_3	1
+#define	BSD4_4	1
 
 /*
  *	#define __NetBSD_Version__ MMmmrrpp00
@@ -63,9 +63,11 @@
  *	And:
  *	     NetBSD-1.2.1 = 102000100
  *
+ *
+ * Don't forget to change conf/osrelease.sh too.
  */
 
-#define __NetBSD_Version__  105000300	/* NetBSD 1.5.3 */
+#define	__NetBSD_Version__	106000000	/* NetBSD 1.6 */
 
 /*
  * Historical NetBSD #define
@@ -79,7 +81,7 @@
  *
  */
 
-#define NetBSD	199905		/* NetBSD version (year & month). */
+#define	NetBSD	199905		/* NetBSD version (year & month). */
 
 #include <sys/null.h>
 
@@ -105,10 +107,10 @@
 #define	NGROUPS		NGROUPS_MAX	/* max number groups */
 #define	NOFILE		OPEN_MAX	/* max open files per process */
 #define	NOGROUP		65535		/* marker for empty group set member */
-#define MAXHOSTNAMELEN	256		/* max hostname size */
+#define	MAXHOSTNAMELEN	256		/* max hostname size */
 
 #ifndef MAXUPRC				/* max simultaneous processes */
-#define MAXUPRC		CHILD_MAX	/* POSIX 1003.1-compliant default */
+#define	MAXUPRC		CHILD_MAX	/* POSIX 1003.1-compliant default */
 #else
 #if (MAXUPRC - 0) < CHILD_MAX
 #error MAXUPRC less than CHILD_MAX.  See options(4) for details.
@@ -124,13 +126,13 @@
 #include <sys/ucred.h>
 #include <sys/uio.h>
 #ifndef NPROC
-#define	NPROC (20 + 16 * MAXUSERS)
+#define	NPROC	(20 + 16 * MAXUSERS)
 #endif
 #ifndef NTEXT
-#define	NTEXT (80 + NPROC / 8)			/* actually the object cache */
+#define	NTEXT	(80 + NPROC / 8)		/* actually the object cache */
 #endif
 #ifndef NVNODE
-#define	NVNODE (NPROC + NTEXT + 100)
+#define	NVNODE	(NPROC + NTEXT + 100)
 #define	NVNODE_IMPLICIT
 #endif
 #endif /* _KERNEL */
@@ -170,7 +172,7 @@
 #define	NODEV	(dev_t)(-1)	/* non-existent device */
 
 #define	CBLOCK	64		/* Clist block size, must be a power of 2. */
-#define CBQSIZE	(CBLOCK/NBBY)	/* Quote bytes/cblock - can do better. */
+#define	CBQSIZE	(CBLOCK/NBBY)	/* Quote bytes/cblock - can do better. */
 				/* Data chars/clist. */
 #define	CBSIZE	(CBLOCK - sizeof(struct cblock *) - CBQSIZE)
 #define	CROUND	(CBLOCK - 1)	/* Clist rounding. */
@@ -187,7 +189,7 @@
 #ifndef MAXBSIZE				/* XXX */
 #define	MAXBSIZE	MAXPHYS
 #endif
-#define MAXFRAG 	8
+#define	MAXFRAG 	8
 
 /*
  * MAXPATHLEN defines the longest permissible path length after expanding
@@ -199,7 +201,7 @@
  * infinite loops reasonably quickly.
  */
 #define	MAXPATHLEN	PATH_MAX
-#define MAXSYMLINKS	32
+#define	MAXSYMLINKS	32
 
 /* Bit map related macros. */
 #define	setbit(a,i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
@@ -212,13 +214,11 @@
 #define	howmany(x, y)	(((x)+((y)-1))/(y))
 #endif
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))
-#define powerof2(x)	((((x)-1)&(x))==0)
+#define	powerof2(x)	((((x)-1)&(x))==0)
 
 /* Macros for min/max. */
-#ifndef _KERNEL
-#define	MIN(a,b) (((a)<(b))?(a):(b))
-#define	MAX(a,b) (((a)>(b))?(a):(b))
-#endif
+#define	MIN(a,b)	(((a)<(b))?(a):(b))
+#define	MAX(a,b)	(((a)>(b))?(a):(b))
 
 /*
  * Constants for setting the parameters of the kernel memory allocator.
@@ -233,10 +233,10 @@
  * size allocations should be done infrequently as they will be slow.
  *
  * Constraints: NBPG <= MAXALLOCSAVE <= 2 ** (MINBUCKET + 14), and
- * MAXALLOCSIZE must be a power of two.
+ * MAXALLOCSAVE must be a power of two.
  */
-#define MINBUCKET	4		/* 4 => min allocation of 16 bytes */
-#define MAXALLOCSAVE	(2 * NBPG)
+#define	MINBUCKET	4		/* 4 => min allocation of 16 bytes */
+#define	MAXALLOCSAVE	(2 * NBPG)
 
 /*
  * Scale factor for scaled integers used to count %cpu time and load avgs.
@@ -250,6 +250,44 @@
  * FSHIFT must be at least 11; this gives us a maximum load avg of ~1024.
  */
 #define	FSHIFT	11		/* bits to right of fixed binary point */
-#define FSCALE	(1<<FSHIFT)
+#define	FSCALE	(1<<FSHIFT)
+
+/* 
+ * The time for a process to be blocked before being very swappable. 
+ * This is a number of seconds which the system takes as being a non-trivial 
+ * amount of real time.  You probably shouldn't change this; 
+ * it is used in subtle ways (fractions and multiples of it are, that is, like 
+ * half of a ``long time'', almost a long time, etc.) 
+ * It is related to human patience and other factors which don't really 
+ * change over time. 
+ */ 
+#define        MAXSLP          20 
+
+/*
+ * Defaults for Unified Buffer Cache parameters.
+ * These may be overridden in <machine/param.h>.
+ */
+
+#ifndef UBC_WINSHIFT
+#define	UBC_WINSHIFT	13
+#endif
+#ifndef UBC_NWINS
+#define	UBC_NWINS	1024
+#endif
+
+#ifdef _KERNEL
+/*
+ * macro to convert from milliseconds to hz without integer overflow
+ * Default version using only 32bits arithmetics.
+ * 64bit port can define 64bit version in their <machine/param.h>
+ * 0x20000 is safe for hz < 20000
+ */
+#ifndef mstohz
+#define mstohz(ms) \
+	(__predict_false((ms) >= 0x20000) ? \
+	    ((ms +0u) / 1000u) * hz : \
+	    ((ms +0u) * hz) / 1000u)
+#endif
+#endif /* _KERNEL */
 
 #endif /* !_SYS_PARAM_H_ */

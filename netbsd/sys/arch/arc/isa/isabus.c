@@ -1,4 +1,4 @@
-/*	$NetBSD: isabus.c,v 1.12 2000/06/20 08:26:55 soda Exp $	*/
+/*	$NetBSD: isabus.c,v 1.16 2002/03/04 02:19:07 simonb Exp $	*/
 /*	$OpenBSD: isabus.c,v 1.15 1998/03/16 09:38:46 pefo Exp $	*/
 /*	NetBSD: isa.c,v 1.33 1995/06/28 04:30:51 cgd Exp 	*/
 
@@ -97,45 +97,27 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/pio.h>
 #include <machine/autoconf.h>
 #include <machine/intr.h>
 
-#include <arc/arc/arctype.h>
-#include <arc/pica/pica.h>
-#include <arc/pica/rd94.h>
-
+#include <dev/ic/i8253reg.h>
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
-#include <arc/isa/timerreg.h>
+#include <arc/isa/isabrvar.h>
 #include <arc/isa/spkrreg.h>
-#include <machine/isa_machdep.h>
 
 static int beeping;
 static struct callout sysbeep_ch = CALLOUT_INITIALIZER;
 
 #define	IRQ_SLAVE	2
-#define ICU_LEN		16
-
-struct isabr_softc {
-	struct	device sc_dv;
-	struct	arc_isa_bus arc_isa_cs;
-	struct	abus sc_bus;
-	struct arc_bus_dma_tag sc_dmat;
-};
 
 /* Definition of the driver for autoconfig. */
-int	isabrmatch(struct device *, struct cfdata *, void *);
-void	isabrattach(struct device *, struct device *, void *);
 int	isabrprint(void *, const char *);
-
-struct cfattach isabr_ca = {
-	sizeof(struct isabr_softc), isabrmatch, isabrattach
-};
-extern struct cfdriver isabr_cd;
 
 extern struct arc_bus_space arc_bus_io, arc_bus_mem;
 
@@ -150,55 +132,21 @@ void	isabr_initicu __P((void));
 void	intr_calculatemasks __P((void));
 int	fakeintr __P((void *a));
 
-int
-isabrmatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
-{
-	struct confargs *ca = aux;
-
-        /* Make sure that we're looking for a ISABR. */
-        if (strcmp(ca->ca_name, isabr_cd.cd_name) != 0)
-                return (0);
-
-	return (1);
-}
+struct isabr_config *isabr_conf = NULL;
 
 void
-isabrattach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+isabrattach(sc)
+	struct isabr_softc *sc;
 {
-	struct isabr_softc *sc = (struct isabr_softc *)self;
 	struct isabus_attach_args iba;
+
+	if (isabr_conf == NULL)
+		panic("isabr_conf isn't initialized");
 
 	printf("\n");
 
 	/* Initialize interrupt controller */
 	isabr_initicu();
-
-	/* set up interrupt handlers */
-	switch(cputype) {
-	case ACER_PICA_61:
-	case MAGNUM:
-	case NEC_R94:
-	case NEC_R96:
-		jazz_bus_dma_tag_init(&sc->sc_dmat);
-		set_intr(MIPS_INT_MASK_2, isabr_iointr, 3);
-		break;
-	case DESKSTATION_TYNE:
-		_bus_dma_tag_init(&sc->sc_dmat); /* XXX dedicated bounce mem */
-		set_intr(MIPS_INT_MASK_2, isabr_iointr, 2);
-		break;
-	case DESKSTATION_RPC44:
-		isadma_bounce_tag_init(&sc->sc_dmat);
-		set_intr(MIPS_INT_MASK_2, isabr_iointr, 2);
-		break;
-	default:
-		panic("isabrattach: unkown cputype!");
-	}
 
 /*XXX we may remove the abus part of the softc struct... */
 	sc->sc_bus.ab_dv = (struct device *)sc;
@@ -214,7 +162,7 @@ isabrattach(parent, self, aux)
 	iba.iba_memt = &arc_bus_mem;
 	iba.iba_dmat = &sc->sc_dmat;
 	iba.iba_ic = &sc->arc_isa_cs;
-	config_found(self, &iba, isabrprint);
+	config_found(&sc->sc_dev, &iba, isabrprint);
 }
 
 int
@@ -351,7 +299,6 @@ isabr_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
 {
 	struct intrhand **p, *q, *ih;
 	static struct intrhand fakehand = {NULL, fakeintr};
-	extern int cold;
 
 	/* no point in sleeping unless someone can free memory. */
 	ih = malloc(sizeof *ih, M_DEVBUF, cold ? M_NOWAIT : M_WAITOK);
@@ -426,49 +373,10 @@ isabr_iointr(mask, cf)
 	struct intrhand *ih;
 	int isa_vector;
 	int o_imen;
-	char vector;
 
-	(void) &isa_vector;	/* shut off gcc unused-variable warnings */
-
-	switch(cputype) {
-	case ACER_PICA_61:
-	case MAGNUM:
-		isa_vector = in32(R4030_SYS_ISA_VECTOR) & (ICU_LEN - 1);
-		break;
-
-	case NEC_R94:
-	case NEC_R96:
-		isa_vector = in32(RD94_SYS_INTSTAT2) & (ICU_LEN - 1);
-		break;
-
-	case DESKSTATION_TYNE:
-		isa_outb(IO_ICU1, 0x0f);	/* Poll */
-		vector = isa_inb(IO_ICU1);
-		if(vector > 0 || (isa_vector = vector & 7) == 2) { 
-			isa_outb(IO_ICU2, 0x0f);
-			vector = isa_inb(IO_ICU2);
-			if(vector > 0) {
-				printf("isa: spurious interrupt.\n");
-				return(~0);
-			}
-			isa_vector = (vector & 7) | 8;
-		}
-		break;
-
-	case DESKSTATION_RPC44:
-		isa_outb(IO_ICU1, 0x0f);	/* Poll */
-		vector = isa_inb(IO_ICU1);
-		if(vector > 0 || (isa_vector = vector & 7) == 2) { 
-			isa_outb(IO_ICU2, 0x0f);
-			vector = isa_inb(IO_ICU2);
-			if(vector > 0) {
-				printf("isa: spurious interrupt.\n");
-				return(~0);
-			}
-			isa_vector = (vector & 7) | 8;
-		}
-		break;
-	}
+	isa_vector = (*isabr_conf->ic_intr_status)();
+	if (isa_vector < 0)
+		return (~0);
 
 	o_imen = imen;
 	imen |= 1 << (isa_vector & (ICU_LEN - 1));
@@ -552,7 +460,6 @@ sysbeep(pitch, period)
 {
 	static int last_pitch, last_period;
 	int s;
-	extern int cold;
 
 	if (cold)
 		return;		/* Can't beep yet. */

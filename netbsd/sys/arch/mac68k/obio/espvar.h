@@ -1,4 +1,4 @@
-/*	$NetBSD: espvar.h,v 1.5.26.1 2001/01/25 17:39:25 jhawk Exp $	*/
+/*	$NetBSD: espvar.h,v 1.6 2000/12/29 17:23:32 briggs Exp $	*/
 
 /*
  * Copyright (c) 1997 Allen Briggs.

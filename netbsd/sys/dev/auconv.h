@@ -1,4 +1,4 @@
-/*	$NetBSD: auconv.h,v 1.5 1999/11/01 18:12:19 augustss Exp $	*/
+/*	$NetBSD: auconv.h,v 1.9 2002/03/09 20:35:28 kent Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -36,18 +36,28 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _SYS_DEV_AUCONV_H_
+#define _SYS_DEV_AUCONV_H_
+
 /* Convert between signed and unsigned. */
-extern void change_sign8 __P((void *, u_char *, int));
-extern void change_sign16_le __P((void *, u_char *, int));
-extern void change_sign16_be __P((void *, u_char *, int));
+extern void change_sign8(void *, u_char *, int);
+extern void change_sign16_le(void *, u_char *, int);
+extern void change_sign16_be(void *, u_char *, int);
 /* Convert between little and big endian. */
-extern void swap_bytes __P((void *, u_char *, int));
-extern void swap_bytes_change_sign16_le __P((void *, u_char *, int));
-extern void swap_bytes_change_sign16_be __P((void *, u_char *, int));
-extern void change_sign16_swap_bytes_le __P((void *, u_char *, int));
-extern void change_sign16_swap_bytes_be __P((void *, u_char *, int));
+extern void swap_bytes(void *, u_char *, int);
+extern void swap_bytes_change_sign16_le(void *, u_char *, int);
+extern void swap_bytes_change_sign16_be(void *, u_char *, int);
+extern void change_sign16_swap_bytes_le(void *, u_char *, int);
+extern void change_sign16_swap_bytes_be(void *, u_char *, int);
 /* Byte expansion/contraction */
-extern void linear8_to_linear16_le __P((void *, u_char *, int));
-extern void linear8_to_linear16_be __P((void *, u_char *, int));
-extern void linear16_to_linear8_le __P((void *, u_char *, int));
-extern void linear16_to_linear8_be __P((void *, u_char *, int));
+extern void linear8_to_linear16_le(void *, u_char *, int);
+extern void linear8_to_linear16_be(void *, u_char *, int);
+extern void linear16_to_linear8_le(void *, u_char *, int);
+extern void linear16_to_linear8_be(void *, u_char *, int);
+/* Byte expansion/contraction with sign change */
+extern void ulinear8_to_slinear16_le(void *, u_char *, int);
+extern void ulinear8_to_slinear16_be(void *, u_char *, int);
+extern void slinear16_to_ulinear8_le(void *, u_char *, int);
+extern void slinear16_to_ulinear8_be(void *, u_char *, int);
+
+#endif /* !_SYS_DEV_AUCONV_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.21.4.1 2000/10/17 19:53:26 scw Exp $	*/
+/*	$NetBSD: if_le.c,v 1.25 2001/05/31 18:46:07 scw Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -118,7 +118,7 @@ struct cfattach le_pcc_ca = {
 
 extern struct cfdriver le_cd;
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -224,11 +224,10 @@ le_pcc_attach(parent, self, aux)
 
 	am7990_config(&lsc->sc_am7990);
 
-	/* Are we the boot device? */
-	if (PCC_PADDR(pa->pa_offset) == bootaddr)
-		booted_device = self;
+	evcnt_attach_dynamic(&lsc->sc_evcnt, EVCNT_TYPE_INTR,
+	    pccintr_evcnt(pa->pa_ipl), "ether", sc->sc_dev.dv_xname);
 
-	pccintr_establish(PCCV_LE, am7990_intr, pa->pa_ipl, sc);
+	pccintr_establish(PCCV_LE, am7990_intr, pa->pa_ipl, sc, &lsc->sc_evcnt);
 
 	pcc_reg_write(sys_pcc, PCCREG_LANCE_INTR_CTRL,
 	    pa->pa_ipl | PCC_IENABLE);

@@ -1,11 +1,11 @@
-/*	$NetBSD: umap_subr.c,v 1.16 2000/03/13 23:52:41 soren Exp $	*/
+/*	$NetBSD: umap_subr.c,v 1.19 2001/11/15 09:48:23 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
  * All rights reserved.
  *
  * This software was written by William Studenmund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,11 +71,13 @@
  *	@(#)umap_subr.c	8.9 (Berkeley) 5/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: umap_subr.c,v 1.19 2001/11/15 09:48:23 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>

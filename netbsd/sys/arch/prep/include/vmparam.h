@@ -1,5 +1,8 @@
-/*	$NetBSD: vmparam.h,v 1.2 2000/05/01 10:43:42 kleink Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.8 2002/03/09 23:35:59 chs Exp $	*/
 
+#ifndef OLDPMAP
+#include <powerpc/mpc6xx/vmparam.h>
+#else
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
@@ -70,17 +73,6 @@
 #define	USRIOSIZE	1024
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Would like to have MAX addresses = 0, but this doesn't (currently) work
  */
 #define	VM_MIN_ADDRESS		((vaddr_t)0)
@@ -89,12 +81,26 @@
 #define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)(KERNEL_SR << ADDR_SR_SHFT))
 #define	VM_MAX_KERNEL_ADDRESS	(VM_MIN_KERNEL_ADDRESS + SEGMENT_LENGTH - 1)
 
+/* XXX max. amount of KVM to be used by buffers. */
+#ifndef VM_MAX_KERNEL_BUF
+#define	VM_MAX_KERNEL_BUF	(SEGMENT_LENGTH * 7 / 10)
+#endif
+
+/*
+ * Override the default pager_map size, there's not enough KVA.
+ */
+#define	PAGER_MAP_SIZE		(4 * 1024 * 1024)
+
 #define	VM_PHYS_SIZE		(USRIOSIZE * NBPG)
 
+#define	__HAVE_PMAP_PHYSSEG
+
+#ifndef _LOCORE
 struct pmap_physseg {
 	struct pv_entry *pvent;
 	char *attrs;
 };
+#endif /* _LOCORE */
 
 #define VM_PHYSSEG_MAX		32
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
@@ -104,3 +110,4 @@ struct pmap_physseg {
 #define VM_FREELIST_DEFAULT	0
 
 #endif /* _MACHINE_VMPARAM_H_ */
+#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.2 2000/04/14 13:41:24 tsutsui Exp $	*/
+/*	$NetBSD: conf.c,v 1.6 2002/01/12 13:37:39 manu Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -123,10 +123,6 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
  */
 dev_t	swapdev = makedev(4, 0);
 
-#include "fb.h"
-#define fbpoll seltrue
-cdev_decl(fb);
-
 #include "ipfilter.h"
 cdev_decl(ipl);
 
@@ -184,15 +180,20 @@ cdev_decl(tun);
 #if 0
 #include "lpt.h"
 cdev_decl(lpt);
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*)))enodev,  \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*)))enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev, 0}
 #endif
 
 #include "scsibus.h"
 cdev_decl(scsibus);
+#include "wsdisplay.h"
+cdev_decl(wsdisplay);
+#include "wskbd.h"
+cdev_decl(wskbd);
+#include "wsmouse.h"
+cdev_decl(wsmouse);
+#include "wsmux.h"
+cdev_decl(wsmux);
+#include "clockctl.h"
+cdev_decl(clockctl);
 
 struct cdevsw	cdevsw[] =
 {
@@ -208,9 +209,9 @@ struct cdevsw	cdevsw[] =
 	cdev_ptc_init(NPTY,ptc),        /* 9: pseudo-tty master */
 	cdev_notdef(),			/* 10: md */
 	cdev_notdef(),			/* 11: kb */
-	cdev_mouse_init(NMS,ms),	/* 12: ms */
+	cdev_notdef(),			/* 12: (was mouse) */
 	cdev_notdef(),			/* 13: xio */
-	cdev_fb_init(NFB,fb),		/* 14: frame buffer */
+	cdev_notdef(),			/* 14: (was frame buffer) */
 	cdev_notdef(),			/* 15: */
 	cdev_tape_init(NST,st),		/* 16: SCSI tape */
 	cdev_notdef(),			/* 17: lbp */
@@ -218,11 +219,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 19: vme */
 	cdev_notdef(),			/* 20: gpib */
 	cdev_notdef(),			/* 21: rd */
-#if 0
-	cdev_tty_init(NFB,bmcn),	/* 22: bitmap console (was zd XXX) */
-#else
-	cdev_notdef(),			/* 22: */
-#endif
+	cdev_notdef(),			/* 22: zd */
 	cdev_notdef(),			/* 23: ether */
 	cdev_bpftun_init(NBPFILTER,bpf),/* 24: Berkeley packet filter */
 	cdev_bpftun_init(NTUN,tun),	/* 25: network tunnel */
@@ -260,10 +257,10 @@ struct cdevsw	cdevsw[] =
 	cdev_ch_init(NCH,ch),		/* 57: SCSI changer */
 	cdev_notdef(),			/* 58: */
 	cdev_notdef(),			/* 59: */
-	cdev_notdef(),			/* 60: */
-	cdev_notdef(),			/* 61: */
-	cdev_notdef(),			/* 62: */
-	cdev_notdef(),			/* 63: */
+	cdev_wsdisplay_init(NWSDISPLAY,wsdisplay), /* 60: wsdisplay */
+	cdev_mouse_init(NWSKBD,wskbd),	/* 61: wskbd */
+	cdev_mouse_init(NWSMOUSE,wsmouse), /* 62: wsmose */
+	cdev_mouse_init(NWSMUX,wsmux),	/* 63: ws multiplexor */
 	cdev_lkm_dummy(),		/* 64: */
 	cdev_lkm_dummy(),		/* 65: */
 	cdev_lkm_dummy(),		/* 66: */
@@ -276,6 +273,7 @@ struct cdevsw	cdevsw[] =
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 73: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 74: RAIDframe disk driver */
 	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 75: svr4 net pseudo-device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 76: clockctl pseudo device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -380,6 +378,8 @@ static int chrtoblktbl[] =  {
 	/* 72 */	NODEV,
 	/* 73 */	NODEV,
 	/* 74 */	32,
+	/* 75 */	NODEV,
+	/* 76 */	NODEV,
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_termios.c,v 1.7.4.1 2001/03/30 21:44:46 he Exp $	*/
+/*	$NetBSD: linux_termios.c,v 1.15 2001/12/19 15:20:16 augustss Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_termios.c,v 1.15 2001/12/19 15:20:16 augustss Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -60,7 +63,7 @@ static speed_t linux_speeds[] = {
 	9600, 19200, 38400, 57600, 115200, 230400
 };
 
-static int linux_spmasks[] = {
+static const int linux_spmasks[] = {
 	LINUX_B0, LINUX_B50, LINUX_B75, LINUX_B110, LINUX_B134, LINUX_B150,
 	LINUX_B200, LINUX_B300, LINUX_B600, LINUX_B1200, LINUX_B1800,
 	LINUX_B2400, LINUX_B4800, LINUX_B9600, LINUX_B19200, LINUX_B38400,
@@ -325,6 +328,13 @@ linux_termios_to_bsd_termios(lts, bts)
 	if (index & LINUX_CBAUDEX)
 		index = (index & ~LINUX_CBAUDEX) + LINUX_NSPEEDS - 1;
 	bts->c_ispeed = bts->c_ospeed = linux_speeds[index];
+	/*
+	 * A null c_ospeed causes NetBSD to hangup the terminal. 
+	 * Linux does not do this, and it sets c_ospeed to zero
+	 * sometimes. If it is null, we store -1 in the kernel
+	 */ 
+	if (bts->c_ospeed == 0)
+		bts->c_ospeed = -1;
 
 	bts->c_cc[VINTR] = lts->c_cc[LINUX_VINTR];
 	bts->c_cc[VQUIT] = lts->c_cc[LINUX_VQUIT];
@@ -419,6 +429,13 @@ bsd_termios_to_linux_termios(bts, lts)
 			break;
 		}
 	}
+	/*
+	 * A null c_ospeed causes NetBSD to hangup the terminal. 
+	 * Linux does not do this, and it sets c_ospeed to zero
+	 * sometimes. If it is null, we store -1 in the kernel
+	 */ 
+	if (bts->c_ospeed == -1)
+		bts->c_ospeed = 0;
 	lts->c_cflag |= mask;
 
 	lts->c_cc[LINUX_VINTR] = bts->c_cc[VINTR];
@@ -463,21 +480,22 @@ linux_ioctl_termios(p, uap, retval)
 	struct sys_ioctl_args ia;
 	int error;
 	char tioclinux;
+	int (*bsdioctl) __P((struct file *, u_long, caddr_t, struct proc *));
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	if ((fp->f_flag & (FREAD | FWRITE)) == 0)
 		return (EBADF);
 
+	bsdioctl = fp->f_ops->fo_ioctl;
 	com = SCARG(uap, com);
 	retval[0] = 0;
                 
 	switch (com) {
 	case LINUX_TCGETS:
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*bsdioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
 		if (error)
 			return error;
 		bsd_termios_to_linux_termios(&tmpbts, &tmplts);
@@ -492,7 +510,7 @@ linux_ioctl_termios(p, uap, retval)
 		 * First fill in all fields, so that we keep the current
 		 * values for fields that Linux doesn't know about.
 		 */
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*bsdioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
 		if (error)
 			return error;
 		error = copyin(SCARG(uap, data), &tmplts, sizeof tmplts);
@@ -510,12 +528,12 @@ linux_ioctl_termios(p, uap, retval)
 			com = TIOCSETAF;
 			break;
 		}
-		error = (*fp->f_ops->fo_ioctl)(fp, com, (caddr_t)&tmpbts, p);
+		error = (*bsdioctl)(fp, com, (caddr_t)&tmpbts, p);
 		if (error)
 			return error;
 		return 0;
 	case LINUX_TCGETA:
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*bsdioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
 		if (error)
 			return error;
 		bsd_termios_to_linux_termio(&tmpbts, &tmplt);
@@ -530,7 +548,7 @@ linux_ioctl_termios(p, uap, retval)
 		 * First fill in all fields, so that we keep the current
 		 * values for fields that Linux doesn't know about.
 		 */
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
+		error = (*bsdioctl)(fp, TIOCGETA, (caddr_t)&tmpbts, p);
 		if (error)
 			return error;
 		error = copyin(SCARG(uap, data), &tmplt, sizeof tmplt);
@@ -548,12 +566,27 @@ linux_ioctl_termios(p, uap, retval)
 			com = TIOCSETAF;
 			break;
 		}
-		error = (*fp->f_ops->fo_ioctl)(fp, com, (caddr_t)&tmpbts, p);
+		error = (*bsdioctl)(fp, com, (caddr_t)&tmpbts, p);
 		if (error)
 			return error;
 		return 0;
+	case LINUX_TCFLSH:
+		switch((u_long)SCARG(uap, data)) {
+		case 0:
+			idat = FREAD;
+			break;
+		case 1:
+			idat = FWRITE;
+			break;
+		case 2:
+			idat = 0;
+			break;
+		default:
+			return EINVAL;
+		}
+		return (*bsdioctl)(fp, TIOCFLUSH, (caddr_t)&idat, p);
 	case LINUX_TIOCGETD:
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCGETD, (caddr_t)&idat, p);
+		error = (*bsdioctl)(fp, TIOCGETD, (caddr_t)&idat, p);
 		if (error)
 			return error;
 		switch (idat) {
@@ -608,7 +641,7 @@ linux_ioctl_termios(p, uap, retval)
 		default:
 			return EINVAL;
 		}
-		error = (*fp->f_ops->fo_ioctl)(fp, TIOCSETD, (caddr_t)&idat, p);
+		error = (*bsdioctl)(fp, TIOCSETD, (caddr_t)&idat, p);
 		if (error)
 			return error;
 		return 0;
@@ -667,6 +700,15 @@ linux_ioctl_termios(p, uap, retval)
 		break;
 	case LINUX_TIOCNOTTY:
 		SCARG(&ia, com) = TIOCNOTTY;
+		break;
+	case LINUX_TCSBRK:
+		SCARG(&ia, com) = SCARG(uap, data) ? TIOCDRAIN : TIOCSBRK;
+		break;
+	case LINUX_TIOCMGET:
+		SCARG(&ia, com) = TIOCMGET;
+		break;
+	case LINUX_TIOCMSET:
+		SCARG(&ia, com) = TIOCMSET;
 		break;
 	default:
 		return EINVAL;

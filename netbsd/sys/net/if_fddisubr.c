@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fddisubr.c,v 1.33 2000/06/14 05:10:28 mycroft Exp $	*/
+/*	$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,12 +67,18 @@
  *
  * Id: if_fddisubr.c,v 1.15 1997/03/21 22:35:50 thomas Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
 #include "opt_llc.h"
 #include "opt_iso.h"
 #include "opt_ns.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -93,6 +99,10 @@
 #include <net/if_llc.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #ifdef INET
 #include <netinet/in.h>
@@ -205,16 +215,17 @@ fddi_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t etype;
-	int s, error = 0, hdrcmplt = 0;
+	int s, len, error = 0, hdrcmplt = 0;
  	u_char esrc[6], edst[6];
 	struct mbuf *m = m0;
 	struct rtentry *rt;
 	struct fddi_header *fh;
 	struct mbuf *mcopy = (struct mbuf *)0;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
+	short mflags;
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 #if !defined(__bsdi__) || _BSDI_VERSION >= 199401
 	if ((rt = rt0) != NULL) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
@@ -239,6 +250,13 @@ fddi_output(ifp, m0, dst, rt0)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
 #endif
+
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -272,16 +290,10 @@ fddi_output(ifp, m0, dst, rt0)
 #endif
 #ifdef INET6
 	case AF_INET6:
-#ifdef OLDIP6OUTPUT
-		if (!nd6_resolve(ifp, rt, m, dst, edst))
-			return (0);	/* if not yet resolved */
-#else
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst)){
-			/* this must be impossible, so we bark */
-			printf("nd6_storelladdr failed\n");
+			/* something bad happened */
 			return(0);
 		}
-#endif /* OLDIP6OUTPUT */
 		etype = htons(ETHERTYPE_IPV6);
 		break;
 #endif
@@ -570,20 +582,22 @@ fddi_output(ifp, m0, dst, rt0)
 	else
 		bcopy((caddr_t)FDDIADDR(ifp), (caddr_t)fh->fddi_shost,
 		    sizeof(fh->fddi_shost));
-	s = splimp();
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	if (m->m_flags & M_MCAST)
+	ifp->if_obytes += len;
+	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
-	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -617,7 +631,6 @@ fddi_input(ifp, m)
 
 	fh = mtod(m, struct fddi_header *);
 
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	if (fh->fddi_dhost[0] & 1) {
 		if (bcmp((caddr_t)fddibroadcastaddr, (caddr_t)fh->fddi_dhost,
@@ -831,7 +844,7 @@ fddi_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -842,25 +855,16 @@ fddi_input(ifp, m)
 /*
  * Perform common duties while attaching to interface list
  */
-#if defined(__NetBSD__)
 void
 fddi_ifattach(ifp, lla)
 	struct ifnet *ifp;
 	caddr_t lla;
-#else
-void
-fddi_ifattach(ifp)
-	struct ifnet *ifp;
-#endif
 {
-#if !defined(__NetBSD__)
-	struct ifaddr *ifa;
-#endif
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_FDDI;
 	ifp->if_addrlen = 6;
 	ifp->if_hdrlen = 21;
+	ifp->if_dlt = DLT_FDDI;
 	ifp->if_mtu = FDDIMTU;
 	ifp->if_output = fddi_output;
 	ifp->if_input = fddi_input;
@@ -868,21 +872,18 @@ fddi_ifattach(ifp)
 #ifdef IFF_NOTRAILERS
 	ifp->if_flags |= IFF_NOTRAILERS;
 #endif
-#if defined(__NetBSD__)
-	if ((sdl = ifp->if_sadl) != NULL && sdl->sdl_family == AF_LINK) {
-	    sdl->sdl_type = IFT_FDDI;
-	    sdl->sdl_alen = ifp->if_addrlen;
-	    bcopy(lla, LLADDR(sdl), ifp->if_addrlen);
-	}
+
+	/*
+	 * Update the max_linkhdr
+	 */
+	if (ALIGN(ifp->if_hdrlen) > max_linkhdr)
+		max_linkhdr = ALIGN(ifp->if_hdrlen);
+
+	if_alloc_sadl(ifp);
+	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
+
 	ifp->if_broadcastaddr = fddibroadcastaddr;
-#else
-	for (ifa = ifp->if_addrlist; ifa != NULL; ifa = ifa->ifa_next)
-		if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
-		    sdl->sdl_family == AF_LINK) {
-			sdl->sdl_type = IFT_FDDI;
-			sdl->sdl_alen = ifp->if_addrlen;
-			bcopy(FDDIADDR(ifp), LLADDR(sdl), ifp->if_addrlen);
-			break;
-		}
-#endif
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_FDDI, sizeof(struct fddi_header));
+#endif /* NBPFILTER > 0 */
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_cmdline.c,v 1.8.2.1 2000/10/18 16:23:59 tv Exp $	*/
+/*	$NetBSD: procfs_cmdline.c,v 1.14 2002/05/09 15:44:45 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1999 Jaromir Dolecek <dolecek@ics.muni.cz>
@@ -37,8 +37,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: procfs_cmdline.c,v 1.14 2002/05/09 15:44:45 thorpej Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/syslimits.h>
 #include <sys/proc.h>
@@ -46,8 +48,6 @@
 #include <sys/exec.h>
 #include <sys/malloc.h>
 #include <miscfs/procfs/procfs.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -96,7 +96,7 @@ procfs_docmdline(curp, p, pfs, uio)
 	}
 
 	/*
-	 * NOTE: Don't bother doing a procfs_checkioperm() here
+	 * NOTE: Don't bother doing a process_checkioperm() here
 	 * because the psstrings info is available by using ps(1),
 	 * so it's not like there's anything to protect here.
 	 */
@@ -109,7 +109,6 @@ procfs_docmdline(curp, p, pfs, uio)
 		free(arg, M_TEMP);
 		return (EFAULT);
 	}
-	PHOLD(p);
 	p->p_vmspace->vm_refcnt++;	/* XXX */
 
 	/*
@@ -188,7 +187,6 @@ procfs_docmdline(curp, p, pfs, uio)
 	/*
 	 * Release the process.
 	 */
-	PRELE(p);
 	uvmspace_free(p->p_vmspace);
 
 	free(arg, M_TEMP);

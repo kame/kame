@@ -1,4 +1,4 @@
-/*	$NetBSD: ns_error.c,v 1.11 2000/03/30 13:02:57 augustss Exp $	*/
+/*	$NetBSD: ns_error.c,v 1.13 2002/05/12 19:09:13 matt Exp $	*/
 
 /*
  * Copyright (c) 1984, 1988, 1993
@@ -35,6 +35,9 @@
  *	@(#)ns_error.c	8.2 (Berkeley) 9/22/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ns_error.c,v 1.13 2002/05/12 19:09:13 matt Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -70,6 +73,8 @@
  */
 int	ns_errprintfs = 0;
 #endif
+
+struct	ns_errstat ns_errstat;
 
 int
 ns_err_x(c)

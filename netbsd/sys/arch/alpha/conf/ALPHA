@@ -1,18 +1,20 @@
-# $NetBSD: ALPHA,v 1.127.2.4 2001/05/01 15:43:36 he Exp $
+# $NetBSD: ALPHA,v 1.164.4.1 2002/08/01 04:15:43 lukem Exp $
 #
 # Alpha kernel with all the options you'd want, and more.
 
 include	"arch/alpha/conf/std.alpha"
 
-ident		"ALPHA-$Revision: 1.127.2.5 $"
+options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+ident		"ALPHA-$Revision: 1.164.4.1 $"
 
 maxusers 32
 
 # CPU Support
 options 	DEC_2000_300	# "Jensen":	2000/300 (DECpc AXP 150)
 options 	DEC_2100_A50	# Avanti etc:	AlphaStation 400, 200, etc.
-#options 	DEC_2100_A500	# Sable:	AlphaServer 2100
-#options 	DEC_2100A_A500	# Lynx:		AlphaServer 2100A
+options 	DEC_2100_A500	# Sable:	AlphaServer 2100
+options 	DEC_2100A_A500	# Lynx:		AlphaServer 2100A
 options 	DEC_3000_500	# Flamingo etc:	3000/[4-9]00*
 options 	DEC_3000_300	# Pelican etc:	3000/300*
 options 	DEC_AXPPCI_33	# NoName:	AXPpci33, etc.
@@ -31,6 +33,7 @@ options 	API_UP1000	# EV6:		Alpha Processor, Inc. UP1000
 
 # Standard system options
 options 	KTRACE			# System call tracing support
+options 	NTP			# kernel PLL for NTP
 
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC		# Cheap kernel consistency checks
@@ -57,6 +60,7 @@ file-system	PORTAL		# Portal file system
 file-system	UMAPFS		# User-mapping file system layer
 file-system	PROCFS		# Process file system (/proc)
 file-system	UNION		# union file system
+file-system	CODA		# CODA distributed file system
 
 # File system options
 options 	QUOTA		# User and group quotas for the FFS
@@ -67,8 +71,8 @@ options 	SOFTDEP		# FFS soft updates support.
 # Networking options
 options 	INET		# Internet protocol suite
 options 	INET6		# IPV6
-#options 	IPSEC		# IP security
-#options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
+options 	IPSEC		# IP security
+options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 #options 	IPSEC_DEBUG	# debug for IP security
 options 	NS		# Xerox NS protocol suite
 options 	ISO,TPIP,EON	# ISO protocol suite
@@ -80,9 +84,9 @@ options 	PPP_DEFLATE	# Deflate compression support for PPP
 options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 options 	PFIL_HOOKS	# pfil(9) packet filter hooks
 options 	IPFILTER_LOG	# ipmon(8) log support
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not suggested.
-#options 	TCP_COMPAT_42
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 # 4.3BSD compatibility.  Should be optional, but necessary for now.
 options 	COMPAT_43
@@ -97,6 +101,9 @@ options 	COMPAT_14
 
 # OSF/1 binary compatibility
 options 	COMPAT_OSF1
+
+# Linux binary compatibility
+options 	COMPAT_LINUX
 
 # System V-like message queues
 options 	SYSVMSG
@@ -121,10 +128,13 @@ options 	MIIVERBOSE		# verbose PHY autoconfig messages
 #options 	PCI_CONFIG_DUMP		# verbosely dump PCI config space
 options 	SCSIVERBOSE		# Verbose SCSI errors
 options 	TCVERBOSE		# recognize "unknown" TC devices
+#options 	PCMCIAVERBOSE		# verbose PCMCIA configuration messages
 options 	UCONSOLE		# users can use TIOCCONS (for xconsole)
 #options 	EXTENT_DEBUG		# extent alloc/dealloc code debugging
 options 	FIX_UNALIGNED_VAX_FP	# fix unaligned VAX FP loads & stores
 #options 	NO_KERNEL_RCSIDS	# don't include kernel file RCS IDs
+#options 	USERCONF		# userconf(4) support
+#options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
 
 # The Alpha console firmware network boots using the BOOTP
 # protocol, so we ask the NFS code to use BOOTP/DHCP as well,
@@ -171,13 +181,13 @@ lpt*	at	jensenio? port ?
 mcclock* at	jensenio? port ?
 pckbc*	at	jensenio? port ?
 
-# TurboChannel host bus adapter support
+# TURBOchannel host bus adapter support
 tcasic*	at	mainbus0
 
-# TurboChannel bus support
+# TURBOchannel bus support
 tc*	at	tcasic?
 
-# TurboChannel devices
+# TURBOchannel devices
 ioasic*	at	tc? slot ? offset ?
 mcclock* at	ioasic? offset ?
 le*	at	ioasic? offset ?
@@ -187,6 +197,7 @@ bba0	at	ioasic? offset ?
 audio*	at	bba?
 tcds*	at	tc? slot ? offset ?
 asc*	at	tcds? chip ?
+asc*	at	tc? slot ? offset ?
 #cfb*	at	tc? slot ? offset ?
 #sfb*	at	tc? slot ? offset ?
 le*	at	tc? slot ? offset ?
@@ -200,15 +211,15 @@ lca*	at	mainbus?
 dwlpx*	at	kft?
 mcpcia*	at	mcbus? mid ?
 tsp*	at	tsc?
-#ttwoga*	at	mainbus?
+ttwoga*	at	mainbus?
 
 # Sable PCI and STDIO bus and devices
-#ttwopci* at	ttwoga? hose ?  
-#sableio* at	ttwopci? bus ?  
-#com*	at	sableio? port ? 
-#lpt*	at	sableio? port ? 
-#pckbc*	at	sableio? port ? 
-#fdc*	at	sableio? port ? 
+ttwopci* at	ttwoga? hose ?
+sableio* at	ttwopci? bus ?
+com*	at	sableio? port ?
+lpt*	at	sableio? port ?
+pckbc*	at	sableio? port ?
+fdc*	at	sableio? port ?
 
 # PCI bus support
 pci*	at	apecs?
@@ -219,7 +230,10 @@ pci*	at	ppb?
 pci*	at	dwlpx?
 pci*	at	mcpcia?
 pci*	at	tsp?
-#pci*	at	ttwopci?
+pci*	at	ttwopci?
+
+# AGP support
+agp*	at	irongate?
 
 # PCI devices
 adv*	at	pci? dev ? function ?		# AdvanSys SCSI
@@ -230,9 +244,9 @@ adw*	at	pci? dev ? function ?		# AdvanSys Wide SCSI
 ahc*	at	pci? dev ? function ?		# Adaptec [23]94x, aic78x0 SCSI
 bha*	at	pci? dev ? function ?		# BusLogic 9xx SCSI (untested)
 cac*	at	pci? dev ? function ?		# Compaq array controller (untested)
+cmpci*	at	pci? dev ? function ?		# C-Media CMI8338/8738 Audio
 cy*	at	pci? dev ? function ?		# Cyclades Cyclom-Y (untested)
 cz*	at	pci? dev ? function ?		# Cyclades-Z (untested)
-de*	at	pci? dev ? function ?		# 21x4x-based Ethernet
 dpt*	at	pci? dev ? function ?		# DPT SmartCache/SmartRAID
 eap*	at	pci? dev ? function ?		# Ensoniq AudioPCI
 en*	at	pci? dev ? function ?		# ENI PCI ATM (untested)
@@ -240,14 +254,16 @@ ep*	at	pci? dev ? function ?		# 3COM 3c59x
 epic*	at	pci? dev ? function ?		# SMC EPIC/100 Ethernet
 esh*	at	pci? dev ? function ?		# Essential HIPPI card
 eso*	at	pci? dev ? function ?		# ESS Solo-1 PCI AudioDrive
-ex*	at	pci? dev ? function ?		# 3COM 3c90x[B] Ethernet
+ex*	at	pci? dev ? function ?		# 3COM 3c90x[BC] Ethernet
 fpa*	at	pci? dev ? function ?		# DEC DEFPA FDDI
 fxp*	at	pci? dev ? function ?		# Intel EEPRO 10+/100B
+gsip*	at	pci? dev ? function ?		# NS DP83820 Gigabit Ethernet
+iha*	at	pci? dev ? function ?		# Initio INIC-940/950 SCSI
 isp*	at	pci? dev ? function ?		# Qlogic ISP 10x0 SCSI
 le*	at	pci? dev ? function ?		# PCI LANCE Ethernet (untested)
-#ncr*	at	pci? dev ? function ?		# NCR 53c8xx SCSI
+sf*	at	pci? dev ? function ?		# Adaptec AIC-6915 Ethernet
 siop*	at	pci? dev ? function ?		# Symbios 53c8xx SCSI
-mlx*	at	pci? dev ? function ?		# Mylex DAC960 family
+mlx*	at	pci? dev ? function ?		# Mylex DAC960 / DEC SWXCR (untested)
 ne*	at	pci? dev ? function ?		# NE2000-compatible Ethernet
 ohci*	at	pci? dev ? function ?		# USB Open Host Controller
 pceb*	at	pci? dev ? function ?		# Intel PCI-EISA Bridges
@@ -262,29 +278,38 @@ tga*	at	pci? dev ? function ?		# DEC ZLXp-E[123] Graphics
 ti*	at	pci? dev ? function ?		# Alteon Tigon Gig-E
 tl*	at	pci? dev ? function ?		# TI ThunderLAN Ethernet
 tlp*	at	pci? dev ? function ?		# DECchip 21x4x and clones
-#options 	TLP_MATCH_21040
-#options 	TLP_MATCH_21041
-#options 	TLP_MATCH_21140
-#options 	TLP_MATCH_21142
 uhci*	at	pci? dev ? function ?		# USB Univ. Host Controller
 vga*	at	pci? dev ? function ?		# PCI VGA Graphics
 vr*	at	pci? dev ? function ?		# VIA Rhine Fast Ethernet
+yds*	at	pci? dev ? function ?		# Yamaha DS-1 PCI Audio
 
+audio*	at	cmpci?
 audio*	at	eap?
 audio*	at	eso?
 audio*	at	sv?
+audio*	at	yds?
+audio*	at	ess?
 
+opl*	at	cmpci? flags 1
 opl*	at	eso?
 #opl*	at	sv?
+opl*	at	yds?
 
+midi*	at	opl?
+
+mpu*	at	cmpci?
 mpu*	at	eso?
+mpu*	at	yds?
+
+midi*	at	mpu?
 
 # MII/PHY support
 exphy*	at mii? phy ?			# 3Com internal PHYs
-icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS1890
+icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS189x
 inphy*	at mii? phy ?			# Intel 82555 PHYs
 iophy*	at mii? phy ?			# Intel 82553 PHYs
 lxtphy*	at mii? phy ?			# Level One LXT-970 PHYs
+gphyter* at mii? phy ?			# NS83861 Gig-E PHY
 nsphy*	at mii? phy ?			# NS83840 PHYs
 nsphyter* at mii? phy ?			# NS83843 PHYs
 qsphy*	at mii? phy ?			# Quality Semiconductor QS6612 PHYs
@@ -299,6 +324,7 @@ eisa*	at	jensenio?
 isa*	at	pceb?
 eisa*	at	pceb?
 isa*	at	sio?
+#isapnp*	at isa?
 
 # ISA devices
 mcclock* at	isa? port 0x70
@@ -308,11 +334,15 @@ pms*	at	pckbc?				# PS/2-style mouse (aux port)
 pcppi*	at	isa?				# PC prog. periph. interface
 spkr0	at	pcppi?				# IBM BASIC emulation
 isabeep0 at	pcppi?				# "keyboard" beep
+midi*	at	pcppi?
 com*	at	isa? port 0x3f8 irq 4		# standard serial ports
 com*	at	isa? port 0x2f8 irq 3
 cs*	at	isa? port 0x300 iomem ? irq ? drq ? # CS8900 Ethernet
 ec0	at	isa? port 0x250 iomem 0xd8000 irq 9 # 3Com 3c503 Ethernet
 ep*	at	isa? port ? irq ?		# 3COM 3c509 Ethernet
+#ep*	at	isapnp?
+#ix0	at	isa? port 0x300 irq 10		# EtherExpress/16
+#iy0	at	isa? port 0x360 irq ?		# EtherExpress PRO
 fdc0	at	isa? port 0x3f0 irq 6 drq 2	# floppy controller
 lc0	at	isa? port 0x300 iomem ? irq ?	# DEC EtherWORKS III (LEMAC)
 lc1	at	isa? port 0x320 iomem ? irq ?	# DEC EtherWORKS III (LEMAC)
@@ -323,11 +353,14 @@ lpt*	at	isa? port 0x3bc irq 7		# standard parallel port
 vga*	at	isa?				# ISA (EISA: XXX) VGA
 wdc0	at	isa? port 0x1f0 irq 14		# ST506/ESDI/IDE controllers
 wdc1	at	isa? port 0x170 irq 15
-we0     at 	isa? port 0x280 iomem 0xd0000 irq 9  # WD/SMC Ethernet
-we1     at 	isa? port 0x300 iomem 0xcc000 irq 10
+#wdc*	at	isapnp?
+we0	at	isa? port 0x280 iomem 0xd0000 irq 9	# WD/SMC Ethernet
+we1	at	isa? port 0x300 iomem 0xcc000 irq 10
 #wss*	at	isa? port 0x530 irq 9 drq 0	# Windows Sound System
+#wss*	at	isapnp?
 #audio*	at	wss?
 #midi*	at	wss?
+ess0	at	isa? port 0x220 irq 5 drq 1 drq2 5   # ESS 18XX
 sb*	at	isa? port 0x220 irq 5 drq 1	# SoundBlaster
 #sb*	at	isapnp?
 audio*	at	sb?
@@ -349,6 +382,7 @@ ahc*	at	eisa? slot ?			# Adaptec 274x, aic7770 SCSI
 bha*	at	eisa? slot ?			# BusLogic 7xx SCSI
 ep*	at	eisa? slot ?			# 3COM 3c579 Ethernet (untested)
 fea*	at	eisa? slot ?			# DEC DEFEA FDDI
+mlx*	at	eisa? slot ?			# Mylex DAC960 / DEC SWXCR (untested)
 tlp*	at	eisa? slot ?			# DEC DE-425 Ethernet
 depca*	at	eisa? slot ?			# DEC DE-422 Ethernet
 le*	at	depca?
@@ -375,8 +409,8 @@ scsibus* at	aic?
 scsibus* at	asc?
 scsibus* at	bha?
 scsibus* at	dpt?
+scsibus* at	iha?
 scsibus* at	isp?
-#scsibus* at	ncr?
 scsibus* at	siop?
 scsibus* at	pcscp?
 scsibus* at	uha?
@@ -418,16 +452,19 @@ usb*	at ohci?
 uhub*	at usb?
 uhub*	at uhub? port ? configuration ? interface ?
 
+# USB HID device
+uhidev*	at uhub? port ? configuration ? interface ?
+
 # USB Mice
-ums*	at uhub? port ? configuration ? interface ?
+ums*	at uhidev? reportid ?
 wsmouse*	at ums?
 
 # USB Keyboards
-ukbd*	at uhub? port ? configuration ? interface ?
+ukbd*	at uhidev? reportid ?
 wskbd*	at ukbd? console ?
 
 # USB Generic HID devices
-uhid*	at uhub? port ? configuration ? interface ?
+uhid*	at uhidev? reportid ?
 
 # USB Printer
 ulpt*	at uhub? port ? configuration ? interface ?
@@ -450,6 +487,17 @@ aue*	at uhub? port ?		# ADMtek AN986 Pegasus based adapters
 cue*	at uhub? port ?		# CATC USB-EL1201A based adapters
 kue*	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
 
+# Serial adapters
+# FTDI FT8U100AX serial adapter
+uftdi*	at uhub? port ?
+ucom*	at uftdi? portno ?
+
+# USB scanners
+uscanner* at uhub? port ?
+
+# Y@P firmware loader
+uyap* at uhub? port ?
+
 # USB Generic driver
 ugen*	at uhub? port ?
 
@@ -463,13 +511,13 @@ wsmouse*	at	pms?
 
 pseudo-device	bpfilter	16
 pseudo-device	ccd		4
-#pseudo-device	raid		4		# RAIDframe disk driver
-#options 	RAID_AUTOCONFIG      # auto-configuration of RAID components
+#pseudo-device	raid		4	# RAIDframe disk driver
+#options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
 pseudo-device	ipfilter	1
 pseudo-device	loop		1
 pseudo-device	md		1
 pseudo-device	ppp		4
-pseudo-device	pty		64
+pseudo-device	pty			# pseudo-terminals
 pseudo-device	sl		4
 pseudo-device	strip		4
 pseudo-device	tun		4
@@ -480,6 +528,8 @@ pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
 pseudo-device	vlan			# IEEE 802.1q encapsulation
 pseudo-device	sequencer	1	# MIDI sequencer
-
 pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness too
+# a pseudo device needed for Coda	# also needs CODA (above)
+pseudo-device	vcoda		4	# coda minicache <-> venus comm.
+pseudo-device	clockctl		# user control of clock subsystem

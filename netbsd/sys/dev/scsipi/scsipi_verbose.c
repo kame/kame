@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipi_verbose.c,v 1.11 2000/03/30 00:00:55 augustss Exp $	*/
+/*	$NetBSD: scsipi_verbose.c,v 1.15 2001/11/15 09:48:17 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,7 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: scsipi_verbose.c,v 1.15 2001/11/15 09:48:17 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/proc.h>
@@ -201,6 +203,10 @@ static const struct {
 { 0x37, 0x00, "Rounded Parameter" },
 { 0x39, 0x00, "Saving Parameters Not Supported" },
 { 0x3A, 0x00, "Medium Not Present" },
+{ 0x3A, 0x01, "Medium Not Present - Tray Closed" },
+{ 0x3A, 0x02, "Medium Not Present - Tray Open" },
+{ 0x3A, 0x03, "Medium Not Present - Loadable" },
+{ 0x3A, 0x04, "Medium Not Present - Medium Auxilliary Memory Accessible" },
 { 0x3B, 0x00, "Positioning Error" },
 { 0x3B, 0x01, "Tape Position Error At Beginning-of-Medium" },
 { 0x3B, 0x02, "Tape Position Error At End-of-Medium" },
@@ -484,7 +490,7 @@ scsipi_print_sense(xs, verbosity)
 {
 	int i, j;
 
-	xs->sc_link->sc_print_addr(xs->sc_link);
+	scsipi_printaddr(xs->xs_periph);
  	printf(" Check Condition on CDB: 0x%02x", xs->cmd->opcode);
 
  	switch (CDB_GROUPID(xs->cmd->opcode)) {

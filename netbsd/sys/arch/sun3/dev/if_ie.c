@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie.c,v 1.32 1999/08/20 03:52:38 chs Exp $ */
+/*	$NetBSD: if_ie.c,v 1.37 2001/09/05 13:55:27 tsutsui Exp $ */
 
 /*-
  * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.
@@ -135,7 +135,7 @@
 #include <netns/ns_if.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -356,7 +356,7 @@ ie_attach(sc)
 	/*
 	 * Initialize and attach S/W interface
 	 */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = iestart;
 	ifp->if_ioctl = ieioctl;
@@ -367,9 +367,6 @@ ie_attach(sc)
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_addr);
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 }
 
 /*
@@ -467,7 +464,7 @@ ie_intr(arg)
 	void *arg;
 {
 	struct ie_softc *sc = arg;
-	register u_short status;
+	u_short status;
 	int loopcnt;
 
 	/*
@@ -674,9 +671,9 @@ static inline u_short
 ether_cmp(one, two)
 	u_char *one, *two;
 {
-	register u_short *a = (u_short *) one;
-	register u_short *b = (u_short *) two;
-	register u_short diff;
+	u_short *a = (u_short *) one;
+	u_short *b = (u_short *) two;
+	u_short diff;
 
 	diff  = *a++ - *b++;
 	diff |= *a++ - *b++;
@@ -705,105 +702,19 @@ check_eh(sc, eh, to_bpf)
 	int *to_bpf;
 {
 	struct ifnet *ifp;
-	int i;
 
 	ifp = &sc->sc_if;
 
-	switch (sc->promisc) {
-	case IFF_ALLMULTI:
-		/*
-		 * Receiving all multicasts, but no unicasts except those
-		 * destined for us.
-		 */
 #if NBPFILTER > 0
-		/* BPF gets this packet if anybody cares */
-		*to_bpf = (ifp->if_bpf != 0);
-#endif
-		if (eh->ether_dhost[0] & 1)
-			return 1;
-		if (ether_equal(eh->ether_dhost, LLADDR(ifp->if_sadl)))
-			return 1;
-		return 0;
-
-	case IFF_PROMISC:
-		/*
-		 * Receiving all packets.  These need to be passed on to BPF.
-		 */
-#if NBPFILTER > 0
-		*to_bpf = (ifp->if_bpf != 0);
-#endif
-		/* If for us, accept and hand up to BPF */
-		if (ether_equal(eh->ether_dhost, LLADDR(ifp->if_sadl)))
-			return 1;
-
-#if NBPFILTER > 0
-		if (*to_bpf)
-			*to_bpf = 2;	/* we don't need to see it */
+	*to_bpf = (ifp->if_bpf != 0);
+#else
+	*to_bpf = 0;
 #endif
 
-		/*
-		 * Not a multicast, so BPF wants to see it but we don't.
-		 */
-		if (!(eh->ether_dhost[0] & 1))
-			return 1;
-
-		/*
-		 * If it's one of our multicast groups, accept it and pass it
-		 * up.
-		 */
-		for (i = 0; i < sc->mcast_count; i++) {
-			if (ether_equal(eh->ether_dhost,
-			    (u_char *)&sc->mcast_addrs[i])) {
-#if NBPFILTER > 0
-				if (*to_bpf)
-					*to_bpf = 1;
-#endif
-				return 1;
-			}
-		}
-		return 1;
-
-	case IFF_ALLMULTI | IFF_PROMISC:
-		/*
-		 * Acting as a multicast router, and BPF running at the same
-		 * time.  Whew!  (Hope this is a fast machine...)
-		 */
-#if NBPFILTER > 0
-		*to_bpf = (ifp->if_bpf != 0);
-#endif
-		/* We want to see multicasts. */
-		if (eh->ether_dhost[0] & 1)
-			return 1;
-
-		/* We want to see our own packets */
-		if (ether_equal(eh->ether_dhost, LLADDR(ifp->if_sadl)))
-			return 1;
-
-		/* Anything else goes to BPF but nothing else. */
-#if NBPFILTER > 0
-		if (*to_bpf)
-			*to_bpf = 2;
-#endif
-		return 1;
-
-	case 0:
-		/*
-		 * Only accept unicast packets destined for us, or multicasts
-		 * for groups that we belong to.  For now, we assume that the
-		 * '586 will only return packets that we asked it for.  This
-		 * isn't strictly true (it uses hashing for the multicast filter),
-		 * but it will do in this case, and we want to get out of here
-		 * as quickly as possible.
-		 */
-#if NBPFILTER > 0
-		*to_bpf = (ifp->if_bpf != 0);
-#endif
-		return 1;
-	}
-#ifdef	DIAGNOSTIC
-	panic("ie: check_eh, impossible");
-#endif
-	return 0;
+	/*
+	 * This is all handled at a higher level now.
+	 */
+	return 1;
 }
 
 /*
@@ -816,7 +727,7 @@ ie_buflen(sc, head)
 	struct ie_softc *sc;
 	int head;
 {
-	register int len;
+	int len;
 
 	len = SWAP(sc->rbuffs[head]->ie_rbd_actual);
 	len &= (IE_RBUF_SIZE | (IE_RBUF_SIZE - 1));
@@ -1637,7 +1548,7 @@ iestop(sc)
 
 static int
 ieioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
@@ -1670,8 +1581,8 @@ ieioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else
-				bcopy(ina->x_host.c_host,
-				    LLADDR(ifp->if_sadl), ETHER_ADDR_LEN);
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host, ETHER_ADDR_LEN);
 			/* Set new address. */
 			ieinit(sc);
 			break;
@@ -1757,12 +1668,13 @@ mc_reset(sc)
 	ETHER_FIRST_MULTI(step, &sc->sc_ethercom, enm);
 	while (enm) {
 		if (sc->mcast_count >= MAXMCAST ||
-		    bcmp(enm->enm_addrlo, enm->enm_addrhi, 6) != 0) {
+		    ether_cmp(enm->enm_addrlo, enm->enm_addrhi) != 0) {
 			ifp->if_flags |= IFF_ALLMULTI;
 			ieioctl(ifp, SIOCSIFFLAGS, (void *)0);
 			goto setflag;
 		}
-		bcopy(enm->enm_addrlo, &sc->mcast_addrs[sc->mcast_count], 6);
+		memcpy(&sc->mcast_addrs[sc->mcast_count], enm->enm_addrlo,
+		    ETHER_ADDR_LEN);
 		sc->mcast_count++;
 		ETHER_NEXT_MULTI(step, enm);
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: cy_isa.c,v 1.10 1998/06/09 07:24:58 thorpej Exp $	*/
+/*	$NetBSD: cy_isa.c,v 1.14 2002/01/07 21:47:04 thorpej Exp $	*/
 
 /*
  * cy.c
@@ -7,8 +7,10 @@
  * (currently not tested with Cyclom-32 cards)
  *
  * Timo Rossi, 1996
- *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cy_isa.c,v 1.14 2002/01/07 21:47:04 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -24,22 +26,24 @@
 #include <dev/ic/cyreg.h>
 #include <dev/ic/cyvar.h>
 
-static int cy_probe_isa __P((struct device *, struct cfdata *, void *));
-static void cy_attach_isa   __P((struct device *, struct device *, void *));
+int	cy_isa_probe(struct device *, struct cfdata *, void *);
+void	cy_isa_attach(struct device *, struct device *, void *);
 
 struct cfattach cy_isa_ca = {
-	sizeof(struct cy_softc), cy_probe_isa, cy_attach_isa
+	sizeof(struct cy_softc), cy_isa_probe, cy_isa_attach
 };
 
-static int
-cy_probe_isa(parent, match, aux)
-	struct device  *parent;
-	struct cfdata *match;
-	void *aux;
+int
+cy_isa_probe(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct isa_attach_args *ia = aux;
 	struct cy_softc sc;
 	int found;
+
+	if (ia->ia_niomem < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
 
 	memcpy(&sc.sc_dev, match, sizeof(struct device));
 
@@ -47,17 +51,12 @@ cy_probe_isa(parent, match, aux)
 	sc.sc_bustype = CY_BUSTYPE_ISA;
 
 	/* Disallow wildcarded memory address. */
-	if (ia->ia_maddr == ISACF_IOMEM_DEFAULT) {
-		printf("%s: memory addr not defined\n", sc.sc_dev.dv_xname);
-		return (0);
-	}
-
-	if (ia->ia_irq == IRQUNK) {
-		printf("%s: interrupt not defined\n", sc.sc_dev.dv_xname);
+	if (ia->ia_iomem[0].ir_addr == ISACF_IOMEM_DEFAULT)
 		return 0;
-	}
+	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
+		return 0;
 
-	if (bus_space_map(ia->ia_memt, ia->ia_maddr, CY_MEMSIZE, 0,
+	if (bus_space_map(ia->ia_memt, ia->ia_iomem[0].ir_addr, CY_MEMSIZE, 0,
 	    &sc.sc_bsh) != 0)
 		return 0;
 
@@ -66,17 +65,19 @@ cy_probe_isa(parent, match, aux)
 	bus_space_unmap(ia->ia_memt, sc.sc_bsh, CY_MEMSIZE);
 
 	if (found) {
-		ia->ia_iosize = 0;
-		ia->ia_msize = CY_MEMSIZE;
-	}
+		ia->ia_niomem = 1;
+		ia->ia_iomem[0].ir_size = CY_MEMSIZE;
 
-	return found;
+		ia->ia_nirq = 1;
+
+		ia->ia_nio = 0;
+		ia->ia_ndrq = 0;
+	}
+	return (found);
 }
 
-static void
-cy_attach_isa(parent, self, aux)
-	struct device  *parent, *self;
-	void *aux;
+void
+cy_isa_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct cy_softc *sc = (void *) self;
 	struct isa_attach_args *ia = aux;
@@ -84,22 +85,25 @@ cy_attach_isa(parent, self, aux)
 	sc->sc_memt = ia->ia_memt;
 	sc->sc_bustype = CY_BUSTYPE_ISA;
 
-	if (bus_space_map(ia->ia_memt, ia->ia_maddr, CY_MEMSIZE, 0,
+	printf(": Cyclades-Y multiport serial\n");
+
+	if (bus_space_map(ia->ia_memt, ia->ia_iomem[0].ir_addr, CY_MEMSIZE, 0,
 	    &sc->sc_bsh) != 0) {
-		printf(": cannot map mem space\n");
+		printf("%s: unable to map device registers\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 
 	if (cy_find(sc) == 0) {
-		printf(": cy_find failed\n");
+		printf("%s: unable to find CD1400s\n", sc->sc_dev.dv_xname);
 		return;
 	}
 
-	cy_attach(parent, self, aux);
+	cy_attach(sc);
 
-	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq,
+	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
 	    IST_EDGE, IPL_TTY, cy_intr, sc);
-
 	if (sc->sc_ih == NULL)
-		printf("%s: couldn't establish interrupt", sc->sc_dev.dv_xname);
+		printf("%s: unable to establish interrupt",
+		    sc->sc_dev.dv_xname);
 }

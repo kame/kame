@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.24.2.1 2001/05/01 14:32:58 he Exp $	*/
+/*	$NetBSD: types.h,v 1.30 2002/02/28 03:17:28 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -39,6 +39,7 @@
 #define	_MACHTYPES_H_
 
 #include <sys/cdefs.h>
+#include <machine/int_types.h>
 
 #if defined(_KERNEL)
 typedef struct label_t {
@@ -54,30 +55,17 @@ typedef unsigned long	vaddr_t;
 typedef unsigned long	vsize_t;
 #endif
 
-/*
- * Basic integral types.  Omit the typedef if
- * not possible for a machine/compiler combination.
- */
-#define	__BIT_TYPES_DEFINED__
-typedef	__signed char		   int8_t;
-typedef	unsigned char		 u_int8_t;
-typedef	short			  int16_t;
-typedef	unsigned short		u_int16_t;
-typedef	int			  int32_t;
-typedef	unsigned int		u_int32_t;
-/* LONGLONG */
-typedef	long long		  int64_t;
-/* LONGLONG */
-typedef	unsigned long long	u_int64_t;
-
-typedef int32_t			register_t;
+typedef int		register_t;
 
 /* The x86 does not have strict alignment requirements. */
 #define	__NO_STRICT_ALIGNMENT
 
-#define __HAVE_DEVICE_REGISTER
-#define __HAVE_NWSCONS
-#define __HAVE_CPU_COUNTER
-#define __HAVE_OLD_DISKLABEL
+#define	__HAVE_DEVICE_REGISTER
+#define	__HAVE_NWSCONS
+#define	__HAVE_CPU_COUNTER
+#define	__HAVE_SYSCALL_INTERN
+#define	__HAVE_MINIMAL_EMUL
+#define	__HAVE_OLD_DISKLABEL
+#define	__HAVE_GENERIC_SOFT_INTERRUPTS
 
 #endif	/* _MACHTYPES_H_ */

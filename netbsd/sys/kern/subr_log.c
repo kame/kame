@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_log.c,v 1.20 2000/05/28 18:31:13 jhawk Exp $	*/
+/*	$NetBSD: subr_log.c,v 1.22 2002/04/28 04:13:51 enami Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -38,6 +38,9 @@
 /*
  * Error log buffer for kernel printf's.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: subr_log.c,v 1.22 2002/04/28 04:13:51 enami Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -273,7 +276,7 @@ logioctl(dev, com, data, flag, p)
 		break;
 
 	default:
-		return (-1);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }

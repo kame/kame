@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_dagdegrd.c,v 1.5 2000/01/07 03:40:57 oster Exp $	*/
+/*	$NetBSD: rf_dagdegrd.c,v 1.10 2001/11/13 07:11:12 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -32,7 +32,12 @@
  * code for creating degraded read DAGs
  */
 
-#include "rf_types.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_dagdegrd.c,v 1.10 2001/11/13 07:11:12 lukem Exp $");
+
+#include <dev/raidframe/raidframevar.h>
+
+#include "rf_archs.h"
 #include "rf_raid.h"
 #include "rf_dag.h"
 #include "rf_dagutils.h"
@@ -505,7 +510,7 @@ rf_CreateDegradedReadDAG(
 	termNode->antecedents[0] = commitNode;
 }
 
-
+#if (RF_INCLUDE_CHAINDECLUSTER > 0)
 /******************************************************************************
  * Create a degraded read DAG for Chained Declustering
  *
@@ -644,6 +649,9 @@ rf_CreateRaidCDegradedReadDAG(
 	termNode->antecedents[0] = commitNode;
 	termNode->antType[0] = rf_control;
 }
+#endif /* (RF_INCLUDE_CHAINDECLUSTER > 0) */
+
+#if (RF_INCLUDE_DECL_PQ > 0) || (RF_INCLUDE_RAID6 > 0) || (RF_INCLUDE_EVENODD > 0)
 /*
  * XXX move this elsewhere?
  */
@@ -1121,3 +1129,5 @@ rf_DoubleDegRead(
 
 	/* zero fill the target data buffers? */
 }
+
+#endif /* (RF_INCLUDE_DECL_PQ > 0) || (RF_INCLUDE_RAID6 > 0) || (RF_INCLUDE_EVENODD > 0) */

@@ -1,9 +1,11 @@
-#	$NetBSD: Makefile,v 1.2.18.1 2000/09/04 15:16:06 augustss Exp $
+#	$NetBSD: Makefile,v 1.5 2002/04/12 17:56:14 heinz Exp $
 
 # use 'make -f Makefile.usbdevs' to make usbdevs.h and usbdevs_data.h
+# _after_ you committed usbdevs. See comment in Makefile.usbdevs
 
 INCSDIR= /usr/include/dev/usb
 
-INCS=	usb.h usbcdc.h usbhid.h usbdevs.h
+# Only install includes which are used by userland
+INCS=	urio.h usb.h usbhid.h
 
 .include <bsd.kinc.mk>

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgfourteen.c,v 1.16.4.1 2000/06/30 16:27:38 simonb Exp $ */
+/*	$NetBSD: cgfourteen.c,v 1.23.4.1 2002/08/07 01:32:10 lukem Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -87,14 +87,16 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
-#include <machine/fbio.h>
+#include <machine/bus.h>
 #include <machine/autoconf.h>
-#include <machine/pmap.h>
-#include <machine/fbvar.h>
-#include <machine/cpu.h>
 #include <machine/conf.h>
+
+#include <dev/sbus/sbusvar.h>
+
+#include <dev/sun/fbio.h>
+#include <dev/sun/fbvar.h>
 
 #include <sparc/dev/cgfourteenreg.h>
 #include <sparc/dev/cgfourteenvar.h>
@@ -129,6 +131,16 @@ static void cg14_reset __P((struct cgfourteen_softc *));
 static void cg14_loadomap __P((struct cgfourteen_softc *));/* cursor overlay */
 static void cg14_setcursor __P((struct cgfourteen_softc *));/* set position */
 static void cg14_loadcursor __P((struct cgfourteen_softc *));/* set shape */
+
+/*
+ * We map the display memory with an offset of 256K when emulating the cg3 or
+ * cg8; the cg3 uses this offset for compatibility with the cg4, and both the
+ * cg4 and cg8 have a mono overlay plane and an overlay enable plane in the
+ * first 256K.  Mapping at an offset of 0x04000000 causes only the color
+ * frame buffer to be mapped, without the overlay planes.
+ */
+#define START		(128*1024 + 128*1024)
+#define NOOVERLAY	(0x04000000)
 
 /*
  * Match a cgfourteen.
@@ -194,8 +206,22 @@ cgfourteenattach(parent, self, aux)
 	fb->fb_type.fb_depth = 8;
 #endif
 	fb_setsize_obp(fb, sc->sc_fb.fb_type.fb_depth, 1152, 900, node);
-
+#ifdef CG14_CG8
+	/*
+	 * fb_setsize_obp set fb->fb_linebytes based on the current
+	 * depth reported by obp, but that defaults to 8 bits (as
+	 * reported by getpropint().  Update the value to reflect
+	 * the depth that will be used after open.
+	 * The display memory size returned by the cg8 driver includes
+	 * the space used by the overlay planes, but the size returned
+	 * by the cg3 driver does not; emulate the other drivers.
+	 */
+	fb->fb_linebytes = (fb->fb_type.fb_width * fb->fb_type.fb_depth) / 8;
+	ramsize = roundup(START + (fb->fb_type.fb_height * fb->fb_linebytes),
+			NBPG);
+#else
 	ramsize = roundup(fb->fb_type.fb_height * fb->fb_linebytes, NBPG);
+#endif
 	fb->fb_type.fb_cmsize = CG14_CLUT_SIZE;
 	fb->fb_type.fb_size = ramsize;
 
@@ -216,11 +242,9 @@ cgfourteenattach(parent, self, aux)
 #endif
 		sa->sa_size = 0x10000;
 	}
-	if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
-			 sa->sa_offset,
-			 sa->sa_size,
-			 BUS_SPACE_MAP_LINEAR,
-			 0, &bh) != 0) {
+	if (sbus_bus_map(sa->sa_bustag,
+			 sa->sa_slot, sa->sa_offset, sa->sa_size,
+			 BUS_SPACE_MAP_LINEAR, &bh) != 0) {
 		printf("%s: cannot map control registers\n", self->dv_xname);
 		return;
 	}
@@ -538,11 +562,6 @@ cgfourteenmmap(dev, off, prot)
 	int prot;
 {
 	struct cgfourteen_softc *sc = cgfourteen_cd.cd_devs[minor(dev)];
-	bus_space_handle_t bh;
-
-#define CG3START	(128*1024 + 128*1024)
-#define CG8START	(256*1024)
-#define NOOVERLAY	(0x04000000)
 
 	if (off & PGOFSET)
 		panic("cgfourteenmmap");
@@ -558,30 +577,28 @@ cgfourteenmmap(dev, off, prot)
 	if ((u_int)off >= 0x10000000 && (u_int)off < 0x10000000 + 16*4096) {
 		off -= 0x10000000;
 		if (bus_space_mmap(sc->sc_bustag,
-				   sc->sc_physadr[CG14_CTL_IDX].sbr_slot,
-				   sc->sc_physadr[CG14_CTL_IDX].sbr_offset+off,
-				   BUS_SPACE_MAP_LINEAR, &bh))
-			return (-1);
-
-		return ((off_t)bh);
+			BUS_ADDR(sc->sc_physadr[CG14_CTL_IDX].sbr_slot,
+				sc->sc_physadr[CG14_CTL_IDX].sbr_offset),
+			off, prot, BUS_SPACE_MAP_LINEAR));
 	}
 #endif
 	
 	if ((u_int)off >= NOOVERLAY)
 		off -= NOOVERLAY;
-#ifdef CG14_CG8
-	else if ((u_int)off >= CG8START) {
-		off -= CG8START;
-	}
-#else
-	else if ((u_int)off >= CG3START)
-		off -= CG3START;
-#endif
+	else if ((u_int)off >= START)
+		off -= START;
 	else
 		off = 0;
 
-	if (off >= sc->sc_fb.fb_type.fb_size *
-		sc->sc_fb.fb_type.fb_depth/8) {
+	/*
+	 * fb_size includes the overlay space only for the CG8.
+	 */
+#ifdef CG14_CG8
+	if (off >= sc->sc_fb.fb_type.fb_size - START)
+#else
+	if (off >= sc->sc_fb.fb_type.fb_size)
+#endif
+	{
 #ifdef DEBUG
 		printf("\nmmap request out of bounds: request 0x%x, "
 		    "bound 0x%x\n", (unsigned) off,
@@ -590,13 +607,10 @@ cgfourteenmmap(dev, off, prot)
 		return (-1);
 	}
 
-	if (bus_space_mmap(sc->sc_bustag,
-			   sc->sc_physadr[CG14_PXL_IDX].sbr_slot,
-			   sc->sc_physadr[CG14_PXL_IDX].sbr_offset + off,
-			   BUS_SPACE_MAP_LINEAR, &bh))
-		return (-1);
-
-	return ((paddr_t)bh);
+	return (bus_space_mmap(sc->sc_bustag,
+		BUS_ADDR(sc->sc_physadr[CG14_PXL_IDX].sbr_slot,
+			sc->sc_physadr[CG14_PXL_IDX].sbr_offset),
+		off, prot, BUS_SPACE_MAP_LINEAR));
 }
 
 int
@@ -733,68 +747,68 @@ cg14_get_cmap(p, cm, cmsize)
 	union cg14cmap *cm;
 	int cmsize;
 {
-        u_int i, start, count;
-        u_char *cp;
+	u_int i, start, count;
+	u_char *cp;
 
-        start = p->index;
-        count = p->count;
-        if (start >= cmsize || start + count > cmsize)
+	start = p->index;
+	count = p->count;
+	if (start >= cmsize || count > cmsize - start)
 #ifdef DEBUG
 	{
 		printf("putcmaperror: start %d cmsize %d count %d\n",
 		    start,cmsize,count);
 #endif
-                return (EINVAL);
+		return (EINVAL);
 #ifdef DEBUG
 	}
 #endif
 
-        if (!uvm_useracc(p->red, count, B_WRITE) ||
-            !uvm_useracc(p->green, count, B_WRITE) ||
-            !uvm_useracc(p->blue, count, B_WRITE))
-                return (EFAULT);
-        for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 4, i++) {
-                p->red[i] = cp[3];
-                p->green[i] = cp[2];
-                p->blue[i] = cp[1];
-        }
-        return (0);
+	if (!uvm_useracc(p->red, count, B_WRITE) ||
+	    !uvm_useracc(p->green, count, B_WRITE) ||
+	    !uvm_useracc(p->blue, count, B_WRITE))
+		return (EFAULT);
+	for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 4, i++) {
+		p->red[i] = cp[3];
+		p->green[i] = cp[2];
+		p->blue[i] = cp[1];
+	}
+	return (0);
 }
 
 /* Write the software shadow colormap */
 static int
 cg14_put_cmap(p, cm, cmsize)
-        struct fbcmap *p;
-        union cg14cmap *cm;
-        int cmsize;
+	struct fbcmap *p;
+	union cg14cmap *cm;
+	int cmsize;
 {
-        u_int i, start, count;
-        u_char *cp;
+	u_int i, start, count;
+	u_char *cp;
 
-        start = p->index;
-        count = p->count;
-        if (start >= cmsize || start + count > cmsize)
+	start = p->index;
+	count = p->count;
+	if (start >= cmsize || count > cmsize - start)
 #ifdef DEBUG
 	{
 		printf("putcmaperror: start %d cmsize %d count %d\n",
 		    start,cmsize,count);
 #endif
-                return (EINVAL);
+		return (EINVAL);
 #ifdef DEBUG
 	}
 #endif
 
-        if (!uvm_useracc(p->red, count, B_READ) ||
-            !uvm_useracc(p->green, count, B_READ) ||
-            !uvm_useracc(p->blue, count, B_READ))
-                return (EFAULT);
-        for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 4, i++) {
-                cp[3] = p->red[i];
-                cp[2] = p->green[i];
-                cp[1] = p->blue[i];
+	if (!uvm_useracc(p->red, count, B_READ) ||
+	    !uvm_useracc(p->green, count, B_READ) ||
+	    !uvm_useracc(p->blue, count, B_READ))
+		return (EFAULT);
+	for (cp = &cm->cm_map[start][0], i = 0; i < count; cp += 4, i++) {
+		cp[3] = p->red[i];
+		cp[2] = p->green[i];
+		cp[1] = p->blue[i];
 		cp[0] = 0;	/* no alpha channel */
-        }
-        return (0);
+	}
+	return (0);
 }
 
 static void

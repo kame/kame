@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.9.4.1 2000/07/27 16:44:21 matt Exp $ */
+/*	$NetBSD: boot.c,v 1.17 2001/05/02 15:33:14 matt Exp $ */
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -34,8 +34,9 @@
  *	@(#)boot.c	7.15 (Berkeley) 5/4/91
  */
 
-#include "sys/param.h"
-#include "sys/reboot.h"
+#include <sys/param.h>
+#include <sys/reboot.h>
+#include <sys/boot_flag.h>
 #include "lib/libsa/stand.h"
 #include "lib/libsa/loadfile.h"
 #include "lib/libkern/libkern.h"
@@ -57,7 +58,7 @@ int	bootdev, debug;
 extern	unsigned opendev;
 
 void	usage(char *), boot(char *), halt(char *);
-void	Xmain(struct rpb *);
+void	Xmain(void);
 void	autoconf(void);
 int	getsecs(void);
 int	setjmp(int *);
@@ -93,25 +94,20 @@ int sluttid, senast, skip, askname;
 struct rpb bootrpb;
 
 void
-Xmain(struct rpb *prpb)
+Xmain(void)
 {
 	int io;
 	int j, nu;
 	u_long marks[MARK_MAX];
+	extern const char bootprog_rev[], bootprog_date[];
 
-	/* First copy rpb/bqo to its new location */
-	bcopy((caddr_t)prpb, &bootrpb, sizeof(struct rpb));
-	if (prpb->iovec) {
-		bootrpb.iovec = (int)alloc(prpb->iovecsz);
-		bcopy((caddr_t)prpb->iovec, (caddr_t)bootrpb.iovec,
-		    prpb->iovecsz);
-	}
 	io = 0;
 	skip = 1;
 	autoconf();
 
 	askname = bootrpb.rpb_bootr5 & RB_ASKNAME;
-	printf("\n\r>> NetBSD/vax boot [%s %s] <<\n", __DATE__, __TIME__);
+	printf("\n\r>> NetBSD/vax boot [%s %s] <<\n", bootprog_rev,
+		bootprog_date);
 	printf(">> Press any key to abort autoboot  ");
 	sluttid = getsecs() + 5;
 	senast = 0;
@@ -148,7 +144,8 @@ Xmain(struct rpb *prpb)
 			marks[MARK_START] = 0;
 			err = loadfile(filelist[fileindex].name, marks, LOAD_KERNEL|COUNT_KERNEL);
 			if (err == 0) {
-				machdep_start((char *)marks[MARK_ENTRY], 0,
+				machdep_start((char *)marks[MARK_ENTRY],
+						      marks[MARK_NSYM],
 					      (void *)marks[MARK_START],
 					      (void *)marks[MARK_SYM],
 					      (void *)marks[MARK_END]);
@@ -203,6 +200,8 @@ void
 boot(char *arg)
 {
 	char *fn = "netbsd";
+	int howto, fl, err;
+	u_long marks[MARK_MAX];
 
 	if (arg) {
 		while (*arg == ' ')
@@ -218,22 +217,30 @@ boot(char *arg)
 				goto load;
 		}
 		if (*arg != '-') {
-fail:			printf("usage: boot [filename] [-asd]\n");
+fail:			printf("usage: boot [filename] [-asdqv]\n");
 			return;
 		}
 
+		howto = 0;
 		while (*++arg) {
-			if (*arg == 'a')
-				bootrpb.rpb_bootr5 |= RB_ASKNAME;
-			else if (*arg == 'd')
-				bootrpb.rpb_bootr5 |= RB_KDB;
-			else if (*arg == 's')
-				bootrpb.rpb_bootr5 |= RB_SINGLE;
-			else
+			fl = 0;
+			BOOT_FLAG(*arg, fl);
+			if (!fl)
 				goto fail;
+			howto |= fl;
 		}
+		bootrpb.rpb_bootr5 = howto;
 	}
-load:	exec(fn, 0, 0);
+load:	
+	marks[MARK_START] = 0;
+	err = loadfile(fn, marks, LOAD_KERNEL|COUNT_KERNEL);
+	if (err == 0) {
+		machdep_start((char *)marks[MARK_ENTRY],
+				      marks[MARK_NSYM],
+			      (void *)marks[MARK_START],
+			      (void *)marks[MARK_SYM],
+			      (void *)marks[MARK_END]);
+	}
 	printf("Boot failed: %s\n", strerror(errno));
 }
 

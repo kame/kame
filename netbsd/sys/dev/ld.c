@@ -1,4 +1,4 @@
-/*	$NetBSD: ld.c,v 1.11 2001/09/06 00:47:56 thorpej Exp $	*/
+/*	$NetBSD: ld.c,v 1.13 2002/05/08 15:49:07 drochner Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * Disk driver for use by RAID controllers.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ld.c,v 1.13 2002/05/08 15:49:07 drochner Exp $");
 
 #include "rnd.h"
 
@@ -171,7 +174,7 @@ void
 ldenddetach(struct ld_softc *sc)
 {
 	struct buf *bp;
-	int s, bmaj, cmaj, mn;
+	int s, bmaj, cmaj, i, mn;
 
 	if ((sc->sc_flags & LDF_ENABLED) == 0)
 		return;
@@ -201,10 +204,12 @@ ldenddetach(struct ld_softc *sc)
 	splx(s);
 
 	/* Nuke the vnodes for any open instances. */
-	mn = DISKUNIT(sc->sc_dv.dv_unit);
-	vdevgone(bmaj, mn, mn + (MAXPARTITIONS - 1), VBLK);
-	vdevgone(cmaj, mn, mn + (MAXPARTITIONS - 1), VCHR);
-	
+	for (i = 0; i < MAXPARTITIONS; i++) {
+		mn = DISKMINOR(sc->sc_dv.dv_unit, i);
+		vdevgone(bmaj, mn, mn, VBLK);
+		vdevgone(cmaj, mn, mn, VCHR);
+	}
+
 	/* Detach from the disk list. */
 	disk_detach(&sc->sc_dk);
 

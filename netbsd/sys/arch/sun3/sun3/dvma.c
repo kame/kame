@@ -1,4 +1,4 @@
-/*	$NetBSD: dvma.c,v 1.17 1999/05/26 19:23:13 thorpej Exp $	*/
+/*	$NetBSD: dvma.c,v 1.22 2001/09/05 13:21:09 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -48,10 +48,6 @@
 #include <sys/core.h>
 #include <sys/exec.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_map.h>
-
 #include <uvm/uvm.h> /* XXX: not _extern ... need uvm_map_create */
 
 #include <machine/autoconf.h>
@@ -71,7 +67,7 @@
 struct map dvma_segmap[NUM_DVMA_SEGS];
 
 /* XXX: Might need to tune this... */
-vm_size_t dvma_segmap_size = 6 * NBSG;
+vsize_t dvma_segmap_size = 6 * NBSG;
 
 /* Using phys_map to manage DVMA scratch-memory pages. */
 /* Note: Could use separate pagemap for obio if needed. */
@@ -79,7 +75,7 @@ vm_size_t dvma_segmap_size = 6 * NBSG;
 void
 dvma_init()
 {
-	vm_offset_t segmap_addr;
+	vaddr_t segmap_addr;
 
 	/*
 	 * Create phys_map covering the entire DVMA space,
@@ -121,7 +117,7 @@ dvma_malloc(bytes)
 	size_t bytes;
 {
     caddr_t new_mem;
-    vm_size_t new_size;
+    vsize_t new_size;
 
     if (!bytes)
 		return NULL;
@@ -141,9 +137,9 @@ dvma_free(addr, size)
 	void *addr;
 	size_t size;
 {
-	vm_size_t sz = m68k_round_page(size);
+	vsize_t sz = m68k_round_page(size);
 
-	uvm_km_free(phys_map, (vm_offset_t)addr, sz);
+	uvm_km_free(phys_map, (vaddr_t)addr, sz);
 }
 
 /*
@@ -160,7 +156,7 @@ dvma_kvtopa(kva, bustype)
 
 	addr = (u_long)kva;
 	if ((addr & DVMA_MAP_BASE) != DVMA_MAP_BASE)
-		panic("dvma_kvtopa: bad dmva addr=0x%x\n", addr);
+		panic("dvma_kvtopa: bad dmva addr=0x%lx\n", addr);
 
 	switch (bustype) {
 	case BUS_OBIO:
@@ -187,19 +183,20 @@ dvma_mapin(kva, len, canwait)
 	int len;
 	int canwait; /* ignored */
 {
-	vm_offset_t seg_kva, seg_dma, seg_len, seg_off;
-	register vm_offset_t v, x;
-	register int sme;
+	vaddr_t seg_kva, seg_dma;
+	vsize_t seg_len, seg_off;
+	vaddr_t v, x;
+	int sme;
 	int s;
 
 	/* Get seg-aligned address and length. */
-	seg_kva = (vm_offset_t)kva;
-	seg_len = (vm_offset_t)len;
+	seg_kva = (vaddr_t)kva;
+	seg_len = (vsize_t)len;
 	seg_off = seg_kva & SEGOFSET;
 	seg_kva -= seg_off;
 	seg_len = m68k_round_seg(seg_len + seg_off);
 
-	s = splimp();
+	s = splvm();
 
 	/* Allocate the DVMA segment(s) */
 	seg_dma = rmalloc(dvma_segmap, seg_len);
@@ -246,19 +243,20 @@ dvma_mapout(dma, len)
 	void *dma;
 	int len;
 {
-	vm_offset_t seg_dma, seg_len, seg_off;
-	register vm_offset_t v, x;
-	register int sme;
+	vaddr_t seg_dma;
+	vsize_t seg_len, seg_off;
+	vaddr_t v, x;
+	int sme;
 	int s;
 
 	/* Get seg-aligned address and length. */
-	seg_dma = (vm_offset_t)dma;
-	seg_len = (vm_offset_t)len;
+	seg_dma = (vaddr_t)dma;
+	seg_len = (vsize_t)len;
 	seg_off = seg_dma & SEGOFSET;
 	seg_dma -= seg_off;
 	seg_len = m68k_round_seg(seg_len + seg_off);
 
-	s = splimp();
+	s = splvm();
 
 	/* Flush cache and remove DVMA mappings. */
 	v = seg_dma;

@@ -1,33 +1,39 @@
-#	$NetBSD: INSTALL,v 1.6.2.2 2001/03/20 18:28:50 he Exp $
+#	$NetBSD: INSTALL,v 1.26.4.1 2002/06/07 19:34:50 thorpej Exp $
 #
 # INSTALL kernel; all supported devices but nothing fancy.
 #
 
 include		"arch/vax/conf/std.vax"
 
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+makeoptions	COPTS="-Os"	# Optimise for space. Implies -O2
+
 # Here are all different supported CPU types listed.
-options 	"VAX8600"
-options 	"VAX8200"
-options 	"VAX780"
-options 	"VAX750"
-options 	"VAX630"	# MV II
-options 	"VAX650"	# MV III, 3600, 3800, 3900
-options 	"VAX660"	# VAX 4000/200
-options 	"VAX670"	# VAX 4000/300
-options 	"VAX410"	# VS 2000
-options 	"VAX43"		# VS 3100/76
-options 	"VAX46"		# VS 4000/60
-options 	"VAX48"		# VS 4000 VLC
-options 	"VAX49"		# VS 4000/90
+options 	VAX8600
+options 	VAX8200
+options 	VAX780
+options 	VAX750
+options 	VAX630		# MV II
+options 	VAX650		# MV III, 3300, 3400, 3500, 3600, 3800, 3900
+options 	VAX660		# VAX 4000/200
+options 	VAX670		# VAX 4000/300
+options 	VAX680		# VAX 4000/[45]00
+options 	VAX410		# VS 2000
+options 	VAX43		# VS 3100/76
+options 	VAX46		# VS 4000/60
+options 	VAX48		# VS 4000 VLC
+options 	VAX49		# VS 4000/90
+options 	VAX53		# VAX 4000/105A
 
 # Max users on system; this is just a hint
 maxusers	8
 
 # Enable the hooks used for initializing the root memory-disk.
 options 	MEMORY_DISK_HOOKS
-options 	MEMORY_DISK_IS_ROOT     # force root on memory disk
-options 	MEMORY_DISK_SERVER=0    # no userspace memory disk support
-options 	MINIROOTSIZE=2276       # size of memory disk, in blocks
+options 	MEMORY_DISK_IS_ROOT	# force root on memory disk
+options 	MEMORY_DISK_SERVER=0	# no userspace memory disk support
+options 	MEMORY_DISK_ROOT_SIZE=3072	# size of memory disk, in blocks
 
 
 # Kernel compiled-in symbolic debugger & system call tracer
@@ -40,9 +46,9 @@ options 	MINIROOTSIZE=2276       # size of memory disk, in blocks
 
 # Network support
 #options 	GATEWAY
-options         INET
+options 	INET
 
-# All supported filesystem types
+# File systems
 file-system 	FFS
 #file-system 	LFS
 #file-system 	MFS
@@ -55,9 +61,13 @@ file-system 	KERNFS
 #file-system 	UNION
 file-system 	CD9660
 
+# Filesystem options
 #options 	QUOTA
 #options 	FFS_EI		# FFS Endian Independant support
 #options 	NFSSERVER
+#options 	NFS_V2_ONLY	# Exclude NFS3 and NQNFS code to save space
+#options 	VNODE_OP_NOINLINE # Save space by not inlining vnode op calls
+
 #options 	NFS_BOOT_BOOTP,NFS_BOOT_DHCP	# Use bootp <> dhcp
 #options 	NFS_BOOT_BOOTPARAM	# Use the Sun way for netbooting.
 
@@ -82,13 +92,16 @@ options 	WSEMUL_VT100
 #options 	COMPAT_12
 #options 	COMPAT_13
 options 	COMPAT_14
+options 	COMPAT_15
 #options 	COMPAT_ULTRIX
-#options 	TCP_COMPAT_42
 
 #options 	LKM
 
+#options 	USERCONF	# userconf(4) support
+options		PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Kernel(s) to compile
-config          netbsd root on ? type ?
+config		netbsd root on ? type ?
 
 mainbus0	at root
 
@@ -127,14 +140,15 @@ hp*		at mba? drive?	# RM/RP disk drives
 
 # Devices on internal MicroVAX bus
 uba0		at ibus?	# Q-Bus adapter
+#asc0		at ibus?	# VAX 4000/105A SCSI ctlr
 
 # Disk controllers at Unibus
-uda0		at uba?	csr 0172150	# UDA50/RQDX?
-uda1		at uba?	csr 0160334
+uda*		at uba?	csr 0172150	# UDA50/RQDX?
+uda*		at uba?	csr 0160334
 mscpbus*	at uda?
 
 # Tape drivers
-mtc0		at uba? csr 0174500	# Tape MSCP ctlr
+mtc*		at uba? csr 0174500	# Tape MSCP ctlr
 mscpbus*	at mtc?
 
 # MSCP devices
@@ -143,11 +157,11 @@ rx*		at mscpbus? drive?	# MSCP floppy
 mt*		at mscpbus? drive?	# MSCP tape
 
 # Unibus tapes
-#ts0		at uba? csr 0172520	# TS11/TSV05 tape.
+#ts*		at uba? csr 0172520	# TS11/TSV05 tape.
 
 # VS2000 builtin MFM controller (HDC9224)
-#hdc0		at vsbus0		# The strange builtin MFM controller
-#rd*		at hdc0 drive?		# The RD disk subsystem on VS2000
+hdc0		at vsbus0 csr 0x200c0000 # HDC9224 MFM/floppy ctlr
+rd*		at hdc0 drive?		# RD5x disks
 
 # SCSI controllers.
 asc0		at vsbus0 csr 0x200c0080 # VS4000/{60,VLC} SCSI-controller
@@ -166,28 +180,29 @@ cd*		at scsibus? target? lun?
 #uk*		at scsibus? target? lun?
 
 # Ethernet cards
-de0		at uba? csr 0174510	# DELUA/DEUNA
-qe0		at uba? csr 0174440	# DEQNA/DELQA
-qe1		at uba? csr 0174460	# DEQNA/DELQA
+de*		at uba? csr 0174510	# DELUA/DEUNA
+qe*		at uba? csr 0174440	# DEQNA/DELQA
+qe*		at uba? csr 0174460	# DEQNA/DELQA
 le0		at vsbus0 csr 0x200e0000# LANCE
 ze0		at vsbus0 csr 0x20008000# SGEC ethernet
 ze0		at ibus0		# SGEC on-board ethernet
 
 # Terminal lines
-dhu0		at uba? csr 0160440	# DHU-11
-dz0		at uba? csr 0160100	# DZ-11
+dhu*		at uba? csr 0160440	# DHU-11
+dz*		at uba? csr 0160100	# DZ-11
 dz0		at vsbus0 csr 0x200a0000# DC-367
-dz0		at vsbus0 csr 0x25000000# VS4000/90
-dl0		at uba? csr 0176500	# DL-11
+dz0		at vsbus0 csr 0x25000000# VS4000/90 and VAX 4000/10x serial lines
+dl*		at uba? csr 0176500	# DL-11
 
 # VAXstation graphics support
 #qd0		at uba? csr 0177400
 smg0		at vsbus0 csr 0x200f0000# Small monochrome display ctlr.
 wsdisplay0	at smg0			# display device driver.
-lkc0		at dz0			# Keyboard LK201
+lkkbd0		at dz0 line 0		# Keyboard LK201
+wskbd0		at lkkbd0		# wscons keyboard
 
-pseudo-device   loop	1
-pseudo-device   pty	8
+pseudo-device	loop	1
+pseudo-device	pty		2	# pseudo-terminals (Sysinst needs two)
 #pseudo-device	bpfilter 8	# Not supported by de yet.
 #pseudo-device	tun	2
 #pseudo-device	gre		2	# generic L3 over IP tunnel
@@ -195,6 +210,5 @@ pseudo-device   pty	8
 #pseudo-device	vnd	4
 #pseudo-device	ccd	4
 #pseudo-device	raid	4		# RAIDframe disk driver
-# rnd is EXPERIMENTAL
 #pseudo-device	rnd			# /dev/random and in-kernel generator
 pseudo-device	md	1

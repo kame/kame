@@ -1,4 +1,4 @@
-/* $NetBSD: if_tr_mca.c,v 1.3 2000/06/06 20:09:20 jdolecek Exp $ */
+/* $NetBSD: if_tr_mca.c,v 1.7 2001/11/13 07:46:26 lukem Exp $ */
 
 /*_
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -35,14 +35,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_tr_mca.c,v 1.7 2001/11/13 07:46:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/device.h>
-
-#include <machine/cpu.h>
-#include <machine/bus.h>
-#include <machine/intr.h>
 
 #include <dev/mca/mcareg.h>
 #include <dev/mca/mcavar.h>
@@ -75,6 +74,30 @@ struct cfattach tr_mca_ca = {
 	sizeof(struct tr_softc), tr_mca_probe, tr_mca_attach
 };
 
+/* supported products */
+static const struct tr_mca_product {
+	u_int32_t tr_id;
+	const char *tr_name;
+} tr_mca_products[] = {
+	{ MCA_PRODUCT_ITR, "IBM Token Ring 16/4 Adapter/A" },
+	{ 0, NULL },
+};
+
+static const struct tr_mca_product *tr_mca_lookup __P((int));
+
+static const struct tr_mca_product *
+tr_mca_lookup(id)
+	int id;
+{
+	const struct tr_mca_product *trp;
+
+	for(trp = tr_mca_products; trp->tr_name; trp++)
+		if (trp->tr_id == id)
+			return (trp);
+
+	return (NULL);
+}
+
 int
 tr_mca_probe(parent, match, aux)
 	struct device  *parent;
@@ -83,12 +106,10 @@ tr_mca_probe(parent, match, aux)
 {
 	struct mca_attach_args *ma = aux;
 
-	switch (ma->ma_id) {
-	case MCA_PRODUCT_ITR:
-		return 1;
-	}
+	if (tr_mca_lookup(ma->ma_id) != NULL)
+		return (1);
 
-	return 0;
+	return (0);
 }
 
 
@@ -102,8 +123,7 @@ tr_mca_attach(parent, self, aux)
 	bus_space_handle_t pioh, mmioh, sramh;
 	int iobase, irq, sram_size, sram_addr, rom_addr;
 	int pos2, pos3, pos4, pos5;
-
-	printf("\n");
+	const struct tr_mca_product *tp;
 
 	pos2 = mca_conf_read(ma->ma_mc, ma->ma_slot, 2);
 	pos3 = mca_conf_read(ma->ma_mc, ma->ma_slot, 3);
@@ -149,6 +169,10 @@ tr_mca_attach(parent, self, aux)
 	irq = 2 + (pos3 >> 7) + ((pos4 & 0x01) << 3);
 	if (irq == 2)
 		irq = 9;
+
+	tp = tr_mca_lookup(ma->ma_id);
+
+	printf(" slot %d irq %d: %s\n", ma->ma_slot + 1, irq, tp->tr_name);
 
 	sram_size = 8 << (((pos3 & 0x0c) >> 2) + 10);
 	sram_addr = (pos2 & 0xfe) << 12;
@@ -204,10 +228,10 @@ tr_mca_attach(parent, self, aux)
 
 	/* establish interrupt handler */
 	sc->sc_ih = mca_intr_establish(ma->ma_mc, irq, IPL_NET, tr_intr, sc);
-	if (sc->sc_ih == NULL)
+	if (sc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt handler\n",
 		       sc->sc_dev.dv_xname);
-	else
-		printf("%s: interrupting at irq %d\n", sc->sc_dev.dv_xname, irq);
+		return;
+	}
 
 }

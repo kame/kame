@@ -1,4 +1,4 @@
-/*	$NetBSD: sbusvar.h,v 1.10 2000/01/11 12:59:44 pk Exp $ */
+/*	$NetBSD: sbusvar.h,v 1.17 2002/03/20 19:32:42 eeh Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -39,6 +39,10 @@
 #ifndef _SBUS_VAR_H
 #define _SBUS_VAR_H
 
+#if defined(_KERNEL_OPT) && (defined(__sparc__) || defined(__sparc64__))
+#include "opt_sparc_arch.h"
+#endif
+
 struct sbus_softc;
 
 /*
@@ -50,6 +54,8 @@ struct sbusdev {
 	void	(*sd_reset) __P((struct device *));
 };
 
+typedef u_int32_t sbus_slot_t;
+typedef u_int32_t sbus_offset_t;
 
 /* Device register space description */
 struct sbus_reg {
@@ -95,6 +101,7 @@ struct sbus_attach_args {
 	u_int32_t	*sa_promvaddrs;/* PROM-supplied virtual addresses -- 32-bit */
 	int		sa_npromvaddrs;	/* Number of PROM VAs */
 #define sa_promvaddr	sa_promvaddrs[0]
+	int		sa_frequency;	/* SBus clockrate */
 };
 
 /* sbus_attach_internal() is also used from obio.c */
@@ -113,8 +120,11 @@ int	sbus_setup_attach_args __P((
 
 void	sbus_destroy_attach_args __P((struct sbus_attach_args *));
 
-#define sbus_bus_map(t, bt, a, s, f, v, hp) \
-	bus_space_map2(t, bt, a, s, f, v, hp)
+#define sbus_bus_map(tag, slot, offset, sz, flags, hp) \
+	bus_space_map(tag, BUS_ADDR(slot,offset), sz, flags, hp)
+bus_addr_t	sbus_bus_addr __P((bus_space_tag_t, u_int, u_int));
+void	sbus_promaddr_to_handle __P((bus_space_tag_t, u_int, 
+	bus_space_handle_t *));
 
 #if notyet
 /* variables per Sbus */

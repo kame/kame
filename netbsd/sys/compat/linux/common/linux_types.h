@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_types.h,v 1.9.22.1 2001/03/30 21:45:33 he Exp $	*/
+/*	$NetBSD: linux_types.h,v 1.14 2002/04/03 17:13:32 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -43,17 +43,20 @@
 #include <compat/linux/arch/i386/linux_types.h>
 #elif defined(__alpha__)
 #include <compat/linux/arch/alpha/linux_types.h>
+#elif defined(__powerpc__)
+#include <compat/linux/arch/powerpc/linux_types.h>
+#elif defined(__arm__)
+#include <compat/linux/arch/arm/linux_types.h>
 /*
  * The rest are not written yet:
  */
-#elif defined(__arm32__)
-#include <compat/linux/arch/arm32/linux_types.h>
 #elif defined(__m68k__)
 #include <compat/linux/arch/m68k/linux_types.h>
 #elif defined(__mips__)
 #include <compat/linux/arch/mips/linux_types.h>
-#elif defined(__powerpc__)
-#include <compat/linux/arch/power/linux_types.h>
+#else
+typedef unsigned long linux_clock_t;
+typedef unsigned long linux_time_t;
 #endif
 
 /*
@@ -86,10 +89,10 @@ struct linux_utimbuf {
 
 struct linux___sysctl {
 	int          *name;
-	int           namelen;
-	void         *old;
+	int           nlen;
+	void         *oldval;
 	size_t       *oldlenp;
-	void         *new;
+	void         *newval;
 	size_t        newlen;
 	unsigned long __unused[4];
 };

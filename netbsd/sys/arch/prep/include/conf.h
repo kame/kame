@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.h,v 1.1 2000/02/29 15:21:27 nonaka Exp $	*/
+/*	$NetBSD: conf.h,v 1.4 2002/04/19 02:15:59 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -38,26 +38,13 @@
 
 #include <sys/conf.h>
 
-#define	mmread	mmrw
-#define	mmwrite	mmrw
-cdev_decl(mm);
-cdev_decl(pms);
-
 bdev_decl(fd);
 cdev_decl(fd);
-
-/* open, close, read, write, ioctl, tty, mmap */
-#define cdev_pc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttpoll, dev_init(c,n,mmap), D_TTY }
 
 cdev_decl(pc);
 
 cdev_decl(mms);
 
 cdev_decl(lms);
-
-cdev_decl(pms);
 
 cdev_decl(joy);

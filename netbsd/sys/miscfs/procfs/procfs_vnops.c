@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_vnops.c,v 1.70.4.1 2001/03/30 21:50:16 he Exp $	*/
+/*	$NetBSD: procfs_vnops.c,v 1.89 2002/05/09 15:44:45 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -43,6 +43,9 @@
  * procfs vnode interface
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: procfs_vnops.c,v 1.89 2002/05/09 15:44:45 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -55,10 +58,10 @@
 #include <sys/mount.h>
 #include <sys/dirent.h>
 #include <sys/resourcevar.h>
-#include <sys/ptrace.h>
 #include <sys/stat.h>
+#include <sys/ptrace.h>
 
-#include <vm/vm.h>	/* for PAGE_SIZE */
+#include <uvm/uvm_extern.h>	/* for PAGE_SIZE */
 
 #include <machine/reg.h>
 
@@ -77,7 +80,7 @@ static int procfs_validfile_linux __P((struct proc *, struct mount *));
  * process-specific sub-directories.  It is
  * used in procfs_lookup and procfs_readdir
  */
-struct proc_target {
+const struct proc_target {
 	u_char	pt_type;
 	u_char	pt_namlen;
 	char	*pt_name;
@@ -97,8 +100,12 @@ struct proc_target {
 	{ DT_REG, N("note"),	Pnote,		NULL },
 	{ DT_REG, N("notepg"),	Pnotepg,	NULL },
 	{ DT_REG, N("map"),	Pmap,		procfs_validmap },
+	{ DT_REG, N("maps"),	Pmaps,		procfs_validmap },
 	{ DT_REG, N("cmdline"), Pcmdline,	NULL },
-	{ DT_REG, N("exe"),     Pfile,          procfs_validfile_linux },
+	{ DT_REG, N("exe"),	Pfile,		procfs_validfile_linux },
+#ifdef __HAVE_PROCFS_MACHDEP
+	PROCFS_MACHDEP_NODETYPE_DEFNS
+#endif
 #undef N
 };
 static int nproc_targets = sizeof(proc_targets) / sizeof(proc_targets[0]);
@@ -109,15 +116,13 @@ static int nproc_targets = sizeof(proc_targets) / sizeof(proc_targets[0]);
  */
 struct proc_target proc_root_targets[] = {
 #define N(s) sizeof(s)-1, s
-	/*        name              type            validp */
+	/*	  name		    type	    validp */
 	{ DT_REG, N("meminfo"),     Pmeminfo,        procfs_validfile_linux },
 	{ DT_REG, N("cpuinfo"),     Pcpuinfo,        procfs_validfile_linux },
 #undef N
 };
 static int nproc_root_targets =
     sizeof(proc_root_targets) / sizeof(proc_root_targets[0]);
-
-
 
 int	procfs_lookup	__P((void *));
 #define	procfs_create	genfs_eopnotsupp_rele
@@ -133,7 +138,6 @@ int	procfs_setattr	__P((void *));
 #define	procfs_ioctl	genfs_enoioctl
 #define	procfs_poll	genfs_poll
 #define procfs_revoke	genfs_revoke
-#define	procfs_mmap	genfs_eopnotsupp
 #define	procfs_fsync	genfs_nullop
 #define	procfs_seek	genfs_nullop
 #define	procfs_remove	genfs_eopnotsupp_rele
@@ -149,7 +153,7 @@ int	procfs_inactive	__P((void *));
 int	procfs_reclaim	__P((void *));
 #define	procfs_lock	genfs_lock
 #define	procfs_unlock	genfs_unlock
-int	procfs_bmap	__P((void *));
+#define	procfs_bmap	genfs_badop
 #define	procfs_strategy	genfs_badop
 int	procfs_print	__P((void *));
 int	procfs_pathconf	__P((void *));
@@ -161,6 +165,7 @@ int	procfs_pathconf	__P((void *));
 #define	procfs_truncate	genfs_eopnotsupp
 #define	procfs_update	genfs_nullop
 #define	procfs_bwrite	genfs_eopnotsupp
+#define procfs_putpages	genfs_null_putpages
 
 static pid_t atopid __P((const char *, u_int));
 
@@ -168,7 +173,7 @@ static pid_t atopid __P((const char *, u_int));
  * procfs vnode operations.
  */
 int (**procfs_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc procfs_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc procfs_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, procfs_lookup },		/* lookup */
 	{ &vop_create_desc, procfs_create },		/* create */
@@ -184,7 +189,6 @@ struct vnodeopv_entry_desc procfs_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, procfs_ioctl },		/* ioctl */
 	{ &vop_poll_desc, procfs_poll },		/* poll */
 	{ &vop_revoke_desc, procfs_revoke },		/* revoke */
-	{ &vop_mmap_desc, procfs_mmap },		/* mmap */
 	{ &vop_fsync_desc, procfs_fsync },		/* fsync */
 	{ &vop_seek_desc, procfs_seek },		/* seek */
 	{ &vop_remove_desc, procfs_remove },		/* remove */
@@ -211,9 +215,10 @@ struct vnodeopv_entry_desc procfs_vnodeop_entries[] = {
 	{ &vop_vfree_desc, procfs_vfree },		/* vfree */
 	{ &vop_truncate_desc, procfs_truncate },	/* truncate */
 	{ &vop_update_desc, procfs_update },		/* update */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, procfs_putpages },	/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc procfs_vnodeop_opv_desc =
+const struct vnodeopv_desc procfs_vnodeop_opv_desc =
 	{ &procfs_vnodeop_p, procfs_vnodeop_entries };
 /*
  * set things up for doing i/o on
@@ -252,7 +257,7 @@ procfs_open(v)
 		    ((pfs->pfs_flags & O_EXCL) && (ap->a_mode & FWRITE)))
 			return (EBUSY);
 
-		if ((error = procfs_checkioperm(p1, p2)) != 0)
+		if ((error = process_checkioperm(p1, p2)) != 0)
 			return (error);
 
 		if (ap->a_mode & FWRITE)
@@ -296,37 +301,6 @@ procfs_close(v)
 		break;
 	}
 
-	return (0);
-}
-
-/*
- * do block mapping for pfsnode (vp).
- * since we don't use the buffer cache
- * for procfs this function should never
- * be called.  in any case, it's not clear
- * what part of the kernel ever makes use
- * of this function.  for sanity, this is the
- * usual no-op bmap, although returning
- * (EIO) would be a reasonable alternative.
- */
-int
-procfs_bmap(v)
-	void *v;
-{
-	struct vop_bmap_args /* {
-		struct vnode *a_vp;
-		daddr_t  a_bn;
-		struct vnode **a_vpp;
-		daddr_t *a_bnp;
-		int * a_runp;
-	} */ *ap = v;
-
-	if (ap->a_vpp != NULL)
-		*ap->a_vpp = ap->a_vp;
-	if (ap->a_bnp != NULL)
-		*ap->a_bnp = ap->a_bn;
-	if (ap->a_runp != NULL)
-		*ap->a_runp = 0;
 	return (0);
 }
 
@@ -541,6 +515,9 @@ procfs_getattr(v)
 	case Pmem:
 	case Pregs:
 	case Pfpregs:
+#if defined(__HAVE_PROCFS_MACHDEP) && defined(PROCFS_MACHDEP_PROTECT_CASES)
+	PROCFS_MACHDEP_PROTECT_CASES
+#endif
 		/*
 		 * If the process has exercised some setuid or setgid
 		 * privilege, then rip away read/write permission so
@@ -554,6 +531,7 @@ procfs_getattr(v)
 	case Pnote:
 	case Pnotepg:
 	case Pmap:
+	case Pmaps:
 	case Pcmdline:
 		vap->va_nlink = 1;
 		vap->va_uid = procp->p_ucred->cr_uid;
@@ -641,12 +619,26 @@ procfs_getattr(v)
 	case Pstatus:
 	case Pnote:
 	case Pnotepg:
-	case Pmap:
 	case Pcmdline:
 	case Pmeminfo:
 	case Pcpuinfo:
 		vap->va_bytes = vap->va_size = 0;
 		break;
+	case Pmap:
+	case Pmaps:
+		/*
+		 * Advise a larger blocksize for the map files, so that
+		 * they may be read in one pass.
+		 */
+		vap->va_blocksize = 4 * PAGE_SIZE;
+		vap->va_bytes = vap->va_size = 0;
+		break;
+
+#ifdef __HAVE_PROCFS_MACHDEP
+	PROCFS_MACHDEP_NODETYPE_CASES
+		error = procfs_machdep_getattr(ap->a_vp, vap, procp);
+		break;
+#endif
 
 	default:
 		panic("procfs_getattr");
@@ -734,7 +726,7 @@ procfs_lookup(v)
 	struct vnode **vpp = ap->a_vpp;
 	struct vnode *dvp = ap->a_dvp;
 	const char *pname = cnp->cn_nameptr;
-	struct proc_target *pt = NULL;
+	const struct proc_target *pt = NULL;
 	struct vnode *fvp;
 	pid_t pid;
 	struct pfsnode *pfs;
@@ -921,7 +913,7 @@ procfs_readdir(v)
 	off_t *cookies = NULL;
 	int ncookies, left, skip, j;
 	struct vnode *vp;
-	struct proc_target *pt;
+	const struct proc_target *pt;
 
 	vp = ap->a_vp;
 	pfs = VTOPFS(vp);
@@ -955,7 +947,7 @@ procfs_readdir(v)
 
 		if (ap->a_ncookies) {
 			ncookies = min(ncookies, (nproc_targets - i));
-			MALLOC(cookies, off_t *, ncookies * sizeof (off_t),
+			cookies = malloc(ncookies * sizeof (off_t),
 			    M_TEMP, M_WAITOK);
 			*ap->a_cookies = cookies;
 		}
@@ -1002,7 +994,7 @@ procfs_readdir(v)
 			 * XXX Potentially allocating too much space here,
 			 * but I'm lazy. This loop needs some work.
 			 */
-			MALLOC(cookies, off_t *, ncookies * sizeof (off_t),
+			cookies = malloc(ncookies * sizeof (off_t),
 			    M_TEMP, M_WAITOK);
 			*ap->a_cookies = cookies;
 		}
@@ -1051,7 +1043,7 @@ procfs_readdir(v)
 				d.d_fileno = PROCFS_FILENO(p->p_pid, Pproc);
 				d.d_namlen = sprintf(d.d_name, "%ld",
 				    (long)p->p_pid);
-				d.d_type = DT_REG;
+				d.d_type = DT_DIR;
 				p = p->p_list.le_next;
 				break;
 			}
@@ -1105,7 +1097,7 @@ procfs_readdir(v)
 	if (ap->a_ncookies) {
 		if (error) {
 			if (cookies)
-				FREE(*ap->a_cookies, M_TEMP);
+				free(*ap->a_cookies, M_TEMP);
 			*ap->a_ncookies = 0;
 			*ap->a_cookies = NULL;
 		} else

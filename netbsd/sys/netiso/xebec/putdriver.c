@@ -1,4 +1,4 @@
-/*	$NetBSD: putdriver.c,v 1.4 1994/06/29 06:41:15 cgd Exp $	*/
+/*	$NetBSD: putdriver.c,v 1.6 2001/11/13 01:10:52 lukem Exp $	*/
 
 /*
  * This code is such a kludge that I don't want to put my name on it.
@@ -13,6 +13,9 @@
  * writing his own driver and xebec should JUST produce
  * the tables.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: putdriver.c,v 1.6 2001/11/13 01:10:52 lukem Exp $");
 
 #include <stdio.h>
 #include "main.h"
@@ -229,9 +232,10 @@ static struct { int start; int finish; } parts[] = {
 	PART15,
 };
 
+void
 putdriver(f, x) 
-FILE *f;
-int x;
+	FILE *f;
+	int x;
 {
 	register int i; 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: pccreg.h,v 1.6 2000/03/18 22:33:03 scw Exp $	*/
+/*	$NetBSD: pccreg.h,v 1.9 2001/08/12 18:33:13 scw Exp $	*/
 
 /*
  *
@@ -41,15 +41,12 @@
  * Offsets to the MVME147's onboard device registers.
  * (Relative to the bus_space_tag_t passed in from 'mainbus')
  */
-#define PCC_NVRAM_OFF	0x0000		/* offset of Mostek NVRAM/RTC chip */
-#define PCC_RTC_OFF	0x07f8		/* offset of clock registers NVRAM */
-#define PCC_REG_OFF	0x1000		/* offset of PCC chip registers */
-#define PCC_LE_OFF	0x1800		/* offset of LANCE ethernet chip */
-#define PCC_VME_OFF	0x2000		/* offset of VME chip */
-#define PCC_LPT_OFF	0x2800		/* offset of parallel port register */
-#define PCC_ZS0_OFF	0x3000		/* offset of first 8530 UART */
-#define PCC_ZS1_OFF	0x3800		/* offset of second 8530 UART */
-#define PCC_WDSC_OFF	0x4000		/* offset of 33c93 SCSI chip */
+#define PCC_LE_OFF	0x0800		/* offset of LANCE ethernet chip */
+#define PCC_VME_OFF	0x1000		/* offset of VME chip */
+#define PCC_LPT_OFF	0x1800		/* offset of parallel port register */
+#define PCC_ZS0_OFF	0x2000		/* offset of first 8530 UART */
+#define PCC_ZS1_OFF	0x2800		/* offset of second 8530 UART */
+#define PCC_WDSC_OFF	0x3000		/* offset of 33c93 SCSI chip */
 
 /*
  * This is needed to figure out the boot device.
@@ -156,14 +153,17 @@
  * clock/timer
  */
 
-#define PCC_TIMERACK 0x80	/* ack intr */
-#define PCC_TIMER100HZ 63936	/* load value for 100Hz */
-#define PCC_TIMERCLEAR 0x0	/* reset and clear timer */
-#define PCC_TIMERSTOP  0x1	/* stop clock, but don't clear it */
-#define PCC_TIMERSTART 0x3      /* start timer */
+#define PCC_TIMERACK		0x80	/* ack intr */
+#define PCC_TIMER100HZ		63936	/* load value for 100Hz */
+#define PCC_TIMERCLEAR		0x0	/* reset and clear timer */
+#define PCC_TIMERENABLE		0x1	/* Enable clock */
+#define PCC_TIMERSTOP		0x3	/* stop clock, but don't clear it */
+#define PCC_TIMERSTART		0x7	/* start timer */
+#define PCC_TIMEROVFLSHIFT	4
 
 #define pcc_timer_hz2lim(hz)	(65536 - (160000/(hz)))
 #define pcc_timer_us2lim(us)	(65536 - (160000/(1000000/(us))))
+#define pcc_timer_cnt2us(cnt)	((((cnt) - PCC_TIMER100HZ) * 25) / 4)
 
 /*
  * serial control
@@ -184,5 +184,10 @@
  */
 
 #define PCC_GENCR_IEN	0x10	/* global interrupt enable */
+
+/*
+ * slave base address register
+ */
+#define PCC_SLAVE_BASE_MASK	(0x01fu)
 
 #endif /* __MVME68K_PCCREG_H */

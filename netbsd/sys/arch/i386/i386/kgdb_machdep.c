@@ -1,4 +1,4 @@
-/*	$NetBSD: kgdb_machdep.c,v 1.6.24.1 2001/06/17 22:27:00 he Exp $	*/
+/*	$NetBSD: kgdb_machdep.c,v 1.12 2001/11/15 07:03:29 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -67,7 +67,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kgdb_machdep.c,v 1.12 2001/11/15 07:03:29 lukem Exp $");
+
 #include "opt_ddb.h"
+#include "opt_largepages.h"
 
 #if defined(DDB)
 #error "Can't build DDB and KGDB together."
@@ -83,7 +87,7 @@
 #include <sys/kgdb.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <machine/reg.h>
@@ -105,10 +109,18 @@ kgdb_acc(va, len)
 	last_va &= ~PGOFSET;
 
 	do {
-		pte = kvtopte(va);
+		if (va < VM_MIN_KERNEL_ADDRESS)
+			pte = vtopte(va);
+		else
+			pte = kvtopte(va);
 		if ((*pte & PG_V) == 0)
 			return (0);
-		va  += NBPG;
+#ifdef LARGEPAGES
+		if (*pte & PG_PS)
+			va = (va & PG_LGFRAME) + NBPD;
+		else
+#endif
+			va += PAGE_SIZE;
 	} while (va < last_va);
 
 	return (1);

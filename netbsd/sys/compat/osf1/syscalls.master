@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.30.12.1 2002/03/20 23:37:18 he Exp $
+	$NetBSD: syscalls.master,v 1.39 2001/06/28 04:08:58 simonb Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -31,7 +31,9 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 ; #include's are copied to the syscall names and switch definition files only.
 
+#if defined(_KERNEL_OPT)
 #include "opt_compat_43.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,6 +44,8 @@
 
 #include <compat/osf1/osf1.h>
 #include <compat/osf1/osf1_syscallargs.h>
+
+%%
 
 0	NOARGS		{ int sys_nosys(void); } syscall
 1	NOARGS		{ int sys_exit(int rval); }
@@ -69,12 +73,12 @@
 			    long bufsize, int flags); }
 19	STD		{ off_t osf1_sys_lseek(int fd, off_t offset, \
 			    int whence); }
-20	NOARGS		{ pid_t sys_getpid(void); }
+20	NOARGS		{ pid_t sys_getpid_with_ppid(void); }
 21	STD		{ int osf1_sys_mount(int type, const char *path, \
 			    int flags, caddr_t data); }
 22	STD		{ int osf1_sys_unmount(const char *path, int flags); }
 23	STD		{ int osf1_sys_setuid(uid_t uid); }
-24	NOARGS		{ uid_t sys_getuid(void); }
+24	NOARGS		{ uid_t sys_getuid_with_euid(void); }
 25	UNIMPL		exec_with_loader
 26	UNIMPL		ptrace
 27	STD		{ int osf1_sys_recvmsg_xopen(int s, \
@@ -102,7 +106,7 @@
 45	STD		{ int osf1_sys_open(const char *path, int flags, \
 			    int mode); }
 46	OBSOL		sigaction
-47	NOARGS		{ gid_t sys_getgid(void); }
+47	NOARGS		{ gid_t sys_getgid_with_egid(void); }
 ; XXX
 48	NOARGS		{ int compat_13_sys_sigprocmask(int how, \
 			    sigset13_t mask); }
@@ -155,7 +159,7 @@
 			    struct osf1_itimerval *oitv); }
 84	UNIMPL		old wait
 85	UNIMPL		table
-86	UNIMPL		getitimer
+86	STD		{ int osf1_sys_getitimer(u_int which, struct osf1_itimerval *itv); }
 87	NOARGS		{ int compat_43_sys_gethostname(char *hostname, \
 			    u_int len); }
 88	NOARGS		{ int compat_43_sys_sethostname(const char *hostname, \
@@ -336,12 +340,15 @@
 221	UNIMPL
 222	UNIMPL		security
 223	UNIMPL		kloadcall
-224	UNIMPL
-225	UNIMPL
-226	UNIMPL
-227	UNIMPL
-228	UNIMPL
-229	UNIMPL
+224	STD		{ int osf1_sys_stat2(const char *path, \
+			    struct osf1_stat2 *ub); }
+225	STD		{ int osf1_sys_lstat2(const char *path, \
+			    struct osf1_stat2 *ub); }
+226	STD		{ int osf1_sys_fstat2(int fd, \
+			    struct osf1_stat2 *sb); }
+227	UNIMPL		statfs2
+228	UNIMPL		fstatfs2
+229	UNIMPL		getfsstat2
 230	UNIMPL
 231	UNIMPL
 232	UNIMPL
@@ -372,10 +379,16 @@
 253	UNIMPL		audgen
 254	UNIMPL		sysfs
 255	UNIMPL		subsys_info
-256	UNIMPL		getsysinfo
+256	STD		{ int osf1_sys_getsysinfo(u_long op, caddr_t buffer, \
+			    u_long nbytes, caddr_t arg, u_long flag); }
 257	STD		{ int osf1_sys_setsysinfo(u_long op, caddr_t buffer, \
 			    u_long nbytes, caddr_t arg, u_long flag); }
 258	UNIMPL		afs_syscall
 259	UNIMPL		swapctl
 260	UNIMPL		memcntl
 261	UNIMPL		fdatasync
+262	UNIMPL		oflock
+263	UNIMPL		_F64_readv
+264	UNIMPL		_F64_writev
+265	UNIMPL		cdslxlate
+266	UNIMPL		sendfile

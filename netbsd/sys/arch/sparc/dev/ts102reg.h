@@ -1,4 +1,4 @@
-/*	$NetBSD: ts102reg.h,v 1.5.4.1 2000/07/26 07:28:34 toddpw Exp $ */
+/*	$NetBSD: ts102reg.h,v 1.6 2000/07/25 09:57:59 toddpw Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

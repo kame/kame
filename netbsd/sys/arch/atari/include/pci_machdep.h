@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.h,v 1.6 2000/06/04 19:14:33 cgd Exp $	*/
+/*	$NetBSD: pci_machdep.h,v 1.10 2002/05/15 19:23:53 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.  All rights reserved.
@@ -35,6 +35,17 @@
 #define _ATARI_PCI_MACHDEP_H_
 
 #include <atari/atari/intr.h>
+
+/*
+ * Machine-specific definitions for PCI autoconfiguration.
+ */
+#define	__HAVE_PCIIDE_MACHDEP_COMPAT_INTR_ESTABLISH
+
+/*
+ * Forward declarations.
+ */
+struct pci_attach_args;
+
 /*
  * Types provided to machine-independent PCI code
  */
@@ -58,14 +69,18 @@ void		pci_attach_hook(struct device *, struct device *,
 			struct pcibus_attach_args *);
 int		pci_bus_maxdevs(pci_chipset_tag_t, int);
 pcitag_t	pci_make_tag(pci_chipset_tag_t, int, int, int);
+void		pci_decompose_tag(pci_chipset_tag_t, pcitag_t, int *, int *,
+		    int *);
 pcireg_t	pci_conf_read(pci_chipset_tag_t, pcitag_t, int);
 void		pci_conf_write(pci_chipset_tag_t, pcitag_t, int, pcireg_t);
-int		pci_intr_map(pci_chipset_tag_t, pcitag_t, int, int,
-			pci_intr_handle_t *);
+int		pci_intr_map(struct pci_attach_args *, pci_intr_handle_t *);
 const char	*pci_intr_string(pci_chipset_tag_t, pci_intr_handle_t);
 const struct evcnt *pci_intr_evcnt(pci_chipset_tag_t, pci_intr_handle_t);
 void		*pci_intr_establish(pci_chipset_tag_t, pci_intr_handle_t,
 			int, int (*)(void *), void *);
 void		pci_intr_disestablish(pci_chipset_tag_t, void *);
+
+#define	pci_enumerate_bus(sc, m, p)					\
+	pci_enumerate_bus_generic((sc), (m), (p))
 
 #endif /* _ATARI_PCI_MACHDEP_H_ */

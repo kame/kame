@@ -1,4 +1,4 @@
-/*	$NetBSD: pucdata.c,v 1.9.4.2 2001/03/22 01:53:32 he Exp $	*/
+/*	$NetBSD: pucdata.c,v 1.27.4.3 2002/08/02 12:57:50 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998, 1999 Christopher G. Demetriou.  All rights reserved.
@@ -35,6 +35,9 @@
  * match/attach the cards).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pucdata.c,v 1.27.4.3 2002/08/02 12:57:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -45,6 +48,104 @@
 #include <dev/ic/comreg.h>
 
 const struct puc_device_description puc_devices[] = {
+	/*
+	 * SUNIX 40XX series of serial/parallel combo cards.
+	 * Tested with 4055A and 4065A.
+	 */
+	{   "SUNIX 400X 1P",
+	    {	0x1409,	0x7168,	0x1409,	0x4000 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+	    },
+	},
+
+	{   "SUNIX 401X 2P",
+	    {	0x1409,	0x7168,	0x1409,	0x4010 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	{   "SUNIX 402X 1S",
+	    {	0x1409,	0x7168,	0x1409,	0x4020 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+	    },
+	},
+
+	{   "SUNIX 403X 2S",
+	    {	0x1409,	0x7168,	0x1409,	0x4030 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+	    },
+	},
+
+	{   "SUNIX 405X 4S",
+	    {	0x1409,	0x7168,	0x1409,	0x4050 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x08, COM_FREQ},
+	    },
+	},
+
+	{   "SUNIX 406X 8S",
+	    {	0x1409,	0x7168,	0x1409,	0x4060 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x08, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x20, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x24, 0x00, COM_FREQ},
+	    },
+	},
+
+	{   "SUNIX 407X 2S/1P",
+	    {	0x1409,	0x7168,	0x1409,	0x4070 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	{   "SUNIX 408X 2S/2P",
+	    {	0x1409,	0x7168,	0x1409,	0x4080 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+		{ PUC_PORT_TYPE_LPT, 0x20, 0x00, 0x00 },
+	    },
+	},
+
+	{   "SUNIX 409X 4S/2P",
+	    {	0x1409,	0x7168,	0x1409,	0x4090 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x08, COM_FREQ},
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+		{ PUC_PORT_TYPE_LPT, 0x20, 0x00, 0x00 },
+	    },
+	},
+
 	/*
 	 * XXX no entry because I have no data:
 	 * XXX Dolphin Peripherals 4006 (single parallel)
@@ -66,8 +167,8 @@ const struct puc_device_description puc_devices[] = {
 	},
 
 	/*
-	 * XXX no entry because I have no data:
 	 * XXX Dolphin Peripherals 4025 (single serial)
+	 * (clashes with Dolphin Peripherals  4036 (2s variant)
 	 */
 
 	/*
@@ -82,6 +183,19 @@ const struct puc_device_description puc_devices[] = {
 	    {
 		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
+	    },
+	},
+
+	/*
+	 * Dolphin Peripherals 4036 (dual serial port) card.
+	 * (Dolpin 4025 has the same ID but only one port)
+	 */
+	{   "Dolphin Peripherals 4036",
+	    {	0x1409,	0x7168,	0x0,	0x0	},
+	    {	0xffff,	0xffff,	0x0,	0x0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
 	    },
 	},
 
@@ -492,55 +606,96 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* SIIG Cyber PS8000 PCI 16C650 (20x family): 8S - 32 Byte FIFOs */
+	{   "SIIG PS8000 8S PCI 16C650 (20x family)",
+	    {	0x131f,	0x2081,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x18, COM_FREQ },
+	    },
+	},
 
-	/*
-	 * VScom PCI-800, as sold on http://www.swann.com.au/isp/titan.html.
-	 * Some PLX chip.  Note: This board has a software selectable(?)
-	 * clock multiplier which this driver doesn't support, so you'll
-	 * have to use an appropriately scaled baud rate when talking to
-	 * the card.
-	 */
+	/* VScom PCI-400: 4S */
+	{   "VScom PCI-400",
+	    {	0x10b5,	0x1077,	0x10b5,	0x1077	},
+	    {	0xffff,	0xffff,	0xffff,	0xffff	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+	    },
+	},
+
+	/* VScom PCI-800: 8S */
 	{   "VScom PCI-800",
 	    {	0x10b5,	0x1076,	0x10b5,	0x1076	},
 	    {	0xffff,	0xffff,	0xffff,	0xffff	},
 	    {
-		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x20, COM_FREQ },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x28, COM_FREQ },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x30, COM_FREQ },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x38, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x20, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x28, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x30, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x38, COM_FREQ * 8 },
 	    },
 	},
 	/*
 	 * VScom PCI-800H. Uses 8 16950 UART, behind a PCI chips that offers
 	 * 4 com port on PCI device 0 and 4 on PCI device 1. PCI device 0 has
-	 * device ID 3 and PCI device 1 device ID 4. Uses a 14.7456 Mhz crystal
-	 * instead of the standart 1.8432Mhz.
+	 * device ID 3 and PCI device 1 device ID 4.
 	 */
 	{   "Titan PCI-800H",
 	    {	0x14d2,	0xa003,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
 	    {
-		{ PUC_PORT_TYPE_COM, 0x10, 0x00, 14745600 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x08, 14745600 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x10, 14745600 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x18, 14745600 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 8 },
 	    },
 	},
 	{   "Titan PCI-800H",
 	    {	0x14d2,	0xa004,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
 	    {
-		{ PUC_PORT_TYPE_COM, 0x10, 0x00, 14745600 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x08, 14745600 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x10, 14745600 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x18, 14745600 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 8 },
 	    },
 	},
-
+        {   "Titan PCI-200H",
+            {   0x14d2, 0xa005, 0,      0       },
+            {   0xffff, 0xffff, 0,      0       },
+            {
+                { PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
+                { PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8 },
+            },
+        },
+	{   "Titan PCI-800L",
+	    {	0x14d2,	0x8080,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x18, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x20, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x28, COM_FREQ * 8 },
+	    },
+	},
 	/* NEC PK-UG-X001 K56flex PCI Modem card.
 	   NEC MARTH bridge chip and Rockwell RCVDL56ACF/SP using. */
 	{   "NEC PK-UG-X001 K56flex PCI Modem",
@@ -551,7 +706,7 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
-	/*NEC PK-UG-X008 */
+	/* NEC PK-UG-X008 */
 	{   "NEC PK-UG-X008",
 	    {	0x1033,	0x007d,	0x1033,	0x8012	},
 	    {	0xffff,	0xffff,	0xffff,	0xffff	},
@@ -576,6 +731,15 @@ const struct puc_device_description puc_devices[] = {
 	    {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+	    },
+	},
+
+	/* Lava Computers DSerial PCI serial ports */
+	{   "Lava Computers serial port",
+	    {	0x1407,	0x0110,	0,	0	},
+	    {	0xffff,	0xfffc,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 	    },
 	},
 
@@ -619,8 +783,27 @@ const struct puc_device_description puc_devices[] = {
 	 * I/O Flex PCI I/O Card Model-223 with 4 serial and 1 parallel ports.
 	 */
 
+	/* Oxford Semiconductor OX16PCI952 PCI `950 UARTs - 128 byte FIFOs */
+	{   "Oxford Semiconductor OX16PCI952 UARTs",
+	    {   0x1415, 0x9521, 0,	0	},
+	    {   0xffff, 0xffff, 0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+	    },
+	},
+
+	/* Oxford Semiconductor OX16PCI952 PCI Parallel port */
+	{   "Oxford Semiconductor OX16PCI952 Parallel port",
+	    {   0x1415, 0x9523, 0,	0	},
+	    {   0xffff, 0xffff, 0,	0	},
+	    {
+		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+	    },
+	},
+
 	/* Oxford Semiconductor OX16PCI954 PCI UARTs */
-	{   "Qxford Semiconductor OX16PCI954 UARTs",
+	{   "Oxford Semiconductor OX16PCI954 UARTs",
 	    {	0x1415,	0x9501,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
 	    {
@@ -632,8 +815,17 @@ const struct puc_device_description puc_devices[] = {
 	},
 
 	/* Oxford Semiconductor OX16PCI954 PCI Parallel port */
-	{   "Qxford Semiconductor OX16PCI954 Parallel port",
+	{   "Oxford Semiconductor OX16PCI954 Parallel port",
 	    {	0x1415,	0x9513,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+	    },
+	},
+
+	/* NetMos 1P PCI : 1P */
+	{   "NetMos NM9805 1284 Printer port",
+	    {	0x9710,	0x9805,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
 	    {
 		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
@@ -648,6 +840,31 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	/* NetMos 4S1P PCI NM9845 : 4S, 1P */
+	{   "NetMos NM9845 Quad UART and 1284 Printer port",
+	    {	0x9710,	0x9845,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_LPT, 0x20, 0x00, 0x00 },
+	    },
+	},
+
+	/*
+	 * This is the Middle Digital, Inc. PCI-Weasel, which
+	 * uses a PCI interface implemented in FPGA.
+	 */
+	{   "Middle Digital, Inc. Weasel serial port",
+	    {	0xdeaf,	0x9051,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 	    },
 	},
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.45.2.1 2000/09/28 15:38:18 is Exp $	*/
+/*	$NetBSD: pmap.h,v 1.62 2001/12/23 23:08:41 thorpej Exp $	*/
 
 /*
  *
@@ -39,8 +39,9 @@
 #ifndef	_I386_PMAP_H_
 #define	_I386_PMAP_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_user_ldt.h"
+#include "opt_largepages.h"
 #endif
 
 #include <machine/cpufunc.h>
@@ -65,7 +66,7 @@
  *					the final two pages in the last 4MB
  *					used to be reserved for the UAREA
  *					but now are no longer used
- * 768		0xbfc00000->		recursive mapping of PDP (used for
+ * 767		0xbfc00000->		recursive mapping of PDP (used for
  *			0xc0000000	linear mapping of PTPs)
  * 768->1023	0xc0000000->		kernel address space (constant
  *			0xffc00000	across all pmap's/processes)
@@ -133,9 +134,9 @@
  * note that mapping of the PDP at PTP#959's VA (0xeffbf000) is
  * defined as "PDP_BASE".... within that mapping there are two
  * defines:
- *   "PDP_PDE" (0xeffbfefc) is the VA of the PDE in the PDP
+ *   "PDP_PDE" (0xbfeffbfc) is the VA of the PDE in the PDP
  *      which points back to itself.
- *   "APDP_PDE" (0xeffbfffc) is the VA of the PDE in the PDP which
+ *   "APDP_PDE" (0xbfeffffc) is the VA of the PDE in the PDP which
  *      establishes the recursive mapping of the alternate pmap.
  *      to set the alternate PDP, one just has to put the correct
  *	PA info in *APDP_PDE.
@@ -168,13 +169,6 @@
 #define APDP_PDE	(PDP_BASE + PDSLOT_APTE)
 
 /*
- * XXXCDC: tmp xlate from old names:
- * PTDPTDI -> PDSLOT_PTE
- * KPTDI -> PDSLOT_KERN
- * APTDPTDI -> PDSLOT_APTE
- */
-
-/*
  * the follow define determines how many PTPs should be set up for the
  * kernel by locore.s at boot time.  this should be large enough to
  * get the VM system running.  once the VM system is running, the
@@ -187,27 +181,6 @@
 #define NKPTP_MIN	4	/* smallest value we allow */
 #define NKPTP_MAX	(1024 - (KERNBASE/NBPD) - 1)
 				/* largest value (-1 for APTP space) */
-
-/*
- * various address macros
- *
- *  vtopte: return a pointer to the PTE mapping a VA
- *  kvtopte: same as above (takes a KVA, but doesn't matter with this pmap)
- *  ptetov: given a pointer to a PTE, return the VA that it maps
- *  vtophys: translate a VA to the PA mapped to it
- *
- * plus alternative versions of the above
- */
-
-#define vtopte(VA)	(PTE_BASE + i386_btop(VA))
-#define kvtopte(VA)	vtopte(VA)
-#define ptetov(PT)	(i386_ptob(PT - PTE_BASE))
-#define	vtophys(VA)	((*vtopte(VA) & PG_FRAME) | \
-			 ((unsigned)(VA) & ~PG_FRAME))
-#define	avtopte(VA)	(APTE_BASE + i386_btop(VA))
-#define	ptetoav(PT)	(i386_ptob(PT - APTE_BASE))
-#define	avtophys(VA)	((*avtopte(VA) & PG_FRAME) | \
-			 ((unsigned)(VA) & ~PG_FRAME))
 
 /*
  * pdei/ptei: generate index into PDP/PTP from a VA
@@ -289,7 +262,7 @@ struct pmap {
 struct pv_entry;
 
 struct pv_head {
-	simple_lock_data_t pvh_lock;	/* locks every pv on this list */
+	struct simplelock pvh_lock;	/* locks every pv on this list */
 	struct pv_entry *pvh_list;	/* head of list (locked by pvh_lock) */
 };
 
@@ -342,20 +315,6 @@ struct pmap_remove_record {
 	vaddr_t prr_vas[PMAP_RR_MAX];
 };
 
-#if 0
-/*
- * pmap_transfer_location: used to pass the current location in the
- * pmap between pmap_transfer and pmap_transfer_ptes [e.g. during
- * a pmap_copy].
- */
-
-struct pmap_transfer_location {
-	vaddr_t addr;			/* the address (page-aligned) */
-	pt_entry_t *pte;		/* the PTE that maps address */
-	struct vm_page *ptp;		/* the PTP that the PTE lives in */
-};
-#endif
-
 /*
  * global kernel variables
  */
@@ -374,7 +333,7 @@ extern int pmap_pg_g;			/* do we support PG_G? */
 #define	pmap_kernel()			(&kernel_pmap_store)
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
-#define	pmap_update()			tlbflush()
+#define	pmap_update(pmap)		/* nothing (yet) */
 
 #define pmap_clear_modify(pg)		pmap_change_attrs(pg, 0, PG_M)
 #define pmap_clear_reference(pg)	pmap_change_attrs(pg, 0, PG_U)
@@ -394,16 +353,9 @@ void		pmap_activate __P((struct proc *));
 void		pmap_bootstrap __P((vaddr_t));
 boolean_t	pmap_change_attrs __P((struct vm_page *, int, int));
 void		pmap_deactivate __P((struct proc *));
-static void	pmap_page_protect __P((struct vm_page *, vm_prot_t));
 void		pmap_page_remove  __P((struct vm_page *));
-static void	pmap_protect __P((struct pmap *, vaddr_t,
-				vaddr_t, vm_prot_t));
 void		pmap_remove __P((struct pmap *, vaddr_t, vaddr_t));
 boolean_t	pmap_test_attrs __P((struct vm_page *, int));
-void		pmap_transfer __P((struct pmap *, struct pmap *, vaddr_t,
-				   vsize_t, vaddr_t, boolean_t));
-static void	pmap_update_pg __P((vaddr_t));
-static void	pmap_update_2pg __P((vaddr_t,vaddr_t));
 void		pmap_write_protect __P((struct pmap *, vaddr_t,
 				vaddr_t, vm_prot_t));
 
@@ -414,8 +366,8 @@ vaddr_t reserve_dumppages __P((vaddr_t)); /* XXX: not a pmap fn */
 /*
  * Do idle page zero'ing uncached to avoid polluting the cache.
  */
-void		pmap_zero_page_uncached __P((paddr_t));
-#define	PMAP_PAGEIDLEZERO(pa)	pmap_zero_page_uncached((pa))
+boolean_t			pmap_pageidlezero __P((paddr_t));
+#define	PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
 
 /*
  * inline functions
@@ -426,13 +378,12 @@ void		pmap_zero_page_uncached __P((paddr_t));
  *	if hardware doesn't support one-page flushing)
  */
 
-__inline static void
-pmap_update_pg(va)
-	vaddr_t va;
+__inline static void __attribute__((__unused__))
+pmap_update_pg(vaddr_t va)
 {
 #if defined(I386_CPU)
 	if (cpu_class == CPUCLASS_386)
-		pmap_update();
+		tlbflush();
 	else
 #endif
 		invlpg((u_int) va);
@@ -442,13 +393,12 @@ pmap_update_pg(va)
  * pmap_update_2pg: flush two pages from the TLB
  */
 
-__inline static void
-pmap_update_2pg(va, vb)
-	vaddr_t va, vb;
+__inline static void __attribute__((__unused__))
+pmap_update_2pg(vaddr_t va, vaddr_t vb)
 {
 #if defined(I386_CPU)
 	if (cpu_class == CPUCLASS_386)
-		pmap_update();
+		tlbflush();
 	else
 #endif
 	{
@@ -466,10 +416,8 @@ pmap_update_2pg(va, vb)
  *	unprotecting a page is done on-demand at fault time.
  */
 
-__inline static void
-pmap_page_protect(pg, prot)
-	struct vm_page *pg;
-	vm_prot_t prot;
+__inline static void __attribute__((__unused__))
+pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 {
 	if ((prot & VM_PROT_WRITE) == 0) {
 		if (prot & (VM_PROT_READ|VM_PROT_EXECUTE)) {
@@ -488,11 +436,8 @@ pmap_page_protect(pg, prot)
  *	unprotecting a page is done on-demand at fault time.
  */
 
-__inline static void
-pmap_protect(pmap, sva, eva, prot)
-	struct pmap *pmap;
-	vaddr_t sva, eva;
-	vm_prot_t prot;
+__inline static void __attribute__((__unused__))
+pmap_protect(struct pmap *pmap, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 {
 	if ((prot & VM_PROT_WRITE) == 0) {
 		if (prot & (VM_PROT_READ|VM_PROT_EXECUTE)) {
@@ -503,6 +448,46 @@ pmap_protect(pmap, sva, eva, prot)
 	}
 }
 
+/*
+ * various address inlines
+ *
+ *  vtopte: return a pointer to the PTE mapping a VA, works only for
+ *  user and PT addresses
+ *
+ *  kvtopte: return a pointer to the PTE mapping a kernel VA
+ */
+
+#include <lib/libkern/libkern.h>
+
+static __inline pt_entry_t * __attribute__((__unused__))
+vtopte(vaddr_t va)
+{
+
+	KASSERT(va < (PDSLOT_KERN << PDSHIFT));
+
+	return (PTE_BASE + i386_btop(va));
+}
+
+static __inline pt_entry_t * __attribute__((__unused__))
+kvtopte(vaddr_t va)
+{
+
+	KASSERT(va >= (PDSLOT_KERN << PDSHIFT));
+
+#ifdef LARGEPAGES
+	{
+		pd_entry_t *pde;
+
+		pde = PDP_BASE + pdei(va);
+		if (*pde & PG_PS)
+			return ((pt_entry_t *)pde);
+	}
+#endif
+
+	return (PTE_BASE + i386_btop(va));
+}
+
+paddr_t vtophys __P((vaddr_t));
 vaddr_t	pmap_map __P((vaddr_t, paddr_t, paddr_t, vm_prot_t));
 
 #if defined(USER_LDT)

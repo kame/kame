@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fea.c,v 1.20 2000/03/30 12:45:28 augustss Exp $	*/
+/*	$NetBSD: if_fea.c,v 1.25 2002/01/14 13:39:14 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1996 Matt Thomas <matt@3am-software.com>
@@ -10,7 +10,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -31,6 +31,9 @@
  *
  *	This module support the DEFEA EISA FDDI Controller.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_fea.c,v 1.25 2002/01/14 13:39:14 tsutsui Exp $");
 
 #include "opt_inet.h"
 
@@ -70,10 +73,6 @@
 #else
 #include <net/if_fddi.h>
 #endif
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
 
 #if defined(__FreeBSD__)
 #include <netinet/if_ether.h>
@@ -251,14 +250,13 @@ pdq_eisa_attach(
     resvaddr_t *mspace;
     int irq = ffs(ed->ioconf.irq) - 1;
 
-    sc = (pdq_softc_t *) malloc(sizeof(*sc), M_DEVBUF, M_WAITOK);
+    sc = (pdq_softc_t *) malloc(sizeof(*sc), M_DEVBUF, M_WAITOK|M_ZERO);
     if (sc == NULL) {
 	printf("fea%d: malloc failed!\n", sc->sc_if.if_unit);
 	return -1;
     }
     pdqs_eisa[ed->unit] = sc;
 
-    bzero(sc, sizeof(pdq_softc_t));	/* Zero out the softc*/
     sc->sc_if.if_name = "fea";
     sc->sc_if.if_unit = ed->unit;
 

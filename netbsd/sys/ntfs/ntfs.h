@@ -1,4 +1,4 @@
-/*	$NetBSD: ntfs.h,v 1.9 1999/10/31 19:45:26 jdolecek Exp $	*/
+/*	$NetBSD: ntfs.h,v 1.14 2001/05/30 11:42:13 mrg Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 Semen Ustimenko
@@ -29,7 +29,7 @@
  */
 
 /*#define NTFS_DEBUG 1*/
-#if defined(__NetBSD__) && defined(_KERNEL) && !defined(_LKM)
+#if defined(__NetBSD__) && defined(_KERNEL_OPT)
 #include "opt_ntfs.h"
 #endif
 
@@ -240,6 +240,12 @@ struct bootfile {
 	u_int32_t       bf_volsn;	/* volume ser. num. */
 };
 
+#pragma pack()
+
+typedef wchar (ntfs_wget_func_t) __P((const char **));
+typedef int (ntfs_wput_func_t) __P((char *, size_t, wchar));
+typedef int (ntfs_wcmp_func_t) __P((wchar, wchar));
+
 #define	NTFS_SYSNODESNUM	0x0B
 struct ntfsmount {
 	struct mount   *ntm_mountp;	/* filesystem vfs structure */
@@ -256,6 +262,9 @@ struct ntfsmount {
 	struct ntvattrdef *ntm_ad;
 	int		ntm_adnum;
 	struct netexport ntm_export;	/* export information */
+	ntfs_wget_func_t *ntm_wget;	/* decode string to Unicode string */
+	ntfs_wput_func_t *ntm_wput;	/* encode Unicode string to string */
+	ntfs_wcmp_func_t *ntm_wcmp;	/* compare to wide characters */
 };
 
 #define ntm_mftcn	ntm_bootfile.bf_mftcn
@@ -263,8 +272,6 @@ struct ntfsmount {
 #define	ntm_mftrecsz	ntm_bootfile.bf_mftrecsz
 #define	ntm_spc		ntm_bootfile.bf_spc
 #define	ntm_bps		ntm_bootfile.bf_bps
-
-#pragma pack()
 
 #define	NTFS_NEXTREC(s, type) ((type)(((caddr_t) s) + (s)->reclen))
 
@@ -303,7 +310,7 @@ MALLOC_DECLARE(M_NTFSNTHASH);
 #define M_NTFSFNODE	M_NTFS
 #define M_NTFSDIR	M_NTFS
 typedef int (vop_t) __P((void *));
-#define HASHINIT(a, b, c, d)	hashinit((a), (b), (c), (d))
+#define HASHINIT(a, b, c, d)	hashinit((a), HASH_LIST, (b), (c), (d))
 #define bqrelse(bp)		brelse(bp)
 #define VOP__UNLOCK(a, b, c)	VOP_UNLOCK((a), (b))
 #define VGET(a, b, c)		vget((a), (b))
@@ -320,13 +327,12 @@ typedef int (vop_t) __P((void *));
 #endif /* NetBSD */
 
 #if defined(NTFS_DEBUG)
-#define dprintf(a) printf a
-#if NTFS_DEBUG > 1
-#define ddprintf(a) printf a
-#else
-#define ddprintf(a)
-#endif
-#else
+extern int ntfs_debug;
+#define DPRINTF(X, Y) do { if(ntfs_debug >= (X)) printf Y; } while(0)
+#define dprintf(a) DPRINTF(1, a)
+#define ddprintf(a) DPRINTF(2, a)
+#else /* NTFS_DEBUG */
+#define DPRINTF(X, Y)
 #define dprintf(a)
 #define ddprintf(a)
 #endif

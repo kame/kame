@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt.c,v 1.31 2000/03/23 06:42:33 thorpej Exp $	*/
+/*	$NetBSD: lpt.c,v 1.34 2001/04/13 23:30:02 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994 Matthias Pfaller.
@@ -543,9 +543,6 @@ plipattach(sc, unit)
 	ether_ifattach(ifp, myaddr);
 	ifp->if_mtu = PLIPMTU;
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif                 
 	sc->sc_ifsoftint = intr_establish(SOFTINT, plipsoftint, sc,
 				sc->sc_dev.dv_xname, IPL_NET, IPL_ZERO, 0);
 }
@@ -828,7 +825,7 @@ plipinput(sc)
 	}
 	i8255->port_b = 0x00;
 
-	s = splimp();
+	s = splnet();
 	if ((m = m_devget(sc->sc_ifbuf, len, 0, ifp, NULL)) != NULL) {
 		/* We assume that the header fit entirely in one mbuf. */
 		eh = mtod(m, struct ether_header *);
@@ -933,7 +930,7 @@ pliptransmit:
 ");
 #else
 static int
-pliptransmit(i8255. buf, len)
+pliptransmit(i8255, buf, len)
 	volatile struct i8255 *i8255;
 	u_char *buf;
 	int len;
@@ -989,7 +986,7 @@ plipoutput(arg)
 		callout_stop(&sc->sc_plipout_ch);
 
 	for (;;) {
-		s = splimp();
+		s = splnet();
 		IF_DEQUEUE(&ifp->if_snd, m0);
 		splx(s);
 		if (!m0)
@@ -1064,7 +1061,7 @@ retry:
 
 	if ((ifp->if_flags & (IFF_RUNNING | IFF_UP)) == (IFF_RUNNING | IFF_UP)
 	    && sc->sc_ifoerrs < PLIPMXRETRY) {
-		s = splimp();
+		s = splnet();
 		IF_PREPEND(&ifp->if_snd, m0);
 		splx(s);
 		callout_reset(&sc->sc_plipout_ch, PLIPRETRY, plipoutput, sc);

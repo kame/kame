@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_vnops.c,v 1.31.2.2 2002/02/26 21:18:05 he Exp $	*/
+/*	$NetBSD: ffs_vnops.c,v 1.49 2002/05/05 17:00:06 chs Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -35,6 +35,9 @@
  *	@(#)ffs_vnops.c	8.15 (Berkeley) 5/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ffs_vnops.c,v 1.49 2002/05/05 17:00:06 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/resourcevar.h>
@@ -48,15 +51,10 @@
 #include <sys/pool.h>
 #include <sys/signalvar.h>
 
-#include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
-
 #include <miscfs/fifofs/fifo.h>
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/specfs/specdev.h>
 
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/dir.h>
 #include <ufs/ufs/ufs_extern.h>
@@ -65,11 +63,13 @@
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
 
+#include <uvm/uvm.h>
+
 static int ffs_full_fsync __P((void *));
 
 /* Global vfs data structures for ufs. */
 int (**ffs_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc ffs_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc ffs_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, ufs_lookup },		/* lookup */
 	{ &vop_create_desc, ufs_create },		/* create */
@@ -117,13 +117,15 @@ struct vnodeopv_entry_desc ffs_vnodeop_entries[] = {
 	{ &vop_truncate_desc, ffs_truncate },		/* truncate */
 	{ &vop_update_desc, ffs_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void*)))NULL }
+	{ &vop_getpages_desc, ffs_getpages },		/* getpages */
+	{ &vop_putpages_desc, ffs_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc ffs_vnodeop_opv_desc =
+const struct vnodeopv_desc ffs_vnodeop_opv_desc =
 	{ &ffs_vnodeop_p, ffs_vnodeop_entries };
 
 int (**ffs_specop_p) __P((void *));
-struct vnodeopv_entry_desc ffs_specop_entries[] = {
+const struct vnodeopv_entry_desc ffs_specop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, spec_lookup },		/* lookup */
 	{ &vop_create_desc, spec_create },		/* create */
@@ -169,13 +171,15 @@ struct vnodeopv_entry_desc ffs_specop_entries[] = {
 	{ &vop_truncate_desc, spec_truncate },		/* truncate */
 	{ &vop_update_desc, ffs_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_getpages_desc, spec_getpages },		/* getpages */
+	{ &vop_putpages_desc, spec_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc ffs_specop_opv_desc =
+const struct vnodeopv_desc ffs_specop_opv_desc =
 	{ &ffs_specop_p, ffs_specop_entries };
 
 int (**ffs_fifoop_p) __P((void *));
-struct vnodeopv_entry_desc ffs_fifoop_entries[] = {
+const struct vnodeopv_entry_desc ffs_fifoop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, fifo_lookup },		/* lookup */
 	{ &vop_create_desc, fifo_create },		/* create */
@@ -221,9 +225,10 @@ struct vnodeopv_entry_desc ffs_fifoop_entries[] = {
 	{ &vop_truncate_desc, fifo_truncate },		/* truncate */
 	{ &vop_update_desc, ffs_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, fifo_putpages }, 		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc ffs_fifoop_opv_desc =
+const struct vnodeopv_desc ffs_fifoop_opv_desc =
 	{ &ffs_fifoop_p, ffs_fifoop_entries };
 
 int doclusterread = 1;
@@ -239,15 +244,15 @@ ffs_fsync(v)
 		struct vnode *a_vp;
 		struct ucred *a_cred;
 		int a_flags;
-		off_t offlo;
-		off_t offhi;
+		off_t a_offlo;
+		off_t a_offhi;
 		struct proc *a_p;
 	} */ *ap = v;
-	struct buf *bp, *nbp, *ibp;
+	struct buf *bp;
 	int s, num, error, i;
 	struct indir ia[NIADDR + 1];
 	int bsize;
-	daddr_t blk_low, blk_high;
+	daddr_t blk_high;
 	struct vnode *vp;
 
 	/*
@@ -259,43 +264,41 @@ ffs_fsync(v)
 	vp = ap->a_vp;
 
 	bsize = ap->a_vp->v_mount->mnt_stat.f_iosize;
-	blk_low = ap->a_offlo / bsize;
 	blk_high = ap->a_offhi / bsize;
 	if (ap->a_offhi % bsize != 0)
 		blk_high++;
 
 	/*
-	 * First, flush all data blocks in range.
+	 * First, flush all pages in range.
 	 */
-loop:
-	s = splbio();
-	for (bp = LIST_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
-		nbp = LIST_NEXT(bp, b_vnbufs);
-		if ((bp->b_flags & B_BUSY))
-			continue;
-		if (bp->b_lblkno < blk_low || bp->b_lblkno > blk_high)
-			continue;
-		bp->b_flags |= B_BUSY | B_VFLUSH;
-		splx(s);
-		bawrite(bp);
-		goto loop;
+
+	if (vp->v_type == VREG) {
+		simple_lock(&vp->v_interlock);
+		error = VOP_PUTPAGES(vp, trunc_page(ap->a_offlo),
+		    round_page(ap->a_offhi), PGO_CLEANIT|PGO_SYNCIO);
+		if (error) {
+			return error;
+		}
 	}
 
 	/*
-	 * Then, flush possibly unwritten indirect blocks. Without softdeps,
-	 * these should be the only ones left.
+	 * Then, flush indirect blocks.
 	 */
+
+	s = splbio();
 	if (!(ap->a_flags & FSYNC_DATAONLY) && blk_high >= NDADDR) {
 		error = ufs_getlbns(vp, blk_high, ia, &num);
-		if (error != 0)
+		if (error) {
+			splx(s);
 			return error;
+		}
 		for (i = 0; i < num; i++) {
-			ibp = incore(vp, ia[i].in_lbn);
-			if (ibp != NULL && !(ibp->b_flags & B_BUSY) &&
-			    (ibp->b_flags & B_DELWRI)) {
-				ibp->b_flags |= B_BUSY | B_VFLUSH;
+			bp = incore(vp, ia[i].in_lbn);
+			if (bp != NULL && !(bp->b_flags & B_BUSY) &&
+			    (bp->b_flags & B_DELWRI)) {
+				bp->b_flags |= B_BUSY | B_VFLUSH;
 				splx(s);
-				bawrite(ibp);
+				bawrite(bp);
 				s = splbio();
 			}
 		}
@@ -304,11 +307,9 @@ loop:
 	if (ap->a_flags & FSYNC_WAIT) {
 		while (vp->v_numoutput > 0) {
 			vp->v_flag |= VBWAIT;
-			tsleep((caddr_t)&vp->v_numoutput, PRIBIO + 1,
-			    "fsync_range", 0);
+			tsleep(&vp->v_numoutput, PRIBIO + 1, "fsync_range", 0);
 		}
 	}
-
 	splx(s);
 
 	return (VOP_UPDATE(vp, NULL, NULL,
@@ -327,13 +328,13 @@ ffs_full_fsync(v)
 		struct vnode *a_vp;
 		struct ucred *a_cred;
 		int a_flags;
-		off_t offlo;
-		off_t offhi;
+		off_t a_offlo;
+		off_t a_offhi;
 		struct proc *a_p;
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct buf *bp, *nbp;
-	int s, error, passes, skipmeta, inodedeps_only, waitfor;;
+	int s, error, passes, skipmeta, inodedeps_only, waitfor;
 
 	if (vp->v_type == VBLK &&
 	    vp->v_specmountpoint != NULL &&
@@ -341,19 +342,29 @@ ffs_full_fsync(v)
 		softdep_fsync_mountdev(vp);
 
 	inodedeps_only = DOINGSOFTDEP(vp) && (ap->a_flags & FSYNC_RECLAIM)
-	    && LIST_EMPTY(&vp->v_dirtyblkhd);
+	    && vp->v_uobj.uo_npages == 0 && LIST_EMPTY(&vp->v_dirtyblkhd);
 
-	/* 
-	 * Flush all dirty buffers associated with a vnode
+	/*
+	 * Flush all dirty data associated with a vnode.
 	 */
+
+	if (vp->v_type == VREG) {
+		simple_lock(&vp->v_interlock);
+		error = VOP_PUTPAGES(vp, 0, 0, PGO_ALLPAGES | PGO_CLEANIT |
+		    ((ap->a_flags & FSYNC_WAIT) ? PGO_SYNCIO : 0));
+		if (error) {
+			return error;
+		}
+	}
+
 	passes = NIADDR + 1;
 	skipmeta = 0;
 	if (ap->a_flags & (FSYNC_DATAONLY|FSYNC_WAIT))
 		skipmeta = 1;
 	s = splbio();
+
 loop:
-	for (bp = LIST_FIRST(&vp->v_dirtyblkhd); bp;
-	     bp = LIST_NEXT(bp, b_vnbufs))
+	LIST_FOREACH(bp, &vp->v_dirtyblkhd, b_vnbufs)
 		bp->b_flags &= ~B_SCANNED;
 	for (bp = LIST_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 		nbp = LIST_NEXT(bp, b_vnbufs);
@@ -455,4 +466,114 @@ ffs_reclaim(v)
 	pool_put(&ffs_inode_pool, vp->v_data);
 	vp->v_data = NULL;
 	return (0);
+}
+
+int
+ffs_getpages(void *v)
+{
+	struct vop_getpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offset;
+		struct vm_page **a_m;
+		int *a_count;
+		int a_centeridx;
+		vm_prot_t a_access_type;
+		int a_advice;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	struct inode *ip = VTOI(vp);
+	struct fs *fs = ip->i_fs;
+
+	/*
+	 * don't allow a softdep write to create pages for only part of a block.
+	 * the dependency tracking requires that all pages be in memory for
+	 * a block involved in a dependency.
+	 */
+
+	if (ap->a_flags & PGO_OVERWRITE &&
+	    (blkoff(fs, ap->a_offset) != 0 ||
+	     blkoff(fs, *ap->a_count << PAGE_SHIFT) != 0) &&
+	    DOINGSOFTDEP(ap->a_vp)) {
+		if ((ap->a_flags & PGO_LOCKED) == 0) {
+			simple_unlock(&vp->v_interlock);
+		}
+		return EINVAL;
+	}
+	return genfs_getpages(v);
+}
+
+int
+ffs_putpages(void *v)
+{
+	struct vop_putpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offlo;
+		voff_t a_offhi;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	struct uvm_object *uobj = &vp->v_uobj;
+	struct inode *ip = VTOI(vp);
+	struct fs *fs = ip->i_fs;
+	struct vm_page *pg;
+	off_t off;
+	ufs_lbn_t lbn;
+
+	if (!DOINGSOFTDEP(vp) || (ap->a_flags & PGO_CLEANIT) == 0) {
+		return genfs_putpages(v);
+	}
+
+	/*
+	 * for softdep files, force the pages in a block to be written together.
+	 * if we're the pagedaemon and we would have to wait for other pages,
+	 * just fail the request.  the pagedaemon will pick a different page.
+	 */
+
+	ap->a_offlo &= ~fs->fs_qbmask;
+	lbn = lblkno(fs, ap->a_offhi);
+	ap->a_offhi = blkroundup(fs, ap->a_offhi);
+	if (curproc == uvm.pagedaemon_proc) {
+		for (off = ap->a_offlo; off < ap->a_offhi; off += PAGE_SIZE) {
+			pg = uvm_pagelookup(uobj, off);
+
+			/*
+			 * we only have missing pages here because the
+			 * calculation of offhi above doesn't account for
+			 * fragments.  so once we see one missing page,
+			 * the rest should be missing as well, but we'll
+			 * check for the rest just to be paranoid.
+			 */
+
+			if (pg == NULL) {
+				continue;
+			}
+			if (pg->flags & PG_BUSY) {
+				simple_unlock(&uobj->vmobjlock);
+				return EBUSY;
+			}
+		}
+	}
+	return genfs_putpages(v);
+}
+
+/*
+ * Return the last logical file offset that should be written for this file
+ * if we're doing a write that ends at "size".
+ */
+
+void
+ffs_gop_size(struct vnode *vp, off_t size, off_t *eobp)
+{
+	struct inode *ip = VTOI(vp);
+	struct fs *fs = ip->i_fs;
+	ufs_lbn_t olbn, nlbn;
+
+	olbn = lblkno(fs, ip->i_ffs_size);
+	nlbn = lblkno(fs, size);
+	if (nlbn < NDADDR && olbn <= nlbn) {
+		*eobp = fragroundup(fs, size);
+	} else {
+		*eobp = blkroundup(fs, size);
+	}
 }

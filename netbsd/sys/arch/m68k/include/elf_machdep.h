@@ -1,4 +1,4 @@
-/*	$NetBSD: elf_machdep.h,v 1.5 2000/04/02 15:35:49 minoura Exp $	*/
+/*	$NetBSD: elf_machdep.h,v 1.7 2002/01/28 21:34:48 thorpej Exp $	*/
 
 #define	ELF32_MACHDEP_ENDIANNESS	ELFDATA2MSB
 #define	ELF32_MACHDEP_ID_CASES						\
@@ -8,6 +8,14 @@
 #define	ELF64_MACHDEP_ENDIANNESS	XXX	/* break compilation */
 #define	ELF64_MACHDEP_ID_CASES						\
 		/* no 64-bit ELF machine types supported */
+
+#define	ELF32_MACHDEP_ID	EM_68K
+
+/*
+ * Machine-dependent ELF flags.  These are defined by the GNU tools.
+ */
+#define	EF_CPU32	0x00810000
+#define	EF_M68000	0x01000000
 
 #define ARCH_ELFSIZE		32	/* MD native binary size */
 

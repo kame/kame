@@ -1,4 +1,4 @@
-/*	$NetBSD: if_arcsubr.c,v 1.31 2000/04/12 10:36:38 itojun Exp $	*/
+/*	$NetBSD: if_arcsubr.c,v 1.39 2002/03/05 04:12:59 itojun Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Ignatios Souvatzis
@@ -37,7 +37,13 @@
  *       @(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_arcsubr.c,v 1.39 2002/03/05 04:12:59 itojun Exp $");
+
 #include "opt_inet.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,6 +66,10 @@
 #include <net/if_arc.h>
 #include <net/if_arp.h>
 #include <net/if_ether.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #ifdef INET
 #include <netinet/in.h>
@@ -119,9 +129,10 @@ arc_output(ifp, m0, dst, rt0)
 	struct arccom		*ac;
 	struct arc_header	*ah;
 	struct arphdr		*arph;
-	int			s, error, newencoding;
+	int			s, error, newencoding, len;
 	u_int8_t		atype, adst, myself;
 	int			tfrags, sflag, fsflag, rsflag;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING)) 
 		return(ENETDOWN); /* m, m1 aren't initialized yet */
@@ -133,7 +144,6 @@ arc_output(ifp, m0, dst, rt0)
 
 	myself = *LLADDR(ifp->if_sadl);
 
-	ifp->if_lastchange = time;
 	if ((rt = rt0)) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 			if ((rt0 = rt = rtalloc1(dst, 1)))
@@ -156,6 +166,12 @@ arc_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	switch (dst->sa_family) {
 #ifdef INET
@@ -232,13 +248,8 @@ arc_output(ifp, m0, dst, rt0)
 #endif
 #ifdef INET6
 	case AF_INET6:
-#ifdef OLDIP6OUTPUT
-		if (!nd6_resolve(ifp, rt, m, dst, (u_char *)&adst))
-			return(0);	/* if not yet resolves */
-#else
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)&adst))
 			return(0); /* it must be impossible, but... */
-#endif /* OLDIP6OUTPUT */
 		atype = htons(ARCTYPE_INET6);
 		newencoding = 1;
 		break;
@@ -292,18 +303,19 @@ arc_output(ifp, m0, dst, rt0)
 			ah->arc_flag = rsflag;
 			ah->arc_seqid = ac->ac_seqid;
 
-			s = splimp();
+			len = m->m_pkthdr.len;
+			s = splnet();
 			/*
 			 * Queue message on interface, and start output if 
 			 * interface not yet active.
 			 */
-			if (IF_QFULL(&ifp->if_snd)) {
-				IF_DROP(&ifp->if_snd);
+			IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+			if (error) {
+				/* mbuf is already freed */
 				splx(s);
-				senderr(ENOBUFS);
+				return (error);
 			}
-			ifp->if_obytes += m->m_pkthdr.len;
-			IF_ENQUEUE(&ifp->if_snd, m);
+			ifp->if_obytes += len;
 			if ((ifp->if_flags & IFF_OACTIVE) == 0)
 				(*ifp->if_start)(ifp);
 			splx(s);
@@ -352,18 +364,20 @@ arc_output(ifp, m0, dst, rt0)
 		ah->arc_dhost = adst;
 		ah->arc_shost = myself;
 	}
-	s = splimp();
+
+	len = m->m_pkthdr.len;
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	ifp->if_obytes += len;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -570,7 +584,6 @@ arc_input(ifp, m)
 
 	ah = mtod(m, struct arc_header *);
 
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 
 	if (arcbroadcastaddr == ah->arc_dhost) {
@@ -624,7 +637,7 @@ arc_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -658,13 +671,8 @@ arc_storelladdr(ifp, lla)
 	struct ifnet *ifp;
 	u_int8_t lla;
 {
-	struct sockaddr_dl *sdl;
-	if ((sdl = ifp->if_sadl) &&
-	   sdl->sdl_family == AF_LINK) {
-		sdl->sdl_type = IFT_ARCNET;
-		sdl->sdl_alen = ifp->if_addrlen;
-		*(LLADDR(sdl)) = lla;
-	}
+
+	*(LLADDR(ifp->if_sadl)) = lla;
 	ifp->if_mtu = ARC_PHDS_MAXMTU;
 }
 
@@ -681,6 +689,7 @@ arc_ifattach(ifp, lla)
 	ifp->if_type = IFT_ARCNET;
 	ifp->if_addrlen = 1;
 	ifp->if_hdrlen = ARC_HDRLEN;
+	ifp->if_dlt = DLT_ARCNET;
 	if (ifp->if_flags & IFF_BROADCAST)
 		ifp->if_flags |= IFF_MULTICAST|IFF_ALLMULTI;
 	if (ifp->if_flags & IFF_LINK0 && arc_ipmtu > ARC_PHDS_MAXMTU)
@@ -698,7 +707,12 @@ arc_ifattach(ifp, lla)
 		   ifp->if_xname, ifp->if_xname); 
 	}
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 	arc_storelladdr(ifp, lla);
 
 	ifp->if_broadcastaddr = &arcbroadcastaddr;
+
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_ARCNET, ARC_HDRLEN);
+#endif
 }

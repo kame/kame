@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.21.12.1 2001/06/07 19:56:14 he Exp $
+	$NetBSD: syscalls.master,v 1.26 2001/06/06 16:17:40 thorpej Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -31,8 +31,10 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 ; #include's are copied to the syscall names and switch definition files only.
 
+#if defined(_KERNEL_OPT)
 #include "opt_sysv.h"
 #include "opt_compat_43.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,6 +48,8 @@
 #include <compat/hpux/hpux_syscallargs.h>
 
 #include <machine/hpux_machdep.h>
+
+%%
 
 0	NOARGS		{ int sys_nosys(void); } syscall
 1	NOARGS		{ int sys_exit(int rval); }
@@ -72,7 +76,7 @@
 			    struct hpux_ostat *sb); }
 19	NOARGS		{ long compat_43_sys_lseek(int fd, long offset, \
 			    int whence); }
-20	NOARGS		{ pid_t sys_getpid(void); }
+20	NOARGS MPSAFE	{ pid_t sys_getpid(void); }
 21	UNIMPL		mount
 22	UNIMPL		umount
 23	NOARGS		{ int sys_setuid(uid_t uid); }

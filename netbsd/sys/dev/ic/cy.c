@@ -1,4 +1,4 @@
-/*	$NetBSD: cy.c,v 1.13.2.1 2000/11/10 16:40:07 tv Exp $	*/
+/*	$NetBSD: cy.c,v 1.26 2002/03/17 19:40:57 atatat Exp $	*/
 
 /*
  * cy.c
@@ -15,7 +15,9 @@
  * can be enabled by defining CY_DEBUG1
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cy.c,v 1.26 2002/03/17 19:40:57 atatat Exp $");
+
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/syslog.h>
@@ -42,19 +44,20 @@
 #define	CLR(t, f)	(t) &= ~(f)
 #define	ISSET(t, f)	((t) & (f))
 
-static int cyparam __P((struct tty *, struct termios *));
-static void cystart __P((struct tty *));
-static void cy_poll __P((void *));
-static int cy_modem_control __P((struct cy_softc *,
-    struct cy_port *, int, int));
-static void cy_enable_transmitter __P((struct cy_softc *, struct cy_port *));
-static void cd1400_channel_cmd __P((struct cy_softc *, struct cy_port *, int));
-static int cy_speed __P((speed_t, int *, int *, int));
+int	cyparam(struct tty *, struct termios *);
+void	cystart(struct tty *);
+void	cy_poll(void *);
+int	cy_modem_control(struct cy_softc *, struct cy_port *, int, int);
+void	cy_enable_transmitter(struct cy_softc *, struct cy_port *);
+void	cd1400_channel_cmd(struct cy_softc *, struct cy_port *, int);
+int	cy_speed(speed_t, int *, int *, int);
 
 extern struct cfdriver cy_cd;
 
 static int      cy_open = 0;
 static int      cy_events = 0;
+
+int	cy_attached_ttys;
 
 cdev_decl(cy);
 
@@ -64,8 +67,7 @@ struct callout cy_poll_callout = CALLOUT_INITIALIZER;
  * Common probe routine
  */
 int
-cy_find(sc)
-	struct cy_softc *sc;
+cy_find(struct cy_softc *sc)
 {
 	int cy_chip, chip;
 	u_char firmware_ver;
@@ -161,19 +163,16 @@ cy_find(sc)
 }
 
 void
-cy_attach(parent, self, aux)
-	struct device  *parent, *self;
-	void *aux;
+cy_attach(struct cy_softc *sc)
 {
-	int  port, cy_chip, num_chips, cdu, chip;
-	struct cy_softc *sc = (void *) self;
+	int port, cy_chip, num_chips, cdu, chip;
 	int cy_clock;
 
 	num_chips = sc->sc_nchips;
 	if (num_chips == 0)
 		return;
 
-	bzero(sc->sc_ports, sizeof(sc->sc_ports));
+	memset(sc->sc_ports, 0, sizeof(sc->sc_ports));
 
 	port = 0;
 	for (cy_chip = 0, chip = 0; cy_chip < num_chips; cy_chip++,
@@ -203,6 +202,7 @@ cy_attach(parent, self, aux)
 		    (cy_clock / CD1400_PPR_PRESCALER / 1000) + 1);
 
 		for (cdu = 0; cdu < CD1400_NO_OF_CHANNELS; cdu++) {
+			sc->sc_ports[port].cy_softc = sc;
 			sc->sc_ports[port].cy_port_num = port;
 			sc->sc_ports[port].cy_chip = cy_chip;
 			sc->sc_ports[port].cy_clock = cy_clock;
@@ -213,46 +213,72 @@ cy_attach(parent, self, aux)
 
 	} /* for(each CD1400 on a card... ) */
 
-	printf(": %d ports\n", port);
+	sc->sc_nchannels = port;
+
+	printf("%s: %d channels (ttyCY%03d..ttyCY%03d)\n",
+	    sc->sc_dev.dv_xname, sc->sc_nchannels, cy_attached_ttys,
+	    cy_attached_ttys + (sc->sc_nchannels - 1));
+
+	cy_attached_ttys += sc->sc_nchannels;
 
 	/* ensure an edge for the next interrupt */
 	bus_space_write_1(sc->sc_memt, sc->sc_bsh,
 	    CY_CLEAR_INTR << sc->sc_bustype, 0);
 }
 
+#define	CYDIALOUT_MASK		0x80000
+#define	CY_DIALOUT(dev)		(minor(dev) & CYDIALOUT_MASK)
+
+#define	CY_PORT(dev)		cy_getport((dev))
+#define	CY_BOARD(cy)		((cy)->cy_softc)
+
+static struct cy_port *
+cy_getport(dev_t dev)
+{
+	int i, j, k, u = minor(dev) & ~CYDIALOUT_MASK;
+	struct cy_softc *sc;
+
+	for (i = 0, j = 0; i < cy_cd.cd_ndevs; i++) {
+		k = j;
+		sc = device_lookup(&cy_cd, i);
+		if (sc == NULL)
+			continue;
+		if (sc->sc_nchannels == 0)
+			continue;
+		j += sc->sc_nchannels;
+		if (j > u)
+			break;
+	}
+
+	if (i == cy_cd.cd_ndevs)
+		return (NULL);
+	else
+		return (&sc->sc_ports[u - k]);
+}
+
 /*
  * open routine. returns zero if successfull, else error code
  */
 int
-cyopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+cyopen(dev_t dev, int flag, int mode, struct proc *p)
 {
-	int card = CY_CARD(dev);
-	int port = CY_PORT(dev);
 	struct cy_softc *sc;
 	struct cy_port *cy;
 	struct tty *tp;
 	int s, error;
 
-#ifdef CY_DEBUG
-	printf("cy%d open port %d flag 0x%x mode 0x%x\n",
-	    card, port, flag, mode);
-#endif
-
-	if (card >= cy_cd.cd_ndevs || (sc = cy_cd.cd_devs[card]) == NULL)
-		return ENXIO;
-
-	cy = &sc->sc_ports[port];
+	cy = CY_PORT(dev);
+	if (cy == NULL)
+		return (ENXIO);
+	sc = CY_BOARD(cy);
 
 	s = spltty();
 	if (cy->cy_tty == NULL) {
 		if ((cy->cy_tty = ttymalloc()) == NULL) {
 			splx(s);
-			printf("cy%d: port %d: can't allocate tty\n",
-			    card, port);
-			return ENOMEM;
+			printf("%s: port %d: can't allocate tty\n",
+			    sc->sc_dev.dv_xname, cy->cy_port_num);
+			return (ENOMEM);
 		}
 		tty_attach(cy->cy_tty);
 	}
@@ -286,7 +312,7 @@ cyopen(dev, flag, mode, p)
 			cy->cy_ibuf = malloc(CY_IBUF_SIZE, M_DEVBUF, M_NOWAIT);
 			if (cy->cy_ibuf == NULL) {
 				printf("%s: port %d: can't allocate input buffer\n",
-				       sc->sc_dev.dv_xname, port);
+				       sc->sc_dev.dv_xname, cy->cy_port_num);
 				splx(s);
 				return ENOMEM;
 			}
@@ -297,12 +323,13 @@ cyopen(dev, flag, mode, p)
 
 		/* select CD1400 channel */
 		cd_write_reg(sc, cy->cy_chip, CD1400_CAR,
-		    port & CD1400_CAR_CHAN);
+		    cy->cy_port_num & CD1400_CAR_CHAN);
 		/* reset the channel */
 		cd1400_channel_cmd(sc, cy, CD1400_CCR_CMDRESET);
 		/* encode unit (port) number in LIVR */
 		/* there is just enough space for 5 bits (32 ports) */
-		cd_write_reg(sc, cy->cy_chip, CD1400_LIVR, port << 3);
+		cd_write_reg(sc, cy->cy_chip, CD1400_LIVR,
+		    cy->cy_port_num << 3);
 
 		cy->cy_channel_control = 0;
 
@@ -355,31 +382,25 @@ cyopen(dev, flag, mode, p)
 	}
 	splx(s);
 
-	return (*linesw[tp->t_line].l_open) (dev, tp);
+	return (*tp->t_linesw->l_open) (dev, tp);
 }
 
 /*
  * close routine. returns zero if successfull, else error code
  */
 int
-cyclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+cyclose(dev_t dev, int flag, int mode, struct proc *p)
 {
-	int card = CY_CARD(dev);
-	int port = CY_PORT(dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
-	struct tty *tp = cy->cy_tty;
+	struct cy_softc *sc;
+	struct cy_port *cy;
+	struct tty *tp;
 	int s;
 
-#ifdef CY_DEBUG
-	printf("%s: close port %d, flag 0x%x, mode 0x%x\n",
-	    sc->sc_dev.dv_xname, port, flag, mode);
-#endif
+	cy = CY_PORT(dev);
+	sc = CY_BOARD(cy);
+	tp = cy->cy_tty;
 
-	(*linesw[tp->t_line].l_close) (tp, flag);
+	(*tp->t_linesw->l_close) (tp, flag);
 	s = spltty();
 
 	if (ISSET(tp->t_cflag, HUPCL) &&
@@ -406,96 +427,84 @@ cyclose(dev, flag, mode, p)
  * Read routine
  */
 int
-cyread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+cyread(dev_t dev, struct uio *uio, int flag)
 {
-	int card = CY_CARD(dev);
-	int port = CY_PORT(dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
-	struct tty *tp = cy->cy_tty;
+	struct cy_port *cy;
+	struct tty *tp;
 
-#ifdef CY_DEBUG
-	printf("%s: read port %d uio %p flag 0x%x\n",
-	    sc->sc_dev.dv_xname, port, uio, flag);
-#endif
+	cy = CY_PORT(dev);
+	tp = cy->cy_tty;
 
-	return ((*linesw[tp->t_line].l_read) (tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 /*
  * Write routine
  */
 int
-cywrite(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+cywrite(dev_t dev, struct uio *uio, int flag)
 {
-	int card = CY_CARD(dev);
-	int port = CY_PORT(dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
-	struct tty *tp = cy->cy_tty;
+	struct cy_port *cy;
+	struct tty *tp;
 
-#ifdef CY_DEBUG
-	printf("%s: write port %d uio %p flag 0x%x\n",
-	    sc->sc_dev.dv_xname, port, uio, flag);
-#endif
+	cy = CY_PORT(dev);
+	tp = cy->cy_tty;
 
-	return ((*linesw[tp->t_line].l_write) (tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+/*
+ * Poll routine
+ */
+int
+cypoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct cy_port *cy;
+	struct tty *tp;
+
+	cy = CY_PORT(dev);
+	tp = cy->cy_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 /*
  * return tty pointer
  */
 struct tty *
-cytty(dev)
-	dev_t dev;
+cytty(dev_t dev)
 {
-	int card = CY_CARD(dev);
-	int port = CY_PORT(dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
-	struct tty *tp = cy->cy_tty;
+	struct cy_port *cy;
 
-#ifdef CY_DEBUG
-	printf("%s: tty port %d tp %p\n", sc->sc_dev.dv_xname, port, tp);
-#endif
-	return tp;
+	cy = CY_PORT(dev);
+
+	return (cy->cy_tty);
 }
 
 /*
  * ioctl routine
  */
 int
-cyioctl(dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+cyioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
-	int card = CY_CARD(dev);
-	int port = CY_PORT(dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
-	struct tty *tp = cy->cy_tty;
+	struct cy_softc *sc;
+	struct cy_port *cy;
+	struct tty *tp;
 	int error;
 
-#ifdef CY_DEBUG
-	printf("%s: port %d ioctl cmd 0x%lx data %p flag 0x%x\n",
-	    sc->sc_dev.dv_xname, port, cmd, data, flag);
-#endif
+	cy = CY_PORT(dev);
+	sc = CY_BOARD(cy);
+	tp = cy->cy_tty;
 
-	error = (*linesw[tp->t_line].l_ioctl) (tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
 
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return error;
 
 	/* XXX should not allow dropping DTR when dialin? */
@@ -551,7 +560,7 @@ cyioctl(dev, cmd, data, flag, p)
 		break;
 
 	default:
-		return ENOTTY;
+		return EPASSTHROUGH;
 	}
 
 	return 0;
@@ -561,19 +570,14 @@ cyioctl(dev, cmd, data, flag, p)
  * start output
  */
 void
-cystart(tp)
-	struct tty *tp;
+cystart(struct tty *tp)
 {
-	int card = CY_CARD(tp->t_dev);
-	int port = CY_PORT(tp->t_dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
+	struct cy_softc *sc;
+	struct cy_port *cy;
 	int s;
 
-#ifdef CY_DEBUG
-	printf("%s: port %d start, tty %p\n", sc->sc_dev.dv_xname, port, tp);
-#endif
-
+	cy = CY_PORT(tp->t_dev);
+	sc = cy->cy_softc;
 
 	s = spltty();
 
@@ -604,23 +608,14 @@ out:
  * stop output
  */
 void
-cystop(tp, flag)
-	struct tty *tp;
-	int flag;
+cystop(struct tty *tp, int flag)
 {
-	int card = CY_CARD(tp->t_dev);
-	int port = CY_PORT(tp->t_dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
+	struct cy_port *cy;
 	int s;
 
-#ifdef CY_DEBUG
-	printf("%s: port %d stop tty %p flag 0x%x\n",
-	    sc->sc_dev.dv_xname, port, tp, flag);
-#endif
+	cy = CY_PORT(tp->t_dev);
 
 	s = spltty();
-
 	if (ISSET(tp->t_state, TS_BUSY)) {
 		if (!ISSET(tp->t_state, TS_TTSTOP))
 			SET(tp->t_state, TS_FLUSH);
@@ -638,23 +633,15 @@ cystop(tp, flag)
  * parameter setting routine.
  * returns 0 if successfull, else returns error code
  */
-static int
-cyparam(tp, t)
-	struct tty *tp;
-	struct termios *t;
+int
+cyparam(struct tty *tp, struct termios *t)
 {
-	int card = CY_CARD(tp->t_dev);
-	int port = CY_PORT(tp->t_dev);
-	struct cy_softc *sc = cy_cd.cd_devs[card];
-	struct cy_port *cy = &sc->sc_ports[port];
-	int ibpr, obpr, i_clk_opt, o_clk_opt;
-	int s, opt;
+	struct cy_softc *sc;
+	struct cy_port *cy;
+	int ibpr, obpr, i_clk_opt, o_clk_opt, s, opt;
 
-#ifdef CY_DEBUG
-	printf("%s: port %d param tty %p termios %p\n",
-	    sc->sc_dev.dv_xname, port, tp, t);
-	printf("ispeed %d ospeed %d\n", t->c_ispeed, t->c_ospeed);
-#endif
+	cy = CY_PORT(tp->t_dev);
+	sc = CY_BOARD(cy);
 
 	if (t->c_ospeed != 0 && cy_speed(t->c_ospeed, &o_clk_opt, &obpr, cy->cy_clock) < 0)
 		return EINVAL;
@@ -780,17 +767,12 @@ cyparam(tp, t)
  * set/get modem line status
  *
  * bits can be: TIOCM_DTR, TIOCM_RTS, TIOCM_CTS, TIOCM_CD, TIOCM_RI, TIOCM_DSR
- *
  */
-static int
-cy_modem_control(sc, cy, bits, howto)
-	struct cy_softc *sc;
-	struct cy_port *cy;
-	int bits;
-	int howto;
+int
+cy_modem_control(struct cy_softc *sc, struct cy_port *cy, int bits, int howto)
 {
-	int s, msvr;
 	struct tty *tp = cy->cy_tty;
+	int s, msvr;
 
 	s = spltty();
 
@@ -798,10 +780,9 @@ cy_modem_control(sc, cy, bits, howto)
 	cd_write_reg(sc, cy->cy_chip, CD1400_CAR,
 	    cy->cy_port_num & CD1400_CAR_CHAN);
 
-	/* does not manipulate RTS if it is used for flow control */
+	/* Does not manipulate RTS if it is used for flow control. */
 	switch (howto) {
 	case DMGET:
-		splx(s);
 		bits = 0;
 		if (cy->cy_channel_control & CD1400_CCR_RCVEN)
 			bits |= TIOCM_LE;
@@ -823,14 +804,13 @@ cy_modem_control(sc, cy, bits, howto)
 			bits |= TIOCM_CTS;
 		if (msvr & CD1400_MSVR2_CD)
 			bits |= TIOCM_CD;
-		if (msvr & CD1400_MSVR2_DSR)	/* not connected on some
-						 * Cyclom cards? */
+		/* Not connected on some Cyclom-Y boards? */
+		if (msvr & CD1400_MSVR2_DSR)
 			bits |= TIOCM_DSR;
-		if (msvr & CD1400_MSVR2_RI)	/* not connected on Cyclom-8Y
-						 * cards? */
+		/* Not connected on some Cyclom-8Y boards? */
+		if (msvr & CD1400_MSVR2_RI)
 			bits |= TIOCM_RI;
-		splx(s);
-		return bits;
+		break;
 
 	case DMSET:		/* replace old values with new ones */
 		if (cy->cy_clock == CY_CLOCK_60) {
@@ -850,14 +830,16 @@ cy_modem_control(sc, cy, bits, howto)
 
 	case DMBIS:		/* set bits */
 		if (cy->cy_clock == CY_CLOCK_60) {
-			if (!ISSET(tp->t_cflag, CRTSCTS) && (bits & TIOCM_RTS) != 0)
+			if (!ISSET(tp->t_cflag, CRTSCTS) &&
+			    (bits & TIOCM_RTS) != 0)
 				cd_write_reg(sc, cy->cy_chip, CD1400_MSVR2,
 				    CD1400_MSVR2_DTR);
 			if (bits & TIOCM_DTR)
 				cd_write_reg(sc, cy->cy_chip, CD1400_MSVR1,
 				    CD1400_MSVR1_RTS);
 		} else {
-			if (!ISSET(tp->t_cflag, CRTSCTS) && (bits & TIOCM_RTS) != 0)
+			if (!ISSET(tp->t_cflag, CRTSCTS) &&
+			    (bits & TIOCM_RTS) != 0)
 				cd_write_reg(sc, cy->cy_chip, CD1400_MSVR1,
 				    CD1400_MSVR1_RTS);
 			if (bits & TIOCM_DTR)
@@ -881,16 +863,15 @@ cy_modem_control(sc, cy, bits, howto)
 		break;
 	}
 	splx(s);
-	return 0;
+	return ((howto == DMGET) ? bits : 0);
 }
 
 /*
  * Upper-level handler loop (called from timer interrupt?)
  * This routine is common for multiple cards
  */
-static void
-cy_poll(arg)
-	void *arg;
+void
+cy_poll(void *arg)
 {
 	int card, port;
 	struct cy_softc *sc;
@@ -910,7 +891,7 @@ cy_poll(arg)
 	splx(s);
 
 	for (card = 0; card < cy_cd.cd_ndevs; card++) {
-		sc = cy_cd.cd_devs[card];
+		sc = device_lookup(&cy_cd, card);
 		if (sc == NULL)
 			continue;
 
@@ -919,8 +900,7 @@ cy_poll(arg)
 		did_something = 0;
 #endif
 
-		for (port = 0; port < sc->sc_nchips * CD1400_NO_OF_CHANNELS;
-		    port++) {
+		for (port = 0; port < sc->sc_nchannels; port++) {
 			cy = &sc->sc_ports[port];
 			if ((tp = cy->cy_tty) == NULL || cy->cy_ibuf == NULL ||
 			    (!ISSET(tp->t_state, TS_ISOPEN) && tp->t_wopen == 0))
@@ -952,7 +932,7 @@ cy_poll(arg)
 				    sc->sc_dev.dv_xname, port, chr);
 #endif
 
-				(*linesw[tp->t_line].l_rint) (chr, tp);
+				(*tp->t_linesw->l_rint) (chr, tp);
 
 				s = spltty();	/* really necessary? */
 				if ((cy->cy_ibuf_rd_ptr += 2) ==
@@ -1017,8 +997,8 @@ cy_poll(arg)
 				    "(card %d, port %d, carrier %d)\n",
 				    card, port, carrier);
 #endif
-				if (CY_DIALIN(tp->t_dev) &&
-				    !(*linesw[tp->t_line].l_modem)(tp, carrier))
+				if (CY_DIALOUT(tp->t_dev) == 0 &&
+				    !(*tp->t_linesw->l_modem)(tp, carrier))
 					cy_modem_control(sc, cy,
 					    TIOCM_DTR, DMBIC);
 
@@ -1033,7 +1013,7 @@ cy_poll(arg)
 				CLR(cy->cy_flags, CY_F_START);
 				splx(s);
 
-				(*linesw[tp->t_line].l_start) (tp);
+				(*tp->t_linesw->l_start) (tp);
 
 #ifdef CY_DEBUG1
 				did_something = 1;
@@ -1073,8 +1053,7 @@ out:
  * hardware interrupt routine
  */
 int
-cy_intr(arg)
-	void *arg;
+cy_intr(void *arg)
 {
 	struct cy_softc *sc = arg;
 	struct cy_port *cy;
@@ -1346,10 +1325,8 @@ cy_intr(arg)
 /*
  * subroutine to enable CD1400 transmitter
  */
-static void
-cy_enable_transmitter(sc, cy)
-	struct cy_softc *sc;
-	struct cy_port *cy;
+void
+cy_enable_transmitter(struct cy_softc *sc, struct cy_port *cy)
 {
 	int s = spltty();
 	cd_write_reg(sc, cy->cy_chip, CD1400_CAR,
@@ -1362,11 +1339,8 @@ cy_enable_transmitter(sc, cy)
 /*
  * Execute a CD1400 channel command
  */
-static void
-cd1400_channel_cmd(sc, cy, cmd)
-	struct cy_softc *sc;
-	struct cy_port *cy;
-	int cmd;
+void
+cd1400_channel_cmd(struct cy_softc *sc, struct cy_port *cy, int cmd)
 {
 	u_int waitcnt = 5 * 8 * 1024;	/* approx 5 ms */
 
@@ -1392,10 +1366,8 @@ cd1400_channel_cmd(sc, cy, cmd)
  * to be well within allowed limits (less than 3%)
  * with every speed value between 50 and 150000 bps.
  */
-static int
-cy_speed(speed, cor, bpr, cy_clock)
-    speed_t speed;
-    int *cor, *bpr, cy_clock;
+int
+cy_speed(speed_t speed, int *cor, int *bpr, int cy_clock)
 {
 	int c, co, br;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.44.4.1 2000/07/23 03:49:34 itojun Exp $ */
+/*	$NetBSD: param.h,v 1.51 2002/02/26 15:13:26 simonb Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -54,6 +54,9 @@
 #define	MACHINE_ARCH	"sparc"
 #define	MID_MACHINE	MID_SPARC
 
+#ifdef _KERNEL_OPT
+#include "opt_sparc_arch.h"
+#endif
 #ifdef _KERNEL				/* XXX */
 #ifndef _LOCORE				/* XXX */
 #include <machine/cpu.h>		/* XXX */
@@ -111,23 +114,25 @@ extern int nbpg, pgofset, pgshift;
  * of the hardware page size.
  */
 #define	MSIZE		256		/* size of an mbuf */
-#define	MCLBYTES	2048		/* enough for whole Ethernet packet */
-#define	MCLSHIFT	11		/* log2(MCLBYTES) */
-#define	MCLOFSET	(MCLBYTES - 1)
 
-#if defined(_KERNEL) && !defined(_LKM)
-#include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#ifndef MCLSHIFT
+#define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
+					/* 2K cluster can hold Ether frame */
+#endif	/* MCLSHIFT */
+
+#define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
 
 #ifndef NMBCLUSTERS
+#if defined(_KERNEL_OPT)
+#include "opt_gateway.h"
+#endif
+
 #ifdef GATEWAY
 #define	NMBCLUSTERS	512		/* map size, max cluster allocation */
 #else
 #define	NMBCLUSTERS	256		/* map size, max cluster allocation */
 #endif
 #endif
-
-#define MSGBUFSIZE	4096
 
 /*
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
@@ -157,33 +162,39 @@ extern int nbpg, pgofset, pgshift;
 #define	bdbtofsb(bn)	((bn) / (BLKDEV_IOSIZE / DEV_BSIZE))
 
 /*
- * dvmamap manages a range of DVMA addresses intended to create double
- * mappings of physical memory. In a way, `dvmamap' is a submap of the
- * VM map `phys_map'. The difference is the use of the `resource map'
- * routines to manage page allocation, allowing DVMA addresses to be
- * allocated and freed from within interrupt routines.
- *
- * Note that `phys_map' can still be used to allocate memory-backed pages
- * in DVMA space.
- */
-#if defined(_KERNEL) || defined(_STANDALONE)
-#ifndef _LOCORE
-
-extern void	delay __P((unsigned int));
-#define	DELAY(n)	delay(n)
-
-extern int cputyp;
-
-#endif /* _LOCORE */
-#endif /* _KERNEL */
-
-/*
  * Values for the cputyp variable.
  */
 #define CPU_SUN4	0
 #define CPU_SUN4C	1
 #define CPU_SUN4M	2
 #define CPU_SUN4U	3
+
+#if defined(_KERNEL) || defined(_STANDALONE)
+#ifndef _LOCORE
+
+extern int cputyp;
+
+extern void	delay __P((unsigned int));
+#define	DELAY(n)	delay(n)
+#endif /* _LOCORE */
+
+
+/*
+ * microSPARC-IIep is a sun4m but with an integrated PCI controller.
+ * In a lot of places (like pmap &c) we want it to be treated as SUN4M.
+ * But since various low-level things are done very differently from
+ * normal sparcs (and since for now it requires a relocated kernel
+ * anyway), the MSIIEP kernels are not supposed to support any other
+ * system.  So insist on SUN4M defined and SUN4 and SUN4C not defined.
+ */
+#if defined(MSIIEP)
+#if defined(SUN4) || defined(SUN4C)
+#error "microSPARC-IIep kernels cannot support sun4 or sun4c"
+#endif
+#if !defined(SUN4M)
+#error "microSPARC-IIep kernel must have 'options SUN4M'"
+#endif
+#endif /* MSIIEP */
 
 /*
  * Shorthand CPU-type macros. Enumerate all eight cases.
@@ -273,3 +284,4 @@ extern int cputyp;
 #	define PGOFSET		pgofset
 #	define PGSHIFT		pgshift
 #endif
+#endif /* _KERNEL || _STANDALONE */

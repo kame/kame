@@ -1,4 +1,4 @@
-/*      $NetBSD: pte.h,v 1.14.2.1 2000/10/17 01:41:32 tv Exp $      */
+/*	$NetBSD: pte.h,v 1.19 2001/08/31 04:44:57 simonb Exp $	  */
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -51,7 +51,7 @@ struct pte {
 
 typedef struct pte	pt_entry_t;	/* Mach page table entry */
 
-#endif _LOCORE
+#endif /* _LOCORE */
 
 #define PT_ENTRY_NULL	((pt_entry_t *) 0)
 
@@ -78,26 +78,32 @@ extern pt_entry_t *Sysmap;
  */
 #endif
 
+#ifdef __ELF__
+#define VAX_SYSMAP	"Sysmap"
+#else
+#define VAX_SYSMAP	"_Sysmap"
+#endif
+
 #ifdef __GNUC__
 #define kvtopte(va) ({ \
 	struct pte *r; \
-	asm("extzv $9,$21,%1,%0;moval *_Sysmap[%0],%0" : "=r"(r) : "g"(va)); \
+	asm("extzv $9,$21,%1,%0;moval *" VAX_SYSMAP "[%0],%0" : "=r"(r) : "g"(va)); \
 	r; \
 })
 #define kvtophys(va) ({ \
-	long r; \
-	asm("extzv $9,$21,%1,%0;ashl $9,*_Sysmap[%0],%0;insv %1,$0,$9,%0" \
-	    : "&=r"(r) : "g"(va) : "cc"); \
+	paddr_t r; \
+	asm("extzv $9,$21,%1,%0;ashl $9,*" VAX_SYSMAP "[%0],%0;insv %1,$0,$9,%0" \
+	    : "=&r"(r) : "g"(va) : "cc"); \
 	r; \
 })
 #else /* __GNUC__ */
 #define kvtophys(va) \
-	(((kvtopte(va))->pg_pfn << VAX_PGSHIFT) | ((int)(va) & VAX_PGOFSET))
+	(((kvtopte(va))->pg_pfn << VAX_PGSHIFT) | ((paddr_t)(va) & VAX_PGOFSET))
 #define kvtopte(va) (&Sysmap[PG_PFNUM(va)])
 #endif /* __GNUC__ */
 #define uvtopte(va, pcb) \
-	(((unsigned)va < 0x40000000) ? \
-	&((pcb->P0BR)[PG_PFNUM(va)]) : \
-	&((pcb->P1BR)[PG_PFNUM(va)]))
+	(((vaddr_t)va < 0x40000000) ? \
+	&(((pcb)->P0BR)[PG_PFNUM(va)]) : \
+	&(((pcb)->P1BR)[PG_PFNUM(va)]))
 
 #endif

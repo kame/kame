@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.43 2000/06/04 04:30:48 takemura Exp $	*/
+/*	$NetBSD: main.c,v 1.58 2001/07/17 01:41:39 toshii Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 Shin Takemura.
@@ -59,7 +59,7 @@
  */
 TCHAR *version_string = 
 	TEXT("PocketBSD boot loader\r\n")
-	TEXT("Version 1.14.0 2000.06.04\r\n")
+	TEXT("Version 1.17.5 2001.05.05\r\n")
 #if ( _WIN32_WCE < 200 )
 	TEXT("Compiled for WinCE 1.01\r\n")
 #else
@@ -86,6 +86,8 @@ struct fb_type {
 	TCHAR *name;
 };
 
+
+
 struct fb_setting {
 	TCHAR *name;
 	int type;
@@ -100,12 +102,15 @@ struct fb_setting {
 
 -----------------------------------------------------------------------------*/
 HINSTANCE  hInst = NULL;
-HWND		hWndMain;
+HWND		hDlgMain;
+HWND		hBack;
 HWND		hWndCB = NULL;
 HWND		hDlgLoad = NULL;
 unsigned int	dlgStatus;
 int		user_define_idx;
 int		osversion;
+BOOL booting = FALSE;
+int how_long_to_boot = -1;
 
 /*-----------------------------------------------------------------------------
 
@@ -114,6 +119,7 @@ int		osversion;
 -----------------------------------------------------------------------------*/
 TCHAR szAppName[ ] = TEXT("PocketBSD boot");
 TCHAR szTitle[ ]   = TEXT("Welcome to PocketBSD!");
+int errno;
 
 /*
  * Wince_conf  identify executable binary file.
@@ -124,10 +130,17 @@ static char *wince_conf = "Compiled for WinCE 1.01";
 static char *wince_conf = "Compiled for WinCE 2.00";
 #endif
 
+#define IDD_TIMER 300
+
 struct fb_type fb_types[] = {
 	{ BIFB_D2_M2L_3,	TEXT(BIFBN_D2_M2L_3)	},
 	{ BIFB_D2_M2L_3x2,	TEXT(BIFBN_D2_M2L_3x2)	},
 	{ BIFB_D2_M2L_0,	TEXT(BIFBN_D2_M2L_0)	},
+	{ BIFB_D2_M2L_0x2,	TEXT(BIFBN_D2_M2L_0x2)	},
+	{ BIFB_D4_M2L_F,	TEXT(BIFBN_D4_M2L_F)	},
+	{ BIFB_D4_M2L_Fx2,	TEXT(BIFBN_D4_M2L_Fx2)	},
+	{ BIFB_D4_M2L_0,	TEXT(BIFBN_D4_M2L_0)	},
+	{ BIFB_D4_M2L_0x2,	TEXT(BIFBN_D4_M2L_0x2)	},
 	{ BIFB_D8_00,		TEXT(BIFBN_D8_00)	},
 	{ BIFB_D8_FF,		TEXT(BIFBN_D8_FF)	},
 	{ BIFB_D16_0000,	TEXT(BIFBN_D16_0000)	},
@@ -139,6 +152,10 @@ int fb_size[] = {
 	768, 800, 1024, 1150, 1280, 1600
 };
 
+int boot_times[] = {
+	30,25,20,15,10,5
+};
+
 int fb_bpl[] = {
 	40, 80, 128, 160, 240, 256, 320,
 	384, 400, 480, 512, 600, 640, 768, 800, 1024, 1150, 1280, 1600
@@ -146,8 +163,13 @@ int fb_bpl[] = {
 
 struct fb_setting fb_settings[] = {
 	/*
-	 * You must choose fb_type to make the screen look black-on-white.
-	 * (Foreground color is black and background color is white.)
+	 * You must choose fb_type to make the screen looks like:
+	 *   black-on-white on monochrome or gray scale screen
+	 *   white-on-black on color screen
+	 * without 'reverse video' on the properties daialog.
+	 *
+	 * 'black-on-white' means that Foreground color is black and 
+	 * background color is white.
 	 */
 	{ NULL, BIFB_D2_M2L_3,
 		320, 240, 80, 0xa000000,
@@ -179,6 +201,9 @@ struct fb_setting fb_settings[] = {
 	{ TEXT("MobileGearII MC-R320"), BIFB_D2_M2L_0,
 		640, 240, 160, 0xa000000,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_NEC_MCR_320 },
+	{ TEXT("MobileGearII MC/R330"), BIFB_D2_M2L_0,
+		640, 240, 160, 0xa000000,
+		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_NEC_MCR_330 },
 	{ TEXT("MobileGearII MC/R430"), BIFB_D16_0000,
 		640, 240, 1280, 0xa180100,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_NEC_MCR_430 },
@@ -203,6 +228,9 @@ struct fb_setting fb_settings[] = {
 	{ TEXT("MobileGearII MC/R530"), BIFB_D16_0000,
 		640, 240, 1280, 0xa180100,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_NEC_MCR_530 },
+	{ TEXT("DoCoMo sigmarion"), BIFB_D16_0000,
+		640, 240, 1280, 0xa000000,
+		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_NEC_MCR_SIGMARION },
 	{ TEXT("Mobile Pro 770"), BIFB_D16_0000,
 		640, 240, 1600, 0xa000000,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_NEC_MCR_520A },
@@ -242,12 +270,21 @@ struct fb_setting fb_settings[] = {
 	{ TEXT("E-500"), BIFB_D16_FFFF,
 		240, 320, 512, 0xa200000,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_CASIO_CASSIOPEIAE_E500 },
+	{ TEXT("PocketPostPet"), BIFB_D16_FFFF,
+		320, 240, 1024, 0xa200000,
+		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_CASIO_POCKETPOSTPET_POCKETPOSTPET },
 	{ TEXT("INTERTOP CX300"), BIFB_D8_00,
 		640, 480, 640, 0xa000000,
+		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_FUJITSU_INTERTOP_IT300 },
+	{ TEXT("INTERTOP CX300(16bpp)"), BIFB_D16_0000,
+		640, 480, 1280, 0xa000000,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_FUJITSU_INTERTOP_IT300 },
 	{ TEXT("INTERTOP CX310"), BIFB_D8_00,
 		640, 480, 640, 0xa000000,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_FUJITSU_INTERTOP_IT310 },
+	{ TEXT("PenCentra 130"), BIFB_D8_00,
+		640, 480, 640, 0x10201e00,
+		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_FUJITSU_PENCENTRA_130 },
 	{ TEXT("IBM WorkPad z50"), BIFB_D16_0000,
 		640, 480, 1280, 0xa000000,
 		PLATID_CPU_MIPS_VR_4121, PLATID_MACH_IBM_WORKPAD_26011AU },
@@ -266,8 +303,11 @@ struct fb_setting fb_settings[] = {
 	{ TEXT("Compaq PRESARIO 213"), BIFB_D8_00,
 		320, 240, 0, 0,
 		PLATID_CPU_MIPS_VR_4111, PLATID_MACH_COMPAQ_PRESARIO_213 },
-	{ TEXT("Compaq Aero 1530"), BIFB_D2_M2L_0,
-		320, 240, 0, 0,
+	{ TEXT("Compaq Aero 1530"), BIFB_D4_M2L_F,
+		320, 240, 160, 0x0a000000,
+		PLATID_CPU_MIPS_VR_4111, PLATID_MACH_COMPAQ_AERO_1530 },
+	{ TEXT("Aero1530(Small Font)"), BIFB_D4_M2L_Fx2,
+		640, 240, 160, 0x0a000000,
 		PLATID_CPU_MIPS_VR_4111, PLATID_MACH_COMPAQ_AERO_1530 },
 	{ TEXT("Victor InterLink MP-C101"), BIFB_D16_0000,
 		640, 480, 0, 0,
@@ -293,9 +333,9 @@ struct fb_setting fb_settings[] = {
 #define UNICODE_MEMORY_CARD \
 	TEXT('\\'), 0xff92, 0xff93, 0xff98, TEXT(' '), 0xff76, 0xff70, \
 	0xff84, 0xff9e
-TCHAR unicode_memory_card[] = { UNICODE_MEMORY_CARD,  TEXT('\\') };
-TCHAR unicode_memory_card1[] = { UNICODE_MEMORY_CARD,  TEXT('1'), TEXT('\\') };
-TCHAR unicode_memory_card2[] = { UNICODE_MEMORY_CARD,  TEXT('2'), TEXT('\\') };
+TCHAR unicode_memory_card[] = { UNICODE_MEMORY_CARD,  TEXT('\\'), 0 };
+TCHAR unicode_memory_card1[] = { UNICODE_MEMORY_CARD, TEXT('1'),TEXT('\\'),0 };
+TCHAR unicode_memory_card2[] = { UNICODE_MEMORY_CARD, TEXT('2'),TEXT('\\'),0 };
 #endif
 
 #define LANGID_DEFAULT MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT)
@@ -337,6 +377,7 @@ int kernel_list_items = ARRAYSIZEOF(kernel_list);
   function prototypes
 
 -----------------------------------------------------------------------------*/
+BOOL CALLBACK MainDlgProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void SetBootInfo(struct bootinfo *bi, struct fb_setting *fbs);
 void wstrcpy(TCHAR* dst, TCHAR* src);
@@ -363,6 +404,8 @@ int reverse_fb_type(int type)
 	} types[] = {
 		{ BIFB_D2_M2L_3,	BIFB_D2_M2L_0	},
 		{ BIFB_D2_M2L_3x2,	BIFB_D2_M2L_0x2	},
+		{ BIFB_D4_M2L_F,	BIFB_D4_M2L_0	},
+		{ BIFB_D4_M2L_Fx2,	BIFB_D4_M2L_0x2	},
 		{ BIFB_D8_FF,		BIFB_D8_00		},
 		{ BIFB_D16_FFFF,	BIFB_D16_0000,	},
 	};
@@ -384,8 +427,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 {
 	MSG          msg;
 	WNDCLASS     wc;
-	int i, idx;
-	RECT rect;
+	HDC hdc;
+	int i, idx,width,height;
+
 #if ( 200 <= _WIN32_WCE )
 	OSVERSIONINFO	osverinfo;
 
@@ -440,11 +484,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 	hardware_test();
 
-	/*
-	 *	Main Window
-         */
-#define WS_EX_CONTROLPARENT     0x00010000L
-	hWndMain = CreateWindowEx((osversion < 211) ? 0 : WS_EX_CONTROLPARENT,
+
+	hBack = CreateWindowEx(0,
 				  szAppName,
 				  szTitle,
 				  WS_VISIBLE,
@@ -457,24 +498,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 				  hInstance,
 				  NULL);
 
-	GetClientRect(hWndMain, &rect);
-	if (rect.right < rect.bottom) {
-		/*
-		 *	portrait
-		 */
-		CreateMainWindow(hInst, hWndMain,
-				 MAKEINTRESOURCE(IDD_MAIN_240X320),
-				 CommandBar_Height(hWndCB));
-	} else {
-		/*
-		 *	landscape
-		 */
-		CreateMainWindow(hInst, hWndMain,
-				 MAKEINTRESOURCE(IDD_MAIN_640X240),
-				 CommandBar_Height(hWndCB));
+
+	hdc = GetDC(0);
+	width = GetDeviceCaps(hdc,HORZRES);
+	height = GetDeviceCaps(hdc,VERTRES);
+	ReleaseDC(0,hdc);
+
+	if(width > height){
+		hDlgMain = CreateDialog(hInstance,MAKEINTRESOURCE(IDD_MAIN_320X240),hBack,MainDlgProc); 
 	}
-	SetFocus(GetDlgItem(hWndMain, IDC_BOOT));
-	SetForegroundWindow(hWndMain);
+	else{
+		hDlgMain = CreateDialog(hInstance,MAKEINTRESOURCE(IDD_MAIN_240X320),hBack,MainDlgProc);
+	}
+
+	SetFocus(GetDlgItem(hDlgMain, IDC_BOOT));
+	SetForegroundWindow(hDlgMain);
 
 	/*
 	 *  load preferences
@@ -522,57 +560,69 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			TCHAR tmpbuf[1024];
 			wsprintf(tmpbuf, TEXT("%s%S"),
 			    path_list[i].name, "netbsd");
-			SendDlgItemMessage(hWndMain, IDC_KERNEL,
+			SendDlgItemMessage(hDlgMain, IDC_KERNEL,
 			    CB_ADDSTRING, 0, (LPARAM)tmpbuf);
 		}
 	}
 #ifdef ADDITIONAL_KERNELS
 	for (i = 0; i < kernel_list_items; i++) {
-		SendDlgItemMessage(hWndMain, IDC_KERNEL, CB_ADDSTRING, 0,
+		SendDlgItemMessage(hDlgMain, IDC_KERNEL, CB_ADDSTRING, 0,
 				   (LPARAM)kernel_list[i]);
 	}
 #endif
 	/*
-	SendDlgItemMessage(hWndMain, IDC_KERNEL, CB_SETCURSEL, 0,
+	SendDlgItemMessage(hDlgMain, IDC_KERNEL, CB_SETCURSEL, 0,
 			   (LPARAM)NULL);
 	*/
-	SetDlgItemText(hWndMain, IDC_KERNEL, pref.kernel_name);
-	SetDlgItemText(hWndMain, IDC_OPTIONS, pref.options);
+	SetDlgItemText(hDlgMain, IDC_KERNEL, pref.kernel_name);
+	SetDlgItemText(hDlgMain, IDC_OPTIONS, pref.options);
 
 	/*
 	 *  Frame Buffer setting names.
 	 */
 	for (i = 0; i < ARRAYSIZEOF(fb_settings); i++) {
-		idx = SendDlgItemMessage(hWndMain, IDC_FBSELECT, CB_ADDSTRING,
+		idx = SendDlgItemMessage(hDlgMain, IDC_FBSELECT, CB_ADDSTRING,
 					 0, (LPARAM)fb_settings[i].name);
-		SendDlgItemMessage(hWndMain, IDC_FBSELECT,
+		SendDlgItemMessage(hDlgMain, IDC_FBSELECT,
 				   CB_SETITEMDATA, idx, (LPARAM)i);
 		if (i == 0) {
 			user_define_idx = idx;
 		}
 	}
-	SendDlgItemMessage(hWndMain, IDC_FBSELECT, CB_SETCURSEL,
+	SendDlgItemMessage(hDlgMain, IDC_FBSELECT, CB_SETCURSEL,
 			   pref.setting_idx, (LPARAM)NULL);
-	/*
-	 *  Check box, 'Pause before boot'
-	 */
-	SendDlgItemMessage(hWndMain, IDC_PAUSE, BM_SETCHECK,
-			   pref.check_last_chance, 0);
-	SendDlgItemMessage(hWndMain, IDC_DEBUG, BM_SETCHECK,
-			   pref.load_debug_info, 0);
-	SendDlgItemMessage(hWndMain, IDC_COMM, BM_SETCHECK,
-			   pref.serial_port, 0);
-	SendDlgItemMessage(hWndMain, IDC_REVERSEVIDEO, BM_SETCHECK,
-			   pref.reverse_video, 0);
 
+	if(pref.autoboot){
+		if(pref.boot_time > 0){/* 0 can't use */
+			booting = TRUE;
+			how_long_to_boot = pref.boot_time;
+			SetTimer(hDlgMain,IDD_TIMER,1000,NULL);
+			stat_printf(
+				TEXT("autoboot after %d second,tap or hit any key to interrupt"),
+				pref.boot_time);
+		}
+	}
 	/*
 	 *  Map window and message loop
 	 */
-	ShowWindow(hWndMain, SW_SHOW);
-	UpdateWindow(hWndMain);
+	ShowWindow(hDlgMain, SW_SHOW);
+	UpdateWindow(hDlgMain);
+
+
 	while (GetMessage(&msg, NULL, 0, 0)) {
-		if (osversion < 211 ||
-		    hWndMain == 0 || !IsDialogMessage(hWndMain, &msg)) {
+	//	if (osversion < 211 ||
+		if(booting){
+			if(msg.message == WM_KEYDOWN || msg.message == WM_LBUTTONDOWN){
+				booting = FALSE;
+				how_long_to_boot = -1;
+				KillTimer(hDlgMain,IDD_TIMER);
+				stat_printf(TEXT("interrupt"));
+				continue;
+			}
+		}
+			
+		if(!IsDialogMessage(hDlgMain, &msg)) {
+		
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
@@ -584,6 +634,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 BOOL CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message) {
+
 	case WM_INITDIALOG:
 		return (1);
 
@@ -615,6 +666,7 @@ BOOL CALLBACK DlgProc2(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 
 	case WM_COMMAND:
+	
 		switch (LOWORD(wParam)) {
 		case IDC_ABOUT_EDIT:
 			switch (HIWORD(wParam)) {
@@ -628,6 +680,120 @@ BOOL CALLBACK DlgProc2(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDCANCEL:
 			EndDialog(hWnd, LOWORD(wParam));
 			return (1);
+		}
+		break;
+	default:
+		return (0);
+	}
+}
+
+
+
+BOOL CALLBACK PropDlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	HWND hwnd;
+	TCHAR tempbuf[PATHBUFLEN];
+	static BOOL autop;
+	int i;
+	switch (message) {
+	case WM_INITDIALOG:
+		autop = pref.autoboot;
+
+		SendDlgItemMessage(hWnd, IDC_PAUSE, BM_SETCHECK,
+			   pref.check_last_chance, 0);
+		SendDlgItemMessage(hWnd, IDC_DEBUG, BM_SETCHECK,
+			   pref.load_debug_info, 0);
+		SendDlgItemMessage(hWnd, IDC_COMM, BM_SETCHECK,
+			   pref.serial_port, 0);
+		SendDlgItemMessage(hWnd, IDC_REVERSEVIDEO, BM_SETCHECK,
+			   pref.reverse_video, 0);
+		SendDlgItemMessage(hWnd,IDC_AUTOBOOT,BM_SETCHECK,pref.autoboot,0);
+
+		for (i = 0; i < ARRAYSIZEOF(boot_times); i++) {
+			wsprintf(tempbuf, TEXT("%d"), boot_times[i]);
+			SendDlgItemMessage(hWnd, IDC_BOOT_TIME, CB_ADDSTRING,
+					   0, (LPARAM)tempbuf);			
+		}
+
+		if(pref.boot_time){
+			wsprintf(tempbuf,TEXT("%d"),pref.boot_time);
+			SetDlgItemText(hWnd,IDC_BOOT_TIME,tempbuf);
+		}
+		else{
+			wsprintf(tempbuf, TEXT("%d"), boot_times[0]);
+			SendDlgItemMessage(hWnd, IDC_BOOT_TIME, CB_ADDSTRING,
+					   0, (LPARAM)tempbuf);	
+		}
+
+		
+		hwnd = GetDlgItem(hWnd,IDC_BOOT_TIME);		
+		EnableWindow(hwnd,pref.autoboot);			
+	
+		return (1);
+
+	case WM_PALETTECHANGED:
+		palette_check(hWnd);
+		break;
+
+	case WM_COMMAND:
+		switch (LOWORD(wParam)) {
+		case IDC_AUTOBOOT:
+			autop = !autop;
+			SendDlgItemMessage(hWnd,IDC_AUTOBOOT,BM_SETCHECK,
+				autop,0);
+
+			hwnd = GetDlgItem(hWnd,IDC_BOOT_TIME);		
+			EnableWindow(hwnd,autop);	
+			
+			break;
+		case IDPROPOK:
+			if (SendDlgItemMessage(hWnd, IDC_PAUSE,
+					       BM_GETCHECK, 0, 0) ==
+								BST_CHECKED) {
+				pref.check_last_chance = TRUE;
+			} else {
+				pref.check_last_chance = FALSE;
+			}
+
+			if (SendDlgItemMessage(hWnd, IDC_DEBUG,
+					       BM_GETCHECK, 0, 0) ==
+								BST_CHECKED) {
+				pref.load_debug_info = TRUE;
+			} else {
+				pref.load_debug_info = FALSE;
+			}
+
+			if (SendDlgItemMessage(hWnd, IDC_COMM,
+					       BM_GETCHECK, 0, 0) ==
+								BST_CHECKED) {
+				pref.serial_port = TRUE;
+			} else {
+				pref.serial_port = FALSE;
+			}
+
+			if (SendDlgItemMessage(hWnd, IDC_REVERSEVIDEO,
+					       BM_GETCHECK, 0, 0) ==
+								BST_CHECKED) {
+				pref.reverse_video = TRUE;
+			} else {
+				pref.reverse_video = FALSE;
+			}
+			
+			if (SendDlgItemMessage(hWnd, IDC_AUTOBOOT,
+					       BM_GETCHECK, 0, 0) ==
+								BST_CHECKED) {
+				pref.autoboot = TRUE;
+			} else {
+				pref.autoboot = FALSE;
+			}
+			GetDlgItemText(hWnd,IDC_BOOT_TIME,tempbuf,PATHBUFLEN);
+			pref.boot_time = _wtoi(tempbuf);
+
+			EndDialog(hWnd, 0);
+			return (1);
+		case IDCANCEL:
+			EndDialog(hWnd,0);
+			return(1);
 		}
 		break;
 	default:
@@ -925,7 +1091,173 @@ BOOL CheckCancel(int progress)
 	return (dlgStatus != 0);
 }
 
+BOOL BootKernel(int directboot)
+{
+	int argc;
+	int i;
+	TCHAR wkernel_name[PATHBUFLEN];
+	TCHAR woptions[PATHBUFLEN];
+	
+	char options[PATHBUFLEN*2], kernel_name[PATHBUFLEN*2];
+	
+	platid_t platid;
+	
+	char *p, *argv[32];
+	struct bootinfo bi;
+
+	if (GetDlgItemText(hDlgMain, IDC_KERNEL, wkernel_name,
+		sizeof(wkernel_name)) == 0) {      
+		MessageBox (NULL, TEXT("Kernel name required"),
+			szAppName, MB_OK);
+		return FALSE;
+	}				
+	GetDlgItemText(hDlgMain, IDC_OPTIONS,
+		woptions, sizeof(woptions));
+	if (wcstombs(options, woptions, sizeof(options)) < 0 ||
+		wcstombs(kernel_name, wkernel_name,
+			     sizeof(kernel_name)) < 0) {
+		MessageBox (NULL, TEXT("invalid character"),
+			szAppName, MB_OK);
+		return FALSE;
+	}
+	
+	argc = 0;
+	argv[argc++] = kernel_name;
+	p = options;
+	while (*p) {
+		while (*p == ' ' || *p == '\t') {
+			p++;
+		}
+		if (*p == '\0') 
+			return FALSE;
+		if (ARRAYSIZEOF(argv) <= argc) {
+			MessageBox (NULL,
+				TEXT("too many options"),
+				szAppName, MB_OK);
+			argc++;
+			break;
+		} else {
+			argv[argc++] = p;
+		}
+		while (*p != ' ' && *p != '\t' && *p != '\0') {
+			p++;
+		}
+		if (*p == '\0') {
+			break;
+		} else {
+			*p++ = '\0';
+		}
+	}
+	if (ARRAYSIZEOF(argv) < argc) {
+		return FALSE;
+	}
+	
+	
+	EnableWindow(hDlgMain, FALSE);
+	
+	if (directboot || (MessageBox (hDlgMain,
+		TEXT("Data in memory will be lost.\nAre you sure?"),
+		szAppName,
+		MB_YESNO | MB_DEFBUTTON2 | MB_ICONHAND) == IDYES)) {
+		booting = FALSE;
+		dlgStatus = 0;
+		hDlgLoad =
+			CreateDialog(hInst,
+					       MAKEINTRESOURCE(IDD_LOAD),
+						   hDlgMain, DlgProc);
+		ShowWindow(hDlgLoad, SW_SHOWNORMAL);
+		BringWindowToTop(hDlgLoad);
+		
+		/*
+		*  save settings.
+		*/
+		pref.fb_type		= fb_settings[0].type;
+		pref.fb_width		= fb_settings[0].width;
+		pref.fb_height		= fb_settings[0].height;
+		pref.fb_linebytes	= fb_settings[0].linebytes;
+		pref.fb_addr		= fb_settings[0].addr;
+		pref.platid_cpu		= fb_settings[0].platid_cpu;
+		pref.platid_machine	= fb_settings[0].platid_machine;
+		wstrcpy(pref.kernel_name, wkernel_name);
+		wstrcpy(pref.options, woptions);
+		
+		pref_save(path_list, path_list_items);
+		
+		SetBootInfo(&bi, &fb_settings[pref.setting_idx]);
+		debug_printf(TEXT("Args: "));
+		for (i = 0; i < argc; i++) {
+			debug_printf(TEXT("'%S' "), argv[i]);
+		}
+		debug_printf(TEXT("\n"));
+		debug_printf(TEXT("Bootinfo: fb_type=%d 0x%X %dx%d %d\n"),
+			bi.fb_type, bi.fb_addr,
+			bi.fb_width, bi.fb_height,
+			bi.fb_line_bytes);
+		
+		if (pref.serial_port) {
+			SerialPort(TRUE);
+		}
+		if (pref.reverse_video) {
+			bi.fb_type = reverse_fb_type(bi.fb_type);
+		}
+		/* 
+		* Set system information
+		*/
+		platid.dw.dw0 = bi.platid_cpu;
+		platid.dw.dw1 = bi.platid_machine;
+		if (set_system_info(&platid)) {
+		/*
+		*  boot !
+			*/
+			pbsdboot(wkernel_name, argc, argv, &bi);
+		}
+		/*
+		*  Not return.
+		*/
+		
+		if (pref.serial_port) {
+			SerialPort(FALSE);
+		}
+		
+		DestroyWindow(hDlgLoad);
+	}
+	EnableWindow(hDlgMain, TRUE);
+
+	return FALSE;
+}
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message,
+						 WPARAM wParam, LPARAM lParam ){
+	switch (message) {
+	case WM_CREATE:
+		palette_init(hWnd);
+		break;
+
+	case WM_PALETTECHANGED:
+		palette_check(hWnd);
+		break;
+
+	 case WM_QUERYNEWPALETTE:
+		return(TRUE);
+
+	case WM_CLOSE:
+	        sndPlaySound(TEXT("Close"), SND_NODEFAULT | SND_ASYNC);
+
+		DestroyWindow(hWnd);
+		break;
+
+	case WM_DESTROY:
+	        PostQuitMessage(0);
+		break;
+
+	default:
+        	return (DefWindowProc(hWnd, message, wParam, lParam));
+
+	}
+	return 0;
+}
+
+BOOL CALLBACK MainDlgProc(HWND hWnd, UINT message,
                           WPARAM wParam, LPARAM lParam )
 {
 	int i, idx;
@@ -935,9 +1267,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message,
 		sndPlaySound(TEXT("OpenProg"), SND_NODEFAULT | SND_ASYNC);
 		hWndCB = CommandBar_Create(hInst, hWnd, 1);
 		CommandBar_AddAdornments(hWndCB, STD_HELP, (DWORD)NULL);
-		palette_init(hWnd);
 		break;
-
 	case WM_PAINT:
 		{
 		HDC          hdc;
@@ -960,182 +1290,48 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message,
 		DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUT), hWnd, DlgProc2);
         break;
 
+
+	case WM_TIMER:
+		if(!booting){/* ignore! */
+			KillTimer(hWnd,IDD_TIMER);
+			stat_printf(TEXT("interrupt2"));
+			return (1);
+		}
+		if(how_long_to_boot > 0){
+			how_long_to_boot--;
+			stat_printf(
+				TEXT("autoboot after %d second,tap or hit any key to interrupt"),
+				how_long_to_boot);
+		}
+		else{
+			KillTimer(hWnd,IDD_TIMER);
+			BootKernel(1);
+		}
+		break;
+	
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
 		case IDC_BOOT:
-			{
-		       	int argc;
-		       	TCHAR wkernel_name[PATHBUFLEN];
-			TCHAR woptions[PATHBUFLEN];
-			char options[PATHBUFLEN*2], kernel_name[PATHBUFLEN*2];
-			platid_t platid;
-
-			char *p, *argv[32];
-			struct bootinfo bi;
-
-			if (SendDlgItemMessage(hWndMain, IDC_PAUSE,
-					       BM_GETCHECK, 0, 0) ==
-								BST_CHECKED) {
-				pref.check_last_chance = TRUE;
-			} else {
-				pref.check_last_chance = FALSE;
-			}
-
-			if (SendDlgItemMessage(hWndMain, IDC_DEBUG,
-					       BM_GETCHECK, 0, 0) ==
-								BST_CHECKED) {
-				pref.load_debug_info = TRUE;
-			} else {
-				pref.load_debug_info = FALSE;
-			}
-
-			if (SendDlgItemMessage(hWndMain, IDC_COMM,
-					       BM_GETCHECK, 0, 0) ==
-								BST_CHECKED) {
-				pref.serial_port = TRUE;
-			} else {
-				pref.serial_port = FALSE;
-			}
-
-			if (SendDlgItemMessage(hWndMain, IDC_REVERSEVIDEO,
-					       BM_GETCHECK, 0, 0) ==
-								BST_CHECKED) {
-				pref.reverse_video = TRUE;
-			} else {
-				pref.reverse_video = FALSE;
-			}
-
-			if (GetDlgItemText(hWndMain, IDC_KERNEL, wkernel_name,
-					   sizeof(wkernel_name)) == 0) {      
-				MessageBox (NULL, TEXT("Kernel name required"),
-					    szAppName, MB_OK);
-				break;
-			}				
-			GetDlgItemText(hWndMain, IDC_OPTIONS,
-				       woptions, sizeof(woptions));
-			if (wcstombs(options, woptions, sizeof(options)) < 0 ||
-			    wcstombs(kernel_name, wkernel_name,
-				     sizeof(kernel_name)) < 0) {
-				MessageBox (NULL, TEXT("invalid character"),
-					    szAppName, MB_OK);
-				break;				
-			}
-
-			argc = 0;
-			argv[argc++] = kernel_name;
-			p = options;
-			while (*p) {
-				while (*p == ' ' || *p == '\t') {
-					p++;
-				}
-				if (*p == '\0') 
-					break;
-				if (ARRAYSIZEOF(argv) <= argc) {
-					MessageBox (NULL,
-						    TEXT("too many options"),
-						    szAppName, MB_OK);
-					argc++;
-					break;				
-				} else {
-					argv[argc++] = p;
-				}
-				while (*p != ' ' && *p != '\t' && *p != '\0') {
-					p++;
-				}
-				if (*p == '\0') {
-					break;
-				} else {
-					*p++ = '\0';
-				}
-			}
-			if (ARRAYSIZEOF(argv) < argc) {
-				break;
-			}
-
-			EnableWindow(hWndMain, FALSE);
-			if (MessageBox (hWndMain,
-					TEXT("Data in memory will be lost.\nAre you sure?"),
-					szAppName,
-					MB_YESNO | MB_DEFBUTTON2 | MB_ICONHAND) == IDYES) {
-				dlgStatus = 0;
-				hDlgLoad =
-				  CreateDialog(hInst,
-					       MAKEINTRESOURCE(IDD_LOAD),
-					       hWndMain, DlgProc);
-				ShowWindow(hDlgLoad, SW_SHOWNORMAL);
-				BringWindowToTop(hDlgLoad);
-
-				/*
-				 *  save settings.
-				 */
-				pref.fb_type		= fb_settings[0].type;
-				pref.fb_width		= fb_settings[0].width;
-				pref.fb_height		= fb_settings[0].height;
-				pref.fb_linebytes	= fb_settings[0].linebytes;
-				pref.fb_addr		= fb_settings[0].addr;
-				pref.platid_cpu		= fb_settings[0].platid_cpu;
-				pref.platid_machine	= fb_settings[0].platid_machine;
-				wstrcpy(pref.kernel_name, wkernel_name);
-				wstrcpy(pref.options, woptions);
-
-				pref_save(path_list, path_list_items);
-
-				SetBootInfo(&bi, &fb_settings[pref.setting_idx]);
-				debug_printf(TEXT("Args: "));
-				for (i = 0; i < argc; i++) {
-					debug_printf(TEXT("'%S' "), argv[i]);
-				}
-				debug_printf(TEXT("\n"));
-				debug_printf(TEXT("Bootinfo: fb_type=%d 0x%X %dx%d %d\n"),
-					     bi.fb_type, bi.fb_addr,
-					     bi.fb_width, bi.fb_height,
-					     bi.fb_line_bytes);
-
-				if (pref.serial_port) {
-					SerialPort(TRUE);
-				}
-				if (pref.reverse_video) {
-					bi.fb_type = reverse_fb_type(bi.fb_type);
-				}
-				/* 
-				 * Set system infomation
-				 */
-				platid.dw.dw0 = bi.platid_cpu;
-				platid.dw.dw1 = bi.platid_machine;
-				if (set_system_info(&platid)) {
-					/*
-					*  boot !
-					*/
-					pbsdboot(wkernel_name, argc, argv, &bi);
-				}
-				/*
-				 *  Not return.
-				 */
-
-				if (pref.serial_port) {
-					SerialPort(FALSE);
-				}
-
-				DestroyWindow(hDlgLoad);
-			}
-			EnableWindow(hWndMain, TRUE);
-			}
+			BootKernel(0);
 			break;
 		case IDC_FBSETTING:
 			if (DialogBox(hInst, MAKEINTRESOURCE(IDD_FB),
-				      hWndMain, FbDlgProc) == IDOK) {
+				      hDlgMain, FbDlgProc) == IDOK) {
 				/* User defined */
 				pref.setting_idx = 0;
-				SendDlgItemMessage(hWndMain, IDC_FBSELECT,
+				SendDlgItemMessage(hDlgMain, IDC_FBSELECT,
 						   CB_DELETESTRING,
 						   (WPARAM)user_define_idx, 0);
-				SendDlgItemMessage(hWndMain, IDC_FBSELECT,
+				SendDlgItemMessage(hDlgMain, IDC_FBSELECT,
 						   CB_INSERTSTRING,
 						   (WPARAM)user_define_idx,
 						   (LPARAM)fb_settings[0].name);
 				SendDlgItemMessage(hWnd, IDC_FBSELECT,
 						   CB_SETCURSEL, 0, 0);
 			}
+			break;
+		case IDC_PROPERTY:
+			DialogBox(hInst, MAKEINTRESOURCE(IDD_PROP), hWnd, PropDlgProc);
 			break;
 		case IDC_FBSELECT:
 			switch (HIWORD(wParam)) {
@@ -1168,8 +1364,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message,
 	        PostQuitMessage(0);
 		break;
 
-	default:
-        	return (DefWindowProc(hWnd, message, wParam, lParam));
 	}
 
 	return (0);

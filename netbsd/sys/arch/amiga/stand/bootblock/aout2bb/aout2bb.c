@@ -1,4 +1,4 @@
-/*	$NetBSD: aout2bb.c,v 1.4 1999/02/16 23:34:10 is Exp $	*/
+/*	$NetBSD: aout2bb.c,v 1.6 2002/01/26 13:17:12 aymeric Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -53,7 +53,7 @@
 #include "aout2bb.h"
 #include "chksum.h"
 
-void usage __P((void));
+void usage(void);
 int intcmp(const void *, const void *);
 int main(int argc, char *argv[]);
 
@@ -66,9 +66,12 @@ int main(int argc, char *argv[]);
 #define BBSIZE 8192
 
 char *progname;
-u_int8_t buffer[BBSIZE];
-u_int32_t relbuf[BBSIZE/sizeof(u_int32_t)]; 
+int bbsize = BBSIZE;
+u_int8_t *buffer;
+u_int32_t *relbuf;
 	/* can't have more relocs than that*/
+
+extern char *optarg;
 
 int
 intcmp(i, j)
@@ -78,7 +81,7 @@ intcmp(i, j)
 
 	r = (*(u_int32_t *)i) < (*(u_int32_t *)j);
 	
-	return 2*r-1; 
+	return 2*r-1;
 }
 
 int
@@ -103,10 +106,13 @@ main(argc, argv)
 	progname = argv[0];
 
 	/* insert getopt here, if needed */
-	while ((c = getopt(argc, argv, "F")) != -1)
+	while ((c = getopt(argc, argv, "FS:")) != -1)
 	switch(c) {
 	case 'F':
 		sumsize = 2;
+		break;
+	case 'S':
+		bbsize = (atoi(optarg) + 511) & ~511;
 		break;
 	default:
 		usage();
@@ -117,10 +123,16 @@ main(argc, argv)
 	if (argc < 2)
 		usage();
 
+	buffer = malloc(bbsize);
+	relbuf = (u_int32_t *)malloc(bbsize);
+	if (buffer == NULL || relbuf == NULL)
+		err(1, "Unable to allocate memory\n");
+
 	ifd = open(argv[0], O_RDONLY, 0);
 	if (ifd < 0)
 		err(1, "Can't open %s", argv[0]);
 
+/* XXX stat(ifd, sb), mmap(0, sb.st_size); */
 	image = mmap(0, 65536, PROT_READ, MAP_FILE|MAP_PRIVATE, ifd, 0);
 	if (image == 0)
 		err(1, "Can't mmap %s", argv[1]);
@@ -152,7 +164,7 @@ main(argc, argv)
 	drsz = ntohl(eh->a_drsize);
 	entry = ntohl(eh->a_entry);
 
-	dprintf(("tsz = 0x%x, dsz = 0x%x, bsz = 0x%x, total 0x%x, entry=0x%x\n", 
+	dprintf(("tsz = 0x%x, dsz = 0x%x, bsz = 0x%x, total 0x%x, entry=0x%x\n",
 		tsz, dsz, bsz, tsz+dsz+bsz, entry));
 
 	if ((trsz+drsz)==0)
@@ -166,14 +178,14 @@ main(argc, argv)
 	/*
 	 * We have one contiguous area allocated by the ROM to us.
 	 */
-	if (tsz+dsz+bsz > BBSIZE)
+	if (tsz+dsz+bsz > bbsize)
 		errx(1, "%s: resulting image too big\n", argv[0]);
 
 	memset(buffer, sizeof(buffer), 0);
 	memcpy(buffer, image + N_TXTOFF(*eh), tsz+dsz);
 
 	/*
-	 * Hm. This tool REALLY should understand more than one 
+	 * Hm. This tool REALLY should understand more than one
 	 * relocator version. For now, check that the relocator at
 	 * the image start does understand what we output.
 	 */
@@ -185,7 +197,7 @@ main(argc, argv)
 			/*NOTREACHED*/
 
 		case RELVER_RELATIVE_BYTES:
-			rpo = buffer + BBSIZE - 1;
+			rpo = buffer + bbsize - 1;
 			delta = -1;
 			break;
 
@@ -304,40 +316,41 @@ main(argc, argv)
 		oldaddr = relbuf[i];
 
 		if (delta < 0 ? rpo <= buffer+tsz+dsz
-		    : rpo >= buffer + BBSIZE)
+		    : rpo >= buffer + bbsize)
 			errx(1, "Relocs don't fit.");
 	}
 	*rpo = 0; rpo += delta;
 	*rpo = 0; rpo += delta;
 	*rpo = 0; rpo += delta;
 
-	printf("using %d bytes.\n", delta > 0 ?
-	    rpo-buffer-tsz-dsz : buffer+BBSIZE-rpo);
+	printf("using %d bytes, %d bytes remaining.\n", delta > 0 ?
+	    rpo-buffer-tsz-dsz : buffer+bbsize-rpo, delta > 0 ?
+	    buffer + bbsize - rpo : rpo - buffer - tsz - dsz);
 	/*
 	 * RELOCs must fit into the bss area.
 	 */
 	if (delta < 0 ? rpo <= buffer+tsz+dsz
-	    : rpo >= buffer + BBSIZE)
+	    : rpo >= buffer + bbsize)
 		errx(1, "Relocs don't fit.");
 
-	((u_int32_t *)buffer)[1] = 0; 
-	((u_int32_t *)buffer)[1] = 
+	((u_int32_t *)buffer)[1] = 0;
+	((u_int32_t *)buffer)[1] =
 	    (0xffffffff - chksum((u_int32_t *)buffer, sumsize * 512 / 4));
 
 	ofd = open(argv[1], O_CREAT|O_WRONLY, 0644);
 	if (ofd < 0)
 		err(1, "Can't open %s", argv[1]);
 
-	if (write(ofd, buffer, BBSIZE) != BBSIZE)
+	if (write(ofd, buffer, bbsize) != bbsize)
 		err(1, "Writing output file");
 
 	exit(0);
 }
 
 void
-usage()
+usage(void)
 {
-	fprintf(stderr, "Usage: %s [-F] bootprog bootprog.bin\n",
+	fprintf(stderr, "Usage: %s [-F] [-S bbsize] bootprog bootprog.bin\n",
 	    progname);
 	exit(1);
 	/* NOTREACHED */

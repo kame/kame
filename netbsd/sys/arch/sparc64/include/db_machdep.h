@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.10 2000/03/16 02:36:58 eeh Exp $ */
+/*	$NetBSD: db_machdep.h,v 1.13 2001/11/09 06:52:25 thorpej Exp $ */
 
 /*
  * Mach Operating System
@@ -33,8 +33,8 @@
  * Machine-dependent defines for new kernel debugger.
  */
 
+#include <uvm/uvm_extern.h>
 
-#include <vm/vm.h>
 #include <machine/frame.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
@@ -57,6 +57,7 @@ typedef struct {
 	struct frame64		ddb_fr;
 	struct trapstate	ddb_ts[5];
 	int			ddb_tl;
+	struct fpstate64	ddb_fpstate;
 } db_regs_t;
 #else
 typedef struct db_regs {
@@ -82,6 +83,7 @@ db_regs_t		ddb_regs;	/* register state */
 #define	DDB_REGS	(&ddb_regs)
 #define	DDB_TF		(&ddb_regs.ddb_tf)
 #define	DDB_FR		(&ddb_regs.ddb_fr)
+#define	DDB_FP		(&ddb_regs.ddb_fpstate)
 
 #if defined(lint)
 #define	PC_REGS(regs)	((regs)->ddb_tf.tf_pc)
@@ -134,7 +136,6 @@ db_addr_t	db_branch_taken __P((int inst, db_addr_t pc, db_regs_t *regs));
 
 #define DB_MACHINE_COMMANDS
 
-void db_machine_init __P((void));
 int kdb_trap __P((int, struct trapframe64 *));
 
 /*

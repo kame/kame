@@ -1,4 +1,4 @@
-/*	$NetBSD: pciidevar.h,v 1.5.2.1 2001/02/04 18:54:48 he Exp $	*/
+/*	$NetBSD: pciidevar.h,v 1.7 2001/06/08 04:48:58 simonb Exp $	*/
 
 /*
  * Copyright (c) 1998 Christopher G. Demetriou.  All rights reserved.
@@ -83,5 +83,7 @@ struct pciide_softc {
  */
 
 /* Attach compat interrupt handler, returning handle or NULL if failed. */
+#ifdef __HAVE_PCIIDE_MACHDEP_COMPAT_INTR_ESTABLISH
 void	*pciide_machdep_compat_intr_establish __P((struct device *,
 	    struct pci_attach_args *, int, int (*)(void *), void *));
+#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_auereg.h,v 1.13 2000/05/06 20:38:59 augustss Exp $	*/
+/*	$NetBSD: if_auereg.h,v 1.16 2001/10/10 02:14:17 augustss Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -93,6 +93,7 @@
 #define AUE_PAUSE		AUE_PAUSE0
 #define AUE_RX_FLOWCTL_CNT	0x1A
 #define AUE_RX_FLOWCTL_FIFO	0x1B
+#define AUE_REG_1D		0x1D
 #define AUE_EE_REG		0x20
 #define AUE_EE_DATA0		0x21
 #define AUE_EE_DATA1		0x22
@@ -112,8 +113,10 @@
 #define AUE_PKTLOST1		0x2F
 #define AUE_PKTLOST		AUE_PKTLOST0
 
+#define AUE_REG_7B		0x7B
 #define AUE_GPIO0		0x7E
 #define AUE_GPIO1		0x7F
+#define AUE_REG_81		0x81
 
 #define AUE_CTL0_INCLUDE_RXCRC	0x01
 #define AUE_CTL0_ALLMULTI	0x02
@@ -258,13 +261,20 @@ struct aue_softc {
 	int			aue_if_flags;
 	struct aue_cdata	aue_cdata;
 
-	char			aue_linksys;
+	u_int16_t		aue_flags;
 
+	int			aue_refcnt;
 	char			aue_dying;
 	char			aue_attached;
 	u_int			aue_rx_errs;
 	u_int			aue_intr_errs;
 	struct timeval		aue_rx_notice;
+
+	struct usb_task		aue_tick_task;
+	struct usb_task		aue_stop_task;
+
+	struct lock		aue_mii_lock;
+
 };
 
 #define AUE_TIMEOUT		1000

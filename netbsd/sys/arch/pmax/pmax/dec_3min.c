@@ -1,4 +1,4 @@
-/* $NetBSD: dec_3min.c,v 1.42 2000/06/06 00:08:25 nisimura Exp $ */
+/* $NetBSD: dec_3min.c,v 1.49 2001/09/18 16:15:20 tsutsui Exp $ */
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -73,7 +73,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_3min.c,v 1.42 2000/06/06 00:08:25 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_3min.c,v 1.49 2001/09/18 16:15:20 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -126,7 +126,7 @@ dec_3min_init()
 	platform.cons_init = dec_3min_cons_init;
 	platform.iointr = dec_3min_intr;
 	platform.intr_establish = dec_3min_intr_establish;
-	platform.memsize = memsize_scan;
+	platform.memsize = memsize_bitmap;
 	platform.clkread = kn02ba_clkread;
 
 	/* clear any memory errors */
@@ -142,25 +142,25 @@ dec_3min_init()
 	 * TURBOchannel option slots, just splhigh().
 	 */
 	splvec.splbio = MIPS_SPL_0_1_2_3;
-	splvec.splnet = MIPS_SPL_0_1_2_3; 
+	splvec.splnet = MIPS_SPL_0_1_2_3;
 	splvec.spltty = MIPS_SPL_0_1_2_3;
-	splvec.splimp = MIPS_SPL_0_1_2_3;
+	splvec.splvm = MIPS_SPL_0_1_2_3;
 	splvec.splclock = MIPS_SPL_0_1_2_3;
 	splvec.splstatclock = MIPS_SPL_0_1_2_3;
 
 	/* enable posting of MIPS_INT_MASK_3 to CAUSE register */
 	*(u_int32_t *)(ioasic_base + IOASIC_IMSK) = KMIN_INTR_CLOCK;
-	/* calibrate cpu_mhz value */ 
+	/* calibrate cpu_mhz value */
 	mc_cpuspeed(ioasic_base+IOASIC_SLOT_8_START, MIPS_INT_MASK_3);
 
 	*(u_int32_t *)(ioasic_base + IOASIC_LANCE_DECODE) = 0x3;
 	*(u_int32_t *)(ioasic_base + IOASIC_SCSI_DECODE) = 0xe;
-#if 0	
+#if 0
 	*(u_int32_t *)(ioasic_base + IOASIC_SCC0_DECODE) = (0x10|4);
 	*(u_int32_t *)(ioasic_base + IOASIC_SCC1_DECODE) = (0x10|6);
 	*(u_int32_t *)(ioasic_base + IOASIC_CSR) = 0x00000f00;
-#endif	
-  
+#endif
+
 	/* sanitize interrupt mask */
 	kmin_tc3_imask = (KMIN_INTR_CLOCK|KMIN_INTR_PSWARN|KMIN_INTR_TIMEOUT);
 	*(u_int32_t *)(ioasic_base + IOASIC_INTR) = 0;
@@ -183,7 +183,7 @@ dec_3min_init()
 }
 
 /*
- * Initalize the memory system and I/O buses.
+ * Initialize the memory system and I/O buses.
  */
 static void
 dec_3min_bus_reset()
@@ -311,12 +311,12 @@ dec_3min_intr_establish(dev, cookie, level, handler, arg)
 }
 
 
-#define CHECKINTR(slot, bits)                                   \
+#define CHECKINTR(slot, bits)					\
     do {							\
-        if (can_serve & (bits)) {                               \
-                intrcnt[slot] += 1;                             \
-                (*intrtab[slot].ih_func)(intrtab[slot].ih_arg); \
-        }							\
+	if (can_serve & (bits)) {				\
+		intrcnt[slot] += 1;				\
+		(*intrtab[slot].ih_func)(intrtab[slot].ih_arg);	\
+	}							\
     } while (0)
 
 static void
@@ -362,8 +362,10 @@ dec_3min_intr(status, cause, pc, ipending)
 		if (turnoff)
 			*(u_int32_t *)(ioasic_base + IOASIC_INTR) = ~turnoff;
 
-		if (intr & KMIN_INTR_TIMEOUT)
+		if (intr & KMIN_INTR_TIMEOUT) {
 			kn02ba_errintr();
+			pmax_memerr_evcnt.ev_count++;
+		}
 
 		if (intr & KMIN_INTR_CLOCK) {
 			struct clockframe cf;
@@ -372,13 +374,13 @@ dec_3min_intr(status, cause, pc, ipending)
 				"r"(ioasic_base + IOASIC_SLOT_8_START));
 #ifdef MIPS3
 			if (CPUISMIPS3) {
-				latched_cycle_cnt = mips3_cycle_count();
+				latched_cycle_cnt = mips3_cp0_count_read();
 			}
 #endif
 			cf.pc = pc;
 			cf.sr = status;
 			hardclock(&cf);
-			intrcnt[HARDCLOCK]++;
+			pmax_clock_evcnt.ev_count++;
 		}
 
 		/* If clock interrups were enabled, re-enable them ASAP. */
@@ -470,7 +472,7 @@ kn02ba_clkread()
 	if (CPUISMIPS3) {
 		u_int32_t mips3_cycles;
 
-		mips3_cycles = mips3_cycle_count() - latched_cycle_cnt;
+		mips3_cycles = mips3_cp0_count_read() - latched_cycle_cnt;
 		/* XXX divides take 78 cycles: approximate with * 41/2048 */
 		return((mips3_cycles >> 6) + (mips3_cycles >> 8) +
 		       (mips3_cycles >> 11));

@@ -1,4 +1,4 @@
-/*	$NetBSD: ahdilabel.h,v 1.1 1996/02/19 09:05:51 leo Exp $	*/
+/*	$NetBSD: ahdilabel.h,v 1.3 2001/07/26 23:07:57 wiz Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -61,13 +61,13 @@
 #define	AHDI_MAXRPD	4		/* max. # of partition descriptors */
 					/* in an AHDI bootblock (aka root) */
 #define	AHDI_MAXARPD	2		/* max. # of partition descriptors */
-					/* in an AHDI auxilary root sector */
+					/* in an AHDI auxiliary root sector */
 struct ahdi_part {
 	u_int8_t	ap_flg;		/* bit 0 is in-use flag            */
 	u_int8_t	ap_id[3];	/* id: GEM, BGM, XGM, UNX, MIX     */
 	u_int32_t	ap_st;		/* block where partition starts    */
 	u_int32_t	ap_size;	/* partition size in blocks        */
-};
+} __attribute__((__packed__));
 #define	ap_end	ap_size /* in the in-core copy, store end instead of size  */
 
 struct ahdi_root {
@@ -77,7 +77,7 @@ struct ahdi_root {
 	u_int32_t	 ar_bslst;	/* start of bad-sector list        */
 	u_int32_t	 ar_bslsize;	/* # of blocks in bad-sector list  */
 	u_int16_t	 ar_checksum;
-};
+} __attribute__((__packed__));
 
 /*
  * AHDI partition table.
@@ -86,7 +86,7 @@ struct ahdi_root {
 struct ahdi_ptbl {
 	struct cpu_disklabel	*at_cdl;
 	u_int			at_hdsize;   /* size of volume in blocks   */
-	u_int			at_nroots;   /* # of auxilary root sectors */
+	u_int			at_nroots;   /* # of auxiliary root sectors */
 	u_int			at_nparts;   /* # of AHDI partitions       */
 	struct ahdi_part	at_parts[AHDI_MAXPARTS];
 };

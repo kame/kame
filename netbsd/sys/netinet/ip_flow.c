@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_flow.c,v 1.14.10.1 2000/06/30 19:46:32 thorpej Exp $	*/
+/*	$NetBSD: ip_flow.c,v 1.23 2002/03/08 20:48:43 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ip_flow.c,v 1.23 2002/03/08 20:48:43 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -47,10 +50,7 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
-#include <sys/proc.h>
 #include <sys/pool.h>
-
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -132,7 +132,7 @@ ipflow_init()
 	int i;
 
 	pool_init(&ipflow_pool, sizeof(struct ipflow), 0, 0, 0, "ipflowpl",
-	    0, NULL, NULL, M_IPFLOW);
+	    NULL);
 
 	LIST_INIT(&ipflowlist);
 	for (i = 0; i < IPFLOW_HASHSIZE; i++)
@@ -157,7 +157,7 @@ ipflow_fastforward(
 		return 0;
 
 	/*
-	 * Was packet recieved as a link-level multicast or broadcast?
+	 * Was packet received as a link-level multicast or broadcast?
 	 * If so, don't try to fast forward..
 	 */
 	if ((m->m_flags & (M_BCAST|M_MCAST)) != 0)
@@ -178,10 +178,24 @@ ipflow_fastforward(
 		return 0;
 
 	/*
-	 * Veryify the IP header checksum.
+	 * Verify the IP header checksum.
 	 */
-	if (in_cksum(m, sizeof(struct ip)) != 0)
-		return 0;
+	switch (m->m_pkthdr.csum_flags &
+		((m->m_pkthdr.rcvif->if_csum_flags_rx & M_CSUM_IPv4) |
+		 M_CSUM_IPv4_BAD)) {
+	case M_CSUM_IPv4|M_CSUM_IPv4_BAD:
+		return (0);
+
+	case M_CSUM_IPv4:
+		/* Checksum was okay. */
+		break;
+
+	default:
+		/* Must compute it ourselves. */
+		if (in_cksum(m, sizeof(struct ip)) != 0)
+			return (0);
+		break;
+	}
 
 	/*
 	 * Route and interface still up?
@@ -198,12 +212,20 @@ ipflow_fastforward(
 		return 0;
 
 	/*
+	 * Clear any in-bound checksum flags for this packet.
+	 */
+	m->m_pkthdr.csum_flags = 0;
+
+	/*
 	 * Everything checks out and so we can forward this packet.
 	 * Modify the TTL and incrementally change the checksum.
 	 * 
 	 * This method of adding the checksum works on either endian CPU.
 	 * If htons() is inlined, all the arithmetic is folded; otherwise
 	 * the htons()s are combined by CSE due to the __const__ attribute.
+	 *
+	 * Don't bother using HW checksumming here -- the incremental
+	 * update is pretty fast.
 	 */
 	ip->ip_ttl -= IPTTLDEC;
 	if (ip->ip_sum >= (u_int16_t) ~htons(IPTTLDEC << 8))
@@ -262,7 +284,7 @@ ipflow_free(
 	 * Once it's off the list, we can deal with it at normal
 	 * network IPL.
 	 */
-	s = splimp();
+	s = splnet();
 	IPFLOW_REMOVE(ipf);
 	splx(s);
 	ipflow_addstats(ipf);
@@ -306,7 +328,7 @@ ipflow_reap(
 		/*
 		 * Remove the entry from the flow table.
 		 */
-		s = splimp();
+		s = splnet();
 		IPFLOW_REMOVE(ipf);
 		splx(s);
 		ipflow_addstats(ipf);
@@ -373,7 +395,7 @@ ipflow_create(
 		}
 		bzero((caddr_t) ipf, sizeof(*ipf));
 	} else {
-		s = splimp();
+		s = splnet();
 		IPFLOW_REMOVE(ipf);
 		splx(s);
 		ipflow_addstats(ipf);
@@ -396,7 +418,7 @@ ipflow_create(
 	 * Insert into the approriate bucket of the flow table.
 	 */
 	hash = ipflow_hash(ip->ip_dst, ip->ip_src, ip->ip_tos);
-	s = splimp();
+	s = splnet();
 	IPFLOW_INSERT(&ipflowtable[hash], ipf);
 	splx(s);
 }

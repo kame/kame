@@ -1,4 +1,4 @@
-/* $NetBSD: tc_sgmap.c,v 1.3 1997/09/02 13:20:33 thorpej Exp $ */
+/* $NetBSD: tc_sgmap.c,v 1.5 2001/07/19 06:40:03 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -39,16 +39,17 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(1, "$NetBSD: tc_sgmap.c,v 1.3 1997/09/02 13:20:33 thorpej Exp $");
+__KERNEL_RCSID(1, "$NetBSD: tc_sgmap.c,v 1.5 2001/07/19 06:40:03 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
+#include <sys/mbuf.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 

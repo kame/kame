@@ -1,4 +1,4 @@
-/*	$NetBSD: wstsc.c,v 1.23 1998/12/05 19:43:39 mjacob Exp $	*/
+/*	$NetBSD: wstsc.c,v 1.26 2002/01/28 09:57:04 aymeric Exp $ */
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -35,6 +35,10 @@
  *
  *	@(#)supradma.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wstsc.c,v 1.26 2002/01/28 09:57:04 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -48,25 +52,18 @@
 #include <amiga/dev/scivar.h>
 #include <amiga/dev/zbusvar.h>
 
-void wstscattach __P((struct device *, struct device *, void *));
-int wstscmatch __P((struct device *, struct cfdata *, void *));
+void wstscattach(struct device *, struct device *, void *);
+int wstscmatch(struct device *, struct cfdata *, void *);
 
-int wstsc_dma_xfer_in __P((struct sci_softc *dev, int len,
-    register u_char *buf, int phase));
-int wstsc_dma_xfer_out __P((struct sci_softc *dev, int len,
-    register u_char *buf, int phase));
-int wstsc_dma_xfer_in2 __P((struct sci_softc *dev, int len,
-    register u_short *buf, int phase));
-int wstsc_dma_xfer_out2 __P((struct sci_softc *dev, int len,
-    register u_short *buf, int phase));
-int wstsc_intr __P((void *));
-
-struct scsipi_device wstsc_scsidev = {
-	NULL,		/* use default error handler */
-	NULL,		/* do not have a start functio */
-	NULL,		/* have no async handler */
-	NULL,		/* Use default done routine */
-};
+int wstsc_dma_xfer_in(struct sci_softc *dev, int len,
+    register u_char *buf, int phase);
+int wstsc_dma_xfer_out(struct sci_softc *dev, int len,
+    register u_char *buf, int phase);
+int wstsc_dma_xfer_in2(struct sci_softc *dev, int len,
+    register u_short *buf, int phase);
+int wstsc_dma_xfer_out2(struct sci_softc *dev, int len,
+    register u_short *buf, int phase);
+int wstsc_intr(void *);
 
 #ifdef DEBUG
 extern int sci_debug;
@@ -87,10 +84,7 @@ struct cfattach wstsc_ca = {
  * if this a Supra WordSync board
  */
 int
-wstscmatch(pdp, cfp, auxp)
-	struct device *pdp;
-	struct cfdata *cfp;
-	void *auxp;
+wstscmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 {
 	struct zbus_args *zap;
 
@@ -108,19 +102,18 @@ wstscmatch(pdp, cfp, auxp)
 }
 
 void
-wstscattach(pdp, dp, auxp)
-	struct device *pdp, *dp;
-	void *auxp;
+wstscattach(struct device *pdp, struct device *dp, void *auxp)
 {
 	volatile u_char *rp;
-	struct sci_softc *sc;
+	struct sci_softc *sc = (struct sci_softc *)dp;
 	struct zbus_args *zap;
+	struct scsipi_adapter *adapt = &sc->sc_adapter;
+	struct scsipi_channel *chan = &sc->sc_channel;
 
 	printf("\n");
 
 	zap = auxp;
-	
-	sc = (struct sci_softc *)dp;
+
 	rp = zap->va;
 	/*
 	 * set up 5380 register pointers
@@ -157,32 +150,37 @@ wstscattach(pdp, dp, auxp)
 
 	scireset(sc);
 
-	sc->sc_adapter.scsipi_cmd = sci_scsicmd;
-	sc->sc_adapter.scsipi_minphys = sci_minphys;
+	/*
+	 * Fill in the scsipi_adapter.
+	 */
+	memset(adapt, 0, sizeof(*adapt));
+	adapt->adapt_dev = &sc->sc_dev;
+	adapt->adapt_nchannels = 1;
+	adapt->adapt_openings = 7;
+	adapt->adapt_max_periph = 1;
+	adapt->adapt_request = sci_scsipi_request;
+	adapt->adapt_minphys = sci_minphys;
 
-	sc->sc_link.scsipi_scsi.channel = SCSI_CHANNEL_ONLY_ONE;
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.scsipi_scsi.adapter_target = 7;
-	sc->sc_link.adapter = &sc->sc_adapter;
-	sc->sc_link.device = &wstsc_scsidev;
-	sc->sc_link.openings = 1;
-	sc->sc_link.scsipi_scsi.max_target = 7;
-	sc->sc_link.scsipi_scsi.max_lun = 7;
-	sc->sc_link.type = BUS_SCSI;
-	TAILQ_INIT(&sc->sc_xslist);
+	/*
+	 * Fill in the scsipi_channel.
+	 */
+	memset(chan, 0, sizeof(*chan));
+	chan->chan_adapter = adapt;
+	chan->chan_bustype = &scsi_bustype;
+	chan->chan_channel = 0;
+	chan->chan_ntargets = 8;
+	chan->chan_nluns = 8;
+	chan->chan_id = 7;
 
 	/*
 	 * attach all scsi units on us
 	 */
-	config_found(dp, &sc->sc_link, scsiprint);
+	config_found(dp, chan, scsiprint);
 }
 
 int
-wstsc_dma_xfer_in (dev, len, buf, phase)
-	struct sci_softc *dev;
-	int len;
-	register u_char *buf;
-	int phase;
+wstsc_dma_xfer_in(struct sci_softc *dev, int len, register u_char *buf,
+                  int phase)
 {
 	int wait = sci_data_wait;
 	volatile register u_char *sci_dma = dev->sci_idata;
@@ -265,11 +263,8 @@ wstsc_dma_xfer_in (dev, len, buf, phase)
 }
 
 int
-wstsc_dma_xfer_out (dev, len, buf, phase)
-	struct sci_softc *dev;
-	int len;
-	register u_char *buf;
-	int phase;
+wstsc_dma_xfer_out(struct sci_softc *dev, int len, register u_char *buf,
+                   int phase)
 {
 	int wait = sci_data_wait;
 	volatile register u_char *sci_dma = dev->sci_data;
@@ -318,11 +313,8 @@ wstsc_dma_xfer_out (dev, len, buf, phase)
 
 
 int
-wstsc_dma_xfer_in2 (dev, len, buf, phase)
-	struct sci_softc *dev;
-	int len;
-	register u_short *buf;
-	int phase;
+wstsc_dma_xfer_in2(struct sci_softc *dev, int len, register u_short *buf,
+                   int phase)
 {
 	volatile register u_short *sci_dma = (u_short *)(dev->sci_idata + 0x10);
 	volatile register u_char *sci_csr = dev->sci_csr + 0x10;
@@ -408,11 +400,8 @@ wstsc_dma_xfer_in2 (dev, len, buf, phase)
 }
 
 int
-wstsc_dma_xfer_out2 (dev, len, buf, phase)
-	struct sci_softc *dev;
-	int len;
-	register u_short *buf;
-	int phase;
+wstsc_dma_xfer_out2(struct sci_softc *dev, int len, register u_short *buf,
+                    int phase)
 {
 	volatile register u_short *sci_dma = (ushort *)(dev->sci_data + 0x10);
 	volatile register u_char *sci_bus_csr = dev->sci_bus_csr;
@@ -514,8 +503,7 @@ wstsc_dma_xfer_out2 (dev, len, buf, phase)
 }
 
 int
-wstsc_intr(arg)
-	void *arg;
+wstsc_intr(void *arg)
 {
 	struct sci_softc *dev = arg;
 	u_char stat;

@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.11 2000/06/04 19:14:49 cgd Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.18 2001/07/22 11:29:48 wiz Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -49,8 +49,7 @@
 #include <sys/errno.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define _MACPPC_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -181,12 +180,12 @@ pci_conf_write(pc, tag, reg, data)
 }
 
 int
-pci_intr_map(pc, intrtag, pin, line, ihp)
-	pci_chipset_tag_t pc;
-	pcitag_t intrtag;
-	int pin, line;
+pci_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
+	int pin = pa->pa_intrpin;
+	int line = pa->pa_intrline;
 
 	if (pin == 0) {
 		/* No IRQ used. */
@@ -254,9 +253,6 @@ pci_intr_evcnt(pc, ih)
 	/* XXX for now, no evcnt parent reported */
 	return NULL;
 }
-
-extern void * intr_establish();
-extern void intr_disestablish();
 
 void *
 pci_intr_establish(pc, ih, level, func, arg)
@@ -357,7 +353,7 @@ find_node_intr(node, addr, intr)
 {
 	int parent, len, mlen, iparent;
 	int match, i;
-	u_int32_t map[64], *mp;
+	u_int32_t map[160], *mp;
 	u_int32_t imask[8], maskedaddr[8];
 	u_int32_t icells;
 	char name[32];
@@ -381,30 +377,28 @@ find_node_intr(node, addr, intr)
 #endif
 
 	/* mask addr by "interrupt-map-mask" */
-	bcopy(addr, maskedaddr, mlen);
+	memcpy(maskedaddr, addr, mlen);
 	for (i = 0; i < mlen / 4; i++)
 		maskedaddr[i] &= imask[i];
 
 	mp = map;
 	while (len > mlen) {
-		match = bcmp(maskedaddr, mp, mlen);
+		match = memcmp(maskedaddr, mp, mlen);
 		mp += mlen / 4;
 		len -= mlen;
 
 		/*
 		 * We must read "#interrupt-cells" for each time because
-		 * interrupt-parent may be defferent.
-		 *
-		 * XXX assume #address-cells == 1
+		 * interrupt-parent may be different.
 		 */
 		iparent = *mp++;
 		len -= 4;
 		if (OF_getprop(iparent, "#interrupt-cells", &icells, 4) != 4)
-			return -1;
+			goto nomap;
 
 		/* Found. */
 		if (match == 0) {
-			bcopy(mp, intr, icells * 4);
+			memcpy(intr, mp, icells * 4);
 			return icells * 4;
 		}
 
@@ -418,12 +412,21 @@ nomap:
 	 * pci-bridge, use parent's interrupt.  This occurs on a PCI
 	 * slot.  (e.g. AHA-3940)
 	 */
-	bzero(name, sizeof(name));
+	memset(name, 0, sizeof(name));
 	OF_getprop(parent, "name", name, sizeof(name));
 	if (strcmp(name, "pci-bridge") == 0) {
 		len = OF_getprop(parent, "AAPL,interrupts", intr, 4) ;
 		if (len == 4)
 			return len;
+		/*
+		 * XXX I don't know what is the correct local address.
+		 * XXX Use the first entry for now.
+		 */
+		len = OF_getprop(parent, "interrupt-map", map, sizeof(map));
+		if (len >= 36) {
+			addr = &map[5];
+			return find_node_intr(parent, addr, intr);
+		}
 	}
 
 	/* XXX This may be wrong... */

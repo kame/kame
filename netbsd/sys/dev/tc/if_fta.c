@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fta.c,v 1.15 1998/07/05 00:51:25 jonathan Exp $	*/
+/*	$NetBSD: if_fta.c,v 1.19 2001/11/13 06:26:10 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 Matt Thomas <matt@3am-software.com>
@@ -10,7 +10,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -35,6 +35,9 @@
  *   This module supports the DEC DEFTA TurboChannel FDDI Controller
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_fta.c,v 1.19 2001/11/13 06:26:10 lukem Exp $");
+
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -55,10 +58,6 @@
 #include <netinet/in.h>
 #include <netinet/if_inarp.h>
 #endif
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
 
 #include <dev/tc/tcvar.h>
 #include <dev/ic/pdqvar.h>

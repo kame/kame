@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.h,v 1.36.2.2 2000/06/22 11:08:13 soren Exp $	*/
+/* $NetBSD: locore.h,v 1.61 2002/05/13 04:15:40 simonb Exp $ */
 
 /*
  * Copyright 1996 The Board of Trustees of The Leland Stanford
@@ -17,15 +17,6 @@
  * Jump table for MIPS cpu locore functions that are implemented
  * differently on different generations, or instruction-level
  * archtecture (ISA) level, the Mips family.
- * The following functions must be provided for each mips ISA level:
- *
- *
- *	MachFlushCache
- *	MachFlushDCache
- *	MachFlushICache
- *	wbflush
- *	proc_trampoline()
- *	cpu_switch_resume()
  *
  * We currently provide support for MIPS I and MIPS III.
  */
@@ -38,151 +29,230 @@
 #include "opt_mips_cache.h"
 #endif
 
+#include <mips/cpuregs.h>
+
+struct tlb;
+
 /*
  * locore service routine for exception vectors. Used outside locore
  * only to print them by name in stack tracebacks
  */
 
-u_int32_t mips_read_causereg __P((void));
-u_int32_t mips_read_statusreg __P((void));
+uint32_t mips_cp0_cause_read(void);
+void	mips_cp0_cause_write(uint32_t);
+uint32_t mips_cp0_status_read(void);
+void	mips_cp0_status_write(uint32_t);
 
-void mips1_ConfigCache  __P((void));
-void mips1_FlushCache  __P((void));
-void mips1_FlushDCache  __P((vaddr_t addr, vsize_t len));
-void mips1_FlushICache  __P((vaddr_t addr, vsize_t len));
+#ifdef MIPS1
+void	mips1_SetPID(int);
+void	mips1_TBIA(int);
+void	mips1_TBIAP(int);
+void	mips1_TBIS(vaddr_t);
+int	mips1_TLBUpdate(u_int, u_int);
+void	mips1_wbflush(void);
+void	mips1_proc_trampoline(void);
+void	mips1_cpu_switch_resume(void);
 
-void mips1_SetPID   __P((int pid));
-void mips1_TBIA __P((int));
-void mips1_TBIAP __P((int));
-void mips1_TBIS __P((vaddr_t));
-void mips1_TBRPL __P((vaddr_t, vaddr_t, unsigned int));
-int mips1_TLBUpdate __P((u_int, u_int));
+uint32_t tx3900_cp0_config_read(void);
+#endif
 
-void mips1_wbflush __P((void));
-void mips1_proc_trampoline __P((void));
-void mips1_cpu_switch_resume __P((void));
+#if defined(MIPS3) || defined(MIPS4)
+void	mips3_SetPID(int);
+void	mips3_TBIA(int);
+void	mips3_TBIAP(int);
+void	mips3_TBIS(vaddr_t);
+int	mips3_TLBUpdate(u_int, u_int);
+void	mips3_TLBRead(int, struct tlb *);
+void	mips3_wbflush(void);
+void	mips3_proc_trampoline(void);
+void	mips3_cpu_switch_resume(void);
 
-void mips3_ConfigCache __P((void));
-void mips3_FlushCache  __P((void));
-void mips3_FlushDCache __P((vaddr_t addr, vaddr_t len));
-void mips3_FlushICache __P((vaddr_t addr, vaddr_t len));
-void mips3_HitFlushDCache __P((vaddr_t, int));
+#ifdef MIPS3_5900
+void	mips5900_SetPID(int);
+void	mips5900_TBIA(int);
+void	mips5900_TBIAP(int);
+void	mips5900_TBIS(vaddr_t);
+int	mips5900_TLBUpdate(u_int, u_int);
+void	mips5900_TLBRead(int, struct tlb *);
+void	mips5900_wbflush(void);
+void	mips5900_proc_trampoline(void);
+void	mips5900_cpu_switch_resume(void);
+#endif
+#endif
 
-void mips3_SetPID  __P((int pid));
-void mips3_TBIA __P((int));
-void mips3_TBIAP __P((int));
-void mips3_TBIS __P((vaddr_t));
-void mips3_TBRPL __P((vaddr_t, vaddr_t, unsigned int));
-int mips3_TLBUpdate __P((u_int, u_int));
-struct tlb;
-void mips3_TLBRead __P((int, struct tlb *));
-void mips3_SetWIRED __P((int));
-void mips3_wbflush __P((void));
-void mips3_proc_trampoline __P((void));
-void mips3_cpu_switch_resume __P((void));
+#ifdef MIPS32
+void	mips32_SetPID(int);
+void	mips32_TBIA(int);
+void	mips32_TBIAP(int);
+void	mips32_TBIS(vaddr_t);
+int	mips32_TLBUpdate(u_int, u_int);
+void	mips32_TLBRead(int, struct tlb *);
+void	mips32_wbflush(void);
+void	mips32_proc_trampoline(void);
+void	mips32_cpu_switch_resume(void);
+#endif
 
-void mips3_FlushCache_2way  __P((void));
-void mips3_FlushDCache_2way __P((vaddr_t addr, vaddr_t len));
-void mips3_HitFlushDCache_2way __P((vaddr_t, int));
-void mips3_FlushICache_2way __P((vaddr_t addr, vaddr_t len));
+#ifdef MIPS64
+void	mips64_SetPID(int);
+void	mips64_TBIA(int);
+void	mips64_TBIAP(int);
+void	mips64_TBIS(vaddr_t);
+int	mips64_TLBUpdate(u_int, u_int);
+void	mips64_TLBRead(int, struct tlb *);
+void	mips64_wbflush(void);
+void	mips64_proc_trampoline(void);
+void	mips64_cpu_switch_resume(void);
+#endif
 
-u_int32_t mips3_read_config __P((void));
-u_int32_t mips3_cycle_count __P((void));
-u_int32_t mips3_write_count __P((u_int32_t));
-u_int32_t mips3_read_compare __P((void));
-void mips3_write_config __P((u_int32_t));
-void mips3_write_compare __P((u_int32_t));
-void mips3_write_xcontext_upper __P((u_int32_t));
-void mips3_clearBEV __P((void));
+uint32_t mips3_cp0_compare_read(void);
+void	mips3_cp0_compare_write(uint32_t);
+
+uint32_t mips3_cp0_config_read(void);
+void	mips3_cp0_config_write(uint32_t);
+uint32_t mipsNN_cp0_config1_read(void);
+void	mipsNN_cp0_config1_write(uint32_t);
+
+uint32_t mips3_cp0_count_read(void);
+void	mips3_cp0_count_write(uint32_t);
+
+uint32_t mips3_cp0_wired_read(void);
+void	mips3_cp0_wired_write(uint32_t);
+
+uint64_t mips3_ld(uint64_t *);
+void	mips3_sd(uint64_t *, uint64_t);
+
+static inline uint32_t	mips3_lw_a64(uint64_t addr)
+		    __attribute__((__unused__));
+static inline void	mips3_sw_a64(uint64_t addr, uint32_t val)
+		    __attribute__ ((__unused__));
+
+static inline uint32_t
+mips3_lw_a64(uint64_t addr)
+{
+	uint32_t addrlo, addrhi;
+	uint32_t rv;
+	uint32_t sr;
+
+	sr = mips_cp0_status_read();
+	mips_cp0_status_write(sr | MIPS3_SR_KX);
+
+	addrlo = addr & 0xffffffff;
+	addrhi = addr >> 32;
+	__asm__ __volatile__ ("		\n\
+		.set push		\n\
+		.set mips3		\n\
+		.set noreorder		\n\
+		.set noat		\n\
+		dsll32	$3, %1, 0	\n\
+		dsll32	$1, %2, 0	\n\
+		dsrl32	$3, $3, 0	\n\
+		or	$1, $1, $3	\n\
+		lw	%0, 0($1)	\n\
+		.set pop		\n\
+	" : "=r"(rv) : "r"(addrlo), "r"(addrhi) : "$1", "$3" );
+
+	mips_cp0_status_write(sr);
+
+	return (rv);
+}
+
+static inline void
+mips3_sw_a64(uint64_t addr, uint32_t val)
+{
+	uint32_t addrlo, addrhi;
+	uint32_t sr;
+
+	sr = mips_cp0_status_read();
+	mips_cp0_status_write(sr | MIPS3_SR_KX);
+
+	addrlo = addr & 0xffffffff;
+	addrhi = addr >> 32;
+	__asm__ __volatile__ ("			\n\
+		.set push			\n\
+		.set mips3			\n\
+		.set noreorder			\n\
+		.set noat			\n\
+		dsll32	$3, %1, 0		\n\
+		dsll32	$1, %2, 0		\n\
+		dsrl32	$3, $3, 0		\n\
+		or	$1, $1, $3		\n\
+		sw	%0, 0($1)		\n\
+		.set pop			\n\
+	" : : "r"(val), "r"(addrlo), "r"(addrhi) : "$1", "$3" );
+
+	mips_cp0_status_write(sr);
+}
 
 /*
- *  A vector with an entry for each mips-ISA-level dependent
+ * A vector with an entry for each mips-ISA-level dependent
  * locore function, and macros which jump through it.
+ *
  * XXX the macro names are chosen to be compatible with the old
- * Sprite  coding-convention names used in 4.4bsd/pmax.
+ * XXX Sprite coding-convention names used in 4.4bsd/pmax.
  */
 typedef struct  {
-	void (*flushCache)  __P((void));
-	void (*flushDCache) __P((vaddr_t addr, vsize_t len));
-	void (*flushICache) __P((vaddr_t addr, vsize_t len));
-	void (*setTLBpid)  __P((int pid));
-	void (*TBIAP)	__P((int));
-	void (*TBIS)	__P((vaddr_t));
-	void (*TBRPL)	__P((vaddr_t, vaddr_t, unsigned int));
-	int  (*tlbUpdate)  __P((u_int highreg, u_int lowreg));
-	void (*wbflush) __P((void));
+	void (*setTLBpid)(int pid);
+	void (*TBIAP)(int);
+	void (*TBIS)(vaddr_t);
+	int  (*tlbUpdate)(u_int highreg, u_int lowreg);
+	void (*wbflush)(void);
 } mips_locore_jumpvec_t;
 
 /* Override writebuffer-drain method. */
-void mips_set_wbflush __P((void (*) __P((void)) ));
-
+void	mips_set_wbflush(void (*)(void));
 
 /* stacktrace() -- print a stack backtrace to the console */
-void stacktrace __P((void));
+void	stacktrace(void);
 /* logstacktrace() -- log a stack traceback to msgbuf */
-void logstacktrace __P((void));
+void	logstacktrace(void);
 
 /*
  * The "active" locore-fuction vector, and
-
  */
 extern mips_locore_jumpvec_t mips_locore_jumpvec;
-extern mips_locore_jumpvec_t r2000_locore_vec;
-extern mips_locore_jumpvec_t r4000_locore_vec;
 extern long *mips_locoresw[];
 
-#if defined(MIPS3) && !defined (MIPS1)
-#if	defined(MIPS3_5200)
-#define MachFlushCache		mips3_FlushCache_2way
-#define MachFlushDCache		mips3_FlushDCache_2way
-#define MachHitFlushDCache	mips3_HitFlushDCache_2way
-#define MachFlushICache		mips3_FlushICache_2way
-#else
-#define MachFlushCache		mips3_FlushCache
-#if	defined(MIPS3_L2CACHE_ABSENT) && defined(MIPS3_4100)
-#define MachFlushDCache         mips3_FlushDCache		/* VR4100 */
-#elif	!defined(MIPS3_L2CACHE_ABSENT) && defined(MIPS3_L2CACHE_PRESENT)
-#define MachFlushDCache		mips3_FlushDCache
-#else
-#define MachFlushDCache		(*(mips_locore_jumpvec.flushDCache))
-#endif
-#define MachHitFlushDCache	mips3_HitFlushDCache
-#define MachFlushICache		mips3_FlushICache
-#endif
-#define MachSetPID		mips3_SetPID
-#define MIPS_TBIAP()		mips3_TBIAP(mips_num_tlb_entries)
-#define MIPS_TBIS		mips3_TBIS
-#define MIPS_TBRPL		mips3_TBRPL
-#define MachTLBUpdate		mips3_TLBUpdate
-#define wbflush()		mips3_wbflush()
-#define proc_trampoline		mips3_proc_trampoline
-#endif
-
-#if !defined(MIPS3) && defined (MIPS1)
-#define MachFlushCache		mips1_FlushCache
-#define MachFlushDCache		mips1_FlushDCache
-#define MachFlushICache		mips1_FlushICache
+#if    defined(MIPS1) && !defined(MIPS3) && !defined(MIPS32) && !defined(MIPS64)
 #define MachSetPID		mips1_SetPID
 #define MIPS_TBIAP()		mips1_TBIAP(mips_num_tlb_entries)
 #define MIPS_TBIS		mips1_TBIS
-#define MIPS_TBRPL		mips1_TBRPL
 #define MachTLBUpdate		mips1_TLBUpdate
 #define wbflush()		mips1_wbflush()
 #define proc_trampoline		mips1_proc_trampoline
-#endif
-
-
-
-#if defined(MIPS3) && defined (MIPS1)
-#define MachFlushCache		(*(mips_locore_jumpvec.flushCache))
-#define MachFlushDCache		(*(mips_locore_jumpvec.flushDCache))
-#define MachFlushICache		(*(mips_locore_jumpvec.flushICache))
+#elif !defined(MIPS1) &&  defined(MIPS3) && !defined(MIPS32) && !defined(MIPS64) && !defined(MIPS3_5900)
+#define MachSetPID		mips3_SetPID
+#define MIPS_TBIAP()		mips3_TBIAP(mips_num_tlb_entries)
+#define MIPS_TBIS		mips3_TBIS
+#define MachTLBUpdate		mips3_TLBUpdate
+#define proc_trampoline		mips3_proc_trampoline
+#define wbflush()		mips3_wbflush()
+#elif !defined(MIPS1) && !defined(MIPS3) &&  defined(MIPS32) && !defined(MIPS64)
+#define	MachSetPID		mips32_SetPID
+#define	MIPS_TBIAP()		mips32_TBIAP(mips_num_tlb_entries)
+#define	MIPS_TBIS		mips32_TBIS
+#define	MachTLBUpdate		mips32_TLBUpdate
+#define proc_trampoline		mips32_proc_trampoline
+#define wbflush()		mips32_wbflush()
+#elif !defined(MIPS1) && !defined(MIPS3) && !defined(MIPS32) &&  defined(MIPS64)
+ /* all common with mips3 */
+#define MachSetPID		mips64_SetPID
+#define MIPS_TBIAP()		mips64_TBIAP(mips_num_tlb_entries)
+#define MIPS_TBIS		mips64_TBIS
+#define MachTLBUpdate		mips64_TLBUpdate
+#define proc_trampoline		mips64_proc_trampoline
+#define wbflush()		mips64_wbflush()
+#elif !defined(MIPS1) &&  defined(MIPS3) && !defined(MIPS32) && !defined(MIPS64) && defined(MIPS3_5900)
+#define MachSetPID		mips5900_SetPID
+#define MIPS_TBIAP()		mips5900_TBIAP(mips_num_tlb_entries)
+#define MIPS_TBIS		mips5900_TBIS
+#define MachTLBUpdate		mips5900_TLBUpdate
+#define proc_trampoline		mips5900_proc_trampoline
+#define wbflush()		mips5900_wbflush()
+#else
 #define MachSetPID		(*(mips_locore_jumpvec.setTLBpid))
 #define MIPS_TBIAP()		(*(mips_locore_jumpvec.TBIAP))(mips_num_tlb_entries)
 #define MIPS_TBIS		(*(mips_locore_jumpvec.TBIS))
-#define MIPS_TBRPL		(*(mips_locore_jumpvec.TBRPL))
 #define MachTLBUpdate		(*(mips_locore_jumpvec.tlbUpdate))
-#define MachHitFlushDCache	mips3_HitFlushDCache
 #define wbflush()		(*(mips_locore_jumpvec.wbflush))()
 #define proc_trampoline		(mips_locoresw[1])
 #endif
@@ -194,46 +264,42 @@ extern long *mips_locoresw[];
 /*
  * CPU identification, from PRID register.
  */
-union cpuprid {
-	int	cpuprid;
-	struct {
-#if BYTE_ORDER == BIG_ENDIAN
-		u_int	pad1:16;	/* reserved */
-		u_int	cp_imp:8;	/* implementation identifier */
-		u_int	cp_majrev:4;	/* major revision identifier */
-		u_int	cp_minrev:4;	/* minor revision identifier */
-#else
-		u_int	cp_minrev:4;	/* minor revision identifier */
-		u_int	cp_majrev:4;	/* major revision identifier */
-		u_int	cp_imp:8;	/* implementation identifier */
-		u_int	pad1:16;	/* reserved */
-#endif
-	} cpu;
-};
+typedef int mips_prid_t;
 
+#define	MIPS_PRID_REV(x)	(((x) >>  0) & 0x00ff)
+#define	MIPS_PRID_IMPL(x)	(((x) >>  8) & 0x00ff)
+
+/* pre-MIPS32/64 */
+#define	MIPS_PRID_RSVD(x)	(((x) >> 16) & 0xffff)
+#define	MIPS_PRID_REV_MIN(x)	((MIPS_PRID_REV(x) >> 0) & 0x0f)
+#define	MIPS_PRID_REV_MAJ(x)	((MIPS_PRID_REV(x) >> 4) & 0x0f)
+
+/* MIPS32/64 */
+#define	MIPS_PRID_CID(x)	(((x) >> 16) & 0x00ff)	/* Company ID */
+#define	    MIPS_PRID_CID_PREHISTORIC	0x00	/* Not MIPS32/64 */
+#define	    MIPS_PRID_CID_MTI		0x01	/* MIPS Technologies, Inc. */
+#define	    MIPS_PRID_CID_BROADCOM	0x02	/* Broadcom */
+#define	    MIPS_PRID_CID_ALCHEMY	0x03	/* Alchemy Semiconductor */
+#define	    MIPS_PRID_CID_SIBYTE	0x04	/* SiByte */
+#define	    MIPS_PRID_CID_SANDCRAFT	0x05	/* SandCraft */
+#define	MIPS_PRID_COPTS(x)	(((x) >> 24) & 0x00ff)	/* Company Options */
 
 #ifdef _KERNEL
-
 /*
  * Global variables used to communicate CPU type, and parameters
  * such as cache size, from locore to higher-level code (e.g., pmap).
  */
-extern union	cpuprid cpu_id;
-extern union	cpuprid fpu_id;
-extern int	cpu_arch;
-extern int	mips_num_tlb_entries;
-extern u_int	mips_L1DCacheSize;
-extern u_int	mips_L1ICacheSize;
-extern u_int	mips_L1DCacheLSize;
-extern u_int	mips_L1ICacheLSize;
-extern int	mips_L2CachePresent;
-extern u_int	mips_L2CacheLSize;
-extern u_int	mips_CacheAliasMask;
 
-#ifdef MIPS3
-extern int	mips3_L1TwoWayCache;
-extern int	mips3_cacheflush_bug;
-#endif /* MIPS3 */
+extern mips_prid_t cpu_id;
+extern mips_prid_t fpu_id;
+extern int	mips_num_tlb_entries;
+
+void mips_pagecopy(caddr_t dst, caddr_t src);
+void mips_pagezero(caddr_t dst);
+
+#ifdef __HAVE_MIPS_MACHDEP_CACHE_CONFIG
+void mips_machdep_cache_config(void);
+#endif
 
 /*
  * trapframe argument passed to trap()
@@ -245,6 +311,8 @@ struct trapframe {
 	mips_reg_t tf_mullo;
 	mips_reg_t tf_mulhi;
 	mips_reg_t tf_epc;		/* may be changed by trap() call */
+	u_int32_t  tf_ppl;		/* previous priority level */
+	int32_t    tf_pad;		/* for 8 byte aligned */
 };
 
 /*
@@ -260,7 +328,5 @@ struct kernframe {
 	register_t cf_ra;
 	struct trapframe cf_frame;
 };
-
-#endif
-
+#endif	/* _KERNEL */
 #endif	/* _MIPS_LOCORE_H */

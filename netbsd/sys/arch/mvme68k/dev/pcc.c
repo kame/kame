@@ -1,4 +1,4 @@
-/*	$NetBSD: pcc.c,v 1.13 2000/03/18 22:33:03 scw Exp $	*/
+/*	$NetBSD: pcc.c,v 1.20 2001/08/12 18:33:13 scw Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -74,11 +74,10 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/kcore.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
-
-#include <mvme68k/mvme68k/isr.h>
 
 #include <mvme68k/dev/mainbus.h>
 #include <mvme68k/dev/pccreg.h>
@@ -98,6 +97,8 @@ struct cfattach pcc_ca = {
 
 extern struct cfdriver pcc_cd;
 static int pccintr __P((void *));
+static int pccsoftintr __P((void *));
+static void pccsoftintrassert __P((void));
 
 /*
  * Structure used to describe a device for autoconfiguration purposes.
@@ -111,8 +112,7 @@ struct pcc_device {
  * Devices that live on the PCC, attached in this order.
  */
 static struct pcc_device pcc_devices[] = {
-	{"clock", PCC_RTC_OFF},
-	{"nvram", PCC_NVRAM_OFF},
+	{"clock", 0},
 	{"zsc", PCC_ZS0_OFF},
 	{"zsc", PCC_ZS1_OFF},
 	{"le", PCC_LE_OFF},
@@ -137,7 +137,12 @@ static int pcc_vec2intctrl[] = {
 	PCCREG_SOFT2_INTR_CTRL	/* PCCV_SOFT2 */
 };
 
+extern phys_ram_seg_t mem_clusters[];
 struct pcc_softc *sys_pcc;
+
+/* The base address of the MVME147 from the VMEbus */
+bus_addr_t pcc_slave_base_addr;
+
 
 /* ARGSUSED */
 int
@@ -175,8 +180,7 @@ pccattach(parent, self, args)
 
 	/* Get a handle to the PCC's registers. */
 	sc->sc_bust = ma->ma_bust;
-	bus_space_map(sc->sc_bust, PCC_REG_OFF + ma->ma_offset,
-	    PCCREG_SIZE, 0, &sc->sc_bush);
+	bus_space_map(sc->sc_bust, ma->ma_offset, PCCREG_SIZE, 0, &sc->sc_bush);
 
 	/* Tell the chip the base interrupt vector */
 	pcc_reg_write(sc, PCCREG_VECTOR_BASE, PCC_VECBASE);
@@ -185,18 +189,37 @@ pccattach(parent, self, args)
 	    "rev %d, vecbase 0x%x\n", pcc_reg_read(sc, PCCREG_REVISION),
 	    pcc_reg_read(sc, PCCREG_VECTOR_BASE));
 
+	evcnt_attach_dynamic(&sc->sc_evcnt, EVCNT_TYPE_INTR,
+	    isrlink_evcnt(7), "nmi", "abort sw");
+
 	/* Hook up interrupt handler for abort button, and enable it */
-	pccintr_establish(PCCV_ABORT, pccintr, 7, NULL);
+	pccintr_establish(PCCV_ABORT, pccintr, 7, NULL, &sc->sc_evcnt);
 	pcc_reg_write(sc, PCCREG_ABORT_INTR_CTRL,
 	    PCC_ABORT_IEN | PCC_ABORT_ACK);
+
+	/*
+	 * Install a handler for Software Interrupt 1
+	 * and arrange to schedule soft interrupts on demand.
+	 */
+	pccintr_establish(PCCV_SOFT1, pccsoftintr, 1, sc, &sc->sc_evcnt);
+	_softintr_chipset_assert = pccsoftintrassert;
 
 	/* Make sure the global interrupt line is hot. */
 	reg = pcc_reg_read(sc, PCCREG_GENERAL_CONTROL) | PCC_GENCR_IEN;
 	pcc_reg_write(sc, PCCREG_GENERAL_CONTROL, reg);
 
 	/*
+	 * Calculate the board's VMEbus slave base address, for the
+	 * benefit of the VMEchip driver.
+	 * (Weird that this register is in the PCC ...)
+	 */
+	reg = pcc_reg_read(sc, PCCREG_SLAVE_BASE_ADDR) & PCC_SLAVE_BASE_MASK;
+	pcc_slave_base_addr = (bus_addr_t)reg * mem_clusters[0].size;
+
+	/*
 	 * Attach configured children.
 	 */
+	npa._pa_base = ma->ma_offset;
 	for (i = 0; pcc_devices[i].pcc_name != NULL; ++i) {
 		/*
 		 * Note that IPL is filled in by match function.
@@ -224,7 +247,7 @@ pccprint(aux, cp)
 	if (cp)
 		printf("%s at %s", pa->pa_name, cp);
 
-	printf(" offset 0x%lx", pa->pa_offset);
+	printf(" offset 0x%lx", pa->pa_offset - pa->_pa_base);
 	if (pa->pa_ipl != -1)
 		printf(" ipl %d", pa->pa_ipl);
 
@@ -235,10 +258,11 @@ pccprint(aux, cp)
  * pccintr_establish: establish pcc interrupt
  */
 void
-pccintr_establish(pccvec, hand, lvl, arg)
+pccintr_establish(pccvec, hand, lvl, arg, evcnt)
 	int pccvec;
 	int (*hand) __P((void *)), lvl;
 	void *arg;
+	struct evcnt *evcnt;
 {
 
 #ifdef DEBUG
@@ -252,7 +276,7 @@ pccintr_establish(pccvec, hand, lvl, arg)
 	}
 #endif
 
-	isrlink_vectored(hand, arg, lvl, pccvec + PCC_VECBASE);
+	isrlink_vectored(hand, arg, lvl, pccvec + PCC_VECBASE, evcnt);
 }
 
 void
@@ -285,4 +309,30 @@ pccintr(frame)
 	    PCC_ABORT_IEN | PCC_ABORT_ACK);
 
 	return (nmihand(frame));
+}
+
+static void
+pccsoftintrassert(void)
+{
+
+	/* Request a software interrupt at ipl 1 */
+	pcc_reg_write(sys_pcc, PCCREG_SOFT1_INTR_CTRL, 1 | PCC_IENABLE);
+}
+
+/*
+ * Handle PCC soft interupt #1
+ */
+static int
+pccsoftintr(arg)
+	void *arg;
+{
+	struct pcc_softc *sc = arg;
+
+	/* Clear the interrupt */
+	pcc_reg_write(sc, PCCREG_SOFT1_INTR_CTRL, 0);
+
+	/* Call the soft interrupt dispatcher */
+	softintr_dispatch();
+
+	return (1);
 }

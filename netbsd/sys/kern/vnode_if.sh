@@ -33,7 +33,7 @@ copyright="\
  * SUCH DAMAGE.
  */
 "
-SCRIPT_ID='$NetBSD: vnode_if.sh,v 1.19 1999/07/07 23:32:50 wrstuden Exp $'
+SCRIPT_ID='$NetBSD: vnode_if.sh,v 1.30 2001/11/12 14:34:24 lukem Exp $'
 
 # Script to produce VFS front-end sugar.
 #
@@ -160,8 +160,17 @@ echo -n "$copyright"
 echo ''
 echo '#ifndef _SYS_VNODE_IF_H_'
 echo '#define _SYS_VNODE_IF_H_'
+echo ''
+echo '#ifdef _KERNEL'
+echo '#if defined(_LKM) || defined(LKM)'
+echo '/* LKMs always use non-inlined vnode ops. */'
+echo '#define	VNODE_OP_NOINLINE'
+echo '#else'
+echo '#include "opt_vnode_op_noinline.h"'
+echo '#endif'
+echo '#endif /* _KERNEL */'
 echo '
-extern struct vnodeop_desc vop_default_desc;
+extern const struct vnodeop_desc vop_default_desc;
 '
 
 # Body stuff
@@ -170,22 +179,23 @@ sed -e "$sed_prep" $src | $awk "$toupper"'
 function doit() {
 	# Declare arg struct, descriptor.
 	printf("\nstruct %s_args {\n", name);
-	printf("\tstruct vnodeop_desc * a_desc;\n");
+	printf("\tconst struct vnodeop_desc * a_desc;\n");
 	for (i=0; i<argc; i++) {
 		printf("\t%s a_%s;\n", argtype[i], argname[i]);
 	}
 	printf("};\n");
-	printf("extern struct vnodeop_desc %s_desc;\n", name);
+	printf("extern const struct vnodeop_desc %s_desc;\n", name);
 	# Prototype it.
-	protoarg = sprintf("static __inline int %s __P((", toupper(name));
+	printf("#ifndef VNODE_OP_NOINLINE\n");
+	printf("static __inline\n");
+	printf("#endif\n");
+	protoarg = sprintf("int %s(", toupper(name));
 	protolen = length(protoarg);
 	printf("%s", protoarg);
 	for (i=0; i<argc; i++) {
 		protoarg = sprintf("%s", argtype[i]);
 		if (i < (argc-1)) protoarg = (protoarg ", ");
 		arglen = length(protoarg);
-		if (i == (argc-1))
-			arglen += length(" __attribute__((__unused__))");
 		if ((protolen + arglen) > 77) {
 			protoarg = ("\n    " protoarg);
 			arglen += 4;
@@ -194,8 +204,13 @@ function doit() {
 		printf("%s", protoarg);
 		protolen += arglen;
 	}
-	printf(")) __attribute__((__unused__));\n");
+	printf(")\n");
+	printf("#ifndef VNODE_OP_NOINLINE\n");
+	printf("__attribute__((__unused__))\n");
+	printf("#endif\n");
+	printf(";\n");
 	# Define inline function.
+	printf("#ifndef VNODE_OP_NOINLINE\n");
 	printf("static __inline int %s(", toupper(name));
 	for (i=0; i<argc; i++) {
 		printf("%s", argname[i]);
@@ -212,9 +227,12 @@ function doit() {
 	}
 	printf("\treturn (VCALL(%s%s, VOFFSET(%s), &a));\n}\n",
 		argname[0], arg0special, name);
+	printf("#endif\n");
+	vops++;
 }
 BEGIN	{
 	arg0special="";
+	vops = 1; # start at 1, to count the 'default' op
 }
 END	{
 	printf("\n/* Special cases: */\n#include <sys/buf.h>\n");
@@ -226,6 +244,8 @@ END	{
 	doit();
 	name="vop_bwrite";
 	doit();
+
+	printf("\n#define VNODE_OPS_COUNT\t%d\n", vops);
 }
 '"$awk_parser" | sed -e "$anal_retentive"
 
@@ -245,12 +265,28 @@ exec > $out_c
 echo -n "$warning" | sed -e 's/\$//g;s/@/\$/g'
 echo ""
 echo -n "$copyright"
+echo "
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, \"\$NetBSD\$\");
+"
+
+echo '
+/*
+ * If we have LKM support, always include the non-inline versions for
+ * LKMs.  Otherwise, do it based on the option.
+ */
+#ifdef LKM
+#define	VNODE_OP_NOINLINE
+#else
+#include "opt_vnode_op_noinline.h"
+#endif'
 echo '
 #include <sys/param.h>
 #include <sys/mount.h>
+#include <sys/buf.h>
 #include <sys/vnode.h>
 
-struct vnodeop_desc vop_default_desc = {
+const struct vnodeop_desc vop_default_desc = {
 	0,
 	"default",
 	0,
@@ -279,7 +315,7 @@ function do_offset(typematch) {
 
 function doit() {
 	# Define offsets array
-	printf("\nint %s_vp_offsets[] = {\n", name);
+	printf("\nconst int %s_vp_offsets[] = {\n", name);
 	for (i=0; i<argc; i++) {
 		if (argtype[i] == "struct vnode *") {
 			printf ("\tVOPARG_OFFSETOF(struct %s_args,a_%s),\n",
@@ -289,9 +325,9 @@ function doit() {
 	print "\tVDESC_NO_OFFSET";
 	print "};";
 	# Define F_desc
-	printf("struct vnodeop_desc %s_desc = {\n", name);
+	printf("const struct vnodeop_desc %s_desc = {\n", name);
 	# offset
-	printf ("\t0,\n");
+	printf ("\t%d,\n", vop_offset++);
 	# printable name
 	printf ("\t\"%s\",\n", name);
 	# flags
@@ -327,18 +363,44 @@ function doit() {
 	do_offset("struct componentname *");
 	# transport layer information
 	printf ("\tNULL,\n};\n");
+
+	# Define function.
+	printf("#ifdef VNODE_OP_NOINLINE\n");
+	printf("int\n%s(", toupper(name));
+	for (i=0; i<argc; i++) {
+		printf("%s", argname[i]);
+		if (i < (argc-1)) printf(", ");
+	}
+	printf(")\n");
+	for (i=0; i<argc; i++) {
+		printf("\t%s %s;\n", argtype[i], argname[i]);
+	}
+	printf("{\n\tstruct %s_args a;\n", name);
+	printf("\ta.a_desc = VDESC(%s);\n", name);
+	for (i=0; i<argc; i++) {
+		printf("\ta.a_%s = %s;\n", argname[i], argname[i]);
+	}
+	printf("\treturn (VCALL(%s%s, VOFFSET(%s), &a));\n}\n",
+		argname[0], arg0special, name);
+	printf("#endif\n");
 }
-END	{
+BEGIN	{
 	printf("\n/* Special cases: */\n");
+	# start from 1 (vop_default is at 0)
+	vop_offset=1;
 	argc=1;
 	argdir[0]="IN";
 	argtype[0]="struct buf *";
 	argname[0]="bp";
+	arg0special="->b_vp";
 	willrele[0]=0;
 	name="vop_strategy";
 	doit();
 	name="vop_bwrite";
 	doit();
+	printf("\n/* End of special cases */\n");
+
+	arg0special="";
 }
 '"$awk_parser" | sed -e "$anal_retentive"
 
@@ -349,7 +411,7 @@ echo '
 # Add the vfs_op_descs array to the C file.
 # Begin stuff
 echo '
-struct vnodeop_desc *vfs_op_descs[] = {
+const struct vnodeop_desc * const vfs_op_descs[] = {
 	&vop_default_desc,	/* MUST BE FIRST */
 	&vop_strategy_desc,	/* XXX: SPECIAL CASE */
 	&vop_bwrite_desc,	/* XXX: SPECIAL CASE */

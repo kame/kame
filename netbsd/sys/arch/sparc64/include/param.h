@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.20.2.2 2000/10/18 16:31:28 tv Exp $ */
+/*	$NetBSD: param.h,v 1.30 2002/04/18 16:31:47 eeh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -45,7 +45,7 @@
  */
 
 /*
- * Copyright (c) 1996-1999 Eduardo Horvath
+ * Copyright (c) 1996-2002 Eduardo Horvath
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -67,7 +67,9 @@
  *
  */
 
-
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
 
 #define	_MACHINE	sparc64
 #define	MACHINE		"sparc64"
@@ -81,6 +83,9 @@
 #define	MID_MACHINE	MID_SPARC
 #endif
 
+#ifdef _KERNEL_OPT
+#include "opt_sparc_arch.h"
+#endif
 #ifdef _KERNEL				/* XXX */
 #ifndef _LOCORE				/* XXX */
 #include <machine/cpu.h>		/* XXX */
@@ -197,19 +202,23 @@ extern int nbpg, pgofset, pgshift;
  * of the hardware page size.
  */
 #define	MSIZE		256		/* size of an mbuf */
-#define	MCLBYTES	2048		/* enough for whole Ethernet packet */
-#define	MCLSHIFT	11		/* log2(MCLBYTES) */
-#define	MCLOFSET	(MCLBYTES - 1)
 
-#if defined(_KERNEL) && !defined(_LKM)
-#include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#ifndef MCLSHIFT
+#define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
+					/* 2K cluster can hold Ether frame */
+#endif	/* MCLSHIFT */
+
+#define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
 
 #ifndef NMBCLUSTERS
+#if defined(_KERNEL_OPT)
+#include "opt_gateway.h"
+#endif
+
 #ifdef GATEWAY
-#define	NMBCLUSTERS	512		/* map size, max cluster allocation */
+#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
 #else
-#define	NMBCLUSTERS	256		/* map size, max cluster allocation */
+#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
 #endif
 #endif
 
@@ -220,7 +229,7 @@ extern int nbpg, pgofset, pgshift;
  * logical pages.
  */
 #define	NKMEMPAGES_MIN_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
-#define	NKMEMPAGES_MAX_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((128 * 1024 * 1024) >> PAGE_SHIFT)
 
 /* pages ("clicks") to disk blocks */
 #define	ctod(x)		((x) << (PGSHIFT - DEV_BSHIFT))
@@ -242,40 +251,18 @@ extern int nbpg, pgofset, pgshift;
  */
 #define	bdbtofsb(bn)	((bn) / (BLKDEV_IOSIZE / DEV_BSIZE))
 
-/*
- * dvmamap manages a range of DVMA addresses intended to create double
- * mappings of physical memory. In a way, `dvmamap' is a submap of the
- * VM map `phys_map'. The difference is the use of the `resource map'
- * routines to manage page allocation, allowing DVMA addresses to be
- * allocated and freed from within interrupt routines.
- *
- * Note that `phys_map' can still be used to allocate memory-backed pages
- * in DVMA space.
- */
 #ifdef _KERNEL
 #ifndef _LOCORE
-#if 0
-extern vaddr_t	dvma_base;
-extern vaddr_t	dvma_end;
-extern struct map	*dvmamap;
-/*
- * The dvma resource map is defined in page units, which are numbered 1 to N.
- * Use these macros to convert to/from virtual addresses.
- */
-#define rctov(n)		(ctob(((n)-1))+dvma_base)
-#define vtorc(v)		((btoc((v)-dvma_base))+1)
-
-extern caddr_t	kdvma_mapin __P((caddr_t, int, int));
-extern caddr_t	dvma_malloc __P((size_t, void *, int));
-extern void	dvma_free __P((caddr_t, size_t, void *));
-#endif
 
 extern void	delay __P((unsigned int));
 #define	DELAY(n)	delay(n)
 
+#ifdef	__arch64__
+/* If we're using a 64-bit kernel use 64-bit math */
+#define mstohz(ms) ((ms + 0UL) * hz / 1000)
+#endif
+
 extern int cputyp;
-extern int cpumod;
-extern int mmumod;
 
 #endif /* _LOCORE */
 #endif /* _KERNEL */
@@ -309,6 +296,8 @@ extern int mmumod;
 #define CPU_ISSUN4	(0)
 #define CPU_ISSUN4OR4C	(0)
 #define CPU_ISSUN4COR4M	(0)
-#define	NBPG		8192		/* bytes/page */
-#define	PGOFSET		(NBPG-1)	/* byte offset into page */
+
+
 #define	PGSHIFT		13		/* log2(NBPG) */
+#define	NBPG		(1<<PGSHIFT)	/* bytes/page */
+#define	PGOFSET		(NBPG-1)	/* byte offset into page */

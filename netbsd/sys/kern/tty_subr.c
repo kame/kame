@@ -1,4 +1,4 @@
-/*	$NetBSD: tty_subr.c,v 1.19 2000/03/30 09:27:13 augustss Exp $	*/
+/*	$NetBSD: tty_subr.c,v 1.22 2001/12/27 02:27:50 ad Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Theo de Raadt
@@ -32,6 +32,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tty_subr.c,v 1.22 2001/12/27 02:27:50 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,18 +88,18 @@ clalloc(clp, size, quot)
 	int quot;
 {
 
-	MALLOC(clp->c_cs, u_char *, size, M_TTYS, M_WAITOK);
+	clp->c_cs = malloc(size, M_TTYS, M_WAITOK);
 	if (!clp->c_cs)
 		return (-1);
 	memset(clp->c_cs, 0, size);
 
 	if(quot) {
-		MALLOC(clp->c_cq, u_char *, QMEM(size), M_TTYS, M_WAITOK);
+		clp->c_cq = malloc(QMEM(size), M_TTYS, M_WAITOK);
 		if (!clp->c_cq) {
-			FREE(clp->c_cs, M_TTYS);
+			free(clp->c_cs, M_TTYS);
 			return (-1);
 		}
-		memset(clp->c_cs, 0, QMEM(size));
+		memset(clp->c_cq, 0, QMEM(size));
 	} else
 		clp->c_cq = (u_char *)0;
 
@@ -112,9 +115,9 @@ clfree(clp)
 	struct clist *clp;
 {
 	if(clp->c_cs)
-		FREE(clp->c_cs, M_TTYS);
+		free(clp->c_cs, M_TTYS);
 	if(clp->c_cq)
-		FREE(clp->c_cq, M_TTYS);
+		free(clp->c_cq, M_TTYS);
 	clp->c_cs = clp->c_cq = (u_char *)0;
 }
 

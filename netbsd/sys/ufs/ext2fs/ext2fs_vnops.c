@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_vnops.c,v 1.26.4.2 2001/04/06 00:03:33 he Exp $	*/
+/*	$NetBSD: ext2fs_vnops.c,v 1.40 2001/11/08 02:39:08 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.
@@ -42,6 +42,9 @@
  * Modified for ext2fs by Manuel Bouyer.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_vnops.c,v 1.40 2001/11/08 02:39:08 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/resourcevar.h>
@@ -59,15 +62,10 @@
 #include <sys/pool.h>
 #include <sys/signalvar.h>
 
-#include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
-
 #include <miscfs/fifofs/fifo.h>
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/specfs/specdev.h>
 
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufs_extern.h>
 #include <ufs/ufs/ufsmount.h>
@@ -76,6 +74,7 @@
 #include <ufs/ext2fs/ext2fs_extern.h>
 #include <ufs/ext2fs/ext2fs_dir.h>
 
+extern int prtactive;
 
 static int ext2fs_chmod
 	__P((struct vnode *, int, struct ucred *, struct proc *));
@@ -135,11 +134,15 @@ ext2fs_mknod(v)
 	struct vnode **vpp = ap->a_vpp;
 	struct inode *ip;
 	int error;
+	struct mount	*mp;	
+	ino_t		ino;
 
 	if ((error = ext2fs_makeinode(MAKEIMODE(vap->va_type, vap->va_mode),
 		    ap->a_dvp, vpp, ap->a_cnp)) != 0)
 		return (error);
 	ip = VTOI(*vpp);
+	mp  = (*vpp)->v_mount;
+	ino = ip->i_number;
 	ip->i_flag |= IN_ACCESS | IN_CHANGE | IN_UPDATE;
 	if (vap->va_rdev != VNOVAL) {
 		/*
@@ -156,7 +159,11 @@ ext2fs_mknod(v)
 	vput(*vpp);
 	(*vpp)->v_type = VNON;
 	vgone(*vpp);
-	*vpp = 0;
+	error = VFS_VGET(mp, ino, vpp);
+	if (error != 0) {
+		*vpp = NULL;
+		return (error);
+	}
 	return (0);
 }
 
@@ -199,7 +206,6 @@ ext2fs_access(v)
 	struct vnode *vp = ap->a_vp;
 	struct inode *ip = VTOI(vp);
 	mode_t mode = ap->a_mode;
-
 
 	/*
 	 * Disallow write attempts on read-only file systems;
@@ -255,7 +261,7 @@ ext2fs_getattr(v)
 	vap->va_uid = ip->i_e2fs_uid;
 	vap->va_gid = ip->i_e2fs_gid;
 	vap->va_rdev = (dev_t)fs2h32(ip->i_din.e2fs_din.e2di_rdev);
-	vap->va_size = ip->i_e2fs_size;
+	vap->va_size = vp->v_size;
 	vap->va_atime.tv_sec = ip->i_e2fs_atime;
 	vap->va_atime.tv_nsec = 0;
 	vap->va_mtime.tv_sec = ip->i_e2fs_mtime;
@@ -425,8 +431,6 @@ ext2fs_chmod(vp, mode, cred, p)
 	ip->i_e2fs_mode &= ~ALLPERMS;
 	ip->i_e2fs_mode |= (mode & ALLPERMS);
 	ip->i_flag |= IN_CHANGE;
-	if ((vp->v_flag & VTEXT) && (ip->i_e2fs_mode & S_ISTXT) == 0)
-		(void) uvm_vnp_uncache(vp);
 	return (0);
 }
 
@@ -565,7 +569,7 @@ ext2fs_link(v)
 		ip->i_e2fs_nlink--;
 		ip->i_flag |= IN_CHANGE;
 	}
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
 out1:
 	if (dvp != vp)
 		VOP_UNLOCK(vp, 0);
@@ -745,7 +749,7 @@ abortit:
 	/*
 	 * If ".." must be changed (ie the directory gets a new
 	 * parent) then the source directory must not be in the
-	 * directory heirarchy above the target, as this would
+	 * directory hierarchy above the target, as this would
 	 * orphan everything below the source directory. Also
 	 * the user must have write permission in the source so
 	 * as to be able to change "..". We must repeat the call 
@@ -1093,7 +1097,7 @@ bad:
 	} else
 		*ap->a_vpp = tvp;
 out:
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
 	vput(dvp);
 	return (error);
 }
@@ -1212,7 +1216,8 @@ ext2fs_symlink(v)
 		error = vn_rdwr(UIO_WRITE, vp, ap->a_target, len, (off_t)0,
 		    UIO_SYSSPACE, IO_NODELOCKED, ap->a_cnp->cn_cred,
 		    (size_t *)0, (struct proc *)0);
-	vput(vp);
+	if (error)
+		vput(vp);
 	return (error);
 }
 
@@ -1345,7 +1350,7 @@ ext2fs_makeinode(mode, dvp, vpp, cnp)
 		mode |= IFREG;
 
 	if ((error = VOP_VALLOC(dvp, mode, cnp->cn_cred, &tvp)) != 0) {
-		free(cnp->cn_pnbuf, M_NAMEI);
+		PNBUF_PUT(cnp->cn_pnbuf);
 		vput(dvp);
 		return (error);
 	}
@@ -1370,7 +1375,7 @@ ext2fs_makeinode(mode, dvp, vpp, cnp)
 	if (error != 0)
 		goto bad;
 	if ((cnp->cn_flags & SAVESTART) == 0)
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		PNBUF_PUT(cnp->cn_pnbuf);
 	vput(dvp);
 	*vpp = tvp;
 	return (0);
@@ -1380,7 +1385,7 @@ bad:
 	 * Write error occurred trying to update the inode
 	 * or the directory so must deallocate the inode.
 	 */
-	free(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
 	vput(dvp);
 	ip->i_e2fs_nlink = 0;
 	ip->i_flag |= IN_CHANGE;
@@ -1400,7 +1405,6 @@ ext2fs_reclaim(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct inode *ip;
-	extern int prtactive;
 
 	if (prtactive && vp->v_usecount != 0) 
 		vprint("ext2fs_reclaim: pushing active", vp);
@@ -1425,7 +1429,7 @@ ext2fs_reclaim(v)
 
 /* Global vfs data structures for ext2fs. */
 int (**ext2fs_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc ext2fs_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc ext2fs_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, ext2fs_lookup },		/* lookup */
 	{ &vop_create_desc, ext2fs_create },		/* create */
@@ -1470,13 +1474,15 @@ struct vnodeopv_entry_desc ext2fs_vnodeop_entries[] = {
 	{ &vop_truncate_desc, ext2fs_truncate },	/* truncate */
 	{ &vop_update_desc, ext2fs_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void*)))NULL }
+	{ &vop_getpages_desc, genfs_getpages },		/* getpages */
+	{ &vop_putpages_desc, genfs_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc ext2fs_vnodeop_opv_desc =
+const struct vnodeopv_desc ext2fs_vnodeop_opv_desc =
 	{ &ext2fs_vnodeop_p, ext2fs_vnodeop_entries };
 
 int (**ext2fs_specop_p) __P((void *));
-struct vnodeopv_entry_desc ext2fs_specop_entries[] = {
+const struct vnodeopv_entry_desc ext2fs_specop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, spec_lookup },		/* lookup */
 	{ &vop_create_desc, spec_create },		/* create */
@@ -1521,13 +1527,15 @@ struct vnodeopv_entry_desc ext2fs_specop_entries[] = {
 	{ &vop_truncate_desc, spec_truncate },		/* truncate */
 	{ &vop_update_desc, ext2fs_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_getpages_desc, spec_getpages },		/* getpages */
+	{ &vop_putpages_desc, spec_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc ext2fs_specop_opv_desc =
+const struct vnodeopv_desc ext2fs_specop_opv_desc =
 	{ &ext2fs_specop_p, ext2fs_specop_entries };
 
 int (**ext2fs_fifoop_p) __P((void *));
-struct vnodeopv_entry_desc ext2fs_fifoop_entries[] = {
+const struct vnodeopv_entry_desc ext2fs_fifoop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, fifo_lookup },		/* lookup */
 	{ &vop_create_desc, fifo_create },		/* create */
@@ -1572,7 +1580,8 @@ struct vnodeopv_entry_desc ext2fs_fifoop_entries[] = {
 	{ &vop_truncate_desc, fifo_truncate },		/* truncate */
 	{ &vop_update_desc, ext2fs_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, fifo_putpages }, 		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc ext2fs_fifoop_opv_desc =
+const struct vnodeopv_desc ext2fs_fifoop_opv_desc =
 	{ &ext2fs_fifoop_p, ext2fs_fifoop_entries };

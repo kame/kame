@@ -1,4 +1,4 @@
-/*	$NetBSD: compat_13_machdep.c,v 1.8 2000/04/10 13:34:19 pk Exp $	*/
+/*	$NetBSD: compat_13_machdep.c,v 1.12 2000/12/29 17:09:49 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -76,10 +76,6 @@ compat_13_sys_sigreturn(p, v, retval)
 
 	/* First ensure consistent stack state (see sendsig). */
 	write_user_windows();
-#if 0
-	/* Make sure our D$ is not polluted w/bad data */
-	blast_vcache();
-#endif
 	if (rwindow_save(p)) {
 #ifdef DEBUG
 		printf("compat_13_sys_sigreturn: rwindow_save(%p) failed, sending SIGILL\n", p);
@@ -124,7 +120,8 @@ compat_13_sys_sigreturn(p, v, retval)
 	if (((scp->sc_pc | scp->sc_npc) & 3) != 0 || scp->sc_pc == 0 || scp->sc_npc == 0)
 #ifdef DEBUG
 	{
-		printf("compat_13_sys_sigreturn: pc %p or npc %p invalid\n", scp->sc_pc, scp->sc_npc);
+		printf("compat_13_sys_sigreturn: pc %p or npc %p invalid\n",
+			(void *)scp->sc_pc, (void *)scp->sc_npc);
 #ifdef DDB
 		Debugger();
 #endif
@@ -145,8 +142,9 @@ compat_13_sys_sigreturn(p, v, retval)
 	tf->tf_out[6] = scp->sc_sp;
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW) {
-		printf("compat_13_sys_sigreturn: return trapframe pc=%p sp=%p tstate=%llx\n",
-		       (vaddr_t)tf->tf_pc, (vaddr_t)tf->tf_out[6], tf->tf_tstate);
+		printf("compat_13_sys_sigreturn: return trapframe pc=%llx sp=%llx tstate=%llx\n",
+			(long long)tf->tf_pc, (long long)tf->tf_out[6],
+			(long long)tf->tf_tstate);
 #ifdef DDB
 		if (sigdebug & SDB_DDB) Debugger();
 #endif
@@ -154,9 +152,9 @@ compat_13_sys_sigreturn(p, v, retval)
 #endif
 
 	if (scp->sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask */
 	native_sigset13_to_sigset(&scp->sc_mask, &mask);

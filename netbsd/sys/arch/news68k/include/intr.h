@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.3 2000/02/16 15:32:03 tsutsui Exp $	*/
+/*	$NetBSD: intr.h,v 1.7 2001/04/13 23:30:01 thorpej Exp $	*/
 
 /*
  *
@@ -39,6 +39,7 @@
 #define	_NEWS68K_INTR_H_
 
 #include <machine/psl.h>
+#include <m68k/asm_single.h>
 
 #ifdef _KERNEL
 /*
@@ -55,13 +56,13 @@
 #define	splbio()	splraise4()
 #define	splnet()	splraise4()
 #define	spltty()	splraise5()
-#define	splimp()	splraise5()
+#define	splvm()		splraise5()
 #define	splserial()     splraise5()
 #define	splclock()	splraise6()
 #define	splstatclock()	splclock()
-#define	splvm()		spl6()
 #define	splhigh()	spl7()
 #define	splsched()	spl7()
+#define	spllock()	spl7()
 
 /*
  * simulated software interrupt register
@@ -74,10 +75,8 @@ extern volatile u_char *ctrl_int2;
 #define	SIR_CLOCK	1
 #define	NEXT_SIR	2
 
-#define	siron(x)	\
-	__asm __volatile ("orb %0,%1" : : "di" ((u_char)(x)), "g" (ssir))
-#define	siroff(x)	\
-	__asm __volatile ("andb %0,%1" : : "di" ((u_char)~(x)), "g" (ssir))
+#define	siron(x)	single_inst_bset_b((ssir), (x))
+#define	siroff(x)	single_inst_bclr_b((ssir), (x))
 #define	setsoftint(x)	do {				\
 				siron(x);		\
 				*ctrl_int2 = 0xff;	\

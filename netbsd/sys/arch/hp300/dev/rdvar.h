@@ -1,4 +1,4 @@
-/*	$NetBSD: rdvar.h,v 1.9.4.1 2000/10/18 00:10:59 tv Exp $	*/
+/*	$NetBSD: rdvar.h,v 1.10 2000/10/10 19:58:43 he Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.

@@ -1,4 +1,4 @@
-/*	$NetBSD: db_trace.c,v 1.4 2000/05/26 03:34:28 jhawk Exp $	*/
+/*	$NetBSD: db_trace.c,v 1.20 2002/05/13 20:30:09 matt Exp $	*/
 /*	$OpenBSD: db_trace.c,v 1.3 1997/03/21 02:10:48 niklas Exp $	*/
 
 /* 
@@ -27,19 +27,24 @@
  * the rights to redistribute these changes.
  */
 
+#include "opt_ppcarch.h"
+
 #include <sys/param.h>
 #include <sys/proc.h>
+#include <sys/user.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
 #include <machine/pmap.h>
+#include <powerpc/spr.h>
 
 #include <ddb/db_access.h>
+#include <ddb/db_interface.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_variables.h>
 
-struct db_variable db_regs[] = {
+const struct db_variable db_regs[] = {
 	{ "r0",  (long *)&ddb_regs.r[0],  FCN_NULL },
 	{ "r1",  (long *)&ddb_regs.r[1],  FCN_NULL },
 	{ "r2",  (long *)&ddb_regs.r[2],  FCN_NULL },
@@ -74,10 +79,17 @@ struct db_variable db_regs[] = {
 	{ "r31", (long *)&ddb_regs.r[31], FCN_NULL },
 	{ "iar", (long *)&ddb_regs.iar,   FCN_NULL },
 	{ "msr", (long *)&ddb_regs.msr,   FCN_NULL },
+	{ "lr",  (long *)&ddb_regs.lr,    FCN_NULL },
+	{ "ctr", (long *)&ddb_regs.ctr,   FCN_NULL },
+	{ "cr",  (long *)&ddb_regs.cr,    FCN_NULL },
+	{ "xer", (long *)&ddb_regs.xer,   FCN_NULL },
+#ifdef PPC_IBM4XX
+	{ "dear", (long *)&ddb_regs.dear, FCN_NULL },
+	{ "esr", (long *)&ddb_regs.esr,   FCN_NULL },
+	{ "pid", (long *)&ddb_regs.pid,   FCN_NULL },
+#endif
 };
-struct db_variable *db_eregs = db_regs + sizeof (db_regs)/sizeof (db_regs[0]);
-
-extern label_t	*db_recover;
+const struct db_variable * const db_eregs = db_regs + sizeof (db_regs)/sizeof (db_regs[0]);
 
 /*
  *	Frame tracing.
@@ -90,12 +102,18 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 	char *modif;
 	void (*pr) __P((const char *, ...));
 {
-	db_addr_t frame, lr, caller;
+	db_addr_t frame, lr, caller, *args;
+	db_addr_t fakeframe[2];
 	db_expr_t diff;
 	db_sym_t sym;
 	char *symname;
 	boolean_t kernel_only = TRUE;
 	boolean_t trace_thread = FALSE;
+	extern int trapexit[];
+#ifdef PPC_MPC6XX
+	extern int end[];
+#endif
+	boolean_t full = FALSE;
 
 	{
 		register char *cp = modif;
@@ -106,25 +124,159 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 				trace_thread = TRUE;
 			if (c == 'u')
 				kernel_only = FALSE;
+			if (c == 'f')
+				full = TRUE;
 		}
 	}
 
-	frame = (db_addr_t)ddb_regs.r[1];
-	while ((frame = *(db_addr_t *)frame) && count--) {
+	if (have_addr) {
+		if (trace_thread) {
+			struct proc *p;
+			struct user *u;
+
+			(*pr)("trace: pid %d ", (int)addr);
+			p = pfind(addr);
+			if (p == NULL) {
+				(*pr)("not found\n");
+				return;
+			}	
+			if (!(p->p_flag&P_INMEM)) {
+				(*pr)("swapped out\n");
+				return;
+			}
+			u = p->p_addr;
+			frame = (db_addr_t)u->u_pcb.pcb_sp;
+			(*pr)("at %p\n", frame);
+		} else
+			frame = (db_addr_t)addr;
+	} else {
+		frame = (db_addr_t)ddb_regs.r[1];
+	}
+	for (;;) {
+		if (frame < NBPG)
+			break;
+#ifdef PPC_MPC6XX
+		if (kernel_only &&
+		    ((frame > (db_addr_t) end &&
+		      frame < VM_MIN_KERNEL_ADDRESS) ||
+		     frame >= VM_MAX_KERNEL_ADDRESS))
+			break;
+#endif 
+		frame = *(db_addr_t *)frame;
+	    next_frame:
+		args = (db_addr_t *)(frame + 8);
+		if (frame < NBPG)
+			break;
+#ifdef PPC_MPC6XX
+		if (kernel_only &&
+		    ((frame > (db_addr_t) end &&
+		      frame < VM_MIN_KERNEL_ADDRESS) ||
+		     frame >= VM_MAX_KERNEL_ADDRESS))
+			break;
+#endif
+	        if (count-- == 0)
+			break;
+
 		lr = *(db_addr_t *)(frame + 4) - 4;
-		if (lr & 3) {
+		if ((lr & 3) || (lr < 0x100)) {
 			(*pr)("saved LR(0x%x) is invalid.", lr);
 			break;
 		}
 		if ((caller = (db_addr_t)vtophys(lr)) == 0)
 			caller = lr;
 
+		if (frame != (db_addr_t) fakeframe) {
+			(*pr)("0x%08lx: ", frame);
+		} else {
+			(*pr)("  <????>  : ");
+		}
+		if (caller + 4 == (db_addr_t) &trapexit) {
+			const char *trapstr;
+			struct trapframe *tf = (struct trapframe *) (frame+8);
+			(*pr)("%s ", tf->srr1 & PSL_PR ? "user" : "kernel");
+			switch (tf->exc) {
+			case EXC_DSI:
+#ifdef PPC_MPC6XX
+				(*pr)("DSI %s trap @ %#x by ",
+				    tf->dsisr & DSISR_STORE ? "write" : "read",
+				    tf->dar);
+#endif
+#ifdef PPC_IBM4XX
+				(*pr)("DSI %s trap @ %#x by ",
+				    tf->esr & ESR_DST ? "write" : "read",
+				    tf->dear);
+#endif
+				goto print_trap;
+			case EXC_ISI: trapstr = "ISI"; break;
+			case EXC_PGM: trapstr = "PGM"; break;
+			case EXC_SC: trapstr = "SC"; break;
+			case EXC_EXI: trapstr = "EXI"; break;
+			case EXC_MCHK: trapstr = "MCHK"; break;
+			case EXC_VEC: trapstr = "VEC"; break;
+			case EXC_FPU: trapstr = "FPU"; break;
+			case EXC_FPA: trapstr = "FPA"; break;
+			case EXC_DECR: trapstr = "DECR"; break;
+			case EXC_ALI: trapstr = "ALI"; break;
+			case EXC_BPT: trapstr = "BPT"; break;
+			case EXC_TRC: trapstr = "TRC"; break;
+			case EXC_RUNMODETRC: trapstr = "RUNMODETRC"; break;
+			case EXC_PERF: trapstr = "PERF"; break;
+			case EXC_SMI: trapstr = "SMI"; break;
+			case EXC_RST: trapstr = "RST"; break;
+			default: trapstr = NULL; break;
+			}
+			if (trapstr != NULL) {
+				(*pr)("%s trap by ", trapstr);
+			} else {
+				(*pr)("trap %#x by ", tf->exc);
+			}
+		   print_trap:	
+			lr = (db_addr_t) tf->srr0;
+			if ((caller = (db_addr_t)vtophys(lr)) == 0)
+				caller = lr;
+			diff = 0;
+			symname = NULL;
+			sym = db_search_symbol(caller, DB_STGY_ANY, &diff);
+			db_symbol_values(sym, &symname, 0);
+			if (symname == NULL || !strcmp(symname, "end")) {
+				(*pr)("%p: srr1=%#x\n", caller, tf->srr1);
+			} else {
+				(*pr)("%s+%x: srr1=%#x\n", symname, diff,
+				    tf->srr1);
+			}
+			(*pr)("%-10s  r1=%#x cr=%#x xer=%#x ctr=%#x",
+			    "", tf->fixreg[1], tf->cr, tf->xer, tf->ctr);
+#ifdef PPC_MPC6XX
+			if (tf->exc == EXC_DSI)
+				(*pr)(" dsisr=%#x", tf->dsisr);
+#endif
+#ifdef PPC_IBM4XX
+			if (tf->exc == EXC_DSI)
+				(*pr)(" dear=%#x", tf->dear);
+			(*pr)(" esr=%#x pid=%#x", tf->esr, tf->pid);
+#endif
+			(*pr)("\n");
+			fakeframe[0] = (db_addr_t) tf->fixreg[1];
+			fakeframe[1] = (db_addr_t) tf->lr;
+			frame = (db_addr_t) fakeframe;
+			if (kernel_only && (tf->srr1 & PSL_PR))
+				break;
+			goto next_frame;
+		}
+
 		diff = 0;
 		symname = NULL;
 		sym = db_search_symbol(caller, DB_STGY_ANY, &diff);
 		db_symbol_values(sym, &symname, 0);
-		if (symname == NULL)
-			symname = "?";
-		(*pr)("at %s+%x\n", symname, diff);
+		if (symname == NULL || !strcmp(symname, "end"))
+			(*pr)("at %p", caller);
+		else
+			(*pr)("at %s+%x", symname, diff);
+		if (full)
+			/* Print all the args stored in that stackframe. */
+			(*pr)("(%lx, %lx, %lx, %lx, %lx, %lx, %lx, %lx)",
+				args[0], args[1], args[2], args[3],
+				args[4], args[5], args[6], args[7]);
+		(*pr)("\n");
 	}
 }

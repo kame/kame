@@ -1,4 +1,4 @@
-/*	$NetBSD: cache.h,v 1.22 2000/06/06 07:56:40 pk Exp $ */
+/*	$NetBSD: cache.h,v 1.25 2002/01/25 17:40:45 pk Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -46,6 +46,10 @@
 #ifndef SPARC_CACHE_H
 #define SPARC_CACHE_H
 
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
+
 /*
  * Sun-4 and Sun-4c virtual address cache.
  *
@@ -71,6 +75,8 @@ enum vactype { VAC_UNKNOWN, VAC_NONE, VAC_WRITETHROUGH, VAC_WRITEBACK };
  *			ct_tid:14,	(cache tag ID)
  *			:2;		(unused; must be zero)
  *	};
+ *
+ * (The SS2 has 16 MMU contexts, which makes `ct_cid' one bit wider.)
  *
  * The SPARCstation 1 cache sees virtual addresses as:
  *
@@ -128,6 +134,7 @@ enum vactype { VAC_UNKNOWN, VAC_NONE, VAC_WRITETHROUGH, VAC_WRITEBACK };
 
 extern int cache_alias_dist;		/* */
 extern int cache_alias_bits;
+extern u_long dvma_cachealign;
 
 /* Optimize cache alias macros on single architecture kernels */
 #if defined(SUN4) && !defined(SUN4C) && !defined(SUN4M)
@@ -161,6 +168,7 @@ void	sun4_vcache_flush_context __P((void));	/* flush current context */
 void	sun4_vcache_flush_region __P((int));	/* flush region in cur ctx */
 void	sun4_vcache_flush_segment __P((int, int));/* flush seg in cur ctx */
 void	sun4_vcache_flush_page __P((int va));	/* flush page in cur ctx */
+void	sun4_vcache_flush_page_hw __P((int va));/* flush page in cur ctx */
 void	sun4_cache_flush __P((caddr_t, u_int));/* flush region */
 
 void	srmmu_vcache_flush_context __P((void));	/* flush current context */

@@ -1,13 +1,15 @@
-#	$NetBSD: DR-EVIL,v 1.21.2.2 2001/04/25 08:58:31 he Exp $
+#	$NetBSD: DR-EVIL,v 1.44.6.2 2002/08/01 04:22:29 lukem Exp $
 #
 #	DR-EVIL -- Dell Inspiron 3800 laptop used by thorpej@netbsd.org
 #
 
 include "arch/i386/conf/std.i386"
 
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
 maxusers	32		# estimated number of users
 
-#options IFAREF_DEBUG
+#options 	IFAREF_DEBUG
 
 # CPU support.  At least one is REQUIRED.
 #options 	I386_CPU
@@ -25,6 +27,7 @@ options 	__AUDIT__
 #options 	VM86		# virtual 8086 emulation
 options 	USER_LDT	# user-settable LDT; used by WINE
 #options 	MTRR		# MTRR support
+#options 	PERFCTRS	# performance-monitoring counters support
 # eliminate delay no-ops in I/O; recommended on all but very old machines
 options 	DUMMY_NOPS
 
@@ -37,7 +40,7 @@ options 	XSERVER		# X server support in console drivers
 
 # This option allows you to force a serial console at the specified
 # I/O address.   see console(4) for details.
-#options 	"CONSDEVNAME=\"com\"",CONADDR=0x2f8,CONSPEED=57600
+#options 	CONSDEVNAME="\"com\"",CONADDR=0x2f8,CONSPEED=57600
 #	you don't want the option below ON iff you are using the
 #	serial console option of the new boot strap code.
 #options 	CONS_OVERRIDE	# Always use above! independent of boot info
@@ -67,6 +70,9 @@ options 	SYSVSHM		# System V-like memory sharing
 
 options 	LKM		# loadable kernel modules
 
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC	# expensive kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
@@ -74,7 +80,7 @@ options 	DIAGNOSTIC	# expensive kernel consistency checks
 options 	DDB		# in-kernel debugger
 options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
 #options 	KGDB		# remote debugger
-#options 	"KGDB_DEVNAME=\"com\"",KGDBADDR=0x3f8,KGDBRATE=9600
+#options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
 makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
@@ -87,12 +93,12 @@ options 	COMPAT_13	# NetBSD 1.3,
 options 	COMPAT_14	# NetBSD 1.4,
 options 	COMPAT_43	# and 4.3BSD
 options 	COMPAT_386BSD_MBRPART # recognize old partition ID
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 #options 	COMPAT_SVR4	# binary compatibility with SVR4
 #options 	COMPAT_IBCS2	# binary compatibility with SCO and ISC
 options 	COMPAT_LINUX	# binary compatibility with Linux
 #options 	COMPAT_FREEBSD	# binary compatibility with FreeBSD
-#options 	COMPAT_AOUT	# binary compatibility w/ NetBSD a.out
 
 # Executable format options
 
@@ -140,11 +146,9 @@ options 	NETATALK	# AppleTalk networking protocols
 #options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
 #options 	IPFILTER_LOG	# ipmon(8) log support
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 options 	NMBCLUSTERS=4096 # Max. number of mbuf clusters
-
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not recommended.
-#options 	TCP_COMPAT_42
 
 # These options enable verbose messages for several subsystems.
 # Warning, these may compile large string tables into the kernel!
@@ -155,7 +159,7 @@ options 	PCIVERBOSE	# verbose PCI device autoconfig messages
 #options 	PCMCIAVERBOSE	# verbose PCMCIA configuration messages
 options 	SCSIVERBOSE	# human readable SCSI error messages
 options 	USBVERBOSE	# verbose USB device autoconfig messages
-options 	PNPBIOSVERBOSE	# verbos PnP BIOS messages
+options 	PNPBIOSVERBOSE	# verbose PnP BIOS messages
 
 options 	NFS_BOOT_BOOTP,NFS_BOOT_BOOTPARAM
 
@@ -195,7 +199,7 @@ options 	APMDEBUG
 
 # Basic Bus Support
 
-# Plug-and-Play BIOS and attached devices 
+# Plug-and-Play BIOS and attached devices
 
 pnpbios*	at mainbus?
 
@@ -203,10 +207,10 @@ options 	PNPBIOSEVENTS
 options 	PNPBIOSEVENTSDEBUG
 
 # mainboard audio chips
-#ess*		at pnpbios? index ?	# ESS AudioDrive  
+#ess*		at pnpbios? index ?	# ESS AudioDrive
 #sb*		at pnpbios? index ?	# NeoMagic 256AV in sb mode
 #wss*		at pnpbios? index ?	# NeoMagic 256AV in wss mode
-#ym*		at pnpbios? index ?	# OPL3-SA3 
+#ym*		at pnpbios? index ?	# OPL3-SA3
 
 # com port
 # If enabled, consider changing "com0", "com1", and "com2" under "ISA Serial
@@ -308,10 +312,7 @@ pcmcia*		at cardslot?
 # wscons
 pckbc*	at isa?			# pc keyboard controller
 pckbd*	at pckbc?		# PC keyboard
-# "opms" should not be enabled together with "pms" or "pmsi"
 pms*		at pckbc?		# PS/2 mouse for wsmouse
-#pmsi*		at pckbc?		# PS/2 "Intelli"mouse for wsmouse
-#opms*		at pckbc?		# backwards compatible PS/2 mouse
 #vga0		at isa?
 vga*		at pci?
 #pcdisplay0	at isa?			# CGA, MDA, EGA, HGA
@@ -319,7 +320,6 @@ wsdisplay*	at vga? console ?
 #wsdisplay*	at pcdisplay? console ?
 wskbd*		at pckbd? console ? mux 1
 wsmouse*	at pms? mux 0
-#wsmouse*	at pmsi? mux 0
 
 pcppi0		at isa?
 sysbeep0	at pcppi?
@@ -386,7 +386,6 @@ lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 #bha*	at pci? dev ? function ?	# BusLogic 9xx SCSI
 #dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID
 #isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
-#ncr*	at pci? dev ? function ?	# NCR 53c8xx SCSI
 #siop*	at pci? dev ? function ?	# Symbios 53c8xx SCSI (experimental)
 #pcscp*	at pci? dev ? function ?	# AMD 53c974 PCscsi-PCI SCSI
 
@@ -414,7 +413,7 @@ esp*	at pcmcia? function ?		# Qlogic ESP406/FAS408 SCSI
 #bha1	at isa? port 0x334 irq ? drq ?
 # The "nca" and "dpt" probes might give false hits or hang your machine.
 #dpt0	at isa? port 0x170 irq ? drq ?	# DPT SmartCache/SmartRAID
-#nca0	at isa? port 0x360 irq 15	# Port-mapped NCR 53C80 contoller
+#nca0	at isa? port 0x360 irq 15	# Port-mapped NCR 53C80 controller
 #nca1	at isa? iomem 0xd8000 irq 5	# Memory-mapped controller (T128, etc.)
 #sea0	at isa? iomem 0xc8000 irq 5	# Seagate/Future Domain SCSI
 #uha0	at isa? port 0x330 irq ? drq ?	# UltraStor [13]4f SCSI
@@ -424,6 +423,7 @@ esp*	at pcmcia? function ?		# Qlogic ESP406/FAS408 SCSI
 
 # CardBus SCSI cards
 ahc*	at cardbus? dev ? function ?	# Adaptec ADP-1480
+adv*	at cardbus? dev ? function ?	# AdvanSys 1200[A,B], 9xx[U,UA] SCSI
 
 # SCSI bus support
 #scsibus* at adv?
@@ -450,7 +450,7 @@ st*	at scsibus? target ? lun ?	# SCSI tape drives
 cd*	at scsibus? target ? lun ?	# SCSI CD-ROM drives
 #ch*	at scsibus? target ? lun ?	# SCSI autochangers
 #ss*	at scsibus? target ? lun ?	# SCSI scanners
-#ses*	at scsibus? target ? lun ?	# SCSI Enclosure Servcies devices
+#ses*	at scsibus? target ? lun ?	# SCSI Enclosure Services devices
 uk*	at scsibus? target ? lun ?	# SCSI unknown
 
 # RAID controllers and devices
@@ -465,14 +465,14 @@ ca*	at cac? unit ?			# Compaq array disk devices
 pciide* at pci ? dev ? function ? flags 0x0000
 
 # ISA Plug-and-Play IDE controllers
-#wdc*	at isapnp? 
+#wdc*	at isapnp?
 
 # PCMCIA IDE controllers
 wdc*	at pcmcia? function ?
 
 # ISA ST506, ESDI, and IDE controllers
 # Use flags 0x01 if you want to try to use 32bits data I/O (the driver will
-# fall back to 16bits I/O if 32bits I/O are not functionnal).
+# fall back to 16bits I/O if 32bits I/O are not functional).
 # Some controllers pass the initial 32bit test, but will fail later.
 #wdc0	at isa? port 0x1f0 irq 14 flags 0x00
 #wdc1	at isa? port 0x170 irq 15 flags 0x00
@@ -524,10 +524,9 @@ fd*	at fdc? drive ?			# the drives themselves
 # Network Interfaces
 
 # PCI network interfaces
-#de*	at pci? dev ? function ?	# DEC 21x4x-based Ethernet
 #en*	at pci? dev ? function ?	# ENI/Adaptec ATM
 #ep*	at pci? dev ? function ?	# 3Com 3c59x
-#ex*	at pci? dev ? function ?	# 3Com 90x[B]
+#ex*	at pci? dev ? function ?	# 3Com 90x[BC]
 #epic*	at pci? dev ? function ?	# SMC EPIC/100 Ethernet
 #esh*	at pci? dev ? function ?	# Essential HIPPI card
 #fpa*	at pci? dev ? function ?	# DEC DEFPA FDDI
@@ -540,11 +539,7 @@ fd*	at fdc? drive ?			# the drives themselves
 #sip*	at pci? dev ? function ?	# SiS 900 Ethernet
 #ti*	at pci? dev ? function ?	# Alteon ACEnic gigabit Ethernet
 #tl*	at pci? dev ? function ?	# ThunderLAN-based Ethernet
-#tlp*	at pci? dev ? function ?	# DECchip 21x4x (and clones) Ethernet
-#options 	TLP_MATCH_21040
-#options 	TLP_MATCH_21041
-#options 	TLP_MATCH_21140
-#options 	TLP_MATCH_21142
+#tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
 #vr*	at pci? dev ? function ?	# VIA Rhine Fast Ethernet
 
 # EISA network interfaces
@@ -595,8 +590,8 @@ sm*	at mhzc?
 #ne0	at isa? port 0x280 irq 9		# NE[12]000 ethernet cards
 #ne1	at isa? port 0x300 irq 10
 #sm0	at isa? port 0x300 irq 10		# SMC91C9x Ethernet
-#tr0	at isa? port 0xa20 iomem 0xd8000 irq ?  # IBM TROPIC based Token-Ring
-#tr1	at isa? port 0xa24 iomem 0xd0000 irq ?  # IBM TROPIC based Token-Ring
+#tr0	at isa? port 0xa20 iomem 0xd8000 irq ?	# IBM TROPIC based Token-Ring
+#tr1	at isa? port 0xa24 iomem 0xd0000 irq ?	# IBM TROPIC based Token-Ring
 #tr*	at isa? port ? irq ?			# 3COM TROPIC based Token-Ring
 #we0	at isa? port 0x280 iomem 0xd0000 irq 9	# WD/SMC Ethernet
 #we1	at isa? port 0x300 iomem 0xcc000 irq 10
@@ -610,7 +605,7 @@ rtk*	at cardbus? dev ? function ?	# Realtek 8129/8139
 # MII/PHY support
 #dmphy*	at mii? phy ?			# Davicom DM9101 PHYs
 exphy*	at mii? phy ?			# 3Com internal PHYs
-#icsphy* at mii? phy ?			# Integrated Circuit Systems ICS1890
+#icsphy* at mii? phy ?			# Integrated Circuit Systems ICS189x
 inphy*	at mii? phy ?			# Intel 82555 PHYs
 #iophy*	at mii? phy ?			# Intel 82553 PHYs
 #lxtphy* at mii? phy ?			# Level One LXT-970 PHYs
@@ -639,16 +634,19 @@ usb*	at ohci?
 uhub*	at usb?
 uhub*	at uhub? port ? configuration ? interface ?
 
+# USB HID device
+uhidev*	at uhub? port ? configuration ? interface ?
+
 # USB Mice
-ums*	at uhub? port ? configuration ? interface ?
+ums*	at uhidev? reportid ?
 wsmouse*	at ums? mux 0
 
 # USB Keyboards
-ukbd*	at uhub? port ? configuration ? interface ?
+ukbd*	at uhidev? reportid ?
 wskbd*	at ukbd? console ? mux 1
 
 # USB Generic HID devices
-uhid*	at uhub? port ? configuration ? interface ?
+uhid*	at uhidev? reportid ?
 
 # USB Printer
 ulpt*	at uhub? port ? configuration ? interface ?
@@ -711,7 +709,7 @@ ugen*	at uhub? port ? configuration ? interface ?
 #aria0	at isa? port 0x290 irq 10 		# Aria
 #gus0	at isa? port 0x220 irq 7 drq 1 drq2 6	# Gravis Ultra Sound
 #pas0	at isa? port 0x220 irq 7 drq 1		# ProAudio Spectrum
-#pss0	at isa? port 0x220 irq 7 drq 6  	# Personal Sound System
+#pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
 #sp0	at pss0 port 0x530 irq 10 drq 0		# 	sound port driver
 #sb0	at isa? port 0x220 irq 5 drq 1 drq2 5	# SoundBlaster
 #wss0	at isa? port 0x530 irq 10 drq 0	drq2 1	# Windows Sound System
@@ -719,8 +717,9 @@ ugen*	at uhub? port ? configuration ? interface ?
 
 #cms0	at isa? port 0x200			# Creative Music System
 
-# OPL[23] FM syntheziers
+# OPL[23] FM synthesizers
 #opl0	at isa? port 0x388	# use only if not attached to sound card
+#opl*	at cmpci? flags 1
 #opl*	at eso?
 #opl*	at ess?
 #opl*	at fms?
@@ -750,6 +749,7 @@ audio* at uaudio?
 
 # MPUI 401 UARTs
 #mpu*	at isa? port 0x330 irq 9	# MPU401 or compatible card
+#mpu*	at cmpci?
 #mpu*	at eso?
 #mpu*	at fms?
 #mpu*	at sb?
@@ -785,7 +785,6 @@ bktr* at pci? dev ? function ?
 #olms1	at isa? port 0x238 irq 5
 #omms0	at isa? port 0x23c irq 5	# Microsoft InPort mouse
 #omms1	at isa? port 0x238 irq 5
-#opms0	at pc? irq 12		# PS/2 auxiliary port mouse
 
 
 # Joysticks
@@ -826,18 +825,18 @@ pseudo-device	ppp		2	# Point-to-Point Protocol
 #pseudo-device	strip		2	# Starmode Radio IP (Metricom)
 #pseudo-device	tun		2	# network tunneling over tty
 #pseudo-device	gre		2	# generic L3 over IP tunnel
-#pseudo-device	ipip		2	# IP Encapsulation within IP (RFC 2003)
 pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC 1933)
 pseudo-device	faith		1	# IPv[46] TCP relay translation
 
 # miscellaneous pseudo-devices
-pseudo-device	pty		128	# pseudo-terminals
+pseudo-device	pty			# pseudo-terminals
 #pseudo-device	tb		1	# tablet line discipline
 pseudo-device	sequencer	1	# MIDI sequencer
 # rnd works; RND_COM does not on port i386 yet.
 pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness as well (BROKEN)
+pseudo-device	clockctl		# user control of clock subsystem
 
 # a pseudo device needed for Coda	# also needs CODA (above)
 #pseudo-device	vcoda		4	# coda minicache <-> venus comm.
-pseudo-device	wsmux		4
+pseudo-device	wsmux

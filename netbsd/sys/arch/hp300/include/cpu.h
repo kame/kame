@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.35 2000/05/27 21:46:42 he Exp $	*/
+/*	$NetBSD: cpu.h,v 1.38 2001/05/30 12:28:42 mrg Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -45,7 +45,7 @@
 #ifndef _HP300_CPU_H_
 #define	_HP300_CPU_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -114,7 +114,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define	need_resched()	{ want_resched++; aston(); }
+#define	need_resched(ci)	{ want_resched++; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -205,9 +205,6 @@ int	cachectl1 __P((unsigned long, vaddr_t, size_t, struct proc *));
 void	physaccess __P((caddr_t, caddr_t, int, int));
 void	physunaccess __P((caddr_t, int));
 int	kvtop __P((caddr_t));
-
-/* trap.c functions */
-void	child_return __P((void *));
 
 /* what is this supposed to do? i.e. how is it different than startrtclock? */
 #define	enablertclock()

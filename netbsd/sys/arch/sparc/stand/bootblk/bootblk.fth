@@ -1,4 +1,4 @@
-\	$NetBSD: bootblk.fth,v 1.1.2.1 2000/08/26 00:05:22 mrg Exp $
+\	$NetBSD: bootblk.fth,v 1.3.16.1 2002/06/13 02:53:29 lukem Exp $
 \
 \	IEEE 1275 Open Firmware Boot Block
 \
@@ -20,7 +20,7 @@
 \	   must display the following acknowledgement:
 \	     This product includes software developed by Eduardo Horvath.
 \	4. The name of the author may not be used to endorse or promote products
-\	   derived from this software withough specific prior written permission
+\	   derived from this software without specific prior written permission
 \
 \	THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
 \	IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -125,9 +125,10 @@ fload	assym.fth.h
 sbsize buffer: sb-buf
 -1 value boot-ihandle
 dev_bsize value bsize
+0 value raid-offset	\ Offset if it's a raid-frame partition
 
 : strategy ( addr size start -- nread )
-   bsize * 0 " seek" boot-ihandle $call-method
+   raid-offset + bsize * 0 " seek" boot-ihandle $call-method
    -1 = if 
       ." strategy: Seek failed" cr
       abort
@@ -283,7 +284,8 @@ h# 2000 buffer: indir-block
 \ Read file into internal buffer and return pointer and len
 \
 
-2000 buffer: cur-block		\ Why do dynamic allocation?
+0 value cur-block			\ allocated dynamically in ufs-open
+0 value cur-blocksize			\ size of cur-block
 -1 value cur-blockno
 0 value cur-offset
 
@@ -403,23 +405,17 @@ h# 2000 buffer: indir-block
       niaddr 0 ?do
 	sb-buf fs_nindir l@ * dup	( sizebp sizebp -- )
 	sb-buf fs_maxfilesize dup x@	( sizebp sizebp *fs_maxfilesize fs_maxfilesize -- )
-	rot ( sizebp *fs_maxfilesize fs_maxfilesize sizebp -- )
-	+ ( sizebp *fs_maxfilesize new_fs_maxfilesize  -- ) swap x! ( sizebp -- )
-      loop drop ( -- )
+	rot 				( sizebp *fs_maxfilesize fs_maxfilesize sizebp -- )
+	+ 				( sizebp *fs_maxfilesize new_fs_maxfilesize  -- ) 
+        swap x! 			( sizebp -- )
+      loop drop 			( -- )
       sb-buf dup fs_bmask l@ not swap fs_qbmask x!
       sb-buf dup fs_fmask l@ not swap fs_qfmask x!
    then
 ;
 
-: ufs-open ( bootpath,len -- )
-   boot-ihandle -1 =  if
-      over cif-open dup 0=  if 		( boot-path len ihandle? )
-         ." Could not open device" space type cr 
-         abort
-      then 				( boot-path len ihandle )
-      to boot-ihandle			\ Save ihandle to boot device
-   then 2drop
-   sboff 0 " seek" boot-ihandle $call-method
+: read-super ( sector -- )
+0 " seek" boot-ihandle $call-method
    -1 = if 
       ." Seek failed" cr
       abort
@@ -433,25 +429,44 @@ h# 2000 buffer: indir-block
    else 
       drop
    then
+;
+
+: ufs-open ( bootpath,len -- )
+   boot-ihandle -1 =  if
+      over cif-open dup 0=  if 		( boot-path len ihandle? )
+         ." Could not open device" space type cr 
+         abort
+      then 				( boot-path len ihandle )
+      to boot-ihandle			\ Save ihandle to boot device
+   then 2drop
+   sboff read-super
    sb-buf fs_magic l@ fs_magic_value <>  if
-      ." Invalid superblock magic" cr
-      abort
+      64 dup to raid-offset 
+      dev_bsize * sboff + read-super
+      sb-buf fs_magic l@ fs_magic_value <>  if
+         ." Invalid superblock magic" cr
+         abort
+      then
    then
    sb-buf fs_bsize l@ dup maxbsize >  if
       ." Superblock bsize" space . ." too large" cr
       abort
    then 
-   fs_SIZEOF <  if
+   dup fs_SIZEOF <  if
       ." Superblock bsize < size of superblock" cr
       abort
    then
-   ffs_oldcompat
+   ffs_oldcompat	( fs_bsize -- fs_bsize )
+   dup to cur-blocksize alloc-mem to cur-block    \ Allocate cur-block
    boot-debug?  if ." ufs-open complete" cr then
 ;
 
 : ufs-close ( -- ) 
    boot-ihandle dup -1 <>  if
       cif-close -1 to boot-ihandle 
+   then
+   cur-block 0<> if
+      cur-block cur-blocksize free-mem
    then
 ;
 
@@ -541,7 +556,16 @@ h# 2000 buffer: indir-block
    2drop
 ;
 
-h# 5000 constant loader-base
+\
+\ According to the 1275 addendum for SPARC processors:
+\ Default load-base is 0x4000.  At least 0x8.0000 or
+\ 512KB must be available at that address.  
+\
+\ The Fcode bootblock can take up up to 8KB (O.K., 7.5KB) 
+\ so load programs at 0x4000 + 0x2000=> 0x6000
+\
+
+h# 6000 constant loader-base
 
 \
 \ Elf support -- find the load addr

@@ -1,4 +1,4 @@
-/*	$NetBSD: mt.c,v 1.14 2000/05/19 18:54:31 thorpej Exp $	*/
+/*	$NetBSD: mt.c,v 1.16 2002/03/15 05:55:36 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -65,6 +65,9 @@
  * Modified for 4.4BSD by Mark Davies and Andrew Vignaux, Department of
  * Computer Science, Victoria University of Wellington
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mt.c,v 1.16 2002/03/15 05:55:36 gmcgarry Exp $");                                                  
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -537,7 +540,7 @@ spl_mtintr(arg)
 
 	hpibppclear(sc->sc_hpibno);
 	mtintr(sc);
-	(void) splx(s);
+	splx(s);
 }
 
 void
@@ -547,7 +550,7 @@ spl_mtstart(arg)
 	int s = splbio();
 
 	mtstart(arg);
-	(void) splx(s);
+	splx(s);
 }
 
 void

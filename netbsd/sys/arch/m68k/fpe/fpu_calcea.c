@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu_calcea.c,v 1.9 2000/06/13 12:28:13 minoura Exp $	*/
+/*	$NetBSD: fpu_calcea.c,v 1.13 2001/07/28 13:21:26 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon W. Ross
@@ -35,6 +35,7 @@
 #include <sys/signal.h>
 #include <sys/systm.h>
 #include <machine/frame.h>
+#include <m68k/m68k.h>
 
 #include "fpu_emulate.h"
 
@@ -96,12 +97,14 @@ fpu_decode_ea(frame, insn, ea, modreg)
      * rest of the address modes need to be separately
      * handled for the LC040 and the others.
      */
-    else if (frame->f_format == 4) {
+#if 0 /* XXX */
+    else if (frame->f_format == 4 && frame->f_fmt4.f_fa) {
 	/* LC040 */
 	ea->ea_flags = EA_FRAME_EA;
 	ea->ea_fea = frame->f_fmt4.f_fa;
 #ifdef DEBUG_FPE
-	printf("decode_ea: 68LC040 - in-frame EA (%p)\n", (void *)ea->ea_fea);
+	printf("decode_ea: 68LC040 - in-frame EA (%p) size %d\n",
+		(void *)ea->ea_fea, insn->is_datasize);
 #endif
 	if ((modreg & 070) == 030) {
 	    /* postincrement mode */
@@ -109,8 +112,17 @@ fpu_decode_ea(frame, insn, ea, modreg)
 	} else if ((modreg & 070) == 040) {
 	    /* predecrement mode */
 	    ea->ea_flags |= EA_PREDECR;
+#ifdef M68060
+#if defined(M68020) || defined(M68030) || defined(M68040)
+	    if (cputype == CPU_68060)
+#endif
+		if (insn->is_datasize == 12)
+			ea->ea_fea -= 8;
+#endif
 	}
-    } else {
+    }
+#endif /* XXX */
+    else {
 	/* 020/030 */
 	switch (modreg & 070) {
 
@@ -235,7 +247,7 @@ decode_ea6(frame, insn, ea, modreg)
     idx <<= ((extword >>9) & 3);
 
     if ((extword & 0x100) == 0) {
-	/* brief extention word - sign-extend the displacement */
+	/* brief extension word - sign-extend the displacement */
 	basedisp = (extword & 0xff);
 	if (basedisp & 0x80) {
 	    basedisp |= 0xffffff00;
@@ -248,7 +260,7 @@ decode_ea6(frame, insn, ea, modreg)
 	       ea->ea_idxreg, ea->ea_basedisp);
 #endif
     } else {
-	/* full extention word */
+	/* full extension word */
 	if (extword & 0x80) {
 	    ea->ea_flags |= EA_BASE_SUPPRSS;
 	}
@@ -331,6 +343,7 @@ fpu_load_ea(frame, insn, ea, dst)
     }
     step = (len == 1 && ea->ea_regnum == 15 /* sp */) ? 2 : len;
 
+#if 0
     if (ea->ea_flags & EA_FRAME_EA) {
 	/* Using LC040 frame EA */
 #ifdef DEBUG_FPE
@@ -379,8 +392,10 @@ fpu_load_ea(frame, insn, ea, dst)
 #ifdef DEBUG_FPE
 	printf("load_ea: src %p\n", src);
 #endif
-	bcopy(src, dst, len);
-    } else if (ea->ea_flags & EA_IMMED) {
+	memcpy(dst, src, len);
+    } else
+#endif
+    if (ea->ea_flags & EA_IMMED) {
 #ifdef DEBUG_FPE
 	printf("load_ea: immed %08x%08x%08x size %d\n",
 	       ea->ea_immed[0], ea->ea_immed[1], ea->ea_immed[2], len);
@@ -392,7 +407,7 @@ fpu_load_ea(frame, insn, ea, dst)
 	    printf("load_ea: short/byte immed opr - addr adjusted\n");
 #endif
 	}
-	bcopy(src, dst, len);
+	memcpy(dst, src, len);
     } else if (ea->ea_flags & EA_ABS) {
 #ifdef DEBUG_FPE
 	printf("load_ea: abs addr %08x\n", ea->ea_absaddr);
@@ -406,7 +421,7 @@ fpu_load_ea(frame, insn, ea, dst)
 #endif
 	    reg = NULL;
 	    /* Grab the register contents. 4 is offset to the first
-	       extention word from the opcode */
+	       extension word from the opcode */
 	    src = (char *)insn->is_pc + 4;
 #ifdef DEBUG_FPE
 	    printf("load_ea: pc relative pc+4 = %p\n", src);
@@ -553,7 +568,7 @@ fpu_store_ea(frame, insn, ea, src)
 #ifdef DEBUG_FPE
 	printf("store_ea: dst %p\n", dst);
 #endif
-	bcopy(src, dst, len);
+	memcpy(dst, src, len);
     } else /* One of MANY indirect forms... */ {
 #ifdef DEBUG_FPE
 	printf("store_ea: using register %c%d\n",
@@ -670,7 +685,7 @@ fetch_immed(frame, insn, dst)
 }
 
 /*
- * fetch_disp: fetch displacement in full extention words
+ * fetch_disp: fetch displacement in full extension words
  */
 static int
 fetch_disp(frame, insn, size, res)

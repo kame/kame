@@ -1,4 +1,4 @@
-/* $NetBSD: pci_1000.c,v 1.9 2000/06/05 21:47:21 thorpej Exp $ */
+/* $NetBSD: pci_1000.c,v 1.13 2002/05/15 16:57:42 thorpej Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pci_1000.c,v 1.9 2000/06/05 21:47:21 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_1000.c,v 1.13 2002/05/15 16:57:42 thorpej Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -78,7 +78,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_1000.c,v 1.9 2000/06/05 21:47:21 thorpej Exp $")
 #include <sys/device.h>
 #include <sys/syslog.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 
@@ -95,7 +95,7 @@ __KERNEL_RCSID(0, "$NetBSD: pci_1000.c,v 1.9 2000/06/05 21:47:21 thorpej Exp $")
 static bus_space_tag_t another_mystery_icu_iot;
 static bus_space_handle_t another_mystery_icu_ioh;
 
-int	dec_1000_intr_map __P((void *, pcitag_t, int, int, pci_intr_handle_t *));
+int	dec_1000_intr_map __P((struct pci_attach_args *, pci_intr_handle_t *));
 const char *dec_1000_intr_string __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_1000_intr_evcnt __P((void *, pci_intr_handle_t));
 void	*dec_1000_intr_establish __P((void *, pci_intr_handle_t,
@@ -107,7 +107,7 @@ void	dec_1000_intr_disestablish __P((void *, void *));
 
 struct alpha_shared_intr *dec_1000_pci_intr;
 
-static void dec_1000_iointr __P((void *framep, unsigned long vec));
+static void dec_1000_iointr __P((void *arg, unsigned long vec));
 static void dec_1000_enable_intr __P((int irq));
 static void dec_1000_disable_intr __P((int irq));
 static void pci_1000_imi __P((void));
@@ -153,16 +153,16 @@ pci_1000_pickintr(core, iot, memt, pc)
 #if NSIO > 0 || NPCEB > 0
 	sio_intr_setup(pc, iot);
 #endif
-	set_iointr(dec_1000_iointr);
 }
 
 int     
-dec_1000_intr_map(ccv, bustag, buspin, line, ihp)
-        void *ccv;
-        pcitag_t bustag; 
-        int buspin, line;
+dec_1000_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
         pci_intr_handle_t *ihp;
 {
+	pcitag_t bustag = pa->pa_intrtag;
+	int buspin = pa->pa_intrpin;
+	pci_chipset_tag_t pc = pa->pa_pc;
 	int	device;
 
 	if (buspin == 0)	/* No IRQ used. */
@@ -170,7 +170,7 @@ dec_1000_intr_map(ccv, bustag, buspin, line, ihp)
 	if (!(1 <= buspin && buspin <= 4))
 		goto bad;
 
-	alpha_pci_decompose_tag(pc_tag, bustag, NULL, &device, NULL);
+	pci_decompose_tag(pc, bustag, NULL, &device, NULL);
 
 	switch(device) {
 	case 6:
@@ -232,8 +232,10 @@ dec_1000_intr_establish(ccv, ih, level, func, arg)
 	    level, func, arg, "dec_1000 irq");
 
 	if (cookie != NULL &&
-	    alpha_shared_intr_isactive(dec_1000_pci_intr, ih))
+	    alpha_shared_intr_firstactive(dec_1000_pci_intr, ih)) {
+		scb_set(0x900 + SCB_IDXTOVEC(ih), dec_1000_iointr, NULL);
 		dec_1000_enable_intr(ih);
+	}
 	return (cookie);
 }
 
@@ -253,38 +255,27 @@ dec_1000_intr_disestablish(ccv, cookie)
 		dec_1000_disable_intr(irq);
 		alpha_shared_intr_set_dfltsharetype(dec_1000_pci_intr, irq,
 		    IST_NONE);
+		scb_free(0x900 + SCB_IDXTOVEC(irq));
 	}
 
 	splx(s);
 }
 
 static void
-dec_1000_iointr(framep, vec)
-	void *framep;
+dec_1000_iointr(arg, vec)
+	void *arg;
 	unsigned long vec;
 {
 	int irq;
 
-	if (vec >= 0x900) {
-		if (vec >= 0x900 + (PCI_NIRQ << 4))
-			panic("dec_1000_iointr: vec 0x%lx out of range\n", vec);
-		irq = (vec - 0x900) >> 4;
+	irq = SCB_VECTOIDX(vec - 0x900);
 
-		if (!alpha_shared_intr_dispatch(dec_1000_pci_intr, irq)) {
-			alpha_shared_intr_stray(dec_1000_pci_intr, irq,
-			    "dec_1000 irq");
-			if (ALPHA_SHARED_INTR_DISABLE(dec_1000_pci_intr, irq))
-				dec_1000_disable_intr(irq);
-		}
-		return;
+	if (!alpha_shared_intr_dispatch(dec_1000_pci_intr, irq)) {
+		alpha_shared_intr_stray(dec_1000_pci_intr, irq,
+		    "dec_1000 irq");
+		if (ALPHA_SHARED_INTR_DISABLE(dec_1000_pci_intr, irq))
+			dec_1000_disable_intr(irq);
 	}
-#if NSIO > 0 || NPCEB > 0
-	if (vec >= 0x800) {
-		sio_iointr(framep, vec);
-		return;
-	} 
-#endif
-	panic("dec_1000_iointr: weird vec 0x%lx\n", vec);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: akbdmap.h,v 1.2 1999/01/13 08:13:41 tsubai Exp $	*/
+/*	$NetBSD: akbdmap.h,v 1.4 2002/03/04 04:03:36 dbj Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -94,7 +94,7 @@ static const keysym_t akbd_keydesc_us[] = {
     KC(49),			KS_space,
     KC(50),			KS_grave,	KS_asciitilde,
     KC(51),			KS_Delete,
-
+    KC(52),			KS_KP_Enter,    /* Maybe we should pretend this is alt-R */
     KC(53),			KS_Escape,
     KC(54),			KS_Control_L,
     KC(55),  KS_Cmd,				/* Command */
@@ -128,10 +128,67 @@ static const keysym_t akbd_keydesc_us[] = {
     KC(92),			KS_KP_9,
 
     KC(95),			KS_comma,	/* XXX KS_KP_comma */
+    KC(96),			KS_f5,
+    KC(97),			KS_f6,
+    KC(98),			KS_f7,
+    KC(99),			KS_f3,
+    KC(100),			KS_f8,
+
+    KC(101),			KS_f9,
+
+    KC(103),			KS_f11,
 
     KC(106),			KS_KP_Enter,
 
+    KC(109),			KS_f10,
+
+    KC(111),			KS_f12,
+
+    KC(115),			KS_Home,
+    KC(116),			KS_Prior,
+
+    KC(118),			KS_f4,
+    KC(119),			KS_End,
+    KC(120),			KS_f2,
+    KC(121),			KS_Next,
+    KC(122),			KS_f1,
+
     KC(127),  KS_Cmd_Debugger,
+};
+
+static const keysym_t akbd_keydesc_fr[] = {
+/*  pos		normal		shifted		altgr		shift-altgr */
+    KC(0),	KS_q,
+    KC(6),	KS_w,
+    KC(10),	KS_at,		KS_numbersign,
+    KC(12),	KS_a,
+    KC(13),	KS_z,
+    KC(18),	KS_ampersand,	KS_1,
+    KC(19),	KS_eacute,	KS_2,		KS_asciitilde,
+    KC(20),	KS_quotedbl,	KS_3,		KS_numbersign,
+    KC(21),	KS_apostrophe,	KS_4,		KS_braceleft,
+    KC(22),	KS_section,	KS_6,		KS_bar,
+    KC(23),	KS_parenleft,	KS_5,		KS_bracketleft,	KS_braceleft,
+    KC(24),	KS_minus,	KS_underscore,	KS_braceright,
+    KC(25),	KS_ccedilla,	KS_9,		KS_asciicircum,
+    KC(26),	KS_egrave,	KS_7,		KS_grave,
+    KC(27),	KS_parenright,	KS_degree,	KS_bracketright, KS_braceright,
+    KC(28),	KS_exclam,	KS_8,		KS_bar,
+    KC(29),	KS_agrave,	KS_0,		KS_at,
+    KC(30),	KS_dollar,	KS_asterisk,
+    KC(33),	KS_dead_circumflex, KS_dead_diaeresis,
+    KC(39),	KS_mu,		KS_percent,
+    KC(40),	KS_k,
+    KC(41),	KS_m,
+    KC(42),	KS_grave,	KS_sterling,
+    KC(43),	KS_semicolon,	KS_period,
+    KC(44),	KS_equal,	KS_plus,
+    KC(46),	KS_comma,	KS_question,
+    KC(47),	KS_colon,	KS_slash,	KS_backslash,
+    KC(50),	KS_less,	KS_greater,
+    KC(52),	KS_Alt_R,
+    KC(55),	KS_Meta_L,				/* Command */
+    KC(58),	KS_Alt_R,				/* Option */
 };
 
 #if 0
@@ -147,6 +204,7 @@ static const keysym_t akbd_keydesc_jp[] = {
 
 static const struct wscons_keydesc akbd_keydesctab[] = {
 	KBD_MAP(KB_US,			0,	akbd_keydesc_us),
+	KBD_MAP(KB_FR,			KB_US,	akbd_keydesc_fr),
 	{0, 0, 0, 0}
 };
 

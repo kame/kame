@@ -1,4 +1,4 @@
-/*	$NetBSD: z8530sc.c,v 1.12 2000/03/30 12:45:32 augustss Exp $	*/
+/*	$NetBSD: z8530sc.c,v 1.16 2001/11/13 13:14:46 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
@@ -51,6 +51,9 @@
  * This file contains the machine-independent parts of the
  * driver common to tty and keyboard/mouse sub-drivers.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: z8530sc.c,v 1.16 2001/11/13 13:14:46 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -131,11 +134,7 @@ zs_loadchannelregs(cs)
 {
 	u_char *reg;
 
-	/* Copy "pending" regs to "current" */
-	bcopy((caddr_t)cs->cs_preg, (caddr_t)cs->cs_creg, 16);
-	reg = cs->cs_creg;	/* current regs */
-
-	zs_write_csr(cs, ZSM_RESET_ERR);	/* XXX: reset error condition */
+	zs_write_csr(cs, ZSM_RESET_ERR); /* XXX: reset error condition */
 
 #if 1
 	/*
@@ -144,6 +143,13 @@ zs_loadchannelregs(cs)
 	 */
 	zs_iflush(cs);	/* XXX */
 #endif
+
+	if (memcmp((caddr_t)cs->cs_preg, (caddr_t)cs->cs_creg, 16) == 0)
+	    return;	/* only change if values are different */
+
+	/* Copy "pending" regs to "current" */
+	memcpy((caddr_t)cs->cs_creg, (caddr_t)cs->cs_preg, 16);
+	reg = cs->cs_creg;	/* current regs */
 
 	/* disable interrupts */
 	zs_write_reg(cs, 1, reg[1] & ~ZSWR1_IMASK);

@@ -1,4 +1,4 @@
-/*	$NetBSD: pdq_ifsubr.c,v 1.26 2000/03/07 00:33:13 mycroft Exp $	*/
+/*	$NetBSD: pdq_ifsubr.c,v 1.39 2002/03/05 04:12:58 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1996 Matt Thomas <matt@3am-software.com>
@@ -10,7 +10,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -33,6 +33,9 @@
  *	This module provide bus independent BSD specific O/S functions.
  *	(ie. it provides an ifnet interface to the rest of the system)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pdq_ifsubr.c,v 1.39 2002/03/05 04:12:58 itojun Exp $");
 
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -92,9 +95,9 @@
 #include <netns/ns_if.h>
 #endif
 
+#ifndef __NetBSD__
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
+#endif
 
 #if defined(__FreeBSD__)
 /*
@@ -162,7 +165,7 @@ pdq_ifwatchdog(
     ifp->if_timer = 0;
     for (;;) {
 	struct mbuf *m;
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 	if (m == NULL)
 	    return;
 	PDQ_OS_DATABUF_FREE(PDQ_OS_IFP_TO_SOFTC(ifp)->sc_pdq, m);
@@ -174,7 +177,6 @@ pdq_ifstart(
     struct ifnet *ifp)
 {
     pdq_softc_t * const sc = PDQ_OS_IFP_TO_SOFTC(ifp);
-    struct ifqueue *ifq = &ifp->if_snd;
     struct mbuf *m;
     int tx = 0;
 
@@ -188,8 +190,9 @@ pdq_ifstart(
 	sc->sc_if.if_flags |= IFF_OACTIVE;
 	return;
     }
+    sc->sc_flags |= PDQIF_DOWNCALL;
     for (;; tx = 1) {
-	IF_DEQUEUE(ifq, m);
+	IFQ_POLL(&ifp->if_snd, m);
 	if (m == NULL)
 	    break;
 #if defined(PDQ_BUS_DMA) && !defined(PDQ_BUS_DMA_NOTX)
@@ -202,7 +205,8 @@ pdq_ifstart(
 	    }
 	    if (!bus_dmamap_create(sc->sc_dmatag, m->m_pkthdr.len, 255,
 				   m->m_pkthdr.len, 0, BUS_DMA_NOWAIT, &map)) {
-		if (!bus_dmamap_load_mbuf(sc->sc_dmatag, map, m, BUS_DMA_NOWAIT)) {
+		if (!bus_dmamap_load_mbuf(sc->sc_dmatag, map, m,
+					  BUS_DMA_WRITE|BUS_DMA_NOWAIT)) {
 		    bus_dmamap_sync(sc->sc_dmatag, map, 0, m->m_pkthdr.len,
 				    BUS_DMASYNC_PREWRITE);
 		    M_SETCTX(m, map);
@@ -222,13 +226,13 @@ pdq_ifstart(
 
 	if (pdq_queue_transmit_data(sc->sc_pdq, m) == PDQ_FALSE)
 	    break;
+	IFQ_DEQUEUE(&ifp->if_snd, m);
     }
-    if (m != NULL) {
+    if (m != NULL)
 	ifp->if_flags |= IFF_OACTIVE;
-	IF_PREPEND(ifq, m);
-    }
     if (tx)
 	PDQ_DO_TYPE2_PRODUCER(sc->sc_pdq);
+    sc->sc_flags &= ~PDQIF_DOWNCALL;
 }
 
 void
@@ -281,9 +285,10 @@ pdq_os_restart_transmitter(
 {
     pdq_softc_t *sc = pdq->pdq_os_ctx;
     sc->sc_if.if_flags &= ~IFF_OACTIVE;
-    if (sc->sc_if.if_snd.ifq_head != NULL) {
+    if (IFQ_IS_EMPTY(&sc->sc_if.if_snd) == 0) {
 	sc->sc_if.if_timer = PDQ_OS_TX_TIMEOUT;
-	pdq_ifstart(&sc->sc_if);
+	if ((sc->sc_flags & PDQIF_DOWNCALL) == 0)
+	    pdq_ifstart(&sc->sc_if);
     } else {
 	sc->sc_if.if_timer = 0;
     }
@@ -326,7 +331,7 @@ pdq_os_addr_fill(
 
     ETHER_FIRST_MULTI(step, PDQ_FDDICOM(sc), enm);
     while (enm != NULL && num_addrs > 0) {
-	if (bcmp(enm->enm_addrlo, enm->enm_addrhi, 6) == 0) {
+	if (memcmp(enm->enm_addrlo, enm->enm_addrhi, 6) == 0) {
 	    ((u_short *) addr->lanaddr_bytes)[0] = ((u_short *) enm->enm_addrlo)[0];
 	    ((u_short *) addr->lanaddr_bytes)[1] = ((u_short *) enm->enm_addrlo)[1];
 	    ((u_short *) addr->lanaddr_bytes)[2] = ((u_short *) enm->enm_addrlo)[2];
@@ -449,9 +454,9 @@ pdq_ifioctl(
 			ina->x_host = *(union ns_host *)PDQ_LANADDR(sc);
 		    } else {
 			ifp->if_flags &= ~IFF_RUNNING;
-			bcopy((caddr_t)ina->x_host.c_host,
-			      (caddr_t)PDQ_LANADDR(sc),
-			      PDQ_LANADDR_SIZE(sc));
+			memcpy((caddr_t)PDQ_LANADDR(sc),
+			    (caddr_t)ina->x_host.c_host,
+			    PDQ_LANADDR_SIZE(sc));
 		    }
 
 		    pdq_ifinit(sc);
@@ -468,9 +473,8 @@ pdq_ifioctl(
 	}
 	case SIOCGIFADDR: {
 	    struct ifreq *ifr = (struct ifreq *)data;
-	    bcopy((caddr_t) PDQ_LANADDR(sc),
-		  (caddr_t) ((struct sockaddr *)&ifr->ifr_data)->sa_data,
-		  6);
+	    memcpy((caddr_t) ((struct sockaddr *)&ifr->ifr_data)->sa_data,
+		(caddr_t) PDQ_LANADDR(sc), 6);
 	    break;
 	}
 
@@ -558,6 +562,7 @@ pdq_ifattach(
     ifp->if_output = fddi_output;
 #endif
     ifp->if_start = pdq_ifstart;
+    IFQ_SET_READY(&ifp->if_snd);
 
 #if defined(IFM_FDDI)
     {
@@ -574,9 +579,6 @@ pdq_ifattach(
     fddi_ifattach(ifp, (caddr_t)&sc->sc_pdq->pdq_hwaddr);
 #else
     fddi_ifattach(ifp);
-#endif
-#if NBPFILTER > 0
-    PDQ_BPFATTACH(sc, DLT_FDDI, sizeof(struct fddi_header));
 #endif
 }
 
@@ -641,8 +643,8 @@ pdq_os_memalloc_contig(
     if (!not_ok) {
 	steps = 8;
 	pdq->pdq_unsolicited_info.ui_pa_bufstart = sc->sc_uimap->dm_segs[0].ds_addr;
-	cb_segs[0].ds_addr = db_segs[0].ds_addr +
-		 offsetof(pdq_descriptor_block_t, pdqdb_consumer);
+	cb_segs[0] = db_segs[0];
+	cb_segs[0].ds_addr += offsetof(pdq_descriptor_block_t, pdqdb_consumer);
 	cb_segs[0].ds_len = sizeof(pdq_consumer_block_t);
 	not_ok = bus_dmamem_map(sc->sc_dmatag, cb_segs, 1,
 				sizeof(*pdq->pdq_cbp), (caddr_t *) &pdq->pdq_cbp,
@@ -798,7 +800,8 @@ pdq_os_databuf_alloc(
 	m_free(m);
 	return NULL;
     }
-    if (bus_dmamap_load_mbuf(sc->sc_dmatag, map, m, BUS_DMA_NOWAIT)) {
+    if (bus_dmamap_load_mbuf(sc->sc_dmatag, map, m,
+    			     BUS_DMA_READ|BUS_DMA_NOWAIT)) {
 	printf("%s: can't load dmamap\n", sc->sc_dev.dv_xname);
 	bus_dmamap_destroy(sc->sc_dmatag, map);
 	m_free(m);

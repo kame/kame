@@ -1,4 +1,4 @@
-/*	$NetBSD: cz.c,v 1.9 2000/06/14 17:54:33 thorpej Exp $	*/
+/*	$NetBSD: cz.c,v 1.19 2002/03/17 19:40:59 atatat Exp $	*/
 
 /*-
  * Copyright (c) 2000 Zembu Labs, Inc.
@@ -71,6 +71,9 @@
  * This driver inspired by the FreeBSD driver written by Brian J. McGovern
  * for FreeBSD 3.2.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cz.c,v 1.19 2002/03/17 19:40:59 atatat Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -346,8 +349,7 @@ cz_attach(struct device *parent,
 	 * Now that we're ready to roll, map and establish the interrupt
 	 * handler.
 	 */
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih) != 0) {
+	if (pci_intr_map(pa, &ih) != 0) {
 		/*
 		 * The common case is for Cyclades-Z boards to run
 		 * in polling mode, and thus not have an interrupt
@@ -396,11 +398,15 @@ cz_attach(struct device *parent,
 	 *	hardware flow control.
 	 */
 	CZ_WIN_RAM(cz);
+
+	if (cz->cz_nchannels == 0) {
+		/* No channels?  No more work to do! */
+		return;
+	}
+
 	cz->cz_ports = malloc(sizeof(struct cztty_softc) * cz->cz_nchannels,
-	    M_DEVBUF, M_WAITOK);
+	    M_DEVBUF, M_WAITOK|M_ZERO);
 	cztty_attached_ttys += cz->cz_nchannels;
-	memset(cz->cz_ports, 0,
-	    sizeof(struct cztty_softc) * cz->cz_nchannels);
 
 	for (i = 0; i < cz->cz_nchannels; i++) {
 		sc = &cz->cz_ports[i];
@@ -652,10 +658,14 @@ cz_load_firmware(struct cz_softc *cz)
 	}
 
 	fid = CZ_FWCTL_READ(cz, BRDCTL_FWVERSION);
-	printf("%s: %s, %d channels (ttyCZ%04d..ttyCZ%04d), "
-	    "firmware %x.%x.%x\n",
-	    cz->cz_dev.dv_xname, board, cz->cz_nchannels,
-	    cztty_attached_ttys, cztty_attached_ttys + (cz->cz_nchannels - 1),
+	printf("%s: %s, ", cz->cz_dev.dv_xname, board);
+	if (cz->cz_nchannels == 0)
+		printf("no channels attached, ");
+	else
+		printf("%d channels (ttyCZ%04d..ttyCZ%04d), ",
+		    cz->cz_nchannels, cztty_attached_ttys,
+		    cztty_attached_ttys + (cz->cz_nchannels - 1));
+	printf("firmware %x.%x.%x\n",
 	    (fid >> 8) & 0xf, (fid >> 4) & 0xf, fid & 0xf);
 
 	return (0);
@@ -703,6 +713,14 @@ cz_intr(void *arg)
 
 		/* now clear this interrupt, posslibly enabling another */
 		CZ_PLX_WRITE(cz, PLX_LOCAL_PCI_DOORBELL, command);
+
+		if (cz->cz_ports == NULL) {
+#ifdef CZ_DEBUG
+			printf("%s: interrupt on channel %d, but no channels\n",
+			    cz->cz_dev.dv_xname, channel);
+#endif
+			continue;
+		}
 
 		sc = &cz->cz_ports[channel];
 
@@ -758,7 +776,7 @@ cz_intr(void *arg)
 			if (!ISSET(tp->t_state, TS_ISOPEN))
 				break;
 
-			(void) (*linesw[tp->t_line].l_modem)(tp,
+			(void) (*tp->t_linesw->l_modem)(tp,
 			    ISSET(C_RS_DCD, CZTTY_CHAN_READ(sc,
 			    CHNCTL_RS_STATUS)));
 			break;
@@ -796,7 +814,7 @@ cz_intr(void *arg)
 			 * A break is a \000 character with TTY_FE error
 			 * flags set. So TTY_FE by itself works.
 			 */
-			(*linesw[tp->t_line].l_rint)(TTY_FE, tp);
+			(*tp->t_linesw->l_rint)(TTY_FE, tp);
 			ttwakeup(tp);
 			wakeup(tp);
 			break;
@@ -836,22 +854,12 @@ cz_wait_pci_doorbell(struct cz_softc *cz, const char *wstring)
  * Cyclades-Z TTY code starts here...
  *****************************************************************************/
 
-#define	CZTTYCHAN_MASK		0x0003f
-#define	CZTTYBOARD_MASK		(0x7ffff & ~CZTTYCHAN_MASK)
-#define	CZTTYBOARD_SHIFT	6
 #define CZTTYDIALOUT_MASK	0x80000
 
-#define	CZTTY_CHAN(dev)		(minor((dev)) & CZTTYCHAN_MASK)
-#define	CZTTY_BOARD(dev)	((minor((dev)) & CZTTYBOARD_MASK) >>	\
-				 CZTTYBOARD_SHIFT)
 #define	CZTTY_DIALOUT(dev)	(minor((dev)) & CZTTYDIALOUT_MASK)
 #define	CZTTY_CZ(sc)		((sc)->sc_parent)
 
-#define	CZ_SOFTC(dev)							\
-	((struct cz_softc *)(CZTTY_BOARD(dev) < cz_cd.cd_ndevs ?	\
-	  cz_cd.cd_devs[CZTTY_BOARD(dev)] : NULL))
-
-#define	CZTTY_SOFTC(dev) cztty_getttysoftc(dev)
+#define	CZTTY_SOFTC(dev)	cztty_getttysoftc(dev)
 
 struct cztty_softc *
 cztty_getttysoftc(dev_t dev)
@@ -861,15 +869,19 @@ cztty_getttysoftc(dev_t dev)
 
 	for (i = 0, j = 0; i < cz_cd.cd_ndevs; i++) {
 		k = j;
-		cz = cz_cd.cd_devs[i];
+		cz = device_lookup(&cz_cd, i);
+		if (cz == NULL)
+			continue;
+		if (cz->cz_ports == NULL)
+			continue;
 		j += cz->cz_nchannels;
 		if (j > u)
 			break;
 	}
 
-	if (i >= cz_cd.cd_ndevs) {
+	if (i >= cz_cd.cd_ndevs)
 		return (NULL);
-	} else
+	else
 		return (&cz->cz_ports[u - k]);
 }
 
@@ -1048,7 +1060,7 @@ czttyopen(dev_t dev, int flags, int mode, struct proc *p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error)
 		goto bad;
 
@@ -1081,7 +1093,7 @@ czttyclose(dev_t dev, int flags, int mode, struct proc *p)
 	if (!ISSET(tp->t_state, TS_ISOPEN))
 		return (0);
 
-	(*linesw[tp->t_line].l_close)(tp, flags);
+	(*tp->t_linesw->l_close)(tp, flags);
 	ttyclose(tp);
 
 	if (!ISSET(tp->t_state, TS_ISOPEN) && tp->t_wopen == 0) {
@@ -1107,7 +1119,7 @@ czttyread(dev_t dev, struct uio *uio, int flags)
 	struct cztty_softc *sc = CZTTY_SOFTC(dev);
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flags));
+	return ((*tp->t_linesw->l_read)(tp, uio, flags));
 }
 
 /*
@@ -1121,7 +1133,24 @@ czttywrite(dev_t dev, struct uio *uio, int flags)
 	struct cztty_softc *sc = CZTTY_SOFTC(dev);
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flags));
+	return ((*tp->t_linesw->l_write)(tp, uio, flags));
+}
+
+/*
+ * czttypoll:
+ *
+ *	Poll a Cyclades-Z serial port.
+ */
+int
+czttypoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct cztty_softc *sc = CZTTY_SOFTC(dev);
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 /*
@@ -1136,12 +1165,12 @@ czttyioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	struct tty *tp = sc->sc_tty;
 	int s, error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = 0;
@@ -1187,7 +1216,7 @@ czttyioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		break;
 
 	default:
-		error = ENOTTY;
+		error = EPASSTHROUGH;
 		break;
 	}
 
@@ -1451,7 +1480,7 @@ czttyparam(struct tty *tp, struct termios *t)
 	 * request.
 	 */
 	rs_status = CZTTY_CHAN_READ(sc, CHNCTL_RS_STATUS);
-	(void) (*linesw[tp->t_line].l_modem)(tp, ISSET(rs_status, C_RS_DCD));
+	(void) (*tp->t_linesw->l_modem)(tp, ISSET(rs_status, C_RS_DCD));
 
 	return (0);
 }
@@ -1630,7 +1659,7 @@ cztty_receive(struct cztty_softc *sc, struct tty *tp)
 #ifdef HOSTRAMCODE
 		}
 #endif
-		(*linesw[tp->t_line].l_rint)(ch, tp);
+		(*tp->t_linesw->l_rint)(ch, tp);
 		get = (get + 1) % size;
 		done = 1;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_pcmcia.c,v 1.8 2000/06/05 15:36:45 tsutsui Exp $	*/
+/*	$NetBSD: esp_pcmcia.c,v 1.10 2001/11/13 07:26:32 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esp_pcmcia.c,v 1.10 2001/11/13 07:26:32 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,15 +87,6 @@ void	esp_pcmcia_attach __P((struct device *, struct device *, void *));
 void	esp_pcmcia_init __P((struct esp_pcmcia_softc *));
 int	esp_pcmcia_detach __P((struct device *, int));
 int	esp_pcmcia_enable __P((void *, int));
-
-static struct scsipi_adapter esp_pcmcia_adapter = {
-	0,			/* adapter refcnt */
-	ncr53c9x_scsi_cmd,	/* cmd */
-	minphys,		/* minphys */
-	NULL,			/* ioctl */
-	esp_pcmcia_enable,	/* enable */
-	NULL,			/* getgeom */
-};
 
 struct cfattach esp_pcmcia_ca = {
 	sizeof(struct esp_pcmcia_softc), esp_pcmcia_match, esp_pcmcia_attach,
@@ -209,7 +203,9 @@ esp_pcmcia_attach(parent, self, aux)
 	 *  Initialize nca board itself.
 	 */
 	esc->sc_flags |= ESP_PCMCIA_ATTACHING;
-	ncr53c9x_attach(sc, &esp_pcmcia_adapter, NULL);
+	sc->sc_adapter.adapt_minphys = minphys;
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	ncr53c9x_attach(sc);
 	esc->sc_flags &= ~ESP_PCMCIA_ATTACHING;
 	esc->sc_flags |= ESP_PCMCIA_ATTACHED;
 	return;

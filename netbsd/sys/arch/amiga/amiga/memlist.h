@@ -1,4 +1,4 @@
-/*	$NetBSD: memlist.h,v 1.4 1994/10/26 02:02:02 cgd Exp $	*/
+/*	$NetBSD: memlist.h,v 1.6 2002/04/25 09:20:29 aymeric Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -31,7 +31,7 @@
  */
 
 /*
- * memory list passed by loadbsd 
+ * memory list passed by loadbsd
  */
 
 struct boot_memlist {
@@ -44,7 +44,7 @@ struct boot_memlist {
 	} m_seg[1];
 };
 
-struct boot_memlist *memlist;
+extern struct boot_memlist *memlist;
 
 /* some attribute flags we are interested in */
 #define MEMF_CHIP	(1L << 1)	/* Chip memory */

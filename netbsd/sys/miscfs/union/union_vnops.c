@@ -1,4 +1,4 @@
-/*	$NetBSD: union_vnops.c,v 1.47.4.1 2000/12/14 23:36:22 he Exp $	*/
+/*	$NetBSD: union_vnops.c,v 1.58 2001/12/06 04:29:24 chs Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1994, 1995 Jan-Simon Pendry.
@@ -39,13 +39,15 @@
  *	@(#)union_vnops.c	8.33 (Berkeley) 7/31/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: union_vnops.c,v 1.58 2001/12/06 04:29:24 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/file.h>
 #include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -93,6 +95,8 @@ int union_islocked	__P((void *));
 int union_pathconf	__P((void *));
 int union_advlock	__P((void *));
 int union_strategy	__P((void *));
+int union_getpages	__P((void *));
+int union_putpages	__P((void *));
 
 static void union_fixup __P((struct union_node *));
 static int union_lookup1 __P((struct vnode *, struct vnode **,
@@ -103,7 +107,7 @@ static int union_lookup1 __P((struct vnode *, struct vnode **,
  * Global vfs data structures
  */
 int (**union_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc union_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc union_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, union_lookup },		/* lookup */
 	{ &vop_create_desc, union_create },		/* create */
@@ -142,6 +146,8 @@ struct vnodeopv_entry_desc union_vnodeop_entries[] = {
 	{ &vop_islocked_desc, union_islocked },		/* islocked */
 	{ &vop_pathconf_desc, union_pathconf },		/* pathconf */
 	{ &vop_advlock_desc, union_advlock },		/* advlock */
+	{ &vop_getpages_desc, union_getpages },		/* getpages */
+	{ &vop_putpages_desc, union_putpages },		/* putpages */
 #ifdef notdef
 	{ &vop_blkatoff_desc, union_blkatoff },		/* blkatoff */
 	{ &vop_valloc_desc, union_valloc },		/* valloc */
@@ -150,9 +156,9 @@ struct vnodeopv_entry_desc union_vnodeop_entries[] = {
 	{ &vop_update_desc, union_update },		/* update */
 	{ &vop_bwrite_desc, union_bwrite },		/* bwrite */
 #endif
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ NULL, NULL }
 };
-struct vnodeopv_desc union_vnodeop_opv_desc =
+const struct vnodeopv_desc union_vnodeop_opv_desc =
 	{ &union_vnodeop_p, union_vnodeop_entries };
 
 #define FIXUP(un) { \
@@ -608,12 +614,10 @@ union_mknod(v)
 		if (error)
 			return (error);
 
-		if (vp != NULLVP) {
-			error = union_allocvp(ap->a_vpp, mp, NULLVP, NULLVP,
-					cnp, vp, NULLVP, 1);
-			if (error)
-				vput(vp);
-		}
+		error = union_allocvp(ap->a_vpp, mp, NULLVP, NULLVP,
+				      cnp, vp, NULLVP, 1);
+		if (error)
+		    vput(vp);
 		return (error);
 	}
 
@@ -1525,14 +1529,13 @@ union_symlink(v)
 
 	if (dvp != NULLVP) {
 		int error;
-		struct vnode *vp;
 
 		FIXUP(un);
 		VREF(dvp);
 		un->un_flags |= UN_KLOCK;
 		vput(ap->a_dvp);
-		error = VOP_SYMLINK(dvp, &vp, cnp, ap->a_vap, ap->a_target);
-		*ap->a_vpp = NULLVP;
+		error = VOP_SYMLINK(dvp, ap->a_vpp, cnp, ap->a_vap,
+				    ap->a_target);
 		return (error);
 	}
 
@@ -1970,4 +1973,59 @@ union_strategy(v)
 	bp->b_vp = savedvp;
 
 	return (error);
+}
+
+int
+union_getpages(v)
+	void *v;
+{
+	struct vop_getpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offset;
+		struct vm_page **a_m;
+		int *a_count;
+		int a_centeridx;
+		vm_prot_t a_access_type;
+		int a_advice;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	int error;
+
+	/*
+	 * just pass the request on to the underlying layer.
+	 */
+
+	if (ap->a_flags & PGO_LOCKED) {
+		return EBUSY;
+	}
+	ap->a_vp = OTHERVP(vp);
+	simple_unlock(&vp->v_interlock);
+	simple_lock(&ap->a_vp->v_interlock);
+	error = VCALL(ap->a_vp, VOFFSET(vop_getpages), ap);
+	return error;
+}
+
+int
+union_putpages(v)
+	void *v;
+{
+	struct vop_putpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offlo;
+		voff_t a_offhi;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	int error;
+
+	/*
+	 * just pass the request on to the underlying layer.
+	 */
+
+	ap->a_vp = OTHERVP(vp);
+	simple_unlock(&vp->v_interlock);
+	simple_lock(&ap->a_vp->v_interlock);
+	error = VCALL(ap->a_vp, VOFFSET(vop_putpages), ap);
+	return error;
 }

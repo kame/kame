@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.7 1998/11/13 04:47:07 oster Exp $	*/
+/*	$NetBSD: conf.c,v 1.11 2002/01/12 14:54:15 manu Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -45,10 +45,30 @@ bdev_decl(sw);
 #include "raid.h"
 bdev_decl(raid);
 
+#include "cd.h"
+bdev_decl(cd);
+
+#include "sd.h"
+bdev_decl(sd);
+
+#include "wd.h"
+bdev_decl(wd);
+
+#include "md.h"
+bdev_decl(md);
+
+#include "ld.h"
+bdev_decl(ld);
+
 struct bdevsw bdevsw[] = {
 	bdev_disk_init(NOFDISK,ofdisk_),/* 0: Openfirmware disk */
 	bdev_swap_init(1,sw),		/* 1: swap pseudo device */
-	bdev_disk_init(NRAID,raid),	/* 3: RAIDframe disk driver */
+	bdev_disk_init(NRAID,raid),	/* 2: RAIDframe disk driver */
+	bdev_disk_init(NCD,cd),		/* 3: CD-ROM driver */
+	bdev_disk_init(NSD,sd),		/* 4: SCSI disk driver */
+	bdev_disk_init(NWD,wd),		/* 5: ATA disk driver */
+	bdev_disk_init(NMD,md),		/* 6: memory disk driver */
+	bdev_disk_init(NLD,ld),		/* 7: logical disks */
 };
 int nblkdev = sizeof bdevsw / sizeof bdevsw[0];
 
@@ -74,14 +94,21 @@ cdev_decl(ofrtc_);
 #include "bpfilter.h"
 cdev_decl(bpf);
 #include "rnd.h"
+#include "openfirm.h"
+cdev_decl(openfirm);
 
 cdev_decl(raid);
+cdev_decl(cd);
+cdev_decl(sd);
+cdev_decl(wd);
+cdev_decl(md);
+cdev_decl(ld);
 
-#define	cdev_rtc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), \
-	dev_init(c,n,read), dev_init(c,n,write), \
-	(dev_type_ioctl((*))) enodev, (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
+#include "clockctl.h"
+cdev_decl(clockctl);
+
+/* open, close, read, write */
+#define	cdev_rtc_init(c,n)	cdev__ocrw_init(c,n)
 
 struct cdevsw cdevsw[] = {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -97,6 +124,13 @@ struct cdevsw cdevsw[] = {
 	cdev_bpftun_init(NBPFILTER,bpf),/* 10: Berkeley packet filter */
 	cdev_rnd_init(NRND,rnd),	/* 11: random source pseudo-device */
 	cdev_disk_init(NRAID,raid),	/* 12: RAIDframe disk driver */
+	cdev_openfirm_init(NOPENFIRM,openfirm),/* 13: OpenFirmware pseudo-device */
+	cdev_disk_init(NCD,cd),		/* 14: CD-ROM driver */
+	cdev_disk_init(NSD,sd),		/* 15: SCSI disk driver */
+	cdev_disk_init(NWD,wd),		/* 16: ATA disk driver */
+	cdev_disk_init(NMD,md),		/* 17: memory disk driver */
+	cdev_disk_init(NLD,ld),		/* 18: logical disks */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 19: clockctl pseudo device */
 };
 int nchrdev = sizeof cdevsw / sizeof cdevsw[0];
 
@@ -142,7 +176,14 @@ static int chrtoblktbl[] = {
 	/*  9 */	NODEV,
 	/* 10 */	NODEV,
 	/* 11 */	NODEV,
-	/* 12 */	3,
+	/* 12 */	2,
+	/* 13 */	NODEV,
+	/* 14 */	3,
+	/* 15 */	4,
+	/* 16 */	5,
+	/* 17 */	6,
+	/* 18 */	7,
+	/* 19 */	NODEV,
 };
 
 /*

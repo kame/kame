@@ -1,4 +1,4 @@
-/*	$NetBSD: ucred.h,v 1.13.24.1 2002/02/09 19:19:56 he Exp $	*/
+/*	$NetBSD: ucred.h,v 1.14 2001/11/29 21:20:00 christos Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993

@@ -1,4 +1,4 @@
-/*	$NetBSD: mman.h,v 1.24.12.1 2000/08/05 11:10:43 wiz Exp $	*/
+/*	$NetBSD: mman.h,v 1.28 2000/10/18 01:43:18 assar Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -46,6 +46,19 @@
 typedef	_BSD_SIZE_T_	size_t;
 #undef	_BSD_SIZE_T_
 #endif
+
+#include <sys/ansi.h>
+
+#ifndef	mode_t
+typedef	__mode_t	mode_t;
+#define	mode_t		__mode_t
+#endif
+
+#ifndef	off_t
+typedef	__off_t		off_t;		/* file offset */
+#define	off_t		__off_t
+#endif
+
 
 /*
  * Protections are chosen from these bits, or-ed together

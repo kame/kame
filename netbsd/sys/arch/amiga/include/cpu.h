@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.49 2000/05/26 21:19:26 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.54 2002/04/25 09:20:33 aymeric Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -48,7 +48,7 @@
  * Exported definitions unique to amiga/68k cpu support.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -81,6 +81,7 @@ extern struct cpu_info cpu_info_store;
 #define	cpu_swapout(p)			/* nothing */
 #define	cpu_number()			0
 
+extern volatile unsigned int interrupt_depth;
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
  * machine state in an opaque clockframe.  One the hp300, we use
@@ -96,13 +97,7 @@ struct clockframe {
 /*#define	CLKF_BASEPRI(framep)	(((framep)->sr & PSL_IPL) == 0)*/
 #define	CLKF_BASEPRI(framep)	(0)
 #define	CLKF_PC(framep)		((framep)->pc)
-#if 0
-/* We would like to do it this way... */
-#define	CLKF_INTR(framep)	(((framep)->sr & PSL_M) == 0)
-#else
-/* but until we start using PSL_M, we have to do this instead */
-#define	CLKF_INTR(framep)	(0)	/* XXX */
-#endif
+#define	CLKF_INTR(framep)	(interrupt_depth > 1)
 
 
 /*
@@ -110,7 +105,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define	need_resched()	{want_resched = 1; setsoftast();}
+#define	need_resched(ci)	{want_resched = 1; setsoftast();}
 
 /*
  * Give a profiling tick to the current process from the softclock
@@ -149,7 +144,7 @@ extern int astpending;		/* need trap before returning to user mode */
 #define AMIGA_68060	(1L<<7)
 
 #ifdef _KERNEL
-int machineid;
+extern int machineid;
 #endif
 
 /*
@@ -242,11 +237,6 @@ void	setredzone __P((u_int *, caddr_t));
  * Prototypes from pmap.c:
  */
 void	pmap_bootstrap __P((vm_offset_t, vm_offset_t));
-
-/*
- * Prototypes from trap.c:
- */
-void	child_return __P((void *));
 
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: necpb.c,v 1.2 2000/06/17 07:25:57 soda Exp $	*/
+/*	$NetBSD: necpb.c,v 1.11 2002/05/16 01:01:33 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -76,8 +76,7 @@
 #include <sys/malloc.h>
 #include <sys/extent.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define _ARC_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -86,11 +85,12 @@
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
+#include <machine/platform.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 
-#include <arc/pica/rd94.h>
+#include <arc/jazz/rd94.h>
 #include <arc/pci/necpbvar.h>
 
 int	necpbmatch __P((struct device *, struct cfdata *, void *));
@@ -107,7 +107,7 @@ void		necpb_decompose_tag __P((pci_chipset_tag_t, pcitag_t, int *,
 pcireg_t	necpb_conf_read __P((pci_chipset_tag_t, pcitag_t, int));
 void		necpb_conf_write __P((pci_chipset_tag_t, pcitag_t, int,
 		    pcireg_t));
-int		necpb_intr_map __P((pci_chipset_tag_t, pcitag_t, int, int,
+int		necpb_intr_map __P((struct pci_attach_args *,
 		    pci_intr_handle_t *));
 const char *	necpb_intr_string __P((pci_chipset_tag_t, pci_intr_handle_t));
 void *		necpb_intr_establish __P((pci_chipset_tag_t, pci_intr_handle_t,
@@ -127,7 +127,7 @@ static struct necpb_intrhand	*necpb_inttbl[4];
 
 /* There can be only one. */
 int necpbfound;
-struct necpb_config necpb_configuration;
+struct necpb_context necpb_main_context;
 static long necpb_mem_ex_storage[EXTENT_FIXED_STORAGE_SIZE(10) / sizeof(long)];
 static long necpb_io_ex_storage[EXTENT_FIXED_STORAGE_SIZE(10) / sizeof(long)];
 
@@ -153,7 +153,7 @@ necpbmatch(parent, match, aux)
  */
 void
 necpb_init(ncp)
-	struct necpb_config *ncp;
+	struct necpb_context *ncp;
 {
 	pcitag_t tag;
 	pcireg_t csr;
@@ -176,6 +176,7 @@ necpb_init(ncp)
 	ncp->nc_pc.pc_attach_hook = necpb_attach_hook;
 	ncp->nc_pc.pc_bus_maxdevs = necpb_bus_maxdevs;
 	ncp->nc_pc.pc_make_tag = necpb_make_tag;
+	ncp->nc_pc.pc_decompose_tag = necpb_decompose_tag;
 	ncp->nc_pc.pc_conf_read = necpb_conf_read;
 	ncp->nc_pc.pc_conf_write = necpb_conf_write;
 	ncp->nc_pc.pc_intr_map = necpb_intr_map;
@@ -183,24 +184,32 @@ necpb_init(ncp)
 	ncp->nc_pc.pc_intr_establish = necpb_intr_establish;
 	ncp->nc_pc.pc_intr_disestablish = necpb_intr_disestablish;
 
-	/* XXX: enable all mem/io/busmaster */
+	/*
+	 * XXX:
+	 *  NEC's firmware does not configure PCI devices completely.
+	 *  We need to disable expansion ROM and enable mem/io/busmaster
+	 *  bits here.
+	 */
 	tag = necpb_make_tag(&ncp->nc_pc, 0, 3, 0);
 	csr = necpb_conf_read(&ncp->nc_pc, tag, PCI_COMMAND_STATUS_REG);
 	csr |= PCI_COMMAND_IO_ENABLE | PCI_COMMAND_MEM_ENABLE |
 	    PCI_COMMAND_MASTER_ENABLE;
 	necpb_conf_write(&ncp->nc_pc, tag, PCI_COMMAND_STATUS_REG, csr);
+	necpb_conf_write(&ncp->nc_pc, tag, PCI_MAPREG_ROM, 0);
 
 	tag = necpb_make_tag(&ncp->nc_pc, 0, 4, 0);
 	csr = necpb_conf_read(&ncp->nc_pc, tag, PCI_COMMAND_STATUS_REG);
 	csr |= PCI_COMMAND_IO_ENABLE | PCI_COMMAND_MEM_ENABLE |
 	    PCI_COMMAND_MASTER_ENABLE;
 	necpb_conf_write(&ncp->nc_pc, tag, PCI_COMMAND_STATUS_REG, csr);
+	necpb_conf_write(&ncp->nc_pc, tag, PCI_MAPREG_ROM, 0);
 
 	tag = necpb_make_tag(&ncp->nc_pc, 0, 5, 0);
 	csr = necpb_conf_read(&ncp->nc_pc, tag, PCI_COMMAND_STATUS_REG);
 	csr |= PCI_COMMAND_IO_ENABLE | PCI_COMMAND_MEM_ENABLE |
 	    PCI_COMMAND_MASTER_ENABLE;
 	necpb_conf_write(&ncp->nc_pc, tag, PCI_COMMAND_STATUS_REG, csr);
+	necpb_conf_write(&ncp->nc_pc, tag, PCI_MAPREG_ROM, 0);
 
 	ncp->nc_initialized = 1;
 }
@@ -218,7 +227,7 @@ necpbattach(parent, self, aux)
 
 	printf("\n");
 
-	sc->sc_ncp = &necpb_configuration;
+	sc->sc_ncp = &necpb_main_context;
 	necpb_init(sc->sc_ncp);
 
 	out32(RD94_SYS_PCI_INTMASK, 0xf);
@@ -226,7 +235,7 @@ necpbattach(parent, self, aux)
 	for (i = 0; i < 4; i++)
 		necpb_inttbl[i] = NULL;
 
-	set_intr(MIPS_INT_MASK_2, necpb_intr, 3);
+	(*platform->set_intr)(MIPS_INT_MASK_2, necpb_intr, 3);
 
 	pba.pba_busname = "pci";
 	pba.pba_iot = &sc->sc_ncp->nc_iot;
@@ -235,6 +244,7 @@ necpbattach(parent, self, aux)
 	pba.pba_pc = &sc->sc_ncp->nc_pc;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 	pba.pba_bus = 0;
+	pba.pba_bridgetag = NULL;
 
 	config_found(self, &pba, necpbprint);
 }
@@ -330,12 +340,13 @@ necpb_conf_write(pc, tag, reg, data)
 }
 
 int
-necpb_intr_map(pc, intrtag, pin, line, ihp)
-	pci_chipset_tag_t pc;
-	pcitag_t intrtag;
-	int pin, line;
+necpb_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
+	pci_chipset_tag_t pc = pa->pa_pc;
+	pcitag_t intrtag = pa->pa_intrtag;
+	int pin = pa->pa_intrpin;
 	int bus, dev;
 
 	if (pin == 0) {
@@ -382,7 +393,7 @@ necpb_intr_string(pc, ih)
 	static char str[8];
 
 	if (ih >= 4)
-		panic("necpb_intr_string: bogus handle %d", ih);
+		panic("necpb_intr_string: bogus handle %ld", ih);
 	sprintf(str, "int %c", 'A' + (int)ih);
 	return (str);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: pk_subr.c,v 1.19 2000/03/30 13:53:36 augustss Exp $	*/
+/*	$NetBSD: pk_subr.c,v 1.23 2001/11/13 00:12:58 lukem Exp $	*/
 
 /*
  * Copyright (c) 1984 University of British Columbia.
@@ -43,6 +43,9 @@
  *	@(#)pk_subr.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pk_subr.c,v 1.23 2001/11/13 00:12:58 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -70,7 +73,7 @@ int             pk_recvspace = 1024 * 2 + 8;
 
 struct pklcd_q  pklcd_q = {&pklcd_q, &pklcd_q};
 
-struct x25bitslice x25_bitslice[] = {
+const struct x25bitslice x25_bitslice[] = {
 	/* mask, shift value */
 	{0xf0, 0x4},
 	{0xf, 0x0},
@@ -211,7 +214,7 @@ pk_template(lcn, type)
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 	if (m == 0)
 		panic("pk_template");
-	m->m_act = 0;
+	m->m_nextpkt = 0;
 
 	/*
 	 * Efficiency hack: leave a four byte gap at the beginning
@@ -886,7 +889,7 @@ pk_procerror(error, lcp, errstr, diagnostic)
 	int diagnostic;
 {
 
-	pk_message(lcp->lcd_lcn, lcp->lcd_pkp->pk_xcp, errstr);
+	pk_message(lcp->lcd_lcn, lcp->lcd_pkp->pk_xcp, "%s", errstr);
 
 	switch (error) {
 	case PK_CLEAR:
@@ -1175,7 +1178,7 @@ pk_fragment(lcp, m0, qbit, mbit, wait)
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("pk_fragment");
 	totlen = m->m_pkthdr.len;
-	m->m_act = 0;
+	m->m_nextpkt = 0;
 	sb = lcp->lcd_so ? &lcp->lcd_so->so_snd : &lcp->lcd_sb;
 	do {
 		if (totlen > psize) {
@@ -1188,7 +1191,7 @@ pk_fragment(lcp, m0, qbit, mbit, wait)
 		if (m == 0)
 			goto abort;
 		*mp = m;
-		mp = &m->m_act;
+		mp = &m->m_nextpkt;
 		*mp = 0;
 		xp = mtod(m, struct x25_packet *);
 		0[(char *) xp] = 0;
@@ -1204,8 +1207,8 @@ pk_fragment(lcp, m0, qbit, mbit, wait)
 			SMBIT(xp, 1);
 	} while ((m = next) != NULL);
 	for (m = head; m; m = next) {
-		next = m->m_act;
-		m->m_act = 0;
+		next = m->m_nextpkt;
+		m->m_nextpkt = 0;
 		sbappendrecord(sb, m);
 	}
 	return 0;
@@ -1215,7 +1218,7 @@ abort:
 	if (next)
 		m_freem(next);
 	for (m = head; m; m = next) {
-		next = m->m_act;
+		next = m->m_nextpkt;
 		m_freem(m);
 	}
 	return ENOBUFS;

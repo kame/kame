@@ -1,4 +1,4 @@
-/*	$NetBSD: if_loop.c,v 1.30 2000/03/30 09:45:36 augustss Exp $	*/
+/*	$NetBSD: if_loop.c,v 1.40 2001/11/12 23:49:40 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,6 +67,9 @@
 /*
  * Loopback interface driver for protocol testing and timing.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_loop.c,v 1.40 2001/11/12 23:49:40 lukem Exp $");
 
 #include "opt_inet.h"
 #include "opt_atalk.h"
@@ -139,6 +142,10 @@
 
 struct	ifnet loif[NLOOP];
 
+#ifdef ALTQ
+void	lostart(struct ifnet *);
+#endif
+
 void
 loopattach(n)
 	int n;
@@ -154,12 +161,18 @@ loopattach(n)
 		ifp->if_flags = IFF_LOOPBACK | IFF_MULTICAST;
 		ifp->if_ioctl = loioctl;
 		ifp->if_output = looutput;
+#ifdef ALTQ
+		ifp->if_start = lostart;
+#endif
 		ifp->if_type = IFT_LOOP;
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
+		ifp->if_dlt = DLT_NULL;
+		IFQ_SET_READY(&ifp->if_snd);
 		if_attach(ifp);
+		if_alloc_sadl(ifp);
 #if NBPFILTER > 0
-		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int));
+		bpfattach(ifp, DLT_NULL, sizeof(u_int));
 #endif
 	}
 }
@@ -176,7 +189,6 @@ looutput(ifp, m, dst, rt)
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput: no header mbuf");
-	ifp->if_lastchange = time;
 #if NBPFILTER > 0
 	if (ifp->if_bpf && (ifp->if_flags & IFF_LOOPBACK)) {
 		/*
@@ -187,7 +199,7 @@ looutput(ifp, m, dst, rt)
 		 * try to free it or keep a pointer to it).
 		 */
 		struct mbuf m0;
-		u_int af = dst->sa_family;
+		u_int32_t af = dst->sa_family;
 
 		m0.m_next = m;
 		m0.m_len = 4;
@@ -258,6 +270,36 @@ looutput(ifp, m, dst, rt)
 
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
+
+#ifdef ALTQ
+	/*
+	 * ALTQ on the loopback interface is just for debugging.  It's
+	 * used only for loopback interfaces, not for a simplex interface.
+	 */
+	if ((ALTQ_IS_ENABLED(&ifp->if_snd) || TBR_IS_ENABLED(&ifp->if_snd)) &&
+	    ifp->if_start == lostart) {
+		struct altq_pktattr pktattr;
+		int error;
+
+		/*
+		 * If the queueing discipline needs packet classification,
+		 * do it before prepending the link headers.
+		 */
+		IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
+		M_PREPEND(m, sizeof(uint32_t), M_DONTWAIT);
+		if (m == NULL)
+			return (ENOBUFS);
+		*(mtod(m, uint32_t *)) = dst->sa_family;
+
+		s = splnet();
+		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+		(*ifp->if_start)(ifp);
+		splx(s);
+		return (error);
+	}
+#endif /* ALTQ */
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -303,7 +345,7 @@ looutput(ifp, m, dst, rt)
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);
@@ -318,12 +360,89 @@ looutput(ifp, m, dst, rt)
 	return (0);
 }
 
+#ifdef ALTQ
+void
+lostart(struct ifnet *ifp)
+{
+	struct ifqueue *ifq;
+	struct mbuf *m;
+	uint32_t af;
+	int s, isr;
+
+	for (;;) {
+		IFQ_DEQUEUE(&ifp->if_snd, m);
+		if (m == NULL)
+			return;
+
+		af = *(mtod(m, uint32_t *));
+		m_adj(m, sizeof(uint32_t));
+
+		switch (af) {
+#ifdef INET
+		case AF_INET:
+			ifq = &ipintrq;
+			isr = NETISR_IP;
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			m->m_flags |= M_LOOP;
+			ifq = &ip6intrq;
+			isr = NETISR_IPV6;
+			break;
+#endif
+#ifdef IPX
+		case AF_IPX:
+			ifq = &ipxintrq;
+			isr = NETISR_IPX;
+			break;
+#endif
+#ifdef NS
+		case AF_NS:
+			ifq = &nsintrq;
+			isr = NETISR_NS;
+			break;
+#endif
+#ifdef ISO
+		case AF_ISO:
+			ifq = &clnlintrq;
+			isr = NETISR_ISO;
+			break;
+#endif
+#ifdef NETATALK
+		case AF_APPLETALK:
+			ifq = &atintrq2;
+			isr = NETISR_ATALK;
+			break;
+#endif
+		default:
+			printf("%s: can't handle af%d\n", ifp->if_xname, af);
+			m_freem(m);
+			return;
+		}
+
+		s = splnet();
+		if (IF_QFULL(ifq)) {
+			IF_DROP(ifq);
+			splx(s);
+			m_freem(m);
+			return;
+		}
+		IF_ENQUEUE(ifq, m);
+		schednetisr(isr);
+		ifp->if_ipackets++;
+		ifp->if_ibytes += m->m_pkthdr.len;
+		splx(s);
+	}
+}
+#endif /* ALTQ */
+
 /* ARGSUSED */
 void
-lortrequest(cmd, rt, sa)
+lortrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 
 	if (rt)

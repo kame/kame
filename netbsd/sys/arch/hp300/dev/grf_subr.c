@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_subr.c,v 1.5 1997/10/09 09:06:53 jtc Exp $	*/
+/*	$NetBSD: grf_subr.c,v 1.8 2002/03/15 05:52:54 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Subroutines common to all framebuffer devices.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grf_subr.c,v 1.8 2002/03/15 05:52:54 gmcgarry Exp $");                                                  
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h> 
@@ -62,22 +65,17 @@ grfdev_attach(sc, init, regs, sw)
 {
 	struct grfdev_attach_args ga;
 	struct grf_data *gp;
-	int isconsole;
 
-	isconsole = (sc->sc_scode == conscode);
-
-	if (isconsole) 
+	if (sc->sc_isconsole) 
 		sc->sc_data = gp = &grf_cn;
 	else {
-		sc->sc_data = gp =
-		    (struct grf_data *)malloc(sizeof(struct grf_data),
-		    M_DEVBUF, M_NOWAIT);
+		MALLOC(sc->sc_data, struct grf_data *, sizeof(struct grf_data),
+		    M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (sc->sc_data == NULL) {
 			printf("\n%s: can't allocate grf data\n",
 			    sc->sc_dev.dv_xname);
 			return;
 		}
-		bzero(sc->sc_data, sizeof(struct grf_data));
 
 		/* Initialize the framebuffer hardware. */
 		if ((*init)(sc->sc_data, sc->sc_scode, regs) == 0) {
@@ -87,6 +85,7 @@ grfdev_attach(sc, init, regs, sw)
 			return;
 		}
 
+		gp = sc->sc_data;
 		gp->g_flags = GF_ALIVE;
 		gp->g_sw = sw;
 		gp->g_display.gd_id = gp->g_sw->gd_swid;
@@ -103,7 +102,7 @@ grfdev_attach(sc, init, regs, sw)
 
 	/* Attach a grf. */
 	ga.ga_scode = sc->sc_scode;	/* XXX */
-	ga.ga_isconsole = isconsole;
+	ga.ga_isconsole = sc->sc_isconsole;
 	ga.ga_data = (void *)sc->sc_data;
 	(void)config_found(&sc->sc_dev, &ga, grfdevprint);
 }

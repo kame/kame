@@ -1,11 +1,11 @@
-/*	$NetBSD: overlay_vfsops.c,v 1.4 2000/06/10 18:27:03 assar Exp $	*/
+/*	$NetBSD: overlay_vfsops.c,v 1.10 2001/11/15 09:48:22 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 National Aeronautics & Space Administration
  * All rights reserved.
  *
  * This software was written by William Studenmund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -73,15 +73,17 @@
  */
 
 /*
- * Null Layer
- * (See null_vnops.c for a description of what this does.)
+ * Overlay Layer
+ * (See overlay_vnops.c for a description of what this does.)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: overlay_vfsops.c,v 1.10 2001/11/15 09:48:22 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/proc.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -167,8 +169,8 @@ ov_mount(mp, path, data, ndp, p)
 	nmp->ovm_alloc = layer_node_alloc;	/* the default alloc is fine */
 	nmp->ovm_vnodeop_p = overlay_vnodeop_p;
 	simple_lock_init(&nmp->ovm_hashlock);
-	nmp->ovm_node_hashtbl = hashinit(NOVERLAYNODECACHE, M_CACHE, M_WAITOK,
-			&nmp->ovm_node_hash);
+	nmp->ovm_node_hashtbl = hashinit(NOVERLAYNODECACHE, HASH_LIST, M_CACHE,
+	    M_WAITOK, &nmp->ovm_node_hash);
 
 	/*
 	 * Fix up overlay node for root vnode
@@ -260,9 +262,9 @@ ov_unmount(mp, mntflags, p)
 	return 0;
 }
 
-extern struct vnodeopv_desc overlay_vnodeop_opv_desc;
+extern const struct vnodeopv_desc overlay_vnodeop_opv_desc;
 
-struct vnodeopv_desc *ov_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const ov_vnodeopv_descs[] = {
 	&overlay_vnodeop_opv_desc,
 	NULL,
 };
@@ -280,6 +282,7 @@ struct vfsops overlay_vfsops = {
 	layerfs_fhtovp,
 	layerfs_vptofh,
 	layerfs_init,
+	NULL,
 	layerfs_done,
 	layerfs_sysctl,
 	NULL,				/* vfs_mountroot */

@@ -1,4 +1,4 @@
-/*	$NetBSD: sd_atapi.c,v 1.7 2000/06/09 08:54:28 enami Exp $	*/
+/*	$NetBSD: sd_atapi.c,v 1.14 2002/01/09 18:48:18 drochner Exp $	*/
 
 /*
  * Copyright 1998
@@ -39,7 +39,9 @@
  * Chris Demetriou, January 10, 1998.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sd_atapi.c,v 1.14 2002/01/09 18:48:18 drochner Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -48,10 +50,10 @@
 #include <sys/errno.h>
 #include <sys/device.h>
 #include <sys/disk.h>
+#include <sys/conf.h>
 
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsipi_disk.h>
-#include <dev/scsipi/atapi_all.h>
 #include <dev/scsipi/atapi_disk.h>
 #include <dev/scsipi/atapiconf.h>
 #include <dev/scsipi/sdvar.h>
@@ -91,7 +93,7 @@ sd_atapibus_match(parent, match, aux)
 	struct scsipibus_attach_args *sa = aux;
 	int priority;
 
-	if (sa->sa_sc_link->type != BUS_ATAPI)
+	if (scsipi_periph_bustype(sa->sa_periph) != SCSIPI_BUSTYPE_ATAPI)
 		return (0);
 
 	(void)scsipi_inqmatch(&sa->sa_inqbuf,
@@ -112,14 +114,14 @@ sd_atapibus_attach(parent, self, aux)
 {
 	struct sd_softc *sd = (void *)self;
 	struct scsipibus_attach_args *sa = aux;
-	struct scsipi_link *sc_link = sa->sa_sc_link;
+	struct scsipi_periph *periph = sa->sa_periph;
 
-	SC_DEBUG(sc_link, SDEV_DB2, ("sd_atapi_attach: "));
+	SC_DEBUG(periph, SCSIPI_DB2, ("sd_atapi_attach: "));
 
 	sd->type = (sa->sa_inqbuf.type & SID_TYPE);
-	scsipi_strvis(sd->name, 16, sa->sa_inqbuf.product, 16);
+	strncpy(sd->name, sa->sa_inqbuf.vendor, 16);
 
-	sdattach(parent, sd, sc_link, &sd_atapibus_ops);
+	sdattach(parent, sd, periph, &sd_atapibus_ops);
 }
 
 static int
@@ -134,15 +136,15 @@ sd_atapibus_get_parms(sd, dp, flags)
 	char capacity_data[ATAPI_CAP_DESC_SIZE(1)];
 	int error;
 
-	bzero(&scsipi_cmd, sizeof scsipi_cmd);
+	memset(&scsipi_cmd, 0, sizeof scsipi_cmd);
 	scsipi_cmd.opcode = ATAPI_READ_FORMAT_CAPACITIES;
 	_lto2b(ATAPI_CAP_DESC_SIZE(1), scsipi_cmd.length);
 
-	error = scsipi_command(sd->sc_link,
+	error = scsipi_command(sd->sc_periph,
 	    (struct scsipi_generic *)&scsipi_cmd, sizeof(scsipi_cmd),
 	    (void *)capacity_data, ATAPI_CAP_DESC_SIZE(1), SDRETRIES, 20000,
 	    NULL, flags | XS_CTL_DATA_IN | XS_CTL_DATA_ONSTACK);
-	SC_DEBUG(sd->sc_link, SDEV_DB2,
+	SC_DEBUG(sd->sc_periph, SCSIPI_DB2,
 	    ("sd_atapibus_get_parms: read format capacities error=%d\n",
 	    error));
 	if (error != 0)
@@ -157,6 +159,10 @@ sd_atapibus_get_parms(sd, dp, flags)
 
 	case ATAPI_CAP_DESC_CODE_FORMATTED:
 		break;
+
+	case 0:
+		if (sd->sc_periph->periph_quirks & PQUIRK_BYTE5_ZERO)
+			break;
 
 	default:
 #ifdef DIAGNOSTIC
@@ -185,10 +191,12 @@ sd_atapibus_get_parms(sd, dp, flags)
 	 *
 	 * XXX Rigid geometry page?
 	 */
-	error = atapi_mode_sense(sd->sc_link, ATAPI_FLEX_GEOMETRY_PAGE,
-	    (struct atapi_mode_header *)&sense_data, FLEXGEOMETRYPAGESIZE,
+	if (sd->sc_periph->periph_quirks & PQUIRK_NO_FLEX_PAGE)
+		return (SDGP_RESULT_OK);
+	error = scsipi_mode_sense_big(sd->sc_periph, 0,
+	    ATAPI_FLEX_GEOMETRY_PAGE, &sense_data.header, FLEXGEOMETRYPAGESIZE,
 	    flags | XS_CTL_DATA_ONSTACK, SDRETRIES, 20000);
-	SC_DEBUG(sd->sc_link, SDEV_DB2,
+	SC_DEBUG(sd->sc_periph, SCSIPI_DB2,
 	    ("sd_atapibus_get_parms: mode sense (flex) error=%d\n", error));
 	if (error != 0)
 		return (SDGP_RESULT_OK);

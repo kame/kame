@@ -1,4 +1,4 @@
-/*	$NetBSD: iophy.c,v 1.9.4.1 2000/07/04 04:11:12 thorpej Exp $	*/
+/*	$NetBSD: iophy.c,v 1.16 2002/03/25 20:51:25 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -70,6 +70,9 @@
  * Intel 82553 PHY driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iophy.c,v 1.16 2002/03/25 20:51:25 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -86,57 +89,60 @@
 
 #include <dev/mii/iophyreg.h>
 
-int	iophymatch __P((struct device *, struct cfdata *, void *));
-void	iophyattach __P((struct device *, struct device *, void *));
+int	iophymatch(struct device *, struct cfdata *, void *);
+void	iophyattach(struct device *, struct device *, void *);
 
 struct cfattach iophy_ca = {
 	sizeof(struct mii_softc), iophymatch, iophyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	iophy_service __P((struct mii_softc *, struct mii_data *, int));
-void	iophy_status __P((struct mii_softc *));
+int	iophy_service(struct mii_softc *, struct mii_data *, int);
+void	iophy_status(struct mii_softc *);
 
 const struct mii_phy_funcs iophy_funcs = {
 	iophy_service, iophy_status, mii_phy_reset,
 };
 
+const struct mii_phydesc iophys[] = {
+	{ MII_OUI_xxINTEL,		MII_MODEL_xxINTEL_I82553,
+	  MII_STR_xxINTEL_I82553 },
+
+	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82553,
+	  MII_STR_yyINTEL_I82553 },
+
+	{ 0,				0,
+	  NULL },
+};
+
 int
-iophymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+iophymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;
 
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxINTEL &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxINTEL_I82553)
-		return (10);
-
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_INTEL &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_INTEL_I82553)
+	if (mii_phy_match(ma, iophys) != NULL)
 		return (10);
 
 	return (0);
 }
 
 void
-iophyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+iophyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 
-	printf(": %s, rev. %d\n", MII_STR_INTEL_I82553,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, iophys);
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &iophy_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	PHY_RESET(sc);
 
@@ -151,10 +157,7 @@ iophyattach(parent, self, aux)
 }
 
 int
-iophy_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+iophy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;
@@ -216,8 +219,7 @@ iophy_service(sc, mii, cmd)
 }
 
 void
-iophy_status(sc)
-	struct mii_softc *sc;
+iophy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;

@@ -1,4 +1,4 @@
-/*	$NetBSD: mb8795var.h,v 1.1.1.1.24.1 2000/10/16 22:49:42 tv Exp $	*/
+/*	$NetBSD: mb8795var.h,v 1.5 2002/05/20 20:19:36 jdolecek Exp $	*/
 /*
  * Copyright (c) 1998 Darrin B. Jewell
  * All rights reserved.
@@ -40,24 +40,6 @@ struct mb8795_softc {
 	struct	device sc_dev;		/* base device glue */
 	struct	ethercom sc_ethercom;	/* Ethernet common part */
 
-#if 0
-	struct	ifmedia sc_media;	/* our supported media */
-
-	int	(*sc_mediachange) __P((struct mb8795_softc *));
-	void	(*sc_mediastatus) __P((struct mb8795_softc *,
-		    struct ifmediareq *));
-
-	/*
-	 * Media-supported by this interface.  If this is NULL,
-	 * the only supported media is assumed to be "manual".
-	 */
-	int	*sc_supmedia;
-	int	sc_nsupmedia;
-	int	sc_defaultmedia;
-
-	int	sc_havecarrier;	/* carrier status */
-#endif
-
 	void	*sc_sh;		/* shutdownhook cookie */
 
 	int sc_debug;
@@ -73,9 +55,11 @@ struct mb8795_softc {
 	struct mbuf *sc_tx_mb_head;   /* pointer to data for this command */
 	int sc_tx_loaded;
 
-	u_char *sc_txbuf;							/* to solve alignment problems, we
-																 * copy the mbuf into this buffer before
-																 * trying to dma it */
+	u_char *sc_txbuf; 	/* to solve alignment problems, we
+				 * copy the mbuf into this buffer before
+				 * trying to dma it */
+
+	struct ifaltq sc_tx_snd;
 
 	bus_dma_tag_t sc_rx_dmat;
 	bus_dmamap_t sc_rx_dmamap[MB8795_NRXBUFS];

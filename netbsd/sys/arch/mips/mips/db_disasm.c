@@ -1,4 +1,4 @@
-/*	$NetBSD: db_disasm.c,v 1.5 1999/12/27 21:12:25 castor Exp $	*/
+/*	$NetBSD: db_disasm.c,v 1.10 2002/02/22 16:18:36 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -76,6 +76,10 @@ static char *spec_name[64] = {
 /*56 */ "dsll","spec71","dsrl","dsra","dsll32","spec75","dsrl32","dsra32"
 };
 
+static char *spec2_name[4] = {		/* QED RM4650, R5000, etc. */
+/* 0 */ "mad", "madu", "mul", "spec3"
+};
+
 static char *bcond_name[32] = {
 /* 0 */ "bltz", "bgez", "bltzl", "bgezl", "?", "?", "?", "?",
 /* 8 */ "tgei", "tgeiu", "tlti", "tltiu", "teqi", "?", "tnei", "?",
@@ -84,7 +88,7 @@ static char *bcond_name[32] = {
 };
 
 static char *cop1_name[64] = {
-/* 0 */ "fadd", "fsub", "fmpy", "fdiv", "fsqrt","fabs", "fmov", "fneg",
+/* 0 */ "fadd",  "fsub", "fmpy", "fdiv", "fsqrt","fabs", "fmov", "fneg",
 /* 8 */ "fop08","fop09","fop0a","fop0b","fop0c","fop0d","fop0e","fop0f",
 /*16 */ "fop10","fop11","fop12","fop13","fop14","fop15","fop16","fop17",
 /*24 */ "fop18","fop19","fop1a","fop1b","fop1c","fop1d","fop1e","fop1f",
@@ -114,7 +118,7 @@ static char *c0_opname[64] = {
 	"c0op00","tlbr",  "tlbwi", "c0op03","c0op04","c0op05","tlbwr", "c0op07",
 	"tlbp",	 "c0op11","c0op12","c0op13","c0op14","c0op15","c0op16","c0op17",
 	"rfe",	 "c0op21","c0op22","c0op23","c0op24","c0op25","c0op26","c0op27",
-	"eret","c0op31","c0op32","c0op33","c0op34","c0op35","c0op36","c0op37",
+	"eret",  "c0op31","c0op32","c0op33","c0op34","c0op35","c0op36","c0op37",
 	"c0op40","c0op41","c0op42","c0op43","c0op44","c0op45","c0op46","c0op47",
 	"c0op50","c0op51","c0op52","c0op53","c0op54","c0op55","c0op56","c0op57",
 	"c0op60","c0op61","c0op62","c0op63","c0op64","c0op65","c0op66","c0op67",
@@ -122,13 +126,17 @@ static char *c0_opname[64] = {
 };
 
 static char *c0_reg[32] = {
-	"index","random","tlblo0","tlblo1","context","tlbmask","wired","c0r7",
-	"badvaddr","count","tlbhi","c0r11","sr","cause","epc",	"prid",
-	"config","lladr","watchlo","watchhi","xcontext","c0r21","c0r22","c0r23",
-	"c0r24","c0r25","ecc","cacheerr","taglo","taghi","errepc","c0r31"
+	"index",    "random",   "tlblo0",  "tlblo1",
+	"context",  "pagemask", "wired",   "cp0r7",
+	"badvaddr", "count",    "tlbhi",   "compare",
+	"status",   "cause",    "epc",     "prid",
+	"config",   "lladdr",   "watchlo", "watchhi",
+	"xcontext", "cp0r21",   "cp0r22",  "debug",
+	"depc",     "perfcnt",  "ecc",     "cacheerr",
+	"taglo",    "taghi",    "errepc",  "desave"
 };
 
-void print_addr(long);
+static void print_addr(db_addr_t);
 
 /*
  * Disassemble instruction at 'loc'.  'altfmt' specifies an
@@ -140,12 +148,27 @@ void print_addr(long);
  * be executed but the 'linear' next instruction.
  */
 db_addr_t
-db_disasm(loc, altfmt)
-	db_addr_t	loc;
-	boolean_t	altfmt;
-
+db_disasm(db_addr_t loc, boolean_t altfmt)
 {
-	return (db_disasm_insn(*(int*)loc, loc, altfmt));
+	u_int32_t instr;
+
+	/*
+	 * Take some care with addresses to not UTLB here as it
+	 * loses the current debugging context.  KSEG2 not checked.
+	 */
+	if (loc < MIPS_KSEG0_START) {
+		instr = fuword((void *)loc);
+		if (instr == 0xffffffff) {
+			/* "sd ra, -1(ra)" is unlikely */
+			db_printf("invalid address.\n");
+			return loc;
+		}
+	}
+	else {
+		instr =  *(u_int32_t *)loc;
+	}
+
+	return (db_disasm_insn(instr, loc, altfmt));
 }
 
 
@@ -154,10 +177,7 @@ db_disasm(loc, altfmt)
  * 'loc' may in fact contain a breakpoint instruction.
  */
 db_addr_t
-db_disasm_insn(insn, loc, altfmt)
-	int		insn;
-	db_addr_t	loc;
-	boolean_t	altfmt;
+db_disasm_insn(int insn, db_addr_t loc, boolean_t altfmt)
 {
 	boolean_t bdslot = FALSE;
 	InstFmt i;
@@ -170,6 +190,10 @@ db_disasm_insn(insn, loc, altfmt)
 			db_printf("nop");
 			break;
 		}
+		/* XXX
+		 * "addu" is a "move" only in 32-bit mode.  What's the correct
+		 * answer - never decode addu/daddu as "move"?
+		 */
 		if (i.RType.func == OP_ADDU && i.RType.rt == 0) {
 			db_printf("move\t%s,%s",
 			    reg_name[i.RType.rd],
@@ -249,6 +273,21 @@ db_disasm_insn(insn, loc, altfmt)
 			    reg_name[i.RType.rs],
 			    reg_name[i.RType.rt]);
 		}
+		break;
+
+	case OP_SPECIAL2:
+		if (i.RType.func == OP_MUL)
+			db_printf("%s\t%s,%s,%s",
+				spec2_name[i.RType.func & 0x3],
+		    		reg_name[i.RType.rd],
+		    		reg_name[i.RType.rs],
+		    		reg_name[i.RType.rt]);
+		else
+			db_printf("%s\t%s,%s",
+				spec2_name[i.RType.func & 0x3],
+		    		reg_name[i.RType.rs],
+		    		reg_name[i.RType.rt]);
+			
 		break;
 
 	case OP_BCOND:
@@ -412,6 +451,14 @@ db_disasm_insn(insn, loc, altfmt)
 		    i.IType.imm);
 		break;
 
+	case OP_CACHE:
+		db_printf("%s\t0x%x,0x%x(%s)",
+		    op_name[i.IType.op],
+		    i.IType.rt,
+		    i.IType.imm,
+		    reg_name[i.IType.rs]);
+		break;
+
 	case OP_ADDI:
 	case OP_DADDI:
 	case OP_ADDIU:
@@ -432,15 +479,14 @@ db_disasm_insn(insn, loc, altfmt)
 	db_printf("\n");
 	if (bdslot) {
 		db_printf("\t\tbdslot:\t");
-		db_print_loc_and_inst(loc+4);
+		db_disasm(loc+4, FALSE);
 		return (loc + 8);
 	}
 	return (loc + 4);
 }
 
-void
-print_addr(loc)
-	long loc;
+static void
+print_addr(db_addr_t loc)
 {
 	db_expr_t diff;
 	db_sym_t sym;

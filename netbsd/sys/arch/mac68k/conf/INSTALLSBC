@@ -1,15 +1,19 @@
-#	$NetBSD: INSTALLSBC,v 1.6.2.1 2002/04/03 22:20:29 he Exp $
+#	$NetBSD: INSTALLSBC,v 1.9.4.1 2002/07/05 14:00:53 lukem Exp $
 #
-# INSTALL
+# INSTALLSBC
 
 include	"arch/mac68k/conf/std.mac68k"
+
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+makeoptions	COPTS="-Os"		# Optimise for space. Implies -O2
 
 maxusers	8		# estimated number of users
 
 # Enable the hooks used for initializing the ram-disk.
 options 	MEMORY_DISK_HOOKS
 options 	MEMORY_DISK_IS_ROOT 	# Force root on ram-disk
-options 	MINIROOTSIZE=5120	# 2.5 MB
+options 	MEMORY_DISK_ROOT_SIZE=5120	# 2.5 MB
 
 # CPU support.  At least one is REQUIRED.
 options 	M68040
@@ -26,6 +30,9 @@ options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
 options 	INSECURE	# disable kernel security levels
 
 options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
+
+#options 	USERCONF	# userconf(4) support
+options		PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
 
 # Diagnostic/debugging support options - XXX remove these at some point
 options 	DIAGNOSTIC	# cheap kernel consistency checks
@@ -46,6 +53,10 @@ file-system 	NFS		# Network File System client
 file-system 	CD9660		# ISO 9660 + Rock Ridge file system
 file-system 	MSDOSFS		# MS-DOS file system
 file-system 	KERNFS		# /kern
+
+# Filesystem options
+#options 	NFS_V2_ONLY	# Exclude NFS3 and NQNFS code to save space
+#options 	VNODE_OP_NOINLINE # Save space by not inlining vnode op calls
 
 # Networking options
 options 	INET		# IP + ICMP + TCP + UDP
@@ -138,6 +149,10 @@ sd*	at scsibus? target ? lun ?	# SCSI disk drives
 cd*	at scsibus? target ? lun ?	# SCSI CD-ROM drives
 st*	at scsibus? target ? lun ?	# SCSI tape drives
 
+# IDE controller and devices
+wdc*	at obio? flags 0x1000
+wd*	at wdc? channel ? drive ?
+
 
 # Miscellaneous mass storage devices
 
@@ -176,4 +191,5 @@ pseudo-device	ppp		1 	# Point-to-Point Protocol
 pseudo-device	sl		1 	# Serial Line IP
 
 # miscellaneous pseudo-devices
-pseudo-device	pty		64	# pseudo-terminals
+pseudo-device	bpfilter	8	# Berkeley packet filter
+pseudo-device	pty		2	# pseudo-terminals (Sysinst needs two)

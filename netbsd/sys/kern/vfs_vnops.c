@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_vnops.c,v 1.42 2000/04/11 04:37:51 chs Exp $	*/
+/*	$NetBSD: vfs_vnops.c,v 1.54 2002/03/17 19:41:08 atatat Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -40,6 +40,9 @@
  *	@(#)vfs_vnops.c	8.14 (Berkeley) 6/15/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vfs_vnops.c,v 1.54 2002/03/17 19:41:08 atatat Exp $");
+
 #include "fs_union.h"
 
 #include <sys/param.h>
@@ -56,16 +59,18 @@
 #include <sys/tty.h>
 #include <sys/poll.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #ifdef UNION
 #include <miscfs/union/union.h>
 #endif
 
-struct 	fileops vnops =
-	{ vn_read, vn_write, vn_ioctl, vn_fcntl, vn_poll, vn_closefile };
+static int  vn_statfile __P((struct file *fp, struct stat *sb, struct proc *p));
+
+struct 	fileops vnops = {
+	vn_read, vn_write, vn_ioctl, vn_fcntl, vn_poll,
+	vn_statfile, vn_closefile
+};
 
 /*
  * Common code for vnode open operations.
@@ -158,8 +163,14 @@ vn_open(ndp, fmode, cmode)
 	}
 	if ((error = VOP_OPEN(vp, fmode, cred, p)) != 0)
 		goto bad;
+	if (vp->v_type == VREG &&
+	    uvn_attach(vp, fmode & FWRITE ? VM_PROT_WRITE : 0) == NULL) {
+		error = EIO;
+		goto bad;
+	}
 	if (fmode & FWRITE)
 		vp->v_writecount++;
+
 	return (0);
 bad:
 	vput(vp);
@@ -176,23 +187,26 @@ vn_writechk(vp)
 {
 
 	/*
-	 * If there's shared text associated with
-	 * the vnode, try to free it up once.  If
-	 * we fail, we can't allow writing.
+	 * If the vnode is in use as a process's text,
+	 * we can't allow writing.
 	 */
-	if ((vp->v_flag & VTEXT) && !uvm_vnp_uncache(vp))
+	if (vp->v_flag & VTEXT)
 		return (ETXTBSY);
 	return (0);
 }
 
 /*
- * Mark a vnode as being the text image of a running process.
+ * Mark a vnode as having executable mappings.
  */
 void
-vn_marktext(vp)
+vn_markexec(vp)
 	struct vnode *vp;
 {
-	vp->v_flag |= VTEXT;
+	if ((vp->v_flag & VEXECMAP) == 0) {
+		uvmexp.filepages -= vp->v_uobj.uo_npages;
+		uvmexp.execpages += vp->v_uobj.uo_npages;
+	}
+	vp->v_flag |= VEXECMAP;
 }
 
 /*
@@ -237,8 +251,13 @@ vn_rdwr(rw, vp, base, len, offset, segflg, ioflg, cred, aresid, p)
 	struct iovec aiov;
 	int error;
 
-	if ((ioflg & IO_NODELOCKED) == 0)
-		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	if ((ioflg & IO_NODELOCKED) == 0) {
+		if (rw == UIO_READ) {
+			vn_lock(vp, LK_SHARED | LK_RETRY);
+		} else {
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+		}
+	}
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	aiov.iov_base = base;
@@ -288,7 +307,7 @@ unionread:
 	auio.uio_segflg = segflg;
 	auio.uio_procp = p;
 	auio.uio_resid = count;
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	vn_lock(vp, LK_SHARED | LK_RETRY);
 	auio.uio_offset = fp->f_offset;
 	error = VOP_READDIR(vp, &auio, fp->f_cred, &eofflag, cookies,
 		    ncookies);
@@ -373,7 +392,7 @@ vn_read(fp, offset, uio, cred, flags)
 		ioflag |= IO_SYNC;
 	if (fp->f_flag & FALTIO)
 		ioflag |= IO_ALTSEMANTICS;
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	vn_lock(vp, LK_SHARED | LK_RETRY);
 	uio->uio_offset = *offset;
 	count = uio->uio_resid;
 	error = VOP_READ(vp, uio, ioflag, cred);
@@ -426,12 +445,24 @@ vn_write(fp, offset, uio, cred, flags)
 /*
  * File table vnode stat routine.
  */
-int
-vn_stat(vp, sb, p)
-	struct vnode *vp;
+static int
+vn_statfile(fp, sb, p)
+	struct file *fp;
 	struct stat *sb;
 	struct proc *p;
 {
+	struct vnode *vp = (struct vnode *)fp->f_data;
+
+	return vn_stat(vp, sb, p);
+}
+
+int
+vn_stat(fdata, sb, p)
+	void *fdata;
+	struct stat *sb;
+	struct proc *p;
+{
+	struct vnode *vp = fdata;
 	struct vattr va;
 	int error;
 	mode_t mode;
@@ -535,7 +566,7 @@ vn_ioctl(fp, com, data, p)
 		/* fall into ... */
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 
 	case VFIFO:
 	case VCHR:
@@ -579,13 +610,17 @@ vn_lock(vp, flags)
 		if ((flags & LK_INTERLOCK) == 0)
 			simple_lock(&vp->v_interlock);
 		if (vp->v_flag & VXLOCK) {
+			if (flags & LK_NOWAIT) {
+				simple_unlock(&vp->v_interlock);
+				return EBUSY;
+			}
 			vp->v_flag |= VXWANT;
-			simple_unlock(&vp->v_interlock);
-			tsleep((caddr_t)vp, PINOD, "vn_lock", 0);
+			ltsleep(vp, PINOD | PNORELOCK,
+			    "vn_lock", 0, &vp->v_interlock);
 			error = ENOENT;
 		} else {
 			error = VOP_LOCK(vp, flags | LK_INTERLOCK);
-			if (error == 0 || error == EDEADLK)
+			if (error == 0 || error == EDEADLK || error == EBUSY)
 				return (error);
 		}
 		flags &= ~LK_INTERLOCK;

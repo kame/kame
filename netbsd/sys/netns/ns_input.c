@@ -1,4 +1,4 @@
-/*	$NetBSD: ns_input.c,v 1.15 2000/03/30 13:02:57 augustss Exp $	*/
+/*	$NetBSD: ns_input.c,v 1.18 2002/05/12 20:23:49 matt Exp $	*/
 
 /*
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
@@ -34,6 +34,9 @@
  *
  *	@(#)ns_input.c	8.2 (Berkeley) 9/22/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ns_input.c,v 1.18 2002/05/12 20:23:49 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -77,6 +80,8 @@ static u_int16_t allones[] = {-1, -1, -1};
 
 struct nspcb nspcb;
 struct nspcb nsrawpcb;
+
+struct idpstat idpstat;
 
 struct ifqueue	nsintrq;
 int	nsqmaxlen = IFQ_MAXLEN;
@@ -122,7 +127,7 @@ next:
 	 * Get next datagram off input queue and get IDP header
 	 * in first mbuf.
 	 */
-	s = splimp();
+	s = splnet();
 	IF_DEQUEUE(&nsintrq, m);
 	splx(s);
 	nsintr_getpck++;

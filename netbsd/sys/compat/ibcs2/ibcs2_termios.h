@@ -1,4 +1,4 @@
-/*	$NetBSD: ibcs2_termios.h,v 1.3.42.1 2000/09/05 01:43:19 matt Exp $	*/
+/*	$NetBSD: ibcs2_termios.h,v 1.4 2000/08/11 22:20:10 matt Exp $	*/
 
 /*
  * Copyright (c) 1994 Scott Bartram

@@ -1,6 +1,4 @@
-/*	$NetBSD: i82365_isasubr.c,v 1.21 2000/05/09 17:59:39 jhawk Exp $	*/
-
-#define	PCICISADEBUG
+/*	$NetBSD: i82365_isasubr.c,v 1.30 2001/11/15 09:48:09 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Christian E. Hopps.  All rights reserved.
@@ -33,15 +31,16 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i82365_isasubr.c,v 1.30 2001/11/15 09:48:09 lukem Exp $");
 
-#include <sys/types.h>
+#define	PCICISADEBUG
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/extent.h>
 #include <sys/malloc.h>
-
-#include <vm/vm.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -89,9 +88,6 @@ int	pcic_isa_alloc_iosize = PCIC_ISA_ALLOC_IOSIZE;
  * IRQs for PCMCIA slots.  Useful if order of probing would screw up other
  * devices, or if PCIC hardware/cards have trouble with certain interrupt
  * lines.
- *
- * We disable IRQ 10 by default, since some common laptops (namely, the
- * NEC Versa series) reserve IRQ 10 for the docking station SCSI interface.
  */
 
 #ifndef PCIC_ISA_INTR_ALLOC_MASK
@@ -101,7 +97,7 @@ int	pcic_isa_alloc_iosize = PCIC_ISA_ALLOC_IOSIZE;
 int	pcic_isa_intr_alloc_mask = PCIC_ISA_INTR_ALLOC_MASK;
 
 #ifndef	PCIC_IRQ_PROBE
-#ifdef __hpcmips__
+#ifdef hpcmips
 /*
  * The irq probing doesn't work with current vrisab implementation.
  * The irq is just an key to find matching GPIO port to use and is fixed.
@@ -268,7 +264,7 @@ pcic_isa_probe_interrupts(sc, h)
 	}
 	sc->intr_mask[h->chip] = mask;
 
-	printf("%s\n", sc->intr_mask ? "" : " none");
+	printf("%s\n", sc->intr_mask[h->chip] ? "" : " none");
 }
 
 /*
@@ -333,7 +329,7 @@ pcic_isa_config_interrupts(self)
 	 * scarce, shareable, and for PCIC controllers, very infrequent.
 	 */
 	if ((self->dv_cfdata->cf_flags & 1) == 0) {
-		if (sc->irq != IRQUNK) {
+		if (sc->irq != ISACF_IRQ_DEFAULT) {
 			if ((chipmask & (1 << sc->irq)) == 0)
 				printf("%s: warning: configured irq %d not "
 				    "detected as available\n",
@@ -341,27 +337,27 @@ pcic_isa_config_interrupts(self)
 		} else if (chipmask == 0 ||
 		    isa_intr_alloc(ic, chipmask, IST_EDGE, &sc->irq)) {
 			printf("%s: no available irq; ", sc->dev.dv_xname);
-			sc->irq = IRQUNK;
+			sc->irq = ISACF_IRQ_DEFAULT;
 		} else if ((chipmask & ~(1 << sc->irq)) == 0 && chipuniq == 0) {
 			printf("%s: can't share irq with cards; ",
 			    sc->dev.dv_xname);
-			sc->irq = IRQUNK;
+			sc->irq = ISACF_IRQ_DEFAULT;
 		}
 	} else {
 		printf("%s: ", sc->dev.dv_xname);
-		sc->irq = IRQUNK;
+		sc->irq = ISACF_IRQ_DEFAULT;
 	}
 
-	if (sc->irq != IRQUNK) {
+	if (sc->irq != ISACF_IRQ_DEFAULT) {
 		sc->ih = isa_intr_establish(ic, sc->irq, IST_EDGE, IPL_TTY,
 		    pcic_intr, sc);
 		if (sc->ih == NULL) {
 			printf("%s: can't establish interrupt",
 			    sc->dev.dv_xname);
-			sc->irq = IRQUNK;
+			sc->irq = ISACF_IRQ_DEFAULT;
 		}
 	}
-	if (sc->irq == IRQUNK)
+	if (sc->irq == ISACF_IRQ_DEFAULT)
 		printf("polling for socket events\n");
 	else
 		printf("%s: using irq %d for socket events\n", sc->dev.dv_xname,
@@ -477,12 +473,22 @@ pcic_isa_chip_intr_establish(pch, pf, ipl, fct, arg)
 	void *ih;
 	int reg;
 
+	/*
+	 * PLEASE NOTE:
+	 * The IRQLEVEL bit has no bearing on what happens on the host side of
+	 * the PCMCIA controller.  ISA interrupts are defined to be edge-
+	 * triggered, and as this attachment is for ISA devices, the interrupt
+	 * *must* be configured for edge-trigger.  If you think you should
+	 * change this to use IST_LEVEL, you are *wrong*.  You should figure
+	 * out what your real problem is and leave this code alone rather than
+	 * breaking everyone else's systems.  - mycroft
+	 */
 	if (pf->cfe->flags & PCMCIA_CFE_IRQLEVEL)
-		ist = IST_EDGE;
+		ist = IST_EDGE;		/* SEE COMMENT ABOVE */
 	else if (pf->cfe->flags & PCMCIA_CFE_IRQPULSE)
-		ist = IST_PULSE;
+		ist = IST_PULSE;	/* SEE COMMENT ABOVE */
 	else
-		ist = IST_EDGE;
+		ist = IST_EDGE;		/* SEE COMMENT ABOVE */
 
 	if (isa_intr_alloc(ic, sc->intr_mask[h->chip], ist, &irq))
 		return (NULL);

@@ -1,4 +1,4 @@
-/*	$NetBSD: bootxx.c,v 1.3 1998/02/10 10:25:08 leo Exp $	*/
+/*	$NetBSD: bootxx.c,v 1.9 2002/04/18 20:12:01 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 Waldi Ravens.
@@ -30,28 +30,25 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-asm("	.text
-	.even
-start:
-	bras	_bootxx
-");
 #define	boot_BSD	bsd_startup
 
 #include <stand.h>
 #include <atari_stand.h>
 #include <string.h>
 #include <libkern.h>
-#include <kparamb.h>
+#include <tosdefs.h>
+#include <sys/boot_flag.h>
 #include <sys/exec.h>
 #include <sys/reboot.h>
 #include <machine/cpu.h>
 
-#include "bootxx.h"
 
-void	boot_BSD __P((kparb *)__attribute__((noreturn)));
-int	load_BSD __P((osdsc *));
-int	sys_info __P((osdsc *));
-int	usr_info __P((osdsc *));
+typedef int      (*bxxx_t) __P((void *, void *, struct osdsc *));
+
+void	boot_BSD __P((struct kparamb *)__attribute__((noreturn)));
+int	bootxxx __P((void *, void *, struct osdsc *));
+int	load_booter __P((struct osdsc *));
+int	usr_info __P((struct osdsc *));
 
 int
 bootxx(readsector, disklabel, autoboot)
@@ -59,19 +56,20 @@ bootxx(readsector, disklabel, autoboot)
 		*disklabel;
 	int	autoboot;
 {
-	static osdsc	os_desc;
+	static osdsc_t	os_desc;
 	extern char	end[], edata[];
-	osdsc		*od = &os_desc;
+	osdsc_t		*od = &os_desc;
+	bxxx_t		bootxxx = (bxxx_t)(LOADADDR3);
 
 	bzero(edata, end - edata);
+	setheap(end, (void*)(LOADADDR3 - 4));
 
-	printf("\033v\nNetBSD/Atari boot loader ($Revision: 1.3 $)\n\n");
+	printf("\033v\nNetBSD/Atari secondary bootloader"
+						" ($Revision: 1.9 $)\n\n");
 
 	if (init_dskio(readsector, disklabel, -1))
 		return(-1);
 
-	if (sys_info(od))
-		return(-2);
 
 	for (;;) {
 		od->rootfs = 0;			/* partition a */
@@ -91,76 +89,22 @@ bootxx(readsector, disklabel, autoboot)
 		}
 		autoboot = 0;			/* in case auto boot fails */
 
+		
 		if (init_dskio(readsector, disklabel, od->rootfs))
 			continue;
 
-		if (load_BSD(od))
+		if (load_booter(od))
 			continue;
 
-		boot_BSD(&od->kp);
+		(*bootxxx)(readsector, disklabel, od);
 	}
 	/* NOTREACHED */
 }
 
-int
-sys_info(od)
-	osdsc	*od;
-{
-	long	*jar;
-	int	tos;
-
-	od->stmem_size = *ADDR_PHYSTOP;
-
-	if (*ADDR_CHKRAMTOP == RAMTOP_MAGIC) {
-		od->ttmem_size  = *ADDR_RAMTOP;
-		if (od->ttmem_size > TTRAM_BASE) {
-			od->ttmem_size  -= TTRAM_BASE;
-			od->ttmem_start  = TTRAM_BASE;
-		}
-	}
-
-	tos = (*ADDR_SYSBASE)->os_version;
-	if ((tos > 0x300) && (tos < 0x306))
-		od->cputype = ATARI_CLKBROKEN;
-
-	if ((jar = *ADDR_P_COOKIE)) {
-		while (jar[0]) {
-			if (jar[0] == 0x5f435055L) { /* _CPU	*/
-				switch(jar[1]) {
-					case 0:
-						od->cputype |= ATARI_68000;
-						break;
-					case 10:
-						od->cputype |= ATARI_68010;
-						break;
-					case 20:
-						od->cputype |= ATARI_68020;
-						break;
-					case 30:
-						od->cputype |= ATARI_68030;
-						break;
-					case 40:
-						od->cputype |= ATARI_68040;
-						break;
-					case 60:
-						od->cputype |= ATARI_68060;
-						break;
-				}
-			}
-			jar += 2;
-		}
-	}
-	if (!(od->cputype & ATARI_ANYCPU)) {
-		printf("Unknown CPU-type.\n");
-		return(-1);
-	}
-
-	return(0);
-}
 
 int
 usr_info(od)
-	osdsc	*od;
+	osdsc_t	*od;
 {
 	static char	line[800];
 	char		c, *p = line;
@@ -193,9 +137,8 @@ usr_info(od)
 				od->boothowto &= ~RB_SINGLE;
 			else if (c == 'b')
 				od->boothowto |= RB_ASKNAME;
-			else if (c == 'd')
-				od->boothowto |= RB_KDB;
-			else return(-1);
+			else
+				BOOT_FLAG(c, od->boothowto);
 			break;
 		  case '.':
 			od->ostype = p;
@@ -231,87 +174,42 @@ done:
 }
 
 int
-load_BSD(od)
-	osdsc		*od;
+load_booter(od)
+	osdsc_t		*od;
 {
-	struct exec	hdr;
-	int		err, fd;
-	u_int		textsz, strsz;
+	int		fd = -1;
+	u_char		*bstart = (u_char *)(LOADADDR3);
+	int		bsize;
+	char		*fname;
+	char		*boot_names[] = {	/* 3rd level boot names	  */
+				"/boot.atari",	/* in order of preference */
+				"/boot",
+				"/boot.ata",
+				NULL };		/* NULL terminated!	  */
+
 
 	/*
-	 * Read kernel's exec-header.
+	 * Read booter's exec-header.
 	 */
-	err = 1;
-	if ((fd = open(od->osname, 0)) < 0)
-		goto error;
-	err = 2;
-	if (read(fd, &hdr, sizeof(hdr)) != sizeof(hdr))
-		goto error;
-	err = 3;
-	if (N_GETMAGIC(hdr) != NMAGIC)
-		goto error;
-
-	/*
-	 * Extract sizes from kernel executable.
-	 */
-	textsz     = (hdr.a_text + __LDPGSZ - 1) & ~(__LDPGSZ - 1);
-	od->ksize  = textsz + hdr.a_data + hdr.a_bss;
-	od->kentry = hdr.a_entry;
-	od->kstart = NULL;
-	od->k_esym = 0;
-
-	if (hdr.a_syms) {
-	    u_int x = sizeof(hdr) + hdr.a_text + hdr.a_data + hdr.a_syms;
-	    err = 8;
-	    if (lseek(fd, (off_t)x, SEEK_SET) != x)
-		goto error;
-	    err = 9;
-	    if (read(fd, &strsz, sizeof(strsz)) != sizeof(strsz))
-		goto error;
-	    err = 10;
-	    if (lseek(fd, (off_t)sizeof(hdr), SEEK_SET) != sizeof(hdr))
-		goto error;
-	    od->ksize += sizeof(strsz) + hdr.a_syms + strsz;
+	for (fname = boot_names[0]; fname != NULL; fname++) {
+		if ((fd = open(fname, 0)) < 0)
+			printf("Cannot open '%s'\n", fname);
+		else break;
 	}
-
-	/*
-	 * Read text & data, clear bss
-	 */
-	err = 16;
-	if ((od->kstart = alloc(od->ksize)) == NULL)
-		goto error;
-	err = 17;
-	if (read(fd, od->kstart, hdr.a_text) != hdr.a_text)
-		goto error;
-	err = 18;
-	if (read(fd, od->kstart + textsz, hdr.a_data) != hdr.a_data)
-		goto error;
-	bzero(od->kstart + textsz + hdr.a_data, hdr.a_bss);
-
-	/*
-	 * Read symbol and string table
-	 */
-	if (hdr.a_syms) {
-		char *p = od->kstart + textsz + hdr.a_data + hdr.a_bss;
-		*((u_int32_t *)p)++ = hdr.a_syms;
-		err = 24;
-		if (read(fd, p, hdr.a_syms) != hdr.a_syms)
-			goto error;
-		p += hdr.a_syms;
-		err = 25;
-		if (read(fd, p, strsz) != strsz)
-			goto error;
-		od->k_esym = (p - (char *)od->kstart) + strsz;
+	if (fd < 0)
+		return (-1);
+	while((bsize = read(fd, bstart, 1024)) > 0) {
+		bstart += bsize;
+	
 	}
+	close(fd);
+	return 0;
+}
 
-	return(0);
-
-error:
-	if (fd >= 0) {
-		if (od->kstart)
-			free(od->kstart, od->ksize);
-		close(fd);
-	}
-	printf("Error %d in load_BSD.\n", err);
-	return(-1);
+void
+_rtt()
+{
+	printf("Halting...\n");
+	for(;;)
+		;
 }

@@ -1,4 +1,4 @@
-/* 	$NetBSD: rasops8.c,v 1.9 2000/06/13 13:36:59 ad Exp $	*/
+/* 	$NetBSD: rasops8.c,v 1.16 2002/02/11 20:50:58 uwe Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -36,14 +36,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_rasops.h"
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rasops8.c,v 1.9 2000/06/13 13:36:59 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rasops8.c,v 1.16 2002/02/11 20:50:58 uwe Exp $");
 
-#include <sys/types.h>
+#include "opt_rasops.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
+#include <sys/bswap.h>
 
 #include <dev/wscons/wsdisplayvar.h>
 #include <dev/wscons/wsconsio.h>
@@ -55,7 +56,6 @@ static void 	rasops8_putchar8 __P((void *, int, int, u_int, long attr));
 static void 	rasops8_putchar12 __P((void *, int, int, u_int, long attr));
 static void 	rasops8_putchar16 __P((void *, int, int, u_int, long attr));
 static void	rasops8_makestamp __P((struct rasops_info *ri, long));
-#endif
 
 /*
  * 4x1 stamp for optimized character blitting
@@ -63,6 +63,7 @@ static void	rasops8_makestamp __P((struct rasops_info *ri, long));
 static int32_t	stamp[16];
 static long	stamp_attr;
 static int	stamp_mutex;	/* XXX see note in README */
+#endif
 
 /*
  * XXX this confuses the hell out of gcc2 (not egcs) which always insists
@@ -76,7 +77,7 @@ static int	stamp_mutex;	/* XXX see note in README */
 #define STAMP_READ(o)		(*(int32_t *)((caddr_t)stamp + (o)))
 
 /*
- * Initalize a 'rasops_info' descriptor for this depth.
+ * Initialize a 'rasops_info' descriptor for this depth.
  */
 void
 rasops8_init(ri)
@@ -188,17 +189,24 @@ rasops8_makestamp(ri, attr)
 	stamp_attr = attr;
 
 	for (i = 0; i < 16; i++) {
-#if BYTE_ORDER == LITTLE_ENDIAN
-		stamp[i] = (i & 8 ? fg : bg);
-		stamp[i] |= ((i & 4 ? fg : bg) << 8);
-		stamp[i] |= ((i & 2 ? fg : bg) << 16);
-		stamp[i] |= ((i & 1 ? fg : bg) << 24);
+#if BYTE_ORDER == BIG_ENDIAN
+#define NEED_LITTLE_ENDIAN_STAMP RI_BSWAP
 #else
-		stamp[i] = (i & 1 ? fg : bg);
-		stamp[i] |= ((i & 2 ? fg : bg) << 8);
-		stamp[i] |= ((i & 4 ? fg : bg) << 16);
-		stamp[i] |= ((i & 8 ? fg : bg) << 24);
+#define NEED_LITTLE_ENDIAN_STAMP 0
 #endif
+		if ((ri->ri_flg & RI_BSWAP) == NEED_LITTLE_ENDIAN_STAMP) {
+			/* little endian */
+			stamp[i] = (i & 8 ? fg : bg);
+			stamp[i] |= ((i & 4 ? fg : bg) << 8);
+			stamp[i] |= ((i & 2 ? fg : bg) << 16);
+			stamp[i] |= ((i & 1 ? fg : bg) << 24);
+		} else {
+			/* big endian */
+			stamp[i] = (i & 1 ? fg : bg);
+			stamp[i] |= ((i & 2 ? fg : bg) << 8);
+			stamp[i] |= ((i & 4 ? fg : bg) << 16);
+			stamp[i] |= ((i & 8 ? fg : bg) << 24);
+		}
 	}
 }
 

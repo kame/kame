@@ -1,4 +1,4 @@
-/*	$NetBSD: hdfd.c,v 1.24.4.1 2000/09/06 09:33:07 leo Exp $	*/
+/*	$NetBSD: hdfd.c,v 1.29 2001/11/21 17:33:27 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996 Leo Weppelman
@@ -80,7 +80,6 @@
 #include <sys/conf.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -227,8 +226,8 @@ struct fd_softc {
 	int		sc_bcount;	/* byte count left */
  	int		sc_opts;	/* user-set options */
 	int		sc_skip;	/* bytes already transferred */
-	int		sc_nblks;	/* #blocks currently tranferring */
-	int		sc_nbytes;	/* #bytes currently tranferring */
+	int		sc_nblks;	/* #blocks currently transferring */
+	int		sc_nbytes;	/* #bytes currently transferring */
 
 	int		sc_drive;	/* physical unit number */
 	int		sc_flags;
@@ -527,7 +526,7 @@ fdc_ctrl_intr(frame)
 
 	/*
 	 * Disable further interrupts. The fdcintr() routine
-	 * explicitely enables them when needed.
+	 * explicitly enables them when needed.
 	 */
 	MFP2->mf_ierb &= ~IB_DCHG;
 
@@ -1324,7 +1323,7 @@ fdioctl(dev, cmd, addr, flag, p)
 	int			error;
 	struct fdformat_parms	*form_parms;
 	struct fdformat_cmd	*form_cmd;
-	struct ne7_fd_formb	fd_formb;
+	struct ne7_fd_formb	*fd_formb;
 	unsigned int		scratch;
 	int			il[FD_MAX_NSEC + 1];
 	register int		i, j;
@@ -1454,29 +1453,35 @@ fdioctl(dev, cmd, addr, flag, p)
 			return EINVAL;
 		}
 
-		fd_formb.head = form_cmd->head;
-		fd_formb.cyl = form_cmd->cylinder;
-		fd_formb.transfer_rate = fd->sc_type->rate;
-		fd_formb.fd_formb_secshift = fd->sc_type->secsize;
-		fd_formb.fd_formb_nsecs = fd->sc_type->sectrac;
-		fd_formb.fd_formb_gaplen = fd->sc_type->gap2;
-		fd_formb.fd_formb_fillbyte = fd->sc_type->fillbyte;
+		fd_formb = malloc(sizeof(struct ne7_fd_formb),
+		    M_TEMP, M_NOWAIT);
+		if (fd_formb == 0)
+			return ENOMEM;
+
+		fd_formb->head = form_cmd->head;
+		fd_formb->cyl = form_cmd->cylinder;
+		fd_formb->transfer_rate = fd->sc_type->rate;
+		fd_formb->fd_formb_secshift = fd->sc_type->secsize;
+		fd_formb->fd_formb_nsecs = fd->sc_type->sectrac;
+		fd_formb->fd_formb_gaplen = fd->sc_type->gap2;
+		fd_formb->fd_formb_fillbyte = fd->sc_type->fillbyte;
 
 		bzero(il,sizeof il);
-		for (j = 0, i = 1; i <= fd_formb.fd_formb_nsecs; i++) {
-			while (il[(j%fd_formb.fd_formb_nsecs)+1])
+		for (j = 0, i = 1; i <= fd_formb->fd_formb_nsecs; i++) {
+			while (il[(j%fd_formb->fd_formb_nsecs)+1])
 				j++;
-			il[(j%fd_formb.fd_formb_nsecs)+1] = i;
+			il[(j%fd_formb->fd_formb_nsecs)+1] = i;
 			j += fd->sc_type->interleave;
 		}
-		for (i = 0; i < fd_formb.fd_formb_nsecs; i++) {
-			fd_formb.fd_formb_cylno(i) = form_cmd->cylinder;
-			fd_formb.fd_formb_headno(i) = form_cmd->head;
-			fd_formb.fd_formb_secno(i) = il[i+1];
-			fd_formb.fd_formb_secsize(i) = fd->sc_type->secsize;
+		for (i = 0; i < fd_formb->fd_formb_nsecs; i++) {
+			fd_formb->fd_formb_cylno(i) = form_cmd->cylinder;
+			fd_formb->fd_formb_headno(i) = form_cmd->head;
+			fd_formb->fd_formb_secno(i) = il[i+1];
+			fd_formb->fd_formb_secsize(i) = fd->sc_type->secsize;
 		}
 		
-		error = fdformat(dev, &fd_formb, p);
+		error = fdformat(dev, fd_formb, p);
+		free(fd_formb, M_TEMP);
 		return error;
 
 	case FDIOCGETOPTS:		/* get drive options */
@@ -1512,7 +1517,6 @@ fdformat(dev, finfo, p)
 	bp = (struct buf *)malloc(sizeof(struct buf), M_TEMP, M_NOWAIT);
 	if(bp == 0)
 		return ENOBUFS;
-	PHOLD(p);
 	bzero((void *)bp, sizeof(struct buf));
 	bp->b_flags = B_BUSY | B_PHYS | B_FORMAT;
 	bp->b_proc = p;
@@ -1552,7 +1556,6 @@ fdformat(dev, finfo, p)
 	if(bp->b_flags & B_ERROR) {
 		rv = bp->b_error;
 	}
-	PRELE(p);
 	free(bp, M_TEMP);
 	return rv;
 }

@@ -1,3 +1,3 @@
-/*	$NetBSD: cpu.h,v 1.3 1999/12/24 08:29:25 msaitoh Exp $	*/
+/*	$NetBSD: cpu.h,v 1.5 2002/03/04 14:36:15 uch Exp $	*/
 
 #include <sh3/cpu.h>

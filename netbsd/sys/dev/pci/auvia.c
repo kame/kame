@@ -1,4 +1,4 @@
-/*	$NetBSD: auvia.c,v 1.3.4.2 2000/09/01 08:35:48 jdolecek Exp $	*/
+/*	$NetBSD: auvia.c,v 1.17 2002/04/02 16:02:38 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -46,11 +46,16 @@
  * ftp://ftp.alsa-project.org/pub/manuals/ad/AD1881_0.pdf (example AC'97 codec)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: auvia.c,v 1.17 2002/04/02 16:02:38 fvdl Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/audioio.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcivar.h>
@@ -59,6 +64,7 @@
 #include <dev/mulaw.h>
 #include <dev/auconv.h>
 
+#include <dev/ic/ac97reg.h>
 #include <dev/ic/ac97var.h>
 
 #include <dev/pci/auviavar.h>
@@ -79,6 +85,9 @@ struct auvia_dma_op {
 #define AUVIA_DMAOP_STOP	0x20000000
 #define AUVIA_DMAOP_COUNT(x)	((x)&0x00FFFFFF)
 };
+
+/* rev. H and later seem to support only fixed rate 48 kHz */
+#define	AUVIA_FIXED_RATE	48000	
 
 int	auvia_match(struct device *, struct cfdata *, void *);
 void	auvia_attach(struct device *, struct device *, void *);
@@ -147,14 +156,6 @@ struct cfattach auvia_ca = {
 
 #define TIMEOUT	50
 
-#define	AC97_REG_EXT_AUDIO_ID		0x28
-#define		AC97_CODEC_DOES_VRA		0x0001
-#define	AC97_REG_EXT_AUDIO_STAT		0x2A
-#define		AC97_ENAB_VRA			0x0001
-#define		AC97_ENAB_MICVRA		0x0004
-#define	AC97_REG_EXT_DAC_RATE		0x2C
-#define	AC97_REG_EXT_ADC_RATE		0x32
-
 struct audio_hw_if auvia_hw_if = {
 	auvia_open,
 	auvia_close,
@@ -182,6 +183,7 @@ struct audio_hw_if auvia_hw_if = {
 	auvia_get_props,
 	auvia_trigger_output,
 	auvia_trigger_input,
+	NULL, /* dev_ioctl */
 };
 
 int	auvia_attach_codec(void *, struct ac97_codec_if *);
@@ -199,8 +201,12 @@ auvia_match(struct device *parent, struct cfdata *match, void *aux)
 
 	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_VIATECH)
 		return 0;
-	if (PCI_PRODUCT(pa->pa_id) != PCI_PRODUCT_VIATECH_VT82C686A_AC97)
+	switch (PCI_PRODUCT(pa->pa_id)) {
+	case PCI_PRODUCT_VIATECH_VT82C686A_AC97:
+		break;
+	default:
 		return 0;
+	}
 
 	return 1;
 }
@@ -233,8 +239,7 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 	printf(": VIA VT82C686A AC'97 Audio (rev %s)\n",
 		sc->sc_revision);
 
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-			&ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -287,21 +292,19 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	/*
-	 * Driver works as okay on my VIA 694D Pro with auvia rev. H, even
-	 * through the bit won't get set. Earlier models probably need
-	 * the test as it is.
+	 * Print a warning if the codec doesn't support hardware variable
+	 * rate audio.
 	 */
-	if (auvia_read_codec(sc, AC97_REG_EXT_AUDIO_ID, &v)
-		|| (sc->sc_revision[0] < 'H' && !(v & AC97_CODEC_DOES_VRA))) {
-		/* XXX */
-
-		printf("%s: codec must support AC'97 2.0 Variable Rate Audio\n",
+	if (auvia_read_codec(sc, AC97_REG_EXTENDED_ID, &v)
+		|| !(v & AC97_CODEC_DOES_VRA)) {
+		printf("%s: warning: codec doesn't support hardware AC'97 2.0 Variable Rate Audio\n",
 			sc->sc_dev.dv_xname);
-		return;
+		sc->sc_fixed_rate = AUVIA_FIXED_RATE; /* XXX wrong value */
 	} else {
 		/* enable VRA */
-		auvia_write_codec(sc, AC97_REG_EXT_AUDIO_STAT,
+		auvia_write_codec(sc, AC97_REG_EXTENDED_STATUS,
 			AC97_ENAB_VRA | AC97_ENAB_MICVRA);
+		sc->sc_fixed_rate = 0;
 	}
 
 	/* disable mutes */
@@ -312,6 +315,7 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 			{ AudioCoutputs, AudioNmaster},
 			{ AudioCinputs, AudioNdac},
 			{ AudioCinputs, AudioNcd},
+			{ AudioCinputs, AudioNline},
 			{ AudioCrecord, AudioNvolume},
 		};
 		
@@ -548,11 +552,14 @@ auvia_set_params(void *addr, int setmode, int usemode,
 			return (EINVAL);
 
 		reg = mode == AUMODE_PLAY ?
-			AC97_REG_EXT_DAC_RATE : AC97_REG_EXT_ADC_RATE;
+			AC97_REG_PCM_FRONT_DAC_RATE : AC97_REG_PCM_LR_ADC_RATE;
 
-		auvia_write_codec(sc, reg, (u_int16_t) p->sample_rate);
-		auvia_read_codec(sc, reg, &regval);
-		p->sample_rate = regval;
+		if (!sc->sc_fixed_rate) {
+			auvia_write_codec(sc, reg, (u_int16_t) p->sample_rate);
+			auvia_read_codec(sc, reg, &regval);
+			p->sample_rate = regval;
+		} else
+			p->sample_rate = sc->sc_fixed_rate;
 
 		p->factor = 1;
 		p->sw_code = 0;
@@ -700,8 +707,8 @@ auvia_malloc(void *addr, int direction, size_t size, int pool, int flags)
 		return 0;
 
 	p->size = size;
-	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, NBPG, 0, &p->seg, 1, 
-				      &rseg, BUS_DMA_NOWAIT)) != 0) {
+	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &p->seg,
+				      1, &rseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: unable to allocate dma, error = %d\n", 
 		       sc->sc_dev.dv_xname, error);
 		goto fail_alloc;
@@ -943,6 +950,9 @@ auvia_intr(void *arg)
 {
 	struct auvia_softc *sc = arg;
 	u_int8_t r;
+	int rval;
+
+	rval = 0;
 
 	r = bus_space_read_1(sc->sc_iot, sc->sc_ioh, AUVIA_RECORD_STAT);
 	if (r & AUVIA_RPSTAT_INTR) {
@@ -952,6 +962,7 @@ auvia_intr(void *arg)
 		/* clear interrupts */
 		bus_space_write_1(sc->sc_iot, sc->sc_ioh, AUVIA_RECORD_STAT,
 			AUVIA_RPSTAT_INTR);
+		rval = 1;
 	}
 	r = bus_space_read_1(sc->sc_iot, sc->sc_ioh, AUVIA_PLAY_STAT);
 	if (r & AUVIA_RPSTAT_INTR) {
@@ -961,7 +972,8 @@ auvia_intr(void *arg)
 		/* clear interrupts */
 		bus_space_write_1(sc->sc_iot, sc->sc_ioh, AUVIA_PLAY_STAT,
 			AUVIA_RPSTAT_INTR);
+		rval = 1;
 	}
 
-	return 1;
+	return rval;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: dmphy.c,v 1.7.4.1 2000/07/04 04:11:12 thorpej Exp $	*/
+/*	$NetBSD: dmphy.c,v 1.13 2002/03/25 20:51:24 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,6 +71,9 @@
  * Data Sheet available from www.davicom8.com
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dmphy.c,v 1.13 2002/03/25 20:51:24 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -88,54 +91,60 @@
 
 #include <dev/mii/dmphyreg.h>
 
-int	dmphymatch __P((struct device *, struct cfdata *, void *));
-void	dmphyattach __P((struct device *, struct device *, void *));
+int	dmphymatch(struct device *, struct cfdata *, void *);
+void	dmphyattach(struct device *, struct device *, void *);
 
 struct cfattach dmphy_ca = {
 	sizeof(struct mii_softc), dmphymatch, dmphyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	dmphy_service __P((struct mii_softc *, struct mii_data *, int));
-void	dmphy_status __P((struct mii_softc *));
+int	dmphy_service(struct mii_softc *, struct mii_data *, int);
+void	dmphy_status(struct mii_softc *);
 
 const struct mii_phy_funcs dmphy_funcs = {
 	dmphy_service, dmphy_status, mii_phy_reset,
 };
 
+const struct mii_phydesc dmphys[] = {
+	{ MII_OUI_xxDAVICOM,		MII_MODEL_xxDAVICOM_DM9101,
+	  MII_STR_xxDAVICOM_DM9101 },
+
+	{ MII_OUI_DAVICOM,		MII_MODEL_xxDAVICOM_DM9101,
+	  MII_STR_xxDAVICOM_DM9101 },
+
+	{ 0,				0,
+	  NULL },
+};
+
 int
-dmphymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+dmphymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;
 
-	if ((MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxDAVICOM ||
-	     MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_DAVICOM) &&
-	    (MII_MODEL(ma->mii_id2) == MII_MODEL_xxDAVICOM_DM9101))
+	if (mii_phy_match(ma, dmphys) != NULL)
 		return (10);
 
 	return (0);
 }
 
 void
-dmphyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+dmphyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 
-	printf(": %s, rev. %d\n", MII_STR_xxDAVICOM_DM9101,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, dmphys);  
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &dmphy_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	PHY_RESET(sc);
 
@@ -150,10 +159,7 @@ dmphyattach(parent, self, aux)
 }
 
 int
-dmphy_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+dmphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;
@@ -215,8 +221,7 @@ dmphy_service(sc, mii, cmd)
 }
 
 void
-dmphy_status(sc)
-	struct mii_softc *sc;
+dmphy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;

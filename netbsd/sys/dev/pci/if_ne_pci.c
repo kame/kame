@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_pci.c,v 1.16 2000/03/22 20:58:29 ws Exp $	*/
+/*	$NetBSD: if_ne_pci.c,v 1.21 2001/11/13 07:48:44 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,9 +37,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ne_pci.c,v 1.21 2001/11/13 07:48:44 lukem Exp $");
+
 #include "opt_ipkdb.h"
-#include "opt_inet.h"
-#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,11 +52,6 @@
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#endif
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -110,13 +106,12 @@ const struct ne_pci_product {
 	void (*npp_mediastatus) __P((struct dp8390_softc *,
 	    struct ifmediareq *));
 	void (*npp_init_card) __P((struct dp8390_softc *));
-	void (*npp_init_media) __P((struct dp8390_softc *, int **,
-	    int *, int *));
+	void (*npp_media_init) __P((struct dp8390_softc *));
 	const char *npp_name;
 } ne_pci_products[] = {
 	{ PCI_VENDOR_REALTEK,		PCI_PRODUCT_REALTEK_RT8029,
 	  rtl80x9_mediachange,		rtl80x9_mediastatus,
-	  rtl80x9_init_card,		rtl80x9_init_media,
+	  rtl80x9_init_card,		rtl80x9_media_init,
 	  "RealTek 8029" },
 
 	{ PCI_VENDOR_WINBOND,		PCI_PRODUCT_WINBOND_W89C940F,
@@ -221,7 +216,6 @@ ne_pci_attach(parent, self, aux)
 	const struct ne_pci_product *npp;
 	pci_intr_handle_t ih;
 	pcireg_t csr;
-	int *media, nmedia, defmedia;
 
 	npp = ne_pci_lookup(pa);
 	if (npp == NULL) {
@@ -266,28 +260,19 @@ ne_pci_attach(parent, self, aux)
 	/* This interface is always enabled. */
 	dsc->sc_enabled = 1;
 
-	if (npp->npp_init_media != NULL) {
-		(*npp->npp_init_media)(dsc, &media, &nmedia, &defmedia);
-		dsc->sc_mediachange = npp->npp_mediachange;
-		dsc->sc_mediastatus = npp->npp_mediastatus;
-	} else {
-		media = NULL;
-		nmedia = 0;
-		defmedia = 0;
-	}
-
-	/* Always fill in init_card; it might be used for non-media stuff. */
+	dsc->sc_mediachange = npp->npp_mediachange;
+	dsc->sc_mediastatus = npp->npp_mediastatus;
+	dsc->sc_media_init = npp->npp_media_init;
 	dsc->init_card = npp->npp_init_card;
 
 	/*
 	 * Do generic NE2000 attach.  This will read the station address
 	 * from the EEPROM.
 	 */
-	ne2000_attach(nsc, NULL, media, nmedia, defmedia);
+	ne2000_attach(nsc, NULL);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", dsc->sc_dev.dv_xname);
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: kbdvar.h,v 1.6 2000/05/19 05:26:18 eeh Exp $	*/
+/*	$NetBSD: kbdvar.h,v 1.8 2001/12/09 12:03:32 pk Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -59,9 +59,9 @@
 #define	KBD_TX_RING_SIZE	16
 #define KBD_TX_RING_MASK (KBD_TX_RING_SIZE-1)
 /*
- * Keyboard serial line speed is fixed at 1200 bps.
+ * Keyboard serial line speed defaults to 1200 bps.
  */
-#define KBD_BPS 1200
+#define KBD_DEFAULT_BPS 1200
 #define KBD_RESET_TIMO 1000 /* mS. */
 
 /*
@@ -83,11 +83,21 @@ struct kbd_softc {
 
 	/* Stuff our parent setup */
 	union {
-		struct	zs_chanstate *ku_zcs;
-		struct	ucom_softc *ku_usc;
-	} k_cs_u;
-#define	k_cs k_cs_u.ku_zcs
-#define	k_usc k_cs_u.ku_usc
+		struct zs_chanstate *ku_cs;
+		struct ucom_softc *ku_usc;
+		void *ku_priv;
+	} k_u;
+#define	k_cs k_u.ku_cs
+#define	k_usc k_u.ku_usc
+#define k_priv k_u.ku_priv
+
+	/*
+	 * The deviopen and deviclose routines are provided
+	 * by the lower level driver and used as a back door
+	 * when opening and closing the internal device.
+	 */
+	int	(*k_deviopen)	__P((struct device *, int));
+	int	(*k_deviclose)	__P((struct device *, int));
 	void	(*k_write_data) __P((struct kbd_softc *, int));
 
 	/* Flags to communicate with kbd_softint() */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mem.c,v 1.15.4.1 2000/06/30 16:27:43 simonb Exp $	*/
+/*	$NetBSD: mem.c,v 1.24 2002/02/27 06:51:57 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -52,10 +52,6 @@
 #include <sys/proc.h>
 #include <sys/uio.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_map.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -67,11 +63,18 @@
 
 #include <sun3/sun3/machdep.h>
 
-/* XXX - Put this in pmap_pvt.h or something? */
-extern vm_offset_t avail_start;
+#define DEV_VME16D16	5	/* minor device 5 is /dev/vme16d16 */
+#define DEV_VME24D16	6	/* minor device 6 is /dev/vme24d16 */
+#define DEV_VME32D16	7	/* minor device 7 is /dev/vme32d16 */
+#define DEV_VME16D32	8	/* minor device 8 is /dev/vme16d32 */
+#define DEV_VME24D32	9	/* minor device 9 is /dev/vme24d32 */
+#define DEV_VME32D32	10	/* minor device 10 is /dev/vme32d32 */
+#define DEV_EEPROM	11 	/* minor device 11 is eeprom */
+#define DEV_LEDS	13 	/* minor device 13 is leds */
 
-#define	mmread	mmrw
-cdev_decl(mm);
+/* XXX - Put this in pmap_pvt.h or something? */
+extern paddr_t avail_start;
+
 static int promacc __P((caddr_t, int, int));
 static caddr_t devzeropage;
 
@@ -105,14 +108,14 @@ mmrw(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	register struct iovec *iov;
-	register vm_offset_t o, v;
-	register int c, rw;
+	struct iovec *iov;
+	vaddr_t o, v;
+	int c, rw;
 	int error = 0;
 	static int physlock;
 	vm_prot_t prot;
 
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 		if (vmmap == 0)
 			return (EIO);
 		/* lock against other uses of shared vmmap */
@@ -136,7 +139,7 @@ mmrw(dev, uio, flags)
 		}
 		switch (minor(dev)) {
 
-		case 0:                        /*  /dev/mem  */
+		case DEV_MEM:
 			v = uio->uio_offset;
 			/* allow reads only in RAM */
 			if (!pmap_pa_exists(v)) {
@@ -158,14 +161,16 @@ mmrw(dev, uio, flags)
 			    VM_PROT_WRITE;
 			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
 			    trunc_page(v), prot, prot|PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			o = v & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
 			    (vaddr_t)vmmap + NBPG);
+			pmap_update(pmap_kernel());
 			break;
 
-		case 1:                        /*  /dev/kmem  */
+		case DEV_KMEM:
 			v = uio->uio_offset;
 		use_kmem:
 			/*
@@ -185,17 +190,17 @@ mmrw(dev, uio, flags)
 			error = uiomove((caddr_t)v, c, uio);
 			break;
 
-		case 2:                        /*  /dev/null  */
+		case DEV_NULL:
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
 			return (0);
 
-		case 11:                        /*  /dev/eeprom  */
+		case DEV_EEPROM:
 			error = eeprom_uio(uio);
 			/* Yes, return (not break) so EOF works. */
 			return (error);
 
-		case 12:                        /*  /dev/zero  */
+		case DEV_ZERO:
 			/* Write to /dev/zero is ignored. */
 			if (uio->uio_rw == UIO_WRITE) {
 				uio->uio_resid = 0;
@@ -208,13 +213,13 @@ mmrw(dev, uio, flags)
 			if (devzeropage == NULL) {
 				devzeropage = (caddr_t)
 				    malloc(NBPG, M_TEMP, M_WAITOK);
-				bzero(devzeropage, NBPG);
+				memset(devzeropage, 0, NBPG);
 			}
 			c = min(iov->iov_len, NBPG);
 			error = uiomove(devzeropage, c, uio);
 			break;
 
-		case 13:                        /*  /dev/leds  */
+		case DEV_LEDS:
 			error = leds_uio(uio);
 			/* Yes, return (not break) so EOF works. */
 			return (error);
@@ -230,7 +235,7 @@ mmrw(dev, uio, flags)
 	 * redirection above jumps here on error to do its unlock.
 	 */
 unlock:
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 		if (physlock > 1)
 			wakeup((caddr_t)&physlock);
 		physlock = 0;
@@ -252,7 +257,7 @@ mmmmap(dev, off, prot)
 
 	switch (minor(dev)) {
 
-	case 0:		/* dev/mem */
+	case DEV_MEM:		/* dev/mem */
 		/* Allow access only in valid memory. */
 		if (!pmap_pa_exists(off))
 			break;
@@ -260,30 +265,30 @@ mmmmap(dev, off, prot)
 
 #if 0	/* XXX - NOTYET */
 		/* XXX - Move this to bus_subr.c? */
-	case 5: 	/* dev/vme16d16 */
+	case DEV_VME16D16:
 		if (off & 0xffff0000)
 			break;
 		off |= 0xff0000;
 		/* fall through */
-	case 6: 	/* dev/vme24d16 */
+	case DEV_VME24D16:
 		if (off & 0xff000000)
 			break;
 		off |= 0xff000000;
 		/* fall through */
-	case 7: 	/* dev/vme32d16 */
+	case DEV_VME32D16:
 		return (off | PMAP_VME16);
 
-	case 8: 	/* dev/vme16d32 */
+	case DEV_VME16D32:
 		if (off & 0xffff0000)
 			break;
 		off |= 0xff0000;
 		/* fall through */
-	case 9: 	/* dev/vme24d32 */
+	case DEV_VME24D32:
 		if (off & 0xff000000)
 			break;
 		off |= 0xff000000;
 		/* fall through */
-	case 10:	/* dev/vme32d32 */
+	case DEV_VME32D32:
 		return (off | PMAP_VME32);
 #endif	/* XXX */
 	}
@@ -301,10 +306,10 @@ promacc(va, len, rw)
 	caddr_t va;
 	int len, rw;
 {
-	vm_offset_t sva, eva;
+	vaddr_t sva, eva;
 
-	sva = (vm_offset_t)va;
-	eva = (vm_offset_t)va + len;
+	sva = (vaddr_t)va;
+	eva = (vaddr_t)va + len;
 
 	/* Test for the most common case first. */
 	if (sva < SUN3X_PROM_BASE)

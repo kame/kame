@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_obio.c,v 1.7.4.1 2000/07/19 02:53:12 mrg Exp $	*/
+/*	$NetBSD: if_le_obio.c,v 1.13 2002/03/11 16:27:02 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -92,7 +92,7 @@ struct cfattach le_obio_ca = {
 
 extern struct cfdriver le_cd;
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -142,7 +142,7 @@ lematch_obio(parent, cf, aux)
 		return (0);
 
 	oba = &uoba->uoba_oba4;
-	return (bus_space_probe(oba->oba_bustag, 0, oba->oba_paddr,
+	return (bus_space_probe(oba->oba_bustag, oba->oba_paddr,
 				2,	/* probe size */
 				0,	/* offset */
 				0,	/* flags */
@@ -168,10 +168,9 @@ leattach_obio(parent, self, aux)
 	lesc->sc_bustag = oba->oba_bustag;
 	lesc->sc_dmatag = dmatag = oba->oba_dmatag;
 
-	if (obio_bus_map(oba->oba_bustag, oba->oba_paddr,
-			 0, 2 * sizeof(u_int16_t),
-			 0, 0,
-			 &lesc->sc_reg) != 0) {
+	if (bus_space_map(oba->oba_bustag, oba->oba_paddr,
+			  2 * sizeof(u_int16_t),
+			  0, &lesc->sc_reg) != 0) {
 		printf("%s @ obio: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -202,9 +201,9 @@ leattach_obio(parent, self, aux)
 		return;
 	}
 	/* Load DMA buffer */
-	if ((error = bus_dmamap_load_raw(dmatag, lesc->sc_dmamap,
-				&seg, rseg,
-				MEMSIZE, BUS_DMA_NOWAIT)) != 0) {
+	if ((error = bus_dmamap_load(dmatag, lesc->sc_dmamap,
+				     sc->sc_mem, MEMSIZE, NULL,
+				     BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: DMA buffer map load error %d\n",
 			self->dv_xname, error);
 		bus_dmamem_unmap(dmatag, (caddr_t)sc->sc_mem, MEMSIZE);

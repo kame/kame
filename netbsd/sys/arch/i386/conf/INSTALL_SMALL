@@ -1,4 +1,4 @@
-#	$NetBSD: INSTALL_SMALL,v 1.49.2.3 2001/04/25 09:07:40 he Exp $
+#	$NetBSD: INSTALL_SMALL,v 1.85 2002/04/26 02:05:11 ad Exp $
 #
 #	INSTALL_SMALL - Small Installation kernel.
 #
@@ -14,12 +14,13 @@
 
 include "arch/i386/conf/std.i386"
 
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
 # Enable the hooks used for initializing the root memory-disk.
 options 	MEMORY_DISK_HOOKS
 options 	MEMORY_DISK_IS_ROOT	# force root on memory disk
 options 	MEMORY_DISK_SERVER=0	# no userspace memory disk support
-options 	MINIROOTSIZE=2640	# size of memory disk, in blocks
-#options 	MINIROOTSIZE=2880	# 1.44M, same as a floppy
+options 	MEMORY_DISK_ROOT_SIZE=2880	# 1.44M, same as a floppy
 
 makeoptions	COPTS="-Os"		# generates smaller code than -O2, -O1
 
@@ -43,7 +44,7 @@ options 	MATH_EMULATE	# floating point emulation
 
 # This option allows you to force a serial console at the specified
 # I/O address.
-#options 	"CONSDEVNAME=\"com\"",CONADDR=0x3f8,CONSPEED=9600
+#options 	CONSDEVNAME="\"com\"",CONADDR=0x3f8,CONSPEED=9600
 
 # The following options override the memory sizes passed in from the boot
 # block.  Use them *only* if the boot block is unable to determine the correct
@@ -68,6 +69,9 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 
 #options 	LKM		# loadable kernel modules
 
+#options 	USERCONF	# userconf(4) support
+options		PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Diagnostic/debugging support options
 #options 	DIAGNOSTIC	# expensive kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
@@ -75,7 +79,7 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 #options 	DDB		# in-kernel debugger
 #options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 #options 	KGDB		# remote debugger
-#options 	"KGDB_DEVNAME=\"com\"",KGDBADDR=0x3f8,KGDBRATE=9600
+#options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
 #makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
@@ -88,6 +92,7 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 options 	COMPAT_14	# NetBSD 1.4,
 #options 	COMPAT_43	# and 4.3BSD
 options 	COMPAT_386BSD_MBRPART # recognize old partition ID
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 #options 	COMPAT_SVR4	# binary compatibility with SVR4
 #options 	COMPAT_IBCS2	# binary compatibility with SCO and ISC
@@ -98,7 +103,7 @@ options 	COMPAT_386BSD_MBRPART # recognize old partition ID
 file-system 	FFS		# UFS
 #file-system 	EXT2FS		# second extended file system (linux)
 #file-system 	LFS		# log-structured file system
-#file-system 	MFS		# memory file system
+file-system 	MFS		# memory file system
 file-system 	NFS		# Network File System client
 file-system 	CD9660		# ISO 9660 + Rock Ridge file system
 file-system 	MSDOSFS		# MS-DOS file system
@@ -115,6 +120,9 @@ file-system 	KERNFS		# /kern
 #options 	NFSSERVER	# Network File System server
 #options 	EXT2FS_SYSTEM_FLAGS # makes ext2fs file flags (append and
 				# immutable) behave as system flags.
+options 	NFS_V2_ONLY	# Exclude NFS3 and NQNFS code to save space
+options 	VNODE_OP_NOINLINE # Save space by not inlining vnode op calls
+
 # Networking options
 #options 	GATEWAY		# packet forwarding
 options 	INET		# IP + ICMP + TCP + UDP
@@ -129,9 +137,7 @@ options 	INET		# IP + ICMP + TCP + UDP
 #options 	PPP_DEFLATE	# Deflate compression support for PPP
 #options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
-
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not recommended.
-#options 	TCP_COMPAT_42
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 # These options enable verbose messages for several subsystems.
 # Warning, these may compile large string tables into the kernel!
@@ -140,6 +146,7 @@ options 	INET		# IP + ICMP + TCP + UDP
 #options 	PCI_CONFIG_DUMP	# verbosely dump PCI config space
 #options 	PCMCIAVERBOSE	# verbose PCMCIA configuration messages
 #options 	SCSIVERBOSE	# human readable SCSI error messages
+#options 	I2OVERBOSE	# verbose I2O driver messages
 
 # Kernel root file system and dump configuration.
 config		netbsd	root on ? type ?
@@ -171,13 +178,13 @@ mainbus0 at root
 #puc*	at pci? dev ? function ?	# PCI "universal" comm. cards
 
 # EISA bus support
-eisa*	at mainbus?
-#eisa*	at pceb?
+eisa0	at mainbus?
+#eisa0	at pceb?
 
 # ISA bus support
-isa*	at mainbus?
-#eisa*	at pceb?
-#isa*	at pcib?
+isa0	at mainbus?
+#isa0	at pceb?
+#isa0	at pcib?
 
 # PCMCIA bus support
 #pcmcia*	at pcic? controller ? socket ?
@@ -248,6 +255,11 @@ com2	at isa? port 0x3e8 irq 5
 #lpt1	at isa? port 0x278
 #lpt2	at isa? port 0x3bc
 
+# I2O devices
+#iop*	at pci? dev ? function ?	# I/O processor
+#iopsp*	at iop? tid ?			# SCSI/FC-AL ports
+#ld*	at iop? tid ?			# block devices
+#dpti*	at iop? tid 0			# DPT/Adaptec control interface
 
 # SCSI Controllers and Devices
 
@@ -256,7 +268,8 @@ com2	at isa? port 0x3e8 irq 5
 #bha*	at pci? dev ? function ?	# BusLogic 9xx SCSI
 #dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID
 #isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
-#ncr*	at pci? dev ? function ?	# NCR 53c8xx SCSI
+#mly*	at pci? dev ? function ?	# Mylex AcceleRAID and eXtremeRAID
+#siop*	at pci? dev ? function ?	# NCR 53c8xx SCSI
 
 # EISA SCSI controllers
 ahb*	at eisa? slot ?			# Adaptec 174[02] SCSI
@@ -294,11 +307,13 @@ scsibus* at ahb?
 scsibus* at ahc?
 scsibus* at aic?
 scsibus* at bha?
-#scsibus* at dpt?
+scsibus* at dpt?
+#scsibus* at iopsp?
 #scsibus* at isp?
 #scsibus* at nca?
-#scsibus* at ncr?
 scsibus* at sea?
+#scsibus* at mly?
+#scsibus* at siop?
 scsibus* at uha?
 scsibus* at wds?
 
@@ -311,8 +326,22 @@ cd*	at scsibus? target ? lun ?	# SCSI CD-ROM drives
 #uk*	at scsibus? target ? lun ?	# SCSI unknown
 
 # RAID controllers and devices
-#cac*	at pci? dev ? function ?	# Compaq array controller
-#ca*	at cac? unit ?			# Compaq array disk device
+#aac*	at pci? dev ? function ?	# Adaptec AAC family
+#cac*	at eisa? slot ?			# Compaq EISA array controllers
+#cac*	at pci? dev ? function ?	# Compaq PCI array controllers
+#icp*	at pci? dev ? function ?	# ICP-Vortex GDT & Intel RAID
+#mlx*	at pci? dev ? function ?	# Mylex DAC960 & DEC SWXCR family
+#mlx*	at eisa? slot ?			# Mylex DAC960 & DEC SWXCR family
+#twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
+
+#ld*	at aac? unit ?			# logical disk devices
+#ld*	at cac? unit ?
+#ld*	at icp? unit ?
+#ld*	at twe? unit ?
+#ld*	at mlx? unit ?
+
+#icpsp*	at icp? unit ?			# SCSI pass-through
+#scsibus* at icpsp?
 
 # IDE and related devices
 
@@ -332,6 +361,7 @@ atapibus* at wdc?
 # ATAPI devices
 cd*	at atapibus? drive ?		# ATAPI CD-ROM drives
 sd*	at atapibus? drive ?		# ATAPI disk drives
+st*	at atapibus? drive ? flags 0x0000	# ATAPI tape drives
 
 
 # Miscellaneous mass storage devices
@@ -356,7 +386,6 @@ fd*	at fdc? drive ?			# the drives themselves
 # Network Interfaces
 
 # PCI network interfaces
-#de*	at pci? dev ? function ?	# DEC 21x4x-based Ethernet
 #en*	at pci? dev ? function ?	# ENI/Adaptec ATM
 #ep*	at pci? dev ? function ?	# 3Com 3c59x/3c90x Ethernet
 #fpa*	at pci? dev ? function ?	# DEC DEFPA FDDI
@@ -364,6 +393,7 @@ fd*	at fdc? drive ?			# the drives themselves
 #le*	at pci? dev ? function ?	# PCnet-PCI Ethernet
 #ne*	at pci? dev ? function ?	# NE2000-compatible Ethernet
 #tl*	at pci? dev ? function ?	# ThunderLAN-based Ethernet
+#tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
 
 # EISA network interfaces
 ep*	at eisa? slot ?			# 3Com 3c579 Ethernet
@@ -409,6 +439,7 @@ we1	at isa? port 0x300 iomem 0xcc000 irq 10
 #nsphy*	at mii? phy ?			# NS83840 PHYs
 #qsphy*	at mii? phy ?			# Quality Semiconductor QS6612 PHYs
 #tlphy*	at mii? phy ?			# ThunderLAN PHYs
+#ukphy*	at mii? phy ?			# generic unknown PHYs
 
 # Audio Devices
 
@@ -419,7 +450,7 @@ we1	at isa? port 0x300 iomem 0xcc000 irq 10
 # ISA audio devices
 #gus0	at isa? port 0x220 irq 7 drq 1 drq2 6	# Gravis Ultra Sound
 #pas0	at isa? port 0x220 irq 7 drq 1		# ProAudio Spectrum
-#pss0	at isa? port 0x220 irq 7 drq 6  	# Personal Sound System
+#pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
 #sp0	at pss0 port 0x530 irq 10 drq 0		# 	sound port driver
 #sb0	at isa? port 0x220 irq 7 drq 1 drq2 5	# SoundBlaster
 #wss0	at isa? port 0x530 irq 10 drq 0	drq2 1	# Windows Sound System
@@ -443,7 +474,6 @@ we1	at isa? port 0x300 iomem 0xcc000 irq 10
 #olms1	at isa? port 0x238 irq 5
 #omms0	at isa? port 0x23c irq 5	# Microsoft InPort mouse
 #omms1	at isa? port 0x238 irq 5
-#opms0	at pc? irq 12		# PS/2 auxiliary port mouse
 
 
 # Joysticks
@@ -482,7 +512,7 @@ pseudo-device	loop			# network loopback
 #pseudo-device	tun		2	# network tunneling over tty
 
 # miscellaneous pseudo-devices
-pseudo-device	pty		2	# pseudo-terminals
+pseudo-device	pty		2	# pseudo-terminals (Sysinst needs two)
 #pseudo-device	tb		1	# tablet line discipline
 #pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness as well (BROKEN)

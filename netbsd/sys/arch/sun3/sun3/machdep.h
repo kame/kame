@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.h,v 1.21 1999/11/22 19:01:50 jdolecek Exp $	*/
+/*	$NetBSD: machdep.h,v 1.27 2001/09/05 13:21:10 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
@@ -62,22 +62,16 @@ struct proc;
 struct reg;
 struct trapframe;
 struct uio;
-
-extern int cold;
-extern int fputype;
+struct mmu_rootptr;
 
 extern label_t *nofault;
 
-extern vm_offset_t vmmap;	/* XXX - See mem.c */
+extern vaddr_t vmmap;	/* XXX - See mem.c */
 
 /* Cache flush functions. */
 void	DCIA __P((void));
 void	DCIU __P((void));
 void	ICIA __P((void));
-
-int 	cachectl1 __P((unsigned long, vaddr_t, size_t, struct proc *));
-
-void	child_return __P((void *));
 
 void	clock_init  __P((void));
 void	cninit __P((void));
@@ -91,13 +85,11 @@ void	enable_video __P((int));
 
 int 	fpu_emulate __P((struct trapframe *, struct fpframe *));
 
-int 	getdfc __P((void));
-int 	getsfc __P((void));
-
 /* Backward compatibility... */
 #define getsr	_getsr
 
 void**	getvbr __P((void));
+int	getcrp __P((struct mmu_rootptr *));
 
 void	initfpu __P((void));
 void	intreg_init __P((void));
@@ -110,7 +102,7 @@ void	m68881_restore __P((struct fpframe *));
 
 void	netintr __P((void));
 
-caddr_t	obio_find_mapping __P((int pa, int size));
+caddr_t	obio_find_mapping __P((paddr_t pa, psize_t size));
 void	obio_init __P((void));
 
 void	proc_trampoline __P((void));
@@ -138,20 +130,20 @@ extern int cache_size;
 void	cache_enable __P((void));
 
 /* Kernel virtual address space available: */
-extern vm_offset_t virtual_avail, virtual_end;
+extern vaddr_t virtual_avail, virtual_end;
 /* Physical address space available: */
-extern vm_offset_t avail_start, avail_end;
+extern paddr_t avail_start, avail_end;
 /* The "hole" (used to skip the Sun3/50 video RAM) */
-extern vm_offset_t hole_start, hole_size;
+extern paddr_t hole_start, hole_size;
 
 /* cache.c */
 void	cache_enable __P((void));
-void	cache_flush_page(vm_offset_t pgva);
-void	cache_flush_segment(vm_offset_t sgva);
+void	cache_flush_page(vaddr_t pgva);
+void	cache_flush_segment(vaddr_t sgva);
 void	cache_flush_context(void);
 
 /* pmap.c */
-void	pmap_bootstrap __P((vm_offset_t nextva));
+void	pmap_bootstrap __P((vaddr_t nextva));
 void	pmap_kcore_hdr __P((struct sun3_kcore_hdr *));
 void	pmap_get_pagemap __P((int *pt, int off));
 
@@ -168,24 +160,24 @@ extern int has_iocache;
 extern struct mmu_rootptr mon_crp;
 
 /* Lowest "managed" kernel virtual address. */
-extern vm_offset_t virtual_avail;
+extern vaddr_t virtual_avail;
 
 /* Cache flush ops, Sun3X specific. */
-void	DCIAS __P((vm_offset_t));
+void	DCIAS __P((paddr_t));
 void	DCIS __P((void));
 void	ICPA __P((void));
 void	PCIA __P((void));
 /* ATC flush operations. */
 void	TBIA __P((void));
-void	TBIS __P((vm_offset_t));
+void	TBIS __P((vaddr_t));
 void	TBIAS __P((void));
 void	TBIAU __P((void));
 
 void	loadcrp __P((struct mmu_rootptr *));
 
-void	pmap_bootstrap __P((vm_offset_t nextva));
+void	pmap_bootstrap __P((vaddr_t nextva));
 void	pmap_kcore_hdr __P((struct sun3x_kcore_hdr *));
-int 	pmap_pa_exists __P((vm_offset_t pa));
+int 	pmap_pa_exists __P((paddr_t pa));
 
 #endif	/* SUN3X */
 

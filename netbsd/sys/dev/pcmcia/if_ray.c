@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ray.c,v 1.20.2.3 2001/01/26 00:32:07 jhawk Exp $	*/
+/*	$NetBSD: if_ray.c,v 1.32 2002/03/10 11:32:18 martin Exp $	*/
 /* 
  * Copyright (c) 2000 Christian E. Hopps
  * All rights reserved.
@@ -49,11 +49,14 @@
  *	Given the nature of the buggy build 4 firmware there may be problems.
  *
  *	Authentication added by Steve Weiss <srw@alum.mit.edu> based on
- *	advice from Corey Thomas (author the the Linux RayLink driver).
+ *	advice from Corey Thomas (author of the Linux RayLink driver).
  *	Authentication is currently limited to adhoc networks, and was
  *	added to support a requirement of the newest Windows drivers for
  *	the RayLink.  Tested with Aviator Pro (firmware 5.63) on Win98.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ray.c,v 1.32 2002/03/10 11:32:18 martin Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -99,8 +102,6 @@
 #include <dev/pcmcia/pcmciadevs.h>
 
 #include <dev/pcmcia/if_rayreg.h>
-
-#define RAY_USE_AMEM 0
 
 #define	RAY_DEBUG
 
@@ -156,10 +157,6 @@ struct ray_softc {
 	struct pcmcia_function		*sc_pf;
 	struct pcmcia_mem_handle	sc_mem;
 	int				sc_window;
-#if RAY_USE_AMEM
-	struct pcmcia_mem_handle	sc_amem;
-	int				sc_awindow;
-#endif
 	void				*sc_ih;
 	void				*sc_sdhook;
 	void				*sc_pwrhook;
@@ -193,7 +190,7 @@ struct ray_softc {
 	u_int8_t	sc_mode;	/* current operating mode SC_MODE_xx */
 	u_int8_t	sc_countrycode;	/* current country code */
 	u_int8_t	sc_dcountrycode; /* desired country code */
-	int		sc_havenet;	/* true if we have aquired a network */
+	int		sc_havenet;	/* true if we have acquired a network */
 	bus_size_t	sc_txpad;	/* tib size plus "phy" size */
 	u_int8_t	sc_deftxrate;	/* default transfer rate */
 	u_int8_t	sc_encrypt;
@@ -225,6 +222,7 @@ struct ray_softc {
 #define	sc_memh	sc_mem.memh
 #define	sc_ccrt	sc_pf->pf_ccrt
 #define	sc_ccrh	sc_pf->pf_ccrh
+#define	sc_ccroff sc_pf->pf_ccr_offset
 #define	sc_startup_4	sc_u.u_params_4
 #define	sc_startup_5	sc_u.u_params_5
 #define	sc_version	sc_ecf_startup.e_fw_build_string
@@ -393,21 +391,12 @@ static void ray_dump_mbuf __P((struct ray_softc *, struct mbuf *));
  * macros for writing to various regions in the mapped memory space
  */
 
-#if RAY_USE_AMEM
-/* read and write the registers in the CCR (attribute) space */
-#define	REG_WRITE(sc, off, val) \
-	bus_space_write_1((sc)->sc_amem.memt, (sc)->sc_amem.memh, (off), (val))
-
-#define	REG_READ(sc, off) \
-	bus_space_read_1((sc)->sc_amem.memt, (sc)->sc_amem.memh, (off))
-#else
 	/* use already mapped ccrt */
 #define	REG_WRITE(sc, off, val) \
-	bus_space_write_1((sc)->sc_ccrt, (sc)->sc_ccrh, (off), (val))
+	bus_space_write_1((sc)->sc_ccrt, (sc)->sc_ccrh, ((sc)->sc_ccroff + (off)), (val))
 
 #define	REG_READ(sc, off) \
-	bus_space_read_1((sc)->sc_ccrt, (sc)->sc_ccrh, (off))
-#endif
+	bus_space_read_1((sc)->sc_ccrt, (sc)->sc_ccrh, ((sc)->sc_ccroff + (off)))
 
 #define	SRAM_READ_1(sc, off) \
 	((u_int8_t)bus_space_read_1((sc)->sc_memt, (sc)->sc_memh, (off)))
@@ -515,7 +504,7 @@ ray_attach(parent, self, aux)
 	struct pcmcia_attach_args *pa;
 	struct ray_softc *sc;
 	struct ifnet *ifp;
-	bus_addr_t memoff;
+	bus_size_t memoff;
 	char devinfo[256];
 
 	pa = aux;
@@ -523,9 +512,6 @@ ray_attach(parent, self, aux)
 	sc->sc_pf = pa->pf;
 	ifp = &sc->sc_if;
 	sc->sc_window = -1;
-#if RAY_USE_AMEM
-	sc->sc_awindow = -1;
-#endif
 
 	/* Print out what we are */
 	pcmcia_devinfo(&pa->pf->sc->card, 0, devinfo, sizeof devinfo);
@@ -553,24 +539,6 @@ ray_attach(parent, self, aux)
 		pcmcia_mem_free(sc->sc_pf, &sc->sc_mem);
 		goto fail;
 	}
-
-#if RAY_USE_AMEM
-	/* use the already mapped ccrt in our pf */
-	/*
-	 * map in the memory
-	 */
-	if (pcmcia_mem_alloc(sc->sc_pf, 0x1000, &sc->sc_amem)) {
-		printf(": can\'t alloc attr memory\n");
-		goto fail;
-	}
-
-	if (pcmcia_mem_map(sc->sc_pf, PCMCIA_MEM_ATTR, 0,
-	    0x1000, &sc->sc_amem, &memoff, &sc->sc_awindow)) {
-		printf(": can\'t map attr memory\n");
-		pcmcia_mem_free(sc->sc_pf, &sc->sc_amem);
-		goto fail;
-	}
-#endif
 
 	/* get startup results */
 	ep = &sc->sc_ecf_startup;
@@ -635,6 +603,8 @@ ray_attach(parent, self, aux)
 	ifp->if_ioctl = ray_ioctl;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
+
 	if_attach(ifp);
 	ether_ifattach(ifp, ep->e_station_addr);
 	/* need enough space for ieee80211_header + (snap or e2) */
@@ -649,9 +619,6 @@ ray_attach(parent, self, aux)
 	else
 		ifmedia_set(&sc->sc_media, IFM_INFRA);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	/* disable the card */
 	pcmcia_function_disable(sc->sc_pf);
 
@@ -666,12 +633,6 @@ fail:
 	pcmcia_function_disable(sc->sc_pf);
 
 	/* free the alloc/map */
-#if RAY_USE_AMEM
-	if (sc->sc_awindow != -1) {
-		pcmcia_mem_unmap(sc->sc_pf, sc->sc_awindow);
-		pcmcia_mem_free(sc->sc_pf, &sc->sc_amem);
-	}
-#endif
 	if (sc->sc_window != -1) {
 		pcmcia_mem_unmap(sc->sc_pf, sc->sc_window);
 		pcmcia_mem_free(sc->sc_pf, &sc->sc_mem);
@@ -725,21 +686,13 @@ ray_detach(self, flags)
 		ray_disable(sc);
 
 	/* give back the memory */
-#if RAY_USE_AMEM
-	if (sc->sc_awindow != -1) {
-		pcmcia_mem_unmap(sc->sc_pf, sc->sc_awindow);
-		pcmcia_mem_free(sc->sc_pf, &sc->sc_amem);
-	}
-#endif
 	if (sc->sc_window != -1) {
 		pcmcia_mem_unmap(sc->sc_pf, sc->sc_window);
 		pcmcia_mem_free(sc->sc_pf, &sc->sc_mem);
 	}
 
 	ifmedia_delete_instance(&sc->sc_media, IFM_INST_ANY);
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
+
 	ether_ifdetach(ifp);
 	if_detach(ifp);
 	powerhook_disestablish(sc->sc_pwrhook);
@@ -860,7 +813,11 @@ ray_init(sc)
 	sc->sc_if.if_flags |= IFF_RUNNING | IFF_OACTIVE;
 
 	/* set this now so it gets set in the download */
-	sc->sc_promisc = !!(sc->sc_if.if_flags & (IFF_PROMISC|IFF_ALLMULTI));
+	if (sc->sc_if.if_flags & IFF_ALLMULTI)
+		sc->sc_if.if_flags |= IFF_PROMISC;
+	else if (sc->sc_if.if_pcount == 0)
+		sc->sc_if.if_flags &= ~IFF_PROMISC;
+	sc->sc_promisc = !!(sc->sc_if.if_flags & IFF_PROMISC);
 
 	/* call after we mark ourselves running */
 	ray_download_params(sc);
@@ -1193,16 +1150,15 @@ ray_intr_start(sc)
 
 	ifp = &sc->sc_if;
 
-	RAY_DPRINTF(("%s: start free %d qlen %d qmax %d\n",
-	    ifp->if_xname, sc->sc_txfree, ifp->if_snd.ifq_len,
-	    ifp->if_snd.ifq_maxlen));
+	RAY_DPRINTF(("%s: start free %d\n",
+	    ifp->if_xname, sc->sc_txfree));
 
 	ray_cmd_cancel(sc, SCP_IFSTART);
 
 	if ((ifp->if_flags & IFF_RUNNING) == 0 || !sc->sc_havenet)
 		return;
 
-	if (ifp->if_snd.ifq_len == 0)
+	if (IFQ_IS_EMPTY(&ifp->if_snd))
 		return;
 
 	firsti = i = previ = RAY_CCS_LINK_NULL;
@@ -1234,7 +1190,7 @@ ray_intr_start(sc)
 			}
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (!m0) {
 			RAY_DPRINTF(("%s: dry queue.\n", ifp->if_xname));
 			break;
@@ -1388,7 +1344,7 @@ ray_intr_start(sc)
 	}
 
 	/* send it off */
-	RAY_DPRINTF(("%s: ray_start issueing %d \n", sc->sc_xname, firsti));
+	RAY_DPRINTF(("%s: ray_start issuing %d \n", sc->sc_xname, firsti));
 	SRAM_WRITE_1(sc, RAY_SCB_CCSI, firsti);
 	RAY_ECF_START_CMD(sc);
 
@@ -2924,7 +2880,11 @@ ray_update_promisc(sc)
 	ray_cmd_cancel(sc, SCP_UPD_PROMISC);
 
 	/* do the issue check before equality check */
-	promisc = !!(sc->sc_if.if_flags & (IFF_PROMISC | IFF_ALLMULTI));
+	if (sc->sc_if.if_flags & IFF_ALLMULTI)
+		sc->sc_if.if_flags |= IFF_PROMISC;
+	else if (sc->sc_if.if_pcount == 0)
+		sc->sc_if.if_flags &= ~IFF_PROMISC;
+	promisc = !!(sc->sc_if.if_flags & IFF_PROMISC);
 	if ((sc->sc_if.if_flags & IFF_RUNNING) == 0)
 		return;
 	else if (ray_cmd_is_running(sc, SCP_UPDATESUBCMD)) {

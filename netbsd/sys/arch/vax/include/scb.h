@@ -1,4 +1,4 @@
-/*	$NetBSD: scb.h,v 1.10.2.1 2000/07/27 16:58:41 matt Exp $	*/
+/*	$NetBSD: scb.h,v 1.11 2000/07/10 09:14:34 ragge Exp $	*/
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.

@@ -1,7 +1,7 @@
-/*	$NetBSD: twe.c,v 1.20.4.1 2001/10/25 18:03:02 he Exp $	*/
+/*	$NetBSD: twe.c,v 1.22.2.1 2002/05/26 16:05:36 perry Exp $	*/
 
 /*-
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000, 2001, 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -69,6 +69,9 @@
  * Driver for the 3ware Escalade family of RAID controllers.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: twe.c,v 1.22.2.1 2002/05/26 16:05:36 perry Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -80,9 +83,8 @@
 #include <sys/malloc.h>
 #include <sys/disk.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <uvm/uvm_extern.h>
+
 #include <machine/bswap.h>
 #include <machine/bus.h>
 
@@ -91,11 +93,6 @@
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/twereg.h>
 #include <dev/pci/twevar.h>
-
-#define	TWE_INL(sc, port) \
-    bus_space_read_4((sc)->sc_iot, (sc)->sc_ioh, port)
-#define	TWE_OUTL(sc, port, val) \
-    bus_space_write_4((sc)->sc_iot, (sc)->sc_ioh, port, val)
 
 #define	PCI_CBIO	0x10
 
@@ -112,6 +109,9 @@ static int	twe_reset(struct twe_softc *);
 static int	twe_submatch(struct device *, struct cfdata *, void *);
 static int	twe_status_check(struct twe_softc *, u_int);
 static int	twe_status_wait(struct twe_softc *, u_int, int);
+
+static inline u_int32_t	twe_inl(struct twe_softc *, int);
+static inline void	twe_outl(struct twe_softc *, int, u_int32_t);
 
 struct cfattach twe_ca = {
 	sizeof(struct twe_softc), twe_match, twe_attach
@@ -137,6 +137,24 @@ struct {
 	{ 0x0015, "table undefined" },
 	{ 0x00ff, "aen queue full" },
 };
+
+static inline u_int32_t
+twe_inl(struct twe_softc *sc, int off)
+{
+
+	bus_space_barrier(sc->sc_iot, sc->sc_ioh, off, 4,
+	    BUS_SPACE_BARRIER_WRITE | BUS_SPACE_BARRIER_READ);
+	return (bus_space_read_4(sc->sc_iot, sc->sc_ioh, off));
+}
+
+static inline void
+twe_outl(struct twe_softc *sc, int off, u_int32_t val)
+{
+
+	bus_space_write_4(sc->sc_iot, sc->sc_ioh, off, val);
+	bus_space_barrier(sc->sc_iot, sc->sc_ioh, off, 4,
+	    BUS_SPACE_BARRIER_WRITE);
+}
 
 /*
  * Match a supported board.
@@ -168,6 +186,7 @@ twe_attach(struct device *parent, struct device *self, void *aux)
 	pcireg_t csr;
 	const char *intrstr;
 	int size, i, rv, rseg;
+	size_t max_segs, max_xfer;
 	struct twe_param *dtp, *ctp;
 	bus_dma_segment_t seg;
 	struct twe_cmd *tc;
@@ -195,8 +214,7 @@ twe_attach(struct device *parent, struct device *self, void *aux)
 	    csr | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-	    &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: can't map interrupt\n", sc->sc_dv.dv_xname);
 		return;
 	}
@@ -217,7 +235,7 @@ twe_attach(struct device *parent, struct device *self, void *aux)
 	 */
         size = sizeof(struct twe_cmd) * TWE_MAX_QUEUECNT;
 
-	if ((rv = bus_dmamem_alloc(sc->sc_dmat, size, NBPG, 0, &seg, 1, 
+	if ((rv = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &seg, 1, 
 	    &rseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: unable to allocate commands, rv = %d\n",
 		    sc->sc_dv.dv_xname, rv);
@@ -252,13 +270,15 @@ twe_attach(struct device *parent, struct device *self, void *aux)
 	ccb = malloc(sizeof(*ccb) * TWE_MAX_QUEUECNT, M_DEVBUF, M_NOWAIT);
 	sc->sc_ccbs = ccb;
 	tc = (struct twe_cmd *)sc->sc_cmds;
+	max_segs = twe_get_maxsegs();
+	max_xfer = twe_get_maxxfer(max_segs);
 
 	for (i = 0; i < TWE_MAX_QUEUECNT; i++, tc++, ccb++) {
 		ccb->ccb_cmd = tc;
 		ccb->ccb_cmdid = i;
 		ccb->ccb_flags = 0;
-		rv = bus_dmamap_create(sc->sc_dmat, TWE_MAX_XFER,
-		    TWE_MAX_SEGS, NBPG, 0,
+		rv = bus_dmamap_create(sc->sc_dmat, max_xfer,
+		    max_segs, PAGE_SIZE, 0,
 		    BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW,
 		    &ccb->ccb_dmamap_xfer);
 		if (rv != 0) {
@@ -278,7 +298,7 @@ twe_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	TWE_OUTL(sc, TWE_REG_CTL, TWE_CTL_DISABLE_INTRS);
+	twe_outl(sc, TWE_REG_CTL, TWE_CTL_DISABLE_INTRS);
 
 	/* Reset the controller. */
 	if (twe_reset(sc)) {
@@ -319,7 +339,7 @@ twe_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Initialise connection with controller and enable interrupts. */
 	twe_init_connection(sc);
-	TWE_OUTL(sc, TWE_REG_CTL, TWE_CTL_CLEAR_ATTN_INTR |
+	twe_outl(sc, TWE_REG_CTL, TWE_CTL_CLEAR_ATTN_INTR |
 	    TWE_CTL_UNMASK_RESP_INTR |
 	    TWE_CTL_ENABLE_INTRS);
 
@@ -345,7 +365,7 @@ twe_reset(struct twe_softc *sc)
 	int got, rv;
 
 	/* Issue a soft reset. */
-	TWE_OUTL(sc, TWE_REG_CTL, TWE_CTL_ISSUE_SOFT_RESET |
+	twe_outl(sc, TWE_REG_CTL, TWE_CTL_ISSUE_SOFT_RESET |
 	    TWE_CTL_CLEAR_HOST_INTR |
 	    TWE_CTL_CLEAR_ATTN_INTR |
 	    TWE_CTL_MASK_CMD_INTR |
@@ -379,7 +399,7 @@ twe_reset(struct twe_softc *sc)
 	}
 
 	/* Check controller status. */
-	status = TWE_INL(sc, TWE_REG_STS);
+	status = twe_inl(sc, TWE_REG_STS);
 	if (twe_status_check(sc, status)) {
 		printf("%s: controller errors detected\n",
 		    sc->sc_dv.dv_xname);
@@ -388,7 +408,7 @@ twe_reset(struct twe_softc *sc)
 
 	/* Drain the response queue. */
 	for (;;) {
-		status = TWE_INL(sc, TWE_REG_STS);
+		status = twe_inl(sc, TWE_REG_STS);
 		if (twe_status_check(sc, status) != 0) {
 			printf("%s: can't drain response queue\n",
 			    sc->sc_dv.dv_xname);
@@ -396,7 +416,7 @@ twe_reset(struct twe_softc *sc)
 		}
 		if ((status & TWE_STS_RESP_QUEUE_EMPTY) != 0)
 			break;
-		junk = TWE_INL(sc, TWE_REG_RESP_QUEUE);
+		junk = twe_inl(sc, TWE_REG_RESP_QUEUE);
 	}
 
 	return (0);
@@ -447,7 +467,7 @@ twe_intr(void *arg)
 
 	sc = arg;
 	caught = 0;
-	status = TWE_INL(sc, TWE_REG_STS);
+	status = twe_inl(sc, TWE_REG_STS);
 	twe_status_check(sc, status);
 
 	/* Host interrupts - purpose unknown. */
@@ -455,7 +475,7 @@ twe_intr(void *arg)
 #ifdef DIAGNOSTIC
 		printf("%s: host interrupt\n", sc->sc_dv.dv_xname);
 #endif
-		TWE_OUTL(sc, TWE_REG_CTL, TWE_CTL_CLEAR_HOST_INTR);
+		twe_outl(sc, TWE_REG_CTL, TWE_CTL_CLEAR_HOST_INTR);
 		caught = 1;
 	}
 
@@ -471,7 +491,7 @@ twe_intr(void *arg)
 			if (rv != 0) {
 				printf("%s: unable to retrieve AEN (%d)\n",
 				    sc->sc_dv.dv_xname, rv);
-				TWE_OUTL(sc, TWE_REG_CTL,
+				twe_outl(sc, TWE_REG_CTL,
 				    TWE_CTL_CLEAR_ATTN_INTR);
 			} else
 				sc->sc_flags |= TWEF_AEN;
@@ -489,7 +509,7 @@ twe_intr(void *arg)
 #ifdef DIAGNOSTIC
 		printf("%s: command interrupt\n", sc->sc_dv.dv_xname);
 #endif
-		TWE_OUTL(sc, TWE_REG_CTL, TWE_CTL_MASK_CMD_INTR);
+		twe_outl(sc, TWE_REG_CTL, TWE_CTL_MASK_CMD_INTR);
 		caught = 1;
 	}
 
@@ -526,7 +546,7 @@ twe_aen_handler(struct twe_ccb *ccb, int error)
 	twe_ccb_free(sc, ccb);
 
 	if (TWE_AEN_CODE(aen) == TWE_AEN_QUEUE_EMPTY) {
-		TWE_OUTL(sc, TWE_REG_CTL, TWE_CTL_CLEAR_ATTN_INTR);
+		twe_outl(sc, TWE_REG_CTL, TWE_CTL_CLEAR_ATTN_INTR);
 		sc->sc_flags &= ~TWEF_AEN;
 		return;
 	}
@@ -669,14 +689,14 @@ twe_poll(struct twe_softc *sc)
 	found = 0;
 
 	for (;;) {
-		status = TWE_INL(sc, TWE_REG_STS);
+		status = twe_inl(sc, TWE_REG_STS);
 		twe_status_check(sc, status);
 
 		if ((status & TWE_STS_RESP_QUEUE_EMPTY))
 			break;
 
 		found = 1;
-		cmdid = TWE_INL(sc, TWE_REG_RESP_QUEUE);
+		cmdid = twe_inl(sc, TWE_REG_RESP_QUEUE);
 		cmdid = (cmdid & TWE_RESP_MASK) >> TWE_RESP_SHIFT;
 		if (cmdid >= TWE_MAX_QUEUECNT) {
 			printf("%s: bad completion\n", sc->sc_dv.dv_xname);
@@ -716,7 +736,7 @@ twe_status_wait(struct twe_softc *sc, u_int32_t status, int timo)
 {
 
 	for (timo *= 10; timo != 0; timo--) {
-		if ((TWE_INL(sc, TWE_REG_STS) & status) == status)
+		if ((twe_inl(sc, TWE_REG_STS) & status) == status)
 			break;
 		delay(100000);
 	}
@@ -820,9 +840,9 @@ twe_ccb_map(struct twe_softc *sc, struct twe_ccb *ccb)
 	 * The data as a whole must be 512-byte aligned.
 	 */
 	if (((u_long)ccb->ccb_data & (TWE_ALIGNMENT - 1)) != 0) {
-		s = splimp();
+		s = splvm();
 		/* XXX */
-		ccb->ccb_abuf = uvm_km_kmemalloc(kmem_map, uvmexp.kmem_object,
+		ccb->ccb_abuf = uvm_km_kmemalloc(kmem_map, NULL,
 		    ccb->ccb_datasize, UVM_KMF_NOWAIT);
 		splx(s);
 		data = (void *)ccb->ccb_abuf;
@@ -837,10 +857,12 @@ twe_ccb_map(struct twe_softc *sc, struct twe_ccb *ccb)
 	 * Map the data buffer into bus space and build the S/G list.
 	 */
 	rv = bus_dmamap_load(sc->sc_dmat, ccb->ccb_dmamap_xfer, data,
-	    ccb->ccb_datasize, NULL, BUS_DMA_NOWAIT);
+	    ccb->ccb_datasize, NULL, BUS_DMA_NOWAIT | BUS_DMA_STREAMING |
+	    ((ccb->ccb_flags & TWE_CCB_DATA_IN) ?
+	    BUS_DMA_READ : BUS_DMA_WRITE));
 	if (rv != 0) {
 		if (ccb->ccb_abuf != (vaddr_t)0) {
-			s = splimp();
+			s = splvm();
 			/* XXX */
 			uvm_km_free(kmem_map, ccb->ccb_abuf,
 			    ccb->ccb_datasize);
@@ -923,7 +945,7 @@ twe_ccb_unmap(struct twe_softc *sc, struct twe_ccb *ccb)
 		if ((ccb->ccb_flags & TWE_CCB_DATA_IN) != 0)
 			memcpy(ccb->ccb_data, (void *)ccb->ccb_abuf,
 			    ccb->ccb_datasize);
-		s = splimp();
+		s = splvm();
 		/* XXX */
 		uvm_km_free(kmem_map, ccb->ccb_abuf, ccb->ccb_datasize);
 		splx(s);
@@ -989,7 +1011,7 @@ twe_ccb_submit(struct twe_softc *sc, struct twe_ccb *ccb)
 	u_int status;
 
 	/* Check to see if we can post a command. */
-	status = TWE_INL(sc, TWE_REG_STS);
+	status = twe_inl(sc, TWE_REG_STS);
 	twe_status_check(sc, status);
 
 	if ((status & TWE_STS_CMD_QUEUE_FULL) == 0) {
@@ -999,7 +1021,7 @@ twe_ccb_submit(struct twe_softc *sc, struct twe_ccb *ccb)
 		ccb->ccb_flags |= TWE_CCB_ACTIVE;
 		pa = sc->sc_cmds_paddr +
 		    ccb->ccb_cmdid * sizeof(struct twe_cmd);
-		TWE_OUTL(sc, TWE_REG_CMD_QUEUE, (u_int32_t)pa);
+		twe_outl(sc, TWE_REG_CMD_QUEUE, (u_int32_t)pa);
 		rv = 0;
 	} else
 		rv = EBUSY;

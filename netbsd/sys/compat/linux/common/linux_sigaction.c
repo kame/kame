@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_sigaction.c,v 1.19 2000/03/30 11:27:17 augustss Exp $	*/
+/*	$NetBSD: linux_sigaction.c,v 1.23 2002/03/31 22:22:47 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * heavily from: svr4_signal.c,v 1.7 1995/01/09 01:04:21 christos Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_sigaction.c,v 1.23 2002/03/31 22:22:47 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,17 +89,24 @@ linux_sys_sigaction(p, v, retval)
 		error = copyin(SCARG(uap, nsa), &nlsa, sizeof(nlsa));
 		if (error)
 			return (error);
-		linux_old_to_native_sigaction(&nlsa, &nbsa);
+		linux_old_to_native_sigaction(&nbsa, &nlsa);
 	}
 	sig = SCARG(uap, signum);
 	if (sig < 0 || sig >= LINUX__NSIG)
 		return (EINVAL);
-	error = sigaction1(p, linux_to_native_sig[sig],
-	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0);
-	if (error)
-		return (error);
+	if (sig > 0 && !linux_to_native_signo[sig]) {
+		/* Pretend that we did something useful for unknown signals. */
+		obsa.sa_handler = SIG_IGN;
+		sigemptyset(&obsa.sa_mask);
+		obsa.sa_flags = 0;
+	} else {
+		error = sigaction1(p, linux_to_native_signo[sig],
+		    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0);
+		if (error)
+			return (error);
+	}
 	if (SCARG(uap, osa)) {
-		native_to_linux_old_sigaction(&obsa, &olsa);
+		native_to_linux_old_sigaction(&olsa, &obsa);
 		error = copyout(&olsa, SCARG(uap, osa), sizeof(olsa));
 		if (error)
 			return (error);

@@ -1,4 +1,4 @@
-/*	$NetBSD: llparse.c,v 1.4 1994/06/29 06:41:02 cgd Exp $	*/
+/*	$NetBSD: llparse.c,v 1.7 2002/05/16 19:30:41 wiz Exp $	*/
 
 /*
  * ************************* NOTICE *******************************
@@ -11,6 +11,10 @@
  * University of Wisconsin for the Crystal project.
  * ****************************************************************
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: llparse.c,v 1.7 2002/05/16 19:30:41 wiz Exp $");
+
 #include "xebec.h"
 #include "llparse.h"
 #include "main.h"
@@ -24,13 +28,16 @@ short		llparsestack[STACKSIZE];
 short		llstackptr = 0;
 LLtoken		lltoken;
 
+void		prt_token();
+
+int
 llparse()
 {
-	register		havetoken = FALSE;
-	register		sym;
+	register int		havetoken = FALSE;
+	register int		sym;
 	register LLtoken	*t = &lltoken;
-	register		parseaction;
-	register		accepted = FALSE;
+	register int		parseaction;
+	register int		accepted = FALSE;
 
 	llpushprod(llnprods-1); /* $$$ ::= <start symbol>  */
 
@@ -115,12 +122,13 @@ llparse()
 	return(0);
 }
 
+void
 llpushprod(prod) 	/* recognize production prod - push rhs on stack */
-short prod;
+	short prod;
 {
-	register	start;
-	register	length;
-	register	count;
+	register int	start;
+	register int	length;
+	register int	count;
 
 	start = llprodindex[prod].llprodstart;
 	length = llprodindex[prod].llprodlength;
@@ -162,14 +170,14 @@ short prod;
 	}
 }
 
-
+int
 llepsilonok(term)
 {
-	register	ptr;
-	register	sym;
-	register	pact;
-	register	nomore;
-	register	rval;
+	register int	ptr;
+	register int	sym;
+	register int	pact;
+	register int	nomore;
+	register int	rval;
 
 	IFDEBUG(L)
 		printf("llepsilonok() enter\n");
@@ -215,9 +223,10 @@ llepsilonok(term)
 }
 
 
-short llfindaction(sym, term)
+short
+llfindaction(sym, term)
 {
-	register	index;
+	register int	index;
 
 	IFDEBUG(L)
 		printf("llfindaction(sym=%d, term=%d) enter \n", sym, term);
@@ -233,7 +242,7 @@ short llfindaction(sym, term)
 	return(0);
 }
 
-
+void
 llparsererror(token)
 LLtoken *token;
 {
@@ -248,9 +257,9 @@ LLtoken *token;
 	Exit(-1);
 }
 
-
+void
 llgettoken(token)
-LLtoken *token;
+	LLtoken *token;
 {
 	llscan(token);
 	token->llstate = NORMAL;
@@ -283,8 +292,9 @@ struct llattr	llattrdesc[LLMAXDESC];
 
 int	lldescindex = 1;
 
-
+void
 llsetattr(n)
+	int n;
 {
 	register struct llattr *ptr;
 
@@ -306,8 +316,9 @@ llsetattr(n)
 	lldescindex++;
 }
 
+void
 llpushattr(attr)
-LLattrib attr;
+	LLattrib attr;
 {
 	struct llattr *a;
 
@@ -323,6 +334,7 @@ LLattrib attr;
 	a->llaindex++; /* inc count of attrs on the stack for this prod */
 }
 
+void
 llfinprod()
 {
 	IFDEBUG(L)
@@ -337,6 +349,7 @@ llfinprod()
 
 #ifndef LINT
 #ifdef DEBUG
+void
 dump_parse_stack()
 {
 	int ind;
@@ -349,18 +362,19 @@ dump_parse_stack()
 	}
 }
 
-#endif DEBUG
-#endif LINT
+#endif /* DEBUG */
+#endif /* !LINT */
 
+void
 prt_token(t)
-LLtoken *t;
+	LLtoken *t;
 {
-	fprintf(stdout, "t at 0x%x\n", t);
+	fprintf(stdout, "t at 0x%p\n", t);
 	fprintf(stdout, "t->llterm=0x%x\n", t->llterm); (void) fflush(stdout);
 	fprintf(stdout, "TOK: %s\n", llstrings[t->llterm]);
 	(void) fflush(stdout);
 #ifdef LINT
 	/* to make lint shut up */
 	fprintf(stdout, "", llnterms, llnsyms, llnprods, llinfinite);
-#endif LINT
+#endif /* LINT */
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: qec.c,v 1.10.4.1 2000/07/19 02:53:08 mrg Exp $ */
+/*	$NetBSD: qec.c,v 1.19 2002/03/20 17:59:16 eeh Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,7 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: qec.c,v 1.19 2002/03/20 17:59:16 eeh Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -59,8 +61,7 @@ void		qec_init	__P((struct qec_softc *));
 
 static int qec_bus_map __P((
 		bus_space_tag_t,
-		bus_type_t,		/*slot*/
-		bus_addr_t,		/*offset*/
+		bus_addr_t,		/*coded slot+offset*/
 		bus_size_t,		/*size*/
 		int,			/*flags*/
 		vaddr_t,		/*preferred virtual address */
@@ -133,7 +134,7 @@ qecattach(parent, self, aux)
 			 sa->sa_reg[0].sbr_slot,
 			 sa->sa_reg[0].sbr_offset,
 			 sa->sa_reg[0].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &sc->sc_regs) != 0) {
+			 0, &sc->sc_regs) != 0) {
 		printf("%s: attach: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -147,15 +148,15 @@ qecattach(parent, self, aux)
 			 sa->sa_reg[1].sbr_slot,
 			 sa->sa_reg[1].sbr_offset,
 			 sa->sa_reg[1].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &bh) != 0) {
+			 BUS_SPACE_MAP_LINEAR, &bh) != 0) {
 		printf("%s: attach: cannot map registers\n", self->dv_xname);
 		return;
 	}
-	sc->sc_buffer = (caddr_t)bh;
+	sc->sc_buffer = (caddr_t)bus_space_vaddr(sa->sa_bustag, bh);
 	sc->sc_bufsiz = (bus_size_t)sa->sa_reg[1].sbr_size;
 
 	/* Get number of on-board channels */
-	sc->sc_nchannels = getpropint(node, "#channels", -1);
+	sc->sc_nchannels = PROM_getpropint(node, "#channels", -1);
 	if (sc->sc_nchannels == -1) {
 		printf(": no channels\n");
 		return;
@@ -168,7 +169,7 @@ qecattach(parent, self, aux)
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-	sc->sc_burst = getpropint(node, "burst-sizes", -1);
+	sc->sc_burst = PROM_getpropint(node, "burst-sizes", -1);
 	if (sc->sc_burst == -1)
 		/* take SBus burst sizes */
 		sc->sc_burst = sbusburst;
@@ -181,7 +182,7 @@ qecattach(parent, self, aux)
 	/*
 	 * Collect address translations from the OBP.
 	 */
-	error = getprop(node, "ranges", sizeof(struct sbus_range),
+	error = PROM_getprop(node, "ranges", sizeof(struct sbus_range),
 			 &sc->sc_nrange, (void **)&sc->sc_range);
 	switch (error) {
 	case 0:
@@ -192,14 +193,13 @@ qecattach(parent, self, aux)
 	}
 
 	/* Allocate a bus tag */
-	sbt = (bus_space_tag_t)
-		malloc(sizeof(struct sparc_bus_space_tag), M_DEVBUF, M_NOWAIT);
+	sbt = (bus_space_tag_t) malloc(sizeof(struct sparc_bus_space_tag), 
+	    M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (sbt == NULL) {
 		printf("%s: attach: out of memory\n", self->dv_xname);
 		return;
 	}
 
-	bzero(sbt, sizeof *sbt);
 	sbt->cookie = sc;
 	sbt->parent = sc->sc_bustag;
 	sbt->sparc_bus_map = qec_bus_map;
@@ -208,7 +208,7 @@ qecattach(parent, self, aux)
 	/*
 	 * Save interrupt information for use in our qec_intr_establish()
 	 * function below. Apparently, the intr level for the quad
-	 * ethernet board (qe) is stored in the QEC node rather then
+	 * ethernet board (qe) is stored in the QEC node rather than
 	 * separately in each of the QE nodes.
 	 *
 	 * XXX - qe.c should call bus_intr_establish() with `level = 0'..
@@ -231,31 +231,29 @@ qecattach(parent, self, aux)
 }
 
 int
-qec_bus_map(t, btype, offset, size, flags, vaddr, hp)
+qec_bus_map(t, baddr, size, flags, va, hp)
 	bus_space_tag_t t;
-	bus_type_t btype;
-	bus_addr_t offset;
+	bus_addr_t baddr;
 	bus_size_t size;
 	int	flags;
-	vaddr_t vaddr;
+	vaddr_t va;	/* Ignored */
 	bus_space_handle_t *hp;
 {
 	struct qec_softc *sc = t->cookie;
-	int slot = btype;
+	int slot = BUS_ADDR_IOSPACE(baddr);
 	int i;
 
 	for (i = 0; i < sc->sc_nrange; i++) {
-		bus_addr_t paddr;
-		bus_type_t iospace;
+		struct sbus_range *rp = &sc->sc_range[i];
 
 		if (sc->sc_range[i].cspace != slot)
 			continue;
 
 		/* We've found the connection to the parent bus */
-		paddr = sc->sc_range[i].poffset + offset;
-		iospace = sc->sc_range[i].pspace;
-		return (bus_space_map2(sc->sc_bustag, iospace, paddr,
-					size, flags, vaddr, hp));
+		return (bus_space_map(sc->sc_bustag,
+				BUS_ADDR(rp->pspace,
+					 rp->poffset + BUS_ADDR_PADDR(baddr)),
+				size, flags, hp));
 	}
 
 	return (EINVAL);

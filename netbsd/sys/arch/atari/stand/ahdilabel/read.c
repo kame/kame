@@ -1,4 +1,4 @@
-/*	$NetBSD: read.c,v 1.1.2.2 2001/03/22 02:21:20 he Exp $	*/
+/*	$NetBSD: read.c,v 1.2 2001/02/25 14:32:59 jdc Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

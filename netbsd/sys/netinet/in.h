@@ -1,4 +1,4 @@
-/*	$NetBSD: in.h,v 1.47.4.3 2002/02/26 20:57:22 he Exp $	*/
+/*	$NetBSD: in.h,v 1.58 2002/05/13 13:34:32 kleink Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -43,15 +43,44 @@
 #ifndef _NETINET_IN_H_
 #define	_NETINET_IN_H_
 
+#include <machine/int_types.h>
+
+#ifndef uint8_t
+typedef __uint8_t	uint8_t;
+#define	uint8_t		__uint8_t
+#endif
+
+#ifndef uint32_t
+typedef __uint32_t	uint32_t;
+#define	uint32_t	__uint32_t
+#endif
+
+#include <sys/ansi.h>
+
+#ifndef in_addr_t
+typedef __in_addr_t	in_addr_t;
+#define	in_addr_t	__in_addr_t
+#endif
+
+#ifndef in_port_t
+typedef __in_port_t	in_port_t;
+#define	in_port_t	__in_port_t
+#endif
+
+#ifndef sa_family_t
+typedef __sa_family_t	sa_family_t;
+#define	sa_family_t	__sa_family_t
+#endif
+
 /*
  * Protocols
  */
 #define	IPPROTO_IP		0		/* dummy for IP */
-#define IPPROTO_HOPOPTS		0		/* IP6 hop-by-hop options */
+#define	IPPROTO_HOPOPTS		0		/* IP6 hop-by-hop options */
 #define	IPPROTO_ICMP		1		/* control message protocol */
 #define	IPPROTO_IGMP		2		/* group mgmt protocol */
 #define	IPPROTO_GGP		3		/* gateway^2 (deprecated) */
-#define IPPROTO_IPV4		4 		/* IP header */
+#define	IPPROTO_IPV4		4 		/* IP header */
 #define	IPPROTO_IPIP		4		/* IP inside IP */
 #define	IPPROTO_TCP		6		/* tcp */
 #define	IPPROTO_EGP		8		/* exterior gateway protocol */
@@ -59,22 +88,23 @@
 #define	IPPROTO_UDP		17		/* user datagram protocol */
 #define	IPPROTO_IDP		22		/* xns idp */
 #define	IPPROTO_TP		29 		/* tp-4 w/ class negotiation */
-#define IPPROTO_IPV6		41		/* IP6 header */
-#define IPPROTO_ROUTING		43		/* IP6 routing header */
-#define IPPROTO_FRAGMENT	44		/* IP6 fragmentation header */
-#define IPPROTO_RSVP		46		/* resource reservation */
-#define IPPROTO_GRE		47		/* GRE encaps RFC 1701 */
+#define	IPPROTO_IPV6		41		/* IP6 header */
+#define	IPPROTO_ROUTING		43		/* IP6 routing header */
+#define	IPPROTO_FRAGMENT	44		/* IP6 fragmentation header */
+#define	IPPROTO_RSVP		46		/* resource reservation */
+#define	IPPROTO_GRE		47		/* GRE encaps RFC 1701 */
 #define	IPPROTO_ESP		50 		/* encap. security payload */
 #define	IPPROTO_AH		51 		/* authentication header */
-#define IPPROTO_MOBILE		55		/* IP Mobility RFC 2004 */
-#define IPPROTO_IPV6_ICMP	58		/* IPv6 ICMP */
-#define IPPROTO_ICMPV6		58		/* ICMP6 */
-#define IPPROTO_NONE		59		/* IP6 no next header */
-#define IPPROTO_DSTOPTS		60		/* IP6 destination option */
+#define	IPPROTO_MOBILE		55		/* IP Mobility RFC 2004 */
+#define	IPPROTO_IPV6_ICMP	58		/* IPv6 ICMP */
+#define	IPPROTO_ICMPV6		58		/* ICMP6 */
+#define	IPPROTO_NONE		59		/* IP6 no next header */
+#define	IPPROTO_DSTOPTS		60		/* IP6 destination option */
 #define	IPPROTO_EON		80		/* ISO cnlp */
 #define	IPPROTO_ENCAP		98		/* encapsulation header */
-#define IPPROTO_PIM		103		/* Protocol indep. multicast */
-#define IPPROTO_IPCOMP		108		/* IP Payload Comp. Protocol */
+#define	IPPROTO_PIM		103		/* Protocol indep. multicast */
+#define	IPPROTO_IPCOMP		108		/* IP Payload Comp. Protocol */
+#define	IPPROTO_VRRP		112		/* VRRP RFC 2338 */
 
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256
@@ -92,7 +122,7 @@
  * When a user does a bind(2) or connect(2) with a port number of zero,
  * a non-conflicting local port address is chosen.
  *
- * The default range is IPPORT_ANONMIX to IPPORT_ANONMAX, although
+ * The default range is IPPORT_ANONMIN to IPPORT_ANONMAX, although
  * that is settable by sysctl(3); net.inet.ip.anonportmin and
  * net.inet.ip.anonportmax respectively.
  *
@@ -121,7 +151,7 @@
  * Internet address (a structure for historical reasons)
  */
 struct in_addr {
-	u_int32_t s_addr;
+	in_addr_t s_addr;
 } __attribute__((__packed__));
 
 /*
@@ -134,32 +164,32 @@ struct in_addr {
  * on these macros not doing byte-swapping.
  */
 #ifdef _KERNEL
-#define	__IPADDR(x)	((u_int32_t) htonl((u_int32_t)(x)))
+#define	__IPADDR(x)	((uint32_t) htonl((uint32_t)(x)))
 #else
-#define	__IPADDR(x)	((u_int32_t)(x))
+#define	__IPADDR(x)	((uint32_t)(x))
 #endif
 
-#define	IN_CLASSA(i)		(((u_int32_t)(i) & __IPADDR(0x80000000)) == \
+#define	IN_CLASSA(i)		(((uint32_t)(i) & __IPADDR(0x80000000)) == \
 				 __IPADDR(0x00000000))
 #define	IN_CLASSA_NET		__IPADDR(0xff000000)
 #define	IN_CLASSA_NSHIFT	24
 #define	IN_CLASSA_HOST		__IPADDR(0x00ffffff)
 #define	IN_CLASSA_MAX		128
 
-#define	IN_CLASSB(i)		(((u_int32_t)(i) & __IPADDR(0xc0000000)) == \
+#define	IN_CLASSB(i)		(((uint32_t)(i) & __IPADDR(0xc0000000)) == \
 				 __IPADDR(0x80000000))
 #define	IN_CLASSB_NET		__IPADDR(0xffff0000)
 #define	IN_CLASSB_NSHIFT	16
 #define	IN_CLASSB_HOST		__IPADDR(0x0000ffff)
 #define	IN_CLASSB_MAX		65536
 
-#define	IN_CLASSC(i)		(((u_int32_t)(i) & __IPADDR(0xe0000000)) == \
+#define	IN_CLASSC(i)		(((uint32_t)(i) & __IPADDR(0xe0000000)) == \
 				 __IPADDR(0xc0000000))
 #define	IN_CLASSC_NET		__IPADDR(0xffffff00)
 #define	IN_CLASSC_NSHIFT	8
 #define	IN_CLASSC_HOST		__IPADDR(0x000000ff)
 
-#define	IN_CLASSD(i)		(((u_int32_t)(i) & __IPADDR(0xf0000000)) == \
+#define	IN_CLASSD(i)		(((uint32_t)(i) & __IPADDR(0xf0000000)) == \
 				 __IPADDR(0xe0000000))
 /* These ones aren't really net and host fields, but routing needn't know. */
 #define	IN_CLASSD_NET		__IPADDR(0xf0000000)
@@ -167,12 +197,12 @@ struct in_addr {
 #define	IN_CLASSD_HOST		__IPADDR(0x0fffffff)
 #define	IN_MULTICAST(i)		IN_CLASSD(i)
 
-#define	IN_EXPERIMENTAL(i)	(((u_int32_t)(i) & __IPADDR(0xf0000000)) == \
+#define	IN_EXPERIMENTAL(i)	(((uint32_t)(i) & __IPADDR(0xf0000000)) == \
 				 __IPADDR(0xf0000000))
-#define	IN_BADCLASS(i)		(((u_int32_t)(i) & __IPADDR(0xf0000000)) == \
+#define	IN_BADCLASS(i)		(((uint32_t)(i) & __IPADDR(0xf0000000)) == \
 				 __IPADDR(0xf0000000))
 
-#define	IN_LOCAL_GROUP(i)	(((u_int32_t)(i) & __IPADDR(0xffffff00)) == \
+#define	IN_LOCAL_GROUP(i)	(((uint32_t)(i) & __IPADDR(0xffffff00)) == \
 				 __IPADDR(0xe0000000))
 
 #define	INADDR_ANY		__IPADDR(0x00000000)
@@ -193,14 +223,14 @@ struct in_addr {
  * Socket address, internet style.
  */
 struct sockaddr_in {
-	u_int8_t  sin_len;
-	u_int8_t  sin_family;
-	u_int16_t sin_port;
-	struct	  in_addr sin_addr;
-	int8_t	  sin_zero[8];
+	uint8_t		sin_len;
+	sa_family_t	sin_family;
+	in_port_t	sin_port;
+	struct in_addr	sin_addr;
+	__int8_t	sin_zero[8];
 };
 
-#define INET_ADDRSTRLEN                 16
+#define	INET_ADDRSTRLEN                 16
 
 /*
  * Structure used to describe IP options.
@@ -211,7 +241,7 @@ struct sockaddr_in {
  */
 struct ip_opts {
 	struct in_addr	ip_dst;		/* first hop, 0 w/o src rt */
-	int8_t		ip_opts[40];	/* actually variable in size */
+	__int8_t	ip_opts[40];	/* actually variable in size */
 };
 
 /*
@@ -231,11 +261,11 @@ struct ip_opts {
 #define	IP_MULTICAST_LOOP	11   /* u_char; set/get IP multicast loopback */
 #define	IP_ADD_MEMBERSHIP	12   /* ip_mreq; add an IP group membership */
 #define	IP_DROP_MEMBERSHIP	13   /* ip_mreq; drop an IP group membership */
-#define IP_PORTRANGE		19   /* int; range to use for ephemeral port */
+#define	IP_PORTRANGE		19   /* int; range to use for ephemeral port */
 #define	IP_RECVIF		20   /* bool; receive reception if w/dgram */
 #define	IP_ERRORMTU		21   /* int; get MTU of last xmit = EMSGSIZE */
 #if 1 /*IPSEC*/
-#define IP_IPSEC_POLICY		22 /* struct; get/set security policy */
+#define	IP_IPSEC_POLICY		22 /* struct; get/set security policy */
 #endif
 
 /*
@@ -261,7 +291,7 @@ struct ip_mreq {
 #define	IP_PORTRANGE_HIGH	1	/* same as DEFAULT (FreeBSD compat) */
 #define	IP_PORTRANGE_LOW	2	/* use privileged range */
 
-#if !defined(_XOPEN_SOURCE)
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 /*
  * Definitions for inet sysctl operations.
  *
@@ -344,11 +374,11 @@ struct ip_mreq {
 #define	IPCTL_MTUDISCTIMEOUT   12	/* allow path MTU discovery */
 #define	IPCTL_MAXFLOWS         13	/* maximum ip flows allowed */
 #define	IPCTL_HOSTZEROBROADCAST 14	/* is host zero a broadcast addr? */
-#define IPCTL_GIF_TTL 	       15	/* default TTL for gif encap packet */
-#define IPCTL_LOWPORTMIN       16	/* minimum reserved port */
-#define IPCTL_LOWPORTMAX       17	/* maximum reserved port */
-#define IPCTL_MAXFRAGPACKETS   18	/* max packets in reassembly queue */
-#define	IPCTL_GRE_TTL          19	/* default TTL for gre encap packet */
+#define	IPCTL_GIF_TTL 	       15	/* default TTL for gif encap packet */
+#define	IPCTL_LOWPORTMIN       16	/* minimum reserved port */
+#define	IPCTL_LOWPORTMAX       17	/* maximum reserved port */
+#define	IPCTL_MAXFRAGPACKETS   18	/* max packets reassembly queue */
+#define IPCTL_GRE_TTL          19	/* default TTL for gre encap packet */
 #define	IPCTL_MAXID	       20
 
 #define	IPCTL_NAMES { \
@@ -373,14 +403,61 @@ struct ip_mreq {
 	{ "maxfragpackets", CTLTYPE_INT }, \
 	{ "grettl", CTLTYPE_INT }, \
 }
-#endif /* !_XOPEN_SOURCE */
+#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 
 /* INET6 stuff */
-#define __KAME_NETINET_IN_H_INCLUDED_
+#define	__KAME_NETINET_IN_H_INCLUDED_
 #include <netinet6/in6.h>
 #undef __KAME_NETINET_IN_H_INCLUDED_
 
 #ifdef _KERNEL
+/*
+ * in_cksum_phdr:
+ *
+ *	Compute significant parts of the IPv4 checksum pseudo-header
+ *	for use in a delayed TCP/UDP checksum calculation.
+ *
+ *	Args:
+ *
+ *		src		Source IP address
+ *		dst		Destination IP address
+ *		lenproto	htons(proto-hdr-len + proto-number)
+ */
+static __inline u_int16_t __attribute__((__unused__))
+in_cksum_phdr(u_int32_t src, u_int32_t dst, u_int32_t lenproto)
+{
+	u_int32_t sum;
+
+	sum = lenproto +
+	      (u_int16_t)(src >> 16) +
+	      (u_int16_t)(src /*& 0xffff*/) +
+	      (u_int16_t)(dst >> 16) +
+	      (u_int16_t)(dst /*& 0xffff*/);
+
+	sum = (u_int16_t)(sum >> 16) + (u_int16_t)(sum /*& 0xffff*/);
+
+	if (sum > 0xffff)
+		sum -= 0xffff;
+
+	return (sum);
+}
+
+/*
+ * in_cksum_addword:
+ *
+ *	Add the two 16-bit network-order values, carry, and return.
+ */
+static __inline u_int16_t __attribute__((__unused__))
+in_cksum_addword(u_int16_t a, u_int16_t b)
+{
+	u_int32_t sum = a + b;
+
+	if (sum > 0xffff)
+		sum -= 0xffff;
+
+	return (sum);
+}
+
 extern	struct in_addr zeroin_addr;
 extern	u_char	ip_protox[];
 
@@ -388,6 +465,7 @@ int	in_broadcast __P((struct in_addr, struct ifnet *));
 int	in_canforward __P((struct in_addr));
 int	in_cksum __P((struct mbuf *, int));
 int	in4_cksum __P((struct mbuf *, u_int8_t, int, int));
+void	in_delayed_cksum __P((struct mbuf *));
 int	in_localaddr __P((struct in_addr));
 void	in_socktrim __P((struct sockaddr_in *));
 

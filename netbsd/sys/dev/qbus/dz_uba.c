@@ -1,4 +1,4 @@
-/*	$NetBSD: dz_uba.c,v 1.12 2000/06/05 00:09:18 matt Exp $ */
+/*	$NetBSD: dz_uba.c,v 1.14 2002/02/25 14:58:07 ad Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden. All rights reserved.
  * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dz_uba.c,v 1.14 2002/02/25 14:58:07 ad Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -51,8 +54,8 @@
 
 #include <dev/qbus/ubavar.h>
 
-#include <dev/qbus/dzreg.h>
-#include <dev/qbus/dzvar.h>
+#include <dev/dec/dzreg.h>
+#include <dev/dec/dzvar.h>
 
 #include "ioconf.h"
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: crl.c,v 1.9 2000/06/02 21:51:46 matt Exp $	*/
+/*	$NetBSD: crl.c,v 1.11 2000/11/20 08:24:23 chs Exp $	*/
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -147,7 +147,13 @@ crlrw(dev, uio, flag)
 			if (error)
 				break;
 		}
-		bp->b_flags = uio->uio_rw == UIO_WRITE ? B_WRITE : B_READ;
+		if (uio->uio_rw == UIO_WRITE) {
+			bp->b_flags &= ~(B_READ|B_DONE);
+			bp->b_flags |= B_WRITE;
+		} else {
+			bp->b_flags &= ~(B_WRITE|B_DONE);
+			bp->b_flags |= B_READ;
+		}
 		s = splconsmedia(); 
 		crlstart();
 		while ((bp->b_flags & B_DONE) == 0)
@@ -208,10 +214,18 @@ crlintr(arg)
 		switch (crltab.crl_active) {
 
 		case CRL_F_RETSTS:
-			crlstat.crl_ds = mfpr(PR_STXDB);
-			printf("crlcs=0x%b, crlds=0x%b\n", crlstat.crl_cs,
-				CRLCS_BITS, crlstat.crl_ds, CRLDS_BITS); 
-			break;
+			{
+				char sbuf[256], sbuf2[256];
+
+				crlstat.crl_ds = mfpr(PR_STXDB);
+
+				bitmask_snprintf(crlstat.crl_cs, CRLCS_BITS,
+						 sbuf, sizeof(sbuf));
+				bitmask_snprintf(crlstat.crl_ds, CRLDS_BITS,
+						 sbuf2, sizeof(sbuf2));
+				printf("crlcs=0x%s, crlds=0x%s\n", sbuf, sbuf2);
+				break;
+			}
 
 		case CRL_F_READ:
 		case CRL_F_WRITE:

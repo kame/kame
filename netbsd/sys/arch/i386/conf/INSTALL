@@ -1,4 +1,4 @@
-#	$NetBSD: INSTALL,v 1.148.2.5 2001/10/25 18:05:29 he Exp $
+#	$NetBSD: INSTALL,v 1.196.4.1 2002/06/24 17:38:43 lukem Exp $
 #
 #	INSTALL - Installation kernel.
 #
@@ -11,14 +11,16 @@
 
 include "arch/i386/conf/std.i386"
 
-makeoptions 	COPTS="-Os"		# Optimise for space. Implies -O2
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+makeoptions	COPTS="-Os"		# Optimise for space. Implies -O2
 
 # Enable the hooks used for initializing the root memory-disk.
 options 	MEMORY_DISK_HOOKS
 options 	MEMORY_DISK_IS_ROOT	# force root on memory disk
 options 	MEMORY_DISK_SERVER=0	# no userspace memory disk support
-options 	MINIROOTSIZE=4096	# size of memory disk, in blocks
-#options 	MINIROOTSIZE=2880	# 1.44M, same as a floppy
+options 	MEMORY_DISK_ROOT_SIZE=4096	# size of memory disk, in blocks
+#options 	MEMORY_DISK_ROOT_SIZE=2880	# 1.44M, same as a floppy
 
 maxusers	32		# estimated number of users
 
@@ -40,7 +42,7 @@ options 	MATH_EMULATE	# floating point emulation
 
 # This option allows you to force a serial console at the specified
 # I/O address.
-#options 	"CONSDEVNAME=\"com\"",CONADDR=0x3f8,CONSPEED=9600
+#options 	CONSDEVNAME="\"com\"",CONADDR=0x3f8,CONSPEED=9600
 
 # The following options override the memory sizes passed in from the boot
 # block.  Use them *only* if the boot block is unable to determine the correct
@@ -70,6 +72,9 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 
 #options 	LKM		# loadable kernel modules
 
+#options 	USERCONF	# userconf(4) support
+options 	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Diagnostic/debugging support options
 #options 	DIAGNOSTIC	# expensive kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
@@ -78,8 +83,8 @@ options 	DDB		# in-kernel debugger
 #options 	DDB_ONPANIC=1	# see also sysctl(8): `ddb.onpanic'
 options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 #options 	KGDB		# remote debugger
-#options 	"KGDB_DEVNAME=\"com\"",KGDBADDR=0x3f8,KGDBRATE=9600
-#makeoptions 	DEBUG="-g"	# compile full symbol table
+#options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
+#makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
 #options 	COMPAT_NOMID	# compatibility with 386BSD, BSDI, NetBSD 0.8,
@@ -91,6 +96,7 @@ options 	COMPAT_13	# NetBSD 1.3,
 options 	COMPAT_14	# NetBSD 1.4,
 #options 	COMPAT_43	# and 4.3BSD
 options 	COMPAT_386BSD_MBRPART # recognize old partition ID
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 #options 	COMPAT_SVR4	# binary compatibility with SVR4
 #options 	COMPAT_IBCS2	# binary compatibility with SCO and ISC
@@ -117,6 +123,8 @@ file-system 	KERNFS		# /kern
 # Filesystem options
 #options 	QUOTA		# UFS quotas
 #options 	NFSSERVER	# Network File System server
+#options 	NFS_V2_ONLY	# Exclude NFS3 and NQNFS code to save space
+options 	VNODE_OP_NOINLINE # Save space by not inlining vnode op calls
 #options 	EXT2FS_SYSTEM_FLAGS # makes ext2fs file flags (append and
 				# immutable) behave as system flags.
 
@@ -135,9 +143,7 @@ options 	INET6		# IPv6
 #options 	PPP_DEFLATE	# Deflate compression support for PPP
 #options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
-
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not recommended.
-#options 	TCP_COMPAT_42
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 # These options enable verbose messages for several subsystems.
 # Warning, these may compile large string tables into the kernel!
@@ -147,7 +153,30 @@ options 	INET6		# IPv6
 #options 	PCI_CONFIG_DUMP	# verbosely dump PCI config space
 #options 	PCMCIAVERBOSE	# verbose PCMCIA configuration messages
 #options 	SCSIVERBOSE	# human readable SCSI error messages
-#options	I2OVERBOSE	# verobse I2O driver messages
+#options 	I2OVERBOSE	# verbose I2O driver messages
+
+#
+# wscons options
+#
+# builtin terminal emulations 
+#options 	WSEMUL_SUN		# sun terminal emulation
+options 	WSEMUL_VT100		# VT100 / VT220 emulation
+# different kernel output - see dev/wscons/wsdisplayvar.h
+options 	WS_KERNEL_FG=WSCOL_WHITE
+#options 	WS_KERNEL_BG=WSCOL_BLACK
+# compatibility to other console drivers
+#options 	WSDISPLAY_COMPAT_PCVT           # emulate some ioctls
+#options 	WSDISPLAY_COMPAT_SYSCONS        # emulate some ioctls
+#options 	WSDISPLAY_COMPAT_USL            # VT handling
+#options 	WSDISPLAY_COMPAT_RAWKBD         # can get raw scancodes
+# see dev/pckbc/wskbdmap_mfii.c for implemented layouts
+#options 	PCKBD_LAYOUT="(KB_DE | KB_NODEAD)"
+# allocate a number of virtual screens at autoconfiguration time
+#options 	WSDISPLAY_DEFAULTSCREENS=4
+# use a large software cursor that doesn't blink
+options 	PCDISPLAY_SOFTCURSOR
+# modify the screen type of the console; defaults to "80x25"
+#options 	VGA_CONSOLE_SCREENTYPE="\"80x24\""
 
 # Kernel root file system and dump configuration.
 config		netbsd	root on ? type ?
@@ -179,13 +208,13 @@ ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 puc*	at pci? dev ? function ?	# PCI "universal" comm. cards
 
 # EISA bus support
-eisa*	at mainbus?
-eisa*	at pceb?
+eisa0	at mainbus?
+eisa0	at pceb?
 
 # ISA bus support
-isa*	at mainbus?
-isa*	at pceb?
-isa*	at pcib?
+isa0	at mainbus?
+isa0	at pceb?
+isa0	at pcib?
 
 # PCMCIA bus support
 pcmcia*	at pcic? controller ? socket ?
@@ -194,6 +223,7 @@ pcmcia*	at tcic? controller ? socket ?
 # ISA PCMCIA controllers
 pcic0 	at isa? port 0x3e0 iomem 0xd0000 iosiz 0x10000
 pcic1 	at isa? port 0x3e2 iomem 0xe0000 iosiz 0x4000
+pcic2	at isa? port 0x3e4 iomem 0xe0000 iosiz 0x4000
 tcic0 	at isa? port 0x240 iomem 0xd0000 iosiz 0x10000
 
 # PCI PCMCIA controllers
@@ -214,7 +244,7 @@ npx0	at isa? port 0xf0 irq 13	# x86 math coprocessor
 # Console Devices
 
 # ISA console
-pc0	at isa? port 0x60 irq 1		# pccons generic PC console driver
+#pc0	at isa? port 0x60 irq 1		# pccons generic PC console driver
 
 # Keyboard layout configuration for pccons
 #options 	FRENCH_KBD
@@ -223,23 +253,19 @@ pc0	at isa? port 0x60 irq 1		# pccons generic PC console driver
 #options 	NORWEGIAN_KBD
 
 # wscons
-#pckbc0	at isa?			# pc keyboard controller
-#pckbd*	at pckbc?		# PC keyboard
-# "opms" should not be enabled together with "pms" or "pmsi"
+pckbc0		at isa?			# pc keyboard controller
+pckbd*		at pckbc?		# PC keyboard
 #pms*		at pckbc?		# PS/2 mouse for wsmouse
-#pmsi*		at pckbc?	# PS/2 "Intelli"mouse for wsmouse
-#opms*		at pckbc?		# backwards compatible PS/2 mouse
-#vga0		at isa?
-#vga*		at pci?
-#pcdisplay0	at isa?			# CGA, MDA, EGA, HGA
-#wsdisplay*	at vga? console ?
-#wsdisplay*	at pcdisplay? console ?
-#wskbd*	at pckbd? console ?
-#wsmouse*	at pms?
-#wsmouse*	at pmsi?
+vga0		at isa?
+vga*		at pci? dev ? function ?
+pcdisplay0	at isa?			# CGA, MDA, EGA, HGA
+wsdisplay*	at vga? console ?
+wsdisplay*	at pcdisplay? console ?
+wskbd*		at pckbd? console ?
+#wsmouse*	at pms? mux 0
 
-#pcppi0	at isa?
-#sysbeep0	at pcppi?
+pcppi0		at isa?
+sysbeep0	at pcppi?
 
 # Serial Devices
 
@@ -284,10 +310,10 @@ com2	at isa? port 0x3e8 irq 5
 #lpt2	at isa? port 0x3bc
 
 # I2O devices
-iop*	at pci? dev ? function ?	# I/O processors
-iopsp*	at iop? tid ?			# SCSI ports
-ld*	at iop? tid ?			# block devices
-#dpti*	at iop? tid 0			# Adaptec/DPT control interface
+iop*	at pci? dev ? function ?	# I/O processor
+iopsp*	at iop? tid ?			# SCSI/FC-AL ports
+ld*	at iop? tid ?			# Block devices
+#dpti*	at iop? tid 0			# DPT/Adaptec control interface
 
 # SCSI Controllers and Devices
 
@@ -297,10 +323,12 @@ adw*	at pci? dev ? function ?	# AdvanSys 9x0UW[D], 3940U[2,3]W SCSI
 ahc*	at pci? dev ? function ?	# Adaptec [23]94x, aic78x0 SCSI
 bha*	at pci? dev ? function ?	# BusLogic 9xx SCSI
 dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID
+iha*	at pci? dev ? function ?	# Initio INIC-940/950 SCSI
 isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
-#ncr*	at pci? dev ? function ?	# NCR 53c8xx SCSI
-siop*	at pci? dev ? function ?	# NCR 53c8xx SCSI (new driver)
+mly*	at pci? dev ? function ?	# Mylex AcceleRAID and eXtremeRAID
 pcscp*	at pci? dev ? function ?	# AMD 53c974 PCscsi-PCI SCSI
+siop*	at pci? dev ? function ?	# NCR 53c8xx SCSI (new driver)
+trm*	at pci? dev ? function ?	# Tekram DC-395U/UW/F, DC-315/U SCSI
 
 # EISA SCSI controllers
 ahb*	at eisa? slot ?			# Adaptec 174[02] SCSI
@@ -343,13 +371,15 @@ scsibus* at ahc?
 scsibus* at aic?
 scsibus* at bha?
 scsibus* at dpt?
+scsibus* at iha?
 scsibus* at iopsp?
 scsibus* at isp?
 #scsibus* at nca?
-#scsibus* at ncr?
-scsibus* at siop?
+scsibus* at mly?
 scsibus* at pcscp?
 scsibus* at sea?
+scsibus* at siop?
+scsibus* at trm?
 scsibus* at uha?
 scsibus* at wds?
 
@@ -361,15 +391,24 @@ cd*	at scsibus? target ? lun ?	# SCSI CD-ROM drives
 #ss*	at scsibus? target ? lun ?	# SCSI scanners
 #uk*	at scsibus? target ? lun ?	# SCSI unknown
 
-# RAID controllers and devices
-cac*	at eisa? slot ?			# Compaq array controllers
-cac*	at pci? dev ? function ?	# Compaq array controllers
-mlx*	at pci? dev ? function ?	# Mylex DAC960 family
-twe*	at pci? dev ? function ?	# 3ware Escalade family
 
+# RAID controllers and devices
+aac*	at pci? dev ? function ?	# Adaptec AAC family
+cac*	at eisa? slot ?			# Compaq EISA array controllers
+cac*	at pci? dev ? function ?	# Compaq PCI array controllers
+icp*	at pci? dev ? function ?	# ICP-Vortex GDT & Intel RAID
+mlx*	at pci? dev ? function ?	# Mylex DAC960 & DEC SWXCR family
+mlx*	at eisa? slot ?			# Mylex DAC960 & DEC SWXCR family
+twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
+
+ld*	at aac? unit ?			# logical disk devices
 ld*	at cac? unit ?
-ld*	at mlx? unit ?
+ld*	at icp? unit ?
 ld*	at twe? unit ?
+ld*	at mlx? unit ?
+
+icpsp*	at icp? unit ?			# SCSI pass-through
+scsibus* at icpsp?
 
 # IDE and related devices
 # PCI IDE controllers - see pciide(4) for supported hardware.
@@ -382,7 +421,7 @@ pciide* at pci ? dev ? function ? flags 0x0000
 wdc*	at isapnp?
 
 # PCMCIA IDE controllers
-wdc*    at pcmcia? function ?   
+wdc*	at pcmcia? function ?
 
 # ISA ST506, ESDI, and IDE controllers
 # Use flags 0x01 if you want to try to use 32bits data I/O (the driver will
@@ -413,6 +452,7 @@ atapibus* at pciide? channel ?
 # flags have the same meaning as for IDE drives.
 cd*	at atapibus? drive ? flags 0x0000	# ATAPI CD-ROM drives
 sd*	at atapibus? drive ? flags 0x0000	# ATAPI disk drives
+st*	at atapibus? drive ? flags 0x0000	# ATAPI tape drives
 #uk*	at atapibus? drive ? flags 0x0000	# ATAPI unknown
 
 
@@ -438,26 +478,32 @@ fd*	at fdc? drive ?			# the drives themselves
 # Network Interfaces
 
 # PCI network interfaces
-de*	at pci? dev ? function ?	# DEC 21x4x-based Ethernet
-en*	at pci? dev ? function ?	# ENI/Adaptec ATM
+an*	at pci? dev ? function ?	# Aironet PC4500/PC4800 (802.11)
+#en*	at pci? dev ? function ?	# ENI/Adaptec ATM
 ep*	at pci? dev ? function ?	# 3Com 3c59x
-ex*	at pci? dev ? function ?	# 3Com 90x[B]
+ex*	at pci? dev ? function ?	# 3Com 90x[BC]
 epic*	at pci? dev ? function ?	# SMC EPIC/100 Ethernet
-esh*	at pci? dev ? function ?	# Essential HIPPI card
+#esh*	at pci? dev ? function ?	# Essential HIPPI card
 fpa*	at pci? dev ? function ?	# DEC DEFPA FDDI
 fxp*	at pci? dev ? function ?	# Intel EtherExpress PRO 10+/100B
+gsip*	at pci? dev ? function ?	# NS83820 Gigabit Ethernet
+#hme*	at pci? dev ? function ?	# Sun Microelectronics STP2002-STQ
 le*	at pci? dev ? function ?	# PCnet-PCI Ethernet
+#lmc*	at pci? dev ? function ?	# Lan Media Corp SSI/HSSI/DS3
 ne*	at pci? dev ? function ?	# NE2000-compatible Ethernet
-sip*	at pci? dev ? function ?	# SiS 900 Ethernet
-tl*	at pci? dev ? function ?	# ThunderLAN-based Ethernet
-tlp*	at pci? dev ? function ?	# DECchip 21x4x (and clones) Ethernet
-#options 	TLP_MATCH_21040
-#options 	TLP_MATCH_21041
-#options 	TLP_MATCH_21140
-#options 	TLP_MATCH_21142
-vr*	at pci? dev ? function ?	# VIA Rhine Fast Ethernet
-lmc*	at pci? dev ? function ?	# Lan Media Corp SSI/HSSI/DS3
+#ntwoc*	at pci? dev ? function ?	# Riscom/N2 PCI Sync Serial
+pcn*	at pci? dev ? function ?	# AMD PCnet-PCI Ethernet
 rtk*	at pci? dev ? function ?	# Realtek 8129/8139
+sf*	at pci? dev ? function ?	# Adaptec AIC-6915 Ethernet
+sip*	at pci? dev ? function ?	# SiS 900/DP83815 Ethernet
+ste*	at pci? dev ? function ?	# Sundance ST-201 Ethernet
+stge*	at pci? dev ? function ?	# Sundance/Tamarack TC9021 Gigabit
+ti*	at pci? dev ? function ?	# Alteon ACEnic gigabit Ethernet
+tl*	at pci? dev ? function ?	# ThunderLAN-based Ethernet
+tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
+vr*	at pci? dev ? function ?	# VIA Rhine Fast Ethernet
+wi*	at pci? dev ? function ?	# Intersil Prism Mini-PCI (802.11b)
+wm*	at pci? dev ? function ?	# Intel 82543/82544 gigabit
 
 # EISA network interfaces
 ep*	at eisa? slot ?			# 3Com 3c579 Ethernet
@@ -465,17 +511,19 @@ fea*	at eisa? slot ?			# DEC DEFEA FDDI
 tlp*	at eisa? slot ?			# DEC DE-425 Ethernet
 
 # ISA Plug-and-Play network interfaces
+an*	at isapnp?			# # Aironet 802.11
 ep*	at isapnp?			# 3Com 3c509 Ethernet
 ne*	at isapnp?			# NE2000-compatible Ethernet
 tr*	at isapnp?			# IBM/3COM TROPIC Token-Ring
 
 # PCMCIA network interfaces
+an*	at pcmcia? function ?		# Aironet PC4500/PC4800 (802.11)
 awi*	at pcmcia? function ?		# BayStack 650 (802.11FH)
 cnw*	at pcmcia? function ?		# Xircom/Netwave AirSurfer
 ep*	at pcmcia? function ?		# 3Com 3c589 and 3c562 Ethernet
 mbe*	at pcmcia? function ?		# MB8696x based Ethernet
 ne*	at pcmcia? function ?		# NE2000-compatible Ethernet
-ray* 	at pcmcia? function ?           # Raytheon Raylink (802.11)
+ray* 	at pcmcia? function ?		# Raytheon Raylink (802.11)
 sm*	at pcmcia? function ?		# Megahertz Ethernet
 wi*	at pcmcia? function ?		# Lucent WaveLan IEEE (802.11)
 xi*	at pcmcia? function ?		# Xircom CreditCard Ethernet
@@ -506,24 +554,33 @@ le*	at bicc?
 ne0	at isa? port 0x280 irq 9		# NE[12]000 ethernet cards
 ne1	at isa? port 0x300 irq 10
 sm0	at isa? port 0x300 irq 10		# SMC91C9x Ethernet
-tr0	at isa? port 0xa20 iomem 0xd8000 irq ?  # IBM TROPIC based Token-Ring
-tr1	at isa? port 0xa24 iomem 0xd0000 irq ?  # IBM TROPIC based Token-Ring
+tr0	at isa? port 0xa20 iomem 0xd8000 irq ?	# IBM TROPIC based Token-Ring
+tr1	at isa? port 0xa24 iomem 0xd0000 irq ?	# IBM TROPIC based Token-Ring
 tr*	at isa? port ? irq ?			# 3COM TROPIC based Token-Ring
 we0	at isa? port 0x280 iomem 0xd0000 irq 9	# WD/SMC Ethernet
 we1	at isa? port 0x300 iomem 0xcc000 irq 10
 
 # MII/PHY support
+acphy*	at mii? phy ?			# DAltima AC101 and AMD Am79c874 PHYs
+amhphy* at mii? phy ?			# AMD 79c901 Ethernet PHYs
+bmtphy* at mii? phy ?			# Broadcom BCM5201 and BCM5202 PHYs
+brgphy* at mii? phy ?			# Broadcom BCM5400-family PHYs
+dmphy*	at mii? phy ?			# Davicom DM9101 PHYs
 exphy*	at mii? phy ?			# 3Com internal PHYs
-icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS1890
+glxtphy* at mii? phy ?			# Level One LXT-1000 PHYs
+gphyter* at mii? phy ?			# NS83861 Gig-E PHY
+icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS189x
 inphy*	at mii? phy ?			# Intel 82555 PHYs
 iophy*	at mii? phy ?			# Intel 82553 PHYs
 lxtphy*	at mii? phy ?			# Level One LXT-970 PHYs
 nsphy*	at mii? phy ?			# NS83840 PHYs
 nsphyter* at mii? phy ?			# NS83843 PHYs
+pnaphy* at mii? phy ?			# generic HomePNA PHYs
 qsphy*	at mii? phy ?			# Quality Semiconductor QS6612 PHYs
 sqphy*	at mii? phy ?			# Seeq 80220/80221/80223 PHYs
 tlphy*	at mii? phy ?			# ThunderLAN PHYs
 tqphy*	at mii? phy ?			# TDK Semiconductor PHYs
+urlphy*	at mii? phy ?			# Realtek RTL8150L internal PHYs
 ukphy*	at mii? phy ?			# generic unknown PHYs
 
 # USB Controller and Devices
@@ -540,16 +597,19 @@ usb*	at ohci?
 uhub*	at usb?
 uhub*	at uhub? port ? configuration ? interface ?
 
+# USB HID device
+uhidev*	at uhub? port ? configuration ? interface ?
+
 # USB Mice
-#ums*	at uhub? port ? configuration ? interface ?
+#ums*	at uhidev? reportid ?
 #wsmouse*	at ums?
 
 # USB Keyboards
-ukbd*	at uhub? port ? configuration ? interface ?
+ukbd*	at uhidev? reportid ?
 wskbd*	at ukbd? console ?
 
 # USB Generic HID devices
-uhid*	at uhub? port ? configuration ? interface ?
+#uhid*	at uhidev? reportid ?
 
 # USB Printer
 #ulpt*	at uhub? port ? configuration ? interface ?
@@ -559,6 +619,9 @@ umass*	at uhub? port ? configuration ? interface ?
 atapibus* at umass? channel ?
 scsibus* at umass? channel ?
 
+# Y@P firmware loader
+#uyap* at uhub? port ?
+
 # USB Generic driver
 #ugen*	at uhub? port ? configuration ? interface ?
 
@@ -566,6 +629,7 @@ scsibus* at umass? channel ?
 aue* 	at uhub? port ?		# ADMtek AN986 Pegasus based adapters
 cue* 	at uhub? port ?		# CATC USB-EL1201A based adapters
 kue* 	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
+url*	at uhub? port ?		# Realtek RTL8150L based adapters
 
 # Audio Devices
 
@@ -583,7 +647,7 @@ kue* 	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
 #aria0	at isa? port 0x290 irq 10 		# Aria
 #gus0	at isa? port 0x220 irq 7 drq 1 drq2 6	# Gravis Ultra Sound
 #pas0	at isa? port 0x220 irq 7 drq 1		# ProAudio Spectrum
-#pss0	at isa? port 0x220 irq 7 drq 6  	# Personal Sound System
+#pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
 #sp0	at pss0 port 0x530 irq 10 drq 0		# 	sound port driver
 #sb0	at isa? port 0x220 irq 7 drq 1 drq2 5	# SoundBlaster
 #wss0	at isa? port 0x530 irq 10 drq 0	drq2 1	# Windows Sound System
@@ -594,7 +658,7 @@ kue* 	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
 #opl*	at ess?
 #opl*	at sb?
 #opl*	at sv?
- 
+
 # Audio support
 #audio*	at aria?
 #audio*	at eap?
@@ -630,7 +694,6 @@ kue* 	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
 #olms1	at isa? port 0x238 irq 5
 #omms0	at isa? port 0x23c irq 5	# Microsoft InPort mouse
 #omms1	at isa? port 0x238 irq 5
-#opms0	at pc? irq 12		# PS/2 auxiliary port mouse
 
 # Joysticks
 
@@ -668,10 +731,9 @@ pseudo-device	sl		2	# Serial Line IP
 #pseudo-device	strip		2	# Starmode Radio IP (Metricom)
 #pseudo-device	tun		2	# network tunneling over tty
 #pseudo-device	gre		2	# generic L3 over IP tunnel
-#pseudo-device	ipip		2	# IP Encapsulation within IP (RFC 2003)
 
 # miscellaneous pseudo-devices
-pseudo-device	pty		2	# pseudo-terminals
+pseudo-device	pty		2	# pseudo-terminals (Sysinst needs two)
 #pseudo-device	tb		1	# tablet line discipline
 #pseudo-device	sequencer	1	# MIDI sequencer
 # rnd works; RND_COM does not on port i386 yet.
@@ -680,3 +742,8 @@ pseudo-device	pty		2	# pseudo-terminals
 
 # a pseudo device needed for Coda	# also needs CODA (above)
 #pseudo-device	vcoda		4	# coda minicache <-> venus comm.
+
+# wscons pseudo-devices
+pseudo-device	wsmux			# mouse & keyboard multiplexor
+#pseudo-device	wsfont
+

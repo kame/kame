@@ -1,4 +1,4 @@
-/*	$NetBSD: cacvar.h,v 1.5.2.2 2002/01/29 23:31:18 he Exp $	*/
+/*	$NetBSD: cacvar.h,v 1.9 2002/01/25 16:10:36 ad Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

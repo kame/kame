@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_stat.h,v 1.18 2000/04/11 08:12:14 pk Exp $	*/
+/*	$NetBSD: uvm_stat.h,v 1.24 2002/03/05 05:45:54 simonb Exp $	*/
 
 /*
  *
@@ -37,7 +37,7 @@
 #ifndef _UVM_UVM_STAT_H_
 #define _UVM_UVM_STAT_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_uvmhist.h"
 #endif
 
@@ -116,7 +116,7 @@ struct uvm_history {
 	LIST_ENTRY(uvm_history) list;	/* link on list of all histories */
 	int n;				/* number of entries */
 	int f; 				/* next free one */
-	simple_lock_data_t l;		/* lock on this history */
+	struct simplelock l;		/* lock on this history */
 	struct uvm_history_ent *e;	/* the malloc'd entries */
 };
 
@@ -134,6 +134,7 @@ LIST_HEAD(uvm_history_head, uvm_history);
 /* and these are the bit values of each history */
 #define	UVMHIST_MAPHIST		0x00000001	/* maphist */
 #define	UVMHIST_PDHIST		0x00000002	/* pdhist */
+#define	UVMHIST_UBCHIST		0x00000004	/* ubchist */
 
 #ifdef _KERNEL
 
@@ -150,6 +151,8 @@ LIST_HEAD(uvm_history_head, uvm_history);
 #define UVMHIST_FUNC(FNAME)
 #define uvmhist_dump(NAME)
 #else
+#include <sys/kernel.h>		/* for "cold" variable */
+
 extern	struct uvm_history_head uvm_histories;
 
 #define UVMHIST_DECL(NAME) struct uvm_history NAME
@@ -179,8 +182,6 @@ do { \
 	memset((NAME).e, 0, sizeof(struct uvm_history_ent) * (NAME).n); \
 	LIST_INSERT_HEAD(&uvm_histories, &(NAME), list); \
 } while (0)
-
-extern int cold;
 
 #if defined(UVMHIST_PRINT)
 extern int uvmhist_print_enabled;
@@ -232,7 +233,7 @@ do { \
 #define UVMHIST_FUNC(FNAME) \
 	static int _uvmhist_cnt = 0; \
 	static char *_uvmhist_name = FNAME; \
-	int _uvmhist_call; 
+	int _uvmhist_call;
 
 static __inline void uvmhist_print __P((struct uvm_history_ent *));
 

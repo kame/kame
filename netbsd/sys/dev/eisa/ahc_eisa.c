@@ -1,4 +1,4 @@
-/*	$NetBSD: ahc_eisa.c,v 1.18 2000/03/15 02:04:43 fvdl Exp $	*/
+/*	$NetBSD: ahc_eisa.c,v 1.20 2001/11/13 12:47:33 lukem Exp $	*/
 
 /*
  * Product specific probe and attach routines for:
@@ -31,10 +31,14 @@
  * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15 2000/01/29 14:22:19 peter Exp $
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ahc_eisa.c,v 1.20 2001/11/13 12:47:33 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+#include <sys/reboot.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -51,16 +55,6 @@
 #include <dev/ic/aic7xxxvar.h>
 #include <dev/ic/aic77xxreg.h>
 #include <dev/ic/aic77xxvar.h>
-
-/*
- * Under normal circumstances, these messages are unnecessary
- * and not terribly cosmetic.
- */
-#ifdef DEBUG
-#define bootverbose	1
-#else
-#define bootverbose	1
-#endif
 
 int	ahc_eisa_match __P((struct device *, struct cfdata *, void *));
 void	ahc_eisa_attach __P((struct device *, struct device *, void *));

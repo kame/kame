@@ -1,4 +1,4 @@
-/* $NetBSD: uba_dma.c,v 1.4 2000/05/27 21:44:35 ragge Exp $ */
+/* $NetBSD: uba_dma.c,v 1.6 2001/07/27 12:57:20 ragge Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #define _VAX_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -114,7 +114,7 @@ uba_dma_init(sc)
 		pte = sc->uv_uba->uba_map;
 	} else {
 		pte = (struct pte *)vax_map_physmem(sc->uv_addr,
-		    sc->uv_size/(VAX_NBPG/sizeof(struct pte)));
+		    vax_btoc(vax_btoc(sc->uv_size) * sizeof(struct pte)));
 		if (pte == 0)
 			panic("uba_dma_init");
 	}

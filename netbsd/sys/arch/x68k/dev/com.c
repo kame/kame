@@ -1,4 +1,4 @@
-/*	$NetBSD: com.c,v 1.17 2000/03/23 06:47:32 thorpej Exp $	*/
+/*	$NetBSD: com.c,v 1.24 2002/03/17 19:40:52 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -77,6 +77,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_com.h"
 
 #include <sys/param.h>
@@ -151,21 +152,16 @@ struct callout com_poll_ch = CALLOUT_INITIALIZER;
 
 int comprobe __P((struct device *, struct cfdata *, void *));
 void comattach __P((struct device *, struct device *, void *));
-int comprobe1 __P((int));
-int comopen __P((dev_t, int, int, struct proc *));
-int comclose __P((dev_t, int, int, struct proc *));
-int comread __P((dev_t, struct uio *, int));
-int comwrite __P((dev_t, struct uio *, int));
-int comioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
-struct tty *comtty __P((dev_t));
-void comstop __P((struct tty *, int));
-void comdiag __P((void *));
+cdev_decl(com);
+
+static int comprobe1 __P((int));
+static void comdiag __P((void *));
 int comintr __P((void *));
-void compoll __P((void *));
-int comparam __P((struct tty *, struct termios *));
-void comstart __P((struct tty *));
-void cominit __P((int, int));
-int comspeed __P((long));
+static void compollin __P((void *));
+static int comparam __P((struct tty *, struct termios *));
+static void comstart __P((struct tty *));
+static void cominit __P((int, int));
+static int comspeed __P((long));
 
 static u_char tiocm_xxx2mcr __P((int));
 
@@ -206,7 +202,7 @@ extern int kgdb_debug_init;
 #define	CLR(t, f)	(t) &= ~(f)
 #define	ISSET(t, f)	((t) & (f))
 
-int
+static int
 comspeed(speed)
 	long speed;
 {
@@ -231,7 +227,7 @@ comspeed(speed)
 #undef	divrnd(n, q)
 }
 
-int
+static int
 comprobe1(iobase)
 	int iobase;
 {
@@ -489,7 +485,7 @@ comopen(dev, flag, mode, p)
 		ttsetwater(tp);
 
 		if (comsopen++ == 0)
-			callout_reset(&com_poll_ch, 1, compoll, NULL);
+			callout_reset(&com_poll_ch, 1, compollin, NULL);
 
 		sc->sc_ibufp = sc->sc_ibuf = sc->sc_ibufs[0];
 		sc->sc_ibufhigh = sc->sc_ibuf + COM_IHIGHWATER;
@@ -556,7 +552,7 @@ comopen(dev, flag, mode, p)
 	error = ttyopen(tp, COMDIALOUT(dev), ISSET(flag, O_NONBLOCK));
 
 	if (!error)
-		error = (*linesw[tp->t_line].l_open)(dev, tp);
+		error = (*tp->t_linesw->l_open)(dev, tp);
 
 	/* XXX cleanup on error */
 
@@ -579,7 +575,7 @@ comclose(dev, flag, mode, p)
 	if (!ISSET(tp->t_state, TS_ISOPEN))
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	s = spltty();
 	CLR(sc->sc_lcr, LCR_SBREAK);
 	outb(pio(iobase , com_lcr), sc->sc_lcr);
@@ -612,7 +608,7 @@ comread(dev, uio, flag)
 	struct com_softc *sc = xcom_cd.cd_devs[COMUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
  
 int
@@ -624,7 +620,19 @@ comwrite(dev, uio, flag)
 	struct com_softc *sc = xcom_cd.cd_devs[COMUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
  
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+compoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct com_softc *sc = xcom_cd.cd_devs[COMUNIT(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -664,11 +672,12 @@ comioctl(dev, cmd, data, flag, p)
 	int iobase = sc->sc_iobase;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return error;
 
 	switch (cmd) {
@@ -759,13 +768,13 @@ comioctl(dev, cmd, data, flag, p)
 		break;
 	}
 	default:
-		return ENOTTY;
+		return EPASSTHROUGH;
 	}
 
 	return 0;
 }
 
-int
+static int
 comparam(tp, t)
 	struct tty *tp;
 	struct termios *t;
@@ -865,7 +874,7 @@ comparam(tp, t)
 	if (!ISSET(sc->sc_msr, MSR_DCD) &&
 	    !ISSET(sc->sc_swflags, COM_SW_SOFTCAR) &&
 	    ISSET(oldcflag, MDMBUF) != ISSET(tp->t_cflag, MDMBUF) &&
-	    (*linesw[tp->t_line].l_modem)(tp, 0) == 0) {
+	    (*tp->t_linesw->l_modem)(tp, 0) == 0) {
 		CLR(sc->sc_mcr, sc->sc_dtr);
 		outb(pio(iobase , com_mcr), sc->sc_mcr);
 	}
@@ -878,7 +887,7 @@ comparam(tp, t)
 
 int comdebug = 0;
 
-void
+static void
 comstart(tp)
 	struct tty *tp;
 {
@@ -958,7 +967,7 @@ comstop(tp, flag)
 	splx(s);
 }
 
-void
+static void
 comdiag(arg)
 	void *arg;
 {
@@ -980,8 +989,8 @@ comdiag(arg)
 	    floods, floods == 1 ? "" : "s");
 }
 
-void
-compoll(arg)
+static void
+compollin(arg)
 	void *arg;
 {
 	int unit;
@@ -1052,12 +1061,12 @@ compoll(arg)
 			}
 			/* This is ugly, but fast. */
 			c |= lsrmap[(*ibufp++ & (LSR_BI|LSR_FE|LSR_PE)) >> 2];
-			(*linesw[tp->t_line].l_rint)(c, tp);
+			(*tp->t_linesw->l_rint)(c, tp);
 		}
 	}
 
 out:
-	callout_reset(&com_poll_ch, 1, compoll, NULL);
+	callout_reset(&com_poll_ch, 1, compollin, NULL);
 }
 
 int
@@ -1110,7 +1119,9 @@ comintr(arg)
 						     sc->sc_mcr);
 					}
 				}
+#ifdef DDB
 			next:
+#endif
 				lsr = inb(pio(iobase , com_lsr));
 			} while (ISSET(lsr, LSR_RXRDY));
 
@@ -1128,14 +1139,14 @@ comintr(arg)
 			sc->sc_msr = msr;
 			if (ISSET(delta, MSR_DCD) &&
 			    !ISSET(sc->sc_swflags, COM_SW_SOFTCAR) &&
-			    (*linesw[tp->t_line].l_modem)(tp, ISSET(msr, MSR_DCD)) == 0) {
+			    (*tp->t_linesw->l_modem)(tp, ISSET(msr, MSR_DCD)) == 0) {
 				CLR(sc->sc_mcr, sc->sc_dtr);
 				outb(pio(iobase , com_mcr), sc->sc_mcr);
 			}
 			if (ISSET(delta & msr, MSR_CTS) &&
 			    ISSET(tp->t_cflag, CRTSCTS)) {
 				/* the line is up and we want to do rts/cts flow control */
-				(*linesw[tp->t_line].l_start)(tp);
+				(*tp->t_linesw->l_start)(tp);
 			}
 		}
 
@@ -1143,7 +1154,7 @@ comintr(arg)
 			CLR(tp->t_state, TS_BUSY | TS_FLUSH);
 			if (sc->sc_halt > 0)
 				wakeup(&tp->t_outq);
-			(*linesw[tp->t_line].l_start)(tp);
+			(*tp->t_linesw->l_start)(tp);
 		}
 
 		if ((iir = ISSET(inb(pio(iobase , com_iir)), IIR_NOPEND)))
@@ -1196,7 +1207,7 @@ comcninit(cp)
 	comconsinit = 0;
 }
 
-void
+static void
 cominit(unit, rate)
 	int unit, rate;
 {

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_oldselect.c,v 1.49 1998/10/04 00:02:39 fvdl Exp $	*/
+/*	$NetBSD: linux_oldselect.c,v 1.52 2001/11/13 02:08:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -36,14 +36,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_oldselect.c,v 1.52 2001/11/13 02:08:56 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mount.h>
 
 #include <sys/syscallargs.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
 
 #include <compat/linux/common/linux_types.h>
 #include <compat/linux/common/linux_misc.h>

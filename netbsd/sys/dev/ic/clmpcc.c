@@ -1,4 +1,4 @@
-/*	$NetBSD: clmpcc.c,v 1.10.4.2 2000/07/29 17:23:16 scw Exp $ */
+/*	$NetBSD: clmpcc.c,v 1.20 2002/03/17 19:40:57 atatat Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -40,9 +40,11 @@
  * Cirrus Logic CD2400/CD2401 Four Channel Multi-Protocol Comms. Controller.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clmpcc.c,v 1.20 2002/03/17 19:40:57 atatat Exp $");
+
 #include "opt_ddb.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -299,7 +301,7 @@ clmpcc_attach(sc)
 	printf(": Cirrus Logic CD240%c Serial Controller\n",
 		(clmpcc_rd_msvr(sc) & CLMPCC_MSVR_PORT_ID) ? '0' : '1');
 
-#ifndef __GENERIC_SOFT_INTERRUPTS
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 	sc->sc_soft_running = 0;
 #else
 	sc->sc_softintr_cookie =
@@ -506,12 +508,10 @@ clmpccopen(dev, flag, mode, p)
 	struct tty *tp;
 	int oldch;
 	int error;
-	int unit;
- 
-	if ( (unit = CLMPCCUNIT(dev)) >= clmpcc_cd.cd_ndevs ||
-	     (sc = clmpcc_cd.cd_devs[unit]) == NULL ) {
-		return ENXIO;
-	}
+
+	sc = device_lookup(&clmpcc_cd, CLMPCCUNIT(dev));
+	if (sc == NULL)
+		return (ENXIO);
 
 	ch = &sc->sc_chans[CLMPCCCHAN(dev)];
 
@@ -586,7 +586,7 @@ clmpccopen(dev, flag, mode, p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error)
 		goto bad;
 
@@ -610,7 +610,8 @@ clmpccclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	struct clmpcc_softc	*sc = clmpcc_cd.cd_devs[CLMPCCUNIT(dev)];
+	struct clmpcc_softc	*sc =
+		device_lookup(&clmpcc_cd, CLMPCCUNIT(dev));
 	struct clmpcc_chan	*ch = &sc->sc_chans[CLMPCCCHAN(dev)];
 	struct tty		*tp = ch->ch_tty;
 	int s;
@@ -618,7 +619,7 @@ clmpccclose(dev, flag, mode, p)
 	if ( ISCLR(tp->t_state, TS_ISOPEN) )
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 
 	s = spltty();
 
@@ -644,10 +645,10 @@ clmpccread(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(dev)];
+	struct clmpcc_softc *sc = device_lookup(&clmpcc_cd, CLMPCCUNIT(dev));
 	struct tty *tp = sc->sc_chans[CLMPCCCHAN(dev)].ch_tty;
  
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
  
 int
@@ -656,17 +657,29 @@ clmpccwrite(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(dev)];
+	struct clmpcc_softc *sc = device_lookup(&clmpcc_cd, CLMPCCUNIT(dev));
 	struct tty *tp = sc->sc_chans[CLMPCCCHAN(dev)].ch_tty;
  
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+clmpccpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct clmpcc_softc *sc = device_lookup(&clmpcc_cd, CLMPCCUNIT(dev));
+	struct tty *tp = sc->sc_chans[CLMPCCCHAN(dev)].ch_tty;
+
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
 clmpcctty(dev)
 	dev_t dev;
 {
-	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(dev)];
+	struct clmpcc_softc *sc = device_lookup(&clmpcc_cd, CLMPCCUNIT(dev));
 
 	return (sc->sc_chans[CLMPCCCHAN(dev)].ch_tty);
 }
@@ -679,17 +692,17 @@ clmpccioctl(dev, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(dev)];
+	struct clmpcc_softc *sc = device_lookup(&clmpcc_cd, CLMPCCUNIT(dev));
 	struct clmpcc_chan *ch = &sc->sc_chans[CLMPCCCHAN(dev)];
 	struct tty *tp = ch->ch_tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return error;
 
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return error;
 
 	error = 0;
@@ -745,7 +758,7 @@ clmpccioctl(dev, cmd, data, flag, p)
 		break;
 
 	default:
-		error = ENOTTY;
+		error = EPASSTHROUGH;
 		break;
 	}
 
@@ -838,7 +851,8 @@ clmpcc_param(tp, t)
 	struct tty *tp;
 	struct termios *t;
 {
-	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(tp->t_dev)];
+	struct clmpcc_softc *sc =
+	    device_lookup(&clmpcc_cd, CLMPCCUNIT(tp->t_dev));
 	struct clmpcc_chan *ch = &sc->sc_chans[CLMPCCCHAN(tp->t_dev)];
 	u_char cor;
 	u_char oldch;
@@ -1029,7 +1043,8 @@ static void
 clmpcc_start(tp)
 	struct tty *tp;
 {
-	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(tp->t_dev)];
+	struct clmpcc_softc *sc =
+	    device_lookup(&clmpcc_cd, CLMPCCUNIT(tp->t_dev));
 	struct clmpcc_chan *ch = &sc->sc_chans[CLMPCCCHAN(tp->t_dev)];
 	u_int oldch;
 	int s;
@@ -1076,7 +1091,8 @@ clmpccstop(tp, flag)
 	struct tty *tp;
 	int flag;
 {
-	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(tp->t_dev)];
+	struct clmpcc_softc *sc =
+	    device_lookup(&clmpcc_cd, CLMPCCUNIT(tp->t_dev));
 	struct clmpcc_chan *ch = &sc->sc_chans[CLMPCCCHAN(tp->t_dev)];
 	int s;
 
@@ -1226,7 +1242,7 @@ rx_done:
 		}
 
 		clmpcc_wrreg(sc, CLMPCC_REG_REOIR, 0);
-#ifndef __GENERIC_SOFT_INTERRUPTS
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 		if ( sc->sc_soft_running == 0 ) {
 			sc->sc_soft_running = 1;
 			(sc->sc_softhook)(sc);
@@ -1353,7 +1369,7 @@ clmpcc_txintr(arg)
 		 * Request Tx processing in the soft interrupt handler
 		 */
 		ch->ch_tx_done = 1;
-#ifndef __GENERIC_SOFT_INTERRUPTS
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 		if ( sc->sc_soft_running == 0 ) {
 			sc->sc_soft_running = 1;
 			(sc->sc_softhook)(sc);
@@ -1398,7 +1414,7 @@ clmpcc_mdintr(arg)
 
 	clmpcc_wrreg(sc, CLMPCC_REG_MEOIR, 0);
 
-#ifndef __GENERIC_SOFT_INTERRUPTS
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 	if ( sc->sc_soft_running == 0 ) {
 		sc->sc_soft_running = 1;
 		(sc->sc_softhook)(sc);
@@ -1423,7 +1439,7 @@ clmpcc_softintr(arg)
 	u_int c;
 	int chan;
 
-#ifndef __GENERIC_SOFT_INTERRUPTS
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 	sc->sc_soft_running = 0;
 #endif
 
@@ -1434,7 +1450,7 @@ clmpcc_softintr(arg)
 		tp = ch->ch_tty;
 
 		get = ch->ch_ibuf_rd;
-		rint = linesw[tp->t_line].l_rint;
+		rint = tp->t_linesw->l_rint;
 
 		/* Squirt buffered incoming data into the tty layer */
 		while ( get != ch->ch_ibuf_wr ) {
@@ -1480,7 +1496,7 @@ clmpcc_softintr(arg)
 				 * explicit request.
 				 */
 				reg = clmpcc_rd_msvr(sc) & CLMPCC_MSVR_CD;
-				(*linesw[tp->t_line].l_modem)(tp, reg != 0);
+				(*tp->t_linesw->l_modem)(tp, reg != 0);
 			}
 
 			CLR(tp->t_state, TS_BUSY);
@@ -1490,7 +1506,7 @@ clmpcc_softintr(arg)
 				ndflush(&tp->t_outq,
 				     (int)(ch->ch_obuf_addr - tp->t_outq.c_cf));
 
-			(*linesw[tp->t_line].l_start)(tp);
+			(*tp->t_linesw->l_start)(tp);
 		}
 	}
 }
@@ -1512,7 +1528,7 @@ clmpcc_cnattach(sc, chan, rate)
 	cons_chan = chan;
 	cons_rate = rate;
 
-	return 0;
+	return (clmpcc_init(sc));
 }
 
 /*

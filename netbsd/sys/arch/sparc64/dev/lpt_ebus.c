@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_ebus.c,v 1.5.4.1 2000/07/18 16:23:19 mrg Exp $	*/
+/*	$NetBSD: lpt_ebus.c,v 1.12 2002/03/21 01:17:08 eeh Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Matthew R. Green
@@ -40,8 +40,8 @@
 
 #include <machine/bus.h>
 
-#include <sparc64/dev/ebusreg.h>
-#include <sparc64/dev/ebusvar.h>
+#include <dev/ebus/ebusreg.h>
+#include <dev/ebus/ebusvar.h>
 
 #include <dev/ic/lptvar.h>
 
@@ -89,19 +89,20 @@ lpt_ebus_attach(parent, self, aux)
 	 *
 	 * Use the prom address if there.
 	 */
-	if (ea->ea_nvaddrs)
-		sc->sc_ioh = (bus_space_handle_t)ea->ea_vaddrs[0];
-	else if (ebus_bus_map(sc->sc_iot, 0,
-			      EBUS_PADDR_FROM_REG(&ea->ea_regs[0]),
-			      ea->ea_regs[0].size,
-			      BUS_SPACE_MAP_LINEAR,
-			      0, &sc->sc_ioh) != 0) {
+	if (ea->ea_nvaddr)
+		sparc_promaddr_to_handle(sc->sc_iot, ea->ea_vaddr[0],
+			&sc->sc_ioh);
+	else if (bus_space_map(sc->sc_iot,
+			      EBUS_ADDR_FROM_REG(&ea->ea_reg[0]),
+			      ea->ea_reg[0].size,
+			      0,
+			      &sc->sc_ioh) != 0) {
 		printf(": can't map register space\n");
                 return;
 	}
 
-	for (i = 0; i < ea->ea_nintrs; i++)
-		bus_intr_establish(ea->ea_bustag, ea->ea_intrs[i],
+	for (i = 0; i < ea->ea_nintr; i++)
+		bus_intr_establish(ea->ea_bustag, ea->ea_intr[i],
 				   IPL_SERIAL, 0, lptintr, sc);
 	printf("\n");
 

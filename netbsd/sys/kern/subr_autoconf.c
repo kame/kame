@@ -1,4 +1,4 @@
-/* $NetBSD: subr_autoconf.c,v 1.54 2000/06/13 22:36:17 cgd Exp $ */
+/* $NetBSD: subr_autoconf.c,v 1.63 2002/04/15 05:30:12 gmcgarry Exp $ */
 
 /*
  * Copyright (c) 1996, 2000 Christopher G. Demetriou
@@ -81,8 +81,9 @@
  */
 
 #include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: subr_autoconf.c,v 1.63 2002/04/15 05:30:12 gmcgarry Exp $");
 
-__KERNEL_RCSID(0, "$NetBSD: subr_autoconf.c,v 1.54 2000/06/13 22:36:17 cgd Exp $");
+#include "opt_ddb.h"
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -92,6 +93,12 @@ __KERNEL_RCSID(0, "$NetBSD: subr_autoconf.c,v 1.54 2000/06/13 22:36:17 cgd Exp $
 #include <sys/errno.h>
 #include <sys/proc.h>
 #include <machine/limits.h>
+
+#include "opt_userconf.h"
+#ifdef USERCONF
+#include <sys/userconf.h>
+#include <sys/reboot.h>
+#endif
 
 /*
  * Autoconfiguration subroutines.
@@ -131,8 +138,11 @@ struct deferred_config_head interrupt_config_queue;
 static void config_process_deferred(struct deferred_config_head *,
 	struct device *);
 
-struct devicelist alldevs;		/* list of all devices */
-struct evcntlist allevents;		/* list of all event counters */
+/* list of all devices */
+struct devicelist alldevs;
+
+/* list of all events */
+struct evcntlist allevents = TAILQ_HEAD_INITIALIZER(allevents);
 
 __volatile int config_pending;		/* semaphore for mountroot */
 
@@ -146,7 +156,11 @@ configure(void)
 	TAILQ_INIT(&deferred_config_queue);
 	TAILQ_INIT(&interrupt_config_queue);
 	TAILQ_INIT(&alldevs); 
-	TAILQ_INIT(&allevents);
+
+#ifdef USERCONF
+	if (boothowto & RB_USERCONF)
+		user_config();
+#endif
 
 	/*
 	 * Do the machine-dependent portion of autoconfiguration.  This
@@ -225,6 +239,9 @@ config_search(cfmatch_t fn, struct device *parent, void *aux)
 		 */
 		if (cf->cf_fstate == FSTATE_FOUND)
 			continue;
+		if (cf->cf_fstate == FSTATE_DNOTFOUND ||
+		    cf->cf_fstate == FSTATE_DSTAR)
+			continue;
 		for (p = cf->cf_parents; *p >= 0; p++)
 			if (parent->dv_cfdata == &cfdata[*p])
 				mapply(&m, cf);
@@ -280,7 +297,7 @@ config_found_sm(struct device *parent, void *aux, cfprint_t print,
 	if ((cf = config_search(submatch, parent, aux)) != NULL)
 		return (config_attach(parent, cf, aux, print));
 	if (print)
-		printf(msgs[(*print)(aux, parent->dv_xname)]);
+		printf("%s", msgs[(*print)(aux, parent->dv_xname)]);
 	return (NULL);
 }
 
@@ -310,6 +327,42 @@ number(char *ep, int n)
 	}
 	*--ep = n + '0';
 	return (ep);
+}
+
+/*
+ * Expand the size of the cd_devs array if necessary.
+ */
+void
+config_makeroom(int n, struct cfdriver *cd)
+{
+	int old, new;
+	void **nsp;
+
+	if (n < cd->cd_ndevs)
+		return;
+
+	/*
+	 * Need to expand the array.
+	 */
+	old = cd->cd_ndevs;
+	if (old == 0)
+		new = MINALLOCSIZE / sizeof(void *);
+	else
+		new = old * 2;
+	while (new <= n)
+		new *= 2;
+	cd->cd_ndevs = new;
+	nsp = malloc(new * sizeof(void *), M_DEVBUF,
+	    cold ? M_NOWAIT : M_WAITOK);	
+	if (nsp == NULL)
+		panic("config_attach: %sing dev array",
+		    old != 0 ? "expand" : "creat");
+	memset(nsp + old, 0, (new - old) * sizeof(void *));
+	if (old != 0) {
+		memcpy(nsp, cd->cd_devs, old * sizeof(void *));
+		free(cd->cd_devs, M_DEVBUF);
+	}
+	cd->cd_devs = nsp;
 }
 
 /*
@@ -383,32 +436,7 @@ config_attach(struct device *parent, struct cfdata *cf, void *aux,
 	}
 
 	/* put this device in the devices array */
-	if (dev->dv_unit >= cd->cd_ndevs) {
-		/*
-		 * Need to expand the array.
-		 */
-		int old = cd->cd_ndevs, new;
-		void **nsp;
-
-		if (old == 0)
-			new = MINALLOCSIZE / sizeof(void *);
-		else
-			new = old * 2;
-		while (new <= dev->dv_unit)
-			new *= 2;
-		cd->cd_ndevs = new;
-		nsp = malloc(new * sizeof(void *), M_DEVBUF,
-		    cold ? M_NOWAIT : M_WAITOK);	
-		if (nsp == 0)
-			panic("config_attach: %sing dev array",
-			    old != 0 ? "expand" : "creat");
-		memset(nsp + old, 0, (new - old) * sizeof(void *));
-		if (old != 0) {
-			memcpy(nsp, cd->cd_devs, old * sizeof(void *));
-			free(cd->cd_devs, M_DEVBUF);
-		}
-		cd->cd_devs = nsp;
-	}
+	config_makeroom(dev->dv_unit, cd);
 	if (cd->cd_devs[dev->dv_unit])
 		panic("config_attach: duplicate %s", dev->dv_xname);
 	cd->cd_devs[dev->dv_unit] = dev;
@@ -763,3 +791,19 @@ evcnt_detach(struct evcnt *ev)
 
 	TAILQ_REMOVE(&allevents, ev, ev_list);
 }
+
+#ifdef DDB
+void
+event_print(int full, void (*pr)(const char *, ...))
+{
+	struct evcnt *evp;
+
+	TAILQ_FOREACH(evp, &allevents, ev_list) {
+		if (evp->ev_count == 0 && !full)
+			continue;
+
+		(*pr)("evcnt type %d: %s %s = %lld\n", evp->ev_type,
+		    evp->ev_group, evp->ev_name, evp->ev_count);
+	}
+}
+#endif /* DDB */

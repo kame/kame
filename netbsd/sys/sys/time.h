@@ -1,4 +1,4 @@
-/*	$NetBSD: time.h,v 1.29.4.1 2000/08/16 01:20:32 itojun Exp $	*/
+/*	$NetBSD: time.h,v 1.34 2002/01/31 00:13:08 simonb Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -36,7 +36,7 @@
  */
 
 #ifndef _SYS_TIME_H_
-#define _SYS_TIME_H_
+#define	_SYS_TIME_H_
 
 #include <sys/types.h>
 
@@ -90,7 +90,7 @@ struct timezone {
 			(vvp)->tv_sec++;				\
 			(vvp)->tv_usec -= 1000000;			\
 		}							\
-	} while (0)
+	} while (/* CONSTCOND */ 0)
 #define	timersub(tvp, uvp, vvp)						\
 	do {								\
 		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
@@ -99,7 +99,7 @@ struct timezone {
 			(vvp)->tv_sec--;				\
 			(vvp)->tv_usec += 1000000;			\
 		}							\
-	} while (0)
+	} while (/* CONSTCOND */ 0)
 
 /* Operations on timespecs. */
 #define	timespecclear(tsp)		(tsp)->tv_sec = (tsp)->tv_nsec = 0
@@ -116,7 +116,7 @@ struct timezone {
 			(vsp)->tv_sec++;				\
 			(vsp)->tv_nsec -= 1000000000L;			\
 		}							\
-	} while (0)
+	} while (/* CONSTCOND */ 0)
 #define	timespecsub(tsp, usp, vsp)					\
 	do {								\
 		(vsp)->tv_sec = (tsp)->tv_sec - (usp)->tv_sec;		\
@@ -125,7 +125,7 @@ struct timezone {
 			(vsp)->tv_sec--;				\
 			(vsp)->tv_nsec += 1000000000L;			\
 		}							\
-	} while (0)
+	} while (/* CONSTCOND */ 0)
 
 /*
  * Names of the interval timers, and structure
@@ -151,12 +151,13 @@ struct clockinfo {
 	int	profhz;		/* profiling clock frequency */
 };
 
-#define CLOCK_REALTIME	0
-#define CLOCK_VIRTUAL	1
-#define CLOCK_PROF	2
+#define	CLOCK_REALTIME	0
+#define	CLOCK_VIRTUAL	1
+#define	CLOCK_PROF	2
+#define	CLOCK_MONOTONIC	3
 
-#define TIMER_RELTIME	0x0	/* relative timer */
-#define TIMER_ABSTIME	0x1	/* absolute timer */
+#define	TIMER_RELTIME	0x0	/* relative timer */
+#define	TIMER_ABSTIME	0x1	/* absolute timer */
 
 #ifdef _KERNEL
 int	itimerfix __P((struct timeval *tv));
@@ -165,6 +166,10 @@ void	microtime __P((struct timeval *tv));
 int	settime __P((struct timeval *));
 int	ratecheck __P((struct timeval *, const struct timeval *));
 int	ppsratecheck __P((struct timeval *, int *, int));
+int	settimeofday1 __P((const struct timeval *, const struct timezone *, 
+	    struct proc *));
+int	adjtime1 __P((const struct timeval *, struct timeval *, struct proc *));
+int	clock_settime1 __P((clockid_t, const struct timespec *));
 #else /* !_KERNEL */
 
 #ifndef _STANDALONE

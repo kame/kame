@@ -1,4 +1,4 @@
-/*	$NetBSD: smc83c170.c,v 1.32.4.2 2000/12/31 20:15:01 jhawk Exp $	*/
+/*	$NetBSD: smc83c170.c,v 1.49 2001/11/13 13:14:44 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -42,8 +42,9 @@
  * Ethernet PCI Integrated Controller (EPIC/100).
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smc83c170.c,v 1.49 2001/11/13 13:14:44 lukem Exp $");
+
 #include "bpfilter.h"
 
 #include <sys/param.h>
@@ -56,7 +57,9 @@
 #include <sys/ioctl.h>
 #include <sys/errno.h>
 #include <sys/device.h>
- 
+
+#include <uvm/uvm_extern.h>
+
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
@@ -66,20 +69,11 @@
 #include <net/bpf.h>
 #endif 
 
-#ifdef INET
-#include <netinet/in.h> 
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
 #include <machine/bus.h>
 #include <machine/intr.h>
 
 #include <dev/mii/miivar.h>
+#include <dev/mii/lxtphyreg.h>
 
 #include <dev/ic/smc83c170reg.h>
 #include <dev/ic/smc83c170var.h>
@@ -87,13 +81,13 @@
 void	epic_start __P((struct ifnet *));
 void	epic_watchdog __P((struct ifnet *));
 int	epic_ioctl __P((struct ifnet *, u_long, caddr_t));
+int	epic_init __P((struct ifnet *));
+void	epic_stop __P((struct ifnet *, int));
 
 void	epic_shutdown __P((void *));
 
 void	epic_reset __P((struct epic_softc *));
-int	epic_init __P((struct epic_softc *));
 void	epic_rxdrain __P((struct epic_softc *));
-void	epic_stop __P((struct epic_softc *, int));
 int	epic_add_rxbuf __P((struct epic_softc *, int));
 void	epic_read_eeprom __P((struct epic_softc *, int, int, u_int16_t *));
 void	epic_set_mchash __P((struct epic_softc *));
@@ -122,7 +116,7 @@ epic_attach(sc)
 	bus_space_tag_t st = sc->sc_st;
 	bus_space_handle_t sh = sc->sc_sh;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
-	int i, rseg, error;
+	int i, rseg, error, miiflags;
 	bus_dma_segment_t seg;
 	u_int8_t enaddr[ETHER_ADDR_LEN], devname[12 + 1];
 	u_int16_t myea[ETHER_ADDR_LEN / 2], mydevname[6];
@@ -134,7 +128,7 @@ epic_attach(sc)
 	 * DMA map for it.
 	 */
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
-	    sizeof(struct epic_control_data), NBPG, 0, &seg, 1, &rseg,
+	    sizeof(struct epic_control_data), PAGE_SIZE, 0, &seg, 1, &rseg,
 	    BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: unable to allocate control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
@@ -180,7 +174,7 @@ epic_attach(sc)
 	}
 
 	/*
-	 * Create the recieve buffer DMA maps.
+	 * Create the receive buffer DMA maps.
 	 */
 	for (i = 0; i < EPIC_NRXDESC; i++) {
 		if ((error = bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1,
@@ -230,6 +224,10 @@ epic_attach(sc)
 	printf("%s: %s, Ethernet address %s\n", sc->sc_dev.dv_xname,
 	    devname, ether_sprintf(enaddr));
 
+	miiflags = 0;
+	if (sc->sc_hwflags & EPIC_HAS_MII_FIBER)
+		miiflags |= MIIF_HAVEFIBER;
+
 	/*
 	 * Initialize our media structures and probe the MII.
 	 */
@@ -240,12 +238,23 @@ epic_attach(sc)
 	ifmedia_init(&sc->sc_mii.mii_media, 0, epic_mediachange,
 	    epic_mediastatus);
 	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
-	    MII_OFFSET_ANY, 0);
+	    MII_OFFSET_ANY, miiflags);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
 	} else
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_AUTO);
+
+	if (sc->sc_hwflags & EPIC_HAS_BNC) {
+		/* use the next free media instance */
+		sc->sc_serinst = sc->sc_mii.mii_instance++;
+		ifmedia_add(&sc->sc_mii.mii_media,
+			    IFM_MAKEWORD(IFM_ETHER, IFM_10_2, 0,
+					 sc->sc_serinst),
+			    0, NULL);
+		printf("%s: 10base2/BNC\n", sc->sc_dev.dv_xname);
+	} else
+		sc->sc_serinst = -1;
 
 	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
@@ -253,6 +262,9 @@ epic_attach(sc)
 	ifp->if_ioctl = epic_ioctl;
 	ifp->if_start = epic_start;
 	ifp->if_watchdog = epic_watchdog;
+	ifp->if_init = epic_init;
+	ifp->if_stop = epic_stop;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * We can support 802.1Q VLAN-sized frames.
@@ -264,10 +276,6 @@ epic_attach(sc)
 	 */
 	if_attach(ifp);
 	ether_ifattach(ifp, enaddr);
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_ethercom.ec_if.if_bpf, ifp, DLT_EN10MB,
-	    sizeof(struct ether_header));
-#endif
 
 	/*
 	 * Make sure the interface is shutdown during reboot.
@@ -315,7 +323,7 @@ epic_shutdown(arg)
 {
 	struct epic_softc *sc = arg;
 
-	epic_stop(sc, 1);
+	epic_stop(&sc->sc_ethercom.ec_if, 1);
 }
 
 /*
@@ -350,9 +358,10 @@ epic_start(ifp)
 		/*
 		 * Grab a packet off the queue.
 		 */
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_POLL(&ifp->if_snd, m0);
 		if (m0 == NULL)
 			break;
+		m = NULL;
 
 		/*
 		 * Get the last and next available transmit descriptor.
@@ -370,12 +379,11 @@ epic_start(ifp)
 		 * again.
 		 */
 		if (bus_dmamap_load_mbuf(sc->sc_dmat, dmamap, m0,
-		    BUS_DMA_NOWAIT) != 0) {
+		    BUS_DMA_WRITE|BUS_DMA_NOWAIT) != 0) {
 			MGETHDR(m, M_DONTWAIT, MT_DATA);
 			if (m == NULL) {
 				printf("%s: unable to allocate Tx mbuf\n",
 				    sc->sc_dev.dv_xname);
-				IF_PREPEND(&ifp->if_snd, m0);
 				break;
 			}
 			if (m0->m_pkthdr.len > MHLEN) {
@@ -384,22 +392,23 @@ epic_start(ifp)
 					printf("%s: unable to allocate Tx "
 					    "cluster\n", sc->sc_dev.dv_xname);
 					m_freem(m);
-					IF_PREPEND(&ifp->if_snd, m0);
 					break;
 				}
 			}
 			m_copydata(m0, 0, m0->m_pkthdr.len, mtod(m, caddr_t));
 			m->m_pkthdr.len = m->m_len = m0->m_pkthdr.len;
-			m_freem(m0);
-			m0 = m;
 			error = bus_dmamap_load_mbuf(sc->sc_dmat, dmamap,
-			    m0, BUS_DMA_NOWAIT);
+			    m, BUS_DMA_WRITE|BUS_DMA_NOWAIT);
 			if (error) {
 				printf("%s: unable to load Tx buffer, "
 				    "error = %d\n", sc->sc_dev.dv_xname, error);
-				IF_PREPEND(&ifp->if_snd, m0);
 				break;
 			}
+		}
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
+		if (m != NULL) {
+			m_freem(m0);
+			m0 = m;
 		}
 
 		/* Initialize the fraglist. */
@@ -507,7 +516,7 @@ epic_watchdog(ifp)
 	printf("%s: device timeout\n", sc->sc_dev.dv_xname);
 	ifp->if_oerrors++;
 
-	(void) epic_init(sc);
+	(void) epic_init(ifp);
 }
 
 /*
@@ -522,82 +531,18 @@ epic_ioctl(ifp, cmd, data)
 {
 	struct epic_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
-	struct ifaddr *ifa = (struct ifaddr *)data;
-	int s, error = 0;
+	int s, error;
 
 	s = splnet();
 
 	switch (cmd) {
-	case SIOCSIFADDR:
-		ifp->if_flags |= IFF_UP;
-
-		switch (ifa->ifa_addr->sa_family) {
-#ifdef INET
-		case AF_INET:
-			if ((error = epic_init(sc)) != 0)
-				break;
-			arp_ifinit(ifp, ifa);
-			break;
-#endif /* INET */
-#ifdef NS
-		case AF_NS:
-		    {
-			struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
-
-			if (ns_nullhost(*ina))
-				ina->x_host = *(union ns_host *)
-				    LLADDR(ifp->if_sadl);
-			else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
-				    ifp->if_addrlen);
-			/* Set new address. */
-			error = epic_init(sc);
-			break;
-		    }
-#endif /* NS */
-		default:
-			error = epic_init(sc);
-			break;
-		}
+	case SIOCSIFMEDIA:
+	case SIOCGIFMEDIA:
+		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii.mii_media, cmd);
 		break;
 
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu > ETHERMTU)
-			error = EINVAL;
-		else
-			ifp->if_mtu = ifr->ifr_mtu;
-		break;
-
-	case SIOCSIFFLAGS:
-		if ((ifp->if_flags & IFF_UP) == 0 &&
-		    (ifp->if_flags & IFF_RUNNING) != 0) {
-			/*
-			 * If interface is marked down and it is running, then
-			 * stop it.
-			 */
-			epic_stop(sc, 1);
-		} else if ((ifp->if_flags & IFF_UP) != 0 &&
-			   (ifp->if_flags & IFF_RUNNING) == 0) {
-			/*
-			 * If interfase it marked up and it is stopped, then
-			 * start it.
-			 */
-			error = epic_init(sc);
-		} else if ((ifp->if_flags & IFF_UP) != 0) {
-			/*
-			 * Reset the interface to pick up changes in any other
-			 * flags that affect the hardware state.
-			 */
-			error = epic_init(sc);
-		}
-		break;
-
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-		error = (cmd == SIOCADDMULTI) ?
-		    ether_addmulti(ifr, &sc->sc_ethercom) :
-		    ether_delmulti(ifr, &sc->sc_ethercom);
-
+	default:
+		error = ether_ioctl(ifp, cmd, data);
 		if (error == ENETRESET) {
 			/*
 			 * Multicast list has changed; set the hardware filter
@@ -608,15 +553,6 @@ epic_ioctl(ifp, cmd, data)
 			epic_set_mchash(sc);
 			error = 0;
 		}
-		break;
-
-	case SIOCSIFMEDIA:
-	case SIOCGIFMEDIA:
-		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii.mii_media, cmd);
-		break;
-
-	default:
-		error = EINVAL;
 		break;
 	}
 
@@ -633,7 +569,6 @@ epic_intr(arg)
 {
 	struct epic_softc *sc = arg;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
-	struct ether_header *eh;
 	struct epic_rxdesc *rxd;
 	struct epic_txdesc *txd;
 	struct epic_descsoft *ds;
@@ -698,10 +633,9 @@ epic_intr(arg)
 			    ds->ds_dmamap->dm_mapsize, BUS_DMASYNC_POSTREAD);
 
 			/*
-			 * The EPIC includes the CRC with every packet;
-			 * trim it.
+			 * The EPIC includes the CRC with every packet.
 			 */
-			len = rxd->er_rxlength - ETHER_CRC_LEN;
+			len = rxd->er_rxlength;
 
 			if (len < sizeof(struct ether_header)) {
 				/*
@@ -750,34 +684,25 @@ epic_intr(arg)
 				}
 			}
 
+			m->m_flags |= M_HASFCS;
 			m->m_pkthdr.rcvif = ifp;
 			m->m_pkthdr.len = m->m_len = len;
-			eh = mtod(m, struct ether_header *);
 
 #if NBPFILTER > 0
 			/*
 			 * Pass this up to any BPF listeners, but only
 			 * pass it up the stack if its for us.
 			 */
-			if (ifp->if_bpf) {
+			if (ifp->if_bpf)
 				bpf_mtap(ifp->if_bpf, m);
-				if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-				    memcmp(LLADDR(ifp->if_sadl),
-				           eh->ether_dhost,
-				           ETHER_ADDR_LEN) != 0 &&
-				    ETHER_IS_MULTICAST(eh->ether_dhost) == 0) {
-					m_freem(m);
-					continue;
-				}
-			}
-#endif /* NPBFILTER > 0 */
-			
+#endif
+
 			/* Pass it on. */
 			(*ifp->if_input)(ifp, m);
 			ifp->if_ipackets++;
 		}
 
-		/* Update the recieve pointer. */
+		/* Update the receive pointer. */
 		sc->sc_rxptr = i;
 
 		/*
@@ -883,7 +808,7 @@ epic_intr(arg)
 		else
 			printf("%s: unknown fatal error\n",
 			    sc->sc_dev.dv_xname);
-		(void) epic_init(sc);
+		(void) epic_init(ifp);
 	}
 
 	/*
@@ -953,12 +878,12 @@ epic_reset(sc)
  * Initialize the interface.  Must be called at splnet().
  */
 int
-epic_init(sc)
-	struct epic_softc *sc;
+epic_init(ifp)
+	struct ifnet *ifp;
 {
+	struct epic_softc *sc = ifp->if_softc;
 	bus_space_tag_t st = sc->sc_st;
 	bus_space_handle_t sh = sc->sc_sh;
-	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	u_int8_t *enaddr = LLADDR(ifp->if_sadl);
 	struct epic_txdesc *txd;
 	struct epic_descsoft *ds;
@@ -968,7 +893,7 @@ epic_init(sc)
 	/*
 	 * Cancel any pending I/O.
 	 */
-	epic_stop(sc, 0);
+	epic_stop(ifp, 0);
 
 	/*
 	 * Reset the EPIC to a known state.
@@ -1001,7 +926,7 @@ epic_init(sc)
 	bus_space_write_4(st, sh, EPIC_GENCTL, genctl | GENCTL_RESET_PHY);
 	delay(100);
 	bus_space_write_4(st, sh, EPIC_GENCTL, genctl);
-	delay(100);
+	delay(1000);
 	bus_space_write_4(st, sh, EPIC_NVCTL, reg0);
 
 	/*
@@ -1026,7 +951,7 @@ epic_init(sc)
 	bus_space_write_4(st, sh, EPIC_RXCON, reg0);
 
 	/* Set the current media. */
-	mii_mediachg(&sc->sc_mii);
+	epic_mediachange(ifp);
 
 	/* Set up the multicast hash table. */
 	epic_set_mchash(sc);
@@ -1064,7 +989,8 @@ epic_init(sc)
 				epic_rxdrain(sc);
 				goto out;
 			}
-		}
+		} else
+			EPIC_INIT_RXDESC(sc, i);
 	}
 	sc->sc_rxptr = 0;
 
@@ -1134,13 +1060,13 @@ epic_rxdrain(sc)
  * Stop transmission on the interface.
  */
 void
-epic_stop(sc, drain)
-	struct epic_softc *sc;
-	int drain;
+epic_stop(ifp, disable)
+	struct ifnet *ifp;
+	int disable;
 {
+	struct epic_softc *sc = ifp->if_softc;
 	bus_space_tag_t st = sc->sc_st;
 	bus_space_handle_t sh = sc->sc_sh;
-	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	struct epic_descsoft *ds;
 	u_int32_t reg;
 	int i;
@@ -1181,12 +1107,8 @@ epic_stop(sc, drain)
 		}
 	}
 
-	if (drain) {
-		/*
-		 * Release the receive buffers.
-		 */
+	if (disable)
 		epic_rxdrain(sc);
-	}
 
 	/*
 	 * Mark the interface down and cancel the watchdog timer.
@@ -1303,7 +1225,8 @@ epic_add_rxbuf(sc, idx)
 	ds->ds_mbuf = m;
 
 	error = bus_dmamap_load(sc->sc_dmat, ds->ds_dmamap,
-	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL, BUS_DMA_NOWAIT);
+	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL,
+	    BUS_DMA_READ|BUS_DMA_NOWAIT);
 	if (error) {
 		printf("%s: can't load rx DMA map %d, error = %d\n",
 		    sc->sc_dev.dv_xname, idx, error);
@@ -1354,7 +1277,7 @@ epic_set_mchash(sc)
 
 	ETHER_FIRST_MULTI(step, ec, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
 			/*
 			 * We must listen to a range of multicast addresses.
 			 * For now, just accept all multicasts, rather than
@@ -1462,7 +1385,7 @@ epic_statchg(self)
 	struct device *self;
 {
 	struct epic_softc *sc = (struct epic_softc *)self;
-	u_int32_t txcon;
+	u_int32_t txcon, miicfg;
 
 	/*
 	 * Update loopback bits in TXCON to reflect duplex mode.
@@ -1473,6 +1396,16 @@ epic_statchg(self)
 	else
 		txcon &= ~(TXCON_LOOPBACK_D1|TXCON_LOOPBACK_D2);
 	bus_space_write_4(sc->sc_st, sc->sc_sh, EPIC_TXCON, txcon);
+
+	/* On some cards we need manualy set fullduplex led */
+	if (sc->sc_hwflags & EPIC_DUPLEXLED_ON_694) {
+		miicfg = bus_space_read_4(sc->sc_st, sc->sc_sh, EPIC_MIICFG);
+		if (IFM_OPTIONS(sc->sc_mii.mii_media_active) & IFM_FDX) 
+			miicfg |= MIICFG_ENABLE;
+		else
+			miicfg &= ~MIICFG_ENABLE;
+		bus_space_write_4(sc->sc_st, sc->sc_sh, EPIC_MIICFG, miicfg);
+	}
 
 	/*
 	 * There is a multicast filter bug in 10Mbps mode.  Kick the
@@ -1504,8 +1437,78 @@ epic_mediachange(ifp)
 	struct ifnet *ifp;
 {
 	struct epic_softc *sc = ifp->if_softc;
+	struct mii_data *mii = &sc->sc_mii;
+	struct ifmedia *ifm = &mii->mii_media;
+	int media = ifm->ifm_cur->ifm_media;
+	u_int32_t miicfg;
+	struct mii_softc *miisc;
+	int cfg;
 
-	if (ifp->if_flags & IFF_UP)
-		mii_mediachg(&sc->sc_mii);
+	if (!(ifp->if_flags & IFF_UP))
+		return (0);
+
+	if (IFM_INST(media) != sc->sc_serinst) {
+		/* If we're not selecting serial interface, select MII mode */
+#ifdef EPICMEDIADEBUG
+		printf("%s: parallel mode\n", ifp->if_xname);
+#endif		
+		miicfg = bus_space_read_4(sc->sc_st, sc->sc_sh, EPIC_MIICFG);
+		miicfg &= ~MIICFG_SERMODEENA;
+		bus_space_write_4(sc->sc_st, sc->sc_sh, EPIC_MIICFG, miicfg);
+	}
+
+	mii_mediachg(mii);
+
+	if (IFM_INST(media) == sc->sc_serinst) {
+		/* select serial interface */
+#ifdef EPICMEDIADEBUG
+		printf("%s: serial mode\n", ifp->if_xname);
+#endif
+		miicfg = bus_space_read_4(sc->sc_st, sc->sc_sh, EPIC_MIICFG);
+		miicfg |= (MIICFG_SERMODEENA | MIICFG_ENABLE);
+		bus_space_write_4(sc->sc_st, sc->sc_sh, EPIC_MIICFG, miicfg);
+
+		/* There is no driver to fill this */
+		mii->mii_media_active = media;
+		mii->mii_media_status = 0;
+
+		epic_statchg(&sc->sc_dev);
+		return (0);
+	}
+
+	/* Lookup selected PHY */
+	for (miisc = LIST_FIRST(&mii->mii_phys); miisc != NULL;
+	     miisc = LIST_NEXT(miisc, mii_list)) {
+		if (IFM_INST(media) == miisc->mii_inst)
+			break;
+	}
+	if (!miisc) {
+		printf("epic_mediachange: can't happen\n"); /* ??? panic */
+		return (0);
+	}
+#ifdef EPICMEDIADEBUG
+	printf("%s: using phy %s\n", ifp->if_xname,
+	       miisc->mii_dev.dv_xname);
+#endif
+
+	if (miisc->mii_flags & MIIF_HAVEFIBER) {
+		/* XXX XXX assume it's a Level1 - should check */
+
+		/* We have to powerup fiber tranceivers */
+		cfg = PHY_READ(miisc, MII_LXTPHY_CONFIG);
+		if (IFM_SUBTYPE(media) == IFM_100_FX) {
+#ifdef EPICMEDIADEBUG
+			printf("%s: power up fiber\n", ifp->if_xname);
+#endif
+			cfg |= (CONFIG_LEDC1 | CONFIG_LEDC0);
+		} else {
+#ifdef EPICMEDIADEBUG
+			printf("%s: power down fiber\n", ifp->if_xname);
+#endif
+			cfg &= ~(CONFIG_LEDC1 | CONFIG_LEDC0);
+		}
+		PHY_WRITE(miisc, MII_LXTPHY_CONFIG, cfg);
+	}
+
 	return (0);
 }

@@ -1,5 +1,5 @@
-#	$NetBSD: Makefile,v 1.15 1997/06/01 03:39:03 mrg Exp $
+#	$NetBSD: Makefile,v 1.17 2002/05/07 12:32:52 lukem Exp $
 
-SUBDIR= boot bootxx installboot binstall
+SUBDIR= boot bootxx bootblk ofwboot ofwboot.net binstall
 
 .include <bsd.subdir.mk>

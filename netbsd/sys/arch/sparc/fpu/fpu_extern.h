@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu_extern.h,v 1.3.2.1 2000/08/07 01:31:13 mrg Exp $	*/
+/*	$NetBSD: fpu_extern.h,v 1.5 2001/12/04 00:05:05 darrenr Exp $	*/
 
 /*-
  * Copyright (c) 1995 The NetBSD Foundation, Inc.
@@ -35,6 +35,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
 
 struct proc;
 #ifndef SUN4U

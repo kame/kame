@@ -1,4 +1,4 @@
-/*	$NetBSD: eeprom.c,v 1.18 1998/02/05 04:56:36 gwr Exp $	*/
+/*	$NetBSD: eeprom.c,v 1.21 2001/09/05 14:03:48 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -51,12 +51,11 @@
 #include <sys/buf.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
+#include <sys/kernel.h>
 
 #include <machine/autoconf.h>
 #include <machine/idprom.h>
 #include <machine/eeprom.h>
-
-#define HZ 100	/* XXX */
 
 #ifndef EEPROM_SIZE
 #define EEPROM_SIZE 0x800
@@ -80,14 +79,14 @@ struct cfattach eeprom_ca = {
 
 static int
 eeprom_match(parent, cf, args)
-    struct device *parent;
+	struct device *parent;
 	struct cfdata *cf;
-    void *args;
+	void *args;
 {
 	struct confargs *ca = args;
 
-	/* This driver only supports one unit. */
-	if (cf->cf_unit != 0)
+	/* This driver only supports one instance. */
+	if (eeprom_va != NULL)
 		return (0);
 
 	if (bus_peek(ca->ca_bustype, ca->ca_paddr, 1) == -1)
@@ -140,7 +139,7 @@ eeprom_attach(parent, self, args)
 
 	if (ee_size < EEPROM_SIZE) {
 		/* Clear out the last part. */
-		bzero(dst, (EEPROM_SIZE - ee_size));
+		memset(dst, 0, (EEPROM_SIZE - ee_size));
 	}
 }
 
@@ -248,7 +247,7 @@ ee_update(int off, int cnt)
 			 * holding the lock to prevent all access to
 			 * the EEPROM while it recovers.
 			 */
-			(void)tsleep(eeprom_va, PZERO-1, "eeprom", HZ/50);
+			(void)tsleep(eeprom_va, PZERO-1, "eeprom", hz/50);
 		}
 		/* Make sure the write worked. */
 		if (*ep != *bp)

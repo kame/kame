@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.54 2000/05/29 20:00:55 ragge Exp $     */
+/*	$NetBSD: trap.c,v 1.70 2002/04/29 01:54:11 thorpej Exp $     */
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -45,9 +45,7 @@
 #include <sys/signalvar.h>
 #include <sys/exec.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/mtpr.h>
 #include <machine/pte.h>
@@ -68,10 +66,10 @@
 volatile int startsysc = 0, faultdebug = 0;
 #endif
 
-static __inline void userret __P((struct proc *, struct trapframe *, u_quad_t));
+static __inline void userret (struct proc *, struct trapframe *, u_quad_t);
 
-void	arithflt __P((struct trapframe *));
-void	syscall __P((struct trapframe *));
+void	trap (struct trapframe *);
+void	syscall (struct trapframe *);
 
 char *traptypes[]={
 	"reserved addressing",
@@ -112,10 +110,7 @@ int no_traps = 18;
  *	return to usermode.
  */
 static __inline void
-userret(p, frame, oticks)
-	struct proc *p;
-	struct trapframe *frame;
-	u_quad_t oticks;
+userret(struct proc *p, struct trapframe *frame, u_quad_t oticks)
 {
 	int sig;
 
@@ -145,14 +140,13 @@ userret(p, frame, oticks)
 }
 
 void
-arithflt(frame)
-	struct trapframe *frame;
+trap(struct trapframe *frame)
 {
 	u_int	sig = 0, type = frame->trap, trapsig = 1;
 	u_int	rv, addr, umode;
 	struct	proc *p = curproc;
 	u_quad_t oticks = 0;
-	vm_map_t map;
+	struct vm_map *map;
 	vm_prot_t ftype;
 	
 	uvmexp.traps++;
@@ -200,11 +194,15 @@ fram:
 #ifdef nohwbug
 		panic("translation fault");
 #endif
+
+	case T_PTELEN|T_USER:	/* Page table length exceeded */
 	case T_ACCFLT|T_USER:
 		if (frame->code < 0) { /* Check for kernel space */
 			sig = SIGSEGV;
 			break;
 		}
+
+	case T_PTELEN:
 	case T_ACCFLT:
 #ifdef TRAPDEBUG
 if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
@@ -214,6 +212,8 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 		if (p == 0)
 			panic("trap: access fault: addr %lx code %lx",
 			    frame->pc, frame->code);
+		if (frame->psl & PSL_IS)
+			panic("trap: pflt on IS");
 #endif
 
 		/*
@@ -230,18 +230,23 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 			map = &p->p_vmspace->vm_map;
 
 		if (frame->trap & T_WRITE)
-			ftype = VM_PROT_WRITE|VM_PROT_READ;
+			ftype = VM_PROT_WRITE;
 		else
 			ftype = VM_PROT_READ;
 
+		if (umode)
+			KERNEL_PROC_LOCK(p);
+		else
+			KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 		rv = uvm_fault(map, addr, 0, ftype);
-		if (rv != KERN_SUCCESS) {
+		if (rv != 0) {
 			if (umode == 0) {
+				KERNEL_UNLOCK();
 				FAULTCHK;
 				panic("Segv in kernel mode: pc %x addr %x",
 				    (u_int)frame->pc, (u_int)frame->code);
 			}
-			if (rv == KERN_RESOURCE_SHORTAGE) {
+			if (rv == ENOMEM) {
 				printf("UVM: pid %d (%s), uid %d killed: "
 				       "out of swap\n",
 				       p->p_pid, p->p_comm,
@@ -253,16 +258,10 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 			}
 		} else
 			trapsig = 0;
-		break;
-
-	case T_PTELEN:
-		if (p && p->p_addr)
-			FAULTCHK;
-		panic("ptelen fault in system space: addr %lx pc %lx",
-		    frame->code, frame->pc);
-
-	case T_PTELEN|T_USER:	/* Page table length exceeded */
-		sig = SIGSEGV;
+		if (umode) 
+			KERNEL_PROC_UNLOCK(p);
+		else
+			KERNEL_UNLOCK();
 		break;
 
 	case T_BPTFLT|T_USER:
@@ -299,9 +298,17 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 		return;
 #endif
 	}
-
-	if (trapsig)
+	if (trapsig) {
+#ifdef DEBUG
+		if (sig == SIGSEGV || sig == SIGILL)
+			printf("pid %d (%s): sig %d: type %lx, code %lx, pc %lx, psl %lx\n",
+			       p->p_pid, p->p_comm, sig, frame->trap,
+			       frame->code, frame->pc, frame->psl);
+#endif
+		KERNEL_PROC_LOCK(p);
 		trapsignal(p, sig, frame->code);
+		KERNEL_PROC_UNLOCK(p);
+	}
 
 	if (umode == 0)
 		return;
@@ -310,10 +317,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 }
 
 void
-setregs(p, pack, stack)
-	struct proc *p;
-	struct exec_package *pack;
-	u_long stack;
+setregs(struct proc *p, struct exec_package *pack, u_long stack)
 {
 	struct trapframe *exptr;
 
@@ -323,19 +327,19 @@ setregs(p, pack, stack)
 	exptr->r6 = stack;			/* for ELF */
 	exptr->r7 = 0;				/* for ELF */
 	exptr->r8 = 0;				/* for ELF */
-	exptr->r9 = (u_long) PS_STRINGS;	/* for ELF */
+	exptr->r9 = (u_long) p->p_psstr;	/* for ELF */
 }
 
 void
-syscall(frame)
-	struct	trapframe *frame;
+syscall(struct trapframe *frame)
 {
-	struct sysent *callp;
+	const struct sysent *callp;
 	u_quad_t oticks;
 	int nsys;
 	int err, rval[2], args[8];
 	struct trapframe *exptr;
 	struct proc *p = curproc;
+
 
 #ifdef TRAPDEBUG
 if(startsysc)printf("trap syscall %s pc %lx, psl %lx, sp %lx, pid %d, frame %p\n",
@@ -349,7 +353,7 @@ if(startsysc)printf("trap syscall %s pc %lx, psl %lx, sp %lx, pid %d, frame %p\n
 	nsys = p->p_emul->e_nsysent;
 	oticks = p->p_sticks;
 
-	if(frame->code == SYS___syscall){
+	if (frame->code == SYS___syscall) {
 		int g = *(int *)(frame->ap);
 
 		frame->code = *(int *)(frame->ap + 4);
@@ -357,14 +361,15 @@ if(startsysc)printf("trap syscall %s pc %lx, psl %lx, sp %lx, pid %d, frame %p\n
 		*(int *)(frame->ap) = g - 2;
 	}
 
-	if(frame->code < 0 || frame->code >= nsys)
+	if ((unsigned long) frame->code >= nsys)
 		callp += p->p_emul->e_nosys;
 	else
 		callp += frame->code;
 
 	rval[0] = 0;
 	rval[1] = frame->r1;
-	if(callp->sy_narg) {
+	KERNEL_PROC_LOCK(p);
+	if (callp->sy_narg) {
 		err = copyin((char*)frame->ap + 4, args, callp->sy_argsize);
 		if (err) {
 #ifdef KTRACE
@@ -380,11 +385,12 @@ if(startsysc)printf("trap syscall %s pc %lx, psl %lx, sp %lx, pid %d, frame %p\n
 		ktrsyscall(p, frame->code, callp->sy_argsize, args);
 #endif
 	err = (*callp->sy_call)(curproc, args, rval);
+	KERNEL_PROC_UNLOCK(p);
 	exptr = curproc->p_addr->u_pcb.framep;
 
 #ifdef TRAPDEBUG
 if(startsysc)
-	printf("retur %s pc %lx, psl %lx, sp %lx, pid %d, v{rde %d r0 %d, r1 %d, frame %p\n",
+	printf("retur %s pc %lx, psl %lx, sp %lx, pid %d, err %d r0 %d, r1 %d, frame %p\n",
 	       syscallnames[exptr->code], exptr->pc, exptr->psl,exptr->sp,
 		p->p_pid,err,rval[0],rval[1],exptr); /* } */
 #endif
@@ -398,7 +404,7 @@ bad:
 		break;
 
 	case EJUSTRETURN:
-		return;
+		break;
 
 	case ERESTART:
 		exptr->pc -= (exptr->code > 63 ? 4 : 2);
@@ -413,8 +419,11 @@ bad:
 	userret(p, frame, oticks);
 
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
+	if (KTRPOINT(p, KTR_SYSRET)) {
+		KERNEL_PROC_LOCK(p);
 		ktrsysret(p, frame->code, err, rval[0]);
+		KERNEL_PROC_UNLOCK(p);
+	}
 #endif
 }
 
@@ -423,11 +432,14 @@ child_return(void *arg)
 {
         struct proc *p = arg;
 
+	KERNEL_PROC_UNLOCK(p);
 	userret(p, p->p_addr->u_pcb.framep, 0);
 
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
+	if (KTRPOINT(p, KTR_SYSRET)) {
+		KERNEL_PROC_LOCK(p);
 		ktrsysret(p, SYS_fork, 0, 0);
+		KERNEL_PROC_UNLOCK(p);
+	}
 #endif
 }
-

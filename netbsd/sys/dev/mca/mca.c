@@ -1,7 +1,7 @@
-/*	$NetBSD: mca.c,v 1.1 2000/05/11 15:42:05 jdolecek Exp $	*/
+/*	$NetBSD: mca.c,v 1.7 2001/11/24 12:33:14 jdolecek Exp $	*/
 
 /*-
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
  * Copyright (c) 1996-1999 Scott D. Telford.
  * All rights reserved.
  *
@@ -41,7 +41,8 @@
  * MCA Bus device
  */
 
-#include "opt_mcaverbose.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mca.c,v 1.7 2001/11/24 12:33:14 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,7 +52,7 @@
 
 #include <dev/mca/mcareg.h>
 #include <dev/mca/mcavar.h>
-
+#include <dev/mca/mcadevs.h>
 
 int	mca_match __P((struct device *, struct cfdata *, void *));
 void	mca_attach __P((struct device *, struct device *, void *));
@@ -96,7 +97,25 @@ mca_print(aux, pnp)
 		printf("%s slot %d: %s", pnp, ma->ma_slot + 1, devinfo);
 	}
 
-	return (mca_issupp(ma->ma_id)) ? UNCONF : UNSUPP;
+	/*
+	 * Print "configured" for Memory Extension boards - there is no
+	 * meaningfull driver for them, they "just work".
+	 */
+	switch(ma->ma_id) {
+	case MCA_PRODUCT_HRAM: case MCA_PRODUCT_IQRAM: case MCA_PRODUCT_MICRAM:
+	case MCA_PRODUCT_ASTRAM: case MCA_PRODUCT_KINGRAM:
+	case MCA_PRODUCT_KINGRAM8: case MCA_PRODUCT_KINGRAM16:
+	case MCA_PRODUCT_KINGRAM609: case MCA_PRODUCT_HYPRAM:
+	case MCA_PRODUCT_QRAM1: case MCA_PRODUCT_QRAM2: case MCA_PRODUCT_EVERAM:
+	case MCA_PRODUCT_BOCARAM: case MCA_PRODUCT_IBMRAM1:
+	case MCA_PRODUCT_IBMRAM2: case MCA_PRODUCT_IBMRAM3:
+	case MCA_PRODUCT_IBMRAM4: case MCA_PRODUCT_IBMRAM5:
+	case MCA_PRODUCT_IBMRAM6: case MCA_PRODUCT_IBMRAM7:
+		printf(": memory configured\n");
+		return (QUIET);
+	default:
+		return (UNCONF);
+	}
 }
 
 int
@@ -158,7 +177,8 @@ mca_attach(parent, self, aux)
 		if (ma.ma_id == 0xffff)	/* no adapter here */
 			continue;
 
-		if (ma.ma_pos[2] & MCA_POS2_ENABLE)
+		if (ma.ma_pos[2] & MCA_POS2_ENABLE
+		    || mca_match_disabled(ma.ma_id))
 			config_found_sm(self, &ma, mca_print, mca_submatch);
 		else {
 			mca_print(&ma, self->dv_xname);

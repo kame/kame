@@ -1,4 +1,4 @@
-/*	$NetBSD: cd9660_vnops.c,v 1.58 2000/05/27 16:03:56 jdolecek Exp $	*/
+/*	$NetBSD: cd9660_vnops.c,v 1.71 2001/11/17 18:56:46 perry Exp $	*/
 
 /*-
  * Copyright (c) 1994
@@ -39,6 +39,9 @@
  *
  *	@(#)cd9660_vnops.c	8.15 (Berkeley) 5/27/95
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cd9660_vnops.c,v 1.71 2001/11/17 18:56:46 perry Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,7 +108,6 @@ cd9660_mknod(ndp, vap, cred, p)
 	struct vnode *vp;
 	struct iso_node *ip;
 	struct iso_dnode *dp;
-	int error;
 
 	vp = ndp->ni_vp;
 	ip = VTOI(vp);
@@ -119,12 +121,11 @@ cd9660_mknod(ndp, vap, cred, p)
 		return (EINVAL);
 	}
 
-	dp = iso_dmap(ip->i_dev,ip->i_number,1);
+	dp = iso_dmap(ip->i_dev, ip->i_number, 1);
 	if (ip->inode.iso_rdev == vap->va_rdev ||
 	    vap->va_rdev == (dev_t)VNOVAL) {
 		/* same as the unmapped one, delete the mapping */
-		dp->d_next->d_prev = dp->d_prev;
-		*dp->d_prev = dp->d_next;
+		LIST_REMOVE(dp, d_hash);
 		FREE(dp, M_CACHE);
 	} else
 		/* enter new mapping */
@@ -239,16 +240,6 @@ cd9660_getattr(v)
 	return (0);
 }
 
-#ifdef DEBUG
-extern int doclusterread;
-#else
-#define doclusterread 1
-#endif
-
-/* XXX until cluster routines can handle block sizes less than one page */
-#define cd9660_doclusterread \
-	(doclusterread && (ISO_DEFAULT_BLOCK_SIZE >= NBPG))
-
 /*
  * Vnode op for reading.
  */
@@ -276,13 +267,34 @@ cd9660_read(v)
 		return (0);
 	if (uio->uio_offset < 0)
 		return (EINVAL);
+	if (uio->uio_offset >= ip->i_size)
+		return 0;
 	ip->i_flag |= IN_ACCESS;
 	imp = ip->i_mnt;
+
+	if (vp->v_type == VREG) {
+		error = 0;
+		while (uio->uio_resid > 0) {
+			void *win;
+			vsize_t bytelen = MIN(ip->i_size - uio->uio_offset,
+					      uio->uio_resid);
+
+			if (bytelen == 0)
+				break;
+			win = ubc_alloc(&vp->v_uobj, uio->uio_offset,
+					&bytelen, UBC_READ);
+			error = uiomove(win, bytelen, uio);
+			ubc_release(win, 0);
+			if (error)
+				break;
+		}
+		goto out;
+	}
+
 	do {
 		lbn = lblkno(imp, uio->uio_offset);
 		on = blkoff(imp, uio->uio_offset);
-		n = min((u_int)(imp->logical_block_size - on),
-			uio->uio_resid);
+		n = MIN(imp->logical_block_size - on, uio->uio_resid);
 		diff = (off_t)ip->i_size - uio->uio_offset;
 		if (diff <= 0)
 			return (0);
@@ -290,23 +302,14 @@ cd9660_read(v)
 			n = diff;
 		size = blksize(imp, ip, lbn);
 		rablock = lbn + 1;
-		if (cd9660_doclusterread) {
-			if (lblktosize(imp, rablock) <= ip->i_size)
-				error = cluster_read(vp, (off_t)ip->i_size,
-						     lbn, size, NOCRED, &bp);
-			else
-				error = bread(vp, lbn, size, NOCRED, &bp);
+		if (lblktosize(imp, rablock) < ip->i_size) {
+			rasize = blksize(imp, ip, rablock);
+			error = breadn(vp, lbn, size, &rablock,
+				       &rasize, 1, NOCRED, &bp);
 		} else {
-			if (vp->v_lastr + 1 == lbn &&
-			    lblktosize(imp, rablock) < ip->i_size) {
-				rasize = blksize(imp, ip, rablock);
-				error = breadn(vp, lbn, size, &rablock,
-					       &rasize, 1, NOCRED, &bp);
-			} else
-				error = bread(vp, lbn, size, NOCRED, &bp);
+			error = bread(vp, lbn, size, NOCRED, &bp);
 		}
-		vp->v_lastr = lbn;
-		n = min(n, size - bp->b_resid);
+		n = MIN(n, size - bp->b_resid);
 		if (error) {
 			brelse(bp);
 			return (error);
@@ -315,21 +318,9 @@ cd9660_read(v)
 		error = uiomove(bp->b_data + on, (int)n, uio);
 		brelse(bp);
 	} while (error == 0 && uio->uio_resid > 0 && n != 0);
+
+out:
 	return (error);
-}
-
-/*
- * Mmap a file
- *
- * NB Currently unsupported.
- */
-/* ARGSUSED */
-int
-cd9660_mmap(v)
-	void *v;
-{
-
-	return (EINVAL);
 }
 
 int
@@ -469,8 +460,7 @@ cd9660_readdir(v)
 		idp->cookies = NULL;
 	else {
 		ncookies = uio->uio_resid / 16;
-		MALLOC(cookies, off_t *, ncookies * sizeof(off_t), M_TEMP,
-		    M_WAITOK);
+		cookies = malloc(ncookies * sizeof(off_t), M_TEMP, M_WAITOK);
 		idp->cookies = cookies;
 		idp->ncookies = ncookies;
 	}
@@ -591,7 +581,7 @@ cd9660_readdir(v)
 
 	if (ap->a_ncookies != NULL) {
 		if (error)
-			FREE(cookies, M_TEMP);
+			free(cookies, M_TEMP);
 		else {
 			/*
 			 * Work out the number of cookies actually used.
@@ -705,7 +695,7 @@ cd9660_readlink(v)
 		return (error);
 	}
 	uio->uio_resid -= symlen;
-	(char *)uio->uio_iov->iov_base += symlen;
+	uio->uio_iov->iov_base = (char *)uio->uio_iov->iov_base + symlen;
 	uio->uio_iov->iov_len -= symlen;
 	return (0);
 }
@@ -911,7 +901,7 @@ cd9660_setattr(v)
  * Global vfs data structures for cd9660
  */
 int (**cd9660_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc cd9660_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc cd9660_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, cd9660_lookup },		/* lookup */
 	{ &vop_create_desc, cd9660_create },		/* create */
@@ -956,16 +946,18 @@ struct vnodeopv_entry_desc cd9660_vnodeop_entries[] = {
 	{ &vop_truncate_desc, cd9660_truncate },	/* truncate */
 	{ &vop_update_desc, cd9660_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_getpages_desc, genfs_getpages },		/* getpages */
+	{ &vop_putpages_desc, genfs_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc cd9660_vnodeop_opv_desc =
+const struct vnodeopv_desc cd9660_vnodeop_opv_desc =
 	{ &cd9660_vnodeop_p, cd9660_vnodeop_entries };
 
 /*
  * Special device vnode ops
  */
 int (**cd9660_specop_p) __P((void *));
-struct vnodeopv_entry_desc cd9660_specop_entries[] = {
+const struct vnodeopv_entry_desc cd9660_specop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, spec_lookup },		/* lookup */
 	{ &vop_create_desc, spec_create },		/* create */
@@ -1010,13 +1002,15 @@ struct vnodeopv_entry_desc cd9660_specop_entries[] = {
 	{ &vop_truncate_desc, spec_truncate },		/* truncate */
 	{ &vop_update_desc, cd9660_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_getpages_desc, spec_getpages },		/* getpages */
+	{ &vop_putpages_desc, spec_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc cd9660_specop_opv_desc =
+const struct vnodeopv_desc cd9660_specop_opv_desc =
 	{ &cd9660_specop_p, cd9660_specop_entries };
 
 int (**cd9660_fifoop_p) __P((void *));
-struct vnodeopv_entry_desc cd9660_fifoop_entries[] = {
+const struct vnodeopv_entry_desc cd9660_fifoop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, fifo_lookup },		/* lookup */
 	{ &vop_create_desc, fifo_create },		/* create */
@@ -1061,7 +1055,8 @@ struct vnodeopv_entry_desc cd9660_fifoop_entries[] = {
 	{ &vop_truncate_desc, fifo_truncate },		/* truncate */
 	{ &vop_update_desc, cd9660_update },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, fifo_putpages }, 		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc cd9660_fifoop_opv_desc =
+const struct vnodeopv_desc cd9660_fifoop_opv_desc =
 	{ &cd9660_fifoop_p, cd9660_fifoop_entries };

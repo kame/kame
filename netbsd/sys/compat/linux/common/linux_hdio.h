@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_hdio.h,v 1.1.6.1 2001/03/30 21:39:59 he Exp $	*/
+/*	$NetBSD: linux_hdio.h,v 1.1 2000/12/10 14:12:17 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000 Wasabi Systems, Inc.

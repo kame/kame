@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_disk.c,v 1.29 2000/03/30 09:27:12 augustss Exp $	*/
+/*	$NetBSD: subr_disk.c,v 1.37.10.1 2002/07/22 04:39:45 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1999, 2000 The NetBSD Foundation, Inc.
@@ -77,15 +77,17 @@
  *	@(#)ufs_disksubr.c	8.5 (Berkeley) 1/21/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: subr_disk.c,v 1.37.10.1 2002/07/22 04:39:45 lukem Exp $");
+
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/syslog.h>
-#include <sys/time.h>
 #include <sys/disklabel.h>
 #include <sys/disk.h>
+#include <sys/sysctl.h>
 
 /*
  * A global list of all disks attached to the system.  May grow or
@@ -93,6 +95,7 @@
  */
 struct	disklist_head disklist;	/* TAILQ_HEAD */
 int	disk_count;		/* number of drives in global disklist */
+struct simplelock disklist_slock = SIMPLELOCK_INITIALIZER;
 
 /*
  * Seek sort for disks.  We depend on the driver which calls us using b_resid
@@ -113,9 +116,7 @@ int	disk_count;		/* number of drives in global disklist */
  * The bufq points to the last such ordered request.
  */
 void
-disksort_cylinder(bufq, bp)
-	struct buf_queue *bufq;
-	struct buf *bp;
+disksort_cylinder(struct buf_queue *bufq, struct buf *bp)
 {
 	struct buf *bq, *nbq;
 
@@ -165,7 +166,7 @@ disksort_cylinder(bufq, bp)
 				} while ((nbq = BUFQ_NEXT(bq)) != NULL);
 				goto insert;		/* after last */
 			}
-			bq = BUFQ_NEXT(bq);
+			bq = nbq;
 		}
 		/*
 		 * No inversions... we will go after the last, and
@@ -216,9 +217,7 @@ insert:	BUFQ_INSERT_AFTER(bufq, bq, bp);
  * The bufq points to the last such ordered request.
  */
 void
-disksort_blkno(bufq, bp)
-	struct buf_queue *bufq;
-	struct buf *bp;
+disksort_blkno(struct buf_queue *bufq, struct buf *bp)
 {
 	struct buf *bq, *nbq;
 
@@ -263,7 +262,7 @@ disksort_blkno(bufq, bp)
 				} while ((nbq = BUFQ_NEXT(bq)) != NULL);
 				goto insert;		/* after last */
 			}
-			bq = BUFQ_NEXT(bq);
+			bq = nbq;
 		}
 		/*
 		 * No inversions... we will go after the last, and
@@ -299,9 +298,7 @@ insert:	BUFQ_INSERT_AFTER(bufq, bq, bp);
  * the tail of the queue.
  */
 void
-disksort_tail(bufq, bp)
-	struct buf_queue *bufq;
-	struct buf *bp;
+disksort_tail(struct buf_queue *bufq, struct buf *bp)
 {
 
 	BUFQ_INSERT_TAIL(bufq, bp);
@@ -311,8 +308,7 @@ disksort_tail(bufq, bp)
  * Compute checksum for disk label.
  */
 u_int
-dkcksum(lp)
-	struct disklabel *lp;
+dkcksum(struct disklabel *lp)
 {
 	u_short *start, *end;
 	u_short sum = 0;
@@ -339,14 +335,11 @@ hp0g: hard error reading fsbn 12345 of 12344-12347 (hp0 bn %d cn %d tn %d sn %d)
  * or addlog, respectively.  There is no trailing space.
  */
 void
-diskerr(bp, dname, what, pri, blkdone, lp)
-	struct buf *bp;
-	char *dname, *what;
-	int pri, blkdone;
-	struct disklabel *lp;
+diskerr(const struct buf *bp, const char *dname, const char *what, int pri,
+    int blkdone, const struct disklabel *lp)
 {
 	int unit = DISKUNIT(bp->b_dev), part = DISKPART(bp->b_dev);
-	void (*pr) __P((const char *, ...));
+	void (*pr)(const char *, ...);
 	char partname = 'a' + part;
 	int sn;
 
@@ -374,7 +367,8 @@ diskerr(bp, dname, what, pri, blkdone, lp)
 		(*pr)(" (%s%d bn %d; cn %d", dname, unit, sn,
 		    sn / lp->d_secpercyl);
 		sn %= lp->d_secpercyl;
-		(*pr)(" tn %d sn %d)", sn / lp->d_nsectors, sn % lp->d_nsectors);
+		(*pr)(" tn %d sn %d)", sn / lp->d_nsectors,
+		    sn % lp->d_nsectors);
 	}
 }
 
@@ -382,7 +376,7 @@ diskerr(bp, dname, what, pri, blkdone, lp)
  * Initialize the disklist.  Called by main() before autoconfiguration.
  */
 void
-disk_init()
+disk_init(void)
 {
 
 	TAILQ_INIT(&disklist);
@@ -394,18 +388,21 @@ disk_init()
  * name provided.
  */
 struct disk *
-disk_find(name)
-	char *name;
+disk_find(char *name)
 {
 	struct disk *diskp;
 
 	if ((name == NULL) || (disk_count <= 0))
 		return (NULL);
 
-	for (diskp = disklist.tqh_first; diskp != NULL;
-	    diskp = diskp->dk_link.tqe_next)
-		if (strcmp(diskp->dk_name, name) == 0)
+	simple_lock(&disklist_slock);
+	for (diskp = TAILQ_FIRST(&disklist); diskp != NULL;
+	    diskp = TAILQ_NEXT(diskp, dk_link))
+		if (strcmp(diskp->dk_name, name) == 0) {
+			simple_unlock(&disklist_slock);
 			return (diskp);
+		}
+	simple_unlock(&disklist_slock);
 
 	return (NULL);
 }
@@ -414,8 +411,7 @@ disk_find(name)
  * Attach a disk.
  */
 void
-disk_attach(diskp)
-	struct disk *diskp;
+disk_attach(struct disk *diskp)
 {
 	int s;
 
@@ -443,7 +439,9 @@ disk_attach(diskp)
 	/*
 	 * Link into the disklist.
 	 */
+	simple_lock(&disklist_slock);
 	TAILQ_INSERT_TAIL(&disklist, diskp, dk_link);
+	simple_unlock(&disklist_slock);
 	++disk_count;
 }
 
@@ -451,8 +449,7 @@ disk_attach(diskp)
  * Detach a disk.
  */
 void
-disk_detach(diskp)
-	struct disk *diskp;
+disk_detach(struct disk *diskp)
 {
 
 	/*
@@ -460,7 +457,9 @@ disk_detach(diskp)
 	 */
 	if (--disk_count < 0)
 		panic("disk_detach: disk_count < 0");
+	simple_lock(&disklist_slock);
 	TAILQ_REMOVE(&disklist, diskp, dk_link);
+	simple_unlock(&disklist_slock);
 
 	/*
 	 * Free the space used by the disklabel structures.
@@ -474,8 +473,7 @@ disk_detach(diskp)
  * 0 to 1, set the timestamp.
  */
 void
-disk_busy(diskp)
-	struct disk *diskp;
+disk_busy(struct disk *diskp)
 {
 	int s;
 
@@ -495,9 +493,7 @@ disk_busy(diskp)
  * time, and reset the timestamp.
  */
 void
-disk_unbusy(diskp, bcount)
-	struct disk *diskp;
-	long bcount;
+disk_unbusy(struct disk *diskp, long bcount)
 {
 	int s;
 	struct timeval dv_time, diff_time;
@@ -528,8 +524,7 @@ disk_unbusy(diskp, bcount)
  * may skew any pending transfer results.
  */
 void
-disk_resetstat(diskp)
-	struct disk *diskp;
+disk_resetstat(struct disk *diskp)
 {
 	int s = splbio(), t;
 
@@ -543,4 +538,102 @@ disk_resetstat(diskp)
 	timerclear(&diskp->dk_time);
 
 	splx(s);
+}
+
+int
+sysctl_disknames(void *vwhere, size_t *sizep)
+{
+	char buf[DK_DISKNAMELEN + 1];
+	char *where = vwhere;
+	struct disk *diskp;
+	size_t needed, left, slen;
+	int error, first;
+
+	first = 1;
+	error = 0;
+	needed = 0;
+	left = *sizep;
+
+	simple_lock(&disklist_slock);
+	for (diskp = TAILQ_FIRST(&disklist); diskp != NULL;
+	    diskp = TAILQ_NEXT(diskp, dk_link)) {
+		if (where == NULL)
+			needed += strlen(diskp->dk_name) + 1;
+		else {
+			memset(buf, 0, sizeof(buf));
+			if (first) {
+				strncpy(buf, diskp->dk_name, sizeof(buf));
+				first = 0;
+			} else {
+				buf[0] = ' ';
+				strncpy(buf + 1, diskp->dk_name,
+				    sizeof(buf) - 1);
+			}
+			buf[DK_DISKNAMELEN] = '\0';
+			slen = strlen(buf);
+			if (left < slen + 1)
+				break;
+			/* +1 to copy out the trailing NUL byte */
+			error = copyout(buf, where, slen + 1);
+			if (error)
+				break;
+			where += slen;
+			needed += slen;
+			left -= slen;
+		}
+	}
+	simple_unlock(&disklist_slock);
+	*sizep = needed;
+	return (error);
+}
+
+int
+sysctl_diskstats(int *name, u_int namelen, void *vwhere, size_t *sizep)
+{
+	struct disk_sysctl sdisk;
+	struct disk *diskp;
+	char *where = vwhere;
+	size_t tocopy, left;
+	int error;
+
+	if (where == NULL) {
+		*sizep = disk_count * sizeof(struct disk_sysctl);
+		return (0);
+	}
+
+	if (namelen == 0)
+		tocopy = sizeof(sdisk);
+	else
+		tocopy = name[0];
+
+	error = 0;
+	left = *sizep;
+	memset(&sdisk, 0, sizeof(sdisk));
+	*sizep = 0;
+
+	simple_lock(&disklist_slock);
+	TAILQ_FOREACH(diskp, &disklist, dk_link) {
+		if (left < sizeof(struct disk_sysctl))
+			break;
+		strncpy(sdisk.dk_name, diskp->dk_name, sizeof(sdisk.dk_name));
+		sdisk.dk_xfer = diskp->dk_xfer;
+		sdisk.dk_seek = diskp->dk_seek;
+		sdisk.dk_bytes = diskp->dk_bytes;
+		sdisk.dk_attachtime_sec = diskp->dk_attachtime.tv_sec;
+		sdisk.dk_attachtime_usec = diskp->dk_attachtime.tv_usec;
+		sdisk.dk_timestamp_sec = diskp->dk_timestamp.tv_sec;
+		sdisk.dk_timestamp_usec = diskp->dk_timestamp.tv_usec;
+		sdisk.dk_time_sec = diskp->dk_time.tv_sec;
+		sdisk.dk_time_usec = diskp->dk_time.tv_usec;
+		sdisk.dk_busy = diskp->dk_busy;
+
+		error = copyout(&sdisk, where, min(tocopy, sizeof(sdisk)));
+		if (error)
+			break;
+		where += tocopy;
+		*sizep += tocopy;
+		left -= tocopy;
+	}
+	simple_unlock(&disklist_slock);
+	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: openfirm.c,v 1.4 1999/01/10 10:24:16 tsubai Exp $	*/
+/*	$NetBSD: openfirm.c,v 1.11 2001/09/24 13:22:33 wiz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,6 +31,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/param.h>
+#include <sys/systm.h>
 
 #include <machine/psl.h>
 #include <machine/stdarg.h>
@@ -39,8 +40,8 @@
 
 char *OF_buf;
 
-extern void ofw_stack __P((void));
-extern void ofbcopy __P((const void *, void *, size_t));
+void ofw_stack(void);
+void ofbcopy(const void *, void *, size_t);
 
 int
 OF_peer(phandle)
@@ -199,6 +200,36 @@ OF_getprop(handle, prop, buf, buflen)
 }
 
 int
+OF_nextprop(handle, prop, nextprop)
+	int handle;
+	char *prop;
+	void *nextprop;
+{
+	static struct {
+		char *name;
+		int nargs;
+		int nreturns;
+		int phandle;
+		char *prop;
+		char *buf;
+		int flag;
+	} args = {
+		"nextprop",
+		3,
+		1,
+	};
+
+	ofw_stack();
+	args.phandle = handle;
+	args.prop = prop;
+	args.buf = OF_buf;
+	if (openfirmware(&args) == -1)
+		return -1;
+	strncpy(nextprop, OF_buf, 32);
+	return args.flag;
+}
+
+int
 OF_finddevice(name)
 	char *name;
 {
@@ -327,10 +358,14 @@ OF_call_method(method, ihandle, nargs, nreturns, va_alist)
 	for (ip = args.args_n_results + (n = nargs); --n >= 0;)
 		*--ip = va_arg(ap, int);
 	ofw_stack();
-	if (openfirmware(&args) == -1)
+	if (openfirmware(&args) == -1) {
+		va_end(ap);
 		return -1;
-	if (args.args_n_results[nargs])
+	}
+	if (args.args_n_results[nargs]) {
+		va_end(ap);
 		return args.args_n_results[nargs];
+	}
 	for (ip = args.args_n_results + nargs + (n = args.nreturns); --n > 0;)
 		*va_arg(ap, int *) = *--ip;
 	va_end(ap);
@@ -464,11 +499,12 @@ OF_read(handle, addr, len)
 			ofbcopy(OF_buf, p, args.actual);
 			act += args.actual;
 		}
-		if (args.actual < l)
+		if (args.actual < l) {
 			if (act)
 				return act;
 			else
 				return args.actual;
+		}
 	}
 	return act;
 }
@@ -599,15 +635,14 @@ OF_exit()
 }
 
 void
-(*OF_set_callback(newfunc))()
-	void (*newfunc)();
+(*OF_set_callback (void (*newfunc)(void *))) (void *)
 {
 	static struct {
 		char *name;
 		int nargs;
 		int nreturns;
-		void (*newfunc)();
-		void (*oldfunc)();
+		void (*newfunc)(void *);
+		void (*oldfunc)(void *);
 	} args = {
 		"set-callback",
 		1,

@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.22 1999/08/04 15:54:28 thorpej Exp $	*/
+/*	$NetBSD: intr.c,v 1.24 2001/12/04 17:56:36 wiz Exp $	*/
 
 /*
  * Copyright (c) 1994 Matthias Pfaller.
@@ -33,8 +33,6 @@
 #define DEFINE_SPLX
 #include <sys/param.h>
 #include <sys/systm.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -104,7 +102,7 @@ intr_init()
 	if (sir != IR_SOFT)
 		panic("Could not allocate IR_SOFT");
 
-	/* Disable IR_SOFT in all priority levels other then IPL_ZERO. */
+	/* Disable IR_SOFT in all priority levels other than IPL_ZERO. */
 	for (i = 1; i < NIPL; i++)
 		imask[i] |= 1 << IR_SOFT;
 }

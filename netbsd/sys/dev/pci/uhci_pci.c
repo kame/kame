@@ -1,4 +1,4 @@
-/*	$NetBSD: uhci_pci.c,v 1.16 2000/04/27 15:26:46 augustss Exp $	*/
+/*	$NetBSD: uhci_pci.c,v 1.21 2001/11/13 07:48:49 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,6 +37,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uhci_pci.c,v 1.21 2001/11/13 07:48:49 lukem Exp $");
+
+#include "ehci.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -47,6 +52,7 @@
 #include <machine/bus.h>
 
 #include <dev/pci/pcivar.h>
+#include <dev/pci/usb_pci.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -56,13 +62,17 @@
 #include <dev/usb/uhcireg.h>
 #include <dev/usb/uhcivar.h>
 
-int	uhci_pci_match __P((struct device *, struct cfdata *, void *));
-void	uhci_pci_attach __P((struct device *, struct device *, void *));
-int	uhci_pci_detach __P((device_ptr_t, int));
+int	uhci_pci_match(struct device *, struct cfdata *, void *);
+void	uhci_pci_attach(struct device *, struct device *, void *);
+int	uhci_pci_detach(device_ptr_t, int);
 
 struct uhci_pci_softc {
 	uhci_softc_t		sc;
+#if NEHCI > 0
+	struct usb_pci		sc_pci;
+#endif
 	pci_chipset_tag_t	sc_pc;
+	pcitag_t		sc_tag;
 	void 			*sc_ih;		/* interrupt vectoring */
 };
 
@@ -72,10 +82,7 @@ struct cfattach uhci_pci_ca = {
 };
 
 int
-uhci_pci_match(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+uhci_pci_match(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct pci_attach_args *pa = (struct pci_attach_args *) aux;
 
@@ -88,17 +95,15 @@ uhci_pci_match(parent, match, aux)
 }
 
 void
-uhci_pci_attach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+uhci_pci_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct uhci_pci_softc *sc = (struct uhci_pci_softc *)self;
 	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
 	pci_chipset_tag_t pc = pa->pa_pc;
+	pcitag_t tag = pa->pa_tag;
 	char const *intrstr;
 	pci_intr_handle_t ih;
-	pcireg_t csr, legsup;
+	pcireg_t csr;
 	char *vendor;
 	char *devname = sc->sc.sc_bus.bdev.dv_xname;
 	char devinfo[256];
@@ -118,16 +123,16 @@ uhci_pci_attach(parent, self, aux)
 	bus_space_write_2(sc->sc.iot, sc->sc.ioh, UHCI_INTR, 0);
 
 	sc->sc_pc = pc;
+	sc->sc_tag = tag;
 	sc->sc.sc_bus.dmatag = pa->pa_dmat;
 
 	/* Enable the device. */
-	csr = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG);
-	pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
+	csr = pci_conf_read(pc, tag, PCI_COMMAND_STATUS_REG);
+	pci_conf_write(pc, tag, PCI_COMMAND_STATUS_REG,
 		       csr | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", devname);
 		return;
 	}
@@ -142,14 +147,10 @@ uhci_pci_attach(parent, self, aux)
 	}
 	printf("%s: interrupting at %s\n", devname, intrstr);
 
-        /* Verify that the PIRQD enable bit is set, some BIOS's don't do that*/
-	legsup = pci_conf_read(pc, pa->pa_tag, PCI_LEGSUP);
-	if (!(legsup & PCI_LEGSUP_USBPIRQDEN)) {
-		legsup = PCI_LEGSUP_USBPIRQDEN;
-		pci_conf_write(pc, pa->pa_tag, PCI_LEGSUP, legsup);
-        }
+	/* Set LEGSUP register to its default value. */
+	pci_conf_write(pc, tag, PCI_LEGSUP, PCI_LEGSUP_USBPIRQDEN);
 
-	switch(pci_conf_read(pc, pa->pa_tag, PCI_USBREV) & PCI_USBREV_MASK) {
+	switch(pci_conf_read(pc, tag, PCI_USBREV) & PCI_USBREV_MASK) {
 	case PCI_USBREV_PRE_1_0:
 		sc->sc.sc_bus.usbrev = USBREV_PRE_1_0;
 		break;
@@ -180,15 +181,17 @@ uhci_pci_attach(parent, self, aux)
 		return;
 	}
 
+#if NEHCI > 0
+	usb_pci_add(&sc->sc_pci, pa, &sc->sc.sc_bus);
+#endif
+
 	/* Attach usb device. */
 	sc->sc.sc_child = config_found((void *)sc, &sc->sc.sc_bus,
 				       usbctlprint);
 }
 
 int
-uhci_pci_detach(self, flags)
-	device_ptr_t self;
-	int flags;
+uhci_pci_detach(device_ptr_t self, int flags)
 {
 	struct uhci_pci_softc *sc = (struct uhci_pci_softc *)self;
 	int rv;
@@ -204,5 +207,8 @@ uhci_pci_detach(self, flags)
 		bus_space_unmap(sc->sc.iot, sc->sc.ioh, sc->sc.sc_size);
 		sc->sc.sc_size = 0;
 	}
+#if NEHCI > 0
+	usb_pci_rem(&sc->sc_pci);
+#endif
 	return (0);
 }

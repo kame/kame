@@ -1,4 +1,4 @@
-/*	$NetBSD: if_hippisubr.c,v 1.5.4.1 2000/10/17 01:23:49 tv Exp $	*/
+/*	$NetBSD: if_hippisubr.c,v 1.14.10.1 2002/06/15 01:06:54 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1989, 1993
@@ -33,7 +33,12 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_hippisubr.c,v 1.14.10.1 2002/06/15 01:06:54 lukem Exp $");
+
 #include "opt_inet.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,6 +59,10 @@
 #include <net/if_llc.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #include <net/if_hippi.h>
 
@@ -91,16 +100,16 @@ hippi_output(ifp, m0, dst, rt0)
 {
 	u_int16_t htype;
 	u_int32_t ifield = 0;
-	int s, error = 0;
+	int s, len, error = 0;
 	struct mbuf *m = m0;
 	struct rtentry *rt;
 	struct hippi_header *hh;
 	u_int32_t *cci;
 	u_int32_t d2_len;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 
 	/* HIPPI doesn't really do broadcast or multicast right now */
 	if (m->m_flags & (M_BCAST | M_MCAST))
@@ -138,12 +147,15 @@ hippi_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
-	switch (dst->sa_family) {
 
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
+	switch (dst->sa_family) {
 #ifdef INET
-#ifdef INET6
-	case AF_INET6:
-#endif
 	case AF_INET:
 		if (rt) {
 			struct sockaddr_dl *sdl = 
@@ -154,6 +166,20 @@ hippi_output(ifp, m0, dst, rt0)
 		if (!ifield)  /* XXX:  bogus check, but helps us get going */
 			senderr(EHOSTUNREACH);
 		htype = htons(ETHERTYPE_IP);
+		break;
+#endif
+
+#ifdef INET6
+	case AF_INET6:
+		if (rt) {
+			struct sockaddr_dl *sdl = 
+				(struct sockaddr_dl *) SDL(rt->rt_gateway);
+			if (sdl->sdl_family == AF_LINK && sdl->sdl_alen != 0)
+				bcopy(LLADDR(sdl), &ifield, sizeof(ifield));
+		}
+		if (!ifield)  /* XXX:  bogus check, but helps us get going */
+			senderr(EHOSTUNREACH);
+		htype = htons(ETHERTYPE_IPV6);
 		break;
 #endif
 
@@ -188,7 +214,7 @@ hippi_output(ifp, m0, dst, rt0)
 	if (m == 0)
 		senderr(ENOBUFS);
 	cci = mtod(m, u_int32_t *);
-	bzero(cci, sizeof(struct hippi_header) + 8);
+	memset(cci, 0, sizeof(struct hippi_header) + 8);
 	cci[0] = 0;
 	cci[1] = ifield;
 	hh = (struct hippi_header *) &cci[2];
@@ -204,18 +230,19 @@ hippi_output(ifp, m0, dst, rt0)
 		m_copyback(m, m->m_pkthdr.len, 8 - d2_len % 8, (caddr_t) buffer);
 	}
 
-	s = splimp();
+	len = m->m_pkthdr.len;
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already free */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	ifp->if_obytes += len;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -253,7 +280,6 @@ hippi_input(ifp, m)
 
 	hh = mtod(m, struct hippi_header *);
 
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	if (hh->hi_le.le_dest_addr[0] & 1) {
 		if (bcmp((caddr_t)etherbroadcastaddr, 
@@ -294,7 +320,7 @@ hippi_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -322,7 +348,7 @@ hippi_ip_input(ifp, m)
 	schednetisr(NETISR_IP);
 	inq = &ipintrq;
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -332,7 +358,6 @@ hippi_ip_input(ifp, m)
 }
 #endif
 
-
 /*
  * Perform common duties while attaching to interface list
  */
@@ -341,19 +366,20 @@ hippi_ifattach(ifp, lla)
 	struct ifnet *ifp;
 	caddr_t lla;
 {
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_HIPPI;
 	ifp->if_addrlen = 6;  /* regular 802.3 MAC address */
 	ifp->if_hdrlen = sizeof(struct hippi_header) + 8; /* add CCI */
+	ifp->if_dlt = DLT_HIPPI;
 	ifp->if_mtu = HIPPIMTU;
 	ifp->if_output = hippi_output;
 	ifp->if_input = hippi_input;
 	ifp->if_baudrate = IF_Mbps(800);	/* XXX double-check */
-	if ((sdl = ifp->if_sadl) &&
-	    sdl->sdl_family == AF_LINK) {
-		sdl->sdl_type = IFT_HIPPI;
-		sdl->sdl_alen = ifp->if_addrlen;
-		bcopy((caddr_t)lla, LLADDR(sdl), ifp->if_addrlen);
-	}
+
+	if_alloc_sadl(ifp);
+	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
+
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_HIPPI, sizeof(struct hippi_header));
+#endif
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: eisavar.h,v 1.14.4.1 2000/08/11 18:00:09 thorpej Exp $	*/
+/*	$NetBSD: eisavar.h,v 1.17 2000/08/11 00:46:17 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.1 1996/05/17 21:18:34 chuck Exp $	*/
+/*	$NetBSD: if_le.c,v 1.4 2001/11/08 21:41:42 scw Exp $	*/
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -68,10 +68,14 @@
 
 #include <machine/prom.h>
 
-#include "stand.h"
+#include <lib/libkern/libkern.h>
+#include <lib/libsa/stand.h>
+#include <lib/libsa/net.h>
+
 #include "libsa.h"
 #include "netif.h"
 #include "config.h"
+#include "dev_net.h"
 
 #include "if_lereg.h"
 
@@ -136,7 +140,7 @@ le_match(nif, machdep_hint)
 	if (bugargs.cputyp != CPU_147)
 		return (0);
 	name = machdep_hint;
-	if (name && !bcmp(le_driver.netif_bname, name, 2))
+	if (name && !memcmp(le_driver.netif_bname, name, 2))
 		val += 10;
 	for (i = 0; i < nle_config; i++) {
 		if (le_config[i].used)
@@ -197,14 +201,14 @@ le_reset(nif, myea)
 	struct lereg1 *ler1 = le_softc.sc_r1;
 	struct lereg2 *ler2 = le_softc.sc_r2;
 	unsigned int a;
-	int     timo = 100000, stat, i;
+	int     timo = 100000, stat = 0, i;
 
 	if (le_debug)
 		printf("le%d: le_reset called\n", nif->nif_unit);
 	ler1->ler1_rap = LE_CSR0;
 	ler1->ler1_rdp = LE_C0_STOP;	/* do nothing until we are finished */
 
-	bzero(ler2, sizeof(*ler2));
+	memset(ler2, 0, sizeof(*ler2));
 
 	ler2->ler2_mode = LE_MODE_NORMAL;
 	ler2->ler2_padr[0] = myea[1];
@@ -319,7 +323,8 @@ le_poll(desc, pkt, len)
 		if (length > len)
 			length = len;
 
-		bcopy((void *)&ler2->ler2_rbuf[le_softc.next_rmd], pkt, length);
+		memcpy(pkt, (void *)&ler2->ler2_rbuf[le_softc.next_rmd],
+		    length);
 	}
 cleanup:
 	a = (u_int) & ler2->ler2_rbuf[le_softc.next_rmd];
@@ -341,7 +346,7 @@ le_put(desc, pkt, len)
 	volatile struct lereg1 *ler1 = le_softc.sc_r1;
 	volatile struct lereg2 *ler2 = le_softc.sc_r2;
 	volatile struct letmd *tmd;
-	int     timo = 100000, stat, i;
+	int     timo = 100000, stat = 0;
 	unsigned int a;
 
 	ler1->ler1_rap = LE_CSR0;
@@ -351,7 +356,7 @@ le_put(desc, pkt, len)
 	while (tmd->tmd1_bits & LE_T1_OWN) {
 		printf("le%d: output buffer busy\n", desc->io_netif->nif_unit);
 	}
-	bcopy(pkt, (void *)ler2->ler2_tbuf[le_softc.next_tmd], len);
+	memcpy((void *)ler2->ler2_tbuf[le_softc.next_tmd], pkt, len);
 	if (len < 64)
 		tmd->tmd2 = -64;
 	else
@@ -439,7 +444,7 @@ le_init(desc, machdep_hint)
 	if (le_debug)
 		printf("le%d: le_init called\n", desc->io_netif->nif_unit);
 	machdep_common_ether(desc->myea);
-	bzero(&le_softc, sizeof(le_softc));
+	memset(&le_softc, 0, sizeof(le_softc));
 	le_softc.sc_r1 =
 	    (struct lereg1 *) le_config[desc->io_netif->nif_unit].phys_addr;
 	le_softc.sc_r2 = (struct lereg2 *) (eram - (1024 * 1024));

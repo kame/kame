@@ -1,7 +1,7 @@
-/* $NetBSD: lock.h,v 1.8 2000/06/08 03:10:06 thorpej Exp $ */
+/* $NetBSD: lock.h,v 1.16 2001/12/17 23:34:57 thorpej Exp $ */
 
 /*-
- * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -88,8 +88,9 @@ __cpu_simple_lock(__cpu_simple_lock_t *alp)
 		"3:	br	1b		\n"
 		"4:				\n"
 		"	# END __cpu_simple_lock\n"
-		: "=r" (t0), "=m" (*alp)
-		: "i" (__SIMPLELOCK_LOCKED), "1" (*alp));
+		: "=&r" (t0), "=m" (*alp)
+		: "i" (__SIMPLELOCK_LOCKED), "m" (*alp)
+		: "memory");
 }
 
 static __inline int
@@ -112,8 +113,9 @@ __cpu_simple_lock_try(__cpu_simple_lock_t *alp)
 		"3:	br	1b		\n"
 		"4:				\n"
 		"	# END __cpu_simple_lock_try"
-		: "=r" (t0), "=r" (v0), "=m" (*alp)
-		: "i" (__SIMPLELOCK_LOCKED), "2" (*alp));
+		: "=&r" (t0), "=r" (v0), "=m" (*alp)
+		: "i" (__SIMPLELOCK_LOCKED), "m" (*alp)
+		: "memory");
 
 	return (v0 != 0);
 }
@@ -124,10 +126,35 @@ __cpu_simple_unlock(__cpu_simple_lock_t *alp)
 
 	__asm __volatile(
 		"# BEGIN __cpu_simple_unlock\n"
-		"	stl	$31, %0		\n"
 		"	mb			\n"
+		"	stl	$31, %0		\n"
 		"	# END __cpu_simple_unlock"
 		: "=m" (*alp));
 }
+
+#if defined(MULTIPROCESSOR)
+/*
+ * On the Alpha, interprocessor interrupts come in at device priority
+ * level.  This can cause some problems while waiting for r/w spinlocks
+ * from a high'ish priority level: IPIs that come in will not be processed.
+ * This can lead to deadlock.
+ *
+ * This hook allows IPIs to be processed while a spinlock's interlock
+ * is released.
+ */
+#define	SPINLOCK_SPIN_HOOK						\
+do {									\
+	struct cpu_info *__ci = curcpu();				\
+	int __s;							\
+									\
+	if (__ci->ci_ipis != 0) {					\
+		/* printf("CPU %lu has IPIs pending\n",			\
+		    __ci->ci_cpuid); */					\
+		__s = splipi();						\
+		alpha_ipi_process(__ci, NULL);				\
+		splx(__s);						\
+	}								\
+} while (0)
+#endif /* MULTIPROCESSOR */
 
 #endif /* _ALPHA_LOCK_H_ */

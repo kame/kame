@@ -1,4 +1,4 @@
-/*	$NetBSD: sw.c,v 1.3.2.1 2000/07/22 21:14:19 pk Exp $	*/
+/*	$NetBSD: sw.c,v 1.6 2002/03/11 16:27:02 pk Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -142,7 +142,6 @@
 
 #ifdef	DEBUG
 int sw_debug = 0;
-static int sw_link_flags = 0 /* | SDEV_DB2 */ ;
 #endif
 
 /*
@@ -242,7 +241,7 @@ sw_match(parent, cf, aux)
 
 	/* Make sure there is something there... */
 	oba = &uoba->uoba_oba4;
-	return (bus_space_probe(oba->oba_bustag, 0, oba->oba_paddr,
+	return (bus_space_probe(oba->oba_bustag, oba->oba_paddr,
 				1,	/* probe size */
 				1,	/* offset */
 				0,	/* flags */
@@ -265,11 +264,10 @@ sw_attach(parent, self, aux)
 	sc->sc_dmatag = oba->oba_dmatag;
 
 	/* Map the controller registers. */
-	if (obio_bus_map(oba->oba_bustag, oba->oba_paddr,
-			 0,
-			 SWREG_BANK_SZ,
-			 BUS_SPACE_MAP_LINEAR,
-			 0, &bh) != 0) {
+	if (bus_space_map(oba->oba_bustag, oba->oba_paddr,
+			  SWREG_BANK_SZ,
+			  BUS_SPACE_MAP_LINEAR,
+			  &bh) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -373,12 +371,9 @@ sw_attach(parent, self, aux)
 			bitmask_snprintf(sc->sc_options, SW_OPTIONS_BITS,
 			    bits, sizeof(bits)));
 	}
-#ifdef	DEBUG
-	ncr_sc->sc_link.flags |= sw_link_flags;
-#endif
 
-	ncr_sc->sc_link.scsipi_scsi.adapter_target = 7;
-	ncr_sc->sc_adapter.scsipi_minphys = sw_minphys;
+	ncr_sc->sc_channel.chan_id = 7;
+	ncr_sc->sc_adapter.adapt_minphys = sw_minphys;
 
 	/* Initialize sw board */
 	sw_reset_adapter(ncr_sc);
@@ -399,7 +394,7 @@ sw_minphys(struct buf *bp)
 #endif
 		bp->b_bcount = MAX_DMA_LEN;
 	}
-	return (minphys(bp));
+	minphys(bp);
 }
 
 #define CSR_WANT (SW_CSR_SBC_IP | SW_CSR_DMA_IP | \
@@ -680,7 +675,7 @@ sw_intr_off(ncr_sc)
 
 /*
  * This function is called during the COMMAND or MSG_IN phase
- * that preceeds a DATA_IN or DATA_OUT phase, in case we need
+ * that precedes a DATA_IN or DATA_OUT phase, in case we need
  * to setup the DMA engine before the bus enters a DATA phase.
  *
  * On the OBIO version we just clear the DMA count and address

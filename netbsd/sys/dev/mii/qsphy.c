@@ -1,4 +1,4 @@
-/*	$NetBSD: qsphy.c,v 1.20.4.1 2000/07/04 04:11:13 thorpej Exp $	*/
+/*	$NetBSD: qsphy.c,v 1.27 2002/03/25 20:51:25 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,6 +71,9 @@
  * datasheet from www.qualitysemi.com
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: qsphy.c,v 1.27 2002/03/25 20:51:25 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -87,54 +90,58 @@
 
 #include <dev/mii/qsphyreg.h>
 
-int	qsphymatch __P((struct device *, struct cfdata *, void *));
-void	qsphyattach __P((struct device *, struct device *, void *));
+int	qsphymatch(struct device *, struct cfdata *, void *);
+void	qsphyattach(struct device *, struct device *, void *);
 
 struct cfattach qsphy_ca = {
 	sizeof(struct mii_softc), qsphymatch, qsphyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	qsphy_service __P((struct mii_softc *, struct mii_data *, int));
-void	qsphy_status __P((struct mii_softc *));
-void	qsphy_reset __P((struct mii_softc *));
+int	qsphy_service(struct mii_softc *, struct mii_data *, int);
+void	qsphy_status(struct mii_softc *);
+void	qsphy_reset(struct mii_softc *);
 
 const struct mii_phy_funcs qsphy_funcs = {
 	qsphy_service, qsphy_status, qsphy_reset,
 };
 
+const struct mii_phydesc qsphys[] = {
+	{ MII_OUI_xxQUALSEMI,		MII_MODEL_xxQUALSEMI_QS6612,
+	  MII_STR_xxQUALSEMI_QS6612 },
+
+	{ 0,				0,
+	  NULL },
+};
+
 int
-qsphymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+qsphymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;
-
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_QUALSEMI &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_QUALSEMI_QS6612)
+	
+	if (mii_phy_match(ma, qsphys) != NULL)
 		return (10);
 
 	return (0);
 }
 
 void
-qsphyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+qsphyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 
-	printf(": %s, rev. %d\n", MII_STR_QUALSEMI_QS6612,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, qsphys);
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &qsphy_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	PHY_RESET(sc);
 
@@ -149,10 +156,7 @@ qsphyattach(parent, self, aux)
 }
 
 int
-qsphy_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+qsphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;
@@ -214,8 +218,7 @@ qsphy_service(sc, mii, cmd)
 }
 
 void
-qsphy_status(sc)
-	struct mii_softc *sc;
+qsphy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
@@ -273,8 +276,7 @@ qsphy_status(sc)
 }
 
 void
-qsphy_reset(sc)
-	struct mii_softc *sc;
+qsphy_reset(struct mii_softc *sc)
 {
 
 	mii_phy_reset(sc);

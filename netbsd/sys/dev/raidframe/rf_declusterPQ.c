@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_declusterPQ.c,v 1.3 1999/02/05 00:06:09 oster Exp $	*/
+/*	$NetBSD: rf_declusterPQ.c,v 1.7 2001/11/13 07:11:13 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -34,10 +34,13 @@
  *
  *--------------------------------------------------*/
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_declusterPQ.c,v 1.7 2001/11/13 07:11:13 lukem Exp $");
 
-#include "rf_types.h"
+#include <dev/raidframe/raidframevar.h>
+
+#include "rf_archs.h"
 #include "rf_raid.h"
-#include "rf_configure.h"
 #include "rf_decluster.h"
 #include "rf_declusterPQ.h"
 #include "rf_debugMem.h"
@@ -45,6 +48,7 @@
 #include "rf_alloclist.h"
 #include "rf_general.h"
 
+#if (RF_INCLUDE_PARITY_DECLUSTERING_PQ > 0) || (RF_INCLUDE_EVENODD > 0)
 /* configuration code */
 
 int 
@@ -486,3 +490,4 @@ rf_IdentifyStripeDeclusteredPQ(
 								 * block design table */
 	*diskids = info->LayoutTable[tableOffset];
 }
+#endif /* (RF_INCLUDE_PARITY_DECLUSTERING_PQ > 0) || (RF_INCLUDE_EVENODD > 0) */

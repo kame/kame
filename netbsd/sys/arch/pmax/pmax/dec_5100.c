@@ -1,4 +1,4 @@
-/* $NetBSD: dec_5100.c,v 1.26 2000/06/06 00:08:25 nisimura Exp $ */
+/* $NetBSD: dec_5100.c,v 1.33 2001/09/18 16:15:20 tsutsui Exp $ */
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_5100.c,v 1.26 2000/06/06 00:08:25 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_5100.c,v 1.33 2001/09/18 16:15:20 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -76,8 +76,8 @@ dec_5100_init()
 
 	splvec.splbio = MIPS_SPL1;
 	splvec.splnet = MIPS_SPL1;
-	splvec.spltty = MIPS_SPL_0_1; 
-	splvec.splimp = MIPS_SPL_0_1_2;
+	splvec.spltty = MIPS_SPL_0_1;
+	splvec.splvm = MIPS_SPL_0_1_2;
 	splvec.splclock = MIPS_SPL_0_1_2;
 	splvec.splstatclock = MIPS_SPL_0_1_2;
 
@@ -88,7 +88,7 @@ dec_5100_init()
 }
 
 /*
- * Initalize the memory system and I/O buses.
+ * Initialize the memory system and I/O buses.
  */
 static void
 dec_5100_bus_reset()
@@ -167,7 +167,7 @@ dec_5100_intr(status, cause, pc, ipending)
 		cf.pc = pc;
 		cf.sr = status;
 		hardclock(&cf);
-		intrcnt[HARDCLOCK]++;
+		pmax_clock_evcnt.ev_count++;
 
 		/* keep clock interrupts enabled when we return */
 		cause &= ~MIPS_INT_MASK_2;
@@ -189,7 +189,7 @@ dec_5100_intr(status, cause, pc, ipending)
 
 	if (ipending & MIPS_INT_MASK_3) {
 		dec_5100_memintr();
-		intrcnt[ERROR_INTR]++;
+		pmax_memerr_evcnt.ev_count++;
 	}
 
 	_splset(MIPS_SR_INT_IE | (status & ~cause & MIPS_HARD_INT_MASK));
@@ -211,11 +211,11 @@ dec_5100_memintr()
 	/* read icsr and clear error  */
 	icsr = *(volatile u_int32_t *)MIPS_PHYS_TO_KSEG1(KN230_SYS_ICSR);
 	icsr |= KN230_CSR_INTR_WMERR;
-	*(volatile u_int32_t *)MIPS_PHYS_TO_KSEG1(KN230_SYS_ICSR);
+	*(volatile u_int32_t *)MIPS_PHYS_TO_KSEG1(KN230_SYS_ICSR) = icsr;
 	kn230_wbflush();
 
 #ifdef DIAGNOSTIC
-		printf("\nMemory interrupt\n");
+	printf("\nMemory interrupt\n");
 #endif
 
 	/* ignore errors during probes */
@@ -223,7 +223,7 @@ dec_5100_memintr()
 		return;
 
 	if (icsr & KN230_CSR_INTR_WMERR) {
-		panic("write to non-existant memory");
+		panic("write to non-existent memory");
 	}
 	else {
 		panic("stray memory error interrupt");

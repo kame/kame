@@ -1,9 +1,9 @@
-# $NetBSD: NULL,v 1.1 2000/05/25 22:11:58 is Exp $
+# $NetBSD: NULL,v 1.10 2002/04/12 08:10:50 gmcgarry Exp $
 #
 # This file was automatically created. Changes will be
 # lost when running make in this directory.
 #
-# Created from: 
+# Created from:
 #$ NetBSD: GENERIC,v 1.129 1999/10/15 21:50:34 is Exp $
 
 include "arch/amigappc/conf/std.amigappc"
@@ -14,17 +14,18 @@ options 	RTC_OFFSET=0
 #mainboards to support (in addition to Amiga)
 
 #options 	BB060STUPIDROM	# You need this, if you have a non-DraCo
-				# MC68060 with an OS ROM up to (at least) 
+				# MC68060 with an OS ROM up to (at least)
 				# V40 (OS3.1) and want to boot with the
 				# bootblock.
 				# You do not need this if you have a DraCo,
 				# have no 68060 or NEVER use the bootblock
-#options		P5PPC68KBOARD	# Phase5 PPC/68K board support
+#options 	P5PPC68KBOARD	# Phase5 PPC/68K board support
 
 #processors this kernel should support
 
-options		PPC604E
-options		PPC603E
+options		PPC_MPC6XX
+options 	PPC604E
+options 	PPC603E
 
 #options 	M68060		# support for 060
 #options 	M060SP		# MC68060 software support (Required for 060)
@@ -52,6 +53,7 @@ options		PPC603E
 #options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
 #options 	IPFILTER_LOG	# ipmon(8) log support
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 file-system 	FFS		# Berkeley fast file system
 #file-system 	EXT2FS		# second extended file system (linux)
@@ -76,9 +78,9 @@ file-system 	FFS		# Berkeley fast file system
 #options 	EXT2FS_SYSTEM_FLAGS # makes ext2fs file flags (append and
 				# immutable) behave as system flags.
 
-#Compatability options for various existing systems
+#Compatibility options for various existing systems
 
-#options 	TCP_COMPAT_42	# compatibility with 4.2BSD TCP/IP
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 #options 	COMPAT_43	# compatibility with 4.3BSD interfaces
 #options 	COMPAT_09	# compatibility with NetBSD 0.9
 #options 	COMPAT_10	# compatibility with NetBSD 1.0
@@ -102,11 +104,11 @@ options 	EXEC_ELF32	# 32-bit ELF executables (Linux, SVR4)
 #options 	KTRACE		# system call tracing support
 #options 	LKM		# Loadable kernel modules
 #options 	UCONSOLE	# anyone can redirect a virtual console
-#options 	INSECURE	# allow, among other insecure stuff, LKM 
-				# loading in multi-user mode.
-#options 	SCSIVERBOSE	# Verbose SCSI errors
-
+#options 	INSECURE	# disable kernel security levels
+#options 	SCSIVERBOSE	# human readable SCSI error messages
 #options 	NTP		# NTP phase/frequency locked loop
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
 
 #Misc. debugging options
 
@@ -122,12 +124,12 @@ options 	EXEC_ELF32	# 32-bit ELF executables (Linux, SVR4)
 
 #options 	LIMITMEM=24	# Do not use more than LIMITMEM MB of the
 				# first bank of RAM. (default: unlimited)
-#options	NKPTADD=4	# set this for 4 additional KPT pages
-#options	NKPTADDSHIFT=24	# set this for 1 additional KPT page
+#options 	NKPTADD=4	# set this for 4 additional KPT pages
+#options 	NKPTADDSHIFT=24	# set this for 1 additional KPT page
 				# per 16 MB (1<<24 bytes) of RAM
-                                # define and decrease this, or define and
-                                # increase NKPTADD if you get "out of PT pages"
-                                # panics.
+				# define and decrease this, or define and
+				# increase NKPTADD if you get "out of PT pages"
+				# panics.
 
 #ATTENTION: There is NO WARRANTY AT ALL that the sync will be complete
 #before the 10 secondinterval ends, or that KBDRESET does work at all.
@@ -231,7 +233,7 @@ a34kbbc0	at mainbus0		# A3000/A4000 battery backed clock
 
 #Zorro-II, Zorro-III, DraCo Direct-Bus devices (sans graphics)
 
-#Alas, Melody-Z2 dont configure in the DraCo bus. 
+#Alas, Melody-Z2 dont configure in the DraCo bus.
 #melody* 	at zbus0		# Melody MPEG audio decoder
 #audio*		at melody?
 
@@ -274,9 +276,9 @@ a34kbbc0	at mainbus0		# A3000/A4000 battery backed clock
 #scsibus*	at aftsc0
 #flsc0		at zbus0		# FastlaneZ3 scsi
 #scsibus*	at flsc0
-#bzsc0		at zbus0		# Blizzard 1230 I,II scsi 
+#bzsc0		at zbus0		# Blizzard 1230 I,II scsi
 #scsibus*	at bzsc0
-#bzivsc0 	at zbus0		# Blizzard 12x0 IV scsi 
+#bzivsc0 	at zbus0		# Blizzard 12x0 IV scsi
 #scsibus*	at bzivsc0
 #bztzsc0 	at zbus0		# Blizzard 2060 scsi
 #scsibus*	at bztzsc0
@@ -305,19 +307,18 @@ a34kbbc0	at mainbus0		# A3000/A4000 battery backed clock
 #pseudo-device	ppp		1	# PPP network interfaces
 #pseudo-device	tun		1	# network tunnel line discipline
 #pseudo-device	gre		2	# generic L3 over IP tunnel
-#pseudo-device	ipip		2	# IP Encapsulation within IP (RFC 2003)
 #pseudo-device	bpfilter	16	# Berkeley packet filter
 #pseudo-device	ipfilter		# IP Filter package
 
 pseudo-device	view		4	# views (needed for grfcc)
-pseudo-device	pty		16	# pseudo ptys
+pseudo-device	pty			# pseudo-terminals
 
 #pseudo-device	vnd		4	# vnode pseudo-disks
 #pseudo-device	ccd		4	# concatenated disk devices
 #pseudo-device	raid		4	# RAIDframe disk driver
 
 #rnd is EXPERIMENTAL at this point.
-#pseudo-device  rnd                     # /dev/random and in-kernel generator
-#options        RND_COM                 # use "com" randomness as well (BROKEN)
+#pseudo-device	rnd			# /dev/random and in-kernel generator
+#options 	RND_COM			# use "com" randomness as well (BROKEN)
 
 config	netbsd root on ? type ?

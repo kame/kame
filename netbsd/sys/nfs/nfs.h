@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs.h,v 1.22.2.4 2002/02/09 23:26:06 he Exp $	*/
+/*	$NetBSD: nfs.h,v 1.33 2002/05/12 23:04:35 matt Exp $	*/
 /*
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -83,6 +83,9 @@
 #define	NFS_MAXASYNCDAEMON 	20	/* Max. number async_daemons runable */
 #ifdef _KERNEL
 extern int nfs_niothreads;              /* Number of async_daemons desired */
+#ifndef NFS_DEFAULT_NIOTHREADS
+#define NFS_DEFAULT_NIOTHREADS 4
+#endif
 #endif
 #define NFS_MAXGATHERDELAY	100	/* Max. write gather delay (msec) */
 #ifndef NFS_GATHERDELAY
@@ -115,7 +118,11 @@ extern int nfs_niothreads;              /* Number of async_daemons desired */
 #define	NMOD(a)		((a) % nfs_asyncdaemons)
 #define NFS_CMPFH(n, f, s) \
 	((n)->n_fhsize == (s) && !memcmp((caddr_t)(n)->n_fhp,  (caddr_t)(f),  (s)))
+#ifdef NFS_V2_ONLY
+#define NFS_ISV3(v)	(0)
+#else
 #define NFS_ISV3(v)	(VFSTONFS((v)->v_mount)->nm_flag & NFSMNT_NFSV3)
+#endif
 #define NFS_SRVMAXDATA(n) \
 		(((n)->nd_flag & ND_NFSV3) ? (((n)->nd_nam2) ? \
 		 NFS_MAXDGRAMDATA : NFS_MAXDATA) : NFS_V2MAXDATA)
@@ -129,10 +136,10 @@ extern int nfs_niothreads;              /* Number of async_daemons desired */
 #endif
 
 /*
- * The B_INVAFTERWRITE flag should be set to whatever is required by the
- * buffer cache code to say "Invalidate the block after it is written back".
+ * Use the vm_page flag reserved for pager use to indicate pages
+ * which have been written to the server but not yet committed.
  */
-#define	B_INVAFTERWRITE	B_INVAL
+#define PG_NEEDCOMMIT PG_PAGER1
 
 /*
  * The IO_METASYNC flag should be implemented for local file systems.
@@ -307,7 +314,7 @@ struct nfsreq {
 /*
  * Queue head for nfsreq's
  */
-TAILQ_HEAD(, nfsreq) nfs_reqq;
+extern TAILQ_HEAD(nfsreqhead, nfsreq) nfs_reqq;
 
 /* Flag values for r_flags */
 #define R_TIMING	0x01		/* timing request (in mntp) */
@@ -340,8 +347,7 @@ TAILQ_HEAD(, nfsreq) nfs_reqq;
 #endif
 #define	NMUIDHASH(nmp, uid) \
 	(&(nmp)->nm_uidhashtbl[(uid) % NFS_MUIDHASHSIZ])
-#define	NFSNOHASH(fhsum) \
-	(&nfsnodehashtbl[(fhsum) & nfsnodehash])
+#define	NFSNOHASH(fhsum) ((fhsum) & nfsnodehash)
 
 #ifndef NFS_DIRHASHSIZ
 #define NFS_DIRHASHSIZ 64
@@ -432,8 +438,8 @@ struct nfssvc_sock {
 #define	SLP_LASTFRAG	0x20
 #define SLP_ALLFLAGS	0xff
 
-TAILQ_HEAD(, nfssvc_sock) nfssvc_sockhead;
-int nfssvc_sockhead_flag;
+extern TAILQ_HEAD(nfssvc_sockhead, nfssvc_sock) nfssvc_sockhead;
+extern int nfssvc_sockhead_flag;
 #define	SLP_INIT	0x01
 #define	SLP_WANTINIT	0x02
 
@@ -498,9 +504,12 @@ struct nfsrv_descript {
 #define ND_KERBFULL	0x40
 #define ND_KERBAUTH	(ND_KERBNICK | ND_KERBFULL)
 
-TAILQ_HEAD(, nfsd) nfsd_head;
-int nfsd_head_flag;
+extern TAILQ_HEAD(nfsdhead, nfsd) nfsd_head;
+extern int nfsd_head_flag;
 #define	NFSD_CHECKSLP	0x01
+
+extern struct nfsstats nfsstats;
+extern int nfs_numasync;
 
 /*
  * These macros compare nfsrv_descript structures.

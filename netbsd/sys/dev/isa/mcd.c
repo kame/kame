@@ -1,4 +1,4 @@
-/*	$NetBSD: mcd.c,v 1.66.4.2 2001/05/26 16:22:14 he Exp $	*/
+/*	$NetBSD: mcd.c,v 1.74 2002/01/07 21:47:11 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
@@ -55,7 +55,9 @@
 
 /*static char COPYRIGHT[] = "mcd-driver (C)1993 by H.Veit & B.Moore";*/
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mcd.c,v 1.74 2002/01/07 21:47:11 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -233,7 +235,7 @@ mcdattach(parent, self, aux)
 	struct mcd_mbox mbx;
 
 	/* Map i/o space */
-	if (bus_space_map(iot, ia->ia_iobase, MCD_NPORT, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, MCD_NPORT, 0, &ioh)) {
 		printf(": can't map i/o space\n");
 		return;
 	}
@@ -272,8 +274,8 @@ mcdattach(parent, self, aux)
 
 	mcd_soft_reset(sc);
 
-	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_BIO, mcdintr, sc);
+	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_BIO, mcdintr, sc);
 }
 
 /*
@@ -318,15 +320,11 @@ mcdopen(dev, flag, fmt, p)
 	int flag, fmt;
 	struct proc *p;
 {
-	int error;
-	int unit, part;
+	int error, part;
 	struct mcd_softc *sc;
 
-	unit = MCDUNIT(dev);
-	if (unit >= mcd_cd.cd_ndevs)
-		return ENXIO;
-	sc = mcd_cd.cd_devs[unit];
-	if (!sc)
+	sc = device_lookup(&mcd_cd, MCDUNIT(dev));
+	if (sc == NULL)
 		return ENXIO;
 
 	if ((error = mcdlock(sc)) != 0)
@@ -424,7 +422,7 @@ mcdclose(dev, flag, fmt, p)
 	int flag, fmt;
 	struct proc *p;
 {
-	struct mcd_softc *sc = mcd_cd.cd_devs[MCDUNIT(dev)];
+	struct mcd_softc *sc = device_lookup(&mcd_cd, MCDUNIT(dev));
 	int part = MCDPART(dev);
 	int error;
 	
@@ -460,7 +458,7 @@ void
 mcdstrategy(bp)
 	struct buf *bp;
 {
-	struct mcd_softc *sc = mcd_cd.cd_devs[MCDUNIT(bp->b_dev)];
+	struct mcd_softc *sc = device_lookup(&mcd_cd, MCDUNIT(bp->b_dev));
 	struct disklabel *lp = sc->sc_dk.dk_label;
 	daddr_t blkno;
 	int s;
@@ -601,7 +599,7 @@ mcdioctl(dev, cmd, addr, flag, p)
 	int flag;
 	struct proc *p;
 {
-	struct mcd_softc *sc = mcd_cd.cd_devs[MCDUNIT(dev)];
+	struct mcd_softc *sc = device_lookup(&mcd_cd, MCDUNIT(dev));
 	int error;
 	int part;
 #ifdef __HAVE_OLD_DISKLABEL
@@ -765,7 +763,7 @@ mcdgetdefaultlabel(sc, lp)
 	struct disklabel *lp;
 {
 
-	bzero(lp, sizeof(struct disklabel));
+	memset(lp, 0, sizeof(struct disklabel));
 
 	lp->d_secsize = sc->blksize;
 	lp->d_ntracks = 1;
@@ -806,7 +804,7 @@ mcdgetdisklabel(sc)
 {
 	struct disklabel *lp = sc->sc_dk.dk_label;
 	
-	bzero(sc->sc_dk.dk_cpulabel, sizeof(struct cpu_disklabel));
+	memset(sc->sc_dk.dk_cpulabel, 0, sizeof(struct cpu_disklabel));
 
 	mcdgetdefaultlabel(sc, lp);
 }
@@ -955,12 +953,22 @@ mcdprobe(parent, match, aux)
 	bus_space_handle_t ioh;
 	int rv;
 
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
 	/* Disallow wildcarded i/o address. */
-	if (ia->ia_iobase == ISACF_PORT_DEFAULT)
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
+		return (0);
+	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
 		return (0);
 
 	/* Map i/o space */
-	if (bus_space_map(iot, ia->ia_iobase, MCD_NPORT, 0, &ioh))
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, MCD_NPORT, 0, &ioh))
 		return 0;
 
 	sc.debug = 0;
@@ -971,8 +979,13 @@ mcdprobe(parent, match, aux)
 	bus_space_unmap(iot, ioh, MCD_NPORT);
 
 	if (rv)	{
-		ia->ia_iosize = MCD_NPORT;
-		ia->ia_msize = 0;
+		ia->ia_nio = 1;
+		ia->ia_io[0].ir_addr = MCD_NPORT;
+
+		ia->ia_nirq = 1;
+
+		ia->ia_niomem = 0;
+		ia->ia_ndrq = 0;
 	}
 
 	return (rv);

@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipi_disk.h,v 1.5 1998/02/13 08:28:55 enami Exp $	*/
+/*	$NetBSD: scsipi_disk.h,v 1.7 2001/11/19 17:18:09 soren Exp $	*/
 
 /*
  * SCSI and SCSI-like interfaces description
@@ -59,6 +59,8 @@ struct scsipi_rw_big {
 	u_int8_t opcode;
 	u_int8_t byte2;
 #define	SRWB_RELADDR	0x01
+#define	SRWB_FUA	0x08	/* force unit access */
+#define	SRWB_DPO	0x10	/* disable page out */
 	u_int8_t addr[4];
 	u_int8_t reserved;
 	u_int8_t length[2];
@@ -73,19 +75,6 @@ struct scsipi_read_capacity {
 	u_int8_t unused[3];
 	u_int8_t control;
 };
-
-#define START_STOP		0x1b
-struct scsipi_start_stop {
-	u_int8_t opcode;
-	u_int8_t byte2;
-	u_int8_t unused[2];
-	u_int8_t how;
-#define	SSS_STOP		0x00
-#define	SSS_START		0x01
-#define	SSS_LOEJ		0x02
-	u_int8_t control;
-};
-
 
 /* DATAs definitions for the above commands */
 

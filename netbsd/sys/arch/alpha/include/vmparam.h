@@ -1,4 +1,4 @@
-/* $NetBSD: vmparam.h,v 1.18 2000/05/22 17:13:54 thorpej Exp $ */
+/* $NetBSD: vmparam.h,v 1.24 2001/11/15 18:06:12 soren Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -51,9 +51,7 @@
 
 /*
  * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack.  Immediately above the user stack
- * resides the user structure, which is UPAGES long and contains the
- * kernel stack.
+ * is the top (end) of the user stack.
  *
  * Digital UNIX (formerly DEC OSF/1) places the stack below the
  * text segment (i.e. growing downward from 4G).  We may want to
@@ -99,17 +97,6 @@
 #endif
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
@@ -118,7 +105,7 @@
 #define VM_MAXUSER_ADDRESS	((vaddr_t)(ALPHA_USEG_END + 1L))    /* 4T */
 #define VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t)ALPHA_K1SEG_BASE)
-#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)ALPHA_K1SEG_END)
+#define VM_MAX_KERNEL_ADDRESS	trunc_page((vaddr_t)ALPHA_K1SEG_END)
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
@@ -134,10 +121,19 @@
 #define	VM_FREELIST_DEFAULT	0
 
 /*
- * pmap-specific data stored in the vm_physmem[] array.
+ * pmap-specific data store in the vm_page structure.
  */
-struct pmap_physseg {
-	struct pv_head *pvhead;		/* pv list of this seg */
+#define	__HAVE_VM_PAGE_MD
+struct vm_page_md {
+	struct pv_entry *pvh_list;		/* pv_entry list */
+	struct simplelock pvh_slock;		/* lock on this head */
+	int pvh_attrs;				/* page attributes */
 };
+
+#define	VM_MDPAGE_INIT(pg)						\
+do {									\
+	(pg)->mdpage.pvh_list = NULL;					\
+	simple_lock_init(&(pg)->mdpage.pvh_slock);			\
+} while (/*CONSTCOND*/0)
 
 #endif	/* ! _ALPHA_VMPARAM_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: aic7xxxvar.h,v 1.24 2000/05/27 21:58:15 fvdl Exp $	*/
+/*	$NetBSD: aic7xxxvar.h,v 1.31 2002/02/11 11:01:52 wiz Exp $	*/
 
 /*
  * Interface to the generic driver for the aic7xxx based adaptec
@@ -37,14 +37,6 @@
 
 #ifndef _AIC7XXX_H_
 #define _AIC7XXX_H_
-
-#ifndef MAX
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
-#endif
-
-#ifndef MIN
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#endif
 
 #ifndef FALSE
 #define FALSE 0
@@ -116,7 +108,7 @@ typedef enum {
 	AHC_BUS_MASK	= 0x0F00
 } ahc_chip;
 
-extern char *ahc_chip_names[];
+extern const char * const ahc_chip_names[];
 
 typedef enum {
 	AHC_FENONE	= 0x0000,
@@ -186,7 +178,7 @@ typedef enum {
 	AHC_NEWEEPROM_FMT	= 0x4000,
 	AHC_RESOURCE_SHORTAGE	= 0x8000,
 	AHC_TQINFIFO_BLOCKED	= 0x10000,/* Blocked waiting for ATIOs */
-	AHC_INT50_SPEEDFLEX	= 0x20000,/*
+	AHC_INT50_SPEEDFLEX	= 0x20000 /*
 					   * Internal 50pin connector
 					   * sits behind an aic3860
 					   */
@@ -221,7 +213,7 @@ typedef enum {
 
 /*
  * The driver keeps up to MAX_SCB scb structures per card in memory.  The SCB
- * consists of a "hardware SCB" mirroring the fields availible on the card
+ * consists of a "hardware SCB" mirroring the fields available on the card
  * and additional information the kernel stores for each transaction.
  */
 struct hardware_scb {
@@ -361,7 +353,7 @@ struct tmode_tstate {
 	u_int16_t		 ultraenb;	/* Using ultra sync rate  */
 	u_int16_t	 	 discenable;	/* Disconnection allowed  */
 	u_int16_t		 tagenable;	/* Tagged Queuing allowed */
-	u_int16_t		 tagdisable;	/* TQ explicity disallowed */
+	u_int16_t		 tagdisable;	/* TQ explicitly disallowed */
 };
 
 #define AHC_TARGET_WILDCARD -1
@@ -513,27 +505,24 @@ struct scb_data {
 					 */
 };
 
-typedef TAILQ_HEAD(, scsipi_xfer) xs_list_t;
-
 struct ahc_softc {
 	struct device		sc_dev;
 
-	struct  scsipi_link sc_link;
-	struct  scsipi_link sc_link_b;
+	struct  scsipi_channel sc_channel;
+	struct  scsipi_channel sc_channel_b;
 	struct  scsipi_adapter sc_adapter;
 
 	bus_space_tag_t		 tag;
 	bus_space_handle_t	 bsh;
 	struct scb_data		*scb_data;
 
-	xs_list_t		sc_q;
-	int			queue_blocked;
-	u_int16_t		devqueue_blocked[16];
 #define AHC_NEG_PENDING		0x01
 #define AHC_NEG_SDTRDONE	0x02
 #define AHC_NEG_WDTRDONE	0x04
 	u_int8_t		inited_targets[16];
 	u_int8_t		inited_channels[2];
+
+	struct device		*child;
 
 	/*
 	 * SCBs that have been send to the controller
@@ -672,6 +661,8 @@ void	ahc_free(struct ahc_softc *);
 int	ahc_probe_scbs(struct ahc_softc *);
 int	ahc_init(struct ahc_softc *);
 int	ahc_attach(struct ahc_softc *);
+int	ahc_detach(struct ahc_softc *, int);
+int	ahc_activate(struct device *, enum devact);
 int	ahc_intr(void *arg);
 
 /*

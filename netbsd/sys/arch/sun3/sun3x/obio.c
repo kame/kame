@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.11 1999/04/06 02:07:51 gwr Exp $	*/
+/*	$NetBSD: obio.c,v 1.14 2001/09/05 14:26:08 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -119,7 +119,7 @@ static int obio_alist[] = {
 	OBIO_IOC_FLUSH,
 
 	OBIO_FDC,	/* floppy disk (3/80) */
-	OBIO_PRINTER_PORT, /* printer port (3/80 */
+	OBIO_PRINTER_PORT, /* printer port (3/80) */
 };
 #define OBIO_ALIST_LEN (sizeof(obio_alist) / \
                         sizeof(obio_alist[0]))
@@ -222,7 +222,8 @@ obio_submatch(parent, cf, aux)
  * physical address it maps to (if found).
  */
 static struct prom_map {
-	vm_offset_t pa, va;
+	paddr_t pa;
+	vaddr_t va;
 } prom_mappings[] = {
 	{ OBIO_ENABLEREG, 0 },	/* regs: Sys ENA, Bus ERR, etc. */
 	{ OBIO_ZS_KBD_MS, 0 },	/* Keyboard and Mouse */
@@ -239,9 +240,10 @@ static struct prom_map {
  * a mapping will have to be created.
  */
 caddr_t
-obio_find_mapping(int pa, int sz)
+obio_find_mapping(paddr_t pa, psize_t sz)
 {
-	int i, off;
+	int i;
+	vsize_t off;
 
 	off = pa & PGOFSET;
 	pa -= off;
@@ -268,7 +270,8 @@ static void
 save_prom_mappings __P((void))
 {
 	int *mon_pte;
-	vm_offset_t va, pa;
+	vaddr_t va;
+	paddr_t pa;
 	int i;
 
 	/* Note: mon_ctbl[0] maps SUN3X_MON_KDB_BASE */

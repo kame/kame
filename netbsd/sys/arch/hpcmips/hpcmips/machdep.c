@@ -1,4 +1,33 @@
-/*	$NetBSD: machdep.c,v 1.26.4.2 2000/08/13 09:09:28 jdolecek Exp $	*/
+/*	$NetBSD: machdep.c,v 1.74 2002/04/27 23:24:55 shin Exp $	*/
+
+/*-
+ * Copyright (c) 1999 Shin Takemura, All rights reserved.
+ * Copyright (c) 1999-2001 SATO Kazumi, All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -38,64 +67,56 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * from: Utah Hdr: machdep.c 1.63 91/04/24
+ *
  *	@(#)machdep.c	8.3 (Berkeley) 1/12/94
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.74 2002/04/27 23:24:55 shin Exp $");
 
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.26.4.2 2000/08/13 09:09:28 jdolecek Exp $");
-
-/* from: Utah Hdr: machdep.c 1.63 91/04/24 */
-#include "opt_vr41x1.h"
+#include "opt_vr41xx.h"
 #include "opt_tx39xx.h"
+#include "opt_boot_standalone.h"
+#include "opt_spec_platform.h"
 #include "biconsdev.h"
 #include "fs_mfs.h"
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_rtc_offset.h"
 #include "fs_nfs.h"
+#include "opt_kloader.h"
+#include "opt_kloader_kernel_path.h"
+#include "debug_hpc.h"
+#include "opt_md.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
-#include <sys/proc.h>
+#include <sys/user.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
-#include <sys/conf.h>
-#include <sys/file.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-#include <sys/msgbuf.h>
-#include <sys/ioctl.h>
-#include <sys/user.h>
 #include <sys/mount.h>
-#include <sys/syscallargs.h>
-#include <sys/kcore.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <uvm/uvm_extern.h>
-
 #include <sys/sysctl.h>
-#include <dev/cons.h>
+#include <sys/boot_flag.h>
 
-#include <ufs/mfs/mfs_extern.h>		/* mfs_initminiroot() */
+#include <ufs/mfs/mfs_extern.h>	/* mfs_initminiroot() */
+#include <dev/cons.h>		/* cntab access (cpu_reboot) */
 
-#include <machine/cpu.h>
-#include <machine/reg.h>
 #include <machine/psl.h>
-#include <machine/pte.h>
-#include <machine/bus.h>
-#include <machine/autoconf.h>
 #include <machine/sysconf.h>
 #include <machine/bootinfo.h>
 #include <machine/platid.h>
-#include <machine/locore.h>
+#include <machine/platid_mask.h>
+#include <machine/kloader.h>
+#include <machine/debug.h>
+
+#ifdef KGDB
+#include <sys/kgdb.h>
+#endif
 
 #ifdef DDB
-#include <sys/exec_aout.h>		/* XXX backwards compatilbity for DDB */
 #include <machine/db_machdep.h>
-#include <ddb/db_access.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
 #ifndef DB_ELFSIZE
@@ -105,39 +126,65 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.26.4.2 2000/08/13 09:09:28 jdolecek Ex
 #include <sys/exec_elf.h>
 #endif
 
-#if NBICONSDEV > 0
-#include <hpcmips/dev/biconsvar.h>
-#include <hpcmips/dev/bicons.h>
-#define DPRINTF(arg) printf arg
-#else
+#if NBICONSDEV > 0 
+#include <sys/conf.h>
+#include <dev/hpc/biconsvar.h>
+#include <dev/hpc/bicons.h>
+#define biconscnpollc	nullcnpollc
+cons_decl(bicons);
+static struct consdev bicons __attribute((__unused__)) = cons_init(bicons);
+static int __bicons_enable;
+#define DPRINTF(arg)	{ if (__bicons_enable) printf arg; }
+#else /* NBICONSDEV > 0 */
 #define DPRINTF(arg)
-#endif
+#endif /* NBICONSDEV > 0 */
 
 #ifdef NFS
-extern int nfs_mountroot __P((void));
-extern int (*mountroot) __P((void));
+#include <nfs/rpcv2.h>
+#include <nfs/nfsproto.h>
+#include <nfs/nfs.h>
+#include <nfs/nfsmount.h>
+#endif
+
+#ifdef MEMORY_DISK_DYNAMIC
+#include <dev/md.h>
 #endif
 
 /* the following is used externally (sysctl_hw) */
 char	machine[] = MACHINE;		/* from <machine/param.h> */
 char	machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
 char	cpu_model[128];	
-
 char	cpu_name[40];			/* set cpu depend xx_init() */
+struct cpu_info cpu_info_store;		/* only one cpu */
+int	cpuspeed = 1;			/* approx # instr per usec. */
 
-/* Our exported CPU info; we can have only one. */  
-struct cpu_info cpu_info_store;
+/* CPU core switch table */
+struct platform platform;
+#ifdef VR41XX
+extern void	vr_init(void);
+#endif
+#ifdef TX39XX
+extern void	tx_init(void);
+#endif
 
-/* verbose boot message */
-int	hpcmips_verbose = 0;
-#define VPRINTF(arg)	if (hpcmips_verbose) printf arg;
+/* boot environment */
+static struct bootinfo bi_copy;
+struct bootinfo *bootinfo;
+char booted_kernel[128];
+extern void makebootdev(const char *);
+#ifdef KLOADER
+#if !defined(KLOADER_KERNEL_PATH)
+#define KLOADER_KERNEL_PATH	"/netbsd"
+#endif /* !KLOADER_KERNEL_PATH */
+static char kernel_path[] = KLOADER_KERNEL_PATH;
+#endif /* KLOADER */
 
 /* maps for VM objects */
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map;
+struct vm_map *mb_map;
+struct vm_map *phys_map;
 
-int	systype;		/* mother board type */
+/* physical memory */
 int	physmem;		/* max supported memory, changes to actual */
 int	mem_cluster_cnt;
 phys_ram_seg_t mem_clusters[VM_PHYSSEG_MAX];
@@ -151,60 +198,12 @@ phys_ram_seg_t mem_clusters[VM_PHYSSEG_MAX];
  */
 int	safepri = MIPS3_PSL_LOWIPL;	/* XXX */
 
-unsigned ssir;				/* schedules software interrupt */
-
-struct splvec	splvec;			/* XXX will go XXX */
-
-void mach_init __P((int, char *[], struct bootinfo*));
-
-static struct bootinfo bi_copy;
-struct bootinfo *bootinfo = NULL;
-
-unsigned (*clkread) __P((void)); /* high resolution timer if available */
-unsigned nullclkread __P((void));
-
-int	initcpu __P((void));
-void	consinit __P((void));
+void mach_init(int, char *[], struct bootinfo *);
 
 #ifdef DEBUG
 /* stacktrace code violates prototypes to get callee's registers */
-extern void stacktrace __P((void)); /*XXX*/
+extern void stacktrace(void); /*XXX*/
 #endif
-
-/* Motherboard or system-specific initialization vector */
-void	unimpl_os_init __P((void));
-void	unimpl_bus_reset __P((void));
-int	unimpl_intr __P((unsigned, unsigned, unsigned, unsigned));
-void	unimpl_cons_init __P((void));
-void	unimpl_device_register __P((struct device *, void *));
-int 	unimpl_iointr __P((u_int32_t, u_int32_t, u_int32_t, u_int32_t));
-void	unimpl_clockintr __P ((void *));
-void    unimpl_fb_init __P((caddr_t*));
-void    unimpl_mem_init __P((paddr_t));
-void	unimpl_reboot __P((int howto, char *bootstr));
-
-struct platform platform = {
-	"iobus not set",
-	unimpl_os_init,
-	unimpl_bus_reset,
-	unimpl_cons_init,
-	unimpl_device_register,
-	unimpl_iointr,
-	unimpl_clockintr,
-	unimpl_fb_init,
-	unimpl_mem_init,
-	unimpl_reboot,
-};
-
-#ifdef VR41X1
-extern void	vr_init __P((void));
-#endif
-#ifdef TX39XX
-extern void	tx_init __P((void));
-#endif
-
-extern caddr_t esym;
-extern struct user *proc0paddr;
 
 /*
  * Do all the stuff that locore normally does before calling main().
@@ -212,34 +211,64 @@ extern struct user *proc0paddr;
  * Return the first page address following the system.
  */
 void
-mach_init(argc, argv, bi)
-	int argc;
-	char *argv[];
-	struct bootinfo *bi;
+mach_init(int argc, char *argv[], struct bootinfo *bi)
 {
-	int i;
+	/* 
+	 * this routines stack is never polluted since stack pointer
+	 * is lower than kernel text segment, and at exiting, stack pointer
+	 * is changed to proc0.
+	 */
+#ifdef KLOADER
+	struct kloader_bootinfo kbi;
+#endif
+	extern struct user *proc0paddr;
+	extern char edata[], end[];
+#ifdef DDB
+	extern caddr_t esym;
+#endif
 	caddr_t kernend, v;
 	unsigned size;
 	char *cp;
-	extern char edata[], end[];
+	int i;
 
 	/* clear the BSS segment */
 #ifdef DDB
-	if (memcmp(((Elf_Ehdr *)end)->e_ident, ELFMAG, SELFMAG) == 0 &&
-	    ((Elf_Ehdr *)end)->e_ident[EI_CLASS] == ELFCLASS) {
+	size_t symbolsz = 0;
+	Elf_Ehdr *eh = (void *)end;
+	if (memcmp(eh->e_ident, ELFMAG, SELFMAG) == 0 &&
+	    eh->e_ident[EI_CLASS] == ELFCLASS) {
 		esym = end;
-		esym += ((Elf_Ehdr *)end)->e_entry;
+		if (eh->e_entry != 0) {
+			/* pbsdboot */
+			symbolsz = eh->e_entry;
+		} else {
+			/* hpcboot */
+			Elf_Shdr *sh = (void *)(end + eh->e_shoff);
+			for(i = 0; i < eh->e_shnum; i++, sh++)
+				if (sh->sh_offset > 0 &&
+				    (sh->sh_offset + sh->sh_size) > symbolsz)
+					symbolsz = sh->sh_offset + sh->sh_size;
+		}
+		esym += symbolsz;
 		kernend = (caddr_t)mips_round_page(esym);
 		bzero(edata, end - edata);
 	} else
-#endif
+#endif /* DDB */
 	{
 		kernend = (caddr_t)mips_round_page(end);
 		memset(edata, 0, kernend - edata);
 	}
 
+#if defined(BOOT_STANDALONE)
+#if !defined (SPEC_PLATFORM) || SPEC_PLATFORM == 1
+#error specify SPEC_PLATFORM=platid_mask_MACH_xxx_yyy in BOOT_STANDALONE case.
+#error see platid_mask.c for platid_mask_MACH_xxx_yyy.
+#else
+	memcpy(&platid, &SPEC_PLATFORM, sizeof(platid));
+#endif
+#endif /* defined(BOOT_STANDALONE) && defined(SPEC_PLATFORM) */
 	/*
-	 *  Arguments are set up by boot lader.
+	 *  Arguments are set up by boot loader.
 	 */
 	if (bi && bi->magic == BOOTINFO_MAGIC) {
 		memset(&bi_copy, 0, sizeof(struct bootinfo));
@@ -252,25 +281,44 @@ mach_init(argc, argv, bi)
 			platid.dw.dw1 = bootinfo->platid_machine;
 		}
 	}
-	/* Platform Specific Function Hooks */
-#if defined TX39XX && defined VR41X1
-#error misconfiguration
-#elif defined TX39XX
-	tx_init();
-#elif defined VR41X1
-	vr_init();
+	/* copy boot parameter for kloader */
+#ifdef KLOADER
+	kloader_bootinfo_set(&kbi, argc, argv, bi, FALSE);
 #endif
-	/* Initialize frame buffer */
+
+	/* 
+	 * CPU core Specific Function Hooks 
+	 */
+#if defined(VR41XX) && defined(TX39XX)
+	if (platid_match(&platid, &platid_mask_CPU_MIPS_VR_41XX))
+		vr_init();
+	else if (platid_match(&platid, &platid_mask_CPU_MIPS_TX_3900) ||
+	    platid_match(&platid, &platid_mask_CPU_MIPS_TX_3920))
+		tx_init();
+#elif defined(VR41XX)
+	vr_init();
+#elif defined(TX39XX)
+	tx_init();
+#else
+#error "define TX39XX and/or VR41XX"
+#endif
+
+#if NBICONSDEV > 0
+	/* 
+	 *  bicons don't need actual device initialize.  only bootinfo needed. 
+	 */
+	__bicons_enable = (bicons_init(&bicons) == 0);
+	if (__bicons_enable)
+		cn_tab = &bicons;
+#endif
+
+	/* Initialize frame buffer (to steal DMA buffer, stay here.) */
+#ifdef HPC_DEBUG_LCD
+	dbg_lcd_test();
+#endif
 	(*platform.fb_init)(&kernend);
 	kernend = (caddr_t)mips_round_page(kernend);
 
-#if NBICONSDEV > 0
-	/* Use builtin console output until we initialize a console driver. */
-	cn_tab = &builtincd;
-
-	/* Initialize builtin console. */
-	bicons_init();
-#endif
 	/*
 	 * Set the VM page size.
 	 */
@@ -283,11 +331,12 @@ mach_init(argc, argv, bi)
 	 * Clear out the I and D caches.
 	 */
 	mips_vector_init();
+	intr_init();
 
+#ifdef DEBUG
 	/*
 	 * Look at arguments passed to us and compute boothowto.
 	 */
-	/* XXX, for debugging. */
 	if (bootinfo) {
 		DPRINTF(("Bootinfo. available, "));
 	}
@@ -295,17 +344,17 @@ mach_init(argc, argv, bi)
 	for (i = 0; i < argc; i++) {
 		DPRINTF(("%s ", argv[i]));
 	}
-
 	DPRINTF(("\n"));
 	DPRINTF(("platform ID: %08lx %08lx\n", platid.dw.dw0, platid.dw.dw1));
+#endif /* DEBUG */
 
 #ifndef RTC_OFFSET
 	/*
 	 * rtc_offset from bootinfo.timezone set by pbsdboot.exe
 	 */
 	if (rtc_offset == 0 && bootinfo
-	   && bootinfo->timezone > (-12*60)
-	   && bootinfo->timezone <= (12*60))
+	    && bootinfo->timezone > (-12*60)
+	    && bootinfo->timezone <= (12*60))
 		rtc_offset = bootinfo->timezone;
 #endif /* RTC_OFFSET */
 
@@ -316,25 +365,11 @@ mach_init(argc, argv, bi)
 #ifdef KADB
 	boothowto |= RB_KDB;
 #endif
+	strncpy(booted_kernel, argv[0], sizeof(booted_kernel));
+	booted_kernel[sizeof(booted_kernel)-1] = 0;
 	for (i = 1; i < argc; i++) {
 		for (cp = argv[i]; *cp; cp++) {
 			switch (*cp) {
-			case 's': /* single-user */
-				boothowto |= RB_SINGLE;
-				break;
-
-			case 'd': /* break into the kernel debugger ASAP */
-				boothowto |= RB_KDB;
-				break;
-
-			case 'm': /* mini root present in memory */
-				boothowto |= RB_MINIROOT;
-				break;
-
-			case 'a': /* ask for names */
-				boothowto |= RB_ASKNAME;
-				break;
-
 			case 'h': /* XXX, serial console */
 				bootinfo->bi_cnuse |= BI_CNUSE_SERIAL;
 				break;
@@ -346,13 +381,13 @@ mach_init(argc, argv, bi)
 					mountroot = nfs_mountroot;
 				else
 					makebootdev(cp+2);
-#else
+#else /* NFS */
 				makebootdev(cp+2);
-#endif
+#endif /* NFS */
 				cp += strlen(cp);
 				break;
-			case 'v': /* verbose for hpcmips */
-				hpcmips_verbose = 1;
+			default:
+				BOOT_FLAG(*cp, boothowto);
 				break;
 			}
 		}
@@ -362,19 +397,21 @@ mach_init(argc, argv, bi)
 	 * Check to see if a mini-root was loaded into memory. It resides
 	 * at the start of the next page just after the end of BSS.
 	 */
-	if (boothowto & RB_MINIROOT)
-		kernend += round_page(mfs_initminiroot(kernend));
-#endif
+	if (boothowto & RB_MINIROOT) {
+		size_t fssz;
+		fssz = round_page(mfs_initminiroot(kernend));
+#ifdef MEMORY_DISK_DYNAMIC
+		md_root_setconf((caddr_t)kernend, fssz);
+#endif /* MEMORY_DISK_DYNAMIC */
+		kernend += fssz;
+	}
+#endif /* MFS */
 
 #ifdef DDB
-	/*
-	 * Initialize machine-dependent DDB commands, in case of early panic.
-	 */
-	db_machine_init();
 	/* init symbols if present */
 	if (esym)
-		ddb_init(1000, &end, (int*)esym);
-#endif
+		ddb_init(symbolsz, &end, esym);
+#endif /* DDB */
 	/*
 	 * Alloc u pages for proc0 stealing KSEG0 memory.
 	 */
@@ -387,19 +424,33 @@ mach_init(argc, argv, bi)
 
 	kernend += UPAGES * PAGE_SIZE;
 
-	/* Setup interrupt handler */
-	(*platform.os_init)();
-
-	/* Initialize console. */
+	/* Initialize console and KGDB serial port. */
 	(*platform.cons_init)();
 
+#if defined(DDB) || defined(KGDB)
+	if (boothowto & RB_KDB) {
 #ifdef DDB
-	if (boothowto & RB_KDB)
 		Debugger();
-#endif
+#endif /* DDB */
+#ifdef KGDB
+		kgdb_debug_init = 1;
+		kgdb_connect(1);
+#endif /* KGDB */
+	}
+#endif /* DDB || KGDB */
 
 	/* Find physical memory regions. */
 	(*platform.mem_init)((paddr_t)kernend - MIPS_KSEG0_START);
+	/* 
+	 *  Clear currently unused D-RAM area 
+	 *  (For reboot Windows CE clearly)
+	 */
+	{
+		u_int32_t sp;
+		__asm__ __volatile__("move %0, $29" : "=r"(sp));
+		KDASSERT(sp > KERNBASE + 0x400);
+		memset((void *)(KERNBASE + 0x400), 0, sp - (KERNBASE + 0x400));
+	}
 
 	printf("mem_cluster_cnt = %d\n", mem_cluster_cnt);
 	physmem = 0;
@@ -419,12 +470,11 @@ mach_init(argc, argv, bi)
 
 		printf("loading 0x%lx,0x%lx\n", start, size);
 
-		memset((void *)MIPS_PHYS_TO_KSEG1(start), 0,
-		       size);
+		memset((void *)MIPS_PHYS_TO_KSEG1(start), 0, size);
 
 		uvm_page_physload(atop(start), atop(start + size),
-				  atop(start), atop(start + size),
-				  VM_FREELIST_DEFAULT);
+		    atop(start), atop(start + size),
+		    VM_FREELIST_DEFAULT);
 	}
 
 	/*
@@ -433,22 +483,26 @@ mach_init(argc, argv, bi)
 	mips_init_msgbuf();
 
 	/*
-	 * Allocate space for system data structures.  These data structures
-	 * are allocated here instead of cpu_startup() because physical
-	 * memory is directly addressable.  We don't have to map these into
-	 * virtual address space.
+	 * Compute the size of system data structures.  pmap_bootstrap()
+	 * needs some of this information.
 	 */
 	size = (unsigned)allocsys(NULL, NULL);
-	v = (caddr_t)pmap_steal_memory(size, NULL, NULL);
-	if ((allocsys(v, NULL) - v) != size)
-		panic("mach_init: table size inconsistency");
 
 	/*
 	 * Initialize the virtual memory system.
 	 */
 	pmap_bootstrap();
-}
 
+	/*
+	 * Allocate space for system data structures.  These data structures
+	 * are allocated here instead of cpu_startup() because physical
+	 * memory is directly addressable.  We don't have to map these into
+	 * virtual address space.
+	 */
+	v = (caddr_t)uvm_pageboot_alloc(size);
+	if ((allocsys(v, NULL) - v) != size)
+		panic("mach_init: table size inconsistency");
+}
 
 /*
  * Machine-dependent startup code.
@@ -477,7 +531,7 @@ cpu_startup()
 	printf("%s\n", cpu_model);
 	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
 	printf("total memory = %s\n", pbuf);
-	if (hpcmips_verbose) {
+	if (bootverbose) {
 		/* show again when verbose mode */
 		printf("total memory banks = %d\n", mem_cluster_cnt);
 		for (i = 0; i < mem_cluster_cnt; i++) {
@@ -495,9 +549,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
-		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+	    NULL, UVM_UNKNOWN_OFFSET, 0,
+	    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		UVM_ADV_NORMAL, 0)) != 0)
 		panic("cpu_startup: cannot allocate VM for buffers");
 
 	minaddr = (vaddr_t)buffers;
@@ -528,23 +582,25 @@ cpu_startup()
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
 			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-				       VM_PROT_READ|VM_PROT_WRITE);
+			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
+
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+	    16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   VM_PHYS_SIZE, 0, FALSE, NULL);
+	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
 	/*
 	 * No need to allocate an mbuf cluster submap.  Mbuf clusters
@@ -564,11 +620,6 @@ cpu_startup()
 	 * Set up buffers, so they can be used to read disk labels.
 	 */
 	bufinit();
-
-	/*
-	 * Set up CPU-specific registers, cache, etc.
-	 */
-	initcpu();
 }
 
 
@@ -576,14 +627,8 @@ cpu_startup()
  * Machine dependent system variables.
  */
 int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
+    size_t newlen, struct proc *p)
 {
 
 	/* all sysctl names at this level are terminal */
@@ -594,6 +639,12 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case CPU_CONSDEV:
 		return (sysctl_rdstruct(oldp, oldlenp, newp, &cn_tab->cn_dev,
 		    sizeof cn_tab->cn_dev));
+	case CPU_ROOT_DEVICE:
+		return (sysctl_rdstring(oldp, oldlenp, newp, 
+		    root_device->dv_xname));
+	case CPU_BOOTED_KERNEL:
+		return (sysctl_rdstring(oldp, oldlenp, newp, 
+		    booted_kernel));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -601,11 +652,8 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 }
 
 void
-cpu_reboot(howto, bootstr)
-	volatile int howto;	/* XXX volatile to keep gcc happy */
-	char *bootstr;
+cpu_reboot(int howto, char *bootstr)
 {
-	extern int cold;
 
 	/* take a snap shot before clobbering any registers */
 	if (curproc)
@@ -623,8 +671,18 @@ cpu_reboot(howto, bootstr)
 	}
 
 	/* If "always halt" was specified as a boot flag, obey. */
-	if ((boothowto & RB_HALT) != 0)
+	if ((boothowto & RB_HALT) != 0) {
 		howto |= RB_HALT;
+	}
+
+#ifdef KLOADER
+	if ((howto & RB_HALT) == 0) {
+		if (howto & RB_STRING)
+			kloader_reboot_setup(bootstr);
+		else
+			kloader_reboot_setup(kernel_path);
+	}
+#endif
 
 	boothowto = howto;
 	if ((howto & RB_NOSYNC) == 0) {
@@ -644,235 +702,32 @@ cpu_reboot(howto, bootstr)
 	splhigh();
 
 	/* If rebooting and a dump is requested do it. */
-#if 0
-	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP)
-#else
 	if (howto & RB_DUMP)
-#endif
 		dumpsys();
 
-haltsys:
+ haltsys:
 
 	/* run any shutdown hooks */
 	doshutdownhooks();
 
 	/* Finally, halt/reboot the system. */
-	printf("%s\n\n", howto & RB_HALT ? "halted." : "rebooting...");
-	(*platform.reboot)(howto, bootstr);
+	if (howto & RB_HALT) {
+		printf("halted.\n");
+	} else {
+#ifdef KLOADER
+		kloader_reboot();
+		/* NOTREACHED */
+#endif
+	}
 
+	(*platform.reboot)(howto, bootstr);
 	while(1)
 		;
 	/*NOTREACHED*/
 }
 
-/*
- * Return the best possible estimate of the time in the timeval to
- * which tvp points.  We guarantee that the time will be greater than
- * the value obtained by a previous call.  Some models of DECstations
- * provide a high resolution timer circuit.
- */
-void
-microtime(tvp)
-	struct timeval *tvp;
-{
-	int s = splclock();
-	static struct timeval lasttime;
-
-	*tvp = time;
-
-	if (tvp->tv_usec >= 1000000) {
-		tvp->tv_usec -= 1000000;
-		tvp->tv_sec++;
-	}
-
-	if (tvp->tv_sec == lasttime.tv_sec &&
-	    tvp->tv_usec <= lasttime.tv_usec &&
-	    (tvp->tv_usec = lasttime.tv_usec + 1) >= 1000000) {
-		tvp->tv_sec++;
-		tvp->tv_usec -= 1000000;
-	}
-	lasttime = *tvp;
-	splx(s);
-}
-
-
-int
-initcpu()
-{
-	int i = 0;
-
-	/*
-	 * reset after autoconfig probe:
-	 * clear  any memory errors, reset any pending interrupts.
-	 */
-
-	(*platform.bus_reset)();	/* XXX_cf_alpha */
-
-	return i;
-}
-
 void
 consinit()
 {
-	/*
-	 *	Nothing to do.
-	 *	Console is alredy initialized in platform.cons_init().
-	 */
-
-	return;
+	/* platform.cons_init() do it */
 }
-
-void
-cpu_intr(status, cause, pc, ipending)
-	u_int32_t status;
-	u_int32_t cause;
-	u_int32_t pc;
-	u_int32_t ipending;
-{
-	uvmexp.intrs++;
-
-#ifdef VR41X1
-	if (ipending & MIPS_INT_MASK_5) {
-		/*
-		 *  Writing a value to the Compare register,
-		 *  as a side effect, clears the timer interrupt request.
-		 */
-		mips3_write_compare(mips3_cycle_count());
-	}
-#endif
-
-	/* device interrupts */
-#ifdef ENABLE_MIPS_TX3900
-	if (ipending & MIPS_HARD_INT_MASK) {
-		_splset((*platform.iointr)(status, cause, pc, ipending));
-	}
-#else
-	if (ipending & MIPS3_HARD_INT_MASK) {
-		_splset((*platform.iointr)(status, cause, pc, ipending));
-	}
-#endif
-
-	/* software simulated interrupt */
-	if ((ipending & MIPS_SOFT_INT_MASK_1)
-	        || (ssir && (status & MIPS_SOFT_INT_MASK_1))) {
-
-#define DO_SIR(bit, fn)						\
-	do {							\
-		if (n & (bit)) {				\
-			uvmexp.softs++;				\
-			fn;					\
-		}						\
-	} while (0)
-
-		unsigned n;
-		n = ssir; ssir = 0;
-		_clrsoftintr(MIPS_SOFT_INT_MASK_1);
-
-		DO_SIR(SIR_NET, netintr());
-#undef DO_SIR
-		}
-
-	/* 'softclock' interrupt */
-	if (ipending & MIPS_SOFT_INT_MASK_0) {
-		_clrsoftintr(MIPS_SOFT_INT_MASK_0);
-		uvmexp.softs++;
-		intrcnt[SOFTCLOCK_INTR]++;
-		softclock();
-	}
-
-	return;
-}
-
-/*
- * Wait "n" microseconds. (scsi code needs this).
- */
-void
-delay(n)
-        int n;
-{
-        DELAY(n);
-}
-
-/*
- *  Ensure all platform vectors are always initialized.
- */
-void
-unimpl_os_init()
-{
-	panic("sysconf.init didnt set os_init");
-}
-
-void
-unimpl_bus_reset()
-{
-	panic("sysconf.init didnt set bus_reset");
-}
-
-void
-unimpl_cons_init()
-{
-	panic("sysconf.init didnt set cons_init");
-}
-
-void
-unimpl_device_register(sc, arg)
-	struct device *sc;
-	void *arg;
-{
-	panic("sysconf.init didnt set device_register");
-
-}
-
-int
-unimpl_iointr(arg, arg2, arg3, arg4)
-	u_int32_t arg, arg2, arg3, arg4;
-{
-	panic("sysconf.init didnt set iointr");
-}
-
-void
-unimpl_clockintr(arg)
-	void *arg;
-{
-	panic("sysconf.init didnt set clockintr");
-}
-
-int
-unimpl_intr(mask, pc, statusreg, causereg)
-	u_int mask;
-	u_int pc;
-	u_int statusreg;
-	u_int causereg;
-{
-	panic("sysconf.init didnt set intr");
-}
-
-void
-unimpl_mem_init(kernend)
-	paddr_t kernend;
-{
-	panic("sysconf.init didnt set memory");
-}
-
-void
-unimpl_fb_init(kernend)
-	caddr_t *kernend;
-{
-	panic("sysconf.init didnt set frame buffer");
-}
-
-void
-unimpl_reboot(howto, bootstr)
-	int howto;
-	char *bootstr;
-{
-	printf("platform depend reboot code is not implemented.\n");
-}
-
-unsigned
-nullclkread()
-{
-	return 0;
-}	
-
-

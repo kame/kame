@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ae.c,v 1.67.26.3 2002/02/23 17:25:59 he Exp $	*/
+/*	$NetBSD: if_ae.c,v 1.71 2001/11/10 21:32:33 jklos Exp $	*/
 
 /*
  * Device driver for National Semiconductor DS8390/WD83C690 based ethernet

@@ -1,4 +1,4 @@
-#	$NetBSD: std.sparc,v 1.19.4.1 2000/06/23 14:36:14 fvdl Exp $
+#	$NetBSD: std.sparc,v 1.20 2000/06/22 20:27:56 fvdl Exp $
 
 #
 # Mandatory NetBSD/sparc kernel options.

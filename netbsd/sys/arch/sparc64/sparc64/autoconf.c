@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.31.2.3 2000/08/13 09:09:30 jdolecek Exp $ */
+/*	$NetBSD: autoconf.c,v 1.57.4.1 2002/06/05 04:07:28 lukem Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -48,6 +48,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,12 +64,13 @@
 #include <sys/malloc.h>
 #include <sys/queue.h>
 #include <sys/msgbuf.h>
+#include <sys/boot_flag.h>
 
 #include <net/if.h>
 
 #include <dev/cons.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/autoconf.h>
@@ -79,6 +81,7 @@
 #include <sparc64/sparc64/timerreg.h>
 
 #include <dev/ata/atavar.h>
+#include <dev/ata/wdvar.h>
 #include <dev/pci/pcivar.h>
 #include <dev/sbus/sbusvar.h>
 
@@ -105,6 +108,8 @@ extern	int kgdb_debug_panic;
 #endif
 
 static	int rootnode;
+char platform_type[32];
+
 static	char *str2hex __P((char *, int *));
 static	int mbprint __P((void *, const char *));
 static	void crazymap __P((char *, int *));
@@ -117,7 +122,6 @@ struct	bootpath bootpath[8];
 int	nbootpath;
 static	void bootpath_build __P((void));
 static	void bootpath_print __P((struct bootpath *));
-int	search_prom __P((int, char *));
 
 /* Global interrupt mappings for all device types.  Match against the OBP
  * 'device_type' property. 
@@ -129,6 +133,7 @@ struct intrmap intrmap[] = {
 	{ "network",	PIL_NET },
 	{ "display",	PIL_VIDEO },
 	{ "audio",	PIL_AUD },
+	{ "ide",	PIL_SCSI },
 /* The following devices don't have device types: */
 	{ "SUNW,CS4231",	PIL_AUD },
 	{ NULL,		0 }
@@ -136,6 +141,7 @@ struct intrmap intrmap[] = {
 
 #ifdef DEBUG
 #define ACDB_BOOTDEV	0x1
+#define	ACDB_PROBE	0x2
 int autoconf_debug = 0x0;
 #define DPRINTF(l, s)   do { if (autoconf_debug & l) printf s; } while (0)
 #else
@@ -216,9 +222,9 @@ bootstrap(nctx)
 
 	/* 
 	 * Initialize ddb first and register OBP callbacks.
-	 * We can do this because ddb_machine_init() and 
-	 * ddb_init() do not allocate anything, just initialze
-	 * some pointers to important things like the symtab.
+	 * We can do this because ddb_init() does not allocate anything,
+	 * just initialze some pointers to important things
+	 * like the symtab.
 	 *
 	 * By doing this first and installing the OBP callbacks
 	 * we get to do symbolic debugging of pmap_bootstrap().
@@ -230,7 +236,6 @@ bootstrap(nctx)
 	/* Initialize the PROM console so printf will not panic */
 	(*cn_tab->cn_init)(cn_tab);
 #ifdef DDB
-	db_machine_init();
 #ifdef DB_ELF_SYMBOLS
 	ddb_init((int)((caddr_t)esym - (caddr_t)ssym), ssym, esym); 
 #else
@@ -313,25 +318,32 @@ bootpath_build()
 	/* Setup pointer to boot flags */
 	OF_getprop(chosen, "bootargs", buf, sizeof(buf));
 	cp = buf;
-	if (cp == NULL)
-		return;
-	while (*cp != '-')
-		if (*cp++ == '\0')
-			return;
 
-	for (;;) {
-		switch (*++cp) {
-
-		case '\0':
-			return;
-
-		case 'a':
-			boothowto |= RB_ASKNAME;
+	/* Find start of boot flags */
+	while (*cp) {
+		while(*cp == ' ' || *cp == '\t') cp++;
+		if (*cp == '-' || *cp == '\0')
 			break;
+		while(*cp != ' ' && *cp != '\t' && *cp != '\0') cp++;
+		
+	}
+	if (*cp != '-')
+		return;
 
-		case 'd':	/* kgdb - always on zs	XXX */
+	for (;*++cp;) {
+		int fl;
+
+		fl = 0;
+		BOOT_FLAG(*cp, fl);
+		if (!fl) {
+			printf("unknown option `%c'\n", *cp);
+			continue;
+		}
+		boothowto |= fl;
+
+		/* specialties */
+		if (*cp == 'd') {
 #if defined(KGDB)
-			boothowto |= RB_KDB;	/* XXX unused */
 			kgdb_debug_panic = 1;
 			kgdb_connect(1);
 #elif defined(DDB)
@@ -339,20 +351,11 @@ bootpath_build()
 #else
 			printf("kernel has no debugger\n");
 #endif
-			break;
-
-		case 's':
-			boothowto |= RB_SINGLE;
-			break;
-
-		case 't':
-		{
+		} else if (*cp == 't') {
 			/* turn on traptrace w/o breaking into kdb */
 			extern int trap_trace_dis;
 
 			trap_trace_dis = 0;
-			break;
-		}
 		}
 	}
 }
@@ -564,7 +567,7 @@ findroot()
 {
 	register int node;
 
-	if ((node = rootnode) == 0 && (node = nextsibling(0)) == 0)
+	if ((node = rootnode) == 0 && (node = OF_peer(0)) == 0)
 		panic("no PROM root device");
 	rootnode = node;
 	return (node);
@@ -582,9 +585,11 @@ findnode(first, name)
 	int node;
 	char buf[32];
 
-	for (node = first; node; node = nextsibling(node))
-		if (strcmp(getpropstringA(node, "name", buf), name) == 0)
+	for (node = first; node; node = OF_peer(node)) {
+		if ((OF_getprop(node, "name", buf, sizeof(buf)) > 0) &&
+			(strcmp(buf, name) == 0))
 			return (node);
+	}
 	return (0);
 }
 
@@ -616,9 +621,9 @@ extern struct sparc_bus_dma_tag mainbus_dma_tag;
 extern struct sparc_bus_space_tag mainbus_space_tag;
 
 	struct mainbus_attach_args ma;
-	char namebuf[32];
+	char buf[32];
 	const char *const *ssp, *sp = NULL;
-	int node0, node;
+	int node0, node, rv;
 
 	static const char *const openboot_special[] = {
 		/* ignore these (end with NULL) */
@@ -636,7 +641,8 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		NULL
 	};
 
-	printf(": %s\n", getpropstringA(findroot(), "name", namebuf));
+	OF_getprop(findroot(), "name", platform_type, sizeof(platform_type));
+	printf(": %s\n", platform_type);
 
 
 	/*
@@ -658,11 +664,12 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 	/* the first early device to be configured is the cpu */
 	{
 		/* XXX - what to do on multiprocessor machines? */
-		register const char *cp;
 		
-		for (node = firstchild(node); node; node = nextsibling(node)) {
-			cp = getpropstringA(node, "device_type", namebuf);
-			if (strcmp(cp, "cpu") == 0) {
+		for (node = OF_child(node); node; node = OF_peer(node)) {
+			if (OF_getprop(node, "device_type", 
+				buf, sizeof(buf)) <= 0)
+				continue;
+			if (strcmp(buf, "cpu") == 0) {
 				bzero(&ma, sizeof(ma));
 				ma.ma_bustag = &mainbus_space_tag;
 				ma.ma_dmatag = &mainbus_dma_tag;
@@ -680,7 +687,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 	node = findroot();	/* re-init root node */
 
 	/* Find the "options" node */
-	node0 = firstchild(node);
+	node0 = OF_child(node);
 	optionsnode = findnode(node0, "options");
 	if (optionsnode == 0)
 		panic("no options in OPENPROM");
@@ -690,16 +697,17 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 	 * PROM entries that are not for devices, or which must be
 	 * done before we get here.
 	 */
-	for (node = node0; node; node = nextsibling(node)) {
-		const char *cp;
+	for (node = node0; node; node = OF_peer(node)) {
+		int portid;
 
-		if (node_has_property(node, "device_type") &&
-		    strcmp(getpropstringA(node, "device_type", namebuf),
-			   "cpu") == 0)
+		DPRINTF(ACDB_PROBE, ("Node: %x", node));
+		if ((OF_getprop(node, "device_type", buf, sizeof(buf)) > 0) &&
+			strcmp(buf, "cpu") == 0)
 			continue;
-		cp = getpropstringA(node, "name", namebuf);
+		OF_getprop(node, "name", buf, sizeof(buf));
+		DPRINTF(ACDB_PROBE, (" name %s\n", buf));
 		for (ssp = openboot_special; (sp = *ssp) != NULL; ssp++)
-			if (strcmp(cp, sp) == 0)
+			if (strcmp(buf, sp) == 0)
 				break;
 		if (sp != NULL)
 			continue; /* an "early" device already configured */
@@ -707,30 +715,64 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		bzero(&ma, sizeof ma);
 		ma.ma_bustag = &mainbus_space_tag;
 		ma.ma_dmatag = &mainbus_dma_tag;
-		ma.ma_name = getpropstringA(node, "name", namebuf);
+		ma.ma_name = buf;
 		ma.ma_node = node;
-		ma.ma_upaid = getpropint(node, "upa-portid", -1);
+		if (OF_getprop(node, "upa-portid", &portid, sizeof(portid)) !=
+			sizeof(portid)) 
+			portid = -1;
+		ma.ma_upaid = portid;
 
-		if (getprop(node, "reg", sizeof(*ma.ma_reg), 
+		if (PROM_getprop(node, "reg", sizeof(*ma.ma_reg), 
 			     &ma.ma_nreg, (void**)&ma.ma_reg) != 0)
 			continue;
-
-		if (getprop(node, "interrupts", sizeof(*ma.ma_interrupts), 
-			     &ma.ma_ninterrupts, (void**)&ma.ma_interrupts) != 0) {
+#ifdef DEBUG
+		if (autoconf_debug & ACDB_PROBE) {
+			if (ma.ma_nreg)
+				printf(" reg %08lx.%08lx\n",
+					(long)ma.ma_reg->ur_paddr, 
+					(long)ma.ma_reg->ur_len);
+			else
+				printf(" no reg\n");
+		}
+#endif
+		rv = PROM_getprop(node, "interrupts", sizeof(*ma.ma_interrupts), 
+			&ma.ma_ninterrupts, (void**)&ma.ma_interrupts);
+		if (rv != 0 && rv != ENOENT) {
 			free(ma.ma_reg, M_DEVBUF);
 			continue;
 		}
-		if (getprop(node, "address", sizeof(*ma.ma_address), 
-			     &ma.ma_naddress, (void**)&ma.ma_address) != 0) {
+#ifdef DEBUG
+		if (autoconf_debug & ACDB_PROBE) {
+			if (ma.ma_interrupts)
+				printf(" interrupts %08x\n", 
+					*ma.ma_interrupts);
+			else
+				printf(" no interrupts\n");
+		}
+#endif
+		rv = PROM_getprop(node, "address", sizeof(*ma.ma_address), 
+			&ma.ma_naddress, (void**)&ma.ma_address);
+		if (rv != 0 && rv != ENOENT) {
 			free(ma.ma_reg, M_DEVBUF);
-			free(ma.ma_interrupts, M_DEVBUF);
+			if (ma.ma_ninterrupts)
+				free(ma.ma_interrupts, M_DEVBUF);
 			continue;
 		}
-
+#ifdef DEBUG
+		if (autoconf_debug & ACDB_PROBE) {
+			if (ma.ma_naddress)
+				printf(" address %08x\n", 
+					*ma.ma_address);
+			else
+				printf(" no address\n");
+		}
+#endif
 		(void) config_found(dev, (void *)&ma, mbprint);
 		free(ma.ma_reg, M_DEVBUF);
-		free(ma.ma_interrupts, M_DEVBUF);
-		free(ma.ma_address, M_DEVBUF);
+		if (ma.ma_ninterrupts)
+			free(ma.ma_interrupts, M_DEVBUF);
+		if (ma.ma_naddress)
+			free(ma.ma_address, M_DEVBUF);
 	}
 	/* Try to attach PROM console */
 	bzero(&ma, sizeof ma);
@@ -743,7 +785,7 @@ struct cfattach mainbus_ca = {
 };
 
 int
-getprop(node, name, size, nitem, bufp)
+PROM_getprop(node, name, size, nitem, bufp)
 	int	node;
 	char	*name;
 	size_t	size;
@@ -753,7 +795,8 @@ getprop(node, name, size, nitem, bufp)
 	void	*buf;
 	long	len;
 
-	len = getproplen(node, name);
+	*nitem = 0;
+	len = PROM_getproplen(node, name);
 	if (len <= 0)
 		return (ENOENT);
 
@@ -779,7 +822,7 @@ getprop(node, name, size, nitem, bufp)
  * Internal form of proplen().  Returns the property length.
  */
 long
-getproplen(node, name)
+PROM_getproplen(node, name)
 	int node;
 	char *name;
 {
@@ -792,25 +835,25 @@ getproplen(node, name)
  * subsequent calls.
  */
 char *
-getpropstring(node, name)
+PROM_getpropstring(node, name)
 	int node;
 	char *name;
 {
 	static char stringbuf[32];
 
-	return (getpropstringA(node, name, stringbuf));
+	return (PROM_getpropstringA(node, name, stringbuf));
 }
 
-/* Alternative getpropstring(), where caller provides the buffer */
+/* Alternative PROM_getpropstring(), where caller provides the buffer */
 char *
-getpropstringA(node, name, buffer)
+PROM_getpropstringA(node, name, buffer)
 	int node;
 	char *name;
 	char *buffer;
 {
 	int blen;
 
-	if (getprop(node, name, 1, &blen, (void **)&buffer) != 0)
+	if (PROM_getprop(node, name, 1, &blen, (void **)&buffer) != 0)
 		blen = 0;
 
 	buffer[blen] = '\0';	/* usually unnecessary */
@@ -822,18 +865,19 @@ getpropstringA(node, name, buffer)
  * The return value is the property, or the default if there was none.
  */
 int
-getpropint(node, name, deflt)
+PROM_getpropint(node, name, deflt)
 	int node;
 	char *name;
 	int deflt;
 {
-	int intbuf, *ip = &intbuf;
-	int len;
+	int intbuf;
 
-	if (getprop(node, name, sizeof(int), &len, (void **)&ip) != 0)
+	
+
+	if (OF_getprop(node, name, &intbuf, sizeof(intbuf)) != sizeof(intbuf))
 		return (deflt);
 
-	return (*ip);
+	return (intbuf);
 }
 
 /*
@@ -856,47 +900,7 @@ nextsibling(node)
 	return OF_peer(node);
 }
 
-/* The following recursively searches a PROM tree for a given node */
-int
-search_prom(rootnode, name)
-        register int rootnode;
-        register char *name;
-{
-	int rtnnode;
-	int node = rootnode;
-	char buf[32];
-
-	if (node == findroot() ||
-	    !strcmp("hierarchical", getpropstringA(node, "device_type", buf)))
-		node = firstchild(node);
-
-	if (node == 0)
-		panic("search_prom: null node");
-
-	do {
-		if (strcmp(getpropstringA(node, "name", buf), name) == 0)
-			return (node);
-
-		if (node_has_property(node,"device_type") &&
-		    (strcmp(getpropstringA(node, "device_type", buf),
-			     "hierarchical") == 0
-		     || strcmp(getpropstringA(node, "name", buf), "iommu") == 0)
-		    && (rtnnode = search_prom(node, name)) != 0)
-			return (rtnnode);
-
-	} while ((node = nextsibling(node)));
-
-	return (0);
-}
-
 /* The following are used primarily in consinit() */
-
-int
-opennode(path)		/* translate phys. device path to node */
-	register char *path;
-{
-	return OF_open(path);
-}
 
 int
 node_has_property(node, prop)	/* returns 1 if node has given property */
@@ -907,18 +911,6 @@ node_has_property(node, prop)	/* returns 1 if node has given property */
 }
 
 #ifdef RASTERCONSOLE
-/* Pass a string to the FORTH PROM to be interpreted */
-void
-rominterpret(s)
-	register char *s;
-{
-
-	if (promvec->pv_romvec_vers < 2)
-		promvec->pv_fortheval.v0_eval(strlen(s), s);
-	else
-		promvec->pv_fortheval.v2_eval(s);
-}
-
 /*
  * Try to figure out where the PROM stores the cursor row & column
  * variables.  Returns nonzero on error.
@@ -927,41 +919,20 @@ int
 romgetcursoraddr(rowp, colp)
 	register int **rowp, **colp;
 {
-	char buf[100];
+	cell_t row = NULL, col = NULL;
 
+	OF_interpret("stdout @ is my-self addr line# addr column# ", 0, 2,
+		&col, &row);
 	/*
-	 * line# and column# are global in older proms (rom vector < 2)
-	 * and in some newer proms.  They are local in version 2.9.  The
-	 * correct cutoff point is unknown, as yet; we use 2.9 here.
+	 * We are running on a 64-bit machine, so these things point to
+	 * 64-bit values.  To convert them to pointers to integers, add
+	 * 4 to the address.
 	 */
-	if (promvec->pv_romvec_vers < 2 || promvec->pv_printrev < 0x00020009)
-		sprintf(buf,
-		    "' line# >body >user %lx ! ' column# >body >user %lx !",
-		    (u_long)rowp, (u_long)colp);
-	else
-		sprintf(buf,
-		    "stdout @ is my-self addr line# %lx ! addr column# %lx !",
-		    (u_long)rowp, (u_long)colp);
-	*rowp = *colp = NULL;
-	rominterpret(buf);
-	return (*rowp == NULL || *colp == NULL);
+	*rowp = (int *)(row+4);
+	*colp = (int *)(col+4);
+	return (row == NULL || col == NULL);
 }
-#endif
-
-void
-romhalt()
-{
-	OF_exit();
-	panic("PROM exit failed");
-}
-
-void
-romboot(bootargs)
-	char *bootargs;
-{
-	OF_boot(bootargs);
-	panic("PROM boot failed");
-}
+#endif /* RASTERCONSOLE */
 
 void
 callrom()
@@ -1021,7 +992,7 @@ getdevunit(name, unit)
 #define BUSCLASS_FDC		9
 
 static int bus_class __P((struct device *));
-static char *bus_compatible __P((char *, struct device *));
+static int dev_compatible __P((struct device *, void *, char *));
 static int instance_match __P((struct device *, void *, struct bootpath *));
 static void nail_bootdev __P((struct device *, struct bootpath *));
 
@@ -1041,50 +1012,127 @@ static struct {
 	{ "espdma",	BUSCLASS_SBUS },
 	{ "ledma",	BUSCLASS_SBUS },
 	{ "simba",	BUSCLASS_PCI },
+	{ "ppb",	BUSCLASS_PCI },
 	{ "pciide",	BUSCLASS_PCI },
+	{ "siop",	BUSCLASS_PCI },
 	{ "pci",	BUSCLASS_PCI },
-	{ "vme",	BUSCLASS_VME },
-	{ "xdc",	BUSCLASS_XDC },
-	{ "xyc",	BUSCLASS_XYC },
 	{ "fdc",	BUSCLASS_FDC },
 };
 
 /*
- * A list of PROM device names that differ from our NetBSD
- * device names.
+ * A list of driver names may have differently named PROM nodes.
  */
 static struct {
-	char	*bpname;
-	int	class;
-	char	*cfname;
+	char	*name;
+	char	*compat[6];
 } dev_compat_tab[] = {
-	{ "espdma",	BUSCLASS_NONE,		"dma" },
-	{ "QLGC,isp",	BUSCLASS_NONE,		"isp" },
-	{ "PTI,isp",	BUSCLASS_NONE,		"isp" },
-	{ "ptisp",	BUSCLASS_NONE,		"isp" },
-	{ "SUNW,fdtwo",	BUSCLASS_NONE,		"fdc" },
-	{ "pci",	BUSCLASS_MAINBUS,	"psycho" },
-	{ "pci",	BUSCLASS_PCI,		"simba" },
-	{ "ide",	BUSCLASS_PCI,		"pciide" },
-	{ "disk",	BUSCLASS_NONE,		"wd" },  /* XXX */
-	{ "network",	BUSCLASS_NONE,		"hme" }, /* XXX */
+	{ "dma",	{ "espdma", NULL }},
+	{ "isp",	{ "QLGC,isp", "PTI,isp", "ptiisp", "scsi", NULL }},
+	{ "fdc",	{ "SUNW,fdtwo",	NULL }},
+	{ "psycho",	{ "pci", NULL }},
+	{ "wd",		{ "disk", "ide-disk", NULL }},
+	{ "sd",		{ "disk", NULL }},
+	{ "hme",	{ "SUNW,hme", "network", NULL }},
+	{ "esp",	{ "SUNW,fas", "fas", NULL }},
+	{ "siop",	{ "glm",  "SUNW,glm", NULL }},
+	{ NULL,		{ NULL }},
 };
 
-static char *
-bus_compatible(bpname, dev)
-	char *bpname;
+int
+dev_compatible(dev, aux, bpname)
 	struct device *dev;
+	void *aux;
+	char *bpname;
 {
-	int i, class = bus_class(dev);
+	int i, j;
 
-	for (i = sizeof(dev_compat_tab)/sizeof(dev_compat_tab[0]); i-- > 0;) {
-		if (strcmp(bpname, dev_compat_tab[i].bpname) == 0 &&
-		    (dev_compat_tab[i].class == BUSCLASS_NONE ||
-		     dev_compat_tab[i].class == class))
-			return (dev_compat_tab[i].cfname);
+	/*
+	 * Step 1:
+	 *
+	 * If this is a PCI device, find it's device class and try that.
+	 */
+	if ((bus_class(dev->dv_parent)) == BUSCLASS_PCI) {
+		struct pci_attach_args *pa = aux;
+
+		DPRINTF(ACDB_BOOTDEV,
+			("\n%s: dev_compatible: checking PCI class %x\n",
+				dev->dv_xname, pa->pa_class));
+
+		switch (PCI_CLASS(pa->pa_class)) {
+			/*
+			 * We can only really have pci-pci bridges,
+			 * disk controllers, or NICs on the bootpath.
+			 */
+		case PCI_CLASS_BRIDGE:
+			if (PCI_SUBCLASS(pa->pa_class) != 
+				PCI_SUBCLASS_BRIDGE_PCI)
+				break;
+			DPRINTF(ACDB_BOOTDEV,
+				("\n%s: dev_compatible: comparing %s with %s\n",
+					dev->dv_xname, bpname, "pci"));
+			if (strcmp(bpname, "pci") == 0)
+				return (0);
+			break;
+		case PCI_CLASS_MASS_STORAGE:
+			if (PCI_SUBCLASS(pa->pa_class) == 
+				PCI_SUBCLASS_MASS_STORAGE_IDE) {
+				DPRINTF(ACDB_BOOTDEV,
+					("\n%s: dev_compatible: "
+						"comparing %s with %s\n",
+						dev->dv_xname, bpname, "ide"));
+				if (strcmp(bpname, "ide") == 0)
+					return (0);
+			}
+			if (PCI_SUBCLASS(pa->pa_class) == 
+				PCI_SUBCLASS_MASS_STORAGE_SCSI) {
+				DPRINTF(ACDB_BOOTDEV,
+					("\n%s: dev_compatible: "
+						"comparing %s with %s\n",
+						dev->dv_xname, bpname, "scsi"));
+				if (strcmp(bpname, "scsi") == 0)
+					return (0);
+			}
+			break;
+		case PCI_CLASS_NETWORK:
+			DPRINTF(ACDB_BOOTDEV,
+				("\n%s: dev_compatible: comparing %s with %s\n",
+					dev->dv_xname, bpname, "network"));
+			if (strcmp(bpname, "network") == 0)
+				return (0);
+			break;
+		default:
+			break;
+		}
 	}
 
-	return (bpname);
+	/*
+	 * Step 2:
+	 * 
+	 * Look through the list of equivalent names and see if any of them
+	 * match.  This is a nasty O(n^2) operation.
+	 */
+	for (i = 0; dev_compat_tab[i].name != NULL; i++) {
+		if (strcmp(dev->dv_cfdata->cf_driver->cd_name, 
+			dev_compat_tab[i].name) == 0) {
+			DPRINTF(ACDB_BOOTDEV,
+				("\n%s: dev_compatible: translating %s\n",
+					dev->dv_xname, dev_compat_tab[i].name));
+			for (j = 0; dev_compat_tab[i].compat[j] != NULL; j++) {
+				DPRINTF(ACDB_BOOTDEV,
+					("\n%s: dev_compatible: "
+						"comparing %s to %s\n",
+						dev->dv_xname, bpname,
+						dev_compat_tab[i].compat[j]));
+				if (strcmp(bpname, 
+					dev_compat_tab[i].compat[j]) == 0)
+					return (0);
+			}
+		}
+	}
+	DPRINTF(ACDB_BOOTDEV,
+		("\n%s: dev_compatible: no match\n",
+			dev->dv_xname));
+	return (1);
 }
 
 static int
@@ -1161,22 +1209,6 @@ instance_match(dev, aux, bp)
 		    bp->val[1] == pa->pa_function)
 			return (1);
 		break;
-#if 0
-	case BUSCLASS_XDC:
-	case BUSCLASS_XYC:
-		{
-		/*
-		 * XXX - x[dy]c attach args are not exported right now..
-		 * XXX   we happen to know they look like this:
-		 */
-		struct xxxx_attach_args { int driveno; } *aap = aux;
-
-		if (aap->driveno == bp->val[0])
-			return (1);
-
-		}
-		break;
-#endif
 	default:
 		break;
 	}
@@ -1229,18 +1261,20 @@ device_register(dev, aux)
 		return;
 
 	/*
-	 * Translate PROM name in case our drivers are named differently
+	 * Translate device name to device class name in case the prom uses
+	 * that.
 	 */
-	bpname = bus_compatible(bp->name, dev);
+	bpname = bp->name;
 	dvname = dev->dv_cfdata->cf_driver->cd_name;
-
 	DPRINTF(ACDB_BOOTDEV,
-	    ("\n%s: device_register: dvname %s(%s) bpname %s(%s)\n",
-	    dev->dv_xname, dvname, dev->dv_xname, bpname, bp->name));
+	    ("\n%s: device_register: dvname %s(%s) bpname %s\n",
+	    dev->dv_xname, dvname, dev->dv_xname, bpname));
 
 	/* First, match by name */
-	if (strcmp(dvname, bpname) != 0)
-		return;
+	if (strcmp(dvname, bpname) != 0) {
+		if (dev_compatible(dev, aux, bpname) != 0)
+			return;
+	}
 
 	if (bus_class(dev) != BUSCLASS_NONE) {
 		/*
@@ -1257,7 +1291,7 @@ device_register(dev, aux)
 	} else if (strcmp(dvname, "le") == 0 ||
 		   strcmp(dvname, "hme") == 0) {
 		/*
-		 * ethernet devices: LANCE, Happy Meal Ethernet.
+		 * ethernet devices.
 		 */
 		if (instance_match(dev, aux, bp) != 0) {
 			nail_bootdev(dev, bp);
@@ -1274,7 +1308,7 @@ device_register(dev, aux)
 		 * correct controller in our boot path.
 		 */
 		struct scsipibus_attach_args *sa = aux;
-		struct scsipi_link *sc_link = sa->sa_sc_link;
+		struct scsipi_periph *periph = sa->sa_periph;
 		struct scsibus_softc *sbsc =
 			(struct scsibus_softc *)dev->dv_parent;
 		u_int target = bp->val[0];
@@ -1287,33 +1321,25 @@ device_register(dev, aux)
 		/*
 		 * Bounds check: we know the target and lun widths.
 		 */
-		if (target > sc_link->scsipi_scsi.max_target ||
-		    lun > sc_link->scsipi_scsi.max_lun) {
+		if (target >= periph->periph_channel->chan_ntargets ||
+		    lun >= periph->periph_channel->chan_nluns) {
 			printf("SCSI disk bootpath component not accepted: "
 			       "target %u; lun %u\n", target, lun);
 			return;
 		}
 
-		if (sc_link->scsipi_scsi.target == target &&
-		    sc_link->scsipi_scsi.lun == lun) {
+		if (periph->periph_target == target &&
+		    periph->periph_lun == lun) {
 			nail_bootdev(dev, bp);
 			DPRINTF(ACDB_BOOTDEV, ("\t-- found [cs]d disk %s\n",
 			    dev->dv_xname));
 			return;
 		}
-	} else if (strcmp("xd", dvname) == 0 || strcmp("xy", dvname) == 0) {
-		/* A Xylogic disk */
-		if (instance_match(dev, aux, bp) != 0) {
-			nail_bootdev(dev, bp);
-			DPRINTF(ACDB_BOOTDEV, ("\t-- found x[yd] disk %s\n",
-			    dev->dv_xname));
-			return;
-		}
 	} else if (strcmp("wd", dvname) == 0) {
 		/* IDE disks. */
-		struct ata_atapi_attach *aa = aux;
+		struct ata_device *adev = aux;
 
-		if (aa->aa_channel == bp->val[0]) {
+		if (adev->adev_channel == bp->val[0]) {
 			nail_bootdev(dev, bp);
 			DPRINTF(ACDB_BOOTDEV, ("\t-- found wd disk %s\n",
 			    dev->dv_xname));

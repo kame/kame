@@ -1,7 +1,7 @@
-/*	$NetBSD: pchb.c,v 1.18.4.4 2002/03/20 22:36:36 he Exp $	*/
+/*	$NetBSD: pchb.c,v 1.33.4.1 2002/06/21 16:30:45 lukem Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pchb.c,v 1.33.4.1 2002/06/21 16:30:45 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,6 +51,13 @@
 
 #include <dev/pci/pcidevs.h>
 
+#include <dev/pci/agpreg.h>
+#include <dev/pci/agpvar.h>
+
+#include <arch/i386/pci/pchbvar.h>
+
+#include "rnd.h"
+
 #define PCISET_BRIDGETYPE_MASK	0x3
 #define PCISET_TYPE_COMPAT	0x1
 #define PCISET_TYPE_AUX		0x2
@@ -55,6 +65,9 @@
 #define PCISET_BUSCONFIG_REG	0x48
 #define PCISET_BRIDGE_NUMBER(reg)	(((reg) >> 8) & 0xff)
 #define PCISET_PCI_BUS_NUMBER(reg)	(((reg) >> 16) & 0xff)
+
+/* XXX should be in dev/ic/i82443reg.h */
+#define	I82443BX_SDRAMC_REG	0x76
 
 /* XXX should be in dev/ic/i82424{reg.var}.h */
 #define I82424_CPU_BCTL_REG		0x53
@@ -69,16 +82,14 @@ int	pchbmatch __P((struct device *, struct cfdata *, void *));
 void	pchbattach __P((struct device *, struct device *, void *));
 
 int	pchb_print __P((void *, const char *));
+int	agp_print __P((void *, const char *));
 
 struct cfattach pchb_ca = {
-	sizeof(struct device), pchbmatch, pchbattach
+	sizeof(struct pchb_softc), pchbmatch, pchbattach
 };
 
 int
-pchbmatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+pchbmatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct pci_attach_args *pa = aux;
 
@@ -91,20 +102,23 @@ pchbmatch(parent, match, aux)
 }
 
 void
-pchbattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+pchbattach(struct device *parent, struct device *self, void *aux)
 {
+#if NRND > 0
+	struct pchb_softc *sc = (void *) self;
+#endif
 	struct pci_attach_args *pa = aux;
 	char devinfo[256];
 	struct pcibus_attach_args pba;
+	struct agpbus_attach_args apa;
 	pcireg_t bcreg;
 	u_char bdnum, pbnum;
 	pcitag_t tag;
-	int doattach, attachflags;
+	int doattach, attachflags, has_agp;
 
 	printf("\n");
 	doattach = 0;
+	has_agp = 0;
 	attachflags = pa->pa_flags;
 
 	/*
@@ -116,7 +130,7 @@ pchbattach(parent, self, aux)
 	printf("%s: %s (rev. 0x%02x)\n", self->dv_xname, devinfo,
 	    PCI_REVISION(pa->pa_class));
 	switch (PCI_VENDOR(pa->pa_id)) {
-	case PCI_VENDOR_PEQUR:
+	case PCI_VENDOR_SERVERWORKS:
 		pbnum = pci_conf_read(pa->pa_pc, pa->pa_tag, 0x44) & 0xff;
 
 		if (pbnum == 0)
@@ -128,10 +142,10 @@ pchbattach(parent, self, aux)
 		 */
 		doattach = 1;
 		switch (PCI_PRODUCT(pa->pa_id)) {
-		case PCI_PRODUCT_PEQUR_XX5:
-		case PCI_PRODUCT_PEQUR_CNB20HE:
-		case PCI_PRODUCT_PEQUR_CNB20LE:
-		case PCI_PRODUCT_PEQUR_CIOB20:
+		case PCI_PRODUCT_SERVERWORKS_XX5:
+		case PCI_PRODUCT_SERVERWORKS_CNB20HE:
+		case PCI_PRODUCT_SERVERWORKS_CNB20LE:
+		case PCI_PRODUCT_SERVERWORKS_CIOB20:
 			if ((attachflags &
 			    (PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED)) ==
 			    PCI_FLAGS_MEM_ENABLED)
@@ -142,6 +156,36 @@ pchbattach(parent, self, aux)
 
 	case PCI_VENDOR_INTEL:
 		switch (PCI_PRODUCT(pa->pa_id)) {
+		case PCI_PRODUCT_INTEL_82452_PB:
+			bcreg = pci_conf_read(pa->pa_pc, pa->pa_tag, 0x40);
+			pbnum = PCISET_BRIDGE_NUMBER(bcreg);
+			if (pbnum != 0xff) {
+				pbnum++;
+				doattach = 1;
+			}
+			break;
+		case PCI_PRODUCT_INTEL_82443BX_AGP:
+		case PCI_PRODUCT_INTEL_82443BX_NOAGP:
+			/*
+			 * BIOS BUG WORKAROUND!  The 82443BX
+			 * datasheet indicates that the only
+			 * legal setting for the "Idle/Pipeline
+			 * DRAM Leadoff Timing (IPLDT)" parameter
+			 * (bits 9:8) is 01.  Unfortunately, some
+			 * BIOSs do not set these bits properly.
+			 */
+			bcreg = pci_conf_read(pa->pa_pc, pa->pa_tag,
+			    I82443BX_SDRAMC_REG);
+			if ((bcreg & 0x0300) != 0x0100) {
+				printf("%s: fixing Idle/Pipeline DRAM "
+				    "Leadoff Timing\n", self->dv_xname);
+				bcreg &= ~0x0300;
+				bcreg |=  0x0100;
+				pci_conf_write(pa->pa_pc, pa->pa_tag,
+				    I82443BX_SDRAMC_REG, bcreg);
+			}
+			break;
+
 		case PCI_PRODUCT_INTEL_PCI450_PB:
 			bcreg = pci_conf_read(pa->pa_pc, pa->pa_tag,
 					      PCISET_BUSCONFIG_REG);
@@ -221,8 +265,44 @@ pchbattach(parent, self, aux)
 			if (pbnum != 0)
 				doattach = 1;
 			break;
+
+		case PCI_PRODUCT_INTEL_82810_MCH:
+		case PCI_PRODUCT_INTEL_82810_DC100_MCH:
+		case PCI_PRODUCT_INTEL_82810E_MCH:
+		case PCI_PRODUCT_INTEL_82815_FULL_HUB:
+		case PCI_PRODUCT_INTEL_82830MP_IO_1:
+			/*
+			 * The host bridge is either in GFX mode (internal
+			 * graphics) or in AGP mode. In GFX mode, we pretend
+			 * to have AGP because the graphics memory access
+			 * is very similar and the AGP GATT code will
+			 * deal with this. In the latter case, the
+			 * pci_get_capability(PCI_CAP_AGP) test below will
+			 * fire, so we do no harm by already setting the flag.
+			 */
+			has_agp = 1;
+			break;
 		}
 		break;
+	}
+
+#if NRND > 0
+	/*
+	 * Attach a random number generator, if there is one.
+	 */
+	pchb_attach_rnd(sc, pa);
+#endif
+
+	/*
+	 * If we haven't detected AGP yet (via a product ID),
+	 * then check for AGP capability on the device.
+	 */
+	if (has_agp ||
+	    pci_get_capability(pa->pa_pc, pa->pa_tag, PCI_CAP_AGP,
+			       NULL, NULL) != 0) {
+		apa.apa_busname = "agp";
+		apa.apa_pci_args = *pa;
+		config_found(self, &apa, agp_print);
 	}
 
 	if (doattach) {
@@ -231,6 +311,7 @@ pchbattach(parent, self, aux)
 		pba.pba_memt = pa->pa_memt;
 		pba.pba_dmat = pa->pa_dmat;
 		pba.pba_bus = pbnum;
+		pba.pba_bridgetag = NULL;
 		pba.pba_flags = attachflags;
 		pba.pba_pc = pa->pa_pc;
 		config_found(self, &pba, pchb_print);
@@ -238,14 +319,21 @@ pchbattach(parent, self, aux)
 }
 
 int
-pchb_print(aux, pnp)
-	void *aux;
-	const char *pnp;
+pchb_print(void *aux, const char *pnp)
 {
 	struct pcibus_attach_args *pba = aux;
 
 	if (pnp)
 		printf("%s at %s", pba->pba_busname, pnp);
 	printf(" bus %d", pba->pba_bus);
+	return (UNCONF);
+}
+
+int
+agp_print(void *aux, const char *pnp)
+{
+	struct agpbus_attach_args *apa = aux;
+	if (pnp)
+		printf("%s at %s", apa->apa_busname, pnp);
 	return (UNCONF);
 }

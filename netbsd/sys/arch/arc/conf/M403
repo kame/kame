@@ -1,11 +1,16 @@
-#	$NetBSD: M403,v 1.8.2.1 2000/08/10 21:55:32 soda Exp $
+#	$NetBSD: M403,v 1.21.4.1 2002/08/01 04:17:11 lukem Exp $
 #
 #	configuration file for MIPS Magnum 4000 system
 #
 
 include		"arch/arc/conf/std.arc"
 
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
 maxusers	32		# estimated number of users
+
+# Platform support
+options 	PLATFORM_MICROSOFT_JAZZ		# MIPS Magnum
 
 # Standard system options
 
@@ -21,18 +26,21 @@ options 	SYSVSHM		# System V-like memory sharing
 
 options 	LKM		# loadable kernel modules
 
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Diagnostic/debugging support options
-options 	DIAGNOSTIC	# cheap kernel consistency checks
-#options 	DEBUG		# expensive debugging checks/support
-#options 	KMEMSTATS	# kernel memory statistics (vmstat -m)
-options 	DDB		# in-kernel debugger
+options 	DIAGNOSTIC		# cheap kernel consistency checks
+#options 	DEBUG			# expensive debugging checks/support
+#options 	KMEMSTATS		# kernel memory statistics (vmstat -m)
+options 	DDB			# in-kernel debugger
 #options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
-#options 	KGDB		# remote gdb
-#options 	KGDBRATE=19200	# kernel gdb port rate (default 9600)
-#options 	KGDBDEV="17*256+0"	# device for kernel gdb
-#makeoptions	DEBUG="-g"	# compile full symbol table
+#options 	KGDB			# remote gdb
+#options 	KGDB_DEVRATE=19200	# kernel gdb port rate (default 9600)
+#options 	KGDB_DEV="17*256+0"	# device for kernel gdb
+#makeoptions	DEBUG="-g"		# compile full symbol table
 
 # Compatibility options
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 options 	COMPAT_10	# NetBSD 1.0,
 options 	COMPAT_11	# NetBSD 1.1,
 options 	COMPAT_12	# NetBSD 1.2,
@@ -67,7 +75,7 @@ file-system 	PROCFS		# /proc
 # File system options
 options 	QUOTA		# FFS quotas
 #options 	FFS_EI		# FFS Endian Independent support
-#options 	SOFTDEP		# FFS soft updates support.
+options 	SOFTDEP		# FFS soft updates support.
 options 	NFSSERVER	# Network File System server
 #options 	EXT2FS_SYSTEM_FLAGS # makes ext2fs file flags (append and
 				# immutable) behave as system flags.
@@ -91,9 +99,7 @@ options 	PPP_DEFLATE	# Deflate compression support for PPP
 options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
 options 	PFIL_HOOKS	# pfil(9) packet filter hooks
 options 	IPFILTER_LOG	# ipmon(8) log support
-
-# Compatibility with 4.2BSD implementation of TCP/IP.  Not recommended.
-#options 	TCP_COMPAT_42
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 # These options enable verbose messages for several subsystems.
 # Warning, these may compile large string tables into the kernel!
@@ -116,33 +122,42 @@ config		netbsd	root on ? type ?
 mainbus0	at root
 cpu*		at mainbus0
 
-#### Pica bus devices
+#### Jazz-Internal bus devices
 
-pica*		at mainbus0	# ACER Pica systems local bus.
-aclock0 	at pica?
-#pc0		at pica?
-#opms0		at pica?
-vga0		at pica?	# Jazz localbus VGA
-pckbc0		at pica?	# PC keyboard controller
+# PLATFORM_ACER_PICA_61
+# PLATFORM_MICROSOFT_JAZZ
+# PLATFORM_NEC_JC94
+# PLATFORM_NEC_R94
+# PLATFORM_NEC_R96
+# PLATFORM_NEC_RAX94
+# PLATFORM_NEC_RD94
+jazzio*		at mainbus0	# Jazz-Internal bus host bridge.
+
+timer0		at jazzio?
+mcclock0 	at jazzio?
+#pc0		at jazzio?
+#opms0		at jazzio?
+pckbc0		at jazzio?	# PC keyboard controller
 options 	COM_FREQ_MAGNUM=8192000	# 8.192 MHz - NEC M403
-com0		at pica?
-com1		at pica?
-lpt0		at pica?
-sn0		at pica?
+com0		at jazzio?
+com1		at jazzio?
+lpt0		at jazzio?
+sn0		at jazzio?
 
-fdc0		at pica?
+fdc0		at jazzio?
 fd*		at fdc? drive ?
 
-asc0		at pica?
+asc0		at jazzio?			# NCR53C9x SCSI
 scsibus* 	at asc?
-
-#siop0		at pica?
-#scsibus* 	at siop?
 
 #### ISA bus devices
 
-isabr*		at mainbus0	# ISA Bus bridge (std ISA bus).
-isa*		at isabr?
+# PLATFORM_ACER_PICA_61
+# PLATFORM_MICROSOFT_JAZZ
+# PLATFORM_NEC_R94
+# PLATFORM_NEC_R96
+jazzisabr*	at mainbus0	# Jazz-(E)ISA bus bridge.
+isa*		at jazzisabr?
 
 com2		at isa? port 0x3f8 irq 4
 com3		at isa? port 0x2f8 irq 3
@@ -158,14 +173,10 @@ uk*		at scsibus? target ? lun ?
 
 #### Workstation Console attachments
 
-wsdisplay*	at vga?
-#wsdisplay*	at tga?
 pckbd*		at pckbc?	# PC keyboard (kbd port)
 wskbd*		at pckbd?
 pms*		at pckbc?	# PS/2-style mouse (aux port)
 wsmouse*	at pms?
-#pmsi*		at pckbc?	# PS/2 "Intelli"mouse (aux port)
-#wsmouse*	at pmsi?
 
 #### Pseudo devices
 
@@ -184,21 +195,22 @@ pseudo-device	sl		2	# Serial Line IP
 #pseudo-device	strip		2	# Starmode Radio IP (Metricom)
 pseudo-device	tun		2	# network tunneling over tty
 #pseudo-device	gre		2	# generic L3 over IP tunnel
-pseudo-device	ipip		2	# IP Encapsulation within IP (RFC 2003)
 pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
+pseudo-device	vlan			# IEEE 802.1q encapsulation
 
 # miscellaneous pseudo-devices
-pseudo-device	pty		64	# pseudo-terminals
+pseudo-device	pty			# pseudo-terminals
 #pseudo-device	tb		1	# tablet line discipline
 #pseudo-device	sequencer	1	# MIDI sequencer
 # rnd works; RND_COM does not on port arc yet.
 pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness as well (BROKEN)
+pseudo-device	clockctl		# user control of clock subsystem
 
 # a pseudo device needed for Coda	# also needs CODA (above)
 #pseudo-device	vcoda		4	# coda minicache <-> venus comm.
 
 # mouse & keyboard multiplexor pseudo-devices
-#pseudo-device	wsmux		2
+#pseudo-device	wsmux

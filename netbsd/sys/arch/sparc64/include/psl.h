@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.11.12.2 2000/07/31 02:11:01 mrg Exp $ */
+/*	$NetBSD: psl.h,v 1.20 2001/04/13 23:30:05 thorpej Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -47,9 +47,8 @@
 #ifndef PSR_IMPL
 
 /*
- * SPARC Process Status Register (in psl.h for hysterical raisins).
- * Of course, this register does not exist in v9, but we keep this stuff
- * in here in case we need it for compatibility w/v7 and v8.
+ * SPARC Process Status Register (in psl.h for hysterical raisins).  This
+ * doesn't exist on the V9.
  *
  * The picture in the Sun manuals looks like this:
  *	                                     1 1
@@ -60,41 +59,43 @@
  *	+-------+-------+-------+-----------+-+-+-------+-+-+-+---------+
  */
 
-#define	PSR_IMPL	0xf0000000	/* implementation */
-#define	PSR_VER		0x0f000000	/* version */
-#define	PSR_ICC		0x00f00000	/* integer condition codes */
-#define	PSR_N		0x00800000	/* negative */
-#define	PSR_Z		0x00400000	/* zero */
-#define	PSR_O		0x00200000	/* overflow */
-#define	PSR_C		0x00100000	/* carry */
-#define	PSR_EC		0x00002000	/* coprocessor enable */
-#define	PSR_EF		0x00001000	/* FP enable */
-#define	PSR_PIL		0x00000f00	/* interrupt level */
-#define	PSR_S		0x00000080	/* supervisor (kernel) mode */
-#define	PSR_PS		0x00000040	/* previous supervisor mode (traps) */
-#define	PSR_ET		0x00000020	/* trap enable */
-#define	PSR_CWP		0x0000001f	/* current window pointer */
+#define PSR_IMPL	0xf0000000	/* implementation */
+#define PSR_VER		0x0f000000	/* version */
+#define PSR_ICC		0x00f00000	/* integer condition codes */
+#define PSR_N		0x00800000	/* negative */
+#define PSR_Z		0x00400000	/* zero */
+#define PSR_O		0x00200000	/* overflow */
+#define PSR_C		0x00100000	/* carry */
+#define PSR_EC		0x00002000	/* coprocessor enable */
+#define PSR_EF		0x00001000	/* FP enable */
+#define PSR_PIL		0x00000f00	/* interrupt level */
+#define PSR_S		0x00000080	/* supervisor (kernel) mode */
+#define PSR_PS		0x00000040	/* previous supervisor mode (traps) */
+#define PSR_ET		0x00000020	/* trap enable */
+#define PSR_CWP		0x0000001f	/* current window pointer */
 
-#define	PSR_BITS "\20\16EC\15EF\10S\7PS\6ET"
+#define PSR_BITS "\20\16EC\15EF\10S\7PS\6ET"
 
 /* Interesting spl()s */
 #define PIL_SCSI	3
 #define PIL_FDSOFT	4
-#define	PIL_AUSOFT	4
+#define PIL_AUSOFT	4
 #define PIL_BIO		5
 #define PIL_VIDEO	5
-#define	PIL_TTY		6
-#define	PIL_LPT		6
-#define	PIL_NET		6
+#define PIL_TTY		6
+#define PIL_LPT		6
+#define PIL_NET		6
 #define PIL_IMP		7
-#define	PIL_CLOCK	10
+#define PIL_CLOCK	10
 #define PIL_FD		11
 #define PIL_SER		12
-#define PIL_AUD		13
+#define	PIL_AUD		13
+#define PIL_HIGH	15
+#define PIL_SCHED	PIL_CLOCK
+#define PIL_LOCK	PIL_HIGH
 
 /* 
  * SPARC V9 CCR register
- *
  */
 
 #define ICC_C	0x01L
@@ -134,7 +135,7 @@
 #define PSTATE_IE	0x002	/* interrupt enable */
 #define PSTATE_AG	0x001	/* enable alternate globals */
 
-#define	PSTATE_BITS "\20\14IG\13MG\12CLE\11TLE\10\7MM\6RED\5PEF\4AM\3PRIV\2IE\1AG"
+#define PSTATE_BITS "\20\14IG\13MG\12CLE\11TLE\10\7MM\6RED\5PEF\4AM\3PRIV\2IE\1AG"
 
 
 /*
@@ -163,6 +164,7 @@
 #define PSTATE_USER	(PSTATE_MM_TSO|PSTATE_AM|PSTATE_IE)
 #endif
 
+
 /*
  * SPARC V9 TSTATE register
  *
@@ -170,7 +172,7 @@
  *  +-----+-----+-----+--------+---+-----+
  *  | CCR | ASI |  -  | PSTATE | - | CWP |
  *  +-----+-----+-----+--------+---+-----+
- * */
+ */
 
 #define TSTATE_CWP		0x01f
 #define TSTATE_PSTATE		0x6ff00
@@ -201,7 +203,7 @@
 #define TSTATE_IE	(PSTATE_IE<<TSTATE_PSTATE_SHIFT)
 #define TSTATE_AG	(PSTATE_AG<<TSTATE_PSTATE_SHIFT)
 
-#define	TSTATE_BITS "\20\14IG\13MG\12CLE\11TLE\10\7MM\6RED\5PEF\4AM\3PRIV\2IE\1AG"
+#define TSTATE_BITS "\20\14IG\13MG\12CLE\11TLE\10\7MM\6RED\5PEF\4AM\3PRIV\2IE\1AG"
 
 #define TSTATE_KERN	((TSTATE_KERN)<<TSTATE_PSTATE_SHIFT)
 #define TSTATE_USER	((TSTATE_USER)<<TSTATE_PSTATE_SHIFT)
@@ -384,8 +386,7 @@ SPLHOLD(spllpt, PIL_LPT)
 /*
  * Memory allocation (must be as high as highest network, tty, or disk device)
  */
-SPLHOLD(splimp, PIL_IMP)
-SPLHOLD(splpmap, PIL_IMP)
+SPLHOLD(splvm, PIL_IMP)
 
 SPLHOLD(splclock, PIL_CLOCK)
 
@@ -402,7 +403,10 @@ SPLHOLD(splaudio, PIL_AUD)
 /* second sparc timer interrupts at level 14 */
 SPLHOLD(splstatclock, 14)
 
-SPLHOLD(splhigh, 15)
+SPLHOLD(splsched, PIL_SCHED)
+SPLHOLD(spllock, PIL_LOCK)
+
+SPLHOLD(splhigh, PIL_HIGH)
 
 /* splx does not have a return value */
 #ifdef SPLDEBUG
@@ -428,14 +432,15 @@ static __inline void splx(newpil)
 #define	splnet()	splnetX(__FILE__, __LINE__)
 #define	spltty()	splttyX(__FILE__, __LINE__)
 #define	spllpt()	spllptX(__FILE__, __LINE__)
-#define	splimp()	splimpX(__FILE__, __LINE__)
-#define	splpmap()	splpmapX(__FILE__, __LINE__)
+#define	splvm()		splvmX(__FILE__, __LINE__)
 #define	splclock()	splclockX(__FILE__, __LINE__)
 #define	splfd()		splfdX(__FILE__, __LINE__)
 #define	splzs()		splzsX(__FILE__, __LINE__)
 #define	splserial()	splzerialX(__FILE__, __LINE__)
 #define	splaudio()	splaudioX(__FILE__, __LINE__)
 #define	splstatclock()	splstatclockX(__FILE__, __LINE__)
+#define	splsched()	splschedX(__FILE__, __LINE__)
+#define	spllock()	spllockX(__FILE__, __LINE__)
 #define	splhigh()	splhighX(__FILE__, __LINE__)
 #define splx(x)		splxX((x),__FILE__, __LINE__)
 

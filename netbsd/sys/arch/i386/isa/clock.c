@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.65 2000/05/11 16:38:13 jdolecek Exp $	*/
+/*	$NetBSD: clock.c,v 1.70 2002/01/01 09:14:14 perry Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994 Charles M. Hannum.
@@ -85,12 +85,16 @@ NEGLIGENCE, OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/* #define CLOCKDEBUG */
-/* #define CLOCK_PARANOIA */
-
 /*
  * Primitive clock interrupt routines.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.70 2002/01/01 09:14:14 perry Exp $");
+
+/* #define CLOCKDEBUG */
+/* #define CLOCK_PARANOIA */
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -109,14 +113,14 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <i386/isa/timerreg.h>
 #include <dev/clock_subr.h>
 
-#include "pcppi.h"
-#if (NPCPPI > 0)
-#include <dev/isa/pcppivar.h>
-
 #include "mca.h"
 #if NMCA > 0
 #include <machine/mca_machdep.h>	/* for MCA_system */
 #endif
+
+#include "pcppi.h"
+#if (NPCPPI > 0)
+#include <dev/isa/pcppivar.h>
 
 #ifdef CLOCKDEBUG
 int clock_debug = 0;
@@ -182,7 +186,7 @@ static int ticks[6];
 
 /*
  * i8254 latch check routine:
- *     National Geode (formerly Cyrix MediaGX) has a sirious bug in
+ *     National Geode (formerly Cyrix MediaGX) has a serious bug in
  *     its built-in i8254-compatible clock module.
  *     Set the variable 'clock_broken_latch' to indicate it.
  *     XXX check only cpu_id
@@ -641,6 +645,31 @@ cmoscheck()
 			  + mc146818_read(NULL, 0x2f));
 }
 
+#if NMCA > 0
+/*
+ * Check whether the CMOS layout is PS/2 like, to be called at splclock().
+ */
+static int cmoscheckps2 __P((void));
+static int
+cmoscheckps2()
+{
+#if 0
+	/* Disabled until I find out the CRC checksum algorithm IBM uses */
+	int i;
+	unsigned short cksum = 0;
+
+	for (i = 0x10; i <= 0x31; i++)
+		cksum += mc146818_read(NULL, i); /* XXX softc */
+
+	return (cksum == (mc146818_read(NULL, 0x32) << 8)
+			  + mc146818_read(NULL, 0x33));
+#else
+	/* Check 'incorrect checksum' bit of IBM PS/2 Diagnostic Status Byte */
+	return ((mc146818_read(NULL, NVRAM_DIAG) & (1<<6)) == 0);
+#endif
+}
+#endif /* NMCA > 0 */
+
 /*
  * patchable to control century byte handling:
  * 1: always update
@@ -654,6 +683,7 @@ int rtc_update_century = 0;
  * into full width.
  * Being here, deal with the CMOS century byte.
  */
+static int centb = NVRAM_CENTURY;
 static int clock_expandyear __P((int));
 static int
 clock_expandyear(clockyear)
@@ -670,6 +700,10 @@ clock_expandyear(clockyear)
 	s = splclock();
 	if (cmoscheck())
 		cmoscentury = mc146818_read(NULL, NVRAM_CENTURY);
+#if NMCA > 0
+	else if (MCA_system && cmoscheckps2())
+		cmoscentury = mc146818_read(NULL, (centb = 0x37));
+#endif
 	else
 		cmoscentury = 0;
 	splx(s);
@@ -693,8 +727,7 @@ clock_expandyear(clockyear)
 			printf("WARNING: Setting NVRAM century to %d\n",
 			       clockcentury);
 			s = splclock();
-			mc146818_write(NULL, NVRAM_CENTURY,
-				       bintobcd(clockcentury));
+			mc146818_write(NULL, centb, bintobcd(clockcentury));
 			splx(s);
 		}
 	} else if (cmoscentury == 19 && rtc_update_century == 0)
@@ -716,17 +749,24 @@ inittodr(base)
 	int s;
 
 	/*
-	 * We mostly ignore the suggested time and go for the RTC clock time
-	 * stored in the CMOS RAM.  If the time can't be obtained from the
-	 * CMOS, or if the time obtained from the CMOS is 5 or more years
-	 * less than the suggested time, we used the suggested time.  (In
-	 * the latter case, it's likely that the CMOS battery has died.)
+	 * We mostly ignore the suggested time (which comes from the
+	 * file system) and go for the RTC clock time stored in the
+	 * CMOS RAM.  If the time can't be obtained from the CMOS, or
+	 * if the time obtained from the CMOS is 5 or more years less
+	 * than the suggested time, we used the suggested time.  (In
+	 * the latter case, it's likely that the CMOS battery has
+	 * died.)
 	 */
 
-	if (base < 25*SECYR) {	/* if before 1995, something's odd... */
+	/*
+	 * XXX Traditionally, the dates in this code snippet get
+	 * updated every few years. It would be neater if they could
+	 * somehow be automatically set when the kernel was built.
+	 */
+	if (base && base < 30*SECYR) {	/* if before 2000, something's odd. */
 		printf("WARNING: preposterous time in file system\n");
-		/* read the system clock anyway */
-		base = 27*SECYR + 186*SECDAY + SECDAY/2;
+		/* Since the fs time is silly, set the base time to 2002 */
+		base = 32*SECYR;
 	}
 
 	s = splclock();
@@ -773,7 +813,7 @@ inittodr(base)
 	printf("readclock: %ld (%ld)\n", time.tv_sec, base);
 #endif
 
-	if (base < time.tv_sec - 5*SECYR)
+	if (base != 0 && base < time.tv_sec - 5*SECYR)
 		printf("WARNING: file system time much less than clock time\n");
 	else if (base > time.tv_sec + 5*SECYR) {
 		printf("WARNING: clock time much less than file system time\n");
@@ -831,7 +871,7 @@ resettodr()
 	rtcput(&rtclk);
 	if (rtc_update_century > 0) {
 		century = bintobcd(dt.dt_year / 100);
-		mc146818_write(NULL, NVRAM_CENTURY, century); /* XXX softc */
+		mc146818_write(NULL, centb, century); /* XXX softc */
 	}
 	splx(s);
 }

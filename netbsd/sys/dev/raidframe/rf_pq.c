@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_pq.c,v 1.7 2000/01/07 03:41:02 oster Exp $	*/
+/*	$NetBSD: rf_pq.c,v 1.11 2001/11/13 07:11:16 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -30,8 +30,15 @@
  * Code for RAID level 6 (P + Q) disk array architecture.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_pq.c,v 1.11 2001/11/13 07:11:16 lukem Exp $");
+
 #include "rf_archs.h"
-#include "rf_types.h"
+
+#if (RF_INCLUDE_DECL_PQ > 0) || (RF_INCLUDE_RAID6 > 0) || (RF_INCLUDE_EVENODD > 0)
+
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_raid.h"
 #include "rf_dag.h"
 #include "rf_dagffrd.h"
@@ -79,6 +86,7 @@ rf_RegularPFunc(node)
 {
 	return (rf_RegularXorFunc(node));
 }
+#endif /* (RF_INCLUDE_DECL_PQ > 0) || (RF_INCLUDE_RAID6 > 0) || (RF_INCLUDE_EVENODD > 0) */
 #if (RF_INCLUDE_DECL_PQ > 0) || (RF_INCLUDE_RAID6 > 0)
 
 static void 
@@ -752,7 +760,7 @@ QDelta(
 #ifdef _KERNEL
 	/* PQ in kernel currently not supported because the encoding/decoding
 	 * table is not present */
-	bzero(dest, length);
+	memset(dest, 0, length);
 #else				/* KERNEL */
 	/* this code probably doesn't work and should be rewritten  -wvcii */
 	/* 13 5 bit quants in a 64 bit word */

@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_debug.c,v 1.10.4.1 2000/09/14 18:50:18 perseant Exp $	*/
+/*	$NetBSD: lfs_debug.c,v 1.16 2002/05/14 20:03:53 perseant Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,20 +71,51 @@
  */
 
 #ifdef DEBUG
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lfs_debug.c,v 1.16 2002/05/14 20:03:53 perseant Exp $");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
+#include <sys/buf.h>
 
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/lfs/lfs.h>
 #include <ufs/lfs/lfs_extern.h>
 
+int lfs_lognum;
+struct lfs_log_entry lfs_log[LFS_LOGLENGTH];
+
+int lfs_bwrite_log(struct buf *bp, char *file, int line)
+{
+        struct vop_bwrite_args a;
+        a.a_desc = VDESC(vop_bwrite);
+        a.a_bp = bp;
+
+	if (!(bp->b_flags & (B_DELWRI | B_GATHERED)))
+		LFS_ENTER_LOG("write", file, line, bp->b_lblkno, bp->b_flags);
+        return (VCALL(bp->b_vp, VOFFSET(vop_bwrite), &a));
+}
+
+void lfs_dumplog(void)
+{
+	int i;
+
+	for (i = lfs_lognum; i != (lfs_lognum - 1) % LFS_LOGLENGTH; i = (i + 1) % LFS_LOGLENGTH)
+		if (lfs_log[i].file) {
+			printf("lbn %d %s %lx %d %s\n",
+				lfs_log[i].block,
+				lfs_log[i].op,
+				lfs_log[i].flags,
+				lfs_log[i].line,
+				lfs_log[i].file + 56);
+		}
+}
+
 void 
-lfs_dump_super(lfsp)
-	struct lfs *lfsp;
+lfs_dump_super(struct lfs *lfsp)
 {
 	int i;
 	
@@ -146,12 +177,11 @@ lfs_dump_super(lfsp)
 	       "nextseg	 ", lfsp->lfs_nextseg,
 	       "curseg	 ", lfsp->lfs_curseg,
 	       "offset	 ", lfsp->lfs_offset);
-	printf("tstamp	 %x\n", lfsp->lfs_tstamp);
+	printf("tstamp	 %llx\n", (long long)lfsp->lfs_tstamp);
 }
 
 void
-lfs_dump_dinode(dip)
-	struct dinode *dip;
+lfs_dump_dinode(struct dinode *dip)
 {
 	int i;
 	
@@ -182,10 +212,10 @@ lfs_check_segsum(struct lfs *fs, struct segment *sp, char *file, int line)
 	static int offset; 
 #endif
 	
-	if((actual = i = 1) == 1)
+	if ((actual = i = 1) == 1)
 		return; /* XXXX not checking this anymore, really */
 	
-	if(sp->sum_bytes_left >= sizeof(FINFO) - sizeof(ufs_daddr_t)
+	if (sp->sum_bytes_left >= sizeof(FINFO) - sizeof(ufs_daddr_t)
 	   && sp->fip->fi_nblocks > 512) {
 		printf("%s:%d: fi_nblocks = %d\n",file,line,sp->fip->fi_nblocks);
 #ifdef DDB
@@ -193,19 +223,19 @@ lfs_check_segsum(struct lfs *fs, struct segment *sp, char *file, int line)
 #endif
 	}
 	
-	if(sp->sum_bytes_left > 484) {
+	if (sp->sum_bytes_left > 484) {
 		printf("%s:%d: bad value (%d = -%d) for sum_bytes_left\n",
-		       file, line, sp->sum_bytes_left, LFS_SUMMARY_SIZE-sp->sum_bytes_left);
+		       file, line, sp->sum_bytes_left, fs->lfs_sumsize-sp->sum_bytes_left);
 		panic("too many bytes");
 	}
 	
-	actual = LFS_SUMMARY_SIZE
+	actual = fs->lfs_sumsize
 		/* amount taken up by FINFOs */
 		- ((char *)&(sp->fip->fi_blocks[sp->fip->fi_nblocks]) - (char *)(sp->segsum))
 			/* amount taken up by inode blocks */
 			- sizeof(ufs_daddr_t)*((sp->ninodes+INOPB(fs)-1) / INOPB(fs));
 #if 0
-	if(actual - sp->sum_bytes_left < offset) 
+	if (actual - sp->sum_bytes_left < offset) 
 	{  
 		printf("%s:%d: offset changed %d -> %d\n", file, line,
 		       offset, actual-sp->sum_bytes_left);
@@ -214,19 +244,19 @@ lfs_check_segsum(struct lfs *fs, struct segment *sp, char *file, int line)
 	}
 #endif
 #if 0
-	if(actual != sp->sum_bytes_left)
+	if (actual != sp->sum_bytes_left)
 		printf("%s:%d: warning: segsum miscalc at %d (-%d => %d)\n",
 		       file, line, sp->sum_bytes_left,
-		       LFS_SUMMARY_SIZE-sp->sum_bytes_left,
+		       fs->lfs_sumsize-sp->sum_bytes_left,
 		       actual);
 #endif
-	if(sp->sum_bytes_left > 0
-	   && ((char *)(sp->segsum))[LFS_SUMMARY_SIZE
+	if (sp->sum_bytes_left > 0
+	   && ((char *)(sp->segsum))[fs->lfs_sumsize
 				     - sizeof(ufs_daddr_t) * ((sp->ninodes+INOPB(fs)-1) / INOPB(fs))
 				     - sp->sum_bytes_left] != '\0') {
 		printf("%s:%d: warning: segsum overwrite at %d (-%d => %d)\n",
 		       file, line, sp->sum_bytes_left,
-		       LFS_SUMMARY_SIZE-sp->sum_bytes_left,
+		       fs->lfs_sumsize-sp->sum_bytes_left,
 		       actual);
 #ifdef DDB
 		Debugger();
@@ -235,11 +265,7 @@ lfs_check_segsum(struct lfs *fs, struct segment *sp, char *file, int line)
 }
 
 void
-lfs_check_bpp(fs, sp, file, line)
-	struct lfs *fs;
-	struct segment *sp;
-	char *file;
-	int line;
+lfs_check_bpp(struct lfs *fs, struct segment *sp, char *file, int line)
 {
 	daddr_t blkno;
 	struct buf **bpp;
@@ -247,9 +273,9 @@ lfs_check_bpp(fs, sp, file, line)
 	
 	devvp = VTOI(fs->lfs_ivnode)->i_devvp;
 	blkno = (*(sp->bpp))->b_blkno;
-	for(bpp=sp->bpp; bpp < sp->cbpp; bpp++) {
-		if((*bpp)->b_blkno != blkno) {
-			if((*bpp)->b_vp == devvp) {
+	for (bpp = sp->bpp; bpp < sp->cbpp; bpp++) {
+		if ((*bpp)->b_blkno != blkno) {
+			if ((*bpp)->b_vp == devvp) {
 				printf("Oops, would misplace raw block 0x%x at "
 				       "0x%x\n",
 				       (*bpp)->b_blkno,
@@ -263,7 +289,7 @@ lfs_check_bpp(fs, sp, file, line)
 				       (*bpp)->b_blkno);
 			}
 		}
-		blkno += btodb((*bpp)->b_bcount);
+		blkno += fsbtodb(fs, btofsb(fs, (*bpp)->b_bcount));
 	}
 }
 #endif /* DEBUG */

@@ -1,4 +1,4 @@
-/*	$NetBSD: multicpu.c,v 1.2 2000/06/11 07:50:12 ragge Exp $	*/
+/*	$NetBSD: multicpu.c,v 1.9 2001/06/04 21:37:11 ragge Exp $	*/
 
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
@@ -43,12 +43,14 @@
 #include <sys/user.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/vm_page.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
+#include <machine/../vax/gencons.h>
 
 #include "ioconf.h"
+
+struct cpu_mp_dep *mp_dep_call;
 
 static	void slaverun(void);
 
@@ -69,7 +71,7 @@ cpu_boot_secondary_processors()
 
 	while ((q = SIMPLEQ_FIRST(&cpuq))) {
 		SIMPLEQ_REMOVE_HEAD(&cpuq, q, cq_q);
-		(*dep_call->cpu_startslave)(q->cq_dev, q->cq_ci);
+		(*mp_dep_call->cpu_startslave)(q->cq_dev, q->cq_ci);
 		free(q, M_TEMP);
 	}
 }
@@ -79,9 +81,10 @@ cpu_boot_secondary_processors()
  * struct and fill it in and prepare for getting started by 
  * cpu_boot_secondary_processors().
  */
-struct cpu_info *
+void
 cpu_slavesetup(struct device *dev)
 {
+	struct cpu_mp_softc *sc = (struct cpu_mp_softc *)dev;
 	struct cpuq *cq;
 	struct cpu_info *ci;
 	struct pglist mlist;
@@ -116,8 +119,7 @@ cpu_slavesetup(struct device *dev)
 	scratch = VM_PAGE_TO_PHYS(pg) | KERNBASE;
 
 	/* Populate the PCB and the cpu_info struct */
-	ci = (struct cpu_info *)(scratch + VAX_NBPG);
-	memset(ci, 0, sizeof(struct cpu_info));
+	ci = &sc->sc_ci;
 	ci->ci_dev = dev;
 	ci->ci_exit = scratch;
 	(u_long)ci->ci_pcb = (u_long)pcb & ~KERNBASE;
@@ -134,16 +136,96 @@ cpu_slavesetup(struct device *dev)
 	cq->cq_ci = ci;
 	cq->cq_dev = dev;
 	SIMPLEQ_INSERT_TAIL(&cpuq, cq, cq_q);
-	return ci;
 }
+
+volatile int sta;
 
 void
 slaverun()
 {
 	struct cpu_info *ci = curcpu();
 
-	(volatile)ci->ci_flags |= CI_RUNNING;
+	((volatile struct cpu_info *)ci)->ci_flags |= CI_RUNNING;
+	cpu_send_ipi(IPI_DEST_MASTER, IPI_RUNNING);
 	printf("%s: running\n", ci->ci_dev->dv_xname);
-	for (;;)
+	while (sta != ci->ci_dev->dv_unit)
 		;
+	splsched();
+	sched_lock_idle();
+	cpu_switch(0);
+}
+
+/*
+ * Send an IPI of type type to the CPU with logical device number cpu.
+ */
+void
+cpu_send_ipi(int cpu, int type)
+{
+	struct cpu_mp_softc *sc;
+	int i;
+
+	if (cpu >= 0) {
+		sc = cpu_cd.cd_devs[cpu];
+		bbssi(type, &sc->sc_ci.ci_ipimsgs);
+		(*mp_dep_call->cpu_send_ipi)(&sc->sc_dev);
+		return;
+	}
+
+	for (i = 0; i < cpu_cd.cd_ndevs; i++) {
+		sc = cpu_cd.cd_devs[i];
+		if (sc == NULL)
+			continue;
+		switch (cpu) {
+		case IPI_DEST_MASTER:
+			if (sc->sc_ci.ci_flags & CI_MASTERCPU) {
+				bbssi(type, &sc->sc_ci.ci_ipimsgs);
+				(*mp_dep_call->cpu_send_ipi)(&sc->sc_dev);
+			}
+			break;
+		case IPI_DEST_ALL:
+			if (i == cpu_number())
+				continue;	/* No IPI to myself */
+			bbssi(type, &sc->sc_ci.ci_ipimsgs);
+			(*mp_dep_call->cpu_send_ipi)(&sc->sc_dev);
+			break;
+		}
+	}
+}
+
+void
+cpu_handle_ipi()
+{
+	struct cpu_info *ci = curcpu();
+	int bitno;
+
+	while ((bitno = ffs(ci->ci_ipimsgs))) {
+		bitno -= 1; /* ffs() starts from 1 */
+		bbcci(bitno, &ci->ci_ipimsgs);
+		switch (bitno) {
+		case IPI_START_CNTX:
+#ifdef DIAGNOSTIC
+			if (CPU_IS_PRIMARY(ci) == 0)
+				panic("cpu_handle_ipi");
+#endif
+			gencnstarttx();
+			break;
+		case IPI_SEND_CNCHAR:
+#ifdef DIAGNOSTIC
+			if (CPU_IS_PRIMARY(ci) == 0)
+				panic("cpu_handle_ipi2");
+#endif
+			(*mp_dep_call->cpu_cnintr)();
+			break;
+		case IPI_RUNNING:
+			break;
+		case IPI_TBIA:
+			mtpr(0, PR_TBIA);
+			break;
+		case IPI_DDB:
+			Debugger();
+			break;
+		default:
+			panic("cpu_handle_ipi: bad bit %x\n", bitno);
+		}
+	}
 }

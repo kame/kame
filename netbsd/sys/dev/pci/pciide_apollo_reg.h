@@ -1,4 +1,4 @@
-/*	$NetBSD: pciide_apollo_reg.h,v 1.6.4.2 2001/05/15 20:53:17 he Exp $	*/
+/*	$NetBSD: pciide_apollo_reg.h,v 1.11 2002/04/23 20:41:17 bouyer Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -13,8 +13,7 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *	This product includes software developed by Manuel Bouyer.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -90,8 +89,14 @@
 	(((1 - (channel)) << 4) + ((1 - (drive)) << 3)))
 #define APO_UDMA_CLK66(channel) (0x08 << ((1 - (channel)) << 4))
 
-static int8_t apollo_udma100_tim[] = {0x0f, 0x07, 0x04, 0x02, 0x01, 0x00}; /* XXX check modes others than 2, 4, 5 */
-static int8_t apollo_udma66_tim[] = {0x03, 0x03, 0x02, 0x01, 0x00};
-static int8_t apollo_udma33_tim[] = {0x03, 0x02, 0x00};
-static int8_t apollo_pio_set[] = {0x0a, 0x0a, 0x0a, 0x02, 0x02};
-static int8_t apollo_pio_rec[] = {0x08, 0x08, 0x08, 0x02, 0x00};
+static const int8_t apollo_udma100_tim[] __attribute__((__unused__)) =
+    /* XXX Check modes other than 2, 4, 5 */
+    {0x0f, 0x07, 0x04, 0x02, 0x01, 0x00};
+static const int8_t apollo_udma66_tim[] __attribute__((__unused__)) =
+    {0x03, 0x03, 0x02, 0x01, 0x00};
+static const int8_t apollo_udma33_tim[] __attribute__((__unused__)) =
+    {0x03, 0x02, 0x00};
+static const int8_t apollo_pio_set[] __attribute__((__unused__)) =
+    {0x0a, 0x0a, 0x0a, 0x02, 0x02};
+static const int8_t apollo_pio_rec[] __attribute__((__unused__)) =
+    {0x08, 0x08, 0x08, 0x02, 0x00};

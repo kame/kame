@@ -1,4 +1,4 @@
-/*	$NetBSD: neo.c,v 1.8.2.1 2001/05/06 14:39:36 he Exp $	*/
+/*	$NetBSD: neo.c,v 1.12 2002/04/15 04:13:25 simonb Exp $	*/
 
 /*
  * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
@@ -30,6 +30,9 @@
  * FreeBSD: src/sys/dev/sound/pci/neomagic.c,v 1.8 2000/03/20 15:30:50 cg Exp
  * OpenBSD: neo.c,v 1.4 2000/07/19 09:04:37 csapuntz Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: neo.c,v 1.12 2002/04/15 04:13:25 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,7 +74,7 @@
  * Most Neomagic audio chips use the AC-97 codec interface. However, there 
  * seem to be a select few chips 256AV chips that do not support AC-97.
  * This driver does not support them but there are rumors that it
- * mgiht work with wss isa drivers. This might require some playing around
+ * might work with wss isa drivers. This might require some playing around
  * with your BIOS.
  *
  * The Neomagic 256 AV/ZX have 2 PCI I/O region descriptors. Both of
@@ -92,7 +95,7 @@
  * Also, writes to the AC-97 register space may take order 40us to
  * complete.
  *
- * Unlike many sound engines, the Neomagic does not support (as fas as
+ * Unlike many sound engines, the Neomagic does not support (as far as
  * we know :) the notion of interrupting every n bytes transferred,
  * unlike many DMA engines.  Instead, it allows you to specify one
  * location in each ring buffer (called the watermark). When the chip
@@ -258,6 +261,7 @@ struct audio_hw_if neo_hw_if = {
 	neo_get_props,
 	neo_trigger_output,
 	neo_trigger_input,
+	NULL,
 };
 
 /* -------------------------------------------------------------------- */
@@ -573,8 +577,7 @@ neo_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->dev.dv_xname);
 		return;
 	}
@@ -1019,8 +1022,6 @@ neo_mappage(void *addr, void *mem, off_t off, int prot)
 	vaddr_t v = (vaddr_t) mem;
 	bus_addr_t pciaddr;
 
-	/* XXX Need new mapping code. */
-
 	if (v == sc->pbuf_vaddr)
 		pciaddr = sc->pbuf_pciaddr;
 	else if (v == sc->rbuf_vaddr)
@@ -1028,11 +1029,8 @@ neo_mappage(void *addr, void *mem, off_t off, int prot)
 	else
 		return (-1);
 
-#ifdef __i386__
-	return (i386_btop(pciaddr + off));
-#else
-	return (-1);
-#endif
+	return (bus_space_mmap(sc->bufiot, pciaddr, off, prot,
+	    BUS_SPACE_MAP_LINEAR));
 }
 
 int

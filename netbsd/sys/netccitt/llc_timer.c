@@ -1,4 +1,4 @@
-/*	$NetBSD: llc_timer.c,v 1.5 2000/03/30 13:53:34 augustss Exp $	*/
+/*	$NetBSD: llc_timer.c,v 1.7 2001/11/13 00:12:58 lukem Exp $	*/
 
 /* 
  * Copyright (c) 1990, 1991, 1992
@@ -41,6 +41,9 @@
  *
  *	@(#)llc_timer.c	8.1 (Berkeley) 6/10/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: llc_timer.c,v 1.7 2001/11/13 00:12:58 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,7 +89,7 @@ llc_timer()
 	struct llc_linkcb *nlinkp;
 	int timer;
 	int action;
-	int s = splimp();
+	int s = splnet();
 
 	/*
 	 * All links are accessible over the doubly linked list llccb_q

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcivar.h,v 1.42.4.1 2001/05/15 21:00:17 he Exp $	*/
+/*	$NetBSD: pcivar.h,v 1.51 2002/05/18 21:40:41 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -41,6 +41,7 @@
  * provided by pci_machdep.h.
  */
 
+#include <sys/device.h>
 #include <machine/bus.h>
 #include <dev/pci/pcireg.h>
 
@@ -49,7 +50,9 @@
  */
 typedef u_int32_t pcireg_t;		/* configuration space register XXX */
 struct pcibus_attach_args;
+struct pci_softc;
 
+#ifdef _KERNEL
 /*
  * Machine-dependent definitions.
  */
@@ -67,6 +70,12 @@ struct pcibus_attach_args {
 	int		pba_flags;	/* flags; see below */
 
 	int		pba_bus;	/* PCI bus number */
+
+	/*
+	 * Pointer to the pcitag of our parent bridge.  If there is no
+	 * parent bridge, then we assume we are a root bus.
+	 */
+	pcitag_t	*pba_bridgetag;
 
 	/*
 	 * Interrupt swizzling information.  These fields
@@ -104,6 +113,7 @@ struct pci_attach_args {
 	pcitag_t	pa_intrtag;	/* intr. appears to come from here */
 	pci_intr_pin_t	pa_intrpin;	/* intr. appears on this pin */
 	pci_intr_line_t	pa_intrline;	/* intr. routing information */
+	pci_intr_pin_t  pa_rawintrpin; 	/* unswizzled pin */
 };
 
 /*
@@ -134,6 +144,20 @@ struct pci_quirkdata {
 #define	PCI_QUIRK_MULTIFUNCTION		1
 
 #include "locators.h"
+
+struct pci_softc {
+	struct device sc_dev;
+	bus_space_tag_t sc_iot, sc_memt;
+	bus_dma_tag_t sc_dmat;
+	pci_chipset_tag_t sc_pc;
+	int sc_bus, sc_maxndevs;
+	pcitag_t *sc_bridgetag;
+	u_int sc_intrswiz;
+	pcitag_t sc_intrtag;
+	int sc_flags;
+};
+
+extern struct cfdriver pci_cd;
 
 /*
  * Locators devices that attach to 'pcibus', as specified to config.
@@ -167,6 +191,10 @@ int pci_get_capability __P((pci_chipset_tag_t, pcitag_t, int,
 /*
  * Helper functions for autoconfiguration.
  */
+int	pci_enumerate_bus_generic(struct pci_softc *,
+	    int (*)(struct pci_attach_args *), struct pci_attach_args *);
+int	pci_probe_device(struct pci_softc *, pcitag_t tag,
+	    int (*)(struct pci_attach_args *), struct pci_attach_args *);
 void	pci_devinfo __P((pcireg_t, pcireg_t, int, char *));
 void	pci_conf_print __P((pci_chipset_tag_t, pcitag_t,
 	    void (*)(pci_chipset_tag_t, pcitag_t, const pcireg_t *)));
@@ -174,8 +202,19 @@ const struct pci_quirkdata *
 	pci_lookup_quirkdata __P((pci_vendor_id_t, pci_product_id_t));
 
 /*
+ * Helper functions for user access to the PCI bus.
+ */
+struct proc;
+int	pci_devioctl __P((pci_chipset_tag_t, pcitag_t, u_long, caddr_t,
+	    int flag, struct proc *));
+
+/*
  * Misc.
  */
 char   *pci_findvendor __P((pcireg_t));
+int	pci_find_device(struct pci_attach_args *pa,
+			int (*match)(struct pci_attach_args *));
+
+#endif /* _KERNEL */
 
 #endif /* _DEV_PCI_PCIVAR_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_fault_i.h,v 1.10 2000/01/11 06:57:50 chs Exp $	*/
+/*	$NetBSD: uvm_fault_i.h,v 1.15 2001/09/15 20:36:45 chs Exp $	*/
 
 /*
  *
@@ -40,6 +40,11 @@
 /*
  * uvm_fault_i.h: fault inline functions
  */
+static boolean_t uvmfault_lookup __P((struct uvm_faultinfo *, boolean_t));
+static boolean_t uvmfault_relock __P((struct uvm_faultinfo *));
+static void uvmfault_unlockall __P((struct uvm_faultinfo *, struct vm_amap *,
+			            struct uvm_object *, struct vm_anon *));
+static void uvmfault_unlockmaps __P((struct uvm_faultinfo *, boolean_t));
 
 /*
  * uvmfault_unlockmaps: unlock the maps
@@ -90,39 +95,6 @@ uvmfault_unlockall(ufi, amap, uobj, anon)
 }
 
 /*
- * uvmfault_check_intrsafe: check for a virtual address managed by
- * an interrupt-safe map.
- *
- * => caller must provide a uvm_faultinfo structure with the IN
- *	params properly filled in
- * => if we find an intersafe VA, we fill in ufi->map, and return TRUE
- */
-
-static __inline boolean_t
-uvmfault_check_intrsafe(ufi)
-	struct uvm_faultinfo *ufi;
-{
-	struct vm_map_intrsafe *vmi;
-	int s;
-
-	s = vmi_list_lock();
-	for (vmi = LIST_FIRST(&vmi_list); vmi != NULL;
-	     vmi = LIST_NEXT(vmi, vmi_list)) {
-		if (ufi->orig_rvaddr >= vm_map_min(&vmi->vmi_map) &&
-		    ufi->orig_rvaddr < vm_map_max(&vmi->vmi_map))
-			break;
-	}
-	vmi_list_unlock(s);
-
-	if (vmi != NULL) {
-		ufi->map = &vmi->vmi_map;
-		return (TRUE);
-	}
-
-	return (FALSE);
-}
-
-/*
  * uvmfault_lookup: lookup a virtual address in a map
  *
  * => caller must provide a uvm_faultinfo structure with the IN
@@ -131,7 +103,7 @@ uvmfault_check_intrsafe(ufi)
  * => if the lookup is a success we will return with the maps locked
  * => if "write_lock" is TRUE, we write_lock the map, otherwise we only
  *	get a read lock.
- * => note that submaps can only appear in the kernel and they are 
+ * => note that submaps can only appear in the kernel and they are
  *	required to use the same virtual addresses as the map they
  *	are referenced by (thus address translation between the main
  *	map and the submap is unnecessary).
@@ -142,7 +114,7 @@ uvmfault_lookup(ufi, write_lock)
 	struct uvm_faultinfo *ufi;
 	boolean_t write_lock;
 {
-	vm_map_t tmpmap;
+	struct vm_map *tmpmap;
 
 	/*
 	 * init ufi values for lookup.
@@ -157,6 +129,13 @@ uvmfault_lookup(ufi, write_lock)
 	 */
 
 	while (1) {
+		/*
+		 * Make sure this is not an "interrupt safe" map.
+		 * Such maps are never supposed to be involved in
+		 * a fault.
+		 */
+		if (ufi->map->flags & VM_MAP_INTRSAFE)
+			return (FALSE);
 
 		/*
 		 * lock map
@@ -170,7 +149,7 @@ uvmfault_lookup(ufi, write_lock)
 		/*
 		 * lookup
 		 */
-		if (!uvm_map_lookup_entry(ufi->map, ufi->orig_rvaddr, 
+		if (!uvm_map_lookup_entry(ufi->map, ufi->orig_rvaddr,
 								&ufi->entry)) {
 			uvmfault_unlockmaps(ufi, write_lock);
 			return(FALSE);
@@ -232,7 +211,7 @@ uvmfault_relock(ufi)
 	uvmexp.fltrelck++;
 
 	/*
-	 * relock map.   fail if version mismatch (in which case nothing 
+	 * relock map.   fail if version mismatch (in which case nothing
 	 * gets locked).
 	 */
 
@@ -243,7 +222,7 @@ uvmfault_relock(ufi)
 	}
 
 	uvmexp.fltrelckok++;
-	return(TRUE);		/* got it! */
+	return(TRUE);
 }
 
 #endif /* _UVM_UVM_FAULT_I_H_ */

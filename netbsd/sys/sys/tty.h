@@ -1,4 +1,4 @@
-/*	$NetBSD: tty.h,v 1.49 2000/03/28 05:52:15 simonb Exp $	*/
+/*	$NetBSD: tty.h,v 1.52 2001/06/08 15:43:34 mrg Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -83,7 +83,7 @@ struct tty {
 	struct	callout t_outq_ch;	/* for ttycheckoutq() */
 	struct	callout t_rstrt_ch;	/* for delayed output start */
 	long	t_outcc;		/* Output queue statistics. */
-	u_char	t_line;			/* Interface to device drivers. */
+	struct	linesw *t_linesw;	/* Interface to device drivers. */
 	dev_t	t_dev;			/* Device. */
 	int	t_state;		/* Device and driver (TS*) state. */
 	int	t_wopen;		/* Processes waiting for open. */
@@ -216,7 +216,7 @@ int	 ttioctl __P((struct tty *tp, u_long com, caddr_t data, int flag,
 	    struct proc *p));
 int	 ttread __P((struct tty *tp, struct uio *uio, int flag));
 void	 ttrstrt __P((void *tp));
-int	 ttpoll __P((dev_t device, int events, struct proc *p));
+int	 ttpoll __P((struct tty *tp, int events, struct proc *p));
 void	 ttsetwater __P((struct tty *tp));
 int	 ttspeedtab __P((int speed, struct speedtab *table));
 int	 ttstart __P((struct tty *tp));
@@ -252,7 +252,7 @@ u_char	*firstc __P((struct clist *clp, int *c));
 int	clalloc __P((struct clist *, int, int));
 void	clfree __P((struct clist *));
 
-#if !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_compat_freebsd.h"
 #include "opt_compat_sunos.h"
 #include "opt_compat_svr4.h"
@@ -261,7 +261,7 @@ void	clfree __P((struct clist *));
 #endif
 
 #if defined(COMPAT_43) || defined(COMPAT_SUNOS) || defined(COMPAT_SVR4) || \
-    defined(COMPAT_FREEBSD) || defined(COMPAT_OSF1)
+    defined(COMPAT_FREEBSD) || defined(COMPAT_OSF1) || defined(LKM)
 # define COMPAT_OLDTTY
 int 	ttcompat __P((struct tty *, u_long, caddr_t, int, struct proc *));
 #endif

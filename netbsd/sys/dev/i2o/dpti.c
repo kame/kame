@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: dpti.c,v 1.3 2001/11/13 12:24:58 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -64,7 +64,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD$");
+__KERNEL_RCSID(0, "$NetBSD: dpti.c,v 1.3 2001/11/13 12:24:58 lukem Exp $");
 
 #include "opt_i2o.h"
 
@@ -79,7 +79,7 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #include <sys/conf.h>
 #include <sys/ioctl.h>
 
-#include <machine/vmparam.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #ifdef i386

@@ -1,4 +1,4 @@
-/*	$NetBSD: dev_tape.c,v 1.3 1998/09/05 15:20:47 pk Exp $	*/
+/*	$NetBSD: dev_tape.c,v 1.5 2001/07/07 09:06:43 scw Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -44,10 +44,13 @@
 
 #include <sys/types.h>
 #include <machine/prom.h>
+#include <machine/stdarg.h>
+
+#include <lib/libkern/libkern.h>
 
 #include "stand.h"
 #include "libsa.h"
-
+#include "dev_tape.h"
 
 extern int debug;
 
@@ -68,7 +71,6 @@ devopen(f, fname, file)
 	char **file;
 {
 	struct devsw *dp;
-	int error;
 
 	*file = (char*)fname;
 	dp = &devsw[0];
@@ -79,12 +81,16 @@ devopen(f, fname, file)
 }
 
 int
-tape_open(f, fname)
-	struct open_file *f;
-	char *fname;		/* partition number, i.e. "1" */
+tape_open(struct open_file *f, ...)
 {
+	char *fname;		/* partition number, i.e. "1" */
 	int	part;
 	struct mvmeprom_dskio *ti;
+	va_list ap;
+
+	va_start(ap, f);
+	fname = va_arg(ap, char *);
+	va_end(ap);
 
 	/*
 	 * Set the tape segment number to the one indicated
@@ -100,7 +106,7 @@ tape_open(f, fname)
 	 * (determines what gets opened)
 	 */
 	ti = &tape_ioreq;
-	bzero((caddr_t)ti, sizeof(*ti));
+	memset((caddr_t)ti, 0, sizeof(*ti));
 
 	ti->ctrl_lun = bugargs.ctrl_lun;
 	ti->dev_lun = bugargs.dev_lun;
@@ -136,7 +142,7 @@ tape_strategy(devdata, flag, dblk, size, buf, rsize)
 	int	flag;
 	daddr_t	dblk;
 	u_int	size;
-	char	*buf;
+	void	*buf;
 	u_int	*rsize;
 {
 	struct mvmeprom_dskio *ti;
@@ -168,7 +174,7 @@ tape_strategy(devdata, flag, dblk, size, buf, rsize)
 }
 
 int
-tape_ioctl()
+tape_ioctl(struct open_file *f, u_long cmd, void * data)
 {
 	return EIO;
 }
@@ -209,7 +215,7 @@ hackprom_diskrd(struct mvmeprom_dskio *ti)
 	/*
 	 * Grab the required number of block(s)
 	 */
-	bcopy(&(hackload_addr[blkoffset]), ti->pbuffer,
+	memcpy(ti->pbuffer, &(hackload_addr[blkoffset]),
 	      ti->blk_cnt * MVMEPROM_BLOCK_SIZE);
 
 	blkoffset += (ti->blk_cnt * MVMEPROM_BLOCK_SIZE);

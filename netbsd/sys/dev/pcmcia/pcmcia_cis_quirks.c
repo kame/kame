@@ -1,6 +1,4 @@
-/*	$NetBSD: pcmcia_cis_quirks.c,v 1.6 2000/04/12 21:07:55 scw Exp $	*/
-
-#define	PCMCIADEBUG
+/*	$NetBSD: pcmcia_cis_quirks.c,v 1.18 2002/01/13 12:28:02 aymeric Exp $	*/
 
 /*
  * Copyright (c) 1998 Marc Horowitz.  All rights reserved.
@@ -31,7 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcmcia_cis_quirks.c,v 1.18 2002/01/13 12:28:02 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -48,7 +48,7 @@
 /* these structures are just static templates which are then copied
    into "live" allocated structures */
 
-struct pcmcia_function pcmcia_3cxem556_func0 = {
+static const struct pcmcia_function pcmcia_3cxem556_func0 = {
 	0,			/* function number */
 	PCMCIA_FUNCTION_NETWORK,
 	0x07,			/* last cfe number */
@@ -56,7 +56,7 @@ struct pcmcia_function pcmcia_3cxem556_func0 = {
 	0x63,			/* ccr_mask */
 };
 
-struct pcmcia_config_entry pcmcia_3cxem556_func0_cfe0 = {
+static const struct pcmcia_config_entry pcmcia_3cxem556_func0_cfe0 = {
 	0x07,			/* cfe number */
 	PCMCIA_CFE_IO8 | PCMCIA_CFE_IO16 | PCMCIA_CFE_IRQLEVEL,
 	PCMCIA_IFTYPE_IO,
@@ -65,11 +65,11 @@ struct pcmcia_config_entry pcmcia_3cxem556_func0_cfe0 = {
 	{ { 0x0010, 0 } },	/* iospace */
 	0xffff,			/* irqmask */
 	0,			/* num_memspace */
-	{ },			/* memspace */
+	{ { 0 } },		/* memspace */
 	0,			/* maxtwins */
 };
 
-static struct pcmcia_function pcmcia_3cxem556_func1 = {
+static const struct pcmcia_function pcmcia_3cxem556_func1 = {
 	1,			/* function number */
 	PCMCIA_FUNCTION_SERIAL,
 	0x27,			/* last cfe number */
@@ -77,7 +77,7 @@ static struct pcmcia_function pcmcia_3cxem556_func1 = {
 	0x63,			/* ccr_mask */
 };
 
-static struct pcmcia_config_entry pcmcia_3cxem556_func1_cfe0 = {
+static const struct pcmcia_config_entry pcmcia_3cxem556_func1_cfe0 = {
 	0x27,			/* cfe number */
 	PCMCIA_CFE_IO8 | PCMCIA_CFE_IRQLEVEL,
 	PCMCIA_IFTYPE_IO,
@@ -86,11 +86,11 @@ static struct pcmcia_config_entry pcmcia_3cxem556_func1_cfe0 = {
 	{ { 0x0008, 0 } },	/* iospace */
 	0xffff,			/* irqmask */
 	0,			/* num_memspace */
-	{ },			/* memspace */
+	{ { 0 } },		/* memspace */
 	0,			/* maxtwins */
 };
 
-static struct pcmcia_function pcmcia_3ccfem556bi_func0 = {
+static const struct pcmcia_function pcmcia_3ccfem556bi_func0 = {
 	0,			/* function number */
 	PCMCIA_FUNCTION_NETWORK,
 	0x07,			/* last cfe number */
@@ -98,7 +98,7 @@ static struct pcmcia_function pcmcia_3ccfem556bi_func0 = {
 	0x267,			/* ccr_mask */
 };
 
-static struct pcmcia_config_entry pcmcia_3ccfem556bi_func0_cfe0 = {
+static const struct pcmcia_config_entry pcmcia_3ccfem556bi_func0_cfe0 = {
 	0x07,			/* cfe number */
 	PCMCIA_CFE_IO8 | PCMCIA_CFE_IO16 | PCMCIA_CFE_IRQLEVEL,
 	PCMCIA_IFTYPE_IO,
@@ -107,11 +107,11 @@ static struct pcmcia_config_entry pcmcia_3ccfem556bi_func0_cfe0 = {
 	{ { 0x0020, 0 } },	/* iospace */
 	0xffff,			/* irqmask */
 	0,			/* num_memspace */
-	{ },			/* memspace */
+	{ { 0 } },		/* memspace */
 	0,			/* maxtwins */
 };
 
-static struct pcmcia_function pcmcia_3ccfem556bi_func1 = {
+static const struct pcmcia_function pcmcia_3ccfem556bi_func1 = {
 	1,			/* function number */
 	PCMCIA_FUNCTION_SERIAL,
 	0x27,			/* last cfe number */
@@ -119,7 +119,7 @@ static struct pcmcia_function pcmcia_3ccfem556bi_func1 = {
 	0x277,			/* ccr_mask */
 };
 
-static struct pcmcia_config_entry pcmcia_3ccfem556bi_func1_cfe0 = {
+static const struct pcmcia_config_entry pcmcia_3ccfem556bi_func1_cfe0 = {
 	0x27,			/* cfe number */
 	PCMCIA_CFE_IO8 | PCMCIA_CFE_IRQLEVEL,
 	PCMCIA_IFTYPE_IO,
@@ -128,11 +128,11 @@ static struct pcmcia_config_entry pcmcia_3ccfem556bi_func1_cfe0 = {
 	{ { 0x0008, 0 } },	/* iospace */
 	0xffff,			/* irqmask */
 	0,			/* num_memspace */
-	{ },			/* memspace */
+	{ { 0 } },		/* memspace */
 	0,			/* maxtwins */
 };
 
-static struct pcmcia_function pcmcia_sveclancard_func0 = {
+static const struct pcmcia_function pcmcia_sveclancard_func0 = {
 	0,			/* function number */
 	PCMCIA_FUNCTION_NETWORK,
 	0x1,			/* last cfe number */
@@ -140,7 +140,7 @@ static struct pcmcia_function pcmcia_sveclancard_func0 = {
 	0x1,			/* ccr_mask */
 };
 
-static struct pcmcia_config_entry pcmcia_sveclancard_func0_cfe0 = {
+static const struct pcmcia_config_entry pcmcia_sveclancard_func0_cfe0 = {
 	0x1,			/* cfe number */
 	PCMCIA_CFE_MWAIT_REQUIRED | PCMCIA_CFE_RDYBSY_ACTIVE |
 	PCMCIA_CFE_WP_ACTIVE | PCMCIA_CFE_BVD_ACTIVE | PCMCIA_CFE_IO16,
@@ -150,11 +150,11 @@ static struct pcmcia_config_entry pcmcia_sveclancard_func0_cfe0 = {
 	{ { 0x20, 0x300 } },	/* iospace */
 	0xdeb8,			/* irqmask */
 	0,			/* num_memspace */
-	{ },			/* memspace */
+	{ { 0 } },		/* memspace */
 	0,			/* maxtwins */
 };
 
-static struct pcmcia_function pcmcia_ndc_nd5100_func0 = {
+static const struct pcmcia_function pcmcia_ndc_nd5100_func0 = {
 	0,			/* function number */
 	PCMCIA_FUNCTION_NETWORK,
 	0x23,			/* last cfe number */
@@ -162,7 +162,7 @@ static struct pcmcia_function pcmcia_ndc_nd5100_func0 = {
 	0x3,			/* ccr_mask */
 };
 
-static struct pcmcia_config_entry pcmcia_ndc_nd5100_func0_cfe0 = {
+static const struct pcmcia_config_entry pcmcia_ndc_nd5100_func0_cfe0 = {
 	0x20,			/* cfe number */
 	PCMCIA_CFE_MWAIT_REQUIRED | PCMCIA_CFE_IO16 | PCMCIA_CFE_IRQLEVEL,
 	PCMCIA_IFTYPE_IO,
@@ -171,11 +171,54 @@ static struct pcmcia_config_entry pcmcia_ndc_nd5100_func0_cfe0 = {
 	{ { 0x20, 0x300 } },	/* iospace */
 	0xdeb8,			/* irqmask */
 	0,			/* num_memspace */
-	{ },			/* memspace */
+	{ { 0 } },		/* memspace */
 	0,			/* maxtwins */
 };
 
-static struct pcmcia_cis_quirk pcmcia_cis_quirks[] = {
+static const struct pcmcia_function pcmcia_emtac_a2424i_func0 = {
+	0,			/* function number */
+	PCMCIA_FUNCTION_NETWORK,
+	0x21,			/* last cfe number */
+	0x3e0,			/* ccr_base */
+	0x1,			/* ccr_mask */
+};
+
+static const struct pcmcia_config_entry pcmcia_emtac_a2424i_func0_cfe0 = {
+	0x21,			/* cfe number */
+	PCMCIA_CFE_IO16 | PCMCIA_CFE_IRQLEVEL | PCMCIA_CFE_IRQPULSE,
+	PCMCIA_IFTYPE_IO,
+	1,			/* num_iospace */
+	6,			/* iomask */
+	{ { 0x40, 0x100 } },	/* iospace */
+	0xffff,			/* irqmask */
+	0,			/* num_memspace */
+	{ { 0 } },		/* memspace */
+	0,			/* maxtwins */
+};
+
+static const struct pcmcia_function pcmcia_fujitsu_j181_func0 = {
+	0,			/* function number */
+	PCMCIA_FUNCTION_NETWORK,
+	0x21,			/* last cfe number */
+	0xfe0,			/* ccr_base */
+	0xf,			/* ccr_mask */
+};
+
+static const struct pcmcia_config_entry pcmcia_fujitsu_j181_func0_cfe0 = {
+	0xc,			/* cfe number */
+	PCMCIA_CFE_MWAIT_REQUIRED | PCMCIA_CFE_WP_ACTIVE | PCMCIA_CFE_IO8 |
+	PCMCIA_CFE_IO16 | PCMCIA_CFE_IRQLEVEL | PCMCIA_CFE_IRQPULSE,
+	PCMCIA_IFTYPE_IO,
+	1,			/* num_iospace */
+	10,			/* iomask */
+	{ { 0x20, 0x140 } },	/* iospace */
+	0xffff,			/* irqmask */
+	0,			/* num_memspace */
+	{ { 0 } },		/* memspace */
+	0,			/* maxtwins */
+};
+
+static const struct pcmcia_cis_quirk pcmcia_cis_quirks[] = {
 	{ PCMCIA_VENDOR_3COM, PCMCIA_PRODUCT_3COM_3CXEM556, PCMCIA_CIS_INVALID, 
 	  &pcmcia_3cxem556_func0, &pcmcia_3cxem556_func0_cfe0 },
 	{ PCMCIA_VENDOR_3COM, PCMCIA_PRODUCT_3COM_3CXEM556, PCMCIA_CIS_INVALID,
@@ -194,6 +237,11 @@ static struct pcmcia_cis_quirk pcmcia_cis_quirks[] = {
 	  &pcmcia_sveclancard_func0, &pcmcia_sveclancard_func0_cfe0 },
 	{ PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID, PCMCIA_CIS_NDC_ND5100_E,
 	  &pcmcia_ndc_nd5100_func0, &pcmcia_ndc_nd5100_func0_cfe0 },
+	{ PCMCIA_VENDOR_EMTAC, PCMCIA_PRODUCT_EMTAC_WLAN, PCMCIA_CIS_INVALID,
+	  &pcmcia_emtac_a2424i_func0, &pcmcia_emtac_a2424i_func0_cfe0 },
+	{ PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
+	  PCMCIA_CIS_FUJITSU_FMV_J181,
+	  &pcmcia_fujitsu_j181_func0, &pcmcia_fujitsu_j181_func0_cfe0 },
 };
 	
 static int n_pcmcia_cis_quirks =
@@ -204,7 +252,8 @@ void pcmcia_check_cis_quirks(sc)
 {
 	int wiped = 0;
 	int i, j;
-	struct pcmcia_function *pf, *pf_next, *pf_last;
+	struct pcmcia_function *pf, *pf_next;
+	const struct pcmcia_function *pf_last;
 	struct pcmcia_config_entry *cfe, *cfe_next;
 
 	pf = NULL;

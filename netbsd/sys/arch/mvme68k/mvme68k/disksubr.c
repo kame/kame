@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.18.4.1 2002/06/26 17:29:13 he Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.23 2002/03/05 09:40:40 simonb Exp $	*/
 
 /*
  * Copyright (c) 1995 Dale Rahn.
@@ -58,49 +58,10 @@ static void printlp __P((struct disklabel *lp, char *str));
 static void printclp __P((struct cpu_disklabel *clp, char *str));
 #endif
 
-void
-dk_establish(dk, dev)
-	struct disk *dk;
-	struct device *dev;
-{
-	struct scsibus_softc *sbsc;
-	int target, lun;
-
-	if (bootpart == -1) /* ignore flag from controller driver? */
-		return;
-
-	/*
- 	 * scsi: sd,cd
- 	 */
-
-	if (strncmp("sd", dev->dv_xname, 2) == 0 ||
-	    strncmp("cd", dev->dv_xname, 2) == 0) {
-
-        	sbsc = (struct scsibus_softc *)dev->dv_parent;
-		target = bootctrllun % 8; /* XXX: 147 only */
-		lun = bootdevlun; /* XXX: 147, untested */
-
-		/* 
-		 * XXX: on the 167: 
-		 * ignore bootctrllun
-		 * target = bootdevlun / 10
-		 * lun = bootdevlun % 10
-		 */
-
-        	if (lun < 8 && target < 8 &&
-		    sbsc->sc_link[target][lun] != NULL &&
-            	    sbsc->sc_link[target][lun]->device_softc == (void *)dev) {
-			booted_device = dev;
-                	return;
-		}
-        }
-
-	return;
-}
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl and anything required in the strategy routine
  * (e.g., sector size) must be filled in before calling us.
@@ -123,17 +84,16 @@ readdisklabel(dev, strat, lp, clp)
 	bp->b_dev = dev;
 	bp->b_blkno = 0; /* contained in block 0 */
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = 0; /* contained in block 0 */
 	(*strat)(bp);
 
 	if (biowait(bp)) {
 		msg = "cpu_disklabel read error\n";
 	} else {
-		bcopy(bp->b_data, clp, sizeof (struct cpu_disklabel));
+		memcpy(clp, bp->b_data, sizeof (struct cpu_disklabel));
 	}
 
-	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 
 	if (msg || clp->magic1 != DISKMAGIC || clp->magic2 != DISKMAGIC) {
@@ -187,7 +147,7 @@ setdisklabel(olp, nlp, openmask, clp)
 	    dkcksum(nlp) != 0)
 		return (EINVAL);
 
-	while ((i = ffs((long)openmask)) != 0) {
+	while ((i = ffs(openmask)) != 0) {
 		i--;
 		openmask &= ~(1 << i);
 		if (nlp->d_npartitions <= i)
@@ -245,17 +205,16 @@ writedisklabel(dev, strat, lp, clp)
 	bp->b_dev = dev;
 	bp->b_blkno = 0; /* contained in block 0 */
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = 0; /* contained in block 0 */
 	(*strat)(bp);
 
 	if ( (error = biowait(bp)) != 0 ) {
 		/* nothing */
 	} else {
-		bcopy(bp->b_data, clp, sizeof(struct cpu_disklabel));
+		memcpy(clp, bp->b_data, sizeof(struct cpu_disklabel));
 	}
 
-	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 
 	if (error) {
@@ -275,19 +234,18 @@ writedisklabel(dev, strat, lp, clp)
 		/* obtain buffer to scrozz drive with */
 		bp = geteblk((int)lp->d_secsize);
 
-		bcopy(clp, bp->b_data, sizeof(struct cpu_disklabel));
+		memcpy(bp->b_data, clp, sizeof(struct cpu_disklabel));
 
 		/* request no partition relocation by driver on I/O operations */
 		bp->b_dev = dev;
 		bp->b_blkno = 0; /* contained in block 0 */
 		bp->b_bcount = lp->d_secsize;
-		bp->b_flags = B_WRITE;
+		bp->b_flags |= B_WRITE;
 		bp->b_cylinder = 0; /* contained in block 0 */
 		(*strat)(bp);
 
 		error = biowait(bp);
 
-		bp->b_flags = B_INVAL | B_AGE | B_READ;
 		brelse(bp);
 	}
 	return (error); 
@@ -395,9 +353,9 @@ bsdtocpulabel(lp, clp)
 	clp->sbsize = lp->d_sbsize;
 	clp->checksum = lp->d_checksum;
 	/* note: assume at least 4 partitions */
-	bcopy(&lp->d_partitions[0], clp->vid_4, sizeof(struct partition) * 4);
-	bzero(clp->cfg_4, sizeof(struct partition) * 12);
-	bcopy(&lp->d_partitions[4], clp->cfg_4, sizeof(struct partition) 
+	memcpy(clp->vid_4, &lp->d_partitions[0], sizeof(struct partition) * 4);
+	memset(clp->cfg_4, 0, sizeof(struct partition) * 12);
+	memcpy(clp->cfg_4, &lp->d_partitions[4], sizeof(struct partition) 
 		* ((MAXPARTITIONS < 16) ? (MAXPARTITIONS - 4) : 12));
 
 	/*
@@ -405,14 +363,14 @@ bsdtocpulabel(lp, clp)
 	 * see disklabel.h for more details
 	 * [note: this used to be handled by 'wrtvid']
 	 */
-	bcopy(VID_ID, clp->vid_id, sizeof(clp->vid_id));
+	memcpy(clp->vid_id, VID_ID, sizeof(clp->vid_id));
 	clp->vid_oss = VID_OSS;
 	clp->vid_osl = VID_OSL;
 	clp->vid_osa_u = VID_OSAU;
 	clp->vid_osa_l = VID_OSAL;
 	clp->vid_cas = VID_CAS;
 	clp->vid_cal = VID_CAL;
-	bcopy(VID_MOT, clp->vid_mot, sizeof(clp->vid_mot));
+	memcpy(clp->vid_mot, VID_MOT, sizeof(clp->vid_mot));
 	clp->cfg_rec = CFG_REC;
 	clp->cfg_psm = CFG_PSM;
 }
@@ -479,8 +437,8 @@ cputobsdlabel(lp, clp)
 	lp->d_bbsize = clp->bbsize;
 	lp->d_sbsize = clp->sbsize;
 	/* note: assume at least 4 partitions */
-	bcopy(clp->vid_4, &lp->d_partitions[0], sizeof(struct partition) * 4);
-	bcopy(clp->cfg_4, &lp->d_partitions[4], sizeof(struct partition) 
+	memcpy(&lp->d_partitions[0], clp->vid_4, sizeof(struct partition) * 4);
+	memcpy(&lp->d_partitions[4], clp->cfg_4, sizeof(struct partition) 
 		* ((MAXPARTITIONS < 16) ? (MAXPARTITIONS - 4) : 12));
 	lp->d_checksum = 0;
 	lp->d_checksum = dkcksum(lp);

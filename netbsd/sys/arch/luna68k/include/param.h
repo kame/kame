@@ -1,4 +1,4 @@
-/* $Id: param.h,v 1.1.1.1 2000/12/01 16:01:18 itojun Exp $ */
+/* $Id: param.h,v 1.1.1.2 2002/09/25 05:30:37 itojun Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -55,7 +55,7 @@
 #define NBSEG		(1 << SEGSHIFT)	/* bytes/segment */
 #define SEGOFSET	(NBSEG-1)	/* byte offset into segment */
 
-#define UPAGES		3		/* pages of u-area */
+#define UPAGES		2		/* pages of u-area */
 
 #include <m68k/param.h>
 

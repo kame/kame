@@ -1,4 +1,4 @@
-/*	$NetBSD: bt_subr.c,v 1.2 1995/04/10 22:12:48 gwr Exp $ */
+/*	$NetBSD: bt_subr.c,v 1.4.14.1 2002/08/07 01:30:42 lukem Exp $ */
 
 /*
  * Copyright (c) 1993
@@ -48,7 +48,7 @@
 #include <sys/buf.h>
 #include <sys/errno.h>
 
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 
 #include "btreg.h"
 #include "btvar.h"
@@ -64,16 +64,16 @@
  */
 int
 bt_getcmap(p, cm, cmsize)
-	register struct fbcmap *p;
+	struct fbcmap *p;
 	union bt_cmap *cm;
 	int cmsize;
 {
-	register u_int i, start, count;
-	register u_char *cp;
+	u_int i, start, count;
+	u_char *cp;
 
 	start = p->index;
 	count = p->count;
-	if (start >= cmsize || start + count > cmsize)
+	if (start >= cmsize || count > cmsize - start)
 		return (EINVAL);
 	if (!useracc(p->red, count, B_WRITE) ||
 	    !useracc(p->green, count, B_WRITE) ||
@@ -92,16 +92,16 @@ bt_getcmap(p, cm, cmsize)
  */
 int
 bt_putcmap(p, cm, cmsize)
-	register struct fbcmap *p;
+	struct fbcmap *p;
 	union bt_cmap *cm;
 	int cmsize;
 {
-	register u_int i, start, count;
-	register u_char *cp;
+	u_int i, start, count;
+	u_char *cp;
 
 	start = p->index;
 	count = p->count;
-	if (start >= cmsize || start + count > cmsize)
+	if (start >= cmsize || count > cmsize - start)
 		return (EINVAL);
 	if (!useracc(p->red, count, B_READ) ||
 	    !useracc(p->green, count, B_READ) ||

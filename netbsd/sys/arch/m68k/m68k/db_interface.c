@@ -1,4 +1,4 @@
-/*	$NetBSD: db_interface.c,v 1.26 1999/10/12 17:08:58 jdolecek Exp $	*/
+/*	$NetBSD: db_interface.c,v 1.28 2002/05/13 20:30:08 matt Exp $	*/
 
 /* 
  * Mach Operating System
@@ -36,7 +36,7 @@
 #include <sys/reboot.h>
 #include <sys/systm.h> /* just for boothowto --eichin */
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
 
@@ -47,8 +47,6 @@
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
 
-
-extern label_t	*db_recover;
 
 int	db_active = 0;
 db_regs_t	ddb_regs;

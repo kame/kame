@@ -1,4 +1,4 @@
-/*	$NetBSD: umap_vfsops.c,v 1.25 2000/06/10 18:27:04 assar Exp $	*/
+/*	$NetBSD: umap_vfsops.c,v 1.33 2001/11/15 09:48:23 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -44,11 +44,13 @@
  * (See mount_umap(8) for a description of this layer.)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: umap_vfsops.c,v 1.33 2001/11/15 09:48:23 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -110,7 +112,7 @@ umapfs_mount(mp, path, data, ndp, p)
 	/*
 	 * Find lower node
 	 */
-	NDINIT(ndp, LOOKUP, FOLLOW|WANTPARENT|LOCKLEAF,
+	NDINIT(ndp, LOOKUP, FOLLOW|LOCKLEAF,
 		UIO_USERSPACE, args.umap_target, p);
 	if ((error = namei(ndp)) != 0)
 		return (error);
@@ -122,8 +124,6 @@ umapfs_mount(mp, path, data, ndp, p)
 #ifdef UMAPFS_DIAGNOSTIC
 	printf("vp = %p, check for VDIR...\n", lowerrootvp);
 #endif
-	vrele(ndp->ni_dvp);
-	ndp->ni_dvp = 0;
 
 	if (lowerrootvp->v_type != VDIR) {
 		vput(lowerrootvp);
@@ -193,8 +193,8 @@ umapfs_mount(mp, path, data, ndp, p)
 	amp->umapm_alloc = layer_node_alloc;	/* the default alloc is fine */
 	amp->umapm_vnodeop_p = umap_vnodeop_p;
 	simple_lock_init(&amp->umapm_hashlock);
-	amp->umapm_node_hashtbl = hashinit(NUMAPNODECACHE, M_CACHE, M_WAITOK,
-			&amp->umapm_node_hash);
+	amp->umapm_node_hashtbl = hashinit(NUMAPNODECACHE, HASH_LIST, M_CACHE,
+	    M_WAITOK, &amp->umapm_node_hash);
 
 
 	/*
@@ -287,9 +287,9 @@ umapfs_unmount(mp, mntflags, p)
 	return (0);
 }
 
-extern struct vnodeopv_desc umapfs_vnodeop_opv_desc;
+extern const struct vnodeopv_desc umapfs_vnodeop_opv_desc;
 
-struct vnodeopv_desc *umapfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const umapfs_vnodeopv_descs[] = {
 	&umapfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -307,6 +307,7 @@ struct vfsops umapfs_vfsops = {
 	layerfs_fhtovp,
 	layerfs_vptofh,
 	layerfs_init,
+	NULL,
 	layerfs_done,
 	layerfs_sysctl,
 	NULL,				/* vfs_mountroot */

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_subs.c,v 1.77.2.3 2001/04/06 00:02:45 he Exp $	*/
+/*	$NetBSD: nfs_subs.c,v 1.103 2002/03/17 22:22:40 christos Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -73,7 +73,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_subs.c,v 1.103 2002/03/17 22:22:40 christos Exp $");
+
 #include "fs_nfs.h"
+#include "opt_nfs.h"
 #include "opt_nfsserver.h"
 #include "opt_iso.h"
 #include "opt_inet.h"
@@ -98,8 +102,6 @@
 #include <sys/time.h>
 #include <sys/dirent.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <nfs/rpcv2.h>
@@ -114,8 +116,6 @@
 #include <nfs/nfs_var.h>
 
 #include <miscfs/specfs/specdev.h>
-
-#include <vm/vm.h>
 
 #include <netinet/in.h>
 #ifdef ISO
@@ -134,13 +134,16 @@ u_int32_t nfs_prog, nqnfs_prog, nfs_true, nfs_false;
 
 /* And other global data */
 static u_int32_t nfs_xid = 0;
-nfstype nfsv2_type[9] = { NFNON, NFREG, NFDIR, NFBLK, NFCHR, NFLNK, NFNON,
-		      NFCHR, NFNON };
-nfstype nfsv3_type[9] = { NFNON, NFREG, NFDIR, NFBLK, NFCHR, NFLNK, NFSOCK,
-		      NFFIFO, NFNON };
-enum vtype nv2tov_type[8] = { VNON, VREG, VDIR, VBLK, VCHR, VLNK, VNON, VNON };
-enum vtype nv3tov_type[8]={ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO };
+const nfstype nfsv2_type[9] =
+	{ NFNON, NFREG, NFDIR, NFBLK, NFCHR, NFLNK, NFNON, NFCHR, NFNON };
+const nfstype nfsv3_type[9] =
+	{ NFNON, NFREG, NFDIR, NFBLK, NFCHR, NFLNK, NFSOCK, NFFIFO, NFNON };
+const enum vtype nv2tov_type[8] =
+	{ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VNON, VNON };
+const enum vtype nv3tov_type[8] =
+	{ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO };
 int nfs_ticks;
+int nfs_commitsize;
 
 /* NFS client/server stats. */
 struct nfsstats nfsstats;
@@ -148,7 +151,7 @@ struct nfsstats nfsstats;
 /*
  * Mapping of old NFS Version 2 RPC numbers to generic numbers.
  */
-int nfsv3_procid[NFS_NPROCS] = {
+const int nfsv3_procid[NFS_NPROCS] = {
 	NFSPROC_NULL,
 	NFSPROC_GETATTR,
 	NFSPROC_SETATTR,
@@ -180,7 +183,7 @@ int nfsv3_procid[NFS_NPROCS] = {
 /*
  * and the reverse mapping from generic to Version 2 procedure numbers
  */
-int nfsv2_procid[NFS_NPROCS] = {
+const int nfsv2_procid[NFS_NPROCS] = {
 	NFSV2PROC_NULL,
 	NFSV2PROC_GETATTR,
 	NFSV2PROC_SETATTR,
@@ -214,7 +217,7 @@ int nfsv2_procid[NFS_NPROCS] = {
  * Use NFSERR_IO as the catch all for ones not specifically defined in
  * RFC 1094.
  */
-static u_char nfsrv_v2errmap[ELAST] = {
+static const u_char nfsrv_v2errmap[ELAST] = {
   NFSERR_PERM,	NFSERR_NOENT,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,
   NFSERR_NXIO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,
   NFSERR_IO,	NFSERR_IO,	NFSERR_ACCES,	NFSERR_IO,	NFSERR_IO,
@@ -245,12 +248,12 @@ static u_char nfsrv_v2errmap[ELAST] = {
  * The first entry is the default error return and the rest are the valid
  * errors for that RPC in increasing numeric order.
  */
-static short nfsv3err_null[] = {
+static const short nfsv3err_null[] = {
 	0,
 	0,
 };
 
-static short nfsv3err_getattr[] = {
+static const short nfsv3err_getattr[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_STALE,
@@ -259,7 +262,7 @@ static short nfsv3err_getattr[] = {
 	0,
 };
 
-static short nfsv3err_setattr[] = {
+static const short nfsv3err_setattr[] = {
 	NFSERR_IO,
 	NFSERR_PERM,
 	NFSERR_IO,
@@ -275,7 +278,7 @@ static short nfsv3err_setattr[] = {
 	0,
 };
 
-static short nfsv3err_lookup[] = {
+static const short nfsv3err_lookup[] = {
 	NFSERR_IO,
 	NFSERR_NOENT,
 	NFSERR_IO,
@@ -288,7 +291,7 @@ static short nfsv3err_lookup[] = {
 	0,
 };
 
-static short nfsv3err_access[] = {
+static const short nfsv3err_access[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_STALE,
@@ -297,7 +300,7 @@ static short nfsv3err_access[] = {
 	0,
 };
 
-static short nfsv3err_readlink[] = {
+static const short nfsv3err_readlink[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -309,7 +312,7 @@ static short nfsv3err_readlink[] = {
 	0,
 };
 
-static short nfsv3err_read[] = {
+static const short nfsv3err_read[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_NXIO,
@@ -322,7 +325,7 @@ static short nfsv3err_read[] = {
 	0,
 };
 
-static short nfsv3err_write[] = {
+static const short nfsv3err_write[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -338,7 +341,7 @@ static short nfsv3err_write[] = {
 	0,
 };
 
-static short nfsv3err_create[] = {
+static const short nfsv3err_create[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -355,7 +358,7 @@ static short nfsv3err_create[] = {
 	0,
 };
 
-static short nfsv3err_mkdir[] = {
+static const short nfsv3err_mkdir[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -372,7 +375,7 @@ static short nfsv3err_mkdir[] = {
 	0,
 };
 
-static short nfsv3err_symlink[] = {
+static const short nfsv3err_symlink[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -389,7 +392,7 @@ static short nfsv3err_symlink[] = {
 	0,
 };
 
-static short nfsv3err_mknod[] = {
+static const short nfsv3err_mknod[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -407,7 +410,7 @@ static short nfsv3err_mknod[] = {
 	0,
 };
 
-static short nfsv3err_remove[] = {
+static const short nfsv3err_remove[] = {
 	NFSERR_IO,
 	NFSERR_NOENT,
 	NFSERR_IO,
@@ -421,7 +424,7 @@ static short nfsv3err_remove[] = {
 	0,
 };
 
-static short nfsv3err_rmdir[] = {
+static const short nfsv3err_rmdir[] = {
 	NFSERR_IO,
 	NFSERR_NOENT,
 	NFSERR_IO,
@@ -439,7 +442,7 @@ static short nfsv3err_rmdir[] = {
 	0,
 };
 
-static short nfsv3err_rename[] = {
+static const short nfsv3err_rename[] = {
 	NFSERR_IO,
 	NFSERR_NOENT,
 	NFSERR_IO,
@@ -462,7 +465,7 @@ static short nfsv3err_rename[] = {
 	0,
 };
 
-static short nfsv3err_link[] = {
+static const short nfsv3err_link[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -482,7 +485,7 @@ static short nfsv3err_link[] = {
 	0,
 };
 
-static short nfsv3err_readdir[] = {
+static const short nfsv3err_readdir[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -495,7 +498,7 @@ static short nfsv3err_readdir[] = {
 	0,
 };
 
-static short nfsv3err_readdirplus[] = {
+static const short nfsv3err_readdirplus[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_ACCES,
@@ -509,7 +512,7 @@ static short nfsv3err_readdirplus[] = {
 	0,
 };
 
-static short nfsv3err_fsstat[] = {
+static const short nfsv3err_fsstat[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_STALE,
@@ -518,7 +521,7 @@ static short nfsv3err_fsstat[] = {
 	0,
 };
 
-static short nfsv3err_fsinfo[] = {
+static const short nfsv3err_fsinfo[] = {
 	NFSERR_STALE,
 	NFSERR_STALE,
 	NFSERR_BADHANDLE,
@@ -526,7 +529,7 @@ static short nfsv3err_fsinfo[] = {
 	0,
 };
 
-static short nfsv3err_pathconf[] = {
+static const short nfsv3err_pathconf[] = {
 	NFSERR_STALE,
 	NFSERR_STALE,
 	NFSERR_BADHANDLE,
@@ -534,7 +537,7 @@ static short nfsv3err_pathconf[] = {
 	0,
 };
 
-static short nfsv3err_commit[] = {
+static const short nfsv3err_commit[] = {
 	NFSERR_IO,
 	NFSERR_IO,
 	NFSERR_STALE,
@@ -543,7 +546,7 @@ static short nfsv3err_commit[] = {
 	0,
 };
 
-static short *nfsrv_v3errmap[] = {
+static const short * const nfsrv_v3errmap[] = {
 	nfsv3err_null,
 	nfsv3err_getattr,
 	nfsv3err_setattr,
@@ -573,7 +576,7 @@ extern time_t nqnfsstarttime;
 extern int nqsrv_clockskew;
 extern int nqsrv_writeslack;
 extern int nqsrv_maxlease;
-extern int nqnfs_piggy[NFS_NPROCS];
+extern const int nqnfs_piggy[NFS_NPROCS];
 extern struct nfsnodehashhead *nfsnodehashtbl;
 extern u_long nfsnodehash;
 
@@ -595,11 +598,13 @@ nfsm_reqh(vp, procid, hsiz, bposp)
 	caddr_t *bposp;
 {
 	struct mbuf *mb;
-	u_int32_t *tl;
 	caddr_t bpos;
-	struct mbuf *mb2;
 	struct nfsmount *nmp;
+#ifndef NFS_V2_ONLY
+	u_int32_t *tl;
+	struct mbuf *mb2;
 	int nqflag;
+#endif
 
 	MGET(mb, M_WAIT, MT_DATA);
 	if (hsiz >= MINCLSIZE)
@@ -612,6 +617,7 @@ nfsm_reqh(vp, procid, hsiz, bposp)
 	 */
 	if (vp) {
 		nmp = VFSTONFS(vp->v_mount);
+#ifndef NFS_V2_ONLY
 		if (nmp->nm_flag & NFSMNT_NQNFS) {
 			nqflag = NQNFS_NEEDLEASE(vp, procid);
 			if (nqflag) {
@@ -623,6 +629,7 @@ nfsm_reqh(vp, procid, hsiz, bposp)
 				*tl = 0;
 			}
 		}
+#endif
 	}
 	/* Finally, return values */
 	*bposp = bpos;
@@ -855,7 +862,8 @@ nfsm_mbuftouio(mrep, uiop, siz, dpos)
 			uiop->uio_iovcnt--;
 			uiop->uio_iov++;
 		} else {
-			(caddr_t)uiop->uio_iov->iov_base += uiosiz;
+			uiop->uio_iov->iov_base =
+			    (caddr_t)uiop->uio_iov->iov_base + uiosiz;
 			uiop->uio_iov->iov_len -= uiosiz;
 		}
 		siz -= uiosiz;
@@ -934,7 +942,8 @@ nfsm_uiotombuf(uiop, mq, siz, bpos)
 			uiop->uio_offset += xfer;
 			uiop->uio_resid -= xfer;
 		}
-		(caddr_t)uiop->uio_iov->iov_base += uiosiz;
+		uiop->uio_iov->iov_base = (caddr_t)uiop->uio_iov->iov_base +
+		    uiosiz;
 		uiop->uio_iov->iov_len -= uiosiz;
 		siz -= uiosiz;
 	}
@@ -1219,8 +1228,8 @@ nfs_initdircache(vp)
 
 	np->n_dircachesize = 0;
 	np->n_dblkno = 1;
-	np->n_dircache =
-	    hashinit(NFS_DIRHASHSIZ, M_NFSDIROFF, M_WAITOK, &nfsdirhashmask);
+	np->n_dircache = hashinit(NFS_DIRHASHSIZ, HASH_LIST, M_NFSDIROFF,
+	    M_WAITOK, &nfsdirhashmask);
 	TAILQ_INIT(&np->n_dirchain);
 	if (nmp->nm_flag & NFSMNT_XLATECOOKIE) {
 		MALLOC(np->n_dirgens, unsigned *,
@@ -1295,8 +1304,8 @@ struct nfsdircache *
 nfs_enterdircache(vp, off, blkoff, en, blkno)
 	struct vnode *vp;
 	off_t off, blkoff;
-	daddr_t blkno;
 	int en;
+	daddr_t blkno;
 {
 	struct nfsnode *np = VTONFS(vp);
 	struct nfsdirhashhead *ndhp;
@@ -1457,6 +1466,7 @@ nfs_init()
 	nfsrv_initcache();		/* Init the server request cache */
 #endif /* NFSSERVER */
 
+#if defined(NFSSERVER) || !defined(NFS_V2_ONLY)
 	/*
 	 * Initialize the nqnfs data structures.
 	 */
@@ -1465,8 +1475,12 @@ nfs_init()
 			+ nqsrv_clockskew + nqsrv_writeslack;
 		NQLOADNOVRAM(nqnfsstarttime);
 		CIRCLEQ_INIT(&nqtimerhead);
-		nqfhhashtbl = hashinit(NQLCHSZ, M_NQLEASE, M_WAITOK, &nqfhhash);
+		nqfhhashtbl = hashinit(NQLCHSZ, HASH_LIST, M_NQLEASE,
+		    M_WAITOK, &nqfhhash);
 	}
+#endif
+
+	exithook_establish(nfs_exit, NULL);
 
 	/*
 	 * Initialize reply list and start timer
@@ -1482,14 +1496,14 @@ nfs_init()
 void
 nfs_vfs_init()
 {
-	int i;
-
-	/* Ensure async daemons disabled */
-	for (i = 0; i < NFS_MAXASYNCDAEMON; i++) {
-		nfs_iodwant[i] = (struct proc *)0;
-		nfs_iodmount[i] = (struct nfsmount *)0;
-	}
 	nfs_nhinit();			/* Init the nfsnode table */
+	nfs_commitsize = uvmexp.npages << (PAGE_SHIFT - 4);
+}
+
+void
+nfs_vfs_reinit()
+{
+	nfs_nhreinit();
 }
 
 void
@@ -1549,6 +1563,8 @@ nfs_loadattrcache(vpp, fp, vaper)
 	int32_t rdev;
 	struct nfsnode *np;
 	extern int (**spec_nfsv2nodeop_p) __P((void *));
+	uid_t uid;
+	gid_t gid;
 
 	if (v3) {
 		vtyp = nfsv3tov_type(fp->fa_type);
@@ -1570,6 +1586,8 @@ nfs_loadattrcache(vpp, fp, vaper)
 		if (vtyp == VCHR && rdev == 0xffffffff)
 			vtyp = VFIFO;
 	}
+
+	vmode &= ALLPERMS;
 
 	/*
 	 * If v_type == VNON it is a new node, so fill in the v_type,
@@ -1594,16 +1612,19 @@ nfs_loadattrcache(vpp, fp, vaper)
 				 * Since the nfsnode does not have a lock, its
 				 * vnode lock has to be carried over.
 				 */
+				/*
+				 * XXX is the old node sure to be locked here?
+				 */
+				KASSERT(lockstatus(&vp->v_lock) ==
+				    LK_EXCLUSIVE);
 				nvp->v_data = vp->v_data;
 				vp->v_data = NULL;
 				VOP_UNLOCK(vp, 0);
 				vp->v_op = spec_vnodeop_p;
 				vrele(vp);
 				vgone(vp);
-				/*
-				 * XXX When nfs starts locking, we need to
-				 * lock the new node here.
-				 */
+				lockmgr(&nvp->v_lock, LK_EXCLUSIVE,
+				    &nvp->v_interlock);
 				/*
 				 * Reinitialize aliased node.
 				 */
@@ -1613,9 +1634,19 @@ nfs_loadattrcache(vpp, fp, vaper)
 		}
 		np->n_mtime = mtime.tv_sec;
 	}
+	uid = fxdr_unsigned(uid_t, fp->fa_uid);
+	gid = fxdr_unsigned(gid_t, fp->fa_gid);
 	vap = np->n_vattr;
+
+	/*
+	 * Invalidate access cache if uid, gid or mode changed.
+	 */
+	if (np->n_accstamp != -1 &&
+	    (gid != vap->va_gid || uid != vap->va_uid || vmode != vap->va_mode))
+		np->n_accstamp = -1;
+
 	vap->va_type = vtyp;
-	vap->va_mode = vmode & ALLPERMS;
+	vap->va_mode = vmode;
 	vap->va_rdev = (dev_t)rdev;
 	vap->va_mtime = mtime;
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsid.val[0];
@@ -1636,8 +1667,8 @@ nfs_loadattrcache(vpp, fp, vaper)
 	}
 	if (v3) {
 		vap->va_nlink = fxdr_unsigned(u_short, fp->fa_nlink);
-		vap->va_uid = fxdr_unsigned(uid_t, fp->fa_uid);
-		vap->va_gid = fxdr_unsigned(gid_t, fp->fa_gid);
+		vap->va_uid = uid;
+		vap->va_gid = gid;
 		vap->va_size = fxdr_hyper(&fp->fa3_size);
 		vap->va_bytes = fxdr_hyper(&fp->fa3_used);
 		vap->va_fileid = fxdr_unsigned(int32_t,
@@ -1648,8 +1679,8 @@ nfs_loadattrcache(vpp, fp, vaper)
 		vap->va_filerev = 0;
 	} else {
 		vap->va_nlink = fxdr_unsigned(u_short, fp->fa_nlink);
-		vap->va_uid = fxdr_unsigned(uid_t, fp->fa_uid);
-		vap->va_gid = fxdr_unsigned(gid_t, fp->fa_gid);
+		vap->va_uid = uid;
+		vap->va_gid = gid;
 		vap->va_size = fxdr_unsigned(u_int32_t, fp->fa2_size);
 		vap->va_bytes = fxdr_unsigned(int32_t, fp->fa2_blocks)
 		    * NFS_FABLKSIZE;
@@ -1663,17 +1694,14 @@ nfs_loadattrcache(vpp, fp, vaper)
 		vap->va_filerev = 0;
 	}
 	if (vap->va_size != np->n_size) {
-		if (vap->va_type == VREG) {
-			if (np->n_flag & NMODIFIED) {
-				if (vap->va_size < np->n_size)
-					vap->va_size = np->n_size;
-				else
-					np->n_size = vap->va_size;
-			} else
-				np->n_size = vap->va_size;
-			uvm_vnp_setsize(vp, np->n_size);
-		} else
+		if ((np->n_flag & NMODIFIED) && vap->va_size < np->n_size) {
+			vap->va_size = np->n_size;
+		} else {
 			np->n_size = vap->va_size;
+			if (vap->va_type == VREG) {
+				uvm_vnp_setsize(vp, np->n_size);
+			}
+		}
 	}
 	np->n_attrstamp = time.tv_sec;
 	if (vaper != NULL) {
@@ -1772,7 +1800,7 @@ nfs_cookieheuristic(vp, flagp, p, cred)
 	if (error || len == 0) {
 		FREE(buf, M_TEMP);
 		if (cookies)
-			FREE(cookies, M_TEMP);
+			free(cookies, M_TEMP);
 		return;
 	}
 
@@ -1796,7 +1824,7 @@ nfs_cookieheuristic(vp, flagp, p, cred)
 	}
 
 	FREE(buf, M_TEMP);
-	FREE(cookies, M_TEMP);
+	free(cookies, M_TEMP);
 }
 #endif /* NFS */
 
@@ -1832,7 +1860,11 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 	struct componentname *cnp = &ndp->ni_cnd;
 
 	*retdirp = (struct vnode *)0;
-	MALLOC(cnp->cn_pnbuf, char *, len + 1, M_NAMEI, M_WAITOK);
+
+	if ((len + 1) > MAXPATHLEN)
+		return (ENAMETOOLONG);
+	cnp->cn_pnbuf = PNBUF_GET();
+
 	/*
 	 * Copy the name from the mbuf list to ndp->ni_pnbuf
 	 * and set the various ndp fields appropriately.
@@ -1892,7 +1924,7 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 		 * Oh joy. For WebNFS, handle those pesky '%' escapes,
 		 * and the 'native path' indicator.
 		 */
-		MALLOC(cp, char *, MAXPATHLEN, M_NAMEI, M_WAITOK);
+		cp = PNBUF_GET();
 		fromcp = cnp->cn_pnbuf;
 		tocp = cp;
 		if ((unsigned char)*fromcp >= WEBNFS_SPECCHAR_START) {
@@ -1933,7 +1965,7 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 				*tocp++ = *fromcp++;
 		}
 		*tocp = '\0';
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		PNBUF_PUT(cnp->cn_pnbuf);
 		cnp->cn_pnbuf = cp;
 	}
 
@@ -1959,24 +1991,23 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 	 * And call lookup() to do the real work
 	 */
 	error = lookup(ndp);
-	if (error)
-		break;
+	if (error) {
+		PNBUF_PUT(cnp->cn_pnbuf);
+		return (error);
+	}
 	/*
 	 * Check for encountering a symbolic link
 	 */
 	if ((cnp->cn_flags & ISSYMLINK) == 0) {
-		if (cnp->cn_flags & (SAVENAME | SAVESTART)) {
+		if (cnp->cn_flags & (SAVENAME | SAVESTART))
 			cnp->cn_flags |= HASBUF;
-			return (0);
-		}
-		break;
+		else
+			PNBUF_PUT(cnp->cn_pnbuf);
+		return (0);
 	} else {
-		if ((cnp->cn_flags & LOCKPARENT) && ndp->ni_pathlen == 1)
+		if ((cnp->cn_flags & LOCKPARENT) && (cnp->cn_flags & ISLASTCN))
 			VOP_UNLOCK(ndp->ni_dvp, 0);
 		if (!pubflag) {
-			vrele(ndp->ni_dvp);
-			vput(ndp->ni_vp);
-			ndp->ni_vp = NULL;
 			error = EINVAL;
 			break;
 		}
@@ -1985,8 +2016,14 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 			error = ELOOP;
 			break;
 		}
+		if (ndp->ni_vp->v_mount->mnt_flag & MNT_SYMPERM) {
+			error = VOP_ACCESS(ndp->ni_vp, VEXEC, cnp->cn_cred,
+			    cnp->cn_proc);
+			if (error != 0)
+				break;
+		}
 		if (ndp->ni_pathlen > 1)
-			MALLOC(cp, char *, MAXPATHLEN, M_NAMEI, M_WAITOK);
+			cp = PNBUF_GET();
 		else
 			cp = cnp->cn_pnbuf;
 		aiov.iov_base = cp;
@@ -2002,7 +2039,7 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 		if (error) {
 		badlink:
 			if (ndp->ni_pathlen > 1)
-				FREE(cp, M_NAMEI);
+				PNBUF_PUT(cp);
 			break;
 		}
 		linklen = MAXPATHLEN - auio.uio_resid;
@@ -2016,7 +2053,7 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 		}
 		if (ndp->ni_pathlen > 1) {
 			memcpy(cp + linklen, ndp->ni_next, ndp->ni_pathlen);
-			FREE(cnp->cn_pnbuf, M_NAMEI);
+			PNBUF_PUT(cnp->cn_pnbuf);
 			cnp->cn_pnbuf = cp;
 		} else
 			cnp->cn_pnbuf[linklen] = '\0';
@@ -2033,8 +2070,11 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag, pubflag)
 		}
 	}
    }
+	vrele(ndp->ni_dvp);
+	vput(ndp->ni_vp);
+	ndp->ni_vp = NULL;
 out:
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
 	return (error);
 }
 
@@ -2360,7 +2400,6 @@ netaddr_match(family, haddr, nam)
 	return (0);
 }
 
-
 /*
  * The write verifier has changed (probably due to a server reboot), so all
  * B_NEEDCOMMIT blocks will have to be written again. Since they are on the
@@ -2371,17 +2410,14 @@ void
 nfs_clearcommit(mp)
 	struct mount *mp;
 {
-	struct vnode *vp, *nvp;
-	struct buf *bp, *nbp;
+	struct vnode *vp;
 	struct nfsnode *np;
+	struct vm_page *pg;
 	int s;
 
 	s = splbio();
-loop:
-	for (vp = mp->mnt_vnodelist.lh_first; vp; vp = nvp) {
-		if (vp->v_mount != mp)	/* Paranoia */
-			goto loop;
-		nvp = vp->v_mntvnodes.le_next;
+	LIST_FOREACH(vp, &mp->mnt_vnodelist, v_mntvnodes) {
+		KASSERT(vp->v_mount == mp);
 		if (vp->v_type == VNON)
 			continue;
 		np = VTONFS(vp);
@@ -2389,12 +2425,11 @@ loop:
 		    np->n_pushedhi = 0;
 		np->n_commitflags &=
 		    ~(NFS_COMMIT_PUSH_VALID | NFS_COMMIT_PUSHED_VALID);
-		for (bp = vp->v_dirtyblkhd.lh_first; bp; bp = nbp) {
-			nbp = bp->b_vnbufs.le_next;
-			if ((bp->b_flags & (B_BUSY | B_DELWRI | B_NEEDCOMMIT))
-				== (B_DELWRI | B_NEEDCOMMIT))
-				bp->b_flags &= ~B_NEEDCOMMIT;
+		simple_lock(&vp->v_uobj.vmobjlock);
+		TAILQ_FOREACH(pg, &vp->v_uobj.memq, listq) {
+			pg->flags &= ~PG_NEEDCOMMIT;
 		}
+		simple_unlock(&vp->v_uobj.vmobjlock);
 	}
 	splx(s);
 }
@@ -2426,47 +2461,47 @@ nfs_merge_commit_ranges(vp)
 }
 
 int
-nfs_in_committed_range(vp, bp)
+nfs_in_committed_range(vp, off, len)
 	struct vnode *vp;
-	struct buf *bp;
+	off_t off, len;
 {
 	struct nfsnode *np = VTONFS(vp);
 	off_t lo, hi;
 
 	if (!(np->n_commitflags & NFS_COMMIT_PUSHED_VALID))
 		return 0;
-	lo = (off_t)bp->b_blkno * DEV_BSIZE;
-	hi = lo + bp->b_dirtyend;
+	lo = off;
+	hi = lo + len;
 
 	return (lo >= np->n_pushedlo && hi <= np->n_pushedhi);
 }
 
 int
-nfs_in_tobecommitted_range(vp, bp)
+nfs_in_tobecommitted_range(vp, off, len)
 	struct vnode *vp;
-	struct buf *bp;
+	off_t off, len;
 {
 	struct nfsnode *np = VTONFS(vp);
 	off_t lo, hi;
 
 	if (!(np->n_commitflags & NFS_COMMIT_PUSH_VALID))
 		return 0;
-	lo = (off_t)bp->b_blkno * DEV_BSIZE;
-	hi = lo + bp->b_dirtyend;
+	lo = off;
+	hi = lo + len;
 
 	return (lo >= np->n_pushlo && hi <= np->n_pushhi);
 }
 
 void
-nfs_add_committed_range(vp, bp)
+nfs_add_committed_range(vp, off, len)
 	struct vnode *vp;
-	struct buf *bp;
+	off_t off, len;
 {
 	struct nfsnode *np = VTONFS(vp);
 	off_t lo, hi;
 
-	lo = (off_t)bp->b_blkno * DEV_BSIZE;
-	hi = lo + bp->b_dirtyend;
+	lo = off;
+	hi = lo + len;
 
 	if (!(np->n_commitflags & NFS_COMMIT_PUSHED_VALID)) {
 		np->n_pushedlo = lo;
@@ -2485,9 +2520,9 @@ nfs_add_committed_range(vp, bp)
 }
 
 void
-nfs_del_committed_range(vp, bp)
+nfs_del_committed_range(vp, off, len)
 	struct vnode *vp;
-	struct buf *bp;
+	off_t off, len;
 {
 	struct nfsnode *np = VTONFS(vp);
 	off_t lo, hi;
@@ -2495,8 +2530,8 @@ nfs_del_committed_range(vp, bp)
 	if (!(np->n_commitflags & NFS_COMMIT_PUSHED_VALID))
 		return;
 
-	lo = (off_t)bp->b_blkno * DEV_BSIZE;
-	hi = lo + bp->b_dirtyend;
+	lo = off;
+	hi = lo + len;
 
 	if (lo > np->n_pushedhi || hi < np->n_pushedlo)
 		return;
@@ -2522,15 +2557,15 @@ nfs_del_committed_range(vp, bp)
 }
 
 void
-nfs_add_tobecommitted_range(vp, bp)
+nfs_add_tobecommitted_range(vp, off, len)
 	struct vnode *vp;
-	struct buf *bp;
+	off_t off, len;
 {
 	struct nfsnode *np = VTONFS(vp);
 	off_t lo, hi;
 
-	lo = (off_t)bp->b_blkno * DEV_BSIZE;
-	hi = lo + bp->b_dirtyend;
+	lo = off;
+	hi = lo + len;
 
 	if (!(np->n_commitflags & NFS_COMMIT_PUSH_VALID)) {
 		np->n_pushlo = lo;
@@ -2549,9 +2584,9 @@ nfs_add_tobecommitted_range(vp, bp)
 }
 
 void
-nfs_del_tobecommitted_range(vp, bp)
+nfs_del_tobecommitted_range(vp, off, len)
 	struct vnode *vp;
-	struct buf *bp;
+	off_t off, len;
 {
 	struct nfsnode *np = VTONFS(vp);
 	off_t lo, hi;
@@ -2559,8 +2594,8 @@ nfs_del_tobecommitted_range(vp, bp)
 	if (!(np->n_commitflags & NFS_COMMIT_PUSH_VALID))
 		return;
 
-	lo = (off_t)bp->b_blkno * DEV_BSIZE;
-	hi = lo + bp->b_dirtyend;
+	lo = off;
+	hi = lo + len;
 
 	if (lo > np->n_pushhi || hi < np->n_pushlo)
 		return;
@@ -2595,7 +2630,7 @@ nfsrv_errmap(nd, err)
 	struct nfsrv_descript *nd;
 	int err;
 {
-	short *defaulterrp, *errp;
+	const short *defaulterrp, *errp;
 
 	if (nd->nd_flag & ND_NFSV3) {
 	    if (nd->nd_procnum <= NFSPROC_COMMIT) {

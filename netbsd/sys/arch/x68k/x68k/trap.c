@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.41 2000/06/06 18:52:47 soren Exp $	*/
+/*	$NetBSD: trap.c,v 1.58 2002/02/14 07:08:19 chs Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,15 +43,12 @@
  */
 
 #include "opt_ddb.h"
-#include "opt_syscall_debug.h"
+#include "opt_kgdb.h"
 #include "opt_execfmt.h"
-#include "opt_ktrace.h"
-#include "opt_compat_netbsd.h"
 #include "opt_compat_sunos.h"
 #include "opt_compat_hpux.h"
-#include "opt_compat_linux.h"
 #include "opt_m680x0.h"
-#include "opt_fpuemulate.h"
+#include "opt_fpu_emulate.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,9 +60,6 @@
 #include <sys/syscall.h>
 #include <sys/syslog.h>
 #include <sys/user.h>
-#ifdef KTRACE
-#include <sys/ktrace.h>
-#endif
 
 #include <machine/psl.h>
 #include <machine/trap.h>
@@ -73,8 +67,6 @@
 #include <machine/reg.h>
 #include <machine/db_machdep.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
 #include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
@@ -89,22 +81,12 @@ extern struct emul emul_hpux;
 #endif
 
 #ifdef COMPAT_SUNOS
+#include <compat/sunos/sunos_exec.h>
 #include <compat/sunos/sunos_syscall.h>
-extern struct emul emul_sunos;
-#endif
-
-#ifdef COMPAT_LINUX
-#ifdef EXEC_AOUT
-extern struct emul emul_linux_aout;
-#endif
-#ifdef EXEC_ELF32
-extern struct emul emul_linux_elf32;
-#endif
 #endif
 
 int	writeback __P((struct frame *fp, int docachepush));
 void	trap __P((int type, u_int code, u_int v, struct frame frame));
-void	syscall __P((register_t code, struct frame frame));
 
 #if defined(M68040) || defined(M68060)
 #ifdef DEBUG
@@ -264,6 +246,22 @@ again:
 }
 
 /*
+ * Used by the common m68k syscall() and child_return() functions.
+ * XXX: Temporary until all m68k ports share common trap()/userret() code.
+ */
+void machine_userret(struct proc *, struct frame *, u_quad_t);
+
+void
+machine_userret(p, f, t)
+	struct proc *p;
+	struct frame *f;
+	u_quad_t t;
+{
+
+	userret(p, f, t, 0, 0);
+}
+
+/*
  * Trap is called from locore to handle most types of processor traps,
  * including events such as simulated software interrupts/AST's.
  * System calls are broken out for efficiency.
@@ -370,10 +368,10 @@ trap(type, code, v, frame)
 		printf("pid %d: kernel %s exception\n", p->p_pid,
 		       type==T_COPERR ? "coprocessor" : "format");
 		type |= T_USER;
-		p->p_sigacts->ps_sigact[SIGILL].sa_handler = SIG_DFL;
-		sigdelset(&p->p_sigignore, SIGILL);
-		sigdelset(&p->p_sigcatch, SIGILL);
-		sigdelset(&p->p_sigmask, SIGILL);
+		SIGACTION(p, SIGILL).sa_handler = SIG_DFL;
+		sigdelset(&p->p_sigctx.ps_sigignore, SIGILL);
+		sigdelset(&p->p_sigctx.ps_sigcatch, SIGILL);
+		sigdelset(&p->p_sigctx.ps_sigmask, SIGILL);
 		i = SIGILL;
 		ucode = frame.f_format;	/* XXX was ILL_RESAD_FAULT */
 		break;
@@ -560,7 +558,7 @@ trap(type, code, v, frame)
 		if (ssir & SIR_CLOCK) {
 			siroff(SIR_CLOCK);
 			uvmexp.softs++;
-			softclock();
+			softclock(NULL);
 		}
 		if (ssir & SIR_SERIAL) {
 #include "zsc.h"
@@ -612,10 +610,10 @@ trap(type, code, v, frame)
 	    {
 		vaddr_t va;
 		struct vmspace *vm = p->p_vmspace;
-		vm_map_t map;
+		struct vm_map *map;
 		int rv;
 		vm_prot_t ftype;
-		extern vm_map_t kernel_map;
+		extern struct vm_map *kernel_map;
 
 #ifdef DEBUG
 		if ((mmudebug & MDB_WBFOLLOW) || MDB_ISPID(p->p_pid))
@@ -637,7 +635,7 @@ trap(type, code, v, frame)
 			map = vm ? &vm->vm_map : kernel_map;
 
 		if (WRFAULT(code))
-			ftype = VM_PROT_READ | VM_PROT_WRITE;
+			ftype = VM_PROT_WRITE;
 		else
 			ftype = VM_PROT_READ;
 
@@ -656,10 +654,10 @@ trap(type, code, v, frame)
 			vaddr_t bva;
 
 			rv = pmap_mapmulti(map->pmap, va);
-			if (rv != KERN_SUCCESS) {
+			if (rv != 0) {
 				bva = HPMMBASEADDR(va);
 				rv = uvm_fault(map, bva, 0, ftype);
-				if (rv == KERN_SUCCESS)
+				if (rv == 0)
 					(void) pmap_mapmulti(map->pmap, va);
 			}
 		} else
@@ -679,16 +677,16 @@ trap(type, code, v, frame)
 		 */
 		if ((vm != NULL && (caddr_t)va >= vm->vm_maxsaddr)
 		    && map != kernel_map) {
-			if (rv == KERN_SUCCESS) {
+			if (rv == 0) {
 				unsigned nss;
 
 				nss = btoc(USRSTACK-(unsigned)va);
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
-			} else if (rv == KERN_PROTECTION_FAILURE)
-				rv = KERN_INVALID_ADDRESS;
+			} else if (rv == EACCES)
+				rv = EFAULT;
 		}
-		if (rv == KERN_SUCCESS) {
+		if (rv == 0) {
 			if (type == T_MMUFLT) {
 #ifdef M68040
 				if (cputype == CPU_68040)
@@ -708,7 +706,7 @@ trap(type, code, v, frame)
 			goto dopanic;
 		}
 		ucode = v;
-		if (rv == KERN_RESOURCE_SHORTAGE) {
+		if (rv == ENOMEM) {
 			printf("UVM: pid %d (%s), uid %d killed: out of swap\n",
 			       p->p_pid, p->p_comm,
 			       p->p_cred && p->p_ucred ?
@@ -796,12 +794,14 @@ writeback(fp, docachepush)
 			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
 			    trunc_page(f->f_fa), VM_PROT_WRITE,
 			    VM_PROT_WRITE|PMAP_WIRED);
-			fa = (u_int)&vmmap[(f->f_fa & PGOFSET) & ~0xF];
-			bcopy((caddr_t)&f->f_pd0, (caddr_t)fa, 16);
+			pmap_update(pmap_kernel());
+			fa = (u_int)&vmmap[m68k_page_offset(f->f_fa) & ~0xF];
+			memcpy((caddr_t)fa, (caddr_t)&f->f_pd0, 16);
 			(void) pmap_extract(pmap_kernel(), (paddr_t)fa, &pa);
 			DCFL(pa);
 			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
 				    (vaddr_t)&vmmap[NBPG]);
+			pmap_update(pmap_kernel());
 		} else
 			printf("WARNING: pid %d(%s) uid %d: CPUSH not done\n",
 			       p->p_pid, p->p_comm, p->p_ucred->cr_uid);
@@ -821,7 +821,8 @@ writeback(fp, docachepush)
 		wbstats.move16s++;
 #endif
 		if (KDFAULT(f->f_wb1s))
-			bcopy((caddr_t)&f->f_pd0, (caddr_t)(f->f_fa & ~0xF), 16);
+			memcpy((caddr_t)(f->f_fa & ~0xF),
+			    (caddr_t)&f->f_pd0, 16);
 		else
 			err = suline((caddr_t)(f->f_fa & ~0xF), (caddr_t)&f->f_pd0);
 		if (err) {
@@ -1029,213 +1030,3 @@ dumpwb(num, s, a, d)
 }
 #endif
 #endif
-
-/*
- * Process a system call.
- */
-void
-syscall(code, frame)
-	register_t code;
-	struct frame frame;
-{
-	caddr_t params;
-	struct sysent *callp;
-	struct proc *p;
-	int error, opc, nsys;
-	size_t argsize;
-	register_t args[8], rval[2];
-	u_quad_t sticks;
-
-	uvmexp.syscalls++;
-	if (!USERMODE(frame.f_sr))
-		panic("syscall");
-	p = curproc;
-	sticks = p->p_sticks;
-	p->p_md.md_regs = frame.f_regs;
-	opc = frame.f_pc;
-
-	nsys = p->p_emul->e_nsysent;
-	callp = p->p_emul->e_sysent;
-
-#ifdef COMPAT_SUNOS
-	if (p->p_emul == &emul_sunos) {
-		/*
-		 * SunOS passes the syscall-number on the stack, whereas
-		 * BSD passes it in D0. So, we have to get the real "code"
-		 * from the stack, and clean up the stack, as SunOS glue
-		 * code assumes the kernel pops the syscall argument the
-		 * glue pushed on the stack. Sigh...
-		 */
-		code = fuword((caddr_t)frame.f_regs[SP]);
-
-		/*
-		 * XXX
-		 * Don't do this for sunos_sigreturn, as there's no stored pc
-		 * on the stack to skip, the argument follows the syscall
-		 * number without a gap.
-		 */
-		if (code != SUNOS_SYS_sigreturn) {
-			frame.f_regs[SP] += sizeof (int);
-			/*
-			 * remember that we adjusted the SP, 
-			 * might have to undo this if the system call
-			 * returns ERESTART.
-			 */
-			p->p_md.md_flags |= MDP_STACKADJ;
-		} else
-			p->p_md.md_flags &= ~MDP_STACKADJ;
-	}
-#endif
-
-	params = (caddr_t)frame.f_regs[SP] + sizeof(int);
-
-	switch (code) {
-	case SYS_syscall:
-		/*
-		 * Code is first argument, followed by actual args.
-		 */
-		code = fuword(params);
-		params += sizeof(int);
-		/*
-		 * XXX sigreturn requires special stack manipulation
-		 * that is only done if entered via the sigreturn
-		 * trap.  Cannot allow it here so make sure we fail.
-		 */
-		switch (code) {
-#ifdef COMPAT_13
-		case SYS_compat_13_sigreturn13:
-#endif
-		case SYS___sigreturn14:
-			code = nsys;
-			break;
-		}
-		break;
-	case SYS___syscall:
-		/*
-		 * Like syscall, but code is a quad, so as to maintain
-		 * quad alignment for the rest of the arguments.
-		 */
-		if (callp != sysent)
-			break;
-		code = fuword(params + _QUAD_LOWWORD * sizeof(int));
-		params += sizeof(quad_t);
-		break;
-	default:
-		break;
-	}
-	if (code < 0 || code >= nsys)
-		callp += p->p_emul->e_nosys;		/* illegal */
-	else
-		callp += code;
-	argsize = callp->sy_argsize;
-#ifdef COMPAT_LINUX
-	if (0
-# ifdef EXEC_AOUT
-	    || p->p_emul == &emul_linux_aout
-# endif
-# ifdef EXEC_ELF32
-	    || p->p_emul == &emul_linux_elf32
-# endif
-	     ) {
-		/*
-		 * Linux passes the args in d1-d5
-		 */
-		switch (argsize) {
-		case 20:
-			args[4] = frame.f_regs[D5];
-		case 16:
-			args[3] = frame.f_regs[D4];
-		case 12:
-			args[2] = frame.f_regs[D3];
-		case 8:
-			args[1] = frame.f_regs[D2];
-		case 4:
-			args[0] = frame.f_regs[D1];
-		case 0:
-			error = 0;
-			break;
-		default:
-#ifdef DEBUG
-			panic("linux syscall %d weird argsize %d",
-				code, argsize);
-#else
-			error = EINVAL;
-#endif
-			break;
-		}
-	} else
-#endif
-	if (argsize)
-		error = copyin(params, (caddr_t)args, argsize);
-	else
-		error = 0;
-#ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
-#endif
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, code, argsize, args);
-#endif
-	if (error)
-		goto bad;
-	rval[0] = 0;
-	rval[1] = frame.f_regs[D1];
-	error = (*callp->sy_call)(p, args, rval);
-	switch (error) {
-	case 0:
-		frame.f_regs[D0] = rval[0];
-		frame.f_regs[D1] = rval[1];
-		frame.f_sr &= ~PSL_C;	/* carry bit */
-		break;
-	case ERESTART:
-		/*
-		 * We always enter through a `trap' instruction, which is 2
-		 * bytes, so adjust the pc by that amount.
-		 */
-		frame.f_pc = opc - 2;
-		break;
-	case EJUSTRETURN:
-		/* nothing to do */
-		break;
-	default:
-	bad:
-		if (p->p_emul->e_errno)
-			error = p->p_emul->e_errno[error];
-		frame.f_regs[D0] = error;
-		frame.f_sr |= PSL_C;	/* carry bit */
-		break;
-	}
-
-#ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
-#endif
-#ifdef COMPAT_SUNOS
-	/* need new p-value for this */
-	if (error == ERESTART && (p->p_md.md_flags & MDP_STACKADJ))
-		frame.f_regs[SP] -= sizeof (int);
-#endif
-	userret(p, &frame, sticks, (u_int)0, 0);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, code, error, rval[0]);
-#endif
-}
-
-void
-child_return(arg)
-	void *arg;
-{
-	struct proc *p = arg;
-	/* See cpu_fork() */
-	struct frame *f = (struct frame *)p->p_md.md_regs;
-
-	f->f_regs[D0] = 0;
-	f->f_sr &= ~PSL_C;
-	f->f_format = FMT0;
-
-	userret(p, f, 0, (u_int)0, 0);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, SYS_fork, 0, 0);
-#endif
-}

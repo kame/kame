@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_tty.c,v 1.16 1998/12/10 17:13:08 christos Exp $	*/
+/*	$NetBSD: hpux_tty.c,v 1.20 2001/11/13 02:08:21 lukem Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -45,7 +45,13 @@
 /*
  * stty/gtty/termio emulation stuff
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hpux_tty.c,v 1.20 2001/11/13 02:08:21 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_43.h"
+#endif
 
 #ifndef COMPAT_43
 #define COMPAT_43
@@ -518,11 +524,12 @@ getsettty(p, fdes, com, cmarg)
 	struct sgttyb sb;
 	int error;
 
-	if (((unsigned)fdes) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fdes]) == NULL)
+	if ((fp = fd_getfile(fdp, fdes)) == NULL)
 		return (EBADF);
+
 	if ((fp->f_flag & (FREAD|FWRITE)) == 0)
 		return (EBADF);
+
 	if (com == HPUXTIOCSETP) {
 		if ((error = copyin(cmarg, (caddr_t)&hsb, sizeof hsb)))
 			return (error);

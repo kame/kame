@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ate.c,v 1.24 2000/05/29 17:37:17 jhawk Exp $	*/
+/*	$NetBSD: if_ate.c,v 1.30 2002/01/07 21:47:06 thorpej Exp $	*/
 
 /*
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
@@ -31,6 +31,9 @@
  * incurred with its use.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ate.c,v 1.30 2002/01/07 21:47:06 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -46,6 +49,7 @@
 
 #include <dev/ic/mb86960reg.h>
 #include <dev/ic/mb86960var.h>
+#include <dev/ic/ate_subr.h>
 
 #include <dev/isa/isavar.h>
 #include <dev/isa/if_fereg.h>	/* XXX */
@@ -60,12 +64,12 @@ struct ate_softc {
 	void	*sc_ih;				/* interrupt cookie */
 };
 
-struct cfattach ate_ca = {
+struct cfattach ate_isa_ca = {
 	sizeof(struct ate_softc), ate_match, ate_attach
 };
 
 #if NetBSD <= 199712
-struct cfdriver ate_cd = {
+struct cfdriver ate_isa_cd = {
 	NULL, "ate", DV_IFNET
 };
 #endif
@@ -78,9 +82,6 @@ struct fe_simple_probe_struct {
 
 static __inline__ int fe_simple_probe __P((bus_space_tag_t, 
     bus_space_handle_t, struct fe_simple_probe_struct const *));
-static __inline__ void ate_strobe __P((bus_space_tag_t, bus_space_handle_t));
-static void ate_read_eeprom __P((bus_space_tag_t, bus_space_handle_t,
-    u_char *));
 static int ate_find __P((bus_space_tag_t, bus_space_handle_t, int *,
     int *));
 static int ate_detect __P((bus_space_tag_t, bus_space_handle_t,
@@ -111,15 +112,23 @@ ate_match(parent, match, aux)
 	int i, iobase, irq, rv = 0;
 	u_int8_t myea[ETHER_ADDR_LEN];
 
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
 	/* Disallow wildcarded values. */
-	if (ia->ia_iobase == ISACF_PORT_DEFAULT)
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
 		return (0);
 
 	/*
 	 * See if the sepcified address is valid for MB86965A JLI mode.
 	 */
 	for (i = 0; i < NATE_IOMAP; i++)
-		if (ate_iomap[i] == ia->ia_iobase)
+		if (ate_iomap[i] == ia->ia_io[0].ir_addr)
 			break;
 	if (i == NATE_IOMAP) {
 #ifdef ATE_DEBUG
@@ -129,10 +138,10 @@ ate_match(parent, match, aux)
 	}
 
 	/* Map i/o space. */
-	if (bus_space_map(iot, ia->ia_iobase, ATE_NPORTS, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, ATE_NPORTS, 0, &ioh)) {
 #ifdef ATE_DEBUG
 		printf("ate_match: couldn't map iospace 0x%x\n",
-		    ia->ia_iobase);
+		    ia->ia_io[0].ir_addr);
 #endif
 		return (0);
 	}
@@ -144,7 +153,7 @@ ate_match(parent, match, aux)
 		goto out;
 	}
 
-	if (iobase != ia->ia_iobase) {
+	if (iobase != ia->ia_io[0].ir_addr) {
 #ifdef ATE_DEBUG
 		printf("ate_match: unexpected iobase in board: 0x%x\n",
 		    ia->ia_iobase);
@@ -159,18 +168,24 @@ ate_match(parent, match, aux)
 		goto out;
 	}
 
-	if (ia->ia_irq != ISACF_IRQ_DEFAULT) {
-		if (ia->ia_irq != irq) {
+	if (ia->ia_irq[0].ir_irq != ISACF_IRQ_DEFAULT) {
+		if (ia->ia_irq[0].ir_irq != irq) {
 			printf("ate_match: irq mismatch; "
 			    "kernel configured %d != board configured %d\n",
-			    ia->ia_irq, irq);
+			    ia->ia_irq[0].ir_irq, irq);
 			goto out;
 		}
 	} else
-		ia->ia_irq = irq;
+		ia->ia_irq[0].ir_irq = irq;
 
-	ia->ia_iosize = ATE_NPORTS;
-	ia->ia_msize = 0;
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_size = ATE_NPORTS;
+
+	ia->ia_nirq = 1;
+
+	ia->ia_niomem = 0;
+	ia->ia_ndrq = 0;
+
 	rv = 1;
 
  out:
@@ -202,105 +217,6 @@ fe_simple_probe (iot, ioh, sp)
 	}
 
 	return (1);
-}
-
-/*
- * Routines to read all bytes from the config EEPROM through MB86965A.
- * I'm not sure what exactly I'm doing here...  I was told just to follow
- * the steps, and it worked.  Could someone tell me why the following
- * code works?  (Or, why all similar codes I tried previously doesn't
- * work.)  FIXME.
- */
-
-static __inline__ void
-ate_strobe (iot, ioh)
-	bus_space_tag_t iot;
-	bus_space_handle_t ioh;
-{
-
-	/*
-	 * Output same value twice.  To speed-down execution?
-	 */
-	bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
-	bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
-	bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT | FE_B16_CLOCK);
-	bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT | FE_B16_CLOCK);
-	bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
-	bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
-}
-
-static void
-ate_read_eeprom(iot, ioh, data)
-	bus_space_tag_t iot;
-	bus_space_handle_t ioh;
-	u_char *data;
-{
-	int n, count;
-	u_char val, bit;
-
-	/* Read bytes from EEPROM; two bytes per an iterration. */
-	for (n = 0; n < FE_EEPROM_SIZE / 2; n++) {
-		/* Reset the EEPROM interface. */
-		bus_space_write_1(iot, ioh, FE_BMPR16, 0x00);
-		bus_space_write_1(iot, ioh, FE_BMPR17, 0x00);
-		bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
-
-		/* Start EEPROM access. */
-		bus_space_write_1(iot, ioh, FE_BMPR17, FE_B17_DATA);
-		ate_strobe(iot, ioh);
-
-		/* Pass the iterration count to the chip. */
-		count = 0x80 | n;
-		for (bit = 0x80; bit != 0x00; bit >>= 1) {
-			bus_space_write_1(iot, ioh, FE_BMPR17,
-			    (count & bit) ? FE_B17_DATA : 0);
-			ate_strobe(iot, ioh);
-		}
-		bus_space_write_1(iot, ioh, FE_BMPR17, 0x00);
-
-		/* Read a byte. */
-		val = 0;
-		for (bit = 0x80; bit != 0x00; bit >>= 1) {
-			ate_strobe(iot, ioh);
-			if (bus_space_read_1(iot, ioh, FE_BMPR17) &
-			    FE_B17_DATA)
-				val |= bit;
-		}
-		*data++ = val;
-
-		/* Read one more byte. */
-		val = 0;
-		for (bit = 0x80; bit != 0x00; bit >>= 1) {
-			ate_strobe(iot, ioh);
-			if (bus_space_read_1(iot, ioh, FE_BMPR17) &
-			    FE_B17_DATA)
-				val |= bit;
-		}
-		*data++ = val;
-	}
-
-	/* Make sure the EEPROM is turned off. */
-	bus_space_write_1(iot, ioh, FE_BMPR16, 0);
-	bus_space_write_1(iot, ioh, FE_BMPR17, 0);
-
-#if ATE_DEBUG >= 3
-	/* Report what we got. */
-	data -= FE_EEPROM_SIZE;
-	log(LOG_INFO, "ate_read_eeprom: EEPROM at %04x:"
-	    " %02x%02x%02x%02x %02x%02x%02x%02x -"
-	    " %02x%02x%02x%02x %02x%02x%02x%02x -"
-	    " %02x%02x%02x%02x %02x%02x%02x%02x -"
-	    " %02x%02x%02x%02x %02x%02x%02x%02x\n",
-	    (int) ioh,		/* XXX */
-	    data[ 0], data[ 1], data[ 2], data[ 3],
-	    data[ 4], data[ 5], data[ 6], data[ 7],
-	    data[ 8], data[ 9], data[10], data[11],
-	    data[12], data[13], data[14], data[15],
-	    data[16], data[17], data[18], data[19],
-	    data[20], data[21], data[22], data[23],
-	    data[24], data[25], data[26], data[27],
-	    data[28], data[29], data[30], data[31]);
-#endif
 }
 
 /*
@@ -363,7 +279,7 @@ ate_find(iot, ioh, iobase, irq)
 	 * We are now almost sure we have an AT1700 at the given
 	 * address.  So, read EEPROM through 86965.  We have to write
 	 * into LSI registers to read from EEPROM.  I want to avoid it
-	 * at this stage, but I cannot test the presense of the chip
+	 * at this stage, but I cannot test the presence of the chip
 	 * any further without reading EEPROM.  FIXME.
 	 */
 	ate_read_eeprom(iot, ioh, eeprom);
@@ -419,7 +335,7 @@ ate_detect(iot, ioh, enaddr)
 
 	/* Get our station address from EEPROM. */
 	ate_read_eeprom(iot, ioh, eeprom);
-	bcopy(eeprom + FE_ATI_EEP_ADDR, enaddr, ETHER_ADDR_LEN);
+	memcpy(enaddr, eeprom + FE_ATI_EEP_ADDR, ETHER_ADDR_LEN);
 
 	/* Make sure we got a valid station address. */
 	if ((enaddr[0] & 0x03) != 0x00 ||
@@ -471,7 +387,7 @@ ate_attach(parent, self, aux)
 	printf("\n");
 
 	/* Map i/o space. */
-	if (bus_space_map(iot, ia->ia_iobase, ATE_NPORTS, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, ATE_NPORTS, 0, &ioh)) {
 		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -479,7 +395,7 @@ ate_attach(parent, self, aux)
 	sc->sc_bst = iot;
 	sc->sc_bsh = ioh;
 
-	/* Determine the card type and get ehternet address. */
+	/* Determine the card type and get ethernet address. */
 	type = ate_detect(iot, ioh, myea);
 	switch (type) {
 	case FE_TYPE_AT1700T:
@@ -517,8 +433,8 @@ ate_attach(parent, self, aux)
 	mb86960_config(sc, NULL, 0, 0);
 
 	/* Establish the interrupt handler. */
-	isc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_NET, mb86960_intr, sc);
+	isc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_NET, mb86960_intr, sc);
 	if (isc->sc_ih == NULL)
 		printf("%s: couldn't establish interrupt handler\n",
 		    sc->sc_dev.dv_xname);

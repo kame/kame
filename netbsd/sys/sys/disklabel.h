@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.60.4.4 2002/01/29 22:16:37 he Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.70.4.1 2002/07/22 04:39:55 lukem Exp $	*/
 
 /*
  * Copyright (c) 1987, 1988, 1993
@@ -272,7 +272,7 @@ struct olddisklabel {
 #define	DTYPE_VND		12		/* vnode pseudo-disk */
 #define DTYPE_ATAPI		13		/* ATAPI */
 #define	DTYPE_RAID		14		/* RAIDframe */
-#define DTYPE_LD		15		/* logical disk */
+#define	DTYPE_LD		15		/* logical disk */
 
 #ifdef DKTYPENAMES
 static const char *const dktypenames[] = {
@@ -324,6 +324,8 @@ static const char *const dktypenames[] = {
 #define	FS_RAID		19		/* RAIDframe component */
 #define	FS_CCD		20		/* concatenated disk component */
 
+/* Adjust the FSMAXTYPES def below if you add something after CCD */
+
 #ifdef	FSTYPENAMES
 static const char *const fstypenames[] = {
 	"unused",
@@ -350,6 +352,8 @@ static const char *const fstypenames[] = {
 	NULL
 };
 #define FSMAXTYPES	(sizeof(fstypenames) / sizeof(fstypenames[0]) - 1)
+#else
+#define FSMAXTYPES	(FS_CCD + 1)
 #endif
 
 #ifdef FSCKNAMES
@@ -466,8 +470,8 @@ struct partinfo {
 #ifdef _KERNEL
 struct buf_queue;
 
-void	 diskerr
-	    __P((struct buf *, char *, char *, int, int, struct disklabel *));
+void	 diskerr __P((const struct buf *, const char *, const char *, int,
+	    int, const struct disklabel *));
 void	 disksort_cylinder __P((struct buf_queue *, struct buf *));
 void	 disksort_blkno __P((struct buf_queue *, struct buf *));
 void	 disksort_tail __P((struct buf_queue *, struct buf *));

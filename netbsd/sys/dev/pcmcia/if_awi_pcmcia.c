@@ -1,4 +1,4 @@
-/* $NetBSD: if_awi_pcmcia.c,v 1.16.2.1 2000/07/14 14:37:50 onoe Exp $ */
+/* $NetBSD: if_awi_pcmcia.c,v 1.22 2001/12/15 13:23:22 soren Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -44,9 +44,8 @@
  * DS cards based on the same chipset.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_awi_pcmcia.c,v 1.22 2001/12/15 13:23:22 soren Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -64,24 +63,6 @@
 #include <net/if_media.h>
 #include <net/if_ieee80211.h>
 
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
-
 #include <machine/cpu.h>
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -95,12 +76,11 @@
 #include <dev/pcmcia/pcmciavar.h>
 #include <dev/pcmcia/pcmciadevs.h>
 
-static int awi_pcmcia_match __P((struct device *, struct cfdata *, void *));
-static void awi_pcmcia_attach __P((struct device *, struct device *, void *));
-static int awi_pcmcia_detach __P((struct device *, int));
-static int awi_pcmcia_enable __P((struct awi_softc *));
-static void awi_pcmcia_disable __P((struct awi_softc *));
-static void awi_pcmcia_powerhook __P((int, void *));
+static int awi_pcmcia_match(struct device *, struct cfdata *, void *);
+static void awi_pcmcia_attach(struct device *, struct device *, void *);
+static int awi_pcmcia_detach(struct device *, int);
+static int awi_pcmcia_enable(struct awi_softc *);
+static void awi_pcmcia_disable(struct awi_softc *);
 
 struct awi_pcmcia_softc {
 	struct awi_softc sc_awi;		/* real "awi" softc */
@@ -111,7 +91,7 @@ struct awi_pcmcia_softc {
 	int sc_io_window;			/* our i/o window */
 	int sc_mem_window;			/* our memory window */
 	struct pcmcia_function *sc_pf;		/* our PCMCIA function */
-	void *sc_powerhook;			/* power hook descriptor */
+	void *sc_ih;				/* interrupt handler */
 };
 
 static int	awi_pcmcia_find __P((struct awi_pcmcia_softc *,
@@ -122,7 +102,7 @@ struct cfattach awi_pcmcia_ca = {
 	awi_pcmcia_detach, awi_activate
 };
 
-static struct awi_pcmcia_product {
+static const struct awi_pcmcia_product {
 	u_int32_t	app_vendor;	/* vendor ID */
 	u_int32_t	app_product;	/* product ID */
 	const char	*app_cisinfo[4]; /* CIS information */
@@ -153,14 +133,14 @@ static struct awi_pcmcia_product {
 	  { NULL, NULL, NULL, NULL },	NULL },
 };
 
-static struct awi_pcmcia_product *
+static const struct awi_pcmcia_product *
 	awi_pcmcia_lookup __P((struct pcmcia_attach_args *));
 
-static struct awi_pcmcia_product *
+static const struct awi_pcmcia_product *
 awi_pcmcia_lookup(pa)
 	struct pcmcia_attach_args *pa;
 {
-	struct awi_pcmcia_product *app;
+	const struct awi_pcmcia_product *app;
 
 	for (app = awi_pcmcia_products; app->app_name != NULL; app++) {
 		/* match by vendor/product id */
@@ -191,15 +171,15 @@ awi_pcmcia_enable(sc)
 	struct pcmcia_function *pf = psc->sc_pf;
 
 	/* establish the interrupt. */
-	sc->sc_ih = pcmcia_intr_establish(pf, IPL_NET, awi_intr, sc);
-	if (sc->sc_ih == NULL) {
+	psc->sc_ih = pcmcia_intr_establish(pf, IPL_NET, awi_intr, sc);
+	if (psc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt\n",
 		    sc->sc_dev.dv_xname);
 		return (1);
 	}
 
 	if (pcmcia_function_enable(pf)) {
-		pcmcia_intr_disestablish(pf, sc->sc_ih);
+		pcmcia_intr_disestablish(pf, psc->sc_ih);
 		return (1);
 	}
 	DELAY(1000);
@@ -215,7 +195,7 @@ awi_pcmcia_disable(sc)
 	struct pcmcia_function *pf = psc->sc_pf;
 
 	pcmcia_function_disable(pf);
-	pcmcia_intr_disestablish(pf, sc->sc_ih);
+	pcmcia_intr_disestablish(pf, psc->sc_ih);
 }
 
 static int
@@ -295,10 +275,10 @@ awi_pcmcia_attach(parent, self, aux)
 {
 	struct awi_pcmcia_softc *psc = (void *)self;
 	struct awi_softc *sc = &psc->sc_awi;
-	struct awi_pcmcia_product *app;
+	const struct awi_pcmcia_product *app;
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_config_entry *cfe;
-	bus_addr_t memoff;
+	bus_size_t memoff;
 
 	app = awi_pcmcia_lookup(pa);
 	if (app == NULL)
@@ -347,13 +327,12 @@ awi_pcmcia_attach(parent, self, aux)
 	sc->sc_disable = awi_pcmcia_disable;
 
 	/* establish the interrupt. */
-	sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, awi_intr, sc);
-	if (sc->sc_ih == NULL) {
+	psc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, awi_intr, sc);
+	if (psc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt\n",
 		    sc->sc_dev.dv_xname);
 		goto no_interrupt;
 	}
-	sc->sc_ifp = &sc->sc_ec.ec_if;
 	sc->sc_cansleep = 1;
 
 	if (awi_attach(sc) != 0) {
@@ -361,7 +340,6 @@ awi_pcmcia_attach(parent, self, aux)
 		    sc->sc_dev.dv_xname);
 		goto attach_failed;
 	}
-	psc->sc_powerhook = powerhook_establish(awi_pcmcia_powerhook, psc);
 
 	sc->sc_enabled = 0;
 	/* disable device and disestablish the interrupt */
@@ -369,7 +347,7 @@ awi_pcmcia_attach(parent, self, aux)
 	return;
 
  attach_failed:
-	pcmcia_intr_disestablish(psc->sc_pf, sc->sc_ih);
+	pcmcia_intr_disestablish(psc->sc_pf, psc->sc_ih);
 
  no_interrupt:
 	/* Unmap our memory window and space */
@@ -402,9 +380,6 @@ awi_pcmcia_detach(self, flags)
 		/* Nothing to detach. */
 		return (0);
 
-	if (psc->sc_powerhook != NULL)
-		powerhook_disestablish(psc->sc_powerhook);
-
 	error = awi_detach(&psc->sc_awi);
 	if (error != 0)
 		return (error);
@@ -421,15 +396,4 @@ awi_pcmcia_detach(self, flags)
 	/* Free our i/o space. */
 	pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
 	return (0);
-}
-
-static void
-awi_pcmcia_powerhook(why, arg)
-	int why;
-	void *arg;
-{
-	struct awi_pcmcia_softc *psc = arg;
-	struct awi_softc *sc = &psc->sc_awi;
-
-	awi_power(sc, why);
 }

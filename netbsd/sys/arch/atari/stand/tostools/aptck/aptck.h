@@ -1,4 +1,4 @@
-/*	$NetBSD: aptck.h,v 1.1.1.1 1996/01/07 21:54:15 leo Exp $	*/
+/*	$NetBSD: aptck.h,v 1.3 2002/02/24 20:51:07 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 Waldi Ravens.
@@ -41,13 +41,6 @@
 #define BUS(major, minor)	(((major) >> 3) & 0x1FFF)
 #define BIOSDEV(major, minor)	(((minor) == 0) ? ((major) + 2) : 0)
 
-typedef signed char	int8_t;
-typedef unsigned char	u_int8_t;
-typedef signed short	int16_t;
-typedef unsigned short	u_int16_t;
-typedef signed long	int32_t;
-typedef unsigned long	u_int32_t;
-
 typedef enum {
 	ACSI = 0,
 	SCSI = 1,
@@ -75,8 +68,8 @@ typedef struct {
 	u_int		hdsize;		/* medium size from root sector	*/
 	u_int		bslst;		/* start of bad sector list	*/
 	u_int		bslend;		/* end of bad sector list	*/
-	u_int		nroots;		/* # of auxilary root sectors	*/
-	u_int		*roots;		/* list of auxilary roots	*/
+	u_int		nroots;		/* # of auxiliary root sectors	*/
+	u_int		*roots;		/* list of auxiliary roots	*/
 	u_int		nparts;		/* number of regular partitions	*/
 	part_t 		*parts;		/* list of partition descriptors */
 } disk_t;

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_ntptime.c,v 1.11 2000/06/02 18:22:44 cgd Exp $	*/
+/*	$NetBSD: kern_ntptime.c,v 1.21 2002/05/03 01:22:30 eeh Exp $	*/
 
 /******************************************************************************
  *                                                                            *
@@ -48,6 +48,10 @@
  * this routine are used by hardclock() to adjust the phase and
  * frequency of the phase-lock loop which controls the system clock.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_ntptime.c,v 1.21 2002/05/03 01:22:30 eeh Exp $");
+
 #include "opt_ntp.h"
 
 #include <sys/param.h>
@@ -55,6 +59,7 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
+#include <sys/sysctl.h>
 #include <sys/timex.h>
 #include <sys/vnode.h>
 
@@ -63,11 +68,7 @@
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
-#include <sys/sysctl.h>
-
 #ifdef NTP
-
 /*
  * The following variables are used by the hardclock() routine in the
  * kern_clock.c module and are described in that module. 
@@ -96,8 +97,6 @@ extern long pps_calcnt;		/* calibration intervals */
 extern long pps_errcnt;		/* calibration errors */
 extern long pps_stbcnt;		/* stability limit exceeded */
 #endif /* PPS_SYNC */
-
-
 
 /*ARGSUSED*/
 /*
@@ -185,7 +184,6 @@ sys_ntp_gettime(p, v, retval)
 	return(error);
 }
 
-
 /* ARGSUSED */
 /*
  * ntp_adjtime() - NTP daemon application interface
@@ -201,73 +199,87 @@ sys_ntp_adjtime(p, v, retval)
 	} */ *uap = v;
 	struct timex ntv;
 	int error = 0;
+
+	if ((error = copyin((caddr_t)SCARG(uap, tp), (caddr_t)&ntv,
+			sizeof(ntv))) != 0)
+		return (error);
+
+	if (ntv.modes != 0 && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		return (error);
+
+	return (ntp_adjtime1(&ntv, v, retval));
+}
+
+int
+ntp_adjtime1(ntv, v, retval)
+	struct timex *ntv;
+	void *v;
+	register_t	*retval;
+{
+	struct sys_ntp_adjtime_args /* {
+		syscallarg(struct timex *) tp;
+	} */ *uap = v;
+	int error = 0;
 	int modes;
 	int s;
 
-	if ((error = copyin((caddr_t)SCARG(uap, tp), (caddr_t)&ntv,
-			sizeof(ntv))))
-		return (error);
-
 	/*
-	 * Update selected clock variables - only the superuser can
-	 * change anything. Note that there is no error checking here on
-	 * the assumption the superuser should know what it is doing.
+	 * Update selected clock variables. Note that there is no error 
+	 * checking here on the assumption the superuser should know 
+	 * what it is doing.
 	 */
-	modes = ntv.modes;
-	if (modes != 0 && (error = suser(p->p_ucred, &p->p_acflag)))
-		return (error);
-
+	modes = ntv->modes;
 	s = splclock();
 	if (modes & MOD_FREQUENCY)
 #ifdef PPS_SYNC
-		time_freq = ntv.freq - pps_freq;
+		time_freq = ntv->freq - pps_freq;
 #else /* PPS_SYNC */
-		time_freq = ntv.freq;
+		time_freq = ntv->freq;
 #endif /* PPS_SYNC */
 	if (modes & MOD_MAXERROR)
-		time_maxerror = ntv.maxerror;
+		time_maxerror = ntv->maxerror;
 	if (modes & MOD_ESTERROR)
-		time_esterror = ntv.esterror;
+		time_esterror = ntv->esterror;
 	if (modes & MOD_STATUS) {
 		time_status &= STA_RONLY;
-		time_status |= ntv.status & ~STA_RONLY;
+		time_status |= ntv->status & ~STA_RONLY;
 	}
 	if (modes & MOD_TIMECONST)
-		time_constant = ntv.constant;
+		time_constant = ntv->constant;
 	if (modes & MOD_OFFSET)
-		hardupdate(ntv.offset);
+		hardupdate(ntv->offset);
 
 	/*
 	 * Retrieve all clock variables
 	 */
 	if (time_offset < 0)
-		ntv.offset = -(-time_offset >> SHIFT_UPDATE);
+		ntv->offset = -(-time_offset >> SHIFT_UPDATE);
 	else
-		ntv.offset = time_offset >> SHIFT_UPDATE;
+		ntv->offset = time_offset >> SHIFT_UPDATE;
 #ifdef PPS_SYNC
-	ntv.freq = time_freq + pps_freq;
+	ntv->freq = time_freq + pps_freq;
 #else /* PPS_SYNC */
-	ntv.freq = time_freq;
+	ntv->freq = time_freq;
 #endif /* PPS_SYNC */
-	ntv.maxerror = time_maxerror;
-	ntv.esterror = time_esterror;
-	ntv.status = time_status;
-	ntv.constant = time_constant;
-	ntv.precision = time_precision;
-	ntv.tolerance = time_tolerance;
+	ntv->maxerror = time_maxerror;
+	ntv->esterror = time_esterror;
+	ntv->status = time_status;
+	ntv->constant = time_constant;
+	ntv->precision = time_precision;
+	ntv->tolerance = time_tolerance;
 #ifdef PPS_SYNC
-	ntv.shift = pps_shift;
-	ntv.ppsfreq = pps_freq;
-	ntv.jitter = pps_jitter >> PPS_AVG;
-	ntv.stabil = pps_stabil;
-	ntv.calcnt = pps_calcnt;
-	ntv.errcnt = pps_errcnt;
-	ntv.jitcnt = pps_jitcnt;
-	ntv.stbcnt = pps_stbcnt;
+	ntv->shift = pps_shift;
+	ntv->ppsfreq = pps_freq;
+	ntv->jitter = pps_jitter >> PPS_AVG;
+	ntv->stabil = pps_stabil;
+	ntv->calcnt = pps_calcnt;
+	ntv->errcnt = pps_errcnt;
+	ntv->jitcnt = pps_jitcnt;
+	ntv->stbcnt = pps_stbcnt;
 #endif /* PPS_SYNC */
 	(void)splx(s);
 
-	error = copyout((caddr_t)&ntv, (caddr_t)SCARG(uap, tp), sizeof(ntv));
+	error = copyout((caddr_t)ntv, (caddr_t)SCARG(uap, tp), sizeof(*ntv));
 	if (!error) {
 
 		/*
@@ -287,8 +299,6 @@ sys_ntp_adjtime(p, v, retval)
 	}
 	return error;
 }
-
-
 
 /*
  * return information about kernel precision timekeeping
@@ -369,41 +379,16 @@ sysctl_ntptime(where, sizep)
 #endif /* notyet */
 	return (sysctl_rdstruct(where, sizep, NULL, &ntv, sizeof(ntv)));
 }
-
 #else /* !NTP */
+/* For some reason, raising SIGSYS (as sys_nosys would) is problematic. */
 
-/*
- * For kernels configured without the NTP option, emulate the behavior
- * of a kernel with no NTP support (i.e., sys_nosys()). On systems
- * where kernel  NTP support appears present when xntpd is compiled,
- * (e.g., sys/timex.h is present),  xntpd relies on getting a SIGSYS
- * signal in response to an ntp_adjtime() syscal, to inform xntpd that
- * NTP support is not really present, and xntpd should fall back to
- * using a user-level phase-locked loop to discipline the clock.
- */
 int
 sys_ntp_gettime(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
+
 	return(ENOSYS);
 }
-
-int
-sys_ntp_adjtime(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
-{
-	return(sys_nosys(p, v, retval));
-}
-
-int
-sysctl_ntptime(where, sizep)
-	void *where;
-	size_t *sizep;
-{
-	return (ENOSYS);
-}
-#endif /* NTP */
+#endif /* !NTP */

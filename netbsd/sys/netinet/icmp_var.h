@@ -1,4 +1,4 @@
-/*	$NetBSD: icmp_var.h,v 1.15.2.1 2000/08/16 01:22:22 itojun Exp $	*/
+/*	$NetBSD: icmp_var.h,v 1.19 2001/10/30 06:41:09 kml Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -55,6 +55,7 @@ struct	icmpstat {
 	u_quad_t icps_badlen;		/* calculated bound mismatch */
 	u_quad_t icps_reflect;		/* number of responses */
 	u_quad_t icps_inhist[ICMP_MAXTYPE + 1];
+	u_quad_t icps_pmtuchg;		/* path MTU changes */
 };
 
 /*
@@ -66,7 +67,9 @@ struct	icmpstat {
 #endif
 #define ICMPCTL_RETURNDATABYTES	3	/* # of bytes to include in errors */
 #define ICMPCTL_ERRPPSLIMIT	4	/* ICMP error pps limitation */
-#define ICMPCTL_MAXID		5
+#define ICMPCTL_REDIRACCEPT	5	/* Accept redirects from routers */
+#define ICMPCTL_REDIRTIMEOUT	6	/* Remove routes added via redirects */
+#define ICMPCTL_MAXID		7
 
 #define ICMPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -74,6 +77,8 @@ struct	icmpstat {
 	{ 0, 0 }, \
 	{ "returndatabytes", CTLTYPE_INT }, \
 	{ "errppslimit", CTLTYPE_INT }, \
+	{ "rediraccept", CTLTYPE_INT }, \
+	{ "redirtimeout", CTLTYPE_INT }, \
 }
 
 #ifdef _KERNEL

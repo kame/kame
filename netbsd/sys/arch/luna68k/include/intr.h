@@ -1,4 +1,4 @@
-/* $NetBSD: intr.h,v 1.1 2000/01/05 08:49:01 nisimura Exp $ */
+/* $NetBSD: intr.h,v 1.4 2002/05/05 22:07:59 jdolecek Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -39,6 +39,8 @@
 #ifndef _MACHINE_INTR_H
 #define _MACHINE_INTR_H
 
+#ifdef _KERNEL
+
 /*
  * spl functions; all but spl0 are done in-line
  */
@@ -51,18 +53,18 @@
 #define splbio()        spl2()
 #define splnet()        spl3()
 #define spltty()        spl6()
-#define splimp()        spl7()
 #define splclock()      spl5()
 #define splstatclock()	spl5()
 #define splvm()         spl7()
 #define splhigh()       spl7()
 #define splsched()      spl7()
+#define spllock()	spl7()
 
 /* watch out for side effects */
 #define splx(s)         ((s) & PSL_IPL ? _spl(s) : spl0())
 
-#ifdef _KERNEL
 int spl0 __P((void));
+
 #endif /* _KERNEL */
 
 #endif	/* _MACHINE_INTR_H */

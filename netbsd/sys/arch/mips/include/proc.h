@@ -1,4 +1,4 @@
-/*	$NetBSD: proc.h,v 1.10 2000/03/28 02:58:46 simonb Exp $	*/
+/*	$NetBSD: proc.h,v 1.14 2002/03/05 14:12:29 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -40,15 +40,21 @@
 
 #ifndef _MIPS_PROC_H_
 #define _MIPS_PROC_H_
+
+struct proc;
+
 /*
  * Machine-dependent part of the proc structure for MIPS
  */
 struct mdproc {
-	void *md_regs;		/* registers on current frame */
+	void	*md_regs;		/* registers on current frame */
 	int	md_flags;		/* machine-dependent flags */
 	int	md_upte[UPAGES];	/* ptes for mapping u page */
 	int	md_ss_addr;		/* single step address for ptrace */
 	int	md_ss_instr;		/* single step instruction for ptrace */
+	__volatile int md_astpending;	/* AST pending on return to userland */
+					/* syscall entry for this process */
+	void	(*md_syscall)(struct proc *, u_int, u_int, u_int);
 };
 
 /* md_flags */
@@ -59,11 +65,13 @@ struct mdproc {
  */
 struct frame {
 	mips_reg_t f_regs[38];
+	u_int32_t f_ppl;	/* previous priority level */
+	int32_t f_pad;		/* for 8 byte aligned */
 };
 
 #ifdef _KERNEL
 /* kernel single-step emulation */
-int mips_singlestep __P((struct proc *p));
+int mips_singlestep(struct proc *p);
 #endif /* _KERNEL */
 
 #endif /* _MIPS_PROC_H_ */

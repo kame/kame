@@ -1,4 +1,4 @@
-/*	$NetBSD: bereg.h,v 1.3.4.1 2000/07/26 23:11:21 mycroft Exp $	*/
+/*	$NetBSD: bereg.h,v 1.4 2000/07/24 04:28:51 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/* $NetBSD: db_machdep.h,v 1.10 2000/06/08 02:57:36 thorpej Exp $ */
+/* $NetBSD: db_machdep.h,v 1.13 2001/04/19 17:48:47 thorpej Exp $ */
 
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
@@ -35,15 +35,15 @@
  */
 
 #include <sys/param.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/frame.h>
 
 typedef	vaddr_t		db_addr_t;	/* address - unsigned */
 typedef	long		db_expr_t;	/* expression - signed */
 
 typedef struct trapframe db_regs_t;
-db_regs_t		ddb_regs;	/* register state */
-#define	DDB_REGS	(&ddb_regs)
+extern db_regs_t	*ddb_regp;	/* pointer to current register state */
+#define	DDB_REGS	(ddb_regp)
 
 #define	PC_REGS(regs)	((db_addr_t)(regs)->tf_regs[FRAME_PC])
 
@@ -92,6 +92,9 @@ int	ddb_trap(unsigned long, unsigned long, unsigned long,
 
 int	alpha_debug(unsigned long, unsigned long, unsigned long,
 	    unsigned long, struct trapframe *);
+
+struct alpha_bus_space;
+void	alpha_kgdb_init(const char **, struct alpha_bus_space *);
 
 /*
  * We define some of our own commands.

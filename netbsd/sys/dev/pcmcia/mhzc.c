@@ -1,4 +1,4 @@
-/*	$NetBSD: mhzc.c,v 1.5.4.1 2000/08/06 02:12:17 briggs Exp $	*/
+/*	$NetBSD: mhzc.c,v 1.8 2001/11/13 07:26:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -44,6 +44,9 @@
  * the Linux smc91c92_cs.c driver to find the magic details to get this
  * working!
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mhzc.c,v 1.8 2001/11/13 07:26:34 lukem Exp $");
 
 #include "opt_inet.h" 
 #include "opt_ns.h"
@@ -171,7 +174,7 @@ const struct mhzc_product {
 int	mhzc_print __P((void *, const char *));
 
 int	mhzc_check_cfe __P((struct mhzc_softc *, struct pcmcia_config_entry *));
-int	mhzc_alloc_ethernet __P((struct mhzc_softc *));
+int	mhzc_alloc_ethernet __P((struct mhzc_softc *, struct pcmcia_config_entry *));
 
 int	mhzc_enable __P((struct mhzc_softc *, int));
 void	mhzc_disable __P((struct mhzc_softc *, int));
@@ -249,7 +252,7 @@ mhzc_attach(parent, self, aux)
 		return;
 	}
 
-	if (mhzc_alloc_ethernet(sc) == 0) {
+	if (mhzc_alloc_ethernet(sc, cfe) == 0) {
 		printf("%s: unable to allocate space for Ethernet portion\n",
 		    sc->sc_dev.dv_xname);
 		goto alloc_ethernet_failed;
@@ -306,13 +309,14 @@ mhzc_check_cfe(sc, cfe)
 }
 
 int
-mhzc_alloc_ethernet(sc)
+mhzc_alloc_ethernet(sc, cfe)
 	struct mhzc_softc *sc;
+	struct pcmcia_config_entry *cfe;
 {
 	bus_addr_t addr, maxaddr;
 
-	maxaddr = sc->sc_pf->sc->iobase + sc->sc_pf->sc->iosize;
-	addr = sc->sc_pf->sc->iobase;
+	addr = cfe->iospace[0].start + cfe->iospace[0].length;
+	maxaddr = 0x1000;
 
 	/*
 	 * Now round it up so that it starts on a 16-byte boundary.
@@ -340,7 +344,7 @@ mhzc_print(aux, pnp)
 	const char *name = aux;
 
 	if (pnp)
-		printf("%s at %s", name, pnp);
+		printf("%s at %s(*)",  name, pnp);
 
 	return (UNCONF);
 }
@@ -701,6 +705,9 @@ com_mhzc_attach(parent, self, aux)
 		printf("unable to map I/O space\n");
 		return;
 	}
+	printf(" io 0x%x-0x%x",
+	    (int)msc->sc_modem_pcioh.addr,
+	    (int)(msc->sc_modem_pcioh.addr + msc->sc_modem_pcioh.size - 1));
 
 	msc->sc_flags |= MHZC_MODEM_MAPPED;
 
@@ -787,7 +794,9 @@ sm_mhzc_attach(parent, self, aux)
 		printf("unable to map I/O space\n");
 		return;
 	}
-	printf("\n");
+	printf(" io 0x%x-0x%x\n",
+	   (int)msc->sc_ethernet_pcioh.addr,
+	   (int)(msc->sc_ethernet_pcioh.addr + msc->sc_modem_pcioh.size - 1));
 
 	msc->sc_flags |= MHZC_ETHERNET_MAPPED;
 

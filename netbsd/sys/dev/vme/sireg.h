@@ -1,4 +1,4 @@
-/*	$NetBSD: sireg.h,v 1.1.2.1 2000/07/22 21:08:23 pk Exp $	*/
+/*	$NetBSD: sireg.h,v 1.1 2000/07/03 23:30:33 pk Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

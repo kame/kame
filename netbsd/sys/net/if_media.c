@@ -1,4 +1,4 @@
-/*	$NetBSD: if_media.c,v 1.11 2000/03/30 09:45:36 augustss Exp $	*/
+/*	$NetBSD: if_media.c,v 1.15 2001/11/12 23:49:40 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -81,6 +81,9 @@
  * Many thanks to Matt Thomas for providing the information necessary
  * to implement this interface.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_media.c,v 1.15 2001/11/12 23:49:40 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -247,12 +250,12 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 				    newmedia);
 			}
 #endif
-			return (ENXIO);
+			return (EINVAL);
 		}
 
 		/*
 		 * If no change, we're done.
-		 * XXX Automedia may invole software intervention.
+		 * XXX Automedia may involve software intervention.
 		 *     Keep going in case the connected media changed.
 		 *     Similarly, if best match changed (kernel debugger?).
 		 */
@@ -413,7 +416,7 @@ ifmedia_delete_instance(ifm, inst)
  * Compute the interface `baudrate' from the media, for the interface
  * metrics (used by routing daemons).
  */
-struct ifmedia_baudrate ifmedia_baudrate_descriptions[] =
+static const struct ifmedia_baudrate ifmedia_baudrate_descriptions[] =
     IFM_BAUDRATE_DESCRIPTIONS;
 
 int
@@ -434,13 +437,13 @@ ifmedia_baudrate(mword)
 
 #ifdef IFMEDIA_DEBUG
 
-struct ifmedia_description ifm_type_descriptions[] =
+static const struct ifmedia_description ifm_type_descriptions[] =
     IFM_TYPE_DESCRIPTIONS;
 
-struct ifmedia_description ifm_subtype_descriptions[] =
+static const struct ifmedia_description ifm_subtype_descriptions[] =
     IFM_SUBTYPE_DESCRIPTIONS;
 
-struct ifmedia_description ifm_option_descriptions[] =
+static const struct ifmedia_description ifm_option_descriptions[] =
     IFM_OPTION_DESCRIPTIONS;
 
 /*
@@ -450,7 +453,7 @@ static void
 ifmedia_printword(ifmw)
 	int ifmw;
 {
-	struct ifmedia_description *desc;
+	const struct ifmedia_description *desc;
 	int seen_option = 0;
 
 	/* Print the top-level interface type. */

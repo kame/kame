@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_disks.c,v 1.31.2.2 2000/10/17 20:11:33 tv Exp $	*/
+/*	$NetBSD: rf_disks.c,v 1.38 2001/11/15 09:48:13 lukem Exp $	*/
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -66,17 +66,19 @@
  * rf_disks.c -- code to perform operations on the actual disks
  ***************************************************************/
 
-#include "rf_types.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_disks.c,v 1.38 2001/11/15 09:48:13 lukem Exp $");
+
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_raid.h"
 #include "rf_alloclist.h"
 #include "rf_utils.h"
-#include "rf_configure.h"
 #include "rf_general.h"
 #include "rf_options.h"
 #include "rf_kintf.h"
 #include "rf_netbsd.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -406,6 +408,7 @@ rf_AutoConfigureDisks(raidPtr, cfgPtr, auto_config)
 
 	/* Check for mod_counters that are too low */
 	mod_counter_found = 0;
+	mod_counter = 0;
 	ac = auto_config;
 	while(ac!=NULL) {
 		if (mod_counter_found==0) {
@@ -420,6 +423,7 @@ rf_AutoConfigureDisks(raidPtr, cfgPtr, auto_config)
 		ac = ac->next;
 	}
 
+	bs = 0;
 	for (r = 0; r < raidPtr->numRow; r++) {
 		numFailuresThisRow = 0;
 		for (c = 0; c < raidPtr->numCol; c++) {
@@ -1022,10 +1026,6 @@ rf_add_hot_spare(raidPtr, sparePtr)
 	unsigned int bs;
 	int spare_number;
 
-#if 0
-	printf("Just in rf_add_hot_spare: %d\n",raidPtr->numSpare);
-	printf("Num col: %d\n",raidPtr->numCol);
-#endif
 	if (raidPtr->numSpare >= RF_MAXSPARE) {
 		RF_ERRORMSG1("Too many spares: %d\n", raidPtr->numSpare);
 		return(EINVAL);

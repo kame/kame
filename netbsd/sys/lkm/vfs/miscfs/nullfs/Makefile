@@ -1,10 +1,8 @@
-#	$NetBSD: Makefile,v 1.6 1999/07/08 01:51:57 wrstuden Exp $
+#	$NetBSD: Makefile,v 1.8 2001/12/12 12:06:48 lukem Exp $
 
 .include "../Makefile.inc"
 
 .PATH:	$S/miscfs/nullfs $S/miscfs/genfs ${.CURDIR}/../..
-
-MKMAN=	no
 
 KMOD=	nullfs
 

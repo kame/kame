@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_alloclist.c,v 1.4 1999/08/13 03:41:53 oster Exp $	*/
+/*	$NetBSD: rf_alloclist.c,v 1.9 2001/11/20 02:37:29 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -36,7 +36,12 @@
  *
  ***************************************************************************/
 
-#include "rf_types.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_alloclist.c,v 1.9 2001/11/20 02:37:29 oster Exp $");
+
+#include <dev/raidframe/raidframevar.h>
+
+#include "rf_options.h"
 #include "rf_threadstuff.h"
 #include "rf_alloclist.h"
 #include "rf_debugMem.h"
@@ -45,18 +50,18 @@
 #include "rf_shutdown.h"
 
 RF_DECLARE_STATIC_MUTEX(alist_mutex)
-	static unsigned int fl_hit_count, fl_miss_count;
+static unsigned int fl_hit_count, fl_miss_count;
 
-	static RF_AllocListElem_t *al_free_list = NULL;
-	static int al_free_list_count;
+static RF_AllocListElem_t *al_free_list = NULL;
+static int al_free_list_count;
 
 #define RF_AL_FREELIST_MAX 256
 
 #define DO_FREE(_p,_sz) RF_Free((_p),(_sz))
 
-	static void rf_ShutdownAllocList(void *);
+static void rf_ShutdownAllocList(void *);
 
-	static void rf_ShutdownAllocList(ignored)
+static void rf_ShutdownAllocList(ignored)
 	void   *ignored;
 {
 	RF_AllocListElem_t *p, *pt;
@@ -182,6 +187,6 @@ rf_real_MakeAllocList(lockflag)
 	if (p == NULL) {
 		return (NULL);
 	}
-	bzero((char *) p, sizeof(RF_AllocListElem_t));
+	memset((char *) p, 0, sizeof(RF_AllocListElem_t));
 	return (p);
 }

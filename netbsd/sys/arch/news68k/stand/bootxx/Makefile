@@ -1,31 +1,33 @@
-#	$NetBSD: Makefile,v 1.3 2000/04/13 14:19:58 tsutsui Exp $
+#	$NetBSD: Makefile,v 1.10 2002/05/20 14:05:22 lukem Exp $
+
+NOMAN= # defined
+
+.include <bsd.own.mk>
 
 COMMON=	${.CURDIR}/../common
-.ifnmake(print-objdir)
-COMMONOBJ!=	cd ${COMMON}; ${MAKE} print-objdir
-.endif
+COMMONOBJ!=	cd ${COMMON} && ${PRINTOBJDIR}
 
 .PATH:	${COMMON}
 
 PROG= bootxx
 SRCS= start.S bootxx.c
 SRCS+= romcalls.S putchar.c
-MKMAN= no
 STRIPFLAG=
 BINMODE= 444
 
 SIZE?= size
+OBJCOPY?= objcopy
 
 S= ${.CURDIR}/../../../..
 
-LDFLAGS= -x -N -Ttext 0
+LDFLAGS= -x -N -Ttext 0 -e start
 CFLAGS= -Os -Wall
 
 CPPFLAGS+= -D_STANDALONE # -DBOOTXX_DEBUG
 CPPFLAGS+= -nostdinc -I${.OBJDIR} -I${S}
 AFLAGS= -D_LOCORE
 
-CLEANFILES+= machine m68k
+CLEANFILES+= machine m68k ${PROG}.sym
 
 L= ${COMMONOBJ}/lib
 LIBS= ${L}/sa/libsa.a ${L}/kern/libkern.a
@@ -43,7 +45,8 @@ m68k::
 	ln -s ${S}/arch/m68k/include $@
 
 ${PROG}: ${OBJS} machine m68k
-	${LD} ${LDFLAGS} -o ${PROG} ${OBJS} ${LIBS}
-	${SIZE} ${PROG}
+	${LD} ${LDFLAGS} -o ${.TARGET}.sym ${OBJS} ${LIBS}
+	${SIZE} ${.TARGET}.sym
+	${OBJCOPY} -O binary ${.TARGET}.sym ${.TARGET}
 
 .include <bsd.prog.mk>

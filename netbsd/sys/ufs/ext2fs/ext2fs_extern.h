@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_extern.h,v 1.8 2000/03/16 18:08:32 jdolecek Exp $	*/
+/*	$NetBSD: ext2fs_extern.h,v 1.11 2001/09/15 20:36:41 chs Exp $	*/
 
 /*-
  * Copyright (c) 1997 Manuel Bouyer.
@@ -71,6 +71,9 @@ int ext2fs_vfree __P((void *));
 /* ext2fs_balloc.c */
 int ext2fs_balloc __P((struct inode *, ufs_daddr_t, int, struct ucred *,
 			struct buf **, int));
+int ext2fs_gop_alloc __P((struct vnode *, off_t, off_t, int, struct ucred *));
+int ext2fs_balloc_range __P((struct vnode *, off_t, off_t, struct ucred *,
+			     int));
 
 /* ext2fs_bmap.c */
 int ext2fs_bmap __P((void *));
@@ -84,10 +87,10 @@ int ext2fs_inactive __P((void *));
 int ext2fs_readdir __P((void *));
 int ext2fs_lookup  __P((void *));
 int ext2fs_direnter __P((struct inode *, struct vnode *,
-									struct componentname *));
+			 struct componentname *));
 int ext2fs_dirremove __P((struct vnode *, struct componentname *));
 int ext2fs_dirrewrite __P((struct inode *, struct inode *,
-								struct componentname *));
+			   struct componentname *));
 int ext2fs_dirempty __P((struct inode *, ino_t, struct ucred *));
 int ext2fs_checkpath __P((struct inode *, struct inode *, struct ucred *));
 
@@ -100,6 +103,7 @@ void	ext2fs_checkoverlap __P((struct buf *, struct inode *));
 
 /* ext2fs_vfsops.c */
 void ext2fs_init __P((void));
+void ext2fs_reinit __P((void));
 void ext2fs_done __P((void));
 int ext2fs_mountroot __P((void));
 int ext2fs_mount __P((struct mount *, const char *, void *, struct nameidata *,
@@ -137,10 +141,10 @@ int ext2fs_rmdir __P((void *));
 int ext2fs_symlink __P((void *));
 int ext2fs_readlink __P((void *));
 int ext2fs_advlock __P((void *));
-int ext2fs_vinit __P(( struct mount *, int (**specops) __P((void *)),
-					   int (**fifoops) __P((void *)), struct vnode **));
+int ext2fs_vinit __P((struct mount *, int (**specops)(void *),
+		      int (**fifoops)(void *), struct vnode **));
 int ext2fs_makeinode __P((int, struct vnode *, struct vnode **,
-						  struct componentname *cnp));
+			  struct componentname *cnp));
 int ext2fs_reclaim __P((void *));
 
 #define ext2fs_fsync genfs_fsync

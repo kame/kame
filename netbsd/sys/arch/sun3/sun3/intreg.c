@@ -1,4 +1,4 @@
-/*	$NetBSD: intreg.c,v 1.13 1999/03/24 05:51:14 mrg Exp $	*/
+/*	$NetBSD: intreg.c,v 1.17 2001/09/05 13:21:09 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -46,8 +46,6 @@
 #include <sys/device.h>
 #include <sys/vmmeter.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <m68k/asm_single.h>
@@ -73,7 +71,7 @@ struct cfattach intreg_ca = {
 };
 
 volatile u_char *interrupt_reg;
-
+int intreg_attached;
 
 /* called early (by internal_configure) */
 void
@@ -91,14 +89,14 @@ intreg_init()
 
 static int
 intreg_match(parent, cf, args)
-    struct device *parent;
+	struct device *parent;
 	struct cfdata *cf;
-    void *args;
+	void *args;
 {
 	struct confargs *ca = args;
 
-	/* This driver only supports one unit. */
-	if (cf->cf_unit != 0)
+	/* This driver only supports one instance. */
+	if (intreg_attached)
 		return (0);
 
 	/* Validate the given address. */
@@ -123,6 +121,7 @@ intreg_attach(parent, self, args)
 
 	/* Install handler for our "soft" interrupt. */
 	isr_add_autovect(soft1intr, (void *)sc, 1);
+	intreg_attached = 1;
 }
 
 
@@ -153,7 +152,7 @@ soft1intr(arg)
 		}
 		if (sir.sir_which[SIR_CLOCK]) {
 			sir.sir_which[SIR_CLOCK] = 0;
-			softclock();
+			softclock(NULL);
 		}
 		if (sir.sir_which[SIR_SPARE2]) {
 			sir.sir_which[SIR_SPARE2] = 0;
@@ -172,7 +171,7 @@ soft1intr(arg)
 void isr_soft_request(level)
 	int level;
 {
-	register u_char bit;
+	u_char bit;
 
 	if ((level < 1) || (level > 3))
 		return;
@@ -184,7 +183,7 @@ void isr_soft_request(level)
 void isr_soft_clear(level)
 	int level;
 {
-	register u_char bit;
+	u_char bit;
 
 	if ((level < 1) || (level > 3))
 		return;

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_srvcache.c,v 1.16 2000/03/30 12:51:16 augustss Exp $	*/
+/*	$NetBSD: nfs_srvcache.c,v 1.19 2001/11/10 10:59:10 lukem Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -43,6 +43,10 @@
  *		of an NFS Server", in Proc. Winter 1989 USENIX Conference,
  *		pages 53-63. San Diego, February 1989.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_srvcache.c,v 1.19 2001/11/10 10:59:10 lukem Exp $");
+
 #include "opt_iso.h"
 
 #include <sys/param.h>
@@ -87,7 +91,7 @@ u_long nfsrvhash;
 /*
  * Static array that defines which nfs rpc's are nonidempotent
  */
-int nonidempotent[NFS_NPROCS] = {
+const int nonidempotent[NFS_NPROCS] = {
 	FALSE,
 	FALSE,
 	TRUE,
@@ -117,7 +121,7 @@ int nonidempotent[NFS_NPROCS] = {
 };
 
 /* True iff the rpc reply is an nfs status ONLY! */
-static int nfsv2_repstat[NFS_NPROCS] = {
+static const int nfsv2_repstat[NFS_NPROCS] = {
 	FALSE,
 	FALSE,
 	FALSE,
@@ -145,7 +149,8 @@ void
 nfsrv_initcache()
 {
 
-	nfsrvhashtbl = hashinit(desirednfsrvcache, M_NFSD, M_WAITOK, &nfsrvhash);
+	nfsrvhashtbl = hashinit(desirednfsrvcache, HASH_LIST, M_NFSD,
+	    M_WAITOK, &nfsrvhash);
 	TAILQ_INIT(&nfsrvlruhead);
 }
 

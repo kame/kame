@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.32.6.1 2000/07/03 22:24:13 thorpej Exp $	*/
+/*	$NetBSD: zs.c,v 1.35 2002/03/17 19:40:43 atatat Exp $	*/
 
 /*
  * Copyright (c) 1996-1998 Bill Studenmund
@@ -444,7 +444,7 @@ zsmdioctl(cs, cmd, data)
 {
 	switch (cmd) {
 	default:
-		return (-1);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -588,7 +588,7 @@ zs_set_speed(cs, bps)
 	 */
 	for (i=0; i < xcs->cs_clock_count; i++) {
 		if (xcs->cs_clocks[i].clk <= 0)
-			continue;	/* skip non-existant or bad clocks */
+			continue;	/* skip non-existent or bad clocks */
 		if (xcs->cs_clocks[i].flags & ZSC_BRG) {
 			/* check out BRG at /16 */
 			tc1 = BPS_TO_TCONST(xcs->cs_clocks[i].clk >> 4, bps);

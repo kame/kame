@@ -1,4 +1,4 @@
-/*	$NetBSD: mlx.c,v 1.13 2001/08/05 11:11:33 jdolecek Exp $	*/
+/*	$NetBSD: mlx.c,v 1.16 2002/04/23 11:57:45 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -73,6 +73,9 @@
  * o SCSI pass-through.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mlx.c,v 1.16 2002/04/23 11:57:45 ad Exp $");
+
 #include "ld.h"
 
 #include <sys/param.h>
@@ -90,6 +93,8 @@
 
 #include <machine/vmparam.h>
 #include <machine/bus.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/ldvar.h>
 
@@ -281,7 +286,7 @@ mlx_init(struct mlx_softc *mlx, const char *intrstr)
 	 */
         size = MLX_SGL_SIZE * MLX_MAX_QUEUECNT;
 
-	if ((rv = bus_dmamem_alloc(mlx->mlx_dmat, size, NBPG, 0, &seg, 1,
+	if ((rv = bus_dmamem_alloc(mlx->mlx_dmat, size, PAGE_SIZE, 0, &seg, 1,
 	    &rseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: unable to allocate sglists, rv = %d\n",
 		    mlx->mlx_dv.dv_xname, rv);
@@ -314,7 +319,7 @@ mlx_init(struct mlx_softc *mlx, const char *intrstr)
 	memset(mlx->mlx_sgls, 0, size);
 
 	/*
-	 * Allocate and initalize the CCBs.
+	 * Allocate and initialize the CCBs.
 	 */
 	mc = malloc(sizeof(*mc) * MLX_MAX_QUEUECNT, M_DEVBUF, M_NOWAIT);
 	mlx->mlx_ccbs = mc;
@@ -850,8 +855,10 @@ mlxioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		for (i = 0; i < MLX_MAX_DRIVES; i++) {
 			ms = &mlx->mlx_sysdrive[i];
 			if (ms->ms_dv != NULL)
-				if (ms->ms_dv->dv_xname[2] == '0' + *arg)
-					return (i);
+				if (ms->ms_dv->dv_xname[2] == '0' + *arg) {
+					*arg = i;
+					return (0);
+				}
 		}
 		return (ENOENT);
 	}
@@ -1913,7 +1920,8 @@ mlx_ccb_map(struct mlx_softc *mlx, struct mlx_ccb *mc, void *data, int size,
 	xfer = mc->mc_xfer_map;
 
 	rv = bus_dmamap_load(mlx->mlx_dmat, xfer, data, size, NULL,
-	    BUS_DMA_NOWAIT);
+	    BUS_DMA_NOWAIT | BUS_DMA_STREAMING |
+	    ((dir & MC_XFER_IN) ? BUS_DMA_READ : BUS_DMA_WRITE));
 	if (rv != 0)
 		return (rv);
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_socketcall.c,v 1.19 1999/03/25 04:26:45 sommerfe Exp $	*/
+/*	$NetBSD: linux_socketcall.c,v 1.24 2002/03/29 20:49:41 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_socketcall.c,v 1.24 2002/03/29 20:49:41 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -68,6 +71,13 @@
 
 #include <compat/linux/linux_syscallargs.h>
 
+#undef DPRINTF
+#ifdef DEBUG_LINUX
+#define DPRINTF(a)	uprintf a
+#else
+#define DPRINTF(a)
+#endif
+
 /* Used on: arm, i386, m68k, mips, ppc, sparc, sparc64 */
 /* Not used on: alpha */
 
@@ -79,25 +89,28 @@
  */
 
 /* The sizes of the arguments.  Used for copyin. */
-int linux_socketcall_argsize[] = {
-	-1,
-	sizeof(struct linux_sys_socket_args),		/* 1 */
-	sizeof(struct linux_sys_bind_args),
-	sizeof(struct linux_sys_connect_args),
-	sizeof(struct linux_sys_listen_args),
-	sizeof(struct linux_sys_accept_args),		/* 5 */
-	sizeof(struct linux_sys_getsockname_args),
-	sizeof(struct linux_sys_getpeername_args),
-	sizeof(struct linux_sys_socketpair_args),
-	sizeof(struct linux_sys_send_args),
-	sizeof(struct linux_sys_recv_args),		/* 10 */
-	sizeof(struct linux_sys_sendto_args),
-	sizeof(struct linux_sys_recvfrom_args),
-	sizeof(struct linux_sys_shutdown_args),
-	sizeof(struct linux_sys_setsockopt_args),
-	sizeof(struct linux_sys_getsockopt_args),	/* 15 */
-	sizeof(struct linux_sys_sendmsg_args),
-	sizeof(struct linux_sys_recvmsg_args),		/* 17 */
+static const struct {
+	char *name;
+	int argsize;
+} linux_socketcall[LINUX_MAX_SOCKETCALL+1] = {
+	{"invalid",	-1},						/* 0 */
+	{"socket",	sizeof(struct linux_sys_socket_args)},		/* 1 */
+	{"bind",	sizeof(struct linux_sys_bind_args)},		/* 2 */
+	{"connect",	sizeof(struct linux_sys_connect_args)},		/* 3 */
+	{"listen",	sizeof(struct linux_sys_listen_args)},		/* 4 */
+	{"accept",	sizeof(struct linux_sys_accept_args)},		/* 5 */
+	{"getsockname",	sizeof(struct linux_sys_getsockname_args)},	/* 6 */
+	{"getpeername",	sizeof(struct linux_sys_getpeername_args)},	/* 7 */
+	{"socketpair",	sizeof(struct linux_sys_socketpair_args)},	/* 8 */
+	{"send",	sizeof(struct linux_sys_send_args)},		/* 9 */
+	{"recv",	sizeof(struct linux_sys_recv_args)},		/* 10 */
+	{"sendto",	sizeof(struct linux_sys_sendto_args)},		/* 11 */
+	{"recvfrom",	sizeof(struct linux_sys_recvfrom_args)},	/* 12 */
+	{"shutdown",	sizeof(struct linux_sys_shutdown_args)},	/* 13 */
+	{"setsockopt",	sizeof(struct linux_sys_setsockopt_args)},	/* 14 */
+	{"getsockopt",	sizeof(struct linux_sys_getsockopt_args)},	/* 15 */
+	{"sendmsg",	sizeof(struct linux_sys_sendmsg_args)},		/* 16 */
+	{"recvmsg",	sizeof(struct linux_sys_recvmsg_args)},		/* 17 */
 };
 
 /*
@@ -117,49 +130,74 @@ linux_sys_socketcall(p, v, retval)
 	struct linux_socketcall_dummy_args lda;
 	int error;
 
-	if (SCARG(uap, what) > LINUX_MAX_SOCKETCALL)
+	if (SCARG(uap, what) < 0 || SCARG(uap, what) > LINUX_MAX_SOCKETCALL)
 		return ENOSYS;
 
 	if ((error = copyin((caddr_t) SCARG(uap, args), (caddr_t) &lda,
-	    linux_socketcall_argsize[SCARG(uap, what)])))
+	    linux_socketcall[SCARG(uap, what)].argsize))) {
+		DPRINTF(("copyin for %s failed %d\n",
+		linux_socketcall[SCARG(uap, what)].name, error));
 		return error;
+	}
 
 	switch (SCARG(uap, what)) {
 	case LINUX_SYS_socket:
-		return linux_sys_socket(p, (void *)&lda, retval);
+		error = linux_sys_socket(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_bind:
-		return sys_bind(p, (void *)&lda, retval);
+		error = linux_sys_bind(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_connect:
-		return linux_sys_connect(p, (void *)&lda, retval);
+		error = linux_sys_connect(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_listen:
-		return sys_listen(p, (void *)&lda, retval);
+		error = sys_listen(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_accept:
-		return compat_43_sys_accept(p, (void *)&lda, retval);
+		error = linux_sys_accept(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_getsockname:
-		return compat_43_sys_getsockname(p, (void *)&lda, retval);
+		error = linux_sys_getsockname(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_getpeername:
-		return compat_43_sys_getpeername(p, (void *)&lda, retval);
+		error = linux_sys_getpeername(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_socketpair:
-		return linux_sys_socketpair(p, (void *)&lda, retval);
+		error = linux_sys_socketpair(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_send:
-		return compat_43_sys_send(p, (void *)&lda, retval);
+		error = linux_sys_send(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_recv:
-		return compat_43_sys_recv(p, (void *)&lda, retval);
+		error = linux_sys_recv(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_sendto:
-		return linux_sys_sendto(p, (void *)&lda, retval);
+		error = linux_sys_sendto(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_recvfrom:
-		return linux_sys_recvfrom(p, (void *)&lda, retval);
+		error = linux_sys_recvfrom(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_shutdown:
-		return sys_shutdown(p, (void *)&lda, retval);
+		error = sys_shutdown(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_setsockopt:
-		return linux_sys_setsockopt(p, (void *)&lda, retval);
+		error = linux_sys_setsockopt(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_getsockopt:
-		return linux_sys_getsockopt(p, (void *)&lda, retval);
+		error = linux_sys_getsockopt(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_sendmsg:
-		return sys_sendmsg(p, (void *)&lda, retval);
+		error = linux_sys_sendmsg(p, (void *)&lda, retval);
+		break;
 	case LINUX_SYS_recvmsg:
-		return sys_recvmsg(p, (void *)&lda, retval);
+		error = linux_sys_recvmsg(p, (void *)&lda, retval);
+		break;
 	default:
-		return ENOSYS;
+		error = ENOSYS;
+		break;
 	}
+
+	DPRINTF(("sys_%s() = %d\n", linux_socketcall[SCARG(uap, what)].name,
+	    error));
+	return error;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cc.h,v 1.10 1999/09/25 21:47:03 is Exp $	*/
+/*	$NetBSD: cc.h,v 1.14 2002/04/25 09:20:26 aymeric Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -36,16 +36,20 @@
 #include <sys/queue.h>
 #include <amiga/amiga/cc_registers.h>
 
+#ifndef __powerpc__
+#include "opt_lev6_defer.h"
+#endif /* __powerpc__ */
+
 #if ! defined (HIADDR)
 #define HIADDR(x) (u_short)((((unsigned long)(x))>>16)&0xffff)
-#endif 
+#endif
 #if ! defined (LOADDR)
 #define LOADDR(x) (u_short)(((unsigned long)(x))&0xffff)
 #endif
 
 
-/* 
- * Audio stuff 
+/*
+ * Audio stuff
  */
 struct audio_channel {
 	u_short play_count;
@@ -54,10 +58,10 @@ struct audio_channel {
 };
 
 #ifdef LEV6_DEFER
-#define AUCC_MAXINT 3 
+#define AUCC_MAXINT 3
 #define AUCC_ALLINTF (INTF_AUD0|INTF_AUD1|INTF_AUD2)
-#else 
-#define AUCC_MAXINT 4 
+#else
+#define AUCC_MAXINT 4
 #define AUCC_ALLINTF (INTF_AUD0|INTF_AUD1|INTF_AUD2|INTF_AUD3)
 #endif
 /*
@@ -86,7 +90,7 @@ enum vbl_node_bits {
 enum vlb_node_flags {
     VBLNF_OFF = 1 << VBLNB_OFF,
     VBLNF_TURNOFF = 1 << VBLNB_TURNOFF,
-};    
+};
 
 /*
  * Blitter stuff.
@@ -153,7 +157,7 @@ typedef struct copper_list {
  */
 
 struct mem_node {
-	CIRCLEQ_ENTRY(mem_node) link; 	
+	CIRCLEQ_ENTRY(mem_node) link; 
 	CIRCLEQ_ENTRY(mem_node) free_link;
 	u_long size;		/* size of memory following node. */
 };
@@ -163,9 +167,9 @@ struct mem_node {
 #define MNODES_MEM(mn) ((u_char *)(&mn[1]))
 #define PREP_DMA_MEM(mem) (void *)((caddr_t)mem - CHIPMEMADDR)
 
-vaddr_t CHIPMEMADDR;
-vaddr_t chipmem_start;
-vaddr_t chipmem_end;
+extern vaddr_t CHIPMEMADDR;
+extern vaddr_t chipmem_start;
+extern vaddr_t chipmem_end;
 #define CHIPMEMBASE	(0x00000000)
 #define CHIPMEMTOP	(0x00200000)
 #define NCHIPMEMPG	btoc(CHIPMEMTOP - CHIPMEMBASE)
@@ -173,43 +177,42 @@ vaddr_t chipmem_end;
 /*
  * Prototypes.
  */
-void custom_chips_init __P((void));
+void custom_chips_init(void);
 /* vertical blank server chain */
-void cc_init_vbl __P((void));
-void add_vbl_function __P((struct vbl_node *, short, void *));
-void remove_vbl_function __P((struct vbl_node *));
-void turn_vbl_function_off __P((struct vbl_node *));
-void turn_vbl_function_on __P((struct vbl_node *));
+void cc_init_vbl(void);
+void add_vbl_function(struct vbl_node *, short, void *);
+void remove_vbl_function(struct vbl_node *);
+void turn_vbl_function_off(struct vbl_node *);
+void turn_vbl_function_on(struct vbl_node *);
 /* blitter */
-void cc_init_blitter __P((void));
-int is_blitter_busy __P((void));
-void wait_blit __P((void));
-void blitter_handler __P((void));
-void do_blit __P((u_short));
-void set_blitter_control __P((u_short, u_short));
-void set_blitter_mods __P((u_short, u_short, u_short, u_short));
-void set_blitter_masks __P((u_short, u_short));
-void set_blitter_data __P((u_short, u_short, u_short));
-void set_blitter_pointers __P((void *, void *, void *, void *));
+void cc_init_blitter(void);
+int is_blitter_busy(void);
+void wait_blit(void);
+void blitter_handler(void);
+void do_blit(u_short);
+void set_blitter_control(u_short, u_short);
+void set_blitter_mods(u_short, u_short, u_short, u_short);
+void set_blitter_masks(u_short, u_short);
+void set_blitter_data(u_short, u_short, u_short);
+void set_blitter_pointers(void *, void *, void *, void *);
 /* copper */
-void install_copper_list __P((cop_t *));
-cop_t *find_copper_inst __P((cop_t *, u_short));
-void cc_init_copper __P((void));
-void copper_handler __P((void));
+void install_copper_list(cop_t *);
+cop_t *find_copper_inst(cop_t *, u_short);
+void cc_init_copper(void);
+void copper_handler(void);
 /* audio */
-void cc_init_audio __P((void));
-void play_sample __P((u_short, u_short *, u_short, u_short, u_short, u_long));
-void audio_handler __P((void));
+void cc_init_audio(void);
+void play_sample(u_short, u_short *, u_short, u_short, u_short, u_long);
+void audio_handler(void);
 /* chipmem */
-void cc_init_chipmem __P((void));
-void * alloc_chipmem __P((u_long));
-void free_chipmem __P((void *));
-u_long avail_chipmem __P((int));
-u_long sizeof_chipmem __P((void *));
+void cc_init_chipmem(void);
+void * alloc_chipmem(u_long);
+void free_chipmem(void *);
+u_long avail_chipmem(int);
+u_long sizeof_chipmem(void *);
 
-void wait_tof __P((void));
-void vbl_handler __P((void));
-void *chipmem_steal __P((long));
+void wait_tof(void);
+void vbl_handler(void);
+void *chipmem_steal(long);
 
 #endif /* _CC_H */
-

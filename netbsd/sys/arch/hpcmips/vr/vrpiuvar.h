@@ -1,8 +1,8 @@
-/*	$NetBSD: vrpiuvar.h,v 1.3 2000/01/10 14:08:04 takemura Exp $	*/
+/*	$NetBSD: vrpiuvar.h,v 1.10 2002/03/10 10:13:32 takemura Exp $	*/
 
 /*
- * Copyright (c) 1999 Shin Takemura All rights reserved.
- * Copyright (c) 1999 PocketBSD Project. All rights reserved.
+ * Copyright (c) 1999, 2002 TAKEMURA Shin All rights reserved.
+ * Copyright (c) 1999,2000 PocketBSD Project. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,21 +27,38 @@
  *
  */
 
-enum vrpiu_stat {
-	VRPIU_STAT_DISABLE,
-	VRPIU_STAT_RELEASE,
-	VRPIU_STAT_TOUCH,
+enum vrpiu_tpstat {
+	VRPIU_TP_STAT_DISABLE,
+	VRPIU_TP_STAT_RELEASE,
+	VRPIU_TP_STAT_TOUCH,
 };
+
+enum vrpiu_adstat {
+	VRPIU_AD_STAT_DISABLE,
+	VRPIU_AD_STAT_ENABLE,
+};
+
 
 struct vrpiu_softc {
 	struct device sc_dev;
 	bus_space_tag_t sc_iot;
 	bus_space_handle_t sc_ioh;
+	bus_space_handle_t sc_buf_ioh;
+	int sc_unit;
 	void *sc_handler;
-	vrip_chipset_tag_t *sc_vrip;
+	vrip_chipset_tag_t sc_vrip;
 
-	enum vrpiu_stat sc_stat;
+	enum vrpiu_tpstat sc_tpstat;
+	enum vrpiu_adstat sc_adstat;
+	u_int16_t sc_interval;
+
 	struct device *sc_wsmousedev;
 
 	struct tpcalib_softc sc_tpcalib;
+
+	struct callout sc_adpoll;
+	struct callout sc_tptimeout;
+	void *sc_power_hook;
+	struct hpcbattery_values sc_battery;
+	struct hpcbattery_spec *sc_battery_spec;
 };

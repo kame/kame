@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.11.4.1 2000/12/31 18:35:15 jhawk Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.20 2002/03/09 23:35:57 chs Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,6 +30,11 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifndef OLDPMAP
+#include <powerpc/mpc6xx/vmparam.h>
+#define _MACHINE_VMPARAM_H_
+#endif
 
 #ifndef _MACHINE_VMPARAM_H_
 #define _MACHINE_VMPARAM_H_
@@ -70,17 +75,6 @@
 #define	USRIOSIZE	1024
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Would like to have MAX addresses = 0, but this doesn't (currently) work
  */
 #define	VM_MIN_ADDRESS		((vaddr_t)0)
@@ -91,10 +85,12 @@
 
 /* XXX max. amount of KVM to be used by buffers. */
 #ifndef VM_MAX_KERNEL_BUF
-#define VM_MAX_KERNEL_BUF	(SEGMENT_LENGTH * 7 / 10)
+#define VM_MAX_KERNEL_BUF	(SEGMENT_LENGTH / 2)
 #endif
 
 #define	VM_PHYS_SIZE		(USRIOSIZE * NBPG)
+
+#define	__HAVE_PMAP_PHYSSEG
 
 struct pmap_physseg {
 	struct pv_entry *pvent;

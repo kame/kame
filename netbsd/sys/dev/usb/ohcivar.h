@@ -1,4 +1,4 @@
-/*	$NetBSD: ohcivar.h,v 1.24 2000/06/01 14:28:58 augustss Exp $	*/
+/*	$NetBSD: ohcivar.h,v 1.30 2001/12/31 12:20:35 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/ohcivar.h,v 1.13 1999/11/17 22:33:41 n_hibma Exp $	*/
 
 /*
@@ -105,6 +105,7 @@ typedef struct ohci_softc {
 	int sc_noport;
 	u_int8_t sc_addr;		/* device address */
 	u_int8_t sc_conf;		/* device configuration */
+	char sc_softwake;
 
 	ohci_soft_ed_t *sc_freeeds;
 	ohci_soft_td_t *sc_freetds;
@@ -124,11 +125,25 @@ typedef struct ohci_softc {
 	void *sc_powerhook;		/* cookie from power hook */
 	void *sc_shutdownhook;		/* cookie from shutdown hook */
 #endif
+	u_int32_t sc_control;		/* Preserved during suspend/standby */
+	u_int32_t sc_intre;
+
+	u_int sc_overrun_cnt;
+	struct timeval sc_overrun_ntc;
+
+	usb_callout_t sc_tmo_rhsc;
 
 	device_ptr_t sc_child;
 
 	char sc_dying;
 } ohci_softc_t;
+
+struct ohci_xfer {
+	struct usbd_xfer xfer;
+	struct usb_task	abort_task;
+};
+
+#define OXFER(xfer) ((struct ehci_xfer *)(xfer))
 
 usbd_status	ohci_init(ohci_softc_t *);
 int		ohci_intr(void *);

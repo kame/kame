@@ -1,4 +1,4 @@
-/*	$NetBSD: qe.c,v 1.10.4.1 2000/07/19 02:53:07 mrg Exp $	*/
+/*	$NetBSD: qe.c,v 1.22 2002/03/20 17:57:33 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -71,6 +71,9 @@
  * and a loan of a card from Paul Southworth of the Internet Engineering
  * Group (www.ieng.com).
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: qe.c,v 1.22 2002/03/20 17:57:33 eeh Exp $");
 
 #define QEDEBUG
 
@@ -221,31 +224,35 @@ qeattach(parent, self, aux)
 		return;
 	}
 
-	if (bus_space_map2(sa->sa_bustag,
-			  (bus_type_t)sa->sa_reg[0].sbr_slot,
-			  (bus_addr_t)sa->sa_reg[0].sbr_offset,
+	if (bus_space_map(sa->sa_bustag,
+			  (bus_addr_t)BUS_ADDR(
+				sa->sa_reg[0].sbr_slot,
+				sa->sa_reg[0].sbr_offset),
 			  (bus_size_t)sa->sa_reg[0].sbr_size,
-			  BUS_SPACE_MAP_LINEAR, 0, &sc->sc_cr) != 0) {
+			  0, &sc->sc_cr) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}
 
-	if (bus_space_map2(sa->sa_bustag,
-			  (bus_type_t)sa->sa_reg[1].sbr_slot,
-			  (bus_addr_t)sa->sa_reg[1].sbr_offset,
+	if (bus_space_map(sa->sa_bustag,
+			  (bus_addr_t)BUS_ADDR(
+				sa->sa_reg[1].sbr_slot,
+				sa->sa_reg[1].sbr_offset),
 			  (bus_size_t)sa->sa_reg[1].sbr_size,
-			  BUS_SPACE_MAP_LINEAR, 0, &sc->sc_mr) != 0) {
+			  0, &sc->sc_mr) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}
 
-	sc->sc_rev = getpropint(node, "mace-version", -1);
+	sc->sc_rev = PROM_getpropint(node, "mace-version", -1);
 	printf(" rev %x", sc->sc_rev);
 
+	sc->sc_bustag = sa->sa_bustag;
+	sc->sc_dmatag = sa->sa_dmatag;
 	sc->sc_qec = qec;
 	sc->sc_qr = qec->sc_regs;
 
-	sc->sc_channel = getpropint(node, "channel#", -1);
+	sc->sc_channel = PROM_getpropint(node, "channel#", -1);
 	sc->sc_burst = qec->sc_burst;
 
 	qestop(sc);
@@ -282,26 +289,27 @@ qeattach(parent, self, aux)
 		return;
 	}
 
-	/* Load the buffer */
-	if ((error = bus_dmamap_load_raw(dmatag, sc->sc_dmamap,
-				&seg, rseg, size, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: DMA buffer map load error %d\n",
-			self->dv_xname, error);
-		bus_dmamem_free(dmatag, &seg, rseg);
-		return;
-	}
-	sc->sc_rb.rb_dmabase = sc->sc_dmamap->dm_segs[0].ds_addr;
-
 	/* Map DMA buffer in CPU addressable space */
 	if ((error = bus_dmamem_map(dmatag, &seg, rseg, size,
 			            &sc->sc_rb.rb_membase,
 			            BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
 		printf("%s: DMA buffer map error %d\n",
 			self->dv_xname, error);
-		bus_dmamap_unload(dmatag, sc->sc_dmamap);
 		bus_dmamem_free(dmatag, &seg, rseg);
 		return;
 	}
+
+	/* Load the buffer */
+	if ((error = bus_dmamap_load(dmatag, sc->sc_dmamap,
+				     sc->sc_rb.rb_membase, size, NULL,
+				     BUS_DMA_NOWAIT)) != 0) {
+		printf("%s: DMA buffer map load error %d\n",
+			self->dv_xname, error);
+		bus_dmamem_unmap(dmatag, sc->sc_rb.rb_membase, size);
+		bus_dmamem_free(dmatag, &seg, rseg);
+		return;
+	}
+	sc->sc_rb.rb_dmabase = sc->sc_dmamap->dm_segs[0].ds_addr;
 
 	/* Initialize media properties */
 	ifmedia_init(&sc->sc_ifmedia, 0, qe_ifmedia_upd, qe_ifmedia_sts);
@@ -323,17 +331,13 @@ qeattach(parent, self, aux)
 	ifp->if_watchdog = qewatchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS |
 	    IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
 
 	printf(" address %s\n", ether_sprintf(sc->sc_enaddr));
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB,
-	    sizeof(struct ether_header));
-#endif
 }
 
 /*
@@ -489,7 +493,7 @@ qestart(ifp)
 	bix = sc->sc_rb.rb_tdhead;
 
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 
@@ -1043,7 +1047,7 @@ qeinit(sc)
 #if defined(SUN4U) || defined(__GNUC__)
 	(void)&t;
 #endif
-	s = splimp();
+	s = splnet();
 
 	qestop(sc);
 

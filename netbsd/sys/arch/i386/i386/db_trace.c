@@ -1,4 +1,4 @@
-/*	$NetBSD: db_trace.c,v 1.28.2.1 2001/06/17 22:28:55 he Exp $	*/
+/*	$NetBSD: db_trace.c,v 1.31 2001/11/15 07:03:29 lukem Exp $	*/
 
 /* 
  * Mach Operating System
@@ -26,6 +26,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_trace.c,v 1.31 2001/11/15 07:03:29 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -42,7 +45,7 @@
 /*
  * Machine register set.
  */
-struct db_variable db_regs[] = {
+const struct db_variable db_regs[] = {
 	{ "ds",		(long *)&ddb_regs.tf_ds,     FCN_NULL },
 	{ "es",		(long *)&ddb_regs.tf_es,     FCN_NULL },
 	{ "fs",		(long *)&ddb_regs.tf_fs,     FCN_NULL },
@@ -60,7 +63,7 @@ struct db_variable db_regs[] = {
 	{ "esp",	(long *)&ddb_regs.tf_esp,    FCN_NULL },
 	{ "ss",		(long *)&ddb_regs.tf_ss,     FCN_NULL },
 };
-struct db_variable *db_eregs = db_regs + sizeof(db_regs)/sizeof(db_regs[0]);
+const struct db_variable * const db_eregs = db_regs + sizeof(db_regs)/sizeof(db_regs[0]);
 
 /*
  * Stack trace.

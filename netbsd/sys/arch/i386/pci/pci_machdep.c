@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.36.2.1 2000/08/10 22:25:57 soda Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.44 2002/02/28 21:48:06 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -79,6 +79,9 @@
  * as defined section 3.6.4.1, `Generating Configuration Cycles'.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_machdep.c,v 1.44 2002/02/28 21:48:06 thorpej Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -87,8 +90,7 @@
 #include <sys/device.h>
 #include <sys/lock.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define _I386_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -467,12 +469,12 @@ not2:
 }
 
 int
-pci_intr_map(pc, intrtag, pin, line, ihp)
-	pci_chipset_tag_t pc;
-	pcitag_t intrtag;
-	int pin, line;
+pci_intr_map(pa, ihp)
+	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
+	int pin = pa->pa_intrpin;
+	int line = pa->pa_intrline;
 
 	if (pin == 0) {
 		/* No IRQ used. */
@@ -499,7 +501,8 @@ pci_intr_map(pc, intrtag, pin, line, ihp)
 	 * the BIOS has not configured the device.
 	 */
 	if (line == 0 || line == I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
-		printf("pci_intr_map: no mapping for pin %c\n", '@' + pin);
+		printf("pci_intr_map: no mapping for pin %c (line=%02x)\n",
+		       '@' + pin, line);
 		goto bad;
 	} else {
 		if (line >= ICU_LEN) {
@@ -565,7 +568,7 @@ pci_intr_disestablish(pc, cookie)
 	void *cookie;
 {
 
-	return isa_intr_disestablish(NULL, cookie);
+	isa_intr_disestablish(NULL, cookie);
 }
 
 /*
@@ -576,7 +579,8 @@ pci_intr_disestablish(pc, cookie)
 int
 pci_bus_flags()
 {
-	int rval = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
+	int rval = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED |
+	    PCI_FLAGS_MRL_OKAY | PCI_FLAGS_MRM_OKAY | PCI_FLAGS_MWI_OKAY;
 	int device, maxndevs;
 	pcitag_t tag;
 	pcireg_t id;
@@ -610,6 +614,7 @@ pci_bus_flags()
  disable_mem:
 	printf("Warning: broken PCI-Host bridge detected; "
 	    "disabling memory-mapped access\n");
-	rval &= ~PCI_FLAGS_MEM_ENABLED;
+	rval &= ~(PCI_FLAGS_MEM_ENABLED|PCI_FLAGS_MRL_OKAY|PCI_FLAGS_MRM_OKAY|
+	    PCI_FLAGS_MWI_OKAY);
 	return (rval);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.64.2.1 2001/04/25 09:29:38 he Exp $	*/
+/*	$NetBSD: cpu.h,v 1.80 2002/05/12 23:16:52 matt Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -41,7 +41,7 @@
 #ifndef _I386_CPU_H_
 #define _I386_CPU_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_multiprocessor.h"
 #include "opt_lockdebug.h"
 #endif
@@ -54,12 +54,35 @@
 #include <machine/segments.h>
 
 #include <sys/sched.h>
+
+struct i386_cache_info {
+	int		cai_index;
+	u_int32_t	cai_desc;
+	u_int		cai_totalsize;
+	u_int		cai_associativity;
+	u_int		cai_linesize;
+};
+
+#define	CAI_ITLB	0		/* Instruction TLB (4K pages) */
+#define	CAI_ITLB2	1		/* Instruction TLB (2/4M pages) */
+#define	CAI_DTLB	2		/* Data TLB (4K pages) */
+#define	CAI_DTLB2	3		/* Data TLB (2/4M pages) */
+#define	CAI_ICACHE	4		/* Instruction cache */
+#define	CAI_DCACHE	5		/* Data cache */
+#define	CAI_L2CACHE	6		/* Level 2 cache */
+
+#define	CAI_COUNT	7
+
 struct cpu_info {
 	struct schedstate_percpu ci_schedstate; /* scheduler state */
 #if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
 	u_long ci_spin_locks;		/* # of spin locks held */
 	u_long ci_simple_locks;		/* # of simple locks held */
 #endif
+
+	u_int ci_cflush_lsize;	/* CFLUSH insn line size */
+	struct i386_cache_info ci_cinfo[CAI_COUNT];
+	void (*ci_info) __P((int));
 };
 
 #ifdef _KERNEL
@@ -80,21 +103,29 @@ extern struct cpu_info cpu_info_store;
  * encapsulate the previous machine state in an opaque
  * clockframe; for now, use generic intrframe.
  *
- * XXX intrframe has a lot of gunk we don't need.
+ * Note: Since spllowersoftclock() does not actually unmask the currently
+ * running (hardclock) interrupt, CLKF_BASEPRI() *must* always be 0; otherwise
+ * we could stall hardclock ticks if another interrupt takes too long.
  */
 #define clockframe intrframe
 
 #define	CLKF_USERMODE(frame)	USERMODE((frame)->if_cs, (frame)->if_eflags)
-#define	CLKF_BASEPRI(frame)	((frame)->if_ppl == 0)
+#define	CLKF_BASEPRI(frame)	(0)
 #define	CLKF_PC(frame)		((frame)->if_eip)
 #define	CLKF_INTR(frame)	((frame)->if_ppl & (1 << IPL_TAGINTR))
+
+/*
+ * This is used during profiling to integrate system time.  It can safely
+ * assume that the process is resident.
+ */
+#define	PROC_PC(p)		((p)->p_md.md_regs->tf_eip)
 
 /*
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-int	want_resched;		/* resched() was called */
-#define	need_resched()		(want_resched = 1, setsoftast())
+extern	int	want_resched;		/* resched() was called */
+#define	need_resched(ci)	(want_resched = 1, setsoftast())
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -125,6 +156,8 @@ struct cpu_nocpuid_nameclass {
 	const char *cpu_name;
 	int cpu_class;
 	void (*cpu_setup) __P((void));
+	void (*cpu_cacheinfo) __P((struct cpu_info *));
+	void (*cpu_info) __P((int));
 };
 
 
@@ -136,6 +169,8 @@ struct cpu_cpuid_nameclass {
 		int cpu_class;
 		const char *cpu_models[CPU_MAXMODEL+2];
 		void (*cpu_setup) __P((void));
+		void (*cpu_cacheinfo) __P((struct cpu_info *));
+		void (*cpu_info) __P((int));
 	} cpu_family[CPU_MAXFAMILY - CPU_MINFAMILY + 1];
 };
 
@@ -150,6 +185,10 @@ extern char cpu_vendor[];
 extern int cpuid_level;
 extern const struct cpu_nocpuid_nameclass i386_nocpuid_cpus[];
 extern const struct cpu_cpuid_nameclass i386_cpuid_cpus[];
+
+extern int i386_use_fxsave;
+extern int i386_has_sse;
+extern int i386_has_sse2;
 
 /* machdep.c */
 void	delay __P((int));
@@ -192,9 +231,8 @@ int	math_emulate __P((struct trapframe *));
 #endif
 #ifdef USER_LDT
 /* sys_machdep.h */
-void	i386_user_cleanup __P((struct pcb *));
-int	i386_get_ldt __P((struct proc *, char *, register_t *));
-int	i386_set_ldt __P((struct proc *, char *, register_t *));
+int	i386_get_ldt __P((struct proc *, void *, register_t *));
+int	i386_set_ldt __P((struct proc *, void *, register_t *));
 #endif
 
 /* isa_machdep.c */
@@ -208,9 +246,6 @@ int	isa_nmi __P((void));
 /* vm86.c */
 void	vm86_gpfault __P((struct proc *, int));
 #endif /* VM86 */
-
-/* trap.c */
-void	child_return __P((void *));
 
 /* consinit.c */
 void kgdb_port_init __P((void));
@@ -229,9 +264,22 @@ void i386_bus_space_mallocok __P((void));
 #define	CPU_BIOSEXTMEM		3	/* int: bios-reported ext. mem (K) */
 #define	CPU_NKPDE		4	/* int: number of kernel PDEs */
 #define	CPU_BOOTED_KERNEL	5	/* string: booted kernel name */
-#define CPU_DISKINFO		6	/* disk geometry information */
-#define CPU_FPU_PRESENT		7	/* FPU is present */
-#define	CPU_MAXID		8	/* number of valid machdep ids */
+#define CPU_DISKINFO		6	/* struct disklist *:
+					 * disk geometry information */
+#define CPU_FPU_PRESENT		7	/* int: FPU is present */
+#define	CPU_OSFXSR		8	/* int: OS uses FXSAVE/FXRSTOR */
+#define	CPU_SSE			9	/* int: OS/CPU supports SSE */
+#define	CPU_SSE2		10	/* int: OS/CPU supports SSE2 */
+#define CPU_TMLR_MODE		11 	/* int: longrun mode
+					 * 0: minimum frequency
+					 * 1: economy
+					 * 2: performance
+					 * 3: maximum frequency
+					 */
+#define CPU_TMLR_FREQUENCY	12 	/* int: current frequency */
+#define CPU_TMLR_VOLTAGE	13 	/* int: curret voltage */
+#define CPU_TMLR_PERCENTAGE	14	/* int: current clock percentage */
+#define	CPU_MAXID		15	/* number of valid machdep ids */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
@@ -242,6 +290,13 @@ void i386_bus_space_mallocok __P((void));
 	{ "booted_kernel", CTLTYPE_STRING }, \
 	{ "diskinfo", CTLTYPE_STRUCT }, \
 	{ "fpu_present", CTLTYPE_INT }, \
+	{ "osfxsr", CTLTYPE_INT }, \
+	{ "sse", CTLTYPE_INT }, \
+	{ "sse2", CTLTYPE_INT }, \
+	{ "tm_longrun_mode", CTLTYPE_INT }, \
+	{ "tm_longrun_frequency", CTLTYPE_INT }, \
+	{ "tm_longrun_voltage", CTLTYPE_INT }, \
+	{ "tm_longrun_percentage", CTLTYPE_INT }, \
 }
 
 

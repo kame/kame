@@ -1,4 +1,4 @@
-/*	$NetBSD: ukphy.c,v 1.12.2.1 2000/07/04 04:11:13 thorpej Exp $	*/
+/*	$NetBSD: ukphy.c,v 1.18 2002/03/25 20:51:26 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -70,6 +70,9 @@
  * driver for generic unknown PHYs
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ukphy.c,v 1.18 2002/03/25 20:51:26 thorpej Exp $");
+
 #include "opt_mii.h"
 
 #include <sys/param.h>
@@ -96,25 +99,22 @@ struct mii_knowndev {
 #include <dev/mii/miidevs_data.h>
 #endif
 
-int	ukphymatch __P((struct device *, struct cfdata *, void *));
-void	ukphyattach __P((struct device *, struct device *, void *));
+int	ukphymatch(struct device *, struct cfdata *, void *);
+void	ukphyattach(struct device *, struct device *, void *);
 
 struct cfattach ukphy_ca = {
 	sizeof(struct mii_softc), ukphymatch, ukphyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	ukphy_service __P((struct mii_softc *, struct mii_data *, int));
+int	ukphy_service(struct mii_softc *, struct mii_data *, int);
 
 const struct mii_phy_funcs ukphy_funcs = {
 	ukphy_service, ukphy_status, mii_phy_reset,
 };
 
 int
-ukphymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+ukphymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 
 	/*
@@ -124,9 +124,7 @@ ukphymatch(parent, match, aux)
 }
 
 void
-ukphyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+ukphyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
@@ -157,7 +155,8 @@ ukphyattach(parent, self, aux)
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &ukphy_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	/*
 	 * Don't do loopback on unknown PHYs.  It might confuse some of them.
@@ -168,8 +167,11 @@ ukphyattach(parent, self, aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
+	if (sc->mii_capabilities & BMSR_EXTSTAT)
+		sc->mii_extcapabilities = PHY_READ(sc, MII_EXTSR);
 	printf("%s: ", sc->mii_dev.dv_xname);
-	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
+	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0 &&
+	    (sc->mii_extcapabilities & EXTSR_MEDIAMASK) == 0)
 		printf("no media present");
 	else
 		mii_phy_add_media(sc);
@@ -177,10 +179,7 @@ ukphyattach(parent, self, aux)
 }
 
 int
-ukphy_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+ukphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;

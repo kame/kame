@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.13.4.1 2000/06/30 16:27:30 simonb Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.22 2001/09/10 21:19:17 chris Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -45,9 +45,6 @@
 #include <sys/proc.h>
 #include <sys/mbuf.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
 
 #define _MACPPC_BUS_DMA_PRIVATE
@@ -93,7 +90,7 @@ _bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	    (flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK)) == NULL)
 		return (ENOMEM);
 
-	bzero(mapstore, mapsize);
+	memset(mapstore, 0, mapsize);
 	map = (struct macppc_bus_dmamap *)mapstore;
 	map->_dm_size = size;
 	map->_dm_segcnt = nsegments;
@@ -421,14 +418,18 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 	int *rsegs;
 	int flags;
 {
-	paddr_t avail_start, avail_end;
+	paddr_t avail_start = 0xffffffff, avail_end = 0;
 	paddr_t curaddr, lastaddr, high;
-	vm_page_t m;    
+	struct vm_page *m;    
 	struct pglist mlist;
-	int curseg, error;
+	int curseg, error, bank;
 
-	avail_start = vm_physmem[0].avail_start << PGSHIFT;
-	avail_end = vm_physmem[vm_nphysseg - 1].avail_end << PGSHIFT;
+	for (bank = 0; bank < vm_nphysseg; bank++) {
+		if (avail_start > vm_physmem[bank].avail_start << PGSHIFT)
+			avail_start = vm_physmem[bank].avail_start << PGSHIFT;
+		if (avail_end < vm_physmem[bank].avail_end << PGSHIFT)
+			avail_end = vm_physmem[bank].avail_end << PGSHIFT;
+	}
 
 	/* Always round the size. */
 	size = round_page(size);
@@ -458,7 +459,7 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 		curaddr = VM_PAGE_TO_PHYS(m);
 #ifdef DIAGNOSTIC
 		if (curaddr < avail_start || curaddr >= high) {
-			printf("vm_page_alloc_memory returned non-sensical"
+			printf("uvm_pglistalloc returned non-sensical"
 			    " address 0x%lx\n", curaddr);
 			panic("_bus_dmamem_alloc");
 		}
@@ -488,7 +489,7 @@ _bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -541,11 +542,10 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 		    addr += NBPG, va += NBPG, size -= NBPG) {
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
-			pmap_enter(pmap_kernel(), va, addr,
-			    VM_PROT_READ | VM_PROT_WRITE,
-			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
+			pmap_kenter_pa(va, addr, VM_PROT_READ | VM_PROT_WRITE);
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }

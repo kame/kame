@@ -1,4 +1,4 @@
-/* $NetBSD: jensenioreg.h,v 1.1.2.1 2000/07/12 20:59:13 thorpej Exp $ */
+/* $NetBSD: jensenioreg.h,v 1.1 2000/07/12 20:36:10 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

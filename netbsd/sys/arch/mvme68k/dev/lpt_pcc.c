@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_pcc.c,v 1.3 2000/03/18 22:33:03 scw Exp $ */
+/*	$NetBSD: lpt_pcc.c,v 1.5 2002/02/12 20:38:17 scw Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -48,7 +48,8 @@
 
 #include <machine/bus.h>
 
-#include <mvme68k/dev/lptvar.h>
+#include <dev/mvme/lptvar.h>
+
 #include <mvme68k/dev/lpt_pccreg.h>
 #include <mvme68k/dev/pccreg.h>
 #include <mvme68k/dev/pccvar.h>
@@ -134,10 +135,15 @@ lpt_pcc_attach(parent, self, args)
 	 */
 	lpt_attach_subr(sc);
 
+	/* Register the event counter */
+	evcnt_attach_dynamic(&sc->sc_evcnt, EVCNT_TYPE_INTR,
+	    pccintr_evcnt(sc->sc_ipl), "printer", sc->sc_dev.dv_xname);
+
 	/*
 	 * Hook into the printer interrupt
 	 */
-	pccintr_establish(PCCV_PRINTER, lpt_pcc_intr, sc->sc_ipl, sc);
+	pccintr_establish(PCCV_PRINTER, lpt_pcc_intr, sc->sc_ipl, sc,
+	    &sc->sc_evcnt);
 }
 
 /*

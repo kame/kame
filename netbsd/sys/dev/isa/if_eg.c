@@ -1,4 +1,4 @@
-/*	$NetBSD: if_eg.c,v 1.49 2000/03/30 12:45:33 augustss Exp $	*/
+/*	$NetBSD: if_eg.c,v 1.57 2002/01/07 21:47:06 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1993 Dean Huxley <dean@fsa.ca>
@@ -33,17 +33,20 @@
  * Support for 3Com 3c505 Etherlink+ card.
  */
 
-/* To do:
+/*
+ * To do:
  * - multicast
  * - promiscuous
- * - get rid of isa indirect stuff
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_eg.c,v 1.57 2002/01/07 21:47:06 thorpej Exp $");
+
 #include "opt_inet.h"
 #include "opt_ns.h"
 #include "bpfilter.h"
 #include "rnd.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -276,7 +279,7 @@ egreadPCB(iot, ioh, pcb)
 	bus_space_write_1(iot, ioh, EG_CONTROL,
 	    (bus_space_read_1(iot, ioh, EG_CONTROL) & ~EG_PCB_STAT) | EG_PCB_NULL);
 
-	bzero(pcb, EG_PCBLEN);
+	memset(pcb, 0, EG_PCBLEN);
 
 	if (egreadPCBready(iot, ioh))
 		return 1;
@@ -332,17 +335,29 @@ egprobe(parent, match, aux)
 
 	rval = 0;
 
-	if ((ia->ia_iobase & ~0x07f0) != 0) {
-		DPRINTF(("Weird iobase %x\n", ia->ia_iobase));
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
+	/* Disallow wildcarded i/o address. */
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
+		return (0);
+
+	/* Disallow wildcarded IRQ. */
+	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
+		return (0);
+
+	if ((ia->ia_io[0].ir_addr & ~0x07f0) != 0) {
+		DPRINTF(("Weird iobase %x\n", ia->ia_io[0].ir_addr));
 		return 0;
 	}
 
-	/* Disallow wildcarded i/o address. */
-	if (ia->ia_iobase == ISACF_PORT_DEFAULT)
-		return (0);
-
 	/* Map i/o space. */
-	if (bus_space_map(iot, ia->ia_iobase, 0x08, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, 0x08, 0, &ioh)) {
 		DPRINTF(("egprobe: can't map i/o space in probe\n"));
 		return 0;
 	}
@@ -372,8 +387,14 @@ egprobe(parent, match, aux)
 		goto out;
 	}
 
-	ia->ia_iosize = 0x08;
-	ia->ia_msize = 0;
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_size = 0x08;
+
+	ia->ia_nirq = 1;
+
+	ia->ia_niomem = 0;
+	ia->ia_ndrq = 0;
+
 	rval = 1;
 
  out:
@@ -396,7 +417,7 @@ egattach(parent, self, aux)
 	printf("\n");
 
 	/* Map i/o space. */
-	if (bus_space_map(iot, ia->ia_iobase, ia->ia_iosize, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, 0x08, 0, &ioh)) {
 		printf("%s: can't map i/o space\n", self->dv_xname);
 		return;
 	}
@@ -448,7 +469,7 @@ egattach(parent, self, aux)
 		egprintpcb(sc->eg_pcb);
 		return;
 	}
-	bcopy(&sc->eg_pcb[2], myaddr, ETHER_ADDR_LEN);
+	memcpy(myaddr, &sc->eg_pcb[2], ETHER_ADDR_LEN);
 
 	printf("%s: ROM v%d.%02d %dk address %s\n", self->dv_xname,
 	    sc->eg_rom_major, sc->eg_rom_minor, sc->eg_ram,
@@ -474,23 +495,20 @@ egattach(parent, self, aux)
 	}
 
 	/* Initialize ifnet structure. */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = egstart;
 	ifp->if_ioctl = egioctl;
 	ifp->if_watchdog = egwatchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
-	
+	IFQ_SET_READY(&ifp->if_snd);
+
 	/* Now we can attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, myaddr);
 	
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
-
-	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_NET, egintr, sc);
+	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_NET, egintr, sc);
 
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
@@ -602,7 +620,7 @@ egstart(ifp)
 
 loop:
 	/* Dequeue the next datagram. */
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == 0)
 		return;
 	
@@ -639,7 +657,7 @@ loop:
 
 	buffer = sc->eg_outbuf;
 	for (m = m0; m != 0; m = m->m_next) {
-		bcopy(mtod(m, caddr_t), buffer, m->m_len);
+		memcpy(buffer, mtod(m, caddr_t), m->m_len);
 		buffer += m->m_len;
 	}
 
@@ -712,9 +730,9 @@ egintr(arg)
 		case EG_RSP_GETSTATS:
 			DPRINTF(("%s: Card Statistics\n",
 			    sc->sc_dev.dv_xname));
-			bcopy(&sc->eg_pcb[2], &i, sizeof(i));
+			memcpy(&i, &sc->eg_pcb[2], sizeof(i));
 			DPRINTF(("Receive Packets %d\n", i));
-			bcopy(&sc->eg_pcb[6], &i, sizeof(i));
+			memcpy(&i, &sc->eg_pcb[6], sizeof(i));
 			DPRINTF(("Transmit Packets %d\n", i));
 			DPRINTF(("CRC errors %d\n",
 			    *(short *) &sc->eg_pcb[10]));
@@ -753,7 +771,6 @@ egread(sc, buf, len)
 {
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	struct mbuf *m;
-	struct ether_header *eh;
 	
 	if (len <= sizeof(struct ether_header) ||
 	    len > ETHER_MAX_LEN) {
@@ -772,30 +789,13 @@ egread(sc, buf, len)
 
 	ifp->if_ipackets++;
 
-	/* We assume the header fit entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	/*
 	 * Check if there's a BPF listener on this interface.
 	 * If so, hand off the raw packet to BPF.
 	 */
-	if (ifp->if_bpf) {
+	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
-
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-		if ((ifp->if_flags & IFF_PROMISC) &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    bcmp(eh->ether_dhost, LLADDR(ifp->if_sadl),
-			    sizeof(eh->ether_dhost)) != 0) {
-			m_freem(m);
-			return;
-		}
-	}
 #endif
 
 	(*ifp->if_input)(ifp, m);
@@ -831,7 +831,7 @@ egget(sc, buf, totlen)
 		}
 
 		m->m_len = len = min(totlen, len);
-		bcopy((caddr_t)buf, mtod(m, caddr_t), len);
+		memcpy(mtod(m, caddr_t), (caddr_t)buf, len);
 		buf += len;
 
 		totlen -= len;
@@ -884,7 +884,7 @@ egioctl(ifp, cmd, data)
 				ina->x_host =
 				   *(union ns_host *)LLADDR(ifp->if_sadl);
 			else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
+				memcpy(LLADDR(ifp->if_sadl), ina->x_host.c_host,
 				    ETHER_ADDR_LEN);
 			/* Set new address. */
 			eginit(sc);

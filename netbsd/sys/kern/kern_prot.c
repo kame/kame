@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_prot.c,v 1.58.4.2 2002/02/09 19:20:17 he Exp $	*/
+/*	$NetBSD: kern_prot.c,v 1.68 2001/12/06 23:11:59 christos Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1990, 1991, 1993
@@ -44,12 +44,10 @@
  * System calls related to processes and protection
  */
 
-#include "opt_compat_freebsd.h"
-#include "opt_compat_ibcs2.h"
-#include "opt_compat_sunos.h"
-#include "opt_compat_linux.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_prot.c,v 1.68 2001/12/06 23:11:59 christos Exp $");
+
 #include "opt_compat_43.h"
-#include "opt_compat_osf1.h"
 
 #include <sys/param.h>
 #include <sys/acct.h>
@@ -63,6 +61,13 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
+int	sys_getpid(struct proc *, void *, register_t *);
+int	sys_getpid_with_ppid(struct proc *, void *, register_t *);
+int	sys_getuid(struct proc *, void *, register_t *);
+int	sys_getuid_with_euid(struct proc *, void *, register_t *);
+int	sys_getgid(struct proc *, void *, register_t *);
+int	sys_getgid_with_egid(struct proc *, void *, register_t *);
+
 /* ARGSUSED */
 int
 sys_getpid(p, v, retval)
@@ -72,11 +77,19 @@ sys_getpid(p, v, retval)
 {
 
 	*retval = p->p_pid;
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS) || defined(COMPAT_IBCS2) || \
-    defined(COMPAT_FREEBSD) || defined(COMPAT_OSF1) || \
-    (defined(COMPAT_LINUX) && defined(__alpha__))
+	return (0);
+}
+
+/* ARGSUSED */
+int
+sys_getpid_with_ppid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+
+	retval[0] = p->p_pid;
 	retval[1] = p->p_pptr->p_pid;
-#endif
 	return (0);
 }
 
@@ -155,11 +168,19 @@ sys_getuid(p, v, retval)
 {
 
 	*retval = p->p_cred->p_ruid;
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS) || defined(COMPAT_IBCS2) || \
-    defined(COMPAT_FREEBSD) || defined(COMPAT_OSF1) || \
-    (defined(COMPAT_LINUX) && defined(__alpha__))
+	return (0);
+}
+
+/* ARGSUSED */
+int
+sys_getuid_with_euid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+
+	retval[0] = p->p_cred->p_ruid;
 	retval[1] = p->p_ucred->cr_uid;
-#endif
 	return (0);
 }
 
@@ -184,10 +205,19 @@ sys_getgid(p, v, retval)
 {
 
 	*retval = p->p_cred->p_rgid;
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS) || defined(COMPAT_FREEBSD) || \
-    defined(COMPAT_OSF1) || (defined(COMPAT_LINUX) && defined(alpha))
+	return (0);
+}
+
+/* ARGSUSED */
+int
+sys_getgid_with_egid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+
+	retval[0] = p->p_cred->p_rgid;
 	retval[1] = p->p_ucred->cr_gid;
-#endif
 	return (0);
 }
 
@@ -656,12 +686,9 @@ void
 crfree(cr)
 	struct ucred *cr;
 {
-	int s;
 
-	s = splimp();				/* ??? */
 	if (--cr->cr_ref == 0)
 		FREE((caddr_t)cr, M_CRED);
-	(void) splx(s);
 }
 
 /*

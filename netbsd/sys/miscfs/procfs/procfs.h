@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs.h,v 1.29.4.1 2001/03/30 21:47:21 he Exp $	*/
+/*	$NetBSD: procfs.h,v 1.37 2002/05/09 15:44:45 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -39,6 +39,9 @@
  *	@(#)procfs.h	8.9 (Berkeley) 5/14/95
  */
 
+/* This also pulls in __HAVE_PROCFS_MACHDEP */
+#include <sys/ptrace.h>
+
 /*
  * The different types of node in a procfs filesystem
  */
@@ -58,7 +61,11 @@ typedef enum {
 	Pmap,		/* memory map */
 	Pcmdline,	/* process command line args */
 	Pmeminfo,	/* system memory info (if -o linux) */
-	Pcpuinfo	/* CPU info (if -o linux) */
+	Pcpuinfo,	/* CPU info (if -o linux) */
+	Pmaps,		/* memory map, Linux style (if -o linux) */
+#ifdef __HAVE_PROCFS_MACHDEP
+	PROCFS_MACHDEP_NODE_TYPES
+#endif
 } pfstype;
 
 /*
@@ -103,12 +110,10 @@ struct procfs_args {
 
 struct procfsmount {
 	void *pmnt_exechook;
-	struct mount *pmnt_mp;
 	int pmnt_flags;
 };
 
 #define VFSTOPROC(mp)	((struct procfsmount *)(mp)->mnt_data)
-#define PROCTOVFS(pp)	((pp)->pmnt_mp)
 
 /*
  * Convert between pfsnode vnode
@@ -123,12 +128,11 @@ struct vfs_namemap {
 };
 
 int vfs_getuserstr __P((struct uio *, char *, int *));
-vfs_namemap_t *vfs_findname __P((vfs_namemap_t *, char *, int));
+const vfs_namemap_t *vfs_findname __P((const vfs_namemap_t *, const char *, int));
 
 #define PFIND(pid) ((pid) ? pfind(pid) : &proc0)
 int procfs_freevp __P((struct vnode *));
 int procfs_allocvp __P((struct mount *, struct vnode **, long, pfstype));
-struct vnode *procfs_findtextvp __P((struct proc *));
 int procfs_donote __P((struct proc *, struct proc *, struct pfsnode *,
     struct uio *));
 int procfs_doregs __P((struct proc *, struct proc *, struct pfsnode *,
@@ -142,7 +146,7 @@ int procfs_doctl __P((struct proc *, struct proc *, struct pfsnode *,
 int procfs_dostatus __P((struct proc *, struct proc *, struct pfsnode *,
     struct uio *));
 int procfs_domap __P((struct proc *, struct proc *, struct pfsnode *,
-    struct uio *));
+    struct uio *, int));
 int procfs_docmdline __P((struct proc *, struct proc *, struct pfsnode *,
     struct uio *));
 int procfs_domeminfo __P((struct proc *, struct proc *, struct pfsnode *,
@@ -150,9 +154,9 @@ int procfs_domeminfo __P((struct proc *, struct proc *, struct pfsnode *,
 int procfs_docpuinfo __P((struct proc *, struct proc *, struct pfsnode *,
     struct uio *));
 
-int procfs_checkioperm __P((struct proc *, struct proc *));
 void procfs_revoke_vnodes __P((struct proc *, void *));
 void procfs_hashinit __P((void));
+void procfs_hashreinit __P((void));
 void procfs_hashdone __P((void));
 
 /* functions to check whether or not files should be displayed */
@@ -172,5 +176,14 @@ extern int (**procfs_vnodeop_p) __P((void *));
 extern struct vfsops procfs_vfsops;
 
 int	procfs_root __P((struct mount *, struct vnode **));
+
+#ifdef __HAVE_PROCFS_MACHDEP
+struct vattr;
+
+void	procfs_machdep_allocvp(struct vnode *);
+int	procfs_machdep_rw(struct proc *, struct proc *, struct pfsnode *,
+	    struct uio *);
+int	procfs_machdep_getattr(struct vnode *, struct vattr *, struct proc *);
+#endif
 
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$NetBSD: apci.c,v 1.8 2000/03/23 06:37:23 thorpej Exp $	*/
+/*	$NetBSD: apci.c,v 1.17 2002/04/17 23:31:24 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1999 The NetBSD Foundation, Inc.
@@ -92,6 +92,9 @@
  * XXX FIXME!
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: apci.c,v 1.17 2002/04/17 23:31:24 gmcgarry Exp $");                                                  
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -110,9 +113,7 @@
 
 #include <dev/cons.h>
 
-#include <hp300/dev/dioreg.h>		/* to check for dca at 9 */
-#include <hp300/dev/diovar.h>
-#include <hp300/dev/diodevs.h>
+#include <hp300/dev/intiovar.h>
 
 #include <hp300/dev/frodoreg.h>
 #include <hp300/dev/frodovar.h>
@@ -188,10 +189,13 @@ struct apciregs *apci_cn = NULL;	/* console hardware */
 int	apciconsinit;			/* has been initialized */
 int	apcimajor;			/* our major number */
 
-void	apcicnprobe __P((struct consdev *));
-void	apcicninit __P((struct consdev *));
+int	apcicnattach __P((bus_space_tag_t, bus_addr_t, int));
 int	apcicngetc __P((dev_t));
 void	apcicnputc __P((dev_t, int));
+
+static struct consdev apci_cons = {
+       NULL, NULL, apcicngetc, apcicnputc, nullcnpollc, NULL, NODEV, CN_REMOTE
+};
 
 
 int
@@ -356,7 +360,7 @@ apciopen(dev, flag, mode, p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error)
 		goto bad;
 
@@ -385,7 +389,7 @@ apciclose(dev, flag, mode, p)
 	apci = sc->sc_apci;
 	tp = sc->sc_tty;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 
 	s = spltty();
 
@@ -415,7 +419,7 @@ apciread(dev, uio, flag)
 	struct apci_softc *sc = apci_cd.cd_devs[APCIUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -427,7 +431,19 @@ apciwrite(dev, uio, flag)
 	struct apci_softc *sc = apci_cd.cd_devs[APCIUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+apcipoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct apci_softc *sc = apci_cd.cd_devs[APCIUNIT(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -452,7 +468,7 @@ apciintr(arg)
 #define	RCVBYTE() \
 	c = apci->ap_data; \
 	if ((tp->t_state & TS_ISOPEN) != 0) \
-		(*linesw[tp->t_line].l_rint)(c, tp)
+		(*tp->t_linesw->l_rint)(c, tp)
 
 	for (;;) {
 		iir = apci->ap_iir;	/* get UART status */
@@ -482,8 +498,8 @@ apciintr(arg)
 
 		case IIR_TXRDY:
 			tp->t_state &=~ (TS_BUSY|TS_FLUSH);
-			if (tp->t_line)
-				(*linesw[tp->t_line].l_start)(tp);
+			if (tp->t_linesw != linesw[0])
+				(*tp->t_linesw->l_start)(tp);
 			else
 				apcistart(tp);
 			break;
@@ -525,7 +541,7 @@ apcieint(sc, stat)
 		sc->sc_perr++;
 	} else if (stat & LSR_OE)
 		sc->sc_oflow++;
-	(*linesw[tp->t_line].l_rint)(c, tp);
+	(*tp->t_linesw->l_rint)(c, tp);
 }
 
 void
@@ -539,8 +555,8 @@ apcimint(sc, stat)
 	if ((stat & MSR_DDCD) &&
 	    (sc->sc_flags & APCI_SOFTCAR) == 0) {
 		if (stat & MSR_DCD)
-			(void)(*linesw[tp->t_line].l_modem)(tp, 1);
-		else if ((*linesw[tp->t_line].l_modem)(tp, 0) == 0)
+			(void)(*tp->t_linesw->l_modem)(tp, 1);
+		else if ((*tp->t_linesw->l_modem)(tp, 0) == 0)
 			apci->ap_mcr &= ~(MCR_DTR | MCR_RTS);
 	}
 
@@ -571,11 +587,12 @@ apciioctl(dev, cmd, data, flag, p)
 	struct apciregs *apci = sc->sc_apci;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -644,7 +661,7 @@ apciioctl(dev, cmd, data, flag, p)
 	}
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -696,7 +713,7 @@ apciparam(tp, t)
 		(void) apcimctl(sc, 0, DMSET);	/* hang up line */
 
 	/*
-	 * Set the FIFO threshold based on the recieve speed, if we
+	 * Set the FIFO threshold based on the receive speed, if we
 	 * are changing it.
 	 */
 	if (tp->t_ispeed != t->c_ispeed) {
@@ -720,7 +737,8 @@ apciparam(tp, t)
 	tp->t_cflag = cflag;
 
 	apci->ap_ier = IER_ERXRDY | IER_ETXRDY | IER_ERLS | IER_EMSC;
-	apci->ap_mcr |= MCR_IEN;
+	if (mmuid != MMUID_425_E)
+		apci->ap_mcr |= MCR_IEN;
 
 	splx(s);
 	return (0);
@@ -786,13 +804,15 @@ apcimctl(sc, bits, how)
 	struct apciregs *apci = sc->sc_apci;
 	int s;
 
-	/*
-	 * Always make sure MCR_IEN is set (unless setting to 0)
-	 */
-	if (how == DMBIS || (how == DMSET && bits))
-		bits |= MCR_IEN;
-	else if (how == DMBIC)
-		bits &= ~MCR_IEN;
+	if (mmuid != MMUID_425_E) {
+		/*
+		 * Always make sure MCR_IEN is set (unless setting to 0)
+		 */
+		if (how == DMBIS || (how == DMSET && bits))
+			bits |= MCR_IEN;
+		else if (how == DMBIC)
+			bits &= ~MCR_IEN;
+	}
 
 	s = spltty();
 
@@ -875,59 +895,44 @@ apcitimeout(arg)
  * The following routines are required for the APCI to act as the console.
  */
 
-void
-apcicnprobe(cp)
-	struct consdev *cp;
+int
+apcicnattach(bus_space_tag_t bst, bus_addr_t addr, int scode)
 {
+        bus_space_handle_t bsh;
+        caddr_t va;
+        struct apciregs *apci;
 
-	/* locate the major number */
-	for (apcimajor = 0; apcimajor < nchrdev; apcimajor++)
-		if (cdevsw[apcimajor].d_open == apciopen)
-			break;
-
-	/* initialize the required fields */
-	cp->cn_dev = makedev(apcimajor, 0);	/* XXX */
-	cp->cn_pri = CN_DEAD;
-
-	/* Abort early if console is already forced. */
-	if (conforced)
-		return;
-
-	/*
-	 * The APCI can only be a console on a 425e; on other 4xx
-	 * models, the "first" serial port is mapped to the DCA
-	 * at select code 9.  See frodo.c for the autoconfiguration
-	 * version of this check.
-	 */
 	if (machineid != HP_425 || mmuid != MMUID_425_E)
-		return;
+		return (1);
 
-#ifdef APCI_FORCE_CONSOLE
-	cp->cn_pri = CN_REMOTE;
-	conforced = 1;
-	conscode = -2;			/* XXX */
-#else
-	cp->cn_pri = CN_NORMAL;
+        if (bus_space_map(bst, addr, INTIO_DEVSIZE, BUS_SPACE_MAP_LINEAR, &bsh))
+                return (1);
+
+        va = bus_space_vaddr(bst, bsh);
+	apci = (struct apciregs *)va;
+
+	apciinit(apci, apcidefaultrate);
+        apciconsinit = 1;
+        apci_cn = apci;
+
+        /* locate the major number */
+        for (apcimajor = 0; apcimajor < nchrdev; apcimajor++)
+                if (cdevsw[apcimajor].d_open == apciopen)
+                        break;
+
+        /* initialize required fields */
+        cn_tab = &apci_cons;
+        cn_tab->cn_dev = makedev(apcimajor, 0);
+
+#ifdef KGDB
+	/* XXX this needs to be fixed. */
+	if (major(kgdb_dev) == 1)			/* XXX */
+		kgdb_dev = makedev(apcimajor, minor(kgdb_dev));
 #endif
 
-	/*
-	 * If our priority is higher than the currently-remembered
-	 * console, install ourselves.
-	 */
-	if (((cn_tab == NULL) || (cp->cn_pri > cn_tab->cn_pri)) || conforced)
-		cn_tab = cp;
+        return (0);
 }
 
-/* ARGSUSED */
-void
-apcicninit(cp)
-	struct consdev *cp;
-{
-
-	apci_cn = (struct apciregs *)IIOV(FRODO_BASE + FRODO_APCI_OFFSET(1));
-	apciinit(apci_cn, apcidefaultrate);
-	apciconsinit = 1;
-}
 
 /* ARGSUSED */
 int

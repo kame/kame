@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.5 2000/01/16 14:21:00 minoura Exp $	*/
+/*	$NetBSD: intr.h,v 1.8 2001/04/13 23:30:07 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -52,14 +52,14 @@ void	spl0 __P((void));
 #define splsoftnet()	splraise1()	/* disallow softnet */
 #define splnet()        _splraise(PSL_S|PSL_IPL4) /* disallow network */
 #define splbio()        _splraise(PSL_S|PSL_IPL3) /* disallow block I/O */
-#define splimp()        _splraise(PSL_S|PSL_IPL4) /* disallow imput */
 #define spltty()        _splraise(PSL_S|PSL_IPL4) /* disallow tty interrupts */
+#define splvm()         _splraise(PSL_S|PSL_IPL4) /* disallow vm */
 #define splzs()         splraise5()	/* disallow serial interrupts */
 #define splclock()      splraise6()	/* disallow clock interrupt */
 #define splstatclock()  splraise6()	/* disallow clock interrupt */
-#define splvm()         _splraise(PSL_S|PSL_IPL4) /* disallow virtual memory operations */
 #define splhigh()       spl7()	/* disallow everything */
 #define splsched()      spl7()	/* disallow scheduling */
+#define spllock()	spl7()	/* disallow scheduling */
 
 /* watch out for side effects */
 #define splx(s)         ((s) & PSL_IPL ? _spl(s) : spl0())

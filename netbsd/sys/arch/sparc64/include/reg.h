@@ -1,6 +1,7 @@
-/*	$NetBSD: reg.h,v 1.6.4.1 2000/07/18 16:23:23 mrg Exp $ */
+/*	$NetBSD: reg.h,v 1.10 2002/05/16 23:29:42 eeh Exp $ */
 
 /*
+ * Copyright (c) 1996-2002 Eduardo Horvath.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -66,13 +67,11 @@ struct trapframe32 {
 /*
  * The v9 trapframe is a bit more complex.  Since we don't get a free 
  * register window with each trap we need some way to keep track of
- * pending traps.  We use tf_fault to save the faulting address for
- * memory faults and tf_kstack to thread trapframes on the kernel
- * stack(s).  If tf_kstack == 0 then this is the lowest level trap;
- * we came from user mode.
+ * pending traps.
  * (The slot tf_global[0] is used to store the %fp when this is used
  * as a clockframe.  This is known as `cheating'.)
  */
+
 struct trapframe64 {
 	int64_t		tf_tstate;	/* tstate register */
 	int64_t		tf_pc;		/* return pc */
@@ -86,9 +85,10 @@ struct trapframe64 {
 	int64_t		tf_global[8];	/* global registers in trap's caller */
 	/* n.b. tf_global[0] is used for fp when this is a clockframe */
 	int64_t		tf_out[8];	/* output registers in trap's caller */
-	int64_t		tf_local[8];	/* local registers in trap's caller */
+	int64_t		tf_local[8];	/* local registers in trap's caller (for debug) */
 	int64_t		tf_in[8];	/* in registers in trap's caller (for debug) */
 };
+
 
 /*
  * Register windows.  Each stack pointer (%o6 aka %sp) in each window
@@ -172,7 +172,7 @@ struct fpstate32 {
 };
 
 /*
- * The actual FP registers are made accessable (c.f. ptrace(2)) through
+ * The actual FP registers are made accessible (c.f. ptrace(2)) through
  * a `struct fpreg'; <arch/sparc64/sparc64/process_machdep.c> relies on the
  * fact that `fpreg' is a prefix of `fpstate'.
  */

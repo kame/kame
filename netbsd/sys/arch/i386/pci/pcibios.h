@@ -1,4 +1,4 @@
-/*	$NetBSD: pcibios.h,v 1.2.6.1 2000/08/10 22:42:04 soda Exp $	*/
+/*	$NetBSD: pcibios.h,v 1.5 2002/01/22 15:07:27 uch Exp $	*/
 
 /*
  * Copyright (c) 1999, by UCHIYAMA Yasushi
@@ -90,7 +90,15 @@ extern int pcibios_pir_table_nentries;
 extern int pcibios_max_bus;
 
 void pci_device_foreach __P((pci_chipset_tag_t, int,
-			     void (*) (pci_chipset_tag_t, pcitag_t)));
+			     void (*) (pci_chipset_tag_t, pcitag_t, void*),
+			     void *context));
+
+void pci_device_foreach_min __P((pci_chipset_tag_t, int, int,
+				 void (*) (pci_chipset_tag_t, pcitag_t, void*),
+				 void *context));
+
+void pci_bridge_foreach(pci_chipset_tag_t, int, int,
+    void (*) (pci_chipset_tag_t, pcitag_t, void *), void *);
 
 #ifdef PCIBIOSVERBOSE
 extern int pcibiosverbose;

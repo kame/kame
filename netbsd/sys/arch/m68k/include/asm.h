@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.19.6.1 2000/07/25 08:32:59 kleink Exp $	*/
+/*	$NetBSD: asm.h,v 1.23 2001/05/27 01:01:08 chs Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -105,8 +105,14 @@
 #define	_ENTRY(name) \
 	.text; .even; .globl name; .type name,@function; name:
 
+#ifdef __ELF__
+#define	MCOUNT_ENTRY	__mcount
+#else
+#define	MCOUNT_ENTRY	mcount
+#endif
+
 #ifdef GPROF
-#define _PROF_PROLOG	link %a6,#0; jbsr mcount; unlk %a6
+#define _PROF_PROLOG	link %a6,#0; jbsr MCOUNT_ENTRY; unlk %a6
 #else
 #define _PROF_PROLOG
 #endif
@@ -180,6 +186,8 @@
 	9:	.asciz	x			;	\
 		.even
 
+#endif /* _KERNEL */
+
 /*
  * Shorthand for defining vectors for the vector table.
  */
@@ -191,8 +199,6 @@
 
 #define	VECTOR_UNUSED					\
 	.long	0
-
-#endif /* _KERNEL */
 
 #ifdef __ELF__
 #define	WEAK_ALIAS(alias,sym)						\
@@ -211,5 +217,17 @@
 	.stabs msg,30,0,0,0 ;						\
 	.stabs __STRING(_/**/sym),1,0,0,0
 #endif /* __STDC__ */
+
+/*
+ * Macros to hide shortcomings in the 68010.
+ */
+#ifndef __mc68010__
+#define	EXTBL(reg)					\
+	extbl	reg
+#else	/* __mc68010__ */
+#define	EXTBL(reg)					\
+	extw	reg		;			\
+	extl	reg
+#endif	/* __mc68010__ */
 
 #endif /* _M68K_ASM_H_ */

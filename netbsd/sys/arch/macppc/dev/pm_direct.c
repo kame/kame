@@ -1,4 +1,4 @@
-/*	$NetBSD: pm_direct.c,v 1.9.2.1 2001/04/01 16:59:18 he Exp $	*/
+/*	$NetBSD: pm_direct.c,v 1.17 2002/01/02 20:28:43 dbj Exp $	*/
 
 /*
  * Copyright (C) 1997 Takashi Hamada
@@ -184,9 +184,6 @@ int	pm_receive_pm2 __P((u_char *));
 int	pm_send_pm2 __P((u_char));
 int	pm_pmgrop_pm2 __P((PMData *));
 void	pm_intr_pm2 __P((void));
-
-/* this function is MRG-Based (for testing) */
-int	pm_pmgrop_mrg __P((PMData *));
 
 /* these functions are called from adb_direct.c */
 void	pm_setup_adb __P((void));
@@ -902,29 +899,6 @@ pm_intr_pm2()
 }
 
 
-#if 0
-/*
- * MRG-based PMgrOp routine
- */
-int
-pm_pmgrop_mrg(pmdata)
-	PMData *pmdata;
-{
-	u_int32_t rval=0;
-
-	asm("
-		movl	%1, a0
-		.word	0xa085
-		movl	d0, %0"
-		: "=g" (rval)
-		: "g" (pmdata)
-		: "a0", "d0" );
-
-	return rval;
-}
-#endif
-
-
 /*
  * My PMgrOp routine
  */
@@ -1047,7 +1021,7 @@ pm_adb_op(buffer, compRout, data, command)
 
 	PM_VIA_INTR_ENABLE();
 
-	/* wait until the PM interrupt is occured */
+	/* wait until the PM interrupt has occurred */
 	timo = 0x80000;
 	while (adbWaiting == 1) {
 		if (read_via_reg(VIA1, vIFR) & 0x14)
@@ -1060,8 +1034,22 @@ pm_adb_op(buffer, compRout, data, command)
 #endif
 #endif
 		if ((--timo) < 0) {
-			splx(s);
-			return 1;
+			/* Try to take an interrupt anyway, just in case.
+			 * This has been observed to happen on my ibook
+			 * when i press a key after boot and before adb
+			 * is attached;  For example, when booting with -d.
+			 */
+			pm_intr();
+			if (adbWaiting) {
+				printf("pm_adb_op: timeout. command = 0x%x\n",command);
+				splx(s);
+				return 1;
+			}
+#ifdef ADB_DEBUG
+			else {
+				printf("pm_adb_op: missed interrupt. cmd=0x%x\n",command);
+			}
+#endif
 		}
 	}
 
@@ -1204,7 +1192,7 @@ pm_read_date_time(time)
 	p.r_buf = p.data;
 	pmgrop(&p);
 
-	bcopy(p.data, time, 4);
+	memcpy(time, p.data, 4);
 }
 
 void
@@ -1216,7 +1204,7 @@ pm_set_date_time(time)
 	p.command = PMU_SET_RTC;
 	p.num_data = 4;
 	p.s_buf = p.r_buf = p.data;
-	bcopy(&time, p.data, 4);
+	memcpy(p.data, &time, 4);
 	pmgrop(&p);
 }
 

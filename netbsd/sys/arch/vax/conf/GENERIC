@@ -1,29 +1,47 @@
-#	$NetBSD: GENERIC,v 1.71.2.7 2001/05/01 15:55:40 he Exp $
+# $NetBSD: GENERIC,v 1.97.4.2 2002/08/01 04:34:46 lukem Exp $
 #
-# GENERIC VAX configuration file; all supported devices.
+# GENERIC machine description file
+# 
+# This machine description file is used to generate the default NetBSD
+# kernel.  The generic kernel does not include all options, subsystems
+# and device drivers, but should be useful for most applications.
 #
+# The machine description file can be customised for your specific
+# machine to reduce the kernel size and improve its performance.
+#
+# For further information on compiling NetBSD kernels, see the config(8)
+# man page.
+#
+# For further information on hardware support for this architecture, see
+# the intro(4) man page.  For further information about kernel options
+# for this architecture, see the options(4) man page.  For an explanation
+# of each device driver in this file see the section 4 man page for the
+# device.
 
 include		"arch/vax/conf/std.vax"
 
-#ident 		"GENERIC-$Revision: 1.71.2.7 $"
+options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+#ident 		"GENERIC-$Revision: 1.97.4.2 $"
 
 # Here are all different supported CPU types listed.
-options 	"VAX8600"
-options 	"VAX8200"
-options 	"VAX780"
-options 	"VAX750"
-options 	"VAX630"	# MV II
-#options	"VAX640"	# MV 3400
-options 	"VAX650"	# MV III, 3600, 3800, 3900
-options 	"VAX660"	# VAX 4000/200
-options 	"VAX670"	# VAX 4000/300
-#options 	"VAX680"	# VAX 4000/500
-options 	"VAX410"	# VS 2000
-options 	"VAX43"		# VS 3100/76
-options 	"VAX46"		# VS 4000/60
-options 	"VAX48"		# VS 4000 VLC
-options 	"VAX49"		# VS 4000/90
-#options 	"VAX53"		# VAX 4000/105A
+#options 	VAX8800		# VAX 8500, 8530, 8550, 8700, 8800
+options 	VAX8600
+options 	VAX8200
+#options 	VAX6400
+options 	VAX780
+options 	VAX750
+options 	VAX630		# MV II
+options 	VAX650		# MV III, 3300, 3400, 3500, 3600, 3800, 3900
+options 	VAX660		# VAX 4000/200
+options 	VAX670		# VAX 4000/300
+options 	VAX680		# VAX 4000/[45]00
+options 	VAX410		# VS 2000
+options 	VAX43		# VS 3100/76
+options 	VAX46		# VS 4000/60
+options 	VAX48		# VS 4000 VLC
+options 	VAX49		# VS 4000/90
+options 	VAX53		# VAX 4000/10[058], MicroVAX 3100/m96
 
 # Max users on system; this is just a hint
 maxusers	8
@@ -34,18 +52,30 @@ options 	DDB
 #options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
 options 	KTRACE
 #options 	DIAGNOSTIC
-#options 	DEBUG,KMEMSTATS,PMAPDEBUG,TRAPDEBUG
+#options 	DEBUG,KMEMSTATS,PMAPDEBUG,TRAPDEBUG,LOCKDEBUG
 
 options 	SCSIVERBOSE		# Verbose SCSI errors
 
-# Network support
-#options 	GATEWAY
-options		NTP		# NTP kernel support
-options         INET		# IPv4
+# Networking options
+#options 	GATEWAY		# packet forwarding
+options 	NTP		# NTP kernel support
+options 	INET		# IP + ICMP + TCP + UDP
 options 	INET6		# IPV6
 #options 	IPSEC		# IP security
 #options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 #options 	IPSEC_DEBUG	# debug for IP security
+#options 	MROUTING	# IP multicast routing
+#options 	NS		# XNS
+#options 	NSIP		# XNS tunneling over IP
+#options 	ISO,TPIP	# OSI
+#options 	EON		# OSI tunneling over IP
+#options 	CCITT,LLC,HDLC	# X.25
+#options 	NETATALK	# AppleTalk networking protocols
+#options 	PPP_BSDCOMP	# BSD-Compress compression support for PPP
+#options 	PPP_DEFLATE	# Deflate compression support for PPP
+#options 	PPP_FILTER	# Active filter support for PPP (requires bpf)
+#options 	PFIL_HOOKS	# pfil(9) packet filter hooks
+#options 	IPFILTER_LOG	# ipmon(8) log support
 
 # All supported filesystem types
 file-system 	FFS
@@ -63,7 +93,7 @@ file-system 	CD9660
 
 options 	QUOTA
 #options 	FFS_EI		# FFS Endian Independant support
-options 	SOFTDEP         # FFS soft updates support.
+options 	SOFTDEP		# FFS soft updates support.
 options 	NFSSERVER
 options 	NFS_BOOT_BOOTP,NFS_BOOT_DHCP	# Use bootp <> dhcp
 options 	NFS_BOOT_BOOTPARAM	# Use the Sun way for netbooting.
@@ -71,10 +101,15 @@ options 	NFS_BOOT_BOOTPARAM	# Use the Sun way for netbooting.
 # WS console uses VT100 terminal emulation
 options 	WSEMUL_VT100
 options 	WSDISPLAY_DEFAULTSCREENS=8
+options 	FONT_QVSS8x15
 
 # System V shared memory & semaphores support.
 options 	SYSVMSG
 options 	SYSVSEM
+#options 	SEMMNI=10	# number of semaphore identifiers
+#options 	SEMMNS=60	# number of semaphores in system
+#options 	SEMUME=10	# max number of undo entries per process
+#options 	SEMMNU=30	# number of undo structures in system
 options 	SYSVSHM
 
 # Old compat stuff; needed to run 4.3BSD Reno programs.
@@ -95,8 +130,11 @@ options 	COMPAT_IBCS2	# DEC SVR.3 compatilibity
 
 options 	LKM
 
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+
 # Kernel(s) to compile
-config          netbsd root on ? type ?
+config		netbsd root on ? type ?
 
 mainbus0	at root
 
@@ -104,25 +142,35 @@ mainbus0	at root
 abus0		at mainbus0		# Master bus on VAX 8600
 sbi0		at mainbus0		# SBI, master bus on 11/780.
 cmi0		at mainbus0		# 11/750 internal bus.
-bi0		at mainbus0		# VAX 8200 
+bi0		at mainbus0		# VAX 8200
 vsbus0		at mainbus0		# All VAXstations
 ibus0		at mainbus0		# All MicroVAX
 #nbi0		at mainbus0		# VAX 8800
 #xmi0		at mainbus0		# VAX 6000
 
+# NMI (internal bus) on VAX 88xx-series.
+#cpu*		at nmi0 slot?		# 1-4 KA88 CPUs
+#mem*		at nmi0 slot?
+#bi*		at nmi0 slot?		# BI bus adapters
+
+# XMI on VAX 6000 (and higher)
+#cpu*		at xmi? node?		# 1-? VAX 6000 CPUs
+#mem*		at xmi? node?
+#bi*		at xmi? node?		# XMI-BI adapter
+
 # Vsbus, the virtual VAXstation bus, and possible devices.
 le0		at vsbus0 csr 0x200e0000 # LANCE ethernet
 ze0		at vsbus0 csr 0x20008000 # SGEC ethernet
 dz0		at vsbus0 csr 0x200a0000 # DC-367 DZ-11 lookalike ctlr
-dz0		at vsbus0 csr 0x25000000 # VS4000/90 serial line
-hdc0		at vsbus0 csr 0x200c0000 # HDC9224 MFM/floppy ctlr
+dz0		at vsbus0 csr 0x25000000 # VS4000/90 and 4000/10x serial line
 si0		at vsbus0 csr 0x200c0080 # VS2000/3100 SCSI-ctlr
-asc0		at vsbus0 csr 0x200c0080 # VS4000/60 (or VLC) SCSI-ctlr
-asc0		at vsbus0 csr 0x26000080 # VS4000/90 SCSI-ctlr
 si1		at vsbus0 csr 0x200c0180 # VS2000/3100 SCSI-ctlr
+asc0		at vsbus0 csr 0x200c0080 # VS4000/60 (or VLC) SCSI-ctlr
+asc0		at vsbus0 csr 0x26000080 # VS4000/90 and 4000/10x SCSI-ctlr
 smg0		at vsbus0 csr 0x200f0000 # Small monochrome display ctlr.
 #clr0		at vsbus0 csr 0x30000000 # 4- or 8-bitplans color graphics
 
+hdc0		at vsbus0 csr 0x200c0000 # HDC9224 MFM/floppy ctlr
 rd*		at hdc0 drive?		# RD5x disks
 #ry*		at hdc0 drive?		# RX floppies
 
@@ -130,7 +178,6 @@ rd*		at hdc0 drive?		# RD5x disks
 uba0		at ibus0 		# Qbus adapter
 ze0		at ibus0 		# SGEC on-board ethernet
 le0		at ibus0		# LANCE ethernet (MV3400)
-#dz0		at ibus0		# VAX 4000/105A serial lines
 #shac0		at ibus0 		# DSSI controller
 
 # Devices connected at VAXBI
@@ -156,18 +203,18 @@ mba*		at sbi? tr?		# Massbus adapters
 hp*		at mba? drive?		# RM/RP disk drives
 
 # Devices on Unibus/Qbus adapters
-uda0		at uba?	csr 0172150	# UDA50/RQDX?
-uda1		at uba?	csr 0160334
-mtc0		at uba? csr 0174500	# Tape MSCP ctlr
+uda*		at uba?	csr 0172150	# UDA50/RQDX?
+uda*		at uba?	csr 0160334
+mtc*		at uba? csr 0174500	# Tape MSCP ctlr
 #ts0		at uba? csr 0172520	# TS11/TSV05 tape.
 #qd0		at uba? csr 0177400	# 4- or 8-bitplans color graphics
 #qv0		at uba? csr 0177400	# Monochrome graphics
-de0		at uba? csr 0174510	# DELUA/DEUNA
-qe0		at uba? csr 0174440	# DEQNA/DELQA
-dhu0		at uba? csr 0160440	# DHU-11
-dz0		at uba? csr 0160100	# DZ-11
-dl0		at uba? csr 0176500	# DL-11
-rlc0		at uba? csr 0174400	# RL11/RLV11 controller
+de*		at uba? csr 0174510	# DELUA/DEUNA
+qe*		at uba? csr 0174440	# DEQNA/DELQA
+dhu*		at uba? csr 0160440	# DHU-11
+dz*		at uba? csr 0160100	# DZ-11
+dl*		at uba? csr 0176500	# DL-11
+rlc*		at uba? csr 0174400	# RL11/RLV11 controller
 rl*		at rlc? drive?		# RL01/RL02 disk drive
 
 # MSCP devices
@@ -178,9 +225,6 @@ mscpbus*	at kdb?
 ra*		at mscpbus? drive?	# MSCP disk
 rx*		at mscpbus? drive?	# MSCP floppy
 mt*		at mscpbus? drive?	# MSCP tape
-
-# VS2000 builtin MFM controller (HDC9224)
-#hdc0		at vsbus0		# The strange builtin MFM controller
 
 # SCSI devices
 scsibus*	at asc?
@@ -198,22 +242,38 @@ wsdisplay0	at smg0
 #wsdisplay0	at clr0
 #wsdisplay0	at qd0
 #wsdisplay0	at qv0
-lkc0		at dz0
+lkkbd0		at dz0 line 0
+wskbd*		at lkkbd? console ?
+lkms0		at dz0 line 1
+wsmouse*	at lkms?
 
-pseudo-device   loop	1
-pseudo-device   pty	64		# pseudo-terminals
+pseudo-device	loop	1
+pseudo-device	pty			# pseudo-terminals
 pseudo-device	bpfilter 8		# Not supported by de yet.
-pseudo-device	sl	2
-pseudo-device	ppp	2
+pseudo-device	ipfilter		# IP filter (firewall) and NAT
+#pseudo-device	sl	2
+#pseudo-device	ppp	2
+#pseudo-device	pppoe			# PPP over Ethernet (RFC 2516)
 pseudo-device	tun	2
 #pseudo-device	gre	2		# generic L3 over IP tunnel
 pseudo-device	gif	4		# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith	1		# IPv[46] tcp relay translation i/f
 #pseudo-device	stf	1		# 6to4 IPv6 over IPv4 encapsulation
 pseudo-device	vlan			# IEEE 802.1q encapsulation
+pseudo-device	bridge			# simple inter-network bridging
 pseudo-device	tb	1
 pseudo-device	vnd	4
 pseudo-device	ccd	4
-#pseudo-device	raid	4		# RAIDframe disk driver
-#options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
+pseudo-device	raid	8		# RAIDframe disk driver
+options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
+# Options to enable various other RAIDframe RAID types.
+# options	RF_INCLUDE_EVENODD=1
+# options	RF_INCLUDE_RAID5_RS=1
+# options	RF_INCLUDE_PARITYLOGGING=1
+# options	RF_INCLUDE_CHAINDECLUSTER=1
+# options	RF_INCLUDE_INTERDECLUSTER=1
+# options 	RF_INCLUDE_PARITY_DECLUSTERING=1
+# options	RF_INCLUDE_PARITY_DECLUSTERING_DS=1
 pseudo-device	rnd			# /dev/random and in-kernel generator
+#pseudo-device	leds			# control the leds on vaxstations.
+pseudo-device	clockctl		# user control of clock subsystem

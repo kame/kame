@@ -1,4 +1,4 @@
-# $NetBSD: std.sun3x,v 1.5.4.1 2000/06/23 14:36:15 fvdl Exp $
+# $NetBSD: std.sun3x,v 1.8 2002/02/10 18:22:32 chs Exp $
 
 # Standard information for Sun3X machines.
 machine	sun3 m68k
@@ -8,9 +8,10 @@ machine	sun3 m68k
 # (Your kernel will only run on one or the other.)
 makeoptions	MACHTYPE=sun3x
 options 	_SUN3X_
+makeoptions	CMACHFLAGS="-m68030"
 
 # The root node (required)
 mainbus0 at root
 
 # Standard defines
-options 	EXEC_AOUT, EXEC_SCRIPT
+options 	EXEC_ELF32, EXEC_SCRIPT

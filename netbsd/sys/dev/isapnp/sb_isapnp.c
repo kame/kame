@@ -1,4 +1,4 @@
-/*	$NetBSD: sb_isapnp.c,v 1.35 1999/10/18 05:11:39 itohy Exp $	*/
+/*	$NetBSD: sb_isapnp.c,v 1.38 2001/11/13 07:56:43 lukem Exp $	*/
 
 /*
  * Copyright (c) 1991-1993 Regents of the University of California.
@@ -33,6 +33,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sb_isapnp.c,v 1.38 2001/11/13 07:56:43 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,6 +107,11 @@ sb_isapnp_attach(parent, self, aux)
 
 	printf("\n");
 
+	/* Avance logic ALS100+ does not like being frobbed 
+	   trying to set irq/drq so set that quirk skip over it */
+	if(!strcmp(ipa->ipa_devlogic, "@@@1001"))
+		sc->sc_quirks = SB_QUIRK_NO_INIT_DRQ;
+
 	if (isapnp_config(ipa->ipa_iot, ipa->ipa_memt, ipa)) {
 		printf("%s: error in region allocation\n", 
 		       sc->sc_dev.dv_xname);
@@ -128,7 +136,7 @@ sb_isapnp_attach(parent, self, aux)
                 } else
                 	sc->sc_drq16 = ipa->ipa_drq[1].num;
         } else
-        	sc->sc_drq16 = DRQUNK;
+        	sc->sc_drq16 = ISACF_DRQ_DEFAULT;
 
 #if NMPU > 0
 	if (ipa->ipa_nio > 1) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: wskbdmap_mfii.c,v 1.15.4.1 2001/02/03 18:17:21 he Exp $	*/
+/*	$NetBSD: wskbdmap_mfii.c,v 1.23.10.1 2002/06/21 05:06:46 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wskbdmap_mfii.c,v 1.23.10.1 2002/06/21 05:06:46 lukem Exp $");
 
 #include <sys/types.h>
 #include <dev/wscons/wsksymdef.h>
@@ -275,7 +278,7 @@ static const keysym_t pckbd_keydesc_fr[] = {
     KC(30),  KS_q,
     KC(39),  KS_m,
     KC(40),  KS_ugrave,		KS_percent,
-    KC(41),  KS_twosuperior,
+    KC(41),  KS_twosuperior,	KS_asciitilde,
     KC(43),  KS_asterisk,	KS_mu,
     KC(44),  KS_w,
     KC(50),  KS_comma,		KS_question,
@@ -366,7 +369,7 @@ static const keysym_t pckbd_keydesc_es[] = {
     KC(9),   KS_8,		KS_parenleft,
     KC(10),  KS_9,		KS_parenright,
     KC(11),  KS_0,		KS_equal,
-    KC(12),  KS_grave,		KS_question,
+    KC(12),  KS_apostrophe,	KS_question,
     KC(13),  KS_exclamdown,	KS_questiondown,
     KC(26),  KS_dead_grave,	KS_dead_circumflex, KS_bracketleft,
     KC(27),  KS_plus,		KS_asterisk,	KS_bracketright,
@@ -481,6 +484,9 @@ static const keysym_t pckbd_keydesc_iopener[] = {
 
 #define KBD_MAP(name, base, map) \
 			{ name, base, sizeof(map)/sizeof(keysym_t), map }
+/* KBD_NULLMAP generates a entry for machine native variant.
+   the entry will be modified by machine dependent keyboard driver. */
+#define KBD_NULLMAP(name, base) { name, base, 0, 0 }
 
 const struct wscons_keydesc pckbd_keydesctab[] = {
 	KBD_MAP(KB_US,			0,	pckbd_keydesc_us),
@@ -507,6 +513,12 @@ const struct wscons_keydesc pckbd_keydesctab[] = {
 	KBD_MAP(KB_US | KB_IOPENER | KB_SWAPCTRLCAPS,	KB_US | KB_IOPENER,
 		pckbd_keydesc_swapctrlcaps),
 	KBD_MAP(KB_ES ,			KB_US,	pckbd_keydesc_es),
+	KBD_NULLMAP(KB_US | KB_MACHDEP,	KB_US),
+	KBD_NULLMAP(KB_JP | KB_MACHDEP,	KB_JP),
+	KBD_NULLMAP(KB_US | KB_MACHDEP | KB_SWAPCTRLCAPS,
+		    KB_US | KB_SWAPCTRLCAPS),
+	KBD_NULLMAP(KB_JP | KB_MACHDEP | KB_SWAPCTRLCAPS,
+		    KB_JP | KB_SWAPCTRLCAPS),
 	{0, 0, 0, 0}
 };
 

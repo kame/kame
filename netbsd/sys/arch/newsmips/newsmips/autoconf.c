@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.13 2000/06/01 15:38:25 matt Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.15 2002/05/16 02:50:54 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -156,11 +156,14 @@ findroot()
 	for (dv = alldevs.tqh_first; dv; dv=dv->dv_list.tqe_next) {
 		if (strcmp(dv->dv_xname, "scsibus0") == 0) {
 			struct scsibus_softc *sdv = (void *)dv;
+			struct scsipi_periph *periph;
 
-			if (sdv->sc_link[ctlr][0] == NULL)
+			periph = scsipi_lookup_periph(sdv->sc_channel,
+			    ctlr, 0);
+			if (periph == NULL)
 				continue;
 
-			booted_device = sdv->sc_link[ctlr][0]->device_softc;
+			booted_device = periph->periph_dev;
 			booted_partition = part;
 			return;
 		}

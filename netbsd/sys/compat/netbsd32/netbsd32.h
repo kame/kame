@@ -1,7 +1,7 @@
-/*	$NetBSD: netbsd32.h,v 1.10.4.1 2000/08/26 01:04:46 mrg Exp $	*/
+/*	$NetBSD: netbsd32.h,v 1.21 2001/12/08 00:35:27 thorpej Exp $	*/
 
 /*
- * Copyright (c) 1998 Matthew R. Green
+ * Copyright (c) 1998, 2001 Matthew R. Green
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,12 @@
  * NetBSD 32-bit compatibility module.
  */
 
+#include <sys/systm.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/syscallargs.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 /*
  * first, define all the types we need.
@@ -165,6 +170,11 @@ typedef u_int32_t netbsd32_orlimitp_t;
 
 typedef u_int32_t netbsd32_rlimitp_t;
 
+struct netbsd32_loadavg {
+	fixpt_t	ldavg[3];
+	netbsd32_long	fscale;
+};
+
 /* from <sys/ipc.h> */
 typedef u_int32_t netbsd32_ipc_permp_t;
 struct netbsd32_ipc_perm {
@@ -255,7 +265,7 @@ struct netbsd32_semid_ds {
 };
 
 struct netbsd32_semid_ds14 {
-	struct netbsd32_ipc_perm	sem_perm;/* operation permission struct */
+	struct netbsd32_ipc_perm14	sem_perm;/* operation permission struct */
 	netbsd32_semp_t	sem_base;	/* pointer to first semaphore in set */
 	unsigned short	sem_nsems;	/* number of sems in set */
 	netbsd32_time_t	sem_otime;		/* last operation time */
@@ -285,6 +295,18 @@ struct netbsd32_sembuf {
 typedef u_int32_t netbsd32_shmid_dsp_t;
 struct netbsd32_shmid_ds {
 	struct netbsd32_ipc_perm	shm_perm; /* operation permission structure */
+	size_t		shm_segsz;	/* size of segment in bytes */
+	pid_t		shm_lpid;	/* process ID of last shm op */
+	pid_t		shm_cpid;	/* process ID of creator */
+	shmatt_t	shm_nattch;	/* number of current attaches */
+	netbsd32_time_t	shm_atime;	/* time of last shmat() */
+	netbsd32_time_t	shm_dtime;	/* time of last shmdt() */
+	netbsd32_time_t	shm_ctime;	/* time of last change by shmctl() */
+	netbsd32_voidp	_shm_internal;	/* sysv stupidity */
+};
+
+struct netbsd32_shmid_ds14 {
+	struct netbsd32_ipc_perm14	shm_perm; /* operation permission structure */
 	int		shm_segsz;	/* size of segment in bytes */
 	pid_t		shm_lpid;	/* process ID of last shm op */
 	pid_t		shm_cpid;	/* process ID of creator */
@@ -414,7 +436,11 @@ struct netbsd32_stat {
 	u_int32_t st_flags;		/* user defined flags for file */
 	u_int32_t st_gen;		/* file generation number */
 	int64_t	  st_qspare[2];
-};
+}
+#ifdef __x86_64__
+__attribute__((packed))
+#endif
+;
 
 /* from <sys/timex.h> */
 typedef u_int32_t netbsd32_ntptimevalp_t;
@@ -507,15 +533,14 @@ typedef struct firm_event32 {
 #define	NETBSD32TOX_UAP(name, type)	NETBSD32TOX(uap, &ua, name, type);
 #define	NETBSD32TOX64_UAP(name, type)	NETBSD32TOX64(uap, &ua, name, type);
 
+int	coredump_netbsd32(struct proc *, struct vnode *, struct ucred *);
+
 /*
  * random other stuff
  */
 #include <compat/common/compat_util.h>
- 
-extern const char netbsd32_emul_path[];
-  
-#define NETBSD32_CHECK_ALT_EXIST(p, sgp, path) \
-    emul_find(p, sgp, netbsd32_emul_path, (const char *)path, \
-	(const char **)&path, 0)
 
+void netbsd32_from_stat43 __P((struct stat43 *, struct netbsd32_stat43 *));
+int netbsd32_execve2(struct proc *, struct sys_execve_args *, register_t *);
+ 
 #endif /* _COMPAT_NETBSD32_NETBSD32_H_ */

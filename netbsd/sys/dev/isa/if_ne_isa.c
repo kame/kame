@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_isa.c,v 1.9 1998/11/01 01:04:48 christos Exp $	*/
+/*	$NetBSD: if_ne_isa.c,v 1.13 2002/01/07 21:47:08 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,9 +37,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ne_isa.c,v 1.13 2002/01/07 21:47:08 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,24 +54,6 @@
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
 
 #include <machine/intr.h>
 #include <machine/bus.h>
@@ -115,18 +96,26 @@ ne_isa_match(parent, match, aux)
 	bus_space_handle_t asich;
 	int rv = 0;
 
-	/* Disallow wildcarded values. */
-	if (ia->ia_irq == ISACF_IRQ_DEFAULT)
+	if (ia->ia_nio < 1)
 		return (0);
-	if (ia->ia_iobase == ISACF_PORT_DEFAULT)
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
+	/* Disallow wildcarded values. */
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
+		return (0);
+	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
 		return (0);
 
 	/* Make sure this is a valid NE[12]000 i/o address. */
-	if ((ia->ia_iobase & 0x1f) != 0)
+	if ((ia->ia_io[0].ir_addr & 0x1f) != 0)
 		return (0);
 
 	/* Map i/o space. */
-	if (bus_space_map(nict, ia->ia_iobase, NE2000_NPORTS, 0, &nich))
+	if (bus_space_map(nict, ia->ia_io[0].ir_addr, NE2000_NPORTS, 0, &nich))
 		return (0);
 
 	asict = nict;
@@ -137,8 +126,15 @@ ne_isa_match(parent, match, aux)
 	/* Look for an NE2000-compatible card. */
 	rv = ne2000_detect(nict, nich, asict, asich);
 
-	if (rv)
-		ia->ia_iosize = NE2000_NPORTS;
+	if (rv) {
+		ia->ia_nio = 1;
+		ia->ia_io[0].ir_size = NE2000_NPORTS;
+
+		ia->ia_nirq = 1;
+
+		ia->ia_niomem = 0;
+		ia->ia_ndrq = 0;
+	}
 
  out:
 	bus_space_unmap(nict, nich, NE2000_NPORTS);
@@ -158,20 +154,14 @@ ne_isa_attach(parent, self, aux)
 	bus_space_handle_t nich;
 	bus_space_tag_t asict = nict;
 	bus_space_handle_t asich;
-	void (*npp_init_media) __P((struct dp8390_softc *, int **,
-	    int *, int *));
-	int *media, nmedia, defmedia;
 	const char *typestr;
 	int netype;
 
 	printf("\n");
 
-	npp_init_media = NULL;
-	media = NULL;
-	nmedia = defmedia = 0;
-
 	/* Map i/o space. */
-	if (bus_space_map(nict, ia->ia_iobase, NE2000_NPORTS, 0, &nich)) {
+	if (bus_space_map(nict, ia->ia_io[0].ir_addr, NE2000_NPORTS,
+	    0, &nich)) {
 		printf("%s: can't map i/o space\n", dsc->sc_dev.dv_xname);
 		return;
 	}
@@ -210,10 +200,10 @@ ne_isa_attach(parent, self, aux)
 		    bus_space_read_1(nict, nich, NERTL_RTL0_8019ID1) ==
 								RTL0_8019ID1) {
 			typestr = "NE2000 (RTL8019)";
-			npp_init_media = rtl80x9_init_media;
 			dsc->sc_mediachange = rtl80x9_mediachange;
 			dsc->sc_mediastatus = rtl80x9_mediastatus;
 			dsc->init_card = rtl80x9_init_card;
+			dsc->sc_media_init = rtl80x9_media_init;
 		}
 		break;
 
@@ -224,10 +214,6 @@ ne_isa_attach(parent, self, aux)
 
 	printf("%s: %s Ethernet\n", dsc->sc_dev.dv_xname, typestr);
 
-	/* Initialize media, if we have it. */
-	if (npp_init_media != NULL)
-		(*npp_init_media)(dsc, &media, &nmedia, &defmedia);
-
 	/* This interface is always enabled. */
 	dsc->sc_enabled = 1;
 
@@ -235,11 +221,11 @@ ne_isa_attach(parent, self, aux)
 	 * Do generic NE2000 attach.  This will read the station address
 	 * from the EEPROM.
 	 */
-	ne2000_attach(nsc, NULL, media, nmedia, defmedia);
+	ne2000_attach(nsc, NULL);
 
 	/* Establish the interrupt handler. */
-	isc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_NET, dp8390_intr, dsc);
+	isc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_NET, dp8390_intr, dsc);
 	if (isc->sc_ih == NULL)
 		printf("%s: couldn't establish interrupt handler\n",
 		    dsc->sc_dev.dv_xname);

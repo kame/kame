@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.17 2000/05/19 18:54:26 thorpej Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.22 2002/03/05 09:40:41 simonb Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -52,7 +52,7 @@
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl and anything required in the strategy routine
  * (e.g., sector size) must be filled in before calling us.
@@ -80,7 +80,7 @@ readdisklabel(dev, strat, lp, osdep)
 	bp->b_dev = dev;
 	bp->b_blkno = LABELSECTOR;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = LABELSECTOR / lp->d_secpercyl;
 	(*strat)(bp);
 	if (biowait(bp)) {
@@ -100,7 +100,6 @@ readdisklabel(dev, strat, lp, osdep)
 			break;
 		}
 	}
-	bp->b_flags = B_INVAL | B_AGE;
 	brelse(bp);
 	return (msg);
 }
@@ -121,7 +120,7 @@ setdisklabel(olp, nlp, openmask, osdep)
 	if (nlp->d_magic != DISKMAGIC || nlp->d_magic2 != DISKMAGIC ||
 	    dkcksum(nlp) != 0)
 		return (EINVAL);
-	while ((i = ffs((long)openmask)) != 0) {
+	while ((i = ffs(openmask)) != 0) {
 		i--;
 		openmask &= ~(1 << i);
 		if (nlp->d_npartitions <= i)
@@ -172,7 +171,7 @@ writedisklabel(dev, strat, lp, osdep)
 	bp->b_dev = makedev(major(dev), DISKMINOR(DISKUNIT(dev), labelpart));
 	bp->b_blkno = LABELSECTOR;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_READ;
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 
 	/* if successful, locate disk label within block and validate */
@@ -185,7 +184,8 @@ writedisklabel(dev, strat, lp, osdep)
 		if (dlp->d_magic == DISKMAGIC && dlp->d_magic2 == DISKMAGIC &&
 		    dkcksum(dlp) == 0) {
 			*dlp = *lp;
-			bp->b_flags = B_WRITE;
+			bp->b_flags &= ~(B_READ|B_DONE);
+			bp->b_flags |= B_WRITE;
 			(*strat)(bp);
 			error = biowait(bp);
 			goto done;
@@ -239,44 +239,4 @@ bounds_check_with_label(struct buf *bp, struct disklabel *lp, int wlabel)
 bad:
 	bp->b_flags |= B_ERROR;
 	return(-1);
-}
-
-/*
- * This function appears to be called by each disk driver.
- * Aparently this is to give this MD code a chance to do
- * additional "device registration" types of work. (?)
- * For example, the sparc port uses this to record the
- * device node for the PROM-specified boot device.
- */
-void
-dk_establish(dk, dev)
-	struct disk *dk;
-	struct device *dev;
-{
-	struct scsibus_softc *sbsc;
-	int major, target, lun;
-
-	major  = B_TYPE(bootdev);
-	target = B_UNIT(bootdev);
-	lun    = 0;
-
-	if (booted_device != NULL || major != 0)
-		return;
-
-	/*
- 	 * scsi: sd, cd
- 	 */
-
-	if (strncmp("sd", dev->dv_xname, 2) == 0 ||
-	    strncmp("cd", dev->dv_xname, 2) == 0) {
-		sbsc = (struct scsibus_softc *)dev->dv_parent;
-
-		if (sbsc->sc_link[target][lun] != NULL &&
-		    sbsc->sc_link[target][lun]->device_softc == (void *)dev) {
-			booted_device = dev;
-			return;
-		}
-	}
-
-	return;
 }

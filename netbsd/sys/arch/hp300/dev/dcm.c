@@ -1,4 +1,4 @@
-/*	$NetBSD: dcm.c,v 1.44 1998/03/28 23:49:06 thorpej Exp $	*/
+/*	$NetBSD: dcm.c,v 1.51 2002/03/17 19:40:38 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -87,6 +87,12 @@
 /*
  *  98642/MUX
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dcm.c,v 1.51 2002/03/17 19:40:38 atatat Exp $");                                                  
+
+#include "opt_kgdb.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -153,18 +159,6 @@ struct	dcmischeme {
 	int	dis_intr;	/* recv interrupts during last interval */
 	int	dis_char;	/* characters read during last interval */
 };
-
-/*
- * Stuff for DCM console support.  This could probably be done a little
- * better.
- */
-static	struct dcmdevice *dcm_cn = NULL;	/* pointer to hardware */
-static	int dcmconsinit;			/* has been initialized */
-/* static	int dcm_lastcnpri = CN_DEAD; */	/* XXX last priority */
-
-int	dcmdefaultrate = DEFAULT_BAUD_RATE;
-int	dcmconbrdbusy = 0;
-int	dcmmajor;
 
 #ifdef KGDB
 /*
@@ -300,9 +294,7 @@ void	dcminit __P((struct dcmdevice *, int, int));
 
 int	dcmselftest __P((struct dcm_softc *));
 
-int	dcm_console_scan __P((int, caddr_t, void *));
-void	dcmcnprobe __P((struct consdev *));
-void	dcmcninit __P((struct consdev *));
+int	dcmcnattach __P((bus_space_tag_t, bus_addr_t, int));
 int	dcmcngetc __P((dev_t));
 void	dcmcnputc __P((dev_t, int));
 
@@ -312,6 +304,22 @@ void	dcmattach __P((struct device *, struct device *, void *));
 struct cfattach dcm_ca = {
 	sizeof(struct dcm_softc), dcmmatch, dcmattach
 };
+
+/*
+ * Stuff for DCM console support.  This could probably be done a little
+ * better.
+ */
+static	struct dcmdevice *dcm_cn = NULL;	/* pointer to hardware */
+static	int dcmconsinit;			/* has been initialized */
+/* static	int dcm_lastcnpri = CN_DEAD; */	/* XXX last priority */
+
+static struct consdev dcm_cons = {
+       NULL, NULL, dcmcngetc, dcmcnputc, nullcnpollc, NULL, NODEV, CN_REMOTE
+};
+int	dcmconscode;
+int	dcmdefaultrate = DEFAULT_BAUD_RATE;
+int	dcmconbrdbusy = 0;
+int	dcmmajor;
 
 extern struct cfdriver dcm_cd;
 
@@ -346,8 +354,8 @@ dcmattach(parent, self, aux)
 
 	sc->sc_flags = 0;
 
-	if (scode == conscode) {
-		dcm = (struct dcmdevice *)conaddr;
+	if (scode == dcmconscode) {
+		dcm = dcm_cn;
 		sc->sc_flags |= DCM_ISCONSOLE;
 
 		/*
@@ -551,7 +559,7 @@ dcmopen(dev, flag, mode, p)
 		printf("%s port %d: dcmopen: st %x fl %x\n",
 			sc->sc_dev.dv_xname, port, tp->t_state, tp->t_flags);
 #endif
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 
  bad:
 	return (error);
@@ -575,7 +583,7 @@ dcmclose(dev, flag, mode, p)
 	sc = dcm_cd.cd_devs[board];
 	tp = sc->sc_tty[port];
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 
 	s = spltty();
 
@@ -614,7 +622,7 @@ dcmread(dev, uio, flag)
 	sc = dcm_cd.cd_devs[board];
 	tp = sc->sc_tty[port];
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
  
 int
@@ -634,7 +642,27 @@ dcmwrite(dev, uio, flag)
 	sc = dcm_cd.cd_devs[board];
 	tp = sc->sc_tty[port];
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+dcmpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	int unit, board, port;
+	struct dcm_softc *sc;
+	struct tty *tp;
+
+	unit = DCMUNIT(dev);
+	board = DCMBOARD(unit);
+	port = DCMPORT(unit);
+
+	sc = dcm_cd.cd_devs[board];
+	tp = sc->sc_tty[port];
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -866,7 +894,7 @@ dcmreadbuf(sc, port)
 				    "%s port %d: uart overflow\n",
 				    sc->sc_dev.dv_xname, port);
 		}
-		(*linesw[tp->t_line].l_rint)(c, tp);
+		(*tp->t_linesw->l_rint)(c, tp);
 	}
 	sc->sc_scheme.dis_char += nch;
 
@@ -893,7 +921,7 @@ dcmxint(sc, port)
 	tp->t_state &= ~TS_BUSY;
 	if (tp->t_state & TS_FLUSH)
 		tp->t_state &= ~TS_FLUSH;
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 }
 
 void
@@ -926,9 +954,9 @@ dcmmint(sc, port, mcnd)
 	}
 	if (delta & MI_CD) {
 		if (mcnd & MI_CD)
-			(void)(*linesw[tp->t_line].l_modem)(tp, 1);
+			(void)(*tp->t_linesw->l_modem)(tp, 1);
 		else if ((sc->sc_softCAR & (1 << port)) == 0 &&
-		    (*linesw[tp->t_line].l_modem)(tp, 0) == 0) {
+		    (*tp->t_linesw->l_modem)(tp, 0) == 0) {
 			sc->sc_modem[port]->mdmout = MO_OFF;
 			SEM_LOCK(dcm);
 			dcm->dcm_modemchng |= (1 << port);
@@ -965,11 +993,13 @@ dcmioctl(dev, cmd, data, flag, p)
 		printf("%s port %d: dcmioctl: cmd %lx data %x flag %x\n",
 		       sc->sc_dev.dv_xname, port, cmd, *data, flag);
 #endif
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -1052,7 +1082,7 @@ dcmioctl(dev, cmd, data, flag, p)
 	}
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -1337,7 +1367,7 @@ dcmmctl(dev, bits, how)
 		dcm->dcm_cr |= CR_MODM;
 		SEM_UNLOCK(dcm);
 		DELAY(10); /* delay until done */
-		(void) splx(s);
+		splx(s);
 	}
 	return (bits);
 }
@@ -1497,77 +1527,41 @@ dcmselftest(sc)
  */
 
 int
-dcm_console_scan(scode, va, arg)
-	int scode;
-	caddr_t va;
-	void *arg;
+dcmcnattach(bus_space_tag_t bst, bus_addr_t addr, int scode)
 {
-	struct dcmdevice *dcm = (struct dcmdevice *)va;
-	struct consdev *cp = arg;
-	u_char *dioiidev;
-	int force = 0, pri;
+        bus_space_handle_t bsh;
+        caddr_t va;
+        struct dcmdevice *dcm;
+
+        if (bus_space_map(bst, addr, DIOCSIZE, 0, &bsh))
+                return (1);
+
+        va = bus_space_vaddr(bst, bsh);
+	dcm = (struct dcmdevice *)va;
 
 	switch (dcm->dcm_rsid) {
-	case DCMID:
-		pri = CN_NORMAL;
-		break;
-
-	case DCMID|DCMCON:
-		pri = CN_REMOTE;
-		break;
-
-	default:
-		return (0);
-	}
-
 #ifdef CONSCODE
-	/*
-	 * Raise our priority, if appropriate.
-	 */
-	if (scode == CONSCODE) {
-		pri = CN_REMOTE;
-		force = conforced = 1;
-	}
+	case DCMID:
 #endif
-
-	/* Only raise priority. */
-	if (pri > cp->cn_pri)
-		cp->cn_pri = pri;
-
-	/*
-	 * If our priority is higher than the currently-remembered
-	 * console, stash our priority, for the benefit of dcmcninit().
-	 */
-	if (((cn_tab == NULL) || (cp->cn_pri > cn_tab->cn_pri)) || force) {
-		cn_tab = cp;
-		if (scode >= 132) {
-			dioiidev = (u_char *)va;
-			return ((dioiidev[0x101] + 1) * 0x100000);
-		}
-		return (DIOCSIZE);
+	case DCMID|DCMCON:
+		break;
+	default:
+		goto error;
 	}
-	return (0);
-}
 
-void
-dcmcnprobe(cp)
-	struct consdev *cp;
-{
+	dcminit(dcm, DCMCONSPORT, dcmdefaultrate);
+        dcmconsinit = 1;
+	dcmconscode = scode;
+        dcm_cn = dcm;
 
-	/* locate the major number */
-	for (dcmmajor = 0; dcmmajor < nchrdev; dcmmajor++)
-		if (cdevsw[dcmmajor].d_open == dcmopen)
-			break;
+        /* locate the major number */
+        for (dcmmajor = 0; dcmmajor < nchrdev; dcmmajor++)
+                if (cdevsw[dcmmajor].d_open == dcmopen)
+                        break;
 
-	/* initialize required fields */
-	cp->cn_dev = makedev(dcmmajor, 0);	/* XXX */
-	cp->cn_pri = CN_DEAD;
-
-	/* Abort early if console already forced. */
-	if (conforced)
-		return;
-
-	console_scan(dcm_console_scan, cp);
+        /* initialize required fields */
+        cn_tab = &dcm_cons;
+        cn_tab->cn_dev = makedev(dcmmajor, 0);
 
 #ifdef KGDB_CHEAT
 	/* XXX this needs to be fixed. */
@@ -1590,17 +1584,13 @@ dcmcnprobe(cp)
 		}
 	}
 #endif
-}
 
-/* ARGSUSED */
-void
-dcmcninit(cp)
-	struct consdev *cp;
-{
 
-	dcm_cn = (struct dcmdevice *)conaddr;
-	dcminit(dcm_cn, DCMCONSPORT, dcmdefaultrate);
-	dcmconsinit = 1;
+        return (0);
+
+error:
+        bus_space_unmap(bst, bsh, DIOCSIZE);
+        return (1);
 }
 
 /* ARGSUSED */

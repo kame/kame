@@ -1,4 +1,4 @@
-/*	$NetBSD: esp.c,v 1.12 2000/06/05 07:59:53 nisimura Exp $	*/
+/*	$NetBSD: esp.c,v 1.14 2001/04/25 17:53:24 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -240,12 +240,14 @@ espattach(parent, self, aux)
 	    sc->sc_dev.dv_xname, "intr");
 
 	/* Do the common parts of attachment. */
-	ncr53c9x_attach(sc, NULL, NULL);
+	sc->sc_adapter.adapt_minphys = minphys;
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	ncr53c9x_attach(sc);
 
 #if 0
 	/* XXX - This doesn't work yet.  Not sure why... */
 	/* Turn on target selection using the `dma' method */
-	ncr53c9x_dmaselect = 1;  /* XXX - OK? */
+	sc->sc_features |= NCR_F_DMASELECT;  /* XXX - OK? */
 #endif
 }
 

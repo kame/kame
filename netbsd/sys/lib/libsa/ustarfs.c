@@ -1,4 +1,4 @@
-/*	$NetBSD: ustarfs.c,v 1.14.4.1 2000/10/03 00:35:47 lukem Exp $	*/
+/*	$NetBSD: ustarfs.c,v 1.19 2002/05/10 11:07:01 lukem Exp $	*/
 
 /* [Notice revision 2.2]
  * Copyright (c) 1997, 1998 Avalon Computer Systems, Inc.
@@ -105,12 +105,13 @@ typedef struct ustar_struct {
 		ust_gid[8],
 		ust_size[12],
 		ust_misc[12 + 8 + 1 + 100],
-		ust_magic[6];
+		ust_magic[6],
 	/* there is more, but we don't care */
+		ust_pad[1];	/* make it aligned */
 } ustar_t;
 
 /*
- * We buffer one even cylindar of data...it's actually only really one
+ * We buffer one even cylinder of data...it's actually only really one
  * cyl on a 1.44M floppy, but on other devices it's fast enough with any
  * kind of block buffering, so we optimize for the slowest device.
  */
@@ -144,6 +145,15 @@ static int ustarfs_cylinder_read __P((struct open_file *, ustoffs, int));
 static void ustarfs_sscanf __P((const char *, const char *, int *));
 static int read512block __P((struct open_file *, ustoffs, char block[512]));
 static int init_volzero_sig __P((struct open_file *));
+
+#ifdef HAVE_CHANGEDISK_HOOK
+/*
+ * Called when the next volume is prompted.
+ * Machine dependent code can eject the medium etc.
+ * The new medium must be ready when this hook returns.
+ */
+void changedisk_hook __P((struct open_file *));
+#endif
 
 static int
 convert(f, base, fw)
@@ -271,7 +281,11 @@ get_volume(f, vn)
 			printf("remove disk %d, ", havevolume + 1);
 		printf("insert disk %d, and press return...",
 			needvolume + 1);
+#ifdef HAVE_CHANGEDISK_HOOK
+		changedisk_hook(f);
+#else
 		getchar();
+#endif
 		printf("\n");
 		e = ustarfs_cylinder_read(f, 0, needvolume != 0);
 		if (e)
@@ -323,7 +337,7 @@ read512block(f, vda, block)
 	 * 	do disk swap
 	 * get physical disk address
 	 * round down to cylinder boundary
-	 * read cylindar
+	 * read cylinder
 	 * set window (in vda space) and try again
 	 * [ there is an implicit assumption that windowbase always identifies
 	 *    the current volume, even if initwindow == 0. This way, a
@@ -471,7 +485,7 @@ ustarfs_seek(f, offs, whence)
 	}
 	return ustf->uas_fseek;
 }
-#endif /* !LIBSA_NO_FS_CLOSE */
+#endif /* !LIBSA_NO_FS_SEEK */
 
 int
 ustarfs_read(f, start, size, resid)

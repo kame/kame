@@ -1,4 +1,4 @@
-/* $NetBSD: process_machdep.c,v 1.13 1999/08/10 23:35:45 thorpej Exp $ */
+/* $NetBSD: process_machdep.c,v 1.18 2001/07/12 23:35:43 thorpej Exp $ */
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -54,7 +54,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: process_machdep.c,v 1.13 1999/08/10 23:35:45 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: process_machdep.c,v 1.18 2001/07/12 23:35:43 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,9 +74,7 @@ __KERNEL_RCSID(0, "$NetBSD: process_machdep.c,v 1.13 1999/08/10 23:35:45 thorpej
 #define	process_fpframe(p)	(&(process_pcb(p)->pcb_fp))
 
 int
-process_read_regs(p, regs)
-	struct proc *p;
-	struct reg *regs;
+process_read_regs(struct proc *p, struct reg *regs)
 {
 
 	frametoreg(process_frame(p), regs);
@@ -86,9 +84,7 @@ process_read_regs(p, regs)
 }
 
 int
-process_write_regs(p, regs)
-	struct proc *p;
-	struct reg *regs;
+process_write_regs(struct proc *p, struct reg *regs)
 {
 
 	regtoframe(regs, process_frame(p));
@@ -98,9 +94,7 @@ process_write_regs(p, regs)
 }
 
 int
-process_sstep(p, sstep)
-	struct proc *p;
-	int sstep;
+process_sstep(struct proc *p, int sstep)
 {
 
 	if (sstep)
@@ -110,9 +104,7 @@ process_sstep(p, sstep)
 }
 
 int
-process_set_pc(p, addr)
-	struct proc *p;
-	caddr_t addr;
+process_set_pc(struct proc *p, caddr_t addr)
 {
 	struct trapframe *frame = process_frame(p);
 
@@ -121,30 +113,23 @@ process_set_pc(p, addr)
 }
 
 int
-process_read_fpregs(p, regs)
-	struct proc *p;
-	struct fpreg *regs;
+process_read_fpregs(struct proc *p, struct fpreg *regs)
 {
 
-	if (p == fpcurproc) {
-		alpha_pal_wrfen(1);
-		savefpstate(process_fpframe(p));
-		alpha_pal_wrfen(0);
-	}
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p, 1);
 
-	bcopy(process_fpframe(p), regs, sizeof(struct fpreg));
+	memcpy(regs, process_fpframe(p), sizeof(struct fpreg));
 	return (0);
 }
 
 int
-process_write_fpregs(p, regs)
-	struct proc *p;
-	struct fpreg *regs;
+process_write_fpregs(struct proc *p, struct fpreg *regs)
 {
 
-	if (p == fpcurproc)
-		fpcurproc = NULL;
+	if (p->p_addr->u_pcb.pcb_fpcpu != NULL)
+		fpusave_proc(p, 0);
 
-	bcopy(regs, process_fpframe(p), sizeof(struct fpreg));
+	memcpy(process_fpframe(p), regs, sizeof(struct fpreg));
 	return (0);
 }

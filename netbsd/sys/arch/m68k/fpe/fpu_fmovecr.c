@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu_fmovecr.c,v 1.7.12.1 2000/09/26 09:03:35 is Exp $	*/
+/*	$NetBSD: fpu_fmovecr.c,v 1.8 2000/09/22 19:47:59 is Exp $	*/
 
 /*
  * Copyright (c) 1995  Ken Nakata

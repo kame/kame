@@ -1,4 +1,4 @@
-/*	$NetBSD: gvpio.c,v 1.5 2000/01/23 21:06:12 aymeric Exp $ */
+/*	$NetBSD: gvpio.c,v 1.9 2002/01/28 09:56:57 aymeric Exp $ */
 
 /*
  * Copyright (c) 1997 Ignatios Souvatzis
@@ -31,6 +31,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: gvpio.c,v 1.9 2002/01/28 09:56:57 aymeric Exp $");
+
 /*
  * GVP I/O Extender
  */
@@ -54,7 +57,6 @@
 #include <amiga/dev/supio.h>
 #include <amiga/dev/zbusvar.h>
 #include <amiga/dev/gvpbusvar.h>
-#include <amiga/dev/gvpiovar.h>
 
 struct gvpio_softc {
 	struct device sc_dev;
@@ -64,20 +66,18 @@ struct gvpio_softc {
 	struct isr sc_comisr;
 };
 
-int gvpiomatch __P((struct device *, struct cfdata *, void *));
-void gvpioattach __P((struct device *, struct device *, void *));
-int gvpioprint __P((void *auxp, const char *));
-int gvp_com_intr __P((void *));
+int gvpiomatch(struct device *, struct cfdata *, void *);
+void gvpioattach(struct device *, struct device *, void *);
+int gvpioprint(void *auxp, const char *);
+int gvp_com_intr(void *);
+void gvp_com_intr_establish(struct device *, struct gvpcom_int_hdl *);
 
 struct cfattach gvpio_ca = {
 	sizeof(struct gvpio_softc), gvpiomatch, gvpioattach
 };
 
 int
-gvpiomatch(parent, cfp, auxp)
-	struct device *parent;
-	struct cfdata *cfp;
-	void *auxp;
+gvpiomatch(struct device *parent, struct cfdata *cfp, void *auxp)
 {
 
 	struct gvpbus_args *gap;
@@ -103,9 +103,7 @@ struct gvpio_devs {
 };
 
 void
-gvpioattach(parent, self, auxp)
-	struct device *parent, *self;
-	void *auxp;
+gvpioattach(struct device *parent, struct device *self, void *auxp)
 {
 	struct gvpio_softc *giosc;
 	struct gvpio_devs  *giosd;
@@ -123,7 +121,7 @@ gvpioattach(parent, self, auxp)
 	gbase = gap->zargs.va;
 	giosc->sc_cntr = &gbase[0x41];
 	giosc->sc_bst.base = (u_long)gbase + 1;
-	giosc->sc_bst.absm = amiga_bus_stride_2;
+	giosc->sc_bst.absm = &amiga_bus_stride_2;
 	LIST_INIT(&giosc->sc_comhdls);
 	giosd = gvpiodevs;
 
@@ -160,9 +158,7 @@ gvpioattach(parent, self, auxp)
 }
 
 int
-gvpioprint(auxp, pnp)
-	void *auxp;
-	const char *pnp;
+gvpioprint(void *auxp, const char *pnp)
 {
 	struct supio_attach_args *supa;
 	supa = auxp;
@@ -177,9 +173,7 @@ gvpioprint(auxp, pnp)
 }
 
 void
-gvp_com_intr_establish(self, p)
-	struct device *self;
-	struct gvpcom_int_hdl *p;
+gvp_com_intr_establish(struct device *self, struct gvpcom_int_hdl *p)
 {
 	struct gvpio_softc *sc;
 
@@ -189,8 +183,7 @@ gvp_com_intr_establish(self, p)
 }
 
 int
-gvp_com_intr(p)
-	void *p;
+gvp_com_intr(void *p)
 {
 	struct gvpio_softc *sc;
 	struct gvpcom_int_hdl *np;

@@ -1,9 +1,9 @@
-/*	$NetBSD: uvm_meter.c,v 1.12 2000/05/26 00:36:53 thorpej Exp $	*/
+/*	$NetBSD: uvm_meter.c,v 1.23 2001/12/09 03:07:19 chs Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
  * Copyright (c) 1982, 1986, 1989, 1993
- *      The Regents of the University of California.  
+ *      The Regents of the University of California.
  *
  * All rights reserved.
  *
@@ -18,7 +18,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *      This product includes software developed by Charles D. Cranor,
- *      Washington University, and the University of California, Berkeley 
+ *      Washington University, and the University of California, Berkeley
  *      and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
@@ -40,11 +40,14 @@
  * from: Id: uvm_meter.c,v 1.1.2.1 1997/08/14 19:10:35 chuck Exp
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uvm_meter.c,v 1.23 2001/12/09 03:07:19 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 /*
@@ -52,10 +55,10 @@
  */
 
 int maxslp = MAXSLP;	/* patchable ... */
-struct loadavg averunnable; /* decl. */
+struct loadavg averunnable;
 
 /*
- * constants for averages over 1, 5, and 15 minutes when sampling at 
+ * constants for averages over 1, 5, and 15 minutes when sampling at
  * 5 second intervals.
  */
 
@@ -71,6 +74,7 @@ static fixpt_t cexp[3] = {
 
 static void uvm_loadav __P((struct loadavg *));
 static void uvm_total __P((struct vmtotal *));
+static int sysctl_uvmexp __P((void *, size_t *));
 
 /*
  * uvm_meter: calculate load average and wake up the swapper (if needed)
@@ -81,11 +85,11 @@ uvm_meter()
 	if ((time.tv_sec % 5) == 0)
 		uvm_loadav(&averunnable);
 	if (proc0.p_slptime > (maxslp / 2))
-		wakeup((caddr_t)&proc0);
+		wakeup(&proc0);
 }
 
 /*
- * uvm_loadav: compute a tenex style load average of a quantity on 
+ * uvm_loadav: compute a tenex style load average of a quantity on
  * 1, 5, and 15 minute internvals.
  */
 static void
@@ -96,7 +100,8 @@ uvm_loadav(avg)
 	struct proc *p;
 
 	proclist_lock_read();
-	for (nrun = 0, p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	nrun = 0;
+	LIST_FOREACH(p, &allproc, p_list) {
 		switch (p->p_stat) {
 		case SSLEEP:
 			if (p->p_priority > PZERO || p->p_slptime > 1)
@@ -128,6 +133,7 @@ uvm_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	struct proc *p;
 {
 	struct vmtotal vmtotals;
+	int rv, t;
 
 	/* all sysctl names at this level are terminal */
 	if (namelen != 1)
@@ -144,16 +150,167 @@ uvm_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		    sizeof(vmtotals)));
 
 	case VM_UVMEXP:
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &uvmexp,
+		return (sysctl_rdminstruct(oldp, oldlenp, newp, &uvmexp,
 		    sizeof(uvmexp)));
+	case VM_UVMEXP2:
+		if (newp)
+			return (EPERM);
+		return (sysctl_uvmexp(oldp, oldlenp));
 
 	case VM_NKMEMPAGES:
 		return (sysctl_rdint(oldp, oldlenp, newp, nkmempages));
+
+#define UPDATEMIN(a, ap, bp, cp) 					\
+	{								\
+		t = uvmexp.ap;						\
+		rv = sysctl_int(oldp, oldlenp, newp, newlen, &t);	\
+		if (rv) {						\
+			return rv;					\
+		}							\
+		if (t + uvmexp.bp + uvmexp.cp > 95 || t < 0) {		\
+			return EINVAL;					\
+		}							\
+		uvmexp.ap = t;						\
+		uvmexp.a = t * 256 / 100;				\
+		return rv;						\
+	}
+
+	case VM_ANONMIN:
+		UPDATEMIN(anonmin, anonminpct, fileminpct, execminpct);
+
+	case VM_EXECMIN:
+		UPDATEMIN(execmin, execminpct, fileminpct, anonminpct);
+
+	case VM_FILEMIN:
+		UPDATEMIN(filemin, fileminpct, execminpct, anonminpct);
+
+#undef UPDATEMIN
+#define UPDATEMAX(a, ap)	 					\
+	{								\
+		t = uvmexp.ap;						\
+		rv = sysctl_int(oldp, oldlenp, newp, newlen, &t);	\
+		if (rv) {						\
+			return rv;					\
+		}							\
+		if (t > 100 || t < 0) {					\
+			return EINVAL;					\
+		}							\
+		uvmexp.ap = t;						\
+		uvmexp.a = t * 256 / 100;				\
+		return rv;						\
+	}
+
+	case VM_ANONMAX:
+		UPDATEMAX(anonmax, anonmaxpct);
+
+	case VM_EXECMAX:
+		UPDATEMAX(execmax, execmaxpct);
+
+	case VM_FILEMAX:
+		UPDATEMAX(filemax, filemaxpct);
+
+#undef UPDATEMAX
+
+	case VM_MAXSLP:
+		return (sysctl_rdint(oldp, oldlenp, newp, maxslp));
+
+	case VM_USPACE:
+		return (sysctl_rdint(oldp, oldlenp, newp, USPACE));
 
 	default:
 		return (EOPNOTSUPP);
 	}
 	/* NOTREACHED */
+}
+
+static int
+sysctl_uvmexp(oldp, oldlenp)
+	void *oldp;
+	size_t *oldlenp;
+{
+	struct uvmexp_sysctl u;
+
+	memset(&u, 0, sizeof(u));
+
+	/* Entries here are in order of uvmexp_sysctl, not uvmexp */
+	u.pagesize = uvmexp.pagesize;
+	u.pagemask = uvmexp.pagemask;
+	u.pageshift = uvmexp.pageshift;
+	u.npages = uvmexp.npages;
+	u.free = uvmexp.free;
+	u.active = uvmexp.active;
+	u.inactive = uvmexp.inactive;
+	u.paging = uvmexp.paging;
+	u.wired = uvmexp.wired;
+	u.zeropages = uvmexp.zeropages;
+	u.reserve_pagedaemon = uvmexp.reserve_pagedaemon;
+	u.reserve_kernel = uvmexp.reserve_kernel;
+	u.freemin = uvmexp.freemin;
+	u.freetarg = uvmexp.freetarg;
+	u.inactarg = uvmexp.inactarg;
+	u.wiredmax = uvmexp.wiredmax;
+	u.nswapdev = uvmexp.nswapdev;
+	u.swpages = uvmexp.swpages;
+	u.swpginuse = uvmexp.swpginuse;
+	u.swpgonly = uvmexp.swpgonly;
+	u.nswget = uvmexp.nswget;
+	u.nanon = uvmexp.nanon;
+	u.nanonneeded = uvmexp.nanonneeded;
+	u.nfreeanon = uvmexp.nfreeanon;
+	u.faults = uvmexp.faults;
+	u.traps = uvmexp.traps;
+	u.intrs = uvmexp.intrs;
+	u.swtch = uvmexp.swtch;
+	u.softs = uvmexp.softs;
+	u.syscalls = uvmexp.syscalls;
+	u.pageins = uvmexp.pageins;
+	u.swapins = uvmexp.swapins;
+	u.swapouts = uvmexp.swapouts;
+	u.pgswapin = uvmexp.pgswapin;
+	u.pgswapout = uvmexp.pgswapout;
+	u.forks = uvmexp.forks;
+	u.forks_ppwait = uvmexp.forks_ppwait;
+	u.forks_sharevm = uvmexp.forks_sharevm;
+	u.pga_zerohit = uvmexp.pga_zerohit;
+	u.pga_zeromiss = uvmexp.pga_zeromiss;
+	u.zeroaborts = uvmexp.zeroaborts;
+	u.fltnoram = uvmexp.fltnoram;
+	u.fltnoanon = uvmexp.fltnoanon;
+	u.fltpgwait = uvmexp.fltpgwait;
+	u.fltpgrele = uvmexp.fltpgrele;
+	u.fltrelck = uvmexp.fltrelck;
+	u.fltrelckok = uvmexp.fltrelckok;
+	u.fltanget = uvmexp.fltanget;
+	u.fltanretry = uvmexp.fltanretry;
+	u.fltamcopy = uvmexp.fltamcopy;
+	u.fltnamap = uvmexp.fltnamap;
+	u.fltnomap = uvmexp.fltnomap;
+	u.fltlget = uvmexp.fltlget;
+	u.fltget = uvmexp.fltget;
+	u.flt_anon = uvmexp.flt_anon;
+	u.flt_acow = uvmexp.flt_acow;
+	u.flt_obj = uvmexp.flt_obj;
+	u.flt_prcopy = uvmexp.flt_prcopy;
+	u.flt_przero = uvmexp.flt_przero;
+	u.pdwoke = uvmexp.pdwoke;
+	u.pdrevs = uvmexp.pdrevs;
+	u.pdswout = uvmexp.pdswout;
+	u.pdfreed = uvmexp.pdfreed;
+	u.pdscans = uvmexp.pdscans;
+	u.pdanscan = uvmexp.pdanscan;
+	u.pdobscan = uvmexp.pdobscan;
+	u.pdreact = uvmexp.pdreact;
+	u.pdbusy = uvmexp.pdbusy;
+	u.pdpageouts = uvmexp.pdpageouts;
+	u.pdpending = uvmexp.pdpending;
+	u.pddeact = uvmexp.pddeact;
+	u.anonpages = uvmexp.anonpages;
+	u.filepages = uvmexp.filepages;
+	u.execpages = uvmexp.execpages;
+	u.colorhit = uvmexp.colorhit;
+	u.colormiss = uvmexp.colormiss;
+
+	return (sysctl_rdminstruct(oldp, oldlenp, NULL, &u, sizeof(u)));
 }
 
 /*
@@ -165,8 +322,8 @@ uvm_total(totalp)
 {
 	struct proc *p;
 #if 0
-	vm_map_entry_t	entry;
-	vm_map_t map;
+	struct vm_map_entry *	entry;
+	struct vm_map *map;
 	int paging;
 #endif
 
@@ -177,7 +334,7 @@ uvm_total(totalp)
 	 */
 
 	proclist_lock_read();
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	LIST_FOREACH(p, &allproc, p_list) {
 		if (p->p_flag & P_SYSTEM)
 			continue;
 		switch (p->p_stat) {

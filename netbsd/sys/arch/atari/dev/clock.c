@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.23.2.1 2001/02/26 22:49:25 he Exp $	*/
+/*	$NetBSD: clock.c,v 1.27 2001/07/26 15:05:09 wiz Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -115,14 +115,14 @@ static int	divisor;	/* Systemclock divisor	*/
  * be a power of 2. Since this gives us an even number, not an odd number,
  * we discard one case and compensate. That is, a variance of 64 would
  * give us offsets in [0..63]. Instead, we take offsets in [1..63].
- * This is symetric around the point 32, or statvar/2, and thus averages
+ * This is symmetric around the point 32, or statvar/2, and thus averages
  * to that value (assuming uniform random numbers).
  */
 #ifdef STATCLOCK
 static int	statvar = 32;	/* {stat,prof}clock variance		*/
 static int	statmin;	/* statclock divisor - variance/2	*/
 static int	profmin;	/* profclock divisor - variance/2	*/
-static int	clk2min;	/* current, from above choises		*/
+static int	clk2min;	/* current, from above choices		*/
 #endif
 
 int
@@ -418,12 +418,21 @@ gettod()
 {
 	int			sps;
 	mc_todregs		clkregs;
+	u_int			regb;
 	struct clock_ymdhms	dt;
 
 	sps = splhigh();
+	regb = mc146818_read(RTC, MC_REGB);
 	MC146818_GETTOD(RTC, &clkregs);
 	splx(sps);
 
+	regb &= MC_REGB_24HR|MC_REGB_BINARY;
+	if (regb != (MC_REGB_24HR|MC_REGB_BINARY)) {
+		printf("Error: Nonstandard RealTimeClock Configuration -"
+			" value ignored\n"
+			"       A write to /dev/rtc will correct this.\n");
+			return(0);
+	}
 	if(clkregs[MC_SEC] > 59)
 		return(0);
 	if(clkregs[MC_MIN] > 59)
@@ -555,6 +564,8 @@ rtcwrite(dev, uio, flags)
 		return(EINVAL);
 
 	s = splclock();
+	mc146818_write(RTC, MC_REGB,
+		mc146818_read(RTC, MC_REGB) | MC_REGB_24HR | MC_REGB_BINARY);
 	MC146818_GETTOD(RTC, &clkregs);
 	splx(s);
 

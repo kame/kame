@@ -1,4 +1,4 @@
-#	$NetBSD: vnode_if.src,v 1.24.4.1 2000/12/14 23:37:38 he Exp $
+#	$NetBSD: vnode_if.src,v 1.30 2001/09/15 20:36:37 chs Exp $
 #
 # Copyright (c) 1992, 1993
 #	The Regents of the University of California.  All rights reserved.
@@ -45,7 +45,7 @@
 #     
 # The locking value can take the following values:
 # L: locked.
-# U: unlocked/
+# U: unlocked.
 # -: not applicable.  vnode does not yet (or no longer) exists.
 # =: the same on input and output, may be either L or U.
 # X: locked if not nil.
@@ -113,13 +113,13 @@ vop_create {
 
 #
 #% mknod      dvp     L U U
-#% mknod      vpp     - X -
+#% mknod      vpp     - L -
 #
 #! mknod cnp	CREATE, LOCKPARENT
 #
 vop_mknod {
 	IN WILLPUT struct vnode *dvp;
-	OUT WILLRELE struct vnode **vpp;
+	OUT struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
 };
@@ -236,7 +236,7 @@ vop_revoke {
 };
 
 #     
-# XXX - not used
+#% mmap      vp      = = =
 #
 vop_mmap {
 	IN struct vnode *vp;
@@ -338,17 +338,13 @@ vop_rmdir {
 
 #
 #% symlink    dvp     L U U
-#% symlink    vpp     - U -
+#% symlink    vpp     - L -
 #
 #! symlink cnp	CREATE, LOCKPARENT
 #
-# XXX - note that the return vnode has already been VRELE'ed
-#     by the filesystem layer.  To use it you must use vget,
-#     possibly with a further namei.
-#
 vop_symlink {
 	IN WILLPUT struct vnode *dvp;
-	OUT WILLRELE struct vnode **vpp;
+	OUT struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
 	IN char *target;
@@ -569,3 +565,27 @@ vop_whiteout {
 #vop_bwrite {
 #	IN struct buf *bp;
 #};
+
+#
+#% getpages	vp L L L
+#
+vop_getpages {
+	IN struct vnode *vp;
+	IN voff_t offset;
+	IN struct vm_page **m;
+	IN int *count;
+	IN int centeridx;
+	IN vm_prot_t access_type;
+	IN int advice;
+	IN int flags;
+};
+
+#
+#% putpages	vp = = =
+#
+vop_putpages {
+	IN struct vnode *vp;
+	IN voff_t offlo;
+	IN voff_t offhi;
+	IN int flags;
+};

@@ -1,4 +1,4 @@
-/*	$NetBSD: ucomvar.h,v 1.7.2.1 2000/09/04 17:53:14 augustss Exp $	*/
+/*	$NetBSD: ucomvar.h,v 1.10 2001/12/31 12:15:21 augustss Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -57,7 +57,7 @@ struct ucom_methods {
 #define UCOM_SET_BREAK 3
 	int (*ucom_param)(void *sc, int portno, struct termios *);
 	int (*ucom_ioctl)(void *sc, int portno, u_long cmd,
-			  caddr_t data, int flag, struct proc *p);
+			  caddr_t data, int flag, usb_proc_ptr p);
 	int (*ucom_open)(void *sc, int portno);
 	void (*ucom_close)(void *sc, int portno);
 	void (*ucom_read)(void *sc, int portno, u_char **ptr, u_int32_t *count);
@@ -99,6 +99,7 @@ struct ucom_attach_args {
 	u_int ibufsizepad;
 	u_int obufsize;
 	u_int opkthdrlen;
+	const char *info;	/* attach message */
 	usbd_device_handle device;
 	usbd_interface_handle iface;
 	struct ucom_methods *methods;

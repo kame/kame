@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu_implode.c,v 1.5.2.2 2000/08/07 01:31:42 mrg Exp $ */
+/*	$NetBSD: fpu_implode.c,v 1.10 2002/01/19 03:02:34 eeh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -48,6 +48,10 @@
  * FPU subroutines: `implode' internal format numbers into the machine's
  * `packed binary' format.
  */
+
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -275,7 +279,9 @@ fpu_ftox(fe, fp, res)
 		i = ((u_int64_t)fp->fp_mant[2]<<32)|fp->fp_mant[3];
 		if (i >= ((u_int64_t)0x8000000000000000LL + sign))
 			break;
-		return (sign ? -i : i);
+		if (sign) i = -i;
+		res[1] = (int)i;
+		return (i>>32);
 
 	default:		/* Inf, qNaN, sNaN */
 		break;
@@ -503,6 +509,10 @@ fpu_implode(fe, fp, type, space)
 	register u_int *space;
 {
 
+	DPRINTF(FPE_REG, ("\n imploding: "));
+	DUMPFPN(FPE_REG, fp);
+	DPRINTF(FPE_REG, ("\n"));
+
 	switch (type) {
 
 #ifdef SUN4U
@@ -531,4 +541,11 @@ fpu_implode(fe, fp, type, space)
 	default:
 		panic("fpu_implode");
 	}
+#ifdef SUN4U
+	DPRINTF(FPE_REG, ("fpu_implode: %x %x %x %x\n", 
+		space[0], space[1], space[2], space[3]));
+#else
+	DPRINTF(FPE_REG, ("fpu_implode: %x %x\n", 
+		space[0], space[1]));
+#endif
 }

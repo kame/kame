@@ -1,4 +1,4 @@
-/*	$NetBSD: ac.c,v 1.12 2000/05/19 18:54:31 thorpej Exp $	*/
+/*	$NetBSD: ac.c,v 1.14 2002/03/15 05:52:53 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -87,6 +87,9 @@
  * never uses it.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ac.c,v 1.14 2002/03/15 05:52:53 gmcgarry Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -162,12 +165,14 @@ acattach(parent, self, aux)
 	sc->sc_sq.sq_go = acgo;
 	sc->sc_sq.sq_intr = acintr;
 
-	sc->sc_bp = (struct buf *)malloc(sizeof(struct buf),
+	MALLOC(sc->sc_bp, struct buf *, sizeof(struct buf), M_DEVBUF, M_NOWAIT);
+	if (sc->sc_bp == NULL) {
+		printf("%s: memory allocation failed\n", sc->sc_dev.dv_xname);
+		return;
+	}
+	MALLOC(sc->sc_cmd, struct scsi_fmt_cdb *, sizeof(struct scsi_fmt_cdb),
 	    M_DEVBUF, M_NOWAIT);
-	sc->sc_cmd = (struct scsi_fmt_cdb *)malloc(sizeof(struct scsi_fmt_cdb),
-	    M_DEVBUF, M_NOWAIT);
-
-	if (sc->sc_bp == NULL || sc->sc_cmd == NULL) {
+	if (sc->sc_cmd == NULL) {
 		printf("%s: memory allocation failed\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -321,7 +326,7 @@ accommand(dev, command, bufp, buflen)
 		panic("accommand: active!");
 
 	sc->sc_flags |= ACF_ACTIVE;
-	bzero((caddr_t)cmd->cdb, sizeof(cmd->cdb));
+	memset((caddr_t)cmd->cdb, 0, sizeof(cmd->cdb));
 	cmd->cdb[0] = command;
 
 	switch (command) {
@@ -455,7 +460,7 @@ acgeteinfo(dev)
 	char msbuf[48];
 	int error;
 
-	bzero(msbuf, sizeof msbuf);
+	memset(msbuf, 0, sizeof msbuf);
 	error = accommand(dev, ACCMD_MODESENSE, msbuf, sizeof msbuf);
 	if (error)
 		return(error);

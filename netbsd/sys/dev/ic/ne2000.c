@@ -1,4 +1,4 @@
-/*	$NetBSD: ne2000.c,v 1.29 2000/03/22 20:58:28 ws Exp $	*/
+/*	$NetBSD: ne2000.c,v 1.37 2001/11/13 13:14:42 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -54,6 +54,9 @@
  * Common code shared by all NE2000-compatible Ethernet interfaces.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ne2000.c,v 1.37 2001/11/13 13:14:42 lukem Exp $");
+
 #include "opt_ipkdb.h"
 
 #include <sys/param.h>
@@ -89,6 +92,8 @@
 #include <dev/ic/ne2000reg.h>
 #include <dev/ic/ne2000var.h>
 
+#include <dev/ic/ax88190reg.h>
+
 #if BYTE_ORDER == BIG_ENDIAN
 #include <machine/bswap.h>
 #endif
@@ -105,10 +110,9 @@ void	ne2000_readmem __P((bus_space_tag_t, bus_space_handle_t,
 	    bus_space_tag_t, bus_space_handle_t, int, u_int8_t *, size_t, int));
 
 int
-ne2000_attach(nsc, myea, media, nmedia, defmedia)
+ne2000_attach(nsc, myea)
 	struct ne2000_softc *nsc;
 	u_int8_t *myea;
-	int *media, nmedia, defmedia;
 {
 	struct dp8390_softc *dsc = &nsc->sc_dp8390;
 	bus_space_tag_t nict = dsc->sc_regt;
@@ -172,6 +176,7 @@ ne2000_attach(nsc, myea, media, nmedia, defmedia)
 		memsize = 8192 * 2;
 		break;
 	case NE2000_TYPE_DL10019:
+	case NE2000_TYPE_DL10022:
 		memsize = 8192 * 3;
 		break;
 	}
@@ -198,7 +203,7 @@ ne2000_attach(nsc, myea, media, nmedia, defmedia)
 			    x << ED_PAGE_SHIFT, ED_PAGE_SIZE, useword, 0);
 			ne2000_readmem(nict, nich, asict, asich,
 			    x << ED_PAGE_SHIFT, tbuf, ED_PAGE_SIZE, useword);
-			if (bcmp(pbuf0, tbuf, ED_PAGE_SIZE) == 0) {
+			if (memcmp(pbuf0, tbuf, ED_PAGE_SIZE) == 0) {
 				for (i = 0; i < ED_PAGE_SIZE; i++)
 					pbuf[i] = 255 - x;
 				ne2000_writemem(nict, nich, asict, asich,
@@ -207,7 +212,7 @@ ne2000_attach(nsc, myea, media, nmedia, defmedia)
 				ne2000_readmem(nict, nich, asict, asich,
 				    x << ED_PAGE_SHIFT, tbuf, ED_PAGE_SIZE,
 				    useword);
-				if (bcmp(pbuf, tbuf, ED_PAGE_SIZE) == 0) {
+				if (memcmp(pbuf, tbuf, ED_PAGE_SIZE) == 0) {
 					mstart = x << ED_PAGE_SHIFT;
 					memsize = ED_PAGE_SIZE;
 					break;
@@ -227,7 +232,7 @@ ne2000_attach(nsc, myea, media, nmedia, defmedia)
 			    x << ED_PAGE_SHIFT, ED_PAGE_SIZE, useword, 0);
 			ne2000_readmem(nict, nich, asict, asich,
 			    x << ED_PAGE_SHIFT, tbuf, ED_PAGE_SIZE, useword);
-			if (bcmp(pbuf0, tbuf, ED_PAGE_SIZE) == 0) {
+			if (memcmp(pbuf0, tbuf, ED_PAGE_SIZE) == 0) {
 				for (i = 0; i < ED_PAGE_SIZE; i++)
 					pbuf[i] = 255 - x;
 				ne2000_writemem(nict, nich, asict, asich,
@@ -236,7 +241,7 @@ ne2000_attach(nsc, myea, media, nmedia, defmedia)
 				ne2000_readmem(nict, nich, asict, asich,
 				    x << ED_PAGE_SHIFT, tbuf, ED_PAGE_SIZE,
 				    useword);
-				if (bcmp(pbuf, tbuf, ED_PAGE_SIZE) == 0)
+				if (memcmp(pbuf, tbuf, ED_PAGE_SIZE) == 0)
 					memsize += ED_PAGE_SIZE;
 				else
 					break;
@@ -265,7 +270,7 @@ ne2000_attach(nsc, myea, media, nmedia, defmedia)
 			bus_space_write_1(nict, nich, ED_P0_DCR, ED_DCR_WTS);
 			NIC_BARRIER(nict, nich);
 			ne2000_readmem(nict, nich, asict, asich,
-			    NE2000_AX88190_NODEID_OFFSET, dsc->sc_enaddr,
+			    AX88190_NODEID_OFFSET, dsc->sc_enaddr,
 			    ETHER_ADDR_LEN, useword);
 		} else {
 			ne2000_readmem(nict, nich, asict, asich, 0, romdata,
@@ -275,14 +280,17 @@ ne2000_attach(nsc, myea, media, nmedia, defmedia)
 				    romdata[i * (useword ? 2 : 1)];
 		}
 	} else
-		bcopy(myea, dsc->sc_enaddr, sizeof(dsc->sc_enaddr));
+		memcpy(dsc->sc_enaddr, myea, sizeof(dsc->sc_enaddr));
 
 	/* Clear any pending interrupts that might have occurred above. */
 	NIC_BARRIER(nict, nich);
 	bus_space_write_1(nict, nich, ED_P0_ISR, 0xff);
 	NIC_BARRIER(nict, nich);
 
-	if (dp8390_config(dsc, media, nmedia, defmedia)) {
+	if (dsc->sc_media_init == NULL)
+		dsc->sc_media_init = dp8390_media_init;
+
+	if (dp8390_config(dsc)) {
 		printf("%s: setup failed\n", dsc->sc_dev.dv_xname);
 		return (1);
 	}
@@ -314,12 +322,12 @@ ne2000_detect(nict, nich, asict, asich)
 	/* Reset the board. */
 #ifdef GWETHER
 	bus_space_write_1(asict, asich, NE2000_ASIC_RESET, 0);
-	bus_space_barrier(asict, asich, 0, NE2000_NPORTS,
+	bus_space_barrier(nict, nich, 0, NE2000_NPORTS,
 			  BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	delay(200);
 #endif /* GWETHER */
 	tmp = bus_space_read_1(asict, asich, NE2000_ASIC_RESET);
-	bus_space_barrier(asict, asich, 0, NE2000_NPORTS,
+	bus_space_barrier(nict, nich, 0, NE2000_NPORTS,
 			  BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	delay(10000);
 
@@ -332,7 +340,7 @@ ne2000_detect(nict, nich, asict, asich)
 	 * the invasive thing for now.  Yuck.]
 	 */
 	bus_space_write_1(asict, asich, NE2000_ASIC_RESET, tmp);
-	bus_space_barrier(asict, asich, 0, NE2000_NPORTS,
+	bus_space_barrier(nict, nich, 0, NE2000_NPORTS,
 			  BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	delay(5000);
 
@@ -427,7 +435,7 @@ ne2000_detect(nict, nich, asict, asich)
 	ne2000_readmem(nict, nich, asict, asich, 8192, test_buffer,
 	    sizeof(test_buffer), 0);
 
-	if (bcmp(test_pattern, test_buffer, sizeof(test_pattern))) {
+	if (memcmp(test_pattern, test_buffer, sizeof(test_pattern))) {
 		/* not an NE1000 - try NE2000 */
 		bus_space_write_1(nict, nich, ED_P0_DCR,
 		    ED_DCR_WTS | ED_DCR_FT1 | ED_DCR_LS);
@@ -445,7 +453,7 @@ ne2000_detect(nict, nich, asict, asich)
 		ne2000_readmem(nict, nich, asict, asich, 16384, test_buffer,
 		    sizeof(test_buffer), 1);
 
-		if (bcmp(test_pattern, test_buffer, sizeof(test_pattern)))
+		if (memcmp(test_pattern, test_buffer, sizeof(test_pattern)))
 			goto out;	/* not an NE2000 either */
 
 		rv = NE2000_TYPE_NE2000;
@@ -722,8 +730,9 @@ ne2000_readmem(nict, nich, asict, asich, src, dst, amount, useword)
 	NIC_BARRIER(nict, nich);
 	bus_space_write_1(nict, nich, ED_P0_CR,
 	    ED_CR_RD0 | ED_CR_PAGE_0 | ED_CR_STA);
-	NIC_BARRIER(nict, nich);
 
+	bus_space_barrier(nict, nich, 0, NE2000_NPORTS,
+			  BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	if (useword)
 		bus_space_read_multi_stream_2(asict, asich, NE2000_ASIC_DATA,
 		    (u_int16_t *)dst, amount >> 1);
@@ -772,8 +781,9 @@ ne2000_writemem(nict, nich, asict, asich, src, dst, len, useword, quiet)
 	NIC_BARRIER(nict, nich);
 	bus_space_write_1(nict, nich, ED_P0_CR,
 	    ED_CR_RD1 | ED_CR_PAGE_0 | ED_CR_STA);
-	NIC_BARRIER(nict, nich);
 
+	bus_space_barrier(nict, nich, 0, NE2000_NPORTS,
+			  BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	if (useword)
 		bus_space_write_multi_stream_2(asict, asich, NE2000_ASIC_DATA,
 		    (u_int16_t *)src, len >> 1);
@@ -788,6 +798,8 @@ ne2000_writemem(nict, nich, asict, asich, src, dst, len, useword, quiet)
 	 * waiting causes really bad things to happen - like the NIC wedging
 	 * the bus.
 	 */
+	bus_space_barrier(nict, nich, 0, NE2000_NPORTS,
+			  BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	while (((bus_space_read_1(nict, nich, ED_P0_ISR) & ED_ISR_RDC) !=
 	    ED_ISR_RDC) && --maxwait)
 		DELAY(1);
@@ -854,8 +866,10 @@ ne2000_ipkdb_attach(kip)
 		kip->name = "ne2000";
 		break;
 	case NE2000_TYPE_DL10019:
+	case NE2000_TYPE_DL10022:
 		dp->mem_start = dp->mem_size = 8192 * 3;
-		kip->name = "dl10019";
+		kip->name = (np->sc_type == NE2000_TYPE_DL10019) ?
+		    "dl10022" : "dl10019";
 		break;
 	case NE2000_TYPE_AX88190:
 		dp->rcr_proto = ED_RCR_INTT;
@@ -884,7 +898,7 @@ ne2000_ipkdb_attach(kip)
 			/* Select word transfer */
 			bus_space_write_1(nict, nich, ED_P0_DCR, ED_DCR_WTS);
 			ne2000_readmem(nict, nich, np->sc_asict, np->sc_asich,
-				NE2000_AX88190_NODEID_OFFSET, kip->myenetaddr,
+				AX88190_NODEID_OFFSET, kip->myenetaddr,
 				ETHER_ADDR_LEN, useword);
 		} else {
 			ne2000_readmem(nict, nich, np->sc_asict, np->sc_asich,

@@ -1,9 +1,9 @@
-/*	$NetBSD: bus.h,v 1.8.2.1 2000/06/30 16:27:16 simonb Exp $	*/
+/*	$NetBSD: bus.h,v 1.14 2002/03/17 21:45:06 simonb Exp $	*/
 /*	NetBSD: bus.h,v 1.27 2000/03/15 16:44:50 drochner Exp 	*/
 /*	$OpenBSD: bus.h,v 1.15 1999/08/11 23:15:21 niklas Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -158,6 +158,7 @@ struct arc_bus_space {
 				bus_size_t));
 	int	(*bs_subregion) __P((bus_space_tag_t, bus_space_handle_t,
 				bus_size_t, bus_size_t,	bus_space_handle_t *));
+	paddr_t	(*bs_mmap) __P((bus_space_tag_t, bus_addr_t, off_t, int, int));
 
 	/* allocation/deallocation */
 	int	(*bs_alloc) __P((bus_space_tag_t, bus_addr_t, bus_addr_t,
@@ -208,6 +209,7 @@ void	arc_bus_space_unmap __P((bus_space_tag_t, bus_space_handle_t,
 	    bus_size_t));
 int	arc_bus_space_subregion __P((bus_space_tag_t, bus_space_handle_t,
 	    bus_size_t, bus_size_t, bus_space_handle_t *));
+paddr_t	arc_bus_space_mmap __P((bus_space_tag_t, bus_addr_t, off_t, int, int));
 int	arc_bus_space_alloc __P((bus_space_tag_t, bus_addr_t, bus_addr_t,
 	    bus_size_t, bus_size_t, bus_size_t, int, bus_addr_t *,
 	    bus_space_handle_t *));
@@ -242,7 +244,7 @@ int	arc_bus_space_alloc __P((bus_space_tag_t, bus_addr_t, bus_addr_t,
  * MACHINE DEPENDENT, NOT PORTABLE INTERFACE:
  * (cannot be implemented on e.g. I/O space on i386, non-linear space on alpha)
  * Return physical address of a region.
- * A helper function for device mmap entry.
+ * A helper function for machine-dependent device mmap entry.
  */
 #define bus_space_paddr(bst, bsh, pap)					\
 	(*(bst)->bs_paddr)(bst, bsh, pap)
@@ -256,6 +258,15 @@ int	arc_bus_space_alloc __P((bus_space_tag_t, bus_addr_t, bus_addr_t,
  */
 #define bus_space_vaddr(bst, bsh)					\
 	((void *)(bsh))
+
+/*
+ *	paddr_t bus_space_mmap __P((bus_space_tag_t, bus_addr_t, off_t,
+ *	    int, int));
+ *
+ * Mmap bus space on behalf of the user.
+ */
+#define	bus_space_mmap(bst, addr, off, prot, flags)			\
+	(*(bst)->bs_mmap)((bst), (addr), (off), (prot), (flags))
 
 /*
  *	int bus_space_map __P((bus_space_tag_t t, bus_addr_t addr,
@@ -670,16 +681,19 @@ bus_space_copy_region(8,64)
 /*
  * Flags used in various bus DMA methods.
  */
-#define BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
-#define BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
-#define BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
-#define BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
-#define BUS_DMA_BUS2		0x20
-#define BUS_DMA_BUS3		0x40
-#define BUS_DMA_BUS4		0x80
+#define BUS_DMA_WAITOK		0x000	/* safe to sleep (pseudo-flag) */
+#define BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
+#define BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
+#define BUS_DMA_COHERENT	0x004	/* hint: map memory DMA coherent */
+#define	BUS_DMA_STREAMING	0x008	/* hint: sequential, unidirectional */
+#define BUS_DMA_BUS1		0x010	/* placeholders for bus functions... */
+#define BUS_DMA_BUS2		0x020
+#define BUS_DMA_BUS3		0x040
+#define BUS_DMA_BUS4		0x080
+#define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
+#define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
 
-#define ARC_DMAMAP_COHERENT	0x100	/* no cache flush necessary on sync */
+#define ARC_DMAMAP_COHERENT	0x10000	/* no cache flush necessary on sync */
 
 /* Forwards needed by prototypes below. */
 struct mbuf;
@@ -799,6 +813,7 @@ struct arc_bus_dmamap {
 	bus_size_t	_dm_maxsegsz;	/* largest possible segment */
 	bus_size_t	_dm_boundary;	/* don't cross this */
 	int		_dm_flags;	/* misc. flags */
+	struct proc	*_dm_proc;	/* proc that owns the mapping */
 
 	/*
 	 * Private cookie to be used by the DMA back-end.
@@ -826,9 +841,7 @@ int	_bus_dmamap_load_uio __P((bus_dma_tag_t, bus_dmamap_t,
 int	_bus_dmamap_load_raw __P((bus_dma_tag_t, bus_dmamap_t,
 	    bus_dma_segment_t *, int, bus_size_t, int));
 void	_bus_dmamap_unload __P((bus_dma_tag_t, bus_dmamap_t));
-void	_mips1_bus_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
-	    bus_size_t, int));
-void	_mips3_bus_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+void	_bus_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
 	    bus_size_t, int));
 
 int	_bus_dmamem_alloc __P((bus_dma_tag_t tag, bus_size_t size,

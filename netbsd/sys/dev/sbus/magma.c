@@ -1,4 +1,4 @@
-/*	$NetBSD: magma.c,v 1.7.2.1 2000/07/19 02:53:07 mrg Exp $	*/
+/*	$NetBSD: magma.c,v 1.16 2002/03/21 00:18:36 eeh Exp $	*/
 /*
  * magma.c
  *
@@ -31,14 +31,18 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#if 0
-#define MAGMA_DEBUG
-#endif
 
 /*
  * Driver for Magma SBus Serial/Parallel cards using the Cirrus Logic
  * CD1400 & CD1190 chips
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: magma.c,v 1.16 2002/03/21 00:18:36 eeh Exp $");
+
+#if 0
+#define MAGMA_DEBUG
+#endif
 
 #include "magma.h"
 #if NMAGMA > 0
@@ -97,77 +101,82 @@
  */
 static struct magma_board_info supported_cards[] = {
 	{
-		"MAGMA,4_Sp", "Magma 4 Sp", 4, 0,
+		"MAGMA_Sp", "MAGMA,4_Sp", "Magma 4 Sp", 4, 0,
 		1, 0xa000, 0xc000, 0xe000, { 0x8000, 0, 0, 0 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,8_Sp", "Magma 8 Sp", 8, 0,
+		"MAGMA_Sp", "MAGMA,8_Sp", "Magma 8 Sp", 8, 0,
 		2, 0xa000, 0xc000, 0xe000, { 0x4000, 0x6000, 0, 0 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,_8HS_Sp", "Magma Fast 8 Sp", 8, 0,
+		"MAGMA_Sp", "MAGMA,_8HS_Sp", "Magma Fast 8 Sp", 8, 0,
 		2, 0x2000, 0x4000, 0x6000, { 0x8000, 0xa000, 0, 0 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,_8SP_422", "Magma 8 Sp - 422", 8, 0,
+		"MAGMA_Sp", "MAGMA,_8SP_422", "Magma 8 Sp - 422", 8, 0,
 		2, 0x2000, 0x4000, 0x6000, { 0x8000, 0xa000, 0, 0 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,12_Sp", "Magma 12 Sp", 12, 0,
+		"MAGMA_Sp", "MAGMA,12_Sp", "Magma 12 Sp", 12, 0,
 		3, 0xa000, 0xc000, 0xe000, { 0x2000, 0x4000, 0x6000, 0 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,16_Sp", "Magma 16 Sp", 16, 0,
+		"MAGMA_Sp", "MAGMA,16_Sp", "Magma 16 Sp", 16, 0,
 		4, 0xd000, 0xe000, 0xf000, { 0x8000, 0x9000, 0xa000, 0xb000 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,16_Sp_2", "Magma 16 Sp", 16, 0,
+		"MAGMA_Sp", "MAGMA,16_Sp_2", "Magma 16 Sp", 16, 0,
 		4, 0x2000, 0x4000, 0x6000, { 0x8000, 0xa000, 0xc000, 0xe000 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,16HS_Sp", "Magma Fast 16 Sp", 16, 0,
+		"MAGMA_Sp", "MAGMA,16HS_Sp", "Magma Fast 16 Sp", 16, 0,
 		4, 0x2000, 0x4000, 0x6000, { 0x8000, 0xa000, 0xc000, 0xe000 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,21_Sp", "Magma LC 2+1 Sp", 2, 1,
+		"MAGMA_Sp", "MAGMA,21_Sp", "Magma LC 2+1 Sp", 2, 1,
 		1, 0xa000, 0xc000, 0xe000, { 0x8000, 0, 0, 0 },
 		0, { 0, 0 }
 	},
 	{
-		"MAGMA,21HS_Sp", "Magma 2+1 Sp", 2, 1,
+		"MAGMA_Sp", "MAGMA,21HS_Sp", "Magma 2+1 Sp", 2, 1,
 		1, 0xa000, 0xc000, 0xe000, { 0x4000, 0, 0, 0 },
 		1, { 0x6000, 0 }
 	},
 	{
-		"MAGMA,41_Sp", "Magma 4+1 Sp", 4, 1,
+		"MAGMA_Sp", "MAGMA,41_Sp", "Magma 4+1 Sp", 4, 1,
 		1, 0xa000, 0xc000, 0xe000, { 0x4000, 0, 0, 0 },
 		1, { 0x6000, 0 }
 	},
 	{
-		"MAGMA,82_Sp", "Magma 8+2 Sp", 8, 2,
+		"MAGMA_Sp", "MAGMA,82_Sp", "Magma 8+2 Sp", 8, 2,
 		2, 0xd000, 0xe000, 0xf000, { 0x8000, 0x9000, 0, 0 },
 		2, { 0xa000, 0xb000 }
 	},
 	{
-		"MAGMA,P1_Sp", "Magma P1 Sp", 0, 1,
+		"MAGMA_Sp", "MAGMA,P1_Sp", "Magma P1 Sp", 0, 1,
 		0, 0, 0, 0, { 0, 0, 0, 0 },
 		1, { 0x8000, 0 }
 	},
 	{
-		"MAGMA,P2_Sp", "Magma P2 Sp", 0, 2,
+		"MAGMA_Sp", "MAGMA,P2_Sp", "Magma P2 Sp", 0, 2,
 		0, 0, 0, 0, { 0, 0, 0, 0 },
 		2, { 0x4000, 0x8000 }
 	},
 	{
-		NULL, NULL, 0, 0,
+		"MAGMA 2+1HS Sp", "", "Magma 2+1HS Sp", 2, 0,
+		1, 0xa000, 0xc000, 0xe000, { 0x4000, 0, 0, 0 },
+		1, { 0x8000, 0 }
+	},
+	{
+		NULL, NULL, NULL, 0, 0,
 		0, 0, 0, 0, { 0, 0, 0, 0 },
 		0, { 0, 0 }
 	}
@@ -310,20 +319,26 @@ magma_match(parent, cf, aux)
 	void *aux;
 {
 	struct sbus_attach_args *sa = aux;
+	struct magma_board_info *card;
 
-	/* is it a magma Sp card? */
-	if( strcmp(sa->sa_name, "MAGMA_Sp") != 0 )
-		return(0);
+	/* See if we support this device */
+	for (card = supported_cards; ; card++) {
+		if (card->mb_sbusname == NULL)
+			/* End of table: no match */
+			return (0);
+		if (strcmp(sa->sa_name, card->mb_sbusname) == 0)
+			break;
+	}
 
 	dprintf(("magma: matched `%s'\n", sa->sa_name));
 	dprintf(("magma: magma_prom `%s'\n",
-		getpropstring(sa->sa_node, "magma_prom")));
+		PROM_getpropstring(sa->sa_node, "magma_prom")));
 	dprintf(("magma: intlevels `%s'\n",
-		getpropstring(sa->sa_node, "intlevels")));
+		PROM_getpropstring(sa->sa_node, "intlevels")));
 	dprintf(("magma: chiprev `%s'\n",
-		getpropstring(sa->sa_node, "chiprev")));
+		PROM_getpropstring(sa->sa_node, "chiprev")));
 	dprintf(("magma: clock `%s'\n",
-		getpropstring(sa->sa_node, "clock")));
+		PROM_getpropstring(sa->sa_node, "clock")));
 
 	return (1);
 }
@@ -336,57 +351,80 @@ magma_attach(parent, self, aux)
 {
 	struct sbus_attach_args *sa = aux;
 	struct magma_softc *sc = (struct magma_softc *)self;
-	struct magma_board_info *card = supported_cards;
+	struct magma_board_info *card;
 	bus_space_handle_t bh;
-	char *magma_prom;
+	char *magma_prom, *clockstr;
+	int cd_clock;
 	int node, chip;
 
 	node = sa->sa_node;
-	magma_prom = getpropstring(node, "magma_prom");
 
-	/* find the card type */
-	while (card->mb_name && strcmp(magma_prom, card->mb_name) != 0)
-		card++;
+	/*
+	 * Find the card model.
+	 * Older models all have sbus node name `MAGMA_Sp' (see
+	 * `supported_cards[]' above), and must be distinguished
+	 * by the `magma_prom' property.
+	 */
+	magma_prom = PROM_getpropstring(node, "magma_prom");
 
-	dprintf((" addr %p", sc));
-	printf(" softpri %d:", PIL_TTY);
+	for (card = supported_cards; card->mb_name != NULL; card++) {
+		if (strcmp(sa->sa_name, card->mb_sbusname) != 0)
+			/* Sbus node name doesn't match */
+			continue;
+		if (strcmp(magma_prom, card->mb_name) == 0)
+			/* Model name match */
+			break;
+	}
 
 	if( card->mb_name == NULL ) {
-		printf(" %s (unsupported)\n", magma_prom);
+		printf(": %s (unsupported)\n", magma_prom);
 		return;
 	}
 
-	printf(" %s\n", card->mb_realname);
+	dprintf((" addr %p", sc));
+	printf(" softpri %d: %s\n", PIL_TTY, card->mb_realname);
 
 	sc->ms_board = card;
 	sc->ms_ncd1400 = card->mb_ncd1400;
 	sc->ms_ncd1190 = card->mb_ncd1190;
 
 	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_slot,
-			 sa->sa_offset,
-			 sa->sa_size,
-			 BUS_SPACE_MAP_LINEAR,
-			 0, &bh) != 0) {
+			 sa->sa_slot, sa->sa_offset, sa->sa_size,
+			 BUS_SPACE_MAP_LINEAR, &bh) != 0) {
 		printf("%s @ sbus: cannot map registers\n", self->dv_xname);
 		return;
 	}
 
 	/* the SVCACK* lines are daisychained */
-	sc->ms_svcackr = (caddr_t)bh + card->mb_svcackr;
-	sc->ms_svcackt = (caddr_t)bh + card->mb_svcackt;
-	sc->ms_svcackm = (caddr_t)bh + card->mb_svcackm;
+	sc->ms_svcackr = (caddr_t)bus_space_vaddr(sa->sa_bustag, bh)
+		+ card->mb_svcackr;
+	sc->ms_svcackt = (caddr_t)bus_space_vaddr(sa->sa_bustag, bh)
+		+ card->mb_svcackt;
+	sc->ms_svcackm = (caddr_t)bus_space_vaddr(sa->sa_bustag, bh)
+		+ card->mb_svcackm;
+
+	/*
+	 * Find the clock speed; it's the same for all CD1400 chips
+	 * on the board.
+	 */
+	clockstr = PROM_getpropstring(node, "clock");
+	if (*clockstr == '\0')
+		/* Default to 25MHz */
+		cd_clock = 25;
+	else {
+		cd_clock = 0;
+		while (*clockstr != '\0')
+			cd_clock = (cd_clock * 10) + (*clockstr++ - '0');
+	}
 
 	/* init the cd1400 chips */
 	for( chip = 0 ; chip < card->mb_ncd1400 ; chip++ ) {
 		struct cd1400 *cd = &sc->ms_cd1400[chip];
 
+		cd->cd_clock = cd_clock;
 		cd->cd_reg = (caddr_t)bh + card->mb_cd1400[chip];
 
-		/* XXX getpropstring(node, "clock") */
-		cd->cd_clock = 25;
-
-		/* getpropstring(node, "chiprev"); */
+		/* PROM_getpropstring(node, "chiprev"); */
 		/* seemingly the Magma drivers just ignore the propstring */
 		cd->cd_chiprev = cd1400_read_reg(cd, CD1400_GFRCR);
 
@@ -424,9 +462,10 @@ magma_attach(parent, self, aux)
 		struct cd1190 *cd = &sc->ms_cd1190[chip];
 
 		cd->cd_reg = (caddr_t)bh + card->mb_cd1190[chip];
-		dprintf(("%s attach CD1190 %d addr %p (failed)\n",
-			self->dv_xname, chip, cd->cd_reg));
+
 		/* XXX don't know anything about these chips yet */
+		printf("%s: CD1190 %d addr %p (unsupported)\n",
+			self->dv_xname, chip, cd->cd_reg);
 	}
 
 	sbus_establish(&sc->ms_sd, &sc->ms_dev);
@@ -730,7 +769,7 @@ magma_soft(arg)
 				log(LOG_WARNING, "%s%x: fifo overflow\n",
 				    mtty->ms_dev.dv_xname, port);
 
-			(*linesw[tp->t_line].l_rint)(data, tp);
+			(*tp->t_linesw->l_rint)(data, tp);
 			serviced = 1;
 		}
 
@@ -742,7 +781,7 @@ magma_soft(arg)
 		if( ISSET(flags, MTTYF_CARRIER_CHANGED) ) {
 			dprintf(("%s%x: cd %s\n", mtty->ms_dev.dv_xname,
 				port, mp->mp_carrier ? "on" : "off"));
-			(*linesw[tp->t_line].l_modem)(tp, mp->mp_carrier);
+			(*tp->t_linesw->l_modem)(tp, mp->mp_carrier);
 			serviced = 1;
 		}
 
@@ -755,7 +794,7 @@ magma_soft(arg)
 		if( ISSET(flags, MTTYF_DONE) ) {
 			ndflush(&tp->t_outq, mp->mp_txp - tp->t_outq.c_cf);
 			CLR(tp->t_state, TS_BUSY);
-			(*linesw[tp->t_line].l_start)(tp);	/* might be some more */
+			(*tp->t_linesw->l_start)(tp);	/* might be some more */
 			serviced = 1;
 		}
 	} /* for(each mtty...) */
@@ -836,12 +875,12 @@ mtty_attach(parent, dev, args)
 		struct tty *tp;
 
 		mp->mp_cd1400 = &sc->ms_cd1400[chip];
-		if( mp->mp_cd1400->cd_parmode && chan == 0 )
+		if (mp->mp_cd1400->cd_parmode && chan == 0)
 			chan = 1; /* skip channel 0 if parmode */
 		mp->mp_channel = chan;
 
 		tp = ttymalloc();
-		if( tp == NULL ) break;
+		if (tp == NULL) break;
 		tty_attach(tp);
 		tp->t_oproc = mtty_start;
 		tp->t_param = mtty_param;
@@ -849,12 +888,13 @@ mtty_attach(parent, dev, args)
 		mp->mp_tty = tp;
 
 		mp->mp_rbuf = malloc(MTTY_RBUF_SIZE, M_DEVBUF, M_NOWAIT);
-		if( mp->mp_rbuf == NULL ) break;
+		if (mp->mp_rbuf == NULL) break;
 
 		mp->mp_rend = mp->mp_rbuf + MTTY_RBUF_SIZE;
 
 		chan = (chan + 1) % CD1400_NO_OF_CHANNELS;
-		if( chan == 0 ) chip++;
+		if (chan == 0)
+			chip++;
 	}
 
 	ms->ms_nports = port;
@@ -944,7 +984,7 @@ mttyopen(dev, flags, mode, p)
 	if (error != 0)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error != 0)
 		goto bad;
 
@@ -975,7 +1015,7 @@ mttyclose(dev, flag, mode, p)
 	struct tty *tp = mp->mp_tty;
 	int s;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 
 	s = spltty();
@@ -1015,7 +1055,7 @@ mttyread(dev, uio, flags)
 	struct mtty_port *mp = &ms->ms_port[MAGMA_PORT(dev)];
 	struct tty *tp = mp->mp_tty;
 
-	return( (*linesw[tp->t_line].l_read)(tp, uio, flags) );
+	return( (*tp->t_linesw->l_read)(tp, uio, flags) );
 }
 
 /*
@@ -1031,7 +1071,23 @@ mttywrite(dev, uio, flags)
 	struct mtty_port *mp = &ms->ms_port[MAGMA_PORT(dev)];
 	struct tty *tp = mp->mp_tty;
 
-	return( (*linesw[tp->t_line].l_write)(tp, uio, flags) );
+	return( (*tp->t_linesw->l_write)(tp, uio, flags) );
+}
+
+/*
+ * Poll routine
+ */
+int
+mttypoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct mtty_softc *ms = mtty_cd.cd_devs[MAGMA_CARD(dev)];
+	struct mtty_port *mp = &ms->ms_port[MAGMA_PORT(dev)];
+	struct tty *tp = mp->mp_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 /*
@@ -1063,11 +1119,11 @@ mttyioctl(dev, cmd, data, flags, p)
 	struct tty *tp = mp->mp_tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flags, p);
-	if( error >= 0 ) return(error);
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flags, p);
+	if( error != EPASSTHROUGH ) return(error);
 
 	error = ttioctl(tp, cmd, data, flags, p);
-	if( error >= 0 ) return(error);
+	if( error != EPASSTHROUGH ) return(error);
 
 	error = 0;
 
@@ -1120,7 +1176,7 @@ mttyioctl(dev, cmd, data, flags, p)
 		break;
 
 	default:
-		error = ENOTTY;
+		error = EPASSTHROUGH;
 	}
 
 	return(error);

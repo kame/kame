@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_extent.c,v 1.32.2.3 2002/02/10 14:12:10 he Exp $	*/
+/*	$NetBSD: subr_extent.c,v 1.46 2002/03/08 20:48:41 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * General purpose extent manager.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: subr_extent.c,v 1.46 2002/03/08 20:48:41 thorpej Exp $");
+
 #ifdef _KERNEL
 #include <sys/param.h>
 #include <sys/extent.h>
@@ -50,8 +53,7 @@
 #include <sys/proc.h>
 #include <sys/lock.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define	KMEM_IS_RUNNING		(kmem_map != NULL)
 #elif defined(_EXTENT_TESTING)
@@ -78,9 +80,11 @@ free(p, t)			free(p)
 #define	\
 tsleep(chan, pri, str, timo)	(EWOULDBLOCK)
 #define	\
+ltsleep(chan,pri,str,timo,lck)	(EWOULDBLOCK)
+#define	\
 wakeup(chan)			((void)0)
 #define	\
-pool_get(pool, flags)		malloc(pool->pr_size,0,0)
+pool_get(pool, flags)		malloc((pool)->pr_size,0,0)
 #define	\
 pool_put(pool, rp)		free(rp,0)
 #define	\
@@ -99,7 +103,6 @@ simple_unlock(l)		((void)(l))
 #define	KMEM_IS_RUNNING			(1)
 #endif
 
-static	pool_handle_t expool_create __P((void));
 static	void extent_insert_and_optimize __P((struct extent *, u_long, u_long,
 	    int, struct extent_region *, struct extent_region *));
 static	struct extent_region *extent_alloc_region_descriptor
@@ -107,7 +110,9 @@ static	struct extent_region *extent_alloc_region_descriptor
 static	void extent_free_region_descriptor __P((struct extent *,
 	    struct extent_region *));
 
-static pool_handle_t expool;
+static struct pool expool;
+static struct simplelock expool_init_slock = SIMPLELOCK_INITIALIZER;
+static int expool_initialized;
 
 /*
  * Macro to align to an arbitrary power-of-two boundary.
@@ -120,16 +125,25 @@ static pool_handle_t expool;
  * (This is deferred until one of our callers thinks we can malloc()).
  */
 
-static pool_handle_t expool_create()
+static __inline void
+expool_init(void)
 {
+
+	simple_lock(&expool_init_slock);
+	if (expool_initialized) {
+		simple_unlock(&expool_init_slock);
+		return;
+	}
+
 #if defined(_KERNEL)
-	expool = pool_create(sizeof(struct extent_region), 0, 0,
-			     0, "extent", 0, 0, 0, 0);
+	pool_init(&expool, sizeof(struct extent_region), 0, 0, 0,
+	    "extent", NULL);
 #else
-	expool = (pool_handle_t)malloc(sizeof(*expool),0,0);
-	expool->pr_size = sizeof(struct extent_region);
+	expool.pr_size = sizeof(struct extent_region);
 #endif
-	return (expool);
+
+	expool_initialized = 1;
+	simple_unlock(&expool_init_slock);
 }
 
 /*
@@ -196,11 +210,9 @@ extent_create(name, start, end, mtype, storage, storagesize, flags)
 		}
 	} else {
 		s = splhigh();
-		if (expool == NULL)
-			expool_create();
+		if (expool_initialized == 0)
+			expool_init();
 		splx(s);
-		if (expool == NULL)
-			return (NULL);
 
 		ex = (struct extent *)malloc(sizeof(struct extent),
 		    mtype, (flags & EX_WAITOK) ? M_WAITOK : M_NOWAIT);
@@ -394,6 +406,11 @@ extent_alloc_region(ex, start, size, flags)
 		panic("extent_alloc_region: overflow");
 	}
 #endif
+#ifdef LOCKDEBUG
+	if (flags & EX_WAITSPACE)
+		simple_lock_only_held(NULL,
+		    "extent_alloc_region(EX_WAITSPACE)");
+#endif
 
 	/*
 	 * Make sure the requested region lies within the
@@ -469,10 +486,9 @@ extent_alloc_region(ex, start, size, flags)
 			 */
 			if (flags & EX_WAITSPACE) {
 				ex->ex_flags |= EXF_WANTED;
-				simple_unlock(&ex->ex_slock);
-				error = tsleep(ex,
-				    PRIBIO | ((flags & EX_CATCH) ? PCATCH : 0),
-				    "extnt", 0);
+				error = ltsleep(ex,
+				    PNORELOCK | PRIBIO | ((flags & EX_CATCH) ? PCATCH : 0),
+				    "extnt", 0, &ex->ex_slock);
 				if (error)
 					return (error);
 				goto alloc_start;
@@ -557,10 +573,15 @@ extent_alloc_subregion1(ex, substart, subend, size, alignment, skew, boundary,
 		panic("extent_alloc_subregion: bad alignment");
 	if (boundary && (boundary < size)) {
 		printf(
-		    "extent_alloc_subregion: extent `%s', size 0x%lx,
-		    boundary 0x%lx\n", ex->ex_name, size, boundary);
+		    "extent_alloc_subregion: extent `%s', size 0x%lx, "
+		    "boundary 0x%lx\n", ex->ex_name, size, boundary);
 		panic("extent_alloc_subregion: bad boundary");
 	}
+#endif
+#ifdef LOCKDEBUG
+	if (flags & EX_WAITSPACE)
+		simple_lock_only_held(NULL,
+		    "extent_alloc_subregion1(EX_WAITSPACE)");
 #endif
 
 	/*
@@ -860,9 +881,9 @@ skip:
 	 */
 	if (flags & EX_WAITSPACE) {
 		ex->ex_flags |= EXF_WANTED;
-		simple_unlock(&ex->ex_slock);
-		error = tsleep(ex,
-		    PRIBIO | ((flags & EX_CATCH) ? PCATCH : 0), "extnt", 0);
+		error = ltsleep(ex,
+		    PNORELOCK | PRIBIO | ((flags & EX_CATCH) ? PCATCH : 0),
+		    "extnt", 0, &ex->ex_slock);
 		if (error)
 			return (error);
 		goto alloc_start;
@@ -1089,22 +1110,18 @@ extent_alloc_region_descriptor(ex, flags)
 				return (NULL);
 			}
 			ex->ex_flags |= EXF_FLWANTED;
-			simple_unlock(&ex->ex_slock);
-			if (tsleep(&fex->fex_freelist,
-			    PRIBIO | ((flags & EX_CATCH) ? PCATCH : 0),
-			    "extnt", 0))
+			if (ltsleep(&fex->fex_freelist,
+			    PNORELOCK| PRIBIO | ((flags & EX_CATCH) ? PCATCH : 0),
+			    "extnt", 0, &ex->ex_slock))
 				return (NULL);
 		}
 	}
 
  alloc:
 	s = splhigh();
-	if (expool == NULL && !expool_create()) {
-		splx(s);
-		return (NULL);
-	}
-
-	rp = pool_get(expool, (flags & EX_WAITOK) ? PR_WAITOK : 0);
+	if (expool_initialized == 0)
+		expool_init();
+	rp = pool_get(&expool, (flags & EX_WAITOK) ? PR_WAITOK : 0);
 	splx(s);
 
 	if (rp != NULL)
@@ -1141,7 +1158,7 @@ extent_free_region_descriptor(ex, rp)
 				goto wake_em_up;
 			} else {
 				s = splhigh();
-				pool_put(expool, rp);
+				pool_put(&expool, rp);
 				splx(s);
 			}
 		} else {
@@ -1162,7 +1179,7 @@ extent_free_region_descriptor(ex, rp)
 	 * We know it's dynamically allocated if we get here.
 	 */
 	s = splhigh();
-	pool_put(expool, rp);
+	pool_put(&expool, rp);
 	splx(s);
 }
 

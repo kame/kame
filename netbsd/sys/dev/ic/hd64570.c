@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64570.c,v 1.11 2000/01/09 17:32:58 chopps Exp $	*/
+/*	$NetBSD: hd64570.c,v 1.21 2002/03/05 04:12:57 itojun Exp $	*/
 
 /*
  * Copyright (c) 1999 Christian E. Hopps
@@ -64,6 +64,9 @@
  *	   rx uses a page and tx uses a page.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64570.c,v 1.21 2002/03/05 04:12:57 itojun Exp $");
+
 #include "bpfilter.h"
 #include "opt_inet.h"
 #include "opt_iso.h"
@@ -80,11 +83,14 @@
 #include <net/if_types.h>
 #include <net/netisr.h>
 
-#ifdef INET
+#if defined(INET) || defined(INET6)
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
+#ifdef INET6
+#include <netinet6/in6_var.h>
+#endif
 #endif
 
 #ifdef ISO
@@ -181,7 +187,7 @@ static	void sca_frame_print(sca_port_t *, sca_desc_t *, u_int8_t *);
 #define	sca_write_1(sc, reg, val)	(sc)->sc_write_1(sc, reg, val)
 #define	sca_write_2(sc, reg, val)	(sc)->sc_write_2(sc, reg, val)
 
-#define	sca_page_addr(sc, addr)	((bus_addr_t)(addr) & (sc)->scu_pagemask)
+#define	sca_page_addr(sc, addr)	((bus_addr_t)(u_long)(addr) & (sc)->scu_pagemask)
 
 static inline void
 msci_write_1(sca_port_t *scp, u_int reg, u_int8_t val)
@@ -452,10 +458,12 @@ sca_port_attach(struct sca_softc *sc, u_int port)
 #ifdef SCA_USE_FASTQ
 	scp->fastq.ifq_maxlen = IFQ_MAXLEN;
 #endif
+	IFQ_SET_READY(&ifp->if_snd);
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 
 #if NBPFILTER > 0
-	bpfattach(&scp->sp_bpf, ifp, DLT_HDLC, HDLC_HDRLEN);
+	bpfattach(ifp, DLT_HDLC, HDLC_HDRLEN);
 #endif
 
 	if (sc->sc_parent == NULL)
@@ -797,18 +805,23 @@ sca_output(ifp, m, dst, rt0)
 	struct hdlc_llc_header *llc;
 #endif
 	struct hdlc_header *hdlc;
-	struct ifqueue *ifq;
-	int s, error;
+	struct ifqueue *ifq = NULL;
+	int s, error, len;
+	short mflags;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	error = 0;
-	ifp->if_lastchange = time;
 
 	if ((ifp->if_flags & IFF_UP) != IFF_UP) {
 		error = ENETDOWN;
 		goto bad;
 	}
 
-	ifq = &ifp->if_snd;
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	/*
 	 * determine address family, and priority for this packet
@@ -830,6 +843,19 @@ sca_output(ifp, m, dst, rt0)
 			return (ENOBUFS);
 		hdlc = mtod(m, struct hdlc_header *);
 		hdlc->h_proto = htons(HDLC_PROTOCOL_IP);
+		break;  
+#endif
+#ifdef INET6
+	case AF_INET6:
+		/*
+		 * Add cisco serial line header. If there is no
+		 * space in the first mbuf, allocate another.
+		 */     
+		M_PREPEND(m, sizeof(struct hdlc_header), M_DONTWAIT);
+		if (m == 0)
+			return (ENOBUFS);
+		hdlc = mtod(m, struct hdlc_header *);
+		hdlc->h_proto = htons(HDLC_PROTOCOL_IPV6);
 		break;  
 #endif
 #ifdef ISO     
@@ -864,21 +890,26 @@ sca_output(ifp, m, dst, rt0)
 	/*
 	 * queue the packet.  If interactive, use the fast queue.
 	 */
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
 	s = splnet();
-	if (IF_QFULL(ifq)) {
-		IF_DROP(ifq);
+	if (ifq != NULL) {
+		if (IF_QFULL(ifq)) {
+			IF_DROP(ifq);
+			m_freem(m);
+			error = ENOBUFS;
+		} else
+			IF_ENQUEUE(ifq, m);
+	} else
+		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error != 0) {
+		splx(s);
 		ifp->if_oerrors++;
 		ifp->if_collisions++;
-		error = ENOBUFS;
-		splx(s);
-		goto bad;
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(ifq, m);
-
-	ifp->if_lastchange = time;
-
-	if (m->m_flags & M_MCAST)
+	ifp->if_obytes += len;
+	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
 
 	sca_start(ifp);
@@ -911,26 +942,39 @@ sca_ioctl(ifp, cmd, addr)
 
 	switch (cmd) {
 	case SIOCSIFADDR:
+		switch(ifa->ifa_addr->sa_family) {
 #ifdef INET
-		if (ifa->ifa_addr->sa_family == AF_INET) {
+		case AF_INET:
+#endif
+#ifdef INET6
+		case AF_INET6:
+#endif
+#if defined(INET) || defined(INET6)
 			ifp->if_flags |= IFF_UP;
 			sca_port_up(ifp->if_softc);
-		} else
+			break;
 #endif
+		default:
 			error = EAFNOSUPPORT;
+			break;
+		}
 		break;
 
 	case SIOCSIFDSTADDR:
 #ifdef INET
-		if (ifa->ifa_addr->sa_family != AF_INET)
-			error = EAFNOSUPPORT;
-#else
-		error = EAFNOSUPPORT;
+		if (ifa->ifa_addr->sa_family == AF_INET)
+			break;
 #endif
+#ifdef INET6
+		if (ifa->ifa_addr->sa_family == AF_INET6)
+			break;
+#endif
+		error = EAFNOSUPPORT;
 		break;
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
+		/* XXX need multicast group management code */
 		if (ifr == 0) {
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
@@ -938,6 +982,10 @@ sca_ioctl(ifp, cmd, addr)
 		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
 			break;
 #endif
 		default:
@@ -1021,7 +1069,7 @@ sca_start(ifp)
 		IF_DEQUEUE(&scp->fastq, mb_head);
 	if (mb_head == NULL)
 #endif
-		IF_DEQUEUE(&ifp->if_snd, mb_head);
+		IFQ_DEQUEUE(&ifp->if_snd, mb_head);
 	if (mb_head == NULL)
 		goto start_xmit;
 
@@ -1077,7 +1125,7 @@ X
 			    ("TX: about to mbuf len %d\n", m->m_len));
 
 			if (sc->sc_usedma)
-				bcopy(mtod(m, u_int8_t *), buf, m->m_len);
+				memcpy(buf, mtod(m, u_int8_t *), m->m_len);
 			else
 				bus_space_write_region_1(sc->scu_memt,
 				    sc->scu_memh, sca_page_addr(sc, buf_p),
@@ -1097,8 +1145,8 @@ X
 	/*
 	 * Pass packet to bpf if there is a listener.
 	 */
-	if (scp->sp_bpf)
-		bpf_mtap(scp->sp_bpf, mb_head);
+	if (ifp->if_bpf)
+		bpf_mtap(ifp->if_bpf, mb_head);
 #endif
 
 	m_freem(mb_head);
@@ -1364,7 +1412,7 @@ sca_msci_intr(sca_port_t *scp, u_int8_t isr)
 			/* underrun -- try to increase ready control */
 			trc0 = msci_read_1(scp, SCA_TRC00);
 			if (trc0 == 0x1f)
-				printf("TX: underun - fifo depth maxed\n");
+				printf("TX: underrun - fifo depth maxed\n");
 			else {
 				if ((trc0 += 2) > 0x1f)
 					trc0 = 0x1f;
@@ -1559,12 +1607,11 @@ sca_frame_process(sca_port_t *scp)
 	}
 
 #if NBPFILTER > 0
-	if (scp->sp_bpf)
-		bpf_mtap(scp->sp_bpf, m);
+	if (scp->sp_if.if_bpf)
+		bpf_mtap(scp->sp_if.if_bpf, m);
 #endif
 
 	scp->sp_if.if_ipackets++;
-	scp->sp_if.if_lastchange = time;
 
 	hdlc = mtod(m, struct hdlc_header *);
 	switch (ntohs(hdlc->h_proto)) {
@@ -1579,6 +1626,17 @@ sca_frame_process(sca_port_t *scp)
 		schednetisr(NETISR_IP);
 		break;
 #endif	/* INET */
+#ifdef INET6
+	case HDLC_PROTOCOL_IPV6:
+		SCA_DPRINTF(SCA_DEBUG_RX, ("Received IP packet\n"));
+		m->m_pkthdr.rcvif = &scp->sp_if;
+		m->m_pkthdr.len -= sizeof(struct hdlc_header);
+		m->m_data += sizeof(struct hdlc_header);
+		m->m_len -= sizeof(struct hdlc_header);
+		ifq = &ip6intrq;
+		schednetisr(NETISR_IPV6);
+		break;
+#endif	/* INET6 */
 #ifdef ISO
 	case HDLC_PROTOCOL_ISO:
 		if (m->m_pkthdr.len < sizeof(struct hdlc_llc_header)) 
@@ -1981,7 +2039,7 @@ sca_mbuf_alloc(struct sca_softc *sc, caddr_t p, u_int len)
 	if (p != NULL) {
 		/* XXX do we need to sync here? */
 		if (sc->sc_usedma)
-			bcopy(p, mtod(m, caddr_t), len);
+			memcpy(mtod(m, caddr_t), p, len);
 		else
 			bus_space_read_region_1(sc->scu_memt, sc->scu_memh,
 			    sca_page_addr(sc, p), mtod(m, u_int8_t *), len);

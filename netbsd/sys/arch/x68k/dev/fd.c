@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.34 2000/04/18 21:06:06 minoura Exp $	*/
+/*	$NetBSD: fd.c,v 1.40 2001/12/27 02:23:24 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -99,8 +99,6 @@
 #if NRND > 0
 #include <sys/rnd.h>
 #endif
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -233,8 +231,8 @@ struct fd_softc {
 	int sc_bcount;		/* byte count left */
  	int sc_opts;			/* user-set options */
 	int sc_skip;		/* bytes already transferred */
-	int sc_nblks;		/* number of blocks currently tranferring */
-	int sc_nbytes;		/* number of bytes currently tranferring */
+	int sc_nblks;		/* number of blocks currently transferring */
+	int sc_nbytes;		/* number of bytes currently transferring */
 
 	int sc_drive;		/* physical unit number */
 	int sc_flags;
@@ -329,10 +327,6 @@ fdc_dmastart(fdc, read, addr, count)
 					  DMAC_SCR_DAC_NO_COUNT),
 					 (u_int8_t*) (fdc->sc_addr +
 						      fddata));	/* XXX */
-#if defined(M68040) || defined(M68060)
-	if (mmutype == MMU_68040)
-		dma_cachectl(addr, count);
-#endif
 
 	dmac_start_xfer(fdc->sc_dmachan->ch_softc, fdc->sc_xfer);
 }
@@ -450,8 +444,8 @@ fdcattach(parent, self, aux)
 					     ia->ia_dmaintr, fdcdmaintr, fdc,
 					     ia->ia_dmaintr+1, fdcdmaerrintr,
 					     fdc);
-	if (bus_dmamap_create(fdc->sc_dmat, FDC_MAXIOSIZE, 16, 0xf000, 0,
-			      BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW,
+	if (bus_dmamap_create(fdc->sc_dmat, FDC_MAXIOSIZE, 1, DMAC_MAXSEGSZ,
+			      0, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW,
 			      &fdc->sc_dmamap)) {
 		printf("%s: can't set up intio DMA map\n",
 		    fdc->sc_dev.dv_xname);
@@ -1295,17 +1289,15 @@ loop:
 		 }}
 #endif
 		if ((read = bp->b_flags & B_READ)) {
-			bcopy(fd->sc_copybuf
-			      + (fd->sc_part & SEC_P01 ? FDC_BSIZE : 0),
-			      bp->b_data + fd->sc_skip,
-			      FDC_BSIZE);
+			memcpy(bp->b_data + fd->sc_skip, fd->sc_copybuf
+			    + (fd->sc_part & SEC_P01 ? FDC_BSIZE : 0),
+			    FDC_BSIZE);
 			fdc->sc_state = IOCOMPLETE;
 			goto iocomplete2;
 		} else {
-			bcopy(bp->b_data + fd->sc_skip,
-			      fd->sc_copybuf
-			      + (fd->sc_part & SEC_P01 ? FDC_BSIZE : 0),
-			      FDC_BSIZE);
+			memcpy(fd->sc_copybuf
+			    + (fd->sc_part & SEC_P01 ? FDC_BSIZE : 0),
+			    bp->b_data + fd->sc_skip, FDC_BSIZE);
 			fdc_dmastart(fdc, read, fd->sc_copybuf, 1024);
 		}
 		out_fdc(iot, ioh, NE7CMD_WRITE);	/* WRITE */
@@ -1681,7 +1673,7 @@ fdgetdisklabel(sc, dev)
 
 	part = DISKPART(dev);
 	lp = sc->sc_dk.dk_label;
-	bzero(lp, sizeof(struct disklabel));
+	memset(lp, 0, sizeof(struct disklabel));
 
 	lp->d_secsize     = 128 << sc->sc_type->secsize;
 	lp->d_ntracks     = sc->sc_type->heads;

@@ -1,4 +1,4 @@
-/*      $NetBSD: sv.c,v 1.10.6.1 2000/06/30 16:27:50 simonb Exp $ */
+/*      $NetBSD: sv.c,v 1.15 2001/11/13 07:48:49 lukem Exp $ */
 /*      $OpenBSD: sv.c,v 1.2 1998/07/13 01:50:15 csapuntz Exp $ */
 
 /*
@@ -73,6 +73,9 @@
  *   Heavily based on the eap driver by Lennart Augustsson
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sv.c,v 1.15 2001/11/13 07:48:49 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -130,7 +133,7 @@ struct audio_device sv_device = {
 
 #define ARRAY_SIZE(foo)  ((sizeof(foo)) / sizeof(foo[0]))
 
-int	sv_allocmem __P((struct sv_softc *, size_t, size_t, struct sv_dma *));
+int	sv_allocmem __P((struct sv_softc *, size_t, size_t, int, struct sv_dma *));
 int	sv_freemem __P((struct sv_softc *, struct sv_dma *));
 
 int	sv_open __P((void *, int));
@@ -185,6 +188,7 @@ struct audio_hw_if sv_hw_if = {
 	sv_get_props,
 	sv_trigger_output,
 	sv_trigger_input,
+	NULL,
 };
 
 
@@ -420,8 +424,7 @@ sv_attach(parent, self, aux)
 	sv_read(sc, SV_CODEC_STATUS);
 	
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -509,10 +512,11 @@ sv_intr(p)
 }
 
 int
-sv_allocmem(sc, size, align, p)
+sv_allocmem(sc, size, align, direction, p)
 	struct sv_softc *sc;
 	size_t size;
 	size_t align;
+	int direction;
 	struct sv_dma *p;
 {
 	int error;
@@ -535,7 +539,8 @@ sv_allocmem(sc, size, align, p)
 		goto unmap;
 
 	error = bus_dmamap_load(sc->sc_dmatag, p->map, p->addr, p->size, NULL, 
-				BUS_DMA_NOWAIT);
+				BUS_DMA_NOWAIT |
+                                (direction == AUMODE_RECORD) ? BUS_DMA_READ : BUS_DMA_WRITE);
 	if (error)
 		goto destroy;
 	DPRINTF(("sv_allocmem: pa=%lx va=%lx pba=%lx\n",
@@ -1442,7 +1447,7 @@ sv_malloc(addr, direction, size, pool, flags)
 	p = malloc(sizeof(*p), pool, flags);
 	if (!p)
 		return (0);
-	error = sv_allocmem(sc, size, 16, p);
+	error = sv_allocmem(sc, size, 16, direction, p);
 	if (error) {
 		free(p, pool);
 		return (0);

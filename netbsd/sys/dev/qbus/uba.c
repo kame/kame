@@ -1,4 +1,4 @@
-/*	$NetBSD: uba.c,v 1.53 2000/06/05 00:09:18 matt Exp $	   */
+/*	$NetBSD: uba.c,v 1.59 2001/11/15 09:48:13 lukem Exp $	   */
 /*
  * Copyright (c) 1996 Jonathan Stone.
  * Copyright (c) 1994, 1996 Ludd, University of Lule}, Sweden.
@@ -37,8 +37,10 @@
  *	@(#)autoconf.c	7.20 (Berkeley) 5/9/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uba.c,v 1.59 2001/11/15 09:48:13 lukem Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/systm.h>
 #include <sys/map.h>
@@ -51,8 +53,7 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/scb.h>
@@ -80,7 +81,7 @@ uba_enqueue(struct uba_unit *uu)
 
 	uh = (void *)((struct device *)(uu->uu_softc))->dv_parent;
 
-	s = splimp();
+	s = spluba();
 	SIMPLEQ_INSERT_TAIL(&uh->uh_resq, uu, uu_resq);
 	splx(s);
 }
@@ -89,7 +90,7 @@ uba_enqueue(struct uba_unit *uu)
  * When a routine that uses resources is finished, the next device
  * in queue for map registers etc is called. If it succeeds to get
  * resources, call next, and next, and next...
- * This routine must be called at splimp.
+ * This routine must be called at spluba.
  */
 void
 uba_done(struct uba_softc *uh)
@@ -116,10 +117,74 @@ uba_reset_establish(void (*reset)(struct device *), struct device *dev)
 	struct uba_reset *ur;
 
 	ur = malloc(sizeof(struct uba_reset), M_DEVBUF, M_NOWAIT);
+	if (ur == NULL)
+		panic("uba_reset_establish");
 	ur->ur_dev = dev;
 	ur->ur_reset = reset;
 
 	SIMPLEQ_INSERT_TAIL(&uh->uh_resetq, ur, ur_resetq);
+}
+
+/*
+ * Allocate a bunch of map registers and map them to the given address.
+ */
+int
+uballoc(struct uba_softc *uh, struct ubinfo *ui, int flags)
+{
+	int waitok = (flags & UBA_CANTWAIT) == 0;
+	int error;
+
+	if ((error = bus_dmamap_create(uh->uh_dmat, ui->ui_size, 1,
+	    ui->ui_size, 0, (waitok ? BUS_DMA_WAITOK : BUS_DMA_NOWAIT),
+	    &ui->ui_dmam)))
+		return error;
+
+	if ((error = bus_dmamap_load(uh->uh_dmat, ui->ui_dmam, ui->ui_vaddr,
+	    ui->ui_size, NULL, (waitok ? BUS_DMA_WAITOK : BUS_DMA_NOWAIT)))) {
+		bus_dmamap_destroy(uh->uh_dmat, ui->ui_dmam);
+		return error;
+	}
+	ui->ui_baddr = ui->ui_dmam->dm_segs[0].ds_addr;
+	return 0;
+}
+
+/*
+ * Allocate DMA-able memory and map it on the unibus.
+ */
+int
+ubmemalloc(struct uba_softc *uh, struct ubinfo *ui, int flags)
+{
+	int waitok = (flags & UBA_CANTWAIT ? BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
+	int error;
+
+	if ((error = bus_dmamem_alloc(uh->uh_dmat, ui->ui_size, NBPG, 0,
+	    &ui->ui_seg, 1, &ui->ui_rseg, waitok)))
+		return error;
+	if ((error = bus_dmamem_map(uh->uh_dmat, &ui->ui_seg, ui->ui_rseg,
+	    ui->ui_size, &ui->ui_vaddr, waitok|BUS_DMA_COHERENT))) {
+		bus_dmamem_free(uh->uh_dmat, &ui->ui_seg, ui->ui_rseg);
+		return error;
+	}
+	if ((error = uballoc(uh, ui, flags))) {
+		bus_dmamem_unmap(uh->uh_dmat, ui->ui_vaddr, ui->ui_size);
+		bus_dmamem_free(uh->uh_dmat, &ui->ui_seg, ui->ui_rseg);
+	}
+	return error;
+}
+
+void
+ubfree(struct uba_softc *uh, struct ubinfo *ui)
+{
+	bus_dmamap_unload(uh->uh_dmat, ui->ui_dmam);
+	bus_dmamap_destroy(uh->uh_dmat, ui->ui_dmam);
+}
+
+void
+ubmemfree(struct uba_softc *uh, struct ubinfo *ui)
+{
+	bus_dmamem_unmap(uh->uh_dmat, ui->ui_vaddr, ui->ui_size);
+	bus_dmamem_free(uh->uh_dmat, &ui->ui_seg, ui->ui_rseg);
+	ubfree(uh, ui);
 }
 
 /*
@@ -133,7 +198,7 @@ ubareset(struct uba_softc *uh)
 	struct uba_reset *ur;
 	int s;
 
-	s = splimp();
+	s = spluba();
 	SIMPLEQ_INIT(&uh->uh_resq);
 	printf("%s: reset", uh->uh_dev.dv_xname);
 	(*uh->uh_ubainit)(uh);

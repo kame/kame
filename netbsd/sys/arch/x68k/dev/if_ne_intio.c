@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: if_ne_intio.c,v 1.2 2002/01/14 04:25:47 isaki Exp $	*/
 
 /*
  * Copyright (c) 2001 Tetsuya Isaki. All rights reserved.
@@ -80,8 +80,10 @@
 
 #include <arch/x68k/dev/intiovar.h>
 
-#define NE_INTIO_ADDR (0xece300)
-#define NE_INTIO_INTR (0xf9)
+#define NE_INTIO_ADDR  (0xece300)
+#define NE_INTIO_ADDR2 (0xeceb00)
+#define NE_INTIO_INTR  (0xf9)
+#define NE_INTIO_INTR2 (0xf8)
 
 static int  ne_intio_match(struct device *, struct cfdata *, void *);
 static void ne_intio_attach(struct device *, struct device *, void *);
@@ -109,9 +111,8 @@ ne_intio_match(struct device *parent, struct cfdata *cf, void *aux)
 		ia->ia_intr = NE_INTIO_INTR;
 
 	/* fixed parameters */
-	if (ia->ia_addr != NE_INTIO_ADDR)
-		return 0;
-	if (ia->ia_intr != NE_INTIO_INTR)
+	if (!(ia->ia_addr == NE_INTIO_ADDR  && ia->ia_intr == NE_INTIO_INTR ) &&
+	    !(ia->ia_addr == NE_INTIO_ADDR2 && ia->ia_intr == NE_INTIO_INTR2)  )
 		return 0;
 
 	/* Make sure this is a valid NE2000 I/O address */
@@ -150,17 +151,10 @@ ne_intio_attach(struct device *parent, struct device *self, void *aux)
 	bus_space_handle_t ioh;
 	bus_space_tag_t asict;
 	bus_space_handle_t asich;
-	void (*npp_init_media) __P((struct dp8390_softc *, int **,
-	    int *, int *));
-	int *media, nmedia, defmedia;
 	const char *typestr;
 	int netype;
 
 	printf(": Nereid Ethernet\n");
-
-	npp_init_media = NULL;
-	media = NULL;
-	nmedia = defmedia = 0;
 
 	/* Map I/O space */
 	if (bus_space_map(iot, ia->ia_addr, NE2000_NPORTS*2,
@@ -205,10 +199,10 @@ ne_intio_attach(struct device *parent, struct device *self, void *aux)
 		      bus_space_read_1(iot, ioh, NERTL_RTL0_8019ID1) ==
 		      RTL0_8019ID1) {
 			typestr = "NE2000 (RTL8019)";
-			npp_init_media = rtl80x9_init_media;
 			dsc->sc_mediachange = rtl80x9_mediachange;
 			dsc->sc_mediastatus = rtl80x9_mediastatus;
 			dsc->init_card      = rtl80x9_init_card;
+			dsc->sc_media_init  = rtl80x9_media_init;
 		}
 		break;
 
@@ -219,10 +213,6 @@ ne_intio_attach(struct device *parent, struct device *self, void *aux)
 
 	printf("%s: %s Ethernet\n", dsc->sc_dev.dv_xname, typestr);
 
-	/* Initialize media, if we have it. */
-	if (npp_init_media != NULL)
-		(*npp_init_media)(dsc, &media, &nmedia, &defmedia);
-
 	/* This interface is always enabled */
 	dsc->sc_enabled = 1;
 
@@ -230,7 +220,7 @@ ne_intio_attach(struct device *parent, struct device *self, void *aux)
 	 * Do generic NE2000 attach.
 	 * This will read the mac address from the EEPROM.
 	 */
-	ne2000_attach(sc, NULL, media, nmedia, defmedia);
+	ne2000_attach(sc, NULL);
 
 	/* Establish the interrupt handler */
 	if (intio_intr_establish(ia->ia_intr, "ne", ne_intio_intr, dsc))

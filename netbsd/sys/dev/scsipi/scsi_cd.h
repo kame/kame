@@ -1,4 +1,4 @@
-/*	$NetBSD: scsi_cd.h,v 1.12 1998/02/13 08:28:30 enami Exp $	*/
+/*	$NetBSD: scsi_cd.h,v 1.15 2001/09/02 19:53:40 thorpej Exp $	*/
 
 /*
  * Written by Julian Elischer (julian@tfs.com)
@@ -33,11 +33,6 @@ struct scsi_play_track {
 	u_int8_t end_index;
 	u_int8_t control;
 };
-
-/* sense pages */
-#define SCSI_CD_PAGE_CODE    0x3F
-#define SCSI_AUDIO_PAGE  0x0e
-#define SCSI_CD_PAGE_PS  0x80
 
 #define	SCSI_CD_WRITE_PARAMS_PAGE	0x05
 #define	SCSI_CD_WRITE_PARAMS_PAGE_LEN	0x32
@@ -77,11 +72,11 @@ union scsi_cd_pages {
 };
 
 struct scsi_cd_mode_data {
-	struct scsi_mode_header header;
+	struct scsipi_mode_header header;
 	struct scsi_blk_desc blk_desc;
 	union scsi_cd_pages page;
 };
 
 #define AUDIOPAGESIZE \
-	(sizeof(struct scsi_mode_header) + sizeof(struct scsi_blk_desc) \
+	(sizeof(struct scsipi_mode_header) + sizeof(struct scsi_blk_desc) \
 	    + sizeof(struct cd_audio_page))

@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: emuxkivar.h,v 1.3 2001/12/23 23:14:59 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

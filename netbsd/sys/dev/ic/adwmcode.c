@@ -1,4 +1,4 @@
-/*      $NetBSD: adwmcode.c,v 1.5 2000/05/27 18:24:50 dante Exp $        */
+/*      $NetBSD: adwmcode.c,v 1.10 2001/11/15 09:48:04 lukem Exp $        */
 
 /*
  * Generic driver definitions and exported functions for the Advanced
@@ -53,8 +53,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: adwmcode.c,v 1.10 2001/11/15 09:48:04 lukem Exp $");
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -69,10 +70,6 @@
 
 #include <machine/bus.h>
 #include <machine/intr.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
 
 #include "adwmcode.h"
 
@@ -90,7 +87,7 @@ AdwInitCarriers(carr_dmap, carriers)
 	u_int32_t	carr_next = NULL;
 	int		i;
 
-	bzero(carriers, sizeof(ADW_CARRIER) * ADW_MAX_CARRIER);
+	memset(carriers, 0, sizeof(ADW_CARRIER) * ADW_MAX_CARRIER);
 
 	for(i=0; i < ADW_MAX_CARRIER; i++) {
 		carr = (ADW_CARRIER *)(((u_int8_t *)carriers) +

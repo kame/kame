@@ -1,4 +1,4 @@
-/*	$NetBSD: param.c,v 1.35.4.1 2000/11/13 20:36:33 tv Exp $	*/
+/*	$NetBSD: param.c,v 1.40 2001/12/17 15:40:43 atatat Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1989 Regents of the University of California.
@@ -40,9 +40,13 @@
  *	@(#)param.c	7.20 (Berkeley) 6/27/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: param.c,v 1.40 2001/12/17 15:40:43 atatat Exp $");
+
 #include "opt_rtc_offset.h"
 #include "opt_sb_max.h"
 #include "opt_sysv.h"
+#include "opt_sysvparam.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,6 +70,9 @@
 #ifdef SYSVMSG
 #include <sys/msg.h>
 #endif
+
+#define CONFIG_FILE
+#include "config_file.h"
 
 /*
  * System parameter formulae.
@@ -128,10 +135,18 @@ int	mcllowat = MCLLOWAT;
  * Values in support of System V compatible shared memory.	XXX
  */
 #ifdef SYSVSHM
+#ifndef	SHMMAX
 #define	SHMMAX	SHMMAXPGS	/* shminit() performs a `*= NBPG' */
+#endif
+#ifndef	SHMMIN
 #define	SHMMIN	1
+#endif
+#ifndef	SHMMNI
 #define	SHMMNI	128			/* <= SHMMMNI in shm.h */
+#endif
+#ifndef	SHMSEG
 #define	SHMSEG	128
+#endif
 #define	SHMALL	SHMMAXPGS
 
 struct	shminfo shminfo = {

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.19 2000/06/11 14:20:46 minoura Exp $	*/
+/*	$NetBSD: conf.c,v 1.28 2002/03/16 16:56:00 martin Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -85,51 +85,30 @@ struct bdevsw	bdevsw[] =
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
-/* open, close, read, write, ioctl, poll */
-#define	cdev_gen_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) nullop, \
-	0, dev_init(c,n,poll), (dev_type_mmap((*))) enodev }
-
-/* open, close, ioctl, poll, mmap -- XXX should be a map device */
-#define	cdev_grf_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) nullop, \
-	(dev_type_write((*))) nullop, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
-	dev_init(c,n,mmap) }
-
-/* open, close, read, write, ioctl, tty, mmap */
+/* open, close, read, write, ioctl, tty, ttpoll */
 #define cdev_ite_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	dev_init(c,n,tty), ttpoll, (dev_type_mmap((*))) enodev, D_TTY }
+	dev_init(c,n,write), dev_init(c,n,ioctl), dev_noimpl(stop,enodev), \
+	dev_init(c,n,tty), dev_init(c,n,poll), dev_noimpl(mmap,enodev), D_TTY }
 
 /* open, close, write, ioctl */
-#define	cdev_par_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
+#define	cdev_par_init(c,n)	cdev__ocwi_init(c,n)
 
 /* open, close, ioctl */
-#define	cdev_sram_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) nullop, 0, (dev_type_poll((*))) enodev, \
-	(dev_type_mmap((*))) enodev }
+#define	cdev_sram_init(c,n)	cdev__oci_init(c,n)
+#define	cdev_pow_init(c,n)	cdev__oci_init(c,n)
+#define	cdev_bell_init(c,n)	cdev__oci_init(c,n)
 
-/* open, close, ioctl */
-#define	cdev_pow_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) nullop, 0, (dev_type_poll((*))) enodev, \
-	(dev_type_mmap((*))) enodev }
-
-/* open, close, ioctl */
-#define	cdev_bell_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) nullop, 0, (dev_type_poll((*))) enodev, \
-	(dev_type_mmap((*))) enodev }
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
 
 cdev_decl(cn);
 cdev_decl(ctty);
@@ -187,6 +166,8 @@ cdev_decl(bell);
 cdev_decl(ch);
 #include "uk.h"
 cdev_decl(uk);
+#include "clockctl.h"
+cdev_decl(clockctl);
 #include "ipfilter.h"
 #include "rnd.h"
 
@@ -210,12 +191,12 @@ struct cdevsw	cdevsw[] =
 	cdev_tty_init(NZSTTY,zs),	/* 12: zs serial */
 	cdev_ite_init(NITE,ite),	/* 13: console terminal emulator */
 #if NKBD > 0
-	cdev_gen_init(1,kbd),		/* 14: /dev/kbd */
+	cdev__ocrwip_init(1,kbd),	/* 14: /dev/kbd */
 #else
 	cdev_notdef(),
 #endif
 #if NMS > 0
-	cdev_gen_init(1,ms),		/* 15: /dev/mouse */
+	cdev__ocrwip_init(1,ms),	/* 15: /dev/mouse */
 #else
 	cdev_notdef(),
 #endif
@@ -240,12 +221,18 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NCCD,ccd),	/* 34: concatenated disk driver */
 	cdev_scanner_init(NSS,ss),	/* 35: SCSI scanner */
 	cdev_ch_init(NCH,ch),		/* 36: SCSI changer device */
-	cdev_ch_init(NUK,uk),		/* 37: SCSI unknown device */
+	cdev_uk_init(NUK,uk),		/* 37: SCSI unknown device */
 	cdev_ipf_init(NIPFILTER,ipl),	/* 38: IP filter device */
 	cdev_rnd_init(NRND,rnd),	/* 39: random source pseudo-device */
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 40: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 41: RAIDframe disk driver */
 	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 42: svr4 net pseudo-device */
+	cdev_isdn_init(NISDN, isdn),		/* 43: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 44: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 45: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 46: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 47: isdn phone device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl), /* 48: settimeofday driver */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -307,6 +294,10 @@ static int chrtoblktbl[] = {
 	/* 36 */	NODEV,		/* 37 */	NODEV,
 	/* 38 */	NODEV,		/* 39 */	NODEV,
 	/* 40 */	NODEV,		/* 41 */	16,
+	/* 42 */	NODEV,		/* 43 */	NODEV,
+	/* 44 */	NODEV,		/* 45 */	NODEV,
+	/* 46 */	NODEV,		/* 47 */	NODEV,
+	/* 48 */	NODEV,
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: iommu.c,v 1.44.2.2 2000/07/22 21:18:57 pk Exp $ */
+/*	$NetBSD: iommu.c,v 1.63 2002/03/11 16:27:03 pk Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -35,6 +35,7 @@
  * SUCH DAMAGE.
  *
  */
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/extent.h>
@@ -42,10 +43,8 @@
 #include <sys/queue.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <sys/proc.h>
 
-#include <uvm/uvm_extern.h>
 #include <uvm/uvm.h>
 
 #define _SPARC_BUS_DMA_PRIVATE
@@ -69,7 +68,6 @@ struct iommu_softc {
 };
 struct	iommu_softc *iommu_sc;/*XXX*/
 int	has_iocache;
-u_long	dvma_cachealign;
 
 /*
  * Note: operations on the extent map are being protected with
@@ -84,7 +82,9 @@ int	iommu_print __P((void *, const char *));
 void	iommu_attach __P((struct device *, struct device *, void *));
 int	iommu_match __P((struct device *, struct cfdata *, void *));
 
+#if defined(SUN4M)
 static void iommu_copy_prom_entries __P((struct iommu_softc *));
+#endif
 
 struct cfattach iommu_ca = {
 	sizeof(struct iommu_softc), iommu_match, iommu_attach
@@ -175,14 +175,14 @@ iommu_attach(parent, self, aux)
 	struct mainbus_attach_args *ma = aux;
 	bus_space_handle_t bh;
 	int node;
+	int js1_implicit_iommu;
 	int i, s;
 	u_int iopte_table_pa;
 	struct pglist mlist;
 	u_int size;
-	vm_page_t m;
+	struct vm_page *m;
 	vaddr_t va;
 
-	iommu_sc = sc;
 	/*
 	 * XXX there is only one iommu, for now -- do not know how to
 	 * address children on others
@@ -191,7 +191,19 @@ iommu_attach(parent, self, aux)
 		printf(" unsupported\n");
 		return;
 	}
+	iommu_sc = sc;
+
+	/* 
+	 * JS1/OF device tree does not have an iommu node and sbus
+	 * node is directly under root.  mainbus_attach detects this
+	 * and calls us with sbus node instead so that we can attach
+	 * implicit iommu and attach that sbus node under it.
+	 */
 	node = ma->ma_node;
+	if (strcmp(PROM_getpropstring(node, "name"), "sbus") == 0)
+		js1_implicit_iommu = 1;
+	else
+		js1_implicit_iommu = 0;
 
 	/*
 	 * Map registers into our space. The PROM may have done this
@@ -201,12 +213,10 @@ iommu_attach(parent, self, aux)
 	 * XXX struct iommureg is bigger than ra->ra_len; what are the
 	 *     other fields for?
 	 */
-	if (bus_space_map2(
+	if (bus_space_map(
 			ma->ma_bustag,
-			ma->ma_iospace,
 			ma->ma_paddr,
 			sizeof(struct iommureg),
-			0,
 			0,
 			&bh) != 0) {
 		printf("iommu_attach: cannot map registers\n");
@@ -214,12 +224,14 @@ iommu_attach(parent, self, aux)
 	}
 	sc->sc_reg = (struct iommureg *)bh;
 
-	sc->sc_hasiocache = node_has_property(node, "cache-coherence?");
+	sc->sc_hasiocache = js1_implicit_iommu ? 0
+				: node_has_property(node, "cache-coherence?");
 	if (CACHEINFO.c_enabled == 0) /* XXX - is this correct? */
 		sc->sc_hasiocache = 0;
 	has_iocache = sc->sc_hasiocache; /* Set global flag */
 
-	sc->sc_pagesize = getpropint(node, "page-size", NBPG),
+	sc->sc_pagesize = js1_implicit_iommu ? NBPG
+				: PROM_getpropint(node, "page-size", NBPG),
 
 	/*
 	 * Allocate memory for I/O pagetables.
@@ -247,11 +259,10 @@ iommu_attach(parent, self, aux)
 	/* Map the pages */
 	for (; m != NULL; m = TAILQ_NEXT(m,pageq)) {
 		paddr_t pa = VM_PAGE_TO_PHYS(m);
-		pmap_enter(pmap_kernel(), va, pa | PMAP_NC,
-		    VM_PROT_READ|VM_PROT_WRITE,
-		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+		pmap_kenter_pa(va, pa | PMAP_NC, VM_PROT_READ | VM_PROT_WRITE);
 		va += NBPG;
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Copy entries from current IOMMU table.
@@ -294,13 +305,37 @@ iommu_attach(parent, self, aux)
 		panic("iommu: unable to allocate DVMA map");
 
 	/*
+	 * If we are attaching implicit iommu on JS1/OF we do not have
+	 * an iommu node to traverse, instead mainbus_attach passed us
+	 * sbus node in ma.ma_node.  Attach it as the only iommu child.
+	 */
+	if (js1_implicit_iommu) {
+		struct iommu_attach_args ia;
+		struct iommu_reg sbus_iommu_reg = { 0, 0x10001000, 0x28 };
+
+		bzero(&ia, sizeof ia);
+
+		/* Propagate BUS & DMA tags */
+		ia.iom_bustag = ma->ma_bustag;
+		ia.iom_dmatag = &iommu_dma_tag;
+
+		ia.iom_name = "sbus";
+		ia.iom_node = node;
+		ia.iom_reg = &sbus_iommu_reg;
+		ia.iom_nreg = 1;
+
+		(void) config_found(&sc->sc_dev, (void *)&ia, iommu_print);
+		return;
+	}
+
+	/*
 	 * Loop through ROM children (expect Sbus among them).
 	 */
 	for (node = firstchild(node); node; node = nextsibling(node)) {
 		struct iommu_attach_args ia;
 
 		bzero(&ia, sizeof ia);
-		ia.iom_name = getpropstring(node, "name");
+		ia.iom_name = PROM_getpropstring(node, "name");
 
 		/* Propagate BUS & DMA tags */
 		ia.iom_bustag = ma->ma_bustag;
@@ -309,7 +344,7 @@ iommu_attach(parent, self, aux)
 		ia.iom_node = node;
 
 		ia.iom_reg = NULL;
-		getprop(node, "reg", sizeof(struct sbus_reg),
+		PROM_getprop(node, "reg", sizeof(struct sbus_reg),
 			&ia.iom_nreg, (void **)&ia.iom_reg);
 
 		(void) config_found(&sc->sc_dev, (void *)&ia, iommu_print);
@@ -319,6 +354,7 @@ iommu_attach(parent, self, aux)
 #endif
 }
 
+#if defined(SUN4M)
 static void
 iommu_copy_prom_entries(sc)
 	struct iommu_softc *sc;
@@ -375,6 +411,7 @@ iommu_copy_prom_entries(sc)
 		sta(SRMMU_PCR, ASI_SRMMU, mmupcr_save);
 	}
 }
+#endif
 
 void
 iommu_enter(dva, pa)
@@ -524,7 +561,7 @@ iommu_dvma_alloc(map, va, len, flags, dvap, sgsizep)
 	bus_size_t *sgsizep;
 {
 	bus_size_t sgsize;
-	u_long align, voff;
+	u_long align, voff, dvaddr;
 	int s, error;
 	int pagesz = PAGE_SIZE;
 
@@ -548,9 +585,9 @@ iommu_dvma_alloc(map, va, len, flags, dvap, sgsizep)
 					map->_dm_boundary,
 					(flags & BUS_DMA_NOWAIT) == 0
 						? EX_WAITOK : EX_NOWAIT,
-					(u_long *)dvap);
+					&dvaddr);
 	splx(s);
-
+	*dvap = (bus_addr_t)dvaddr;
 	*sgsizep = sgsize;
 	return (error);
 }
@@ -658,7 +695,7 @@ iommu_dmamap_load_raw(t, map, segs, nsegs, size, flags)
 	bus_size_t size;
 	int flags;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	paddr_t pa;
 	bus_addr_t dva;
 	bus_size_t sgsize;
@@ -762,7 +799,7 @@ iommu_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	caddr_t *kvap;
 	int flags;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	vaddr_t va;
 	bus_addr_t addr;
 	struct pglist *mlist;
@@ -802,9 +839,7 @@ iommu_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			panic("iommu_dmamem_map: size botch");
 
 		addr = VM_PAGE_TO_PHYS(m);
-		pmap_enter(pmap_kernel(), va, addr | cbit,
-		    VM_PROT_READ | VM_PROT_WRITE,
-		    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
+		pmap_kenter_pa(va, addr | cbit, VM_PROT_READ | VM_PROT_WRITE);
 #if 0
 			if (flags & BUS_DMA_COHERENT)
 				/* XXX */;
@@ -812,6 +847,7 @@ iommu_dmamem_map(t, segs, nsegs, size, kvap, flags)
 		va += pagesz;
 		size -= pagesz;
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }

@@ -1,32 +1,42 @@
-/*	$NetBSD: txcom.c,v 1.8 2000/03/23 06:38:03 thorpej Exp $ */
+/*	$NetBSD: txcom.c,v 1.16 2002/03/17 19:40:40 atatat Exp $ */
 
-/*
- * Copyright (c) 1999, 2000, by UCHIYAMA Yasushi
+/*-
+ * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by UCHIYAMA Yasushi.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 2. The name of the developer may NOT be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *        This product includes software developed by the NetBSD
+ *        Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "opt_tx39_debug.h"
-#include "opt_tx39uartdebug.h"
+
+#include "opt_tx39uart_debug.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,6 +55,7 @@
 #include <dev/cons.h> /* consdev */
 
 #include <machine/bus.h>
+#include <machine/config_hook.h>
 
 #include <hpcmips/tx/tx39var.h>
 #include <hpcmips/tx/tx39icureg.h>
@@ -55,17 +66,22 @@
 
 #include <hpcmips/tx/tx39clockreg.h> /* XXX */
 
-#include <hpcmips/tx/txiomanvar.h>
-
 #define SET(t, f)	(t) |= (f)
 #define CLR(t, f)	(t) &= ~(f)
 #define ISSET(t, f)	((t) & (f))
+/* 
+ * UARTA channel has DTR, DSR, RTS, CTS lines. and they  wired to MFIO/IO port.
+ */
+#define IS_COM0(s)	((s) == 0)
+#define IS_COM1(s)	((s) == 1)
+#define ON		((void *)1)
+#define OFF		((void *)0)
 
-#ifdef TX39UARTDEBUG
-#define	DPRINTF(arg) printf arg
-#else
-#define	DPRINTF(arg)
+#ifdef	TX39UART_DEBUG
+#define DPRINTF_ENABLE
+#define DPRINTF_DEBUG	tx39uart_debug
 #endif
+#include <machine/debug.h>
 
 #define TXCOM_HW_CONSOLE	0x40
 #define	TXCOM_RING_SIZE		256 /* must be a power of two! */
@@ -80,6 +96,8 @@ struct txcom_chip {
 	int sc_hwflags;
 	
 	int sc_dcd;
+	int sc_msr_cts;
+	int sc_tx_stopped;
 };
 
 struct txcom_softc {
@@ -100,50 +118,56 @@ struct txcom_softc {
 
 extern struct cfdriver txcom_cd;
 
-int	txcom_match	__P((struct device*, struct cfdata*, void*));
-void	txcom_attach	__P((struct device*, struct device*, void*));
-int	txcom_print	__P((void*, const char*));
+int	txcom_match(struct device *, struct cfdata *, void *);
+void	txcom_attach(struct device *, struct device *, void *);
+int	txcom_print(void*, const char *);
 
-int	txcom_txintr		__P((void*));
-int	txcom_rxintr		__P((void*));
-int	txcom_frameerr_intr	__P((void*));
-int	txcom_parityerr_intr	__P((void*));
-int	txcom_break_intr	__P((void*));
+int	txcom_txintr(void *);
+int	txcom_rxintr(void *);
+int	txcom_frameerr_intr(void *);
+int	txcom_parityerr_intr(void *);
+int	txcom_break_intr(void *);
 
-void	txcom_rxsoft	__P((void*));
-void	txcom_txsoft	__P((void*));
+void	txcom_rxsoft(void *);
+void	txcom_txsoft(void *);
  
-int	txcom_stsoft	__P((void*));
-int	txcom_stsoft2	__P((void*));
-int	txcom_stsoft3	__P((void*));
-int	txcom_stsoft4	__P((void*));
+int	txcom_stsoft(void *);
+int	txcom_stsoft2(void *);
+int	txcom_stsoft3(void *);
+int	txcom_stsoft4(void *);
 
 
-void	txcom_shutdown	__P((struct txcom_softc*));
-void	txcom_break	__P((struct txcom_softc*, int));
-void	txcom_modem	__P((struct txcom_softc*, int));
-void	txcomstart	__P((struct tty*));
-int	txcomparam	__P((struct tty*, struct termios*));
+void	txcom_shutdown(struct txcom_softc *);
+void	txcom_break(struct txcom_softc *, int);
+void	txcom_modem(struct txcom_softc *, int);
+void	txcomstart(struct tty *);
+int	txcomparam(struct tty *, struct termios *);
 
-void	txcom_reset		__P((struct txcom_chip*));
-int	txcom_enable		__P((struct txcom_chip*));
-void	txcom_disable		__P((struct txcom_chip*));
-void	txcom_setmode		__P((struct txcom_chip*));
-void	txcom_setbaudrate	__P((struct txcom_chip*));
-int	txcom_cngetc		__P((dev_t));
-void	txcom_cnputc		__P((dev_t, int));
-void	txcom_cnpollc		__P((dev_t, int));
+void	txcom_reset	(struct txcom_chip *);
+int	txcom_enable	(struct txcom_chip *);
+void	txcom_disable	(struct txcom_chip *);
+void	txcom_setmode	(struct txcom_chip *);
+void	txcom_setbaudrate(struct txcom_chip *);
+int	txcom_cngetc	(dev_t);
+void	txcom_cnputc	(dev_t, int);
+void	txcom_cnpollc	(dev_t, int);
 
-__inline int	__txcom_txbufready __P((struct txcom_chip*, int));
-__inline const char *__txcom_slotname __P((int));
+int	txcom_dcd_hook(void *, int, long, void *);
+int	txcom_cts_hook(void *, int, long, void *);
 
-void	txcom_dump	__P((struct txcom_chip*));
+
+__inline__ int	__txcom_txbufready(struct txcom_chip *, int);
+const char *__txcom_slotname(int);
+
+#ifdef TX39UARTDEBUG
+void	txcom_dump(struct txcom_chip *);
+#endif
 
 cdev_decl(txcom);
 
 struct consdev txcomcons = {
 	NULL, NULL, txcom_cngetc, txcom_cnputc, txcom_cnpollc, 
-	    NULL, NODEV, CN_NORMAL
+	NULL, NODEV, CN_NORMAL
 };
 
 /* Serial console */
@@ -164,10 +188,7 @@ txcom_match(parent, cf, aux)
 }
 
 void
-txcom_attach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+txcom_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct tx39uart_attach_args *ua = aux;
 	struct txcom_softc *sc = (void*)self;
@@ -178,13 +199,13 @@ txcom_attach(parent, self, aux)
 
 	/* Check this slot used as serial console */
 	console = (ua->ua_slot == txcom_chip.sc_slot) &&
-		(txcom_chip.sc_hwflags & TXCOM_HW_CONSOLE);
+	    (txcom_chip.sc_hwflags & TXCOM_HW_CONSOLE);
 
 	if (console) {
 		sc->sc_chip = &txcom_chip;
 	} else {
 		if (!(sc->sc_chip = malloc(sizeof(struct txcom_chip),
-					   M_DEVBUF, M_WAITOK))) {
+		    M_DEVBUF, M_WAITOK))) {
 			printf(": can't allocate chip\n");
 			return;
 		}
@@ -234,27 +255,35 @@ txcom_attach(parent, self, aux)
 #define TXCOMINTR(i, s) MAKEINTR(2, TX39_INTRSTATUS2_UART##i##INT(s))
 	
 	tx_intr_establish(tc, TXCOMINTR(RX, slot), IST_EDGE, IPL_TTY, 
-			  txcom_rxintr, sc);
+	    txcom_rxintr, sc);
 	tx_intr_establish(tc, TXCOMINTR(TX, slot), IST_EDGE, IPL_TTY,
-			  txcom_txintr, sc);
+	    txcom_txintr, sc);
 	tx_intr_establish(tc, TXCOMINTR(RXOVERRUN, slot), IST_EDGE, IPL_TTY,
-			  txcom_rxintr, sc);
+	    txcom_rxintr, sc);
 	tx_intr_establish(tc, TXCOMINTR(TXOVERRUN, slot), IST_EDGE, IPL_TTY,
-			  txcom_txintr, sc);
+	    txcom_txintr, sc);
 	tx_intr_establish(tc, TXCOMINTR(FRAMEERR, slot), IST_EDGE, IPL_TTY,
-			  txcom_frameerr_intr, sc);
+	    txcom_frameerr_intr, sc);
 	tx_intr_establish(tc, TXCOMINTR(PARITYERR, slot), IST_EDGE, IPL_TTY,
-			  txcom_parityerr_intr, sc);
+	    txcom_parityerr_intr, sc);
 	tx_intr_establish(tc, TXCOMINTR(BREAK, slot), IST_EDGE, IPL_TTY,
-			  txcom_break_intr, sc);
+	    txcom_break_intr, sc);
 
-	if (ua->ua_slot == 0)
-		txioman_uarta_init(tc, self);
+	/*
+	 * UARTA has external signal line. (its wiring is platform dependent)
+	 */
+	if (IS_COM0(slot)) {
+		/* install DCD, CTS hooks. */
+		config_hook(CONFIG_HOOK_EVENT, CONFIG_HOOK_COM0_DCD,
+		    CONFIG_HOOK_EXCLUSIVE, txcom_dcd_hook, sc);
+		config_hook(CONFIG_HOOK_EVENT, CONFIG_HOOK_COM0_CTS,
+		    CONFIG_HOOK_EXCLUSIVE, txcom_cts_hook, sc);
+	}
 
 	/*
 	 * UARTB can connect IR module
 	 */
-	if (ua->ua_slot == 1) {
+	if (IS_COM1(slot)) {
 		struct txcom_attach_args tca;
 		tca.tca_tc = tc;
 		tca.tca_parent = self;
@@ -263,16 +292,13 @@ txcom_attach(parent, self, aux)
 }
 
 int
-txcom_print(aux, pnp)
-	void *aux;
-	const char *pnp;
+txcom_print(void *aux, const char *pnp)
 {
 	return pnp ? QUIET : UNCONF;
 }
 
 void
-txcom_reset(chip)
-	struct txcom_chip *chip;
+txcom_reset(struct txcom_chip *chip)
 {
 	tx_chipset_tag_t tc;
 	int slot, ofs;
@@ -292,8 +318,7 @@ txcom_reset(chip)
 }
 
 int
-txcom_enable(chip)
-	struct txcom_chip *chip;
+txcom_enable(struct txcom_chip *chip)
 {
 	tx_chipset_tag_t tc;
 	txreg_t reg;
@@ -302,6 +327,11 @@ txcom_enable(chip)
 	tc = chip->sc_tc;
 	slot = chip->sc_slot;
 	ofs = TX39_UARTCTRL1_REG(slot);
+
+	/* External power supply (if any) */
+	config_hook_call(CONFIG_HOOK_POWERCONTROL,
+	    CONFIG_HOOK_POWERCONTROL_COM0, PWCTL_ON);
+	delay(3);
 
 	/* Supply clock */
 	reg = tx_conf_read(tc, TX39_CLOCKCTRL_REG);
@@ -321,10 +351,10 @@ txcom_enable(chip)
 	reg &= ~TX39_UARTCTRL1_ENBREAHALT;
 	tx_conf_write(tc, ofs, reg);
 
-	timeout = 100;
+	timeout = 100000;
 	
 	while(!(tx_conf_read(tc, ofs) & TX39_UARTCTRL1_UARTON) &&
-	      --timeout > 0)
+	    --timeout > 0)
 		;
 	
 	if (timeout == 0 && !cold) {
@@ -336,8 +366,7 @@ txcom_enable(chip)
 }
 
 void
-txcom_disable(chip)
-	struct txcom_chip *chip;
+txcom_disable(struct txcom_chip *chip)
 {
 	tx_chipset_tag_t tc;
 	txreg_t reg;
@@ -361,10 +390,8 @@ txcom_disable(chip)
 	
 }
 
-__inline int
-__txcom_txbufready(chip, retry)
-	struct txcom_chip *chip;
-	int retry;
+__inline__ int
+__txcom_txbufready(struct txcom_chip *chip, int retry)
 {
 	tx_chipset_tag_t tc = chip->sc_tc;
 	int ofs = TX39_UARTCTRL1_REG(chip->sc_slot);
@@ -378,8 +405,7 @@ __txcom_txbufready(chip, retry)
 }
 
 void
-txcom_pulse_mode(dev)
-	struct device *dev;
+txcom_pulse_mode(struct device *dev)
 {
 	struct txcom_softc *sc = (void*)dev;
 	struct txcom_chip *chip = sc->sc_chip;
@@ -402,8 +428,7 @@ txcom_pulse_mode(dev)
  * console
  */
 int
-txcom_cngetc(dev)
-	dev_t dev;
+txcom_cngetc(dev_t dev)
 {
 	tx_chipset_tag_t tc;
 	int ofs, c, s;
@@ -428,9 +453,7 @@ txcom_cngetc(dev)
 }
 
 void
-txcom_cnputc(dev, c)
-	dev_t dev;
-	int c;
+txcom_cnputc(dev_t dev, int c)
 {
 	struct txcom_chip *chip = &txcom_chip;
 	tx_chipset_tag_t tc = chip->sc_tc;
@@ -442,7 +465,7 @@ txcom_cnputc(dev, c)
 	__txcom_txbufready(chip, -1);
 
 	tx_conf_write(tc, TX39_UARTTXHOLD_REG(chip->sc_slot), 
-		      (c & TX39_UARTTXHOLD_TXDATA_MASK));
+	    (c & TX39_UARTTXHOLD_TXDATA_MASK));
 
 	__txcom_txbufready(chip, -1);
 	
@@ -450,15 +473,12 @@ txcom_cnputc(dev, c)
 }
 
 void
-txcom_cnpollc(dev, on)
-	dev_t dev;
-	int on;
+txcom_cnpollc(dev_t dev, int on)
 {
 }
 
 void
-txcom_setmode(chip)
-	struct txcom_chip *chip;
+txcom_setmode(struct txcom_chip *chip)
 {
 	tcflag_t cflag = chip->sc_cflag;
 	int ofs = TX39_UARTCTRL1_REG(chip->sc_slot);
@@ -501,8 +521,7 @@ txcom_setmode(chip)
 }
 
 void
-txcom_setbaudrate(chip)
-	struct txcom_chip *chip;
+txcom_setbaudrate(struct txcom_chip *chip)
 {
 	int baudrate;
 	int ofs = TX39_UARTCTRL1_REG(chip->sc_slot);
@@ -512,7 +531,7 @@ txcom_setbaudrate(chip)
 		return;
 
 	if (!cold)
-		DPRINTF(("txcom_setbaudrate: %d\n", chip->sc_speed));
+		DPRINTF("%d\n", chip->sc_speed);
 
 	reg1 = tx_conf_read(chip->sc_tc, ofs);
 	reg1 &= ~TX39_UARTCTRL1_ENUART;
@@ -528,8 +547,7 @@ txcom_setbaudrate(chip)
 }
 
 int
-txcom_cnattach(slot, speed, cflag)
-	int slot, speed, cflag;
+txcom_cnattach(int slot, int speed, int cflag)
 {
 	cn_tab = &txcomcons;
 
@@ -554,25 +572,28 @@ txcom_cnattach(slot, speed, cflag)
  * tty
  */
 void
-txcom_break(sc, on)
-	struct txcom_softc *sc;
-	int on;
+txcom_break(struct txcom_softc *sc, int on)
 {
 	struct txcom_chip *chip = sc->sc_chip;
 
 	tx_conf_write(chip->sc_tc, TX39_UARTTXHOLD_REG(chip->sc_slot), 
-		      on ? TX39_UARTTXHOLD_BREAK : 0);
+	    on ? TX39_UARTTXHOLD_BREAK : 0);
 }
 
 void
-txcom_modem(sc, on)
-	struct txcom_softc *sc;
-	int on;
+txcom_modem(struct txcom_softc *sc, int on)
 {
 	struct txcom_chip *chip = sc->sc_chip;
 	tx_chipset_tag_t tc = chip->sc_tc;
 	int slot = chip->sc_slot;
 	txreg_t reg;
+
+	/* assert DTR */
+	if (IS_COM0(slot)) {
+		config_hook_call(CONFIG_HOOK_SET, 
+		    CONFIG_HOOK_COM0_DTR,
+		    (void *)on);
+	}
 
 	reg = tx_conf_read(tc, TX39_UARTCTRL1_REG(slot));
 	reg &= ~TX39_UARTCTRL1_ENUART;
@@ -589,8 +610,7 @@ txcom_modem(sc, on)
 }
 
 void
-txcom_shutdown(sc)
-	struct txcom_softc *sc;
+txcom_shutdown(struct txcom_softc *sc)
 {
 	struct tty *tp = sc->sc_tty;
 	int s = spltty();
@@ -616,21 +636,19 @@ txcom_shutdown(sc)
 	splx(s);
 }
 
-__inline const char *
-__txcom_slotname(slot)
-	int slot;
+const char *
+__txcom_slotname(int slot)
 {
-	static const char *slotname[] = {"UARTA", "UARTB"};
-	if (slot != 0 && slot != 1) {
-		return "bogus slot";
-	} else {
-		return slotname[slot];
-	}
+	static const char *slotname[] = {"UARTA", "UARTB", "unknown"};
+
+	if (slot != 0 && slot != 1)
+		return slotname[2];
+
+	return slotname[slot];
 }
 
 int
-txcom_frameerr_intr(arg)
-	void *arg;
+txcom_frameerr_intr(void *arg)
 {
 	struct txcom_softc *sc = arg;
 	
@@ -640,8 +658,7 @@ txcom_frameerr_intr(arg)
 }
 
 int
-txcom_parityerr_intr(arg)
-	void *arg;
+txcom_parityerr_intr(void *arg)
 {
 	struct txcom_softc *sc = arg;
 	
@@ -651,8 +668,7 @@ txcom_parityerr_intr(arg)
 }
 
 int
-txcom_break_intr(arg)
-	void *arg;
+txcom_break_intr(void *arg)
 {
 	struct txcom_softc *sc = arg;
 	
@@ -662,8 +678,7 @@ txcom_break_intr(arg)
 }
 
 int
-txcom_rxintr(arg)
-	void *arg;
+txcom_rxintr(void *arg)
 {
 	struct txcom_softc *sc = arg;
 	struct txcom_chip *chip = sc->sc_chip;
@@ -671,7 +686,7 @@ txcom_rxintr(arg)
 
 	c = TX39_UARTRXHOLD_RXDATA(
 		tx_conf_read(chip->sc_tc, 
-			     TX39_UARTRXHOLD_REG(chip->sc_slot)));
+		    TX39_UARTRXHOLD_REG(chip->sc_slot)));
 
 	sc->sc_rbuf[sc->sc_rbput] = c;
 	sc->sc_rbput = (sc->sc_rbput + 1) % TXCOM_RING_MASK;
@@ -682,16 +697,15 @@ txcom_rxintr(arg)
 }
 
 void
-txcom_rxsoft(arg)
-	void *arg;
+txcom_rxsoft(void *arg)
 {
 	struct txcom_softc *sc = arg;
 	struct tty *tp = sc->sc_tty;
-	int (*rint) __P((int c, struct tty *tp));
+	int (*rint)(int, struct tty *);
 	int code;
 	int s, end, get;
 
-	rint = linesw[tp->t_line].l_rint;
+	rint = tp->t_linesw->l_rint;
 
 	s = spltty();
 	end = sc->sc_rbput;
@@ -713,8 +727,7 @@ txcom_rxsoft(arg)
 }
 
 int
-txcom_txintr(arg)
-	void *arg;
+txcom_txintr(void *arg)
 {
 	struct txcom_softc *sc = arg;
 	struct txcom_chip *chip = sc->sc_chip;
@@ -722,8 +735,8 @@ txcom_txintr(arg)
 
 	if (sc->sc_tbc > 0) {
 		tx_conf_write(tc, TX39_UARTTXHOLD_REG(chip->sc_slot), 
-			      (*sc->sc_tba & 
-			       TX39_UARTTXHOLD_TXDATA_MASK));
+		    (*sc->sc_tba & 
+			TX39_UARTTXHOLD_TXDATA_MASK));
 		sc->sc_tbc--;
 		sc->sc_tba++;
 	} else {
@@ -734,8 +747,7 @@ txcom_txintr(arg)
 }
 
 void
-txcom_txsoft(arg)
-	void *arg;
+txcom_txsoft(void *arg)
 {
 	struct txcom_softc *sc = arg;
 	struct tty *tp = sc->sc_tty;
@@ -748,16 +760,13 @@ txcom_txsoft(arg)
 		ndflush(&tp->t_outq, (int)(sc->sc_tba - tp->t_outq.c_cf));
 	}
 
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 
 	splx(s);
 }
 
 int
-txcomopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+txcomopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(dev)];
 	struct txcom_chip *chip;
@@ -832,11 +841,11 @@ txcomopen(dev, flag, mode, p)
 	splx(s);
 #define	TXCOMDIALOUT(x)	(minor(x) & 0x80000)
 	if ((err = ttyopen(tp, TXCOMDIALOUT(dev), ISSET(flag, O_NONBLOCK)))) {
-		DPRINTF(("txcomopen: ttyopen failed\n"));
+		DPRINTF("ttyopen failed\n");
 		goto out;
 	}
-	if ((err = (*linesw[tp->t_line].l_open)(dev, tp))) {
-		DPRINTF(("txcomopen: line dicipline open failed\n"));
+	if ((err = (*tp->t_linesw->l_open)(dev, tp))) {
+		DPRINTF("line dicipline open failed\n");
 		goto out;
 	}
 
@@ -856,10 +865,7 @@ txcomopen(dev, flag, mode, p)
 }
 
 int
-txcomclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+txcomclose(dev_t dev, int flag, int mode, struct proc *p)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
@@ -868,7 +874,7 @@ txcomclose(dev, flag, mode, p)
 	if (!ISSET(tp->t_state, TS_ISOPEN))
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 
 	if (!ISSET(tp->t_state, TS_ISOPEN) && tp->t_wopen == 0) {
@@ -884,32 +890,34 @@ txcomclose(dev, flag, mode, p)
 }
 
 int
-txcomread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+txcomread(dev_t dev, struct uio *uio, int flag)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
  
 int
-txcomwrite(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+txcomwrite(dev_t dev, struct uio *uio, int flag)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+txcompoll(dev_t dev, int events, struct proc *p)
+{
+	struct txcom_softc *sc = txcom_cd.cd_devs[minor(dev)];
+	struct tty *tp = sc->sc_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
-txcomtty(dev)
-	dev_t dev;
+txcomtty(dev_t dev)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(dev)];
 	
@@ -917,24 +925,19 @@ txcomtty(dev)
 }
 
 int
-txcomioctl(dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+txcomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(dev)];
 	struct tty *tp = sc->sc_tty;
 	int s, err;
 
-	err = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (err >= 0) {
+	err = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (err != EPASSTHROUGH) {
 		return err;
 	}
 
 	err = ttioctl(tp, cmd, data, flag, p);
-	if (err >= 0) {
+	if (err != EPASSTHROUGH) {
 		return err;
 	}
 
@@ -944,7 +947,7 @@ txcomioctl(dev, cmd, data, flag, p)
 
 	switch (cmd) {
 	default:
-		err = ENOTTY;
+		err = EPASSTHROUGH;
 		break;
 
 	case TIOCSBRK:
@@ -983,9 +986,7 @@ txcomioctl(dev, cmd, data, flag, p)
 }
 
 void
-txcomstop(tp, flag)
-	struct tty *tp;
-	int flag;
+txcomstop(struct tty *tp, int flag)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(tp->t_dev)];
 	int s;
@@ -1004,8 +1005,7 @@ txcomstop(tp, flag)
 }
 
 void
-txcomstart(tp)
-	struct tty *tp;
+txcomstart(struct tty *tp)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(tp->t_dev)];
 	struct txcom_chip *chip = sc->sc_chip;
@@ -1035,7 +1035,7 @@ txcomstart(tp)
 
 	/* Output the first character of the contiguous buffer. */
 	tx_conf_write(tc, TX39_UARTTXHOLD_REG(slot), 
-		      (*sc->sc_tba & TX39_UARTTXHOLD_TXDATA_MASK));
+	    (*sc->sc_tba & TX39_UARTTXHOLD_TXDATA_MASK));
 		       
 	sc->sc_tbc--;
 	sc->sc_tba++;
@@ -1048,9 +1048,7 @@ txcomstart(tp)
  * Set TXcom tty parameters from termios.
  */
 int
-txcomparam(tp, t)
-	struct tty *tp;
-	struct termios *t;
+txcomparam(struct tty *tp, struct termios *t)
 {
 	struct txcom_softc *sc = txcom_cd.cd_devs[minor(tp->t_dev)];
 	struct txcom_chip *chip;
@@ -1119,7 +1117,7 @@ txcomparam(tp, t)
 	 * CLOCAL or MDMBUF.  We don't hang up here; we only do that by
 	 * explicit request.
 	 */
-	(void) (*linesw[tp->t_line].l_modem)(tp, chip->sc_dcd);
+	(void) (*tp->t_linesw->l_modem)(tp, chip->sc_dcd);
 
 	/*
 	 * If hardware flow control is disabled, unblock any hard flow 
@@ -1134,9 +1132,47 @@ txcomparam(tp, t)
 	return 0;
 }
 
+int
+txcom_dcd_hook(void *arg, int type, long id, void *msg)
+{
+	struct txcom_softc *sc = arg;
+	struct tty *tp = sc->sc_tty;
+	struct txcom_chip *chip = sc->sc_chip;
+	int modem = !(int)msg; /* p-edge 1, n-edge 0 */
+
+	DPRINTF("DCD %s\n", modem ? "ON" : "OFF");
+		 
+	if (modem && chip->sc_dcd)	
+		(void) (*tp->t_linesw->l_modem)(tp, chip->sc_dcd);
+
+	return 0;
+}
+
+int
+txcom_cts_hook(void *arg, int type, long id, void *msg)
+{
+	struct txcom_softc *sc = arg;
+	struct tty *tp = sc->sc_tty;
+	struct txcom_chip *chip = sc->sc_chip;
+	int clear = !(int)msg; /* p-edge 1, n-edge 0 */
+
+	DPRINTF("CTS %s\n", clear ? "ON"  : "OFF");
+
+	if (chip->sc_msr_cts) {
+		if (!clear) {
+			chip->sc_tx_stopped = 1;
+		} else {
+			chip->sc_tx_stopped = 0;
+			(*tp->t_linesw->l_start)(tp);
+		}
+	}
+
+	return 0;
+}
+
+#ifdef TX39UARTDEBUG
 void
-txcom_dump(chip)
-	struct txcom_chip *chip;
+txcom_dump(struct txcom_chip *chip)
 {
 	tx_chipset_tag_t tc = chip->sc_tc;
 	int slot = chip->sc_slot;
@@ -1144,7 +1180,7 @@ txcom_dump(chip)
 	
 	reg = tx_conf_read(tc, TX39_UARTCTRL1_REG(slot));
 #define ISSETPRINT(r, m) \
-	__is_set_print(r, TX39_UARTCTRL1_##m, #m)
+	dbg_bitmask_print(r, TX39_UARTCTRL1_##m, #m)
 	ISSETPRINT(reg, UARTON);
 	ISSETPRINT(reg, EMPTY);
 	ISSETPRINT(reg, PRXHOLDFULL);
@@ -1166,79 +1202,4 @@ txcom_dump(chip)
 	ISSETPRINT(reg, ENPARITY);
 	ISSETPRINT(reg, ENUART);
 }
-
-/*
- * Compaq-C function.
- */
-#include <hpcmips/tx/tx39iovar.h>
-
-int	__compaq_uart_dcd	__P((void*));
-int	__mobilon_uart_dcd	__P((void*));
-
-int
-__compaq_uart_dcd(arg)
-	void *arg;
-{
-	struct txcom_softc *sc = arg;
-	struct tty *tp = sc->sc_tty;
-	struct txcom_chip *chip = sc->sc_chip;
-	int modem;
-
-	switch (tx39intrvec) {
-	default:
-		return 0;
-	case ((3 << 16) | 30): /* MFIO 30 positive edge */
-		tx39io_portout(chip->sc_tc, TXPORT(TXMFIO, 31), TXON);
-		modem = 1;
-		break;
-	case ((4 << 16) | 30): /* MFIO 30 negative edge */
-		tx39io_portout(chip->sc_tc, TXPORT(TXMFIO, 31), TXOFF);
-		modem = 1;
-		break;
-	case ((3 << 16) | 5): /* MFIO 5 positive edge */
-		tx39io_portout(chip->sc_tc, TXPORT(TXMFIO, 6), TXON);
-		modem = 0;
-		break;
-	case ((4 << 16) | 5): /* MFIO 5 negative edge */
-		tx39io_portout(chip->sc_tc, TXPORT(TXMFIO, 6), TXOFF);
-		modem = 0;
-		break;
-	}
-	
-	if (modem && chip->sc_dcd)	
-		(void) (*linesw[tp->t_line].l_modem)(tp, chip->sc_dcd);
-
-	return 0;
-}
-
-int
-__mobilon_uart_dcd(arg)
-	void *arg;
-{
-	struct txcom_softc *sc = arg;
-	struct tty *tp = sc->sc_tty;
-	struct txcom_chip *chip = sc->sc_chip;
-	int modem;
-
-	switch (tx39intrvec) {
-	default:
-		return 0;
-	case ((5 << 16) | 4): /* IO 4 positive edge */
-		modem = 1;
-		break;
-	case ((5 << 16) | 11): /* IO 4 negative edge */
-		modem = 1;
-		break;
-	case ((5 << 16) | 6): /* IO 6 positive edge */
-		modem = 0;
-		break;
-	case ((5 << 16) | 13): /* IO 6 negative edge */
-		modem = 0;
-		break;
-	}
-	
-	if (modem && chip->sc_dcd)	
-		(void) (*linesw[tp->t_line].l_modem)(tp, chip->sc_dcd);
-
-	return 0;
-}
+#endif /* TX39UARTDEBUG */

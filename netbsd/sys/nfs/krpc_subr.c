@@ -1,4 +1,4 @@
-/*	$NetBSD: krpc_subr.c,v 1.23 1998/08/09 21:19:49 perry Exp $	*/
+/*	$NetBSD: krpc_subr.c,v 1.25 2001/11/10 10:59:08 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon Ross, Adam Glass
@@ -41,6 +41,9 @@
  *      libnetboot/rpc.c
  *               @(#) Header: rpc.c,v 1.12 93/09/28 08:31:56 leres Exp  (LBL)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: krpc_subr.c,v 1.25 2001/11/10 10:59:08 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -241,7 +244,7 @@ krpc_call(sa, prog, vers, func, data, from_p)
 	from = NULL;
 
 	/*
-	 * Create socket and set its recieve timeout.
+	 * Create socket and set its receive timeout.
 	 */
 	if ((error = socreate(AF_INET, &so, SOCK_DGRAM, 0)))
 		goto out;

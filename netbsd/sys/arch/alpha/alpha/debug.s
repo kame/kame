@@ -1,7 +1,7 @@
-/* $NetBSD: debug.s,v 1.5 1999/06/18 18:11:56 thorpej Exp $ */
+/* $NetBSD: debug.s,v 1.8 2001/05/30 15:24:27 lukem Exp $ */
 
 /*-
- * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -37,7 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-__KERNEL_RCSID(6, "$NetBSD: debug.s,v 1.5 1999/06/18 18:11:56 thorpej Exp $")
+__KERNEL_RCSID(6, "$NetBSD: debug.s,v 1.8 2001/05/30 15:24:27 lukem Exp $")
+
+#include "opt_kgdb.h"
 
 /*
  * Debugger glue.
@@ -79,9 +81,9 @@ NESTED_NOPROFILE(alpha_debug, 5, 32, ra, IM_RA|IM_S0, 0)
 	mov	sp, s0
 
 #if defined(MULTIPROCESSOR)
-	/*
-	 * XXX PAUSE ALL OTHER CPUs.
-	 */
+	/* Pause all other CPUs. */
+	ldiq	a0, 1
+	CALL(cpu_pause_resume_all)
 #endif
 
 	/*
@@ -98,15 +100,27 @@ NESTED_NOPROFILE(alpha_debug, 5, 32, ra, IM_RA|IM_S0, 0)
 2:	lda	sp, debug_stack_top	/* sp <- debug_stack_top */
 
 3:	/* Dispatch to the debugger - arguments are already in place. */
+#if defined(KGDB)
+	mov	a3, a0			/* a0 == entry (trap type) */
+	mov	a4, a1			/* a1 == frame pointer */
+	CALL(kgdb_trap)
+	br	9f
+#endif
+#if defined(DDB)
 	CALL(ddb_trap)
-
-	/* Debugger return value in v0; switch back to our previous stack. */
+	br	9f
+#endif
+9:	/* Debugger return value in v0; switch back to our previous stack. */
 	mov	s0, sp
 
 #if defined(MULTIPROCESSOR)
-	/*
-	 * XXX RESUME ALL OTHER CPUs.
-	 */
+	mov	v0, s0
+
+	/* Resume all other CPUs. */
+	mov	zero, a0
+	CALL(cpu_pause_resume_all)
+
+	mov	s0, v0
 #endif
 
 	ldq	ra, (32-8)(sp)		/* restore ra */

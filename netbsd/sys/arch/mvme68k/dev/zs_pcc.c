@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_pcc.c,v 1.8.4.1 2000/10/17 19:52:04 scw Exp $	*/
+/*	$NetBSD: zs_pcc.c,v 1.12 2001/05/31 18:46:09 scw Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -93,12 +93,6 @@ zsc_pcc_match(parent, cf, aux)
 	void *aux;
 {
 	struct pcc_attach_args *pa = aux;
-	int unit;
-
-	/* XXX This is bogus; should fix this. */
-	unit = cf->cf_unit;
-	if (unit < 0 || unit >= NZSC)
-		return (0);
 
 	if (strcmp(pa->pa_name, zsc_cd.cd_name))
 		return (0);
@@ -147,6 +141,9 @@ zsc_pcc_attach(parent, self, aux)
 	 */
 	zs_config(zsc, &zs, PCC_VECBASE + PCCV_ZS, PCLK_147);
 
+	evcnt_attach_dynamic(&zsc->zsc_evcnt, EVCNT_TYPE_INTR,
+	    pccintr_evcnt(zs_level), "rs232", zsc->zsc_dev.dv_xname);
+
 	/*
 	 * Now safe to install interrupt handlers.  Note the arguments
 	 * to the interrupt handlers aren't used.  Note, we only do this
@@ -154,7 +151,7 @@ zsc_pcc_attach(parent, self, aux)
 	 */
 	if (didintr == 0) {
 		didintr = 1;
-		pccintr_establish(PCCV_ZS, zshard_shared, zs_level, zsc);
+		pccintr_establish(PCCV_ZS, zshard_shared, zs_level, zsc, NULL);
 	}
 
 	/* Sanity check the interrupt levels. */
@@ -197,11 +194,11 @@ void
 zsc_pcccninit(cp)
 	struct consdev *cp;
 {
-	bus_space_tag_t bust = MVME68K_INTIO_BUS_SPACE;
 	bus_space_handle_t bush;
 	struct zsdevice zs;
 
-	bus_space_map(bust, MAINBUS_PCC_OFFSET + PCC_ZS0_OFF, 4, 0, &bush);
+	bus_space_map(&_mainbus_space_tag,
+	    intiobase_phys + MAINBUS_PCC_OFFSET + PCC_ZS0_OFF, 4, 0, &bush);
 
 	/* XXX: This is a gross hack. I need to bus-space zs.c ... */
 	zs.zs_chan_b.zc_csr = (volatile u_char *) bush;

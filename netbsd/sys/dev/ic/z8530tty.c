@@ -1,4 +1,4 @@
-/*	$NetBSD: z8530tty.c,v 1.67.4.1 2001/03/16 19:46:52 he Exp $	*/
+/*	$NetBSD: z8530tty.c,v 1.79 2002/03/17 19:40:58 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999
@@ -98,6 +98,11 @@
  * fixing *many* bugs, and substantially improving performance.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: z8530tty.c,v 1.79 2002/03/17 19:40:58 atatat Exp $");
+
+#include "opt_kgdb.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -128,6 +133,7 @@
 #define	ZSTTY_RING_SIZE	2048
 #endif
 
+static struct cnm_state zstty_cnm_state;
 /*
  * Make this an option variable one can patch.
  * But be warned:  this must be a power of 2!
@@ -224,7 +230,7 @@ static void zs_shutdown __P((struct zstty_softc *));
 static void	zsstart __P((struct tty *));
 static int	zsparam __P((struct tty *, struct termios *));
 static void zs_modem __P((struct zstty_softc *, int));
-static void tiocm_to_zs __P((struct zstty_softc *, int, int));
+static void tiocm_to_zs __P((struct zstty_softc *, u_long, int));
 static int  zs_to_tiocm __P((struct zstty_softc *));
 static int    zshwiflow __P((struct tty *, int));
 static void  zs_hwiflow __P((struct zstty_softc *));
@@ -278,6 +284,7 @@ zstty_attach(parent, self, aux)
 	char *i, *o;
 
 	callout_init(&zst->zst_diag_ch);
+	cn_init_magic(&zstty_cnm_state);
 
 	tty_unit = zst->zst_dev.dv_unit;
 	channel = args->channel;
@@ -302,10 +309,13 @@ zstty_attach(parent, self, aux)
 	if ((zst->zst_hwflags & ZS_HWFLAG_CONSOLE_INPUT) != 0) {
 		i = "input";
 		if ((args->hwflags & ZS_HWFLAG_USE_CONSDEV) != 0) {
+			args->consdev->cn_dev = dev;
 			cn_tab->cn_pollc = args->consdev->cn_pollc;
 			cn_tab->cn_getc = args->consdev->cn_getc;
 		}
 		cn_tab->cn_dev = dev;
+		/* Set console magic to BREAK */
+		cn_set_magic("\047\001");
 	}
 	if ((zst->zst_hwflags & ZS_HWFLAG_CONSOLE_OUTPUT) != 0) {
 		o = "output";
@@ -323,7 +333,7 @@ zstty_attach(parent, self, aux)
 		 * Allow kgdb to "take over" this port.  Returns true
 		 * if this serial port is in-use by kgdb.
 		 */
-		printf(" (kgdb)");
+		printf(" (kgdb)\n");
 		/*
 		 * This is the kgdb port (exclusive use)
 		 * so skip the normal attach code.
@@ -391,7 +401,7 @@ zstty_attach(parent, self, aux)
 		zs_modem(zst, 1);
 
 		splx(s);
-	} else {
+	} else if (!ISSET(zst->zst_hwflags, ZS_HWFLAG_NORESET)) {
 		/* Not the console; may need reset. */
 		int reset;
 
@@ -416,14 +426,8 @@ struct tty *
 zstty(dev)
 	dev_t dev;
 {
-	struct zstty_softc *zst;
-	int unit = ZSUNIT(dev);
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(dev));
 
-#ifdef	DIAGNOSTIC
-	if (unit >= zstty_cd.cd_ndevs)
-		panic("zstty");
-#endif
-	zst = zstty_cd.cd_devs[unit];
 	return (zst->zst_tty);
 }
 
@@ -487,18 +491,16 @@ zsopen(dev, flags, mode, p)
 	int mode;
 	struct proc *p;
 {
-	int unit = ZSUNIT(dev);
 	struct zstty_softc *zst;
 	struct zs_chanstate *cs;
 	struct tty *tp;
 	int s, s2;
 	int error;
 
-	if (unit >= zstty_cd.cd_ndevs)
+	zst = device_lookup(&zstty_cd, ZSUNIT(dev));
+	if (zst == NULL)
 		return (ENXIO);
-	zst = zstty_cd.cd_devs[unit];
-	if (zst == 0)
-		return (ENXIO);
+
 	tp = zst->zst_tty;
 	cs = zst->zst_cs;
 
@@ -611,7 +613,7 @@ zsopen(dev, flags, mode, p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error)
 		goto bad;
 
@@ -639,14 +641,14 @@ zsclose(dev, flags, mode, p)
 	int mode;
 	struct proc *p;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(dev));
 	struct tty *tp = zst->zst_tty;
 
 	/* XXX This is for cons.c. */
 	if (!ISSET(tp->t_state, TS_ISOPEN))
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flags);
+	(*tp->t_linesw->l_close)(tp, flags);
 	ttyclose(tp);
 
 	if (!ISSET(tp->t_state, TS_ISOPEN) && tp->t_wopen == 0) {
@@ -670,10 +672,10 @@ zsread(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(dev));
 	struct tty *tp = zst->zst_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flags));
+	return ((*tp->t_linesw->l_read)(tp, uio, flags));
 }
 
 int
@@ -682,10 +684,22 @@ zswrite(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(dev));
 	struct tty *tp = zst->zst_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flags));
+	return ((*tp->t_linesw->l_write)(tp, uio, flags));
+}
+
+int
+zspoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(dev));
+	struct tty *tp = zst->zst_tty;
+
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -696,23 +710,23 @@ zsioctl(dev, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(dev));
 	struct zs_chanstate *cs = zst->zst_cs;
 	struct tty *tp = zst->zst_tty;
 	int error;
 	int s;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 #ifdef	ZS_MD_IOCTL
-	error = ZS_MD_IOCTL;
-	if (error >= 0)
+	error = ZS_MD_IOCTL(cs, cmd, data);
+	if (error != EPASSTHROUGH)
 		return (error);
 #endif	/* ZS_MD_IOCTL */
 
@@ -899,7 +913,7 @@ zsioctl(dev, cmd, data, flag, p)
 		break;
 
 	default:
-		error = ENOTTY;
+		error = EPASSTHROUGH;
 		break;
 	}
 
@@ -915,7 +929,7 @@ static void
 zsstart(tp)
 	struct tty *tp;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(tp->t_dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(tp->t_dev));
 	struct zs_chanstate *cs = zst->zst_cs;
 	int s;
 
@@ -978,7 +992,7 @@ zsstop(tp, flag)
 	struct tty *tp;
 	int flag;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(tp->t_dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(tp->t_dev));
 	int s;
 
 	s = splzs();
@@ -1002,7 +1016,7 @@ zsparam(tp, t)
 	struct tty *tp;
 	struct termios *t;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(tp->t_dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(tp->t_dev));
 	struct zs_chanstate *cs = zst->zst_cs;
 	int ospeed, cflag;
 	u_char tmp3, tmp4, tmp5;
@@ -1231,7 +1245,8 @@ zs_modem(zst, onoff)
 static void
 tiocm_to_zs(zst, how, ttybits)
 	struct zstty_softc *zst;
-	int how, ttybits;
+	u_long how;
+	int ttybits;
 {
 	struct zs_chanstate *cs = zst->zst_cs;
 	u_char zsbits;
@@ -1301,7 +1316,7 @@ zshwiflow(tp, block)
 	struct tty *tp;
 	int block;
 {
-	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(tp->t_dev)];
+	struct zstty_softc *zst = device_lookup(&zstty_cd, ZSUNIT(tp->t_dev));
 	struct zs_chanstate *cs = zst->zst_cs;
 	int s;
 
@@ -1393,6 +1408,7 @@ zstty_rxint(cs)
 			zs_write_csr(cs, ZSWR0_RESET_ERRORS);
 		}
 
+		cn_check_magic(zst->zst_tty->t_dev, c, zstty_cnm_state);
 		put[0] = c;
 		put[1] = rr1;
 		put += 2;
@@ -1502,11 +1518,8 @@ zstty_stint(cs, force)
 	 * Check here for console break, so that we can abort
 	 * even when interrupts are locking up the machine.
 	 */
-	if (ISSET(rr0, ZSRR0_BREAK) &&
-	    ISSET(zst->zst_hwflags, ZS_HWFLAG_CONSOLE_INPUT)) {
-		zs_abort(cs);
-		return;
-	}
+	if (ISSET(rr0, ZSRR0_BREAK))
+		cn_check_magic(zst->zst_tty->t_dev, CNC_BREAK, zstty_cnm_state);
 
 	if (!force)
 		delta = rr0 ^ cs->cs_rr0;
@@ -1602,7 +1615,7 @@ zstty_rxsoft(zst, tp)
 	struct tty *tp;
 {
 	struct zs_chanstate *cs = zst->zst_cs;
-	int (*rint) __P((int c, struct tty *tp)) = linesw[tp->t_line].l_rint;
+	int (*rint) __P((int c, struct tty *tp)) = tp->t_linesw->l_rint;
 	u_char *get, *end;
 	u_int cc, scc;
 	u_char rr1;
@@ -1712,7 +1725,7 @@ zstty_txsoft(zst, tp)
 		CLR(tp->t_state, TS_FLUSH);
 	else
 		ndflush(&tp->t_outq, (int)(zst->zst_tba - tp->t_outq.c_cf));
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 }
 
 integrate void
@@ -1734,14 +1747,14 @@ zstty_stsoft(zst, tp)
 		/*
 		 * Inform the tty layer that carrier detect changed.
 		 */
-		(void) (*linesw[tp->t_line].l_modem)(tp, ISSET(rr0, ZSRR0_DCD));
+		(void) (*tp->t_linesw->l_modem)(tp, ISSET(rr0, ZSRR0_DCD));
 	}
 
 	if (ISSET(delta, cs->cs_rr0_cts)) {
 		/* Block or unblock output according to flow control. */
 		if (ISSET(rr0, cs->cs_rr0_cts)) {
 			zst->zst_tx_stopped = 0;
-			(*linesw[tp->t_line].l_start)(tp);
+			(*tp->t_linesw->l_start)(tp);
 		} else {
 			zst->zst_tx_stopped = 1;
 		}

@@ -1,4 +1,4 @@
-/*	$NetBSD: i2o.h,v 1.9.4.1 2001/10/25 17:53:54 he Exp $	*/
+/*	$NetBSD: i2o.h,v 1.9 2001/09/21 23:44:21 ad Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.

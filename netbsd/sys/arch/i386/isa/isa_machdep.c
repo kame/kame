@@ -1,6 +1,4 @@
-/*	$NetBSD: isa_machdep.c,v 1.48 2000/06/04 21:27:41 mycroft Exp $	*/
-
-#define ISA_DMA_STATS
+/*	$NetBSD: isa_machdep.c,v 1.53 2001/11/18 13:48:00 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -77,6 +75,11 @@
  *	@(#)isa.c	7.2 (Berkeley) 5/13/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isa_machdep.c,v 1.53 2001/11/18 13:48:00 jdolecek Exp $");
+
+#define ISA_DMA_STATS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -96,7 +99,7 @@
 #include <dev/isa/isavar.h>
 #include <i386/isa/icu.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include "mca.h"
 #if NMCA > 0
@@ -120,6 +123,41 @@ static int fakeintr __P((void *));
 static int mca_clockfakeintr __P((void *));
 #endif
 
+/*
+ * Cookie used by ISA dma.  A pointer to one of these it stashed in
+ * the DMA map.
+ */
+struct i386_isa_dma_cookie {
+	int	id_flags;		/* flags; see below */
+
+	/*
+	 * Information about the original buffer used during
+	 * DMA map syncs.  Note that origibuflen is only used
+	 * for ID_BUFTYPE_LINEAR.
+	 */
+	void	*id_origbuf;		/* pointer to orig buffer if
+					   bouncing */
+	bus_size_t id_origbuflen;	/* ...and size */
+	int	id_buftype;		/* type of buffer */
+
+	void	*id_bouncebuf;		/* pointer to the bounce buffer */
+	bus_size_t id_bouncebuflen;	/* ...and size */
+	int	id_nbouncesegs;		/* number of valid bounce segs */
+	bus_dma_segment_t id_bouncesegs[0]; /* array of bounce buffer
+					       physical memory segments */
+};
+
+/* id_flags */
+#define	ID_MIGHT_NEED_BOUNCE	0x01	/* map could need bounce buffers */
+#define	ID_HAS_BOUNCE		0x02	/* map currently has bounce buffers */
+#define	ID_IS_BOUNCING		0x04	/* map is bouncing current xfer */
+
+/* id_buftype */
+#define	ID_BUFTYPE_INVALID	0
+#define	ID_BUFTYPE_LINEAR	1
+#define	ID_BUFTYPE_MBUF		2
+#define	ID_BUFTYPE_UIO		3
+#define	ID_BUFTYPE_RAW		4
 
 int	_isa_bus_dmamap_create __P((bus_dma_tag_t, bus_size_t, int,
 	    bus_size_t, bus_size_t, int, bus_dmamap_t *));
@@ -166,8 +204,8 @@ struct i386_bus_dma_tag isa_bus_dma_tag = {
 };
 
 /*
- * Fill in default interrupt table (in case of spuruious interrupt
- * during configuration of kernel, setup interrupt control unit
+ * Fill in default interrupt table (in case of spurious interrupt
+ * during configuration of kernel), setup interrupt control unit
  */
 void
 isa_defaultirq()
@@ -496,11 +534,18 @@ isa_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
 		if (type == intrtype[irq])
 			break;
 	case IST_PULSE:
-		if (type != IST_NONE)
-			panic("intr_establish: irq %d can't share %s with %s",
-			      irq,
-			      isa_intr_typename(intrtype[irq]),
-			      isa_intr_typename(type));
+		if (type != IST_NONE) {
+			/*
+			 * We can't share interrupts in this case.
+			 */
+#ifdef DEBUG
+			printf("intr_establish: irq %d can't share %s "
+			    "with %s\n", irq,
+			    isa_intr_typename(intrtype[irq]),
+			    isa_intr_typename(type));
+#endif
+			return (NULL);
+		}
 		break;
 	}
 
@@ -690,7 +735,7 @@ _isa_bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	 * 32-bit DMA, and indicate that here.
 	 *
 	 * ...or, there is an opposite case.  The most segments
-	 * a transfer will require is (maxxfer / NBPG) + 1.  If
+	 * a transfer will require is (maxxfer / PAGE_SIZE) + 1.  If
 	 * the caller can't handle that many segments (e.g. the
 	 * ISA DMA controller), we may have to bounce it as well.
 	 */
@@ -701,7 +746,7 @@ _isa_bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	}
 	cookieflags = 0;
 	if (map->_dm_bounce_thresh != 0 ||
-	    ((map->_dm_size / NBPG) + 1) > map->_dm_segcnt) {
+	    ((map->_dm_size / PAGE_SIZE) + 1) > map->_dm_segcnt) {
 		cookieflags |= ID_MIGHT_NEED_BOUNCE;
 		cookiesize += (sizeof(bus_dma_segment_t) * map->_dm_segcnt);
 	}
@@ -1136,7 +1181,7 @@ _isa_dma_alloc_bouncebuf(t, map, size, flags)
 
 	cookie->id_bouncebuflen = round_page(size);
 	error = _isa_bus_dmamem_alloc(t, cookie->id_bouncebuflen,
-	    NBPG, map->_dm_boundary, cookie->id_bouncesegs,
+	    PAGE_SIZE, map->_dm_boundary, cookie->id_bouncesegs,
 	    map->_dm_segcnt, &cookie->id_nbouncesegs, flags);
 	if (error)
 		goto out;

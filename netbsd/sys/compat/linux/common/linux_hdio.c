@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_hdio.c,v 1.1.6.1 2001/03/30 21:39:59 he Exp $	*/
+/*	$NetBSD: linux_hdio.c,v 1.4 2002/03/16 20:43:53 christos Exp $	*/
 
 /*
  * Copyright (c) 2000 Wasabi Systems, Inc.
@@ -34,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_hdio.c,v 1.4 2002/03/16 20:43:53 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -76,9 +79,7 @@ linux_ioctl_hdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	struct linux_hd_big_geometry hdg_big;
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -92,8 +93,8 @@ linux_ioctl_hdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	switch (com) {
 	case LINUX_HDIO_OBSOLETE_IDENTITY:
 	case LINUX_HDIO_GET_IDENTITY:
-		sg = stackgap_init(p->p_emul);
-		atap = stackgap_alloc(&sg, DEV_BSIZE);
+		sg = stackgap_init(p, 0);
+		atap = stackgap_alloc(p, &sg, DEV_BSIZE);
 		if (atap == NULL) {
 			error = ENOMEM;
 			break;

@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.54 2000/05/28 05:49:04 thorpej Exp $ */
+/*	$NetBSD: vm_machdep.c,v 1.62 2001/12/30 18:52:54 pk Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -59,8 +59,7 @@
 #include <sys/vnode.h>
 #include <sys/map.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/frame.h>
@@ -83,15 +82,13 @@ pagemove(from, to, size)
 	while (size > 0) {
 		if (pmap_extract(pmap_kernel(), (vaddr_t)from, &pa) == FALSE)
 			panic("pagemove 2");
-		pmap_remove(pmap_kernel(),
-		    (vaddr_t)from, (vaddr_t)from + PAGE_SIZE);
-		pmap_enter(pmap_kernel(),
-		    (vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE,
-		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+		pmap_kremove((vaddr_t)from, PAGE_SIZE);
+		pmap_kenter_pa((vaddr_t)to, pa, VM_PROT_READ | VM_PROT_WRITE);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 
@@ -145,6 +142,7 @@ vmapbuf(bp, len)
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	} while (len);
+	pmap_update(kpmap);
 }
 
 /*
@@ -164,8 +162,8 @@ vunmapbuf(bp, len)
 	kva = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - kva;
 	len = round_page(off + len);
-
-	/* This will call pmap_remove() for us. */
+	pmap_remove(vm_map_pmap(kernel_map), kva, kva + len);
+	pmap_update(vm_map_pmap(kernel_map));
 	uvm_km_free_wakeup(kernel_map, kva, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = NULL;
@@ -265,18 +263,16 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	if (stack != NULL)
 		tf2->tf_out[6] = (u_int)stack + stacksize;
 
-	/* Duplicate efforts of syscall(), but slightly differently */
-	if (tf2->tf_global[1] & SYSCALL_G2RFLAG) {
-		/* jmp %g2 (or %g7, deprecated) on success */
-		tf2->tf_npc = tf2->tf_global[2];
-	} else {
-		/*
-		 * old system call convention: clear C on success
-		 * note: proc_trampoline() sets a fresh psr when
-		 * returning to user mode.
-		 */
-		/*tf2->tf_psr &= ~PSR_C;   -* success */
-	}
+	/*
+	 * The fork system call always uses the old system call
+	 * convention; clear carry and skip trap instruction as
+	 * in syscall().
+	 * note: proc_trampoline() sets a fresh psr when returning
+	 * to user mode.
+	 */
+	/*tf2->tf_psr &= ~PSR_C;   -* success */
+	tf2->tf_pc = tf2->tf_npc;
+	tf2->tf_npc = tf2->tf_pc + 4;
 
 	/* Set return values in child mode */
 	tf2->tf_out[0] = 0;
@@ -291,7 +287,6 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	npcb->pcb_sp = (int)rp;
 	npcb->pcb_psr &= ~PSR_CWP;	/* Run in window #0 */
 	npcb->pcb_wim = 1;		/* Fence at window #1 */
-
 }
 
 /*

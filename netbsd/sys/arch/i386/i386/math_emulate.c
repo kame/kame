@@ -1,4 +1,4 @@
-/*	$NetBSD: math_emulate.c,v 1.21 1999/04/22 00:23:33 fvdl Exp $	*/
+/*	$NetBSD: math_emulate.c,v 1.24 2001/11/15 07:03:30 lukem Exp $	*/
 
 /*
  * expediant "port" of linux 8087 emulator to 386BSD, with apologies -wfj
@@ -36,6 +36,9 @@
  * hide most of the 387-specific things here.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: math_emulate.c,v 1.24 2001/11/15 07:03:30 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -72,6 +75,7 @@ int
 math_emulate(info)
 	struct trapframe *info;
 {
+	struct proc *p = curproc;
 	u_short cw, code;
 	temp_real tmp;
 	char * address;
@@ -86,10 +90,13 @@ math_emulate(info)
 
 	/* ever used fp? */
 	if ((curproc->p_md.md_flags & MDP_USEDFPU) == 0) {
-		cw = curproc->p_addr->u_pcb.pcb_savefpu.sv_env.en_cw;
+		if (i386_use_fxsave)
+			cw = p->p_addr->u_pcb.pcb_savefpu.sv_xmm.sv_env.en_cw;
+		else
+			cw = p->p_addr->u_pcb.pcb_savefpu.sv_87.sv_env.en_cw;
 		fninit();
 		I387.cwd = cw;
-		curproc->p_md.md_flags |= MDP_USEDFPU;
+		p->p_md.md_flags |= MDP_USEDFPU;
 	}
 
 	if (I387.cwd & I387.swd & 0x3f)
@@ -109,7 +116,6 @@ math_emulate(info)
 		switch (prefix) {
 		case INSPREF_LOCK:
 			math_abort(info, SIGILL);
-			break;
 		case INSPREF_REPN:
 		case INSPREF_REPE:
 			break;
@@ -129,7 +135,6 @@ math_emulate(info)
 			break;
 		case -1:
 			math_abort(info,SIGSEGV);
-			break;
 		default:
 			goto done;
 		}
@@ -369,8 +374,6 @@ done:
 	case 0xf8: /* XXX */
 		printf("ffree not implemented\n\r");
 		math_abort(info,SIGILL);
-		fpop();
-		return(0);
 	case 0xf9: /* XXX */
 		fxchg(&ST(0),&ST(code & 7));
 		return(0);

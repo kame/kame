@@ -1,4 +1,4 @@
-/*	$NetBSD: db_interface.c,v 1.29.4.1 2001/06/17 22:26:49 he Exp $	*/
+/*	$NetBSD: db_interface.c,v 1.35 2002/05/14 02:58:35 matt Exp $	*/
 
 /* 
  * Mach Operating System
@@ -31,6 +31,10 @@
 /*
  * Interface to new debugger.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.35 2002/05/14 02:58:35 matt Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -38,7 +42,7 @@
 #include <sys/reboot.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
 
@@ -52,11 +56,11 @@
 #include <ddb/db_output.h>
 #include <ddb/ddbvar.h>
 
-extern label_t	*db_recover;
 extern char *trap_type[];
 extern int trap_types;
 
 int	db_active = 0;
+db_regs_t ddb_regs;	/* register state */
 
 void kdbprinttrap __P((int, int));
 
@@ -113,6 +117,12 @@ kdb_trap(type, code, regs)
 		asm("movw %%ss,%w0" : "=r" (ddb_regs.tf_ss));
 	}
 
+	ddb_regs.tf_cs &= 0xffff;
+	ddb_regs.tf_ds &= 0xffff;
+	ddb_regs.tf_es &= 0xffff;
+	ddb_regs.tf_fs &= 0xffff;		
+	ddb_regs.tf_gs &= 0xffff;
+	ddb_regs.tf_ss &= 0xffff;
 	s = splhigh();
 	db_active++;
 	cnpollc(TRUE);

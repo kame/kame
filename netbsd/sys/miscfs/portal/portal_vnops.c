@@ -1,4 +1,4 @@
-/*	$NetBSD: portal_vnops.c,v 1.36 2000/06/05 17:21:38 thorpej Exp $	*/
+/*	$NetBSD: portal_vnops.c,v 1.41 2001/12/06 04:27:42 chs Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -43,10 +43,12 @@
  * Portal Filesystem
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: portal_vnops.c,v 1.41 2001/12/06 04:27:42 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/proc.h>
 #include <sys/filedesc.h>
@@ -84,7 +86,6 @@ int	portal_setattr	__P((void *));
 #define	portal_fcntl	genfs_fcntl
 #define	portal_ioctl	genfs_enoioctl
 #define	portal_poll	genfs_eopnotsupp
-#define	portal_mmap	genfs_eopnotsupp
 #define portal_revoke	genfs_revoke
 #define	portal_fsync	genfs_nullop
 #define	portal_seek	genfs_seek
@@ -113,9 +114,10 @@ int	portal_pathconf	__P((void *));
 #define	portal_truncate	genfs_eopnotsupp
 #define	portal_update	genfs_eopnotsupp
 #define	portal_bwrite	genfs_eopnotsupp
+#define	portal_putpages	genfs_null_putpages
 
 int (**portal_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, portal_lookup },		/* lookup */
 	{ &vop_create_desc, portal_create },		/* create */
@@ -131,7 +133,6 @@ struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, portal_ioctl },		/* ioctl */
 	{ &vop_poll_desc, portal_poll },		/* poll */
 	{ &vop_revoke_desc, portal_revoke },		/* revoke */
-	{ &vop_mmap_desc, portal_mmap },		/* mmap */
 	{ &vop_fsync_desc, portal_fsync },		/* fsync */
 	{ &vop_seek_desc, portal_seek },		/* seek */
 	{ &vop_remove_desc, portal_remove },		/* remove */
@@ -159,9 +160,10 @@ struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
 	{ &vop_truncate_desc, portal_truncate },	/* truncate */
 	{ &vop_update_desc, portal_update },		/* update */
 	{ &vop_bwrite_desc, portal_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, portal_putpages },	/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc portal_vnodeop_opv_desc =
+const struct vnodeopv_desc portal_vnodeop_opv_desc =
 	{ &portal_vnodeop_p, portal_vnodeop_entries };
 
 static void

@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_descrip.c,v 1.5 1999/06/26 01:24:41 cgd Exp $ */
+/* $NetBSD: osf1_descrip.c,v 1.14 2002/03/16 20:43:55 christos Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -57,6 +57,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: osf1_descrip.c,v 1.14 2002/03/16 20:43:55 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -78,7 +81,6 @@
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/wait.h>
-#include <vm/vm.h>
 
 #include <compat/osf1/osf1.h>
 #include <compat/osf1/osf1_syscallargs.h>
@@ -98,7 +100,7 @@ osf1_sys_fcntl(p, v, retval)
 	caddr_t sg;
 	int error;
 
-	sg = stackgap_init(p->p_emul);
+	sg = stackgap_init(p, 0);
 
 	SCARG(&a, fd) = SCARG(uap, fd);
 
@@ -149,7 +151,7 @@ osf1_sys_fcntl(p, v, retval)
 			SCARG(&a, cmd) = F_SETLK;
 		else if (SCARG(uap, cmd) == OSF1_F_SETLKW)
 			SCARG(&a, cmd) = F_SETLKW;
-		SCARG(&a, arg) = stackgap_alloc(&sg, sizeof nflock);
+		SCARG(&a, arg) = stackgap_alloc(p, &sg, sizeof nflock);
 
 		error = copyin(SCARG(uap, arg), &oflock, sizeof oflock);
 		if (error == 0)
@@ -243,33 +245,49 @@ osf1_sys_fstat(p, v, retval)
 	struct osf1_stat oub;
 	int error;
 
-	if ((unsigned)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);
+	error = (*fp->f_ops->fo_stat)(fp, &ub, p);
+	FILE_UNUSE(fp, p);
 
-	switch (fp->f_type) {
-
-	case DTYPE_VNODE:
-		error = vn_stat((struct vnode *)fp->f_data, &ub, p);
-		break;
-
-	case DTYPE_SOCKET:
-		error = soo_stat((struct socket *)fp->f_data, &ub);
-		break;
-
-	default:
-		panic("ofstat");
-		/*NOTREACHED*/
-	}
 	osf1_cvt_stat_from_native(&ub, &oub);
 	if (error == 0)
 		error = copyout((caddr_t)&oub, (caddr_t)SCARG(uap, sb),
 		    sizeof (oub));
 
+	return (error);
+}
+
+/*
+ * Return status information about a file descriptor.
+ */
+int
+osf1_sys_fstat2(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct osf1_sys_fstat2_args *uap = v;
+	struct filedesc *fdp = p->p_fd;
+	struct file *fp;
+	struct stat ub;
+	struct osf1_stat2 oub;
+	int error;
+
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
+		return (EBADF);
+
+	FILE_USE(fp);
+	error = (*fp->f_ops->fo_stat)(fp, &ub, p);
 	FILE_UNUSE(fp, p);
+
+	osf1_cvt_stat2_from_native(&ub, &oub);
+	if (error == 0)
+		error = copyout((caddr_t)&oub, (caddr_t)SCARG(uap, sb),
+		    sizeof (oub));
+
 	return (error);
 }
 

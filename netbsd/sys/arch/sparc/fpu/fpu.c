@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.c,v 1.7.2.1 2000/08/07 01:30:31 mrg Exp $ */
+/*	$NetBSD: fpu.c,v 1.15 2002/01/19 03:30:54 eeh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -136,6 +136,7 @@ fpu_cleanup(p, fs)
 		break;
 
 	case FSR_TT_IEEE:
+		DPRINTF(FPE_INSN, ("fpu_cleanup: FSR_TT_IEEE\n"));
 		/* XXX missing trap address! */
 		if ((i = fsr & FSR_CX) == 0)
 			panic("fpu ieee trap, but no exception");
@@ -143,6 +144,7 @@ fpu_cleanup(p, fs)
 		break;		/* XXX should return, but queue remains */
 
 	case FSR_TT_UNFIN:
+		DPRINTF(FPE_INSN, ("fpu_cleanup: FSR_TT_UNFIN\n"));
 #ifdef SUN4U
 		if (fs->fs_qsize == 0) {
 			printf("fpu_cleanup: unfinished fpop");
@@ -153,6 +155,7 @@ fpu_cleanup(p, fs)
 
 #endif /* SUN4U */
 	case FSR_TT_UNIMP:
+		DPRINTF(FPE_INSN, ("fpu_cleanup: FSR_TT_UNIMP\n"));
 		if (fs->fs_qsize == 0)
 			panic("fpu_cleanup: unimplemented fpop");
 		break;
@@ -162,6 +165,7 @@ fpu_cleanup(p, fs)
 		/* NOTREACHED */
 
 	case FSR_TT_HWERR:
+		DPRINTF(FPE_INSN, ("fpu_cleanup: FSR_TT_HWERR\n"));
 		log(LOG_ERR, "fpu hardware error (%s[%d])\n",
 		    p->p_comm, p->p_pid);
 		uprintf("%s[%d]: fpu hardware error\n", p->p_comm, p->p_pid);
@@ -195,7 +199,7 @@ fpu_cleanup(p, fs)
 		case NOTFPU:
 #ifdef SUN4U
 #ifdef DEBUG
-			printf("fpu_cleanup: not an FPU error -- sending SIGILL\n", p);
+			printf("fpu_cleanup: not an FPU error -- sending SIGILL\n");
 			Debugger();
 #endif
 #endif /* SUN4U */
@@ -293,14 +297,34 @@ fpu_execute(fe, instr)
 	 * squish them out here.
 	 */
 	opf = instr.i_opf.i_opf;
+	/*
+	 * The low two bits of the opf field for floating point insns usually
+	 * correspond to the operation width:
+	 *
+	 *	0:	Invalid
+	 *	1:	Single precision float
+	 *	2:	Double precision float
+	 *	3:	Quad precision float
+	 *
+	 * The exceptions are the integer to float conversion instructions.
+	 *
+	 * For double and quad precision, the low bit if the rs or rd field
+	 * is actually the high bit of the register number.
+	 */
+
 	type = opf & 3;
-	mask = "\0\0\1\3"[type];
-	rs1 = instr.i_opf.i_rs1 & ~mask;
-	rs2 = instr.i_opf.i_rs2 & ~mask;
-	rd = instr.i_opf.i_rd & ~mask;
-#ifdef notdef
+	mask = 0x3 >> (3 - type);
+
+	rs1 = instr.i_opf.i_rs1;
+	rs1 = (rs1 & ~mask) | ((rs1 & mask & 0x1) << 5);
+	rs2 = instr.i_opf.i_rs2;
+	rs2 = (rs2 & ~mask) | ((rs2 & mask & 0x1) << 5);
+	rd = instr.i_opf.i_rd;
+	rd = (rd & ~mask) | ((rd & mask & 0x1) << 5);
+#ifdef DIAGNOSTIC
 	if ((rs1 | rs2 | rd) & mask)
-		return (BADREG);
+		/* This may be an FPU insn but it is illegal. */
+		return (NOTFPU);
 #endif
 	fs = fe->fe_fpstate;
 	fe->fe_fsr = fs->fs_fsr & ~FSR_CX;
@@ -308,7 +332,7 @@ fpu_execute(fe, instr)
 #ifdef SUN4U
 	/*
 	 * Check to see if we're dealing with a fancy cmove and handle
-	 * it first.
+	 * it first.  
 	 */
 	if (instr.i_op3.i_op3 == IOP3_FPop2 && (opf&0xff0) != (FCMP&0xff0)) {
 		switch (opf >>= 2) {
@@ -431,9 +455,9 @@ fpu_execute(fe, instr)
 #ifndef SUN4U
 		fs->fs_regs[rd] = rs1;
 #else /* SUN4U */
-		i = 1<<type;
+		i = 1<<(type-1);
 		fs->fs_regs[rd++] = rs1;
-		while (--i) 
+		while (--i > 0) 
 			fs->fs_regs[rd++] = fs->fs_regs[++rs2];
 #endif /* SUN4U */
 		fs->fs_fsr = fe->fe_fsr;
@@ -525,23 +549,32 @@ fpu_execute(fe, instr)
 		break;
 
 	case FTOX >> 2:
-		DPRINTF(FPE_INSN, ("fpu_execute: FTOx\n"));
+		DPRINTF(FPE_INSN, ("fpu_execute: FTOX\n"));
 		fpu_explode(fe, fp = &fe->fe_f1, type, rs2);
 		type = FTYPE_LNG;
+		/* Recalculate destination register */
+		rd = instr.i_opf.i_rd;
 		break;
+
 #endif /* SUN4U */
+	case FTOI >> 2:
+		DPRINTF(FPE_INSN, ("fpu_execute: FTOI\n"));
+		fpu_explode(fe, fp = &fe->fe_f1, type, rs2);
+		type = FTYPE_INT;
+		/* Recalculate destination register */
+		rd = instr.i_opf.i_rd;
+		break;
 
 	case FTOS >> 2:
 	case FTOD >> 2:
-#ifndef SUN4U
-	case FTOX >> 2:
-#else /* SUN4U */
 	case FTOQ >> 2:
-#endif /* SUN4U */
-	case FTOI >> 2:
 		DPRINTF(FPE_INSN, ("fpu_execute: FTOx\n"));
 		fpu_explode(fe, fp = &fe->fe_f1, type, rs2);
+		/* Recalculate rd with correct type info. */
 		type = opf & 3;	/* sneaky; depends on instruction encoding */
+		mask = 0x3 >> (3 - type);
+		rd = instr.i_opf.i_rd;
+		rd = (rd & ~mask) | ((rd & mask & 0x1) << 5);
 		break;
 	}
 
@@ -566,12 +599,14 @@ fpu_execute(fe, instr)
 		fsr |= (cx << FSR_CX_SHIFT) | (cx << FSR_AX_SHIFT);
 	}
 	fs->fs_fsr = fsr;
+	DPRINTF(FPE_REG, ("-> %c%d\n", (type == FTYPE_LNG) ? 'x' :
+		((type == FTYPE_INT) ? 'i' :
+			((type == FTYPE_SNG) ? 's' :
+				((type == FTYPE_DBL) ? 'd' :
+					((type == FTYPE_EXT) ? 'q' : '?')))),
+		rd));
 	fs->fs_regs[rd] = space[0];
-	if (type >= FTYPE_DBL
-#ifdef SUN4U
-	    || type == FTYPE_LNG
-#endif /* SUN4U */
-	    ) {
+	if (type >= FTYPE_DBL || type == FTYPE_LNG) {
 		fs->fs_regs[rd + 1] = space[1];
 		if (type > FTYPE_DBL) {
 			fs->fs_regs[rd + 2] = space[2];

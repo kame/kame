@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_readwrite.c,v 1.12 2000/05/13 23:43:13 perseant Exp $	*/
+/*	$NetBSD: ext2fs_readwrite.c,v 1.24 2002/03/25 02:23:55 chs Exp $	*/
 
 /*-
  * Copyright (c) 1997 Manuel Bouyer.
@@ -37,6 +37,9 @@
  * Modified for ext2fs by Manuel Bouyer.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_readwrite.c,v 1.24 2002/03/25 02:23:55 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/resourcevar.h>
@@ -51,11 +54,6 @@
 #include <sys/malloc.h>
 #include <sys/signalvar.h>
 
-#include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
-
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ext2fs/ext2fs.h>
 #include <ufs/ext2fs/ext2fs_extern.h>
@@ -83,6 +81,8 @@ ext2fs_read(v)
 	struct uio *uio;
 	struct m_ext2fs *fs;
 	struct buf *bp;
+	void *win;
+	vsize_t bytelen;
 	ufs_daddr_t lbn, nextlbn;
 	off_t bytesinfile;
 	long size, xfersize, blkoffset;
@@ -110,6 +110,28 @@ ext2fs_read(v)
 		return (EFBIG);
 	if (uio->uio_resid == 0)
 		return (0);
+	if (uio->uio_offset >= ip->i_e2fs_size)
+		return (0);
+
+	if (vp->v_type == VREG) {
+		error = 0;
+		while (uio->uio_resid > 0) {
+			bytelen = MIN(ip->i_e2fs_size - uio->uio_offset,
+			    uio->uio_resid);
+
+			if (bytelen == 0) {
+				break;
+			}
+			win = ubc_alloc(&vp->v_uobj, uio->uio_offset,
+			    &bytelen, UBC_READ);
+			error = uiomove(win, bytelen, uio);
+			ubc_release(win, 0);
+			if (error) {
+				break;
+			}
+		}
+		goto out;
+	}
 
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
 		if ((bytesinfile = ip->i_e2fs_size - uio->uio_offset) <= 0)
@@ -126,18 +148,13 @@ ext2fs_read(v)
 
 		if (lblktosize(fs, nextlbn) >= ip->i_e2fs_size)
 			error = bread(vp, lbn, size, NOCRED, &bp);
-		else if (doclusterread)
-			error = cluster_read(vp,
-				ip->i_e2fs_size, lbn, size, NOCRED, &bp);
-		else if (lbn - 1 == vp->v_lastr) {
+		else {
 			int nextsize = fs->e2fs_bsize;
 			error = breadn(vp, lbn,
 				size, &nextlbn, &nextsize, 1, NOCRED, &bp);
-		} else
-			error = bread(vp, lbn, size, NOCRED, &bp);
+		}
 		if (error)
 			break;
-		vp->v_lastr = lbn;
 
 		/*
 		 * We should only get non-zero b_resid when an I/O error
@@ -152,14 +169,15 @@ ext2fs_read(v)
 				break;
 			xfersize = size;
 		}
-		error = uiomove((char *)bp->b_data + blkoffset, (int)xfersize,
-				uio);
+		error = uiomove((char *)bp->b_data + blkoffset, xfersize, uio);
 		if (error)
 			break;
 		brelse(bp);
 	}
 	if (bp != NULL)
 		brelse(bp);
+
+out:
 	if (!(vp->v_mount->mnt_flag & MNT_NOATIME)) {
 		ip->i_flag |= IN_ACCESS;
 		if ((ap->a_ioflag & IO_SYNC) == IO_SYNC)
@@ -189,12 +207,17 @@ ext2fs_write(v)
 	struct proc *p;
 	ufs_daddr_t lbn;
 	off_t osize;
-	int blkoffset, error, flags, ioflag, resid, size, xfersize;
+	int blkoffset, error, flags, ioflag, resid, xfersize;
+	vsize_t bytelen;
+	void *win;
+	off_t oldoff;
+	boolean_t async;
 
 	ioflag = ap->a_ioflag;
 	uio = ap->a_uio;
 	vp = ap->a_vp;
 	ip = VTOI(vp);
+	error = 0;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_WRITE)
@@ -235,66 +258,117 @@ ext2fs_write(v)
 		psignal(p, SIGXFSZ);
 		return (EFBIG);
 	}
+	if (uio->uio_resid == 0)
+		return (0);
 
+	async = vp->v_mount->mnt_flag & MNT_ASYNC;
 	resid = uio->uio_resid;
 	osize = ip->i_e2fs_size;
-	flags = ioflag & IO_SYNC ? B_SYNC : 0;
 
+	if (vp->v_type == VREG) {
+		while (uio->uio_resid > 0) {
+			oldoff = uio->uio_offset;
+			blkoffset = blkoff(fs, uio->uio_offset);
+			bytelen = MIN(fs->e2fs_bsize - blkoffset,
+			    uio->uio_resid);
+
+			error = ext2fs_balloc_range(vp, uio->uio_offset,
+			    bytelen, ap->a_cred, 0);
+			if (error) {
+				break;
+			}
+			win = ubc_alloc(&vp->v_uobj, uio->uio_offset,
+			    &bytelen, UBC_WRITE);
+			error = uiomove(win, bytelen, uio);
+			ubc_release(win, 0);
+			if (error) {
+				break;
+			}
+
+			/*
+			 * update UVM's notion of the size now that we've
+			 * copied the data into the vnode's pages.
+			 */
+
+			if (vp->v_size < uio->uio_offset) {
+				uvm_vnp_setsize(vp, uio->uio_offset);
+			}
+
+			/*
+			 * flush what we just wrote if necessary.
+			 * XXXUBC simplistic async flushing.
+			 */
+
+			if (!async && oldoff >> 16 != uio->uio_offset >> 16) {
+				simple_lock(&vp->v_interlock);
+				error = VOP_PUTPAGES(vp, (oldoff >> 16) << 16,
+				    (uio->uio_offset >> 16) << 16, PGO_CLEANIT);
+			}
+		}
+		if (error == 0 && ioflag & IO_SYNC) {
+			simple_lock(&vp->v_interlock);
+			error = VOP_PUTPAGES(vp, trunc_page(oldoff),
+			    round_page(blkroundup(fs, uio->uio_offset)),
+			    PGO_CLEANIT | PGO_SYNCIO);
+		}
+
+		goto out;
+	}
+
+	flags = ioflag & IO_SYNC ? B_SYNC : 0;
 	for (error = 0; uio->uio_resid > 0;) {
 		lbn = lblkno(fs, uio->uio_offset);
 		blkoffset = blkoff(fs, uio->uio_offset);
-		xfersize = fs->e2fs_bsize - blkoffset;
-		if (uio->uio_resid < xfersize)
-			xfersize = uio->uio_resid;
-		if (fs->e2fs_bsize > xfersize)
+		xfersize = MIN(fs->e2fs_bsize - blkoffset, uio->uio_resid);
+		if (xfersize < fs->e2fs_bsize)
 			flags |= B_CLRBUF;
 		else
 			flags &= ~B_CLRBUF;
-
 		error = ext2fs_balloc(ip,
-			lbn, blkoffset + xfersize, ap->a_cred, &bp, flags);
+		    lbn, blkoffset + xfersize, ap->a_cred, &bp, flags);
 		if (error)
 			break;
-		if (uio->uio_offset + xfersize > ip->i_e2fs_size) {
+		if (ip->i_e2fs_size < uio->uio_offset + xfersize) {
 			ip->i_e2fs_size = uio->uio_offset + xfersize;
-			uvm_vnp_setsize(vp, ip->i_e2fs_size);
 		}
-		(void)uvm_vnp_uncache(vp);
+		error = uiomove((char *)bp->b_data + blkoffset, xfersize, uio);
 
-		size = fs->e2fs_bsize - bp->b_resid;
-		if (size < xfersize)
-			xfersize = size;
+		/*
+		 * update UVM's notion of the size now that we've
+		 * copied the data into the vnode's pages.
+		 */
 
-		error =
-			uiomove((char *)bp->b_data + blkoffset, (int)xfersize, uio);
+		if (vp->v_size < uio->uio_offset) {
+			uvm_vnp_setsize(vp, uio->uio_offset);
+		}
+
 		if (ioflag & IO_SYNC)
 			(void)bwrite(bp);
 		else if (xfersize + blkoffset == fs->e2fs_bsize)
-			if (doclusterwrite)
-				cluster_write(bp, ip->i_e2fs_size);
-			else
-				bawrite(bp);
+			bawrite(bp);
 		else
 			bdwrite(bp);
 		if (error || xfersize == 0)
 			break;
-		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
+
 	/*
 	 * If we successfully wrote any data, and we are not the superuser
 	 * we clear the setuid and setgid bits as a precaution against
 	 * tampering.
 	 */
+
+out:
+	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	if (resid > uio->uio_resid && ap->a_cred && ap->a_cred->cr_uid != 0)
 		ip->i_e2fs_mode &= ~(ISUID | ISGID);
 	if (error) {
-		if (ioflag & IO_UNIT) {
-			(void)VOP_TRUNCATE(vp, osize,
-				ioflag & IO_SYNC, ap->a_cred, uio->uio_procp);
-			uio->uio_offset -= resid - uio->uio_resid;
-			uio->uio_resid = resid;
-		}
+		(void) VOP_TRUNCATE(vp, osize, ioflag & IO_SYNC, ap->a_cred,
+		    uio->uio_procp);
+		uio->uio_offset -= resid - uio->uio_resid;
+		uio->uio_resid = resid;
 	} else if (resid > uio->uio_resid && (ioflag & IO_SYNC) == IO_SYNC)
 		error = VOP_UPDATE(vp, NULL, NULL, UPDATE_WAIT);
+	KASSERT(vp->v_size == ip->i_e2fs_size);
 	return (error);
 }

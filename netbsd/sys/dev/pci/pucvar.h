@@ -1,4 +1,4 @@
-/*	$NetBSD: pucvar.h,v 1.2.18.1 2001/03/22 01:53:00 he Exp $	*/
+/*	$NetBSD: pucvar.h,v 1.4 2001/01/03 15:13:15 bouyer Exp $	*/
 
 /*
  * Copyright (c) 1998, 1999 Christopher G. Demetriou.  All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space_sparse.c,v 1.1 2000/06/09 05:14:44 soda Exp $	*/
+/*	$NetBSD: bus_space_sparse.c,v 1.6 2001/09/10 21:19:31 chris Exp $	*/
 /*	NetBSD: bus_machdep.c,v 1.1 2000/01/26 18:48:00 drochner Exp 	*/
 
 /*-
@@ -50,9 +50,6 @@
 #include <sys/malloc.h>
 #include <sys/extent.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
 #include <uvm/uvm_extern.h>
 
 #include <mips/cpuregs.h>
@@ -131,11 +128,12 @@ arc_sparse_bus_space_compose_handle(bst, addr, size, flags, bshp)
 		    vaddr = uvm_km_valloc(kernel_map, (vsize_t)(end - start));
 
 		if (vaddr == NULL)
-			panic("arc_bus_space_compose_handle: "
+			panic("arc_sparse_bus_space_compose_handle: "
 			      "cannot allocate KVA 0x%llx..0x%llx",
 			      start, end);
 		for (va = vaddr; start < end; start += NBPG, va += NBPG)
 			pmap_kenter_pa(va, start, VM_PROT_READ|VM_PROT_WRITE);
+		pmap_update(pmap_kernel());
 		vaddr += (offset & PGOFSET);
 		if (cacheable)
 			arc_kseg2_make_cacheable(vaddr, size);

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.13.4.2 2000/10/25 16:38:11 tv Exp $	*/
+/*	$NetBSD: if_le.c,v 1.21 2002/03/20 20:39:15 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le.c,v 1.21 2002/03/20 20:39:15 eeh Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -98,7 +101,7 @@ struct cfattach le_sbus_ca = {
 
 extern struct cfdriver le_cd;
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -181,7 +184,6 @@ leattach_sbus(parent, self, aux)
 			 sa->sa_slot,
 			 sa->sa_offset,
 			 sa->sa_size,
-			 BUS_SPACE_MAP_LINEAR,
 			 0, &lesc->sc_reg) != 0) {
 		printf("%s @ sbus: cannot map registers\n", self->dv_xname);
 		return;
@@ -210,7 +212,7 @@ leattach_sbus(parent, self, aux)
 		lebuf->attached = 1;
 
 		/* That old black magic... */
-		sc->sc_conf3 = getpropint(sa->sa_node,
+		sc->sc_conf3 = PROM_getpropint(sa->sa_node,
 					  "busmaster-regval",
 					  LE_C3_BSWP | LE_C3_ACON | LE_C3_BCON);
 		break;

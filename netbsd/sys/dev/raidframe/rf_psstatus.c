@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_psstatus.c,v 1.5 2000/01/08 22:57:31 oster Exp $	*/
+/*	$NetBSD: rf_psstatus.c,v 1.8 2001/11/13 07:11:16 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -36,7 +36,11 @@
  *
  *****************************************************************************/
 
-#include "rf_types.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_psstatus.c,v 1.8 2001/11/13 07:11:16 lukem Exp $");
+
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_raid.h"
 #include "rf_general.h"
 #include "rf_debugprint.h"
@@ -303,7 +307,7 @@ rf_AllocPSStatus(raidPtr)
 
 	RF_FREELIST_GET_INIT_ARG(raidPtr->pss_freelist, p, next, (RF_ReconParityStripeStatus_t *), init_pss, raidPtr);
 	if (p) {
-		bzero(p->issued, raidPtr->numCol);
+		memset(p->issued, 0, raidPtr->numCol);
 	}
 	p->next = NULL;
 	/* no need to initialize here b/c the only place we're called from is

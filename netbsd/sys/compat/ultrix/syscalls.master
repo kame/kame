@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.32 1999/07/30 16:03:49 drochner Exp $
+	$NetBSD: syscalls.master,v 1.37 2001/05/30 11:37:33 mrg Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -31,9 +31,10 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 ; #include's are copied to the syscall names and switch definition files only.
 
+#if defined(_KERNEL_OPT)
 #include "opt_nfsserver.h"
-
 #include "fs_nfs.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,6 +42,8 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 #include <compat/ultrix/ultrix_syscallargs.h>
+
+%%
 
 0	NOARGS		{ int sys_nosys(void); } syscall
 1	NOARGS		{ int sys_exit(int rval); }
@@ -65,7 +68,7 @@
 18	OBSOL		stat
 19	NOARGS		{ long compat_43_sys_lseek(int fd, long offset, \
 			    int whence); }
-20	NOARGS		{ pid_t sys_getpid(void); }
+20	NOARGS MPSAFE	{ pid_t sys_getpid(void); }
 21	STD		{ int ultrix_sys_mount(char *special, char *dir, \
 			     int rdonly, int type, caddr_t data); }
 22	OBSOL		sysV_unmount

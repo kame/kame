@@ -1,4 +1,4 @@
-/*	$NetBSD: sdvar.h,v 1.12 2000/05/23 10:20:15 bouyer Exp $	*/
+/*	$NetBSD: sdvar.h,v 1.16 2002/01/09 04:12:12 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -53,12 +53,19 @@
  * Ported to run under 386BSD by Julian Elischer (julian@dialix.oz.au) Sept 1992
  */
 
+#include "opt_scsi.h"
 #include "rnd.h"
 #if NRND > 0
 #include <sys/rnd.h>
 #endif
 
+#ifndef	SDRETRIES
 #define	SDRETRIES	4
+#endif
+
+#ifndef	SD_IO_TIMEOUT
+#define	SD_IO_TIMEOUT	(60 * 1000)
+#endif
 
 struct sd_ops;
 
@@ -74,8 +81,9 @@ struct sd_softc {
 #define	SDF_ANCIENT	0x10		/* disk is ancient; for minphys */
 #define	SDF_DIRTY	0x20		/* disk is dirty; needs cache flush */
 #define	SDF_FLUSHING	0x40		/* flushing, for sddone() */
-#define	SDF_RESTART	0x80		/* we issued a scsi_start command */
-	struct scsipi_link *sc_link;	/* contains our targ, lun, etc. */
+
+	struct scsipi_periph *sc_periph;/* contains our targ, lun, etc. */
+
 	struct disk_parms {
 		u_long	heads;		/* number of heads */
 		u_long	cyls;		/* number of cylinders */
@@ -84,6 +92,7 @@ struct sd_softc {
 		u_long	disksize;	/* total number sectors */
 		u_long	rot_rate;	/* rotational rate, in RPM */
 	} params;
+
 	struct buf_queue buf_queue;
 	u_int8_t type;
 	char name[16]; /* product name, for default disklabel */
@@ -100,12 +109,14 @@ struct sd_ops {
 	int	(*sdo_get_parms) __P((struct sd_softc *, struct disk_parms *,
 		    int));
 	int	(*sdo_flush) __P((struct sd_softc *, int));
+	int	(*sdo_getcache) __P((struct sd_softc *, int *));
+	int	(*sdo_setcache) __P((struct sd_softc *, int));
 };
 #define	SDGP_RESULT_OK		0	/* paramters obtained */
 #define	SDGP_RESULT_OFFLINE	1	/* no media, or otherwise losing */
 #define	SDGP_RESULT_UNFORMATTED	2	/* unformatted media (max params) */
 
-void sdattach __P((struct device *, struct sd_softc *, struct scsipi_link *,
+void sdattach __P((struct device *, struct sd_softc *, struct scsipi_periph *,
     const struct sd_ops *));
 int sdactivate __P((struct device *, enum devact));
 int sddetach __P((struct device *, int));

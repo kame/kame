@@ -1,4 +1,4 @@
-/*	$NetBSD: qd.c,v 1.19 2000/05/27 04:52:35 thorpej Exp $	*/
+/*	$NetBSD: qd.c,v 1.24 2002/03/17 19:41:01 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1988 Regents of the University of California.
@@ -61,6 +61,9 @@
  * qd.c - QDSS display driver for VAXSTATION-II GPX workstation
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: qd.c,v 1.24 2002/03/17 19:41:01 atatat Exp $");
+
 #include "opt_ddb.h"
 
 #include "qd.h"
@@ -74,7 +77,7 @@
 #include <sys/poll.h>
 #include <sys/buf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
 
@@ -869,7 +872,7 @@ qdopen(dev, flag, mode, p)
 		* enable intrpts, open line discipline 
 		*/
 		dga->csr |= GLOBAL_IE;	/* turn on the interrupts */
-		return ((*linesw[tp->t_line].l_open)(dev, tp));
+		return ((*tp->t_linesw->l_open)(dev, tp));
 	}
 	dga->csr |= GLOBAL_IE;	/* turn on the interrupts */
 	return(0);
@@ -1058,7 +1061,7 @@ qdclose(dev, flag, mode, p)
 		* this is the console 
 		*/
 		tp = qd_tty[minor_dev];
-		(*linesw[tp->t_line].l_close)(tp, flag);
+		(*tp->t_linesw->l_close)(tp, flag);
 		ttyclose(tp);
 		tp->t_state = 0;
 		qdflags[unit].inuse &= ~CONS_DEV;
@@ -1492,14 +1495,11 @@ qdioctl(dev, cmd, datap, flags, p)
 			tp = qd_tty[minor_dev];
 			error = 
 			   
-		   (*linesw[tp->t_line].l_ioctl)(tp, cmd, datap, flags, p);
-			if (error >= 0) {
+		   (*tp->t_linesw->l_ioctl)(tp, cmd, datap, flags, p);
+			if (error != EPASSTHROUGH) {
 				return(error);
 			}
-			error = ttioctl(tp, cmd, datap, flags, p);
-			if (error >= 0) {
-				return(error);
-			}
+			return ttioctl(tp, cmd, datap, flags, p);
 		}
 		break;
 	}
@@ -1553,35 +1553,7 @@ qdpoll(dev, events, p)
 		* this is a tty device
 		*/
 		tp = qd_tty[minor_dev];
-	   
-		if (events & (POLLIN | POLLRDNORM))  {
-		     /* This is ttnread.  It's static and I don't feel
-		      * like altering platform independant parts of NetBSD
-		      */
-		     int nread;
-		     /* if (tp->t_lflag & PENDIN)
-				     ttypend(tp); */
-		     nread = tp->t_canq.c_cc;
-		     if (!(tp->t_lflag & ICANON))  {
-			     nread += tp->t_rawq.c_cc;
-			     if (nread < tp->t_cc[VMIN] && !tp->t_cc[VTIME])
-				     nread = 0;
-		     }
-		     if (nread > 0) 
-			     revents |= events & (POLLIN | POLLRDNORM);
-		}
-	   
-		if (events & (POLLOUT | POLLWRNORM))
-			if (tp->t_outq.c_cc <= tp->t_lowat)
-				revents |= events & (POLLOUT | POLLWRNORM);
-	   
-		if (revents == 0)  {
-			if (events & (POLLIN | POLLRDNORM))
-				selrecord(p, &tp->t_rsel);
-	  
-			if (events & (POLLOUT | POLLWRNORM))
-				selrecord(p, &tp->t_wsel);
-		}
+		revents = (*tp->t_linesw->l_poll)(tp, events, p);
 	}
 	   
 	splx(s);
@@ -1609,7 +1581,7 @@ qdwrite(dev, uio, flag)
 		* this is the console...  
 		*/
 		tp = qd_tty[minor_dev];
-		return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+		return ((*tp->t_linesw->l_write)(tp, uio, flag));
 	} else if (qdflags[unit].inuse & GRAPHIC_DEV) {
 	       /*
 		* this is a DMA xfer from user space 
@@ -1638,7 +1610,7 @@ qdread(dev, uio, flag)
 		* this is the console
 		*/
 		tp = qd_tty[minor_dev];
-		return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+		return ((*tp->t_linesw->l_read)(tp, uio, flag));
 	} else if (qdflags[unit].inuse & GRAPHIC_DEV) {
 	       /*
 		* this is a bitmap-to-processor xfer 
@@ -2841,7 +2813,7 @@ GET_TBUTTON:
 				char *string;
 				string = q_special[chr & 0x7F];
 				while(*string)
-				    (*linesw[tp->t_line].l_rint)(*string++, tp);
+				    (*tp->t_linesw->l_rint)(*string++, tp);
 			}
 			else {
 #ifdef DDB
@@ -2854,9 +2826,9 @@ GET_TBUTTON:
 				    return;
 			   
 				if (j == 2)  /* Second char wasn't 'D' */
-				    (*linesw[tp->t_line].l_rint)(27, tp);
+				    (*tp->t_linesw->l_rint)(27, tp);
 #endif
-				(*linesw[tp->t_line].l_rint)(chr&0177, tp);
+				(*tp->t_linesw->l_rint)(chr&0177, tp);
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: pfb.c,v 1.5.4.1 2000/06/30 16:27:22 simonb Exp $	*/
+/*	$NetBSD: pfb.c,v 1.8 2002/03/17 19:40:36 atatat Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -45,6 +45,7 @@
 #include <dev/wscons/wscons_raster.h>
 #include <dev/wscons/wsdisplayvar.h>
 
+#include <machine/autoconf.h>
 #include <machine/bus.h>
 
 #include "pfbvar.h"
@@ -128,7 +129,7 @@ pfbattach(parent, self, aux)
 	void *aux;
 {
 	struct pfb_softc *sc = (struct pfb_softc *)self;
-	struct pci_attach_args *pa = aux;
+	/* struct pci_attach_args *pa = aux; */
 	struct wsemuldisplaydev_attach_args a;
 	struct pfb_devconfig *dc;
 
@@ -203,7 +204,6 @@ pfb_ioctl(v, cmd, data, flag, p)
 	struct pfb_softc *sc = v;
 	struct pfb_devconfig *dc = sc->sc_dc;
 	struct wsdisplay_fbinfo *wdf;
-	struct grfinfo *gm;
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
@@ -212,13 +212,13 @@ pfb_ioctl(v, cmd, data, flag, p)
 
 	case WSDISPLAYIO_GINFO:
 		wdf = (void *)data;
-		wdf->height = sc->sc_dc->dc_raster.height;
-		wdf->width = sc->sc_dc->dc_raster.width;
-		wdf->depth = sc->sc_dc->dc_raster.depth;
+		wdf->height = dc->dc_raster.height;
+		wdf->width = dc->dc_raster.width;
+		wdf->depth = dc->dc_raster.depth;
 		wdf->cmsize = 256;
 		return 0;
 	}
-	return -1;
+	return EPASSTHROUGH;
 }
 
 paddr_t

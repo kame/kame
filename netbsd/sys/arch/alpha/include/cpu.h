@@ -1,12 +1,12 @@
-/* $NetBSD: cpu.h,v 1.44 2000/06/08 03:10:06 thorpej Exp $ */
+/* $NetBSD: cpu.h,v 1.58 2001/05/30 12:28:38 mrg Exp $ */
 
 /*-
- * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
  * by Jason R. Thorpe of the Numerical Aerospace Simulation Facility,
- * NASA Ames Research Center.
+ * NASA Ames Research Center, and by Charles M. Hannum.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -82,7 +82,7 @@
 #ifndef _ALPHA_CPU_H_
 #define _ALPHA_CPU_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_multiprocessor.h"
 #include "opt_lockdebug.h"
 #endif
@@ -115,6 +115,7 @@ struct cpu_info {
 	u_long ci_simple_locks;		/* # of simple locks held */
 #endif
 	struct proc *ci_curproc;	/* current owner of the processor */
+	struct cpu_info *ci_next;	/* next cpu_info structure */
 
 	/*
 	 * Private members.
@@ -127,38 +128,55 @@ struct cpu_info {
 	paddr_t ci_idle_pcb_paddr;	/* PA of idle PCB */
 	struct cpu_softc *ci_softc;	/* pointer to our device */
 	u_long ci_want_resched;		/* preempt current process */
-	u_long ci_astpending;		/* AST is pending */
 	u_long ci_intrdepth;		/* interrupt trap depth */
+	struct trapframe *ci_db_regs;	/* registers for debuggers */
+
+	/*
+	 * Variables used by microtime().
+	 */
+	struct timeval ci_pcc_time;
+	long ci_pcc_pcc;
+	long ci_pcc_ms_delta;
+	long ci_pcc_denom;
+
 #if defined(MULTIPROCESSOR)
-	u_long ci_flags;		/* flags; see below */
-	u_long ci_ipis;			/* interprocessor interrupts pending */
+	__volatile u_long ci_flags;	/* flags; see below */
+	__volatile u_long ci_ipis;	/* interprocessor interrupts pending */
 #endif
 };
 
 #define	CPUF_PRIMARY	0x01		/* CPU is primary CPU */
 #define	CPUF_PRESENT	0x02		/* CPU is present */
 #define	CPUF_RUNNING	0x04		/* CPU is running */
+#define	CPUF_PAUSED	0x08		/* CPU is paused */
+#define	CPUF_FPUSAVE	0x10		/* CPU is currently in fpusave_cpu() */
+
+extern	struct cpu_info cpu_info_primary;
+extern	struct cpu_info *cpu_info_list;
+
+#define	CPU_INFO_ITERATOR		int
+#define	CPU_INFO_FOREACH(cii, ci)	cii = 0, ci = cpu_info_list; \
+					ci != NULL; ci = ci->ci_next
 
 #if defined(MULTIPROCESSOR)
-extern	u_long cpus_running;
-extern	struct cpu_info cpu_info[];
+extern	__volatile u_long cpus_running;
+extern	__volatile u_long cpus_paused;
+extern	struct cpu_info *cpu_info[];
 
 #define	curcpu()		((struct cpu_info *)alpha_pal_rdval())
 #define	CPU_IS_PRIMARY(ci)	((ci)->ci_flags & CPUF_PRIMARY)
 
 void	cpu_boot_secondary_processors(void);
-#else /* ! MULTIPROCESSOR */
-extern	struct cpu_info cpu_info_store;
 
-#define	curcpu()	(&cpu_info_store)
+void	cpu_pause_resume(unsigned long, int);
+void	cpu_pause_resume_all(int);
+#else /* ! MULTIPROCESSOR */
+#define	curcpu()	(&cpu_info_primary)
 #endif /* MULTIPROCESSOR */
 
 #define	curproc		curcpu()->ci_curproc
 #define	fpcurproc	curcpu()->ci_fpcurproc
 #define	curpcb		curcpu()->ci_curpcb
-
-extern	u_long cpu_implver;		/* from IMPLVER instruction */
-extern	u_long cpu_amask;		/* from AMASK instruction */
 
 /*
  * definitions of cpu-dependent requirements
@@ -189,16 +207,20 @@ struct clockframe {
 #define	CLKF_INTR(framep)	(curcpu()->ci_intrdepth)
 
 /*
+ * This is used during profiling to integrate system time.  It can safely
+ * assume that the process is resident.
+ */
+#define	PROC_PC(p)		((p)->p_md.md_tf->tf_regs[FRAME_PC])
+
+/*
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
- *
- * XXXSMP
- * need_resched() needs to take a cpu_info *.
  */
-#define	need_resched()							\
+#define	need_resched(ci)						\
 do {									\
-	curcpu()->ci_want_resched = 1;					\
-	aston(curcpu());						\
+	(ci)->ci_want_resched = 1;					\
+	if ((ci)->ci_curproc != NULL)					\
+		aston((ci)->ci_curproc);				\
 } while (/*CONSTCOND*/0)
 
 /*
@@ -209,14 +231,14 @@ do {									\
 #define	need_proftick(p)						\
 do {									\
 	(p)->p_flag |= P_OWEUPC;					\
-	aston((p)->p_cpu);						\
+	aston(p);							\
 } while (/*CONSTCOND*/0)
 
 /*
  * Notify the current process (p) that it has a signal pending,
  * process as soon as possible.
  */
-#define	signotify(p)	aston((p)->p_cpu)
+#define	signotify(p)	aston(p)
 
 /*
  * XXXSMP
@@ -224,7 +246,7 @@ do {									\
  * it sees a normal kernel entry?  I guess letting it happen later
  * follows the `asynchronous' part of the name...
  */
-#define	aston(ci)	((ci)->ci_astpending = 1)
+#define	aston(p)	((p)->p_md.md_astpending = 1)
 #endif /* _KERNEL */
 
 /*
@@ -236,7 +258,8 @@ do {									\
 #define	CPU_UNALIGNED_FIX	4	/* int: fix unaligned accesses */
 #define	CPU_UNALIGNED_SIGBUS	5	/* int: SIGBUS unaligned accesses */
 #define	CPU_BOOTED_KERNEL	6	/* string: booted kernel name */
-#define	CPU_MAXID		7	/* 6 valid machdep IDs */
+#define	CPU_FP_SYNC_COMPLETE	7	/* int: always fixup sync fp traps */
+#define	CPU_MAXID		8	/* 7 valid machdep IDs */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
@@ -246,6 +269,7 @@ do {									\
 	{ "unaligned_fix", CTLTYPE_INT }, \
 	{ "unaligned_sigbus", CTLTYPE_INT }, \
 	{ "booted_kernel", CTLTYPE_STRING }, \
+	{ "fp_sync_complete", CTLTYPE_INT }, \
 }
 
 #ifdef _KERNEL
@@ -256,7 +280,10 @@ struct reg;
 struct rpb;
 struct trapframe;
 
+extern struct timeval microset_time;
+
 int	badaddr(void *, size_t);
+void	microset(struct cpu_info *, struct trapframe *);
 
 #endif /* _KERNEL */
 #endif /* _ALPHA_CPU_H_ */

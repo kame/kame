@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_exit.c,v 1.79 2000/05/27 00:11:12 sommerfeld Exp $	*/
+/*	$NetBSD: kern_exit.c,v 1.93.6.1 2002/07/29 15:37:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -77,6 +77,9 @@
  *	@(#)kern_exit.c	8.10 (Berkeley) 2/23/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_exit.c,v 1.93.6.1 2002/07/29 15:37:28 lukem Exp $");
+
 #include "opt_ktrace.h"
 #include "opt_sysv.h"
 
@@ -104,20 +107,10 @@
 #include <sys/filedesc.h>
 #include <sys/signalvar.h>
 #include <sys/sched.h>
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
 #include <machine/cpu.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -126,13 +119,10 @@
  *	Death of process.
  */
 int
-sys_exit(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+sys_exit(struct proc *p, void *v, register_t *retval)
 {
 	struct sys_exit_args /* {
-		syscallarg(int) rval;
+		syscallarg(int)	rval;
 	} */ *uap = v;
 
 	exit1(p, W_EXITCODE(SCARG(uap, rval), 0));
@@ -146,13 +136,10 @@ sys_exit(p, v, retval)
  * status and rusage for wait().  Check for child processes and orphan them.
  */
 void
-exit1(p, rv)
-	struct proc *p;
-	int rv;
+exit1(struct proc *p, int rv)
 {
-	struct proc *q, *nq;
-	struct vmspace *vm;
-	int s;
+	struct proc	*q, *nq;
+	int		s;
 
 	if (__predict_false(p == initproc))
 		panic("init died (signal %d, exit %d)",
@@ -173,9 +160,9 @@ exit1(p, rv)
 		p->p_flag &= ~P_PPWAIT;
 		wakeup((caddr_t)p->p_pptr);
 	}
-	sigfillset(&p->p_sigignore);
-	sigemptyset(&p->p_siglist);
-	p->p_sigcheck = 0;
+	sigfillset(&p->p_sigctx.ps_sigignore);
+	sigemptyset(&p->p_sigctx.ps_siglist);
+	p->p_sigctx.ps_sigcheck = 0;
 	callout_stop(&p->p_realit_ch);
 
 	/*
@@ -185,26 +172,7 @@ exit1(p, rv)
 	fdfree(p);
 	cwdfree(p);
 
-	/* The next three chunks should probably be moved to vmspace_exit. */
-	vm = p->p_vmspace;
-#ifdef SYSVSHM
-	if (vm->vm_shm && vm->vm_refcnt == 1)
-		shmexit(vm);
-#endif
-#ifdef SYSVSEM
-	semexit(p);
-#endif
-	/*
-	 * Release user portion of address space.
-	 * This releases references to vnodes,
-	 * which could cause I/O if the file has been unlinked.
-	 * Need to do this early enough that we can still sleep.
-	 * Can't free the entire vmspace as the kernel stack
-	 * may be mapped within that space also.
-	 */
-	if (vm->vm_refcnt == 1)
-		(void) uvm_deallocate(&vm->vm_map, VM_MIN_ADDRESS,
-		    VM_MAXUSER_ADDRESS - VM_MIN_ADDRESS);
+	doexithooks(p);
 
 	if (SESS_LEADER(p)) {
 		struct session *sp = p->p_session;
@@ -284,6 +252,27 @@ exit1(p, rv)
 	}
 
 	/*
+	 * Reset p_opptr pointer of all former children which got
+	 * traced by another process and were reparented. We reset
+	 * it to NULL here; the trace detach code then reparents
+	 * the child to initproc. We only check allproc list, since
+	 * eventual former children on zombproc list won't reference
+	 * p_opptr anymore.
+	 */
+	if (p->p_flag & P_CHTRACED) {
+		struct proc *t;
+
+		proclist_lock_read();
+
+		LIST_FOREACH(t, &allproc, p_list) {
+			if (t->p_opptr == p)
+				t->p_opptr = NULL;
+		}
+
+		proclist_unlock_read();
+	}
+
+	/*
 	 * Save exit status and final rusage info, adding in child rusage
 	 * info and self times.
 	 */
@@ -329,6 +318,15 @@ exit1(p, rv)
 	p->p_limit = NULL;
 
 	/*
+	 * If emulation has process exit hook, call it now.
+	 */
+	if (p->p_emul->e_proc_exit)
+		(*p->p_emul->e_proc_exit)(p);
+
+	/* This process no longer needs to hold the kernel lock. */
+	KERNEL_PROC_UNLOCK(p);
+
+	/*
 	 * Finally, call machine-dependent code to switch to a new
 	 * context (possibly the idle context).  Once we are no longer
 	 * using the dead process's vmspace and stack, exit2() will be
@@ -343,7 +341,8 @@ exit1(p, rv)
 
 /*
  * We are called from cpu_exit() once it is safe to schedule the
- * dead process's resources to be freed.
+ * dead process's resources to be freed (i.e., once we've switched to
+ * the idle PCB for the current CPU).
  *
  * NOTE: One must be careful with locking in this routine.  It's
  * called from a critical section in machine-dependent code, so
@@ -353,8 +352,7 @@ exit1(p, rv)
  * list (using the p_hash member), and wake up the reaper.
  */
 void
-exit2(p)
-	struct proc *p;
+exit2(struct proc *p)
 {
 
 	simple_lock(&deadproc_slock);
@@ -370,23 +368,26 @@ exit2(p)
  * a zombie, and the parent is allowed to read the undead's status.
  */
 void
-reaper()
+reaper(void *arg)
 {
 	struct proc *p;
+
+	KERNEL_PROC_UNLOCK(curproc);
 
 	for (;;) {
 		simple_lock(&deadproc_slock);
 		p = LIST_FIRST(&deadproc);
 		if (p == NULL) {
 			/* No work for us; go to sleep until someone exits. */
-			simple_unlock(&deadproc_slock);
-			(void) tsleep(&deadproc, PVM, "reaper", 0);
+			(void) ltsleep(&deadproc, PVM|PNORELOCK,
+			    "reaper", 0, &deadproc_slock);
 			continue;
 		}
 
 		/* Remove us from the deadproc list. */
 		LIST_REMOVE(p, p_hash);
 		simple_unlock(&deadproc_slock);
+		KERNEL_PROC_LOCK(curproc);
 
 		/*
 		 * Give machine-dependent code a chance to free any
@@ -409,32 +410,29 @@ reaper()
 		/* Wake up the parent so it can get exit status. */
 		if ((p->p_flag & P_FSTRACE) == 0 && p->p_exitsig != 0)
 			psignal(p->p_pptr, P_EXITSIG(p));
+		KERNEL_PROC_UNLOCK(curproc);
 		wakeup((caddr_t)p->p_pptr);
 	}
 }
 
 int
-sys_wait4(q, v, retval)
-	struct proc *q;
-	void *v;
-	register_t *retval;
+sys_wait4(struct proc *q, void *v, register_t *retval)
 {
 	struct sys_wait4_args /* {
-		syscallarg(int) pid;
-		syscallarg(int *) status;
-		syscallarg(int) options;
-		syscallarg(struct rusage *) rusage;
+		syscallarg(int)			pid;
+		syscallarg(int *)		status;
+		syscallarg(int)			options;
+		syscallarg(struct rusage *)	rusage;
 	} */ *uap = v;
-	int nfound;
-	struct proc *p, *t;
-	int status, error, s;
+	struct proc	*p, *t;
+	int		nfound, status, error, s;
 
 	if (SCARG(uap, pid) == 0)
 		SCARG(uap, pid) = -q->p_pgid;
 	if (SCARG(uap, options) &~ (WUNTRACED|WNOHANG|WALTSIG))
 		return (EINVAL);
 
-loop:
+ loop:
 	nfound = 0;
 	for (p = q->p_children.lh_first; p != 0; p = p->p_sibling.le_next) {
 		if (SCARG(uap, pid) != WAIT_ANY &&
@@ -446,8 +444,9 @@ loop:
 		 * if WALTSIG is set; wait for processes with p_exitsig ==
 		 * SIGCHLD only if WALTSIG is clear.
 		 */
-		if ((SCARG(uap, options) & WALTSIG) ?
-		    (p->p_exitsig == SIGCHLD) : (P_EXITSIG(p) != SIGCHLD))
+		if (((SCARG(uap, options) & WALLSIG) == 0) &&
+		    ((SCARG(uap, options) & WALTSIG) ?
+		     (p->p_exitsig == SIGCHLD) : (P_EXITSIG(p) != SIGCHLD)))
 			continue;
 
 		nfound++;
@@ -475,11 +474,10 @@ loop:
 			 * parent the exit signal.  The rest of the cleanup
 			 * will be done when the old parent waits on the child.
 			 */
-			if ((p->p_flag & P_TRACED) &&
-			    p->p_oppid != p->p_pptr->p_pid) {
-				t = pfind(p->p_oppid);
+			if ((p->p_flag & P_TRACED) && p->p_opptr != p->p_pptr){
+				t = p->p_opptr;
 				proc_reparent(p, t ? t : initproc);
-				p->p_oppid = 0;
+				p->p_opptr = NULL;
 				p->p_flag &= ~(P_TRACED|P_WAITED|P_FSTRACE);
 				if (p->p_exitsig != 0)
 					psignal(p->p_pptr, P_EXITSIG(p));
@@ -556,9 +554,7 @@ loop:
  * make process 'parent' the new parent of process 'child'.
  */
 void
-proc_reparent(child, parent)
-	struct proc *child;
-	struct proc *parent;
+proc_reparent(struct proc *child, struct proc *parent)
 {
 
 	if (child->p_pptr == parent)

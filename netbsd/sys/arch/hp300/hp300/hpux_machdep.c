@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_machdep.c,v 1.23 1999/08/16 02:59:23 simonb Exp $	*/
+/*	$NetBSD: hpux_machdep.c,v 1.28.6.1 2002/08/07 01:30:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -77,6 +77,9 @@
  * Machinde-dependent bits for HP-UX binary compatibility.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hpux_machdep.c,v 1.28.6.1 2002/08/07 01:30:56 lukem Exp $");                                                  
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -107,10 +110,6 @@
 #include <machine/reg.h>
 #include <machine/psl.h>
 #include <machine/vmparam.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_map.h> 
 
 #include <uvm/uvm_extern.h>
 
@@ -197,7 +196,7 @@ hpux_cpu_vmcmd(p, ev)
 #if 0 /* XXX - unable to handle HPUX coredumps */
 	/* Make sure we have room. */
 	if (ev->ev_len <= sizeof(p->p_addr->u_md.md_exec))
-		bcopy((caddr_t)ev->ev_addr, p->p_addr->u_md.md_exec,
+		memcpy(p->p_addr->u_md.md_exec, (caddr_t)ev->ev_addr,
 		    ev->ev_len);
 #endif
 
@@ -280,6 +279,9 @@ hpux_sys_getcontext(p, v, retval)
 	const char *str;
 	int l, i, error = 0;
 	int len; 
+
+	if (SCARG(uap, len) <= 0)
+		return (EINVAL);
 
 	for (i = 0; context_table[i].str != NULL; i++)
 		if (context_table[i].val == fputype)
@@ -428,7 +430,6 @@ hpux_sendsig(catcher, sig, mask, code)
 	struct proc *p = curproc;
 	struct hpuxsigframe *fp, kf;
 	struct frame *frame;
-	struct sigacts *psp = p->p_sigacts;
 	short ft;
 	int onstack, fsize;
 
@@ -437,14 +438,14 @@ hpux_sendsig(catcher, sig, mask, code)
 
 	/* Do we need to jump onto the signal stack? */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context. */
 	fsize = sizeof(struct hpuxsigframe);
 	if (onstack)
-		fp = (struct hpuxsigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-						      psp->ps_sigstk.ss_size);
+		fp = (struct hpuxsigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+						p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct hpuxsigframe *)(frame->f_regs[SP]);
 	fp--;
@@ -468,7 +469,7 @@ hpux_sendsig(catcher, sig, mask, code)
 	 *	- FP coprocessor state
 	 */
 	kf.hsf_sigstate.hss_flags = HSS_USERREGS;
-	bcopy(frame->f_regs, kf.hsf_sigstate.hss_frame.f_regs,
+	memcpy(kf.hsf_sigstate.hss_frame.f_regs, frame->f_regs,
 	    sizeof(frame->f_regs));
 	if (ft >= FMT4) {
 #ifdef DEBUG
@@ -478,7 +479,7 @@ hpux_sendsig(catcher, sig, mask, code)
 		kf.hsf_sigstate.hss_flags |= HSS_RTEFRAME;
 		kf.hsf_sigstate.hss_frame.f_format = frame->f_format;
 		kf.hsf_sigstate.hss_frame.f_vector = frame->f_vector;
-		bcopy(&frame->F_u, &kf.hsf_sigstate.hss_frame.F_u,
+		memcpy(&kf.hsf_sigstate.hss_frame.F_u, &frame->F_u,
 		    exframesize[ft]);
 		/*
 		 * Leave an indicator that we need to clean up the kernel
@@ -520,7 +521,7 @@ hpux_sendsig(catcher, sig, mask, code)
 	kf.hsf_sc.hsc_pc	= frame->f_pc;
 
 	/* Save the signal stack. */
-	kf.hsf_sc.hsc_onstack	= psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	kf.hsf_sc.hsc_onstack	= p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 
 	bsdtohpuxmask(mask, &kf.hsf_sc.hsc_mask);
 
@@ -552,11 +553,11 @@ hpux_sendsig(catcher, sig, mask, code)
 
 	/* Set up the registers to return to sigcode. */
 	frame->f_regs[SP] = (int)fp;
-	frame->f_pc = (int)psp->ps_sigcode;
+	frame->f_pc = (int)p->p_sigctx.ps_sigcode;
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 
 #ifdef DEBUG
 	if ((hpuxsigdebug & SDB_KSTACK) && p->p_pid == hpuxsigpid)
@@ -663,7 +664,7 @@ hpux_sys_sigreturn(p, v, retval)
 		frame->f_stackadj -= sz;
 		frame->f_format = tstate.hss_frame.f_format;
 		frame->f_vector = tstate.hss_frame.f_vector;
-		bcopy(&tstate.hss_frame.F_u, &frame->F_u, sz);
+		memcpy(&frame->F_u, &tstate.hss_frame.F_u, sz);
 #ifdef DEBUG
 		if (hpuxsigdebug & SDB_FOLLOW)
 			printf("sigreturn(%d): copy in %d of frame type %d\n",
@@ -676,8 +677,8 @@ hpux_sys_sigreturn(p, v, retval)
 	 * which were handled above.
 	 */
 	if (flags & HSS_USERREGS)
-		bcopy(tstate.hss_frame.f_regs,
-		    frame->f_regs, sizeof(frame->f_regs) - (2 * NBPW));
+		memcpy(frame->f_regs, tstate.hss_frame.f_regs,
+		    sizeof(frame->f_regs) - (2 * NBPW));
 
 	/*
 	 * Finally we restore the original FP context
@@ -695,13 +696,13 @@ hpux_sys_sigreturn(p, v, retval)
 	frame->f_sr = scp->hsc_ps;
 
 	if (scp->hsc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 
 	/* Restore signal mask. */
-	hpuxtobsdmask(scp->hsc_mask, &p->p_sigmask);
-	sigminusset(&sigcantmask, &p->p_sigmask);
+	hpuxtobsdmask(scp->hsc_mask, &p->p_sigctx.ps_sigmask);
+	sigminusset(&sigcantmask, &p->p_sigctx.ps_sigmask);
 
 #ifdef DEBUG
 	if ((hpuxsigdebug & SDB_FPSTATE) && *(char *)&tstate.hss_fpstate)

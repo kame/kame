@@ -1,4 +1,32 @@
-/*	$NetBSD: cpu.c,v 1.5 2000/05/12 04:43:21 shin Exp $	*/
+/*	$NetBSD: cpu.c,v 1.10 2001/09/16 15:45:43 uch Exp $	*/
+/*-
+ * Copyright (c) 1999 Shin Takemura, All rights reserved.
+ * Copyright (c) 1999-2001 SATO Kazumi, All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ */
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -28,17 +56,11 @@
  */
 
 #include <sys/param.h>
-#include <sys/device.h>
 #include <sys/systm.h>
 
-#include <mips/locore.h>
-#include <machine/cpu.h>
+#include <machine/sysconf.h>
 #include <machine/bus.h>
 #include <machine/autoconf.h>
-#include <machine/platid.h>
-#include <machine/platid_mask.h>
-
-#include "opt_vr41x1.h"
 
 /* Definition of the driver for autoconfig. */
 static int	cpumatch(struct device *, struct cfdata *, void *);
@@ -50,41 +72,24 @@ struct cfattach cpu_ca = {
 
 extern struct cfdriver cpu_cd;
 
-extern void cpu_identify __P((void));
-extern void vr_idle __P((void));
-
-
 static int
-cpumatch(parent, cf, aux)
-	struct device *parent;
-	struct cfdata *cf;
-	void *aux;
+cpumatch(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-
 	/* make sure that we're looking for a CPU. */
-	if (strcmp(ma->ma_name, cpu_cd.cd_name) != 0) {
-		return (0);
-	}
-	return (1);
+	return (strcmp(ma->ma_name, cpu_cd.cd_name) != 0 ? 0 : 1);
 }
 
 static void
-cpuattach(parent, dev, aux)
-	struct device *parent;
-	struct device *dev;
-	void *aux;
+cpuattach(struct device *parent, struct device *dev, void *aux)
 {
 
 	printf(": ");
 
 	cpu_identify();
 
-#ifdef VR41X1
-	if (platid_match(&platid, &platid_mask_CPU_MIPS_VR_41XX)) {
-		printf("cpu0: install VR specific idle routine\n");
-		CPU_IDLE = (long *)vr_idle;
-	}
-#endif
+	/* install CPU specific idle routine if any. */
+	if (platform.cpu_idle != NULL)
+		CPU_IDLE = (long *)platform.cpu_idle;
 }

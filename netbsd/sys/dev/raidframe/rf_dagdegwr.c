@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_dagdegwr.c,v 1.5 2000/01/07 03:40:57 oster Exp $	*/
+/*	$NetBSD: rf_dagdegwr.c,v 1.9 2001/11/13 07:11:13 lukem Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -33,7 +33,11 @@
  *
  */
 
-#include "rf_types.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_dagdegwr.c,v 1.9 2001/11/13 07:11:13 lukem Exp $");
+
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_raid.h"
 #include "rf_dag.h"
 #include "rf_dagutils.h"
@@ -87,13 +91,12 @@ rf_CreateDegradedWriteDAG(raidPtr, asmap, dag_h, bp, flags, allocList)
 	RF_RaidAccessFlags_t flags;
 	RF_AllocListElem_t *allocList;
 {
-	RF_RaidLayout_t *layoutPtr = &(raidPtr->Layout);
-	RF_PhysDiskAddr_t *failedPDA = asmap->failedPDAs[0];
 
 	RF_ASSERT(asmap->numDataFailed == 1);
 	dag_h->creator = "DegradedWriteDAG";
 
-	/* if the access writes only a portion of the failed unit, and also
+	/*
+	 * if the access writes only a portion of the failed unit, and also
 	 * writes some portion of at least one surviving unit, we create two
 	 * DAGs, one for the failed component and one for the non-failed
 	 * component, and do them sequentially.  Note that the fact that we're
@@ -101,9 +104,13 @@ rf_CreateDegradedWriteDAG(raidPtr, asmap, dag_h, bp, flags, allocList)
 	 * access either starts or ends in the failed unit, and hence we need
 	 * create only two dags.  This is inefficient in that the same data or
 	 * parity can get read and written twice using this structure.  I need
-	 * to fix this to do the access all at once. */
-	RF_ASSERT(!(asmap->numStripeUnitsAccessed != 1 && failedPDA->numSector != layoutPtr->sectorsPerStripeUnit));
-	rf_CreateSimpleDegradedWriteDAG(raidPtr, asmap, dag_h, bp, flags, allocList);
+	 * to fix this to do the access all at once.
+	 */
+	RF_ASSERT(!(asmap->numStripeUnitsAccessed != 1 &&
+		    asmap->failedPDAs[0]->numSector !=
+			raidPtr->Layout.sectorsPerStripeUnit));
+	rf_CreateSimpleDegradedWriteDAG(raidPtr, asmap, dag_h, bp, flags,
+	    allocList);
 }
 
 
@@ -511,7 +518,7 @@ rf_CommonCreateSimpleDegradedWriteDAG(raidPtr, asmap, dag_h, bp, flags,
   pda_p->numSector = num; \
   pda_p->next = NULL; \
   RF_MallocAndAdd(pda_p->bufPtr,rf_RaidAddressToByte(raidPtr,num),(char *), allocList)
-
+#if (RF_INCLUDE_PQ > 0) || (RF_INCLUDE_EVENODD > 0)
 void 
 rf_WriteGenerateFailedAccessASMs(
     RF_Raid_t * raidPtr,
@@ -840,3 +847,4 @@ rf_DoubleDegSmallWrite(
 		DISK_NODE_PARAMS(wqNodes[1], pda);
 	}
 }
+#endif   /* (RF_INCLUDE_PQ > 0) || (RF_INCLUDE_EVENODD > 0) */

@@ -1,4 +1,4 @@
-/* $NetBSD: bus_dma.h,v 1.3.12.1 2000/06/30 16:27:32 simonb Exp $ */
+/* $NetBSD: bus_dma.h,v 1.9 2001/07/19 15:32:16 thorpej Exp $ */
 
 /*
  * This file was extracted from from alpha/include/bus.h
@@ -9,7 +9,7 @@
 
 
 /*-
- * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1997, 1998, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -82,14 +82,17 @@
 /*
  * Flags used in various bus DMA methods.
  */
-#define	BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
-#define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
-#define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define	BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
-#define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
-#define	BUS_DMA_BUS2		0x20
-#define	BUS_DMA_BUS3		0x40
-#define	BUS_DMA_BUS4		0x80
+#define	BUS_DMA_WAITOK		0x000	/* safe to sleep (pseudo-flag) */
+#define	BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
+#define	BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
+#define	BUS_DMA_COHERENT	0x004	/* hint: map memory DMA coherent */
+#define	BUS_DMA_STREAMING	0x008	/* hint: sequential, unidirectional */
+#define	BUS_DMA_BUS1		0x010	/* placeholders for bus functions... */
+#define	BUS_DMA_BUS2		0x020
+#define	BUS_DMA_BUS3		0x040
+#define	BUS_DMA_BUS4		0x080
+#define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
+#define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
 
 /* Forwards needed by prototypes below. */
 struct mbuf;
@@ -115,9 +118,6 @@ typedef struct next68k_bus_dmamap *bus_dmamap_t;
 struct next68k_bus_dma_segment {
 	bus_addr_t	ds_addr;	/* DMA address */
 	bus_size_t	ds_len;		/* length of transfer */
-
-	/* Machine dependant fields: */
-	bus_size_t  ds_xfer_len;			/* length of successful transfer */
 };
 typedef struct next68k_bus_dma_segment	bus_dma_segment_t;
 
@@ -133,7 +133,7 @@ struct next68k_bus_dma_tag {
 	/*
 	 * Some chipsets have a built-in boundary constraint, independent
 	 * of what the device requests.  This allows that boundary to
-	 * be specified.  If the device has a more restrictive contraint,
+	 * be specified.  If the device has a more restrictive constraint,
 	 * the map will use that, otherwise this boundary will be used.
 	 * This value is ignored if 0.
 	 */
@@ -213,12 +213,16 @@ struct next68k_bus_dmamap {
 	bus_size_t	_dm_boundary;	/* don't cross this */
 	int		_dm_flags;	/* misc. flags */
 
+	/* Machine dependant fields: */
+	bus_size_t  dm_xfer_len;			/* length of successful transfer */
+
 	/*
 	 * PUBLIC MEMBERS: these are used by machine-independent code.
 	 */
 	bus_size_t	dm_mapsize;	/* size of the mapping */
 	int		dm_nsegs;	/* # valid segments in mapping */
 	bus_dma_segment_t dm_segs[1];	/* segments; variable length */
+
 };
 
 #ifdef _NEXT68K_BUS_DMA_PRIVATE

@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_lwp.c,v 1.3 2000/05/28 05:49:05 thorpej Exp $	*/
+/*	$NetBSD: svr4_lwp.c,v 1.6 2001/11/13 02:09:23 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: svr4_lwp.c,v 1.6 2001/11/13 02:09:23 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

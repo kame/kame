@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.2.4.1 2000/07/22 15:48:38 scw Exp $	*/
+/*	$NetBSD: intr.h,v 1.11 2001/07/06 19:00:14 scw Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -52,6 +52,7 @@
 #define	IPL_NET		2	/* disable network interrupts */
 #define	IPL_TTY		3	/* disable terminal interrupts */
 #define	IPL_TTYNOBUF	4	/* IPL_TTY + higher ISR priority */
+#define	IPL_SERIAL	4	/* disable serial interrupts */
 #define	IPL_CLOCK	5	/* disable clock interrupts */
 #define	IPL_HIGH	6	/* disable all interrupts */
 
@@ -70,8 +71,7 @@
 }
 
 #ifdef _KERNEL
-/* spl0 requires checking for software interrupts */
-
+#define spl0()			_spl0()
 #define spllowersoftclock()	spl1()
 #define splsoft()		splraise1()
 #define splsoftclock()		splsoft()
@@ -80,29 +80,25 @@
 #define splbio()		splraise2()
 #define splnet()		splraise3()
 #define spltty()		splraise3()
-#define splimp()		splraise3()
+#define splvm()			splraise3()
 #define splserial()		splraise4()
 #define splclock()		splraise5()
 #define splstatclock()		splraise5()
-#define splvm()			splraise5()
 #define splhigh()		spl7()
 #define splsched()		spl7()
-
-/* watch out for side effects */
-#define splx(s)         (s & PSL_IPL ? _spl(s) : spl0())
-
+#define spllock()		spl7()
 
 #ifndef _LOCORE
-/*
- * Simulated software interrupt register
- * This is cleared to zero to indicate a soft interrupt is pending
- * (Yes, it's a bit bizarre, but it allows the use of the m68k's `tas'
- * instruction so we can avoid masking interrupts elsewhere.)
- */
-extern volatile unsigned char ssir;
+
+static __inline void
+splx(int sr)
+{
+
+	__asm __volatile("movw %0,%%sr" : : "di" (sr));
+}
+
 #define setsoft(x)		x = 0
 
-#define __GENERIC_SOFT_INTERRUPTS
 struct mvme68k_soft_intrhand {
 	LIST_ENTRY(mvme68k_soft_intrhand) sih_q;
 	struct mvme68k_soft_intr *sih_intrhead;
@@ -121,23 +117,21 @@ void	*softintr_establish(int, void (*)(void *), void *);
 void	softintr_disestablish(void *);
 void	softintr_init(void);
 void	softintr_dispatch(void);
+extern void (*_softintr_chipset_assert)(void);
 
 #define softintr_schedule(arg)						\
 		do {							\
 			struct mvme68k_soft_intrhand *__sih = (arg);	\
 			__sih->sih_pending = 1;				\
 			setsoft(__sih->sih_intrhead->msi_ssir);		\
-			setsoft(ssir);					\
+			_softintr_chipset_assert();			\
 		} while (0)
 
 /* XXX For legacy software interrupts */
 extern struct mvme68k_soft_intrhand *softnet_intrhand;
-extern struct mvme68k_soft_intrhand *softclock_intrhand;
 
 #define setsoftnet()	softintr_schedule(softnet_intrhand)
-#define setsoftclock()	softintr_schedule(softclock_intrhand)
 
-extern int spl0 __P((void));
 #endif /* !_LOCORE */
 #endif /* _KERNEL */
 

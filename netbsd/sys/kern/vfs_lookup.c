@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_lookup.c,v 1.34.4.1 2002/06/26 17:44:52 he Exp $	*/
+/*	$NetBSD: vfs_lookup.c,v 1.39.10.1 2002/06/21 05:47:58 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -40,6 +40,9 @@
  *	@(#)vfs_lookup.c	8.10 (Berkeley) 5/27/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vfs_lookup.c,v 1.39.10.1 2002/06/21 05:47:58 lukem Exp $");
+
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -50,14 +53,18 @@
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/errno.h>
-#include <sys/malloc.h>
 #include <sys/filedesc.h>
+#include <sys/hash.h>
+#include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/syslog.h>
 
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+
+struct pool pnbuf_pool;		/* pathname buffer pool */
+struct pool_cache pnbuf_cache;	/* pathname buffer cache */
 
 /*
  * Convert a pathname into a pointer to a locked inode.
@@ -91,7 +98,6 @@ namei(ndp)
 	int error, linklen;
 	struct componentname *cnp = &ndp->ni_cnd;
 
-	ndp->ni_cnd.cn_cred = ndp->ni_cnd.cn_proc->p_ucred;
 #ifdef DIAGNOSTIC
 	if (!cnp->cn_cred || !cnp->cn_proc)
 		panic ("namei: bad cred/proc");
@@ -107,7 +113,7 @@ namei(ndp)
 	 * name into the buffer.
 	 */
 	if ((cnp->cn_flags & HASBUF) == 0)
-		MALLOC(cnp->cn_pnbuf, caddr_t, MAXPATHLEN, M_NAMEI, M_WAITOK);
+		cnp->cn_pnbuf = PNBUF_GET();
 	if (ndp->ni_segflg == UIO_SYSSPACE)
 		error = copystr(ndp->ni_dirp, cnp->cn_pnbuf,
 			    MAXPATHLEN, &ndp->ni_pathlen);
@@ -122,7 +128,7 @@ namei(ndp)
 		error = ENOENT;
 
 	if (error) {
-		free(cnp->cn_pnbuf, M_NAMEI);
+		PNBUF_PUT(cnp->cn_pnbuf);
 		ndp->ni_vp = NULL;
 		return (error);
 	}
@@ -152,7 +158,7 @@ namei(ndp)
 		cnp->cn_nameptr = cnp->cn_pnbuf;
 		ndp->ni_startdir = dp;
 		if ((error = lookup(ndp)) != 0) {
-			FREE(cnp->cn_pnbuf, M_NAMEI);
+			PNBUF_PUT(cnp->cn_pnbuf);
 			return (error);
 		}
 		/*
@@ -160,7 +166,7 @@ namei(ndp)
 		 */
 		if ((cnp->cn_flags & ISSYMLINK) == 0) {
 			if ((cnp->cn_flags & (SAVENAME | SAVESTART)) == 0)
-				FREE(cnp->cn_pnbuf, M_NAMEI);
+				PNBUF_PUT(cnp->cn_pnbuf);
 			else
 				cnp->cn_flags |= HASBUF;
 			return (0);
@@ -178,7 +184,7 @@ namei(ndp)
 				break;
 		}
 		if (ndp->ni_pathlen > 1)
-			MALLOC(cp, char *, MAXPATHLEN, M_NAMEI, M_WAITOK);
+			cp = PNBUF_GET();
 		else
 			cp = cnp->cn_pnbuf;
 		aiov.iov_base = cp;
@@ -194,7 +200,7 @@ namei(ndp)
 		if (error) {
 		badlink:
 			if (ndp->ni_pathlen > 1)
-				FREE(cp, M_NAMEI);
+				PNBUF_PUT(cp);
 			break;
 		}
 		linklen = MAXPATHLEN - auio.uio_resid;
@@ -208,7 +214,7 @@ namei(ndp)
 		}
 		if (ndp->ni_pathlen > 1) {
 			memcpy(cp + linklen, ndp->ni_next, ndp->ni_pathlen);
-			FREE(cnp->cn_pnbuf, M_NAMEI);
+			PNBUF_PUT(cnp->cn_pnbuf);
 			cnp->cn_pnbuf = cp;
 		} else
 			cnp->cn_pnbuf[linklen] = '\0';
@@ -224,11 +230,39 @@ namei(ndp)
 			VREF(dp);
 		}
 	}
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	PNBUF_PUT(cnp->cn_pnbuf);
 	vrele(ndp->ni_dvp);
 	vput(ndp->ni_vp);
 	ndp->ni_vp = NULL;
 	return (error);
+}
+
+/*
+ * Determine the namei hash (for cn_hash) for name.
+ * If *ep != NULL, hash from name to ep-1.
+ * If *ep == NULL, hash from name until the first NUL or '/', and
+ * return the location of this termination character in *ep.
+ *
+ * This function returns an equivalent hash to the MI hash32_strn().
+ * The latter isn't used because in the *ep == NULL case, determining
+ * the length of the string to the first NUL or `/' and then calling
+ * hash32_strn() involves unnecessary double-handling of the data.
+ */
+uint32_t
+namei_hash(const char *name, const char **ep)
+{
+	uint32_t	hash;
+
+	hash = HASH32_STR_INIT;
+	if (*ep != NULL) {
+		for (; name < *ep; name++)
+			hash = hash * 33 + *(uint8_t *)name;
+	} else {
+		for (; *name != '\0' && *name != '/'; name++)
+			hash = hash * 33 + *(uint8_t *)name;
+		*ep = name;
+	}
+	return (hash + (hash >> 5));
 }
 
 /*
@@ -345,9 +379,8 @@ dirloop:
 	 * responsibility for freeing the pathname buffer.
 	 */
 	cnp->cn_consume = 0;
-	cnp->cn_hash = 0;
-	for (cp = cnp->cn_nameptr; *cp != '\0' && *cp != '/'; cp++)
-		cnp->cn_hash += (unsigned char)*cp;
+	cp = NULL;
+	cnp->cn_hash = namei_hash(cnp->cn_nameptr, &cp);
 	cnp->cn_namelen = cp - cnp->cn_nameptr;
 	if (cnp->cn_namelen > NAME_MAX) {
 		error = ENAMETOOLONG;
@@ -661,8 +694,8 @@ relookup(dvp, vpp, cnp)
 	 * responsibility for freeing the pathname buffer.
 	 */
 #ifdef NAMEI_DIAGNOSTIC
-	for (newhash = 0, cp = cnp->cn_nameptr; *cp != 0 && *cp != '/'; cp++)
-		newhash += (unsigned char)*cp;
+	cp = NULL;
+	newhash = namei_hash(cnp->cn_nameptr, &cp);
 	if (newhash != cnp->cn_hash)
 		panic("relookup: bad hash");
 	if (cnp->cn_namelen != cp - cnp->cn_nameptr)

@@ -1,7 +1,7 @@
-/* $NetBSD: sched.h,v 1.5 2000/06/03 20:42:44 thorpej Exp $ */
+/* $NetBSD: sched.h,v 1.14 2001/07/01 18:06:12 thorpej Exp $ */
 
 /*-
- * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -79,6 +79,11 @@
 #ifndef	_SYS_SCHED_H_
 #define	_SYS_SCHED_H_
 
+#if defined(_KERNEL_OPT)
+#include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
+#endif
+
 /*
  * Posix defines a <sched.h> which may want to include <sys/sched.h>
  */
@@ -138,6 +143,9 @@ struct schedstate_percpu {
 	u_int spc_schedticks;		/* ticks for schedclock() */
 	u_int64_t spc_cp_time[CPUSTATES]; /* CPU state statistics */
 	u_char spc_curpriority;		/* usrpri of curproc */
+	int spc_rrticks;		/* ticks until roundrobin() */
+	int spc_pscnt;			/* prof/stat counter */
+	int spc_psdiv;			/* prof/stat divisor */	
 };
 
 /* spc_flags */
@@ -146,15 +154,30 @@ struct schedstate_percpu {
 
 #define	SPCF_SWITCHCLEAR	(SPCF_SEENRR|SPCF_SHOULDYIELD)
 
+/*
+ * Flags passed to the Linux-compatible __clone(2) system call.
+ */
+#define	CLONE_CSIGNAL		0x000000ff	/* signal to be sent at exit */
+#define	CLONE_VM		0x00000100	/* share address space */
+#define	CLONE_FS		0x00000200	/* share "file system" info */
+#define	CLONE_FILES		0x00000400	/* share file descriptors */
+#define	CLONE_SIGHAND		0x00000800	/* share signal actions */
+#define	CLONE_PID		0x00001000	/* share process ID */
+#define	CLONE_PTRACE		0x00002000	/* ptrace(2) continues on 
+						   child */
+#define	CLONE_VFORK		0x00004000	/* parent blocks until child
+						   exits */
+
 #endif /* !_POSIX_SOURCE && !_XOPEN_SOURCE && !_ANSI_SOURCE */
 
-#ifdef	_KERNEL
+#ifdef _KERNEL
 
 #define	PPQ	(128 / RUNQUE_NQS)	/* priorities per queue */
 #define NICE_WEIGHT 2			/* priorities per nice level */
 #define	ESTCPULIM(e) min((e), NICE_WEIGHT * PRIO_MAX - PPQ)
 
-int	schedhz;			/* ideally: 16 */
+extern int schedhz;			/* ideally: 16 */
+extern int rrticks;			/* ticks per roundrobin() */
 
 /*
  * Global scheduler state.  We would like to group these all together
@@ -171,8 +194,11 @@ extern __volatile u_int32_t sched_whichqs;
 #define	SLPQUE(ident)	(&sched_slpque[SLPQUE_LOOKUP(ident)])
 
 struct proc;
+struct cpu_info;
 
-void schedclock __P((struct proc *p));
+void schedclock(struct proc *p);
+void sched_wakeup(void *);
+void roundrobin(struct cpu_info *);
 
 /*
  * scheduler_fork_hook:
@@ -182,7 +208,7 @@ void schedclock __P((struct proc *p));
 #define	scheduler_fork_hook(parent, child)				\
 do {									\
 	(child)->p_estcpu = (parent)->p_estcpu;				\
-} while (0)
+} while (/* CONSTCOND */ 0)
 
 /*
  * scheduler_wait_hook:
@@ -194,6 +220,40 @@ do {									\
 	/* XXX Only if parent != init?? */				\
 	(parent)->p_estcpu = ESTCPULIM((parent)->p_estcpu +		\
 	    (child)->p_estcpu);						\
-} while (0)
+} while (/* CONSTCOND */ 0)
+
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+#include <sys/lock.h>
+
+extern struct simplelock sched_lock;
+
+#define	SCHED_ASSERT_LOCKED()	LOCK_ASSERT(simple_lock_held(&sched_lock))
+#define	SCHED_ASSERT_UNLOCKED()	LOCK_ASSERT(simple_lock_held(&sched_lock) == 0)
+
+#define	SCHED_LOCK(s)							\
+do {									\
+	s = splsched();							\
+	simple_lock(&sched_lock);					\
+} while (/* CONSTCOND */ 0)
+
+#define	SCHED_UNLOCK(s)							\
+do {									\
+	simple_unlock(&sched_lock);					\
+	splx(s);							\
+} while (/* CONSTCOND */ 0)
+
+void	sched_lock_idle(void);
+void	sched_unlock_idle(void);
+
+#else /* ! MULTIPROCESSOR || LOCKDEBUG */
+
+#define	SCHED_ASSERT_LOCKED()		/* nothing */
+#define	SCHED_ASSERT_UNLOCKED()		/* nothing */
+
+#define	SCHED_LOCK(s)			s = splsched()
+#define	SCHED_UNLOCK(s)			splx(s)
+
+#endif /* MULTIPROCESSOR || LOCKDEBUG */
+
 #endif	/* _KERNEL */
 #endif	/* _SYS_SCHED_H_ */

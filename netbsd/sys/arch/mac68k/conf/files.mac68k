@@ -1,13 +1,13 @@
-#	$NetBSD: files.mac68k,v 1.95.4.1 2000/08/06 12:56:18 briggs Exp $
+#	$NetBSD: files.mac68k,v 1.105 2002/04/27 19:29:08 shiba Exp $
 
 # mac68k-specific configuration info
 
 # options understood by the mac68k-specific part of the kernel
 # (note, these are case-sensitive)
-defopt	opt_adb.h	ADB_DEBUG MRG_ADB ALTXBUTTONS 
-defopt	opt_mac68k.h	DISABLE_EXT_CACHE ZS_CONSOLE_ABORT
+defflag	opt_adb.h		ADB_DEBUG MRG_ADB ALTXBUTTONS
+defflag	opt_mac68k.h		DISABLE_EXT_CACHE ZS_CONSOLE_ABORT
 
-defopt	opt_wsdisplay_compat.h	WSDISPLAY_COMPAT_ITEFONT
+defflag	opt_wsdisplay_compat.h	WSDISPLAY_COMPAT_ITEFONT
 
 # maxpartitions must be first item in files.${ARCH}.newconf
 maxpartitions 8
@@ -18,7 +18,6 @@ device mainbus { }			# no locators (yet?)
 attach mainbus at root
 
 include "dev/wscons/files.wscons"
-include "dev/mii/files.mii"
 
 define obio_norm { [addr = -1], ["no drq" = -1], ["no hsk" = -1] }
 define obio_scsi5380 { [addr = -1], [drq = -1], [hsk = -1] }
@@ -123,6 +122,14 @@ file	arch/mac68k/obio/esp.c		esp
 #attach	qsc at nubus
 #file	arch/mac68k/nubus/qsc.c		qsc
 
+#
+# Machine-independent ATA drivers
+#
+include	"dev/ata/files.ata"
+
+attach	wdc at obio_norm with wdc_obio
+file	arch/mac68k/obio/wdc_obio.c	wdc_obio
+
 device	zsc { channel = -1 }
 attach	zsc at obio_norm
 file	arch/mac68k/dev/zs.c		zsc needs-flag
@@ -141,6 +148,9 @@ file	arch/mac68k/mac68k/fpu.c	fpu
 
 file	arch/m68k/m68k/db_memrw.c	ddb | kgdb
 include "arch/m68k/fpe/files.fpe"
+
+file	arch/m68k/m68k/bus_dma.c
+file	arch/m68k/m68k/cacheops.c
 
 # legitimate pseudo-devices
 defpseudo grf
@@ -163,6 +173,7 @@ file	arch/mac68k/mac68k/pmap.c
 file	arch/mac68k/mac68k/pmap_bootstrap.c	compile-with "${NOPROF_C}"
 file	arch/mac68k/mac68k/pram.c
 file	arch/mac68k/mac68k/pramasm.s
+file	arch/mac68k/mac68k/procfs_machdep.c	procfs
 file	arch/mac68k/mac68k/psc.c
 file	arch/mac68k/mac68k/sys_machdep.c
 file	arch/mac68k/mac68k/trap.c
@@ -176,8 +187,8 @@ file	dev/cons.c
 file	dev/cninit.c
 
 # Memory Disk for installs
-#     These files are out of order
-file	arch/mac68k/dev/md_root.c	memory_disk_hooks
+#	These files are out of order
+file	dev/md_root.c			memory_disk_hooks
 
 major	{sd = 4}
 major	{cd = 6}
@@ -186,7 +197,13 @@ major	{md = 13}
 # RAIDframe
 major	{raid = 20}
 
+#ATA disk
+major	{wd = 22}
+
 # Compatibility modules
+
+# NetBSD m68k a.out Binary Compatibility (COMPAT_AOUT_M68K)
+include "compat/aoutm68k/files.aoutm68k"
 
 # SunOS Binary Compatibility (COMPAT_SUNOS)
 include "compat/sunos/files.sunos"
@@ -198,6 +215,7 @@ include "compat/svr4/files.svr4"
 # Linux binary compatibility (COMPAT_LINUX)
 include "compat/linux/files.linux"
 include "compat/linux/arch/m68k/files.linux_m68k"
+file arch/m68k/m68k/linux_trap.c		compat_linux
 
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"

@@ -1,4 +1,4 @@
-/*	$NetBSD: i82557.c,v 1.34.2.4 2002/06/06 19:41:07 he Exp $	*/
+/*	$NetBSD: i82557.c,v 1.65.2.1 2002/06/10 16:07:11 tv Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999, 2001, 2002 The NetBSD Foundation, Inc.
@@ -72,8 +72,9 @@
  * and its successors, the i82558 and i82559.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i82557.c,v 1.65.2.1 2002/06/10 16:07:11 tv Exp $");
+
 #include "bpfilter.h"
 #include "rnd.h"
 
@@ -90,7 +91,7 @@
 
 #include <machine/endian.h>
 
-#include <vm/vm.h>		/* for PAGE_SIZE */
+#include <uvm/uvm_extern.h>
 
 #if NRND > 0
 #include <sys/rnd.h>
@@ -105,16 +106,6 @@
 #include <net/bpf.h>
 #endif
 
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
 #include <machine/bus.h>
 #include <machine/intr.h>
 
@@ -122,6 +113,8 @@
 
 #include <dev/ic/i82557reg.h>
 #include <dev/ic/i82557var.h>
+
+#include <dev/microcode/i8255x/rcvbundl.h>
 
 /*
  * NOTE!  On the Alpha, we have an alignment constraint.  The
@@ -191,8 +184,8 @@ void	fxp_80c24_mediastatus(struct ifnet *, struct ifmediareq *);
 void	fxp_start(struct ifnet *);
 int	fxp_ioctl(struct ifnet *, u_long, caddr_t);
 void	fxp_watchdog(struct ifnet *);
-int	fxp_init(struct fxp_softc *);
-void	fxp_stop(struct fxp_softc *, int);
+int	fxp_init(struct ifnet *);
+void	fxp_stop(struct ifnet *, int);
 
 void	fxp_txintr(struct fxp_softc *);
 void	fxp_rxintr(struct fxp_softc *);
@@ -209,11 +202,18 @@ void	fxp_eeprom_update_cksum(struct fxp_softc *);
 void	fxp_get_info(struct fxp_softc *, u_int8_t *);
 void	fxp_tick(void *);
 void	fxp_mc_setup(struct fxp_softc *);
+void	fxp_load_ucode(struct fxp_softc *);
 
 void	fxp_shutdown(void *);
 void	fxp_power(int, void *);
 
 int	fxp_copy_small = 0;
+
+/*
+ * Variables for interrupt mitigating microcode.
+ */
+int	fxp_int_delay = 1000;		/* usec */
+int	fxp_bundle_max = 6;		/* packets */
 
 struct fxp_phytype {
 	int	fp_phy;		/* type of PHY, -1 for MII at the end. */
@@ -261,7 +261,7 @@ fxp_scb_cmd(struct fxp_softc *sc, u_int8_t cmd)
 void
 fxp_attach(struct fxp_softc *sc)
 {
-	u_int8_t enaddr[6];
+	u_int8_t enaddr[ETHER_ADDR_LEN];
 	struct ifnet *ifp;
 	bus_dma_segment_t seg;
 	int rseg, i, error;
@@ -369,6 +369,9 @@ fxp_attach(struct fxp_softc *sc)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+	ifp->if_init = fxp_init;
+	ifp->if_stop = fxp_stop;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * We can support 802.1Q VLAN-sized frames.
@@ -380,10 +383,6 @@ fxp_attach(struct fxp_softc *sc)
 	 */
 	if_attach(ifp);
 	ether_ifattach(ifp, enaddr);
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_ethercom.ec_if.if_bpf, ifp, DLT_EN10MB,
-	    sizeof(struct ether_header));
-#endif
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
 	    RND_TYPE_NET, 0);
@@ -450,6 +449,7 @@ fxp_attach(struct fxp_softc *sc)
 void
 fxp_mii_initmedia(struct fxp_softc *sc)
 {
+	int flags;
 
 	sc->sc_flags |= FXPF_MII;
 
@@ -459,11 +459,15 @@ fxp_mii_initmedia(struct fxp_softc *sc)
 	sc->sc_mii.mii_statchg = fxp_statchg;
 	ifmedia_init(&sc->sc_mii.mii_media, 0, fxp_mii_mediachange,
 	    fxp_mii_mediastatus);
+
+	flags = MIIF_NOISOLATE;
+	if (sc->sc_rev >= FXP_REV_82558_A4)
+		flags |= MIIF_DOPAUSE;
 	/*
 	 * The i82557 wedges if all of its PHYs are isolated!
 	 */
 	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
-	    MII_OFFSET_ANY, MIIF_NOISOLATE);
+	    MII_OFFSET_ANY, flags);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
@@ -503,7 +507,7 @@ fxp_shutdown(void *arg)
 	 * Since the system's going to halt shortly, don't bother
 	 * freeing mbufs.
 	 */
-	fxp_stop(sc, 0);
+	fxp_stop(&sc->sc_ethercom.ec_if, 0);
 }
 /*
  * Power handler routine. Called when the system is transitioning
@@ -515,19 +519,18 @@ void
 fxp_power(int why, void *arg)
 {
 	struct fxp_softc *sc = arg;
-	struct ifnet *ifp;
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	int s;
 
 	s = splnet();
 	switch (why) {
 	case PWR_SUSPEND:
 	case PWR_STANDBY:
-		fxp_stop(sc, 0);
+		fxp_stop(ifp, 0);
 		break;
 	case PWR_RESUME:
-		ifp = &sc->sc_ethercom.ec_if;
 		if (ifp->if_flags & IFF_UP)
-			fxp_init(sc);
+			fxp_init(ifp);
 		break;
 	case PWR_SOFTSUSPEND:
 	case PWR_SOFTSTANDBY:
@@ -543,7 +546,7 @@ fxp_power(int why, void *arg)
 void
 fxp_get_info(struct fxp_softc *sc, u_int8_t *enaddr)
 {
-	u_int16_t data, myea[3];
+	u_int16_t data, myea[ETHER_ADDR_LEN / 2];
 
 	/*
 	 * Reset to a stable state.
@@ -843,9 +846,10 @@ fxp_start(struct ifnet *ifp)
 		/*
 		 * Grab a packet off the queue.
 		 */
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_POLL(&ifp->if_snd, m0);
 		if (m0 == NULL)
 			break;
+		m = NULL;
 
 		if (sc->sc_txpending == FXP_NTXCB) {
 			FXP_EVCNT_INCR(&sc->sc_ev_txstall);
@@ -867,12 +871,11 @@ fxp_start(struct ifnet *ifp)
 		 * again.
 		 */
 		if (bus_dmamap_load_mbuf(sc->sc_dmat, dmamap, m0,
-		    BUS_DMA_NOWAIT) != 0) {
+		    BUS_DMA_WRITE|BUS_DMA_NOWAIT) != 0) {
 			MGETHDR(m, M_DONTWAIT, MT_DATA);
 			if (m == NULL) {
 				printf("%s: unable to allocate Tx mbuf\n",
 				    sc->sc_dev.dv_xname);
-				IF_PREPEND(&ifp->if_snd, m0);
 				break;
 			}
 			if (m0->m_pkthdr.len > MHLEN) {
@@ -881,22 +884,24 @@ fxp_start(struct ifnet *ifp)
 					printf("%s: unable to allocate Tx "
 					    "cluster\n", sc->sc_dev.dv_xname);
 					m_freem(m);
-					IF_PREPEND(&ifp->if_snd, m0);
 					break;
 				}
 			}
 			m_copydata(m0, 0, m0->m_pkthdr.len, mtod(m, caddr_t));
 			m->m_pkthdr.len = m->m_len = m0->m_pkthdr.len;
-			m_freem(m0);
-			m0 = m;
 			error = bus_dmamap_load_mbuf(sc->sc_dmat, dmamap,
-			    m0, BUS_DMA_NOWAIT);
+			    m, BUS_DMA_WRITE|BUS_DMA_NOWAIT);
 			if (error) {
 				printf("%s: unable to load Tx buffer, "
 				    "error = %d\n", sc->sc_dev.dv_xname, error);
-				IF_PREPEND(&ifp->if_snd, m0);
 				break;
 			}
+		}
+
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
+		if (m != NULL) {
+			m_freem(m0);
+			m0 = m;
 		}
 
 		/* Initialize the fraglist. */
@@ -1058,7 +1063,7 @@ fxp_intr(void *arg)
 				 * If we want a re-init, do that now.
 				 */
 				if (sc->sc_flags & FXPF_WANTINIT)
-					(void) fxp_init(sc);
+					(void) fxp_init(ifp);
 			}
 		}
 	}
@@ -1126,7 +1131,6 @@ fxp_rxintr(struct fxp_softc *sc)
 	struct mbuf *m, *m0;
 	bus_dmamap_t rxmap;
 	struct fxp_rfa *rfa;
-	struct ether_header *eh;
 	u_int16_t len, rxstat;
 
 	for (;;) {
@@ -1208,23 +1212,14 @@ fxp_rxintr(struct fxp_softc *sc)
 
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = len;
-		eh = mtod(m, struct ether_header *);
 
 #if NBPFILTER > 0
 		/*
 		 * Pass this up to any BPF listeners, but only
 		 * pass it up the stack it its for us.
 		 */
-		if (ifp->if_bpf) {
+		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
-
-			if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-			    (rxstat & FXP_RFA_STATUS_IAMATCH) != 0 &&
-			    (eh->ether_dhost[0] & 1) == 0) {
-				m_freem(m);
-				continue;
-			}
-		}
 #endif
 
 		/* Pass it on. */
@@ -1293,7 +1288,7 @@ fxp_tick(void *arg)
 	 * speed transition).
 	 */
 	if (sc->sc_rxidle > FXP_MAX_RX_IDLE) {
-		(void) fxp_init(sc);
+		(void) fxp_init(ifp);
 		splx(s);
 		return;
 	}
@@ -1363,9 +1358,9 @@ fxp_rxdrain(struct fxp_softc *sc)
  * the interface.
  */
 void
-fxp_stop(struct fxp_softc *sc, int drain)
+fxp_stop(struct ifnet *ifp, int disable)
 {
-	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+	struct fxp_softc *sc = ifp->if_softc;
 	struct fxp_txsoft *txs;
 	int i;
 
@@ -1386,10 +1381,12 @@ fxp_stop(struct fxp_softc *sc, int drain)
 	}
 
 	/*
-	 * Issue software reset
+	 * Issue software reset.  This unloads any microcode that
+	 * might already be loaded.
 	 */
-	CSR_WRITE_4(sc, FXP_CSR_PORT, FXP_PORT_SELECTIVE_RESET);
-	DELAY(10);
+	sc->sc_flags &= ~FXPF_UCODE_LOADED;
+	CSR_WRITE_4(sc, FXP_CSR_PORT, FXP_PORT_SOFTWARE_RESET);
+	DELAY(50);
 
 	/*
 	 * Release any xmit buffers.
@@ -1404,11 +1401,9 @@ fxp_stop(struct fxp_softc *sc, int drain)
 	}
 	sc->sc_txpending = 0;
 
-	if (drain) {
-		/*
-		 * Release the receive buffers.
-		 */
+	if (disable) {
 		fxp_rxdrain(sc);
+		fxp_disable(sc);
 	}
 
 }
@@ -1427,26 +1422,29 @@ fxp_watchdog(struct ifnet *ifp)
 	printf("%s: device timeout\n", sc->sc_dev.dv_xname);
 	ifp->if_oerrors++;
 
-	(void) fxp_init(sc);
+	(void) fxp_init(ifp);
 }
 
 /*
  * Initialize the interface.  Must be called at splnet().
  */
 int
-fxp_init(struct fxp_softc *sc)
+fxp_init(struct ifnet *ifp)
 {
-	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+	struct fxp_softc *sc = ifp->if_softc;
 	struct fxp_cb_config *cbp;
 	struct fxp_cb_ias *cb_ias;
 	struct fxp_txdesc *txd;
 	bus_dmamap_t rxmap;
 	int i, prm, save_bf, lrxen, allm, error = 0;
 
+	if ((error = fxp_enable(sc)) != 0)
+		goto out;
+
 	/*
 	 * Cancel any pending I/O
 	 */
-	fxp_stop(sc, 0);
+	fxp_stop(ifp, 0);
 
 	/* 
 	 * XXX just setting sc_flags to 0 here clears any FXPF_MII
@@ -1504,6 +1502,11 @@ fxp_init(struct fxp_softc *sc)
 
 	cbp = &sc->sc_control_data->fcd_configcb;
 	memset(cbp, 0, sizeof(struct fxp_cb_config));
+
+	/*
+	 * Load microcode for this controller.
+	 */
+	fxp_load_ucode(sc);
 
 	/*
 	 * This copy is kind of disgusting, but there are a bunch of must be
@@ -1740,8 +1743,11 @@ fxp_init(struct fxp_softc *sc)
 	fxp_start(ifp);
 
  out:
-	if (error)
+	if (error) {
+		ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+		ifp->if_timer = 0;
 		printf("%s: interface not running\n", sc->sc_dev.dv_xname);
+	}
 	return (error);
 }
 
@@ -1827,7 +1833,8 @@ fxp_add_rfabuf(struct fxp_softc *sc, bus_dmamap_t rxmap, int unload)
 	M_SETCTX(m, rxmap);
 
 	error = bus_dmamap_load(sc->sc_dmat, rxmap,
-	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL, BUS_DMA_NOWAIT);
+	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL,
+	    BUS_DMA_READ|BUS_DMA_NOWAIT);
 	if (error) {
 		printf("%s: can't load rx DMA map %d, error = %d\n",
 		    sc->sc_dev.dv_xname, sc->sc_rxq.ifq_len, error);
@@ -1885,119 +1892,42 @@ fxp_mdi_write(struct device *self, int phy, int reg, int value)
 }
 
 int
-fxp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+fxp_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct fxp_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
-	struct ifaddr *ifa = (struct ifaddr *)data;
-	int s, error = 0;
+	int s, error;
 
 	s = splnet();
 
-	switch (command) {
-	case SIOCSIFADDR:
-		if ((error = fxp_enable(sc)) != 0)
-			break;
-		ifp->if_flags |= IFF_UP;
-
-		switch (ifa->ifa_addr->sa_family) {
-#ifdef INET
-		case AF_INET:
-			if ((error = fxp_init(sc)) != 0)
-				break;
-			arp_ifinit(ifp, ifa);
-			break;
-#endif /* INET */
-#ifdef NS
-		case AF_NS:
-		    {
-			 struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
-
-			 if (ns_nullhost(*ina))
-				ina->x_host = *(union ns_host *)
-				    LLADDR(ifp->if_sadl);
-			 else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
-				    ifp->if_addrlen);
-			 /* Set new address. */
-			 error = fxp_init(sc);
-			 break;
-		    }
-#endif /* NS */
-		default:
-			error = fxp_init(sc);
-			break;
-		}
-		break;
-
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu > ETHERMTU)
-			error = EINVAL;
-		else
-			ifp->if_mtu = ifr->ifr_mtu;
-		break;
-
-	case SIOCSIFFLAGS:
-		if ((ifp->if_flags & IFF_UP) == 0 &&
-		    (ifp->if_flags & IFF_RUNNING) != 0) {
-			/*
-			 * If interface is marked down and it is running, then
-			 * stop it.
-			 */
-			fxp_stop(sc, 1);
-			fxp_disable(sc);
-		} else if ((ifp->if_flags & IFF_UP) != 0 &&
-		    (ifp->if_flags & IFF_RUNNING) == 0) {
-			/*
-			 * If interface is marked up and it is stopped, then
-			 * start it.
-			 */
-			if((error = fxp_enable(sc)) != 0)
-				break;
-			error = fxp_init(sc);
-		} else if ((ifp->if_flags & IFF_UP) != 0) {
-			/*
-			 * Reset the interface to pick up change in any other
-			 * flags that affect the hardware state.
-			 */
-			if((error = fxp_enable(sc)) != 0)
-				break;
-			error = fxp_init(sc);
-		}
-		break;
-
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-		if(sc->sc_enabled == 0) {
-			error = EIO;
-			break;
-		}
-		error = (command == SIOCADDMULTI) ?
-		    ether_addmulti(ifr, &sc->sc_ethercom) :
-		    ether_delmulti(ifr, &sc->sc_ethercom);
-
-		if (error == ENETRESET) {
-			/*
-			 * Multicast list has changed; set the hardware
-			 * filter accordingly.
-			 */
-			if (sc->sc_txpending) {
-				sc->sc_flags |= FXPF_WANTINIT;
-				error = 0;
-			} else
-				error = fxp_init(sc);
-		}
-		break;
-
+	switch (cmd) {
 	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
-		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii.mii_media, command);
+		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii.mii_media, cmd);
 		break;
 
 	default:
-		error = EINVAL;
+		error = ether_ioctl(ifp, cmd, data);
+		if (error == ENETRESET) {
+			if (sc->sc_enabled) {
+				/*
+				 * Multicast list has changed; set the
+				 * hardware filter accordingly.
+				 */
+				if (sc->sc_txpending) {
+					sc->sc_flags |= FXPF_WANTINIT;
+					error = 0;
+				} else
+					error = fxp_init(ifp);
+			} else
+				error = 0;
+		}
 		break;
 	}
+
+	/* Try to get more packets going. */
+	if (sc->sc_enabled)
+		fxp_start(ifp);
 
 	splx(s);
 	return (error);
@@ -2100,6 +2030,121 @@ fxp_mc_setup(struct fxp_softc *sc)
 	}
 }
 
+static const uint32_t fxp_ucode_d101a[] = D101_A_RCVBUNDLE_UCODE;
+static const uint32_t fxp_ucode_d101b0[] = D101_B0_RCVBUNDLE_UCODE;
+static const uint32_t fxp_ucode_d101ma[] = D101M_B_RCVBUNDLE_UCODE;
+static const uint32_t fxp_ucode_d101s[] = D101S_RCVBUNDLE_UCODE;
+static const uint32_t fxp_ucode_d102[] = D102_B_RCVBUNDLE_UCODE;
+static const uint32_t fxp_ucode_d102c[] = D102_C_RCVBUNDLE_UCODE;
+
+#define	UCODE(x)	x, sizeof(x)
+
+static const struct ucode {
+	uint32_t	revision;
+	const uint32_t	*ucode;
+	size_t		length;
+	uint16_t	int_delay_offset;
+	uint16_t	bundle_max_offset;
+} ucode_table[] = {
+	{ FXP_REV_82558_A4, UCODE(fxp_ucode_d101a),
+	  D101_CPUSAVER_DWORD, 0 },
+
+	{ FXP_REV_82558_B0, UCODE(fxp_ucode_d101b0),
+	  D101_CPUSAVER_DWORD, 0 },
+
+	{ FXP_REV_82559_A0, UCODE(fxp_ucode_d101ma),
+	  D101M_CPUSAVER_DWORD, D101M_CPUSAVER_BUNDLE_MAX_DWORD },
+
+	{ FXP_REV_82559S_A, UCODE(fxp_ucode_d101s),
+	  D101S_CPUSAVER_DWORD, D101S_CPUSAVER_BUNDLE_MAX_DWORD },
+
+	{ FXP_REV_82550, UCODE(fxp_ucode_d102),
+	  D102_B_CPUSAVER_DWORD, D102_B_CPUSAVER_BUNDLE_MAX_DWORD },
+
+	{ FXP_REV_82550_C, UCODE(fxp_ucode_d102c),
+	  D102_C_CPUSAVER_DWORD, D102_C_CPUSAVER_BUNDLE_MAX_DWORD },
+
+	{ 0, NULL, 0, 0, 0 }
+};
+
+void
+fxp_load_ucode(struct fxp_softc *sc)
+{
+	const struct ucode *uc;
+	struct fxp_cb_ucode *cbp = &sc->sc_control_data->fcd_ucode;
+	int count;
+
+	if (sc->sc_flags & FXPF_UCODE_LOADED)
+		return;
+
+	/*
+	 * Only load the uCode if the user has requested that
+	 * we do so.
+	 */
+	if ((sc->sc_ethercom.ec_if.if_flags & IFF_LINK0) == 0) {
+		sc->sc_int_delay = 0;
+		sc->sc_bundle_max = 0;
+		return;
+	}
+
+	for (uc = ucode_table; uc->ucode != NULL; uc++) {
+		if (sc->sc_rev == uc->revision)
+			break;
+	}
+	if (uc->ucode == NULL)
+		return;
+
+	/* BIG ENDIAN: no need to swap to store 0 */
+	cbp->cb_status = 0;
+	cbp->cb_command = htole16(FXP_CB_COMMAND_UCODE | FXP_CB_COMMAND_EL);
+	cbp->link_addr = 0xffffffff;		/* (no) next command */
+	memcpy((void *) cbp->ucode, uc->ucode, uc->length);
+
+	if (uc->int_delay_offset)
+		*(uint16_t *) &cbp->ucode[uc->int_delay_offset] =
+		    htole16(fxp_int_delay + (fxp_int_delay / 2));
+
+	if (uc->bundle_max_offset)
+		*(uint16_t *) &cbp->ucode[uc->bundle_max_offset] =
+		    htole16(fxp_bundle_max);
+	
+	FXP_CDUCODESYNC(sc, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
+
+	/*
+	 * Download the uCode to the chip.
+	 */
+	fxp_scb_wait(sc);
+	CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL, sc->sc_cddma + FXP_CDUCODEOFF);
+	fxp_scb_cmd(sc, FXP_SCB_COMMAND_CU_START);
+
+	/* ...and wait for it to complete. */
+	count = 10000;
+	do {
+		FXP_CDUCODESYNC(sc,
+		    BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
+		DELAY(2);
+	} while ((le16toh(cbp->cb_status) & FXP_CB_STATUS_C) == 0 && --count);
+	if (count == 0) {
+		sc->sc_int_delay = 0;
+		sc->sc_bundle_max = 0;
+		printf("%s: timeout loading microcode\n",
+		    sc->sc_dev.dv_xname);
+		return;
+	}
+
+	if (sc->sc_int_delay != fxp_int_delay ||
+	    sc->sc_bundle_max != fxp_bundle_max) {
+		sc->sc_int_delay = fxp_int_delay;
+		sc->sc_bundle_max = fxp_bundle_max;
+		printf("%s: Microcode loaded: int delay: %d usec, "
+		    "max bundle: %d\n", sc->sc_dev.dv_xname,
+		    sc->sc_int_delay,
+		    uc->bundle_max_offset == 0 ? 0 : sc->sc_bundle_max);
+	}
+
+	sc->sc_flags |= FXPF_UCODE_LOADED;
+}
+
 int
 fxp_enable(struct fxp_softc *sc)
 {
@@ -2183,9 +2228,6 @@ fxp_detach(struct fxp_softc *sc)
 
 #if NRND > 0
 	rnd_detach_source(&sc->rnd_source);
-#endif
-#if NBPFILTER > 0
-	bpfdetach(ifp);
 #endif
 	ether_ifdetach(ifp);
 	if_detach(ifp);

@@ -1,4 +1,4 @@
-/*	$NetBSD: fifo.h,v 1.16 1998/08/13 10:06:33 kleink Exp $	*/
+/*	$NetBSD: fifo.h,v 1.18 2001/12/06 04:27:41 chs Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -81,6 +81,7 @@ int	fifo_pathconf	__P((void *));
 #define fifo_truncate	genfs_nullop
 #define fifo_update	genfs_nullop
 #define fifo_bwrite	genfs_nullop
+#define	fifo_putpages	genfs_null_putpages
 
 void 	fifo_printinfo __P((struct vnode *));
 

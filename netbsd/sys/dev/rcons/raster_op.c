@@ -1,4 +1,4 @@
-/*	$NetBSD: raster_op.c,v 1.9.4.1 2000/10/06 23:25:02 deberg Exp $ */
+/*	$NetBSD: raster_op.c,v 1.11 2001/11/13 06:58:44 lukem Exp $ */
 
 /*-
  * Copyright (c) 1991, 1993
@@ -69,6 +69,9 @@
  *       8-bits no-src
  *       16-bits no-src
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: raster_op.c,v 1.11 2001/11/13 06:58:44 lukem Exp $");
 
 #include <sys/types.h>
 #ifdef _KERNEL

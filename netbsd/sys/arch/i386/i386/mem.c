@@ -1,4 +1,4 @@
-/*	$NetBSD: mem.c,v 1.44.6.1 2000/06/30 16:27:26 simonb Exp $	*/
+/*	$NetBSD: mem.c,v 1.51 2002/02/27 01:20:53 christos Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -40,11 +40,14 @@
  *	@(#)mem.c	8.3 (Berkeley) 1/12/94
  */
 
-#include "opt_compat_netbsd.h"
-
 /*
  * Memory special file
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.51 2002/02/27 01:20:53 christos Exp $");
+
+#include "opt_compat_netbsd.h"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -56,8 +59,6 @@
 
 #include <machine/cpu.h>
 #include <machine/conf.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -75,7 +76,7 @@ mmopen(dev, flag, mode, p)
 	switch (minor(dev)) {
 #ifdef COMPAT_10
 	/* This is done by i386_iopl(3) now. */
-	case 14:
+	case DEV_IO:
 		if (flag & FWRITE) {
 			struct trapframe *fp;
 			fp = curproc->p_md.md_regs;
@@ -115,7 +116,7 @@ mmrw(dev, uio, flags)
 	static int physlock;
 	vm_prot_t prot;
 
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 		/* lock against other uses of shared vmmap */
 		while (physlock > 0) {
 			physlock++;
@@ -136,23 +137,22 @@ mmrw(dev, uio, flags)
 			continue;
 		}
 		switch (minor(dev)) {
-
-/* minor device 0 is physical memory */
-		case 0:
+		case DEV_MEM:
 			v = uio->uio_offset;
 			prot = uio->uio_rw == UIO_READ ? VM_PROT_READ :
 			    VM_PROT_WRITE;
 			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
 			    trunc_page(v), prot, PMAP_WIRED|prot);
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
-			c = min(uio->uio_resid, (int)(NBPG - o));
+			c = min(uio->uio_resid, (int)(PAGE_SIZE - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
-			    (vaddr_t)vmmap + NBPG);
+			    (vaddr_t)vmmap + PAGE_SIZE);
+			pmap_update(pmap_kernel());
 			break;
 
-/* minor device 1 is kernel memory */
-		case 1:
+		case DEV_KMEM:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
 			if (!uvm_kernacc((caddr_t)v, c,
@@ -161,24 +161,22 @@ mmrw(dev, uio, flags)
 			error = uiomove((caddr_t)v, c, uio);
 			break;
 
-/* minor device 2 is EOF/rathole */
-		case 2:
+		case DEV_NULL:
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
 			return (0);
 
-/* minor device 12 (/dev/zero) is source of nulls on read, rathole on write */
-		case 12:
+		case DEV_ZERO:
 			if (uio->uio_rw == UIO_WRITE) {
 				uio->uio_resid = 0;
 				return (0);
 			}
 			if (zeropage == NULL) {
 				zeropage = (caddr_t)
-				    malloc(NBPG, M_TEMP, M_WAITOK);
-				memset(zeropage, 0, NBPG);
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				memset(zeropage, 0, PAGE_SIZE);
 			}
-			c = min(iov->iov_len, NBPG);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(zeropage, c, uio);
 			break;
 
@@ -186,7 +184,7 @@ mmrw(dev, uio, flags)
 			return (ENXIO);
 		}
 	}
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 		if (physlock > 1)
 			wakeup((caddr_t)&physlock);
 		physlock = 0;
@@ -210,7 +208,7 @@ mmmmap(dev, off, prot)
 	 * and /dev/zero is a hack that is handled via the default
 	 * pager in mmap().
 	 */
-	if (minor(dev) != 0)
+	if (minor(dev) != DEV_MEM)
 		return (-1);
 
 	if ((u_int)off > ctob(physmem) && suser(p->p_ucred, &p->p_acflag) != 0)

@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_ecoff.c,v 1.11 2000/04/11 04:37:50 chs Exp $	*/
+/*	$NetBSD: exec_ecoff.c,v 1.16 2001/11/12 15:25:02 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Adam Glass
@@ -32,6 +32,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: exec_ecoff.c,v 1.16 2001/11/12 15:25:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -39,7 +42,6 @@
 #include <sys/vnode.h>
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
 
 #include <sys/exec_ecoff.h>
 
@@ -55,9 +57,7 @@
  * package.
  */
 int
-exec_ecoff_makecmds(p, epp)
-	struct proc *p;
-	struct exec_package *epp;
+exec_ecoff_makecmds(struct proc *p, struct exec_package *epp)
 {
 	int error;
 	struct ecoff_exechdr *execp = epp->ep_hdr;
@@ -68,7 +68,7 @@ exec_ecoff_makecmds(p, epp)
 	if (ECOFF_BADMAG(execp))
 		return ENOEXEC;
 
-	error = cpu_exec_ecoff_hook(p, epp);
+	error = (*epp->ep_esch->u.ecoff_probe_func)(p, epp);
 
 	/*
 	 * if there was an error or there are already vmcmds set up,
@@ -122,9 +122,7 @@ exec_ecoff_makecmds(p, epp)
  * stack setup functions.  They might have errors to return.
  */
 int
-exec_ecoff_setup_stack(p, epp)
-	struct proc *p;
-	struct exec_package *epp;
+exec_ecoff_setup_stack(struct proc *p, struct exec_package *epp)
 {
 
 	epp->ep_maxsaddr = USRSTACK - MAXSSIZ;
@@ -156,11 +154,8 @@ exec_ecoff_setup_stack(p, epp)
  * exec_ecoff_prep_omagic(): Prepare a ECOFF OMAGIC binary's exec package
  */
 int
-exec_ecoff_prep_omagic(p, epp, execp, vp)
-	struct proc *p;
-	struct exec_package *epp;
-	struct ecoff_exechdr *execp;
-	struct vnode *vp;
+exec_ecoff_prep_omagic(struct proc *p, struct exec_package *epp,
+    struct ecoff_exechdr *execp, struct vnode *vp)
 {
 	struct ecoff_aouthdr *eap = &execp->a;
 
@@ -190,11 +185,8 @@ exec_ecoff_prep_omagic(p, epp, execp, vp)
  *                           package.
  */
 int
-exec_ecoff_prep_nmagic(p, epp, execp, vp)
-	struct proc *p;
-	struct exec_package *epp;
-	struct ecoff_exechdr *execp;
-	struct vnode *vp;
+exec_ecoff_prep_nmagic(struct proc *p, struct exec_package *epp,
+    struct ecoff_exechdr *execp, struct vnode *vp)
 {
 	struct ecoff_aouthdr *eap = &execp->a;
 
@@ -233,11 +225,8 @@ exec_ecoff_prep_nmagic(p, epp, execp, vp)
  * text, data, bss, and stack segments.
  */
 int
-exec_ecoff_prep_zmagic(p, epp, execp, vp)
-	struct proc *p;
-	struct exec_package *epp;
-	struct ecoff_exechdr *execp;
-	struct vnode *vp;
+exec_ecoff_prep_zmagic(struct proc *p, struct exec_package *epp,
+    struct ecoff_exechdr *execp, struct vnode *vp)
 {
 	struct ecoff_aouthdr *eap = &execp->a;
 
@@ -260,7 +249,7 @@ exec_ecoff_prep_zmagic(p, epp, execp, vp)
 #endif
 		return ETXTBSY;
 	}
-	vn_marktext(vp);
+	vp->v_flag |= VTEXT;
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, eap->tsize,

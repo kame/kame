@@ -1,4 +1,4 @@
-/* $NetBSD: am79c930.c,v 1.5 2000/03/23 13:57:58 onoe Exp $ */
+/* $NetBSD: am79c930.c,v 1.7 2001/11/13 13:14:34 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -60,9 +60,11 @@
  * end isr
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: am79c930.c,v 1.7 2001/11/13 13:14:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #ifndef __FreeBSD__
 #include <sys/device.h>
 #endif

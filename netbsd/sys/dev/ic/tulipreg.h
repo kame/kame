@@ -1,4 +1,4 @@
-/*	$NetBSD: tulipreg.h,v 1.20.4.1 2000/08/09 14:39:07 castor Exp $	*/
+/*	$NetBSD: tulipreg.h,v 1.28 2002/04/05 04:48:40 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -76,7 +76,7 @@
  *		- No SIO facility (due to the above two differences).
  *		- GPIO interface is different than the 21140's.
  *		- Boards that lack PHYs use the internal NWay block
- *		  and transciever.
+ *		  and transceiver.
  *
  *	- Winbond 89C840F
  *
@@ -105,6 +105,10 @@
  *		- Not all registers have the pad word between them,
  *		  but luckily, there are all AL981-specific registers,
  *		  so this is easy to deal with.
+ *
+ *	- ADMtek AN983 and AN985
+ *
+ *	  Similar to the ADMtek AL981, but with a few differences.
  *
  *	- Xircom X3201-3
  *
@@ -635,7 +639,7 @@ struct tulip_desc {
 #define	OPMODE_WINB_REIO	0x80000000	/* receive early intr on */
 
 /* Shorthand for media-related OPMODE bits */
-#define	OPMODE_MEDIA_BITS	(OPMODE_FD|OPMODE_PS|OPMODE_PCS|OPMODE_SCR)
+#define	OPMODE_MEDIA_BITS	(OPMODE_FD|OPMODE_PS|OPMODE_TTM|OPMODE_PCS|OPMODE_SCR)
 
 /* CSR7 - Interrupt Enable */
 #define	CSR_INTEN		TULIP_CSR7
@@ -816,7 +820,7 @@ struct tulip_desc {
 						   enable */
 #define	SIATXRX_LTE		0x00001000	/* link test enable */
 #define	SIATXRX_APE		0x00002000	/* auto-polarity enable */
-#define	SIATXRX_SPP		0x00004000	/* set plarity plus */
+#define	SIATXRX_SPP		0x00004000	/* set polarity plus */
 #define	SIATXRX_TAS		0x00008000	/* 10base-T/AUI autosensing
 						   enable (21041/21142) */
 #define	SIATXRX_THX		0x00010000	/* 100baseTX-HDX (21142) */
@@ -884,6 +888,20 @@ struct tulip_desc {
 #define	GPP_PNIC_PIN_100M_LPKB	1
 #define	GPP_PNIC_PIN_BNC_XMER	2
 #define	GPP_PNIC_PIN_LNK100X	3
+
+/*
+ * Definitions used for the SMC 9332DST (21140) board.
+ */
+#define GPP_SMC9332DST_PINS	0x3f	/* General Purpose Pin directions */
+#define GPP_SMC9332DST_OK10	0x80	/* 10 Mb/sec Signal Detect gep<7> */
+#define GPP_SMC9332DST_OK100	0x40	/* 100 Mb/sec Signal Detect gep<6> */
+#define GPP_SMC9332DST_INIT	0x09	/* No loopback --- point-to-point */
+
+/*
+ * Definitions used for the Cogent EM1x0 (21140) board.
+ */
+#define GPP_COGENT_EM1x0_PINS	0x3f	/* General Purpose Pin directions */
+#define GPP_COGENT_EM1x0_INIT	0x09	/* No loopback --- point-to-point */
 
 
 /*
@@ -1034,7 +1052,7 @@ struct tulip_desc {
 #define	CSR_PNIC_NWAY		0xb8
 #define	PNIC_NWAY_RS		0x00000001	/* reset NWay block */
 #define	PNIC_NWAY_PD		0x00000002	/* power down NWay block */
-#define	PNIC_NWAY_BX		0x00000004	/* bypass transciever */
+#define	PNIC_NWAY_BX		0x00000004	/* bypass transceiver */
 #define	PNIC_NWAY_LC		0x00000008	/* AUI low current mode */
 #define	PNIC_NWAY_UV		0x00000010	/* low squelch voltage */
 #define	PNIC_NWAY_DX		0x00000020	/* disable TP pol. correction */
@@ -1337,7 +1355,7 @@ struct tulip_desc {
 #define	CSR_ADM_CR		0x88
 #define	ADM_CR_ATUR		0x00000001	/* auto. tx underrun recover */
 #define	ADM_CR_SINT		0x00000002	/* software interrupt */
-#define	ADM_CR_DRT		0x0000000c	/* drain recieve threshold */
+#define	ADM_CR_DRT		0x0000000c	/* drain receive threshold */
 #define	ADM_CR_DRT_8LW		0x00000000	/*   8 longwords */
 #define	ADM_CR_DRT_16LW		0x00000004	/*   16 longwords */
 #define	ADM_CR_DRT_SF		0x00000008	/*   store-and-forward */
@@ -1463,6 +1481,15 @@ struct tulip_desc {
 						   1 == 1.4 VPP */
 #define	ADM_100CTR_ANC		0x1000		/* autoneg completed */
 #define	ADM_100CTR_DISRER	0x2000		/* disable Rx error counter */
+
+/* Operation Mode Register (AN983) */
+#define	CSR_ADM983_OPMODE	0xfc
+#define	ADM983_OPMODE_SPEED	0x80000000	/* 1 == 100, 0 == 10 */
+#define	ADM983_OPMODE_FD	0x40000000	/* 1 == fd, 0 == hd */
+#define	ADM983_OPMODE_LINK	0x20000000	/* 1 == link, 0 == no link */
+#define	ADM983_OPMODE_EERLOD	0x04000000	/* reload from EEPROM */
+#define	ADM983_OPMODE_SingleChip 0x00000007	/* single-chip mode */
+#define	ADM983_OPMODE_MacOnly	 0x00000004	/* MAC-only mode */
 
 /*
  * Xircom X3201-3 registers

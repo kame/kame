@@ -1,14 +1,14 @@
-#	$NetBSD$
+#	$NetBSD: files.eisa,v 1.25 2001/11/28 10:21:21 lukem Exp $
 #
 # Config file and device description for machine-independent EISA code.
 # Included by ports that need it.  Requires that the SCSI files be
 # defined first.
 
-defopt	EISAVERBOSE
+defflag	EISAVERBOSE
 
 device	eisa {[slot = -1]}
 attach	eisa at eisabus
-file	dev/eisa/eisa.c			eisa	needs-flag
+file	dev/eisa/eisa.c			eisa			needs-flag
 
 # Adaptec AHA-174x EISA SCSI Host Adapter family
 device	ahb: scsi
@@ -51,3 +51,7 @@ file	dev/eisa/if_tlp_eisa.c		tlp_eisa
 device	fea: pdq, fddi, ifnet, arp
 attach	fea at eisa
 file	dev/eisa/if_fea.c		fea
+
+# Mylex RAID controllers
+attach	mlx at eisa with mlx_eisa
+file	dev/eisa/mlx_eisa.c		mlx_eisa

@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.14 2000/05/26 00:36:44 thorpej Exp $
+#	$NetBSD: genassym.cf,v 1.18 2002/04/15 17:05:13 bjh21 Exp $
 
 #-
 # Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -36,7 +36,10 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 #
 
+ifdef _KERNEL_OPT
 include "opt_compat_svr4.h"
+include "opt_mbtype.h"
+endif
 
 include <sys/param.h>
 include <sys/buf.h>
@@ -46,7 +49,6 @@ include <sys/msgbuf.h>
 include <sys/syscall.h>
 include <sys/user.h>
 
-include <vm/vm.h>
 include <uvm/uvm_extern.h>
 
 ifdef COMPAT_SVR4
@@ -183,6 +185,12 @@ define	FR_ADJ			offsetof(struct frame, f_stackadj)
 define	FR_SIZE			sizeof(struct trapframe)
 define	SP			SP
 
+# FP frame offsets
+define	FPF_REGS		offsetof(struct fpframe, fpf_regs[0])
+define	FPF_FPCR		offsetof(struct fpframe, fpf_fpcr)
+define	FPF_FPSR		offsetof(struct fpframe, fpf_fpsr)
+define	FPF_FPI			offsetof(struct fpframe, fpf_fpiar)
+
 # system calls
 define	SYS_exit		SYS_exit
 define	SYS_execve		SYS_execve
@@ -206,11 +214,13 @@ define	CPU_68030		CPU_68030
 define	CPU_68040		CPU_68040
 define	CPU_68060		CPU_68060
 
+ifdef _ATARIHW_
 # AD_SCU definition needs this...
 quote #define stio_addr		0
 
 define	SCU_SOFTINT		AD_SCU + offsetof(struct scu, sys_int)
 define	SCU_SYSMASK		AD_SCU + offsetof(struct scu, sys_mask)
+endif
 
 # SVR4 binary compatibility
 ifdef COMPAT_SVR4

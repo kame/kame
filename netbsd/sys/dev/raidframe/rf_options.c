@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_options.c,v 1.3 1999/02/05 00:06:13 oster Exp $	*/
+/*	$NetBSD: rf_options.c,v 1.5 2001/11/13 07:11:15 lukem Exp $	*/
 /*
  * rf_options.c
  */
@@ -29,9 +29,12 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rf_options.c,v 1.5 2001/11/13 07:11:15 lukem Exp $");
+
+#include <dev/raidframe/raidframevar.h>
 
 #include "rf_threadstuff.h"
-#include "rf_types.h"
 #include "rf_archs.h"
 #include "rf_general.h"
 #include "rf_options.h"

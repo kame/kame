@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.15 2000/04/11 02:43:52 nisimura Exp $	*/
+/*	$NetBSD: intr.h,v 1.23 2001/08/27 02:00:16 nisimura Exp $	*/
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -33,18 +33,44 @@
 #ifndef _PMAX_INTR_H_
 #define _PMAX_INTR_H_
 
+#include <sys/device.h>
+#include <sys/lock.h>
+#include <sys/queue.h>
+
 #define	IPL_NONE	0	/* disable only this interrupt */
-#define	IPL_BIO		1	/* disable block I/O interrupts */
-#define	IPL_NET		2	/* disable network interrupts */
-#define	IPL_TTY		3	/* disable terminal interrupts */
-#define	IPL_CLOCK	4	/* disable clock interrupts */
-#define	IPL_STATCLOCK	5	/* disable profiling interrupts */
-#define	IPL_SERIAL	6	/* disable serial hardware interrupts */
-#define	IPL_DMA		7	/* disable DMA reload interrupts */
+
+#define	IPL_SOFT	1	/* generic software interrupts (SI 0) */
+#define	IPL_SOFTCLOCK	2	/* clock software interrupts (SI 0) */
+#define	IPL_SOFTNET	3	/* network software interrupts (SI 1) */
+#define	IPL_SOFTSERIAL	4	/* serial software interrupts (SI 1) */
+
+#define	IPL_BIO		5	/* disable block I/O interrupts */
+#define	IPL_NET		6	/* disable network interrupts */
+#define	IPL_TTY		7	/* disable terminal interrupts */
+#define	IPL_SERIAL	7	/* disable serial interrupts */
+#define	IPL_CLOCK	8	/* disable clock interrupts */
 #define	IPL_HIGH	8	/* disable all interrupts */
+
+#define	_IPL_NSOFT	4
+#define	_IPL_N		9
+
+#define	_IPL_SI0_FIRST	IPL_SOFT
+#define	_IPL_SI0_LAST	IPL_SOFTCLOCK
+
+#define	_IPL_SI1_FIRST	IPL_SOFTNET
+#define	_IPL_SI1_LAST	IPL_SOFTSERIAL
+
+#define	IPL_SOFTNAMES {							\
+	"misc",								\
+	"clock",							\
+	"net",								\
+	"serial",							\
+}
 
 #ifdef _KERNEL
 #ifndef _LOCORE
+
+extern const u_int32_t ipl_si_to_sr[_IPL_NSOFT];
 
 #include <mips/cpuregs.h>
 
@@ -62,19 +88,21 @@ void	_clrsoftintr __P((int));
 #define splbio()	(_splraise(splvec.splbio))
 #define splnet()	(_splraise(splvec.splnet))
 #define spltty()	(_splraise(splvec.spltty))
-#define splimp()	(_splraise(splvec.splimp))
-#define splpmap()	(_splraise(splvec.splimp))
+#define splvm()		(_splraise(splvec.splvm))
 #define splclock()	(_splraise(splvec.splclock))
 #define splstatclock()	(_splraise(splvec.splstatclock))
 #define spllowersoftclock() _spllower(MIPS_SOFT_INT_MASK_0)
 #define splsoftclock()	_splraise(MIPS_SOFT_INT_MASK_0)
 #define splsoftnet()	_splraise(MIPS_SOFT_INT_MASK_0|MIPS_SOFT_INT_MASK_1)
 
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
+
 struct splvec {
 	int	splbio;
 	int	splnet;
 	int	spltty;
-	int	splimp;
+	int	splvm;
 	int	splclock;
 	int	splstatclock;
 };
@@ -96,22 +124,16 @@ extern struct splvec splvec;
  */
 extern u_long intrcnt[];
 
-#define	SOFTCLOCK_INTR	0
-#define	SOFTNET_INTR	1
-#define	SERIAL0_INTR	2
-#define	SERIAL1_INTR	3
-#define	LANCE_INTR	4
-#define	SCSI_INTR	5
-#define	ERROR_INTR	6
-#define	HARDCLOCK	7
-#define	FPU_INTR	8
-#define	SLOT0_INTR	9
-#define	SLOT1_INTR	10
-#define	SLOT2_INTR	11
-#define	DTOP_INTR	12
-#define	ISDN_INTR	13
-#define	FLOPPY_INTR	14
-#define	STRAY_INTR	15
+#define	SERIAL0_INTR	0
+#define	SERIAL1_INTR	1
+#define	LANCE_INTR	2
+#define	SCSI_INTR	3
+#define	SLOT0_INTR	4
+#define	SLOT1_INTR	5
+#define	SLOT2_INTR	6
+#define	DTOP_INTR	7
+#define	ISDN_INTR	8
+#define	FLOPPY_INTR	9
 
 struct intrhand {
 	int	(*ih_func) __P((void *));
@@ -130,20 +152,66 @@ extern struct intrhand intrtab[];
 #define SYS_DEV_OPT1	SLOT1_INTR
 #define SYS_DEV_OPT2	SLOT2_INTR
 #define SYS_DEV_BOGUS	-1
-#define MAX_DEV_NCOOKIES 16
+#define MAX_DEV_NCOOKIES 10
 
-/*
- * software simulated interrupt
- */
-extern unsigned ssir;
 
-#define SIR_NET		0x1
+struct pmax_intrhand {
+	LIST_ENTRY(pmax_intrhand) ih_q;
+	int (*ih_func)(void *);
+	void *ih_arg;
+};
 
-#define setsoftnet()	setsoft(SIR_NET)
-#define setsoft(x) \
-	do { ssir |= (x); _setsoftintr(MIPS_SOFT_INT_MASK_1); } while (0)
+#define	setsoft(x)							\
+do {									\
+	_setsoftintr(ipl_si_to_sr[(x) - IPL_SOFT]);			\
+} while (0)
 
-#define setsoftclock()	_setsoftintr(MIPS_SOFT_INT_MASK_0)
+struct pmax_soft_intrhand {
+	TAILQ_ENTRY(pmax_soft_intrhand)
+		sih_q;
+	struct pmax_soft_intr *sih_intrhead;
+	void	(*sih_fn)(void *);
+	void	*sih_arg;
+	int	sih_pending;
+};
+
+struct pmax_soft_intr {
+	TAILQ_HEAD(, pmax_soft_intrhand)
+		softintr_q;
+	struct evcnt softintr_evcnt;
+	struct simplelock softintr_slock;
+	unsigned long softintr_ipl;
+};
+
+void	*softintr_establish(int, void (*)(void *), void *);
+void	softintr_disestablish(void *);
+void	softintr_init(void);
+void	softintr_dispatch(void);
+
+#define	softintr_schedule(arg)						\
+do {									\
+	struct pmax_soft_intrhand *__sih = (arg);			\
+	struct pmax_soft_intr *__si = __sih->sih_intrhead;		\
+	int __s;							\
+									\
+	__s = splhigh();						\
+	simple_lock(&__si->softintr_slock);				\
+	if (__sih->sih_pending == 0) {					\
+		TAILQ_INSERT_TAIL(&__si->softintr_q, __sih, sih_q);	\
+		__sih->sih_pending = 1;					\
+		setsoft(__si->softintr_ipl);				\
+	}								\
+	simple_unlock(&__si->softintr_slock);				\
+	splx(__s);							\
+} while (0)
+
+extern struct pmax_soft_intrhand *softnet_intrhand;
+
+#define	setsoftnet()	softintr_schedule(softnet_intrhand)
+
+extern struct evcnt pmax_clock_evcnt;
+extern struct evcnt pmax_fpu_evcnt;
+extern struct evcnt pmax_memerr_evcnt;
 
 #endif /* !_LOCORE */
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mem.c,v 1.6.4.1 2000/06/30 16:27:34 simonb Exp $ */
+/*	$NetBSD: mem.c,v 1.15 2002/02/27 04:13:10 kleink Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -50,23 +50,27 @@
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/malloc.h>
+#include <sys/proc.h>
+#include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 /*ARGSUSED*/
 int
-mmopen(dev, flag, mode)
+mmopen(dev, flag, mode, p)
 	dev_t dev;
 	int flag, mode;
+	struct proc *p;
 {
 	return 0;
 }
 
 /*ARGSUSED*/
 int
-mmclose(dev, flag, mode)
+mmclose(dev, flag, mode, p)
 	dev_t dev;
 	int flag, mode;
+	struct proc *p;
 {
 
 	return 0;
@@ -79,13 +83,13 @@ mmrw(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	vaddr_t o, v;
+	vaddr_t v;
 	u_int c;
 	struct iovec *iov;
 	int error = 0;
 	static caddr_t zeropage;
 	
-	while (uio->uio_resid > 0 && error == 0) {
+	while (uio->uio_resid > 0 && !error) {
 		iov = uio->uio_iov;
 		if (iov->iov_len == 0) {
 			uio->uio_iov++;
@@ -96,53 +100,42 @@ mmrw(dev, uio, flags)
 		}
 		switch (minor(dev)) {
 
-/* minor device 0 is physical memory */
-		case 0:
+		case DEV_MEM:
 			v = uio->uio_offset;
 			c = uio->uio_resid;
-			/* This doesn't allow device mapping!	XXX */
-			pmap_real_memory(&v, &c);
 			error = uiomove((caddr_t)v, c, uio);
-			continue;
+			break;
 
-/* minor device 1 is kernel memory */
-		case 1:
+		case DEV_KMEM:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
 			error = uiomove((caddr_t)v, c, uio);
-			continue;
+			break;
 
-/* minor device 2 is EOF/RATHOLE */
-		case 2:
+		case DEV_NULL:
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
-			return 0;
+			return (0);
 
-/* minor device 12 (/dev/zero) is source of nulls on read, rathole on write */
-		case 12:
+		case DEV_ZERO:
 			if (uio->uio_rw == UIO_WRITE) {
-				c = iov->iov_len;
-				break;
+				uio->uio_resid = 0;
+				return (0);
 			}
 			if (zeropage == NULL) {
-				zeropage = (caddr_t)malloc(NBPG, M_TEMP, M_WAITOK);
-				bzero(zeropage, NBPG);
+				zeropage = (caddr_t)
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				memset(zeropage, 0, PAGE_SIZE);
 			}
-			c = min(iov->iov_len, NBPG);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(zeropage, c, uio);
-			continue;
+			break;
 
 		default:
-			return ENXIO;
+			return (ENXIO);
 		}
-		if (error)
-			break;
-		iov->iov_base = (caddr_t)iov->iov_base + c;
-		iov->iov_len -= c;
-		uio->uio_offset += c;
-		uio->uio_resid -= c;
 	}
-	return error;
+	return (error);
 }
 
 paddr_t
@@ -151,5 +144,12 @@ mmmmap(dev, off, prot)
 	off_t off;
 	int prot;
 {
-	return -1;
+	struct proc *p = curproc;
+
+	if (minor(dev) != DEV_MEM)
+		return (-1);
+
+	if (atop(off) >= physmem && suser(p->p_ucred, &p->p_acflag) != 0)
+		return (-1);
+	return (trunc_page((paddr_t)off));
 }

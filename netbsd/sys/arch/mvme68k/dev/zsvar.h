@@ -1,4 +1,4 @@
-/*	$NetBSD: zsvar.h,v 1.5.4.2 2000/10/17 19:47:29 scw Exp $	*/
+/*	$NetBSD: zsvar.h,v 1.10 2000/11/20 19:35:29 scw Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -42,14 +42,14 @@
  */
 
 /*
- * The MVME-147 provides a 4.9152 MHz clock to the SCC chips.
+ * The MVME-147 provides a 5 MHz clock to the SCC chips.
  */
-#define PCLK_147	(9600 * 512)	/* PCLK pin input clock rate */
+#define PCLK_147	5000000		/* PCLK pin input clock rate */
 
 /*
- * The MVME-162 provides a 9.8304 MHz clock to the SCC chips.
+ * The MVME-162 provides a 10 MHz clock to the SCC chips.
  */
-#define PCLK_162	(9600 * 1024)	/* PCLK pin input clock rate */
+#define PCLK_162	10000000	/* PCLK pin input clock rate */
 
 /*
  * SCC should interrupt host at level 4.
@@ -89,6 +89,6 @@ void	zs_cnconfig __P((int, int, struct zsdevice *, int));
 #ifdef MVME147
 int	zshard_shared __P((void *));
 #endif
-#ifdef MVME162
+#if defined(MVME162) || defined(MVME172)
 int	zshard_unshared(void *);
 #endif

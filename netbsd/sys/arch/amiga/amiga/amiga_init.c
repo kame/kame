@@ -1,4 +1,4 @@
-/*	$NetBSD: amiga_init.c,v 1.69 2000/01/23 21:08:16 aymeric Exp $	*/
+/*	$NetBSD: amiga_init.c,v 1.77.4.1 2002/06/05 09:38:01 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -34,10 +34,13 @@
 #include "opt_amigaccgrf.h"
 #include "opt_p5ppc68kboard.h"
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: amiga_init.c,v 1.77.4.1 2002/06/05 09:38:01 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/user.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
@@ -51,8 +54,6 @@
 #include <sys/dkbad.h>
 #include <sys/reboot.h>
 #include <sys/exec.h>
-#include <vm/pmap.h>
-#include <machine/vmparam.h>
 #include <machine/pte.h>
 #include <machine/cpu.h>
 #include <amiga/amiga/cc.h>
@@ -66,7 +67,6 @@
 
 #define RELOC(v, t)	*((t*)((u_int)&(v) + loadbase))
 
-extern int	machineid, mmutype;
 extern u_int	lowram;
 extern u_int	Sysptmap, Sysptsize, Sysseg, Umap, proc0paddr;
 extern u_int	Sysseg_pa;
@@ -108,6 +108,10 @@ u_int namigahwpg;
 vaddr_t amigashdwaddr;
 u_int namigashdwpg;
 
+vaddr_t CHIPMEMADDR;
+vaddr_t chipmem_start;
+vaddr_t chipmem_end;
+
 vaddr_t z2mem_start;		/* XXX */
 static vaddr_t z2mem_end;		/* XXX */
 int use_z2_mem = 1;			/* XXX */
@@ -116,22 +120,26 @@ u_long boot_fphystart, boot_fphysize, boot_cphysize;
 
 static u_long boot_flags;
 
+struct boot_memlist *memlist;
+
+struct cfdev *cfdev;
+int ncfdev;
+
 u_long scsi_nosync;
 int shift_nosync;
 
-void  start_c __P((int, u_int, u_int, u_int, char *, u_int, u_long, u_long));
-void rollcolor __P((int));
-static int kernel_image_magic_size __P((void));
-static void kernel_image_magic_copy __P((u_char *));
-int kernel_reload_write __P((struct uio *));
-extern void kernel_reload __P((char *, u_long, u_long, u_long, u_long,
-	u_long, u_long, u_long, u_long, u_long, u_long));
-extern void etext __P((void));
-void start_c_cleanup __P((void));
+void  start_c(int, u_int, u_int, u_int, char *, u_int, u_long, u_long);
+void rollcolor(int);
+static int kernel_image_magic_size(void);
+static void kernel_image_magic_copy(u_char *);
+int kernel_reload_write(struct uio *);
+extern void kernel_reload(char *, u_long, u_long, u_long, u_long,
+	u_long, u_long, u_long, u_long, u_long, u_long);
+extern void etext(void);
+void start_c_cleanup(void);
 
 void *
-chipmem_steal(amount)
-	long amount;
+chipmem_steal(long amount)
 {
 	/*
 	 * steal from top of chipmem, so we don't collide with
@@ -241,7 +249,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	RELOC(boot_cphysize, u_long) = cphysize;
 
 	RELOC(machineid, int) = id;
-	RELOC(chipmem_end, paddr_t) = cphysize;
+	RELOC(chipmem_end, vaddr_t) = cphysize;
 	RELOC(esym, char *) = esym_addr;
 	RELOC(boot_flags, u_long) = flags;
 	RELOC(boot_partition, u_long) = boot_part;
@@ -333,13 +341,6 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	}
 
 	/*
-	 * update these as soon as possible!
-	 */
-	RELOC(PAGE_SIZE, u_int)  = NBPG;
-	RELOC(PAGE_MASK, u_int)  = NBPG-1;
-	RELOC(PAGE_SHIFT, u_int) = PG_SHIFT;
-
-	/*
 	 * assume KVA_MIN == 0.  We subtract the kernel code (and
 	 * the configdev's and memlists) from the virtual and
 	 * phsical starts and ends.
@@ -375,8 +376,8 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	ptpa = pstart;
 #ifdef DRACO
 	if ((id>>24)==0x7D) {
-		ptextra = NDRCCPG 
-		    + RELOC(NZTWOMEMPG, u_int) 
+		ptextra = NDRCCPG
+		    + RELOC(NZTWOMEMPG, u_int)
 		    + btoc(RELOC(ZBUSAVAIL, u_int));
 	} else
 #endif
@@ -502,8 +503,8 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 			}
 			sg = (u_int *)RELOC(Sysseg_pa, u_int);
 			sg = (u_int *)(sg[loadbase >> SG4_SHIFT1] & SG4_ADDR1);
-			shadow_pt = 
-			    ((u_int *)(sg[(loadbase & SG4_MASK2) >> SG4_SHIFT2] 
+			shadow_pt =
+			    ((u_int *)(sg[(loadbase & SG4_MASK2) >> SG4_SHIFT2]
 				& SG4_ADDR1)) +
 			    ((loadbase & SG4_MASK3) >> SG4_SHIFT3); /* XXX is */
 
@@ -511,7 +512,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		/*
 		 * Initialize Sysptmap
 		 */
-		sg = (uint *) Sysptmap_pa;
+		sg = (u_int *) Sysptmap_pa;
 		esg = &sg[(ptsize >> PGSHIFT) + 1];
 		pg_proto = ptpa | PG_RW | PG_CI | PG_V;
 		while (sg < esg) {
@@ -569,8 +570,8 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 				vstart += NBPG;
 				avail -= NBPG;
 			}
-			shadow_pt = 
-			    ((u_int *)(sg[loadbase >> SG_ISHIFT] & 0xffffff00)) 
+			shadow_pt =
+			    ((u_int *)(sg[loadbase >> SG_ISHIFT] & 0xffffff00))
 			    + ((loadbase & SG_PMASK) >> SG_PSHIFT);
 		}
 	}
@@ -592,7 +593,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 
 #if defined(M68040) || defined(M68060)
 	/*
-	 * map the kernel segment table cache invalidated for 
+	 * map the kernel segment table cache invalidated for
 	 * these machines (for the 68040 not strictly necessary, but
 	 * recommended by Motorola; for the 68060 mandatory)
 	 */
@@ -648,7 +649,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 
 #ifdef DEBUG_KERNEL_START
 		/*
-		 * early rollcolor Altais mapping 
+		 * early rollcolor Altais mapping
 		 * XXX (only works if in slot 0)
 		 */
 		*pg++ = 0x20000000 | PG_RW | PG_CI | PG_V;
@@ -656,7 +657,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	} else
 #endif
 	{
-		pg_proto = CHIPMEMBASE | PG_RW | PG_CI | PG_V;	
+		pg_proto = CHIPMEMBASE | PG_RW | PG_CI | PG_V;
 						/* CI needed here?? */
 		while (pg_proto < CHIPMEMTOP) {
 			*pg++     = pg_proto;
@@ -697,10 +698,10 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		pg = shadow_pt;
 		*pg++ = PG_NV;			/* Make page 0 invalid */
 		pg_proto += NBPG;
-		for (i = NBPG; i < (u_int)etext; i += NBPG, pg_proto += NBPG) 
+		for (i = NBPG; i < (u_int)etext; i += NBPG, pg_proto += NBPG)
 			*pg++ = pg_proto;
 		pg_proto = (pg_proto & PG_FRAME) | PG_RW | PG_V;
-		for (; i < vstart + USPACE; i += NBPG, pg_proto += NBPG) 
+		for (; i < vstart + USPACE; i += NBPG, pg_proto += NBPG)
 			*pg++ = pg_proto;
 	}
 
@@ -750,15 +751,15 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		RELOC(DRCCADDR, u_int) =
 		    (u_int)RELOC(Sysmap, u_int) - ptextra * NBPG;
 
-		RELOC(CIAADDR, u_int) =
+		RELOC(CIAADDR, vaddr_t) =
 		    RELOC(DRCCADDR, u_int) + DRCIAPG * NBPG;
 
 		if (RELOC(z2mem_end, vaddr_t)) {		/* XXX */
-			RELOC(ZTWOMEMADDR, u_int) =
+			RELOC(ZTWOMEMADDR, vaddr_t) =
 			    RELOC(DRCCADDR, u_int) + NDRCCPG * NBPG;
 
 			RELOC(ZBUSADDR, vaddr_t) =
-			    RELOC(ZTWOMEMADDR, u_int) + 
+			    RELOC(ZTWOMEMADDR, vaddr_t) +
 			    RELOC(NZTWOMEMPG, u_int)*NBPG;
 		} else {
 			RELOC(ZBUSADDR, vaddr_t) =
@@ -769,31 +770,31 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		 * some nice variables for pmap to use
 		 */
 		RELOC(amigahwaddr, vaddr_t) = RELOC(DRCCADDR, u_int);
-	} else 
+	} else
 #endif
 	{
-		RELOC(CHIPMEMADDR, u_int) =
+		RELOC(CHIPMEMADDR, vaddr_t) =
 		    (u_int)RELOC(Sysmap, u_int) - ptextra * NBPG;
 		if (RELOC(z2mem_end, u_int) == 0)
-			RELOC(CIAADDR, u_int) =
-			    RELOC(CHIPMEMADDR, u_int) + NCHIPMEMPG * NBPG;
+			RELOC(CIAADDR, vaddr_t) =
+			    RELOC(CHIPMEMADDR, vaddr_t) + NCHIPMEMPG * NBPG;
 		else {
-			RELOC(ZTWOMEMADDR, u_int) =
-			    RELOC(CHIPMEMADDR, u_int) + NCHIPMEMPG * NBPG;
-			RELOC(CIAADDR, u_int) =
-			    RELOC(ZTWOMEMADDR, u_int) + RELOC(NZTWOMEMPG, u_int) * NBPG;
+			RELOC(ZTWOMEMADDR, vaddr_t) =
+			    RELOC(CHIPMEMADDR, vaddr_t) + NCHIPMEMPG * NBPG;
+			RELOC(CIAADDR, vaddr_t) =
+			    RELOC(ZTWOMEMADDR, vaddr_t) + RELOC(NZTWOMEMPG, u_int) * NBPG;
 		}
 		RELOC(ZTWOROMADDR, vaddr_t)  =
-		    RELOC(CIAADDR, u_int) + NCIAPG * NBPG;
+		    RELOC(CIAADDR, vaddr_t) + NCIAPG * NBPG;
 		RELOC(ZBUSADDR, vaddr_t) =
-		    RELOC(ZTWOROMADDR, u_int) + NZTWOROMPG * NBPG;
+		    RELOC(ZTWOROMADDR, vaddr_t) + NZTWOROMPG * NBPG;
 		RELOC(CIAADDR, vaddr_t) += NBPG/2;	/* not on 8k boundery :-( */
 		RELOC(CUSTOMADDR, vaddr_t)  =
-		    RELOC(ZTWOROMADDR, u_int) - ZTWOROMBASE + CUSTOMBASE;
+		    RELOC(ZTWOROMADDR, vaddr_t) - ZTWOROMBASE + CUSTOMBASE;
 		/*
 		 * some nice variables for pmap to use
 		 */
-		RELOC(amigahwaddr, vaddr_t) = RELOC(CHIPMEMADDR, u_int);
+		RELOC(amigahwaddr, vaddr_t) = RELOC(CHIPMEMADDR, vaddr_t);
 	}
 
 	/* Set number of pages to reserve for mapping Amiga hardware pages */
@@ -845,12 +846,12 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 
 		if (id & AMIGA_68060) {
 			/* do i need to clear the branch cache? */
-			asm volatile (	".word 0x4e7a,0x0002;" 
-					"orl #0x400000,d0;" 
+			asm volatile (	".word 0x4e7a,0x0002;"
+					"orl #0x400000,%%d0;"
 					".word 0x4e7b,0x0002" : : : "d0");
 		}
 
-		asm volatile ("movel %0,a0; .word 0x4e7b,0x8807"
+		asm volatile ("movel %0,%%a0; .word 0x4e7b,0x8807"
 		    : : "a" (RELOC(Sysseg_pa, u_int)) : "a0");
 		asm volatile (".word 0xf518" : : );
 
@@ -864,7 +865,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 ((volatile struct Custom *)0xdff000)->color[0] = 0xA70;		/* ORANGE */
 #endif
 
-		asm volatile ("movel #0xc000,d0; .word 0x4e7b,0x0003" 
+		asm volatile ("movel #0xc000,%%d0; .word 0x4e7b,0x0003"
 		    : : :"d0" );
 	} else
 #endif
@@ -875,14 +876,14 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		 * nolimit, share global, 4 byte PTE's
 		 */
 		(RELOC(protorp[0], u_int)) = 0x80000202;
-		asm volatile ("pmove %0@,srp" : : "a" (&RELOC(protorp, u_int)));
+		asm volatile ("pmove %0@,%%srp":: "a" (&RELOC(protorp, u_int)));
 		/*
 		 * setup and load TC register.
 		 * enable_cpr, enable_srp, pagesize=8k,
 		 * A = 8 bits, B = 11 bits
 		 */
 		tc = 0x82d08b00;
-		asm volatile ("pmove %0@,tc" : : "a" (&tc));
+		asm volatile ("pmove %0@,%%tc" : : "a" (&tc));
 	}
 #ifdef DEBUG_KERNEL_START
 #ifdef DRACO
@@ -918,7 +919,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		draco_intfrc = draco_intpen + NBPG;
 		draco_misc = draco_intfrc + NBPG;
 		draco_ioct = (struct drioct *)(DRCCADDR + DRIOCTLPG*NBPG);
-	} else 
+	} else
 #endif
 	{
 		INTREQRaddr = (vaddr_t)&custom.intreqr;
@@ -927,8 +928,8 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	/*
 	 * Get our chip memory allocation system working
 	 */
-	chipmem_start = CHIPMEMADDR + chipmem_start;
-	chipmem_end   = CHIPMEMADDR + chipmem_end;
+	chipmem_start += CHIPMEMADDR;
+	chipmem_end   += CHIPMEMADDR;
 
 	/* XXX is: this MUST NOT BE DONE before the pmap_bootstrap() call */
 	if (z2mem_end) {
@@ -963,11 +964,11 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 
 		*(volatile u_int8_t *)(DRCCADDR + 1 +
 		    DRSUPIOPG*NBPG + 4*(0x2F8 + 1)) = 0; /* and com1 */
-		
+
 		draco_ioct->io_control |= DRCNTRL_WDOGDIS; /* stop Fido */
 		*draco_misc &= ~1/*DRMISC_FASTZ2*/;
 
-	} else 
+	} else
 #endif
 	{
 		custom.intena = 0x7fff;			/* disable ints */
@@ -1001,10 +1002,10 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 
 #ifdef	P5PPC68KBOARD
 	/*
-	 * Are we an P5 PPC/68K board? install different reset 
+	 * Are we an P5 PPC/68K board? install different reset
 	 * routine.
 	 */
-        
+
         for (cdp = cfdev, ecdp = &cfdev[ncfdev]; cdp < ecdp; cdp++) {
 		if (cdp->rom.manid == 8512 &&
 		    (cdp->rom.prodid == 100 || cdp->rom.prodid == 110)) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: msc.c,v 1.15 1998/09/01 02:33:32 mhitch Exp $	*/
+/*	$NetBSD: msc.c,v 1.22 2002/03/17 19:40:31 atatat Exp $ */
 
 /*
  * Copyright (c) 1993 Zik.
@@ -50,6 +50,9 @@
  *   - Reformatted to NetBSD style format.
  *   - Rewritten the carrier detect system to prevent lock-ups (jm 951029)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: msc.c,v 1.22 2002/03/17 19:40:31 atatat Exp $");
 
 #include "msc.h"
 
@@ -106,10 +109,10 @@
  * you have three boards with minor device numbers from 0 to 45.
  */
 
-int	mscparam __P((struct tty *, struct termios *));
-void	mscstart __P((struct tty *));
-int	mschwiflow __P((struct tty *, int));
-int	mscinitcard __P((struct zbus_args *));
+int	mscparam(struct tty *, struct termios *);
+void	mscstart(struct tty *);
+int	mschwiflow(struct tty *, int);
+int	mscinitcard(struct zbus_args *);
 
 int	mscdefaultrate = TTYDEF_SPEED;
 
@@ -138,7 +141,7 @@ struct speedtab mscspeedtab_normal[] = {
 	{ 115200,	MSCPARAM_B115200 },
 	{ -1,		-1		}
 };
-  
+
 struct speedtab mscspeedtab_turbo[] = {
 	{ 0,		0		},
 	{ 100,		MSCPARAM_B50	},
@@ -159,14 +162,14 @@ struct speedtab mscspeedtab_turbo[] = {
 	{ 230400,	MSCPARAM_B115200 },
 	{ -1,		-1		}
 };
-  
+
 struct   speedtab *mscspeedtab;
 
-int mscmctl __P((dev_t dev, int bits, int howto));
-void mscmint __P((register void *data));
+int mscmctl(dev_t dev, int bits, int howto);
+void mscmint(register void *data);
 
-int mscmatch __P((struct device *, struct cfdata *, void *));
-void mscattach __P((struct device *, struct device *, void *));
+int mscmatch(struct device *, struct cfdata *, void *);
+void mscattach(struct device *, struct device *, void *);
 
 #define	SWFLAGS(dev)	(msc->openflags | (MSCDIALIN(dev) ? 0 : TIOCFLAG_SOFTCAR))
 #define	DEBUG_CD	0
@@ -176,10 +179,7 @@ struct cfattach msc_ca = {
 };
 
 int
-mscmatch(pdp, cfp, auxp)
-	struct device *pdp;
-	struct cfdata *cfp;
-	void *auxp;
+mscmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 {
 	struct zbus_args *zap;
 
@@ -191,9 +191,7 @@ mscmatch(pdp, cfp, auxp)
 }
 
 void
-mscattach(pdp, dp, auxp)
-	struct device *pdp, *dp;
-	void *auxp;
+mscattach(struct device *pdp, struct device *dp, void *auxp)
 {
 	volatile struct mscmemory *mscmem;
 	struct mscdevice *msc;
@@ -251,7 +249,7 @@ mscattach(pdp, dp, auxp)
 		msc_tty[MSCTTYSLOT(MSCSLOTUL(unit, Count)) + 1] = NULL;
 	}
 
-	/* disable the non-existant eighth port */
+	/* disable the non-existent eighth port */
 	if (MSCSLOTUL(unit, NUMLINES) < MSCSLOTS)
 		mscdev[MSCSLOTUL(unit, NUMLINES)].active = 0;
 
@@ -260,22 +258,19 @@ mscattach(pdp, dp, auxp)
 
 	add_vbl_function (&msc_vbl_node[unit], MSC_VBL_PRIORITY, (void *)unit);
 
-	return; 
+	return;
 }
 
 /* ARGSUSED */
 int
-mscopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+mscopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	register struct tty *tp;
 	struct mscdevice *msc;
 	volatile struct mscstatus *ms;
 	int error = 0;
 	int s, slot, ttyn;
-  
+
 	/* get the device structure */
 	slot = MSCSLOT(dev);
 	ttyn = MSCTTY(dev);
@@ -322,7 +317,7 @@ mscopen(dev, flag, mode, p)
 	tp->t_param = mscparam;
 	tp->t_dev = dev;
 	tp->t_hwiflow = mschwiflow;
- 
+
 	/* if port is still closing, just bitbucket remaining characters */
 	if (msc->closing) {
 		ms->OutFlush = TRUE;
@@ -376,7 +371,7 @@ mscopen(dev, flag, mode, p)
 		goto done;
 	}
 
-	/* 
+	/*
 	 * s = spltty();
 	 *
 	 * This causes hangs when put here, like other TTY drivers do, rather than
@@ -403,7 +398,7 @@ mscopen(dev, flag, mode, p)
 	printf("msc%d: %d got CD\n", msc->unit, MSCLINE(dev));
 #endif
 
-	done: 
+	done:
 		/* This is a way to handle lost XON characters */
 		if ((flag & O_TRUNC) && (tp->t_state & TS_TTSTOP)) {
 			tp->t_state &= ~TS_TTSTOP;
@@ -418,21 +413,18 @@ mscopen(dev, flag, mode, p)
 	 */
 	tp->t_dev = dev;
 
-	return((*linesw[tp->t_line].l_open)(dev, tp));
+	return tp->t_linesw->l_open(dev, tp);
 }
 
 
 int
-mscclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+mscclose(dev_t dev, int flag, int mode, struct proc *p)
 {
 	register struct tty *tp;
 	int slot;
 	volatile struct mscstatus *ms;
 	struct mscdevice *msc;
-  
+
 	/* get the device structure */
 	slot = MSCSLOT(dev);
 
@@ -445,9 +437,9 @@ mscclose(dev, flag, mode, p)
 		return ENXIO;
 
 	ms = &msc->board->Status[msc->port];
-  
+
 	tp = msc_tty[MSCTTY(dev)];
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	tp->t_linesw->l_close(tp, flag);
 
 	(void) mscmctl(dev, 0, DMSET);
 
@@ -460,44 +452,50 @@ mscclose(dev, flag, mode, p)
 
 	return (0);
 }
- 
+
 
 int
-mscread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+mscread(dev_t dev, struct uio *uio, int flag)
 {
 	register struct tty *tp;
-  
+
 	tp = msc_tty[MSCTTY(dev)];
 
 	if (! tp)
 	 return ENXIO;
 
-	return((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return tp->t_linesw->l_read(tp, uio, flag);
 }
- 
+
 
 int
-mscwrite(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+mscwrite(dev_t dev, struct uio *uio, int flag)
 {
 	register struct tty *tp;
-  
+
 	tp = msc_tty[MSCTTY(dev)];
 
 	if (! tp)
 		return ENXIO;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return tp->t_linesw->l_write(tp, uio, flag);
 }
 
+int
+mscpoll(dev_t dev, int events, struct proc *p)
+{
+	register struct tty *tp;
+
+	tp = msc_tty[MSCTTY(dev)];
+
+	if (! tp)
+		return ENXIO;
+
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
+}
 
 /*
- * This interrupt is periodically invoked in the vertical blank 
+ * This interrupt is periodically invoked in the vertical blank
  * interrupt. It's used to keep track of the modem control lines
  * and (new with the fast_int code) to move accumulated data up in
  * to the tty layer.
@@ -510,8 +508,7 @@ mscwrite(dev, uio, flag)
  *	 clocal mode or an outdial device. RFH
  */
 void
-mscmint (data)
-	register void *data;
+mscmint(register void *data)
 {
 	register struct tty *tp;
 	struct mscdevice *msc;
@@ -560,7 +557,7 @@ mscmint (data)
 				if (MSCDIALIN(tp->t_dev))
 #endif
 				{
-				    if ((*linesw[tp->t_line].l_modem)(tp, 0) == 0) {
+				    if (tp->t_linesw->l_modem(tp, 0) == 0) {
 					/* clear RTS and DTR, bitbucket output */
 					ms = &msc->board->Status[msc->port];
 					ms->Command = (ms->Command & ~MSCCMD_CMask) |
@@ -579,7 +576,7 @@ mscmint (data)
 			    if ((tp = msc_tty[MSCTTYSLOT(MSCSLOTUL(unit, i))]) &&
 				(tp->t_state & TS_ISOPEN) && tp->t_wopen == 0) {
 				    if (MSCDIALIN(tp->t_dev))
-					(*linesw[tp->t_line].l_modem)(tp, 1);
+					tp->t_linesw->l_modem(tp, 1);
 			    } /* if tp valid and port open */
 			}		/* CD on/off */
 		    } /* if CD changed for this line */
@@ -616,7 +613,7 @@ mscmint (data)
 
 		    /* data types of bytes in ibuf */
 		    cbuf = &msc->board->InCtl[msc->port][0];
-    
+
 		    /* do for all chars, if room */
 		    while (bufpos != newhead) {
 			/* which type of input data? */
@@ -625,7 +622,7 @@ mscmint (data)
 			    case MSCINCTL_EVENT:
 				switch (ibuf[bufpos++]) {
 				    case MSCEVENT_Break:
-					(*linesw[tp->t_line].l_rint)(TTY_FE, tp);
+					tp->t_linesw->l_rint(TTY_FE, tp);
 					break;
 
 				    default:
@@ -638,11 +635,11 @@ mscmint (data)
 				if (tp->t_state & TS_TBLOCK) {
 				    goto NoRoomForYa;
 				}
-				(*linesw[tp->t_line].l_rint)((int)ibuf[bufpos++], tp);
+				tp->t_linesw->l_rint((int)ibuf[bufpos++], tp);
 				break;
 
 			    default:
-				printf("msc%d: unknown data type %d\n", 
+				printf("msc%d: unknown data type %d\n",
 				msc->unit, cbuf[bufpos]);
 				bufpos++;
 			} /* switch on input data type */
@@ -661,8 +658,8 @@ NoRoomForYa:
 		if (tp->t_state & TS_BUSY) {
 		    if (bufpos < IOBUFLOWWATER) {
 			tp->t_state &= ~TS_BUSY;	/* not busy any more */
-			if (tp->t_line)
-			    (*linesw[tp->t_line].l_start)(tp);
+			if (tp->t_linesw)
+			    tp->t_linesw->l_start(tp);
 			else
 			    mscstart(tp);
 		    }
@@ -687,7 +684,7 @@ NoRoomForYa:
 
 		    /* data types of bytes in ibuf */
 		    cbuf = &msc->board->InCtl[msc->port][0];
-    
+
 		    /* do for all chars, if room */
 			while (bufpos != newhead) {
 			    /* which type of input data? */
@@ -728,12 +725,7 @@ NoRoomForYa:
 
 
 int
-mscioctl(dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+mscioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	register struct tty *tp;
 	register int slot;
@@ -741,7 +733,7 @@ mscioctl(dev, cmd, data, flag, p)
 	struct mscdevice *msc;
 	volatile struct mscstatus *ms;
 	int s;
-  
+
 	/* get the device structure */
 	slot = MSCSLOT(dev);
 
@@ -757,16 +749,14 @@ mscioctl(dev, cmd, data, flag, p)
 	if (!(tp = msc_tty[MSCTTY(dev)]))
 		return ENXIO;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-
-	if (error >= 0)
+	error = tp->t_linesw->l_ioctl(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = ttioctl(tp, cmd, data, flag, p);
-
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
-  
+
 	switch (cmd) {
 
 		/* send break */
@@ -788,31 +778,31 @@ mscioctl(dev, cmd, data, flag, p)
 		case TIOCSDTR:
 			(void) mscmctl(dev, TIOCM_DTR | TIOCM_RTS, DMBIS);
 			break;
-      
+
 		case TIOCCDTR:
 			if (!MSCDIALIN(dev))	/* don't let dialins drop DTR */
 				(void) mscmctl(dev, TIOCM_DTR | TIOCM_RTS, DMBIC);
 			break;
-      
+
 		case TIOCMSET:
 			(void) mscmctl(dev, *(int *)data, DMSET);
 			break;
-      
+
 		case TIOCMBIS:
 			(void) mscmctl(dev, *(int *)data, DMBIS);
 			break;
-      
+
 		case TIOCMBIC:
 			if (MSCDIALIN(dev))	/* don't let dialins drop DTR */
 				(void) mscmctl(dev, *(int *)data & TIOCM_DTR, DMBIC);
 			else
 				(void) mscmctl(dev, *(int *)data, DMBIC);
 			break;
-      
+
 		case TIOCMGET:
 			*(int *)data = mscmctl(dev, 0, DMGET);
 			break;
-      
+
 		case TIOCGFLAGS:
 			*(int *)data = SWFLAGS(dev);
 			break;
@@ -828,7 +818,7 @@ mscioctl(dev, cmd, data, flag, p)
 			break;
 
 		default:
-			return (ENOTTY);
+			return (EPASSTHROUGH);
 	}
 
 	return (0);
@@ -836,16 +826,14 @@ mscioctl(dev, cmd, data, flag, p)
 
 
 int
-mscparam(tp, t)
-	register struct tty *tp;
-	register struct termios *t;
+mscparam(register struct tty *tp, register struct termios *t)
 {
 	register int cflag = t->c_cflag;
 	struct mscdevice *msc;
 	volatile struct mscstatus *ms;
 	int s, slot;
 	int ospeed = ttspeedtab(t->c_ospeed, mscspeedtab);
-  
+
 	/* get the device structure */
 	slot = MSCSLOT(tp->t_dev);
 
@@ -867,7 +855,7 @@ mscparam(tp, t)
 	tp->t_ispeed = t->c_ispeed;
 	tp->t_ospeed = t->c_ospeed;
 	tp->t_cflag = cflag;
-  
+
 	/* hang up if baud is zero */
 	if (t->c_ospeed == 0) {
 		if (!MSCDIALIN(tp->t_dev))  /* don't let dialins drop DTR */
@@ -885,7 +873,7 @@ mscparam(tp, t)
 
 		splx(s);
 	}
-  
+
 	return(0);
 }
 
@@ -896,9 +884,7 @@ mscparam(tp, t)
  *	done by both of us. rfh
  */
 int
-mschwiflow(tp, flag)
-	struct tty *tp;
-	int flag;
+mschwiflow(struct tty *tp, int flag)
 {
 
 /* Rob's version */
@@ -933,8 +919,7 @@ mschwiflow(tp, flag)
 
 
 void
-mscstart(tp)
-	register struct tty *tp;
+mscstart(register struct tty *tp)
 {
 	register int cc;
 	register char *cp;
@@ -958,7 +943,7 @@ mscstart(tp)
 	s = spltty();
 
 	/* don't start if explicitly stopped */
-	if (tp->t_state & (TS_TIMEOUT|TS_TTSTOP)) 
+	if (tp->t_state & (TS_TIMEOUT|TS_TTSTOP))
 		goto out;
 
 	/* wake up if below low water */
@@ -1001,7 +986,7 @@ mscstart(tp)
 
 		mob = &msc->board->OutBuf[msc->port][0];
 		cp = &msc->tmpbuf[0];
-      
+
 		/* enable output */
 		ms->OutDisable = FALSE;
 
@@ -1029,10 +1014,10 @@ mscstart(tp)
 			tp->t_state &= ~TS_BUSY;
 	}
 
-out:  
+out:
 	splx(s);
 }
- 
+
 
 /* XXX */
 /*
@@ -1040,9 +1025,8 @@ out:
  */
 /*ARGSUSED*/
 void
-mscstop(tp, flag)
-	register struct tty *tp;
-	int flag;			/* defaulted to int anyway */
+mscstop(register struct tty *tp, int flag)
+/* flag variable defaulted to int anyway */
 {
 	register int s;
 #if 0
@@ -1064,15 +1048,13 @@ mscstop(tp, flag)
 	}
 	splx(s);
 }
- 
+
 
 /*
  * bits can be: TIOCM_DTR, TIOCM_RTS, TIOCM_CTS, TIOCM_CD, TIOCM_RI, TIOCM_DSR
  */
 int
-mscmctl(dev, bits, how)
-	dev_t dev;
-	int bits, how;
+mscmctl(dev_t dev, int bits, int how)
 {
 	struct mscdevice *msc;
 	volatile struct mscstatus *ms;
@@ -1102,11 +1084,11 @@ mscmctl(dev, bits, how)
 		    case DMSET:
 			msc->flags = (bits | (msc->flags & ~(TIOCM_DTR | TIOCM_RTS)));
 			break;
-      
+
 		    case DMBIC:
 			msc->flags &= ~bits;
 			break;
-      
+
 		    case DMBIS:
 			msc->flags |= bits;
 			break;
@@ -1134,14 +1116,13 @@ mscmctl(dev, bits, how)
 	bits = msc->flags;
 
 	(void) splx(s);
-  
+
 	return(bits);
 }
 
 
 struct tty *
-msctty(dev)
-	dev_t dev;
+msctty(dev_t dev)
 {
 	return(msc_tty[MSCTTY(dev)]);
 }
@@ -1153,8 +1134,7 @@ msctty(dev)
  */
 
 int
-mscinitcard(zap)
-	struct zbus_args *zap;
+mscinitcard(struct zbus_args *zap)
 {
 	int bcount;
 	short start;
@@ -1162,7 +1142,7 @@ mscinitcard(zap)
 	volatile u_char *to;
 	volatile struct mscmemory *mlm;
 
-	mlm = (volatile struct mscmemory *)zap->va;	
+	mlm = (volatile struct mscmemory *)zap->va;
 	(void)mlm->Enable6502Reset;
 
 	/* copy the code across to the board */

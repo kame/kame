@@ -1,4 +1,4 @@
-/*	$NetBSD: installboot.c,v 1.1.2.1 2000/09/20 13:58:05 nonaka Exp $	*/
+/*	$NetBSD: installboot.c,v 1.3 2002/03/17 23:45:57 nonaka Exp $	*/
 
 /*
  * Copyright (c) 2000 NONAKA Kimihiro (nonaka@netbsd.org).
@@ -37,8 +37,6 @@
 #include <fcntl.h>
 #include <err.h>
 
-#define	MBR_PTYPE_PREP	0x41
-
 int nowrite, verbose;
 char *boot, *dev;
 
@@ -51,9 +49,9 @@ int main(int, char **);
 void
 usage()
 {
-	extern char *__progname;
 
-	fprintf(stderr, "usage: %s [-n] [-v] <boot> <device>\n", __progname);
+	fprintf(stderr, "usage: %s [-n] [-v] <boot> <device>\n",
+	    getprogname());
 	exit(1);
 }
 

@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.45 2000/06/06 18:07:33 soren Exp $
+	$NetBSD: syscalls.master,v 1.51 2001/05/30 11:37:32 mrg Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -31,7 +31,10 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 ; #include's are copied to the syscall names and switch definition files only.
 
+#if defined(_KERNEL_OPT)
+#include "opt_ntp.h"
 #include "opt_sysv.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +52,8 @@
 #include <compat/svr4/svr4_statvfs.h>
 #include <compat/svr4/svr4_resource.h>
 #include <compat/svr4/svr4_acl.h>
+
+%%
 
 0	NOARGS		{ int sys_nosys(void); } syscall
 1	NOARGS		{ int sys_exit(int rval); }
@@ -75,11 +80,11 @@
 			    struct svr4_stat* ub); }
 19	NOARGS		{ long compat_43_sys_lseek(int fd, long offset, \
 			    int whence); }
-20	NOARGS		{ pid_t sys_getpid(void); }
+20	NOARGS MPSAFE	{ pid_t sys_getpid(void); }
 21	UNIMPL		old_mount
 22	UNIMPL		System V umount
 23	NOARGS		{ int sys_setuid(uid_t uid); }
-24	NOARGS		{ uid_t sys_getuid(void); }
+24	NOARGS		{ uid_t sys_getuid_with_euid(void); }
 25	UNIMPL		stime
 26	UNIMPL		ptrace
 27	STD		{ int svr4_sys_alarm(unsigned sec); }
@@ -103,7 +108,7 @@
 44	UNIMPL		profil
 45	UNIMPL		plock
 46	NOARGS		{ int sys_setgid(gid_t gid); }
-47	NOARGS		{ gid_t sys_getgid(void); }
+47	NOARGS		{ gid_t sys_getgid_with_egid(void); }
 48	STD		{ int svr4_sys_signal(int signum, svr4_sig_t handler); }
 #ifdef SYSVMSG
 49	STD		{ int svr4_sys_msgsys(int what, int a2, int a3, \
@@ -403,5 +408,16 @@
 246	NOARGS		{ int sys_setsockopt(int s, int level, int name, \
 			    const void *val, int valsize); }
 247	UNIMPL		sockconfig
+; For some reason, ntp_gettime doesn't want to raise SIGSYS when it's excluded.
 248	NOARGS		{ int sys_ntp_gettime(struct ntptimeval *ntvp); }
+#if defined(NTP) || !defined(_KERNEL)
 249	NOARGS		{ int sys_ntp_adjtime(struct timex *tp); }
+#else
+249	EXCL		ntp_adjtime
+#endif
+250	UNIMPL		lwp_mutex_unlock
+251	UNIMPL		lwp_mutex_trylock
+252	UNIMPL		lwp_mutex_init
+253	UNIMPL		cladm
+254	UNIMPL		lwp_sigtimedwait
+255	UNIMPL		umount2

@@ -1,27 +1,30 @@
-/*	$NetBSD: if_stripvar.h,v 1.7 2000/03/23 07:03:26 thorpej Exp $	*/
+/*	$NetBSD: if_stripvar.h,v 1.12 2001/06/14 05:44:25 itojun Exp $	*/
 
 #ifndef _NET_IF_STRIPVAR_H_
 #define _NET_IF_STRIPVAR_H_
 
 /*
  * Definitions for STRIP interface data structures
- * 
  */
 struct strip_softc {
 	struct	ifnet sc_if;		/* network-visible interface */
 	int	sc_unit;		/* XXX unit number */
 	struct	ifqueue sc_fastq;	/* interactive output queue */
+	struct	ifqueue sc_inq;		/* input queue */
 	struct	tty *sc_ttyp;		/* pointer to tty structure */
 	struct	callout sc_timo_ch;	/* timeout callout */
 	u_char	*sc_mp;			/* pointer to next available buf char */
 	u_char	*sc_ep;			/* pointer to last available buf char */
-	u_char	*sc_buf;		/* input buffer */
+	u_char	*sc_pktstart;		/* pointer to beginning of packet */
+	struct mbuf *sc_mbuf;		/* input buffer */
 	u_char	*sc_rxbuf;		/* input destuffing buffer */
 	u_char	*sc_txbuf;		/* output stuffing buffer */
-	u_char	*sc_xxx;		/* XXX don't ask... */
 	u_int	sc_flags;		/* see below */
 	long	sc_oqlen;		/* previous output queue size */
 	long	sc_otimeout;		/* number of times output's stalled */
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	void	*sc_si;			/* softintr handle */
+#endif
 #ifdef __NetBSD__
 	int	sc_oldbufsize;		/* previous output buffer size */
 	int	sc_oldbufquot;		/* previous output buffer quoting */
@@ -37,7 +40,7 @@ struct strip_softc {
 
 	long sc_statetimo;		/* When (secs) current state ends */
 
-	caddr_t	sc_bpf;			/* BPF data */
+	struct timeval sc_lastpacket;	/* for watchdog */
 };
 
 

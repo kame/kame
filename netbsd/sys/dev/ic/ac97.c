@@ -1,4 +1,4 @@
-/*      $NetBSD: ac97.c,v 1.11.2.5 2002/02/09 18:19:50 he Exp $ */
+/*      $NetBSD: ac97.c,v 1.24 2002/01/23 14:50:45 ichiro Exp $ */
 /*	$OpenBSD: ac97.c,v 1.8 2000/07/19 09:01:35 csapuntz Exp $	*/
 
 /*
@@ -62,6 +62,9 @@
  * $FreeBSD$
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ac97.c,v 1.24 2002/01/23 14:50:45 ichiro Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -101,9 +104,13 @@ static const struct audio_mixer_enum ac97_source = { 8,
 						 { { AudioNmixerout AudioNmono }, 6 },
 						 { { "phone" }, 7 }}};
 
+/*
+ * Due to different values for each source that uses these structures, 
+ * the ac97_query_devinfo function sets delta in mixer_devinfo_t using
+ * ac97_source_info.bits.
+ */
 static const struct audio_mixer_value ac97_volume_stereo = { { AudioNvolume }, 
 						       2 };
-
 
 static const struct audio_mixer_value ac97_volume_mono = { { AudioNvolume }, 
 						     1 };
@@ -463,7 +470,7 @@ ac97_setup_source_info(as)
 	for (idx = 0, ouridx = 0; idx < SOURCE_INFO_SIZE; idx++) {
 		si = &as->source_info[ouridx];
 
-		bcopy(&source_info[idx], si, sizeof(*si));
+		memcpy(si, &source_info[idx], sizeof(*si));
 
 		switch (si->type) {
 		case AUDIO_MIXER_CLASS:
@@ -477,7 +484,7 @@ ac97_setup_source_info(as)
 			/* Add an entry for mute, if necessary */
 			if (si->mute) {
 				si = &as->source_info[ouridx];
-				bcopy(&source_info[idx], si, sizeof(*si));
+				memcpy(si, &source_info[idx], sizeof(*si));
 				si->qualifier = AudioNmute;
 				si->type = AUDIO_MIXER_ENUM;
 				si->info = &ac97_on_off;
@@ -559,12 +566,10 @@ ac97_attach(host_if)
 	u_int32_t id;
 	mixer_ctrl_t ctl;
 	
-	as = malloc(sizeof(struct ac97_softc), M_DEVBUF, M_WAITOK);
+	as = malloc(sizeof(struct ac97_softc), M_DEVBUF, M_WAITOK|M_ZERO);
 
 	if (as == NULL)
 		return (ENOMEM);
-
-	memset(as, 0, sizeof(*as));
 
 	as->codec_if.vtbl = &ac97civ;
 	as->host_if = host_if;
@@ -676,7 +681,12 @@ ac97_query_devinfo(codec_if, dip)
 		if (name)
 			strcpy(dip->label.name, name);
 
-		bcopy(si->info, &dip->un, si->info_size);
+		memcpy(&dip->un, si->info, si->info_size);
+
+		/* Set the delta for volume sources */
+		if (dip->type == AUDIO_MIXER_VALUE)
+			dip->un.v.delta = 1 << (8 - si->bits);
+
 		return (0);
 	}
 

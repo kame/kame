@@ -1,4 +1,4 @@
-/*	$NetBSD: fms.c,v 1.5.4.2 2000/12/13 23:09:01 he Exp $	*/
+/*	$NetBSD: fms.c,v 1.11 2001/11/13 07:48:42 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Forte Media FM801 Audio Device Driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fms.c,v 1.11 2001/11/13 07:48:42 lukem Exp $");
+
 #include "mpu.h"
 
 #include <sys/param.h>
@@ -48,6 +51,8 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/audioio.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/cpu.h>
@@ -139,6 +144,7 @@ struct audio_hw_if fms_hw_if = {
 	fms_get_props,
 	fms_trigger_output,
 	fms_trigger_input,
+	NULL,
 };
 
 int	fms_attach_codec __P((void *, struct ac97_codec_if *));
@@ -248,8 +254,7 @@ fms_attach(parent, self, aux)
 	
 	printf(": Forte Media FM-801\n");
 	
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-			 &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -767,8 +772,8 @@ fms_malloc(addr, direction, size, pool, flags)
 		return 0;
 	
 	p->size = size;
-	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, NBPG, 0, &p->seg, 1, 
-				      &rseg, BUS_DMA_NOWAIT)) != 0) {
+	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &p->seg,
+				      1, &rseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: unable to allocate dma, error = %d\n", 
 		       sc->sc_dev.dv_xname, error);
 		goto fail_alloc;

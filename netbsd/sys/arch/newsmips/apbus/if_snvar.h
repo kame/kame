@@ -1,4 +1,4 @@
-/*	$NetBSD: if_snvar.h,v 1.1 1999/12/22 05:55:25 tsubai Exp $	*/
+/*	$NetBSD: if_snvar.h,v 1.3 2000/12/03 01:42:29 matt Exp $	*/
 
 /*
  * Copyright (c) 1991   Algorithmics Ltd (http://www.algor.co.uk)
@@ -35,7 +35,7 @@ void mips3_wbflush __P((void));
 void apbus_wbflush __P((void));
 
 static __inline void
-wbflush()
+wbflush(void)
 {
 	mips3_wbflush();
 	apbus_wbflush();
@@ -202,5 +202,5 @@ struct sn_softc {
 #define	CDA_SIZE(sc)	((4*16 + 1) * ((sc->bitmode) ? 4 : 2))
 
 int	snsetup __P((struct sn_softc *sc, u_int8_t *));
-void	snintr __P((void *));
+int	snintr __P((void *));
 void	sn_md_init __P((struct sn_softc *));

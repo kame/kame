@@ -1,4 +1,4 @@
-/*	$NetBSD: vnd.c,v 1.65.4.2 2001/05/01 12:27:07 he Exp $	*/
+/*	$NetBSD: vnd.c,v 1.79.4.1 2002/08/03 00:59:46 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -97,7 +97,12 @@
  * NOTE 3: Doesn't interact with leases, should it?
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vnd.c,v 1.79.4.1 2002/08/03 00:59:46 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "fs_nfs.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -163,6 +168,7 @@ int numvnd = 0;
 
 /* called by main() at boot time */
 void	vndattach __P((int));
+void	vnddetach __P((void));
 
 void	vndclear __P((struct vnd_softc *));
 void	vndstart __P((struct vnd_softc *));
@@ -187,17 +193,23 @@ vndattach(num)
 	if (num <= 0)
 		return;
 	i = num * sizeof(struct vnd_softc);
-	mem = malloc(i, M_DEVBUF, M_NOWAIT);
+	mem = malloc(i, M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (mem == NULL) {
 		printf("WARNING: no memory for vnode disks\n");
 		return;
 	}
-	bzero(mem, i);
 	vnd_softc = (struct vnd_softc *)mem;
 	numvnd = num;
 
 	for (i = 0; i < numvnd; i++)
 		BUFQ_INIT(&vnd_softc[i].sc_tab);
+}
+
+void
+vnddetach()
+{
+
+	free(vnd_softc, M_DEVBUF);
 }
 
 int
@@ -374,9 +386,14 @@ vndstrategy(bp)
 	/* ...and convert to a byte offset within the file. */
 	bn *= lp->d_secsize;
 
+	if (vnd->sc_vp->v_mount == NULL) {
+		bp->b_error = ENXIO;
+		bp->b_flags |= B_ERROR;
+		goto done;
+	}
  	bsize = vnd->sc_vp->v_mount->mnt_stat.f_iosize;
 	addr = bp->b_data;
-	flags = bp->b_flags | B_CALL;
+	flags = (bp->b_flags & (B_READ|B_ASYNC)) | B_CALL;
 
 	/* Allocate a header for this transfer and link it to the buffer */
 	s = splbio();
@@ -438,36 +455,15 @@ vndstrategy(bp)
 		splx(s);
 		nbp->vb_buf.b_flags = flags;
 		nbp->vb_buf.b_bcount = sz;
-		nbp->vb_buf.b_bufsize = bp->b_bufsize;
+		nbp->vb_buf.b_bufsize = round_page((ulong)addr + sz)
+		    - trunc_page((ulong) addr);
 		nbp->vb_buf.b_error = 0;
 		nbp->vb_buf.b_data = addr;
 		nbp->vb_buf.b_blkno = nbp->vb_buf.b_rawblkno = nbn + btodb(off);
 		nbp->vb_buf.b_proc = bp->b_proc;
 		nbp->vb_buf.b_iodone = vndiodone;
 		nbp->vb_buf.b_vp = NULLVP;
-		nbp->vb_buf.b_rcred = vnd->sc_cred;	/* XXX crdup? */
-		nbp->vb_buf.b_wcred = vnd->sc_cred;	/* XXX crdup? */
 		LIST_INIT(&nbp->vb_buf.b_dep);
-		if (bp->b_dirtyend == 0) {
-			nbp->vb_buf.b_dirtyoff = 0;
-			nbp->vb_buf.b_dirtyend = sz;
-		} else {
-			nbp->vb_buf.b_dirtyoff =
-			    max(0, bp->b_dirtyoff - (bp->b_bcount - resid));
-			nbp->vb_buf.b_dirtyend =
-			    min(sz,
-				max(0, bp->b_dirtyend - (bp->b_bcount-resid)));
-		}
-		if (bp->b_validend == 0) {
-			nbp->vb_buf.b_validoff = 0;
-			nbp->vb_buf.b_validend = sz;
-		} else {
-			nbp->vb_buf.b_validoff =
-			    max(0, bp->b_validoff - (bp->b_bcount - resid));
-			nbp->vb_buf.b_validend =
-			    min(sz,
-				max(0, bp->b_validend - (bp->b_bcount-resid)));
-		}
 
 		nbp->vb_xfer = vnx;
 
@@ -537,9 +533,10 @@ vndstart(vnd)
 		vnd->sc_active++;
 #ifdef DEBUG
 		if (vnddebug & VDB_IO)
-			printf("vndstart(%ld): bp %p vp %p blkno 0x%x addr %p cnt 0x%lx\n",
+			printf("vndstart(%ld): bp %p vp %p blkno 0x%x"
+				" flags %lx addr %p cnt 0x%lx\n",
 			    (long) (vnd-vnd_softc), bp, bp->b_vp, bp->b_blkno,
-			    bp->b_data, bp->b_bcount);
+			    bp->b_flags, bp->b_data, bp->b_bcount);
 #endif
 
 		/* Instrumentation. */
@@ -783,7 +780,7 @@ vndioctl(dev, cmd, data, flag, p)
 		 */
 		if (vio->vnd_flags & VNDIOF_HASGEOM) {
 
-			bcopy(&vio->vnd_geom, &vnd->sc_geom,
+			memcpy(&vnd->sc_geom, &vio->vnd_geom,
 			    sizeof(vio->vnd_geom));
 
 			/*
@@ -839,13 +836,6 @@ vndioctl(dev, cmd, data, flag, p)
 			geomsize = 32 * 64 * vnd->sc_geom.vng_ncylinders;
 		}
 
-		/*
-		 * Truncate the size to that specified by
-		 * the geometry.
-		 * XXX Should we even bother with this?
-		 */
-		vnd->sc_size = geomsize;
-
 		if ((error = vndsetcred(vnd, p->p_ucred)) != 0) {
 			(void) vn_close(nd.ni_vp, FREAD|FWRITE, p->p_ucred, p);
 			vndunlock(vnd);
@@ -865,16 +855,16 @@ vndioctl(dev, cmd, data, flag, p)
 #endif
 
 		/* Attach the disk. */
-		bzero(vnd->sc_xname, sizeof(vnd->sc_xname));	/* XXX */
+		memset(vnd->sc_xname, 0, sizeof(vnd->sc_xname)); /* XXX */
 		sprintf(vnd->sc_xname, "vnd%d", unit);		/* XXX */
 		vnd->sc_dkdev.dk_name = vnd->sc_xname;
 		disk_attach(&vnd->sc_dkdev);
 
 		/* Initialize the xfer and buffer pools. */
 		pool_init(&vnd->sc_vxpool, sizeof(struct vndxfer), 0,
-		    0, 0, "vndxpl", 0, NULL, NULL, M_DEVBUF);
+		    0, 0, "vndxpl", NULL);
 		pool_init(&vnd->sc_vbpool, sizeof(struct vndbuf), 0,
-		    0, 0, "vndbpl", 0, NULL, NULL, M_DEVBUF);
+		    0, 0, "vndbpl", NULL);
 
 		/* Try and read the disklabel. */
 		vndgetdisklabel(dev);
@@ -1164,7 +1154,7 @@ vndgetdefaultlabel(sc, lp)
 	struct vndgeom *vng = &sc->sc_geom;
 	struct partition *pp;
 
-	bzero(lp, sizeof(*lp));
+	memset(lp, 0, sizeof(*lp));
 
 	lp->d_secperunit = sc->sc_size / (vng->vng_secsize / DEV_BSIZE);
 	lp->d_secsize = vng->vng_secsize;
@@ -1204,7 +1194,7 @@ vndgetdisklabel(dev)
 	struct cpu_disklabel *clp = sc->sc_dkdev.dk_cpulabel;
 	int i;
 
-	bzero(clp, sizeof(*clp));
+	memset(clp, 0, sizeof(*clp));
 
 	vndgetdefaultlabel(sc, lp);
 

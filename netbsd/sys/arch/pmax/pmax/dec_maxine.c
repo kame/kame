@@ -1,4 +1,4 @@
-/* $NetBSD: dec_maxine.c,v 1.34 2000/06/06 00:08:26 nisimura Exp $ */
+/* $NetBSD: dec_maxine.c,v 1.40 2001/09/18 16:15:20 tsutsui Exp $ */
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -73,7 +73,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_maxine.c,v 1.34 2000/06/06 00:08:26 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_maxine.c,v 1.40 2001/09/18 16:15:20 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -123,7 +123,7 @@ dec_maxine_init()
 	platform.cons_init = dec_maxine_cons_init;
 	platform.iointr = dec_maxine_intr;
 	platform.intr_establish = dec_maxine_intr_establish;
-	platform.memsize = memsize_scan;
+	platform.memsize = memsize_bitmap;
 	platform.clkread = kn02ca_clkread;
 	/* MAXINE has 1 microsec. free-running high resolution timer */
  
@@ -141,7 +141,7 @@ dec_maxine_init()
 	splvec.splbio = MIPS_SPL3; 
 	splvec.splnet = MIPS_SPL3;
 	splvec.spltty = MIPS_SPL3;
-	splvec.splimp = MIPS_SPL3;
+	splvec.splvm = MIPS_SPL3;
 	splvec.splclock = MIPS_SPL_0_1_3;
 	splvec.splstatclock = MIPS_SPL_0_1_3;
  
@@ -167,7 +167,7 @@ dec_maxine_init()
 }
 
 /*
- * Initalize the memory system and I/O buses.
+ * Initialize the memory system and I/O buses.
  */
 static void
 dec_maxine_bus_reset()
@@ -272,7 +272,6 @@ dec_maxine_intr_establish(dev, cookie, level, handler, arg)
 	kn02ca_wbflush();
 }
 
-
 #define CHECKINTR(vvv, bits)					\
     do {							\
 	if (can_serve & (bits)) {				\
@@ -303,7 +302,7 @@ dec_maxine_intr(status, cause, pc, ipending)
 		cf.pc = pc;
 		cf.sr = status;
 		hardclock(&cf);
-		intrcnt[HARDCLOCK]++;
+		pmax_clock_evcnt.ev_count++;
 		/* keep clock interrupts enabled when we return */
 		cause &= ~MIPS_INT_MASK_1;
 	}
@@ -314,13 +313,13 @@ dec_maxine_intr(status, cause, pc, ipending)
 	if (ipending & MIPS_INT_MASK_3) {
 		int ifound;
 		u_int32_t imsk, intr, can_serve, xxxintr;
-	
+
 		do {
 			ifound = 0;
 			intr = *(u_int32_t *)(ioasic_base + IOASIC_INTR);
 			imsk = *(u_int32_t *)(ioasic_base + IOASIC_IMSK);
 			can_serve = intr & imsk;
- 
+
 			CHECKINTR(SYS_DEV_DTOP, XINE_INTR_DTOP);
 			CHECKINTR(SYS_DEV_SCC0, IOASIC_INTR_SCC_0);
 			CHECKINTR(SYS_DEV_LANCE, IOASIC_INTR_LANCE);
@@ -328,19 +327,11 @@ dec_maxine_intr(status, cause, pc, ipending)
 			/* CHECKINTR(SYS_DEV_OPT2, XINE_INTR_VINT);	*/
 			CHECKINTR(SYS_DEV_ISDN, (IOASIC_INTR_ISDN_TXLOAD | IOASIC_INTR_ISDN_RXLOAD));
 			/* CHECKINTR(SYS_DEV_FDC, IOASIC_INTR_FDC);	*/
-			CHECKINTR(SYS_DEV_OPT1, XINE_INTR_TC_1); 
-			CHECKINTR(SYS_DEV_OPT0, XINE_INTR_TC_0); 
+			CHECKINTR(SYS_DEV_OPT1, XINE_INTR_TC_1);
+			CHECKINTR(SYS_DEV_OPT0, XINE_INTR_TC_0);
  
 #define ERRORS	(IOASIC_INTR_ISDN_OVRUN|IOASIC_INTR_SCSI_OVRUN|IOASIC_INTR_SCSI_READ_E|IOASIC_INTR_LANCE_READ_E)
 #define PTRLOAD (IOASIC_INTR_ISDN_TXLOAD|IOASIC_INTR_ISDN_RXLOAD|IOASIC_INTR_SCSI_PTR_LOAD)
- 
-#if 0	
-	if (can_serve & IOASIC_INTR_SCSI_PTR_LOAD) {
-		extern void asc_ptr_load __P((void *));
-		ifound = 1;
-		asc_ptr_load(intrtab[SYS_DEV_SCSI].ih_arg);
-	}
-#endif	
  
 	/* 
 	 * XXX future project is here XXX
@@ -367,8 +358,10 @@ dec_maxine_intr(status, cause, pc, ipending)
 			}
 		} while (ifound);
 	}
-	if (ipending & MIPS_INT_MASK_2)
+	if (ipending & MIPS_INT_MASK_2) {
 		kn02ba_errintr();
+		pmax_memerr_evcnt.ev_count++;
+	}
 
 	_splset(MIPS_SR_INT_IE | (status & ~cause & MIPS_HARD_INT_MASK));
 }
@@ -385,7 +378,7 @@ static unsigned
 kn02ca_clkread()
 {
 	u_int32_t cycles;
-  
+
 	cycles = *(u_int32_t *)MIPS_PHYS_TO_KSEG1(XINE_REG_FCTR);
 	return cycles - latched_cycle_cnt;
 }

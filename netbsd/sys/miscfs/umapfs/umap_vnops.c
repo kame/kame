@@ -1,4 +1,4 @@
-/*	$NetBSD: umap_vnops.c,v 1.16 1999/08/16 21:24:53 wrstuden Exp $	*/
+/*	$NetBSD: umap_vnops.c,v 1.22 2002/01/04 07:19:34 chs Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -42,10 +42,12 @@
  * Umap Layer
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: umap_vnops.c,v 1.22 2002/01/04 07:19:34 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -54,7 +56,6 @@
 #include <miscfs/umapfs/umap.h>
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/genfs/layer_extern.h>
-
 
 int	umap_lookup	__P((void *));
 int	umap_getattr	__P((void *));
@@ -70,7 +71,7 @@ int	umap_rename	__P((void *));
  *
  */
 int (**umap_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc umap_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc umap_vnodeop_entries[] = {
 	{ &vop_default_desc,	umap_bypass },
 
 	{ &vop_lookup_desc,	umap_lookup },
@@ -91,10 +92,12 @@ struct vnodeopv_entry_desc umap_vnodeop_entries[] = {
 	{ &vop_strategy_desc,	layer_strategy },
 	{ &vop_bwrite_desc,	layer_bwrite },
 	{ &vop_bmap_desc,	layer_bmap },
+	{ &vop_getpages_desc,	layer_getpages },
+	{ &vop_putpages_desc,	layer_putpages },
 
-	{ (struct vnodeop_desc*) NULL, (int(*) __P((void *))) NULL }
+	{ NULL, NULL }
 };
-struct vnodeopv_desc umapfs_vnodeop_opv_desc =
+const struct vnodeopv_desc umapfs_vnodeop_opv_desc =
 	{ &umap_vnodeop_p, umap_vnodeop_entries };
 
 /*
@@ -421,7 +424,7 @@ umap_getattr(v)
 	u_long (*mapdata)[2];
 	u_long (*gmapdata)[2];
 	struct vnode **vp1p;
-	struct vnodeop_desc *descp = ap->a_desc;
+	const struct vnodeop_desc *descp = ap->a_desc;
 
 	if ((error = umap_bypass(ap)) != 0)
 		return (error);

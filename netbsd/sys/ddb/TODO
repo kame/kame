@@ -1,4 +1,4 @@
-$NetBSD: TODO,v 1.3 2000/06/17 05:57:41 jhawk Exp $
+$NetBSD: TODO,v 1.10 2002/02/15 07:33:48 simonb Exp $
 
 In rough order.
 
@@ -8,12 +8,12 @@ done	command history sometimes gets slightly confused
 
 2.	uvm_fault()s can loop infinitely (kern/10016)
 
-3.	examine /m (hex + character dump) doesn't work.
+done	examine /m (hex + character dump) doesn't work.
 
 4.	"dot", "next", and "last" are not set properly and are usually
 	the same.
 
-5.	The vax port supporst decimal pids in "kill", etc. This should be
+5.	The vax port supports decimal pids in "kill", etc. This should be
 	MI or not exist at all.
 
 6.	double-quote delimitted strings don't work in "print", nor do
@@ -22,21 +22,21 @@ done	command history sometimes gets slightly confused
 Features to be implemented:
 
 1.	Have "ps" print pids with a 0t prefix to reduce radix
-	confusion.
+	confusion. This is very ugly...needs thought.
 
-2.	"set" should display the old value as "write" does.
+done	"set" should display the old value as "write" does.
 
 3.	Support 64-bit longs in "write". /L or /q? both? long versus quad?
 
 4.	Note only some radixes are supported.
 
 5.	Allow a mechanism for DDB to not fail under X (on the i386).
-	Probably just skip DDB in such cases. 
+	Probably just skip DDB in such cases.
 
 6.	Enable DDB in GENERIC on all architectures not starved for
 	space.
 
-7.	Numbers starting with [a-f] should work, but symbols
+done	Numbers starting with [a-f] should work, but symbols
 	of the same name should have priority.
 
 8.	Implement the unimplemented C operators, especially bitwise-OR (|).
@@ -79,7 +79,7 @@ Features to be implemented:
 	and ] in kadb (but not in adb):
 	     [           Like :e in adb(1), but requires only  one  keys-
 			 troke and no RETURN character.
-	
+
 	     ]           Like :s in adb(1), but requires only  one  keys-
 			 troke and no RETURN character.
 	Does this make people queasy?
@@ -101,3 +101,11 @@ Features to be implemented:
 
 27.	Ensure MD commands have consistent names and factor out
 	common code.
+
+28.	Some way to track symbol table failures, since the message buffer
+	isn't available when we detect them.
+
+29.	Make "workXX" variables work.
+
+30.	Write ddb(9) to document how ports should implement the debugger,
+	and the canonical solution to some niggling annoying issues.

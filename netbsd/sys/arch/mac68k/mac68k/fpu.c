@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.c,v 1.24 1998/04/20 06:46:16 scottr Exp $	*/
+/*	$NetBSD: fpu.c,v 1.26 2002/05/14 02:03:01 matt Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -54,7 +54,6 @@
 /*
  * FPU type; emulator uses FPU_NONE
  */
-int     fputype;
 
 extern label_t *nofault;
 
@@ -143,7 +142,7 @@ fpu_probe()
 	 * have if this will.  We save the state in order to get the
 	 * size of the frame.
 	 */
-	asm("movl %0, a0; fsave a0@" : : "a" (fpframe) : "a0" );
+	asm("movl %0,%%a0; fsave %%a0@" : : "a" (fpframe) : "a0");
 
 	b = *((u_char *)fpframe + 1);
 

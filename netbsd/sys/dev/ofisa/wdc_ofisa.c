@@ -1,4 +1,4 @@
-/*	$NetBSD: wdc_ofisa.c,v 1.5 1998/12/02 00:18:41 sommerfe Exp $	*/
+/*	$NetBSD: wdc_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $	*/
 
 /*
  * Copyright 1997, 1998
@@ -36,6 +36,9 @@
 /*
  * OFW Attachment for 'wdc' disk controller driver
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wdc_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -158,6 +161,7 @@ wdc_ofisa_attach(parent, self, aux)
 	    return;
 	}
 	wdcattach(&sc->wdc_channel);
+	wdc_print_modes(&sc->wdc_channel);
 
 #if 0
 	printf("%s: registers: ", sc->sc_dev.dv_xname);

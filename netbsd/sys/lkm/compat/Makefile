@@ -1,21 +1,46 @@
-# $NetBSD: Makefile,v 1.5 1997/02/18 15:31:51 scottr Exp $
+# $NetBSD: Makefile,v 1.19 2002/03/25 06:52:41 kent Exp $
 
-#
-# XXX  the compat LKMs are currently broken.
-#
-.if 0
-.if (${MACHINE} == "i386")
-SUBDIR+=	freebsd linux
+.if (${MACHINE_ARCH} == "sparc64")
+SUBDIR+=	netbsd32 sunos32 svr4 svr4_32
 .endif
 
-.if (${MACHINE} == "sparc")
-SUBDIR+=	sunos svr4
+.if (${MACHINE} == "i386")
+SUBDIR+=	freebsd linux svr4 pecoff
+.endif
+
+# These are untested, but do compile.  Once they are tested,
+# move them above.
+
+.if !make(install)
+
+.if (${MACHINE} == "alpha")
+SUBDIR+=	linux osf1
+.endif
+
+.if (${MACHINE} == "hp300")
+SUBDIR+=	hpux
+.endif
+
+.if (${MACHINE} == "i386")
+SUBDIR+=	aout ibcs2
 .endif
 
 .if (${MACHINE_ARCH} == "m68k")
-SUBDIR+=	sunos
-.endif
+SUBDIR+=	aoutm68k sunos svr4
 .endif
 
+.if (${MACHINE_ARCH} == "mipsel")
+SUBDIR+=	ultrix
+.endif
+
+.if (${MACHINE_ARCH} == "sparc")
+SUBDIR+=	sunos svr4
+.endif
+
+.if (${MACHINE_ARCH} == "vax")
+SUBDIR+=	ibcs2 ultrix
+.endif
+
+.endif # !make(install)
 
 .include <bsd.subdir.mk>

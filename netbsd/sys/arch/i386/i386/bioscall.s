@@ -1,4 +1,4 @@
-/*	$NetBSD: bioscall.s,v 1.4 1998/12/01 04:30:59 thorpej Exp $ */
+/*	$NetBSD: bioscall.s,v 1.6 2001/09/21 14:12:50 fvdl Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -40,6 +40,8 @@
 
 #include <machine/asm.h>
 
+/* LINTSTUB: include <machine/bioscall.h> */
+
 	.globl	_C_LABEL(PTDpaddr)	/* from locore.s */
 	
 _C_LABEL(biostramp_image):
@@ -63,24 +65,25 @@ _C_LABEL(biostramp_image_size):
  *
  *	Fills in *regs with registers as returned by BIOS.
  */
+/* LINTSTUB: Func: void bioscall(int function, struct bioscallregs *regs) */
 NENTRY(bioscall)
 	pushl	%ebp
 	movl	%esp,%ebp		/* set up frame ptr */
-	
+
 	movl	%cr3,%eax		/* save PTDB register */
 	pushl	%eax
-	
+
 	movl	_C_LABEL(PTDpaddr),%eax	/* install proc0 PTD */
 	movl	%eax,%cr3
 
-	movl $(BIOSTRAMP_BASE),%eax	/* address of trampoline area */
-	pushl 12(%ebp)
-	pushl 8(%ebp)
-	call %eax			/* machdep.c initializes it */
-	addl $8,%esp			/* clear args from stack */
-		
-	popl %eax
-	movl %eax,%cr3			/* restore PTDB register */
-	
+	movl	$(BIOSTRAMP_BASE),%eax	/* address of trampoline area */
+	pushl	12(%ebp)
+	pushl	8(%ebp)
+	call	*%eax			/* machdep.c initializes it */
+	addl	$8,%esp			/* clear args from stack */
+
+	popl	%eax
+	movl	%eax,%cr3			/* restore PTDB register */
+
 	leave
 	ret

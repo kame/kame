@@ -1,4 +1,4 @@
-/* $NetBSD: sgmap.c,v 1.7.4.1 2000/11/16 20:37:43 tv Exp $ */
+/* $NetBSD: sgmap.c,v 1.9 2000/11/16 19:25:42 matt Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/sgmap.h>

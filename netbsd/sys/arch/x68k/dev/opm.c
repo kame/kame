@@ -1,4 +1,4 @@
-/*	$NetBSD: opm.c,v 1.5 1999/03/24 14:07:39 minoura Exp $	*/
+/*	$NetBSD: opm.c,v 1.7 2001/12/27 02:23:25 wiz Exp $	*/
 
 /*
  * Copyright (c) 1995 Masanobu Saitoh, Takuya Harakawa.
@@ -147,14 +147,15 @@ readopm(reg)
 }
 
 #include "fd.h"
+#include "vs.h"
 #include "bell.h"
 
-#if 0
+#if NVS > 0
 void
 adpcm_chgclk(clk)
 	u_char	clk;
 {
-	writeopm(0x1b, readopm(0x1b) & ~OPM1B_CT1MSK | clk);
+	writeopm(0x1b, (readopm(0x1b) & ~OPM1B_CT1MSK) | clk);
 }
 #endif
 
@@ -187,7 +188,7 @@ opm_set_voice(channel, voice)
 	int channel;
 	struct opm_voice *voice;
 {
-	bcopy(voice, &opm0->sc_vdata[channel], sizeof(struct opm_voice));
+	memcpy(&opm0->sc_vdata[channel], voice, sizeof(struct opm_voice));
 
 	opm_set_voice_sub(0x40 + channel, &voice->m1);
 	opm_set_voice_sub(0x48 + channel, &voice->m2);

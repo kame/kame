@@ -1,4 +1,4 @@
-/*	$NetBSD: amiga_init.c,v 1.1 2000/05/25 22:11:57 is Exp $	*/
+/*	$NetBSD: amiga_init.c,v 1.3 2000/07/01 03:34:05 mrg Exp $	*/
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -34,7 +34,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/user.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
@@ -48,7 +48,6 @@
 #include <sys/dkbad.h>
 #include <sys/reboot.h>
 #include <sys/exec.h>
-#include <vm/pmap.h>
 #include <amiga/amiga/cc.h>
 
 u_long boot_fphystart, boot_fphysize, cphysize;

@@ -1,4 +1,4 @@
-/* $NetBSD: dec_kn8ae.c,v 1.24 2000/05/26 21:19:20 thorpej Exp $ */
+/* $NetBSD: dec_kn8ae.c,v 1.27 2001/08/20 12:20:04 wiz Exp $ */
 
 /*
  * Copyright (c) 1997 by Matthew Jacob
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_kn8ae.c,v 1.24 2000/05/26 21:19:20 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_kn8ae.c,v 1.27 2001/08/20 12:20:04 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -193,13 +193,13 @@ dec_kn8ae_device_register(dev, aux)
 		if (parent->dv_parent != scsidev)
 			return;
 
-		if (b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+		if (b->unit / 100 != sa->sa_periph->periph_target)
 			return;
 
 		/* XXX LUN! */
 
 		/*
-		 * the value in boot_dev_type is some wierd number
+		 * the value in boot_dev_type is some weird number
 		 * XXX: Only support SD booting for now.
 		 */
 		if (strcmp(cd->cd_name, "sd") &&
@@ -491,7 +491,7 @@ kn8ae_mcheck(mces, type, logout, framep)
 
 	get_dwlpx_regs = 0;
 	ptr = NULL;
-	bzero(mcs, sizeof (mcs));
+	memset(mcs, 0, sizeof (mcs));
 
 	hdr = (mc_hdr_ev5 *) logout;
 	mptr = (mc_uc_ev5 *) (logout + sizeof (*hdr));

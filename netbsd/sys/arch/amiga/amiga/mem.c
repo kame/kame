@@ -1,4 +1,4 @@
-/*	$NetBSD: mem.c,v 1.26.4.1 2000/06/30 16:27:14 simonb Exp $	*/
+/*	$NetBSD: mem.c,v 1.34 2002/03/25 13:14:10 aymeric Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -40,27 +40,24 @@
  *	@(#)mem.c	8.3 (Berkeley) 1/12/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.34 2002/03/25 13:14:10 aymeric Exp $");
+
 /*
  * Memory special file
  */
 
 #include <sys/param.h>
-#include <sys/conf.h>
 #include <sys/buf.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
 
+#include <machine/conf.h>
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
-
-#define mmread  mmrw
-#define mmwrite mmrw
-cdev_decl(mm);
 
 extern int kernel_reload_write(struct uio *uio);
 extern u_int lowram;
@@ -102,7 +99,7 @@ mmrw(dev, uio, flags)
 	static int physlock;
 	vm_prot_t prot;
 
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 		/* lock against other uses of shared vmmap */
 		while (physlock > 0) {
 			physlock++;
@@ -125,7 +122,7 @@ mmrw(dev, uio, flags)
 		switch (minor(dev)) {
 
 		/* minor device 0 is physical memory */
-		case 0:
+		case DEV_MEM:
 			v = uio->uio_offset;
 #ifndef DEBUG
 			/* allow reads only in RAM (except for DEBUG) */
@@ -138,15 +135,16 @@ mmrw(dev, uio, flags)
 			    VM_PROT_WRITE;
 			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
 			    trunc_page(v), prot, prot|PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(), (vm_offset_t)vmmap,
 			    (vm_offset_t)vmmap + NBPG);
+			pmap_update(pmap_kernel());
 			continue;
 
-		/* minor device 1 is kernel memory */
-		case 1:
+		case DEV_KMEM:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
 			if (!uvm_kernacc((caddr_t)v, c,
@@ -175,7 +173,7 @@ mmrw(dev, uio, flags)
 			continue;
 
 		/* minor device 2 is EOF/RATHOLE */
-		case 2:
+		case DEV_NULL:
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
 			return (0);
@@ -184,7 +182,7 @@ mmrw(dev, uio, flags)
 		 * minor device 12 (/dev/zero) is source of nulls on read,
 		 * rathole on write
 		 */
-		case 12:
+		case DEV_ZERO:
 			if (uio->uio_rw == UIO_WRITE) {
 				c = iov->iov_len;
 				break;
@@ -198,12 +196,7 @@ mmrw(dev, uio, flags)
 			error = uiomove(devzeropage, c, uio);
 			continue;
 
-		/*
-		 * minor device 20 (/dev/reload) represents magic memory
-		 * which you can write a kernel image to, causing a reboot
-		 * into that kernel
-		 */
-		case 20:
+		case DEV_RELOAD:
 			if (uio->uio_rw == UIO_READ)
 				return 0;
 			error = kernel_reload_write(uio);
@@ -219,7 +212,7 @@ mmrw(dev, uio, flags)
 		uio->uio_offset += c;
 		uio->uio_resid -= c;
 	}
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 #ifndef DEBUG
 unlock:
 #endif

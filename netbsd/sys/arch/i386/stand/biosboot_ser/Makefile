@@ -1,18 +1,18 @@
-#	$NetBSD: Makefile,v 1.5.2.1 2001/04/01 16:30:03 he Exp $
+#	$NetBSD: Makefile,v 1.9 2002/02/17 20:03:08 thorpej Exp $
 
 S=	${.CURDIR}/../../../../
 
 BASE= biosboot_ser
 PROG= ${BASE}.sym
-MKMAN=	no
+NOMAN=	# defined
 NEWVERSWHAT=	"BIOS Boot"
+STARTFILE=	${BSSTART}
+RELOC=		0x0
 
 .PATH: ${.CURDIR}/../biosboot/
 SRCS= main.c devopen.c conf.c exec.c
 
-CLEANFILES+= ${BSSTART}
-
-CPPFLAGS+= -DCOMPAT_OLDBOOT -DCOMPAT_386BSD_MBRPART -DDEBUG
+CPPFLAGS+= -DCOMPAT_386BSD_MBRPART -DDEBUG
 
 #Sample use of serial line debugger
 #CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_COM0KBD

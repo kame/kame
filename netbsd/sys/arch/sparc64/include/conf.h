@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.h,v 1.7 2000/05/19 05:26:18 eeh Exp $	*/
+/*	$NetBSD: conf.h,v 1.10 2002/02/27 01:19:08 christos Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,16 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define mmread mmrw
-#define mmwrite mmrw
-cdev_decl(mm);
-
-/* open, close, ioctl */
-#define	cdev_openprom_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) nullop, 0, (dev_type_poll((*))) enodev, \
-	(dev_type_mmap((*))) enodev }
+#include <sys/conf.h>
 
 cdev_decl(openprom);
 
@@ -57,12 +48,6 @@ bdev_decl(fd);
 cdev_decl(fd);
 
 cdev_decl(fb);
-
-/* open, close, read, write, ioctl, poll */
-#define	cdev_gen_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) nullop, \
-	0, dev_init(c,n,poll), (dev_type_mmap((*))) enodev }
 
 cdev_decl(ms);
 
@@ -103,3 +88,5 @@ bdev_decl(wd);
 cdev_decl(wd);
 
 cdev_decl(pcons);
+
+cdev_decl(com);

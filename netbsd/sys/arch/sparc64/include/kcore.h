@@ -1,4 +1,4 @@
-/*	$NetBSD: kcore.h,v 1.3.22.1 2000/08/07 01:06:05 mrg Exp $	*/
+/*	$NetBSD: kcore.h,v 1.4 2000/08/01 00:40:26 eeh Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.

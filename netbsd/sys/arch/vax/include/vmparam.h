@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.32 2000/03/07 00:05:59 matt Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.38 2002/04/01 13:28:10 ragge Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -47,6 +47,14 @@
  */
 
 /*
+ * We use 4K VM pages on the VAX.  Override the PAGE_* definitions
+ * to be compile-time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
+/*
  * USRTEXT is the start of the user text/data space, while USRSTACK
  * is the top (end) of the user stack. Immediately above the user stack
  * resides kernel.
@@ -63,17 +71,17 @@
 #ifndef MAXTSIZ
 #define MAXTSIZ		(8*1024*1024)		/* max text size */
 #endif
-#ifndef MAXDSIZ
-#define MAXDSIZ		(24*1024*1024)		/* max data size */
-#endif
-#ifndef MAXSSIZ
-#define MAXSSIZ		(8*1024*1024)		/* max stack size */
-#endif
 #ifndef DFLDSIZ
-#define DFLDSIZ		(16*1024*1024)		/* initial data size limit */
+#define DFLDSIZ		(32*1024*1024)		/* initial data size limit */
+#endif
+#ifndef MAXDSIZ
+#define MAXDSIZ		(64*1024*1024)		/* max data size */
 #endif
 #ifndef DFLSSIZ
 #define DFLSSIZ		(512*1024)		/* initial stack size limit */
+#endif
+#ifndef MAXSSIZ
+#define MAXSSIZ		(8*1024*1024)		/* max stack size */
 #endif
 
 /*
@@ -89,20 +97,8 @@
  */
 
 #ifndef SHMMAXPGS
-#define SHMMAXPGS	64		/* XXXX should be 1024 */
+#define SHMMAXPGS	1024
 #endif
-
-/*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.	 You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-
-#define MAXSLP		20
 
 #define VM_PHYSSEG_MAX		1
 #define VM_PHYSSEG_NOADD
@@ -110,10 +106,6 @@
 
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
-
-struct pmap_physseg {
-	int	dummy;
-};
 
 /* MD round macros */
 #define	vax_round_page(x) (((vaddr_t)(x) + VAX_PGOFSET) & ~VAX_PGOFSET)

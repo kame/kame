@@ -1,4 +1,4 @@
-/*	$NetBSD: advfsops.c,v 1.42.4.1 2000/11/09 23:03:09 tv Exp $	*/
+/*	$NetBSD: advfsops.c,v 1.52 2002/05/14 00:05:56 matt Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -31,7 +31,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: advfsops.c,v 1.52 2002/05/14 00:05:56 matt Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
@@ -53,6 +56,7 @@
 #include <adosfs/adosfs.h>
 
 void adosfs_init __P((void));
+void adosfs_reinit __P((void));
 void adosfs_done __P((void));
 int adosfs_mount __P((struct mount *, const char *, void *, struct nameidata *,
 		      struct proc *));
@@ -76,6 +80,12 @@ int adosfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 struct simplelock adosfs_hashlock;
 
 struct pool adosfs_node_pool;
+
+struct genfs_ops adosfs_genfsops = {
+	genfs_size,
+};
+
+int (**adosfs_vnodeop_p) __P((void *));
 
 int
 adosfs_mount(mp, path, data, ndp, p)
@@ -243,6 +253,8 @@ adosfs_mountfs(devvp, mp, p)
 	mp->mnt_data = (qaddr_t)amp;
         mp->mnt_stat.f_fsid.val[0] = (long)devvp->v_rdev;
         mp->mnt_stat.f_fsid.val[1] = makefstype(MOUNT_ADOSFS);
+	mp->mnt_fs_bshift = ffs(amp->bsize) - 1;
+	mp->mnt_dev_bshift = DEV_BSHIFT;	/* XXX */
 	mp->mnt_flag |= MNT_LOCAL;
 
 	/*
@@ -584,8 +596,10 @@ adosfs_vget(mp, an, vpp)
 	ap->mtime.mins = adoswordn(bp, ap->nwords - 22);
 	ap->mtime.ticks = adoswordn(bp, ap->nwords - 21);
 
-	*vpp = vp;		/* return vp */
-	brelse(bp);		/* release buffer */
+	genfs_node_init(vp, &adosfs_genfsops);
+	*vpp = vp;
+	brelse(bp);
+	vp->v_size = ap->fsize;
 	return (0);
 }
 
@@ -799,8 +813,7 @@ adosfs_init()
 	simple_lock_init(&adosfs_hashlock);
 
 	pool_init(&adosfs_node_pool, sizeof(struct anode), 0, 0, 0,
-	    "adosndpl", 0, pool_page_alloc_nointr, pool_page_free_nointr,
-	    M_ANODE);
+	    "adosndpl", &pool_allocator_nointr);
 }
 
 void
@@ -826,9 +839,9 @@ adosfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
  * vfs generic function call table
  */
 
-extern struct vnodeopv_desc adosfs_vnodeop_opv_desc; 
+extern const struct vnodeopv_desc adosfs_vnodeop_opv_desc; 
 
-struct vnodeopv_desc *adosfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc *adosfs_vnodeopv_descs[] = {
 	&adosfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -846,6 +859,7 @@ struct vfsops adosfs_vfsops = {
 	adosfs_fhtovp,                  
 	adosfs_vptofh,                  
 	adosfs_init,                    
+	NULL,
 	adosfs_done,
 	adosfs_sysctl,
 	NULL,				/* vfs_mountroot */

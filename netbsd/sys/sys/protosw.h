@@ -1,4 +1,4 @@
-/*	$NetBSD: protosw.h,v 1.22.4.1 2001/03/11 21:12:51 he Exp $	*/
+/*	$NetBSD: protosw.h,v 1.26 2001/03/21 19:22:29 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -61,11 +61,6 @@
  * described below.
  */
 
-/*
- * For pfil_head structure.
- */
-#include <net/pfil.h>
-
 struct mbuf;
 struct sockaddr;
 struct socket;
@@ -105,7 +100,6 @@ struct protosw {
 			__P((void));
 	int	(*pr_sysctl)		/* sysctl for protocol */
 			__P((int *, u_int, void *, size_t *, void *, size_t));
-	struct	pfil_head	pr_pfh;
 };
 
 #define	PR_SLOWHZ	2		/* 2 slow timeouts per second */
@@ -123,6 +117,8 @@ struct protosw {
 #define	PR_RIGHTS	0x10		/* passes capabilities */
 #define	PR_LISTEN	0x20		/* supports listen(2) and accept(2) */
 #define	PR_LASTHDR	0x40		/* enforce ipsec policy; last header */
+#define	PR_ABRTACPTDIS	0x80		/* abort on accept(2) to disconnected
+					   socket */
 
 /*
  * The arguments to usrreq are:
@@ -267,6 +263,7 @@ struct protosw *pffindtype __P((int, int));
 struct domain *pffinddomain __P((int));
 extern struct protosw inetsw[];
 void pfctlinput __P((int, struct sockaddr *));
+void pfctlinput2 __P((int, struct sockaddr *, void *));
 #endif /* _KERNEL */
 
 #endif /* !_SYS_PROTOSW_H_ */

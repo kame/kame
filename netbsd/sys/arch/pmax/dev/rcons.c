@@ -1,4 +1,4 @@
-/*	$NetBSD: rcons.c,v 1.41.4.4 2001/05/15 22:43:03 he Exp $	*/
+/*	$NetBSD: rcons.c,v 1.53 2002/03/17 19:40:48 atatat Exp $	*/
 
 /*
  * Copyright (c) 1995
@@ -53,7 +53,7 @@
 #include <dev/rasops/rasops.h>
 #include <dev/rcons/rcons.h>
 
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 #include <machine/fbvar.h>
 #include <machine/conf.h>
 
@@ -100,7 +100,7 @@ rcons_connect (info)
 	int cookie, epwf, bior;
 
 	/* XXX */
-	switch (info->fi_type.fb_boardtype) {
+	switch (info->fi_type.fb_type) {
 	case PMAX_FBTYPE_MFB:
 		ri.ri_depth = 8;
 		ri.ri_flg = RI_CLEAR | RI_FORCEMONO;
@@ -129,19 +129,23 @@ rcons_connect (info)
 	wsfont_init();
 
 	if (epwf)
-		cookie = wsfont_find(NULL, 8, 0, 0);
-	else
-		cookie = wsfont_find("Gallant", 0, 0, 0);
-
-	if (cookie > 0)
-		wsfont_lock(cookie, &ri.ri_font, bior,
+		cookie = wsfont_find(NULL, 8, 0, 0, bior,
 		    WSDISPLAY_FONTORDER_L2R);
+	else
+		cookie = wsfont_find("Gallant", 0, 0, 0, bior,
+		    WSDISPLAY_FONTORDER_L2R);
+
+	if (cookie > 0) {
+		if (wsfont_lock(cookie, &ri.ri_font))
+			panic("wsfont_lock failed");
+	} else
+		panic("rcons_connect: no font available");
 
 	/* Get operations set and set framebugger colormap */
 	if (rasops_init(&ri, 5000, 80))
 		panic("rcons_connect: rasops_init failed");
 
-	if (ri.ri_depth == 8 && info->fi_type.fb_boardtype != PMAX_FBTYPE_MFB)
+	if (ri.ri_depth == 8 && info->fi_type.fb_type != PMAX_FBTYPE_MFB)
 		info->fi_driver->fbd_putcmap(info, rasops_cmap, 0, 256);
 
 	fbconstty = &rcons_tty [0];
@@ -267,6 +271,8 @@ rasterconsoleattach (n)
 	clalloc(&tp->t_canq, 1024, 1);
 	/* output queue doesn't need quoting */
 	clalloc(&tp->t_outq, 1024, 0);
+	/* Set default line discipline. */
+	tp->t_linesw = linesw[0];
 #ifdef DEBUG
 	printf("rconsattach: %d raster consoles\n", n);
 #endif
@@ -317,7 +323,7 @@ rconsopen(dev, flag, mode, p)
 	} else if (tp->t_state & TS_XCLUDE && p->p_ucred->cr_uid != 0)
 		return (EBUSY);
 
-	status = (*linesw[tp->t_line].l_open)(dev, tp);
+	status = (*tp->t_linesw->l_open)(dev, tp);
 	return status;
 }
 
@@ -330,7 +336,7 @@ rconsclose(dev, flag, mode, p)
 {
 	struct tty *tp = &rcons_tty [0];
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	ttyclose(tp);
 
 	return (0);
@@ -345,7 +351,7 @@ rconsread(dev, uio, flag)
 {
 	struct tty *tp = &rcons_tty [0];
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 /* ARGSUSED */
@@ -358,7 +364,19 @@ rconswrite(dev, uio, flag)
 	struct tty *tp;
 
 	tp = &rcons_tty [0];
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+rconspoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct tty *tp;
+
+	tp = &rcons_tty [0];
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -382,11 +400,9 @@ rconsioctl(dev, cmd, data, flag, p)
 	int error;
 
 	tp = &rcons_tty [0];
-	if ((error = linesw[tp->t_line].l_ioctl(tp, cmd, data, flag, p)) >= 0)
+	if ((error = tp->t_linesw->l_ioctl(tp, cmd, data, flag, p)) != EPASSTHROUGH)
 		return (error);
-	if ((error = ttioctl(tp, cmd, data, flag, p)) >= 0)
-		return (error);
-	return (ENOTTY);
+	return ttioctl(tp, cmd, data, flag, p);
 }
 
 /* ARGSUSED */
@@ -396,15 +412,6 @@ rconsstop(tp, rw)
 	int rw;
 {
 
-}
-
-int
-rconspoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-	return (ttpoll(dev, events, p));
 }
 
 /*ARGSUSED*/
@@ -448,7 +455,7 @@ rconsstart(tp)
 	if (cl->c_cc <= tp->t_lowat) {
 		if (tp->t_state & TS_ASLEEP) {
 			tp->t_state &= ~TS_ASLEEP;
-			wakeup((caddr_t)cl);
+			wakeup(cl);
 		}
 		selwakeup(&tp->t_wsel);
 	}
@@ -476,7 +483,7 @@ rcons_later(tpaddr)
 	(*(fbconstty->t_oproc)) (tp);	/* XXX */
 
 	tp->t_state &= ~TS_BUSY;
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 	splx(s);
 }
 #endif	/* notyet */
@@ -505,6 +512,6 @@ rcons_input (dev, ic)
 	if (!(tp -> t_state & TS_ISOPEN)) {
 		return;
 	}
-	(*linesw [tp -> t_line].l_rint)(ic, tp);
+	(*tp->t_linesw->l_rint)(ic, tp);
 }
 #endif /* NRASTERCONSOLE > 0 */

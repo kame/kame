@@ -1,4 +1,4 @@
-/*	$NetBSD: ymvar.h,v 1.6.4.1 2002/03/27 10:18:30 he Exp $	*/
+/*	$NetBSD: ymvar.h,v 1.8 2002/03/10 13:57:11 itohy Exp $	*/
 
 /*-
  * Copyright (c) 1999-2000, 2002 The NetBSD Foundation, Inc.
@@ -175,9 +175,21 @@ struct ym_softc {
 	/* 3D encehamcement */
 	u_int8_t sc_eqmode;
 	struct ad1848_volume sc_treble, sc_bass, sc_wide;
-#define YM_EQ_OFF(v)	\
-	((v)->left < (AUDIO_MAX_GAIN + 1) / (SA3_3D_BITS + 1) &&	\
-	(v)->right < (AUDIO_MAX_GAIN + 1) / (SA3_3D_BITS + 1))
+	/*
+	 * The equalizer of OPL3-SA3 is ``flat'' if it is turned off.
+	 * For compatibility with other drivers, however, make it flat
+	 * if it is set at center (or smaller).
+	 */
+#define YM_EQ_REDUCE_BIT	1	/* use only 128 values from 256 */
+#define YM_EQ_FLAT_OFFSET	128	/* center */
+#define YM_EQ_EXPAND_VALUE(v)	\
+    ((v) < YM_EQ_FLAT_OFFSET? 0 : ((v) - YM_EQ_FLAT_OFFSET) << YM_EQ_REDUCE_BIT)
+
+#define YM_3D_ON_MIN	((AUDIO_MAX_GAIN + 1) / (SA3_3D_BITS + 1))
+#define YM_EQ_ON_MIN	((YM_3D_ON_MIN >> YM_EQ_REDUCE_BIT) + YM_EQ_FLAT_OFFSET)
+
+#define YM_EQ_OFF(v)	((v)->left < YM_EQ_ON_MIN && (v)->right < YM_EQ_ON_MIN)
+#define YM_WIDE_OFF(v)	((v)->left < YM_3D_ON_MIN && (v)->right < YM_3D_ON_MIN)
 
 	struct device *sc_audiodev;
 

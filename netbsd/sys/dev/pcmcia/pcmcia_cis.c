@@ -1,6 +1,4 @@
-/*	$NetBSD: pcmcia_cis.c,v 1.18.4.2 2001/03/13 21:36:48 he Exp $	*/
-
-#define	PCMCIACISDEBUG
+/*	$NetBSD: pcmcia_cis.c,v 1.29 2002/01/12 16:25:15 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -31,7 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcmcia_cis.c,v 1.29 2002/01/12 16:25:15 tsutsui Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -60,6 +60,8 @@ struct cis_state {
 };
 
 int	pcmcia_parse_cis_tuple __P((struct pcmcia_tuple *, void *));
+static int decode_funce __P((struct pcmcia_tuple *, struct pcmcia_function *));
+
 
 void
 pcmcia_read_cis(sc)
@@ -126,9 +128,6 @@ pcmcia_scan_cis(dev, fct, arg)
 #endif
 		return -1;
 	}
-	tuple.memt = pcmh.memt;
-	tuple.memh = pcmh.memh;
-
 	/* initialize state for the primary tuple chain */
 	if (pcmcia_chip_mem_map(pct, pch, PCMCIA_MEM_ATTR, 0,
 	    PCMCIA_CIS_SIZE, &pcmh, &tuple.ptr, &window)) {
@@ -139,6 +138,9 @@ pcmcia_scan_cis(dev, fct, arg)
 #endif
 		return -1;
 	}
+	tuple.memt = pcmh.memt;
+	tuple.memh = pcmh.memh;
+
 	DPRINTF(("cis mem map %x\n", (unsigned int) tuple.memh));
 
 	tuple.mult = 2;
@@ -154,6 +156,19 @@ pcmcia_scan_cis(dev, fct, arg)
 
 	while (1) {
 		while (1) {
+			/*
+			 * Perform boundary check for insane cards.
+			 * If CIS is too long, simulate CIS end.
+			 * (This check may not be sufficient for
+			 * malicious cards.)
+			 */
+			if (tuple.mult * tuple.ptr >= PCMCIA_CIS_SIZE - 1
+			    - 32 /* ad hoc value */ ) {
+				DPRINTF(("CISTPL_END (too long CIS)\n"));
+				tuple.code = PCMCIA_CISTPL_END;
+				goto cis_end;
+			}
+
 			/* get the tuple code */
 
 			DELAY(1000);
@@ -167,6 +182,7 @@ pcmcia_scan_cis(dev, fct, arg)
 				continue;
 			} else if (tuple.code == PCMCIA_CISTPL_END) {
 				DPRINTF(("CISTPL_END\n ff\n"));
+			cis_end:
 				/* Call the function for the END tuple, since
 				   the CIS semantics depend on it */
 				if ((*fct) (&tuple, arg)) {
@@ -533,6 +549,13 @@ pcmcia_print_cis(sc)
 			break;
 		case PCMCIA_FUNCTION_DISK:
 			printf("fixed disk");
+			switch (pf->pf_funce_disk_interface) {
+			case PCMCIA_TPLFE_DDI_PCCARD_ATA:
+				printf("(ata)");
+				break;
+			default:
+				break;
+			}
 			break;
 		case PCMCIA_FUNCTION_VIDEO:
 			printf("video adapter");
@@ -817,10 +840,22 @@ pcmcia_parse_cis_tuple(tuple, arg)
 			    tuple->length));
 			break;
 		}
-		if ((state->pf == NULL) || (state->gotmfc == 2)) {
+		if (state->pf) {
+			if (state->pf->function == PCMCIA_FUNCTION_UNSPEC) {
+				/*
+				 * This looks like a opportunistic function
+				 * created by a CONFIG tuple.  Just keep it.
+				 */
+			} else {
+				/*
+				 * A function is being defined, end it.
+				 */
+				state->pf = NULL;
+			}
+		}
+		if (state->pf == NULL) {
 			state->pf = malloc(sizeof(*state->pf), M_DEVBUF,
-			    M_NOWAIT);
-			bzero(state->pf, sizeof(*state->pf));
+			    M_NOWAIT|M_ZERO);
 			state->pf->number = state->count++;
 			state->pf->last_config_index = -1;
 			SIMPLEQ_INIT(&state->pf->cfe_head);
@@ -831,6 +866,16 @@ pcmcia_parse_cis_tuple(tuple, arg)
 		state->pf->function = pcmcia_tuple_read_1(tuple, 0);
 
 		DPRINTF(("CISTPL_FUNCID\n"));
+		break;
+	case PCMCIA_CISTPL_FUNCE:
+		if (state->pf == NULL || state->pf->function <= 0) {
+			DPRINTF(("CISTPL_FUNCE is not followed by "
+			    "valid CISTPL_FUNCID\n"));
+			break;
+		}
+		if (tuple->length >= 2) {
+			decode_funce(tuple, state->pf);
+		}
 		break;
 	case PCMCIA_CISTPL_CONFIG:
 		if (tuple->length < 3) {
@@ -857,8 +902,7 @@ pcmcia_parse_cis_tuple(tuple, arg)
 			}
 			if (state->pf == NULL) {
 				state->pf = malloc(sizeof(*state->pf),
-				    M_DEVBUF, M_NOWAIT);
-				bzero(state->pf, sizeof(*state->pf));
+				    M_DEVBUF, M_NOWAIT|M_ZERO);
 				state->pf->number = state->count++;
 				state->pf->last_config_index = -1;
 				SIMPLEQ_INIT(&state->pf->cfe_head);
@@ -1286,4 +1330,42 @@ pcmcia_parse_cis_tuple(tuple, arg)
 	}
 
 	return (0);
+}
+
+
+
+static int
+decode_funce(tuple, pf)
+	struct pcmcia_tuple *tuple;
+	struct pcmcia_function *pf;
+{
+	int type = pcmcia_tuple_read_1(tuple, 0);
+
+	switch (pf->function) {
+	case PCMCIA_FUNCTION_DISK:
+		if (type == PCMCIA_TPLFE_TYPE_DISK_DEVICE_INTERFACE) {
+			pf->pf_funce_disk_interface
+			    = pcmcia_tuple_read_1(tuple, 1);
+		}
+		break;
+	case PCMCIA_FUNCTION_NETWORK:
+		if (type == PCMCIA_TPLFE_TYPE_LAN_NID) {
+			int i;
+			int len = pcmcia_tuple_read_1(tuple, 1);
+			if (tuple->length < 2 + len || len > 8) {
+				/* tuple length not enough or nid too long */
+				break;
+			}
+			for (i = 0; i < len; ++i) {
+				pf->pf_funce_lan_nid[i]
+				    = pcmcia_tuple_read_1(tuple, 2 + i);
+			}
+			pf->pf_funce_lan_nidlen = len;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }

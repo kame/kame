@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.41.4.2 2000/08/13 09:09:28 jdolecek Exp $	*/
+/*	$NetBSD: machdep.c,v 1.61 2002/03/05 16:13:57 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,7 +43,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.41.4.2 2000/08/13 09:09:28 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.61 2002/03/05 16:13:57 simonb Exp $");
 
 /* from: Utah Hdr: machdep.c 1.63 91/04/24 */
 
@@ -68,15 +68,12 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.41.4.2 2000/08/13 09:09:28 jdolecek Ex
 #include <sys/device.h>
 #include <sys/user.h>
 #include <sys/exec.h>
-#include <vm/vm.h>
-#include <sys/sysctl.h>
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 #include <sys/kcore.h>
 
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
+#include <sys/sysctl.h>
 
 #include <ufs/mfs/mfs_extern.h>		/* mfs_initminiroot() */
 
@@ -88,7 +85,12 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.41.4.2 2000/08/13 09:09:28 jdolecek Ex
 #include <machine/bootinfo.h>
 #include <machine/apbus.h>
 #include <machine/apcall.h>
-#include <mips/locore.h>		/* wbflush() */
+
+#include <mips/cache.h>
+#include <mips/locore.h>
+
+#define	_NEWSMIPS_BUS_DMA_PRIVATE
+#include <machine/bus.h>
 
 #ifdef DDB
 #include <machine/db_machdep.h>
@@ -114,9 +116,9 @@ struct cpu_info cpu_info_store;
 
 /* maps for VM objects */
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 char *bootinfo = NULL;		/* pointer to bootinfo structure */
 int physmem;			/* max supported memory, changes to actual */
@@ -129,6 +131,7 @@ int mem_cluster_cnt;
 struct idrom idrom;
 void (*enable_intr) __P((void));
 void (*disable_intr) __P((void));
+void (*readmicrotime) __P((struct timeval *tvp));
 
 /* System type dependent initializations. */
 extern void news3400_init __P((void));
@@ -176,7 +179,6 @@ mach_init(x_boothowto, x_bootdev, x_bootname, x_maxmem)
 	int x_bootname;
 	int x_maxmem;
 {
-	register int i;
 	u_long first, last;
 	caddr_t kernend, v;
 	vsize_t size;
@@ -219,10 +221,30 @@ mach_init(x_boothowto, x_bootdev, x_bootname, x_maxmem)
 
 #ifdef news5000
 	if (systype == NEWS5000) {
+		int i;
+		char *bootspec = (char *)x_bootdev;
+
 		_sip = (void *)bi_arg->sip;
 		x_maxmem = _sip->apbsi_memsize;
 		x_maxmem -= 0x00100000;	/* reserve 1MB for ROM monitor */
-
+		if (strncmp(bootspec, "scsi", 4) == 0) {
+			x_bootdev = (5 << 28) | 0;	 /* magic, sd */
+			bootspec += 4;
+			if (*bootspec != '(' /*)*/)
+				goto bootspec_end;
+			i = strtoul(bootspec + 1, &bootspec, 10);
+			x_bootdev |= (i << 24);		/* bus */
+			if (*bootspec != ',')
+				goto bootspec_end;
+			i = strtoul(bootspec + 1, &bootspec, 10);
+			x_bootdev |= (i / 10) << 20;	/* controller */
+			x_bootdev |= (i % 10) << 16;	/* unit */
+			if (*bootspec != ',')
+				goto bootspec_end;
+			i = strtoul(bootspec + 1, &bootspec, 10);
+			x_bootdev |= (i << 8);		/* partition */
+		}
+  bootspec_end:
 		consinit();
 	}
 #endif
@@ -263,6 +285,13 @@ mach_init(x_boothowto, x_bootdev, x_bootname, x_maxmem)
 	 * Clear out the I and D caches.
 	 */
 	mips_vector_init();
+
+	/*
+	 * We know the CPU type now.  Initialize our DMA tags (might
+	 * need this early).
+	 */
+	newsmips_bus_dma_init();
+
 #if 0
 	if (systype == NEWS5000) {
 		mips_L2CacheSize = 1024 * 1024;		/* XXX to be safe */
@@ -271,15 +300,10 @@ mach_init(x_boothowto, x_bootdev, x_bootname, x_maxmem)
 #endif
 
 #ifdef DDB
-	/*
-	 * Initialize machine-dependent DDB commands, in case of early panic.
-	 */
-	db_machine_init();
 	if (nsym)
 		ddb_init(esym - ssym, ssym, esym);
 #endif
 
-	boothowto &= ~RB_ASKNAME;	/* for lack of cn_getc */
 #ifdef KADB
 	boothowto |= RB_KDB;
 #endif
@@ -292,17 +316,6 @@ mach_init(x_boothowto, x_bootdev, x_bootname, x_maxmem)
 	if (boothowto & RB_MINIROOT)
 		kernend += round_page(mfs_initminiroot(kernend));
 #endif
-
-	/*
-	 * Alloc u pages for proc0 stealing KSEG0 memory.
-	 */
-	proc0.p_addr = proc0paddr = (struct user *)kernend;
-	proc0.p_md.md_regs = (struct frame *)(kernend + USPACE) - 1;
-	memset(proc0.p_addr, 0, USPACE);
-	curpcb = &proc0.p_addr->u_pcb;
-	curpcb->pcb_context[11] = MIPS_INT_MASK | MIPS_SR_INT_IE; /* SR */
-
-	kernend += USPACE;
 
 	/*
 	 * Load the rest of the available pages into the VM system.
@@ -318,13 +331,32 @@ mach_init(x_boothowto, x_bootdev, x_bootname, x_maxmem)
 	mips_init_msgbuf();
 
 	/*
+	 * Compute the size of system data structures.  pmap_bootstrap()
+	 * needs some of this information.
+	 */
+	size = (vsize_t)allocsys(NULL, NULL);
+
+	/*
+	 * Initialize the virtual memory system.
+	 */
+	pmap_bootstrap();
+
+	/*
+	 * Allocate space for proc0's USPACE.
+	 */
+	v = (caddr_t)uvm_pageboot_alloc(USPACE); 
+	proc0.p_addr = proc0paddr = (struct user *)v;
+	proc0.p_md.md_regs = (struct frame *)(v + USPACE) - 1;
+	curpcb = &proc0.p_addr->u_pcb;
+	curpcb->pcb_context[11] = MIPS_INT_MASK | MIPS_SR_INT_IE; /* SR */
+
+	/*
 	 * Allocate space for system data structures.  These data structures
 	 * are allocated here instead of cpu_startup() because physical
 	 * memory is directly addressable.  We don't have to map these into
 	 * virtual address space.
 	 */
-	size = (vsize_t)allocsys(NULL, NULL);
-	v = (caddr_t)pmap_steal_memory(size, NULL, NULL); 
+	v = (caddr_t)uvm_pageboot_alloc(size); 
 	if ((allocsys(v, NULL) - v) != size)
 		panic("mach_init: table size inconsistency");
 
@@ -335,56 +367,52 @@ mach_init(x_boothowto, x_bootdev, x_bootname, x_maxmem)
 #ifdef news3400
 	case NEWS3400:
 		news3400_init();
+		strcpy(cpu_model, idrom.id_machine);
+		if (strcmp(cpu_model, "news3400") == 0 ||
+		    strcmp(cpu_model, "news3200") == 0 ||
+		    strcmp(cpu_model, "news3700") == 0) {
+			/*
+			 * Set up interrupt handling and I/O addresses.
+			 */
+			hardware_intr = news3400_intr;
+			cpuspeed = 10;
+		} else {
+			printf("kernel not configured for machine %s\n",
+			    cpu_model);
+		}
 		break;
 #endif
 
 #ifdef news5000
 	case NEWS5000:
 		news5000_init();
+		strcpy(cpu_model, idrom.id_machine);
+		if (strcmp(cpu_model, "news5000") == 0 ||
+		    strcmp(cpu_model, "news5900") == 0) {
+			/*
+			 * Set up interrupt handling and I/O addresses.
+			 */
+			hardware_intr = news5000_intr;
+			cpuspeed = 50;	/* ??? XXX */
+		} else {
+			printf("kernel not configured for machine %s\n",
+			    cpu_model);
+		}
 		break;
 #endif
-	}
-
-	i = idrom.id_modelid;
-
-	switch (i) {
 
 	default:
-		printf("kernel not configured for systype 0x%x\n", i);
-		/* cpu_reboot(RB_HALT | RB_NOSYNC, NULL); */
-
-#ifdef news5000
-	case 2: /* NWS-5000U/W */
-	case 5: /* NWS-5000R */
-	case 7: /* NWS-5000X */
-	case 9: /* NWS-5900X */
-	case 11:/* NWS-5000G */
-		/*
-		 * Set up interrupt handling and I/O addresses.
-		 */
-		hardware_intr = news5000_intr;
-		strcpy(cpu_model, "news5000");
-		cpuspeed = 50;	/* ??? XXX */
+		printf("kernel not configured for systype %d\n", systype);
 		break;
-#endif
-
-#ifdef news3400
-	case 3: /* NWS-3410 */
-	case 6: /* NWS-3470 */
-		/*
-		 * Set up interrupt handling and I/O addresses.
-		 */
-		hardware_intr = news3400_intr;
-		strcpy(cpu_model, "news3400");
-		cpuspeed = 10;
-		break;
-#endif
 	}
+}
 
-	/*
-	 * Initialize the virtual memory system.
-	 */
-	pmap_bootstrap();
+void
+mips_machdep_cache_config(void)
+{
+	/* All r4k news boxen have a 1MB L2 cache. */
+	if (CPUISMIPS3)
+		mips_sdcache_size = 1024 * 1024;
 }
 
 /*
@@ -420,9 +448,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	base = bufpages / nbuf;
@@ -452,6 +480,8 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
+
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -637,14 +667,10 @@ microtime(tvp)
 	int s = splclock();
 	static struct timeval lasttime;
 
-	*tvp = time;
-#if 0
-	tvp->tv_usec += clkread();
-	if (tvp->tv_usec >= 1000000) {
-		tvp->tv_usec -= 1000000;
-		tvp->tv_sec++;
-	}
-#endif
+	if (readmicrotime)
+		readmicrotime(tvp);
+	else
+		*tvp = time;
 
 	if (tvp->tv_sec == lasttime.tv_sec &&
 	    tvp->tv_usec <= lasttime.tv_usec &&
@@ -707,22 +733,6 @@ cpu_intr(status, cause, pc, ipending)
 		_clrsoftintr(MIPS_SOFT_INT_MASK_0);
 		uvmexp.softs++;
 		intrcnt[SOFTCLOCK_INTR]++;
-		softclock();
+		softclock(NULL);
 	}
 }
-
-#ifdef EXEC_ECOFF
-#include <sys/exec_ecoff.h>
-
-int
-cpu_exec_ecoff_hook(p, epp)
-	struct proc *p;
-	struct exec_package *epp;
-{
-	extern struct emul emul_netbsd;
-
-	epp->ep_emul = &emul_netbsd;
-
-	return 0;
-}
-#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.104.2.1 2000/09/12 13:43:55 pk Exp $ */
+/*	$NetBSD: cpu.c,v 1.126 2002/01/25 17:40:45 pk Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -52,16 +52,16 @@
  */
 
 #include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
+#include "opt_ddb.h"
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
+#include <sys/lock.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#include <uvm/uvm_extern.h>
 #include <uvm/uvm.h>
 
 #include <machine/autoconf.h>
@@ -69,6 +69,7 @@
 #include <machine/reg.h>
 #include <machine/ctlreg.h>
 #include <machine/trap.h>
+#include <machine/pcb.h>
 #include <machine/pmap.h>
 
 #include <machine/oldmon.h>
@@ -89,9 +90,10 @@ char	machine[] = MACHINE;		/* from <machine/param.h> */
 char	machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
 char	cpu_model[100];
 
-int	ncpu;
+int	ncpu;				/* # of CPUs detected by PROM */
 struct	cpu_info **cpus;
 #define CPU_MID2CPUNO(mid) ((mid) - 8)
+static	int cpu_instance;		/* current # of CPUs wired by us */
 
 
 /* The CPU configuration driver. */
@@ -105,7 +107,6 @@ struct cfattach cpu_ca = {
 static char *fsrtoname __P((int, int, int));
 void cache_print __P((struct cpu_softc *));
 void cpu_setup __P((struct cpu_softc *));
-void cpu_spinup __P((struct cpu_softc *));
 void fpu_init __P((struct cpu_info *));
 
 #define	IU_IMPL(psr)	((u_int)(psr) >> 28)
@@ -115,8 +116,14 @@ void fpu_init __P((struct cpu_info *));
 #define SRMMU_VERS(mmusr)	(((mmusr) >> 24) & 0xf)
 
 #if defined(MULTIPROCESSOR)
+void cpu_spinup __P((struct cpu_softc *));
 struct cpu_info *alloc_cpuinfo_global_va __P((int, vsize_t *));
 struct cpu_info	*alloc_cpuinfo __P((void));
+
+int go_smp_cpus = 0;	/* non-primary cpu's wait for this to go */
+
+/* lock this to send IPI's */
+struct simplelock xpmsg_lock = SIMPLELOCK_INITIALIZER;
 
 struct cpu_info *
 alloc_cpuinfo_global_va(ismaster, sizep)
@@ -178,7 +185,7 @@ alloc_cpuinfo()
 	vaddr_t va;
 	vsize_t sz;
 	vaddr_t low, high;
-	vm_page_t m;
+	struct vm_page *m;
 	struct pglist mlist;
 	struct cpu_info *cpi;
 
@@ -196,13 +203,12 @@ alloc_cpuinfo()
 	/* Map the pages */
 	for (m = TAILQ_FIRST(&mlist); m != NULL; m = TAILQ_NEXT(m, pageq)) {
 		paddr_t pa = VM_PAGE_TO_PHYS(m);
-		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ|VM_PROT_WRITE,
-		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
 		va += NBPG;
 	}
+	pmap_update(pmap_kernel());
 
-	bzero((void *)cpi, sizeof(struct cpu_info));
+	bzero((void *)cpi, sz);
 	cpi->eintstack = (void *)((vaddr_t)cpi + sz);
 	cpi->idle_u = (void *)((vaddr_t)cpi + sz - INT_STACK_SIZE - USPACE);
 
@@ -272,7 +278,6 @@ cpu_attach(parent, self, aux)
 	void *aux;
 {
 static	struct cpu_softc *bootcpu;
-static	int cpu_instance;
 	struct mainbus_attach_args *ma = aux;
 	struct cpu_softc *sc = (struct cpu_softc *)self;
 	struct cpu_info *cpi;
@@ -281,7 +286,7 @@ static	int cpu_instance;
 	node = ma->ma_node;
 
 #if defined(MULTIPROCESSOR)
-	mid = (node != 0) ? getpropint(node, "mid", 0) : 0;
+	mid = (node != 0) ? PROM_getpropint(node, "mid", 0) : 0;
 #else
 	mid = 0;
 #endif
@@ -324,7 +329,11 @@ static	int cpu_instance;
 		cpi = sc->sc_cpuinfo = alloc_cpuinfo();
 		cpi->ci_self = cpi;
 		cpi->curpcb = cpi->idle_u;
-		/* Note: `idle_u' and `eintstack' are set in alloc_cpuinfo() */
+		cpi->curpcb->pcb_wim = 1;
+		/*
+		 * Note: `idle_u' and `eintstack' are set in alloc_cpuinfo().
+		 * The %wim register will be initialized in cpu_hatch().
+		 */
 		getcpuinfo(cpi, node);
 #else
 		printf(": no SMP support in kernel\n");
@@ -337,9 +346,10 @@ static	int cpu_instance;
 #endif
 
 	cpus[cpu_instance] = cpi;
-	cpi->cpu_no = cpu_instance++;
+	cpi->ci_cpuid = cpu_instance++;
 	cpi->mid = mid;
 	cpi->node = node;
+	simple_lock_init(&cpi->msg.lock);
 
 	if (ncpu > 1)
 		printf(": mid %d", mid);
@@ -365,13 +375,24 @@ static	int cpu_instance;
 
 	cache_print(sc);
 
-	if (cpu_instance == ncpu) {
-		/* Install MP cache flush functions on boot cpu */
-		cpuinfo.cache_flush = smp_cache_flush;
-		cpuinfo.vcache_flush_page = smp_vcache_flush_page;
-		cpuinfo.vcache_flush_segment = smp_vcache_flush_segment;
-		cpuinfo.vcache_flush_region = smp_vcache_flush_region;
-		cpuinfo.vcache_flush_context = smp_vcache_flush_context;
+	if (ncpu > 1 && cpu_instance == ncpu) {
+		int n;
+		/*
+		 * Install MP cache flush functions, unless the
+		 * single-processor versions are no-ops.
+		 */
+		for (n = 0; n < ncpu; n++) {
+			struct cpu_info *cpi = cpus[n];
+			if (cpi == NULL)
+				continue;
+#define SET_CACHE_FUNC(x) \
+	if (cpi->x != __CONCAT(noop_,x)) cpi->x = __CONCAT(smp_,x)
+			SET_CACHE_FUNC(cache_flush);
+			SET_CACHE_FUNC(vcache_flush_page);
+			SET_CACHE_FUNC(vcache_flush_segment);
+			SET_CACHE_FUNC(vcache_flush_region);
+			SET_CACHE_FUNC(vcache_flush_context);
+		}
 	}
 #endif /* MULTIPROCESSOR */
 }
@@ -383,13 +404,34 @@ static	int cpu_instance;
 void
 cpu_boot_secondary_processors()
 {
+	int n;
 
-	/*
-	 * XXX This is currently a noop; the CPUs are already running, but
-	 * XXX aren't doing anything.  Eventually, this will release a
-	 * XXX semaphore that all those secondary processors are anxiously
-	 * XXX waiting on.
-	 */
+	if (cpu_instance != ncpu) {
+		printf("NOTICE: only %d out of %d CPUs were configured\n",
+			cpu_instance, ncpu);
+		return;
+	}
+
+	if (cpus == NULL)
+		return;
+
+	printf("cpu0: booting secondary processors:");
+	for (n = 0; n < ncpu; n++) {
+		struct cpu_info *cpi = cpus[n];
+
+		if (cpi == NULL || cpuinfo.mid == cpi->mid)
+			continue;
+
+		printf(" cpu%d", cpi->ci_cpuid);
+		cpi->flags |= CPUFLG_READY;
+	}
+
+	/* Tell the other CPU's to start up.  */
+	go_smp_cpus = 1;
+
+	/* OK, we're done. */
+	cpuinfo.flags |= CPUFLG_READY;
+	printf("\n");
 }
 #endif /* MULTIPROCESSOR */
 
@@ -423,6 +465,7 @@ cpu_setup(sc)
 #endif
 }
 
+#if defined(MULTIPROCESSOR)
 /*
  * Allocate per-CPU data, then start up this CPU using PROM.
  */
@@ -430,10 +473,9 @@ void
 cpu_spinup(sc)
 	struct cpu_softc *sc;
 {
-#if defined(SUN4M)
 	struct cpu_info *cpi = sc->sc_cpuinfo;
 	int n;
-extern void cpu_hatch __P((void));
+extern void cpu_hatch __P((void));	/* in locore.s */
 	caddr_t pc = (caddr_t)cpu_hatch;
 	struct openprom_addr oa;
 
@@ -470,44 +512,174 @@ extern void cpu_hatch __P((void));
 		delay(100);
 	}
 	printf("CPU did not spin up\n");
-#endif
+}
+
+/* 
+ * Calls raise_ipi(), waits for the remote CPU to notice the message, and
+ * unlocks this CPU's message lock, which we expect was locked at entry.
+ */
+void
+raise_ipi_wait_and_unlock(cpi)
+	struct cpu_info *cpi;
+{
+	int i;
+
+	raise_ipi(cpi);
+	i = 0;
+	while ((cpi->flags & CPUFLG_GOTMSG) == 0) {
+		if (i++ > 500000) {
+			printf("raise_ipi_wait_and_unlock(cpu%d): couldn't ping cpu%d\n",
+			    cpuinfo.ci_cpuid, cpi->ci_cpuid);
+			break;
+		}
+	}
+	simple_unlock(&cpi->msg.lock);
+}
+
+/*
+ * Call a function on every CPU.  One must hold xpmsg_lock around
+ * this function.
+ */
+void
+cross_call(func, arg0, arg1, arg2, arg3, cpuset)
+	int	(*func)(int, int, int, int);
+	int	arg0, arg1, arg2, arg3;
+	int	cpuset;	/* XXX unused; cpus to send to: we do all */
+{
+	int n, i, not_done;
+	struct xpmsg_func *p;
+
+	/*
+	 * If no cpus are configured yet, just call ourselves.
+	 */
+	if (cpus == NULL) {
+		p = &cpuinfo.msg.u.xpmsg_func;
+		p->func = func;
+		p->arg0 = arg0;
+		p->arg1 = arg1;
+		p->arg2 = arg2;
+		p->arg3 = arg3;
+		p->retval = (*p->func)(p->arg0, p->arg1, p->arg2, p->arg3); 
+		return;
+	}
+
+	/*
+	 * Firstly, call each CPU.  We do this so that they might have
+	 * finished by the time we start looking.
+	 */
+	for (n = 0; n < ncpu; n++) {
+		struct cpu_info *cpi = cpus[n];
+
+		if (CPU_READY(cpi))
+			continue;
+		
+		simple_lock(&cpi->msg.lock);
+		cpi->msg.tag = XPMSG_FUNC;
+		p = &cpi->msg.u.xpmsg_func;
+		p->func = func;
+		p->arg0 = arg0;
+		p->arg1 = arg1;
+		p->arg2 = arg2;
+		p->arg3 = arg3;
+		cpi->flags &= ~CPUFLG_GOTMSG;
+		raise_ipi(cpi);
+	}
+
+	/*
+	 * Second, call ourselves.
+	 */
+
+	p = &cpuinfo.msg.u.xpmsg_func;
+
+	/* Call this on me first. */
+	p->func = func;
+	p->arg0 = arg0;
+	p->arg1 = arg1;
+	p->arg2 = arg2;
+	p->arg3 = arg3;
+
+	p->retval = (*p->func)(p->arg0, p->arg1, p->arg2, p->arg3); 
+
+	/*
+	 * Lastly, start looping, waiting for all cpu's to register that they
+	 * have completed (bailing if it takes "too long", being loud about
+	 * this in the process).
+	 */
+	i = 0;
+	while (not_done) {
+		not_done = 0;
+		for (n = 0; n < ncpu; n++) {
+			struct cpu_info *cpi = cpus[n];
+
+			if (CPU_READY(cpi))
+				continue;
+
+			if ((cpi->flags & CPUFLG_GOTMSG) != 0)
+				not_done = 1;
+		}
+		if (not_done && i++ > 100000) {
+			printf("cross_call(cpu%d): couldn't ping cpus:",
+			    cpuinfo.ci_cpuid);
+			break;
+		}
+		if (not_done == 0)
+			break;
+	}
+	for (n = 0; n < ncpu; n++) {
+		struct cpu_info *cpi = cpus[n];
+
+		if (CPU_READY(cpi))
+			continue;
+		simple_unlock(&cpi->msg.lock);
+		if ((cpi->flags & CPUFLG_GOTMSG) != 0)
+			printf(" cpu%d", cpi->ci_cpuid);
+	}
+	if (not_done)
+		printf("\n");
 }
 
 void
 mp_pause_cpus()
 {
-#ifdef SUN4M
 	int n;
 
+	if (cpus == NULL)
+		return;
+
+	LOCK_XPMSG();
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
-		if (cpi == NULL || cpuinfo.mid == cpi->mid)
+
+		if (CPU_READY(cpi))
 			continue;
 
 		simple_lock(&cpi->msg.lock);
 		cpi->msg.tag = XPMSG_PAUSECPU;
-		raise_ipi(cpi);
+		cpi->flags &= ~CPUFLG_GOTMSG;
+		raise_ipi_wait_and_unlock(cpi);
 	}
-#endif
+	UNLOCK_XPMSG();
 }
 
 void
 mp_resume_cpus()
 {
-#ifdef SUN4M
 	int n;
+
+	if (cpus == NULL)
+		return;
 
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
+
 		if (cpi == NULL || cpuinfo.mid == cpi->mid)
 			continue;
 
-		simple_lock(&cpi->msg.lock);
-		cpi->msg.tag = XPMSG_RESUMECPU;
-		raise_ipi(cpi);
+		/* tell it to continue */
+		cpi->flags &= ~CPUFLG_PAUSED;
 	}
-#endif
 }
+#endif /* MULTIPROCESSOR */
 
 /*
  * fpu_init() must be run on associated CPU.
@@ -735,7 +907,7 @@ getcacheinfo_sun4(sc, node)
 	}
 }
 
-struct	idprom idprom;
+struct	idprom sun4_idprom_store;
 void	getidprom __P((struct idprom *, int size));
 
 void
@@ -744,10 +916,15 @@ cpumatch_sun4(sc, mp, node)
 	struct module_info *mp;
 	int	node;
 {
+	extern struct idprom *idprom;
+	/*
+	 * XXX - for e.g. myetheraddr(), which in sun4 can be called
+	 *	 before the clock attaches.
+	 */
+	idprom = &sun4_idprom_store;
 
-	getidprom(&idprom, sizeof(idprom));
-	switch (idprom.id_machine) {
-	/* XXX: don't know about Sun4 types */
+	getidprom(&sun4_idprom_store, sizeof(struct idprom));
+	switch (sun4_idprom_store.id_machine) {
 	case ID_SUN4_100:
 		sc->cpu_type = CPUTYP_4_100;
 		sc->classlvl = 100;
@@ -818,11 +995,11 @@ cpumatch_sun4c(sc, mp, node)
 
 	rnode = findroot();
 	sc->mmu_npmeg = sc->mmu_nsegment =
-		getpropint(rnode, "mmu-npmg", 128);
-	sc->mmu_ncontext = getpropint(rnode, "mmu-nctx", 8);
+		PROM_getpropint(rnode, "mmu-npmg", 128);
+	sc->mmu_ncontext = PROM_getpropint(rnode, "mmu-nctx", 8);
                               
 	/* Get clock frequency */ 
-	sc->hz = getpropint(rnode, "clock-frequency", 0);
+	sc->hz = PROM_getpropint(rnode, "clock-frequency", 0);
 }
 
 void
@@ -839,16 +1016,16 @@ getcacheinfo_sun4c(sc, node)
 
 	/* Sun4c's have only virtually-addressed caches */
 	ci->c_physical = 0; 
-	ci->c_totalsize = getpropint(node, "vac-size", 65536);
+	ci->c_totalsize = PROM_getpropint(node, "vac-size", 65536);
 	/*
 	 * Note: vac-hwflush is spelled with an underscore
 	 * on the 4/75s.
 	 */
 	ci->c_hwflush =
-		getpropint(node, "vac_hwflush", 0) |
-		getpropint(node, "vac-hwflush", 0);
+		PROM_getpropint(node, "vac_hwflush", 0) |
+		PROM_getpropint(node, "vac-hwflush", 0);
 
-	ci->c_linesize = l = getpropint(node, "vac-linesize", 16);
+	ci->c_linesize = l = PROM_getpropint(node, "vac-linesize", 16);
 	for (i = 0; (1 << i) < l; i++)
 		/* void */;
 	if ((1 << i) != l)
@@ -864,7 +1041,7 @@ getcacheinfo_sun4c(sc, node)
 	 * chip that affects traps.  (I wish I knew more about this
 	 * mysterious buserr-type variable....)
 	 */
-	if (getpropint(node, "buserr-type", 0) == 1)
+	if (PROM_getpropint(node, "buserr-type", 0) == 1)
 		sc->flags |= CPUFLG_SUN4CACHEBUG;
 }
 #endif /* SUN4C */
@@ -873,11 +1050,15 @@ void
 sun4_hotfix(sc)
 	struct cpu_info *sc;
 {
+
 	if ((sc->flags & CPUFLG_SUN4CACHEBUG) != 0) {
 		kvm_uncache((caddr_t)trapbase, 1);
 		printf(": cache chip bug; trap page uncached");
 	}
 
+	/* Use the hardware-assisted page flush routine, if present */
+	if (sc->cacheinfo.c_hwflush)
+		sc->vcache_flush_page = sun4_vcache_flush_page_hw;
 }
 
 #if defined(SUN4M)
@@ -898,7 +1079,7 @@ getcacheinfo_obp(sc, node)
 	 */
 	ci->c_physical = node_has_property(node, "cache-physical?");
 
-	if (getpropint(node, "ncaches", 1) == 2)
+	if (PROM_getpropint(node, "ncaches", 1) == 2)
 		ci->c_split = 1;
 	else
 		ci->c_split = 0;
@@ -910,28 +1091,28 @@ getcacheinfo_obp(sc, node)
 	    node_has_property(node, "dcache-nlines") &&
 	    ci->c_split) {
 		/* Harvard architecture: get I and D cache sizes */
-		ci->ic_nlines = getpropint(node, "icache-nlines", 0);
+		ci->ic_nlines = PROM_getpropint(node, "icache-nlines", 0);
 		ci->ic_linesize = l =
-			getpropint(node, "icache-line-size", 0);
+			PROM_getpropint(node, "icache-line-size", 0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
 			panic("bad icache line size %d", l);
 		ci->ic_l2linesize = i;
 		ci->ic_associativity =
-			getpropint(node, "icache-associativity", 1);
+			PROM_getpropint(node, "icache-associativity", 1);
 		ci->ic_totalsize = l * ci->ic_nlines * ci->ic_associativity;
 	
-		ci->dc_nlines = getpropint(node, "dcache-nlines", 0);
+		ci->dc_nlines = PROM_getpropint(node, "dcache-nlines", 0);
 		ci->dc_linesize = l =
-			getpropint(node, "dcache-line-size",0);
+			PROM_getpropint(node, "dcache-line-size",0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
 			panic("bad dcache line size %d", l);
 		ci->dc_l2linesize = i;
 		ci->dc_associativity =
-			getpropint(node, "dcache-associativity", 1);
+			PROM_getpropint(node, "dcache-associativity", 1);
 		ci->dc_totalsize = l * ci->dc_nlines * ci->dc_associativity;
 
 		ci->c_l2linesize = min(ci->ic_l2linesize, ci->dc_l2linesize);
@@ -939,9 +1120,9 @@ getcacheinfo_obp(sc, node)
 		ci->c_totalsize = ci->ic_totalsize + ci->dc_totalsize;
 	} else {
 		/* unified I/D cache */
-		ci->c_nlines = getpropint(node, "cache-nlines", 128);
+		ci->c_nlines = PROM_getpropint(node, "cache-nlines", 128);
 		ci->c_linesize = l = 
-			getpropint(node, "cache-line-size", 0);
+			PROM_getpropint(node, "cache-line-size", 0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
@@ -949,20 +1130,20 @@ getcacheinfo_obp(sc, node)
 		ci->c_l2linesize = i;
 		ci->c_totalsize = l *
 			ci->c_nlines *
-			getpropint(node, "cache-associativity", 1);
+			PROM_getpropint(node, "cache-associativity", 1);
 	}
 	
 	if (node_has_property(node, "ecache-nlines")) {
 		/* we have a L2 "e"xternal cache */
-		ci->ec_nlines = getpropint(node, "ecache-nlines", 32768);
-		ci->ec_linesize = l = getpropint(node, "ecache-line-size", 0);
+		ci->ec_nlines = PROM_getpropint(node, "ecache-nlines", 32768);
+		ci->ec_linesize = l = PROM_getpropint(node, "ecache-line-size", 0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
 			panic("bad ecache line size %d", l);
 		ci->ec_l2linesize = i;
 		ci->ec_associativity =
-			getpropint(node, "ecache-associativity", 1);
+			PROM_getpropint(node, "ecache-associativity", 1);
 		ci->ec_totalsize = l * ci->ec_nlines * ci->ec_associativity;
 	}
 	if (ci->c_totalsize == 0)
@@ -1394,22 +1575,22 @@ getcpuinfo(sc, node)
 		i = getpsr();
 		if (node == 0 ||
 		    (cpu_impl =
-		     getpropint(node, "psr-implementation", -1)) == -1)
+		     PROM_getpropint(node, "psr-implementation", -1)) == -1)
 			cpu_impl = IU_IMPL(i);
 
 		if (node == 0 ||
-		    (cpu_vers = getpropint(node, "psr-version", -1)) == -1)
+		    (cpu_vers = PROM_getpropint(node, "psr-version", -1)) == -1)
 			cpu_vers = IU_VERS(i);
 
 		if (CPU_ISSUN4M) {
 			i = lda(SRMMU_PCR, ASI_SRMMU);
 			if (node == 0 ||
 			    (mmu_impl =
-			     getpropint(node, "implementation", -1)) == -1)
+			     PROM_getpropint(node, "implementation", -1)) == -1)
 				mmu_impl = SRMMU_IMPL(i);
 
 			if (node == 0 ||
-			    (mmu_vers = getpropint(node, "version", -1)) == -1)
+			    (mmu_vers = PROM_getpropint(node, "version", -1)) == -1)
 				mmu_vers = SRMMU_VERS(i);
 		} else {
 			mmu_impl = ANY;
@@ -1420,16 +1601,16 @@ getcpuinfo(sc, node)
 		 * Get CPU version/implementation from ROM. If not
 		 * available, assume same as boot CPU.
 		 */
-		cpu_impl = getpropint(node, "psr-implementation", -1);
+		cpu_impl = PROM_getpropint(node, "psr-implementation", -1);
 		if (cpu_impl == -1)
 			cpu_impl = cpuinfo.cpu_impl;
-		cpu_vers = getpropint(node, "psr-version", -1);
+		cpu_vers = PROM_getpropint(node, "psr-version", -1);
 		if (cpu_vers == -1)
 			cpu_vers = cpuinfo.cpu_vers;
 
 		/* Get MMU version/implementation from ROM always */
-		mmu_impl = getpropint(node, "implementation", -1);
-		mmu_vers = getpropint(node, "version", -1);
+		mmu_impl = PROM_getpropint(node, "implementation", -1);
+		mmu_vers = PROM_getpropint(node, "version", -1);
 	}
 
 	for (mp = cpu_conf; ; mp++) {
@@ -1471,12 +1652,12 @@ getcpuinfo(sc, node)
 		mp->minfo->getcacheinfo(sc, node);
 
 		if (node && sc->hz == 0 && !CPU_ISSUN4/*XXX*/) {
-			sc->hz = getpropint(node, "clock-frequency", 0);
+			sc->hz = PROM_getpropint(node, "clock-frequency", 0);
 			if (sc->hz == 0) {
 				/*
 				 * Try to find it in the OpenPROM root...
 				 */     
-				sc->hz = getpropint(findroot(),
+				sc->hz = PROM_getpropint(findroot(),
 						    "clock-frequency", 0);
 			}
 		}
@@ -1503,24 +1684,14 @@ getcpuinfo(sc, node)
 		MPCOPY(copy_page);
 #undef MPCOPY
 		/*
-		 * On the boot cpu we use the single-processor cache flush
-		 * functions until all CPUs are initialized.
+		 * Use the single-processor cache flush functions until
+		 * all CPUs are initialized.
 		 */
-		if (sc->master) {
-			sc->cache_flush = sc->sp_cache_flush;
-			sc->vcache_flush_page = sc->sp_vcache_flush_page;
-			sc->vcache_flush_segment = sc->sp_vcache_flush_segment;
-			sc->vcache_flush_region = sc->sp_vcache_flush_region;
-			sc->vcache_flush_context = sc->sp_vcache_flush_context;
-		} else {
-#if defined(MULTIPROCESSOR)
-			sc->cache_flush = smp_cache_flush;
-			sc->vcache_flush_page = smp_vcache_flush_page;
-			sc->vcache_flush_segment = smp_vcache_flush_segment;
-			sc->vcache_flush_region = smp_vcache_flush_region;
-			sc->vcache_flush_context = smp_vcache_flush_context;
-#endif
-		}
+		sc->cache_flush = sc->sp_cache_flush;
+		sc->vcache_flush_page = sc->sp_vcache_flush_page;
+		sc->vcache_flush_segment = sc->sp_vcache_flush_segment;
+		sc->vcache_flush_region = sc->sp_vcache_flush_region;
+		sc->vcache_flush_context = sc->sp_vcache_flush_context;
 		return;
 	}
 	panic("Out of CPUs");
@@ -1604,3 +1775,33 @@ fsrtoname(impl, vers, fver)
 	}
 	return (NULL);
 }
+
+#ifdef DDB
+
+#include <ddb/db_output.h>
+#include <machine/db_machdep.h>
+
+#include "ioconf.h"
+
+void cpu_debug_dump(void);
+
+/*
+ * Dump cpu information from ddb.
+ */
+void
+cpu_debug_dump(void)
+{
+	struct cpu_info *ci;
+	CPU_INFO_ITERATOR cii;
+
+	db_printf("addr		cpuid	flags	curproc		fpproc\n");
+	for (CPU_INFO_FOREACH(cii, ci)) {
+		db_printf("%p	%d	%x	%10p	%10p\n",
+		    ci,
+		    ci->ci_cpuid,
+		    ci->flags,
+		    ci->ci_curproc,
+		    ci->fpproc);
+	}
+}
+#endif

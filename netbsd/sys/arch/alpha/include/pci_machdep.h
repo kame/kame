@@ -1,4 +1,4 @@
-/* $NetBSD: pci_machdep.h,v 1.5 2000/06/04 19:14:19 cgd Exp $ */
+/* $NetBSD: pci_machdep.h,v 1.10 2002/05/15 19:23:52 thorpej Exp $ */
 
 /*
  * Copyright (c) 1996 Carnegie-Mellon University.
@@ -30,6 +30,7 @@
 /*
  * Machine-specific definitions for PCI autoconfiguration.
  */
+#define	__HAVE_PCIIDE_MACHDEP_COMPAT_INTR_ESTABLISH
 
 /*
  * Types provided to machine-independent PCI code
@@ -53,11 +54,13 @@ struct alpha_pci_chipset {
 			    struct device *, struct pcibus_attach_args *);
 	int		(*pc_bus_maxdevs)(void *, int);
 	pcitag_t	(*pc_make_tag)(void *, int, int, int);
+	void		(*pc_decompose_tag)(void *, pcitag_t, int *,
+			    int *, int *);
 	pcireg_t	(*pc_conf_read)(void *, pcitag_t, int);
 	void		(*pc_conf_write)(void *, pcitag_t, int, pcireg_t);
 
 	void		*pc_intr_v;
-	int		(*pc_intr_map)(void *, pcitag_t, int, int,
+	int		(*pc_intr_map)(struct pci_attach_args *, 
 			    pci_intr_handle_t *);
 	const char	*(*pc_intr_string)(void *, pci_intr_handle_t);
 	const struct evcnt *(*pc_intr_evcnt)(void *, pci_intr_handle_t);
@@ -65,9 +68,6 @@ struct alpha_pci_chipset {
 			    int, int (*)(void *), void *);
 	void		(*pc_intr_disestablish)(void *, void *);
 
-	/* alpha-specific */
-	void		(*pc_decompose_tag)(void *, pcitag_t, int *,
-			    int *, int *);
 	void		*(*pc_pciide_compat_intr_establish)(void *,
 			    struct device *, struct pci_attach_args *, int,
 			    int (*)(void *), void *);
@@ -82,12 +82,14 @@ struct alpha_pci_chipset {
     (*(c)->pc_bus_maxdevs)((c)->pc_conf_v, (b))
 #define	pci_make_tag(c, b, d, f)					\
     (*(c)->pc_make_tag)((c)->pc_conf_v, (b), (d), (f))
+#define	pci_decompose_tag(c, t, bp, dp, fp)				\
+    (*(c)->pc_decompose_tag)((c)->pc_conf_v, (t), (bp), (dp), (fp))
 #define	pci_conf_read(c, t, r)						\
     (*(c)->pc_conf_read)((c)->pc_conf_v, (t), (r))
 #define	pci_conf_write(c, t, r, v)					\
     (*(c)->pc_conf_write)((c)->pc_conf_v, (t), (r), (v))
-#define	pci_intr_map(c, it, ip, il, ihp)				\
-    (*(c)->pc_intr_map)((c)->pc_intr_v, (it), (ip), (il), (ihp))
+#define	pci_intr_map(pa, ihp)						\
+    (*(pa)->pa_pc->pc_intr_map)((pa), (ihp))
 #define	pci_intr_string(c, ih)						\
     (*(c)->pc_intr_string)((c)->pc_intr_v, (ih))
 #define	pci_intr_evcnt(c, ih)						\
@@ -97,14 +99,15 @@ struct alpha_pci_chipset {
 #define	pci_intr_disestablish(c, iv)					\
     (*(c)->pc_intr_disestablish)((c)->pc_intr_v, (iv))
 
+#define	pci_enumerate_bus(sc, m, p)					\
+	pci_enumerate_bus_generic((sc), (m), (p))
+
 /*
  * alpha-specific PCI functions.
  * NOT TO BE USED DIRECTLY BY MACHINE INDEPENDENT CODE.
  */
 void	pci_display_console(bus_space_tag_t, bus_space_tag_t,
 	    pci_chipset_tag_t, int, int, int);
-#define	alpha_pci_decompose_tag(c, t, bp, dp, fp)			\
-    (*(c)->pc_decompose_tag)((c)->pc_conf_v, (t), (bp), (dp), (fp))
 #define	alpha_pciide_compat_intr_establish(c, d, p, ch, f, a)		\
     ((c)->pc_pciide_compat_intr_establish == NULL ? NULL :		\
      (*(c)->pc_pciide_compat_intr_establish)((c)->pc_conf_v, (d), (p),	\

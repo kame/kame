@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.36 2000/06/09 15:27:35 scottr Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.41.8.1 2002/06/29 23:24:54 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -277,7 +277,7 @@ read_mac_label(dlbuf, lp, match)
 	*match = (-1);
 
 	/* the Macintosh partition table starts at sector #1 */
-	part = (struct part_map_entry *)(dlbuf + lp->d_secsize);
+	part = (struct part_map_entry *)(dlbuf + DEV_BSIZE);
 
 	/* Fill in standard partitions */
 	lp->d_npartitions = RAW_PART + 1;
@@ -400,8 +400,8 @@ read_bsd_label(dlbuf, lp, match)
 	msg = NULL;
 
 	blk_start = (struct disklabel *)dlbuf;
-	blk_end = (struct disklabel *)(dlbuf + NUM_PARTS * 
-	    lp->d_secsize - sizeof(struct disklabel));
+	blk_end = (struct disklabel *)(dlbuf + (NUM_PARTS << DEV_BSHIFT) -
+	    sizeof(struct disklabel));
 
 	for (dlp = blk_start; dlp <= blk_end; 
 	     dlp = (struct disklabel *)((char *)dlp + sizeof(long))) {
@@ -420,7 +420,7 @@ read_bsd_label(dlbuf, lp, match)
 }
 
 /*
- * Attempt to read a disk label from a device using the indicated stategy
+ * Attempt to read a disk label from a device using the indicated strategy
  * routine.  The label must be partly set up before this: secpercyl and
  * anything required in the strategy routine (e.g., sector size) must be
  * filled in before calling us.  Returns null on success and an error
@@ -435,6 +435,7 @@ readdisklabel(dev, strat, lp, osdep)
 {
 	struct buf *bp;
 	char *msg;
+	int size;
 
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
@@ -443,18 +444,21 @@ readdisklabel(dev, strat, lp, osdep)
 		return msg = "Zero secpercyl";
 
 	msg = NULL;
+
 	/* 
 	 * Read in the first #(NUM_PARTS + 1) blocks of the disk.
 	 * The native Macintosh partition table starts at 
 	 * sector #1, but we want #0 too for the BSD label.
 	 */
-	bp = geteblk((int)lp->d_secsize * (NUM_PARTS + 1));
+
+	size = roundup((NUM_PARTS + 1) << DEV_BSHIFT, lp->d_secsize);
+	bp = geteblk(size);
 
 	bp->b_dev = dev;
 	bp->b_blkno = 0;
 	bp->b_resid = 0;
-	bp->b_bcount = lp->d_secsize * (NUM_PARTS + 1);
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_bcount = size;
+	bp->b_flags |= B_READ;
 	bp->b_cylinder = 1 / lp->d_secpercyl;
 	(*strat)(bp);
 
@@ -473,11 +477,9 @@ readdisklabel(dev, strat, lp, osdep)
 			msg = "no disk label";
 	}
 
-	bp->b_flags |= B_INVAL;
 	brelse(bp);
 	return (msg);
 }
-
 
 /*
  * Check new disk label for sensibility before setting it.
@@ -492,10 +494,27 @@ setdisklabel(olp, nlp, openmask, osdep)
 	int i;
 	struct partition *opp, *npp;
 
+	/* sanity clause */
+	if (nlp->d_secpercyl == 0 || nlp->d_secsize == 0 ||
+	    (nlp->d_secsize % DEV_BSIZE) != 0)
+		return(EINVAL);
+
+	/* special case to allow disklabel to be invalidated */
+	if (nlp->d_magic == 0xffffffff) {
+		*olp = *nlp;
+		return (0);
+	}
+
 	if (nlp->d_magic != DISKMAGIC || nlp->d_magic2 != DISKMAGIC ||
 	    dkcksum(nlp) != 0)
 		return (EINVAL);
-	while ((i = ffs((long)openmask)) != 0) {
+
+	/*
+	 * XXX We are missing any sort of check if other partition types,
+	 * e.g. Macintosh or (PC) BIOS, will be overwritten.
+	 */
+
+	while ((i = ffs(openmask)) != 0) {
 		i--;
 		openmask &= ~(1 << i);
 		if (nlp->d_npartitions <= i)
@@ -551,7 +570,7 @@ writedisklabel(dev, strat, lp, osdep)
 	bp->b_dev = MAKEDISKDEV(major(dev), DISKUNIT(dev), labelpart);
 	bp->b_blkno = LABELSECTOR;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_READ;
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 	if (error = biowait(bp))
 		goto done;
@@ -562,7 +581,8 @@ writedisklabel(dev, strat, lp, osdep)
 		if (dlp->d_magic == DISKMAGIC && dlp->d_magic2 == DISKMAGIC &&
 		    dkcksum(dlp) == 0) {
 			*dlp = *lp;
-			bp->b_flags = B_WRITE;
+			bp->b_flags &= ~(B_READ|B_DONE);
+			bp->b_flags |= B_WRITE;
 			(*strat)(bp);
 			error = biowait(bp);
 			goto done;
@@ -573,7 +593,25 @@ done:
 	brelse(bp);
 	return (error);
 #else
-	return 0;
+	int i;
+
+	/*
+	 * Clear and re-analyze the ondisk Apple Disk Partition Map,
+	 * then recompute the faked incore disk label. This is necessary
+	 * for sysinst, which may have modified the disk layout. We don't
+	 * (yet?) support writing real BSD disk labels, so this hack
+	 * instead causes the DIOCWDINFO ioctl invoked by sysinst to
+	 * update the in-core disk label when it is "written" to disk.
+	 * This code was originally developed by Bob Nestor on 9/13/99.
+	 */
+	lp->d_npartitions = 0;
+	for (i = 0; i < MAXPARTITIONS; i++) {
+		lp->d_partitions[i].p_fstype = FS_UNUSED;
+		lp->d_partitions[i].p_offset = 0;
+		if (i != RAW_PART)
+			lp->d_partitions[i].p_size = 0;
+	}
+	return (readdisklabel(dev, strat, lp, osdep) ? EINVAL : 0);
 #endif
 }
 

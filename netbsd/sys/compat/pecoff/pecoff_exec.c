@@ -1,4 +1,4 @@
-/*	$NetBSD: pecoff_exec.c,v 1.2.2.1 2001/02/03 20:01:50 he Exp $	*/
+/*	$NetBSD: pecoff_exec.c,v 1.17 2002/03/25 06:44:46 kent Exp $	*/
 
 /*
  * Copyright (c) 2000 Masaru OKI
@@ -36,6 +36,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pecoff_exec.c,v 1.17 2002/03/25 06:44:46 kent Exp $");
+
 /*#define DEBUG_PECOFF*/
 
 #include <sys/param.h>
@@ -50,91 +53,61 @@
 #include <sys/resourcevar.h>
 #include <sys/stat.h>
 
-#include <vm/vm.h>
-
 #include <sys/exec_coff.h>
 #include <machine/coff_machdep.h>
 
 #include <compat/pecoff/pecoff_exec.h>
 #include <compat/pecoff/pecoff_util.h>
+#include <compat/pecoff/pecoff_syscall.h>
 
-void * pecoff_copyargs __P((struct exec_package *pack,
-			   struct ps_strings *arginfo,
-			   void *stack, void *argp));
-int pecoff_signature __P((struct proc *p, struct vnode *vp,
-			    struct pecoff_dos_filehdr *dp));
-int pecoff_load_file __P((struct proc *p, struct exec_package *epp,
-			 char *path, struct exec_vmcmd_set *vcset,
-			 u_long *entry, struct pecoff_args *argp));
-void pecoff_load_section __P((struct exec_vmcmd_set *vcset, struct vnode *vp,
-			     struct coff_scnhdr *sh, long *addr,
-			     u_long *size, int *prot));
-int exec_pecoff_makecmds __P((struct proc *p, struct exec_package *epp));
-int exec_pecoff_coff_makecmds __P((struct proc *p, struct exec_package *epp,
-				  struct coff_filehdr *fp, int peofs));
-int exec_pecoff_setup_stack __P((struct proc *p, struct exec_package *epp));
-int exec_pecoff_prep_omagic __P((struct proc *p, struct exec_package *epp,
-				     struct coff_filehdr *fp,
-				     struct coff_aouthdr *ap, int peofs));
-int exec_pecoff_prep_nmagic __P((struct proc *p, struct exec_package *epp,
-				     struct coff_filehdr *fp,
-				     struct coff_aouthdr *ap, int peofs));
-int exec_pecoff_prep_zmagic __P((struct proc *p, struct exec_package *epp,
-				     struct coff_filehdr *fp,
-				     struct coff_aouthdr *ap, int peofs));
-int pecoff_read_from __P((struct proc *p, struct vnode *vp, int pos,
-			 caddr_t buf, int siz));
+int pecoff_signature (struct proc *p, struct vnode *vp,
+		      struct pecoff_dos_filehdr *dp);
+int pecoff_load_file (struct proc *p, struct exec_package *epp,
+		      const char *path, struct exec_vmcmd_set *vcset,
+		      u_long *entry, struct pecoff_args *argp);
+void pecoff_load_section (struct exec_vmcmd_set *vcset, struct vnode *vp,
+			  struct coff_scnhdr *sh, long *addr,
+			  u_long *size, int *prot);
+int exec_pecoff_makecmds (struct proc *p, struct exec_package *epp);
+int exec_pecoff_coff_makecmds (struct proc *p, struct exec_package *epp,
+			       struct coff_filehdr *fp, int peofs);
+int exec_pecoff_setup_stack (struct proc *p, struct exec_package *epp);
+int exec_pecoff_prep_omagic (struct proc *p, struct exec_package *epp,
+			     struct coff_filehdr *fp,
+			     struct coff_aouthdr *ap, int peofs);
+int exec_pecoff_prep_nmagic (struct proc *p, struct exec_package *epp,
+			     struct coff_filehdr *fp,
+			     struct coff_aouthdr *ap, int peofs);
+int exec_pecoff_prep_zmagic (struct proc *p, struct exec_package *epp,
+			     struct coff_filehdr *fp,
+			     struct coff_aouthdr *ap, int peofs);
 
 
-const char pecoff_emul_path[] = "/emul/pecoff";
-extern char sigcode[], esigcode[];
-
-struct emul emul_pecoff = {
-	"pecoff",
-	0,
-	sendsig,
-	SYS_syscall,
-	SYS_MAXSYSCALL,
-	sysent,
-#ifdef SYSCALL_DEBUG
-	syscallnames,
-#else
-	0,
-#endif
-	howmany(sizeof(struct pecoff_args), sizeof(char *)),
-	pecoff_copyargs,
-	setregs,
-	sigcode,
-	esigcode,
-};
-
-
-void *
-pecoff_copyargs(pack, arginfo, stack, argp)
+int
+pecoff_copyargs(pack, arginfo, stackp, argp)
 	struct exec_package *pack;
 	struct ps_strings *arginfo;
-	void *stack;
+	char **stackp;
 	void *argp;
 {
 	int len = sizeof(struct pecoff_args);
-	struct pecoff_imghdr *ap;
+	struct pecoff_args *ap;
+	int error;
 
-	stack = copyargs(pack, arginfo, stack, argp);
-	if (!stack) {
-		return NULL;
-	}
-	ap = (struct pecoff_imghdr *)pack->ep_emul_arg;
-	if (copyout(ap, stack, len)) {
-		return NULL;
-	}
+	if ((error = copyargs(pack, arginfo, stackp, argp)) != 0)
+		return error;
+
+	ap = (struct pecoff_args *)pack->ep_emul_arg;
+	if ((error = copyout(ap, *stackp, len)) != 0)
+		return error;
+
 #if 0 /*  kern_exec.c? */
-	free((char *)ap, M_TEMP);
+	free(ap, M_TEMP);
 	pack->ep_emul_arg = 0;
 #endif
 
-	stack = (caddr_t)stack + len;
-	
-	return stack;
+	*stackp += len;
+	return error;
 }
 
 #define PECOFF_SIGNATURE "PE\0\0"
@@ -155,7 +128,7 @@ pecoff_signature(p, vp, dp)
 	if (DOS_BADMAG(dp)) {
 		return ENOEXEC;
 	}
-	error = pecoff_read_from(p, vp, dp->d_peofs, buf, sizeof(buf));
+	error = exec_read_from(p, vp, dp->d_peofs, buf, sizeof(buf));
 	if (error) {
 		return error;
 	}
@@ -172,7 +145,7 @@ int
 pecoff_load_file(p, epp, path, vcset, entry, argp)
 	struct proc *p;
 	struct exec_package *epp;
-	char *path;
+	const char *path;
 	struct exec_vmcmd_set *vcset;
 	u_long *entry;
 	struct pecoff_args *argp;
@@ -186,10 +159,25 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 	struct coff_aouthdr *ap;
 	struct pecoff_opthdr *wp;
 	struct coff_scnhdr *sh = 0;
+	const char *bp;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, path, p);
-	if ((error = namei(&nd)) != 0)
+	if ((error = emul_find(p, NULL, epp->ep_esch->es_emul->e_path,
+			       path, &bp, 0))) {
+		char *ptr;
+		int len;
+
+		len = strlen(path) + 1;
+		if (len > MAXPATHLEN)
+			return error;
+		ptr = malloc(len, M_TEMP, M_WAITOK);
+		copystr(path, ptr, len, 0);
+		bp = ptr;
+	}
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, bp, p);
+	if ((error = namei(&nd)) != 0) {
+		free((void *)bp, M_TEMP);
 		return error;
+	}
 	vp = nd.ni_vp;
 
 	/*
@@ -223,15 +211,14 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 	/*
 	 * Read header.
 	 */
-	error = pecoff_read_from(p, vp, 0, (caddr_t)&dh, sizeof(dh));
+	error = exec_read_from(p, vp, 0, &dh, sizeof(dh));
 	if (error != 0)
 		goto bad;
 	if ((error = pecoff_signature(p, vp, &dh)) != 0)
 		goto bad;
 	fp = malloc(PECOFF_HDR_SIZE, M_TEMP, M_WAITOK);
 	peofs = dh.d_peofs + sizeof(signature) - 1;
-	if ((error = pecoff_read_from(p, vp, peofs, (caddr_t)fp,
-				     PECOFF_HDR_SIZE)) != 0)
+	if ((error = exec_read_from(p, vp, peofs, fp, PECOFF_HDR_SIZE)) != 0)
 		goto bad;
 	if (COFF_BADMAG(fp)) {
 		error = ENOEXEC;
@@ -242,8 +229,8 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 	/* read section header */
 	scnsiz = sizeof(struct coff_scnhdr) * fp->f_nscns;
 	sh = malloc(scnsiz, M_TEMP, M_WAITOK);
-	if ((error = pecoff_read_from(p, vp, peofs + PECOFF_HDR_SIZE,
-				     (caddr_t)sh, scnsiz)) != 0)
+	if ((error = exec_read_from(p, vp, peofs + PECOFF_HDR_SIZE, sh,
+	    scnsiz)) != 0)
 		goto bad;
 
 	/*
@@ -259,8 +246,8 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 		if ((sh[i].s_flags & COFF_STYP_TEXT) &&
 		    (sh[i].s_flags & COFF_STYP_EXEC) == 0)
 			continue;
-		if ((sh[i].s_flags & (COFF_STYP_TEXT|
-				      COFF_STYP_DATA|COFF_STYP_BSS)) == 0)
+		if ((sh[i].s_flags & (COFF_STYP_TEXT|COFF_STYP_DATA|
+				      COFF_STYP_BSS|COFF_STYP_READ)) == 0)
 			continue;
 		sh[i].s_vaddr += wp->w_base; /* RVA --> VA */
 		pecoff_load_section(vcset, vp, &sh[i], &addr, &size, &prot);
@@ -269,8 +256,9 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 	argp->a_ldbase = wp->w_base;
 	argp->a_ldexport = wp->w_imghdr[0].i_vaddr + wp->w_base;
 
-	free((char *)fp, M_TEMP);
-	free((char *)sh, M_TEMP);
+	free(fp, M_TEMP);
+	free(sh, M_TEMP);
+	free((void *)bp, M_TEMP);
 	vrele(vp);
 	return 0;
 
@@ -279,9 +267,10 @@ badunlock:
 
 bad:
 	if (fp != 0)
-		free((char *)fp, M_TEMP);
+		free(fp, M_TEMP);
 	if (sh != 0)
-		free((char *)sh, M_TEMP);
+		free(sh, M_TEMP);
+	free((void *)bp, M_TEMP);
 	vrele(vp);
 	return error;
 }
@@ -355,17 +344,14 @@ exec_pecoff_makecmds(p, epp)
 		return error;
 	peofs = dp->d_peofs + sizeof(signature) - 1;
 	fp = malloc(PECOFF_HDR_SIZE, M_TEMP, M_WAITOK);
-	error = pecoff_read_from(p, epp->ep_vp, peofs, (caddr_t)fp,
-				PECOFF_HDR_SIZE);
+	error = exec_read_from(p, epp->ep_vp, peofs, fp, PECOFF_HDR_SIZE);
 	if (error) {
 		free(fp, M_TEMP);
 		return error;
 	}
 	error = exec_pecoff_coff_makecmds(p, epp, fp, peofs);
 
-	if (error == 0)
-		epp->ep_emul = &emul_pecoff;
-	else
+	if (error != 0)
 		kill_vmcmds(&epp->ep_vmcmds);
 
 	free(fp, M_TEMP);
@@ -472,8 +458,8 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 	epp->ep_dsize = 0;
 	/* read section header */
 	sh = malloc(scnsiz, M_TEMP, M_WAITOK);
-	error = pecoff_read_from(p, epp->ep_vp, peofs + PECOFF_HDR_SIZE,
-				(caddr_t)sh, scnsiz);
+	error = exec_read_from(p, epp->ep_vp, peofs + PECOFF_HDR_SIZE, sh,
+	    scnsiz);
 	if (error) {
 		free(sh, M_TEMP);
 		return error;
@@ -483,30 +469,20 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 	 */
 	for (i = 0; i < fp->f_nscns; i++) {
 		int prot = /*0*/VM_PROT_WRITE;
+		long s_flags = sh[i].s_flags;
 
-		if (sh[i].s_flags & COFF_STYP_DISCARD)
+		if ((s_flags & COFF_STYP_DISCARD) != 0)
 			continue;
 		sh[i].s_vaddr += wp->w_base; /* RVA --> VA */
 
-		if ((sh[i].s_flags & COFF_STYP_TEXT) != 0) {
+		if ((s_flags & COFF_STYP_TEXT) != 0) {
 			/* set up command for text segment */
 /*			DPRINTF(("COFF text addr %lx size %ld offset %ld\n",
 				 sh[i].s_vaddr, sh[i].s_size, sh[i].s_scnptr));
 */			pecoff_load_section(&epp->ep_vmcmds, epp->ep_vp,
 					   &sh[i], &epp->ep_taddr,
 					   &epp->ep_tsize, &prot);
-		}
-		if ((sh[i].s_flags & COFF_STYP_DATA) != 0) {
-			/* set up command for data segment */
-/*			DPRINTF(("COFF data addr %lx size %ld offset %ld\n",
-			sh[i].s_vaddr, sh[i].s_size, sh[i].s_scnptr));*/
-			pecoff_load_section(&epp->ep_vmcmds, epp->ep_vp,
-					   &sh[i], &daddr, &dsize, &prot);
-			epp->ep_daddr = min(epp->ep_daddr, daddr);
-			dsize = daddr + dsize - epp->ep_daddr;
-			epp->ep_dsize = max(epp->ep_dsize, dsize);
-		}
-		if ((sh[i].s_flags & COFF_STYP_BSS) != 0) {
+		} else if ((s_flags & COFF_STYP_BSS) != 0) {
 			/* set up command for bss segment */
 			baddr = sh[i].s_vaddr;
 			bsize = sh[i].s_paddr;
@@ -516,6 +492,15 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 			epp->ep_daddr = min(epp->ep_daddr, baddr);
 			bsize = baddr + bsize - epp->ep_daddr;
 			epp->ep_dsize = max(epp->ep_dsize, bsize);
+		} else if ((s_flags & (COFF_STYP_DATA|COFF_STYP_READ)) != 0) {
+			/* set up command for data segment */
+/*			DPRINTF(("COFF data addr %lx size %ld offset %ld\n",
+			sh[i].s_vaddr, sh[i].s_size, sh[i].s_scnptr));*/
+			pecoff_load_section(&epp->ep_vmcmds, epp->ep_vp,
+					   &sh[i], &daddr, &dsize, &prot);
+			epp->ep_daddr = min(epp->ep_daddr, daddr);
+			dsize = daddr + dsize - epp->ep_daddr;
+			epp->ep_dsize = max(epp->ep_dsize, dsize);
 		}
 	}
 	/* set up ep_emul_arg */
@@ -550,29 +535,4 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 
 	free(sh, M_TEMP);
 	return exec_pecoff_setup_stack(p, epp);
-}
-
-/*
- */
-int
-pecoff_read_from(p, vp, pos, buf, siz)
-	struct proc *p;
-	struct vnode *vp;
-	int pos;
-	caddr_t buf;
-	int siz;
-{
-	int error;
-	size_t resid;
-
-	error = vn_rdwr(UIO_READ, vp, buf, siz, pos,
-			UIO_SYSSPACE, IO_NODELOCKED, p->p_ucred,
-			&resid, p);
-	if (error)
-		return error;
-
-	if (resid != 0) {
-		return ENOEXEC;
-	}
-	return 0;
 }

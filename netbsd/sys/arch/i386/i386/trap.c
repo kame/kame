@@ -1,7 +1,7 @@
-/*	$NetBSD: trap.c,v 1.139.2.2 2001/06/17 22:29:37 he Exp $	*/
+/*	$NetBSD: trap.c,v 1.165 2002/02/18 15:58:02 simonb Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -78,17 +78,14 @@
  * 386 Trap and System call handling
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.165 2002/02/18 15:58:02 simonb Exp $");
+
 #include "opt_ddb.h"
-#include "opt_syscall_debug.h"
-#include "opt_execfmt.h"
+#include "opt_kgdb.h"
 #include "opt_math_emulate.h"
 #include "opt_vm86.h"
-#include "opt_ktrace.h"
 #include "opt_cputype.h"
-#include "opt_compat_freebsd.h"
-#include "opt_compat_linux.h"
-#include "opt_compat_ibcs2.h"
-#include "opt_compat_aout.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -97,12 +94,7 @@
 #include <sys/acct.h>
 #include <sys/kernel.h>
 #include <sys/signal.h>
-#ifdef KTRACE
-#include <sys/ktrace.h>
-#endif
 #include <sys/syscall.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -111,6 +103,7 @@
 #include <machine/psl.h>
 #include <machine/reg.h>
 #include <machine/trap.h>
+#include <machine/userret.h>
 #ifdef DDB
 #include <machine/db_machdep.h>
 #endif
@@ -126,88 +119,14 @@
 #include <sys/kgdb.h>
 #endif
 
-#ifdef COMPAT_IBCS2
-#include <sys/exec_elf.h>
-#include <compat/ibcs2/ibcs2_errno.h>
-#include <compat/ibcs2/ibcs2_exec.h>
-extern struct emul emul_ibcs2_coff, emul_ibcs2_xout, emul_ibcs2_elf;
-#endif
-
-#ifdef COMPAT_LINUX
-# include <sys/exec.h>
-# include <compat/linux/linux_syscall.h>
-
-# ifdef EXEC_AOUT
-extern struct emul emul_linux_aout;
-# endif
-# ifdef EXEC_ELF32
-extern struct emul emul_linux_elf32;
-# endif
-# ifdef EXEC_ELF64
-extern struct emul emul_linux_elf64;
-# endif
-#endif /* COMPAT_LINUX */
-
-#ifdef COMPAT_FREEBSD
-# ifdef EXEC_AOUT
-extern struct emul emul_freebsd_aout;
-# endif /* EXEC_AOUT */
-# ifdef EXEC_ELF32
-extern struct emul emul_freebsd_elf32;
-# endif /* EXEC_ELF32 */
-#endif /* COMPAT_FREEBSD */
-
-#ifdef COMPAT_AOUT
-extern struct emul emul_netbsd_aout;
-#endif /* COMPAT_AOUT */
-
 #include "npx.h"
 
-static __inline void userret __P((struct proc *, int, u_quad_t));
 void trap __P((struct trapframe));
 #if defined(I386_CPU)
 int trapwrite __P((unsigned));
 #endif
-void syscall __P((struct trapframe));
 
-/*
- * Define the code needed before returning to user mode, for
- * trap and syscall.
- */
-static __inline void
-userret(p, pc, oticks)
-	register struct proc *p;
-	int pc;
-	u_quad_t oticks;
-{
-	int sig;
-
-	/* take pending signals */
-	while ((sig = CURSIG(p)) != 0)
-		postsig(sig);
-	p->p_priority = p->p_usrpri;
-	if (want_resched) {
-		/*
-		 * We are being preempted.
-		 */
-		preempt(NULL);
-		while ((sig = CURSIG(p)) != 0)
-			postsig(sig);
-	}
-
-	/*
-	 * If profiling, charge recent system time to the trapped pc.
-	 */
-	if (p->p_flag & P_PROFIL) { 
-		extern int psratio;
-
-		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
-	}                   
-
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
-}
-
-char	*trap_type[] = {
+const char *trap_type[] = {
 	"privileged instruction fault",		/*  0 T_PRIVINFLT */
 	"breakpoint trap",			/*  1 T_BPTFLT */
 	"arithmetic trap",			/*  2 T_ARITHTRAP */
@@ -234,6 +153,8 @@ int	trap_types = sizeof trap_type / sizeof trap_type[0];
 int	trapdebug = 0;
 #endif
 
+#define	IDTVEC(name)	__CONCAT(X, name)
+
 /*
  * trap(frame):
  *	Exception, fault, and trap interface to BSD kernel. This
@@ -249,17 +170,19 @@ trap(frame)
 {
 	register struct proc *p = curproc;
 	int type = frame.tf_trapno;
-	u_quad_t sticks;
-	struct pcb *pcb = NULL;
+	struct pcb *pcb;
 	extern char fusubail[],
 		    resume_iret[], resume_pop_ds[], resume_pop_es[],
-		    resume_pop_fs[], resume_pop_gs[];
-		    
+		    resume_pop_fs[], resume_pop_gs[],
+		    IDTVEC(osyscall)[];
 	struct trapframe *vframe;
 	int resume;
+	caddr_t onfault;
+	int error;
 
 	uvmexp.traps++;
 
+	pcb = (p != NULL) ? &p->p_addr->u_pcb : NULL;
 #ifdef DEBUG
 	if (trapdebug) {
 		printf("trap %d code %x eip %x cs %x eflags %x cr2 %x cpl %x\n",
@@ -271,11 +194,9 @@ trap(frame)
 
 	if (!KERNELMODE(frame.tf_cs, frame.tf_eflags)) {
 		type |= T_USER;
-		sticks = p->p_sticks;
 		p->p_md.md_regs = &frame;
+		pcb->pcb_cr2 = 0;
 	}
-	else
-		sticks = 0;
 
 	switch (type) {
 
@@ -313,11 +234,14 @@ trap(frame)
 	case T_PROTFLT:
 	case T_SEGNPFLT:
 	case T_ALIGNFLT:
+	case T_TSSFLT:
 		/* Check for copyin/copyout fault. */
-		pcb = &p->p_addr->u_pcb;
 		if (pcb->pcb_onfault != 0) {
-		copyfault:
+copyefault:
+			error = EFAULT;
+copyfault:
 			frame.tf_eip = (int)pcb->pcb_onfault;
+			frame.tf_eax = error;
 			return;
 		}
 
@@ -402,12 +326,12 @@ trap(frame)
 	case T_STKFLT|T_USER:
 	case T_ALIGNFLT|T_USER:
 	case T_NMI|T_USER:
-		trapsignal(p, SIGBUS, type &~ T_USER);
+		(*p->p_emul->e_trapsignal)(p, SIGBUS, type & ~T_USER);
 		goto out;
 
 	case T_PRIVINFLT|T_USER:	/* privileged instruction fault */
 	case T_FPOPFLT|T_USER:		/* coprocessor operand fault */
-		trapsignal(p, SIGILL, type &~ T_USER);
+		(*p->p_emul->e_trapsignal)(p, SIGILL, type & ~T_USER);
 		goto out;
 
 	case T_ASTFLT|T_USER:		/* Allow process switch */
@@ -416,6 +340,9 @@ trap(frame)
 			p->p_flag &= ~P_OWEUPC;
 			ADDUPROF(p);
 		}
+		/* Allow a forced task switch. */
+		if (want_resched)
+			preempt(NULL);
 		goto out;
 
 	case T_DNA|T_USER: {
@@ -426,12 +353,12 @@ trap(frame)
 				goto trace;
 			return;
 		}
-		trapsignal(p, rv, type &~ T_USER);
+		(*p->p_emul->e_trapsignal)(p, rv, type & ~T_USER);
 		goto out;
 #else
 		printf("pid %d killed due to lack of floating point\n",
 		    p->p_pid);
-		trapsignal(p, SIGKILL, type &~ T_USER);
+		(*p->p_emul->e_trapsignal)(p, SIGKILL, type & ~T_USER);
 		goto out;
 #endif
 	}
@@ -439,23 +366,22 @@ trap(frame)
 	case T_BOUND|T_USER:
 	case T_OFLOW|T_USER:
 	case T_DIVIDE|T_USER:
-		trapsignal(p, SIGFPE, type &~ T_USER);
+		(*p->p_emul->e_trapsignal)(p, SIGFPE, type & ~T_USER);
 		goto out;
 
 	case T_ARITHTRAP|T_USER:
-		trapsignal(p, SIGFPE, frame.tf_err);
+		(*p->p_emul->e_trapsignal)(p, SIGFPE, frame.tf_err);
 		goto out;
 
 	case T_PAGEFLT:			/* allow page faults in kernel mode */
 		if (p == 0)
 			goto we_re_toast;
-		pcb = &p->p_addr->u_pcb;
 		/*
 		 * fusubail is used by [fs]uswintr() to prevent page faulting
 		 * from inside the profiling interrupt.
 		 */
 		if (pcb->pcb_onfault == fusubail)
-			goto copyfault;
+			goto copyefault;
 #if 0
 		/* XXX - check only applies to 386's and 486's with WP off */
 		if (frame.tf_err & PGEX_P)
@@ -466,15 +392,15 @@ trap(frame)
 	case T_PAGEFLT|T_USER: {	/* page fault */
 		register vaddr_t va;
 		register struct vmspace *vm = p->p_vmspace;
-		register vm_map_t map;
-		int rv;
+		register struct vm_map *map;
 		vm_prot_t ftype;
-		extern vm_map_t kernel_map;
+		extern struct vm_map *kernel_map;
 		unsigned nss;
 
 		if (vm == NULL)
 			goto we_re_toast;
-		va = trunc_page((vaddr_t)rcr2());
+		pcb->pcb_cr2 = rcr2();
+		va = trunc_page((vaddr_t)pcb->pcb_cr2);
 		/*
 		 * It is only a kernel address space fault iff:
 		 *	1. (type & T_USER) == 0  and
@@ -488,7 +414,7 @@ trap(frame)
 		else
 			map = &vm->vm_map;
 		if (frame.tf_err & PGEX_W)
-			ftype = VM_PROT_READ | VM_PROT_WRITE;
+			ftype = VM_PROT_WRITE;
 		else
 			ftype = VM_PROT_READ;
 
@@ -519,8 +445,11 @@ trap(frame)
 		}
 
 		/* Fault the original page in. */
-		rv = uvm_fault(map, va, 0, ftype);
-		if (rv == KERN_SUCCESS) {
+		onfault = pcb->pcb_onfault;
+		pcb->pcb_onfault = NULL;
+		error = uvm_fault(map, va, 0, ftype);
+		pcb->pcb_onfault = onfault;
+		if (error == 0) {
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 
@@ -528,39 +457,45 @@ trap(frame)
 				return;
 			goto out;
 		}
+		if (error == EACCES) {
+			error = EFAULT;
+		}
 
 		if (type == T_PAGEFLT) {
 			if (pcb->pcb_onfault != 0)
 				goto copyfault;
 			printf("uvm_fault(%p, 0x%lx, 0, %d) -> %x\n",
-			    map, va, ftype, rv);
+			    map, va, ftype, error);
 			goto we_re_toast;
 		}
-		if (rv == KERN_RESOURCE_SHORTAGE) {
+		if (error == ENOMEM) {
 			printf("UVM: pid %d (%s), uid %d killed: out of swap\n",
 			       p->p_pid, p->p_comm,
 			       p->p_cred && p->p_ucred ?
 			       p->p_ucred->cr_uid : -1);
-			trapsignal(p, SIGKILL, T_PAGEFLT);
+			(*p->p_emul->e_trapsignal)(p, SIGKILL, T_PAGEFLT);
 		} else {
-			trapsignal(p, SIGSEGV, T_PAGEFLT);
+			(*p->p_emul->e_trapsignal)(p, SIGSEGV, T_PAGEFLT);
 		}
 		break;
 	}
 
-#if !defined(DDB) && !defined(KGDB)
-	/* XXX need to deal with this when DDB is present, too */
-	case T_TRCTRAP:	/* kernel trace trap; someone single stepping lcall's */
-			/* syscall has to turn off the trace bit itself */
-		return;
-#endif
+	case T_TRCTRAP:
+		/* Check whether they single-stepped into a lcall. */
+		if (frame.tf_eip == (int)IDTVEC(osyscall))
+			return;
+		if (frame.tf_eip == (int)IDTVEC(osyscall) + 1) {
+			frame.tf_eflags &= ~PSL_T;
+			return;
+		}
+		goto we_re_toast;
 
 	case T_BPTFLT|T_USER:		/* bpt instruction fault */
 	case T_TRCTRAP|T_USER:		/* trace trap */
 #ifdef MATH_EMULATE
 	trace:
 #endif
-		trapsignal(p, SIGTRAP, type &~ T_USER);
+		(*p->p_emul->e_trapsignal)(p, SIGTRAP, type & ~T_USER);
 		break;
 
 #if	NISA > 0 || NMCA > 0
@@ -598,7 +533,7 @@ trap(frame)
 	if ((type & T_USER) == 0)
 		return;
 out:
-	userret(p, frame.tf_eip, sticks);
+	userret(p);
 }
 
 #if defined(I386_CPU)
@@ -627,8 +562,7 @@ trapwrite(addr)
 			nss = 0;
 	}
 
-	if (uvm_fault(&vm->vm_map, va, 0, VM_PROT_READ | VM_PROT_WRITE)
-	    != KERN_SUCCESS)
+	if (uvm_fault(&vm->vm_map, va, 0, VM_PROT_WRITE) != 0)
 		return 1;
 
 	if (nss > vm->vm_ssize)
@@ -637,225 +571,3 @@ trapwrite(addr)
 	return 0;
 }
 #endif /* I386_CPU */
-
-/*
- * syscall(frame):
- *	System call request from POSIX system call gate interface to kernel.
- * Like trap(), argument is call by reference.
- */
-/*ARGSUSED*/
-void
-syscall(frame)
-	struct trapframe frame;
-{
-	register caddr_t params;
-	register struct sysent *callp;
-	register struct proc *p;
-	int error, opc, nsys;
-	size_t argsize;
-	register_t code, args[8], rval[2];
-	u_quad_t sticks;
-#ifdef COMPAT_LINUX
-	int linux;
-#endif /* COMPAT_LINUX */
-#ifdef COMPAT_FREEBSD
-	int freebsd;
-#endif /* COMPAT_FREEBSD */
-
-	uvmexp.syscalls++;
-	if (!USERMODE(frame.tf_cs, frame.tf_eflags))
-		panic("syscall");
-	p = curproc;
-	sticks = p->p_sticks;
-	p->p_md.md_regs = &frame;
-	opc = frame.tf_eip;
-	code = frame.tf_eax;
-
-	nsys = p->p_emul->e_nsysent;
-	callp = p->p_emul->e_sysent;
-
-#ifdef COMPAT_LINUX
-	linux = 0
-# ifdef EXEC_AOUT
-	    || (p->p_emul == &emul_linux_aout)
-# endif /* EXEC_AOUT */
-# ifdef EXEC_ELF32
-	    || (p->p_emul == &emul_linux_elf32)
-# endif /* EXEC_ELF32 */
-# ifdef EXEC_ELF64
-	    || (p->p_emul == &emul_linux_elf64)
-# endif /* EXEC_ELF64 */
-	    ;
-#endif /* COMPAT_LINUX */
-
-#ifdef COMPAT_FREEBSD
-	freebsd = 0
-# ifdef EXEC_AOUT
-	    || (p->p_emul == &emul_freebsd_aout)
-# endif /* EXEC_AOUT */
-# ifdef EXEC_ELF32
-	    || (p->p_emul == &emul_freebsd_elf32)
-# endif /* EXEC_ELF32 */
-	    ;
-#endif /* COMPAT_FREEBSD */
-
-#ifdef COMPAT_IBCS2
-	if (p->p_emul == &emul_ibcs2_coff || p->p_emul == &emul_ibcs2_elf ||
-	    p->p_emul == &emul_ibcs2_xout)
-		if (IBCS2_HIGH_SYSCALL(code))
-			code = IBCS2_CVT_HIGH_SYSCALL(code);
-#endif /* COMPAT_IBCS2 */
-	params = (caddr_t)frame.tf_esp + sizeof(int);
-
-#ifdef VM86
-	/*
-	 * VM86 mode application found our syscall trap gate by accident; let
-	 * it get a SIGSYS and have the VM86 handler in the process take care
-	 * of it.
-	 */
-	if (frame.tf_eflags & PSL_VM)
-		code = -1;
-	else
-#endif /* VM86 */
-
-	switch (code) {
-	case SYS_syscall:
-#ifdef COMPAT_LINUX
-		/* Linux has a special system setup call as number 0 */
-		if (linux)
-			break;
-#endif /* COMPAT_LINUX */
-		/*
-		 * Code is first argument, followed by actual args.
-		 */
-		code = fuword(params);
-		params += sizeof(int);
-		break;
-	case SYS___syscall:
-		/*
-		 * Like syscall, but code is a quad, so as to maintain
-		 * quad alignment for the rest of the arguments.
-		 */
-		if (callp == sysent 	/* Native */
-#ifdef COMPAT_FREEBSD
-		    || freebsd		/* FreeBSD has the same function */
-#endif
-#ifdef COMPAT_AOUT
-		    || (p->p_emul == &emul_netbsd_aout)	/* Our a.out */
-#endif
-		    ) {
-			code = fuword(params + _QUAD_LOWWORD * sizeof(int));
-			params += sizeof(quad_t);
-		}
-		break;
-	default:
-		break;
-	}
-	if (code < 0 || code >= nsys)
-		callp += p->p_emul->e_nosys;		/* illegal */
-	else
-		callp += code;
-	argsize = callp->sy_argsize;
-	if (argsize) {
-#ifdef COMPAT_LINUX
-		if (linux) {
-			/*
-			 * Linux passes the args in ebx, ecx, edx, esi, edi, in
-			 * increasing order.
-			 */
-			switch (argsize >> 2) {
-			case 5:
-				args[4] = frame.tf_edi;
-			case 4:
-				args[3] = frame.tf_esi;
-			case 3:
-				args[2] = frame.tf_edx;
-			case 2:
-				args[1] = frame.tf_ecx;
-			case 1:
-				args[0] = frame.tf_ebx;
-				break;
-			default:
-				panic("linux syscall bogus argument size %d",
-				    argsize);
-				break;
-			}
-		}
-		else
-#endif /* COMPAT_LINUX */
-		{
-			error = copyin(params, (caddr_t)args, argsize);
-			if (error)
-				goto bad;
-		}
-	}
-#ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
-#endif /* SYSCALL_DEBUG */
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, code, argsize, args);
-#endif /* KTRACE */
-	rval[0] = 0;
-	rval[1] = frame.tf_edx;
-	error = (*callp->sy_call)(p, args, rval);
-	switch (error) {
-	case 0:
-		/*
-		 * Reinitialize proc pointer `p' as it may be different
-		 * if this is a child returning from fork syscall.
-		 */
-		p = curproc;
-		frame.tf_eax = rval[0];
-#ifdef COMPAT_LINUX
-		if (!linux)
-#endif /* COMPAT_LINUX */
-			frame.tf_edx = rval[1];
-		frame.tf_eflags &= ~PSL_C;	/* carry bit */
-		break;
-	case ERESTART:
-		/*
-		 * The offset to adjust the PC by depends on whether we entered
-		 * the kernel through the trap or call gate.  We pushed the
-		 * size of the instruction into tf_err on entry.
-		 */
-		frame.tf_eip = opc - frame.tf_err;
-		break;
-	case EJUSTRETURN:
-		/* nothing to do */
-		break;
-	default:
-	bad:
-		if (p->p_emul->e_errno)
-			error = p->p_emul->e_errno[error];
-		frame.tf_eax = error;
-		frame.tf_eflags |= PSL_C;	/* carry bit */
-		break;
-	}
-
-#ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
-#endif /* SYSCALL_DEBUG */
-	userret(p, frame.tf_eip, sticks);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, code, error, rval[0]);
-#endif /* KTRACE */
-}
-
-void
-child_return(arg)
-	void *arg;
-{
-	struct proc *p = arg;
-	struct trapframe *tf = p->p_md.md_regs;
-
-	tf->tf_eax = 0;
-	tf->tf_eflags &= ~PSL_C;
-
-	userret(p, tf->tf_eip, 0);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, SYS_fork, 0, 0);
-#endif
-}

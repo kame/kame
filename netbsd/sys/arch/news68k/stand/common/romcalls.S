@@ -1,4 +1,4 @@
-/*	$NetBSD: romcalls.S,v 1.1.6.1 2000/12/24 07:48:51 jhawk Exp $	*/
+/*	$NetBSD: romcalls.S,v 1.3 2001/03/03 13:59:10 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Izumi Tsutsui.  All rights reserved.
@@ -60,7 +60,7 @@ ENTRY_NOPROFILE(rom_read)
 	moveq	#SYS_read, %d0
 	trap	#0
 	moveml	%a6@(-40),%d2-%d7/%a2-%a5
-	unlk	a6
+	unlk	%a6
 	rts
 
 ENTRY_NOPROFILE(rom_write)

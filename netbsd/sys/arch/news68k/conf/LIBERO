@@ -1,10 +1,12 @@
-# 	$NetBSD: LIBERO,v 1.5 2000/06/14 22:02:32 veego Exp $
+# 	$NetBSD: LIBERO,v 1.17.4.1 2002/08/01 04:28:05 lukem Exp $
 
 #	NEWS1750 config file;
 #
 #	"The far way to the eventual news68k port"
 #
 include		"arch/news68k/conf/std.news68k"
+
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
 maxusers	8
 
@@ -21,6 +23,8 @@ options 	SYSVSHM			# System V shared memory
 #options 	SHMMAXPGS=1024		# 1024 pages is the default
 options 	LKM			# loadable kernel modules
 #options 	UCONSOLE		# users can redirect console (unsafe)
+#options 	USERCONF		# userconf(4) support
+#options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
 
 # Debugging options
 options 	DDB			# kernel dynamic debugger
@@ -34,7 +38,13 @@ options 	SCSIVERBOSE		# Verbose SCSI errors
 options 	COMPAT_43		# compatibility with 4.3BSD binaries
 options 	COMPAT_13		# NetBSD 1.3 binary compatibility
 options 	COMPAT_14		# NetBSD 1.4 binary compatibility
-#options 	TCP_COMPAT_42		# compatibility with 4.2BSD TCP/IP
+options 	COMPAT_AOUT_M68K	# compatibility with NetBSD/m68k a.out
+
+#options 	COMPAT_SVR4		# binary compatibility with SVR4
+options 	COMPAT_SUNOS		# binary compatibility with SunOS
+#options 	COMPAT_LINUX		# binary compatibllity with Linux/m68k
+
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 # Filesystem options
 file-system	FFS		# Berkeley Fast Filesystem
@@ -46,7 +56,7 @@ file-system	KERNFS		# /kern
 file-system	PROCFS		# /proc
 file-system	FDESC		# /dev/fd/*
 #file-system	NULLFS		# loopback file system
-#file-system	UNION		# union file system 
+#file-system	UNION		# union file system
 
 options 	NFSSERVER	# nfs server support
 #options 	QUOTA		# ffs quotas
@@ -62,6 +72,7 @@ options 	INET6		# IPv6
 #options 	GATEWAY		# IP packet forwarding
 #options 	PFIL_HOOKS	# pfil(9) packet filter hooks
 #options 	IPFILTER_LOG	# ipmon(8) log support
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 options 	NFS_BOOT_BOOTPARAM
 
 config	netbsd root on ? type ?
@@ -76,20 +87,27 @@ mainbus0 at root
 # NEWS HYPER-BUS
 hb0	at mainbus0 systype NEWS1700
 
-# MK48T02 realtime clock
-clock0	at hb0 addr 0xe0d807f8 ipl 6
+# interval timer
+timer0	at hb0 addr 0xe1000000 ipl 6
+
+# MK48T02 TOD clock
+mkclock0 at hb0 addr 0xe0d80000
 
 # onboard LANCE ethernet
 le0	at hb0 addr 0xe0f00000 ipl 4
 
-# keyboard/mouse; not yet
-#kb0	at hb0 addr 0xe0d00000 ipl 5
-#ms0	at hb0 addr 0xe0d00005 ipl 5
+# keyboard/mouse
+kbc0	at hb0 addr 0xe0d00000 ipl 5
+kb0	at kbc0
+ms0	at kbc0
+
+wskbd*	at kb?
+wsmouse* at ms?
 
 # onboard z8530 SCC
 zsc0	at hb0 addr 0xe0d40000 ipl 5 vect 64 flags 0x0
 zstty0	at zsc0 channel 0
-zstty1	at zsc0 channel 1 
+zstty1	at zsc0 channel 1
 
 # Frame buffer devices; not yet
 #fb0	at hb0 addr 0xf0700000			# NWB225
@@ -113,7 +131,7 @@ zstty1	at zsc0 channel 1
 # and disable disconnect/reselect for targets 0-3
 #
 si0	at hb0 addr 0xe0cc0000 ipl 4 flags 0xf
-scsibus* at si0	
+scsibus* at si0
 
 sd*	at scsibus? target ? lun ?		# SCSI disks
 st*	at scsibus? target ? lun ?		# SCSI tapes
@@ -124,7 +142,7 @@ cd*	at scsibus? target ? lun ?		# SCSI CD-ROMs
 
 # Misc.
 pseudo-device	loop			# loopback interface; required
-pseudo-device	pty		32	# pseudo-terminals
+pseudo-device	pty			# pseudo-terminals
 pseudo-device	md		1	# memory disk device
 pseudo-device	vnd		4	# disk-like interface to files
 #pseudo-device	ccd		4	# concatenated and striped disks
@@ -136,7 +154,7 @@ pseudo-device	ppp		2	# PPP interfaces
 pseudo-device	bpfilter	16	# Berkeley Packet Filter
 pseudo-device	ipfilter		# ip filter
 #pseudo-device	strip		1	# Starmode Radio IP (Metricom)
-#pseudo-device	ipip		2	# IP Encapsulation within IP (RFC 2003)
 pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 pseudo-device	rnd			# /dev/random and in-kernle generator
+pseudo-device	clockctl		# user control of clock subsystem

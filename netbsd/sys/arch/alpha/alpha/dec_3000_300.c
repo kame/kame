@@ -1,4 +1,4 @@
-/* $NetBSD: dec_3000_300.c,v 1.30 2000/05/22 20:13:32 thorpej Exp $ */
+/* $NetBSD: dec_3000_300.c,v 1.34 2001/04/25 17:53:04 bouyer Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -33,7 +33,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_3000_300.c,v 1.30 2000/05/22 20:13:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_3000_300.c,v 1.34 2001/04/25 17:53:04 bouyer Exp $");
 
 #include "opt_new_scc_driver.h"
 
@@ -47,14 +47,14 @@ __KERNEL_RCSID(0, "$NetBSD: dec_3000_300.c,v 1.30 2000/05/22 20:13:32 thorpej Ex
 #include <machine/conf.h>
 
 #include <dev/tc/tcvar.h>
-#include <alpha/tc/tcdsvar.h>
+#include <dev/tc/tcdsvar.h>
 #include <alpha/tc/tc_3000_300.h>
 #ifndef NEW_SCC_DRIVER
 #include <alpha/tc/sccvar.h>
 #endif
 
 #include <machine/z8530var.h>
-#include <dev/dec/zskbdvar.h>
+#include <dev/tc/zs_ioasicvar.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -144,9 +144,7 @@ dec_3000_300_cons_init()
 			 * XXX Should use ctb_line_off to get the
 			 * XXX line parameters.
 			 */
-			if (zs_ioasic_cnattach(0x1a0000000, 0x00100000, 1,
-			    9600, (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8))
-				panic("can't init serial console");
+			zs_ioasic_cnattach(0x1a0000000, 0x00100000, 1);
 			break;
 		}
 
@@ -231,7 +229,7 @@ dec_3000_300_device_register(dev, aux)
 		if (parent->dv_parent != scsidev)
 			return;
 
-		if (b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+		if (b->unit / 100 != sa->sa_periph->periph_target)
 			return;
 
 		/* XXX LUN! */

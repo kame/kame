@@ -1,4 +1,4 @@
-/*	$NetBSD: tty_pty.c,v 1.43.4.3 2000/08/04 13:08:14 mason Exp $	*/
+/*	$NetBSD: tty_pty.c,v 1.62 2002/03/25 04:26:43 itohy Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -40,9 +40,10 @@
  * (Actually two drivers, requiring two entries in 'cdevsw')
  */
 
-#include "opt_compat_sunos.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tty_pty.c,v 1.62 2002/03/25 04:26:43 itohy Exp $");
 
-#include "pty.h"		/* XXX */
+#include "opt_compat_sunos.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,13 +58,10 @@
 #include <sys/uio.h>
 #include <sys/conf.h>
 #include <sys/poll.h>
+#include <sys/malloc.h>
 
-
-
-#if NPTY == 1
-#undef NPTY
-#define	NPTY	64		/* crude XXX */
-#endif
+#define	DEFAULT_NPTYS		16	/* default number of initial ptys */
+#define DEFAULT_MAXPTYS		992	/* default maximum number of ptys */
 
 /* Macros to clear/set/test flags. */
 #define	SET(t, f)	(t) |= (f)
@@ -82,8 +80,12 @@ struct	pt_softc {
 	struct	selinfo pt_selr, pt_selw;
 	u_char	pt_send;
 	u_char	pt_ucntl;
-} pt_softc[NPTY];		/* XXX */
-int	npty = NPTY;		/* for pstat -t */
+};
+
+static struct pt_softc **pt_softc = NULL;	/* pty array */
+static int npty = 0;			/* for pstat -t */
+static int maxptys = DEFAULT_MAXPTYS;	/* maximum number of ptys (sysctable) */
+static struct simplelock pt_softc_mutex = SIMPLELOCK_INITIALIZER;
 
 #define	PF_PKT		0x08		/* packet mode */
 #define	PF_STOPPED	0x10		/* user told stopped */
@@ -93,8 +95,158 @@ int	npty = NPTY;		/* for pstat -t */
 
 void	ptyattach __P((int));
 void	ptcwakeup __P((struct tty *, int));
+int	ptcopen __P((dev_t, int, int, struct proc *));
 struct tty *ptytty __P((dev_t));
 void	ptsstart __P((struct tty *));
+int	pty_maxptys __P((int, int));
+
+static struct pt_softc **ptyarralloc __P((int));
+static int check_pty __P((dev_t));
+
+/*
+ * Allocate and zero array of nelem elements.
+ */
+static struct pt_softc **
+ptyarralloc(nelem)
+	int nelem;
+{
+	struct pt_softc **pt;
+	nelem += 10;
+	pt = malloc(nelem * sizeof(struct pt_softc *), M_DEVBUF, M_WAITOK);
+	memset(pt, '\0', nelem * sizeof(struct pt_softc *));
+	return pt;
+}
+
+/*
+ * Check if the minor is correct and ensure necessary structures
+ * are properly allocated.
+ */
+static int
+check_pty(dev)
+	dev_t dev;
+{
+	struct pt_softc *pti;
+
+	if (minor(dev) >= npty) {
+		struct pt_softc **newpt;
+		int newnpty;
+
+		/* check if the requested pty can be granted */
+		if (minor(dev) >= maxptys) {
+	    limit_reached:
+			tablefull("pty", "increase kern.maxptys");
+			return (ENXIO);
+		}
+
+		/*
+		 * Now grab the pty array mutex - we need to ensure
+		 * that the pty array is consistent while copying it's
+		 * content to newly allocated, larger space; we also
+		 * need to be safe against pty_maxptys().
+		 */
+		simple_lock(&pt_softc_mutex);
+
+		do {
+			for(newnpty = npty; newnpty <= minor(dev);
+				newnpty *= 2);
+
+			if (newnpty > maxptys)
+				newnpty = maxptys;
+
+			simple_unlock(&pt_softc_mutex);
+			newpt = ptyarralloc(newnpty);
+			simple_lock(&pt_softc_mutex);
+
+			if (maxptys == npty) {
+				simple_unlock(&pt_softc_mutex);
+				goto limit_reached;
+			}
+		} while(newnpty > maxptys);
+
+		/*
+		 * If the pty array was not enlarged while we were waiting
+		 * for mutex, copy current contents of pt_softc[] to newly
+		 * allocated array and start using the new bigger array.
+		 */
+		if (minor(dev) >= npty) {
+			memcpy(newpt, pt_softc, npty*sizeof(struct pt_softc *));
+			free(pt_softc, M_DEVBUF);
+
+			pt_softc = newpt;
+			npty = newnpty;
+		} else {
+			/* was enlarged when waited fot lock, free new space */
+			free(newpt, M_DEVBUF);
+		}
+
+		simple_unlock(&pt_softc_mutex);
+	}
+		
+	/*
+	 * If the entry is not yet allocated, allocate one. The mutex is
+	 * needed so that the state of pt_softc[] array is consistant
+	 * in case it has been longened above.
+	 */
+	if (!pt_softc[minor(dev)]) {
+		MALLOC(pti, struct pt_softc *, sizeof(struct pt_softc),
+			M_DEVBUF, M_WAITOK);
+
+	 	pti->pt_tty = ttymalloc();
+
+		simple_lock(&pt_softc_mutex);
+
+		/*
+		 * Check the entry again - it might have been
+		 * added while we were waiting for mutex.
+		 */
+		if (!pt_softc[minor(dev)]) {
+			tty_attach(pti->pt_tty);
+			pt_softc[minor(dev)] = pti;
+		} else {
+			ttyfree(pti->pt_tty);
+			FREE(pti, M_DEVBUF);
+		}
+
+		simple_unlock(&pt_softc_mutex);
+	}
+
+	return (0);
+}
+
+/*
+ * Set maxpty in thread-safe way. Returns 0 in case of error, otherwise
+ * new value of maxptys.
+ */
+int
+pty_maxptys(newmax, set)
+	int newmax, set;
+{
+	if (!set)
+		return (maxptys);
+
+	/* the value cannot be set to value lower than current number of ptys */
+	if (newmax < npty)
+		return (0);
+
+	/* can proceed immediatelly if bigger than current maximum */
+	if (newmax > maxptys) {
+		maxptys = newmax;
+		return (maxptys);
+	}
+
+	/*
+	 * We have to grab the pt_softc lock, so that we would pick correct
+	 * value of npty (might be modified in check_pty()).
+	 */
+	simple_lock(&pt_softc_mutex);
+
+	if (newmax > npty)
+		maxptys = newmax;
+
+	simple_unlock(&pt_softc_mutex);
+
+	return (maxptys);
+}
 
 /*
  * Establish n (or default if n is 1) ptys in the system.
@@ -103,15 +255,11 @@ void
 ptyattach(n)
 	int n;
 {
-#ifdef notyet
-#define	DEFAULT_NPTY	64
-
 	/* maybe should allow 0 => none? */
 	if (n <= 1)
-		n = DEFAULT_NPTY;
-	pt_softc = malloc(n * sizeof(struct pt_softc), M_DEVBUF, M_WAITOK);
+		n = DEFAULT_NPTYS;
+	pt_softc = ptyarralloc(n);
 	npty = n;
-#endif
 }
 
 /*ARGSUSED*/
@@ -125,15 +273,12 @@ ptsopen(dev, flag, devtype, p)
 	struct tty *tp;
 	int error;
 
-	if (minor(dev) >= npty)
-		return (ENXIO);
-	pti = &pt_softc[minor(dev)];
-	if (!pti->pt_tty) {
-		tp = pti->pt_tty = ttymalloc();
-		tty_attach(tp);
-	}
-	else
-		tp = pti->pt_tty;
+	if ((error = check_pty(dev)))
+		return (error);
+
+	pti = pt_softc[minor(dev)];
+	tp = pti->pt_tty;
+
 	if (!ISSET(tp->t_state, TS_ISOPEN)) {
 		ttychars(tp);		/* Set up default chars */
 		tp->t_iflag = TTYDEF_IFLAG;
@@ -155,7 +300,7 @@ ptsopen(dev, flag, devtype, p)
 			if (error)
 				return (error);
 		}
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	ptcwakeup(tp, FREAD|FWRITE);
 	return (error);
 }
@@ -166,11 +311,11 @@ ptsclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 	int error;
 
-	error = (*linesw[tp->t_line].l_close)(tp, flag);
+	error = (*tp->t_linesw->l_close)(tp, flag);
 	error |= ttyclose(tp);
 	ptcwakeup(tp, FREAD|FWRITE);
 	return (error);
@@ -183,15 +328,14 @@ ptsread(dev, uio, flag)
 	int flag;
 {
 	struct proc *p = curproc;
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 	int error = 0;
 
 again:
 	if (pti->pt_flags & PF_REMOTE) {
 		while (isbackground(p, tp)) {
-			if (sigismember(&p->p_sigignore, SIGTTIN) ||
-			    sigismember(&p->p_sigmask, SIGTTIN) ||
+			if (sigismasked(p, SIGTTIN) ||
 			    p->p_pgrp->pg_jobc == 0 ||
 			    p->p_flag & P_PPWAIT)
 				return (EIO);
@@ -221,7 +365,7 @@ again:
 			return (error);
 	} else
 		if (tp->t_oproc)
-			error = (*linesw[tp->t_line].l_read)(tp, uio, flag);
+			error = (*tp->t_linesw->l_read)(tp, uio, flag);
 	ptcwakeup(tp, FWRITE);
 	return (error);
 }
@@ -237,12 +381,30 @@ ptswrite(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 
 	if (tp->t_oproc == 0)
 		return (EIO);
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+/*
+ * Poll pseudo-tty.
+ */
+int
+ptspoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct pt_softc *pti = pt_softc[minor(dev)];
+	struct tty *tp = pti->pt_tty;
+
+	if (tp->t_oproc == 0)
+		return (EIO);
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 /*
@@ -253,7 +415,7 @@ void
 ptsstart(tp)
 	struct tty *tp;
 {
-	struct pt_softc *pti = &pt_softc[minor(tp->t_dev)];
+	struct pt_softc *pti = pt_softc[minor(tp->t_dev)];
 
 	if (ISSET(tp->t_state, TS_TTSTOP))
 		return;
@@ -269,7 +431,7 @@ ptsstop(tp, flush)
 	struct tty *tp;
 	int flush;
 {
-	struct pt_softc *pti = &pt_softc[minor(tp->t_dev)];
+	struct pt_softc *pti = pt_softc[minor(tp->t_dev)];
 	int flag;
 
 	/* note: FLUSHREAD and FLUSHWRITE already ok */
@@ -293,7 +455,7 @@ ptcwakeup(tp, flag)
 	struct tty *tp;
 	int flag;
 {
-	struct pt_softc *pti = &pt_softc[minor(tp->t_dev)];
+	struct pt_softc *pti = pt_softc[minor(tp->t_dev)];
 
 	if (flag & FREAD) {
 		selwakeup(&pti->pt_selr);
@@ -305,8 +467,6 @@ ptcwakeup(tp, flag)
 	}
 }
 
-int ptcopen __P((dev_t, int, int, struct proc *));
-
 /*ARGSUSED*/
 int
 ptcopen(dev, flag, devtype, p)
@@ -316,20 +476,18 @@ ptcopen(dev, flag, devtype, p)
 {
 	struct pt_softc *pti;
 	struct tty *tp;
+	int error;
 
-	if (minor(dev) >= npty)
-		return (ENXIO);
-	pti = &pt_softc[minor(dev)];
-	if (!pti->pt_tty) {
-		tp = pti->pt_tty = ttymalloc();
-		tty_attach(tp);
-	}
-	else
-		tp = pti->pt_tty;
+	if ((error = check_pty(dev)))
+		return (error);
+
+	pti = pt_softc[minor(dev)];
+	tp = pti->pt_tty;
+
 	if (tp->t_oproc)
 		return (EIO);
 	tp->t_oproc = ptsstart;
-	(void)(*linesw[tp->t_line].l_modem)(tp, 1);
+	(void)(*tp->t_linesw->l_modem)(tp, 1);
 	CLR(tp->t_lflag, EXTPROC);
 	pti->pt_flags = 0;
 	pti->pt_send = 0;
@@ -344,10 +502,10 @@ ptcclose(dev, flag, devtype, p)
 	int flag, devtype;
 	struct proc *p;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 
-	(void)(*linesw[tp->t_line].l_modem)(tp, 0);
+	(void)(*tp->t_linesw->l_modem)(tp, 0);
 	CLR(tp->t_state, TS_CARR_ON);
 	tp->t_oproc = 0;		/* mark closed */
 	return (0);
@@ -359,7 +517,7 @@ ptcread(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 	char buf[BUFSIZ];
 	int error = 0, cc;
@@ -429,7 +587,7 @@ ptcwrite(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 	u_char *cp = NULL;
 	int cc = 0;
@@ -477,11 +635,11 @@ again:
 		}
 		while (cc > 0) {
 			if ((tp->t_rawq.c_cc + tp->t_canq.c_cc) >= TTYHOG - 2 &&
-			   (tp->t_canq.c_cc > 0 || !ISSET(tp->t_iflag, ICANON))) {
+			   (tp->t_canq.c_cc > 0 || !ISSET(tp->t_lflag, ICANON))) {
 				wakeup((caddr_t)&tp->t_rawq);
 				goto block;
 			}
-			(*linesw[tp->t_line].l_rint)(*cp++, tp);
+			(*tp->t_linesw->l_rint)(*cp++, tp);
 			cnt++;
 			cc--;
 		}
@@ -518,7 +676,7 @@ ptcpoll(dev, events, p)
 	int events;
 	struct proc *p;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 	int revents = 0;
 	int s = splsoftclock();
@@ -535,7 +693,7 @@ ptcpoll(dev, events, p)
 		    ((pti->pt_flags & PF_REMOTE) ?
 		     (tp->t_canq.c_cc == 0) :
 		     ((tp->t_rawq.c_cc + tp->t_canq.c_cc < TTYHOG-2) ||
-		      (tp->t_canq.c_cc == 0 && ISSET(tp->t_iflag, ICANON)))))
+		      (tp->t_canq.c_cc == 0 && ISSET(tp->t_lflag, ICANON)))))
 			revents |= events & (POLLOUT | POLLWRNORM);
 
 	if (events & POLLHUP)
@@ -559,7 +717,7 @@ struct tty *
 ptytty(dev)
 	dev_t dev;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 
 	return (tp);
@@ -574,7 +732,7 @@ ptyioctl(dev, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	struct pt_softc *pti = &pt_softc[minor(dev)];
+	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 	u_char *cc = tp->t_cc;
 	int stop, error, sig;
@@ -609,19 +767,6 @@ ptyioctl(dev, cmd, data, flag, p)
 		switch (cmd) {
 
 		case TIOCGPGRP:
-#ifdef COMPAT_SUNOS
-			{
-			/*
-			 * I'm not sure about SunOS TIOCGPGRP semantics
-			 * on PTYs, but it's something like this:
-			 */
-			extern struct emul emul_sunos;
-			if (p->p_emul == &emul_sunos && tp->t_pgrp == 0)
-				return (EIO);
-			*(int *)data = tp->t_pgrp->pg_id;
-			return (0);
-			}
-#endif
 			/*
 			 * We avoid calling ttioctl on the controller since,
 			 * in that case, tp must be the controlling terminal.
@@ -672,16 +817,16 @@ ptyioctl(dev, cmd, data, flag, p)
 				return (EINVAL);
 			if (!ISSET(tp->t_lflag, NOFLSH))
 				ttyflush(tp, FREAD|FWRITE);
-			pgsignal(tp->t_pgrp, sig, 1);
 			if ((sig == SIGINFO) &&
 			    (!ISSET(tp->t_lflag, NOKERNINFO)))
 				ttyinfo(tp);
+			pgsignal(tp->t_pgrp, sig, 1);
 			return(0);
 		}
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error < 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error == EPASSTHROUGH)
 		 error = ttioctl(tp, cmd, data, flag, p);
-	if (error < 0) {
+	if (error == EPASSTHROUGH) {
 		if (pti->pt_flags & PF_UCNTL &&
 		    (cmd & ~0xff) == UIOCCMD(0)) {
 			if (cmd & 0xff) {
@@ -690,7 +835,6 @@ ptyioctl(dev, cmd, data, flag, p)
 			}
 			return (0);
 		}
-		error = ENOTTY;
 	}
 	/*
 	 * If external processing and packet mode send ioctl packet.

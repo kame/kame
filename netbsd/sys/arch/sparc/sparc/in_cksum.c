@@ -1,4 +1,4 @@
-/*	$NetBSD: in_cksum.c,v 1.9 1998/11/29 10:37:08 mycroft Exp $ */
+/*	$NetBSD: in_cksum.c,v 1.12 2002/04/05 00:19:56 simonb Exp $ */
 
 /*
  * Copyright (c) 1995 Zubin Dittia.
@@ -44,8 +44,12 @@
  */
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip_var.h>
 
 /*
  * Checksum routine for Internet Protocol family headers.
@@ -134,14 +138,11 @@
 #define ADDSHORT	{sum += *(u_short *)w;}
 #define ADVANCE(n)	{w += n; mlen -= n;}
 
-int
-in_cksum(m, len)
-	register struct mbuf *m;
-	register int len;
+static __inline__ int
+in_cksum_internal(struct mbuf *m, int off, int len, u_int sum)
 {
-	register u_char *w;
-	register u_int sum = 0;
-	register int mlen = 0;
+	u_char *w;
+	int mlen = 0;
 	int byte_swapped = 0;
 
 	/*
@@ -149,13 +150,14 @@ in_cksum(m, len)
 	 * allow the compiler to pick which specific machine registers to
 	 * use, instead of hard-coding this in the asm code above.
 	 */
-	register u_int tmp1, tmp2;
+	u_int tmp1, tmp2;
 
 	for (; m && len; m = m->m_next) {
 		if (m->m_len == 0)
 			continue;
-		w = mtod(m, u_char *);
-		mlen = m->m_len;
+		w = mtod(m, u_char *) + off;
+		mlen = m->m_len - off;
+		off = 0;
 		if (len < mlen)
 			mlen = len;
 		len -= mlen;
@@ -177,7 +179,7 @@ in_cksum(m, len)
 		}
 
 		/*
-		 * Do as many 32 bit operattions as possible using the
+		 * Do as many 32 bit operations as possible using the
 		 * 64/32/16/8/4 macro's above, using as many as possible of
 		 * these.
 		 */
@@ -221,4 +223,55 @@ in_cksum(m, len)
 	ADDCARRY;
 
 	return (0xffff ^ sum);
+}
+
+int
+in_cksum(m, len)
+	struct mbuf *m;
+	int len;
+{
+
+	return (in_cksum_internal(m, 0, len, 0));
+}
+
+int
+in4_cksum(m, nxt, off, len)
+	struct mbuf *m;
+	u_int8_t nxt;
+	int off, len;
+{
+	u_char *w;
+	u_int sum = 0;
+	struct ipovly ipov;
+
+	/*
+	 * Declare two temporary registers for use by the asm code.  We
+	 * allow the compiler to pick which specific machine registers to
+	 * use, instead of hard-coding this in the asm code above.
+	 */
+	u_int tmp1, tmp2;
+
+	if (nxt != 0) {
+		/* pseudo header */
+		memset(&ipov, 0, sizeof(ipov));
+		ipov.ih_len = htons(len);
+		ipov.ih_pr = nxt; 
+		ipov.ih_src = mtod(m, struct ip *)->ip_src; 
+		ipov.ih_dst = mtod(m, struct ip *)->ip_dst;
+		w = (u_char *)&ipov;
+		/* assumes sizeof(ipov) == 20 */
+		ADD16;
+		w += 16;
+		ADD4;
+	}
+
+	/* skip unnecessary part */
+	while (m && off > 0) {
+		if (m->m_len > off)
+			break;
+		off -= m->m_len;
+		m = m->m_next;
+	}
+
+	return (in_cksum_internal(m, off, len, sum));
 }

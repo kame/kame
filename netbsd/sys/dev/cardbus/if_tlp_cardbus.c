@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tlp_cardbus.c,v 1.24.4.1 2002/01/29 22:52:10 he Exp $	*/
+/*	$NetBSD: if_tlp_cardbus.c,v 1.33 2002/04/14 17:17:10 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * CardBus bus front-end for the Digital Semiconductor ``Tulip'' (21x4x)
  * Ethernet controller family driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_tlp_cardbus.c,v 1.33 2002/04/14 17:17:10 mycroft Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -154,8 +157,25 @@ const struct tulip_cardbus_product {
 	{ CARDBUS_VENDOR_ABOCOM,	CARDBUS_PRODUCT_ABOCOM_PCM200,
 	  TULIP_CHIP_AN985 },
 
+	{ CARDBUS_VENDOR_HAWKING,	CARDBUS_PRODUCT_HAWKING_PN672TX,
+	  TULIP_CHIP_AN985 },
+
 	{ 0,				0,
 	  TULIP_CHIP_INVALID },
+};
+
+struct tlp_cardbus_quirks {
+	void		(*tpq_func) __P((struct tulip_cardbus_softc *,
+			    const u_int8_t *));
+	u_int8_t	tpq_oui[3];
+};
+
+void	tlp_cardbus_lxt_quirks __P((struct tulip_cardbus_softc *,
+	    const u_int8_t *));
+
+const struct tlp_cardbus_quirks tlp_cardbus_21142_quirks[] = {
+	{ tlp_cardbus_lxt_quirks,	{ 0x00, 0x40, 0x05 } },
+	{ NULL,				{ 0, 0, 0 } }
 };
 
 void	tlp_cardbus_setup __P((struct tulip_cardbus_softc *));
@@ -168,6 +188,8 @@ void	tlp_cardbus_x3201_reset __P((struct tulip_softc *));
 
 const struct tulip_cardbus_product *tlp_cardbus_lookup
     __P((const struct cardbus_attach_args *));
+void tlp_cardbus_get_quirks __P((struct tulip_cardbus_softc *,
+    const u_int8_t *, const struct tlp_cardbus_quirks *));
 
 const struct tulip_cardbus_product *
 tlp_cardbus_lookup(ca)
@@ -183,6 +205,23 @@ tlp_cardbus_lookup(ca)
 			return (tcp);
 	}
 	return (NULL);
+}
+
+void
+tlp_cardbus_get_quirks(csc, enaddr, tpq)
+	struct tulip_cardbus_softc *csc;
+	const u_int8_t *enaddr;
+	const struct tlp_cardbus_quirks *tpq;
+{
+
+	for (; tpq->tpq_func != NULL; tpq++) {
+		if (tpq->tpq_oui[0] == enaddr[0] &&
+		    tpq->tpq_oui[1] == enaddr[1] &&
+		    tpq->tpq_oui[2] == enaddr[2]) {
+			(*tpq->tpq_func)(csc, enaddr);
+			return;
+		}
+	}
 }
 
 int
@@ -265,13 +304,12 @@ tlp_cardbus_attach(parent, self, aux)
 			sc->sc_chip = TULIP_CHIP_AN983;
 			break;
 
-		default:
-			/* Unknown -- use default. */
 		}
 		break;
 
 	default:
-		/* Nothing. */
+		/* Nothing. -- to make gcc happy */
+		break;
 	}
 
 	printf(": %s Ethernet, pass %d.%d\n",
@@ -281,29 +319,29 @@ tlp_cardbus_attach(parent, self, aux)
 	/*
 	 * Map the device.
 	 */
-	csc->sc_csr = PCI_COMMAND_MASTER_ENABLE;
-	if (Cardbus_mapreg_map(ct, TULIP_PCI_IOBA,
-	    PCI_MAPREG_TYPE_IO, 0, &sc->sc_st, &sc->sc_sh, &adr,
+	csc->sc_csr = CARDBUS_COMMAND_MASTER_ENABLE;
+	if (Cardbus_mapreg_map(ct, TULIP_PCI_MMBA,
+	    CARDBUS_MAPREG_TYPE_MEM, 0, &sc->sc_st, &sc->sc_sh, &adr,
+	    &csc->sc_mapsize) == 0) {
+#if rbus
+#else
+		(*ct->ct_cf->cardbus_mem_open)(cc, 0, adr, adr+csc->sc_mapsize);
+#endif
+		csc->sc_cben = CARDBUS_MEM_ENABLE;
+		csc->sc_csr |= CARDBUS_COMMAND_MEM_ENABLE;
+		csc->sc_bar_reg = TULIP_PCI_MMBA;
+		csc->sc_bar_val = adr | CARDBUS_MAPREG_TYPE_MEM;
+	} else if (Cardbus_mapreg_map(ct, TULIP_PCI_IOBA,
+	    CARDBUS_MAPREG_TYPE_IO, 0, &sc->sc_st, &sc->sc_sh, &adr,
 	    &csc->sc_mapsize) == 0) {
 #if rbus
 #else
 		(*ct->ct_cf->cardbus_io_open)(cc, 0, adr, adr+csc->sc_mapsize);
 #endif
 		csc->sc_cben = CARDBUS_IO_ENABLE;
-		csc->sc_csr |= PCI_COMMAND_IO_ENABLE;
+		csc->sc_csr |= CARDBUS_COMMAND_IO_ENABLE;
 		csc->sc_bar_reg = TULIP_PCI_IOBA;
-		csc->sc_bar_val = adr | PCI_MAPREG_TYPE_IO;
-	} else if (Cardbus_mapreg_map(ct, TULIP_PCI_MMBA,
-	    PCI_MAPREG_TYPE_MEM|PCI_MAPREG_MEM_TYPE_32BIT, 0,
-	    &sc->sc_st, &sc->sc_sh, &adr, &csc->sc_mapsize) == 0) {
-#if rbus
-#else
-		(*ct->ct_cf->cardbus_mem_open)(cc, 0, adr, adr+csc->sc_mapsize);
-#endif
-		csc->sc_cben = CARDBUS_MEM_ENABLE;
-		csc->sc_csr |= PCI_COMMAND_MEM_ENABLE;
-		csc->sc_bar_reg = TULIP_PCI_MMBA;
-		csc->sc_bar_val = adr | PCI_MAPREG_TYPE_MEM;
+		csc->sc_bar_val = adr | CARDBUS_MAPREG_TYPE_IO;
 	} else {
 		printf("%s: unable to map device registers\n",
 		    sc->sc_dev.dv_xname);
@@ -361,7 +399,10 @@ tlp_cardbus_attach(parent, self, aux)
 			    sizeof(enaddr));
 		}
 
-		/* XXX XXX XXX QUIRKS XXX XXX XXX */
+		/*
+		 * Deal with any quirks this board might have.
+		 */
+		tlp_cardbus_get_quirks(csc, enaddr, tlp_cardbus_21142_quirks);
 
 		/*
 		 * If we don't already have a media switch, default to
@@ -573,7 +614,8 @@ tlp_cardbus_setup(csc)
 		break;
 
 	default:
-		/* Nothing. */
+		/* Nothing. -- to make gcc happy */
+		break;
 	}
 
 	if (cardbus_get_capability(cc, cf, csc->sc_tag,
@@ -636,4 +678,14 @@ tlp_cardbus_x3201_reset(sc)
 	TULIP_WRITE(sc, CSR_SIAGEN, (reg & ~SIAGEN_MD) | SIAGEN_CWE |
 	    0x00050000);
 	TULIP_WRITE(sc, CSR_SIAGEN, (reg & ~SIAGEN_CWE) | SIAGEN_MD);
+}
+
+void
+tlp_cardbus_lxt_quirks(csc, enaddr)
+	struct tulip_cardbus_softc *csc;
+	const u_int8_t *enaddr;
+{
+	struct tulip_softc *sc = &csc->sc_tulip;
+
+	sc->sc_mediasw = &tlp_sio_mii_mediasw;
 }

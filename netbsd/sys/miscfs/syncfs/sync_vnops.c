@@ -1,4 +1,4 @@
-/*	$NetBSD: sync_vnops.c,v 1.2.6.2 2000/12/14 23:36:19 he Exp $	*/
+/*	$NetBSD: sync_vnops.c,v 1.8 2001/12/06 04:30:49 chs Exp $	*/
 
 /*
  * Copyright 1997 Marshall Kirk McKusick. All Rights Reserved.
@@ -31,6 +31,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sync_vnops.c,v 1.8 2001/12/06 04:30:49 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -42,7 +45,7 @@
 #include <miscfs/syncfs/syncfs.h>
 
 int (**sync_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc sync_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc sync_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_close_desc, sync_close },		/* close */
 	{ &vop_fsync_desc, sync_fsync },		/* fsync */
@@ -52,10 +55,11 @@ struct vnodeopv_entry_desc sync_vnodeop_entries[] = {
 	{ &vop_unlock_desc, sync_unlock },		/* unlock */
 	{ &vop_print_desc, sync_print },		/* print */
 	{ &vop_islocked_desc, sync_islocked },		/* islocked */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_putpages_desc, sync_putpages },		/* islocked */
+	{ NULL, NULL }
 };
 
-struct vnodeopv_desc sync_vnodeop_opv_desc =
+const struct vnodeopv_desc sync_vnodeop_opv_desc =
 	{ &sync_vnodeop_p, sync_vnodeop_entries };
 
 /*
@@ -75,12 +79,14 @@ vfs_allocate_syncvnode(mp)
 
 	vp->v_writecount = 1;
 	vp->v_type = VNON;
+
 	/*
 	 * Place the vnode onto the syncer worklist. We attempt to
 	 * scatter them about on the list so that they will go off
 	 * at evenly distributed times even if all the filesystems
 	 * are mounted at once.
 	 */
+
 	next += incr;
 	if (next == 0 || next > syncer_maxdelay) {
 		start /= 2;
@@ -106,11 +112,11 @@ vfs_deallocate_syncvnode(mp)
 	struct vnode *vp;
 
 	vp = mp->mnt_syncer;
-	mp->mnt_syncer = 0;
+	mp->mnt_syncer = NULL;
 	vn_syncer_remove_from_worklist(vp);
 	vp->v_writecount = 0;
-	vgone(vp);
 	vrele(vp);
+	vgone(vp);
 }
 
 /*
@@ -174,8 +180,6 @@ sync_inactive(v)
 	struct vnode *vp = ap->a_vp;
 
 	VOP_UNLOCK(vp, 0);
-	if (vp->v_usecount == 0)
-		vgone(vp);
 	return (0);
 }
 
@@ -183,18 +187,8 @@ int
 sync_reclaim(v)
 	void *v;
 {
-	struct vop_reclaim_args /* {
-		struct vnode *a_vp;
-	} */ *ap = v;
-	struct vnode *vp = ap->a_vp;
-	int s;
 
-	s = splbio();
-	vp->v_mount->mnt_syncer = NULL;
-	LIST_REMOVE(vp, v_synclist);
-	splx(s);
-
-	return 0;
+	return (0);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: am79900.c,v 1.5 2000/03/30 12:45:29 augustss Exp $	*/
+/*	$NetBSD: am79900.c,v 1.11 2001/11/13 13:14:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998
@@ -42,6 +42,9 @@
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: am79900.c,v 1.11 2001/11/13 13:14:34 lukem Exp $");
+
 #include "bpfilter.h"
 #include "rnd.h"
 
@@ -76,7 +79,7 @@
 void am79900_meminit __P((struct lance_softc *));
 void am79900_start __P((struct ifnet *));
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -155,7 +158,7 @@ am79900_meminit(sc)
 	 * Update our private copy of the Ethernet address.
 	 * We NEED the copy so we can ensure its alignment!
 	 */
-	bcopy(LLADDR(ifp->if_sadl), sc->sc_enaddr, 6);
+	memcpy(sc->sc_enaddr, LLADDR(ifp->if_sadl), ETHER_ADDR_LEN);
 	myaddr = sc->sc_enaddr;
 
 	init.init_padr[0] = myaddr[0] | (myaddr[1] << 8)
@@ -365,7 +368,7 @@ am79900_intr(arg)
 
 	isr = (*sc->sc_rdcsr)(sc, LE_CSR0) | sc->sc_saved_csr0;
 	sc->sc_saved_csr0 = 0;
-#ifdef LEDEBUG
+#if defined(LEDEBUG) && LEDEBUG > 1
 	if (sc->sc_debug)
 		printf("%s: am79900_intr entering with isr=%04x\n",
 		    sc->sc_dev.dv_xname, isr);
@@ -467,7 +470,7 @@ am79900_start(ifp)
 			    sc->sc_no_td, sc->sc_last_td);
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: smc91cxx.c,v 1.25.2.1 2000/08/06 02:12:15 briggs Exp $	*/
+/*	$NetBSD: smc91cxx.c,v 1.40 2002/05/03 03:30:48 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -77,6 +77,9 @@
  * written for NetBSD/amiga by Michael Hitch.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smc91cxx.c,v 1.40 2002/05/03 03:30:48 thorpej Exp $");
+
 #include "opt_inet.h"
 #include "opt_ccitt.h"
 #include "opt_llc.h"
@@ -139,6 +142,11 @@
 #include <dev/ic/smc91cxxreg.h>
 #include <dev/ic/smc91cxxvar.h>
 
+#ifndef __BUS_SPACE_HAS_STREAM_METHODS
+#define bus_space_write_multi_stream_2 bus_space_write_multi_2
+#define bus_space_read_multi_stream_2  bus_space_read_multi_2
+#endif /* __BUS_SPACE_HAS_STREAM_METHODS */
+
 /* XXX Hardware padding doesn't work yet(?) */
 #define	SMC91CXX_SW_PAD
 
@@ -147,7 +155,7 @@ const char *smc91cxx_idstrs[] = {
 	NULL,				/* 1 */
 	NULL,				/* 2 */
 	"SMC91C90/91C92",		/* 3 */
-	"SMC91C94",			/* 4 */
+	"SMC91C94/91C96",		/* 4 */
 	"SMC91C95",			/* 5 */
 	NULL,				/* 6 */
 	"SMC91C100",			/* 7 */
@@ -276,13 +284,14 @@ smc91cxx_attach(sc, myea)
 	    ether_sprintf(myea));
 
 	/* Initialize the ifnet structure. */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = smc91cxx_start;
 	ifp->if_ioctl = smc91cxx_ioctl;
 	ifp->if_watchdog = smc91cxx_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
@@ -301,7 +310,7 @@ smc91cxx_attach(sc, myea)
 	SMC_SELECT_BANK(sc, 1);
 	tmp = bus_space_read_2(bst, bsh, CONFIG_REG_W);
 
-	miicapabilities = BMSR_MEDIAMASK;
+	miicapabilities = BMSR_MEDIAMASK|BMSR_ANEG;
 	switch (sc->sc_chipid) {
 	case CHIP_91100:
 		/*
@@ -335,10 +344,6 @@ smc91cxx_attach(sc, myea)
 		ifmedia_set(ifm, IFM_ETHER | (aui ? IFM_10_5 : IFM_10_T));
 		break;
 	}
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
@@ -584,7 +589,8 @@ smc91cxx_start(ifp)
 	/*
 	 * Peek at the next packet.
 	 */
-	if ((m = ifp->if_snd.ifq_head) == NULL)
+	IFQ_POLL(&ifp->if_snd, m);
+	if (m == NULL)
 		return;
 
 	/*
@@ -603,7 +609,7 @@ smc91cxx_start(ifp)
 	if ((len + pad) > (ETHER_MAX_LEN - ETHER_CRC_LEN)) {
 		printf("%s: large packet discarded\n", sc->sc_dev.dv_xname);
 		ifp->if_oerrors++;
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		m_freem(m);
 		goto readcheck;
 	}
@@ -680,7 +686,7 @@ smc91cxx_start(ifp)
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC address, etc.
 	 */
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 
 	/*
 	 * Push the packet out to the card.
@@ -802,10 +808,11 @@ smc91cxx_intr(arg)
 	if (status & IM_RCV_INT) {
 #if 1 /* DIAGNOSTIC */
 		packetno = bus_space_read_2(bst, bsh, FIFO_PORTS_REG_W);
-		if (packetno & FIFO_REMPTY)
+		if (packetno & FIFO_REMPTY) {
 			printf("%s: receive interrupt on empty fifo\n",
 			    sc->sc_dev.dv_xname);
-		else
+			goto out;
+		} else
 #endif
 		smc91cxx_read(sc);
 	}
@@ -926,6 +933,7 @@ smc91cxx_intr(arg)
 	 */
 	smc91cxx_start(ifp);
 
+out:
 	/*
 	 * Reenable the interrupts we wish to receive now that processing
 	 * is complete.
@@ -998,9 +1006,8 @@ smc91cxx_read(sc)
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m == NULL)
 		goto out;
-
 	m->m_pkthdr.rcvif = ifp;
-	m->m_pkthdr.len = m->m_len = packetlen;
+	m->m_pkthdr.len = packetlen;
 
 	/*
 	 * Always put the packet in a cluster.
@@ -1016,8 +1023,12 @@ smc91cxx_read(sc)
 	}
 
 	/*
-	 * Pull the packet off the interface.
+	 * Pull the packet off the interface.  Make sure the payload
+	 * is aligned.
 	 */
+	m->m_data = (caddr_t) ALIGN(mtod(m, caddr_t) +
+	    sizeof(struct ether_header)) - sizeof(struct ether_header);
+
 	eh = mtod(m, struct ether_header *);
 	data = mtod(m, u_int8_t *);
 	if (packetlen > 1)
@@ -1053,15 +1064,6 @@ smc91cxx_read(sc)
 	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
-
-	/*
-	 * If this is unicast and not for me, drop it.
-	 */
-	if ((eh->ether_dhost[0] & 1) == 0 &&	/* !mcast and !bcast */
-	    ether_cmp(eh->ether_dhost, LLADDR(ifp->if_sadl)) != 0) {
-		m_freem(m);
-		goto out;
-	}
 
 	m->m_pkthdr.len = m->m_len = packetlen;
 	(*ifp->if_input)(ifp, m);
@@ -1120,7 +1122,7 @@ smc91cxx_ioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else {
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl), 
+				memcpy(LLADDR(ifp->if_sadl), ina->x_host.c_host,
 				    ETHER_ADDR_LEN);
 			}
 
@@ -1350,9 +1352,6 @@ smc91cxx_detach(self, flags)
 
 #if NRND > 0
 	rnd_detach_source(&sc->rnd_source);
-#endif
-#if NBPFILTER > 0
-	bpfdetach(ifp);
 #endif
 	ether_ifdetach(ifp);
 	if_detach(ifp);

@@ -1,4 +1,4 @@
-/*	$NetBSD: msvar.h,v 1.1 1999/05/14 07:07:16 mrg Exp $	*/
+/*	$NetBSD: msvar.h,v 1.3 2001/12/09 12:02:06 pk Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -57,14 +57,9 @@
 #define	MS_TX_RING_SIZE	16
 #define MS_TX_RING_MASK (MS_TX_RING_SIZE-1)
 /*
- * Keyboard serial line speed is fixed at 1200 bps; mouse serial line
- * speed defaults to 1200 bps.
+ * mouse serial line speed defaults to 1200 bps.
  */
-#ifdef	SUN_MS_BPS
-#define	MS_BPS	SUN_MS_BPS
-#else
-#define MS_BPS 	1200
-#endif
+#define MS_DEFAULT_BPS 	1200
 
 /*
  * Mouse state.  A Mouse Systems mouse is a fairly simple device,
@@ -80,6 +75,14 @@
 struct ms_softc {
 	struct	device ms_dev;		/* required first: base device */
 	struct	zs_chanstate *ms_cs;
+
+	/*
+	 * The deviopen and deviclose routines are provided
+	 * by the lower level driver and used as a back door
+	 * when opening and closing the internal device.
+	 */
+	int	(*ms_deviopen)	__P((struct device *, int));
+	int	(*ms_deviclose)	__P((struct device *, int));
 
 	/* Flags to communicate with ms_softintr() */
 	volatile int ms_intr_flags;

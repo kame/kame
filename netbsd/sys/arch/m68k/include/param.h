@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.7.4.1 2000/07/23 03:49:31 itojun Exp $	*/
+/*	$NetBSD: param.h,v 1.11 2002/02/26 15:13:23 simonb Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -47,9 +47,13 @@
 /*
  * Machine independent constants for m68k
  */
+#ifndef	MACHINE_ARCH
 #define	_MACHINE_ARCH	m68k
 #define	MACHINE_ARCH	"m68k"
+#endif
+#ifndef	MID_MACHINE
 #define	MID_MACHINE	MID_M68K
+#endif
 
 /*
  * Round p (pointer or byte index) up to a correctly-aligned value for all
@@ -87,24 +91,24 @@
 
 /*
  * Constants related to network buffer management.
- * MCLBYTES must be no larger than CLBYTES (the software page size), and,
+ * MCLBYTES must be no larger than NBPG (the software page size), and,
  * on machines that exchange pages of input or output buffers with mbuf
  * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
  * of the hardware page size.
  */
 #define	MSIZE		256		/* size of an mbuf */
 
-#ifndef	MCLSHIFT
-# define	MCLSHIFT	11	/* convert bytes to m_buf clusters */
+#ifndef MCLSHIFT
+#define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
+					/* 2K cluster can hold Ether frame */
 #endif	/* MCLSHIFT */
 
-#define	MCLBYTES	(1 << MCLSHIFT)
-#define	MCLOFSET	(MCLBYTES - 1)
-#ifndef NMBCLUSTERS
+#define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#ifndef NMBCLUSTERS
+#if defined(_KERNEL_OPT)
 #include "opt_gateway.h"
-#endif /* _KERNEL && ! _LKM */
+#endif
 
 #ifdef GATEWAY
 # define	NMBCLUSTERS	512	/* map size, max cluster allocation */

@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.11 2000/05/19 18:54:28 thorpej Exp $ */
+/*	$NetBSD: disksubr.c,v 1.15 2002/03/05 09:40:42 simonb Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Gordon W. Ross
@@ -61,7 +61,7 @@ extern struct device *bootdv;
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl, secsize and anything required for a block i/o read
  * operation in the driver's strategy/start routines
@@ -86,10 +86,12 @@ readdisklabel(dev, strat, lp, clp)
 	/* minimal requirements for archtypal disk label */
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
-	lp->d_npartitions = 1;
-	if (lp->d_partitions[0].p_size == 0)
-		lp->d_partitions[0].p_size = 0x1fffffff;
-	lp->d_partitions[0].p_offset = 0;
+	if (lp->d_npartitions == 0) {
+		lp->d_npartitions = RAW_PART + 1;
+		if (lp->d_partitions[RAW_PART].p_size == 0)
+			lp->d_partitions[RAW_PART].p_size = 0x1fffffff;
+		lp->d_partitions[RAW_PART].p_offset = 0;
+	}
 
 	/* obtain buffer to probe drive with */
 	bp = geteblk((int)lp->d_secsize);
@@ -99,7 +101,7 @@ readdisklabel(dev, strat, lp, clp)
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
+	bp->b_flags |= B_READ;
 	(*strat)(bp);
 
 	/* if successful, locate disk label within block and validate */
@@ -108,7 +110,6 @@ readdisklabel(dev, strat, lp, clp)
 		/* Save the whole block in case it has info we need. */
 		bcopy(bp->b_data, clp->cd_block, sizeof(clp->cd_block));
 	}
-	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 	if (error)
 		return ("disk label read error");
@@ -160,7 +161,7 @@ setdisklabel(olp, nlp, openmask, clp)
 	    dkcksum(nlp) != 0)
 		return (EINVAL);
 
-	while ((i = ffs((long)openmask)) != 0) {
+	while ((i = ffs(openmask)) != 0) {
 		i--;
 		openmask &= ~(1 << i);
 		if (nlp->d_npartitions <= i)
@@ -216,7 +217,7 @@ writedisklabel(dev, strat, lp, clp)
 	bp->b_blkno = LABELSECTOR;
 	bp->b_cylinder = 0;
 	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_WRITE;
+	bp->b_flags |= B_WRITE;
 	(*strat)(bp);
 	error = biowait(bp);
 	brelse(bp);

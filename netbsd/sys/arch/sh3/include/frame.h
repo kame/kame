@@ -1,6 +1,7 @@
-/*	$NetBSD: frame.h,v 1.1 1999/09/13 10:31:18 itojun Exp $	*/
+/*	$NetBSD: frame.h,v 1.8 2002/05/09 12:25:41 uch Exp $	*/
 
 /*-
+ * Copyright (c) 2002 The NetBSD Foundation, Inc. All rights reserved.
  * Copyright (c) 1995 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -40,26 +41,23 @@
  */
 
 #ifndef _SH3_FRAME_H_
-#define _SH3_FRAME_H_
+#define	_SH3_FRAME_H_
 
 #include <sys/signal.h>
 
 /*
- * System stack frames.
- */
-
-/*
- * Exception/Trap Stack Frame
+ * Exception Stack Frame
  */
 struct trapframe {
-	int	tf_trapno;
-	int	dummy;
+	/* software member */
+	int	tf_expevt;
+	int	tf_ubc;
+	/* hardware registers */
 	int	tf_spc;
 	int	tf_ssr;
 	int	tf_macl;
 	int	tf_mach;
 	int	tf_pr;
-	int	tf_r14;
 	int	tf_r13;
 	int	tf_r12;
 	int	tf_r11;
@@ -75,43 +73,14 @@ struct trapframe {
 	int	tf_r1;
 	int	tf_r0;
 	int	tf_r15;
-};
-
-/*
- * Interrupt stack frame
- */
-struct intrframe {
-	int	if_trapno;
-	int	dummy;
-	int	if_spc;
-	int	if_ssr;
-	int	if_macl;
-	int	if_mach;
-	int	if_pr;
-	int	if_r14;
-	int	if_r13;
-	int	if_r12;
-	int	if_r11;
-	int	if_r10;
-	int	if_r9;
-	int	if_r8;
-	int	if_r7;
-	int	if_r6;
-	int	if_r5;
-	int	if_r4;
-	int	if_r3;
-	int	if_r2;
-	int	if_r1;
-	int	if_r0;
-	int	if_r15;
-	int	if_pri;
+	int	tf_r14;
 };
 
 /*
  * Stack frame inside cpu_switch()
  */
 struct switchframe {
-	int	sf_ppl;
+	int	sf_r15;
 	int	sf_r14;
 	int	sf_r13;
 	int	sf_r12;
@@ -120,6 +89,9 @@ struct switchframe {
 	int	sf_r9;
 	int	sf_r8;
 	int	sf_pr;
+	int	sf_r6_bank;
+	int	sf_sr;
+	int	sf_r7_bank;
 };
 
 /*

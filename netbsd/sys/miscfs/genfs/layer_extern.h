@@ -1,11 +1,11 @@
-/*	$NetBSD: layer_extern.h,v 1.3 2000/03/16 18:08:24 jdolecek Exp $	*/
+/*	$NetBSD: layer_extern.h,v 1.5 2001/12/06 04:29:23 chs Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
  * All rights reserved.
  *
  * This software was written by William Studenmund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -117,3 +117,5 @@ int	layer_lookup __P((void *));
 int	layer_setattr __P((void *));
 int	layer_access __P((void *));
 int	layer_open __P((void *));
+int	layer_getpages __P((void *));
+int	layer_putpages __P((void *));

@@ -1,4 +1,4 @@
-/*	$NetBSD: fdesc_vfsops.c,v 1.31 2000/06/10 18:27:02 assar Exp $	*/
+/*	$NetBSD: fdesc_vfsops.c,v 1.36 2001/11/15 09:48:21 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -44,14 +44,16 @@
  * /dev/fd Filesystem
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fdesc_vfsops.c,v 1.36 2001/11/15 09:48:21 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/filedesc.h>
@@ -324,9 +326,9 @@ fdesc_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	return (EOPNOTSUPP);
 }
 
-extern struct vnodeopv_desc fdesc_vnodeop_opv_desc;
+extern const struct vnodeopv_desc fdesc_vnodeop_opv_desc;
 
-struct vnodeopv_desc *fdesc_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const fdesc_vnodeopv_descs[] = {
 	&fdesc_vnodeop_opv_desc,
 	NULL,
 };
@@ -344,6 +346,7 @@ struct vfsops fdesc_vfsops = {
 	fdesc_fhtovp,
 	fdesc_vptofh,
 	fdesc_init,
+	NULL,
 	fdesc_done,
 	fdesc_sysctl,
 	NULL,				/* vfs_mountroot */

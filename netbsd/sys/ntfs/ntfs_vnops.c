@@ -1,4 +1,4 @@
-/*	$NetBSD: ntfs_vnops.c,v 1.24.4.1 2000/12/14 23:36:26 he Exp $	*/
+/*	$NetBSD: ntfs_vnops.c,v 1.40 2001/12/18 07:51:16 chs Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -39,11 +39,13 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ntfs_vnops.c,v 1.40 2001/12/18 07:51:16 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
@@ -52,16 +54,13 @@
 #include <sys/buf.h>
 #include <sys/dirent.h>
 
+#if !defined(__NetBSD__)
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_prot.h>
-#include <vm/vm_page.h>
-#include <vm/vm_object.h>
-#include <vm/vm_pager.h>
+#endif
+
 #if defined(__FreeBSD__)
 #include <vm/vnode_pager.h>
 #endif
-#include <vm/vm_extern.h>
 
 #include <sys/sysctl.h>
 
@@ -587,52 +586,59 @@ ntfs_readdir(ap)
 	int i, error = 0;
 	u_int32_t faked = 0, num;
 	int ncookies = 0;
-	struct dirent cde;
+	struct dirent *cde;
 	off_t off;
 
 	dprintf(("ntfs_readdir %d off: %d resid: %d\n",ip->i_number,(u_int32_t)uio->uio_offset,uio->uio_resid));
 
 	off = uio->uio_offset;
 
+	MALLOC(cde, struct dirent *, sizeof(struct dirent), M_TEMP, M_WAITOK);
+
 	/* Simulate . in every dir except ROOT */
-	if( ip->i_number != NTFS_ROOTINO ) {
-		struct dirent dot = { NTFS_ROOTINO,
-				sizeof(struct dirent), DT_DIR, 1, "." };
+	if (ip->i_number != NTFS_ROOTINO
+	    && uio->uio_offset < sizeof(struct dirent)) {
+		cde->d_fileno = ip->i_number;
+		cde->d_reclen = sizeof(struct dirent);
+		cde->d_type = DT_DIR;
+		cde->d_namlen = 1;
+		strncpy(cde->d_name, ".", 2);
+		error = uiomove((void *)cde, sizeof(struct dirent), uio);
+		if (error)
+			goto out;
 
-		if( uio->uio_offset < sizeof(struct dirent) ) {
-			dot.d_fileno = ip->i_number;
-			error = uiomove((char *)&dot,sizeof(struct dirent),uio);
-			if(error)
-				return (error);
-
-			ncookies ++;
-		}
+		ncookies++;
 	}
 
 	/* Simulate .. in every dir including ROOT */
-	if( uio->uio_offset < 2 * sizeof(struct dirent) ) {
-		struct dirent dotdot = { NTFS_ROOTINO,
-				sizeof(struct dirent), DT_DIR, 2, ".." };
+	if (uio->uio_offset < 2 * sizeof(struct dirent)) {
+		cde->d_fileno = NTFS_ROOTINO;	/* XXX */
+		cde->d_reclen = sizeof(struct dirent);
+		cde->d_type = DT_DIR;
+		cde->d_namlen = 2;
+		strncpy(cde->d_name, "..", 3);
 
-		error = uiomove((char *)&dotdot,sizeof(struct dirent),uio);
-		if(error)
-			return (error);
+		error = uiomove((void *) cde, sizeof(struct dirent), uio);
+		if (error)
+			goto out;
 
-		ncookies ++;
+		ncookies++;
 	}
 
 	faked = (ip->i_number == NTFS_ROOTINO) ? 1 : 2;
 	num = uio->uio_offset / sizeof(struct dirent) - faked;
 
-	while( uio->uio_resid >= sizeof(struct dirent) ) {
+	while (uio->uio_resid >= sizeof(struct dirent)) {
 		struct attr_indexentry *iep;
+		char *fname;
+		size_t remains;
+		int sz;
 
 		error = ntfs_ntreaddir(ntmp, fp, num, &iep);
+		if (error)
+			goto out;
 
-		if(error)
-			return (error);
-
-		if( NULL == iep )
+		if (NULL == iep)
 			break;
 
 		for(; !(iep->ie_flag & NTFS_IEFLAG_LAST) && (uio->uio_resid >= sizeof(struct dirent));
@@ -641,22 +647,27 @@ ntfs_readdir(ap)
 			if(!ntfs_isnamepermitted(ntmp,iep))
 				continue;
 
+			remains = sizeof(cde->d_name) - 1;
+			fname = cde->d_name;
 			for(i=0; i<iep->ie_fnamelen; i++) {
-				cde.d_name[i] = ntfs_u28(iep->ie_fname[i]);
+				sz = (*ntmp->ntm_wput)(fname, remains,
+						iep->ie_fname[i]);
+				fname += sz;
+				remains -= sz;
 			}
-			cde.d_name[i] = '\0';
+			*fname = '\0';
 			dprintf(("ntfs_readdir: elem: %d, fname:[%s] type: %d, flag: %d, ",
-				num, cde.d_name, iep->ie_fnametype,
+				num, cde->d_name, iep->ie_fnametype,
 				iep->ie_flag));
-			cde.d_namlen = iep->ie_fnamelen;
-			cde.d_fileno = iep->ie_number;
-			cde.d_type = (iep->ie_fflag & NTFS_FFLAG_DIR) ? DT_DIR : DT_REG;
-			cde.d_reclen = sizeof(struct dirent);
-			dprintf(("%s\n", (cde.d_type == DT_DIR) ? "dir":"reg"));
+			cde->d_namlen = fname - (char *) cde->d_name;
+			cde->d_fileno = iep->ie_number;
+			cde->d_type = (iep->ie_fflag & NTFS_FFLAG_DIR) ? DT_DIR : DT_REG;
+			cde->d_reclen = sizeof(struct dirent);
+			dprintf(("%s\n", (cde->d_type == DT_DIR) ? "dir":"reg"));
 
-			error = uiomove((char *)&cde, sizeof(struct dirent), uio);
-			if(error)
-				return (error);
+			error = uiomove((void *)cde, sizeof(struct dirent), uio);
+			if (error)
+				goto out;
 
 			ncookies++;
 			num++;
@@ -689,8 +700,7 @@ ntfs_readdir(ap)
 		MALLOC(cookies, u_long *, ncookies * sizeof(u_long),
 		       M_TEMP, M_WAITOK);
 #else /* defined(__NetBSD__) */
-		MALLOC(cookies, off_t *, ncookies * sizeof(off_t),
-		       M_TEMP, M_WAITOK);
+		cookies = malloc(ncookies * sizeof(off_t), M_TEMP, M_WAITOK);
 #endif
 		for (dp = dpStart, cookiep = cookies, i=0;
 		     i < ncookies;
@@ -705,6 +715,8 @@ ntfs_readdir(ap)
 	if (ap->a_eofflag)
 	    *ap->a_eofflag = VTONT(ap->a_vp)->i_size <= uio->uio_offset;
 */
+    out:
+	FREE(cde, M_TEMP);
 	return (error);
 }
 
@@ -920,7 +932,7 @@ VNODEOP_SET(ntfs_vnodeop_opv_desc);
 
 #else /* !FreeBSD */
 
-struct vnodeopv_entry_desc ntfs_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc ntfs_vnodeop_entries[] = {
 	{ &vop_default_desc, (vop_t *) ntfs_bypass },
 	{ &vop_lookup_desc, (vop_t *) ntfs_lookup },	/* lookup */
 	{ &vop_create_desc, genfs_eopnotsupp },		/* create */
@@ -937,7 +949,7 @@ struct vnodeopv_entry_desc ntfs_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, genfs_enoioctl },		/* ioctl */
 	{ &vop_poll_desc, genfs_poll },			/* poll */
 	{ &vop_revoke_desc, genfs_revoke },		/* revoke */
-	{ &vop_mmap_desc, genfs_eopnotsupp },		/* mmap */
+	{ &vop_mmap_desc, genfs_mmap },			/* mmap */
 	{ &vop_fsync_desc, genfs_fsync },		/* fsync */
 	{ &vop_seek_desc, genfs_seek },			/* seek */
 	{ &vop_remove_desc, genfs_eopnotsupp },		/* remove */
@@ -966,9 +978,11 @@ struct vnodeopv_entry_desc ntfs_vnodeop_entries[] = {
 	{ &vop_truncate_desc, genfs_eopnotsupp },	/* truncate */
 	{ &vop_update_desc, genfs_eopnotsupp },		/* update */
 	{ &vop_bwrite_desc, vn_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc *)NULL, (int (*) __P((void *)))NULL }
+	{ &vop_getpages_desc, genfs_compat_getpages },	/* getpages */
+	{ &vop_putpages_desc, genfs_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc ntfs_vnodeop_opv_desc =
+const struct vnodeopv_desc ntfs_vnodeop_opv_desc =
 	{ &ntfs_vnodeop_p, ntfs_vnodeop_entries };
 
 #endif

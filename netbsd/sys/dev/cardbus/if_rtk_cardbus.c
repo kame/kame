@@ -1,4 +1,4 @@
-/*	$NetBSD: if_rtk_cardbus.c,v 1.3 2000/05/19 13:42:30 tsutsui Exp $	*/
+/*	$NetBSD: if_rtk_cardbus.c,v 1.7 2002/01/04 15:24:24 kanaoka Exp $	*/
 
 /*
  * Copyright (c) 2000 Masanori Kanaoka
@@ -34,6 +34,9 @@
  *		- elecom-Laneed	LD-10/100CBA (Accton MPX5030)
  *		- MELCO		LPC3-TX-CB   (RealTek 8139)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_rtk_cardbus.c,v 1.7 2002/01/04 15:24:24 kanaoka Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"

@@ -1,4 +1,4 @@
-/*	$NetBSD: mem.c,v 1.17.4.1 2000/06/30 16:27:19 simonb Exp $	*/
+/*	$NetBSD: mem.c,v 1.25 2002/04/09 14:54:40 leo Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -52,8 +52,6 @@
 #include <sys/uio.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -62,9 +60,7 @@
 
 #include "nvr.h"
 
-#define mmread  mmrw
-#define mmwrite mmrw
-cdev_decl(mm);
+#define	DEV_NVRAM	11	/* Nvram minor-number */
 
 extern u_int lowram;
 static caddr_t devzeropage;
@@ -106,7 +102,7 @@ mmrw(dev, uio, flags)
 	static int	physlock;
 	vm_prot_t	prot;
 
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 		/* lock against other uses of shared vmmap */
 		while (physlock > 0) {
 			physlock++;
@@ -128,7 +124,7 @@ mmrw(dev, uio, flags)
 		}
 		switch (minor(dev)) {
 
-		case 0: /* minor device 0 is physical memory */
+		case DEV_MEM:
 			v = uio->uio_offset;
 
 			/*
@@ -146,14 +142,16 @@ mmrw(dev, uio, flags)
 			    VM_PROT_WRITE;
 			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
 			    trunc_page(v), prot, prot|PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
 			    (vaddr_t)vmmap + NBPG);
+			pmap_update(pmap_kernel());
 			break;
 
-		case 1: /* minor device 1 is kernel memory */
+		case DEV_KMEM:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
 			if (!uvm_kernacc((caddr_t)v, c,
@@ -162,12 +160,12 @@ mmrw(dev, uio, flags)
 			error = uiomove((caddr_t)v, c, uio);
 			break;
 
-		case 2: /* minor device 2 is EOF/RATHOLE */
+		case DEV_NULL:
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
 			return (0);
 
-		case 11: /* minor device 11 (/dev/nvram) */
+		case DEV_NVRAM:
 #if NNVR > 0
 			error = nvram_uio(uio);
 			return (error);
@@ -175,7 +173,7 @@ mmrw(dev, uio, flags)
 			return (ENXIO);
 #endif
 
-		case 12: /* minor device 12 (/dev/zero) */
+		case DEV_ZERO:
 			if (uio->uio_rw == UIO_WRITE) {
 				c = iov->iov_len;
 				break;

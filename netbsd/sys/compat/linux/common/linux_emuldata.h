@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_emuldata.h,v 1.1 1998/12/08 21:00:11 erh Exp $	*/
+/*	$NetBSD: linux_emuldata.h,v 1.4 2002/02/15 16:48:02 christos Exp $	*/
 
 #ifndef _COMMON_LINUX_EMULDATA_H
 #define _COMMON_LINUX_EMULDATA_H
@@ -7,9 +7,14 @@
  * This is auxillary data the linux compat code
  * needs to do its work.  A pointer to it is
  * stored in the emuldata field of the proc
- * structure. (NOTYET)
+ * structure.
  */
 struct linux_emuldata {
-    sigset_t	ps_siginfo;		/* Which signals have a RT handler */
+#if notyet
+	sigset_t ps_siginfo;	/* Which signals have a RT handler */
+#endif
+	int	debugreg[8];	/* GDB information for ptrace - for use, */
+				/* see ../arch/i386/linux_ptrace.c */
+	caddr_t	p_break;	/* Processes' idea of break */	
 };
 #endif /* !_COMMON_LINUX_EMULDATA_H */

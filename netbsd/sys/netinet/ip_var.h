@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_var.h,v 1.41.4.1 2000/08/26 16:38:33 tron Exp $	*/
+/*	$NetBSD: ip_var.h,v 1.47 2002/05/07 02:59:38 matt Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -63,19 +63,20 @@ struct ipovly {
  * port numbers (which are no longer needed once we've located the
  * tcpcb) are overlayed with an mbuf pointer.
  */
-LIST_HEAD(ipqehead, ipqent);
+TAILQ_HEAD(ipqehead, ipqent);
 struct ipqent {
-	LIST_ENTRY(ipqent) ipqe_q;
+	TAILQ_ENTRY(ipqent) ipqe_q;
 	union {
 		struct ip	*_ip;
 		struct tcpiphdr *_tcp;
 	} _ipqe_u1;
-	struct mbuf	*ipqe_m;	/* mbuf contains packet */
+	struct mbuf	*ipqe_m;	/* point to first mbuf */
+	struct mbuf	*ipre_mlast;	/* point to last mbuf */
 	u_int8_t	ipqe_mff;	/* for IP fragmentation */
 	/*
 	 * The following are used in TCP reassembly
 	 */
-	LIST_ENTRY(ipqent) ipqe_timeq;
+	TAILQ_ENTRY(ipqent) ipqe_timeq;
 	u_int32_t ipqe_seq;
 	u_int32_t ipqe_len;
 	u_int32_t ipqe_flags;
@@ -117,6 +118,7 @@ struct ipoption {
  */
 struct ip_moptions {
 	struct	  ifnet *imo_multicast_ifp; /* ifp for outgoing multicasts */
+	struct in_addr imo_multicast_addr; /* ifindex/addr on MULTICAST_IF */
 	u_int8_t  imo_multicast_ttl;	/* TTL for outgoing multicasts */
 	u_int8_t  imo_multicast_loop;	/* 1 => hear sends if a member */
 	u_int16_t imo_num_memberships;	/* no. memberships this socket */
@@ -153,6 +155,7 @@ struct	ipstat {
 	u_quad_t ips_rcvmemdrop;	/* frags dropped for lack of memory */
 	u_quad_t ips_toolong;		/* ip length > max ip packet size */
 	u_quad_t ips_nogif;		/* no match gif found */
+	u_quad_t ips_badaddr;		/* invalid address on header */
 };
 
 #define	IPFLOW_HASHBITS			6 /* should not be a multiple of 8 */
@@ -178,6 +181,7 @@ struct ipflow {
 #define	IP_RETURNMTU		0x4		/* pass back mtu on EMSGSIZE */
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
+#define	IP_MTUDISC		0x0400		/* Path MTU Discovery; set DF */
 
 extern struct ipstat ipstat;		/* ip statistics */
 extern LIST_HEAD(ipqhead, ipq) ipq;	/* ip reass. queue */
@@ -222,6 +226,7 @@ struct mbuf *
 void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
 int	 ip_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	 ipintr __P((void));
+void *	 rip_ctlinput __P((int, struct sockaddr *, void *));
 int	 rip_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 void	 rip_init __P((void));
 void	 rip_input __P((struct mbuf *, ...));

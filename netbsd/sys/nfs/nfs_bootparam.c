@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_bootparam.c,v 1.15 1999/07/26 02:16:35 enami Exp $	*/
+/*	$NetBSD: nfs_bootparam.c,v 1.19 2001/11/10 10:59:09 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1997 The NetBSD Foundation, Inc.
@@ -40,7 +40,11 @@
  * Support for NFS diskless booting, Sun-style (RPC/bootparams)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_bootparam.c,v 1.19 2001/11/10 10:59:09 lukem Exp $");
+
 #include "opt_nfs_boot.h"
+#include "opt_inet.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -132,6 +136,7 @@ nfs_bootparam(nd, procp)
 	}
 
 	error = EADDRNOTAVAIL;
+#ifdef INET
 #if NARP > 0
 	if (ifp->if_type == IFT_ETHER || ifp->if_type == IFT_FDDI) {
 		/*
@@ -139,6 +144,7 @@ nfs_bootparam(nd, procp)
 		 */
 		error = revarpwhoarewe(ifp, &arps_ip, &my_ip);
 	}
+#endif
 #endif
 	if (error) {
 		printf("revarp failed, error=%d\n", error);
@@ -306,7 +312,7 @@ bp_whoami(bpsin, my_ip, gw_ip)
 
 	struct mbuf *m, *from;
 	struct sockaddr_in *sin;
-	int error, msg_len;
+	int error;
 	int16_t port;
 
 	/*
@@ -343,7 +349,6 @@ bp_whoami(bpsin, my_ip, gw_ip)
 	}
 	reply = mtod(m, struct callit_reply *);
 	port = fxdr_unsigned(u_int32_t, reply->port);
-	msg_len = fxdr_unsigned(u_int32_t, reply->encap_len);
 	m_adj(m, sizeof(*reply));
 
 	/*

@@ -1,4 +1,4 @@
-/*	$NetBSD: atari5380.c,v 1.31 2000/03/29 14:19:22 leo Exp $	*/
+/*	$NetBSD: atari5380.c,v 1.33 2001/09/16 16:34:28 wiz Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -29,6 +29,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include "opt_atariscsi.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -367,7 +369,7 @@ tt_poll_edma(SC_REQ *reqp)
 	 *   - 5380:
 	 *	- End of DMA flag is set
 	 *	- We lost BSY (error!!)
-	 *	- A phase mismatch has occured (partial transfer)
+	 *	- A phase mismatch has occurred (partial transfer)
 	 *   - DMA-controller:
 	 *	- A bus error occurred (Kernel error!!)
 	 *	- All bytes are transferred

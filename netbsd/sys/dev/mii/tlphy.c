@@ -1,4 +1,4 @@
-/*	$NetBSD: tlphy.c,v 1.25.4.1 2000/07/04 04:11:13 thorpej Exp $	*/
+/*	$NetBSD: tlphy.c,v 1.34 2002/03/25 20:51:26 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -70,6 +70,9 @@
  * Driver for Texas Instruments's ThunderLAN PHYs
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tlphy.c,v 1.34 2002/03/25 20:51:26 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -102,57 +105,61 @@ struct tlphy_softc {
 	int sc_need_acomp;
 };
 
-int	tlphymatch __P((struct device *, struct cfdata *, void *));
-void	tlphyattach __P((struct device *, struct device *, void *));
+int	tlphymatch(struct device *, struct cfdata *, void *);
+void	tlphyattach(struct device *, struct device *, void *);
 
 struct cfattach tlphy_ca = {
 	sizeof(struct tlphy_softc), tlphymatch, tlphyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	tlphy_service __P((struct mii_softc *, struct mii_data *, int));
-int	tlphy_auto __P((struct tlphy_softc *, int));
-void	tlphy_acomp __P((struct tlphy_softc *));
-void	tlphy_status __P((struct mii_softc *));
+int	tlphy_service(struct mii_softc *, struct mii_data *, int);
+int	tlphy_auto(struct tlphy_softc *, int);
+void	tlphy_acomp(struct tlphy_softc *);
+void	tlphy_status(struct mii_softc *);
 
 const struct mii_phy_funcs tlphy_funcs = {
 	tlphy_service, tlphy_status, mii_phy_reset,
 };
 
+const struct mii_phydesc tlphys[] = {
+	{ MII_OUI_TI,		MII_MODEL_TI_TLAN10T,
+	  MII_STR_TI_TLAN10T },
+
+	{ 0,			0,
+	  NULL },
+};
+
 int
-tlphymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+tlphymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;       
 
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxTI &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxTI_TLAN10T)
+	if (mii_phy_match(ma, tlphys) != NULL)
 		return (10);
 
 	return (0);
 }
 
 void
-tlphyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+tlphyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct tlphy_softc *sc = (struct tlphy_softc *)self;
 	struct tl_softc *tlsc = (struct tl_softc *)self->dv_parent;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 	const char *sep = "";
 
-	printf(": %s, rev. %d\n", MII_STR_xxTI_TLAN10T,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, tlphys);
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->sc_mii.mii_inst = mii->mii_instance;
 	sc->sc_mii.mii_phy = ma->mii_phyno;
 	sc->sc_mii.mii_funcs = &tlphy_funcs;
 	sc->sc_mii.mii_pdata = mii;
-	sc->sc_mii.mii_flags = mii->mii_flags;
+	sc->sc_mii.mii_flags = ma->mii_flags;
+	sc->sc_mii.mii_anegticks = 5;
 
 	PHY_RESET(&sc->sc_mii);
 
@@ -187,7 +194,7 @@ tlphyattach(parent, self, aux)
 		}
 	}
 	if (sc->sc_mii.mii_capabilities & BMSR_MEDIAMASK) {
-		printf(sep);
+		printf("%s", sep);
 		mii_phy_add_media(&sc->sc_mii);
 	} else if ((sc->sc_tlphycap &
 		    (TLPHY_MEDIA_10_2 | TLPHY_MEDIA_10_5)) == 0)
@@ -198,10 +205,7 @@ tlphyattach(parent, self, aux)
 }
 
 int
-tlphy_service(self, mii, cmd)
-	struct mii_softc *self;
-	struct mii_data *mii;
-	int cmd;
+tlphy_service(struct mii_softc *self, struct mii_data *mii, int cmd)
 {
 	struct tlphy_softc *sc = (struct tlphy_softc *)self;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
@@ -302,12 +306,10 @@ tlphy_service(self, mii, cmd)
 }
 
 void
-tlphy_status(physc)
-	struct mii_softc *physc;
+tlphy_status(struct mii_softc *physc)
 {
 	struct tlphy_softc *sc = (void *) physc;
 	struct mii_data *mii = sc->sc_mii.mii_pdata;
-	struct tl_softc *tlsc = (struct tl_softc *)sc->sc_mii.mii_dev.dv_parent;
 	int bmsr, bmcr, tlctrl;
 
 	mii->mii_media_status = IFM_AVALID;
@@ -329,8 +331,7 @@ tlphy_status(physc)
 		else
 			printf("%s: AUI selected with no matching media !\n",
 			    sc->sc_mii.mii_dev.dv_xname);
-		if (tlsc->tl_flags & TL_IFACT)
-			mii->mii_media_status |= IFM_ACTIVE;
+		mii->mii_media_status |= IFM_ACTIVE;
 		return;
 	}
 
@@ -354,9 +355,7 @@ tlphy_status(physc)
 }
 
 int
-tlphy_auto(sc, waitfor)
-	struct tlphy_softc *sc;
-	int waitfor;
+tlphy_auto(struct tlphy_softc *sc, int waitfor)
 {
 	int error;
 
@@ -382,8 +381,7 @@ tlphy_auto(sc, waitfor)
 }
 
 void
-tlphy_acomp(sc)
-	struct tlphy_softc *sc;
+tlphy_acomp(struct tlphy_softc *sc)
 {
 	int aner, anlpar;
 

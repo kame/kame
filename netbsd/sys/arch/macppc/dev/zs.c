@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.15 2000/06/07 17:37:07 tsubai Exp $	*/
+/*	$NetBSD: zs.c,v 1.20 2002/03/17 19:40:45 atatat Exp $	*/
 
 /*
  * Copyright (c) 1996, 1998 Bill Studenmund
@@ -54,6 +54,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,6 +67,9 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
+#ifdef KGDB
+#include <sys/kgdb.h>
+#endif
 
 #include <dev/cons.h>
 #include <dev/ofw/openfirm.h>
@@ -80,8 +84,6 @@
 /* Booter flags interface */
 #define ZSMAC_RAW	0x01
 #define ZSMAC_LOCALTALK	0x02
-
-#define	PCLK	(9600 * 384)
 
 #include "zsc.h"	/* get the # of zs chips defined */
 
@@ -98,13 +100,6 @@ int zs_major = 12;
  */
 #define ZSABORT_DELAY 3000000
 
-/* The layout of this is hardware-dependent (padding, order). */
-struct zschan {
-	volatile u_char	zc_csr;		/* ctrl,status, and indirect access */
-	u_char		zc_xxx0[15];
-	volatile u_char	zc_data;	/* data */
-	u_char		zc_xxx1[15];
-};
 struct zsdevice {
 	/* Yes, they are backwards. */
 	struct	zschan zs_chan_b;
@@ -257,7 +252,8 @@ zsc_attach(parent, self, aux)
 		zsc->zsc_txdmareg[channel] = mapiodev(regs[2], regs[3]);
 		zsc->zsc_txdmacmd[channel] =
 			dbdma_alloc(sizeof(dbdma_command_t) * 3);
-		bzero(zsc->zsc_txdmacmd[channel], sizeof(dbdma_command_t) * 3);
+		memset(zsc->zsc_txdmacmd[channel], 0,
+			sizeof(dbdma_command_t) * 3);
 		dbdma_reset(zsc->zsc_txdmareg[channel]);
 #endif
 		node = OF_peer(node);	/* ch-b */
@@ -284,8 +280,8 @@ zsc_attach(parent, self, aux)
 		cs->cs_reg_csr  = &zc->zc_csr;
 		cs->cs_reg_data = &zc->zc_data;
 
-		bcopy(zs_init_reg, cs->cs_creg, 16);
-		bcopy(zs_init_reg, cs->cs_preg, 16);
+		memcpy(cs->cs_creg, zs_init_reg, 16);
+		memcpy(cs->cs_preg, zs_init_reg, 16);
 
 		/* Current BAUD rate generator clock. */
 		cs->cs_brg_clk = PCLK / 16;	/* RTxC is 230400*16, so use 230400 */
@@ -434,7 +430,7 @@ zsmdioctl(cs, cmd, data)
 {
 	switch (cmd) {
 	default:
-		return (-1);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -443,6 +439,7 @@ void
 zsmd_setclock(cs)
 	struct zs_chanstate *cs;
 {
+#ifdef NOTYET
 	struct xzs_chanstate *xcs = (void *)cs;
 
 	if (cs->cs_channel != 0)
@@ -452,7 +449,8 @@ zsmd_setclock(cs)
 	 * If the new clock has the external bit set, then select the
 	 * external source.
 	 */
-	/*via_set_modem((xcs->cs_pclk_flag & ZSC_EXTERN) ? 1 : 0);*/
+	via_set_modem((xcs->cs_pclk_flag & ZSC_EXTERN) ? 1 : 0);
+#endif
 }
 
 static int zssoftpending;
@@ -625,7 +623,7 @@ zs_set_speed(cs, bps)
 	 */
 	for (i = 0; i < xcs->cs_clock_count; i++) {
 		if (xcs->cs_clocks[i].clk <= 0)
-			continue;	/* skip non-existant or bad clocks */
+			continue;	/* skip non-existent or bad clocks */
 		if (xcs->cs_clocks[i].flags & ZSC_BRG) {
 			/* check out BRG at /16 */
 			tc1 = BPS_TO_TCONST(xcs->cs_clocks[i].clk >> 4, bps);
@@ -904,10 +902,6 @@ void  zs_write_data(cs, val)
 #define zscnpollc	nullcnpollc
 cons_decl(zs);
 
-static void	zs_putc __P((register volatile struct zschan *, int));
-static int	zs_getc __P((register volatile struct zschan *));
-extern int	zsopen __P(( dev_t dev, int flags, int mode, struct proc *p));
-
 static int stdin, stdout;
 
 /*
@@ -932,9 +926,10 @@ static int stdin, stdout;
  * Polled input char.
  */
 int
-zs_getc(zc)
-	register volatile struct zschan *zc;
+zs_getc(v)
+	void *v;
 {
+	register volatile struct zschan *zc = v;
 	register int s, c, rr0;
 
 	s = splhigh();
@@ -959,10 +954,11 @@ zs_getc(zc)
  * Polled output char.
  */
 void
-zs_putc(zc, c)
-	register volatile struct zschan *zc;
+zs_putc(v, c)
+	void *v;
 	int c;
 {
+	register volatile struct zschan *zc = v;
 	register int s, rr0;
 	register long wait = 0;
 
@@ -992,7 +988,7 @@ zscngetc(dev)
 	register int c;
 
 	if (zc) {
-		c = zs_getc(zc);
+		c = zs_getc((void *)zc);
 	} else {
 		char ch = 0;
 		OF_read(stdin, &ch, 1);
@@ -1012,7 +1008,7 @@ zscnputc(dev, c)
 	register volatile struct zschan *zc = zs_conschan;
 
 	if (zc) {
-		zs_putc(zc, c);
+		zs_putc((void *)zc, c);
 	} else {
 		char ch = c;
 		OF_write(stdout, &ch, 1);
@@ -1044,7 +1040,9 @@ zs_abort(cs)
 	/* If we time out, turn off the abort ability! */
 	}
 
-#ifdef DDB
+#if defined(KGDB)
+	kgdb_connect(1);
+#elif defined(DDB)
 	Debugger();
 #endif
 }
@@ -1080,14 +1078,14 @@ zscnprobe(cp)
 	if ((pkg = OF_instance_to_package(stdin)) == -1)
 		return;
 
-	bzero(name, sizeof(name));
+	memset(name, 0, sizeof(name));
 	if (OF_getprop(pkg, "device_type", name, sizeof(name)) == -1)
 		return;
 
 	if (strcmp(name, "serial") != 0)
 		return;
 
-	bzero(name, sizeof(name));
+	memset(name, 0, sizeof(name));
 	if (OF_getprop(pkg, "name", name, sizeof(name)) == -1)
 		return;
 
@@ -1110,7 +1108,7 @@ zscninit(cp)
 	if ((escc_ch = OF_instance_to_package(stdin)) == -1)
 		return;
 
-	bzero(name, sizeof(name));
+	memset(name, 0, sizeof(name));
 	if (OF_getprop(escc_ch, "name", name, sizeof(name)) == -1)
 		return;
 

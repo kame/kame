@@ -1,4 +1,4 @@
-/*	$NetBSD: promlib.c,v 1.6.12.1 2002/03/20 22:28:41 he Exp $ */
+/*	$NetBSD: promlib.c,v 1.13 2001/12/07 11:00:39 hannken Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * OPENPROM functions.  These are here mainly to hide the OPENPROM interface
  * from the rest of the kernel.
  */
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
 
 #include <sys/errno.h>
 #include <sys/param.h>
@@ -81,10 +84,12 @@ static char	*obp_v2_getbootargs __P((void));
 static int	obp_v2_finddevice __P((char *));
 static int	obp_ticks __P((void));
 
-int		findchosen __P((void));
+static int	findchosen __P((void));
 static char	*opf_getbootpath __P((void));
 static char	*opf_getbootfile __P((void));
 static char	*opf_getbootargs __P((void));
+static int	opf_finddevice __P((char *));
+static int	opf_instance_to_package __P((int));
 static char	*opf_nextprop __P((int, char *));
 
 
@@ -157,18 +162,26 @@ notimplemented()
 		(*sun4pvec->fbWriteStr)(str, n);
 	} else
 #endif
-	if (obpvec->pv_romvec_vers < 2) {
-		(*obpvec->pv_putstr)(str, n);
-	} else {
-		int fd = *obpvec->pv_v2bootargs.v2_fd1;
-		(*obpvec->pv_v2devops.v2_write)(fd, str, n);
+	if (obpvec->pv_magic == OBP_MAGIC) {
+		if (obpvec->pv_romvec_vers < 2) {
+			(*obpvec->pv_putstr)(str, n);
+		} else {
+			int fd = *obpvec->pv_v2bootargs.v2_fd1;
+			(*obpvec->pv_v2devops.v2_write)(fd, str, n);
+		}
+	} else {	/* assume OFW */
+		static int stdout_node;
+		if (stdout_node == 0) {
+			int chosen = findchosen();
+			OF_getprop(chosen, "stdout", &stdout_node, sizeof(int));
+		}
+		OF_write(stdout_node, str, n);
 	}
-
 }
 
 
 /*
- * getprop() reads the named property data from a given node.
+ * PROM_getprop() reads the named property data from a given node.
  * A buffer for the data may be passed in `*bufp'; if NULL, a
  * buffer is allocated. The argument `size' specifies the data
  * element size of the property data. This function checks that
@@ -178,7 +191,7 @@ notimplemented()
  */
 
 int
-getprop(node, name, size, nitem, bufp)
+PROM_getprop(node, name, size, nitem, bufp)
 	int	node;
 	char	*name;
 	int	size;
@@ -188,7 +201,7 @@ getprop(node, name, size, nitem, bufp)
 	void	*buf;
 	int	len;
 
-	len = getproplen(node, name);
+	len = PROM_getproplen(node, name);
 	if (len <= 0)
 		return (ENOENT);
 
@@ -218,20 +231,20 @@ getprop(node, name, size, nitem, bufp)
  * subsequent calls.
  */
 char *
-getpropstring(node, name)
+PROM_getpropstring(node, name)
 	int node;
 	char *name;
 {
 	static char stringbuf[32];
 
-	return (getpropstringA(node, name, stringbuf, sizeof stringbuf));
+	return (PROM_getpropstringA(node, name, stringbuf, sizeof stringbuf));
 }
 
 /*
- * Alternative getpropstring(), where caller provides the buffer
+ * Alternative PROM_getpropstring(), where caller provides the buffer
  */
 char *
-getpropstringA(node, name, buf, bufsize)
+PROM_getpropstringA(node, name, buf, bufsize)
 	int node;
 	char *name;
 	char *buf;
@@ -239,7 +252,7 @@ getpropstringA(node, name, buf, bufsize)
 {
 	int len = bufsize - 1;
 
-	if (getprop(node, name, 1, &len, (void **)&buf) != 0)
+	if (PROM_getprop(node, name, 1, &len, (void **)&buf) != 0)
 		len = 0;
 
 	buf[len] = '\0';	/* usually unnecessary */
@@ -251,7 +264,7 @@ getpropstringA(node, name, buf, bufsize)
  * The return value is the property, or the default if there was none.
  */
 int
-getpropint(node, name, deflt)
+PROM_getpropint(node, name, deflt)
 	int node;
 	char *name;
 	int deflt;
@@ -259,7 +272,7 @@ getpropint(node, name, deflt)
 	int intbuf, *ip = &intbuf;
 	int len = 1;
 
-	if (getprop(node, name, sizeof(int), &len, (void **)&ip) != 0)
+	if (PROM_getprop(node, name, sizeof(int), &len, (void **)&ip) != 0)
 		return (deflt);
 
 	return (*ip);
@@ -278,7 +291,7 @@ prom_search(rootnode, name)
 	int node = rootnode;
 	char buf[32];
 
-#define GPSA(nm)	getpropstringA(node, nm, buf, sizeof buf)
+#define GPSA(nm)	PROM_getpropstringA(node, nm, buf, sizeof buf)
 	if (node == findroot() ||
 	    !strcmp("hierarchical", GPSA("device type")))
 		node = firstchild(node);
@@ -288,16 +301,16 @@ prom_search(rootnode, name)
 
 	do {
 		if (strcmp(GPSA("name"), name) == 0)
-			return node;
+			return (node);
 
 		if ((strcmp(GPSA("device_type"), "hierarchical") == 0 ||
 		    strcmp(GPSA("name"), "iommu") == 0)
 		    && (rtnnode = prom_search(node, name)) != 0)
-			return rtnnode;
+			return (rtnnode);
 
 	} while ((node = nextsibling(node)) != NULL);
 
-	return 0;
+	return (0);
 }
 #endif
 
@@ -398,7 +411,7 @@ prom_findnode(first, name)
 	char buf[32];
 
 	for (node = first; node != 0; node = prom_nextsibling(node)) {
-		if (strcmp(getpropstringA(node, "name", buf, sizeof(buf)),
+		if (strcmp(PROM_getpropstringA(node, "name", buf, sizeof(buf)),
 			   name) == 0)
 			return (node);
 	}
@@ -414,7 +427,7 @@ prom_node_has_property(node, prop)
 	const char *prop;
 {
 
-	return (getproplen(node, (caddr_t)prop) != -1);
+	return (PROM_getproplen(node, (caddr_t)prop) != -1);
 }
 
 
@@ -696,72 +709,90 @@ obp_ticks()
 	return (*((int *)promops.po_tickdata));
 }
 
-int
+static int
 findchosen()
 {
 static	int chosennode;
 	int node;
 
-	if ((node = chosennode) == 0 && (node = OF_finddevice("/chosen")) == 0)
+	if ((node = chosennode) == 0 && (node = OF_finddevice("/chosen")) == -1)
 		panic("no CHOSEN node");
 
 	chosennode = node;
 	return (node);
 }
 
-char *
+static int
+opf_finddevice(name)
+	char *name;
+{
+	int phandle = OF_finddevice(name);
+	if (phandle == -1)
+		return (0);
+	else
+		return (phandle);
+}
+
+static int
+opf_instance_to_package(ihandle)
+	int ihandle;
+{
+	int phandle = OF_instance_to_package(ihandle);
+	if (phandle == -1)
+		return (0);
+	else
+		return (phandle);
+}
+
+
+static char *
 opf_getbootpath()
 {
 	int node = findchosen();
 	char *buf = NULL;
 	int blen = 0;
 
-	if (getprop(node, "bootpath", 1, &blen, (void **)&buf) != 0)
-		return "";
+	if (PROM_getprop(node, "bootpath", 1, &blen, (void **)&buf) != 0)
+		return ("");
 
 	return (buf);
 }
 
-char *
+static char *
 opf_getbootargs()
 {
 	int node = findchosen();
 	char *buf = NULL;
 	int blen = 0;
 
-	if (getprop(node, "bootargs", 1, &blen, (void **)&buf) != 0)
-		return "";
+	if (PROM_getprop(node, "bootargs", 1, &blen, (void **)&buf) != 0)
+		return ("");
 
 	return (parse_bootargs(buf));
 }
 
-char *
+static char *
 opf_getbootfile()
 {
 	int node = findchosen();
 	char *buf = NULL;
 	int blen = 0;
 
-	if (getprop(node, "bootargs", 1, &blen, (void **)&buf) != 0)
-		return "";
+	if (PROM_getprop(node, "bootargs", 1, &blen, (void **)&buf) != 0)
+		return ("");
 
 	return (parse_bootfile(buf));
 }
 
-char *
+static char *
 opf_nextprop(node, prop)
 	int node;
 	char *prop;
 {
-#if 0
-	if (OF_nextprop(node, prop, buf) != 0)
-		return (NULL);
-
+#define OF_NEXTPROP_BUF_SIZE 32	/* specified by the standard */
+	static char buf[OF_NEXTPROP_BUF_SIZE];
+	OF_nextprop(node, prop, buf);
 	return (buf);
-#else
-	printf("opf_nextprop not implemented yet\n");
-	return (NULL);
-#endif
 }
 
 static void prom_init_oldmon __P((void));
@@ -945,14 +976,15 @@ prom_init_opf()
 	promops.po_putchar = obp_v2_putchar;
 	promops.po_getchar = obp_v2_getchar;
 	promops.po_peekchar = obp_v2_peekchar;
+	promops.po_putstr = obp_v2_putstr;
 
 	promops.po_open = OF_open;
 	promops.po_close = OF_close;
 	promops.po_read = OF_read;
 	promops.po_write = OF_write;
 	promops.po_seek = OF_seek;
-	promops.po_instance_to_package = OF_instance_to_package;
-	promops.po_finddevice = OF_finddevice;
+	promops.po_instance_to_package = opf_instance_to_package;
+	promops.po_finddevice = opf_finddevice;
 
 	/* Retrieve and cache stdio handles */
 	node = findchosen();

@@ -1,4 +1,4 @@
-/*	$NetBSD: ct.c,v 1.25 2000/05/19 18:54:31 thorpej Exp $	*/
+/*	$NetBSD: ct.c,v 1.28 2002/03/15 05:55:35 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -84,6 +84,9 @@
  *	merge with cs80 disk driver
  *	finish support of 9145
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ct.c,v 1.28 2002/03/15 05:55:35 gmcgarry Exp $");                                                  
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -181,6 +184,7 @@ struct	ctinfo {
 	{ CT7914PID,	1,	"7914P"	},
 	{ CT9144ID,	0,	"9144"	},
 	{ CT9145ID,	0,	"9145"	},
+	{ CT35401ID,	0,	"35401A"},
 };
 int	nctinfo = sizeof(ctinfo) / sizeof(ctinfo[0]);
 
@@ -273,7 +277,7 @@ ctident(parent, sc, ha)
 	hpibrecv(parent->dv_unit, ha->ha_slave, C_EXEC, &desc, 37);
 	hpibrecv(parent->dv_unit, ha->ha_slave, C_QSTAT, &stat, sizeof(stat));
 
-	bzero(name, sizeof(name));
+	memset(name, 0, sizeof(name));
 	if (stat == 0) {
 		n = desc.d_name;
 		for (i = 5; i >= 0; i--) {
@@ -284,11 +288,12 @@ ctident(parent, sc, ha)
 
 	switch (ha->ha_id) {
 	case CT7946ID:
-		if (bcmp(name, "079450", 6) == 0)
+		if (memcmp(name, "079450", 6) == 0)
 			return (0);		/* not really a 7946 */
 		/* fall into... */
 	case CT9144ID:
 	case CT9145ID:
+	case CT35401ID:
 		type = CT9144;
 		canstream = 1;
 		break;

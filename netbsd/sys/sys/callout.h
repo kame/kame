@@ -1,4 +1,4 @@
-/*	$NetBSD: callout.h,v 1.14 2000/03/24 11:57:16 enami Exp $	*/
+/*	$NetBSD: callout.h,v 1.16 2001/09/11 04:32:19 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -81,13 +81,16 @@
 
 #include <sys/queue.h>
 
-TAILQ_HEAD(callout_queue, callout);
+struct callout_queue {
+	uint64_t	cq_hint;		/* earliest callout in bkt */
+	TAILQ_HEAD(, callout) cq_q;		/* callouts in this bucket */
+};
 
 struct callout {
 	TAILQ_ENTRY(callout) c_link;
 	u_int64_t	c_time;			/* when callout fires */
 	void		*c_arg;			/* function argument */
-	void		(*c_func) __P((void *));/* functiuon to call */
+	void		(*c_func)(void *);	/* functiuon to call */
 	int		c_flags;		/* state of this entry */
 };
 
@@ -105,13 +108,13 @@ extern int ncallout;
 extern int *callwheel_sizes;		/* for allocsys() */
 #endif
 
-void	callout_setsize __P((void));
-void	callout_startup __P((void));
-void	callout_init __P((struct callout *));
-void	callout_reset __P((struct callout *, int, void (*)(void *), void *));
-void	callout_stop __P((struct callout *));
+void	callout_setsize(void);
+void	callout_startup(void);
+void	callout_init(struct callout *);
+void	callout_reset(struct callout *, int, void (*)(void *), void *);
+void	callout_stop(struct callout *);
 #ifdef CALLWHEEL_STATS
-void	callout_showstats __P((void));
+void	callout_showstats(void);
 #endif
 
 #define	callout_active(c)	((c)->c_flags & CALLOUT_ACTIVE)

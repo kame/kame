@@ -1,4 +1,4 @@
-/*	$NetBSD: cd9660_node.h,v 1.19 2000/03/30 02:11:09 simonb Exp $	*/
+/*	$NetBSD: cd9660_node.h,v 1.22 2001/09/15 20:36:36 chs Exp $	*/
 
 /*-
  * Copyright (c) 1994
@@ -40,6 +40,8 @@
  *	@(#)cd9660_node.h	8.6 (Berkeley) 5/14/95
  */
 
+#include <miscfs/genfs/genfs_node.h>
+
 /*
  * Theoretically, directories can be more than 2Gb in length,
  * however, in practice this seems unlikely. So, we define
@@ -65,7 +67,7 @@ typedef	struct	{
  * FOr device# (major,minor) translation table
  */
 struct iso_dnode {
-	struct iso_dnode *d_next, **d_prev;	/* hash chain */
+	LIST_ENTRY(iso_dnode) d_hash;
 	dev_t		i_dev;		/* device where dnode resides */
 	ino_t		i_number;	/* the identity of the inode */
 	dev_t		d_dev;		/* device # for translation */
@@ -73,7 +75,8 @@ struct iso_dnode {
 #endif
 
 struct iso_node {
-	struct	iso_node *i_next, **i_prev;	/* hash chain */
+	struct	genfs_node i_gnode;
+	LIST_ENTRY(iso_node) i_hash;
 	struct	vnode *i_vnode;	/* vnode associated with this inode */
 	struct	vnode *i_devvp;	/* vnode for block I/O */
 	u_long	i_flag;		/* see below */
@@ -114,7 +117,7 @@ int	cd9660_getattr	__P((void *));
 int	cd9660_read	__P((void *));
 #define	cd9660_ioctl	genfs_enoioctl
 #define	cd9660_poll	genfs_poll
-int	cd9660_mmap	__P((void *));
+#define	cd9660_mmap	genfs_mmap
 #define	cd9660_seek	genfs_seek
 int	cd9660_readdir	__P((void *));
 int	cd9660_readlink	__P((void *));

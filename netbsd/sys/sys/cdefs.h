@@ -1,4 +1,4 @@
-/*	$NetBSD: cdefs.h,v 1.36 2000/05/27 12:22:24 kleink Exp $	*/
+/*	$NetBSD: cdefs.h,v 1.42 2001/11/23 10:19:47 enami Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -68,11 +68,13 @@
 #endif
 
 #if defined(__cplusplus)
-#define	__BEGIN_DECLS	extern "C" {
-#define	__END_DECLS	};
+#define	__BEGIN_DECLS		extern "C" {
+#define	__END_DECLS		};
+#define	__static_cast(x,y)	static_cast<x>(y)
 #else
 #define	__BEGIN_DECLS
 #define	__END_DECLS
+#define	__static_cast(x,y)	(x)y
 #endif
 
 /*
@@ -86,7 +88,7 @@
 #define	___STRING(x)	__STRING(x)
 #define	___CONCAT(x,y)	__CONCAT(x,y)
 
-#if defined(__STDC__) || defined(__cplusplus)
+#if __STDC__ || defined(__cplusplus)
 #define	__P(protos)	protos		/* full-blown ANSI C */
 #define	__CONCAT(x,y)	x ## y
 #define	__STRING(x)	#x
@@ -161,17 +163,37 @@
 #endif
 #endif
 
-#ifdef __KPRINTF_ATTRIBUTE__
-#define __kprintf_attribute__(a) __attribute__(a)
-#else
-#define __kprintf_attribute__(a)
-#endif
-
 /* Delete pseudo-keywords wherever they are not available or needed. */
 #ifndef __dead
 #define	__dead
 #define	__pure
 #endif
+
+/*
+ * C99 defines the restrict type qualifier keyword, which was made available
+ * in GCC 2.92.
+ */
+#if __STDC_VERSION__ >= 199901L
+#define	__restrict	restrict
+#else
+#if !__GNUC_PREREQ__(2, 92)
+#define	__restrict	/* delete __restrict when not supported */
+#endif
+#endif
+
+/*
+ * C99 defines __func__ predefined identifier, which was made available
+ * in GCC 2.95.
+ */
+#if !(__STDC_VERSION__ >= 199901L)
+#if __GNUC_PREREQ__(2, 6)
+#define	__func__	__PRETTY_FUNCTION__
+#elif __GNUC_PREREQ__(2, 4)
+#define	__func__	__FUNCTION__
+#else
+#define	__func__	""
+#endif
+#endif /* !(__STDC_VERSION__ >= 199901L) */
 
 #if defined(_KERNEL)
 #if defined(NO_KERNEL_RCSIDS)

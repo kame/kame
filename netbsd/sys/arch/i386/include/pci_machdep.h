@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.h,v 1.14.2.1 2000/08/10 22:25:57 soda Exp $	*/
+/*	$NetBSD: pci_machdep.h,v 1.18 2002/05/15 19:23:54 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -33,6 +33,7 @@
 /*
  * Machine-specific definitions for PCI autoconfiguration.
  */
+#define	__HAVE_PCIIDE_MACHDEP_COMPAT_INTR_ESTABLISH
 
 /*
  * Many i386 PCI systems only work properly with I/O mapped space, in
@@ -78,6 +79,7 @@ typedef int pci_intr_handle_t;
 extern int pci_mode;
 int		pci_mode_detect(void);
 int		pci_bus_flags(void);
+struct		pci_attach_args;
 
 /*
  * Functions provided to machine-independent PCI code.
@@ -91,13 +93,15 @@ void		pci_decompose_tag(pci_chipset_tag_t, pcitag_t,
 pcireg_t	pci_conf_read(pci_chipset_tag_t, pcitag_t, int);
 void		pci_conf_write(pci_chipset_tag_t, pcitag_t, int,
 		    pcireg_t);
-int		pci_intr_map(pci_chipset_tag_t, pcitag_t, int, int,
-		    pci_intr_handle_t *);
+int		pci_intr_map(struct pci_attach_args *, pci_intr_handle_t *);
 const char	*pci_intr_string(pci_chipset_tag_t, pci_intr_handle_t);
 const struct evcnt *pci_intr_evcnt(pci_chipset_tag_t, pci_intr_handle_t);
 void		*pci_intr_establish(pci_chipset_tag_t, pci_intr_handle_t,
 		    int, int (*)(void *), void *);
 void		pci_intr_disestablish(pci_chipset_tag_t, void *);
+
+#define	pci_enumerate_bus(sc, m, p)					\
+	pci_enumerate_bus_generic((sc), (m), (p))
 
 /*
  * ALL OF THE FOLLOWING ARE MACHINE-DEPENDENT, AND SHOULD NOT BE USED

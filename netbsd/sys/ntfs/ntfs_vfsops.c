@@ -1,4 +1,4 @@
-/*	$NetBSD: ntfs_vfsops.c,v 1.27 2000/03/30 12:47:02 augustss Exp $	*/
+/*	$NetBSD: ntfs_vfsops.c,v 1.40 2001/12/18 07:51:16 chs Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 Semen Ustimenko
@@ -28,6 +28,8 @@
  *	Id: ntfs_vfsops.c,v 1.7 1999/05/31 11:28:30 phk Exp
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ntfs_vfsops.c,v 1.40 2001/12/18 07:51:16 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,12 +44,11 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 
+#if defined(__NetBSD__)
+#include <uvm/uvm_extern.h>
+#else
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_prot.h>
-#include <vm/vm_page.h>
-#include <vm/vm_object.h>
-#include <vm/vm_extern.h>
+#endif
 
 #include <miscfs/specfs/specdev.h>
 
@@ -95,6 +96,7 @@ static int	ntfs_fhtovp __P((struct mount *, struct fid *,
 				 int *, struct ucred **));
 #elif defined(__NetBSD__)
 static void	ntfs_init __P((void));
+static void	ntfs_reinit __P((void));
 static void	ntfs_done __P((void));
 static int	ntfs_fhtovp __P((struct mount *, struct fid *,
 				 struct vnode **));
@@ -109,6 +111,12 @@ static int	ntfs_fhtovp __P((struct mount *, struct fid *,
 				 struct mbuf *, struct vnode **,
 				 int *, struct ucred **));
 #endif
+
+struct genfs_ops ntfs_genfsops = {
+	NULL,
+	NULL,
+	genfs_compat_gop_write,
+};
 
 #ifdef __NetBSD__
 /*
@@ -199,6 +207,12 @@ ntfs_init()
 {
 	ntfs_nthashinit();
 	ntfs_toupper_init();
+}
+
+static void
+ntfs_reinit()
+{
+	ntfs_nthashreinit();
 }
 
 static void
@@ -496,6 +510,11 @@ ntfs_mountfs(devvp, mp, argsp, p)
 	ntmp->ntm_flag = argsp->flag;
 	mp->mnt_data = (qaddr_t)ntmp;
 
+	/* set file name encode/decode hooks XXX utf-8 only for now */
+	ntmp->ntm_wget = ntfs_utf8_wget;
+	ntmp->ntm_wput = ntfs_utf8_wput;
+	ntmp->ntm_wcmp = ntfs_utf8_wcmp;
+
 	dprintf(("ntfs_mountfs(): case-%s,%s uid: %d, gid: %d, mode: %o\n",
 		(ntmp->ntm_flag & NTFS_MFLAG_CASEINS)?"insens.":"sens.",
 		(ntmp->ntm_flag & NTFS_MFLAG_ALLNAMES)?" allnames,":"",
@@ -555,7 +574,7 @@ ntfs_mountfs(devvp, mp, argsp, p)
 		}
 
 		/* Alloc memory for attribute definitions */
-		MALLOC(ntmp->ntm_ad, struct ntvattrdef *,
+		ntmp->ntm_ad = (struct ntvattrdef *) malloc(
 			num * sizeof(struct ntvattrdef),
 			M_NTFSMNT, M_WAITOK);
 
@@ -644,7 +663,7 @@ ntfs_unmount(
 	dprintf(("ntfs_unmount: vflushing...\n"));
 	error = vflush(mp,NULLVP,flags | SKIPSYSTEM);
 	if (error) {
-		printf("ntfs_unmount: vflush failed: %d\n",error);
+		dprintf(("ntfs_unmount: vflush failed: %d\n",error));
 		return (error);
 	}
 
@@ -659,8 +678,10 @@ ntfs_unmount(
 
 	/* vflush system vnodes */
 	error = vflush(mp,NULLVP,flags);
-	if (error)
+	if (error) {
+		/* XXX should this be panic() ? */
 		printf("ntfs_unmount: vflush failed(sysnodes): %d\n",error);
+	}
 
 	/* Check if the type of device node isn't VBAD before
 	 * touching v_specinfo.  If the device vnode is revoked, the
@@ -690,7 +711,7 @@ ntfs_unmount(
 	dprintf(("ntfs_umount: freeing memory...\n"));
 	mp->mnt_data = (qaddr_t)0;
 	mp->mnt_flag &= ~MNT_LOCAL;
-	FREE(ntmp->ntm_ad, M_NTFSMNT);
+	free(ntmp->ntm_ad, M_NTFSMNT);
 	FREE(ntmp, M_NTFSMNT);
 	return (error);
 }
@@ -742,7 +763,7 @@ ntfs_calccfree(
 
 	bmsize = VTOF(vp)->f_size;
 
-	MALLOC(tmp, u_int8_t *, bmsize, M_TEMP, M_WAITOK);
+	tmp = (u_int8_t *) malloc(bmsize, M_TEMP, M_WAITOK);
 
 	error = ntfs_readattr(ntmp, VTONT(vp), NTFS_A_DATA, NULL,
 			       0, bmsize, tmp, NULL);
@@ -755,7 +776,7 @@ ntfs_calccfree(
 	*cfreep = cfree;
 
     out:
-	FREE(tmp, M_TEMP);
+	free(tmp, M_TEMP);
 	return(error);
 }
 
@@ -766,11 +787,10 @@ ntfs_statfs(
 	struct proc *p)
 {
 	struct ntfsmount *ntmp = VFSTONTFS(mp);
-	u_int64_t mftsize,mftallocated;
+	u_int64_t mftallocated;
 
 	dprintf(("ntfs_statfs():\n"));
 
-	mftsize = VTOF(ntmp->ntm_sysvn[NTFS_MFTINO])->f_size;
 	mftallocated = VTOF(ntmp->ntm_sysvn[NTFS_MFTINO])->f_allocated;
 
 #if defined(__FreeBSD__)
@@ -838,7 +858,7 @@ ntfs_fhtovp(
 	struct ntfid *ntfhp = (struct ntfid *)fhp;
 	int error;
 
-	ddprintf(("ntfs_fhtovp(): %s: %d\n", mp->mnt_stat->f_mntonname,
+	ddprintf(("ntfs_fhtovp(): %s: %d\n", mp->mnt_stat.f_mntonname,
 		ntfhp->ntfid_ino));
 
 	error = ntfs_vgetex(mp, ntfhp->ntfid_ino, ntfhp->ntfid_attr, NULL,
@@ -862,7 +882,7 @@ ntfs_vptofh(
 	struct ntfid *ntfhp;
 	struct fnode *fn;
 
-	ddprintf(("ntfs_fhtovp(): %s: %p\n", vp->v_mount->mnt_stat->f_mntonname,
+	ddprintf(("ntfs_fhtovp(): %s: %p\n", vp->v_mount->mnt_stat.f_mntonname,
 		vp));
 
 	fn = VTOF(vp);
@@ -948,11 +968,21 @@ ntfs_vgetex(
 		fp->f_flag |= FN_VALID;
 	}
 
+	/*
+	 * We may be calling vget() now. To avoid potential deadlock, we need
+	 * to release ntnode lock, since due to locking order vnode
+	 * lock has to be acquired first.
+	 * ntfs_fget() bumped ntnode usecount, so ntnode won't be recycled
+	 * prematurely.
+	 */
+	ntfs_ntput(ip);
+
 	if (FTOV(fp)) {
-		VGET(FTOV(fp), lkflags, p);
-		*vpp = FTOV(fp);
-		ntfs_ntput(ip);
-		return (0);
+		/* vget() returns error if the vnode has been recycled */
+		if (VGET(FTOV(fp), lkflags, p) == 0) {
+			*vpp = FTOV(fp);
+			return (0);
+		}
 	}
 
 	error = getnewvnode(VT_NTFS, ntmp->ntm_mountp, ntfs_vnodeop_p, &vp);
@@ -973,8 +1003,6 @@ ntfs_vgetex(
 	if (ino == NTFS_ROOTINO)
 		vp->v_flag |= VROOT;
 
-	ntfs_ntput(ip);
-
 	if (lkflags & LK_TYPE_MASK) {
 		error = VN_LOCK(vp, lkflags, p);
 		if (error) {
@@ -983,10 +1011,10 @@ ntfs_vgetex(
 		}
 	}
 
+	genfs_node_init(vp, &ntfs_genfsops);
 	VREF(ip->i_devvp);
 	*vpp = vp;
 	return (0);
-	
 }
 
 static int
@@ -1016,9 +1044,9 @@ static struct vfsops ntfs_vfsops = {
 };
 VFS_SET(ntfs_vfsops, ntfs, 0);
 #elif defined(__NetBSD__)
-extern struct vnodeopv_desc ntfs_vnodeop_opv_desc;
+extern const struct vnodeopv_desc ntfs_vnodeop_opv_desc;
 
-struct vnodeopv_desc *ntfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const ntfs_vnodeopv_descs[] = {
 	&ntfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -1036,6 +1064,7 @@ struct vfsops ntfs_vfsops = {
 	ntfs_fhtovp,
 	ntfs_vptofh,
 	ntfs_init,
+	ntfs_reinit,
 	ntfs_done,
 	ntfs_sysctl,
 	ntfs_mountroot,
@@ -1043,5 +1072,3 @@ struct vfsops ntfs_vfsops = {
 	ntfs_vnodeopv_descs,
 };
 #endif
-
-

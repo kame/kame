@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.h,v 1.1 2000/02/29 15:21:48 nonaka Exp $	*/
+/*	$NetBSD: boot.h,v 1.3 2001/06/19 11:56:28 nonaka Exp $	*/
 
 #define TICKS_PER_SEC	(33000000 / 4)		/* 33MHz */
 #define NS_PER_TICK	(1000000000 / TICKS_PER_SEC)

@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_extern.h,v 1.16 2000/04/04 09:23:20 jdolecek Exp $	*/
+/*	$NetBSD: ffs_extern.h,v 1.22 2002/05/05 17:00:06 chs Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993, 1994
@@ -79,7 +79,7 @@ __BEGIN_DECLS
 int ffs_alloc __P((struct inode *, ufs_daddr_t, ufs_daddr_t , int, struct ucred *,
 		   ufs_daddr_t *));
 int ffs_realloccg __P((struct inode *, ufs_daddr_t, ufs_daddr_t, int, int ,
-		       struct ucred *, struct buf **));
+		       struct ucred *, struct buf **, ufs_daddr_t *));
 int ffs_reallocblks __P((void *));
 int ffs_valloc __P((void *));
 ufs_daddr_t ffs_blkpref __P((struct inode *, ufs_daddr_t, int, ufs_daddr_t *));
@@ -89,6 +89,7 @@ void ffs_clusteracct __P((struct fs *, struct cg *, ufs_daddr_t, int));
 
 /* ffs_balloc.c */
 int ffs_balloc __P((void *));
+int ffs_gop_alloc __P((struct vnode *, off_t, off_t, int, struct ucred *));
 
 /* ffs_bswap.c */
 void ffs_sb_swap __P((struct fs*, struct fs *));
@@ -106,13 +107,14 @@ void ffs_fragacct __P((struct fs *, int, int32_t[], int, int));
 #ifdef DIAGNOSTIC
 void	ffs_checkoverlap __P((struct buf *, struct inode *));
 #endif
-int ffs_isblock __P((struct fs *, unsigned char *, ufs_daddr_t));
-int ffs_isfreeblock __P((struct fs *, unsigned char *, ufs_daddr_t));
+int ffs_isblock __P((struct fs *, u_char *, ufs_daddr_t));
+int ffs_isfreeblock __P((struct fs *, u_char *, ufs_daddr_t));
 void ffs_clrblock __P((struct fs *, u_char *, ufs_daddr_t));
-void ffs_setblock __P((struct fs *, unsigned char *, ufs_daddr_t));
+void ffs_setblock __P((struct fs *, u_char *, ufs_daddr_t));
 
 /* ffs_vfsops.c */
 void ffs_init __P((void));
+void ffs_reinit __P((void));
 void ffs_done __P((void));
 int ffs_mountroot __P((void));
 int ffs_mount __P((struct mount *, const char *, void *, struct nameidata *,
@@ -137,6 +139,9 @@ int ffs_read __P((void *));
 int ffs_write __P((void *));
 int ffs_fsync __P((void *));
 int ffs_reclaim __P((void *));
+int ffs_getpages __P((void *));
+int ffs_putpages __P((void *));
+void ffs_gop_size __P((struct vnode *, off_t, off_t *));
 __END_DECLS
 
  
@@ -144,6 +149,7 @@ __END_DECLS
  * Soft dependency function prototypes.
  */
 void	softdep_initialize __P((void));
+void	softdep_reinitialize __P((void));
 int	softdep_mount __P((struct vnode *, struct mount *, struct fs *,
 	    struct ucred *));
 int	softdep_flushfiles __P((struct mount *, int, struct proc *));

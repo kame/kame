@@ -1,4 +1,4 @@
-/*	$NetBSD: writedtab.c,v 1.1.2.1 2000/08/14 08:00:00 leo Exp $	*/
+/*	$NetBSD: writedtab.c,v 1.1 2000/08/07 09:23:40 leo Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

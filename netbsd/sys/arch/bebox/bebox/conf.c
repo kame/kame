@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.11 1999/07/29 19:14:36 augustss Exp $	*/
+/*	$NetBSD: conf.c,v 1.18 2002/04/18 15:44:21 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -96,39 +96,16 @@ struct bdevsw	bdevsw[] =
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
-/* open, close, read, write, ioctl, tty, mmap */
-#define cdev_pc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttpoll, dev_init(c,n,mmap), D_TTY }
-
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
-
-/* open, close, read, ioctl */
-#define cdev_joy_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, seltrue, \
-	(dev_type_mmap((*))) enodev }
-
-/* open, close, ioctl, poll -- XXX should be a generic device */
-#define cdev_ocis_init(c,n) { \
-        dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-        (dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-        (dev_type_stop((*))) enodev, 0,  dev_init(c,n,poll), \
-        (dev_type_mmap((*))) enodev, 0 }
-#define cdev_apm_init cdev_ocis_init
-
-/* open, close, read, ioctl */
-#define cdev_satlink_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
-	(dev_type_mmap((*))) enodev }
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
 
 cdev_decl(cn);
 cdev_decl(ctty);
@@ -173,8 +150,6 @@ cdev_decl(spkr);
 cdev_decl(mms);
 #include "lms.h"
 cdev_decl(lms);
-#include "pms.h"
-cdev_decl(pms);
 #include "cy.h"
 cdev_decl(cy);
 cdev_decl(mcd);
@@ -206,6 +181,9 @@ cdev_decl(wsmux);
 
 #include "scsibus.h"
 cdev_decl(scsibus);
+
+#include "clockctl.h"
+cdev_decl(clockctl);
 
 struct cdevsw	cdevsw[] =
 {
@@ -246,7 +224,7 @@ struct cdevsw	cdevsw[] =
 	cdev_lkm_dummy(),		/* 34 */
 	cdev_mouse_init(NMMS,mms),	/* 35: Microsoft mouse */
 	cdev_mouse_init(NLMS,lms),	/* 36: Logitech mouse */
-	cdev_mouse_init(NPMS,pms),	/* 37: PS/2 mouse */
+	cdev_notdef(),			/* 37: was: opms (PS/2 mouse) */
 	cdev_tty_init(NCY,cy),		/* 38: Cyclom serial port */
 	cdev_disk_init(NMCD,mcd),	/* 39: Mitsumi CD-ROM */
 	cdev_bpftun_init(NTUN,tun),	/* 40: network tunnel */
@@ -270,6 +248,13 @@ struct cdevsw	cdevsw[] =
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 50: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 51: RAIDframe disk driver */
 	cdev_mouse_init(NWSMUX,	wsmux), /* 52: ws multiplexor */
+	cdev_isdn_init(NISDN, isdn),		/* 53: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 54: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 55: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 56: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 57: isdn phone device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 58: clockctl pseudo device */
+
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -364,6 +349,12 @@ static int chrtoblktbl[] = {
 	/* 50 */	NODEV,
 	/* 51 */	18,
 	/* 52 */	NODEV,
+	/* 53 */	NODEV,
+	/* 54 */	NODEV,
+	/* 55 */	NODEV,
+	/* 56 */	NODEV,
+	/* 57 */	NODEV,
+	/* 58 */	NODEV,
 };
 
 /*

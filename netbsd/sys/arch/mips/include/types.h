@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.24 2000/06/09 04:37:51 soda Exp $	*/
+/*	$NetBSD: types.h,v 1.30 2002/03/05 15:41:14 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -42,12 +42,12 @@
 #define	_MACHTYPES_H_
 
 #include <sys/cdefs.h>
+#include <mips/int_types.h>
 
 /*
  * Note that mips_reg_t is distinct from the register_t defined
  * in <types.h> to allow these structures to be as hidden from
  * the rest of the operating system as possible.
- *
  */
 
 #if defined(_MIPS_BSD_API) && _MIPS_BSD_API != _MIPS_BSD_API_LP32
@@ -83,28 +83,14 @@ typedef unsigned long	vaddr_t;
 typedef unsigned long	vsize_t;
 #endif
 
-/*
- * Basic integral types.  Omit the typedef if
- * not possible for a machine/compiler combination.
- */
-#define	__BIT_TYPES_DEFINED__
-typedef	__signed char		   int8_t;
-typedef	unsigned char		 u_int8_t;
-typedef	short			  int16_t;
-typedef	unsigned short		u_int16_t;
-typedef	int			  int32_t;
-typedef	unsigned int		u_int32_t;
-/* LONGLONG */
-typedef	long long		  int64_t;
-/* LONGLONG */
-typedef	unsigned long long	u_int64_t;
-
-typedef int32_t			register_t;
+typedef int		register_t;
 
 #define	__SWAP_BROKEN
 
-#ifdef MIPS3
-#define __HAVE_CPU_COUNTER
+#define	__HAVE_AST_PERPROC
+#define	__HAVE_SYSCALL_INTERN
+#ifdef MIPS3_PLUS	/* XXX bogus! */
+#define	__HAVE_CPU_COUNTER
 #endif
 
 #endif	/* _MACHTYPES_H_ */

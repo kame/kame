@@ -1,7 +1,7 @@
-/*	$NetBSD: netbsd32_compat_13.c,v 1.6 2000/03/30 11:27:18 augustss Exp $	*/
+/*	$NetBSD: netbsd32_compat_13.c,v 1.11 2002/03/16 20:43:54 christos Exp $	*/
 
 /*
- * Copyright (c) 1998 Matthew R. Green
+ * Copyright (c) 1998, 2001 Matthew R. Green
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,11 +28,15 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: netbsd32_compat_13.c,v 1.11 2002/03/16 20:43:54 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/signal.h>
+#include <sys/signalvar.h>
 #include <sys/syscallargs.h>
 
 #include <compat/netbsd32/netbsd32.h>
@@ -49,27 +53,49 @@ compat_13_netbsd32_sigaltstack13(p, v, retval)
 		syscallarg(netbsd32_sigaltstack13p_t) oss;
 	} */ *uap = v;
 	struct compat_13_sys_sigaltstack_args ua;
-	struct sigaltstack13 nss13, oss13;
-	struct netbsd32_sigaltstack13 *s32nss13, *s32oss13;
-	int rv;
+	struct sigaltstack13 ss13, *nss13up, *oss13up;
+	struct netbsd32_sigaltstack13 s32ss;
+	caddr_t sg;
+	int error;
 
-	SCARG(&ua, nss) = &nss13;
-	SCARG(&ua, oss) = &oss13;
+	if (!SCARG(uap, nss))
+		return (EINVAL);
 
-	s32nss13 = (struct netbsd32_sigaltstack13 *)(u_long)SCARG(uap, nss);
-	s32oss13 = (struct netbsd32_sigaltstack13 *)(u_long)SCARG(uap, oss);
+	sg = stackgap_init(p, 0);
 
-	nss13.ss_sp = (char *)(u_long)s32nss13->ss_sp;
-	nss13.ss_size = s32nss13->ss_size;
-	nss13.ss_flags = s32nss13->ss_flags;
+	SCARG(&ua, nss) = nss13up = stackgap_alloc(p, &sg, sizeof(*nss13up));
+	if (SCARG(uap, oss))
+		SCARG(&ua, oss) = oss13up = stackgap_alloc(p, &sg, sizeof(*oss13up));
+	else
+		SCARG(&ua, oss) = NULL;
 
-	rv = compat_13_sys_sigaltstack(p, &ua, retval);
+	error = copyin((caddr_t)(u_long)SCARG(uap, nss), &s32ss, sizeof s32ss);
+	if (error)
+		return (error);
+	ss13.ss_sp = (char *)(u_long)s32ss.ss_sp;
+	ss13.ss_size = s32ss.ss_size;
+	ss13.ss_flags = s32ss.ss_flags;
+	error = copyout(&ss13, nss13up, sizeof *nss13up);
+	if (error)
+		return (error);
 
-	s32oss13->ss_sp = (netbsd32_charp)(u_long)oss13.ss_sp;
-	s32oss13->ss_size = oss13.ss_size;
-	s32oss13->ss_flags = oss13.ss_flags;
+	error = compat_13_sys_sigaltstack(p, &ua, retval);
+	if (error)
+		return (error);
 
-	return (rv);
+	if (SCARG(uap, oss)) {
+		error = copyin(nss13up, &ss13, sizeof *nss13up);
+		if (error)
+			return (error);
+		s32ss.ss_sp = (netbsd32_charp)(u_long)ss13.ss_sp;
+		s32ss.ss_size = ss13.ss_size;
+		s32ss.ss_flags = ss13.ss_flags;
+		error = copyout(&s32ss, (caddr_t)(u_long)SCARG(uap, nss), sizeof s32ss);
+		if (error)
+			return (error);
+	}
+
+	return (0);
 }
 
 

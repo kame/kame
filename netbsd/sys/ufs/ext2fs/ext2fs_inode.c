@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_inode.c,v 1.19 2000/05/30 19:09:44 mycroft Exp $	*/
+/*	$NetBSD: ext2fs_inode.c,v 1.27 2001/11/08 02:39:07 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.
@@ -37,6 +37,9 @@
  * Modified for ext2fs by Manuel Bouyer.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_inode.c,v 1.27 2001/11/08 02:39:07 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mount.h>
@@ -49,17 +52,14 @@
 #include <sys/trace.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
-
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/ufs_extern.h>
 
 #include <ufs/ext2fs/ext2fs.h>
 #include <ufs/ext2fs/ext2fs_extern.h>
+
+extern int prtactive;
 
 static int ext2fs_indirtrunc __P((struct inode *, ufs_daddr_t, ufs_daddr_t,
 				  ufs_daddr_t, int, long *));
@@ -80,7 +80,6 @@ ext2fs_inactive(v)
 	struct proc *p = ap->a_p;
 	struct timespec ts;
 	int error = 0;
-	extern int prtactive;
 	
 	if (prtactive && vp->v_usecount != 0)
 		vprint("ext2fs_inactive: pushing active", vp);
@@ -90,7 +89,9 @@ ext2fs_inactive(v)
 
 	error = 0;
 	if (ip->i_e2fs_nlink == 0 && (vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
-		error = VOP_TRUNCATE(vp, (off_t)0, 0, NOCRED, NULL); 
+		if (ip->i_e2fs_size != 0) {
+			error = VOP_TRUNCATE(vp, (off_t)0, 0, NOCRED, NULL);
+		}
 		TIMEVAL_TO_TIMESPEC(&time, &ts);
 		ip->i_e2fs_dtime = ts.tv_sec;
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
@@ -105,7 +106,7 @@ out:
 	 * so that it can be reused immediately.
 	 */
 	if (ip->i_e2fs_dtime != 0)
-		vrecycle(vp, (struct simplelock *)0, p);
+		vrecycle(vp, NULL, p);
 	return (error);
 }   
 
@@ -191,15 +192,14 @@ ext2fs_truncate(v)
 	struct vnode *ovp = ap->a_vp;
 	ufs_daddr_t lastblock;
 	struct inode *oip;
-	ufs_daddr_t bn, lbn, lastiblock[NIADDR], indir_lbn[NIADDR];
+	ufs_daddr_t bn, lastiblock[NIADDR], indir_lbn[NIADDR];
 	ufs_daddr_t oldblks[NDADDR + NIADDR], newblks[NDADDR + NIADDR];
 	off_t length = ap->a_length;
 	struct m_ext2fs *fs;
-	struct buf *bp;
 	int offset, size, level;
 	long count, nblocks, blocksreleased = 0;
 	int i;
-	int aflags, error, allerror = 0;
+	int error, allerror = 0;
 	off_t osize;
 
 	if (length < 0)
@@ -236,53 +236,26 @@ ext2fs_truncate(v)
 		if (length > fs->fs_maxfilesize)
 			return (EFBIG);
 #endif
-		offset = blkoff(fs, length - 1);
-		lbn = lblkno(fs, length - 1);
-		aflags = B_CLRBUF;
-		if (ap->a_flags & IO_SYNC)
-			aflags |= B_SYNC;
-		error = ext2fs_balloc(oip, lbn, offset + 1, ap->a_cred, &bp,
-				   aflags);
-		if (error)
-			return (error);
-		oip->i_e2fs_size = length;
-		uvm_vnp_setsize(ovp, length);
-		(void) uvm_vnp_uncache(ovp);
-		if (aflags & B_SYNC)
-			bwrite(bp);
-		else
-			bawrite(bp);
+		ext2fs_balloc_range(ovp, length - 1, 1, ap->a_cred,
+		    ap->a_flags & IO_SYNC ? B_SYNC : 0);
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
-		return (VOP_UPDATE(ovp, NULL, NULL, UPDATE_WAIT));
+		return (VOP_UPDATE(ovp, NULL, NULL, 1));
 	}
 	/*
 	 * Shorten the size of the file. If the file is not being
 	 * truncated to a block boundry, the contents of the
 	 * partial block following the end of the file must be
-	 * zero'ed in case it ever become accessable again because
+	 * zero'ed in case it ever become accessible again because
 	 * of subsequent file growth.
 	 */
 	offset = blkoff(fs, length);
-	if (offset == 0) {
-		oip->i_e2fs_size = length;
-	} else {
-		lbn = lblkno(fs, length);
-		aflags = B_CLRBUF;
-		if (ap->a_flags & IO_SYNC)
-			aflags |= B_SYNC;
-		error = ext2fs_balloc(oip, lbn, offset, ap->a_cred, &bp, aflags);
-		if (error)
-			return (error);
-		oip->i_e2fs_size = length;
+	if (offset != 0) {
 		size = fs->e2fs_bsize;
-		(void) uvm_vnp_uncache(ovp);
-		memset((char *)bp->b_data + offset, 0,  (u_int)(size - offset));
-		allocbuf(bp, size);
-		if (aflags & B_SYNC)
-			bwrite(bp);
-		else
-			bawrite(bp);
+
+		/* XXXUBC we should handle more than just VREG */
+		uvm_vnp_zerorange(ovp, length, size - offset);
 	}
+	oip->i_e2fs_size = length;
 	uvm_vnp_setsize(ovp, length);
 
 	/*
@@ -321,6 +294,7 @@ ext2fs_truncate(v)
 	 * Note that we save the new block configuration so we can check it
 	 * when we are done.
 	 */
+
 	memcpy((caddr_t)newblks, (caddr_t)&oip->i_e2fs_blocks[0], sizeof newblks);
 	memcpy((caddr_t)&oip->i_e2fs_blocks[0], (caddr_t)oldblks, sizeof oldblks);
 	oip->i_e2fs_size = osize;
@@ -363,28 +337,26 @@ ext2fs_truncate(v)
 		ext2fs_blkfree(oip, bn);
 		blocksreleased += btodb(fs->e2fs_bsize);
 	}
-	if (lastblock < 0)
-		goto done;
 
 done:
 #ifdef DIAGNOSTIC
 	for (level = SINGLE; level <= TRIPLE; level++)
-		if (newblks[NDADDR + level] != oip->i_e2fs_blocks[NDADDR + level])
-			panic("itrunc1");
+		if (newblks[NDADDR + level] !=
+		    oip->i_e2fs_blocks[NDADDR + level])
+			panic("ext2fs_truncate1");
 	for (i = 0; i < NDADDR; i++)
 		if (newblks[i] != oip->i_e2fs_blocks[i])
-			panic("itrunc2");
+			panic("ext2fs_truncate2");
 	if (length == 0 &&
-	    (!LIST_EMPTY(&ovp->v_cleanblkhd) || !LIST_EMPTY(&ovp->v_dirtyblkhd)))
-		panic("itrunc3");
+	    (!LIST_EMPTY(&ovp->v_cleanblkhd) ||
+	     !LIST_EMPTY(&ovp->v_dirtyblkhd)))
+		panic("ext2fs_truncate3");
 #endif /* DIAGNOSTIC */
 	/*
 	 * Put back the real size.
 	 */
 	oip->i_e2fs_size = length;
 	oip->i_e2fs_nblock -= blocksreleased;
-	if (oip->i_e2fs_nblock < 0)			/* sanity */
-		oip->i_e2fs_nblock = 0;
 	oip->i_flag |= IN_CHANGE;
 	return (allerror);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.14 2000/02/11 19:30:30 thorpej Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.23 2001/11/15 18:06:19 soren Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -48,19 +48,21 @@
 /*
  * Machine dependent constants for X68K
  */
+
+/*
+ * We use 4K pages on the X68K.  Override the PAGE_* definitions
+ * to be compile-time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 /*
  * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack.  LOWPAGES and HIGHPAGES are
- * the number of pages from the beginning of the P0 region to the
- * beginning of the text and from the beginning of the P1 region to the
- * beginning of the stack respectively.
+ * is the top (end) of the user stack.
  */
 #define	USRTEXT		8192			/* Must equal __LDPGSZ */
-#define	USRSTACK	(-HIGHPAGES*NBPG)	/* Start of user stack */
-#define	BTOPUSRSTACK	(0x100000-HIGHPAGES)	/* btop(USRSTACK) */
-#define P1PAGES		0x100000
-#define	LOWPAGES	0
-#define HIGHPAGES	3			/* UPAGES */
+#define	USRSTACK	VM_MAXUSER_ADDRESS	/* Start of user stack */
 
 /*
  * Virtual memory related constants, all in bytes
@@ -105,24 +107,6 @@
 #endif
 
 /*
- * External IO space map size.
- */
-#ifndef EIOMAPSIZE
-#define EIOMAPSIZE	0
-#endif
-
-/*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
-
-/*
  * Mach derived constants
  */
 
@@ -139,9 +123,6 @@
 /* # of kernel PT pages (initial only, can grow dynamically) */
 #define VM_KERNEL_PT_PAGES	((vsize_t)2)		/* XXX: SYSPTSIZE */
 
-/* pcb base */
-#define	pcbb(p)		((u_int)(p)->p_addr)
-
 /*
  * Constants which control the way the VM system deals with memory segments.
  */
@@ -152,6 +133,8 @@
 
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
+
+#define	__HAVE_PMAP_PHYSSEG
 
 /*
  * pmap-specific data stored in the vm_physmem[] array.

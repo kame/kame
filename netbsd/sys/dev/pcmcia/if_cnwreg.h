@@ -1,4 +1,4 @@
-/*	$NetBSD: if_cnwreg.h,v 1.2.4.1 2000/07/07 07:31:29 itojun Exp $	*/
+/*	$NetBSD: if_cnwreg.h,v 1.3 2000/07/05 18:42:19 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

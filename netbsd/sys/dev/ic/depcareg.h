@@ -1,4 +1,4 @@
-/*	$NetBSD: depcareg.h,v 1.1.2.1 2000/08/11 18:16:49 thorpej Exp $	*/
+/*	$NetBSD: depcareg.h,v 1.1 2000/08/11 02:27:09 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: zssc.c,v 1.28 1999/01/10 13:24:11 tron Exp $	*/
+/*	$NetBSD: zssc.c,v 1.31 2002/01/28 09:57:04 aymeric Exp $ */
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -36,6 +36,9 @@
  *	@(#)dma.c
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zssc.c,v 1.31 2002/01/28 09:57:04 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -51,22 +54,11 @@
 #include <amiga/dev/siopvar.h>
 #include <amiga/dev/zbusvar.h>
 
-void zsscattach __P((struct device *, struct device *, void *));
-int  zsscmatch __P((struct device *, struct cfdata *, void *));
-int  zssc_dmaintr __P((void *));
+void zsscattach(struct device *, struct device *, void *);
+int  zsscmatch(struct device *, struct cfdata *, void *);
+int  zssc_dmaintr(void *);
 #ifdef DEBUG
-void zssc_dump __P((void));
-#endif
-
-struct scsipi_device zssc_scsidev = {
-	NULL,		/* use default error handler */
-	NULL,		/* do not have a start functio */
-	NULL,		/* have no async handler */
-	NULL,		/* Use default done routine */
-};
-
-
-#ifdef DEBUG
+void zssc_dump(void);
 #endif
 
 struct cfattach zssc_ca = {
@@ -77,10 +69,7 @@ struct cfattach zssc_ca = {
  * if we are an PPI Zeus
  */
 int
-zsscmatch(pdp, cfp, auxp)
-	struct device *pdp;
-	struct cfdata *cfp;
-	void *auxp;
+zsscmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 {
 	struct zbus_args *zap;
 
@@ -91,9 +80,7 @@ zsscmatch(pdp, cfp, auxp)
 }
 
 void
-zsscattach(pdp, dp, auxp)
-	struct device *pdp, *dp;
-	void *auxp;
+zsscattach(struct device *pdp, struct device *dp, void *auxp)
 {
 	struct siop_softc *sc;
 	struct zbus_args *zap;
@@ -115,18 +102,20 @@ zsscattach(pdp, dp, auxp)
 
 	alloc_sicallback();
 
-	sc->sc_adapter.scsipi_cmd = siop_scsicmd;
-	sc->sc_adapter.scsipi_minphys = siop_minphys;
+	sc->sc_adapter.adapt_dev = &sc->sc_dev;
+	sc->sc_adapter.adapt_nchannels = 1;
+	sc->sc_adapter.adapt_openings = 7;
+	sc->sc_adapter.adapt_max_periph = 1;
+	sc->sc_adapter.adapt_ioctl = NULL;
+	sc->sc_adapter.adapt_minphys = siop_minphys;
+	sc->sc_adapter.adapt_request = siop_scsipi_request;
 
-	sc->sc_link.scsipi_scsi.channel = SCSI_CHANNEL_ONLY_ONE;
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.scsipi_scsi.adapter_target = 7;
-	sc->sc_link.adapter = &sc->sc_adapter;
-	sc->sc_link.device = &zssc_scsidev;
-	sc->sc_link.openings = 2;
-	sc->sc_link.scsipi_scsi.max_target = 7;
-	sc->sc_link.scsipi_scsi.max_lun = 7;
-	sc->sc_link.type = BUS_SCSI;
+	sc->sc_channel.chan_adapter = &sc->sc_adapter;
+	sc->sc_channel.chan_bustype = &scsi_bustype;
+	sc->sc_channel.chan_channel = 0;
+	sc->sc_channel.chan_ntargets = 8;
+	sc->sc_channel.chan_nluns = 8;
+	sc->sc_channel.chan_id = 7;
 
 	siopinitialize(sc);
 
@@ -138,7 +127,7 @@ zsscattach(pdp, dp, auxp)
 	/*
 	 * attach all scsi units on us
 	 */
-	config_found(dp, &sc->sc_link, scsiprint);
+	config_found(dp, &sc->sc_channel, scsiprint);
 }
 
 /*
@@ -150,8 +139,7 @@ zsscattach(pdp, dp, auxp)
  */
 
 int
-zssc_dmaintr(arg)
-	void *arg;
+zssc_dmaintr(void *arg)
 {
 	struct siop_softc *sc = arg;
 	siop_regmap_p rp;
@@ -183,7 +171,7 @@ zssc_dmaintr(arg)
 
 #ifdef DEBUG
 void
-zssc_dump()
+zssc_dump(void)
 {
 	extern struct cfdriver zssc_cd;
 	int i;

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_sched.c,v 1.6 2000/05/28 05:49:05 thorpej Exp $	*/
+/*	$NetBSD: linux_sched.c,v 1.10 2002/03/31 22:22:47 christos Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -41,7 +41,9 @@
  * Linux compatibility module. Try to deal with scheduler related syscalls.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_sched.c,v 1.10 2002/03/31 22:22:47 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
@@ -91,7 +93,7 @@ linux_sys_clone(p, v, retval)
 	sig = SCARG(uap, flags) & LINUX_CLONE_CSIGNAL;
 	if (sig < 0 || sig >= LINUX__NSIG)
 		return (EINVAL);
-	sig = linux_to_native_sig[sig];
+	sig = linux_to_native_signo[sig];
 
 	/*
 	 * Note that Linux does not provide a portable way of specifying
@@ -274,7 +276,7 @@ linux_sys_sched_yield(cp, v, retval)
 	void *v;
 	register_t *retval;
 {
-	need_resched();
+	need_resched(curcpu());
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-/*	 $NetBSD: nfsnode.h,v 1.29.4.1 2000/12/14 23:37:30 he Exp $	*/
+/*	 $NetBSD: nfsnode.h,v 1.34 2001/09/15 20:36:40 chs Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -45,6 +45,8 @@
 #ifndef _NFS_NFS_H_
 #include <nfs/nfs.h>
 #endif
+#include <miscfs/genfs/genfs.h>
+#include <miscfs/genfs/genfs_node.h>
 
 /*
  * Silly rename structure that hangs off the nfsnode until the name
@@ -96,6 +98,7 @@ struct nfsdircache {
  * An nfsnode is 'named' by its file handle. (nget/nfs_node.c)
  */
 struct nfsnode {
+	struct genfs_node	n_gnode;
 	u_quad_t		n_size;		/* Current size of file */
 	u_quad_t		n_brev;		/* Modify rev when cached */
 	u_quad_t		n_lrev;		/* Modify rev for lease */
@@ -140,6 +143,8 @@ struct nfsnode {
 	off_t			n_pushhi;	/* Last block in range */
 	struct lock		n_commitlock;	/* Serialize commits XXX */
 	int			n_commitflags;
+	struct ucred		*n_rcred;
+	struct ucred		*n_wcred;
 };
 
 /*
@@ -173,7 +178,7 @@ struct nfsnode {
  * Convert between nfsnode pointers and vnode pointers
  */
 #define VTONFS(vp)	((struct nfsnode *)(vp)->v_data)
-#define NFSTOV(np)	((struct vnode *)(np)->n_vnode)
+#define NFSTOV(np)	((np)->n_vnode)
 
 /*
  * Queue head for nfsiod's
@@ -206,7 +211,7 @@ int	nfsfifo_write	__P((void *));
 #define	nfs_ioctl	genfs_enoioctl
 #define	nfs_poll	genfs_poll
 #define nfs_revoke	genfs_revoke
-int	nfs_mmap	__P((void *));
+#define	nfs_mmap	genfs_mmap
 int	nfs_fsync	__P((void *));
 #define nfs_seek	genfs_seek
 int	nfs_remove	__P((void *));
@@ -220,9 +225,9 @@ int	nfs_readlink	__P((void *));
 #define	nfs_abortop	genfs_abortop
 int	nfs_inactive	__P((void *));
 int	nfs_reclaim	__P((void *));
-#define nfs_lock	genfs_nolock
-#define nfs_unlock	genfs_nounlock
-#define nfs_islocked	genfs_noislocked
+#define nfs_lock	genfs_lock
+#define nfs_unlock	genfs_unlock
+#define nfs_islocked	genfs_islocked
 int	nfs_bmap	__P((void *));
 int	nfs_strategy	__P((void *));
 int	nfs_print	__P((void *));
@@ -235,6 +240,9 @@ int	nfs_bwrite	__P((void *));
 #define	nfs_vfree	genfs_nullop
 int	nfs_truncate	__P((void *));
 int	nfs_update	__P((void *));
+int	nfs_getpages	__P((void *));
+int	nfs_putpages	__P((void *));
+int	nfs_gop_write(struct vnode *, struct vm_page **, int, int);
 
 extern int (**nfsv2_vnodeop_p) __P((void *));
 

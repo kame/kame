@@ -1,4 +1,4 @@
-/*	$NetBSD: m68k4k_exec.c,v 1.4 2000/04/11 04:37:49 chs Exp $	*/
+/*	$NetBSD: m68k4k_exec.c,v 1.8 2001/11/13 02:09:02 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -40,11 +40,12 @@
  * that making it work on other machines is worth the trouble.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: m68k4k_exec.c,v 1.8 2001/11/13 02:09:02 lukem Exp $");
+
 #if !defined(__m68k__)
 #error YOU GOTTA BE KIDDING!
 #endif
-
-#include "opt_compat_aout.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,13 +55,7 @@
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
-
 #include <compat/m68k4k/m68k4k_exec.h>
-
-#if defined(COMPAT_AOUT)
-extern struct emul emul_netbsd_aout;
-#endif
 
 int	exec_m68k4k_prep_zmagic __P((struct proc *, struct exec_package *));
 int	exec_m68k4k_prep_nmagic __P((struct proc *, struct exec_package *));
@@ -118,10 +113,6 @@ exec_m68k4k_makecmds(p, epp)
 
 	if (error)
 		kill_vmcmds(&epp->ep_vmcmds);
-#if defined(COMPAT_AOUT)
-	else
-		epp->ep_emul = &emul_netbsd_aout;
-#endif
 
 	return error;
 }
@@ -162,7 +153,7 @@ exec_m68k4k_prep_zmagic(p, epp)
 #endif
 		return ETXTBSY;
 	}
-	vn_marktext(epp->ep_vp);
+	epp->ep_vp->v_flag |= VTEXT;
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_text,

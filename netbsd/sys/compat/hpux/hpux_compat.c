@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_compat.c,v 1.49.4.2 2001/06/07 19:55:59 he Exp $	*/
+/*	$NetBSD: hpux_compat.c,v 1.59.6.1 2002/08/07 01:31:58 lukem Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -45,8 +45,14 @@
 /*
  * Various HP-UX compatibility routines
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hpux_compat.c,v 1.59.6.1 2002/08/07 01:31:58 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_sysv.h"
 #include "opt_compat_43.h"
+#endif
 
 #ifndef COMPAT_43
 #define COMPAT_43
@@ -75,8 +81,6 @@
 #include <sys/user.h>
 #include <sys/mman.h>
 
-#include <vm/vm.h>
-
 #include <machine/cpu.h>
 #include <machine/reg.h>
 #include <machine/psl.h>
@@ -97,13 +101,7 @@
 int unimpresponse = 0;
 #endif
 
-
-extern char sigcode[], esigcode[];
-extern struct sysent hpux_sysent[];
-extern char *hpux_syscallnames[];
-
-int	hpuxtobsdioctl __P((u_long));
-
+static int	hpuxtobsdioctl __P((u_long));
 static int	hpux_scale __P((struct timeval *));
 
 /*
@@ -182,8 +180,8 @@ hpux_sys_wait(p, v, retval)
 	SCARG(&w4, options) = 0;
 
 	if (SCARG(uap, status) == NULL) {
-		caddr_t sg = stackgap_init(p->p_emul);
-		SCARG(&w4, status) = stackgap_alloc(&sg, sz);
+		caddr_t sg = stackgap_init(p, 0);
+		SCARG(&w4, status) = stackgap_alloc(p, &sg, sz);
 	}
 	else
 		SCARG(&w4, status) = SCARG(uap, status);
@@ -404,10 +402,13 @@ hpux_sys_utssys(p, v, retval)
 	/* gethostname */
 	case 5:
 		/* SCARG(uap, dev) is length */
-		if (SCARG(uap, dev) > hostnamelen + 1)
-			SCARG(uap, dev) = hostnamelen + 1;
-		error = copyout((caddr_t)hostname, (caddr_t)SCARG(uap, uts),
-				SCARG(uap, dev));
+		i = SCARG(uap, dev);
+		if (i < 0) {
+			error = EINVAL;
+			break;
+		} else if (i > hostnamelen + 1)
+			i = hostnamelen + 1;
+		error = copyout((caddr_t)hostname, (caddr_t)SCARG(uap, uts), i);
 		break;
 
 	case 1:	/* ?? */
@@ -671,7 +672,7 @@ hpux_sys_mmap(p, v, retval)
 	return (sys_mmap(p, &nargs, retval));
 }
 
-int
+static int
 hpuxtobsdioctl(com)
 	u_long com;
 {
@@ -732,9 +733,9 @@ hpux_sys_ioctl(p, v, retval)
 	if (com == HPUXTIOCGETP || com == HPUXTIOCSETP)
 		return (getsettty(p, SCARG(uap, fd), com, SCARG(uap, data)));
 
-	if (((unsigned)SCARG(uap, fd)) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
+
 	if ((fp->f_flag & (FREAD|FWRITE)) == 0)
 		return (EBADF);
 
@@ -1306,5 +1307,5 @@ hpux_sys_pause_6x(p, v, retval)
 	register_t *retval;
 {
 
-	return (sigsuspend1(p, &p->p_sigmask));
+	return (sigsuspend1(p, &p->p_sigctx.ps_sigmask));
 }

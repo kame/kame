@@ -1,8 +1,6 @@
-/* $NetBSD: kern.ldscript,v 1.2 1997/06/23 02:40:28 jonathan Exp $ */
+/* $NetBSD: kern.ldscript,v 1.4 2001/10/05 05:03:27 simonb Exp $ */
 
-/*  ldscript for NetBSD/mips kernels */
-OUTPUT_FORMAT("elf32-littlemips", "elf32-bigmips",
-	      "elf32-littlemips")
+/*  ldscript for NetBSD/mips kernels and LKMs */
 OUTPUT_ARCH(mips)
 ENTRY(_start)
 SEARCH_DIR(/lib);
@@ -23,7 +21,7 @@ SECTIONS
   PROVIDE (etext = .);
   .rodata    : { *(.rodata)  }
   .reginfo : { *(.reginfo) }
-  . = . + 0x1000;
+/*  . = . + 0x1000; */
   .data    :
   {
     _fdata = . ;

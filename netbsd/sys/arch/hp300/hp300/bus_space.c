@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space.c,v 1.1 1998/01/11 21:40:52 thorpej Exp $	*/
+/*	$NetBSD: bus_space.c,v 1.4 2002/03/15 05:55:37 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,13 +40,16 @@
  * Implementation of bus_space mapping for the hp300.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_space.c,v 1.4 2002/03/15 05:55:37 gmcgarry Exp $");                                                  
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/map.h>
 
 #include <machine/bus.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 extern struct map extiomap[];
 extern caddr_t extiobase;
@@ -69,7 +72,7 @@ bus_space_map(t, bpa, size, flags, bshp)
 		 * Intio space is direct-mapped in pmap_bootstrap(); just
 		 * do the translation.
 		 */
-		*bshp = (bus_space_handle_t)IIOV(bpa);
+		*bshp = (bus_space_handle_t)IIOV(INTIOBASE + bpa);
 		return (0);
 	}
 

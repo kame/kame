@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.27 1999/06/19 19:44:08 is Exp $	*/
+/*	$NetBSD: pmap.h,v 1.34 2002/04/25 09:20:33 aymeric Exp $	*/
 
 /* 
  * Copyright (c) 1987 Carnegie-Mellon University
@@ -53,7 +53,7 @@ struct pmap {
 	short			pm_sref;	/* segment table ref count */
 	short			pm_count;	/* pmap reference count */
 	long			pm_ptpages;	/* more stats: PT pages */
-	simple_lock_data_t	pm_lock;	/* lock on pmap */
+	struct simplelock	pm_lock;	/* lock on pmap */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 };
 
@@ -85,7 +85,7 @@ typedef struct pmap	*pmap_t;
 }
 
 /*
- * For each vm_page_t, there is a list of all currently valid virtual
+ * For each struct vm_page, there is a list of all currently valid virtual
  * mappings of that page.  An entry is a pv_entry_t, the list is pv_table.
  */
 typedef struct pv_entry {
@@ -120,10 +120,9 @@ struct pv_page {
 };
 
 #ifdef	_KERNEL
-pv_entry_t	pv_table;	/* array of entries, one per page */
-u_int		*Sysmap;
-char		*vmmap;		/* map for mem, dumps, etc. */
-struct pmap	kernel_pmap_store;
+extern u_int		*Sysmap;
+extern caddr_t		vmmap;		/* map for mem, dumps, etc. */
+extern struct pmap	kernel_pmap_store;
 
 #define	pmap_kernel()		(&kernel_pmap_store)
 
@@ -135,6 +134,8 @@ struct pmap	kernel_pmap_store;
 
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
+
+#define	pmap_update(pmap)		/* nothing (yet) */
 
 vaddr_t		pmap_map __P((vaddr_t, paddr_t, paddr_t, int));
 void		pmap_procwr __P((struct proc *, vaddr_t, u_long));

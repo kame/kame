@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.35 2000/05/30 15:35:00 deberg Exp $	*/
+/*	$NetBSD: machdep.c,v 1.49 2002/05/20 17:55:46 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -44,6 +44,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_compat_hpux.h"
 
 #include <sys/param.h>
@@ -73,10 +74,7 @@
 #ifdef KGDB
 #include <sys/kgdb.h>
 #endif
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
+#include <sys/boot_flag.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -85,6 +83,16 @@
 #include <ddb/db_access.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
+#endif
+
+#ifdef KGDB
+#include <sys/kgdb.h>
+
+/* Is zs configured in? */
+#include "zsc.h"
+#if (NZSC > 0)
+#include <next68k/dev/zs_cons.h>
+#endif
 #endif
 
 #include <sys/sysctl.h>
@@ -104,6 +112,9 @@
 #include <next68k/next68k/rtc.h>
 #include <next68k/next68k/seglist.h>
 
+int nsym;
+char *ssym, *esym;
+
 #define	MAXMEM	64*1024	/* XXX - from cmap.h */
 
 /* the following is used externally (sysctl_hw) */
@@ -112,9 +123,9 @@ char	machine[] = MACHINE;	/* from <machine/param.h> */
 /* Our exported CPU info; we can have only one. */  
 struct cpu_info cpu_info_store;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 caddr_t	msgbufaddr;		/* KVA of message buffer */
 paddr_t msgbufpa;		/* PA of message buffer */
@@ -174,7 +185,7 @@ int	mem_cluster_cnt;
  * Early initialization, before main() is called.
  */
 void
-next68k_init()
+next68k_init(void)
 {
 	int i;
 
@@ -193,38 +204,26 @@ next68k_init()
 		 * list we want to put the memory on.
 		 */
 		uvm_page_physload(atop(phys_seg_list[i].ps_start),
-				 atop(phys_seg_list[i].ps_end),
-				 atop(phys_seg_list[i].ps_start),
-				 atop(phys_seg_list[i].ps_end), VM_FREELIST_DEFAULT);
+				  atop(phys_seg_list[i].ps_end),
+				  atop(phys_seg_list[i].ps_start),
+				  atop(phys_seg_list[i].ps_end),
+				  VM_FREELIST_DEFAULT);
 	}
 
 	{
 		char *p = rom_boot_arg;
 		boothowto = 0;
 		if (*p++ == '-') {
-			for (;*p;p++) {
-				switch(*p) {
-				case 'a':
-					boothowto |= RB_ASKNAME;
-					break;
-				case 's':
-					boothowto |= RB_SINGLE;
-					break;
-				case 'd':
-					boothowto |= RB_KDB;
-					break;
-				default:
-					break;
-				}
-			}
+			for (;*p;p++)
+				BOOT_FLAG(*p, boothowto);
 		}
 	}
 
-  /* Initialize the interrupt handlers. */
-  isrinit();
+	/* Initialize the interrupt handlers. */
+	isrinit();
 
-  /* Calibrate the delay loop. */
-  next68k_calibrate_delay();
+	/* Calibrate the delay loop. */
+	next68k_calibrate_delay();
 
 	/*
 	 * Initialize error message buffer (at end of core).
@@ -234,6 +233,7 @@ next68k_init()
 		    msgbufpa + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	initmsgbuf(msgbufaddr, round_page(MSGBUFSIZE));
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -244,31 +244,23 @@ next68k_init()
 void
 consinit()
 {
-  /*
-   * Generic console: sys/dev/cons.c
-   *	Initializes either ite or ser as console.
-   *	Can be called from locore.s and init_main.c.
-   */
-  static int init = 0;
-  
-  if (!init) {
+	static int init = 0;
 
+	/*
+	 * Generic console: sys/dev/cons.c
+	 *	Initializes either ite or ser as console.
+	 *	Can be called from locore.s and init_main.c.
+	 */
+
+	if (!init) {
 		cninit();
-
-#ifdef KGDB
+#if defined(KGDB) && (NZSC > 0)
 		zs_kgdb_init();
 #endif
-
 #ifdef  DDB
 		/* Initialize kernel debugger, if compiled in. */
-		{
-			extern int end;
-			extern int *esym; 
-
-			ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
-		}
+		ddb_init(nsym, ssym, esym);
 #endif
-
 		if (boothowto & RB_KDB) {
 #if defined(KGDB)
 			kgdb_connect(1);
@@ -277,10 +269,10 @@ consinit()
 #endif
 		}
 
-    init = 1;
-  }
-  else
-    next68k_calibrate_delay();
+		init = 1;
+	} else {
+		next68k_calibrate_delay();
+	}
 }
 
 /*
@@ -334,9 +326,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	base = bufpages / nbuf;
@@ -366,6 +358,7 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -402,7 +395,7 @@ cpu_startup()
 	 * XXX but not right now.
 	 */
 	if (uvm_map_protect(kernel_map, 0, round_page((vaddr_t)&kernel_text),
-	    UVM_PROT_NONE, TRUE) != KERN_SUCCESS)
+	    UVM_PROT_NONE, TRUE) != 0)
 		panic("can't mark pre-text pages off-limits");
 
 	/*
@@ -411,7 +404,7 @@ cpu_startup()
 	 */
 	if (uvm_map_protect(kernel_map, trunc_page((vaddr_t)&kernel_text),
 	    round_page((vaddr_t)&etext), UVM_PROT_READ|UVM_PROT_EXEC, TRUE)
-	    != KERN_SUCCESS)
+	    != 0)
 		panic("can't protect kernel text");
 
 	/*
@@ -448,7 +441,7 @@ setregs(p, pack, stack)
 	frame->f_regs[D7] = 0;
 	frame->f_regs[A0] = 0;
 	frame->f_regs[A1] = 0;
-	frame->f_regs[A2] = (int)PS_STRINGS;
+	frame->f_regs[A2] = (int)p->p_psstr;
 	frame->f_regs[A3] = 0;
 	frame->f_regs[A4] = 0;
 	frame->f_regs[A5] = 0;
@@ -769,7 +762,7 @@ cpu_dump(dump, blknop)
 /*
  * These variables are needed by /sbin/savecore
  */
-u_long	dumpmag = 0x8fca0101;	/* magic number */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number */
 int	dumpsize = 0;		/* pages */
 long	dumplo = 0;		/* blocks */
 
@@ -865,6 +858,7 @@ dumpsys()
 #undef NPGMB
 		pmap_enter(pmap_kernel(), (vm_offset_t)vmmap, maddr,
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
+		pmap_update(pmap_kernel());
 
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
  bad:

@@ -1,4 +1,4 @@
-/*	$NetBSD: auxreg.c,v 1.27 2000/03/23 06:44:46 thorpej Exp $ */
+/*	$NetBSD: auxreg.c,v 1.29 2002/03/11 16:27:03 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -43,6 +43,8 @@
  *
  *	@(#)auxreg.c	8.1 (Berkeley) 6/11/93
  */
+
+#include "opt_blink.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -135,7 +137,6 @@ auxregattach_mainbus(parent, self, aux)
 	bus_space_handle_t bh;
 
 	if (bus_space_map2(ma->ma_bustag,
-			  ma->ma_iospace,
 			  (bus_addr_t)ma->ma_paddr,
 			  sizeof(long),
 			  BUS_SPACE_MAP_LINEAR,
@@ -159,11 +160,11 @@ auxregattach_obio(parent, self, aux)
 	struct sbus_attach_args *sa = &uoba->uoba_sbus;
 	bus_space_handle_t bh;
 
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_slot, sa->sa_offset,
-			 sizeof(long),
-			 BUS_SPACE_MAP_LINEAR,
-			 AUXREG_VA, &bh) != 0) {
+	if (bus_space_map2(sa->sa_bustag,
+			  BUS_ADDR(sa->sa_slot, sa->sa_offset),
+			  sizeof(long),
+			  BUS_SPACE_MAP_LINEAR,
+			  AUXREG_VA, &bh) != 0) {
 		printf("auxregattach_obio: can't map register\n");
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: md.c,v 1.22 2000/01/21 23:39:57 thorpej Exp $	*/
+/*	$NetBSD: md.c,v 1.28 2002/01/13 19:28:07 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon W. Ross, Leo Weppelman.
@@ -45,6 +45,9 @@
  * to the authors of the MFS implementation.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: md.c,v 1.28 2002/01/13 19:28:07 tsutsui Exp $");
+
 #include "opt_md.h"
 
 #include <sys/param.h>
@@ -58,9 +61,7 @@
 #include <sys/conf.h>
 #include <sys/disklabel.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/md.h>
 
@@ -127,12 +128,11 @@ mdattach(n)
 	/* Attach as if by autoconfig. */
 	for (i = 0; i < n; i++) {
 
-		sc = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT);
+		sc = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT|M_ZERO);
 		if (!sc) {
 			printf("ramdisk: malloc for attach failed!\n");
 			return;
 		}
-		bzero((caddr_t)sc, sizeof(*sc));
 		ramdisk_devs[i] = sc;
 		sc->sc_dev.dv_unit = i;
 		sprintf(sc->sc_dev.dv_xname, "md%d", i);
@@ -154,7 +154,7 @@ md_attach(parent, self, aux)
 	/*
 	 * This external function might setup a pre-loaded disk.
 	 * All it would need to do is setup the md_conf struct.
-	 * See sys/arch/sun3/dev/md_root.c for an example.
+	 * See sys/dev/md_root.c for an example.
 	 */
 	md_attach_hook(sc->sc_dev.dv_unit, &sc->sc_md);
 #endif
@@ -366,9 +366,9 @@ mdstrategy(bp)
 			xfer = (sc->sc_size - off);
 		addr = sc->sc_addr + off;
 		if (bp->b_flags & B_READ)
-			bcopy(addr, bp->b_data, xfer);
+			memcpy(bp->b_data, addr, xfer);
 		else
-			bcopy(bp->b_data, addr, xfer);
+			memcpy(addr, bp->b_data, xfer);
 		bp->b_resid -= xfer;
 		break;
 

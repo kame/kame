@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_driver.h,v 1.4 2000/02/13 04:53:57 oster Exp $	*/
+/*	$NetBSD: rf_driver.h,v 1.7 2002/01/07 01:58:03 oster Exp $	*/
 /*
  * rf_driver.h
  */
@@ -32,11 +32,11 @@
 #ifndef _RF__RF_DRIVER_H_
 #define _RF__RF_DRIVER_H_
 
+#include <dev/raidframe/raidframevar.h>
+
 #include "rf_threadstuff.h"
-#include "rf_types.h"
 #include "rf_netbsd.h"
 
-#if _KERNEL
 RF_DECLARE_EXTERN_MUTEX(rf_printf_mutex)
 int     rf_BootRaidframe(void);
 int     rf_UnbootRaidframe(void);
@@ -47,22 +47,18 @@ RF_RaidAccessDesc_t *rf_AllocRaidAccDesc(RF_Raid_t * raidPtr, RF_IoType_t type,
 					 RF_RaidAddr_t raidAddress, 
 					 RF_SectorCount_t numBlocks, 
 					 caddr_t bufPtr,
-					 void *bp, RF_DagHeader_t ** paramDAG,
-					 RF_AccessStripeMapHeader_t ** paramASM,
+					 void *bp,
 					 RF_RaidAccessFlags_t flags, 
-					 void (*cbF) (struct buf *), 
-					 void *cbA,
 					 RF_AccessState_t * states);
 void    rf_FreeRaidAccDesc(RF_RaidAccessDesc_t * desc);
 int     rf_DoAccess(RF_Raid_t * raidPtr, RF_IoType_t type, int async_flag,
 		    RF_RaidAddr_t raidAddress, RF_SectorCount_t numBlocks, 
-		    caddr_t bufPtr, void *bp_in, RF_DagHeader_t ** paramDAG,
-		    RF_AccessStripeMapHeader_t ** paramASM, 
-		    RF_RaidAccessFlags_t flags, 
-		    RF_RaidAccessDesc_t ** paramDesc, 
-		    void (*cbF) (struct buf *), void *cbA);
+		    caddr_t bufPtr, void *bp_in, 
+		    RF_RaidAccessFlags_t flags);
+#if 0
 int     rf_SetReconfiguredMode(RF_Raid_t * raidPtr, RF_RowCol_t row,
 			       RF_RowCol_t col);
+#endif
 int     rf_FailDisk(RF_Raid_t * raidPtr, RF_RowCol_t frow, RF_RowCol_t fcol,
 		    int initRecon);
 void    rf_SignalQuiescenceLock(RF_Raid_t * raidPtr, 
@@ -74,5 +70,5 @@ void    rf_StartUserStats(RF_Raid_t * raidPtr);
 void    rf_StopUserStats(RF_Raid_t * raidPtr);
 void    rf_UpdateUserStats(RF_Raid_t * raidPtr, int rt, int numsect);
 void    rf_PrintUserStats(RF_Raid_t * raidPtr);
-#endif /* _KERNEL */
+
 #endif				/* !_RF__RF_DRIVER_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_cdrom.c,v 1.5.6.1 2001/03/30 21:37:59 he Exp $ */
+/*	$NetBSD: linux_cdrom.c,v 1.13 2002/03/22 17:14:18 christos Exp $ */
 
 /*
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -33,6 +33,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_cdrom.c,v 1.13 2002/03/22 17:14:18 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -56,8 +59,8 @@
 static int bsd_to_linux_msf_lba(unsigned address_format, union msf_lba *bml,
 				union linux_cdrom_addr *llml);
 
-#if 0
-#define DPRINTF(x) printf x
+#if DEBUG_LINUX
+#define DPRINTF(x) uprintf x
 #else
 #define DPRINTF(x)
 #endif
@@ -126,9 +129,7 @@ linux_ioctl_cdrom(p, uap, retval)
 	dvd_authinfo dai;
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	FILE_USE(fp);
@@ -183,8 +184,8 @@ linux_ioctl_cdrom(p, uap, retval)
 		if (error)
 			break;
 	    
-		sg = stackgap_init(p->p_emul);
-		entry = stackgap_alloc(&sg, sizeof *entry);
+		sg = stackgap_init(p, 0);
+		entry = stackgap_alloc(p, &sg, sizeof *entry);
 		t_toc_entry.address_format = l_tocentry.cdte_format;
 		t_toc_entry.starting_track = l_tocentry.cdte_track;
 		t_toc_entry.data_len = sizeof *entry;
@@ -203,7 +204,7 @@ linux_ioctl_cdrom(p, uap, retval)
 		l_tocentry.cdte_ctrl = t_entry.control;
 		if (bsd_to_linux_msf_lba(t_entry.addr_type, &t_entry.addr,
 		    &l_tocentry.cdte_addr) < 0) {
-			printf("linux_ioctl: unknown format msf/lba\n");
+			DPRINTF(("linux_ioctl: unknown format msf/lba\n"));
 			error = EINVAL;
 			break;
 		}
@@ -243,8 +244,8 @@ linux_ioctl_cdrom(p, uap, retval)
 		if (error)
 			break;
 
-		sg = stackgap_init(p->p_emul);
-		info = stackgap_alloc(&sg, sizeof *info);
+		sg = stackgap_init(p, 0);
+		info = stackgap_alloc(p, &sg, sizeof *info);
 		t_subchannel.address_format = CD_MSF_FORMAT;
 		t_subchannel.track = 0;
 		t_subchannel.data_format = l_subchnl.cdsc_format;
@@ -348,8 +349,8 @@ linux_ioctl_cdrom(p, uap, retval)
 		if (error)
 			break;
 
-		sg = stackgap_init(p->p_emul);
-		entry = stackgap_alloc(&sg, sizeof *entry);
+		sg = stackgap_init(p, 0);
+		entry = stackgap_alloc(p, &sg, sizeof *entry);
 		t_toc_entry.address_format = l_session.addr_format;
 		t_toc_entry.starting_track = 0;
 		t_toc_entry.data_len = sizeof *entry;

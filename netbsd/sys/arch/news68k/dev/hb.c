@@ -1,4 +1,4 @@
-/*	$NetBSD: hb.c,v 1.3 2000/02/08 16:17:31 tsutsui Exp $	*/
+/*	$NetBSD: hb.c,v 1.5 2001/07/07 06:24:00 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Izumi Tsutsui.  All rights reserved.
@@ -31,6 +31,7 @@
 #include <sys/device.h>
 
 #include <machine/autoconf.h>
+#include <machine/bus.h>
 #include <machine/cpu.h>
 
 #include <news68k/news68k/isr.h>
@@ -73,7 +74,7 @@ hb_attach(parent, self, aux)
 	struct hb_attach_args ha;
 
 	printf("\n");
-	bzero(&ha, sizeof(ha));
+	memset(&ha, 0, sizeof(ha));
 
 	config_search(hb_search, self, &ha);
 }
@@ -90,6 +91,10 @@ hb_search(parent, cf, aux)
 	ha->ha_address = cf->cf_addr;
 	ha->ha_ipl = cf->cf_ipl;
 	ha->ha_vect = cf->cf_vect;
+
+	/* XXX news68k Hyper-bus is not a real bus... */
+	ha->ha_bust = ISIIOPA(ha->ha_address) ?
+	    NEWS68K_BUS_SPACE_INTIO : NEWS68K_BUS_SPACE_EIO;
 
 	if ((*cf->cf_attach->ca_match)(parent, cf, ha) > 0)
 		config_attach(parent, cf, ha, hb_print);

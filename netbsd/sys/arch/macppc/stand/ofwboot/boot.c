@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.7 1999/08/03 07:08:36 tsubai Exp $	*/
+/*	$NetBSD: boot.c,v 1.16 2002/03/30 07:15:51 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -77,37 +77,35 @@
  *	[promdev[{:|,}partition]]/[filename] [flags]
  */
 
-#define	ELFSIZE		32		/* We use 32-bit ELF. */
-
 #include <sys/param.h>
-#include <sys/exec.h>
-#include <sys/exec_elf.h>
-#include <sys/reboot.h>
-#include <sys/disklabel.h>
+#include <sys/boot_flag.h>
 
 #include <lib/libsa/stand.h>
 #include <lib/libsa/loadfile.h>
 #include <lib/libkern/libkern.h>
 
-#include <machine/cpu.h>
-#include <machine/machine_type.h>
-
 #include "ofdev.h"
 #include "openfirm.h"
+
+#ifdef DEBUG
+# define DPRINTF printf
+#else
+# define DPRINTF while (0) printf
+#endif
 
 char bootdev[128];
 char bootfile[128];
 int boothowto;
-int debug;
 
 static ofw_version = 0;
+static char *kernels[] = { "/netbsd", "/netbsd.gz", "/netbsd.macppc", NULL };
 
 static void
 prom2boot(dev)
 	char *dev;
 {
 	char *cp;
-	
+
 	cp = dev + strlen(dev) - 1;
 	for (; *cp; cp--) {
 		if (*cp == ':') {
@@ -147,20 +145,8 @@ parseargs(str, howtop)
 
 found:
 	*cp++ = 0;
-	while (*cp) {
-		switch (*cp++) {
-		case 'a':
-			*howtop |= RB_ASKNAME;
-			break;
-		case 's':
-			*howtop |= RB_SINGLE;
-			break;
-		case 'd':
-			*howtop |= RB_KDB;
-			debug = 1;
-			break;
-		}
-	}
+	while (*cp)
+		BOOT_FLAG(*cp++, *howtop);
 }
 
 static void
@@ -170,26 +156,18 @@ chain(entry, args, ssym, esym)
 	void *ssym, *esym;
 {
 	extern char end[];
-	int l, machine_tag;
-
-	freeall();
+	int l;
 
 	/*
 	 * Stash pointer to end of symbol table after the argument
 	 * strings.
 	 */
 	l = strlen(args) + 1;
-	bcopy(&ssym, args + l, sizeof(ssym));
+	memcpy(args + l, &ssym, sizeof(ssym));
 	l += sizeof(ssym);
-	bcopy(&esym, args + l, sizeof(esym));
+	memcpy(args + l, &esym, sizeof(esym));
 	l += sizeof(esym);
-
-	/*
-	 * Tell the kernel we're an OpenFirmware system.
-	 */
-	machine_tag = POWERPC_MACHINE_OPENFIRMWARE;
-	bcopy(&machine_tag, args + l, sizeof(machine_tag));
-	l += sizeof(machine_tag);
+	l += sizeof(int);	/* XXX */
 
 	OF_chain((void *)RELOC, end - (char *)RELOC, entry, args, l);
 	panic("chain");
@@ -224,16 +202,14 @@ main()
 	if ((openprom = OF_finddevice("/openprom")) != -1) {
 		char model[32];
 
-		bzero(model, sizeof model);
+		memset(model, 0, sizeof model);
 		OF_getprop(openprom, "model", model, sizeof model);
 		for (cp = model; *cp; cp++)
 			if (*cp >= '0' && *cp <= '9') {
 				ofw_version = *cp - '0';
 				break;
 			}
-#if 0
-		printf(">> Open Firmware version %d.x\n", ofw_version);
-#endif
+		DPRINTF(">> Open Firmware version %d.x\n", ofw_version);
 	}
 
 	/*
@@ -263,20 +239,33 @@ main()
 
 	prom2boot(bootdev);
 	parseargs(bootline, &boothowto);
+	DPRINTF("bootline=%s\n", bootline);
 
 	for (;;) {
+		int i;
+
 		if (boothowto & RB_ASKNAME) {
 			printf("Boot: ");
 			gets(bootline);
 			parseargs(bootline, &boothowto);
 		}
-		marks[MARK_START] = 0;
-		if (loadfile(bootline, marks, LOAD_ALL) >= 0)
-			break;
-		if (errno)
-			printf("open %s: %s\n", opened_name, strerror(errno));
+
+		if (bootline[0]) {
+			kernels[0] = bootline;
+			kernels[1] = NULL;
+		}
+
+		for (i = 0; kernels[i]; i++) {
+			DPRINTF("Trying %s\n", kernels[i]);
+
+			marks[MARK_START] = 0;
+			if (loadfile(kernels[i], marks, LOAD_KERNEL) >= 0)
+				goto loaded;
+		}
 		boothowto |= RB_ASKNAME;
 	}
+loaded:
+
 #ifdef	__notyet__
 	OF_setprop(chosen, "bootpath", opened_name, strlen(opened_name) + 1);
 	cp = bootline;
@@ -307,10 +296,31 @@ main()
 	entry = marks[MARK_ENTRY];
 	ssym = (void *)marks[MARK_SYM];
 	esym = (void *)marks[MARK_END];
-	
+
 	printf(" start=0x%x\n", entry);
 	__syncicache((void *)entry, (u_int)ssym - (u_int)entry);
 	chain((void *)entry, bootline, ssym, esym);
 
 	OF_exit();
 }
+
+#ifdef HAVE_CHANGEDISK_HOOK
+void
+changedisk_hook(of)
+	struct open_file *of;
+{
+	struct of_dev *op = of->f_devdata;
+	int c;
+
+	OF_call_method("eject", op->handle, 0, 0);
+
+	c = getchar();
+	if (c == 'q') {
+		printf("quit\n");
+		OF_exit();
+	}
+
+	OF_call_method("close", op->handle, 0, 0);
+	OF_call_method("open", op->handle, 0, 0);
+}
+#endif

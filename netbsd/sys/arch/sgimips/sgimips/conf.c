@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.1 2000/06/14 16:02:43 soren Exp $	*/
+/*	$NetBSD: conf.c,v 1.17 2002/05/21 06:35:08 manu Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -38,6 +38,8 @@
  *	@(#)conf.c	8.2 (Berkeley) 11/14/93
  */
 
+#include "opt_compat_irix.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -66,11 +68,41 @@
 #include "wd.h"
 bdev_decl(wd);
 cdev_decl(wd);
-#include "ca.h"
+#include "ld.h"
 #include "zstty.h"
 cdev_decl(zs);
 #include "com.h"
 cdev_decl(com);
+
+#include "wsdisplay.h"
+cdev_decl(wsdisplay);
+#include "wskbd.h"
+cdev_decl(wskbd);
+#include "wsmouse.h"
+cdev_decl(wsmouse);
+#include "wsmux.h"
+cdev_decl(wsmux);
+#include "wsfont.h"
+cdev_decl(wsfont);
+
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
+
+cdev_decl(arcbios_tty);
+
+#include "clockctl.h"
+cdev_decl(clockctl);
+
+cdev_decl(irix_kmem);
+cdev_decl(irix_usema);
 
 struct bdevsw bdevsw[] =
 {
@@ -88,7 +120,7 @@ struct bdevsw bdevsw[] =
 	bdev_tape_init(NST,st),		/* 11: SCSI tape */
 	bdev_disk_init(NCD,cd),		/* 12: SCSI CD-ROM */
 	bdev_disk_init(NWD,wd),		/* 13: ATA disk */
-	bdev_disk_init(NCA,ca),		/* 14: Compaq array */
+	bdev_disk_init(NLD,ld),		/* 14: logical disk driver */
 	bdev_notdef(),			/* 15: */
 	bdev_notdef(),			/* 16: */
 	bdev_notdef(),			/* 17: */
@@ -98,22 +130,22 @@ struct bdevsw bdevsw[] =
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
 /*
- * swapdev is a fake block device implemented in sw.c and only used 
+ * swapdev is a fake block device implemented in sw.c and only used
  * internally to get to swstrategy.  It cannot be provided to the
  * users, because the swstrategy routine munches the b_dev and b_blkno
  * entries before calling the appropriate driver.  This would horribly
  * confuse, e.g. the hashing routines.  User access (e.g., for libkvm
  * and ps) is provided through the /dev/drum character (raw) device.
  */
-dev_t	swapdev = makedev(0, 0);
+dev_t	swapdev = makedev(1, 0);
 
 struct cdevsw cdevsw[] =
 {
-	cdev_cn_init(1,cn),             /* 0: console */
+	cdev_cn_init(1,cn),		/* 0: console */
 	cdev_swap_init(1,sw),		/* 1: /dev/drum (swap pseudo-device) */
 	cdev_disk_init(NMD,md),		/* 2: memory disk driver */
-	cdev_disk_init(NVND,vnd),	/* 3: vnode disk driver */
-	cdev_disk_init(NCCD,ccd),	/* 4: concatenated disk driver */
+	cdev_disk_init(NCCD,ccd),	/* 3: concatenated disk driver */
+	cdev_disk_init(NVND,vnd),	/* 4: vnode disk driver */
 	cdev_disk_init(NRAID,raid),	/* 5: RAIDframe disk driver */
 	cdev_notdef(),			/* 6: */
 	cdev_notdef(),			/* 7: */
@@ -123,7 +155,7 @@ struct cdevsw cdevsw[] =
 	cdev_tape_init(NST,st),		/* 11: SCSI tape */
 	cdev_disk_init(NCD,cd),		/* 12: SCSI CD-ROM */
 	cdev_disk_init(NWD,wd),		/* 13: ATA disk */
-	cdev_disk_init(NCA,ca),		/* 14: Compaq array */
+	cdev_disk_init(NLD,ld),		/* 14: logical disk driver */
 	cdev_notdef(),			/* 15: */
 	cdev_notdef(),			/* 16: */
 	cdev_notdef(),			/* 17: */
@@ -131,8 +163,8 @@ struct cdevsw cdevsw[] =
 	cdev_notdef(),			/* 19: */
 	cdev_mm_init(1,mm),		/* 20: /dev/{null,mem,kmem,...} */
 	cdev_ctty_init(1,ctty),		/* 21: controlling terminal */
-	cdev_tty_init(NPTY,pts),        /* 22: pseudo-tty slave */
-	cdev_ptc_init(NPTY,ptc),        /* 23: pseudo-tty master */
+	cdev_tty_init(NPTY,pts),	/* 22: pseudo-tty slave */
+	cdev_ptc_init(NPTY,ptc),	/* 23: pseudo-tty master */
 	cdev_log_init(1,log),		/* 24: /dev/klog */
 	cdev_lkm_init(NLKM,lkm),	/* 25: lkm */
 	cdev_fd_init(1,filedesc),	/* 26: file descriptor pseudo-device */
@@ -146,9 +178,39 @@ struct cdevsw cdevsw[] =
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 34: SCSI bus */
 	cdev_tty_init(NZSTTY,zs),	/* 35: Zilog 8530 serial port */
 	cdev_tty_init(NCOM,com),	/* 36: com serial port */
-	cdev_tty_init(1,arcs),		/* 37: ARCS PROM console */
-	cdev_notdef(),			/* 38: */
-	cdev_notdef(),			/* 39: */
+	cdev_tty_init(1,arcbios_tty),	/* 37: ARCS PROM console */
+	cdev_isdn_init(NISDN, isdn),	/* 38: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 39: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 40: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 41: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 42: isdn phone device */
+	cdev_svr4_net_init(NSVR4_NET,svr4_net), /* 43: svr4 net pseudo-device */
+	cdev_notdef(),			/* 44: */
+	cdev_notdef(),			/* 45: */
+	cdev_notdef(),			/* 46: */
+	cdev_notdef(),			/* 47: */
+	cdev_notdef(),			/* 48: */
+	cdev_notdef(),			/* 49: */
+	cdev_wsdisplay_init(NWSDISPLAY,
+			wsdisplay),	/* 50: frame buffers, etc. */
+	cdev_mouse_init(NWSKBD,wskbd),	/* 51: keyboards */
+	cdev_mouse_init(NWSMOUSE,
+			wsmouse),	/* 52: mice */
+	cdev_mouse_init(NWSMUX, wsmux),	/* 53: ws multiplexor */
+	cdev__oci_init(NWSFONT,wsfont),	/* 54: wsfont pseudo-device */
+	cdev_notdef(),			/* 55: */
+	cdev_notdef(),			/* 56: */
+	cdev_notdef(),			/* 57: */
+	cdev_notdef(),			/* 58: */
+	cdev_notdef(),			/* 59: */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 60: clockctl pseudo device */
+#ifdef COMPAT_IRIX
+	cdev_irix_kmem_init(1,irix_kmem),	/* 61: IRIX kmem emulator */
+	cdev_irix_usema_init(1,irix_usema),	/* 62: IRIX usema emulator */
+#else
+	cdev_notdef(),			/* 61: */
+	cdev_notdef(),			/* 62: */
+#endif
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -168,14 +230,14 @@ iszerodev(dev)
 	return (major(dev) == mem_no && minor(dev) == 12);
 }
 
-static int chrtoblktbl[] =  {
+static int chrtoblktbl[] = {
 	/* XXX This needs to be dynamic for LKMs. */
 	/* VCHR */	/* VBLK */
 	/*  0 */	NODEV,
 	/*  1 */	1,
 	/*  2 */	2,
 	/*  3 */	3,
-	/*  4 */	3,
+	/*  4 */	4,
 	/*  5 */	5,
 	/*  6 */	NODEV,
 	/*  7 */	NODEV,
@@ -210,6 +272,29 @@ static int chrtoblktbl[] =  {
 	/* 37 */	NODEV,
 	/* 38 */	NODEV,
 	/* 39 */	NODEV,
+	/* 40 */	NODEV,
+	/* 41 */	NODEV,
+	/* 42 */	NODEV,
+	/* 43 */	NODEV,
+	/* 44 */	NODEV,
+	/* 45 */	NODEV,
+	/* 46 */	NODEV,
+	/* 47 */	NODEV,
+	/* 48 */	NODEV,
+	/* 49 */	NODEV,
+	/* 50 */	NODEV,
+	/* 51 */	NODEV,
+	/* 52 */	NODEV,
+	/* 53 */	NODEV,
+	/* 54 */	NODEV,
+	/* 55 */	NODEV,
+	/* 56 */	NODEV,
+	/* 57 */	NODEV,
+	/* 58 */	NODEV,
+	/* 59 */	NODEV,
+	/* 60 */	NODEV,
+	/* 61 */	NODEV,
+	/* 62 */	NODEV,
 };
 
 dev_t

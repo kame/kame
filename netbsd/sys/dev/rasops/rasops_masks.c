@@ -1,4 +1,4 @@
-/* 	$NetBSD: rasops_masks.c,v 1.5 2000/06/13 13:37:00 ad Exp $	*/
+/* 	$NetBSD: rasops_masks.c,v 1.7 2001/11/13 07:00:23 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -36,10 +36,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rasops_masks.c,v 1.7 2001/11/13 07:00:23 lukem Exp $");
+
 #include "rasops_masks.h"
 
 /* `ragged edge' bitmasks */
-int32_t rasops_lmask[32+1] = {
+const int32_t rasops_lmask[32+1] = {
 	MBE(0x00000000), MBE(0x7fffffff), MBE(0x3fffffff), MBE(0x1fffffff),
 	MBE(0x0fffffff), MBE(0x07ffffff), MBE(0x03ffffff), MBE(0x01ffffff),
 	MBE(0x00ffffff), MBE(0x007fffff), MBE(0x003fffff), MBE(0x001fffff),
@@ -51,7 +54,7 @@ int32_t rasops_lmask[32+1] = {
 	MBE(0x00000000)
 };
 
-int32_t rasops_rmask[32+1] = {
+const int32_t rasops_rmask[32+1] = {
 	MBE(0x00000000), MBE(0x80000000), MBE(0xc0000000), MBE(0xe0000000),
 	MBE(0xf0000000), MBE(0xf8000000), MBE(0xfc000000), MBE(0xfe000000),
 	MBE(0xff000000), MBE(0xff800000), MBE(0xffc00000), MBE(0xffe00000),
@@ -64,7 +67,7 @@ int32_t rasops_rmask[32+1] = {
 };
 
 /* Part bitmasks */
-int32_t rasops_pmask[32][32] = {
+const int32_t rasops_pmask[32][32] = {
       { MBE(0xffffffff), MBE(0x80000000), MBE(0xc0000000), MBE(0xe0000000),
 	MBE(0xf0000000), MBE(0xf8000000), MBE(0xfc000000), MBE(0xfe000000),
 	MBE(0xff000000), MBE(0xff800000), MBE(0xffc00000), MBE(0xffe00000),

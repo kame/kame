@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_bootstrap.c,v 1.17 1999/12/14 17:51:21 thorpej Exp $	*/
+/*	$NetBSD: pmap_bootstrap.c,v 1.20 2002/03/15 05:55:38 gmcgarry Exp $	*/
 
 /* 
  * Copyright (c) 1991, 1993
@@ -39,6 +39,9 @@
  *	@(#)pmap_bootstrap.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap_bootstrap.c,v 1.20 2002/03/15 05:55:38 gmcgarry Exp $");                                                  
+
 #include <sys/param.h>
 #include <sys/proc.h>
 
@@ -50,8 +53,7 @@
 
 #include <hp300/hp300/clockreg.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
+#include <uvm/uvm_extern.h>
 
 #define RELOC(v, t)	*((t*)((u_int)&(v) + firstpa))
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: iomap.h,v 1.8 2000/01/06 12:15:04 leo Exp $	*/
+/*	$NetBSD: iomap.h,v 1.11 2002/04/15 17:05:14 bjh21 Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -32,6 +32,10 @@
 
 #ifndef _MACHINE_IOMAP_H
 #define _MACHINE_IOMAP_H
+
+#ifdef _KERNEL_OPT
+#include "opt_mbtype.h"
+#endif
 /*
  * Atari TT hardware:
  * I/O Address maps
@@ -45,22 +49,50 @@ vaddr_t	stio_addr;		/* Where the st io-area is mapped	*/
  * the config-space, they should be used for a PCI-console only. Other
  * cards should use the bus-functions to map io & mem spaces.
  * Each card gets an config area of NBPG  bytes.
+ * 'pci_mem_uncached' is used by the Milan interrupt handler that frobs
+ * with the PLX. Also, the Milan uses the first page of 'pci_io_addr' for
+ * access to some of it's ISA I/O devices (RTC, Interrupt controller, etc.)
  */
 vaddr_t	pci_conf_addr;		/* KVA base of PCI config space		*/
 vaddr_t	pci_io_addr;		/* KVA base of PCI io-space		*/
 vaddr_t	pci_mem_addr;		/* KVA base of PCI mem-space		*/
+vaddr_t	pci_mem_uncached;	/* KVA base of an uncached PCI mem-page	*/
 #endif /* _KERNEL */
 
-#define	PCI_CONFB_PHYS	(0xA0000000L)
-#define	PCI_CONFM_PHYS	(0x00010000L)
-#define	PCI_IO_PHYS	(0xB0000000L)
-#define	PCI_MEM_PHYS	(0x80000000L)
-#define PCI_VGA_PHYS	(0x800a0000L)
+#define	PCI_CONFB_PHYS		(0xA0000000L)
+#define	PCI_CONFM_PHYS		(0x00010000L)
 
+#if defined(_ATARIHW_)
+#define	PCI_IO_PHYS		(0xB0000000L)
+#define	PCI_MEM_PHYS		(0x80000000L)
+#define PCI_VGA_PHYS		(0x800a0000L)
+#define	ISA_IOSTART		(0xfff30000L) /* XXX: With byte frobbing */
+#define	ISA_MEMSTART		(0xff000000L)
+#endif /* defined(_ATARIHW_) */
+
+#if defined(_MILANHW_)
+#define	PCI_IO_PHYS		(0x80000000L)
+#define	PCI_MEM_PHYS		(0x40000000L)
+#define PCI_VGA_PHYS		(0x400a0000L)
+#define	ISA_IOSTART		(0x80000000L) /* !NO! byte frobbing	 */
+#define	ISA_MEMSTART		(0x40000000L)
+#endif	/* defined(_MILANHW_) */
+
+/*
+ * Pre-allocated PCI-memory regions (atari_init.c). We need those in the
+ * boot-stages.
+ * XXX: Can probably be reduced to only PCI_CONF_SIZE (Leo).
+ */
 #define PCI_CONF_SIZE	(4 * NBPG)
 #define PCI_IO_SIZE	(NBPG)
-#define PCI_VGA_SIZE	(32 * 1024)
+#define PCI_MEM_SIZE	(NBPG)
 
+#define	PCI_VGA_SIZE	(32 * 1024) /* XXX Leo: Only used by grfabs_et now. */
+
+/*
+ * See bootm_init()/bootm_alloc() in bus.c for the usage of this pool
+ * of pre-allocated VA-space.
+ */
 #define	BOOTM_VA_POOL	(32 * 8192)	/* Pre-allocated VA-space	*/
 
 #define	AD_RAM		(0x000000L)	/* main memory			*/
@@ -71,9 +103,11 @@ vaddr_t	pci_mem_addr;		/* KVA base of PCI mem-space		*/
 /*
  * Physical address of I/O area. Use only for pte initialisation!
  */
-#define	STIO_PHYS	((machineid & ATARI_HADES)	\
-				? 0xffff8000L		\
+#define	STIO_PHYS	((machineid & (ATARI_HADES | ATARI_MILAN))	\
+				? 0xffff8000L				\
 				: 0x00ff8000L)
+
+#if defined(_ATARIHW_)
 
 /*
  * I/O addresses in the STIO area:
@@ -93,4 +127,22 @@ vaddr_t	pci_mem_addr;		/* KVA base of PCI mem-space		*/
 #define	AD_MFP		(AD_STIO + 0x7A00)	/* 68901		*/
 #define	AD_MFP2		(AD_STIO + 0x7A80)	/* 68901-TT		*/
 #define	AD_ACIA		(AD_STIO + 0x7C00)	/* 2 * 6850		*/
+#endif /* defined(_ATARIHW_) */
+
+#if defined(_MILANHW_)
+/*
+ * Milan onboard I/O
+ */
+#define	AD_MFP		(AD_STIO + 0x4100)	/* 68901		*/
+#define	AD_PLX		(AD_STIO + 0x4200)	/* PLX9080		*/
+
+/*
+ * Milan special locations in the first page of the PCI I/O space.
+ */
+#define	AD_8259_MASTER	(pci_io_addr + 0x20)	/* Master int. contr.	*/
+#define	AD_8259_SLAVE	(pci_io_addr + 0xA0)	/* Slave int. contr.	*/
+#define	AD_RTC		(pci_io_addr + 0x70)	/* MC146818 compat. RTC	*/
+
+#endif /* defined(_MILANHW_) */
+
 #endif /* _MACHINE_IOMAP_H */

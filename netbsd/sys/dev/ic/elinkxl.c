@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxl.c,v 1.34.2.7 2002/02/13 22:15:10 he Exp $	*/
+/*	$NetBSD: elinkxl.c,v 1.63 2002/05/12 15:48:38 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,8 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: elinkxl.c,v 1.63 2002/05/12 15:48:38 wiz Exp $");
+
 #include "bpfilter.h"
 #include "rnd.h"
 
@@ -56,23 +57,12 @@
 #include <sys/rnd.h>
 #endif
 
+#include <uvm/uvm_extern.h>
+
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
@@ -83,9 +73,6 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 #include <machine/endian.h>
-
-#include <vm/vm.h>
-#include <vm/pmap.h>
 
 #include <dev/mii/miivar.h>
 #include <dev/mii/mii.h>
@@ -109,7 +96,7 @@ void ex_set_filter __P((struct ex_softc *));
 void ex_set_media __P((struct ex_softc *));
 struct mbuf *ex_get __P((struct ex_softc *, int));
 u_int16_t ex_read_eeprom __P((struct ex_softc *, int));
-void ex_init __P((struct ex_softc *));
+int ex_init __P((struct ifnet *));
 void ex_read __P((struct ex_softc *));
 void ex_reset __P((struct ex_softc *));
 void ex_set_mc __P((struct ex_softc *));
@@ -239,7 +226,7 @@ ex_config(sc)
 	 * map for them.
 	 */
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
-	    EX_NUPD * sizeof (struct ex_upd), NBPG, 0, &sc->sc_useg, 1, 
+	    EX_NUPD * sizeof (struct ex_upd), PAGE_SIZE, 0, &sc->sc_useg, 1, 
             &sc->sc_urseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: can't allocate upload descriptors, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
@@ -284,7 +271,7 @@ ex_config(sc)
 	 * map for them.
 	 */
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
-	    EX_NDPD * sizeof (struct ex_dpd), NBPG, 0, &sc->sc_dseg, 1, 
+	    EX_NDPD * sizeof (struct ex_dpd), PAGE_SIZE, 0, &sc->sc_dseg, 1, 
 	    &sc->sc_drseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: can't allocate download descriptors, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
@@ -300,7 +287,7 @@ ex_config(sc)
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
-	bzero(sc->sc_dpd, EX_NDPD * sizeof (struct ex_dpd));
+	memset(sc->sc_dpd, 0, EX_NDPD * sizeof (struct ex_dpd));
 
 	attach_stage = 6;
 
@@ -431,18 +418,28 @@ ex_config(sc)
 	} else
 		ex_probemedia(sc);
 
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = ex_start;
 	ifp->if_ioctl = ex_ioctl;
 	ifp->if_watchdog = ex_watchdog;
+	ifp->if_init = ex_init;
+	ifp->if_stop = ex_stop;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * We can support 802.1Q VLAN-sized frames.
 	 */
 	sc->sc_ethercom.ec_capabilities |= ETHERCAP_VLAN_MTU;
+
+	/*
+	 * The 3c90xB has hardware IPv4/TCPv4/UDPv4 checksum support.
+	 */
+	if (sc->ex_conf & EX_CONF_90XB)
+		sc->sc_ethercom.ec_if.if_capabilities |= IFCAP_CSUM_IPv4 |
+		    IFCAP_CSUM_TCPv4 | IFCAP_CSUM_UDPv4;
 
 	if_attach(ifp);
 	ether_ifattach(ifp, macaddr);
@@ -454,11 +451,6 @@ ex_config(sc)
 
 	/* TODO: set queues to 0 */
 
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_ethercom.ec_if.if_bpf, ifp, DLT_EN10MB,
-		  sizeof(struct ether_header));
-#endif
-
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
 			  RND_TYPE_NET, 0);
@@ -468,13 +460,13 @@ ex_config(sc)
 	sc->sc_sdhook = shutdownhook_establish(ex_shutdown, sc);
 	if (sc->sc_sdhook == NULL)
 		printf("%s: WARNING: unable to establish shutdown hook\n",
-		    sc->sc_dev.dv_xname);
+			sc->sc_dev.dv_xname);
 
 	/* Add a suspend hook to make sure we come back up after a resume. */
 	sc->sc_powerhook = powerhook_establish(ex_power, sc);
 	if (sc->sc_powerhook == NULL)
 		printf("%s: WARNING: unable to establish power hook\n",
-		    sc->sc_dev.dv_xname);
+			sc->sc_dev.dv_xname);
 
 	/* The attach is successful. */
 	sc->ex_flags |= EX_FLAGS_ATTACHED;
@@ -578,7 +570,7 @@ ex_probemedia(sc)
 		return;
 	}
 
-#define	PRINT(s)	printf("%s%s", sep, s); sep = ", "
+#define	PRINT(str)	printf("%s%s", sep, str); sep = ", "
 
 	for (exm = ex_native_media; exm->exm_name != NULL; exm++) {
 		if (reset_options & exm->exm_mpbit) {
@@ -618,19 +610,21 @@ ex_probemedia(sc)
 /*
  * Bring device up.
  */
-void
-ex_init(sc)
-	struct ex_softc *sc;
+int
+ex_init(ifp)
+	struct ifnet *ifp;
 {
-	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+	struct ex_softc *sc = ifp->if_softc;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
-	int s, i;
+	int i;
+	int error = 0;
 
-	s = splnet();
+	if ((error = ex_enable(sc)) != 0)
+		goto out;
 
 	ex_waitcmd(sc);
-	ex_stop(sc);
+	ex_stop(ifp, 0);
 
 	/*
 	 * Set the station address and clear the station mask. The latter
@@ -666,8 +660,10 @@ ex_init(sc)
 	bus_space_write_4(iot, ioh, ELINK_DMACTRL,
 	    bus_space_read_4(iot, ioh, ELINK_DMACTRL) | ELINK_DMAC_UPRXEAREN);
 
-	bus_space_write_2(iot, ioh, ELINK_COMMAND, SET_RD_0_MASK | S_MASK);
-	bus_space_write_2(iot, ioh, ELINK_COMMAND, SET_INTR_MASK | S_MASK);
+	bus_space_write_2(iot, ioh, ELINK_COMMAND,
+	    SET_RD_0_MASK | XL_WATCHED_INTERRUPTS);
+	bus_space_write_2(iot, ioh, ELINK_COMMAND,
+	    SET_INTR_MASK | XL_WATCHED_INTERRUPTS);
 
 	bus_space_write_2(iot, ioh, ELINK_COMMAND, ACK_INTR | 0xff);
 	if (sc->intr_ack)
@@ -704,9 +700,15 @@ ex_init(sc)
 
 	GO_WINDOW(1);
 
-	splx(s);
-
 	callout_reset(&sc->ex_mii_callout, hz, ex_tick, sc);
+
+ out:
+	if (error) {
+		ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+		ifp->if_timer = 0;
+		printf("%s: interface not running\n", sc->sc_dev.dv_xname);
+	}
+	return (error);
 }
 
 #define	ex_mchash(addr)	(ether_crc32_be((addr), ETHER_ADDR_LEN) & 0xff)
@@ -737,7 +739,7 @@ ex_set_mc(sc)
 	} else {
 		ETHER_FIRST_MULTI(estep, ec, enm);
 		while (enm != NULL) {
-			if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
+			if (memcmp(enm->enm_addrlo, enm->enm_addrhi,
 			    ETHER_ADDR_LEN) != 0)
 				goto out;
 			i = ex_mchash(enm->enm_addrlo);
@@ -757,6 +759,7 @@ static void
 ex_txstat(sc)
 	struct ex_softc *sc;
 {
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 	int i;
@@ -773,7 +776,7 @@ ex_txstat(sc)
 			if (sc->sc_ethercom.ec_if.if_flags & IFF_DEBUG)
 				printf("%s: jabber (%x)\n",
 				       sc->sc_dev.dv_xname, i);
-			ex_init(sc);
+			ex_init(ifp);
 			/* TODO: be more subtle here */
 		} else if (i & TXS_UNDERRUN) {
 			++sc->sc_ethercom.ec_if.if_oerrors;
@@ -785,7 +788,7 @@ ex_txstat(sc)
 				    sc->tx_start_thresh = min(ETHER_MAX_LEN,
 					    sc->tx_start_thresh + 20);
 			sc->tx_succ_ok = 0;
-			ex_init(sc);
+			ex_init(ifp);
 			/* TODO: be more subtle here */
 		} else if (i & TXS_MAX_COLLISION) {
 			++sc->sc_ethercom.ec_if.if_collisions;
@@ -800,10 +803,9 @@ int
 ex_media_chg(ifp)
 	struct ifnet *ifp;
 {
-	struct ex_softc *sc = ifp->if_softc;
 
 	if (ifp->if_flags & IFF_UP)
-		ex_init(sc);
+		ex_init(ifp);
 	return 0;
 }
 
@@ -935,8 +937,10 @@ ex_start(ifp)
 	volatile struct ex_fraghdr *fr = NULL;
 	volatile struct ex_dpd *dpd = NULL, *prevdpd = NULL;
 	struct ex_txdesc *txp;
+	struct mbuf *mb_head;
 	bus_dmamap_t dmamap;
-	int offset, totlen;
+	int offset, totlen, segment, error;
+	u_int32_t csum_flags;
 
 	if (sc->tx_head || sc->tx_free == NULL)
 		return;
@@ -947,21 +951,18 @@ ex_start(ifp)
 	 * We're finished if there is nothing more to add to the list or if
 	 * we're all filled up with buffers to transmit.
 	 */
-	while (ifp->if_snd.ifq_head != NULL && sc->tx_free != NULL) {
-		struct mbuf *mb_head;
-		int segment, error;
-
+	while (sc->tx_free != NULL) {
 		/*
 		 * Grab a packet to transmit.
 		 */
-		IF_DEQUEUE(&ifp->if_snd, mb_head);
+		IFQ_DEQUEUE(&ifp->if_snd, mb_head);
+		if (mb_head == NULL)
+			break;
 
 		/*
 		 * Get pointer to next available tx desc.
 		 */
 		txp = sc->tx_free;
-		sc->tx_free = txp->tx_next;
-		txp->tx_next = NULL;
 		dmamap = txp->tx_dmamap;
 
 		/*
@@ -971,7 +972,7 @@ ex_start(ifp)
 		 */
  reload:
 		error = bus_dmamap_load_mbuf(sc->sc_dmat, dmamap,
-		    mb_head, BUS_DMA_NOWAIT);
+		    mb_head, BUS_DMA_WRITE|BUS_DMA_NOWAIT);
 		switch (error) {
 		case 0:
 			/* Success. */
@@ -1022,6 +1023,12 @@ ex_start(ifp)
 			goto out;
 		}
 
+		/*
+		 * remove our tx desc from freelist.
+		 */
+		sc->tx_free = txp->tx_next;
+		txp->tx_next = NULL;
+
 		fr = &txp->tx_dpd->dpd_frags[0];
 		totlen = 0;
 		for (segment = 0; segment < dmamap->dm_nsegs; segment++, fr++) {
@@ -1039,6 +1046,25 @@ ex_start(ifp)
 		dpd = txp->tx_dpd;
 		dpd->dpd_nextptr = 0;
 		dpd->dpd_fsh = htole32(totlen);
+
+		/* Byte-swap constants so compiler can optimize. */
+
+		if (sc->ex_conf & EX_CONF_90XB) {
+			csum_flags = 0;
+
+			if (mb_head->m_pkthdr.csum_flags & M_CSUM_IPv4)
+				csum_flags |= htole32(EX_DPD_IPCKSUM);
+
+			if (mb_head->m_pkthdr.csum_flags & M_CSUM_TCPv4)
+				csum_flags |= htole32(EX_DPD_TCPCKSUM);
+			else if (mb_head->m_pkthdr.csum_flags & M_CSUM_UDPv4)
+				csum_flags |= htole32(EX_DPD_UDPCKSUM);
+
+			dpd->dpd_fsh |= csum_flags;
+		} else {
+			KDASSERT((mb_head->m_pkthdr.csum_flags &
+			    (M_CSUM_IPv4|M_CSUM_TCPv4|M_CSUM_UDPv4)) == 0);
+		}
 
 		bus_dmamap_sync(sc->sc_dmat, sc->sc_dpd_dmamap,
 		    ((caddr_t)dpd - (caddr_t)sc->sc_dpd),
@@ -1105,17 +1131,15 @@ ex_intr(arg)
 	int ret = 0;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 
-	if (sc->enabled == 0 ||
+	if ((ifp->if_flags & IFF_RUNNING) == 0 ||
 	    (sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
 		return (0);
 
 	for (;;) {
-		bus_space_write_2(iot, ioh, ELINK_COMMAND, C_INTR_LATCH);
-
 		stat = bus_space_read_2(iot, ioh, ELINK_STATUS);
 
-		if ((stat & S_MASK) == 0) {
-			if ((stat & S_INTR_LATCH) == 0) {
+		if ((stat & XL_WATCHED_INTERRUPTS) == 0) {
+			if ((stat & INTR_LATCH) == 0) {
 #if 0
 				printf("%s: intr latch cleared\n",
 				       sc->sc_dev.dv_xname);
@@ -1130,24 +1154,24 @@ ex_intr(arg)
 		 * Acknowledge interrupts.
 		 */
 		bus_space_write_2(iot, ioh, ELINK_COMMAND, ACK_INTR |
-				  (stat & S_MASK));
+		    (stat & (XL_WATCHED_INTERRUPTS | INTR_LATCH)));
 		if (sc->intr_ack)
 			(*sc->intr_ack)(sc);
 
-		if (stat & S_HOST_ERROR) {
+		if (stat & HOST_ERROR) {
 			printf("%s: adapter failure (%x)\n",
 			    sc->sc_dev.dv_xname, stat);
 			ex_reset(sc);
-			ex_init(sc);
+			ex_init(ifp);
 			return 1;
 		}
-		if (stat & S_TX_COMPLETE) {
+		if (stat & TX_COMPLETE) {
 			ex_txstat(sc);
 		}
-		if (stat & S_UPD_STATS) {
+		if (stat & UPD_STATS) {
 			ex_getstats(sc);
 		}
-		if (stat & S_DN_COMPLETE) {
+		if (stat & DN_COMPLETE) {
 			struct ex_txdesc *txp, *ptxp = NULL;
 			bus_dmamap_t txmap;
 
@@ -1186,7 +1210,7 @@ ex_intr(arg)
 			ifp->if_flags &= ~IFF_OACTIVE;
 		}
 
-		if (stat & S_UP_COMPLETE) {
+		if (stat & UP_COMPLETE) {
 			struct ex_rxdesc *rxd;
 			struct mbuf *m;
 			struct ex_upd *upd;
@@ -1221,7 +1245,6 @@ ex_intr(arg)
 				 * instead.
 				 */
 				if (ex_add_rxbuf(sc, rxd) == 0) {
-					struct ether_header *eh;
 					u_int16_t total_len;
 
 					if (pktstat &
@@ -1241,29 +1264,30 @@ ex_intr(arg)
 					}
 					m->m_pkthdr.rcvif = ifp;
 					m->m_pkthdr.len = m->m_len = total_len;
-					eh = mtod(m, struct ether_header *);
 #if NBPFILTER > 0
-					if (ifp->if_bpf) {
-						bpf_tap(ifp->if_bpf,
-						    mtod(m, caddr_t),
-						    total_len); 
-						/*
-						 * Only pass this packet up
-						 * if it is for us.
-						 */
-						if ((ifp->if_flags &
-						    IFF_PROMISC) &&
-						    (eh->ether_dhost[0] & 1)
-						    == 0 &&
-						    bcmp(eh->ether_dhost,
-							LLADDR(ifp->if_sadl),
-							sizeof(eh->ether_dhost))
-							    != 0) {
-							m_freem(m);
-							goto rcvloop;
-						}
-					}
-#endif /* NBPFILTER > 0 */
+					if (ifp->if_bpf)
+						bpf_mtap(ifp->if_bpf, m);
+#endif
+		/*
+		 * Set the incoming checksum information for the packet.
+		 */
+		if ((sc->ex_conf & EX_CONF_90XB) != 0 &&
+		    (pktstat & EX_UPD_IPCHECKED) != 0) {
+			m->m_pkthdr.csum_flags |= M_CSUM_IPv4;
+			if (pktstat & EX_UPD_IPCKSUMERR)
+				m->m_pkthdr.csum_flags |= M_CSUM_IPv4_BAD;
+			if (pktstat & EX_UPD_TCPCHECKED) {
+				m->m_pkthdr.csum_flags |= M_CSUM_TCPv4;
+				if (pktstat & EX_UPD_TCPCKSUMERR)
+					m->m_pkthdr.csum_flags |=
+					    M_CSUM_TCP_UDP_BAD;
+			} else if (pktstat & EX_UPD_UDPCHECKED) {
+				m->m_pkthdr.csum_flags |= M_CSUM_UDPv4;
+				if (pktstat & EX_UPD_UDPCKSUMERR)
+					m->m_pkthdr.csum_flags |=
+					    M_CSUM_TCP_UDP_BAD;
+			}
+		}
 					(*ifp->if_input)(ifp, m);
 				}
 				goto rcvloop;
@@ -1275,7 +1299,7 @@ ex_intr(arg)
 			if (bus_space_read_4(iot, ioh, ELINK_UPLISTPTR) == 0) {
 				printf("%s: uplistptr was 0\n",
 				       sc->sc_dev.dv_xname);
-				ex_init(sc);
+				ex_init(ifp);
 			} else if (bus_space_read_4(iot, ioh, ELINK_UPPKTSTATUS)
 				   & 0x2000) {
 				printf("%s: receive stalled\n",
@@ -1287,7 +1311,7 @@ ex_intr(arg)
 	}
 
 	/* no more interrupts */
-	if (ret && ifp->if_snd.ifq_head)
+	if (ret && IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		ex_start(ifp);
 	return ret;
 }
@@ -1299,99 +1323,29 @@ ex_ioctl(ifp, cmd, data)
 	caddr_t data;
 {
 	struct ex_softc *sc = ifp->if_softc;
-	struct ifaddr *ifa = (struct ifaddr *)data;
 	struct ifreq *ifr = (struct ifreq *)data;
-	int s, error = 0;
+	int s, error;
 
 	s = splnet();
 
 	switch (cmd) {
-
-	case SIOCSIFADDR:
-		if ((error = ex_enable(sc)) != 0)
-			break;
-		ifp->if_flags |= IFF_UP;
-		switch (ifa->ifa_addr->sa_family) {
-#ifdef INET
-		case AF_INET:
-			ex_init(sc);
-			arp_ifinit(&sc->sc_ethercom.ec_if, ifa);
-			break;
-#endif
-#ifdef NS
-		case AF_NS:
-		    {
-			struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
-
-			if (ns_nullhost(*ina))
-				ina->x_host = *(union ns_host *)
-				    LLADDR(ifp->if_sadl);
-			else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
-				    ifp->if_addrlen);
-			/* Set new address. */
-			ex_init(sc);
-			break;
-		    }
-#endif
-		default:
-			ex_init(sc);
-			break;
-		}
-		break;
 	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ex_mii.mii_media, cmd);
 		break;
 
-	case SIOCSIFFLAGS:
-		if ((ifp->if_flags & IFF_UP) == 0 &&
-		    (ifp->if_flags & IFF_RUNNING) != 0) {
-			/*
-			 * If interface is marked down and it is running, then
-			 * stop it.
-			 */
-			ex_stop(sc);
-			ifp->if_flags &= ~IFF_RUNNING;
-			ex_disable(sc);
-		} else if ((ifp->if_flags & IFF_UP) != 0 &&
-			   (ifp->if_flags & IFF_RUNNING) == 0) {
-			/*
-			 * If interface is marked up and it is stopped, then
-			 * start it.
-			 */
-			if ((error = ex_enable(sc)) != 0)
-				break;
-			ex_init(sc);
-		} else if ((ifp->if_flags & IFF_UP) != 0) {
-			/*
-			 * Deal with other flags that change hardware
-			 * state, i.e. IFF_PROMISC.
-			 */
-			if ((error = ex_enable(sc)) != 0)
-				break;
-			ex_set_mc(sc);
-		}
-		break;
-
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-		error = (cmd == SIOCADDMULTI) ?
-		    ether_addmulti(ifr, &sc->sc_ethercom) :
-		    ether_delmulti(ifr, &sc->sc_ethercom);
-
+	default:
+		error = ether_ioctl(ifp, cmd, data);
 		if (error == ENETRESET) {
+			if (sc->enabled) {
 			/*
 			 * Multicast list has changed; set the hardware filter
 			 * accordingly.
 			 */
-			ex_set_mc(sc);
+				ex_set_mc(sc);
+			}
 			error = 0;
 		}
-		break;
-
-	default:
-		error = EINVAL;
 		break;
 	}
 
@@ -1418,12 +1372,19 @@ ex_getstats(sc)
 	ifp->if_collisions += bus_space_read_1(iot, ioh, TX_COLLISIONS);
 	/*
 	 * There seems to be no way to get the exact number of collisions,
-	 * this is the number that occured at the very least.
+	 * this is the number that occurred at the very least.
 	 */
 	ifp->if_collisions += 2 * bus_space_read_1(iot, ioh,
 	    TX_AFTER_X_COLLISIONS);
-	ifp->if_ibytes += bus_space_read_2(iot, ioh, RX_TOTAL_OK);
-	ifp->if_obytes += bus_space_read_2(iot, ioh, TX_TOTAL_OK);
+	/*
+	 * Interface byte counts are counted by ether_input() and
+	 * ether_output(), so don't accumulate them here.  Just
+	 * read the NIC counters so they don't generate overflow interrupts.
+	 * Upper byte counters are latched from reading the totals, so
+	 * they don't need to be read if we don't need their values.
+	 */
+	bus_space_read_2(iot, ioh, RX_TOTAL_OK);
+	bus_space_read_2(iot, ioh, TX_TOTAL_OK);
 
 	/*
 	 * Clear the following to avoid stats overflow interrupts
@@ -1434,9 +1395,6 @@ ex_getstats(sc)
 	bus_space_read_1(iot, ioh, TX_CD_LOST);
 	GO_WINDOW(4);
 	bus_space_read_1(iot, ioh, ELINK_W4_BADSSD);
-	upperok = bus_space_read_1(iot, ioh, ELINK_W4_UBYTESOK);
-	ifp->if_ibytes += (upperok & 0x0f) << 16;
-	ifp->if_obytes += (upperok & 0xf0) << 12;
 	GO_WINDOW(1);
 }
 
@@ -1472,7 +1430,7 @@ ex_tick(arg)
 		mii_tick(&sc->ex_mii);
 
 	if (!(bus_space_read_2((sc)->sc_iot, (sc)->sc_ioh, ELINK_STATUS)
-	    & S_COMMAND_IN_PROGRESS))
+	    & COMMAND_IN_PROGRESS))
 		ex_getstats(sc);
 
 	splx(s);
@@ -1508,16 +1466,17 @@ ex_watchdog(ifp)
 	++sc->sc_ethercom.ec_if.if_oerrors;
 
 	ex_reset(sc);
-	ex_init(sc);
+	ex_init(ifp);
 }
 
 void
-ex_stop(sc)
-	struct ex_softc *sc;
+ex_stop(ifp, disable)
+	struct ifnet *ifp;
+	int disable;
 {
+	struct ex_softc *sc = ifp->if_softc;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
-	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	struct ex_txdesc *tx;
 	struct ex_rxdesc *rx;
 	int i;
@@ -1552,11 +1511,14 @@ ex_stop(sc)
 		ex_add_rxbuf(sc, rx);
 	}
 
-	bus_space_write_2(iot, ioh, ELINK_COMMAND, C_INTR_LATCH);
+	bus_space_write_2(iot, ioh, ELINK_COMMAND, ACK_INTR | INTR_LATCH);
 
 	callout_stop(&sc->ex_mii_callout);
 	if (sc->ex_conf & EX_CONF_MII)
 		mii_down(&sc->ex_mii);
+
+	if (disable) 
+		ex_disable(sc);
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 	ifp->if_timer = 0;
@@ -1633,9 +1595,6 @@ ex_detach(sc)
 #if NRND > 0
 	rnd_detach_source(&sc->rnd_source);
 #endif
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
 	ether_ifdetach(ifp);
 	if_detach(ifp);
 
@@ -1664,7 +1623,7 @@ ex_detach(sc)
 
 	shutdownhook_disestablish(sc->sc_sdhook);
 	powerhook_disestablish(sc->sc_powerhook);
-	
+
 	return (0);
 }
 
@@ -1677,7 +1636,7 @@ ex_shutdown(arg)
 {
 	struct ex_softc *sc = arg;
 
-	ex_stop(sc);
+	ex_stop(&sc->sc_ethercom.ec_if, 1);
 }
 
 /*
@@ -1768,7 +1727,8 @@ ex_add_rxbuf(sc, rxd)
 		if (oldm != NULL)
 			bus_dmamap_unload(sc->sc_dmat, rxmap);
 		error = bus_dmamap_load(sc->sc_dmat, rxmap,
-		    m->m_ext.ext_buf, MCLBYTES, NULL, BUS_DMA_NOWAIT);
+		    m->m_ext.ext_buf, MCLBYTES, NULL,
+		    BUS_DMA_READ|BUS_DMA_NOWAIT);
 		if (error) {
 			printf("%s: can't load rx buffer, error = %d\n",
 			    sc->sc_dev.dv_xname, error);
@@ -1894,7 +1854,7 @@ ex_enable(sc)
 	if (sc->enabled == 0 && sc->enable != NULL) {
 		if ((*sc->enable)(sc) != 0) {
 			printf("%s: de/vice enable failed\n",
-			    sc->sc_dev.dv_xname);
+				sc->sc_dev.dv_xname);
 			return (EIO);
 		}
 		sc->enabled = 1;
@@ -1925,7 +1885,7 @@ ex_power(why, arg)
 	switch (why) {
 	case PWR_SUSPEND:
 	case PWR_STANDBY:
-		ex_stop(sc);
+		ex_stop(ifp, 0);
 		if (sc->power != NULL)
 			(*sc->power)(sc, why);
 		break;
@@ -1933,7 +1893,7 @@ ex_power(why, arg)
 		if (ifp->if_flags & IFF_UP) {
 			if (sc->power != NULL)
 				(*sc->power)(sc, why);
-			ex_init(sc);
+			ex_init(ifp);
 		}
 		break;
 	case PWR_SOFTSUSPEND:		
@@ -1943,6 +1903,3 @@ ex_power(why, arg)
 	}
 	splx(s);
 }
-
-
-

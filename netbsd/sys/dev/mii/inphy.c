@@ -1,4 +1,4 @@
-/*	$NetBSD: inphy.c,v 1.19.4.1 2000/07/04 04:11:12 thorpej Exp $	*/
+/*	$NetBSD: inphy.c,v 1.27 2002/03/25 20:51:25 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,6 +71,9 @@
  * Data Sheet available from www.intel.com
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: inphy.c,v 1.27 2002/03/25 20:51:25 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -88,53 +91,57 @@
 
 #include <dev/mii/inphyreg.h>
 
-int	inphymatch __P((struct device *, struct cfdata *, void *));
-void	inphyattach __P((struct device *, struct device *, void *));
+int	inphymatch(struct device *, struct cfdata *, void *);
+void	inphyattach(struct device *, struct device *, void *);
 
 struct cfattach inphy_ca = {
 	sizeof(struct mii_softc), inphymatch, inphyattach, mii_phy_detach,
 	    mii_phy_activate
 };
 
-int	inphy_service __P((struct mii_softc *, struct mii_data *, int));
-void	inphy_status __P((struct mii_softc *));
+int	inphy_service(struct mii_softc *, struct mii_data *, int);
+void	inphy_status(struct mii_softc *);
 
 const struct mii_phy_funcs inphy_funcs = {
 	inphy_service, inphy_status, mii_phy_reset,
 };
 
+const struct mii_phydesc inphys[] = {
+	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82555,
+	  MII_STR_yyINTEL_I82555 },
+
+	{ 0,				0,
+	  NULL },
+};
+
 int
-inphymatch(parent, match, aux)
-	struct device *parent;
-	struct cfdata *match;
-	void *aux;
+inphymatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mii_attach_args *ma = aux;
 
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_INTEL &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_INTEL_I82555)
+	if (mii_phy_match(ma, inphys) != NULL)
 		return (10);
 
 	return (0);
 }
 
 void
-inphyattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+inphyattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	const struct mii_phydesc *mpd;
 
-	printf(": %s, rev. %d\n", MII_STR_INTEL_I82555,
-	    MII_REV(ma->mii_id2));
+	mpd = mii_phy_match(ma, inphys);
+	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &inphy_funcs;
 	sc->mii_pdata = mii;
-	sc->mii_flags = mii->mii_flags;
+	sc->mii_flags = ma->mii_flags;
+	sc->mii_anegticks = 5;
 
 	PHY_RESET(sc);
 
@@ -149,10 +156,7 @@ inphyattach(parent, self, aux)
 }
 
 int
-inphy_service(sc, mii, cmd)
-	struct mii_softc *sc;
-	struct mii_data *mii;
-	int cmd;
+inphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
 	int reg;
@@ -214,8 +218,7 @@ inphy_service(sc, mii, cmd)
 }
 
 void
-inphy_status(sc)
-	struct mii_softc *sc;
+inphy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;

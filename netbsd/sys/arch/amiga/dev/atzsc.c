@@ -1,4 +1,4 @@
-/*	$NetBSD: atzsc.c,v 1.28 1998/12/05 19:43:34 mjacob Exp $	*/
+/*	$NetBSD: atzsc.c,v 1.31 2002/01/28 09:56:51 aymeric Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -35,6 +35,10 @@
  *
  *	@(#)dma.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: atzsc.c,v 1.31 2002/01/28 09:56:51 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -52,26 +56,18 @@
 #include <amiga/dev/atzscreg.h>
 #include <amiga/dev/zbusvar.h>
 
-void atzscattach __P((struct device *, struct device *, void *));
-int atzscmatch __P((struct device *, struct cfdata *, void *));
+void atzscattach(struct device *, struct device *, void *);
+int atzscmatch(struct device *, struct cfdata *, void *);
 
-void atzsc_enintr __P((struct sbic_softc *));
-void atzsc_dmastop __P((struct sbic_softc *));
-int atzsc_dmanext __P((struct sbic_softc *));
-int atzsc_dmaintr __P((void *));
-int atzsc_dmago __P((struct sbic_softc *, char *, int, int));
+void atzsc_enintr(struct sbic_softc *);
+void atzsc_dmastop(struct sbic_softc *);
+int atzsc_dmanext(struct sbic_softc *);
+int atzsc_dmaintr(void *);
+int atzsc_dmago(struct sbic_softc *, char *, int, int);
 
 #ifdef DEBUG
-void atzsc_dump __P((void));
+void atzsc_dump(void);
 #endif
-
-struct scsipi_device atzsc_scsidev = {
-	NULL,		/* use default error handler */
-	NULL,		/* do not have a start functio */
-	NULL,		/* have no async handler */
-	NULL,		/* Use default done routine */
-};
-
 
 #ifdef DEBUG
 int	atzsc_dmadebug = 0;
@@ -85,10 +81,7 @@ struct cfattach atzsc_ca = {
  * if we are an A3000 we are here.
  */
 int
-atzscmatch(pdp, cfp, auxp)
-	struct device *pdp;
-	struct cfdata *cfp;
-	void *auxp;
+atzscmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 {
 	struct zbus_args *zap;
 
@@ -105,17 +98,16 @@ atzscmatch(pdp, cfp, auxp)
 }
 
 void
-atzscattach(pdp, dp, auxp)
-	struct device *pdp, *dp;
-	void *auxp;
+atzscattach(struct device *pdp, struct device *dp, void *auxp)
 {
 	volatile struct sdmac *rp;
-	struct sbic_softc *sc;
+	struct sbic_softc *sc = (struct sbic_softc *)dp;
 	struct zbus_args *zap;
+	struct scsipi_adapter *adapt = &sc->sc_adapter;
+	struct scsipi_channel *chan = &sc->sc_channel;
 
 	zap = auxp;
-	
-	sc = (struct sbic_softc *)dp;
+
 	sc->sc_cregs = rp = zap->va;
 	/*
 	 * disable ints and reset bank register
@@ -135,7 +127,7 @@ atzscattach(pdp, dp, auxp)
 	sc->sc_dmamask = ~0x00ffffff;
 #if 0
 	/*
-	 * If the users kva space is not ztwo try and allocate a bounce buffer. 
+	 * If the users kva space is not ztwo try and allocate a bounce buffer.
 	 * XXX this needs to change if we move to multiple memory segments.
 	 */
 	if (kvtop(sc) & sc->sc_dmamask) {
@@ -151,21 +143,30 @@ atzscattach(pdp, dp, auxp)
 	sc->sc_sbic.sbic_value_p = (volatile unsigned char *)rp + 0x93;
 
 	sc->sc_clkfreq = sbic_clock_override ? sbic_clock_override : 77;
-	
+
 	printf(": dmamask 0x%lx\n", ~sc->sc_dmamask);
 
-	sc->sc_adapter.scsipi_cmd = sbic_scsicmd;
-	sc->sc_adapter.scsipi_minphys = sbic_minphys;
+	/*
+	 * Fill in the scsipi_adapter.
+	 */
+	memset(adapt, 0, sizeof(*adapt));
+	adapt->adapt_dev = &sc->sc_dev;
+	adapt->adapt_nchannels = 1;
+	adapt->adapt_openings = 7;
+	adapt->adapt_max_periph = 1;
+	adapt->adapt_request = sbic_scsipi_request;
+	adapt->adapt_minphys = sbic_minphys;
 
-	sc->sc_link.scsipi_scsi.channel = SCSI_CHANNEL_ONLY_ONE;
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.scsipi_scsi.adapter_target = 7;
-	sc->sc_link.adapter = &sc->sc_adapter;
-	sc->sc_link.device = &atzsc_scsidev;
-	sc->sc_link.openings = 2;
-	sc->sc_link.scsipi_scsi.max_target = 7;
-	sc->sc_link.scsipi_scsi.max_lun = 7;
-	sc->sc_link.type = BUS_SCSI;
+	/*
+	 * Fill in the scsipi_channel.
+	 */
+	memset(chan, 0, sizeof(*chan));
+	chan->chan_adapter = adapt;
+	chan->chan_bustype = &scsi_bustype;
+	chan->chan_channel = 0;
+	chan->chan_ntargets = 8;
+	chan->chan_nluns = 8;
+	chan->chan_id = 7;
 
 	sbicinit(sc);
 
@@ -177,12 +178,11 @@ atzscattach(pdp, dp, auxp)
 	/*
 	 * attach all scsi units on us
 	 */
-	config_found(dp, &sc->sc_link, scsiprint);
+	config_found(dp, chan, scsiprint);
 }
 
 void
-atzsc_enintr(dev)
-	struct sbic_softc *dev;
+atzsc_enintr(struct sbic_softc *dev)
 {
 	volatile struct sdmac *sdp;
 
@@ -193,10 +193,7 @@ atzsc_enintr(dev)
 }
 
 int
-atzsc_dmago(dev, addr, count, flags)
-	struct sbic_softc *dev;
-	char *addr;
-	int count, flags;
+atzsc_dmago(struct sbic_softc *dev, char *addr, int count, int flags)
 {
 	volatile struct sdmac *sdp;
 
@@ -221,8 +218,7 @@ atzsc_dmago(dev, addr, count, flags)
 }
 
 void
-atzsc_dmastop(dev)
-	struct sbic_softc *dev;
+atzsc_dmastop(struct sbic_softc *dev)
 {
 	volatile struct sdmac *sdp;
 	int s;
@@ -244,7 +240,7 @@ atzsc_dmastop(dev)
 			while ((sdp->ISTR & ISTR_FE_FLG) == 0)
 				;
 		}
-		/* 
+		/*
 		 * clear possible interrupt and stop dma
 		 */
 		sdp->CINT = 1;
@@ -255,8 +251,7 @@ atzsc_dmastop(dev)
 }
 
 int
-atzsc_dmaintr(arg)
-	void *arg;
+atzsc_dmaintr(void *arg)
 {
 	struct sbic_softc *dev = arg;
 	volatile struct sdmac *sdp;
@@ -283,9 +278,9 @@ atzsc_dmaintr(arg)
 		found++;
 
 		sdp->CINT = 1;	/* clear possible interrupt */
-	
+
 		/*
-		 * check for SCSI ints in the same go and 
+		 * check for SCSI ints in the same go and
 		 * eventually save an interrupt
 		 */
 	}
@@ -297,8 +292,7 @@ atzsc_dmaintr(arg)
 
 
 int
-atzsc_dmanext(dev)
-	struct sbic_softc *dev;
+atzsc_dmanext(struct sbic_softc *dev)
 {
 	volatile struct sdmac *sdp;
 
@@ -311,15 +305,15 @@ atzsc_dmanext(dev)
 		return(0);
 	}
 	if ((dev->sc_dmacmd & (CNTR_TCEN | CNTR_DDIR)) == 0) {
-		  /* 
+		  /*
 		   * only FLUSH if terminal count not enabled,
 		   * and reading from peripheral
 		   */
 		sdp->FLUSH = 1;
 		while ((sdp->ISTR & ISTR_FE_FLG) == 0)
 			;
-        }
-	/* 
+	}
+	/*
 	 * clear possible interrupt and stop dma
 	 */
 	sdp->CINT = 1;	/* clear possible interrupt */
@@ -334,7 +328,7 @@ atzsc_dmanext(dev)
 
 #ifdef DEBUG
 void
-atzsc_dump()
+atzsc_dump(void)
 {
 	extern struct cfdriver atzsc_cd;
 	int i;

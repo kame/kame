@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.64 2000/04/14 13:29:58 tsutsui Exp $ */
+/*	$NetBSD: conf.c,v 1.74 2002/03/16 16:55:59 martin Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -44,6 +44,8 @@
  *	@(#)conf.c	8.3 (Berkeley) 11/14/93
  */
 
+/* XXX KEEP THIS FILE IN SYNC WITH THE arch/sparc64/sparc64/conf.c VERSION */
+
 #include "opt_compat_svr4.h"
 
 #include <sys/param.h>
@@ -76,6 +78,8 @@
 #include "zstty.h"
 #include "bpp.h"
 #include "magma.h"		/* has NMTTY and NMBPP */
+#include "siosixteen.h"
+cdev_decl(cdtty);
 
 #include "fdc.h"		/* has NFDC and NFD; see files.sparc */
 
@@ -97,9 +101,28 @@
 #include "ipfilter.h"
 #include "rnd.h"
 #include "scsibus.h"
+#include "ses.h"
+cdev_decl(ses);
 
 #include "vcoda.h"
 cdev_decl(vc_nb_);
+
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
+
+#include "pci.h"
+cdev_decl(pci);
+
+#include "clockctl.h"
+cdev_decl(clockctl);
 
 struct bdevsw	bdevsw[] =
 {
@@ -138,7 +161,7 @@ struct cdevsw	cdevsw[] =
 	cdev_tty_init(1,kd), 		/* 1: PROM-based console (internal) */
 	cdev_ctty_init(1,ctty),		/* 2: controlling terminal */
 	cdev_mm_init(1,mm),		/* 3: /dev/{null,mem,kmem,...} */
-	cdev_notdef(),			/* 4 */
+	cdev_ses_init(NSES,ses),	/* 4: SCSI SES/SAF-TE */
 	cdev_notdef(),			/* 5: tapemaster tape */
 	cdev_notdef(),			/* 6: systech/versatec */
 	cdev_swap_init(1,sw),		/* 7: /dev/drum (swap pseudo-device) */
@@ -203,14 +226,14 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 66 */
 	cdev_fb_init(NCGSIX,cgsix),	/* 67: /dev/cgsix */
 	cdev_notdef(),			/* 68 */
-	cdev_gen_init(NAUDIO,audio),	/* 69: /dev/audio */
+	cdev__ocrwip_init(NAUDIO,audio),	/* 69: /dev/audio */
 	cdev_openprom_init(1,openprom),	/* 70: /dev/openprom */
 	cdev_tctrl_init(NTCTRL,tctrl),	/* 71: /dev/tctrl */
-	cdev_notdef(),			/* 72 */
-	cdev_notdef(),			/* 73 */
-	cdev_notdef(),			/* 74 */
-	cdev_notdef(),			/* 75 */
-	cdev_notdef(),			/* 76 */
+	cdev_isdn_init(NISDN, isdn),		/* 72: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl),	/* 73: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan),	/* 74: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc),	/* 75: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel),	/* 76: isdn phone device */
 	cdev_notdef(),			/* 77 */
 	cdev_notdef(),			/* 78 */
 	cdev_notdef(),			/* 79 */
@@ -235,13 +258,13 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 98 */
 	cdev_fb_init(NCGFOURTEEN,cgfourteen), /* 99: /dev/cgfourteen */
 	cdev_tty_init(NMTTY,mtty),	/* 100 */
-	cdev_gen_init(NMBPP,mbpp),	/* 101 */
+	cdev__ocrwip_init(NMBPP,mbpp),	/* 101 */
 	cdev_notdef(),			/* 102 */
 	cdev_notdef(),			/* 103 */
 	cdev_notdef(),			/* 104 */
 	cdev_bpftun_init(NBPFILTER,bpf),/* 105: packet filter */
 	cdev_notdef(),			/* 106 */
-	cdev_gen_init(NBPP,bpp),	/* 107: on-board parallel port */
+	cdev__ocrwip_init(NBPP,bpp),	/* 107: on-board parallel port */
 	cdev_notdef(),			/* 108 */
 	cdev_fb_init(NTCX,tcx),		/* 109: /dev/tcx */
 	cdev_disk_init(NVND,vnd),	/* 110: vnode disk driver */
@@ -257,6 +280,9 @@ struct cdevsw	cdevsw[] =
 	cdev_scsibus_init(NSCSIBUS,scsibus), /* 120: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 121: RAIDframe disk driver */
 	cdev_fb_init(NPNOZZ,p9100),	/* 122: /dev/cgfourteen */
+	cdev_pci_init(NPCI,pci),	/* 123: PCI bus access device */
+	cdev_tty_init(NCLCD,cdtty),	/* 124: Aurora multiport serial */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 125 clockctl pseudo device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -418,6 +444,10 @@ static int chrtoblktbl[] = {
 	/*119 */	NODEV,
 	/*120 */	NODEV,
 	/*121 */	25,
+	/*122 */	NODEV,
+	/*123 */	NODEV,
+	/*124 */	NODEV,
+	/*125 */	NODEV,
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: apmvar.h,v 1.9 1999/08/17 19:05:53 drochner Exp $	*/
+/*	$NetBSD: apmvar.h,v 1.14 2001/09/10 05:23:32 perry Exp $	*/
 /*-
  * Copyright (c) 1995 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -52,6 +52,8 @@
 #define APM_CPUIDLE_SLOW	0x04
 #define APM_DISABLED		0x08
 #define APM_DISENGAGED		0x10
+
+#define APM_ERR_LIMIT		10
 
 #define	APM_ERR_CODE(regs)	(((regs)->AX & 0xff00) >> 8)
 #define	APM_ERR_PM_DISABLED	0x01
@@ -280,7 +282,9 @@ struct apm_power_info {
 	u_char battery_life;
 	u_char spare1;
 	u_int minutes_left;		/* estimate */
-	u_int spare2[6];
+	u_int nbattery;		
+	u_int batteryid;
+	u_int spare2[4];
 };
 
 struct apm_ctl {
@@ -291,11 +295,11 @@ struct apm_ctl {
 #define	APM_IOC_REJECT	_IOW('A', 0, struct apm_event_info) /* reject request # */
 #define	APM_IOC_STANDBY	_IO('A', 1)	/* put system into standby */
 #define	APM_IOC_SUSPEND	_IO('A', 2)	/* put system into suspend */
-#define	APM_IOC_GETPOWER _IOR('A', 3, struct apm_power_info) /* fetch battery state */
+#define	OAPM_IOC_GETPOWER _IOR('A', 3, struct apm_power_info) /* fetch battery state */
+#define	APM_IOC_GETPOWER _IOWR('A', 3, struct apm_power_info) /* fetch battery state */
 #define	APM_IOC_NEXTEVENT _IOR('A', 4, struct apm_event_info) /* fetch event */
-#if 0
 #define	APM_IOC_DEV_CTL	_IOW('A', 5, struct apm_ctl) /* put device into mode */
-#endif
+
 
 struct apm_attach_args {
 	char *aaa_busname;
@@ -304,13 +308,13 @@ struct apm_attach_args {
 #ifdef _KERNEL
 extern struct apm_connect_info apminfo;	/* in locore */
 extern int apmpresent;
-extern int apmcall __P((int function, struct bioscallregs *regs));
-extern void bioscall __P((int function, struct bioscallregs *regs));
-extern void apm_cpu_busy __P((void));
-extern void apm_cpu_idle __P((void));
-extern void apminit __P((void));
+int apmcall __P((int function, struct bioscallregs *regs));
+void bioscall __P((int function, struct bioscallregs *regs));
+void apm_cpu_busy __P((void));
+void apm_cpu_idle __P((void));
+void apminit __P((void));
 int apm_set_powstate __P((u_int devid, u_int powstate));
-extern int apm_busprobe __P((void));
+int apm_busprobe __P((void));
 #endif /* _KERNEL */
 #endif /* _LOCORE */
 #endif /* __i386_apm_h__ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: memreg.c,v 1.28 1998/09/21 10:32:00 pk Exp $ */
+/*	$NetBSD: memreg.c,v 1.32 2002/03/11 16:27:04 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -45,9 +45,11 @@
  *
  *	@(#)memreg.c	8.1 (Berkeley) 6/11/93
  */
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/proc.h>
 #include <sys/device.h>
 
 #include <machine/autoconf.h>
@@ -130,12 +132,11 @@ memregattach_mainbus(parent, self, aux)
 		return;
 	}
 
-	if (bus_space_map2(ma->ma_bustag,
-			   ma->ma_iospace,
+	if (bus_space_map(ma->ma_bustag,
 			   ma->ma_paddr,
 			   sizeof(par_err_reg),
 			   BUS_SPACE_MAP_LINEAR,
-			   0, &bh) != 0) {
+			   &bh) != 0) {
 		printf("memregattach_mainbus: can't map register\n");
 		return;
 	}
@@ -158,11 +159,10 @@ memregattach_obio(parent, self, aux)
 			return;
 		}
 
-		if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
-				 sa->sa_offset,
+		if (sbus_bus_map(sa->sa_bustag,
+				 sa->sa_slot, sa->sa_offset,
 				 sizeof(par_err_reg),
-				 BUS_SPACE_MAP_LINEAR,
-				 0, &bh) != 0) {
+				 BUS_SPACE_MAP_LINEAR, &bh) != 0) {
 			printf("memregattach_obio: can't map register\n");
 			return;
 		}
@@ -242,9 +242,11 @@ hardmemerr4m(type, sfsr, sfva, afsr, afva)
  * once, and then fail if we get called again.
  */
 
+/* XXXSMP */
 static int addrold = (int) 0xdeadbeef; /* We pick an unlikely address */
 static int addroldtop = (int) 0xdeadbeef;
 static int oldtype = -1;
+/* XXXSMP */
 
 void
 hypersparc_memerr(type, sfsr, sfva, tf)
@@ -255,6 +257,11 @@ hypersparc_memerr(type, sfsr, sfva, tf)
 {
 	u_int afsr;
 	u_int afva;
+
+	if ((tf->tf_psr & PSR_PS) == 0)
+		KERNEL_PROC_LOCK(curproc);
+	else
+		KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 
 	(*cpuinfo.get_asyncflt)(&afsr, &afva);
 	if ((afsr & AFSR_AFO) != 0) {	/* HS async fault! */
@@ -268,10 +275,17 @@ hypersparc_memerr(type, sfsr, sfva, tf)
 		oldtype = -1;
 		addrold = afva;
 		addroldtop = afsr & AFSR_AFA;
-		return;
 	}
+out:
+	if ((tf->tf_psr & PSR_PS) == 0)
+		KERNEL_PROC_UNLOCK(curproc);
+	else
+		KERNEL_UNLOCK();
+	return;
+
 hard:
 	hardmemerr4m(type, sfsr, sfva, afsr, afva);
+	goto out;
 }
 
 void
@@ -283,6 +297,11 @@ viking_memerr(type, sfsr, sfva, tf)
 {
 	u_int afsr=0;	/* No Async fault registers on the viking */
 	u_int afva=0;
+
+	if ((tf->tf_psr & PSR_PS) == 0)
+		KERNEL_PROC_LOCK(curproc);
+	else
+		KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 
 	if (type == T_STOREBUFFAULT) {
 
@@ -303,8 +322,6 @@ viking_memerr(type, sfsr, sfva, tf)
 		sta(SRMMU_PCR, ASI_SRMMU,
 		    lda(SRMMU_PCR, ASI_SRMMU) | VIKING_PCR_SB);
 
-		return;
-
 	} else if (type == T_DATAFAULT && (sfsr & SFSR_FAV) == 0) {
 		/*
 		 * bizarre.
@@ -316,10 +333,18 @@ viking_memerr(type, sfsr, sfva, tf)
 		if (oldtype == T_DATAFAULT)
 			goto hard;
 		oldtype = T_DATAFAULT;
-		return;
 	}
+
+out:
+	if ((tf->tf_psr & PSR_PS) == 0)
+		KERNEL_PROC_UNLOCK(curproc);
+	else
+		KERNEL_UNLOCK();
+	return;
+
 hard:
 	hardmemerr4m(type, sfsr, sfva, afsr, afva);
+	goto out;
 }
 
 void
@@ -332,6 +357,11 @@ memerr4m(type, sfsr, sfva, tf)
 	u_int afsr;
 	u_int afva;
 
+	if ((tf->tf_psr & PSR_PS) == 0)
+		KERNEL_PROC_LOCK(curproc);
+	else
+		KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
+
 	/*
 	 * No known special cases.
 	 * Just get async registers, if any, and report the unhandled case.
@@ -340,5 +370,9 @@ memerr4m(type, sfsr, sfva, tf)
 		afsr = afva = 0;
 
 	hardmemerr4m(type, sfsr, sfva, afsr, afva);
+	if ((tf->tf_psr & PSR_PS) == 0)
+		KERNEL_PROC_UNLOCK(curproc);
+	else
+		KERNEL_UNLOCK();
 }
 #endif /* SUN4M */

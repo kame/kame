@@ -1,4 +1,4 @@
-/*	$NetBSD: in_cksum.c,v 1.5 1999/04/24 08:10:39 simonb Exp $	*/
+/*	$NetBSD: in_cksum.c,v 1.7 2002/03/05 14:15:31 simonb Exp $	*/
 
 /*
  * Copyright (c) 1993 Regents of the University of California.
@@ -56,7 +56,7 @@ union memptr {
 	unsigned char *c;
 };
 
-static __inline u_int32_t fastsum __P((union memptr, int n, u_int sum, int odd));
+static __inline u_int32_t fastsum(union memptr, int, u_int, int);
 
 
 /*
@@ -69,10 +69,7 @@ static __inline u_int32_t fastsum __P((union memptr, int n, u_int sum, int odd))
  * over the data before adding it to `oldsum'.
  */
 u_int32_t
-fastsum(buf, n, oldsum, odd_aligned)
-	union memptr buf;
-	int n;
-	unsigned int oldsum;
+fastsum(union memptr buf, int n, unsigned int oldsum, int odd_aligned)
 {
 	unsigned long hilo = 0, high = 0;
 	unsigned long w0, w1;
@@ -80,6 +77,10 @@ fastsum(buf, n, oldsum, odd_aligned)
 
 	/* Align to 32 bits. */
 	if (buf.u & 0x3) {
+		/* Skip to the end for very small mbufs */
+		if (n < 3)
+			goto verylittleleft;
+
 		/*
 	         * 16-bit-align.
 		 * If buf is odd-byte-aligned, add the byte and toggle
@@ -206,13 +207,15 @@ fastsum(buf, n, oldsum, odd_aligned)
 		sum += *(buf.s++);
 	}
 
-	/* handle trailing byte */
-	if (n > 0)
+ verylittleleft:
+	/* handle trailing byte and short (possibly) unaligned payloads */
+	while (n-- > 0) {
 #if BYTE_ORDER == BIG_ENDIAN
 		sum += *buf.c << 8;
 #else
 		sum += *buf.c;
 #endif
+	}
 
 	/*
 	 * compensate for a trailing byte in previous mbuf
@@ -239,9 +242,7 @@ fastsum(buf, n, oldsum, odd_aligned)
  *
  */
 int
-in_cksum(m, len)
-	struct mbuf *m;
-	int len;
+in_cksum(struct mbuf *m, int len)
 {
 	/*u_short **/ union memptr w;
 	u_int32_t sum = 0;

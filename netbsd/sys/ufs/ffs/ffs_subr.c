@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_subr.c,v 1.15 2000/03/30 12:41:12 augustss Exp $	*/
+/*	$NetBSD: ffs_subr.c,v 1.22 2002/04/10 08:05:13 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -35,26 +35,36 @@
  *	@(#)ffs_subr.c	8.5 (Berkeley) 3/21/95
  */
 
-#include <sys/param.h>
-#include <sys/systm.h>
-#ifndef _KERNEL
-#include <ufs/ufs/dinode.h>
-#include <ufs/ffs/fs.h>
-#include <ufs/ffs/ffs_extern.h>
-#include <ufs/ufs/ufs_bswap.h>
+#include <sys/cdefs.h>
+#if defined(__KERNEL_RCSID)
+__KERNEL_RCSID(0, "$NetBSD: ffs_subr.c,v 1.22 2002/04/10 08:05:13 mycroft Exp $");
 #endif
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <sys/param.h>
 
 /* in ffs_tables.c */
 extern int inside[], around[];
 extern u_char *fragtbl[];
 
-#ifdef _KERNEL
+#ifndef _KERNEL
+#include <ufs/ufs/dinode.h>
+#include <ufs/ffs/fs.h>
+#include <ufs/ffs/ffs_extern.h>
+#include <ufs/ufs/ufs_bswap.h>
+void    panic __P((const char *, ...))
+    __attribute__((__noreturn__,__format__(__printf__,1,2)));
+
+#else	/* _KERNEL */
+#include <sys/systm.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/buf.h>
-#include <ufs/ufs/quota.h>
-#include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/inode.h>
+#include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/ufs_extern.h>
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
@@ -96,7 +106,7 @@ ffs_blkatoff(v)
 	*ap->a_bpp = bp;
 	return (0);
 }
-#endif
+#endif	/* _KERNEL */
 
 /*
  * Update the frsum fields to reflect addition or deletion 
@@ -117,7 +127,7 @@ ffs_fragacct(fs, fragmap, fraglist, cnt, needswap)
 	inblk = (int)(fragtbl[fs->fs_frag][fragmap]) << 1;
 	fragmap <<= 1;
 	for (siz = 1; siz < fs->fs_frag; siz++) {
-		if ((inblk & (1 << (siz + (fs->fs_frag % NBBY)))) == 0)
+		if ((inblk & (1 << (siz + (fs->fs_frag & (NBBY - 1))))) == 0)
 			continue;
 		field = around[siz];
 		subfield = inside[siz];
@@ -168,7 +178,7 @@ ffs_checkoverlap(bp, ip)
 		panic("Disk buffer overlap");
 	}
 }
-#endif /* DIAGNOSTIC */
+#endif /* _KERNEL && DIAGNOSTIC */
 
 /*
  * block operations
@@ -178,25 +188,26 @@ ffs_checkoverlap(bp, ip)
 int
 ffs_isblock(fs, cp, h)
 	struct fs *fs;
-	unsigned char *cp;
+	u_char *cp;
 	ufs_daddr_t h;
 {
-	unsigned char mask;
+	u_char mask;
 
-	switch ((int)fs->fs_frag) {
-	case 8:
+	switch ((int)fs->fs_fragshift) {
+	case 3:
 		return (cp[h] == 0xff);
-	case 4:
+	case 2:
 		mask = 0x0f << ((h & 0x1) << 2);
 		return ((cp[h >> 1] & mask) == mask);
-	case 2:
+	case 1:
 		mask = 0x03 << ((h & 0x3) << 1);
 		return ((cp[h >> 2] & mask) == mask);
-	case 1:
+	case 0:
 		mask = 0x01 << (h & 0x7);
 		return ((cp[h >> 3] & mask) == mask);
 	default:
-		panic("ffs_isblock");
+		panic("ffs_isblock: unknown fs_fragshift %d",
+		    (int)fs->fs_fragshift);
 	}
 }
 
@@ -206,21 +217,22 @@ ffs_isblock(fs, cp, h)
 int
 ffs_isfreeblock(fs, cp, h)
 	struct fs *fs;
-	unsigned char *cp;
+	u_char *cp;
 	ufs_daddr_t h;
 {
 
-	switch ((int)fs->fs_frag) {
-	case 8:
+	switch ((int)fs->fs_fragshift) {
+	case 3:
 		return (cp[h] == 0);
-	case 4:
-		return ((cp[h >> 1] & (0x0f << ((h & 0x1) << 2))) == 0);
 	case 2:
-		return ((cp[h >> 2] & (0x03 << ((h & 0x3) << 1))) == 0);
+		return ((cp[h >> 1] & (0x0f << ((h & 0x1) << 2))) == 0);
 	case 1:
+		return ((cp[h >> 2] & (0x03 << ((h & 0x3) << 1))) == 0);
+	case 0:
 		return ((cp[h >> 3] & (0x01 << (h & 0x7))) == 0);
 	default:
-		panic("ffs_isfreeblock");
+		panic("ffs_isfreeblock: unknown fs_fragshift %d",
+		    (int)fs->fs_fragshift);
 	}
 }
 
@@ -234,21 +246,22 @@ ffs_clrblock(fs, cp, h)
 	ufs_daddr_t h;
 {
 
-	switch ((int)fs->fs_frag) {
-	case 8:
+	switch ((int)fs->fs_fragshift) {
+	case 3:
 		cp[h] = 0;
 		return;
-	case 4:
+	case 2:
 		cp[h >> 1] &= ~(0x0f << ((h & 0x1) << 2));
 		return;
-	case 2:
+	case 1:
 		cp[h >> 2] &= ~(0x03 << ((h & 0x3) << 1));
 		return;
-	case 1:
+	case 0:
 		cp[h >> 3] &= ~(0x01 << (h & 0x7));
 		return;
 	default:
-		panic("ffs_clrblock");
+		panic("ffs_clrblock: unknown fs_fragshift %d",
+		    (int)fs->fs_fragshift);
 	}
 }
 
@@ -258,25 +271,25 @@ ffs_clrblock(fs, cp, h)
 void
 ffs_setblock(fs, cp, h)
 	struct fs *fs;
-	unsigned char *cp;
+	u_char *cp;
 	ufs_daddr_t h;
 {
 
-	switch ((int)fs->fs_frag) {
-
-	case 8:
+	switch ((int)fs->fs_fragshift) {
+	case 3:
 		cp[h] = 0xff;
 		return;
-	case 4:
+	case 2:
 		cp[h >> 1] |= (0x0f << ((h & 0x1) << 2));
 		return;
-	case 2:
+	case 1:
 		cp[h >> 2] |= (0x03 << ((h & 0x3) << 1));
 		return;
-	case 1:
+	case 0:
 		cp[h >> 3] |= (0x01 << (h & 0x7));
 		return;
 	default:
-		panic("ffs_setblock");
+		panic("ffs_setblock: unknown fs_fragshift %d",
+		    (int)fs->fs_fragshift);
 	}
 }

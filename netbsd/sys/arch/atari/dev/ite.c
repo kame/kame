@@ -1,4 +1,4 @@
-/*	$NetBSD: ite.c,v 1.29 2000/03/23 06:36:04 thorpej Exp $	*/
+/*	$NetBSD: ite.c,v 1.35 2002/03/17 19:40:35 atatat Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -153,7 +153,13 @@ struct cfattach ite_ca = {
 	sizeof(struct ite_softc), itematch, iteattach
 };
 
-extern struct cfdriver ite_cd;
+extern struct cfdriver	ite_cd;
+
+/*
+ * Keep track of the device number of the ite console. Only used in the
+ * itematch/iteattach functions.
+ */
+static int		cons_ite = -1;
 
 int
 itematch(pdp, cfp, auxp)
@@ -161,27 +167,29 @@ itematch(pdp, cfp, auxp)
 	struct cfdata	*cfp;
 	void		*auxp;
 {
-	struct grf_softc *gp  = auxp;
-	int		 maj;
+	static int	 nmatches = 0;
 	
+	/*
+	 * Handle early console stuff. The first cf_unit number
+	 * matches the console unit. All other early matches will fail.
+	 */
+	if (atari_realconfig == 0) {
+		if (cons_ite >= 0)
+			return 0;
+		cons_ite = cfp->cf_unit;
+		return 1;
+	}
+
 	/*
 	 * all that our mask allows (more than enough no one 
 	 * has > 32 monitors for text consoles on one machine)
 	 */
+	if (nmatches >= sizeof(ite_confunits) * NBBY)
+		return 0;	/* checks STAR */
 	if (cfp->cf_unit >= sizeof(ite_confunits) * NBBY)
-		return(0);
-	/*
-	 * XXX
-	 * normally this would be done in attach, however
-	 * during early init we do not have a device pointer
-	 * and thus no unit number.
-	 */
-	for(maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == iteopen)
-			break;
-
-	gp->g_itedev = makedev(maj, cfp->cf_unit);
-	return(1);
+		return 0;	/* refuses ite100 at .... */
+	nmatches++;
+	return 1;
 }
 
 void
@@ -192,16 +200,20 @@ void		*auxp;
 	struct grf_softc	*gp;
 	struct ite_softc	*ip;
 	int			s;
+	int			maj, unit;
 
 	gp = (struct grf_softc *)auxp;
+	ip = (struct ite_softc *)dp;
 
-	/*
-	 * mark unit as attached (XXX see itematch)
-	 */
-	ite_confunits |= 1 << ITEUNIT(gp->g_itedev);
+	for(maj = 0; maj < nchrdev; maj++)
+		if (cdevsw[maj].d_open == iteopen)
+			break;
+	unit = (dp != NULL) ? ip->device.dv_unit : cons_ite;
+	gp->g_itedev = makedev(maj, unit);
 
 	if(dp) {
-		ip = (struct ite_softc *)dp;
+
+		ite_confunits |= 1 << ITEUNIT(gp->g_itedev);
 
 		s = spltty();
 		if(con_itesoftc.grf != NULL
@@ -261,11 +273,6 @@ void
 itecnprobe(cd)
 	struct consdev *cd;
 {
-	/*
-	 * bring graphics layer up.
-	 */
-	config_console();
-
 	/* 
 	 * return priority of the best ite (already picked from attach)
 	 * or CN_DEAD.
@@ -429,7 +436,7 @@ iteopen(dev, mode, devtype, p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open) (dev, tp);
+	error = (*tp->t_linesw->l_open) (dev, tp);
 	if (error)
 		goto bad;
 
@@ -460,7 +467,7 @@ iteclose(dev, flag, mode, p)
 	tp = getitesp(dev)->tp;
 
 	KDASSERT(tp);
-	(*linesw[tp->t_line].l_close) (tp, flag);
+	(*tp->t_linesw->l_close) (tp, flag);
 	ttyclose(tp);
 	ite_off(dev, 0);
 	return (0);
@@ -477,7 +484,7 @@ iteread(dev, uio, flag)
 	tp = getitesp(dev)->tp;
 
 	KDASSERT(tp);
-	return ((*linesw[tp->t_line].l_read) (tp, uio, flag));
+	return ((*tp->t_linesw->l_read) (tp, uio, flag));
 }
 
 int
@@ -491,7 +498,21 @@ itewrite(dev, uio, flag)
 	tp = getitesp(dev)->tp;
 
 	KDASSERT(tp);
-	return ((*linesw[tp->t_line].l_write) (tp, uio, flag));
+	return ((*tp->t_linesw->l_write) (tp, uio, flag));
+}
+
+int
+itepoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct tty *tp;
+
+	tp = getitesp(dev)->tp;
+
+	KDASSERT(tp);
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 void
@@ -530,11 +551,12 @@ iteioctl(dev, cmd, addr, flag, p)
 
 	KDASSERT(tp);
 
-	error = (*linesw[tp->t_line].l_ioctl) (tp, cmd, addr, flag, p);
-	if(error >= 0)
+	error = (*tp->t_linesw->l_ioctl) (tp, cmd, addr, flag, p);
+	if(error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, addr, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -598,10 +620,7 @@ iteioctl(dev, cmd, addr, flag, p)
 		kbd_bell_gparms(&ib->volume, &ib->pitch, &ib->msec);
 		return 0;
 	}
-	error = (ip->itexx_ioctl)(ip, cmd, addr, flag, p);
-	if(error >= 0)
-		return(error);
-	return (ENOTTY);
+	return (ip->itexx_ioctl)(ip, cmd, addr, flag, p);
 }
 
 void
@@ -1060,9 +1079,9 @@ enum caller	caller;
 		 * keypad-appmode sends SS3 followed by the above
 		 * translated character
 		 */
-		(*linesw[kbd_tty->t_line].l_rint) (27, kbd_tty);
-		(*linesw[kbd_tty->t_line].l_rint) ('O', kbd_tty);
-		(*linesw[kbd_tty->t_line].l_rint) (out[cp - in], kbd_tty);
+		kbd_tty->t_linesw->l_rint(27, kbd_tty);
+		kbd_tty->t_linesw->l_rint('O', kbd_tty);
+		kbd_tty->t_linesw->l_rint(out[cp - in], kbd_tty);
 		splx(s);
 		return;
 	} else {
@@ -1092,11 +1111,11 @@ enum caller	caller;
 		 * in the default keymap
 		 */
 		for (i = *str++; i; i--)
-			(*linesw[kbd_tty->t_line].l_rint) (*str++, kbd_tty);
+			kbd_tty->t_linesw->l_rint(*str++, kbd_tty);
 		splx(s);
 		return;
 	}
-	(*linesw[kbd_tty->t_line].l_rint) (code, kbd_tty);
+	kbd_tty->t_linesw->l_rint(code, kbd_tty);
 
 	splx(s);
 	return;
@@ -1112,7 +1131,7 @@ ite_sendstr(str)
 	kbd_tty = kbd_ite->tp;
 	KDASSERT(kbd_tty);
 	while (*str)
-		(*linesw[kbd_tty->t_line].l_rint) (*str++, kbd_tty);
+		kbd_tty->t_linesw->l_rint(*str++, kbd_tty);
 }
 
 static void

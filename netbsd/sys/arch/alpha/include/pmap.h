@@ -1,7 +1,7 @@
-/* $NetBSD: pmap.h,v 1.35 2000/06/08 03:10:06 thorpej Exp $ */
+/* $NetBSD: pmap.h,v 1.54 2001/09/10 21:19:09 chris Exp $ */
 
 /*-
- * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -80,7 +80,7 @@
 #ifndef	_PMAP_MACHINE_
 #define	_PMAP_MACHINE_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_multiprocessor.h"
 #endif
 
@@ -102,49 +102,46 @@
  * The kernel pmap is a special case; it gets statically-allocated
  * arrays which hold enough for ALPHA_MAXPROCS.
  */
+struct pmap_asn_info {
+	unsigned int		pma_asn;	/* address space number */
+	unsigned long		pma_asngen;	/* ASN generation number */
+};
+
 struct pmap {
 	TAILQ_ENTRY(pmap)	pm_list;	/* list of all pmaps */
 	pt_entry_t		*pm_lev1map;	/* level 1 map */
 	int			pm_count;	/* pmap reference count */
 	struct simplelock	pm_slock;	/* lock on pmap */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
-	long			pm_nlev2;	/* level 2 pt page count */
-	long			pm_nlev3;	/* level 3 pt page count */
-	unsigned int		*pm_asn;	/* address space number */
-	unsigned long		*pm_asngen;	/* ASN generation number */
 	unsigned long		pm_cpus;	/* mask of CPUs using pmap */
 	unsigned long		pm_needisync;	/* mask of CPUs needing isync */
+	struct pmap_asn_info	pm_asni[1];	/* ASN information */
+			/*	variable length		*/
 };
-
 typedef struct pmap	*pmap_t;
+
+/*
+ * Compute the sizeo of a pmap structure.  Subtract one because one
+ * ASN info structure is already included in the pmap structure itself.
+ */
+#define	PMAP_SIZEOF(x)							\
+	(ALIGN(sizeof(struct pmap) +					\
+	       (sizeof(struct pmap_asn_info) * ((x) - 1))))
 
 #define	PMAP_ASN_RESERVED	0	/* reserved for Lev1map users */
 
-extern struct pmap	kernel_pmap_store;
-
-#define pmap_kernel()	(&kernel_pmap_store)
+extern u_long		kernel_pmap_store[];
 
 /*
- * For each vm_page_t, there is a list of all currently valid virtual
+ * For each struct vm_page, there is a list of all currently valid virtual
  * mappings of that page.  An entry is a pv_entry_t, the list is pv_table.
  */
 typedef struct pv_entry {
-	LIST_ENTRY(pv_entry) pv_list;	/* pv_entry list */
+	struct pv_entry	*pv_next;	/* next pv_entry on list */
 	struct pmap	*pv_pmap;	/* pmap where mapping lies */
 	vaddr_t		pv_va;		/* virtual address for mapping */
 	pt_entry_t	*pv_pte;	/* PTE that maps the VA */
 } *pv_entry_t;
-
-/*
- * The head of the list of pv_entry_t's, also contains page attributes.
- */
-struct pv_head {
-	LIST_HEAD(, pv_entry) pvh_list;		/* pv_entry list */
-	struct simplelock pvh_slock;		/* lock on this head */
-	int pvh_attrs;				/* page attributes */
-	int pvh_usage;				/* page usage */
-	int pvh_refcnt;				/* special use ref count */
-};
 
 /* pvh_attrs */
 #define	PGA_MODIFIED		0x01		/* modified */
@@ -156,17 +153,6 @@ struct pv_head {
 #define	PGU_L1PT		2		/* level 1 page table */
 #define	PGU_L2PT		3		/* level 2 page table */
 #define	PGU_L3PT		4		/* level 3 page table */
-
-#define	PGU_ISPTPAGE(pgu)	((pgu) >= PGU_L1PT)
-
-#define	PGU_STRINGS							\
-{									\
-	"normal",							\
-	"pvent",							\
-	"l1pt",								\
-	"l2pt",								\
-	"l3pt",								\
-}
 
 #ifdef _KERNEL
 
@@ -189,23 +175,52 @@ struct pv_head {
 #endif /* NEW_SCC_DRIVER */
 
 #if defined(MULTIPROCESSOR)
-void	pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t);
-void	pmap_do_tlb_shootdown(void);
+struct cpu_info;
+struct trapframe;
+
+void	pmap_do_reactivate(struct cpu_info *, struct trapframe *);
+
+void	pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t, u_long *);
+void	pmap_tlb_shootnow(u_long);
+void	pmap_do_tlb_shootdown(struct cpu_info *, struct trapframe *);
+#define	PMAP_TLB_SHOOTDOWN_CPUSET_DECL		u_long shootset = 0;
+#define	PMAP_TLB_SHOOTDOWN(pm, va, pte)					\
+	pmap_tlb_shootdown((pm), (va), (pte), &shootset)
+#define	PMAP_TLB_SHOOTNOW()						\
+	pmap_tlb_shootnow(shootset)
+#else
+#define	PMAP_TLB_SHOOTDOWN_CPUSET_DECL		/* nothing */
+#define	PMAP_TLB_SHOOTDOWN(pm, va, pte)		/* nothing */
+#define	PMAP_TLB_SHOOTNOW()			/* nothing */
 #endif /* MULTIPROCESSOR */
 #endif /* _LKM */
+
+#define pmap_kernel()	((pmap_t) (&kernel_pmap_store[0]))
  
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 
+#define	pmap_copy(dp, sp, da, l, sa)	/* nothing */
+#define	pmap_update(pmap)		/* nothing (yet) */
+
+#define	pmap_is_referenced(pg)						\
+	(((pg)->mdpage.pvh_attrs & PGA_REFERENCED) != 0)
+#define	pmap_is_modified(pg)						\
+	(((pg)->mdpage.pvh_attrs & PGA_MODIFIED) != 0)
+
 extern	pt_entry_t *VPT;		/* Virtual Page Table */
 
 #define	PMAP_STEAL_MEMORY		/* enable pmap_steal_memory() */
+#define	PMAP_GROWKERNEL			/* enable pmap_growkernel() */
 
 /*
  * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
  */
 #define	PMAP_MAP_POOLPAGE(pa)		ALPHA_PHYS_TO_K0SEG((pa))
 #define	PMAP_UNMAP_POOLPAGE(va)		ALPHA_K0SEG_TO_PHYS((va))
+
+boolean_t			pmap_pageidlezero(paddr_t);
+#define	PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
 
 paddr_t vtophys(vaddr_t);
 

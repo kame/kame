@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_obio.c,v 1.7.2.1 2000/07/19 02:53:10 mrg Exp $	*/
+/*	$NetBSD: esp_obio.c,v 1.11 2002/03/11 16:27:02 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -119,7 +119,7 @@ espmatch_obio(parent, cf, aux)
 		return (0);
 
 	oba = &uoba->uoba_oba4;
-	return (bus_space_probe(oba->oba_bustag, 0, oba->oba_paddr,
+	return (bus_space_probe(oba->oba_bustag, oba->oba_paddr,
 				1,	/* probe size */
 				0,	/* offset */
 				0,	/* flags */
@@ -158,11 +158,10 @@ espattach_obio(parent, self, aux)
 		panic("espattach: no dma found");
 	}
 
-	if (obio_bus_map(oba->oba_bustag, oba->oba_paddr,
-			 0,	/* offset */
-			 16,	/* size (of ncr53c9xreg) */
-			 BUS_SPACE_MAP_LINEAR,
-			 0, &esc->sc_reg) != 0) {
+	if (bus_space_map(oba->oba_bustag, oba->oba_paddr,
+			  16,	/* size (of ncr53c9xreg) */
+			  BUS_SPACE_MAP_LINEAR,
+			  &esc->sc_reg) != 0) {
 		printf("%s @ obio: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -262,10 +261,10 @@ espattach_obio(parent, self, aux)
 	    sc->sc_dev.dv_xname, "intr");
 
 	/* Do the common parts of attachment. */
-	ncr53c9x_attach(sc, NULL, NULL);
-
-	/* Turn on target selection using the `dma' method */
-	ncr53c9x_dmaselect = 1;
+	sc->sc_adapter.adapt_minphys = minphys;
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	ncr53c9x_attach(sc);
+	sc->sc_features |= NCR_F_DMASELECT;
 }
 
 /*

@@ -1,27 +1,29 @@
-# 	$NetBSD: NONPLUS,v 1.19.4.2 2000/07/18 16:23:17 mrg Exp $
+# 	$NetBSD: NONPLUS,v 1.35.4.1 2002/08/01 04:32:39 lukem Exp $
 
 include "arch/sparc64/conf/std.sparc64"
+
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
 maxusers	64
 
 ## System kernel configuration.  See options(4) for more detail.
 
-options AUDIO_DEBUG=1
+#options 	AUDIO_DEBUG=1
 
 # Options for variants of the Sun SPARC architecure.
 # We currently support three architecture types; at least one is required.
-options		SUN4U		# sun4u - Ultra 140 and 170
-options		TRAPWIN		# use a new window for traps
-options		__ELF__		# we use elf 
-#options		_LP64		# we're using a 64-bit compiler
+options 	SUN4U		# sun4u - UltraSPARC
+options 	__ELF__		# we use elf
+#options 	__SWAP_BROKEN
+makeoptions	SPARC_BINARIES=1
 
 ## System options specific to the sparc machine type
 
 ## Use a faster console than the PROM's slow drawing routines.  Not needed
 ## for headless (no framebuffer) machines.
 #options 	RASTERCONSOLE		# fast rasterop console
-#options	FONT_GALLANT12x22	# the console font
-#options	FONT_BOLD8x16		# a somewhat smaller font
+#options 	FONT_GALLANT12x22	# the console font
+#options 	FONT_BOLD8x16		# a somewhat smaller font
 
 #### System options that are the same for all ports
 
@@ -33,8 +35,8 @@ options		__ELF__		# we use elf
 config		netbsd	root on ? type ?
 
 ## UVM options.
-options		UVM_PAGE_TRKOWN
-options		UVMHIST
+#options 	UVM_PAGE_TRKOWN
+#options 	UVMHIST
 #options 	UVMHIST_PRINT	# Loud!
 
 ## System call tracing (see ktrace(1)).
@@ -43,7 +45,7 @@ options 	KTRACE
 ## Collect statistics on kernel malloc's and free's.  This does have a
 ## significant performance hit on slower machines, so it is intended for
 ## diagnostic use only.
-options 	KMEMSTATS
+#options 	KMEMSTATS
 
 ## System V compatible IPC subsystem.  (msgctl(2), semctl(2), and shmctl(2))
 options 	SYSVMSG		# System V message queues
@@ -53,6 +55,9 @@ options 	SYSVSHM		# System V shared memory
 
 ## Loadable kernel module support; still under development.
 options 	LKM
+
+#options 	USERCONF	# userconf(4) support
+#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
 
 ## NFS boot options; default on sparc is the bootparam protocol
 options 	NFS_BOOT_BOOTPARAM
@@ -66,38 +71,40 @@ options 	NFS_BOOT_BOOTPARAM
 ## intercept.  DDB_HISTORY_SIZE adds up/down arrow command history.
 options 	DDB			# kernel dynamic debugger
 options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
-options 	DDB_ONPANIC		# see also sysctl(8): `ddb.onpanic'
+options 	DDB_ONPANIC=1		# see also sysctl(8): `ddb.onpanic'
 
 ## You may also use gdb, on another computer connected to this machine over
-## a serial port.  Both KGDBDEV and KGDBRATE should be specified; KGDBDEV is
-## a dev_t encoded device number of the serial port to use.
+## a serial port.  Both KGDB_DEV and KGDB_DEVRATE should be specified;
+## KGDB_DEV is a dev_t encoded device number of the serial port to use.
 ## (0xc01 = ttya, 0xc02 = ttyb.)
-#options 	KGDB		# support for kernel gdb
-#options 	KGDBDEV=0xc01	# kgdb device number (this sample is `ttyb')
-#options 	KGDBRATE=38400	# baud rate
+#options 	KGDB			# support for kernel gdb
+#options 	KGDB_DEV=0xc01		# kgdb device number (this is `ttyb')
+#options 	KGDB_DEVRATE=38400	# baud rate
 
 
 ## Compile the kernel with debugging symbols (`netbsd.gdb' is the debug file),
 ## such that gdb(1) can be used on a kernel coredump.
 
-makeoptions 	DEBUG="-g"
+makeoptions	DEBUG="-g"
 
 
 ## Adds code to the kernel that does internal consistency checks, and will
 ## cause the kernel to panic if corruption of internal data structures
 ## is detected.
-options 	DIAGNOSTIC	# extra kernel sanity checking
+#options 	DIAGNOSTIC	# extra kernel sanity checking
 
 ## Enable (possibly expensive) debugging code that may also display messages
 ## on the system console
-options 	DEBUG
+#options 	DEBUG
+#options 	LOCKDEBUG
 
 ## Enable printing of spl() transisions -- really slow
 ##
-#options		SPLDEBUG
+#options 	SPLDEBUG
 
 ## Make SCSI error messages more verbose when explaining their meanings.
 options 	SCSIVERBOSE
+#options 	SCSIDEBUG
 
 ## `INSECURE' turns off the kernel security level (securelevel = 0 always).
 ## This allows writing to /dev/mem, loading kernel modules while multi-user,
@@ -123,6 +130,7 @@ options 	SCSIVERBOSE
 ## compat_sunos(8) and compat_svr4(8).
 
 options 	COMPAT_43	# 4.3BSD system interfaces
+options 	COMPAT_09	# NetBSD 0.9 binary compatibility
 options 	COMPAT_10	# NetBSD 1.0 binary compatibility
 options 	COMPAT_11	# NetBSD 1.1 binary compatibility
 options 	COMPAT_12	# NetBSD 1.2 binary compatibility
@@ -130,18 +138,19 @@ options 	COMPAT_13	# NetBSD 1.3 binary compatibility
 options 	COMPAT_14	# NetBSD 1.4 binary compatibility
 options 	COMPAT_SUNOS	# SunOS 4.x binary compatibility
 options 	COMPAT_SVR4	# SunOS 5.x binary compatibility
-#options		COMPAT_NETBSD32	# NetBSD/sparc binary compatibility
-options 	EXEC_ELF32	# Exec module for SunOS 5.x binaries.
-#options		EXEC_ELF64	# Exec module for SunOS 5.x binaries.
-options		SYSCALL_DEBUG
-options		COMPAT_AOUT	# NetBSD/sparc compat support
-options 	EXEC_AOUT	# execve(2) support for a.out binaries
+#options 	COMPAT_NETBSD32	# NetBSD/sparc binary compatibility
+options 	EXEC_ELF32	# Exec module for NetBSD/sparc 1.5 binaries.
+#options 	SYSCALL_DEBUG
+options 	EXEC_AOUT	# Exec module for NetBSD/sparc pre-1.5 binaries.
+
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 ## File systems.  You probably need at least one of FFS or NFS.
 file-system	FFS		# Berkeley Fast Filesystem
 file-system	NFS		# Sun NFS-compatible filesystem client
 file-system	KERNFS		# kernel data-structure filesystem
 file-system	NULLFS		# NULL layered filesystem
+file-system 	OVERLAY		# overlay file system
 file-system	MFS		# memory-based filesystem
 file-system	FDESC		# user file descriptor filesystem
 file-system	UMAPFS		# uid/gid remapping filesystem
@@ -156,12 +165,16 @@ file-system	MSDOSFS		# MS-DOS FAT filesystem(s).
 options 	NFSSERVER	# Sun NFS-compatible filesystem server
 options 	QUOTA		# FFS quotas
 #options 	FFS_EI		# FFS Endian Independent support
-options		SOFTDEP		# FFS soft updates support.
+options 	SOFTDEP		# FFS soft updates support.
 
 ## Network protocol support.  In most environments, INET is required.
 options 	INET		# IP (Internet Protocol) v4
-options 	TCP_COMPAT_42	# 4.2BSD IP implementation compatibility
-#options 	GATEWAY		# packet forwarding ("router switch")
+options 	INET6		# IPV6
+#options 	IPSEC		# IP security
+#options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
+#options 	IPSEC_DEBUG	# debug for IP security
+#options 	TCP_SIGNATURE	# TCP MD5 Signatures, for BGP routing sessions
+options 	GATEWAY		# packet forwarding ("router switch")
 #options 	MROUTING	# packet forwarding of multicast packets
 #options 	DIRECTED_BROADCAST	# allow broadcasts through routers
 #options 	NS		# Xerox NS networking
@@ -170,14 +183,14 @@ options 	ISO,TPIP	# OSI networking
 #options 	EON		# OSI tunneling over IP
 #options 	CCITT,LLC,HDLC	# X.25 packet switched protocol
 options 	NETATALK	# AppleTalk (over Ethernet) protocol
-#options 	NTP		# Network Time Protocol in-kernel support
+options 	NTP		# Network Time Protocol in-kernel support
 #options 	PPS_SYNC	# Add serial line synchronization for NTP
-#options 	PFIL_HOOKS	# Add pfil(9) hooks, intended for custom LKMs.
+options 	PFIL_HOOKS	# Add pfil(9) hooks, intended for custom LKMs.
 #options 	IPFILTER_LOG	# Add ipmon(8) logging for ipfilter device
 options 	PPP_BSDCOMP	# Add BSD compression to ppp device
 options 	PPP_DEFLATE	# Add deflate (libz) compression to ppp device
 options 	PPP_FILTER	# Add active filters for ppp (via bpf)
-
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 
 #### Main bus and CPU .. all systems.
@@ -192,12 +205,18 @@ sbus0	at mainbus0				# sun4c and sun4u
 
 #### Standard system devices -- all required for a given architecture
 
+#pcons0	at mainbus0				# PROM console
+
 ## Auxiliary system registers -- We use the OBP for power management
 #auxio*	at ebus?				# auxio registers
 #auxio*	at sbus? slot ? offset ?		# auxio registers
 
+## Auxiliary system registers on sun4c and sun4m
+#auxreg0 at sbus0
+#auxreg0 at pci0
+
 # We also need:
-# bpp0 at sbus0					# parallel port
+bpp0 at sbus0 slot ? offset ?			# parallel port
 # ecpp0 at pci0					# parallel port ?
 
 ## Mostek clock
@@ -211,25 +230,37 @@ timer0	at mainbus0
 
 ## Zilog 8530 serial chips.  Each has two-channels.
 ## zs0 is ttya and ttyb.  zs1 is the keyboard and mouse.
-zs0	at sbus0 slot ? offset ?
-zstty0	at zs0 channel 0	# ttya
-zstty1	at zs0 channel 1	# ttyb
+#zs0	at sbus0 slot ? offset ?
+#zstty0	at zs0 channel 0	# ttya
+#zstty1	at zs0 channel 1	# ttyb
 
-zs1	at sbus0 slot ? offset ?
-kbd0	at zs1 channel 0	# keyboard
-ms0	at zs1 channel 1	# mouse
+#old attach scheme
+#zs1	at sbus0 slot ? offset ?
+#kbd0	at zs1 channel 0	# keyboard
+#ms0	at zs1 channel 1	# mouse
+
+#new attach scheme
+#zstty2	at zs1 channel 0	# ttya
+#zstty3	at zs1 channel 1	# ttyb
+#kbd0	at zstty2		# keyboard
+#ms0	at zstty3		# mouse
+
+#wildcard attach scheme
+zs*	at sbus? slot ? offset ?
+zstty*	at zs? channel ?
+kbd0	at zstty?
+ms0	at zstty?
 
 ## PCI machines apparently have serial ports
 ## called `se' and `su'
 
 ## Part of a PC87332VLJ?
-#su0	at ebus?		# ttya
-#su1	at ebus?		# ttyb
-#kbd0	at su0			# keyboard
-#ms0	at su1			# mouse
+#com*	at ebus?			# `com' driver
+#kbd0	at com?			# keyboard
+#ms0	at com?			# mouse
 
 ## This is the SAB82532 DUART
-#se0	at ebus?		# 
+#se0	at ebus?		#
 
 
 #### Disk controllers and disks
@@ -266,8 +297,8 @@ scsibus* at esp?
 sd0	at scsibus? target 0 lun 0		# SCSI disks
 sd1	at scsibus? target 1 lun 0		# SCSI disks
 sd2	at scsibus? target 2 lun 0		# SCSI disks
-sd3	at scsibus? target 3 lun 0		# SCSI disks
-sd4	at scsibus? target 4 lun 0		# SCSI disks
+sd3	at scsibus? target 3 lun 0 flags 0x10	# SCSI disks
+sd4	at scsibus? target 4 lun 0 flags 0x10	# SCSI disks
 sd5	at scsibus? target 5 lun 0		# SCSI disks
 sd6	at scsibus? target 6 lun 0		# SCSI disks
 sd*	at scsibus? target ? lun ?		# SCSI disks
@@ -308,8 +339,8 @@ pseudo-device	ccd	4
 ## directly like the sun4c on-board, one uses the ledma device like the
 ## sun4m on-board, and one uses the lebuffer device.
 
-options 	LANCE_REVC_BUG
-options		LEDEBUG
+#options 	LANCE_REVC_BUG
+#options 	LEDEBUG
 
 ledma0		at sbus0 slot ? offset ?		# sun4m on-board
 le0		at ledma0				# sun4m on-board
@@ -328,7 +359,7 @@ le*		at lebuffer?				# SBus
 pseudo-device	loop
 
 ## SLIP and CSLIP interfaces, for IP over a serial line.
-pseudo-device	sl		2
+#pseudo-device	sl		2
 
 ## PPP, the successor to SLIP.  See pppd(8).
 pseudo-device	ppp		2
@@ -386,15 +417,13 @@ cgsix*		at sbus? slot ? offset ?
 #### Other device configuration
 
 ## Pseudo ttys, required for network logins and programs like screen.
-## 32 is a good number for average systems; you may have as many as you
-## like, though 256 is more or less the upper limit.  Increasing this
-## number still requires you to run /dev/MAKEDEV to create the files
-## for the ptys.
 
-pseudo-device	pty		32	# pseudo-ttys (for network, etc.)
+pseudo-device	pty			# pseudo-ttys (for network, etc.)
 
 ## Random device, used to implement /dev/random (a source of random noise),
 ## and generate randomness for some kernel formulae.
 ## THIS DEVICE IS EXPERIMENTAL; use at your own risk.
 
 pseudo-device	rnd
+
+pseudo-device	clockctl		# user control of clock subsystem

@@ -1,4 +1,4 @@
-/*	$NetBSD: dvma.c,v 1.14 1999/11/13 00:32:19 thorpej Exp $	*/
+/*	$NetBSD: dvma.c,v 1.23 2001/09/11 20:37:13 chs Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -87,10 +87,6 @@
 #include <sys/core.h>
 #include <sys/exec.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_map.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
@@ -150,7 +146,7 @@ dvma_kvtopa(kva, bustype)
 
 	addr = (u_long)kva;
 	if ((addr & DVMA_MAP_BASE) != DVMA_MAP_BASE)
-		panic("dvma_kvtopa: bad dmva addr=0x%x\n", addr);
+		panic("dvma_kvtopa: bad dmva addr=0x%lx\n", addr);
 
 	switch (bustype) {
 	case BUS_OBIO:
@@ -176,13 +172,13 @@ dvma_mapin(kmem_va, len, canwait)
 	int     len, canwait;
 {
 	void * dvma_addr;
-	vm_offset_t kva, tva;
-	register int npf, s;
+	vaddr_t kva, tva;
+	int npf, s;
 	paddr_t pa;
 	long off, pn;
 	boolean_t rv;
 
-	kva = (u_long)kmem_va;
+	kva = (vaddr_t)kmem_va;
 #ifdef	DIAGNOSTIC
 	/*
 	 * Addresses below VM_MIN_KERNEL_ADDRESS are not part of the kernel
@@ -195,12 +191,12 @@ dvma_mapin(kmem_va, len, canwait)
 	/*
 	 * Calculate the offset of the data buffer from a page boundary.
 	 */
-	off = (int)kva & PGOFSET;
+	off = kva & PGOFSET;
 	kva -= off;	/* Truncate starting address to nearest page. */
 	len = round_page(len + off); /* Round the buffer length to pages. */
 	npf = btoc(len); /* Determine the number of pages to be mapped. */
 
-	s = splimp();
+	s = splvm();
 	for (;;) {
 		/*
 		 * Try to allocate DVMA space of the appropriate size
@@ -239,12 +235,12 @@ dvma_mapin(kmem_va, len, canwait)
 #ifdef	DEBUG
 		if (rv == FALSE)
 			panic("dvma_mapin: null page frame");
-#endif	DEBUG
+#endif	/* DEBUG */
 
 		iommu_enter((tva & IOMMU_VA_MASK), pa);
-		pmap_enter(pmap_kernel(), tva, pa | PMAP_NC,
-			VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
+		pmap_kenter_pa(tva, pa | PMAP_NC, VM_PROT_READ | VM_PROT_WRITE);
 	}
+	pmap_update(pmap_kernel());
 
 	return (dvma_addr);
 }
@@ -270,19 +266,10 @@ dvma_mapout(dvma_addr, len)
 	len = round_page(len + off);
 
 	iommu_remove((kva & IOMMU_VA_MASK), len);
+	pmap_kremove(kva, len);
+	pmap_update(pmap_kernel());
 
-	/*
-	 * XXX - don't call pmap_remove() with DVMA space yet.
-	 * XXX   It cannot (currently) handle the removal
-	 * XXX   of address ranges which do not participate in the
-	 * XXX   PV system by virtue of their _virtual_ addresses.
-	 * XXX   DVMA is one of these special address spaces.
-	 */
-#ifdef	DVMA_ON_PVLIST
-	pmap_remove(pmap_kernel(), kva, kva + len);
-#endif	/* DVMA_ON_PVLIST */
-
-	s = splimp();
+	s = splvm();
 	rmfree(dvmamap, btoc(len), btoc(kva));
 	wakeup(dvmamap);
 	splx(s);
@@ -297,7 +284,7 @@ dvma_malloc(bytes)
 	size_t bytes;
 {
 	void *new_mem, *dvma_mem;
-	vm_size_t new_size;
+	vsize_t new_size;
 
 	if (!bytes)
 		return NULL;
@@ -317,7 +304,7 @@ dvma_free(addr, size)
 	void *addr;
 	size_t size;
 {
-	vm_size_t sz = m68k_round_page(size);
+	vsize_t sz = m68k_round_page(size);
 
 	dvma_mapout(addr, sz);
 	/* XXX: need kmem address to free it...

@@ -1,4 +1,4 @@
-/*	$NetBSD: itevar.h,v 1.5 1999/03/24 14:11:47 minoura Exp $	*/
+/*	$NetBSD: itevar.h,v 1.7 2001/12/27 02:23:25 wiz Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -119,11 +119,11 @@ enum emul_level {
 	(ip->attrbuf + ((y) * ip->cols) + (x))
 
 #define attrclr(ip, sy, sx, h, w) \
-	bzero(ip->attrbuf + ((sy) * ip->cols) + (sx), (h) * (w))
+	memset(ip->attrbuf + ((sy) * ip->cols) + (sx), 0, (h) * (w))
   
 #define attrmov(ip, sy, sx, dy, dx, h, w) \
-	bcopy(ip->attrbuf + ((sy) * ip->cols) + (sx), \
-	      ip->attrbuf + ((dy) * ip->cols) + (dx), \
+	memcpy(ip->attrbuf + ((dy) * ip->cols) + (dx), \
+	      ip->attrbuf + ((sy) * ip->cols) + (sx), \
 	      (h) * (w))
 
 #define attrtest(ip, attr) \
@@ -263,5 +263,6 @@ extern unsigned char kern_font[];
 
 /* keyboard LED status variable */
 extern unsigned char kbdled;
+void ite_set_glyph __P((void));
 void kbd_setLED __P((void));
 #endif

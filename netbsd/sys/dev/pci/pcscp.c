@@ -1,4 +1,4 @@
-/*	$NetBSD: pcscp.c,v 1.10 2000/06/05 15:08:00 tsutsui Exp $	*/
+/*	$NetBSD: pcscp.c,v 1.17 2001/11/13 07:48:48 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999 The NetBSD Foundation, Inc.
@@ -45,6 +45,9 @@
  * http://www.amd.com/products/npd/techdocs/techdocs.html
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcscp.c,v 1.17 2001/11/13 07:48:48 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -54,10 +57,11 @@
 #include <machine/intr.h>
 #include <machine/endian.h>
 
-#include <dev/scsipi/scsi_all.h>
+#include <uvm/uvm_extern.h>
+
 #include <dev/scsipi/scsipi_all.h>
+#include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsiconf.h>
-#include <dev/scsipi/scsi_message.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -259,8 +263,7 @@ pcscp_attach(parent, self, aux)
 	sc->sc_maxxfer = 16 * 1024 * 1024;
 
 	/* map and establish interrupt */
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -298,7 +301,7 @@ pcscp_attach(parent, self, aux)
 	 */
 
 	if ((error = bus_dmamem_alloc(esc->sc_dmat,
-	    sizeof(u_int32_t) * MDL_SIZE, NBPG, 0, &seg, 1, &rseg,
+	    sizeof(u_int32_t) * MDL_SIZE, PAGE_SIZE, 0, &seg, 1, &rseg,
 	    BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: unable to allocate memory for the MDL, "
 		    "error = %d\n", sc->sc_dev.dv_xname, error);
@@ -329,10 +332,12 @@ pcscp_attach(parent, self, aux)
 	/* Do the common parts of attachment. */
 	printf("%s", sc->sc_dev.dv_xname);
 
-	ncr53c9x_attach(sc, NULL, NULL);
+	sc->sc_adapter.adapt_minphys = minphys;
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	ncr53c9x_attach(sc);
 
 	/* Turn on target selection using the `dma' method */
-	ncr53c9x_dmaselect = 1;
+	sc->sc_features |= NCR_F_DMASELECT;
 }
 
 /*
@@ -562,8 +567,10 @@ pcscp_dma_setup(sc, addr, len, datain, dmasize)
 
 	error = bus_dmamap_load(esc->sc_dmat, dmap, *esc->sc_dmaaddr,
 	    *esc->sc_dmalen, NULL,
-	    sc->sc_nexus->xs->xs_control & XS_CTL_NOSLEEP ?
-	    BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
+	    ((sc->sc_nexus->xs->xs_control & XS_CTL_NOSLEEP) ?
+	    BUS_DMA_NOWAIT : BUS_DMA_WAITOK) | BUS_DMA_STREAMING |
+	    ((sc->sc_nexus->xs->xs_control & XS_CTL_DATA_IN) ?
+	     BUS_DMA_READ : BUS_DMA_WRITE));
 	if (error) {
 		printf("%s: unable to load dmamap, error = %d\n",
 		    sc->sc_dev.dv_xname, error);

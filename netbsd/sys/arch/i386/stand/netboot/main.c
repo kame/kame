@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.5.28.1 2000/08/13 09:09:27 jdolecek Exp $	 */
+/*	$NetBSD: main.c,v 1.10 2001/07/05 00:58:45 itojun Exp $	 */
 
 /*
  * Copyright (c) 1996
@@ -54,33 +54,13 @@ void	command_help __P((char *));
 void	command_quit __P((char *));
 void	command_boot __P((char *));
 
-struct bootblk_command commands[] = {
+const struct bootblk_command commands[] = {
 	{ "help",	command_help },
 	{ "?",		command_help },
 	{ "quit",	command_quit },
 	{ "boot",	command_boot },
 	{ NULL,		NULL },
 };
-
-#ifdef COMPAT_OLDBOOT
-int
-parsebootfile(fname, fsname, devname, unit, partition, file)
-	const char     *fname;
-	char          **fsname;	/* out */
-	char          **devname;/* out */
-	unsigned int   *unit, *partition;	/* out */
-	const char    **file;	/* out */
-{
-	return (EINVAL);
-}
-
-int 
-biosdisk_gettype(f)
-	struct open_file *f;
-{
-	return (0);
-}
-#endif
 
 int 
 bootit(filename, howto)
@@ -137,7 +117,7 @@ command_help(arg)
 	char *arg;
 {
 	printf("commands are:\n"
-	       "boot [filename] [-ads]\n"
+	       "boot [filename] [-acdqsv]\n"
 	       "     (ex. \"netbsd.old -s\"\n"
 	       "help|?\n"
 	       "quit\n");

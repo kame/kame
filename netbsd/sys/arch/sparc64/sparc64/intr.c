@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.25.2.1 2000/07/18 16:23:26 mrg Exp $ */
+/*	$NetBSD: intr.c,v 1.42 2002/05/06 19:19:48 eeh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -44,60 +44,22 @@
  *	@(#)intr.c	8.3 (Berkeley) 11/11/93
  */
 
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-#include "opt_ccitt.h"
-#include "opt_natm.h"
 #include "opt_ddb.h"
-#include "ppp.h"
+#include "pcons.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/socket.h>
 #include <sys/malloc.h>
-
-#include <vm/vm.h>
 
 #include <dev/cons.h>
 
 #include <net/netisr.h>
-#include <net/if.h>
 
 #include <machine/cpu.h>
 #include <machine/ctlreg.h>
 #include <machine/instr.h>
 #include <machine/trap.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#include <netinet/ip_var.h>
-#endif
-#ifdef INET6
-# ifndef INET
-#  include <netinet/in.h>
-# endif
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#endif
-#ifdef NS
-#include <netns/ns_var.h>
-#endif
-#ifdef ISO
-#include <netiso/iso.h>
-#include <netiso/clnp.h>
-#endif
-#ifdef NETATALK
-#include <netatalk/at_extern.h>
-#endif
-#include "ppp.h"
-#if NPPP > 0
-#include <net/ppp_defs.h>
-#include <net/if_ppp.h>
-#endif
 
 /*
  * The following array is to used by locore.s to map interrupt packets
@@ -110,8 +72,7 @@ struct intrhand *intrlev[MAXINTNUM];
 void	strayintr __P((const struct trapframe64 *, int));
 int	softintr __P((void *));
 int	softnet __P((void *));
-int	send_softclock __P((void *));
-int	intr_list_handler __P((void *, void *));
+int	intr_list_handler __P((void *));
 
 /*
  * Stray interrupt handler.  Clear it if possible.
@@ -141,8 +102,9 @@ strayintr(fp, vectored)
 	/* If we're in polled mode ignore spurious interrupts */
 	if ((fp->tf_pil == PIL_SER) /* && swallow_zsintrs */) return;
 
-	printf("stray interrupt ipl %u pc=%lx npc=%lx pstate=%s vecttored=%d\n",
-	    fp->tf_pil, fp->tf_pc, fp->tf_npc, 
+	printf("stray interrupt ipl %u pc=%llx npc=%llx pstate=%s vecttored=%d\n",
+	    fp->tf_pil, (unsigned long long)fp->tf_pc,
+	    (unsigned long long)fp->tf_npc, 
 	    bitmask_snprintf((fp->tf_tstate>>TSTATE_PSTATE_SHIFT),
 	      PSTATE_BITS, buf, sizeof(buf)), vectored);
 
@@ -159,8 +121,6 @@ strayintr(fp, vectored)
 #endif
 }
 
-#include "arp.h"
-
 /*
  * Level 1 software interrupt (could also be Sbus level 1 interrupt).
  * Three possible reasons:
@@ -171,7 +131,11 @@ int
 softintr(fp)
 	void *fp;
 {
+#if NPCONS >0
+	extern void pcons_dopoll __P((void));
 
+	pcons_dopoll();
+#endif
 	return (1);
 }
 
@@ -192,22 +156,11 @@ softnet(fp)
 } while (0)
 #include <net/netisr_dispatch.h>
 #undef DONETISR
-}
-
-/* 
- * Damn softclock doesn't return a value.
- */
-int
-send_softclock(fp)
-	void *fp;
-{
-	softclock();
-	return 1;
+	return (1);
 }
 
 struct intrhand soft01intr = { softintr, NULL, 1 };
 struct intrhand soft01net = { softnet, NULL, 1 };
-struct intrhand soft01clock = { send_softclock, NULL, 1 };
 
 #if 1
 void 
@@ -218,10 +171,6 @@ void
 setsoftnet() {
 	send_softint(-1, IPL_SOFTNET, &soft01net);
 }
-void 
-setsoftclock() {
-	send_softint(-1, IPL_SOFTCLOCK, &soft01clock);
-}
 #endif
 
 /*
@@ -229,7 +178,7 @@ setsoftclock() {
  * Only `prewired' interrupts appear here; boot-time configured devices
  * are attached via intr_establish() below.
  */
-struct intrhand *intrhand[15] = {
+struct intrhand *intrhand[16] = {
 	NULL,			/*  0 = error */
 	&soft01intr,		/*  1 = software level 1 + Sbus */
 	NULL,	 		/*  2 = Sbus level 2 (4m: Sbus L1) */
@@ -244,7 +193,8 @@ struct intrhand *intrhand[15] = {
 	NULL,			/* 11 = floppy */
 	NULL,			/* 12 = zs hardware interrupt */
 	NULL,			/* 13 = audio chip */
-	NULL			/* 14 = counter 1 = profiling timer */
+	NULL,			/* 14 = counter 1 = profiling timer */
+	NULL			/* 15 = async faults */
 };
 
 int fastvec = 0;
@@ -254,9 +204,8 @@ int fastvec = 0;
  * a handler to hand out interrupts.
  */
 int
-intr_list_handler(arg, vec)
+intr_list_handler(arg)
 	void * arg;
-	void * vec;
 {
 	int claimed = 0;
 	struct intrhand *ih = (struct intrhand *)arg;
@@ -268,8 +217,8 @@ intr_list_handler(arg, vec)
 		{
 			extern int intrdebug;
 			if (intrdebug & 1)
-				printf("intr %p %x arg %p vec %p %s\n",
-					ih, ih->ih_number, ih->ih_arg, vec,
+				printf("intr %p %x arg %p %s\n",
+					ih, ih->ih_number, ih->ih_arg,
 					claimed ? "claimed" : "");
 		}
 #endif
@@ -288,7 +237,7 @@ intr_establish(level, ih)
 	int level;
 	struct intrhand *ih;
 {
-	register struct intrhand **p, *q;
+	register struct intrhand **p, *q = NULL;
 	int s;
 
 	s = splhigh();
@@ -299,9 +248,7 @@ intr_establish(level, ih)
 	ih->ih_pil = level; /* XXXX caller should have done this before */
 	ih->ih_pending = 0; /* XXXX caller should have done this before */
 	ih->ih_next = NULL;
-	for (p = &intrhand[level]; (q = *p) != NULL; p = &q->ih_next)
-		;
-	*p = ih;
+
 	/*
 	 * Store in fast lookup table
 	 */
@@ -319,8 +266,10 @@ intr_establish(level, ih)
 			 * Interrupt is already there.  We need to create a
 			 * new interrupt handler and interpose it.
 			 */
-			printf("intr_establish: intr reused %d\n", ih->ih_number);
-
+#ifdef DEBUG
+			printf("intr_establish: intr reused %x\n", 
+				ih->ih_number);
+#endif
 			if (q->ih_fun != intr_list_handler) {
 				nih = (struct intrhand *)
 					malloc(sizeof(struct intrhand),
@@ -334,30 +283,41 @@ intr_establish(level, ih)
 			/* Add the ih to the head of the list */
 			ih->ih_next = (struct intrhand *)q->ih_arg;
 			q->ih_arg = (void *)ih;
-		}
-		else
+		} else {
 			intrlev[ih->ih_number] = ih;
+		}
 #ifdef NOT_DEBUG
-		printf("\nintr_establish: vector %x pil %x mapintr %p clrintr %p fun %p arg %p\n",
-		       ih->ih_number, ih->ih_pil, (long)ih->ih_map, (long)ih->ih_clr, ih->ih_fun, ih->ih_arg);
+		printf("\nintr_establish: vector %x pil %x mapintr %p "
+			"clrintr %p fun %p arg %p\n",
+			ih->ih_number, ih->ih_pil, (void *)ih->ih_map,
+			(void *)ih->ih_clr, (void *)ih->ih_fun,
+			(void *)ih->ih_arg);
 		/*Debugger();*/
 #endif
 	} else
-		panic("intr_establish: bad intr number %d", ih->ih_number);
+		panic("intr_establish: bad intr number %x", ih->ih_number);
+
+	/* If it's not shared, stick it in the intrhand list for that level. */
+	if (q != NULL) {
+		for (p = &intrhand[level]; (q = *p) != NULL; p = &q->ih_next)
+			;
+		*p = ih;
+	}
+
 	splx(s);
 }
 
 void *
 softintr_establish(level, fun, arg)
 	int level; 
-	int (*fun) __P((void *));
+	void (*fun) __P((void *));
 	void *arg;
 {
 	struct intrhand *ih;
 
 	ih = malloc(sizeof(*ih), M_DEVBUF, 0);
 	bzero(ih, sizeof(*ih));
-	ih->ih_fun = fun;
+	ih->ih_fun = (int (*) __P((void *)))fun;	/* XXX */
 	ih->ih_arg = arg;
 	ih->ih_pil = level;
 	ih->ih_pending = 0;

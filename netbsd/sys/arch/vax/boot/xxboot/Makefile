@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.7 2000/06/19 04:22:14 matt Exp $
+#	$NetBSD: Makefile,v 1.13.4.1 2002/06/18 13:46:15 lukem Exp $
 
 S=	${.CURDIR}/../../../..
 
@@ -9,16 +9,17 @@ LINKS+=	${BINDIR}/xxboot ${BINDIR}/sdboot
 LINKS+=	${BINDIR}/xxboot ${BINDIR}/hpboot
 WARNS?=	1
 
-SRCS=	start.s bootxx.c romread.s urem.s udiv.s str.s
+SRCS=	start.S bootxx.c romread.S str.S
 
 STRIPFLAG=
 CPPFLAGS+=-D_STANDALONE -DLIBSA_NO_FD_CHECKING -DLIBSA_NO_RAW_ACCESS \
 	-DLIBSA_NO_TWIDDLE -DLIBSA_SINGLE_DEVICE=rom \
 	-DLIBSA_NO_COMPAT_UFS \
 	-DLIBSA_NO_FS_SYMLINK -DLIBSA_NO_FS_CLOSE \
-	-DLIBSA_NO_FS_WRITE -DLIBSA_NO_FS_SEEK
+	-DLIBSA_NO_FS_WRITE -DLIBSA_NO_FS_SEEK \
+	-DNEED_UFS -DNEED_CD9660
 BINDIR=	/usr/mdec
-NOMAN=	1
+NOMAN=	# defined
 
 CFLAGS=	-Os
 
@@ -30,15 +31,21 @@ KERN_AS=library
 .include "${S}/lib/libkern/Makefile.inc"
 LIBKERN=${KERNLIB}
 
-.BEGIN:
+.if ${MACHINE} == "vax"
+.PHONY: machine-links
+beforedepend: machine-links
+machine-links:
 	@[ -h machine ] || ln -s ${S}/arch/${MACHINE}/include machine
 	@[ -h ${MACHINE_ARCH} ] || ln -s ${S}/arch/${MACHINE_ARCH}/include ${MACHINE_ARCH}
 .NOPATH: machine ${MACHINE_ARCH}
 CLEANFILES+= machine ${MACHINE_ARCH}
+.endif
+CLEANFILES+= ${PROG}.out
 
 ${PROG}: ${OBJS} ${LIBSA} ${LIBZ} ${LIBKERN}
 ${PROG}: ${OBJS} ${LIBSA} ${LIBKERN}
-	ld -N -Ttext 100000 -o ${PROG}.out ${OBJS} ${LIBSA} ${LIBKERN}
-	objcopy -O binary ${PROG}.out ${PROG}
+	${LD} -N -Ttext 100000 -o ${PROG}.out ${OBJS} ${LIBSA} ${LIBKERN}
+	${SIZE} ${PROG}.out
+	${OBJCOPY} -O binary ${PROG}.out ${PROG}
 
 .include <bsd.prog.mk>

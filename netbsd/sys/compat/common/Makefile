@@ -1,7 +1,7 @@
-#	$NetBSD: Makefile,v 1.24 1999/08/25 04:47:12 thorpej Exp $
+#	$NetBSD: Makefile,v 1.28.4.1 2002/06/19 00:03:07 lukem Exp $
 
 LIB=	compat
-MKPIC=	no
+NOPIC=	# defined
 
 CPPFLAGS=	${COMPATCPPFLAGS}
 
@@ -27,11 +27,25 @@ SRCS+=	kern_sig_13.c
 SRCS+=	sysv_ipc_14.c sysv_msg_14.c sysv_shm_14.c sysv_sem_14.c
 
 # really, all machines where sizeof(int) != sizeof(long) (LP64)
-.if (${MACHINE_ARCH} != "alpha")
+.if (${MACHINE_ARCH} != "alpha" && ${MACHINE_ARCH} != "sparc64" \
+  && ${MACHINE_ARCH} != "x86_64")
 SRCS+=	kern_ipc_10.c 
+.endif
+
+# Compatibility code for 32-bit emulations on 64-bit platforms
+.if (${MACHINE_ARCH} == "sparc64" || ${MACHINE_ARCH} == "x86_64")
+SRCS+=	netbsd32_compat_09.c netbsd32_compat_10.c netbsd32_compat_10.c \
+	netbsd32_compat_12.c netbsd32_compat_13.c netbsd32_compat_14.c \
+	netbsd32_compat_43.c
+.PATH.c: ${COMPATDIR}/../netbsd32
 .endif
 
 # only needed during build
 libinstall::
 
+.include <bsd.own.mk>
+.undef DESTDIR
 .include <bsd.lib.mk>
+
+showsources: ${SRCS} 
+	@echo ${.ALLSRC}

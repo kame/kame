@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.5 1994/06/29 06:41:07 cgd Exp $	*/
+/*	$NetBSD: main.c,v 1.9 2002/05/16 19:30:41 wiz Exp $	*/
 
 /*
  * TODO:
@@ -11,11 +11,16 @@
  * However it does work...
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: main.c,v 1.9 2002/05/16 19:30:41 wiz Exp $");
+
 #include <stdio.h>
 #include <strings.h>
+#include <time.h>
 #include "malloc.h"
 #include "debug.h"
 #include "main.h"
+#include "procs.h"
 
 int	debug[128];
 
@@ -42,8 +47,16 @@ char *synonyms[] = {
 	0
 };
 
+void FakeFilename();
+extern void llparse();
+extern void initsets();
+extern void init_alloc();
+extern void dump_predtable();
+extern void printprotoerrs();
+
+void
 usage(a)
-char *a;
+	char *a;
 {
 	fprintf(stderr, 
 	"usage: %s <transition file> {-D<debug options>} <other options>\n",
@@ -68,8 +81,9 @@ char *a;
 	Exit(-1);
 }
 
+void
 openfiles(proto)
-register char *proto;
+	register char *proto;
 {
 	register char *junk;
 	register int lenp = strlen(proto);
@@ -96,16 +110,16 @@ register char *proto;
 	IFDEBUG(X)
 #ifdef DEBUG
 		DOIT(astringfile);
-#endif DEBUG
+#endif /* DEBUG */
 		fprintf(astringfile, 
-				"#ifndef _NFILE\n#include <stdio.h>\n#endif _NFILE\n" );
+				"#ifndef _NFILE\n#include <stdio.h>\n#endif /* _NFILE */\n" );
 	ENDDEBUG
 
 	DOIT(statevalfile);
 	DOIT(statefile);
 	DOIT(actfile);
 	fprintf(actfile,
-		"#ifndef lint\nstatic char *rcsid = \"$Header/**/$\";\n#endif lint\n");
+		"#ifndef lint\nstatic char *rcsid = \"$Header/**/$\";\n#endif /* lint */\n");
 
 	if(pgoption)
 		putdriver(actfile, 15);
@@ -123,9 +137,10 @@ register char *proto;
 	initsets(eventfile_h, statefile);
 }
 
+void
 includecode(file, f)
-FILE *file;
-register char *f;
+	FILE *file;
+	register char *f;
 {
 	register int count=1;
 	static char o='{';
@@ -133,7 +148,7 @@ register char *f;
 	register char *g;
 
 	IFDEBUG(a)
-		fprintf(stdout, "including: %s, f=0x%x", f,f);
+		fprintf(stdout, "including: %s, f=0x%p", f,f);
 	ENDDEBUG
 	g = ++f;
 	while(count>0) {
@@ -149,6 +164,7 @@ register char *f;
 	FakeFilename(file, Transfilename, lineno);
 }
 
+void
 putincludes()
 {
 	FakeFilename(actfile, Transfilename, lineno);
@@ -161,6 +177,7 @@ putincludes()
 	FakeFilename(actfile, Transfilename, lineno);
 }
 
+int
 main(argc, argv)
 int argc;
 char *argv[];
@@ -196,23 +213,23 @@ char *argv[];
 			actfile_name =  (char *)strcpy(actfile_name,name);
 #ifdef LINT
 			name =
-#endif LINT
+#endif /* LINT */
 			strcat(actfile_name, ".c");
 			fprintf(stdout, "debugging file is %s\n",actfile_name);
 			break;
 		case 'K':
-			debug[c]=1;
+			debug[(unsigned char) c]=1;
 			fprintf(OUT, "option %c file %s\n",c, &argv[i][j+1]);
 			(void) strcpy(kerneldirname,&argv[i][++j]);
 			break;
 		case 'X':
-			debug[c]=1;
+			debug[(unsigned char) c]=1;
 			name = &argv[i][++j];
 			astringfile_name = Malloc( strlen(name)+4);
 			astringfile_name =  (char *)strcpy(astringfile_name,name);
 #ifdef LINT
 			name =
-#endif LINT
+#endif /* LINT */
 			strcat(astringfile_name, ".c");
 			fprintf(OUT, "option %c, astringfile name %s\n",c, name);
 			break;
@@ -222,7 +239,7 @@ char *argv[];
 			eventfile_h_name =  (char *)strcpy(eventfile_h_name,name);
 #ifdef LINT
 			name =
-#endif LINT
+#endif /* LINT */
 			strcat(eventfile_h_name, ".h");
 			fprintf(stdout, "event files is %s\n",eventfile_h_name);
 			break;
@@ -232,7 +249,7 @@ char *argv[];
 			statevalfile_name =  (char *)strcpy(statevalfile_name,name);
 #ifdef LINT
 			name =
-#endif LINT
+#endif /* LINT */
 			strcat(statevalfile_name, ".init");
 			fprintf(stdout, "state table initial values file is %s\n",statevalfile_name);
 			break;
@@ -242,7 +259,7 @@ char *argv[];
 			statefile_name =  (char *)strcpy(statefile_name,name);
 #ifdef LINT
 			name =
-#endif LINT
+#endif /* LINT */
 			strcat(statefile_name, ".h");
 			fprintf(stdout, "state file is %s\n",statefile_name);
 			break;
@@ -255,13 +272,13 @@ char *argv[];
 				debug['X']);
 			break;
 		case 'D':
-			while( c = argv[i][++j] ) {
+			while((c = argv[i][++j])) {
 				if(c ==  'X') {
 					fprintf(OUT, "debugging on");
 					if(debug['X']) fprintf(OUT,
 						" - overrides any -%d flags used\n", debug['X']);
 				}
-				debug[c]=1;
+				debug[(unsigned char) c]=1;
 				fprintf(OUT, "debug %c\n",c);
 			}
 			break;
@@ -291,10 +308,10 @@ char *argv[];
 			fprintf(OUT, "Option K overrides option X\n");
 			debug['X'] = 0;
 		}
-#endif notdef
+#endif /* notdef */
 		if(strlen(kerneldirname)<1) {
 			fprintf(OUT, "K option: dir name too short!\n");
-			exit(-1);
+			exit(1);
 		}
 		/* add ../name/ */
 		c = (char *) Malloc(strlen(kerneldirname)+6) ;
@@ -302,7 +319,7 @@ char *argv[];
 			fprintf(OUT, "Cannot allocate %d bytes for kerneldirname\n",
 				strlen(kerneldirname + 6) );
 			fprintf(OUT, "kerneldirname is %s\n", kerneldirname  );
-			exit(-1);
+			exit(1);
 		}
 		*c = '.';
 		*(c+1) = '.';
@@ -371,10 +388,13 @@ char *argv[];
 	fprintf(stdout, "%d seconds\n", finish - start);
 	if( print_protoerrs ) 
 		printprotoerrs();
+
+	exit(0);
 }
 
 int transno = 0;
 
+void
 Exit(n)
 {
 	fprintf(stderr, "Error at line %d\n",lineno);
@@ -386,6 +406,7 @@ Exit(n)
 	exit(n);
 }
 
+#if 0
 syntax() 
 {
 	static char *synt[] = {
@@ -397,11 +418,13 @@ syntax()
 		"*TRANSITIONS <string>\n",
 	};
 }
+#endif
 	
+void
 FakeFilename(outfile, name, l)
-FILE *outfile;
-char *name;
-int l;
+	FILE *outfile;
+	char *name;
+	int l;
 {
 	/*
 	doesn't work

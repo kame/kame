@@ -1,4 +1,4 @@
-/*	$NetBSD: cfb.c,v 1.38 2000/02/03 04:09:13 nisimura Exp $	*/
+/*	$NetBSD: cfb.c,v 1.40 2001/09/19 19:04:16 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -88,7 +88,7 @@
 
 #include <machine/autoconf.h>
 #include <machine/pmioctl.h>
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 #include <machine/fbvar.h>
 #include <pmax/dev/bt459.h>
 #include <pmax/dev/cfbvar.h>
@@ -177,7 +177,7 @@ cfbattach(parent, self, aux)
 	void *aux;
 {
 	struct tc_attach_args *ta = aux;
-	caddr_t base = 	(caddr_t)(ta->ta_addr);
+	caddr_t base = (caddr_t)(ta->ta_addr);
 	int unit = self->dv_unit;
 	struct fbinfo *fi;
 	
@@ -238,7 +238,7 @@ cfbinit(fi, cfbaddr, unit, silent)
 	fi->fi_blanked = 0;
 
 	/* Fill in Frame Buffer Type struct. */
-	fi->fi_type.fb_boardtype = PMAX_FBTYPE_CFB;
+	fi->fi_type.fb_type = PMAX_FBTYPE_CFB;
 	fi->fi_type.fb_width = 1024;
 	fi->fi_type.fb_height = 864;
 	fi->fi_type.fb_depth = 8;

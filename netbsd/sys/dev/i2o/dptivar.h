@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: dptivar.h,v 1.2 2001/09/27 18:43:37 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: depcavar.h,v 1.1.2.1 2000/08/11 18:16:50 thorpej Exp $	*/
+/*	$NetBSD: depcavar.h,v 1.1 2000/08/11 02:27:10 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: scsi_message.h,v 1.4 2000/03/15 02:02:37 fvdl Exp $	*/
+/*	$NetBSD: scsi_message.h,v 1.8 2002/04/23 09:46:51 bouyer Exp $	*/
 
 /* Messages (1 byte) */		     /* I/T (M)andatory or (O)ptional */
 #define MSG_CMDCOMPLETE		0x00 /* M/M */
@@ -29,7 +29,8 @@
 /* Identify message */		     /* M/M */	
 #define MSG_IDENTIFYFLAG	0x80 
 #define MSG_IDENTIFY_DISCFLAG	0x40
-#define MSG_IDENTIFY(lun, disc)	(((disc) ? 0xc0 : MSG_IDENTIFYFLAG) | (lun))
+#define MSG_IDENTIFY(lun, disc)	\
+	(MSG_IDENTIFYFLAG | ((disc) ? MSG_IDENTIFY_DISCFLAG : 0) | (lun))
 #define MSG_ISIDENTIFY(m)	((m) & MSG_IDENTIFYFLAG)
 
 /* Extended messages (opcode and length) */
@@ -39,6 +40,31 @@
 #define MSG_EXT_WDTR		0x03
 #define MSG_EXT_WDTR_LEN	0x02
 
-#define MSG_EXT_WDTR_BUS_8_BIT  0x00
-#define MSG_EXT_WDTR_BUS_16_BIT 0x01
-#define MSG_EXT_WDTR_BUS_32_BIT 0x02 
+#define MSG_EXT_WDTR_BUS_8_BIT	0x00
+#define MSG_EXT_WDTR_BUS_16_BIT	0x01
+#define MSG_EXT_WDTR_BUS_32_BIT	0x02 
+
+#define MSG_EXT_PPR		0x04
+#define MSG_EXT_PPR_LEN		0x06
+/*
+ * Offsets:	0x3: transfer period factor
+ * 		0x4: reserved
+ * 		0x5: REQ/ACK offset
+ *		0x6: transfer width exponent
+ *		0x7: flags
+ */
+#define MSG_EXT_PPR_IU		0x01
+#define MSG_EXT_PPR_DT		0x02
+#define MSG_EXT_PPR_QAS		0x04
+#define MSG_EXT_PPR_HOLDMCS	0x08
+#define MSG_EXT_PPR_WRFLOW	0x10
+#define MSG_EXT_PPR_RDSTRM	0x20
+#define MSG_EXT_PPR_RTI		0x40
+#define MSG_EXT_PPR_PCOM	0x80
+
+#define MSG_ISEXTENDED(m)	((m) == MSG_EXTENDED)
+
+/* message length */
+#define MSG_IS1BYTE(m)	\
+	((!MSG_ISEXTENDED(m) && (m) < 0x20) || MSG_ISIDENTIFY(m))
+#define MSG_IS2BYTE(m)		(((m) & 0xf0) == 0x20)

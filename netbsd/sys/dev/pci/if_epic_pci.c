@@ -1,4 +1,4 @@
-/*	$NetBSD: if_epic_pci.c,v 1.7.12.4 2000/07/16 20:29:08 tron Exp $	*/
+/*	$NetBSD: if_epic_pci.c,v 1.19 2001/11/13 07:48:43 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -42,9 +42,8 @@
  * Ethernet PCI Integrated Controller (EPIC/100) driver.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_epic_pci.c,v 1.19 2001/11/13 07:48:43 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h> 
@@ -60,20 +59,6 @@
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_ether.h>
-
-#if NBPFILTER > 0 
-#include <net/bpf.h>
-#endif 
-
-#ifdef INET
-#include <netinet/in.h> 
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -100,8 +85,8 @@ struct epic_pci_softc {
 	void	*sc_ih;			/* interrupt handle */
 };
 
-int	epic_pci_match __P((struct device *, struct cfdata *, void *));
-void	epic_pci_attach __P((struct device *, struct device *, void *));
+int	epic_pci_match(struct device *, struct cfdata *, void *);
+void	epic_pci_attach(struct device *, struct device *, void *);
 
 struct cfattach epic_pci_ca = {
 	sizeof(struct epic_pci_softc), epic_pci_match, epic_pci_attach,
@@ -116,8 +101,7 @@ const struct epic_pci_product {
 	{ 0,				NULL },
 };
 
-const struct epic_pci_product *epic_pci_lookup
-    __P((const struct pci_attach_args *));
+const struct epic_pci_product *epic_pci_lookup(const struct pci_attach_args *);
 
 const struct epic_pci_product *
 epic_pci_lookup(pa)
@@ -131,6 +115,38 @@ epic_pci_lookup(pa)
 	for (epp = epic_pci_products; epp->epp_name != NULL; epp++)
 		if (PCI_PRODUCT(pa->pa_id) == epp->epp_prodid)
 			return (epp);
+
+	return (NULL);
+}
+
+const struct epic_pci_subsys_info {
+	pcireg_t subsysid;
+	int flags;
+} epic_pci_subsys_info[] = {
+	{ PCI_ID_CODE(PCI_VENDOR_SMC, 0xa024), /* SMC9432BTX1 */
+	  EPIC_HAS_BNC },
+	{ PCI_ID_CODE(PCI_VENDOR_SMC, 0xa016), /* SMC9432FTX */
+	  EPIC_HAS_MII_FIBER | EPIC_DUPLEXLED_ON_694 },
+	{ 0xffffffff,
+	  0 }
+};
+
+const struct epic_pci_subsys_info *
+  epic_pci_subsys_lookup(const struct pci_attach_args *);
+
+const struct epic_pci_subsys_info *
+epic_pci_subsys_lookup(pa)
+	const struct pci_attach_args *pa;
+{
+	pci_chipset_tag_t pc = pa->pa_pc;
+	pcireg_t reg;
+	const struct epic_pci_subsys_info *esp;
+
+	reg = pci_conf_read(pc, pa->pa_tag, PCI_SUBSYS_ID_REG);
+
+	for (esp = epic_pci_subsys_info; esp->subsysid != 0xffffffff; esp++)
+		if (esp->subsysid == reg)
+			return (esp);
 
 	return (NULL);
 }
@@ -161,6 +177,7 @@ epic_pci_attach(parent, self, aux)
 	pci_intr_handle_t ih;
 	const char *intrstr = NULL;
 	const struct epic_pci_product *epp;
+	const struct epic_pci_subsys_info *esp;
 	bus_space_tag_t iot, memt;
 	bus_space_handle_t ioh, memh;
 	pcireg_t reg;
@@ -173,7 +190,9 @@ epic_pci_attach(parent, self, aux)
 		case PCI_PMCSR_STATE_D2:
 			printf(": waking up from power state D%d\n%s",
 			    reg & PCI_PMCSR_STATE_MASK, sc->sc_dev.dv_xname);
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4, 0);
+			pci_conf_write(pc, pa->pa_tag, pmreg + 4,
+			    (reg & ~PCI_PMCSR_STATE_MASK) |
+			    PCI_PMCSR_STATE_D0);
 			break;
 		case PCI_PMCSR_STATE_D3:
 			/*
@@ -182,7 +201,9 @@ epic_pci_attach(parent, self, aux)
 			 */
 			printf(": unable to wake up from power state D3, "
 			       "reboot required.\n");
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4, 0);
+			pci_conf_write(pc, pa->pa_tag, pmreg + 4,
+			    (reg & ~PCI_PMCSR_STATE_MASK) |
+			    PCI_PMCSR_STATE_D0);
 			return;
 		}
 	}
@@ -226,8 +247,7 @@ epic_pci_attach(parent, self, aux)
 	/*
 	 * Map and establish our interrupt.
 	 */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: unable to map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -242,6 +262,10 @@ epic_pci_attach(parent, self, aux)
 		return;
 	}
 	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+
+	esp = epic_pci_subsys_lookup(pa);
+	if (esp)
+		sc->sc_hwflags = esp->flags;
 
 	/*
 	 * Finish off the attach.

@@ -1,4 +1,4 @@
-/*	$NetBSD: zbus.c,v 1.43 1999/11/25 22:11:03 is Exp $	*/
+/*	$NetBSD: zbus.c,v 1.47 2002/04/25 09:20:32 aymeric Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -29,6 +29,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zbus.c,v 1.47 2002/04/25 09:20:32 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -50,8 +54,13 @@ struct preconfdata {
 	caddr_t vaddr;
 };
 
+vaddr_t		ZTWOROMADDR;
+vaddr_t		ZTWOMEMADDR;
+u_int		NZTWOMEMPG;
+vaddr_t		ZBUSADDR;	/* kva of Zorro bus I/O pages */
+u_int		ZBUSAVAIL;	/* bytes of Zorro bus I/O space left */
 
-/* 
+/*
  * explain the names.. 0123456789 => zothfisven
  */
 static struct aconfdata aconftab[] = {
@@ -206,19 +215,18 @@ static struct preconfdata preconftab[] = {
 static int npreconfent = sizeof(preconftab) / sizeof(struct preconfdata);
 
 
-void zbusattach __P((struct device *, struct device *, void *));
-int zbusprint __P((void *, const char *));
-int zbusmatch __P((struct device *, struct cfdata *, void *));
-caddr_t zbusmap __P((caddr_t, u_int));
-static char *aconflookup __P((int, int));
+void zbusattach(struct device *, struct device *, void *);
+int zbusprint(void *, const char *);
+int zbusmatch(struct device *, struct cfdata *, void *);
+caddr_t zbusmap(caddr_t, u_int);
+static char *aconflookup(int, int);
 
 /*
  * given a manufacturer id and product id, find the name
  * that describes this board.
  */
 static char *
-aconflookup(mid, pid)
-	int mid, pid;
+aconflookup(int mid, int pid)
 {
 	struct aconfdata *adp, *eadp;
 
@@ -229,8 +237,8 @@ aconflookup(mid, pid)
 	return("board");
 }
 
-/* 
- * mainbus driver 
+/*
+ * mainbus driver
  */
 
 struct cfattach zbus_ca = {
@@ -241,10 +249,7 @@ static struct cfdata *early_cfdata;
 
 /*ARGSUSED*/
 int
-zbusmatch(pdp, cfp, auxp)
-	struct device *pdp;
-	struct cfdata *cfp;
-	void *auxp;
+zbusmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 {
 
 	if (matchname(auxp, "zbus") == 0)
@@ -260,9 +265,7 @@ zbusmatch(pdp, cfp, auxp)
  * with that driver if matched else print a diag.
  */
 void
-zbusattach(pdp, dp, auxp)
-	struct device *pdp, *dp;
-	void *auxp;
+zbusattach(struct device *pdp, struct device *dp, void *auxp)
 {
 	struct zbus_args za;
 	struct preconfdata *pcp, *epcp;
@@ -280,7 +283,7 @@ zbusattach(pdp, dp, auxp)
 	}
 	for (cdp = cfdev; cdp < ecdp; cdp++) {
 		for (pcp = preconftab; pcp < epcp; pcp++) {
-			if (pcp->manid == cdp->rom.manid && 
+			if (pcp->manid == cdp->rom.manid &&
 			    pcp->prodid == cdp->rom.prodid)
 				break;
 		}
@@ -300,11 +303,11 @@ zbusattach(pdp, dp, auxp)
 		if (amiga_realconfig && pcp < epcp && pcp->vaddr)
 			za.va = pcp->vaddr;
 		else {
-			za.va = (void *) (isztwopa(za.pa) ? ztwomap(za.pa) 
+			za.va = (void *) (isztwopa(za.pa) ? ztwomap(za.pa)
 			    : zbusmap(za.pa, za.size));
 /*                     		??????? */
 			/*
-			 * save value if early console init 
+			 * save value if early console init
 			 */
 			if (amiga_realconfig == 0)
 				pcp->vaddr = za.va;
@@ -321,9 +324,7 @@ zbusattach(pdp, dp, auxp)
  * print configuration info.
  */
 int
-zbusprint(auxp, pnp)
-	void *auxp;
-	const char *pnp;
+zbusprint(void *auxp, const char *pnp)
 {
 	struct zbus_args *zap;
 	int rv;
@@ -349,9 +350,7 @@ zbusprint(auxp, pnp)
  * range check done here.
  */
 caddr_t
-zbusmap (pa, size)
-	caddr_t pa;
-	u_int size;
+zbusmap(caddr_t pa, u_int size)
 {
 	static vaddr_t nextkva = 0;
 	vaddr_t kva;
@@ -367,6 +366,15 @@ zbusmap (pa, size)
 	nextkva += size;
 	if (nextkva > ZBUSADDR + ZBUSAVAIL)
 		panic("allocating too much Zorro I/O address space");
+#if defined(__powerpc__)
+/*
+ * XXX we use direct constant mapping, so no need for:
+ * physaccess((caddr_t)kva, (caddr_t)pa, size, PTE_RW|PTE_I);
+ */
+#elif defined(__m68k__)
 	physaccess((caddr_t)kva, (caddr_t)pa, size, PG_RW|PG_CI);
+#else
+ERROR no support for this target cpu yet.
+#endif
 	return((caddr_t)kva);
 }

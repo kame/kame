@@ -1,4 +1,4 @@
-/*	$NetBSD: bktr_tuner.h,v 1.1.1.1 2000/05/07 00:16:18 wiz Exp $	*/
+/*	$NetBSD: bktr_tuner.h,v 1.1 2000/05/07 00:16:18 wiz Exp $	*/
 
 /* FreeBSD: src/sys/dev/bktr/bktr_tuner.h,v 1.1 1999/09/26 22:06:20 roger Exp */
 

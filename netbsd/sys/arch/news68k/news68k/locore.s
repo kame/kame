@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.8.2.2 2000/12/24 08:09:22 jhawk Exp $	*/
+/*	$NetBSD: locore.s,v 1.25 2002/05/14 02:03:02 matt Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -51,6 +51,8 @@
 #include "opt_compat_sunos.h"
 #include "opt_fpsp.h"
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
+#include "opt_lockdebug.h"
 
 #include "assym.h"
 #include <machine/asm.h>
@@ -123,7 +125,8 @@ GLOBAL(kernel_text)
 ASENTRY_NOPROFILE(start)
 	movw	#PSL_HIGHIPL,%sr	| no interrupts
 
-	movl	#0x0	,%a5		| RAM starts at 0 (%a5)
+	movl	#0x0, %a5		| RAM starts at 0 (%a5)
+	movl	#0x0, %a6		| clear %fp to terminate debug trace
 
 	RELOC(bootdev,%a0)
 	movl	%d6, %a0@		| save bootdev
@@ -375,9 +378,9 @@ Lstploaddone:
 	movc	%d0,%cacr		| turn on both caches
 	jmp	Lenab1
 Lmotommu2:
-#if 0 /* use %tt0 register to map I/O space */
+#if 1 /* XXX use %tt0 register to map I/O space temporary */
 	RELOC(protott0, %a0)
-	movl	#0xe0018550,%a0@	| use %tt0 (0xe0000000-0xe1ffffff)
+	movl	#0xe01f8550,%a0@	| use %tt0 (0xe0000000-0xffffffff)
 	.long	0xf0100800		| pmove %a0@,%tt0
 #endif
 	RELOC(prototc, %a2)
@@ -526,7 +529,7 @@ Lbe10:
 #else
 	moveq	#1,%d0			| user program access FC
 #endif
-					| (we dont seperate data/program)
+					| (we dont separate data/program)
 	btst	#5,%sp@(FR_HW+8)	| supervisor mode?
 	jeq	Lbe10a			| if no, done
 	movql	#5,%d0			| else supervisor program access
@@ -831,11 +834,13 @@ ENTRY_NOPROFILE(lev4intr)		/* Level 4: scsi, le, vme etc. */
 	INTERRUPT_RESTOREREG
 	rte
 
+#if 0
 ENTRY_NOPROFILE(lev5intr)		/* Level 5: kb, ms (zs is vectored) */
 	INTERRUPT_SAVEREG
 	jbsr	_C_LABEL(intrhand_lev5)
 	INTERRUPT_RESTOREREG
 	rte
+#endif
 
 ENTRY_NOPROFILE(_isr_clock)		/* Level 6: clock (see clock_hb.c) */
 	INTERRUPT_SAVEREG
@@ -937,6 +942,12 @@ Laststkadj:
  * Use common m68k sigcode.
  */
 #include <m68k/m68k/sigcode.s>
+#ifdef COMPAT_SUNOS
+#include <m68k/m68k/sunos_sigcode.s>
+#endif
+#ifdef COMPAT_SVR4
+#include <m68k/m68k/svr4_sigcode.s>
+#endif
 
 /*
  * Primitives
@@ -959,7 +970,11 @@ GLOBAL(masterpaddr)		| XXXcompatibility (debuggers)
 
 ASLOCAL(mdpflag)
 	.byte	0		| copy of proc md_flags low byte
+#ifdef __ELF__
+	.align	4
+#else
 	.align	2
+#endif
 
 ASBSS(nullpcb,SIZEOF_PCB)
 
@@ -967,6 +982,8 @@ ASBSS(nullpcb,SIZEOF_PCB)
  * At exit of a process, do a switch for the last time.
  * Switch to a safe stack and PCB, and select a new process to run.  The
  * old stack and u-area will be freed by the reaper.
+ *
+ * MUST BE CALLED AT SPLHIGH!
  */
 ENTRY(switch_exit)
 	movl    %sp@(4),%a0
@@ -979,6 +996,11 @@ ENTRY(switch_exit)
 	jbsr	_C_LABEL(exit2)
 	lea	%sp@(4),%sp	| pop args
 
+#if defined(LOCKDEBUG)
+	/* Acquire sched_lock */
+	jbsr	C_LABEL(sched_lock_idle)
+#endif
+
 	jra	_C_LABEL(cpu_switch)
 
 /*
@@ -986,8 +1008,25 @@ ENTRY(switch_exit)
  * to wait for something to come ready.
  */
 ASENTRY_NOPROFILE(Idle)
+#if defined(LOCKDEBUG)
+	/* Release sched_lock */
+	jbsr	_C_LABEL(sched_unlock_idle)
+#endif
+	movw	#PSL_LOWIPL,%sr
+
+	/* Try to zero some pages. */
+	movl	_C_LABEL(uvm)+UVM_PAGE_IDLE_ZERO,%d0
+	jeq	1f
+	jbsr	_C_LABEL(uvm_pageidlezero)
+	jra	2f
+1:
 	stop	#PSL_LOWIPL
+2:
 	movw	#PSL_HIGHIPL,%sr
+#if defined(LOCKDEBUG)
+	/* Acquire sched_lock */
+	jbsr	_C_LABEL(sched_lock_idle)
+#endif
 	movl    _C_LABEL(sched_whichqs),%d0
 	jeq     _ASM_LABEL(Idle)
 	jra	Lsw1
@@ -1019,10 +1058,14 @@ ENTRY(cpu_switch)
 	 * Find the highest-priority queue that isn't empty,
 	 * then take the first proc from that queue.
 	 */
-	movw    #PSL_HIGHIPL,%sr	| lock out interrupts
 	movl    _C_LABEL(sched_whichqs),%d0
 	jeq     _ASM_LABEL(Idle)
 Lsw1:
+	/*
+	 * Interrupts are blocked, sched_lock is held.  If
+	 * we come here via Idle, %d0 contains the contents
+	 * of a non-zero sched_whichqs.
+	 */
 	movl    %d0,%d1
 	negl    %d0
 	andl    %d1,%d0
@@ -1074,8 +1117,8 @@ Lsw2:
 	fsave	%a2@			| save FP state
 	tstb	%a2@			| null state frame?
 	jeq	Lswnofpsave		| yes, all done
-	fmovem	%fp0-%fp7,%a2@(216)	| save FP general registers
-	fmovem	%fpcr/%fpsr/%fpi,%a2@(312) | save FP control registers
+	fmovem	%fp0-%fp7,%a2@(FPF_REGS) | save FP general registers
+	fmovem	%fpcr/%fpsr/%fpi,%a2@(FPF_FPCR) | save FP control registers
 Lswnofpsave:
 
 	clrl	%a0@(P_BACK)		| clear back link
@@ -1083,6 +1126,18 @@ Lswnofpsave:
 	movb	%a0@(P_MD_FLAGS+3),_ASM_LABEL(mdpflag)
 	movl	%a0@(P_ADDR),%a1		| get p_addr
 	movl	%a1,_C_LABEL(curpcb)
+
+#if defined(LOCKDEBUG)
+	/*
+	 * Done mucking with the run queues, release the
+	 * scheduler lock, but keep interrupts out.
+	 */
+	movl	%a0,sp@-		| not args...
+	movl	%a1,sp@-		| ...just saving
+	jbsr	_C_LABEL(sched_unlock_idle)
+	movl	sp@+,%a1
+	movl	sp@+,%a0
+#endif
 
 	/*
 	 * Activate process's address space.
@@ -1105,8 +1160,8 @@ Lswnofpsave:
 	lea	%a1@(PCB_FPCTX),%a0	| pointer to FP save area
 	tstb	%a0@			| null state frame?
 	jeq	Lresfprest		| yes, easy
-	fmovem	%a0@(312),%fpcr/%fpsr/%fpi | restore FP control registers
-	fmovem	%a0@(216),%fp0-%fp7	| restore FP general registers
+	fmovem	%a0@(FPF_FPCR),%fpcr/%fpsr/%fpi | restore FP control registers
+	fmovem	%a0@(FPF_REGS),%fp0-%fp7 | restore FP general registers
 Lresfprest:
 	frestore %a0@			| restore state
 Lnofprest:
@@ -1131,8 +1186,8 @@ ENTRY(savectx)
 	fsave	%a0@			| save FP state
 	tstb	%a0@			| null state frame?
 	jeq	Lsvnofpsave		| yes, all done
-	fmovem	%fp0-%fp7,%a0@(216)	| save FP general registers
-	fmovem	%fpcr/%fpsr/%fpi,%a0@(312) | save FP control registers
+	fmovem	%fp0-%fp7,%a0@(FPF_REGS) | save FP general registers
+	fmovem	%fpcr/%fpsr/%fpi,%a0@(FPF_FPCR) | save FP control registers
 Lsvnofpsave:
 	moveq	#0,%d0			| return 0
 	rts
@@ -1284,17 +1339,6 @@ ENTRY(ecacheoff)
 Lnocache8:
 	rts
 
-/*
- * Get callers current SP value.
- * Note that simply taking the address of a local variable in a C function
- * doesn't work because callee saved registers may be outside the stack frame
- * defined by A6 (e.g. GCC generated code).
- */
-ENTRY_NOPROFILE(getsp)
-	movl	%sp,%d0			| get current SP
-	addql	#4,%d0			| compensate for return address
-	rts
-
 ENTRY_NOPROFILE(getsfc)
 	movc	%sfc,%d0
 	rts
@@ -1350,7 +1394,11 @@ ENTRY_NOPROFILE(_delay)
 	 * operations and that the loop will run from a single cache
 	 * half-line.
 	 */
+#ifdef __ELF__
 	.align  8
+#else
+	.align	3
+#endif
 L_delay:
 	subl	%d1,%d0
 	jgt	L_delay
@@ -1365,8 +1413,8 @@ ENTRY(m68881_save)
 Lm68881fpsave:  
 	tstb	%a0@			| null state frame?
 	jeq	Lm68881sdone		| yes, all done
-	fmovem	%fp0-%fp7,%a0@(216)	| save FP general registers
-	fmovem	%fpcr/%fpsr/%fpi,%a0@(312) | save FP control registers
+	fmovem	%fp0-%fp7,%a0@(FPF_REGS) | save FP general registers
+	fmovem	%fpcr/%fpsr/%fpi,%a0@(FPF_FPCR) | save FP control registers
 Lm68881sdone:
 	rts
 
@@ -1375,16 +1423,16 @@ ENTRY(m68881_restore)
 Lm68881fprestore:
 	tstb	%a0@			| null state frame?
 	jeq	Lm68881rdone		| yes, easy
-	fmovem	%a0@(312),%fpcr/%fpsr/%fpi | restore FP control registers
-	fmovem	%a0@(216),%fp0-%fp7	| restore FP general registers
+	fmovem	%a0@(FPF_FPCR),%fpcr/%fpsr/%fpi | restore FP control registers
+	fmovem	%a0@(FPF_REGS),%fp0-%fp7 | restore FP general registers
 Lm68881rdone:
 	frestore %a0@			| restore state
 	rts
 
 /*
  * Handle the nitty-gritty of rebooting the machine.
- * Basically we just turn off the MMU, restore the Bug's initial VBR
- * and either return to Bug or jump through the ROM reset vector
+ * Basically we just turn off the MMU, restore the PROM's initial VBR
+ * and jump through the PROM halt vector with argument via %d7
  * depending on how the system was halted.
  */
 ENTRY_NOPROFILE(doboot)
@@ -1479,8 +1527,6 @@ GLOBAL(bootctrllun)
 	.long	0
 GLOBAL(bootaddr)
 	.long	0
-GLOBAL(boothowto)
-	.long	0
 
 GLOBAL(want_resched)
 	.long	0
@@ -1522,17 +1568,16 @@ GLOBAL(cache_clr)
 /* interrupt counters */
 GLOBAL(intrnames)
 	.asciz	"spur"
-	.asciz	"lev1"		| AST ???
-	.asciz	"lev2"		| software interrupt
-	.asciz	"lev3"		| slot intr, VME intr 2, fd, lpt
-	.asciz	"lev4"		| slot intr, VME intr 4, le, scsi
-	.asciz	"lev5"		| kb, ms, zs
-	.asciz	"clock"		| clock
+	.asciz	"AST"		| lev1: AST
+	.asciz	"softint"	| lev2: software interrupt
+	.asciz	"lev3"		| lev3: slot intr, VME intr 2, fd, lpt
+	.asciz	"lev4"		| lev4: slot intr, VME intr 4, le, scsi
+	.asciz	"lev5"		| lev5: kb, ms, zs
+	.asciz	"clock"		| lev6: clock
 	.asciz	"nmi"		| parity error
-	.asciz	"statclock"
 GLOBAL(eintrnames)
 	.even
 
 GLOBAL(intrcnt)
-	.long	0,0,0,0,0,0,0,0,0,0
+	.long	0,0,0,0,0,0,0,0
 GLOBAL(eintrcnt)

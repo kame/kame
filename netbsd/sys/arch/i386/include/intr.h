@@ -1,11 +1,11 @@
-/*	$NetBSD: intr.h,v 1.14 2000/06/08 23:03:13 cgd Exp $	*/
+/*	$NetBSD: intr.h,v 1.25 2002/05/12 23:16:52 matt Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Charles M. Hannum.
+ * by Charles M. Hannum, and by Jason R. Thorpe.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -70,14 +70,24 @@
 
 #ifndef _LOCORE
 
-volatile int cpl, ipending, astpending;
-int imask[NIPL];
+extern volatile int cpl, ipending, astpending;
+extern int imask[NIPL];
 
-extern void Xspllower __P((void));
+void Xspllower __P((void));
 
 static __inline int splraise __P((int));
 static __inline void spllower __P((int));
 static __inline void softintr __P((int));
+
+/*
+ * compiler barrier: prevent reordering of instructions.
+ * XXX something similar will move to <sys/cdefs.h>
+ * or thereabouts.
+ * This prevents the compiler from reordering code around
+ * this "instruction", acting as a sequence point for code generation.
+ */
+
+#define	__splbarrier() __asm __volatile("":::"memory")
 
 /*
  * Add a mask to cpl, and return the old value of cpl.
@@ -89,6 +99,7 @@ splraise(ncpl)
 	register int ocpl = cpl;
 
 	cpl = ocpl | ncpl;
+	__splbarrier();
 	return (ocpl);
 }
 
@@ -101,6 +112,7 @@ spllower(ncpl)
 	register int ncpl;
 {
 
+	__splbarrier();
 	cpl = ncpl;
 	if (ipending & ~ncpl)
 		Xspllower();
@@ -117,7 +129,7 @@ spllower(ncpl)
 #define	splstatclock()	splclock()
 #define	splserial()	splraise(imask[IPL_SERIAL])
 
-#define spllpt()	spltty()
+#define	spllpt()	spltty()
 
 /*
  * Software interrupt masks
@@ -133,8 +145,10 @@ spllower(ncpl)
 /*
  * Miscellaneous
  */
-#define	splimp()	splraise(imask[IPL_IMP])
+#define	splvm()		splraise(imask[IPL_IMP])
 #define	splhigh()	splraise(imask[IPL_HIGH])
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
 #define	spl0()		spllower(0)
 #define	splx(x)		spllower(x)
 
@@ -151,10 +165,67 @@ softintr(mask)
 }
 
 #define	setsoftast()	(astpending = 1)
-#define	setsoftclock()	softintr(SIR_CLOCK)
 #define	setsoftnet()	softintr(SIR_NET)
-#define	setsoftserial()	softintr(SIR_SERIAL)
 
 #endif /* !_LOCORE */
+
+/*
+ * Generic software interrupt support.
+ */
+
+#define	I386_SOFTINTR_SOFTCLOCK		0
+#define	I386_SOFTINTR_SOFTNET		1
+#define	I386_SOFTINTR_SOFTSERIAL	2
+#define	I386_NSOFTINTR			3
+
+#ifndef _LOCORE
+#include <sys/queue.h>
+
+struct i386_soft_intrhand {
+	TAILQ_ENTRY(i386_soft_intrhand)
+		sih_q;
+	struct i386_soft_intr *sih_intrhead;
+	void	(*sih_fn)(void *);
+	void	*sih_arg;
+	int	sih_pending;
+};
+
+struct i386_soft_intr {
+	TAILQ_HEAD(, i386_soft_intrhand)
+		softintr_q;
+	int softintr_ssir;
+};
+
+#define	i386_softintr_lock(si, s)					\
+do {									\
+	/* XXX splhigh braindamage on i386 */				\
+	(s) = splserial();						\
+} while (/*CONSTCOND*/ 0)
+
+#define	i386_softintr_unlock(si, s)					\
+do {									\
+	splx((s));							\
+} while (/*CONSTCOND*/ 0)
+
+void	*softintr_establish(int, void (*)(void *), void *);
+void	softintr_disestablish(void *);
+void	softintr_init(void);
+void	softintr_dispatch(int);
+
+#define	softintr_schedule(arg)						\
+do {									\
+	struct i386_soft_intrhand *__sih = (arg);			\
+	struct i386_soft_intr *__si = __sih->sih_intrhead;		\
+	int __s;							\
+									\
+	i386_softintr_lock(__si, __s);					\
+	if (__sih->sih_pending == 0) {					\
+		TAILQ_INSERT_TAIL(&__si->softintr_q, __sih, sih_q);	\
+		__sih->sih_pending = 1;					\
+		softintr(__si->softintr_ssir);				\
+	}								\
+	i386_softintr_unlock(__si, __s);				\
+} while (/*CONSTCOND*/ 0)
+#endif /* _LOCORE */
 
 #endif /* !_I386_INTR_H_ */

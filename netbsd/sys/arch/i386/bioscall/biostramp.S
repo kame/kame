@@ -1,4 +1,4 @@
-/*	$NetBSD: biostramp.S,v 1.8 1999/08/23 08:24:36 kleink Exp $	*/
+/*	$NetBSD: biostramp.S,v 1.10 2001/12/14 20:30:10 christos Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -90,9 +90,10 @@
 	.set ESI_REGADDR,(EDX_REGADDR-4)
 	.set EDI_REGADDR,(ESI_REGADDR-4)
 	.set EFLAGS_REGADDR,(EDI_REGADDR-4)
-	.set ENDREGADDR,(EFLAGS_REGADDR-4)
+	.set ES_REGADDR, (EFLAGS_REGADDR-4)
+	.set ENDREGADDR,(ES_REGADDR-4)
 	
-	.set REALSTACK,ENDREGADDR-16		# leave a red zone?
+	.set REALSTACK,ENDREGADDR-20		# leave a red zone?
 
 #define COPY_FLAGS (PSL_C|PSL_PF|PSL_AF|PSL_Z|PSL_N|PSL_D|PSL_V)
 
@@ -135,6 +136,7 @@ ENTRY(do_bios_call)
 	andl $COPY_FLAGS,%ecx
 	orl %ecx,%eax
 	movl %eax,EFLAGS_REGADDR
+	movl $0, ES_REGADDR 
 	
 	# save flags, disable interrupts, do real mode stuff
 	pushfl
@@ -203,7 +205,7 @@ xreal:	# really in real mode now
 	# set up segment selectors.  Note: everything is now relative
 	# to zero-base in this file, except %ss.
 	# data items in our scratch area need to reflect MYADDR
-	xorl %ax,%ax
+	xorl %eax,%eax
 	movw %ax,%ss
 
 	movw %cs,%ax
@@ -219,15 +221,15 @@ xreal:	# really in real mode now
 	# Don't forget that we're in real mode, with 16-bit default data.
 	# all these movl's are really movw's, and movw's are movl's!
 	addr32
-	movw EDI_REGADDR-MYBASE,%edi
+	movw EDI_REGADDR-MYBASE,%di
 	addr32
-	movw ESI_REGADDR-MYBASE,%esi
+	movw ESI_REGADDR-MYBASE,%si
 	addr32
-	movw EDX_REGADDR-MYBASE,%edx
+	movw EDX_REGADDR-MYBASE,%dx
 	addr32
-	movw ECX_REGADDR-MYBASE,%ecx
+	movw ECX_REGADDR-MYBASE,%cx
 	addr32
-	movw EBX_REGADDR-MYBASE,%ebx
+	movw EBX_REGADDR-MYBASE,%bx
 	addr32
 	movb FUNCTION_ADDR-MYBASE,%al
 	addr32
@@ -237,11 +239,11 @@ xreal:	# really in real mode now
 	ljmp $(MYBASE>>4),$flushit
 flushit:
 	addr32
-	movw EFLAGS_REGADDR-MYBASE,%eax
+	movw EFLAGS_REGADDR-MYBASE,%ax
 	pushl %eax
 	popfl
 	addr32
-	movw EAX_REGADDR-MYBASE,%eax
+	movw EAX_REGADDR-MYBASE,%ax
 	
 intaddr: 
 	int $0xff
@@ -249,20 +251,22 @@ intaddr:
 	# save results
 	pushf
 	addr32
-	movw %eax,EAX_REGADDR-MYBASE
+	movw %ax,EAX_REGADDR-MYBASE
 	addr32
-	movw %ebx,EBX_REGADDR-MYBASE
+	movw %bx,EBX_REGADDR-MYBASE
 	addr32
-	movw %ecx,ECX_REGADDR-MYBASE
+	movw %cx,ECX_REGADDR-MYBASE
 	addr32
-	movw %edx,EDX_REGADDR-MYBASE
+	movw %dx,EDX_REGADDR-MYBASE
 	addr32
-	movw %esi,ESI_REGADDR-MYBASE
+	movw %si,ESI_REGADDR-MYBASE
 	addr32
-	movw %edi,EDI_REGADDR-MYBASE
-	pop %eax
+	movw %di,EDI_REGADDR-MYBASE
+	pop %ax
 	addr32
-	movw %eax,EFLAGS_REGADDR-MYBASE
+	movw %ax,EFLAGS_REGADDR-MYBASE
+	addr32
+	movw %es,ES_REGADDR-MYBASE
 
 	# and return to protected mode
 	cli	# just to be sure
@@ -318,6 +322,8 @@ x32:
 	movl %eax,BIOSCALLREG_EDI(%ebx)
 	movl EFLAGS_REGADDR,%eax
 	movl %eax,BIOSCALLREG_EFLAGS(%ebx)
+	movl ES_REGADDR, %eax
+	movl %eax,BIOSCALLREG_ES(%ebx)
 	
 	# finish up, restore registers, and return
 	popfl

@@ -1,4 +1,4 @@
-/*	$NetBSD: kdb.c,v 1.21 2000/06/05 00:09:17 matt Exp $ */
+/*	$NetBSD: kdb.c,v 1.26 2001/11/13 12:51:34 lukem Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -39,6 +39,9 @@
  *   Nices hardware error handling.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kdb.c,v 1.26 2001/11/13 12:51:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/buf.h>
@@ -47,9 +50,9 @@
 #include <sys/user.h>
 #include <sys/malloc.h>
 #include <sys/systm.h>
+#include <sys/sched.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #ifdef __vax__
 #include <machine/pte.h>
@@ -190,7 +193,7 @@ err2:		bus_dmamem_unmap(sc->sc_dmat, sc->sc_kdb,
 		bus_dmamap_destroy(sc->sc_dmat, sc->sc_cmap);
 		goto err2;
 	}
-	bzero(sc->sc_kdb, sizeof(struct mscp_pack));
+	memset(sc->sc_kdb, 0, sizeof(struct mscp_pack));
 
 	ma.ma_mc = &kdb_mscp_ctlr;
 	ma.ma_type = MSCPBUS_DISK|MSCPBUS_KDB;
@@ -237,7 +240,8 @@ kdbgo(usc, mxi)
 	 * On other systems, do something else... 
 	 */
 	err = bus_dmamap_load(sc->sc_dmat, mxi->mxi_dmam, bp->b_data,
-	    bp->b_bcount, bp->b_proc, BUS_DMA_NOWAIT);
+	    bp->b_bcount, (bp->b_flags & B_PHYS ? bp->b_proc : 0),
+	    BUS_DMA_NOWAIT);
 
 	if (err) /* Shouldn't happen */
 		panic("kdbgo: bus_dmamap_load: error %d", err);
@@ -305,7 +309,9 @@ kdbintr(void *arg)
 		kdbsaerror(&sc->sc_dev, 1);
 		return;
 	}
+	KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 	mscp_intr(sc->sc_softc);
+	KERNEL_UNLOCK();
 }
 
 #ifdef notyet

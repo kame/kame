@@ -1,4 +1,4 @@
-/*	$NetBSD: rrunner.c,v 1.16.2.1 2000/06/30 16:27:46 simonb Exp $	*/
+/*	$NetBSD: rrunner.c,v 1.30 2002/02/14 07:08:02 chs Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rrunner.c,v 1.30 2002/02/14 07:08:02 chs Exp $");
+
 #include "opt_inet.h"
 #include "opt_ns.h"
 
@@ -59,8 +62,6 @@
 #include <sys/device.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -251,7 +252,7 @@ eshconfig(sc)
 		goto bad_dmamap_load;
 	}
     
-	bzero(sc->sc_dma_addr, sc->sc_dma_size);
+	memset(sc->sc_dma_addr, 0, sc->sc_dma_size);
 
 	sc->sc_gen_info_dma = sc->sc_dma->dm_segs->ds_addr;
 	sc->sc_gen_info = (struct rr_gen_info *) sc->sc_dma_addr;
@@ -409,12 +410,13 @@ eshconfig(sc)
 
 	bus_space_write_4(iot, ioh, RR_MISC_LOCAL_CTL, misc_local_ctl);
 
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = eshstart;
 	ifp->if_ioctl = eshioctl;
 	ifp->if_watchdog = eshwatchdog;
 	ifp->if_flags = IFF_SIMPLEX | IFF_NOTRAILERS | IFF_NOARP;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if_attach(ifp);
 	hippi_ifattach(ifp, sc->sc_ula);
@@ -422,10 +424,6 @@ eshconfig(sc)
 	sc->sc_misaligned_bufs = sc->sc_bad_lens = 0;
 	sc->sc_fp_rings = 0;
 
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_if.if_bpf, ifp, DLT_HIPPI,
-		  sizeof(struct hippi_header));
-#endif
 	return;
 
 bad_ring_dmamap_create:
@@ -637,7 +635,7 @@ eshinit(sc)
 
 	/* Initialize the general ring information */
 
-	bzero(sc->sc_recv_ring_table, 
+	memset(sc->sc_recv_ring_table, 0,
 	      sizeof(struct rr_ring_ctl) * RR_ULP_COUNT);
 
 	ring = &sc->sc_gen_info->ri_event_ring_ctl;
@@ -698,7 +696,7 @@ bad_init:
 /*
  * Code to handle the Framing Protocol (FP) interface to the esh.
  * This will allow us to write directly to the wire, with no
- * intervening bcopy's to slow us down.
+ * intervening memcpy's to slow us down.
  */
 
 int 
@@ -711,21 +709,19 @@ esh_fpopen(dev, oflags, devtype, p)
 	struct esh_softc *sc;
 	struct rr_ring_ctl *ring_ctl;
 	struct esh_fp_ring_ctl *recv;
-	int unit = ESHUNIT(dev);
 	int ulp = ESHULP(dev);
 	int error = 0;
 	bus_size_t size;
 	int rseg;
 	int s;
 
-
-	if (unit >= esh_cd.cd_ndevs || ulp == HIPPI_ULP_802)
+	sc = device_lookup(&esh_cd, ESHUNIT(dev));
+	if (sc == NULL || ulp == HIPPI_ULP_802)
 		return (ENXIO);
 
-	sc = esh_cd.cd_devs[unit];
-
 #ifdef ESH_PRINTF
-	printf("esh_fpopen:  opening board %d, ulp %d\n", unit, ulp);
+	printf("esh_fpopen:  opening board %d, ulp %d\n",
+	    sc->sc_dev.dv_unit, ulp);
 #endif
 
 	/* If the card is not up, initialize it. */
@@ -798,10 +794,9 @@ esh_fpopen(dev, oflags, devtype, p)
 	 */
 
 	recv = (struct esh_fp_ring_ctl *) 
-	    malloc(sizeof(*recv), M_DEVBUF, M_WAITOK);
+	    malloc(sizeof(*recv), M_DEVBUF, M_WAITOK|M_ZERO);
 	if (recv == NULL)
 		return(ENOMEM);
-	bzero(recv, sizeof(*recv));
 	TAILQ_INIT(&recv->ec_queue);
 
 	size = RR_FP_RECV_RING_SIZE * sizeof(struct rr_descr);
@@ -845,13 +840,13 @@ esh_fpopen(dev, oflags, devtype, p)
 		goto bad_fp_dmamap_load;
 	}
 
-	bzero(recv->ec_descr, size);
+	memset(recv->ec_descr, 0, size);
 
 	/* 
 	 * Create the ring:
 	 *
 	 * XXX:  HTF are we gonna deal with the fact that we don't know
-	 *	 if the open succeeded until we get a responce from 
+	 *	 if the open succeeded until we get a response from 
 	 *	 the event handler?  I guess we could go to sleep waiting
 	 *	 for the interrupt, and get woken up by the eshintr
 	 *       case handling it.
@@ -908,7 +903,7 @@ bad_fp_ring_create:
 	printf("esh_fpopen:  bad ring create\n");
 #endif
 	sc->sc_fp_recv[ulp] = NULL;
-	bzero(ring_ctl, sizeof(*ring_ctl));
+	memset(ring_ctl, 0, sizeof(*ring_ctl));
 	bus_dmamap_unload(sc->sc_dmat, recv->ec_dma);
 bad_fp_dmamap_load:
 	bus_dmamap_destroy(sc->sc_dmat, recv->ec_dma);
@@ -935,25 +930,24 @@ esh_fpclose(dev, fflag, devtype, p)
 	struct esh_softc *sc;
 	struct rr_ring_ctl *ring_ctl;
 	struct esh_fp_ring_ctl *ring;
-	int unit = ESHUNIT(dev);
 	int ulp = ESHULP(dev);
 	int index;
 	int error = 0;
 	int s;
 
-
-	if (unit >= esh_cd.cd_ndevs || ulp == HIPPI_ULP_802)
+	sc = device_lookup(&esh_cd, ESHUNIT(dev));
+	if (sc == NULL || ulp == HIPPI_ULP_802)
 		return (ENXIO);
 
 	s = splnet();
 
-	sc = esh_cd.cd_devs[unit];
 	ring = sc->sc_fp_recv[ulp];
 	ring_ctl = &sc->sc_recv_ring_table[ulp];
 	index = ring->ec_index;
 
 #ifdef ESH_PRINTF
-	printf("esh_fpclose:  closing unit %d, ulp %d\n", unit, ulp);
+	printf("esh_fpclose:  closing unit %d, ulp %d\n",
+	    sc->sc_dev.dv_unit, ulp);
 #endif
 	assert(ring);
 	assert(ring_ctl);
@@ -989,7 +983,7 @@ esh_fpclose(dev, fflag, devtype, p)
 			 RR_FP_RECV_RING_SIZE * sizeof(struct rr_descr));
 	bus_dmamem_free(sc->sc_dmat, &ring->ec_dmaseg, ring->ec_dma->dm_nsegs);
 	free(ring, M_DEVBUF);
-	bzero(ring_ctl, sizeof(*ring_ctl));
+	memset(ring_ctl, 0, sizeof(*ring_ctl));
 	sc->sc_fp_recv[ulp] = NULL;
 	sc->sc_fp_recv_index[index] = NULL;
 
@@ -1012,9 +1006,7 @@ esh_fpread(dev, uio, ioflag)
 	struct esh_softc *sc;
 	struct esh_fp_ring_ctl *ring;
 	struct esh_dmainfo *di;
-	int unit = ESHUNIT(dev);
 	int ulp = ESHULP(dev);
-	int flags = B_READ;
 	int error;
 	int i;
 	int s;
@@ -1023,13 +1015,12 @@ esh_fpread(dev, uio, ioflag)
 	printf("esh_fpread:  dev %x\n", dev);
 #endif
 
-	s = splnet();
-	if (unit >= esh_cd.cd_ndevs || ulp == HIPPI_ULP_802) {
-		error = ENXIO;
-		goto fpread_done;
-	}
+	sc = device_lookup(&esh_cd, ESHUNIT(dev));
+	if (sc == NULL || ulp == HIPPI_ULP_802)
+		return (ENXIO);
 
-	sc = esh_cd.cd_devs[unit];
+	s = splnet();
+
 	ring = sc->sc_fp_recv[ulp];
 
 	if ((sc->sc_flags & ESH_FL_INITIALIZED) == 0) {
@@ -1038,17 +1029,8 @@ esh_fpread(dev, uio, ioflag)
 	}
 
 	/* Check for validity */
-
 	for (i = 0; i < uio->uio_iovcnt; i++) {
-		/* XXXCDC: map not locked, rethink */
-		if (!uvm_useracc(uio->uio_iov[i].iov_base,
-				 uio->uio_iov[i].iov_len,
-				 (flags == B_READ) ? B_WRITE : B_READ)) {
-			error = EFAULT;
-			goto fpread_done;
-		}
 		/* Check for valid offsets and sizes */
-
 		if (((u_long) uio->uio_iov[i].iov_base & 3) != 0 || 
 		    (i < uio->uio_iovcnt - 1 && 
 		     (uio->uio_iov[i].iov_len & 3) != 0)) {
@@ -1060,18 +1042,17 @@ esh_fpread(dev, uio, ioflag)
 	PHOLD(p);	/* Lock process info into memory */
 
 	/* Lock down the pages */
-
 	for (i = 0; i < uio->uio_iovcnt; i++) {
 		iovp = &uio->uio_iov[i];
-		if (uvm_vslock(p, iovp->iov_base, iovp->iov_len,
-		    VM_PROT_READ | VM_PROT_WRITE) != KERN_SUCCESS) {
+		error = uvm_vslock(p, iovp->iov_base, iovp->iov_len,
+		    VM_PROT_WRITE);
+		if (error) {
 			/* Unlock what we've locked so far. */
 			for (--i; i >= 0; i--) {
 				iovp = &uio->uio_iov[i];
 				uvm_vsunlock(p, iovp->iov_base,
 				    iovp->iov_len);
 			}
-			error = EFAULT;
 			goto fpread_done;
 		}
 	}
@@ -1096,7 +1077,7 @@ esh_fpread(dev, uio, ioflag)
 #endif
 
 	error = bus_dmamap_load_uio(sc->sc_dmat, di->ed_dma, 
-				    uio, BUS_DMA_WAITOK);
+				    uio, BUS_DMA_READ|BUS_DMA_WAITOK);
 	if (error) {
 		printf("%s:  esh_fpread:  bus_dmamap_load_uio "
 		       "failed\terror code %d\n", 
@@ -1185,9 +1166,7 @@ esh_fpwrite(dev, uio, ioflag)
 	struct esh_softc *sc;
 	struct esh_send_ring_ctl *ring;
 	struct esh_dmainfo *di;
-	int unit = ESHUNIT(dev);
 	int ulp = ESHULP(dev);
-	int flags = B_WRITE;
 	int error;
 	int len;
 	int i;
@@ -1197,13 +1176,12 @@ esh_fpwrite(dev, uio, ioflag)
 	printf("esh_fpwrite:  dev %x\n", dev);
 #endif
 
-	s = splnet();
-	if (unit >= esh_cd.cd_ndevs || ulp == HIPPI_ULP_802) {
-		error = EPROTOTYPE;  /* XXX:  Not really kosher, but obvious */
-		goto fpwrite_done;
-	}
+	sc = device_lookup(&esh_cd, ESHUNIT(dev));
+	if (sc == NULL || ulp == HIPPI_ULP_802)
+		return (ENXIO);
 
-	sc = esh_cd.cd_devs[unit];
+	s = splnet();
+
 	ring = &sc->sc_send;
 
 	if ((sc->sc_flags & ESH_FL_INITIALIZED) == 0) {
@@ -1212,16 +1190,7 @@ esh_fpwrite(dev, uio, ioflag)
 	}
 
 	/* Check for validity */
-
 	for (i = 0; i < uio->uio_iovcnt; i++) {
-		/* XXXCDC: map not locked, rethink */
-		if (!uvm_useracc(uio->uio_iov[i].iov_base,
-				 uio->uio_iov[i].iov_len,
-				 (flags == B_READ) ? B_WRITE : B_READ)) {
-			error = EFAULT;
-			goto fpwrite_done;
-		}
-
 		if (((u_long) uio->uio_iov[i].iov_base & 3) != 0 || 
 		    (i < uio->uio_iovcnt - 1 && 
 		     (uio->uio_iov[i].iov_len & 3) != 0)) {
@@ -1233,18 +1202,17 @@ esh_fpwrite(dev, uio, ioflag)
 	PHOLD(p);	/* Lock process info into memory */
 
 	/* Lock down the pages */
-
 	for (i = 0; i < uio->uio_iovcnt; i++) {
 		iovp = &uio->uio_iov[i];
-		if (uvm_vslock(p, iovp->iov_base, iovp->iov_len,
-		    VM_PROT_READ) != KERN_SUCCESS) {
+		error = uvm_vslock(p, iovp->iov_base, iovp->iov_len,
+		    VM_PROT_READ);
+		if (error) {
 			/* Unlock what we've locked so far. */
 			for (--i; i >= 0; i--) {
 				iovp = &uio->uio_iov[i];
 				uvm_vsunlock(p, iovp->iov_base,
 				    iovp->iov_len);
 			}
-			error = EFAULT;
 			goto fpwrite_done;
 		}
 	}
@@ -1268,7 +1236,7 @@ esh_fpwrite(dev, uio, ioflag)
 #endif
 
 	error = bus_dmamap_load_uio(sc->sc_dmat, di->ed_dma, 
-				    uio, BUS_DMA_WAITOK);
+				    uio, BUS_DMA_WRITE|BUS_DMA_WAITOK);
 	if (error) {
 		printf("%s:  esh_fpwrite:  bus_dmamap_load_uio "
 		       "failed\terror code %d\n", 
@@ -1351,7 +1319,6 @@ esh_fpstrategy(bp)
 	struct buf *bp;
 {
 	struct esh_softc *sc;
-	int unit = ESHUNIT(bp->b_dev);
 	int ulp = ESHULP(bp->b_dev);
 	int error = 0;
 	int s;
@@ -1361,15 +1328,15 @@ esh_fpstrategy(bp)
 	       "\tunit %x, ulp %d\n",
 		bp->b_bcount, bp->b_flags, bp->b_dev, unit, ulp);
 #endif
-        
+
+	sc = device_lookup(&esh_cd, ESHUNIT(bp->b_dev));
+
 	s = splnet();
-	if (unit >= esh_cd.cd_ndevs || ulp == HIPPI_ULP_802) {
+	if (sc == NULL || ulp == HIPPI_ULP_802) {
 		bp->b_error = ENXIO;
 		bp->b_flags |= B_ERROR;
 		goto done;
 	}
-
-	sc = esh_cd.cd_devs[unit];
 
 	if (bp->b_bcount == 0)
 		goto done;
@@ -1400,7 +1367,8 @@ esh_fpstrategy(bp)
 		di->ed_buf = bp;
 		error = bus_dmamap_load(sc->sc_dmat, di->ed_dma, 
 					bp->b_data, bp->b_bcount, 
-					bp->b_proc, BUS_DMA_WAITOK);
+					bp->b_proc,
+					BUS_DMA_READ|BUS_DMA_WAITOK);
 		if (error) {
 			printf("%s:  esh_fpstrategy:  "
 			       "bus_dmamap_load "
@@ -1733,7 +1701,7 @@ eshintr(arg)
 			if (event->re_ring == HIPPI_ULP_802) {
 				struct rr_ring_ctl *ring = 
 					sc->sc_recv_ring_table + HIPPI_ULP_802;
-				bzero(ring, sizeof(*ring));
+				memset(ring, 0, sizeof(*ring));
 				sc->sc_flags &= ~ESH_FL_CLOSING_SNAP;
 				sc->sc_flags &= ~ESH_FL_SNAP_RING_UP;
 				while (sc->sc_snap_recv.ec_consumer 
@@ -2017,7 +1985,7 @@ eshstart(ifp)
 	while ((sc->sc_flags & ESH_FL_SNAP_RING_UP) != 0 &&
 	       (m = send->ec_cur_mbuf) == NULL && send->ec_cur_buf == NULL &&
 		send->ec_cur_dmainfo == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)		/* not really needed */
 			break;
 
@@ -2051,7 +2019,7 @@ eshstart(ifp)
 			continue;
 
 		error = bus_dmamap_load_mbuf(sc->sc_dmat, send->ec_dma,
-					     m, BUS_DMA_NOWAIT);
+					     m, BUS_DMA_WRITE|BUS_DMA_NOWAIT);
 		if (error)
 			panic("%s:  eshstart:  "
 			      "bus_dmamap_load_mbuf failed err %d\n", 
@@ -2093,7 +2061,7 @@ eshstart(ifp)
 
 		error = bus_dmamap_load(sc->sc_dmat, send->ec_dma,
 					bp->b_data, bp->b_bcount, bp->b_proc,
-					BUS_DMA_NOWAIT);
+					BUS_DMA_WRITE|BUS_DMA_NOWAIT);
 
 		if (error)
 			panic("%s:  eshstart:  "
@@ -2621,7 +2589,7 @@ esh_fill_snap_ring(sc)
 
 		error = bus_dmamap_load(sc->sc_dmat, recv->ec_dma[offset],
 					mtod(m, void *), MCLBYTES,
-					NULL, BUS_DMA_NOWAIT);
+					NULL, BUS_DMA_READ|BUS_DMA_NOWAIT);
 		if (error) {
 			printf("%s:  esh_fill_recv_ring:  bus_dmamap_load "
 			       "failed\toffset %x, error code %d\n", 
@@ -3074,9 +3042,8 @@ eshioctl(ifp, cmd, data)
 				ina->x_host = *(union ns_host *)
 					LLADDR(ifp->if_sadl);
 			else
-				bcopy(ina->x_host.c_host,
-				      LLADDR(ifp->if_sadl),
-				      ifp->if_addrlen);
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host, ifp->if_addrlen);
 				/* Set new address. */
 			eshinit(sc);
 			break;
@@ -3254,7 +3221,7 @@ esh_generic_ioctl(struct esh_softc *sc, u_long cmd, caddr_t data,
 				  (misc_host_ctl & RR_MH_NO_SWAP) | 
 				  RR_MH_HALT_PROC);
 
-		/* Make the EEPROM accessable */
+		/* Make the EEPROM accessible */
 
 		misc_local_ctl = bus_space_read_4(iot, ioh, RR_MISC_LOCAL_CTL);
 		value = misc_local_ctl & 
@@ -3488,7 +3455,7 @@ eshstop(sc)
 	 * when we restart.
 	 */
 
-	bzero(sc->sc_fp_recv_index, 
+	memset(sc->sc_fp_recv_index, 0,
 	      sizeof(struct esh_fp_ring_ctl *) * RR_MAX_RECV_RING);
 
 	/* Be sure to wake up any other processes waiting on driver action. */
@@ -3744,9 +3711,9 @@ esh_new_dmainfo(sc)
 
 	/* None sitting around, so build one now... */
 
-	di = (struct esh_dmainfo *) malloc(sizeof(*di), M_DEVBUF, M_WAITOK);
+	di = (struct esh_dmainfo *) malloc(sizeof(*di), M_DEVBUF,
+	    M_WAITOK|M_ZERO);
 	assert(di != NULL);
-	bzero(di, sizeof(*di));
 
 	if (bus_dmamap_create(sc->sc_dmat, ESH_MAX_NSEGS * RR_DMA_MAX, 
 			      ESH_MAX_NSEGS, RR_DMA_MAX, RR_DMA_BOUNDRY, 

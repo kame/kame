@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_malloc.c,v 1.52 2000/05/26 23:18:26 sommerfeld Exp $	*/
+/*	$NetBSD: kern_malloc.c,v 1.71 2002/04/03 09:45:22 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -36,6 +36,9 @@
  *	@(#)kern_malloc.c	8.4 (Berkeley) 5/20/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_malloc.c,v 1.71 2002/04/03 09:45:22 fvdl Exp $");
+
 #include "opt_lockdebug.h"
 
 #include <sys/param.h>
@@ -45,13 +48,10 @@
 #include <sys/malloc.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
 
-static struct vm_map_intrsafe kmem_map_store;
-vm_map_t kmem_map = NULL;
+static struct vm_map kmem_map_store;
+struct vm_map *kmem_map = NULL;
 
 #include "opt_kmempages.h"
 
@@ -83,12 +83,13 @@ int	nkmempages = NKMEMPAGES;
 
 #include "opt_kmemstats.h"
 #include "opt_malloclog.h"
+#include "opt_malloc_debug.h"
 
 struct kmembuckets bucket[MINBUCKET + 16];
 struct kmemstats kmemstats[M_LAST];
 struct kmemusage *kmemusage;
 char *kmembase, *kmemlimit;
-const char *memname[] = INITKMEMNAMES;
+const char * const memname[] = INITKMEMNAMES;
 
 #ifdef MALLOCLOG
 #ifndef MALLOCLOGSIZE
@@ -106,18 +107,11 @@ struct malloclog {
 
 long	malloclogptr;
 
-static void domlog __P((void *a, long size, int type, int action,
-	const char *file, long line));
-static void hitmlog __P((void *a));
+static void domlog(void *, long, int, int, const char *, long);
+static void hitmlog(void *);
 
 static void
-domlog(a, size, type, action, file, line)
-	void *a;
-	long size;
-	int type;
-	int action;
-	const char *file;
-	long line;
+domlog(void *a, long size, int type, int action, const char *file, long line)
 {
 
 	malloclog[malloclogptr].addr = a;
@@ -132,13 +126,12 @@ domlog(a, size, type, action, file, line)
 }
 
 static void
-hitmlog(a)
-	void *a;
+hitmlog(void *a)
 {
 	struct malloclog *lp;
 	long l;
 
-#define	PRT \
+#define	PRT do { \
 	if (malloclog[l].addr == a && malloclog[l].action) { \
 		lp = &malloclog[l]; \
 		printf("malloc log entry %ld:\n", l); \
@@ -148,13 +141,14 @@ hitmlog(a)
 		printf("\taction = %s\n", lp->action == 1 ? "alloc" : "free"); \
 		printf("\tfile = %s\n", lp->file); \
 		printf("\tline = %ld\n", lp->line); \
-	}
+	} \
+} while (/* CONSTCOND */0)
 
 	for (l = malloclogptr; l < MALLOCLOGSIZE; l++)
-		PRT
+		PRT;
 
 	for (l = 0; l < malloclogptr; l++)
-		PRT
+		PRT;
 }
 #endif /* MALLOCLOG */
 
@@ -162,7 +156,7 @@ hitmlog(a)
 /*
  * This structure provides a set of masks to catch unaligned frees.
  */
-long addrmask[] = { 0,
+const long addrmask[] = { 0,
 	0x00000001, 0x00000003, 0x00000007, 0x0000000f,
 	0x0000001f, 0x0000003f, 0x0000007f, 0x000000ff,
 	0x000001ff, 0x000003ff, 0x000007ff, 0x00000fff,
@@ -173,8 +167,12 @@ long addrmask[] = { 0,
  * The WEIRD_ADDR is used as known text to copy into free objects so
  * that modifications after frees can be detected.
  */
-#define WEIRD_ADDR	((unsigned) 0xdeadbeef)
-#define MAX_COPY	32
+#define	WEIRD_ADDR	((unsigned) 0xdeadbeef)
+#ifdef DEBUG
+#define	MAX_COPY	PAGE_SIZE
+#else
+#define	MAX_COPY	32
+#endif
 
 /*
  * Normally the freelist structure is used only to hold the list pointer
@@ -201,16 +199,10 @@ struct freelist {
  */
 #ifdef MALLOCLOG
 void *
-_malloc(size, type, flags, file, line)
-	unsigned long size;
-	int type, flags;
-	const char *file;
-	long line;
+_malloc(unsigned long size, int type, int flags, const char *file, long line)
 #else
 void *
-malloc(size, type, flags)
-	unsigned long size;
-	int type, flags;
+malloc(unsigned long size, int type, int flags)
 #endif /* MALLOCLOG */
 {
 	struct kmembuckets *kbp;
@@ -230,9 +222,17 @@ malloc(size, type, flags)
 	if (__predict_false(((unsigned long)type) > M_LAST))
 		panic("malloc - bogus type");
 #endif
+#ifdef LOCKDEBUG
+	if ((flags & M_NOWAIT) == 0)
+		simple_lock_only_held(NULL, "malloc");
+#endif
+#ifdef MALLOC_DEBUG
+	if (debug_malloc(size, type, flags, (void **) &va))
+		return ((void *) va);
+#endif
 	indx = BUCKETINDX(size);
 	kbp = &bucket[indx];
-	s = splmem();
+	s = splvm();
 #ifdef KMEMSTATS
 	while (ksp->ks_memuse >= ksp->ks_limit) {
 		if (flags & M_NOWAIT) {
@@ -251,13 +251,13 @@ malloc(size, type, flags)
 	if (kbp->kb_next == NULL) {
 		kbp->kb_last = NULL;
 		if (size > MAXALLOCSAVE)
-			allocsize = roundup(size, PAGE_SIZE);
+			allocsize = round_page(size);
 		else
 			allocsize = 1 << indx;
 		npg = btoc(allocsize);
-		va = (caddr_t) uvm_km_kmemalloc(kmem_map, uvmexp.kmem_object,
-				(vsize_t)ctob(npg), 
-				(flags & M_NOWAIT) ? UVM_KMF_NOWAIT : 0);
+		va = (caddr_t) uvm_km_kmemalloc(kmem_map, NULL,
+		    (vsize_t)ctob(npg),
+		    (flags & M_NOWAIT) ? UVM_KMF_NOWAIT : 0);
 		if (__predict_false(va == NULL)) {
 			/*
 			 * Kmem_malloc() can return NULL, even if it can
@@ -267,7 +267,7 @@ malloc(size, type, flags)
 			 * are completely free and which are in buckets
 			 * with too many free elements.)
 			 */
-			if ((flags & M_NOWAIT) == 0)
+			if ((flags & (M_NOWAIT|M_CANFAIL)) == 0)
 				panic("malloc: out of space in kmem_map");
 			splx(s);
 			return ((void *) NULL);
@@ -330,16 +330,15 @@ malloc(size, type, flags)
 
 		vm_map_lock(kmem_map);
 		rv = uvm_map_checkprot(kmem_map, addr,
-				       addr + sizeof(struct freelist),
-				       VM_PROT_WRITE);
+		    addr + sizeof(struct freelist), VM_PROT_WRITE);
 		vm_map_unlock(kmem_map);
 
 		if (__predict_false(rv == 0)) {
-			printf(
-		    "%s %ld of object %p size %ld %s %s (invalid addr %p)\n",
-			    "Data modified on freelist: word", 
+			printf("Data modified on freelist: "
+			    "word %ld of object %p size %ld previous type %s "
+			    "(invalid addr %p)\n",
 			    (long)((int32_t *)&kbp->kb_next - (int32_t *)kbp),
-			    va, size, "previous type", savedtype, kbp->kb_next);
+			    va, size, savedtype, kbp->kb_next);
 #ifdef MALLOCLOG
 			hitmlog(va);
 #endif
@@ -364,9 +363,10 @@ malloc(size, type, flags)
 	for (lp = (int32_t *)va; lp < end; lp++) {
 		if (__predict_true(*lp == WEIRD_ADDR))
 			continue;
-		printf("%s %ld of object %p size %ld %s %s (0x%x != 0x%x)\n",
-		    "Data modified on freelist: word",
-		    (long)(lp - (int32_t *)va), va, size, "previous type",
+		printf("Data modified on freelist: "
+		    "word %ld of object %p size %ld previous type %s "
+		    "(0x%x != 0x%x)\n",
+		    (long)(lp - (int32_t *)va), va, size,
 		    savedtype, *lp, WEIRD_ADDR);
 #ifdef MALLOCLOG
 		hitmlog(va);
@@ -398,6 +398,8 @@ out:
 	domlog(va, size, type, 1, file, line);
 #endif
 	splx(s);
+	if ((flags & M_ZERO) != 0)
+		memset(va, 0, size);
 	return ((void *) va);
 }
 
@@ -406,16 +408,10 @@ out:
  */
 #ifdef MALLOCLOG
 void
-_free(addr, type, file, line)
-	void *addr;
-	int type;
-	const char *file;
-	long line;
+_free(void *addr, int type, const char *file, long line)
 #else
 void
-free(addr, type)
-	void *addr;
-	int type;
+free(void *addr, int type)
 #endif /* MALLOCLOG */
 {
 	struct kmembuckets *kbp;
@@ -432,6 +428,11 @@ free(addr, type)
 	struct kmemstats *ksp = &kmemstats[type];
 #endif
 
+#ifdef MALLOC_DEBUG
+	if (debug_free(addr, type))
+		return;
+#endif
+
 #ifdef DIAGNOSTIC
 	/*
 	 * Ensure that we're free'ing something that we could
@@ -439,14 +440,14 @@ free(addr, type)
 	 * to see that the address is within kmem_map.
 	 */
 	if (__predict_false((vaddr_t)addr < kmem_map->header.start ||
-			    (vaddr_t)addr >= kmem_map->header.end))
+	    (vaddr_t)addr >= kmem_map->header.end))
 		panic("free: addr %p not within kmem_map", addr);
 #endif
 
 	kup = btokup(addr);
 	size = 1 << kup->ku_indx;
 	kbp = &bucket[kup->ku_indx];
-	s = splmem();
+	s = splvm();
 #ifdef MALLOCLOG
 	domlog(addr, 0, type, 2, file, line);
 #endif
@@ -461,7 +462,7 @@ free(addr, type)
 		alloc = addrmask[kup->ku_indx];
 	if (((u_long)addr & alloc) != 0)
 		panic("free: unaligned addr %p, size %ld, type %s, mask %ld\n",
-			addr, size, memname[type], alloc);
+		    addr, size, memname[type], alloc);
 #endif /* DIAGNOSTIC */
 	if (size > MAXALLOCSAVE) {
 		uvm_km_free(kmem_map, (vaddr_t)addr, ctob(kup->ku_pagecnt));
@@ -543,10 +544,7 @@ free(addr, type)
  * Change the size of a block of memory.
  */
 void *
-realloc(curaddr, newsize, type, flags)
-	void *curaddr;
-	unsigned long newsize;
-	int type, flags;
+realloc(void *curaddr, unsigned long newsize, int type, int flags)
 {
 	struct kmemusage *kup;
 	long cursize;
@@ -556,18 +554,23 @@ realloc(curaddr, newsize, type, flags)
 #endif
 
 	/*
-	 * Realloc() with a NULL pointer is the same as malloc().
+	 * realloc() with a NULL pointer is the same as malloc().
 	 */
 	if (curaddr == NULL)
 		return (malloc(newsize, type, flags));
 
 	/*
-	 * Realloc() with zero size is the same as free().
+	 * realloc() with zero size is the same as free().
 	 */
 	if (newsize == 0) {
 		free(curaddr, type);
 		return (NULL);
 	}
+
+#ifdef LOCKDEBUG
+	if ((flags & M_NOWAIT) == 0)
+		simple_lock_only_held(NULL, "realloc");
+#endif
 
 	/*
 	 * Find out how large the old allocation was (and do some
@@ -586,8 +589,9 @@ realloc(curaddr, newsize, type, flags)
 	else
 		alloc = addrmask[kup->ku_indx];
 	if (((u_long)curaddr & alloc) != 0)
-		panic("realloc: unaligned addr %p, size %ld, type %s, mask %ld\n",
-			curaddr, cursize, memname[type], alloc);
+		panic("realloc: "
+		    "unaligned addr %p, size %ld, type %s, mask %ld\n",
+		    curaddr, cursize, memname[type], alloc);
 #endif /* DIAGNOSTIC */
 
 	if (cursize > MAXALLOCSAVE)
@@ -606,11 +610,11 @@ realloc(curaddr, newsize, type, flags)
 	newaddr = malloc(newsize, type, flags);
 	if (__predict_false(newaddr == NULL)) {
 		/*
-		 * Malloc() failed, because flags included M_NOWAIT.
+		 * malloc() failed, because flags included M_NOWAIT.
 		 * Return NULL to indicate that failure.  The old
 		 * pointer is still valid.
 		 */
-		return NULL;
+		return (NULL);
 	}
 	memcpy(newaddr, curaddr, cursize);
 
@@ -623,11 +627,24 @@ realloc(curaddr, newsize, type, flags)
 }
 
 /*
+ * Roundup size to the actual allocation size.
+ */
+unsigned long
+malloc_roundup(unsigned long size)
+{
+
+	if (size > MAXALLOCSAVE)
+		return (roundup(size, PAGE_SIZE));
+	else
+		return (1 << BUCKETINDX(size));
+}
+
+/*
  * Compute the number of pages that kmem_map will map, that is,
  * the size of the kernel malloc arena.
  */
 void
-kmeminit_nkmempages()
+kmeminit_nkmempages(void)
 {
 	int npages;
 
@@ -663,7 +680,7 @@ kmeminit_nkmempages()
  * Initialize the kernel memory allocator
  */
 void
-kmeminit()
+kmeminit(void)
 {
 #ifdef KMEMSTATS
 	long indx;
@@ -689,10 +706,10 @@ kmeminit()
 	kmeminit_nkmempages();
 
 	kmemusage = (struct kmemusage *) uvm_km_zalloc(kernel_map,
-		(vsize_t)(nkmempages * sizeof(struct kmemusage)));
+	    (vsize_t)(nkmempages * sizeof(struct kmemusage)));
 	kmem_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&kmembase,
-		(vaddr_t *)&kmemlimit, (vsize_t)(nkmempages << PAGE_SHIFT), 
-			VM_MAP_INTRSAFE, FALSE, &kmem_map_store.vmi_map);
+	    (vaddr_t *)&kmemlimit, (vsize_t)(nkmempages << PAGE_SHIFT), 
+	    VM_MAP_INTRSAFE, FALSE, &kmem_map_store);
 #ifdef KMEMSTATS
 	for (indx = 0; indx < MINBUCKET + 16; indx++) {
 		if (1 << indx >= PAGE_SIZE)
@@ -702,7 +719,11 @@ kmeminit()
 		bucket[indx].kb_highwat = 5 * bucket[indx].kb_elmpercl;
 	}
 	for (indx = 0; indx < M_LAST; indx++)
-		kmemstats[indx].ks_limit = (nkmempages << PAGE_SHIFT) * 6 / 10;
+		kmemstats[indx].ks_limit =
+		    ((u_long)nkmempages << PAGE_SHIFT) * 6U / 10U;
+#endif
+#ifdef MALLOC_DEBUG
+	debug_malloc_init();
 #endif
 }
 
@@ -714,10 +735,10 @@ kmeminit()
  *
  * usage: call dump_kmemstats
  */
-void	dump_kmemstats __P((void));
+void	dump_kmemstats(void);
 
 void
-dump_kmemstats()
+dump_kmemstats(void)
 {
 #ifdef KMEMSTATS
 	const char *name;

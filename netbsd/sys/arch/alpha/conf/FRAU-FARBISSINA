@@ -1,11 +1,13 @@
-# $NetBSD: FRAU-FARBISSINA,v 1.5.2.1 2000/08/11 18:23:19 thorpej Exp $
+# $NetBSD: FRAU-FARBISSINA,v 1.16.4.1 2002/08/01 04:16:02 lukem Exp $
 #
 # frau-farbissina.shagadelic.org -- thorpej's AlphaServer 1200 MP hacking
 # box
 
 include	"arch/alpha/conf/std.alpha"
 
-#ident 		"FRAU-FARBISSINA-$Revision: 1.1.1.1 $"
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
+#ident 		"FRAU-FARBISSINA-$Revision: 1.1.1.2 $"
 
 maxusers 64
 
@@ -99,6 +101,8 @@ options 	MIIVERBOSE		# verbose PHY autoconfig messages
 options 	SCSIVERBOSE		# Verbose SCSI errors
 #options 	TCVERBOSE		# recognize "unknown" TC devices
 options 	UCONSOLE		# users can use TIOCCONS (for xconsole)
+#options 	USERCONF		# userconf(4) support
+#options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
 
 # The Alpha console firmware network boots using the BOOTP
 # protocol, so we ask the NFS code to use BOOTP/DHCP as well,
@@ -183,19 +187,17 @@ adw*	at	pci? dev ? function ?		# AdvanSys Wide SCSI
 #bha*	at	pci? dev ? function ?		# BusLogic 9xx SCSI (untested)
 #cac*	at	pci? dev ? function ?		# Compaq array controller (untested)
 #cy*	at	pci? dev ? function ?		# Cyclades Cyclom-Y (untested)
-#de*	at	pci? dev ? function ?		# 21x4x-based Ethernet
 #dpt*	at	pci? dev ? function ?		# DPT SmartCache/SmartRAID
 #eap*	at	pci? dev ? function ?		# Ensoniq AudioPCI
 #en*	at	pci? dev ? function ?		# ENI PCI ATM (untested)
 #ep*	at	pci? dev ? function ?		# 3COM 3c59x
 epic*	at	pci? dev ? function ?		# SMC EPIC/100 Ethernet
 #eso*	at	pci? dev ? function ?		# ESS Solo-1 PCI AudioDrive
-ex*	at	pci? dev ? function ?		# 3COM 3c90x[B] Ethernet
+ex*	at	pci? dev ? function ?		# 3COM 3c90x[BC] Ethernet
 fpa*	at	pci? dev ? function ?		# DEC DEFPA FDDI
 fxp*	at	pci? dev ? function ?		# Intel EEPRO 10+/100B
 isp*	at	pci? dev ? function ?		# Qlogic ISP 10x0 SCSI
 #le*	at	pci? dev ? function ?		# PCI LANCE Ethernet (untested)
-#ncr*	at	pci? dev ? function ?		# NCR 53c8xx SCSI
 siop*	at	pci? dev ? function ?		# Symbios 53c8xx SCSI
 #ne*	at	pci? dev ? function ?		# NE2000-compatible Ethernet
 #ohci*	at	pci? dev ? function ?		# USB Open Host Controller
@@ -211,10 +213,6 @@ sip*	at	pci? dev ? function ?		# SiS 900 Ethernet
 #ti*	at	pci? dev ? function ?		# Alteon Tigon Gig-E
 #tl*	at	pci? dev ? function ?		# TI ThunderLAN Ethernet
 tlp*	at	pci? dev ? function ?		# DECchip 21x4x and clones
-options 	TLP_MATCH_21040
-options 	TLP_MATCH_21041
-options 	TLP_MATCH_21140
-options 	TLP_MATCH_21142
 #uhci*	at	pci? dev ? function ?		# USB Univ. Host Controller
 vga*	at	pci? dev ? function ?		# PCI VGA Graphics
 #vr*	at	pci? dev ? function ?		# VIA Rhine Fast Ethernet
@@ -230,7 +228,7 @@ vga*	at	pci? dev ? function ?		# PCI VGA Graphics
 
 # MII/PHY support
 exphy*	at mii? phy ?			# 3Com internal PHYs
-icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS1890
+icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS189x
 inphy*	at mii? phy ?			# Intel 82555 PHYs
 lxtphy*	at mii? phy ?			# Level One LXT-970 PHYs
 nsphy*	at mii? phy ?			# NS83840 PHYs
@@ -266,8 +264,8 @@ lpt*	at	isa? port 0x3bc irq 7		# standard parallel port
 #vga*	at	isa?				# ISA (EISA: XXX) VGA
 #wdc0	at	isa? port 0x1f0 irq 14		# ST506/ESDI/IDE controllers
 #wdc1	at	isa? port 0x170 irq 15
-#we0     at 	isa? port 0x280 iomem 0xd0000 irq 9  # WD/SMC Ethernet
-#we1     at 	isa? port 0x300 iomem 0xcc000 irq 10
+#we0	at	isa? port 0x280 iomem 0xd0000 irq 9	# WD/SMC Ethernet
+#we1	at	isa? port 0x300 iomem 0xcc000 irq 10
 #wss*	at	isa? port 0x530 irq 9 drq 0	# Windows Sound System
 #audio*	at	wss?
 #midi*	at	wss?
@@ -356,16 +354,19 @@ fd*	at	fdc? drive ?
 #uhub*	at usb?
 #uhub*	at uhub? port ? configuration ? interface ?
 
+# USB HID device
+#uhidev*	at uhub? port ? configuration ? interface ?
+
 # USB Mice
-#ums*	at uhub? port ? configuration ? interface ?
+#ums*	at uhidev? reportid ?
 #wsmouse*	at ums?
 
 # USB Keyboards
-#ukbd*	at uhub? port ? configuration ? interface ?
+#ukbd*	at uhidev? reportid ?
 #wskbd*	at ukbd? console ?
 
 # USB Generic HID devices
-#uhid*	at uhub? port ? configuration ? interface ?
+#uhid*	at uhidev? reportid ?
 
 # USB Printer
 #ulpt*	at uhub? port ? configuration ? interface ?
@@ -397,13 +398,13 @@ wsmouse*	at	pms?
 
 pseudo-device	bpfilter	16
 pseudo-device	ccd		4
-pseudo-device	raid		4		# RAIDframe disk driver
-#options 	RAID_AUTOCONFIG      # auto-configuration of RAID components
+pseudo-device	raid		4	# RAIDframe disk driver
+#options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
 #pseudo-device	ipfilter	1
 pseudo-device	loop		1
 #pseudo-device	md		1
 #pseudo-device	ppp		4
-pseudo-device	pty		64
+pseudo-device	pty
 #pseudo-device	sl		4
 pseudo-device	vnd		4
 #pseudo-device	gre		2	# generic L3 over IP tunnel
@@ -411,6 +412,7 @@ pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
 #pseudo-device	sequencer	1	# MIDI sequencer
+pseudo-device	clockctl		# user control of clock subsystem
 
 # rnd is EXPERIMENTAL
 pseudo-device	rnd			# /dev/random and in-kernel generator

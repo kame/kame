@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.1.2.1 2000/08/26 00:05:22 mrg Exp $
+#	$NetBSD: Makefile,v 1.1 2000/08/20 14:58:44 mrg Exp $
 
 CPPFLAGS+=	-DNETBOOT
 PROG=		ofwboot.net

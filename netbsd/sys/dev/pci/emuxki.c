@@ -1,4 +1,4 @@
-/*	$NetBSD: emuxki.c,v 1.7.4.2 2002/02/09 17:37:19 he Exp $	*/
+/*	$NetBSD: emuxki.c,v 1.9 2002/02/02 18:10:28 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -57,7 +57,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: emuxki.c,v 1.7.4.2 2002/02/09 17:37:19 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: emuxki.c,v 1.9 2002/02/02 18:10:28 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -210,6 +210,7 @@ static struct audio_hw_if emuxki_hw_if = {
 	emuxki_get_props,
 	emuxki_trigger_output,
 	emuxki_trigger_input,
+	NULL,			/* dev_ioctl */
 };
 
 /*
@@ -319,7 +320,7 @@ emuxki_scinit(struct emuxki_softc *sc)
 		return (err);
 
 	bus_space_write_4(sc->sc_iot, sc->sc_ioh, EMU_HCFG,
-		EMU_HCFG_AUDIOENABLE |
+		EMU_HCFG_AUDIOENABLE | EMU_HCFG_JOYENABLE |
 		EMU_HCFG_LOCKTANKCACHE_MASK | EMU_HCFG_AUTOMUTE);
 	bus_space_write_4(sc->sc_iot, sc->sc_ioh, EMU_INTE,
 		bus_space_read_4(sc->sc_iot, sc->sc_ioh, EMU_INTE) |
@@ -380,8 +381,7 @@ emuxki_attach(struct device *parent, struct device *self, void *aux)
 		pci_conf_read(pa->pa_pc, pa->pa_tag,
 		(PCI_COMMAND_STATUS_REG) | PCI_COMMAND_MASTER_ENABLE));
 
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n",
 			sc->sc_dev.dv_xname);
 		bus_space_unmap(sc->sc_iot, sc->sc_ioh, sc->sc_ios);

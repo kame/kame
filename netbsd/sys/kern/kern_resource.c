@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_resource.c,v 1.57 2000/05/31 05:02:32 thorpej Exp $	*/
+/*	$NetBSD: kern_resource.c,v 1.62 2001/11/23 18:56:33 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -40,6 +40,9 @@
  *	@(#)kern_resource.c	8.8 (Berkeley) 2/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_resource.c,v 1.62 2001/11/23 18:56:33 jdolecek Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -52,9 +55,16 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
+
+/*
+ * Maximum process data and stack limits.
+ * They are variables so they are patchable.
+ *
+ * XXXX Do we really need them to be patchable?
+ */
+rlim_t maxdmap = MAXDSIZ;
+rlim_t maxsmap = MAXSSIZ;
 
 /*
  * Resource controls and accounting.
@@ -189,6 +199,7 @@ donice(curp, chgp, n)
 	int n;
 {
 	struct pcred *pcred = curp->p_cred;
+	int s;
 
 	if (pcred->pc_ucred->cr_uid && pcred->p_ruid &&
 	    pcred->pc_ucred->cr_uid != chgp->p_ucred->cr_uid &&
@@ -202,7 +213,9 @@ donice(curp, chgp, n)
 	if (n < chgp->p_nice && suser(pcred->pc_ucred, &curp->p_acflag))
 		return (EACCES);
 	chgp->p_nice = n;
+	SCHED_LOCK(s);
 	(void)resetpriority(chgp);
+	SCHED_UNLOCK(s);
 	return (0);
 }
 
@@ -235,7 +248,6 @@ dosetrlimit(p, cred, which, limp)
 	struct rlimit *limp;
 {
 	struct rlimit *alimp;
-	extern unsigned maxdmap, maxsmap;
 	struct plimit *newplim;
 	int error;
 
@@ -251,12 +263,17 @@ dosetrlimit(p, cred, which, limp)
 	    limp->rlim_max == alimp->rlim_max)
 		return 0;
 
-	if (limp->rlim_cur > alimp->rlim_max || 
-	    limp->rlim_max > alimp->rlim_max)
-		if ((error = suser(cred->pc_ucred, &p->p_acflag)) != 0)
+	if (limp->rlim_cur > limp->rlim_max) {
+		/*
+		 * This is programming error. According to SUSv2, we should
+		 * return error in this case.
+		 */
+		return (EINVAL);
+	}
+	if (limp->rlim_max > alimp->rlim_max
+	    && (error = suser(cred->pc_ucred, &p->p_acflag)) != 0)
 			return (error);
-	if (limp->rlim_cur > limp->rlim_max)
-		limp->rlim_cur = limp->rlim_max;
+
 	if (p->p_limit->p_refcnt > 1 &&
 	    (p->p_limit->p_lflags & PL_SHAREMOD) == 0) {
 		newplim = limcopy(p->p_limit);
@@ -279,6 +296,16 @@ dosetrlimit(p, cred, which, limp)
 			limp->rlim_cur = maxsmap;
 		if (limp->rlim_max > maxsmap)
 			limp->rlim_max = maxsmap;
+
+		/*
+		 * Return EINVAL if the new stack size limit is lower than
+		 * current usage. Otherwise, the process would get SIGSEGV the
+		 * moment it would try to access anything on it's current stack.
+		 * This conforms to SUSv2.
+		 */
+		if (limp->rlim_cur < p->p_vmspace->vm_ssize * PAGE_SIZE
+		    || limp->rlim_max < p->p_vmspace->vm_ssize * PAGE_SIZE)
+			return (EINVAL);
 
 		/*
 		 * Stack is allocated to the max at exec time with

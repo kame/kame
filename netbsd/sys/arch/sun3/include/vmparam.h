@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.25 2000/01/26 09:44:13 tsutsui Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.31 2001/11/15 18:06:18 soren Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -33,6 +33,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _SUN3_VMPARAM_H_
+#define _SUN3_VMPARAM_H_ 1
+
+/*
+ * We use 8K pages on both the sun3 and sun3x.  Override PAGE_*
+ * to be compile-time constants.
+ */
+#define	PAGE_SHIFT	13
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 #ifdef	_SUN3_
 #include <machine/vmparam3.h>
 #endif	/* SUN3 */
@@ -41,22 +52,34 @@
 #endif	/* SUN3X */
 #ifdef	_LKM
 #define	USRSTACK KERNBASE
+/* Be conservative. If an LKM is gonna be built for sun3x, define this first */
+#ifndef MAXDSIZ
+#define MAXDSIZ         (32*1024*1024)          /* max data size */
+#endif
 extern	char KERNBASE[];
 #endif	/* _LKM */
 
 /* This is needed by some LKMs. */
 #define VM_PHYSSEG_MAX		4
-struct pmap_physseg {
-	/* NULL */
-};
 
 /*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
+ * Mach-derived constants:
  */
-#define	MAXSLP 		20
+
+/* user/kernel map constants */
+#define VM_MIN_ADDRESS		((vaddr_t)0)
+#define VM_MAX_ADDRESS		((vaddr_t)KERNBASE)
+#define VM_MAXUSER_ADDRESS	((vaddr_t)KERNBASE)
+#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)KERNBASE)
+#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)KERN_END)
+
+/* virtual sizes (bytes) for various kernel submaps */
+#define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
+
+#define VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
+#define VM_PHYSSEG_NOADD	/* can't add RAM after vm_mem_init */
+
+#define	VM_NFREELIST		1
+#define	VM_FREELIST_DEFAULT	0
+
+#endif	/* _SUN3_VMPARAM_H_ */

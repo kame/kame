@@ -1,4 +1,4 @@
-/*	$NetBSD: hd_output.c,v 1.12 2000/03/30 13:53:33 augustss Exp $	*/
+/*	$NetBSD: hd_output.c,v 1.14 2001/11/13 00:12:57 lukem Exp $	*/
 
 /*
  * Copyright (c) 1984 University of British Columbia.
@@ -39,6 +39,9 @@
  *
  *	@(#)hd_output.c	8.1 (Berkeley) 6/10/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd_output.c,v 1.14 2001/11/13 00:12:57 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -220,7 +223,7 @@ hd_ifoutput(m, va_alist)
 {
 	struct hdcb *hdp;
 	struct ifnet *ifp;
-	int             s = splimp();
+	int             s = splnet();
 	va_list	ap;
 
 	va_start(ap, m);

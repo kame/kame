@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.47.4.1 2000/07/26 09:33:39 pk Exp $	*/
+/*	$NetBSD: obio.c,v 1.52 2002/04/11 11:11:23 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997,1998 The NetBSD Foundation, Inc.
@@ -47,12 +47,11 @@
 #include <sys/syslog.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <sparc/dev/sbusvar.h>
 #include <machine/autoconf.h>
-#include <machine/pmap.h>
 #include <machine/oldmon.h>
 #include <machine/cpu.h>
 #include <machine/ctlreg.h>
@@ -94,9 +93,9 @@ struct obio4_busattachargs {
 #if defined(SUN4)
 static	int obioprint  __P((void *, const char *));
 static	int obiosearch   __P((struct device *, struct cfdata *, void *));
-static	int obio_bus_mmap __P((bus_space_tag_t, bus_type_t, bus_addr_t,
-			       int, bus_space_handle_t *));
-static	int _obio_bus_map __P((bus_space_tag_t, bus_type_t, bus_addr_t,
+static	paddr_t obio_bus_mmap __P((bus_space_tag_t, bus_addr_t, off_t,
+			       int, int));
+static	int _obio_bus_map __P((bus_space_tag_t, bus_addr_t,
 			       bus_size_t, int,
 			       vaddr_t, bus_space_handle_t *));
 
@@ -218,7 +217,7 @@ obioprint(args, busname)
 	union obio_attach_args *uoba = args;
 	struct obio4_attach_args *oba = &uoba->uoba_oba4;
 
-	printf(" addr 0x%lx", (long)oba->oba_paddr);
+	printf(" addr 0x%lx", (u_long)BUS_ADDR_PADDR(oba->oba_paddr));
 	if (oba->oba_pri != -1)
 		printf(" level %d", oba->oba_pri);
 
@@ -226,36 +225,34 @@ obioprint(args, busname)
 }
 
 int
-_obio_bus_map(t, btype, paddr, size, flags, vaddr, hp)
+_obio_bus_map(t, ba, size, flags, va, hp)
 	bus_space_tag_t t;
-	bus_type_t btype;
-	bus_addr_t paddr;
+	bus_addr_t ba;
 	bus_size_t size;
 	int	flags;
-	vaddr_t vaddr;
+	vaddr_t va;
 	bus_space_handle_t *hp;
 {
 	struct obio4_softc *sc = t->cookie;
 
 	if ((flags & OBIO_BUS_MAP_USE_ROM) != 0 &&
-	     obio_find_rom_map(paddr, PMAP_OBIO, size, hp) == 0)
+	     obio_find_rom_map(ba, size, hp) == 0)
 		return (0);
 
-	return (bus_space_map2(sc->sc_bustag, PMAP_OBIO, paddr,
-				size, flags, vaddr, hp));
+	return (bus_space_map2(sc->sc_bustag, ba, size, flags, va, hp));
 }
 
-int
-obio_bus_mmap(t, btype, paddr, flags, hp)
+paddr_t
+obio_bus_mmap(t, ba, off, prot, flags)
 	bus_space_tag_t t;
-	bus_type_t btype;
-	bus_addr_t paddr;
+	bus_addr_t ba;
+	off_t off;
+	int prot;
 	int flags;
-	bus_space_handle_t *hp;
 {
 	struct obio4_softc *sc = t->cookie;
 
-	return (bus_space_mmap(sc->sc_bustag, PMAP_OBIO, paddr, flags, hp));
+	return (bus_space_mmap(sc->sc_bustag, ba, off, prot, flags));
 }
 
 int
@@ -294,7 +291,7 @@ obiosearch(parent, cf, aux)
 	uoba.uoba_isobio4 = 1;
 	oba->oba_bustag = &obio_space_tag;
 	oba->oba_dmatag = oap->ma->ma_dmatag;
-	oba->oba_paddr = cf->cf_loc[0];
+	oba->oba_paddr = BUS_ADDR(PMAP_OBIO, cf->cf_loc[0]);
 	oba->oba_pri = cf->cf_loc[1];
 
 	if ((*cf->cf_attach->ca_match)(parent, cf, &uoba) == 0)
@@ -310,23 +307,23 @@ obiosearch(parent, cf, aux)
  * Else, create a new mapping.
  */
 int
-obio_find_rom_map(pa, iospace, len, hp)
-	bus_addr_t	pa;
-	bus_type_t	iospace;
+obio_find_rom_map(ba, len, hp)
+	bus_addr_t	ba;
 	int		len;
 	bus_space_handle_t *hp;
 {
 #define	getpte(va)		lda(va, ASI_PTE)
 
-	u_long	pf;
+	u_long	pa, pf;
 	int	pgtype;
 	u_long	va, pte;
 
 	if (len > NBPG)
 		return (EINVAL);
 
+	pa = BUS_ADDR_PADDR(ba);
 	pf = pa >> PGSHIFT;
-	pgtype = PMAP_T2PTE_4(iospace);
+	pgtype = PMAP_T2PTE_4(PMAP_OBIO);
 
 	for (va = OLDMON_STARTVADDR; va < OLDMON_ENDVADDR; va += NBPG) {
 		pte = getpte(va);
@@ -338,7 +335,7 @@ obio_find_rom_map(pa, iospace, len, hp)
 		 * Found entry in PROM's pagetable
 		 * note: preserve page offset
 		 */
-		*hp = (bus_space_handle_t)(va | ((u_long)pa & PGOFSET));
+		*hp = (bus_space_handle_t)(va | (pa & PGOFSET));
 		return (0);
 	}
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_pager_i.h,v 1.9 2000/05/08 23:13:42 thorpej Exp $	*/
+/*	$NetBSD: uvm_pager_i.h,v 1.11 2001/05/25 04:06:16 chs Exp $	*/
 
 /*
  *
@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * from: Id: uvm_pager_i.h,v 1.1.2.2 1997/10/09 23:05:46 chuck Exp 
+ * from: Id: uvm_pager_i.h,v 1.1.2.2 1997/10/09 23:05:46 chuck Exp
  */
 
 #ifndef _UVM_UVM_PAGER_I_H_
@@ -56,12 +56,16 @@ PAGER_INLINE struct vm_page *
 uvm_pageratop(kva)
 	vaddr_t kva;
 {
+	struct vm_page *pg;
 	paddr_t pa;
- 
-	if (__predict_false(pmap_extract(pmap_kernel(), kva, &pa) == FALSE))
-		panic("uvm_pageratop");
-	return (PHYS_TO_VM_PAGE(pa));
-} 
+	boolean_t rv;
+
+	rv = pmap_extract(pmap_kernel(), kva, &pa);
+	KASSERT(rv);
+	pg = PHYS_TO_VM_PAGE(pa);
+	KASSERT(pg != NULL);
+	return (pg);
+}
 
 #endif /* defined(UVM_PAGER_INLINE) || defined(UVM_PAGER) */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: sbdsp.c,v 1.104.4.1 2000/06/30 16:27:48 simonb Exp $	*/
+/*	$NetBSD: sbdsp.c,v 1.109 2002/01/06 20:24:12 augustss Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -80,6 +80,9 @@
  * Linux drivers.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbdsp.c,v 1.109 2002/01/06 20:24:12 augustss Exp $");
+
 #include "midi.h"
 #include "mpu.h"
 
@@ -92,7 +95,6 @@
 #include <sys/device.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
-#include <vm/vm.h>
 
 #include <machine/cpu.h>
 #include <machine/intr.h>
@@ -185,11 +187,11 @@ static struct sbmode sbpmodes[] = {
  { SB_JAZZ,1,16,22727,45454,SB_DSP_HS_OUTPUT,SB_DSP_HALT  ,SB_DSP_CONT  ,JAZZ16_RECORD_MONO },
  { SB_JAZZ,1,16, 4000,22727,SB_DSP_WDMA_LOOP,SB_DSP_HALT  ,SB_DSP_CONT  ,JAZZ16_RECORD_MONO },
  { SB_JAZZ,2,16,11025,22727,SB_DSP_HS_OUTPUT,SB_DSP_HALT  ,SB_DSP_CONT  ,JAZZ16_RECORD_STEREO },
- { SB_16,  1, 8, 5000,45000,SB_DSP16_WDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
- { SB_16,  2, 8, 5000,45000,SB_DSP16_WDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
+ { SB_16,  1, 8, 5000,49000,SB_DSP16_WDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
+ { SB_16,  2, 8, 5000,49000,SB_DSP16_WDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
 #define PLAY16 15 /* must be the index of the next entry in the table */
- { SB_16,  1,16, 5000,45000,SB_DSP16_WDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
- { SB_16,  2,16, 5000,45000,SB_DSP16_WDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
+ { SB_16,  1,16, 5000,49000,SB_DSP16_WDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
+ { SB_16,  2,16, 5000,49000,SB_DSP16_WDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
  { -1 }
 };
 static struct sbmode sbrmodes[] = {
@@ -206,10 +208,10 @@ static struct sbmode sbrmodes[] = {
  { SB_JAZZ,1,16,22727,45454,SB_DSP_HS_INPUT ,SB_DSP_HALT  ,SB_DSP_CONT  ,JAZZ16_RECORD_MONO },
  { SB_JAZZ,1,16, 4000,22727,SB_DSP_RDMA_LOOP,SB_DSP_HALT  ,SB_DSP_CONT  ,JAZZ16_RECORD_MONO },
  { SB_JAZZ,2,16,11025,22727,SB_DSP_HS_INPUT ,SB_DSP_HALT  ,SB_DSP_CONT  ,JAZZ16_RECORD_STEREO },
- { SB_16,  1, 8, 5000,45000,SB_DSP16_RDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
- { SB_16,  2, 8, 5000,45000,SB_DSP16_RDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
- { SB_16,  1,16, 5000,45000,SB_DSP16_RDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
- { SB_16,  2,16, 5000,45000,SB_DSP16_RDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
+ { SB_16,  1, 8, 5000,49000,SB_DSP16_RDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
+ { SB_16,  2, 8, 5000,49000,SB_DSP16_RDMA_8 ,SB_DSP_HALT  ,SB_DSP_CONT  },
+ { SB_16,  1,16, 5000,49000,SB_DSP16_RDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
+ { SB_16,  2,16, 5000,49000,SB_DSP16_RDMA_16,SB_DSP16_HALT,SB_DSP16_CONT},
  { -1 }
 };
 
@@ -228,6 +230,8 @@ int	sbdsp_block_input __P((void *));
 static	int sbdsp_adjust __P((int, int));
 
 int	sbdsp_midi_intr __P((void *));
+
+static void	sbdsp_powerhook __P((int, void*));
 
 #ifdef AUDIO_DEBUG
 void	sb_printsc __P((struct sbdsp_softc *));
@@ -426,6 +430,25 @@ sbdsp_attach(sc)
 	if (sc->sc_drq16 != -1 && sc->sc_drq16 != sc->sc_drq8)
 		sc->sc_drq16_maxsize = isa_dmamaxsize(sc->sc_ic,
 		    sc->sc_drq16);
+
+	powerhook_establish (sbdsp_powerhook, sc);
+}
+
+static void
+sbdsp_powerhook (why, arg)
+	int why;
+	void *arg;
+{
+	struct sbdsp_softc *sc = arg;
+	int i;
+
+	if (!sc || why != PWR_RESUME)
+		return;
+
+	/* Reset the mixer. */
+	sbdsp_mix_write(sc, SBP_MIX_RESET, SBP_MIX_RESET);
+	for (i = 0; i < SB_NDEVS; i++)
+		sbdsp_set_mixer_gain (sc, i);
 }
 
 void

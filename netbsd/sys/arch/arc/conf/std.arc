@@ -1,4 +1,4 @@
-#	$NetBSD: std.arc,v 1.9.4.1 2000/06/23 14:36:07 fvdl Exp $
+#	$NetBSD: std.arc,v 1.12 2001/10/23 20:40:01 thorpej Exp $
 # standard arc info
 
 machine arc mips
@@ -20,3 +20,6 @@ options 	MIPS3_L2CACHE_PRESENT	# may have L2 cache
 options 	MIPS3_L2CACHE_ABSENT	# may not have L2 cache
 
 options 	__NO_SOFT_SERIAL_INTERRUPT	# for "com" driver
+
+makeoptions	DEFTEXTADDR="0x80200000"
+makeoptions	MACHINE_ARCH="mipsel"

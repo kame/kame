@@ -1,4 +1,4 @@
-/*	$NetBSD: netif_of.c,v 1.3 1999/02/04 15:41:15 tsubai Exp $	*/
+/*	$NetBSD: netif_of.c,v 1.5 2002/03/29 15:15:07 tsutsui Exp $	*/
 
 /*
  * Copyright (C) 1995 Wolfgang Solfrank.
@@ -76,7 +76,7 @@ netif_open(machdep_hint)
 	struct iodesc *io;
 	int fd, error;
 	char addr[32];
-	
+
 #ifdef	NETIF_DEBUG
 	printf("netif_open...");
 #endif
@@ -89,11 +89,11 @@ netif_open(machdep_hint)
 		errno = ENFILE;
 		return -1;
 	}
-	bzero(io, sizeof *io);
+	memset(io, 0, sizeof *io);
 
 	netif_of.nif_devdata = op;
 	io->io_netif = &netif_of;
-	
+
 	/* Put our ethernet address in io->myea */
 	OF_getprop(OF_instance_to_package(op->handle),
 		   "local-mac-address", io->myea, sizeof io->myea) == -1 &&
@@ -174,7 +174,7 @@ netif_put(desc, pkt, len)
 	}
 
 	if (op->dmabuf) {
-		bcopy(pkt, op->dmabuf, sendlen);
+		memcpy(op->dmabuf, pkt, sendlen);
 		pkt = op->dmabuf;
 	}
 	rv = OF_write(op->handle, pkt, sendlen);

@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.6 2000/06/09 04:58:35 soda Exp $	*/
+/*	$NetBSD: machdep.c,v 1.39 2002/05/13 06:17:36 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -33,11 +33,6 @@
 
 #include "opt_compat_netbsd.h"
 #include "opt_ddb.h"
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -57,95 +52,31 @@
 #include <sys/systm.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <sys/sysctl.h>
 
 #include <net/netisr.h>
 
+#include <machine/autoconf.h>
 #include <machine/bat.h>
 #include <machine/bootinfo.h>
 #include <machine/bus.h>
 #include <machine/intr.h>
 #include <machine/pmap.h>
+#include <machine/platform.h>
 #include <machine/powerpc.h>
 #include <machine/residual.h>
 #include <machine/trap.h>
 
 #include <dev/cons.h>
 
-#include "pc.h"
-#if (NPC > 0)
-#include <machine/pccons.h>
-#endif
-
-#include "vga.h"
-#if (NVGA > 0)
-#include <dev/ic/mc6845reg.h>
-#include <dev/ic/pcdisplayvar.h>
-#include <dev/ic/vgareg.h>
-#include <dev/ic/vgavar.h>
-#endif
-
-#include "pckbc.h"
-#if (NPCKBC > 0)
-#include <dev/isa/isareg.h>
-#include <dev/ic/i8042reg.h>
-#include <dev/ic/pckbcvar.h>
-#endif
-#include "pckbd.h" /* for pckbc_machdep_cnattach */
-
 #include "com.h"
 #if (NCOM > 0)
 #include <sys/termios.h>
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
-#endif
-
-#ifdef INET
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/in_var.h>
-#include "arp.h"
-#if (NARP > 0)
-#include <netinet/if_inarp.h>
-#endif
-#endif
-
-#ifdef INET6
-# ifndef INET
-#  include <netinet/in.h>
-# endif
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#endif
-
-#ifdef NS
-#include <netns/ns_var.h>
-#endif
-
-#ifdef ISO
-#include <netiso/iso.h>
-#include <netiso/clnp.h>
-#endif
-
-#ifdef CCITT
-#include <netccitt/x25.h>
-#include <netccitt/pk.h>
-#include <netccitt/pk_extern.h>
-#endif
-
-#ifdef NETATALK
-#include <netatalk/at_extern.h>
-#endif
-
-#include "ppp.h"
-#if (NPPP > 0)
-#include <net/ppp_defs.h>
-#include <net/if_ppp.h>
+void comsoft(void);
 #endif
 
 #ifdef DDB
@@ -154,26 +85,21 @@
 #endif
 
 void initppc __P((u_long, u_long, u_int, void *));
-void identifycpu __P((void));
 void dumpsys __P((void));
 void strayintr __P((int));
-void lcsplx __P((int));
-
-/* Our exported CPU info; we have only one right now. */  
-struct cpu_info cpu_info_store;
+int lcsplx __P((int));
 
 /*
  * Global variables used here and there
  */
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 char bootinfo[BOOTINFO_MAXSIZE];
 
 char machine[] = MACHINE;		/* machine */
 char machine_arch[] = MACHINE_ARCH;	/* machine architecture */
-char cpu_model[80];
 
 struct pcb *curpcb;
 struct pmap *curpm;
@@ -183,14 +109,10 @@ extern struct user *proc0paddr;
 
 struct bat battable[16];
 
-paddr_t prep_intr_reg;			/* PReP interrupt vector register */
+vaddr_t prep_intr_reg;			/* PReP interrupt vector register */
 
 #define	OFMEMREGIONS	32
 struct mem_region physmemr[OFMEMREGIONS], availmemr[OFMEMREGIONS];
-
-int astpending;
-
-char *bootpath;
 
 paddr_t msgbuf_paddr;
 vaddr_t msgbuf_vaddr;
@@ -208,16 +130,16 @@ initppc(startkernel, endkernel, args, btinfo)
 	u_int args;
 	void *btinfo;
 {
-	extern trapcode, trapsize;
-	extern alitrap, alisize;
-	extern dsitrap, dsisize;
-	extern isitrap, isisize;
-	extern decrint, decrsize;
-	extern tlbimiss, tlbimsize;
-	extern tlbdlmiss, tlbdlmsize;
-	extern tlbdsmiss, tlbdsmsize;
+	extern int trapcode, trapsize;
+	extern int alitrap, alisize;
+	extern int dsitrap, dsisize;
+	extern int isitrap, isisize;
+	extern int decrint, decrsize;
+	extern int tlbimiss, tlbimsize;
+	extern int tlbdlmiss, tlbdlmsize;
+	extern int tlbdsmiss, tlbdsmsize;
 #ifdef DDB
-	extern ddblow, ddbsize;
+	extern int ddblow, ddbsize;
 	extern void *startsym, *endsym;
 #endif
 	int exc, scratch;
@@ -225,7 +147,7 @@ initppc(startkernel, endkernel, args, btinfo)
 	/*
 	 * copy bootinfo
 	 */
-	bcopy(btinfo, bootinfo, sizeof(bootinfo));
+	memcpy(bootinfo, btinfo, sizeof(bootinfo));
 
 	/*
 	 * copy residual data
@@ -240,7 +162,7 @@ initppc(startkernel, endkernel, args, btinfo)
 
 		if (((RESIDUAL *)resinfo->addr != 0) &&
 		    ((RESIDUAL *)resinfo->addr)->ResidualLength != 0) {
-			bcopy(resinfo->addr, &resdata, sizeof(resdata));
+			memcpy(&resdata, resinfo->addr, sizeof(resdata));
 			res = &resdata;
 		} else
 			panic("No residual data.");
@@ -275,8 +197,11 @@ initppc(startkernel, endkernel, args, btinfo)
 		ns_per_tick = 1000000000 / ticks_per_sec;
 	}
 
+	/* Initialize the CPU type */
+	ident_platform();
+
 	proc0.p_addr = proc0paddr;
-	bzero(proc0.p_addr, sizeof *proc0.p_addr);
+	memset(proc0.p_addr, 0, sizeof *proc0.p_addr);
 
 	curpcb = &proc0paddr->u_pcb;
 
@@ -316,29 +241,39 @@ initppc(startkernel, endkernel, args, btinfo)
 	 * Set up initial BAT table
 	 */
 	/* map the lowest 256 MB area */
-	battable[0].batl = BATL(0x00000000, BAT_M, BAT_PP_RW);
-	battable[0].batu = BATU(0x00000000, BAT_BL_256M, BAT_Vs);
+	battable[0x00000000 >> 28].batl =
+	    BATL(0x00000000, BAT_M, BAT_PP_RW);
+	battable[0x00000000 >> 28].batu =
+	    BATU(0x00000000, BAT_BL_256M, BAT_Vs);
 
 	/* map the PCI/ISA I/O 256 MB area */
-	battable[1].batl = BATL(PREP_BUS_SPACE_IO, BAT_I, BAT_PP_RW);
-	battable[1].batu = BATU(PREP_BUS_SPACE_IO, BAT_BL_256M, BAT_Vs);
+	battable[PREP_BUS_SPACE_IO >> 28].batl =
+	    BATL(PREP_BUS_SPACE_IO, BAT_I | BAT_G, BAT_PP_RW);
+	battable[PREP_BUS_SPACE_IO >> 28].batu =
+	    BATU(PREP_BUS_SPACE_IO, BAT_BL_256M, BAT_Vs);
 
 	/* map the PCI/ISA MEMORY 256 MB area */
-	battable[2].batl = BATL(PREP_BUS_SPACE_MEM, BAT_I, BAT_PP_RW);
-	battable[2].batu = BATU(PREP_BUS_SPACE_MEM, BAT_BL_256M, BAT_Vs);
+	battable[PREP_BUS_SPACE_MEM >> 28].batl =
+	    BATL(PREP_BUS_SPACE_MEM, BAT_I | BAT_G, BAT_PP_RW);
+	battable[PREP_BUS_SPACE_MEM >> 28].batu =
+	    BATU(PREP_BUS_SPACE_MEM, BAT_BL_256M, BAT_Vs);
 
 	/*
 	 * Now setup fixed bat registers
 	 */
 	asm volatile ("mtibatl 0,%0; mtibatu 0,%1"
-		      :: "r"(battable[0].batl), "r"(battable[0].batu));
+		      :: "r"(battable[0x00000000 >> 28].batl),
+			 "r"(battable[0x00000000 >> 28].batu));
 
 	asm volatile ("mtdbatl 0,%0; mtdbatu 0,%1"
-		      :: "r"(battable[0].batl), "r"(battable[0].batu));
+		      :: "r"(battable[0x00000000 >> 28].batl),
+			 "r"(battable[0x00000000 >> 28].batu));
 	asm volatile ("mtdbatl 1,%0; mtdbatu 1,%1"
-		      :: "r"(battable[1].batl), "r"(battable[1].batu));
+		      :: "r"(battable[PREP_BUS_SPACE_IO >> 28].batl),
+			 "r"(battable[PREP_BUS_SPACE_IO >> 28].batu));
 	asm volatile ("mtdbatl 2,%0; mtdbatu 2,%1"
-		      :: "r"(battable[2].batl), "r"(battable[2].batu));
+		      :: "r"(battable[PREP_BUS_SPACE_MEM >> 28].batl),
+			 "r"(battable[PREP_BUS_SPACE_MEM >> 28].batu));
 
 	asm volatile ("sync; isync");
 	/*
@@ -347,7 +282,7 @@ initppc(startkernel, endkernel, args, btinfo)
 	for (exc = EXC_RSVD; exc <= EXC_LAST; exc += 0x100)
 		switch (exc) {
 		default:
-			bcopy(&trapcode, (void *)exc, (size_t)&trapsize);
+			memcpy((void *)exc, &trapcode, (size_t)&trapsize);
 			break;
 		case EXC_EXI:
 			/*
@@ -355,31 +290,34 @@ initppc(startkernel, endkernel, args, btinfo)
 			 */
 			break;
 		case EXC_ALI:
-			bcopy(&alitrap, (void *)EXC_ALI, (size_t)&alisize);
+			memcpy((void *)EXC_ALI, &alitrap, (size_t)&alisize);
 			break;
 		case EXC_DSI:
-			bcopy(&dsitrap, (void *)EXC_DSI, (size_t)&dsisize);
+			memcpy((void *)EXC_DSI, &dsitrap, (size_t)&dsisize);
 			break;
 		case EXC_ISI:
-			bcopy(&isitrap, (void *)EXC_ISI, (size_t)&isisize);
+			memcpy((void *)EXC_ISI, &isitrap, (size_t)&isisize);
 			break;
 		case EXC_DECR:
-			bcopy(&decrint, (void *)EXC_DECR, (size_t)&decrsize);
+			memcpy((void *)EXC_DECR, &decrint, (size_t)&decrsize);
 			break;
 		case EXC_IMISS:
-			bcopy(&tlbimiss, (void *)EXC_IMISS, (size_t)&tlbimsize);
+			memcpy((void *)EXC_IMISS, &tlbimiss,
+			    (size_t)&tlbimsize);
 			break;
 		case EXC_DLMISS:
-			bcopy(&tlbdlmiss, (void *)EXC_DLMISS, (size_t)&tlbdlmsize);
+			memcpy((void *)EXC_DLMISS, &tlbdlmiss,
+			    (size_t)&tlbdlmsize);
 			break;
 		case EXC_DSMISS:
-			bcopy(&tlbdsmiss, (void *)EXC_DSMISS, (size_t)&tlbdsmsize);
+			memcpy((void *)EXC_DSMISS, &tlbdsmiss,
+			    (size_t)&tlbdsmsize);
 			break;
 #ifdef DDB
 		case EXC_PGM:
 		case EXC_TRC:
 		case EXC_BPT:
-			bcopy(&ddblow, (void *)exc, (size_t)&ddbsize);
+			memcpy((void *)exc, &ddblow, (size_t)&ddbsize);
 			break;
 #endif
 		}
@@ -389,7 +327,7 @@ initppc(startkernel, endkernel, args, btinfo)
 	/*
 	 * external interrupt handler install
 	 */
-	install_extint(ext_intr);
+	install_extint(*platform->ext_intr);
 
 	/*
 	 * Now enable translation (and machine checks/recoverable interrupts).
@@ -405,7 +343,7 @@ initppc(startkernel, endkernel, args, btinfo)
 	/*
 	 * Initialize pmap module.
 	 */
-	pmap_bootstrap(startkernel, endkernel);
+	pmap_bootstrap(startkernel, endkernel, NULL);
 
 #ifdef DDB
 	ddb_init((int)((u_long)endsym - (u_long)startsym), startsym, endsym);
@@ -422,52 +360,6 @@ mem_regions(mem, avail)
 
 	*mem = physmemr;
 	*avail = availmemr;
-}
-
-/*
- * This should probably be in autoconf!				XXX
- */
-void
-identifycpu()
-{
-	int cpu, pvr;
-
-	asm ("mfpvr %0" : "=r"(pvr));
-	cpu = pvr >> 16;
-	switch (cpu) {
-	case 1:
-		sprintf(cpu_model, "601");
-		break;
-	case 3:
-		sprintf(cpu_model, "603");
-		break;
-	case 4:
-		sprintf(cpu_model, "604");
-		break;
-	case 5:
-		sprintf(cpu_model, "602");
-		break;
-	case 6:
-		sprintf(cpu_model, "603e");
-		break;
-	case 7:
-		sprintf(cpu_model, "603ev");
-		break;
-	case 8:
-		sprintf(cpu_model, "750");
-		break;
-	case 9:
-		sprintf(cpu_model, "604ev");
-		break;
-	case 20:
-		sprintf(cpu_model, "620");
-		break;
-	default:
-		sprintf(cpu_model, "Version %x", cpu);
-		break;
-	}
-	sprintf(cpu_model + strlen(cpu_model), " (Revision %x)", pvr & 0xffff);
-	printf("CPU: PowerPC %s\n", cpu_model);
 }
 
 void
@@ -487,7 +379,7 @@ install_extint(handler)
 	asm volatile ("mfmsr %0; andi. %1,%0,%2; mtmsr %1"
 		      : "=r"(omsr), "=r"(msr) : "K"((u_short)~PSL_EE));
 	extint_call = (extint_call & 0xfc000003) | offset;
-	bcopy(&extint, (void *)EXC_EXI, (size_t)&extsize);
+	memcpy((void *)EXC_EXI, &extint, (size_t)&extsize);
 	__syncicache((void *)&extint_call, sizeof extint_call);
 	__syncicache((void *)EXC_EXI, (int)&extsize);
 	asm volatile ("mtmsr %0" :: "r"(omsr));
@@ -515,6 +407,7 @@ cpu_startup()
 		panic("startup: no room for interrupt register");
 	pmap_enter(pmap_kernel(), prep_intr_reg, PREP_INTR_REG,
 	    VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Initialize error message buffer (at end of core).
@@ -525,12 +418,13 @@ cpu_startup()
 		pmap_enter(pmap_kernel(), msgbuf_vaddr + i * NBPG,
 		    msgbuf_paddr + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbuf_vaddr, round_page(MSGBUFSIZE));
 
 	printf("%s", version);
 
 	printf("Model: %s\n", res->VitalProductData.PrintableModel);
-	identifycpu();
+	cpu_identify(NULL, 0);
 
 	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
 	printf("total memory = %s\n", pbuf);
@@ -551,9 +445,9 @@ cpu_startup()
 	 */
 	sz = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(sz),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	base = bufpages / nbuf;
@@ -582,13 +476,13 @@ cpu_startup()
 			if (pg == NULL)
 				panic("startup: not enough memory for "
 					"buffer cache");
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ | VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(kernel_map->pmap);
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -603,11 +497,15 @@ cpu_startup()
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				 VM_PHYS_SIZE, 0, FALSE, NULL);
 
+#ifndef PMAP_MAP_POOLPAGE
 	/*
-	 * No need to allocate an mbuf cluster submap.  Mbuf clusters
-	 * are allocated via the pool allocator, and we use direct-mapped
-	 * pool pages.
+	 * We need to allocate an mbuf cluster submap if the pool
+	 * allocater isn't using direct-mapped pool pages.
 	 */
+	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+				 nmbclusters * mclbytes, VM_MAP_INTRSAFE,
+				 FALSE, NULL);
+#endif
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
@@ -625,7 +523,7 @@ cpu_startup()
 	{
 		int msr;
 
-		splhigh();
+		splraise(-1);
 		asm volatile ("mfmsr %0; ori %0,%0,%1; mtmsr %0"
 			      : "=r"(msr) : "K"(PSL_EE));
 	}
@@ -656,204 +554,6 @@ lookup_bootinfo(type)
 		(size_t)help < (size_t)bootinfo + sizeof (bootinfo));
 
 	return (NULL);
-}
-
-/*
- * consinit
- * Initialize system console.
- */
-void
-consinit()
-{
-	struct btinfo_console *consinfo;
-	static int initted = 0;
-
-	if (initted)
-		return;
-	initted = 1;
-
-	consinfo = (struct btinfo_console *)lookup_bootinfo(BTINFO_CONSOLE);
-	if (!consinfo)
-		panic("not found console information in bootinfo");
-
-#if (NPFB > 0)
-	if (!strcmp(consinfo->devname, "fb")) {
-		pfb_cnattach(consinfo->addr);
-#if (NPCKBC > 0)
-		pckbc_cnattach(PREP_BUS_SPACE_IO, IO_KBD, KBCMDP,
-		    PCKBC_KBD_SLOT);
-#endif
-		return;
-	}
-#endif
-
-#if (NPC > 0) || (NVGA > 0)
-	if (!strcmp(consinfo->devname, "vga")) {
-#if (NVGA > 0)
-		if (!vga_cnattach(PREP_BUS_SPACE_IO, PREP_BUS_SPACE_MEM,
-				-1, 1))
-			goto dokbd;
-#endif
-#if (NPC > 0)
-		pccnattach();
-#endif
-dokbd:
-#if (NPCKBC > 0)
-		pckbc_cnattach(PREP_BUS_SPACE_IO, IO_KBD, KBCMDP,
-		    PCKBC_KBD_SLOT);
-#endif
-		return;
-	}
-#endif /* PC | VGA */
-
-#if (NCOM > 0)
-	if (!strcmp(consinfo->devname, "com")) {
-		bus_space_tag_t tag = PREP_BUS_SPACE_IO;
-
-		if(comcnattach(tag, consinfo->addr, consinfo->speed, COM_FREQ,
-		    ((TTYDEF_CFLAG & ~(CSIZE | CSTOPB | PARENB)) | CS8)))
-			panic("can't init serial console");
-
-		return;
-	}
-#endif
-	panic("invalid console device %s", consinfo->devname);
-}
-
-#if (NPCKBC > 0) && (NPCKBD == 0)
-/*
- * glue code to support old console code with the
- * mi keyboard controller driver
- */
-int
-pckbc_machdep_cnattach(kbctag, kbcslot)
-	pckbc_tag_t kbctag;
-	pckbc_slot_t kbcslot;
-{
-
-#if (NPC > 0) && (NPCCONSKBD > 0)
-	return (pcconskbd_cnattach(kbctag, kbcslot));
-#else
-	return (ENXIO);
-#endif
-}
-#endif
-
-/*
- * Set set up registers on exec.
- */
-void
-setregs(p, pack, stack)
-	struct proc *p;
-	struct exec_package *pack;
-	u_long stack;
-{
-	struct trapframe *tf = trapframe(p);
-	struct ps_strings arginfo;
-
-	bzero(tf, sizeof *tf);
-	tf->fixreg[1] = -roundup(-stack + 8, 16);
-
-	/*
-	 * XXX Machine-independent code has already copied arguments and
-	 * XXX environment to userland.  Get them back here.
-	 */
-	(void)copyin((char *)PS_STRINGS, &arginfo, sizeof(arginfo));
-
-	/*
-	 * Set up arguments for _start():
-	 *	_start(argc, argv, envp, obj, cleanup, ps_strings);
-	 *
-	 * Notes:
-	 *	- obj and cleanup are the auxilliary and termination
-	 *	  vectors.  They are fixed up by ld.elf_so.
-	 *	- ps_strings is a NetBSD extention, and will be
-	 * 	  ignored by executables which are strictly
-	 *	  compliant with the SVR4 ABI.
-	 *
-	 * XXX We have to set both regs and retval here due to different
-	 * XXX calling convention in trap.c and init_main.c.
-	 */
-	tf->fixreg[3] = arginfo.ps_nargvstr;
-	tf->fixreg[4] = (register_t)arginfo.ps_argvstr;
-	tf->fixreg[5] = (register_t)arginfo.ps_envstr;
-	tf->fixreg[6] = 0;			/* auxillary vector */
-	tf->fixreg[7] = 0;			/* termination vector */
-	tf->fixreg[8] = (register_t)PS_STRINGS;	/* NetBSD extension */
-
-	tf->srr0 = pack->ep_entry;
-	tf->srr1 = PSL_MBO | PSL_USERSET | PSL_FE_DFLT;
-	p->p_addr->u_pcb.pcb_flags = 0;
-}
-
-/*
- * Machine dependent system variables.
- */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
-{
-
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);
-
-	switch (name[0]) {
-	case CPU_CACHELINE:
-		return sysctl_rdint(oldp, oldlenp, newp, CACHELINESIZE);
-	default:
-		return (EOPNOTSUPP);
-	}
-}
-
-/*
- * Crash dump handling.
- */
-u_long dumpmag = 0x8fca0101;		/* magic number */
-int dumpsize = 0;			/* size of dump in pages */
-long dumplo = -1;			/* blocks */
-
-/*
- * This is called by main to set dumplo and dumpsize.
- * Dumps always skip the first NBPG of disk space
- * in case there might be a disk label stored there.
- * If there is extra space, put dump at the end to
- * reduce the chance that swapping trashes it.
- */
-void
-cpu_dumpconf()
-{
-	int nblks;	/* size of dump area */
-	int maj;
-
-	if (dumpdev == NODEV)
-		return;
-	maj = major(dumpdev);
-	if (maj < 0 || maj >= nblkdev)
-		panic("dumpconf: bad dumpdev=0x%x", dumpdev);
-	if (bdevsw[maj].d_psize == NULL)
-		return;
-	nblks = (*bdevsw[maj].d_psize)(dumpdev);
-	if (nblks <= ctod(1))
-		return;
-
-	dumpsize = physmem;
-
-	/* Always skip the first NBPG, in case there is a label there. */
-	if (dumplo < ctod(1))
-		dumplo = ctod(1);
-
-	/* Put dump at end of partition, and make it fit. */
-	if (dumpsize > dtoc(nblks - dumplo))
-		dumpsize = dtoc(nblks - dumplo);
-	if (dumplo < nblks - ctod(dumpsize))
-		dumplo = nblks - ctod(dumpsize);
 }
 
 void
@@ -951,33 +651,31 @@ halt_sys:
 
 	printf("rebooting...\n\n");
 
-	{
-		/* XXX: ibm_machdep */
-		int msr;
-		u_char reg;
+	(*platform->reset)();
 
-		asm volatile("mfmsr %0" : "=r"(msr));
-		msr |= PSL_IP;
-		asm volatile("mtmsr %0" :: "r"(msr));
-
-		reg = *(volatile u_char *)(PREP_BUS_SPACE_IO + 0x92);
-		reg &= ~1UL;
-		*(volatile u_char *)(PREP_BUS_SPACE_IO + 0x92) = reg;
-		reg = *(volatile u_char *)(PREP_BUS_SPACE_IO + 0x92);
-		reg |= 1;
-		*(volatile u_char *)(PREP_BUS_SPACE_IO + 0x92) = reg;
-	}
-
-	while(1);
+	for (;;)
+		continue;
 	/* NOTREACHED */
 }
 
-void
+/*
+ * lcsplx() is called from locore; it is an open-coded version of
+ * splx() differing in that it returns the previous priority level.
+ */
+int
 lcsplx(ipl)
 	int ipl;
 {
+	int oldcpl;
 
-	splx(ipl);
+	__asm__ volatile("sync; eieio\n");	/* reorder protect */
+	oldcpl = cpl;
+	cpl = ipl;
+	if (ipending & ~ipl)
+		do_pending_int();
+	__asm__ volatile("sync; eieio\n");	/* reorder protect */
+
+	return (oldcpl);
 }
 
 /*
@@ -1001,11 +699,11 @@ mapiodev(pa, len)
 		return NULL;
 
 	for (; len > 0; len -= NBPG) {
-		pmap_enter(pmap_kernel(), taddr, faddr,
-			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+		pmap_kenter_pa(taddr, faddr, VM_PROT_READ | VM_PROT_WRITE);
 		faddr += NBPG;
 		taddr += NBPG;
 	}
+	pmap_update(pmap_kernel());
 
 	return (void *)(va + off);
 }

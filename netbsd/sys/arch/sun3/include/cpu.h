@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.24 2000/05/26 21:20:23 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.30 2002/05/14 02:58:34 matt Exp $	*/
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
@@ -47,9 +47,11 @@
 #ifndef _CPU_H_
 #define _CPU_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
+
+#include <m68k/m68k.h>
 
 #ifdef _KERNEL
 
@@ -95,7 +97,7 @@ struct clockframe {
 	u_short	cf_sr;		/* sr at time of interrupt */
 	u_long	cf_pc;		/* pc at time of interrupt */
 	u_short	cf_vo;		/* vector offset (4-word frame) */
-};
+} __attribute__((packed));
 
 #define	CLKF_USERMODE(framep)	(((framep)->cf_sr & PSL_S) == 0)
 #define	CLKF_BASEPRI(framep)	(((framep)->cf_sr & PSL_IPL) == 0)
@@ -115,8 +117,8 @@ extern int astpending;	 /* need to trap before returning to user mode */
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-extern int want_resched; /* resched() was called */
-#define	need_resched()	{ want_resched = 1; aston(); }
+extern int want_resched;	 /* resched() was called */
+#define	need_resched(ci)	{ want_resched = 1; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -141,7 +143,11 @@ extern void isr_soft_request __P((int level));
 union sun3sir {
 	int 	sir_any;
 	char	sir_which[4];
-} sun3sir;
+};
+
+#ifdef _KERNEL
+extern union sun3sir sun3sir;
+#endif
 
 #define SIR_NET  	0
 #define SIR_CLOCK	1
@@ -151,6 +157,8 @@ union sun3sir {
 #define	setsoftint(x)	isr_soft_request(x)
 #define setsoftnet()	(sun3sir.sir_which[SIR_NET] = 1, setsoftint(1))
 #define setsoftclock()	(sun3sir.sir_which[SIR_CLOCK] = 1, setsoftint(1))
+
+int	cachectl1 __P((unsigned long, vaddr_t, size_t, struct proc *));
 
 #endif	/* _KERNEL */
 

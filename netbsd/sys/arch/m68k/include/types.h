@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.12 1998/08/13 02:10:38 eeh Exp $	*/
+/*	$NetBSD: types.h,v 1.14 2001/04/28 15:41:31 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -38,6 +38,7 @@
 #define	_M68K_TYPES_H_
 
 #include <sys/cdefs.h>
+#include <m68k/int_types.h>
 
 #if defined(_KERNEL)
 typedef struct label_t {		/* consistent with HP-UX */
@@ -56,22 +57,6 @@ typedef vm_offset_t	vaddr_t;
 typedef vm_size_t	vsize_t;
 #endif
 
-/*
- * Basic integral types.  Omit the typedef if
- * not possible for a machine/compiler combination.
- */
-#define	__BIT_TYPES_DEFINED__
-typedef	signed char		   int8_t;
-typedef	unsigned char		 u_int8_t;
-typedef	short			  int16_t;
-typedef	unsigned short		u_int16_t;
-typedef	int			  int32_t;
-typedef	unsigned int		u_int32_t;
-/* LONGLONG */
-typedef	long long		  int64_t;
-/* LONGLONG */
-typedef	unsigned long long	u_int64_t;
-
-typedef int32_t			register_t;
+typedef int		register_t;
 
 #endif	/* !_M68K_TYPES_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: news5000.c,v 1.4 2000/04/14 10:11:07 tsubai Exp $	*/
+/*	$NetBSD: news5000.c,v 1.8 2001/04/27 12:55:51 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 SHIMIZU Ryo.  All rights reserved.
@@ -37,8 +37,19 @@
 #include <newsmips/apbus/apbusvar.h>
 #include <newsmips/newsmips/machid.h>
 
-static void level1_intr __P((void));
-static void level0_intr __P((void));
+extern void (*readmicrotime) (struct timeval *tvp);
+
+static void level1_intr (void);
+static void level0_intr (void);
+
+static void enable_intr_5000 (void);
+static void disable_intr_5000 (void);
+static void readmicrotime_5000 (struct timeval *);
+static void readidrom_5000 (u_char *);
+
+void news5000_init (void);
+
+static u_int freerun_off;
 
 /*
  * Handle news5000 interrupts.
@@ -72,6 +83,7 @@ news5000_intr(status, cause, pc, ipending)
 
 		if (int2stat & NEWS5000_INT2_TIMER0) {
 			*(volatile u_int *)NEWS5000_TIMER0 = 1;
+			freerun_off = *(volatile u_int *)NEWS5000_FREERUN;
 
 			cf.pc = pc;
 			cf.sr = status;
@@ -97,6 +109,22 @@ news5000_intr(status, cause, pc, ipending)
 	if (ipending & MIPS_INT_MASK_4) {
 		u_int int4stat = *(volatile u_int *)NEWS5000_INTST4;
 		printf("level4 interrupt (%08x)\n", int4stat);
+		if (int4stat & NEWS5000_INT4_APBUS) {
+			u_int stat = *(volatile u_int *)NEWS5000_APBUS_INTST;
+			printf("APbus error 0x%04x\n", stat & 0xffff);
+			if (stat & NEWS5000_APBUS_INT_DMAADDR) {
+				printf("DMA Address Error: slot=%x, addr=0x%08x\n",
+				    *(volatile u_int *)NEWS5000_APBUS_DER_S,
+				    *(volatile u_int *)NEWS5000_APBUS_DER_A);
+			}
+			if (stat & NEWS5000_APBUS_INT_RDTIMEO)
+				printf("IO Read Timeout: addr=0x%08x\n",
+				    *(volatile u_int *)NEWS5000_APBUS_BER_A);
+			if (stat & NEWS5000_APBUS_INT_WRTIMEO)
+				printf("IO Write Timeout: addr=0x%08x\n",
+				    *(volatile u_int *)NEWS5000_APBUS_BER_A);
+			*(volatile u_int *)0xb4c00014 = stat;
+		}
 
 		apbus_wbflush();
 		cause &= ~MIPS_INT_MASK_4;
@@ -126,8 +154,8 @@ news5000_intr(status, cause, pc, ipending)
 }
 
 
-void
-level1_intr()
+static void
+level1_intr(void)
 {
 	u_int int1stat;
 
@@ -141,8 +169,8 @@ level1_intr()
 		printf("level1 stray interrupt?\n");
 }
 
-void
-level0_intr()
+static void
+level0_intr(void)
 {
 	u_int int0stat;
 
@@ -156,29 +184,23 @@ level0_intr()
 		printf("level0 stray interrupt?\n");
 }
 
-void
-enable_intr_5000()
+static void
+enable_intr_5000(void)
 {
-	volatile u_int *inten0 = (void *)NEWS5000_INTEN0;
-	volatile u_int *inten1 = (void *)NEWS5000_INTEN1;
 
-	*inten0 = NEWS5000_INT0_DMAC | NEWS5000_INT0_SONIC |
-		  NEWS5000_INT0_FDC;
-	*inten1 = NEWS5000_INT1_KBD | NEWS5000_INT1_SCC |
-		  NEWS5000_INT1_AUDIO0 | NEWS5000_INT1_AUDIO1 |
-		  NEWS5000_INT1_PARALLEL | NEWS5000_INT1_FB;
+	/* INT0 and INT1 has been enabled at attach */
+	/* INT2 -- It's not a time to enable timer yet. */
+	/* INT3 -- not used for NWS-5000 */
 
-	/* It's not a time to enable timer yet. */
-	/* *(volatile u_int *)NEWS5000_INTEN2 = 0; */
+	*(volatile u_int *)NEWS5000_INTEN4 = NEWS5000_INT4_APBUS;
+	*(volatile u_int *)NEWS5000_APBUS_INTMSK = 0xffff;
 
-	/* currently INT3-INT5 are not used */
-	*(volatile u_int *)NEWS5000_INTEN3 = 0;
-	*(volatile u_int *)NEWS5000_INTEN4 = 0;
+	/* INT5 -- currently ignored */
 	*(volatile u_int *)NEWS5000_INTEN5 = 0;
 }
 
-void
-disable_intr_5000()
+static void
+disable_intr_5000(void)
 {
 	*(volatile u_int *)NEWS5000_INTEN0 = 0;
 	*(volatile u_int *)NEWS5000_INTEN1 = 0;
@@ -188,7 +210,25 @@ disable_intr_5000()
 	*(volatile u_int *)NEWS5000_INTEN5 = 0;
 }
 
-void
+static void
+readmicrotime_5000(tvp)
+	struct timeval *tvp;
+{
+	u_int freerun;
+
+	*tvp = time;
+	freerun = *(volatile u_int *)NEWS5000_FREERUN;
+	freerun -= freerun_off;
+	if (freerun > 1000000)
+		freerun = 1000000;
+	tvp->tv_usec += freerun;
+	if (tvp->tv_usec >= 1000000) {
+		tvp->tv_usec -= 1000000;
+		tvp->tv_sec++;
+	}
+}
+
+static void
 readidrom_5000(rom)
 	u_char *rom;
 {
@@ -202,10 +242,17 @@ readidrom_5000(rom)
 extern struct idrom idrom;
 
 void
-news5000_init()
+news5000_init(void)
 {
 	enable_intr = enable_intr_5000;
 	disable_intr = disable_intr_5000;
 
 	readidrom_5000((u_char *)&idrom);
+	readmicrotime = readmicrotime_5000;
+	hostid = idrom.id_serial;
+
+	/* XXX reset uPD72067 FDC to avoid spurious interrupts */
+#define NEWS5000_FDC_FDOUT 0xbed20000
+#define FDO_FRST 0x04
+	*(volatile u_int8_t *)NEWS5000_FDC_FDOUT = FDO_FRST;
 }

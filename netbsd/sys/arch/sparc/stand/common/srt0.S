@@ -1,4 +1,4 @@
-/*	$NetBSD: srt0.S,v 1.4 1999/03/05 11:12:16 pk Exp $	*/
+/*	$NetBSD: srt0.S,v 1.7 2001/11/21 21:38:00 uwe Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -47,7 +47,6 @@
 	.file	"str0.s"
 
 	.comm	_C_LABEL(romp), 4
-	.comm	_C_LABEL(opf_romp), 4
 	.comm	_C_LABEL(cputyp), 4
 	.comm	_C_LABEL(nbpg), 4
 	.comm	_C_LABEL(pgofset), 4
@@ -64,13 +63,21 @@ start:
 	save	%o1, -CCFSZ, %sp
 
 	/*
-	 * Relocate.
+	 * Find which address we are at.
 	 */
 1:	call	2f
+	 sethi	%hi(1b), %l0
+2:	or	%l0, %lo(1b), %l0
+	cmp	%l0, %o7	! %o7 contains actual address of 1b
+	beq	4f		! already there, no need to relocate
 	 nop
-2:	add	%o7, (start-1b), %l0
+
+	/*
+	 * Relocate.
+	 */
+	add	%o7, (start-1b), %l0
 	set	start, %l1
-	set	_end, %o0
+	set	_edata, %o0
 	sub	%o0, %l1, %l2		! length
 3:	ld	[%l0], %o0
 	add	%l0, 4, %l0
@@ -79,6 +86,9 @@ start:
 	bg	3b
 	 add	%l1, 4, %l1
 
+	/*
+	 * Jump to our relocated self.
+	 */
 	set	4f, %g1
 	jmp	%g1
 	 nop
@@ -138,14 +148,22 @@ start:
 	mov	SUN4CM_PGSHIFT, %g5
 
 	/*
-	 * Save address of PROM vector (passed in %i0).
+	 * OpenProm machines pass PROM vector in %o0 (%i0 after save)
+	 * OpenFirm machines pass OF entry in %o3 (%i3 after save)
 	 */
+	cmp	%i0, 0
+	be	is_openfirm
+	 nop
+
+	! save address of PROM vector
 	sethi	%hi(_C_LABEL(romp)), %o1
 	st	%i0, [%o1 + %lo(_C_LABEL(romp))]
+	b,a	is_sun4cm
 
-	/* Also save %i3, which is the Openfirmware entry, if any */
-	sethi	%hi(_C_LABEL(opf_romp)), %o1
-	st	%i3, [%o1 + %lo(_C_LABEL(opf_romp))]
+is_openfirm:
+	! save address of OpenFirmware client interface handler
+	sethi	%hi(_C_LABEL(romp)), %o1
+	st	%i3, [%o1 + %lo(_C_LABEL(romp))]
 	b,a	is_sun4cm
 
 is_sun4:

@@ -1,4 +1,4 @@
-/* $NetBSD: vmevar.h,v 1.8.2.1 2000/06/29 23:33:10 thorpej Exp $ */
+/* $NetBSD: vmevar.h,v 1.9 2000/06/25 00:23:13 pk Exp $ */
 
 /*
  * Copyright (c) 1999

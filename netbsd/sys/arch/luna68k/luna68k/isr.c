@@ -1,5 +1,5 @@
-/* $NetBSD: isr.c,v 1.2 2000/02/21 20:38:48 erh Exp $ */
-/*	$NetBSD: isr.c,v 1.2 2000/02/21 20:38:48 erh Exp $	*/
+/* $NetBSD: isr.c,v 1.5 2000/07/09 08:08:20 nisimura Exp $ */
+/*	$NetBSD: isr.c,v 1.5 2000/07/09 08:08:20 nisimura Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -39,24 +39,16 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: isr.c,v 1.2 2000/02/21 20:38:48 erh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isr.c,v 1.5 2000/07/09 08:08:20 nisimura Exp $");
 
 /*
  * Link and dispatch interrupts.
  */
 
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/vmmeter.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -287,18 +279,7 @@ isrdispatch_vectored(pc, evec, frame)
 		printf("isrdispatch_vectored: vec 0x%x not claimed\n", vec);
 }
 
-/*
- * XXX Why on earth isn't this in a common file?!
- */
-void	netintr __P((void));
-void	arpintr __P((void));
-void	atintr __P((void));
-void	ipintr __P((void));
-void	ip6intr __P((void));
-void	nsintr __P((void));
-void	clnlintr __P((void));
-void	ccittintr __P((void));
-void	pppintr __P((void));
+void netintr __P((void));
 
 void
 netintr()

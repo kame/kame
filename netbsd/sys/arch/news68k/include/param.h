@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.2 2000/02/11 19:30:28 thorpej Exp $	*/
+/*	$NetBSD: param.h,v 1.5 2001/05/30 12:28:47 mrg Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -64,7 +64,7 @@
 #define NBSEG		(1 << SEGSHIFT)	/* bytes/segment */
 #define	SEGOFSET	(NBSEG-1)	/* byte offset into segment */
 
-#define	UPAGES		3		/* pages of u-area */
+#define	UPAGES		2		/* pages of u-area */
 
 #include <m68k/param.h>
 
@@ -74,7 +74,7 @@
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
  * logical pages.
  */
-#define	NKMEMPAGES_MIN_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MIN_DEFAULT	((3 * 1024 * 1024) >> PAGE_SHIFT)
 #define	NKMEMPAGES_MAX_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
 
 #if defined(_KERNEL) && !defined(_LOCORE)
@@ -84,7 +84,7 @@
 void	_delay __P((u_int));
 #endif /* _KERNEL && !_LOCORE */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_compat_hpux.h"
 #endif
 

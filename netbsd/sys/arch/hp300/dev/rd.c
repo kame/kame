@@ -1,4 +1,4 @@
-/*	$NetBSD: rd.c,v 1.43.4.1 2000/10/18 00:10:42 tv Exp $	*/
+/*	$NetBSD: rd.c,v 1.49 2002/04/08 21:41:44 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -81,6 +81,9 @@
 /*
  * CS80/SS80 disk driver
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rd.c,v 1.49 2002/04/08 21:41:44 gmcgarry Exp $");                                                  
 
 #include "opt_useleds.h"
 #include "rnd.h"
@@ -264,6 +267,7 @@ int	rdgetinfo __P((dev_t));
 void	rdrestart __P((void *));
 struct buf *rdfinish __P((struct rd_softc *, struct buf *));
 
+void	rdgetdefaultlabel __P((struct rd_softc *, struct disklabel *));
 void	rdrestart __P((void *));
 void	rdustart __P((struct rd_softc *));
 struct buf *rdfinish __P((struct rd_softc *, struct buf *));
@@ -333,7 +337,7 @@ rdattach(parent, self, aux)
 	/*
 	 * Initialize and attach the disk structure.
 	 */
-	bzero(&sc->sc_dkdev, sizeof(sc->sc_dkdev));
+	memset(&sc->sc_dkdev, 0, sizeof(sc->sc_dkdev));
 	sc->sc_dkdev.dk_name = sc->sc_dev.dv_xname;
 	disk_attach(&sc->sc_dkdev);
 
@@ -406,7 +410,7 @@ rdident(parent, sc, ha)
 	hpibsend(ctlr, slave, C_CMD, cmd, sizeof(cmd));
 	hpibrecv(ctlr, slave, C_EXEC, desc, 37);
 	hpibrecv(ctlr, slave, C_QSTAT, &stat, sizeof(stat));
-	bzero(name, sizeof(name)); 
+	memset(name, 0, sizeof(name)); 
 	if (stat == 0) {
 		n = desc->d_name;
 		for (i = 5; i >= 0; i--) {
@@ -442,21 +446,21 @@ rdident(parent, sc, ha)
 	 */
 	switch (ha->ha_id) {
 	case RD7946AID:
-		if (bcmp(name, "079450", 6) == 0)
+		if (memcmp(name, "079450", 6) == 0)
 			id = RD7945A;
 		else
 			id = RD7946A;
 		break;
 
 	case RD9134LID:
-		if (bcmp(name, "091340", 6) == 0)
+		if (memcmp(name, "091340", 6) == 0)
 			id = RD9134L;
 		else
 			id = RD9122D;
 		break;
 
 	case RD9134DID:
-		if (bcmp(name, "091220", 6) == 0)
+		if (memcmp(name, "091220", 6) == 0)
 			id = RD9122S;
 		else
 			id = RD9134D;
@@ -532,16 +536,8 @@ rdgetinfo(dev)
 	 * Set some default values to use while reading the label
 	 * or to use if there isn't a label.
 	 */
-	bzero((caddr_t)lp, sizeof *lp);
-	lp->d_type = DTYPE_HPIB;
-	lp->d_secsize = DEV_BSIZE;
-	lp->d_nsectors = 32;
-	lp->d_ntracks = 20;
-	lp->d_ncylinders = 1;
-	lp->d_secpercyl = 32*20;
-	lp->d_npartitions = 3;
-	lp->d_partitions[2].p_offset = 0;
-	lp->d_partitions[2].p_size = LABELSECTOR+1;
+	memset((caddr_t)lp, 0, sizeof *lp);
+	rdgetdefaultlabel(rs, lp);
 
 	/*
 	 * Now try to read the disklabel
@@ -965,7 +961,7 @@ rdstatus(rs)
 	rs->sc_rsc.c_sram = C_SRAM;
 	rs->sc_rsc.c_ram = C_RAM;
 	rs->sc_rsc.c_cmd = C_STATUS;
-	bzero((caddr_t)&rs->sc_stat, sizeof(rs->sc_stat));
+	memset((caddr_t)&rs->sc_stat, 0, sizeof(rs->sc_stat));
 	rv = hpibsend(c, s, C_CMD, &rs->sc_rsc, sizeof(rs->sc_rsc));
 	if (rv != sizeof(rs->sc_rsc)) {
 #ifdef DEBUG
@@ -1053,7 +1049,7 @@ rderror(unit)
 		return(1);
 
 	/*
-	 * First conjure up the block number at which the error occured.
+	 * First conjure up the block number at which the error occurred.
 	 * Note that not all errors report a block number, in that case
 	 * we just use b_blkno.
  	 */
@@ -1071,7 +1067,7 @@ rderror(unit)
 	 * Now output a generic message suitable for badsect.
 	 * Note that we don't use harderr cuz it just prints
 	 * out b_blkno which is just the beginning block number
-	 * of the transfer, not necessary where the error occured.
+	 * of the transfer, not necessary where the error occurred.
 	 */
 	printf("%s%c: hard error sn%d\n", rs->sc_dev.dv_xname,
 	    'a'+rdpart(bp->b_dev), pbn);
@@ -1191,8 +1187,46 @@ rdioctl(dev, cmd, data, flag, p)
 				       (struct cpu_disklabel *)0);
 		sc->sc_flags = flags;
 		return (error);
+
+	case DIOCGDEFLABEL:
+		rdgetdefaultlabel(sc, (struct disklabel *)data);
+		return (0);
 	}
 	return(EINVAL);
+}
+
+void
+rdgetdefaultlabel(sc, lp)
+	struct rd_softc *sc;
+	struct disklabel *lp;
+{
+	int type = sc->sc_type;
+
+	memset((caddr_t)lp, 0, sizeof(struct disklabel));
+
+	lp->d_type = DTYPE_HPIB;
+	lp->d_secsize = DEV_BSIZE;
+	lp->d_nsectors = rdidentinfo[type].ri_nbpt;
+	lp->d_ntracks = rdidentinfo[type].ri_ntpc;
+	lp->d_ncylinders = rdidentinfo[type].ri_ncyl;
+	lp->d_secperunit = rdidentinfo[type].ri_nblocks;
+	lp->d_secpercyl = lp->d_ntracks * lp->d_nsectors;
+	
+	strncpy(lp->d_typename, rdidentinfo[type].ri_desc, 16);
+	strncpy(lp->d_packname, "fictitious", 16);
+	lp->d_rpm = 3000;
+	lp->d_interleave = 1;
+	lp->d_flags = 0;
+
+	lp->d_partitions[RAW_PART].p_offset = 0;
+	lp->d_partitions[RAW_PART].p_size =
+	    lp->d_secperunit * (lp->d_secsize / DEV_BSIZE);
+	lp->d_partitions[RAW_PART].p_fstype = FS_UNUSED;
+	lp->d_npartitions = RAW_PART + 1;
+
+	lp->d_magic = DISKMAGIC;
+	lp->d_magic2 = DISKMAGIC;
+	lp->d_checksum = dkcksum(lp);
 }
 
 int

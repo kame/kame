@@ -1,4 +1,4 @@
-/*	$NetBSD: pm_direct.c,v 1.13.4.2 2000/09/28 19:04:32 scottr Exp $	*/
+/*	$NetBSD: pm_direct.c,v 1.19 2002/03/05 17:39:26 shiba Exp $	*/
 
 /*
  * Copyright (C) 1997 Takashi Hamada
@@ -252,7 +252,6 @@ pm_setup_adb()
 	switch (mac68k_machine.machineid) {
 		case MACH_MACPB140:
 		case MACH_MACPB145:
-		case MACH_MACPB150:
 		case MACH_MACPB160:
 		case MACH_MACPB165:
 		case MACH_MACPB165C:
@@ -261,6 +260,7 @@ pm_setup_adb()
 		case MACH_MACPB180C:
 			pmHardware = PM_HW_PB1XX;
 			break;
+		case MACH_MACPB150:
 		case MACH_MACPB210:
 		case MACH_MACPB230:
 		case MACH_MACPB250:
@@ -902,12 +902,12 @@ pm_pmgrop_mrg(pmdata)
 	u_int32_t rval=0;
 
 	asm("
-		movl	%1, a0
+		movl	%1,%%a0
 		.word	0xa085
-		movl	d0, %0"
+		movl	%%d0,%0"
 		: "=g" (rval)
 		: "g" (pmdata)
-		: "a0", "d0" );
+		: "a0","d0");
 
 	return rval;
 }
@@ -1050,10 +1050,11 @@ pm_adb_op(buffer, compRout, data, command)
 
 	PM_VIA_INTR_ENABLE();
 
-	/* wait until the PM interrupt is occured */
+	/* wait until the PM interrupt has occurred */
 	delay = 0x80000;
 	while (adbWaiting == 1) {
 		switch (mac68k_machine.machineid) {
+		case MACH_MACPB150:
 		case MACH_MACPB210:
 		case MACH_MACPB230:	/* daishi tested with Duo230 */
 		case MACH_MACPB250:

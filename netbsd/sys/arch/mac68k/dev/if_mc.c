@@ -1,4 +1,4 @@
-/*	$NetBSD: if_mc.c,v 1.15 1999/12/20 01:06:40 scottr Exp $	*/
+/*	$NetBSD: if_mc.c,v 1.19 2002/01/16 06:00:37 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997 David Huang <khym@bga.com>
@@ -76,7 +76,7 @@
 #include <netccitt/pk_extern.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include "bpfilter.h"
 #if NBPFILTER > 0
@@ -176,9 +176,6 @@ mcsetup(sc, lladdr)
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
 	ifp->if_watchdog = mcwatchdog;
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	if_attach(ifp);
 	ether_ifattach(ifp, lladdr);
 
@@ -627,9 +624,6 @@ mace_read(sc, pkt, len)
 	int len;
 {
 	struct ifnet *ifp = &sc->sc_if;
-#if NBPFILTER > 0
-	struct ether_header *eh = (struct ether_header *)pkt;
-#endif
 	struct mbuf *m;
 
 	if (len <= sizeof(struct ether_header) ||
@@ -642,20 +636,6 @@ mace_read(sc, pkt, len)
 		return;
 	}
 
-#if NBPFILTER > 0
-	/*
-	 * Check if there's a bpf filter listening on this interface.
-	 * If so, hand off the raw packet to enet, then discard things
-	 * not destined for us (but be sure to keep broadcast/multicast).
-	 */
-	if (ifp->if_bpf) {
-		bpf_tap(ifp->if_bpf, pkt, len);
-		if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    ETHER_CMP(eh->ether_dhost, sc->sc_enaddr))
-			return;
-	}
-#endif
 	m = mace_get(sc, pkt, len);
 	if (m == NULL) {
 		ifp->if_ierrors++;
@@ -663,6 +643,12 @@ mace_read(sc, pkt, len)
 	}
 
 	ifp->if_ipackets++;
+
+#if NBPFILTER > 0
+	/* Pass the packet to any BPF listeners. */
+	if (ifp->if_bpf) 
+		bpf_mtap(ifp->if_bpf, m);
+#endif
 
 	/* Pass the packet up. */
 	(*ifp->if_input)(ifp, m);

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_en.c,v 1.9.4.1 2000/07/19 02:53:05 mrg Exp $	*/
+/*	$NetBSD: if_en.c,v 1.14 2002/03/20 20:39:15 eeh Exp $	*/
 
 /*
  *
@@ -42,9 +42,11 @@
  * SBUS glue for the eni155s card.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_en.c,v 1.14 2002/03/20 20:39:15 eeh Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/device.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
@@ -130,10 +132,11 @@ en_sbus_attach(parent, self, aux)
 
 	printf("\n");
 
-	if (bus_space_map2(sa->sa_bustag, sa->sa_slot,
+	if (sbus_bus_map(sa->sa_bustag,
+			 sa->sa_slot,
 			 sa->sa_offset,
 			 4*1024*1024,
-			 0, 0, &sc->en_base) != 0) {
+			 0, &sc->en_base) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}

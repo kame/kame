@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_proc.c,v 1.41.4.2 2002/04/26 17:56:40 he Exp $	*/
+/*	$NetBSD: kern_proc.c,v 1.47 2002/04/12 17:02:33 christos Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -71,6 +71,9 @@
  *
  *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kern_proc.c,v 1.47 2002/04/12 17:02:33 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -179,20 +182,23 @@ procinit()
 	LIST_INIT(&deadproc);
 	simple_lock_init(&deadproc_slock);
 
-	pidhashtbl = hashinit(maxproc / 4, M_PROC, M_WAITOK, &pidhash);
-	pgrphashtbl = hashinit(maxproc / 4, M_PROC, M_WAITOK, &pgrphash);
-	uihashtbl = hashinit(maxproc / 16, M_PROC, M_WAITOK, &uihash);
+	pidhashtbl =
+	    hashinit(maxproc / 4, HASH_LIST, M_PROC, M_WAITOK, &pidhash);
+	pgrphashtbl =
+	    hashinit(maxproc / 4, HASH_LIST, M_PROC, M_WAITOK, &pgrphash);
+	uihashtbl =
+	    hashinit(maxproc / 16, HASH_LIST, M_PROC, M_WAITOK, &uihash);
 
 	pool_init(&proc_pool, sizeof(struct proc), 0, 0, 0, "procpl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_PROC);
+	    &pool_allocator_nointr);
 	pool_init(&pgrp_pool, sizeof(struct pgrp), 0, 0, 0, "pgrppl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_PGRP);
+	    &pool_allocator_nointr);
 	pool_init(&pcred_pool, sizeof(struct pcred), 0, 0, 0, "pcredpl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_SUBPROC);
+	    &pool_allocator_nointr);
 	pool_init(&plimit_pool, sizeof(struct plimit), 0, 0, 0, "plimitpl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_SUBPROC);
+	    &pool_allocator_nointr);
 	pool_init(&rusage_pool, sizeof(struct rusage), 0, 0, 0, "rusgepl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_ZOMBIE);
+	    &pool_allocator_nointr);
 }
 
 /*
@@ -201,15 +207,13 @@ procinit()
 void
 proclist_lock_read()
 {
-	int error, s;
+	int error;
 
-	s = splclock();
 	error = spinlockmgr(&proclist_lock, LK_SHARED, NULL);
 #ifdef DIAGNOSTIC
 	if (__predict_false(error != 0))
 		panic("proclist_lock_read: failed to acquire lock");
 #endif
-	splx(s);
 }
 
 /*
@@ -218,11 +222,8 @@ proclist_lock_read()
 void
 proclist_unlock_read()
 {
-	int s;
 
-	s = splclock();
 	(void) spinlockmgr(&proclist_lock, LK_RELEASE, NULL);
-	splx(s);
 }
 
 /*
@@ -231,7 +232,7 @@ proclist_unlock_read()
 int
 proclist_lock_write()
 {
-	int error, s;
+	int s, error;
 
 	s = splclock();
 	error = spinlockmgr(&proclist_lock, LK_EXCLUSIVE, NULL);

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap3x.h,v 1.10 1998/06/09 19:58:50 gwr Exp $	*/
+/*	$NetBSD: pmap3x.h,v 1.16 2001/09/10 21:19:27 chris Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -44,7 +44,7 @@
 struct pmap {
 	struct a_tmgr_struct	*pm_a_tmgr; 	/* Level-A table manager */
 	u_long              	pm_a_phys;  	/* MMU level-A phys addr */
-	simple_lock_data_t	pm_lock;    	/* lock on pmap */
+	struct simplelock	pm_lock;    	/* lock on pmap */
 	int             	pm_refcount;	/* reference count */
 	int             	pm_version;
 };
@@ -65,8 +65,10 @@ segsz_t pmap_count __P((pmap_t, int));
 /* We use the PA plus some low bits for device mmap. */
 #define pmap_phys_address(addr) 	(addr)
 
+#define	pmap_update(pmap)		/* nothing (yet) */
+
 /* Map a given physical region to a virtual region */
-vm_offset_t pmap_map __P((vm_offset_t, vm_offset_t, vm_offset_t, int));
+vaddr_t pmap_map __P((vaddr_t, paddr_t, paddr_t, int));
 
 /*
  * Flags to tell pmap_enter `this is not to be cached', etc.

@@ -1,4 +1,4 @@
-/* $NetBSD: bootxx.c,v 1.9.2.1 2000/07/27 16:48:26 matt Exp $ */
+/* $NetBSD: bootxx.c,v 1.16 2002/03/29 05:45:08 matt Exp $ */
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -43,6 +43,7 @@
 #include "lib/libsa/stand.h"
 #include "lib/libsa/ufs.h"
 #include "lib/libsa/cd9660.h"
+#include "lib/libsa/ustarfs.h"
 
 #include "lib/libkern/libkern.h"
 
@@ -64,6 +65,8 @@
 
 #include "../boot/data.h"
 
+#define	RF_PROTECTED_SECTORS	64	/* XXX refer to <.../rf_optnames.h> */
+
 void	Xmain(void);
 void	hoppabort(int);
 void	romread_uvax(int lbn, int size, void *buf, struct rpb *rpb);
@@ -80,6 +83,7 @@ int	vax_cputype;
 int	vax_load_failure;
 struct udadevice {u_short udaip;u_short udasa;};
 volatile struct udadevice *csr;
+static int moved;
 
 extern int from;
 #define	FROM750	1
@@ -101,7 +105,7 @@ Xmain()
 	u_long entry;
 
 	vax_cputype = (mfpr(PR_SID) >> 24) & 0xFF;
-
+	moved = 0;
 	/*
 	 */ 
 	rpb = (void *)0xf0000; /* Safe address right now */
@@ -185,9 +189,13 @@ die:
  * - Must be the first file on tape.
  */
 struct fs_ops file_system[] = {
+#ifdef NEED_UFS
 	{ ufs_open, 0, ufs_read, 0, 0, ufs_stat },
+#endif
+#ifdef NEED_CD9660
 	{ cd9660_open, 0, cd9660_read, 0, 0, cd9660_stat },
-#if 0
+#endif
+#ifdef NEED_USTARFS
 	{ ustarfs_open, 0, ustarfs_read, 0, 0, ustarfs_stat },
 #endif
 };
@@ -239,7 +247,7 @@ devopen(f, fname, file)
 	/*
 	 * Reinit the VMB boot device.
 	 */
-	if (bqo->unit_init) {
+	if (bqo->unit_init && (moved++ == 0)) {
 		int initfn;
 
 		initfn = rpb->iovec + bqo->unit_init;
@@ -262,6 +270,8 @@ devopen(f, fname, file)
 	return 0;
 }
 
+extern struct disklabel romlabel;
+
 int
 romstrategy(sc, func, dblk, size, buf, rsize)
 	void    *sc;
@@ -273,6 +283,15 @@ romstrategy(sc, func, dblk, size, buf, rsize)
 {
 	int	block = dblk;
 	int     nsize = size;
+
+	if (romlabel.d_magic == DISKMAGIC && romlabel.d_magic2 == DISKMAGIC) {
+		if (romlabel.d_npartitions > 1) {
+			block += romlabel.d_partitions[0].p_offset;
+			if (romlabel.d_partitions[0].p_fstype == FS_RAID) {
+				block += RF_PROTECTED_SECTORS;
+			}
+		}
+	}
 
 	if (from == FROMMV) {
 		romread_uvax(block, size, buf, rpb);
@@ -329,7 +348,11 @@ hpread(int bn)
 	/*
 	 * Avoid four subroutine calls by using hardware division.
 	 */
-	asm("clrl r1;movl %3,r0;ediv %4,r0,%0,%1;movl %1,r0;ediv %5,r0,%2,%1"
+	asm("clrl %%r1;"
+	    "movl %3,%%r0;"
+	    "ediv %4,%%r0,%0,%1;"
+	    "movl %1,%%r0;"
+	    "ediv %5,%%r0,%2,%1"
 	    : "=g"(cn),"=g"(sn),"=g"(tn)
 	    : "g"(bn),"g"(dp->d_secpercyl),"g"(dp->d_nsectors)
 	    : "r0","r1","cc");
@@ -373,3 +396,31 @@ romclose(f)
 {
 	return 0;
 }
+
+#ifdef USE_PRINTF
+void
+putchar(int ch)
+{
+	/*
+	 * On KA88 we may get C-S/C-Q from the console.
+	 * Must obey it.
+	 */
+	while (mfpr(PR_RXCS) & GC_DON) {
+		if ((mfpr(PR_RXDB) & 0x7f) == 19) {
+			while (1) {
+				while ((mfpr(PR_RXCS) & GC_DON) == 0)
+					;
+				if ((mfpr(PR_RXDB) & 0x7f) == 17)
+					break;
+			}
+		}
+	}
+
+	while ((mfpr(PR_TXCS) & GC_RDY) == 0)
+		;
+	mtpr(0, PR_TXCS);
+	mtpr(ch & 0377, PR_TXDB);
+	if (ch == 10)
+		putchar(13);
+}
+#endif

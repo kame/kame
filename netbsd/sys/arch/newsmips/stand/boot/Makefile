@@ -1,24 +1,26 @@
-#	$NetBSD: Makefile,v 1.8 2000/02/01 05:25:43 tsutsui Exp $
+#	$NetBSD: Makefile,v 1.13 2002/04/13 08:04:41 tsutsui Exp $
 
 S= ${.CURDIR}/../../../..
 
 PROG= boot
 SRCS= locore.S boot.c bootinfo.c devopen.c net.c netif_news.c
-MKMAN= no
+NOMAN= # defined
 STRIPFLAG=
 BINMODE= 444
 
-OBJCOPY?= objcopy
 SIZE?= size
 STRIP?= strip
 
-COMMON!=  cd ${.CURDIR}/../common && ${MAKE} print-objdir
+.include <bsd.own.mk>
+
+COMMON!=  cd ${.CURDIR}/../common && ${PRINTOBJDIR}
 
 CLEANFILES+= ${PROG}.elf ${PROG}.tmp
 
 LDFLAGS= -x -N -Ttext a0700000 -e _start
-CFLAGS= -Os -G 0 -mno-abicalls -Wall
+CFLAGS= -Os -mmemcpy -mno-abicalls -G 0 -Wall
 
+CPPFLAGS+= -DSUPPORT_USTARFS -DHAVE_CHANGEDISK_HOOK
 CPPFLAGS+= -DSUN_BOOTPARAMS
 CPPFLAGS+= -D_STANDALONE #-DBOOT_DEBUG
 CPPFLAGS+= -I${.CURDIR} -I${COMMON} -I${S}

@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.60 2000/03/06 21:36:12 thorpej Exp $	*/
+/*	$NetBSD: zs.c,v 1.64 2001/09/05 14:03:49 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -43,6 +43,8 @@
  * Plain tty/async lines use the zs_async slave.
  * Sun keyboard/mouse uses the zs_kbd/zs_ms slaves.
  */
+
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -219,15 +221,20 @@ zs_match(parent, cf, aux)
 	void *aux;
 {
 	struct confargs *ca = aux;
-	int unit = cf->cf_unit;
+	int unit;
 	void *va;
 
 	/*
 	 * This driver only supports its wired-in mappings,
 	 * because the console support depends on those.
 	 */
-	if (ca->ca_paddr != zs_physaddr[unit])
+	if (ca->ca_paddr == zs_physaddr[0]) {
+		unit = 0;
+	} else if (ca->ca_paddr == zs_physaddr[1]) {
+		unit = 1;
+	} else {
 		return (0);
+	}
 
 	/* Make sure zs_init() found mappings. */
 	va = zsaddr[unit];
@@ -291,8 +298,8 @@ zs_attach(parent, self, aux)
 		cs->cs_reg_csr  = &zc->zc_csr;
 		cs->cs_reg_data = &zc->zc_data;
 
-		bcopy(zs_init_reg, cs->cs_creg, 16);
-		bcopy(zs_init_reg, cs->cs_preg, 16);
+		memcpy(cs->cs_creg, zs_init_reg, 16);
+		memcpy(cs->cs_preg, zs_init_reg, 16);
 
 		/* XXX: Get these from the EEPROM instead? */
 		/* XXX: See the mvme167 code.  Better. */
@@ -392,8 +399,8 @@ static int
 zshard(arg)
 	void *arg;
 {
-	register struct zsc_softc *zsc;
-	register int unit, rval, softreq;
+	struct zsc_softc *zsc;
+	int unit, rval, softreq;
 
 	rval = softreq = 0;
 	for (unit = 0; unit < zsc_cd.cd_ndevs; unit++) {
@@ -420,8 +427,8 @@ static int
 zssoft(arg)
 	void *arg;
 {
-	register struct zsc_softc *zsc;
-	register int s, unit;
+	struct zsc_softc *zsc;
+	int s, unit;
 
 	/* This is not the only ISR on this IPL. */
 	if (zssoftpending == 0)
@@ -573,7 +580,7 @@ zs_write_reg(cs, reg, val)
 u_char zs_read_csr(cs)
 	struct zs_chanstate *cs;
 {
-	register u_char val;
+	u_char val;
 
 	val = *cs->cs_reg_csr;
 	ZS_DELAY();
@@ -591,7 +598,7 @@ void  zs_write_csr(cs, val)
 u_char zs_read_data(cs)
 	struct zs_chanstate *cs;
 {
-	register u_char val;
+	u_char val;
 
 	val = *cs->cs_reg_data;
 	ZS_DELAY();
@@ -622,7 +629,7 @@ void
 zs_abort(cs)
 	struct zs_chanstate *cs;
 {
-	register volatile struct zschan *zc = zs_conschan;
+	volatile struct zschan *zc = zs_conschan;
 	int rr0;
 
 	/* Wait for end of break to avoid PROM abort. */
@@ -643,8 +650,8 @@ int
 zs_getc(arg)
 	void *arg;
 {
-	register volatile struct zschan *zc = arg;
-	register int s, c, rr0;
+	volatile struct zschan *zc = arg;
+	int s, c, rr0;
 
 	s = splhigh();
 	/* Wait for a character to arrive. */
@@ -672,8 +679,8 @@ zs_putc(arg, c)
 	void *arg;
 	int c;
 {
-	register volatile struct zschan *zc = arg;
-	register int s, rr0;
+	volatile struct zschan *zc = arg;
+	int s, rr0;
 
 	s = splhigh();
 	/* Wait for transmitter to become ready. */

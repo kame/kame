@@ -1,4 +1,4 @@
-/* $NetBSD: dec_3100.c,v 1.30.2.1 2001/02/03 20:37:17 he Exp $ */
+/* $NetBSD: dec_3100.c,v 1.35 2001/09/18 16:15:19 tsutsui Exp $ */
 
 /*
  * Copyright (c) 1998 Jonathan Stone.  All rights reserved.
@@ -118,7 +118,7 @@ dec_3100_init()
 	splvec.splbio = MIPS_SPL0;
 	splvec.splnet = MIPS_SPL_0_1;
 	splvec.spltty = MIPS_SPL_0_1_2;
-	splvec.splimp = MIPS_SPLHIGH;				/* ??? */
+	splvec.splvm = MIPS_SPLHIGH;				/* ??? */
 	splvec.splclock = MIPS_SPL_0_1_2_3;
 	splvec.splstatclock = MIPS_SPL_0_1_2_3;
 
@@ -133,7 +133,7 @@ dec_3100_init()
 }
 
 /*
- * Initalize the memory system and I/O buses.
+ * Initialize the memory system and I/O buses.
  */
 static void
 dec_3100_bus_reset()
@@ -195,7 +195,7 @@ dec_3100_intr(status, cause, pc, ipending)
 		cf.pc = pc;
 		cf.sr = status;
 		hardclock(&cf);
-		intrcnt[HARDCLOCK]++;
+		pmax_clock_evcnt.ev_count++;
 
 		/* keep clock interrupts enabled when we return */
 		cause &= ~MIPS_INT_MASK_3;
@@ -210,7 +210,7 @@ dec_3100_intr(status, cause, pc, ipending)
 
 	if (ipending & MIPS_INT_MASK_4) {
 		dec_3100_errintr();
-		intrcnt[ERROR_INTR]++;
+		pmax_memerr_evcnt.ev_count++;
 	}
 	_splset(MIPS_SR_INT_IE | (status & ~cause & MIPS_HARD_INT_MASK));
 }

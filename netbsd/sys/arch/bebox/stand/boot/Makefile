@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.9 2000/01/23 17:04:04 mycroft Exp $
+#	$NetBSD: Makefile,v 1.16 2002/04/09 16:05:37 sakamoto Exp $
 
 S= ${.CURDIR}/../../../..
 
@@ -10,7 +10,7 @@ CSRCS+= boot.c clock.c com.c conf.c cons.c cpu.c devopen.c
 CSRCS+= fd.c filesystem.c inkernel.c io.c tgets.c prf.c monitor.c
 CSRCS+= kbd.c ns16550.c vreset.c vga.c video.c
 
-CLEANFILES+= vers.c vers.o ${BOOTPROG} ${.CURDIR}/lib
+CLEANFILES+= vers.c vers.o ${BOOTPROG}
 
 CPPFLAGS= -I${.CURDIR} -I${.CURDIR}/../elf2pef -I${.CURDIR}/../../..
 CPPFLAGS+= -I${S} -I${S}/lib/libsa
@@ -23,8 +23,9 @@ CPPFLAGS+= -DCONS_VGA
 AOBJS=	${ASRCS:.s=.o}
 COBJS=	${CSRCS:.c=.o}
 OBJS=	${AOBJS} ${COBJS}
+CFLAGS= -Wno-main
 AFLAGS= -x assembler-with-cpp -traditional-cpp
-MKMAN=	no
+NOMAN=	# defined
 STRIPFLAG=
 BINMODE= 444
 
@@ -52,16 +53,19 @@ SAMISCMAKEFLAGS= SA_USE_CREAD=yes SA_USE_LOADFILE=yes
 .include "${S}/lib/libsa/Makefile.inc"
 LIBSA=		${SALIB}
 
+.PHONY: vers.c
+vers.c: version
+	sh ${S}/conf/newvers_stand.sh ${.CURDIR}/version "bebox" ${NEWVERSWHAT}
+
 realall: ${BOOTPROG}
 
-${BOOTPROG}: ${OBJS} ${LIBSA} ${LIBZ} ${LIBKERN}
-	sh ${.CURDIR}/../newvers.sh ${.CURDIR}/version ${NEWVERSWHAT}
-	${COMPILE.c} vers.c
-	${LD} -o ${BOOTPROG} -s -N -T ld.script -Ttext ${RELOC} ${OBJS} \
+${BOOTPROG}: ${OBJS} ${LIBSA} ${LIBZ} ${LIBKERN} vers.o
+	${LD} -o ${BOOTPROG} -s -N -T ${.CURDIR}/ld.script -Ttext ${RELOC} ${OBJS} \
 		${LIBSA} ${LIBZ} ${LIBKERN} vers.o
 
-remake: cleanobjs all
-cleanobjs:
-	rm -f ${OBJS}
+cleandir distclean: cleanlibdir
+
+cleanlibdir:
+	rm -rf lib
 
 .include <bsd.prog.mk>

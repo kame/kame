@@ -1,4 +1,4 @@
-/* $NetBSD: pckbc_isa.c,v 1.2 2000/03/23 07:01:35 thorpej Exp $ */
+/* $NetBSD: pckbc_isa.c,v 1.7 2002/01/12 16:21:07 tsutsui Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -30,6 +30,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pckbc_isa.c,v 1.7 2002/01/12 16:21:07 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -76,14 +79,31 @@ pckbc_isa_match(parent, match, aux)
 	bus_space_handle_t ioh_d, ioh_c;
 	int res, ok = 1;
 
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
 	/* If values are hardwired to something that they can't be, punt. */
-	if ((ia->ia_iobase != IOBASEUNK && ia->ia_iobase != IO_KBD) ||
-	    ia->ia_maddr != MADDRUNK ||
-	    (ia->ia_irq != IRQUNK && ia->ia_irq != 1 /* XXX */) ||
-	    ia->ia_drq != DRQUNK)
+	if (ia->ia_nio < 1 ||
+	    (ia->ia_io[0].ir_addr != ISACF_PORT_DEFAULT &&
+	     ia->ia_io[0].ir_addr != IO_KBD))
+		return (0);
+
+	if (ia->ia_niomem > 0 &&
+	    (ia->ia_iomem[0].ir_addr != ISACF_IOMEM_DEFAULT))
+		return (0);
+
+	if (ia->ia_nirq < 1 ||
+	    (ia->ia_irq[0].ir_irq != ISACF_IRQ_DEFAULT &&
+	     ia->ia_irq[0].ir_irq != 1 /*XXX*/))
+		return (0);
+
+	if (ia->ia_ndrq > 0 &&
+	    (ia->ia_drq[0].ir_drq != ISACF_DRQ_DEFAULT))
 		return (0);
 
 	if (pckbc_is_console(iot, IO_KBD) == 0) {
+		struct pckbc_internal t;
+
 		if (bus_space_map(iot, IO_KBD + KBDATAP, 1, 0, &ioh_d))
 			return (0);
 		if (bus_space_map(iot, IO_KBD + KBCMDP, 1, 0, &ioh_c)) {
@@ -91,15 +111,20 @@ pckbc_isa_match(parent, match, aux)
 			return (0);
 		}
 
+		memset(&t, 0, sizeof(t));
+		t.t_iot = iot;
+		t.t_ioh_d = ioh_d;
+		t.t_ioh_c = ioh_c;
+
 		/* flush KBC */
-		(void) pckbc_poll_data1(iot, ioh_d, ioh_c, PCKBC_KBD_SLOT, 0);
+		(void) pckbc_poll_data1(&t, PCKBC_KBD_SLOT, 0);
 
 		/* KBC selftest */
 		if (pckbc_send_cmd(iot, ioh_c, KBC_SELFTEST) == 0) {
 			ok = 0;
 			goto out;
 		}
-		res = pckbc_poll_data1(iot, ioh_d, ioh_c, PCKBC_KBD_SLOT, 0);
+		res = pckbc_poll_data1(&t, PCKBC_KBD_SLOT, 0);
 		if (res != 0x55) {
 			printf("kbc selftest: %x\n", res);
 			ok = 0;
@@ -110,9 +135,13 @@ pckbc_isa_match(parent, match, aux)
 	}
 
 	if (ok) {
-		ia->ia_iobase = IO_KBD;
-		ia->ia_iosize = 5;
-		ia->ia_msize = 0x0;
+		ia->ia_io[0].ir_addr = IO_KBD;
+		ia->ia_io[0].ir_size = 5;
+		ia->ia_nio = 1;
+
+		ia->ia_niomem = 0;
+		ia->ia_nirq = 0;
+		ia->ia_ndrq = 0;
 	}
 	return (ok);
 }
@@ -132,13 +161,25 @@ pckbc_isa_attach(parent, self, aux)
 	isc->sc_ic = ia->ia_ic;
 	iot = ia->ia_iot;
 
-	/*
-	 * Set up IRQs for "normal" ISA.
-	 *
-	 * XXX The "aux" slot is different (9) on the Alpha AXP150 Jensen.
-	 */
-	isc->sc_irq[PCKBC_KBD_SLOT] = 1;
-	isc->sc_irq[PCKBC_AUX_SLOT] = 12;
+	switch (ia->ia_nirq) {
+	case 1:
+		/* Both channels use the same IRQ. */
+		isc->sc_irq[PCKBC_KBD_SLOT] =
+		    isc->sc_irq[PCKBC_AUX_SLOT] = ia->ia_irq[0].ir_irq;
+		break;
+
+	case 2:
+		/* First IRQ is kbd, second IRQ is aux port. */
+		isc->sc_irq[PCKBC_KBD_SLOT] = ia->ia_irq[0].ir_irq;
+		isc->sc_irq[PCKBC_AUX_SLOT] = ia->ia_irq[1].ir_irq;
+		break;
+
+	default:
+		/* Set up IRQs for "normal" ISA. */
+		isc->sc_irq[PCKBC_KBD_SLOT] = 1;
+		isc->sc_irq[PCKBC_AUX_SLOT] = 12;
+		break;
+	}
 
 	sc->intr_establish = pckbc_isa_intr_establish;
 
@@ -153,8 +194,8 @@ pckbc_isa_attach(parent, self, aux)
 		    bus_space_map(iot, IO_KBD + KBCMDP, 1, 0, &ioh_c))
 			panic("pckbc_attach: couldn't map");
 
-		t = malloc(sizeof(struct pckbc_internal), M_DEVBUF, M_WAITOK);
-		bzero(t, sizeof(struct pckbc_internal));
+		t = malloc(sizeof(struct pckbc_internal), M_DEVBUF,
+		    M_WAITOK|M_ZERO);
 		t->t_iot = iot;
 		t->t_ioh_d = ioh_d;
 		t->t_ioh_c = ioh_c;

@@ -1,4 +1,4 @@
-/*	$NetBSD: ibcs2_stat.c,v 1.14.4.1 2000/08/30 03:59:20 sommerfeld Exp $	*/
+/*	$NetBSD: ibcs2_stat.c,v 1.19.6.4 2002/08/09 22:37:14 lukem Exp $	*/
 /*
  * Copyright (c) 1995, 1998 Scott Bartram
  * All rights reserved.
@@ -26,6 +26,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ibcs2_stat.c,v 1.19.6.4 2002/08/09 22:37:14 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -39,8 +42,6 @@
 #include <sys/malloc.h>
 #include <sys/vnode.h>
 #include <sys/syscallargs.h>
-
-#include <vm/vm.h>
 
 #include <compat/ibcs2/ibcs2_types.h>
 #include <compat/ibcs2/ibcs2_fcntl.h>
@@ -86,6 +87,11 @@ cvt_statfs(sp, buf, len)
 {
 	struct ibcs2_statfs ssfs;
 
+	if (len < 0)
+		return (EINVAL);
+	if (len > sizeof(ssfs))
+		len = sizeof(ssfs);
+
 	memset(&ssfs, 0, sizeof ssfs);
 	ssfs.f_fstyp = 0;
 	ssfs.f_bsize = sp->f_bsize;
@@ -107,6 +113,11 @@ cvt_statvfs(sp, buf, len)
 {
 	struct ibcs2_statvfs ssvfs;
 
+	if (len < 0)
+		return (EINVAL);
+	if (len > sizeof(ssvfs))
+		len = sizeof(ssvfs);
+
 	memset(&ssvfs, 0, sizeof ssvfs);
 	ssvfs.f_frsize = ssvfs.f_bsize = sp->f_bsize;
 	ssvfs.f_blocks = sp->f_blocks;
@@ -121,7 +132,7 @@ cvt_statvfs(sp, buf, len)
 	ssvfs.f_namemax = PATH_MAX;
 	ssvfs.f_fstr[0] = 0;
 	return copyout((caddr_t)&ssvfs, buf, len);
-}	
+}
 
 int
 ibcs2_sys_statfs(p, v, retval)
@@ -139,9 +150,9 @@ ibcs2_sys_statfs(p, v, retval)
 	struct statfs *sp;
 	int error;
 	struct nameidata nd;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	IBCS2_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -199,9 +210,9 @@ ibcs2_sys_statvfs(p, v, retval)
 	struct statfs *sp;
 	int error;
 	struct nameidata nd;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	IBCS2_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -259,9 +270,9 @@ ibcs2_sys_stat(p, v, retval)
 	struct ibcs2_stat ibcs2_st;
 	struct sys___stat13_args cup;
 	int error;
-	caddr_t sg = stackgap_init(p->p_emul);
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(st));
-	IBCS2_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	caddr_t sg = stackgap_init(p, 0);
+	SCARG(&cup, ub) = stackgap_alloc(p, &sg, sizeof(st));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	SCARG(&cup, path) = SCARG(uap, path);
 
 	if ((error = sys___stat13(p, &cup, retval)) != 0)
@@ -287,10 +298,10 @@ ibcs2_sys_lstat(p, v, retval)
 	struct ibcs2_stat ibcs2_st;
 	struct sys___lstat13_args cup;
 	int error;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
-	SCARG(&cup, ub) = stackgap_alloc(&sg, sizeof(st));
-	IBCS2_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	SCARG(&cup, ub) = stackgap_alloc(p, &sg, sizeof(st));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	SCARG(&cup, path) = SCARG(uap, path);
 
 	if ((error = sys___lstat13(p, &cup, retval)) != 0)
@@ -316,10 +327,10 @@ ibcs2_sys_fstat(p, v, retval)
 	struct ibcs2_stat ibcs2_st;
 	struct sys___fstat13_args cup;
 	int error;
-	caddr_t sg = stackgap_init(p->p_emul);
+	caddr_t sg = stackgap_init(p, 0);
 
 	SCARG(&cup, fd) = SCARG(uap, fd);
-	SCARG(&cup, sb) = stackgap_alloc(&sg, sizeof(st));
+	SCARG(&cup, sb) = stackgap_alloc(p, &sg, sizeof(st));
 	if ((error = sys___fstat13(p, &cup, retval)) != 0)
 		return error;
 	if ((error = copyin(SCARG(&cup, sb), &st, sizeof(st))) != 0)

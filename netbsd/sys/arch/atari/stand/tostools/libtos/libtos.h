@@ -1,4 +1,4 @@
-/*	$NetBSD: libtos.h,v 1.1.1.1 1996/01/07 21:50:49 leo Exp $	*/
+/*	$NetBSD: libtos.h,v 1.4 2002/02/24 20:51:08 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 Waldi Ravens.
@@ -30,8 +30,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef LIBTOS_H
-#define LIBTOS_H
+#ifndef _LIBTOS_H
+#define _LIBTOS_H
 
 #ifdef __STDC__
 #define	PROTO(x)	x
@@ -51,20 +51,34 @@
 
 #include <sys/types.h>
 #include <stdarg.h>
-#include "kparamb.h"
 
+#ifndef int8_t
+/*
+ * My TOS/MiNT installation does not define these (Leo 09/10/2001).
+ */
+typedef	unsigned char	u_int8_t;
+typedef	unsigned short	u_int16_t;
+typedef	unsigned long	u_int32_t;
+#endif /* int8_t */
+
+struct kparamb;
+struct osdsc;
+
+EXTERN int	aout_load	 PROTO((int, struct osdsc *, char **, int));
 EXTERN void	bsd_startup      PROTO((struct kparamb *)) NORETURN;
-EXTERN void	init_toslib      PROTO((char *));
-EXTERN void	redirect_output  PROTO((char *));
+EXTERN int	elf_load	 PROTO((int, struct osdsc *, char **, int));
 EXTERN int	eprintf          PROTO((char *, ...));
-EXTERN int	veprintf         PROTO((char *, va_list));
-EXTERN void	set_wait_for_key PROTO((void));
-EXTERN void	press_any_key    PROTO((void));
-EXTERN int	key_wait         PROTO((char *));
-EXTERN void	xexit            PROTO((int)) NORETURN;
 EXTERN void	error            PROTO((int, char *, ...));
 EXTERN void	fatal            PROTO((int, char *, ...)) NORETURN;
+EXTERN void	init_toslib      PROTO((char *));
+EXTERN int	key_wait         PROTO((char *));
+EXTERN void	press_any_key    PROTO((void));
+EXTERN void	redirect_output  PROTO((char *));
+EXTERN void	set_wait_for_key PROTO((void));
+EXTERN void	sys_info	 PROTO((struct osdsc *));
+EXTERN int	veprintf         PROTO((char *, va_list));
+EXTERN void	xexit            PROTO((int)) NORETURN;
 EXTERN void *	xmalloc          PROTO((size_t));
 EXTERN void *	xrealloc         PROTO((void *, size_t));
 
-#endif	/* LIBTOS_H */
+#endif	/* !_LIBTOS_H */

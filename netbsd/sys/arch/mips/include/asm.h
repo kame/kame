@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.23.2.2 2001/06/07 15:58:51 he Exp $	*/
+/*	$NetBSD: asm.h,v 1.32 2002/05/13 06:11:52 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -58,6 +58,7 @@
 #ifndef _MIPS_ASM_H
 #define _MIPS_ASM_H
 
+#include <machine/cdefs.h>	/* for API selection */
 #include <mips/regdef.h>
 
 /*
@@ -69,15 +70,16 @@
 	.set	push;						\
 	.set	noreorder;					\
 	.set	noat;						\
-	sw	t9,-4(sp);					\
+	subu	sp,sp,16;					\
+	sw	t9,12(sp);					\
 	move	AT,ra;						\
 	lui	t9,%hi(_mcount); 				\
 	addiu	t9,t9,%lo(_mcount);				\
 	jalr	t9;						\
-	subu	sp,sp,16;					\
+	nop;							\
 	lw	t9,4(sp);					\
 	addiu	sp,sp,8;					\
-	addiu	t9,t9,36;					\
+	addiu	t9,t9,40;					\
 	.set	pop;					
 
 #ifdef GPROF
@@ -103,17 +105,17 @@
 #define AENT(x)
 #endif
 
-#ifdef __ELF__
+/*
+ * WEAK_ALIAS: create a weak alias.
+ */
 #define	WEAK_ALIAS(alias,sym)						\
 	.weak alias;							\
 	alias = sym
-#endif
 
 /*
  * WARN_REFERENCES: create a warning if the specified symbol is referenced
  * (ELF only, and thus, no leading underscores).
  */
-#ifdef __ELF__
 #ifdef __STDC__
 #define	WARN_REFERENCES(_sym,_msg)				\
 	.section .gnu.warning. ## _sym ; .ascii _msg ; .text
@@ -121,7 +123,6 @@
 #define	WARN_REFERENCES(_sym,_msg)				\
 	.section .gnu.warning./**/_sym ; .ascii _msg ; .text
 #endif /* __STDC__ */
-#endif /* __ELF__ */
 
 /*
  * LEAF
@@ -232,11 +233,13 @@ _C_LABEL(x):
 #define PANIC(msg)			\
 	la	a0, 9f;			\
 	jal	_C_LABEL(panic);	\
+	nop;				\
 	MSG(msg)
 
 #define	PRINTF(msg)			\
 	la	a0, 9f;			\
 	jal	_C_LABEL(printf);	\
+	nop;				\
 	MSG(msg)
 
 #define	MSG(msg)			\
@@ -307,8 +310,13 @@ _C_LABEL(x):
 #define DYNAMIC_STATUS_MASK(sr,scratch)	\
 	lw	scratch, mips_dynamic_status_mask; \
 	and	sr, sr, scratch
+
+#define DYNAMIC_STATUS_MASK_TOUSER(sr,scratch1)		\
+	ori	sr, (MIPS_INT_MASK | MIPS_SR_INT_IE);	\
+	DYNAMIC_STATUS_MASK(sr,scratch1)
 #else
 #define DYNAMIC_STATUS_MASK(sr,scratch)
+#define DYNAMIC_STATUS_MASK_TOUSER(sr,scratch1)
 #endif
 
 #endif /* _MIPS_ASM_H */

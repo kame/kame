@@ -1,4 +1,4 @@
-/* $NetBSD: mips_mcclock.c,v 1.9 2000/03/28 02:58:49 simonb Exp $ */
+/* $NetBSD: mips_mcclock.c,v 1.11 2002/03/05 15:54:33 simonb Exp $ */
 
 /*
  * Copyright (c) 1997 Jonathan Stone (hereinafter referred to as the author)
@@ -34,7 +34,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mips_mcclock.c,v 1.9 2000/03/28 02:58:49 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mips_mcclock.c,v 1.11 2002/03/05 15:54:33 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,15 +44,14 @@ __KERNEL_RCSID(0, "$NetBSD: mips_mcclock.c,v 1.9 2000/03/28 02:58:49 simonb Exp 
 #include <dev/dec/mcclockvar.h>
 #include <dev/dec/mcclock_pad32.h>
 
-#include <mips/cpu.h>			/* CPUISMIPS3 */
+#include <mips/cpu.h>			/* MIPS_HAS_CLOCK */
+#include <mips/locore.h>		/* mips_cp0_cause_read() */
 #include <mips/mips/mips_mcclock.h>
 
 
-unsigned mips_mc_cpuspeed __P((void *, int, int (*)(void *, int)));
-int mips_mcclock_tickloop __P((void *, int));
-unsigned mips_mcclock_to_mhz __P((unsigned iters));
-
-u_int mips_read_causereg __P((void));
+unsigned mips_mc_cpuspeed(void *, int, int (*)(void *, int));
+int mips_mcclock_tickloop(void *, int);
+unsigned mips_mcclock_to_mhz(unsigned iters);
 
 
 /*
@@ -82,8 +81,7 @@ unsigned
 mips_mc_cpuspeed(mcclock_addr, clockmask, tickpollfn)
 	void *mcclock_addr;
 	int clockmask;
-	int (*tickpollfn) __P((void *mcclock_addr,
-			     int clockmask));
+	int (*tickpollfn)(void *mcclock_addr, int clockmask);
 {
 	int s;
 	int iters = 0;
@@ -157,7 +155,7 @@ mips_mcclock_tickloop(mcclock_addr, clockmask)
 	junk++;	junk++;	junk++;	junk++;
 
 	/* Poll clock interrupt, waiting for next tick to happen. */
-	while ((mips_read_causereg() & clockmask) == 0)
+	while ((mips_cp0_cause_read() & clockmask) == 0)
 		;
 
 	/* Ack the mc146818 interrupt caused by starting tick. */
@@ -166,13 +164,13 @@ mips_mcclock_tickloop(mcclock_addr, clockmask)
 	junk++;	junk++;	junk++;	junk++;
 
 	/* Count loops until next tick-interrupt request occurs (4ms). */
-	if (CPUISMIPS3) {
-		while ((mips_read_causereg() & clockmask) == 0) {
+	if (MIPS_HAS_CLOCK) {
+		while ((mips_cp0_cause_read() & clockmask) == 0) {
 			__asm __volatile ("nop; nop; nop; nop");
 			iters++;
 		}
 	} else {
-		while ((mips_read_causereg() & clockmask) == 0) {
+		while ((mips_cp0_cause_read() & clockmask) == 0) {
 			__asm __volatile ("nop; nop;");
 			iters++;
 		}
@@ -210,7 +208,7 @@ mips_mcclock_to_mhz(unsigned iters)
 	 * with about 2 Mhz slop to allow for variation.
 	 */
 
-#ifdef MIPS3
+#ifdef MIPS3_PLUS
 	if (CPUISMIPS3) {
 		if (iters < 18100) {
 			/* error */
@@ -232,7 +230,7 @@ mips_mcclock_to_mhz(unsigned iters)
 			cpuspeed = 38;	/* XXX */
 		}
 	}
-#endif /* MIPS3 */
+#endif /* MIPS3_PLUS */
 
 #ifdef MIPS1
 	if (!CPUISMIPS3) {

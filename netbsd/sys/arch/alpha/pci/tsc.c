@@ -1,4 +1,4 @@
-/* $NetBSD: tsc.c,v 1.2.4.1 2000/06/27 19:46:04 thorpej Exp $ */
+/* $NetBSD: tsc.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999 by Ross Harvey.  All rights reserved.
@@ -35,7 +35,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: tsc.c,v 1.2.4.1 2000/06/27 19:46:04 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tsc.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -133,7 +133,7 @@ void tscattach(parent, self, aux)
 	}
 	printf(", Dchip 0 rev %d\n", (int)LDQP(TS_D_DREV) & 0xf);
 
-	bzero(&tsp, sizeof tsp);
+	memset(&tsp, 0, sizeof tsp);
 	tsp.tsp_name = "tsp";
 	config_found(self, &tsp, NULL);
 
@@ -180,8 +180,18 @@ tspattach(parent, self, aux)
 
 	printf("\n");
 	pcp = tsp_init(1, t->tsp_slot);
+
 	tsp_dma_init(pcp);
+	
+	/*
+	 * Do PCI memory initialization that needs to be deferred until
+	 * malloc is safe.  On the Tsunami, we need to do this after
+	 * DMA is initialized, as well.
+	 */
+	tsp_bus_mem_init2(&pcp->pc_memt, pcp);
+
 	pci_6600_pickintr(pcp);
+
 	pba.pba_busname = "pci";
 	pba.pba_iot = &pcp->pc_iot;
 	pba.pba_memt = &pcp->pc_memt;
@@ -189,6 +199,7 @@ tspattach(parent, self, aux)
 	    alphabus_dma_get_tag(&pcp->pc_dmat_direct, ALPHA_BUS_PCI);
 	pba.pba_pc = &pcp->pc_pc;
 	pba.pba_bus = 0;
+	pba.pba_bridgetag = NULL;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED |
 	    PCI_FLAGS_MRL_OKAY | PCI_FLAGS_MRM_OKAY | PCI_FLAGS_MWI_OKAY;
 	config_found(self, &pba, tspprint);

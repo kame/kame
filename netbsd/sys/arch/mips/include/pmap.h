@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.28 2000/04/28 19:25:55 soren Exp $	*/
+/*	$NetBSD: pmap.h,v 1.38 2002/03/05 15:37:32 simonb Exp $	*/
 
 /*
  * Copyright (c) 1987 Carnegie-Mellon University
@@ -83,7 +83,7 @@ struct segtab {
  */
 typedef struct pmap {
 	int			pm_count;	/* pmap reference count */
-	simple_lock_data_t	pm_lock;	/* lock on pmap */
+	struct simplelock	pm_lock;	/* lock on pmap */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 	unsigned		pm_asid;	/* TLB address space tag */
 	unsigned		pm_asidgen;	/* its generation number */
@@ -91,7 +91,7 @@ typedef struct pmap {
 } *pmap_t;
 
 /*
- * For each vm_page_t, there is a list of all currently valid virtual
+ * For each struct vm_page, there is a list of all currently valid virtual
  * mappings of that page.  An entry is a pv_entry_t, the list is pv_table.
  * XXX really should do this as a part of the higher level code.
  */
@@ -116,24 +116,26 @@ extern struct pmap kernel_pmap_store;
 #define	pmap_wired_count(pmap) 	((pmap)->pm_stats.wired_count)
 #define pmap_resident_count(pmap) ((pmap)->pm_stats.resident_count)
 
+#define	pmap_update(pmap)	/* nothing (yet) */
+
 /*
  *	Bootstrap the system enough to run with virtual memory.
  */
-void	pmap_bootstrap __P((void));
+void	pmap_bootstrap(void);
 
-void	pmap_set_modified __P((paddr_t));
+void	pmap_set_modified(paddr_t);
 
-void	pmap_procwr __P((struct proc *, vaddr_t, size_t));
+void	pmap_procwr(struct proc *, vaddr_t, size_t);
 #define	PMAP_NEED_PROCWR
 
 /*
  * pmap_prefer() helps reduce virtual-coherency exceptions in
  * the virtually-indexed cache on mips3 CPUs.
  */
-#ifdef MIPS3
+#ifdef MIPS3_PLUS
 #define PMAP_PREFER(pa, va)             pmap_prefer((pa), (va))
-void	pmap_prefer __P((vaddr_t, vaddr_t *));
-#endif /* MIPS3 */
+void	pmap_prefer(vaddr_t, vaddr_t *);
+#endif /* MIPS3_PLUS */
 
 #define	PMAP_STEAL_MEMORY	/* enable pmap_steal_memory() */
 
@@ -144,18 +146,9 @@ void	pmap_prefer __P((vaddr_t, vaddr_t *));
 #define	PMAP_UNMAP_POOLPAGE(va)	MIPS_KSEG0_TO_PHYS((va))
 
 /*
- * Do idle page zero'ing uncached to avoid polluting the cache.
+ * Select CCA to use for unmanaged pages.
  */
-void	pmap_zero_page_uncached __P((paddr_t));
-#define PMAP_PAGEIDLEZERO(pa)	pmap_zero_page_uncached((pa))
-
-/*
- * Kernel cache operations for the user-space API
- */
-int mips_user_cacheflush __P((struct proc *p, vaddr_t va, int nbytes,
-	int whichcache));
-int mips_user_cachectl   __P((struct proc *p, vaddr_t va, int nbytes,
-	int ctl));
+#define	PMAP_CCA_FOR_PA(pa)	2		/* uncached */
 
 #endif	/* _KERNEL */
 #endif	/* _PMAP_MACHINE_ */

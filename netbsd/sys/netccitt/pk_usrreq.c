@@ -1,4 +1,4 @@
-/*	$NetBSD: pk_usrreq.c,v 1.19 2000/03/30 13:53:37 augustss Exp $	*/
+/*	$NetBSD: pk_usrreq.c,v 1.21 2001/11/13 00:12:59 lukem Exp $	*/
 
 /*
  * Copyright (c) 1984 University of British Columbia.
@@ -42,6 +42,9 @@
  *
  *	@(#)pk_usrreq.c	8.2 (Berkeley) 1/9/95
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pk_usrreq.c,v 1.21 2001/11/13 00:12:59 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -412,7 +415,7 @@ pk_control(so, cmd, data, ifp, p)
 p		 * is its first address, and to validate the address.
 		 */
 		ia->ia_start = pk_start;
-		s = splimp();
+		s = splnet();
 		if (ifp->if_ioctl)
 			error = (*ifp->if_ioctl) (ifp, SIOCSIFCONF_X25,
 						  (caddr_t) ifa);

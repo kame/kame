@@ -1,4 +1,4 @@
-/*	$NetBSD: check.c,v 1.1.2.2 2000/10/26 21:12:21 tv Exp $	*/
+/*	$NetBSD: check.c,v 1.2 2000/10/23 06:56:00 jdc Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr.c,v 1.31.2.2 2000/10/06 20:00:31 ragge Exp $	*/
+/*	$NetBSD: ncr.c,v 1.35 2001/04/25 17:53:26 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -125,7 +125,7 @@ si_vsbus_match(struct device *parent, struct cfdata *cf, void *aux)
 	volatile char *si_csr = (char *) va->va_addr;
 
 	if (vax_boardtype == VAX_BTYP_49 || vax_boardtype == VAX_BTYP_46
-	    || vax_boardtype == VAX_BTYP_48)
+	    || vax_boardtype == VAX_BTYP_48 || vax_boardtype == VAX_BTYP_53)
 		return 0;
 	/* This is the way Linux autoprobes the interrupt MK-990321 */
 	si_csr[12] = 0;
@@ -215,8 +215,8 @@ si_vsbus_attach(struct device *parent, struct device *self, void *aux)
 
 	printf("\n%s: NCR5380, SCSI ID %d\n", ncr_sc->sc_dev.dv_xname, target);
 
-	ncr_sc->sc_adapter.scsipi_minphys = si_minphys;
-	ncr_sc->sc_link.scsipi_scsi.adapter_target = target;
+	ncr_sc->sc_adapter.adapt_minphys = si_minphys;
+	ncr_sc->sc_channel.chan_id = target;
 
 	/*
 	 * Init the vsbus DMA resource queue struct */

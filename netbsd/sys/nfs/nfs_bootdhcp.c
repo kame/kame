@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_bootdhcp.c,v 1.15 2000/05/28 07:01:09 gmcgarry Exp $	*/
+/*	$NetBSD: nfs_bootdhcp.c,v 1.20 2002/05/12 12:52:58 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1997 The NetBSD Foundation, Inc.
@@ -49,6 +49,9 @@
  * Gordon Ross reorganized Tor's version into this form and
  * integrated it into the NetBSD sources during Aug 1997.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_bootdhcp.c,v 1.20 2002/05/12 12:52:58 simonb Exp $");
 
 #include "opt_nfs_boot.h"
 
@@ -338,13 +341,11 @@ bootpcheck(m, context)
 	/*
 	 * don't make first checks more expensive than necessary
 	 */
-#define ofs(what, elem) ((int)&(((what *)0)->elem))
-	if (m->m_len < ofs(struct bootp, bp_secs)) {
-		m = m_pullup(m, ofs(struct bootp, bp_secs));
+	if (m->m_len < offsetof(struct bootp, bp_sname)) {
+		m = m_pullup(m, offsetof(struct bootp, bp_sname));
 		if (m == NULL)
 			return (-1);
 	}
-#undef ofs
 	bootp = mtod(m, struct bootp*);
 
 	if (bootp->bp_op != BOOTREPLY) {
@@ -408,17 +409,17 @@ bootpcheck(m, context)
 		}
 		switch (tag) {
 #ifdef NFS_BOOT_DHCP
-		    case TAG_DHCP_MSGTYPE:
+		case TAG_DHCP_MSGTYPE:
 			if (*p != bpc->expected_dhcpmsgtype)
 				return (-1);
 			bpc->dhcp_ok = 1;
 			break;
-		    case TAG_SERVERID:
+		case TAG_SERVERID:
 			memcpy(&bpc->dhcp_serverip.s_addr, p,
 			      sizeof(bpc->dhcp_serverip.s_addr));
 			break;
 #endif
-		    default:
+		default:
 			break;
 		}
 		p += len;
@@ -445,6 +446,10 @@ bootpc_call(nd, procp)
 	u_char *haddr;
 	u_char hafmt, halen;
 	struct bootpcontext bpc;
+#ifdef NFS_BOOT_DHCP
+	char vci[64];
+	int vcilen;
+#endif
 
 	error = socreate(AF_INET, &so, SOCK_DGRAM, 0);
 	if (error) {
@@ -547,13 +552,24 @@ bootpc_call(nd, procp)
 	bootp->bp_hlen  = halen;	/* Hardware address length */
 	bootp->bp_xid = ++xid;
 	memcpy(bootp->bp_chaddr, haddr, halen);
+#ifdef NFS_BOOT_BOOTP_REQFILE
+	strncpy(bootp->bp_file, NFS_BOOT_BOOTP_REQFILE, sizeof(bootp->bp_file));
+#endif
 	/* Fill-in the vendor data. */
 	memcpy(bootp->bp_vend, vm_rfc1048, 4);
 #ifdef NFS_BOOT_DHCP
 	bootp->bp_vend[4] = TAG_DHCP_MSGTYPE;
 	bootp->bp_vend[5] = 1;
 	bootp->bp_vend[6] = DHCPDISCOVER;
-	bootp->bp_vend[7] = TAG_END;
+	/*
+	 * Insert a NetBSD Vendor Class Identifier option.
+	 */
+	sprintf(vci, "%s:%s:kernel:%s", ostype, MACHINE, osrelease);
+	vcilen = strlen(vci);
+	bootp->bp_vend[7] = TAG_CLASSID;
+	bootp->bp_vend[8] = vcilen;
+	memcpy(&bootp->bp_vend[9], vci, vcilen);
+	bootp->bp_vend[9 + vcilen] = TAG_END;
 #else
 	bootp->bp_vend[4] = TAG_END;
 #endif
@@ -588,7 +604,15 @@ bootpc_call(nd, procp)
 		bootp->bp_vend[20] = 4;
 		leasetime = htonl(300);
 		memcpy(&bootp->bp_vend[21], &leasetime, 4);
-		bootp->bp_vend[25] = TAG_END;
+		/*
+		 * Insert a NetBSD Vendor Class Identifier option.
+		 */
+		sprintf(vci, "%s:%s:kernel:%s", ostype, MACHINE, osrelease);
+		vcilen = strlen(vci);
+		bootp->bp_vend[25] = TAG_CLASSID;
+		bootp->bp_vend[26] = vcilen;
+		memcpy(&bootp->bp_vend[27], vci, vcilen);
+		bootp->bp_vend[27 + vcilen] = TAG_END;
 
 		bpc.expected_dhcpmsgtype = DHCPACK;
 
@@ -604,10 +628,10 @@ bootpc_call(nd, procp)
 	 * the buffer at bpc.replybuf.
 	 */
 #ifdef NFS_BOOT_DHCP
-	printf("nfs_boot: %s server: %s\n",
+	printf("nfs_boot: %s next-server: %s\n",
 	       (bpc.dhcp_ok ? "DHCP" : "BOOTP"),
 #else
-	printf("nfs_boot: BOOTP server: %s\n",
+	printf("nfs_boot: BOOTP next-server: %s\n",
 #endif
 	       inet_ntoa(bpc.replybuf->bp_siaddr));
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.27 1999/11/28 20:30:57 is Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.33 2002/01/28 09:56:48 aymeric Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
@@ -35,6 +35,9 @@
  *	@(#)sys_machdep.c	7.7 (Berkeley) 5/7/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sys_machdep.c,v 1.33 2002/01/28 09:56:48 aymeric Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -44,72 +47,14 @@
 #include <sys/uio.h>
 #include <sys/kernel.h>
 #include <sys/buf.h>
-#include <sys/trace.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <m68k/cacheops.h>
-
-#ifdef TRACE
-int	nvualarm;
-
-sys_vtrace(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
-{
-	register struct sys_vtrace_args /* {
-		syscallarg(int) request;
-		syscallarg(int) value;
-	} */ *uap = v;
-	int vdoualarm();
-
-	switch (SCARG(uap, request)) {
-
-	case VTR_DISABLE:		/* disable a trace point */
-	case VTR_ENABLE:		/* enable a trace point */
-		if (SCARG(uap, value) < 0 || SCARG(uap, value) >= TR_NFLAGS)
-			return (EINVAL);
-		*retval = traceflags[SCARG(uap, value)];
-		traceflags[SCARG(uap, value)] = SCARG(uap, request);
-		break;
-
-	case VTR_VALUE:		/* return a trace point setting */
-		if (SCARG(uap, value) < 0 || SCARG(uap, value) >= TR_NFLAGS)
-			return (EINVAL);
-		*retval = traceflags[SCARG(uap, value)];
-		break;
-
-	case VTR_UALARM:	/* set a real-time ualarm, less than 1 min */
-		if (SCARG(uap, value) <= 0 || SCARG(uap, value) > 60 * hz ||
-		    nvualarm > 5)
-			return (EINVAL);
-		nvualarm++;
-		timeout(vdoualarm, (caddr_t)p->p_pid, SCARG(uap, value));
-		break;
-
-	case VTR_STAMP:
-		trace(TR_STAMP, SCARG(uap, value), p->p_pid);
-		break;
-	}
-	return (0);
-}
-
-vdoualarm(arg)
-	int arg;
-{
-	register struct proc *p;
-
-	p = pfind(arg);
-	if (p)
-		psignal(p, 16);
-	nvualarm--;
-}
-#endif
 
 /* XXX should be in an include file somewhere */
 #define CC_PURGE	1
@@ -134,16 +79,18 @@ cachectl1(req, addr, len, p)
 		vaddr_t end = 0;
 		paddr_t pa = 0;
 
-		if (addr == 0 ||
+		if (addr == 0
 #if defined(M68040)
 #if defined(M68060)
-		    (cputype == CPU_68040 && req & CC_IPURGE) ||
+		    || (cputype == CPU_68040 && req & CC_IPURGE)
 #else
-		    (req & CC_IPURGE) ||
+		    || (req & CC_IPURGE)
 #endif
 #endif
-		    ((req & ~CC_EXTPURGE) != CC_PURGE && len > 2*NBPG))
+		    || ((req & ~CC_EXTPURGE) != CC_PURGE
+		        && len > 2*NBPG))
 			doall = 1;
+
 		if (!doall) {
 			end = addr + len;
 			if (len <= 1024) {
@@ -180,7 +127,7 @@ cachectl1(req, addr, len, p)
 					ICPP(pa);
 				}
 				break;
-			
+
 			case CC_EXTPURGE|CC_PURGE:
 			case CC_PURGE:
 				if (doall)
@@ -200,7 +147,7 @@ cachectl1(req, addr, len, p)
 				else if (inc == NBPG)
 					DCFP(pa);
 				break;
-				
+
 			default:
 				error = EINVAL;
 				break;

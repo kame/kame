@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.21.2.3 2002/04/22 22:15:38 he Exp $	*/
+/*	$NetBSD: conf.c,v 1.39.4.1 2002/05/30 08:37:46 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -52,6 +52,8 @@ bdev_decl(sd);
 bdev_decl(st);
 #include "cd.h"
 bdev_decl(cd);
+#include "ld.h"
+bdev_decl(ld);
 #include "md.h"
 bdev_decl(md);
 #include "wd.h"
@@ -71,14 +73,12 @@ struct bdevsw bdevsw[] = {
 	bdev_disk_init(NWD,wd),		/* 10: IDE disk driver */
 	bdev_lkm_dummy(),		/* 11 */
 	bdev_disk_init(NRAID,raid),	/* 12: RAIDframe disk driver */
+	bdev_disk_init(NLD,ld),		/* 13: logical disk */
 };
 int nblkdev = sizeof bdevsw / sizeof bdevsw[0];
 
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
+#include <dev/sysmon/sysmonconf.h>
+cdev_decl(sysmon);
 
 cdev_decl(cn);
 cdev_decl(ctty);
@@ -152,11 +152,33 @@ cdev_decl(ugen);
 cdev_decl(ulpt);
 #include "ucom.h"
 cdev_decl(ucom);
+#include "urio.h"
+cdev_decl(urio);
+#include "uscanner.h"
+cdev_decl(uscanner);
 
 #include "com.h"
 cdev_decl(com);
 #include "cy.h"
 cdev_decl(cy);
+#include "openfirm.h"
+cdev_decl(openfirm);
+
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
+#include "clockctl.h"
+cdev_decl(clockctl);
+
+#include "pci.h"
+cdev_decl(pci);
 
 struct cdevsw cdevsw[] = {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -209,7 +231,19 @@ struct cdevsw cdevsw[] = {
 	cdev_tty_init(NCY,cy),		/* 47: Cyclom-Y serial port */
 	cdev_audio_init(NAUDIO,audio),	/* 48: generic audio I/O */
 	cdev_midi_init(NMIDI,midi),	/* 49: MIDI I/O */
-	cdev_midi_init(NSEQUENCER,sequencer),	/* 50: sequencer I/O */
+	cdev_midi_init(NSEQUENCER,sequencer), /* 50: sequencer I/O */
+	cdev_usbdev_init(NURIO,urio),	/* 51: Diamond Rio 500 */
+	cdev_ugen_init(NUSCANNER,uscanner),/* 52: USB scanner */
+	cdev_openfirm_init(NOPENFIRM,openfirm), /* 53: /dev/openfirm */
+	cdev_isdn_init(NISDN, isdn),	/* 54: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl), /* 55: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan), /* 56: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc), /* 57: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel), /* 58: isdn phone device */
+	cdev_disk_init(NLD,ld),		/* 59: logical disk driver */
+	cdev_pci_init(NPCI,pci),	/* 60: PCI bus access device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 61: settimeofday driver */
+	cdev_sysmon_init(NSYSMON, sysmon),	/* 62: System Monitor */
 };
 int nchrdev = sizeof cdevsw / sizeof cdevsw[0];
 
@@ -294,6 +328,18 @@ static int chrtoblktbl[] = {
 	/* 48 */	NODEV,
 	/* 49 */	NODEV,
 	/* 50 */	NODEV,
+	/* 51 */	NODEV,
+	/* 52 */	NODEV,
+	/* 53 */	NODEV,
+	/* 54 */	NODEV,
+	/* 55 */	NODEV,
+	/* 56 */	NODEV,
+	/* 57 */	NODEV,
+	/* 58 */	NODEV,
+	/* 59 */	NODEV,
+	/* 60 */	NODEV,
+	/* 61 */	NODEV,
+	/* 62 */	NODEV,
 };
 
 /*

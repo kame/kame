@@ -1,4 +1,4 @@
-/* $NetBSD: bus_dma.c,v 1.13.4.3 2001/06/16 20:30:09 he Exp $ */
+/* $NetBSD: bus_dma.c,v 1.25 2001/09/10 21:19:20 chris Exp $ */
 
 /*
  * This file was taken from from alpha/common/bus_dma.c
@@ -46,7 +46,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.13.4.3 2001/06/16 20:30:09 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.25 2001/09/10 21:19:20 chris Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,11 +56,7 @@ __KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.13.4.3 2001/06/16 20:30:09 he Exp $");
 #include <sys/proc.h>
 #include <sys/mbuf.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
 #include <uvm/uvm_extern.h>
-
 
 #include <machine/cpu.h>
 
@@ -161,6 +157,7 @@ _bus_dmamap_load_buffer_direct_common(t, map, buf, buflen, p, flags,
 	bus_addr_t curaddr, lastaddr, baddr, bmask;
 	vaddr_t vaddr = (vaddr_t)buf;
 	int seg;
+	boolean_t rv;
 
 	lastaddr = *lastaddrp;
 	bmask = ~(map->_dm_boundary - 1);
@@ -170,10 +167,11 @@ _bus_dmamap_load_buffer_direct_common(t, map, buf, buflen, p, flags,
 		 * Get the physical address for this segment.
 		 */
 		if (p != NULL)
-			(void) pmap_extract(p->p_vmspace->vm_map.pmap,
+			rv = pmap_extract(p->p_vmspace->vm_map.pmap,
 			    vaddr, &curaddr);
 		else
-			(void) pmap_extract(pmap_kernel(),vaddr, &curaddr);
+			rv = pmap_extract(pmap_kernel(), vaddr, &curaddr);
+		KASSERT(rv);
 
 		/*
 		 * Compute the segment size, and adjust counts.
@@ -463,7 +461,7 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 #ifdef DIAGNOSTIC
 			if ((p % 16) || (e % 16)) {
 				panic("unaligned address in _bus_dmamap_sync while flushing.\n"
-						"address=0x%08x, end=0x%08x, ops=0x%x",p,e,ops);
+						"address=0x%08lx, end=0x%08lx, ops=0x%x",p,e,ops);
 			}
 #endif
 			while((p<e)&&(p%NBPG)) {
@@ -481,7 +479,7 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 #ifdef DIAGNOSTIC
 			if (p != e) {
 				panic("overrun in _bus_dmamap_sync while flushing.\n"
-						"address=0x%08x, end=0x%08x, ops=0x%x",p,e,ops);
+						"address=0x%08lx, end=0x%08lx, ops=0x%x",p,e,ops);
 			}
 #endif
 		}
@@ -503,7 +501,7 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 #ifdef DIAGNOSTIC
 			if ((p % 16) || (e % 16)) {
 				panic("unaligned address in _bus_dmamap_sync while purging.\n"
-						"address=0x%08x, end=0x%08x, ops=0x%x", p,e,ops);
+						"address=0x%08lx, end=0x%08lx, ops=0x%x", p,e,ops);
 			}
 #endif
 			while((p<e)&&(p%NBPG)) {
@@ -521,7 +519,7 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 #ifdef DIAGNOSTIC
 			if (p != e) {
 				panic("overrun in _bus_dmamap_sync while flushing.\n"
-						"address=0x%08x, end=0x%08x, ops=0x%x",p,e,ops);
+						"address=0x%08lx, end=0x%08lx, ops=0x%x",p,e,ops);
 			}
 #endif
 		}
@@ -543,7 +541,7 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 {
 	extern paddr_t avail_start, avail_end;
 	paddr_t curaddr, lastaddr, high;
-	vm_page_t m;    
+	struct vm_page *m;    
 	struct pglist mlist;
 	int curseg, error;
 
@@ -575,7 +573,7 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 		curaddr = VM_PAGE_TO_PHYS(m);
 #ifdef DIAGNOSTIC
 		if (curaddr < avail_start || curaddr >= high) {
-			printf("vm_page_alloc_memory returned non-sensical"
+			printf("uvm_pglistalloc returned non-sensical"
 			    " address 0x%lx\n", curaddr);
 			panic("_bus_dmamem_alloc");
 		}
@@ -605,7 +603,7 @@ _bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -663,6 +661,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }

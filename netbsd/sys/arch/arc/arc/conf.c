@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.18 2000/06/17 07:28:07 soda Exp $	*/
+/*	$NetBSD: conf.c,v 1.23 2002/03/16 16:55:53 martin Exp $	*/
 /*	$OpenBSD: conf.c,v 1.27 1999/08/12 13:06:33 niklas Exp $ */
 
 /*
@@ -100,30 +100,16 @@ int	nblkdev = ARRAY_LENGTH(bdevsw);
  *	Character devices.
  */
 
-/* open, close, read, write, ioctl, tty, mmap */
-#define	cdev_pc_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttpoll, dev_init(c,n,mmap), D_TTY }
-
-/* open, close, write, ioctl */
-#define	cdev_lpt_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
-
-/* open, close, write, ioctl */
-#define	cdev_spkr_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
-	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
-	0, seltrue, (dev_type_mmap((*))) enodev }
-
-/* open, close, read, ioctl */
-#define	cdev_joy_init(c,n) { \
-	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-	(dev_type_stop((*))) enodev, 0, seltrue, \
-	(dev_type_mmap((*))) enodev }
+#include "isdn.h"
+#include "isdnctl.h"
+#include "isdntrc.h"
+#include "isdnbchan.h"
+#include "isdntel.h"
+cdev_decl(isdn);
+cdev_decl(isdnctl);
+cdev_decl(isdntrc);
+cdev_decl(isdnbchan);
+cdev_decl(isdntel);
 
 cdev_decl(cn);
 cdev_decl(sw);
@@ -183,6 +169,8 @@ cdev_decl(uk);
 cdev_decl(ss);
 #include "ch.h"
 cdev_decl(ch);
+#include "clockctl.h"
+cdev_decl(clockctl);
 
 struct cdevsw	cdevsw[] =
 {
@@ -225,11 +213,11 @@ struct cdevsw	cdevsw[] =
 	cdev_scanner_init(NSS,ss),	/* 34: SCSI scanner */
 	cdev_notdef(),			/* 35: OpenBSD Kernel symbols device */
 	cdev_ch_init(NCH,ch),		/* 36: SCSI autochanger */
-	cdev_notdef(),			/* 37: */
-	cdev_notdef(),			/* 38: */
-	cdev_notdef(),			/* 39: */
-	cdev_notdef(),			/* 40: */
-	cdev_notdef(),			/* 41: */
+	cdev_isdn_init(NISDN, isdn),	/* 37: isdn main device */
+	cdev_isdnctl_init(NISDNCTL, isdnctl), /* 38: isdn control device */
+	cdev_isdnbchan_init(NISDNBCHAN, isdnbchan), /* 39: isdn raw b-channel access */
+	cdev_isdntrc_init(NISDNTRC, isdntrc), /* 40: isdn trace device */
+	cdev_isdntel_init(NISDNTEL, isdntel), /* 41: isdn phone device */
 	cdev_notdef(),			/* 42: */
 	cdev_notdef(),			/* 33: */
 	cdev_notdef(),			/* 44: */
@@ -240,6 +228,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 49: */
 	cdev_notdef(),			/* 50: */
 	cdev_notdef(),			/* 51: OpenBSD xfs comm. device */
+	cdev_clockctl_init(NCLOCKCTL, clockctl),/* 52: clockctl pseudo device */
 };
 
 int	nchrdev = ARRAY_LENGTH(cdevsw);
@@ -317,6 +306,23 @@ static int chrtoblktbl[] =  {
 	/* 33 */	NODEV,
 	/* 34 */	NODEV,
 	/* 35 */	NODEV,
+	/* 36 */	NODEV,
+	/* 37 */	NODEV,
+	/* 38 */	NODEV,
+	/* 39 */	NODEV,
+	/* 40 */	NODEV,
+	/* 41 */	NODEV,
+	/* 42 */	NODEV,
+	/* 43 */	NODEV,
+	/* 44 */	NODEV,
+	/* 45 */	NODEV,
+	/* 46 */	NODEV,
+	/* 47 */	NODEV,
+	/* 48 */	NODEV,
+	/* 49 */	NODEV,
+	/* 50 */	NODEV,
+	/* 51 */	NODEV,
+	/* 52 */	NODEV,
 };
 
 /*

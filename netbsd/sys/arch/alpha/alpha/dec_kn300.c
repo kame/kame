@@ -1,4 +1,4 @@
-/* $NetBSD: dec_kn300.c,v 1.17 2000/06/09 04:58:33 soda Exp $ */
+/* $NetBSD: dec_kn300.c,v 1.23 2001/08/20 12:20:04 wiz Exp $ */
 
 /*
  * Copyright (c) 1998 by Matthew Jacob
@@ -30,9 +30,11 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_kgdb.h"
+
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_kn300.c,v 1.17 2000/06/09 04:58:33 soda Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_kn300.c,v 1.23 2001/08/20 12:20:04 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,6 +58,8 @@ __KERNEL_RCSID(0, "$NetBSD: dec_kn300.c,v 1.17 2000/06/09 04:58:33 soda Exp $");
 #include <dev/ic/pckbcvar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <alpha/mcbus/mcbusreg.h>
 #include <alpha/mcbus/mcbusvar.h>
@@ -82,6 +86,15 @@ static void dec_kn300_device_register __P((struct device *, void *));
 static void dec_kn300_mcheck_handler
 	__P((unsigned long, struct trapframe *, unsigned long, unsigned long));
 
+#ifdef KGDB
+#include <machine/db_machdep.h>
+
+static const char *kgdb_devlist[] = {
+	"com",
+	NULL,
+};
+#endif /* KGDB */
+
 #define	ALPHASERVER_4100	"AlphaServer 4100"
 
 const struct alpha_variation_table dec_kn300_variations[] = {
@@ -93,6 +106,7 @@ void
 dec_kn300_init()
 {
 	u_int64_t variation;
+	int cachesize;
 
 	platform.family = ALPHASERVER_4100;
 
@@ -107,6 +121,38 @@ dec_kn300_init()
 	platform.cons_init = dec_kn300_cons_init;
 	platform.device_register = dec_kn300_device_register;
 	platform.mcheck_handler = dec_kn300_mcheck_handler;
+
+	/*
+	 * Determine B-cache size by looking at the primary (console)
+	 * MCPCIA's WHOAMI register.
+	 */
+	mcpcia_init();
+
+	if (mcbus_primary.mcbus_valid) {
+		switch (mcbus_primary.mcbus_bcache) {
+		default:
+		case CPU_BCache_0MB:
+			/* No B-cache or invalid; default to 1MB. */
+			/* FALLTHROUGH */
+
+		case CPU_BCache_1MB:
+			cachesize = (1 * 1024 * 1024);
+			break;
+
+		case CPU_BCache_2MB:
+			cachesize = (2 * 1024 * 1024);
+			break;
+
+		case CPU_BCache_4MB:
+			cachesize = (4 * 1024 * 1024);
+			break;
+		}
+	} else {
+		/* Default to 1MB. */
+		cachesize = (1 * 1024 * 1024);
+	}
+
+	uvmexp.ncolors = atop(cachesize);
 }
 
 void
@@ -117,12 +163,12 @@ dec_kn300_cons_init()
 	extern struct mcpcia_config mcpcia_console_configuration;
 
 	ccp = &mcpcia_console_configuration;
-	mcpcia_init();
+	/* It's already initialized. */
 
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case CTB_PRINTERPORT: 
 		/* serial console ... */
 		/*
 		 * Delay to allow PROM putchars to complete.
@@ -137,7 +183,7 @@ dec_kn300_cons_init()
 		}
 		break;
 
-	case 3:
+	case CTB_GRAPHICS:
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
@@ -163,6 +209,10 @@ dec_kn300_cons_init()
 		panic("consinit: unknown console type %ld\n",
 		    ctb->ctb_term_type);
 	}
+#ifdef KGDB
+	/* Attach the KGDB device. */
+	alpha_kgdb_init(kgdb_devlist, &ccp->cc_iot);
+#endif /* KGDB */
 }
 
 /* #define	BDEBUG	1 */
@@ -246,13 +296,13 @@ dec_kn300_device_register(dev, aux)
 		if (parent->dv_parent != scsidev)
 			return;
 
-		if (b->unit / 100 != sa->sa_sc_link->scsipi_scsi.target)
+		if (b->unit / 100 != sa->sa_periph->periph_target)
 			return;
 
 		/* XXX LUN! */
 
 		/*
-		 * the value in boot_dev_type is some wierd number
+		 * the value in boot_dev_type is some weird number
 		 * XXX: Only support SD booting for now.
 		 */
 		if (strcmp(cd->cd_name, "sd") &&

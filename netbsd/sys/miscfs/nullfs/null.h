@@ -1,11 +1,11 @@
-/*	$NetBSD: null.h,v 1.11 2000/03/13 23:52:40 soren Exp $	*/
+/*	$NetBSD: null.h,v 1.13 2001/11/07 04:56:09 enami Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
  * All rights reserved.
  *
- * This software was written by William Studnemund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * This software was written by William Studenmund of the
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -108,13 +108,14 @@ struct null_node {
 #define	null_vnode	ln.layer_vnode
 #define	null_flags	ln.layer_flags
 
-int null_node_create __P((struct mount *mp, struct vnode *target, struct vnode **vpp));
+int	null_node_create __P((struct mount *, struct vnode *,
+	    struct vnode **));
 
 #define	MOUNTTONULLMOUNT(mp) ((struct null_mount *)((mp)->mnt_data))
 #define	VTONULL(vp) ((struct null_node *)(vp)->v_data)
 #define	NULLTOV(xp) ((xp)->null_vnode)
 #ifdef NULLFS_DIAGNOSTIC
-extern struct vnode *layer_checkvp __P((struct vnode *vp, char *fil, int lno));
+struct vnode *layer_checkvp __P((struct vnode *, char *, int));
 #define	NULLVPTOLOWERVP(vp) layer_checkvp((vp), __FILE__, __LINE__)
 #else
 #define	NULLVPTOLOWERVP(vp) (VTONULL(vp)->null_lowervp)

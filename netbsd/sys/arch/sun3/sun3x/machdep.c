@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.57.2.1 2000/12/15 04:26:18 he Exp $	*/
+/*	$NetBSD: machdep.c,v 1.79 2002/05/18 06:59:12 lukem Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -42,6 +42,7 @@
  */
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,11 +70,6 @@
 #ifdef	KGDB
 #include <sys/kgdb.h>
 #endif
-
-#include <vm/vm.h>
-#include <vm/vm_map.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -105,16 +101,18 @@ extern char etext[];
 /* Our exported CPU info; we can have only one. */  
 struct cpu_info cpu_info_store;
 
-vm_map_t exec_map = NULL;  
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;  
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 int	physmem;
 int	fputype;
 caddr_t	msgbufaddr;
 
 /* Virtual page frame for /dev/mem (see mem.c) */
-vm_offset_t vmmap;
+vaddr_t vmmap;
+
+union sun3sir sun3sir;
 
 /*
  * safepri is a safe priority for sleep to set for a spin-wait
@@ -126,6 +124,8 @@ u_char cpu_machine_id = 0;
 char *cpu_string = NULL;
 int cpu_has_vme = 0;
 int has_iocache = 0;
+
+vaddr_t dumppage;
 
 static void identifycpu __P((void));
 static void initcpu __P((void));
@@ -147,15 +147,13 @@ consinit()
 	cninit();
 
 #ifdef DDB
-	db_machine_init();
 	{
-		extern int end[];
-		extern char *esym;
+		extern int nsym;
+		extern char *ssym, *esym;
 
-		/* symsize, symstart, symend */
-		ddb_init(end[0], end + 1, (int*)esym);
+		ddb_init(nsym, ssym, esym);
 	}
-#endif DDB
+#endif	/* DDB */
 
 	/*
 	 * Now that the console can do input as well as
@@ -186,9 +184,9 @@ cpu_startup()
 {
 	caddr_t v;
 	int sz, i;
-	vm_size_t size;
+	vsize_t size;
 	int base, residual;
-	vm_offset_t minaddr, maxaddr;
+	vaddr_t minaddr, maxaddr;
 	char pbuf[9];
 
 	/*
@@ -213,6 +211,12 @@ cpu_startup()
 	printf("total memory = %s\n", pbuf);
 
 	/*
+	 * Get scratch page for dumpsys().
+	 */
+	if ((dumppage = uvm_km_alloc(kernel_map, NBPG)) == 0)
+		panic("startup: alloc dumppage");
+
+	/*
 	 * Find out how much space we need, allocate it,
 	 * and then give everything true virtual addresses.
 	 */
@@ -227,12 +231,12 @@ cpu_startup()
 	 * in that they usually occupy more virtual memory than physical.
 	 */
 	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vm_offset_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
-	minaddr = (vm_offset_t)buffers;
+	minaddr = (vaddr_t)buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
 		/* don't want to alloc more physical mem than needed */
 		bufpages = btoc(MAXBSIZE) * nbuf;
@@ -240,8 +244,8 @@ cpu_startup()
 	base = bufpages / nbuf;
 	residual = bufpages % nbuf;
 	for (i = 0; i < nbuf; i++) {
-		vm_size_t curbufsize;
-		vm_offset_t curbuf;
+		vsize_t curbufsize;
+		vaddr_t curbuf;
 		struct vm_page *pg;
 
 		/*
@@ -250,7 +254,7 @@ cpu_startup()
 		 * for the first "residual" buffers, and then we allocate
 		 * "base" pages for the rest.
 		 */
-		curbuf = (vm_offset_t) buffers + (i * MAXBSIZE);
+		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
 		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
 
 		while (curbufsize) {
@@ -264,6 +268,7 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -290,15 +295,6 @@ cpu_startup()
 	printf("avail memory = %s\n", pbuf);
 	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
 	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
-
-	/*
-	 * Tell the VM system that writing to kernel text isn't allowed.
-	 * If we don't, we might end up COW'ing the text segment!
-	 */
-	if (uvm_map_protect(kernel_map, (vm_offset_t) kernel_text,
-	    m68k_trunc_page((vm_offset_t) etext),
-	    UVM_PROT_READ|UVM_PROT_EXEC, TRUE) != KERN_SUCCESS)
-		panic("can't protect kernel text");
 
 	/*
 	 * Allocate a virtual page (for use by /dev/mem)
@@ -346,7 +342,7 @@ setregs(p, pack, stack)
 	tf->tf_regs[D7] = 0;
 	tf->tf_regs[A0] = 0;
 	tf->tf_regs[A1] = 0;
-	tf->tf_regs[A2] = (int)PS_STRINGS;
+	tf->tf_regs[A2] = (int)p->p_psstr;
 	tf->tf_regs[A3] = 0;
 	tf->tf_regs[A4] = 0;
 	tf->tf_regs[A5] = 0;
@@ -523,7 +519,7 @@ cpu_reboot(howto, user_boot_string)
 
 	if (howto & RB_HALT) {
 	haltsys:
-		printf("Kernel halted.\n");
+		printf("halted.\n");
 		sunmon_halt();
 	}
 
@@ -553,7 +549,7 @@ cpu_reboot(howto, user_boot_string)
 			*p = '\0';
 		}
 	}
-	printf("Kernel rebooting...\n");
+	printf("rebooting...\n");
 	sunmon_reboot(bootstr);
 	for (;;) ;
 	/*NOTREACHED*/
@@ -562,9 +558,11 @@ cpu_reboot(howto, user_boot_string)
 /*
  * These variables are needed by /sbin/savecore
  */
-u_long	dumpmag = 0x8fca0101;	/* magic number */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number */
 int 	dumpsize = 0;		/* pages */
 long	dumplo = 0; 		/* blocks */
+
+#define DUMP_EXTRA	1	/* CPU-dependent extra pages */
 
 /*
  * This is called by main to set dumplo, dumpsize.
@@ -576,13 +574,10 @@ long	dumplo = 0; 		/* blocks */
 void
 cpu_dumpconf()
 {
-	int nblks;	/* size of dump area */
+	int devblks;	/* size of dump device in blocks */
+	int dumpblks;	/* size of dump image in blocks */
 	int maj;
 	int (*getsize)__P((dev_t));
-
-	/* Validate space in page zero for the kcore header. */
-	if (MSGBUFOFF < (sizeof(kcore_seg_t) + sizeof(cpu_kcore_hdr_t)))
-		panic("cpu_dumpconf: MSGBUFOFF too small");
 
 	if (dumpdev == NODEV)
 		return;
@@ -593,20 +588,26 @@ cpu_dumpconf()
 	getsize = bdevsw[maj].d_psize;
 	if (getsize == NULL)
 		return;
-	nblks = (*getsize)(dumpdev);
-	if (nblks <= ctod(1))
+	devblks = (*getsize)(dumpdev);
+	if (devblks <= ctod(1))
 		return;
+	devblks &= ~(ctod(1) - 1);
+
+	/*
+	 * Note: savecore expects dumpsize to be the
+	 * number of pages AFTER the dump header.
+	 */
+	dumpsize = physmem; 	/* pages */
 
 	/* Position dump image near end of space, page aligned. */
-	dumpsize = physmem; 	/* pages */
-	dumplo = nblks - ctod(dumpsize);
-	dumplo &= ~(ctod(1)-1);
+	dumpblks = ctod(physmem + DUMP_EXTRA);
+	dumplo = devblks - dumpblks;
 
 	/* If it does not fit, truncate it by moving dumplo. */
 	/* Note: Must force signed comparison. */
 	if (dumplo < ((long)ctod(1))) {
 		dumplo = ctod(1);
-		dumpsize = dtoc(nblks - dumplo);
+		dumpsize = dtoc(devblks - dumplo) - DUMP_EXTRA;
 	}
 }
 
@@ -625,12 +626,12 @@ void
 dumpsys()
 {
 	struct bdevsw *dsw;
-	kcore_seg_t	*kseg_p;
+	kcore_seg_t *kseg_p;
 	cpu_kcore_hdr_t *chdr_p;
 	struct sun3x_kcore_hdr *sh;
 	phys_ram_seg_t *crs_p;
 	char *vaddr;
-	vm_offset_t paddr;
+	paddr_t paddr;
 	int psize, todo, seg, segsz;
 	daddr_t blkno;
 	int error = 0;
@@ -662,19 +663,21 @@ dumpsys()
 	    minor(dumpdev), dumplo);
 
 	/*
-	 * We put the dump header is in physical page zero,
-	 * so there is no extra work here to write it out.
-	 * All we do is initialize the header.
+	 * Prepare the dump header
 	 */
+	blkno = dumplo;
+	todo = dumpsize;	/* pages */
+	vaddr = (char *)dumppage;
+	memset(vaddr, 0, NBPG);
 
 	/* Set pointers to all three parts. */
-	kseg_p = (kcore_seg_t *)KERNBASE;
-	chdr_p = (cpu_kcore_hdr_t *) (kseg_p + 1);
+	kseg_p = (kcore_seg_t *)vaddr;
+	chdr_p = (cpu_kcore_hdr_t *)(kseg_p + 1);
 	sh = &chdr_p->un._sun3x;
 
 	/* Fill in kcore_seg_t part. */
 	CORE_SETMAGIC(*kseg_p, KCORE_MAGIC, MID_MACHINE, CORE_CPU);
-	kseg_p->c_size = sizeof(*chdr_p);
+	kseg_p->c_size = (ctob(DUMP_EXTRA) - sizeof(*kseg_p));
 
 	/* Fill in cpu_kcore_hdr_t part. */
 	strncpy(chdr_p->name, kernel_arch, sizeof(chdr_p->name));
@@ -684,31 +687,23 @@ dumpsys()
 	/* Fill in the sun3x_kcore_hdr part. */
 	pmap_kcore_hdr(sh);
 
+	/* Write out the dump header. */
+	error = (*dsw->d_dump)(dumpdev, blkno, vaddr, NBPG);
+	if (error)
+		goto fail;
+	blkno += btodb(NBPG);
+
 	/*
 	 * Now dump physical memory.  Note that physical memory
 	 * might NOT be congiguous, so do it by segments.
 	 */
 
-	blkno = dumplo;
-	todo = dumpsize;	/* pages */
-	vaddr = (char*)vmmap;	/* Borrow /dev/mem VA */
+	vaddr = (char *)vmmap;	/* Borrow /dev/mem VA */
 
 	for (seg = 0; seg < SUN3X_NPHYS_RAM_SEGS; seg++) {
 		crs_p = &sh->ram_segs[seg];
 		paddr = crs_p->start;
 		segsz = crs_p->size;
-		/*
-		 * Our header lives in the first little bit of
-		 * physical memory (not written separately), so
-		 * we have to adjust the first ram segment size
-		 * and start address to reflect the stolen RAM.
-		 * (Nothing interesing in that RAM anyway 8^).
-		 */
-		if (seg == 0) {
-			int adj = sizeof(*kseg_p) + sizeof(*chdr_p);
-			crs_p->start += adj;
-			crs_p->size  -= adj;
-		}
 
 		while (todo && (segsz > 0)) {
 
@@ -717,10 +712,11 @@ dumpsys()
 				printf("\r%4d", todo);
 
 			/* Make a temporary mapping for the page. */
-			pmap_enter(pmap_kernel(), vmmap, paddr | PMAP_NC,
-					   VM_PROT_READ, 0);
+			pmap_kenter_pa(vmmap, paddr | PMAP_NC, VM_PROT_READ);
+			pmap_update(pmap_kernel());
 			error = (*dsw->d_dump)(dumpdev, blkno, vaddr, NBPG);
-			pmap_remove(pmap_kernel(), vmmap, vmmap + NBPG);
+			pmap_kremove(vmmap, NBPG);
+			pmap_update(pmap_kernel());
 			if (error)
 				goto fail;
 			paddr += NBPG;

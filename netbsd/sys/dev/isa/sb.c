@@ -1,4 +1,4 @@
-/*	$NetBSD: sb.c,v 1.69 1999/10/10 00:08:24 mycroft Exp $	*/
+/*	$NetBSD: sb.c,v 1.72 2001/11/13 08:01:29 lukem Exp $	*/
 
 /*
  * Copyright (c) 1991-1993 Regents of the University of California.
@@ -33,6 +33,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sb.c,v 1.72 2001/11/13 08:01:29 lukem Exp $");
 
 #include "midi.h"
 
@@ -110,6 +113,7 @@ struct audio_hw_if sb_hw_if = {
 	sbdsp_get_props,
 	sbdsp_trigger_output,
 	sbdsp_trigger_input,
+	0,
 };
 
 /*
@@ -182,7 +186,7 @@ sbmatch(sc)
 		}
 	}
 
-	if (ISSB16CLASS(sc)) {
+	if (ISSB16CLASS(sc) && !(sc->sc_quirks & SB_QUIRK_NO_INIT_DRQ)) {
 		int w, r;
 #if 0
 		printf("%s: old drq conf %02x\n", sc->sc_dev.dv_xname,

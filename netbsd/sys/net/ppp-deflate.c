@@ -1,4 +1,4 @@
-/*	$NetBSD: ppp-deflate.c,v 1.6.24.1 2002/03/20 23:32:56 he Exp $	*/
+/*	$NetBSD: ppp-deflate.c,v 1.11 2002/03/13 04:04:00 fvdl Exp $	*/
 /*	Id: ppp-deflate.c,v 1.5 1997/03/04 03:33:28 paulus Exp 	*/
 
 /*
@@ -30,8 +30,10 @@
  * OR MODIFICATIONS.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ppp-deflate.c,v 1.11 2002/03/13 04:04:00 fvdl Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <net/ppp_defs.h>
@@ -125,7 +127,7 @@ zalloc(notused, items, size)
 {
     void *ptr;
 
-    MALLOC(ptr, void *, items * size, M_DEVBUF, M_NOWAIT);
+    ptr = malloc(items * size, M_DEVBUF, M_NOWAIT);
     return ptr;
 }
 
@@ -134,7 +136,7 @@ zfree(notused, ptr)
     void *notused;
     void *ptr;
 {
-    FREE(ptr, M_DEVBUF);
+    free(ptr, M_DEVBUF);
 }
 
 /*
@@ -173,7 +175,7 @@ z_comp_alloc(options, opt_len)
     }
 
     state->w_size = w_size;
-    bzero(&state->stats, sizeof(state->stats));
+    memset(&state->stats, 0, sizeof(state->stats));
     return (void *) state;
 }
 
@@ -402,7 +404,7 @@ z_decomp_alloc(options, opt_len)
     }
 
     state->w_size = w_size;
-    bzero(&state->stats, sizeof(state->stats));
+    memset(&state->stats, 0, sizeof(state->stats));
     return (void *) state;
 }
 

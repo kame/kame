@@ -1,17 +1,21 @@
-#	$NetBSD: INSTALL,v 1.5 2000/03/22 00:58:19 cgd Exp $
+#	$NetBSD: INSTALL,v 1.21 2002/04/25 15:06:25 atatat Exp $
 #
 # First try for BEBOX config file
 #
 
 include "arch/bebox/conf/std.bebox"
 
+#options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
+
 maxusers	32
 
+makeoptions	COPTS="-Os"		# Optimise for space. Implies -O2
+
 # Enable the hooks used for initializing the root memory-disk.
-options		MEMORY_DISK_HOOKS
-options		MEMORY_DISK_IS_ROOT	# force root on memory disk
-options		MEMORY_DISK_SERVER=0	# no userspace memory disk support
-options		MINIROOTSIZE=3074	# size of memory disk, in blocks
+options 		MEMORY_DISK_HOOKS
+options 		MEMORY_DISK_IS_ROOT	# force root on memory disk
+options 		MEMORY_DISK_SERVER=0	# no userspace memory disk support
+options 		MEMORY_DISK_ROOT_SIZE=3074	# size of memory disk, in blocks
 
 #options 	IPKDBUSERHACK	# Allow access to mapped memory via kgdb
 #options 	DEBUG_BY_TOOLS	# Allow debugging from toolsnet
@@ -26,16 +30,19 @@ options		MINIROOTSIZE=3074	# size of memory disk, in blocks
 #options 	DDB
 #options 	DDB_HISTORY_SIZE=100	# Enable history editing in DDB
 #options 	KTRACE
+#options 	USERCONF		# userconf(4) support
+options		PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
 
-options 	TCP_COMPAT_42
+#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 #options 	COMPAT_43
 #options 	COMPAT_09
 options 	COMPAT_10
 options 	COMPAT_12
 options 	COMPAT_13
 options 	COMPAT_14
-options		COMPAT_386BSD_MBRPART	# recognize old partition ID
+options 		COMPAT_386BSD_MBRPART	# recognize old partition ID
 
+# File systems
 file-system 	FFS
 file-system	EXT2FS
 file-system 	MFS
@@ -50,11 +57,17 @@ file-system 	KERNFS
 #file-system 	UMAPFS
 #file-system 	UNION
 
+# Filesystem options
+#options 	NFS_V2_ONLY	# Exclude NFS3 and NQNFS code to save space
+#options 	VNODE_OP_NOINLINE # Save space by not inlining vnode op calls
+
 #options 	NFSSERVER
 
 options 	INET
 
-#options	NFS_BOOT_BOOTPARAM
+#options 	NFS_BOOT_BOOTPARAM
+
+#options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
 config		netbsd	root on ? type ffs
 
@@ -62,7 +75,7 @@ config		netbsd	root on ? type ffs
 pseudo-device	md		1
 pseudo-device	loop
 #pseudo-device	bpfilter	8	# packet filter
-pseudo-device	pty		64
+pseudo-device	pty		2	# pseudo-terminals (Sysinst needs two)
 
 #
 # device
@@ -74,6 +87,7 @@ options 	PCIVERBOSE	# verbose PCI device messages
 
 mainbus0 at root
 
+cpu*	at mainbus0
 pci0	at mainbus0 bus ?
 
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
@@ -89,7 +103,7 @@ com0	at isa? port 0x3f8 irq 4	# standard PC serial ports
 com1	at isa? port 0x2f8 irq 3
 #com2	at isa? port 0x380 irq 16
 #com3	at isa? port 0x388 irq 17
-  
+
 lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 #lpt1	at isa? port 0x278
 #lpt2	at isa? port 0x3bc
@@ -98,10 +112,9 @@ lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 #lms1	at isa? port 0x238 irq 5
 #mms0	at isa? port 0x23c irq 5	# Microsoft InPort mouse
 #mms1	at isa? port 0x238 irq 5
-#pms0	at pckbd? irq 12		# PS/2 auxiliary port mouse
 
-#ncr*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
-#scsibus* at ncr?
+#siop*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
+#scsibus* at siop?
 
 #sd*	at scsibus? target ? lun ?	# SCSI disk drives
 #st*	at scsibus? target ? lun ?	# SCSI tape drives

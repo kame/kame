@@ -1,4 +1,4 @@
-/* $NetBSD: jensenio_bus_intio.c,v 1.1.2.1 2000/07/12 20:59:11 thorpej Exp $ */
+/* $NetBSD: jensenio_bus_intio.c,v 1.1 2000/07/12 20:36:08 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: jensenio_bus_intio.c,v 1.1.2.1 2000/07/12 20:59:11 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: jensenio_bus_intio.c,v 1.1 2000/07/12 20:36:08 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

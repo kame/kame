@@ -1,4 +1,4 @@
-/*	$NetBSD: ydsreg.h,v 1.1.6.1 2001/05/01 11:45:26 he Exp $	*/
+/*	$NetBSD: ydsreg.h,v 1.1 2001/03/30 14:32:09 minoura Exp $	*/
 
 /*
  * Copyright (c) 2000, 2001 Kazuki Sakamoto and Minoura Makoto.

@@ -1,4 +1,4 @@
-/*	$NetBSD: sdvar.h,v 1.8.4.1 2000/10/18 00:11:13 tv Exp $	*/
+/*	$NetBSD: sdvar.h,v 1.9 2000/10/10 19:58:43 he Exp $	*/
 
 /*
  * Copyright (c) 1990, 1993

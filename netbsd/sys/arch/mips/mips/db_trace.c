@@ -1,4 +1,4 @@
-/*	$NetBSD: db_trace.c,v 1.14 2000/05/27 02:18:12 enami Exp $	*/
+/*	$NetBSD: db_trace.c,v 1.21 2002/03/05 15:12:58 simonb Exp $	*/
 
 /*
  * Mach Operating System
@@ -26,8 +26,11 @@
  * the rights to redistribute these changes.
  */
 
+#include <sys/types.h>
 #include <sys/param.h>
-#include <vm/vm_param.h>		/* XXX boolean_t */
+#include <sys/systm.h>
+#include <sys/proc.h>
+#include <sys/user.h>
 
 #include <mips/mips_opcode.h>
 
@@ -38,8 +41,8 @@
 #include <ddb/db_variables.h>
 #include <ddb/db_sym.h>
 
-int __start __P((void));	/* lowest kernel code address */
-vaddr_t getreg_val __P((db_expr_t regno));
+int __start(void);	/* lowest kernel code address */
+vaddr_t getreg_val(db_expr_t regno);
 
 #define REG_ARG(i)	(4+i)
 #define SAVES_RA(x)	isa_spill((x),31)
@@ -54,37 +57,27 @@ vaddr_t getreg_val __P((db_expr_t regno));
 		 ((int *)(&((struct mips_kernel_state *)0)->sp) - (int *)0):  \
 	 -1)
 
-db_sym_t localsym __P((db_sym_t sym, boolean_t isreg, int *lex_level));
+db_sym_t localsym(db_sym_t sym, boolean_t isreg, int *lex_level);
 
 /*
  * Machine register set.
  */
 struct mips_saved_state *db_cur_exc_frame = 0;
 
-/*
- *  forward declarations
- */
-int print_exception_frame __P((struct mips_saved_state *fp,
-			       unsigned epc));
-
 /*XXX*/
-void stacktrace_subr __P((int a0, int a1, int a2, int a3,
-			  u_int pc, u_int sp, u_int fp, u_int ra,
-			  void (*)(const char*, ...)));
+void	stacktrace_subr(int, int, int, int, u_int, u_int, u_int, u_int,
+	    void (*)(const char*, ...));
 
 /*
  * Stack trace helper.
  */
-void db_mips_stack_trace __P((int count, vaddr_t stackp,
-			      vaddr_t the_pc, vaddr_t the_ra, int flags,
-			      vaddr_t kstackp));
-int db_mips_variable_func __P((struct db_variable *vp, db_expr_t *valuep,
-			       int db_var_fun));
+void db_mips_stack_trace(int, vaddr_t, vaddr_t, vaddr_t, int, vaddr_t);
+int db_mips_variable_func(const struct db_variable *, db_expr_t *, int);
 
 #define DB_SETF_REGS db_mips_variable_func
 #define DBREGS_REG()
 
-struct db_variable db_regs[] = {
+const struct db_variable db_regs[] = {
 	{ "at",	(long *)&ddb_regs.f_regs[AST],  DB_SETF_REGS },
 	{ "v0",	(long *)&ddb_regs.f_regs[V0],  DB_SETF_REGS },
 	{ "v1",	(long *)&ddb_regs.f_regs[V1],  DB_SETF_REGS },
@@ -123,23 +116,48 @@ struct db_variable db_regs[] = {
 	{ "cs",	(long *)&ddb_regs.f_regs[CAUSE],  DB_SETF_REGS },
 	{ "pc",	(long *)&ddb_regs.f_regs[PC],  DB_SETF_REGS },
 };
-struct db_variable *db_eregs = db_regs + sizeof(db_regs)/sizeof(db_regs[0]);
+const struct db_variable * const db_eregs = db_regs + sizeof(db_regs)/sizeof(db_regs[0]);
 
 void
-db_stack_trace_print(addr, have_addr, count, modif, pr)
-	db_expr_t	addr;
-	boolean_t	have_addr;
-	db_expr_t	count;
-	char		*modif;
-	void		(*pr) __P((const char *, ...));
+db_stack_trace_print(db_expr_t addr, boolean_t have_addr, db_expr_t count,
+    char *modif, void (*pr)(const char *, ...))
 {
 #ifndef DDB_TRACE
-	stacktrace_subr(ddb_regs.f_regs[A0], ddb_regs.f_regs[A1],
-			ddb_regs.f_regs[A2], ddb_regs.f_regs[A3],
-			ddb_regs.f_regs[PC],
-			ddb_regs.f_regs[SP],
-			ddb_regs.f_regs[S8],	/* non-virtual frame pointer */
-			ddb_regs.f_regs[RA],
+	struct pcb *pcb;
+	struct proc *p;
+
+	if (!have_addr) {
+		stacktrace_subr(ddb_regs.f_regs[A0], ddb_regs.f_regs[A1],
+				ddb_regs.f_regs[A2], ddb_regs.f_regs[A3],
+				ddb_regs.f_regs[PC],
+				ddb_regs.f_regs[SP],
+				/* non-virtual frame pointer */
+				ddb_regs.f_regs[S8],
+				ddb_regs.f_regs[RA],
+				pr);
+		return;
+	}
+
+	/* "trace/t" */
+	(*pr)("pid %d ", (int)addr);
+	p = pfind(addr);
+	if (p == NULL) {
+		(*pr)("not found\n");
+		return;
+	}	
+	if (!(p->p_flag&P_INMEM)) {
+		(*pr)("swapped out\n");
+		return;
+	}
+
+	pcb = &(p->p_addr->u_pcb);
+	(*pr)("at %p\n", pcb);
+
+	stacktrace_subr(0,0,0,0,	/* no args known */
+			(int)cpu_switch,
+			pcb->pcb_context[8],
+			pcb->pcb_context[9],
+			pcb->pcb_context[10],
 			pr);
 #else
 /*
@@ -208,21 +226,19 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 }
 
 void
-db_mips_stack_trace(count, stackp, the_pc, the_ra, flags, kstackp)
-	int count;
-	vaddr_t stackp, the_pc, the_ra;
-	int flags;
-	vaddr_t kstackp;
+db_mips_stack_trace(int count, vaddr_t stackp, vaddr_t the_pc, vaddr_t the_ra,
+    int flags, vaddr_t kstackp)
 {
-	return;
+
+	/* nothing... */
 }
 
 
 int
-db_mips_variable_func (struct db_variable *vp,
-	db_expr_t *valuep,
-	int db_var_fcn)
+db_mips_variable_func (const struct db_variable *vp, db_expr_t *valuep,
+    int db_var_fcn)
 {
+
 	switch (db_var_fcn) {
 	case DB_VAR_GET:
 		*valuep = *(mips_reg_t *) vp->valuep;

@@ -1,4 +1,4 @@
-/*	$NetBSD: lkc.c,v 1.11 1999/06/06 19:10:49 ragge Exp $ */
+/*	$NetBSD: lkc.c,v 1.13 2002/02/25 14:58:09 ad Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -43,15 +43,15 @@
 
 #include <machine/vsbus.h>
 
-#include <dev/qbus/dzreg.h>
-#include <dev/qbus/dzvar.h>
+#include <dev/dec/dzreg.h>
+#include <dev/dec/dzvar.h>
 
 #include "ioconf.h"
 
-static  int lkc_match __P((struct device *, struct cfdata *, void *));
-static  void lkc_attach __P((struct device *, struct device *, void *));
-static	int lkc_catch __P((int, int));
-	int lkc_decode __P((int));
+static  int lkc_match(struct device *, struct cfdata *, void *);
+static  void lkc_attach(struct device *, struct device *, void *);
+static	int lkc_catch(int, int);
+	int lkc_decode(int);
 
 struct  lkc_softc {
 	struct  device ls_dev;

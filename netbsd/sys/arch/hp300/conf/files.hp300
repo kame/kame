@@ -1,4 +1,4 @@
-#	$NetBSD: files.hp300,v 1.42 2000/03/14 15:56:54 oster Exp $
+#	$NetBSD: files.hp300,v 1.55 2002/02/23 21:52:25 gmcgarry Exp $
 #
 # hp300-specific configuration info
 
@@ -8,11 +8,11 @@ maxpartitions 8
 maxusers 2 8 64
 
 # SPU configuration options.
-defopt	opt_spuconf.h HP320 HP330 HP340 HP345 HP350 HP360 HP370
-	HP375 HP380 HP385 HP400 HP425 HP433
+defflag	opt_spuconf.h	HP320 HP330 HP340 HP345 HP350 HP360 HP370
+			HP375 HP380 HP385 HP400 HP425 HP433
 
 # Misc. options.
-defopt	USELEDS		# make the lights twinkle
+defflag			USELEDS		# make the lights twinkle
 
 # NOTE!  The order of these lines is significant!  Don't change them
 # unless you absolutely know what you're doing!
@@ -43,6 +43,17 @@ file	arch/hp300/dev/dio.c		dio
 #
 # Devices in Internal i/o space
 #
+
+# Real-time clock (not optional)
+device	rtc
+attach	rtc at intio
+file	arch/hp300/dev/rtc.c			rtc
+
+# Human (Hilarious) Interface Loop
+device	hil { }
+attach	hil at intio
+file	arch/hp300/dev/hil.c			hil	needs-flag
+file	arch/hp300/dev/hil_keymaps.c		hil
 
 # Apollo Utilility Chip (a.k.a. "Frodo") found on 4xx workstations
 device	frodo { offset = -1 }
@@ -174,10 +185,9 @@ file	arch/hp300/dev/ac.c		ac needs-flag
 # RAIDframe
 major	{raid = 15}
 
-# Human (Hilarious) Interface Loop
-# XXX should be a real device
-file	arch/hp300/dev/hil.c
-file	arch/hp300/dev/hil_keymaps.c
+# Memory Disk for ramdisk
+file	dev/md_root.c			memory_disk_hooks
+major	{md = 14}
 
 #
 # Non-device files
@@ -196,21 +206,25 @@ file	arch/hp300/hp300/leds.c			useleds
 file	arch/hp300/hp300/mem.c
 file	arch/hp300/hp300/pmap.c
 file	arch/hp300/hp300/pmap_bootstrap.c	compile-with "${NOPROF_C}"
+file	arch/hp300/hp300/procfs_machdep.c	procfs
+file	arch/hp300/hp300/softintr.c
 file	arch/hp300/hp300/sys_machdep.c
 file	arch/hp300/hp300/trap.c
 file	arch/hp300/hp300/vm_machdep.c
 file	arch/hp300/hp300/disksubr.c
 file	arch/hp300/dev/dma.c
-file	arch/hp300/dev/md_root.c		memory_disk_hooks
 
+file	dev/clock_subr.c
 file	dev/cons.c
-file	dev/cninit.c
 
 #
 # HP-UX binary compatibility
 #
 include "compat/hpux/files.hpux"
 file	arch/hp300/hp300/hpux_machdep.c		compat_hpux
+
+# NetBSD m68k a.out Binary Compatibility (COMPAT_AOUT_M68K)
+include	"compat/aoutm68k/files.aoutm68k"
 
 # SVR4 Binary Compatibility (COMPAT_SVR4)
 include	"compat/svr4/files.svr4"
@@ -222,6 +236,7 @@ file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
 # Linux binary compatibility (COMPAT_LINUX)
 include "compat/linux/files.linux"
 include "compat/linux/arch/m68k/files.linux_m68k"
+file arch/m68k/m68k/linux_trap.c		compat_linux
 
 # a.out binary compatibility (COMPAT_AOUT)
 include "compat/aout/files.aout"

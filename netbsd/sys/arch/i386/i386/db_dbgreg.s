@@ -1,4 +1,4 @@
-/*	$NetBSD: db_dbgreg.s,v 1.2 1998/12/01 04:31:00 thorpej Exp $	*/
+/*	$NetBSD: db_dbgreg.s,v 1.4 2002/05/14 14:22:33 yamt Exp $	*/
 
 /* 
  * Mach Operating System
@@ -159,15 +159,17 @@ ENTRY(dr3)
 	shll	%cl, %eax
 	orl	%eax, %edx
 
+	shll	$1, %ecx
+
 	movzbl	B_ARG1, %eax
 	andb	$3, %al
-	addb	$0x10, %ecx
+	addb	$0x10, %cl
 	shll	%cl, %eax
 	orl	%eax, %edx
 
 	movzbl	B_ARG2, %eax
 	andb	$3, %al
-	addb	$0x2, %ecx
+	addb	$0x2, %cl
 	shll	%cl, %eax
 	orl	%eax, %edx
 
@@ -183,7 +185,7 @@ dr_msk:
 	.long	~0x00f0000c
 	.long	~0x0f000030
 	.long	~0xf00000c0
-ENTRY(dr_addr)
+_C_LABEL(dr_addr):
 	.long	0,0,0,0
 	.long	0,0,0,0
 	.text

@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_socket.c,v 1.22 2000/03/30 09:27:13 augustss Exp $	*/
+/*	$NetBSD: sys_socket.c,v 1.32 2001/11/12 15:25:25 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -35,6 +35,9 @@
  *	@(#)sys_socket.c	8.3 (Berkeley) 2/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sys_socket.c,v 1.32 2001/11/12 15:25:25 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/file.h>
@@ -45,12 +48,13 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/route.h>
 
 struct	fileops socketops =
-    { soo_read, soo_write, soo_ioctl, soo_fcntl, soo_poll, soo_close };
+    { soo_read, soo_write, soo_ioctl, soo_fcntl, soo_poll, soo_stat, soo_close};
 
 /* ARGSUSED */
 int
@@ -191,16 +195,17 @@ soo_poll(fp, events, p)
 }
 
 int
-soo_stat(so, ub)
-	struct socket *so;
+soo_stat(fp, ub, p)
+	struct file *fp;
 	struct stat *ub;
+	struct proc *p;
 {
+	struct socket *so = (struct socket *)fp->f_data;
 
 	memset((caddr_t)ub, 0, sizeof(*ub));
 	ub->st_mode = S_IFSOCK;
 	return ((*so->so_proto->pr_usrreq)(so, PRU_SENSE,
-	    (struct mbuf *)ub, (struct mbuf *)0, (struct mbuf *)0,
-	    (struct proc *)0));
+	    (struct mbuf *)ub, (struct mbuf *)0, (struct mbuf *)0, p));
 }
 
 /* ARGSUSED */

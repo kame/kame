@@ -1,4 +1,4 @@
-/*	$NetBSD: globals.c,v 1.3 1995/09/18 21:19:27 pk Exp $	*/
+/*	$NetBSD: globals.c,v 1.5 2002/03/15 13:23:34 simonb Exp $	*/
 
 /*
  *	globals.c:

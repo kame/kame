@@ -1,7 +1,7 @@
-/*	$NetBSD: svr4_exec.c,v 1.30 1999/10/25 13:55:07 kleink Exp $	 */
+/*	$NetBSD: svr4_exec.c,v 1.47 2001/11/13 02:09:21 lukem Exp $	 */
 
 /*-
- * Copyright (c) 1994 The NetBSD Foundation, Inc.
+ * Copyright (c) 1994, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,109 +36,50 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define	ELFSIZE		32				/* XXX should die */
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: svr4_exec.c,v 1.47 2001/11/13 02:09:21 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/proc.h>
-#include <sys/malloc.h>
-#include <sys/namei.h>
-#include <sys/vnode.h>
-#include <sys/exec_elf.h>
-#include <sys/exec.h>
 
-#include <sys/mman.h>
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_map.h>
-
-#include <machine/cpu.h>
-#include <machine/reg.h>
+#include <machine/svr4_machdep.h>
 
 #include <compat/svr4/svr4_types.h>
-#include <compat/svr4/svr4_util.h>
 #include <compat/svr4/svr4_syscall.h>
-#include <compat/svr4/svr4_exec.h>
 #include <compat/svr4/svr4_errno.h>
 #include <compat/svr4/svr4_signal.h>
+#include <compat/svr4/svr4_exec.h>
 
-static void *svr4_copyargs __P((struct exec_package *, struct ps_strings *,
-			       void *, void *));
-
-const char svr4_emul_path[] = "/emul/svr4";
 extern char svr4_sigcode[], svr4_esigcode[];
 extern struct sysent svr4_sysent[];
-extern char *svr4_syscallnames[];
+extern const char * const svr4_syscallnames[];
+#ifndef __HAVE_SYSCALL_INTERN
+void syscall __P((void));
+#endif
 
-struct emul emul_svr4 = {
+const struct emul emul_svr4 = {
 	"svr4",
+	"/emul/svr4",
+#ifndef __HAVE_MINIMAL_EMUL
+	0,
 	native_to_svr4_errno,
-	svr4_sendsig,
 	SVR4_SYS_syscall,
 	SVR4_SYS_MAXSYSCALL,
+#endif
 	svr4_sysent,
 	svr4_syscallnames,
-	SVR4_AUX_ARGSIZ,
-	svr4_copyargs,
-	svr4_setregs,
+	svr4_sendsig,
+	trapsignal,
 	svr4_sigcode,
 	svr4_esigcode,
-};
-
-static void *
-svr4_copyargs(pack, arginfo, stack, argp)
-	struct exec_package *pack;
-	struct ps_strings *arginfo;
-	void *stack;
-	void *argp;
-{
-	AuxInfo *a;
-
-	if (!(a = (AuxInfo *) elf32_copyargs(pack, arginfo, stack, argp)))
-		return NULL;
-#ifdef SVR4_COMPAT_SOLARIS2
-	if (pack->ep_emul_arg) {
-		a->au_type = AT_SUN_UID;
-		a->au_v = p->p_ucred->cr_uid;
-		a++;
-
-		a->au_type = AT_SUN_RUID;
-		a->au_v = p->p_cred->ruid;
-		a++;
-
-		a->au_type = AT_SUN_GID;
-		a->au_v = p->p_ucred->cr_gid;
-		a++;
-
-		a->au_type = AT_SUN_RGID;
-		a->au_v = p->p_cred->rgid;
-		a++;
-	}
+	svr4_setregs,
+	NULL,
+	NULL,
+	NULL,
+#ifdef __HAVE_SYSCALL_INTERN
+	svr4_syscall_intern,
+#else
+	syscall,
 #endif
-	return a;
-}
-
-int
-svr4_elf32_probe(p, epp, eh, itp, pos)
-	struct proc *p;
-	struct exec_package *epp;
-	Elf32_Ehdr *eh;
-	char *itp;
-	Elf32_Addr *pos;
-{
-	const char *bp;
-	int error;
-	size_t len;
-
-	if (itp[0]) {
-		if ((error = emul_find(p, NULL, svr4_emul_path, itp, &bp, 0)))
-			return error;
-		if ((error = copystr(bp, itp, MAXPATHLEN, &len)))
-			return error;
-		free((void *)bp, M_TEMP);
-	}
-	epp->ep_emul = &emul_svr4;
-	*pos = SVR4_INTERP_ADDR;
-	return 0;
-}
+};

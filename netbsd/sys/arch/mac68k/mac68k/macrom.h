@@ -1,4 +1,4 @@
-/*	$NetBSD: macrom.h,v 1.11.34.1 2000/11/15 20:28:43 tv Exp $	*/
+/*	$NetBSD: macrom.h,v 1.13 2001/12/09 19:07:01 briggs Exp $	*/
 
 /*-
  * Copyright (C) 1994	Bradley A. Grantham
@@ -239,6 +239,6 @@ int	mach_cputype __P((void));
 
 /* trace all instructions, not just flow changes. */
 #define tron() \
-	asm("movw sr, d0 ; orw #0x8000, d0 ; movw d0, sr" : : : "d0")
+	asm("movw %%sr, %%d0 ; orw #0x8000, %%d0 ; movw %%d0, %%sr" : : : "d0")
 #define troff() \
-	asm("movw sr, d0 ; andw #0x3fff, d0 ; movw d0, sr" : : : "d0")
+	asm("movw %%sr, %%d0 ; andw #0x3fff, %%d0 ; movw %%d0, %%sr" : : : "d0")

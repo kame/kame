@@ -1,4 +1,4 @@
-/* 	$NetBSD: intr.h,v 1.4 2000/06/11 23:33:37 matt Exp $	*/
+/* 	$NetBSD: intr.h,v 1.13 2001/06/04 15:34:57 ragge Exp $	*/
 
 /*
  * Copyright (c) 1998 Matt Thomas.
@@ -44,10 +44,11 @@
 #define IPL_CLOCK	0x18	/* clock */
 #define IPL_UBA		0x17	/* unibus adapters */
 #define IPL_IMP		0x17	/* memory allocation */
+#define IPL_NET		0x16	/* network */
 #define IPL_BIO		0x15	/* block I/O */
-#define IPL_NET		0x15	/* network */
 #define IPL_TTY		0x15	/* terminal */
 #define IPL_AUDIO	0x15	/* audio */
+#define IPL_IPI		0x14	/* interprocessor interrupt */
 #define IPL_CONSMEDIA	0x14	/* console media */
 
 /* Software interrupt level s are 0 (0x00) thru 15 (0x0f)
@@ -73,7 +74,7 @@
 ({								\
 	register int val;					\
 	__asm __volatile ("mfpr $0x12,%0;mtpr %1,$0x12"		\
-				: "&=g" (val)			\
+				: "=&g" (val)			\
 				: "g" (reg));			\
 	val;							\
 })
@@ -89,7 +90,7 @@
 ({								\
 	register int val;					\
 	__asm __volatile ("mfpr $0x12,%0"			\
-				: "&=g" (val)			\
+				: "=&g" (val)			\
 				: );				\
 	if ((reg) > val) {					\
 		_splset(reg);					\
@@ -112,15 +113,20 @@ do {								\
 #define splsoftserial()	_splraise(IPL_SOFTSERIAL)	/* IPL0D */
 #define splddb()	_splraise(IPL_SOFTDDB)		/* IPL0F */
 #define splconsmedia()	_splraise(IPL_CONSMEDIA)	/* IPL14 */
+#define	splipi()	_splraise(IPL_IPI)		/* IPL14 */
 #define splbio()	_splraise(IPL_BIO)		/* IPL15 */
-#define splnet()	_splraise(IPL_NET)		/* IPL15 */
 #define spltty()	_splraise(IPL_TTY)		/* IPL15 */
-#define splimp()	_splraise(IPL_IMP)		/* IPL17 */
+#define splnet()	_splraise(IPL_NET)		/* IPL16 */
+#define splvm()		_splraise(IPL_IMP)		/* IPL17 */
 #define splclock()	_splraise(IPL_CLOCK)		/* IPL18 */
 #define splhigh()	_splraise(IPL_HIGH)		/* IPL1F */
 #define splstatclock()	splclock()
 
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
+
 /* These are better to use when playing with VAX buses */
+#define	spluba()	_splraise(IPL_UBA)		/* IPL17 */
 #define spl4()		splx(0x14)
 #define spl5()		splx(0x15)
 #define spl6()		splx(0x16)
@@ -131,9 +137,6 @@ do {								\
 #define setsoftddb()	_setsirr(IPL_SOFTDDB)
 #define setsoftserial()	_setsirr(IPL_SOFTSERIAL)
 #define setsoftnet()	_setsirr(IPL_SOFTNET)
-#define setsoftclock()	_setsirr(IPL_SOFTCLOCK)
-
-#define __GENERIC_SOFT_INTERRUPTS
 
 #if !defined(_LOCORE)
 LIST_HEAD(sh_head, softintr_handler);

@@ -1,4 +1,4 @@
-/*	$NetBSD: dz_vsbus.c,v 1.11 1999/03/27 15:33:46 ragge Exp $ */
+/*	$NetBSD: dz_vsbus.c,v 1.22.4.1 2002/06/11 01:58:07 lukem Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -51,17 +51,26 @@
 #include <machine/cpu.h>
 #include <machine/scb.h>
 
-#include <machine/../vax/gencons.h>
+#include <arch/vax/vax/gencons.h>
 
-#include <vax/uba/dzreg.h>
-#include <vax/uba/dzvar.h>
+#include <dev/dec/dzreg.h>
+#include <dev/dec/dzvar.h>
 
 #include "ioconf.h"
-#include "lkc.h"
+#include "dzkbd.h"
+#include "dzms.h"
+#include "opt_cputype.h"
 
-static  int     dz_vsbus_match __P((struct device *, struct cfdata *, void *));
-static  void    dz_vsbus_attach __P((struct device *, struct device *, void *));
-static	int	dz_print __P((void *, const char *));
+#if NDZKBD > 0 || NDZMS > 0
+#include <dev/dec/dzkbdvar.h>
+
+#if 0
+static	struct dz_linestate dz_conslinestate = { NULL, -1, NULL, NULL, NULL };
+#endif
+#endif
+
+static  int     dz_vsbus_match(struct device *, struct cfdata *, void *);
+static  void    dz_vsbus_attach(struct device *, struct device *, void *);
 
 static	vaddr_t dz_regs; /* Used for console */
 
@@ -83,74 +92,122 @@ static volatile struct ss_dz {/* base address of DZ-controller: 0x200A0000 */
 #undef REG
 
 cons_decl(dz);
+cdev_decl(dz);
 
-int
-dz_print(aux, name)
-	void *aux;
-	const char *name;
+#if NDZKBD > 0 || NDZMS > 0
+static int
+dz_print(void *aux, const char *name)
 {
+#if 0
+#if NDZKBD > 0 || NDZMS > 0
+	struct dz_attach_args *dz_args = aux;
+	if (name == NULL) {
+		printf (" line %d", dz_args->line);
+		if (dz_args->hwflags & DZ_HWFLAG_CONSOLE)
+			printf (" (console)");
+	}
+	return (QUIET);
+#else
 	if (name)
 		printf ("lkc at %s", name);
 	return (UNCONF);
+#endif
+#endif
+	return (UNCONF);
 }
+#endif
 
 static int
-dz_vsbus_match(parent, cf, aux)
-	struct device *parent;
-	struct cfdata *cf;
-	void *aux;
+dz_vsbus_match(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct vsbus_attach_args *va = aux;
 	struct ss_dz *dzP;
 	short i;
 
+#if VAX53 || VAX49 || VAXANY
+	if (vax_boardtype == VAX_BTYP_53 || vax_boardtype == VAX_BTYP_49)
+		if (cf->cf_loc[0] != 0x25000000)
+			return 0; /* Ugly */
+#endif
+
 	dzP = (struct ss_dz *)va->va_addr;
 	i = dzP->tcr;
-	dzP->csr = DZ_CSR_MSE;
+	dzP->csr = DZ_CSR_MSE|DZ_CSR_TXIE;
 	dzP->tcr = 0;
 	DELAY(1000);
 	dzP->tcr = 1;
 	DELAY(100000);
 	dzP->tcr = i;
-	va->va_ivec = dzxint;
 
 	/* If the device doesn't exist, no interrupt has been generated */
 	return 1;
 }
 
 static void
-dz_vsbus_attach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+dz_vsbus_attach(struct device *parent, struct device *self, void *aux)
 {
-	struct  dz_softc *sc = (void *)self;
+	struct dz_softc *sc = (void *)self;
 	struct vsbus_attach_args *va = aux;
+#if NDZKBD > 0 || NDZMS > 0
+	struct dzkm_attach_args daa;
+#endif
+	int s;
 
-	sc->sc_dr.dr_csr = (void *)(dz_regs + 0);
-	sc->sc_dr.dr_rbuf = (void *)(dz_regs + 4);
-	sc->sc_dr.dr_dtr = (void *)(dz_regs + 9);
-	sc->sc_dr.dr_break = (void *)(dz_regs + 13);
-	sc->sc_dr.dr_tbuf = (void *)(dz_regs + 12);
-	sc->sc_dr.dr_tcr = (void *)(dz_regs + 8);
-	sc->sc_dr.dr_dcd = (void *)(dz_regs + 13);
-	sc->sc_dr.dr_ring = (void *)(dz_regs + 13);
+	/* 
+	 * XXX - This is evil and ugly, but...
+	 * due to the nature of how bus_space_* works on VAX, this will
+	 * be perfectly good until everything is converted.
+	 */
+	if (dz_regs == 0) /* This isn't console */
+		dz_regs = vax_map_physmem(va->va_paddr, 1);
+	sc->sc_ioh = dz_regs;
+	sc->sc_dr.dr_csr = 0;
+	sc->sc_dr.dr_rbuf = 4;
+	sc->sc_dr.dr_dtr = 9;
+	sc->sc_dr.dr_break = 13;
+	sc->sc_dr.dr_tbuf = 12;
+	sc->sc_dr.dr_tcr = 8;
+	sc->sc_dr.dr_dcd = 13;
+	sc->sc_dr.dr_ring = 13;
 
 	sc->sc_type = DZ_DZV;
 
 	sc->sc_dsr = 0x0f; /* XXX check if VS has modem ctrl bits */
-	scb_vecalloc(va->va_cvec - 4, dzrint, self->dv_unit, SCB_ISTACK);
+
+	scb_vecalloc(va->va_cvec, dzxint, sc, SCB_ISTACK, &sc->sc_tintrcnt);
+	scb_vecalloc(va->va_cvec - 4, dzrint, sc, SCB_ISTACK, &sc->sc_rintrcnt);
+
 	printf("\n%s: 4 lines", self->dv_xname);
 
-	dzattach(sc);
+	dzattach(sc, NULL);
+	DELAY(10000);
 
-	if (((vax_confdata & 0x80) == 0) ||/* workstation, have lkc */
-	    (vax_boardtype == VAX_BTYP_48))
-		config_found(self, 0, dz_print);
+#if NDZKBD > 0
+	/* Don't touch this port if this is the console */
+	if (cn_tab->cn_dev != makedev(getmajor(dzopen), 0)) {
+		dz->rbuf = DZ_LPR_RX_ENABLE | (DZ_LPR_B4800 << 8) 
+		    | DZ_LPR_8_BIT_CHAR;
+		daa.daa_line = 0;
+		daa.daa_flags =
+		    (cn_tab->cn_pri == CN_INTERNAL ? DZKBD_CONSOLE : 0);
+		config_found(self, &daa, dz_print);
+	}
+#endif
+#if NDZMS > 0
+	dz->rbuf = DZ_LPR_RX_ENABLE | (DZ_LPR_B4800 << 8) | DZ_LPR_7_BIT_CHAR \
+	    | DZ_LPR_PARENB | DZ_LPR_OPAR | 1 /* line */;
+	daa.daa_line = 1;
+	daa.daa_flags = 0;
+	config_found(self, &daa, dz_print);
+#endif
+	s = spltty();
+	dzrint(sc);
+	dzxint(sc);
+	splx(s);
 }
 
 int
-dzcngetc(dev) 
-	dev_t dev;
+dzcngetc(dev_t dev)
 {
 	int c = 0;
 	int mino = minor(dev);
@@ -171,14 +228,12 @@ dzcngetc(dev)
 	return (c);
 }
 
-#define	DZMAJOR	1
-
 void
-dzcnprobe(cndev)
-	struct	consdev *cndev;
+dzcnprobe(struct consdev *cndev)
 {
 	extern	vaddr_t iospace;
 	int diagcons;
+	paddr_t ioaddr = 0x200A0000;
 
 	switch (vax_boardtype) {
 	case VAX_BTYP_410:
@@ -193,6 +248,8 @@ dzcnprobe(cndev)
 		break;
 
 	case VAX_BTYP_49:
+	case VAX_BTYP_53:
+		ioaddr = 0x25000000;
 		diagcons = 3;
 		break;
 
@@ -204,14 +261,13 @@ dzcnprobe(cndev)
 		cndev->cn_pri = CN_REMOTE;
 	else
 		cndev->cn_pri = CN_NORMAL;
-	cndev->cn_dev = makedev(DZMAJOR, diagcons);
-	dz_regs = iospace;
-	ioaccess(iospace, 0x200A0000, 1);
+	cndev->cn_dev = makedev(getmajor(dzopen), diagcons);
+	(vaddr_t)dz = dz_regs = iospace;
+	ioaccess(iospace, ioaddr, 1);
 }
 
 void
-dzcninit(cndev)
-	struct	consdev *cndev;
+dzcninit(struct consdev *cndev)
 {
 	dz = (void*)dz_regs;
 
@@ -222,9 +278,7 @@ dzcninit(cndev)
 
 
 void
-dzcnputc(dev,ch)
-	dev_t	dev;
-	int	ch;
+dzcnputc(dev_t dev, int	ch)
 {
 	int timeout = 1<<15;            /* don't hang the machine! */
 	int mino = minor(dev);
@@ -249,9 +303,7 @@ dzcnputc(dev,ch)
 }
 
 void 
-dzcnpollc(dev, pollflag)
-	dev_t dev;
-	int pollflag;
+dzcnpollc(dev_t dev, int pollflag)
 {
 	static	u_char mask;
 
@@ -261,43 +313,42 @@ dzcnpollc(dev, pollflag)
 		vsbus_setmask(mask);
 }
 
-#if NLKC
-cons_decl(lkc);
+#if NDZKBD > 0 || NDZMS > 0
+int
+dzgetc(struct dz_linestate *ls)
+{
+	int line = ls->dz_line;
+	u_short rbuf;
+
+	for (;;) {
+		for(; (dz->csr & DZ_CSR_RX_DONE) == 0;);
+		rbuf = dz->rbuf;
+		if (((rbuf >> 8) & 3) == line)
+			return (rbuf & 0xff);
+	}
+}
 
 void
-lkccninit(cndev)
-	struct	consdev *cndev;
+dzputc(struct dz_linestate *ls, int ch)
 {
-	dz = (void*)dz_regs;
+	int line = 0; /* = ls->dz_line; */
+	u_short tcr;
+	int s;
 
-	dz->csr = 0;    /* Disable scanning until initting is done */
-	dz->tcr = 1;    /* Turn off all but line 0's xmitter */
-	dz->rbuf = 0x1c18; /* XXX */
-	dz->csr = 0x20; /* Turn scanning back on */
+	/* if the dz has already been attached, the MI
+	   driver will do the transmitting: */
+	if (ls && ls->dz_sc) {
+		s = spltty();
+		putc(ch, &ls->dz_sc->sc_dz[line].dz_tty->t_outq);
+		tcr = dz->tcr;
+		if (!(tcr & (1 << line)))
+			dz->tcr = tcr | (1 << line);
+		dzxint(ls->dz_sc);
+		splx(s);
+		return;
+	}
+
+	/* use dzcnputc to do the transmitting: */
+	dzcnputc(makedev(getmajor(dzopen), line), ch);
 }
-
-int
-lkccngetc(dev) 
-	dev_t dev;
-{
-	int lkc_decode(int);
-	int c;
-//	u_char mask;
-
-	
-//	mask = vsbus_setmask(0);	/* save old state */
-
-loop:
-	while ((dz->csr & 0x80) == 0)
-		; /* Wait for char */
-
-	c = lkc_decode(dz->rbuf & 255);
-	if (c < 1)
-		goto loop;
-
-//	vsbus_clrintr(0x80); /* XXX */
-//	vsbus_setmask(mask);
-
-	return (c);
-}
-#endif
+#endif /* NDZKBD > 0 || NDZMS > 0 */

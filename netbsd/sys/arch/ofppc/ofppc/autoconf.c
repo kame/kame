@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.9 2000/06/01 15:38:26 matt Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.11 2001/08/26 02:47:40 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -37,9 +37,9 @@
 #include <sys/reboot.h>
 #include <sys/systm.h>
 
+#include <machine/autoconf.h>
 #include <machine/powerpc.h>
 
-void configure __P((void));
 static void findroot __P((void));
 
 struct device *booted_device;	/* boot device */
@@ -84,14 +84,16 @@ findroot()
 	/*
 	 * Try to find the device where we were booted from.
 	 */
-	for (cp = bootpath + strlen(bootpath); --cp >= bootpath;) {
-		if (*cp == '/') {
-			*cp = '\0';
-			if (!dk_match(bootpath)) {
+	if (bootpath != NULL) {
+		for (cp = bootpath + strlen(bootpath); --cp >= bootpath;) {
+			if (*cp == '/') {
+				*cp = '\0';
+				if (!dk_match(bootpath)) {
+					*cp = '/';
+					break;
+				}
 				*cp = '/';
-				break;
 			}
-			*cp = '/';
 		}
 	}
 	dk_cleanup();

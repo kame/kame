@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.c,v 1.7.4.1 2000/06/30 16:27:45 simonb Exp $	*/
+/*	$NetBSD: bus.c,v 1.18 2001/12/19 14:53:26 minoura Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,13 +48,17 @@
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/device.h>
-
-#include <vm/vm.h>
-#include <vm/vm_page.h>
+#include <sys/proc.h>
 
 #include <uvm/uvm_extern.h>
 
+#include <m68k/cacheops.h>
 #include <machine/bus.h>
+
+#if defined(M68040) || defined(M68060)
+static inline void dmasync_flush(bus_addr_t, bus_size_t);
+static inline void dmasync_inval(bus_addr_t, bus_size_t);
+#endif
 
 int
 x68k_bus_space_alloc(t, rstart, rend, size, alignment, boundary, flags,
@@ -320,6 +324,54 @@ x68k_bus_dmamap_unload(t, map)
 	map->dm_nsegs = 0;
 }
 
+#if defined(M68040) || defined(M68060)
+static inline void
+dmasync_flush(bus_addr_t addr, bus_size_t len)
+{
+	bus_addr_t end = addr+len;
+
+	if (len <= 1024) {
+		addr = addr & ~0xF;
+
+		do {
+			DCFL(addr);
+			addr += 16;
+		} while (addr < end);
+	} else {
+		addr = m68k_trunc_page(addr);
+
+		do {
+			DCFP(addr);
+			addr += NBPG;
+		} while (addr < end);
+	}
+}
+
+static inline void
+dmasync_inval(bus_addr_t addr, bus_size_t len)
+{
+	bus_addr_t end = addr+len;
+
+	if (len <= 1024) {
+		addr = addr & ~0xF;
+
+		do {
+			DCFL(addr);
+			ICPL(addr);
+			addr += 16;
+		} while (addr < end);
+	} else {
+		addr = m68k_trunc_page(addr);
+
+		do {
+			DCPL(addr);
+			ICPP(addr);
+			addr += NBPG;
+		} while (addr < end);
+	}
+}
+#endif
+
 /*
  * Common function for DMA map synchronization.  May be called
  * by bus-specific DMA map synchronization functions.
@@ -332,8 +384,50 @@ x68k_bus_dmamap_sync(t, map, offset, len, ops)
 	bus_size_t len;
 	int ops;
 {
+#if defined(M68040) || defined(M68060)
+	bus_dma_segment_t *ds = map->dm_segs;
+	bus_addr_t seg;
+	int i;
 
-	/* Nothing to do here. */
+	if ((ops & (BUS_DMASYNC_PREREAD|BUS_DMASYNC_POSTWRITE)) == 0)
+		return;
+#if defined(M68020) || defined(M68030)
+	if (mmutype != MMU_68040) {
+		if ((ops & BUS_DMASYNC_POSTWRITE) == 0)
+			return;	/* no copyback cache */
+		ICIA();		/* no per-page/per-line control */
+		DCIA();
+		return;
+	}		
+#endif
+	if (offset >= map->dm_mapsize)
+		return;	/* driver bug; warn it? */
+	if (offset+len > map->dm_mapsize)
+		len = map->dm_mapsize; /* driver bug; warn it? */
+
+	i = 0;
+	while (ds[i].ds_len <= offset) {
+		offset -= ds[i++].ds_len;
+		continue;
+	}
+	while (len > 0) {
+		seg = ds[i].ds_len - offset;
+		if (seg > len)
+			seg = len;
+		if (mmutype == MMU_68040 && (ops & BUS_DMASYNC_PREWRITE))
+			dmasync_flush(ds[i].ds_addr+offset, seg);
+		if (ops & BUS_DMASYNC_POSTREAD)
+			dmasync_inval(ds[i].ds_addr+offset, seg);
+		offset = 0;
+		len -= seg;
+		i++;
+	}
+#else  /* no 040/060 */
+	if ((ops & BUS_DMASYNC_POSTWRITE)) {
+		ICIA();		/* no per-page/per-line control */
+		DCIA();
+	}
+#endif
 }
 
 /*
@@ -364,7 +458,7 @@ x68k_bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -401,7 +495,6 @@ x68k_bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	vaddr_t va;
 	bus_addr_t addr;
 	int curseg;
-	extern vm_map_t kernel_map;
 
 	size = round_page(size);
 
@@ -423,6 +516,7 @@ x68k_bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }
@@ -437,10 +531,8 @@ x68k_bus_dmamem_unmap(t, kva, size)
 	caddr_t kva;
 	size_t size;
 {
-	extern vm_map_t kernel_map;
-
 #ifdef DIAGNOSTIC
-	if ((u_long)kva & PGOFSET)
+	if (m68k_page_offset(kva))
 		panic("x68k_bus_dmamem_unmap");
 #endif
 
@@ -465,11 +557,11 @@ x68k_bus_dmamem_mmap(t, segs, nsegs, off, prot, flags)
 
 	for (i = 0; i < nsegs; i++) {
 #ifdef DIAGNOSTIC
-		if (off & PGOFSET)
+		if (m68k_page_offset(off))
 			panic("x68k_bus_dmamem_mmap: offset unaligned");
-		if (segs[i].ds_addr & PGOFSET)
+		if (m68k_page_offset(segs[i].ds_addr))
 			panic("x68k_bus_dmamem_mmap: segment unaligned");
-		if (segs[i].ds_len & PGOFSET)
+		if (m68k_page_offset(segs[i].ds_len))
 			panic("x68k_bus_dmamem_mmap: segment size not multiple"
 			    " of page size");
 #endif
@@ -539,7 +631,7 @@ x68k_bus_dmamap_load_buffer(map, buf, buflen, p, flags,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = NBPG - m68k_page_offset(vaddr);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -609,7 +701,7 @@ x68k_bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	paddr_t high;
 {
 	paddr_t curaddr, lastaddr;
-	vm_page_t m;
+	struct vm_page *m;
 	struct pglist mlist;
 	int curseg, error;
 
@@ -639,7 +731,7 @@ x68k_bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 		curaddr = VM_PAGE_TO_PHYS(m);
 #ifdef DIAGNOSTIC
 		if (curaddr < low || curaddr >= high) {
-			printf("vm_page_alloc_memory returned non-sensical"
+			printf("uvm_pglistalloc returned non-sensical"
 			    " address 0x%lx\n", curaddr);
 			panic("x68k_bus_dmamem_alloc_range");
 		}

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.c,v 1.19.4.2 2000/07/06 11:29:58 leo Exp $	*/
+/*	$NetBSD: bus.c,v 1.31 2002/01/09 20:54:14 leo Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -42,21 +42,22 @@
 #include <sys/extent.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/proc.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <m68k/cacheops.h>
+#define	_ATARI_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 
-static int  _bus_dmamap_load_buffer __P((bus_dma_tag_t tag, bus_dmamap_t,
-		void *, bus_size_t, struct proc *, int, paddr_t *,
-		int *, int));
-static int  _bus_dmamem_alloc_range __P((bus_dma_tag_t tag, bus_size_t size,
+int  bus_dmamem_alloc_range __P((bus_dma_tag_t tag, bus_size_t size,
 		bus_size_t alignment, bus_size_t boundary,
 		bus_dma_segment_t *segs, int nsegs, int *rsegs, int flags,
 		paddr_t low, paddr_t high));
+static int  _bus_dmamap_load_buffer __P((bus_dma_tag_t tag, bus_dmamap_t,
+		void *, bus_size_t, struct proc *, int, paddr_t *,
+		int *, int));
 static int  bus_mem_add_mapping __P((bus_space_tag_t t, bus_addr_t bpa,
 		bus_size_t size, int flags, bus_space_handle_t *bsph));
 
@@ -153,7 +154,6 @@ bus_size_t		size;
 int			flags;
 bus_space_handle_t	*mhp;
 {
-	paddr_t	pa, endpa;
 	int	error;
 
 	/*
@@ -165,9 +165,6 @@ bus_space_handle_t	*mhp;
 
 	if (error)
 		return (error);
-
-	pa    = m68k_trunc_page(bpa + t->base);
-	endpa = m68k_round_page((bpa + t->base + size) - 1);
 
 	error = bus_mem_add_mapping(t, bpa, size, flags, mhp);
 	if (error) {
@@ -285,6 +282,7 @@ bus_space_handle_t	*bshp;
 
 		*ptep = npte;
 	}
+	pmap_update(pmap_kernel());
 	TBIAS();
 	return (0);
 }
@@ -337,12 +335,31 @@ bus_space_handle_t	*mhp;
 	return 0;
 }
 
+paddr_t
+bus_space_mmap(t, addr, off, prot, flags)
+	bus_space_tag_t t;
+	bus_addr_t addr;
+	off_t off;
+	int prot;
+	int flags;
+{
+
+	/*
+	 * "addr" is the base address of the device we're mapping.
+	 * "off" is the offset into that device.
+	 *
+	 * Note we are called for each "page" in the device that
+	 * the upper layers want to map.
+	 */
+	return (m68k_btop(addr + off));
+}
+
 /*
  * Common function for DMA map creation.  May be called by bus-specific
  * DMA map creation functions.
  */
 int
-bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
+_bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	bus_dma_tag_t t;
 	bus_size_t size;
 	int nsegments;
@@ -392,7 +409,7 @@ bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
  * DMA map destruction functions.
  */
 void
-bus_dmamap_destroy(t, map)
+_bus_dmamap_destroy(t, map)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
 {
@@ -405,7 +422,7 @@ bus_dmamap_destroy(t, map)
  * be called by bus-specific DMA map load functions.
  */
 int
-bus_dmamap_load(t, map, buf, buflen, p, flags)
+_bus_dmamap_load(t, map, buf, buflen, p, flags)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
 	void *buf;
@@ -439,7 +456,7 @@ bus_dmamap_load(t, map, buf, buflen, p, flags)
  * Like _bus_dmamap_load(), but for mbufs.
  */
 int
-bus_dmamap_load_mbuf(t, map, m0, flags)
+_bus_dmamap_load_mbuf(t, map, m0, flags)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
 	struct mbuf *m0;
@@ -482,7 +499,7 @@ bus_dmamap_load_mbuf(t, map, m0, flags)
  * Like _bus_dmamap_load(), but for uios.
  */
 int
-bus_dmamap_load_uio(t, map, uio, flags)
+_bus_dmamap_load_uio(t, map, uio, flags)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
 	struct uio *uio;
@@ -541,7 +558,7 @@ bus_dmamap_load_uio(t, map, uio, flags)
  * bus_dmamem_alloc().
  */
 int
-bus_dmamap_load_raw(t, map, segs, nsegs, size, flags)
+_bus_dmamap_load_raw(t, map, segs, nsegs, size, flags)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
 	bus_dma_segment_t *segs;
@@ -558,7 +575,7 @@ bus_dmamap_load_raw(t, map, segs, nsegs, size, flags)
  * bus-specific DMA map unload functions.
  */
 void
-bus_dmamap_unload(t, map)
+_bus_dmamap_unload(t, map)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
 {
@@ -576,7 +593,7 @@ bus_dmamap_unload(t, map)
  * by bus-specific DMA map synchronization functions.
  */
 void
-bus_dmamap_sync(t, map, off, len, ops)
+_bus_dmamap_sync(t, map, off, len, ops)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
 	bus_addr_t off;
@@ -587,9 +604,7 @@ bus_dmamap_sync(t, map, off, len, ops)
 	int	i, pa_off, inc, seglen;
 	u_long	pa, end_pa;
 
-	if (t == BUS_PCI_DMA_TAG)
-		pa_off = 0x80000000; /* XXX */
-	else pa_off = 0;
+	pa_off = t->_displacement;
 
 	/* Flush granularity */
 	inc = (len > 1024) ? NBPG : 16;
@@ -638,7 +653,7 @@ bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 	int flags;
 {
 
-	return (_bus_dmamem_alloc_range(t, size, alignment, boundary,
+	return (bus_dmamem_alloc_range(t, size, alignment, boundary,
 	    segs, nsegs, rsegs, flags, 0, trunc_page(avail_end)));
 }
 
@@ -652,14 +667,12 @@ bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr, offset;
 	struct pglist mlist;
 	int curseg;
 
-	if (t == BUS_PCI_DMA_TAG)
-		offset = 0x80000000; /* XXX */
-	else offset = 0;
+	offset = t->_displacement;
 
 	/*
 	 * Build a list of pages to free back to the VM system.
@@ -694,9 +707,7 @@ bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	bus_addr_t addr, offset;
 	int curseg;
 
-	if (t == BUS_PCI_DMA_TAG)
-		offset = 0x80000000; /* XXX */
-	else offset = 0;
+	offset = t->_displacement;
 
 	size = round_page(size);
 
@@ -718,6 +729,7 @@ bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }
@@ -757,9 +769,7 @@ bus_dmamem_mmap(t, segs, nsegs, off, prot, flags)
 {
 	int i, offset;
 
-	if (t == BUS_PCI_DMA_TAG)
-		offset = 0x80000000; /* XXX */
-	else offset = 0;
+	offset = t->_displacement;
 
 	for (i = 0; i < nsegs; i++) {
 #ifdef DIAGNOSTIC
@@ -811,10 +821,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 	int seg;
 	pmap_t pmap;
 
-	if (t == BUS_PCI_DMA_TAG)
-		offset = 0x80000000; /* XXX */
-	else
-		offset = 0;
+	offset = t->_displacement;
 
 	if (p != NULL)
 		pmap = p->p_vmspace->vm_map.pmap;
@@ -890,8 +897,8 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
  * Allocate physical memory from the given physical address range.
  * Called by DMA-safe memory allocation methods.
  */
-static int
-_bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
+int
+bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
     flags, low, high)
 	bus_dma_tag_t t;
 	bus_size_t size, alignment, boundary;
@@ -904,13 +911,11 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 {
 	paddr_t curaddr, lastaddr;
 	bus_addr_t offset;
-	vm_page_t m;
+	struct vm_page *m;
 	struct pglist mlist;
 	int curseg, error;
 
-	if (t == BUS_PCI_DMA_TAG)
-		offset = 0x80000000; /* XXX */
-	else offset = 0;
+	offset = t->_displacement;
 
 	/* Always round the size. */
 	size = round_page(size);
@@ -939,7 +944,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 		curaddr = VM_PAGE_TO_PHYS(m);
 #ifdef DIAGNOSTIC
 		if (curaddr < low || curaddr >= high) {
-			printf("vm_page_alloc_memory returned non-sensical"
+			printf("uvm_pglistalloc returned non-sensical"
 			    " address 0x%lx\n", curaddr);
 			panic("_bus_dmamem_alloc_range");
 		}

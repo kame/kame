@@ -1,4 +1,4 @@
-/*	 $NetBSD: rasops.c,v 1.32 2000/06/13 13:36:53 ad Exp $	*/
+/*	 $NetBSD: rasops.c,v 1.39 2002/03/13 15:05:15 ad Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,12 +37,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rasops.c,v 1.32 2000/06/13 13:36:53 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rasops.c,v 1.39 2002/03/13 15:05:15 ad Exp $");
 
 #include "opt_rasops.h"
 #include "rasops_glue.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -114,7 +113,7 @@ static void	rasops_do_cursor __P((struct rasops_info *));
 static void	rasops_init_devcmap __P((struct rasops_info *));
 
 /*
- * Initalize a 'rasops_info' descriptor.
+ * Initialize a 'rasops_info' descriptor.
  */
 int
 rasops_init(ri, wantrows, wantcols)
@@ -130,16 +129,18 @@ rasops_init(ri, wantrows, wantcols)
 		wsfont_init();
 
 		/* Want 8 pixel wide, don't care about aestethics */
-		if ((cookie = wsfont_find(NULL, 8, 0, 0)) <= 0)
-			cookie = wsfont_find(NULL, 0, 0, 0);
+		cookie = wsfont_find(NULL, 8, 0, 0, WSDISPLAY_FONTORDER_L2R,
+		    WSDISPLAY_FONTORDER_L2R);
+		if (cookie <= 0)
+			cookie = wsfont_find(NULL, 0, 0, 0,
+			    WSDISPLAY_FONTORDER_L2R, WSDISPLAY_FONTORDER_L2R);
 
 		if (cookie <= 0) {
 			printf("rasops_init: font table is empty\n");
 			return (-1);
 		}
 
-		if (wsfont_lock(cookie, &ri->ri_font,
-		    WSDISPLAY_FONTORDER_L2R, WSDISPLAY_FONTORDER_L2R) <= 0) {
+		if (wsfont_lock(cookie, &ri->ri_font)) {
 			printf("rasops_init: couldn't lock font\n");
 			return (-1);
 		}
@@ -234,7 +235,8 @@ rasops_reconfig(ri, wantrows, wantcols)
 	ri->ri_origbits = ri->ri_bits;
 
 	if ((ri->ri_flg & RI_CENTER) != 0) {
-		ri->ri_bits += ((ri->ri_stride - ri->ri_emustride) >> 1) & ~3;
+		ri->ri_bits += (((ri->ri_width * bpp >> 3) - 
+		    ri->ri_emustride) >> 1) & ~3;
 		ri->ri_bits += ((ri->ri_height - ri->ri_emuheight) >> 1) *
 		    ri->ri_stride;
 
@@ -275,6 +277,11 @@ rasops_reconfig(ri, wantrows, wantcols)
 #if NRASOPS2 > 0
 	case 2:
 		rasops2_init(ri);
+		break;
+#endif
+#if NRASOPS4 > 0
+	case 4:
+		rasops4_init(ri);
 		break;
 #endif
 #if NRASOPS8 > 0
@@ -326,6 +333,14 @@ rasops_mapchar(cookie, c, cp)
 	if (ri->ri_font == NULL)
 		panic("rasops_mapchar: no font selected\n");
 #endif
+
+	if (ri->ri_font->encoding != WSDISPLAY_FONTENC_ISO) {
+		if ( (c = wsfont_map_unichar(ri->ri_font, c)) < 0) {
+			*cp = ' ';
+			return (0);
+
+		}
+	}
 
 	if (c < ri->ri_font->firstchar) {
 		*cp = ' ';

@@ -1,4 +1,4 @@
-/*	$NetBSD: xd.c,v 1.27.2.4 2001/05/06 13:27:40 he Exp $	*/
+/*	$NetBSD: xd.c,v 1.40 2002/01/14 13:32:48 tsutsui Exp $	*/
 
 /*
  *
@@ -50,6 +50,9 @@
  * VME card (found in many VME based suns).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: xd.c,v 1.40 2002/01/14 13:32:48 tsutsui Exp $");
+
 #undef XDC_DEBUG		/* full debug */
 #define XDC_DIAG		/* extra sanity checks */
 #if defined(DIAGNOSTIC) && !defined(XDC_DIAG)
@@ -72,9 +75,6 @@
 #include <sys/syslog.h>
 #include <sys/dkbad.h>
 #include <sys/conf.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -396,16 +396,17 @@ xd_dmamem_alloc(tag, map, seg, nsegp, len, kvap, dmap)
 		return (error);
 	}
 
-	if ((error = bus_dmamap_load_raw(tag, map,
-					seg, nseg, len, BUS_DMA_NOWAIT)) != 0) {
+	if ((error = bus_dmamem_map(tag, seg, nseg,
+				    len, kvap,
+				    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
 		bus_dmamem_free(tag, seg, nseg);
 		return (error);
 	}
 
-	if ((error = bus_dmamem_map(tag, seg, nseg,
-				    len, kvap,
-				    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
-		bus_dmamap_unload(tag, map);
+	if ((error = bus_dmamap_load(tag, map,
+				     *kvap, len, NULL,
+				     BUS_DMA_NOWAIT)) != 0) {
+		bus_dmamem_unmap(tag, *kvap, len);
 		bus_dmamem_free(tag, seg, nseg);
 		return (error);
 	}
@@ -578,10 +579,10 @@ xdcattach(parent, self, aux)
 	bzero(xdc->iopbase, XDC_MAXIOPB * sizeof(struct xd_iopb));
 
 	xdc->reqs = (struct xd_iorq *)
-	    malloc(XDC_MAXIOPB * sizeof(struct xd_iorq), M_DEVBUF, M_NOWAIT);
+	    malloc(XDC_MAXIOPB * sizeof(struct xd_iorq),
+	    M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (xdc->reqs == NULL)
 		panic("xdc malloc");
-	bzero(xdc->reqs, XDC_MAXIOPB * sizeof(struct xd_iorq));
 
 	/* init free list, iorq to iopb pointers, and non-zero fields in the
 	 * iopb which never change. */
@@ -1495,7 +1496,7 @@ xdc_rqtopb(iorq, iopb, cmd, subfun)
 /*
  * xdc_cmd: front end for POLL'd and WAIT'd commands.  Returns rqno.
  * If you've already got an IORQ, you can call submit directly (currently
- * there is no need to do this).    NORM requests are handled seperately.
+ * there is no need to do this).    NORM requests are handled separately.
  */
 int
 xdc_cmd(xdcsc, cmd, subfn, unit, block, scnt, dptr, fullmode)
@@ -1629,7 +1630,7 @@ xdc_startbuf(xdcsc, xdsc, bp)
 	/* init iorq and load iopb from it */
 	xdc_rqinit(iorq, xdcsc, xdsc, XD_SUB_NORM | XD_MODE_VERBO, block,
 		   bp->b_bcount / XDFM_BPS,
-		   (caddr_t)iorq->dmamap->dm_segs[0].ds_addr,
+		   (caddr_t)(u_long)iorq->dmamap->dm_segs[0].ds_addr,
 		   bp);
 
 	xdc_rqtopb(iorq, iopb, (bp->b_flags & B_READ) ? XDCMD_RD : XDCMD_WR, 0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: z8530tty.c,v 1.6 2000/03/26 08:29:12 tsubai Exp $	*/
+/*	$NetBSD: z8530tty.c,v 1.12 2002/03/17 19:40:44 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999
@@ -97,6 +97,8 @@
  * The driver was massively overhauled in November 1997 by Charles Hannum,
  * fixing *many* bugs, and substantially improving performance.
  */
+
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -540,7 +542,7 @@ zsopen(dev, flags, mode, p)
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 	if (error)
 		goto bad;
 
@@ -575,7 +577,7 @@ zsclose(dev, flags, mode, p)
 	if (!ISSET(tp->t_state, TS_ISOPEN))
 		return 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flags);
+	(*tp->t_linesw->l_close)(tp, flags);
 	ttyclose(tp);
 
 	if (!ISSET(tp->t_state, TS_ISOPEN) && tp->t_wopen == 0) {
@@ -602,7 +604,7 @@ zsread(dev, uio, flags)
 	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(dev)];
 	struct tty *tp = zst->zst_tty;
 
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flags));
+	return ((*tp->t_linesw->l_read)(tp, uio, flags));
 }
 
 int
@@ -614,7 +616,19 @@ zswrite(dev, uio, flags)
 	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(dev)];
 	struct tty *tp = zst->zst_tty;
 
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flags));
+	return ((*tp->t_linesw->l_write)(tp, uio, flags));
+}
+
+int
+zspoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct zstty_softc *zst = zstty_cd.cd_devs[ZSUNIT(dev)];
+	struct tty *tp = zst->zst_tty;
+ 
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 int
@@ -631,17 +645,17 @@ zsioctl(dev, cmd, data, flag, p)
 	int error;
 	int s;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 #ifdef	ZS_MD_IOCTL
-	error = ZS_MD_IOCTL;
-	if (error >= 0)
+	error = ZS_MD_IOCTL(cs, cmd, data);
+	if (error != EPASSTHROUGH)
 		return (error);
 #endif	/* ZS_MD_IOCTL */
 
@@ -688,7 +702,7 @@ zsioctl(dev, cmd, data, flag, p)
 		break;
 
 	default:
-		error = ENOTTY;
+		error = EPASSTHROUGH;
 		break;
 	}
 
@@ -1333,7 +1347,7 @@ zstty_rxsoft(zst, tp)
 	struct tty *tp;
 {
 	struct zs_chanstate *cs = zst->zst_cs;
-	int (*rint) __P((int c, struct tty *tp)) = linesw[tp->t_line].l_rint;
+	int (*rint) __P((int c, struct tty *tp)) = tp->t_linesw->l_rint;
 	u_char *get, *end;
 	u_int cc, scc;
 	u_char rr1;
@@ -1436,7 +1450,7 @@ zstty_txsoft(zst, tp)
 		CLR(tp->t_state, TS_FLUSH);
 	else
 		ndflush(&tp->t_outq, (int)(zst->zst_tba - tp->t_outq.c_cf));
-	(*linesw[tp->t_line].l_start)(tp);
+	(*tp->t_linesw->l_start)(tp);
 }
 
 integrate void
@@ -1458,14 +1472,14 @@ zstty_stsoft(zst, tp)
 		/*
 		 * Inform the tty layer that carrier detect changed.
 		 */
-		(void) (*linesw[tp->t_line].l_modem)(tp, ISSET(rr0, ZSRR0_DCD));
+		(void) (*tp->t_linesw->l_modem)(tp, ISSET(rr0, ZSRR0_DCD));
 	}
 
 	if (ISSET(delta, cs->cs_rr0_cts)) {
 		/* Block or unblock output according to flow control. */
 		if (ISSET(rr0, cs->cs_rr0_cts)) {
 			zst->zst_tx_stopped = 0;
-			(*linesw[tp->t_line].l_start)(tp);
+			(*tp->t_linesw->l_start)(tp);
 		} else {
 			zst->zst_tx_stopped = 1;
 		}

@@ -1,4 +1,4 @@
-/*	$NetBSD: gdt.h,v 1.7.14.1 2000/08/16 23:18:27 thorpej Exp $	*/
+/*	$NetBSD: gdt.h,v 1.8 2000/08/16 04:44:37 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.

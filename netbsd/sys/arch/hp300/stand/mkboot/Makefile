@@ -1,10 +1,9 @@
-#	$NetBSD: Makefile,v 1.4 1999/02/13 02:54:44 lukem Exp $
+#	$NetBSD: Makefile,v 1.7 2001/12/12 01:49:43 tv Exp $
 
-.include <bsd.own.mk>
-
-PROG=	mkboot
-MKMAN=	no
+HOSTPROG=	mkboot
+SRCS=		mkboot.c
 
 LDSTATIC?=-static
+NOMAN=	# defined
 
-.include <bsd.prog.mk>
+.include <bsd.hostprog.mk>

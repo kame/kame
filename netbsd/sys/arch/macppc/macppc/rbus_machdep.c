@@ -1,4 +1,4 @@
-/*	$NetBSD: rbus_machdep.c,v 1.4.4.1 2000/11/01 16:26:36 tv Exp $	*/
+/*	$NetBSD: rbus_machdep.c,v 1.10 2001/06/10 15:32:58 tsubai Exp $	*/
 
 /*
  * Copyright (c) 1999
@@ -31,10 +31,6 @@
 #include <sys/device.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/bat.h>
@@ -43,6 +39,7 @@
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
 #include <dev/cardbus/rbus.h>
+#include <dev/ofw/openfirm.h>
 
 static void macppc_cardbus_init __P((pci_chipset_tag_t, pcitag_t));
 

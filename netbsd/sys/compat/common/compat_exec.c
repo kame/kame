@@ -1,4 +1,4 @@
-/*	$NetBSD: compat_exec.c,v 1.2 2000/04/11 04:37:48 chs Exp $	*/
+/*	$NetBSD: compat_exec.c,v 1.5 2001/11/13 02:07:59 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: compat_exec.c,v 1.5 2001/11/13 02:07:59 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -37,7 +40,6 @@
 #include <sys/vnode.h>
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
 
 /*
  * exec_aout_prep_oldzmagic():
@@ -74,7 +76,7 @@ exec_aout_prep_oldzmagic(p, epp)
 #endif
 		return ETXTBSY;
 	}
-	vn_marktext(epp->ep_vp);
+	epp->ep_vp->v_flag |= VTEXT;
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_text,

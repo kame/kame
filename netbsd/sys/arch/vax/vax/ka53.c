@@ -1,4 +1,4 @@
-/*	$NetBSD: ka53.c,v 1.2 2000/06/04 02:19:27 matt Exp $	*/
+/*	$NetBSD: ka53.c,v 1.7 2002/02/24 01:04:27 matt Exp $	*/
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,6 +30,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Done by Michael Kukat (michael@unixiron.org)
+ * Thanx for the good cooperation with Hugh Graham (hugh@openbsd.org)
+ * and his useful hints for the console of these machines
+ */
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -46,19 +52,17 @@ static void    ka53_memerr(void);
 static int     ka53_mchk(caddr_t);
 static void    ka53_halt(void);
 static void    ka53_reboot(int);
-#ifdef notyet
-static void    ka53_softmem(int);
-static void    ka53_hardmem(int);
+static void    ka53_softmem(void *);
+static void    ka53_hardmem(void *);
 static void    ka53_steal_pages(void);
 static void    ka53_cache_enable(void);
-#endif
 static void    ka53_halt(void);
 
 /* 
- * Declaration of 680-specific calls.
+ * Declaration of 53-specific calls.
  */
 struct cpu_dep ka53_calls = {
-	0, /*ka53_steal_pages,*/
+	ka53_steal_pages,
 	ka53_mchk,
 	ka53_memerr, 
 	ka53_conf,
@@ -68,21 +72,38 @@ struct cpu_dep ka53_calls = {
 	2,	/* SCB pages */
 	ka53_halt,
 	ka53_reboot,
+	NULL,
+	NULL,
+	CPU_RAISEIPL,
 };
 
 
 void
 ka53_conf()
 {
-	printf("cpu0: KA53, ucode rev %d\n", vax_cpudata & 0xff);
+	char *cpuname;
+
+	/* Don't ask why, but we seem to need this... */
+	volatile int *hej = (void *)mfpr(PR_ISP);
+	*hej = *hej;
+	hej[-1] = hej[-1];
+
+	switch((vax_siedata & 0xff00) >> 8) {
+		case VAX_STYP_51: cpuname = "KA51"; break;
+		case VAX_STYP_52: cpuname = "KA52"; break;
+		case VAX_STYP_53: cpuname = "KA53,54,57"; break;
+		case VAX_STYP_55: cpuname = "KA55"; break;
+		default: cpuname = "unknown NVAX";
+	}
+	printf("cpu0: %s, ucode rev %d\n", cpuname, vax_cpudata & 0xff);
 }
 
 /*
  * Why may we get memory errors during startup???
  */
-/*
+
 void
-ka53_hardmem(int arg)
+ka53_hardmem(void *arg)
 {
 	if (cold == 0)
 		printf("Hard memory error\n");
@@ -90,13 +111,12 @@ ka53_hardmem(int arg)
 }
 
 void
-ka53_softmem(int arg)
+ka53_softmem(void *arg)
 {
 	if (cold == 0)
 		printf("Soft memory error\n");
 	splhigh();
 }
-*/
 
 /*
  * KA53-specific IPRs. KA53 has the funny habit to control all caches
@@ -121,13 +141,10 @@ ka53_softmem(int arg)
 #define PCCTL_I_EN	0x02
 #define PCCTL_D_EN	0x01
 
-#if 0
 void
 ka53_cache_enable()
 {
 	int start, slut;
-
-	return;
 
 	/*
 	 * Turn caches off.
@@ -172,7 +189,7 @@ ka53_cache_enable()
 		mtpr(0, start);
 
 	/* Flush the pipes (via REI) */
-	asm("movpsl -(sp); movab 1f,-(sp); rei; 1:;");
+	asm("movpsl -(%sp); movab 1f,-(%sp); rei; 1:;");
 
 	/* Enable primary cache */
 	mtpr(PCCTL_P_EN|PCCTL_I_EN|PCCTL_D_EN, PR_PCCTL);
@@ -186,7 +203,6 @@ ka53_cache_enable()
 	}
 	mtpr(ICSR_ENABLE, PR_ICSR);
 }
-#endif
 
 void
 ka53_memerr()
@@ -202,7 +218,6 @@ ka53_mchk(caddr_t addr)
 	return 0;
 }
 
-#if 0
 void
 ka53_steal_pages()
 {
@@ -218,7 +233,6 @@ ka53_steal_pages()
 	/* Turn on caches (to speed up execution a bit) */
 	ka53_cache_enable();
 }
-#endif
 
 static void
 ka53_halt()

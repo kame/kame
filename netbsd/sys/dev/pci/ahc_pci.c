@@ -1,4 +1,4 @@
-/*	$NetBSD: ahc_pci.c,v 1.24.4.2 2002/02/06 14:07:27 he Exp $	*/
+/*	$NetBSD: ahc_pci.c,v 1.32 2001/11/21 19:01:33 wiz Exp $	*/
 
 /*
  * Product specific probe and attach routines for:
@@ -35,12 +35,16 @@
  * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.28 2000/02/09 21:00:22 gibbs Exp $
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ahc_pci.c,v 1.32 2001/11/21 19:01:33 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/queue.h>
 #include <sys/device.h>
+#include <sys/reboot.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -64,12 +68,6 @@
 #include <dev/ic/smc93cx6var.h>
 
 #include <dev/microcode/aic7xxx/aic7xxx_reg.h>
-
-#ifdef DEBUG
-#define bootverbose 1
-#else
-#define bootverbose 1
-#endif
 
 struct ahc_pci_busdata {
 	pci_chipset_tag_t pc;
@@ -185,11 +183,11 @@ static ahc_device_setup_t ahc_aha398XX_setup;
 struct ahc_pci_identity {
 	u_int64_t		 full_id;
 	u_int64_t		 id_mask;
-	char			*name;
+	const char		*name;
 	ahc_device_setup_t	*setup;
 };
 
-struct ahc_pci_identity ahc_pci_ident_table [] =
+const struct ahc_pci_identity ahc_pci_ident_table [] =
 {
 	/* aic7850 based controllers */
 	{
@@ -554,7 +552,7 @@ static const int ahc_num_pci_devs =
 #define		CACHESIZE	0x0000003f	/* only 5 bits */
 #define		LATTIME		0x0000ff00
 
-static struct ahc_pci_identity *ahc_find_pci_device(pcireg_t, pcireg_t);
+static const struct ahc_pci_identity *ahc_find_pci_device(pcireg_t, pcireg_t);
 static int ahc_ext_scbram_present(struct ahc_softc *ahc);
 static void ahc_ext_scbram_config(struct ahc_softc *ahc, int enable,
 				  int pcheck, int fast);
@@ -570,12 +568,12 @@ struct cfattach ahc_pci_ca = {
         sizeof(struct ahc_softc), ahc_pci_probe, ahc_pci_attach
 };
 
-static struct ahc_pci_identity *
+static const struct ahc_pci_identity *
 ahc_find_pci_device(id, subid)
 	pcireg_t id, subid;
 {
 	u_int64_t  full_id;
-	struct	   ahc_pci_identity *entry;
+	const struct	   ahc_pci_identity *entry;
 	u_int	   i;
 
 	full_id = ahc_compose_id(PCI_PRODUCT(id), PCI_VENDOR(id),
@@ -596,7 +594,7 @@ ahc_pci_probe(parent, match, aux)
 	void *aux;
 {
 	struct pci_attach_args *pa = aux;
-	struct	   ahc_pci_identity *entry;
+	const struct	   ahc_pci_identity *entry;
 	pcireg_t   subid;
 
 	subid = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_SUBSYS_ID_REG);
@@ -610,7 +608,7 @@ ahc_pci_attach(parent, self, aux)
 	void *aux;
 {
 	struct pci_attach_args *pa = aux;
-	struct		   ahc_pci_identity *entry;
+	const struct	   ahc_pci_identity *entry;
 	struct		   ahc_softc *ahc = (void *)self;
 	pcireg_t	   command;
 	ahc_chip	   ahc_t = AHC_NONE;
@@ -739,8 +737,7 @@ ahc_pci_attach(parent, self, aux)
 					  |TARGCRCENDEN|TARGCRCCNTEN);
 	}
 
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", ahc->sc_dev.dv_xname);
 		ahc_free(ahc);
 		return;
@@ -853,7 +850,7 @@ ahc_pci_attach(parent, self, aux)
 }
 
 /*
- * Test for the presense of external sram in an
+ * Test for the presence of external sram in an
  * "unshared" configuration.
  */
 static int

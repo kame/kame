@@ -1,3 +1,5 @@
+/*	$NetBSD: fwohcireg.h,v 1.11 2002/01/26 16:34:27 ichiro Exp $	*/
+
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -35,7 +37,7 @@
  */
 
 #ifndef _DEV_IEEE1394_FWOHCIREG_H_
-#define _DEV_IEEE1394_FWOHCIREG_H_
+#define	_DEV_IEEE1394_FWOHCIREG_H_
 
 /* PCI/CardBus-Specific definitions
  */
@@ -58,6 +60,9 @@
 #define	PCI_GLOBAL_SWAP_BE		0x00000001
 
 /* Bus Independent Definitions */
+
+#define	OHCI_CONFIG_SIZE		1024
+#define	OHCI_CONFIG_ALIGNMENT		1024
 
 /* OHCI Registers
  * OHCI Registers are divided into four spaces:
@@ -140,7 +145,7 @@
 #define	OHCI_REG_PhysicalRequestFilterHiSet	0x110
 #define	OHCI_REG_PhysicalRequestFilterHiClear	0x114
 #define	OHCI_REG_PhysicalRequestFilterLoSet	0x118
-#define	OHCI_REG_PhysicalRequestFilterLoCLear	0x11c
+#define	OHCI_REG_PhysicalRequestFilterLoClear	0x11c
 #define	OHCI_REG_PhysicalUpperBound		0x120
 #define	OHCI_REG_reserved_124			0x124
 #define	OHCI_REG_reserved_128			0x128
@@ -176,35 +181,58 @@
 #define	OHCI_SUBREG_ContextControlClear		0x004
 #define	OHCI_SUBREG_reserved_008		0x008
 #define	OHCI_SUBREG_CommandPtr			0x00c
-#define	OHCI_SUBREG_CommandMatch		0x010
+#define	OHCI_SUBREG_ContextMatch		0x010
 #define	OHCI_SUBREG_reserved_014		0x014
 #define	OHCI_SUBREG_reserved_018		0x018
 #define	OHCI_SUBREG_reserved_01c		0x01c
 #define	OHCI_ASYNC_DMA_WRITE(sc, ctx, reg, val) \
-	OHCI_CSR_WRITE(sc, OHCI_REG_ASYNC_DMA_BASE + 8*(ctx) + (reg), val)
-#define	OHCI_ASYNC_DMA_READ (sc, ctx, reg) \
-	OHCI_CSR_READ (sc, OHCI_REG_ASYNC_DMA_BASE + 8*(ctx) + (reg))
+	OHCI_CSR_WRITE(sc, OHCI_REG_ASYNC_DMA_BASE + 32*(ctx) + (reg), val)
+#define	OHCI_ASYNC_DMA_READ(sc, ctx, reg) \
+	OHCI_CSR_READ(sc, OHCI_REG_ASYNC_DMA_BASE + 32*(ctx) + (reg))
 
 #define	OHCI_REG_SYNC_TX_DMA_BASE		0x200
 #define	OHCI_SYNC_TX_DMA_WRITE(sc, ctx, reg, val) \
 	OHCI_CSR_WRITE(sc, OHCI_REG_SYNC_TX_DMA_BASE + 16*(ctx) + (reg), val)
-#define	OHCI_SYNC_TX_DMA_READ (sc, ctx, reg) \
-	OHCI_CSR_READ (sc, OHCI_REG_SYNC_TX_DMA_BASE + 16*(ctx) + (reg))
+#define	OHCI_SYNC_TX_DMA_READ(sc, ctx, reg) \
+	OHCI_CSR_READ(sc, OHCI_REG_SYNC_TX_DMA_BASE + 16*(ctx) + (reg))
 
 #define	OHCI_REG_SYNC_RX_DMA_BASE	0x400
 #define	OHCI_SYNC_RX_DMA_WRITE(sc, ctx, reg, val) \
 	OHCI_CSR_WRITE(sc, OHCI_REG_SYNC_RX_DMA_BASE + 32*(ctx) + (reg), val)
-#define	OHCI_SYNC_RX_DMA_READ (sc, ctx, reg) \
-	OHCI_CSR_READ (sc, OHCI_REG_SYNC_RX_DMA_BASE + 32*(ctx) + (reg))
+#define	OHCI_SYNC_RX_DMA_READ(sc, ctx, reg) \
+	OHCI_CSR_READ(sc, OHCI_REG_SYNC_RX_DMA_BASE + 32*(ctx) + (reg))
+
+#define	OHCI_BITVAL(val, name) \
+	((((val) & name##_MASK) >> name##_BITPOS))
 
 /* OHCI_REG_Version
  */
 #define	OHCI_Version_GUID_ROM		0x01000000
-#define	OHCI_Version_GET_Version(x)	((((x) >> 16) & 0xf) + (((x) >> 20) & 0xf) * 10)
-#define	OHCI_Version_GET_Revision(x)	((((x) >> 4) & 0xf) + ((x) & 0xf) * 10)
+#define	OHCI_Version_GET_Version(x) \
+	((((x) >> 16) & 0xf) + (((x) >> 20) & 0xf) * 10)
+#define	OHCI_Version_GET_Revision(x) \
+	((((x) >> 4) & 0xf) + ((x) & 0xf) * 10)
+
+/* OHCI_REG_Guid_Rom
+ */
+#define	OHCI_Guid_AddrReset		0x80000000
+#define	OHCI_Guid_RdStart		0x02000000
+#define	OHCI_Guid_RdData_MASK		0x00ff0000
+#define	OHCI_Guid_RdData_BITPOS		16
+#define	OHCI_Guid_MiniROM_MASK		0x000000ff
+#define	OHCI_Guid_MiniROM_BITPOS	0
 
 /* OHCI_REG_GUIDxx
  */
+
+/* OHCI_REG_CsrControl
+ */
+#define	OHCI_CsrControl_Done		0x80000000
+#define	OHCI_CsrControl_SelMASK		0x00000003
+#define	OHCI_CsrControl_BusManId		0
+#define	OHCI_CsrControl_BWAvail			1
+#define	OHCI_CsrControl_ChanAvailHi		2
+#define	OHCI_CsrControl_ChanAvailLo		3
 
 /* OHCI_REG_BusOptions
  */
@@ -223,9 +251,85 @@
 #define	OHCI_BusOptions_IRMC		0x80000000
 #define	OHCI_BusOptions_reserved	0x07000f38
 
-/* OCHI_REG_Int{Event|Mask}*
+/* OHCI_REG_HCControl
+ */
+
+#define	OHCI_HCControl_SoftReset	0x00010000
+#define	OHCI_HCControl_LinkEnable	0x00020000
+#define	OHCI_HCControl_PostedWriteEnable 0x00040000
+#define	OHCI_HCControl_LPS		0x00080000
+#define	OHCI_HCControl_APhyEnhanceEnable 0x00400000
+#define	OHCI_HCControl_ProgramPhyEnable	0x00800000
+#define	OHCI_HCControl_NoByteSwapData	0x40000000
+#define	OHCI_HCControl_BIBImageValid	0x80000000
+
+/* OHCI_REG_SelfID
+ */
+#define	OHCI_SelfID_Error		0x80000000
+#define	OHCI_SelfID_Gen_MASK		0x00ff0000
+#define	OHCI_SelfID_Gen_BITPOS		16
+#define	OHCI_SelfID_Size_MASK		0x000007fc
+#define	OHCI_SelfID_Size_BITPOS		2
+
+/* OHCI_REG_Int{Event|Mask}*
  */
 #define	OHCI_Int_MasterEnable		0x80000000
+#define	OHCI_Int_VendorSpecific		0x40000000
+#define	OHCI_Int_SoftInterrupt		0x20000000
+#define	OHCI_Int_Ack_Tardy		0x08000000
+#define	OHCI_Int_PhyRegRcvd		0x04000000
+#define	OHCI_Int_CycleTooLong		0x02000000
+#define	OHCI_Int_UnrecoverableError	0x01000000
+#define	OHCI_Int_CycleInconsistent	0x00800000
+#define	OHCI_Int_CycleLost		0x00400000
+#define	OHCI_Int_Cycle64Seconds		0x00200000
+#define	OHCI_Int_CycleSynch		0x00100000
+#define	OHCI_Int_Phy			0x00080000
+#define	OHCI_Int_RegAccessFail		0x00040000
+#define	OHCI_Int_BusReset		0x00020000
+#define	OHCI_Int_SelfIDComplete		0x00010000
+#define	OHCI_Int_SelfIDCOmplete2	0x00008000
+#define	OHCI_Int_LockRespErr		0x00000200
+#define	OHCI_Int_PostedWriteErr		0x00000100
+#define	OHCI_Int_IsochRx		0x00000080
+#define	OHCI_Int_IsochTx		0x00000040
+#define	OHCI_Int_RSPkt			0x00000020
+#define	OHCI_Int_RQPkt			0x00000010
+#define	OHCI_Int_ARRS			0x00000008
+#define	OHCI_Int_ARRQ			0x00000004
+#define	OHCI_Int_RespTxComplete		0x00000002
+#define	OHCI_Int_ReqTxComplete		0x00000001
+
+/* OHCI_REG_LinkControl
+ */
+#define	OHCI_LinkControl_CycleSource	0x00400000
+#define	OHCI_LinkControl_CycleMaster	0x00200000
+#define	OHCI_LinkControl_CycleTimerEnable 0x00100000
+#define	OHCI_LinkControl_RcvPhyPkt	0x00000400
+#define	OHCI_LinkControl_RcvSelfID	0x00000200
+#define	OHCI_LinkControl_Tag1SyncFilterLock 0x00000040
+
+/* OHCI_REG_NodeId
+ */
+#define	OHCI_NodeId_IDValid		0x80000000
+#define	OHCI_NodeId_ROOT		0x40000000
+#define	OHCI_NodeId_CPS			0x08000000
+#define	OHCI_NodeId_BusNumber		0x0000ffc0
+#define	OHCI_NodeId_NodeNumber		0x0000003f
+
+/* OHCI_REG_PhyControl
+ */
+#define	OHCI_PhyControl_RdDone		0x80000000
+#define	OHCI_PhyControl_RdAddr		0x0f000000
+#define	OHCI_PhyControl_RdAddr_BITPOS	24
+#define	OHCI_PhyControl_RdData		0x00ff0000
+#define	OHCI_PhyControl_RdData_BITPOS	16
+#define	OHCI_PhyControl_RdReg		0x00008000
+#define	OHCI_PhyControl_WrReg		0x00004000
+#define	OHCI_PhyControl_RegAddr		0x00000f00
+#define	OHCI_PhyControl_RegAddr_BITPOS	8
+#define	OHCI_PhyControl_WrData		0x000000ff
+#define	OHCI_PhyControl_WrData_BITPOS	0
 
 /*
  * Section 3.1.1: ContextControl register
@@ -373,5 +477,75 @@
  */
 #define	OHCI_CTXCTL_EVENT_ACK_TYPE_ERROR	30
 #define	OHCI_CTXCTL_EVENT_RESERVED31		31
+
+/* Context Control for isochronous transmit context
+ */
+#define	OHCI_CTXCTL_TX_CYCLE_MATCH_ENABLE	0x80000000
+#define	OHCI_CTXCTL_TX_CYCLE_MATCH_BITLEN	0x7fff0000
+#define	OHCI_CTXCTL_TX_CYCLE_MATCH_BITPOS	16
+
+#define	OHCI_CTXCTL_RX_BUFFER_FILL		0x80000000
+#define	OHCI_CTXCTL_RX_ISOCH_HEADER		0x40000000
+#define	OHCI_CTXCTL_RX_CYCLE_MATCH_ENABLE	0x20000000
+#define	OHCI_CTXCTL_RX_MULTI_CHAN_MODE		0x10000000
+#define	OHCI_CTXCTL_RX_DUAL_BUFFER_MODE		0x08000000
+
+/* Context Match registers
+ */
+#define	OHCI_CTXMATCH_TAG3			0x80000000
+#define	OHCI_CTXMATCH_TAG2			0x40000000
+#define	OHCI_CTXMATCH_TAG1			0x20000000
+#define	OHCI_CTXMATCH_TAG0			0x10000000
+#define	OHCI_CTXMATCH_CYCLE_MATCH_MASK		0x07fff000
+#define	OHCI_CTXMATCH_CYCLE_MATCH_BITPOS	12
+#define	OHCI_CTXMATCH_SYNC_MASK			0x00000f00
+#define	OHCI_CTXMATCH_SYNC_BITPOS		8
+#define	OHCI_CTXMATCH_TAG1_SYNC_FILTER		0x00000040
+#define	OHCI_CTXMATCH_CHANNEL_NUMBER_MASK	0x0000003f
+#define	OHCI_CTXMATCH_CHANNEL_NUMBER_BITPOS	0
+
+/*
+ * Miscellaneous definitions.
+ */
+
+#define	OHCI_TCODE_PHY				0xe
+
+#if BYTE_ORDER == BIG_ENDIAN
+struct fwohci_desc {
+	u_int16_t	fd_flags;
+	u_int16_t	fd_reqcount;
+	u_int32_t	fd_data;
+	u_int32_t	fd_branch;
+	u_int16_t	fd_status;
+	u_int16_t	fd_rescount;
+};
+#endif
+#if BYTE_ORDER == LITTLE_ENDIAN
+struct fwohci_desc {
+	u_int16_t	fd_reqcount;
+	u_int16_t	fd_flags;
+	u_int32_t	fd_data;
+	u_int32_t	fd_branch;
+	u_int16_t	fd_rescount;
+	u_int16_t	fd_status;
+};
+#endif
+#define	fd_timestamp	fd_rescount
+
+#define	OHCI_DESC_INPUT		0x2000
+#define	OHCI_DESC_LAST		0x1000
+#define	OHCI_DESC_STATUS	0x0800
+#define	OHCI_DESC_IMMED		0x0200
+#define	OHCI_DESC_PING		0x0080
+#define	OHCI_DESC_INTR_ALWAYS	0x0030
+#define	OHCI_DESC_INTR_ERR	0x0010
+#define	OHCI_DESC_BRANCH	0x000c
+#define	OHCI_DESC_WAIT		0x0003
+
+#define	OHCI_DESC_MAX		8
+
+/* Some constants for passing ACK values around with from status reg's */
+
+#define OHCI_DESC_STATUS_ACK_MASK 0x1f
 
 #endif	/* _DEV_IEEE1394_FWOHCIREG_ */

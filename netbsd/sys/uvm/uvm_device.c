@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_device.c,v 1.22.2.3 2000/06/30 16:27:54 simonb Exp $	*/
+/*	$NetBSD: uvm_device.c,v 1.40 2002/02/28 21:00:23 christos Exp $	*/
 
 /*
  *
@@ -34,11 +34,14 @@
  * from: Id: uvm_device.c,v 1.1.2.9 1998/02/06 05:11:47 chs Exp
  */
 
-#include "opt_uvmhist.h"
-
 /*
  * uvm_device.c: the device pager.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uvm_device.c,v 1.40 2002/02/28 21:00:23 christos Exp $");
+
+#include "opt_uvmhist.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,10 +49,6 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/vnode.h>
-
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm.h>
 #include <uvm/uvm_device.h>
@@ -62,24 +61,17 @@
 
 LIST_HEAD(udv_list_struct, uvm_device);
 static struct udv_list_struct udv_list;
-static simple_lock_data_t udv_lock;
+static struct simplelock udv_lock;
 
 /*
  * functions
  */
 
-static void		udv_init __P((void));
-static void             udv_reference __P((struct uvm_object *));
-static void             udv_detach __P((struct uvm_object *));
-static int		udv_fault __P((struct uvm_faultinfo *, vaddr_t,
-				       vm_page_t *, int, int, vm_fault_t,
-				       vm_prot_t, int));
-static int		udv_asyncget __P((struct uvm_object *, voff_t,
-				       int));
-static boolean_t        udv_flush __P((struct uvm_object *, voff_t, voff_t,
-				       int));
-static int		udv_put __P((struct uvm_object *, vm_page_t *,
-					int, boolean_t));
+static void	udv_init __P((void));
+static void	udv_reference __P((struct uvm_object *));
+static void	udv_detach __P((struct uvm_object *));
+static int	udv_fault __P((struct uvm_faultinfo *, vaddr_t,
+    struct vm_page **, int, int, vm_fault_t, vm_prot_t, int));
 
 /*
  * master pager structure
@@ -90,14 +82,6 @@ struct uvm_pagerops uvm_deviceops = {
 	udv_reference,
 	udv_detach,
 	udv_fault,
-	udv_flush,
-	NULL,		/* no get function since we have udv_fault */
-	udv_asyncget,
-	udv_put,
-	NULL,		/* no cluster function */
-	NULL,		/* no put cluster function */
-	NULL,		/* no AIO-DONE function since no async i/o */
-	NULL,		/* no releasepg function since no normal pages */
 };
 
 /*
@@ -110,10 +94,9 @@ struct uvm_pagerops uvm_deviceops = {
  * init pager private data structures.
  */
 
-void
-udv_init()
+static void
+udv_init(void)
 {
-
 	LIST_INIT(&udv_list);
 	simple_lock_init(&udv_lock);
 }
@@ -127,6 +110,7 @@ udv_init()
  * => caller must _not_ already be holding the lock on the uvm_object.
  * => in fact, nothing should be locked so that we can sleep here.
  */
+
 struct uvm_object *
 udv_attach(arg, accessprot, off, size)
 	void *arg;
@@ -134,9 +118,10 @@ udv_attach(arg, accessprot, off, size)
 	voff_t off;			/* used only for access check */
 	vsize_t size;			/* used only for access check */
 {
-	dev_t device = *((dev_t *) arg);
+	dev_t device = *((dev_t *)arg);
 	struct uvm_device *udv, *lcv;
-	paddr_t (*mapfn) __P((dev_t, off_t, int));
+	dev_type_mmap((*mapfn));
+
 	UVMHIST_FUNC("udv_attach"); UVMHIST_CALLED(maphist);
 
 	UVMHIST_LOG(maphist, "(device=0x%x)", device,0,0,0);
@@ -147,20 +132,21 @@ udv_attach(arg, accessprot, off, size)
 
 	mapfn = cdevsw[major(device)].d_mmap;
 	if (mapfn == NULL ||
-			mapfn == (paddr_t (*) __P((dev_t, off_t, int))) enodev ||
-			mapfn == (paddr_t (*) __P((dev_t, off_t, int))) nullop)
+	    mapfn == (dev_type_mmap((*))) enodev ||
+	    mapfn == (dev_type_mmap((*))) nullop)
 		return(NULL);
 
 	/*
 	 * Negative offsets on the object are not allowed.
 	 */
+
 	if (off < 0)
 		return(NULL);
 
 	/*
 	 * Check that the specified range of the device allows the
 	 * desired protection.
-	 * 
+	 *
 	 * XXX assumes VM_PROT_* == PROT_*
 	 * XXX clobbers off and size, but nothing else here needs them.
 	 */
@@ -175,14 +161,14 @@ udv_attach(arg, accessprot, off, size)
 	 * keep looping until we get it
 	 */
 
-	while (1) {
+	for (;;) {
 
 		/*
-		 * first, attempt to find it on the main list 
+		 * first, attempt to find it on the main list
 		 */
 
 		simple_lock(&udv_lock);
-		for (lcv = udv_list.lh_first ; lcv != NULL ; lcv = lcv->u_list.le_next) {
+		LIST_FOREACH(lcv, &udv_list, u_list) {
 			if (device == lcv->u_device)
 				break;
 		}
@@ -216,7 +202,7 @@ udv_attach(arg, accessprot, off, size)
 			simple_lock(&lcv->u_obj.vmobjlock);
 			lcv->u_obj.uo_refs++;
 			simple_unlock(&lcv->u_obj.vmobjlock);
-			
+
 			simple_lock(&udv_lock);
 			if (lcv->u_flags & UVM_DEVICE_WANTED)
 				wakeup(lcv);
@@ -231,7 +217,8 @@ udv_attach(arg, accessprot, off, size)
 
 		simple_unlock(&udv_lock);
 		/* NOTE: we could sleep in the following malloc() */
-		MALLOC(udv, struct uvm_device *, sizeof(*udv), M_TEMP, M_WAITOK);
+		MALLOC(udv, struct uvm_device *, sizeof(*udv), M_TEMP,
+		       M_WAITOK);
 		simple_lock(&udv_lock);
 
 		/*
@@ -239,14 +226,14 @@ udv_attach(arg, accessprot, off, size)
 		 * to the list while we were sleeping...
 		 */
 
-		for (lcv = udv_list.lh_first ; lcv != NULL ;
-		    lcv = lcv->u_list.le_next) {
+		LIST_FOREACH(lcv, &udv_list, u_list) {
 			if (device == lcv->u_device)
 				break;
 		}
 
 		/*
-		 * did we lose a race to someone else?   free our memory and retry.
+		 * did we lose a race to someone else?
+		 * free our memory and retry.
 		 */
 
 		if (lcv) {
@@ -262,21 +249,18 @@ udv_attach(arg, accessprot, off, size)
 
 		simple_lock_init(&udv->u_obj.vmobjlock);
 		udv->u_obj.pgops = &uvm_deviceops;
-		TAILQ_INIT(&udv->u_obj.memq);	/* not used, but be safe */
+		TAILQ_INIT(&udv->u_obj.memq);
 		udv->u_obj.uo_npages = 0;
 		udv->u_obj.uo_refs = 1;
 		udv->u_flags = 0;
 		udv->u_device = device;
 		LIST_INSERT_HEAD(&udv_list, udv, u_list);
 		simple_unlock(&udv_lock);
-
 		return(&udv->u_obj);
-
-	}  /* while(1) loop */
-
+	}
 	/*NOTREACHED*/
 }
-	
+
 /*
  * udv_reference
  *
@@ -295,8 +279,8 @@ udv_reference(uobj)
 
 	simple_lock(&uobj->vmobjlock);
 	uobj->uo_refs++;
-	UVMHIST_LOG(maphist, "<- done (uobj=0x%x, ref = %d)", 
-	uobj, uobj->uo_refs,0,0);
+	UVMHIST_LOG(maphist, "<- done (uobj=0x%x, ref = %d)",
+		    uobj, uobj->uo_refs,0,0);
 	simple_unlock(&uobj->vmobjlock);
 }
 
@@ -312,37 +296,27 @@ static void
 udv_detach(uobj)
 	struct uvm_object *uobj;
 {
-	struct uvm_device *udv = (struct uvm_device *) uobj;
+	struct uvm_device *udv = (struct uvm_device *)uobj;
 	UVMHIST_FUNC("udv_detach"); UVMHIST_CALLED(maphist);
-
 
 	/*
 	 * loop until done
 	 */
 again:
 	simple_lock(&uobj->vmobjlock);
-	
 	if (uobj->uo_refs > 1) {
-		uobj->uo_refs--;			/* drop ref! */
+		uobj->uo_refs--;
 		simple_unlock(&uobj->vmobjlock);
-		UVMHIST_LOG(maphist," <- done, uobj=0x%x, ref=%d", 
+		UVMHIST_LOG(maphist," <- done, uobj=0x%x, ref=%d",
 			  uobj,uobj->uo_refs,0,0);
 		return;
 	}
 
-#ifdef DIAGNOSTIC
-	if (uobj->uo_npages || !TAILQ_EMPTY(&uobj->memq))
-		panic("udv_detach: pages in a device object?");
-#endif
-
-	/*
-	 * now lock udv_lock
-	 */
-	simple_lock(&udv_lock);
-
 	/*
 	 * is it being held?   if so, wait until others are done.
 	 */
+
+	simple_lock(&udv_lock);
 	if (udv->u_flags & UVM_DEVICE_HOLD) {
 		udv->u_flags |= UVM_DEVICE_WANTED;
 		simple_unlock(&uobj->vmobjlock);
@@ -353,31 +327,14 @@ again:
 	/*
 	 * got it!   nuke it now.
 	 */
+
 	LIST_REMOVE(udv, u_list);
 	if (udv->u_flags & UVM_DEVICE_WANTED)
 		wakeup(udv);
 	simple_unlock(&udv_lock);
 	simple_unlock(&uobj->vmobjlock);
 	FREE(udv, M_TEMP);
-
 	UVMHIST_LOG(maphist," <- done, freed uobj=0x%x", uobj,0,0,0);
-	return;
-}
-
-
-/*
- * udv_flush
- *
- * flush pages out of a uvm object.   a no-op for devices.
- */
-
-static boolean_t udv_flush(uobj, start, stop, flags)
-	struct uvm_object *uobj;
-	voff_t start, stop;
-	int flags;
-{
-
-	return(TRUE);
 }
 
 /*
@@ -400,7 +357,7 @@ static int
 udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 	struct uvm_faultinfo *ufi;
 	vaddr_t vaddr;
-	vm_page_t *pps;
+	struct vm_page **pps;
 	int npages, centeridx, flags;
 	vm_fault_t fault_type;
 	vm_prot_t access_type;
@@ -419,27 +376,21 @@ udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 	UVMHIST_LOG(maphist,"  flags=%d", flags,0,0,0);
 
 	/*
-	 * XXX: !PGO_LOCKED calls are currently not allowed (or used)
-	 */
-
-	if ((flags & PGO_LOCKED) == 0)
-		panic("udv_fault: !PGO_LOCKED fault");
-
-	/*
 	 * we do not allow device mappings to be mapped copy-on-write
 	 * so we kill any attempt to do so here.
 	 */
-	
+
 	if (UVM_ET_ISCOPYONWRITE(entry)) {
-		UVMHIST_LOG(maphist, "<- failed -- COW entry (etype=0x%x)", 
+		UVMHIST_LOG(maphist, "<- failed -- COW entry (etype=0x%x)",
 		entry->etype, 0,0,0);
 		uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap, uobj, NULL);
-		return(VM_PAGER_ERROR);
+		return(EIO);
 	}
 
 	/*
-	 * get device map function.   
+	 * get device map function.
 	 */
+
 	device = udv->u_device;
 	mapfn = cdevsw[major(device)].d_mmap;
 
@@ -449,16 +400,17 @@ udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 	 * for pmap_enter (even if we have a submap).   since virtual
 	 * addresses in a submap must match the main map, this is ok.
 	 */
+
 	/* udv offset = (offset from start of entry) + entry's offset */
 	curr_offset = entry->offset + (vaddr - entry->start);
 	/* pmap va = vaddr (virtual address of pps[0]) */
 	curr_va = vaddr;
-	
+
 	/*
 	 * loop over the page range entering in as needed
 	 */
 
-	retval = VM_PAGER_OK;
+	retval = 0;
 	for (lcv = 0 ; lcv < npages ; lcv++, curr_offset += PAGE_SIZE,
 	    curr_va += PAGE_SIZE) {
 		if ((flags & PGO_ALLPAGES) == 0 && lcv != centeridx)
@@ -469,7 +421,7 @@ udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 
 		mdpgno = (*mapfn)(device, curr_offset, access_type);
 		if (mdpgno == -1) {
-			retval = VM_PAGER_ERROR;
+			retval = EIO;
 			break;
 		}
 		paddr = pmap_phys_address(mdpgno);
@@ -478,7 +430,7 @@ udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 		    "  MAPPING: device: pm=0x%x, va=0x%x, pa=0x%lx, at=%d",
 		    ufi->orig_map->pmap, curr_va, paddr, mapprot);
 		if (pmap_enter(ufi->orig_map->pmap, curr_va, paddr,
-		    mapprot, PMAP_CANFAIL | mapprot) != KERN_SUCCESS) {
+		    mapprot, PMAP_CANFAIL | mapprot) != 0) {
 			/*
 			 * pmap_enter() didn't have the resource to
 			 * enter this mapping.  Unlock everything,
@@ -491,45 +443,13 @@ udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 			 */
 			uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap,
 			    uobj, NULL);
+			pmap_update(ufi->orig_map->pmap);	/* sync what we have so far */
 			uvm_wait("udv_fault");
-			return (VM_PAGER_REFAULT);
+			return (ERESTART);
 		}
 	}
 
 	uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap, uobj, NULL);
+	pmap_update(ufi->orig_map->pmap);
 	return (retval);
-}
-
-/*
- * udv_asyncget: start async I/O to bring pages into ram
- *
- * => caller must lock object(???XXX: see if this is best)
- * => a no-op for devices
- */
-
-static int
-udv_asyncget(uobj, offset, npages)
-	struct uvm_object *uobj;
-	voff_t offset;
-	int npages;
-{
-
-	return(KERN_SUCCESS);
-}
-
-/*
- * udv_put: flush page data to backing store.
- *
- * => this function should never be called (since we never have any
- *	page structures to "put")
- */
-
-static int
-udv_put(uobj, pps, npages, flags)
-	struct uvm_object *uobj;
-	struct vm_page **pps;
-	int npages, flags;
-{
-
-	panic("udv_put: trying to page out to a device!");
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_ctl.c,v 1.17 1999/07/22 18:13:38 thorpej Exp $	*/
+/*	$NetBSD: procfs_ctl.c,v 1.22.10.1 2002/07/29 15:37:48 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -39,6 +39,9 @@
  *	@(#)procfs_ctl.c	8.4 (Berkeley) 6/15/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: procfs_ctl.c,v 1.22.10.1 2002/07/29 15:37:48 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -50,7 +53,6 @@
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
-#include <sys/ptrace.h>
 #include <miscfs/procfs/procfs.h>
 
 #define PROCFS_CTL_ATTACH	1
@@ -59,7 +61,7 @@
 #define PROCFS_CTL_RUN		4
 #define PROCFS_CTL_WAIT		5
 
-static vfs_namemap_t ctlnames[] = {
+static const vfs_namemap_t ctlnames[] = {
 	/* special /proc commands */
 	{ "attach",	PROCFS_CTL_ATTACH },
 	{ "detach",	PROCFS_CTL_DETACH },
@@ -69,7 +71,7 @@ static vfs_namemap_t ctlnames[] = {
 	{ 0 },
 };
 
-static vfs_namemap_t signames[] = {
+static const vfs_namemap_t signames[] = {
 	/* regular signal names */
 	{ "hup",	SIGHUP },	{ "int",	SIGINT },
 	{ "quit",	SIGQUIT },	{ "ill",	SIGILL },
@@ -103,7 +105,7 @@ procfs_control(curp, p, op, sig)
 	struct proc *p;
 	int op, sig;
 {
-	int error;
+	int s, error;
 
 	/*
 	 * You cannot do anything to the process if it is currently exec'ing
@@ -224,9 +226,11 @@ procfs_control(curp, p, op, sig)
 		 * Stop the target.
 		 */
 		SET(p->p_flag, P_TRACED|P_FSTRACE);
-		p->p_oppid = p->p_pptr->p_pid;
-		if (p->p_pptr != curp)
+		p->p_opptr = p->p_pptr;
+		if (p->p_pptr != curp) {
+			p->p_pptr->p_flag |= P_CHTRACED;
 			proc_reparent(p, curp);
+		}
 		sig = SIGSTOP;
 		goto sendsig;
 
@@ -248,15 +252,13 @@ procfs_control(curp, p, op, sig)
 
 		if (op == PROCFS_CTL_DETACH) {
 			/* give process back to original parent */
-			if (p->p_oppid != p->p_pptr->p_pid) {
-				struct proc *pp;
-	
-				pp = pfind(p->p_oppid);
+			if (p->p_opptr != p->p_pptr) {
+				struct proc *pp = p->p_opptr;
 				proc_reparent(p, pp ? pp : initproc);
 			}
 
 			/* not being traced any more */
-			p->p_oppid = 0;
+			p->p_opptr = NULL;
 			CLR(p->p_flag, P_TRACED|P_FSTRACE|P_WAITED);
 		}
 
@@ -264,7 +266,9 @@ procfs_control(curp, p, op, sig)
 		/* Finally, deliver the requested signal (or none). */
 		if (p->p_stat == SSTOP) {
 			p->p_xstat = sig;
+			SCHED_LOCK(s);
 			setrunnable(p);
+			SCHED_UNLOCK(s);
 		} else {
 			if (sig != 0)
 				psignal(p, sig);
@@ -296,7 +300,7 @@ procfs_doctl(curp, p, pfs, uio)
 	int xlen;
 	int error;
 	char msg[PROCFS_CTLLEN+1];
-	vfs_namemap_t *nm;
+	const vfs_namemap_t *nm;
 
 	if (uio->uio_rw != UIO_WRITE)
 		return (EOPNOTSUPP);

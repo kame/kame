@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.10.4.2 2000/10/18 16:31:28 tv Exp $ */
+/*	$NetBSD: vmparam.h,v 1.19 2001/11/15 18:06:18 soren Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -45,7 +45,7 @@
  */
 
 /*
- * Machine dependent constants for Sun-4u SPARC
+ * Machine dependent constants for Sun-4c SPARC
  */
 
 #ifndef VMPARAM_H
@@ -56,50 +56,74 @@
  * is the top (end) of the user stack.
  */
 #define	USRTEXT		0x2000			/* Start of user text */
+#define USRSTACK32	0xffffe000L
 #ifdef __arch64__
 #define USRSTACK	0xffffffffffffe000L
 #else
-#define USRSTACK	0xffffe000L
+#define USRSTACK	USRSTACK32
 #endif
 
 /*
  * Virtual memory related constants, all in bytes
+ */
+/* #ifdef __arch64__ */
+#if 0
+/*
+ * 64-bit limits:
  *
- * XXXX -- These need to be updated to 64-bits.
+ * Since the compiler generates `call' instructions we can't
+ * have more than 4GB in a single text segment.
+ *
+ * And since we only have a 40-bit adderss space, allow half
+ * of that for data and the other half for stack.
  */
 #ifndef MAXTSIZ
-#define	MAXTSIZ		(64*1024*1024)		/* max text size */
+#define	MAXTSIZ		(4L*1024*1024*1024)	/* max text size */
 #endif
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(64*1024*1024)		/* initial data size limit */
+#define	DFLDSIZ		(128L*1024*1024)	/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		(256*1024*1024)		/* max data size */
+#define	MAXDSIZ		(1L<<39)		/* max data size */
 #endif
 #ifndef	DFLSSIZ
-#define	DFLSSIZ		(512*1024)		/* initial stack size limit */
+#define	DFLSSIZ		(1024*1024)		/* initial stack size limit */
 #endif
 #ifndef	MAXSSIZ
 #define	MAXSSIZ		MAXDSIZ			/* max stack size */
 #endif
-
+#else
+/*
+ * 32-bit limits:
+ *
+ * We only have 4GB to play with.  Limit stack, data, and text
+ * each to half of that.
+ *
+ * This is silly.  Apparently if we go above these numbers
+ * integer overflows in other parts of the kernel cause hangs.
+ */
+#ifndef MAXTSIZ
+#define	MAXTSIZ		(1*1024*1024*1024)	/* max text size */
+#endif
+#ifndef DFLDSIZ
+#define	DFLDSIZ		(128*1024*1024)		/* initial data size limit */
+#endif
+#ifndef MAXDSIZ
+#define	MAXDSIZ		(1*1024*1024*1024)	/* max data size */
+#endif
+#ifndef	DFLSSIZ
+#define	DFLSSIZ		(1024*1024)		/* initial stack size limit */
+#endif
+#ifndef	MAXSSIZ
+#define	MAXSSIZ		(8*1024*1024)			/* max stack size */
+#endif
+#endif
 /*
  * Size of shared memory map
  */
 #ifndef SHMMAXPGS
 #define SHMMAXPGS	1024
 #endif
-
-/*
- * The time for a process to be blocked before being very swappable.
- * This is a number of seconds which the system takes as being a non-trivial
- * amount of real time.  You probably shouldn't change this;
- * it is used in subtle ways (fractions and multiples of it are, that is, like
- * half of a ``long time'', almost a long time, etc.)
- * It is related to human patience and other factors which don't really
- * change over time.
- */
-#define	MAXSLP 		20
 
 /*
  * Mach derived constants
@@ -111,6 +135,7 @@
 #define VM_MIN_ADDRESS		((vaddr_t)0)
 #define VM_MAX_ADDRESS		((vaddr_t)-1)
 #define VM_MAXUSER_ADDRESS	((vaddr_t)-1)
+#define VM_MAXUSER_ADDRESS32	((vaddr_t)(0x00000000ffffffffL&~PGOFSET))
 
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t)KERNBASE)
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)KERNEND)
@@ -122,11 +147,11 @@
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
 
+#define	__HAVE_PMAP_PHYSSEG
+
 /*
  * pmap specific data stored in the vm_physmem[] array
  */
-
-struct pv_entry;
 
 struct pmap_physseg {
 	struct pv_entry *pvent;

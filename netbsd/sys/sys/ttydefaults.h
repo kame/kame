@@ -1,4 +1,4 @@
-/*	$NetBSD: ttydefaults.h,v 1.9.38.1 2000/08/05 23:56:15 chuck Exp $	*/
+/*	$NetBSD: ttydefaults.h,v 1.10 2000/08/05 01:27:12 chuck Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993

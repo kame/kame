@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ep_pcmcia.c,v 1.33.4.1 2002/03/28 22:59:30 he Exp $	*/
+/*	$NetBSD: if_ep_pcmcia.c,v 1.37 2002/03/10 22:28:02 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -66,9 +66,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_inet.h"
-#include "opt_ns.h"
-#include "bpfilter.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ep_pcmcia.c,v 1.37 2002/03/10 22:28:02 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,24 +83,6 @@
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h>
-#include <netinet/if_inarp.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -201,18 +182,19 @@ ep_pcmcia_enable(sc)
 	struct pcmcia_function *pf = psc->sc_pf;
 	int error;
 
+	if ((error = ep_pcmcia_enable1(sc)) != 0)
+		return error;
+
 	/* establish the interrupt. */
 	sc->sc_ih = pcmcia_intr_establish(pf, IPL_NET, epintr, sc);
 	if (sc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt\n",
 		    sc->sc_dev.dv_xname);
+		ep_pcmcia_disable1(sc);
 		return (1);
 	}
 
-	error = ep_pcmcia_enable1(sc);
-	if (error != 0)
-		pcmcia_intr_disestablish(psc->sc_pf, sc->sc_ih);
-	return (error);
+	return 0;
 }
 
 int

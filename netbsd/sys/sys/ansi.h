@@ -1,11 +1,11 @@
-/*	$NetBSD: ansi.h,v 1.1 2000/06/04 08:50:28 itojun Exp $	*/
+/*	$NetBSD: ansi.h,v 1.9 2002/05/12 22:58:48 kleink Exp $	*/
 
 /*-
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000, 2001, 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Jun-ichiro itojun Hagino.
+ * by Jun-ichiro itojun Hagino and by Klaus Klein.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,8 +39,17 @@
 #ifndef	_SYS_ANSI_H_
 #define	_SYS_ANSI_H_
 
-#include <sys/cdefs.h>
+#include <machine/int_types.h>
 
-typedef unsigned int __socklen_t;
+typedef char *		__caddr_t;	/* core address */
+typedef __uint32_t	__gid_t;	/* group id */
+typedef __uint32_t	__in_addr_t;	/* IP(v4) address */
+typedef __uint16_t	__in_port_t;	/* "Internet" port number */
+typedef __uint32_t	__mode_t;	/* file permissions */
+typedef __int64_t	__off_t;	/* file offset */
+typedef __int32_t	__pid_t;	/* process id */
+typedef __uint8_t	__sa_family_t;	/* socket address family */
+typedef unsigned int	__socklen_t;	/* socket-related datum length */
+typedef __uint32_t	__uid_t;	/* user id */
 
-#endif	/* _SYS_ANSI_H_ */
+#endif	/* !_SYS_ANSI_H_ */

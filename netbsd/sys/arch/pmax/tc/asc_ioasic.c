@@ -1,4 +1,4 @@
-/* $NetBSD: asc_ioasic.c,v 1.9.2.1 2000/09/30 01:47:17 mhitch Exp $ */
+/* $NetBSD: asc_ioasic.c,v 1.12 2001/08/26 11:47:25 simonb Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: asc_ioasic.c,v 1.9.2.1 2000/09/30 01:47:17 mhitch Exp $");
+__KERNEL_RCSID(0, "$NetBSD: asc_ioasic.c,v 1.12 2001/08/26 11:47:25 simonb Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -78,7 +78,7 @@ struct asc_softc {
 static int  asc_ioasic_match __P((struct device *, struct cfdata *, void *));
 static void asc_ioasic_attach __P((struct device *, struct device *, void *));
 
-struct cfattach xasc_ioasic_ca = {
+struct cfattach asc_ioasic_ca = {
 	sizeof(struct asc_softc), asc_ioasic_match, asc_ioasic_attach
 };
 
@@ -190,7 +190,9 @@ asc_ioasic_attach(parent, self, aux)
 	sc->sc_maxxfer = 64 * 1024;
 
 	/* Do the common parts of attachment. */
-	ncr53c9x_attach(sc, NULL, NULL);
+	sc->sc_adapter.adapt_minphys = minphys;
+	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	ncr53c9x_attach(sc);
 }
 
 void

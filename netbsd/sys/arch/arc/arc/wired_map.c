@@ -1,4 +1,4 @@
-/*	$NetBSD: wired_map.c,v 1.3 2000/06/09 06:06:58 soda Exp $	*/
+/*	$NetBSD: wired_map.c,v 1.6 2002/03/05 16:11:57 simonb Exp $	*/
 
 /*-
  * Copyright (C) 2000 Shuichiro URATA.  All rights reserved.
@@ -28,7 +28,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/cpu.h>
 #include <mips/locore.h>
 #include <mips/pte.h>
@@ -85,7 +85,7 @@ arc_enter_wired(va, pa0, pa1, pg_size)
 	wired_map[nwired].size = MIPS3_PG_SIZE_MASK_TO_SIZE(pg_size);
 
 	/* Allocate new wired entry */
-	mips3_SetWIRED(MIPS3_TLB_WIRED_UPAGES + nwired + 1);
+	mips3_cp0_wired_write(MIPS3_TLB_WIRED_UPAGES + nwired + 1);
 
 	/* Map to it */
 	tlb.tlb_mask = pg_size;
@@ -93,11 +93,13 @@ arc_enter_wired(va, pa0, pa1, pg_size)
 	if (pa0 == 0)
 		tlb.tlb_lo0 = MIPS3_PG_G;
 	else
-		tlb.tlb_lo0 = mips3_paddr_to_tlbpfn(pa0) | MIPS3_PG_IOPAGE;
+		tlb.tlb_lo0 = mips3_paddr_to_tlbpfn(pa0) | \
+		    MIPS3_PG_IOPAGE(PMAP_CCA_FOR_PA(pa0));
 	if (pa1 == 0)
 		tlb.tlb_lo1 = MIPS3_PG_G;
 	else
-		tlb.tlb_lo1 = mips3_paddr_to_tlbpfn(pa1) | MIPS3_PG_IOPAGE;
+		tlb.tlb_lo1 = mips3_paddr_to_tlbpfn(pa1) | \
+		    MIPS3_PG_IOPAGE(PMAP_CCA_FOR_PA(pa1));
 	mips3_TLBWriteIndexedVPS(MIPS3_TLB_WIRED_UPAGES + nwired,
 	    &tlb);
 

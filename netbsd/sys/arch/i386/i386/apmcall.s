@@ -1,4 +1,4 @@
-/*	$NetBSD: apmcall.s,v 1.7 1999/12/08 16:46:33 joda Exp $ */
+/*	$NetBSD: apmcall.s,v 1.9 2002/01/13 12:45:54 drochner Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -43,6 +43,11 @@
 
 #include "opt_apm.h"
 
+__KERNEL_RCSID(0, "$NetBSD: apmcall.s,v 1.9 2002/01/13 12:45:54 drochner Exp $");
+
+/* LINTSTUB: include <machine/bioscall.h> */
+/* LINTSTUB: include <machine/apmvar.h> */
+
 /*
  * int apmcall(int function, struct bioscallregs *regs):
  * 	call the APM protected mode bios function FUNCTION for BIOS selection
@@ -58,6 +63,7 @@ apmstatus:	.long 0
 #endif
 _C_LABEL(apm_disable_interrupts):	.long APM_DISABLE_INTERRUPTS
 	.text
+/* LINTSTUB: Func: int apmcall(int function, struct bioscallregs *regs) */
 NENTRY(apmcall)
 	pushl	%ebp
 	movl	%esp,%ebp
@@ -70,11 +76,11 @@ NENTRY(apmcall)
 	pushl	%es
 	pushl	%fs
 	pushl	%gs
-	xorl	%ax,%ax
+	xorl	%eax,%eax
 /*	movl	%ax,%ds		# can't toss %ds, we need it for apmstatus*/
-	movl	%ax,%es
-	movl	%ax,%fs
-	movl	%ax,%gs
+	movw	%ax,%es
+	movw	%ax,%fs
+	movw	%ax,%gs
 #endif
 	xorl	%eax,%eax
 	movb	%cs:8(%ebp),%al
@@ -92,7 +98,7 @@ nocli:
 	clc /* clear carry in case BIOS doesn't do it for us on no-error */
 	pushl	%ds
 	/* Now call the 32-bit code segment entry point */
-	lcall	%cs:(_C_LABEL(apminfo)+APM_ENTRY)
+	lcall	*%cs:(_C_LABEL(apminfo)+APM_ENTRY)
 	popl	%ds
 	setc	apmstatus
 	popfl

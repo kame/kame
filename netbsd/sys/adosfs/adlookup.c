@@ -1,4 +1,4 @@
-/*	$NetBSD: adlookup.c,v 1.25 1999/09/20 07:29:27 frueauf Exp $	*/
+/*	$NetBSD: adlookup.c,v 1.27 2001/11/12 22:59:17 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -30,6 +30,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: adlookup.c,v 1.27 2001/11/12 22:59:17 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/vnode.h>
@@ -76,7 +80,6 @@ adosfs_lookup(v)
 	struct ucred *ucp;	/* lookup credentials */
 	u_long bn, plen, hval;
 	const u_char *pelt;
-	struct proc *p;
 
 #ifdef ADOSFS_DIAGNOSTIC
 	advopprint(sp);
@@ -90,7 +93,6 @@ adosfs_lookup(v)
 	nameiop = cnp->cn_nameiop;
 	cnp->cn_flags &= ~PDIRUNLOCK;
 	flags = cnp->cn_flags;
-	p = cnp->cn_proc;
 	last = flags & ISLASTCN;
 	lockp = flags & LOCKPARENT;
 	wantp = flags & (LOCKPARENT | WANTPARENT);

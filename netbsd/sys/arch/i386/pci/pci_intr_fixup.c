@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_intr_fixup.c,v 1.5.6.3 2001/06/07 15:46:56 he Exp $	*/
+/*	$NetBSD: pci_intr_fixup.c,v 1.19 2001/12/07 08:07:57 onoe Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -66,6 +66,9 @@
  * PCI Interrupt Router support.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_intr_fixup.c,v 1.19 2001/12/07 08:07:57 onoe Exp $");
+
 #include "opt_pcibios.h"
 
 #include <sys/param.h>
@@ -95,7 +98,7 @@ struct pciintr_link_map {
 	SIMPLEQ_ENTRY(pciintr_link_map) list;
 };
 
-pciintr_icu_tag_t pciintr_icu_tag = NULL;
+pciintr_icu_tag_t pciintr_icu_tag;
 pciintr_icu_handle_t pciintr_icu_handle;
 
 #ifdef PCIBIOS_IRQS_HINT
@@ -116,7 +119,7 @@ int	pciintr_link_fixup __P((void));
 int	pciintr_link_route __P((u_int16_t *));
 int	pciintr_irq_release __P((u_int16_t *));
 int	pciintr_header_fixup __P((pci_chipset_tag_t));
-void	pciintr_do_header_fixup __P((pci_chipset_tag_t, pcitag_t));
+void	pciintr_do_header_fixup __P((pci_chipset_tag_t, pcitag_t, void*));
 
 SIMPLEQ_HEAD(, pciintr_link_map) pciintr_link_map_list;
 
@@ -135,6 +138,10 @@ const struct pciintr_icu_table {
 	  piix_init },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82371SB_ISA,
 	  piix_init },
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801BA_LPC,
+	  piix_init },
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801BAM_LPC,
+	  piix_init },
 
 	{ PCI_VENDOR_OPTI,	PCI_PRODUCT_OPTI_82C558,
 	  opti82c558_init },
@@ -148,6 +155,9 @@ const struct pciintr_icu_table {
 
 	{ PCI_VENDOR_SIS,	PCI_PRODUCT_SIS_85C503,
 	  sis85c503_init },
+
+	{ PCI_VENDOR_AMD,	PCI_PRODUCT_AMD_PBC756_PMC,
+	  amd756_init },
 
 	{ PCI_VENDOR_ALI,	PCI_PRODUCT_ALI_M1543,
 	  ali1543_init },
@@ -582,16 +592,17 @@ pciintr_header_fixup(pc)
 	PCIBIOS_PRINTV(("------------------------------------------\n"));
 	PCIBIOS_PRINTV(("  device vendor product pin PIRQ IRQ stage\n"));
 	PCIBIOS_PRINTV(("------------------------------------------\n"));
-	pci_device_foreach(pc, pcibios_max_bus, pciintr_do_header_fixup);
+	pci_device_foreach(pc, pcibios_max_bus, pciintr_do_header_fixup, NULL);
 	PCIBIOS_PRINTV(("------------------------------------------\n"));
 
 	return (0);
 }
 
 void
-pciintr_do_header_fixup(pc, tag)
+pciintr_do_header_fixup(pc, tag, context)
 	pci_chipset_tag_t pc;
 	pcitag_t tag;
+	void *context;
 {
 	struct pcibios_intr_routing *pir;
 	struct pciintr_link_map *l;
@@ -606,12 +617,14 @@ pciintr_do_header_fixup(pc, tag)
 	pin = PCI_INTERRUPT_PIN(intr);
 	irq = PCI_INTERRUPT_LINE(intr);
 
+#if 0
 	if (pin == 0) {
 		/*
 		 * No interrupt used.
 		 */
 		return;
 	}
+#endif
 
 	pir = pciintr_pir_lookup(bus, device);
 	if (pir == NULL || (link = pir->linkmap[pin - 1].link) == 0) {
@@ -716,8 +729,21 @@ pci_intr_fixup(pc, iot, pciirq)
 	 * specified by the PIR Table, and use the compat ID,
 	 * if present.  Otherwise, we have to look for the router
 	 * ourselves (the PCI-ISA bridge).
+	 *
+	 * A number of buggy BIOS implementations leave the router
+	 * entry as 000:00:0, which is typically not the correct
+	 * device/function.  If the router device address is set to
+	 * this value, and the compatible router entry is undefined
+	 * (zero is the correct value to indicate undefined), then we
+	 * work on the basis it is most likely an error, and search
+	 * the entire device-space of bus 0 (but obviously starting
+	 * with 000:00:0, in case that really is the right one).
 	 */
-	if (pcibios_pir_header.signature != 0) {
+	if (pcibios_pir_header.signature != 0 &&
+	    (pcibios_pir_header.router_bus != 0 ||
+	     PIR_DEVFUNC_DEVICE(pcibios_pir_header.router_devfunc) != 0 ||
+	     PIR_DEVFUNC_FUNCTION(pcibios_pir_header.router_devfunc) != 0 ||
+	     pcibios_pir_header.compat_router != 0)) {
 		icutag = pci_make_tag(pc, pcibios_pir_header.router_bus,
 		    PIR_DEVFUNC_DEVICE(pcibios_pir_header.router_devfunc),
 		    PIR_DEVFUNC_FUNCTION(pcibios_pir_header.router_devfunc));
@@ -740,6 +766,10 @@ pci_intr_fixup(pc, iot, pciirq)
 		 * router.
 		 */
 		for (device = 0; device < maxdevs; device++) {
+			const struct pci_quirkdata *qd;
+			int function, nfuncs;
+			pcireg_t bhlcr;
+
 			icutag = pci_make_tag(pc, 0, device, 0);
 			icuid = pci_conf_read(pc, icutag, PCI_ID_REG);
 
@@ -750,10 +780,43 @@ pci_intr_fixup(pc, iot, pciirq)
 			if (PCI_VENDOR(icuid) == 0)
 				continue;
 
-			piit = pciintr_icu_lookup(icuid);
-			if (piit != NULL)
-				break;
+			qd = pci_lookup_quirkdata(PCI_VENDOR(icuid),
+			    PCI_PRODUCT(icuid));
+
+			bhlcr = pci_conf_read(pc, icutag, PCI_BHLC_REG);
+			if (PCI_HDRTYPE_MULTIFN(bhlcr) ||
+			    (qd != NULL &&
+			     (qd->quirks & PCI_QUIRK_MULTIFUNCTION) != 0))
+				nfuncs = 8;
+			else
+				nfuncs = 1;
+
+			for (function = 0; function < nfuncs; function++) {
+				icutag = pci_make_tag(pc, 0, device, function);
+				icuid = pci_conf_read(pc, icutag, PCI_ID_REG);
+
+				/* Invalid vendor ID value? */
+				if (PCI_VENDOR(icuid) == PCI_VENDOR_INVALID)
+					continue;
+				/* Not invalid, but we've done this ~forever */
+				if (PCI_VENDOR(icuid) == 0)
+					continue;
+
+				piit = pciintr_icu_lookup(icuid);
+				if (piit != NULL)
+					goto found;
+			}
 		}
+
+		/*
+		 * Invalidate the ICU ID.  If we failed to find the
+		 * interrupt router (piit == NULL) we don't want to
+		 * display a spurious device address below containing
+		 * the product information of the last device we
+		 * looked at.
+		 */
+		icuid = 0;
+found:;
 	}
 
 	if (piit == NULL) {

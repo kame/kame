@@ -1,4 +1,4 @@
-/*	$NetBSD: pccbbreg.h,v 1.5 2000/06/07 09:02:47 haya Exp $	*/
+/*	$NetBSD: pccbbreg.h,v 1.7 2001/08/30 09:20:18 haya Exp $	*/
 /*
  * Copyright (c) 1999 HAYAKAWA Koichi.  All rights reserved.
  *
@@ -39,6 +39,7 @@
 #define PCI_BUSNUM   0x18	/* latency timer, Subordinate bus number */
 #define PCI_BCR_INTR 0x3C	/* intr line, intr pin, bridge control regs */
 #define PCI_LEGACY 0x44		/* legacy IO register address (32 bits) */
+#define	PCI_SYSCTRL 0x80	/* System control */
 #define PCI_CBCTRL 0x90		/* Retry status, Card ctrl, Device ctrl */
 
 #define PCI_CLASS_INTERFACE_MASK  0xffffff00
@@ -95,7 +96,17 @@
 #define PCI113X_CBCTRL_INTR_DET 0x0100 /* functional interrupt detect */
 
 /*  PCI_CBCTRL bits for TI PCI12XX */
-#define PCI12XX_CBCTRL_INT_SERIAL 0x040000
+#define PCI12XX_SYSCTRL_VCCPROT		0x200000
+#define PCI12XX_SYSCTRL_PWRSAVE		0x000040
+#define PCI12XX_SYSCTRL_SUBSYSRW	0x000020
+#define PCI12XX_SYSCTRL_CB_DPAR		0x000010
+#define PCI12XX_SYSCTRL_CDMA_EN		0x000008
+#define PCI12XX_SYSCTRL_KEEPCLK		0x000002
+#define PCI12XX_SYSCTRL_RIMUX		0x000001
+#define PCI12XX_CBCTRL_CSC		0x20000000u
+#define PCI12XX_CBCTRL_ASYNC_CSC	0x01000000u
+#define PCI12XX_CBCTRL_INT_SERIAL	0x060000
+#define PCI12XX_CBCTRL_INT_PCI_SERIAL	0x040000
 #define PCI12XX_CBCTRL_INT_ISA    0x020000
 #define PCI12XX_CBCTRL_INT_PCI    0x000000
 #define PCI12XX_CBCTRL_INT_MASK   0x060000
@@ -134,6 +145,9 @@
 # define TOPIC_SLOT_CTRL_CLOCK_2      0x00000800 /* PCI Clock/2 */
 # define TOPIC_SLOT_CTRL_CLOCK_1      0x00000400 /* PCI Clock */
 # define TOPIC_SLOT_CTRL_CLOCK_0      0x00000000 /* no clock */
+# define TOPIC97_SLOT_CTRL_STSIRQP    0x00000400 /* status change intr pulse */
+# define TOPIC97_SLOT_CTRL_IRQP       0x00000200 /* function intr pulse */
+# define TOPIC97_SLOT_CTRL_PCIINT     0x00000100 /* intr routing to PCI INT */
 
 # define TOPIC_SLOT_CTRL_CARDBUS      0x80000000
 # define TOPIC_SLOT_CTRL_VS1          0x04000000

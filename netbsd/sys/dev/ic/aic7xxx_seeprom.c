@@ -1,4 +1,4 @@
-/*	$NetBSD: aic7xxx_seeprom.c,v 1.3 2000/06/06 17:29:40 soren Exp $	*/
+/*	$NetBSD: aic7xxx_seeprom.c,v 1.6 2001/11/13 13:14:34 lukem Exp $	*/
 
 /*       
  * Product specific probe and attach routines for: 
@@ -39,12 +39,16 @@
 $
  */     
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: aic7xxx_seeprom.c,v 1.6 2001/11/13 13:14:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/queue.h>
 #include <sys/device.h>
+#include <sys/reboot.h>		/* for AB_* needed by bootverbose */
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -56,12 +60,6 @@ $
 #include <dev/microcode/aic7xxx/aic7xxx_reg.h>
 #include <dev/ic/aic7xxxvar.h>
 #include <dev/ic/smc93cx6var.h>
-
-#ifdef DEBUG
-#define bootverbose 1
-#else
-#define bootverbose 0
-#endif
 
 static void configure_termination(struct ahc_softc *,
 				  struct seeprom_descriptor *, u_int, u_int *);
@@ -603,17 +601,14 @@ acquire_seeprom(struct ahc_softc *ahc, struct seeprom_descriptor *sd)
 }
 
 static void
-release_seeprom(sd)
-	struct seeprom_descriptor *sd;
+release_seeprom(struct seeprom_descriptor *sd)
 {
 	/* Release access to the memory port and the serial EEPROM. */
 	SEEPROM_OUTB(sd, 0);
 }
 
 static void
-write_brdctl(ahc, value)
-	struct 	ahc_softc *ahc;
-	u_int8_t value;
+write_brdctl(struct ahc_softc *ahc, u_int8_t value)
 {
 	u_int8_t brdctl;
 
@@ -645,8 +640,7 @@ write_brdctl(ahc, value)
 }
 
 static u_int8_t
-read_brdctl(ahc)
-	struct 	ahc_softc *ahc;
+read_brdctl(struct ahc_softc *ahc)
 {
 	u_int8_t brdctl;
 	u_int8_t value;

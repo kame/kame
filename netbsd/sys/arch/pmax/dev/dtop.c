@@ -1,4 +1,4 @@
-/*	$NetBSD: dtop.c,v 1.53 2000/04/26 04:16:17 mhitch Exp $	*/
+/*	$NetBSD: dtop.c,v 1.58 2002/03/17 19:40:48 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -94,7 +94,7 @@ SOFTWARE.
 ********************************************************/
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.53 2000/04/26 04:16:17 mhitch Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.58 2002/03/17 19:40:48 atatat Exp $");
 
 #include "opt_ddb.h"
 #include "rasterconsole.h"
@@ -118,7 +118,7 @@ __KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.53 2000/04/26 04:16:17 mhitch Exp $");
 #include <machine/dc7085cons.h>		/*  mdmctl bits same on dtop and dc? */
 
 #include <machine/pmioctl.h>
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 #include <machine/fbvar.h>
 
 #include <pmax/dev/dtopreg.h>
@@ -331,8 +331,7 @@ dtopopen(dev, flag, mode, p)
 	while (!(flag & O_NONBLOCK) && !(tp->t_cflag & CLOCAL) &&
 	       !(tp->t_state & TS_CARR_ON)) {
 		tp->t_wopen++;
-		error = ttysleep(tp, (caddr_t)&tp->t_rawq,
-				      TTIPRI | PCATCH, ttopen, 0);
+		error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH, ttopen, 0);
 		tp->t_wopen--;
 		if (error != 0)
 			break;
@@ -340,7 +339,7 @@ dtopopen(dev, flag, mode, p)
 	splx(s);
 	if (error)
 		return (error);
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = (*tp->t_linesw->l_open)(dev, tp);
 
 #if (RASTERCONSOLE > 0) && defined(RCONS_BRAINDAMAGE)
 	/* handle raster console specially */
@@ -364,7 +363,7 @@ dtopclose(dev, flag, mode, p)
 
 	unit = minor(dev);
 	tp = DTOP_TTY(unit);
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	(*tp->t_linesw->l_close)(tp, flag);
 	return (ttyclose(tp));
 }
 
@@ -376,7 +375,7 @@ dtopread(dev, uio, flag)
 	struct tty *tp;
 
 	tp = DTOP_TTY(minor(dev));
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
 
 int
@@ -387,7 +386,19 @@ dtopwrite(dev, uio, flag)
 	struct tty *tp;
 
 	tp = DTOP_TTY(minor(dev));
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return ((*tp->t_linesw->l_write)(tp, uio, flag));
+}
+
+int
+dtoppoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
+{
+	struct tty *tp;
+
+	tp = DTOP_TTY(minor(dev));
+	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
 struct tty *
@@ -412,11 +423,13 @@ dtopioctl(dev, cmd, data, flag, p)
 	int error;
 
 	tp = DTOP_TTY(unit);
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+
+	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
+	if (error != EPASSTHROUGH)
 		return (error);
+
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	switch (cmd) {
@@ -434,7 +447,7 @@ dtopioctl(dev, cmd, data, flag, p)
 		break;
 
 	default:
-		return (ENOTTY);
+		return (EPASSTHROUGH);
 	}
 	return (0);
 }
@@ -499,7 +512,7 @@ dtopstart(tp)
 	if (tp->t_outq.c_cc <= tp->t_lowat) {
 		if (tp->t_state & TS_ASLEEP) {
 			tp->t_state &= ~TS_ASLEEP;
-			wakeup((caddr_t)&tp->t_outq);
+			wakeup(&tp->t_outq);
 		}
 		selwakeup(&tp->t_wsel);
 	}
@@ -521,7 +534,7 @@ dtopstart(tp)
 		if (tp->t_outq.c_cc <= tp->t_lowat) {
 			if (tp->t_state & TS_ASLEEP) {
 				tp->t_state &= ~TS_ASLEEP;
-				wakeup((caddr_t)&tp->t_outq);
+				wakeup(&tp->t_outq);
 			}
 			selwakeup(&tp->t_wsel);
 		}
@@ -888,7 +901,7 @@ dtop_keyboard_handler(dev, msg, event, outc)
 	if (msg_len == 1)
 		save[0] = msg->body[0];
 	else if (msg_len > 0)
-		bcopy(msg->body, save, msg_len);
+		memcpy(save, msg->body, msg_len);
 
 	/*
 	 * Cancel out any keys in both the last and current message as
@@ -943,7 +956,7 @@ dtop_keyboard_handler(dev, msg, event, outc)
 		    } else if (cp /*&& tp != NULL*/) {
 			for (; cl; cl--, cp++) {
 #if 0
-				(*linesw[tp->t_line].l_rint)(*cp, tp);
+				(*tp->t_linesw->l_rint)(*cp, tp);
 #else
 				rcons_input(0, *cp);
 #endif
@@ -963,7 +976,7 @@ dtop_keyboard_handler(dev, msg, event, outc)
 	if (msg_len == 1)
 		dev->keyboard.last_codes[0] = save[0];
 	else if (msg_len > 0)
-		bcopy(save, dev->keyboard.last_codes, msg_len);
+		memcpy(dev->keyboard.last_codes, save, msg_len);
 	dev->keyboard.last_codes_count = msg_len;
 	if (dev->keyboard.k_ar_state == K_AR_ACTIVE)
 		callout_reset(&dev->keyboard.repeat_ch, hz / 2,
@@ -1000,7 +1013,7 @@ dtop_keyboard_repeat(arg)
 			if ((cp = lk_mapchar(KEY_REPEAT, &cl)) != NULL) {
 				for (; cl; cl--, cp++) {
 #if 0
-					(*linesw[tp->t_line].l_rint)(*cp, tp);
+					(*tp->t_linesw->l_rint)(*cp, tp);
 #else
 					rcons_input(0, *cp);
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: et4000.c,v 1.4.6.1 2000/06/30 16:27:20 simonb Exp $	*/
+/*	$NetBSD: et4000.c,v 1.5 2000/06/26 04:55:35 simonb Exp $	*/
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ultrix_misc.c,v 1.57.4.1 2000/07/21 02:38:13 nisimura Exp $	*/
+/*	$NetBSD: ultrix_misc.c,v 1.76 2002/03/16 23:55:57 christos Exp $	*/
 
 /*
  * Copyright (c) 1995, 1997 Jonathan Stone (hereinafter referred to as the author)
@@ -79,8 +79,13 @@
  * from: Header: sun_misc.c,v 1.16 93/04/07 02:46:27 torek Exp 
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ultrix_misc.c,v 1.76 2002/03/16 23:55:57 christos Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_nfsserver.h"
 #include "opt_sysv.h"
+#endif
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
@@ -91,7 +96,9 @@
  * handled here.
  */
 
+#if defined(_KERNEL_OPT)
 #include "fs_nfs.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -137,43 +144,46 @@
 
 #include <compat/ultrix/ultrix_flock.h>
 
+#ifdef __mips
+#include <mips/cachectl.h>
+#endif
+
 static int ultrix_to_bsd_flock __P((struct ultrix_flock *, struct flock *));
 static void bsd_to_ultrix_flock __P((struct flock *, struct ultrix_flock *));
 
 extern struct sysent ultrix_sysent[];
-extern char *ultrix_syscallnames[];
-
-
-/*
- * Select the appropriate setregs callback for the target architecture.
- */
-#ifdef __mips__
-#include <machine/ecoff_machdep.h>
-#define ULTRIX_EXEC_SETREGS cpu_exec_ecoff_setregs
-#endif /* mips */
-
-#ifdef __vax__
-#define ULTRIX_EXEC_SETREGS setregs
-#endif /* vax */
-
-
-extern void ULTRIX_EXEC_SETREGS __P((struct proc *, struct exec_package *,
-					u_long));
+extern const char * const ultrix_syscallnames[];
 extern char ultrix_sigcode[], ultrix_esigcode[];
+#ifdef __HAVE_SYSCALL_INTERN
+void syscall_intern(struct proc *);
+#else
+void syscall __P((void));
+#endif
 
-struct emul emul_ultrix = {
+const struct emul emul_ultrix = {
 	"ultrix",
+	"/emul/ultrix",
+#ifndef __HAVE_MINIMAL_EMUL
+	0,
 	NULL,
-	sendsig,
 	ULTRIX_SYS_syscall,
 	ULTRIX_SYS_MAXSYSCALL,
+#endif
 	ultrix_sysent,
 	ultrix_syscallnames,
-	0,
-	copyargs,
-	ULTRIX_EXEC_SETREGS,
+	sendsig,
+	trapsignal,
 	ultrix_sigcode,
 	ultrix_esigcode,
+	setregs,
+	NULL,
+	NULL,
+	NULL,
+#ifdef __HAVE_SYSCALL_INTERN
+	syscall_intern,
+#else
+	syscall,
+#endif
 };
 
 #define GSI_PROG_ENV 1
@@ -282,7 +292,6 @@ ultrix_sys_select(p, v, retval)
 		if (atv.tv_sec < 0 || atv.tv_usec < 0)
 			printf("ultrix select( %ld, %ld): negative timeout\n",
 			    atv.tv_sec, atv.tv_usec);
-		/*tvp = (timeval *)STACKGAPBASE;*/
 #endif
 
 	}
@@ -351,8 +360,7 @@ ultrix_sys_mmap(p, v, retval)
 	 * Special case: if fd refers to /dev/zero, map as MAP_ANON.  (XXX)
 	 */
 	fdp = p->p_fd;
-	if ((unsigned)SCARG(&ouap, fd) < fdp->fd_nfiles &&		/*XXX*/
-	    (fp = fdp->fd_ofiles[SCARG(&ouap, fd)]) != NULL &&		/*XXX*/
+	if ((fp = fd_getfile(fdp, SCARG(&ouap, fd))) != NULL &&		/*XXX*/
 	    fp->f_type == DTYPE_VNODE &&				/*XXX*/
 	    (vp = (struct vnode *)fp->f_data)->v_type == VCHR &&	/*XXX*/
 	    iszerodev(vp->v_rdev)) {					/*XXX*/
@@ -503,12 +511,13 @@ ultrix_sys_nfssvc(p, v, retval)
 	struct sys_nfssvc_args outuap;
 	struct sockaddr sa;
 	int error;
+	caddr_t sg = stackgap_init(p, 0);
 
 	memset(&outuap, 0, sizeof outuap);
 	SCARG(&outuap, fd) = SCARG(uap, fd);
-	SCARG(&outuap, mskval) = STACKGAPBASE;
+	SCARG(&outuap, mskval) = stackgap_alloc(p, &sg, sizeof sa);
 	SCARG(&outuap, msklen) = sizeof sa;
-	SCARG(&outuap, mtchval) = outuap.mskval + sizeof sa;
+	SCARG(&outuap, mtchval) = stackgap_alloc(p, &sg, sizeof sa);
 	SCARG(&outuap, mtchlen) = sizeof sa;
 
 	memset(&sa, 0, sizeof sa);
@@ -874,8 +883,8 @@ ultrix_sys_fcntl(p, v, retval)
 		error = ultrix_to_bsd_flock(&ufl, &fl);
 		if (error)
 			return (error);
-		sg = stackgap_init(p->p_emul);
-		flp = (struct flock *)stackgap_alloc(&sg, sizeof(*flp));
+		sg = stackgap_init(p, 0);
+		flp = (struct flock *)stackgap_alloc(p, &sg, sizeof(*flp));
 		error = copyout(&fl, flp, sizeof(*flp));
 		if (error)
 			return (error);

@@ -1,17 +1,17 @@
-#	$NetBSD: Makefile,v 1.13.14.4 2000/10/19 14:18:47 he Exp $
+#	$NetBSD: Makefile,v 1.20 2002/02/17 20:03:09 thorpej Exp $
 
 S=	${.CURDIR}/../../../../
 
 BASE= dosboot
 PROG= ${BASE}.com
-MKMAN=	no
+NOMAN=	# defined
 NEWVERSWHAT=	"DOS Boot"
+STARTFILE=	${DOSSTART}
+RELOC=		0x100
 
 SRCS= main.c devopen.c exec.c
 
-CLEANFILES+= ${DOSSTART} ${BASE}.sym
-
-CPPFLAGS+= -DCOMPAT_OLDBOOT -DCOMPAT_386BSD_MBRPART
+CPPFLAGS+= -DCOMPAT_386BSD_MBRPART
 CPPFLAGS+= -DXMS
 #uncomment if there are problems with memory detection
 #CPPFLAGS+= -DCONSERVATIVE_MEMDETECT

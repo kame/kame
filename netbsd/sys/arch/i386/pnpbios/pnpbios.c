@@ -1,4 +1,4 @@
-/* $NetBSD: pnpbios.c,v 1.18 2000/05/28 21:46:05 jhawk Exp $ */
+/* $NetBSD: pnpbios.c,v 1.26 2001/11/15 07:03:35 lukem Exp $ */
 
 /*
  * Copyright (c) 2000 Jason R. Thorpe.  All rights reserved.
@@ -40,6 +40,9 @@
  * it.  I didn't want to toss the code though
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pnpbios.c,v 1.26 2001/11/15 07:03:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -47,8 +50,7 @@
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/isa_machdep.h>
 #include <machine/segments.h>
@@ -141,6 +143,7 @@ static int	pnpbios_submatch	__P((struct device *parent,
     struct cfdata *match, void *aux));
 extern int	pnpbioscall		__P((int));
 
+static void	pnpbios_enumerate(struct pnpbios_softc *sc);
 static int	pnpbios_update_dock_status __P((struct pnpbios_softc *sc));
 
 /* scanning functions */
@@ -276,6 +279,7 @@ pnpbios_mapit(addr, len, prot)
 		return (0);
 	for (; pa < endpa; pa += NBPG, va += NBPG)
 		pmap_kenter_pa(va, pa, prot);
+	pmap_update(pmap_kernel());
 
 	return ((caddr_t)(startva + (addr - startpa)));
 }
@@ -287,16 +291,14 @@ pnpbios_attach(parent, self, aux)
 {
 	struct pnpbios_softc *sc = (struct pnpbios_softc *)self;
 	struct pnpbios_attach_args *paa = aux;
-	struct pnpdevnode *dn;
 	caddr_t p;
 	unsigned int codepbase, datapbase, evaddrp;
 	caddr_t codeva, datava;
 	extern char pnpbiostramp[], epnpbiostramp[];
-	int res, num, i, size, idx;
+	int res, num, size;
 #ifdef PNPBIOSEVENTS
 	int evtype;
 #endif
-	u_int8_t *buf;
 
 	pnpbios_softc = sc;
 	sc->sc_ic = paa->paa_ic;
@@ -362,7 +364,6 @@ pnpbios_attach(parent, self, aux)
 	}
 
 	printf(": nodes %d, max len %d\n", num, size);
-	buf = malloc(size, M_DEVBUF, M_NOWAIT);
 
 #ifdef PNPBIOSEVENTS
 	EDPRINTF(("%s: event flag vaddr 0x%08x\n", sc->sc_dev.dv_xname,
@@ -372,6 +373,44 @@ pnpbios_attach(parent, self, aux)
 	/* Set initial dock status. */
 	sc->sc_docked = -1;
 	(void) pnpbios_update_dock_status(sc);
+
+	/* Enumerate the device nodes. */
+	pnpbios_enumerate(sc);
+
+#ifdef PNPBIOSEVENTS
+	/* if we have an event mechnism queue a thread to deal with them */
+	/* XXX need to update with irq if we do that */
+	if (evtype != PNP_IC_CONTROL_EVENT_NONE) {
+		if (evtype != PNP_IC_CONTROL_EVENT_POLL || sc->sc_evaddr) {
+			sc->sc_threadrun = 1;
+			config_pending_incr();
+			kthread_create(pnpbios_create_event_thread, sc);
+		}
+	}
+#endif
+}
+
+static void
+pnpbios_enumerate(sc)
+	struct pnpbios_softc *sc;
+{
+	int res, num, i, size, idx;
+	struct pnpdevnode *dn;
+	u_int8_t *buf;
+
+	res = pnpbios_getnumnodes(&num, &size);
+	if (res) {
+		printf("%s: pnpbios_getnumnodes: error %d\n",
+		    sc->sc_dev.dv_xname, res);
+		return;
+	}
+
+	buf = malloc(size, M_DEVBUF, M_NOWAIT);
+	if (buf == NULL) {
+		printf("%s: unable to allocate node buffer\n",
+		    sc->sc_dev.dv_xname);
+		return;
+	}
 
 	/* 
 	 * Loop through the list of indices getting data and match/attaching
@@ -437,18 +476,6 @@ pnpbios_attach(parent, self, aux)
 		printf("%s: last index %d\n", sc->sc_dev.dv_xname, idx);
 
 	free(buf, M_DEVBUF);
-
-#ifdef PNPBIOSEVENTS
-	/* if we have an event mechnism queue a thread to deal with them */
-	/* XXX need to update with irq if we do that */
-	if (evtype != PNP_IC_CONTROL_EVENT_NONE) {
-		if (evtype != PNP_IC_CONTROL_EVENT_POLL || sc->sc_evaddr) {
-			sc->sc_threadrun = 1;
-			config_pending_incr();
-			kthread_create(pnpbios_create_event_thread, sc);
-		}
-	}
-#endif
 }
 
 static int
@@ -556,7 +583,7 @@ pnpbios_getnode(flags, idxp, buf, len)
 		return (res);
 
 	*idxp = *(short *)(pnpbios_scratchbuf + 0);
-	bcopy(pnpbios_scratchbuf + 2, buf, len);
+	memcpy(buf, pnpbios_scratchbuf + 2, len);
 	return (0);
 }
 
@@ -941,7 +968,7 @@ pnp_scan(bufp, maxlen, r, in_depends)
 
 	p = *bufp;
 
-	bzero(r, sizeof(*r));
+	memset(r, 0, sizeof(*r));
 	SIMPLEQ_INIT(&r->mem);
 	SIMPLEQ_INIT(&r->io);
 	SIMPLEQ_INIT(&r->irq);
@@ -1361,6 +1388,26 @@ pnpbios_getiobase(pbt, resc, idx, tagp, basep)
 	if (basep)
 		*basep = io->minbase;
 	return (0);
+}
+
+int
+pnpbios_getiosize(pbt, resc, idx, sizep)
+        pnpbios_tag_t pbt;
+        struct pnpresources *resc;
+        int idx;
+        int *sizep;
+{
+        struct pnp_io *io;
+
+        if (idx >= resc->numio)
+            return (EINVAL);
+
+        io = SIMPLEQ_FIRST(&resc->io);
+        while (idx--)
+                io = SIMPLEQ_NEXT(io, next);
+        if (sizep)
+                *sizep = io->len;
+        return (0);
 }
 
 void *

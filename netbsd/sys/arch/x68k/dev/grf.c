@@ -1,4 +1,4 @@
-/*	$NetBSD: grf.c,v 1.16.12.1 2000/06/30 16:27:44 simonb Exp $	*/
+/*	$NetBSD: grf.c,v 1.21 2001/12/27 02:23:24 wiz Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -74,11 +74,6 @@
 #include <compat/hpux/hpux.h>
 extern struct emul emul_hpux;
 #endif
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_pager.h>
 
 #include <uvm/uvm_extern.h>
 #include <uvm/uvm_map.h>
@@ -198,7 +193,7 @@ grfioctl(dev, cmd, data, flag, p)
 	switch (cmd) {
 
 	case GRFIOCGINFO:
-		bcopy((caddr_t)&gp->g_display, data, sizeof(struct grfinfo));
+		memcpy(data, (caddr_t)&gp->g_display, sizeof(struct grfinfo));
 		break;
 
 	case GRFIOCON:
@@ -584,7 +579,6 @@ grfunmap(dev, addr, p)
 {
 	struct grf_softc *gp = grf_cd.cd_devs[GRFUNIT(dev)];
 	vsize_t size;
-	int rv;
 
 #ifdef DEBUG
 	if (grfdebug & GDB_MMAP)
@@ -594,9 +588,9 @@ grfunmap(dev, addr, p)
 		return(EINVAL);		/* XXX: how do we deal with this? */
 	(void) (*gp->g_sw->gd_mode)(gp, GM_UNMAP, 0);
 	size = round_page(gp->g_display.gd_regsize + gp->g_display.gd_fbsize);
-	rv = uvm_unmap(&p->p_vmspace->vm_map, (vaddr_t)addr,
+	uvm_unmap(&p->p_vmspace->vm_map, (vaddr_t)addr,
 	    (vaddr_t)addr + size);
-	return(rv == KERN_SUCCESS ? 0 : EINVAL);
+	return 0;
 }
 
 #ifdef COMPAT_HPUX
@@ -646,7 +640,7 @@ grffindpid(gp)
 	if (gp->g_pid == NULL) {
 		gp->g_pid = (short *)
 			malloc(GRFMAXLCK * sizeof(short), M_DEVBUF, M_WAITOK);
-		bzero((caddr_t)gp->g_pid, GRFMAXLCK * sizeof(short));
+		memset((caddr_t)gp->g_pid, 0, GRFMAXLCK * sizeof(short));
 	}
 	pid = curproc->p_pid;
 	ni = limit = gp->g_pid[0];

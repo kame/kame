@@ -1,4 +1,4 @@
-/*	$NetBSD: pccvar.h,v 1.5 2000/03/18 22:33:04 scw Exp $	*/
+/*	$NetBSD: pccvar.h,v 1.8 2001/05/31 18:46:08 scw Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1999 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 #ifndef _MVME68K_PCCVAR_H
 #define _MVME68K_PCCVAR_H
 
+/* For isrlink_evcnt() definition */
+#include <mvme68k/mvme68k/isr.h>
+
 /*
  * Structure used to attach PCC devices.
  */
@@ -48,6 +51,8 @@ struct pcc_attach_args {
 	bus_dma_tag_t	pa_dmat;
 	bus_space_tag_t	pa_bust;
 	bus_addr_t	pa_offset;
+
+	bus_addr_t	_pa_base;
 };
 
 /* Shorthand for locators. */
@@ -59,11 +64,15 @@ struct pcc_softc {
         struct device sc_dev;
 	bus_space_tag_t sc_bust;
 	bus_space_handle_t sc_bush;
+	struct evcnt sc_evcnt;
 };
 
 extern struct pcc_softc *sys_pcc;
+extern bus_addr_t pcc_slave_base_addr;
 
-void	pccintr_establish __P((int, int (*)(void *), int, void *));
+#define	pccintr_evcnt(ipl)	isrlink_evcnt(ipl)
+void	pccintr_establish __P((int, int (*)(void *), int, void *,
+	    struct evcnt *));
 void	pccintr_disestablish __P((int));
 
 #endif /* _MVME68K_PCCVAR_H */

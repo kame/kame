@@ -1,8 +1,8 @@
-/*	$NetBSD: uvm_km.c,v 1.35.4.1 2001/04/23 21:32:05 he Exp $	*/
+/*	$NetBSD: uvm_km.c,v 1.56 2002/03/07 20:15:32 thorpej Exp $	*/
 
-/* 
+/*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
- * Copyright (c) 1991, 1993, The Regents of the University of California.  
+ * Copyright (c) 1991, 1993, The Regents of the University of California.
  *
  * All rights reserved.
  *
@@ -20,7 +20,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *	This product includes software developed by Charles D. Cranor,
- *      Washington University, the University of California, Berkeley and 
+ *      Washington University, the University of California, Berkeley and
  *      its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
@@ -44,17 +44,17 @@
  *
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and
  * its documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
- * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" 
- * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND 
+ *
+ * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+ * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
  *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
@@ -65,8 +65,6 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-
-#include "opt_uvmhist.h"
 
 /*
  * uvm_km.c: handle kernel memory allocation and management
@@ -79,11 +77,11 @@
  * starts at VM_MIN_KERNEL_ADDRESS and goes to VM_MAX_KERNEL_ADDRESS.
  * note that VM_MIN_KERNEL_ADDRESS is equal to vm_map_min(kernel_map).
  *
- * the kernel_map has several "submaps."   submaps can only appear in 
+ * the kernel_map has several "submaps."   submaps can only appear in
  * the kernel_map (user processes can't use them).   submaps "take over"
  * the management of a sub-range of the kernel's address space.  submaps
  * are typically allocated at boot time and are never released.   kernel
- * virtual address space that is mapped by a submap is locked by the 
+ * virtual address space that is mapped by a submap is locked by the
  * submap's lock -- not the kernel_map's lock.
  *
  * thus, the useful feature of submaps is that they allow us to break
@@ -93,9 +91,9 @@
  * the vm system has several standard kernel submaps, including:
  *   kmem_map => contains only wired kernel memory for the kernel
  *		malloc.   *** access to kmem_map must be protected
- *		by splimp() because we are allowed to call malloc()
+ *		by splvm() because we are allowed to call malloc()
  *		at interrupt time ***
- *   mb_map => memory for large mbufs,  *** protected by splimp ***
+ *   mb_map => memory for large mbufs,  *** protected by splvm ***
  *   pager_map => used to map "buf" structures into kernel space
  *   exec_map => used during exec to handle exec args
  *   etc...
@@ -103,19 +101,18 @@
  * the kernel allocates its private memory out of special uvm_objects whose
  * reference count is set to UVM_OBJ_KERN (thus indicating that the objects
  * are "special" and never die).   all kernel objects should be thought of
- * as large, fixed-sized, sparsely populated uvm_objects.   each kernel 
+ * as large, fixed-sized, sparsely populated uvm_objects.   each kernel
  * object is equal to the size of kernel virtual address space (i.e. the
  * value "VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS").
  *
  * most kernel private memory lives in kernel_object.   the only exception
  * to this is for memory that belongs to submaps that must be protected
- * by splimp().    each of these submaps has their own private kernel 
- * object (e.g. kmem_object, mb_object).
+ * by splvm().  pages in these submaps are not assigned to an object.
  *
  * note that just because a kernel object spans the entire kernel virutal
  * address space doesn't mean that it has to be mapped into the entire space.
- * large chunks of a kernel object's space go unused either because 
- * that area of kernel VM is unmapped, or there is some other type of 
+ * large chunks of a kernel object's space go unused either because
+ * that area of kernel VM is unmapped, or there is some other type of
  * object mapped into that range (e.g. a vnode).    for submap's kernel
  * objects, the only part of the object that can ever be populated is the
  * offsets that are managed by the submap.
@@ -127,13 +124,7 @@
  *   uvm_km_alloc(kernel_map, PAGE_SIZE) [allocate 1 wired down page in the
  *   kernel map].    if uvm_km_alloc returns virtual address 0xf8235000,
  *   then that means that the page at offset 0x235000 in kernel_object is
- *   mapped at 0xf8235000.   
- *
- * note that the offsets in kmem_object and mb_object also follow this
- * rule.   this means that the offsets for kmem_object must fall in the
- * range of [vm_map_min(kmem_object) - vm_map_min(kernel_map)] to
- * [vm_map_max(kmem_object) - vm_map_min(kernel_map)], so the offsets
- * in those objects will typically not start at zero.
+ *   mapped at 0xf8235000.
  *
  * kernel object have one other special property: when the kernel virtual
  * memory mapping them is unmapped, the backing memory in the object is
@@ -142,13 +133,14 @@
  * and no need to save them after they are no longer referenced.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uvm_km.c,v 1.56 2002/03/07 20:15:32 thorpej Exp $");
+
+#include "opt_uvmhist.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm.h>
 
@@ -156,25 +148,13 @@
  * global data structures
  */
 
-vm_map_t kernel_map = NULL;
-
-struct vmi_list vmi_list;
-simple_lock_data_t vmi_list_slock;
+struct vm_map *kernel_map = NULL;
 
 /*
  * local data structues
  */
 
 static struct vm_map		kernel_map_store;
-static struct uvm_object	kmem_object_store;
-static struct uvm_object	mb_object_store;
-
-/*
- * All pager operations here are NULL, but the object must have
- * a pager ops vector associated with it; various places assume
- * it to be so.
- */
-static struct uvm_pagerops	km_pager;
 
 /*
  * uvm_km_init: init kernel maps and objects to reflect reality (i.e.
@@ -192,12 +172,6 @@ uvm_km_init(start, end)
 	vaddr_t base = VM_MIN_KERNEL_ADDRESS;
 
 	/*
-	 * first, initialize the interrupt-safe map list.
-	 */
-	LIST_INIT(&vmi_list);
-	simple_lock_init(&vmi_list_slock);
-
-	/*
 	 * next, init kernel memory objects.
 	 */
 
@@ -207,43 +181,19 @@ uvm_km_init(start, end)
 				 VM_MIN_KERNEL_ADDRESS, UAO_FLAG_KERNOBJ);
 
 	/*
-	 * kmem_object: for use by the kernel malloc().  Memory is always
-	 * wired, and this object (and the kmem_map) can be accessed at
-	 * interrupt time.
-	 */
-	simple_lock_init(&kmem_object_store.vmobjlock);
-	kmem_object_store.pgops = &km_pager;
-	TAILQ_INIT(&kmem_object_store.memq);
-	kmem_object_store.uo_npages = 0;
-	/* we are special.  we never die */
-	kmem_object_store.uo_refs = UVM_OBJ_KERN_INTRSAFE; 
-	uvmexp.kmem_object = &kmem_object_store;
-
-	/*
-	 * mb_object: for mbuf cluster pages on platforms which use the
-	 * mb_map.  Memory is always wired, and this object (and the mb_map)
-	 * can be accessed at interrupt time.
-	 */
-	simple_lock_init(&mb_object_store.vmobjlock);
-	mb_object_store.pgops = &km_pager;
-	TAILQ_INIT(&mb_object_store.memq);
-	mb_object_store.uo_npages = 0;
-	/* we are special.  we never die */
-	mb_object_store.uo_refs = UVM_OBJ_KERN_INTRSAFE; 
-	uvmexp.mb_object = &mb_object_store;
-
-	/*
-	 * init the map and reserve allready allocated kernel space 
-	 * before installing.
+	 * init the map and reserve any space that might already
+	 * have been allocated kernel space before installing.
 	 */
 
 	uvm_map_setup(&kernel_map_store, base, end, VM_MAP_PAGEABLE);
 	kernel_map_store.pmap = pmap_kernel();
-	if (uvm_map(&kernel_map_store, &base, start - base, NULL,
-	    UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
-	    UVM_INH_NONE, UVM_ADV_RANDOM,UVM_FLAG_FIXED)) != KERN_SUCCESS)
+	if (start != base &&
+	    uvm_map(&kernel_map_store, &base, start - base, NULL,
+		    UVM_UNKNOWN_OFFSET, 0,
+		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
+		    		UVM_ADV_RANDOM, UVM_FLAG_FIXED)) != 0)
 		panic("uvm_km_init: could not reserve space for kernel");
-	
+
 	/*
 	 * install!
 	 */
@@ -264,7 +214,7 @@ uvm_km_init(start, end)
 struct vm_map *
 uvm_km_suballoc(map, min, max, size, flags, fixed, submap)
 	struct vm_map *map;
-	vaddr_t *min, *max;		/* OUT, OUT */
+	vaddr_t *min, *max;		/* IN/OUT, OUT */
 	vsize_t size;
 	int flags;
 	boolean_t fixed;
@@ -278,9 +228,9 @@ uvm_km_suballoc(map, min, max, size, flags, fixed, submap)
 	 * first allocate a blank spot in the parent map
 	 */
 
-	if (uvm_map(map, min, size, NULL, UVM_UNKNOWN_OFFSET, 
+	if (uvm_map(map, min, size, NULL, UVM_UNKNOWN_OFFSET, 0,
 	    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
-	    UVM_ADV_RANDOM, mapflags)) != KERN_SUCCESS) {
+	    UVM_ADV_RANDOM, mapflags)) != 0) {
 	       panic("uvm_km_suballoc: unable to allocate space in parent map");
 	}
 
@@ -308,7 +258,7 @@ uvm_km_suballoc(map, min, max, size, flags, fixed, submap)
 	 * now let uvm_map_submap plug in it...
 	 */
 
-	if (uvm_map_submap(map, *min, *max, submap) != KERN_SUCCESS)
+	if (uvm_map_submap(map, *min, *max, submap) != 0)
 		panic("uvm_km_suballoc: submap allocation failed");
 
 	return(submap);
@@ -321,181 +271,84 @@ uvm_km_suballoc(map, min, max, size, flags, fixed, submap)
  *    the pages right away.    (this gets called from uvm_unmap_...).
  */
 
-#define UKM_HASH_PENALTY 4      /* a guess */
-
 void
 uvm_km_pgremove(uobj, start, end)
 	struct uvm_object *uobj;
 	vaddr_t start, end;
 {
-	boolean_t by_list;
-	struct vm_page *pp, *ppnext;
-	vaddr_t curoff;
+	struct vm_page *pg;
+	voff_t curoff, nextoff;
+	int swpgonlydelta = 0;
 	UVMHIST_FUNC("uvm_km_pgremove"); UVMHIST_CALLED(maphist);
 
-	simple_lock(&uobj->vmobjlock);		/* lock object */
+	KASSERT(uobj->pgops == &aobj_pager);
+	simple_lock(&uobj->vmobjlock);
 
-#ifdef DIAGNOSTIC
-	if (__predict_false(uobj->pgops != &aobj_pager))
-		panic("uvm_km_pgremove: object %p not an aobj", uobj);
-#endif
-
-	/* choose cheapest traversal */
-	by_list = (uobj->uo_npages <=
-	     ((end - start) >> PAGE_SHIFT) * UKM_HASH_PENALTY);
- 
-	if (by_list)
-		goto loop_by_list;
-
-	/* by hash */
-
-	for (curoff = start ; curoff < end ; curoff += PAGE_SIZE) {
-		pp = uvm_pagelookup(uobj, curoff);
-		if (pp == NULL)
-			continue;
-
-		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
-		    pp->flags & PG_BUSY, 0, 0);
-
-		/* now do the actual work */
-		if (pp->flags & PG_BUSY) {
-			/* owner must check for this when done */
-			pp->flags |= PG_RELEASED;
-		} else {
-			/* free the swap slot... */
-			uao_dropswap(uobj, curoff >> PAGE_SHIFT);
-
-			/*
-			 * ...and free the page; note it may be on the
-			 * active or inactive queues.
-			 */
-			uvm_lock_pageq();
-			uvm_pagefree(pp);
-			uvm_unlock_pageq();
-		}
-		/* done */
-	}
-	simple_unlock(&uobj->vmobjlock);
-	return;
-
-loop_by_list:
-
-	for (pp = uobj->memq.tqh_first ; pp != NULL ; pp = ppnext) {
-		ppnext = pp->listq.tqe_next;
-		if (pp->offset < start || pp->offset >= end) {
+	for (curoff = start; curoff < end; curoff = nextoff) {
+		nextoff = curoff + PAGE_SIZE;
+		pg = uvm_pagelookup(uobj, curoff);
+		if (pg != NULL && pg->flags & PG_BUSY) {
+			pg->flags |= PG_WANTED;
+			UVM_UNLOCK_AND_WAIT(pg, &uobj->vmobjlock, 0,
+				    "km_pgrm", 0);
+			simple_lock(&uobj->vmobjlock);
+			nextoff = curoff;
 			continue;
 		}
 
-		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
-		    pp->flags & PG_BUSY, 0, 0);
+		/*
+		 * free the swap slot, then the page.
+		 */
 
-		/* now do the actual work */
-		if (pp->flags & PG_BUSY) {
-			/* owner must check for this when done */
-			pp->flags |= PG_RELEASED;
-		} else {
-			/* free the swap slot... */
-			uao_dropswap(uobj, pp->offset >> PAGE_SHIFT);
-
-			/*
-			 * ...and free the page; note it may be on the
-			 * active or inactive queues.
-			 */
+		if (pg == NULL &&
+		    uao_find_swslot(uobj, curoff >> PAGE_SHIFT) != 0) {
+			swpgonlydelta++;
+		}
+		uao_dropswap(uobj, curoff >> PAGE_SHIFT);
+		if (pg != NULL) {
 			uvm_lock_pageq();
-			uvm_pagefree(pp);
+			uvm_pagefree(pg);
 			uvm_unlock_pageq();
 		}
-		/* done */
 	}
 	simple_unlock(&uobj->vmobjlock);
-	return;
+
+	if (swpgonlydelta > 0) {
+		simple_lock(&uvm.swap_data_lock);
+		KASSERT(uvmexp.swpgonly >= swpgonlydelta);
+		uvmexp.swpgonly -= swpgonlydelta;
+		simple_unlock(&uvm.swap_data_lock);
+	}
 }
 
 
 /*
  * uvm_km_pgremove_intrsafe: like uvm_km_pgremove(), but for "intrsafe"
- *    objects
+ *    maps
  *
  * => when you unmap a part of anonymous kernel memory you want to toss
- *    the pages right away.    (this gets called from uvm_unmap_...).
+ *    the pages right away.    (this is called from uvm_unmap_...).
  * => none of the pages will ever be busy, and none of them will ever
- *    be on the active or inactive queues (because these objects are
- *    never allowed to "page").
+ *    be on the active or inactive queues (because they have no object).
  */
 
 void
-uvm_km_pgremove_intrsafe(uobj, start, end)
-	struct uvm_object *uobj;
+uvm_km_pgremove_intrsafe(start, end)
 	vaddr_t start, end;
 {
-	boolean_t by_list;
-	struct vm_page *pp, *ppnext;
-	vaddr_t curoff;
+	struct vm_page *pg;
+	paddr_t pa;
 	UVMHIST_FUNC("uvm_km_pgremove_intrsafe"); UVMHIST_CALLED(maphist);
 
-	simple_lock(&uobj->vmobjlock);		/* lock object */
-
-#ifdef DIAGNOSTIC
-	if (__predict_false(UVM_OBJ_IS_INTRSAFE_OBJECT(uobj) == 0))
-		panic("uvm_km_pgremove_intrsafe: object %p not intrsafe", uobj);
-#endif
-
-	/* choose cheapest traversal */
-	by_list = (uobj->uo_npages <=
-	     ((end - start) >> PAGE_SHIFT) * UKM_HASH_PENALTY);
- 
-	if (by_list)
-		goto loop_by_list;
-
-	/* by hash */
-
-	for (curoff = start ; curoff < end ; curoff += PAGE_SIZE) {
-		pp = uvm_pagelookup(uobj, curoff);
-		if (pp == NULL)
-			continue;
-
-		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
-		    pp->flags & PG_BUSY, 0, 0);
-#ifdef DIAGNOSTIC
-		if (__predict_false(pp->flags & PG_BUSY))
-			panic("uvm_km_pgremove_intrsafe: busy page");
-		if (__predict_false(pp->pqflags & PQ_ACTIVE))
-			panic("uvm_km_pgremove_intrsafe: active page");
-		if (__predict_false(pp->pqflags & PQ_INACTIVE))
-			panic("uvm_km_pgremove_intrsafe: inactive page");
-#endif
-
-		/* free the page */
-		uvm_pagefree(pp);
-	}
-	simple_unlock(&uobj->vmobjlock);
-	return;
-
-loop_by_list:
-
-	for (pp = uobj->memq.tqh_first ; pp != NULL ; pp = ppnext) {
-		ppnext = pp->listq.tqe_next;
-		if (pp->offset < start || pp->offset >= end) {
+	for (; start < end; start += PAGE_SIZE) {
+		if (!pmap_extract(pmap_kernel(), start, &pa)) {
 			continue;
 		}
-
-		UVMHIST_LOG(maphist,"  page 0x%x, busy=%d", pp,
-		    pp->flags & PG_BUSY, 0, 0);
-
-#ifdef DIAGNOSTIC
-		if (__predict_false(pp->flags & PG_BUSY))
-			panic("uvm_km_pgremove_intrsafe: busy page");
-		if (__predict_false(pp->pqflags & PQ_ACTIVE))
-			panic("uvm_km_pgremove_intrsafe: active page");
-		if (__predict_false(pp->pqflags & PQ_INACTIVE))
-			panic("uvm_km_pgremove_intrsafe: inactive page");
-#endif
-
-		/* free the page */
-		uvm_pagefree(pp);
+		pg = PHYS_TO_VM_PAGE(pa);
+		KASSERT(pg);
+		KASSERT(pg->uobject == NULL && pg->uanon == NULL);
+		uvm_pagefree(pg);
 	}
-	simple_unlock(&uobj->vmobjlock);
-	return;
 }
 
 
@@ -513,7 +366,7 @@ loop_by_list:
 
 vaddr_t
 uvm_km_kmemalloc(map, obj, size, flags)
-	vm_map_t map;
+	struct vm_map *map;
 	struct uvm_object *obj;
 	vsize_t size;
 	int flags;
@@ -524,14 +377,9 @@ uvm_km_kmemalloc(map, obj, size, flags)
 	struct vm_page *pg;
 	UVMHIST_FUNC("uvm_km_kmemalloc"); UVMHIST_CALLED(maphist);
 
-
 	UVMHIST_LOG(maphist,"  (map=0x%x, obj=0x%x, size=0x%x, flags=%d)",
-	map, obj, size, flags);
-#ifdef DIAGNOSTIC
-	/* sanity check */
-	if (__predict_false(vm_map_pmap(map) != pmap_kernel()))
-		panic("uvm_km_kmemalloc: invalid map");
-#endif
+		    map, obj, size, flags);
+	KASSERT(vm_map_pmap(map) == pmap_kernel());
 
 	/*
 	 * setup for call
@@ -545,9 +393,9 @@ uvm_km_kmemalloc(map, obj, size, flags)
 	 */
 
 	if (__predict_false(uvm_map(map, &kva, size, obj, UVM_UNKNOWN_OFFSET,
-	      UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
-			  UVM_ADV_RANDOM, (flags & UVM_KMF_TRYLOCK))) 
-			!= KERN_SUCCESS)) {
+	      0, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
+			  UVM_ADV_RANDOM, (flags & UVM_KMF_TRYLOCK)))
+			!= 0)) {
 		UVMHIST_LOG(maphist, "<- done (no VM)",0,0,0,0);
 		return(0);
 	}
@@ -560,6 +408,7 @@ uvm_km_kmemalloc(map, obj, size, flags)
 		UVMHIST_LOG(maphist,"<- done valloc (kva=0x%x)", kva,0,0,0);
 		return(kva);
 	}
+
 	/*
 	 * recover object offset from virtual address
 	 */
@@ -575,14 +424,18 @@ uvm_km_kmemalloc(map, obj, size, flags)
 	loopva = kva;
 	loopsize = size;
 	while (loopsize) {
-		simple_lock(&obj->vmobjlock);
-		pg = uvm_pagealloc(obj, offset, NULL, 0);
-		if (pg) {
+		if (obj) {
+			simple_lock(&obj->vmobjlock);
+		}
+		pg = uvm_pagealloc(obj, offset, NULL, UVM_PGA_USERESERVE);
+		if (__predict_true(pg != NULL)) {
 			pg->flags &= ~PG_BUSY;	/* new page */
 			UVM_PAGE_OWN(pg, NULL);
 		}
-		simple_unlock(&obj->vmobjlock);
-		
+		if (obj) {
+			simple_unlock(&obj->vmobjlock);
+		}
+
 		/*
 		 * out of memory?
 		 */
@@ -597,14 +450,12 @@ uvm_km_kmemalloc(map, obj, size, flags)
 				continue;
 			}
 		}
-		
+
 		/*
-		 * map it in: note that we call pmap_enter with the map and
-		 * object unlocked in case we are kmem_map/kmem_object
-		 * (because if pmap_enter wants to allocate out of kmem_object
-		 * it will need to lock it itself!)
+		 * map it in
 		 */
-		if (UVM_OBJ_IS_INTRSAFE_OBJECT(obj)) {
+
+		if (obj == NULL) {
 			pmap_kenter_pa(loopva, VM_PAGE_TO_PHYS(pg),
 			    VM_PROT_ALL);
 		} else {
@@ -616,7 +467,9 @@ uvm_km_kmemalloc(map, obj, size, flags)
 		offset += PAGE_SIZE;
 		loopsize -= PAGE_SIZE;
 	}
-
+	
+       	pmap_update(pmap_kernel());
+	 
 	UVMHIST_LOG(maphist,"<- done (kva=0x%x)", kva,0,0,0);
 	return(kva);
 }
@@ -627,11 +480,10 @@ uvm_km_kmemalloc(map, obj, size, flags)
 
 void
 uvm_km_free(map, addr, size)
-	vm_map_t map;
+	struct vm_map *map;
 	vaddr_t addr;
 	vsize_t size;
 {
-
 	uvm_unmap(map, trunc_page(addr), round_page(addr+size));
 }
 
@@ -644,18 +496,17 @@ uvm_km_free(map, addr, size)
 
 void
 uvm_km_free_wakeup(map, addr, size)
-	vm_map_t map;
+	struct vm_map *map;
 	vaddr_t addr;
 	vsize_t size;
 {
-	vm_map_entry_t dead_entries;
+	struct vm_map_entry *dead_entries;
 
 	vm_map_lock(map);
-	(void)uvm_unmap_remove(map, trunc_page(addr), round_page(addr+size), 
-			 &dead_entries);
+	uvm_unmap_remove(map, trunc_page(addr), round_page(addr + size),
+	    &dead_entries);
 	wakeup(map);
 	vm_map_unlock(map);
-
 	if (dead_entries != NULL)
 		uvm_unmap_detach(dead_entries, 0);
 }
@@ -668,7 +519,7 @@ uvm_km_free_wakeup(map, addr, size)
 
 vaddr_t
 uvm_km_alloc1(map, size, zeroit)
-	vm_map_t map;
+	struct vm_map *map;
 	vsize_t size;
 	boolean_t zeroit;
 {
@@ -677,11 +528,7 @@ uvm_km_alloc1(map, size, zeroit)
 	UVMHIST_FUNC("uvm_km_alloc1"); UVMHIST_CALLED(maphist);
 
 	UVMHIST_LOG(maphist,"(map=0x%x, size=0x%x)", map, size,0,0);
-
-#ifdef DIAGNOSTIC
-	if (vm_map_pmap(map) != pmap_kernel())
-		panic("uvm_km_alloc1");
-#endif
+	KASSERT(vm_map_pmap(map) == pmap_kernel());
 
 	size = round_page(size);
 	kva = vm_map_min(map);		/* hint */
@@ -691,9 +538,9 @@ uvm_km_alloc1(map, size, zeroit)
 	 */
 
 	if (__predict_false(uvm_map(map, &kva, size, uvm.kernel_object,
-	      UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
+	      UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
 					      UVM_INH_NONE, UVM_ADV_RANDOM,
-					      0)) != KERN_SUCCESS)) {
+					      0)) != 0)) {
 		UVMHIST_LOG(maphist,"<- done (no VM)",0,0,0,0);
 		return(0);
 	}
@@ -706,51 +553,31 @@ uvm_km_alloc1(map, size, zeroit)
 	UVMHIST_LOG(maphist,"  kva=0x%x, offset=0x%x", kva, offset,0,0);
 
 	/*
-	 * now allocate the memory.  we must be careful about released pages.
+	 * now allocate the memory.
 	 */
 
 	loopva = kva;
 	while (size) {
 		simple_lock(&uvm.kernel_object->vmobjlock);
-		pg = uvm_pagelookup(uvm.kernel_object, offset);
-
-		/*
-		 * if we found a page in an unallocated region, it must be
-		 * released
-		 */
-		if (pg) {
-			if ((pg->flags & PG_RELEASED) == 0)
-				panic("uvm_km_alloc1: non-released page");
-			pg->flags |= PG_WANTED;
-			UVM_UNLOCK_AND_WAIT(pg, &uvm.kernel_object->vmobjlock,
-			    FALSE, "km_alloc", 0);
-			continue;   /* retry */
-		}
-		
-		/* allocate ram */
+		KASSERT(uvm_pagelookup(uvm.kernel_object, offset) == NULL);
 		pg = uvm_pagealloc(uvm.kernel_object, offset, NULL, 0);
 		if (pg) {
-			pg->flags &= ~PG_BUSY;	/* new page */
+			pg->flags &= ~PG_BUSY;
 			UVM_PAGE_OWN(pg, NULL);
 		}
 		simple_unlock(&uvm.kernel_object->vmobjlock);
-		if (__predict_false(pg == NULL)) {
-			uvm_wait("km_alloc1w");	/* wait for memory */
+		if (pg == NULL) {
+			uvm_wait("km_alloc1w");
 			continue;
 		}
-		
-		/*
-		 * map it in; note we're never called with an intrsafe
-		 * object, so we always use regular old pmap_enter().
-		 */
 		pmap_enter(map->pmap, loopva, VM_PAGE_TO_PHYS(pg),
 		    UVM_PROT_ALL, PMAP_WIRED | VM_PROT_READ | VM_PROT_WRITE);
-
 		loopva += PAGE_SIZE;
 		offset += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
-	
+	pmap_update(map->pmap);
+
 	/*
 	 * zero on request (note that "size" is now zero due to the above loop
 	 * so we need to subtract kva from loopva to reconstruct the size).
@@ -758,7 +585,6 @@ uvm_km_alloc1(map, size, zeroit)
 
 	if (zeroit)
 		memset((caddr_t)kva, 0, loopva - kva);
-
 	UVMHIST_LOG(maphist,"<- done (kva=0x%x)", kva,0,0,0);
 	return(kva);
 }
@@ -771,18 +597,23 @@ uvm_km_alloc1(map, size, zeroit)
 
 vaddr_t
 uvm_km_valloc(map, size)
-	vm_map_t map;
+	struct vm_map *map;
 	vsize_t size;
+{
+	return(uvm_km_valloc_align(map, size, 0));
+}
+
+vaddr_t
+uvm_km_valloc_align(map, size, align)
+	struct vm_map *map;
+	vsize_t size;
+	vsize_t align;
 {
 	vaddr_t kva;
 	UVMHIST_FUNC("uvm_km_valloc"); UVMHIST_CALLED(maphist);
 
 	UVMHIST_LOG(maphist, "(map=0x%x, size=0x%x)", map, size, 0,0);
-
-#ifdef DIAGNOSTIC
-	if (__predict_false(vm_map_pmap(map) != pmap_kernel()))
-		panic("uvm_km_valloc");
-#endif
+	KASSERT(vm_map_pmap(map) == pmap_kernel());
 
 	size = round_page(size);
 	kva = vm_map_min(map);		/* hint */
@@ -792,9 +623,9 @@ uvm_km_valloc(map, size)
 	 */
 
 	if (__predict_false(uvm_map(map, &kva, size, uvm.kernel_object,
-	    UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
+	    UVM_UNKNOWN_OFFSET, align, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
 					    UVM_INH_NONE, UVM_ADV_RANDOM,
-					    0)) != KERN_SUCCESS)) {
+					    0)) != 0)) {
 		UVMHIST_LOG(maphist, "<- done (no VM)", 0,0,0,0);
 		return(0);
 	}
@@ -812,25 +643,22 @@ uvm_km_valloc(map, size)
  */
 
 vaddr_t
-uvm_km_valloc_wait(map, size)
-	vm_map_t map;
+uvm_km_valloc_prefer_wait(map, size, prefer)
+	struct vm_map *map;
 	vsize_t size;
+	voff_t prefer;
 {
 	vaddr_t kva;
-	UVMHIST_FUNC("uvm_km_valloc_wait"); UVMHIST_CALLED(maphist);
+	UVMHIST_FUNC("uvm_km_valloc_prefer_wait"); UVMHIST_CALLED(maphist);
 
 	UVMHIST_LOG(maphist, "(map=0x%x, size=0x%x)", map, size, 0,0);
-
-#ifdef DIAGNOSTIC
-	if (__predict_false(vm_map_pmap(map) != pmap_kernel()))
-		panic("uvm_km_valloc_wait");
-#endif
+	KASSERT(vm_map_pmap(map) == pmap_kernel());
 
 	size = round_page(size);
 	if (size > vm_map_max(map) - vm_map_min(map))
 		return(0);
 
-	while (1) {
+	for (;;) {
 		kva = vm_map_min(map);		/* hint */
 
 		/*
@@ -839,9 +667,9 @@ uvm_km_valloc_wait(map, size)
 		 */
 
 		if (__predict_true(uvm_map(map, &kva, size, uvm.kernel_object,
-		    UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL,
+		    prefer, 0, UVM_MAPFLAG(UVM_PROT_ALL,
 		    UVM_PROT_ALL, UVM_INH_NONE, UVM_ADV_RANDOM, 0))
-		    == KERN_SUCCESS)) {
+		    == 0)) {
 			UVMHIST_LOG(maphist,"<- done (kva=0x%x)", kva,0,0,0);
 			return(kva);
 		}
@@ -854,6 +682,14 @@ uvm_km_valloc_wait(map, size)
 		tsleep((caddr_t)map, PVM, "vallocwait", 0);
 	}
 	/*NOTREACHED*/
+}
+
+vaddr_t
+uvm_km_valloc_wait(map, size)
+	struct vm_map *map;
+	vsize_t size;
+{
+	return uvm_km_valloc_prefer_wait(map, size, UVM_UNKNOWN_OFFSET);
 }
 
 /* Sanity; must specify both or none. */
@@ -871,7 +707,7 @@ uvm_km_valloc_wait(map, size)
 /* ARGSUSED */
 vaddr_t
 uvm_km_alloc_poolpage1(map, obj, waitok)
-	vm_map_t map;
+	struct vm_map *map;
 	struct uvm_object *obj;
 	boolean_t waitok;
 {
@@ -897,16 +733,16 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 	int s;
 
 	/*
-	 * NOTE: We may be called with a map that doens't require splimp
+	 * NOTE: We may be called with a map that doens't require splvm
 	 * protection (e.g. kernel_map).  However, it does not hurt to
-	 * go to splimp in this case (since unprocted maps will never be
+	 * go to splvm in this case (since unprocted maps will never be
 	 * accessed in interrupt context).
 	 *
 	 * XXX We may want to consider changing the interface to this
 	 * XXX function.
 	 */
 
-	s = splimp();
+	s = splvm();
 	va = uvm_km_kmemalloc(map, obj, PAGE_SIZE, waitok ? 0 : UVM_KMF_NOWAIT);
 	splx(s);
 	return (va);
@@ -922,7 +758,7 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 /* ARGSUSED */
 void
 uvm_km_free_poolpage1(map, addr)
-	vm_map_t map;
+	struct vm_map *map;
 	vaddr_t addr;
 {
 #if defined(PMAP_UNMAP_POOLPAGE)
@@ -934,16 +770,16 @@ uvm_km_free_poolpage1(map, addr)
 	int s;
 
 	/*
-	 * NOTE: We may be called with a map that doens't require splimp
+	 * NOTE: We may be called with a map that doens't require splvm
 	 * protection (e.g. kernel_map).  However, it does not hurt to
-	 * go to splimp in this case (since unprocted maps will never be
+	 * go to splvm in this case (since unprocted maps will never be
 	 * accessed in interrupt context).
 	 *
 	 * XXX We may want to consider changing the interface to this
 	 * XXX function.
 	 */
 
-	s = splimp();
+	s = splvm();
 	uvm_km_free(map, addr, PAGE_SIZE);
 	splx(s);
 #endif /* PMAP_UNMAP_POOLPAGE */

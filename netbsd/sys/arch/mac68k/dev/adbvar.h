@@ -1,4 +1,4 @@
-/*	$NetBSD: adbvar.h,v 1.18.4.1 2000/09/21 13:04:21 scottr Exp $	*/
+/*	$NetBSD: adbvar.h,v 1.19 2000/07/03 08:59:27 scottr Exp $	*/
 
 /*
  * Copyright (C) 1994	Bradley A. Grantham

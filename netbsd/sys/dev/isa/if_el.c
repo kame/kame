@@ -1,4 +1,4 @@
-/*	$NetBSD: if_el.c,v 1.60 2000/03/30 12:45:33 augustss Exp $	*/
+/*	$NetBSD: if_el.c,v 1.66 2002/01/07 21:47:07 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994, Matthew E. Kimmel.  Permission is hereby granted
@@ -17,6 +17,9 @@
  *	- Does not currently support DMA
  *	- Does not currently support multicasts
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_el.c,v 1.66 2002/01/07 21:47:07 thorpej Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -126,12 +129,27 @@ elprobe(parent, match, aux)
 	struct isa_attach_args *ia = aux;
 	bus_space_tag_t iot = ia->ia_iot;
 	bus_space_handle_t ioh;
-	int iobase = ia->ia_iobase;
+	int iobase;
 	u_int8_t station_addr[ETHER_ADDR_LEN];
 	u_int8_t i;
 	int rval;
 
 	rval = 0;
+
+	if (ia->ia_nio < 1)
+		return (0);
+	if (ia->ia_nirq < 1)
+		return (0);
+
+	if (ISA_DIRECT_CONFIG(ia))
+		return (0);
+
+	iobase = ia->ia_io[0].ir_addr;
+
+	if (ia->ia_io[0].ir_addr == ISACF_PORT_DEFAULT)
+		return (0);
+	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
+		return (0);
 
 	/* First check the base. */
 	if (iobase < 0x200 || iobase > 0x3f0)
@@ -172,8 +190,14 @@ elprobe(parent, match, aux)
 	}
 	DPRINTF(("Vendor code ok.\n"));
 
-	ia->ia_iosize = 16;
-	ia->ia_msize = 0;
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_size = 16;
+
+	ia->ia_nirq = 1;
+
+	ia->ia_niomem = 0;
+	ia->ia_ndrq = 0;
+
 	rval = 1;
 
  out:
@@ -204,7 +228,7 @@ elattach(parent, self, aux)
 	DPRINTF(("Attaching %s...\n", sc->sc_dev.dv_xname));
 
 	/* Map i/o space. */
-	if (bus_space_map(iot, ia->ia_iobase, ia->ia_iosize, 0, &ioh)) {
+	if (bus_space_map(iot, ia->ia_io[0].ir_addr, 16, 0, &ioh)) {
 		printf("%s: can't map i/o space\n", self->dv_xname);
 		return;
 	}
@@ -227,12 +251,13 @@ elattach(parent, self, aux)
 	elstop(sc);
 
 	/* Initialize ifnet structure. */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = elstart;
 	ifp->if_ioctl = elioctl;
 	ifp->if_watchdog = elwatchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Now we can attach the interface. */
 	DPRINTF(("Attaching interface...\n"));
@@ -242,14 +267,8 @@ elattach(parent, self, aux)
 	/* Print out some information for the user. */
 	printf("%s: address %s\n", self->dv_xname, ether_sprintf(myaddr));
 
-	/* Finally, attach to bpf filter if it is present. */
-#if NBPFILTER > 0
-	DPRINTF(("Attaching to BPF...\n"));
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
-
-	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
-	    IPL_NET, elintr, sc);
+	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
+	    IST_EDGE, IPL_NET, elintr, sc);
 
 #if NRND > 0
 	DPRINTF(("Attaching to random...\n"));
@@ -382,7 +401,7 @@ elstart(ifp)
 	 */
 	for (;;) {
 		/* Dequeue the next datagram. */
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 
 		/* If there's nothing to send, return. */
 		if (m0 == 0)
@@ -578,7 +597,6 @@ elread(sc, len)
 {
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	struct mbuf *m;
-	struct ether_header *eh;
 
 	if (len <= sizeof(struct ether_header) ||
 	    len > ETHER_MAX_LEN) {
@@ -597,30 +615,13 @@ elread(sc, len)
 
 	ifp->if_ipackets++;
 
-	/* We assume that the header fit entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	/*
 	 * Check if there's a BPF listener on this interface.
 	 * If so, hand off the raw packet to BPF.
 	 */
-	if (ifp->if_bpf) {
+	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
-
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-		if ((ifp->if_flags & IFF_PROMISC) &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    bcmp(eh->ether_dhost, LLADDR(ifp->if_sadl),
-			    sizeof(eh->ether_dhost)) != 0) {
-			m_freem(m);
-			return;
-		}
-	}
 #endif
 
 	(*ifp->if_input)(ifp, m);
@@ -721,7 +722,7 @@ elioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
+				memcpy(LLADDR(ifp->if_sadl), ina->x_host.c_host,
 				    ETHER_ADDR_LEN);
 			/* Set new address. */
 			elinit(sc);

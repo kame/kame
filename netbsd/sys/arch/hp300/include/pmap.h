@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.25 1999/02/25 22:34:41 is Exp $	*/
+/*	$NetBSD: pmap.h,v 1.32 2001/09/10 21:19:13 chris Exp $	*/
 
 /* 
  * Copyright (c) 1987 Carnegie-Mellon University
@@ -65,7 +65,7 @@ struct pmap {
 	st_entry_t		*pm_stpa;	/* 040: ST phys addr */
 	short			pm_sref;	/* segment table ref count */
 	short			pm_count;	/* pmap reference count */
-	simple_lock_data_t	pm_lock;	/* lock on pmap */
+	struct simplelock	pm_lock;	/* lock on pmap */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 	long			pm_ptpages;	/* more stats: PT pages */
 };
@@ -98,7 +98,7 @@ typedef struct pmap	*pmap_t;
 }
 
 /*
- * For each vm_page_t, there is a list of all currently valid virtual
+ * For each struct vm_page, there is a list of all currently valid virtual
  * mappings of that page.  An entry is a pv_entry, the list is pv_table.
  */
 struct pv_entry {
@@ -143,9 +143,10 @@ extern struct pmap	kernel_pmap_store;
 
 extern struct pv_entry	*pv_table;	/* array of entries, one per page */
 
-#define pmap_page_index(pa)		atop(pa - vm_first_phys)
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
+
+#define	pmap_update(pmap)		/* nothing (yet) */
 
 extern pt_entry_t	*Sysmap;
 extern char		*vmmap;		/* map for mem, dumps, etc. */

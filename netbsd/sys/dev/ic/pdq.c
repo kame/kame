@@ -1,4 +1,4 @@
-/*	$NetBSD: pdq.c,v 1.29 2000/05/28 01:28:52 matt Exp $	*/
+/*	$NetBSD: pdq.c,v 1.33 2001/11/13 13:14:43 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1995,1996 Matt Thomas <matt@3am-software.com>
@@ -10,7 +10,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -38,6 +38,9 @@
  * However, it is expected that the PDQ_CSR_WRITE macro will cause a 
  * flushing of the write buffers.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pdq.c,v 1.33 2001/11/13 13:14:43 lukem Exp $");
 
 #define	PDQ_HWSUPPORT	/* for pdq.h */
 
@@ -1013,9 +1016,13 @@ pdq_queue_transmit_data(
      * Everything went fine.  Finish it up.
      */
     tx->tx_descriptor_count[tx->tx_producer] = tx->tx_free - freecnt;
-    if (PDQ_RX_FC_OFFSET != PDQ_OS_HDR_OFFSET)
+    if (PDQ_RX_FC_OFFSET != PDQ_OS_HDR_OFFSET) {
 	dbp->pdqdb_transmits[tx->tx_producer].txd_sop = 1;
+	PDQ_OS_DESC_PRESYNC(pdq, &dbp->pdqdb_transmits[tx->tx_producer],
+	    sizeof(pdq_txdesc_t));
+    }
     eop->txd_eop = 1;
+    PDQ_OS_DESC_PRESYNC(pdq, eop, sizeof(pdq_txdesc_t));
     PDQ_OS_DATABUF_ENQUEUE(&tx->tx_txq, pdu);
     tx->tx_producer = producer;
     tx->tx_free = freecnt;
@@ -1619,7 +1626,7 @@ pdq_initialize(
     dbp = pdq->pdq_dbp;
 
     PDQ_PRINTF(("\nPDQ Descriptor Block = " PDQ_OS_PTR_FMT " (PA = 0x%x)\n", dbp, pdq->pdq_pa_descriptor_block));
-    PDQ_PRINTF(("    Recieve Queue          = " PDQ_OS_PTR_FMT "\n", dbp->pdqdb_receives));
+    PDQ_PRINTF(("    Receive Queue          = " PDQ_OS_PTR_FMT "\n", dbp->pdqdb_receives));
     PDQ_PRINTF(("    Transmit Queue         = " PDQ_OS_PTR_FMT "\n", dbp->pdqdb_transmits));
     PDQ_PRINTF(("    Host SMT Queue         = " PDQ_OS_PTR_FMT "\n", dbp->pdqdb_host_smt));
     PDQ_PRINTF(("    Command Response Queue = " PDQ_OS_PTR_FMT "\n", dbp->pdqdb_command_responses));

@@ -1,4 +1,4 @@
-/*	$NetBSD: fb.c,v 1.5.24.1 2000/06/30 16:27:43 simonb Exp $ */
+/*	$NetBSD: fb.c,v 1.7 2001/09/19 18:10:34 thorpej Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -56,7 +56,7 @@
 #include <sys/proc.h>
 
 #include <machine/eeprom.h>
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 
 #include <sun3/dev/fbvar.h>
 #include <sun3/dev/p4reg.h>

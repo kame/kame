@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_termios.h,v 1.5.18.1 2001/03/30 21:45:08 he Exp $	*/
+/*	$NetBSD: linux_termios.h,v 1.11 2002/01/14 23:14:43 bjh21 Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -39,6 +39,22 @@
 #ifndef _LINUX_TERMIOS_H
 #define _LINUX_TERMIOS_H
 
+#if defined(__i386__)
+#include <compat/linux/arch/i386/linux_termios.h>
+#elif defined(__m68k__)
+#include <compat/linux/arch/m68k/linux_termios.h>
+#elif defined(__alpha__)
+#include <compat/linux/arch/alpha/linux_termios.h>
+#elif defined(__powerpc__)
+#include <compat/linux/arch/powerpc/linux_termios.h>
+#elif defined(__mips__)
+#include <compat/linux/arch/mips/linux_termios.h>
+#elif defined(__arm__)
+#include <compat/linux/arch/arm/linux_termios.h>
+#else
+#error Undefined linux_termios.h machine type.
+#endif
+
 struct linux_winsize {
 	unsigned short ws_row;
 	unsigned short ws_col;
@@ -46,7 +62,10 @@ struct linux_winsize {
 	unsigned short ws_ypixel;
 };
 
-#define LINUX_NCC 8
+/*
+ * LINUX_NCC is architecture dependent. It is now 
+ * defined in sys/compat/linux/<arch>/linux_termios.h
+ */
 struct linux_termio {
 	unsigned short c_iflag;
 	unsigned short c_oflag;
@@ -56,7 +75,6 @@ struct linux_termio {
 	unsigned char c_cc[LINUX_NCC];
 };
 
-#define LINUX_NCCS 19
 struct linux_termios {
 	linux_tcflag_t	c_iflag;
 	linux_tcflag_t	c_oflag;
@@ -64,8 +82,12 @@ struct linux_termios {
 	linux_tcflag_t	c_lflag;
 	linux_cc_t	c_line;
 	linux_cc_t	c_cc[LINUX_NCCS];
-#if 0
-	/* Present on some linux ports but unused: */
+#ifdef LINUX_LARGE_STRUCT_TERMIOS
+	/* 
+    * Present on some linux ports but unused: 
+	 * However we must enable it, else it breaks ioctl 
+	 * definitions (the size does not match anymore)
+    */
 	linux_speed_t	c_ispeed;
 	linux_speed_t	c_ospeed;
 #endif
@@ -120,13 +142,4 @@ struct linux_termios {
 #define LINUX_TIOCLINUX_KERNMSG		11
 #define LINUX_TIOCLINUX_CURCONS		12
 
-#if defined(__i386__)
-#include <compat/linux/arch/i386/linux_termios.h>
-#elif defined(__m68k__)
-#include <compat/linux/arch/m68k/linux_termios.h>
-#elif defined(__alpha__)
-#include <compat/linux/arch/alpha/linux_termios.h>
-#else
-#error Undefined linux_termios.h machine type.
-#endif
 #endif /* !_LINUX_TERMIOS_H */

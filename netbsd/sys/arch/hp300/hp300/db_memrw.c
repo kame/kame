@@ -1,4 +1,4 @@
-/*	$NetBSD: db_memrw.c,v 1.8 1998/08/31 19:20:17 frueauf Exp $	*/
+/*	$NetBSD: db_memrw.c,v 1.10 2002/03/15 05:55:37 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -55,11 +55,14 @@
  * by Jason R. Thorpe <thorpej@NetBSD.ORG>.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_memrw.c,v 1.10 2002/03/15 05:55:37 gmcgarry Exp $");                                                  
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <machine/db_machdep.h>

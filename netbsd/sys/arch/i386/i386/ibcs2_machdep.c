@@ -1,7 +1,7 @@
-/*	$NetBSD: ibcs2_machdep.c,v 1.10.6.1 2001/06/17 22:26:55 he Exp $	*/
+/*	$NetBSD: ibcs2_machdep.c,v 1.18 2002/03/31 22:21:02 christos Exp $	*/
 
 /*-
- * Copyright (c) 1997 The NetBSD Foundation, Inc.
+ * Copyright (c) 1997, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,7 +36,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ibcs2_machdep.c,v 1.18 2002/03/31 22:21:02 christos Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "opt_vm86.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,7 +78,10 @@ ibcs2_setregs(p, epp, stack)
 	register struct trapframe *tf;
 
 	setregs(p, epp, stack);
-	pcb->pcb_savefpu.sv_env.en_cw = __iBCS2_NPXCW__;
+	if (i386_use_fxsave)
+		pcb->pcb_savefpu.sv_xmm.sv_env.en_cw = __iBCS2_NPXCW__;
+	else
+		pcb->pcb_savefpu.sv_87.sv_env.en_cw = __iBCS2_NPXCW__;
 	tf = p->p_md.md_regs;
 	tf->tf_eax = 0x2000000;		/* XXX base of heap */
 }
@@ -99,26 +107,25 @@ ibcs2_sendsig(catcher, sig, mask, code)
 	struct proc *p = curproc;
 	struct trapframe *tf;
 	struct sigframe *fp, frame;
-	struct sigacts *psp = p->p_sigacts;
 	int onstack;
 
 	tf = p->p_md.md_regs;
 
 	/* Do we need to jump onto the signal stack? */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context. */
 	if (onstack)
-		fp = (struct sigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-		    psp->ps_sigstk.ss_size);
+		fp = (struct sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+		    p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct sigframe *)tf->tf_esp;
 	fp--;
 
 	/* Build stack frame for signal trampoline. */
-	frame.sf_signum = native_to_ibcs2_sig[sig];
+	frame.sf_signum = native_to_ibcs2_signo[sig];
 	frame.sf_code = code;
 	frame.sf_scp = &fp->sf_sc;
 	frame.sf_handler = catcher;
@@ -131,6 +138,7 @@ ibcs2_sendsig(catcher, sig, mask, code)
 		frame.sf_sc.sc_es = tf->tf_vm86_es;
 		frame.sf_sc.sc_ds = tf->tf_vm86_ds;
 		frame.sf_sc.sc_eflags = get_vflags(p);
+		(*p->p_emul->e_syscall_intern)(p);
 	} else
 #endif
 	{
@@ -155,7 +163,7 @@ ibcs2_sendsig(catcher, sig, mask, code)
 	frame.sf_sc.sc_err = tf->tf_err;
 
 	/* Save signal stack. */
-	frame.sf_sc.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	frame.sf_sc.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 
 	/* Save signal mask. */
 	frame.sf_sc.sc_mask = *mask;
@@ -176,7 +184,7 @@ ibcs2_sendsig(catcher, sig, mask, code)
 	tf->tf_fs = GSEL(GUDATA_SEL, SEL_UPL);	
 	tf->tf_es = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_ds = GSEL(GUDATA_SEL, SEL_UPL);
-	tf->tf_eip = (int)psp->ps_sigcode;
+	tf->tf_eip = (int)p->p_sigctx.ps_sigcode;
 	tf->tf_cs = GSEL(GUCODE_SEL, SEL_UPL);
 	tf->tf_eflags &= ~(PSL_T|PSL_VM|PSL_AC);
 	tf->tf_esp = (int)fp;
@@ -184,7 +192,7 @@ ibcs2_sendsig(catcher, sig, mask, code)
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 }
 
 int

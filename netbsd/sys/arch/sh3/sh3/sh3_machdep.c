@@ -1,7 +1,7 @@
-/*	$NetBSD: sh3_machdep.c,v 1.6.4.1 2001/05/26 15:28:48 he Exp $	*/
+/*	$NetBSD: sh3_machdep.c,v 1.41 2002/05/10 15:25:13 uch Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1996, 1997, 1998, 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -75,67 +75,204 @@
  *	@(#)machdep.c	7.4 (Berkeley) 6/3/91
  */
 
+#include "opt_kgdb.h"
+#include "opt_memsize.h"
 #include "opt_compat_netbsd.h"
+#include "opt_kstack_debug.h"
 
 #include <sys/param.h>
+#include <sys/systm.h>
+
 #include <sys/buf.h>
 #include <sys/exec.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <sys/mbuf.h>
 #include <sys/mount.h>
+#include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/syscallargs.h>
-#include <sys/systm.h>
 #include <sys/user.h>
 
 #ifdef KGDB
 #include <sys/kgdb.h>
+#ifndef KGDB_DEVNAME
+#define	KGDB_DEVNAME "nodev"
 #endif
+const char kgdb_devname[] = KGDB_DEVNAME;
+#endif /* KGDB */
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <uvm/uvm_extern.h>
 
+#include <sh3/cache.h>
+#include <sh3/clock.h>
+#include <sh3/exception.h>
+#include <sh3/locore.h>
+#include <sh3/mmu.h>
+#include <sh3/intr.h>
+
+/* Our exported CPU info; we can have only one. */
+struct cpu_info cpu_info_store;
+int cpu_arch;
+int cpu_product;
 char cpu_model[120];
 
-/* Our exported CPU info; we can have only one. */  
-struct cpu_info cpu_info_store;
+struct vm_map *exec_map;
+struct vm_map *mb_map;
+struct vm_map *phys_map;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+int physmem;
+struct user *proc0paddr;	/* init_main.c use this. */
+struct pcb *curpcb;
+struct md_upte *curupte;	/* SH3 wired u-area hack */
 
-extern int physmem;
+#if !defined(IOM_RAM_BEGIN)
+#error "define IOM_RAM_BEGIN"
+#elif (IOM_RAM_BEGIN & SH3_P1SEG_BASE) != 0
+#error "IOM_RAM_BEGIN is physical address. not P1 address."
+#endif
+
+#define	VBR	(u_int8_t *)SH3_PHYS_TO_P1SEG(IOM_RAM_BEGIN)
+vaddr_t ram_start = SH3_PHYS_TO_P1SEG(IOM_RAM_BEGIN);
+/* exception handler holder (sh3/sh3/exception_vector.S) */
+extern char sh_vector_generic[], sh_vector_generic_end[];
+extern char sh_vector_interrupt[], sh_vector_interrupt_end[];
+#ifdef SH3
+extern char sh3_vector_tlbmiss[], sh3_vector_tlbmiss_end[];
+#endif
+#ifdef SH4
+extern char sh4_vector_tlbmiss[], sh4_vector_tlbmiss_end[];
+#endif
+/*
+ * These variables are needed by /sbin/savecore
+ */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number */
+int dumpsize;			/* pages */
+long dumplo;	 		/* blocks */
 
 void
-sh3_startup()
+sh_cpu_init(int arch, int product)
 {
-	unsigned i;
-	caddr_t v;
-	int sz;
-	int base, residual;
+	/* CPU type */
+	cpu_arch = arch;
+	cpu_product = product;
+
+#if defined(SH3) && defined(SH4)
+	/* Set register addresses */
+	sh_devreg_init();
+#endif
+	/* Cache access ops. */
+	sh_cache_init();
+
+	/* MMU access ops. */
+	sh_mmu_init();
+
+	/* Hardclock, RTC initialize. */
+	machine_clock_init();
+
+	/* ICU initiailze. */
+	intc_init();
+
+	/* Exception vector. */
+	memcpy(VBR + 0x100, sh_vector_generic,
+	    sh_vector_generic_end - sh_vector_generic);
+#ifdef SH3
+	if (CPU_IS_SH3)
+		memcpy(VBR + 0x400, sh3_vector_tlbmiss,
+		    sh3_vector_tlbmiss_end - sh3_vector_tlbmiss);
+#endif
+#ifdef SH4
+	if (CPU_IS_SH4)
+		memcpy(VBR + 0x400, sh4_vector_tlbmiss,
+		    sh4_vector_tlbmiss_end - sh4_vector_tlbmiss);
+#endif
+	memcpy(VBR + 0x600, sh_vector_interrupt,
+	    sh_vector_interrupt_end - sh_vector_interrupt);
+
+	if (!SH_HAS_UNIFIED_CACHE)
+		sh_icache_sync_all();
+
+	__asm__ __volatile__("ldc %0, vbr" :: "r"(VBR));
+
+	/* kernel stack setup */
+	__sh_switch_resume = CPU_IS_SH3 ? sh3_switch_resume : sh4_switch_resume;
+
+	/* Set page size (4KB) */
+	uvm_setpagesize();
+}
+
+/*
+ * void sh_proc0_init(void):
+ *	Setup proc0 u-area.
+ */
+void
+sh_proc0_init()
+{
+	struct switchframe *sf;
+	vaddr_t u;
+
+	/* Steal process0 u-area */
+	u = uvm_pageboot_alloc(USPACE);
+	memset((void *)u, 0, USPACE);
+
+	/* Setup proc0 */
+	proc0paddr = (struct user *)u;
+	proc0.p_addr = proc0paddr;
+	/*
+	 * u-area map:
+	 * |user| .... | ............... |
+	 * |      NBPG |  USPACE - NBPG  |
+         *        frame top        stack top
+	 * current frame ... r6_bank
+	 * stack top     ... r7_bank
+	 * current stack ... r15
+	 */
+	curpcb = proc0.p_md.md_pcb = &proc0.p_addr->u_pcb;
+	curupte = proc0.p_md.md_upte;
+
+	sf = &curpcb->pcb_sf;
+	sf->sf_r6_bank = u + NBPG;
+	sf->sf_r7_bank = sf->sf_r15	= u + USPACE;
+	__asm__ __volatile__("ldc %0, r6_bank" :: "r"(sf->sf_r6_bank));
+	__asm__ __volatile__("ldc %0, r7_bank" :: "r"(sf->sf_r7_bank));
+
+	proc0.p_md.md_regs = (struct trapframe *)sf->sf_r6_bank - 1;
+#ifdef KSTACK_DEBUG
+	memset((char *)(u + sizeof(struct user)), 0x5a,
+	    NBPG - sizeof(struct user));
+	memset((char *)(u + NBPG), 0xa5, USPACE - NBPG);
+#endif /* KSTACK_DEBUG */
+}
+
+void
+sh_startup()
+{
+	int i, base, residual;
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
-	struct pcb *pcb;
 	char pbuf[9];
 
 	printf(version);
-
-	sprintf(cpu_model, "Hitachi SH3");
+	if (*cpu_model != '\0')
+		printf("%s", cpu_model);
+#ifdef DEBUG
+	printf("general exception handler:\t%d byte\n",
+	    sh_vector_generic_end - sh_vector_generic);
+	printf("TLB miss exception handler:\t%d byte\n",
+#if defined(SH3) && defined(SH4)
+	    CPU_IS_SH3 ? sh3_vector_tlbmiss_end - sh3_vector_tlbmiss :
+	    sh4_vector_tlbmiss_end - sh4_vector_tlbmiss
+#elif defined(SH3)
+	    sh3_vector_tlbmiss_end - sh3_vector_tlbmiss
+#elif defined(SH4)
+	    sh4_vector_tlbmiss_end - sh4_vector_tlbmiss
+#endif
+	    );
+	printf("interrupt exception handler:\t%d byte\n",
+	    sh_vector_interrupt_end - sh_vector_interrupt);
+#endif /* DEBUG */
 
 	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
 	printf("total memory = %s\n", pbuf);
-
-	/*
-	 * Find out how much space we need, allocate it,
-	 * and then give everything true virtual addresses.
-	 */
-	sz = (int)allocsys(NULL, NULL);
-	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(sz))) == 0)
-		panic("startup: no room for tables");
-	if (allocsys(v, NULL) - v != sz)
-		panic("startup: table size inconsistency");
 
 	/*
 	 * Now allocate buffers proper.  They are different than the above
@@ -144,10 +281,10 @@ sh3_startup()
 	size = MAXBSIZE * nbuf;
 	buffers = 0;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
-		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
-		panic("cpu_startup: cannot allocate VM for buffers");
+	    NULL, UVM_UNKNOWN_OFFSET, 0,
+	    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		UVM_ADV_NORMAL, 0)) != 0)
+		panic("sh3_startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
 		/* don't want to alloc more physical mem than needed */
@@ -173,27 +310,28 @@ sh3_startup()
 		while (curbufsize) {
 			pg = uvm_pagealloc(NULL, 0, NULL, 0);
 			if (pg == NULL)
-				panic("cpu_startup: not enough memory for "
+				panic("sh3_startup: not enough memory for "
 				    "buffer cache");
 			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-					VM_PROT_READ|VM_PROT_WRITE);
+			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+	    16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   VM_PHYS_SIZE, 0, FALSE, NULL);
+	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
@@ -204,11 +342,23 @@ sh3_startup()
 	 * Set up buffers, so they can be used to read disk labels.
 	 */
 	bufinit();
+}
 
-	curpcb = pcb = &proc0.p_addr->u_pcb;
-	pcb->r15 = (int)proc0.p_addr + USPACE - 16;
+/*
+ * This is called by main to set dumplo and dumpsize.
+ * Dumps always skip the first CLBYTES of disk space
+ * in case there might be a disk label stored there.
+ * If there is extra space, put dump at the end to
+ * reduce the chance that swapping trashes it.
+ */
+void
+cpu_dumpconf()
+{
+}
 
-	proc0.p_md.md_regs = (struct trapframe *)pcb->r15 - 1;
+void
+dumpsys()
+{
 }
 
 /*
@@ -222,29 +372,24 @@ sh3_startup()
  * specified pc, psl.
  */
 void
-sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 {
 	struct proc *p = curproc;
 	struct trapframe *tf;
 	struct sigframe *fp, frame;
-	struct sigacts *psp = p->p_sigacts;
 	int onstack;
 
 	tf = p->p_md.md_regs;
 
 	/* Do we need to jump onto the signal stack? */
 	onstack =
-	    (psp->ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (psp->ps_sigact[sig].sa_flags & SA_ONSTACK) != 0;
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	/* Allocate space for the signal handler context. */
 	if (onstack)
-		fp = (struct sigframe *)((caddr_t)psp->ps_sigstk.ss_sp +
-						  psp->ps_sigstk.ss_size);
+		fp = (struct sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+		    p->p_sigctx.ps_sigstk.ss_size);
 	else
 		fp = (struct sigframe *)tf->tf_r15;
 	fp--;
@@ -275,26 +420,13 @@ sendsig(catcher, sig, mask, code)
 	frame.sf_sc.sc_r2 = tf->tf_r2;
 	frame.sf_sc.sc_r1 = tf->tf_r1;
 	frame.sf_sc.sc_r0 = tf->tf_r0;
-	frame.sf_sc.sc_trapno = tf->tf_trapno;
-#ifdef TODO
-	frame.sf_sc.sc_err = tf->tf_err;
-#endif
+	frame.sf_sc.sc_expevt = tf->tf_expevt;
 
 	/* Save signal stack. */
-	frame.sf_sc.sc_onstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
+	frame.sf_sc.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
 
 	/* Save signal mask. */
 	frame.sf_sc.sc_mask = *mask;
-
-#ifdef COMPAT_13
-	/*
-	 * XXX We always have to save an old style signal mask because
-	 * XXX we might be delivering a signal to a process which will
-	 * XXX escape from the signal in a non-standard way and invoke
-	 * XXX sigreturn() directly.
-	 */
-	native_sigset_to_sigset13(mask, &frame.sf_sc.__sc_mask13);
-#endif
 
 	if (copyout(&frame, fp, sizeof(frame)) != 0) {
 		/*
@@ -308,15 +440,12 @@ sendsig(catcher, sig, mask, code)
 	/*
 	 * Build context to run handler in.
 	 */
-	tf->tf_spc = (int)psp->ps_sigcode;
-#ifdef TODO
-	tf->tf_ssr &= ~(PSL_T|PSL_VM|PSL_AC);
-#endif
+	tf->tf_spc = (int)p->p_sigctx.ps_sigcode;
 	tf->tf_r15 = (int)fp;
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
-		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 }
 
 /*
@@ -330,10 +459,7 @@ sendsig(catcher, sig, mask, code)
  * a machine fault.
  */
 int
-sys___sigreturn14(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+sys___sigreturn14(struct proc *p, void *v, register_t *retval)
 {
 	struct sys___sigreturn14_args /* {
 		syscallarg(struct sigcontext *) sigcntxp;
@@ -380,9 +506,9 @@ sys___sigreturn14(p, v, retval)
 
 	/* Restore signal stack. */
 	if (context.sc_onstack & SS_ONSTACK)
-		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
+		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
 	/* Restore signal mask. */
 	(void) sigprocmask1(p, SIG_SETMASK, &context.sc_mask, 0);
 
@@ -393,16 +519,11 @@ sys___sigreturn14(p, v, retval)
  * Clear registers on exec
  */
 void
-setregs(p, pack, stack)
-	struct proc *p;
-	struct exec_package *pack;
-	u_long stack;
+setregs(struct proc *p, struct exec_package *pack, u_long stack)
 {
-	register struct pcb *pcb = &p->p_addr->u_pcb;
-	register struct trapframe *tf;
+	struct trapframe *tf;
 
 	p->p_md.md_flags &= ~MDP_USEDFPU;
-	pcb->pcb_flags = 0;
 
 	tf = p->p_md.md_regs;
 
@@ -410,12 +531,12 @@ setregs(p, pack, stack)
 	tf->tf_r1 = 0;
 	tf->tf_r2 = 0;
 	tf->tf_r3 = 0;
-	tf->tf_r4 = *(int *)stack;	/* argc */
-	tf->tf_r5 = stack+4;		/* argv */
-	tf->tf_r6 = stack+4*tf->tf_r4 + 8; /* envp */
+	tf->tf_r4 = fuword((caddr_t)stack);	/* argc */
+	tf->tf_r5 = stack + 4;			/* argv */
+	tf->tf_r6 = stack + 4 * tf->tf_r4 + 8;	/* envp */
 	tf->tf_r7 = 0;
 	tf->tf_r8 = 0;
-	tf->tf_r9 = 0;
+	tf->tf_r9 = (int)p->p_psstr;
 	tf->tf_r10 = 0;
 	tf->tf_r11 = 0;
 	tf->tf_r12 = 0;
@@ -424,46 +545,20 @@ setregs(p, pack, stack)
 	tf->tf_spc = pack->ep_entry;
 	tf->tf_ssr = PSL_USERSET;
 	tf->tf_r15 = stack;
-#ifdef TODO
-	tf->tf_r9 = (int)PS_STRINGS;
-#endif
-}
-
-struct queue {
-	struct queue *q_next, *q_prev;
-};
-
-/*
- * insert an element into a queue
- */
-void
-_insque(v1, v2)
-	void *v1;
-	void *v2;
-{
-	struct queue *elem = v1, *head = v2;
-	struct queue *next;
-
-	next = head->q_next;
-	elem->q_next = next;
-	head->q_next = elem;
-	elem->q_prev = head;
-	next->q_prev = elem;
 }
 
 /*
- * remove an element from a queue
+ * Jump to reset vector.
  */
 void
-_remque(v)
-	void *v;
+cpu_reset()
 {
-	struct queue *elem = v;
-	struct queue *next, *prev;
 
-	next = elem->q_next;
-	prev = elem->q_prev;
-	next->q_prev = prev;
-	prev->q_next = next;
-	elem->q_prev = 0;
+	_cpu_exception_suspend();
+	_reg_write_4(SH_(EXPEVT), EXPEVT_RESET_MANUAL);
+
+	goto *(u_int32_t *)0xa0000000;
+	/* NOTREACHED */
+	while (1)
+		;
 }

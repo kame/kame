@@ -1,4 +1,4 @@
-/*	$NetBSD: neo-coeff.h,v 1.1.6.1 2001/05/06 14:39:09 he Exp $	*/
+/*	$NetBSD: neo-coeff.h,v 1.1 2000/11/05 06:43:45 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>

@@ -1,4 +1,4 @@
-/*	$NetBSD: pte.h,v 1.21 1998/10/08 21:47:35 pk Exp $ */
+/*	$NetBSD: pte.h,v 1.24 2001/12/04 00:05:05 darrenr Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -47,6 +47,10 @@
  *
  *	@(#)pte.h	8.1 (Berkeley) 6/11/93
  */
+
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
 
 /*
  * Sun-4 (sort of), 4c (SparcStation), and 4m Page Table Entries
@@ -399,6 +403,7 @@ struct srmmu_pte {
 	"f\10\23PPN\0b\2W\0b\1V\0"
 
 
+#if defined(_KERNEL) || defined(_STANDALONE)
 /*
  * Macros to get and set the processor context.
  */
@@ -417,3 +422,5 @@ struct srmmu_pte {
 /* sun4m TLB probe */
 #define getpte4m(va)		lda((va & 0xFFFFF000) | ASI_SRMMUFP_L3, \
 				    ASI_SRMMUFP)
+
+#endif /* _KERNEL || _STANDALONE */

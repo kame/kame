@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_misc_notalpha.c,v 1.53.4.2 2000/08/30 03:59:20 sommerfeld Exp $	*/
+/*	$NetBSD: linux_misc_notalpha.c,v 1.63 2002/04/03 14:28:36 tron Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -37,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_misc_notalpha.c,v 1.63 2002/04/03 14:28:36 tron Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -45,15 +48,13 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/namei.h>
+#include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/wait.h>
 
 #include <sys/syscallargs.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
 
 #include <compat/linux/common/linux_types.h>
 #include <compat/linux/common/linux_fcntl.h>
@@ -229,9 +230,9 @@ linux_sys_utime(p, v, retval)
 	struct timeval tv[2], *tvp;
 	struct linux_utimbuf lut;
 
-	sg = stackgap_init(p->p_emul);
-	tvp = (struct timeval *) stackgap_alloc(&sg, sizeof(tv));
-	LINUX_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
+	sg = stackgap_init(p, 0);
+	tvp = (struct timeval *) stackgap_alloc(p, &sg, sizeof(tv));
+	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 
 	SCARG(&ua, path) = SCARG(uap, path);
 
@@ -272,8 +273,8 @@ linux_sys_waitpid(p, v, retval)
 	caddr_t sg;
 
 	if (SCARG(uap, status) != NULL) {
-		sg = stackgap_init(p->p_emul);
-		status = (int *) stackgap_alloc(&sg, sizeof status);
+		sg = stackgap_init(p, 0);
+		status = (int *) stackgap_alloc(p, &sg, sizeof status);
 	} else
 		status = NULL;
 
@@ -285,7 +286,7 @@ linux_sys_waitpid(p, v, retval)
 	if ((error = sys_wait4(p, &w4a, retval)))
 		return error;
 
-	sigdelset(&p->p_siglist, SIGCHLD);
+	sigdelset(&p->p_sigctx.ps_siglist, SIGCHLD);
 
 	if (status != NULL) {
 		if ((error = copyin(status, &tstat, sizeof tstat)))
@@ -390,7 +391,7 @@ linux_sys_getresgid(p, v, retval)
 			     sizeof(gid_t))) != 0)
 		return (error);
 
-	if ((error = copyout(&pc->pc_ucred->cr_uid, SCARG(uap, egid),
+	if ((error = copyout(&pc->pc_ucred->cr_gid, SCARG(uap, egid),
 			     sizeof(gid_t))) != 0)
 		return (error);
 

@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.c,v 1.17 2000/02/19 03:59:05 mycroft Exp $ */
+/* $NetBSD: cpu.c,v 1.20 2001/11/14 18:15:34 thorpej Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -30,6 +30,8 @@
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
+
+#include <mips/locore.h>
 
 #include <machine/autoconf.h>
 

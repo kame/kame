@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_cvt.c,v 1.7.12.1 2000/08/13 09:09:30 jdolecek Exp $ */
+/* $NetBSD: osf1_cvt.c,v 1.13 2002/03/31 22:22:48 christos Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -57,6 +57,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: osf1_cvt.c,v 1.13 2002/03/31 22:22:48 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -78,7 +81,6 @@
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/wait.h>
-#include <vm/vm.h>				/* XXX UVM headers are Cool */
 #include <uvm/uvm.h>				/* XXX see mmap emulation */
 
 #include <nfs/rpcv2.h>
@@ -87,7 +89,7 @@
 #include <nfs/nfsmount.h>
 
 #include <compat/osf1/osf1.h>
-#include <compat/osf1/osf1_util.h>
+#include <compat/common/compat_util.h>
 #include <compat/osf1/osf1_cvt.h>
 
 const struct emul_flags_xtab osf1_access_flags_xtab[] = {
@@ -593,7 +595,7 @@ osf1_cvt_sigset_from_native(bss, oss)
 	osf1_sigemptyset(oss);
 	for (i = 1; i < NSIG; i++) {
 		if (sigismember(bss, i)) {
-			newsig = osf1_signal_rxlist[i];
+			newsig = native_to_osf1_signo[i];
 			if (newsig)
 				osf1_sigaddset(oss, newsig);
 		}
@@ -610,7 +612,7 @@ osf1_cvt_sigset_to_native(oss, bss)
 	sigemptyset(bss);
 	for (i = 1; i < OSF1_NSIG; i++) {
 		if (osf1_sigismember(oss, i)) {
-			newsig = osf1_signal_xlist[i];
+			newsig = osf1_to_native_signo[i];
 			if (newsig)
 				sigaddset(bss, newsig);
 		}
@@ -645,6 +647,33 @@ osf1_cvt_stat_from_native(st, ost)
 	ost->st_blocks = st->st_blocks;
 	ost->st_flags = st->st_flags;
 	ost->st_gen = st->st_gen;
+}
+
+/*
+ * Convert from a stat structure to an osf1 stat structure.
+ */
+void
+osf1_cvt_stat2_from_native(st, ost)
+	const struct stat *st;
+	struct osf1_stat2 *ost;
+{
+
+	memset(ost, 0, sizeof *ost);
+	ost->st_dev = osf1_cvt_dev_from_native(st->st_dev);
+	ost->st_ino = st->st_ino;
+	ost->st_mode = st->st_mode;
+	ost->st_nlink = st->st_nlink;
+	ost->st_uid = st->st_uid == -2 ? (u_int16_t) -2 : st->st_uid;
+	ost->st_gid = st->st_gid == -2 ? (u_int16_t) -2 : st->st_gid;
+	ost->st_rdev = osf1_cvt_dev_from_native(st->st_rdev);
+	ost->st_size = st->st_size;
+	ost->st_atime_sec = st->st_atime;
+	ost->st_mtime_sec = st->st_mtime;
+	ost->st_ctime_sec = st->st_ctime;
+	ost->st_blocksize = st->st_blksize;
+	ost->st_blocks = st->st_blocks;
+	ost->st_flags = st->st_flags;
+	ost->st_generation = st->st_gen;
 }
 
 void

@@ -1,4 +1,4 @@
-/* $NetBSD: universe_pci.c,v 1.2 2000/03/12 11:21:02 drochner Exp $ */
+/* $NetBSD: universe_pci.c,v 1.4 2001/11/13 07:48:49 lukem Exp $ */
 
 /*
  * Copyright (c) 1999
@@ -30,6 +30,9 @@
  * Common functions for PCI-VME-interfaces using the
  * Newbridge/Tundra Universe II chip (CA91C142).
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: universe_pci.c,v 1.4 2001/11/13 07:48:49 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -138,8 +141,7 @@ univ_pci_attach(d, pa, name, inthdl, intcookie)
 	printf("requesting at VME bus level %d\n", (reg >> 22) & 3);
 
 	/* Map and establish the PCI interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", name);
 		return (-1);
 	}

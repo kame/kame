@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.16 2000/05/27 22:37:47 scw Exp $	*/
+/*	$NetBSD: pmap.h,v 1.24 2001/09/10 21:19:19 chris Exp $	*/
 
 /* 
  * Copyright (c) 1987 Carnegie-Mellon University
@@ -55,7 +55,7 @@ struct pmap {
 	st_entry_t		*pm_stpa;	/* 040: ST phys addr */
 	short			pm_sref;	/* segment table ref count */
 	short			pm_count;	/* pmap reference count */
-	simple_lock_data_t	pm_lock;	/* lock on pmap */
+	struct simplelock	pm_lock;	/* lock on pmap */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 	long			pm_ptpages;	/* more stats: PT pages */
 };
@@ -88,7 +88,7 @@ typedef struct pmap	*pmap_t;
 }
 
 /*
- * For each vm_page_t, there is a list of all currently valid virtual
+ * For each struct vm_page, there is a list of all currently valid virtual
  * mappings of that page.  An entry is a pv_entry, the list is pv_table.
  */
 struct pv_entry {
@@ -135,11 +135,14 @@ extern struct pmap	kernel_pmap_store;
 
 extern void _pmap_set_page_cacheable __P((struct pmap *, vaddr_t));
 extern void _pmap_set_page_cacheinhibit __P((struct pmap *, vaddr_t));
+extern int _pmap_page_is_cacheable __P((struct pmap *, vaddr_t));
 
 extern struct pv_entry	*pv_table;	/* array of entries, one per page */
 
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
+
+#define	pmap_update(pmap)		/* nothing (yet) */
 
 extern pt_entry_t	*Sysmap;
 extern char		*vmmap;		/* map for mem, dumps, etc. */
@@ -147,6 +150,12 @@ extern char		*vmmap;		/* map for mem, dumps, etc. */
 vaddr_t	pmap_map __P((vaddr_t, paddr_t, paddr_t, int));
 void	pmap_procwr __P((struct proc *, vaddr_t, size_t));
 #define PMAP_NEED_PROCWR
+
+/*
+ * Do idle page zero'ing uncached to avoid polluting the cache.
+ */
+boolean_t pmap_zero_page_uncached(paddr_t);
+#define	PMAP_PAGEIDLEZERO(pa)	pmap_zero_page_uncached((pa))
 
 #endif /* _KERNEL */
 

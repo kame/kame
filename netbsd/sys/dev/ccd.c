@@ -1,4 +1,4 @@
-/*	$NetBSD: ccd.c,v 1.69.4.1 2001/05/01 12:27:03 he Exp $	*/
+/*	$NetBSD: ccd.c,v 1.76 2002/03/08 20:48:37 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 1999 The NetBSD Foundation, Inc.
@@ -88,6 +88,9 @@
  *	NASA Ames Research Center
  *	Moffett Field, CA 94035
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ccd.c,v 1.76 2002/03/08 20:48:37 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -189,17 +192,16 @@ ccdattach(num)
 	}
 
 	ccd_softc = (struct ccd_softc *)malloc(num * sizeof(struct ccd_softc),
-	    M_DEVBUF, M_NOWAIT);
+	    M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (ccd_softc == NULL) {
 		printf("WARNING: no memory for concatenated disks\n");
 		return;
 	}
 	numccd = num;
-	bzero(ccd_softc, num * sizeof(struct ccd_softc));
 
 	/* Initialize the component buffer pool. */
 	pool_init(&ccd_cbufpool, sizeof(struct ccdbuf), 0,
-	    0, 0, "ccdpl", 0, NULL, NULL, M_DEVBUF);
+	    0, 0, "ccdpl", NULL);
 
 	/* Initialize per-softc structures. */
 	for (i = 0; i < num; i++) {
@@ -252,7 +254,7 @@ ccdinit(cs, cpaths, vpp, p)
 		/*
 		 * Copy in the pathname of the component.
 		 */
-		bzero(tmppath, sizeof(tmppath));	/* sanity */
+		memset(tmppath, 0, sizeof(tmppath));	/* sanity */
 		error = copyinstr(cpaths[ix], tmppath,
 		    MAXPATHLEN, &ci->ci_pathlen);
 		if (error) {
@@ -264,7 +266,7 @@ ccdinit(cs, cpaths, vpp, p)
 			goto out;
 		}
 		ci->ci_path = malloc(ci->ci_pathlen, M_DEVBUF, M_WAITOK);
-		bcopy(tmppath, ci->ci_path, ci->ci_pathlen);
+		memcpy(ci->ci_path, tmppath, ci->ci_pathlen);
 		path_alloced++;
 
 		/*
@@ -404,8 +406,8 @@ ccdinterleave(cs)
 	 * Chances are this is too big, but we don't care.
 	 */
 	size = (cs->sc_nccdisks + 1) * sizeof(struct ccdiinfo);
-	cs->sc_itable = (struct ccdiinfo *)malloc(size, M_DEVBUF, M_WAITOK);
-	bzero((caddr_t)cs->sc_itable, size);
+	cs->sc_itable = (struct ccdiinfo *)malloc(size, M_DEVBUF,
+	    M_WAITOK|M_ZERO);
 
 	/*
 	 * Trivial case: no interleave (actually interleave of disk size).
@@ -1345,7 +1347,7 @@ ccdgetdefaultlabel(cs, lp)
 {
 	struct ccdgeom *ccg = &cs->sc_geom;
 
-	bzero(lp, sizeof(*lp));
+	memset(lp, 0, sizeof(*lp));
 
 	lp->d_secperunit = cs->sc_size;
 	lp->d_secsize = ccg->ccg_secsize;
@@ -1385,7 +1387,7 @@ ccdgetdisklabel(dev)
 	struct disklabel *lp = cs->sc_dkdev.dk_label;
 	struct cpu_disklabel *clp = cs->sc_dkdev.dk_cpulabel;
 
-	bzero(clp, sizeof(*clp));
+	memset(clp, 0, sizeof(*clp));
 
 	ccdgetdefaultlabel(cs, lp);
 

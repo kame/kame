@@ -1,4 +1,4 @@
-/*	$NetBSD: bt478.c,v 1.15 2000/01/10 03:24:31 simonb Exp $	*/
+/*	$NetBSD: bt478.c,v 1.17 2001/09/19 19:04:16 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -62,7 +62,7 @@
 
 #include <machine/bus.h>			/*  wbflush() */
 
-#include <machine/fbio.h>
+#include <dev/sun/fbio.h>
 #include <machine/fbvar.h>
 
 #include <pmax/dev/bt478.h>			/* chipset definitions */
@@ -298,6 +298,6 @@ bt478GetColorMap(fi, bits, index, count)
 	cmap_bits = (u_char *)bits;
 	cmap = (u_char *)(fi -> fi_cmap_bits) + index * 3;
 
-	bcopy (cmap, cmap_bits, count * 3);
+	memcpy(cmap_bits, cmap, count * 3);
 	return 0;
 }

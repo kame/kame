@@ -1,9 +1,9 @@
-/*	$NetBSD: autoconf.h,v 1.1 2000/06/14 15:39:56 soren Exp $	*/
+/*	$NetBSD: autoconf.h,v 1.5 2002/03/13 13:12:28 simonb Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -19,7 +19,7 @@
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -37,11 +37,11 @@
 struct mainbus_attach_args {
 	char		*ma_name;
 	unsigned long	ma_addr;
-	int		ma_arch;
-#if 0					/* ? */
-	int		ma_swarch;
-	int		ma_hwarch;
-#endif
 	bus_space_tag_t	ma_iot;
 	bus_space_handle_t ma_ioh;
 };
+
+extern int ncpus;
+
+void	makebootdev __P((char *));
+

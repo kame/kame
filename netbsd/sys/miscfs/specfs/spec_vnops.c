@@ -1,4 +1,4 @@
-/*	$NetBSD: spec_vnops.c,v 1.48.4.3 2000/12/14 23:36:14 he Exp $	*/
+/*	$NetBSD: spec_vnops.c,v 1.61 2002/05/12 20:42:03 matt Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -35,6 +35,9 @@
  *	@(#)spec_vnops.c	8.15 (Berkeley) 7/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: spec_vnops.c,v 1.61 2002/05/12 20:42:03 matt Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -63,6 +66,8 @@ const char	devout[] = "devout";
 const char	devioc[] = "devioc";
 const char	devcls[] = "devcls";
 
+struct vnode	*speclisth[SPECHSZ];
+
 /*
  * This vnode operations vector is used for two things only:
  * - special device nodes created from whole cloth by the kernel.
@@ -74,7 +79,7 @@ const char	devcls[] = "devcls";
  */
 
 int (**spec_vnodeop_p) __P((void *));
-struct vnodeopv_entry_desc spec_vnodeop_entries[] = {
+const struct vnodeopv_entry_desc spec_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, spec_lookup },		/* lookup */
 	{ &vop_create_desc, spec_create },		/* create */
@@ -119,9 +124,11 @@ struct vnodeopv_entry_desc spec_vnodeop_entries[] = {
 	{ &vop_truncate_desc, spec_truncate },		/* truncate */
 	{ &vop_update_desc, spec_update },		/* update */
 	{ &vop_bwrite_desc, spec_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ &vop_getpages_desc, spec_getpages },		/* getpages */
+	{ &vop_putpages_desc, spec_putpages },		/* putpages */
+	{ NULL, NULL }
 };
-struct vnodeopv_desc spec_vnodeop_opv_desc =
+const struct vnodeopv_desc spec_vnodeop_opv_desc =
 	{ &spec_vnodeop_p, spec_vnodeop_entries };
 
 /*
@@ -160,6 +167,7 @@ spec_open(v)
 	dev_t bdev, dev = (dev_t)vp->v_rdev;
 	int maj = major(dev);
 	int error;
+	struct partinfo pi;
 
 	/*
 	 * Don't allow open if fs is mounted -nodev.
@@ -217,7 +225,18 @@ spec_open(v)
 		 */
 		if ((error = vfs_mountedon(vp)) != 0)
 			return (error);
-		return ((*bdevsw[maj].d_open)(dev, ap->a_mode, S_IFBLK, p));
+		error = (*bdevsw[maj].d_open)(dev, ap->a_mode, S_IFBLK, p);
+		if (error) {
+			return error;
+		}
+		error = (*bdevsw[major(vp->v_rdev)].d_ioctl)(vp->v_rdev,
+		    DIOCGPART, (caddr_t)&pi, FREAD, curproc);
+		if (error == 0) {
+			vp->v_size = (voff_t)pi.disklab->d_secsize *
+			    pi.part->p_size;
+		}
+		return 0;
+
 	case VNON:
 	case VLNK:
 	case VDIR:
@@ -248,8 +267,8 @@ spec_read(v)
 	struct uio *uio = ap->a_uio;
  	struct proc *p = uio->uio_procp;
 	struct buf *bp;
-	daddr_t bn, nextbn;
-	long bsize, bscale;
+	daddr_t bn;
+	int bsize, bscale;
 	struct partinfo dpart;
 	int n, on, majordev;
 	int (*ioctl) __P((dev_t, u_long, caddr_t, int, struct proc *));
@@ -270,7 +289,7 @@ spec_read(v)
 		VOP_UNLOCK(vp, 0);
 		error = (*cdevsw[major(vp->v_rdev)].d_read)
 			(vp->v_rdev, uio, ap->a_ioflag);
-		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+		vn_lock(vp, LK_SHARED | LK_RETRY);
 		return (error);
 
 	case VBLK:
@@ -290,13 +309,7 @@ spec_read(v)
 			bn = (uio->uio_offset >> DEV_BSHIFT) &~ (bscale - 1);
 			on = uio->uio_offset % bsize;
 			n = min((unsigned)(bsize - on), uio->uio_resid);
-			if (vp->v_lastr + bscale == bn) {
-				nextbn = bn + bscale;
-				error = breadn(vp, bn, (int)bsize, &nextbn,
-					(int *)&bsize, 1, NOCRED, &bp);
-			} else
-				error = bread(vp, bn, (int)bsize, NOCRED, &bp);
-			vp->v_lastr = bn;
+			error = bread(vp, bn, bsize, NOCRED, &bp);
 			n = min(n, bsize - bp->b_resid);
 			if (error) {
 				brelse(bp);
@@ -332,7 +345,7 @@ spec_write(v)
 	struct proc *p = uio->uio_procp;
 	struct buf *bp;
 	daddr_t bn;
-	long bsize, bscale;
+	int bsize, bscale;
 	struct partinfo dpart;
 	int n, on, majordev;
 	int (*ioctl) __P((dev_t, u_long, caddr_t, int, struct proc *));
@@ -541,7 +554,7 @@ spec_bmap(v)
 	if (ap->a_bnp != NULL)
 		*ap->a_bnp = ap->a_bn;
 	if (ap->a_runp != NULL)
-		*ap->a_runp = 0;
+		*ap->a_runp = (MAXBSIZE >> DEV_BSHIFT) - 1;
 	return (0);
 }
 
@@ -564,8 +577,8 @@ spec_close(v)
 	int (*devclose) __P((dev_t, int, int, struct proc *));
 	int mode, error, count, flags, flags1;
 
-	simple_lock(&vp->v_interlock);
 	count = vcount(vp);
+	simple_lock(&vp->v_interlock);
 	flags = vp->v_flag;
 	simple_unlock(&vp->v_interlock);
 

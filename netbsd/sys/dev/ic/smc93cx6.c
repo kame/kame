@@ -1,4 +1,4 @@
-/*	$NetBSD: smc93cx6.c,v 1.6 2000/03/15 02:08:30 fvdl Exp $	*/
+/*	$NetBSD: smc93cx6.c,v 1.9 2001/11/13 13:14:45 lukem Exp $	*/
 
 /*
  * Interface for the 93C66/56/46/26/06 serial eeprom parts.
@@ -31,7 +31,7 @@
  *     -------------------------------------------------------------------
  *     READ        1    10   A5 - A0             Reads data stored in memory,
  *                                               starting at specified address
- *     EWEN        1    00   11XXXX              Write enable must preceed
+ *     EWEN        1    00   11XXXX              Write enable must precede
  *                                               all programming modes
  *     ERASE       1    11   A5 - A0             Erase register A5A4A3A2A1A0
  *     WRITE       1    01   A5 - A0   D15 - D0  Writes register
@@ -56,6 +56,9 @@
  *   bit to be sent from the chip.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smc93cx6.c,v 1.9 2001/11/13 13:14:45 lukem Exp $");
 
 #ifndef __NetBSD__
 #include "opt_aic7xxx.h"
@@ -86,8 +89,8 @@ static struct seeprom_cmd {
  * Wait for the SEERDY to go high; about 800 ns.
  */
 #define CLOCK_PULSE(sd, rdy)	{					\
-	int i = 1000;							\
-	while ((SEEPROM_STATUS_INB(sd) & rdy) == 0 && i-- > 0) {	\
+	int cpi = 1000;							\
+	while ((SEEPROM_STATUS_INB(sd) & rdy) == 0 && cpi-- > 0) {	\
 		;  /* Do nothing */					\
 	}								\
 	(void)SEEPROM_INB(sd);	/* Clear clock */			\

@@ -1,4 +1,4 @@
-/*	$NetBSD: ntfs_subr.c,v 1.24 1999/12/20 22:11:57 fvdl Exp $	*/
+/*	$NetBSD: ntfs_subr.c,v 1.32 2001/11/15 09:48:29 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 Semen Ustimenko (semenu@FreeBSD.org)
@@ -28,8 +28,10 @@
  *	Id: ntfs_subr.c,v 1.4 1999/05/12 09:43:01 semenu Exp
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ntfs_subr.c,v 1.32 2001/11/15 09:48:29 lukem Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
@@ -55,6 +57,10 @@
 #include <ntfs/ntfs_compr.h>
 #include <ntfs/ntfs_ihash.h>
 
+#if defined(NTFS_DEBUG)
+int ntfs_debug = NTFS_DEBUG;
+#endif
+
 #if defined(__FreeBSD__)
 MALLOC_DEFINE(M_NTFSNTVATTR, "NTFS vattr", "NTFS file attribute information");
 MALLOC_DEFINE(M_NTFSRDATA, "NTFS res data", "NTFS resident data");
@@ -62,15 +68,23 @@ MALLOC_DEFINE(M_NTFSRUN, "NTFS vrun", "NTFS vrun storage");
 MALLOC_DEFINE(M_NTFSDECOMP, "NTFS decomp", "NTFS decompression temporary");
 #endif
 
+/* Local struct used in ntfs_ntlookupfile() */
+struct ntfs_lookup_ctx {
+	u_int32_t	aoff;
+	u_int32_t	rdsize;
+	cn_t		cn;
+	struct ntfs_lookup_ctx *prev;
+};
+
 static int ntfs_ntlookupattr __P((struct ntfsmount *, const char *, int, int *, char **));
 static int ntfs_findvattr __P((struct ntfsmount *, struct ntnode *, struct ntvattr **, struct ntvattr **, u_int32_t, const char *, size_t, cn_t));
-static int ntfs_uastricmp __P((const wchar *, size_t, const char *, size_t));
-static int ntfs_uastrcmp __P((const wchar *, size_t, const char *, size_t));
+static int ntfs_uastricmp __P((struct ntfsmount *, const wchar *, size_t, const char *, size_t));
+static int ntfs_uastrcmp __P((struct ntfsmount *, const wchar *, size_t, const char *, size_t));
 
 /* table for mapping Unicode chars into uppercase; it's filled upon first
  * ntfs mount, freed upon last ntfs umount */
 static wchar *ntfs_toupper_tab;
-#define NTFS_U28(ch)		((((ch) & 0xFF) == 0) ? '_' : (ch) & 0xFF)
+#define NTFS_U28(ch)		((((ch) & 0xE0) == 0) ? '_' : (ch) & 0xFF)
 #define NTFS_TOUPPER(ch)	(ntfs_toupper_tab[(unsigned char)(ch)])
 static struct lock ntfs_toupper_lock;
 static signed int ntfs_toupper_usecount;
@@ -78,7 +92,7 @@ static signed int ntfs_toupper_usecount;
 /* support macro for ntfs_ntvattrget() */
 #define NTFS_AALPCMP(aalp,type,name,namelen) (				\
   (aalp->al_type == type) && (aalp->al_namelen == namelen) &&		\
-  !ntfs_uastrcmp(aalp->al_name,aalp->al_namelen,name,namelen) )
+  !ntfs_uastrcmp(ntmp, aalp->al_name,aalp->al_namelen,name,namelen) )
 
 /*
  * 
@@ -195,7 +209,7 @@ ntfs_ntvattrget(
 	}
 	/* Scan $ATTRIBUTE_LIST for requested attribute */
 	len = lvap->va_datalen;
-	MALLOC(alpool, caddr_t, len, M_TEMP, M_WAITOK);
+	alpool = (caddr_t) malloc(len, M_TEMP, M_WAITOK);
 	error = ntfs_readntvattr_plain(ntmp, ip, lvap, 0, len, alpool, &len,
 			NULL);
 	if (error)
@@ -251,7 +265,7 @@ ntfs_ntvattrget(
 	       "ino: %d, type: 0x%x, name: %.*s, vcn: %d\n", \
 	       ip->i_number, type, (int) namelen, name, (u_int32_t) vcn));
 out:
-	FREE(alpool, M_TEMP);
+	free(alpool, M_TEMP);
 	return (error);
 }
 
@@ -273,7 +287,7 @@ ntfs_loadntnode(
 
 	dprintf(("ntfs_loadntnode: loading ino: %d\n",ip->i_number));
 
-	MALLOC(mfrp, struct filerec *, ntfs_bntob(ntmp->ntm_bpmftrec),
+	mfrp = (struct filerec *) malloc(ntfs_bntob(ntmp->ntm_bpmftrec),
 	       M_TEMP, M_WAITOK);
 
 	if (ip->i_number < NTFS_SYSNODESNUM) {
@@ -346,7 +360,7 @@ ntfs_loadntnode(
 	ip->i_flag |= IN_LOADED;
 
 out:
-	FREE(mfrp, M_TEMP);
+	free(mfrp, M_TEMP);
 	return (error);
 }
 		
@@ -514,12 +528,12 @@ ntfs_freentvattr(vap)
 {
 	if (vap->va_flag & NTFS_AF_INRUN) {
 		if (vap->va_vruncn)
-			FREE(vap->va_vruncn, M_NTFSRUN);
+			free(vap->va_vruncn, M_NTFSRUN);
 		if (vap->va_vruncl)
-			FREE(vap->va_vruncl, M_NTFSRUN);
+			free(vap->va_vruncl, M_NTFSRUN);
 	} else {
 		if (vap->va_datap)
-			FREE(vap->va_datap, M_NTFSRDATA);
+			free(vap->va_datap, M_NTFSRDATA);
 	}
 	FREE(vap, M_NTFSNTVATTR);
 }
@@ -578,7 +592,7 @@ ntfs_attrtontvattr(
 		vap->va_allocated = rap->a_r.a_datalen;
 		vap->va_vcnstart = 0;
 		vap->va_vcnend = ntfs_btocn(vap->va_allocated);
-		MALLOC(vap->va_datap, caddr_t, vap->va_datalen,
+		vap->va_datap = (caddr_t) malloc(vap->va_datalen,
 		       M_NTFSRDATA, M_WAITOK);
 		memcpy(vap->va_datap, (caddr_t) rap + rap->a_r.a_dataoff,
 		       rap->a_r.a_datalen);
@@ -620,8 +634,8 @@ ntfs_runtovrun(
 		off += (run[off] & 0xF) + ((run[off] >> 4) & 0xF) + 1;
 		cnt++;
 	}
-	MALLOC(cn, cn_t *, cnt * sizeof(cn_t), M_NTFSRUN, M_WAITOK);
-	MALLOC(cl, cn_t *, cnt * sizeof(cn_t), M_NTFSRUN, M_WAITOK);
+	cn = (cn_t *) malloc(cnt * sizeof(cn_t), M_NTFSRUN, M_WAITOK);
+	cl = (cn_t *) malloc(cnt * sizeof(cn_t), M_NTFSRUN, M_WAITOK);
 
 	off = 0;
 	cnt = 0;
@@ -661,29 +675,38 @@ ntfs_runtovrun(
  * Compare unicode and ascii string case insens.
  */
 static int
-ntfs_uastricmp(ustr, ustrlen, astr, astrlen)
+ntfs_uastricmp(ntmp, ustr, ustrlen, astr, astrlen)
+	struct ntfsmount *ntmp;
 	const wchar *ustr;
 	size_t ustrlen;
 	const char *astr;
 	size_t astrlen;
 {
-	size_t             i;
+	size_t  i;
 	int             res;
+	const char *astrend = astr + astrlen;
 
-	for (i = 0; i < ustrlen && i < astrlen; i++) {
-		res = ((int) NTFS_TOUPPER(NTFS_U28(ustr[i]))) -
-			((int)NTFS_TOUPPER(astr[i]));
+	for (i = 0; i < ustrlen && astr < astrend; i++) {
+		res = (*ntmp->ntm_wcmp)(NTFS_TOUPPER(ustr[i]),
+				NTFS_TOUPPER((*ntmp->ntm_wget)(&astr)) );
 		if (res)
 			return res;
 	}
-	return (ustrlen - astrlen);
+
+	if (i == ustrlen && astr == astrend)
+		return 0;
+	else if (i == ustrlen)
+		return -1;
+	else
+		return 1;
 }
 
 /*
  * Compare unicode and ascii string case sens.
  */
 static int
-ntfs_uastrcmp(ustr, ustrlen, astr, astrlen)
+ntfs_uastrcmp(ntmp, ustr, ustrlen, astr, astrlen)
+	struct ntfsmount *ntmp;
 	const wchar *ustr;
 	size_t ustrlen;
 	const char *astr;
@@ -691,13 +714,20 @@ ntfs_uastrcmp(ustr, ustrlen, astr, astrlen)
 {
 	size_t             i;
 	int             res;
+	const char *astrend = astr + astrlen;
 
-	for (i = 0; (i < ustrlen) && (i < astrlen); i++) {
-		res = (int) (((char)NTFS_U28(ustr[i])) - astr[i]);
+	for (i = 0; (i < ustrlen) && (astr < astrend); i++) {
+		res = (*ntmp->ntm_wcmp)(ustr[i], (*ntmp->ntm_wget)(&astr));
 		if (res)
 			return res;
 	}
-	return (ustrlen - astrlen);
+
+	if (i == ustrlen && astr == astrend)
+		return 0;
+	else if (i == ustrlen)
+		return -1;
+	else
+		return 1;
 }
 
 /* 
@@ -821,7 +851,7 @@ ntfs_ntlookupattr(
 
     out:
 	if (namelen) {
-		MALLOC((*attrname), char *, namelen, M_TEMP, M_WAITOK);
+		*attrname = (char *) malloc(namelen, M_TEMP, M_WAITOK);
 		memcpy((*attrname), name, namelen);
 		(*attrname)[namelen] = '\0';
 		*attrtype = NTFS_A_DATA;
@@ -844,7 +874,7 @@ ntfs_ntlookupfile(
 	struct fnode   *fp = VTOF(vp);
 	struct ntnode  *ip = FTONT(fp);
 	struct ntvattr *vap;	/* Root attribute */
-	cn_t            cn;	/* VCN in current attribute */
+	cn_t            cn = 0;	/* VCN in current attribute */
 	caddr_t         rdbuf;	/* Buffer to read directory's blocks  */
 	u_int32_t       blsize;
 	u_int32_t       rdsize;	/* Length of data to read from current block */
@@ -857,6 +887,8 @@ ntfs_ntlookupfile(
 	struct fnode   *nfp;
 	struct vnode   *nvp;
 	enum vtype	f_type;
+	int fullscan = 0;
+	struct ntfs_lookup_ctx *lookup_ctx = NULL, *tctx;
 
 	error = ntfs_ntget(ip);
 	if (error)
@@ -865,9 +897,6 @@ ntfs_ntlookupfile(
 	error = ntfs_ntvattrget(ntmp, ip, NTFS_A_INDXROOT, "$I30", 0, &vap);
 	if (error || (vap->va_flag & NTFS_AF_INRUN))
 		return (ENOTDIR);
-
-	blsize = vap->va_a_iroot->ir_size;
-	rdsize = vap->va_datalen;
 
 	/*
 	 * Divide file name into: foofilefoofilefoofile[:attrspec]
@@ -885,9 +914,17 @@ ntfs_ntlookupfile(
 			break;
 		}
 
-	dprintf(("ntfs_ntlookupfile: blksz: %d, rdsz: %d\n", blsize, rdsize));
+	blsize = vap->va_a_iroot->ir_size;
+	dprintf(("ntfs_ntlookupfile: blksz: %d\n", blsize));
 
-	MALLOC(rdbuf, caddr_t, blsize, M_TEMP, M_WAITOK);
+	rdbuf = (caddr_t) malloc(blsize, M_TEMP, M_WAITOK);
+
+	dprintf(("ntfs_ntlookupfile: blksz: %d\n", blsize, rdsize));
+
+
+    loop:
+	rdsize = vap->va_datalen;
+	dprintf(("ntfs_ntlookupfile: rdsz: %d\n", rdsize));
 
 	error = ntfs_readattr(ntmp, ip, NTFS_A_INDXROOT, "$I30",
 			       0, rdsize, rdbuf, NULL);
@@ -906,21 +943,40 @@ ntfs_ntlookupfile(
 			ddprintf(("scan: %d, %d\n",
 				  (u_int32_t) iep->ie_number,
 				  (u_int32_t) iep->ie_fnametype));
-
+ 
 			/* check the name - the case-insensitible check
 			 * has to come first, to break from this for loop
 			 * if needed, so we can dive correctly */
-			res = ntfs_uastricmp(iep->ie_fname, iep->ie_fnamelen,
-				fname, fnamelen);
-			if (res > 0) break;
-			if (res < 0) continue;
+			res = ntfs_uastricmp(ntmp, iep->ie_fname,
+				iep->ie_fnamelen, fname, fnamelen);
+			if (!fullscan) {
+				if (res > 0) break;
+				if (res < 0) continue;
+			}
 
 			if (iep->ie_fnametype == 0 ||
 			    !(ntmp->ntm_flag & NTFS_MFLAG_CASEINS))
 			{
-				res = ntfs_uastrcmp(iep->ie_fname,
+				res = ntfs_uastrcmp(ntmp, iep->ie_fname,
 					iep->ie_fnamelen, fname, fnamelen);
-				if (res != 0) continue;
+				if (res != 0 && !fullscan) continue;
+			}
+
+			/* if we perform full scan, the file does not match
+			 * and this is subnode, dive */
+			if (fullscan && res != 0) {
+			    if (iep->ie_flag & NTFS_IEFLAG_SUBNODE) {
+				MALLOC(tctx, struct ntfs_lookup_ctx *,
+					sizeof(struct ntfs_lookup_ctx),
+					M_TEMP, M_WAITOK);
+				tctx->aoff	= aoff + iep->reclen;
+				tctx->rdsize	= rdsize;
+				tctx->cn	= cn;
+				tctx->prev	= lookup_ctx;
+				lookup_ctx = tctx;
+				break;
+			    } else
+				continue;
 			}
 
 			if (aname) {
@@ -1019,6 +1075,27 @@ ntfs_ntlookupfile(
 
 			aoff = (((struct attr_indexalloc *) rdbuf)->ia_hdrsize +
 				0x18);
+		} else if (fullscan && lookup_ctx) {
+			cn = lookup_ctx->cn;
+			aoff = lookup_ctx->aoff;
+			rdsize = lookup_ctx->rdsize;
+
+			error = ntfs_readattr(ntmp, ip,
+				(cn == 0) ? NTFS_A_INDXROOT : NTFS_A_INDX,
+				"$I30", ntfs_cntob(cn), rdsize, rdbuf, NULL);
+			if (error)
+				goto fail;
+			
+			if (cn != 0) {
+				error = ntfs_procfixups(ntmp, NTFS_INDXMAGIC,
+						rdbuf, rdsize);
+				if (error)
+					goto fail;
+			}
+
+			tctx = lookup_ctx;
+			lookup_ctx = lookup_ctx->prev;
+			FREE(tctx, M_TEMP);
 		} else {
 			dprintf(("ntfs_ntlookupfile: nowhere to dive :-(\n"));
 			error = ENOENT;
@@ -1026,13 +1103,31 @@ ntfs_ntlookupfile(
 		}
 	} while (1);
 
+	/* perform full scan if no entry was found */
+	if (!fullscan && error == ENOENT) {
+		fullscan = 1;
+		cn = 0;		/* need zero, used by lookup_ctx */
+
+		ddprintf(("ntfs_ntlookupfile: fullscan performed for: %.*s\n",
+			(int) fnamelen, fname));
+		goto loop;
+	}
+
 	dprintf(("finish\n"));
 
 fail:
-	if (attrname) FREE(attrname, M_TEMP);
+	if (attrname)
+		FREE(attrname, M_TEMP);
+	if (lookup_ctx) {
+		while(lookup_ctx) {
+			tctx = lookup_ctx;
+			lookup_ctx = lookup_ctx->prev;
+			FREE(tctx, M_TEMP);
+		}
+	}
 	ntfs_ntvattrrele(vap);
 	ntfs_ntput(ip);
-	FREE(rdbuf, M_TEMP);
+	free(rdbuf, M_TEMP);
 	return (error);
 }
 
@@ -1103,7 +1198,7 @@ ntfs_ntreaddir(
 
 	if (fp->f_dirblbuf == NULL) {
 		fp->f_dirblsz = vap->va_a_iroot->ir_size;
-		MALLOC(fp->f_dirblbuf, caddr_t,
+		fp->f_dirblbuf = (caddr_t) malloc(
 		       max(vap->va_datalen,fp->f_dirblsz), M_NTFSDIR, M_WAITOK);
 	}
 
@@ -1119,7 +1214,7 @@ ntfs_ntreaddir(
 			error = ENOTDIR;
 			goto fail;
 		}
-		MALLOC(bmp, u_char *, bmvap->va_datalen, M_TEMP, M_WAITOK);
+		bmp = (u_char *) malloc(bmvap->va_datalen, M_TEMP, M_WAITOK);
 		error = ntfs_readattr(ntmp, ip, NTFS_A_INDXBITMAP, "$I30", 0,
 				       bmvap->va_datalen, bmp, NULL);
 		if (error)
@@ -1404,7 +1499,7 @@ ntfs_writentvattr_plain(
 		return ENOTTY;
 	}
 
-	ddprintf(("ntfs_writentvattr_plain: data in run: %d chains\n",
+	ddprintf(("ntfs_writentvattr_plain: data in run: %lu chains\n",
 		 vap->va_vruncnt));
 
 	off = roff;
@@ -1434,14 +1529,8 @@ ntfs_writentvattr_plain(
 		off = ntfs_btocnoff(off);
 
 		while (left && ccl) {
-#if defined(__FreeBSD__)
 			tocopy = min(left,
 				  min(ntfs_cntob(ccl) - off, MAXBSIZE - off));
-#else
-			/* under NetBSD, bread() can read
-			 * maximum one block worth of data */
-			tocopy = min(left, ntmp->ntm_bps - off);
-#endif
 			cl = ntfs_btocl(tocopy + off);
 			ddprintf(("ntfs_writentvattr_plain: write: " \
 				"cn: 0x%x cl: %d, off: %d len: %d, left: %d\n",
@@ -1510,7 +1599,7 @@ ntfs_readntvattr_plain(
 		struct buf     *bp;
 		size_t          tocopy;
 
-		ddprintf(("ntfs_readntvattr_plain: data in run: %d chains\n",
+		ddprintf(("ntfs_readntvattr_plain: data in run: %lu chains\n",
 			 vap->va_vruncnt));
 
 		off = roff;
@@ -1538,17 +1627,24 @@ ntfs_readntvattr_plain(
 				off = ntfs_btocnoff(off);
 
 				while (left && ccl) {
-#if defined(__FreeBSD__)
 					tocopy = min(left,
 						  min(ntfs_cntob(ccl) - off,
 						      MAXBSIZE - off));
-#else
-					/* under NetBSD, bread() can read
-					 * maximum one block worth of data */
-					tocopy = min(left,
-						ntmp->ntm_bps - off);
-#endif
 					cl = ntfs_btocl(tocopy + off);
+
+					/*
+					 * If 'off' pushes us to next
+					 * block, don't attempt to read whole
+					 * 'tocopy' at once. This is to avoid
+					 * bread() with varying 'size' for
+					 * same 'blkno', which is not good.
+					 */
+					if (cl > ntfs_btocl(tocopy)) {
+						tocopy -=
+						    ntfs_btocnoff(tocopy + off);
+						cl--;
+					}
+
 					ddprintf(("ntfs_readntvattr_plain: " \
 						"read: cn: 0x%x cl: %d, " \
 						"off: %d len: %d, left: %d\n",
@@ -1592,7 +1688,7 @@ ntfs_readntvattr_plain(
 				off = 0;
 				if (uio) {
 					size_t remains = tocopy;
-					for(; remains; remains++)
+					for(; remains; remains--)
 						uiomove("", 1, uio);
 				} else 
 					bzero(data, tocopy);
@@ -1698,7 +1794,9 @@ ntfs_readattr(
 
 	if ((roff > vap->va_datalen) ||
 	    (roff + rsize > vap->va_datalen)) {
-		ddprintf(("ntfs_readattr: offset too big\n"));
+		printf("ntfs_readattr: offset too big: %ld (%ld) > %ld\n",
+			(long int) roff, (long int) roff + rsize,
+			(long int) vap->va_datalen);
 		ntfs_ntvattrrele(vap);
 		return (E2BIG);
 	}
@@ -1940,13 +2038,14 @@ ntfs_toupper_use(mp, ntmp)
 	 * XXX for now, just the first 256 entries are used anyway,
 	 * so don't bother reading more
 	 */
-	MALLOC(ntfs_toupper_tab, wchar *, 256 * sizeof(wchar),
+	MALLOC(ntfs_toupper_tab, wchar *, 256 * 256 * sizeof(wchar),
 		M_NTFSRDATA, M_WAITOK);
 
 	if ((error = VFS_VGET(mp, NTFS_UPCASEINO, &vp)))
 		goto out;
 	error = ntfs_readattr(ntmp, VTONT(vp), NTFS_A_DATA, NULL,
-			0, 256*sizeof(wchar), (char *) ntfs_toupper_tab, NULL);
+			0, 256*256*sizeof(wchar), (char *) ntfs_toupper_tab,
+			NULL);
 	vput(vp);
 
     out:
@@ -1980,17 +2079,3 @@ ntfs_toupper_unuse()
 	/* release the lock */
 	lockmgr(&ntfs_toupper_lock, LK_RELEASE, NULL);
 } 
-
-/*
- * maps the Unicode char to 8bit equivalent
- * XXX currently only gets lower 8bit from the Unicode char
- * and substitutes a '_' for it if the result would be '\0';
- * something better has to be definitely though out
- */
-char
-ntfs_u28(unichar)
-  wchar unichar;
-{
-	return (char) NTFS_U28(unichar);
-}
-

@@ -1,4 +1,4 @@
-# $NetBSD: do_subst.sh,v 1.2 2000/02/03 19:16:47 cgd Exp $
+# $NetBSD: do_subst.sh,v 1.5 2001/04/15 10:10:43 takemura Exp $
 #
 # Copyright (c) 1999, 2000 Christopher G. Demetriou.  All rights reserved.
 #
@@ -27,17 +27,6 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-if [ "X$1" = "X--show-libdeps" ]; then
-	if ! expr "X$TYPE" : 'Xconsole_program.*' > /dev/null 2>&1 &&
-	   ! expr "X$TYPE" : 'Xapplication.*' > /dev/null 2>&1; then
-		exit
-	fi
-	( for lib in $LIBDEP_LIST; do
-		echo $lib
-	done ) | sort
-	exit
-fi
 
 AWK=awk
 if [ `uname` = SunOS ]; then
@@ -83,7 +72,9 @@ BEGIN {
 		if (CPPDEFS != "") {
 			CPPDEFS=CPPDEFS " "
 		}
-		CPPDEFS=CPPDEFS "/D \"" a[i] "\""
+		a[i] = gensub("([^\\\\]|^)#", "\\1 ", "g", a[i])
+		a[i] = gensub("\\\\#", "#", "g", a[i])
+		CPPDEFS=CPPDEFS "/D " a[i]
 	}
 	sz = split(ENVIRON["CPPDEF_LIST"], a, "[ \t\n]+");
 	for (i = 1; i <= sz; i++) {
@@ -93,7 +84,9 @@ BEGIN {
 		if (CPPDEFS != "") {
 			CPPDEFS=CPPDEFS " "
 		}
-		CPPDEFS=CPPDEFS "/D \"" a[i] "\""
+		a[i] = gensub("([^\\\\]|^)#", "\\1 ", "g", a[i])
+		a[i] = gensub("\\\\#", "#", "g", a[i])
+		CPPDEFS=CPPDEFS "/D " a[i]
 	}
 
 	INCDIRS=""
@@ -185,4 +178,4 @@ BEGIN {
 	gsub("%%% RELEASE_LIBPATH %%%", RELEASE_LIBPATH)
 	print $0
 }
-' ../dspgen/${TYPE}.tmpl | awk ' { printf "%s\r\n", $0 }' > ${NAME}.dsp
+'

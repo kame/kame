@@ -1,4 +1,4 @@
-/*	$NetBSD: mscp_disk.c,v 1.25.4.1 2001/05/01 12:27:22 he Exp $	*/
+/*	$NetBSD: mscp_disk.c,v 1.30 2001/11/13 07:38:28 lukem Exp $	*/
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * Copyright (c) 1988 Regents of the University of California.
@@ -47,6 +47,9 @@
  * TODO
  *	write bad block forwarding code
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mscp_disk.c,v 1.30 2001/11/13 07:38:28 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -263,7 +266,7 @@ raclose(dev, flags, fmt, p)
 	 */
 #if notyet
 	if (ra->ra_openpart == 0) {
-		s = splimp();
+		s = spluba();
 		while (BUFQ_FIRST(&udautab[unit]) != NULL)
 			(void) tsleep(&udautab[unit], PZERO - 1,
 			    "raclose", 0);

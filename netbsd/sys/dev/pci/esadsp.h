@@ -1,4 +1,4 @@
-/* $NetBSD: esadsp.h,v 1.4.6.1 2002/01/24 22:36:48 he Exp $ */
+/* $NetBSD: esadsp.h,v 1.4 2002/01/07 07:33:09 jmcneill Exp $ */
 
 /*
  * Copyright (c) 2002 Lennart Augustsson

@@ -1,4 +1,4 @@
-/*	$NetBSD: pk_var.h,v 1.12 2000/03/13 23:52:40 soren Exp $	*/
+/*	$NetBSD: pk_var.h,v 1.16 2002/05/12 21:43:57 matt Exp $	*/
 
 /*
  * Copyright (c) 1985 Computing Centre, University of British Columbia.
@@ -49,7 +49,7 @@
  *
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 # include "opt_ccitt.h"
 #endif
 
@@ -208,7 +208,7 @@ struct x25bitslice {
 #define	X25SBITS(Arg, Index, Val)	(Arg) |= (((Val) << x25_bitslice[(Index)].bs_shift) & x25_bitslice[(Index)].bs_mask)
 #define	X25CSBITS(Arg, Index, Val)	(Arg) = (((Val) << x25_bitslice[(Index)].bs_shift) & x25_bitslice[(Index)].bs_mask)
 
-extern struct x25bitslice x25_bitslice[];
+extern const struct x25bitslice x25_bitslice[];
 
 
 #define ISOFIFTTYPE(i,t) ((i)->if_type == (t))
@@ -235,8 +235,11 @@ struct mbuf_cache {
 #include <sys/queue.h>
 
 extern struct pkcb_q pkcb_q;
-TAILQ_HEAD(, pklcd) pk_listenhead;
+TAILQ_HEAD(pklcdhead, pklcd);
+extern struct pklcdhead pk_listenhead;
+extern struct mbuf_cache pk_input_cache;
+extern struct mbuf_cache pk_output_cache;
 
 extern char	*pk_name[], *pk_state[];
-int	pk_t20, pk_t21, pk_t22, pk_t23;
+extern int	pk_t20, pk_t21, pk_t22, pk_t23;
 #endif

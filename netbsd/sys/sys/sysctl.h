@@ -1,4 +1,4 @@
-/*	$NetBSD: sysctl.h,v 1.51.2.3 2000/07/24 20:39:50 jdolecek Exp $	*/
+/*	$NetBSD: sysctl.h,v 1.74 2002/03/20 00:23:46 christos Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -47,7 +47,7 @@
 #include <sys/time.h>
 #include <sys/ucred.h>
 #include <sys/proc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 /*
  * Definitions for sysctl call.  The sysctl call uses a hierarchical name
@@ -91,7 +91,9 @@ struct ctlname {
 #define	CTL_USER	8		/* user-level */
 #define	CTL_DDB		9		/* in-kernel debugger */
 #define	CTL_PROC	10		/* per-proc attr */
-#define	CTL_MAXID	11		/* number of valid top-level ids */
+#define	CTL_VENDOR	11		/* vendor-specific data */
+#define	CTL_EMUL	12		/* emulation-specific data */
+#define	CTL_MAXID	13		/* number of valid top-level ids */
 
 #define	CTL_NAMES { \
 	{ 0, 0 }, \
@@ -105,7 +107,15 @@ struct ctlname {
 	{ "user", CTLTYPE_NODE }, \
 	{ "ddb", CTLTYPE_NODE }, \
 	{ "proc", CTLTYPE_NODE }, \
+	{ "vendor", CTLTYPE_NODE }, \
+	{ "emul", CTLTYPE_NODE }, \
 }
+
+/*
+ * The "vendor" toplevel name is to be used by vendors who wish to
+ * have their own private MIB tree. If you do that, please use
+ * vendor.<yourname>.*
+ */
 
 /*
  * CTL_KERN identifiers
@@ -164,7 +174,13 @@ struct ctlname {
 #define	KERN_SYSVIPC_INFO	52	/* number of valid kern ids */
 #define	KERN_MSGBUF		53	/* kernel message buffer */
 #define	KERN_CONSDEV		54	/* dev_t: console terminal device */
-#define	KERN_MAXID		55	/* number of valid kern ids */
+#define	KERN_MAXPTYS		55	/* int: maximum number of ptys */
+#define	KERN_PIPE		56	/* node: pipe limits */
+#define	KERN_MAXPHYS		57	/* int: kernel value of MAXPHYS */
+#define	KERN_SBMAX		58	/* int: max socket buffer size */
+#define	KERN_TKSTAT		59	/* tty in/out counters */
+#define	KERN_MONOTONIC_CLOCK	60	/* int: POSIX monotonic clock */
+#define	KERN_MAXID		61	/* number of valid kern ids */
 
 #define	CTL_KERN_NAMES { \
 	{ 0, 0 }, \
@@ -222,6 +238,12 @@ struct ctlname {
 	{ "sysvipc_info", CTLTYPE_STRUCT }, \
 	{ "msgbuf", CTLTYPE_STRUCT }, \
 	{ "consdev", CTLTYPE_STRUCT }, \
+	{ "maxptys", CTLTYPE_INT }, \
+	{ "pipe", CTLTYPE_NODE }, \
+	{ "maxphys", CTLTYPE_INT }, \
+	{ "sbmax", CTLTYPE_INT }, \
+	{ "tkstat", CTLTYPE_NODE }, \
+	{ "monotonic_clock", CTLTYPE_INT }, \
 }
 
 /*
@@ -285,6 +307,8 @@ struct kinfo_proc {
 #define	KI_MAXCOMLEN	24	/* extra for 8 byte alignment */
 #define	KI_WMESGLEN	8
 #define	KI_MAXLOGNAME	24	/* extra for 8 byte alignment */
+
+#define KI_NOCPU	(~(u_int64_t)0)
 
 typedef struct {
 	u_int32_t	__bits[4];
@@ -398,6 +422,7 @@ struct kinfo_proc2 {
 
 	u_int32_t p_uctime_sec;		/* STRUCT TIMEVAL: child u+s time. */
 	u_int32_t p_uctime_usec;	/* STRUCT TIMEVAL: child u+s time. */
+	u_int64_t p_cpuid;		/* LONG: cpu id */
 };
 
 /*
@@ -416,6 +441,24 @@ struct kinfo_proc2 {
 #define	KERN_SYSVIPC_SHM_INFO		3	/* shminfo and shmid_ds */
 
 /*
+ * tty counter sysctl variables
+ */
+#define	KERN_TKSTAT_NIN			1	/* total input character */
+#define	KERN_TKSTAT_NOUT		2	/* total output character */
+#define	KERN_TKSTAT_CANCC		3	/* canonical input character */
+#define	KERN_TKSTAT_RAWCC		4	/* raw input character */
+#define	KERN_TKSTAT_MAXID		5	/* number of valid TKSTAT ids */
+
+#define	KERN_TKSTAT_NAMES { \
+	{ 0, 0 }, \
+	{ "nin", CTLTYPE_QUAD }, \
+	{ "nout", CTLTYPE_QUAD }, \
+	{ "cancc", CTLTYPE_QUAD }, \
+	{ "rawcc", CTLTYPE_QUAD }, \
+}
+
+
+/*
  * CTL_HW identifiers
  */
 #define	HW_MACHINE	 1		/* string: machine class */
@@ -425,11 +468,12 @@ struct kinfo_proc2 {
 #define	HW_PHYSMEM	 5		/* int: total memory */
 #define	HW_USERMEM	 6		/* int: non-kernel memory */
 #define	HW_PAGESIZE	 7		/* int: software page size */
-#define	HW_DISKNAMES	 8		/* strings: disk drive names */
+#define	HW_DISKNAMES	 8		/* string: disk drive names */
 #define	HW_DISKSTATS	 9		/* struct: diskstats[] */
 #define	HW_MACHINE_ARCH	10		/* string: machine architecture */
 #define	HW_ALIGNBYTES	11		/* int: ALIGNBYTES for the kernel */
-#define	HW_MAXID	12		/* number of valid hw ids */
+#define	HW_CNMAGIC	12		/* string: console magic sequence(s) */
+#define	HW_MAXID	13		/* number of valid hw ids */
 
 #define	CTL_HW_NAMES { \
 	{ 0, 0 }, \
@@ -440,10 +484,11 @@ struct kinfo_proc2 {
 	{ "physmem", CTLTYPE_INT }, \
 	{ "usermem", CTLTYPE_INT }, \
 	{ "pagesize", CTLTYPE_INT }, \
-	{ "disknames", CTLTYPE_STRUCT }, \
+	{ "disknames", CTLTYPE_STRING }, \
 	{ "diskstats", CTLTYPE_STRUCT }, \
 	{ "machine_arch", CTLTYPE_STRING }, \
 	{ "alignbytes", CTLTYPE_INT }, \
+	{ "cnmagic", CTLTYPE_STRING }, \
 }
 
 /*
@@ -583,6 +628,20 @@ struct kinfo_proc2 {
 	{ "hard", CTLTYPE_QUAD }, \
 }
 
+/*
+ * CTL_EMUL definitions
+ *
+ * Second level identifier specifies which emulation variable.
+ * Subsequent levels are specified in the emulations themselves.
+ */
+#define	EMUL_LINUX	1
+
+#define	EMUL_MAXID	2
+#define	CTL_EMUL_NAMES { \
+	{ 0, 0 }, \
+	{ "linux", CTLTYPE_NODE }, \
+}
+
 #ifdef	_KERNEL
 /*
  * CTL_DEBUG variables.
@@ -617,42 +676,38 @@ extern struct ctldebug debug15, debug16, debug17, debug18, debug19;
  * the name.
  */
 typedef int (sysctlfn)
-    __P((int *, u_int, void *, size_t *, void *, size_t, struct proc *));
+    (int *, u_int, void *, size_t *, void *, size_t, struct proc *);
 
-int sysctl_int __P((void *, size_t *, void *, size_t, int *));
-int sysctl_rdint __P((void *, size_t *, void *, int));
-int sysctl_quad __P((void *, size_t *, void *, size_t, quad_t *));
-int sysctl_rdquad __P((void *, size_t *, void *, quad_t));
-int sysctl_string __P((void *, size_t *, void *, size_t, char *, int));
-int sysctl_rdstring __P((void *, size_t *, void *, const char *));
-int sysctl_struct __P((void *, size_t *, void *, size_t, void *, int));
-int sysctl_rdstruct __P((void *, size_t *, void *, const void *, int));
-struct radix_node;
-struct walkarg;
-int sysctl_clockrate __P((void *, size_t *));
-int sysctl_vnode __P((char *, size_t *, struct proc *));
-int sysctl_ntptime __P((void *, size_t *));
+int sysctl_int(void *, size_t *, void *, size_t, int *);
+int sysctl_rdint(void *, size_t *, void *, int);
+int sysctl_quad(void *, size_t *, void *, size_t, quad_t *);
+int sysctl_rdquad(void *, size_t *, void *, quad_t);
+int sysctl_string(void *, size_t *, void *, size_t, char *, int);
+int sysctl_rdstring(void *, size_t *, void *, const char *);
+int sysctl_struct(void *, size_t *, void *, size_t, void *, int);
+int sysctl_rdstruct(void *, size_t *, void *, const void *, int);
+int sysctl_rdminstruct(void *, size_t *, void *, const void *, int);
+int sysctl_clockrate(void *, size_t *);
+int sysctl_disknames(void *, size_t *);
+int sysctl_diskstats(int *, u_int, void *, size_t *);
+int sysctl_vnode(char *, size_t *, struct proc *);
+int sysctl_ntptime(void *, size_t *);
 #ifdef GPROF
-int sysctl_doprof __P((int *, u_int, void *, size_t *, void *, size_t));
+int sysctl_doprof(int *, u_int, void *, size_t *, void *, size_t);
 #endif
-int sysctl_dombuf __P((int *, u_int, void *, size_t *, void *, size_t));
+int sysctl_dombuf(int *, u_int, void *, size_t *, void *, size_t);
 
-void fill_eproc __P((struct proc *, struct eproc *));
+void fill_eproc(struct proc *, struct eproc *);
 
-int kern_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-		     struct proc *));
-int hw_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-		   struct proc *));
-int proc_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-		     struct proc *));
+int kern_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
+int hw_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
+int proc_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
 #ifdef DEBUG
-int debug_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-		      struct proc *));
+int debug_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
 #endif
-int net_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-		    struct proc *));
-int cpu_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-		    struct proc *));
+int net_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
+int cpu_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
+int emul_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
 
 /* ddb_sysctl() declared in ddb_var.h */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: mount.h,v 1.85.2.1 2002/02/09 23:11:20 he Exp $	*/
+/*	$NetBSD: mount.h,v 1.96 2002/02/05 21:25:48 christos Exp $	*/
 
 /*
  * Copyright (c) 1989, 1991, 1993
@@ -114,6 +114,7 @@ struct statfs {
 #define	MOUNT_CODA	"coda"		/* Coda Filesystem */
 #define	MOUNT_FILECORE	"filecore"	/* Acorn Filecore Filesystem */
 #define	MOUNT_NTFS	"ntfs"		/* Windows/NT Filesystem */
+#define	MOUNT_SMBFS	"smbfs"		/* CIFS (SMB) */
 
 /*
  * Structure per mounted file system.  Each mounted file system has an
@@ -131,6 +132,8 @@ struct mount {
 	struct lock	mnt_lock;		/* mount structure lock */
 	int		mnt_flag;		/* flags */
 	int		mnt_maxsymlinklen;	/* max size of short symlink */
+	int		mnt_fs_bshift;		/* offset shift for lblkno */
+	int		mnt_dev_bshift;		/* shift for device sectors */
 	struct statfs	mnt_stat;		/* cache of filesystem stats */
 	qaddr_t		mnt_data;		/* private data */
 	int		mnt_wcnt;		/* count of vfs_busy waiters */
@@ -146,7 +149,6 @@ struct mount {
  * one of the __MNT_UNUSED flags.
  */
 
-#define __MNT_UNUSED1	0x00100000
 #define __MNT_UNUSED2	0x00400000
 #define __MNT_UNUSED3	0x00800000
 
@@ -158,10 +160,26 @@ struct mount {
 #define	MNT_UNION	0x00000020	/* union with underlying filesystem */
 #define	MNT_ASYNC	0x00000040	/* file system written asynchronously */
 #define	MNT_NOCOREDUMP	0x00008000	/* don't write core dumps to this FS */
+#define MNT_IGNORE	0x00100000	/* don't show entry in df */
 #define MNT_NOATIME	0x04000000	/* Never update access times in fs */
 #define MNT_SYMPERM	0x20000000	/* recognize symlink permission */
 #define MNT_NODEVMTIME	0x40000000	/* Never update mod times for devs */
 #define MNT_SOFTDEP	0x80000000	/* Use soft dependencies */
+
+#define __MNT_BASIC_FLAGS \
+	{ MNT_RDONLY,		0,	"read-only" }, \
+	{ MNT_SYNCHRONOUS,	0,	"synchronous" }, \
+	{ MNT_NOEXEC,		0,	"noexec" }, \
+	{ MNT_NOSUID,		0,	"nosuid" }, \
+	{ MNT_NODEV,		0,	"nodev" }, \
+	{ MNT_UNION,		0,	"union" }, \
+	{ MNT_ASYNC,		0,	"asynchronous" }, \
+	{ MNT_NOCOREDUMP,	0,	"nocoredump" }, \
+	{ MNT_IGNORE,		0,	"hidden" }, \
+	{ MNT_NOATIME,		0,	"noatime" }, \
+	{ MNT_SYMPERM,		0,	"symperm" }, \
+	{ MNT_NODEVMTIME,	0,	"nodevmtime" }, \
+	{ MNT_SOFTDEP,		0,	"soft dependencies" },
 
 /*
  * exported mount flags.
@@ -174,6 +192,14 @@ struct mount {
 #define MNT_EXNORESPORT	0x08000000	/* don't enforce reserved ports (NFS) */
 #define MNT_EXPUBLIC	0x10000000	/* public export (WebNFS) */
 
+#define __MNT_EXPORTED_FLAGS \
+	{ MNT_EXRDONLY,		1,	"exported read-only" }, \
+	{ MNT_EXPORTED,		0,	"NFS exported" }, \
+	{ MNT_DEFEXPORTED,	1,	"exported to the world" }, \
+	{ MNT_EXPORTANON,	1,	"anon uid mapping" }, \
+	{ MNT_EXKERB,		1,	"kerberos uid mapping" }, \
+	{ MNT_EXNORESPORT,	0,	"non-reserved ports" }, \
+	{ MNT_EXPUBLIC,		0,	"WebNFS exports" },
 /*
  * Flags set by internal operations.
  */
@@ -181,10 +207,15 @@ struct mount {
 #define	MNT_QUOTA	0x00002000	/* quotas are enabled on filesystem */
 #define	MNT_ROOTFS	0x00004000	/* identifies the root filesystem */
 
+
+#define __MNT_INTERNAL_FLAGS \
+	{ MNT_LOCAL,		0,	"local" }, \
+	{ MNT_QUOTA,		0,	"with quotas" }, \
+	{ MNT_ROOTFS,		1,	"root file system" },
 /*
  * Mask of flags that are visible to statfs()
  */
-#define	MNT_VISFLAGMASK	0xfc00ffff
+#define	MNT_VISFLAGMASK	0xfc10ffff
 
 /*
  * External filesystem control flags.
@@ -198,6 +229,11 @@ struct mount {
 #define	MNT_RELOAD	0x00040000	/* reload filesystem data */
 #define	MNT_FORCE	0x00080000	/* force unmount or readonly change */
 
+#define __MNT_EXTERNAL_FLAGS \
+	{ MNT_UPDATE,		1,	"being updated" }, \
+	{ MNT_DELEXPORT,	1,	"delete export list" }, \
+	{ MNT_RELOAD,		1,	"reload filesystem data" }, \
+	{ MNT_FORCE,		1,	"force unmount or readonly change" },
 /*
  * Internal filesystem control flags.
  *
@@ -209,6 +245,17 @@ struct mount {
 #define MNT_UNMOUNT	0x01000000	/* unmount in progress */
 #define MNT_WANTRDWR	0x02000000	/* upgrade to read/write requested */
 
+#define __MNT_CONTROL_FLAGS \
+	{ MNT_GONE,		0,	"gone" }, \
+	{ MNT_UNMOUNT,		0,	"unmount in progress" }, \
+	{ MNT_WANTRDWR,		0,	"upgrade to read/write requested" },
+
+#define __MNT_FLAGS \
+	__MNT_BASIC_FLAGS \
+	__MNT_EXPORTED_FLAGS \
+	__MNT_INTERNAL_FLAGS \
+	__MNT_EXTERNAL_FLAGS \
+	__MNT_CONTROL_FLAGS
 /*
  * Sysctl CTL_VFS definitions.
  *
@@ -226,10 +273,10 @@ struct mount {
 #define	VFSGEN_MAXID	4		/* number of valid vfs.generic ids */
 
 /*
- * XXX NOTE!  These must be in the order of mountcompatnames[] in
- * XXX sys/kern/vfs_syscalls.c!
- *
  * USE THE SAME NAMES AS MOUNT_*!
+ *
+ * Only need to add new entry here if the filesystem actually supports
+ * sysctl(2).
  */
 #define	CTL_VFS_NAMES { \
 	{ "generic", CTLTYPE_NODE }, \
@@ -287,7 +334,7 @@ struct vfsconf {
 
 #endif
 
-#ifdef __STDC__
+#if __STDC__
 struct nameidata;
 struct mbuf;
 struct vnodeopv_desc;
@@ -315,13 +362,14 @@ struct vfsops {
 				    struct vnode **vpp));
 	int	(*vfs_vptofh)	__P((struct vnode *vp, struct fid *fhp));
 	void	(*vfs_init)	__P((void));
+	void	(*vfs_reinit)	__P((void));
 	void	(*vfs_done)	__P((void));
 	int	(*vfs_sysctl)	__P((int *, u_int, void *, size_t *, void *,
 				    size_t, struct proc *));
 	int	(*vfs_mountroot) __P((void));
 	int	(*vfs_checkexp) __P((struct mount *mp, struct mbuf *nam,
 				    int *extflagsp, struct ucred **credanonp));
-	struct vnodeopv_desc **vfs_opv_descs;
+	const struct vnodeopv_desc * const *vfs_opv_descs;
 	int	vfs_refcount;
 	LIST_ENTRY(vfsops) vfs_list;
 };
@@ -428,6 +476,7 @@ int	vfs_rootmountalloc __P((char *, char *, struct mount **));
 void	vfs_unbusy __P((struct mount *));
 int	vfs_attach __P((struct vfsops *));
 int	vfs_detach __P((struct vfsops *));
+void	vfs_reinit __P((void));
 struct vfsops *vfs_getopsbyname __P((const char *));
 int	vfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 			struct proc *));
@@ -441,8 +490,8 @@ extern	struct simplelock spechash_slock;
 long	makefstype __P((const char *));
 int	dounmount __P((struct mount *, int, struct proc *));
 void	vfsinit __P((void));
-void	vfs_opv_init __P((struct vnodeopv_desc **));
-void	vfs_opv_free __P((struct vnodeopv_desc **));
+void	vfs_opv_init __P((const struct vnodeopv_desc * const *));
+void	vfs_opv_free __P((const struct vnodeopv_desc * const *));
 #ifdef DEBUG
 void	vfs_bufstats __P((void));
 #endif

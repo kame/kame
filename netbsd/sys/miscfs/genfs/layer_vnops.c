@@ -1,11 +1,11 @@
-/*	$NetBSD: layer_vnops.c,v 1.3.4.1 2000/12/14 23:36:11 he Exp $	*/
+/*	$NetBSD: layer_vnops.c,v 1.10 2001/12/06 04:29:23 chs Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
  * All rights reserved.
  *
  * This software was written by William Studenmund of the
- * Numerical Aerospace Similation Facility, NASA Ames Research Center.
+ * Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,7 +71,7 @@
  *
  * Ancestors:
  *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
- *	$Id: layer_vnops.c,v 1.1.1.2 2001/07/10 03:53:30 itojun Exp $
+ *	$Id: layer_vnops.c,v 1.1.1.3 2002/09/25 05:32:43 itojun Exp $
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  */
@@ -235,11 +235,13 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: layer_vnops.c,v 1.10 2001/12/06 04:29:23 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -393,8 +395,7 @@ layer_bypass(v)
 				 descp->vdesc_vpp_offset,ap);
 		/*
 		 * Only vop_lookup, vop_create, vop_makedir, vop_bmap,
-		 * vop_mknod, and vop_symlink return vpp's. The latter
-		 * two are VPP_WILLRELE, so we won't get here, and vop_bmap
+		 * vop_mknod, and vop_symlink return vpp's. vop_bmap
 		 * doesn't call bypass as the lower vpp is fine (we're just
 		 * going to do i/o on it). vop_loookup doesn't call bypass
 		 * as a lookup on "." would generate a locking error.
@@ -737,6 +738,7 @@ layer_inactive(v)
 		struct vnode *a_vp;
 		struct proc *a_p;
 	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
 
 	/*
 	 * Do nothing (and _don't_ bypass).
@@ -750,7 +752,11 @@ layer_inactive(v)
 	 * like they do in the name lookup cache code.
 	 * That's too much work for now.
 	 */
-	VOP_UNLOCK(ap->a_vp, 0);
+	VOP_UNLOCK(vp, 0);
+
+	/* ..., but don't cache the device node. */
+	if (vp->v_type == VBLK || vp->v_type == VCHR)
+		vgone(vp);
 	return (0);
 }
 
@@ -879,4 +885,59 @@ layer_bwrite(v)
 	bp->b_vp = savedvp;
 
 	return (error);
+}
+
+int
+layer_getpages(v)
+	void *v;
+{
+	struct vop_getpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offset;
+		struct vm_page **a_m;
+		int *a_count;
+		int a_centeridx;
+		vm_prot_t a_access_type;
+		int a_advice;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	int error;
+
+	/*
+	 * just pass the request on to the underlying layer.
+	 */
+
+	if (ap->a_flags & PGO_LOCKED) {
+		return EBUSY;
+	}
+	ap->a_vp = LAYERVPTOLOWERVP(vp);
+	simple_unlock(&vp->v_interlock);
+	simple_lock(&ap->a_vp->v_interlock);
+	error = VCALL(ap->a_vp, VOFFSET(vop_getpages), ap);
+	return error;
+}
+
+int
+layer_putpages(v)
+	void *v;
+{
+	struct vop_putpages_args /* {
+		struct vnode *a_vp;
+		voff_t a_offlo;
+		voff_t a_offhi;
+		int a_flags;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	int error;
+
+	/*
+	 * just pass the request on to the underlying layer.
+	 */
+
+	ap->a_vp = LAYERVPTOLOWERVP(vp);
+	simple_unlock(&vp->v_interlock);
+	simple_lock(&ap->a_vp->v_interlock);
+	error = VCALL(ap->a_vp, VOFFSET(vop_putpages), ap);
+	return error;
 }

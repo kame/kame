@@ -1,4 +1,4 @@
-/*	$NetBSD: frame.h,v 1.6.10.1 2000/07/26 23:28:09 mycroft Exp $ */
+/*	$NetBSD: frame.h,v 1.10 2001/12/04 00:53:19 darrenr Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -44,6 +44,10 @@
  *	@(#)frame.h	8.1 (Berkeley) 6/11/93
  */
 
+#if defined(_KERNEL_OPT)
+#include "opt_sparc_arch.h"
+#endif
+
 /*
  * Sparc stack frame format.
  *
@@ -52,7 +56,22 @@
  * of the frame, you must first force the kernel to write any such
  * windows to the stack.
  */
-#if !defined(_LOCORE) && !defined(_LIBC)
+#ifndef _LOCORE
+#ifndef SUN4U
+struct frame {
+	int32_t	fr_local[8];	/* space to save locals (%l0..%l7) */
+	int32_t	fr_arg[6];	/* space to save arguments (%i0..%i5) */
+	struct	frame *fr_fp;	/* space to save frame pointer (%i6) */
+	int32_t	fr_pc;		/* space to save return pc (%i7) */
+	/*
+	 * SunOS reserves another 8 words here; this is pointless
+	 * but we do it for compatibility.
+	 */
+	int32_t	fr_xxx;		/* `structure return pointer' (unused) */
+	int32_t	fr_argd[6];	/* `arg dump area' (lunacy) */
+	int32_t	fr_argx[1];	/* arg extension (args 7..n; variable size) */
+};
+#else
 struct frame32 {
 	int32_t	fr_local[8];	/* space to save locals (%l0..%l7) */
 	int32_t	fr_arg[6];	/* space to save arguments (%i0..%i5) */
@@ -67,6 +86,8 @@ struct frame32 {
 	int32_t	fr_argx[1];	/* arg extension (args 7..n; variable size) */
 };
 #endif
+#endif
+
 /*
  * CCFSZ (C Compiler Frame SiZe) is the size of a stack frame required if
  * a function is to call C code.  It should be just 64, but Sun defined
@@ -75,7 +96,6 @@ struct frame32 {
  * area at times anyway.
  */
 #define CCFSZ		96
-
 
 /*
  * Sparc v9 stack frame format.

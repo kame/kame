@@ -1,4 +1,4 @@
-/*	$NetBSD: mem.c,v 1.23.4.1 2000/06/30 16:27:40 simonb Exp $ */
+/*	$NetBSD: mem.c,v 1.30 2002/02/27 01:20:55 christos Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,6 +43,7 @@
 /*
  * Memory special file
  */
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -56,7 +57,7 @@
 #include <machine/eeprom.h>
 #include <machine/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 extern vaddr_t prom_vstart;
 extern vaddr_t prom_vend;
@@ -100,7 +101,7 @@ mmrw(dev, uio, flags)
 	vm_prot_t prot;
 	extern caddr_t vmmap;
 
-	if (minor(dev) == 0) {
+	if (minor(dev) == DEV_MEM) {
 		/* lock against other uses of shared vmmap */
 		while (physlock > 0) {
 			physlock++;
@@ -112,6 +113,7 @@ mmrw(dev, uio, flags)
 		physlock = 1;
 	}
 	while (uio->uio_resid > 0 && error == 0) {
+		int n;
 		iov = uio->uio_iov;
 		if (iov->iov_len == 0) {
 			uio->uio_iov++;
@@ -120,10 +122,13 @@ mmrw(dev, uio, flags)
 				panic("mmrw");
 			continue;
 		}
+
+		/* Note how much is still to go */
+		n = uio->uio_resid;
+
 		switch (minor(dev)) {
 
-		/* minor device 0 is physical memory */
-		case 0:
+		case DEV_MEM:
 			pa = (paddr_t)uio->uio_offset;
 			if (!pmap_pa_exists(pa)) {
 				error = EFAULT;
@@ -133,15 +138,16 @@ mmrw(dev, uio, flags)
 			    VM_PROT_WRITE;
 			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
 			    trunc_page(pa), prot, prot|PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(),
 			    (vaddr_t)vmmap, (vaddr_t)vmmap + NBPG);
+			pmap_update(pmap_kernel());
 			break;
 
-		/* minor device 1 is kernel memory */
-		case 1:
+		case DEV_KMEM:
 			va = (vaddr_t)uio->uio_offset;
 			if (va >= MSGBUF_VA && va < MSGBUF_VA+NBPG) {
 				c = min(iov->iov_len, 4096);
@@ -158,8 +164,7 @@ mmrw(dev, uio, flags)
 			error = uiomove((void *)va, c, uio);
 			break;
 
-		/* minor device 2 is EOF/RATHOLE */
-		case 2:
+		case DEV_NULL:
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
 			return (0);
@@ -167,11 +172,7 @@ mmrw(dev, uio, flags)
 /* XXX should add sbus, etc */
 
 #if defined(SUN4)
-		/*
-		 * minor device 11 (/dev/eeprom) is the old-style
-		 * (a'la Sun 3) EEPROM.
-		 */
-		case 11:
+		case DEV_EEPROM:
 			if (cputyp == CPU_SUN4)
 				error = eeprom_uio(uio);
 			else
@@ -180,11 +181,7 @@ mmrw(dev, uio, flags)
 			break;
 #endif /* SUN4 */
 
-		/*
-		 * minor device 12 (/dev/zero) is source of nulls on read,
-		 * rathole on write.
-		 */
-		case 12:
+		case DEV_ZERO:
 			if (uio->uio_rw == UIO_WRITE) {
 				uio->uio_resid = 0;
 				return(0);
@@ -201,6 +198,10 @@ mmrw(dev, uio, flags)
 		default:
 			return (ENXIO);
 		}
+
+		/* If we didn't make any progress (i.e. EOF), we're done here */
+		if (n == uio->uio_resid)
+			break;
 	}
 	if (minor(dev) == 0) {
 unlock:

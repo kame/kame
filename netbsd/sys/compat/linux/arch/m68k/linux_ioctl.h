@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_ioctl.h,v 1.1.18.1 2001/03/30 21:35:55 he Exp $	*/
+/*	$NetBSD: linux_ioctl.h,v 1.2 2000/12/10 14:07:57 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

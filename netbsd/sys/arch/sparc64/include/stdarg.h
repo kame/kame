@@ -1,4 +1,4 @@
-/*	$NetBSD: stdarg.h,v 1.9.4.2 2000/07/26 23:29:42 mycroft Exp $ */
+/*	$NetBSD: stdarg.h,v 1.12 2001/08/18 03:47:18 eeh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -51,9 +51,10 @@
 #include <sys/featuretest.h>
 
 #ifdef __lint__
-#define	__builtin_saveregs(t)		(0)
+#define	__builtin_saveregs()		(0)
 #define	__builtin_classify_type(t)	(0)
 #define	__builtin_next_arg(t)		((t) ? 0 : 0)
+#define	__alignof__(t)			(0)
 #endif
 
 typedef _BSD_VA_LIST_	va_list;

@@ -1,4 +1,4 @@
-/*	$NetBSD: adb.c,v 1.36.2.2 2000/11/15 20:20:42 tv Exp $	*/
+/*	$NetBSD: adb.c,v 1.41 2001/11/20 03:19:41 chs Exp $	*/
 
 /*
  * Copyright (C) 1994	Bradley A. Grantham
@@ -197,7 +197,7 @@ adbprint(args, name)
 		rv = UNSUPP; /* most ADB device types are unsupported */
 
 		/* print out what kind of ADB device we have found */
-		printf("%s addr %d: ", name, aa_args->origaddr);
+		printf("%s addr %d: ", name, aa_args->adbaddr);
 		switch(aa_args->origaddr) {
 #ifdef DIAGNOSTIC
 		case 0:
@@ -251,7 +251,7 @@ adbprint(args, name)
 #endif /* DIAGNOSTIC */
 		}
 	} else		/* a device matched and was configured */
-		printf(" addr %d: ", aa_args->origaddr);
+		printf(" addr %d: ", aa_args->adbaddr);
 
 	return (rv);
 }
@@ -317,7 +317,7 @@ void
 adb_op_comprout(void)
 {
 #ifdef __NetBSD__
-	asm("movw	#1,a2@			| update flag value");
+	asm("movw	#1,%a2@			| update flag value");
 #else				/* for macos based testing */
 	asm {
 		move.w #1,(a2) }		/* update flag value */

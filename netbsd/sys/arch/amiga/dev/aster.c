@@ -1,7 +1,7 @@
-/*	$NetBSD: aster.c,v 1.7 2000/01/23 21:06:12 aymeric Exp $ */
+/*	$NetBSD: aster.c,v 1.16 2002/01/28 09:56:51 aymeric Exp $ */
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998,2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: aster.c,v 1.16 2002/01/28 09:56:51 aymeric Exp $");
+
 /*
  * zbus ISDN Blaster, ISDN Master driver.
  */
@@ -64,19 +67,16 @@ struct aster_softc {
 	struct bus_space_tag sc_bst;
 };
 
-int astermatch __P((struct device *, struct cfdata *, void *));
-void asterattach __P((struct device *, struct device *, void *));
-int asterprint __P((void *auxp, const char *));
+int astermatch(struct device *, struct cfdata *, void *);
+void asterattach(struct device *, struct device *, void *);
+int asterprint(void *auxp, const char *);
 
 struct cfattach aster_ca = {
 	sizeof(struct aster_softc), astermatch, asterattach
 };
 
 int
-astermatch(parent, cfp, auxp)
-	struct device *parent;
-	struct cfdata *cfp;
-	void *auxp;
+astermatch(struct device *parent, struct cfdata *cfp, void *auxp)
 {
 
 	struct zbus_args *zap;
@@ -86,49 +86,68 @@ astermatch(parent, cfp, auxp)
 	if (zap->manid == 5001 && zap->prodid == 1)	/* VMC ISDN Blaster */
 		return (1);
 
-	if (zap->manid == 2092 && zap->prodid == 64)	/* BSC ISDN Master */
+	if (zap->manid == 2092 && (zap->prodid == 64 ||	/* BSC ISDN Master */
+	    zap->prodid == 65))				/* BSC ISDN Master II */
 		return (1);
 
 	if (zap->manid == 5000 && zap->prodid == 1)	/* ITH ISDN Master II */
 		return (1);
 
+	if (zap->manid == 4626 && zap->prodid == 5 && zap->serno == 0)
+		return (1);			/* Schoenfeld ISDN Surfer */
+
+	if (zap->manid == 2189 && zap->prodid == 3)
+		return (1);			/* Zeus Dev. ? ISDN board */
+
 	return (0);
 }
 
 void
-asterattach(parent, self, auxp)
-	struct device *parent, *self;
-	void *auxp;
+asterattach(struct device *parent, struct device *self, void *auxp)
 {
 	struct aster_softc *astrsc;
 	struct zbus_args *zap;
 	struct supio_attach_args supa;
-	char *cardname;
 
 	astrsc = (struct aster_softc *)self;
 	zap = auxp;
 
-	if (zap->manid == 5001 && zap->prodid == 1) {
-		cardname = "Blaster";
-		supa.supio_name = "isic";
-	} else if (zap->manid == 2092 && zap->prodid == 64) {
-		cardname = "Master";
-		supa.supio_name = "isic";
-	} else /* if (zap->manid == 5000 && zap->prodid == 1) */ {
-		cardname = "Master II";
-		supa.supio_name = "isicII";
-	}
-	if (parent)
-		printf(": ISDN %s\n", cardname);
-
 	astrsc->sc_bst.base = (u_long)zap->va + 0;
 	astrsc->sc_bst.absm = &amiga_bus_stride_2;
+	supa.supio_ipl = 2;	/* could be 6. isic_supio will decide. */
+
+	switch (zap->manid) {
+	case 5001:
+		supa.supio_name = "isic31VMC ISDN Blaster";
+		break;
+	case 2092:
+		supa.supio_name = "isic31BSC ISDN Master/Master II";
+		break;
+	case 5000:
+		supa.supio_name = "isic13ITH ISDN Master II";
+		break;
+	case 2189:
+		supa.supio_name = "isic@BZeus ISDN Link";
+		break;
+	case 4626:
+		if (zap->serno == 0) {
+			supa.supio_name =
+				"isic1CIndividual Comp. ISDN Surfer";
+			((volatile u_int8_t *)zap->va)[0x00fe] = 0xff;
+			if (((volatile u_int8_t *)zap->va)[0x00fe] & 0x80)
+				supa.supio_ipl = 6;
+			break;
+		}
+		/* FALLTHROUGH */
+	}
+
+	if (parent)
+		printf(" IPL %d: %s\n", supa.supio_ipl, supa.supio_name+6);
 
 	supa.supio_iot = &astrsc->sc_bst;
 
 	supa.supio_iobase = 0;
 	supa.supio_arg = 0;
-	supa.supio_ipl = 2;	/* could be 6. isic_supio will decide. */
 	config_found(self, &supa, asterprint); /* XXX */
 #ifdef __notyet__
 	hyper3i_attach_subr(self, &supa, asterprint);
@@ -136,9 +155,7 @@ asterattach(parent, self, auxp)
 }
 
 int
-asterprint(auxp, pnp)
-	void *auxp;
-	const char *pnp;
+asterprint(void *auxp, const char *pnp)
 {
 	struct supio_attach_args *supa;
 	supa = auxp;

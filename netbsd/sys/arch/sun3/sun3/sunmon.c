@@ -1,4 +1,4 @@
-/*	$NetBSD: sunmon.c,v 1.9.24.1 2000/12/15 04:25:55 he Exp $	*/
+/*	$NetBSD: sunmon.c,v 1.12 2001/02/22 07:11:12 chs Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -39,8 +39,10 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/reboot.h>
+#include <sys/boot_flag.h>
 
 #include <machine/mon.h>
+#include <machine/mc68851.h>
 
 #include <sun3/sun3/machdep.h>
 #include <sun3/sun3/interreg.h>
@@ -51,7 +53,6 @@ static void *sunmon_vcmd;	/* XXX: always 0? */
 
 static void tracedump __P((int));
 static void v_handler __P((int addr, char *str));
-
 
 /*
  * Prepare for running the PROM monitor
@@ -90,26 +91,39 @@ _mode_kernel __P((void))
  * also put our hardware state back into place after
  * the PROM "c" (continue) command is given.
  */
-void sunmon_abort()
+void
+sunmon_abort()
 {
 	int s = splhigh();
+#ifdef	_SUN3X_
+	struct mmu_rootptr crp;
+#endif
 
 	_mode_monitor();
 	delay(100000);
+
+#ifdef	_SUN3X_
+	getcrp(&crp);
+	loadcrp(&mon_crp);
+#endif
 
 	/*
 	 * Drop into the PROM in a way that allows a continue.
 	 * Already setup "trap #14" in sunmon_init().
 	 */
+
 	asm(" trap #14 ; _sunmon_continued: nop");
 
 	/* We have continued from a PROM abort! */
-
+#ifdef	_SUN3X_
+	loadcrp(&crp);
+#endif
 	_mode_kernel();
 	splx(s);
 }
 
-void sunmon_halt()
+void
+sunmon_halt()
 {
 	(void) splhigh();
 	_mode_monitor();
@@ -130,7 +144,8 @@ void sunmon_halt()
 /*
  * Caller must pass a string that is in our data segment.
  */
-void sunmon_reboot(bs)
+void
+sunmon_reboot(bs)
 	char *bs;
 {
 
@@ -285,19 +300,8 @@ sunmon_init()
 #ifdef	DEBUG
 		mon_printf("boot option: %s\n", p);
 #endif
-		for (++p; *p; p++) {
-			switch (*p) {
-			case 'a':
-				boothowto |= RB_ASKNAME;
-				break;
-			case 's':
-				boothowto |= RB_SINGLE;
-				break;
-			case 'd':
-				boothowto |= RB_KDB;
-				break;
-			}
-		}
+		for (++p; *p; p++)
+			BOOT_FLAG(*p, boothowto);
 		argp++;
 	}
 

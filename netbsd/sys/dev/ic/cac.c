@@ -1,4 +1,4 @@
-/*	$NetBSD: cac.c,v 1.6.2.4 2002/01/29 23:31:01 he Exp $	*/
+/*	$NetBSD: cac.c,v 1.20 2002/01/25 16:10:35 ad Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Driver for Compaq array controllers.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cac.c,v 1.20 2002/01/25 16:10:35 ad Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -51,7 +54,8 @@
 #include <sys/malloc.h>
 #include <sys/pool.h>
 
-#include <machine/vmparam.h>
+#include <uvm/uvm_extern.h>
+
 #include <machine/bswap.h>
 #include <machine/bus.h>
 
@@ -104,7 +108,7 @@ cac_init(struct cac_softc *sc, const char *intrstr, int startfw)
 
         size = sizeof(struct cac_ccb) * CAC_MAX_CCBS;
 
-	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, NBPG, 0, &seg, 1, 
+	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &seg, 1, 
 	    &rseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: unable to allocate CCBs, error = %d\n",
 		    sc->sc_dv.dv_xname, error);
@@ -198,7 +202,7 @@ cac_shutdown(void *cookie)
 	int i;
 
 	for (i = 0; i < cac_cd.cd_ndevs; i++) {
-		if ((sc = cac_cd.cd_devs[i]) == NULL)
+		if ((sc = device_lookup(&cac_cd, i)) == NULL)
 			continue; 
 		memset(buf, 0, sizeof(buf));
 		buf[0] = 1;
@@ -287,7 +291,9 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 
 	if ((flags & (CAC_CCB_DATA_IN | CAC_CCB_DATA_OUT)) != 0) {
 		bus_dmamap_load(sc->sc_dmat, ccb->ccb_dmamap_xfer,
-		    (void *)data, datasize, NULL, BUS_DMA_NOWAIT);
+		    (void *)data, datasize, NULL, BUS_DMA_NOWAIT |
+		    BUS_DMA_STREAMING | ((flags & CAC_CCB_DATA_IN) ?
+		    BUS_DMA_READ : BUS_DMA_WRITE));
 
 		bus_dmamap_sync(sc->sc_dmat, ccb->ccb_dmamap_xfer, 0, datasize,
 		    (flags & CAC_CCB_DATA_IN) != 0 ? BUS_DMASYNC_PREREAD :

@@ -1,4 +1,4 @@
-/*	$NetBSD: m68k.h,v 1.6 1997/10/21 19:15:33 gwr Exp $	*/
+/*	$NetBSD: m68k.h,v 1.8 2001/06/14 15:49:05 fredette Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -68,6 +68,7 @@ extern	int mmutype;		/* MMU on this host */
 #endif	/* _KERNEL */
 
 /* values for cputype */
+#define	CPU_68010	-1	/* 68010 */
 #define	CPU_68020	0	/* 68020 */
 #define	CPU_68030	1	/* 68030 */
 #define	CPU_68040	2	/* 68040 */
@@ -107,6 +108,10 @@ void	zeropage __P((void *addr));
 /* locore.s (XXX: move to support.s?) */
 int 	getdfc __P((void));
 int 	getsfc __P((void));
+
+/* w16copy.s */
+void	w16zero __P((void *, u_int));
+void	w16copy __P((const void *, void *, u_int));
 
 #ifdef MAPPEDCOPY
 /* mappedcopy.c */

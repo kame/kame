@@ -1,4 +1,4 @@
-/*	$NetBSD: namei.h,v 1.18 2000/04/16 21:41:50 chs Exp $	*/
+/*	$NetBSD: namei.h,v 1.26 2002/05/12 23:06:28 matt Exp $	*/
 
 /*
  * Copyright (c) 1985, 1989, 1991, 1993
@@ -103,7 +103,7 @@ struct nameidata {
 #define	RENAME		3	/* setup for file renaming */
 #define	OPMASK		3	/* mask for operation */
 /*
- * namei operational modifier flags, stored in ni_cnd.flags
+ * namei operational modifier flags, stored in ni_cnd.cn_flags
  */
 #define	LOCKLEAF	0x0004	/* lock inode on return */
 #define	LOCKPARENT	0x0008	/* want parent vnode returned locked */
@@ -149,6 +149,7 @@ struct nameidata {
 	(ndp)->ni_segflg = segflg; \
 	(ndp)->ni_dirp = namep; \
 	(ndp)->ni_cnd.cn_proc = p; \
+	(ndp)->ni_cnd.cn_cred = p->p_ucred; \
 }
 #endif
 
@@ -174,7 +175,16 @@ struct	namecache {
 };
 
 #ifdef _KERNEL
+#include <sys/pool.h>
+
+extern struct pool pnbuf_pool;		/* pathname buffer pool */
+extern struct pool_cache pnbuf_cache;	/* pathname buffer cache */
+
+#define	PNBUF_GET()	pool_cache_get(&pnbuf_cache, PR_WAITOK)
+#define	PNBUF_PUT(pnb)	pool_cache_put(&pnbuf_cache, (pnb))
+
 int	namei __P((struct nameidata *ndp));
+uint32_t namei_hash __P((const char *, const char **));
 int	lookup __P((struct nameidata *ndp));
 int	relookup __P((struct vnode *dvp, struct vnode **vpp,
 		      struct componentname *cnp));
@@ -183,9 +193,10 @@ int cache_lookup __P((struct vnode *, struct vnode **, struct componentname *));
 int cache_revlookup __P((struct vnode *, struct vnode **, char **, char *));
 void cache_enter __P((struct vnode *, struct vnode *, struct componentname *));
 void nchinit __P((void));
+void nchreinit __P((void));
 struct mount;
 void cache_purgevfs __P((struct mount *));
-
+void namecache_print(struct vnode *, void (*)(const char *, ...));
 #endif
 
 /*
@@ -203,4 +214,8 @@ struct	nchstats {
 	long	ncs_revhits;		/* reverse-cache hits */
 	long	ncs_revmiss;		/* reverse-cache misses */
 };
+
+#ifdef _KERNEL
+extern struct nchstats nchstats;
+#endif
 #endif /* !_SYS_NAMEI_H_ */

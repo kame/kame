@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_syscalls_43.c,v 1.13 2000/03/30 11:27:15 augustss Exp $	*/
+/*	$NetBSD: vfs_syscalls_43.c,v 1.20 2001/11/13 02:08:05 lukem Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -40,7 +40,12 @@
  *	@(#)vfs_syscalls.c	8.28 (Berkeley) 12/10/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vfs_syscalls_43.c,v 1.20 2001/11/13 02:08:05 lukem Exp $");
+
+#if defined(_KERNEL_OPT)
 #include "fs_union.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -146,11 +151,22 @@ compat_43_sys_lstat(p, v, retval)
 	struct stat43 osb;
 	int error;
 	struct nameidata nd;
+	int ndflags;
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW | LOCKLEAF | LOCKPARENT, UIO_USERSPACE,
-	    SCARG(uap, path), p);
-	if ((error = namei(&nd)))
+	ndflags = NOFOLLOW | LOCKLEAF | LOCKPARENT;
+again:
+	NDINIT(&nd, LOOKUP, ndflags, UIO_USERSPACE, SCARG(uap, path), p);
+	if ((error = namei(&nd))) {
+		if (error == EISDIR && (ndflags & LOCKPARENT) != 0) {
+			/*
+			 * Should only happen on '/'. Retry without LOCKPARENT;
+			 * this is safe since the vnode won't be a VLNK.
+			 */
+			ndflags &= ~LOCKPARENT;
+			goto again;
+		}
 		return (error);
+	}
 	/*
 	 * For symbolic links, always return the attributes of its
 	 * containing directory, except for mode, size, and links.
@@ -158,10 +174,12 @@ compat_43_sys_lstat(p, v, retval)
 	vp = nd.ni_vp;
 	dvp = nd.ni_dvp;
 	if (vp->v_type != VLNK) {
-		if (dvp == vp)
-			vrele(dvp);
-		else
-			vput(dvp);
+		if ((ndflags & LOCKPARENT) != 0) {
+			if (dvp == vp)
+				vrele(dvp);
+			else
+				vput(dvp);
+		}
 		error = vn_stat(vp, &sb, p);
 		vput(vp);
 		if (error)
@@ -209,27 +227,20 @@ compat_43_sys_fstat(p, v, retval)
 	struct stat43 oub;
 	int error;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return (EBADF);
-	switch (fp->f_type) {
 
-	case DTYPE_VNODE:
-		error = vn_stat((struct vnode *)fp->f_data, &ub, p);
-		break;
+	FILE_USE(fp);
+	error = (*fp->f_ops->fo_stat)(fp, &ub, p);
+	FILE_UNUSE(fp, p);
 
-	case DTYPE_SOCKET:
-		error = soo_stat((struct socket *)fp->f_data, &ub);
-		break;
-
-	default:
-		panic("ofstat");
-		/*NOTREACHED*/
-	}
-	cvtstat(&ub, &oub);
-	if (error == 0)
+	if (error == 0) {
+		cvtstat(&ub, &oub);
 		error = copyout((caddr_t)&oub, (caddr_t)SCARG(uap, sb),
 		    sizeof (oub));
+	}
+
+	
 	return (error);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: isr.c,v 1.2 2000/02/21 20:38:50 erh Exp $	*/
+/*	$NetBSD: isr.c,v 1.7 2001/07/07 06:24:00 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -45,17 +45,9 @@
  * Link and dispatch interrupts.
  */
 
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -203,7 +195,8 @@ isrunlink_vectored(vec)
 		panic("isrunlink_vectored: not vectored interrupt");
 
 	vectab[vec] = badtrap;
-	bzero(&isr_vectored[vec - ISRVECTORED], sizeof(struct isr_vectored));
+	memset(&isr_vectored[vec - ISRVECTORED], 0,
+	    sizeof(struct isr_vectored));
 }
 
 /*
@@ -312,32 +305,18 @@ get_vector_entry(entry)
 	return ((void *) vectab[entry]);
 }
 
-/*
- * XXX Why on earth isn't this in a common file?!
- */
-
-/*
- * Declarations for the netisr functions...
- * They are in the header files, but that's not
- * really a good reason to drag all those in.
- */
-void netintr __P((void));
-void arpintr __P((void));
-void ipintr __P((void));
-void ip6intr __P((void));
-void atintr __P((void));
-void nsintr __P((void));
-void clnlintr __P((void));
-void ccittintr __P((void));
-void pppintr __P((void));
-
 void
 netintr()
 {
+	int s, isr;
+
+	s = splnet();
+	isr = netisr;
+	netisr = 0;
+	splx(s);
 
 #define DONETISR(bit, fn) do {		\
-	if (netisr & (1 << bit)) {	\
-		netisr &= ~(1 << bit);	\
+	if (isr & (1 << bit)) {		\
 		fn();			\
 	}				\
 } while (0)

@@ -1,4 +1,4 @@
-/*	$NetBSD: bha_eisa.c,v 1.16 1998/08/15 10:10:49 mycroft Exp $	*/
+/*	$NetBSD: bha_eisa.c,v 1.20 2001/11/15 09:48:03 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,7 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bha_eisa.c,v 1.20 2001/11/15 09:48:03 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -44,7 +46,6 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 
-#include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 
@@ -136,7 +137,7 @@ bha_eisa_match(parent, match, aux)
 		return (0);
 	}
 
-	rv = bha_find(iot, ioh2, NULL);
+	rv = bha_find(iot, ioh2);
 
 	bus_space_unmap(iot, ioh2, BHA_ISA_IOSIZE);
 	bus_space_unmap(iot, ioh, BHA_EISA_IOSIZE);
@@ -182,8 +183,8 @@ bha_eisa_attach(parent, self, aux)
 	sc->sc_iot = iot;
 	sc->sc_ioh = ioh2;
 	sc->sc_dmat = ea->ea_dmat;
-	if (!bha_find(iot, ioh2, &bpd))
-		panic("bha_eisa_attach: bha_find failed");
+	if (!bha_probe_inquiry(iot, ioh2, &bpd))
+		panic("bha_eisa_attach failed");
 
 	sc->sc_dmaflags = 0;
 
@@ -205,5 +206,5 @@ bha_eisa_attach(parent, self, aux)
 	}
 	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
-	bha_attach(sc, &bpd);
+	bha_attach(sc);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.4.4.2 2001/03/13 20:48:58 he Exp $	*/
+/*	$NetBSD: cpu.h,v 1.10 2001/05/30 12:28:47 mrg Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -49,7 +49,7 @@
  * Exported definitions unique to news68k cpu support.
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
 
@@ -130,7 +130,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define need_resched()		do { want_resched++; aston(); } while(0)
+#define need_resched(ci)	do { want_resched++; aston(); } while(0)
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -236,9 +236,6 @@ void physaccess __P((caddr_t, caddr_t, int, int));
 void physunaccess __P((caddr_t, int));
 int kvtop __P((caddr_t));
 
-/* trap.c functions */
-void child_return __P((void *));
-
 #endif
 
 /* physical memory sections */
@@ -270,5 +267,11 @@ void child_return __P((void *));
 	((u_int)(pa) >= intiobase_phys && (u_int)(pa) < intiotop_phys)
 #define IIOP(va)	(((u_int)(va) - (u_int)intiobase) + intiobase_phys)
 #define IIOPOFF(pa)	((u_int)(pa) - intiobase_phys)
+
+/* XXX EIO space mapping should be modified like hp300 XXX */
+#define	EIOSIZE		(extiotop_phys - extiobase_phys)
+#define ISEIOVA(va) \
+	((char *)(va) >= extiobase && (char *)(va) < (char *)EIOSIZE)
+#define EIOV(pa)	(((u_int)(pa) - extiobase_phys) + (u_int)extiobase)
 
 #endif /* !_NEWS68K_CPU_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: am79c950.c,v 1.7 1999/05/18 23:52:53 thorpej Exp $	*/
+/*	$NetBSD: am79c950.c,v 1.12 2002/01/16 06:04:23 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997 David Huang <khym@bga.com>
@@ -75,7 +75,7 @@
 #include <netccitt/pk_extern.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include "bpfilter.h"
 #if NBPFILTER > 0
@@ -107,7 +107,7 @@ static void mc_mediastatus __P((struct ifnet *, struct ifmediareq *));
 
 /*
  * Compare two Ether/802 addresses for equality, inlined and
- * unrolled for speed.  Use this like bcmp().
+ * unrolled for speed.  Use this like memcmp().
  *
  * XXX: Add <machine/inlines.h> for stuff like this?
  * XXX: or maybe add it to libkern.h instead?
@@ -167,20 +167,16 @@ mcsetup(sc, lladdr)
 	DELAY(100);
 	NIC_PUT(sc, MACE_IMR, ~0);
 
-	bcopy(lladdr, sc->sc_enaddr, ETHER_ADDR_LEN);
+	memcpy(sc->sc_enaddr, lladdr, ETHER_ADDR_LEN);
 	printf(": address %s\n", ether_sprintf(lladdr));
 
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	memcpy(ifp->if_xname, sc->sc_dev.dv_xname, IFNAMSIZ);
 	ifp->if_softc = sc;
 	ifp->if_ioctl = mcioctl;
 	ifp->if_start = mcstart;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
 	ifp->if_watchdog = mcwatchdog;
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 
 	/* initialize ifmedia structures */
 	ifmedia_init(&sc->sc_media, 0, mc_mediachange, mc_mediastatus);
@@ -227,8 +223,8 @@ mcioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else {
-				bcopy(ina->x_host.c_host,
-				    LLADDR(ifp->if_sadl),
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host,
 				    sizeof(sc->sc_enaddr));
 			}
 			/* Set new address. */
@@ -480,7 +476,7 @@ maceput(sc, m)
 		u_char *data = mtod(m, u_char *);
 		len = m->m_len;
 		totlen += len;
-		bcopy(data, buff, len);
+		memcpy(buff, data, len);
 		buff += len;
 		MFREE(m, n);
 	}
@@ -491,7 +487,7 @@ maceput(sc, m)
 #if 0
 	if (totlen < ETHERMIN + sizeof(struct ether_header)) {
 		int pad = ETHERMIN + sizeof(struct ether_header) - totlen;
-		bzero(sc->sc_txbuf + totlen, pad);
+		memset(sc->sc_txbuf + totlen, 0, pad);
 		totlen = ETHERMIN + sizeof(struct ether_header);
 	}
 #endif
@@ -644,7 +640,6 @@ mace_read(sc, pkt, len)
 	int len;
 {
 	struct ifnet *ifp = &sc->sc_if;
-	struct ether_header *eh = (struct ether_header *)pkt;
 	struct mbuf *m;
 
 	if (len <= sizeof(struct ether_header) ||
@@ -657,20 +652,6 @@ mace_read(sc, pkt, len)
 		return;
 	}
 
-#if NBPFILTER > 0
-	/*
-	 * Check if there's a bpf filter listening on this interface.
-	 * If so, hand off the raw packet to enet, then discard things
-	 * not destined for us (but be sure to keep broadcast/multicast).
-	 */
-	if (ifp->if_bpf) {
-		bpf_tap(ifp->if_bpf, pkt, len);
-		if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    ETHER_CMP(eh->ether_dhost, sc->sc_enaddr))
-			return;
-	}
-#endif
 	m = mace_get(sc, pkt, len);
 	if (m == NULL) {
 		ifp->if_ierrors++;
@@ -678,6 +659,12 @@ mace_read(sc, pkt, len)
 	}
 
 	ifp->if_ipackets++;
+
+#if NBPFILTER > 0 
+	/* Pass this up to any BPF listeners. */
+	if (ifp->if_bpf)
+		bpf_mtap(ifp->if_bpf, m); 
+#endif
 
 	/* Pass the packet up. */
 	(*ifp->if_input)(ifp, m);
@@ -727,7 +714,7 @@ mace_get(sc, pkt, totlen)
 			len = MCLBYTES;
 		}
 		m->m_len = len = min(totlen, len);
-		bcopy(pkt, mtod(m, caddr_t), len);
+		memcpy(mtod(m, caddr_t), pkt, len);
 		pkt += len;
 		totlen -= len;
 		*mp = m;

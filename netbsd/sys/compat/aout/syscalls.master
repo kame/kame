@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.9 2000/05/04 21:52:32 kristerw Exp $
+	$NetBSD: syscalls.master,v 1.16 2002/05/03 00:20:56 eeh Exp $
 
 ;	@(#)syscalls.master	8.2 (Berkeley) 1/13/94
 
@@ -34,14 +34,17 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 ; #include's are copied to the syscall names and switch definition files only.
 
+#if defined(_KERNEL_OPT)
 #include "opt_ktrace.h"
 #include "opt_nfsserver.h"
+#include "opt_ntp.h"
 #include "opt_compat_netbsd.h"
 #include "opt_sysv.h"
 #include "opt_compat_43.h"
 
 #include "fs_lfs.h"
 #include "fs_nfs.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +52,8 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 #include <compat/aout/aout_syscallargs.h>
+
+%%
 
 ; Reserved/unimplemented system calls in the range 0-150 inclusive
 ; are reserved for use in future Berkeley releases.
@@ -67,7 +72,7 @@
 6	NOARGS		{ int sys_close(int fd); }
 7	NOARGS		{ int sys_wait4(int pid, int *status, int options, \
 			    struct rusage *rusage); }
-8	STD		{ int aout_sys_creat(const char *path, mode_t mode); } \
+8	NOARGS		{ int compat_43_sys_creat(const char *path, mode_t mode); } \
 			    ocreat
 9	STD		{ int aout_sys_link(const char *path, \
 			    const char *link); }
@@ -75,7 +80,7 @@
 11	OBSOL		execv
 12	STD		{ int aout_sys_chdir(const char *path); }
 13	NOARGS		{ int sys_fchdir(int fd); }
-14	STD		{ int aout_sys_mknod(const char *path, mode_t mode, \
+14	NOARGS		{ int sys_mknod(const char *path, mode_t mode, \
 			    dev_t dev); }
 15	STD		{ int aout_sys_chmod(const char *path, mode_t mode); }
 16	STD		{ int aout_sys_chown(const char *path, uid_t uid, \
@@ -85,8 +90,8 @@
 			    int flags); }
 19	NOARGS		{ long compat_43_sys_lseek(int fd, long offset, \
 			    int whence); } olseek
-20	NOARGS		{ pid_t sys_getpid(void); }
-21	STD		{ int aout_sys_mount(const char *type, \
+20	NOARGS MPSAFE	{ pid_t sys_getpid(void); }
+21	NOARGS		{ int sys_mount(const char *type, \
 			    const char *path, int flags, void *data); }
 22	STD		{ int aout_sys_unmount(const char *path, int flags); }
 23	NOARGS		{ int sys_setuid(uid_t uid); }
@@ -124,7 +129,7 @@
 44	NOARGS		{ int sys_profil(caddr_t samples, size_t size, \
 			    u_long offset, u_int scale); }
 #if defined(KTRACE) || !defined(_KERNEL)
-45	STD		{ int aout_sys_ktrace(const char *fname, int ops, \
+45	NOARGS		{ int sys_ktrace(const char *fname, int ops, \
 			    int facs, int pid); }
 #else
 45	EXCL		ktrace
@@ -137,7 +142,7 @@
 			    int mask); } sigprocmask13
 49	NOARGS		{ int sys___getlogin(char *namebuf, size_t namelen); }
 50	NOARGS		{ int sys_setlogin(const char *namebuf); }
-51	STD		{ int aout_sys_acct(const char *path); }
+51	NOARGS		{ int sys_acct(const char *path); }
 52	NOARGS		{ int compat_13_sys_sigpending(void); } sigpending13
 53	NOARGS		{ int compat_13_sys_sigaltstack( \
 			    const struct sigaltstack13 *nss, \
@@ -261,14 +266,14 @@
 130	NOARGS		{ int compat_43_sys_ftruncate(int fd, long length); } \
 			    oftruncate
 131	NOARGS		{ int sys_flock(int fd, int how); }
-132	STD		{ int aout_sys_mkfifo(const char *path, mode_t mode); }
+132	NOARGS		{ int sys_mkfifo(const char *path, mode_t mode); }
 133	NOARGS		{ ssize_t sys_sendto(int s, const void *buf, \
 			    size_t len, int flags, const struct sockaddr *to, \
 			    int tolen); }
 134	NOARGS		{ int sys_shutdown(int s, int how); }
 135	NOARGS		{ int sys_socketpair(int domain, int type, \
 			    int protocol, int *rsv); }
-136	STD		{ int aout_sys_mkdir(const char *path, mode_t mode); }
+136	NOARGS		{ int sys_mkdir(const char *path, mode_t mode); }
 137	STD		{ int aout_sys_rmdir(const char *path); }
 138	STD		{ int aout_sys_utimes(const char *path, \
 			    const struct timeval *tptr); }
@@ -287,7 +292,7 @@
 146	NOARGS		{ int compat_43_sys_killpg(int pgid, int signum); } \
 			    okillpg
 147	NOARGS		{ int sys_setsid(void); }
-148	STD		{ int aout_sys_quotactl(const char *path, \
+148	NOARGS		{ int sys_quotactl(const char *path, \
 			    int cmd, int uid, caddr_t arg); }
 149	NOARGS		{ int compat_43_sys_quota(void); } oquota
 150	NOARGS		{ int compat_43_sys_getsockname(int fdec, caddr_t asa, \
@@ -329,21 +334,21 @@
 167	UNIMPL
 168	UNIMPL
 ; XXX more generally, never on machines where sizeof(void *) != sizeof(int)
-#if (defined(SYSVSEM) || !defined(_KERNEL)) && !defined(alpha)
+#if (defined(SYSVSEM) || !defined(_KERNEL)) && !defined(_LP64)
 169	NOARGS		{ int compat_10_sys_semsys(int which, int a2, int a3, \
 			    int a4, int a5); } osemsys
 #else
 169	EXCL		1.0 semsys
 #endif
 ; XXX more generally, never on machines where sizeof(void *) != sizeof(int)
-#if (defined(SYSVMSG) || !defined(_KERNEL)) && !defined(alpha)
+#if (defined(SYSVMSG) || !defined(_KERNEL)) && !defined(_LP64)
 170	NOARGS		{ int compat_10_sys_msgsys(int which, int a2, int a3, \
 			    int a4, int a5, int a6); } omsgsys
 #else
 170	EXCL		1.0 msgsys
 #endif
 ; XXX more generally, never on machines where sizeof(void *) != sizeof(int)
-#if (defined(SYSVSHM) || !defined(_KERNEL)) && !defined(alpha)
+#if (defined(SYSVSHM) || !defined(_KERNEL)) && !defined(_LP64)
 171	NOARGS		{ int compat_10_sys_shmsys(int which, int a2, int a3, \
 			    int a4); } oshmsys
 #else
@@ -354,8 +359,13 @@
 			    size_t nbyte, int pad, off_t offset); }
 174	NOARGS		{ ssize_t sys_pwrite(int fd, const void *buf, \
 			    size_t nbyte, int pad, off_t offset); }
+; For some reason, ntp_gettime doesn't want to raise SIGSYS when it's excluded.
 175	NOARGS		{ int sys_ntp_gettime(struct ntptimeval *ntvp); }
+#if defined(NTP) || !defined(_KERNEL)
 176	NOARGS		{ int sys_ntp_adjtime(struct timex *tp); }
+#else
+176	EXCL		ntp_adjtime
+#endif
 177	UNIMPL
 178	UNIMPL
 179	UNIMPL

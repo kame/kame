@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.6 2000/02/11 13:15:44 tsubai Exp $	*/
+/*	$NetBSD: intr.h,v 1.13 2001/06/08 00:32:03 matt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -75,81 +75,18 @@ struct intrhand {
 	int	ih_irq;
 };
 
-void setsoftclock __P((void));
 void clearsoftclock __P((void));
-int  splsoftclock __P((void));
-void setsoftnet   __P((void));
 void clearsoftnet __P((void));
-int  splsoftnet   __P((void));
+void softnet __P((void));
+void softserial __P((void));
 
-void do_pending_int __P((void));
+int splraise __P((int));
+int spllower __P((int));
+void splx __P((int));
+void softintr __P((int));
 
-static __inline int splraise __P((int));
-static __inline int spllower __P((int));
-static __inline void splx __P((int));
-static __inline void softintr __P((int));
-
-extern volatile int cpl, ipending, astpending, tickspending;
+extern volatile int astpending, tickspending;
 extern int imask[];
-
-/*
- *  Reorder protection in the following inline functions is
- * achived with the "eieio" instruction which the assembler
- * seems to detect and then doen't move instructions past....
- */
-static __inline int
-splraise(ncpl)
-	int ncpl;
-{
-	int ocpl;
-
-	__asm__ volatile("sync; eieio\n");	/* don't reorder.... */
-	ocpl = cpl;
-	cpl = ocpl | ncpl;
-	__asm__ volatile("sync; eieio\n");	/* reorder protect */
-	return (ocpl);
-}
-
-static __inline void
-splx(ncpl)
-	int ncpl;
-{
-
-	__asm__ volatile("sync; eieio\n");	/* reorder protect */
-	cpl = ncpl;
-	if (ipending & ~ncpl)
-		do_pending_int();
-	__asm__ volatile("sync; eieio\n");	/* reorder protect */
-}
-
-static __inline int
-spllower(ncpl)
-	int ncpl;
-{
-	int ocpl;
-
-	__asm__ volatile("sync; eieio\n");	/* reorder protect */
-	ocpl = cpl;
-	cpl = ncpl;
-	if (ipending & ~ncpl)
-		do_pending_int();
-	__asm__ volatile("sync; eieio\n");	/* reorder protect */
-	return (ocpl);
-}
-
-/* Following code should be implemented with lwarx/stwcx to avoid
- * the disable/enable. i need to read the manual once more.... */
-static __inline void
-softintr(ipl)
-	int ipl;
-{
-	int msrsave;
-
-	__asm__ volatile("mfmsr %0" : "=r"(msrsave));
-	__asm__ volatile("mtmsr %0" :: "r"(msrsave & ~PSL_EE));
-	ipending |= 1 << ipl;
-	__asm__ volatile("mtmsr %0" :: "r"(msrsave));
-}
 
 #define ICU_LEN		64
 
@@ -186,8 +123,10 @@ softintr(ipl)
 /*
  * Miscellaneous
  */
-#define splimp()	splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_IMP])
 #define	splhigh()	splraise(imask[IPL_HIGH])
+#define	splsched()	splhigh()
+#define	spllock()	splhigh()
 #define	spl0()		spllower(0)
 
 #define	setsoftclock()	softintr(SIR_CLOCK)
@@ -202,6 +141,14 @@ extern long intrcnt[];
 #define CNT_SOFTNET	66
 #define CNT_SOFTSERIAL	67
 
-#endif /* !_LOCORE */
+#define MACPPC_IPI_HALT		0x01
+#define MACPPC_IPI_FLUSH_FPU	0x02
 
-#endif /* !_MACPPC_INTR_H_ */
+#ifdef MULTIPROCESSOR
+struct cpu_info;
+void macppc_send_ipi(volatile struct cpu_info *, int);
+#endif
+
+#endif /* _LOCORE */
+
+#endif /* _MACPPC_INTR_H_ */

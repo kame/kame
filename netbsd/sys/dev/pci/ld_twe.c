@@ -1,7 +1,7 @@
-/*	$NetBSD: ld_twe.c,v 1.7 2001/06/10 10:48:43 ad Exp $	*/
+/*	$NetBSD: ld_twe.c,v 1.9.2.1 2002/05/26 16:07:54 perry Exp $	*/
 
 /*-
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000, 2001, 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -40,6 +40,9 @@
  * 3ware "Escalade" RAID controller front-end for ld(4) driver.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ld_twe.c,v 1.9.2.1 2002/05/26 16:07:54 perry Exp $");
+
 #include "rnd.h"
 
 #include <sys/param.h>
@@ -55,6 +58,8 @@
 #endif
 
 #include <machine/bus.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/ldvar.h>
 
@@ -100,7 +105,7 @@ ld_twe_attach(struct device *parent, struct device *self, void *aux)
 
 	sc->sc_hwunit = twea->twea_unit;
 	ld->sc_flags = LDF_ENABLED;
-	ld->sc_maxxfer = TWE_MAX_XFER;
+	ld->sc_maxxfer = twe_get_maxxfer(twe_get_maxsegs());
 	ld->sc_secperunit = twe->sc_dsize[twea->twea_unit];
 	ld->sc_secsize = TWE_SECTOR_SIZE;
 	ld->sc_maxqueuecnt = (TWE_MAX_QUEUECNT - 1) / twe->sc_nunits;

@@ -1,4 +1,4 @@
-/*	$NetBSD: procfs_status.c,v 1.15 1998/08/09 20:51:10 perry Exp $	*/
+/*	$NetBSD: procfs_status.c,v 1.17 2001/11/10 13:33:44 lukem Exp $	*/
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -39,6 +39,9 @@
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: procfs_status.c,v 1.17 2001/11/10 13:33:44 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -67,7 +70,7 @@ procfs_dostatus(curp, p, pfs, uio)
 	int i;
 	int xlen;
 	int error;
-	char psbuf[256];		/* XXX - conservative */
+	char psbuf[256+MAXHOSTNAMELEN];		/* XXX - conservative */
 
 	if (uio->uio_rw != UIO_READ)
 		return (EOPNOTSUPP);

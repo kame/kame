@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_cksum.c,v 1.12.4.1 2000/09/14 18:50:18 perseant Exp $	*/
+/*	$NetBSD: lfs_cksum.c,v 1.19.10.1 2002/06/20 03:51:13 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -70,7 +70,9 @@
  *	@(#)lfs_cksum.c	8.2 (Berkeley) 10/9/94
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lfs_cksum.c,v 1.19.10.1 2002/06/20 03:51:13 lukem Exp $");
+
 #include <sys/param.h>
 #ifdef _KERNEL
 # include <sys/systm.h>
@@ -79,7 +81,6 @@
 # include <stddef.h>
 #endif
 #include <sys/mount.h>
-#include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/lfs/lfs.h>
 #include <ufs/lfs/lfs_extern.h>
@@ -91,27 +92,24 @@
  * XXX
  * Use the TCP/IP checksum instead.
  */
-u_long
-cksum(str, len)
-	void *str;
-	size_t len;
+u_int32_t
+cksum(void *str, size_t len)
 {
-	u_long sum;
+	u_int32_t sum;
 	
-	len &= ~(sizeof(u_short) - 1);
-	for (sum = 0; len; len -= sizeof(u_short)) {
-		sum ^= *(u_short *)str;
-		str = (void *)((u_short *)str + 1);
+	len &= ~(sizeof(u_int16_t) - 1);
+	for (sum = 0; len; len -= sizeof(u_int16_t)) {
+		sum ^= *(u_int16_t *)str;
+		str = (void *)((u_int16_t *)str + 1);
 	}
 	return (sum);
 }
 
-u_long	
-lfs_sb_cksum(fs)
-	struct dlfs *fs;
+u_int32_t
+lfs_sb_cksum(struct dlfs *fs)
 {
 	size_t size;  
 	
 	size = (size_t)offsetof(struct dlfs, dlfs_cksum);
-	return cksum(fs,size);
+	return cksum(fs, size);
 }

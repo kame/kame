@@ -1,4 +1,4 @@
-/*	$NetBSD: hmereg.h,v 1.4.4.1 2000/07/31 05:33:51 mrg Exp $	*/
+/*	$NetBSD: hmereg.h,v 1.12 2002/05/07 05:56:47 uwe Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -111,6 +111,17 @@
 	 HME_SEB_STAT_RFIFOVF  | HME_SEB_STAT_LCNTEXP | HME_SEB_STAT_CCNTEXP  |\
 	 HME_SEB_STAT_ACNTEXP)
 
+#define HME_SEB_STAT_VLAN_ERRORS	\
+	(HME_SEB_STAT_SLVPERR  | HME_SEB_STAT_SLVERR  | HME_SEB_STAT_TXTERR   |\
+	 HME_SEB_STAT_TXPERR   | HME_SEB_STAT_TXLERR  | HME_SEB_STAT_TXEACK   |\
+	 HME_SEB_STAT_EOPERR   | HME_SEB_STAT_RXTERR  | HME_SEB_STAT_RXPERR   |\
+	 HME_SEB_STAT_RXLATERR | HME_SEB_STAT_RXERR   | HME_SEB_STAT_NORXD    |\
+	 HME_SEB_STAT_DTIMEXP  | HME_SEB_STAT_FCNTEXP | HME_SEB_STAT_LCCNTEXP |\
+	 HME_SEB_STAT_ECNTEXP  | HME_SEB_STAT_NCNTEXP |                        \
+	 HME_SEB_STAT_TFIFO_UND| HME_SEB_STAT_STSTERR | HME_SEB_STAT_CVCNTEXP |\
+	 HME_SEB_STAT_RFIFOVF  | HME_SEB_STAT_LCNTEXP | HME_SEB_STAT_CCNTEXP  |\
+	 HME_SEB_STAT_ACNTEXP)
+
 /*
  * HME Transmitter register offsets
  */
@@ -167,6 +178,7 @@
 #define HME_MACI_TXSWRST	(130*4)		/* TX reset */
 #define HME_MACI_TXCFG		(131*4)		/* TX config */
 #define HME_MACI_JSIZE		(139*4)		/* TX jam size */
+#define HME_MACI_TXSIZE		(140*4)		/* TX max size */
 #define HME_MACI_NCCNT		(144*4)		/* TX normal collision cnt */
 #define HME_MACI_FCCNT		(145*4)		/* TX first collision cnt */
 #define HME_MACI_EXCNT		(146*4)		/* TX excess collision cnt */
@@ -174,6 +186,7 @@
 #define HME_MACI_RANDSEED	(148*4)		/*  */
 #define HME_MACI_RXSWRST	(194*4)		/* RX reset */
 #define HME_MACI_RXCFG		(195*4)		/* RX config */
+#define HME_MACI_RXSIZE		(196*4)		/* RX max size */
 #define HME_MACI_MACADDR2	(198*4)		/* MAC address */
 #define HME_MACI_MACADDR1	(199*4)
 #define HME_MACI_MACADDR0	(200*4)
@@ -256,11 +269,13 @@
 
 /*
  * Buffer Descriptors.
- *
+ */
+#ifdef notdef
 struct hme_xd {
 	volatile u_int32_t	xd_flags;
-	volatile u_int32_t	xd_addr;	// Buffer address (DMA)
-}; */
+	volatile u_int32_t	xd_addr;	/* Buffer address (DMA) */
+};
+#endif
 #define HME_XD_SIZE			8
 #define HME_XD_FLAGS(base, index)	((base) + ((index) * HME_XD_SIZE) + 0)
 #define HME_XD_ADDR(base, index)	((base) + ((index) * HME_XD_SIZE) + 4)
@@ -268,11 +283,11 @@ struct hme_xd {
 	(p) ? le32toh(*((u_int32_t *)HME_XD_FLAGS(b,i))) :		\
 		(*((u_int32_t *)HME_XD_FLAGS(b,i)))
 #define HME_XD_SETFLAGS(p, b, i, f)	do {				\
-	*((u_int32_t *)HME_XD_FLAGS(b,i)) = ((p) ? htole32(f) : (f));	\
-} while(0)
+	*((u_int32_t *)HME_XD_FLAGS(b,i)) = ((p) ? htole32((f)) : (f));	\
+} while(/* CONSTCOND */ 0)
 #define HME_XD_SETADDR(p, b, i, a)	do {				\
-	*((u_int32_t *)HME_XD_ADDR(b,i)) = ((p) ? htole32(a) : (a));	\
-} while(0)
+	*((u_int32_t *)HME_XD_ADDR(b,i)) = ((p) ? htole32((a)) : (a));	\
+} while(/* CONSTCOND */ 0)
 
 /* Descriptor flag values */
 #define HME_XD_OWN	0x80000000	/* ownership: 1=hw, 0=sw */
