@@ -340,7 +340,7 @@ struct ip6_rthdr *rth;
 #endif 
 struct cmsghdr *cmsg;
 
-char *source = 0;
+char *source;
 char *hostname;
 
 int nprobes = 3;
@@ -369,7 +369,7 @@ main(argc, argv)
 	struct addrinfo hints, *res;
 	int ch, i, on, probe, seq, hops, rcvcmsglen;
 	static u_char *rcvcmsgbuf;
-	char hbuf[NI_MAXHOST];
+	char hbuf[NI_MAXHOST], src0[NI_MAXHOST];
 
 	/*
 	 * Receive ICMP
@@ -726,6 +726,13 @@ main(argc, argv)
 			perror("getsockname");
 			exit(1);
 		}
+		if (getnameinfo((struct sockaddr *)&Src, Src.sin6_len,
+				src0, sizeof(src0), NULL, 0,
+				NI_NUMERICHOST | niflag)) {
+			Fprintf(stderr, "getnameinfo failed for source\n");
+			exit(1);
+		}
+		source = src0;
 		close(dummy);
 	}
 
@@ -757,10 +764,13 @@ main(argc, argv)
 	if (getnameinfo((struct sockaddr *)&Dst, Dst.sin6_len, hbuf,
 			sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag))
 		strcpy(hbuf, "(invalid)");
-	Fprintf(stderr, "traceroute to %s (%s)", hostname, hbuf);
+	Fprintf(stderr, "IPv6 traceroute\n");
+	Fprintf(stderr, "  To: %s (%s)\n", hostname, hbuf);
 	if (source)
-		Fprintf(stderr, " from %s", source);
-	Fprintf(stderr, ", %d hops max, %d byte packets\n", max_hops, datalen);
+		Fprintf(stderr, "  From: %s\n", source);
+	Fprintf(stderr,
+		"  %d hops max, %d byte packets\n",
+		max_hops, datalen);
 	(void) fflush(stderr);
 
 	/*
