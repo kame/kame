@@ -86,8 +86,8 @@ extern u_char ip_protox[];
 
 #define ESPMAXLEN \
 	(sizeof(struct esp) < sizeof(struct newesp) \
-		? sizeof(struct newesp) \
-		: sizeof(struct esp))
+		? sizeof(struct newesp) : sizeof(struct esp))
+
 void
 #if __STDC__
 esp4_input(struct mbuf *m, ...)
@@ -206,8 +206,6 @@ esp4_input(m, va_alist)
 
 	/* check ICV */
     {
-	struct mbuf *n;
-	int len;
 	u_char sum0[AH_MAXSUMSIZE];
 	u_char sum[AH_MAXSUMSIZE];
 	struct ah_algorithm *sumalgo;
@@ -223,21 +221,7 @@ esp4_input(m, va_alist)
 		goto bad;
 	}
 
-	n = m;
-	len = m->m_pkthdr.len;
-	len -= siz;
-	while (n && 0 < len) {
-		if (len < n->m_len)
-			break;
-		len -= n->m_len;
-		n = n->m_next;
-	}
-	if (!n) {
-		ipseclog((LOG_DEBUG, "mbuf chain problem?\n"));
-		ipsecstat.in_inval++;
-		goto bad;
-	}
-	m_copydata(n, len, siz, &sum0[0]);
+	m_copydata(m, m->m_pkthdr.len - siz, siz, &sum0[0]);
 
 	if (esp_auth(m, off, m->m_pkthdr.len - off - siz, sav, sum)) {
 		ipseclog((LOG_WARNING, "auth fail in IPv4 ESP input: %s %s\n",
@@ -323,74 +307,11 @@ noreplaycheck:
 	m->m_flags |= M_DECRYPTED;
     }
 
-#ifdef garbled_data_found_on_mbuf_after_packet
-    {
 	/*
-	 * For simplicity, we'll trim the packet so that there's no extra
-	 * part appended after IP packet.
-	 * This is rare case for some odd drivers, so there should be no
-	 * performance hit.
-	 */
-
-	/*
-	 * Note that, in ip_input, ip_len was already flipped and header
-	 * length was subtracted from ip_len.
-	 */
-#ifdef IPLEN_FLIPPED
-	if (m->m_pkthdr.len != hlen + ip->ip_len)
-#else
-	if (m->m_pkthdr.len != hlen + ntohs(ip->ip_len))
-#endif
-	{
-		size_t siz;
-		struct mbuf *n;
-
-#ifdef IPLEN_FLIPPED
-		siz = hlen + ip->ip_len;
-#else
-		siz = hlen + ntohs(ip->ip_len);
-#endif
-
-		/* find the final mbuf */
-		for (n = m; n; n = n->m_next) {
-			if (n->m_len < siz)
-				siz -= n->m_len;
-			else
-				break;
-		}
-		if (!n) {
-			ipseclog((LOG_DEBUG, "invalid packet\n"));
-			ipsecstat.in_inval++;
-			goto bad;
-		}
-
-		/* trim the final mbuf */
-		if (n->m_len < siz) {
-			ipseclog((LOG_DEBUG,
-			    "invalid size: %d %d\n", n->m_len, siz));
-			ipsecstat.in_inval++;
-			goto bad;
-		}
-		n->m_len = siz;
-
-		/* dispose the rest of the packet */
-		m_freem(n->m_next);
-		n->m_next = NULL;
-
-#ifdef IPLEN_FLIPPED
-		m->m_pkthdr.len = hlen + ip->ip_len;
-#else
-		m->m_pkthdr.len = hlen + ntohs(ip->ip_len);
-#endif
-	}
-    }
-#endif
-
-	/*
-	 * grab content of ESP trailer.
+	 * find the trailer of the ESP.
 	 */
 	m_copydata(m, m->m_pkthdr.len - sizeof(esptail), sizeof(esptail),
-	    (caddr_t)&esptail);
+	     (caddr_t)&esptail);
 	nxt = esptail.esp_nxt;
 	taillen = esptail.esp_padlen + sizeof(esptail);
 
@@ -547,16 +468,15 @@ esp6_input(mp, offp, proto)
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, ESPMAXLEN, IPPROTO_DONE);
-	ip6 = mtod(m, struct ip6_hdr *);
 	esp = (struct esp *)(((u_int8_t *)ip6) + off);
 #else
-	ip6 = mtod(m, struct ip6_hdr *);
 	IP6_EXTHDR_GET(esp, struct esp *, m, off, ESPMAXLEN);
 	if (esp == NULL) {
 		ipsec6stat.in_inval++;
 		return IPPROTO_DONE;
 	}
 #endif
+	ip6 = mtod(m, struct ip6_hdr *);
 
 	if (ntohs(ip6->ip6_plen) == 0) {
 		ipseclog((LOG_ERR, "IPv6 ESP input: "
@@ -628,8 +548,6 @@ esp6_input(mp, offp, proto)
 
 	/* check ICV */
     {
-	struct mbuf *n;
-	size_t len;
 	u_char sum0[AH_MAXSUMSIZE];
 	u_char sum[AH_MAXSUMSIZE];
 	struct ah_algorithm *sumalgo;
@@ -645,21 +563,7 @@ esp6_input(mp, offp, proto)
 		goto bad;
 	}
 
-	n = m;
-	len = m->m_pkthdr.len;
-	len -= siz;	/*XXX*/
-	while (n && 0 < len) {
-		if (len < n->m_len)
-			break;
-		len -= n->m_len;
-		n = n->m_next;
-	}
-	if (!n) {
-		ipseclog((LOG_DEBUG, "mbuf chain problem?\n"));
-		ipsec6stat.in_inval++;
-		goto bad;
-	}
-	m_copydata(n, len, siz, &sum0[0]);
+	m_copydata(m, m->m_pkthdr.len - siz, siz, &sum0[0]);
 
 	if (esp_auth(m, off, m->m_pkthdr.len - off - siz, sav, sum)) {
 		ipseclog((LOG_WARNING, "auth fail in IPv6 ESP input: %s %s\n",
@@ -711,14 +615,12 @@ noreplaycheck:
 	if (m->m_pkthdr.len < off + esplen + ivlen + sizeof(esptail)) {
 		ipseclog((LOG_WARNING,
 		    "IPv6 ESP input: packet too short\n"));
-		ipsecstat.in_inval++;
+		ipsec6stat.in_inval++;
 		goto bad;
 	}
 
 #ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, esplen + ivlen, IPPROTO_DONE);
-	ip6 = mtod(m, struct ip6_hdr *);
-	esp = (struct esp *)(((u_int8_t *)ip6) + off);
+	IP6_EXTHDR_CHECK(m, off, esplen + ivlen, IPPROTO_DONE);	/*XXX*/
 #else
 	IP6_EXTHDR_GET(esp, struct esp *, m, off, esplen + ivlen);
 	if (esp == NULL) {
@@ -727,6 +629,7 @@ noreplaycheck:
 		goto bad;
 	}
 #endif
+	ip6 = mtod(m, struct ip6_hdr *);	/*set it again just in case*/
 
 	/*
 	 * decrypt the packet.
@@ -743,76 +646,13 @@ noreplaycheck:
 
 	m->m_flags |= M_DECRYPTED;
 
-#ifdef garbled_data_found_on_mbuf_after_packet
-    {
 	/*
-	 * For simplicity, we'll trim the packet so that there's no extra
-	 * part appended after IP packet.
-	 * This is rare case for some odd drivers, so there should be no
-	 * performance hit.
-	 */
-
-	/*
-	 * Note that, in ip_input, ip_len was already flipped and header
-	 * length was subtracted from ip_len.
-	 */
-#ifdef IPLEN_FLIPPED
-	if (m->m_pkthdr.len != hlen + ip->ip_len)
-#else
-	if (m->m_pkthdr.len != hlen + ntohs(ip->ip_len))
-#endif
-	{
-		size_t siz;
-		struct mbuf *n;
-
-#ifdef IPLEN_FLIPPED
-		siz = hlen + ip->ip_len;
-#else
-		siz = hlen + ntohs(ip->ip_len);
-#endif
-
-		/* find the final mbuf */
-		for (n = m; n; n = n->m_next) {
-			if (n->m_len < siz)
-				siz -= n->m_len;
-			else
-				break;
-		}
-		if (!n) {
-			ipseclog((LOG_DEBUG, "invalid packet\n"));
-			ipsec6stat.in_inval++;
-			goto bad;
-		}
-
-		/* trim the final mbuf */
-		if (n->m_len < siz) {
-			ipseclog((LOG_DEBUG,
-			    "invalid size: %d %d\n", n->m_len, siz));
-			ipsec6stat.in_inval++;
-			goto bad;
-		}
-		n->m_len = siz;
-
-		/* dispose the rest of the packet */
-		m_freem(n->m_next);
-		n->m_next = NULL;
-
-#ifdef IPLEN_FLIPPED
-		m->m_pkthdr.len = hlen + ip->ip_len;
-#else
-		m->m_pkthdr.len = hlen + ntohs(ip->ip_len);
-#endif
-	}
-    }
-#endif
-
-	/*
-	 * grab content of ESP trailer.
+	 * find the trailer of the ESP.
 	 */
 	m_copydata(m, m->m_pkthdr.len - sizeof(esptail), sizeof(esptail),
-	    (caddr_t)&esptail);
+	     (caddr_t)&esptail);
 	nxt = esptail.esp_nxt;
-	taillen = esptail.esp_padlen + 2;
+	taillen = esptail.esp_padlen + sizeof(esptail);
 
 	if (m->m_pkthdr.len < taillen
 	 || m->m_pkthdr.len - taillen < sizeof(struct ip6_hdr)) {	/*?*/
@@ -847,7 +687,7 @@ noreplaycheck:
 			 * but there's no other way!
 			 */
 #else
-			/* okay to pullup in m_pulldown world. */
+			/* okay to pullup in m_pulldown style */
 #endif
 			m = m_pullup(m, sizeof(*ip6));
 			if (!m) {
@@ -906,11 +746,28 @@ noreplaycheck:
 		stripsiz = esplen + ivlen;
 
 		ip6 = mtod(m, struct ip6_hdr *);
-		ovbcopy((caddr_t)ip6, (caddr_t)(((u_char *)ip6) + stripsiz),
-			off);
-		m->m_data += stripsiz;
-		m->m_len -= stripsiz;
-		m->m_pkthdr.len -= stripsiz;
+		if (m->m_len >= stripsiz + off) {
+			ovbcopy((caddr_t)ip6, ((caddr_t)ip6) + stripsiz, off);
+			m->m_data += stripsiz;
+			m->m_len -= stripsiz;
+			m->m_pkthdr.len -= stripsiz;
+		} else {
+			/* 
+			 * this comes with no copy if the boundary is on
+			 * cluster
+			 */
+			struct mbuf *n;
+
+			n = m_split(m, sizeof(*ip6), M_DONTWAIT);
+			if (n == NULL) {
+				/* m is retained by m_split */
+				goto bad;
+			}
+			m_adj(n, stripsiz);
+			m_cat(m, n);
+			/* m_cat does not update m_pkthdr.len */
+			m->m_pkthdr.len += n->m_pkthdr.len;
+		}
 
 		ip6 = mtod(m, struct ip6_hdr *);
 		ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - stripsiz);
