@@ -166,7 +166,7 @@ struct addrinfo {
 #define	AI_CANONNAME	0x00000002 /* fill ai_canonname */
 #define	AI_NUMERICHOST	0x00000004 /* prevent name resolution */
 #define	AI_NUMERICSERV	0x00000008 /* prevent service name resolution */
-/* valid flags for addrinfo */
+/* valid flags for getaddrinfo (not standard mask, apps should not use it) */
 #define AI_MASK \
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV | \
      AI_ADDRCONFIG)
@@ -175,6 +175,8 @@ struct addrinfo {
 #define	AI_V4MAPPED_CFG	0x00000200 /* accept IPv4-mapped if kernel supports */
 #define	AI_ADDRCONFIG	0x00000400 /* only if any address is assigned */
 #define	AI_V4MAPPED	0x00000800 /* accept IPv4-mapped IPv6 address */
+#define AI_NUMERICSERV	0x00001000 /* prevent service resolution */
+
 /* special recommended flags for getipnodebyname */
 #define	AI_DEFAULT	(AI_V4MAPPED_CFG | AI_ADDRCONFIG)
 
