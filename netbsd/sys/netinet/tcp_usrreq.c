@@ -299,7 +299,7 @@ tcp_usrreq(so, req, m, nam, control, p)
 			break;
 #ifdef INET6
 		case PF_INET6:
-			error = in6_pcbbind(in6p, nam /*, p*/ );
+			error = in6_pcbbind(in6p, nam, p);
 			/* mapped addr case */
 			if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
 				tp->t_family = AF_INET;
@@ -320,8 +320,8 @@ tcp_usrreq(so, req, m, nam, control, p)
 		}
 #ifdef INET6
 		else if (in6p && in6p->in6p_lport == 0) {
-			error = in6_pcbbind(in6p, (struct mbuf *)0 /*,
-			    (struct proc *)0 */ );
+			error = in6_pcbbind(in6p, (struct mbuf *)0,
+			    (struct proc *)0);
 			if (error)
 				break;
 		}
@@ -349,8 +349,8 @@ tcp_usrreq(so, req, m, nam, control, p)
 #ifdef INET6
 		else if (in6p) {
 			if (in6p->in6p_lport == 0) {
-				error = in6_pcbbind(in6p, (struct mbuf *)0 /*,
-				    (struct proc *)0 */ );
+				error = in6_pcbbind(in6p, (struct mbuf *)0,
+				    (struct proc *)0);
 				if (error)
 					break;
 			}

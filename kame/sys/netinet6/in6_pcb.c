@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.43 2000/05/28 23:25:07 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.44 2000/06/02 12:14:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -149,15 +149,22 @@ in6_pcballoc(so, head)
 	return(0);
 }
 
+#ifdef __NetBSD__
+int
+in6_pcbbind(in6p, nam, p)
+	register struct in6pcb *in6p;
+	struct mbuf *nam;
+	struct proc *p;
+#else
 int
 in6_pcbbind(in6p, nam)
 	register struct in6pcb *in6p;
 	struct mbuf *nam;
+#endif
 {
 	struct socket *so = in6p->in6p_socket;
 	struct in6pcb *head = in6p->in6p_head;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)NULL;
-	struct proc *p = curproc;		/* XXX */
 	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 	int error;
@@ -439,8 +446,14 @@ in6_pcbconnect(in6p, nam)
 	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)
 	 || (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
 	  && in6p->in6p_laddr.s6_addr32[3] == 0)) {
-		if (in6p->in6p_lport == 0)
+		if (in6p->in6p_lport == 0) {
+#ifdef __NetBSD__
+			(void)in6_pcbbind(in6p, (struct mbuf *)0,
+			    (struct proc *)0);
+#else
 			(void)in6_pcbbind(in6p, (struct mbuf *)0);
+#endif
+		}
 		in6p->in6p_laddr = *in6a;
 	}
 	in6p->in6p_faddr = sin6->sin6_addr;

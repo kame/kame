@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.51 2000/06/05 00:14:31 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.52 2000/06/05 00:41:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -902,10 +902,11 @@ udp6_usrreq(so, req, m, addr6, control)
 	case PRU_BIND:
 #ifdef __NetBSD__
 		s = splsoftnet();
+		error = in6_pcbbind(in6p, addr6, p);
 #else
 		s = splnet();
-#endif
 		error = in6_pcbbind(in6p, addr6);
+#endif
 		splx(s);
 		break;
 

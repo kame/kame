@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.23 2000/03/25 07:23:44 sumikawa Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.24 2000/04/04 08:48:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -149,7 +149,11 @@ struct	in6pcb {
 #ifdef _KERNEL
 void	in6_losing __P((struct in6pcb *));
 int	in6_pcballoc __P((struct socket *, struct in6pcb *));
+#ifdef __NetBSD__
+int	in6_pcbbind __P((struct in6pcb *, struct mbuf *, struct proc *));
+#else
 int	in6_pcbbind __P((struct in6pcb *, struct mbuf *));
+#endif
 int	in6_pcbconnect __P((struct in6pcb *, struct mbuf *));
 void	in6_pcbdetach __P((struct in6pcb *));
 void	in6_pcbdisconnect __P((struct in6pcb *));
