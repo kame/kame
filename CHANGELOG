@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.922 2000/05/23 16:32:20 itojun Exp $
+$Id: CHANGELOG,v 1.923 2000/05/24 05:33:04 sakane Exp $
 
 <200005>
+Wed May 24 14:32:44 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	supported pre-shared key written by hex string.
+
 Wed May 24 01:29:46 JST 2000  itojun@iijlab.net
 	* netbsd/usr.sbin/pppd: pppd with IPv6 support.  from netbsd-current.
 	* netbsd/sys/net/if_ppp.c: async ppp kernel code with IPv6 support.
