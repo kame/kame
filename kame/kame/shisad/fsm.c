@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.20 2005/03/03 06:25:35 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.21 2005/03/03 19:17:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -993,6 +993,12 @@ bul_reg_fsm(bul, event, data)
 
 			REGFSMS = MIP6_BUL_REG_FSM_STATE_BOUND;
 
+#if 0
+			/*
+			 * no need to update binding update entries of
+			 * correspondent nodes when re-registration.
+			 */
+
 			/*
 			 * home registration has been completed.
 			 * notify all binding update list entries of
@@ -1000,6 +1006,7 @@ bul_reg_fsm(bul, event, data)
 			 * registration.
 			 */
 			bul_fsm_send_registered_event(bul);
+#endif
 
 			break;
 
