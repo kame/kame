@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.190 2002/01/31 14:14:54 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.191 2002/02/03 11:27:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -295,7 +295,7 @@ nd6_ra_input(m, off, icmp6len)
 #endif
 
 	Bzero(&dr0, sizeof(dr0));
-	dr0.rtaddr = src_sa6->sin6_addr;
+	dr0.rtaddr = *src_sa6;
 	dr0.flags  = nd_ra->nd_ra_flags_reserved;
 	dr0.rtlifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	dr0.expire = time_second + dr0.rtlifetime;
@@ -567,12 +567,14 @@ defrouter_addreq(new)
 
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
-	Bzero(&gate, sizeof(gate));
+	Bzero(&gate, sizeof(gate)); /* for safety */
 
-	def.sin6_len = mask.sin6_len = gate.sin6_len
-		= sizeof(struct sockaddr_in6);
-	def.sin6_family = mask.sin6_family = gate.sin6_family = AF_INET6;
-	gate.sin6_addr = new->rtaddr;
+	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
+	def.sin6_family = mask.sin6_family = AF_INET6;
+	gate = new->rtaddr;
+#ifndef SCOPEDROUTING
+	gate.sin6_scope_id = 0;	/* XXX */
+#endif
 
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -696,15 +698,26 @@ defrouter_delifreq()
 
 struct nd_defrouter *
 defrouter_lookup(addr, ifp)
-	struct in6_addr *addr;
+	struct sockaddr_in6 *addr;
 	struct ifnet *ifp;
 {
 	struct nd_defrouter *dr;
 
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
-		if (dr->ifp == ifp && IN6_ARE_ADDR_EQUAL(addr, &dr->rtaddr))
+		if (dr->ifp == ifp &&
+#ifdef SCOPEDROUTING
+		    SA6_ARE_ADDR_EQUAL(addr, &dr->rtaddr)
+#else
+		    /*
+		     * XXX: when addr comes from the routing table, it does
+		     * not have a valid scope zone ID.
+		     */
+		    IN6_ARE_ADDR_EQUAL(&addr->sin6_addr, &dr->rtaddr.sin6_addr)
+#endif
+			) {
 			return(dr);
+		}
 	}
 
 	return(NULL);		/* search failed */
@@ -721,10 +734,8 @@ defrtrlist_del(dr)
 	 * Flush all the routing table entries that use the router
 	 * as a next hop.
 	 */
-	if (!ip6_forwarding && ip6_accept_rtadv) {
-		/* above is a good condition? */
+	if (!ip6_forwarding && ip6_accept_rtadv) /* XXX: better condition? */
 		rt6_flush(&dr->rtaddr, dr->ifp);
-	}
 
 	if (dr->installed) {
 		deldr = dr;
@@ -767,13 +778,14 @@ defrouter_delreq(dr)
 
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
-	Bzero(&gw, sizeof(gw));
+	Bzero(&gw, sizeof(gw));	/* for safety */
 
-	def.sin6_len = mask.sin6_len = gw.sin6_len =
-	    sizeof(struct sockaddr_in6);
-	def.sin6_family = mask.sin6_family = gw.sin6_family = AF_INET6;
-	if (dr)
-		gw.sin6_addr = dr->rtaddr;
+	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
+	def.sin6_family = mask.sin6_family = AF_INET6;
+	gw = dr->rtaddr;
+#ifndef SCOPEDROUTING
+	gw.sin6_scope_id = 0;	/* XXX */
+#endif
 
 	rtrequest(RTM_DELETE, (struct sockaddr *)&def,
 	    dr ? (struct sockaddr *)&gw : NULL,
@@ -911,7 +923,7 @@ defrouter_select()
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
 		if (!selected_dr &&
-		    (rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
+		    (rt = nd6_lookup(&dr->rtaddr.sin6_addr, 0, dr->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			selected_dr = dr;
@@ -939,7 +951,7 @@ defrouter_select()
 		else
  			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
 	} else if (installed_dr &&
-		   (rt = nd6_lookup(&installed_dr->rtaddr, 0,
+		   (rt = nd6_lookup(&installed_dr->rtaddr.sin6_addr, 0,
 				    installed_dr->ifp)) &&
 		   (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		   ND6_IS_LLINFO_PROBREACH(ln) &&
@@ -1592,7 +1604,7 @@ find_pfxlist_reachable_router(pr)
 
 	for (pfxrtr = LIST_FIRST(&pr->ndpr_advrtrs); pfxrtr;
 	     pfxrtr = LIST_NEXT(pfxrtr, pfr_entry)) {
-		if ((rt = nd6_lookup(&pfxrtr->router->rtaddr, 0,
+		if ((rt = nd6_lookup(&pfxrtr->router->rtaddr.sin6_addr, 0,
 				     pfxrtr->router->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln))
@@ -2297,7 +2309,7 @@ in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
  */
 void
 rt6_flush(gateway, ifp)
-	struct in6_addr *gateway;
+	struct sockaddr_in6 *gateway;
 	struct ifnet *ifp;
 {
 	struct radix_node_head *rnh = rt_tables[AF_INET6];
@@ -2308,12 +2320,10 @@ rt6_flush(gateway, ifp)
 #endif
 
 	/* We'll care only link-local addresses */
-	if (!IN6_IS_ADDR_LINKLOCAL(gateway)) {
+	if (!IN6_IS_ADDR_LINKLOCAL(&gateway->sin6_addr)) {
 		splx(s);
 		return;
 	}
-	/* XXX: hack for KAME's link-local address kludge */
-	gateway->s6_addr16[1] = htons(ifp->if_index);
 
 	rnh->rnh_walktree(rnh, rt6_deleteroute, (void *)gateway);
 	splx(s);
@@ -2326,13 +2336,20 @@ rt6_deleteroute(rn, arg)
 {
 #define SIN6(s)	((struct sockaddr_in6 *)s)
 	struct rtentry *rt = (struct rtentry *)rn;
-	struct in6_addr *gate = (struct in6_addr *)arg;
+	struct sockaddr_in6 *gate = (struct sockaddr_in6 *)arg;
 
 	if (rt->rt_gateway == NULL || rt->rt_gateway->sa_family != AF_INET6)
 		return(0);
 
-	if (!IN6_ARE_ADDR_EQUAL(gate, &SIN6(rt->rt_gateway)->sin6_addr))
+#ifdef SCOPEDROUTING
+	if (!SA6_ARE_ADDR_EQUAL(gate, SIN6(rt->rt_gateway)))
 		return(0);
+#else
+	if (!IN6_ARE_ADDR_EQUAL(&gate->sin6_addr,
+				&SIN6(rt->rt_gateway)->sin6_addr)) {
+		return(0);
+	}
+#endif
 
 	/*
 	 * Do not delete a static route.

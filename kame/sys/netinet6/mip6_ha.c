@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.32 2002/01/17 05:24:03 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.33 2002/02/03 11:27:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -198,7 +198,7 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 
 	if ((mha_list == NULL) ||
 	    (dr == NULL) ||
-	    !IN6_IS_ADDR_LINKLOCAL(&dr->rtaddr)) {
+	    !IN6_IS_ADDR_LINKLOCAL(&dr->rtaddr.sin6_addr)) {
 		return (EINVAL);
 	}
 
@@ -209,7 +209,7 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	}
 
 	/* find an exising entry. */
-	lladdr = dr->rtaddr;
+	lladdr = dr->rtaddr.sin6_addr; /* XXX: scope */
 	/* XXX: KAME link-local hack; remove ifindex */
 	lladdr.s6_addr16[1] = 0;
 	mha = mip6_ha_list_find_withaddr(mha_list, &lladdr);

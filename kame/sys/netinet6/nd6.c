@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.222 2002/01/31 14:14:53 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.223 2002/02/03 11:27:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1085,7 +1085,6 @@ nd6_free(rt, gc)
 	int gc;
 {
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo, *next;
-	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 	struct nd_defrouter *dr;
 
 	/*
@@ -1100,7 +1099,7 @@ nd6_free(rt, gc)
 #else
 		s = splnet();
 #endif
-		dr = defrouter_lookup(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
+		dr = defrouter_lookup((struct sockaddr_in6 *)rt_key(rt),
 				      rt->rt_ifp);
 
 		if (dr != NULL && dr->expire &&
@@ -1123,12 +1122,24 @@ nd6_free(rt, gc)
 		}
 
 		if (ln->ln_router || dr) {
+			struct sockaddr_in6 sin6;
+			int e = 0; /* XXX */
+
+			sin6 = *((struct sockaddr_in6 *)rt_key(rt));
 			/*
 			 * rt6_flush must be called whether or not the neighbor
 			 * is in the Default Router List.
 			 * See a corresponding comment in nd6_na_input().
 			 */
-			rt6_flush(&in6, rt->rt_ifp);
+#ifndef SCOPEDROUTING
+			/* sin6 may not have a valid sin6_scope_id */
+			e = in6_recoverscope(&sin6, &sin6.sin6_addr, NULL);
+			if (e == 0) { /* XXX */
+				sin6.sin6_addr = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
+			}
+#endif
+			if (e == 0)
+				rt6_flush(&sin6, rt->rt_ifp);
 		}
 
 		if (dr) {
@@ -1543,16 +1554,8 @@ nd6_ioctl(cmd, data, ifp)
 #endif
 		dr = TAILQ_FIRST(&nd_defrouter);
 		while (dr && i < DRLSTSIZ) {
-			drl->defrouter[i].rtaddr = dr->rtaddr;
-			if (IN6_IS_ADDR_LINKLOCAL(&drl->defrouter[i].rtaddr)) {
-				/* XXX: need to this hack for KAME stack */
-				drl->defrouter[i].rtaddr.s6_addr16[1] = 0;
-			} else
-				log(LOG_ERR,
-				    "default router list contains a "
-				    "non-linklocal address(%s)\n",
-				    ip6_sprintf(&drl->defrouter[i].rtaddr));
-
+			drl->defrouter[i].rtaddr = dr->rtaddr.sin6_addr;
+			in6_clearscope(&drl->defrouter[i].rtaddr);
 			drl->defrouter[i].flags = dr->flags;
 			drl->defrouter[i].rtlifetime = dr->rtlifetime;
 			drl->defrouter[i].expire = dr->expire;
@@ -1614,16 +1617,8 @@ nd6_ioctl(cmd, data, ifp)
 			while (pfr) {
 				if (j < DRLSTSIZ) {
 #define RTRADDR oprl->prefix[i].advrtr[j]
-					RTRADDR = pfr->router->rtaddr;
-					if (IN6_IS_ADDR_LINKLOCAL(&RTRADDR)) {
-						/* XXX: hack for KAME */
-						RTRADDR.s6_addr16[1] = 0;
-					} else
-						log(LOG_ERR,
-						    "a router(%s) advertises "
-						    "a prefix with "
-						    "non-link local address\n",
-						    ip6_sprintf(&RTRADDR));
+					RTRADDR = pfr->router->rtaddr.sin6_addr;
+					in6_clearscope(&RTRADDR);
 #undef RTRADDR
 				}
 				j++;
@@ -2505,14 +2500,8 @@ fill_drlist(req)
 #endif
 		    d + 1 <= de) {
 			bzero(d, sizeof(*d));
-			d->rtaddr.sin6_family = AF_INET6;
-			d->rtaddr.sin6_len = sizeof(d->rtaddr);
-			if (in6_recoverscope(&d->rtaddr, &dr->rtaddr,
-					     dr->ifp) != 0)
-				log(LOG_ERR,
-				    "scope error in "
-				    "default router list (%s)\n",
-				    ip6_sprintf(&dr->rtaddr));
+			d->rtaddr = dr->rtaddr;
+			in6_clearscope(&d->rtaddr);
 			d->flags = dr->flags;
 			d->rtlifetime = dr->rtlifetime;
 			d->expire = dr->expire;
@@ -2650,15 +2639,8 @@ fill_prlist(req)
 #else
 				s6 = &advrtr;
 #endif
-				bzero(s6, sizeof(*s6));
-				s6->sin6_family = AF_INET6;
-				s6->sin6_len = sizeof(*s6);
-				if (in6_recoverscope(s6, &pfr->router->rtaddr,
-						     pfr->router->ifp) != 0) {
-					log(LOG_ERR, "scope error in "
-					    "prefix list (%s)\n",
-					    ip6_sprintf(&pfr->router->rtaddr));
-				}
+				*s6 = pfr->router->rtaddr;
+				in6_clearscope(&s6->sin6_addr);
 #ifdef __FreeBSD__
 				SYSCTL_OUT(req, s6, sizeof(*s6));
 #endif

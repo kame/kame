@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.88 2002/02/02 07:06:13 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.89 2002/02/03 11:27:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -677,9 +677,7 @@ nd6_na_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_neighbor_advert *nd_na;
-#if 0
-	struct in6_addr saddr6 = ip6->ip6_src;
-#endif
+	struct sockaddr_in6 *saddr6;
 	struct sockaddr_in6 taddr6;
 	int flags;
 	int is_router;
@@ -714,6 +712,11 @@ nd6_na_input(m, off, icmp6len)
 		return;
 	}
 #endif
+
+	if (ip6_getpktaddrs(m, &saddr6, NULL))
+		goto bad;	/* should be impossible */
+
+
 	flags = nd_na->nd_na_flags_reserved;
 	is_router = ((flags & ND_NA_FLAG_ROUTER) != 0);
 	is_solicited = ((flags & ND_NA_FLAG_SOLICITED) != 0);
@@ -917,10 +920,7 @@ nd6_na_input(m, off, icmp6len)
 			 * update the Destination Cache entries.
 			 */
 			struct nd_defrouter *dr;
-			struct in6_addr *in6;
 			int s;
-
-			in6 = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 
 			/*
 			 * Lock to protect the default router list.
@@ -933,7 +933,8 @@ nd6_na_input(m, off, icmp6len)
 #else
 			s = splnet();
 #endif
-			dr = defrouter_lookup(in6, rt->rt_ifp);
+			dr = defrouter_lookup((struct sockaddr_in6 *)rt_key(rt),
+					      rt->rt_ifp);
 			if (dr)
 				defrtrlist_del(dr);
 			else if (!ip6_forwarding && ip6_accept_rtadv) {
@@ -944,7 +945,7 @@ nd6_na_input(m, off, icmp6len)
 				 * (e.g. redirect case). So we must
 				 * call rt6_flush explicitly.
 				 */
-				rt6_flush(&ip6->ip6_src, rt->rt_ifp);
+				rt6_flush(saddr6, rt->rt_ifp);
 			}
 			splx(s);
 		}
