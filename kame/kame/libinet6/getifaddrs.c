@@ -210,7 +210,10 @@ getifaddrs(struct ifaddrs **pif)
 		dcnt += SA_RLEN(sa);
 		ncnt += sizeof(ifr->ifr_name) + 1;
 		
-		ifr = (struct ifreq *)(((char *)sa) + SA_LEN(sa));
+		if (SA_LEN(sa) < sizeof(*sa))
+			ifr = (struct ifreq *)(((char *)sa) + sizeof(*sa));
+		else
+			ifr = (struct ifreq *)(((char *)sa) + SA_LEN(sa));
 	}
 #endif	/* NET_RT_IFLIST */
 
