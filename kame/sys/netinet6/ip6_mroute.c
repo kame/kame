@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.52 2001/09/14 06:05:10 sumikawa Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.53 2001/09/20 07:53:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -172,11 +172,6 @@ static mifi_t nummifs = 0;
 static mifi_t reg_mif_num = (mifi_t)-1;
 
 static struct pim6stat pim6stat;
-
-/*
- * one-back cache used by ipip_input to locate a tunnel's mif
- * given a datagram's src ip address.
- */
 static int pim6;
 
 /*
