@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1702 2001/05/31 23:49:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.1703 2001/06/01 05:42:58 jinmei Exp $
 
 <200106>
+2001-06-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_reflect): used the default
+	hoplimit value when rcvif is NULL.  Without the change, icmp6
+	error packets would be sent with 0 hoplimit.
+	All KAME snaps after the following change should be updated:
+	Wed Apr  4 19:49:39 JST 2001  itojun@iijlab.net.
+
 2001-06-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_cache_lladdr): when the link-layer
 	address of a router changes, select the best router again.  This
