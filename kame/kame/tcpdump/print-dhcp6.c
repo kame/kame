@@ -22,7 +22,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-bootp.c,v 1.1.1.1 1999/08/08 23:32:03 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.1 1999/09/11 04:43:49 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -59,7 +59,7 @@ dhcp6_print(register const u_char *cp, u_int length,
 {
 	union dhcp6 *dh6;
 
-	printf(" dhcp6");
+	printf("dhcp6");
 
 	dh6 = (union dhcp6 *)cp;
 	TCHECK(dh6->dh6_msgtype);
@@ -68,25 +68,35 @@ dhcp6_print(register const u_char *cp, u_int length,
 		if (vflag && TTEST(dh6->dh6_sol.dh6sol_relayaddr)) {
 			printf(" solicit(");
 			if ((dh6->dh6_sol.dh6sol_flags & DH6SOL_CLOSE) != 0)
-				printf("C ");
-			printf("cliaddr=%s ",
+				printf("C");
+			if (dh6->dh6_sol.dh6sol_flags != 0)
+				printf(" ");
+			printf("cliaddr=%s",
 				ip6addr_string(&dh6->dh6_sol.dh6sol_cliaddr));
-			printf("relayaddr=%s", 
+			printf(" relayaddr=%s", 
 				ip6addr_string(&dh6->dh6_sol.dh6sol_relayaddr));
 			printf(")");
 		} else
 			printf(" solicit");
 		break;
 	case DH6_ADVERT:
-		if (vflag && TTEST(dh6->dh6_adv.dh6adv_serveraddr)) {
-			printf(" advert(");
-			if ((dh6->dh6_adv.dh6adv_flags & DH6ADV_SERVPRESENT) != 0)
-				printf("S");
-			if ((dh6->dh6_adv.dh6adv_flags & DH6ADV_SERVPREF) != 0)
-				printf("P");
-			printf(")");
-		} else
+		if (!(vflag && TTEST(dh6->dh6_adv.dh6adv_serveraddr))) {
 			printf(" advert");
+			break;
+		}
+		printf(" advert(");
+		if ((dh6->dh6_adv.dh6adv_flags & DH6ADV_SERVPRESENT) != 0)
+			printf("S");
+		if (dh6->dh6_adv.dh6adv_flags != 0)
+			printf(" ");
+		printf("pref=%u", dh6->dh6_adv.dh6adv_pref);
+		printf(" cliaddr=%s",
+			ip6addr_string(&dh6->dh6_adv.dh6adv_cliaddr));
+		printf(" relayaddr=%s", 
+			ip6addr_string(&dh6->dh6_adv.dh6adv_relayaddr));
+		printf(" servaddr=%s", 
+			ip6addr_string(&dh6->dh6_adv.dh6adv_serveraddr));
+		printf(")");
 		break;
 	case DH6_REQUEST:
 		printf(" request");
