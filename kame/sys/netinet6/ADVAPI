@@ -1,0 +1,80 @@
+mark the items you are working on, to avoid duplicated work.
+$Id: ADVAPI,v 1.1 1999/08/05 16:51:42 itojun Exp $
+
+---
+2.  Common Structures and Definitions
+   2.1.  The ip6_hdr Structure
+        2.1.1.  IPv6 Next Header Values			done 971029/kazu
+        2.1.2.  IPv6 Extension Headers			done 971031/kazu
+   2.2.  The icmp6_hdr Structure			done 971029/itojun
+        2.2.1.  ICMPv6 Type and Code Values		done 971029/itojun
+        2.2.2.  ICMPv6 Neighbor Discovery Type and Code Values
+							done 971029/itojun
+   2.3.  Address Testing Macros				done 971028/itojun
+   2.4.  Protocols File					done 971029/itojun
+
+3.  IPv6 Raw Sockets
+   3.1.  Checksums					done 980526/itojun
+   3.2.  ICMPv6 Type Filtering				done 971116/itojun
+
+4.  Ancillary Data
+   4.1.  The msghdr Structure				done 971222/itojun
+   4.2.  The cmsghdr Structure				done 971222/itojun
+   4.3.  Ancillary Data Object Macros			done 971222/itojun
+        4.3.1.  CMSG_FIRSTHDR	
+        4.3.2.  CMSG_NXTHDR
+        4.3.3.  CMSG_DATA
+        4.3.4.  CMSG_SPACE
+        4.3.5.  CMSG_LEN
+   4.4.  Summary of Options Described Using Ancillary Data
+   4.5.  IPV6_PKTOPTIONS Socket Option
+        4.5.1.  TCP Sticky Options			done 980217/jinmei
+        4.5.2.  UDP and Raw Socket Sticky Options	done 980217/jinmei
+
+5.  Packet Information
+   5.1.  Specifying/Receiving the Interface		input ok 971222/itojun
+							output ok 980224/jinmei
+   5.2.  Specifying/Receiving Source/Destination Address
+							input ok 971222/itojun
+							output ok 980224/jinmei
+   5.3.  Specifying/Receiving the Hop Limit		done 971222/itojun
+   5.4.  Specifying the Next Hop Address
+   5.5.  Additional Errors with sendmsg()		done 980217/jinmei
+
+6.  Hop-By-Hop Options
+   6.1.  Receiving Hop-by-Hop Options			done 990411/jinmei
+   6.2.  Sending Hop-by-Hop Options			done 9808??/jinmei
+   6.3.  Hop-by-Hop and Destination Options Processing
+        6.3.1.  inet6_option_space			done 980722/jinmei
+        6.3.2.  inet6_option_init			done 980722/jinmei
+        6.3.3.  inet6_option_append			done 980722/jinmei
+        6.3.4.  inet6_option_alloc			done 990411/jinmei
+        6.3.5.  inet6_option_next			done 990411/jinmei
+        6.3.6.  inet6_option_find			done 990411/jinmei
+        6.3.7.  Options Examples			nothing to be done
+
+7.  Destination Options
+   7.1.  Receiving Destination Options			done 990411/jinmei
+   7.2.  Sending Destination Options			done 990513/jinmei
+
+8.  Routing Header Option
+   8.1.  inet6_rthdr_space				done 980217/jinmei
+   8.2.  inet6_rthdr_init				done 980217/jinmei
+   8.3.  inet6_rthdr_add				done 980217/jinmei
+   8.4.  inet6_rthdr_lasthop				done 980217/jinmei
+   8.5.  inet6_rthdr_reverse
+   8.6.  inet6_rthdr_segments				done 980526/itojun
+   8.7.  inet6_rthdr_getaddr				done 980526/itojun
+   8.8.  inet6_rthdr_getflags				done 980526/itojun
+   8.9.  Routing Header Example
+
+9.  Ordering of Ancillary Data and IPv6 Extension Headers
+
+10.  IPv6-Specific Options with IPv4-Mapped IPv6 Addresses
+
+11.  rresvport_af					done 980115/kazu
+
+12.  Future Items
+   12.1.  Flow Labels
+   12.2.  Path MTU Discovery and UDP
+   12.3.  Neighbor Reachability and UDP
