@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.77 2001/01/18 14:38:34 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.78 2001/01/21 03:45:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -965,7 +965,9 @@ in6_ifattach(ifp, altifp)
 		}
 	}
 
-	if (ifp->if_flags & IFF_POINTOPOINT) {
+	if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
+		int e;
+
 		/*
 		 * route local address to loopback
 		 */
@@ -977,12 +979,17 @@ in6_ifattach(ifp, altifp)
 		mask.sin6_len = sizeof(struct sockaddr_in6);
 		mask.sin6_family = AF_INET6;
 		mask.sin6_addr = in6mask64;
-		rtrequest(RTM_ADD,
-			  (struct sockaddr *)&ia->ia_addr,
-			  (struct sockaddr *)&gate,
-			  (struct sockaddr *)&mask,
-			  RTF_UP|RTF_HOST,
-			  (struct rtentry **)0);
+		e = rtrequest(RTM_ADD,
+			      (struct sockaddr *)&ia->ia_addr,
+			      (struct sockaddr *)&gate,
+			      (struct sockaddr *)&mask,
+			      RTF_UP|RTF_HOST,
+			      (struct rtentry **)0);
+		if (e) {
+			printf("in6_ifattach: failed to set a loopback route up "
+			       "(errno=%d).\n", e);
+			/* XXX: what should we think about such a situation? */
+		}
 	}
 
 	/*
