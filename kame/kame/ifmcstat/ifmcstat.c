@@ -119,11 +119,6 @@ void in6_addr_slistentry(struct in6_addr_slist *ias, char *heading);
 #endif
 
 #if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
-#ifdef __bsdi__
-struct ether_addr {
-	u_int8_t ether_addr_octet[6];
-};
-#endif
 static char *ether_ntoa __P((struct ether_addr *));
 #endif
 
@@ -572,9 +567,7 @@ if_addrlist(ifap)
 			goto nextifap;
 		KREAD(ifap, &ia, struct in_ifaddr);
 		printf("\tinet %s\n", inet_ntoa(ia.ia_addr.sin_addr));
-#ifdef __bsdi__
-		mc = mc ? mc : ia.ia_multiaddrs;
-#elif !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		mc = mc ? mc : ia.ia_multiaddrs.lh_first;
 #endif
 	nextifap:
@@ -647,9 +640,6 @@ in_multientry(mc)
 #ifdef HAVE_IGMPV3
 	struct in_multi_source src;
 #endif
-#ifdef __bsdi__
-#define rti_type type
-#endif
 
 	KREAD(mc, &multi, struct in_multi);
 	printf("\t\tgroup %s\n", inet_ntoa(multi.inm_addr));
@@ -699,14 +689,7 @@ in_multientry(mc)
 #endif
 	}
 
-#ifdef __bsdi__
-	return (multi.inm_next);
-#else
 	return (multi.inm_list.le_next);
-#endif
-#ifdef __bsdi__
-#undef rti_type
-#endif
 }
 
 #ifdef HAVE_IGMPV3
