@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: mtrace6.8,v 1.2 1999/09/12 03:55:46 jinmei Exp $
+.\"     $Id: mtrace6.8,v 1.3 1999/09/12 17:03:18 jinmei Exp $
 .\"
 .Dd Sep 12, 1999
 .Dt MTRACE6 8
@@ -38,6 +38,7 @@ a receiver
 .Nm
 .Op Fl d Ar destination
 .Op Fl g Ar gateway
+.Op Fl h Ar hops
 .Op Fl i Ar interface
 .Op Fl m Ar maxhops
 .Op Fl n
@@ -46,10 +47,67 @@ a receiver
 .Ar source
 .Ar group
 .Sh DESCRIPTION
-To be written.
+.Nm
+utilizes a tracing feature implemented in multicast routers that is
+accessed via an extension to the MLD protocol. A trace query is
+passed hop-by-hop along the reverse path from the
+.Ar destination
+to the
+.Ar source ,
+collecting hop addresses, packet counts, and routing error conditions
+along the path, and then the response is returned to the requestor.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl d Ar destination
+Specifies the multicast receiver that the query wants to trace.
+It is the host running
+.Nm mtrace6
+by default.
+.It Fl g Ar gateway
+Send the trace query via unicast directly to the multicast router
+.Ar gateway .
+The unicast router must be the last-hop router on the path from the
+intended source to the receiver.
+.Ar gateway
+can also be a multicast address that the last hop router joins.
+.It Fl h Ar hops
+Set
+.Ar hops
+to the IPv6 hop limit field of query packets. The default is 64.
+.It Fl i Ar interface
+Specifies the local interface (on a multi-homed host) for sending
+the trace query and as the default for the receiver and the response
+destination.
+.It Fl m Ar maxhops
+Set to
+.Ar maxhops
+to the maximum number of hops that will be traced from the receiver
+back toward the source. The default is 127 hops.
+.It Fl n
+Print hop addresses numerically rather than symbolically and numerically
+(saves a nameserver address-to-name lookup for each router found on
+the path).
+.It Fl r Ar response_addr
+Specify the host that the trace response sends to.
+By default, the response will send to the host running
+.Nm mtrace6 .
+.It Fl w Ar waittime
+Set the time to wait for a trace response to 
+.Ar waittime
+seconds. The default is 3 seconds.
+.El
 .Sh SEE ALSO
 .Xr pim6dd 8 ,
-.Xr pim6sd 8
+.Xr pim6sd 8 ,
+.Xr mtrace 8
+.Sh BUGS
+Multicast trace for IPv6 is experimental. MLD types for query and
+response, and packet format are not officially defined.
+.Pp
+.Ar waittime
+specified by the
+.Fl w
+option is currently meaningless.
 .Sh HISTORY
 The
 .Nm mtrace6
