@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2615 2004/06/02 06:01:52 suz Exp $
+$KAME: CHANGELOG,v 1.2616 2004/06/06 15:09:19 suz Exp $
 
 <200406>
+2004-06-06  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/pim6sd/mld6.c: discard MLDv2 packets with hoplimit != 1
+	(draft-vida-mld-v2-08.txt section 6.2 mandates it, although 
+	RFC2710 does not explicitly mention it).
+
 2004-06-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): do not check
 	the current process or thread in the input path.  It is

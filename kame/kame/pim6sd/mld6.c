@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.50 2004/04/18 15:03:13 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.51 2004/06/06 15:09:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -370,7 +370,12 @@ accept_mld6(recvlen)
 		log_msg(LOG_WARNING, 0,
 		    "received an MLD6 message with illegal hop limit(%d) from %s",
 		    *hlimp, sa6_fmt(src));
-		/* but accept the packet */
+		/* 
+		 * But accept the packet in case of MLDv1, since RFC2710
+		 * does not mention whether to discard such MLD packets or not.
+		 * Whereas in case of MLDv2, it'll be discarded as is stated in
+		 * draft-vida-mld-v2-08.txt section 6.2.
+		 */
 	}
 	if (ifindex == 0)
 	{
@@ -410,8 +415,11 @@ accept_mld6(recvlen)
 			accept_listener_query(src, dst, group,
 					      ntohs(mldh->mld_maxdelay));
 #ifdef MLD6V2_LISTENER_REPORT
-		if (recvlen >= 28)
+		if (recvlen >= 28) {
+			if (*hlimp != 1)
+				return;
 			accept_listenerV2_query(src, dst, (char *)(mldh), recvlen);
+		}
 #endif
 		return;
 
@@ -425,6 +433,8 @@ accept_mld6(recvlen)
 
 #ifdef MLD6V2_LISTENER_REPORT
 	case MLD6V2_LISTENER_REPORT:
+		if (*hlimp != 1)
+			return;
 		accept_listenerV2_report(src,dst,(char *)(mldh),recvlen);
 		return;
 #endif
