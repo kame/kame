@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.89 2001/01/23 18:13:53 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.90 2001/02/05 08:21:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3309,7 +3309,7 @@ ipsec_copypkt(m)
 				 */
 				remain = n->m_len;
 				copied = 0;
-				while(1) {
+				while (1) {
 					int len;
 					struct mbuf *mn;
 

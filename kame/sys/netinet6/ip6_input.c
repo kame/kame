@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.161 2001/02/05 08:19:34 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.162 2001/02/05 08:21:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -696,7 +696,7 @@ ip6_input(m)
 #ifdef MEASURE_PERFORMANCE
 	ctr_beg = read_tsc();
 #endif
-	switch(ip6_ours_check_algorithm) {
+	switch (ip6_ours_check_algorithm) {
 #ifdef MEASURE_PERFORMANCE
 	case OURS_CHECK_ALG_LINEAR:
 	/* traditional linear search: just for measurement */
@@ -1280,7 +1280,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 	u_int32_t jumboplen;
 
 	for (; hbhlen > 0; hbhlen -= optlen, opt += optlen) {
-		switch(*opt) {
+		switch (*opt) {
 		case IP6OPT_PAD1:
 			optlen = 1;
 			break;
@@ -1410,7 +1410,7 @@ ip6_unknown_opt(optp, m, off)
 {
 	struct ip6_hdr *ip6;
 
-	switch(IP6OPT_TYPE(*optp)) {
+	switch (IP6OPT_TYPE(*optp)) {
 	case IP6OPT_TYPE_SKIP: /* ignore the option */
 		return((int)*(optp + 1));
 	case IP6OPT_TYPE_DISCARD:	/* silently discard */
@@ -2180,7 +2180,7 @@ ip6_reset_rcvopt(opts, optname)
 	if (opts == NULL)
 		return;
 
-	switch(optname) {
+	switch (optname) {
 	case IPV6_RECVPKTINFO:
 		if (opts->pktinfo) m_free(opts->pktinfo);
 		opts->pktinfo = NULL;
@@ -2244,7 +2244,7 @@ ip6_get_prevhdr(m, off)
 		while (len < off) {
 			ip6e = (struct ip6_ext *)(mtod(m, caddr_t) + len);
 
-			switch(nxt) {
+			switch (nxt) {
 			case IPPROTO_FRAGMENT:
 				len += sizeof(struct ip6_frag);
 				break;
@@ -2707,7 +2707,7 @@ sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS
 	ip6_forward_cache_miss = 0;
 	ip6_logentry = 0;
 
-	switch(ip6_ours_check_algorithm) {
+	switch (ip6_ours_check_algorithm) {
 	case OURS_CHECK_ALG_HASH:
 		in6h_rebuild(23); /* XXX hardcoding */
 		break;

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.105 2001/02/04 05:54:14 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.106 2001/02/05 08:21:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1655,7 +1655,7 @@ nd6_ioctl(cmd, data, ifp)
 
 			pfr = pr->ndpr_advrtrs.lh_first;
 			j = 0;
-			while(pfr) {
+			while (pfr) {
 				if (j < DRLSTSIZ) {
 #define RTRADDR prl->prefix[i].advrtr[j]
 					RTRADDR = pfr->router->rtaddr;
