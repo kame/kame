@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.63 2000/05/05 11:01:05 sumikawa Exp $	*/
+/*	$KAME: keydb.c,v 1.64 2000/05/11 17:02:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,7 +156,8 @@ keydb_freesecasvar(p)
 	s = splnet();
 #endif
 	p->refcnt--;
-	if (p->refcnt == 0)
+	/* negative refcnt will cause panic intentionally */
+	if (p->refcnt <= 0)
 		keydb_delsecasvar(p);
 	splx(s);
 }

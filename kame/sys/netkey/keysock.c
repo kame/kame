@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.17 2000/05/07 12:57:29 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.18 2000/05/11 17:02:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,7 +158,7 @@ key_usrreq(so, req, m, nam, control, p)
 #else
 		/*
 		 * XXX rcb_faddr must be dynamically allocated, otherwise
-		 * raw_disconnect() will be angry.
+		 * raw_disconnect() will get angry.
 		 */
 	    {
 		struct mbuf *m, *n;
@@ -298,7 +298,7 @@ key_sendup0(rp, m, promisc)
 #ifdef IPSEC_DEBUG
 			printf("key_sendup0: cannot pullup\n");
 #endif
-		pfkeystat.in_nomem++;
+			pfkeystat.in_nomem++;
 			m_freem(m);
 			return ENOBUFS;
 		}
