@@ -324,13 +324,6 @@ udp6_input(mp, offp, proto)
 					    ) {
 						ip6_savecontrol(last, ip6, n,
 								&opts, NULL);
-#ifdef PULLDOWN_TEST
-						/*
-						 * uh is still valid, since
-						 * we don't pass m to
-						 * ip6_savecontrol().
-						 */
-#endif
 					}
 
 					m_adj(n, off + sizeof(struct udphdr));
@@ -385,13 +378,6 @@ udp6_input(mp, offp, proto)
 #endif
 		    ) {
 			ip6_savecontrol(last, ip6, m, &opts, NULL);
-#ifdef PULLDOWN_TEST
-			/*
-			 * since ip6_savecontrol() may modify mbuf chain,
-			 * uh can be invalid here.
-			 */
-			uh = NULL;
-#endif
 		}
 
 		m_adj(m, off + sizeof(struct udphdr));
@@ -475,13 +461,6 @@ udp6_input(mp, offp, proto)
 #endif
 	   ) {
 		ip6_savecontrol(in6p, ip6, m, &opts, NULL);
-#ifdef PULLDOWN_TEST
-		/*
-		 * since ip6_savecontrol() may modify mbuf chain,
-		 * uh can be invalid here.
-		 */
-		uh = NULL;
-#endif
 	}
 
 	m_adj(m, off + sizeof(struct udphdr));
