@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.111 2002/05/10 03:01:34 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.112 2002/05/10 04:53:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -164,7 +164,6 @@ MALLOC_DECLARE(M_NATPT);
 /* IPv6 -> IPv4 */
 struct mbuf	*natpt_translateICMPv6To4	__P((struct pcv *, struct pAddr *));
 void		 natpt_icmp6DstUnreach	__P((struct icmp6_hdr *, struct icmp *));
-void		 natpt_icmp6ParamProb	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp6Informational __P((struct pcv *, struct pcv *));
 void		 natpt_icmp6MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
@@ -325,7 +324,12 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 		break;
 
 	case ICMP6_PARAM_PROB:
-		natpt_icmp6ParamProb(cv6, &cv4);
+		icmp4->icmp_type = ICMP_PARAMPROB;
+		if (icmp6->icmp6_code == ICMP6_PARAMPROB_NEXTHEADER) {
+			icmp4->icmp_type = ICMP_UNREACH;
+			icmp4->icmp_code = ICMP_UNREACH_PROTOCOL;
+		}
+		natpt_icmp6MimicPayload(cv6, &cv4, pad);
 		break;
 
 	case ICMP6_ECHO_REQUEST:
@@ -429,22 +433,6 @@ natpt_icmp6DstUnreach(struct icmp6_hdr *icmp6, struct icmp *icmp4)
 
 
 void
-natpt_icmp6ParamProb(struct pcv *cv6, struct pcv *cv4)
-{
-	struct icmp	*icmp4 = cv4->pyld.icmp4;
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
-
-	icmp4->icmp_type = ICMP_PARAMPROB; /* do more */
-	icmp4->icmp_code = 0;
-
-	if (icmp6->icmp6_code == ICMP6_PARAMPROB_NEXTHEADER) {
-		icmp4->icmp_type = ICMP_UNREACH;
-		icmp4->icmp_code = ICMP_UNREACH_PROTOCOL;
-	}
-}
-
-
-void
 natpt_icmp6Informational(struct pcv *cv6, struct pcv *cv4)
 {
 	int		 dlen;
@@ -540,6 +528,21 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 			udp4->uh_sport = pad->port[0];
 			udp4->uh_dport = pad->port[1];
 		}
+		break;
+
+	case ICMP6_PARAM_PROB:
+		if (icmp6->icmp6_code == ICMP6_PARAMPROB_NEXTHEADER)
+			break;
+
+		HTONL(icmp6->icmp6_pptr);
+		icmp4->icmp_pptr
+			= (icmp6->icmp6_pptr == 0) ? 0	/* version */
+			: (icmp6->icmp6_pptr == 4) ? 2	/* payload length */
+			: (icmp6->icmp6_pptr == 6) ? 9	/* next header */
+			: (icmp6->icmp6_pptr == 7) ? 8	/* ttl */
+			: (icmp6->icmp6_pptr == 8) ? 12	/* source address */
+			: (icmp6->icmp6_pptr == 24) ? 16 /* destination address */
+			: 0xff; /* XXX */
 		break;
 	}
 }
