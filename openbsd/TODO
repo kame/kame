@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.11 1999/10/04 16:06:11 itojun Exp $
+$Id: TODO,v 1.12 1999/10/05 05:26:30 itojun Exp $
 
 
 Things we can do with the current code:
@@ -26,8 +26,7 @@ Things we can't do with the current code:
 	Since we use same symbol (#ifdef IPSEC) to control ipsec code,
 	we need to wrap KAME shared ipsec code by "#ifndef __OpenBSD__".
 - enable KAME "goto ours" hack (check routing table code)
-- the kernel sometimes hangs up in udp_output() during high network load.
-  I'm yet to determine the genuine reason.
+- the kernel sometimes hangs up in udp_output() during NFS transaction.
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
