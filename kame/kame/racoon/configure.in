@@ -142,11 +142,11 @@ else
 	AC_MSG_RESULT(no)
 fi
 
-AC_MSG_CHECKING(if __FUNCTION__ is available)
+AC_MSG_CHECKING(if __func__ is available)
 AC_TRY_COMPILE(dnl
 [#include <stdio.h>
-], [char *x = __FUNCTION__;],
-	[AC_DEFINE(HAVE_FUNCTION_MACRO)
+], [char *x = __func__;],
+	[AC_DEFINE(HAVE_FUNC_MACRO)
 	AC_MSG_RESULT(yes)],
 	[AC_MSG_RESULT(no)])
 

@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.37 2002/06/04 05:20:26 itojun Exp $
+#	$KAME: Makefile.in,v 1.38 2002/06/10 19:58:29 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -7,7 +7,7 @@ CC=	@CC@
 LDFLAGS=@LDFLAGS@
 CPPFLAGS=	@CPPFLAGS@
 OPTFLAG=@OPTFLAG@
-CFLAGS=	@CFLAGS@ $(CPPFLAGS) @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -Dss_family=__ss_family -Dss_len=__ss_len -DSYSCONFDIR=\"${sysconfdir}\"
+CFLAGS=	@CFLAGS@ $(CPPFLAGS) @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -DSYSCONFDIR=\"${sysconfdir}\"
 CFLAGS+=-DYY_NO_UNPUT
 CFLAGS+=-I${srcdir}/../libipsec
 LIBS=	@LIBS@
