@@ -204,9 +204,9 @@ bgp_enable_rte(rte)
 	       * If a gateway is resolved, try to install it.
 	       */
 	      if (IN6_IS_ADDR_LINKLOCAL(&rte->rt_bgw)) {
-		      /* we reject link-local nex hop for IBGP */
+		      /* we reject link-local next hop for IBGP */
 		      rte->rt_flags &= ~RTF_UP;
-		      return 0; 
+		      return 0;
 	      }
 	      if (set_nexthop(&rte->rt_bgw, rte) == 1) {
 		  if (addroute(rte, &rte->rt_gw, rte->rt_gwif) == 0) {
