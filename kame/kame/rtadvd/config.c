@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.20 2000/11/08 06:32:52 itojun Exp $	*/
+/*	$KAME: config.c,v 1.21 2000/11/08 10:21:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -587,6 +587,7 @@ add_prefix(struct rainfo *rai, struct in6_prefixreq *ipr)
 		       __FUNCTION__);
 		return;		/* XXX: error or exit? */
 	}
+	memset(prefix, 0, sizeof(*prefix));
 	prefix->prefix = ipr->ipr_prefix.sin6_addr;
 	prefix->prefixlen = ipr->ipr_plen;
 	prefix->validlifetime = ipr->ipr_vltime;

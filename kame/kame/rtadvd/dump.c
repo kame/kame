@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.12 2000/07/20 10:13:02 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.13 2000/11/08 10:21:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -97,7 +97,9 @@ if_dump()
 	struct prefix *pfx;
 	char prefixbuf[INET6_ADDRSTRLEN];
 	int first;
+	struct timeval now;
 
+	gettimeofday(&now, NULL); /* XXX: unused in most cases */
 	for (rai = ralist; rai; rai = rai->next) {
 		fprintf(fp, "%s:\n", rai->ifname);
 
@@ -177,15 +179,27 @@ if_dump()
 				break;
 			}
 			if (pfx->validlifetime == ND6_INFINITE_LIFETIME)
-				fprintf(fp, "vltime: infinity, ");
+				fprintf(fp, "vltime: infinity");
 			else
-				fprintf(fp, "vltime: %ld, ",
+				fprintf(fp, "vltime: %ld",
 					(long)pfx->validlifetime);
-			if (pfx->preflifetime ==  ND6_INFINITE_LIFETIME)
-				fprintf(fp, "pltime: infinity, ");
+			if (pfx->vltimeexpire != 0)
+				fprintf(fp, "(decr,expire %d), ",
+					pfx->vltimeexpire > now.tv_sec ?
+					pfx->vltimeexpire - now.tv_sec : 0);
 			else
-				fprintf(fp, "pltime: %ld, ",
+				fprintf(fp, ", ");
+			if (pfx->preflifetime ==  ND6_INFINITE_LIFETIME)
+				fprintf(fp, "pltime: infinity");
+			else
+				fprintf(fp, "pltime: %ld",
 					(long)pfx->preflifetime);
+			if (pfx->pltimeexpire != 0)
+				fprintf(fp, "(decr,expire %d), ",
+					pfx->pltimeexpire > now.tv_sec ?
+					pfx->pltimeexpire - now.tv_sec : 0);
+			else
+				fprintf(fp, ", ");
 			fprintf(fp, "flags: %s%s%s",
 				pfx->onlinkflg ? "L" : "",
 				pfx->autoconfflg ? "A" : "",
