@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.171 2001/12/12 22:35:37 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.172 2002/01/02 09:06:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -250,7 +250,7 @@ isakmp_handler(so_isakmp)
 	if (check_recvdpkt((struct sockaddr *)&remote,
 			(struct sockaddr *)&local, buf)) {
 		plog(LLV_NOTIFY, LOCATION, NULL,
-			"the packet is retransmited by %s.\n",
+			"the packet is retransmitted by %s.\n",
 			saddr2str((struct sockaddr *)&remote));
 		error = 0;
 		goto end;
