@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1531 2001/02/04 11:28:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.1532 2001/02/04 11:29:50 jinmei Exp $
 
 <200102>
 2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -58,7 +58,7 @@ Sun Feb  4 11:21:15 JST 2001  itojun@iijlab.net
 	XXX: we assume the type "long long" is more than 32 bits in length.
 
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* {bsdi4,freebsd4,netbsd,openbsd}/sbin/ifconfig/ifconfig.c:
+	* {bsdi[34],freebsd4,netbsd,openbsd}/sbin/ifconfig/ifconfig.c:
 	added a new modifier "autoconf" for IPv6 addresses.
 	For example, when you configure an IPv6 address like this
 	# ifconfig ne0 inet6 3ffe:ffff::1 prefixlen 64 autoconf
