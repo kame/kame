@@ -24,7 +24,11 @@ vs racoon
 	(phase 1を待ってphase 2が再開しない)
 
 vs ashley laurent
-	phase 1 keyid supportいれてよんと言われた。今回間に合うのかな。
+	phase 1 userfqdn supportいれてよんと言われた。今回間に合うのかな。
+
+vs ericsson
+	initiator: DH group typeをつけてはいけない
+	responder: blowfish、およびkey lengthをサポートしないとまずい
 
 テストするには
 	psk.txtにエントリ追加。
