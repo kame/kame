@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.80 2001/09/26 07:58:01 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.81 2001/09/26 09:51:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,42 +197,7 @@ gif_clone_create(ifc, unit)
 	sc->gif_if.if_unit = *unit;
 	sc->r_unit = r;
 
-	sc->encap_cookie4 = sc->encap_cookie6 = NULL;
-#ifdef INET
-	sc->encap_cookie4 = encap_attach_func(AF_INET, -1,
-	    gif_encapcheck, (struct protosw*)&in_gif_protosw, sc);
-	if (sc->encap_cookie4 == NULL) {
-		printf("%s: unable to attach encap4\n", if_name(&sc->gif_if));
-		free(sc, M_GIF);
-		return (EIO);	/* XXX */
-	}
-#endif
-#ifdef INET6
-	sc->encap_cookie6 = encap_attach_func(AF_INET6, -1,
-	    gif_encapcheck, (struct protosw *)&in6_gif_protosw, sc);
-	if (sc->encap_cookie6 == NULL) {
-		if (sc->encap_cookie4) {
-			encap_detach(sc->encap_cookie4);
-			sc->encap_cookie4 = NULL;
-		}
-		printf("%s: unable to attach encap6\n", if_name(&sc->gif_if));
-		free(sc, M_GIF);
-		return (EIO);	/* XXX */
-	}
-#endif
-
-	sc->gif_if.if_mtu    = GIF_MTU;
-	sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
-#if 0
-	/* turn off ingress filter */
-	sc->gif_if.if_flags  |= IFF_LINK2;
-#endif
-	sc->gif_if.if_ioctl  = gif_ioctl;
-	sc->gif_if.if_output = gif_output;
-	sc->gif_if.if_type   = IFT_GIF;
-	sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
-	if_attach(&sc->gif_if);
-	bpfattach(&sc->gif_if, DLT_NULL, sizeof(u_int));
+	gifattach0(sc);
 	TAILQ_INSERT_TAIL(&gifs, sc, gif_link);
 	return (0);
 }
@@ -244,7 +209,7 @@ gif_clone_destroy(ifp)
 	int err;
 	struct gif_softc *sc = ifp->if_softc;
 
-	gif_delete_tunnel(sc);
+	gif_delete_tunnel(ifp);
 	TAILQ_REMOVE(&gifs, sc, gif_link);
 	if (sc->encap_cookie4 != NULL) {
 		err = encap_detach(sc->encap_cookie4);
@@ -345,6 +310,7 @@ gifattach(dummy)
 		gifattach0(sc);
 	}
 }
+#endif
 
 void
 gifattach0(sc)
@@ -377,7 +343,6 @@ gifattach0(sc)
 #endif
 #endif
 }
-#endif
 
 #ifdef __FreeBSD__
 #if __FreeBSD__ >= 4
