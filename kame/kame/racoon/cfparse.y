@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.86 2001/02/21 05:19:11 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.87 2001/02/22 01:11:42 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -166,9 +166,6 @@ static int expand_isakmpspec __P((int, int, int *,
 %token PREFIX PORT PORTANY UL_PROTO ANY
 %token PFS_GROUP LIFETIME LIFETYPE UNITTYPE STRENGTH
 
-	/* static sa */
-%token STATICSA STATICSA_STATEMENT
-
 %token NUMBER SWITCH BOOLEAN
 %token HEXSTRING QUOTEDSTRING ADDRSTRING
 %token EOS BOC EOC COMMA
@@ -183,7 +180,7 @@ static int expand_isakmpspec __P((int, int, int *,
 %type <num> SECLEVELTYPE SECMODETYPE 
 %type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE
 %type <num> CERTTYPE CERT_X509 PROPOSAL_CHECK_LEVEL
-%type <val> QUOTEDSTRING HEXSTRING ADDRSTRING STATICSA_STATEMENT sainfo_id
+%type <val> QUOTEDSTRING HEXSTRING ADDRSTRING sainfo_id
 %type <val> identifierstring
 %type <spidx> policy_index
 %type <saddr> remote_index ike_addrinfo_port
@@ -1275,17 +1272,6 @@ isakmpproposal_spec
 				return -1;
 			}
 		}
-	;
-
-	/* static sa */
-staticsa_statement
-	:	STATICSA STATICSA_STATEMENT
-		{
-			/* execute static sa */
-			/* like system("setkey $2->v"); */
-			vfree($2);
-		}
-		EOS
 	;
 
 %%

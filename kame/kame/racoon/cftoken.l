@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.50 2001/02/21 05:19:11 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.51 2001/02/22 01:11:42 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -312,28 +312,6 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTP>hash_algorithm	{ YYD; yylval.num = algclass_isakmp_hash; return(ALGORITHM_CLASS); }
 <S_RMTP>dh_group	{ YYD; return(DH_GROUP); }
 <S_RMTP>gssapi_id	{ YYD; return(GSSAPI_ID); }
-
-	/* static sa */
-<S_INI>static_sa	{
-				BEGIN S_SA; YYDB;
-				yywarn("staticsa directive don't work yet.");
-				return(STATICSA);
-			}
-<S_SA>{semi}		{ YYD; BEGIN S_INI; return(EOS); }
-<S_SA>[a-zA-Z0-9:\.\-_/ \n\t\"][a-zA-Z0-9:\.\-_/ \n\t\"]* {
-		yymore();
-
-		incstack[incstackp].lineno += yycf_count_nl(yytext);
-
-		yylval.val = vmalloc(yyleng + 1);
-		if (yylval.val == NULL) {
-			yyerror("vmalloc failed");
-			return -1;
-		}
-		memcpy(yylval.val->v, yytext, yylval.val->l);
-
-		return(STATICSA_STATEMENT);
-}
 
 	/* parameter */
 on		{ YYD; yylval.num = TRUE; return(SWITCH); }
