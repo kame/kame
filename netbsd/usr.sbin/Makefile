@@ -13,6 +13,6 @@ SUBDIR+=racoon
 
 SUBDIR+=pppd
 
-SUBDIR+=mip6control had
+SUBDIR+=mip6control had mip6stat
 
 .include <bsd.subdir.mk>
