@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.28 2000/05/27 11:30:43 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.29 2000/06/15 14:23:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -347,7 +347,7 @@ rtmsg_input()
 	if (n > rtmsg_len(msg)) {
 		/*
 		 * This usually won't happen for messages received on 
-		 * an routing socket.
+		 * a routing socket.
 		 */
 		if (dflag > 1)
 			syslog(LOG_DEBUG,
