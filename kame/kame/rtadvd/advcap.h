@@ -1,4 +1,4 @@
-/*	$KAME: advcap.h,v 1.4 2001/06/08 04:46:19 jinmei Exp $	*/
+/*	$KAME: advcap.h,v 1.5 2003/06/09 05:40:54 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1994,1995 by Andrey A. Chernov, Moscow, Russia.
@@ -39,6 +39,9 @@ extern int agetent __P((char *, const char *));
 extern int agetflag __P((const char *));
 extern int64_t agetnum __P((const char *));
 extern char *agetstr __P((const char *, char **));
+#ifdef MIP6
+int64_t agetusec __P((char *));
+#endif
 
 __END_DECLS
 
