@@ -18,7 +18,5 @@ pretend to have someone elses host address.
 
 This port supports IPv4/IPv6 dual stack and IPv4 mapped IPv6 address.
 You can replace stock tcpd or libwrap.a with this.
-Field separater is changed from `:' to `|' because of confliction with
-notation of IPv6 address.  Separater for option field is still `:'.
-IPv6 address pattern is as a `net/prefixlen' pair.
+IPv6 address pattern is as a `[net]/prefixlen' pair.
 This port was tested on KAME/FreeBSD and KAME/FreeBSD3.
