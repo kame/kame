@@ -497,16 +497,24 @@ send:
 
  	hdrlen += optlen;
 
-	if (
 #ifdef INET6
-	    isipv6 == 0 &&
-#endif /* INET6 */
-	    tp->t_inpcb->inp_options) {
+	if (isipv6)
+		ipoptlen = ip6_optlen(tp->t_inpcb);
+	else
+#endif
+	if (tp->t_inpcb->inp_options) {
 		ipoptlen = tp->t_inpcb->inp_options->m_len -
 				offsetof(struct ipoption, ipopt_list);
 	} else {
 		ipoptlen = 0;
 	}
+#ifdef IPSEC
+#ifdef INET6
+	ipoptlen += ipsec_hdrsiz_tcp(tp, isipv6);
+#else
+	ipoptlen += ipsec_hdrsiz_tcp(tp, 0);
+#endif
+#endif
 
 	/*
 	 * Adjust data length if insertion of options will

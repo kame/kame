@@ -2811,49 +2811,6 @@ tcp_mss(tp, offer, isipv6)
 #endif
 			ifp->if_mtu - lgminh;
 
-	{
-		int tmp;
-		struct ipoption *p;
-
-		/* why we don't have this here?  could anyone comment? */
-#ifdef INET6
-		if (isipv6) {
-			if (inp->in6p_outputopts) {
-				tmp = ip6_optlen(inp);
-				if (mss > tmp)
-					mss -= tmp;
-				else {
-					printf("tcp_mss: "
-					       "invalid mss(IP6 option)\n");
-				}
-			}
-		} else
-#endif /* INET6 */
-		if (inp->inp_options) {
-			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
-			if (mss > tmp)
-				mss -= tmp;
-			else {
-				printf("tcp_mss: "
-					"invalid mss(IP4 option)\n");
-			}
-		}
-
-#ifdef IPSEC
-		/* plug for AH/ESP. */
-		tmp = ipsec_hdrsiz_tcp(tp,
-#ifdef INET6
-				       isipv6
-#else
-				       0
-#endif
-				       );
-		if (mss > tmp)
-			mss -= tmp;
-		else
-			printf("tcp_mss: invalid mss(IPsec)\n");
-#endif /*IPSEC*/
-	}
 	if (rt->rt_rmx.rmx_mtu == 0) {
 #ifdef INET6
 		if (isipv6) {
@@ -2983,50 +2940,5 @@ tcp_mssopt(tp, isipv6)
 
 	mss = rt->rt_ifp->if_mtu - lgminh;
 
-    {
-	struct inpcb *inp;
-	int tmp;
-	struct ipoption *p;
-
-	inp = tp->t_inpcb;
-
-	/* why we don't have this here?  could anyone comment? */
-#ifdef INET6
-	if (isipv6) {
-		if (inp->in6p_outputopts) {
-			tmp = ip6_optlen(inp);
-			if (mss > tmp)
-				mss -= tmp;
-			else {
-				printf("tcp_mssopt: "
-				       "invalid mss(IP6 option)\n");
-			}
-		}
-	} else
-#endif /* INET6 */
-	if (inp->inp_options) {
-		tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
-		if (mss > tmp)
-			mss -= tmp;
-	else {
-			printf("tcp_mssopt: "
-				"invalid mss(IP4 option)\n");
-		}
-	}
-#ifdef IPSEC
-	/* plug for AH/ESP. */
-		tmp = ipsec_hdrsiz_tcp(tp,
-#ifdef INET6
-				       isipv6
-#else
-				       0
-#endif
-				       );
-	if (mss > tmp)
-		mss -= tmp;
-	else
-		printf("tcp_mssopt: invalid mss(IPsec)\n");
-#endif /*IPSEC*/
-    }
 	return mss;
 }

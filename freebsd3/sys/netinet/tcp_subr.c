@@ -998,48 +998,6 @@ tcp_mtudisc(inp, errno)
 #endif /* INET6 */
 			;
 
-	    {
-		int tmp;
-		struct ipoption *p;
-
-		/* why we don't have this here?  could anyone comment? */
-#ifdef INET6
-		if (isipv6) {
-			if (inp->in6p_outputopts) {
-				tmp = ip6_optlen(inp);
-				if (mss > tmp)
-					mss -= tmp;
-				else {
-					printf("tcp_mtudisc: "
-					       "invalid mss(IP6 option)\n");
-				}
-			}
-		} else
-#endif /* INET6 */
-		if (inp->inp_options) {
-			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
-			if (mss > tmp)
-				mss -= tmp;
-			else {
-				printf("tcp_mtudisc: "
-					"invalid mss(IP4 option)\n");
-			}
-		}
-#ifdef IPSEC
-		/* plug for AH/ESP. */
-		tmp = ipsec_hdrsiz_tcp(tp,
-#ifdef INET6
-				       isipv6
-#else
-				       0
-#endif
-				       );
-		if (mss > tmp)
-			mss -= tmp;
-		else
-			printf("tcp_mtudisc: invalid mss(IPsec)\n");
-#endif /*IPSEC*/
-	    }
 		if (offered)
 			mss = min(mss, offered);
 		/*
