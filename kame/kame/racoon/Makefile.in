@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.25 2000/08/10 12:27:47 sakane Exp $
+# YIPS $Id: Makefile.in,v 1.26 2000/09/22 18:24:11 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -20,7 +20,8 @@ exec_prefix=	@exec_prefix@
 sysconfdir=	@sysconfdir@
 INSTALL=@INSTALL@
 
-PROG=	racoon kmpstat eaytest
+PROG=	racoon eaytest
+#PROG+=	kmpstat
 #PROG+=	pfkey
 OBJS=	main.o session.o isakmp.o handler.o \
 	isakmp_ident.o isakmp_agg.o isakmp_base.o \

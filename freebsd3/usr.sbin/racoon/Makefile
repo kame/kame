@@ -5,7 +5,8 @@ OPENSSLVER!=	/usr/local/bin/openssl version
 OPENSSLVER!=	openssl version
 .endif
 .if defined(OPENSSLVER) && ${OPENSSLVER} == "OpenSSL 0.9.5a 1 Apr 2000"
-SUBDIR+=racoon kmpstat
+SUBDIR+=racoon
+#SUBDIR+=kmpstat
 .else
 SUBDIR=
 all:
