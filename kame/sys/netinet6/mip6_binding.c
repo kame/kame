@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.149 2002/11/01 10:10:09 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.150 2002/11/13 00:58:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -502,8 +502,9 @@ mip6_home_registration2(mbu)
 }
 
 int
-mip6_bu_list_notify_binding_change(sc)
+mip6_bu_list_notify_binding_change(sc, home)
 	struct hif_softc *sc;
+	int home;
 {
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu, *mbu_next;
@@ -556,7 +557,9 @@ mip6_bu_list_notify_binding_change(sc)
 			mbu->mbu_expire = 0x7fffffff;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		if (mip6_bu_fsm(mbu,
-			MIP6_BU_PRI_FSM_EVENT_MOVEMENT, NULL) != 0) {
+			(home ?
+			 MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME : 
+			 MIP6_BU_PRI_FSM_EVENT_MOVEMENT), NULL) != 0) {
 			mip6log((LOG_ERR,
 			    "%s:%d: "
 			    "state transition failed.\n",
@@ -933,8 +936,9 @@ mip6_bdt_delete(paddr)
 }
 
 int
-mip6_bu_list_remove_all(mbu_list)
+mip6_bu_list_remove_all(mbu_list, all)
 	struct mip6_bu_list *mbu_list;
+	int all;
 {
 	struct mip6_bu *mbu, *mbu_next;
 	int error = 0;
@@ -947,6 +951,12 @@ mip6_bu_list_remove_all(mbu_list)
 	     mbu;
 	     mbu = mbu_next) {
 		mbu_next = LIST_NEXT(mbu, mbu_entry);
+
+		if (!all &&
+		    (mbu->mbu_flags & IP6MU_HOME) == 0 &&
+		    (mbu->mbu_state & (MIP6_BU_STATE_BUNOTSUPP|
+				       MIP6_BU_STATE_MIP6NOTSUPP)) == 0)
+			continue;
 
 		error = mip6_bu_list_remove(mbu_list, mbu);
 		if (error) {

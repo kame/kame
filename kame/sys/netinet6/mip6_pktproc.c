@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.81 2002/11/09 13:49:52 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.82 2002/11/13 00:58:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1016,53 +1016,13 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	if (mbu->mbu_flags & IP6MU_HOME) {
 		/* this is from our home agent. */
 		if (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD) {
-			struct sockaddr_in6 sa6_coa, sa6_hoa;
-
-			/* home unregsitration has completed. */
-
-			/* notify all the CNs that we are home. */
-			error = mip6_bu_list_notify_binding_change(sc);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: removing the bining cache entries of all CNs failed.\n",
-					 __FILE__, __LINE__));
-				m_freem(m);
-				return (error);
-			}
-
-			/* remove a tunnel to our homeagent. */
-			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-						   mbu,
-						   mip6_bu_encapcheck,
-						   &mbu->mbu_encap);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: tunnel removal failed.\n",
-					 __FILE__, __LINE__));
-				m_freem(m);
-				return (error);
-			}
-
-			/* save coa/hoa */
-			sa6_coa = mbu->mbu_coa;
-			sa6_hoa = mbu->mbu_haddr;
-
-			error = mip6_bu_list_remove_all(&sc->hif_bu_list);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: BU remove all failed.\n",
-					 __FILE__, __LINE__));
-				m_freem(m);
-				return (error);
-			}
-			mbu = NULL; /* free in mip6_bu_list_remove_all() */
-
-			/* XXX: send a unsolicited na. */
-		{
 			struct sockaddr_in6 daddr; /* XXX */
 			struct ifaddr *ifa;
 
-			if ((ifa = ifa_ifwithaddr((struct sockaddr *)&sa6_coa))
+			/* home unregsitration has completed. */
+			/* send a unsolicited na. */
+
+			if ((ifa = ifa_ifwithaddr((struct sockaddr *)&mbu->mbu_coa))
 			    == NULL) {
 				mip6log((LOG_ERR,
 					 "%s:%d: can't find CoA interface\n",
@@ -1095,13 +1055,45 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			}
 
 			nd6_na_output(ifa->ifa_ifp, &daddr,
-					      &sa6_hoa,
+					      &mbu->mbu_haddr,
 					      ND_NA_FLAG_OVERRIDE,
 					      1, NULL);
 			mip6log((LOG_INFO,
 				 "%s:%d: send a unsolicited na to %s\n",
 				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
-		}
+
+			/* notify all the CNs that we are home. */
+			error = mip6_bu_list_notify_binding_change(sc, 1);
+			if (error) {
+				mip6log((LOG_ERR,
+					 "%s:%d: removing the bining cache entries of all CNs failed.\n",
+					 __FILE__, __LINE__));
+				m_freem(m);
+				return (error);
+			}
+
+			/* remove a tunnel to our homeagent. */
+			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+						   mbu,
+						   mip6_bu_encapcheck,
+						   &mbu->mbu_encap);
+			if (error) {
+				mip6log((LOG_ERR,
+					 "%s:%d: tunnel removal failed.\n",
+					 __FILE__, __LINE__));
+				m_freem(m);
+				return (error);
+			}
+			error = mip6_bu_list_remove_all(&sc->hif_bu_list, 0);
+			if (error) {
+				mip6log((LOG_ERR,
+					 "%s:%d: BU remove all failed.\n",
+					 __FILE__, __LINE__));
+				m_freem(m);
+				return (error);
+			}
+			mbu = NULL; /* free in mip6_bu_list_remove_all() */
+
 		} else if ((mbu->mbu_pri_fsm_state
 			   == MIP6_BU_PRI_FSM_STATE_WAITA)
 			   || (mbu->mbu_pri_fsm_state
@@ -1128,7 +1120,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			}
 
 			/* notify all the CNs that we have a new coa. */
-			error = mip6_bu_list_notify_binding_change(sc);
+			error = mip6_bu_list_notify_binding_change(sc, 0);
 			if (error) {
 				mip6log((LOG_ERR,
 					 "%s:%d: updating the bining cache entries of all CNs failed.\n",
@@ -1347,8 +1339,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 		goto free_ip6pktopts;
 	}
  free_ip6pktopts:
-	if (opt.ip6po_rthdr)
-		free(opt.ip6po_rthdr, M_IP6OPT);
+	if (opt.ip6po_rthdr2)
+		free(opt.ip6po_rthdr2, M_IP6OPT);
 	if (opt.ip6po_mobility)
 		free(opt.ip6po_mobility, M_IP6OPT);
 
@@ -1545,6 +1537,11 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 	if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, &mbu->mbu_coa)) {
 		/* this binding update is for home un-registration. */
 		ip6mu->ip6mu_lifetime = 0;
+		if (need_rr) {
+			mbu->mbu_careof_nonce_index = mbu->mbu_home_nonce_index;
+			bcopy(&mbu->mbu_home_cookie, &mbu->mbu_careof_cookie,
+			      sizeof(mbu->mbu_careof_cookie));
+		}
 	} else {
 		struct mip6_prefix *mpfx;
 		u_int32_t haddr_lifetime, coa_lifetime, lifetime;

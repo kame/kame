@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.71 2002/11/11 10:20:32 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.72 2002/11/13 00:58:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -565,12 +565,12 @@ struct mip6_bu *mip6_bu_create		__P((const struct sockaddr_in6 *,
 int mip6_bu_list_insert			__P((struct mip6_bu_list *,
 					     struct mip6_bu *));
 int mip6_bu_list_remove __P((struct mip6_bu_list *, struct mip6_bu *));
-int mip6_bu_list_notify_binding_change __P((struct hif_softc *));
+int mip6_bu_list_notify_binding_change __P((struct hif_softc *, int));
 int mip6_tunnel_control __P((int, void *,
 			     int (*) __P((const struct mbuf *,
 					  int, int, void *)),
 			     const struct encaptab **));
-int mip6_bu_list_remove_all		__P((struct mip6_bu_list *));
+int mip6_bu_list_remove_all		__P((struct mip6_bu_list *, int));
 struct mip6_bu *mip6_bu_list_find_withpaddr
 					__P((struct mip6_bu_list *,
 					     struct sockaddr_in6 *,

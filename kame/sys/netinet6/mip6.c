@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.180 2002/11/11 10:20:32 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.181 2002/11/13 00:58:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1421,7 +1421,7 @@ mip6_ioctl(cmd, data)
 				struct mip6_subnet *ms;
 
 				mip6_detach_haddrs(sc);
-				mip6_bu_list_remove_all(&sc->hif_bu_list);
+				mip6_bu_list_remove_all(&sc->hif_bu_list, 1);
 				hif_subnet_list_remove_all(
 					&sc->hif_hs_list_home);
 				hif_subnet_list_remove_all(

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.16 2002/11/01 09:35:12 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.17 2002/11/13 00:58:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -262,6 +262,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+
 			break;
 			
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
@@ -312,6 +315,10 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
+
+			/* free mbu */
+			mbu->mbu_lifetime = 0;
+			mbu->mbu_expire = mono_time.tv_sec + mbu->mbu_lifetime;
 
 			break;
 
@@ -419,6 +426,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
+
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
 
 			break;
 			
@@ -612,6 +622,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 			mip6_bu_stop_timers(mbu);
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
+
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
 
 			break;
 
@@ -818,6 +831,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+
 			break;
 
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
@@ -1002,6 +1018,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+
 			break;
 
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
@@ -1088,6 +1107,10 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_IDLE;
+
+				/* free mbu */
+				mbu->mbu_lifetime = 0;
+				mbu->mbu_expire = mono_time.tv_sec + mbu->mbu_lifetime;
 			}
 			break;
 
@@ -1110,6 +1133,10 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
+
+			/* free mbu */
+			mbu->mbu_lifetime = 0;
+			mbu->mbu_expire = mono_time.tv_sec + mbu->mbu_lifetime;
 
 			break;
 			
@@ -1161,6 +1188,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
+
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
 
 			break;
 		}
