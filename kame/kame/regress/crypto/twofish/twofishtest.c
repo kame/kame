@@ -1,4 +1,4 @@
-/*	$KAME: twofishtest.c,v 1.3 2000/11/08 05:58:26 itojun Exp $	*/
+/*	$KAME: twofishtest.c,v 1.4 2001/05/27 01:56:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <err.h>
 
 #include <crypto/twofish/twofish.h>
 
@@ -64,21 +65,27 @@ struct {
     },
 };
 
-static void hex2key __P((u_int8_t *, const char *));
+static void hex2key __P((u_int8_t *, size_t, const char *));
 int main __P((int, char **));
 
 static void
-hex2key(p, s)
+hex2key(p, l, s)
 	u_int8_t *p;
+	size_t l;
 	const char *s;
 {
 	int i;
 	u_int v;
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < l && *s; i++) {
 		sscanf(s, "%02x", &v);
 		*p++ = v & 0xff;
 		s += 2;
+	}
+
+	if (*s) {
+		errx(1, "hex2key overrun");
+		/*NOTREACHED*/
 	}
 }
 
@@ -92,7 +99,7 @@ main(argc, argv)
 	cipherInstance c;
 	int error;
 	const char *test;
-	u_int8_t ct[16], pt[16], ct0[16], pt0[16];
+	u_int8_t key[32], ct[16], pt[16], ct0[16], pt0[16];
 	int nrounds, rounds;
 
 	if (argc > 1)
@@ -105,8 +112,9 @@ main(argc, argv)
 	rounds = nrounds;
 again:
 	for (i = 0; vector[i].key; i++) {
-		hex2key(pt0, vector[i].pt);
-		hex2key(ct0, vector[i].ct);
+		hex2key(key, sizeof(key), vector[i].key);
+		hex2key(pt0, sizeof(pt0), vector[i].pt);
+		hex2key(ct0, sizeof(ct0), vector[i].ct);
 		memcpy(pt, pt0, sizeof(pt));
 		memset(ct, 0, sizeof(ct));
 
@@ -115,7 +123,7 @@ again:
 		memset(&k, 0, sizeof(k));
 		/* LINTED const cast */
 		if (twofish_makeKey(&k, DIR_ENCRYPT,
-		    strlen(vector[i].key) * 4, (char *)vector[i].key) < 0) {
+		    strlen(vector[i].key) * 4, key) < 0) {
 			printf("makeKey failed for %s %d\n", test, i);
 			error++;
 			continue;
@@ -148,7 +156,7 @@ again:
 		memset(&k, 0, sizeof(k));
 		/* LINTED const cast */
 		if (twofish_makeKey(&k, DIR_DECRYPT,
-		    strlen(vector[i].key) * 4, (char *)vector[i].key) < 0) {
+		    strlen(vector[i].key) * 4, key) < 0) {
 			printf("makeKey failed for %s %d\n", test, i);
 			error++;
 			continue;

@@ -1,4 +1,4 @@
-/*	$KAME: rijndaeltest.c,v 1.6 2000/11/08 05:58:26 itojun Exp $	*/
+/*	$KAME: rijndaeltest.c,v 1.7 2001/05/27 01:56:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <err.h>
 
 #include <crypto/rijndael/rijndael.h>
 
@@ -80,21 +81,27 @@ struct {
     },
 };
 
-static void hex2key __P((u_int8_t *, const char *));
+static void hex2key __P((u_int8_t *, size_t, const char *));
 int main __P((int, char **));
 
 static void
-hex2key(p, s)
+hex2key(p, l, s)
 	u_int8_t *p;
+	size_t l;
 	const char *s;
 {
 	int i;
 	u_int v;
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < l && *s; i++) {
 		sscanf(s, "%02x", &v);
 		*p++ = v & 0xff;
 		s += 2;
+	}
+
+	if (*s) {
+		errx(1, "hex2key overrun");
+		/*NOTREACHED*/
 	}
 }
 
@@ -108,7 +115,7 @@ main(argc, argv)
 	cipherInstance c;
 	int error;
 	const char *test;
-	u_int8_t input[16], output[16], answer[16];
+	u_int8_t key[32], input[16], output[16], answer[16];
 	int nrounds, rounds;
 
 	if (argc > 1)
@@ -122,13 +129,14 @@ main(argc, argv)
 again1:
 	test = "decrypt test";
 	for (i = 0; dvector[i].key; i++) {
-		hex2key(input, dvector[i].ct);
+		hex2key(key, sizeof(key), dvector[i].key);
+		hex2key(input, sizeof(input), dvector[i].ct);
 		memset(output, 0, sizeof(output));
-		hex2key(answer, dvector[i].pt);
+		hex2key(answer, sizeof(answer), dvector[i].pt);
 
 		/* LINTED const cast */
 		if (rijndael_makeKey(&k, DIR_DECRYPT,
-		    strlen(dvector[i].key) * 4, (char *)dvector[i].key) < 0) {
+		    strlen(dvector[i].key) * 4, key) < 0) {
 			printf("makeKey failed for %s %d\n", test, i);
 			error++;
 			continue;
@@ -167,13 +175,14 @@ next1:;
 again2:
 	test = "encrypt test";
 	for (i = 0; evector[i].key; i++) {
-		hex2key(input, evector[i].pt);
+		hex2key(key, sizeof(key), evector[i].key);
+		hex2key(input, sizeof(input), evector[i].pt);
 		memset(output, 0, sizeof(output));
-		hex2key(answer, evector[i].ct);
+		hex2key(answer, sizeof(answer), evector[i].ct);
 
 		/* LINTED const cast */
 		if (rijndael_makeKey(&k, DIR_ENCRYPT,
-		    strlen(evector[i].key) * 4, (char *)evector[i].key) < 0) {
+		    strlen(evector[i].key) * 4, key) < 0) {
 			printf("makeKey failed for %s %d\n", test, i);
 			error++;
 			continue;
