@@ -1,4 +1,4 @@
-/*	$NetBSD: state.c,v 1.11.12.3 2001/07/29 04:13:02 jhawk Exp $	*/
+/*	$NetBSD: state.c,v 1.22 2002/02/11 10:57:58 wiz Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -38,20 +38,13 @@
 #if 0
 static char sccsid[] = "@(#)state.c	8.5 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: state.c,v 1.11.12.3 2001/07/29 04:13:02 jhawk Exp $");
+__RCSID("$NetBSD: state.c,v 1.22 2002/02/11 10:57:58 wiz Exp $");
 #endif
 #endif /* not lint */
 
 #include <stdarg.h>
 
 #include "telnetd.h"
-#if	defined(AUTHENTICATION)
-#include <libtelnet/auth.h>
-#endif
-
-#if defined(ENCRYPTION)
-#include <libtelnet/encrypt.h>
-#endif
 
 static int envvarok __P((char *));
 
@@ -101,9 +94,6 @@ telrcv()
 {
 	register int c;
 	static int state = TS_DATA;
-#if	defined(CRAY2) && defined(UNICOS5)
-	char *opfrontp = pfrontp;
-#endif
 
 	while (ncc > 0) {
 		if ((&ptyobuf[BUFSIZ] - pfrontp) < 2)
@@ -369,28 +359,11 @@ gotiac:			switch (c) {
 			continue;
 
 		default:
-			syslog(LOG_ERR, "telnetd: panic state=%d\n", state);
+			syslog(LOG_ERR, "panic state=%d", state);
 			printf("telnetd: panic state=%d\n", state);
 			exit(1);
 		}
 	}
-#if	defined(CRAY2) && defined(UNICOS5)
-	if (!linemode) {
-		char	xptyobuf[BUFSIZ+NETSLOP];
-		char	xbuf2[BUFSIZ];
-		register char *cp;
-		int n = pfrontp - opfrontp, oc;
-		memmove(xptyobuf, opfrontp, n);
-		pfrontp = opfrontp;
-		pfrontp += term_input(xptyobuf, pfrontp, n, BUFSIZ+NETSLOP,
-					xbuf2, &oc, BUFSIZ);
-		for (cp = xbuf2; oc > 0; --oc) {
-			output_data("%c", *cp);
-			if (*cp++ == IAC)
-				output_data("%c", IAC);
-		}
-	}
-#endif	/* defined(CRAY2) && defined(UNICOS5) */
 }  /* end of telrcv */
 
 /*
@@ -468,20 +441,22 @@ send_do(option, init)
 			set_his_want_state_will(option);
 		do_dont_resp[option]++;
 	}
-	(void) output_data(doopt, option);
+	(void) output_data((const char *)doopt, option);
 
 	DIAG(TD_OPTIONS, printoption("td: send do", option));
 }
 
-#ifdef	AUTHENTICATION
-extern void auth_request __P((void));	/* libtelnet */
-#endif
 #ifdef	LINEMODE
 extern void doclientstat __P((void));
+#endif
+#if 0
+#ifdef	AUTHENTICATION
+extern void auth_request __P((void));	/* libtelnet */
 #endif
 #ifdef	ENCRYPTION
 extern void encrypt_send_support __P((void));
 #endif	/* ENCRYPTION */
+#endif
 
 	void
 willoption(option)
@@ -688,7 +663,7 @@ send_dont(option, init)
 		set_his_want_state_wont(option);
 		do_dont_resp[option]++;
 	}
-	(void) output_data(dont, option);
+	(void) output_data((const char *)dont, option);
 
 	DIAG(TD_OPTIONS, printoption("td: send dont", option));
 }
@@ -743,7 +718,7 @@ wontoption(option)
 			 * If we get a WONT TM, and had sent a DO TM,
 			 * don't respond with a DONT TM, just leave it
 			 * as is.  Short circut the state machine to
-			 * achive this.
+			 * achieve this.
 			 */
 			set_his_want_state_wont(TELOPT_TM);
 			return;
@@ -838,7 +813,7 @@ send_will(option, init)
 		set_my_want_state_will(option);
 		will_wont_resp[option]++;
 	}
-	(void) output_data(will, option);
+	(void) output_data((const char *)will, option);
 
 	DIAG(TD_OPTIONS, printoption("td: send will", option));
 }
@@ -997,7 +972,7 @@ send_wont(option, init)
 		set_my_want_state_wont(option);
 		will_wont_resp[option]++;
 	}
-	(void) output_data(wont, option);
+	(void) output_data((const char *)wont, option);
 
 	DIAG(TD_OPTIONS, printoption("td: send wont", option));
 }
@@ -1248,7 +1223,7 @@ suboption()
 	if (SB_EOF())
 	    break;		/* another garbage check */
 
-	if (request == LM_SLC) {  /* SLC is not preceeded by WILL or WONT */
+	if (request == LM_SLC) {  /* SLC is not preceded by WILL or WONT */
 		/*
 		 * Process suboption buffer of slc's
 		 */
@@ -1571,11 +1546,13 @@ suboption()
 
 }  /* end of suboption */
 
+#ifdef LINEMODE
 	void
 doclientstat()
 {
 	clientstat(TELOPT_LINEMODE, WILL, 0);
 }
+#endif /* LINEMODE */
 
 	void
 send_status()

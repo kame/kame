@@ -1,4 +1,4 @@
-/*	$NetBSD: utility.c,v 1.13.4.3 2001/07/29 04:13:16 jhawk Exp $	*/
+/*	$NetBSD: utility.c,v 1.18.2.1 2003/10/22 06:19:03 jmc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)utility.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: utility.c,v 1.13.4.3 2001/07/29 04:13:16 jhawk Exp $");
+__RCSID("$NetBSD: utility.c,v 1.18.2.1 2003/10/22 06:19:03 jmc Exp $");
 #endif
 #endif /* not lint */
 
@@ -46,18 +46,10 @@ __RCSID("$NetBSD: utility.c,v 1.13.4.3 2001/07/29 04:13:16 jhawk Exp $");
 #define PRINTOPTIONS
 #include "telnetd.h"
 
-#if defined(AUTHENTICATION)
-#include <libtelnet/auth.h>
-#endif
-
-#if defined(ENCRYPTION)
-#include <libtelnet/encrypt.h>
-#endif
-
 char *nextitem __P((char *));
-void fatalperror __P((int, const char *));
-void edithost __P((char *, char *));
 void putstr __P((char *));
+
+extern int not42;
 
 /*
  * utility functions performing io related tasks
@@ -82,7 +74,7 @@ ttloop()
     }
     ncc = read(net, netibuf, sizeof netibuf);
     if (ncc < 0) {
-	syslog(LOG_INFO, "ttloop:  read: %m");
+	syslog(LOG_ERR, "ttloop:  read: %m");
 	exit(1);
     } else if (ncc == 0) {
 	syslog(LOG_INFO, "ttloop:  peer died: %m");
@@ -262,7 +254,6 @@ netclear()
 netflush()
 {
     int n;
-    extern int not42;
 
     if ((n = nfrontp - nbackp) > 0) {
 	DIAG(TD_REPORT,

@@ -1,4 +1,4 @@
-/*	$NetBSD: defs.h,v 1.7 1998/04/01 15:05:10 kleink Exp $	*/
+/*	$NetBSD: defs.h,v 1.10 2001/08/24 00:14:03 wiz Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -50,17 +50,9 @@
 # define LINEMODE
 # define KLUDGELINEMODE
 # define DIAGNOSTICS
-# if defined(UNICOS50) && !defined(UNICOS5)
-#  define UNICOS5
-# endif
-# if !defined(UNICOS5)
-#  define BFTPDAEMON
-#  define HAS_IP_TOS
-# endif
+# define BFTPDAEMON
+# define HAS_IP_TOS
 #endif /* CRAY */
-#if defined(UNICOS5) && !defined(NO_SETSID)
-# define NO_SETSID
-#endif
 
 #if defined(PRINTOPTIONS) && defined(DIAGNOSTICS)
 #define TELOPTS
@@ -140,13 +132,6 @@ typedef unsigned char cc_t;
 
 
 #ifdef	CRAY
-# ifdef	CRAY1
-# include <sys/pty.h>
-#  ifndef FD_ZERO
-# include <sys/select.h>
-#  endif /* FD_ZERO */
-# endif	/* CRAY1 */
-
 #include <memory.h>
 #endif	/* CRAY */
 
@@ -268,7 +253,7 @@ typedef struct {
 			((options[opt]+MY_STATE_DO) & MY_WANT_STATE_DO)
 
 /*
- * Make everything symetrical
+ * Make everything symmetrical
  */
 
 #define	HIS_STATE_WILL			MY_STATE_DO
@@ -298,3 +283,8 @@ typedef struct {
 
 #define his_will_wont_is_changing	my_do_dont_is_changing
 #define his_do_dont_is_changing		my_will_wont_is_changing
+
+/*
+ * Initialization buffer for tty device [16 characters long]
+ */
+#define NULL16STR	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"

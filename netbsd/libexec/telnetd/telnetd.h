@@ -1,4 +1,4 @@
-/*	$NetBSD: telnetd.h,v 1.6.4.1 2001/07/29 04:13:12 jhawk Exp $	*/
+/*	$NetBSD: telnetd.h,v 1.7 2001/07/19 04:57:50 itojun Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993

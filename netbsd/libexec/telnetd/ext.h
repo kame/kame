@@ -1,4 +1,4 @@
-/*	$NetBSD: ext.h,v 1.10.4.2 2001/07/29 04:12:58 jhawk Exp $	*/
+/*	$NetBSD: ext.h,v 1.16 2001/08/24 00:14:03 wiz Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -71,7 +71,7 @@ extern int	got_forwarded_creds;
 
 extern slcfun	slctab[NSLC + 1];	/* slc mapping table */
 
-char	*terminaltype;
+extern char	*terminaltype;
 
 /*
  * I/O data buffers, pointers, and counters.
@@ -85,10 +85,6 @@ extern char	*neturg;		/* one past last bye of urgent data */
 
 extern int	pcc, ncc;
 
-#if defined(CRAY2) && defined(UNICOS5)
-extern int unpcc;  /* characters left unprocessed by CRAY-2 terminal routine */
-extern char *unptyip;  /* pointer to remaining characters in buffer */
-#endif
 
 extern int	pty, net;
 extern char	*line;
@@ -125,7 +121,9 @@ extern void
 #ifdef DIAGNOSTICS
 	printoption P((const char *, int)),
 	printdata P((char *, char *, int)),
+#if !defined(ENCRYPTION)
 	printsub P((int, unsigned char *, int)),
+#endif
 #endif
 	ptyflush P((void)),
 	putchr P((int)),
@@ -157,7 +155,6 @@ extern int
 #ifndef convex
 	getpty P((int *)),
 #endif
-	login_tty P((int)),
 	spcset P((int, cc_t *, cc_t **)),
 	stilloob P((int)),
 	terminit P((void)),
@@ -194,8 +191,6 @@ extern int output_data __P((const char *, ...))
 extern int output_datalen __P((const char *, size_t));
 
 #ifdef	ENCRYPTION
-extern int	(*decrypt_input) P((int));
-extern void	(*encrypt_output) P((unsigned char *, int));
 extern char	*nclearto;
 #endif	/* ENCRYPTION */
 
@@ -221,9 +216,6 @@ extern struct {
 } clocks;
 
 
-#if	defined(CRAY2) && defined(UNICOS5)
-extern int	needtermstat;
-#endif
 
 #ifndef	DEFAULT_IM
 # ifdef CRAY
@@ -239,4 +231,12 @@ extern int	needtermstat;
 #   endif
 #  endif
 # endif
+#endif
+
+#if	defined(AUTHENTICATION)
+#include <libtelnet/auth.h>
+#endif
+
+#if defined(ENCRYPTION)
+#include <libtelnet/encrypt.h>
 #endif
