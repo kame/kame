@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.143 2001/07/21 10:45:38 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.144 2001/07/22 01:13:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -811,7 +811,7 @@ defrouter_select()
 
 	if (installcount == 0) {
 		/*
-		 * None of the default router was found to be reachable.
+		 * None of the default routers was found to be reachable.
 		 * Install all routers with highest preference.
 		 */
 		installedpref = rtpref(TAILQ_FIRST(&nd_defrouter));
