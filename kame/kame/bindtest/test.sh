@@ -2,7 +2,10 @@
 
 bindtest='./bindtest -s'
 port=9999
-platform=foo
+platform=$1
+if test "x$platform" = "x"; then
+	platform=foo
+fi
 
 ($bindtest -p $port
 $bindtest -A -p $port
