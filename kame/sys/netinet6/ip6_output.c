@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.298 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.299 2002/05/24 12:32:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -177,6 +177,7 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_hbh;
 	struct mbuf *ip6e_dest1;
 	struct mbuf *ip6e_rthdr;
+	struct mbuf *ip6e_rthdr2; /* for MIP6 */
 	struct mbuf *ip6e_haddr; /* for MIP6 */
 	struct mbuf *ip6e_dest2;
 	struct mbuf *ip6e_mobility; /* for MIP6 */
@@ -336,7 +337,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* Hop-by-Hop options header */
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);
 		/* Destination options header(1st part) */
-		if (opt->ip6po_rthdr) {
+		if (opt->ip6po_rthdr || opt->ip6po_rthdr2) {
 			/*
 			 * Destination options header(1st part)
 			 * This only makes sence with a routing header.
@@ -352,6 +353,10 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		}
 		/* Routing header */
 		MAKE_EXTHDR(opt->ip6po_rthdr, &exthdrs.ip6e_rthdr);
+#ifdef MIP6
+		/* Type 2 Routing header for MIP6 route optimization */
+		MAKE_EXTHDR(opt->ip6po_rthdr2, &exthdrs.ip6e_rthdr2);
+#endif /* MIP6 */
 		/* Destination options header(2nd part) */
 		MAKE_EXTHDR(opt->ip6po_dest2, &exthdrs.ip6e_dest2);
 #ifdef MIP6
@@ -371,40 +376,29 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (mip6_exthdr_create(m, opt, &mip6opt))
 			goto freehdrs;
 
-		if (((opt != NULL) && (opt->ip6po_rthdr != NULL))
-		    || (mip6opt.mip6po_rthdr != NULL)) {
-			m_freem(exthdrs.ip6e_rthdr);
-			if (mip6opt.mip6po_rthdr != NULL) {
-				/*
-				 * there is no rthdr specified in the
-				 * ip6_pktopts.  but mip6 create a
-				 * rthdr for the router optimization
-				 * purpose.
-				 */
-				MAKE_EXTHDR(mip6opt.mip6po_rthdr,
-					    &exthdrs.ip6e_rthdr);
-			} else {
-				/*
-				 * there is a rthdr specified in the
-				 * ip6_pktopts.  if mip6 require the
-				 * route optimization, the rthdr for
-				 * that purpose is already included in
-				 * the ip6po_rthdr in the
-				 * mip6_destopt_create().
-				 */
-				MAKE_EXTHDR(opt->ip6po_rthdr,
-					    &exthdrs.ip6e_rthdr);
-			}
+		if ((exthdrs.ip6e_rthdr2 == NULL)
+		    && (mip6opt.mip6po_rthdr != NULL)) {
+			/*
+			 * if a type 2 routing header is not specified
+			 * when ip6_output() is called and
+			 * mip6_exthdr_create() creates a type 2
+			 * routing header for route optimization,
+			 * insert it.
+			 */
+			MAKE_EXTHDR(mip6opt.mip6po_rthdr,
+				    &exthdrs.ip6e_rthdr2);
 			/*
 			 * if a routing header exists dest1 must be
 			 * inserted if it exists.
 			 */
-			if ((opt != NULL) && (opt->ip6po_dest1)) {
+			if ((opt != NULL) && (opt->ip6po_dest1)
+			    && (exthdrs.ip6e_dest1 == NULL)) {
 				m_freem(exthdrs.ip6e_dest1);
 				MAKE_EXTHDR(opt->ip6po_dest1,
 					    &exthdrs.ip6e_dest1);
 			}
 		}
+		/* Home Address Destinatio Option. */
 		MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
 		/*
 		 * add a mobility header only when there is no
@@ -508,7 +502,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (exthdrs.ip6e_hbh || exthdrs.ip6e_dest1 ||
 		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2
 #ifdef MIP6
-		    || exthdrs.ip6e_haddr || exthdrs.ip6e_mobility
+		    || exthdrs.ip6e_rthdr2 || exthdrs.ip6e_haddr
+		    || exthdrs.ip6e_mobility
 #endif /* MIP6 */
 		    ) {
 			error = EHOSTUNREACH;
@@ -573,6 +568,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	if (exthdrs.ip6e_dest1) optlen += exthdrs.ip6e_dest1->m_len;
 	if (exthdrs.ip6e_rthdr) optlen += exthdrs.ip6e_rthdr->m_len;
 #ifdef MIP6
+	if (exthdrs.ip6e_rthdr2) optlen += exthdrs.ip6e_rthdr2->m_len;
 	if (exthdrs.ip6e_haddr) optlen += exthdrs.ip6e_haddr->m_len;
 #endif /* MIP6 */
 	unfragpartlen = optlen + sizeof(struct ip6_hdr);
@@ -698,8 +694,10 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		MAKE_CHAIN(exthdrs.ip6e_rthdr, mprev,
 			   nexthdrp, IPPROTO_ROUTING);
 #ifdef MIP6
+		/* a type 2 routing header for route optimization. */
+		MAKE_CHAIN(exthdrs.ip6e_rthdr2, mprev,
+			   nexthdrp, IPPROTO_ROUTING);
 		/*
-		 * XXX
 		 * MIP6 homeaddress destination option must reside
 		 * after rthdr and before ah/esp/frag hdr.
 		 * this order is not recommended in the ipv6 spec of course.
@@ -797,20 +795,30 @@ skip_ipsec2:;
 	 * If there is a routing header, replace the destination address field
 	 * with the first hop of the routing header.
 	 */
-	if (exthdrs.ip6e_rthdr) {
-		struct ip6_rthdr *rh =
-			(struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
-						  struct ip6_rthdr *));
+	if (exthdrs.ip6e_rthdr
+#ifdef MIP6
+	    || exthdrs.ip6e_rthdr2
+#endif /* MIP6 */
+		) {
+		struct ip6_rthdr *rh;
 		struct ip6_rthdr0 *rh0;
 		struct in6_addr *addr;
 		struct sockaddr_in6 sa;
 		struct in6_addr finaldst;
 
+		if (exthdrs.ip6e_rthdr)
+			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
+						       struct ip6_rthdr *));
+#ifdef MIP6
+		else
+			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr2,
+						       struct ip6_rthdr *));
+#endif /* MIP6 */
+
 		finaldst = ip6->ip6_dst;
 		switch (rh->ip6r_type) {
 #ifdef MIP6
 		case IPV6_RTHDR_TYPE_2:
-printf("MIP6 ip6_output XXX\n");
 #endif /* MIP6 */
 		case IPV6_RTHDR_TYPE_0:
 			 rh0 = (struct ip6_rthdr0 *)rh;

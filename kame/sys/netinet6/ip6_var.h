@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.92 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: ip6_var.h,v 1.93 2002/05/24 12:32:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,6 +129,8 @@ struct	ip6po_rhinfo {
 };
 #define ip6po_rthdr	ip6po_rhinfo.ip6po_rhi_rthdr
 #define ip6po_route	ip6po_rhinfo.ip6po_rhi_route
+#define ip6po_rthdr2	ip6po_rhinfo2.ip6po_rhi_rthdr
+#define ip6po_route2	ip6po_rhinfo2.ip6po_rhi_route
 
 /* Nexthop related info */
 struct	ip6po_nhinfo {
@@ -158,6 +160,9 @@ struct	ip6_pktopts {
 
 	/* Routing header related info. */
 	struct	ip6po_rhinfo ip6po_rhinfo;
+
+	/* Mobile IPv6 type 2 Routing header. */
+	struct	ip6po_rhinfo ip6po_rhinfo2;
 
 	/* Destination options header (after a routing header) */
 	struct	ip6_dest *ip6po_dest2;

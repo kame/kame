@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.125 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.126 2002/05/24 12:32:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1685,58 +1685,31 @@ mip6_rthdr_create(pktopt_rthdr, coa, opt)
 	struct sockaddr_in6 *coa;
 	struct ip6_pktopts *opt;
 {
-	struct ip6_rthdr0 *rthdr0, *orthdr0;
-	int osegleft;
-	struct in6_addr *ointhop = NULL, *inthop;
+	struct ip6_rthdr2 *rthdr2;
 	size_t len;
-	int i;
 
 	/*
-	 * recent discussion in the mobileip-wg concluded that the
-	 * multiple rthdrs (one is specified by the caller of
-	 * ip6_output, and the other is MIP6's) should be merged.  see
-	 * the thread of discussion on the mopbile-ip mailing list
-	 * started at 'Tue, 04 Sep 2001 12:51:34 -0700' with the
-	 * subject 'Coexistence with other uses for routing header'.
-	 *
-	 * if we have a type0 routing header pktopt already, we should
-	 * merge them.
+	 * Mobile IPv6 uses type 2 routing header for route
+	 * optimization. if the packet has a type 1 routing header
+	 * already, we must add a type 2 routing header after the type
+	 * 1 routing header.
 	 */
-	if ((opt != NULL) && (opt->ip6po_rthdr != NULL)) {
-		orthdr0 = (struct ip6_rthdr0 *)opt->ip6po_rthdr;
-		if (orthdr0->ip6r0_type == 0) {
-			osegleft = orthdr0->ip6r0_segleft;
-			ointhop = (struct in6_addr *)(orthdr0 + 1);
-		} else {
-			/* other type of the routing header. */
-			return (0);
-		}
-	} else 
-		osegleft = 0;
 
-	len = sizeof(struct ip6_rthdr0)
-		+ (sizeof(struct in6_addr) * (osegleft + 1));
-	rthdr0 = malloc(len, M_IP6OPT, M_NOWAIT);
-	if (rthdr0 == NULL) {
+	len = sizeof(struct ip6_rthdr2)	+ sizeof(struct in6_addr);
+	rthdr2 = malloc(len, M_IP6OPT, M_NOWAIT);
+	if (rthdr2 == NULL) {
 		return (ENOMEM);
 	}
-	bzero(rthdr0, len);
+	bzero(rthdr2, len);
 
-	/* rthdr0->ip6r0_nxt = will be filled later in ip6_output */
-	rthdr0->ip6r0_len = (osegleft + 1) * 2;
-printf("MIP6 mip6_rthdr_create XXX\n");
-	rthdr0->ip6r0_type = 2;
-	rthdr0->ip6r0_segleft = osegleft + 1;
-	rthdr0->ip6r0_reserved = 0;
-	inthop = (struct in6_addr *)(rthdr0 + 1);
-	for (i = 0; i < osegleft; ointhop++, inthop++) {
-		bcopy((caddr_t)ointhop, (caddr_t)inthop,
-		      sizeof(struct in6_addr));
-		i++;
-	}
-	bcopy((caddr_t)&coa->sin6_addr, (caddr_t)inthop,
+	/* rthdr2->ip6r2_nxt = will be filled later in ip6_output */
+	rthdr2->ip6r2_len = 2;
+	rthdr2->ip6r2_type = 2;
+	rthdr2->ip6r2_segleft = 1;
+	rthdr2->ip6r2_reserved = 0;
+	bcopy((caddr_t)&coa->sin6_addr, (caddr_t)(rthdr2 + 1),
 	      sizeof(struct in6_addr));
-	*pktopt_rthdr = (struct ip6_rthdr *)rthdr0;
+	*pktopt_rthdr = (struct ip6_rthdr *)rthdr2;
 
 	return (0);
 }
