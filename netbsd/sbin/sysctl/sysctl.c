@@ -86,11 +86,6 @@ __RCSID("$NetBSD: sysctl.c,v 1.37.2.3 2000/07/22 04:40:39 simonb Exp $");
 #include <netinet6/ip6_var.h>
 #include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
-#ifdef TCP6
-#include <netinet6/tcp6.h>
-#include <netinet6/tcp6_timer.h>
-#include <netinet6/tcp6_var.h>
-#endif
 #include <netinet6/pim6_var.h>
 #endif /* INET6 */
 
@@ -798,24 +793,13 @@ sysctl_inet(string, bufpp, mib, flags, typep)
 struct ctlname inet6name[] = CTL_IPV6PROTO_NAMES;
 struct ctlname ip6name[] = IPV6CTL_NAMES;
 struct ctlname icmp6name[] = ICMPV6CTL_NAMES;
-#ifdef TCP6
-struct ctlname tcp6name[] = TCP6CTL_NAMES;
-#endif
 struct ctlname udp6name[] = UDP6CTL_NAMES;
 struct ctlname pim6name[] = PIM6CTL_NAMES;
 struct ctlname ipsec6name[] = IPSEC6CTL_NAMES;
 struct list inet6list = { inet6name, IPV6PROTO_MAXID };
 struct list inet6vars[] = {
 /*0*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
-	{ 0, 0 },
-#ifdef TCP6
-	{ tcp6name, TCP6CTL_MAXID },	/* tcp6 */
-#else
-	{ 0, 0 },
-#endif
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
 /*10*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },
