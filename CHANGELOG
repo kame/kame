@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.886 2000/05/17 03:25:09 suz Exp $
+$Id: CHANGELOG,v 1.887 2000/05/17 05:11:33 jinmei Exp $
 
 <200005>
+2000-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/scope6config/scope6config.c: added a new syntax
+	"scope6config default" to see the default zones.
+
+2000-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{in6.c, nd6_rtr.c, scope6.c}: introduced the
+	notion of "default scope zones":
+	- store the default zones in scope6_ids[0]
+	- reflect change of default interface to default link
+        - added a new ioctl SIOCGSCOPE6DEF to get the default values
+
 2000-05-17  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
 	* bsdi3/sys/net/if_tun.c:
 	- fixed mbuf allocation bug on tun?
