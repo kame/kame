@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.8 2001/10/09 11:00:00 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.9 2001/10/17 08:31:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -382,8 +382,8 @@ hif_subnet_create(ms)
 	MALLOC(hs, struct hif_subnet *, sizeof(struct hif_subnet),
 	       M_TEMP, M_NOWAIT);
 	if (hs == NULL) {
-		mip6log((LOG_ERR, "%s: hif_subnet memory allocation failed.\n",
-			 __FUNCTION__));
+		mip6log((LOG_ERR, "%s:%d: hif_subnet memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 	hs->hs_ms = ms;
@@ -404,8 +404,8 @@ hif_subnet_list_insert(hs_list, hs)
 
 	ms = hs->hs_ms;
 	if (ms ==  NULL) {
-		mip6log((LOG_ERR, "%s: invalid mip6_subnet pointer.\n",
-			 __FUNCTION__));
+		mip6log((LOG_ERR, "%s:%d: invalid mip6_subnet pointer.\n",
+			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
 
@@ -463,8 +463,8 @@ hif_subnet_list_find_withprefix(hs_list, prefix, prefixlen)
 		if ((ms = hs->hs_ms) == NULL) {
 			/* this must not happen. */
 			mip6log((LOG_ERR,
-				 "%s: hs_ms is a NULL pointer.\n",
-				 __FUNCTION__));
+				 "%s:%d: hs_ms is a NULL pointer.\n",
+				 __FILE__, __LINE__));
 			return (NULL);
 		}
 		if (mip6_subnet_prefix_list_find_withprefix(&ms->ms_mspfx_list,
@@ -496,8 +496,8 @@ hif_subnet_list_find_withhaaddr(hs_list, haaddr)
 		if (ms == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,
-				 "%s: hs_ms is a NULL pointer.\n",
-				 __FUNCTION__));
+				 "%s:%d: hs_ms is a NULL pointer.\n",
+				 __FILE__, __LINE__));
 			return (NULL);
 		}
 		if (mip6_subnet_ha_list_find_withhaaddr(&ms->ms_msha_list,
@@ -518,15 +518,15 @@ hif_coa_create(ifp)
 	struct hif_coa *hcoa;
 
 	if (ifp == NULL) {
-		mip6log((LOG_ERR, "%s: NULL ifp\n",
-			 __FUNCTION__));
+		mip6log((LOG_ERR, "%s:%d: NULL ifp\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 
 	hcoa = malloc(sizeof(struct hif_coa), M_TEMP, M_NOWAIT);
 	if (hcoa == NULL) {
-		mip6log((LOG_ERR, "%s: memory allocation failure\n",
-			 __FUNCTION__));
+		mip6log((LOG_ERR, "%s:%d: memory allocation failure\n",
+			 __FILE__, __LINE__));
 	}
 
 	if (hcoa) {
@@ -669,10 +669,10 @@ hif_ha_list_update_withioctl(sc, data)
 			 * prefix with this updating homeagent.
 			 */
 			mip6log((LOG_ERR,
-				 "%s: no hif_subnet.  you must specify "
+				 "%s:%d: no hif_subnet.  you must specify "
 				 "at least one prefix before setting "
 				 "a home agent manually.\n",
-				 __FUNCTION__));
+				 __FILE__, __LINE__));
 			return (EINVAL);
 		}
 	}
@@ -691,16 +691,16 @@ hif_ha_list_update_withioctl(sc, data)
 				     nmha->mha_lifetime);
 		if (mha == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: mip6_ha memory allocation failed.\n",
-				 __FUNCTION__));
+				 "%s:%d: mip6_ha memory allocation failed.\n",
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		msha = mip6_subnet_ha_create(mha);
 		if (msha == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: mip6_subnet_ha memory allocation "
+				 "%s:%d: mip6_subnet_ha memory allocation "
 				 "failed.\n",
-				 __FUNCTION__));
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		error = mip6_subnet_ha_list_insert(&ms->ms_msha_list, msha);
@@ -792,9 +792,9 @@ hif_subnet_list_update_withmpfx(sc, data)
 			ms = mip6_subnet_create();
 			if (ms == NULL) {
 				mip6log((LOG_ERR,
-					 "%s: mip6_subnet memory allocation "
+					 "%s:%d: mip6_subnet memory allocation "
 					 "failed.\n",
-					 __FUNCTION__));
+					 __FILE__, __LINE__));
 				return (ENOMEM);
 			}
 			error = mip6_subnet_list_insert(&mip6_subnet_list,
@@ -808,9 +808,9 @@ hif_subnet_list_update_withmpfx(sc, data)
 						  nmpfx->mpfx_lifetime);
 			if (mpfx == NULL) {
 				mip6log((LOG_ERR,
-					 "%s: mip6_prefix memory allocation "
+					 "%s:%d: mip6_prefix memory allocation "
 					 "failed.\n",
-					 __FUNCTION__));
+					 __FILE__, __LINE__));
 				return (ENOMEM);
 			}
 			error = mip6_prefix_list_insert(&mip6_prefix_list,
@@ -822,9 +822,9 @@ hif_subnet_list_update_withmpfx(sc, data)
 			mspfx = mip6_subnet_prefix_create(mpfx);
 			if (mspfx == NULL) {
 				mip6log((LOG_ERR,
-					 "%s: mip6_subnet_prefix memory "
+					 "%s:%d: mip6_subnet_prefix memory "
 					 "allocation failed.\n",
-					 __FUNCTION__));
+					 __FILE__, __LINE__));
 				return (ENOMEM);
 			}
 			error = mip6_subnet_prefix_list_insert(&ms->ms_mspfx_list,
@@ -873,8 +873,8 @@ hif_subnet_list_update_withmpfx(sc, data)
 		hs = hif_subnet_create(ms);
 		if (hs == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: hif_subnet memory allocation failed.\n",
-				 __FUNCTION__));
+				 "%s:%d: hif_subnet memory allocation failed.\n",
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		error = hif_subnet_list_insert(&sc->hif_hs_list_home,
