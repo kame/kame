@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.5 2000/05/16 16:25:35 fujisawa Exp $
+ *	$Id: main.c,v 1.6 2000/06/04 13:46:04 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -432,7 +432,7 @@ openLog()
     int		logopt = 0;
 
     logopt = LOG_PID | LOG_NOWAIT;
-    openlog("ptrd", logopt, LOG_DAEMON);
+    openlog("natptd", logopt, LOG_DAEMON);
 }
 
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.3 2000/05/16 16:25:35 fujisawa Exp $
+ *	$Id: defs.h,v 1.4 2000/06/04 13:46:04 fujisawa Exp $
  */
 
 #ifndef TRUE
@@ -40,9 +40,9 @@
 #define	OPT_PIDFILE		(1)
 #define	OPT_STATSFILE		(2)
 
-#define	_PATH_DUMPFILE		"/var/tmp/ptrd_dump"
-#define	_PATH_PIDFILE		"/var/run/ptrd.pid"
-#define	_PATH_STATSFILE		"/var/tmp/ptrd.stats"
+#define	_PATH_DUMPFILE		"/var/tmp/natptd_dump"
+#define	_PATH_PIDFILE		"/var/run/natptd.pid"
+#define	_PATH_STATSFILE		"/var/tmp/natptd.stats"
 
 #define	INADDRARPA		"255.255.255.255.in-addr.arpa."
 
