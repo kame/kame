@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.143 2000/07/20 17:41:01 itojun Exp $	*/
+/*	$KAME: key.c,v 1.144 2000/07/25 20:16:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2568,14 +2568,6 @@ key_delsav(sav)
 		KFREE(sav->lft_s);
 	if (sav->iv != NULL)
 		KFREE(sav->iv);
-#if notyet
-	if (sav->misc1 != NULL)
-		KFREE(sav->misc1);
-	if (sav->misc2 != NULL)
-		KFREE(sav->misc2);
-	if (sav->misc3 != NULL)
-		KFREE(sav->misc3);
-#endif
 
 	KFREE(sav);
 
@@ -2713,11 +2705,6 @@ key_setsaval(sav, m, mhp)
 	sav->lft_c = NULL;
 	sav->lft_h = NULL;
 	sav->lft_s = NULL;
-#if notyet
-	sav->misc1 = NULL;
-	sav->misc2 = NULL;
-	sav->misc3 = NULL;
-#endif
 
 	/* SA */
 	if (mhp->ext[SADB_EXT_SA] != NULL) {
@@ -2935,37 +2922,6 @@ key_setsaval(sav, m, mhp)
 	}
     }
 
-#if notyet
-	/* pre-processing for DES */
-	switch (sav->alg_enc) {
-	case SADB_EALG_DESCBC:
-        	if (des_key_sched((C_Block *)_KEYBUF(sav->key_enc),
-		                  (des_key_schedule)sav->misc1) != 0) {
-#ifdef IPSEC_DEBUG
-			printf("key_setsaval: error des_key_sched.\n");
-#endif
-			sav->misc1 = NULL;
-			/* THROUGH */
-		}
-		break;
-	case SADB_EALG_3DESCBC:
-        	if (des_key_sched((C_Block *)_KEYBUF(sav->key_enc),
-		                  (des_key_schedule)sav->misc1) != 0
-        	 || des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 8),
-		                  (des_key_schedule)sav->misc2) != 0
-        	 || des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16),
-		                  (des_key_schedule)sav->misc3) != 0) {
-#ifdef IPSEC_DEBUG
-			printf("key_setsaval: error des_key_sched.\n");
-#endif
-			sav->misc1 = NULL;
-			sav->misc2 = NULL;
-			sav->misc3 = NULL;
-			/* THROUGH */
-		}
-	}
-#endif
-
 	return 0;
 
  fail:
@@ -2986,14 +2942,6 @@ key_setsaval(sav, m, mhp)
 		KFREE(sav->lft_h);
 	if (sav->lft_s != NULL)
 		KFREE(sav->lft_s);
-#if notyet
-	if (sav->misc1 != NULL)
-		KFREE(sav->misc1);
-	if (sav->misc2 != NULL)
-		KFREE(sav->misc2);
-	if (sav->misc3 != NULL)
-		KFREE(sav->misc3);
-#endif
 
 	return error;
 }

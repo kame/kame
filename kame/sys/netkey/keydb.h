@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.12 2000/07/20 17:41:02 itojun Exp $	*/
+/*	$KAME: keydb.h,v 1.13 2000/07/25 20:16:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,11 +81,6 @@ struct secasvar {
 	struct sadb_key *key_enc;	/* Key for Encryption */
 	caddr_t iv;			/* Initilization Vector */
 	u_int ivlen;			/* length of IV */
-#if 0
-	caddr_t misc1;
-	caddr_t misc2;
-	caddr_t misc3;
-#endif
 	void *sched;			/* intermediate encryption key */
 	size_t schedlen;
 
