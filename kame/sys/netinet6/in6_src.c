@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.13 2000/05/05 13:27:14 sumikawa Exp $	*/
+/*	$KAME: in6_src.c,v 1.14 2000/05/28 14:54:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -452,6 +452,11 @@ in6_pcbsetport(laddr, in6p)
 	for (;;) {
 		lport = htons(head->in6p_lport);
 		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
+#ifdef HAVE_NRL_INPCB
+#ifdef INPLOOKUP_WILDCARD6
+			wild &= ~INPLOOKUP_WILDCARD6;
+#endif
+#endif
 #if 0
 			t = in_pcblookup_bind(&tcbtable,
 					      (struct in_addr *)&in6p->in6p_laddr.s6_addr32[3],
@@ -461,6 +466,9 @@ in6_pcbsetport(laddr, in6p)
 #endif
 		} else {
 #ifdef HAVE_NRL_INPCB
+#ifdef INPLOOKUP_WILDCARD4
+			wild &= ~INPLOOKUP_WILDCARD4;
+#endif
 			/* XXX: ugly cast... */
 			t = in_pcblookup(head, (struct in_addr *)&zeroin6_addr,
 					 0, (struct in_addr *)laddr,
