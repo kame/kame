@@ -28,6 +28,10 @@ CFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 .else
 CPPFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 .endif
+.if (${OPSYS} == "NetBSD") || (${OPSYS} == "OpenBSD")
+LDADD+=	-lutil
+DPADD+=	${LIBUTIL}
+.endif
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6

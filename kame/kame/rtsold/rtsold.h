@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.h,v 1.13 2001/11/13 10:31:23 jinmei Exp $	*/
+/*	$KAME: rtsold.h,v 1.14 2002/05/31 10:10:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,26 +65,25 @@ extern int dflag;
 extern int aflag;
 extern int ifconfig __P((char *));
 extern void iflist_init __P((void));
-struct ifinfo *find_ifinfo __P((int ifindex));
-void rtsol_timer_update __P((struct ifinfo *ifinfo));
+struct ifinfo *find_ifinfo __P((int));
+void rtsol_timer_update __P((struct ifinfo *));
 extern void warnmsg __P((int, const char *, const char *, ...))
      __attribute__((__format__(__printf__, 3, 4)));
 extern char **autoifprobe __P((void));
 
 /* if.c */
 extern int ifinit __P((void));
-extern int interface_up __P((char *name));
-extern int interface_status __P((struct ifinfo*));
-extern int lladdropt_length __P((struct sockaddr_dl *sdl));
-extern void lladdropt_fill __P((struct sockaddr_dl *sdl,
-				struct nd_opt_hdr *ndopt));
-extern struct sockaddr_dl *if_nametosdl __P((char *name));
-extern int getinet6sysctl __P((int code));
+extern int interface_up __P((char *));
+extern int interface_status __P((struct ifinfo *));
+extern int lladdropt_length __P((struct sockaddr_dl *));
+extern void lladdropt_fill __P((struct sockaddr_dl *, struct nd_opt_hdr *));
+extern struct sockaddr_dl *if_nametosdl __P((char *));
+extern int getinet6sysctl __P((int));
 
 /* rtsol.c */
 extern int sockopen __P((void));
 extern void sendpacket __P((struct ifinfo *));
-extern void rtsol_input __P((int s));
+extern void rtsol_input __P((int));
 
 /* probe.c */
 extern int probe_init __P((void));
