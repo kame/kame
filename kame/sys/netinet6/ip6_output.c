@@ -1359,7 +1359,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
-			case IPV6_REACHCONF:
 #ifdef notyet			/* To be implemented */
 			case IPV6_RTHDRDSTOPTS:
 			case IPV6_USE_MIN_MTU:
@@ -1698,7 +1697,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
-			case IPV6_REACHCONF:
 #ifdef notyet			/* To be implemented */
 			case IPV6_RTHDRDSTOPTS:
 			case IPV6_USE_MIN_MTU:
