@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.24 2001/10/24 08:43:53 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.25 2001/10/25 06:20:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -558,8 +558,13 @@ ni6_input(from, fromlen, buf, l)
 			sin6.sin6_len = sizeof(struct sockaddr_in6);
 			memcpy(&sin6.sin6_addr, ni6 + 1,
 			    sizeof(sin6.sin6_addr));
-			if (!ismyaddr((struct sockaddr *)&sin6, sizeof(sin6)) &&
-			    !IN6_IS_ADDR_MULTICAST(&sin6.sin6_addr)) {
+			if (ismyaddr((struct sockaddr *)&sin6, sizeof(sin6)))
+				;
+			else if (IN6_IS_ADDR_MULTICAST(&sin6.sin6_addr)) {
+				/*
+				 * let us permit multicasts for now.
+				 */
+			} else {
 				/*
 				 * proxy case - if we are going to do something
 				 * about this case, be really careful about
@@ -607,7 +612,9 @@ ni6_input(from, fromlen, buf, l)
 			sin.sin_family = AF_INET;
 			sin.sin_len = sizeof(struct sockaddr_in);
 			memcpy(&sin.sin_addr, ni6 + 1, sizeof(sin.sin_addr));
-			if (!ismyaddr((struct sockaddr *)&sin, sizeof(sin))) {
+			if (ismyaddr((struct sockaddr *)&sin, sizeof(sin)))
+				;
+			else {
 				/*
 				 * proxy case
 				 */
