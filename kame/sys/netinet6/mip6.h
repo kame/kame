@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.58 2003/04/23 09:15:50 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.59 2003/04/24 02:28:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -40,6 +40,8 @@
 #define MIP6_BA_INITIAL_TIMEOUT    1
 #define MIP6_BA_MAX_TIMEOUT        256
 #define MIP6_BU_MAX_BACKOFF        7
+#define MIP6_MAX_MOB_PFX_ADV_INTERVAL	86400
+#define MIP6_MIN_MOB_PFX_ADV_INTERVAL	  600
 
 /* binding ack status code. */
 #define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */

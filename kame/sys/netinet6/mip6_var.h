@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.88 2003/04/23 09:15:52 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.89 2003/04/24 02:28:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -117,6 +117,172 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 #define MIP6_REFRESH_MINLIFETIME 2
 #define MIP6_REFRESH_LIFETIME_RATE 50
 
+/* return routability parameters. */
+#define MIP6_COOKIE_MAX_LIFE	240
+#define MIP6_COOKIE_SIZE	8
+#define MIP6_HOME_TOKEN_SIZE	8
+#define MIP6_CAREOF_TOKEN_SIZE	8
+#define MIP6_NONCE_SIZE		8	/* recommended by the spec (5.2.2) */
+					/* must be multiple of size of u_short */
+#define MIP6_NODEKEY_SIZE	20	/* This size is specified at 5.2.1 in mip6 spec */
+#define MIP6_NONCE_HISTORY	10
+typedef u_int8_t mip6_nonce_t[MIP6_NONCE_SIZE];
+typedef u_int8_t mip6_nodekey_t[MIP6_NODEKEY_SIZE];
+typedef u_int8_t mip6_cookie_t[MIP6_COOKIE_SIZE];
+typedef u_int8_t mip6_home_token_t[MIP6_HOME_TOKEN_SIZE];
+typedef u_int8_t mip6_careof_token_t[MIP6_CAREOF_TOKEN_SIZE];
+#define MIP6_KBM_LEN		20
+#define MIP6_AUTHENTICATOR_LEN	12
+
+#define MIP6_MAX_RR_BINDING_LIFE	420
+
+/* the binding update list entry. */
+struct mip6_bu {
+	LIST_ENTRY(mip6_bu) mbu_entry;
+	struct sockaddr_in6 mbu_paddr;      /* peer addr of this BU */
+	struct sockaddr_in6 mbu_haddr;      /* HoA */
+	struct sockaddr_in6 mbu_coa;        /* CoA */
+	u_int16_t           mbu_lifetime;   /* BU lifetime */
+	u_int16_t           mbu_refresh;    /* refresh frequency */
+	u_int16_t           mbu_seqno;      /* sequence number */
+	u_int8_t            mbu_flags;      /* BU flags */
+	mip6_cookie_t       mbu_mobile_cookie;
+	u_int16_t           mbu_home_nonce_index;
+	mip6_home_token_t  mbu_home_token;  /* home keygen token */
+	u_int16_t           mbu_careof_nonce_index;
+        mip6_careof_token_t mbu_careof_token; /* careof keygen token */
+	u_int8_t            mbu_pri_fsm_state; /* primary fsm state */
+	u_int8_t            mbu_sec_fsm_state; /* secondary fsm state */
+	time_t              mbu_expire;     /* expiration time of this BU */
+	time_t              mbu_retrans;    /* retrans/refresh timo value */
+	u_int8_t            mbu_retrans_count;
+	time_t              mbu_failure;    /* failure timo value */
+	u_int8_t            mbu_state;
+	struct hif_softc    *mbu_hif;       /* back pointer to hif */
+	const struct encaptab *mbu_encap;
+};
+#define MIP6_BU_STATE_BUNOTSUPP   0x04
+#define MIP6_BU_STATE_MIP6NOTSUPP 0x80
+
+/* states for the primary fsm. */
+#define MIP6_BU_PRI_FSM_STATE_IDLE	0
+#define MIP6_BU_PRI_FSM_STATE_RRINIT	1
+#define MIP6_BU_PRI_FSM_STATE_RRREDO	2
+#define MIP6_BU_PRI_FSM_STATE_RRDEL	3
+#define MIP6_BU_PRI_FSM_STATE_WAITA	4
+#define MIP6_BU_PRI_FSM_STATE_WAITAR	5
+#define MIP6_BU_PRI_FSM_STATE_WAITD	6
+#define MIP6_BU_PRI_FSM_STATE_BOUND	7
+#define MIP6_IS_BU_BOUND_STATE(mbu)					\
+	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND))
+#define MIP6_IS_BU_WAITA_STATE(mbu)					\
+	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITA)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD))
+#define MIP6_IS_BU_RR_STATE(mbu)					\
+	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRINIT)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRDEL))
+
+/* states for the secondary fsm. */
+#define MIP6_BU_SEC_FSM_STATE_START	0
+#define MIP6_BU_SEC_FSM_STATE_WAITHC	1
+#define MIP6_BU_SEC_FSM_STATE_WAITH	2
+#define MIP6_BU_SEC_FSM_STATE_WAITC	3
+
+/* events for the primary fsm. */
+#define MIP6_BU_PRI_FSM_EVENT_MOVEMENT		0
+#define MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME	1
+#define MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET	2
+#define MIP6_BU_PRI_FSM_EVENT_RR_DONE		3
+#define MIP6_BU_PRI_FSM_EVENT_RR_FAILED		4
+#define MIP6_BU_PRI_FSM_EVENT_BRR		5
+#define MIP6_BU_PRI_FSM_EVENT_BA		6
+#define MIP6_BU_PRI_FSM_EVENT_NO_BINDING	7
+#define MIP6_BU_PRI_FSM_EVENT_UNVERIFIED_HAO	8
+#define MIP6_BU_PRI_FSM_EVENT_UNKNOWN_MH_TYPE	9
+#define MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB	10
+#define MIP6_BU_PRI_FSM_EVENT_RETRANS_TIMER	11
+#define MIP6_BU_PRI_FSM_EVENT_REFRESH_TIMER	12
+#define MIP6_BU_PRI_FSM_EVENT_FAILURE_TIMER	13
+#define MIP6_BU_IS_PRI_FSM_EVENT(ev) ((ev) <= MIP6_BU_PRI_FSM_EVENT_FAILURE_TIMER)
+
+/* events for the secondary fsm. */
+#define MIP6_BU_SEC_FSM_EVENT_START_RR		14
+#define MIP6_BU_SEC_FSM_EVENT_START_HOME_RR	15
+#define MIP6_BU_SEC_FSM_EVENT_STOP_RR		16
+#define MIP6_BU_SEC_FSM_EVENT_HOT		17
+#define MIP6_BU_SEC_FSM_EVENT_COT		18
+#define MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER	19
+#define MIP6_BU_IS_SEC_FSM_EVENT(ev) (!MIP6_BU_IS_PRI_FSM_EVENT((ev)))
+
+#define MIP6_BU_TIMEOUT_INTERVAL 1
+
+#define MIP6_HOT_TIMEOUT 5
+
+/*
+ * the list entry to hold the destination addresses which do not use a
+ * home address as a source address when communicating.
+ */
+struct mip6_unuse_hoa {
+	LIST_ENTRY (mip6_unuse_hoa) unuse_entry;
+	struct in6_addr unuse_addr;
+	u_int16_t unuse_port;
+};
+LIST_HEAD(mip6_unuse_hoa_list, mip6_unuse_hoa);
+
+/* XXX the home agent entry.  not good. */
+struct mip6_ha {
+	LIST_ENTRY(mip6_ha) mha_entry;
+	struct sockaddr_in6 mha_lladdr;    /* XXX link-local addr */
+	struct sockaddr_in6 mha_gaddr;     /* XXX global addr */
+	u_int8_t            mha_flags;     /* RA flags */
+	int16_t             mha_pref;      /* preference */
+	u_int16_t           mha_lifetime;  /* HA lifetime */
+	time_t              mha_expire;    /* expiration time of this HA. */
+};
+LIST_HEAD(mip6_ha_list, mip6_ha);
+
+struct mip6_prefix {
+	LIST_ENTRY(mip6_prefix) mpfx_entry;
+	struct sockaddr_in6     mpfx_prefix;
+	u_int8_t                mpfx_prefixlen;
+	u_int32_t               mpfx_vltime;
+	time_t                  mpfx_vlexpire;
+	u_int32_t               mpfx_pltime;
+	time_t                  mpfx_plexpire;
+	struct sockaddr_in6     mpfx_haddr;
+	u_int16_t		mpfx_mpsid;	/* Used for MPS */
+	u_int8_t		mpfx_sentmps;	/* 1: sent MPS to HA with above ID */
+};
+LIST_HEAD(mip6_prefix_list, mip6_prefix);
+
+struct mip6_subnet_prefix {
+	TAILQ_ENTRY(mip6_subnet_prefix) mspfx_entry;
+	struct mip6_prefix              *mspfx_mpfx;
+};
+
+struct mip6_subnet_ha {
+	TAILQ_ENTRY(mip6_subnet_ha) msha_entry;
+	struct mip6_ha              *msha_mha;
+};
+
+/*
+ * the subnet infomation.  this entry includes the routers and the
+ * prefixes those have some relations each other.
+ */
+struct mip6_subnet {
+	LIST_ENTRY(mip6_subnet)                         ms_entry;
+	TAILQ_HEAD(mip6_subnet_prefix_list, mip6_subnet_prefix) ms_mspfx_list;
+	TAILQ_HEAD(mip6_subnet_ha_list, mip6_subnet_ha) ms_msha_list;
+	int ms_refcnt;
+};
+LIST_HEAD(mip6_subnet_list, mip6_subnet);
+
+#define MIP6_SUBNET_TIMEOUT_INTERVAL 10
+
 /* packet options used by the mip6 packet output processing routine. */
 struct mip6_pktopts {
 	struct ip6_rthdr *mip6po_rthdr2;
@@ -142,24 +308,6 @@ struct mip6_mobility_options {
 #define MOPT_REFRESH	0x0010
 
 #define MOPT_AUTH_LEN(mopts)	(int)(*((mopts)->mopt_auth + 1))
-
-#define MIP6_COOKIE_MAX_LIFE	240
-#define MIP6_COOKIE_SIZE	8
-#define MIP6_HOME_TOKEN_SIZE	8
-#define MIP6_CAREOF_TOKEN_SIZE	8
-#define MIP6_NONCE_SIZE		8	/* recommended by the spec (5.2.2) */
-					/* must be multiple of size of u_short */
-#define MIP6_NODEKEY_SIZE	20	/* This size is specified at 5.2.1 in mip6 spec */
-#define MIP6_NONCE_HISTORY	10
-typedef u_int8_t mip6_nonce_t[MIP6_NONCE_SIZE];
-typedef u_int8_t mip6_nodekey_t[MIP6_NODEKEY_SIZE];
-typedef u_int8_t mip6_cookie_t[MIP6_COOKIE_SIZE];
-typedef u_int8_t mip6_home_token_t[MIP6_HOME_TOKEN_SIZE];
-typedef u_int8_t mip6_careof_token_t[MIP6_CAREOF_TOKEN_SIZE];
-#define MIP6_KBM_LEN		20
-#define MIP6_AUTHENTICATOR_LEN	12
-
-#define MIP6_MAX_RR_BINDING_LIFE	420
 
 /*
  * Mobile IPv6 configuration knobs.
