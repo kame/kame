@@ -253,6 +253,15 @@ ipsec4_getpolicybysock(m, dir, so, error)
 	if (pcbsp == NULL)
 		panic("ipsec4_getpolicybysock: pcbsp is NULL.\n");
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
+		printf("send: priv=%d ", pcbsp->priv);
+		if (so->so_cred) {
+			printf("p_ruid=%d ", so->so_cred->p_ruid);
+			printf("p_svuid=%d ", so->so_cred->p_svuid);
+			printf("cr_uid=%d\n", so->so_cred->pc_ucred->cr_uid);
+		});
+#endif
 	switch (dir) {
 	case IPSEC_DIR_INBOUND:
 		currsp = pcbsp->sp_in;
@@ -995,10 +1004,20 @@ ipsec_init_policy(so, pcb_sp)
 	else
 		new->priv = 0;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	if (so->so_cred == 0 && so->so_cred->pc_ucred->cr_uid == 0)
+	if (so->so_cred != 0 && so->so_cred->pc_ucred->cr_uid == 0)
 		new->priv = 1;
 	else
 		new->priv = 0;
+
+	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
+		printf("init: priv=%d ", new->priv);
+		if (so->so_cred) {
+			printf("p_ruid=%d ", so->so_cred->p_ruid);
+			printf("p_svuid=%d ", so->so_cred->p_svuid);
+			printf("cr_uid=%d\n", so->so_cred->pc_ucred->cr_uid);
+		} else
+			printf("so_cred is NULL\n");
+		);
 #else
 	switch (so->so_proto->pr_domain->dom_family) {
 	case AF_INET:
