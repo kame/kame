@@ -394,8 +394,8 @@ ip6_stats(off, name)
 			printf("\t\t%s: %qu\n", ip6nh[i],
 			       ip6stat.ip6s_nxthist[i]);
 		}
-	printf("\tMbuf statics:\n");
-	printf("\t\t%qu one mbuf\n", ip6stat.ip6s_m1);
+	printf("\tMbuf statistics:\n");
+	p(ip6s_m1, "\t\t%qu one mbuf%s\n");
 	for (first = 1, i = 0; i < 32; i++) {
 		char ifbuf[IFNAMSIZ];
 		if (ip6stat.ip6s_m2m[i] != 0) {		
@@ -408,8 +408,8 @@ ip6_stats(off, name)
 			       ip6stat.ip6s_m2m[i]);
 		}
 	}
-	printf("\t\t%qu one ext mbuf\n", ip6stat.ip6s_mext1);
-	printf("\t\t%qu two or more ext mbuf\n", ip6stat.ip6s_mext2m);	
+	p(ip6s_mext1, "\t\t%qu one ext mbuf%s\n");
+	p(ip6s_mext2m, "\t\t%qu two or more ext mbuf%s\n");
 	p(ip6s_exthdrtoolong, "\t%qu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%qu tunneling packet%s that can't find gif\n");
 	p(ip6s_toomanyhdr, "\t%qu packet%s discarded due to too may headers\n");
