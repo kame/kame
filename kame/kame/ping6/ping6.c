@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.164 2002/11/16 14:05:37 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.165 2002/12/04 12:20:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,8 +339,8 @@ main(argc, argv)
 #endif
 
 	/* just to be sure */
-	memset(&smsghdr, 0, sizeof(&smsghdr));
-	memset(&smsgiov, 0, sizeof(&smsgiov));
+	memset(&smsghdr, 0, sizeof(smsghdr));
+	memset(&smsgiov, 0, sizeof(smsgiov));
 
 	preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
