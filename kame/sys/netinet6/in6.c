@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.379 2004/07/14 16:44:48 suz Exp $	*/
+/*	$KAME: in6.c,v 1.380 2004/07/23 04:39:20 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -326,7 +326,7 @@ in6_ifaddloop(struct ifaddr *ifa)
 		      , 0
 #endif /* __FreeBSD__ */
 		);
-	
+
 	need_loop = (rt == NULL || (rt->rt_flags & RTF_HOST) == 0 ||
 	    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0);
 
@@ -341,10 +341,24 @@ in6_ifaddloop(struct ifaddr *ifa)
 	 * rtentry for CoA (this is eventually HoA) is installed
 	 * correctly.
 	 */
-	if (!need_loop) {
+	if (rt)
 		rtfree(rt);
+	if (!need_loop) {
 		in6_ifloop_request(RTM_DELETE, ifa);
 	}
+
+	/*
+	 * lookup a route again, since MIP6 code releases the route
+	 * allocated in the head of this function.
+	 */
+	rt = rtalloc1(ifa->ifa_addr, 0
+#ifdef __FreeBSD__
+		      , 0
+#endif /* __FreeBSD__ */
+		);
+
+	need_loop = (rt == NULL || (rt->rt_flags & RTF_HOST) == 0 ||
+	    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0);
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 	if (rt)
 		rtfree(rt);
