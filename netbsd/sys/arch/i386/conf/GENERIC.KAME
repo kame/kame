@@ -54,3 +54,6 @@ options 	RADIX_MPATH
 #options 	MIP6_DEBUG
 #options 	MIP6
 #pseudo-device	hif	1
+
+# Virtual Router Redundancy Protocol(VRRP)
+#pseudo-device  vrrp    2

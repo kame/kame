@@ -448,6 +448,30 @@ Note that
 and
 .Cm vlan
 must be set at the same time.
+.It Cm vrrpdev Ar iface lladdr
+If the interface is a vrrp pseudo device, associate physical interface
+.Ar iface
+with it.
+Packets transmitted through the vrrp interface will be
+diverted to the specified physical interface
+.Ar iface
+with source MAC address
+.Ar lladdr.
+Packets received
+by the parent interface with destination MAC address
+.Ar lladdr
+will be diverted to
+the associated vrrp pseudo-interface.
+If the vrrp interface already has
+a physical interface associated with it, this command will fail.
+To
+change the association to another physical interface, the existing
+association must be cleared first.
+.It Fl vrrpdev
+If the driver is a vrrp pseudo device, disassociate the physical interface
+from it.
+This breaks the link between the vrrp interface and its parent,
+clears its link address and shuts the interface down.
 .It Cm vltime Ar n
 (inet6 only)
 Set valid lifetime for the address.

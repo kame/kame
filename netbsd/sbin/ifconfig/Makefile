@@ -18,6 +18,9 @@ CPPFLAGS+=-DINET6
 # comment out to disable ISATAP feature
 CPPFLAGS+=-DUSE_ISATAP
 
+# comment out to disable VRRP feature
+CPPFLAGS+=-DUSE_VRRP
+
 # KAME scope id hack
 CPPFLAGS+=-DKAME_SCOPEID
 

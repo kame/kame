@@ -262,4 +262,5 @@
 #define IFT_PVC		0xf1
 #define IFT_FAITH	0xf2
 #define IFT_HIF		0xf4
+#define IFT_VRRP        0xf5
 #endif /* _NET_IF_TYPES_H_ */

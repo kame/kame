@@ -8,6 +8,7 @@ SUBDIR+=pvcsif pvctxctl
 SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
 SUBDIR+=racoon
+SUBDIR+=vrrp6d
 
 SUBDIR+=mip6control had mip6stat
 
