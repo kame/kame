@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.384 1999/12/28 05:24:25 sumikawa Exp $
+$Id: CHANGELOG,v 1.385 1999/12/28 06:20:18 itojun Exp $
 
 <199912>
 Tue Dec 28 14:24:08 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -9,7 +9,7 @@ Tue Dec 28 14:24:08 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 Tue Dec 28 13:55:57 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/*: sync with ports-current.
 
-Tue Nov  2 13:27:36 JST 1999  itojun@iijlab.net
+Tue Dec 28 JST 1999  itojun@iijlab.net
 	* freebsd2/ports/sendmail.beta, netbsd/pkgsrc/mail/sendmail.beta:
 	  upgrade to sendmail 8.10.0beta10.
 
