@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.26 2000/02/22 14:04:33 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.27 2000/02/26 06:53:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1715,4 +1715,3 @@ nd6_setdefaultiface(ifindex)
 
 	return(error);
 }
-	

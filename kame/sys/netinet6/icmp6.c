@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.68 2000/02/24 16:34:48 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.69 2000/02/26 06:53:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1993,9 +1993,8 @@ icmp6_redirect_output(m0, rt)
 	 * we almost always ask for an mbuf cluster for simplicity.
 	 * (MHLEN < IPV6_MMTU is almost always true)
 	 */
-#ifdef DIAGNOSTIC
-	if (IPV6_MMTU >= MCLBYTES)
-		printf("assumption failed about IPV6_MMTU and MCLBYTES\n");
+#if IPV6_MMTU >= MCLBYTES
+# error assumption failed about IPV6_MMTU and MCLBYTES
 #endif
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 	if (m && IPV6_MMTU >= MHLEN)
