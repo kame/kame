@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2597 2004/04/21 13:52:49 jinmei Exp $
+$KAME: CHANGELOG,v 1.2598 2004/04/22 02:44:27 suz Exp $
 
 <200404>
+2004-04-22  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet/in_msf.c, kame/sys/netinet6/in6_msf.c: silently
+	ignore an advanced MSF-API call (instead of returning EINVAL) when
+	the requested MSF is same as the one stored in kernel.
+
 2004-04-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): simplified the
 	fix to FreeBSD-SA-04:06.ipv6 (merged from FreeBSD to KAME on

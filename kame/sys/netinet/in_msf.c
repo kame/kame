@@ -2376,7 +2376,14 @@ ip_setmopt_srcfilter(sop, imsfp)
 		}
 	} else {
 		/* Something -> IN{non NULL}/EX{non NULL} */
-		if (add_num == 0) { /* only delete some sources */
+		 /* no change or only delete some sources */
+		if (add_num == 0) {
+			if (old_num == 0) {
+				igmplog((LOG_DEBUG, "in_setmcast_srcfilter: "
+					"no change\n"));
+				splx(s);
+				return 0;
+			}
 			if (imop->imo_membership[i] == NULL) {
 				igmplog((LOG_DEBUG, "in_setmcast_srcfilter: "
 					"NULL pointer?\n"));

@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.29 2004/04/06 13:11:12 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.30 2004/04/22 02:44:28 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2381,7 +2381,13 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			return error;
 		}
 	} else {
-		if (add_num == 0) { /* only delete some sources */
+		/* no change or only delete some sources */
+		if (add_num == 0) {
+			if (old_num == 0) {
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: no change\n"));
+				splx(s);
+				return 0;
+			}
 			if (imm == NULL) {
 				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: NULL pointer?\n"));
 				splx(s);
