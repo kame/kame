@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.82 2003/08/05 12:34:23 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.83 2003/10/10 07:34:34 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -966,7 +966,7 @@ set_short_delay(rai)
 	TIMEVAL_SUB(&now, &rai->lastsent, &tm_tmp);
 #ifdef MIP6
 	min_delay.tv_sec = rai->delaybetweenras / 1000;
-	min_delay.tv_usec = rai->delaybetweenras % 1000;
+	min_delay.tv_usec = (rai->delaybetweenras % 1000) * 1000;
 #else
 	min_delay.tv_sec = MIN_DELAY_BETWEEN_RAS;
 	min_delay.tv_usec = 0;
@@ -1795,7 +1795,7 @@ ra_timer_update(void *data, struct timeval *tm)
 
 #ifdef MIP6
 	tm->tv_sec = interval / 1000;
-	tm->tv_usec = interval % 1000;
+	tm->tv_usec = (interval % 1000) * 1000;
 #else
 	tm->tv_sec = interval;
 	tm->tv_usec = 0;
