@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.67 2001/08/08 13:26:37 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.68 2001/08/28 11:44:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,6 +90,7 @@ struct nd_ifinfo {
 };
 
 #define ND6_IFF_PERFORMNUD	0x1
+#define ND6_IFF_ACCEPT_RTADV	0x2
 
 struct in6_nbrinfo {
 	char ifname[IFNAMSIZ];	/* if name, e.g. "en0" */

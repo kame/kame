@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.159 2001/08/28 08:49:00 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.160 2001/08/28 11:44:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -241,7 +241,14 @@ nd6_ra_input(m, off, icmp6len)
 	union nd_opts ndopts;
 	struct nd_defrouter *dr;
 
+	/*
+	 * We only accept RAs only when
+	 * the system-wide variable allows the acceptance, and
+	 * per-interface variable allows RAs on the receiving interface.  
+	 */
 	if (ip6_accept_rtadv == 0)
+		goto freeit;
+	if (!(nd_ifinfo[ifp->if_index].flags & ND6_IFF_ACCEPT_RTADV))
 		goto freeit;
 
 	if (ip6->ip6_hlim != 255) {
