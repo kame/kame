@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.19 2001/12/18 03:10:43 jinmei Exp $	*/
+/*	$KAME: mtrace6.c,v 1.20 2002/06/26 12:43:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -59,6 +59,7 @@
 #include "trace.h"
 
 static char *gateway, *intface, *source, *group, *receiver, *destination;
+static char *linkstr;
 static int mldsoc, hops = 64, maxhops = 127, waittime = 3, querylen, opt_n;
 static struct sockaddr *gw_sock, *src_sock, *grp_sock, *dst_sock, *rcv_sock; 
 static char *querypacket;
@@ -93,7 +94,7 @@ main(argc, argv)
 	int op;
 
 	/* get parameters */
-	while((op = getopt(argc, argv, "d:g:h:i:m:nr:w:")) != -1) {
+	while((op = getopt(argc, argv, "d:g:h:i:l:m:nr:w:")) != -1) {
 		switch(op) {
 		case 'd':
 			destination = optarg;
@@ -110,6 +111,9 @@ main(argc, argv)
 			break;
 		case 'i':
 			intface = optarg;
+			break;
+		case 'l':
+			linkstr = optarg;
 			break;
 		case 'm':
 			maxhops = atoi(optarg);
@@ -140,6 +144,10 @@ main(argc, argv)
 		usage();
 	source = argv[0];
 	group = argv[1];
+
+	/* option consistency check */
+	if (gateway && linkstr)
+		errx(1, "-g and -l are exclusive");
 
 	/* examine addresses and open a socket */
 	open_socket();
@@ -414,9 +422,15 @@ static char *
 all_routers_str(family)
 	int family;
 {
+	static char s[NI_MAXHOST];
+
 	switch(family) {
 	case AF_INET6:
-		return("ff02::1");
+		if (linkstr)
+			snprintf(s, sizeof(s), "ff02::1%%%s", linkstr);
+		else		/* use the default link (assuming it) */
+			snprintf(s, sizeof(s), "ff02::1");
+		return (s);
 	default:
 		errx(1, "all_routers_str: unknown AF(%d)", family);
 	}
@@ -712,8 +726,9 @@ make_packet()
 static void
 usage()
 {
-	fprintf(stderr, "usage: mtrace6 %s\n",
-	     "[-d destination] [-g gateway] [-h hops] [-i interface] "
-	     "[-m maxhops] [-n] [-r response_addr] [-w waittime] source group");
+	fprintf(stderr, "usage: mtrace6 "
+	    "[-d destination] [-g gateway] [-h hops] [-i interface] "
+	    "[-l link] [-m maxhops] [-n] [-r response_addr] [-w waittime] "
+	    "source group\n");
 	exit(1);
 }
