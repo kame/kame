@@ -673,6 +673,7 @@ file kern/tty_tb.c			tb			needs-count
 file kern/tty_tty.c
 file kern/uipc_domain.c
 file kern/uipc_mbuf.c
+file kern/uipc_mbuf2.c
 file kern/uipc_proto.c
 file kern/uipc_socket.c
 file kern/uipc_socket2.c
