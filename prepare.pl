@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $Id: prepare.pl,v 1.9 1999/08/14 03:40:52 itojun Exp $
+# $Id: prepare.pl,v 1.10 1999/08/17 15:02:43 itojun Exp $
 #
 
 $debug = 1;
@@ -53,6 +53,7 @@ sub dig {
 		next if ($i eq 'CVS');
 		next if ($i =~ /\.orig$/);
 		next if ($i =~ /\.rej$/);
+		next if ($i =~ /^\.\#/);	# cvs temporary
 
 		if ($exclude{$i}) {
 			print "exclude $dst/$i\n" if $debug;
