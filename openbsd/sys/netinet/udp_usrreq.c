@@ -822,7 +822,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * - ignore the MTU change notification.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d,
-					     sa, valid);
+					     (struct sockaddr_in6 *)sa, valid);
 
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),
