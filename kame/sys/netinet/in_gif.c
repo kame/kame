@@ -259,10 +259,15 @@ in_gif_input(m, va_alist)
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
+#ifndef __OpenBSD__
 	proto = va_arg(ap, int);
+#endif
 	va_end(ap);
 
 	ip = mtod(m, struct ip *);
+#ifdef __OpenBSD__
+	proto = ip->ip_p;
+#endif
 
 	/* this code will be soon improved. */
 #define	satosin(sa)	((struct sockaddr_in *)(sa))	
