@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.28 2000/06/04 05:20:02 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.29 2000/06/12 02:27:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -59,6 +59,7 @@ u_int16_t dnsid;
 const char *srcport = "53";
 const char *dstport = MDNS_PORT;
 const char *dnsserv = NULL;
+struct addrinfo *dnsserv_ai = NULL;
 const char *intface = NULL;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
@@ -77,6 +78,7 @@ const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 
 static void usage __P((void));
+static int config_dnsserv __P((const char *));
 static int getsock __P((int, const char *, const char *, int, int,
 	enum sdtype));
 static int getsock0 __P((const struct addrinfo *));
@@ -158,6 +160,7 @@ main(argc, argv)
 		exit(1);
 		/*NOTREACHED*/
 	}
+
 	while (argc-- > 0) {
 		if (addserv(*argv, -1, "arg") != 0) {
 			errx(1, "%s: failed to add it to db", *argv);
@@ -165,6 +168,9 @@ main(argc, argv)
 		}
 		argv++;
 	}
+
+	if (dnsserv)
+		(void)config_dnsserv(dnsserv);
 
 	srandom(time(NULL) ^ getpid());
 	dnsid = random() & 0xffff;
@@ -291,6 +297,14 @@ usage()
 }
 
 static int
+config_dnsserv(serv)
+	const char *serv;
+{
+
+	return 0;
+}
+
+static int
 getsock(af, host, serv, socktype, flags, stype)
 	int af;
 	const char *host;
@@ -306,7 +320,7 @@ getsock(af, host, serv, socktype, flags, stype)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
 	hints.ai_socktype = socktype;
-	hints.ai_flags = flags;
+	hints.ai_flags = flags | AI_NUMERICHOST;
 	error = getaddrinfo(host, serv, &hints, &res);
 	if (error) {
 		errno = EADDRNOTAVAIL;
@@ -392,6 +406,7 @@ join(s, af, group)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
 	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
+	hints.ai_flags = AI_NUMERICHOST;
 	if (getaddrinfo(group, "0", &hints, &res) != 0)
 		return -1;
 
