@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1213 2000/08/18 14:53:50 itojun Exp $
+$KAME: CHANGELOG,v 1.1214 2000/08/20 11:26:53 itojun Exp $
 
 <200008>
+Sun Aug 20 20:23:03 JST 2000  itojun@iijlab.net
+	* freebsd3/ports/rsync, netbsd/pkgsrc/net/rsync: upgrade to 2.4.5.
+
+Sun Aug 19 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: repair mbuf manipulation in outgoing
+	  jumbogram support 
+	* sys/netinet6: some pedant fix for memory access alignment constraint.
+	* sys/netinet6/ip6_output.c: add diagnostic code for advanced API
+	  memory allocation (there seem to be some memory leak, need
+	  correction)
+
 Fri Aug 18 23:53:15 JST 2000  itojun@iijlab.net
 	* sys/crypto/rc5: drop IPsec RC5 support.
 
