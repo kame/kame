@@ -258,9 +258,13 @@ tcp_template(tp)
 		hlen = 0;	/*pacify gcc*/
 		return NULL;	/*EAFNOSUPPORT*/
 	}
+#ifdef DIAGNOSTIC
+	if (hlen + sizeof(struct tcphdr) > MCLBYTES)
+		panic("mclbytes too small for t_template");
+#endif
 	if ((m = tp->t_template) == 0) {
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
-		if (m) {
+		if (m && hlen + sizeof(struct tcphdr) > MHLEN) {
 			MCLGET(m, M_DONTWAIT);
 			if ((m->m_flags & M_EXT) == 0) {
 				m_free(m);
