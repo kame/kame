@@ -3,16 +3,16 @@
 # Date created:		6 Oct 1999
 # Whom:			feico@pasta.cs.uit.no
 #
-# $Id: Makefile,v 1.3 2000/01/21 03:19:18 itojun Exp $
+# $Id: Makefile,v 1.4 2000/04/02 13:06:59 itojun Exp $
 
-DISTNAME=	totd-1.1p2
+DISTNAME=	totd-1.1p4
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.pasta.cs.uit.no/pub/Vermicelli/
 
 MAINTAINER=	feico@pasta.cs.uit.no
 HOMEPAGE=	http://www.vermicelli.cs.uit.no/ipv6/software.html
 
-WRKSRC=         ${WRKDIR}/totd-1.1p2
+WRKSRC=         ${WRKDIR}/totd-1.1p4
 
 GNU_CONFIGURE=	YES
 
