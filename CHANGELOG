@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1832 2001/08/07 14:32:44 sakane Exp $
+$KAME: CHANGELOG,v 1.1833 2001/08/07 14:42:24 jinmei Exp $
 
 <200108>
+2001-08-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_pcbopt, ip6_setpktoptions):
+	for the IPV6_NEXTHOP ancillary data/socket option, set
+	sin6_scope_id to 0 in non-SCOPEDROUTING cases, so that the kernel
+	can make a neighbor cache for the specified nexthop with a scoped
+	address.
+
 Tue Aug  7 23:30:59 JST 2001 sakane@kame.net
 	* kame/racoon:
 	RFC2407 4.6.3.3 says that INITIAL-CONTACT is the notify message that
