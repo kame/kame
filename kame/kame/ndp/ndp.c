@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.43 2000/07/20 10:08:30 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.44 2000/10/09 08:39:16 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -126,7 +126,7 @@
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 static int pid;
-static int fflag;
+static int cflag;
 static int nflag;
 static int tflag;
 static int32_t thiszone;	/* time difference with gmt */
@@ -183,7 +183,6 @@ main(argc, argv)
 			aflag = 1;
 			break;
 		case 'c':
-			fflag = 1;
 			cflag = 1;
 			break;
 		case 'd':
@@ -601,7 +600,7 @@ again:;
 			found_entry = 1;
 		} else if (IN6_IS_ADDR_MULTICAST(&sin->sin6_addr))
 			continue;
-		if (fflag == 1) {
+		if (cflag == 1) {
 			delete((char *)inet_ntop(AF_INET6, &sin->sin6_addr,
 						 ntop_buf, sizeof(ntop_buf)));
 			continue;
