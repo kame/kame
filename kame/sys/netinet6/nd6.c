@@ -1379,6 +1379,7 @@ nd6_ioctl(cmd, data, ifp)
 #endif
 		if ((rt = nd6_lookup(&nb_addr, 0, ifp)) == NULL) {
 			error = EINVAL;
+			splx(s);
 			break;
 		}
 		ln = (struct llinfo_nd6 *)rt->rt_llinfo;
