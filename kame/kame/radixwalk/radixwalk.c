@@ -1,4 +1,4 @@
-/* $KAME: radixwalk.c,v 1.3 2000/08/22 08:27:59 jinmei Exp $ */
+/* $KAME: radixwalk.c,v 1.4 2000/08/22 09:12:55 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -87,7 +87,7 @@ static kvm_t *kvmd;
 struct rdtree *get_tree __P((struct radix_node *));
 struct sockaddr *kgetsa __P((struct sockaddr *));
 void kread __P((u_long, char *, int));
-void print_tree __P((struct rdtree *, int, int));
+void print_tree __P((struct rdtree *, int, int, int));
 void print_addr __P((struct sockaddr *, struct sockaddr *));
 void print_mask6 __P((struct sockaddr_in6 *));
 void print_mask4 __P((struct sockaddr_in *));
@@ -171,7 +171,7 @@ main(argc, argv)
 			t = get_tree(head.rnh_treetop);
 			if (af == AF_UNSPEC)
 				printf("AF: %d\n", i);
-			print_tree(t, 0, 0);
+			print_tree(t, 0, 0, i);
 		}
 	}
 
@@ -183,9 +183,7 @@ get_tree(rn)
 	struct radix_node *rn;
 {
 	struct radix_node rnode;
-#if 0
 	struct radix_mask *mp;
-#endif
 	struct rdtree *rdt;
 	int depth_l, depth_r;
 	struct sockaddr *sa;
@@ -222,7 +220,6 @@ get_tree(rn)
 		rdt->rd_kaddr = rn;
 		rdt->rd_b = rnode.rn_b;
 
-#if 0
 		if ((mp = rnode.rn_mklist) != NULL) {
 			struct radix_mask m;
 			struct mtree *mt;
@@ -230,10 +227,17 @@ get_tree(rn)
 			do {
 				kget(mp, m);
 
-				if ((m.rm_flags & RNF_NORMAL) != 0)
-					continue;
+				if ((m.rm_flags & RNF_NORMAL) != 0) {
+					struct radix_node rnode_aux;
 
-				sa = kgetsa((struct sockaddr *)m.rm_mask);
+					kget(m.rm_leaf, rnode_aux);
+					sa = kgetsa((struct sockaddr *)
+						    rnode_aux.rn_mask);
+				}
+				else
+					sa = kgetsa((struct sockaddr *)
+						    m.rm_mask);
+
 				if ((mt = (struct mtree *)malloc(sizeof(*mt)))
 				    == NULL)
 					err(1, "get_tree: malloc");
@@ -244,7 +248,6 @@ get_tree(rn)
 				rdt->rd_mtree = mt;
 			} while ((mp = m.rm_mklist) != NULL);
 		}
-#endif
 
 		rdt->rd_left = get_tree(rnode.rn_l);
 		rdt->rd_right = get_tree(rnode.rn_r);
@@ -301,9 +304,9 @@ kinit()
 }
 
 void
-print_tree(tn, depth, rightp)
+print_tree(tn, depth, rightp, family)
 	struct rdtree *tn;
-	int depth, rightp;
+	int depth, rightp, family;
 {
 	int plen;
 	int indent = depth * indentpitch;
@@ -332,7 +335,7 @@ print_tree(tn, depth, rightp)
 			   (tn->rd_rtflags & RTF_HOST) ? NULL :
 			   (struct sockaddr *)&tn->rd_mask);
 		if (tn->rd_dup != NULL)
-			print_tree(tn->rd_dup, depth, 0);
+			print_tree(tn->rd_dup, depth, 0, family);
 		if (indenttype == LINE && indent)
 			indentbuf[plen] = '\0';
 	}
@@ -340,9 +343,22 @@ print_tree(tn, depth, rightp)
 		struct mtree *m;
 
 		printf("[%d]", tn->rd_b - rtoffset);
-		for (m = tn->rd_mtree; m != NULL; m = m->mt_next) {
-			print_mask6((struct sockaddr_in6 *)&m->mt_mask);
-			putchar(' ');
+		if ((m = tn->rd_mtree) != NULL) {
+			printf("{ ");
+			for (; m != NULL; m = m->mt_next) {
+				switch(family) {
+				case AF_INET6:
+					print_mask6((struct sockaddr_in6 *)
+						    &m->mt_mask);
+					break;
+				case AF_INET:
+					print_mask4((struct sockaddr_in *)
+						    &m->mt_mask);
+					break;
+				}
+				putchar(' ');
+			}
+			putchar('}');
 		}
 		putchar('\n');
 		if (indenttype == LINE && indent) {
@@ -351,8 +367,8 @@ print_tree(tn, depth, rightp)
 			else
 				indentbuf[indent - 1] = '|';
 		}
-		print_tree(tn->rd_left, depth + 1, 0);
-		print_tree(tn->rd_right, depth + 1, 1);
+		print_tree(tn->rd_left, depth + 1, 0, family);
+		print_tree(tn->rd_right, depth + 1, 1, family);
 		if (indenttype == LINE && indent)
 			indentbuf[plen] = '\0';
 	}
@@ -463,7 +479,7 @@ print_mask4(mask)
 	memcpy(&m0, mask, mask->sin_len);
 	m1 = ntohl(m0.sin_addr.s_addr);
 
-	i = 0;
+	i = 32;
 	for (b = 0; b < 32; b++)
 		if (m1 & (1 << b)) {
 			register int bb;
