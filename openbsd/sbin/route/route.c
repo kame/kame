@@ -742,14 +742,9 @@ newroute(argc, argv)
 				break;
 #ifdef INET6
 			case K_PREFIXLEN:
-				argc--;
-				if (prefixlen(*++argv) == 128) {
-					forcenet = 0;
-					ishost = 1;
-				} else {
-					forcenet = 1;
-					ishost = 0;
-				}
+				if (!--argc)
+					usage((char *)NULL);
+				ishost = prefixlen(*++argv);
 				break;
 #endif
 			case K_MTU:
@@ -1154,7 +1149,7 @@ prefixlen(s)
 		memset((void *)&so_mask.sin6.sin6_addr, 0xff, q);
 	if (r > 0)
 		*((u_char *)&so_mask.sin6.sin6_addr + q) = (0xff00 >> r) & 0xff;
-	return (len);
+	return (len == 128);
 }
 #endif
 

@@ -934,14 +934,9 @@ newroute(argc, argv)
 				forcenet++;
 				break;
 			case K_PREFIXLEN:
-				argc--;
-				if (prefixlen(*++argv) == 128) {
-					forcenet = 0;
-					ishost = 1;
-				} else {
-					forcenet = 1;
-					ishost = 0;
-				}
+				if (!--argc)
+					usage((char *)NULL);
+				ishost = prefixlen(*++argv);
 				break;
 			case K_MTU:
 			case K_HOPCOUNT:
@@ -1357,7 +1352,7 @@ prefixlen(s)
 		break;
 #endif
 	}
-	return(len);
+	return(len == max);
 }
 
 #ifndef SMALL
