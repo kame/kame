@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.125 2000/07/27 06:22:40 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.126 2000/07/28 12:12:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1111,6 +1111,10 @@ icmp6_mtudisc_update(dst, icmp6, m)
 		      RTF_CLONING | RTF_PRCLONING);
 #else
 #ifdef __bsdi__
+#ifdef DIAGNOSTIC
+	if (sizeof(sin6) > sizeof(ro6.ro_dst))
+		panic("sizeof(ro6.ro_dst) too small");
+#endif
 	bcopy(&sin6, &ro6.ro_dst, sizeof(struct sockaddr_in6));
 	ro6.ro_rt = 0;
 	rtcalloc((struct route *)&ro6);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.99 2000/07/26 02:10:52 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.100 2000/07/28 12:12:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -590,6 +590,10 @@ ip6_input(m)
 			ip6_forward_rt.ro_rt = 0;
 		}
 
+#ifdef DIAGNOSTIC
+		if (sizeof(struct sockaddr_in6) > sizeof(ip6_forward_rt.ro_dst))
+			panic("sizeof(ip6_forward_rt.ro_dst) too small");
+#endif
 		bzero(&ip6_forward_rt.ro_dst, sizeof(struct sockaddr_in6));
 		dst6 = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 		dst6->sin6_len = sizeof(struct sockaddr_in6);
