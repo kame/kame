@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -116,7 +116,7 @@ static int	udpcksum = 0;		/* XXX */
 SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_RW,
 		&udpcksum, 0, "");
 
-int log_in_vain;
+int log_in_vain = 0;
 SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW, 
 	&log_in_vain, 0, "");
 
@@ -153,9 +153,9 @@ static void udp_append __P((struct inpcb *last, struct ip *ip,
 static void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
 #endif
 
-static int udp_detach __P((struct socket *so));
-static int udp_output __P((struct inpcb *, struct mbuf *, struct sockaddr *,
-			   struct mbuf *, struct proc *));
+static	int udp_detach __P((struct socket *so));
+static	int udp_output __P((struct inpcb *, struct mbuf *, struct sockaddr *,
+			    struct mbuf *, struct proc *));
 
 void
 udp_init()
