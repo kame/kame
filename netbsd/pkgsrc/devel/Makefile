@@ -6,5 +6,6 @@
 
     SUBDIR += boehm-gc
     SUBDIR += ipv6socket_scrub
+    SUBDIR += unproven-pthreads
 
 .include "../mk/bsd.pkg.subdir.mk"

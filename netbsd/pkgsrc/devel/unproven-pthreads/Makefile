@@ -15,6 +15,8 @@ HAS_CONFIGURE=		yes
 MAKE_ENV+=		NOLINT=1 NOPROFILE=1 OBJECT_FMT=${OBJECT_FMT}
 CONFIGURE_ARGS+=	--prefix=${PREFIX}/pthreads
 
+CHOWN?=			/usr/sbin/chown
+
 pre-install:
 	${MKDIR} ${PREFIX}/pthreads
 
