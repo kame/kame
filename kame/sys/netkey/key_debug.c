@@ -27,10 +27,12 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.1 1999/08/03 01:02:11 itojun Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.2 1999/08/12 14:19:02 itojun Exp $ */
 
 #ifdef _KERNEL
-# define KERNEL
+# ifndef KERNEL
+#  define KERNEL
+# endif
 #endif
 
 #ifdef KERNEL
