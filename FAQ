@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.60 2001/09/26 08:51:19 itojun Exp $
+$KAME: FAQ,v 1.61 2001/09/26 08:52:03 itojun Exp $
 
 
 GENERAL
@@ -424,7 +424,7 @@ users only, like www.kame.net?)
 		}
 
 Q: Won't you release new IPv6 patch for apache1.3.x?
-	We forcus to develop apache2.x.  Our IPv6 patch never be
+	We are focused to develop/enhance apache2.x.  Our IPv6 patch never be
 	merged into apache1.3.x original distribution since some include
 	files for mod_xxx are highly depend on IPv4 so our IPv6 patch
 	is strongly influence 3rd party's modules.  Apache2.x already
