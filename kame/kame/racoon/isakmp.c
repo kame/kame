@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.115 2000/12/15 15:25:54 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.116 2000/12/16 14:16:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1254,8 +1254,9 @@ isakmp_open()
 			goto err_and_next;
 		}
 
-		plog(LLV_ERROR, LOCATION, p->addr,
-			"used as isakmp port (fd=%d).\n", p->sock);
+		plog(LLV_INFO, LOCATION, NULL,
+			"%s used as isakmp port (fd=%d)\n",
+			saddr2str(p->addr), p->sock);
 
 		continue;
 
