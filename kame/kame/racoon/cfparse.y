@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.103 2001/08/09 07:32:19 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.104 2001/08/13 13:30:09 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -133,7 +133,7 @@ static int fix_lifebyte __P((u_long));
 %token RETRY RETRY_COUNTER RETRY_INTERVAL RETRY_PERSEND
 %token RETRY_PHASE1 RETRY_PHASE2
 	/* algorithm */
-%token ALGORITHM_LEVEL ALGORITHM_CLASS ALGORITHMTYPE STRENGTHTYPE
+%token ALGORITHM_CLASS ALGORITHMTYPE STRENGTHTYPE
 	/* policy */
 %token POLICY DIRTYPE ACTION
 %token PLADDRTYPE PROPOSAL WHICHSIDE
