@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.22 2002/05/08 15:53:18 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.23 2002/05/09 11:48:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -95,6 +95,7 @@ struct dhcp6_optinfo {
 	struct dhcp6_optconf *requests;	/* options in option request */
 	int rapidcommit;	/* bool */
 	struct dnsq dnslist;	/* DNS server list */
+	struct delegated_prefix_list prefix; /* prefix list */
 };
 
 /* DHCP6 base packet format */
@@ -108,14 +109,6 @@ struct dhcp6 {
 #define dh6_msgtype	dh6_msgtypexid.m
 #define dh6_xid		dh6_msgtypexid.x
 #define DH6_XIDMASK	0x00ffffff
-
-/* DUID type 1 */
-struct dhcp6_duid_type1 {
-	u_int16_t dh6duid1_type;
-	u_int16_t dh6duid1_hwtype;
-	u_int32_t dh6duid1_time;
-	/* link-layer address follows */
-} __attribute__ ((__packed__));
 
 /* options */
 #define DH6OPT_CLIENTID	1
@@ -150,6 +143,23 @@ struct dhcp6opt {
 	u_int16_t dh6opt_type;
 	u_int16_t dh6opt_len;
 	/* type-dependent data follows */
+} __attribute__ ((__packed__));
+
+/* DUID type 1 */
+struct dhcp6_duid_type1 {
+	u_int16_t dh6duid1_type;
+	u_int16_t dh6duid1_hwtype;
+	u_int32_t dh6duid1_time;
+	/* link-layer address follows */
+} __attribute__ ((__packed__));
+
+/* Prefix Information */
+struct dhcp6_prefix_info {
+	u_int16_t dh6_pi_type;
+	u_int16_t dh6_pi_len;
+	u_int32_t dh6_pi_lease;
+	u_int8_t dh6_pi_plen;
+	struct in6_addr dh6_pi_paddr;
 } __attribute__ ((__packed__));
 
 #endif /*__DHCP6_H_DEFINED*/

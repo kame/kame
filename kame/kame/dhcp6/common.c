@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.43 2002/05/08 15:53:17 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.44 2002/05/09 11:48:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -684,8 +684,9 @@ dhcp6_get_options(p, ep, optinfo)
 		dprintf(LOG_INFO, "option buffer short for %s", dhcpoptstr((t))); \
 		goto fail; \
 	} \
-	(p)->dh6opt_type = htons((t)); \
-	(p)->dh6opt_len = htons((l)); \
+	opth.dh6opt_type = htons((t)); \
+	opth.dh6opt_len = htons((l)); \
+	memcpy((p), &opth, sizeof(opth)); \
 	if ((l)) \
 		memcpy((p) + 1, (v), (l)); \
 	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
@@ -698,7 +699,7 @@ dhcp6_set_options(bp, ep, optinfo)
 	struct dhcp6opt *bp, *ep;
 	struct dhcp6_optinfo *optinfo;
 {
-	struct dhcp6opt *p = bp;
+	struct dhcp6opt *p = bp, opth;
 	int len = 0, optlen;
 	char *tmpbuf = NULL;
 
@@ -722,9 +723,8 @@ dhcp6_set_options(bp, ep, optinfo)
 
 		tmpbuf = NULL;
 		for (ns = 0, d = TAILQ_FIRST(&optinfo->dnslist); d;
-		     d = TAILQ_NEXT(d, link)) {
-			ns++;
-		}
+		     d = TAILQ_NEXT(d, link), ns++)
+			;
 		optlen = ns * sizeof(struct in6_addr);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
 			dprintf(LOG_ERR,
@@ -763,6 +763,41 @@ dhcp6_set_options(bp, ep, optinfo)
 		free(tmpbuf);
 	}
 
+	if (!TAILQ_EMPTY(&optinfo->prefix)) {
+		int pfxs;
+		char *tp;
+		struct delegated_prefix *dp;
+		struct dhcp6_prefix_info pi;
+
+		tmpbuf = NULL;
+		for (pfxs = 0, dp = TAILQ_FIRST(&optinfo->prefix); dp;
+		     dp = TAILQ_NEXT(dp, link), pfxs++)
+			;
+		optlen = pfxs * sizeof(struct dhcp6_prefix_info);
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR,
+				"memory allocation failed for options");
+			goto fail;
+		}
+		for (dp = TAILQ_FIRST(&optinfo->prefix), tp = tmpbuf; dp;
+		     dp = TAILQ_NEXT(dp, link), tp += sizeof(pi)) {
+			/*
+			 * XXX: We need a temporary structure due to alignment
+			 * issue.
+			 */
+			memset(&pi, 0, sizeof(pi));
+			pi.dh6_pi_type = htons(DH6OPT_PREFIX_INFORMATION);
+			pi.dh6_pi_len = htons(sizeof(pi) - 4);
+			pi.dh6_pi_lease = htonl(dp->prefix.duration);
+			pi.dh6_pi_plen = dp->prefix.plen;
+			memcpy(&pi.dh6_pi_paddr, &dp->prefix.addr,
+			       sizeof(struct in6_addr));
+			memcpy(tp, &pi, sizeof(pi));
+		}
+		COPY_OPTION(DH6OPT_PREFIX_DELEGATION, optlen, tmpbuf, p);
+		free(tmpbuf);
+		     
+	}
 	return(len);
 
   fail:

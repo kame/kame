@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.72 2002/05/09 01:54:52 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.73 2002/05/09 11:48:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -459,6 +459,7 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
+	struct dhcp6_optconf *opt;
 
 	/*
 	 * Servers MUST discard any Solicit messages that do not include a
@@ -493,6 +494,17 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 
 	/* DNS server */
 	roptinfo.dnslist = dnslist;
+
+	for (opt = optinfo->requests; opt; opt = opt->next) {
+		switch(opt->type) {
+		case DH6OPT_PREFIX_DELEGATION:
+			if (client_conf &&
+			    !TAILQ_EMPTY(&client_conf->prefix)) {
+				roptinfo.prefix = client_conf->prefix;
+			}
+			break;
+		}
+	}
 
 	if (optinfo->rapidcommit && (ifp->allow_flags & DHCIFF_RAPID_COMMIT)) {
 		/*
