@@ -56,6 +56,12 @@ extern void sha1_init __P((struct sha1_ctxt *));
 extern void sha1_pad __P((struct sha1_ctxt *));
 extern void sha1_loop __P((struct sha1_ctxt *, caddr_t, size_t));
 extern void sha1_result __P((struct sha1_ctxt *, caddr_t));
+
+/* compatibilty with other SHA1 source codes */
+typedef struct sha1_ctxt SHA1_CTX;
+#define SHA1Init(x)		sha1_init((x))
+#define SHA1Update(x, y, z)	sha1_loop((x), (y), (z))
+#define SHA1Final(x, y)		sha1_result((y), (x))
 #endif
 
 #define	SHA1_RESULTLEN	(160/8)
