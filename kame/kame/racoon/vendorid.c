@@ -1,4 +1,4 @@
-/*	$KAME: vendorid.c,v 1.8 2001/03/27 02:39:57 thorpej Exp $	*/
+/*	$KAME: vendorid.c,v 1.9 2004/09/10 04:46:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,7 +120,7 @@ check_vendorid(gen)
 		 *
 		 * But we need to be able to recognize
 		 * Windows 2000's ID, which is the MD5
-		 * has of a known string + 4 bytes of
+		 * hash of a known string + 4 bytes of
 		 * what appears to be version info.
 		 */
 		if (vidhash->l <= vidlen &&
