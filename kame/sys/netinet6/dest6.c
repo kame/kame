@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.36 2002/02/19 03:40:38 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.37 2002/02/19 04:07:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,9 +80,7 @@ dest6_input(mp, offp, proto)
 	struct ip6_dest *dstopts;
 	struct mbuf *n;
 	struct ip6_opt_home_address *haopt = NULL;
-#ifdef MIP6
 	struct in6_addr ip6_home;
-#endif /* MIP6 */
 	struct ip6aux *ip6a = NULL;
 	u_int8_t *opt;
 	struct ip6_hdr *ip6;
