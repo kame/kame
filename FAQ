@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.18 2001/06/28 21:43:04 itojun Exp $
+$KAME: FAQ,v 1.19 2001/07/05 06:33:25 itojun Exp $
 
 
 GENERAL
@@ -55,7 +55,7 @@ Q: Why does KAME separate ping6 from ping (for IPv4), and traceroute6 from
 	convenient to uniform the ping command for both IPv4 and
 	IPv6.  The followings are an answer to the request.
 
-	From a developer's point of view:  since the underling API
+	From a developer's point of view:  since the underling raw socket API
 	is totally different between IPv4 and IPv6, we would end
 	up having two types of code base.  There would actually be
 	less benefit to uniform the two commands into a single
