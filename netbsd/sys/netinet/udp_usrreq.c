@@ -355,7 +355,8 @@ udp6_input(mp, offp, proto)
 #endif
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6); /*XXX jumbogram*/
+	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
+	plen = m->m_pkthdr.len - off;
 #ifndef PULLDOWN_TEST
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
 #else
@@ -366,6 +367,8 @@ udp6_input(mp, offp, proto)
 	}
 #endif
 	ulen = ntohs((u_short)uh->uh_ulen);
+	if (ulen == 0 && plen > 0xffff)
+		ulen = plen;
 
 	if (plen != ulen) {
 		udp6stat.udp6s_badlen++;

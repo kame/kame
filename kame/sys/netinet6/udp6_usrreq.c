@@ -163,7 +163,7 @@ udp6_input(mp, offp, proto)
 	register struct in6pcb *in6p;
 	struct	mbuf *opts = 0;
 	int off = *offp;
-	int plen, ulen;
+	u_int32_t plen, ulen;
 	struct sockaddr_in6 udp_in6;
 
 #if defined(NFAITH) && 0 < NFAITH
@@ -178,7 +178,8 @@ udp6_input(mp, offp, proto)
 	udp6stat.udp6s_ipackets++;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
+	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
+	plen = m->m_pkthdr.len - off;
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
@@ -190,6 +191,8 @@ udp6_input(mp, offp, proto)
 	}
 #endif
 	ulen = ntohs((u_short)uh->uh_ulen);
+	if (ulen == 0 && plen > 0xffff)	/* jumbogram */
+		ulen = plen;
 	
 	if (plen != ulen) {
 		udp6stat.udp6s_badlen++;
@@ -558,8 +561,8 @@ udp6_output(in6p, m, addr6, control)
 	register struct mbuf *m;
 	struct mbuf *addr6, *control;
 {
-	register int ulen = m->m_pkthdr.len;
-	int plen = sizeof(struct udphdr) + ulen;
+	register u_int32_t ulen = m->m_pkthdr.len;
+	u_int32_t plen = sizeof(struct udphdr) + ulen;
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
 	struct	in6_addr *laddr, *faddr;
@@ -710,8 +713,11 @@ udp6_output(in6p, m, addr6, control)
 	udp6 = (struct udphdr *)(mtod(m, caddr_t) + hlen);
 	udp6->uh_sport = in6p->in6p_lport; /* lport is always set in the PCB */
 	udp6->uh_dport = fport;
-	udp6->uh_ulen  = htons((u_short)plen);
-	udp6->uh_sum   = 0;
+	if (plen <= 0xffff)
+		udp6->uh_ulen = htons((u_short)plen);
+	else
+		udp6->uh_ulen = 0;
+	udp6->uh_sum = 0;
 
 	switch (af) {
 	case AF_INET6:
@@ -742,6 +748,12 @@ udp6_output(in6p, m, addr6, control)
 		break;
 #ifdef __NetBSD__
 	case AF_INET:
+		/* can't transmit jumbogram over IPv4 */
+		if (plen > 0xffff) {
+			error = EMSGSIZE;
+			goto release;
+		}
+
 		ip = mtod(m, struct ip *);
 
 		ip->ip_len = plen;
