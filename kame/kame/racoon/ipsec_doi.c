@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.118 2000/10/19 03:23:35 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.119 2000/10/25 07:44:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2971,11 +2971,14 @@ ipsecdoi_checkid1(iph1)
 		}
 	}
 
+	/* XXX check peers and defined id type */
+
 	/* compare with the ID if specified. */
 	if (iph1->rmconf->idv_p) {
 		vchar_t *ident0 = NULL;
 		vchar_t ident;
 
+		/* XXX to be moved above "XXX" */
 		if (iph1->rmconf->idvtype_p != doi2idtype(id_b->type)) {
 			plog(logp, LOCATION, NULL,
 				"WARNINIG: ID type mismatched.\n");
@@ -3186,11 +3189,9 @@ set_identifier(vpp, type, value)
 		break;
 	case IDTYPE_ASN1DN:
 		plog(logp, LOCATION, NULL, "asn1dn not supported yet.");
-		/* new = xxx_asn1encode(value); */
-		new = vmalloc(value->l);
+		new = eay_str2asn1dn(value->v, value->l - 1);
 		if (new == NULL)
 			return -1;
-		memcpy(new->v, value->v, value->l);
 		break;
 	}
 
