@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.8 1999/09/11 17:55:21 itojun Exp $
+$Id: PORTABILITY,v 1.9 1999/09/16 08:46:34 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -84,12 +84,20 @@ across those possibilities.
 	MANDIR=	/usr/local/v6/man
 	MAN=	foo.5 baz.8
 	MLINKS=	foo.5 baa.5
-  For other cases, you need to set MAN[0-9] like below.  MANDIR needs to point
+	MKPIC=	# if you do not want shlib, make it empty
+  For OpenBSD, you need to set MAN (not MAN[0-9]).  MANDIR needs to point to
+  "catN" directory, without "N":
+	MANDIR=	/usr/local/v6/man/cat
+	MAN=	foo.5 baz.8
+	MLINKS=	foo.5 baa.5
+	NOPIC=	yes	# if you do not want shlib, define it
+  For FreeBSD, you need to set MAN[0-9] like below.  MANDIR needs to point
   to "manN" directory, without "N":
 	MANDIR=	/usr/local/v6/man/man
 	MAN5=	foo.5
 	MAN8=	baz.8
 	MLINKS=	foo.5 baa.5
+	# if you do not want shlib, do not define SHLIB_{MAJOR,MINOR}
 
 - BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
   If you need to use __FUNCTION__, you need to set CC to "gcc", or "shlicc2"
