@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.113 2002/03/15 09:28:53 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.114 2002/04/08 11:17:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -716,6 +716,41 @@ sysctl_ip6_tempvltime SYSCTL_HANDLER_ARGS
 	return(error);
 }
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+extern struct rttimer_queue *icmp6_mtudisc_timeout_q;
+
+static int
+sysctl_ip6_pmtu_expire(SYSCTL_HANDLER_ARGS)
+{
+	int error = 0;
+	int old;
+
+	error = SYSCTL_OUT(req, arg1, sizeof(int));
+	if (error || !req->newptr)
+		return (error);
+	old = pmtu_expire;
+	error = SYSCTL_IN(req, arg1, sizeof(int));
+
+	/*
+	 * An attempt to detect an increase of estimated path MTU MUST NOT be
+	 * done less than 5 minutes after a Packet Too Big message has been
+	 * received for the given path.
+	 * [RFC 1981, Section 4.]
+	 */
+	if (pmtu_expire != 0 && pmtu_expire < 60 * 5) {
+		pmtu_expire = old;
+		return(EINVAL);
+	}
+
+	/* update the timeout value */
+	if (pmtu_expire)
+		rt_timer_queue_change(icmp6_mtudisc_timeout_q,
+				      (long)pmtu_expire);
+
+	return(error);
+}
+#endif /* freebsd4 */
+
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_FORWARDING,
 	forwarding, CTLFLAG_RW, 	&ip6_forwarding,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_SENDREDIRECTS,
@@ -772,6 +807,11 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_PREFER_TEMPADDR,
 	prefer_tempaddr, CTLFLAG_RW, &ip6_prefer_tempaddr,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEFAULTZONE,
 	use_defaultzone, CTLFLAG_RW, &ip6_use_defzone,		0,"");
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+SYSCTL_OID(_net_inet6_ip6, IPV6CTL_PMTU_EXPIRE, pmtu_expire,
+	   CTLTYPE_INT|CTLFLAG_RW, &pmtu_expire, 0,
+	   sysctl_ip6_pmtu_expire, "I", "");
+#endif
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,

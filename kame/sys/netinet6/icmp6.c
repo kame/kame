@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.293 2002/04/08 10:11:45 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.294 2002/04/08 11:17:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,7 +204,7 @@ static int icmp6_redirect_lowat = 1024;
 #endif
 
 #ifndef __bsdi__
-static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
+struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
 #endif
 
@@ -1455,8 +1455,10 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 		 * because the only bad effect is that we won't be able to
 		 * re-increase the path MTU.
 		 */
-		rt_timer_add(rt, icmp6_mtudisc_timeout,
-			     icmp6_mtudisc_timeout_q);
+		if (pmtu_expire) {
+			rt_timer_add(rt, icmp6_mtudisc_timeout,
+				     icmp6_mtudisc_timeout_q);
+		}
 #endif
 	}
 	if (rt) { /* XXX: need braces to avoid conflict with else in RTFREE. */
