@@ -1060,7 +1060,7 @@ icmp6_stats(off, name)
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
     printf(m, icmp6stat.f, plural(icmp6stat.f))
 
-	p(icp6s_error, "\t%qu call%s to icmp_error\n");
+	p(icp6s_error, "\t%qu call%s to icmp6_error\n");
 	p(icp6s_canterror,
 	    "\t%qu error%s not generated because old message was icmp error or so\n");
 	p(icp6s_toofreq,
