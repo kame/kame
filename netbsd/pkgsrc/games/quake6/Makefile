@@ -11,7 +11,7 @@ HOMEPAGE=	http://www.viagenie.qc.ca/en/ipv6-quake.shtml
 WRKSRC=		${WRKDIR}/quakeforge
 
 post-extract:
-	(cd ${WRKSRC}; find . -name \*.o -exec {$RM} {} \;)
+	(cd ${WRKSRC}; find . -name \*.o -exec ${RM} {} \;)
 
 USE_GMAKE=	yes
 GNU_CONFIGURE=	yes

@@ -62,7 +62,7 @@ $NetBSD$
 -          ss6->sin6_addr.s6_addr32[3]=ss4->sin_addr.s_addr;
 +	  memset(&ss6->sin6_addr, 0, sizeof(ss6->sin6_addr));
 +          ss6->sin6_addr.s6_addr[10] = ss6->sin6_addr.s6_addr[11] = 0xff;
-+	  memcpy(&ss6->sin6_addr[12], &ss4->sin_addr, sizeof(ss4->sin_addr));
++	  memcpy(&ss6->sin6_addr.s6_addr[12], &ss4->sin_addr, sizeof(ss4->sin_addr));
            break;
          case AF_INET6:
            memcpy(&ss,resultp->ai_addr,sizeof(struct sockaddr_in6));
