@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.9 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.10 $";
 #endif
 
 #include <sys/types.h>
@@ -265,14 +265,14 @@ pfkey_send_getspi(so, satype, mode, src, dst, min, max, seq)
 	p = pfkey_setsadbaddr(p,
 	                      SADB_EXT_ADDRESS_SRC,
 	                      src,
-	                      _INALENBYAF(src->sa_family),
+	                      _INALENBYAF(src->sa_family) << 3,
 	                      IPSEC_ULPROTO_ANY);
 
 	/* set sadb_address for destination */
 	p = pfkey_setsadbaddr(p,
 	                      SADB_EXT_ADDRESS_DST,
 	                      dst,
-	                      _INALENBYAF(dst->sa_family),
+	                      _INALENBYAF(dst->sa_family) << 3,
 	                      IPSEC_ULPROTO_ANY);
 
 	/* proccessing spi range */
@@ -798,12 +798,12 @@ pfkey_send_x1(so, type, satype, mode, src, dst, spi, wsize,
 	p = pfkey_setsadbaddr(p,
 	                      SADB_EXT_ADDRESS_SRC,
 	                      src,
-	                      _INALENBYAF(src->sa_family),
+	                      _INALENBYAF(src->sa_family) << 3,
 	                      IPSEC_ULPROTO_ANY);
 	p = pfkey_setsadbaddr(p,
 	                      SADB_EXT_ADDRESS_DST,
 	                      dst,
-	                      _INALENBYAF(dst->sa_family),
+	                      _INALENBYAF(dst->sa_family) << 3,
 	                      IPSEC_ULPROTO_ANY);
 
 	if (e_type != SADB_EALG_NONE)
@@ -870,12 +870,12 @@ pfkey_send_x2(so, type, satype, mode, src, dst, spi)
 	p = pfkey_setsadbaddr(p,
 	                      SADB_EXT_ADDRESS_SRC,
 	                      src,
-	                      _INALENBYAF(src->sa_family),
+	                      _INALENBYAF(src->sa_family) << 3,
 	                      IPSEC_ULPROTO_ANY);
 	p = pfkey_setsadbaddr(p,
 	                      SADB_EXT_ADDRESS_DST,
 	                      dst,
-	                      _INALENBYAF(dst->sa_family),
+	                      _INALENBYAF(dst->sa_family) << 3,
 	                      IPSEC_ULPROTO_ANY);
 
 	/* send message */
@@ -1321,6 +1321,7 @@ pfkey_setsadbsa(buf, spi, wsize, auth, enc, flags)
 /*
  * set data into sadb_address.
  * `buf' must has been allocated sufficiently.
+ * prefixlen is in bits.
  */
 static caddr_t
 pfkey_setsadbaddr(buf, exttype, saddr, prefixlen, ul_proto)
