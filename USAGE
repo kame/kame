@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/20 07:25:51 $
+		     $Date: 2000/04/24 01:09:00 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -73,6 +73,8 @@ Advertisement(in case of hosts) and with prefixes assigned by Router
 Renumbering(in case of routers).  Manual assignment of prefixes or
 change of prefix properties take precedence over ones assigned by
 Router Advertisement or Router Renumbering.
+
+prefix command works only on routers.
 
 If you want to assign a prefix(and consequently address) manually, do
 as follows:
