@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.8 1999/12/16 04:27:38 itojun Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.9 2000/01/17 11:13:16 itojun Exp $ */
 
 #ifdef _KERNEL
 # ifndef KERNEL
@@ -120,6 +120,10 @@ kdebug_sadb(base)
 
 		if (ext->sadb_ext_len == 0) {
 			printf("kdebug_sadb: invalid ext_len=0 was passed.\n");
+			return;
+		}
+		if (ext->sadb_ext_len > tlen) {
+			printf("kdebug_sadb: ext_len exceeds end of buffer.\n");
 			return;
 		}
 
@@ -230,6 +234,7 @@ kdebug_sadb_identity(ext)
 {
 	struct sadb_ident *id = (struct sadb_ident *)ext;
 	int len;
+	union sadb_x_ident_id *aid;
 
 	/* sanity check */
 	if (ext == NULL)
@@ -240,8 +245,6 @@ kdebug_sadb_identity(ext)
 	    id->sadb_ident_exttype == SADB_EXT_IDENTITY_SRC ? "src" : "dst");
 	switch (id->sadb_ident_type) {
 	case SADB_X_IDENTTYPE_ADDR:
-	{
-		union sadb_x_ident_id *aid;
 		aid = (union sadb_x_ident_id *)&id->sadb_ident_id;
 
 		printf(" type=%d prefix=%u ul_proto=%u\n",
@@ -250,7 +253,7 @@ kdebug_sadb_identity(ext)
 			aid->sadb_x_ident_id_addr.ul_proto);
 		kdebug_sockaddr((struct sockaddr *)(id + 1));
 		break;
-	}
+
 	default:
 		printf(" type=%d id=%lu",
 			id->sadb_ident_type, (u_long)id->sadb_ident_id);
@@ -434,8 +437,15 @@ kdebug_sadb_x_policy(ext)
 			printf(" }\n");
 
 			/* prevent infinite loop */
-			if (xisr->sadb_x_ipsecrequest_len <= 0)
-				panic("kdebug_sadb_x_policy: wrong policy struct.\n");
+			if (xisr->sadb_x_ipsecrequest_len <= 0) {
+				printf("kdebug_sadb_x_policy: wrong policy struct.\n");
+				return;
+			}
+			/* prevent overflow */
+			if (xisr->sadb_x_ipsecrequest_len > tlen) {
+				printf("invalid ipsec policy length\n");
+				return;
+			}
 
 			tlen -= xisr->sadb_x_ipsecrequest_len;
 
