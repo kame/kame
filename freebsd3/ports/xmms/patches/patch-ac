@@ -1,0 +1,19 @@
+*** gnomexmms/Makefile.in.org	Wed Jun 14 14:10:47 2000
+--- gnomexmms/Makefile.in	Wed Jun 14 14:11:15 2000
+***************
+*** 164,170 ****
+  @HAVE_GNOME_TRUE@gnorbadir = @GNOME_SYSCONFDIR@/CORBA/servers
+  @HAVE_GNOME_TRUE@gnorba_DATA = gnomexmms.gnorba
+  
+! @HAVE_GNOME_TRUE@sysdatadir = $(datadir)/applets/Multimedia
+  @HAVE_GNOME_TRUE@sysdata_DATA = gnomexmms.desktop
+  
+  @HAVE_GNOME_TRUE@gnorbadatadir = $(sysconfdir)/CORBA/servers
+--- 164,170 ----
+  @HAVE_GNOME_TRUE@gnorbadir = @GNOME_SYSCONFDIR@/CORBA/servers
+  @HAVE_GNOME_TRUE@gnorba_DATA = gnomexmms.gnorba
+  
+! @HAVE_GNOME_TRUE@sysdatadir = $(datadir)/gnome/applets/Multimedia
+  @HAVE_GNOME_TRUE@sysdata_DATA = gnomexmms.desktop
+  
+  @HAVE_GNOME_TRUE@gnorbadatadir = $(sysconfdir)/CORBA/servers
