@@ -36,6 +36,15 @@ struct ip6_opthdr {
 	u_char ip6_elen;
 };
 
+struct new_ip6_rthdr0 {
+	u_int8_t  ip6r0_nxt;		/* next header */
+	u_int8_t  ip6r0_len;		/* length in units of 8 octets */
+	u_int8_t  ip6r0_type;		/* always zero */
+	u_int8_t  ip6r0_segleft;	/* segments left */
+	u_int32_t  ip6r0_reserved;	/* reserved field */
+	/* followed by up to 127 struct in6_addr */
+} __attribute__((__packed__));
+
 int all;
 int debug;
 extern int cflag;	/* defined in v6test.c */
@@ -43,10 +52,10 @@ extern int cflag;	/* defined in v6test.c */
 static u_short in_cksum __P((u_short *, u_short *, int));
 
 void
-cksum6(int linkhdrlen)
+cksum6(int linkhdrlen, int size)
 {
 	int len = 0;
-	int off, nh;
+	int off;
 	u_char ipovly[40];
 	u_short *cksum;
 	struct in6_addr *finaldst;
@@ -56,22 +65,29 @@ cksum6(int linkhdrlen)
 	struct udphdr *udp;
 	struct icmp6_hdr *icmp;
 	struct pim *pim;
-	struct ip6_rthdr0 *rh0;
+	struct new_ip6_rthdr0 *rh0;
 	u_char *packet = (u_char *)(buf) + linkhdrlen;
-	u_char nxt = packet[6];
+	u_char *ep = packet + size;
+	u_char nxt;
 	
 	/* does not generate checksum if "-c" is on */
 	if (cflag)
 		return;
 
+	if (size < sizeof(struct ip6_hdr))
+		return;
+
 	ip = (struct ip6_hdr *)packet;
 	off = sizeof(*ip);
 	len = ntohs(ip->ip6_plen);
-	finaldst = (struct in6_addr *)&packet[24];
-	nh = ip->ip6_nxt;
+	nxt = ip->ip6_nxt;
+	finaldst = &ip->ip6_dst;
+
+	if ((u_char *)ip + len >= ep)
+		return;		/* short packet */
 
 	while (len > 2) {
-		switch (nh) {
+		switch (nxt) {
 		case IPPROTO_IPIP:
 		case IPPROTO_IPV6:
 			return;
@@ -80,24 +96,35 @@ cksum6(int linkhdrlen)
 		case IPPROTO_NONE:
 			return;
 		case IPPROTO_ROUTING:
-			rh0 = (struct ip6_rthdr0 *)(packet + off);
-			if (rh0->ip6r0_type == 0 && rh0->ip6r0_len <= 46) {
-				finaldst = (struct in6_addr *)((caddr_t)rh0 +
-							       ((rh0->ip6r0_len + 1) << 3) -
-							       sizeof(struct in6_addr));
-		    }
+			rh0 = (struct new_ip6_rthdr0 *)(packet + off);
+			if (rh0->ip6r0_segleft == 0)
+				; /* finaldst does not change */
+			else if (rh0->ip6r0_type != 0 ||
+				 (rh0->ip6r0_len % 2) != 0 ||
+				 (rh0->ip6r0_len / 2) < rh0->ip6r0_segleft) {
+				/* Invalid type0 routing header. */
+				return;
+			} else {
+				/* valid type 0 routing header */
+				u_char *rep = (u_char *)rh0 +
+					((rh0->ip6r0_len + 1) << 3);
+				if (rep >= ep)
+					return;
+				finaldst = (struct in6_addr *)(rep - sizeof(struct in6_addr));
+			}
+			/* fall through */
 		case IPPROTO_HOPOPTS:
 		case IPPROTO_DSTOPTS:
 			opt  = (struct ip6_opthdr *)(packet + off);
 			len -= (opt->ip6_elen << 3) + 8;
 			off += (opt->ip6_elen << 3) + 8;
-			nh = opt->ip6_next;
+			nxt = opt->ip6_next;
 			break;
 		case IPPROTO_FRAGMENT:
 			opt  = (struct ip6_opthdr *)(packet + off);
 			len -= sizeof(struct ip6_frag);
 			off += sizeof(struct ip6_frag);
-			nh = opt->ip6_next;
+			nxt = opt->ip6_next;
 			break;
 		case IPPROTO_TCP:
 			tcp  = (struct tcphdr *)(packet + off);
@@ -126,6 +153,9 @@ cksum6(int linkhdrlen)
 	return;
 	
  calc:
+
+	if ((u_char *)cksum >= ep)
+		return;		/* short packet */
 	
 	bcopy(&packet[8], &ipovly[0], 16);
 	bcopy(finaldst, &ipovly[16], 16);
