@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.23 2001/11/11 16:51:49 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.24 2001/11/12 11:19:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -364,3 +364,30 @@ scope6_addr2default(addr)
 
 	return(scope6_ids[0].s6id_list[in6_addrscope(addr)]);
 }
+
+/*
+ * XXX: some applications assume the kernel guesses a correct zone ID when the
+ * outgoing interface is explicitly specified, and omit specifying ID.
+ * This is a bad manner, but we handle such cases anyway.
+ * This function intentionally override the argument SIN6.
+ */
+int
+scope6_setzoneid(ifp, sin6)
+	struct ifnet *ifp;
+	struct sockaddr_in6 *sin6;
+{
+	int64_t zoneid;
+	int error;
+
+	zoneid = in6_addr2zoneid(ifp, &sin6->sin6_addr);
+				 
+	if (zoneid < 0)
+		return(ENXIO);
+	if (zoneid) {
+		sin6->sin6_scope_id = zoneid;
+		if ((error = in6_embedscope(&sin6->sin6_addr, sin6)) != 0)
+			return(error);
+	}
+
+	return(0);
+}	
