@@ -92,6 +92,7 @@
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
+#include <netinet6/ip6protosw.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -128,7 +129,7 @@ rip6_input(mp, offp, proto)
 	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	register struct inpcb *in6p;
 	struct inpcb *last = 0;
-	struct mbuf *opts = 0;
+	struct ip6_recvpktopts opts;
 	struct sockaddr_in6 rip6src;
 
 #if defined(NFAITH) && 0 < NFAITH
@@ -141,6 +142,7 @@ rip6_input(mp, offp, proto)
 	}
 #endif
 	init_sin6(&rip6src, m); /* general init */
+	bzero(&opts, sizeof(opts));
 
 	LIST_FOREACH(in6p, &ripcb, inp_list) {
 		if ((in6p->in6p_vflag & INP_IPV6) == 0)
@@ -165,19 +167,20 @@ rip6_input(mp, offp, proto)
 			if (n) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS ||
 				    last->in6p_socket->so_options & SO_TIMESTAMP)
-					ip6_savecontrol(last, &opts, ip6, n);
+					ip6_savecontrol(last, ip6, n, &opts,
+							NULL);
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
 						(struct sockaddr *)&rip6src,
-						 n, opts) == 0) {
+						 n, opts.head) == 0) {
 					/* should notify about lost packet */
 					m_freem(n);
-					if (opts)
-						m_freem(opts);
+					if (opts.head)
+						m_freem(opts.head);
 				} else
 					sorwakeup(last->in6p_socket);
-				opts = NULL;
+				bzero(&opts, sizeof(opts));
 			}
 		}
 		last = in6p;
@@ -185,14 +188,14 @@ rip6_input(mp, offp, proto)
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS ||
 		    last->in6p_socket->so_options & SO_TIMESTAMP)
-			ip6_savecontrol(last, &opts, ip6, m);
+			ip6_savecontrol(last, ip6, m, &opts, NULL);
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&rip6src, m, opts) == 0) {
+				(struct sockaddr *)&rip6src, m, opts.head) == 0) {
 			m_freem(m);
-			if (opts)
-				m_freem(opts);
+			if (opts.head)
+				m_freem(opts.head);
 		} else
 			sorwakeup(last->in6p_socket);
 	} else {
@@ -207,6 +210,66 @@ rip6_input(mp, offp, proto)
 		ip6stat.ip6s_delivered--;
 	}
 	return IPPROTO_DONE;
+}
+
+void
+rip6_ctlinput(cmd, sa, d)
+	int cmd;
+	struct sockaddr *sa;
+	void *d;
+{
+	struct sockaddr_in6 sa6;
+	struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off = 0;
+	void (*notify) __P((struct inpcb *, int)) = in6_rtchange;
+
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
+
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+	if (PRC_IS_REDIRECT(cmd))
+		notify = in6_rtchange, d = NULL;
+	else if (cmd == PRC_HOSTDEAD)
+		d = NULL;
+	else if (inet6ctlerrmap[cmd] == 0)
+		return;
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+	}
+
+	/* translate addresses into internal form */
+	sa6 = *(struct sockaddr_in6 *)sa;
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
+		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+
+	if (ip6) {
+		/*
+		 * XXX: We assume that when IPV6 is non NULL,
+		 * M and OFF are valid.
+		 */
+		struct in6_addr s;
+
+		/* translate addresses into internal form */
+		memcpy(&s, &ip6->ip6_src, sizeof(s));
+		if (IN6_IS_ADDR_LINKLOCAL(&s))
+			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+
+		(void) in6_pcbnotify(&ripcb, (struct sockaddr *)&sa6,
+				     0, &s, 0, cmd, notify);
+	} else
+		(void) in6_pcbnotify(&ripcb, (struct sockaddr *)&sa6, 0,
+				     &zeroin6_addr, 0, cmd, notify);
 }
 
 /*
@@ -249,7 +312,7 @@ rip6_output(m, va_alist)
 		priv = 1;
 	dst = &dstsock->sin6_addr;
 	if (control) {
-		if ((error = ip6_setpktoptions(control, &opt, priv)) != 0)
+		if ((error = ip6_setpktoptions(control, &opt, priv, 0)) != 0)
 			goto bad;
 		optp = &opt;
 	} else
@@ -371,10 +434,10 @@ rip6_output(m, va_alist)
 	}
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)so;
+	ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 
-	error = ip6_output(m, optp, &in6p->in6p_route, IPV6_SOCKINMRCVIF,
+	error = ip6_output(m, optp, &in6p->in6p_route, 0,
 			   in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
@@ -391,8 +454,11 @@ rip6_output(m, va_alist)
  freectl:
 	if (optp == &opt && optp->ip6po_rthdr && optp->ip6po_route.ro_rt)
 		RTFREE(optp->ip6po_route.ro_rt);
-	if (control)
+	if (control) {
+		if (optp == &opt)
+			ip6_clearpktopts(optp, 0, -1);
 		m_freem(control);
+	}
 	return(error);
 }
 
