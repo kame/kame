@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.54 2001/08/17 11:02:31 itojun Exp $
+$KAME: FAQ,v 1.55 2001/08/22 06:04:08 itojun Exp $
 
 
 GENERAL
@@ -458,6 +458,7 @@ remote host)?
 	can make sure that inbound packet is always encrypted (non-encrypted
 	packets get dropped).  See sbin/ping for usage example.
 	This is a KAME-only API.  There's no standard API for this, AFAIK.
+
 
 LICENSE AND CRYPTO EXPORT
 =========================
