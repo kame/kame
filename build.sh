@@ -1,7 +1,7 @@
 #! /bin/sh
 #
 # build script for KAME buildlab.  may not be useful for normal usage.
-# $KAME: build.sh,v 1.1 2001/01/11 10:57:28 itojun Exp $
+# $KAME: build.sh,v 1.2 2001/01/12 05:02:56 itojun Exp $
 #
 
 PATH=/usr/pkg/bin:/usr/local/bin:/usr/X11R6/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -33,6 +33,7 @@ if test $? != 0; then
 autobuild on $hostname seem to have failed.
 started: $date
 finished: `date`
+result URL: http://master.buildlab.kame.net/$hosttop/
 EOF
 fi
 rm /var/tmp/autobuild.$$
