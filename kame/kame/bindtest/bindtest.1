@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.13 2001/06/26 04:57:53 jinmei Exp $
+.\"	$KAME: bindtest.1,v 1.14 2001/06/26 12:37:01 jinmei Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -102,33 +102,51 @@ socket option on
 sockets
 .Pq note that not many stacks implement this yet .
 .Pp
-With
+When two sockets become ready,
+.Nm
+attempts to send some packets to see which socket accepts which
+packets.
+For UDP cases, it tries to issue
+.Xr sendto 2
+for each address bound to each socket, and for
+the additional address if specified by the
+.Fl o 
+option.
+For TCP cases, the program tries to issue
+.Xr connect 2
+for one destination specified by
+the
 .Fl 1 ,
 .Fl 2 ,
 or
-.Fl o Ar IPv4address ,
-.Nm
-attempts to issue
-.Xr connect 2
-after two sockets become ready.
+.Fl o Ar IPv4address
+options.
 .Fl 1
 and
 .Fl 2
-lets
+let
 .Nm
 .Xr connect 2
-to the address
-.Nm
-have used for
+to the address that the program has used for
 .Xr bind 2 .
 With
 .Fl o ,
 .Nm
 connects to the address specified by the extra argument,
 .Ar IPv4address .
-The options are meaningful only when
+Note that the options
+.Fl 1
+and
+.Fl 2
+are meaningful only when
 .Fl t
 is specified.
+.Pp
+When the
+.Fl o Ar IPv4address
+option is specified, the address can be any valid IPv4 address in
+theory, but, for the testing purpose, the address is meaningful only
+when it is an IPv4 address assigned on testing node itself.
 .Pp
 With
 .Fl s ,
@@ -191,6 +209,10 @@ The second socket received the packet.
 Both sockets received the packet.  This result is not supposed to
 happen, but exists just in case.
 .El
+.Pp
+The meaning of the result table is the same for TCP cases, whereas
+only one of the three possible cases should be tried in a single
+execution of the test.
 .It x
 .Xr bind 2
 failed for the second set, with
