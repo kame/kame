@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.91 2000/05/15 09:24:25 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.92 2000/05/15 09:25:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1063,7 +1063,6 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * - IPv6 destination address validation
  *	we ignore it on purpose - see comment below
  * - IPv6 Subject address handling
- * - FQDN Subject name handling (drop it if it's not for me)
  * - IPv4 Subject address handling support missing
  * - Proxy reply (answer even if it's not for me)
  * - "Supported Qtypes" support missing
