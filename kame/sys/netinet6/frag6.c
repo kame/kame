@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.34 2002/01/31 14:14:50 jinmei Exp $	*/
+/*	$KAME: frag6.c,v 1.35 2002/02/04 06:35:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -598,7 +598,7 @@ frag6_freef(q6)
 			/* adjust pointer */
 			ip6 = mtod(m, struct ip6_hdr *);
 
-			/* restoure source and destination addresses */
+			/* restore source and destination addresses */
 			ip6->ip6_src = q6->ip6q_src.sin6_addr;
 			ip6->ip6_dst = q6->ip6q_dst.sin6_addr;
 
