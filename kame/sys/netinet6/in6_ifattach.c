@@ -466,11 +466,17 @@ in6_ifattach(ifp, type, laddr, noloop)
 			if (in6_ifattach_getifid(ifp) == 0)
 				in6_ifattach_p2p();
 		}
+		bzero(&ia->ia_dstaddr, sizeof(struct sockaddr_in6));
+		ia->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
+		ia->ia_dstaddr.sin6_family = AF_INET6;
 		break;
 	case IN6_IFT_P2P:
 		bcopy((caddr_t)first_ifid,
 		      (caddr_t)&ia->ia_addr.sin6_addr.s6_addr8[8],
 		      IFID_LEN);
+		bzero(&ia->ia_dstaddr, sizeof(struct sockaddr_in6));
+		ia->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
+		ia->ia_dstaddr.sin6_family = AF_INET6;
 		break;
 	case IN6_IFT_ARCNET:
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
