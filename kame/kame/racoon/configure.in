@@ -135,7 +135,7 @@ dnl AC_MSG_RESULT("$ssleay_lib and $ssleay_include")
 AC_MSG_CHECKING(openssl version)
 if test "x$include_path_openssl" = "x"; then
 	AC_EGREP_CPP(yes, [#include <opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x00904100L
+#if OPENSSL_VERSION_NUMBER >= 0x00090581L
 yes
 #endif], [AC_MSG_RESULT(ok)], [AC_MSG_RESULT(too old)
 		echo

@@ -1702,7 +1702,7 @@ if test "x$include_path_openssl" = "x"; then
 #line 1703 "configure"
 #include "confdefs.h"
 #include <opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x00904100L
+#if OPENSSL_VERSION_NUMBER >= 0x00090581L
 yes
 #endif
 EOF
