@@ -1,0 +1,25 @@
+Installation procedure - grabbinb tree via cvsup
+KAME project
+$Id: INSTALL.anoncvs,v 1.1 1999/08/09 00:07:15 itojun Exp $
+
+
+You can grab the latest KAME tree via anonymous cvs (anoncvs).
+
+(0) Install CVS onto your client.
+
+(1) (Only for the first time) Logon to KAME anonymous CVS.
+	% cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame login
+    Password is "anoncvs" (doublequote is not the part of password).
+
+(2) Checkout the tree.
+	% cd $somewhere
+	% cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame co -P kame
+
+    If you are interested in some specific platform only, alternatively
+    you can do the following, but not recommended:
+	% cd $somewhere
+	% cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame co -P \
+		kame/kame kame/netbsd kame/INSTALL kame/INSTALL.anoncvs \
+		kame/Makefile kame/prepare.pl kame/VERSION
+
+(3) Follow the document placed in $somewhere/kame/INSTALL.
