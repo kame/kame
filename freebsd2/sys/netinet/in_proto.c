@@ -63,6 +63,7 @@
  *	$Id: in_proto.c,v 1.33.2.1 1997/09/16 18:37:00 joerg Exp $
  */
 
+#include "opt_natpt.h"
 #include "opt_tcpdebug.h"
 
 #include <sys/param.h>

@@ -67,6 +67,7 @@
 #define	_IP_VHL
 
 #include "opt_ipfw.h"
+#include "opt_natpt.h"
 
 #include <stddef.h>
 
