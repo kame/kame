@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.26 2000/03/28 14:04:32 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.27 2000/04/12 16:11:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -204,6 +204,7 @@ stfattach(dummy)
 		    &in_stf_protosw, sc);
 		if (p == NULL)
 			continue;
+		sc->encap_cookie = p;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(sc->sc_if.if_xname, "stf%d", i);
