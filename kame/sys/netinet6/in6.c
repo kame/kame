@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.85 2000/06/13 10:10:25 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.85.2.1 2000/07/04 04:39:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -578,7 +578,7 @@ in6_control(so, cmd, data, ifp)
 		 * "ifconfig if0 delete" to remove first IPv4 address on the
 		 * interface.  For IPv6, as the spec allow multiple interface
 		 * address from the day one, we consider "remove the first one"
-		 * semantics to be not preferrable.
+		 * semantics to be not preferable.
 		 */
 		if (ia == NULL)
 			return(EADDRNOTAVAIL);
