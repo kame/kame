@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.155 2001/02/06 04:08:18 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.156 2001/02/06 04:48:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1097,10 +1097,14 @@ skip_ipsec2:;
 	}
 	else
 		origifp = ifp;
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-		ip6->ip6_src.s6_addr16[1] = 0;
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
-		ip6->ip6_dst.s6_addr16[1] = 0;
+#ifndef SCOPEDROUTING
+	/*
+	 * clear embedded scope identifiers if necessary.
+	 * in6_clearscope will touch the addresses only when necessary.
+	 */
+	in6_clearscope(&ip6->ip6_src);
+	in6_clearscope(&ip6->ip6_dst);
+#endif
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	/*
