@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.305 2003/09/07 14:33:00 itojun Exp $	*/
+/*	$KAME: key.c,v 1.306 2003/09/07 14:36:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -735,8 +735,8 @@ key_checkrequest(isr, saidx)
 	if (isr->sav != NULL) {
 		if (isr->sav->sah == NULL)
 			panic("key_checkrequest: sah is null.");
-		if (isr->sav == (struct secasvar *)LIST_FIRST(
-			    &isr->sav->sah->savtree[SADB_SASTATE_DEAD])) {
+		if (isr->sav ==
+		    LIST_FIRST(&isr->sav->sah->savtree[SADB_SASTATE_DEAD])) {
 			KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 				printf("DP checkrequest calls free SA:%p\n",
 					isr->sav));
@@ -2852,7 +2852,7 @@ key_delsah(sah)
 	     stateidx++) {
 
 		state = saorder_state_any[stateidx];
-		for (sav = (struct secasvar *)LIST_FIRST(&sah->savtree[state]);
+		for (sav = LIST_FIRST(&sah->savtree[state]);
 		     sav != NULL;
 		     sav = nextsav) {
 
