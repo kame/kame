@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.102 2003/04/07 00:46:19 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.103 2003/06/16 08:39:18 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -724,3 +724,8 @@ Yokogawa IPsec implementation.
 Some statements may not be handled by
 .Xr racoon 8
 yet.
+.\"
+.Sh SECURITY CONSIDERATIONS
+The use of IKE phase 1 aggressive mode is not recommended,
+as describved in
+.Li http://www.kb.cert.org/vuls/id/886601 .
