@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.213 2005/03/02 05:22:52 suz Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.214 2005/03/11 14:22:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -798,6 +798,7 @@ init(ac, flags)
 			/* reject certain types of addresses */
 			s = socket(sa6->sin6_family, SOCK_DGRAM, 0);
 			if (s >= 0) {
+				memset(&ifr6, 0, sizeof(ifr6));
 				strncpy(ifr6.ifr_name, ifap->ifa_name,
 				    sizeof(ifr6.ifr_name));
 				if (ifr6.ifr_name[sizeof(ifr6.ifr_name) - 1]
