@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.262 2002/05/29 03:13:54 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.263 2002/05/29 04:42:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2228,7 +2228,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if (ln->ln_expire && ln->ln_asked == 0) {
 		ln->ln_asked++;
 		ln->ln_expire = time_second +
-			ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
+		    ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
 		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
 	return(0);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.300 2002/05/29 03:27:03 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.301 2002/05/29 04:42:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1811,14 +1811,13 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 	if (ro_pmtu != ro) {
 		/* The first hop and the final destination may differ. */
 		struct sockaddr_in6 *sa6_dst =
-			(struct sockaddr_in6 *)&ro_pmtu->ro_dst;
-		if (ro_pmtu->ro_rt && ((ro_pmtu->ro_rt->rt_flags & RTF_UP)
-				       == 0 ||
+		    (struct sockaddr_in6 *)&ro_pmtu->ro_dst;
+		if (ro_pmtu->ro_rt &&
+		    ((ro_pmtu->ro_rt->rt_flags & RTF_UP) == 0 ||
 #ifdef SCOPEDROUTING
-				       !SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
+		      !SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
 #else
-				       !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr,
-							   &dst->sin6_addr)
+		      !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr, &dst->sin6_addr)
 #endif
 			    )) {
 			RTFREE(ro_pmtu->ro_rt);
