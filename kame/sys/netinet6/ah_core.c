@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.58 2003/07/25 10:16:29 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.59 2003/07/25 10:17:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -277,8 +277,8 @@ ah_common_mature(sav)
 		return 1;
 	}
 
-	if (sav->key_auth->sadb_key_bits < algo->keymin
-	 || algo->keymax < sav->key_auth->sadb_key_bits) {
+	if (sav->key_auth->sadb_key_bits < algo->keymin ||
+	    algo->keymax < sav->key_auth->sadb_key_bits) {
 		ipseclog((LOG_ERR,
 		    "ah_common_mature: invalid key length %d for %s.\n",
 		    sav->key_auth->sadb_key_bits, algo->name));
