@@ -126,9 +126,12 @@
 #define	IFT_SMDSICIP	0x34		/* SMDS InterCarrier Interface */
 #define	IFT_PROPVIRTUAL	0x35		/* Proprietary Virtual/internal */
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
-#define	IFT_GIF		0x37
-#define IFT_DUMMY	0x38
-#define IFT_PVC		0x39
-#define IFT_FAITH	0x40
+
+/* private use */
+#define	IFT_GIF		0xf0
+#define IFT_DUMMY	0xf1
+#define IFT_PVC		0xf2
+#define IFT_FAITH	0xf3
+#define IFT_STF		0xf4
 
 #endif
