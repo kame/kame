@@ -1,3 +1,5 @@
+/*	$KAME: rrenumd.c,v 1.14 2000/07/03 02:54:08 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
