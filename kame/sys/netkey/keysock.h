@@ -27,41 +27,58 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keysock.h,v 1.1 1999/08/03 01:02:15 itojun Exp $ */
+/* $Id: keysock.h,v 1.2 2000/01/10 01:32:06 itojun Exp $ */
 
 #ifndef _NETKEY_KEYSOCK_H_
 #define _NETKEY_KEYSOCK_H_
 
-#ifdef __NetBSD__
-# ifdef _KERNEL
-#  define KERNEL
-# endif
-#endif
+/* statistics for pfkey socket */
+struct pfkeystat {
+	/* kernel -> userland */
+	u_quad_t out_total;		/* # of total calls */
+	u_quad_t out_bytes;		/* total bytecount */
+	u_quad_t out_msgtype[256];	/* message type histogram */
+	u_quad_t out_invlen;		/* invalid length field */
+	u_quad_t out_invver;		/* invalid version field */
+	u_quad_t out_invmsgtype;	/* invalid message type field */
+	u_quad_t out_tooshort;		/* msg too short */
+	u_quad_t out_nomem;		/* memory allocation failure */
+	u_quad_t out_dupext;		/* duplicate extension */
+	u_quad_t out_invexttype;	/* invalid extension type */
+	u_quad_t out_invsatype;		/* invalid sa type */
+	u_quad_t out_invaddr;		/* invalid address extension */
+	/* userland -> kernel */
+	u_quad_t in_total;		/* # of total calls */
+	u_quad_t in_bytes;		/* total bytecount */
+	u_quad_t in_msgtype[256];	/* message type histogram */
+	u_quad_t in_msgtarget[3];	/* one/all/registered */
+	u_quad_t in_nomem;		/* memory allocation failure */
+};
 
-#if defined(KERNEL)
+#define KEY_SENDUP_ONE		0
+#define KEY_SENDUP_ALL		1
+#define KEY_SENDUP_REGISTERED	2
+
+#if defined(KERNEL) || defined(_KERNEL)
 struct keycb {
 	struct rawcb kp_raw;	/* rawcb */
 	int kp_promisc;		/* promiscuous mode */
 	int kp_registered;	/* registered socket */
 };
 
+extern struct pfkeystat pfkeystat;
+
 extern int key_output __P((struct mbuf *, ...));
 #ifndef __NetBSD__
-extern int key_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *));
+extern int key_usrreq __P((struct socket *,
+	int, struct mbuf *, struct mbuf *, struct mbuf *));
 #else
 extern int key_usrreq __P((struct socket *,
 	int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
 #endif
 
-#define KEY_SENDUP_ONE		0
-#define KEY_SENDUP_ALL		1
-#define KEY_SENDUP_REGISTERED	2
-
 extern int key_sendup __P((struct socket *, struct sadb_msg *, u_int, int));
-#else
-#if 0	/* no library defined for this */
-extern int key_sendup __P((int, struct sadb_msg *, u_int, int));
-#endif
-#endif /* defined(KERNEL) */
+extern int key_sendup_mbuf __P((struct socket *, struct mbuf *, int));
+#endif /* KERNEL */
 
 #endif _NETKEY_KEYSOCK_H_

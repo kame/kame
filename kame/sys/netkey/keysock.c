@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.2 1999/10/27 17:41:42 sakane Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.3 2000/01/10 01:32:06 itojun Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -99,6 +99,8 @@ static int key_sendup0 __P((struct rawcb *, struct mbuf *, int));
 		free((caddr_t)(p), M_SECA);				\
 	} while (0)
 #endif
+
+struct pfkeystat pfkeystat;
 
 /*
  * key_usrreq()
@@ -235,24 +237,44 @@ key_output(m, va_alist)
 	if (m == 0)
 		panic("key_output: NULL pointer was passed.\n");
 
-	if (m->m_len < sizeof(long)
-	 && (m = m_pullup(m, 8)) == 0) {
-		printf("key_output: can't pullup mbuf\n");
-		error = ENOBUFS;
+	pfkeystat.out_total++;
+	pfkeystat.out_bytes += m->m_pkthdr.len;
+
+	len = m->m_pkthdr.len;
+	if (len < sizeof(struct sadb_msg)) {
+#ifdef IPSEC_DEBUG
+		printf("key_output: Invalid message length.\n");
+#endif
+		pfkeystat.out_tooshort++;
+		error = EINVAL;
 		goto end;
+	}
+
+	if (m->m_len < sizeof(struct sadb_msg)) {
+		if ((m = m_pullup(m, sizeof(struct sadb_msg))) == 0) {
+#ifdef IPSEC_DEBUG
+			printf("key_output: can't pullup mbuf\n");
+#endif
+			pfkeystat.out_nomem++;
+			error = ENOBUFS;
+			goto end;
+		}
 	}
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("key_output: not M_PKTHDR ??");
 
-#if defined(IPSEC_DEBUG)
+#ifdef IPSEC_DEBUG
 	KEYDEBUG(KEYDEBUG_KEY_DUMP, kdebug_mbuf(m));
 #endif /* defined(IPSEC_DEBUG) */
 
-	len = m->m_pkthdr.len;
-	if (len < sizeof(struct sadb_msg)
-	 || len != PFKEY_UNUNIT64(mtod(m, struct sadb_msg *)->sadb_msg_len)) {
+	msg = mtod(m, struct sadb_msg *);
+	pfkeystat.out_msgtype[msg->sadb_msg_type]++;
+	if (len != PFKEY_UNUNIT64(msg->sadb_msg_len)) {
+#ifdef IPSEC_DEBUG
 		printf("key_output: Invalid message length.\n");
+#endif
+		pfkeystat.out_invlen++;
 		error = EINVAL;
 		goto end;
 	}
@@ -263,8 +285,11 @@ key_output(m, va_alist)
 	 */
 	KMALLOC(msg, struct sadb_msg *, len);
 	if (msg == 0) {
+#ifdef IPSEC_DEBUG
 		printf("key_output: No more memory.\n");
+#endif
 		error = ENOBUFS;
+		pfkeystat.out_nomem++;
 		goto end;
 		/* or do panic ? */
 	}
@@ -309,7 +334,10 @@ key_sendup0(rp, m, promisc)
 		if (m && m->m_len < sizeof(struct sadb_msg))
 			m = m_pullup(m, sizeof(struct sadb_msg));
 		if (!m) {
+#ifdef IPSEC_DEBUG
 			printf("key_sendup0: cannot pullup\n");
+#endif
+		pfkeystat.in_nomem++;
 			m_freem(m);
 			return ENOBUFS;
 		}
@@ -321,11 +349,16 @@ key_sendup0(rp, m, promisc)
 		pmsg->sadb_msg_type = SADB_X_PROMISC;
 		pmsg->sadb_msg_len = PFKEY_UNIT64(m->m_pkthdr.len);
 		/* pid and seq? */
+
+		pfkeystat.in_msgtype[pmsg->sadb_msg_type]++;
 	}
 
 	if (!sbappendaddr(&rp->rcb_socket->so_rcv,
 			(struct sockaddr *)&key_src, m, NULL)) {
+#ifdef IPSEC_DEBUG
 		printf("key_sendup0: sbappendaddr failed\n");
+#endif
+		pfkeystat.in_nomem++;
 		m_freem(m);
 		return ENOBUFS;
 	}
@@ -333,6 +366,7 @@ key_sendup0(rp, m, promisc)
 	return 0;
 }
 
+/* XXX this interface should be obsoleted. */
 int
 key_sendup(so, msg, len, target)
 	struct socket *so;
@@ -341,10 +375,6 @@ key_sendup(so, msg, len, target)
 	int target;	/*target of the resulting message*/
 {
 	struct mbuf *m, *n, *mprev;
-	struct keycb *kp;
-	int sendup;
-	struct rawcb *rp;
-	int error;
 	int tlen;
 
 	/* sanity check */
@@ -354,6 +384,14 @@ key_sendup(so, msg, len, target)
 	KEYDEBUG(KEYDEBUG_KEY_DUMP,
 		printf("key_sendup: \n");
 		kdebug_sadb(msg));
+
+	/*
+	 * we increment statistics here, just in case we have ENOBUFS
+	 * in this function.
+	 */
+	pfkeystat.in_total++;
+	pfkeystat.in_bytes += len;
+	pfkeystat.in_msgtype[msg->sadb_msg_type]++;
 
 	/*
 	 * Get mbuf chain whenever possible (not clusters),
@@ -374,13 +412,16 @@ key_sendup(so, msg, len, target)
 			MGET(n, M_DONTWAIT, MT_DATA);
 			n->m_len = MLEN;
 		}
-		if (!n)
+		if (!n) {
+			pfkeystat.in_nomem++;
 			return ENOBUFS;
-		if (tlen > MCLBYTES) {	/*XXX better threshold? */
+		}
+		if (tlen >= MCLBYTES) {	/*XXX better threshold? */
 			MCLGET(n, M_DONTWAIT);
 			if ((n->m_flags & M_EXT) == 0) {
 				m_free(n);
 				m_freem(m);
+				pfkeystat.in_nomem++;
 				return ENOBUFS;
 			}
 			n->m_len = MCLBYTES;
@@ -401,6 +442,48 @@ key_sendup(so, msg, len, target)
 	m->m_pkthdr.len = len;
 	m->m_pkthdr.rcvif = NULL;
 	m_copyback(m, 0, len, (caddr_t)msg);
+
+	/* avoid duplicated statistics */
+	pfkeystat.in_total--;
+	pfkeystat.in_bytes -= len;
+	pfkeystat.in_msgtype[msg->sadb_msg_type]--;
+
+	return key_sendup_mbuf(so, m, target);
+}
+
+int
+key_sendup_mbuf(so, m, target)
+	struct socket *so;
+	struct mbuf *m;
+	int target;
+{
+	struct mbuf *n;
+	struct keycb *kp;
+	int sendup;
+	struct rawcb *rp;
+	int error;
+
+	if (so == NULL || m == NULL)
+		panic("key_sendup_mbuf: NULL pointer was passed.\n");
+
+	pfkeystat.in_total++;
+	pfkeystat.in_bytes += m->m_pkthdr.len;
+	if (m->m_len < sizeof(struct sadb_msg)) {
+#if 1
+		m = m_pullup(m, sizeof(struct sadb_msg));
+		if (m == NULL) {
+			pfkeystat.in_nomem++;
+			return ENOBUFS;
+		}
+#else
+		/* don't bother pulling it up just for stats */
+#endif
+	}
+	if (m->m_len >= sizeof(struct sadb_msg)) {
+		struct sadb_msg *msg;
+		msg = mtod(m, struct sadb_msg *);
+		pfkeystat.in_msgtype[msg->sadb_msg_type]++;
+	}
 
 #ifndef __NetBSD__
 	for (rp = rawcb.rcb_next; rp != &rawcb; rp = rp->rcb_next)
@@ -448,13 +531,17 @@ key_sendup(so, msg, len, target)
 				sendup++;
 			break;
 		}
+		pfkeystat.in_msgtarget[target]++;
 
 		if (!sendup)
 			continue;
 
 		if ((n = m_copy(m, 0, (int)M_COPYALL)) == NULL) {
+#ifdef IPSEC_DEBUG
 			printf("key_sendup: m_copy fail\n");
+#endif
 			m_freem(m);
+			pfkeystat.in_nomem++;
 			return ENOBUFS;
 		}
 

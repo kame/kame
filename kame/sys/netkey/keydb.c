@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.39 2000/01/08 14:34:54 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.40 2000/01/10 01:32:05 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -168,7 +168,7 @@ SYSCTL_INT(_net_key, KEYCTL_RANDOM_INT,	int_random,	CTLFLAG_RW, \
 	&key_int_random,	0,	"");
 
 /* lifetime for larval SA */
-SYSCTL_INT(_net_key, KEYCTL_LARVAL_LIFETIME,	larval_lifetime,	CTLFLAG_RW, \
+SYSCTL_INT(_net_key, KEYCTL_LARVAL_LIFETIME,	larval_lifetime, CTLFLAG_RW, \
 	&key_larval_lifetime,	0,	"");
 
 /* counter for blocking to send SADB_ACQUIRE to IKEd */
@@ -176,7 +176,7 @@ SYSCTL_INT(_net_key, KEYCTL_BLOCKACQ_COUNT,	blockacq_count,	CTLFLAG_RW, \
 	&key_blockacq_count,	0,	"");
 
 /* lifetime for blocking to send SADB_ACQUIRE to IKEd */
-SYSCTL_INT(_net_key, KEYCTL_BLOCKACQ_LIFETIME,	blockacq_lifetime,	CTLFLAG_RW, \
+SYSCTL_INT(_net_key, KEYCTL_BLOCKACQ_LIFETIME,	blockacq_lifetime, CTLFLAG_RW, \
 	&key_blockacq_lifetime,	0,	"");
 
 #endif /* __FreeBSD__ */
@@ -189,7 +189,8 @@ typedef void (timeout_t)(void *);
 	for (elm = LIST_FIRST(head); elm; elm = LIST_NEXT(elm, field))
 #define __LIST_CHAINED(elm) \
 	(!((elm)->chain.le_next == NULL && (elm)->chain.le_prev == NULL))
-#define LIST_INSERT_TAIL(head, elm, type, field) do {\
+#define LIST_INSERT_TAIL(head, elm, type, field) \
+do {\
 	struct type *curelm = LIST_FIRST(head); \
 	if (curelm == NULL) {\
 		LIST_INSERT_HEAD(head, elm, field); \
@@ -200,21 +201,23 @@ typedef void (timeout_t)(void *);
 	}\
 } while (0)
 
-#define KEY_CHKSASTATE(head, sav, name) {                                    \
+#define KEY_CHKSASTATE(head, sav, name) \
+do { \
 	if ((head) != (sav)) {                                               \
 		printf("%s: state mismatched (TREE=%d SA=%d)\n",             \
 			(name), (head), (sav));                              \
 		continue;                                                    \
 	}                                                                    \
-}
+} while (0)
 
-#define KEY_CHKSPDIR(head, sp, name) {                                       \
+#define KEY_CHKSPDIR(head, sp, name) \
+do { \
 	if ((head) != (sp)) {                                                \
 		printf("%s: direction mismatched (TREE=%d SP=%d), "          \
 			"anyway continue.\n",                                \
 			(name), (head), (sp));                               \
 	}                                                                    \
-}
+} while (0)
 
 #if 1
 #define KMALLOC(p, t, n)                                                     \
@@ -222,7 +225,8 @@ typedef void (timeout_t)(void *);
 #define KFREE(p)                                                             \
 	free((caddr_t)(p), M_SECA);
 #else
-#define KMALLOC(p, t, n) do {                                                \
+#define KMALLOC(p, t, n) \
+do { \
 	((p) = (t)malloc((unsigned long)(n), M_SECA, M_NOWAIT));             \
 	printf("%s %d: %p <- KMALLOC(%s, %d)\n",                             \
 		__FILE__, __LINE__, (p), #t, n);                             \
@@ -242,7 +246,8 @@ typedef void (timeout_t)(void *);
  * set parameters into secpolicyindex buffer.
  * Must allocate secpolicyindex buffer passed to this function.
  */
-#define KEY_SETSECSPIDX(_dir, s, d, ps, pd, ulp, idx) do {                   \
+#define KEY_SETSECSPIDX(_dir, s, d, ps, pd, ulp, idx) \
+do { \
 	bzero((idx), sizeof(struct secpolicyindex));                             \
 	(idx)->dir = (_dir);                                                 \
 	(idx)->prefs = (ps);                                                 \
@@ -256,7 +261,8 @@ typedef void (timeout_t)(void *);
  * set parameters into secasindex buffer.
  * Must allocate secasindex buffer before calling this function.
  */
-#define KEY_SETSECASIDX(p, m, s, d, idx) do {                             \
+#define KEY_SETSECASIDX(p, m, s, d, idx) \
+do { \
 	bzero((idx), sizeof(struct secasindex));                             \
 	(idx)->proto = (p);                                                  \
 	(idx)->mode = (m)->sadb_msg_mode;                                    \
@@ -5333,16 +5339,23 @@ key_parse(msgp, so, targetp)
 
 	/* check version */
 	if (msg->sadb_msg_version != PF_KEY_V2) {
+#ifdef IPSEC_DEBUG
 		printf("key_parse: PF_KEY version %u is mismatched.\n",
 		    msg->sadb_msg_version);
-		return EINVAL;
+#endif
+		pfkeystat.out_invver++;
+		msg->sadb_msg_errno = EINVAL;
+		return orglen;
 	}
 
 	/* check type */
 	if (msg->sadb_msg_type > SADB_MAX) {
+#ifdef IPSEC_DEBUG
 		printf("key_parse: invalid type %u is passed.\n",
 		    msg->sadb_msg_type);
+#endif
 		msg->sadb_msg_errno = EINVAL;
+		pfkeystat.out_invmsgtype++;
 		return orglen;
 	}
 
@@ -5363,10 +5376,13 @@ key_parse(msgp, so, targetp)
 		case SADB_GET:
 		case SADB_ACQUIRE:
 		case SADB_EXPIRE:
+#ifdef IPSEC_DEBUG
 			printf("key_parse: must specify satype "
 				"when msg type=%u.\n",
 				msg->sadb_msg_type);
+#endif
 			msg->sadb_msg_errno = EINVAL;
+			pfkeystat.out_invsatype++;
 			return orglen;
 		}
 		break;
@@ -5381,8 +5397,12 @@ key_parse(msgp, so, targetp)
 		case SADB_X_SPDGET:
 		case SADB_X_SPDDUMP:
 		case SADB_X_SPDFLUSH:
-			printf("key_parse: illegal satype=%u\n", msg->sadb_msg_type);
+#ifdef IPSEC_DEBUG
+			printf("key_parse: illegal satype=%u\n",
+			    msg->sadb_msg_type);
+#endif
 			msg->sadb_msg_errno = EINVAL;
+			pfkeystat.out_invsatype++;
 			return orglen;
 		}
 		break;
@@ -5390,18 +5410,24 @@ key_parse(msgp, so, targetp)
 	case SADB_SATYPE_OSPFV2:
 	case SADB_SATYPE_RIPV2:
 	case SADB_SATYPE_MIP:
+#ifdef IPSEC_DEBUG
 		printf("key_parse: type %u isn't supported.\n",
 		    msg->sadb_msg_satype);
+#endif
 		msg->sadb_msg_errno = EOPNOTSUPP;
+		pfkeystat.out_invsatype++;
 		return orglen;
 	case 1:	/* XXX: What does it do ? */
 		if (msg->sadb_msg_type == SADB_X_PROMISC)
 			break;
 		/*FALLTHROUGH*/
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_parse: invalid type %u is passed.\n",
 		    msg->sadb_msg_satype);
+#endif
 		msg->sadb_msg_errno = EINVAL;
+		pfkeystat.out_invsatype++;
 		return orglen;
 	}
 
@@ -5416,16 +5442,22 @@ key_parse(msgp, so, targetp)
 
 		/* check upper layer protocol */
 		if (src0->sadb_address_proto != dst0->sadb_address_proto) {
+#ifdef IPSEC_DEBUG
 			printf("key_parse: upper layer protocol mismatched.\n");
+#endif
 			msg->sadb_msg_errno = EINVAL;
+			pfkeystat.out_invaddr++;
 			return orglen;
 		}
 
 		/* check family */
 		if (PFKEY_ADDR_SADDR(src0)->sa_family
 		 != PFKEY_ADDR_SADDR(dst0)->sa_family) {
+#ifdef IPSEC_DEBUG
 			printf("key_parse: address family mismatched.\n");
+#endif
 			msg->sadb_msg_errno = EINVAL;
+			pfkeystat.out_invaddr++;
 			return orglen;
 		}
 
@@ -5434,8 +5466,11 @@ key_parse(msgp, so, targetp)
 		/* check max prefixlen */
 		if (prefix < src0->sadb_address_prefixlen
 		 || prefix < dst0->sadb_address_prefixlen) {
+#ifdef IPSEC_DEBUG
 			printf("key_parse: illegal prefixlen.\n");
+#endif
 			msg->sadb_msg_errno = EINVAL;
+			pfkeystat.out_invaddr++;
 			return orglen;
 		}
 
@@ -5444,8 +5479,11 @@ key_parse(msgp, so, targetp)
 		case AF_INET6:
 			break;
 		default:
+#ifdef IPSEC_DEBUG
 			printf("key_parse: invalid address family.\n");
+#endif
 			msg->sadb_msg_errno = EINVAL;
+			pfkeystat.out_invaddr++;
 			return orglen;
 		}
 
@@ -5518,10 +5556,13 @@ key_parse(msgp, so, targetp)
 		break;
 
 	case SADB_EXPIRE:
+#ifdef IPSEC_DEBUG
 		printf("key_parse: why is SADB_EXPIRE received ?\n");
+#endif
 		msg->sadb_msg_errno = EINVAL;
 		if (targetp)
 			*targetp = KEY_SENDUP_ALL;
+		pfkeystat.out_invmsgtype++;
 		return orglen;
 
 	case SADB_FLUSH:
@@ -5550,8 +5591,11 @@ key_parse(msgp, so, targetp)
 		return 0;	/*nothing to reply*/
 
 	case SADB_X_PCHANGE:
+#ifdef IPSEC_DEBUG
 		printf("key_parse: SADB_X_PCHANGE isn't supported.\n");
+#endif
 		msg->sadb_msg_errno = EINVAL;
+		pfkeystat.out_invmsgtype++;
 		return orglen;
 #if 0
 		if (targetp)
@@ -5583,7 +5627,6 @@ key_parse(msgp, so, targetp)
 			return 0;
 		}
 	        break;
-
 
 	case SADB_X_SPDFLUSH:
 		if ((newmsg = key_spdflush(mhp)) == NULL)
@@ -5660,16 +5703,22 @@ key_align(msg, mhp)
 			 * KEY_AUTH or KEY_ENCRYPT ?
 			 */
 			if (mhp[ext->sadb_ext_type] != NULL) {
+#ifdef IPSEC_DEBUG
 				printf("key_align: duplicate ext_type %u "
 					"is passed.\n",
 					ext->sadb_ext_type);
+#endif
+				pfkeystat.out_dupext++;
 				return EINVAL;
 			}
 			mhp[ext->sadb_ext_type] = (caddr_t)ext;
 			break;
 		default:
+#ifdef IPSEC_DEBUG
 			printf("key_align: invalid ext_type %u is passed.\n",
 				ext->sadb_ext_type);
+#endif
+			pfkeystat.out_invexttype++;
 			return EINVAL;
 		}
 
