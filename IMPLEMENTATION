@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.334 2003/06/02 06:31:06 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.335 2003/06/02 06:51:24 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -381,7 +381,7 @@ upper-layer reachability confirmation hint comes, ND process can use it
 to optimize neighbor discovery process - ND process can omit real ND exchange
 and keep the neighbor cache state in REACHABLE.
 We currently have two sources for hints: (1) setsockopt(IPV6_REACHCONF)
-defined by the 2292bis API, and (2) hints from tcp(6)_input.
+defined by the RFC3542 API, and (2) hints from tcp(6)_input.
 
 It is questionable if they are really trustworthy.  For example, a
 rogue userland program can use IPV6_REACHCONF to confuse the ND
@@ -466,7 +466,7 @@ There are several candidates of API to deal with scoped addresses
 without ambiguity.
 
 The IPV6_PKTINFO ancillary data type or socket option defined in the
-advanced API (RFC2292 or draft-ietf-ipngwg-rfc2292bis-xx) can specify
+advanced API (RFC2292 or RFC3542) can specify
 the outgoing interface of a packet.  Similarly, the IPV6_PKTINFO or
 IPV6_RECVPKTINFO socket options tell kernel to pass the incoming
 interface to user applications.
@@ -906,7 +906,7 @@ is sane or not.  Comments are welcome.
 1.10 Applications
 
 For userland programming, we support IPv6 socket API as specified in
-RFC2553/3493, RFC2292 and upcoming internet drafts.
+RFC2553/3493, RFC3542 and upcoming internet drafts.
 
 TCP/UDP over IPv6 is available and quite stable.  You can enjoy "telnet",
 "ftp", "rlogin", "rsh", "ssh", etc.  These applications are protocol
@@ -1418,24 +1418,23 @@ Users can join groups by using appropriate system calls like setsockopt(2).
 
 1.16 Advanced API
 
-Current KAME kernel implements 2292bis API, documented in
-draft-ietf-ipngwg-rfc2292bis-xx.txt.  It also implements RFC2292 API,
+Current KAME kernel implements RFC3542 API.  It also implements RFC2292 API,
 for backward compatibility purposes with *BSD-integrated codebase.
-KAME tree ships with 2292bis headers.
-*BSD-integrated codebase implements either RFC2292, or 2292bis, API.
+KAME tree ships with RFC3542 headers.
+*BSD-integrated codebase implements either RFC2292, or RFC3542, API.
 see "COVERAGE" document for detailed implementation status.
 
 Here are couple of issues to mention:
 - *BSD-integrated binaries, compiled for RFC2292, will work on KAME kernel.
   For example, OpenBSD 2.7 /sbin/rtsol will work on KAME/openbsd kernel.
-- KAME binaries, compiled using 2292bis, will not work on *BSD-integrated
+- KAME binaries, compiled using RFC3542, will not work on *BSD-integrated
   kenrel.  For example, KAME /usr/local/v6/sbin/rtsol will not work on
   OpenBSD 2.7 kernel.
-- 2292bis API is not compatible with RFC2292 API.  2292bis #define symbols
+- RFC3542 API is not compatible with RFC2292 API.  RFC3542 #define symbols
   conflict with RFC2292 symbols.  Therefore, if you compile programs that
   assume RFC2292 API, the compilation itself goes fine, however, the compiled
   binary will not work correctly.  The problem is not KAME issue, but API
-  issue.  For example, Solaris 8 implements 2292bis API.  If you compile
+  issue.  For example, Solaris 8 implements RFC3542 API.  If you compile
   RFC2292-based code on Solaris 8, the binary can behave strange.
 
 There are few (or couple of) incompatible behavior in RFC2292 binary backward
@@ -1444,11 +1443,11 @@ compatibility support in KAME tree.  To enumerate:
   Even if we see packets with "strict" bit set, those bits will not be made
   visible to the userland.
   Background: RFC2292 document is based on RFC1883 IPv6, and it uses
-  strict/loose bitmap.  2292bis document is based on RFC2460 IPv6, and it has
+  strict/loose bitmap.  RFC3542 document is based on RFC2460 IPv6, and it has
   no strict/loose bitmap (it was removed from RFC2460).  KAME tree obeys
   RFC2460 IPv6, and lacks support for strict/loose bitmap.
 
-The 2292bis documents leave some particular cases unspecified.  The
+The RFC3542 documents leave some particular cases unspecified.  The
 KAME implementation treats them as follows:
 - The IPV6_DONTFRAG and IPV6_RECVPATHMTU socket options for TCP
   sockets are ignored.  That is, the setsocktopt() call will succeed
