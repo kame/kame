@@ -72,9 +72,6 @@ static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
 
 struct	socket sockb;
 
-char	*inet6name (struct in6_addr *);
-
-static char ntop_buf[INET6_ADDRSTRLEN];
 
 static	const char *ip6nh[] = {
 	"hop by hop",
@@ -335,6 +332,25 @@ static	const char *ip6nh[] = {
 	"#255",
 };
 
+static char *srcrule_str[] = {
+	"first candidate",
+	"same address",
+	"appropriate scope",
+	"deprecated address",
+	"home address",
+	"outgoing interface",
+	"matching label",
+	"public/temporary address",
+	"alive interface",
+	"preferred interface",
+	"rule #10",
+	"rule #11",
+	"rule #12",
+	"rule #13",
+	"longest match",
+	"rule #15",
+};
+
 /*
  * Dump IP6 statistics structure.
  */
@@ -489,6 +505,12 @@ ip6_stats(u_long off __unused, const char *name, int af1 __unused)
 
 	p1a(ip6s_forward_cachehit, "\t%llu forward cache hit\n");
 	p1a(ip6s_forward_cachemiss, "\t%llu forward cache miss\n");
+	printf("\tSource addresses selection rule applied:\n");
+	for (i = 0; i < 16; i++) {
+		if (ip6stat.ip6s_sources_rule[i])
+			printf("\t\t%llu %s\n", ip6stat.ip6s_sources_rule[i],
+			       srcrule_str[i]);
+	}
 #undef p
 #undef p1a
 }
@@ -968,7 +990,8 @@ pim6_stats(u_long off __unused, const char *name, int af1 __unused)
 
 	if (off == 0)
 		return;
-	kread(off, (char *)&pim6stat, sizeof(pim6stat));
+	if (kread(off, (char *)&pim6stat, sizeof(pim6stat)))
+		return;
 	printf("%s:\n", name);
 
 #define	p(f, m) if (pim6stat.f || sflag <= 1) \
@@ -1009,7 +1032,7 @@ rip6_stats(u_long off __unused, const char *name, int af1 __unused)
 #define	p(f, m) if (rip6stat.f || sflag <= 1) \
     printf(m, (unsigned long long)rip6stat.f, plural(rip6stat.f))
 	p(rip6s_ipackets, "\t%llu message%s received\n");
-	p(rip6s_isum, "\t%llu checksum calcuration%s on inbound\n");
+	p(rip6s_isum, "\t%llu checksum calculation%s on inbound\n");
 	p(rip6s_badsum, "\t%llu message%s with bad checksum\n");
 	p(rip6s_nosock, "\t%llu message%s dropped due to no socket\n");
 	p(rip6s_nosockmcast,
@@ -1030,6 +1053,7 @@ rip6_stats(u_long off __unused, const char *name, int af1 __unused)
 /*
  * Pretty print an Internet address (net address + port).
  * Take numeric_addr and numeric_port into consideration.
+ * XXX: currently unused.
  */
 #define GETSERVBYPORT6(port, proto, ret)\
 {\
@@ -1041,67 +1065,47 @@ rip6_stats(u_long off __unused, const char *name, int af1 __unused)
 		(ret) = getservbyport((int)(port), (proto));\
 };
 
-void
-inet6print(struct in6_addr *in6, int port, const char *proto, int numeric)
-{
-	struct servent *sp = 0;
-	char line[80], *cp;
-	int width;
-
-	sprintf(line, "%.*s.", Wflag ? 39 :
-		(Aflag && !numeric) ? 12 : 16, inet6name(in6));
-	cp = index(line, '\0');
-	if (!numeric && port)
-		GETSERVBYPORT6(port, proto, sp);
-	if (sp || port == 0)
-		sprintf(cp, "%.8s", sp ? sp->s_name : "*");
-	else
-		sprintf(cp, "%d", ntohs((u_short)port));
-	width = Wflag ? 45 : Aflag ? 18 : 22;
-	printf("%-*.*s ", width, width, line);
-}
-
 /*
  * Construct an Internet address representation.
  * If the numeric_addr has been supplied, give
  * numeric value, otherwise try for symbolic name.
+ *
+ * XXX: we could make this function protocol-independent.
+ * XXX: proto is currently ignored.
  */
-
-char *
-inet6name(struct in6_addr *in6p)
+void
+sa_print(struct sockaddr *sa, char *proto, int numeric)
 {
-	char *cp;
-	static char line[50];
-	struct hostent *hp;
-	static char domain[MAXHOSTNAMELEN];
-	static int first = 1;
+	struct sockaddr_in6 sa6;
+	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+	int flags = 0;
+	int n, hwidth, totalwidth;
 
-	if (first && !numeric_addr) {
-		first = 0;
-		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
-		    (cp = index(domain, '.')))
-			(void) strcpy(domain, cp + 1);
-		else
-			domain[0] = 0;
-	}
-	cp = 0;
-	if (!numeric_addr && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
-		hp = gethostbyaddr((char *)in6p, sizeof(*in6p), AF_INET6);
-		if (hp) {
-			if ((cp = index(hp->h_name, '.')) &&
-			    !strcmp(cp + 1, domain))
-				*cp = 0;
-			cp = hp->h_name;
+	hwidth = Wflag ? 39 : ((Aflag && !numeric) ? 12 : 16);
+	totalwidth = Wflag ? 45 : (Aflag ? 18 : 22);
+
+	/* XXX: strip off embedded link ID */
+	if (sa->sa_family == AF_INET6) { /* for safety */
+		sa6 = *(struct sockaddr_in6 *)sa;
+		if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&sa6.sin6_addr)) {
+			sa6.sin6_addr.s6_addr[2] = 0;
+			sa6.sin6_addr.s6_addr[3] = 0;
 		}
+		sa = (struct sockaddr *)&sa6;
 	}
-	if (IN6_IS_ADDR_UNSPECIFIED(in6p))
-		strcpy(line, "*");
-	else if (cp)
-		strcpy(line, cp);
-	else 
-		sprintf(line, "%s",
-			inet_ntop(AF_INET6, (void *)in6p, ntop_buf,
-				sizeof(ntop_buf)));
-	return (line);
+
+	if (numeric)
+		flags |= NI_NUMERICHOST | NI_NUMERICSERV;
+
+	if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), sbuf,
+	    sizeof(sbuf), flags)) {
+		printf("%-*s ", totalwidth, "???");
+		return;
+	}
+
+	n = printf("%.*s.%-5.5s ", hwidth, hbuf, sbuf);
+	if (n <= totalwidth)
+		printf("%*s", totalwidth - n + 1, "");
 }
 #endif /*INET6*/

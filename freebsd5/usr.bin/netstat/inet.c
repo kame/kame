@@ -83,6 +83,7 @@ static const char rcsid[] =
 char	*inetname (struct in_addr *);
 void	inetprint (struct in_addr *, int, const char *, int);
 #ifdef INET6
+extern void	sa_print (struct sockaddr *, char *, int);
 static int udp_done, tcp_done;
 #endif /* INET6 */
 
@@ -263,11 +264,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				inet6print(&inp->in6p_laddr,
-					   (int)inp->inp_lport, name, 1);
+				sa_print((struct sockaddr *)&inp->in6p_lsa,
+				    name, 1);
 				if (!Lflag)
-					inet6print(&inp->in6p_faddr,
-						   (int)inp->inp_fport, name, 1);
+					sa_print((struct sockaddr *)&inp->in6p_fsa,
+					    name, 1);
 			} /* else nothing printed now */
 #endif /* INET6 */
 		} else if (inp->inp_flags & INP_ANONPORT) {
@@ -280,11 +281,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				inet6print(&inp->in6p_laddr,
-					   (int)inp->inp_lport, name, 1);
+				sa_print((struct sockaddr *)&inp->in6p_lsa,
+				    name, 1);
 				if (!Lflag)
-					inet6print(&inp->in6p_faddr,
-						   (int)inp->inp_fport, name, 0);
+					sa_print((struct sockaddr *)&inp->in6p_fsa,
+					    name, 0);
 			} /* else nothing printed now */
 #endif /* INET6 */
 		} else {
@@ -299,13 +300,12 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				inet6print(&inp->in6p_laddr,
-					   (int)inp->inp_lport, name, 0);
+				sa_print((struct sockaddr *)&inp->in6p_lsa,
+				    name, 0);
 				if (!Lflag)
-					inet6print(&inp->in6p_faddr,
-						   (int)inp->inp_fport, name,
-						   inp->inp_lport !=
-							inp->inp_fport);
+					sa_print((struct sockaddr *)&inp->in6p_fsa,
+					    name,
+					    inp->inp_lport != inp->inp_fport);
 			} /* else nothing printed now */
 #endif /* INET6 */
 		}
@@ -434,7 +434,6 @@ tcp_stats(u_long off __unused, const char *name, int af1 __unused)
 	p(tcps_keepdrops, "\t\t%lu connection%s dropped by keepalive\n");
 	p(tcps_predack, "\t%lu correct ACK header prediction%s\n");
 	p(tcps_preddat, "\t%lu correct data packet header prediction%s\n");
-
 	p(tcps_sc_added, "\t%lu syncache entrie%s added\n"); 
 	p1a(tcps_sc_retransmitted, "\t\t%lu retransmitted\n"); 
 	p1a(tcps_sc_dupsyn, "\t\t%lu dupsyn\n"); 
@@ -450,6 +449,18 @@ tcp_stats(u_long off __unused, const char *name, int af1 __unused)
 	p(tcps_sc_zonefail, "\t\t%lu zone failure%s\n"); 
 	p(tcps_sc_sendcookie, "\t%lu cookie%s sent\n"); 
 	p(tcps_sc_recvcookie, "\t%lu cookie%s received\n"); 
+
+	p(tcps_ecn_accepts, "\t%lu ECN connection%s accepted\n");
+	p(tcps_ecn_rcvece, "\t\t%lu ECE packet%s received\n");
+	p(tcps_ecn_rcvcwr, "\t\t%lu CWR packet%s received\n");
+	p(tcps_ecn_rcvce, "\t\t%lu CE packet%s received\n");
+	p(tcps_ecn_sndect, "\t\t%lu ECT packet%s sent\n");
+	p(tcps_ecn_sndece, "\t\t%lu ECE packet%s sent\n");
+	p(tcps_ecn_sndcwr, "\t\t%lu CWR packet%s sent\n");
+	p1a(tcps_cwr_frecovery, "\t\t\tfastrecovery: %lu\n");
+	p1a(tcps_cwr_timeout, "\t\t\ttimeout: %lu\n");
+	p1a(tcps_cwr_ecn, "\t\t\tecn: %lu\n");
+
 #undef p
 #undef p1a
 #undef p2
@@ -694,13 +705,18 @@ igmp_stats(u_long off __unused, const char *name, int af1 __unused)
     printf(m, igmpstat.f, igmpstat.f != 1 ? "ies" : "y")
 	p(igps_rcv_total, "\t%u message%s received\n");
         p(igps_rcv_tooshort, "\t%u message%s received with too few bytes\n");
+	p(igps_rcv_toolong, "\t%u message%s received over MTU size\n");
         p(igps_rcv_badsum, "\t%u message%s received with bad checksum\n");
-        py(igps_rcv_queries, "\t%u membership quer%s received\n");
         py(igps_rcv_badqueries, "\t%u membership quer%s received with invalid field(s)\n");
+	p(igps_rcv_nora, "\t%u message%s received with no router alert\n");
+	py(igps_rcv_v1_queries, "\t%u v1 membership quer%s received\n");
+	py(igps_rcv_v2_queries, "\t%u v2 membership quer%s received\n");
+	py(igps_rcv_v3_queries, "\t%u v3 membership quer%s received\n");
         p(igps_rcv_reports, "\t%u membership report%s received\n");
         p(igps_rcv_badreports, "\t%u membership report%s received with invalid field(s)\n");
         p(igps_rcv_ourreports, "\t%u membership report%s received for groups to which we belong\n");
-        p(igps_snd_reports, "\t%u membership report%s sent\n");
+        p(igps_snd_v1v2_reports, "\t%u v1/v2 membership report%s sent\n");
+        p(igps_snd_v3_reports, "\t%u v3 membership report%s sent\n");
 #undef p
 #undef py
 }

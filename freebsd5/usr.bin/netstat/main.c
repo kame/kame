@@ -168,6 +168,11 @@ static struct nlist nl[] = {
 	{ "" },
 };
 
+#ifdef IPSEC
+static void ipsec_stats0 (u_long, char *, int);
+static void pfkey_stats0 (u_long, char *, int);
+#endif
+
 struct protox {
 	u_char	pr_index;		/* index into nlist of cb head */
 	u_char	pr_sindex;		/* index into nlist of stat block */
@@ -194,7 +199,7 @@ struct protox {
 	  igmp_stats,	NULL,		"igmp",	IPPROTO_IGMP },
 #ifdef IPSEC
 	{ -1,		N_IPSECSTAT,	1,	0,
-	  ipsec_stats,	NULL,		"ipsec",	0},
+	  ipsec_stats0,	NULL,		"ipsec",	0},
 #endif
 	{ -1,		-1,		1,	0,
 	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
@@ -214,7 +219,7 @@ struct protox ip6protox[] = {
 	  icmp6_stats,	icmp6_ifstats,	"icmp6",IPPROTO_ICMPV6 },
 #ifdef IPSEC
 	{ -1,		N_IPSEC6STAT,	1,	0,
-	  ipsec_stats,	NULL,		"ipsec6",0 },
+	  ipsec_stats0,	NULL,		"ipsec6",0 },
 #endif
 #ifdef notyet
 	{ -1,		N_PIM6STAT,	1,	0,
@@ -232,7 +237,7 @@ struct protox ip6protox[] = {
 #ifdef IPSEC
 struct protox pfkeyprotox[] = {
 	{ -1,		N_PFKEYSTAT,	1,	0,
-	  pfkey_stats,	NULL,		"pfkey", 0 },
+	  pfkey_stats0,	NULL,		"pfkey", 0 },
 	{ -1,		-1,		0,	0,
 	  0,		NULL,		0,	0 }
 };
@@ -509,6 +514,25 @@ main(int argc, char *argv[])
 			mbpr(0, 0, 0, 0, 0, 0, 0, 0, 0);
 		exit(0);
 	}
+	if (pflag) {
+		if (iflag && tp->pr_istats) {
+			kread(0, 0, 0);
+			intpr(interval, nl[N_IFNET].n_value, tp->pr_istats);
+			exit(0);
+		}
+		if (!tp->pr_stats) {
+			printf("%s: no stats routine\n", tp->pr_name);
+			exit(0);
+		}
+		if (tp->pr_usesysctl) {
+			(*tp->pr_stats)(tp->pr_usesysctl, tp->pr_name, af);
+		} else {
+			kread(0, 0, 0);
+			(*tp->pr_stats)(nl[tp->pr_sindex].n_value,
+					tp->pr_name, af);
+		}
+		exit(0);
+	}
 #if 0
 	/*
 	 * Keep file descriptors open to avoid overhead
@@ -649,6 +673,18 @@ printproto(tp, name)
 	if (pr != NULL && (off || af != AF_UNSPEC))
 		(*pr)(off, name, af);
 }
+
+#ifdef IPSEC
+static void ipsec_stats0 (u_long off __unused, char *name, int af __unused)
+{
+	ipsec_stats(off, name);
+}
+
+static void pfkey_stats0 (u_long off __unused, char *name, int af __unused)
+{
+	pfkey_stats(off, name);
+}
+#endif
 
 /*
  * Read kernel memory, return 0 on success.

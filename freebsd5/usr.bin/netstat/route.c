@@ -609,7 +609,8 @@ fmt_sockaddr(struct sockaddr *sa, struct sockaddr *mask, int flags)
 		 * sin6_scope_id field of SA should be set in the future.
 		 */
 		if (IN6_IS_ADDR_LINKLOCAL(in6) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(in6)) {
+		    IN6_IS_ADDR_MC_LINKLOCAL(in6) ||
+		    IN6_IS_ADDR_MC_NODELOCAL(in6)) {
 		    /* XXX: override is ok? */
 		    sa6->sin6_scope_id = (u_int32_t)ntohs(*(u_short *)&in6->s6_addr[2]);
 		    *(u_short *)&in6->s6_addr[2] = 0;
@@ -925,7 +926,12 @@ netname6(struct sockaddr_in6 *sa6, struct in6_addr *mask)
 	static char line[MAXHOSTNAMELEN];
 	u_char *p = (u_char *)mask;
 	u_char *lim;
-	int masklen, illegal = 0, flag = NI_WITHSCOPEID;
+	int masklen, illegal = 0;
+#ifdef NI_WITHSCOPEID
+	int flag = NI_WITHSCOPEID;
+#else
+	int flag = 0;
+#endif
 
 	if (mask) {
 		for (masklen = 0, lim = p + 16; p < lim; p++) {
@@ -985,7 +991,11 @@ char *
 routename6(struct sockaddr_in6 *sa6)
 {
 	static char line[MAXHOSTNAMELEN];
+#ifdef NI_WITHSCOPEID
 	int flag = NI_WITHSCOPEID;
+#else
+	int flag = 0;
+#endif
 	/* use local variable for safety */
 	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};
 
