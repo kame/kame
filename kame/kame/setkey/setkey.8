@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.94 2004/05/18 08:48:49 sakane Exp $
+.\"	$KAME: setkey.8,v 1.95 2004/06/08 04:48:05 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -299,7 +299,7 @@ Specify window size of bytes for replay prevention.
 must be decimal number in 32-bit word.
 If
 .Ar size
-is zero or not specified, replay check don't take place.
+is zero or not specified, replay check does not take place.
 .\"
 .It Fl u Ar id
 Specify the identifier of the policy entry in SPD.
@@ -320,7 +320,7 @@ A series of sequential increasing numbers started from 1 are set.
 .El
 .\"
 .It Fl f Li nocyclic-seq
-Don't allow cyclic sequence number.
+Do not allow cyclic sequence number.
 .\"
 .It Fl lh Ar time
 .It Fl ls Ar time
@@ -421,15 +421,15 @@ stands for
 .Dq any protocol .
 Also you can use the protocol number.
 You can specify a type and/or a code of ICMPv6 when
-Upper-layer protocol is ICMPv6.
-the specification can be placed after
+upper-layer protocol is ICMPv6.
+The specification can be placed after
 .Li icmp6 .
 A type is separated with a code by single comma.
 A code must be specified anytime.
 When a zero is specified, the kernel deals with it as a wildcard.
-Note that the kernel can not distinguish a wildcard from that a type
+Note that the kernel cannot distinguish a wildcard from that a type
 of ICMPv6 is zero.
-For example, the following means the policy doesn't require IPsec
+For example, the following means the policy does not require IPsec
 for any inbound Neighbor Solicitation.
 .Dl spdadd ::/0 ::/0 icmp6 135,0 -P in none ;
 .Pp
@@ -512,11 +512,11 @@ If the SA is not available in every level, the kernel will request
 getting SA to the key exchange daemon.
 .Li default
 means the kernel consults to the system wide default against protocol you
-specified, e.g.
+specified, e.g.,
 .Li esp_trans_deflev
 sysctl variable, when the kernel processes the packet.
 .Li use
-means that the kernel use a SA if it's available,
+means that the kernel use a SA if it is available,
 otherwise the kernel keeps normal operation.
 .Li require
 means SA is required whenever the kernel sends a packet matched
@@ -535,7 +535,7 @@ separated by colon
 .Sq \&:
 like the following;
 .Li unique:number .
-in order to bind this policy to the SA.
+In order to bind this policy to the SA.
 .Li number
 must be between 1 and 32767.
 It corresponds to
