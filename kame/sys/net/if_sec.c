@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.4 2001/07/26 01:58:59 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.5 2001/07/26 02:09:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -120,7 +120,7 @@ struct ifnet *
 sec_create(unit)
 	int unit;
 {
-	struct gif_softc *sc;
+	struct sec_softc *sc;
 	struct ifchain *ifcp;
 	int i;
 
@@ -131,6 +131,8 @@ sec_create(unit)
 		else
 			i = sec_maxunit + 1;
 	}
+	if (i > sec_maxunit)
+		sec_maxunit = i;
 
 	sc = malloc(sizeof(*sc), M_DEVBUF, M_WAIT);
 	bzero(sc, sizeof(*sc));
@@ -138,44 +140,18 @@ sec_create(unit)
 	bzero(ifcp, sizeof(*ifcp));
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	sprintf(sc->gif_if.if_xname, "sec%d", i);
+	sprintf(sc->sc_gif.gif_if.if_xname, "sec%d", i);
 #else
-	sc->gif_if.if_name = "sec";
-	sc->gif_if.if_unit = i;
+	sc->sc_gif.gif_if.if_name = "sec";
+	sc->sc_gif.gif_if.if_unit = i;
 #endif
 
-	if (i > sec_maxunit)
-		sec_maxunit = i;
+	gifattach0(&sc->sc_gif);
 
-	sc->encap_cookie4 = sc->encap_cookie6 = NULL;
-
-	/* XXX IPsec encapsulations and path MTU... */
-	sc->gif_if.if_mtu    = GIF_MTU;
-	sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
-	/* turn off ingress filter */
-	sc->gif_if.if_flags  |= IFF_LINK2;
-	sc->gif_if.if_ioctl  = sec_ioctl;
-#ifdef __OpenBSD__
-	sc->gif_if.if_start  = gif_start;
-#endif
-	sc->gif_if.if_output = gif_output;
-	sc->gif_if.if_type   = IFT_GIF;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
-#endif
-	if_attach(&sc->gif_if);
-#if NBPFILTER > 0
-#ifdef HAVE_OLD_BPF
-	bpfattach(&sc->gif_if, DLT_NULL, sizeof(u_int));
-#else
-	bpfattach(&sc->gif_if.if_bpf, &sc->gif_if, DLT_NULL, sizeof(u_int));
-#endif
-#endif
-
-	ifcp->ifp = (struct ifnet *)&sc->gif_if;
+	ifcp->ifp = (struct ifnet *)&sc->sc_gif.gif_if;
 	LIST_INSERT_HEAD(&ifchainhead, ifcp, chain);
 
-	return (struct ifnet *)&sc->gif_if;
+	return (struct ifnet *)&sc->sc_gif.gif_if;
 }
 
 #ifdef __FreeBSD__
@@ -187,11 +163,11 @@ sec_destroy(ifp)
 	struct ifnet *ifp;
 {
 	struct ifchain *ifcp, *next;
-	struct gif_softc *sc;
+	struct sec_softc *sc;
 
 	for (ifcp = LIST_FIRST(&ifchainhead); ifcp; ifcp = next) {
 		next = LIST_NEXT(ifcp, chain);
-		sc = (struct gif_softc *)ifp;
+		sc = (struct sec_softc *)ifp;
 
 		if (ifp == ifcp->ifp) {
 			gif_delete_tunnel(ifp);
@@ -246,11 +222,11 @@ struct ifnet *
 sec_reusable()
 {
 	struct ifchain *ifcp, *next;
-	struct gif_softc *sc;
+	struct sec_softc *sc;
 
 	for (ifcp = LIST_FIRST(&ifchainhead); ifcp; ifcp = next) {
 		next = LIST_NEXT(ifcp, chain);
-		sc = (struct gif_softc *)ifcp->ifp;
+		sc = (struct sec_softc *)ifcp->ifp;
 
 		if (!sc->gif_psrc)
 			return ifcp->ifp;

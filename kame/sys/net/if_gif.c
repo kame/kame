@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.62 2001/07/25 17:25:49 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.63 2001/07/26 02:09:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -165,31 +165,38 @@ gifattach(dummy)
 		sc->gif_if.if_name = "gif";
 		sc->gif_if.if_unit = i;
 #endif
+		gifattach0(sc);
+	}
+}
 
-		sc->encap_cookie4 = sc->encap_cookie6 = NULL;
+void
+gifattach0(sc)
+	struct gif_softc *sc;
+{
 
-		sc->gif_if.if_mtu    = GIF_MTU;
-		sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
-		/* turn off ingress filter */
-		sc->gif_if.if_flags  |= IFF_LINK2;
-		sc->gif_if.if_ioctl  = gif_ioctl;
+	sc->encap_cookie4 = sc->encap_cookie6 = NULL;
+
+	sc->gif_if.if_mtu    = GIF_MTU;
+	sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
+	/* turn off ingress filter */
+	sc->gif_if.if_flags  |= IFF_LINK2;
+	sc->gif_if.if_ioctl  = gif_ioctl;
 #ifdef __OpenBSD__
-		sc->gif_if.if_start  = gif_start;
+	sc->gif_if.if_start  = gif_start;
 #endif
-		sc->gif_if.if_output = gif_output;
-		sc->gif_if.if_type   = IFT_GIF;
+	sc->gif_if.if_output = gif_output;
+	sc->gif_if.if_type   = IFT_GIF;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
-		sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+	sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
-		if_attach(&sc->gif_if);
+	if_attach(&sc->gif_if);
 #if NBPFILTER > 0
 #ifdef HAVE_OLD_BPF
-		bpfattach(&sc->gif_if, DLT_NULL, sizeof(u_int));
+	bpfattach(&sc->gif_if, DLT_NULL, sizeof(u_int));
 #else
-		bpfattach(&sc->gif_if.if_bpf, &sc->gif_if, DLT_NULL, sizeof(u_int));
+	bpfattach(&sc->gif_if.if_bpf, &sc->gif_if, DLT_NULL, sizeof(u_int));
 #endif
 #endif
-	}
 }
 
 #ifdef __FreeBSD__

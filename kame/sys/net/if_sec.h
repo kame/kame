@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.h,v 1.1 2001/07/25 08:43:13 itojun Exp $	*/
+/*	$KAME: if_sec.h,v 1.2 2001/07/26 02:09:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -31,8 +31,20 @@
 #ifndef _NET_IF_SEC_H_
 #define _NET_IF_SEC_H_
 
+#include <net/if_gif.h>
+
+struct sec_softc {
+	struct gif_softc sc_gif;
+	int sc_refcnt;		/* references other than ifchain */
+};
+
 /* Prototypes */
 struct ifnet *sec_create __P((int));
 int sec_destroy __P((struct ifnet *));
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+int sec_ioctl __P((struct ifnet *, int, caddr_t));
+#else
+int sec_ioctl __P((struct ifnet *, u_long, caddr_t));
+#endif
 
 #endif /* _NET_IF_SEC_H_ */

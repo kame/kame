@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.21 2001/07/25 09:20:06 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.22 2001/07/26 02:09:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,6 +82,7 @@ extern struct gif_softc *gif;
 #endif
 
 /* Prototypes */
+void gifattach0 __P((struct gif_softc *));
 #ifndef __OpenBSD__
 void gif_input __P((struct mbuf *, int, struct ifnet *));
 #endif
