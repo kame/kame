@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.35 2001/05/08 04:36:36 itojun Exp $	*/
+/*	$KAME: main.c,v 1.36 2001/06/01 08:26:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,10 +141,8 @@ main(ac, av)
 	 * at the creation time.
 	 */
 	umask(077);
-	if (umask(077) != 077) {
+	if (umask(077) != 077)
 		errx(1, "could not set umask");
-		/*NOTREACHED*/
-	}
 
 	initlcconf();
 	initrmconf();
@@ -165,7 +163,8 @@ main(ac, av)
 	"\n", eay_version());
 
 	if (pfkey_init() < 0)
-		exit(1);
+		errx(1, "something error happened "
+			"while pfkey initializing.");
 
 	/*
 	 * in order to prefer the parameters by command line,
@@ -173,11 +172,8 @@ main(ac, av)
 	 */
 	save_params();
 	error = cfparse();
-	if (error != 0) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"failed to parse configuration file.\n");
-		exit(1);
-	}
+	if (error != 0)
+		errx(1, "failed to parse configuration file.");
 	restore_params();
 
 	/*
@@ -186,7 +182,8 @@ main(ac, av)
 	 */
 	if (loading_sa && !f_local) {
 		if (backupsa_from_file() != 0)
-			exit(1);
+			errx(1, "something error happened "
+				"SA recovering.");
 	}
 
 	if (f_foreground)
@@ -197,9 +194,8 @@ main(ac, av)
 		FILE *fp;
 
 		if (daemon(0, 0) < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to be daemon. (%s)\n", strerror(errno));
-			exit(1);
+			errx(1, "failed to be daemon. (%s)",
+				strerror(errno));
 		}
 		/*
 		 * In case somebody has started inetd manually, we need to
