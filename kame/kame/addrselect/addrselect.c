@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.9 2001/12/21 08:24:22 jinmei Exp $	*/
+/*	$KAME: addrselect.c,v 1.10 2001/12/24 10:39:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -109,13 +109,13 @@ main(argc, argv)
 static void
 get_policy()
 {
-	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ADDRSELPOLICY };
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ADDRCTLPOLICY };
 	size_t l;
 	char *buf;
 	struct in6_addrpolicy *pol, *ep;
 
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), NULL, &l, NULL, 0) < 0) {
-		err(1, "sysctl(IPV6CTL_ADDRSELPOLICY)");
+		err(1, "sysctl(IPV6CTL_ADDRCTLPOLICY)");
 		/* NOTREACHED */
 	}
 	if ((buf = malloc(l)) == NULL) {
@@ -123,7 +123,7 @@ get_policy()
 		/* NOTREACHED */
 	}
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), buf, &l, NULL, 0) < 0) {
-		err(1, "sysctl(IPV6CTL_ADDRSELPOLICY)");
+		err(1, "sysctl(IPV6CTL_ADDRCTLPOLICY)");
 		/* NOTREACHED */
 	}
 
@@ -326,8 +326,8 @@ set_policy()
 
 	for (ent = TAILQ_FIRST(&policyhead); ent;
 	     ent = TAILQ_NEXT(ent, pc_entry)) {
-		if (ioctl(s, SIOCASRCSEL_POLICY, &ent->pc_policy))
-			warn("ioctl(SIOCASRCSEL_POLICY)");
+		if (ioctl(s, SIOCAADDRCTL_POLICY, &ent->pc_policy))
+			warn("ioctl(SIOCAADDRCTL_POLICY)");
 	}
 
 	close(s);
@@ -409,8 +409,8 @@ add_policy(prefix, prec, label)
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
 		err(1, "socket(UDP)");
-	if (ioctl(s, SIOCASRCSEL_POLICY, &p))
-		err(1, "ioctl(SIOCASRCSEL_POLICY)");
+	if (ioctl(s, SIOCAADDRCTL_POLICY, &p))
+		err(1, "ioctl(SIOCAADDRCTL_POLICY)");
 
 	close(s);
 }
@@ -429,8 +429,8 @@ delete_policy(prefix)
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
 		err(1, "socket(UDP)");
-	if (ioctl(s, SIOCDSRCSEL_POLICY, &p))
-		err(1, "ioctl(SIOCDSRCSEL_POLICY)");
+	if (ioctl(s, SIOCDADDRCTL_POLICY, &p))
+		err(1, "ioctl(SIOCDADDRCTL_POLICY)");
 
 	close(s);
 }
@@ -446,8 +446,8 @@ flush_policy()
 
 	for (ent = TAILQ_FIRST(&policyhead); ent;
 	     ent = TAILQ_NEXT(ent, pc_entry)) {
-		if (ioctl(s, SIOCDSRCSEL_POLICY, &ent->pc_policy))
-			warn("ioctl(SIOCDSRCSEL_POLICY)");
+		if (ioctl(s, SIOCDADDRCTL_POLICY, &ent->pc_policy))
+			warn("ioctl(SIOCDADDRCTL_POLICY)");
 	}
 
 	close(s);
