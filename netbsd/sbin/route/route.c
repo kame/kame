@@ -455,7 +455,7 @@ routename(sa)
 		}
 #endif
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
-		    line, sizeof(line), NULL, 0, nflag ? niflags : 0) != 0)
+		    line, sizeof(line), NULL, 0, niflags) != 0)
 			strncpy(line, "invalid", sizeof(line));
 		break;
 	    }
@@ -594,7 +594,7 @@ netname(sa)
 		}
 #endif
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
-		    line, sizeof(line), NULL, 0, nflag ? niflags : 0) != 0)
+		    line, sizeof(line), NULL, 0, niflags) != 0)
 			strncpy(line, "invalid", sizeof(line));
 		break;
 	    }
