@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1743 2001/06/27 05:40:00 itojun Exp $
+$KAME: CHANGELOG,v 1.1744 2001/06/27 10:51:53 sakane Exp $
 
 <200106>
+Wed Jun 27 19:47:19 JST 2001 sakane@kame.net
+	* sys/net/pfkeyv2.h:
+	* sys/netkey/key.c,key_debug.c:
+	* kame/libipsec/pfkey_dump.c:
+	* kame/setkey/scriptdump.pl:
+	printed current sequence number of the SA.  accordingly, changed
+	into sadb_x_sa2_sequence from sadb_x_sa2_reserved3 in the sadb_x_sa2
+	structure.  Also the output of setkey is changed.  sequence number
+	of the sadb is replaced to the end of the output.
+
 Wed Jun 27 14:35:00 JST 2001  itojun@iijlab.net
 	* openbsd/sys/netinet/tcp_input.c: make faithd work on openbsd.
 	  OpenBSD 2.9 has been working okay, this is KAME/openbsd29 issue.
