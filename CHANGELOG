@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1413 2000/12/01 05:55:40 jinmei Exp $
+$KAME: CHANGELOG,v 1.1414 2000/12/01 10:35:39 itojun Exp $
 
 <200012>
+Fri Dec  1 19:35:18 JST 2000  itojun@iijlab.net
+	* openbsd: catch up with openbsd 2.8.
+
 2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *BSD/sys/netinet6/in6_pcb.c (in6_pcbnotify):
 	* *BSD/sys/netinet[6]/{tcp, udp, raw}XXX.c (ctlinput functions):
