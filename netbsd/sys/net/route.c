@@ -698,6 +698,7 @@ rt_timer_queue_create(timeout)
 	Bzero(rtq, sizeof *rtq);
 
 	rtq->rtq_timeout = timeout;
+	rtq->rtq_count = 0;
 	TAILQ_INIT(&rtq->rtq_head);
 	LIST_INSERT_HEAD(&rttimer_queue_head, rtq, rtq_link);
 
@@ -726,6 +727,10 @@ rt_timer_queue_destroy(rtq, destroy)
 		if (destroy)
 			RTTIMER_CALLOUT(r);
 		pool_put(&rttimer_pool, r);
+		if (rtq->rtq_count > 0)
+			rtq->rtq_count--;
+		else
+			printf("rt_timer_queue_destroy: rtq_count reached 0\n");
 	}
 
 	LIST_REMOVE(rtq, rtq_link);
@@ -735,11 +740,13 @@ rt_timer_queue_destroy(rtq, destroy)
 	 */
 }
 
-/* XXX should we maintain counter in rttimer_queue? */
 unsigned long
 rt_timer_count(rtq)
 	struct rttimer_queue *rtq;
 {
+#if 1
+	return rtq->rtq_count;
+#else
 	struct rttimer *r;
 	unsigned long cnt;
 
@@ -749,6 +756,7 @@ rt_timer_count(rtq)
 		cnt++;
 
 	return cnt;
+#endif
 }
 
 void     
@@ -761,6 +769,10 @@ rt_timer_remove_all(rt)
 		LIST_REMOVE(r, rtt_link);
 		TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
 		pool_put(&rttimer_pool, r);
+		if (r->rtt_queue->rtq_count > 0)
+			r->rtt_queue->rtq_count--;
+		else
+			printf("rt_timer_remove_all: rtq_count reached 0\n");
 	}
 }
 
@@ -788,6 +800,10 @@ rt_timer_add(rt, func, queue)
 			LIST_REMOVE(r, rtt_link);
 			TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
 			pool_put(&rttimer_pool, r);
+			if (r->rtt_queue->rtq_count > 0)
+				r->rtt_queue->rtq_count--;
+			else
+				printf("rt_timer_add: rtq_count reached 0\n");
 			break;  /* only one per list, so we can quit... */
 		}
 	}
@@ -803,6 +819,7 @@ rt_timer_add(rt, func, queue)
 	r->rtt_queue = queue;
 	LIST_INSERT_HEAD(&rt->rt_timer, r, rtt_link);
 	TAILQ_INSERT_TAIL(&queue->rtq_head, r, rtt_next);
+	r->rtt_queue->rtq_count++;
 	
 	return (0);
 }
@@ -830,6 +847,10 @@ rt_timer_timer(arg)
 			TAILQ_REMOVE(&rtq->rtq_head, r, rtt_next);
 			RTTIMER_CALLOUT(r);
 			pool_put(&rttimer_pool, r);
+			if (rtq->rtq_count > 0)
+				rtq->rtq_count--;
+			else
+				printf("rt_timer_timer: rtq_count reached 0\n");
 		}
 	}
 	splx(s);

@@ -266,6 +266,7 @@ struct rttimer {
 
 struct rttimer_queue {
 	long				rtq_timeout;
+	unsigned long			rtq_count;
 	TAILQ_HEAD(, rttimer)		rtq_head;
 	LIST_ENTRY(rttimer_queue)	rtq_link;
 };
