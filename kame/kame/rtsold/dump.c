@@ -71,7 +71,7 @@ dump_interface_status()
 			ifinfo->active > 0 ? "active" : "inactive");
 		fprintf(fp, "  rtsold status: %s\n", ifstatstr[ifinfo->state]);
 		fprintf(fp, "  carrier detection: %s\n",
-			ifinfo->mediareqok ? "available" : "unavailabe");
+			ifinfo->mediareqok ? "available" : "unavailable");
 		fprintf(fp, "  probes: %d, dadcount = %d\n",
 			ifinfo->probes, ifinfo->dadcount);
 		if (ifinfo->timer.tv_sec == tm_max.tv_sec &&
