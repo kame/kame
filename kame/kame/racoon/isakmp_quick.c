@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.81 2001/06/27 15:57:50 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.82 2001/06/28 06:22:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1586,18 +1586,13 @@ quick_r3prep(iph2, msg0)
 		/* make inbound policy */
 		iph2->src = dst;
 		iph2->dst = src;
-		if (pk_sendspddelete(iph2) < 0) {
+		if (pk_sendspdupdate2(iph2) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
-				"pfkey spddelete(inbound) failed.\n");
-			goto end;
-		}
-		if (pk_sendspdadd2(iph2) < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"pfkey spdadd2(inbound) failed.\n");
+				"pfkey spdupdate2(inbound) failed.\n");
 			goto end;
 		}
 		plog(LLV_DEBUG, LOCATION, NULL,
-			"pfkey spdadd2(inbound) sent.\n");
+			"pfkey spdupdate2(inbound) sent.\n");
 
 		/* make outbound policy */
 		iph2->src = src;
@@ -1611,18 +1606,18 @@ quick_r3prep(iph2, msg0)
 		spidx->prefs = spidx->prefd;
 		spidx->prefd = pref;
 
-		if (pk_sendspddelete(iph2) < 0) {
+		if (pk_sendspdupdate2(iph2) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
-				"pfkey spddelete(outbound) failed.\n");
-			goto end;
-		}
-		if (pk_sendspdadd2(iph2) < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"pfkey spdadd2(outbound) failed.\n");
+				"pfkey spdupdate2(outbound) failed.\n");
 			goto end;
 		}
 		plog(LLV_DEBUG, LOCATION, NULL,
-			"pfkey spdadd2(outbound) sent.\n");
+			"pfkey spdupdate2(outbound) sent.\n");
+
+		/* spidx_gen is unnecessary any more */
+		delsp_bothdir((struct policyindex *)iph2->spidx_gen);
+		racoon_free(iph2->spidx_gen);
+		iph2->spidx_gen = NULL;
 	}
 
 	error = 0;
