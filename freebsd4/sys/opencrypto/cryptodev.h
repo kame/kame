@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptodev.h,v 1.2.2.6 2003/07/02 17:04:50 sam Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/cryptodev.h,v 1.2.2.8 2004/02/10 17:37:11 bms Exp $	*/
 /*	$OpenBSD: cryptodev.h,v 1.31 2002/06/11 11:14:29 beck Exp $	*/
 
 /*
@@ -379,9 +379,6 @@ extern	int crypto_devallowsoft;	/* only use hardware crypto */
  * XXX these don't really belong here; but for now they're
  *     kept apart from the rest of the system.
  */
-struct mbuf;
-struct	mbuf	*m_getptr(struct mbuf *, int, int *);
-
 struct uio;
 extern	void cuio_copydata(struct uio* uio, int off, int len, caddr_t cp);
 extern	void cuio_copyback(struct uio* uio, int off, int len, caddr_t cp);

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.77 2003/09/02 05:37:12 scottl Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.83 2004/04/13 03:39:17 rwatson Exp $
 
 # XXX present but broken: ip_mroute_mod pcic
 
@@ -9,8 +9,10 @@ SUBDIR=	accf_data \
 	amr \
 	an \
 	aue \
+	bfe \
 	bge \
 	bridge \
+	cam \
 	ccd \
 	cd9660 \
 	coda \
@@ -18,8 +20,11 @@ SUBDIR=	accf_data \
 	cryptodev \
 	cue \
 	dc \
+	dcons \
+	dcons_crom \
 	dummynet \
 	ed \
+	ext2fs \
 	fdesc \
 	firewire \
 	fxp \
@@ -89,6 +94,7 @@ SUBDIR=	accf_data \
 	ulpt \
 	umapfs \
 	umass \
+	umct \
 	umodem \
 	ums \
 	union \
@@ -143,6 +149,7 @@ SUBDIR+=aac \
 	ciss \
 	mly \
 	pst \
+	twa \
 	vesa
 
 .elif ${MACHINE} == "pc98"
@@ -155,10 +162,6 @@ SUBDIR+=canbepm \
 
 .if ${MACHINE_ARCH} == "alpha"
 SUBDIR+=osf1
-.endif
-
-.if defined(WANT_EXT2FS_MODULE)
-SUBDIR+=ext2fs
 .endif
 
 .if defined(MODULES_OVERRIDE)

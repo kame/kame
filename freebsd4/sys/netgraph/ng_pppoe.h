@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.7.2.5 2002/06/17 02:19:06 brian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.7.2.6 2004/03/30 14:03:02 dwmalone Exp $
  * $Whistle: ng_pppoe.h,v 1.7 1999/10/16 10:16:43 julian Exp $
  */
 
@@ -146,7 +146,7 @@ struct ngpppoe_sts {
 #define PTT_HOST_UNIQ	(0x0103)
 #define PTT_AC_COOKIE	(0x0104)
 #define PTT_VENDOR 	(0x0105)
-#define PTT_RELAY_SID	(0x0106)
+#define PTT_RELAY_SID	(0x0110)
 #define PTT_SRV_ERR     (0x0201)
 #define PTT_SYS_ERR  	(0x0202)
 #define PTT_GEN_ERR  	(0x0203)
@@ -162,7 +162,7 @@ struct ngpppoe_sts {
 #define PTT_HOST_UNIQ	(0x0301)
 #define PTT_AC_COOKIE	(0x0401)
 #define PTT_VENDOR 	(0x0501)
-#define PTT_RELAY_SID	(0x0601)
+#define PTT_RELAY_SID	(0x1001)
 #define PTT_SRV_ERR     (0x0102)
 #define PTT_SYS_ERR  	(0x0202)
 #define PTT_GEN_ERR  	(0x0302)

@@ -26,10 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_eisa.c,v 1.1.1.8 2003/11/05 12:59:18 suz Exp $
- *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.11 2003/06/10 03:26:07 gibbs Exp $
+ * $Id: ahc_eisa.c,v 1.1.1.9 2004/08/01 01:16:03 sumikawa Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.12 2004/02/15 19:30:00 gibbs Exp $");
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
 
@@ -131,7 +132,7 @@ aic7770_attach(device_t dev)
 
 	/* Allocate a dmatag for our SCB DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
-	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
+	error = aic_dma_tag_create(ahc, /*parent*/NULL, /*alignment*/1,
 				   /*boundary*/0,
 				   /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 				   /*highaddr*/BUS_SPACE_MAXADDR,

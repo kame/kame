@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151.2.33 2003/08/12 02:23:34 nyan Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151.2.34 2003/10/31 13:44:22 nyan Exp $
  */
 
 #include "apm.h"
@@ -720,8 +720,6 @@ sendsig(catcher, sig, mask, code)
 	regs->tf_cs = _ucodesel;
 	regs->tf_ds = _udatasel;
 	regs->tf_es = _udatasel;
-	regs->tf_fs = _udatasel;
-	load_gs(_udatasel);
 	regs->tf_ss = _udatasel;
 }
 
@@ -981,17 +979,19 @@ cpu_halt(void)
  * On -stable, cpu_idle() is called with interrupts disabled and must
  * return with them enabled.
  */
-#ifdef SMP
-static int	cpu_idle_hlt = 0;
-#else
 static int	cpu_idle_hlt = 1;
-#endif
 SYSCTL_INT(_machdep, OID_AUTO, cpu_idle_hlt, CTLFLAG_RW,
     &cpu_idle_hlt, 0, "Idle loop HLT enable");
 
 void
 cpu_idle(void)
 {
+
+#ifdef SMP
+	if (mp_grab_cpu_hlt())
+		return;
+#endif
+
 	if (cpu_idle_hlt) {
 		/*
 		 * We must guarentee that hlt is exactly the instruction

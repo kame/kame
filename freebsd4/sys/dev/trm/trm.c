@@ -57,7 +57,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.2.2.2 2002/12/19 20:34:45 cognet Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.2.2.3 2004/04/15 20:16:28 cognet Exp $");
 
 #include <sys/param.h>
 
@@ -1048,7 +1048,7 @@ trm_action(struct cam_sim *psim, union ccb *pccb)
 static void 
 trm_poll(struct cam_sim *psim)
 {       
-  
+	trm_Interrupt(cam_sim_softc(psim)); 
 }
 
 static void

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs.h,v 1.2.2.2 2003/01/17 08:20:26 tjr Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs.h,v 1.2.2.3 2004/01/10 04:17:50 tjr Exp $
  */
 #ifndef _SMBFS_SMBFS_H_
 #define _SMBFS_SMBFS_H_
@@ -51,7 +51,7 @@
 #define	SMBFS_MAXPATHCOMP	256	/* maximum number of path components */
 
 
-/* Layout of the mount control block for a netware file system. */
+/* Layout of the mount control block for an smb file system. */
 struct smbfs_args {
 	int		version;
 	int		dev;

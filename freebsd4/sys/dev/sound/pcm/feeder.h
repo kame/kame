@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/feeder.h,v 1.2.2.4 2002/04/22 15:49:36 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/feeder.h,v 1.2.2.5 2003/12/11 14:41:12 dds Exp $
  */
 
 struct pcm_feederdesc {
@@ -60,12 +60,12 @@ struct pcm_feeder *chn_findfeeder(struct pcm_channel *c, u_int32_t type);
 
 #define FEEDER_DECLARE(feeder, palign, pdata) \
 static struct feeder_class feeder ## _class = { \
-	name:		#feeder, \
-	methods:	feeder ## _methods, \
-	size:		sizeof(struct pcm_feeder), \
-	align:		palign, \
-	desc:		feeder ## _desc, \
-	data:		pdata, \
+	.name =		#feeder, \
+	.methods =	feeder ## _methods, \
+	.size =		sizeof(struct pcm_feeder), \
+	.align =	palign, \
+	.desc =		feeder ## _desc, \
+	.data =		pdata, \
 }; \
 SYSINIT(feeder, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, feeder_register, &feeder ## _class);
 

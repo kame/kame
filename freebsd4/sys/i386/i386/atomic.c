@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/atomic.c,v 1.3 1999/08/28 00:43:40 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/atomic.c,v 1.3.18.1 2004/05/06 01:55:21 jdp Exp $
  */
 
 /* This file creates publically callable functions to perform various
@@ -40,6 +40,7 @@
 #undef ATOMIC_ASM
 
 /* Make atomic.h generate public functions */
+#define WANT_FUNCTIONS
 #define static
 #undef __inline
 #define __inline

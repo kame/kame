@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.24.2.25 2003/07/31 10:36:36 maxim Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.24.2.26 2003/12/30 12:28:09 maxim Exp $
  */
 
 #if !defined(KLD_MODULE)
@@ -87,7 +87,7 @@
 
 /*
  * We keep a private variable for the simulation time, but we could
- * probably use an existing one ("softticks" in sys/kern/kern_timer.c)
+ * probably use an existing one ("softticks" in sys/kern/kern_timeout.c)
  */
 static dn_key curr_time = 0 ; /* current simulation time */
 

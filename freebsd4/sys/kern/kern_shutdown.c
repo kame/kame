@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.13 2003/08/31 00:16:28 luoqi Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.14 2003/12/11 21:33:43 jhb Exp $
  */
 
 #include "opt_ddb.h"
@@ -182,21 +182,21 @@ print_uptime()
 	printf("Uptime: ");
 	f = 0;
 	if (ts.tv_sec >= 86400) {
-		printf("%ldd", ts.tv_sec / 86400);
+		printf("%ldd", (long)ts.tv_sec / 86400);
 		ts.tv_sec %= 86400;
 		f = 1;
 	}
 	if (f || ts.tv_sec >= 3600) {
-		printf("%ldh", ts.tv_sec / 3600);
+		printf("%ldh", (long)ts.tv_sec / 3600);
 		ts.tv_sec %= 3600;
 		f = 1;
 	}
 	if (f || ts.tv_sec >= 60) {
-		printf("%ldm", ts.tv_sec / 60);
+		printf("%ldm", (long)ts.tv_sec / 60);
 		ts.tv_sec %= 60;
 		f = 1;
 	}
-	printf("%lds\n", ts.tv_sec);
+	printf("%lds\n", (long)ts.tv_sec);
 }
 
 /*

@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2000 Michael Smith
+ * Copyright (c) 2003 Paul Saab
+ * Copyright (c) 2003 Vinod Kashyap
  * Copyright (c) 2000 BSDi
  * All rights reserved.
  *
@@ -24,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.1.2.3 2003/08/10 20:25:46 ps Exp $
+ *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.1.2.4 2004/04/07 22:18:01 vkashyap Exp $
  */
 
 
@@ -55,6 +57,7 @@ struct twe_usercommand {
 struct twe_qstat {
     u_int32_t	q_length;
     u_int32_t	q_max;
+    u_int32_t	q_min;
 };
 
 /*
@@ -70,8 +73,8 @@ union twe_statrequest {
 /*
  * AEN listen
  */
-#define TWEIO_AEN_POLL		_IOR('T', 102, int)
-#define TWEIO_AEN_WAIT		_IOR('T', 103, int)
+#define TWEIO_AEN_POLL		_IOR('T', 102, u_int16_t)
+#define TWEIO_AEN_WAIT		_IOR('T', 103, u_int16_t)
 
 /*
  * Controller parameter access

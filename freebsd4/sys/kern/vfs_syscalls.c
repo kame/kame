@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.18 2003/04/04 20:35:58 tegge Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.19 2004/02/19 14:02:30 pjd Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -122,6 +122,8 @@ mount(p, uap)
 	struct nameidata nd;
 	char fstypename[MFSNAMELEN];
 
+	if (p->p_prison != NULL)
+		return (EPERM);
 	if (usermount == 0 && (error = suser(p)))
 		return (error);
 	/*
@@ -433,6 +435,10 @@ unmount(p, uap)
 	int error;
 	struct nameidata nd;
 
+	if (p->p_prison != NULL)
+		return (EPERM);
+	if (usermount == 0 && (error = suser(p)))
+		return (error);
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
 	    SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.23 2003/10/02 02:22:58 silby Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.24.2.4 2004/05/22 23:09:19 kensmith Exp $
  */
 
 /*
@@ -76,6 +76,8 @@
 #include <sys/vnode.h>
 #include <sys/resourcevar.h>
 #include <sys/file.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -148,6 +150,10 @@ static void vm_map_copy_entry __P((vm_map_t, vm_map_t, vm_map_entry_t,
 		vm_map_entry_t));
 static void vm_map_split __P((vm_map_entry_t));
 static void vm_map_unclip_range __P((vm_map_t map, vm_map_entry_t start_entry, vm_offset_t start, vm_offset_t end, int flags));
+
+static int old_msync;
+SYSCTL_INT(_vm, OID_AUTO, old_msync, CTLFLAG_RW, &old_msync, 0,
+    "Use old (insecure) msync behavior");
 
 void
 vm_map_startup()
@@ -643,7 +649,7 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 #endif
 
 	if (cow & (MAP_PREFAULT|MAP_PREFAULT_PARTIAL)) {
-		pmap_object_init_pt(map->pmap, start,
+		pmap_object_init_pt(map->pmap, start, prot,
 				    object, OFF_TO_IDX(offset), end - start,
 				    cow & MAP_PREFAULT_PARTIAL);
 	}
@@ -1454,6 +1460,7 @@ vm_map_madvise(map, start, end, behav)
 				pmap_object_init_pt(
 				    map->pmap, 
 				    useStart,
+				    current->protection,
 				    current->object.vm_object,
 				    pindex, 
 				    (count << PAGE_SHIFT),
@@ -2013,7 +2020,7 @@ vm_map_clean(map, start, end, syncio, invalidate)
 			vm_object_page_remove(object,
 			    OFF_TO_IDX(offset),
 			    OFF_TO_IDX(offset + size + PAGE_MASK),
-			    FALSE);
+			    old_msync ? FALSE : TRUE);
 			vm_object_deallocate(object);
 		}
 		start += size;
@@ -2440,7 +2447,7 @@ vmspace_fork(vm1)
 
 	vm2 = vmspace_alloc(old_map->min_offset, old_map->max_offset);
 	bcopy(&vm1->vm_startcopy, &vm2->vm_startcopy,
-	    (caddr_t) (vm1 + 1) - (caddr_t) &vm1->vm_startcopy);
+	    (caddr_t) &vm1->vm_endcopy - (caddr_t) &vm1->vm_startcopy);
 	new_map = &vm2->vm_map;	/* XXX */
 	new_map->timestamp = 1;
 
@@ -2777,7 +2784,8 @@ vmspace_exec(struct proc *p) {
 
 	newvmspace = vmspace_alloc(map->min_offset, map->max_offset);
 	bcopy(&oldvmspace->vm_startcopy, &newvmspace->vm_startcopy,
-	    (caddr_t) (newvmspace + 1) - (caddr_t) &newvmspace->vm_startcopy);
+	    (caddr_t) &newvmspace->vm_endcopy -
+	    (caddr_t) &newvmspace->vm_startcopy);
 	/*
 	 * This code is written like this for prototype purposes.  The
 	 * goal is to avoid running down the vmspace here, but let the
@@ -3253,7 +3261,7 @@ vm_uiomove(mapa, srcobject, cp, cnta, uaddra, npages)
 /*
  * Map the window directly, if it is already in memory
  */
-		pmap_object_init_pt(map->pmap, uaddr,
+		pmap_object_init_pt(map->pmap, uaddr, entry->protection,
 			srcobject, oindex, tcnt, 0);
 
 		map->timestamp++;

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.14 2003/08/24 08:24:38 hsu Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.15 2004/01/09 08:40:36 ru Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -1081,14 +1081,13 @@ ng_ksocket_incoming(struct socket *so, void *arg, int waitflag)
 			u_int len;
 
 			len = sizeof(*meta) + sizeof(*mhead) + sa->sa_len;
-			MALLOC(meta, meta_p, len, M_NETGRAPH, M_NOWAIT);
+			MALLOC(meta, meta_p, len, M_NETGRAPH,
+			    M_NOWAIT | M_ZERO);
 			if (meta == NULL) {
 				FREE(sa, M_SONAME);
 				goto sendit;
 			}
 			mhead = &meta->options[0];
-			bzero(meta, sizeof(*meta));
-			bzero(mhead, sizeof(*mhead));
 			meta->allocated_len = len;
 			meta->used_len = len;
 			mhead->cookie = NGM_KSOCKET_COOKIE;

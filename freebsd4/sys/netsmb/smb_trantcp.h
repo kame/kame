@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_trantcp.h,v 1.1.2.1 2001/05/22 08:32:34 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_trantcp.h,v 1.1.2.2 2004/01/10 04:17:50 tjr Exp $
  */
 #ifndef _NETSMB_SMB_TRANTCP_H_
 #define	_NETSMB_SMB_TRANTCP_H_
@@ -38,7 +38,7 @@
 
 #ifdef NB_DEBUG
 #define NBDEBUG(format, args...)	 printf("%s(%d): "format,	\
-					    __FUNCTION__ , __LINE__ ,## args)
+					    __func__ , __LINE__ ,## args)
 #else
 #define NBDEBUG(format, args...)
 #endif
@@ -78,8 +78,16 @@ struct nbpcb {
 /*
  * Nominal space allocated per a NETBIOS socket.
  */
-#define	NB_SNDQ		(10 * 1024)
-#define	NB_RCVQ		(20 * 1024)
+#define	NB_SNDQ		(64 * 1024)
+#define	NB_RCVQ		(64 * 1024)
+
+/*
+ * TCP slowstart presents a problem in conjunction with large
+ * reads.  To ensure a steady stream of ACKs while reading using
+ * large transaction sizes, we call soreceive() with a smaller
+ * buffer size.  See nbssn_recv().
+ */
+#define NB_SORECEIVE_CHUNK	(8 * 1024)
 
 extern struct smb_tran_desc smb_tran_nbtcp_desc;
 

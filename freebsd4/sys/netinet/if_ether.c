@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.26 2003/09/24 21:48:00 bms Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.27 2003/12/08 16:55:21 bms Exp $
  */
 
 /*
@@ -455,7 +455,7 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 	 * Probably should not allocate empty llinfo struct if we are
 	 * not going to be sending out an arp request.
 	 */
-	if (ifp->if_flags & IFF_NOARP) {
+	if (ifp->if_flags & IFF_NOARP || ifp->if_ipending & IFF_STATICARP) {
 		m_freem(m);
 		return (0);
 	}
@@ -655,6 +655,8 @@ match:
 		itaddr = myaddr;
 		goto reply;
 	}
+	if (ifp->if_ipending & IFF_STATICARP)
+		goto reply;
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
 		/* the following is not an error when doing bridging */

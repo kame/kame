@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.31 2003/08/18 16:43:16 jdp Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.32 2004/01/17 23:04:26 rwatson Exp $
  */
 
 /*
@@ -268,6 +268,10 @@ DRIVER_MODULE(miibus, fxp, miibus_driver, miibus_devclass, 0, 0);
 
 static int fxp_rnr;
 SYSCTL_INT(_hw, OID_AUTO, fxp_rnr, CTLFLAG_RW, &fxp_rnr, 0, "fxp rnr events");
+
+static int fxp_noflow;
+SYSCTL_INT(_hw, OID_AUTO, fxp_noflow, CTLFLAG_RW, &fxp_noflow, 0, "fxp flow control disabled");
+TUNABLE_INT("hw.fxp_noflow", &fxp_noflow);
 
 /*
  * Inline function to copy a 16-bit aligned 32-bit quantity.
@@ -1707,7 +1711,7 @@ fxp_init(void *xsc)
 	cbp->multi_ia =		0;	/* (don't) accept multiple IAs */
 	cbp->mc_all =		sc->flags & FXP_FLAG_ALL_MCAST ? 1 : 0;
 
-	if (sc->revision == FXP_REV_82557) {
+	if (fxp_noflow || sc->revision == FXP_REV_82557) {
 		/*
 		 * The 82557 has no hardware flow control, the values
 		 * below are the defaults for the chip.

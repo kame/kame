@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
- * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.23 2003/10/08 02:26:39 nectar Exp $
+ * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.24.2.1 2004/04/30 03:05:35 kensmith Exp $
  */
 
 /*-
@@ -1219,7 +1219,6 @@ pmap_pinit2(pmap_t pmap)
 static vm_page_t
 _pmap_allocpte(pmap_t pmap, unsigned ptepindex)
 {
-	vm_offset_t pteva;
 	vm_paddr_t ptepa;
 	vm_page_t m;
 
@@ -1227,7 +1226,17 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex)
 	 * Find or fabricate a new pagetable page
 	 */
 	m = vm_page_grab(pmap->pm_pteobj, ptepindex,
-			VM_ALLOC_ZERO | VM_ALLOC_RETRY);
+			VM_ALLOC_ZERO);
+	if (m == NULL) {
+		VM_WAIT;
+		/*
+		 * Indicate the need to retry.  While waiting, the page table
+		 * page may have been allocated.
+		 */
+                return (NULL);
+	}
+	if ((m->flags & PG_ZERO) == 0)
+		pmap_zero_page(VM_PAGE_TO_PHYS(m));
 
 	KASSERT(m->queue == PQ_NONE,
 		("_pmap_allocpte: %p->queue != PQ_NONE", m));
@@ -1257,19 +1266,6 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex)
 	 */
 	pmap->pm_ptphint = m;
 
-	/*
-	 * Try to use the new mapping, but if we cannot, then
-	 * do it with the routine that maps the page explicitly.
-	 */
-	if ((m->flags & PG_ZERO) == 0) {
-		if (pmap_is_current(pmap)) {
-			pteva = UPT_MIN_ADDRESS + i386_ptob(ptepindex);
-			bzero((caddr_t) pteva, PAGE_SIZE);
-		} else {
-			pmap_zero_page(ptepa);
-		}
-	}
-
 	m->valid = VM_PAGE_BITS_ALL;
 	vm_page_flag_clear(m, PG_ZERO);
 	vm_page_flag_set(m, PG_MAPPED);
@@ -1290,6 +1286,7 @@ pmap_allocpte(pmap_t pmap, vm_offset_t va)
 	 */
 	ptepindex = va >> PDRSHIFT;
 
+retry:
 	/*
 	 * Get the page directory entry
 	 */
@@ -1321,12 +1318,16 @@ pmap_allocpte(pmap_t pmap, vm_offset_t va)
 			pmap->pm_ptphint = m;
 		}
 		m->hold_count++;
-		return m;
+	} else {
+		/*
+		 * Here if the pte page isn't mapped, or if it has
+		 * been deallocated.
+		 */
+		m = _pmap_allocpte(pmap, ptepindex);
+		if (m == NULL)
+			goto retry;
 	}
-	/*
-	 * Here if the pte page isn't mapped, or if it has been deallocated.
-	 */
-	return _pmap_allocpte(pmap, ptepindex);
+	return (m);
 }
 
 
@@ -2173,9 +2174,10 @@ pmap_kenter_temporary(vm_paddr_t pa, int i)
  * faults on process startup and immediately after an mmap.
  */
 void
-pmap_object_init_pt(pmap, addr, object, pindex, size, limit)
+pmap_object_init_pt(pmap, addr, prot, object, pindex, size, limit)
 	pmap_t pmap;
 	vm_offset_t addr;
+	vm_prot_t prot;
 	vm_object_t object;
 	vm_pindex_t pindex;
 	vm_size_t size;
@@ -2186,7 +2188,7 @@ pmap_object_init_pt(pmap, addr, object, pindex, size, limit)
 	vm_page_t p, mpte;
 	int objpgs;
 
-	if (pmap == NULL || object == NULL)
+	if ((prot & VM_PROT_READ) == 0 || pmap == NULL || object == NULL)
 		return;
 
 	/*

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.5.2.3 2003/10/06 02:53:52 imp Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.5.2.4 2003/12/24 17:02:00 shiba Exp $
  */
 
 #include <sys/param.h>
@@ -93,6 +93,11 @@ ed_isa_probe(dev)
 	ed_release_resources(dev);
 
 	error = ed_probe_3Com(dev, 0, flags);
+	if (error == 0)
+		goto end;
+	ed_release_resources(dev);
+
+	error = ed_probe_SIC(dev, 0, flags);
 	if (error == 0)
 		goto end;
 	ed_release_resources(dev);

@@ -31,10 +31,10 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.2.2.9 2003/08/22 07:46:58 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.2.2.12 2004/03/28 11:50:42 simokawa Exp $
  *
  */
-#define		PCI_CBMEM		0x10
+#define		PCI_CBMEM		PCIR_BAR(0)
 
 #define		FW_VENDORID_NEC		0x1033
 #define		FW_VENDORID_TI		0x104c
@@ -47,6 +47,7 @@
 #define		FW_DEVICE_UPD861	(0x0063 << 16)
 #define		FW_DEVICE_UPD871	(0x00ce << 16)
 #define		FW_DEVICE_UPD72870	(0x00cd << 16)
+#define		FW_DEVICE_UPD72873	(0x00e7 << 16)
 #define		FW_DEVICE_UPD72874	(0x00f2 << 16)
 #define		FW_DEVICE_TITSB22	(0x8009 << 16)
 #define		FW_DEVICE_TITSB23	(0x8019 << 16)
@@ -76,7 +77,7 @@
 #define		OHCI_MAX_DMA_CH		(0x4 + OHCI_DMA_ITCH + OHCI_DMA_IRCH)
 
 
-typedef volatile u_int32_t 	fwohcireg_t;
+typedef u_int32_t 	fwohcireg_t;
 
 /* for PCI */
 #if BYTE_ORDER == BIG_ENDIAN
@@ -94,12 +95,12 @@ typedef volatile u_int32_t 	fwohcireg_t;
 struct fwohcidb {
 	union {
 		struct {
-			volatile u_int32_t cmd;
-			volatile u_int32_t addr;
-			volatile u_int32_t depend;
-			volatile u_int32_t res;
+			u_int32_t cmd;
+			u_int32_t addr;
+			u_int32_t depend;
+			u_int32_t res;
 		} desc;
-		volatile u_int32_t immed[4];
+		u_int32_t immed[4];
 	} db;
 #define OHCI_STATUS_SHIFT	16
 #define OHCI_COUNT_MASK		0xffff
@@ -170,6 +171,40 @@ struct fwohcidb {
 #define FWOHCIEV_ACKTERR 0x1e
 
 #define FWOHCIEV_MASK 0x1f
+
+struct ohci_dma{
+	fwohcireg_t	cntl;
+
+#define	OHCI_CNTL_CYCMATCH_S	(0x1 << 31)
+
+#define	OHCI_CNTL_BUFFIL	(0x1 << 31)
+#define	OHCI_CNTL_ISOHDR	(0x1 << 30)
+#define	OHCI_CNTL_CYCMATCH_R	(0x1 << 29)
+#define	OHCI_CNTL_MULTICH	(0x1 << 28)
+
+#define	OHCI_CNTL_DMA_RUN	(0x1 << 15)
+#define	OHCI_CNTL_DMA_WAKE	(0x1 << 12)
+#define	OHCI_CNTL_DMA_DEAD	(0x1 << 11)
+#define	OHCI_CNTL_DMA_ACTIVE	(0x1 << 10)
+#define	OHCI_CNTL_DMA_BT	(0x1 << 8)
+#define	OHCI_CNTL_DMA_BAD	(0x1 << 7)
+#define	OHCI_CNTL_DMA_STAT	(0xff)
+
+	fwohcireg_t	cntl_clr;
+	fwohcireg_t	dummy0;
+	fwohcireg_t	cmd;
+	fwohcireg_t	match;
+	fwohcireg_t	dummy1;
+	fwohcireg_t	dummy2;
+	fwohcireg_t	dummy3;
+};
+
+struct ohci_itdma{
+	fwohcireg_t	cntl;
+	fwohcireg_t	cntl_clr;
+	fwohcireg_t	dummy0;
+	fwohcireg_t	cmd;
+};
 
 struct ohci_registers {
 	fwohcireg_t	ver;		/* Version No. 0x0 */
@@ -262,32 +297,6 @@ struct ohci_registers {
 
 	fwohcireg_t	dummy7[23];	/* dummy 0x124-0x17c */
 	
-	struct ohci_dma{
-		fwohcireg_t	cntl;
-
-#define	OHCI_CNTL_CYCMATCH_S	(0x1 << 31)
-
-#define	OHCI_CNTL_BUFFIL	(0x1 << 31)
-#define	OHCI_CNTL_ISOHDR	(0x1 << 30)
-#define	OHCI_CNTL_CYCMATCH_R	(0x1 << 29)
-#define	OHCI_CNTL_MULTICH	(0x1 << 28)
-
-#define	OHCI_CNTL_DMA_RUN	(0x1 << 15)
-#define	OHCI_CNTL_DMA_WAKE	(0x1 << 12)
-#define	OHCI_CNTL_DMA_DEAD	(0x1 << 11)
-#define	OHCI_CNTL_DMA_ACTIVE	(0x1 << 10)
-#define	OHCI_CNTL_DMA_BT	(0x1 << 8)
-#define	OHCI_CNTL_DMA_BAD	(0x1 << 7)
-#define	OHCI_CNTL_DMA_STAT	(0xff)
-
-		fwohcireg_t	cntl_clr;
-		fwohcireg_t	dummy0;
-		fwohcireg_t	cmd;
-		fwohcireg_t	match;
-		fwohcireg_t	dummy1;
-		fwohcireg_t	dummy2;
-		fwohcireg_t	dummy3;
-	} dummy8;
 	/*       0x180, 0x184, 0x188, 0x18c */
 	/*       0x190, 0x194, 0x198, 0x19c */
 	/*       0x1a0, 0x1a4, 0x1a8, 0x1ac */
@@ -300,24 +309,17 @@ struct ohci_registers {
 
 	/*       0x200, 0x204, 0x208, 0x20c */
 	/*       0x210, 0x204, 0x208, 0x20c */
-	struct ohci_itdma{
-		fwohcireg_t	cntl;
-		fwohcireg_t	cntl_clr;
-		fwohcireg_t	dummy0;
-		fwohcireg_t	cmd;
-	} dummy9;
 	struct ohci_itdma dma_itch[0x20];
 
 	/*       0x400, 0x404, 0x408, 0x40c */
 	/*       0x410, 0x404, 0x408, 0x40c */
-
 	struct ohci_dma dma_irch[0x20];
 };
 
 struct fwohcidb_tr{
 	STAILQ_ENTRY(fwohcidb_tr) link;
 	struct fw_xfer *xfer;
-	volatile struct fwohcidb *db;
+	struct fwohcidb *db;
 	bus_dmamap_t dma_map;
 	caddr_t buf;
 	bus_addr_t bus_addr;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)user.h	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/sys/user.h,v 1.24.2.1 2001/10/11 08:20:18 peter Exp $
+ * $FreeBSD: src/sys/sys/user.h,v 1.24.2.2 2004/01/08 22:14:16 des Exp $
  */
 
 #ifndef _SYS_USER_H_
@@ -88,7 +88,8 @@ struct kinfo_proc {
 #define	EPROC_CTTY	0x01	/* controlling tty vnode active */
 #define	EPROC_SLEADER	0x02	/* session leader */
 		char	e_login[roundup(MAXLOGNAME, sizeof(long))];	/* setlogin() name */
-		long	e_spare[2];
+		pid_t	e_sid;			/* session id */
+		long	e_spare[1];
 	} kp_eproc;
 };
 void fill_eproc __P((struct proc *, struct eproc *));

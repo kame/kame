@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.15 2002/10/24 00:35:31 kbyanc Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.17 2004/03/25 08:41:09 ru Exp $
  */
 
 #include "splash.h"
@@ -1283,7 +1283,8 @@ scstart(struct tty *tp)
     u_char buf[PCBURST];
     scr_stat *scp = SC_STAT(tp->t_dev);
 
-    if (scp->status & SLKED || scp->sc->blink_in_progress)
+    if (scp->status & SLKED ||
+	(scp == scp->sc->cur_scp && scp->sc->blink_in_progress))
 	return;
     s = spltty();
     if (!(tp->t_state & (TS_TIMEOUT | TS_BUSY | TS_TTSTOP))) {
@@ -3407,7 +3408,7 @@ sc_bell(scr_stat *scp, int pitch, int duration)
 	if (scp != scp->sc->cur_scp)
 	    scp->sc->blink_in_progress += 2;
 	blink_screen(scp->sc->cur_scp);
-    } else {
+    } else if (duration != 0 && pitch != 0) {
 	if (scp != scp->sc->cur_scp)
 	    pitch *= 2;
 	sysbeep(pitch, duration);

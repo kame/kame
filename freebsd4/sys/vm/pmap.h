@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/pmap.h,v 1.33.2.5 2003/08/09 16:21:20 luoqi Exp $
+ * $FreeBSD: src/sys/vm/pmap.h,v 1.33.2.5.4.1 2004/04/30 03:05:36 kensmith Exp $
  */
 
 /*
@@ -111,8 +111,8 @@ void		 pmap_kenter __P((vm_offset_t, vm_paddr_t));
 void		 pmap_kremove __P((vm_offset_t));
 vm_offset_t	 pmap_map __P((vm_offset_t, vm_paddr_t, vm_paddr_t, int));
 void		 pmap_object_init_pt __P((pmap_t pmap, vm_offset_t addr,
-		    vm_object_t object, vm_pindex_t pindex, vm_offset_t size,
-		    int pagelimit));
+		    vm_prot_t prot, vm_object_t object, vm_pindex_t pindex,
+		    vm_offset_t size, int pagelimit));
 boolean_t	 pmap_page_exists_quick __P((pmap_t pmap, vm_page_t m));
 void		 pmap_page_protect __P((vm_page_t m, vm_prot_t prot));
 void		 pmap_pageable __P((pmap_t, vm_offset_t, vm_offset_t,

@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.h,v 1.2 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.2.4.4 2002/07/02 23:44:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.2.4.5 2004/01/09 08:58:06 ru Exp $
  */
 
 #ifndef _NETGRAPH_PARSE_H_
@@ -429,6 +429,14 @@ extern const struct ng_parse_type ng_parse_hint64_type;
  *   Additional info:		None required
  */
 extern const struct ng_parse_type ng_parse_ipaddr_type;
+
+/*
+ * ETHERNET ADDRESS TYPE
+ *
+ *   Default value:		None
+ *   Additional info:		None required
+ */
+extern const struct ng_parse_type ng_parse_enaddr_type;
 
 /*
  * VARIABLE LENGTH BYTE ARRAY TYPE

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_alloc.c	8.18 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.64.2.2 2001/09/21 19:15:21 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.64.2.3.2.1 2004/05/14 23:03:50 kensmith Exp $
  */
 
 #include "opt_quota.h"
@@ -238,7 +238,11 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
-		bzero((char *)bp->b_data + osize, (u_int)nsize - osize);
+		if ((bp->b_flags & (B_MALLOC | B_VMIO)) != B_VMIO)
+			bzero((char *)bp->b_data + osize,
+			    (u_int)nsize - osize);
+		else
+			vfs_bio_clrbuf(bp);
 		*bpp = bp;
 		return (0);
 	}
@@ -303,7 +307,11 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
-		bzero((char *)bp->b_data + osize, (u_int)nsize - osize);
+		if ((bp->b_flags & (B_MALLOC | B_VMIO)) != B_VMIO)
+			bzero((char *)bp->b_data + osize,
+			    (u_int)nsize - osize);
+		else
+			vfs_bio_clrbuf(bp);
 		*bpp = bp;
 		return (0);
 	}
@@ -696,18 +704,18 @@ ffs_dirpref(pip)
 	 * optimal allocation of a directory inode.
 	 */
 	maxndir = min(avgndir + fs->fs_ipg / 16, fs->fs_ipg);
-	minifree = avgifree - fs->fs_ipg / 4;
-	if (minifree < 0)
-		minifree = 0;
-	minbfree = avgbfree - fs->fs_fpg / fs->fs_frag / 4;
-	if (minbfree < 0)
-		minbfree = 0;
+	minifree = avgifree - avgifree / 4;
+	if (minifree < 1)
+		minifree = 1;
+	minbfree = avgbfree - avgbfree / 4;
+	if (minbfree < 1)
+		minbfree = 1;
 	cgsize = fs->fs_fsize * fs->fs_fpg;
 	dirsize = fs->fs_avgfilesize * fs->fs_avgfpdir;
 	curdirsize = avgndir ? (cgsize - avgbfree * fs->fs_bsize) / avgndir : 0;
 	if (dirsize < curdirsize)
 		dirsize = curdirsize;
-	maxcontigdirs = min(cgsize / dirsize, 255);
+	maxcontigdirs = min((avgbfree * fs->fs_bsize) / dirsize, 255);
 	if (fs->fs_avgfpdir > 0)
 		maxcontigdirs = min(maxcontigdirs,
 				    fs->fs_ipg / fs->fs_avgfpdir);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/bus.h,v 1.30.2.4 2002/10/10 15:13:33 jhb Exp $
+ * $FreeBSD: src/sys/sys/bus.h,v 1.30.2.5 2004/03/17 17:54:25 njl Exp $
  */
 
 #ifndef _SYS_BUS_H_
@@ -228,6 +228,12 @@ int	bus_get_resource(device_t dev, int type, int rid,
 u_long	bus_get_resource_start(device_t dev, int type, int rid);
 u_long	bus_get_resource_count(device_t dev, int type, int rid);
 void	bus_delete_resource(device_t dev, int type, int rid);
+
+static __inline struct resource *
+bus_alloc_resource_any(device_t dev, int type, int *rid, u_int flags)
+{
+	return (bus_alloc_resource(dev, type, rid, 0ul, ~0ul, 1, flags));
+}
 
 /*
  * Access functions for device.

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.35 2003/05/18 08:51:15 murray Exp $
+ * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.36 2003/12/02 06:18:36 bde Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -1994,8 +1994,13 @@ siointr1(com)
 	struct	timecounter *tc;
 	u_int	count;
 
-	int_ctl = inb(com->intr_ctl_port);
-	int_ctl_new = int_ctl;
+	if (COM_IIR_TXRDYBUG(com->flags)) {
+		int_ctl = inb(com->intr_ctl_port);
+		int_ctl_new = int_ctl;
+	} else {
+		int_ctl = 0;
+		int_ctl_new = 0;
+	}
 
 	while (!com->gone) {
 		if (com->pps.ppsparam.mode & PPS_CAPTUREBOTH) {

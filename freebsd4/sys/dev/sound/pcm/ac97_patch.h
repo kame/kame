@@ -22,9 +22,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/ac97_patch.h,v 1.1.2.1 2003/02/07 16:26:45 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/ac97_patch.h,v 1.1.2.2 2004/01/20 17:49:24 gshapiro Exp $
  */
 
 typedef void (*ac97_patch)(struct ac97_info*);
 
 void ad1886_patch(struct ac97_info*);
+void ad198x_patch(struct ac97_info*);

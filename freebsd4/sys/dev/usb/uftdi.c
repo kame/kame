@@ -1,5 +1,4 @@
-/*	$NetBSD: uftdi.c,v 1.12 2002/07/18 14:44:10 scw Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.3.2.3 2003/07/21 11:50:06 akiyama Exp $	*/
+/*	$NetBSD: uftdi.c,v 1.13 2002/09/23 05:51:23 simonb Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -36,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.3.2.5 2004/04/16 18:12:57 julian Exp $");
 
 /*
  * FTDI FT8U100AX serial adapter driver
@@ -106,7 +108,7 @@ SYSCTL_INT(_hw_usb_uftdi, OID_AUTO, debug, CTLFLAG_RW,
 
 struct uftdi_softc {
 	struct ucom_softc	sc_ucom;
-    
+
 	usbd_interface_handle	sc_iface;	/* interface */
 
 	enum uftdi_type		sc_type;
@@ -150,7 +152,16 @@ USB_MATCH(uftdi)
 
 	if (uaa->vendor == USB_VENDOR_FTDI &&
 	    (uaa->product == USB_PRODUCT_FTDI_SERIAL_8U100AX ||
-	     uaa->product == USB_PRODUCT_FTDI_SERIAL_8U232AM))
+	     uaa->product == USB_PRODUCT_FTDI_SERIAL_8U232AM ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_631 ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_632 ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_633 ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_634 ||
+	     uaa->product == USB_PRODUCT_FTDI_USBSERIAL ||
+	     uaa->product == USB_PRODUCT_FTDI_MX2_3 ||
+	     uaa->product == USB_PRODUCT_FTDI_MX4_5 ||
+	     uaa->product == USB_PRODUCT_FTDI_LK202 ||
+	     uaa->product == USB_PRODUCT_FTDI_LK204))
 		return (UMATCH_VENDOR_PRODUCT);
 
 	return (UMATCH_NONE);
@@ -203,6 +214,15 @@ USB_ATTACH(uftdi)
 		sc->sc_hdrlen = 1;
 		break;
 	case USB_PRODUCT_FTDI_SERIAL_8U232AM:
+	case USB_PRODUCT_FTDI_CFA_631:
+	case USB_PRODUCT_FTDI_CFA_632:
+	case USB_PRODUCT_FTDI_CFA_633:
+	case USB_PRODUCT_FTDI_CFA_634:
+	case USB_PRODUCT_FTDI_USBSERIAL:
+	case USB_PRODUCT_FTDI_MX2_3:
+	case USB_PRODUCT_FTDI_MX4_5:
+	case USB_PRODUCT_FTDI_LK202:
+	case USB_PRODUCT_FTDI_LK204:
 		sc->sc_type = UFTDI_TYPE_8U232AM;
 		sc->sc_hdrlen = 0;
 		break;
@@ -210,9 +230,9 @@ USB_ATTACH(uftdi)
 	default:		/* Can't happen */
 		goto bad;
 	}
-	
+
 	ucom->sc_bulkin_no = ucom->sc_bulkout_no = -1;
-	
+
 	for (i = 0; i < id->bNumEndpoints; i++) {
 		int addr, dir, attr;
 		ed = usbd_interface2endpoint_descriptor(iface, i);
@@ -221,7 +241,7 @@ USB_ATTACH(uftdi)
 			       ": %s\n", devname, usbd_errstr(err));
 			goto bad;
 		}
-		
+
 		addr = ed->bEndpointAddress;
 		dir = UE_GET_DIR(ed->bEndpointAddress);
 		attr = ed->bmAttributes & UE_XFERTYPE;
@@ -262,7 +282,7 @@ USB_ATTACH(uftdi)
 	DPRINTF(("uftdi: in=0x%x out=0x%x\n", ucom->sc_bulkin_no, ucom->sc_bulkout_no));
 	ucom_attach(&sc->sc_ucom);
 	free(devinfo, M_USBDEV);
-		
+
 	USB_ATTACH_SUCCESS_RETURN;
 
 bad:
@@ -282,7 +302,6 @@ uftdi_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		if (sc->sc_subdev != NULL)
@@ -297,7 +316,7 @@ uftdi_activate(device_ptr_t self, enum devact act)
 USB_DETACH(uftdi)
 {
 	USB_DETACH_START(uftdi, sc);
- 
+
 	int rv = 0;
 
 	DPRINTF(("uftdi_detach: sc=%p\n", sc));

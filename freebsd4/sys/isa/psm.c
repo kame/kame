@@ -20,7 +20,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/psm.c,v 1.23.2.6 2002/03/27 16:53:35 pb Exp $
+ * $FreeBSD: src/sys/isa/psm.c,v 1.23.2.8 2003/11/12 04:51:24 mikeh Exp $
  */
 
 /*
@@ -1030,6 +1030,10 @@ psmprobe(device_t dev)
 	/*
 	 * NOTE: some controllers appears to hang the `keyboard' when the aux
 	 * port doesn't exist and `PSMC_RESET_DEV' is issued.
+	 *
+	 * Attempt to reset the controller twice -- this helps
+	 * pierce through some KVM switches. The second reset
+	 * is non-fatal.
 	 */
 	if (!reset_aux_dev(sc->kbdc)) {
             recover_from_error(sc->kbdc);
@@ -1037,6 +1041,11 @@ psmprobe(device_t dev)
             if (verbose)
         	printf("psm%d: failed to reset the aux device.\n", unit);
             endprobe(ENXIO);
+	} else if (!reset_aux_dev(sc->kbdc)) {
+	    recover_from_error(sc->kbdc);
+	    if (verbose >= 2)
+        	printf("psm%d: failed to reset the aux device (2).\n",
+        	    unit);
 	}
     }
 
@@ -2768,11 +2777,18 @@ enable_4dplus(struct psm_softc *sc)
     */
 
     id = get_aux_id(kbdc);
-    if (id != PSM_4DPLUS_ID)
-	return FALSE;
+    switch (id) {
+    case PSM_4DPLUS_ID:
+	    sc->hw.buttons = 4;
+	    break;
+    case PSM_4DPLUS_RFSW35_ID:
+	    sc->hw.buttons = 3;
+	    break;
+    default:
+	    return FALSE;
+    }
 
     sc->hw.hwid = id;
-    sc->hw.buttons = 4;		/* XXX */
 
     return TRUE;
 }

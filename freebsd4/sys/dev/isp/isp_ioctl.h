@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_ioctl.h,v 1.1.2.4 2002/07/29 04:21:23 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_ioctl.h,v 1.1.2.6 2004/02/02 22:35:50 mjacob Exp $ */
 /*
  * Copyright (c) 2001 by Matthew Jacob
  *
@@ -73,7 +73,7 @@
 /*
  * Get the current adapter role
  */
-#define ISP_GETROLE     _IOR(ISP_IOC, 5), int
+#define ISP_GETROLE     _IOR(ISP_IOC, 5, int)
 
 /*
  * Get/Clear Stats
@@ -143,6 +143,10 @@ struct isp_hba_device {
 		fc_scsi_supported	: 1,
 		fc_topology		: 3,
 		fc_loopid		: 8;
+	u_int8_t	fc_fw_major;
+	u_int8_t	fc_fw_minor;
+	u_int8_t	fc_fw_micro;
+	u_int8_t	reserved;
 	u_int64_t	nvram_node_wwn;
 	u_int64_t	nvram_port_wwn;
 	u_int64_t	active_node_wwn;

@@ -25,11 +25,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.46 2003/10/21 22:18:19 thomas Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.49 2004/04/20 17:59:44 njl Exp $
  */
 
 #ifdef _KERNEL
-#include "opt_da.h"
 #include "opt_hw_wdog.h"
 #endif /* _KERNEL */
 
@@ -262,110 +261,7 @@ static struct da_quirk_entry da_quirk_table[] =
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "MITSUMI", "USB FDD", "*"},
 		/*quirks*/ DA_Q_NO_SYNC_CACHE
 	},
-#ifdef DA_OLD_QUIRKS
 	/* USB mass storage devices supported by umass(4) */
-	{
-		/*
-		 * Sony Memory Stick adapter MSAC-US1 and
-		 * Sony PCG-C1VJ Internal Memory Stick Slot (MSC-U01).
-		 * Make all sony MS* products use this quirk.
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "MS*", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Sony Memory Stick adapter for the CLIE series
-		 * of PalmOS PDA's
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "CLIE*", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Intelligent Stick USB disk-on-key
-		 * PR: kern/53005
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "USB Card",
-		 "IntelligentStick*", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Sony DSC cameras (DSC-S30, DSC-S50, DSC-S70)
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "Sony DSC", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Microtech USB CameraMate
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "eUSB    Compact*",
-		 "Compact Flash*", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Olympus digital cameras (C-3040ZOOM, C-2040ZOOM, C-1)
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "OLYMPUS", "C-*", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Olympus digital cameras (E-100RS, E-10).
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "OLYMPUS", "E-*", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * KingByte Pen Drives
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "NO BRAND", "PEN DRIVE", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
- 	},
- 	{
-		/*
-		 * FujiFilm Camera
-		 */
- 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "FUJIFILMUSB-DRIVEUNIT",
-		 "USB-DRIVEUNIT", "*"},
- 		/*quirks*/ DA_Q_NO_SYNC_CACHE
- 	},
-	{
-		/*
-		 * Minolta Dimage E203
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "MINOLTA", "DiMAGE E203", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Apacer HandyDrive
-		 * PR: kern/43627
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Apacer", "HandyDrive", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Daisy Technology PhotoClip on Zoran chip
-		 * PR: kern/43580
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "ZORAN", "COACH", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-	{
-		/*
-		 * Sony USB Key-Storage
-		 * PR: kern/46386
-		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "Storage Media", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
-#endif /* DA_OLD_QUIRKS */
 	{
 		/*
 		 * EXATELECOM (Sigmatel) i-Bead 100/105 USB Flash MP3 Player
@@ -376,12 +272,12 @@ static struct da_quirk_entry da_quirk_table[] =
 	},
 	{
 		/*
-		 * Jungsoft NEXDISK USB flash key
-		 * PR: kern/54737
+		 * Power Quotient Int. (PQI) USB flash key
+		 * PR: kern/53067
 		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "JUNGSOFT", "NEXDISK*", "*"},
-		/*quirks*/ DA_Q_NO_SYNC_CACHE
-	},
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Generic*", "USB Flash Disk*",
+		"*"}, /*quirks*/ DA_Q_NO_SYNC_CACHE
+	}, 
  	{
  		/*
  		 * Creative Nomad MUVO mp3 player (USB)
@@ -390,6 +286,30 @@ static struct da_quirk_entry da_quirk_table[] =
  		{T_DIRECT, SIP_MEDIA_REMOVABLE, "CREATIVE", "NOMAD_MUVO", "*"},
  		/*quirks*/ DA_Q_NO_SYNC_CACHE|DA_Q_NO_PREVENT
  	},
+	{
+		/*
+		 * Jungsoft NEXDISK USB flash key
+		 * PR: kern/54737
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "JUNGSOFT", "NEXDISK*", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * FreeDik USB Mini Data Drive
+		 * PR: kern/54786
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "FreeDik*", "Mini Data Drive",
+		"*"}, /*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * Sigmatel USB Flash MP3 Player
+		 * PR: kern/57046
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "SigmaTel", "MSCN", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE|DA_Q_NO_PREVENT
+	},
 };
 
 static	d_open_t	daopen;

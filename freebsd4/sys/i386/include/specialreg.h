@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)specialreg.h	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/specialreg.h,v 1.19.2.3 2003/01/22 17:24:28 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/specialreg.h,v 1.19.2.4 2004/03/03 15:24:15 sobomax Exp $
  */
 
 #ifndef _MACHINE_SPECIALREG_H_
@@ -137,6 +137,9 @@
 #define MSR_MCG_CTL		0x17b
 #define MSR_EVNTSEL0		0x186
 #define MSR_EVNTSEL1		0x187
+#define MSR_THERM_CONTROL	0x19a
+#define MSR_THERM_INTERRUPT	0x19b
+#define MSR_THERM_STATUS	0x19c
 #define MSR_DEBUGCTLMSR		0x1d9
 #define MSR_LASTBRANCHFROMIP	0x1db
 #define MSR_LASTBRANCHTOIP	0x1dc

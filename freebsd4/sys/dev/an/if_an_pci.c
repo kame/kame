@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.8 2003/02/11 03:32:48 ambrisko Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.9 2003/11/30 20:29:42 ambrisko Exp $
  */
 
 /*
@@ -83,7 +83,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.8 2003/02/11 03:32:48 ambrisko Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.9 2003/11/30 20:29:42 ambrisko Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -204,7 +204,7 @@ an_attach_pci(dev)
 		/* Allocate aux. memory */
 		sc->mem_aux_rid = PCIR_MAPS + 8;
 		error = an_alloc_aux_memory(dev, sc->mem_aux_rid, 
-		    AN_AUXMEMSIZE);
+		    AN_AUX_MEM_SIZE);
 		if (error) {
 			printf("an%d: couldn't map aux memory\n", unit);
 			goto fail;

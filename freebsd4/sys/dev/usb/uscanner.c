@@ -1,5 +1,11 @@
-/*	$NetBSD: uscanner.c,v 1.26 2001/12/31 12:15:22 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.15 2003/07/01 12:22:36 joe Exp $	*/
+/*	$NetBSD: uscanner.c,v 1.30 2002/07/11 21:14:36 augustss Exp$	*/
+
+/* Also already merged from NetBSD:
+ *	$NetBSD: uscanner.c,v 1.33 2002/09/23 05:51:24 simonb Exp $
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.20 2004/04/16 18:12:58 julian Exp $");
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -55,7 +61,11 @@
 #endif
 #include <sys/tty.h>
 #include <sys/file.h>
+#if __FreeBSD_version >= 500014
+#include <sys/selinfo.h>
+#else
 #include <sys/select.h>
+#endif
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
@@ -111,6 +121,9 @@ static const struct uscan_info uscanner_devs[] = {
 
   /* Canon */
  {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N656U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N676U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N1220U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N1240U }, 0 },
 
   /* Kye */
  {{ USB_VENDOR_KYE, USB_PRODUCT_KYE_VIVIDPRO }, 0 },
@@ -138,6 +151,9 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_MICROTEK, USB_PRODUCT_MICROTEK_V6USL }, 0 },
  {{ USB_VENDOR_MICROTEK, USB_PRODUCT_MICROTEK_V6USL2 }, 0 },
  {{ USB_VENDOR_MICROTEK, USB_PRODUCT_MICROTEK_V6UL }, 0 },
+
+ /* Minolta */
+ {{ USB_VENDOR_MINOLTA, USB_PRODUCT_MINOLTA_5400 }, 0 },
 
   /* Mustek */
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_1200CU }, 0 },
@@ -180,7 +196,9 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_640U }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1650 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1660 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1670 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1260 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_3200 }, USC_KEEP_OPEN },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_GT9700F }, USC_KEEP_OPEN },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_GT9300UF }, 0 },
 
@@ -188,6 +206,7 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA1220U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA1236U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA2000U }, 0 },
+ {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA2100U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA2200U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA3400 }, 0 },
 
@@ -243,26 +262,21 @@ d_open_t  uscanneropen;
 d_close_t uscannerclose;
 d_read_t  uscannerread;
 d_write_t uscannerwrite;
-d_ioctl_t uscannerioctl;
 d_poll_t  uscannerpoll;
 
 #define USCANNER_CDEV_MAJOR	156
 
 Static struct cdevsw uscanner_cdevsw = {
-	/* open */	uscanneropen,
-	/* close */	uscannerclose,
-	/* read */	uscannerread,
-	/* write */	uscannerwrite,
-	/* ioctl */	uscannerioctl,
-	/* poll */	uscannerpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"uscanner",
-	/* maj */	USCANNER_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
-	/* bmaj */	-1
+	.d_open =	uscanneropen,
+	.d_close =	uscannerclose,
+	.d_read =	uscannerread,
+	.d_write =	uscannerwrite,
+	.d_poll =	uscannerpoll,
+	.d_name =	"uscanner",
+	.d_maj =	USCANNER_CDEV_MAJOR,
+#if __FreeBSD_version < 500014
+	.d_bmaj		-1
+#endif
 };
 #endif
 
@@ -356,6 +370,9 @@ USB_ATTACH(uscanner)
 		UID_ROOT, GID_OPERATOR, 0644, "%s", USBDEVNAME(sc->sc_dev));
 #endif
 
+	usbd_add_drv_event(USB_EVENT_DRIVER_ATTACH, sc->sc_udev,
+			   USBDEV(sc->sc_dev));
+
 	USB_ATTACH_SUCCESS_RETURN;
 }
 
@@ -368,7 +385,7 @@ uscanneropen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 
 	USB_GET_SC_OPEN(uscanner, unit, sc);
 
- 	DPRINTFN(5, ("uscanneropen: flag=%d, mode=%d, unit=%d\n", 
+ 	DPRINTFN(5, ("uscanneropen: flag=%d, mode=%d, unit=%d\n",
 		     flag, mode, unit));
 
 	if (sc->sc_dying)
@@ -594,7 +611,6 @@ uscanner_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;
@@ -655,6 +671,9 @@ USB_DETACH(uscanner)
 	destroy_dev(dev);
 #endif
 
+	usbd_add_drv_event(USB_EVENT_DRIVER_DETACH, sc->sc_udev,
+			   USBDEV(sc->sc_dev));
+
 	return (0);
 }
 
@@ -669,21 +688,15 @@ uscannerpoll(dev_t dev, int events, usb_proc_ptr p)
 	if (sc->sc_dying)
 		return (EIO);
 
-	/* 
+	/*
 	 * We have no easy way of determining if a read will
 	 * yield any data or a write will happen.
 	 * Pretend they will.
 	 */
-	revents |= events & 
+	revents |= events &
 		   (POLLIN | POLLRDNORM | POLLOUT | POLLWRNORM);
 
 	return (revents);
-}
-
-int
-uscannerioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
-{
-	return (EINVAL);
 }
 
 #if defined(__FreeBSD__)

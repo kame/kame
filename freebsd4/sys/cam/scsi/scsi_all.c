@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.10 2003/08/24 03:26:37 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.11 2003/10/30 15:06:35 thomas Exp $
  */
 
 #include <sys/param.h>
@@ -2522,6 +2522,7 @@ scsi_request_sense(struct ccb_scsiio *csio, u_int32_t retries,
 	scsi_cmd = (struct scsi_request_sense *)&csio->cdb_io.cdb_bytes;
 	bzero(scsi_cmd, sizeof(*scsi_cmd));
 	scsi_cmd->opcode = REQUEST_SENSE;
+	scsi_cmd->length = dxfer_len;
 }
 
 void

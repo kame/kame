@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.1.2.12 2003/08/17 19:15:10 ps Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.1.2.14 2004/04/06 22:53:00 ps Exp $
  */
 
 /*
@@ -1816,6 +1816,9 @@ struct bge_status_block {
 #define BCOM_DEVICEID_BCM5705M		0x165D
 #define BCOM_DEVICEID_BCM5705M_ALT	0x165E
 #define BCOM_DEVICEID_BCM5782		0x1696
+#define BCOM_DEVICEID_BCM5788		0x169C
+#define BCOM_DEVICEID_BCM5901		0x170D
+#define BCOM_DEVICEID_BCM5901A2		0x170E
 
 /*
  * Alteon AceNIC PCI vendor/device ID.
@@ -1846,7 +1849,14 @@ struct bge_status_block {
  */
 #define ALTIMA_VENDORID			0x173b
 #define ALTIMA_DEVICE_AC1000		0x03e8
+#define ALTIMA_DEVICE_AC1002		0x03e9
 #define ALTIMA_DEVICE_AC9100	 	0x03ea			
+
+/*
+ * Dell PCI vendor ID
+ */
+
+#define DELL_VENDORID			0x1028
 
 /*
  * Offset of MAC address inside EEPROM.
@@ -2228,6 +2238,7 @@ struct bge_softc {
 	u_int32_t		bge_chipid;
 	u_int8_t		bge_asicrev;
 	u_int8_t		bge_chiprev;
+	u_int8_t		bge_no_3_led;
 	struct bge_ring_data	*bge_rdata;	/* rings */
 	struct bge_chain_data	bge_cdata;	/* mbufs */
 	u_int16_t		bge_tx_saved_considx;

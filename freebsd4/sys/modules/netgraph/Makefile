@@ -1,5 +1,5 @@
 # $Whistle: Makefile,v 1.5 1999/01/24 06:48:37 archie Exp $
-# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.8.2.8 2002/08/20 23:48:15 archie Exp $
+# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.8.2.10 2004/03/10 15:35:19 ru Exp $
 
 SUBDIR=	UI \
 	async \
@@ -7,6 +7,7 @@ SUBDIR=	UI \
 	bridge \
 	cisco \
 	echo \
+	eiface \
 	etf \
 	ether \
 	frame_relay \
@@ -26,7 +27,8 @@ SUBDIR=	UI \
 	sync_sr \
 	tee \
 	tty \
-	vjc
+	vjc \
+	vlan
 
 .if !defined(NOCRYPT) && exists(${.CURDIR}/../../crypto/rc4/rc4.c)
 SUBDIR+=	mppc

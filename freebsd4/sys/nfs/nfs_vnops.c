@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vnops.c	8.16 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150.2.6 2003/06/20 00:54:11 iedowse Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150.2.8 2004/01/10 08:24:33 tjr Exp $
  */
 
 
@@ -469,7 +469,7 @@ nfs_open(ap)
 #ifdef DIAGNOSTIC
 		printf("open eacces vtyp=%d\n",vp->v_type);
 #endif
-		return (EACCES);
+		return (EOPNOTSUPP);
 	}
 	/*
 	 * Get a valid lease. If cached data is stale, flush it.
@@ -735,7 +735,13 @@ nfs_setattr(ap)
  				return (error);
 			    }
  			}
-			np->n_vattr.va_size = vap->va_size;
+			/*
+			 * np->n_size has already been set to vap->va_size
+			 * in nfs_meta_setsize(). We must set it again since
+			 * nfs_loadattrcache() could be called through
+			 * nfs_meta_setsize() and could modify np->n_size.
+			 */
+ 			np->n_vattr.va_size = np->n_size = vap->va_size;
   		};
   	} else if ((vap->va_mtime.tv_sec != VNOVAL ||
 		vap->va_atime.tv_sec != VNOVAL) && (np->n_flag & NMODIFIED) &&
@@ -1014,9 +1020,14 @@ nfs_read(ap)
 {
 	register struct vnode *vp = ap->a_vp;
 
-	if (vp->v_type != VREG)
-		return (EPERM);
-	return (nfs_bioread(vp, ap->a_uio, ap->a_ioflag, ap->a_cred));
+	switch (vp->v_type) {
+	case VREG:
+		return (nfs_bioread(vp, ap->a_uio, ap->a_ioflag, ap->a_cred));
+	case VDIR:
+		return (EISDIR);
+	default:
+		return (EOPNOTSUPP);
+	}
 }
 
 /*

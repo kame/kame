@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  * 	$Id: ng_eiface.c,v 1.14 2000/03/15 12:28:44 vitaly Exp $
- * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.4.2.5 2002/12/17 21:47:48 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.4.2.6 2003/12/15 14:50:04 ru Exp $
  */
 
 #include <sys/param.h>
@@ -519,10 +519,6 @@ ng_eiface_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 
 	/* Update interface stats */
 	ifp->if_ipackets++;
-
-	/* Berkeley packet filter */
-	if (ifp->if_bpf)
-	  bpf_mtap(ifp, m);
 
 	eh = mtod( m, struct ether_header * );
 	ether_type = ntohs(eh->ether_type);

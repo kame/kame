@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vnops.c	8.32 (Berkeley) 6/23/95
- * $FreeBSD: src/sys/miscfs/union/union_vnops.c,v 1.72.2.1 2003/06/18 07:55:47 das Exp $
+ * $FreeBSD: src/sys/miscfs/union/union_vnops.c,v 1.72.2.3 2004/01/13 21:20:02 das Exp $
  */
 
 #include <sys/param.h>
@@ -585,36 +585,30 @@ out:
 		((*ap->a_vpp) ? (*ap->a_vpp)->v_usecount : -99),
 		lowervp, uppervp));
 
-	/*
-	 * dvp lock state, determine whether to relock dvp.  dvp is expected
-	 * to be locked on return if:
-	 *
-	 *	- there was an error (except not EJUSTRETURN), or
-	 *	- we hit the last component and lockparent is true
-	 *
-	 * dvp_is_locked is the current state of the dvp lock, not counting
-	 * the possibility that *ap->a_vpp == dvp (in which case it is locked
-	 * anyway).  Note that *ap->a_vpp == dvp only if no error occured.
-	 */
+	if (error == 0 || error == EJUSTRETURN) {
+		/*
+		 * dvp lock state, determine whether to relock dvp.
+		 * We are expected to unlock dvp unless:
+		 *
+		 *      - there was an error (other than EJUSTRETURN), or
+		 *      - we hit the last component and lockparent is true
+		 */
+		if (*ap->a_vpp != dvp) {
+			if (!lockparent || (cnp->cn_flags & ISLASTCN) == 0)
+				VOP_UNLOCK(dvp, 0, p);
+		}
 
-	if (*ap->a_vpp != dvp) {
-		if ((error == 0 || error == EJUSTRETURN) &&
-		    (!lockparent || (cnp->cn_flags & ISLASTCN) == 0)) {
-			VOP_UNLOCK(dvp, 0, p);
+		if (cnp->cn_namelen == 1 &&
+		    cnp->cn_nameptr[0] == '.' &&
+		    *ap->a_vpp != dvp) {
+#ifdef	DIAGNOSTIC
+			vprint("union_lookup: vp", *ap->a_vpp);
+			vprint("union_lookup: dvp", dvp);
+#endif
+			panic("union_lookup returning . (%p) != startdir (%p)",
+			    *ap->a_vpp, dvp);
 		}
 	}
-
-	/*
-	 * Diagnostics
-	 */
-
-#ifdef DIAGNOSTIC
-	if (cnp->cn_namelen == 1 &&
-	    cnp->cn_nameptr[0] == '.' &&
-	    *ap->a_vpp != dvp) {
-		panic("union_lookup returning . (%p) not same as startdir (%p)", ap->a_vpp, dvp);
-	}
-#endif
 
 	return (error);
 }

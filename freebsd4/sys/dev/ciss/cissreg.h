@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/cissreg.h,v 1.1.2.2 2003/02/06 21:42:59 ps Exp $
+ *	$FreeBSD: src/sys/dev/ciss/cissreg.h,v 1.1.2.4 2003/12/12 22:03:38 ps Exp $
  */
 
 /*
@@ -84,8 +84,8 @@ struct ciss_cdb
 #define CISS_CDB_ATTRIBUTE_AUTO_CONTINGENT	7
     u_int8_t	direction:2;
 #define CISS_CDB_DIRECTION_NONE			0
-#define CISS_CDB_DIRECTION_READ			1
-#define CISS_CDB_DIRECTION_WRITE		2
+#define CISS_CDB_DIRECTION_WRITE		1
+#define CISS_CDB_DIRECTION_READ			2
     u_int16_t	timeout;		/* seconds */
 #define CISS_CDB_BUFFER_SIZE	16
     u_int8_t	cdb[CISS_CDB_BUFFER_SIZE];
@@ -494,6 +494,8 @@ struct ciss_bmic_id_ldrive {
 #define CISS_LDRIVE_RAID4	1
 #define CISS_LDRIVE_RAID1	2
 #define CISS_LDRIVE_RAID5	3
+#define CISS_LDRIVE_RAID51	4
+#define CISS_LDRIVE_RAIDADG	5
     u_int8_t	res1[2];
 #if 0	/* only for identify logical drive extended (0x18) */
     u_int32_t	logical_drive_identifier;

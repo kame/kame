@@ -13,7 +13,7 @@
 # purpose.
 #
 
-# $FreeBSD: src/sys/boot/i386/cdboot/cdboot.s,v 1.9.2.1 2001/12/21 21:01:41 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/cdboot/cdboot.s,v 1.9.2.3 2004/01/20 19:30:31 jhb Exp $
 
 #
 # This program is a freestanding boot program to load an a.out binary
@@ -139,17 +139,33 @@ load_vd:	push %eax			# Save %eax
 		jmp error			# Halt
 have_vd:					# Have Primary VD
 #
-# Lookup the loader binary.
+# Try to look up the loader binary using the paths in the loader_paths
+# array.
 #
-		mov $loader_path,%si		# File to lookup
-		call lookup			# Try to find it
+		mov $loader_paths,%si		# Point to start of array
+lookup_path:	push %si			# Save file name pointer
+		call lookup			# Try to find file
+		pop %di				# Restore file name pointer
+		jnc lookup_found		# Found this file
+		xor %al,%al			# Look for next
+		mov $0xffff,%cx			#  path name by
+		repnz				#  scanning for
+		scasb				#  nul char
+		inc %di				# Skip nul
+		mov %di,%si			# Point %si at next path
+		mov (%si),%al			# Get first char of next path
+		or %al,%al			# Is it double nul?
+		jnz lookup_path			# No, try it.
+		mov $msg_failed,%si		# Failed message
+		jmp error			# Halt
+lookup_found:					# Found a loader file
 #
 # Load the binary into the buffer.  Due to real mode addressing limitations
 # we have to read it in in 64k chunks.
 #
 		mov DIR_SIZE(%bx),%eax		# Read file length
 		add $SECTOR_SIZE-1,%eax		# Convert length to sectors
-		shr $11,%eax
+		shr $SECTOR_SHIFT,%eax
 		cmp $BUFFER_LEN,%eax
 		jbe load_sizeok
 		mov $msg_load2big,%si		# Error message
@@ -266,7 +282,8 @@ pm_end:		sti				# Turn interrupts back on now
 # Lookup the file in the path at [SI] from the root directory.
 #
 # Trashes: All but BX
-# Returns: BX = pointer to record
+# Returns: CF = 0 (success), BX = pointer to record
+#          CF = 1 (not found)
 #
 lookup:		mov $VD_ROOTDIR+MEM_VOLDESC,%bx	# Root directory record
 		push %si
@@ -286,17 +303,21 @@ lookup_dir:	lodsb				# Get first char of path
 		dec %si				# Undo lodsb side effect
 		call find_file			# Lookup first path item
 		jnc lookup_dir			# Try next component
-		mov $msg_lookupfail,%si		# Not found.
+		mov $msg_lookupfail,%si		# Not found message
+		call putstr
+		stc				# Set carry
+		ret
 		jmp error
 lookup_done:	mov $msg_lookupok,%si		# Success message
 		call putstr
+		clc				# Clear carry
 		ret
 
 #
 # Lookup file at [SI] in directory whose record is at [BX].
 #
 # Trashes: All but returns
-# Returns: CF = 0 (success), BX = pointer to record, SX = next path item
+# Returns: CF = 0 (success), BX = pointer to record, SI = next path item
 #          CF = 1 (not found), SI = preserved
 #
 find_file:	mov DIR_EXTENT(%bx),%eax	# Load extent
@@ -379,6 +400,7 @@ ff.match:	add $2,%sp			# Discard saved %si
 # Trashes: EAX
 #
 read:		push %si			# Save
+		push %cx			# Save since some BIOSs trash
 		mov %eax,edd_lba		# LBA to read from
 		mov %ebx,%eax			# Convert address
 		shr $4,%eax			#  to segment
@@ -392,7 +414,8 @@ read.retry:	call twiddle			# Entertain the user
 		int $0x13			# Call BIOS
 		pop %dx				# Restore
 		jc read.fail			# Worked?
-		pop %si				# Restore
+		pop %cx				# Restore
+		pop %si
 		ret				# Return
 read.fail:	cmp $ERROR_TIMEOUT,%ah		# Timeout?
 		je read.retry			# Yes, Retry.
@@ -439,6 +462,7 @@ twiddle:	push %ax			# Save
 		mov twiddle_chars,%bx		# Address table
 		inc %al				# Next
 		and $3,%al			#  char
+		mov %al,twiddle_index		# Save index for next call
 		xlat				# Get char
 		call putc			# Output it
 		mov $8,%al			# Backspace
@@ -536,7 +560,7 @@ name_len:	.byte 0x0			# Length of current name
 
 twiddle_index:	.byte 0x0
 
-msg_welcome:	.asciz	"CD Loader 1.01\r\n\n"
+msg_welcome:	.asciz	"CD Loader 1.2\r\n\n"
 msg_bootinfo:	.asciz	"Building the boot loader arguments\r\n"
 msg_relocate:	.asciz	"Relocating the loader and the BTX\r\n"
 msg_jump:	.asciz	"Starting the BTX loader\r\n"
@@ -548,6 +572,9 @@ msg_lookup2:	.asciz  "... "
 msg_lookupok:	.asciz  "Found\r\n"
 msg_lookupfail:	.asciz  "File not found\r\n"
 msg_load2big:	.asciz  "File too big\r\n"
-loader_path:	.asciz  "/BOOT/LOADER"
+msg_failed:	.asciz	"Boot failed\r\n"
 twiddle_chars:	.ascii	"|/-\\"
+loader_paths:	.asciz  "/BOOT/LOADER"
+		.asciz	"/boot/loader"
+		.byte 0
 

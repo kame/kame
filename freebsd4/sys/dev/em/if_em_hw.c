@@ -31,7 +31,7 @@
 
 *******************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em_hw.c,v 1.1.2.9 2003/09/03 16:36:46 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em_hw.c,v 1.1.2.11 2004/02/14 00:56:45 pdeuskar Exp $*/
 /* if_em_hw.c
  * Shared functions for accessing and configuring the MAC
  */
@@ -102,8 +102,14 @@ em_set_phy_type(struct em_hw *hw)
         hw->phy_type = em_phy_m88;
         break;
     case IGP01E1000_I_PHY_ID:
-        hw->phy_type = em_phy_igp;
-        break;
+        if(hw->mac_type == em_82541 ||
+           hw->mac_type == em_82541_rev_2 ||
+           hw->mac_type == em_82547 ||
+           hw->mac_type == em_82547_rev_2) {
+            hw->phy_type = em_phy_igp;
+            break;
+        }
+        /* Fall Through */
     default:
         /* Should never have loaded on this device */
         hw->phy_type = em_phy_undefined;
@@ -153,7 +159,6 @@ em_phy_init_script(struct em_hw *hw)
         }
 
         em_write_phy_reg(hw, 0x0000, 0x3300);
-
 
         if(hw->mac_type == em_82547) {
             uint16_t fused, fine, coarse;
@@ -842,18 +847,16 @@ em_setup_fiber_serdes_link(struct em_hw *hw)
         if(i == (LINK_UP_TIMEOUT / 10)) {
             DEBUGOUT("Never got a valid link from auto-neg!!!\n");
             hw->autoneg_failed = 1;
-            if(hw->media_type == em_media_type_fiber) {
-                /* AutoNeg failed to achieve a link, so we'll call
-                 * em_check_for_link. This routine will force the link up if
-                 * we detect a signal. This will allow us to communicate with
-                 * non-autonegotiating link partners.
-                 */
-                if((ret_val = em_check_for_link(hw))) {
-                    DEBUGOUT("Error while checking for link\n");
-                    return ret_val;
-                }
-                hw->autoneg_failed = 0;
+            /* AutoNeg failed to achieve a link, so we'll call
+             * em_check_for_link. This routine will force the link up if
+             * we detect a signal. This will allow us to communicate with
+             * non-autonegotiating link partners.
+             */
+            if((ret_val = em_check_for_link(hw))) {
+                DEBUGOUT("Error while checking for link\n");
+                return ret_val;
             }
+            hw->autoneg_failed = 0;
         } else {
             hw->autoneg_failed = 0;
             DEBUGOUT("Valid Link Found\n");
@@ -1493,8 +1496,8 @@ em_phy_force_speed_duplex(struct em_hw *hw)
             if(mii_status_reg & MII_SR_LINK_STATUS) break;
             msec_delay(100);
         }
-        if(i == 0) { /* We didn't get link */
-            /* Reset the DSP and wait again for link. */
+        if((i == 0) && (hw->phy_type == em_phy_m88)) {
+            /* We didn't get link.  Reset the DSP and wait again for link. */
             if((ret_val = em_phy_reset_dsp(hw))) {
                 DEBUGOUT("Error Resetting PHY DSP\n");
                 return ret_val;
@@ -1541,6 +1544,25 @@ em_phy_force_speed_duplex(struct em_hw *hw)
                                           phy_data)))
             return ret_val;
 
+        /* Polarity reversal workaround for forced 10F/10H links. */
+        if(hw->mac_type <= em_82544 &&
+           (hw->forced_speed_duplex == em_10_full ||
+            hw->forced_speed_duplex == em_10_half)) {
+            if((ret_val = em_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT,
+                                              0x0019)))
+                return ret_val;
+            if((ret_val = em_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL,
+                                              0x8F0F)))
+                return ret_val;
+            /* IEEE requirement is 150ms */
+            msec_delay(200);
+            if((ret_val = em_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT,
+                                              0x0019)))
+                return ret_val;
+            if((ret_val = em_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL,
+                                              0x8F00)))
+                return ret_val;
+        }
     }
     return E1000_SUCCESS;
 }
@@ -1871,11 +1893,12 @@ em_config_fc_after_link_up(struct em_hw *hw)
              * be asked to delay transmission of packets than asking
              * our link partner to pause transmission of frames.
              */
-            else if(hw->original_fc == em_fc_none ||
-                    hw->original_fc == em_fc_tx_pause) {
+            else if((hw->original_fc == em_fc_none ||
+                     hw->original_fc == em_fc_tx_pause) ||
+                    hw->fc_strict_ieee) {
                 hw->fc = em_fc_none;
                 DEBUGOUT("Flow Control = NONE.\r\n");
-            } else if(!hw->fc_strict_ieee) {
+            } else {
                 hw->fc = em_fc_rx_pause;
                 DEBUGOUT("Flow Control = RX PAUSE frames only.\r\n");
             }
@@ -1923,7 +1946,6 @@ em_check_for_link(struct em_hw *hw)
     uint32_t signal = 0;
     int32_t ret_val;
     uint16_t phy_data;
-    uint16_t lp_capability;
 
     DEBUGFUNC("em_check_for_link");
 
@@ -2003,24 +2025,17 @@ em_check_for_link(struct em_hw *hw)
 
         /* At this point we know that we are on copper and we have
          * auto-negotiated link.  These are conditions for checking the link
-         * parter capability register.  We use the link partner capability to
-         * determine if TBI Compatibility needs to be turned on or off.  If
-         * the link partner advertises any speed in addition to Gigabit, then
-         * we assume that they are GMII-based, and TBI compatibility is not
-         * needed. If no other speeds are advertised, we assume the link
-         * partner is TBI-based, and we turn on TBI Compatibility.
+         * partner capability register.  We use the link speed to determine if
+         * TBI compatibility needs to be turned on or off.  If the link is not
+         * at gigabit speed, then TBI compatibility is not needed.  If we are
+         * at gigabit speed, we turn on TBI compatibility.
          */
-        if(hw->tbi_compatibility_en) {
-            if((ret_val = em_read_phy_reg(hw, PHY_LP_ABILITY,
-                                             &lp_capability)))
-                return ret_val;
-            if(lp_capability & (NWAY_LPAR_10T_HD_CAPS |
-                                NWAY_LPAR_10T_FD_CAPS |
-                                NWAY_LPAR_100TX_HD_CAPS |
-                                NWAY_LPAR_100TX_FD_CAPS |
-                                NWAY_LPAR_100T4_CAPS)) {
-                /* If our link partner advertises anything in addition to
-                 * gigabit, we do not need to enable TBI compatibility.
+	if(hw->tbi_compatibility_en) {
+            uint16_t speed, duplex;
+            em_get_speed_and_duplex(hw, &speed, &duplex);
+            if(speed != SPEED_1000) {
+                /* If link speed is not set to gigabit speed, we do not need
+                 * to enable TBI compatibility.
                  */
                 if(hw->tbi_compatibility_on) {
                     /* If we previously were in the mode, turn it off. */
@@ -2051,9 +2066,10 @@ em_check_for_link(struct em_hw *hw)
      * auto-negotiation time to complete, in case the cable was just plugged
      * in. The autoneg_failed flag does this.
      */
-    else if((hw->media_type == em_media_type_fiber) &&
+    else if((((hw->media_type == em_media_type_fiber) &&
+            ((ctrl & E1000_CTRL_SWDPIN1) == signal)) ||
+            (hw->media_type == em_media_type_internal_serdes)) &&
             (!(status & E1000_STATUS_LU)) &&
-            ((ctrl & E1000_CTRL_SWDPIN1) == signal) &&
             (!(rxcw & E1000_RXCW_C))) {
         if(hw->autoneg_failed == 0) {
             hw->autoneg_failed = 1;
@@ -2080,12 +2096,36 @@ em_check_for_link(struct em_hw *hw)
      * Device Control register in an attempt to auto-negotiate with our link
      * partner.
      */
-    else if((hw->media_type == em_media_type_fiber) &&
+    else if(((hw->media_type == em_media_type_fiber) ||
+             (hw->media_type == em_media_type_internal_serdes)) &&
               (ctrl & E1000_CTRL_SLU) &&
               (rxcw & E1000_RXCW_C)) {
         DEBUGOUT("RXing /C/, enable AutoNeg and stop forcing link.\r\n");
         E1000_WRITE_REG(hw, TXCW, hw->txcw);
         E1000_WRITE_REG(hw, CTRL, (ctrl & ~E1000_CTRL_SLU));
+
+        hw->serdes_link_down = FALSE;
+    }
+    /* If we force link for non-auto-negotiation switch, check link status
+     * based on MAC synchronization for internal serdes media type.
+     */
+    else if((hw->media_type == em_media_type_internal_serdes) &&
+            !(E1000_TXCW_ANE & E1000_READ_REG(hw, TXCW))) {
+        /* SYNCH bit and IV bit are sticky. */
+        usec_delay(10);
+        if(E1000_RXCW_SYNCH & E1000_READ_REG(hw, RXCW)) {
+            if(!(rxcw & E1000_RXCW_IV)) {
+                hw->serdes_link_down = FALSE;
+                DEBUGOUT("SERDES: Link is up.\n");
+            }
+        } else {
+            hw->serdes_link_down = TRUE;
+            DEBUGOUT("SERDES: Link is down.\n");
+        }
+    }
+    if((hw->media_type == em_media_type_internal_serdes) &&
+       (E1000_TXCW_ANE & E1000_READ_REG(hw, TXCW))) {
+        hw->serdes_link_down = !(E1000_STATUS_LU & E1000_READ_REG(hw, STATUS));
     }
     return E1000_SUCCESS;
 }
@@ -2486,8 +2526,8 @@ em_write_phy_reg_ex(struct em_hw *hw,
         E1000_WRITE_REG(hw, MDIC, mdic);
 
         /* Poll the ready bit to see if the MDI read completed */
-        for(i = 0; i < 64; i++) {
-            usec_delay(50);
+        for(i = 0; i < 640; i++) {
+            usec_delay(5);
             mdic = E1000_READ_REG(hw, MDIC);
             if(mdic & E1000_MDIC_READY) break;
         }
@@ -3503,10 +3543,12 @@ em_write_eeprom(struct em_hw *hw,
     if (em_acquire_eeprom(hw) != E1000_SUCCESS)
         return -E1000_ERR_EEPROM;
 
-    if(eeprom->type == em_eeprom_microwire)
+    if(eeprom->type == em_eeprom_microwire) {
         status = em_write_eeprom_microwire(hw, offset, words, data);
-    else
+    } else {
         status = em_write_eeprom_spi(hw, offset, words, data);
+        msec_delay(10);
+    }
 
     /* Done with writing */
     em_release_eeprom(hw);
@@ -3724,12 +3766,9 @@ em_read_mac_addr(struct em_hw * hw)
         hw->perm_mac_addr[i+1] = (uint8_t) (eeprom_data >> 8);
     }
     if(((hw->mac_type == em_82546) || (hw->mac_type == em_82546_rev_3)) &&
-       (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
-        if(hw->perm_mac_addr[5] & 0x01)
-            hw->perm_mac_addr[5] &= ~(0x01);
-        else
-            hw->perm_mac_addr[5] |= 0x01;
-    }
+       (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1))
+            hw->perm_mac_addr[5] ^= 0x01;
+
     for(i = 0; i < NODE_ADDRESS_SIZE; i++)
         hw->mac_addr[i] = hw->perm_mac_addr[i];
     return E1000_SUCCESS;
@@ -3748,22 +3787,13 @@ void
 em_init_rx_addrs(struct em_hw *hw)
 {
     uint32_t i;
-    uint32_t addr_low;
-    uint32_t addr_high;
 
     DEBUGFUNC("em_init_rx_addrs");
 
     /* Setup the receive address. */
     DEBUGOUT("Programming MAC Address into RAR[0]\n");
-    addr_low = (hw->mac_addr[0] |
-                (hw->mac_addr[1] << 8) |
-                (hw->mac_addr[2] << 16) | (hw->mac_addr[3] << 24));
 
-    addr_high = (hw->mac_addr[4] |
-                 (hw->mac_addr[5] << 8) | E1000_RAH_AV);
-
-    E1000_WRITE_REG_ARRAY(hw, RA, 0, addr_low);
-    E1000_WRITE_REG_ARRAY(hw, RA, 1, addr_high);
+    em_rar_set(hw, hw->mac_addr, 0);
 
     /* Zero out the other 15 receive addresses. */
     DEBUGOUT("Clearing RAR[1-15]\n");
@@ -3780,6 +3810,7 @@ em_init_rx_addrs(struct em_hw *hw)
  * mc_addr_list - the list of new multicast addresses
  * mc_addr_count - number of addresses
  * pad - number of bytes between addresses in the list
+ * rar_used_count - offset where to start adding mc addresses into the RAR's
  *
  * The given list replaces any existing list. Clears the last 15 receive
  * address registers and the multicast table. Uses receive address registers
@@ -3790,11 +3821,11 @@ void
 em_mc_addr_list_update(struct em_hw *hw,
                           uint8_t *mc_addr_list,
                           uint32_t mc_addr_count,
-                          uint32_t pad)
+                          uint32_t pad,
+                          uint32_t rar_used_count)
 {
     uint32_t hash_value;
     uint32_t i;
-    uint32_t rar_used_count = 1; /* RAR[0] is used for our MAC address */
 
     DEBUGFUNC("em_mc_addr_list_update");
 
@@ -4528,8 +4559,8 @@ uint32_t
 em_read_reg_io(struct em_hw *hw,
                   uint32_t offset)
 {
-    uint32_t io_addr = hw->io_base;
-    uint32_t io_data = hw->io_base + 4;
+    unsigned long io_addr = hw->io_base;
+    unsigned long io_data = hw->io_base + 4;
 
     em_io_write(hw, io_addr, offset);
     return em_io_read(hw, io_data);
@@ -4548,8 +4579,8 @@ em_write_reg_io(struct em_hw *hw,
                    uint32_t offset,
                    uint32_t value)
 {
-    uint32_t io_addr = hw->io_base;
-    uint32_t io_data = hw->io_base + 4;
+    unsigned long io_addr = hw->io_base;
+    unsigned long io_data = hw->io_base + 4;
 
     em_io_write(hw, io_addr, offset);
     em_io_write(hw, io_data, value);
@@ -4896,77 +4927,6 @@ em_config_dsp_after_link_change(struct em_hw *hw,
         hw->ffe_config_state = em_ffe_config_enabled;
         }
     }
-    return E1000_SUCCESS;
-}
-
-/***************************************************************************
- *
- * Workaround for the 82547 long TTL on noisy 100HD hubs.
- *
- * This function, specific to 82547 hardware only, needs to be called every
- * second.  It checks if a parallel detect fault has occurred.  If a fault
- * occurred, disable/enable the DSP reset mechanism up to 5 times (once per
- * second).  If link is established, stop the workaround and ensure the DSP
- * reset is enabled.
- *
- * hw: Struct containing variables accessed by shared code
- *
- * returns: - E1000_ERR_PHY if fail to read/write the PHY
- *            E1000_SUCCESS in any other case
- *
- ****************************************************************************/
-int32_t
-em_igp_ttl_workaround(struct em_hw *hw)
-{
-    int32_t ret_val;
-    uint16_t phy_data = 0;
-    uint16_t dsp_value = DSP_RESET_ENABLE;
-
-    if(((hw->mac_type != em_82541) && (hw->mac_type != em_82547)) ||
-       (!hw->ttl_wa_activation)) {
-        return E1000_SUCCESS;
-    }
-
-    /* Check for link first */
-    if((ret_val = em_read_phy_reg(hw, PHY_STATUS, &phy_data)))
-        return ret_val;
-
-    if(phy_data & MII_SR_LINK_STATUS) {
-        /* If link is established during the workaround, the DSP mechanism must
-         * be enabled. */
-        if(hw->dsp_reset_counter) {
-            hw->dsp_reset_counter = 0;
-            dsp_value = DSP_RESET_ENABLE;
-        } else
-            return E1000_SUCCESS;
-    } else {
-        if(hw->dsp_reset_counter == 0) {
-            /* Workaround not activated, check if it needs activation */
-            if((ret_val = em_read_phy_reg(hw, PHY_AUTONEG_EXP, &phy_data)))
-                return ret_val;
-            /* Activate the workaround if there was a parallel detect fault */
-            if(phy_data & NWAY_ER_PAR_DETECT_FAULT)
-                hw->dsp_reset_counter++;
-            else
-                return E1000_SUCCESS;
-        }
-
-        if(hw->dsp_reset_counter) {
-            /* After 5 times, stop the workaround */
-            if(hw->dsp_reset_counter > E1000_MAX_DSP_RESETS) {
-                hw->dsp_reset_counter = 0;
-                dsp_value = DSP_RESET_ENABLE;
-            } else {
-                dsp_value = (hw->dsp_reset_counter & 1) ? DSP_RESET_DISABLE :
-                            DSP_RESET_ENABLE;
-                hw->dsp_reset_counter++;
-            }
-        }
-    }
-
-    if((ret_val = em_write_phy_reg(hw, IGP01E1000_PHY_DSP_RESET, dsp_value)))
-        return ret_val;
-
     return E1000_SUCCESS;
 }
 

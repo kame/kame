@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_event.c,v 1.2.2.9 2003/05/08 07:47:16 kbyanc Exp $
+ * $FreeBSD: src/sys/kern/kern_event.c,v 1.2.2.10 2004/04/04 07:03:14 cperciva Exp $
  */
 
 #include <sys/param.h>
@@ -331,8 +331,8 @@ filt_timerattach(struct knote *kn)
 	MALLOC(calloutp, struct callout *, sizeof(*calloutp),
 	    M_KQUEUE, M_WAITOK);
 	callout_init(calloutp);
-	callout_reset(calloutp, tticks, filt_timerexpire, kn);
 	kn->kn_hook = (caddr_t)calloutp;
+	callout_reset(calloutp, tticks, filt_timerexpire, kn);
 
 	return (0);
 }

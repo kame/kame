@@ -1,5 +1,4 @@
-/*	$NetBSD: uplcom.c,v 1.20 2001/07/31 12:33:11 ichiro Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.8.2.3 2003/07/21 11:29:43 akiyama Exp $	*/
+/*	$NetBSD: uplcom.c,v 1.21 2001/11/13 06:24:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -26,6 +25,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.8.2.6 2004/03/01 00:07:22 julian Exp $");
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -71,6 +73,8 @@
  *
  */
 
+#include "opt_uplcom.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -101,9 +105,9 @@
 
 #include <dev/usb/ucomvar.h>
 
+SYSCTL_NODE(_hw_usb, OID_AUTO, uplcom, CTLFLAG_RW, 0, "USB uplcom");
 #ifdef USB_DEBUG
 static int	uplcomdebug = 0;
-SYSCTL_NODE(_hw_usb, OID_AUTO, uplcom, CTLFLAG_RW, 0, "USB uplcom");
 SYSCTL_INT(_hw_usb_uplcom, OID_AUTO, debug, CTLFLAG_RW,
 	   &uplcomdebug, 0, "uplcom debug level");
 
@@ -122,7 +126,9 @@ SYSCTL_INT(_hw_usb_uplcom, OID_AUTO, debug, CTLFLAG_RW,
 #define	UPLCOM_IFACE_INDEX		0
 #define	UPLCOM_SECOND_IFACE_INDEX	1
 
+#ifndef UPLCOM_INTR_INTERVAL
 #define UPLCOM_INTR_INTERVAL		100	/* ms */
+#endif
 
 #define	UPLCOM_SET_REQUEST		0x01
 #define	UPLCOM_SET_CRTSCTS		0x41
@@ -204,6 +210,12 @@ static const struct uplcom_product {
 	{ USB_VENDOR_RATOC, USB_PRODUCT_RATOC_REXUSB60 },
 	/* ELECOM UC-SGT */
 	{ USB_VENDOR_ELECOM, USB_PRODUCT_ELECOM_UCSGT },
+	/* SOURCENEXT KeikaiDenwa 8 */
+	{ USB_VENDOR_SOURCENEXT, USB_PRODUCT_SOURCENEXT_KEIKAI8 },
+	/* SOURCENEXT KeikaiDenwa 8 with charger */
+	{ USB_VENDOR_SOURCENEXT, USB_PRODUCT_SOURCENEXT_KEIKAI8_CHG },
+	/* HAL Corporation Crossam2+USB */
+	{ USB_VENDOR_HAL, USB_PRODUCT_HAL_IMR001 },
 	{ 0, 0 }
 };
 
@@ -229,6 +241,29 @@ DRIVER_MODULE(uplcom, uhub, uplcom_driver, ucom_devclass, usbd_driver_load, 0);
 MODULE_DEPEND(uplcom, usb, 1, 1, 1);
 MODULE_DEPEND(uplcom, ucom, UCOM_MINVER, UCOM_PREFVER, UCOM_MAXVER);
 MODULE_VERSION(uplcom, UPLCOM_MODVER);
+
+static int	uplcominterval = UPLCOM_INTR_INTERVAL;
+
+static int
+sysctl_hw_usb_uplcom_interval(SYSCTL_HANDLER_ARGS)
+{
+	int err, val;
+
+	val = uplcominterval;
+	err = sysctl_handle_int(oidp, &val, sizeof(val), req);
+	if (err != 0 || req->newptr == NULL)
+		return (err);
+	if (0 < val && val <= 1000)
+		uplcominterval = val;
+	else
+		err = EINVAL;
+
+	return (err);
+}
+
+SYSCTL_PROC(_hw_usb_uplcom, OID_AUTO, interval, CTLTYPE_INT | CTLFLAG_RW,
+	    0, sizeof(int), sysctl_hw_usb_uplcom_interval,
+	    "I", "uplcom interrpt pipe interval");
 
 USB_MATCH(uplcom)
 {
@@ -279,7 +314,7 @@ USB_ATTACH(uplcom)
 
 	DPRINTF(("uplcom attach: sc = %p\n", sc));
 
-	/* initialize endpoints */ 
+	/* initialize endpoints */
 	ucom->sc_bulkin_no = ucom->sc_bulkout_no = -1;
 	sc->sc_intr_number = -1;
 	sc->sc_intr_pipe = NULL;
@@ -304,7 +339,7 @@ USB_ATTACH(uplcom)
 	}
 
 	/* get the (first/common) interface */
-	err = usbd_device2interface_handle(dev, UPLCOM_IFACE_INDEX, 
+	err = usbd_device2interface_handle(dev, UPLCOM_IFACE_INDEX,
 					   &ucom->sc_iface);
 	if (err) {
 		printf("%s: failed to get interface: %s\n",
@@ -331,7 +366,7 @@ USB_ATTACH(uplcom)
 		    UE_GET_XFERTYPE(ed->bmAttributes) == UE_INTERRUPT) {
 			sc->sc_intr_number = ed->bEndpointAddress;
 			sc->sc_isize = UGETW(ed->wMaxPacketSize);
-		} 
+		}
 	}
 
 	if (sc->sc_intr_number == -1) {
@@ -353,11 +388,11 @@ USB_ATTACH(uplcom)
 	 *  Interrupt(0x81) | Interrupt(0x81)
 	 * -----------------+ BulkIN(0x02)
 	 * Interface 1	    | BulkOUT(0x83)
-	 *   BulkIN(0x02)   | 
+	 *   BulkIN(0x02)   |
 	 *   BulkOUT(0x83)  |
 	 */
 	if (cdesc->bNumInterface == 2) {
-		err = usbd_device2interface_handle(dev, 
+		err = usbd_device2interface_handle(dev,
 						   UPLCOM_SECOND_IFACE_INDEX,
 						   &ucom->sc_iface);
 		if (err) {
@@ -366,7 +401,7 @@ USB_ATTACH(uplcom)
 			ucom->sc_dying = 1;
 			goto error;
 		}
-	} 
+	}
 
 	/* Find the bulk{in,out} endpoints */
 
@@ -468,9 +503,9 @@ uplcom_reset(struct uplcom_softc *sc)
 	req.bRequest = UPLCOM_SET_REQUEST;
 	USETW(req.wValue, 0);
 	USETW(req.wIndex, sc->sc_iface_number);
-	USETW(req.wLength, 0); 
+	USETW(req.wLength, 0);
 
-	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, 0); 
+	err = usbd_do_request(sc->sc_ucom.sc_udev, &req, 0);
 	if (err) {
 		printf("%s: uplcom_reset: %s\n",
 		       USBDEVNAME(sc->sc_ucom.sc_dev), usbd_errstr(err));
@@ -677,7 +712,7 @@ uplcom_open(void *addr, int portno)
 {
 	struct uplcom_softc *sc = addr;
 	int err;
-	
+
 	if (sc->sc_ucom.sc_dying)
 		return (ENXIO);
 
@@ -694,7 +729,7 @@ uplcom_open(void *addr, int portno)
 					  sc->sc_intr_buf,
 					  sc->sc_isize,
 					  uplcom_intr,
-					  UPLCOM_INTR_INTERVAL);
+					  uplcominterval);
 		if (err) {
 			printf("%s: cannot open interrupt pipe (addr %d)\n",
 			       USBDEVNAME(sc->sc_ucom.sc_dev),
@@ -707,7 +742,7 @@ uplcom_open(void *addr, int portno)
 }
 
 Static void
-uplcom_close(void *addr, int portno) 
+uplcom_close(void *addr, int portno)
 {
 	struct uplcom_softc *sc = addr;
 	int err;

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.32.2.17 2003/10/22 14:43:52 jhb Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.32.2.21 2003/12/31 18:05:16 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -146,6 +146,7 @@ ata_pci_match(device_t dev)
     case 0x248b8086:
 	return "Intel ICH3 ATA100 controller";
 
+    case 0x24ca8086:
     case 0x24cb8086:
 	return "Intel ICH4 ATA100 controller";
 
@@ -189,7 +190,12 @@ ata_pci_match(device_t dev)
 	    return "VIA 8233 ATA133 controller";
 	if (ata_find_dev(dev, 0x31771106, 0))
 	    return "VIA 8235 ATA133 controller";
+	if (ata_find_dev(dev, 0x31491106, 0))
+	    return "VIA 8237 ATA133 controller";
 	return "VIA Apollo ATA controller";
+
+    case 0x31491106:
+	return "VIA 8237 SATA150 controller";
 
     case 0x55131039:
 	if (ata_find_dev(dev, 0x06301039, 0x30) ||
@@ -242,8 +248,17 @@ ata_pci_match(device_t dev)
     case 0x74411022:
 	return "AMD 768 ATA100 controller";
 
+    case 0x74691022:
+	return "AMD 8111 ATA133 controller";
+
     case 0x01bc10de:
 	return "nVIDIA nForce ATA100 controller";
+
+    case 0x006510de:
+	return "nVIDIA nForce2 ATA133 controller";
+
+    case 0x00d510de:
+	return "nVIDIA nForce2 ATA133 controller";
 
     case 0x02111166:
 	return "ServerWorks ROSB4 ATA33 controller";
@@ -253,6 +268,12 @@ ata_pci_match(device_t dev)
 	    return "ServerWorks CSB5 ATA100 controller";
 	else
 	    return "ServerWorks CSB5 ATA66 controller";
+
+    case 0x02131166:
+	return "ServerWorks CSB6 ATA100 controller (channel 0+1)";
+
+    case 0x02171166:
+	return "ServerWorks CSB6 ATA66 controller (channel 2)";
 
     case 0x4d33105a:
 	return "Promise ATA33 controller";
@@ -577,10 +598,13 @@ ata_pci_intr(struct ata_channel *ch)
 
     case 0x06481095:	/* CMD 648 */
     case 0x06491095:	/* CMD 649 */
-	if (!(pci_read_config(device_get_parent(ch->dev), 0x71, 1) &
-	      (ch->unit ? 0x08 : 0x04)))
-	    return 1;
-	break;
+        if (!(pci_read_config(device_get_parent(ch->dev), 0x71, 1) &
+              (ch->unit ? 0x08 : 0x04)))
+            return 1;
+        pci_write_config(device_get_parent(ch->dev), 0x71, 
+                  pci_read_config(device_get_parent(ch->dev), 0x71, 1) & 
+                  ~(ch->unit ? 0x04 : 0x08), 1);
+        break;
 
     case 0x06801095:	/* SiI 680 */
 	if (!(pci_read_config(device_get_parent(ch->dev),

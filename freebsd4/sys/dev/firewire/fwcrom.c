@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
@@ -30,9 +30,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/dev/firewire/fwcrom.c,v 1.2.2.3 2003/06/20 08:25:27 simokawa Exp $
  */
+
+#ifdef __FreeBSD__
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/firewire/fwcrom.c,v 1.2.2.5 2004/03/28 11:50:42 simokawa Exp $");
+#endif
 
 #include <sys/param.h>
 #if defined(_KERNEL) || defined(TEST)
@@ -49,8 +52,14 @@
 #include <stdlib.h>
 #include <string.h>
 #endif
+
+#ifdef __DragonFly__
+#include "firewire.h"
+#include "iec13213.h"
+#else
 #include <dev/firewire/firewire.h>
 #include <dev/firewire/iec13213.h>
+#endif
 
 #define MAX_ROM (1024 - sizeof(u_int32_t) * 5)
 #define CROM_END(cc) ((vm_offset_t)(cc)->stack[0].dir + MAX_ROM - 1)
@@ -61,9 +70,10 @@ crom_init_context(struct crom_context *cc, u_int32_t *p)
 	struct csrhdr *hdr;
 
 	hdr = (struct csrhdr *)p;
-	if (hdr->info_len == 1) {
-		/* minimum ROM */
+	if (hdr->info_len <= 1) {
+		/* minimum or invalid ROM */
 		cc->depth = -1;
+		return;
 	}
 	p += 1 + hdr->info_len;
 
@@ -423,6 +433,7 @@ crom_add_chunk(struct crom_src *src, struct crom_chunk *parent,
 	return(index);
 }
 
+#define MAX_TEXT ((CROM_MAX_CHUNK_LEN + 1) * 4 - sizeof(struct csrtext))
 int
 crom_add_simple_text(struct crom_src *src, struct crom_chunk *parent,
 				struct crom_chunk *chunk, char *buf)
@@ -430,11 +441,11 @@ crom_add_simple_text(struct crom_src *src, struct crom_chunk *parent,
 	struct csrtext *tl;
 	u_int32_t *p;
 	int len, i;
+	char t[MAX_TEXT];
 
 	len = strlen(buf);
-#define MAX_TEXT ((CROM_MAX_CHUNK_LEN + 1) * 4 - sizeof(struct csrtext))
 	if (len > MAX_TEXT) {
-#if __FreeBSD_version < 500000
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 		printf("text(%d) trancated to %d.\n", len, MAX_TEXT);
 #else
 		printf("text(%d) trancated to %td.\n", len, MAX_TEXT);
@@ -447,7 +458,9 @@ crom_add_simple_text(struct crom_src *src, struct crom_chunk *parent,
 	tl->spec_id = 0;
 	tl->spec_type = 0;
 	tl->lang_id = 0;
-	p = (u_int32_t *) buf;
+	bzero(&t[0], roundup2(len, sizeof(u_int32_t)));
+	bcopy(buf, &t[0], len);
+	p = (u_int32_t *)&t[0];
 	for (i = 0; i < howmany(len, sizeof(u_int32_t)); i ++)
 		tl->text[i] = ntohl(*p++);
 	return (crom_add_chunk(src, parent, chunk, CROM_TEXTLEAF));
@@ -570,9 +583,15 @@ main () {
 	/* private company_id */
 	crom_add_entry(&root, CSRKEY_VENDOR, 0xacde48);
 
+#ifdef __DragonFly__
+	crom_add_simple_text(&src, &root, &text1, "DragonFly");
+	crom_add_entry(&root, CSRKEY_HW, __DragonFly_cc_version);
+	crom_add_simple_text(&src, &root, &text2, "DragonFly-1");
+#else
 	crom_add_simple_text(&src, &root, &text1, "FreeBSD");
 	crom_add_entry(&root, CSRKEY_HW, __FreeBSD_version);
 	crom_add_simple_text(&src, &root, &text2, "FreeBSD-5");
+#endif
 
 	/* SBP unit directory */
 	crom_add_chunk(&src, &root, &unit1, CROM_UDIR);

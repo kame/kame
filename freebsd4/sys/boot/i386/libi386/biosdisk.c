@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/biosdisk.c,v 1.26.2.6 2000/12/28 13:10:47 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/biosdisk.c,v 1.26.2.7 2004/01/28 16:28:50 jhb Exp $
  */
 
 /*
@@ -835,7 +835,7 @@ bd_read(struct open_disk *od, daddr_t dblk, int blks, caddr_t dest)
 	 */
 	x = min(FLOPPY_BOUNCEBUF, (unsigned)blks);
 	bbuf = malloc(x * 2 * BIOSDISK_SECSIZE);
-	if (((u_int32_t)VTOP(bbuf) & 0xffff0000) == ((u_int32_t)VTOP(dest + x * BIOSDISK_SECSIZE) & 0xffff0000)) {
+	if (((u_int32_t)VTOP(bbuf) & 0xffff0000) == ((u_int32_t)VTOP(bbuf + x * BIOSDISK_SECSIZE) & 0xffff0000)) {
 	    breg = bbuf;
 	} else {
 	    breg = bbuf + x * BIOSDISK_SECSIZE;

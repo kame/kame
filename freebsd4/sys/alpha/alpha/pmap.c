@@ -43,7 +43,7 @@
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
  *	from:	i386 Id: pmap.c,v 1.193 1998/04/19 15:22:48 bde Exp
  *		with some ideas from NetBSD's alpha pmap
- * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.9 2002/03/06 22:48:49 silby Exp $
+ * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.9.10.1 2004/04/30 03:05:35 kensmith Exp $
  */
 
 /*
@@ -2232,7 +2232,7 @@ pmap_kenter_temporary(vm_offset_t pa, int i)
  * faults on process startup and immediately after an mmap.
  */
 void
-pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
+pmap_object_init_pt(pmap_t pmap, vm_offset_t addr, vm_prot_t prot,
 		    vm_object_t object, vm_pindex_t pindex,
 		    vm_size_t size, int limit)
 {
@@ -2241,7 +2241,7 @@ pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
 	vm_page_t p, mpte;
 	int objpgs;
 
-	if (pmap == NULL || object == NULL)
+	if ((prot & VM_PROT_READ) == 0 || pmap == NULL || object == NULL)
 		return;
 
 	psize = alpha_btop(size);

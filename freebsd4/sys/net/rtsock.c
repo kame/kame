@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rtsock.c	8.7 (Berkeley) 10/12/95
- * $FreeBSD: src/sys/net/rtsock.c,v 1.44.2.11 2002/12/04 14:05:41 ru Exp $
+ * $FreeBSD: src/sys/net/rtsock.c,v 1.44.2.14 2004/04/20 23:40:14 luigi Exp $
  */
 
 
@@ -319,7 +319,7 @@ route_output(m, so)
 	if (genmask) {
 		struct radix_node *t;
 		t = rn_addmask((caddr_t)genmask, 0, 1);
-		if (t && Bcmp((caddr_t *)genmask + 1, (caddr_t *)t->rn_key + 1,
+		if (t && Bcmp((caddr_t)genmask + 1, (caddr_t)t->rn_key + 1,
 			      *(u_char *)t->rn_key - 1) == 0)
 			genmask = (struct sockaddr *)(t->rn_key);
 		else
@@ -330,8 +330,8 @@ route_output(m, so)
 	 * Verify that the caller has the appropriate privilege; RTM_GET
 	 * is the only operation the non-superuser is allowed.
 	 */
-	if (rtm->rtm_type != RTM_GET && suser_xxx(so->so_cred, NULL, 0) != 0)
-		senderr(EPERM);
+	if (rtm->rtm_type != RTM_GET && (error = suser(curproc)) != 0)
+		senderr(error);
 
 	switch (rtm->rtm_type) {
 
@@ -754,7 +754,7 @@ rt_ifmsg(ifp)
 		return;
 	ifm = mtod(m, struct if_msghdr *);
 	ifm->ifm_index = ifp->if_index;
-	ifm->ifm_flags = (u_short)ifp->if_flags;
+	ifm->ifm_flags = (ifp->if_ipending & ~0xffff) | (u_short)ifp->if_flags;
 	ifm->ifm_data = ifp->if_data;
 	ifm->ifm_addrs = 0;
 	route_proto.sp_protocol = 0;
@@ -955,7 +955,8 @@ sysctl_iflist(af, w)
 
 			ifm = (struct if_msghdr *)w->w_tmem;
 			ifm->ifm_index = ifp->if_index;
-			ifm->ifm_flags = (u_short)ifp->if_flags;
+			ifm->ifm_flags = (ifp->if_ipending & ~0xffff) |
+			    (u_short)ifp->if_flags;
 			ifm->ifm_data = ifp->if_data;
 			ifm->ifm_addrs = info.rti_addrs;
 			error = SYSCTL_OUT(w->w_req,(caddr_t)ifm, len);

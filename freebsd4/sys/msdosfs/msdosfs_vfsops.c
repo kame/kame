@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.7 2003/08/16 18:43:21 trhodes Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.9 2004/04/02 16:56:10 rwatson Exp $ */
 /*	$NetBSD: msdosfs_vfsops.c,v 1.51 1997/11/17 15:36:58 ws Exp $	*/
 
 /*-
@@ -492,7 +492,7 @@ mountmsdosfs(devvp, mp, p, argp)
 #endif
 		/* XXX - We should probably check more values here */
 		if (!pmp->pm_BytesPerSec || !SecPerClust
-			|| !pmp->pm_Heads || pmp->pm_Heads > 255
+			|| !pmp->pm_Heads
 #ifdef PC98
 	    		|| !pmp->pm_SecPerTrack || pmp->pm_SecPerTrack > 255) {
 #else
@@ -672,9 +672,11 @@ mountmsdosfs(devvp, mp, p, argp)
 		if (!bcmp(fp->fsisig1, "RRaA", 4)
 		    && !bcmp(fp->fsisig2, "rrAa", 4)
 		    && !bcmp(fp->fsisig3, "\0\0\125\252", 4)
-		    && !bcmp(fp->fsisig4, "\0\0\125\252", 4))
+		    && !bcmp(fp->fsisig4, "\0\0\125\252", 4)) {
 			pmp->pm_nxtfree = getulong(fp->fsinxtfree);
-		else
+			if (pmp->pm_nxtfree == 0xffffffff)
+				pmp->pm_nxtfree = CLUST_FIRST;
+		} else
 			pmp->pm_fsinfo = 0;
 		brelse(bp);
 		bp = NULL;

@@ -23,10 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/ac97.h,v 1.3.2.10 2003/02/07 16:26:45 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/ac97.h,v 1.3.2.11 2004/01/20 17:49:24 gshapiro Exp $
  */
 
-#define AC97_MUTE	0x8000
+#define AC97_MUTE	0x8080
 
 #define AC97_REG_RESET	0x00
 #define		AC97_CAP_MICCHANNEL	(1 << 0)

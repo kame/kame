@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.40 2003/08/22 20:52:47 jhb Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.43 2004/04/07 08:39:06 rik Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -93,6 +93,12 @@ dev/aic/aic_isa.c		optional	aic isa
 dev/ar/if_ar_isa.c		optional	ar isa
 dev/dgb/dgm.c			optional	dgm
 dev/cm/if_cm_isa.c		optional	cm isa
+dev/ctau/ctau.c			optional	ctau
+dev/ctau/ctddk.c		optional	ctau
+dev/ctau/if_ct.c		optional	ctau
+dev/cx/csigma.c			optional	cx
+dev/cx/cxddk.c			optional	cx
+dev/cx/if_cx.c			optional	cx
 dev/ed/if_ed.c			optional	ed
 dev/ed/if_ed_isa.c		optional	ed isa
 dev/ed/if_ed_pccard.c		optional	ed card
@@ -210,6 +216,7 @@ i386/i386/mpapic.c		optional	smp
 i386/i386/mpboot.s		optional	smp
 i386/i386/mplock.s		optional	smp
 i386/i386/nexus.c		standard
+i386/i386/p4tcc.c		optional	cpu_enable_tcc
 i386/i386/perfmon.c		optional	perfmon
 i386/i386/perfmon.c		optional	perfmon	profiling-routine
 i386/i386/pmap.c		standard
@@ -245,16 +252,13 @@ i386/isa/asc.c			optional	asc
 i386/isa/atapi.c		optional	wdc	\
 	warning "The wdc driver is obsolete.  Please use the ata driver!"
 i386/isa/clock.c		standard
-i386/isa/cronyx.c		optional	cx
 i386/isa/ctx.c			optional	ctx
-i386/isa/cx.c			optional	cx
 i386/isa/cy.c			optional	cy
 i386/isa/elink.c		optional	ep
 i386/isa/elink.c		optional	ie
 isa/fd.c			optional	fd
 i386/isa/gpib.c			optional	gp
 i386/isa/gsc.c			optional	gsc
-i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		optional	el
 i386/isa/if_le.c		optional	le
 i386/isa/if_lnc.c		optional	lnc

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.15 2003/09/07 21:39:22 pb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.20 2004/04/19 19:28:18 cperciva Exp $");
 
 /*
  * PCI "universal" communications card driver configuration data (used to
@@ -702,6 +702,29 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
 	    },
 	},
+	/*
+	 * VScom (Titan?) PCI-800L.  More modern variant of the
+	 * PCI-800.  Uses 6 discrete 16550 UARTs, plus another
+	 * two of them obviously implemented as macro cells in
+	 * the ASIC.  This causes the weird port access pattern
+	 * below, where two of the IO port ranges each access
+	 * one of the ASIC UARTs, and a block of IO addresses
+	 * access the external UARTs.
+	 */
+	{   "Titan VScom PCI-800L",
+	    {   0x14d2, 0x8080, 0x14d2, 0x8080  },
+	    {   0xffff, 0xffff, 0xffff, 0xffff  },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x18, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x20, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x28, COM_FREQ * 8 },
+	    },
+	},
 
 	/* NEC PK-UG-X001 K56flex PCI Modem card.
 	   NEC MARTH bridge chip and Rockwell RCVDL56ACF/SP using. */
@@ -812,12 +835,48 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* Oxford Semiconductor OX16PCI954 PCI UARTs */
+	{   "Oxford Semiconductor OX16PCI954 UARTs",
+	    {	0x1415,	0x950a,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+	    },
+	},
+
 	/* Oxford Semiconductor OX16PCI954 PCI Parallel port */
 	{   "Oxford Semiconductor OX16PCI954 Parallel port",
 	    {	0x1415,	0x9513,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
 	    {
 		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+	    },
+	},
+
+	/* Oxford Semiconductor OX12PCI840 PCI Parallel port */
+	{   "Qxford Semiconductor OX12PCI840 Parallel port",
+		{   0x1415, 0x8403, 0,      0       },
+		{   0xffff, 0xffff, 0,      0 },
+		{
+		    { PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+		},
+	},
+
+	/*
+	 * Oxford Semiconductor OX9160/OX16PCI954 PCI UARTS
+	 * second chip on Exsys EX-41098 8x cards
+	 */
+	{   "Oxford Semiconductor OX9160/OX16PCI954 UARTs (function 1)",
+	    {	0x1415,	0x9511,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
 	    },
 	},
 
@@ -870,6 +929,30 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* Moxa Technologies Co., Ltd. PCI I/O Card 4S RS232 */
+	{   "Moxa Technologies, Smartio C104H/PCI",
+	    {   0x1393, 0x1040, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0,      },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+	    },
+	},
+
+	/* Moxa Technologies Co., Ltd. PCI I/O Card 4S RS232 */
+	{   "Moxa Technologies, Smartio CP-104UL/PCI",
+		{   0x1393, 0x1041, 0,      0       },
+		{   0xffff, 0xffff, 0,      0,      },
+		{
+			{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+			{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+			{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+			{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+		},
+	},
+
 	/* Moxa Technologies Co., Ltd. PCI I/O Card 4S RS232/422/485 */
 	{   "Moxa Technologies, Industio CP-114",
 	    {	0x1393,	0x1141,	0,	0	},
@@ -916,7 +999,7 @@ const struct puc_device_description puc_devices[] = {
 
 	{   "Avlab Technology, PCI IO 2S",
 	    {	0x14db,	0x2130,	0,	0	},
-	    {	0xffff,	0xffff,	0,	0	},
+	    {	0xffff,	0xfffc,	0,	0	},
 	    {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
@@ -954,6 +1037,38 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x1c, 0x08, COM_FREQ },
 	    },
+	},
+
+	{   "IC Book Labs Ironclad x8 Lite",
+	    {   0xb00c, 0x041c, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ }
+	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07 },
+	},
+
+	{   "IC Book Labs Ironclad x8 Pro",
+	    {   0xb00c, 0x051c, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ }
+	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07 },
 	},
 
 	{   "IC Book Labs Dreadnought x16 Lite",
@@ -1002,6 +1117,15 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x78, COM_FREQ * 8, 0x200000 },
 	    },
 	    PUC_ILR_TYPE_DIGI, { 0x07, 0x47 },
+	},
+
+	{   "Sunix SUN1889",
+	    {	0x0009,	0x7168,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8 },
+	    },
 	},
 
 	{ 0 }

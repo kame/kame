@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_tran.h,v 1.1.2.1 2001/05/22 08:32:34 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_tran.h,v 1.1.2.2 2004/01/10 04:17:50 tjr Exp $
  */
 
 #ifndef _NETSMB_SMB_TRAN_H_
@@ -49,6 +49,7 @@
 #define	SMBTP_RCVSZ	2		/* R  - int */
 #define	SMBTP_TIMEOUT	3		/* RW - struct timespec */
 #define	SMBTP_SELECTID	4		/* RW - (void *) */
+#define SMBTP_UPCALL	5		/* RW - (* void)(void *) */
 
 struct smb_tran_ops;
 

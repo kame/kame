@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/netbios.h,v 1.1.2.2 2002/04/22 04:24:25 bp Exp $
+ * $FreeBSD: src/sys/netsmb/netbios.h,v 1.1.2.3 2004/01/10 04:17:50 tjr Exp $
  */
 #ifndef _NETSMB_NETBIOS_H_
 #define	_NETSMB_NETBIOS_H_
@@ -96,7 +96,7 @@
 #define	NBNS_NMFLAG_BCAST	0x01
 #define	NBNS_NMFLAG_RA		0x08	/* recursion available */
 #define	NBNS_NMFLAG_RD		0x10	/* recursion desired */
-#define	NBNS_NMFLAG_TC		0x20	/* truncation occured */
+#define	NBNS_NMFLAG_TC		0x20	/* truncation occurred */
 #define	NBNS_NMFLAG_AA		0x40	/* authoritative answer */
 
 /* 

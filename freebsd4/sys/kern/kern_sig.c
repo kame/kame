@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.17 2003/05/16 16:34:34 obrien Exp $
+ * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.18 2004/01/24 18:56:44 rwatson Exp $
  */
 
 #include "opt_compat.h"
@@ -1623,7 +1623,7 @@ coredump(p)
 	 */
 	limit = p->p_rlimit[RLIMIT_CORE].rlim_cur;
 	if (limit == 0)
-		return 0;
+		return EFBIG;
 
 	name = expand_name(p->p_comm, p->p_ucred->cr_uid, p->p_pid);
 	if (name == NULL)

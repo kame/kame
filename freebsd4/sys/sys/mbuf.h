@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.22 2003/09/13 05:52:47 silby Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.24 2004/02/10 17:37:11 bms Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -582,6 +582,8 @@ extern	int		 nmbufs;
 extern	int		 nsfbufs;
 
 void		 m_adj(struct mbuf *, int);
+int		 m_apply(struct mbuf *, int, int,
+		    int (*)(void *, void *, unsigned int), void *);
 void		 m_cat(struct mbuf *, struct mbuf *);
 int		 m_clalloc(int, int);
 caddr_t		 m_clalloc_wait(void);
@@ -603,6 +605,7 @@ struct  mbuf	*m_getcl(int how, short type, int flags);
 struct	mbuf	*m_getclr(int, int);
 struct	mbuf	*m_gethdr(int, int);
 struct	mbuf	*m_getm(struct mbuf *, int, int, int);
+struct	mbuf	*m_getptr(struct mbuf *, int, int *);
 u_int		m_length(struct mbuf *, struct mbuf **);
 int		 m_mballoc(int, int);
 struct	mbuf	*m_mballoc_wait(int, int);

@@ -23,12 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.13 2002/10/05 18:31:49 scottl Exp $
+ * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.14 2004/04/04 04:38:26 nyan Exp $
  */
 
 #include "vt.h"
 #include "wdc.h"
-#include "cx.h"
 #include "el.h"
 #include "le.h"
 #include "lnc.h"
@@ -78,7 +77,6 @@ struct old_isa_driver {
 
 extern struct isa_driver  vtdriver;
 extern struct isa_driver wdcdriver;
-extern struct isa_driver  cxdriver;
 extern struct isa_driver  eldriver;
 extern struct isa_driver  ledriver;
 extern struct isa_driver lncdriver;
@@ -198,9 +196,6 @@ static struct old_isa_driver old_drivers[] = {
 #endif
 #if NLNC > 0
 	{ INTR_TYPE_NET, &lncdriver },
-#endif
-#if NCX > 0
-	{ INTR_TYPE_NET, &cxdriver },
 #endif
 #if NEL > 0
 	{ INTR_TYPE_NET, &eldriver },

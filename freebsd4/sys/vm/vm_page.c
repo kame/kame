@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
- * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.20 2003/09/25 18:55:27 silby Exp $
+ * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.21 2003/10/31 20:12:11 tegge Exp $
  */
 
 /*
@@ -1404,7 +1404,8 @@ vm_page_cache(vm_page_t m)
 {
 	int s;
 
-	if ((m->flags & (PG_BUSY|PG_UNMANAGED)) || m->busy || m->wire_count) {
+	if ((m->flags & (PG_BUSY|PG_UNMANAGED)) || m->busy ||
+	    m->hold_count || m->wire_count) {
 		printf("vm_page_cache: attempting to cache busy page\n");
 		return;
 	}

@@ -31,14 +31,14 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohcivar.h,v 1.1.2.7 2003/06/30 06:35:56 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohcivar.h,v 1.1.2.10 2004/03/28 11:50:42 simokawa Exp $
  *
  */
 
-#if __FreeBSD_version >= 500000
-#define FWOHCI_TASKQUEUE        1
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 #define FWOHCI_TASKQUEUE        0
+#else
+#define FWOHCI_TASKQUEUE        1
 #endif
 #if FWOHCI_TASKQUEUE
 #include <sys/taskqueue.h>
@@ -49,8 +49,9 @@ typedef struct fwohci_softc {
 	bus_space_tag_t bst;
 	bus_space_handle_t bsh;
 	void *ih;
-#if __FreeBSD_version < 500000
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 	void *ih_cam;
+	void *ih_bio;
 #endif
 	struct resource *bsr;
 	struct resource *irq_res;
@@ -82,10 +83,10 @@ typedef struct fwohci_softc {
 #endif
 } fwohci_softc_t;
 
-void fwohci_intr __P((void *arg));
-int fwohci_init __P((struct fwohci_softc *, device_t));
-void fwohci_poll __P((struct firewire_comm *, int, int));
-void fwohci_reset __P((struct fwohci_softc *, device_t));
-int fwohci_detach __P((struct fwohci_softc *, device_t));
-int fwohci_resume __P((struct fwohci_softc *, device_t));
-int fwohci_stop __P((struct fwohci_softc *, device_t dev));
+void fwohci_intr (void *arg);
+int fwohci_init (struct fwohci_softc *, device_t);
+void fwohci_poll (struct firewire_comm *, int, int);
+void fwohci_reset (struct fwohci_softc *, device_t);
+int fwohci_detach (struct fwohci_softc *, device_t);
+int fwohci_resume (struct fwohci_softc *, device_t);
+int fwohci_stop (struct fwohci_softc *, device_t dev);

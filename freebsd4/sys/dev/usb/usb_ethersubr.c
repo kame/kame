@@ -28,9 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4.2.4 2002/11/06 14:23:20 joe Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4.2.5 2004/03/01 00:07:22 julian Exp $");
 
 /*
  * Callbacks in the USB code operate at splusb() (actually splbio()
@@ -50,6 +51,9 @@
  * properly.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4.2.5 2004/03/01 00:07:22 julian Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -66,11 +70,6 @@
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usb_ethersubr.h>
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4.2.4 2002/11/06 14:23:20 joe Exp $";
-#endif
 
 Static struct ifqueue usbq_rx;
 Static struct ifqueue usbq_tx;

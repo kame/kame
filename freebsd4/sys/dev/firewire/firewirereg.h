@@ -31,11 +31,14 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.1.2.17 2003/08/18 03:52:42 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.1.2.20 2004/03/28 11:50:42 simokawa Exp $
  *
  */
 
-#if __FreeBSD_version >= 500000
+#ifdef __DragonFly__
+typedef	d_thread_t fw_proc;
+#include <sys/select.h>
+#elif __FreeBSD_version >= 500000
 typedef	struct thread fw_proc;
 #include <sys/selinfo.h>
 #else
@@ -68,7 +71,7 @@ struct fw_device{
 };
 
 struct firewire_softc {
-#if __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	dev_t dev;
 #endif
 	struct firewire_comm *fc;
@@ -81,8 +84,8 @@ struct firewire_softc {
 struct firewire_dev_comm {
 	device_t dev;
 	struct firewire_comm *fc;
-	void (*post_busreset) __P((void *));
-	void (*post_explore) __P((void *));
+	void (*post_busreset) (void *);
+	void (*post_explore) (void *);
 };
 
 struct tcode_info {
@@ -136,7 +139,6 @@ struct firewire_comm{
 	STAILQ_HEAD(, tlabel) tlabels[0x40];
 	STAILQ_HEAD(, fw_bind) binds;
 	STAILQ_HEAD(, fw_device) devices;
-	STAILQ_HEAD(, fw_xfer)	pending;
 	u_int  sid_cnt;
 #define CSRSIZE 0x4000
 	u_int32_t csr_arc[CSRSIZE/4];
@@ -151,19 +153,19 @@ struct firewire_comm{
 	struct callout bmr_callout;
 	struct callout timeout_callout;
 	struct callout retry_probe_callout;
-	u_int32_t (*cyctimer) __P((struct  firewire_comm *));
-	void (*ibr) __P((struct firewire_comm *));
-	u_int32_t (*set_bmr) __P((struct firewire_comm *, u_int32_t));
-	int (*ioctl) __P((dev_t, u_long, caddr_t, int, fw_proc *));
-	int (*irx_enable) __P((struct firewire_comm *, int));
-	int (*irx_disable) __P((struct firewire_comm *, int));
-	int (*itx_enable) __P((struct firewire_comm *, int));
-	int (*itx_disable) __P((struct firewire_comm *, int));
-	void (*timeout) __P((void *));
-	void (*poll) __P((struct firewire_comm *, int, int));
-	void (*set_intr) __P((struct firewire_comm *, int));
-	void (*irx_post) __P((struct firewire_comm *, u_int32_t *));
-	void (*itx_post) __P((struct firewire_comm *, u_int32_t *));
+	u_int32_t (*cyctimer) (struct  firewire_comm *);
+	void (*ibr) (struct firewire_comm *);
+	u_int32_t (*set_bmr) (struct firewire_comm *, u_int32_t);
+	int (*ioctl) (dev_t, u_long, caddr_t, int, fw_proc *);
+	int (*irx_enable) (struct firewire_comm *, int);
+	int (*irx_disable) (struct firewire_comm *, int);
+	int (*itx_enable) (struct firewire_comm *, int);
+	int (*itx_disable) (struct firewire_comm *, int);
+	void (*timeout) (void *);
+	void (*poll) (struct firewire_comm *, int, int);
+	void (*set_intr) (struct firewire_comm *, int);
+	void (*irx_post) (struct firewire_comm *, u_int32_t *);
+	void (*itx_post) (struct firewire_comm *, u_int32_t *);
 	struct tcode_info *tcode;
 	bus_dma_tag_t dmat;
 };
@@ -189,7 +191,7 @@ struct fw_xferq {
 
 #define FWXFERQ_HANDLER (1 << 16)
 #define FWXFERQ_WAKEUP (1 << 17)
-	void (*start) __P((struct firewire_comm*));
+	void (*start) (struct firewire_comm*);
 	int dmach;
 	STAILQ_HEAD(, fw_xfer) q;
 	u_int queued;
@@ -206,7 +208,7 @@ struct fw_xferq {
 	struct fw_bulkxfer *stproc;
 	struct selinfo rsel;
 	caddr_t sc;
-	void (*hand) __P((struct fw_xferq *));
+	void (*hand) (struct fw_xferq *);
 };
 
 struct fw_bulkxfer{
@@ -224,7 +226,8 @@ struct tlabel{
 };
 
 struct fw_bind{
-	u_int32_t start_hi, start_lo, addrlen;
+	u_int64_t start;
+	u_int64_t end;
 	STAILQ_HEAD(, fw_xfer) xferlist;
 	STAILQ_ENTRY(fw_bind) fclist;
 	STAILQ_ENTRY(fw_bind) chlist;
@@ -240,9 +243,6 @@ struct fw_xfer{
 	struct firewire_comm *fc;
 	struct fw_xferq *q;
 	struct timeval tv;
-	/* XXX should be removed */
-	u_int32_t dst; /* XXX for if_fwe */
-	u_int8_t spd;
 	int8_t resp;
 #define FWXF_INIT 0
 #define FWXF_INQ 1
@@ -254,53 +254,89 @@ struct fw_xfer{
 	u_int8_t state;
 	u_int8_t retry;
 	u_int8_t tl;
-	void (*retry_req) __P((struct fw_xfer *));
+	void (*retry_req) (struct fw_xfer *);
 	union{
-		void (*hand) __P((struct fw_xfer *));
+		void (*hand) (struct fw_xfer *);
 	} act;
 	struct {
-		int len;
-		caddr_t buf;
+		struct fw_pkt hdr;
+		u_int32_t *payload;
+		u_int16_t pay_len;
+		u_int8_t spd;
 	} send, recv;
 	struct mbuf *mbuf;
 	STAILQ_ENTRY(fw_xfer) link;
 	struct malloc_type *malloc;
 };
-void fw_sidrcv __P((struct firewire_comm *, u_int32_t *, u_int));
-void fw_rcv __P((struct firewire_comm *, struct iovec *, int, u_int, u_int));
-void fw_xfer_unload __P(( struct fw_xfer*));
-void fw_xfer_free __P(( struct fw_xfer*));
-struct fw_xfer *fw_xfer_alloc __P((struct malloc_type *));
-struct fw_xfer *fw_xfer_alloc_buf __P((struct malloc_type *, int, int));
-void fw_init __P((struct firewire_comm *));
-int fw_tbuf_update __P((struct firewire_comm *, int, int));
-int fw_rbuf_update __P((struct firewire_comm *, int, int));
-void fw_asybusy __P((struct fw_xfer *));
-int fw_bindadd __P((struct firewire_comm *, struct fw_bind *));
-int fw_bindremove __P((struct firewire_comm *, struct fw_bind *));
-int fw_asyreq __P((struct firewire_comm *, int, struct fw_xfer*));
-void fw_busreset __P((struct firewire_comm *));
-u_int16_t fw_crc16 __P((u_int32_t *, u_int32_t));
-void fw_xfer_timeout __P((void *));
-void fw_xfer_done __P((struct fw_xfer *));
-void fw_asy_callback __P((struct fw_xfer *));
-struct fw_device *fw_noderesolve_nodeid __P((struct firewire_comm *, int));
-struct fw_device *fw_noderesolve_eui64 __P((struct firewire_comm *, struct fw_eui64 *));
-struct fw_bind *fw_bindlookup __P((struct firewire_comm *, u_int32_t, u_int32_t));
-void fw_drain_txq __P((struct firewire_comm *));
-int fwdev_makedev __P((struct firewire_softc *));
-int fwdev_destroydev __P((struct firewire_softc *));
-void fwdev_clone __P((void *, char *, int, dev_t *));
+
+struct fw_rcv_buf {
+	struct firewire_comm *fc;
+	struct fw_xfer *xfer;
+	struct iovec *vec;
+	u_int nvec;
+	u_int8_t spd;
+};
+
+void fw_sidrcv (struct firewire_comm *, u_int32_t *, u_int);
+void fw_rcv (struct fw_rcv_buf *);
+void fw_xfer_unload ( struct fw_xfer*);
+void fw_xfer_free_buf ( struct fw_xfer*);
+void fw_xfer_free ( struct fw_xfer*);
+struct fw_xfer *fw_xfer_alloc (struct malloc_type *);
+struct fw_xfer *fw_xfer_alloc_buf (struct malloc_type *, int, int);
+void fw_init (struct firewire_comm *);
+int fw_tbuf_update (struct firewire_comm *, int, int);
+int fw_rbuf_update (struct firewire_comm *, int, int);
+void fw_asybusy (struct fw_xfer *);
+int fw_bindadd (struct firewire_comm *, struct fw_bind *);
+int fw_bindremove (struct firewire_comm *, struct fw_bind *);
+int fw_asyreq (struct firewire_comm *, int, struct fw_xfer*);
+void fw_busreset (struct firewire_comm *);
+u_int16_t fw_crc16 (u_int32_t *, u_int32_t);
+void fw_xfer_timeout (void *);
+void fw_xfer_done (struct fw_xfer *);
+void fw_asy_callback (struct fw_xfer *);
+void fw_asy_callback_free (struct fw_xfer *);
+struct fw_device *fw_noderesolve_nodeid (struct firewire_comm *, int);
+struct fw_device *fw_noderesolve_eui64 (struct firewire_comm *, struct fw_eui64 *);
+struct fw_bind *fw_bindlookup (struct firewire_comm *, u_int16_t, u_int32_t);
+void fw_drain_txq (struct firewire_comm *);
+int fwdev_makedev (struct firewire_softc *);
+int fwdev_destroydev (struct firewire_softc *);
+void fwdev_clone (void *, char *, int, dev_t *);
 
 extern int firewire_debug;
 extern devclass_t firewire_devclass;
 
-#define		FWPRI		((PZERO+8)|PCATCH)
-
-#if __FreeBSD_version >= 500000
-#define CALLOUT_INIT(x) callout_init(x, 0 /* mpsafe */)
+#ifdef __DragonFly__
+#define		FWPRI		PCATCH
 #else
+#define		FWPRI		((PZERO+8)|PCATCH)
+#endif
+
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 #define CALLOUT_INIT(x) callout_init(x)
+#else
+#define CALLOUT_INIT(x) callout_init(x, 0 /* mpsafe */)
+#endif
+
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
+/* compatibility shim for 4.X */
+#define bio buf
+#define bio_bcount b_bcount
+#define bio_cmd b_flags
+#define bio_count b_count
+#define bio_data b_data
+#define bio_dev b_dev
+#define bio_error b_error
+#define bio_flags b_flags
+#define bio_offset b_offset
+#define bio_resid b_resid
+#define BIO_ERROR B_ERROR
+#define BIO_READ B_READ
+#define BIO_WRITE B_WRITE
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
 #endif
 
 MALLOC_DECLARE(M_FW);

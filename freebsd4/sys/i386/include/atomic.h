@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/atomic.h,v 1.9.2.1 2000/07/07 00:38:47 obrien Exp $
+ * $FreeBSD: src/sys/i386/include/atomic.h,v 1.9.2.2.2.1 2004/05/06 01:55:21 jdp Exp $
  */
 #ifndef _MACHINE_ATOMIC_H_
 #define _MACHINE_ATOMIC_H_
@@ -46,11 +46,13 @@
  * atomic_clear_int(P, V)	(*(u_int*)(P) &= ~(V))
  * atomic_add_int(P, V)		(*(u_int*)(P) += (V))
  * atomic_subtract_int(P, V)	(*(u_int*)(P) -= (V))
+ * atomic_readandclear_int(P)	(return  *(u_int*)P; *(u_int*)P = 0;)
  *
  * atomic_set_long(P, V)	(*(u_long*)(P) |= (V))
  * atomic_clear_long(P, V)	(*(u_long*)(P) &= ~(V))
  * atomic_add_long(P, V)	(*(u_long*)(P) += (V))
  * atomic_subtract_long(P, V)	(*(u_long*)(P) -= (V))
+ * atomic_readandclear_long(P)	(return  *(u_long*)P; *(u_long*)P = 0;)
  */
 
 /*
@@ -83,8 +85,8 @@ static __inline void					\
 atomic_##NAME##_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 {							\
 	__asm __volatile(MPLOCKED OP			\
-			 : "=m" (*p)			\
-			 :  "0" (*p), "ir" (V)); 	\
+			 : "+m" (*p)			\
+			 : "ir" (V));			\
 }
 
 #else
@@ -103,25 +105,25 @@ atomic_##NAME##_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 9)
 
 /* egcs 1.1.2+ version */
-ATOMIC_ASM(set,	     char,  "orb %b2,%0",   v)
-ATOMIC_ASM(clear,    char,  "andb %b2,%0", ~v)
-ATOMIC_ASM(add,	     char,  "addb %b2,%0",  v)
-ATOMIC_ASM(subtract, char,  "subb %b2,%0",  v)
+ATOMIC_ASM(set,	     char,  "orb %b1,%0",   v)
+ATOMIC_ASM(clear,    char,  "andb %b1,%0", ~v)
+ATOMIC_ASM(add,	     char,  "addb %b1,%0",  v)
+ATOMIC_ASM(subtract, char,  "subb %b1,%0",  v)
 
-ATOMIC_ASM(set,	     short, "orw %w2,%0",   v)
-ATOMIC_ASM(clear,    short, "andw %w2,%0", ~v)
-ATOMIC_ASM(add,	     short, "addw %w2,%0",  v)
-ATOMIC_ASM(subtract, short, "subw %w2,%0",  v)
+ATOMIC_ASM(set,	     short, "orw %w1,%0",   v)
+ATOMIC_ASM(clear,    short, "andw %w1,%0", ~v)
+ATOMIC_ASM(add,	     short, "addw %w1,%0",  v)
+ATOMIC_ASM(subtract, short, "subw %w1,%0",  v)
 
-ATOMIC_ASM(set,	     int,   "orl %2,%0",   v)
-ATOMIC_ASM(clear,    int,   "andl %2,%0", ~v)
-ATOMIC_ASM(add,	     int,   "addl %2,%0",  v)
-ATOMIC_ASM(subtract, int,   "subl %2,%0",  v)
+ATOMIC_ASM(set,	     int,   "orl %1,%0",   v)
+ATOMIC_ASM(clear,    int,   "andl %1,%0", ~v)
+ATOMIC_ASM(add,	     int,   "addl %1,%0",  v)
+ATOMIC_ASM(subtract, int,   "subl %1,%0",  v)
 
-ATOMIC_ASM(set,	     long,  "orl %2,%0",   v)
-ATOMIC_ASM(clear,    long,  "andl %2,%0", ~v)
-ATOMIC_ASM(add,	     long,  "addl %2,%0",  v)
-ATOMIC_ASM(subtract, long,  "subl %2,%0",  v)
+ATOMIC_ASM(set,	     long,  "orl %1,%0",   v)
+ATOMIC_ASM(clear,    long,  "andl %1,%0", ~v)
+ATOMIC_ASM(add,	     long,  "addl %1,%0",  v)
+ATOMIC_ASM(subtract, long,  "subl %1,%0",  v)
 
 #else
 
@@ -146,6 +148,40 @@ ATOMIC_ASM(clear,    long,  "andl %1,%0", ~v)
 ATOMIC_ASM(add,	     long,  "addl %1,%0",  v)
 ATOMIC_ASM(subtract, long,  "subl %1,%0",  v)
 
+#endif
+
+#define	atomic_readandclear_32	atomic_readandclear_int
+
+#ifndef WANT_FUNCTIONS
+static __inline u_int
+atomic_readandclear_int(volatile u_int *addr)
+{
+	u_int result;
+
+	__asm __volatile (
+	"	xorl	%0,%0 ;		"
+	"	xchgl	%1,%0 ;		"
+	"# atomic_readandclear_int"
+	: "=&r" (result)		/* 0 (result) */
+	: "m" (*addr));			/* 1 (addr) */
+
+	return (result);
+}
+
+static __inline u_long
+atomic_readandclear_long(volatile u_long *addr)
+{
+	u_long result;
+
+	__asm __volatile (
+	"	xorl	%0,%0 ;		"
+	"	xchgl	%1,%0 ;		"
+	"# atomic_readandclear_int"
+	: "=&r" (result)		/* 0 (result) */
+	: "m" (*addr));			/* 1 (addr) */
+
+	return (result);
+}
 #endif
 
 #endif /* ! _MACHINE_ATOMIC_H_ */

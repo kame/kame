@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.153 2003/10/22 19:04:08 jhb Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.165 2004/04/20 13:03:55 njl Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -176,6 +176,12 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # I/O device(s).
 #
 # CPU_ENABLE_SSE enables SSE/MMX2 instructions support.
+#
+# CPU_ENABLE_TCC enables Thermal Control Circuitry (TCC) found in some
+# Pentium(tm) 4 and (possibly) later CPUs.  When enabled and detected,
+# TCC allows to restrict power consumption by using group of hw.p4tcc.*
+# sysctls.  This operates independently of SpeedStep and is useful on
+# systems where other mechanisms such as apm(4) or acpi(4) don't work.
 #
 # CPU_FASTER_5X86_FPU enables faster FPU exception handler.
 #
@@ -702,8 +708,8 @@ device		proatm			#ProSum's ProATM-155
 # the CPU fraction reserved to userland with the sysctl variable
 # kern.polling.user_frac (default 50, range 0..100).
 #
-# Only the "dc" "fxp" and "sis" devices support this mode of operation at
-# the time of this writing.
+# Not all device drivers support this mode of operation at the time of
+# this writing.  See polling(4) for more details.
  
 options         DEVICE_POLLING
 
@@ -943,12 +949,6 @@ options 	CAM_MAX_HIGHPOWER=4
 options 	SCSI_NO_SENSE_STRINGS
 options 	SCSI_NO_OP_STRINGS
 options 	SCSI_DELAY=8000	# Be pessimistic about Joe SCSI device
-
-# Options for the CAM SCSI disk driver:
-# DA_OLD_QUIRKS: Restore old USB quirks that have been deprecated.
-#		 Please also email scsi@freebsd.org if you
-#		 have a device that needs this option.
-options 	DA_OLD_QUIRKS
 
 # Options for the CAM CDROM driver:
 # CHANGER_MIN_BUSY_SECONDS: Guaranteed minimum time quantum for a changer LUN
@@ -1259,12 +1259,21 @@ device		aacp	# SCSI Passthrough interface (optional, CAM required)
 #
 device		ida		# Compaq Smart RAID
 device		mlx		# Mylex DAC960
+device		pst		# Promise Supertrak SX6000
 device		amr		# AMI MegaRAID
 
 #
 # 3ware ATA RAID
 #
 device		twe		# 3ware ATA RAID
+
+#
+# 3ware 9000 series PATA/SATA RAID controller driver and options.
+# The driver is implemented as a SIM, and so, needs the CAM infrastructure.
+#
+options		TWA_DEBUG		# 0-10; 10 prints the most messages.
+options		TWA_FLASH_FIRMWARE	# firmware image bundled when defined.
+device		twa			# 3ware 9000 series PATA/SATA RAID
 
 #
 # The 'ATA' driver supports all ATA and ATAPI devices.
@@ -1446,7 +1455,11 @@ options 	PUC_FASTINTR
 # cm: Arcnet SMC COM90c26 / SMC COM90c56
 #     (and SMC COM90c66 in '56 compatibility mode) adapters.
 # cs: IBM Etherjet and other Crystal Semi CS89x0-based adapters
-# cx: Cronyx/Sigma multiport sync/async (with Cisco or PPP framing)
+# ctau: Cronyx/Tau sync dual port V.35/RS-232/RS-530/RS-449/X.21/G.703/E1
+#       serial adaptor (requires sppp (default), or NETGRAPH if
+#       NETGRAPH_CRONYX is configured)
+# cx: Cronyx/Sigma multiport sync/async adapter (requires sppp (default),
+#     or NETGRAPH if NETGRAPH_CRONYX is configured)
 # ed: Western Digital and SMC 80xx; Novell NE1000 and NE2000; 3Com 3C503
 # el: 3Com 3C501 (slow!)
 # ep: 3Com 3C509
@@ -1475,6 +1488,7 @@ options 	PUC_FASTINTR
 device ar0 at isa? port 0x300 irq 10 iomem 0xd0000
 device cm0 at isa? port 0x2e0 irq 9 iomem 0xdc000
 device cs0 at isa? port 0x300
+device ctau0 at isa? port 0x240 irq 15 drq 7
 device cx0 at isa? port 0x240 irq 15 drq 7
 device ed0 at isa? port 0x280 irq 5 iomem 0xd8000
 device el0 at isa? port 0x300 irq 9
@@ -1855,6 +1869,10 @@ options 	AHD_REG_PRETTY_PRINT
 # The `amd' device provides support for the AMD 53C974 SCSI host
 # adapter chip as found on devices such as the Tekram DC-390(T).
 #
+# The `bfe' device provides support for Broadcom 440x fast ethernet
+# adapters these are commonly included on several popular motherboards
+# from Asus and on some DELL laptops.
+#
 # The `bge' device provides support for gigabit ethernet adapters
 # based on the Broadcom BCM570x familiy of controllers, including the
 # 3Com 3c996-T, the Netgear GA302T, the SysKonnect SK-9D21 and SK-9D41,
@@ -2075,6 +2093,7 @@ device		trm		# Tekram DC395U/UW/F and DC315U
 device		miibus
 
 # PCI Ethernet NICs that use the common MII bus controller code.
+device		bfe		# Broadcom BCM4401 10/100.
 device		dc		# DEC/Intel 21143 and various workalikes
 device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
 device		my		# Myson Fast Ethernet (MTD80X, MTD89X)
@@ -2746,13 +2765,28 @@ options 	USB_DEBUG
 options 	UKBD_DFLT_KEYMAP	# specify the built-in keymap
 makeoptions	UKBD_DFLT_KEYMAP=it.iso
 
+# options for uplcom:
+options		UPLCOM_INTR_INTERVAL=100	# interrpt pipe interval
+						# in milliseconds
+
 # options for uvscom:
 options		UVSCOM_DEFAULT_OPKTSIZE=8	# default output packet size
+options		UVSCOM_INTR_INTERVAL=100	# interrpt pipe interval
+						# in milliseconds
 
-# Firewire support
-device		firewire	# Firewire bus code
-device		sbp		# SCSI over Firewire (Requires scbus and da)
-device		fwe		# Ethernet over Firewire (non-standard!)
+# FireWire support
+device		firewire	# FireWire bus code
+device		sbp		# SCSI over FireWire (Requires scbus and da)
+device		sbp_targ	# SBP-2 Target mode  (Requires scbus and targ)
+device		fwe		# Ethernet over FireWire (non-standard!)
+
+# dcons support (Dumb Console Device)
+device		dcons			# dumb console driver
+device		dcons_crom		# FireWire attachment
+options		DCONS_BUF_SIZE=16384	# buffer size
+options		DCONS_POLL_HZ=100	# polling rate
+options		DCONS_FORCE_CONSOLE=0	# force to be the primary console
+options		DCONS_FORCE_GDB=1	# force to be the gdb device
 
 #####################################################################
 # crypto subsystem

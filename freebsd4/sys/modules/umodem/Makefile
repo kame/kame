@@ -1,10 +1,10 @@
-#       $FreeBSD: src/sys/modules/umodem/Makefile,v 1.7 1999/11/28 18:53:35 bde Exp $ 
+# $FreeBSD: src/sys/modules/umodem/Makefile,v 1.7.2.1 2004/03/01 00:07:25 julian Exp $ 
 
-MAINTAINER	 = n_hibma@freebsd.org
+MAINTAINER=	n_hibma@freebsd.org
 
-.PATH:  	 ${.CURDIR}/../../dev/usb
-KMOD		 = umodem
-SRCS		 = bus_if.h device_if.h vnode_if.h opt_usb.h umodem.c
-NOMAN		 =
+.PATH: ${.CURDIR}/../../dev/usb
+
+KMOD=	umodem
+SRCS=	bus_if.h device_if.h vnode_if.h opt_usb.h umodem.c
 
 .include <bsd.kmod.mk>

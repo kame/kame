@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_skreg.h,v 1.8.2.2 2003/10/14 18:22:42 wilko Exp $
+ * $FreeBSD: src/sys/pci/if_skreg.h,v 1.8.2.4 2004/04/15 07:24:21 mckay Exp $
  */
 
 /*
@@ -60,6 +60,11 @@
 #define VENDORID_SK		0x1148
 
 /*
+ * Marvell PCI vendor ID
+ */
+#define VENDORID_MARVELL	0x11AB
+
+/*
  * SK-NET gigabit ethernet device IDs
  */
 #define DEVICEID_SK_V1		0x4300
@@ -74,6 +79,26 @@
  * 3Com gigabit ethernet device ID
  */
 #define DEVICEID_3COM_3C940	0x1700
+
+/*
+ * Linksys PCI vendor ID
+ */
+#define VENDORID_LINKSYS	0x1737
+
+/*
+ * Linksys gigabit ethernet device ID
+ */
+#define DEVICEID_LINKSYS_EG1032	0x1032
+
+/*
+ * D-Link PCI vendor ID
+ */
+#define	VENDORID_DLINK		0x1186
+
+/*
+ * D-Link gigabit ethernet device ID
+ */
+#define DEVICEID_DLINK_DGE530T	0x4c00
 
 /*
  * GEnesis registers. The GEnesis chip has a 256-byte I/O window

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.17 2003/04/04 17:11:16 tegge Exp $
+ * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.19 2004/02/19 11:55:42 truckman Exp $
  */
 
 #include "opt_compat.h"
@@ -1385,6 +1385,8 @@ getsockaddr(namp, uaddr, len)
 
 	if (len > SOCK_MAXADDRLEN)
 		return ENAMETOOLONG;
+	if (len < offsetof(struct sockaddr, sa_data[0]))
+		return EINVAL;
 	MALLOC(sa, struct sockaddr *, len, M_SONAME, M_WAITOK);
 	error = copyin(uaddr, sa, len);
 	if (error) {
@@ -1888,5 +1890,10 @@ done:
 		vrele(vp);
 	if (fp)
 		fdrop(fp, p);
+	/*
+	 * sendfile cannot be restarted.
+	 */
+	if (error == ERESTART)
+		error = EINTR;
 	return (error);
 }

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_stereg.h,v 1.5.2.3 2002/08/21 15:26:01 ambrisko Exp $
+ * $FreeBSD: src/sys/pci/if_stereg.h,v 1.5.2.5 2004/04/06 11:04:54 ru Exp $
  */
 
 /*
@@ -466,7 +466,7 @@ struct ste_desc_onefrag {
 #define STE_PACKET_SIZE		1536
 #define ETHER_ALIGN		2
 #define STE_RX_LIST_CNT		64
-#define STE_TX_LIST_CNT		64
+#define STE_TX_LIST_CNT		128
 #define STE_INC(x, y)		(x) = (x + 1) % y
 #define STE_NEXT(x, y)		(x + 1) % y
 
@@ -479,14 +479,12 @@ struct ste_type {
 struct ste_list_data {
 	struct ste_desc_onefrag	ste_rx_list[STE_RX_LIST_CNT];
 	struct ste_desc		ste_tx_list[STE_TX_LIST_CNT];
-	u_int8_t		ste_pad[STE_MIN_FRAMELEN];
 };
 
 struct ste_chain {
 	struct ste_desc		*ste_ptr;
 	struct mbuf		*ste_mbuf;
 	struct ste_chain	*ste_next;
-	struct ste_chain	*ste_prev;
 	u_int32_t		ste_phys;
 };
 
@@ -503,7 +501,6 @@ struct ste_chain_data {
 
 	int			ste_tx_prod;
 	int			ste_tx_cons;
-	int			ste_tx_cnt;
 };
 
 struct ste_softc {
@@ -520,11 +517,14 @@ struct ste_softc {
 	int			ste_tx_thresh;
 	u_int8_t		ste_link;
 	int			ste_if_flags;
-	int			ste_tx_prev_idx;
+	struct ste_chain	*ste_tx_prev;
 	struct ste_list_data	*ste_ldata;
 	struct ste_chain_data	ste_cdata;
 	struct callout_handle	ste_stat_ch;
 	u_int8_t		ste_one_phy;
+#ifdef DEVICE_POLLING
+	int			rxcycles;
+#endif
 };
 
 struct ste_mii_frame {

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.2 (Berkeley) 1/7/94
- * $FreeBSD: src/sys/sys/unistd.h,v 1.22.2.2 2000/08/22 01:46:30 jhb Exp $
+ * $FreeBSD: src/sys/sys/unistd.h,v 1.22.2.3 2003/11/11 07:26:33 das Exp $
  */
 
 #ifndef _SYS_UNISTD_H_
@@ -218,6 +218,7 @@
 #define RFSIGSHARE	(1<<14)	/* share signal handlers */
 #define RFLINUXTHPN     (1<<16) /* do linux clone exit parent notification */
 #define RFPPWAIT	(1<<31) /* parent sleeps until child exits (vfork) */
+#define	RFKERNELONLY	RFPPWAIT
 
 #endif /* !_POSIX_SOURCE */
 

@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.7.2.6 2003/07/03 22:17:03 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.7.2.8 2004/03/24 09:01:00 julian Exp $
  * $Whistle: ng_tee.c,v 1.18 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -303,8 +303,16 @@ ngt_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	hinfo->stats.inOctets += m->m_pkthdr.len;
 	hinfo->stats.inFrames++;
 
+	/*
+	 * Don't make a copy if only the dup hook exists.
+	 */
+	if ((dup && dup->hook) && (dest->hook == NULL)) {
+		dest = dup;
+		dup = NULL;
+	}
+
 	/* Duplicate packet and meta info if requried */
-	if (dup != NULL) {
+	if (dup && dup->hook) {
 		struct mbuf *m2;
 		meta_p meta2;
 
@@ -336,8 +344,10 @@ ngt_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	}
 
 	/* Deliver frame out destination hook */
-	dest->stats.outOctets += m->m_pkthdr.len;
-	dest->stats.outFrames++;
+	if (dest->hook != NULL) {
+		dest->stats.outOctets += m->m_pkthdr.len;
+		dest->stats.outFrames++;
+	}
 	NG_SEND_DATA(error, dest->hook, m, meta);
 	return (error);
 }

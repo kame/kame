@@ -28,11 +28,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/netsmb/smb_subr.c,v 1.1.2.2 2001/09/03 08:55:11 bp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_subr.c,v 1.1.2.3 2004/01/10 04:17:50 tjr Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/endian.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/malloc.h>
@@ -183,7 +186,7 @@ void
 smb_strtouni(u_int16_t *dst, const char *src)
 {
 	while (*src) {
-		*dst++ = htoles(*src++);
+		*dst++ = htole16(*src++);
 	}
 	*dst = 0;
 }
@@ -260,6 +263,8 @@ smb_maperror(int eclass, int eno)
 			return ENOTEMPTY;
 		    case 183:
 			return EEXIST;
+		    case ERRquota:
+			return EDQUOT;
 		}
 		break;
 	    case ERRSRV:
@@ -267,6 +272,7 @@ smb_maperror(int eclass, int eno)
 		    case ERRerror:
 			return EINVAL;
 		    case ERRbadpw:
+		    case ERRpasswordExpired:
 			return EAUTH;
 		    case ERRaccess:
 			return EACCES;
@@ -277,8 +283,12 @@ smb_maperror(int eclass, int eno)
 			return EAUTH;
 		    case 3:		/* reserved and returned */
 			return EIO;
-		    case 2239:		/* NT: account exists but disabled */
+		    case ERRaccountExpired:
+		    case ERRbadClient:
+		    case ERRbadLogonTime:
 			return EPERM;
+		    case ERRnosupport:
+			return EBADRPC;
 		}
 		break;
 	    case ERRHRD:

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.15 2003/09/28 11:08:31 iedowse Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.16 2003/11/11 07:26:44 das Exp $
  */
 
 #include "opt_ktrace.h"
@@ -129,6 +129,10 @@ rfork(p, uap)
 {
 	int error;
 	struct proc *p2;
+
+	/* Don't allow kernel only flags. */
+	if ((uap->flags & RFKERNELONLY) != 0)
+		return (EINVAL);
 
 	error = fork1(p, uap->flags, &p2);
 	if (error == 0) {

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.10 2002/06/23 22:34:52 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.11 2004/01/02 21:15:10 truckman Exp $
  */
 
 #include "opt_quota.h"
@@ -479,6 +479,8 @@ ffs_reload(mp, cred, p)
 	newfs->fs_csp = fs->fs_csp;
 	newfs->fs_maxcluster = fs->fs_maxcluster;
 	newfs->fs_contigdirs = fs->fs_contigdirs;
+ 	/* The file system is still read-only. */
+ 	newfs->fs_ronly = 1;
 	bcopy(newfs, fs, (u_int)fs->fs_sbsize);
 	if (fs->fs_sbsize < SBSIZE)
 		bp->b_flags |= B_INVAL;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
- * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63.2.9 2003/05/08 07:47:16 kbyanc Exp $
+ * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63.2.12 2004/03/30 07:53:17 pjd Exp $
  */
 
 #include <sys/param.h>
@@ -389,6 +389,8 @@ fill_eproc(p, ep)
 				ep->e_flag |= EPROC_SLEADER;
 		}
 	}
+	if (ep->e_sess != NULL)
+		ep->e_sid = ep->e_sess->s_sid;
 	if ((p->p_flag & P_CONTROLT) &&
 	    (ep->e_sess != NULL) &&
 	    ((tp = ep->e_sess->s_ttyp) != NULL)) {
@@ -553,10 +555,14 @@ sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 	if (!p)
 		return (0);
 
-	if ((!ps_argsopen) && p_trespass(curproc, p))
+	if (!ps_showallprocs && p_trespass(curproc, p))
 		return (0);
-
-	if (req->newptr && curproc != p)
+	if (!PRISON_CHECK(curproc, p))
+		return (0);
+	if (!ps_argsopen && p_trespass(curproc, p))
+		return (0);
+ 
+	if (curproc != p && req->newptr != NULL)
 		return (EPERM);
 
 	if (req->oldptr && p->p_args != NULL)

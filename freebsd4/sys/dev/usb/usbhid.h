@@ -1,5 +1,5 @@
 /*	$NetBSD: usbhid.h,v 1.9 2000/09/03 19:09:14 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbhid.h,v 1.7.2.2 2000/10/31 23:03:00 n_hibma Exp $ */
+/*	$FreeBSD: src/sys/dev/usb/usbhid.h,v 1.7.2.3 2004/03/01 00:07:23 julian Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -53,10 +53,6 @@
 #define UR_SET_IDLE		0x0a
 #define UR_GET_PROTOCOL		0x03
 #define UR_SET_PROTOCOL		0x0b
-
-#if defined(__FreeBSD__)
-#define UPACKED __attribute__ ((packed))
-#endif
 
 typedef struct usb_hid_descriptor {
 	uByte		bLength;

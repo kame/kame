@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.13 2003/02/05 22:03:57 mbr Exp $
+ * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.14 2004/04/03 07:11:11 ru Exp $
  */
 
 /*
@@ -132,7 +132,7 @@ MODULE_DEPEND(nge, miibus, 1, 1, 1);
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.13 2003/02/05 22:03:57 mbr Exp $";
+  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.14 2004/04/03 07:11:11 ru Exp $";
 #endif
 
 #define NGE_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
@@ -1467,7 +1467,8 @@ static void nge_rxeof(sc)
 		 * to vlan_input() instead of ether_input().
 		 */
 		if (extsts & NGE_RXEXTSTS_VLANPKT) {
-			VLAN_INPUT_TAG(eh, m, extsts & NGE_RXEXTSTS_VTCI);
+			VLAN_INPUT_TAG(eh, m,
+			    ntohs(extsts & NGE_RXEXTSTS_VTCI));
                         continue;
                 }
 
@@ -1787,7 +1788,7 @@ static int nge_encap(sc, m_head, txidx)
 
 	if (ifv != NULL) {
 		sc->nge_ldata->nge_tx_list[cur].nge_extsts |=
-			(NGE_TXEXTSTS_VLANPKT|ifv->ifv_tag);
+			(NGE_TXEXTSTS_VLANPKT|htons(ifv->ifv_tag));
 	}
 
 	sc->nge_ldata->nge_tx_list[cur].nge_mbuf = m_head;

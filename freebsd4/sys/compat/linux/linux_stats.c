@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.22.2.3 2001/11/05 19:08:23 marcel Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.22.2.4 2003/11/17 22:58:57 anholt Exp $
  */
 
 #include <sys/param.h>
@@ -260,8 +260,13 @@ linux_statfs(struct proc *p, struct linux_statfs_args *args)
 	linux_statfs.f_bavail = bsd_statfs->f_bavail;
   	linux_statfs.f_ffree = bsd_statfs->f_ffree;
 	linux_statfs.f_files = bsd_statfs->f_files;
-	linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
-	linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	if (suser(p)) {
+		linux_statfs.f_fsid.val[0] = 0;
+		linux_statfs.f_fsid.val[1] = 0;
+	} else {
+		linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
+		linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	}
 	linux_statfs.f_namelen = MAXNAMLEN;
 	return copyout((caddr_t)&linux_statfs, (caddr_t)args->buf,
 	    sizeof(linux_statfs));
@@ -296,8 +301,13 @@ linux_fstatfs(struct proc *p, struct linux_fstatfs_args *args)
 	linux_statfs.f_bavail = bsd_statfs->f_bavail;
   	linux_statfs.f_ffree = bsd_statfs->f_ffree;
 	linux_statfs.f_files = bsd_statfs->f_files;
-	linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
-	linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	if (suser(p)) {
+		linux_statfs.f_fsid.val[0] = 0;
+		linux_statfs.f_fsid.val[1] = 0;
+	} else {
+		linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
+		linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	}
 	linux_statfs.f_namelen = MAXNAMLEN;
 	return copyout((caddr_t)&linux_statfs, (caddr_t)args->buf,
 	    sizeof(linux_statfs));

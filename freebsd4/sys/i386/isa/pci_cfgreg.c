@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pci_cfgreg.c,v 1.1.2.8 2003/08/07 06:17:43 imp Exp $
+ * $FreeBSD: src/sys/i386/isa/pci_cfgreg.c,v 1.1.2.9 2004/01/07 19:23:56 jhb Exp $
  *
  */
 
@@ -43,6 +43,7 @@
 #include <isa/isavar.h>
 #include <i386/isa/pcibus.h>
 /* #include <machine/nexusvar.h> */
+#include <machine/clock.h>
 #include <machine/pci_cfgreg.h>
 #include <machine/segments.h>
 #include <machine/pc/bios.h>
@@ -580,7 +581,7 @@ pcireg_cfgopen(void)
 	devmax = 32;
 
 	outl(CONF1_ADDR_PORT, CONF1_ENABLE_CHK);
-	outb(CONF1_ADDR_PORT +3, 0);
+	DELAY(1);
 	mode1res = inl(CONF1_ADDR_PORT);
 	outl(CONF1_ADDR_PORT, oldval1);
 

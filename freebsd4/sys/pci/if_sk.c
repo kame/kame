@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.10 2003/10/14 18:22:42 wilko Exp $
+ * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.12 2004/04/15 07:24:21 mckay Exp $
  */
 
 /*
@@ -133,7 +133,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.10 2003/10/14 18:22:42 wilko Exp $";
+  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.12 2004/04/15 07:24:21 mckay Exp $";
 #endif
 
 static struct sk_type sk_devs[] = {
@@ -148,9 +148,24 @@ static struct sk_type sk_devs[] = {
 		"SysKonnect Gigabit Ethernet (V2.0)"
 	},
 	{
+		VENDORID_MARVELL,
+		DEVICEID_SK_V2,
+		"Marvell Gigabit Ethernet"
+	},
+	{
 		VENDORID_3COM,
 		DEVICEID_3COM_3C940,
 		"3Com 3C940 Gigabit Ethernet"
+	},
+	{
+		VENDORID_LINKSYS,
+		DEVICEID_LINKSYS_EG1032,
+		"Linksys EG1032 Gigabit Ethernet"
+	},
+	{
+		VENDORID_DLINK,
+		DEVICEID_DLINK_DGE530T,
+		"D-Link DGE-530T Gigabit Ethernet"
 	},
 	{ 0, 0, NULL }
 };
@@ -443,6 +458,12 @@ static void sk_vpd_read(sc)
 	sc->sk_vpd_readonly = NULL;
 
 	sk_vpd_read_res(sc, &res, pos);
+
+	/*
+	 * Bail out quietly if the eeprom appears to be missing or empty.
+	 */
+	if (res.vr_id == 0xff && res.vr_len == 0xff && res.vr_pad == 0xff)
+		return;
 
 	if (res.vr_id != VPD_RES_ID) {
 		printf("skc%d: bad VPD resource id: expected %x got %x\n",
@@ -1490,8 +1511,14 @@ static int skc_attach(dev)
 		break;
 	case DEVICEID_SK_V2:
 	case DEVICEID_3COM_3C940:
+	case DEVICEID_LINKSYS_EG1032:
+	case DEVICEID_DLINK_DGE530T:
 		sc->sk_type = SK_YUKON;
 		break;
+	default:
+		printf("skc%d: unknown device!\n", unit);
+		error = ENXIO;
+		goto fail;
 	}
 
 	/*
@@ -1645,7 +1672,8 @@ static int skc_attach(dev)
 	}
 
 	/* Announce the product name. */
-	printf("skc%d: %s\n", sc->sk_unit, sc->sk_vpd_prodname);
+	if (sc->sk_vpd_prodname != NULL)
+	    printf("skc%d: %s\n", sc->sk_unit, sc->sk_vpd_prodname);
 	sc->sk_devs[SK_PORT_A] = device_add_child(dev, "sk", -1);
 	port = malloc(sizeof(int), M_DEVBUF, M_NOWAIT);
 	*port = SK_PORT_A;

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.7 2003/08/10 23:09:28 nectar Exp $
+ * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.9 2004/03/04 09:02:37 truckman Exp $
  */
 
 #include <sys/param.h>
@@ -433,6 +433,8 @@ kern_ptrace(struct proc *curp, int req, pid_t pid, void *addr, int data)
 
 				pp = pfind(p->p_oppid);
 				proc_reparent(p, pp ? pp : initproc);
+				if (pp == NULL)
+					p->p_sigparent = SIGCHLD;
 			}
 
 			p->p_flag &= ~(P_TRACED | P_WAITED);

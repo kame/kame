@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.2.2.2 2003/07/02 17:04:50 sam Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.2.2.4 2004/02/10 17:37:11 bms Exp $	*/
 /*	$OpenBSD: cryptosoft.c,v 1.35 2002/04/26 08:43:50 deraadt Exp $	*/
 
 /*
@@ -84,13 +84,6 @@ static	int swcr_compdec(struct cryptodesc *, struct swcr_data *, caddr_t, int);
 static	int swcr_process(void *, struct cryptop *, int);
 static	int swcr_newsession(void *, u_int32_t *, struct cryptoini *);
 static	int swcr_freesession(void *, u_int64_t);
-
-/*
- * NB: These came over from openbsd and are kept private
- *     to the crypto code for now.
- */
-extern	int m_apply(struct mbuf *m, int off, int len,
-		    int (*f)(caddr_t, caddr_t, unsigned int), caddr_t fstate);
 
 /*
  * Apply a symmetric encryption/decryption algorithm.

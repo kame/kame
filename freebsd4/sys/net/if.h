@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if.h,v 1.58.2.9 2002/08/30 14:23:38 sobomax Exp $
+ * $FreeBSD: src/sys/net/if.h,v 1.58.2.10 2003/12/08 16:55:20 bms Exp $
  */
 
 #ifndef _NET_IF_H_
@@ -144,6 +144,7 @@ struct if_data {
  */
 #define	IFF_POLLING	0x10000		/* Interface is in polling mode. */
 #define	IFF_PPROMISC	0x20000		/* user-requested promisc mode */
+#define	IFF_STATICARP	0x80000		/* static ARP */
 
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.1.2.5 2002/07/02 23:44:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.1.2.6 2004/01/09 08:58:06 ru Exp $
  */
 
 /*
@@ -77,7 +77,6 @@
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>
 #include <netgraph/ng_bridge.h>
-#include <netgraph/ng_ether.h>
 
 /* Per-link private data */
 struct ng_bridge_link {
@@ -166,7 +165,7 @@ ng_bridge_getTableLength(const struct ng_parse_type *type,
 
 /* Parse type for struct ng_bridge_host_ary */
 static const struct ng_parse_struct_field ng_bridge_host_type_fields[]
-	= NG_BRIDGE_HOST_TYPE_INFO(&ng_ether_enaddr_type);
+	= NG_BRIDGE_HOST_TYPE_INFO(&ng_parse_enaddr_type);
 static const struct ng_parse_type ng_bridge_host_type = {
 	&ng_parse_struct_type,
 	&ng_bridge_host_type_fields
@@ -281,9 +280,6 @@ static struct ng_type ng_bridge_typestruct = {
 	ng_bridge_cmdlist,
 };
 NETGRAPH_INIT(bridge, &ng_bridge_typestruct);
-
-/* Depend on ng_ether so we can use the Ethernet parse type */
-MODULE_DEPEND(ng_bridge, ng_ether, 1, 1, 1);
 
 /******************************************************************
 		    NETGRAPH NODE METHODS

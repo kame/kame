@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.3.2.18 2003/04/08 13:22:08 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.3.2.20 2004/03/20 21:10:08 scottl Exp $
  */
 
 /*
@@ -105,8 +105,6 @@ struct aac_ident
 	"Dell PERC 3/Di"},
 	{0x1028, 0x0002, 0x1028, 0x00d9, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x0008, 0x1028, 0x00cf, AAC_HWIF_I960RX, 0,
-	"Dell PERC 3/Di"},
 	{0x1028, 0x000a, 0x1028, 0x0106, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
 	{0x1028, 0x000a, 0x1028, 0x011b, AAC_HWIF_I960RX, 0,
@@ -127,6 +125,12 @@ struct aac_ident
 	"Dell PERC 320/DC"},
 	{0x9005, 0x0285, 0x9005, 0x0286, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
 	"Adaptec SCSI RAID 2120S"},
+	{0x9005, 0x0285, 0x9005, 0x0290, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
+	 "Adaptec SCSI RAID 2410SA"},
+	{0x9005, 0x0285, 0x1028, 0x0291, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
+	 "Dell CERC SATA RAID 2"},
+	{0x9005, 0x0285, 0x9005, 0x0292, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
+	 "Adaptec SCSI RAID 2810SA"},
 	{0, 0, 0, 0, 0, 0, 0}
 };
 

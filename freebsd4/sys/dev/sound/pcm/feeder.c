@@ -28,7 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.8.2.9 2003/02/08 01:43:07 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.8.2.10 2003/12/11 14:41:12 dds Exp $");
 
 MALLOC_DEFINE(M_FEEDER, "feeder", "pcm feeder");
 
@@ -409,12 +409,12 @@ static kobj_method_t feeder_root_methods[] = {
 	{ 0, 0 }
 };
 static struct feeder_class feeder_root_class = {
-	name:		"feeder_root",
-	methods:	feeder_root_methods,
-	size:		sizeof(struct pcm_feeder),
-	align:		0,
-	desc:		NULL,
-	data:		NULL,
+	.name =		"feeder_root",
+	.methods =	feeder_root_methods,
+	.size =		sizeof(struct pcm_feeder),
+	.align =	0,
+	.desc =		NULL,
+	.data =		NULL,
 };
 SYSINIT(feeder_root, SI_SUB_DRIVERS, SI_ORDER_FIRST, feeder_register, &feeder_root_class);
 SYSUNINIT(feeder_root, SI_SUB_DRIVERS, SI_ORDER_FIRST, feeder_unregisterall, NULL);

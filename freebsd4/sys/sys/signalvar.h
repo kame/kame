@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signalvar.h	8.6 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/signalvar.h,v 1.34.2.1 2000/05/16 06:58:05 dillon Exp $
+ * $FreeBSD: src/sys/sys/signalvar.h,v 1.34.2.2 2004/03/03 12:29:50 ru Exp $
  */
 
 #ifndef	_SYS_SIGNALVAR_H_		/* tmp for user.h */
@@ -210,7 +210,6 @@ void	psignal __P((struct proc *p, int sig));
 void	sigexit __P((struct proc *p, int signum));
 void	siginit __P((struct proc *p));
 void	trapsignal __P((struct proc *p, int sig, u_long code));
-int	__cursig __P((struct proc *p));
 
 /*
  * Machine-dependent functions:
@@ -229,7 +228,7 @@ void	sendsig __P((sig_t action, int sig, sigset_t *retmask, u_long code));
  *
  * MP SAFE
  */
-extern __inline int __cursig(struct proc *p)
+static __inline int __cursig(struct proc *p)
 {
 	sigset_t tmpset;
 	int r;

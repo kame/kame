@@ -22,9 +22,41 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/if_rue.c,v 1.2.2.1 2003/07/30 13:57:35 akiyama Exp $
  */
+/*-
+ * Copyright (c) 1997, 1998, 1999, 2000
+ *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Bill Paul.
+ * 4. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY Bill Paul AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL Bill Paul OR THE VOICES IN HIS HEAD
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_rue.c,v 1.2.2.3 2004/04/16 18:12:57 julian Exp $");
 
 /*
  * RealTek RTL8150 USB to fast ethernet controller driver.
@@ -49,8 +81,11 @@
 
 #include <net/bpf.h>
 
-#include <machine/clock.h> 	/* for DELAY */
 #include <sys/bus.h>
+#include <machine/bus.h>
+#if __FreeBSD_version < 500000
+#include <machine/clock.h>
+#endif
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -68,7 +103,7 @@
 #include "miibus_if.h"
 
 #ifdef USB_DEBUG
-static int	ruedebug = 0;
+Static int	ruedebug = 0;
 SYSCTL_NODE(_hw_usb, OID_AUTO, rue, CTLFLAG_RW, 0, "USB rue");
 SYSCTL_INT(_hw_usb_rue, OID_AUTO, debug, CTLFLAG_RW,
 	   &ruedebug, 0, "rue debug level");
@@ -122,7 +157,7 @@ Static int rue_miibus_readreg(device_ptr_t, int, int);
 Static int rue_miibus_writereg(device_ptr_t, int, int, int);
 Static void rue_miibus_statchg(device_ptr_t);
 
-static u_int8_t rue_calchash(caddr_t);
+Static uint32_t rue_mchash(const uint8_t *);
 Static void rue_setmulti(struct rue_softc *);
 Static void rue_reset(struct rue_softc *);
 
@@ -164,6 +199,7 @@ Static devclass_t rue_devclass;
 DRIVER_MODULE(rue, uhub, rue_driver, rue_devclass, usbd_driver_load, 0);
 DRIVER_MODULE(miibus, rue, miibus_driver, miibus_devclass, 0, 0);
 MODULE_DEPEND(rue, usb, 1, 1, 1);
+MODULE_DEPEND(rue, ether, 1, 1, 1);
 MODULE_DEPEND(rue, miibus, 1, 1, 1);
 
 #define RUE_SETBIT(sc, reg, x) \
@@ -183,12 +219,11 @@ rue_read_mem(struct rue_softc *sc, u_int16_t addr, void *buf, u_int16_t len)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
-	int			s;
 
 	if (sc->rue_dying)
 		return (0);
 
-	s = splusb();
+	RUE_LOCK(sc);
 
 	req.bmRequestType = UT_READ_VENDOR_DEVICE;
 	req.bRequest = UR_SET_ADDRESS;
@@ -196,10 +231,9 @@ rue_read_mem(struct rue_softc *sc, u_int16_t addr, void *buf, u_int16_t len)
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, len);
 
-	err = usbd_do_request_flags(sc->rue_udev, &req, buf,
-				    USBD_NO_TSLEEP, NULL);
+	err = usbd_do_request(sc->rue_udev, &req, buf);
 
-	splx(s);
+	RUE_UNLOCK(sc);
 
 	if (err) {
 		printf("rue%d: control pipe read failed: %s\n",
@@ -215,12 +249,11 @@ rue_write_mem(struct rue_softc *sc, u_int16_t addr, void *buf, u_int16_t len)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
-	int			s;
 
 	if (sc->rue_dying)
 		return (0);
 
-	s = splusb();
+	RUE_LOCK(sc);
 
 	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
 	req.bRequest = UR_SET_ADDRESS;
@@ -228,10 +261,9 @@ rue_write_mem(struct rue_softc *sc, u_int16_t addr, void *buf, u_int16_t len)
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, len);
 
-	err = usbd_do_request_flags(sc->rue_udev, &req, buf,
-				    USBD_NO_TSLEEP, NULL);
+	err = usbd_do_request(sc->rue_udev, &req, buf);
 
-	splx(s);
+	RUE_UNLOCK(sc);
 
 	if (err) {
 		printf("rue%d: control pipe write failed: %s\n",
@@ -319,11 +351,9 @@ rue_csr_write_4(struct rue_softc *sc, int reg, u_int32_t val)
 Static int
 rue_miibus_readreg(device_ptr_t dev, int phy, int reg)
 {
-	struct rue_softc	*sc;
+	struct rue_softc	*sc = USBGETSOFTC(dev);
 	int			rval;
 	int			ruereg;
-
-	sc = device_get_softc(dev);
 
 	if (phy != 0)		/* RTL8150 supports PHY == 0, only */
 		return (0);
@@ -365,10 +395,8 @@ rue_miibus_readreg(device_ptr_t dev, int phy, int reg)
 Static int
 rue_miibus_writereg(device_ptr_t dev, int phy, int reg, int data)
 {
-	struct rue_softc	*sc;
+	struct rue_softc	*sc = USBGETSOFTC(dev);
 	int			ruereg;
-
-	sc = device_get_softc(dev);
 
 	if (phy != 0)		/* RTL8150 supports PHY == 0, only */
 		return (0);
@@ -409,12 +437,9 @@ rue_miibus_writereg(device_ptr_t dev, int phy, int reg, int data)
 Static void
 rue_miibus_statchg(device_ptr_t dev)
 {
-	struct rue_softc	*sc;
-	struct mii_data		*mii;
+	struct rue_softc	*sc = USBGETSOFTC(dev);
+	struct mii_data		*mii = GET_MII(sc);
 	int			bmcr;
-
-	sc = device_get_softc(dev);
-	mii = device_get_softc(sc->rue_miibus);
 
 	RUE_CLRBIT(sc, RUE_CR, (RUE_CR_RE | RUE_CR_TE));
 
@@ -439,22 +464,20 @@ rue_miibus_statchg(device_ptr_t dev)
  * Calculate CRC of a multicast group address, return the upper 6 bits.
  */
 
-static u_int8_t
-rue_calchash(caddr_t addr)
+Static uint32_t
+rue_mchash(const uint8_t *addr)
 {
-	u_int32_t	crc, carry;
-	int		i, j;
-	u_int8_t	c;
+	uint32_t crc, carry;
+	int idx, bit;
+	uint8_t data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF;	/* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -496,10 +519,15 @@ rue_setmulti(struct rue_softc *sc)
 	rue_csr_write_4(sc, RUE_MAR4, 0);
 
 	/* now program new ones */
-	LIST_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link) {
+#if __FreeBSD_version >= 500000
+	TAILQ_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link)
+#else
+	LIST_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link)
+#endif
+	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = rue_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = rue_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -570,21 +598,20 @@ USB_ATTACH(rue)
 {
 	USB_ATTACH_START(rue, sc, uaa);
 	char				*devinfo;
-	int				s;
 	u_char				eaddr[ETHER_ADDR_LEN];
 	struct ifnet			*ifp;
+	usbd_interface_handle		iface;
+	usbd_status			err;
 	usb_interface_descriptor_t	*id;
 	usb_endpoint_descriptor_t	*ed;
 	int				i;
 	struct rue_type			*t;
-	int				err;
 
 	devinfo = malloc(1024, M_USBDEV, M_WAITOK);
 
-	s = splimp();
-
 	bzero(sc, sizeof (struct rue_softc));
-	sc->rue_iface = uaa->iface;
+	usbd_devinfo(uaa->device, 0, devinfo);
+
 	sc->rue_udev = uaa->device;
 	sc->rue_unit = device_get_unit(self);
 
@@ -593,6 +620,15 @@ USB_ATTACH(rue)
 			sc->rue_unit);
 		goto error;
 	}
+
+	err = usbd_device2interface_handle(uaa->device, RUE_IFACE_IDX, &iface);
+	if (err) {
+		printf("rue%d: getting interface handle failed\n",
+		       sc->rue_unit);
+		goto error;
+	}
+
+	sc->rue_iface = iface;
 
 	t = rue_devs;
 	while (t->rue_vid) {
@@ -612,7 +648,7 @@ USB_ATTACH(rue)
 
 	/* Find endpoints */
 	for (i = 0; i < id->bNumEndpoints; i++) {
-		ed = usbd_interface2endpoint_descriptor(uaa->iface, i);
+		ed = usbd_interface2endpoint_descriptor(iface, i);
 		if (ed == NULL) {
 			printf("rue%d: couldn't get ep %d\n", sc->rue_unit, i);
 			goto error;
@@ -629,6 +665,12 @@ USB_ATTACH(rue)
 		}
 	}
 
+#if __FreeBSD_version >= 500000
+	mtx_init(&sc->rue_mtx, device_get_nameunit(self), MTX_NETWORK_LOCK,
+		 MTX_DEF | MTX_RECURSE);
+#endif
+	RUE_LOCK(sc);
+
 	/* Reset the adapter */
 	rue_reset(sc);
 
@@ -637,7 +679,7 @@ USB_ATTACH(rue)
 			   (caddr_t)&eaddr, ETHER_ADDR_LEN);
 	if (err) {
 		printf("rue%d: couldn't get station address\n", sc->rue_unit);
-		goto error;
+		goto error1;
 	}
 
 	/* RealTek RTL8150 was detected */
@@ -663,24 +705,32 @@ USB_ATTACH(rue)
 	if (mii_phy_probe(self, &sc->rue_miibus,
 			  rue_ifmedia_upd, rue_ifmedia_sts)) {
 		printf("rue%d: MII without any PHY!\n", sc->rue_unit);
-		goto error;
+		goto error1;
 	}
 
 	rue_qdat.ifp = ifp;
 	rue_qdat.if_rxstart = rue_rxstart;
 
 	/* Call MI attach routine */
+#if __FreeBSD_version >= 500000
+	ether_ifattach(ifp, eaddr);
+#else
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 	callout_handle_init(&sc->rue_stat_ch);
 	usb_register_netisr();
 	sc->rue_dying = 0;
 
-	splx(s);
+	RUE_UNLOCK(sc);
 	free(devinfo, M_USBDEV);
 	USB_ATTACH_SUCCESS_RETURN;
 
+    error1:
+	RUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
+	mtx_destroy(&sc->rue_mtx);
+#endif
     error:
-	splx(s);
 	free(devinfo, M_USBDEV);
 	USB_ATTACH_ERROR_RETURN;
 }
@@ -690,16 +740,18 @@ rue_detach(device_ptr_t dev)
 {
 	struct rue_softc	*sc;
 	struct ifnet		*ifp;
-	int			s;
-
-	s = splusb();
 
 	sc = device_get_softc(dev);
+	RUE_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
 	sc->rue_dying = 1;
 	untimeout(rue_tick, sc, sc->rue_stat_ch);
+#if __FreeBSD_version >= 500000
+	ether_ifdetach(ifp);
+#else
 	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 
 	if (sc->rue_ep[RUE_ENDPT_TX] != NULL)
 		usbd_abort_pipe(sc->rue_ep[RUE_ENDPT_TX]);
@@ -710,7 +762,10 @@ rue_detach(device_ptr_t dev)
 		usbd_abort_pipe(sc->rue_ep[RUE_ENDPT_INTR]);
 #endif
 
-	splx(s);
+	RUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
+	mtx_destroy(&sc->rue_mtx);
+#endif
 
 	return (0);
 }
@@ -809,26 +864,25 @@ rue_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	struct rue_softc	*sc = priv;
 	struct ifnet		*ifp;
 	struct rue_intrpkt	*p;
-	int			s;
 
-	s = splimp();
+	RUE_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
 	if (!(ifp->if_flags & IFF_RUNNING)) {
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 
 	if (status != USBD_NORMAL_COMPLETION) {
 		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {
-			splx(s);
+			RUE_UNLOCK(sc);
 			return;
 		}
 		printf("rue%d: usb error on intr: %s\n", sc->rue_unit,
 			usbd_errstr(status));
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall(sc->rue_ep[RUE_ENDPT_INTR]);
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 
@@ -838,7 +892,7 @@ rue_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	ifp->if_ierrors += p->rue_crcerr_cnt;
 	ifp->if_collisions += p->rue_col_cnt;
 
-	splx(s);
+	RUE_UNLOCK(sc);
 }
 #endif
 
@@ -849,11 +903,12 @@ rue_rxstart(struct ifnet *ifp)
 	struct rue_chain	*c;
 
 	sc = ifp->if_softc;
-
+	RUE_LOCK(sc);
 	c = &sc->rue_cdata.rue_rx_chain[sc->rue_cdata.rue_rx_prod];
 
 	if (rue_newbuf(sc, c, NULL) == ENOBUFS) {
 		ifp->if_ierrors++;
+		RUE_UNLOCK(sc);
 		return;
 	}
 
@@ -862,6 +917,8 @@ rue_rxstart(struct ifnet *ifp)
 		c, mtod(c->rue_mbuf, char *), RUE_BUFSZ, USBD_SHORT_XFER_OK,
 		USBD_NO_TIMEOUT, rue_rxeof);
 	usbd_transfer(c->rue_xfer);
+
+	RUE_UNLOCK(sc);
 }
 
 /*
@@ -881,17 +938,22 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	if (sc->rue_dying)
 		return;
-
+	RUE_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	if (!(ifp->if_flags & IFF_RUNNING))
+	if (!(ifp->if_flags & IFF_RUNNING)) {
+		RUE_UNLOCK(sc);
 		return;
+	}
 
 	if (status != USBD_NORMAL_COMPLETION) {
-		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED)
+		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {
+			RUE_UNLOCK(sc);
 			return;
-		printf("rue%d: usb error on rx: %s\n", sc->rue_unit,
-			usbd_errstr(status));
+		}
+		if (usbd_ratecheck(&sc->rue_rx_notice))
+			printf("rue%d: usb error on rx: %s\n", sc->rue_unit,
+			       usbd_errstr(status));
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall(sc->rue_ep[RUE_ENDPT_RX]);
 		goto done;
@@ -923,6 +985,7 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	/* Put the packet on the special USB input queue. */
 	usb_ether_input(m);
 
+	RUE_UNLOCK(sc);
 	return;
 
     done:
@@ -931,6 +994,7 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 			c, mtod(c->rue_mbuf, char *), RUE_BUFSZ,
 			USBD_SHORT_XFER_OK, USBD_NO_TIMEOUT, rue_rxeof);
 	usbd_transfer(xfer);
+	RUE_UNLOCK(sc);
 }
 
 /*
@@ -945,22 +1009,21 @@ rue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	struct rue_softc	*sc = c->rue_sc;
 	struct ifnet		*ifp;
 	usbd_status		err;
-	int			s;
 
-	s = splimp();
+	RUE_LOCK(sc);
 
 	ifp = &sc->arpcom.ac_if;
 
 	if (status != USBD_NORMAL_COMPLETION) {
 		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {
-			splx(s);
+			RUE_UNLOCK(sc);
 			return;
 		}
 		printf("rue%d: usb error on tx: %s\n", sc->rue_unit,
 			usbd_errstr(status));
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall(sc->rue_ep[RUE_ENDPT_TX]);
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 
@@ -979,7 +1042,7 @@ rue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	else
 		ifp->if_opackets++;
 
-	splx(s);
+	RUE_UNLOCK(sc);
 }
 
 Static void
@@ -988,35 +1051,30 @@ rue_tick(void *xsc)
 	struct rue_softc	*sc = xsc;
 	struct ifnet		*ifp;
 	struct mii_data		*mii;
-	int			s;
 
-	s = splimp();
-
-	if (sc == NULL) {
-		splx(s);
+	if (sc == NULL)
 		return;
-	}
+
+	RUE_LOCK(sc);
 
 	ifp = &sc->arpcom.ac_if;
-	mii = device_get_softc(sc->rue_miibus);
+	mii = GET_MII(sc);
 	if (mii == NULL) {
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 
 	mii_tick(mii);
-	if (!sc->rue_link) {
-		mii_pollstat(mii);
-		if (mii->mii_media_status & IFM_ACTIVE &&
-		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
-			sc->rue_link++;
-			if (ifp->if_snd.ifq_head != NULL)
-				rue_start(ifp);
+	if (!sc->rue_link && mii->mii_media_status & IFM_ACTIVE &&
+	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
+		sc->rue_link++;
+		if (ifp->if_snd.ifq_head != NULL)
+			rue_start(ifp);
 	}
 
 	sc->rue_stat_ch = timeout(rue_tick, sc, hz);
 
-	splx(s);
+	RUE_UNLOCK(sc);
 }
 
 Static int
@@ -1066,19 +1124,28 @@ rue_start(struct ifnet *ifp)
 	struct rue_softc	*sc = ifp->if_softc;
 	struct mbuf		*m_head = NULL;
 
-	if (!sc->rue_link)
-		return;
+	RUE_LOCK(sc);
 
-	if (ifp->if_flags & IFF_OACTIVE)
+	if (!sc->rue_link) {
+		RUE_UNLOCK(sc);
 		return;
+	}
+
+	if (ifp->if_flags & IFF_OACTIVE) {
+		RUE_UNLOCK(sc);
+		return;
+	}
 
 	IF_DEQUEUE(&ifp->if_snd, m_head);
-	if (m_head == NULL)
+	if (m_head == NULL) {
+		RUE_UNLOCK(sc);
 		return;
+	}
 
 	if (rue_encap(sc, m_head, 0)) {
 		IF_PREPEND(&ifp->if_snd, m_head);
 		ifp->if_flags |= IFF_OACTIVE;
+		RUE_UNLOCK(sc);
 		return;
 	}
 
@@ -1086,8 +1153,7 @@ rue_start(struct ifnet *ifp)
 	 * If there's a BPF listener, bounce a copy of this frame
 	 * to him.
 	 */
-	if (ifp->if_bpf)
-		bpf_mtap(ifp, m_head);
+	BPF_MTAP(ifp, m_head);
 
 	ifp->if_flags |= IFF_OACTIVE;
 
@@ -1095,6 +1161,8 @@ rue_start(struct ifnet *ifp)
 	 * Set a timeout in case the chip goes out to lunch.
 	 */
 	ifp->if_timer = 5;
+
+	RUE_UNLOCK(sc);
 }
 
 Static void
@@ -1102,23 +1170,23 @@ rue_init(void *xsc)
 {
 	struct rue_softc	*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
-	struct mii_data		*mii;
+	struct mii_data		*mii = GET_MII(sc);
 	struct rue_chain	*c;
 	usbd_status		err;
-	int			i, s;
+	int			i;
 	int			rxcfg;
 
-	if (ifp->if_flags & IFF_RUNNING)
-		return;
+	RUE_LOCK(sc);
 
-	s = splimp();
+	if (ifp->if_flags & IFF_RUNNING) {
+		RUE_UNLOCK(sc);
+		return;
+	}
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
 	 */
 	rue_reset(sc);
-
-	mii = device_get_softc(sc->rue_miibus);
 
 	/* Set MAC address */
 	rue_write_mem(sc, RUE_IDR0, sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
@@ -1126,14 +1194,14 @@ rue_init(void *xsc)
 	/* Init TX ring. */
 	if (rue_tx_list_init(sc) == ENOBUFS) {
 		printf("rue%d: tx list init failed\n", sc->rue_unit);
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 
 	/* Init RX ring. */
 	if (rue_rx_list_init(sc) == ENOBUFS) {
 		printf("rue%d: rx list init failed\n", sc->rue_unit);
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 
@@ -1176,7 +1244,7 @@ rue_init(void *xsc)
 	if (err) {
 		printf("rue%d: open rx pipe failed: %s\n",
 			sc->rue_unit, usbd_errstr(err));
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 	err = usbd_open_pipe(sc->rue_iface, sc->rue_ed[RUE_ENDPT_TX],
@@ -1184,7 +1252,7 @@ rue_init(void *xsc)
 	if (err) {
 		printf("rue%d: open tx pipe failed: %s\n",
 			sc->rue_unit, usbd_errstr(err));
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 
@@ -1197,7 +1265,7 @@ rue_init(void *xsc)
 	if (err) {
 		printf("rue%d: open intr pipe failed: %s\n",
 			sc->rue_unit, usbd_errstr(err));
-		splx(s);
+		RUE_UNLOCK(sc);
 		return;
 	}
 #endif
@@ -1214,9 +1282,9 @@ rue_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
-
 	sc->rue_stat_ch = timeout(rue_tick, sc, hz);
+
+	RUE_UNLOCK(sc);
 }
 
 /*
@@ -1227,9 +1295,8 @@ Static int
 rue_ifmedia_upd(struct ifnet *ifp)
 {
 	struct rue_softc	*sc = ifp->if_softc;
-	struct mii_data		*mii;
+	struct mii_data		*mii = GET_MII(sc);
 
-	mii = device_get_softc(sc->rue_miibus);
 	sc->rue_link = 0;
 	if (mii->mii_instance) {
 		struct mii_softc	*miisc;
@@ -1249,9 +1316,7 @@ Static void
 rue_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct rue_softc	*sc = ifp->if_softc;
-	struct mii_data		*mii;
-
-	mii = device_get_softc(sc->rue_miibus);
+	struct mii_data		*mii = GET_MII(sc);
 
 	mii_pollstat(mii);
 	ifmr->ifm_active = mii->mii_media_active;
@@ -1265,16 +1330,10 @@ rue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct ifreq		*ifr = (struct ifreq *)data;
 	struct mii_data		*mii;
 	int			error = 0;
-	int			s;
 
-	s = splimp();
+	RUE_LOCK(sc);
 
 	switch (command) {
-	case SIOCSIFADDR:
-	case SIOCGIFADDR:
-	case SIOCSIFMTU:
-		error = ether_ioctl(ifp, command, data);
-		break;
 	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_flags & IFF_RUNNING &&
@@ -1305,15 +1364,15 @@ rue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:
-		mii = device_get_softc(sc->rue_miibus);
+		mii = GET_MII(sc);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
 	default:
-		error = EINVAL;
+		error = ether_ioctl(ifp, command, data);
 		break;
 	}
 
-	splx(s);
+	RUE_UNLOCK(sc);
 
 	return (error);
 }
@@ -1325,6 +1384,8 @@ rue_watchdog(struct ifnet *ifp)
 	struct rue_chain	*c;
 	usbd_status		stat;
 
+	RUE_LOCK(sc);
+
 	ifp->if_oerrors++;
 	printf("rue%d: watchdog timeout\n", sc->rue_unit);
 
@@ -1334,6 +1395,8 @@ rue_watchdog(struct ifnet *ifp)
 
 	if (ifp->if_snd.ifq_head != NULL)
 		rue_start(ifp);
+
+	RUE_UNLOCK(sc);
 }
 
 /*
@@ -1347,6 +1410,8 @@ rue_stop(struct rue_softc *sc)
 	usbd_status	err;
 	struct ifnet	*ifp;
 	int		i;
+
+	RUE_LOCK(sc);
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_timer = 0;
@@ -1441,6 +1506,8 @@ rue_stop(struct rue_softc *sc)
 	sc->rue_link = 0;
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+
+	RUE_UNLOCK(sc);
 }
 
 /*
@@ -1456,6 +1523,8 @@ rue_shutdown(device_ptr_t dev)
 	sc = device_get_softc(dev);
 
 	sc->rue_dying++;
+	RUE_LOCK(sc);
 	rue_reset(sc);
 	rue_stop(sc);
+	RUE_UNLOCK(sc);
 }

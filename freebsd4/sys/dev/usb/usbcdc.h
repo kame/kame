@@ -1,5 +1,5 @@
-/*	$NetBSD: usbcdc.h,v 1.3 1999/01/03 01:09:18 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbcdc.h,v 1.7.2.2 2000/10/31 23:01:16 n_hibma Exp $	*/
+/*	$NetBSD: usbcdc.h,v 1.6 2000/04/27 15:26:50 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbcdc.h,v 1.7.2.3 2004/03/01 00:07:22 julian Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -145,6 +145,18 @@ typedef struct {
 	uByte	data[16];
 } usb_cdc_notification_t;
 #define UCDC_NOTIFICATION_LENGTH 8
+
+/*
+ * Bits set in the SERIAL STATE notifcation (first byte of data)
+ */
+
+#define UCDC_N_SERIAL_OVERRUN		0x40
+#define UCDC_N_SERIAL_PARITY		0x20
+#define UCDC_N_SERIAL_FRAMING		0x10
+#define UCDC_N_SERIAL_RI		0x08
+#define UCDC_N_SERIAL_BREAK		0x04
+#define UCDC_N_SERIAL_DSR		0x02
+#define UCDC_N_SERIAL_DCD		0x01
 
 /* Serial state bit masks */
 #define UCDC_MDM_RXCARRIER	0x01

@@ -26,7 +26,7 @@
  *
  * 	From Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
  *
- * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.5.2.3 2002/02/11 04:50:11 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.5.2.4 2004/01/24 10:58:38 nyan Exp $
  */
 
 #include <stand.h>
@@ -410,7 +410,7 @@ void
 write_char(int c, int fgcol, int bgcol)
 {
 #ifdef PC98
-	*crtat = (c == 0x5c ? 0xfc : c);
+	*crtat = (c == 0x5c ? 0xfc : (c & 0xff));
 	*(crtat + 0x1000) = at2pc98(fgcol, bgcol);
 #else
 	v86.ctl=0;

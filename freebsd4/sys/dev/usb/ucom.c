@@ -1,5 +1,4 @@
-/*	$NetBSD: ucom.c,v 1.39 2001/08/16 22:31:24 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.24.2.4 2003/07/21 13:10:57 akiyama Exp $	*/
+/*	$NetBSD: ucom.c,v 1.40 2001/11/13 06:24:54 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -26,6 +25,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.24.2.6 2004/03/01 00:07:22 julian Exp $");
 
 /*
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -128,23 +130,19 @@ Static d_ioctl_t ucomioctl;
 #define UCOM_CDEV_MAJOR  138
 
 static struct cdevsw ucom_cdevsw = {
-	/* open */      ucomopen,
-	/* close */     ucomclose,
-	/* read */      ucomread,
-	/* write */     ucomwrite,
-	/* ioctl */     ucomioctl,
-	/* poll */      ttypoll,
-	/* mmap */      nommap,
-	/* strategy */  nostrategy,
-	/* name */      "ucom",
-	/* maj */       UCOM_CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     nopsize,
-	/* flags */     D_TTY | D_KQFILTER,
+	.d_open =	ucomopen,
+	.d_close =	ucomclose,
+	.d_read =	ucomread,
+	.d_write =	ucomwrite,
+	.d_ioctl =	ucomioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"ucom",
+	.d_maj =	UCOM_CDEV_MAJOR,
+	.d_flags =	D_TTY,
 #if __FreeBSD_version < 500014
-	/* bmaj */	-1,
+	.d_bmaj =	-1,
 #endif
-	/* kqfilter */	ttykqfilter,
+	.d_kqfilter =	ttykqfilter,
 };
 
 Static void ucom_cleanup(struct ucom_softc *);
@@ -344,7 +342,7 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 				     &sc->sc_bulkin_pipe);
 		if (err) {
 			printf("%s: open bulk in error (addr %d): %s\n",
-			       USBDEVNAME(sc->sc_dev), sc->sc_bulkin_no, 
+			       USBDEVNAME(sc->sc_dev), sc->sc_bulkin_no,
 			       usbd_errstr(err));
 			error = EIO;
 			goto fail_0;
@@ -548,6 +546,10 @@ ucomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 	int error;
 	int s;
 	int d;
+#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+	u_long oldcmd;
+	struct termios term;
+#endif
 
 	USB_GET_SC(ucom, UCOMUNIT(dev), sc);
 	tp = sc->sc_tty;
@@ -557,15 +559,28 @@ ucomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 
 	DPRINTF(("ucomioctl: cmd = 0x%08lx\n", cmd));
 
+#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+	term = tp->t_termios;
+	oldcmd = cmd;
+	error = ttsetcompat(tp, &cmd, data, &term);
+	if (error != 0)
+		return (error);
+	if (cmd != oldcmd)
+		data = (caddr_t)&term;
+#endif
+
 	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0) {
+	if (error != ENOIOCTL) {
 		DPRINTF(("ucomioctl: l_ioctl: error = %d\n", error));
 		return (error);
 	}
 
+	s = spltty();
+
 	error = ttioctl(tp, cmd, data, flag);
 	disc_optim(tp, &tp->t_termios, sc);
-	if (error >= 0) {
+	if (error != ENOIOCTL) {
+		splx(s);
 		DPRINTF(("ucomioctl: ttioctl: error = %d\n", error));
 		return (error);
 	}
@@ -581,8 +596,6 @@ ucomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 	error = 0;
 
 	DPRINTF(("ucomioctl: our cmd = 0x%08lx\n", cmd));
-
-	s = spltty();
 
 	switch (cmd) {
 	case TIOCSBRK:
@@ -726,7 +739,7 @@ ucom_dtr(struct ucom_softc *sc, int onoff)
 
 	if (sc->sc_callback->ucom_set == NULL)
 		return;
-	sc->sc_callback->ucom_set(sc->sc_parent, sc->sc_portno, 
+	sc->sc_callback->ucom_set(sc->sc_parent, sc->sc_portno,
 				  UCOM_SET_DTR, onoff);
 }
 
@@ -737,7 +750,7 @@ ucom_rts(struct ucom_softc *sc, int onoff)
 
 	if (sc->sc_callback->ucom_set == NULL)
 		return;
-	sc->sc_callback->ucom_set(sc->sc_parent, sc->sc_portno, 
+	sc->sc_callback->ucom_set(sc->sc_parent, sc->sc_portno,
 				  UCOM_SET_RTS, onoff);
 }
 
@@ -911,7 +924,7 @@ ucomstart(struct tty *tp)
 		memcpy(sc->sc_obuf, data, cnt);
 
 	DPRINTF(("ucomstart: %d chars\n", cnt));
-	usbd_setup_xfer(sc->sc_oxfer, sc->sc_bulkout_pipe, 
+	usbd_setup_xfer(sc->sc_oxfer, sc->sc_bulkout_pipe,
 			(usbd_private_handle)sc, sc->sc_obuf, cnt,
 			USBD_NO_COPY, USBD_NO_TIMEOUT, ucomwritecb);
 	/* What can we do on error? */
@@ -1017,8 +1030,8 @@ ucomstartread(struct ucom_softc *sc)
 	if (sc->sc_bulkin_pipe == NULL)
 		return (USBD_NORMAL_COMPLETION);
 
-	usbd_setup_xfer(sc->sc_ixfer, sc->sc_bulkin_pipe, 
-			(usbd_private_handle)sc, 
+	usbd_setup_xfer(sc->sc_ixfer, sc->sc_bulkin_pipe,
+			(usbd_private_handle)sc,
 			sc->sc_ibuf, sc->sc_ibufsize,
 			USBD_SHORT_XFER_OK | USBD_NO_COPY,
 			USBD_NO_TIMEOUT, ucomreadcb);

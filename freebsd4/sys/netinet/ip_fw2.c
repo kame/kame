@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.6.2.18 2003/10/17 11:01:03 scottl Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.6.2.21 2004/04/02 17:15:44 andre Exp $
  */
 
 #define        DEB(x)
@@ -37,6 +37,7 @@
 #include "opt_ipdn.h"
 #include "opt_ipdivert.h"
 #include "opt_inet.h"
+#include "opt_ipsec.h"
 #ifndef INET
 #error IPFIREWALL requires INET.
 #endif /* INET */
@@ -425,27 +426,24 @@ iface_match(struct ifnet *ifp, ipfw_insn_if *cmd)
 static int
 verify_rev_path(struct in_addr src, struct ifnet *ifp)
 {
-	static struct route ro;
+	struct route ro;
 	struct sockaddr_in *dst;
 
+	bzero(&ro, sizeof(ro));
+
 	dst = (struct sockaddr_in *)&(ro.ro_dst);
+	dst->sin_family = AF_INET;
+	dst->sin_len = sizeof(*dst);
+	dst->sin_addr = src;
+	rtalloc_ign(&ro, RTF_CLONING|RTF_PRCLONING);
 
-	/* Check if we've cached the route from the previous call. */
-	if (src.s_addr != dst->sin_addr.s_addr) {
-		ro.ro_rt = NULL;
-
-		bzero(dst, sizeof(*dst));
-		dst->sin_family = AF_INET;
-		dst->sin_len = sizeof(*dst);
-		dst->sin_addr = src;
-
-		rtalloc_ign(&ro, RTF_CLONING|RTF_PRCLONING);
-	}
-
-	if ((ro.ro_rt == NULL) || (ifp == NULL) ||
-	    (ro.ro_rt->rt_ifp->if_index != ifp->if_index))
+	if (ro.ro_rt == NULL)
 		return 0;
-
+	if ((ifp == NULL) || (ro.ro_rt->rt_ifp->if_index != ifp->if_index)) {
+		RTFREE(ro.ro_rt);
+		return 0;
+	}
+	RTFREE(ro.ro_rt);
 	return 1;
 }
 
@@ -1969,7 +1967,7 @@ check_body:
 				    (proto != IPPROTO_ICMP ||
 				     is_icmp_query(ip)) &&
 				    !(m->m_flags & (M_BCAST|M_MCAST)) &&
-				    !IN_MULTICAST(dst_ip.s_addr)) {
+				    !IN_MULTICAST(ntohl(dst_ip.s_addr))) {
 					send_reject(args, cmd->arg1,
 					    offset,ip_len);
 					m = args->m;

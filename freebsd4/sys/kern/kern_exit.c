@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
- * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.11 2003/01/13 22:51:16 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.13 2004/03/03 09:21:14 truckman Exp $
  */
 
 #include "opt_compat.h"
@@ -339,6 +339,7 @@ exit1(p, rv)
 	if (p->p_pptr->p_procsig->ps_flag & PS_NOCLDWAIT) {
 		struct proc *pp = p->p_pptr;
 		proc_reparent(p, initproc);
+		p->p_sigparent = SIGCHLD;
 		/*
 		 * If this was the last child of our parent, notify
 		 * parent, so in case he was wait(2)ing, he will
@@ -348,11 +349,10 @@ exit1(p, rv)
 			wakeup((caddr_t)pp);
 	}
 
-	if (p->p_sigparent && p->p_pptr != initproc) {
-	        psignal(p->p_pptr, p->p_sigparent);
-	} else {
+	if (p->p_pptr == initproc)
 	        psignal(p->p_pptr, SIGCHLD);
-	}
+	else if (p->p_sigparent != 0)
+	        psignal(p->p_pptr, p->p_sigparent);
 
 	wakeup((caddr_t)p->p_pptr);
 #if defined(tahoe)

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.8 2003/07/22 02:12:55 ps Exp $
+ * $FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.9 2003/12/01 21:06:59 ambrisko Exp $
  */
 
 /*
@@ -61,7 +61,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.8 2003/07/22 02:12:55 ps Exp $";
+  "$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.9 2003/12/01 21:06:59 ambrisko Exp $";
 #endif
 
 static int brgphy_probe(device_t);
@@ -618,4 +618,11 @@ brgphy_reset(struct mii_softc *sc)
 	PHY_WRITE(sc, BRGPHY_MII_AUXCTL, 0x7007);
 	val = PHY_READ(sc, BRGPHY_MII_AUXCTL);
 	PHY_WRITE(sc, BRGPHY_MII_AUXCTL, val | (1 << 15) || (1 << 4));
+
+	/* Enable Link LED on Dell boxes */
+	if (bge_sc->bge_no_3_led) {
+		PHY_WRITE(sc, BRGPHY_MII_PHY_EXTCTL, 
+		    PHY_READ(sc, BRGPHY_MII_PHY_EXTCTL)
+		    & ~BRGPHY_PHY_EXTCTL_3_LED);
+	}
 }

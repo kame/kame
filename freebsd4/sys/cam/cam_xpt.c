@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.18 2002/12/09 17:31:55 gibbs Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.19 2004/01/26 07:18:45 simokawa Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -655,8 +655,19 @@ u_int32_t cam_debug_delay;
 #endif /* CAM_DEBUG_BUS || CAM_DEBUG_TARGET || CAM_DEBUG_LUN */
 
 /* Our boot-time initialization hook */
+static int cam_module_event_handler(module_t, int /*modeventtype_t*/, void *);
+
+static moduledata_t cam_moduledata = {
+	"cam",
+	cam_module_event_handler,
+	NULL
+};
+
 static void	xpt_init(void *);
-SYSINIT(cam, SI_SUB_CONFIGURE, SI_ORDER_SECOND, xpt_init, NULL);
+
+DECLARE_MODULE(cam, cam_moduledata, SI_SUB_CONFIGURE, SI_ORDER_SECOND);
+MODULE_VERSION(cam, 1);
+
 
 static cam_status	xpt_compile_path(struct cam_path *new_path,
 					 struct cam_periph *perph,
@@ -1297,6 +1308,18 @@ ptstartover:
 	}
 
 	return(error);
+}
+
+static int
+cam_module_event_handler(module_t mod, int what, void *arg)
+{
+	if (what == MOD_LOAD) {
+		xpt_init(NULL);
+	} else if (what == MOD_UNLOAD) {
+		return EBUSY;
+	}
+
+	return 0;
 }
 
 /* Functions accessed by the peripheral drivers */

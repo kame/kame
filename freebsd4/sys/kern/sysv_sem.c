@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.8 2002/10/22 20:45:03 fjoe Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.9 2004/03/24 11:41:19 cperciva Exp $ */
 
 /*
  * Implementation of SVID semaphores
@@ -834,17 +834,12 @@ semop(p, uap)
 #endif
 		eval = tsleep((caddr_t)semaptr, (PZERO - 4) | PCATCH,
 		    "semwait", 0);
+		/* return code is checked below, after sem[nz]cnt-- */
 #ifdef SEM_DEBUG
 		printf("semop:  good morning (eval=%d)!\n", eval);
 #endif
 
 		suptr = NULL;	/* sem_undo may have been reallocated */
-
-		if (eval != 0)
-			return(EINTR);
-#ifdef SEM_DEBUG
-		printf("semop:  good morning!\n");
-#endif
 
 		/*
 		 * Make sure that the semaphore still exists
@@ -861,6 +856,17 @@ semop(p, uap)
 			semptr->semzcnt--;
 		else
 			semptr->semncnt--;
+
+		/*
+		 * Is it really morning, or was our sleep interrupted?
+		 * (Delayed check of msleep() return code because we
+		 * need to decrement sem[nz]cnt either way.)
+		 */
+		if (eval != 0)
+			return(EINTR);
+#ifdef SEM_DEBUG
+		printf("semop:  good morning!\n");
+#endif
 	}
 
 done:
