@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1647 2001/04/12 17:23:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.1648 2001/04/15 05:40:16 itojun Exp $
 
 <200104>
+Sun Apr 15 14:38:58 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: on IPsec tunnel mode encapsulation, do not
+	  copy TTL (or hop limit) value from inner to outer IP header.
+	  From: Ronald.vanderPol@surfnet.nl
+
 Wed Apr 11 18:52:26 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	Supported to get a certificate from DNS CERT RR.
