@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.44 2000/12/16 14:50:35 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.45 2000/12/17 21:50:10 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -524,12 +524,11 @@ yyerror(char *s, ...)
 #else
 	va_start(ap);
 #endif
-	snprintf(fmt, sizeof(fmt), "%d: \"%s\" %s\n",
-		incstack[incstackp].lineno, yytext, s);
+	snprintf(fmt, sizeof(fmt), "%s:%d: \"%s\" %s\n",
+		incstack[incstackp].path, incstack[incstackp].lineno,
+		yytext, s);
 	plogv(LLV_ERROR, LOCATION, NULL, fmt, ap);
 	va_end(ap);
-	plog(LLV_ERROR, LOCATION, NULL,
-		"in %s\n", incstack[incstackp].path);
 
 	yyerrorcount++;
 }
@@ -545,12 +544,11 @@ yywarn(char *s, ...)
 #else
 	va_start(ap);
 #endif
-	snprintf(fmt, sizeof(fmt), "%d: \"%s\" %s\n",
-		incstack[incstackp].lineno, yytext, s);
+	snprintf(fmt, sizeof(fmt), "%s:%d: \"%s\" %s\n",
+		incstack[incstackp].path, incstack[incstackp].lineno,
+		yytext, s);
 	plogv(LLV_WARNING, LOCATION, NULL, fmt, ap);
 	va_end(ap);
-	plog(LLV_WARNING, LOCATION, NULL,
-		"in %s\n", incstack[incstackp].path);
 }
 
 int
