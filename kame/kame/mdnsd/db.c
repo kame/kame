@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.2 2000/05/31 05:46:29 itojun Exp $	*/
+/*	$KAME: db.c,v 1.3 2000/05/31 10:40:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -60,11 +60,14 @@ int
 dbtimeo()
 {
 	struct scache *sc, *nsc;
+	struct nsdb *ns;
 	struct timeval tv;
 	int errcnt;
+	static int probecnt = 0;
 
 	(void)gettimeofday(&tv, NULL);
 
+	/* check transmit queue */
 	errcnt = 0;
 	for (sc = LIST_FIRST(&scache); sc; sc = nsc) {
 		nsc = LIST_NEXT(sc, link);
@@ -83,6 +86,19 @@ dbtimeo()
 		    (struct sockaddr *)&sc->to, sc->to.ss_len) < 0)
 			errcnt++;
 		delscache(sc);
+	}
+
+	/* check reachability to servers */
+	probecnt++;
+	if ((probecnt % probeinterval) == 0) {
+		dprintf("ns prio cleanup\n");
+		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
+#if 0
+			dprintf("ns %p prio was %d\n", ns, ns->prio);
+			ns->prio = 0;
+			probens(ns);
+#endif
+		}
 	}
 
 	return errcnt == 0 ? 0 : -1;
@@ -191,6 +207,7 @@ newnsdb(addr, comment, flags)
 	if (comment)
 		ns->comment = strdup(comment);
 	ns->flags = flags;
+	ns->prio = 0;
 
 	LIST_INSERT_HEAD(&nsdb, ns, link);
 	return ns;

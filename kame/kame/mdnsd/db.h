@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.2 2000/05/31 05:46:29 itojun Exp $	*/
+/*	$KAME: db.h,v 1.3 2000/05/31 10:40:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -56,6 +56,7 @@ struct nsdb {
 	struct sockaddr_storage addr;
 	char *comment;
 	int flags;
+	int prio;
 };
 
 extern LIST_HEAD(qchead, qcache) qcache;

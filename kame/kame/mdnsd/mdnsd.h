@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.5 2000/05/31 05:46:29 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.6 2000/05/31 10:40:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -44,6 +44,8 @@ extern int nsock;
 extern int family;
 extern const char *hostname;
 extern int dflag;
+extern struct timeval hz;
+extern int probeinterval;
 
 /* mdnsd.c */
 extern int ismyaddr __P((const struct sockaddr *));

@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.10 2000/05/31 09:24:51 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.11 2000/05/31 10:40:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -67,6 +67,8 @@ const char *hostname = NULL;
 static int mcasthops = 1;
 static int mcastloop = 0;
 int dflag = 1;
+struct timeval hz = { 1, 0 };	/* timeout every 1 second */
+int probeinterval = 300;	/* probe reachability every 5min */
 
 static void usage __P((void));
 static int getsock __P((int, const char *, const char *, int, int));

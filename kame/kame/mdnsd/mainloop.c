@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.14 2000/05/31 09:19:19 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.15 2000/05/31 10:40:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -101,7 +101,7 @@ mainloop()
 				fdmax = sock[i];
 		}
 		memset(&timeo, 0, sizeof(timeo));
-		timeo.tv_sec = 1;
+		timeo = hz;
 		i = select(fdmax + 1, &rfds, &wfds, NULL, &timeo);
 		if (i < 0) {
 			err(1, "select");
@@ -126,6 +126,7 @@ mainloop0(i)
 	int fromlen;
 	char buf[8 * 1024];
 	int l;
+	struct nsdb *ns;
 
 	/*
 	 * XXX we need to get destination address of incoming packet.
@@ -140,6 +141,15 @@ mainloop0(i)
 	    &fromlen);
 	if (l < 0)
 		err(1, "recvfrom");
+
+	/* reachability confirmation statistics */
+	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
+		if (fromlen != ns->addr.ss_len ||
+		    memcmp(&from, &ns->addr, fromlen) != 0)
+			continue;
+		ns->prio++;
+		dprintf("ns %p prio %d\n", ns, ns->prio);
+	}
 
 	if (ismyaddr((struct sockaddr *)&from)) {
 		/*
@@ -265,9 +275,9 @@ hexdump(title, buf, len, from)
 	int i;
 	char hbuf[NI_MAXHOST], pbuf[NI_MAXSERV];
 #ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
 #else
-	const int niflags = NI_NUMERICHOST;
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 	HEADER *hp;
 	const char *d, *n;
