@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.29 2001/12/13 23:31:03 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.30 2001/12/28 07:02:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -40,6 +40,9 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
+#endif
+#ifdef __NetBSD__
+#include "opt_ipsec.h"
 #endif
 
 #include <sys/param.h>
