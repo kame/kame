@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.30 2001/01/24 12:52:33 itojun Exp $	*/
+/*	$KAME: config.c,v 1.31 2001/01/28 10:14:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -315,7 +315,7 @@ getconfig(intface)
 			{
 				MAYHAVE(val, entbuf,
 				    (ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO|
-					 ND_OPT_PI_FLAG_RTADDR));
+					 ND_OPT_PI_FLAG_ROUTER));
 			} else
 #endif
 			{
@@ -325,7 +325,7 @@ getconfig(intface)
 			pfx->onlinkflg = val & ND_OPT_PI_FLAG_ONLINK;
 			pfx->autoconfflg = val & ND_OPT_PI_FLAG_AUTO;
 #ifdef MIP6
-			pfx->routeraddr = val & ND_OPT_PI_FLAG_RTADDR;
+			pfx->routeraddr = val & ND_OPT_PI_FLAG_ROUTER;
 #endif
 
 			makeentry(entbuf, i, "vltime", added);
@@ -669,8 +669,8 @@ make_packet(struct rainfo *rainfo)
 	struct nd_opt_prefix_info *ndopt_pi;
 	struct nd_opt_mtu *ndopt_mtu;
 #ifdef MIP6
-	struct nd_opt_advint *ndopt_advint;
-	struct nd_opt_hai *ndopt_hai;
+	struct nd_opt_advinterval *ndopt_advint;
+	struct nd_opt_homeagent_info *ndopt_hai;
 #endif
 	struct prefix *pfx;
 
@@ -693,9 +693,9 @@ make_packet(struct rainfo *rainfo)
 		packlen += sizeof(struct nd_opt_mtu);
 #ifdef MIP6
 	if (mobileip6 && rainfo->maxinterval)
-		packlen += sizeof(struct nd_opt_advint);
+		packlen += sizeof(struct nd_opt_advinterval);
 	if (mobileip6 && rainfo->hatime)
-		packlen += sizeof(struct nd_opt_hai);
+		packlen += sizeof(struct nd_opt_homeagent_info);
 #endif
 
 	/* allocate memory for the packet */
@@ -747,25 +747,25 @@ make_packet(struct rainfo *rainfo)
 
 #ifdef MIP6
 	if (mobileip6 && rainfo->maxinterval) {
-		ndopt_advint = (struct nd_opt_advint *)buf;
-		ndopt_advint->nd_opt_int_type = ND_OPT_ADV_INTERVAL;
-		ndopt_advint->nd_opt_int_len = 1;
-		ndopt_advint->nd_opt_int_reserved = 0;
-		ndopt_advint->nd_opt_int_interval = ntohl(rainfo->maxinterval *
+		ndopt_advint = (struct nd_opt_advinterval *)buf;
+		ndopt_advint->nd_opt_adv_type = ND_OPT_ADVINTERVAL;
+		ndopt_advint->nd_opt_adv_len = 1;
+		ndopt_advint->nd_opt_adv_reserved = 0;
+		ndopt_advint->nd_opt_adv_interval = ntohl(rainfo->maxinterval *
 							  1000);
-		buf += sizeof(struct nd_opt_advint);
+		buf += sizeof(struct nd_opt_advinterval);
 	}
 #endif
 	
 #ifdef MIP6
 	if (rainfo->hatime) {
-		ndopt_hai = (struct nd_opt_hai *)buf;
-		ndopt_hai->nd_opt_hai_type = ND_OPT_HA_INFORMATION;
+		ndopt_hai = (struct nd_opt_homeagent_info *)buf;
+		ndopt_hai->nd_opt_hai_type = ND_OPT_HOMEAGENT_INFO;
 		ndopt_hai->nd_opt_hai_len = 1;
 		ndopt_hai->nd_opt_hai_reserved = 0;
-		ndopt_hai->nd_opt_hai_pref = ntohs(rainfo->hapref);
+		ndopt_hai->nd_opt_hai_preference = ntohs(rainfo->hapref);
 		ndopt_hai->nd_opt_hai_lifetime = ntohs(rainfo->hatime);
-		buf += sizeof(struct nd_opt_hai);
+		buf += sizeof(struct nd_opt_homeagent_info);
 	}
 #endif
 	
@@ -788,7 +788,7 @@ make_packet(struct rainfo *rainfo)
 #ifdef MIP6
 		if (pfx->routeraddr)
 			ndopt_pi->nd_opt_pi_flags_reserved |=
-				ND_OPT_PI_FLAG_RTADDR;
+				ND_OPT_PI_FLAG_ROUTER;
 #endif
 		if (pfx->vltimeexpire || pfx->pltimeexpire)
 			gettimeofday(&now, NULL);
