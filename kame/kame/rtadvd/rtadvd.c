@@ -517,6 +517,7 @@ rtadvd_input()
 				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 					  INET6_ADDRSTRLEN),
 				if_indextoname(pi->ipi6_ifindex, ifnamebuf), i);
+			 return;
 		 }
 		 rs_input(i, (struct nd_router_solicit *)icp, pi, &from);
 		 break;
@@ -553,6 +554,7 @@ rtadvd_input()
 				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 					  INET6_ADDRSTRLEN),
 				if_indextoname(pi->ipi6_ifindex, ifnamebuf), i);
+			 return;
 		 }
 		 ra_input(i, (struct nd_router_advert *)icp, pi, &from);
 		 break;
