@@ -1,9 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.115 1999/09/15 09:39:39 jinmei Exp $
+$Id: CHANGELOG,v 1.116 1999/09/15 09:41:52 jinmei Exp $
 
 
 <199909>
+1999-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): removed a redundant
+	sanity check for ifp in the SIOCGIFSTAT_IN6 case. The check was
+	even harmful to freebsd3.
+
 1999-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (add_m6if, del_m6if):
 	for fbsd3, use if_allmulti() instead of calling if_ioctl directly
