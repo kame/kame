@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.101 2001/02/02 05:03:09 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.102 2001/02/02 05:07:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1693,7 +1693,6 @@ pk_recvacquire(mhp)
 	if (isakmp_post_acquire(iph2[n]) < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to begin ipsec sa negotication.\n");
-		unbindph12(iph2[n]);
 		goto err;
 	}
 

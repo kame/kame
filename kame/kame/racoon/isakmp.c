@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.125 2001/01/28 17:17:17 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.126 2001/02/02 05:07:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1618,8 +1618,10 @@ isakmp_post_acquire(iph2)
 
 	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
-	                [iph2->status])(iph2, NULL) != 0)
+	                [iph2->status])(iph2, NULL) != 0) {
+		unbindph12(iph2);
 		return -1;
+	}
 
 	return 0;
 }
