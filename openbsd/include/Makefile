@@ -35,33 +35,36 @@ LDIRS=	dev net netinet netinet6 netccitt netiso netns netipx nfs sys ufs vm ddb 
 	scsi netatalk isofs xfs
 
 # Directories with an includes target
-RDIRS=	../lib/libc_r ../lib/libcom_err ../lib/libcompat ../lib/libcurses \
-        ../lib/libform ../lib/libmenu ../lib/libocurses ../lib/libossaudio \
-	../lib/libpanel ../lib/librpcsvc ../lib/libskey ../lib/libedit \
-	../lib/libpcap ../lib/libutil ../lib/libwrap ../lib/libz \
-	../sys/arch/${MACHINE}
+#RDIRS=	../lib/libc_r ../lib/libcom_err ../lib/libcompat ../lib/libcurses \
+#        ../lib/libform ../lib/libmenu ../lib/libocurses ../lib/libossaudio \
+#	../lib/libpanel ../lib/librpcsvc ../lib/libskey ../lib/libedit \
+#	../lib/libpcap ../lib/libutil ../lib/libwrap ../lib/libz \
+#	../sys/arch/${MACHINE}
+RDIRS=
 
 # Places using Makefile that needs a prerequisite target met before includes
 PRDIRS=
 
 # Directories with an includes target that use Makefile.bsd-wrapper
-WDIRS=	../lib/libssl ../gnu/lib/libg++/libg++ ../gnu/lib/libg++/libio \
-	../gnu/lib/libg++/librx ../gnu/lib/libg++/libstdc++ \
-	../gnu/usr.bin/gcc ../gnu/lib/libgmp
+#WDIRS=	../lib/libssl ../gnu/lib/libg++/libg++ ../gnu/lib/libg++/libio \
+#	../gnu/lib/libg++/librx ../gnu/lib/libg++/libstdc++ \
+#	../gnu/usr.bin/gcc ../gnu/lib/libgmp
+WDIRS=
 
 # Places using Makefile.bsd-wrapper that needs a prerequisite target met
 # before includes
-PWDIRS=	../lib/libssl
+#PWDIRS=	../lib/libssl
+PWDIRS=
 
 NOOBJ=	noobj
 
 # Change SYS_INCLUDE in bsd.own.mk to "symlinks" if you don't want copies
 .include <bsd.own.mk>
 SYS_INCLUDE?=	copies
-.if (${KERBEROS} == "yes")
-RDIRS+=	../kerberosIV/include ../kerberosIV/kadm ../kerberosIV/krb
-PRDIRS+=../kerberosIV/kadm ../kerberosIV/krb
-.endif
+#.if (${KERBEROS} == "yes")
+#RDIRS+=	../kerberosIV/include ../kerberosIV/kadm ../kerberosIV/krb
+#PRDIRS+=../kerberosIV/kadm ../kerberosIV/krb
+#.endif
 
 prereq:
 	@-for i in ${PRDIRS}; do \
