@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.63 2001/08/28 13:04:22 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.64 2001/09/05 08:30:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -190,6 +190,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	 * XXX
 	 * how to select a src address when we want to use home
 	 * address when we are out and using mobile ip functionality.
+	 *
+	 * these code should be merged into the src addr selection
+	 * code below.
 	 */
 	{
 		struct hif_softc *sc;
@@ -262,7 +265,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	if (ifp == NULL)	/* this should not happen */
 		panic("in6_selectsrc: NULL ifp");
 #endif
-
+p
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		int new_scope = -1, new_matchlen = -1;
 		int srczone, dstzone;
@@ -329,6 +332,20 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		 * XXX: This is a TODO.  We should probably merge the MIP6
 		 * case above.
 		 */
+#ifdef XXX_MIP6_CONSIDERING
+		/*
+		 * XXX TODO:
+		 *
+		 * 1. how to select a home address when we have many
+		 * home addresses for different home links?
+		 * 
+		 * 2. how to handle the home address that have not
+		 * been registered yet.  such an address should not be
+		 * selected ?
+		 */
+		if (ia_best->ia6_flags & IN6_IFF_HOME)
+			REPLACE(4);
+#endif /* XXX_MIP6_CONSIDERING */
 
 		/* Rule 5: Prefer outgoing interface */
 		if (ia_best->ia_ifp == ifp && ia->ia_ifp != ifp)
