@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1422 2000/12/04 06:17:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1423 2000/12/04 10:56:39 itojun Exp $
 
 <200012>
+Mon Dec  4 19:55:10 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_pcb.c (netbsd/openbsd):
+	  re-introduce workaround for updating cached routes in unconnected
+	  inpcb, on ICMPv6 redirect (otherwise, cached routes will not be
+	  updated).  should be revisited.
+
 2000-12-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6[ds]d/mld6.c (make_mld6_msg):
 	* kame/kame/mld6query/mld6.c (make_msg):
