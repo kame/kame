@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.190 2001/08/28 12:26:50 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.191 2001/09/11 07:19:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -944,7 +944,7 @@ nd6_lookup(addr6, create, ifp)
 			 * Create a new route.  RTF_LLINFO is necessary
 			 * to create a Neighbor Cache entry for the
 			 * destination in nd6_rtrequest which will be
-			 * called in rtequest via ifa->ifa_rtrequest.
+			 * called in rtrequest via ifa->ifa_rtrequest.
 			 */
 			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)&sin6,
 					   ifa->ifa_addr,
