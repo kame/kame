@@ -430,7 +430,7 @@ int
 inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 		 size_t len, u_int8_t align, void **databufp)
 {
-	int currentlen = prevlen, padlen;
+	int currentlen = prevlen, padlen = 0;
 
 	/*
 	 * The option type must have a value from 2 to 255, inclusive.
@@ -456,7 +456,8 @@ inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 		return(-1);
 
 	/* Calculate the padding length. */
-	padlen = currentlen % align;
+	if (currentlen % align)
+		padlen = align - (currentlen % align);
 
 	/* The option must fit in the extension header buffer. */
 	currentlen += padlen + 2 + len;
@@ -514,7 +515,7 @@ inet6_opt_finish(void *extbuf, size_t extlen, int prevlen)
 		if (updatelen > extlen)
 			return(-1);
 
-		padp = (u_int8_t *)extbuf + extlen;
+		padp = (u_int8_t *)extbuf + prevlen;
 		if (padlen == 1)
 			*padp = IP6OPT_PAD1;
 		else if (padlen > 0) {
