@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.14 2001/06/23 01:54:22 itojun Exp $	*/
+/*	$KAME: db.h,v 1.15 2001/07/26 14:08:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,7 +32,8 @@
 struct sockdb;
 struct qcache {
 	LIST_ENTRY(qcache) link;
-	struct sockaddr_storage from;
+	struct sockaddr_storage from_ss;
+	struct sockaddr *from;
 	char *qbuf;	/* original query packet */
 	int qlen;
 	u_int16_t id;	/* id on relayed query - net endian */
@@ -50,15 +51,18 @@ struct scache {
 	struct timeval tts;	/* time to send */
 	char *sbuf;		/* answer to send */
 	int slen;
-	struct sockaddr_storage from;
-	struct sockaddr_storage to;
+	struct sockaddr_storage from_ss;
+	struct sockaddr *from;
+	struct sockaddr_storage to_ss;
+	struct sockaddr *to;
 	int sockidx;
 };
 
 enum nstype { N_UNICAST, N_MULTICAST };
 struct nsdb {
 	LIST_ENTRY(nsdb) link;
-	struct sockaddr_storage addr;
+	struct sockaddr_storage addr_ss;
+	struct sockaddr *addr;
 	char *comment;
 	enum nstype type;
 	int prio;

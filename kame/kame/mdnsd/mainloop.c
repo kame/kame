@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.74 2001/07/09 09:35:24 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.75 2001/07/26 14:08:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -277,8 +277,8 @@ recv_dns0(sd, vclen)
 
 	/* reachability confirmation statistics */
 	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
-		if (fromlen != ns->addr.ss_len ||
-		    memcmp(&from, &ns->addr, fromlen) != 0)
+		if (fromlen != ns->addr->sa_len ||
+		    memcmp(&from, ns->addr, fromlen) != 0)
 			continue;
 		ns->prio++;
 		gettimeofday(&ns->lastrx, NULL);
@@ -1125,8 +1125,8 @@ getans_dns(buf, len, from)
 		len = qc->rbuflen;
 		hp->tc = 1;
 	}
-	if (sendto(qc->sd->s, buf, len, 0, (struct sockaddr *)&qc->from,
-	    qc->from.ss_len) != len) {
+	if (sendto(qc->sd->s, buf, len, 0, qc->from,
+	    qc->from->sa_len) != len) {
 		delqcache(qc);
 		goto fail;
 	}
@@ -1307,8 +1307,8 @@ getans_icmp6_fqdn(buf, len, from)
 
 	/* XXX TC bit processing */
 
-	sendto(qc->sd->s, dnsbuf, p - dnsbuf, 0, (struct sockaddr *)&qc->from,
-	    qc->from.ss_len);
+	sendto(qc->sd->s, dnsbuf, p - dnsbuf, 0, qc->from,
+	    qc->from->sa_len);
 
 	if (on) {
 		/* LINTED const cast */
@@ -1430,8 +1430,8 @@ getans_icmp6_nodeaddr(buf, len, from)
 
 	/* XXX TC bit processing */
 
-	sendto(qc->sd->s, dnsbuf, p - dnsbuf, 0, (struct sockaddr *)&qc->from,
-	    qc->from.ss_len);
+	sendto(qc->sd->s, dnsbuf, p - dnsbuf, 0, qc->from,
+	    qc->from->sa_len);
 
 	if (on) {
 		/* LINTED const cast */
@@ -1474,7 +1474,6 @@ relay_dns(sd, buf, len, from)
 	int len;
 	struct sockaddr *from;
 {
-	const struct sockaddr *sa;
 	HEADER *hp;
 	struct qcache *qc;
 	struct nsdb *ns;
@@ -1577,7 +1576,7 @@ relay_dns(sd, buf, len, from)
 			else
 				servtype = S_UNICAST;
 
-			sd = af2sockdb(ns->addr.ss_family, servtype);
+			sd = af2sockdb(ns->addr->sa_family, servtype);
 			if (sd == NULL)
 				continue;
 
@@ -1586,17 +1585,16 @@ relay_dns(sd, buf, len, from)
 			if (ns->type == N_MULTICAST)
 				hp->rd = 0;
 
-			sa = (struct sockaddr *)&ns->addr;
-
 			if (dflag)
-				dnsdump("relay O", buf, len, sa);
+				dnsdump("relay O", buf, len, ns->addr);
 			if (sd->type == S_TCP) {
 				u_int16_t l16;
 
 				l16 = htons(len & 0xffff);
 				(void)write(sd->s, &l16, sizeof(l16));
 			}
-			if (sendto(sd->s, buf, len, 0, sa, sa->sa_len) == len) {
+			if (sendto(sd->s, buf, len, 0, ns->addr,
+			    ns->addr->sa_len) == len) {
 #if 0
 				dprintf("sock %d sent\n", i);
 #endif

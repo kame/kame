@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.39 2001/07/04 05:00:13 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.40 2001/07/26 14:08:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -78,6 +78,7 @@ const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 int signo = 0;
 
+int main __P((int, char **));
 static void usage __P((void));
 static int getsock __P((int, const char *, const char *, int, int,
 	enum sdtype));
@@ -641,7 +642,7 @@ ismyaddr(sa)
 	}
 #endif
 	h1[0] = h2[0] = '\0';
-	if (getnameinfo((struct sockaddr *)&ss[0], ss[0].ss_len, h1, sizeof(h1),
+	if (getnameinfo((struct sockaddr *)&ss[0], sa->sa_len, h1, sizeof(h1),
 	    p, sizeof(p), niflag) != 0)
 		return 0;
 #if 1	/*just for experiment - to run two servers on a single node*/
@@ -674,7 +675,8 @@ ismyaddr(sa)
 			}
 		}
 #endif
-		if (getnameinfo((struct sockaddr *)&ss[1], ss[1].ss_len,
+		if (getnameinfo((struct sockaddr *)&ss[1],
+		    ifa->ifa_addr->sa_len,
 		    h2, sizeof(h2), NULL, 0, niflag) != 0)
 			continue;
 		if (strcmp(h1, h2) != 0)
@@ -730,7 +732,7 @@ status()
 
 	fprintf(fp, "DNS servers:\n");
 	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
-		if (getnameinfo((struct sockaddr *)&ns->addr, ns->addr.ss_len,
+		if (getnameinfo(ns->addr, ns->addr->sa_len,
 		    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) != 0) {
 			strcpy(hbuf, "invalid");
 			strcpy(sbuf, "invalid");

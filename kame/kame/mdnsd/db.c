@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.10 2001/05/02 11:07:56 itojun Exp $	*/
+/*	$KAME: db.c,v 1.11 2001/07/26 14:08:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -84,7 +84,7 @@ dbtimeo()
 		hp = (HEADER *)qc->qbuf;
 		hp->rcode = NXDOMAIN;
 		if (sendto(qc->sd->s, qc->qbuf, qc->qlen, 0,
-		    (struct sockaddr *)&qc->from, qc->from.ss_len) < 0)
+		    qc->from, qc->from->sa_len) < 0)
 			errcnt++;
 
 		dprintf("query %p expired\n", qc);
@@ -107,7 +107,7 @@ dbtimeo()
 			continue;
 
 		if (sendto(sc->sockidx, sc->sbuf, sc->slen, 0,
-		    (struct sockaddr *)&sc->to, sc->to.ss_len) < 0)
+		    sc->to, sc->to->sa_len) < 0)
 			errcnt++;
 		delscache(sc);
 	}
@@ -147,7 +147,7 @@ newqcache(from, buf, len)
 {
 	struct qcache *qc;
 
-	if (from->sa_len > sizeof(qc->from))
+	if (from->sa_len > sizeof(qc->from_ss))
 		return NULL;
 
 	qc = (struct qcache *)malloc(sizeof(*qc));
@@ -160,7 +160,8 @@ newqcache(from, buf, len)
 		return NULL;
 	}
 
-	memcpy(&qc->from, from, from->sa_len);
+	qc->from = (struct sockaddr *)&qc->from_ss;
+	memcpy(qc->from, from, from->sa_len);
 	memcpy(qc->qbuf, buf, len);
 	qc->qlen = len;
 
@@ -188,7 +189,8 @@ newscache(sidx, from, to, buf, len)
 {
 	struct scache *sc;
 
-	if (from->sa_len > sizeof(sc->from) || to->sa_len > sizeof(sc->to))
+	if (from->sa_len > sizeof(sc->from_ss)
+	    || to->sa_len > sizeof(sc->to_ss))
 		return NULL;
 
 	sc = (struct scache *)malloc(sizeof(*sc));
@@ -202,8 +204,10 @@ newscache(sidx, from, to, buf, len)
 	}
 
 	sc->sockidx = -1;
-	memcpy(&sc->from, from, from->sa_len);
-	memcpy(&sc->to, to, to->sa_len);
+	sc->from = (struct sockaddr *)&sc->from_ss;
+	memcpy(sc->from, from, from->sa_len);
+	sc->to = (struct sockaddr *)&sc->to_ss;
+	memcpy(sc->to, to, to->sa_len);
 	memcpy(sc->sbuf, buf, len);
 	sc->slen = len;
 
@@ -229,7 +233,7 @@ newnsdb(addr, comment)
 {
 	struct nsdb *ns;
 
-	if (addr->sa_len > sizeof(ns->addr))
+	if (addr->sa_len > sizeof(ns->addr_ss))
 		return NULL;
 
 	ns = (struct nsdb *)malloc(sizeof(*ns));
@@ -237,7 +241,8 @@ newnsdb(addr, comment)
 		return NULL;
 	memset(ns, 0, sizeof(*ns));
 
-	memcpy(&ns->addr, addr, addr->sa_len);
+	ns->addr = (struct sockaddr *)&ns->addr_ss;
+	memcpy(ns->addr, addr, addr->sa_len);
 	if (comment)
 		ns->comment = strdup(comment);
 
@@ -263,7 +268,7 @@ printnsdb(ns)
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
 	printf("ns %p", ns);
-	if (getnameinfo((struct sockaddr *)&ns->addr, ns->addr.ss_len,
+	if (getnameinfo(ns->addr, ns->addr->sa_len,
 	    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) == 0) {
 		printf(" %s %s", hbuf, sbuf);
 	} else
