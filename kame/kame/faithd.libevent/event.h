@@ -36,6 +36,7 @@ extern "C" {
 
 #define EVLIST_TIMEOUT	0x01
 #define EVLIST_INSERTED	0x02
+#define EVLIST_SIGNAL	0x04
 #define EVLIST_ACTIVE	0x08
 #define EVLIST_INIT	0x80
 
@@ -45,6 +46,8 @@ extern "C" {
 #define EV_TIMEOUT	0x01
 #define EV_READ		0x02
 #define EV_WRITE	0x04
+#define EV_SIGNAL	0x08
+#define EV_PERSIST	0x10	/* Persistant event */
 
 /* Fix so that ppl dont have to run with <sys/queue.h> */
 #ifndef TAILQ_ENTRY
@@ -69,10 +72,13 @@ struct {								\
 struct event {
 	TAILQ_ENTRY (event) ev_next;
 	TAILQ_ENTRY (event) ev_active_next;
+	TAILQ_ENTRY (event) ev_signal_next;
 	RB_ENTRY (event) ev_timeout_node;
 
 	int ev_fd;
 	short ev_events;
+	short ev_ncalls;
+	short *ev_pncalls;	/* Allows deletes in callback */
 
 	struct timeval ev_timeout;
 
@@ -82,6 +88,9 @@ struct event {
 	int ev_res;		/* result passed to event callback */
 	int ev_flags;
 };
+
+#define EVENT_SIGNAL(ev)	ev->ev_fd
+#define EVENT_FD(ev)		ev->ev_fd
 
 #ifdef _EVENT_DEFINED_TQENTRY
 #undef TAILQ_ENTRY
@@ -103,7 +112,7 @@ struct eventop {
 	int (*dispatch)(void *, struct timeval *);
 };
 
-#define TIMEOUT_DEFAULT	5
+#define TIMEOUT_DEFAULT	{5, 0}
 
 void event_init(void);
 int event_dispatch(void);
@@ -122,10 +131,17 @@ void timeout_process(void);
 #define timeout_pending(ev, tv)		event_pending(ev, EV_TIMEOUT, tv)
 #define timeout_initialized(ev)		((ev)->ev_flags & EVLIST_INIT)
 
+#define signal_add(ev, tv)		event_add(ev, tv)
+#define signal_set(ev, x, cb, arg)	\
+	event_set(ev, x, EV_SIGNAL|EV_PERSIST, cb, arg)
+#define signal_del(ev)			event_del(ev)
+#define signal_pending(ev, tv)		event_pending(ev, EV_SIGNAL, tv)
+#define signal_initialized(ev)		((ev)->ev_flags & EVLIST_INIT)
+
 void event_set(struct event *, int, short, void (*)(int, short, void *), void *);
 int event_add(struct event *, struct timeval *);
 int event_del(struct event *);
-	void event_active(struct event *, int);
+void event_active(struct event *, int, short);
 
 int event_pending(struct event *, short, struct timeval *);
 
