@@ -3,7 +3,7 @@
 # Date created:		1 April 1995
 # Whom:			pst
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:25 itojun Exp $
+# $Id: Makefile,v 1.2 2000/05/30 02:18:51 itojun Exp $
 #
 
 DISTNAME=       qpopper2.53
@@ -13,6 +13,8 @@ MASTER_SITES=   ftp://ftp.qualcomm.com/eudora/servers/unix/popper/
 EXTRACT_SUFX=	.tar.Z
 
 MAINTAINER=	ache@freebsd.org
+
+BROKEN=		"security hole"
 
 #
 # If APOP_ONLY variable present in the environment, popper builds
