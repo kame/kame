@@ -1,19 +1,15 @@
-PROG=	ifmcstat
-MAN=	ifmcstat.8
+SRCDIR=	${.CURDIR}/../../kame/rip6query
 
-BINGRP=	kmem
-BINMODE=2555
-LDADD=	-lkvm
-DPADD=	${LIBKVM}
+PROG=	rip6query
+NOMAN=	yes
 
-CPPFLAGS+=	-DINET6
-
+CPPFLAGS+=	-DINET6 -I${SRCDIR}/../route6d
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-.PATH:	${.CURDIR}/../../kame/ifmcstat
+.PATH:	${SRCDIR}
 
 .include <bsd.prog.mk>

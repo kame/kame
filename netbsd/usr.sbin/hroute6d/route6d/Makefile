@@ -5,10 +5,10 @@ SRCS=	main.c startup.c timer.c input.c output.c send_admin.c parse.c \
 SRCDIR=	${.CURDIR}/../../../kame/hroute6d/route6d
 
 CPPFLAGS+=	-I${SRCDIR}/../include -DINET6 -I${.OBJDIR}
-LDADD+=	-L/usr/local/v6/lib -L${.OBJDIR}/../../libinet6 \
-	-L${.OBJDIR}/../../libinet6/obj -linet6
-DPADD+=	-L${.OBJDIR}/../../libinet6/libinet6.a \
-	${.OBJDIR}/../../libinet6/obj/libinet6.a \
+LDADD+=	-L/usr/local/v6/lib -L${.OBJDIR}/../../../lib/libinet6 \
+	-L${.OBJDIR}/../../../lib/libinet6/obj -linet6
+DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
+	${.OBJDIR}/../../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a 
 
 MAN=	hroute6d.8 hroute6d.conf.5

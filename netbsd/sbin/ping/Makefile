@@ -7,9 +7,9 @@ BINOWN=	root
 BINMODE=4555
 LDADD=	-lm
 CPPFLAGS+=	-DIPSEC
-LDADD+= -L${.CURDIR}/../../src/libipsec -L${.CURDIR}/../../src/libipsec/obj \
+LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L/usr/local/v6/lib -lipsec
-LDADD+= -L${.CURDIR}/../../src/libinet6 -L${.CURDIR}/../../src/libinet6/obj \
+LDADD+= -L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 
 .include <bsd.prog.mk>

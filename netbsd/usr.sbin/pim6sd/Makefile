@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.1 1999/08/06 05:15:04 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/06 06:18:01 itojun Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -95,7 +95,7 @@ MAN=	pim6sd.8
 
 afterinstall:
 	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
-		${INSTALLFLAGS} pim6sd ${.CURDIR}/pim6stat ${DESTDIR}${BINDIR}
+		${INSTALLFLAGS} ${SRCDIR}/pim6stat ${DESTDIR}${BINDIR}
 
 .PATH:	${SRCDIR}
 
