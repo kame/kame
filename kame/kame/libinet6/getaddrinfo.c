@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.186 2004/05/16 06:17:32 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.187 2004/05/16 06:21:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,8 +31,12 @@
 
 /*
  * Issues to be discussed:
- * - Thread safe-ness
- *	+ 
+ * - Thread-safeness
+ *	+ the access to _hostconf_init_done in the FreeBSD specific part
+ *	  is not thread safe.  As a result, the access to the _hostconf array
+ *	  is not safe either.
+ *	+ most resolver libraries used as backend of getaddrinfo are not
+ *	  thread safe.
  * - Return values.  There are nonstandard return values defined and used
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
