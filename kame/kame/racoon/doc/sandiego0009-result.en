@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.23 2000/09/21 17:38:01 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.24 2000/09/21 20:11:52 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -197,15 +197,24 @@ vs NxNetworks
 	phase 2:
 	    3des, sha1, tunnel, pfs 2
 	- parsing the type of subjectaltname fault in racoon. (fixed)
+	- even if using old SA, when old SA expire, packet may drop
+	  when both sides clock are different.
 
 vs Intel (Packet Protect Pro/100S)
 	phase 1: main
 	    preshared, 3des-cbc, sha1, DH group 2
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-md5, transport mode, no PFS
-
 	Notes:
 	- fragmented ping works fine, large ftp transfer went well too
+
+	phase 1: main
+	    rsasig, 3des, sha1, DH group 2
+		subjectaltname = ipaddress
+	phase 2:
+	    3des, md5, transport, no pfs
+	- a lot of SA were installed, because kame doesn't delete old SA
+	  until it expires.
 
 vs NetLock
 	phase 1: main
