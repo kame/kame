@@ -97,8 +97,10 @@ static struct mbuf *
 static int	rt_msg2 __P((int,
 		    struct rt_addrinfo *, caddr_t, struct walkarg *));
 static void	rt_xaddrs __P((caddr_t, caddr_t, struct rt_addrinfo *));
+#ifdef BBNHACK
 static void rt_setif __P((struct rtentry *, struct sockaddr *,
 	struct sockaddr *, struct sockaddr *));
+#endif
 
 /* Sleazy use of local variables throughout file, warning!!!! */
 #define dst	info.rti_info[RTAX_DST]
@@ -194,6 +196,9 @@ route_output(m, va_alist)
 	struct rt_addrinfo info;
 	int len, error = 0;
 	struct ifnet *ifp = 0;
+#ifndef BBNHACK
+	struct ifaddr *ifa = 0;
+#endif
 	struct socket *so;
 	va_list ap;
 
@@ -253,6 +258,7 @@ route_output(m, va_alist)
 		error = rtrequest(RTM_ADD, dst, gate, netmask,
 					rtm->rtm_flags, &saved_nrt);
 		if (error == 0 && saved_nrt) {
+#ifdef BBNHACK
 			/* 
 			 * If the route request specified an interface with
 			 * IFA and/or IFP, we set the requested interface on
@@ -282,6 +288,7 @@ route_output(m, va_alist)
 			 */
 
 			rt_setif(saved_nrt, ifpaddr, ifaaddr, gate);
+#endif
 			rt_setmetrics(rtm->rtm_inits,
 				&rtm->rtm_rmx, &saved_nrt->rt_rmx);
 			saved_nrt->rt_refcnt--;
@@ -351,7 +358,7 @@ route_output(m, va_alist)
 			if (gate && rt_setgate(rt, rt_key(rt), gate))
 				senderr(EDQUOT);
 
-#if 1
+#ifdef BBNHACK
 			rt_setif(rt, ifpaddr, ifaaddr, gate);
 #else
 			/* new gateway could require new ifaddr, ifp;
@@ -380,7 +387,7 @@ route_output(m, va_alist)
 #endif
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
 					&rt->rt_rmx);
-#if 0
+#ifndef BBNHACK
 			if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
 			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, gate);
 #endif
@@ -457,6 +464,7 @@ rt_setmetrics(which, in, out)
 #undef metric
 }
 
+#ifdef BBNHACK
 /*
  * Set route's interface given ifpaddr, ifaaddr, and gateway.
  */
@@ -505,6 +513,7 @@ rt_setif(rt, Ifpaddr, Ifaaddr, Gate)
 	if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
 		rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, Gate);
 }
+#endif
 
 
 #define ROUNDUP(a) \
