@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)from: inetd.c	8.4 (Berkeley) 4/13/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/inetd/inetd.c,v 1.46.2.9 1999/08/29 15:42:34 peter Exp $";
+  "$FreeBSD: src/usr.sbin/inetd/inetd.c,v 1.46.2.10 1999/11/18 09:33:48 des Exp $";
 #endif /* not lint */
 
 /*
@@ -112,9 +112,7 @@ static const char rcsid[] =
  */
 
 #include <sys/param.h>
-#include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -143,6 +141,9 @@ static const char rcsid[] =
 #include <sysexits.h>
 #include <ctype.h>
 
+#include "inetd.h"
+#include "pathnames.h"
+
 #ifndef LIBWRAP_ALLOW_FACILITY
 # define LIBWRAP_ALLOW_FACILITY LOG_AUTH
 #endif
@@ -168,8 +169,6 @@ static const char rcsid[] =
 #define RESOURCE_RC "daemon"
 
 #endif
-
-#include "pathnames.h"
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -202,7 +201,6 @@ int	wrap_ex = 0;
 int	wrap_bi = 0;
 int	debug = 0;
 int	log = 0;
-int	nsock;
 int	maxsock;			/* highest-numbered descriptor */
 fd_set	allsock;
 int	options;
@@ -215,133 +213,14 @@ struct	rpcent *rpc;
 struct	in_addr bind_address4;
 struct	in6_addr bind_address6;
 extern	struct in6_addr in6addr_any;
-int     signalpipe[2];
-
-struct	servtab {
-	char	*se_service;		/* name of service */
-	int	se_socktype;		/* type of socket to use */
-	int	se_family;		/* address family */
-	char	*se_proto;		/* protocol used */
-	int	se_maxchild;		/* max number of children */
-	int	se_maxcpm;		/* max connects per IP per minute */
-	int	se_numchild;		/* current number of children */
-	pid_t	*se_pids;		/* array of child pids */
-	char	*se_user;		/* user name to run as */
-	char    *se_group;              /* group name to run as */
-#ifdef  LOGIN_CAP
-	char    *se_class;              /* login class name to run with */
+int	signalpipe[2];
+#ifdef SANITY_CHECK
+int	nsock;
 #endif
-	struct	biltin *se_bi;		/* if built-in, description */
-	char	*se_server;		/* server program */
-	char	*se_server_name;	/* server program without path */
-#define	MAXARGV 20
-	char	*se_argv[MAXARGV+1];	/* program arguments */
-#ifdef IPSEC
-	char	*se_policy;		/* IPsec poilcy string */
-#endif
-	int	se_fd;			/* open descriptor */
-	union {				/* bound address */
-		struct	sockaddr se_un_ctrladdr;
-		struct	sockaddr_in se_un_ctrladdr4;
-		struct	sockaddr_in6 se_un_ctrladdr6;
-	} se_un;
-#define se_ctrladdr	se_un.se_un_ctrladdr
-#define se_ctrladdr4	se_un.se_un_ctrladdr4
-#define se_ctrladdr6	se_un.se_un_ctrladdr6
-  	int	se_ctrladdr_size;
-	u_char	se_type;		/* type: normal, mux, or mux+ */
-	u_char	se_checked;		/* looked at during merge */
-	u_char	se_accept;		/* i.e., wait/nowait mode */
-	u_char	se_rpc;			/* ==1 if RPC service */
-	int	se_rpc_prog;		/* RPC program number */
-	u_int	se_rpc_lowvers;		/* RPC low version */
-	u_int	se_rpc_highvers;	/* RPC high version */
-	int	se_count;		/* number started since se_time */
-	struct	timeval se_time;	/* start of se_count */
-	struct	servtab *se_next;
-	u_char	se_nomapped;		/* don't accept (af != socket af) */
-} *servtab;
 
-#define NORM_TYPE	0
-#define MUX_TYPE	1
-#define MUXPLUS_TYPE	2
-#define TTCP_TYPE	3
-#define FAITH_TYPE	4
-#define ISMUX(sep)	(((sep)->se_type == MUX_TYPE) || \
-			 ((sep)->se_type == MUXPLUS_TYPE))
-#define ISMUXPLUS(sep)	((sep)->se_type == MUXPLUS_TYPE)
-#define ISTTCP(sep)	((sep)->se_type == TTCP_TYPE)
+struct	servtab *servtab;
 
-
-void		chargen_dg __P((int, struct servtab *));
-void		chargen_stream __P((int, struct servtab *));
-void		close_sep __P((struct servtab *));
-void		config __P((int));
-void		daytime_dg __P((int, struct servtab *));
-void		daytime_stream __P((int, struct servtab *));
-void		discard_dg __P((int, struct servtab *));
-void		discard_stream __P((int, struct servtab *));
-void		echo_dg __P((int, struct servtab *));
-void		echo_stream __P((int, struct servtab *));
-void		endconfig __P((void));
-struct servtab *enter __P((struct servtab *));
-void		freeconfig __P((struct servtab *));
-struct servtab *getconfigent __P((void));
-void		machtime_dg __P((int, struct servtab *));
-void		machtime_stream __P((int, struct servtab *));
-int		matchservent __P((char *, char *, char *));
-char	       *newstr __P((char *));
-char	       *nextline __P((FILE *));
-void		print_service __P((char *, struct servtab *));
-void		addchild __P((struct servtab *, int));
-void		reapchild __P((int));
-void		enable __P((struct servtab *));
-void		disable __P((struct servtab *));
-void		retry __P((int));
-int		setconfig __P((void));
-void		setup __P((struct servtab *));
-#ifdef IPSEC
-void		ipsecsetup __P((struct servtab *));
-#endif
-char	       *sskip __P((char **));
-char	       *skip __P((char **));
-struct servtab *tcpmux __P((int));
-int		cpmip __P((struct servtab *, int));
-void		inetd_setproctitle __P((char *, int));
-
-void		unregisterrpc __P((register struct servtab *sep));
-
-struct biltin {
-	char	*bi_service;		/* internally provided service name */
-	int	bi_socktype;		/* type of socket supported */
-	short	bi_fork;		/* 1 if should fork before call */
-	int	bi_maxchild;		/* max number of children (-1=default) */
-	void	(*bi_fn)();		/* function which performs it */
-} biltins[] = {
-	/* Echo received data */
-	{ "echo",	SOCK_STREAM,	1, -1,	echo_stream },
-	{ "echo",	SOCK_DGRAM,	0, 1,	echo_dg },
-
-	/* Internet /dev/null */
-	{ "discard",	SOCK_STREAM,	1, -1,	discard_stream },
-	{ "discard",	SOCK_DGRAM,	0, 1,	discard_dg },
-
-	/* Return 32 bit time since 1970 */
-	{ "time",	SOCK_STREAM,	0, -1,	machtime_stream },
-	{ "time",	SOCK_DGRAM,	0, 1,	machtime_dg },
-
-	/* Return human-readable time */
-	{ "daytime",	SOCK_STREAM,	0, -1,	daytime_stream },
-	{ "daytime",	SOCK_DGRAM,	0, 1,	daytime_dg },
-
-	/* Familiar character generator */
-	{ "chargen",	SOCK_STREAM,	1, -1,	chargen_stream },
-	{ "chargen",	SOCK_DGRAM,	0, 1,	chargen_dg },
-
-	{ "tcpmux",	SOCK_STREAM,	1, -1,	(void (*)())tcpmux },
-
-	{ NULL }
-};
+extern struct biltin biltins[];
 
 #define NUMINT	(sizeof(intab) / sizeof(struct inent))
 char	*CONFIG = _PATH_INETDCONF;
@@ -512,11 +391,13 @@ main(argc, argv, envp)
 	}
 
 	if (pipe(signalpipe) != 0) {
-		syslog(LOG_ERR, "pipe: %%m");
+		syslog(LOG_ERR, "pipe: %m");
 		exit(EX_OSERR);
 	}
 	FD_SET(signalpipe[0], &allsock);
+#ifdef SANITY_CHECK
 	nsock++;
+#endif
 	if (signalpipe[0] > maxsock)
 	    maxsock = signalpipe[0];
 	if (signalpipe[1] > maxsock)
@@ -526,10 +407,12 @@ main(argc, argv, envp)
 	    int n, ctrl;
 	    fd_set readable;
 
+#ifdef SANITY_CHECK
 	    if (nsock == 0) {
 		syslog(LOG_ERR, "%s: nsock=0", __FUNCTION__);
 		exit(EX_SOFTWARE);
 	    }
+#endif
 	    readable = allsock;
 	    if ((n = select(maxsock + 1, &readable, (fd_set *)0,
 		(fd_set *)0, (struct timeval *)0)) <= 0) {
@@ -545,6 +428,9 @@ main(argc, argv, envp)
 		    if (debug)
 			    warnx("someone wants %s", sep->se_service);
 		    if (sep->se_accept && sep->se_socktype == SOCK_STREAM) {
+			    i = 1;
+			    if (ioctl(sep->se_fd, FIONBIO, &i) < 0)
+				    syslog(LOG_ERR, "ioctl (FIONBIO, 1): %m");
 			    ctrl = accept(sep->se_fd, (struct sockaddr *)0,
 				(int *)0);
 			    if (debug)
@@ -559,6 +445,11 @@ main(argc, argv, envp)
                                               close(ctrl);
 				    continue;
 			    }
+			    i = 0;
+			    if (ioctl(sep->se_fd, FIONBIO, &i) < 0)
+				    syslog(LOG_ERR, "ioctl1(FIONBIO, 0): %m");
+			    if (ioctl(ctrl, FIONBIO, &i) < 0)
+				    syslog(LOG_ERR, "ioctl2(FIONBIO, 0): %m");
 			    if (cpmip(sep, ctrl) < 0) {
 				close(ctrl);
 				continue;
@@ -1008,7 +899,7 @@ config(signo)
 		rpc:
 			rpc = getrpcbyname(sep->se_service);
 			if (rpc == 0) {
-				syslog(LOG_ERR, "%s/%s unknown RPC service.",
+				syslog(LOG_ERR, "%s/%s unknown RPC service",
 					sep->se_service, sep->se_proto);
 				if (sep->se_fd != -1)
 					(void) close(sep->se_fd);
@@ -1312,7 +1203,7 @@ enter(cp)
 
 	sep = (struct servtab *)malloc(sizeof (*sep));
 	if (sep == (struct servtab *)0) {
-		syslog(LOG_ERR, "Out of memory.");
+		syslog(LOG_ERR, "malloc: %m");
 		exit(EX_OSERR);
 	}
 	*sep = *cp;
@@ -1346,9 +1237,9 @@ enable(struct servtab *sep)
 		    "%s: %s: not off", __FUNCTION__, sep->se_service);
 		exit(EX_SOFTWARE);
 	}
+	nsock++;
 #endif
 	FD_SET(sep->se_fd, &allsock);
-	nsock++;
 	if (sep->se_fd > maxsock)
 		maxsock = sep->se_fd;
 }
@@ -1379,9 +1270,9 @@ disable(struct servtab *sep)
 		syslog(LOG_ERR, "%s: nsock=0", __FUNCTION__);
 		exit(EX_SOFTWARE);
 	}
+	nsock--;
 #endif
 	FD_CLR(sep->se_fd, &allsock);
-	nsock--;
 	if (sep->se_fd == maxsock)
 		maxsock--;
 }
@@ -1548,7 +1439,7 @@ more:
                                 break;
                         default:
                                 syslog(LOG_ERR,
-					"bad RPC version specifier; %s\n",
+					"bad RPC version specifier; %s",
 					sep->se_service);
                                 freeconfig(sep);
                                 goto more;
@@ -1660,7 +1551,7 @@ more:
 	if (sep->se_maxchild) {
 		sep->se_pids = malloc(sep->se_maxchild * sizeof(*sep->se_pids));
 		if (sep->se_pids == NULL) {
-			syslog(LOG_ERR, "Out of memory.");
+			syslog(LOG_ERR, "malloc: %m");
 			exit(EX_OSERR);
 		}
 	}
@@ -1854,28 +1745,6 @@ inetd_setproctitle(a, s)
 /*
  * Internet services provided internally by inetd:
  */
-#define	BUFSIZE	8192
-#define	SA(s)	((struct sockaddr *)s)
-
-/*
- * Note: *_dg should use a message for options!
- */
-
-/* ARGSUSED */
-void
-echo_stream(s, sep)		/* Echo service -- echo data back */
-	int s;
-	struct servtab *sep;
-{
-	char buffer[BUFSIZE];
-	int i;
-
-	inetd_setproctitle(sep->se_service, s);
-	while ((i = read(s, buffer, sizeof(buffer))) > 0 &&
-	    write(s, buffer, i) > 0)
-		;
-	exit(0);
-}
 
 int check_loop(sin, sep)
 	struct sockaddr_in6 *sin;
@@ -1901,239 +1770,6 @@ int check_loop(sin, sep)
 		}
 	}
 	return 0;
-}
-
-/* ARGSUSED */
-void
-echo_dg(s, sep)			/* Echo service -- echo data back */
-	int s;
-	struct servtab *sep;
-{
-	char buffer[BUFSIZE];
-	int i, size;
-	struct sockaddr_in6 sin;
-
-	size = sizeof(sin);
-	if ((i = recvfrom(s, buffer, sizeof(buffer), 0, SA(&sin), &size)) < 0)
-		return;
-
-	if (check_loop(&sin, sep))
-		return;
-
-	(void) sendto(s, buffer, i, 0, SA(&sin), size);
-}
-
-/* ARGSUSED */
-void
-discard_stream(s, sep)		/* Discard service -- ignore data */
-	int s;
-	struct servtab *sep;
-{
-	int ret;
-	char buffer[BUFSIZE];
-
-	inetd_setproctitle(sep->se_service, s);
-	while (1) {
-		while ((ret = read(s, buffer, sizeof(buffer))) > 0)
-			;
-		if (ret == 0 || errno != EINTR)
-			break;
-	}
-	exit(0);
-}
-
-/* ARGSUSED */
-void
-discard_dg(s, sep)		/* Discard service -- ignore data */
-	int s;
-	struct servtab *sep;
-{
-	char buffer[BUFSIZE];
-
-	(void) read(s, buffer, sizeof(buffer));
-}
-
-#include <ctype.h>
-#define LINESIZ 72
-char ring[128];
-char *endring;
-
-void
-initring()
-{
-	int i;
-
-	endring = ring;
-
-	for (i = 0; i <= 128; ++i)
-		if (isprint(i))
-			*endring++ = i;
-}
-
-/* ARGSUSED */
-void
-chargen_stream(s, sep)		/* Character generator */
-	int s;
-	struct servtab *sep;
-{
-	int len;
-	char *rs, text[LINESIZ+2];
-
-	inetd_setproctitle(sep->se_service, s);
-
-	if (!endring) {
-		initring();
-		rs = ring;
-	}
-
-	text[LINESIZ] = '\r';
-	text[LINESIZ + 1] = '\n';
-	for (rs = ring;;) {
-		if ((len = endring - rs) >= LINESIZ)
-			memmove(text, rs, LINESIZ);
-		else {
-			memmove(text, rs, len);
-			memmove(text + len, ring, LINESIZ - len);
-		}
-		if (++rs == endring)
-			rs = ring;
-		if (write(s, text, sizeof(text)) != sizeof(text))
-			break;
-	}
-	exit(0);
-}
-
-/* ARGSUSED */
-void
-chargen_dg(s, sep)		/* Character generator */
-	int s;
-	struct servtab *sep;
-{
-	struct sockaddr_in6 sin;
-	static char *rs;
-	int len, size;
-	char text[LINESIZ+2];
-
-	if (endring == 0) {
-		initring();
-		rs = ring;
-	}
-
-	size = sizeof(sin);
-	if (recvfrom(s, text, sizeof(text), 0, SA(&sin), &size) < 0)
-		return;
-
-	if (check_loop(&sin, sep))
-		return;
-
-	if ((len = endring - rs) >= LINESIZ)
-		memmove(text, rs, LINESIZ);
-	else {
-		memmove(text, rs, len);
-		memmove(text + len, ring, LINESIZ - len);
-	}
-	if (++rs == endring)
-		rs = ring;
-	text[LINESIZ] = '\r';
-	text[LINESIZ + 1] = '\n';
-	(void) sendto(s, text, sizeof(text), 0, SA(&sin), size);
-}
-
-/*
- * Return a machine readable date and time, in the form of the
- * number of seconds since midnight, Jan 1, 1900.  Since gettimeofday
- * returns the number of seconds since midnight, Jan 1, 1970,
- * we must add 2208988800 seconds to this figure to make up for
- * some seventy years Bell Labs was asleep.
- */
-
-long
-machtime()
-{
-	struct timeval tv;
-
-	if (gettimeofday(&tv, (struct timezone *)NULL) < 0) {
-		if (debug)
-			warnx("unable to get time of day");
-		return (0L);
-	}
-#define	OFFSET ((u_long)25567 * 24*60*60)
-	return (htonl((long)(tv.tv_sec + OFFSET)));
-#undef OFFSET
-}
-
-/* ARGSUSED */
-void
-machtime_stream(s, sep)
-	int s;
-	struct servtab *sep;
-{
-	long result;
-
-	result = machtime();
-	(void) write(s, (char *) &result, sizeof(result));
-}
-
-/* ARGSUSED */
-void
-machtime_dg(s, sep)
-	int s;
-	struct servtab *sep;
-{
-	long result;
-	struct sockaddr_in6 sin;
-	int size;
-
-	size = sizeof(sin);
-	if (recvfrom(s, (char *)&result, sizeof(result),
-		     0, SA(&sin), &size) < 0)
-		return;
-
-	if (check_loop(&sin, sep))
-		return;
-
-	result = machtime();
-	(void) sendto(s, (char *) &result, sizeof(result),
-		      0, SA(&sin), size);
-}
-
-/* ARGSUSED */
-void
-daytime_stream(s, sep)		/* Return human-readable time of day */
-	int s;
-	struct servtab *sep;
-{
-	char buffer[256];
-	time_t clock;
-
-	clock = time((time_t *) 0);
-
-	(void) sprintf(buffer, "%.24s\r\n", ctime(&clock));
-	(void) write(s, buffer, strlen(buffer));
-}
-
-/* ARGSUSED */
-void
-daytime_dg(s, sep)		/* Return human-readable time of day */
-	int s;
-	struct servtab *sep;
-{
-	char buffer[256];
-	time_t clock;
-	struct sockaddr_in6 sin;
-	int size;
-
-	clock = time((time_t *) 0);
-
-	size = sizeof(sin);
-	if (recvfrom(s, buffer, sizeof(buffer), 0, SA(&sin), &size) < 0)
-		return;
-
-	if (check_loop(&sin, sep))
-		return;
-
-	(void) sprintf(buffer, "%.24s\r\n", ctime(&clock));
-	(void) sendto(s, buffer, strlen(buffer), 0, SA(&sin), size);
 }
 
 /*
@@ -2165,94 +1801,6 @@ print_service(action, sep)
 	    , (sep->se_policy ? sep->se_policy : "")
 #endif
 	    );
-}
-
-/*
- *  Based on TCPMUX.C by Mark K. Lottor November 1988
- *  sri-nic::ps:<mkl>tcpmux.c
- */
-
-
-static int		/* # of characters upto \r,\n or \0 */
-getline(fd, buf, len)
-	int fd;
-	char *buf;
-	int len;
-{
-	int count = 0, n;
-	struct sigaction sa;
-
-	sa.sa_flags = 0;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_handler = SIG_DFL;
-	sigaction(SIGALRM, &sa, (struct sigaction *)0);
-	do {
-		alarm(10);
-		n = read(fd, buf, len-count);
-		alarm(0);
-		if (n == 0)
-			return (count);
-		if (n < 0)
-			return (-1);
-		while (--n >= 0) {
-			if (*buf == '\r' || *buf == '\n' || *buf == '\0')
-				return (count);
-			count++;
-			buf++;
-		}
-	} while (count < len);
-	return (count);
-}
-
-#define MAX_SERV_LEN	(256+2)		/* 2 bytes for \r\n */
-
-#define strwrite(fd, buf)	(void) write(fd, buf, sizeof(buf)-1)
-
-struct servtab *
-tcpmux(s)
-	int s;
-{
-	struct servtab *sep;
-	char service[MAX_SERV_LEN+1];
-	int len;
-
-	/* Get requested service name */
-	if ((len = getline(s, service, MAX_SERV_LEN)) < 0) {
-		strwrite(s, "-Error reading service name\r\n");
-		return (NULL);
-	}
-	service[len] = '\0';
-
-	if (debug)
-		warnx("tcpmux: someone wants %s", service);
-
-	/*
-	 * Help is a required command, and lists available services,
-	 * one per line.
-	 */
-	if (!strcasecmp(service, "help")) {
-		for (sep = servtab; sep; sep = sep->se_next) {
-			if (!ISMUX(sep))
-				continue;
-			(void)write(s,sep->se_service,strlen(sep->se_service));
-			strwrite(s, "\r\n");
-		}
-		return (NULL);
-	}
-
-	/* Try matching a service in inetd.conf with the request */
-	for (sep = servtab; sep; sep = sep->se_next) {
-		if (!ISMUX(sep))
-			continue;
-		if (!strcasecmp(service, sep->se_service)) {
-			if (ISMUXPLUS(sep)) {
-				strwrite(s, "+Go\r\n");
-			}
-			return (sep);
-		}
-	}
-	strwrite(s, "-Service not available\r\n");
-	return (NULL);
 }
 
 #define CPMHSIZE	256

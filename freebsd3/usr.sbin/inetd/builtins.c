@@ -57,7 +57,7 @@ extern struct servtab *servtab;
 char ring[128];
 char *endring;
 
-int check_loop __P((struct sockaddr_in *, struct servtab *sep));
+int check_loop __P((struct sockaddr_in6 *, struct servtab *sep));
 void inetd_setproctitle __P((char *, int));
 
 struct biltin biltins[] = {
@@ -82,8 +82,6 @@ struct biltin biltins[] = {
 	{ "chargen",	SOCK_DGRAM,	0, 1,	chargen_dg },
 
 	{ "tcpmux",	SOCK_STREAM,	1, -1,	(void (*)())tcpmux },
-
-	{ "auth",	SOCK_STREAM,	1, -1,	ident_stream },
 
 	{ NULL }
 };
@@ -111,7 +109,7 @@ chargen_dg(s, sep)		/* Character generator */
 	int s;
 	struct servtab *sep;
 {
-	struct sockaddr_in sin;
+	struct sockaddr_in6 sin;
 	static char *rs;
 	int len, size;
 	char text[LINESIZ+2];
@@ -122,8 +120,7 @@ chargen_dg(s, sep)		/* Character generator */
 	}
 
 	size = sizeof(sin);
-	if (recvfrom(s, text, sizeof(text), 0,
-		     (struct sockaddr *)&sin, &size) < 0)
+	if (recvfrom(s, text, sizeof(text), 0, SA(&sin), &size) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
@@ -139,8 +136,7 @@ chargen_dg(s, sep)		/* Character generator */
 		rs = ring;
 	text[LINESIZ] = '\r';
 	text[LINESIZ + 1] = '\n';
-	(void) sendto(s, text, sizeof(text), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+	(void) sendto(s, text, sizeof(text), 0, SA(&sin), sizeof(sin));
 }
 
 /* ARGSUSED */
@@ -189,22 +185,20 @@ daytime_dg(s, sep)		/* Return human-readable time of day */
 {
 	char buffer[256];
 	time_t clock;
-	struct sockaddr_in sin;
+	struct sockaddr_in6 sin;
 	int size;
 
 	clock = time((time_t *) 0);
 
 	size = sizeof(sin);
-	if (recvfrom(s, buffer, sizeof(buffer), 0,
-		     (struct sockaddr *)&sin, &size) < 0)
+	if (recvfrom(s, buffer, sizeof(buffer), 0, SA(&sin), &size) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
 		return;
 
 	(void) sprintf(buffer, "%.24s\r\n", ctime(&clock));
-	(void) sendto(s, buffer, strlen(buffer), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+	(void) sendto(s, buffer, strlen(buffer), 0, SA(&sin), sizeof(sin));
 }
 
 /* ARGSUSED */
@@ -270,18 +264,16 @@ echo_dg(s, sep)			/* Echo service -- echo data back */
 {
 	char buffer[BUFSIZE];
 	int i, size;
-	struct sockaddr_in sin;
+	struct sockaddr_in6 sin;
 
 	size = sizeof(sin);
-	if ((i = recvfrom(s, buffer, sizeof(buffer), 0,
-			  (struct sockaddr *)&sin, &size)) < 0)
+	if ((i = recvfrom(s, buffer, sizeof(buffer), 0, SA(&sin), &size)) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
 		return;
 
-	(void) sendto(s, buffer, i, 0, (struct sockaddr *)&sin,
-		      sizeof(sin));
+	(void) sendto(s, buffer, i, 0, SA(&sin), size);
 }
 
 /* ARGSUSED */
@@ -326,213 +318,6 @@ iderror(lport, fport, s, er)	/* Generic ident_stream error-sending func */
 	exit(0);
 }
 
-/* ARGSUSED */
-void
-ident_stream(s, sep)		/* Ident service (AKA "auth") */
-	int s;
-	struct servtab *sep;
-{
-	struct utsname un;
-	struct stat sb;
-	struct sockaddr_in sin[2];
-	struct ucred uc;
-	struct timeval tv = {
-		10,
-		0
-	};
-	struct passwd *pw;
-	fd_set fdset;
-	char buf[BUFSIZE], *cp = NULL, *p, **av, *osname = NULL;
-	int len, c, fflag = 0, nflag = 0, rflag = 0, argc = 0;
-	u_short lport, fport;
-
-	inetd_setproctitle(sep->se_service, s);
-	/*
-	 * Reset getopt() since we are a fork() but not an exec() from
-	 * a parent which used getopt() already.
-	 */
-	optind = 1;
-	optreset = 1;
-	/*
-	 * Take the internal argument vector and count it out to make an
-	 * argument count for getopt. This can be used for any internal
-	 * service to read arguments and use getopt() easily.
-	 */
-	for (av = sep->se_argv; *av; av++)
-		argc++;
-	if (argc) {
-		int sec, usec;
-
-		while ((c = getopt(argc, sep->se_argv, "fno:rt:")) != -1)
-			switch (c) {
-			case 'f':
-				fflag = 1;
-				break;
-			case 'n':
-				nflag = 1;
-				break;
-			case 'o':
-				osname = optarg;
-				break;
-			case 'r':
-				rflag = 1;
-				break;
-			case 't':
-				switch (sscanf(optarg, "%d.%d", &sec, &usec)) {
-				case 2:
-					tv.tv_usec = usec;
-				case 1:
-					tv.tv_sec = sec;
-					break;
-				default:
-					if (debug)
-						warnx("bad -t argument");
-					break;
-				}
-				break;
-			default:
-				break;
-			}
-	}
-	if (osname == NULL) {
-		if (uname(&un) == -1)
-			iderror(0, 0, s, errno);
-		osname = un.sysname;
-	}
-	len = sizeof(sin[0]);
-	if (getsockname(s, (struct sockaddr *)&sin[0], &len) == -1)
-		iderror(0, 0, s, errno);
-	len = sizeof(sin[1]);
-	if (getpeername(s, (struct sockaddr *)&sin[1], &len) == -1)
-		iderror(0, 0, s, errno);
-	/*
-	 * We're going to prepare for and execute reception of a
-	 * packet of data from the user. The data is in the format
-	 * "local_port , foreign_port\r\n" (with local being the
-	 * server's port and foreign being the client's.)
-	 */
-	FD_ZERO(&fdset);
-	FD_SET(s, &fdset);
-	if (select(s + 1, &fdset, NULL, NULL, &tv) == -1)
-		iderror(0, 0, s, errno);
-	if (ioctl(s, FIONREAD, &len) == -1)
-		iderror(0, 0, s, errno);
-	if (len >= sizeof(buf))
-		len = sizeof(buf) - 1;
-	len = read(s, buf, len);
-	if (len == -1)
-		iderror(0, 0, s, errno);
-	buf[len] = '\0';
-	if (sscanf(buf, "%hu , %hu", &lport, &fport) != 2)
-		iderror(0, 0, s, 0);
-	if (!rflag) /* Send HIDDEN-USER immediately if not "real" */
-		iderror(lport, fport, s, -1);
-	/*
-	 * We take the input and construct an array of two sockaddr_ins
-	 * which contain the local address information and foreign
-	 * address information, respectively, used to look up the
-	 * credentials for the socket (which are returned by the
-	 * sysctl "net.inet.tcp.getcred" when we call it.) The
-	 * arrays have been filled in above via get{peer,sock}name(),
-	 * so right here we are only setting the ports.
-	 */
-	sin[0].sin_port = htons(lport);
-	sin[1].sin_port = htons(fport);
-	len = sizeof(uc);
-	if (sysctlbyname("net.inet.tcp.getcred", &uc, &len, sin,
-	    sizeof(sin)) == -1)
-		iderror(lport, fport, s, errno);
-	pw = getpwuid(uc.cr_uid);	/* Look up the pw to get the username */
-	if (pw == NULL)
-		iderror(lport, fport, s, errno);
-	/*
-	 * If enabled, we check for a file named ".noident" in the user's
-	 * home directory. If found, we return HIDDEN-USER.
-	 */
-	if (nflag) {
-		if (asprintf(&p, "%s/.noident", pw->pw_dir) == -1)
-			iderror(lport, fport, s, errno);
-		if (lstat(p, &sb) == 0) {
-			free(p);
-			iderror(lport, fport, s, -1);
-		}
-		free(p);
-	}
-	/*
-	 * Here, if enabled, we read a user's ".fakeid" file in their
-	 * home directory. It consists of a line containing the name
-	 * they want.
-	 */
-	if (fflag) {
-		FILE *fakeid = NULL;
-
-		if (asprintf(&p, "%s/.fakeid", pw->pw_dir) == -1)
-			iderror(lport, fport, s, errno);
-		/*
-		 * Here we set ourself to effectively be the user, so we don't
-		 * open any files we have no permission to open, especially
-		 * symbolic links to sensitive root-owned files or devices.
-		 */
-		seteuid(pw->pw_uid);
-		setegid(pw->pw_gid);
-		/*
-		 * If we were to lstat() here, it would do no good, since it
-		 * would introduce a race condition and could be defeated.
-		 * Therefore, we open the file we have permissions to open
-		 * and if it's not a regular file, we close it and end up
-		 * returning the user's real username.
-		 */
-		fakeid = fopen(p, "r");
-		free(p);
-		if (fakeid != NULL &&
-		    fstat(fileno(fakeid), &sb) != -1 && S_ISREG(sb.st_mode)) {
-			buf[sizeof(buf) - 1] = '\0';
-			if (fgets(buf, sizeof(buf), fakeid) == NULL) {
-				cp = pw->pw_name;
-				fclose(fakeid);
-				goto printit;
-			}
-			fclose(fakeid);
-			/*
-			 * Usually, the file will have the desired identity
-			 * in the form "identity\n", so we use strtok() to
-			 * end the string (which fgets() doesn't do.)
-			 */
-			strtok(buf, "\r\n");
-			/* User names of >16 characters are invalid */
-			if (strlen(buf) > 16)
-				buf[16] = '\0';
-			cp = buf;
-			/* Allow for beginning white space... */
-			while (isspace(*cp))
-				cp++;
-			/* ...and ending white space. */
-			strtok(cp, " \t");
-			/*
-			 * If the name is a zero-length string or matches
-			 * the name of another user, it's invalid, so
-			 * we will return their real identity instead.
-			 */
-			
-			if (!*cp || getpwnam(cp))
-				cp = getpwuid(uc.cr_uid)->pw_name;
-		} else
-			cp = pw->pw_name;
-	} else
-		cp = pw->pw_name;
-printit:
-	/* Finally, we make and send the reply. */
-	if (asprintf(&p, "%d , %d : USERID : %s : %s\r\n", lport, fport, osname,
-	    cp) == -1) {
-		syslog(LOG_ERR, "asprintf: %m");
-		exit(EX_OSERR);
-	}
-	write(s, p, strlen(p));
-	free(p);
-	
-	exit(0);
-}
-
 /*
  * RFC738 Time Server.
  * Return a machine readable date and time, in the form of the
@@ -542,7 +327,7 @@ printit:
  * some seventy years Bell Labs was asleep.
  */
 
-unsigned long
+long
 machtime()
 {
 	struct timeval tv;
@@ -564,12 +349,12 @@ machtime_dg(s, sep)
 	struct servtab *sep;
 {
 	unsigned long result;
-	struct sockaddr_in sin;
+	struct sockaddr_in6 sin;
 	int size;
 
 	size = sizeof(sin);
 	if (recvfrom(s, (char *)&result, sizeof(result), 0,
-		     (struct sockaddr *)&sin, &size) < 0)
+		     SA(&sin), &size) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
@@ -586,7 +371,7 @@ machtime_stream(s, sep)
 	int s;
 	struct servtab *sep;
 {
-	unsigned long result;
+	long result;
 
 	result = machtime();
 	(void) write(s, (char *) &result, sizeof(result));

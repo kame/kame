@@ -47,14 +47,17 @@
 #define MUX_TYPE	1
 #define MUXPLUS_TYPE	2
 #define TTCP_TYPE	3
+#define FAITH_TYPE	4
 #define ISMUX(sep)	(((sep)->se_type == MUX_TYPE) || \
 			 ((sep)->se_type == MUXPLUS_TYPE))
 #define ISMUXPLUS(sep)	((sep)->se_type == MUXPLUS_TYPE)
 #define ISTTCP(sep)	((sep)->se_type == TTCP_TYPE)
+#define	SA(s)	((struct sockaddr *)s)
 
 struct	servtab {
 	char	*se_service;		/* name of service */
 	int	se_socktype;		/* type of socket to use */
+	int     se_family;              /* address family */
 	char	*se_proto;		/* protocol used */
 	int	se_maxchild;		/* max number of children */
 	int	se_maxcpm;		/* max connects per IP per minute */
@@ -70,8 +73,19 @@ struct	servtab {
 	char	*se_server_name;	/* server program without path */
 #define	MAXARGV 20
 	char	*se_argv[MAXARGV+1];	/* program arguments */
+#ifdef IPSEC
+	char	*se_policy;		/* IPsec poilcy string */
+#endif
 	int	se_fd;			/* open descriptor */
-	struct	sockaddr_in se_ctrladdr;/* bound address */
+	union {				/* bound address */
+		struct	sockaddr se_un_ctrladdr;
+		struct	sockaddr_in se_un_ctrladdr4;
+		struct	sockaddr_in6 se_un_ctrladdr6;
+	} se_un;
+#define se_ctrladdr	se_un.se_un_ctrladdr
+#define se_ctrladdr4	se_un.se_un_ctrladdr4
+#define se_ctrladdr6	se_un.se_un_ctrladdr6
+  	int	se_ctrladdr_size;
 	u_char	se_type;		/* type: normal, mux, or mux+ */
 	u_char	se_checked;		/* looked at during merge */
 	u_char	se_accept;		/* i.e., wait/nowait mode */
@@ -82,14 +96,13 @@ struct	servtab {
 	int	se_count;		/* number started since se_time */
 	struct	timeval se_time;	/* start of se_count */
 	struct	servtab *se_next;
+ 	u_char	se_nomapped;		/* don't accept (af != socket af) */
 };
 
 void		chargen_dg __P((int, struct servtab *));
 void		chargen_stream __P((int, struct servtab *));
 void		close_sep __P((struct servtab *));
-void		flag_signal __P((char));
-void		flag_config __P((int));
-void		config __P((void));
+void		config __P((int));
 void		daytime_dg __P((int, struct servtab *));
 void		daytime_stream __P((int, struct servtab *));
 void		discard_dg __P((int, struct servtab *));
@@ -101,7 +114,6 @@ struct servtab *enter __P((struct servtab *));
 void		freeconfig __P((struct servtab *));
 struct servtab *getconfigent __P((void));
 void		iderror __P((int, int, int, int));
-void		ident_stream __P((int, struct servtab *));
 void		machtime_dg __P((int, struct servtab *));
 void		machtime_stream __P((int, struct servtab *));
 int		matchservent __P((char *, char *, char *));
@@ -109,14 +121,15 @@ char	       *newstr __P((char *));
 char	       *nextline __P((FILE *));
 void		print_service __P((char *, struct servtab *));
 void		addchild __P((struct servtab *, int));
-void		flag_reapchild __P((int));
-void		reapchild __P((void));
+void		reapchild __P((int));
 void		enable __P((struct servtab *));
 void		disable __P((struct servtab *));
-void		flag_retry __P((int));
-void		retry __P((void));
+void		retry __P((int));
 int		setconfig __P((void));
 void		setup __P((struct servtab *));
+#ifdef IPSEC
+void		ipsecsetup __P((struct servtab *));
+#endif
 char	       *sskip __P((char **));
 char	       *skip __P((char **));
 struct servtab *tcpmux __P((int));
