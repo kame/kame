@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.307 2002/05/29 05:07:41 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.308 2002/05/29 05:56:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1454,7 +1454,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 
 	if (rt && (rt->rt_flags & RTF_HOST) &&
 	    !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
-	    mtu < rt->rt_rmx.rmx_mtu) {
+	    (rt->rt_rmx.rmx_mtu > mtu || rt->rt_rmx.rmx_mtu == 0)) {
 		if (mtu < IN6_LINKMTU(rt->rt_ifp)) {
 			icmp6stat.icp6s_pmtuchg++;
 			rt->rt_rmx.rmx_mtu = mtu;
