@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.187 2004/05/16 06:21:45 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.188 2004/05/18 07:39:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -46,12 +46,17 @@
  * Note:
  * - The code filters out AFs that are not supported by the kernel,
  *   when globbing NULL hostname (to loopback, or wildcard).  Is it the right
- *   thing to do?  What is the relationship with post-RFC2553 AI_ADDRCONFIG
+ *   thing to do?  What is the relationship with RFC3493 AI_ADDRCONFIG
  *   in ai_flags?
- * - (post-2553) semantics of AI_ADDRCONFIG itself is too vague.
+ * - RFC3493: the semantics of AI_ADDRCONFIG itself is vague.
  *   (1) what should we do against numeric hostname (2) what should we do
- *   against NULL hostname (3) what is AI_ADDRCONFIG itself.  AF not ready?
- *   non-loopback address configured?  global address configured?
+ *   against NULL hostname (3) what is AI_ADDRCONFIG itself.  According to
+ *   RFC3493, the node has an IPv6 address configured means it has a non
+ *   loopback address.  But is it enough?  What if the node only has link-local
+ *   addresses?  Meanwhile, the default address selection defined in RFC3484
+ *   may help the situation where AI_ADDRCONFIG is desired.  Given those,
+ *   our current implementation simply check if the corresponding AF is
+ *   supported in the kernel.
  *
  * OS specific notes for bsdi3/freebsd2:
  * - We use getipnodebyname() just for thread-safeness.  There's no intent
@@ -600,7 +605,6 @@ globcopy:
 		if (!MATCH(pai->ai_protocol, ex->e_protocol, WILD_PROTOCOL(ex)))
 			continue;
 
-#ifdef AI_ADDRCONFIG
 		/*
 		 * If AI_ADDRCONFIG is specified, check if we are
 		 * expected to return the address family or not.
@@ -608,7 +612,6 @@ globcopy:
 		if ((pai->ai_flags & AI_ADDRCONFIG) != 0 &&
 		    !addrconfig(afd->a_af))
 			continue;
-#endif
 
 		if ((pai->ai_flags & AI_PASSIVE) != 0 && WILD_PASSIVE(ex))
 			;
@@ -1541,10 +1544,8 @@ find_afd(af)
 }
 
 /*
- * post-2553: AI_ADDRCONFIG check.  if we use getipnodeby* as backend, backend
- * will take care of it.
- * the semantics of AI_ADDRCONFIG is not defined well.  we are not sure
- * if the code is right or not.
+ * The semantics of AI_ADDRCONFIG is not defined well.  Right now, we simply 
+ * check if the kernel supports the given address family.
  */
 static int
 addrconfig(af)
