@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.5 2001/01/31 17:35:39 itojun Exp $	*/
+/*	$KAME: backupsa.c,v 1.6 2001/02/01 15:41:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,13 @@
  *    l_alloc l_bytes l_addtime l_usetime seq keymat
  */
 static char *format = "%b %d %T %Y";	/* time format */
+static char *strmon[12] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
+static char *str2tmx __P((char *, struct tm *));
+static int str2num __P((char *, int));
 
 /*
  * output the sa parameter.
@@ -221,7 +228,7 @@ backupsa_from_file()
 			continue;
 
 		memset(&tm, 0, sizeof(tm));
-		p = strptime(buf, format, &tm);
+		p = str2tmx(buf, &tm);
 		if (*p != '%') {
 	err:
 			plog(LLV_ERROR, LOCATION, NULL,
@@ -351,3 +358,115 @@ backupsa_clean()
 	}
 	return 0;
 }
+
+/*
+ * convert fixed string into the tm structure.
+ * The fixed string is like 'Nov 24 18:22:48 1986'.
+ * static char *format = "%b %d %T %Y";
+ */
+static char *
+str2tmx(char *p, struct tm *tm)
+{
+	int i, len;
+
+	/* Month */
+        for (i = 0; i < sizeof(strmon)/sizeof(strmon[0]); i++) {
+		if (strncasecmp(p, strmon[i], strlen(strmon[i])) == 0) {
+			tm->tm_mon = i;
+			break;
+		}
+	}
+	if (i == sizeof(strmon)/sizeof(strmon[0]))
+		return 0;
+	p += strlen(strmon[i]);
+	if (*p++ != ' ')
+		return 0;
+
+	/* Day */
+	len = 2;
+	tm->tm_mday = str2num(p, len);
+	if (tm->tm_mday == -1 || tm->tm_mday > 31)
+		return 0;
+	p += len;
+	if (*p++ != ' ')
+		return 0;
+
+	/* Hour */
+	len = 2;
+	tm->tm_hour = str2num(p, len);
+	if (tm->tm_hour == -1 || tm->tm_hour > 24)
+		return 0;
+	p += len;
+	if (*p++ != ':')
+		return 0;
+
+	/* Min */
+	len = 2;
+	tm->tm_min = str2num(p, len);
+	if (tm->tm_min == -1 || tm->tm_min > 60)
+		return 0;
+	p += len;
+	if (*p++ != ':')
+		return 0;
+
+	/* Sec */
+	len = 2;
+	tm->tm_sec = str2num(p, len);
+	if (tm->tm_sec == -1 || tm->tm_sec > 60)
+		return 0;
+	p += len;
+	if (*p++ != ' ')
+		return 0;
+
+	/* Year */
+	len = 4;
+	tm->tm_year = str2num(p, len);
+	if (tm->tm_year == -1 || tm->tm_year < 1900)
+		return 0;
+	tm->tm_year -= 1900;
+	p += len;
+
+	return p;
+}
+
+static int
+str2num(p, len)
+	char *p;
+	int len;
+{
+	int res, i;
+
+	res = 0;
+        for (i = len; i > 0; i--) {
+		if (!isdigit(*p))
+			return -1;
+		res *= 10;
+		res += *p - '0';
+		p++;
+	}
+
+	return res;
+}
+
+#ifdef TEST
+#include <stdio.h>
+int
+main()
+{
+	struct tm tm;
+	time_t t;
+	char *buf = "Nov 24 18:22:48 1986 ";
+	char *p;
+
+	memset(&tm, 0, sizeof(tm));
+	p = str2tmx(buf, &tm);
+	printf("[%x]\n", *p);
+	t = mktime(&tm);
+	if (t == -1)
+		printf("mktime failed.");
+	p = ctime(&t);
+	printf("[%s]\n", p);
+
+	exit(0);
+}
+#endif
