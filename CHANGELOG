@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1341 2000/10/18 09:23:35 kjc Exp $
+$KAME: CHANGELOG,v 1.1342 2000/10/18 13:30:45 sakane Exp $
 
 <200010>
+Wed Oct 18 18:54:50 JST 2000 sakane@ydc.co.jp
+	* racoon:
+	- fixed to parse the timer directive in the racoon configuration.
+	- the identifier in phase 1 transmitted by peer compared with the user
+	  expecting.  If they are not same, racoon just warns it at the moment.
+	- Moved the place of calling ipsec_checkid1() after parsing the payload
+	  transmitted by peer.
+	- bark if DH computation failed.
+	- added two function to handle the certificate.
+		eay_str2asn1dn(), convert the string into DER.
+		eay_cmp_asn1dn(), compare two subjectname.
+
 2000/10/18 18:15:25 JST kjc@csl.sony.co.jp
 	the 2nd round of the ALTQ cleanup:
 	* add a new discipline, PRIQ (priority queueing).
