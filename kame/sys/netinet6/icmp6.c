@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.109 2000/05/28 12:06:51 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.110 2000/06/04 12:54:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2938,6 +2938,9 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_ND6_USELOOPBACK:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&nd6_useloopback);
+	case ICMPV6CTL_ND6_MAXNUDHINT:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				&nd6_maxnudhint);
 	case ICMPV6CTL_NODEINFO:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &icmp6_nodeinfo);
 	case ICMPV6CTL_ERRPPSLIMIT:

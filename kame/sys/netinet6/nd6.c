@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.66 2000/06/04 12:46:13 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.67 2000/06/04 12:54:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,7 +122,7 @@ int	nd6_useloopback = 1;	/* use loopback interface for local traffic */
 /* preventing too many loops in ND option parsing */
 int nd6_maxndopt = 10;	/* max # of ND options allowed */
 
-int nd6_max_nudhint = 0;	/* max # of subsequent upper layer hints */
+int nd6_maxnudhint = 0;	/* max # of subsequent upper layer hints */
 
 /* for debugging? */
 static int nd6_inuse, nd6_allocated;
@@ -992,7 +992,7 @@ nd6_nud_hint(rt, dst6, force)
 	 */
 	if (!force) {
 		ln->ln_byhint++;
-		if (ln->ln_byhint > nd6_max_nudhint)
+		if (ln->ln_byhint > nd6_maxnudhint)
 			return;
 	}
 

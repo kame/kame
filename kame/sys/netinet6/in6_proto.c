@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.59 2000/05/27 12:01:08 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.60 2000/06/04 12:54:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -759,6 +759,8 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO,
 	nodeinfo, CTLFLAG_RW,	&icmp6_nodeinfo,	0, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ERRPPSLIMIT,
 	errppslimit, CTLFLAG_RW,	&icmp6errppslim,	0, "");
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_MAXNUDHINT,
+	nd6_maxnudhint, CTLFLAG_RW,	&nd6_maxnudhint, 0, "");
 
 #if __FreeBSD__ < 3
 /* net.inet6.udp6 */
