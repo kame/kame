@@ -130,6 +130,7 @@ bgp_read_data(bnp)
 	length = bnp->rp_inlen;
 	bnp->rp_inlen = 0;
 
+	bh = (struct bgphdr *)bnp->rp_inpkt;
 #ifdef DEBUG
 	syslog(LOG_DEBUG,
 	       "BGP+ RECV %s+%d -> %s+%d",
@@ -147,7 +148,6 @@ bgp_read_data(bnp)
 		       bgp_statestr[bnp->rp_state]);
 #endif
 
-	bh = (struct bgphdr *)bnp->rp_inpkt;
 	switch (bh->bh_type) {
 	 case BGP_OPEN:
 		 if (length < BGP_HEADER_LEN + 10) {
