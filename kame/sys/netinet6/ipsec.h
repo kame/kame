@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.61 2002/08/23 03:48:04 sakane Exp $	*/
+/*	$KAME: ipsec.h,v 1.62 2002/09/11 02:40:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,7 +87,7 @@ struct secpolicy {
 #define IPSEC_SPSTATE_DEAD	0
 #define IPSEC_SPSTATE_ALIVE	1
 
-	u_int policy;		/* DISCARD, NONE or IPSEC, see keyv2.h */
+	int policy;		/* DISCARD, NONE or IPSEC, see keyv2.h */
 	struct ipsecrequest *req;
 				/* pointer to the ipsec request tree, */
 				/* if policy == IPSEC else this value == NULL.*/

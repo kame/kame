@@ -245,7 +245,7 @@ extern u_int16_t ip_id;			/* ip packet ctr, for ids */
 extern int   ip_defttl;			/* default IP ttl */
 extern int   ipforwarding;		/* ip forwarding */
 extern int   ip_mtudisc;		/* mtu discovery */
-extern u_int ip_mtudisc_timeout;	/* seconds to timeout mtu discovery */
+extern int   ip_mtudisc_timeout;	/* seconds to timeout mtu discovery */
 extern int   anonportmin;		/* minimum ephemeral port */
 extern int   anonportmax;		/* maximum ephemeral port */
 extern int   lowportmin;		/* minimum reserved port */

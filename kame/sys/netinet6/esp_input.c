@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.69 2002/08/21 23:11:22 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.70 2002/09/11 02:40:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -871,7 +871,7 @@ noreplaycheck:
 		 * we can always compute checksum for AH correctly.
 		 */
 		size_t stripsiz;
-		char *prvnxtp;
+		u_int8_t *prvnxtp;
 
 		/*
 		 * Set the next header field of the previous header correctly.

@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.74 2002/06/09 14:43:57 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.75 2002/09/11 02:40:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -975,7 +975,7 @@ ah6_input(mp, offp, proto)
 		/*
 		 * strip off AH.
 		 */
-		char *prvnxtp;
+		u_int8_t *prvnxtp;
 
 		/*
 		 * Copy the value of the next header field of AH to the

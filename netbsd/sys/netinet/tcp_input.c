@@ -607,7 +607,7 @@ tcp_input(m, va_alist)
 #ifdef INET6
 	struct sockaddr_in6 *src_sa6, *dst_sa6;
 #endif
-	caddr_t optp = NULL;
+	u_int8_t *optp = NULL;
 	int optlen = 0;
 	int len, tlen, toff, hdroptlen = 0;
 	struct tcpcb *tp = 0;
@@ -820,7 +820,7 @@ tcp_input(m, va_alist)
 		 */
 #endif
 		optlen = off - sizeof (struct tcphdr);
-		optp = ((caddr_t)th) + sizeof(struct tcphdr);
+		optp = ((u_int8_t *)th) + sizeof(struct tcphdr);
 		/* 
 		 * Do quick retrieval of timestamp options ("options
 		 * prediction?").  If timestamp is the only option and it's

@@ -237,7 +237,7 @@ int	ip_forwsrcrt = IPFORWSRCRT;
 int	ip_directedbcast = IPDIRECTEDBCAST;
 int	ip_allowsrcrt = IPALLOWSRCRT;
 int	ip_mtudisc = IPMTUDISC;
-u_int	ip_mtudisc_timeout = IPMTUDISCTIMEOUT;
+int	ip_mtudisc_timeout = IPMTUDISCTIMEOUT;
 #ifdef DIAGNOSTIC
 int	ipprintfs = 0;
 #endif
@@ -1971,6 +1971,8 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPCTL_MTUDISCTIMEOUT:
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 		   &ip_mtudisc_timeout);
+		if (ip_mtudisc_timeout < 0)
+			return (EINVAL);
 		if (ip_mtudisc_timeout_q != NULL)
 			rt_timer_queue_change(ip_mtudisc_timeout_q, 
 					      ip_mtudisc_timeout);

@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.30 2002/01/31 14:14:52 jinmei Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.31 2002/09/11 02:40:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -285,7 +285,7 @@ ipcomp6_input(mp, offp, proto)
 	int error;
 	size_t newlen;
 	struct secasvar *sav = NULL;
-	char *prvnxtp;
+	u_int8_t *prvnxtp;
 
 	m = *mp;
 	off = *offp;

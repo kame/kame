@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.170 2002/09/11 02:34:17 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.171 2002/09/11 02:40:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2500,7 +2500,7 @@ ipsec_chkreplay(seq, sav)
 		fr = frlast - diff / 8;
 
 		/* this packet already seen ? */
-		if ((replay->bitmap)[fr] & (1 << (diff % 8)))
+		if (replay->bitmap[fr] & (1 << (diff % 8)))
 			return 0;
 
 		/* out of order but good */
@@ -2545,7 +2545,7 @@ ipsec_updatereplay(seq, sav)
 	if (replay->count == 0) {
 		replay->lastseq = seq;
 		bzero(replay->bitmap, replay->wsize);
-		(replay->bitmap)[frlast] = 1;
+		replay->bitmap[frlast] = 1;
 		goto ok;
 	}
 
@@ -2558,11 +2558,11 @@ ipsec_updatereplay(seq, sav)
 			/* In window */
 			/* set bit for this packet */
 			vshiftl(replay->bitmap, diff, replay->wsize);
-			(replay->bitmap)[frlast] |= 1;
+			replay->bitmap[frlast] |= 1;
 		} else {
 			/* this packet has a "way larger" */
 			bzero(replay->bitmap, replay->wsize);
-			(replay->bitmap)[frlast] = 1;
+			replay->bitmap[frlast] = 1;
 		}
 		replay->lastseq = seq;
 
@@ -2578,11 +2578,11 @@ ipsec_updatereplay(seq, sav)
 		fr = frlast - diff / 8;
 
 		/* this packet already seen ? */
-		if ((replay->bitmap)[fr] & (1 << (diff % 8)))
+		if (replay->bitmap[fr] & (1 << (diff % 8)))
 			return 1;
 
 		/* mark as seen */
-		(replay->bitmap)[fr] |= (1 << (diff % 8));
+		replay->bitmap[fr] |= (1 << (diff % 8));
 
 		/* out of order but good */
 	}

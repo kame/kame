@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.293 2002/09/11 02:34:17 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.294 2002/09/11 02:40:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1935,7 +1935,7 @@ ip6_pullexthdr(m, off, nxt)
  * carefully. Moreover, it will not be used in the near future when
  * we develop `neater' mechanism to process extension headers.
  */
-char *
+u_int8_t *
 ip6_get_prevhdr(m, off)
 	struct mbuf *m;
 	int off;

@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.16 2002/06/12 01:14:02 itojun Exp $	*/
+/*	$KAME: keydb.h,v 1.17 2002/09/11 02:40:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,7 +103,7 @@ struct secreplay {
 	u_int wsize;		/* window size, i.g. 4 bytes */
 	u_int32_t seq;		/* used by sender */
 	u_int32_t lastseq;	/* used by receiver */
-	caddr_t bitmap;		/* used by receiver */
+	u_int8_t *bitmap;	/* used by receiver */
 	int overflow;		/* what round does the counter take. */
 };
 
