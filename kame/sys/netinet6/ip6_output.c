@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.139 2000/12/04 05:36:09 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.140 2000/12/04 05:37:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -458,9 +458,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	 * separate IP6 header from the payload.
 	 */
 #ifdef __OpenBSD__
-	if ((needipsec || optlen) && !hdrsplit)
-#else
 	if ((sproto || optlen) && !hdrsplit)
+#else
+	if ((needipsec || optlen) && !hdrsplit)
 #endif
 	{
 		if ((error = ip6_splithdr(m, &exthdrs)) != 0) {
