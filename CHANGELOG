@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2546 2004/02/13 12:40:06 jinmei Exp $
+$KAME: CHANGELOG,v 1.2547 2004/02/14 09:36:40 jinmei Exp $
 
 <200402>
+2004-02-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ifmcstat/ifmcstat.c (in[6]_multientry): avoid
+	inserting redundant blank lines.
+
 2004-02-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet6/in6_pcb.c (in6_setsockaddr):
 	* freebsd4/sys/netinet6/in6_pcb.c (in6_setpeeraddr):
