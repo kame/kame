@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.51 2001/08/20 06:57:59 itojun Exp $	*/
+/*	$KAME: config.c,v 1.52 2001/10/09 10:23:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -448,7 +448,7 @@ getconfig(intface)
 	/* route information */
 	MAYHAVE(val, "routes", 0);
 	if (val < 0 || val > 0xffffffff) {
-		/* does this check is realy necessary? (jinmei) */
+		/* does this check is really necessary? (jinmei) */
 		syslog(LOG_ERR,
 		       "<%s> number of route (%ld) on %s information improper",
 		       __FUNCTION__, val, intface);
@@ -457,7 +457,7 @@ getconfig(intface)
 	tmp->routes = val;
 	for (i = 0; i < tmp->routes; i++) {
 		struct rtinfo *rti;
-		char entbuf[256];
+		char entbuf[256], oentbuf[256];
 		int added = (tmp->routes > 1) ? 1 : 0;
 
 		/* allocate memory to store prefix information */
@@ -475,14 +475,22 @@ getconfig(intface)
 		makeentry(entbuf, sizeof(entbuf), i, "rtprefix", added);
 		addr = (char *)agetstr(entbuf, &bp);
 		if (addr == NULL) {
+			makeentry(oentbuf, sizeof(oentbuf), i,
+				  "rtrprefix", added);
+			addr = (char *)agetstr(oentbuf, &bp);
+			if (addr) {
+				fprintf(stderr, "%s was obsoleted.  Use %s.\n",
+					oentbuf, entbuf);
+			}
+		}
+		if (addr == NULL) {
 			syslog(LOG_ERR,
 			       "<%s> need %s as a route for interface %s", 
 			       __FUNCTION__, entbuf, intface);
 			exit(1);
 		}
 		if (inet_pton(AF_INET6, addr, &rti->prefix) != 1) {
-			syslog(LOG_ERR,
-			       "<%s> inet_pton failed for %s",
+			syslog(LOG_ERR, "<%s> inet_pton failed for %s",
 			       __FUNCTION__, addr);
 			exit(1);
 		}
@@ -491,7 +499,7 @@ getconfig(intface)
 		 * XXX: currently there's no restriction in route information
 		 * prefix according to
 		 * draft-ietf-ipngwg-router-selection-00.txt.
-		 * however I think the similar restriction be necessary.
+		 * However, I think the similar restriction be necessary.
 		 */
 		MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
 		if (IN6_IS_ADDR_MULTICAST(&rti->prefix)) {
@@ -511,7 +519,18 @@ getconfig(intface)
 #endif
 
 		makeentry(entbuf, sizeof(entbuf), i, "rtplen", added);
-		MAYHAVE(val, entbuf, 64);
+		/* XXX: 256 is a magic number for compatibility check. */
+		MAYHAVE(val, entbuf, 256);
+		if (val == 256) {
+			makeentry(oentbuf, sizeof(oentbuf),
+				  i, "rtrplen", added);
+			MAYHAVE(val, oentbuf, 256);
+			if (val != 256) {
+				fprintf(stderr, "%s was obsoleted.  Use %s.\n",
+					oentbuf, entbuf);
+			} else
+				val = 64;
+		}
 		if (val < 0 || val > 128) {
 			syslog(LOG_ERR, "<%s> prefixlen (%ld) for %s on %s "
 			       "out of range",
@@ -521,7 +540,17 @@ getconfig(intface)
 		rti->prefixlen = (int)val;
 
 		makeentry(entbuf, sizeof(entbuf), i, "rtflags", added);
-		MAYHAVE(val, entbuf, 0);
+		MAYHAVE(val, entbuf, 256); /* XXX */
+		if (val == 256) {
+			makeentry(oentbuf, sizeof(oentbuf),
+				  i, "rtrflags", added);
+			MAYHAVE(val, oentbuf, 256);
+			if (val != 256) {
+				fprintf(stderr, "%s was obsoleted.  Use %s.\n",
+					oentbuf, entbuf);
+			} else
+				val = 0;
+		}
 		rti->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
 		if (rti->rtpref == ND_RA_FLAG_RTPREF_RSV) {
 			syslog(LOG_ERR, "<%s> invalid route preference (%02x) "
@@ -531,8 +560,28 @@ getconfig(intface)
 			exit(1);
 		}
 
+		/*
+		 * Since the spec does not a default value, we should make
+		 * this entry mandatory.  However, FreeBSD 4.4 has shipped
+		 * with this field being optional, we use the router lifetime
+		 * as an ad-hoc default value with a warning message.
+		 */
 		makeentry(entbuf, sizeof(entbuf), i, "rtltime", added);
-		MUSTHAVE(val64, entbuf);
+		MAYHAVE(val64, entbuf, -1);
+		if (val64 == -1) {
+			makeentry(oentbuf, sizeof(oentbuf),
+				  i, "rtrltime", added);
+			MAYHAVE(val64, oentbuf, -1);
+			if (val64 != -1) {
+				fprintf(stderr, "%s was obsoleted.  Use %s.\n",
+					oentbuf, entbuf);
+			} else {
+				fprintf(stderr, "%s should be specified "
+					"for interface %s.\n",
+					entbuf, intface);
+				val64 = tmp->lifetime;
+			}
+		}
 		if (val64 < 0 || val64 > 0xffffffff) {
 			syslog(LOG_ERR, "<%s> route lifetime (" LONGLONG
 				") for %s/%d on %s out of range", __FUNCTION__,
