@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.268 2004/11/17 03:20:14 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.269 2004/11/18 08:22:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1416,7 +1416,7 @@ prelist_update(new, dr, m, mcast)
 		 * identifier is defined in a separate link-type specific
 		 * document.
 		 */
-		ifidlen = ((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->ifidlen;
+		ifidlen = in6_if2idlen(ifp);
 		if (ifidlen < 0) {
 			/* this should not happen, so we always log it. */
 			log(LOG_ERR, "prelist_update: IFID undefined (%s)\n",

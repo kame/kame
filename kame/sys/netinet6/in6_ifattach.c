@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.203 2004/11/11 22:34:45 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.204 2004/11/18 08:22:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -593,7 +593,7 @@ in6_ifattach_linklocal(ifp, altifp)
 	 * autoconfiguration fails and manual configuration is required.
 	 * We simply assume the link-local prefix is fe80::/10.
 	 */
-	ifidlen = ((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->ifidlen;
+	ifidlen = in6_if2idlen(ifp);
 	if (ifidlen < 0) {
 		/* this should not happen, so we always log it. */
 		log(LOG_ERR, "%s: IFID undefined\n", if_name(ifp));

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.103 2004/08/17 10:18:58 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.104 2004/11/18 08:22:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,7 +96,6 @@ struct in6_ifextra {
 	struct icmp6_ifstat *icmp6_ifstat;
 	struct nd_ifinfo *nd_ifinfo;
 	struct scope6_id *scope6_id;
-	int ifidlen;
 };
 
 struct	in6_ifaddr {
@@ -772,6 +771,7 @@ int	in6if_do_dad __P((struct ifnet *));
 void	in6_purgeif __P((struct ifnet *));
 void	in6_savemkludge __P((struct in6_ifaddr *));
 void	in6_setmaxmtu   __P((void));
+int	in6_if2idlen   __P((struct ifnet *));
 void	*in6_domifattach __P((struct ifnet *));
 void	in6_domifdetach __P((struct ifnet *, void *));
 void	in6_restoremkludge __P((struct in6_ifaddr *, struct ifnet *));
