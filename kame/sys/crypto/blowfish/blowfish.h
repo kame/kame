@@ -1,4 +1,4 @@
-/*	$KAME: blowfish.h,v 1.9 2000/09/18 20:59:20 itojun Exp $	*/
+/*	$KAME: blowfish.h,v 1.10 2000/09/18 21:21:20 itojun Exp $	*/
 
 /* crypto/bf/blowfish.h */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
@@ -74,11 +74,10 @@ extern "C" {
 #define BF_ROUNDS	16
 #define BF_BLOCK	8
 
-typedef struct bf_key_st
-	{
+typedef struct bf_key_st {
 	BF_LONG P[BF_ROUNDS+2];
 	BF_LONG S[4*256];
-	} BF_KEY;
+} BF_KEY;
 
 void BF_set_key __P((BF_KEY *, int, unsigned char *));
 void BF_encrypt __P((BF_LONG *, BF_KEY *, int));
