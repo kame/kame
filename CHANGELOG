@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1392 2000/11/16 20:11:19 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1393 2000/11/18 11:26:12 jinmei Exp $
 
 <200011>
+2000-11-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* [fno]bsd: supported the IPV6_RECVPATHMTU socket option. Not
+	compiled as of writing this log.
+
+2000-11-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/racoon/grabmyaddr.c (suitable_ifaddr6): made sure to
+	close the temporary socket. Without this, racoon will eventually
+	die upon the "too many open files" error.
+
 Fri Nov 17 05:09:07 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/apache13: upgrade to 1.3.14.
 
