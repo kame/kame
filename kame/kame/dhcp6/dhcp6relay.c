@@ -319,11 +319,19 @@ relay6_init()
 		/* NOTREACHED */
 	}
 	freeaddrinfo(res);
+#ifdef IPV6_RECVPKTINFO
 	if (setsockopt(csock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		       &on, sizeof(on)) < 0) {
 		err(1, "setsockopt(IPV6_RECVPKTINFO)");
 		/* NOTREACHED */
 	}
+#else
+	if (setsockopt(csock, IPPROTO_IPV6, IPV6_PKTINFO,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(IPV6_PKTINFO)");
+		/* NOTREACHED */
+	}
+#endif
 
 	hints.ai_flags = 0;
 	error = getaddrinfo(DH6ADDR_ALLAGENT, 0, &hints, &res2);
@@ -374,11 +382,19 @@ relay6_init()
 		err(1, "setsockopt(ssock, IPV6_MULTICAST_HOPS(%d))", mhops);
 		/* NOTREACHED */
 	}
+#ifdef IPV6_RECVPKTINFO
 	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		       &on, sizeof(on)) < 0) {
 		err(1, "setsockopt(IPV6_RECVPKTINFO)");
 		/* NOTREACHED */
 	}
+#else
+	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_PKTINFO,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(IPV6_PKTINFO)");
+		/* NOTREACHED */
+	}
+#endif
 
 	/*
 	 * Setup a socket to receive ICMPv6 errors.

@@ -271,10 +271,17 @@ server6_init()
 		err(1, "socket(insock)");
 		/* NOTREACHED */
 	}
+#ifdef IPV6_RECVPKTINFO
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		       &on, sizeof(on)) < 0) {
 		err(1, "setsockopt(IPV6_RECVPKTINFO)");
 	}
+#else
+	if (setsockopt(insock, IPPROTO_IPV6, IPV6_PKTINFO,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(IPV6_PKTINFO)");
+	}
+#endif
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		err(1, "bind(insock)");
 		/* NOTREACHED */
