@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.59 2002/08/30 03:56:20 onoe Exp $	*/
+/*	$KAME: traceroute6.c,v 1.60 2002/08/30 04:01:58 onoe Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -681,11 +681,7 @@ main(argc, argv)
 	 * Send UDP or ICMP
 	 */
 	if (useicmp) {
-		sndsock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
-		if ((sndsock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
-			perror("socket(SOCK_RAW, IPPROTO_ICMPV6)");
-			exit(5);
-		}
+		sndsock = rcvsock;
 	} else {
 		if ((sndsock = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 			perror("socket(SOCK_DGRAM)");
