@@ -1,0 +1,317 @@
+diff -dur xc.ORIG/config/cf/FreeBSD.cf xc/config/cf/FreeBSD.cf
+--- xc.ORIG/config/cf/FreeBSD.cf	Tue Oct 12 04:03:56 1999
++++ xc/config/cf/FreeBSD.cf	Fri Nov 12 05:02:20 1999
+@@ -47,6 +47,15 @@
+ #endif
+ #define HasWChar32		YES
+ 
++#define HasPosixThreads		YES
++#define ThreadedX		YES
++#define BuildThreadStubLibrary	YES
++#define NeedUIThrStubs		YES
++#define HasThreadSafeAPI	NO
++#define ThreadsLibraries	-pthread
++XCOMM math.h uses _REENTRANT in FreeBSD, so we define it here too
++#define SystemMTDefines		-D_REENTRANT -D_THREAD_SAFE
++
+ #define AvoidNullMakeCommand	YES
+ #define StripInstalledPrograms	YES
+ #define CompressAllFonts	YES
+diff -dur xc.ORIG/config/cf/bsdLib.tmpl xc/config/cf/bsdLib.tmpl
+--- xc.ORIG/config/cf/bsdLib.tmpl	Fri Nov  6 13:54:16 1998
++++ xc/config/cf/bsdLib.tmpl	Fri Nov 12 03:35:09 1999
+@@ -48,9 +48,19 @@
+ #define CplusplusLibC
+ #define FrescoSysLibs	CplusplusLibC MathLibrary
+ 
+-#define SharedX11Reqs
++#if ThreadedX
++# ifdef BuildThreadStubLibrary
++#  define SharedThreadReqs	-L$(BUILDLIBDIR) -lXThrStub 
++# else
++#  define SharedThreadReqs	-pthread
++# endif
++#else
++# define SharedThreadReqs /**/
++#endif
++
++#define SharedX11Reqs	SharedThreadReqs
+ #define SharedOldXReqs	$(LDPRELIB) $(XLIBONLY)
+-#define SharedXtReqs	$(LDPRELIB) $(XLIBONLY) $(SMLIB) $(ICELIB)
++#define SharedXtReqs	$(LDPRELIB) $(XLIBONLY) $(SMLIB) $(ICELIB) SharedThreadReqs
+ #define SharedXawReqs	$(LDPRELIB) $(XMULIB) $(XTOOLLIB) $(XLIB)
+ #define SharedXmuReqs	$(LDPRELIB) $(XTOOLLIB) $(XLIB)
+ #define SharedXextReqs	$(LDPRELIB) $(XLIBONLY)
+diff -dur xc.ORIG/include/Xos_r.h xc/include/Xos_r.h
+--- xc.ORIG/include/Xos_r.h	Fri Jul 23 09:00:22 1999
++++ xc/include/Xos_r.h	Fri Oct 15 01:00:13 1999
+@@ -84,6 +84,9 @@
+ #   undef _POSIX_SOURCE
+ #  endif
+ # endif
++# ifdef CSRG_BASED
++#  include <sys/param.h>	/* for MAXHOSTNAMELEN */
++# endif
+ #endif /* _XOS_R_H */
+ 
+ #ifndef WIN32
+@@ -234,31 +237,69 @@
+   struct passwd* pwp;
+   size_t len;
+ } _Xgetpwparams;
+-# define _Xpw_copyPasswd(p) \
++# if defined(CSRG_BASED) /* FreeBSD and hopefully NetBSD, OpenBSD and BSD/OS */
++#  define _Xpw_copyPasswd(p) \
+    (memcpy(&(p).pws, (p).pwp, sizeof(struct passwd)), \
+     ((p).pws.pw_name = (p).pwbuf), \
+     ((p).len = strlen((p).pwp->pw_name)), \
+     strcpy((p).pws.pw_name, (p).pwp->pw_name), \
++    \
+     ((p).pws.pw_passwd = (p).pws.pw_name + (p).len + 1), \
+     ((p).len = strlen((p).pwp->pw_passwd)), \
+     strcpy((p).pws.pw_passwd,(p).pwp->pw_passwd), \
++    \
++    ((p).pws.pw_class = (p).pws.pw_class + (p).len + 1), \
++    ((p).len = strlen((p).pwp->pw_class)), \
++    strcpy((p).pws.pw_class, (p).pwp->pw_class), \
++    \
++    ((p).pws.pw_gecos = (p).pws.pw_class + (p).len + 1), \
++    ((p).len = strlen((p).pwp->pw_gecos)), \
++    strcpy((p).pws.pw_gecos, (p).pwp->pw_gecos), \
++    \
++    ((p).pws.pw_dir = (p).pws.pw_class + (p).len + 1), \
++    ((p).len = strlen((p).pwp->pw_dir)), \
++    strcpy((p).pws.pw_dir, (p).pwp->pw_dir), \
++    \
++    ((p).pws.pw_shell = (p).pws.pw_dir + (p).len + 1), \
++    ((p).len = strlen((p).pwp->pw_shell)), \
++    strcpy((p).pws.pw_shell, (p).pwp->pw_shell), \
++    \
++    ((p).pwp = &(p).pws), \
++    0 )
++# else /* CSRG_BASED */
++#  define _Xpw_copyPasswd(p) \
++   (memcpy(&(p).pws, (p).pwp, sizeof(struct passwd)), \
++    ((p).pws.pw_name = (p).pwbuf), \
++    ((p).len = strlen((p).pwp->pw_name)), \
++    strcpy((p).pws.pw_name, (p).pwp->pw_name), \
++    \
++    ((p).pws.pw_passwd = (p).pws.pw_name + (p).len + 1), \
++    ((p).len = strlen((p).pwp->pw_passwd)), \
++    strcpy((p).pws.pw_passwd,(p).pwp->pw_passwd), \
++    \
+     ((p).pws.pw_age = (p).pws.pw_passwd + (p).len + 1), \
+     ((p).len = strlen((p).pwp->pw_age)), \
+     strcpy((p).pws.pw_age, (p).pwp->pw_age), \
++    \
+     ((p).pws.pw_comment = (p).pws.pw_age + (p).len + 1), \
+     ((p).len = strlen((p).pwp->pw_comment)), \
+     strcpy((p).pws.pw_comment, (p).pwp->pw_comment), \
++    \
+     ((p).pws.pw_gecos = (p).pws.pw_comment + (p).len + 1), \
+     ((p).len = strlen((p).pwp->pw_gecos)), \
+     strcpy((p).pws.pw_gecos, (p).pwp->pw_gecos), \
++    \
+     ((p).pws.pw_dir = (p).pws.pw_comment + (p).len + 1), \
+     ((p).len = strlen((p).pwp->pw_dir)), \
+     strcpy((p).pws.pw_dir, (p).pwp->pw_dir), \
++    \
+     ((p).pws.pw_shell = (p).pws.pw_dir + (p).len + 1), \
+     ((p).len = strlen((p).pwp->pw_shell)), \
+     strcpy((p).pws.pw_shell, (p).pwp->pw_shell), \
++    \
+     ((p).pwp = &(p).pws), \
+     0 )
++# endif /* CSRG_BASED */
+ # define _XGetpwuid(u,p) \
+ ( (_Xos_processLock), \
+   (((p).pwp = getpwuid((u))) ? _Xpw_copyPasswd(p) : 0), \
+diff -dur xc.ORIG/lib/XThrStub/UIThrStubs.c xc/lib/XThrStub/UIThrStubs.c
+--- xc.ORIG/lib/XThrStub/UIThrStubs.c	Thu Nov  2 00:27:07 1995
++++ xc/lib/XThrStub/UIThrStubs.c	Fri Nov 12 04:29:51 1999
+@@ -37,89 +37,149 @@
+  * specificies the thread library on the link line.
+  */
+ 
+-#include <thread.h>
+-#include <synch.h>
++/*
++ * Modifications by Carlos A M dos Santos, XFree86 Project, November 1999.
++ *
++ * Explanation from <X11/Xos_r.h>:
++ * The structure below is complicated, mostly because P1003.1c (the
++ * IEEE POSIX Threads spec) went through lots of drafts, and some
++ * vendors shipped systems based on draft API that were changed later.
++ * Unfortunately POSIX did not provide a feature-test macro for
++ * distinguishing each of the drafts.
++ */
+ 
++#ifdef CTHREADS
++#include <cthreads.h>
++typedef cthread_t xthread_t;
++#define xthread_self cthread_self
++#pragma weak cthread_self = _Xthr_self_stub_
++#define xmutex_init mutex_init
++#pragma weak mutex_init = _Xmutex_init_stub_
++#pragma weak mutex_clear = _Xmutex_destroy_stub_
++#pragma weak mutex_lock = _Xmutex_lock_stub_
++#pragma weak mutex_unlock = _Xmutex_unlock_stub_
++#pragma weak condition_init = _Xcond_init_stub_
++#pragma weak condition_clear = _Xcond_destroy_stub_
++#pragma weak condition_wait = _Xcond_wait_stub_
++#pragma weak condition_signal = _Xcond_signal_stub_
++#pragma weak condition_broadcast = _Xcond_signal_stub_
++#else /* !CTHREADS */
++#if defined(SVR4) && !defined(__sgi)
++#include <thread.h>
++typedef thread_t xthread_t;
+ #pragma weak thr_self = _Xthr_self_stub_
+-thread_t 
++#pragma weak mutex_init = _Xmutex_init_stub_
++#pragma weak mutex_destroy = _Xmutex_destroy_stub_
++#pragma weak mutex_lock = _Xmutex_lock_stub_
++#pragma weak mutex_unlock = _Xmutex_unlock_stub_
++#pragma weak cond_init = _Xcond_init_stub_
++#pragma weak cond_destroy = _Xcond_destroy_stub_
++#pragma weak cond_wait = _Xcond_wait_stub_
++#pragma weak cond_signal = _Xcond_signal_stub_
++#pragma weak cond_broadcast = _Xcond_signal_stub_
++#else /* !SVR4 */
++#ifdef WIN32
++    /*
++     * Don't know what to do here. Is there something do be done at all?
++     */
++#else /* !WIN32 */
++#ifdef USE_TIS_SUPPORT
++#include <tis.h>
++typedef pthread_t xthread_t;
++#pragma weak tis_self = _Xthr_self_stub_
++#pragma weak tis_mutex_init = _Xmutex_init_stub_
++#pragma weak tis_mutex_destroy = _Xmutex_destroy_stub_
++#pragma weak tis_mutex_lock = _Xmutex_lock_stub_
++#pragma weak tis_mutex_unlock = _Xmutex_unlock_stub_
++#pragma weak tis_cond_init = _Xcond_init_stub_
++#pragma weak tis_cond_destroy = _Xcond_destroy_stub_
++#pragma weak tis_cond_wait = _Xcond_wait_stub_
++#pragma weak tis_cond_signal = _Xcond_signal_stub_
++#pragma weak tis_cond_broadcast = _Xcond_signal_stub_
++#else
++#include <pthread.h>
++typedef pthread_t xthread_t;
++#pragma weak pthread_self = _Xthr_self_stub_
++#pragma weak pthread_mutex_init = _Xmutex_init_stub_
++#pragma weak pthread_mutex_destroy = _Xmutex_destroy_stub_
++#pragma weak pthread_mutex_lock = _Xmutex_lock_stub_
++#pragma weak pthread_mutex_unlock = _Xmutex_unlock_stub_
++#pragma weak pthread_cond_init = _Xcond_init_stub_
++#pragma weak pthread_cond_destroy = _Xcond_destroy_stub_
++#pragma weak pthread_cond_wait = _Xcond_wait_stub_
++#pragma weak pthread_cond_signal = _Xcond_signal_stub_
++#pragma weak pthread_cond_broadcast = _Xcond_broadcast_stub_
++#if defined(_DECTHREADS_) || defined(linux)
++#pragma weak pthread_equal = _Xthr_equal_stub_	/* See Xthreads.h! */
++int
++_Xthr_equal_stub_()
++{
++    return(1);
++}
++#endif /* _DECTHREADS_ || linux */
++#endif /* USE_TIS_SUPPORT */
++#endif /* WIN32 */
++#endif /* SVR4 */
++#endif /* CTHREADS */
++
++xthread_t 
+ _Xthr_self_stub_()
+ {
+-    return((thread_t)0);
++    static xthread_t _X_no_thread_id;
++
++    return(_X_no_thread_id);	/* defined by <X11/Xthreads.h> */
+ }
+ 
+-#pragma weak mutex_init = _Xmutex_init_stub_
+ int 
+-_Xmutex_init_stub_(m, t, a)
+-    mutex_t *m;
+-    int t;
+-    void *a;
++_Xmutex_init_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak mutex_destroy = _Xmutex_destroy_stub_
+ int
+-_Xmutex_destroy_stub_(m)
+-    mutex_t *m;
++_Xmutex_destroy_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak mutex_lock = _Xmutex_lock_stub_
+ int
+-_Xmutex_lock_stub_(m)
+-    mutex_t *m;
++_Xmutex_lock_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak mutex_unlock = _Xmutex_unlock_stub_
+ int
+-_Xmutex_unlock_stub_(m)
+-    mutex_t *m;
++_Xmutex_unlock_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak cond_init = _Xcond_init_stub_
+ int 
+-_Xcond_init_stub_(c, t, a)
+-    cond_t *c;
+-    int t;
+-    void *a;
++_Xcond_init_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak cond_destroy = _Xcond_destroy_stub_
+ int
+-_Xcond_destroy_stub_(c)
+-    cond_t *c;
++_Xcond_destroy_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak cond_wait = _Xcond_wait_stub_
+ int
+-_Xcond_wait_stub_(c,m)
+-    cond_t *c;
+-    mutex_t *m;
++_Xcond_wait_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak cond_signal = _Xcond_signal_stub_
+ int
+-_Xcond_signal_stub_(c)
+-    cond_t *c;
++_Xcond_signal_stub_()
+ {
+     return(0);
+ }
+ 
+-#pragma weak cond_broadcast = _Xcond_broadcast_stub_
+ int
+-_Xcond_broadcast_stub_(c)
+-    cond_t *c;
++_Xcond_broadcast_stub_()
+ {
+     return(0);
+ }

@@ -2,19 +2,14 @@ bin/SuperProbe
 bin/X
 bin/XF86Setup
 bin/XF86_3DLabs
-bin/XF86_8514
-bin/XF86_AGX
 bin/XF86_I128
-bin/XF86_Mach32
 bin/XF86_Mach64
-bin/XF86_Mach8
 bin/XF86_Mono
 bin/XF86_P9000
 bin/XF86_S3
 bin/XF86_S3V
 bin/XF86_SVGA
-bin/XF86_VGA16
-bin/XF86_W32
+bin/XF86_TGA
 bin/Xmark
 bin/Xnest
 bin/Xprt
@@ -34,7 +29,6 @@ bin/fstobdf
 bin/gccmakedep
 bin/iceauth
 bin/imake
-bin/joycal
 bin/kbd_mode
 bin/lbxproxy
 bin/lndir
@@ -49,7 +43,6 @@ bin/reconfig
 bin/resize
 bin/rstart
 bin/rstartd
-bin/scanpci
 bin/sessreg
 bin/setxkbmap
 bin/showrgb
@@ -1044,8 +1037,6 @@ lib/X11/fonts/75dpi/timR12.pcf.gz
 lib/X11/fonts/75dpi/timR14.pcf.gz
 lib/X11/fonts/75dpi/timR18.pcf.gz
 lib/X11/fonts/75dpi/timR24.pcf.gz
-lib/X11/fonts/PEX/Roman.phont
-lib/X11/fonts/PEX/Roman_M.phont
 lib/X11/fonts/Speedo/font0419.spd
 lib/X11/fonts/Speedo/font0582.spd
 lib/X11/fonts/Speedo/font0583.spd
@@ -1273,8 +1264,8 @@ lib/X11/rgb.txt
 lib/X11/rstart/commands/@List
 lib/X11/rstart/commands/ListContexts
 lib/X11/rstart/commands/ListGenericCommands
-@exec ln -fs %D/lib/X11/rstart/commands/x11r6 %D/lib/X11/rstart/commands/x
-@exec ln -fs %D/lib/X11/rstart/commands/x11r6 %D/lib/X11/rstart/commands/x11
+@exec ln -sf x11r6 %D/lib/X11/rstart/commands/x
+@exec ln -sf x11r6 %D/lib/X11/rstart/commands/x11
 @unexec rm -f %D/lib/X11/rstart/commands/x
 @unexec rm -f %D/lib/X11/rstart/commands/x11
 lib/X11/rstart/commands/x11r6/@List
@@ -1465,7 +1456,7 @@ lib/X11/xsm/system.xsm
 lib/libFS.a
 lib/libICE.a
 lib/libICE.so
-lib/libICE.so.6.3
+lib/libICE.so.6
 lib/libPEX5.a
 lib/libPEX5.so
 lib/libPEX5.so.6
@@ -1474,19 +1465,19 @@ lib/libSM.so
 lib/libSM.so.6
 lib/libX11.a
 lib/libX11.so
-lib/libX11.so.6.1
+lib/libX11.so.6
 lib/libXIE.a
 lib/libXIE.so
 lib/libXIE.so.6
 lib/libXau.a
 lib/libXaw.a
 lib/libXaw.so
-lib/libXaw.so.6.1
+lib/libXaw.so.6
 lib/libXdmcp.a
 lib/libXdpms.a
 lib/libXext.a
 lib/libXext.so
-lib/libXext.so.6.3
+lib/libXext.so.6
 lib/libXi.a
 lib/libXi.so
 lib/libXi.so.6
@@ -1495,14 +1486,14 @@ lib/libXmu.so
 lib/libXmu.so.6
 lib/libXp.a
 lib/libXp.so
-lib/libXp.so.6.2
+lib/libXp.so.6
 lib/libXss.a
 lib/libXt.a
 lib/libXt.so
 lib/libXt.so.6
 lib/libXtst.a
 lib/libXtst.so
-lib/libXtst.so.6.1
+lib/libXtst.so.6
 lib/libXxf86dga.a
 lib/libXxf86misc.a
 lib/libXxf86vm.a
@@ -1513,13 +1504,11 @@ lib/libxkbfile.a
 lib/libxkbui.a
 @exec /usr/bin/env OBJFORMAT=%%PORTOBJFORMAT%% /sbin/ldconfig -m %B
 @unexec /usr/bin/env OBJFORMAT=%%PORTOBJFORMAT%% /sbin/ldconfig -R
-lib/modules/pex5.so
 lib/modules/xf86AceCad.so
 lib/modules/xf86Calcomp.so
 lib/modules/xf86Dial.so
 lib/modules/xf86Dyna.so
 lib/modules/xf86Elo.so
-lib/modules/xf86Jstk.so
 lib/modules/xf86MuTouch.so
 lib/modules/xf86Summa.so
 lib/modules/xf86Wacom.so
