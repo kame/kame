@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.123 2002/03/15 07:46:13 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.124 2002/04/01 04:45:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2580,9 +2580,7 @@ mip6_align_destopt(buf)
 	struct ip6_ext  *ext_hdr;
 	int              rest;     /* Rest of modulo division */
 	u_int8_t         padlen;   /* Number of bytes to pad */
-	u_int8_t         padn;     /* Number for option type PADN */
 
-	padn = IP6OPT_PADN;
 	rest = buf->off % 8;
 
 	if (rest == 7) {
@@ -2593,10 +2591,9 @@ mip6_align_destopt(buf)
 		/* Add a PADN option */
 		padlen = 8 - rest;
 		bzero((caddr_t)buf->buf + buf->off, padlen);
-		bcopy(&padn, (caddr_t)buf->buf + buf->off, 1);
-		padlen = padlen - 2;
-		bcopy(&padlen, (caddr_t)buf->buf + buf->off + 1, 1);
-		buf->off += padlen + 2;
+		*(u_int8_t *)((caddr_t)buf->buf + buf->off) = IP6OPT_PADN;
+		*(u_int8_t *)((caddr_t)buf->buf + buf->off + 1) = padlen - 2;
+		buf->off += padlen;
 	}
 
 	/* Adjust the extension header length */
@@ -2625,7 +2622,7 @@ mip6_add_opt2dh(opt, dh)
 	struct ip6_opt_binding_request *br;
 	struct ip6_opt_home_address    *ha;
 	caddr_t                         pos;
-	u_int8_t                        type, len, padn, off;
+	u_int8_t                        type, len, off;
 	u_int32_t                       t;
 	int                             rest;
 
@@ -2639,7 +2636,6 @@ mip6_add_opt2dh(opt, dh)
 	}
 
 	/* Add option to Destination header */
-	padn = IP6OPT_PADN;
 	type = *(u_int8_t*)opt;
 	switch (type) {
 		case IP6OPT_BINDING_UPDATE:
@@ -2647,20 +2643,17 @@ mip6_add_opt2dh(opt, dh)
 			rest = dh->off % 4;
 			if (rest == 0) {
 				/* Add a PADN option with length 0 */
-				bzero((caddr_t)dh->buf + dh->off, 2);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				dh->off += 2;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = 0; /* PADN length */
 			} else if (rest == 1) {
 				/* Add a PAD1 option */
-				bzero((caddr_t)dh->buf + dh->off, 1);
-				dh->off += 1;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PAD1;
 			} else if (rest == 3) {
 				/* Add a PADN option with length 1 */
-				len = 1;
 				bzero((caddr_t)dh->buf + dh->off, 3);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
-				dh->off += 3;
+				*(u_int8_t *)(dh->buf + dh->off++) = IP6OPT_PADN;
+				*(u_int8_t *)(dh->buf + dh->off++) = 1;
+				dh->off += 1;
 			}
 
 			/* Copy option to DH */
@@ -2685,20 +2678,17 @@ mip6_add_opt2dh(opt, dh)
 			rest = dh->off % 4;
 			if (rest == 1) {
 				/* Add a PADN option with length 0 */
-				bzero((caddr_t)dh->buf + dh->off, 2);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				dh->off += 2;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = 0; /* PADN length */
 			} else if (rest == 2) {
 				/* Add a PAD1 option */
-				bzero((caddr_t)dh->buf + dh->off, 1);
-				dh->off += 1;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PAD1;
 			} else if (rest == 0) {
 				/* Add a PADN option with length 1 */
-				len = 1;
 				bzero((caddr_t)dh->buf + dh->off, 3);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
-				dh->off += 3;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = 1; /* PADN length */
+				dh->off += 1;
 			}
 
 			/* Copy option to DH */
@@ -2740,20 +2730,18 @@ mip6_add_opt2dh(opt, dh)
 				/* Add a PADN option with length X */
 				len = 6 - rest - 2;
 				bzero((caddr_t)dh->buf + dh->off, len + 2);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
-				dh->off += len + 2;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = len; /* PADN length */
+				dh->off += len;
 			} else if (rest == 5) {
 				/* Add a PAD1 option */
-				bzero((caddr_t)dh->buf + dh->off, 1);
-				dh->off += 1;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PAD1;
 			} else if (rest == 7) {
 				/* Add a PADN option with length 5 */
-				len = 5;
-				bzero((caddr_t)dh->buf + dh->off, len + 2);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
-				dh->off += len + 2;
+				bzero((caddr_t)dh->buf + dh->off, 5 + 2);
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = IP6OPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off++) = 5; /* PADN length */
+				dh->off += 5;
 			}
 
 			/* Copy option to DH */
@@ -2781,7 +2769,7 @@ mip6_add_subopt2dh(subopt, opt, dh)
 {
 	int suboptlen = 0;
 	caddr_t subopt_pos = NULL;
-	u_int8_t type, padn;
+	u_int8_t type;
 	u_int8_t len;
 	int rest;
 
@@ -2794,7 +2782,6 @@ mip6_add_subopt2dh(subopt, opt, dh)
 	}
 
 	/* Add sub-option to Destination option */
-	padn = MIP6SUBOPT_PADN;
 	type = *subopt;
 	switch (type) {
 #ifndef MIP6_DRAFT13
@@ -2809,8 +2796,8 @@ mip6_add_subopt2dh(subopt, opt, dh)
 				/* Add a PADN option with length X */
 				len = 6 - rest - 2;
 				bzero((caddr_t)dh->buf + dh->off, len + 2);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6SUBOPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off + 1) = len;
 				suboptlen = len + 2;
 			} else if (rest == 5) {
 				/* Add a PAD1 option */
@@ -2818,11 +2805,10 @@ mip6_add_subopt2dh(subopt, opt, dh)
 				suboptlen = 1;
 			} else if (rest == 7) {
 				/* Add a PADN option with length 5 */
-				len = 5;
-				bzero((caddr_t)dh->buf + dh->off, len + 2);
-				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
-				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
-				suboptlen = len + 2;
+				bzero((caddr_t)dh->buf + dh->off, 5/*len*/ + 2);
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6SUBOPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off + 1) = 5;
+				suboptlen = 5 + 2;
 			}
 			dh->off += suboptlen;
 			((struct ip6_opt *)opt)->ip6o_len += suboptlen;
