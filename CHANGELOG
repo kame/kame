@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.852 2000/05/05 15:55:54 sumikawa Exp $
+$Id: CHANGELOG,v 1.853 2000/05/05 15:57:43 itojun Exp $
 
 <200005>
+Sat May  6 00:30:39 JST 2000  itojun@iijlab.net
+	* */include/netdb.h, kame/libinet6/getnameinfo.c: 
+	  2nd arg of getnameinfo() is socklen_t, not size_t.
+	  this was changed somewhere before rfc2553.  we forgot to catch
+	  up with the change.
+
 Sat May  6 00:55:30 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/mozilla: upgrade to M15. From: ume
 
