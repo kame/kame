@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.5 2000/02/22 14:04:29 itojun Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.6 2000/02/23 12:53:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_usrreq.c,v 1.5 2000/02/22 14:04:29 itojun Exp $
+ *	$Id: natpt_usrreq.c,v 1.6 2000/02/23 12:53:18 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -403,7 +403,7 @@ natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
 static int
 _natptSetIf(caddr_t addr)
 {
-    struct msgBox	*mbx = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
     struct ifBox	*ifb;
 
     if (((ifb = natpt_asIfBox(mbx->m_ifName)) == NULL)
@@ -440,7 +440,7 @@ _natptSetIf(caddr_t addr)
 static int
 _natptGetIf(caddr_t addr)
 {
-    struct msgBox	*mbx = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
     struct ifBox	*ifb;
 
     if (((ifb = natpt_asIfBox(mbx->m_ifName)) == NULL)
@@ -463,7 +463,7 @@ _natptGetIf(caddr_t addr)
 static int
 _natptSetValue(caddr_t addr)
 {
-    struct msgBox	*mbx = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
 
     switch (mbx->flags)
     {
@@ -484,7 +484,7 @@ static int
 _natptTestLog(caddr_t addr)
 {
     char		*fragile;
-    struct msgBox	*mbox = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 
     MALLOC(fragile, char *, mbox->size, M_TEMP, M_WAITOK);
     copyin(mbox->freight, fragile, mbox->size);

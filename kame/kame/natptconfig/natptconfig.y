@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptconfig.y,v 1.4 2000/02/18 11:39:55 fujisawa Exp $
+ *	$Id: natptconfig.y,v 1.5 2000/02/23 12:53:19 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -49,7 +49,7 @@
 #include "miscvar.h"
 #include "showvar.h"
 
-struct	msgBox		mBox;
+struct	natpt_msgBox	mBox;
 
 char	*yykeyword = NULL;
 char	*yyfilename;

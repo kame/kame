@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.6 2000/02/22 14:04:28 itojun Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.7 2000/02/23 12:53:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_rule.c,v 1.6 2000/02/22 14:04:28 itojun Exp $
+ *	$Id: natpt_rule.c,v 1.7 2000/02/23 12:53:18 fujisawa Exp $
  */
 
 #include <sys/errno.h>
@@ -350,7 +350,7 @@ _natptDisableTrans(caddr_t addr)
 int
 _natptSetRule(caddr_t addr)
 {
-    struct msgBox	*mbx = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
     struct _cSlot	*cst;
     Cell		**anchor;
 
@@ -407,7 +407,7 @@ _natptSetRule(caddr_t addr)
 int
 _natptSetFaithRule(caddr_t addr)
 {
-    struct msgBox	*mbx = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
     struct _cSlot	*cst;
 
     MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_TEMP, M_WAITOK);
@@ -422,7 +422,7 @@ _natptSetFaithRule(caddr_t addr)
 int
 _natptFlushRule(caddr_t addr)
 {
-    struct msgBox	*mbx = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
 
     if (mbx->flags & FLUSH_STATIC)
 	_flushPtrRules(&natptStatic);
@@ -437,7 +437,7 @@ _natptFlushRule(caddr_t addr)
 int
 _natptSetPrefix(caddr_t addr)
 {
-    struct msgBox	*mbx = (struct msgBox *)addr;
+    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
     struct pAddr	*load;
 
     MALLOC(load, struct pAddr *, sizeof(struct pAddr), M_TEMP, M_WAITOK);

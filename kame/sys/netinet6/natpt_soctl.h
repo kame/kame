@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.6 2000/02/22 14:04:29 itojun Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.7 2000/02/23 12:53:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_soctl.h,v 1.6 2000/02/22 14:04:29 itojun Exp $
+ *	$Id: natpt_soctl.h,v 1.7 2000/02/23 12:53:18 fujisawa Exp $
  */
 
 /* cmd for use with ioctl at the socket						*/
@@ -37,24 +37,24 @@
 /*	_IOW()		copy in	 parameters					*/
 /*	_IOWR()		copy in/out parameters					*/
 
-#define	SIOCSETIF	_IOW ('n',   0, struct msgBox)	/* Set interface side	*/
-#define SIOCGETIF	_IOWR('n',   1, struct msgBox)	/* Get interface sidde	*/
-#define	SIOCENBTRANS	_IOW ('n',   2, struct msgBox)	/* Enable  translation	*/
-#define SIOCDSBTRANS	_IOW ('n',   3, struct msgBox)	/* Disable translation	*/
-#define	SIOCSETRULE	_IOW ('n',   4, struct msgBox)	/* Set rule		*/
-#define	SIOCGETRULE	_IOWR('n',   5, struct msgBox)	/* Get rule		*/
-#define SIOCFLUSHRULE	_IOW ('n',   6, struct msgBox)	/* Flush rule		*/
-#define	SIOCSETPREFIX	_IOW ('n',   8, struct msgBox)	/* Set prefix		*/
-#define	SIOCGETPREFIX	_IOWR('n',   9, struct msgBox)	/* Get prefix		*/
-#define	SIOCSETVALUE	_IOW ('n',  10, struct msgBox)	/* Set value		*/
-#define	SIOCGETVALUE	_IOW ('n',  11, struct msgBox)	/* Get value		*/
+#define	SIOCSETIF	_IOW ('n',   0, struct natpt_msgBox)	/* Set interface side	*/
+#define SIOCGETIF	_IOWR('n',   1, struct natpt_msgBox)	/* Get interface sidde	*/
+#define	SIOCENBTRANS	_IOW ('n',   2, struct natpt_msgBox)	/* Enable  translation	*/
+#define SIOCDSBTRANS	_IOW ('n',   3, struct natpt_msgBox)	/* Disable translation	*/
+#define	SIOCSETRULE	_IOW ('n',   4, struct natpt_msgBox)	/* Set rule		*/
+#define	SIOCGETRULE	_IOWR('n',   5, struct natpt_msgBox)	/* Get rule		*/
+#define SIOCFLUSHRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
+#define	SIOCSETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/
+#define	SIOCGETPREFIX	_IOWR('n',   9, struct natpt_msgBox)	/* Get prefix		*/
+#define	SIOCSETVALUE	_IOW ('n',  10, struct natpt_msgBox)	/* Set value		*/
+#define	SIOCGETVALUE	_IOW ('n',  11, struct natpt_msgBox)	/* Get value		*/
 
-#define	SIOCTESTLOG	_IOW ('n',  12, struct msgBox)	/* Test log		*/
+#define	SIOCTESTLOG	_IOW ('n',  12, struct natpt_msgBox)	/* Test log		*/
 
-#define SIOCBREAK	_IO  ('n', 255)			/* stop			*/
+#define SIOCBREAK	_IO  ('n', 255)				/* stop			*/
 
 
-typedef	struct msgBox				/* sizeof():  44[byte]	*/
+typedef	struct natpt_msgBox				/* sizeof():  44[byte]	*/
 {
     int		 flags;
 /* in case SIOC(GET|SET)IF		*/
@@ -87,7 +87,7 @@ typedef	struct msgBox				/* sizeof():  44[byte]	*/
 	char	 M_ifName[IFNAMSIZ];
 	char	 M_aux[32];
     }		 M_dat;
-}   msgBox;
+}   natpt_msgBox;
 
 #define	m_ifName	M_dat.M_ifName
 #define	m_aux		M_dat.M_aux

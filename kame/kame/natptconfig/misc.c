@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.6 2000/02/18 11:39:54 fujisawa Exp $
+ *	$Id: misc.c,v 1.7 2000/02/23 12:53:19 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -72,9 +72,9 @@ u_long	mtobits[33];
 void
 setInterface(char *ifname, int inex)
 {
-    struct msgBox	 mBox;
+    struct natpt_msgBox	 mBox;
 
-    bzero(&mBox, sizeof(msgBox));
+    bzero(&mBox, sizeof(natpt_msgBox));
     strcpy(mBox.m_ifName, ifname);
     mBox.flags = inex;
 
@@ -92,10 +92,10 @@ getInterface()
 void
 setPrefix(int type, struct addrinfo *prefix, int masklen)
 {
-    struct msgBox	 mBox;
+    struct natpt_msgBox	 mBox;
     struct pAddr	*freight;
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
     mBox.flags = type;
     mBox.size = sizeof(struct pAddr);
     mBox.freight = (caddr_t)(freight = (struct pAddr *)malloc(mBox.size));
@@ -116,11 +116,11 @@ setPrefix(int type, struct addrinfo *prefix, int masklen)
 void
 setRule(int dir, int proto, struct pAddr *from, struct pAddr *to)
 {
-    struct msgBox	 mBox;
+    struct natpt_msgBox	 mBox;
     struct _cSlot	*freight;
     struct pAddr	*local, *remote;
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
     mBox.flags = NATPT_STATIC;
     mBox.size  = sizeof(struct _cSlot);
     mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
@@ -156,7 +156,7 @@ setRule(int dir, int proto, struct pAddr *from, struct pAddr *to)
 void
 setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
 {
-    struct msgBox	 mBox;
+    struct natpt_msgBox	 mBox;
     struct _cSlot	*freight;
     struct pAddr	 from;
     struct pAddr	*local, *remote;
@@ -164,7 +164,7 @@ setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
     if ((*(port+0) != 0) && (*(port+1) != 0))
 	errx(1, "port range specified at \"from\" address.");
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
     mBox.flags = NATPT_STATIC;
     mBox.size  = sizeof(struct _cSlot);
     mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
@@ -203,10 +203,10 @@ setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
 void
 setFaithRule(struct pAddr *from)
 {
-    struct msgBox	 mBox;
+    struct natpt_msgBox	 mBox;
     struct _cSlot	*freight;
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
     mBox.flags = NATPT_FAITH;
     mBox.size  = sizeof(struct _cSlot);
     mBox.freight
@@ -234,9 +234,9 @@ setFaithRule(struct pAddr *from)
 void
 flushRule(int type)
 {
-    struct msgBox	 mBox;
+    struct natpt_msgBox	 mBox;
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
 
     switch (type)
     {
@@ -272,9 +272,9 @@ void
 setValue(char *name, int val)
 {
     int			type = 0;
-    struct msgBox	mBox;
+    struct natpt_msgBox	mBox;
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
 
     if (strcmp(name, "natpt_debug") == 0)		type =NATPT_DEBUG;
     else if (strcmp(name, "natpt_dump") == 0)		type =NATPT_DUMP;
@@ -296,9 +296,9 @@ testLog(char *str)
 {
     int			 slen;
     char		*freight;
-    struct msgBox	 mBox;
+    struct natpt_msgBox	 mBox;
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
 
     if (str == NULL)
 	str = LOGTESTPATTERN;

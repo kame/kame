@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.5 2000/02/18 11:39:55 fujisawa Exp $
+ *	$Id: show.c,v 1.6 2000/02/23 12:53:19 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -111,11 +111,11 @@ static void	_showXlateHomogeneous	__P((struct _tSlot *));
 void
 showInterface(char *ifName)
 {
-    struct msgBox	mBox;
+    struct natpt_msgBox	mBox;
 
     extern	int		_fd;
 
-    bzero(&mBox, sizeof(struct msgBox));
+    bzero(&mBox, sizeof(struct natpt_msgBox));
     if (ifName)
 	strcpy(mBox.m_aux, ifName);
 
