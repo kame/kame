@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1036 2000/06/18 19:21:42 sumikawa Exp $
+$Id: CHANGELOG,v 1.1037 2000/06/18 19:43:29 itojun Exp $
 
 <200006>
+Mon Jun 19 04:42:55 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 6/12 snapshot from
+	  tcpdump.org.
+
 Mon Jun 19 04:15:23 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/sys: Security fix "FreeBSD-SA-00:25 FreeBSD/Alpha
 	  platform lacks kernel pseudo-random number generator, some
