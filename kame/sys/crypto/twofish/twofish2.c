@@ -25,7 +25,7 @@
 #include	<sys/types.h>
 #include	<machine/endian.h>
 
-#include	<crypto/twofish/aes.h>
+#include	<crypto/twofish/twofish.h>
 #include	<crypto/twofish/table.h>
 
 int ParseHexDword __P((int, CONST char *, DWORD *, char *));
