@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.70 2000/05/29 08:46:31 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.71 2000/05/29 11:49:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -252,7 +252,7 @@ found:
 saok:
 	iph1->approval = sa;
 
-	newsa = get_sabyproppair(s);
+	newsa = get_sabyproppair(p);
 	if (newsa == NULL)
 		iph1->approval = NULL;
 
