@@ -712,6 +712,12 @@ rtinit(ifa, cmd, flags)
 	info.rti_flags = flags | ifa->ifa_flags;
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = ifa->ifa_addr;
+	/*
+	 * XXX here, it seems that we are assuming that ifa_netmask is NULL
+	 * for RTF_HOST.  bsdi4 passes NULL explicitly (via intermediate
+	 * variable) when RTF_HOST is 1.  still not sure if i can safely
+	 * change it to meet bsdi4 behavior.
+	 */
 	info.rti_info[RTAX_NETMASK] = ifa->ifa_netmask;
 	error = rtrequest1(cmd, &info, &nrt);
 	if (cmd == RTM_DELETE && error == 0 && (rt = nrt)) {
