@@ -170,6 +170,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #ifdef IPV6_REACHCONF
 #define F_REACHCONF	0x8000
 #endif
+#define F_HOSTNAME	0x10000
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -281,12 +282,12 @@ main(argc, argv)
 	preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
 #ifndef IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRS:s:vwW")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:np:qRS:s:vwW")) != EOF)
 #else
 #ifdef IPSEC_POLICY_IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRS:s:vwWP:")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:np:qRS:s:vwWP:")) != EOF)
 #else
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRS:s:vwWAE")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:np:qRS:s:vwWAE")) != EOF)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 		switch(ch) {
@@ -350,6 +351,9 @@ main(argc, argv)
 			}
 			options |= F_FLOOD;
 			setbuf(stdout, (char *)NULL);
+			break;
+		case 'H':
+			options |= F_HOSTNAME;
 			break;
 		case 'h':		/* hoplimit */
 			hoplimit = strtol(optarg, &e, 10);
@@ -461,7 +465,7 @@ main(argc, argv)
 
 	/* getaddrinfo */
 	bzero(&hints, sizeof(struct addrinfo));
-	if ((options & F_NUMERIC) == 0)
+	if ((options & F_NUMERIC) != 0)
 		hints.ai_flags = AI_CANONNAME;
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_RAW;
@@ -1643,7 +1647,7 @@ pr_addr(addr)
 	static char buf[MAXHOSTNAMELEN];
 	int flag = 0;
 
-	if (options & F_NUMERIC)
+	if ((options & F_HOSTNAME) == 0)
 		flag |= NI_NUMERICHOST;
 #ifdef KAME_SCOPEID
 	flag |= NI_WITHSCOPEID;
