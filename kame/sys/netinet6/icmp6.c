@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.196 2001/02/08 17:33:56 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.197 2001/02/09 21:39:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,7 +253,7 @@ icmp6_errcount(stat, type, code)
 	struct icmp6errstat *stat;
 	int type, code;
 {
-	switch(type) {
+	switch (type) {
 	case ICMP6_DST_UNREACH:
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
@@ -277,7 +277,7 @@ icmp6_errcount(stat, type, code)
 		stat->icp6errs_packet_too_big++;
 		return;
 	case ICMP6_TIME_EXCEEDED:
-		switch(code) {
+		switch (code) {
 		case ICMP6_TIME_EXCEED_TRANSIT:
 			stat->icp6errs_time_exceed_transit++;
 			return;
@@ -287,7 +287,7 @@ icmp6_errcount(stat, type, code)
 		}
 		break;
 	case ICMP6_PARAM_PROB:
-		switch(code) {
+		switch (code) {
 		case ICMP6_PARAMPROB_HEADER:
 			stat->icp6errs_paramprob_header++;
 			return;
@@ -1008,7 +1008,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		while (1) { /* XXX: should avoid inf. loop explicitly? */
 			struct ip6_ext *eh;
 
-			switch(nxt) {
+			switch (nxt) {
 			case IPPROTO_HOPOPTS:
 			case IPPROTO_DSTOPTS:
 			case IPPROTO_AH:
@@ -1801,7 +1801,7 @@ ni6_addrs(ni6, m, ifpp, subj)
 	int niflags = ni6->ni_flags;
 
 	if ((niflags & NI_NODEADDR_FLAG_ALL) == 0) {
-		switch(ni6->ni_code) {
+		switch (ni6->ni_code) {
 		case ICMP6_NI_SUBJ_IPV6:
 			if (subj == NULL) /* must be impossible... */
 				return(0);
@@ -1850,7 +1850,7 @@ ni6_addrs(ni6, m, ifpp, subj)
 			 */
 
 			/* What do we have to do about ::1? */
-			switch(in6_addrscope(&ifa6->ia_addr.sin6_addr)) {
+			switch (in6_addrscope(&ifa6->ia_addr.sin6_addr)) {
 			case IPV6_ADDR_SCOPE_LINKLOCAL:
 				if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL) == 0)
 					continue;
@@ -1950,7 +1950,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 				continue; /* we now collect deprecated addrs */
 
 			/* What do we have to do about ::1? */
-			switch(in6_addrscope(&ifa6->ia_addr.sin6_addr)) {
+			switch (in6_addrscope(&ifa6->ia_addr.sin6_addr)) {
 			case IPV6_ADDR_SCOPE_LINKLOCAL:
 				if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL) == 0)
 					continue;
@@ -2976,7 +2976,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 		return EINVAL;
 	}
 
-	switch(op) {
+	switch (op) {
 	case PRCO_SETOPT:
 		switch (optname) {
 		case ICMP6_FILTER:
@@ -3072,9 +3072,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 		}							\
 	} while (0)
 #endif
-#endif
 
-#ifndef HAVE_PPSRATECHECK
 /*
  * ppsratecheck(): packets (or events) per second limitation.
  */
