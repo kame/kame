@@ -286,8 +286,9 @@ cmd
 			char *p, *q;
 			char delim;
 			struct addrinfo hints;
-			struct addrinfo *res;
+			struct addrinfo *res = NULL;
 			int i;
+			unsigned long proto;
 
 			if (epsvall) {
 				reply(501, "EPRT disallowed after EPSV ALL");
@@ -326,17 +327,17 @@ cmd
 			}
 
 			/* some more sanity check */
-			p = result[0];
-			while (*p) {
-				if (!isdigit(*p)) {
+			p = NULL;
+			proto = strtoul(result[0], &p, 10);
+			if (*result[0] && !*p)
+				;
+			else {
 		protounsupp:
-					reply(522, "Unsupported protocol.");
-					if (tmp)
-						free(tmp);
-					usedefault = 1;
-					goto eprt_done;
-				}
-				p++;
+				reply(522, "Unsupported protocol.");
+				if (tmp)
+					free(tmp);
+				usedefault = 1;
+				goto eprt_done;
 			}
 			p = result[2];
 			while (*p) {
@@ -346,19 +347,23 @@ cmd
 			}
 
 			memset(&hints, 0, sizeof(hints));
-			if (atoi(result[0]) == 1)
+			switch (proto) {
+			case 1:
 				hints.ai_family = PF_INET;
-			if (atoi(result[0]) == 2)
+				break;
+			case 2:
 				hints.ai_family = PF_INET6;
-			else
-				hints.ai_family = PF_UNSPEC;	/*XXX*/
-			hints.ai_socktype = SOCK_STREAM;
-			if (getaddrinfo(result[1], result[2], &hints, &res)) {
-				if (hints.ai_family == PF_UNSPEC)
-					goto protounsupp;
-				else
-					goto parsefail;
+				break;
+			default:
+				/* XXX other protocol families? */
+				goto protounsupp;
 			}
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_flags = AI_NUMERICHOST;	/*no DNS*/
+			if (getaddrinfo(result[1], result[2], &hints, &res))
+				goto parsefail;
+			if (res->ai_next)
+				goto protounsupp;
 			if (sizeof(data_dest) < res->ai_addrlen)
 				goto parsefail;
 			memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
@@ -409,6 +414,8 @@ cmd
 			}
 			reply(200, "EPRT command successful.");
 		eprt_done:;
+			if (res)
+				freeaddrinfo(res);
 		}
 
 	| PASV check_login CRLF
