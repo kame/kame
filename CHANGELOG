@@ -1,10 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.619 2000/02/25 18:04:55 itojun Exp $
+$Id: CHANGELOG,v 1.620 2000/02/25 18:06:02 itojun Exp $
 
 <200002>
 Sat Feb 26 03:03:21 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/security/heimdal: upgrade to 0.2q.
+	* openbsd: sys tree was broken for 4 days since "m->m_pkthdr.aux"
+	  change.  sorry for this.  now we properly initialize aux pointer
+	  and the kernel boots fine.
 
 Fri Feb 25 18:03:58 JST 2000  itojun@iijlab.net
 	* kame/traceroute/ifaddrlist.c: ignore 0.0.0.0, it is meaningless
