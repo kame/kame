@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.52 2000/06/12 09:26:19 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.53 2000/06/13 03:56:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -247,6 +247,11 @@ in6_pcbbind(in6p, nam)
 		}
 		if (lport) {
 			int priv;
+
+			/*
+			 * NOTE: all operating systems use suser() for
+			 * privilege check!  do not rewrite it into SS_PRIV.
+			 */
 			priv = (p && !suser(p->p_ucred, &p->p_acflag)) ? 1 : 0;
 			/* GROSS */
 			if (ntohs(lport) < IPV6PORT_RESERVED && !priv)
