@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.18 2000/02/23 16:56:19 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.19 2000/02/23 16:59:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -535,18 +535,16 @@ ah6_input(mp, offp, proto)
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct ah), IPPROTO_DONE);
-	ip6 = mtod(m, struct ip6_hdr *);
-	ah = (struct ah *)(((caddr_t)ip6) + off);
+	ah = (struct ah *)(mtod(m, caddr_t) + off);
 #else
 	IP6_EXTHDR_GET(ah, struct ah *, m, off, sizeof(struct newah));
-	ip6 = mtod(m, struct ip6_hdr *);
 	if (ah == NULL) {
 		ipseclog((LOG_DEBUG, "IPv6 AH input: can't pullup\n"));
 		ipsecstat.in_inval++;
 		return IPPROTO_DONE;
 	}
 #endif
-
+	ip6 = mtod(m, struct ip6_hdr *);
 	nxt = ah->ah_nxt;
 
 	/* find the sassoc.  */
