@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.6 2000/01/10 22:38:38 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.7 2000/01/12 06:09:32 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -64,6 +64,7 @@
 
 #include "schedule.h"
 #include "isakmp_var.h"
+#include "isakmp.h"
 #include "handler.h"
 #include "pfkey.h"
 #include "admin_var.h"
@@ -292,7 +293,6 @@ com_recv()
 	struct admin_com *com;
 	caddr_t buf0, buf;
 	int len;
-	int ret = 0;
 
 	/* receive by PEEK */
 	if ((len = recv(so, combuf, sizeof(combuf), MSG_PEEK)) < 0) {
@@ -402,11 +402,10 @@ com_recv()
 
     end:
 	(void)close(so);
-	return ret;
+	return 0;
 
     bad:
-	ret = -1;
-	goto end;
+	return -1;
 }
 
 /* %%% */
@@ -691,54 +690,40 @@ set_combuf_ul_proto(str)
 
 /* %%% */
 void
-dump_isakmp_sa(buf, tlen)
+dump_isakmp_sa(buf, len)
 	char *buf;
-	int tlen;
+	int len;
 {
-	struct ph1handle *iph1;
-	struct ph2handle *iph2;
-	int len2, i;
-	char *p = buf;
-	struct sockaddr *saddr, *daddr;
+	struct ph1dump *pd;
+	struct tm *tm;
+	char tbuf[56];
 
 /* isakmp status header */
 /* short header;
- source address         destination address    cookies
- 1234567890123456789012 1234567890123456789012 0000000000000000:0000000000000000
+ 1234567890123456789012 0000000000000000:0000000000000000 000000000000
 */
 char *header1 = 
-"Source                 Destination            Cookies                          ";
+"Destination            Cookies                           Created";
 
 /* semi long header;
- source address         destination address    cookies
- 1234567890123456789012 1234567890123456789012 0000000000000000:0000000000000000 123456789012345678901234
+ 1234567890123456789012 0000000000000000:0000000000000000 00 X 00 X X 0000-00-00 00:00:00 1234567890123456789012 
 */
 char *header2 = 
-"Source                 Destination            Cookies                           Established             ";
+"Destination            Cookies                           ST S V  E U Created             Source";
 
 /* long header;
- source address                                destination address                           cookies
- 123456789012345678901234567890123456789012345 123456789012345678901234567890123456789012345 1234567890123456:1234567890123456 123456789012345678901234
- 0000:0000:0000:0000:0000:0000:0000:0000.00000 0000:0000:0000:0000:0000:0000:0000:0000.00000 0000000000000000:0000000000000000 000000000000000000000000
+ 0000:0000:0000:0000:0000:0000:0000:0000.00000 0000000000000000:0000000000000000 00 X 00 X X 0000-00-00 00:00:00 0000:0000:0000:0000:0000:0000:0000:0000.00000 
 */
-char *header3 = 
-"Source                                        Destination                                   Cookies                           Established             ";
+char *header3 =
+"Destination                                   Cookies                           ST S V  E U Created             Source";
 
 /* phase status header */
 /* short format;
    side stats source address         destination address   
    xxx  xxxxx 1234567890123456789012 1234567890123456789012
 */
-char *ph2_header1 = 
-"\tdir stats Source                 Destination           ";
 
-/* long format;
-   side stats source address                                destination address
-   xxx  xxxxx 123456789012345678901234567890123456789012345 123456789012345678901234567890123456789012345
-*/
-char *ph2_header2 = 
-"\tdir stats Source                                        Destination                                  ";
-
+	static char *estr[] = { "", "B", "M", "U", "A", "I", };
 
 	switch (long_format) {
 	case 0:
@@ -753,15 +738,17 @@ char *ph2_header2 =
 		break;
 	}
 
-	while (tlen > 0) {
-		iph1 = (struct ph1handle *)p;
-		saddr = (struct sockaddr *)(p + sizeof(*iph1));
-		daddr = (struct sockaddr *)((caddr_t)saddr + saddr->sa_len);
+	if (len % sizeof(*pd))
+		printf("invalid length %d\n", len);
+	len /= sizeof(*pd);
 
+	pd = (struct ph1dump *)buf;
+
+	while (len-- > 0) {
 	    {
-		char *p;
+		char *p = NULL;
 
-		GETNAMEINFO(saddr, _addr1_, _addr2_);
+		GETNAMEINFO((struct sockaddr *)&pd->remote, _addr1_, _addr2_);
 		switch (long_format) {
 		case 0:
 		case 1:
@@ -775,75 +762,43 @@ char *ph2_header2 =
 		printf("%s ", p);
 	    }
 
-	    {
-		char *p;
+		printf("%s ", pindex_isakmp(&pd->index));
 
-		GETNAMEINFO(daddr, _addr1_, _addr2_);
-		switch (long_format) {
-		case 0:
-		case 1:
-			p = fixed_addr(_addr1_, _addr2_, 22);
-			break;
-		case 2:
-		default:
-			p = fixed_addr(_addr1_, _addr2_, 45);
-			break;
+		if (long_format >= 1) {
+			printf("%2d %c %x ",
+				pd->status,
+				pd->side == INITIATOR ? 'I' : 'R',
+				pd->version);
+			if (ARRAYLEN(estr) > pd->etype)
+				printf("%s ", estr[pd->etype]);
+			printf("%1d ", pd->inuse & 3);
 		}
-		printf("%s ", p);
-	    }
 
-		printf("%s", pindex_isakmp(&iph1->index));
+		tm = localtime(&pd->created);
+		strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
+		printf("%s ", tbuf);
 
-		if (long_format && iph1->created) {
-			char *c = strdup(ctime(&iph1->created));
-			c[24] = '\0';
-			printf(" %s", c);
-			free(c);
+		if (long_format >= 1) {
+			char *p = NULL;
+
+			GETNAMEINFO((struct sockaddr *)&pd->local, _addr1_, _addr2_);
+			switch (long_format) {
+			case 0:
+				break;
+			case 1:
+				p = fixed_addr(_addr1_, _addr2_, 22);
+				break;
+			case 2:
+			default:
+				p = fixed_addr(_addr1_, _addr2_, 45);
+				break;
+			}
+			printf("%s ", p);
 		}
+
 		printf("\n");
 
-	    {
-		int cnt = 0;
-#if 0
-		struct ph1handle *p;
-		LIST_FOREACH(p, &ph1tree, chain) {
-			cnt++;
-		}
-#endif
-		len2 = cnt * sizeof(*iph2);
-	    }
-
-		i = (sizeof(*iph1) + saddr->sa_len + daddr->sa_len);
-		p += i;
-		tlen -= i;
-
-		if (len2 > 0)
-			printf("%s\n", long_format ? ph2_header2 : ph2_header1);
-
-		while (tlen > 0 && len2 > 0) {
-			iph2 = (struct ph2handle *)p;
-			saddr = (struct sockaddr *)(p + sizeof(*iph2));
-			daddr = (struct sockaddr *)((caddr_t)saddr
-				+ saddr->sa_len);
-			printf("\t%03u %05u ", iph2->side, iph2->status);
-
-			GETNAMEINFO(saddr, _addr1_, _addr2_);
-			printf("%s ", long_format ?
-				  fixed_addr(_addr1_, _addr2_, 45)
-				: fixed_addr(_addr1_, _addr2_, 22));
-
-			GETNAMEINFO(daddr, _addr1_, _addr2_);
-			printf("%s", long_format ?
-				  fixed_addr(_addr1_, _addr2_, 45)
-				: fixed_addr(_addr1_, _addr2_, 22));
-
-			printf("\n");
-
-			i = (sizeof(*iph2) + saddr->sa_len + daddr->sa_len);
-			p += i;
-			tlen -= i;
-			len2 -= i;
-		}
+		pd++;
 	}
 
 	return;
@@ -953,7 +908,9 @@ print_schedule(buf, len)
 	struct tm *tm;
 	char tbuf[56];
 
-	len /= sizeof(struct scheddump);
+	if (len % sizeof(*sc))
+		printf("invalid length %d\n", len);
+	len /= sizeof(*sc);
 
 	/*      00000000 00000000 00000000 xxx........*/
 	printf("index    tick     xtime    created\n");
@@ -962,14 +919,11 @@ print_schedule(buf, len)
 		tm = localtime(&sc->created);
 		strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
 
-		printf("%8ld %8ld %8ld %s\n",
+		printf("%-8ld %-8ld %-8ld %s\n",
 			sc->id,
 			sc->tick,
 			sc->xtime,
 			tbuf);
-
-		if (sc->last)
-			break;
 		sc++;
 	}
 

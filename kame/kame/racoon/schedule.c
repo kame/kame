@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.c,v 1.2 2000/01/09 01:31:32 itojun Exp $ */
+/* YIPS @(#)$Id: schedule.c,v 1.3 2000/01/12 06:09:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -225,11 +225,8 @@ sched_dump(buf, len)
 		dst->tick = p->tick;
 
 		p = TAILQ_NEXT(p, chain);
-		if (p == NULL) {
-			dst->last = 1;
+		if (p == NULL)
 			break;
-		}
-		dst->last = 0;
 		dst++;
 	}
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.3 2000/01/09 01:31:32 itojun Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.4 2000/01/12 06:09:33 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -61,7 +61,6 @@ struct scheddump {
 	long id;
 	time_t created;
 	time_t tick;
-	int last;		/* If last record, this value is non-zero */ 
 };
 
 struct timeval *schedular __P((void));

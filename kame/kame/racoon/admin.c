@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.4 2000/01/12 04:24:25 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.5 2000/01/12 06:09:32 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -59,6 +59,7 @@
 #include "remoteconf.h"
 #include "grabmyaddr.h"
 #include "isakmp_var.h"
+#include "isakmp.h"
 #include "handler.h"
 #include "pfkey.h"
 #include "admin.h"
@@ -192,7 +193,7 @@ admin_process(so2, combuf)
 		case ADMIN_PROTO_ISAKMP:
 			switch (com->ac_cmd) {
 			case ADMIN_SHOW_SA:
-				buf = dumpph1(com->ac_proto);
+				buf = dumpph1();
 				if (buf == NULL)
 					com->ac_errno = -1;
 				break;

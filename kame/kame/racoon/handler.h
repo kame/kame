@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.7 2000/01/12 04:24:27 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.8 2000/01/12 06:09:32 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -284,6 +284,19 @@ struct ipsecsakeys {
 	struct ipsecsakeys *next;
 };
 
+/* for dumping */
+struct ph1dump {
+	isakmp_index index;
+	int status;
+	int side;
+	struct sockaddr_storage remote;
+	struct sockaddr_storage local;
+	u_int8_t version;
+	u_int8_t etype;	
+	int inuse;
+	time_t created;
+};
+
 struct sockaddr;
 struct ph1handle;
 struct ph2handle;
@@ -292,7 +305,7 @@ struct policyindex;
 extern struct ph1handle *getph1byindex __P((isakmp_index *index));
 extern struct ph1handle *getph1byindex0 __P((isakmp_index *index));
 extern struct ph1handle *getph1byaddr __P((struct sockaddr *remote));
-extern vchar_t *dumpph1 __P((u_int proto));
+extern vchar_t *dumpph1 __P((void));
 extern struct ph1handle *newph1 __P((void));
 extern void delph1 __P((struct ph1handle *iph1));
 extern int insph1 __P((struct ph1handle *iph1));

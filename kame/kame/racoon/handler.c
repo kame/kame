@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.13 2000/01/12 04:24:27 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.14 2000/01/12 06:09:32 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -115,83 +115,39 @@ getph1byaddr(remote)
  * dump isakmp-sa
  */
 vchar_t *
-dumpph1(proto)
-	u_int proto;
+dumpph1()
 {
-#if 0
 	struct ph1handle *iph1;
-	struct ph2handle *iph2;
+	struct ph1dump *pd;
 	int cnt = 0;
 	vchar_t *buf;
-	caddr_t bufp;
 
 	/* get length of buffer */
-	LIST_FOREACH(p, &ph1tree, chain)
+	LIST_FOREACH(iph1, &ph1tree, chain)
 		cnt++;
 
-	tlen = (sizeof(struct ph1handle) * ph1tab.len);
-	for (iph1 = ph1tab.head;
-	     iph1 != NULL;
-	     iph1 = iph1->next) {
-
-		tlen += iph1->remote->sa_len;
-		tlen += iph1->local->sa_len;
-
-		tlen += (sizeof(struct ph2handle) * iph1->ph2tab.len);
-		for (iph2 = iph1->ph2tab.head;
-		     iph2 != NULL;
-		     iph2 = iph2->next) {
-
-			if (iph2->pst == NULL)
-				continue;
-
-			tlen += iph2->pst->src->sa_len;
-			tlen += iph2->pst->dst->sa_len;
-		}
-	}
-
-	buf = vmalloc(tlen);
+	buf = vmalloc(cnt * sizeof(struct ph1dump));
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
 			"vmalloc(%s)\n", strerror(errno));
 		return NULL;
 	}
-	bufp = buf->v;
+	pd = (struct ph1dump *)buf->v;
 
-	for (iph1 = ph1tab.head;
-	     iph1 != NULL;
-	     iph1 = iph1->next) {
-
-		/* copy ph1 entry */
-		memcpy(bufp, iph1, sizeof(*iph1));
-		bufp += sizeof(*iph1);
-		memcpy(bufp, iph1->local, iph1->local->sa_len);
-		bufp += iph1->local->sa_len;
-		memcpy(bufp, iph1->remote, iph1->remote->sa_len);
-		bufp += iph1->remote->sa_len;
-
-		/* copy ph2 entries */
-		for (iph2 = iph1->ph2tab.head;
-		     iph2 != NULL;
-		     iph2 = iph2->next) {
-
-			/* copy ph2 entry */
-			memcpy(bufp, iph2, sizeof(*iph2));
-			bufp += sizeof(*iph2);
-
-			if (iph2->pst == NULL)
-				continue;
-
-			memcpy(bufp, iph2->pst->src, iph2->pst->src->sa_len);
-			bufp += iph2->pst->src->sa_len;
-			memcpy(bufp, iph2->pst->dst, iph2->pst->dst->sa_len);
-			bufp += iph2->pst->dst->sa_len;
-		}
+	LIST_FOREACH(iph1, &ph1tree, chain) {
+		memcpy(&pd->index, &iph1->index, sizeof(iph1->index));
+		pd->status = iph1->status;
+		pd->side = iph1->side;
+		memcpy(&pd->remote, iph1->remote, iph1->remote->sa_len);
+		memcpy(&pd->local, iph1->local, iph1->local->sa_len);
+		pd->version = iph1->version;
+		pd->etype = iph1->etype;
+		pd->inuse = iph1->inuse;
+		pd->created = iph1->created;
+		pd++;
 	}
 
 	return buf;
-#endif
-	return NULL;
 }
 
 /*
