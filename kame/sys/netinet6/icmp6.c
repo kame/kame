@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.116 2000/06/13 17:32:01 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.117 2000/06/27 06:26:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1912,6 +1912,10 @@ icmp6_reflect(m, off)
 	 * If there are extra headers between IPv6 and ICMPv6, strip
 	 * off that header first.
 	 */
+#ifdef DIAGNOSTIC
+	if (sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr) > MHLEN)
+		panic("assumption failed in icmp6_reflect");
+#endif
 	if (off > sizeof(struct ip6_hdr)) {
 		size_t l;
 		struct ip6_hdr nip6;
