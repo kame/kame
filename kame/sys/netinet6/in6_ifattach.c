@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.87 2001/02/01 13:36:54 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.88 2001/02/01 16:33:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,6 +42,10 @@
 #include <sys/md5k.h>
 #else
 #include <sys/md5.h>
+#endif
+
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
 #endif
 
 #include <net/if.h>
