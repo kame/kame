@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.12 2000/07/12 16:33:25 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.13 2000/08/23 03:21:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -276,10 +276,6 @@ struct ip6_rthdr0 {
 	u_int8_t  ip6r0_segleft;	/* segments left */
 	u_int32_t  ip6r0_reserved;	/* reserved field */
 	/* followed by up to 127 struct in6_addr */
-
-#ifdef COMPAT_RFC2292
-	struct in6_addr  ip6r0_addr[1];	/* up to 127 addresses */
-#endif
 };
 
 /* Fragment header */

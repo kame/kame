@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.19 2000/08/22 10:01:34 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.20 2000/08/23 03:21:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -173,16 +173,7 @@ ip6_rthdr0(m, ip6, rh0)
 
 	index = addrs - rh0->ip6r0_segleft;
 	rh0->ip6r0_segleft--;
-#ifdef COMPAT_RFC2292
-	/*
-	 * The secition is just for source code level compatibility.
-	 * (i.e. use the section with RFC2292-based struct ip6_rthdr0)
-	 * this does not affect binary backward compatibility to RFC2292.
-	 */
-	nextaddr = rh0->ip6r0_addr + index;
-#else
 	nextaddr = ((struct in6_addr *)(rh0 + 1)) + index;
-#endif
 
 	/*
 	 * reject invalid addresses.  be proactive about malicious use of
