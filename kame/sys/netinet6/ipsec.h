@@ -322,7 +322,7 @@ extern int ipsec4_in_reject __P((struct mbuf *, struct inpcb *));
 
 #ifdef INET6
 extern int ipsec6_in_reject_so __P((struct mbuf *, struct socket *));
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 extern int ipsec6_delete_pcbpolicy __P((struct inpcb *));
 extern int ipsec6_set_policy __P((struct inpcb *inp, int optname,
 	caddr_t request, int priv));
@@ -346,13 +346,13 @@ extern int ipsec_chkreplay __P((u_int32_t, struct secasvar *));
 extern int ipsec_updatereplay __P((u_int32_t, struct secasvar *));
 
 extern size_t ipsec4_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 extern size_t ipsec_hdrsiz_tcp __P((struct tcpcb *, int));
 #else
 extern size_t ipsec4_hdrsiz_tcp __P((struct tcpcb *));
 #endif
 #ifdef INET6
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
 #else
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct in6pcb *));

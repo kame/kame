@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.34 2000/01/04 12:00:32 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.35 2000/01/04 13:59:11 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -80,7 +80,9 @@
 #ifdef INET6
 #include <netinet6/ip6.h>
 #include <netinet6/in6_var.h>
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/in6_pcb.h>
+#endif
 #endif /* INET6 */
 
 #include <netkey/keyv2.h>
@@ -95,6 +97,8 @@
 #include <netinet6/esp.h>
 #endif
 #include <netinet6/ipcomp.h>
+
+#include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
@@ -708,6 +712,15 @@ key_freeso(so)
 #ifdef INET6
 	case PF_INET6:
 	    {
+#ifdef HAVE_NRL_INPCB
+		struct inpcb *pcb  = sotoinpcb(so);
+
+		/* Does it have a PCB ? */
+		if (pcb == NULL)
+			return;
+		key_freesp_so(&pcb->inp_sp->sp_in);
+		key_freesp_so(&pcb->inp_sp->sp_out);
+#else
 		struct in6pcb *pcb  = sotoin6pcb(so);
 
 		/* Does it have a PCB ? */
@@ -715,6 +728,7 @@ key_freeso(so)
 			return;
 		key_freesp_so(&pcb->in6p_sp->sp_in);
 		key_freesp_so(&pcb->in6p_sp->sp_out);
+#endif
 	    }
 		break;
 #endif /* INET6 */

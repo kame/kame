@@ -75,7 +75,9 @@
 
 #ifdef INET6
 #include <netinet6/ip6.h>
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/in6_pcb.h>
+#endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
 #endif /*INET6*/
@@ -89,6 +91,17 @@
 #include <netkey/key.h>
 #include <netkey/keydb.h>
 #include <netkey/key_debug.h>
+
+#include <net/net_osdep.h>
+
+#ifdef HAVE_NRL_INPCB
+#define in6pcb	inpcb
+#define in6p_sp	inp_sp
+#define in6p_fport	inp_fport
+#define in6p_lport	inp_lport
+#define in6p_socket	inp_socket
+#define sotoin6pcb(so)	((struct inpcb *)(so)->so_pcb)
+#endif
 
 #ifdef __NetBSD__
 #define ovbcopy	bcopy

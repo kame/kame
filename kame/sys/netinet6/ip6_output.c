@@ -1642,8 +1642,13 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 				if (m != 0)
 					req = mtod(m, caddr_t);
+#ifdef HAVE_NRL_INPCB
+				error = ipsec6_set_policy(inp, optname, req,
+				                          privileged);
+#else
 				error = ipsec6_set_policy(in6p, optname, req,
 				                          privileged);
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				m_freem(m);
 #endif
@@ -1919,7 +1924,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 					req = mtod(m, caddr_t);
 					len = m->m_len;
 				}
+#ifdef HAVE_NRL_INPCB
+				error = ipsec6_get_policy(inp, req, mp);
+#else
 				error = ipsec6_get_policy(in6p, req, mp);
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /*XXX*/
@@ -2772,6 +2781,8 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			    /* check if cmsg_len is large enough for sa_len */
 			    cm->cmsg_len < CMSG_LEN(*CMSG_DATA(cm)))
 				return(EINVAL);
+
+			opt->ip6po_nexthop = (struct sockaddr *)CMSG_DATA(cm);
 
 			if (needcopy) {
 				opt->ip6po_nexthop =
