@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.309 2002/07/01 16:00:12 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.310 2002/07/25 03:08:54 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -241,6 +241,7 @@ draft-ietf-ipngwg-default-addr-select-07.txt:
 	omitted.
 draft-ietf-ipngwg-icmp-v3-02.txt: ICMPv6 for IPv6 specification (revised)
     * See 1.9 in this document for details.
+draft-ietf-vrrp-ipv6-spec-02.txt: Virtual Router Redundancy Protocol for IPv6
 draft-itojun-ipv6-tcp-to-anycast-01.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-itojun-ipv6-transition-abuse-01.txt:
