@@ -1,29 +1,32 @@
 # New ports collection makefile for:	ucd-snmp-v6
-# Version required:			3.5.3 + IPv6 981231
+# Version required:			3.6.2 + IPv6 19990819
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.1 1999/08/08 23:59:29 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/18 15:17:56 itojun Exp $
 #
 
-DISTNAME=	ucd-snmp-3.5.3
-PKGNAME=	ucd-snmp-v6-3.5.3.981231
+DISTNAME=	ucd-snmp-3.6.2
+PKGNAME=	ucd-snmp-v6-3.6.2.19990819
 CATEGORIES=	net
-MASTER_SITES= 	ftp://ftp.ece.ucdavis.edu/pub/snmp/ \
+MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 		ftp://sunsite.cnlab-switch.ch/mirror/ucd-snmp/ \
 		ftp://ftp.win.or.jp/pub/network/snmp/ucd-snmp/
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ucd-snmp-3.5.3-v6-981231.diff.gz
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
+		ftp://ftp.v6.kame.net/pub/kame/misc/
+PATCHFILES=	ucd-snmp-3.6.2-v6-19990819.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@iijlab.net
 
-CONFIGURE_ARGS=	--enable-shared
-CONFIGURE_ARGS+= --enable-ipv6
+#CONFIGURE_ARGS+=	--enable-shared
+CONFIGURE_ARGS+=	--enable-ipv6
 
-USE_CONFIGURE=	YES
-GNU_CONFIGURE=	YES
+# Do not use GNU_CONFIGURE here.  ucd-snmp will make some trouble with
+# --host=ARCH--netbsd.
+HAS_CONFIGURE=	YES
+CONFIGURE_ARGS+=	--prefix=${PREFIX}
 .if defined(BATCH)
 CONFIGURE_ARGS+= --with-defaults --with-sys-contact=nobody@no.where
 .else
@@ -43,15 +46,18 @@ SBIN=		snmpd snmptrapd
 post-install:
 	( cd ${PREFIX}/bin; strip ${BIN} )
 	( cd ${PREFIX}/sbin; strip ${SBIN} )
-	(cd ${PREFIX}/lib && ${LN} libsnmp.so libsnmp.so.3.5.3)
+#	if [ -f ${PREFIX}/lib/libsnmp.so.3.5 ]; then \
+#		/bin/rm ${PREFIX}/lib/libsnmp.so.3.5; \
+#	fi
+#	( cd ${PREFIX}/lib && ${LN} libsnmp.so libsnmp.so.3.5 )
 	@${MKDIR} ${PREFIX}/share/examples/ucd-snmp
 	@for F in ${WRKSRC}/etc/* ; do \
 		${INSTALL_DATA} $$F ${PREFIX}/share/examples/ucd-snmp ; done
 	@if [ ! -f ${PREFIX}/etc/rc.d/snmpd.sh ]; then \
 		echo "Creating ${PREFIX}/etc/rc.d/snmpd.sh startup file."; \
 		echo "#!/bin/sh" > ${PREFIX}/etc/rc.d/snmpd.sh; \
-		echo "[ -x /usr/local/sbin/snmpd ] && /usr/local/sbin/snmpd && echo -n ' snmpd'" >> ${PREFIX}/etc/rc.d/snmpd.sh; \
+		echo "[ -x ${PREFIX}/sbin/snmpd ] && ${PREFIX}/sbin/snmpd && echo -n ' snmpd'" >> ${PREFIX}/etc/rc.d/snmpd.sh; \
 		chmod 751 ${PREFIX}/etc/rc.d/snmpd.sh; \
 	 fi
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"
