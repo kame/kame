@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.241 2003/12/20 08:45:28 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.242 2004/01/29 09:51:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1822,9 +1822,14 @@ pfxlist_onlink_check()
 			if (ifa->ia6_ndpr == NULL) /* XXX: see above. */
 				continue;
 
-			if (find_pfxlist_reachable_router(ifa->ia6_ndpr))
-				ifa->ia6_flags &= ~IN6_IFF_DETACHED;
-			else
+			if (find_pfxlist_reachable_router(ifa->ia6_ndpr)) {
+				if (ifa->ia6_flags & IN6_IFF_DETACHED) {
+					ifa->ia6_flags &= ~IN6_IFF_DETACHED;
+					ifa->ia6_flags |= IN6_IFF_TENTATIVE;
+					nd6_dad_start((struct ifaddr *)ifa,
+					    NULL);
+				}
+			} else
 				ifa->ia6_flags |= IN6_IFF_DETACHED;
 		}
 	}
@@ -1832,8 +1837,11 @@ pfxlist_onlink_check()
 		for (ifa = in6_ifaddr; ifa; ifa = ifa->ia_next) {
 			if ((ifa->ia6_flags & IN6_IFF_AUTOCONF) == 0)
 				continue;
-
-			ifa->ia6_flags &= ~IN6_IFF_DETACHED;
+			if (ifa->ia6_flags & IN6_IFF_DETACHED) {
+				ifa->ia6_flags &= ~IN6_IFF_DETACHED;
+				ifa->ia6_flags |= IN6_IFF_TENTATIVE;
+				nd6_dad_start((struct ifaddr *)ifa, NULL);
+			}
 		}
 	}
 
