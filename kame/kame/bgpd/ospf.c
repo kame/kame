@@ -258,15 +258,14 @@ ospf_sendmsg(sin, pktinfo, len)
   int                 slen;   /* sent data len                 */
   struct msghdr       smsghdr;            /* Adv. API */
   struct iovec        smsgiov;            /* Adv. API */
-                                          /* buffer for ancillary data */
-  char   cmsg[CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-              CMSG_SPACE(sizeof(int))];
   struct cmsghdr     *ch;                 /* Adv. API */
   int                 shoplimit;          /* Adv. API */
-
   struct ip6_pseudohdr  phdr;
   struct ospfhdr       *oh;
   u_int16_t             cksum;
+  static char *cmsg = NULL;	/* buffer for ancillary data */
+  static int cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+	  CMSG_SPACE(sizeof(int)); 
 
 #ifdef DEBUG_OSPF
   char                in6txt[INET6_ADDRSTRLEN];
@@ -282,10 +281,11 @@ ospf_sendmsg(sin, pktinfo, len)
   memset(  ifname, 0, IFNAMSIZ);
 #endif
 
-  memset(cmsg,  0,
-         CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-         CMSG_SPACE(sizeof(int)));
-
+  if (cmsg == NULL && (cmsg = malloc(cmsglen)) == NULL) {
+    syslog(LOG_ERR, "<%s>: malloca failed", __FUNCTION__);
+    fatalx("malloc failed");
+  }
+  memset(cmsg,  0, cmsglen);
   shoplimit = OSPF_HOPLIMIT;
 
 /***  Adv. API  ***/
@@ -298,8 +298,7 @@ ospf_sendmsg(sin, pktinfo, len)
   smsghdr.msg_iovlen     = 1; /* 1 iovec obj. */
 #ifdef ADVANCEDAPI
   smsghdr.msg_control    = (caddr_t)cmsg;   /* buffer for ancillary data   */
-  smsghdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-                           CMSG_SPACE(sizeof(int));
+  smsghdr.msg_controllen = cmsglen;
 #endif
   smsghdr.msg_flags      = 0; /* ? */
 
@@ -387,9 +386,9 @@ ospf_input()
   struct ospfhdr      *oh;     /* OSPF header                           */
   struct msghdr        rmsghdr;            /* Adv. API                  */
   struct iovec         rmsgiov;            /* buffer for data (gather)  */
-                                           /* buffer for ancillary data */
-  char   cmsg[CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-	      CMSG_SPACE(sizeof(int))];
+  static char *cmsg = NULL;	/* buffer for ancillary data */
+  static int cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
+    CMSG_SPACE(sizeof(int));
   struct cmsghdr      *ch;                 /* Adv. API */
   struct in6_pktinfo  *rpktinfo;           /* received I/F address */
   struct in6_pktinfo   spktinfo;           /* sending source I/F   */
@@ -420,8 +419,11 @@ ospf_input()
   memset(ospfpkt,   0, OSPF_MAXPKT);
   memset(&rmsghdr,  0, sizeof(struct msghdr));
   memset(&rmsgiov,  0, sizeof(struct iovec));
-  memset(cmsg,      0, CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-	               CMSG_SPACE(sizeof(int)));
+  if (cmsg == NULL && (cmsg = malloc(cmsglen)) == NULL) {
+    syslog(LOG_ERR, "<%s>: malloc failed", __FUNCTION__);
+    fatalx("malloc failed");
+  }
+  memset(cmsg,      0, cmsglen);
   memset(&spktinfo, 0, sizeof(struct in6_pktinfo));
   rpktinfo  = NULL;
   rhoplimit = NULL;
@@ -436,8 +438,7 @@ ospf_input()
   rmsghdr.msg_iovlen     = 1; /* 1 iovec obj. */
 #ifdef ADVANCEDAPI
   rmsghdr.msg_control    = (caddr_t)cmsg;   /* buffer for ancillary data   */
-  rmsghdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-                           CMSG_SPACE(sizeof(int));
+  rmsghdr.msg_controllen = cmsglen;
 #else
   rmsghdr.msg_control    = (caddr_t)0;
   rmsghdr.msg_controllen = 0;
