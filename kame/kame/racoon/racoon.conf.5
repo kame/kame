@@ -118,8 +118,8 @@ is received.
 .\"
 .Ss File Include
 .Bl -tag -width Ds -compact
-other configuration file can be included by written like below.
 .It Ic include Ar file
+other configuration file can be included.
 .El
 .\"
 .Ss Identifier Specification
@@ -131,7 +131,6 @@ other configuration file can be included by written like below.
 .El
 .\"
 .Ss Timer Specification
-.Pp
 .Bl -tag -width Ds -compact
 .It Ic timer { Ar statements Ic }
 specifys default various timer.
@@ -150,7 +149,6 @@ timer for waiting to complete each phase.
 .El
 .\"
 .Ss Listening Port Specification
-.Pp
 .Bl -tag -width Ds -compact
 .It Ic listen { Ar statements Ic }
 If no
@@ -172,7 +170,6 @@ specify the port for connecting to
 .El
 .\"
 .Ss Remote Nodes Specifications 
-.Pp
 .Bl -tag -width Ds -compact
 .It Xo
 .Ic remote ( Ar address \*(Ba Ic anonymous ) [
@@ -269,7 +266,6 @@ define lifetime of phase 1 SA eay proposal.
 .El
 .\"
 .Ss Policy Specifications 
-.Pp
 .Bl -tag -width Ds -compact
 .It Xo
 .Ic policy Ar address_range Ar direction Ar action
@@ -356,7 +352,6 @@ But in the case of oakley, KB is not supported now.
 .El
 .\"
 .Ss Algorithm Strength Specification
-.Pp
 .Bl -tag -width Ds -compact
 .It Ic algorithm_strength { Ar statements Ic }
 specifies algorithm strength.  These are extracted into attribute of
