@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.4 2005/01/22 12:56:55 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.5 2005/01/24 04:14:45 ryuji Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -499,7 +499,6 @@ struct nemo_hptable *nemo_hpt_add(struct in6_addr *, struct in6_addr *,
 				  u_int8_t, char *);
 
 #define NEMOPREFIXINFO "./nemo_prefixtable.conf"
-#define NEMO_OPTNUM 6
 void nemo_parse_conf(char *);
 void command_show_pt(int s);
 

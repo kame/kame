@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.3 2005/01/24 04:14:44 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -56,6 +56,13 @@
 
 #define NEMO_TUNOPTNUM 3
 #define NEMO_TUNNAME "nemo"
+
+#ifdef MIP_MCOA
+#define NEMO_OPTNUM 5
+#else
+#define NEMO_OPTNUM 4
+#endif /* MIP_MCOA */
+
 
 #include "callout.h"
 #include "shisad.h"

@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.3 2004/12/24 09:26:34 ryuji Exp $  */
+/*      $KAME: nemo_var.c,v 1.4 2005/01/24 04:14:44 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -231,6 +231,12 @@ nemo_parse_conf(filename)
 	struct nemo_hptable *hpt;
 #endif /* MIP_MN */
 
+#ifdef MIP_MCOA
+#define NEMO_OPTNUM 5
+#else
+#define NEMO_OPTNUM 4
+#endif /* MIP_MCOA */
+
 	char *option[NEMO_OPTNUM];
         /*
          * option[0]: HoA 
@@ -238,7 +244,6 @@ nemo_parse_conf(filename)
          * option[2]: Mobile Network Prefix Length
          * option[3]: Registration mode
          * option[4]: Binding Unique Identifier (optional)
-         * option[5]: Home Agent Address (optional)
          */
 	struct nemoprefixinfo {
 		struct in6_addr hoa;
@@ -283,12 +288,10 @@ nemo_parse_conf(filename)
 			syslog(LOG_INFO, "parsing nemoconfig file\n");
 			for (i = 0; i < (NEMO_OPTNUM - 2); i ++)  
 				syslog(LOG_INFO, "\t%d=%s\n", i, option[i]);
-#ifdef MIP_MCOA
-			if (option[NEMO_OPTNUM - 2]) /* because of optional one */
-				syslog(LOG_INFO, "\t%d=%s\n", i++, option[NEMO_OPTNUM - 1]);
-#endif /* MIP_MCOA */
+
 			if (option[NEMO_OPTNUM - 1]) /* because of optional one */
-				syslog(LOG_INFO, "\t%d=%s\n", i, option[NEMO_OPTNUM - 1]);
+				syslog(LOG_INFO, "\t%d=%s\n", i, 
+					option[NEMO_OPTNUM - 1]);
 		}
 
 		memset(&npinfo, 0, sizeof(npinfo));
@@ -304,20 +307,12 @@ nemo_parse_conf(filename)
 		npinfo.nemopfxlen = atoi(option[2]);
 		npinfo.mode = option[3];
 
-
 #ifdef MIP_MCOA
 		if (option[4]) {
 			npinfo.bid = atoi(option[4]);
 		} else 
 			npinfo.bid = 0;
 #endif /* MIP_MCOA */
-
-		if (option[5]) {
-                	if (inet_pton(AF_INET6, option[5], &npinfo.ha) < 0) {
-                       	 	fprintf(stderr, "%s is not correct address\n", option[5]);
-				continue;
-			 }
-		}
 
 		/* Insert this npinfo to prefixtable */
 #ifdef MIP_MN
@@ -333,10 +328,6 @@ nemo_parse_conf(filename)
 					 npinfo.nemopfxlen, npinfo.mode);
 			if (mpt == NULL) 
 				syslog(LOG_ERR, "adding nemoprefix is failed\n");
-			else {	
-				if(option[5]) 
-					mpt->mpt_ha = npinfo.ha;
-			}
 		}
 #elif defined(MIP_HA)
 		hpt = nemo_hpt_get(&npinfo.nemopfx, npinfo.nemopfxlen);
