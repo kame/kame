@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.192 2001/07/15 04:20:40 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.193 2001/07/15 04:24:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
