@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet6.c,v 1.23 2002/06/09 04:07:10 jsyn Exp $	*/
+/*	$OpenBSD: inet6.c,v 1.27 2003/03/16 19:10:46 sturm Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$OpenBSD: inet6.c,v 1.23 2002/06/09 04:07:10 jsyn Exp $");*/
+/*__RCSID("$OpenBSD: inet6.c,v 1.27 2003/03/16 19:10:46 sturm Exp $");*/
 /*__RCSID("KAME Id: inet6.c,v 1.10 2000/02/09 10:49:31 itojun Exp");*/
 #endif
 #endif /* not lint */
@@ -346,9 +346,7 @@ static	char *ip6nh[] = {
  * Dump IP6 statistics structure.
  */
 void
-ip6_stats(off, name)
-	u_long off;
-	char *name;
+ip6_stats(u_long off, char *name)
 {
 	struct ip6stat ip6stat;
 	int first, i;
@@ -510,8 +508,7 @@ ip6_stats(off, name)
  * Dump IPv6 per-interface statistics based on RFC 2465.
  */
 void
-ip6_ifstats(ifname)
-	char *ifname;
+ip6_ifstats(char *ifname)
 {
 	struct in6_ifreq ifr;
 	int s;
@@ -828,9 +825,7 @@ static	char *icmp6names[] = {
  * Dump ICMPv6 statistics.
  */
 void
-icmp6_stats(off, name)
-	u_long off;
-	char *name;
+icmp6_stats(u_long off, char *name)
 {
 	struct icmp6stat icmp6stat;
 	int i, first;
@@ -858,7 +853,7 @@ icmp6_stats(off, name)
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
-				(unsigned long long)icmp6stat.icp6s_outhist[i]);
+			    (unsigned long long)icmp6stat.icp6s_outhist[i]);
 		}
 #undef NELEM
 	p(icp6s_badcode, "\t%llu message%s with bad code fields\n");
@@ -873,7 +868,7 @@ icmp6_stats(off, name)
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
-				(unsigned long long)icmp6stat.icp6s_inhist[i]);
+			    (unsigned long long)icmp6stat.icp6s_inhist[i]);
 		}
 #undef NELEM
 	printf("\tHistogram of error messages to be generated:\n");
@@ -908,8 +903,7 @@ icmp6_stats(off, name)
  * Dump ICMPv6 per-interface statistics based on RFC 2466.
  */
 void
-icmp6_ifstats(ifname)
-	char *ifname;
+icmp6_ifstats(char *ifname)
 {
 	struct in6_ifreq ifr;
 	int s;
@@ -976,9 +970,7 @@ icmp6_ifstats(ifname)
  * Dump PIM statistics structure.
  */
 void
-pim6_stats(off, name)
-	u_long off;
-	char *name;
+pim6_stats(u_long off, char *name)
 {
 	struct pim6stat pim6stat;
 
@@ -1004,9 +996,7 @@ pim6_stats(off, name)
  * Dump raw ip6 statistics structure.
  */
 void
-rip6_stats(off, name)
-	u_long off;
-	char *name;
+rip6_stats(u_long off, char *name)
 {
 	struct rip6stat rip6stat;
 	u_quad_t delivered;
@@ -1019,7 +1009,7 @@ rip6_stats(off, name)
 #define	p(f, m) if (rip6stat.f || sflag <= 1) \
     printf(m, (unsigned long long)rip6stat.f, plural(rip6stat.f))
 	p(rip6s_ipackets, "\t%llu message%s received\n");
-	p(rip6s_isum, "\t%llu checksum calcuration%s on inbound\n");
+	p(rip6s_isum, "\t%llu checksum calculation%s on inbound\n");
 	p(rip6s_badsum, "\t%llu message%s with bad checksum\n");
 	p(rip6s_nosock, "\t%llu message%s dropped due to no socket\n");
 	p(rip6s_nosockmcast,
@@ -1043,38 +1033,42 @@ rip6_stats(off, name)
  */
 
 void
-inet6print(in6, port, proto)
-	struct in6_addr *in6;
-	int port;
-	char *proto;
+inet6print(struct in6_addr *in6, int port, char *proto)
 {
-#define GETSERVBYPORT6(port, proto, ret)\
-do {\
-	if (strcmp((proto), "tcp6") == 0)\
-		(ret) = getservbyport((int)(port), "tcp");\
-	else if (strcmp((proto), "udp6") == 0)\
-		(ret) = getservbyport((int)(port), "udp");\
-	else\
-		(ret) = getservbyport((int)(port), (proto));\
-} while (0)
+
+#define GETSERVBYPORT6(port, proto, ret) do { \
+	if (strcmp((proto), "tcp6") == 0) \
+		(ret) = getservbyport((int)(port), "tcp"); \
+	else if (strcmp((proto), "udp6") == 0) \
+		(ret) = getservbyport((int)(port), "udp"); \
+	else \
+		(ret) = getservbyport((int)(port), (proto)); \
+	} while (0)
+
 	struct servent *sp = 0;
 	char line[80], *cp;
 	int width;
+	int len = sizeof line;
 
 	width = Aflag ? 12 : 16;
 	if (vflag && width < strlen(inet6name(in6)))
 		width = strlen(inet6name(in6));
-	snprintf(line, sizeof line, "%.*s.", width, inet6name(in6));
+	snprintf(line, len, "%.*s.", width, inet6name(in6));
+	len -= strlen(line);
+	if (len <= 0)
+		goto bail;
+
 	cp = strchr(line, '\0');
 	if (!nflag && port)
 		GETSERVBYPORT6(port, proto, sp);
 	if (sp || port == 0)
-		sprintf(cp, "%.8s", sp ? sp->s_name : "*");
+		snprintf(cp, len, "%.8s", sp ? sp->s_name : "*");
 	else
-		sprintf(cp, "%d", ntohs((u_short)port));
+		snprintf(cp, len, "%d", ntohs((u_short)port));
 	width = Aflag ? 18 : 22;
 	if (vflag && width < strlen(line))
 		width = strlen(line);
+bail:
 	printf(" %-*.*s", width, width, line);
 }
 
@@ -1085,8 +1079,7 @@ do {\
  */
 
 char *
-inet6name(in6p)
-	struct in6_addr *in6p;
+inet6name(struct in6_addr *in6p)
 {
 	char *cp;
 	static char line[NI_MAXHOST];
@@ -1149,8 +1142,7 @@ inet6name(in6p)
  * Dump the contents of a TCP6 PCB.
  */
 void
-tcp6_dump(pcbaddr)
-	u_long pcbaddr;
+tcp6_dump(u_long pcbaddr)
 {
 	struct tcp6cb tcp6cb;
 	int i;

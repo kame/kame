@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifconfig.c,v 1.69 2002/07/08 00:48:54 deraadt Exp $	*/
+/*	$OpenBSD: ifconfig.c,v 1.73 2003/03/16 05:20:27 margarida Exp $	*/
 /*	$NetBSD: ifconfig.c,v 1.40 1997/10/01 02:19:43 enami Exp $	*/
 
 /*
@@ -81,7 +81,7 @@ static const char copyright[] =
 #if 0
 static const char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.69 2002/07/08 00:48:54 deraadt Exp $";
+static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.73 2003/03/16 05:20:27 margarida Exp $";
 #endif
 #endif /* not lint */
 
@@ -228,7 +228,7 @@ int	prefix(void *val, int);
 /*
  * Media stuff.  Whenever a media command is first performed, the
  * currently select media is grabbed for this interface.  If `media'
- * is given, the current media word is modifed.  `mediaopt' commands
+ * is given, the current media word is modified.  `mediaopt' commands
  * only modify the set and clear words.  They then operate on the
  * current media word later.
  */
@@ -1044,7 +1044,7 @@ setia6eui64(cmd, val)
 		}
 	}
 	if (!lladdr)
-		errx(1, "could not determine link local address"); 
+		errx(1, "could not determine link local address");
 
  	memcpy(&in6->s6_addr[8], &lladdr->s6_addr[8], 8);
 
@@ -2438,7 +2438,7 @@ in6_getaddr(s, which)
 #ifndef KAME_SCOPEID
 	struct sockaddr_in6 *sin6 = sin6tab[which];
 
-	sin->sin6_len = sizeof(*sin6);
+	sin6->sin6_len = sizeof(*sin6);
 	if (which != MASK)
 		sin6->sin6_family = AF_INET6;
 
@@ -2476,21 +2476,21 @@ in6_getprefix(plen, which)
 	char *plen;
 	int which;
 {
-	struct sockaddr_in6 *sin = sin6tab[which];
+	struct sockaddr_in6 *sin6 = sin6tab[which];
 	u_char *cp;
 	int len = strtol(plen, (char **)NULL, 10);
 
 	if ((len < 0) || (len > 128))
 		errx(1, "%s: bad value", plen);
-	sin->sin6_len = sizeof(*sin);
+	sin6->sin6_len = sizeof(*sin6);
 	if (which != MASK)
-		sin->sin6_family = AF_INET6;
+		sin6->sin6_family = AF_INET6;
 	if ((len == 0) || (len == 128)) {
-		memset(&sin->sin6_addr, 0xff, sizeof(struct in6_addr));
+		memset(&sin6->sin6_addr, 0xff, sizeof(struct in6_addr));
 		return;
 	}
-	memset((void *)&sin->sin6_addr, 0x00, sizeof(sin->sin6_addr));
-	for (cp = (u_char *)&sin->sin6_addr; len > 7; len -= 8)
+	memset((void *)&sin6->sin6_addr, 0x00, sizeof(sin6->sin6_addr));
+	for (cp = (u_char *)&sin6->sin6_addr; len > 7; len -= 8)
 		*cp++ = 0xff;
 	if (len)
 		*cp = 0xff << (8 - len);

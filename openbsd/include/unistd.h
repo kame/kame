@@ -1,4 +1,4 @@
-/*	$OpenBSD: unistd.h,v 1.42 2002/09/17 21:15:58 deraadt Exp $ */
+/*	$OpenBSD: unistd.h,v 1.45 2002/12/03 20:24:29 millert Exp $ */
 /*	$NetBSD: unistd.h,v 1.26.4.1 1996/05/28 02:31:51 mrg Exp $	*/
 
 /*-
@@ -51,7 +51,7 @@
 #ifdef 	__GNUG__
 #define	NULL	__null
 #else
-#define	NULL		0	/* null pointer constant */
+#define	NULL	0L
 #endif
 #endif
 
@@ -146,6 +146,8 @@ long	 gethostid(void);
 int	 gethostname(char *, size_t);
 mode_t	 getmode(const void *, mode_t);
 int	 getpagesize(void);
+int	 getresgid(gid_t *, gid_t *, gid_t *);
+int	 getresuid(uid_t *, uid_t *, uid_t *);
 char	*getpass(const char *);
 char	*getusershell(void);
 char	*getwd(char *);			/* obsoleted by getcwd() */
@@ -194,8 +196,10 @@ int	 setkey(const char *);
 int	 setlogin(const char *);
 void	*setmode(const char *);
 int	 setpgrp(pid_t pid, pid_t pgrp);	/* obsoleted by setpgid() */
-int	 setregid(int, int);
-int	 setreuid(int, int);
+int	 setregid(gid_t, gid_t);
+int	 setresgid(gid_t, gid_t, gid_t);
+int	 setresuid(uid_t, uid_t, uid_t);
+int	 setreuid(uid_t, uid_t);
 int	 setrgid(gid_t);
 int	 setruid(uid_t);
 void	 setusershell(void);
@@ -215,6 +219,8 @@ void	*valloc(size_t);		/* obsoleted by malloc() */
 pid_t	 vfork(void);
 int	 issetugid(void);
 
+#ifndef _GETOPT_DEFINED_
+#define _GETOPT_DEFINED_
 int	 getopt(int, char * const *, const char *);
 extern	 char *optarg;			/* getopt(3) external variables */
 extern	 int opterr;
@@ -223,6 +229,7 @@ extern	 int optopt;
 extern	 int optreset;
 int	 getsubopt(char **, char * const *, char **);
 extern	 char *suboptarg;		/* getsubopt(3) external variable */
+#endif /* _GETOPT_DEFINED_ */
 #endif /* !_POSIX_SOURCE */
 
 #if (!defined(_POSIX_SOURCE) && !defined(_POSIX_C_SOURCE) && \
