@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.31 2001/11/28 11:08:53 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.32 2002/05/23 05:40:13 jinmei Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -482,7 +482,9 @@ m_aux_delete(m, victim)
 		t = (struct mauxtag *)n->m_dat;
 		next = n->m_next;
 		if (n->m_data != ((caddr_t)t) + sizeof(struct mauxtag)) {
-			printf("m_aux_delete: invalid m_data for mbuf=%p (%p %p)\n", n, t, n->m_data);
+			printf("m_aux_delete: "
+			    "invalid m_data for mbuf=%p (%p %p)\n",
+			    n, t, n->m_data);
 			prev = n;
 			n = next;
 			continue;
