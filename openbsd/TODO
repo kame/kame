@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 KAME project
-$Id: TODO,v 1.3 1999/09/20 11:19:31 itojun Exp $
+$Id: TODO,v 1.4 1999/09/20 13:16:37 itojun Exp $
 
 
 Things we can do with the current code:
@@ -10,8 +10,8 @@ Things we can do with the current code:
 - icmp6 layer
 	replies to ping, DAD
 - raw6 socket input/output
-- tcp6 socket input/output
-	daemon side needs to be checked
+- tcp6 socket input/output (both daemon and client)
+- udp6 socket input/output (need testing)
 
 Things we can't do with the current code:
 - some part of setsockopt()
@@ -21,8 +21,6 @@ Things we can't do with the current code:
 	because of this, ping6 cannot get the hoplimit value for incoming
 	packet.
 - multicast related items need checking
-- connect() to IPv6 destination on tcp6 socket does not work (need checking)
-- udp6 needs some more work
 - "options IPSEC" does not even compile
 	I was told that OpenBSD guys will never replace IPsec code.
 	Since we use same symbol (#ifdef IPSEC) to control ipsec code,
