@@ -1,5 +1,5 @@
 .include <bsd.own.mk>			# for EXPORTABLE_SYSTEM definition
 
-SUBDIR+=ifconfig ping ping6 route
+SUBDIR+=netstat telnet
 
 .include <bsd.subdir.mk>
