@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.70 2002/11/04 07:10:40 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.71 2002/11/04 07:13:08 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -867,8 +867,7 @@ mld6_fasttimeo()
 
 	bypass_state_transition:
 #ifdef MLDV2
-		if (IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr)
-		    <= IPV6_ADDR_SCOPE_LINKLOCAL)
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr))
 			goto next_in6m; /* skip */
 
 		if (in6m->in6m_source == NULL)
