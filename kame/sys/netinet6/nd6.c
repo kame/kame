@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.130 2001/02/21 16:22:51 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.131 2001/02/21 16:28:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,38 +267,38 @@ nd6_setmtu(ifp)
 	u_long oldmaxmtu = ndi->maxmtu;
 	u_long oldlinkmtu = ndi->linkmtu;
 
-	switch(ifp->if_type) {
-	 case IFT_ARCNET:	/* XXX MTU handling needs more work */
-		 ndi->maxmtu = MIN(60480, ifp->if_mtu);
-		 break;
-	 case IFT_ETHER:
-		 ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
-		 break;
+	switch (ifp->if_type) {
+	case IFT_ARCNET:	/* XXX MTU handling needs more work */
+		ndi->maxmtu = MIN(60480, ifp->if_mtu);
+		break;
+	case IFT_ETHER:
+		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
+		break;
 #if defined(__FreeBSD__) || defined(__bsdi__)
-	 case IFT_FDDI:
+	case IFT_FDDI:
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
-		 ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
+		ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
 #else
-		 ndi->maxmtu = MIN(FDDIIPMTU, ifp->if_mtu);
+		ndi->maxmtu = MIN(FDDIIPMTU, ifp->if_mtu);
 #endif
-		 break;
+		break;
 #endif
 #if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
-	 case IFT_ATM:
-		 ndi->maxmtu = MIN(ATMMTU, ifp->if_mtu);
-		 break;
+	case IFT_ATM:
+		ndi->maxmtu = MIN(ATMMTU, ifp->if_mtu);
+		break;
 #endif
-	 case IFT_IEEE1394:	/* XXX should be IEEE1394MTU(1500) */
-		 ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
-		 break;
+	case IFT_IEEE1394:	/* XXX should be IEEE1394MTU(1500) */
+		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
+		break;
 #ifdef IFT_IEEE80211
-	 case IFT_IEEE80211:	/* XXX should be IEEE80211MTU(1500) */
-		 ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
-		 break;
+	case IFT_IEEE80211:	/* XXX should be IEEE80211MTU(1500) */
+		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
+		break;
 #endif
-	 default:
-		 ndi->maxmtu = ifp->if_mtu;
-		 break;
+	default:
+		ndi->maxmtu = ifp->if_mtu;
+		break;
 	}
 
 	if (oldmaxmtu != ndi->maxmtu) {
