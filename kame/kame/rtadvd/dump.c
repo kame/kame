@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.23 2002/05/29 09:40:41 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.24 2002/05/29 10:06:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -66,12 +66,6 @@ extern struct rainfo *ralist;
 static char *ether_str __P((struct sockaddr_dl *));
 static void if_dump __P((void));
 
-#if defined(__FreeBSD__) && __FreeBSD__ <= 3	/* XXX: see PORTABILITY */
-#define LONGLONG "%qu"
-#else
-#define LONGLONG "%llu"
-#endif
-
 static char *rtpref_str[] = {
 	"medium",		/* 00 */
 	"high",			/* 01 */
@@ -138,14 +132,13 @@ if_dump()
 			rai->waiting, rai->initcounter);
 
 		/* statistics */
-		fprintf(fp,
-			"  statistics: RA(out/in/inconsistent): "
-			LONGLONG "/" LONGLONG "/" LONGLONG ", ",
-			(unsigned long long)rai->raoutput,
-			(unsigned long long)rai->rainput,
-			(unsigned long long)rai->rainconsistent);
-		fprintf(fp, "RS(input): " LONGLONG "\n",
-			(unsigned long long)rai->rsinput);
+		fprintf(fp, "  statistics: RA(out/in/inconsistent): "
+		    "%llu/%llu/%llu, ",
+		    (unsigned long long)rai->raoutput,
+		    (unsigned long long)rai->rainput,
+		    (unsigned long long)rai->rainconsistent);
+		fprintf(fp, "RS(input): %llu\n",
+		    (unsigned long long)rai->rsinput);
 
 		/* interface information */
 		if (rai->advlinkopt)

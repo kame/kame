@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.60 2002/05/29 10:01:43 itojun Exp $	*/
+/*	$KAME: config.c,v 1.61 2002/05/29 10:06:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -72,12 +72,6 @@ static void get_prefix __P((struct rainfo *));
 static int getinet6sysctl __P((int));
 
 extern struct rainfo *ralist;
-
-#if defined(__FreeBSD__) && __FreeBSD__ <= 3	/* XXX: see PORTABILITY */
-#define LONGLONG "%qd"
-#else
-#define LONGLONG "%lld"
-#endif
 
 void
 getconfig(intface)
@@ -240,8 +234,7 @@ getconfig(intface)
 
 	MAYHAVE(val64, "retrans", DEF_ADVRETRANSTIMER);
 	if (val64 < 0 || val64 > 0xffffffff) {
-		syslog(LOG_ERR, "<%s> retrans time (" LONGLONG
-			") on %s out of range",
+		syslog(LOG_ERR, "<%s> retrans time (%lld) on %s out of range",
 		       __FUNCTION__, (long long)val64, intface);
 		exit(1);
 	}
@@ -377,10 +370,10 @@ getconfig(intface)
 			makeentry(entbuf, sizeof(entbuf), i, "vltime", added);
 			MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
 			if (val64 < 0 || val64 > 0xffffffff) {
-				syslog(LOG_ERR, "<%s> vltime (" LONGLONG
-				       ") for %s/%d on %s is out of range",
-				       __FUNCTION__, (long long)val64,
-				       addr, pfx->prefixlen, intface);
+				syslog(LOG_ERR, "<%s> vltime (%lld) for "
+				    "%s/%d on %s is out of range",
+				    __FUNCTION__, (long long)val64,
+				    addr, pfx->prefixlen, intface);
 				exit(1);
 			}
 			pfx->validlifetime = (u_int32_t)val64;
@@ -397,10 +390,10 @@ getconfig(intface)
 			MAYHAVE(val64, entbuf, DEF_ADVPREFERREDLIFETIME);
 			if (val64 < 0 || val64 > 0xffffffff) {
 				syslog(LOG_ERR,
-				       "<%s> pltime (" LONGLONG
-					") for %s/%d  on %s is out of range",
-				       __FUNCTION__, (long long)val64,
-				       addr, pfx->prefixlen, intface);
+				    "<%s> pltime (%lld) for %s/%d on %s "
+				    "is out of range",
+				    __FUNCTION__, (long long)val64,
+				    addr, pfx->prefixlen, intface);
 				exit(1);
 			}
 			pfx->preflifetime = (u_int32_t)val64;
@@ -582,9 +575,9 @@ getconfig(intface)
 			}
 		}
 		if (val64 < 0 || val64 > 0xffffffff) {
-			syslog(LOG_ERR, "<%s> route lifetime (" LONGLONG
-				") for %s/%d on %s out of range", __FUNCTION__,
-			       (long long)val64, addr, rti->prefixlen, intface);
+			syslog(LOG_ERR, "<%s> route lifetime (%lld) for "
+			    "%s/%d on %s out of range", __FUNCTION__,
+			    (long long)val64, addr, rti->prefixlen, intface);
 			exit(1);
 		}
 		rti->ltime = (u_int32_t)val64;
