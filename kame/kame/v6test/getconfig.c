@@ -427,7 +427,7 @@ make_rthdr(char *name)
 		}
 		if (rthdrlen == 0)
 			rthdrlen = sizeof(struct ip6_rthdr0) +
-				sizeof(struct in6_addr) * (hops - 1);
+				sizeof(struct in6_addr) * hops;
 		break;
 	default:
 		if (rthdrlen == 0)
