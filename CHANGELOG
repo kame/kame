@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.167 1999/10/06 11:44:16 jinmei Exp $
+$Id: CHANGELOG,v 1.168 1999/10/07 05:07:55 itojun Exp $
 
 <199910>
+Thu Oct  7 14:08:24 JST 1999  itojun@iijlab.net
+	* kame/etc/rc.net6: disallow "internal" addresses like ::ffff:127.0.0.1
+	  to appear on the wire.  This is done by configuring reject route
+	  onto the routing table, so you can always re-enable it if you have
+	  some special need for experiments.
+
 1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/netstat/route.c (netname6, routename6): were changed to
 	use getnameinfo in order to accomodate to the new format for
