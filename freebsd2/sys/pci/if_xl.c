@@ -251,6 +251,18 @@ static void xl_mediacheck	__P((struct xl_softc *));
 static void xl_testpacket	__P((struct xl_softc *));
 #endif
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the xl driver can pull as many as 256 packets (when XL_TX_LIST_CNT is 256).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 /*
  * Murphy's law says that it's possible the chip can wedge and
  * the 'command in progress' bit may never clear. Hence, we wait
@@ -1687,6 +1699,9 @@ static int xl_list_tx_init(sc)
 
 	cd->xl_tx_free = &cd->xl_tx_chain[0];
 	cd->xl_tx_tail = cd->xl_tx_head = NULL;
+#ifdef ALTQ
+	sc->xl_cdata.xl_tx_queued = 0;
+#endif
 
 	return(0);
 }
@@ -1915,6 +1930,9 @@ static void xl_txeof(sc)
 
 		cur_tx->xl_next = sc->xl_cdata.xl_tx_free;
 		sc->xl_cdata.xl_tx_free = cur_tx;
+#ifdef ALTQ
+		sc->xl_cdata.xl_tx_queued--;
+#endif
 	}
 
 	if (sc->xl_cdata.xl_tx_head == NULL) {
@@ -2219,6 +2237,14 @@ static void xl_start(ifp)
 	while(sc->xl_cdata.xl_tx_free != NULL) {
 #ifdef ALTQ
 		if (ALTQ_IS_ON(ifp)) {
+			if (sc->xl_cdata.xl_tx_queued >= TXBUF_THRESH4ALTQ) {
+				/*
+				 * stop filling tx buffer if we already have
+				 * enough packets to transmit.
+				 */
+				break;
+			}
+
 			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
 		}
 		else
@@ -2230,6 +2256,9 @@ static void xl_start(ifp)
 		/* Pick a descriptor off the free list. */
 		cur_tx = sc->xl_cdata.xl_tx_free;
 		sc->xl_cdata.xl_tx_free = cur_tx->xl_next;
+#ifdef ALTQ
+		sc->xl_cdata.xl_tx_queued++;
+#endif
 
 		cur_tx->xl_next = NULL;
 

@@ -419,6 +419,19 @@ file adosfs/adlookup.c			adosfs
 file adosfs/adutil.c			adosfs
 file adosfs/advfsops.c			adosfs
 file adosfs/advnops.c			adosfs
+file altq/altq_conf.c			altq
+file altq/altq_afmap.c			altq
+file altq/altq_blue.c			altq
+file altq/altq_cbq.c			altq
+file altq/altq_cdnr.c			altq
+file altq/altq_fifoq.c			altq
+file altq/altq_hfsc.c			altq
+file altq/altq_localq.c			altq
+file altq/altq_red.c			altq
+file altq/altq_rio.c			altq
+file altq/altq_rmclass.c		altq
+file altq/altq_subr.c			altq
+file altq/altq_wfq.c			altq
 file coda/coda_namecache.c		coda
 file coda/coda_psdev.c			vcoda			needs-count
 file coda/coda_subr.c			coda
@@ -727,7 +740,6 @@ file msdosfs/msdosfs_fat.c		msdosfs
 file msdosfs/msdosfs_lookup.c		msdosfs
 file msdosfs/msdosfs_vfsops.c		msdosfs
 file msdosfs/msdosfs_vnops.c		msdosfs
-file net/altq_conf.c			altq
 file net/bpf.c				bpfilter		needs-count
 file net/bpf_filter.c			bpfilter | ppp
 file net/bsd-comp.c			ppp & ppp_bsdcomp
@@ -775,18 +787,6 @@ file netccitt/pk_output.c		ccitt
 file netccitt/pk_subr.c			ccitt
 file netccitt/pk_timer.c		ccitt
 file netccitt/pk_usrreq.c		ccitt
-file netinet/altq_afmap.c		altq
-file netinet/altq_blue.c		altq
-file netinet/altq_cbq.c			altq
-file netinet/altq_cdnr.c		altq
-file netinet/altq_fifoq.c		altq
-file netinet/altq_hfsc.c		altq
-file netinet/altq_localq.c		altq
-file netinet/altq_red.c			altq
-file netinet/altq_rio.c			altq
-file netinet/altq_rmclass.c		altq
-file netinet/altq_subr.c		altq
-file netinet/altq_wfq.c			altq
 file netinet/if_arp.c			arp | netatalk		needs-flag
 file netinet/if_atm.c			atm
 file netinet/igmp.c			inet

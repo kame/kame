@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sl.c,v 1.8 1997/09/05 04:27:01 millert Exp $	*/
+/*	$OpenBSD: if_sl.c,v 1.9 1999/04/22 20:02:43 art Exp $	*/
 /*	$NetBSD: if_sl.c,v 1.39.4.1 1996/06/02 16:26:31 thorpej Exp $	*/
 
 /*
@@ -75,7 +75,6 @@
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/mbuf.h>
-#include <sys/buf.h>
 #include <sys/dkstat.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -213,6 +212,9 @@ slattach()
 		sc->sc_if.if_output = sloutput;
 		sc->sc_if.if_snd.ifq_maxlen = 50;
 		sc->sc_fastq.ifq_maxlen = 32;
+#ifdef ALTQ
+		sc->sc_if.if_altqflags |= ALTQF_READY;
+#endif
 		if_attach(&sc->sc_if);
 #if NBPFILTER > 0
 		bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_SLIP, SLIP_HDRLEN);
@@ -380,6 +382,12 @@ sloutput(ifp, m, dst, rtp)
 	register struct ip *ip;
 	register struct ifqueue *ifq;
 	int s;
+#ifdef ALTQ
+	struct pr_hdr pr_hdr;
+
+	pr_hdr.ph_family = dst->sa_family;
+	pr_hdr.ph_hdr = mtod(m, caddr_t);
+#endif
 
 	/*
 	 * `Cannot happen' (see slioctl).  Someday we will extend
@@ -421,14 +429,37 @@ sloutput(ifp, m, dst, rtp)
 			slstart(sc->sc_ttyp);
 		}
 	}
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		int error;
+
+		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+		if (error) {
+			splx(s);
+			IF_DROP(&sc->sc_if.if_snd);
+			sc->sc_if.if_oerrors++;
+			return (error);
+               }
+       }
+       else {
+#endif /* ALTQ */
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
+#ifdef ALTQ_ACCOUNT
+		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
+#endif
 		m_freem(m);
 		splx(s);
 		sc->sc_if.if_oerrors++;
 		return (ENOBUFS);
 	}
 	IF_ENQUEUE(ifq, m);
+#ifdef ALTQ_ACCOUNT
+	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
+#endif
+#ifdef ALTQ
+	}
+#endif
 	sc->sc_if.if_lastchange = time;
 	if ((sc->sc_oqlen = sc->sc_ttyp->t_outq.c_cc) == 0)
 		slstart(sc->sc_ttyp);
@@ -491,11 +522,20 @@ slstart(tp)
 		 * Get a packet and send it to the interface.
 		 */
 		s = splimp();
+#ifdef ALTQ
+		if (ALTQ_IS_ON(&sc->sc_if))
+			m = (*sc->sc_if.if_altqdequeue)(&sc->sc_if,
+							ALTDQ_DEQUEUE);
+		else {
+#endif
 		IF_DEQUEUE(&sc->sc_fastq, m);
 		if (m)
 			sc->sc_if.if_omcasts++;		/* XXX */
 		else
 			IF_DEQUEUE(&sc->sc_if.if_snd, m);
+#ifdef ALTQ
+		}
+#endif
 		splx(s);
 		if (m == NULL)
 			return;

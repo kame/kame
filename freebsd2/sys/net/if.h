@@ -66,7 +66,7 @@
 #include <sys/time.h>
 #endif
 #if 1 /* ALTQ */
-#include <net/if_altq.h>
+#include <altq/if_altq.h>
 #endif
 
 #ifdef __STDC__

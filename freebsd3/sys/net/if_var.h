@@ -75,7 +75,7 @@ struct	ether_header;
 
 #include <sys/queue.h>		/* get TAILQ macros */
 #if 1 /* ALTQ */
-#include <net/if_altq.h>
+#include <altq/if_altq.h>
 #endif
 
 TAILQ_HEAD(ifnethead, ifnet);	/* we use TAILQs so that the order of */

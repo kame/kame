@@ -1175,6 +1175,9 @@ ax_attach(parent, self, aux)
 	ifp->if_watchdog = ax_watchdog;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = AX_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	for (i = AX_PHYADDR_MIN; i < AX_PHYADDR_MAX + 1; i++) {
@@ -1592,6 +1595,12 @@ int ax_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, AX_IMR, AX_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		ax_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		ax_start(ifp);
 	}
@@ -1715,6 +1724,12 @@ void ax_start(ifp)
 	start_tx = sc->ax_cdata.ax_tx_free;
 
 	while(sc->ax_cdata.ax_tx_free->ax_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -2039,6 +2054,11 @@ void ax_watchdog(ifp)
 	ax_reset(sc);
 	ax_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		ax_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		ax_start(ifp);
 

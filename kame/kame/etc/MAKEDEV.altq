@@ -1,0 +1,186 @@
+#!/bin/sh -
+#
+# Copyright (c) 1991 The Regents of the University of California.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. All advertising materials mentioning features or use of this software
+#    must display the following acknowledgement:
+#	This product includes software developed by the University of
+#	California, Berkeley and its contributors.
+# 4. Neither the name of the University nor the names of its contributors
+#    may be used to endorse or promote products derived from this software
+#    without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+#	@(#)MAKEDEV.local	5.1 (Berkeley) 3/22/91
+#
+
+# altq device MAKEDEV script.
+
+PATH=/sbin:/bin:/usr/bin:/usr/sbin
+umask 77
+
+devpath=/dev
+#
+# altq uses character device major number 96 (defined in sys/net/altq_conf.c).
+# minors assigned as follows:
+#	0:(reserved) 1:cbq 2:wfq 3:afmap 4:fifoq 5:red 6:rio 7:localq 8:hfsc
+#	9:cdnr
+#
+osname=`uname -sm`
+case ${osname} in
+	FreeBSD*)
+		altqchr=96
+		;;
+	NetBSD*i386)
+		altqchr=65
+		;;
+	OpenBSD*i386)
+		altqchr=64
+		;;
+	*)
+		echo "${osname} : unknown os type!"
+		exit 1
+		;;
+esac
+
+if [ $# = 0 ] ; then
+	echo "MAKEDEV.altq: no argument is specified!"
+	echo "  use \"MAKEDEV.altq all\" to create all the altq devices"
+fi
+
+if [ ! -d  ${devpath}/altq ] ; then
+	mkdir ${devpath}/altq
+	chown root.wheel ${devpath}/altq
+	chmod 755 ${devpath}/altq
+fi
+
+for i
+do
+case $i in
+
+all)
+	sh MAKEDEV.altq altq
+	sh MAKEDEV.altq cbq
+	sh MAKEDEV.altq wfq
+	sh MAKEDEV.altq afmap
+	sh MAKEDEV.altq fifoq
+	sh MAKEDEV.altq red
+	sh MAKEDEV.altq rio
+	sh MAKEDEV.altq localq
+	sh MAKEDEV.altq hfsc
+	sh MAKEDEV.altq cdnr
+	sh MAKEDEV.altq blue
+	;;
+
+altq)
+	rm -f ${devpath}/altq/altq
+	mknod ${devpath}/altq/altq c $altqchr 0
+	chown root.wheel ${devpath}/altq/altq
+	chmod 644 ${devpath}/altq/altq
+	;;
+
+cbq)
+	rm -f ${devpath}/cbq
+	rm -f ${devpath}/altq/cbq
+	mknod ${devpath}/altq/cbq c $altqchr 1
+	chown root.wheel ${devpath}/altq/cbq
+	chmod 644 ${devpath}/altq/cbq
+	;;
+
+wfq)
+	rm -f ${devpath}/wfq
+	rm -f ${devpath}/altq/wfq
+	mknod ${devpath}/altq/wfq c $altqchr 2
+	chown root.wheel ${devpath}/altq/wfq
+	chmod 644 ${devpath}/altq/wfq
+	;;
+
+afmap)
+	rm -f ${devpath}/afmap
+	rm -f ${devpath}/altq/afmap
+	mknod ${devpath}/altq/afmap c $altqchr 3
+	chown root.wheel ${devpath}/altq/afmap
+	chmod 644 ${devpath}/altq/afmap
+	;;
+
+fifoq)
+	rm -f ${devpath}/fifoq
+	rm -f ${devpath}/altq/fifoq
+	mknod ${devpath}/altq/fifoq c $altqchr 4
+	chown root.wheel ${devpath}/altq/fifoq
+	chmod 644 ${devpath}/altq/fifoq
+	;;
+
+red)
+	rm -f ${devpath}/red
+	rm -f ${devpath}/altq/red
+	mknod ${devpath}/altq/red c $altqchr 5
+	chown root.wheel ${devpath}/altq/red
+	chmod 644 ${devpath}/altq/red
+	;;
+
+rio)
+	rm -f ${devpath}/rio
+	rm -f ${devpath}/altq/rio
+	mknod ${devpath}/altq/rio c $altqchr 6
+	chown root.wheel ${devpath}/altq/rio
+	chmod 644 ${devpath}/altq/rio
+	;;
+
+localq)
+	rm -f ${devpath}/localq
+	rm -f ${devpath}/altq/localq
+	mknod ${devpath}/altq/localq c $altqchr 7
+	chown root.wheel ${devpath}/altq/localq
+	chmod 644 ${devpath}/altq/localq
+	;;
+
+hfsc)
+	rm -f ${devpath}/hfsc
+	rm -f ${devpath}/altq/hfsc
+	mknod ${devpath}/altq/hfsc c $altqchr 8
+	chown root.wheel ${devpath}/altq/hfsc
+	chmod 644 ${devpath}/altq/hfsc
+	;;
+
+cdnr)
+	rm -f ${devpath}/cdnr
+	rm -f ${devpath}/altq/cdnr
+	mknod ${devpath}/altq/cdnr c $altqchr 9
+	chown root.wheel ${devpath}/altq/cdnr
+	chmod 644 ${devpath}/altq/cdnr
+	;;
+
+blue)
+	rm -f ${devpath}/blue
+	rm -f ${devpath}/altq/blue
+	mknod ${devpath}/altq/blue c $altqchr 10
+	chown root.wheel ${devpath}/altq/blue
+	chmod 644 ${devpath}/altq/blue
+	;;
+
+*)
+	echo 'MAKEDEV.altq: no such device!'
+	;;
+esac
+done

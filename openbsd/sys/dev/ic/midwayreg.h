@@ -1,4 +1,4 @@
-/*	$OpenBSD: midwayreg.h,v 1.8 1999/06/06 15:39:16 deraadt Exp $	*/
+/*	$NetBSD: midwayreg.h,v 1.7 1998/08/20 11:42:55 pk Exp $	*/
 
 /*
  * m i d w a y r e g . h
@@ -8,8 +8,7 @@
  *
  */
 
-#if defined(__sparc__) || defined(__FreeBSD__)
-/* XXX: gross.   netbsd/sparc doesn't have machine/bus.h yet. */
+#if defined(__FreeBSD__)
 typedef void * bus_space_tag_t;
 typedef u_int32_t pci_chipset_tag_t;
 typedef caddr_t bus_space_handle_t;
@@ -20,11 +19,10 @@ typedef caddr_t bus_addr_t;
     (*(volatile u_int32_t *)((h) + (o))))
 #define bus_space_write_4(t, h, o, v)                                   \
     ((void) t, ((void)(*(volatile u_int32_t *)((h) + (o)) = (v))))
+#endif
 
 #if defined(__sparc__)
 #define vtophys(x) ((u_int32_t)(x))	/* sun4c dvma */
-#endif
-
 #endif
 
 
@@ -68,6 +66,7 @@ typedef caddr_t bus_addr_t;
 /*
  * prom & phy: not defined here
  */
+#define MID_ADPMACOFF	0xffc0		/* mac address offset (adaptec only) */
 
 /*
  * midway regs  (byte offsets from en_base)

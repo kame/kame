@@ -187,6 +187,18 @@
 
 #define	TULIP_HZ	10
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the de driver can pull as many as 128 packets (when TULIP_TXDESCS is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 #include DEVAR_INCLUDE
 /*
  * This module supports
@@ -4281,6 +4293,23 @@ tulip_txput(
     }
 #endif
 
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	if (sc->tulip_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
+	    /*
+	     * stop filling tx buffer if we already have enough packets
+	     * to transmit.
+	     * we need to call tulip_tx_intr to release completed packets
+	     * from txq, and check the queue length again.
+	     */
+	    (void)tulip_tx_intr(sc);
+	    if (sc->tulip_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
+		sc->tulip_flags |= TULIP_WANTTXSTART;
+		goto finish;
+	    }
+	}
+    }
+#endif
     /*
      * Now we try to fill in our transmit descriptors.  This is
      * a bit reminiscent of going on the Ark two by two
@@ -4576,16 +4605,6 @@ tulip_txput(
     /*
      * switch back to the single queueing ifstart.
      */
-#ifdef ALTQ
-    if (ALTQ_IS_ON(ifp)) {
-	/*
-	 * de driver is too clever that it doesn't call if_start
-	 * when it thinks it doesn't need to, but altq needs it!
-	 */
-	sc->tulip_flags |= TULIP_WANTTXSTART;
-    }
-    else
-#endif
     sc->tulip_flags &= ~TULIP_WANTTXSTART;
     if (sc->tulip_txtimer == 0)
 	sc->tulip_txtimer = TULIP_TXTIMER;
@@ -4950,7 +4969,7 @@ tulip_ifstart(
 		}
 	    }
 	}
-	else
+	else {
 #endif /* ALTQ */
 	while (sc->tulip_if.if_snd.ifq_head != NULL) {
 	    struct mbuf *m;
@@ -4962,6 +4981,9 @@ tulip_ifstart(
 	}
 	if (sc->tulip_if.if_snd.ifq_head == NULL)
 	    sc->tulip_if.if_start = tulip_ifstart_one;
+#ifdef ALTQ
+	}
+#endif
     }
 
     TULIP_PERFEND(ifstart);
@@ -4980,7 +5002,7 @@ tulip_ifstart_one(
 	if ((sc->tulip_if.if_flags & IFF_RUNNING)
 	        && ((m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK)) != NULL)) {
 	    if ((m0 = tulip_txput(sc, m)) != NULL) {
-		/* txput tailed! */
+		/* txput failed */
 		if (m0 != m)
 		    /* should not happen */
 		    printf("tulip_if_start: bad mbuf dequeued!\n");

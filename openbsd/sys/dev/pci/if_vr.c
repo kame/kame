@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vr.c,v 1.4 1999/02/26 17:05:55 jason Exp $	*/
+/*	$OpenBSD: if_vr.c,v 1.6 1999/09/13 22:32:31 niklas Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -93,7 +93,6 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
-#define bootverbose 0
 
 #define VR_USEIOSPACE
 
@@ -121,42 +120,44 @@ struct cfdriver vr_cd = {
 	0, "vr", DV_IFNET
 };
 
-static int vr_newbuf		__P((struct vr_softc *,
-						struct vr_chain_onefrag *));
-static int vr_encap		__P((struct vr_softc *, struct vr_chain *,
-						struct mbuf * ));
+int vr_newbuf			__P((struct vr_softc *,
+				     struct vr_chain_onefrag *));
+int vr_encap			__P((struct vr_softc *, struct vr_chain *,
+				     struct mbuf * ));
 
-static void vr_rxeof		__P((struct vr_softc *));
-static void vr_rxeoc		__P((struct vr_softc *));
-static void vr_txeof		__P((struct vr_softc *));
-static void vr_txeoc		__P((struct vr_softc *));
-static int vr_intr		__P((void *));
-static void vr_start		__P((struct ifnet *));
-static int vr_ioctl		__P((struct ifnet *, u_long, caddr_t));
-static void vr_init		__P((void *));
-static void vr_stop		__P((struct vr_softc *));
-static void vr_watchdog		__P((struct ifnet *));
-static void vr_shutdown		__P((void *));
-static int vr_ifmedia_upd	__P((struct ifnet *));
-static void vr_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
+void vr_rxeof			__P((struct vr_softc *));
+void vr_rxeoc			__P((struct vr_softc *));
+void vr_txeof			__P((struct vr_softc *));
+void vr_txeoc			__P((struct vr_softc *));
+int vr_intr			__P((void *));
+void vr_start			__P((struct ifnet *));
+int vr_ioctl			__P((struct ifnet *, u_long, caddr_t));
+void vr_init			__P((void *));
+void vr_stop			__P((struct vr_softc *));
+void vr_watchdog		__P((struct ifnet *));
+void vr_shutdown		__P((void *));
+int vr_ifmedia_upd		__P((struct ifnet *));
+void vr_ifmedia_sts		__P((struct ifnet *, struct ifmediareq *));
 
-static void vr_mii_sync		__P((struct vr_softc *));
-static void vr_mii_send		__P((struct vr_softc *, u_int32_t, int));
-static int vr_mii_readreg	__P((struct vr_softc *, struct vr_mii_frame *));
-static int vr_mii_writereg	__P((struct vr_softc *, struct vr_mii_frame *));
-static u_int16_t vr_phy_readreg	__P((struct vr_softc *, int));
-static void vr_phy_writereg	__P((struct vr_softc *, u_int16_t, u_int16_t));
+void vr_mii_sync		__P((struct vr_softc *));
+void vr_mii_send		__P((struct vr_softc *, u_int32_t, int));
+int vr_mii_readreg		__P((struct vr_softc *,
+				     struct vr_mii_frame *));
+int vr_mii_writereg		__P((struct vr_softc *,
+				     struct vr_mii_frame *));
+u_int16_t vr_phy_readreg	__P((struct vr_softc *, int));
+void vr_phy_writereg		__P((struct vr_softc *, u_int16_t, u_int16_t));
 
-static void vr_autoneg_xmit	__P((struct vr_softc *));
-static void vr_autoneg_mii	__P((struct vr_softc *, int, int));
-static void vr_setmode_mii	__P((struct vr_softc *, int));
-static void vr_getmode_mii	__P((struct vr_softc *));
-static void vr_setcfg		__P((struct vr_softc *, u_int16_t));
-static u_int8_t vr_calchash	__P((u_int8_t *));
-static void vr_setmulti		__P((struct vr_softc *));
-static void vr_reset		__P((struct vr_softc *));
-static int vr_list_rx_init	__P((struct vr_softc *));
-static int vr_list_tx_init	__P((struct vr_softc *));
+void vr_autoneg_xmit		__P((struct vr_softc *));
+void vr_autoneg_mii		__P((struct vr_softc *, int, int));
+void vr_setmode_mii		__P((struct vr_softc *, int));
+void vr_getmode_mii		__P((struct vr_softc *));
+void vr_setcfg			__P((struct vr_softc *, u_int16_t));
+u_int8_t vr_calchash		__P((u_int8_t *));
+void vr_setmulti		__P((struct vr_softc *));
+void vr_reset			__P((struct vr_softc *));
+int vr_list_rx_init		__P((struct vr_softc *));
+int vr_list_tx_init		__P((struct vr_softc *));
 
 #define VR_SETBIT(sc, reg, x)				\
 	CSR_WRITE_1(sc, reg,				\
@@ -190,10 +191,23 @@ static int vr_list_tx_init	__P((struct vr_softc *));
 	CSR_WRITE_1(sc, VR_MIICMD,			\
 		CSR_READ_1(sc, VR_MIICMD) & ~x)
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the vr driver can pull as many as 128 packets (when VR_TX_LIST_CNT is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 /*
  * Sync the PHYs by setting data bit and strobing the clock 32 times.
  */
-static void vr_mii_sync(sc)
+void
+vr_mii_sync(sc)
 	struct vr_softc		*sc;
 {
 	register int		i;
@@ -213,7 +227,8 @@ static void vr_mii_sync(sc)
 /*
  * Clock a series of bits through the MII.
  */
-static void vr_mii_send(sc, bits, cnt)
+void
+vr_mii_send(sc, bits, cnt)
 	struct vr_softc		*sc;
 	u_int32_t		bits;
 	int			cnt;
@@ -238,7 +253,8 @@ static void vr_mii_send(sc, bits, cnt)
 /*
  * Read an PHY register through the MII.
  */
-static int vr_mii_readreg(sc, frame)
+int
+vr_mii_readreg(sc, frame)
 	struct vr_softc		*sc;
 	struct vr_mii_frame	*frame;
 	
@@ -332,7 +348,8 @@ fail:
 /*
  * Write to a PHY register through the MII.
  */
-static int vr_mii_writereg(sc, frame)
+int
+vr_mii_writereg(sc, frame)
 	struct vr_softc		*sc;
 	struct vr_mii_frame	*frame;
 	
@@ -382,7 +399,8 @@ static int vr_mii_writereg(sc, frame)
 	return(0);
 }
 
-static u_int16_t vr_phy_readreg(sc, reg)
+u_int16_t
+vr_phy_readreg(sc, reg)
 	struct vr_softc		*sc;
 	int			reg;
 {
@@ -397,7 +415,8 @@ static u_int16_t vr_phy_readreg(sc, reg)
 	return(frame.mii_data);
 }
 
-static void vr_phy_writereg(sc, reg, data)
+void
+vr_phy_writereg(sc, reg, data)
 	struct vr_softc		*sc;
 	u_int16_t		reg;
 	u_int16_t		data;
@@ -418,7 +437,8 @@ static void vr_phy_writereg(sc, reg, data)
 /*
  * Calculate CRC of a multicast group address, return the lower 6 bits.
  */
-static u_int8_t vr_calchash(addr)
+u_int8_t
+vr_calchash(addr)
 	u_int8_t		*addr;
 {
 	u_int32_t		crc, carry;
@@ -446,7 +466,8 @@ static u_int8_t vr_calchash(addr)
 /*
  * Program the 64-bit multicast hash filter.
  */
-static void vr_setmulti(sc)
+void
+vr_setmulti(sc)
 	struct vr_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -502,7 +523,8 @@ static void vr_setmulti(sc)
 /*
  * Initiate an autonegotiation session.
  */
-static void vr_autoneg_xmit(sc)
+void
+vr_autoneg_xmit(sc)
 	struct vr_softc		*sc;
 {
 	u_int16_t		phy_sts;
@@ -522,7 +544,8 @@ static void vr_autoneg_xmit(sc)
 /*
  * Invoke autonegotiation on a PHY.
  */
-static void vr_autoneg_mii(sc, flag, verbose)
+void
+vr_autoneg_mii(sc, flag, verbose)
 	struct vr_softc		*sc;
 	int			flag;
 	int			verbose;
@@ -667,7 +690,8 @@ static void vr_autoneg_mii(sc, flag, verbose)
 	return;
 }
 
-static void vr_getmode_mii(sc)
+void
+vr_getmode_mii(sc)
 	struct vr_softc		*sc;
 {
 	u_int16_t		bmsr;
@@ -676,34 +700,23 @@ static void vr_getmode_mii(sc)
 	ifp = &sc->arpcom.ac_if;
 
 	bmsr = vr_phy_readreg(sc, PHY_BMSR);
-	if (bootverbose)
-		printf("%s: PHY status word: %x\n", sc->sc_dev.dv_xname, bmsr);
 
 	/* fallback */
 	sc->ifmedia.ifm_media = IFM_ETHER|IFM_10_T|IFM_HDX;
 
 	if (bmsr & PHY_BMSR_10BTHALF) {
-		if (bootverbose)
-			printf("%s: 10Mbps half-duplex mode supported\n",
-							sc->sc_dev.dv_xname);
 		ifmedia_add(&sc->ifmedia,
 			IFM_ETHER|IFM_10_T|IFM_HDX, 0, NULL);
 		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_T, 0, NULL);
 	}
 
 	if (bmsr & PHY_BMSR_10BTFULL) {
-		if (bootverbose)
-			printf("%s: 10Mbps full-duplex mode supported\n",
-							sc->sc_dev.dv_xname);
 		ifmedia_add(&sc->ifmedia,
 			IFM_ETHER|IFM_10_T|IFM_FDX, 0, NULL);
 		sc->ifmedia.ifm_media = IFM_ETHER|IFM_10_T|IFM_FDX;
 	}
 
 	if (bmsr & PHY_BMSR_100BTXHALF) {
-		if (bootverbose)
-			printf("%s: 100Mbps half-duplex mode supported\n",
-							sc->sc_dev.dv_xname);
 		ifp->if_baudrate = 100000000;
 		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_TX, 0, NULL);
 		ifmedia_add(&sc->ifmedia,
@@ -712,9 +725,6 @@ static void vr_getmode_mii(sc)
 	}
 
 	if (bmsr & PHY_BMSR_100BTXFULL) {
-		if (bootverbose)
-			printf("%s: 100Mbps full-duplex mode supported\n",
-							sc->sc_dev.dv_xname);
 		ifp->if_baudrate = 100000000;
 		ifmedia_add(&sc->ifmedia,
 			IFM_ETHER|IFM_100_TX|IFM_FDX, 0, NULL);
@@ -723,24 +733,16 @@ static void vr_getmode_mii(sc)
 
 	/* Some also support 100BaseT4. */
 	if (bmsr & PHY_BMSR_100BT4) {
-		if (bootverbose)
-			printf("%s: 100baseT4 mode supported\n",
-							sc->sc_dev.dv_xname);
 		ifp->if_baudrate = 100000000;
 		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_T4, 0, NULL);
 		sc->ifmedia.ifm_media = IFM_ETHER|IFM_100_T4;
 #ifdef FORCE_AUTONEG_TFOUR
-		if (bootverbose)
-			printf("%s: forcing on autoneg support for BT4\n",
-							sc->sc_dev.dv_xname);
 		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_AUTO, 0 NULL):
 		sc->ifmedia.ifm_media = IFM_ETHER|IFM_AUTO;
 #endif
 	}
 
 	if (bmsr & PHY_BMSR_CANAUTONEG) {
-		if (bootverbose)
-			printf("%s: autoneg supported\n", sc->sc_dev.dv_xname);
 		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_AUTO, 0, NULL);
 		sc->ifmedia.ifm_media = IFM_ETHER|IFM_AUTO;
 	}
@@ -751,7 +753,8 @@ static void vr_getmode_mii(sc)
 /*
  * Set speed and duplex mode.
  */
-static void vr_setmode_mii(sc, media)
+void
+vr_setmode_mii(sc, media)
 	struct vr_softc		*sc;
 	int			media;
 {
@@ -813,7 +816,8 @@ static void vr_setmode_mii(sc, media)
  * 'full-duplex' and '100Mbps' bits in the netconfig register, we
  * first have to put the transmit and/or receive logic in the idle state.
  */
-static void vr_setcfg(sc, bmcr)
+void
+vr_setcfg(sc, bmcr)
 	struct vr_softc		*sc;
 	u_int16_t		bmcr;
 {
@@ -835,7 +839,8 @@ static void vr_setcfg(sc, bmcr)
 	return;
 }
 
-static void vr_reset(sc)
+void
+vr_reset(sc)
 	struct vr_softc		*sc;
 {
 	register int		i;
@@ -1050,14 +1055,12 @@ vr_attach(parent, self, aux)
 	ifp->if_start = vr_start;
 	ifp->if_watchdog = vr_watchdog;
 	ifp->if_baudrate = 10000000;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
-	if (bootverbose)
-		printf("%s: probing for a PHY\n", sc->sc_dev.dv_xname);
 	for (i = VR_PHYADDR_MIN; i < VR_PHYADDR_MAX + 1; i++) {
-		if (bootverbose)
-			printf("%s: checking address: %d\n",
-						sc->sc_dev.dv_xname, i);
 		sc->vr_phy_addr = i;
 		vr_phy_writereg(sc, PHY_BMCR, PHY_BMCR_RESET);
 		DELAY(500);
@@ -1069,12 +1072,6 @@ vr_attach(parent, self, aux)
 	if (phy_sts) {
 		phy_vid = vr_phy_readreg(sc, PHY_VENID);
 		phy_did = vr_phy_readreg(sc, PHY_DEVID);
-		if (bootverbose) {
-			printf("%s: found PHY at address %d, ",
-					sc->sc_dev.dv_xname, sc->vr_phy_addr);
-			printf("vendor id: %x device id: %x\n",
-				phy_vid, phy_did);
-		}
 		p = vr_phys;
 		while(p->vr_vid) {
 			if (phy_vid == p->vr_vid &&
@@ -1086,9 +1083,6 @@ vr_attach(parent, self, aux)
 		}
 		if (sc->vr_pinfo == NULL)
 			sc->vr_pinfo = &vr_phys[PHY_UNKNOWN];
-		if (bootverbose)
-			printf("%s: PHY type: %s\n",
-				sc->sc_dev.dv_xname, sc->vr_pinfo->vr_name);
 	} else {
 		printf("%s: MII without any phy!\n", sc->sc_dev.dv_xname);
 		goto fail;
@@ -1126,7 +1120,8 @@ fail:
 /*
  * Initialize the transmit descriptors.
  */
-static int vr_list_tx_init(sc)
+int
+vr_list_tx_init(sc)
 	struct vr_softc		*sc;
 {
 	struct vr_chain_data	*cd;
@@ -1147,6 +1142,9 @@ static int vr_list_tx_init(sc)
 
 	cd->vr_tx_free = &cd->vr_tx_chain[0];
 	cd->vr_tx_tail = cd->vr_tx_head = NULL;
+#ifdef ALTQ
+	sc->vr_cdata.vr_tx_queued = 0;
+#endif
 
 	return(0);
 }
@@ -1157,7 +1155,8 @@ static int vr_list_tx_init(sc)
  * we arrange the descriptors in a closed ring, so that the last descriptor
  * points back to the first.
  */
-static int vr_list_rx_init(sc)
+int
+vr_list_rx_init(sc)
 	struct vr_softc		*sc;
 {
 	struct vr_chain_data	*cd;
@@ -1197,7 +1196,8 @@ static int vr_list_rx_init(sc)
  * MCLBYTES is 2048, so we have to subtract one otherwise we'll
  * overflow the field and make a mess.
  */
-static int vr_newbuf(sc, c)
+int
+vr_newbuf(sc, c)
 	struct vr_softc		*sc;
 	struct vr_chain_onefrag	*c;
 {
@@ -1225,7 +1225,8 @@ static int vr_newbuf(sc, c)
  * A frame has been uploaded: pass the resulting mbuf chain up to
  * the higher level protocols.
  */
-static void vr_rxeof(sc)
+void
+vr_rxeof(sc)
 	struct vr_softc		*sc;
 {
         struct ether_header	*eh;
@@ -1328,7 +1329,8 @@ static void vr_rxeof(sc)
 	return;
 }
 
-void vr_rxeoc(sc)
+void
+vr_rxeoc(sc)
 	struct vr_softc		*sc;
 {
 
@@ -1346,7 +1348,8 @@ void vr_rxeoc(sc)
  * the list buffers.
  */
 
-static void vr_txeof(sc)
+void
+vr_txeof(sc)
 	struct vr_softc		*sc;
 {
 	struct vr_chain		*cur_tx;
@@ -1388,6 +1391,9 @@ static void vr_txeof(sc)
 		ifp->if_opackets++;
         	MFREE(cur_tx->vr_mbuf, n);
 		cur_tx->vr_mbuf = NULL;
+#ifdef ALTQ
+		sc->vr_cdata.vr_tx_queued--;
+#endif
 
 		if (sc->vr_cdata.vr_tx_head == sc->vr_cdata.vr_tx_tail) {
 			sc->vr_cdata.vr_tx_head = NULL;
@@ -1404,7 +1410,8 @@ static void vr_txeof(sc)
 /*
  * TX 'end of channel' interrupt handler.
  */
-static void vr_txeoc(sc)
+void
+vr_txeoc(sc)
 	struct vr_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -1423,7 +1430,8 @@ static void vr_txeoc(sc)
 	return;
 }
 
-static int vr_intr(arg)
+int
+vr_intr(arg)
 	void			*arg;
 {
 	struct vr_softc		*sc;
@@ -1487,6 +1495,12 @@ static int vr_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, VR_IMR, VR_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		vr_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		vr_start(ifp);
 	}
@@ -1498,7 +1512,8 @@ static int vr_intr(arg)
  * Encapsulate an mbuf chain in a descriptor by coupling the mbuf data
  * pointers to the fragment pointers.
  */
-static int vr_encap(sc, c, m_head)
+int
+vr_encap(sc, c, m_head)
 	struct vr_softc		*sc;
 	struct vr_chain		*c;
 	struct mbuf		*m_head;
@@ -1567,7 +1582,8 @@ static int vr_encap(sc, c, m_head)
  * physical addresses.
  */
 
-static void vr_start(ifp)
+void
+vr_start(ifp)
 	struct ifnet		*ifp;
 {
 	struct vr_softc		*sc;
@@ -1593,6 +1609,20 @@ static void vr_start(ifp)
 	start_tx = sc->vr_cdata.vr_tx_free;
 
 	while(sc->vr_cdata.vr_tx_free->vr_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			if (sc->vr_cdata.vr_tx_queued >= TXBUF_THRESH4ALTQ) {
+				/*
+				 * stop filling tx buffer if we already have
+				 * enough packets to transmit.
+				 */
+				break;
+			}
+
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -1600,6 +1630,9 @@ static void vr_start(ifp)
 		/* Pick a descriptor off the free list. */
 		cur_tx = sc->vr_cdata.vr_tx_free;
 		sc->vr_cdata.vr_tx_free = cur_tx->vr_nextdesc;
+#ifdef ALTQ
+		sc->vr_cdata.vr_tx_queued++;
+#endif
 
 		/* Pack the data into the descriptor. */
 		vr_encap(sc, cur_tx, m_head);
@@ -1638,7 +1671,8 @@ static void vr_start(ifp)
 	return;
 }
 
-static void vr_init(xsc)
+void
+vr_init(xsc)
 	void			*xsc;
 {
 	struct vr_softc		*sc = xsc;
@@ -1732,7 +1766,8 @@ static void vr_init(xsc)
 /*
  * Set media options.
  */
-static int vr_ifmedia_upd(ifp)
+int
+vr_ifmedia_upd(ifp)
 	struct ifnet		*ifp;
 {
 	struct vr_softc		*sc;
@@ -1755,7 +1790,8 @@ static int vr_ifmedia_upd(ifp)
 /*
  * Report current media status.
  */
-static void vr_ifmedia_sts(ifp, ifmr)
+void
+vr_ifmedia_sts(ifp, ifmr)
 	struct ifnet		*ifp;
 	struct ifmediareq	*ifmr;
 {
@@ -1800,7 +1836,8 @@ static void vr_ifmedia_sts(ifp, ifmr)
 	return;
 }
 
-static int vr_ioctl(ifp, command, data)
+int
+vr_ioctl(ifp, command, data)
 	struct ifnet		*ifp;
 	u_long			command;
 	caddr_t			data;
@@ -1860,7 +1897,8 @@ static int vr_ioctl(ifp, command, data)
 	return(error);
 }
 
-static void vr_watchdog(ifp)
+void
+vr_watchdog(ifp)
 	struct ifnet		*ifp;
 {
 	struct vr_softc		*sc;
@@ -1883,6 +1921,11 @@ static void vr_watchdog(ifp)
 	vr_reset(sc);
 	vr_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		vr_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		vr_start(ifp);
 
@@ -1893,7 +1936,8 @@ static void vr_watchdog(ifp)
  * Stop the adapter and free any mbufs allocated to the
  * RX and TX lists.
  */
-static void vr_stop(sc)
+void
+vr_stop(sc)
 	struct vr_softc		*sc;
 {
 	register int		i;
@@ -1942,7 +1986,8 @@ static void vr_stop(sc)
  * Stop all chip I/O so that the kernel's probe routines don't
  * get confused by errant DMAs when rebooting.
  */
-static void vr_shutdown(arg)
+void
+vr_shutdown(arg)
 	void			*arg;
 {
 	struct vr_softc		*sc = (struct vr_softc *)arg;

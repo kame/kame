@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_de.c,v 1.40 1999/02/26 17:05:51 jason Exp $	*/
+/*	$OpenBSD: if_de.c,v 1.41 1999/07/18 03:20:18 csapuntz Exp $	*/
 /*	$NetBSD: if_de.c,v 1.45 1997/06/09 00:34:18 thorpej Exp $	*/
 
 /*-
@@ -165,6 +165,18 @@
 #endif
 
 #define	TULIP_HZ	10
+
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the de driver can pull as many as 128 packets (when TULIP_TXDESCS is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
 
 #include DEVAR_INCLUDE
 /*
@@ -4105,6 +4117,11 @@ tulip_txput(
     int segcnt, free;
     u_int32_t d_status;
     struct mbuf *m0;
+#ifdef ALTQ
+     struct ifnet *ifp = &sc->tulip_if;
+     struct mbuf *ombuf = m;
+     int compressed = 0;
+#endif
 
 #if defined(TULIP_DEBUG)
     if ((sc->tulip_cmdmode & TULIP_CMD_TXRUN) == 0) {
@@ -4116,6 +4133,23 @@ tulip_txput(
     }
 #endif
 
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	if (sc->tulip_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
+	    /*
+	     * stop filling tx buffer if we already have enough packets
+	     * to transmit.
+	     * we need to call tulip_tx_intr to release completed packets
+	     * from txq, and check the queue length again.
+	     */
+	    (void)tulip_tx_intr(sc);
+	    if (sc->tulip_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
+		sc->tulip_flags |= TULIP_WANTTXSTART;
+		goto finish;
+	    }
+	}
+    }
+#endif
     /*
      * Now we try to fill in our transmit descriptors.  This is
      * a bit reminiscent of going on the Ark two by two
@@ -4158,6 +4192,28 @@ tulip_txput(
 		 * entries that we can use for one packet, so we have
 		 * recopy it into one mbuf and then try again.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+		    struct mbuf *tmp;
+		    /*
+		     * tulip_mbuf_compress() frees the original mbuf.
+		     * thus, we have to remove the mbuf from the queue
+		     * before calling it.
+		     * we don't have to worry about space shortage
+		     * after compressing the mbuf since the compressed
+		     * mbuf will take only two segs.
+		     */
+		    if (compressed) {
+			/* should not happen */
+			printf("tulip_txput: compress called twice!\n");
+			goto finish;
+		    }
+		    tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		    if (tmp != ombuf)
+			panic("tulip_txput: different mbuf dequeued!");
+		    compressed = 1;
+		}
+#endif
 		m = tulip_mbuf_compress(m);
 		if (m == NULL)
 		    goto finish;
@@ -4224,6 +4280,16 @@ tulip_txput(
      * The descriptors have been filled in.  Now get ready
      * to transmit.
      */
+#ifdef ALTQ
+     if (ALTQ_IS_ON(ifp)) {
+	  if (!compressed && (sc->tulip_flags & TULIP_TXPROBE_ACTIVE) == 0) {
+	      /* remove the mbuf from the queue */
+	      if ((*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE) != ombuf)
+		  panic("tulip_txput: different mbuf dequeued!");
+	  }
+     }
+#endif
+
     IF_ENQUEUE(&sc->tulip_txq, m);
     m = NULL;
 
@@ -4587,11 +4653,19 @@ tulip_ifioctl(
     return error;
 }
 
+#ifdef ALTQ
+/*
+ * the original dequeueing policy is dequeue-and-prepend if something
+ * goes wrong.  when altq is used, it is changed to peek-and-dequeue.
+ * the modification becomes a bit complicated since tulip_txput() might
+ * copy and modify the mbuf passed.
+ */
+#endif
 /*
  * These routines gets called at device spl (from ether_output).  This might
  * pose a problem for TULIP_USE_SOFTINTR if ether_output is called at
  * device spl from another driver.
-	 */
+ */
 
 static ifnet_ret_t
 tulip_ifstart(
@@ -4605,6 +4679,21 @@ tulip_ifstart(
 	if ((sc->tulip_flags & (TULIP_WANTSETUP|TULIP_TXPROBE_ACTIVE)) == TULIP_WANTSETUP)
 	    tulip_txput_setup(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    struct mbuf *m, *m0;
+	    while ((m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK)) != NULL) {
+		if ((m0 = tulip_txput(sc, m)) != NULL) {
+		    /* txput failed */
+		    if (m0 != m)
+			/* should not happen */
+			printf("tulip_if_start: bad mbuf dequeued!\n");
+		    break;
+		}
+	    }
+	}
+	else {
+#endif /* ALTQ */
 	while (sc->tulip_if.if_snd.ifq_head != NULL) {
 	    struct mbuf *m;
 	    IF_DEQUEUE(&sc->tulip_if.if_snd, m);
@@ -4615,6 +4704,9 @@ tulip_ifstart(
 	}
 	if (sc->tulip_if.if_snd.ifq_head == NULL)
 	    sc->tulip_if.if_start = tulip_ifstart_one;
+#ifdef ALTQ
+	}
+#endif
     }
 
     TULIP_PERFEND(ifstart);
@@ -4627,6 +4719,22 @@ tulip_ifstart_one(
     TULIP_PERFSTART(ifstart_one)
     tulip_softc_t * const sc = TULIP_IFP_TO_SOFTC(ifp);
 
+
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	struct mbuf *m, *m0;
+	if ((sc->tulip_if.if_flags & IFF_RUNNING)
+	    && ((m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK)) != NULL)) {
+	    if ((m0 = tulip_txput(sc, m)) != NULL) {
+		/* txput failed */
+		if (m0 != m)
+		    /* should not happen */
+		    printf("tulip_if_start: bad mbuf dequeued!\n");
+	    }
+	}
+    }
+    else
+#endif /* !ALTQ */
     if ((sc->tulip_if.if_flags & IFF_RUNNING)
 	    && sc->tulip_if.if_snd.ifq_head != NULL) {
 	struct mbuf *m;
@@ -4824,6 +4932,9 @@ tulip_attach(
 
     tulip_reset(sc);
 
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
 #if defined(__bsdi__) && _BSDI_VERSION >= 199510
     sc->tulip_pf = printf;
     TULIP_ETHER_IFATTACH(sc);
@@ -5237,11 +5348,6 @@ tulip_pci_attach(
     } while (0)
 #endif /* __NetBSD__ */
 
-#if defined(__OpenBSD__)
-    pci_chipset_tag_t pc = pa->pa_pc;
-    bus_addr_t tulipbase;
-    bus_size_t tulipsize;
-#endif
     int retval, idx;
     u_int32_t revinfo, cfdainfo, id;
 #if !defined(TULIP_IOMAPPED) && defined(__FreeBSD__)
@@ -5407,7 +5513,7 @@ tulip_pci_attach(
 #endif
 #endif /* __bsdi__ */
 
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
     csr_base = 0;
 
     ioh_valid = (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
@@ -5415,32 +5521,6 @@ tulip_pci_attach(
     memh_valid = (pci_mapreg_map(pa, PCI_CBMA,
     		  PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
 		  &memt, &memh, NULL, NULL) == 0);
-#endif
-
-#if defined(__OpenBSD__)
-    ioh_valid = 0;
-    memh_valid = 0;
-    csr_base = 0;
-
-#if defined(TULIP_IO_MAPPED)
-    iot = pa->pa_iot;
-    retval = pci_io_find(pc, pa->pa_tag, PCI_CBIO, &tulipbase, &tulipsize);
-    if (!retval) 
-	retval = bus_space_map(pa->pa_iot, tulipbase, tulipsize, 0,
-	    &ioh);
-
-    ioh_valid = (retval == 0);
-#else
-    memt = pa->pa_memt;
-    retval = pci_mem_find(pc, pa->pa_tag, PCI_CBMA, &tulipbase, &tulipsize,
-	NULL);
-    if (!retval)
-	retval = bus_space_map(pa->pa_memt, tulipbase, tulipsize, 0,
-	    &memh);
-
-    memh_valid = (retval == 0);
-#endif
-
 #endif
 
 #if defined(__OpenBSD__) || defined(__NetBSD__)

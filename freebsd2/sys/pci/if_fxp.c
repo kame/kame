@@ -257,6 +257,18 @@ static int tx_threshold = 64;
  */
 #define FXP_TXCB_MASK	(FXP_NTXCB - 1)
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the fxp driver can pull as many as 128 packets (when FXP_NTXCB is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 /*
  * Number of receive frame area buffers. These are large so chose
  * wisely.
@@ -786,7 +798,11 @@ fxp_start(ifp)
 	struct ifnet *ifp;
 {
 	struct fxp_softc *sc = ifp->if_softc;
+#ifdef ALTQ
+	struct fxp_cb_tx *txp = NULL;
+#else
 	struct fxp_cb_tx *txp;
+#endif
 	struct mbuf *m, *mb_head;
 	int segment, first = 1;
 
@@ -805,6 +821,18 @@ txloop:
 	 */
 #ifdef ALTQ
 	if (ALTQ_IS_ON(ifp)) {
+		if (sc->tx_queued >= TXBUF_THRESH4ALTQ) {
+			/*
+			 * stop filling tx buffer if we already have
+			 * enough packets to transmit.
+			 * we need an interrupt upon tx complete
+			 * to continue sending.
+			 */
+			if (txp != NULL)
+				txp->cb_command |= FXP_CB_COMMAND_I;
+			return;
+		}
+
 		mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
 	}
 	else

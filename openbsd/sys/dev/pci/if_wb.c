@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wb.c,v 1.1 1999/03/11 18:20:13 jason Exp $	*/
+/*	$OpenBSD: if_wb.c,v 1.3 1999/09/27 18:17:01 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: if_wb.c,v 1.7 1999/02/01 21:25:52 wpaul Exp $
+ *	$FreeBSD: if_wb.c,v 1.13 1999/07/11 00:56:07 wpaul Exp $
  */
 
 /*
@@ -135,7 +135,7 @@
  * so failure to positively identify the chip is not a fatal error.
  */
 
-static struct wb_type wb_phys[] = {
+struct wb_type wb_phys[] = {
 	{ TI_PHY_VENDORID, TI_PHY_10BT, "<TI ThunderLAN 10BT (internal)>" },
 	{ TI_PHY_VENDORID, TI_PHY_100VGPMI, "<TI TNETE211 100VG Any-LAN>" },
 	{ NS_PHY_VENDORID, NS_PHY_83840A, "<National Semiconductor DP83840A>"},
@@ -145,49 +145,48 @@ static struct wb_type wb_phys[] = {
 	{ 0, 0, "<MII-compliant physical interface>" }
 };
 
-static int wb_probe	__P((struct device *, void *, void *));
-static void wb_attach	__P((struct device *, struct device *, void *));
+int wb_probe		__P((struct device *, void *, void *));
+void wb_attach		__P((struct device *, struct device *, void *));
 
-static int wb_newbuf		__P((struct wb_softc *,
-						struct wb_chain_onefrag *));
-static int wb_encap		__P((struct wb_softc *, struct wb_chain *,
-						struct mbuf *));
+int wb_newbuf		__P((struct wb_softc *, struct wb_chain_onefrag *,
+    struct mbuf *));
+int wb_encap		__P((struct wb_softc *, struct wb_chain *,
+    struct mbuf *));
 
-static void wb_rxeof		__P((struct wb_softc *));
-static void wb_rxeoc		__P((struct wb_softc *));
-static void wb_txeof		__P((struct wb_softc *));
-static void wb_txeoc		__P((struct wb_softc *));
-static int wb_intr		__P((void *));
-static void wb_start		__P((struct ifnet *));
-static int wb_ioctl		__P((struct ifnet *, u_long, caddr_t));
-static void wb_init		__P((void *));
-static void wb_stop		__P((struct wb_softc *));
-static void wb_watchdog		__P((struct ifnet *));
-static void wb_shutdown		__P((void *));
-static int wb_ifmedia_upd	__P((struct ifnet *));
-static void wb_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
+void wb_rxeof		__P((struct wb_softc *));
+void wb_rxeoc		__P((struct wb_softc *));
+void wb_txeof		__P((struct wb_softc *));
+void wb_txeoc		__P((struct wb_softc *));
+int wb_intr		__P((void *));
+void wb_start		__P((struct ifnet *));
+int wb_ioctl		__P((struct ifnet *, u_long, caddr_t));
+void wb_init		__P((void *));
+void wb_stop		__P((struct wb_softc *));
+void wb_watchdog	__P((struct ifnet *));
+void wb_shutdown	__P((void *));
+int wb_ifmedia_upd	__P((struct ifnet *));
+void wb_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
 
-static void wb_eeprom_putbyte	__P((struct wb_softc *, int));
-static void wb_eeprom_getword	__P((struct wb_softc *, int, u_int16_t *));
-static void wb_read_eeprom	__P((struct wb_softc *, caddr_t, int,
-							int, int));
-static void wb_mii_sync		__P((struct wb_softc *));
-static void wb_mii_send		__P((struct wb_softc *, u_int32_t, int));
-static int wb_mii_readreg	__P((struct wb_softc *, struct wb_mii_frame *));
-static int wb_mii_writereg	__P((struct wb_softc *, struct wb_mii_frame *));
-static u_int16_t wb_phy_readreg	__P((struct wb_softc *, int));
-static void wb_phy_writereg	__P((struct wb_softc *, int, int));
+void wb_eeprom_putbyte	__P((struct wb_softc *, int));
+void wb_eeprom_getword	__P((struct wb_softc *, int, u_int16_t *));
+void wb_read_eeprom	__P((struct wb_softc *, caddr_t, int, int, int));
+void wb_mii_sync	__P((struct wb_softc *));
+void wb_mii_send	__P((struct wb_softc *, u_int32_t, int));
+int wb_mii_readreg	__P((struct wb_softc *, struct wb_mii_frame *));
+int wb_mii_writereg	__P((struct wb_softc *, struct wb_mii_frame *));
+void wb_phy_writereg	__P((struct wb_softc *, int, int));
+u_int16_t wb_phy_readreg	__P((struct wb_softc *, int));
 
-static void wb_autoneg_xmit	__P((struct wb_softc *));
-static void wb_autoneg_mii	__P((struct wb_softc *, int, int));
-static void wb_setmode_mii	__P((struct wb_softc *, int));
-static void wb_getmode_mii	__P((struct wb_softc *));
-static void wb_setcfg		__P((struct wb_softc *, int));
-static u_int8_t wb_calchash	__P((caddr_t));
-static void wb_setmulti		__P((struct wb_softc *));
-static void wb_reset		__P((struct wb_softc *));
-static int wb_list_rx_init	__P((struct wb_softc *));
-static int wb_list_tx_init	__P((struct wb_softc *));
+void wb_autoneg_xmit	__P((struct wb_softc *));
+void wb_autoneg_mii	__P((struct wb_softc *, int, int));
+void wb_setmode_mii	__P((struct wb_softc *, int));
+void wb_getmode_mii	__P((struct wb_softc *));
+void wb_setcfg		__P((struct wb_softc *, int));
+u_int8_t wb_calchash	__P((caddr_t));
+void wb_setmulti	__P((struct wb_softc *));
+void wb_reset		__P((struct wb_softc *));
+int wb_list_rx_init	__P((struct wb_softc *));
+int wb_list_tx_init	__P((struct wb_softc *));
 
 #define WB_SETBIT(sc, reg, x)				\
 	CSR_WRITE_4(sc, reg,				\
@@ -208,7 +207,7 @@ static int wb_list_tx_init	__P((struct wb_softc *));
 /*
  * Send a read command and address to the EEPROM, check for ACK.
  */
-static void wb_eeprom_putbyte(sc, addr)
+void wb_eeprom_putbyte(sc, addr)
 	struct wb_softc		*sc;
 	int			addr;
 {
@@ -238,7 +237,7 @@ static void wb_eeprom_putbyte(sc, addr)
 /*
  * Read a word of data stored in the EEPROM at address 'addr.'
  */
-static void wb_eeprom_getword(sc, addr, dest)
+void wb_eeprom_getword(sc, addr, dest)
 	struct wb_softc		*sc;
 	int			addr;
 	u_int16_t		*dest;
@@ -279,7 +278,7 @@ static void wb_eeprom_getword(sc, addr, dest)
 /*
  * Read a sequence of words from the EEPROM.
  */
-static void wb_read_eeprom(sc, dest, off, cnt, swap)
+void wb_read_eeprom(sc, dest, off, cnt, swap)
 	struct wb_softc		*sc;
 	caddr_t			dest;
 	int			off;
@@ -304,7 +303,7 @@ static void wb_read_eeprom(sc, dest, off, cnt, swap)
 /*
  * Sync the PHYs by setting data bit and strobing the clock 32 times.
  */
-static void wb_mii_sync(sc)
+void wb_mii_sync(sc)
 	struct wb_softc		*sc;
 {
 	register int		i;
@@ -324,7 +323,7 @@ static void wb_mii_sync(sc)
 /*
  * Clock a series of bits through the MII.
  */
-static void wb_mii_send(sc, bits, cnt)
+void wb_mii_send(sc, bits, cnt)
 	struct wb_softc		*sc;
 	u_int32_t		bits;
 	int			cnt;
@@ -349,7 +348,7 @@ static void wb_mii_send(sc, bits, cnt)
 /*
  * Read an PHY register through the MII.
  */
-static int wb_mii_readreg(sc, frame)
+int wb_mii_readreg(sc, frame)
 	struct wb_softc		*sc;
 	struct wb_mii_frame	*frame;
 	
@@ -445,7 +444,7 @@ fail:
 /*
  * Write to a PHY register through the MII.
  */
-static int wb_mii_writereg(sc, frame)
+int wb_mii_writereg(sc, frame)
 	struct wb_softc		*sc;
 	struct wb_mii_frame	*frame;
 	
@@ -491,7 +490,7 @@ static int wb_mii_writereg(sc, frame)
 	return(0);
 }
 
-static u_int16_t wb_phy_readreg(sc, reg)
+u_int16_t wb_phy_readreg(sc, reg)
 	struct wb_softc		*sc;
 	int			reg;
 {
@@ -506,7 +505,7 @@ static u_int16_t wb_phy_readreg(sc, reg)
 	return(frame.mii_data);
 }
 
-static void wb_phy_writereg(sc, reg, data)
+void wb_phy_writereg(sc, reg, data)
 	struct wb_softc		*sc;
 	int			reg;
 	int			data;
@@ -524,7 +523,7 @@ static void wb_phy_writereg(sc, reg, data)
 	return;
 }
 
-static u_int8_t wb_calchash(addr)
+u_int8_t wb_calchash(addr)
 	caddr_t			addr;
 {
 	u_int32_t		crc, carry;
@@ -558,7 +557,7 @@ static u_int8_t wb_calchash(addr)
 /*
  * Program the 64-bit multicast hash filter.
  */
-static void wb_setmulti(sc)
+void wb_setmulti(sc)
 	struct wb_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -613,7 +612,7 @@ static void wb_setmulti(sc)
 /*
  * Initiate an autonegotiation session.
  */
-static void wb_autoneg_xmit(sc)
+void wb_autoneg_xmit(sc)
 	struct wb_softc		*sc;
 {
 	u_int16_t		phy_sts;
@@ -633,7 +632,7 @@ static void wb_autoneg_xmit(sc)
 /*
  * Invoke autonegotiation on a PHY.
  */
-static void wb_autoneg_mii(sc, flag, verbose)
+void wb_autoneg_mii(sc, flag, verbose)
 	struct wb_softc		*sc;
 	int			flag;
 	int			verbose;
@@ -663,8 +662,8 @@ static void wb_autoneg_mii(sc, flag, verbose)
 	phy_sts = wb_phy_readreg(sc, PHY_BMSR);
 	if (!(phy_sts & PHY_BMSR_CANAUTONEG)) {
 		if (verbose)
-			printf("wb%d: autonegotiation not supported\n",
-							sc->wb_unit);
+			printf("%s: autonegotiation not supported\n",
+			    sc->sc_dev.dv_xname);
 		ifm->ifm_media = IFM_ETHER|IFM_10_T|IFM_HDX;	
 		return;
 	}
@@ -703,17 +702,19 @@ static void wb_autoneg_mii(sc, flag, verbose)
 		sc->wb_autoneg = 0;
 		break;
 	default:
-		printf("wb%d: invalid autoneg flag: %d\n", sc->wb_unit, flag);
+		printf("%s: invalid autoneg flag: %d\n",
+		    sc->sc_dev.dv_xname, flag);
 		return;
 	}
 
 	if (wb_phy_readreg(sc, PHY_BMSR) & PHY_BMSR_AUTONEGCOMP) {
 		if (verbose)
-			printf("wb%d: autoneg complete, ", sc->wb_unit);
+			printf("%s: autoneg complete, ", sc->sc_dev.dv_xname);
 		phy_sts = wb_phy_readreg(sc, PHY_BMSR);
 	} else {
 		if (verbose)
-			printf("wb%d: autoneg not complete, ", sc->wb_unit);
+			printf("%s: autoneg not complete, ",
+			    sc->sc_dev.dv_xname);
 	}
 
 	media = wb_phy_readreg(sc, PHY_BMCR);
@@ -778,7 +779,7 @@ static void wb_autoneg_mii(sc, flag, verbose)
 	return;
 }
 
-static void wb_getmode_mii(sc)
+void wb_getmode_mii(sc)
 	struct wb_softc		*sc;
 {
 	u_int16_t		bmsr;
@@ -840,7 +841,7 @@ static void wb_getmode_mii(sc)
 /*
  * Set speed and duplex mode.
  */
-static void wb_setmode_mii(sc, media)
+void wb_setmode_mii(sc, media)
 	struct wb_softc		*sc;
 	int			media;
 {
@@ -853,14 +854,14 @@ static void wb_setmode_mii(sc, media)
 	 * If an autoneg session is in progress, stop it.
 	 */
 	if (sc->wb_autoneg) {
-		printf("wb%d: canceling autoneg session\n", sc->wb_unit);
+		printf("%s: canceling autoneg session\n", sc->sc_dev.dv_xname);
 		ifp->if_timer = sc->wb_autoneg = sc->wb_want_auto = 0;
 		bmcr = wb_phy_readreg(sc, PHY_BMCR);
 		bmcr &= ~PHY_BMCR_AUTONEGENBL;
 		wb_phy_writereg(sc, PHY_BMCR, bmcr);
 	}
 
-	printf("wb%d: selecting MII, ", sc->wb_unit);
+	printf("%s: selecting MII, ", sc->sc_dev.dv_xname);
 
 	bmcr = wb_phy_readreg(sc, PHY_BMCR);
 
@@ -902,7 +903,7 @@ static void wb_setmode_mii(sc, media)
  * 'full-duplex' and '100Mbps' bits in the netconfig register, we
  * first have to put the transmit and/or receive logic in the idle state.
  */
-static void wb_setcfg(sc, bmcr)
+void wb_setcfg(sc, bmcr)
 	struct wb_softc		*sc;
 	int			bmcr;
 {
@@ -920,8 +921,8 @@ static void wb_setcfg(sc, bmcr)
 		}
 
 		if (i == WB_TIMEOUT)
-			printf("wb%d: failed to force tx and "
-				"rx to idle state\n", sc->wb_unit);
+			printf("%s: failed to force tx and "
+				"rx to idle state\n", sc->sc_dev.dv_xname);
 	}
 
 	if (bmcr & PHY_BMCR_SPEEDSEL)
@@ -940,7 +941,7 @@ static void wb_setcfg(sc, bmcr)
 	return;
 }
 
-static void wb_reset(sc)
+void wb_reset(sc)
 	struct wb_softc		*sc;
 {
 	register int		i;
@@ -953,7 +954,7 @@ static void wb_reset(sc)
 			break;
 	}
 	if (i == WB_TIMEOUT)
-		printf("wb%d: reset never completed!\n", sc->wb_unit);
+		printf("%s: reset never completed!\n", sc->sc_dev.dv_xname);
 
 	/* Wait a little while for the chip to get its brains in order. */
 	DELAY(1000);
@@ -969,7 +970,7 @@ static void wb_reset(sc)
  * Probe for a Winbond chip. Check the PCI vendor and device
  * IDs against our list and return a device name if we find a match.
  */
-static int
+int
 wb_probe(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
@@ -997,7 +998,7 @@ wb_probe(parent, match, aux)
  * Attach the interface. Allocate softc structures, do ifmedia
  * setup and ethernet/BPF attach.
  */
-static void
+void
 wb_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
@@ -1010,18 +1011,14 @@ wb_attach(parent, self, aux)
 	struct ifnet *ifp = &sc->arpcom.ac_if;
 	bus_addr_t iobase;
 	bus_size_t iosize;
-	int i, media = IFM_ETHER|IFM_100_TX|IFM_FDX;
-	unsigned int round;
+	int i, media = IFM_ETHER|IFM_100_TX|IFM_FDX, s;
+	u_int round;
 	caddr_t roundptr;
 	u_int16_t phy_vid, phy_did, phy_sts;
 	struct wb_type		*p;
 	u_int32_t command;
 
-#if 0
 	s = splimp();
-#endif
-
-	sc->wb_unit = sc->sc_dev.dv_unit;
 
 	/*
 	 * Handle power management nonsense.
@@ -1078,7 +1075,7 @@ wb_attach(parent, self, aux)
 	}
 	sc->wb_btag = pa->pa_iot;
 #else
-	if (!(command & PCI_COMMAND_IO_ENABLE)) {
+	if (!(command & PCI_COMMAND_MEM_ENABLE)) {
 		printf(": failed to enable memory mapping!\n");
 		goto fail;
 	}
@@ -1124,11 +1121,16 @@ wb_attach(parent, self, aux)
 				M_DEVBUF, M_NOWAIT);
 	if (sc->wb_ldata_ptr == NULL) {
 		printf("%s: no memory for list buffers!\n",sc->sc_dev.dv_xname);
-		return;
+		goto fail;
 	}
 
 	sc->wb_ldata = (struct wb_list_data *)sc->wb_ldata_ptr;
-	round = (unsigned int)sc->wb_ldata_ptr & 0xF;
+#ifdef __alpha__
+	round = (u_int64_t)sc->wb_ldata_ptr & 0xF;
+#endif
+#ifdef __i386__
+	round = (u_int32_t)sc->wb_ldata_ptr & 0xF;
+#endif
 	roundptr = sc->wb_ldata_ptr;
 	for (i = 0; i < 8; i++) {
 		if (round % 8) {
@@ -1149,6 +1151,10 @@ wb_attach(parent, self, aux)
 	ifp->if_watchdog = wb_watchdog;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = WB_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
+
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	for (i = WB_PHYADDR_MIN; i < WB_PHYADDR_MAX + 1; i++) {
@@ -1175,7 +1181,7 @@ wb_attach(parent, self, aux)
 		if (sc->wb_pinfo == NULL)
 			sc->wb_pinfo = &wb_phys[PHY_UNKNOWN];
 	} else {
-		printf("wb%d: MII without any phy!\n", sc->wb_unit);
+		printf("%s: MII without any phy!\n", sc->sc_dev.dv_xname);
 		goto fail;
 	}
 
@@ -1204,16 +1210,14 @@ wb_attach(parent, self, aux)
 	shutdownhook_establish(wb_shutdown, sc);
 
 fail:
-#if 0
 	splx(s);
-#endif
 	return;
 }
 
 /*
  * Initialize the transmit descriptors.
  */
-static int wb_list_tx_init(sc)
+int wb_list_tx_init(sc)
 	struct wb_softc		*sc;
 {
 	struct wb_chain_data	*cd;
@@ -1246,7 +1250,7 @@ static int wb_list_tx_init(sc)
  * we arrange the descriptors in a closed ring, so that the last descriptor
  * points back to the first.
  */
-static int wb_list_rx_init(sc)
+int wb_list_rx_init(sc)
 	struct wb_softc		*sc;
 {
 	struct wb_chain_data	*cd;
@@ -1259,7 +1263,7 @@ static int wb_list_rx_init(sc)
 	for (i = 0; i < WB_RX_LIST_CNT; i++) {
 		cd->wb_rx_chain[i].wb_ptr =
 			(struct wb_desc *)&ld->wb_rx_list[i];
-		if (wb_newbuf(sc, &cd->wb_rx_chain[i]) == ENOBUFS)
+		if (wb_newbuf(sc, &cd->wb_rx_chain[i], NULL) == ENOBUFS)
 			return(ENOBUFS);
 		if (i == (WB_RX_LIST_CNT - 1)) {
 			cd->wb_rx_chain[i].wb_nextdesc = &cd->wb_rx_chain[0];
@@ -1281,21 +1285,32 @@ static int wb_list_rx_init(sc)
 /*
  * Initialize an RX descriptor and attach an MBUF cluster.
  */
-static int wb_newbuf(sc, c)
-	struct wb_softc		*sc;
-	struct wb_chain_onefrag	*c;
+int
+wb_newbuf(sc, c, m)
+	struct wb_softc *sc;
+	struct wb_chain_onefrag *c;
+	struct mbuf *m;
 {
 	struct mbuf		*m_new = NULL;
 
-	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-	if (m_new == NULL)
-		return(ENOBUFS);
+	if (m == NULL) {
+		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
+		if (m_new == NULL)
+			return(ENOBUFS);
 
-	MCLGET(m_new, M_DONTWAIT);
-	if (!(m_new->m_flags & M_EXT)) {
-		m_freem(m_new);
-		return(ENOBUFS);
+		MCLGET(m_new, M_DONTWAIT);
+		if (!(m_new->m_flags & M_EXT)) {
+			m_freem(m_new);
+			return(ENOBUFS);
+		}
+		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
+	} else {
+		m_new = m;
+		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
+		m_new->m_data = m_new->m_ext.ext_buf;
 	}
+
+	m_adj(m_new, sizeof(u_int64_t));
 
 	c->wb_mbuf = m_new;
 	c->wb_ptr->wb_data = vtophys(mtod(m_new, caddr_t));
@@ -1309,7 +1324,7 @@ static int wb_newbuf(sc, c)
  * A frame has been uploaded: pass the resulting mbuf chain up to
  * the higher level protocols.
  */
-static void wb_rxeof(sc)
+void wb_rxeof(sc)
 	struct wb_softc		*sc;
 {
         struct ether_header	*eh;
@@ -1323,15 +1338,18 @@ static void wb_rxeof(sc)
 
 	while(!((rxstat = sc->wb_cdata.wb_rx_head->wb_ptr->wb_status) &
 							WB_RXSTAT_OWN)) {
+		struct mbuf *m0 = NULL;
+
 		cur_rx = sc->wb_cdata.wb_rx_head;
 		sc->wb_cdata.wb_rx_head = cur_rx->wb_nextdesc;
+		m = cur_rx->wb_mbuf;
 
 		if ((rxstat & WB_RXSTAT_MIIERR)
 			 || WB_RXBYTES(cur_rx->wb_ptr->wb_status) == 0) {
 			ifp->if_ierrors++;
 			wb_reset(sc);
-			printf("wb%x: receiver babbling: possible chip "
-				"bug, forcing reset\n", sc->wb_unit);
+			printf("%s: receiver babbling: possible chip "
+				"bug, forcing reset\n", sc->sc_dev.dv_xname);
 			ifp->if_flags |= IFF_OACTIVE;
 			ifp->if_timer = 2;
 			return;
@@ -1339,9 +1357,7 @@ static void wb_rxeof(sc)
 
 		if (rxstat & WB_RXSTAT_RXERR) {
 			ifp->if_ierrors++;
-			cur_rx->wb_ptr->wb_ctl =
-				WB_RXCTL_RLINK | (MCLBYTES - 1);
-			cur_rx->wb_ptr->wb_status = WB_RXSTAT;
+			wb_newbuf(sc, cur_rx, m);
 			continue;
 		}
 
@@ -1357,35 +1373,15 @@ static void wb_rxeof(sc)
 		 */
 		total_len -= ETHER_CRC_LEN;
 
-		if (total_len < MINCLSIZE) {
-			m = m_devget(mtod(cur_rx->wb_mbuf, char *),
-				total_len, 0, ifp, NULL);
-			cur_rx->wb_ptr->wb_ctl =
-				WB_RXCTL_RLINK | (MCLBYTES - 1);
-			cur_rx->wb_ptr->wb_status = WB_RXSTAT;
-			if (m == NULL) {
-				ifp->if_ierrors++;
-				continue;
-			}
-		} else {
-			m = cur_rx->wb_mbuf;
-		/*
-		 * Try to conjure up a new mbuf cluster. If that
-		 * fails, it means we have an out of memory condition and
-		 * should leave the buffer in place and continue. This will
-		 * result in a lost packet, but there's little else we
-		 * can do in this situation.
-		 */
-			if (wb_newbuf(sc, cur_rx) == ENOBUFS) {
-				ifp->if_ierrors++;
-				cur_rx->wb_ptr->wb_ctl =
-					WB_RXCTL_RLINK | (MCLBYTES - 1);
-				cur_rx->wb_ptr->wb_status = WB_RXSTAT;
-				continue;
-			}
-			m->m_pkthdr.rcvif = ifp;
-			m->m_pkthdr.len = m->m_len = total_len;
+		m0 = m_devget(mtod(m, char *) - ETHER_ALIGN,
+		    total_len + ETHER_ALIGN, 0, ifp, NULL);
+		wb_newbuf(sc, cur_rx, m);
+		if (m0 == NULL) {
+			ifp->if_ierrors++;
+			continue;
 		}
+		m_adj(m0, ETHER_ALIGN);
+		m = m0;
 
 		ifp->if_ipackets++;
 		eh = mtod(m, struct ether_header *);
@@ -1423,7 +1419,7 @@ void wb_rxeoc(sc)
  * A frame was downloaded to the chip. It's safe for us to clean up
  * the list buffers.
  */
-static void wb_txeof(sc)
+void wb_txeof(sc)
 	struct wb_softc		*sc;
 {
 	struct wb_chain		*cur_tx;
@@ -1479,7 +1475,7 @@ static void wb_txeof(sc)
 /*
  * TX 'end of channel' interrupt handler.
  */
-static void wb_txeoc(sc)
+void wb_txeoc(sc)
 	struct wb_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -1504,7 +1500,7 @@ static void wb_txeoc(sc)
 	return;
 }
 
-static int wb_intr(arg)
+int wb_intr(arg)
 	void			*arg;
 {
 	struct wb_softc		*sc;
@@ -1582,6 +1578,12 @@ static int wb_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, WB_IMR, WB_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		wb_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		wb_start(ifp);
 	}
@@ -1593,7 +1595,7 @@ static int wb_intr(arg)
  * Encapsulate an mbuf chain in a descriptor by coupling the mbuf data
  * pointers to the fragment pointers.
  */
-static int wb_encap(sc, c, m_head)
+int wb_encap(sc, c, m_head)
 	struct wb_softc		*sc;
 	struct wb_chain		*c;
 	struct mbuf		*m_head;
@@ -1687,7 +1689,7 @@ static int wb_encap(sc, c, m_head)
  * physical addresses.
  */
 
-static void wb_start(ifp)
+void wb_start(ifp)
 	struct ifnet		*ifp;
 {
 	struct wb_softc		*sc;
@@ -1713,6 +1715,12 @@ static void wb_start(ifp)
 	start_tx = sc->wb_cdata.wb_tx_free;
 
 	while(sc->wb_cdata.wb_tx_free->wb_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -1782,7 +1790,7 @@ static void wb_start(ifp)
 	return;
 }
 
-static void wb_init(xsc)
+void wb_init(xsc)
 	void			*xsc;
 {
 	struct wb_softc		*sc = xsc;
@@ -1825,8 +1833,8 @@ static void wb_init(xsc)
 
 	/* Init circular RX list. */
 	if (wb_list_rx_init(sc) == ENOBUFS) {
-		printf("wb%d: initialization failed: no "
-			"memory for rx buffers\n", sc->wb_unit);
+		printf("%s: initialization failed: no "
+			"memory for rx buffers\n", sc->sc_dev.dv_xname);
 		wb_stop(sc);
 		(void)splx(s);
 		return;
@@ -1891,7 +1899,7 @@ static void wb_init(xsc)
 /*
  * Set media options.
  */
-static int wb_ifmedia_upd(ifp)
+int wb_ifmedia_upd(ifp)
 	struct ifnet		*ifp;
 {
 	struct wb_softc		*sc;
@@ -1914,7 +1922,7 @@ static int wb_ifmedia_upd(ifp)
 /*
  * Report current media status.
  */
-static void wb_ifmedia_sts(ifp, ifmr)
+void wb_ifmedia_sts(ifp, ifmr)
 	struct ifnet		*ifp;
 	struct ifmediareq	*ifmr;
 {
@@ -1959,7 +1967,7 @@ static void wb_ifmedia_sts(ifp, ifmr)
 	return;
 }
 
-static int wb_ioctl(ifp, command, data)
+int wb_ioctl(ifp, command, data)
 	struct ifnet		*ifp;
 	u_long			command;
 	caddr_t			data;
@@ -2017,7 +2025,7 @@ static int wb_ioctl(ifp, command, data)
 	return(error);
 }
 
-static void wb_watchdog(ifp)
+void wb_watchdog(ifp)
 	struct ifnet		*ifp;
 {
 	struct wb_softc		*sc;
@@ -2030,16 +2038,21 @@ static void wb_watchdog(ifp)
 	}
 
 	ifp->if_oerrors++;
-	printf("wb%d: watchdog timeout\n", sc->wb_unit);
+	printf("%s: watchdog timeout\n", sc->sc_dev.dv_xname);
 
 	if (!(wb_phy_readreg(sc, PHY_BMSR) & PHY_BMSR_LINKSTAT))
-		printf("wb%d: no carrier - transceiver cable problem?\n",
-								sc->wb_unit);
+		printf("%s: no carrier - transceiver cable problem?\n",
+		    sc->sc_dev.dv_xname);
 
 	wb_stop(sc);
 	wb_reset(sc);
 	wb_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		wb_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		wb_start(ifp);
 
@@ -2050,7 +2063,7 @@ static void wb_watchdog(ifp)
  * Stop the adapter and free any mbufs allocated to the
  * RX and TX lists.
  */
-static void wb_stop(sc)
+void wb_stop(sc)
 	struct wb_softc		*sc;
 {
 	register int		i;
@@ -2098,7 +2111,7 @@ static void wb_stop(sc)
  * Stop all chip I/O so that the kernel's probe routines don't
  * get confused by errant DMAs when rebooting.
  */
-static void wb_shutdown(arg)
+void wb_shutdown(arg)
 	void			*arg;
 {
 	struct wb_softc		*sc = (struct wb_softc *)arg;

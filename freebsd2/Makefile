@@ -42,6 +42,8 @@ afterinstall:
 		fi \
 	done
 	cp ${.CURDIR}/INSTALL ${DESTDIR}${PREFIX}/share/doc/kame/INSTALL.freebsd2
+	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev
 
 .include <bsd.subdir.mk>
 .include "../Makefile.inc"

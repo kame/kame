@@ -175,9 +175,9 @@
 #endif
 
 #ifdef ALTQ
-#include <netinet/altq.h>
+#include <altq/altq.h>
 #ifdef AFMAP
-#include <netinet/altq_afmap.h>
+#include <altq/altq_afmap.h>
 #endif
 #endif
 
@@ -236,6 +236,18 @@
 #define BPF_MTAP(ifp, m)		bpf_mtap((ifp)->if_bpf, (m))
 #endif
 #endif /* NBPFILTER > 0 */
+
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the en driver pulls all the packets in the queue.
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 12KB.
+ */
+#define TXBUF_THRESH4ALTQ	(12 * 1024)
+#endif
 
 /*
  * params
@@ -1783,7 +1795,7 @@ struct ifnet *ifp;
 	   * when altq is used, don't dequeue the packet until we
 	   * know we have enough buffer space.  this makes packet
 	   * dropping is done in altq_enqueue.
-	   * also make the internal buffer smaller (20KB instead of 64KB)
+	   * also make the internal buffer smaller (12KB instead of 64KB)
 	   * to keep packets remaining in altq.
 	   */
 	  m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
@@ -1791,7 +1803,7 @@ struct ifnet *ifp;
 	      ap = mtod(m, struct atm_pseudohdr *);
 	      atm_vci = ATM_PH_VCI(ap);
 	      txchan = sc->txvc2slot[atm_vci];
-	      if (sc->txslot[txchan].mbsize > 20*1024)
+	      if (sc->txslot[txchan].mbsize >= TXBUF_THRESH4ALTQ)
 		  return;
 
 	      tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
@@ -1811,7 +1823,7 @@ struct ifnet *ifp;
 	      ap = mtod(m, struct atm_pseudohdr *);
 	      atm_vci = ATM_PH_VCI(ap);
 	      txchan = sc->txvc2slot[atm_vci];
-	      if (sc->txslot[txchan].mbsize > 20*1024)
+	      if (sc->txslot[txchan].mbsize >= EN_TXHIWAT - ATMMTU)
 		      return;
       }
 #endif

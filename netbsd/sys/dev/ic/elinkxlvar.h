@@ -71,6 +71,9 @@ struct ex_softc {
 	struct ex_txdesc *tx_tail;
 	struct ex_txdesc *tx_free;
 	struct ex_txdesc *tx_ftail;
+#ifdef ALTQ
+	int tx_queued;			/* # of active tx chains */
+#endif
 
 	int tx_start_thresh;		/* Current TX_start_thresh.     */
 	int tx_succ_ok;			/* # packets sent in sequence   */

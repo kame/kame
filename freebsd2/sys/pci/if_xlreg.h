@@ -468,6 +468,9 @@ struct xl_chain_data {
 	struct xl_chain		*xl_tx_head;
 	struct xl_chain		*xl_tx_tail;
 	struct xl_chain		*xl_tx_free;
+#ifdef ALTQ
+	int			xl_tx_queued;	/* # of active tx chains */
+#endif
 };
 
 #define XL_RXSTAT_LENMASK	0x00001FFF

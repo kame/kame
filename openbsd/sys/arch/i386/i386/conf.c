@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.51 1999/01/11 14:28:57 niklas Exp $	*/
+/*	$OpenBSD: conf.c,v 1.57 1999/08/13 05:38:05 fgsch Exp $	*/
 /*	$NetBSD: conf.c,v 1.75 1996/05/03 19:40:20 christos Exp $	*/
 
 /*
@@ -41,7 +41,6 @@
 
 #include <machine/conf.h>
 
-#include "wdc.h"
 #include "wd.h"
 bdev_decl(wd);
 bdev_decl(sw);
@@ -54,8 +53,6 @@ bdev_decl(wt);
 #include "st.h"
 #include "cd.h"
 #include "uk.h"
-#include "acd.h"
-bdev_decl(acd);
 #include "mcd.h"
 bdev_decl(mcd);
 #include "vnd.h"
@@ -87,7 +84,7 @@ struct bdevsw	bdevsw[] =
 	bdev_disk_init(NSCD,scd),	/* 15: Sony CD-ROM */
 	bdev_disk_init(NCCD,ccd),	/* 16: concatenated disk driver */
 	bdev_disk_init(NRD,rd),		/* 17: ram disk driver */
-	bdev_disk_init(NACD,acd),	/* 18: ATAPI CD-ROM */
+	bdev_notdef(),			/* 18 */
 	bdev_disk_init(NRAID,raid),	/* 19: RAIDframe disk driver */
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
@@ -131,6 +128,12 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 	(dev_type_stop((*))) enodev, 0, seltrue, \
         dev_init(c,n,mmap) }
 
+/* open, close, read, ioctl */
+#define	cdev_wdt_init(c, n) { \
+	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
+	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
+	(dev_type_stop((*))) enodev, 0, seltrue, (dev_type_mmap((*))) enodev }
+
 
 #define	mmread	mmrw
 #define	mmwrite	mmrw
@@ -148,7 +151,6 @@ cdev_decl(scd);
 #include "vt.h"
 cdev_decl(pc);
 #include "ss.h"
-cdev_decl(acd);
 #include "lpt.h"
 cdev_decl(lpt);
 #include "ch.h"
@@ -187,8 +189,16 @@ cdev_decl(xfs_dev);
 #endif
 #include "bktr.h"
 cdev_decl(bktr);
+#include "wdt.h"
+cdev_decl(wdt);
 #include "ksyms.h"
 cdev_decl(ksyms);   
+#include "usb.h"
+cdev_decl(usb);
+#include "uhid.h"
+cdev_decl(uhid);
+#include "ugen.h"
+cdev_decl(ugen);
 
 #ifdef IPFILTER
 #define NIPF 1
@@ -235,7 +245,7 @@ struct cdevsw	cdevsw[] =
 	cdev_ocis_init(NAPM,apm),	/* 21: Advancded Power Management */
 	cdev_fd_init(1,filedesc),	/* 22: file descriptor pseudo-device */
 	cdev_bpftun_init(NBPFILTER,bpf),/* 23: Berkeley packet filter */
-	cdev_disk_init(NACD,acd),	/* 24: ATAPI CD-ROM */
+	cdev_notdef(),			/* 24 */
 #if 0
 	cdev_ocis_init(NPCMCIA,pcmcia), /* 25: PCMCIA Bus */
 #else
@@ -278,6 +288,20 @@ struct cdevsw	cdevsw[] =
 	cdev_midi_init(NMIDI,midi),	/* 52: MIDI I/O */
 	cdev_midi_init(NSEQUENCER,sequencer),	/* 53: sequencer I/O */
 	cdev_disk_init(NRAID,raid),	/* 54: RAIDframe disk driver */
+	cdev_wdt_init(NWDT,wdt),	/* 55: WDT50x watchdog timer */
+	/* The following slots are reserved for isdn4bsd. */
+	cdev_notdef(),			/* 56: i4b main device */
+	cdev_notdef(),			/* 57: i4b control device */
+	cdev_notdef(),			/* 58: i4b raw b-channel access */
+	cdev_notdef(),			/* 59: i4b trace device */
+	cdev_notdef(),			/* 60: i4b phone device */
+	/* End of reserved slots for isdn4bsd. */
+	cdev_usb_init(NUSB,usb),	/* 61: USB controller */
+	cdev_usbdev_init(NUHID,uhid),	/* 62: USB generic HID */
+	cdev_ugen_init(NUGEN,ugen),	/* 63: USB generic driver */
+#ifdef ALTQ
+	cdev_notdef(),			/* 64: ALTQ */
+#endif
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -421,7 +445,6 @@ static struct {
 	{ "sd", 4 },
 #if 0
 	/* XXX It's not clear at all that recognizing these will help us */
-	{ "acd", 18 },
 	{ "cd", 6 },
 	{ "mcd", 7 },		/* XXX I wonder if any BIOSes support this */
 	{ "scd", 15 }		/* 	-	   "		-	   */

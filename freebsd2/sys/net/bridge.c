@@ -606,10 +606,14 @@ forward:
 			    if (m->m_flags & M_MCAST)
 				    ifp->if_omcasts++;
 			    splx(s);
-			    if (m == *m0)
-				    *m0 = NULL ; /* the packet is gone... */
-			    m = NULL ;
 		    }
+		    /*
+		     * when enqueue fails, mbuf is freed by if_altqenqueue.
+		     * we need to clear m regardless of the return value.
+		     */
+		    if (m == *m0)
+			    *m0 = NULL ; /* the packet is gone... */
+		    m = NULL ;
 	    }
 	    else {
 #endif /* ALTQ */

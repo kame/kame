@@ -114,6 +114,10 @@ extern int ipport_hifirstauto;
 extern int ipport_hilastauto;
 extern struct baddynamicports baddynamicports;
 
+#ifdef ALTQ
+int (*altq_input) __P((struct mbuf *, int)) = NULL;
+#endif
+
 extern	struct domain inetdomain;
 extern	struct protosw inetsw[];
 u_char	ip_protox[IPPROTO_MAX];
@@ -316,6 +320,12 @@ ipv4_input(struct mbuf *m, ...)
 		ipstat.ips_badsum++;
 		goto bad;
 	}
+
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET) == 0)
+		/* packet is dropped by traffic conditioner */
+		return;
+#endif
 
 	/*
 	 * Convert fields to host representation.

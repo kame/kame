@@ -64,9 +64,9 @@
 #endif
 
 #ifdef ALTQ
-#include <netinet/altq.h>
+#include <altq/altq.h>
 #ifdef AFMAP
-#include <netinet/altq_afmap.h>
+#include <altq/altq_afmap.h>
 #endif
 #endif
 

@@ -370,6 +370,9 @@ struct vr_chain_data {
 	struct vr_chain		*vr_tx_head;
 	struct vr_chain		*vr_tx_tail;
 	struct vr_chain		*vr_tx_free;
+#ifdef ALTQ
+	int			vr_tx_queued;	/* # of active tx chains */
+#endif
 };
 
 struct vr_type {

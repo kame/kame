@@ -40,7 +40,7 @@
 
 #include <sys/queue.h>
 #if 1 /* ALTQ */
-#include <net/if_altq.h>
+#include <altq/if_altq.h>
 #endif
 
 /*

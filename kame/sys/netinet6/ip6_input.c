@@ -122,7 +122,7 @@
 #endif
 
 #ifdef ALTQ
-#include <netinet/altq_cdnr.h>
+#include <altq/altq_cdnr.h>
 #endif
 
 #include <netinet6/ip6protosw.h>

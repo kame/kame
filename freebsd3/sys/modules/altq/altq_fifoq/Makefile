@@ -1,5 +1,5 @@
 
-.PATH:	${.CURDIR}/../../../netinet
+.PATH:	${.CURDIR}/../../../altq
 KMOD=	altq_fifoq
 SRCS=	altq_fifoq.c opt_altq.h
 

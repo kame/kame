@@ -187,6 +187,8 @@ pseudo-device faith: ifnet
 pseudo-device gif: ifnet
 pseudo-device dummy: ifnet
 
+pseudo-device altq: ifnet
+
 pseudo-device sequencer
 
 pseudo-device ksyms
@@ -199,6 +201,19 @@ file adosfs/adlookup.c			adosfs
 file adosfs/adutil.c			adosfs
 file adosfs/advfsops.c			adosfs
 file adosfs/advnops.c			adosfs
+file altq/altq_afmap.c			altq
+file altq/altq_blue.c			altq
+file altq/altq_cbq.c			altq
+file altq/altq_cdnr.c			altq
+file altq/altq_conf.c			altq
+file altq/altq_fifoq.c			altq
+file altq/altq_hfsc.c			altq
+file altq/altq_localq.c			altq
+file altq/altq_red.c			altq
+file altq/altq_rio.c			altq
+file altq/altq_rmclass.c		altq
+file altq/altq_subr.c			altq
+file altq/altq_wfq.c			altq
 file ddb/db_access.c			ddb
 file ddb/db_aout.c			ddb
 file ddb/db_break.c			ddb

@@ -75,9 +75,9 @@
 #endif
 
 #ifdef ALTQ
-#include <netinet/altq.h>
+#include <altq/altq.h>
 #ifdef AFMAP
-#include <netinet/altq_afmap.h>
+#include <altq/altq_afmap.h>
 #endif
 #endif
 
@@ -203,34 +203,34 @@ atm_output(ifp, m0, dst, rt0)
 			bcopy(dst->sa_data, &atmdst, sizeof(atmdst));
 			llc_hdr = (struct atmllc *)(dst->sa_data + sizeof(atmdst));
 			break;
-			
+
 		default:
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			printf("%s: can't handle af%d\n", ifp->if_xname, 
-			    dst->sa_family);
+			       dst->sa_family);
 #elif defined(__FreeBSD__) || defined(__bsdi__)
 			printf("%s%d: can't handle af%d\n", ifp->if_name, 
-			    ifp->if_unit, dst->sa_family);
+			       ifp->if_unit, dst->sa_family);
 #endif
 			senderr(EAFNOSUPPORT);
 		}
 
 #if defined(ALTQ) && defined(AFMAP)
 		if (ifp->if_altqflags & ALTQF_DRIVER1) {
-		        /* try to map flow to vpi/vci. */
+			/* try to map flow to vpi/vci. */
 			struct flowinfo flow;
-		        struct afm *afm;
+			struct afm *afm;
 
 			altq_extractflow(m, &pr_hdr, &flow, FIMB_ALL);
-		        if ((afm = afm_match(ifp, &flow)) != NULL) {
-			        /* matching entry found.  overwrite vpi:vci. */
+			if ((afm = afm_match(ifp, &flow)) != NULL) {
+				/* matching entry found.  overwrite vpi:vci. */
 #if 0
 				printf("%s%d: atm_output:afmap vci %d -> %d\n",
 				       ifp->if_name, ifp->if_unit,
 				       ATM_PH_VCI(&atmdst), afm->afm_vci);
 #endif
-			        ATM_PH_VPI(&atmdst) = afm->afm_vpi;
-			        ATM_PH_SETVCI(&atmdst, afm->afm_vci);
+				ATM_PH_VPI(&atmdst) = afm->afm_vpi;
+				ATM_PH_SETVCI(&atmdst, afm->afm_vci);
 
 				afm->afms_packets++;
 				afm->afms_bytes = m->m_pkthdr.len;
@@ -263,7 +263,7 @@ atm_output(ifp, m0, dst, rt0)
 	 */
 #ifdef ALTQ
 	if (ALTQ_IS_ON(ifp)) {
-	        s = splimp();
+		s = splimp();
 		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
 		splx(s);
 		if (error) {
@@ -361,30 +361,30 @@ atm_input(ifp, ah, m, rxhand)
 	  }
 
 #ifdef ATM_PVCEXT
-	  /* atm bridging support */
-	  if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LINK2)) ==
-	      (IFF_POINTOPOINT|IFF_LINK2)) {
-		  struct pvcsif *pvcsif = (struct pvcsif *)ifp;
+	/* atm bridging support */
+	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LINK2)) ==
+		(IFF_POINTOPOINT|IFF_LINK2)) {
+		struct pvcsif *pvcsif = (struct pvcsif *)ifp;
 
-		  if (pvcsif->sif_fwdifp != NULL) {
-			  struct sockaddr dst;
+		if (pvcsif->sif_fwdifp != NULL) {
+			struct sockaddr dst;
 
-			  /* set address family to dummy dst addr */
-			  switch (etype) {
-			  case ETHERTYPE_IP:
-				  dst.sa_family = AF_INET;
-				  break;
-			  case ETHERTYPE_IPV6:
-				  dst.sa_family = AF_INET6;
-				  break;
-			  default:
-				  m_freem(m);
-				  return;
-			  }
-			  atm_output(pvcsif->sif_fwdifp, m, &dst, NULL);
-			  return;
-		  }
-	  }
+			/* set address family to dummy dst addr */
+			switch (etype) {
+			case ETHERTYPE_IP:
+				dst.sa_family = AF_INET;
+				break;
+			case ETHERTYPE_IPV6:
+				dst.sa_family = AF_INET6;
+				break;
+			default:
+				m_freem(m);
+				return;
+			}
+			atm_output(pvcsif->sif_fwdifp, m, &dst, NULL);
+			return;
+		}
+	}
 #endif /* ATM_PVCEXT */
 
 	  switch (etype) {

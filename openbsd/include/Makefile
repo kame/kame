@@ -33,6 +33,7 @@ MFILES+= link.h dlfcn.h
 DIRS=	arpa protocols rpc rpcsvc
 LDIRS=	dev net netinet netinet6 netccitt netiso netns netipx nfs sys ufs vm \
 	ddb scsi netatalk isofs xfs uvm miscfs
+LDIRS+=	altq
 
 # Directories with an includes target
 RDIRS=

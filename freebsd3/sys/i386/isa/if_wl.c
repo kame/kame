@@ -1,4 +1,4 @@
-/* $Id: if_wl.c,v 1.20 1999/01/12 00:36:31 eivind Exp $ */
+/* $FreeBSD: src/sys/i386/isa/if_wl.c,v 1.20.2.2 1999/09/16 07:35:38 roberto Exp $ */
 /* 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -507,6 +507,9 @@ wlattach(struct isa_device *id)
        ifp->if_done
        ifp->if_reset
        */
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
     if_attach(ifp);
     ether_ifattach(ifp);
 
@@ -893,6 +896,12 @@ wlstart(struct ifnet *ifp)
 
     /* get ourselves some data */
     ifp = &(sc->wl_if);
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+    }
+    else
+#endif
     IF_DEQUEUE(&ifp->if_snd, m);
     if (m != (struct mbuf *)0) {
 #if NBPFILTER > 0
@@ -1282,6 +1291,8 @@ wlioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	    }
 	    error = 0;
 	}
+#else
+	wlinit(sc);
 #endif
 	break;
 #endif	/* MULTICAST */

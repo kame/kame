@@ -37,6 +37,9 @@
  */
 
 #include <sys/queue.h>
+#if 1 /* ALTQ */
+#include <altq/if_altq.h>
+#endif
 
 /*
  * Structures defining a network interface, providing a packet
@@ -145,6 +148,17 @@ struct ifnet {				/* and the entries */
 		int	ifq_drops;
 	} if_snd;			/* output queue */
 	struct ifprefix *if_prefixlist; /* linked list of prefixes per if */
+#if 1 /* ALTQ */
+	/* alternate queueing related stuff */
+	int     if_altqtype;            /* queueing scheme id */
+	int     if_altqflags;           /* altq flags (e.g. ready, in-use) */
+	void    *if_altqp;              /* queue state */
+	int     (*if_altqenqueue)
+		__P((struct ifnet *, struct mbuf *, struct pr_hdr *, int));
+	struct mbuf *(*if_altqdequeue)
+		__P((struct ifnet *, int));
+	void    *if_altqcdnr;           /* input traffic conditioner */
+#endif /* ALTQ */
 };
 #define	if_mtu		if_data.ifi_mtu
 #define	if_type		if_data.ifi_type

@@ -37,5 +37,6 @@ afterinstall:
 		fi \
 	done
 	cp ${.CURDIR}/INSTALL ${DESTDIR}${PREFIX}/share/doc/kame/INSTALL.netbsd
-
+	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev
 .include <bsd.subdir.mk>

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fxp.c,v 1.19 1999/02/26 17:05:53 jason Exp $	*/
+/*	$OpenBSD: if_fxp.c,v 1.21 1999/10/14 18:28:39 jason Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -234,6 +234,18 @@ static int tx_threshold = 64;
  */
 #define FXP_NTXCB	128
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the fxp driver can pull as many as 128 packets (when FXP_NTXCB is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 /*
  * Number of completed TX commands at which point an interrupt
  * will be generated to garbage collect the attached buffers.
@@ -323,6 +335,7 @@ fxp_match(parent, match, aux)
 
 	switch (PCI_PRODUCT(pa->pa_id)) {
 	case PCI_PRODUCT_INTEL_82557:
+	case PCI_PRODUCT_INTEL_82559:
 		return (1);
 	}
 
@@ -413,6 +426,9 @@ fxp_attach(parent, self, aux)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	printf(": %s, address %s\n", intrstr,
 	    ether_sprintf(sc->arpcom.ac_enaddr));
@@ -642,6 +658,9 @@ fxp_attach(config_id, unit)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Attach the interface.
@@ -840,7 +859,11 @@ fxp_start(ifp)
 	struct ifnet *ifp;
 {
 	struct fxp_softc *sc = ifp->if_softc;
+#ifdef ALTQ
+	struct fxp_cb_tx *txp = NULL;
+#else
 	struct fxp_cb_tx *txp;
+#endif
 
 	/*
 	 * See if we need to suspend xmit until the multicast filter
@@ -858,14 +881,40 @@ fxp_start(ifp)
 	 * NOTE: One TxCB is reserved to guarantee that fxp_mc_setup() can add
 	 *       a NOP command when needed.
 	 */
+#ifdef ALTQ
+	while (sc->tx_queued < FXP_NTXCB) {
+#else
 	while (ifp->if_snd.ifq_head != NULL && sc->tx_queued < FXP_NTXCB - 1) {
+#endif
 		struct mbuf *m, *mb_head;
 		int segment;
 
 		/*
 		 * Grab a packet to transmit.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			if (sc->tx_queued >= TXBUF_THRESH4ALTQ) {
+				/*
+				 * stop filling tx buffer if we already have
+				 * enough packets to transmit.
+				 * we need an interrupt upon tx complete
+				 * to continue sending.
+				 */
+				if (txp != NULL)
+					txp->cb_command |= FXP_CB_COMMAND_I;
+				break;
+			}
+
+			mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+			IF_DEQUEUE(&ifp->if_snd, mb_head);
+		if (mb_head == NULL)
+			break;
+#else
 		IF_DEQUEUE(&ifp->if_snd, mb_head);
+#endif
 
 		/*
 		 * Get pointer to next available tx desc.
@@ -1015,6 +1064,11 @@ fxp_intr(arg)
 			/*
 			 * Try to start more packets transmitting.
 			 */
+#ifdef ALTQ
+			if (ALTQ_IS_ON(ifp))
+				fxp_start(ifp);
+			else
+#endif
 			if (ifp->if_snd.ifq_head != NULL)
 				fxp_start(ifp);
 		}
@@ -1172,6 +1226,10 @@ fxp_stats_update(arg)
 		sp->rx_rnr_errors = 0;
 		sp->rx_overrun_errors = 0;
 	}
+
+	/* Tick the MII clock. */
+	mii_tick(&sc->sc_mii);
+
 	splx(s);
 	/*
 	 * Schedule another timeout one second from now.

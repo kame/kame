@@ -46,6 +46,8 @@ afterinstall:
 				${DESTDIR}$(PREFIX)/share/doc/kame; \
 		fi \
 	done
+	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev
 
 .include <bsd.subdir.mk>
 .include "../Makefile.inc"

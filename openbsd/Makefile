@@ -36,6 +36,8 @@ afterinstall:
 			cp ../$$i $(PREFIX)/share/doc/kame; \
 		fi \
 	done
+	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+		kame/etc/MAKEDEV.altq /dev
 
 .include <bsd.subdir.mk>
 .include "../Makefile.inc"

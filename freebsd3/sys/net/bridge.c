@@ -813,24 +813,28 @@ forward:
 #ifdef ALTQ
 	    if (ALTQ_IS_ON(ifp)) {
 		    struct pr_hdr pr_hdr;
-
+		    int len, mcast;
+		    
+		    /*
+		     * if_altqenqueue frees mbuf even when it fails.
+		     * it also calls if_start if necessary.
+		     */
+		    if (m == *m0)
+			    *m0 = NULL ; /* original is gone... */
+		    len = m->m_pkthdr.len;
+		    mcast = m->m_flags & M_MCAST;
 		    make_ether_prhdr(m, &pr_hdr);
 		    error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr,
 						   ALTEQ_NORMAL);
 		    if (error) {
 			    IF_DROP(&ifp->if_snd);
-			    MUTE(ifp); /* good measure... */
-			    splx(s);
 		    }
 		    else {
-			    ifp->if_obytes += m->m_pkthdr.len;
-			    if (m->m_flags & M_MCAST)
+			    ifp->if_obytes += len;
+			    if (mcast)
 				    ifp->if_omcasts++;
-			    splx(s);
-			    if (m == *m0)
-				    *m0 = NULL ; /* the packet is gone... */
-			    m = NULL ;
 		    }
+		    splx(s);
 	    }
 	    else {
 #endif /* ALTQ */
@@ -855,11 +859,11 @@ forward:
 		    (*ifp->if_start)(ifp);
 		splx(s);
 	    }
+	    if (m == *m0)
+		*m0 = NULL ;    /* original is gone... */
 #ifdef ALTQ
 	    }
 #endif
-	    if (m == *m0)
-		*m0 = NULL ;    /* original is gone... */
 	    BDG_STAT(ifp, BDG_OUT);
 	}
 	if (once)

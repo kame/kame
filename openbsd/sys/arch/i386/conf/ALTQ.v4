@@ -1,0 +1,36 @@
+include	"arch/i386/conf/GENERIC"
+
+en*	at pci? dev ? function ?	# Midway ATM controller
+
+option		IPFORWARDING	# packet forwarding
+option		NMBCLUSTERS=16384 # Heavy duty Ethernet d00d0
+
+#option		HZ=1000		# Fine tune the clock for CBQ
+# need to fix i386/microtime.s and/or kern/kern_clock.c,
+# and possibly other places (NTP will panic with HZ=1000) on OpenBSD
+
+# a pseudo device needed for ALTQ
+pseudo-device	altq		# altq pseudo-device
+
+# ALTQ options
+option		ALTQ		# alternate queueing
+option		ALTQ_IPSEC	# check IPsec ESP/AH in IPv4
+#option		ALTQ_ECN	# ecn extension to tcp (needs RED)
+#option		ALTQ_DEBUG	# altq debug
+#option		ALTQ_ACCOUNT	# altq accounting
+#option		AFMAP		# ATM flow mapping (needs testing under OpenBSD)
+option		CBQ		# class based queueing
+option		HFSC		# hierarchical fair service curve
+option		WFQ		# weighted fair queueing
+option		FIFOQ		# fifo queueing
+option		RED		# random early detection
+option		RIO		# twin red for diffserv (needs RED)
+option		FLOWVALVE	# flowvalve for RED (needs RED)
+option		CBQ_RED		# red for cbq (needs CBQ and RED)
+option		CBQ_RIO		# rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
+option		LOCALQ		# local use
+option		HFSC_RED	# red for hfsc (needs HFSC and RED)
+option		HFSC_RIO	# rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
+option		CDNR		# diffserv traffic conditioner
+option		BLUE		# blue by wu-chang feng
+

@@ -1,0 +1,82 @@
+.Dd September 28, 1999
+.Dt ALTQD 8
+.Sh NAME
+.Nm altqd
+.Nd ALTQ daemon
+.Sh SYNOPSIS
+.Nm altqd 
+.Op Fl f Ar conf_file
+.Op Fl dvD
+.Sh DESCRIPTION
+.Nm
+is a daemon program that reads a configuration file and then sets up
+the ALTQ state of network interfaces.  After configuring the ALTQ
+state, 
+.Nm
+will detach and become a daemon.
+
+The signal SIGINT or SIGTERM will shutdown 
+.Nm
+, and the signal SIGHUP will restart 
+.Nm
+\&.
+.Pp
+The following options are available:
+.Bl -tag -width Fl -offset indent
+.It Fl f
+Specify a configuration file to read instead of the default.  The
+default file is 
+.Pa /etc/altq.conf
+\&.
+.It Fl d
+Debug mode. 
+.Nm
+does not detach and goes into the command mode.
+.It Fl v
+Print debugging information.  This option implies 
+.Fl d
+\&.
+.It Fl D
+Dummy mode.  
+.Nm
+does not issue altq system calls.
+.El
+
+.Sh COMMANDS
+When 
+.Fl d
+option is provided, 
+.Nm 
+goes into the command mode after reading the configuration file and
+setting up the ALTQ state.  Each command is a single line, starting
+with the command verb.
+.Pp
+The basic commands are as follows:
+.Bl -tag -width help -offset indent
+.It Sy help Em or Sy ?
+Display a complete list of commands and their syntax.
+.It Sy quit
+Exit.
+.It Sy altq reload
+reload the configuration file and reinitialize ALTQ.
+.It Sy altq Em iface_name Op enable|disable
+Enables or disables ALTQ on the interface named 
+.Em iface_name.
+When 
+.Nm
+enters the command mode, ALTQ is enabled on all the
+interfaces listed in the configuration file.
+.It Sy altq Em iface_name Op acc enable|disable
+Enables or disables the ALTQ accounting mode on the interface named
+.Em iface_name.
+When 
+.Nm
+enters the command mode, the ALTQ accounting mode is disabled.
+.El
+
+.Sh FILES
+.Pa /etc/altq.conf , 
+.Pa /var/run/altqd.pid
+.Pa /var/run/altq_quip
+.Sh SEE ALSO
+.Xr altq.conf 5

@@ -102,6 +102,18 @@
 #include <dev/ic/elinkxlreg.h>
 #include <dev/ic/elinkxlvar.h>
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the ex driver can pull as many as 256 packets (when EX_NDPD is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 #ifdef DEBUG
 int exdebug = 0;
 #endif
@@ -400,6 +412,9 @@ ex_config(sc)
 	ifp->if_watchdog = ex_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	if_attach(ifp);
 	ether_ifattach(ifp, macaddr);
@@ -909,13 +924,34 @@ ex_start(ifp)
 	 * We're finished if there is nothing more to add to the list or if
 	 * we're all filled up with buffers to transmit.
 	 */
+#ifdef ALTQ
+	while (((ALTQ_IS_ON(ifp)) || ifp->if_snd.ifq_head != NULL)
+	       && sc->tx_free != NULL) {
+#else
 	while (ifp->if_snd.ifq_head != NULL && sc->tx_free != NULL) {
+#endif
 		struct mbuf *mb_head;
 		int segment, error;
 
 		/*
 		 * Grab a packet to transmit.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			if (sc->tx_queued >= TXBUF_THRESH4ALTQ) {
+				/*
+				 * stop filling tx buffer if we already have
+				 * enough packets to transmit.
+				 */
+				break;
+			}
+
+			mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+			if (mb_head == NULL)
+				break;
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, mb_head);
 
 		/*
@@ -925,6 +961,9 @@ ex_start(ifp)
 		sc->tx_free = txp->tx_next;
 		txp->tx_next = NULL;
 		dmamap = txp->tx_dmamap;
+#ifdef ALTQ
+		sc->tx_queued++;
+#endif
 
 		/*
 		 * Go through each of the mbufs in the chain and initialize
@@ -1114,6 +1153,9 @@ ex_intr(arg)
 					bus_dmamap_unload(sc->sc_dmat, txmap);
 					m_freem(txp->tx_mbhead);
 					txp->tx_mbhead = NULL;
+#ifdef ALTQ
+					sc->tx_queued--;
+#endif
 				}
 				ptxp = txp;
 			}
@@ -1234,6 +1276,12 @@ ex_intr(arg)
 	}
 	if (ret) {
 		bus_space_write_2(iot, ioh, ELINK_COMMAND, C_INTR_LATCH);
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			ex_start(ifp);
+		}
+		else
+#endif
 		if (ifp->if_snd.ifq_head != NULL)
 			ex_start(ifp);
 	}
@@ -1500,6 +1548,9 @@ ex_init_txdescs(sc)
 	}
 	sc->tx_free = &sc->sc_txdescs[0];
 	sc->tx_ftail = &sc->sc_txdescs[EX_NDPD-1];
+#ifdef ALTQ
+	sc->tx_queued = 0;
+#endif
 }
 
 
