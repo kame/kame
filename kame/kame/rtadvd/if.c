@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.23 2003/01/08 05:28:07 suz Exp $	*/
+/*	$KAME: if.c,v 1.24 2003/01/08 08:47:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,9 +63,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <net/if_stf.h>
 #include "rtadvd.h"
 #include "if.h"
-#include <net/if_stf.h>
 
 #define ROUNDUP(a, size) \
 	(((a) & ((size)-1)) ? (1 + ((a) | ((size)-1))) : (a))
@@ -627,7 +627,7 @@ int
 is_isatap(struct rainfo *rai)
 {
 #ifndef ISATAP
-	return 0
+	return 0;
 #else
 	struct ifreq ifr;
 	int s;
@@ -642,14 +642,14 @@ is_isatap(struct rainfo *rai)
 
 	memset(&ifr, 0, sizeof(ifr));
 	memcpy(ifr.ifr_name, rai->ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFPHYS, (caddr_t)&ifr) < 0) {
-		syslog(LOG_DEBUG, "<%s> ioctl:SIOCGIFPHYS: failed for %s",
+	if (ioctl(s, SIOCGSTFMODE, (caddr_t)&ifr) < 0) {
+		syslog(LOG_DEBUG, "<%s> ioctl:SIOCGSTFMODE: failed for %s",
 		       __func__, ifr.ifr_name);
 		close(s);
 		return 0;
 	}
 	close(s);
-	return (ifr.ifr_phys == STFM_ISATAP);
+	return ((int)ifr.ifr_data == STFM_ISATAP);
 #endif /* ISATAP */
 }
 

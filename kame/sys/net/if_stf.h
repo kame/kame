@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.h,v 1.6 2003/01/08 05:25:56 suz Exp $	*/
+/*	$KAME: if_stf.h,v 1.7 2003/01/08 08:47:23 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,9 +32,13 @@
 #ifndef _NET_IF_STF_H_
 #define _NET_IF_STF_H_
 
-#define ISATAP 1
-
 #ifdef _KERNEL
+
+#include "stf.h"
+#if NSTF == 2
+#define ISATAP
+#endif
+
 struct stf_softc {
 	/* if_physical determines stf to work in 6to4 or ISATAP */
 	struct ifnet	sc_if;	   /* common area */
@@ -46,6 +50,7 @@ struct stf_softc {
 	} __sc_ro46;
 #define sc_ro	__sc_ro46.__sc_ro4
 	const struct encaptab *encap_cookie;
+	int sc_mode;	/* 6to4 or ISATAP */
 	LIST_ENTRY(stf_softc) sc_list; /* all stf's are linked */
 };
 
@@ -75,11 +80,11 @@ struct isatap_rtr {
 #ifdef _KERNEL
 #define STF_IS_6TO4(x) \
 	((((struct stf_softc *) (x))->sc_if.if_type == IFT_STF) && \
-	 (((struct stf_softc *) (x))->sc_if.if_physical == STFM_6TO4))
+	 (((struct stf_softc *) (x))->sc_mode == STFM_6TO4))
 #ifdef ISATAP
 #define STF_IS_ISATAP(x) \
 	((((struct stf_softc *) (x))->sc_if.if_type == IFT_STF) && \
-	 (((struct stf_softc *) (x))->sc_if.if_physical == STFM_ISATAP))
+	 (((struct stf_softc *) (x))->sc_mode == STFM_ISATAP))
 #else
 #define STF_IS_ISATAP(x)  0	/* disable ISATAP */
 #endif
@@ -90,5 +95,8 @@ void in_stf_input __P((struct mbuf *, int));
 void in_stf_input __P((struct mbuf *, ...));
 #endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
+#ifndef __FreeBSD__
+extern int fill_isatap_rtrlist __P((void *, size_t *, size_t));
+#endif
 #endif /* _KERNEL */
 #endif /* _NET_IF_STF_H_ */

@@ -899,15 +899,17 @@ setisatapmode(mode, param, s, afp)
 	int s;
 	const struct afswtch *afp;
 {
+	int isatapmode;
 	if (strcasecmp(mode, "on") == 0)
-		ifr.ifr_phys = STFM_ISATAP;
+		isatapmode = STFM_ISATAP;
 	else if (strcasecmp(mode, "off") == 0)
-		ifr.ifr_phys = STFM_6TO4;
+		isatapmode = STFM_6TO4;
 	else
 		err(1, "syntax error");
 
-	if (ioctl(s, SIOCSIFPHYS, (caddr_t) &ifr) < 0)
-		err(1, "SIOCSIFPHYS");
+	memcpy(&ifr.ifr_data, &isatapmode, sizeof(isatapmode));
+	if (ioctl(s, SIOCSSTFMODE, (caddr_t) &ifr) < 0)
+		err(1, "SIOCSSTFMODE");
 }
 
 void
@@ -1446,9 +1448,9 @@ isatap_status(s, rt)
 	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
 
 	/* just skip if it is not an ISATAP interface */
-	if (ioctl(s, SIOCGIFPHYS, (caddr_t) &ifr) < 0)
+	if (ioctl(s, SIOCGSTFMODE, (caddr_t) &ifr) < 0)
 		return;
-	if (ifr.ifr_phys != STFM_ISATAP) {
+	if ((int) ifr.ifr_data != STFM_ISATAP) {
 		printf("\tisatapmode off\n");
 		return;
 	}

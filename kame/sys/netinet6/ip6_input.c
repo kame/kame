@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.298 2003/01/08 05:25:57 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.299 2003/01/08 08:47:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,6 +141,8 @@
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
+
+#include <net/if_stf.h>
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #include <netinet6/ipsec.h>
@@ -2343,8 +2345,10 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    &ip6_use_defzone);
 	case IPV6CTL_MAXFRAGS:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_maxfrags);
+#ifdef ISATAP
 	case IPV6CTL_ISATAPRTR:
 		return fill_isatap_rtrlist(oldp, oldlenp, newlen);
+#endif
 	default:
 		return EOPNOTSUPP;
 	}
@@ -2402,8 +2406,10 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    sizeof(rip6stat));
 	case IPV6CTL_ADDRCTLPOLICY:
 		return in6_src_sysctl(oldp, oldlenp, newp, newlen);
+#ifdef ISATAP
 	case IPV6CTL_ISATAPRTR:
 		return fill_isatap_rtrlist(oldp, oldlenp, newlen);
+#endif
 	default:
 		return (sysctl_int_arr(ip6_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen));

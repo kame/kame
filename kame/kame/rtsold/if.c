@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.20 2003/01/08 05:28:07 suz Exp $	*/
+/*	$KAME: if.c,v 1.21 2003/01/08 08:47:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,11 +69,10 @@
 #ifdef HAVE_GETIFADDRS
 #include <ifaddrs.h>
 #endif
+#include "rtsold.h"
 #ifdef ISATAP
 #include <net/if_stf.h>
 #endif
-
-#include "rtsold.h"
 
 extern int rssock;
 static int ifsock;
@@ -480,14 +479,14 @@ is_isatap(struct ifinfo *ifinfo)
 
 	memset(&ifr, 0, sizeof(ifr));
 	memcpy(ifr.ifr_name, ifinfo->ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFPHYS, (caddr_t)&ifr) < 0) {
+	if (ioctl(s, SIOCGSTFMODE, (caddr_t)&ifr) < 0) {
 		warnmsg(LOG_DEBUG, __func__,
-			"ioctl:SIOCGIFPHYS: failed for %s", ifr.ifr_name);
+			"ioctl:SIOCGSTFMODE: failed for %s", ifr.ifr_name);
 		close(s);
 		return 0;
 	}
 	close(s);
-	return (ifr.ifr_phys == STFM_ISATAP);
+	return ((int) ifr.ifr_data == STFM_ISATAP);
 #endif /* ISATAP */
 }
 

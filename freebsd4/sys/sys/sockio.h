@@ -127,6 +127,8 @@
 #define	SIOCDIFPHYADDR	 _IOW('i', 73, struct ifreq)	/* delete gif addrs */
 #define	SIOCSLIFPHYADDR	 _IOW('i', 74, struct if_laddrreq) /* set gif addrs */
 #define	SIOCGLIFPHYADDR	_IOWR('i', 75, struct if_laddrreq) /* get gif addrs */
+#define	SIOCGSTFMODE	_IOWR('i', 76, struct ifreq)	/* get stf mode */
+#define	SIOCSSTFMODE	 _IOW('i', 77, struct ifreq)	/* set stf mode */
 
 #define	SIOCSIFGENERIC	 _IOW('i', 57, struct ifreq)	/* generic IF set op */
 #define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */

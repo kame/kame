@@ -1,4 +1,4 @@
-/*	$KAME: if.h,v 1.8 2003/01/08 05:28:07 suz Exp $	*/
+/*	$KAME: if.h,v 1.9 2003/01/08 08:47:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -30,6 +30,12 @@
  */
 
 #define RTADV_TYPE2BITMASK(type) (0x1 << type)
+
+#ifdef SIOCGSTFMODE
+#ifndef ISATAP
+#define ISATAP
+#endif
+#endif
 
 extern struct if_msghdr **iflist;
 extern size_t ifblock_size;

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.93 2003/01/08 05:25:56 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.94 2003/01/08 08:47:23 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -224,8 +224,7 @@ static int stf_ioctl __P((struct ifnet *, u_long, caddr_t));
 #ifdef __FreeBSD__
 static int fill_isatap_rtrlist __P((struct sysctl_req *));
 #else
-static int stf_sysctl __P((int, void *, size_t *, void *, size_t));
-static int fill_isatap_rtrlist __P((void *, size_t *, size_t));
+int fill_isatap_rtrlist __P((void *, size_t *, size_t));
 #endif
 
 void
@@ -283,12 +282,12 @@ stfattach(dummy)
 
 		/* XXX: hardcoding */
 		if (i == 0) {
-			sc->sc_if.if_physical = STFM_6TO4; 
+			sc->sc_mode = STFM_6TO4; 
 			sc->sc_if.if_flags &= ~IFF_MULTICAST;
 			/* just for backward compatibility */
 		}
 		if (i == 1) {
-			sc->sc_if.if_physical = STFM_ISATAP;
+			sc->sc_mode = STFM_ISATAP;
 			sc->sc_if.if_flags |= IFF_MULTICAST;
 		}
 
@@ -1210,19 +1209,20 @@ stf_ioctl(ifp, cmd, data)
 			error = EAFNOSUPPORT;
 		break;
 
-	case SIOCGIFPHYS:
-		ifr->ifr_phys = sc->sc_if.if_physical;
+	case SIOCGSTFMODE:
+		bcopy(&sc->sc_mode, &ifr->ifr_data, sizeof(sc->sc_mode));
 		break;
 		
-	case SIOCSIFPHYS:
+	case SIOCSSTFMODE:
 		/* multiple ISATAP/6to4 interface can cause confusion */
 		LIST_FOREACH(scp, &stf_softc_list, sc_list) {
-			if (scp->sc_if.if_physical == ifr->ifr_phys) {
+			if (bcmp(&sc->sc_mode, &ifr->ifr_data,
+				 sizeof(sc->sc_mode)) == 0) {
 				error = EEXIST;
 				return error;
 			}
 		}
-		sc->sc_if.if_physical = ifr->ifr_phys;
+		bcopy(&ifr->ifr_data, &sc->sc_mode, sizeof(sc->sc_mode));
 		/* 
 		 * implementation following old ISATAP spec sends RS toward
 		 * ff02::2.  To receive this RS, ISATAP stf has to be multicast-
@@ -1342,7 +1342,7 @@ stf_sysctl_isatap_rtrlist SYSCTL_HANDLER_ARGS
 
 
 #ifndef __FreeBSD__
-static int
+int
 fill_isatap_rtrlist(oldp, oldlenp, ol)
 	void *oldp;
 	size_t *oldlenp, ol;

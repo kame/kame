@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.h,v 1.15 2003/01/08 05:28:07 suz Exp $	*/
+/*	$KAME: rtsold.h,v 1.16 2003/01/08 08:47:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,6 +28,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#ifdef SIOCGSTFMODE
+#ifndef ISATAP
+#define ISATAP
+#endif
+#endif
 
 struct ifinfo {
 	struct ifinfo *next;	/* pointer to the next interface */
