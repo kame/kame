@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.23 2001/06/25 07:14:54 sumikawa Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.24 2001/06/26 02:08:40 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -120,6 +120,9 @@ MALLOC_DEFINE(M_IP6FW, "Ip6Fw/Ip6Acct", "Ip6Fw/Ip6Acct chain's");
 #endif
 #endif
 
+#ifndef LOG_SECURITY
+#define LOG_SECURITY LOG_AUTH
+#endif
 static int fw6_debug = 1;
 #ifdef IPV6FIREWALL_VERBOSE
 static int fw6_verbose = 1;
