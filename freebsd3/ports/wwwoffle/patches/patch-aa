@@ -1,0 +1,80 @@
+--- Makefile.orig	Wed Sep  1 23:19:03 1999
++++ Makefile	Tue Oct 26 13:17:51 1999
+@@ -16,9 +16,9 @@
+ 
+ LOCALHOST=localhost:8080
+ 
+-INSTDIR=/usr/local
+-SPOOLDIR=/var/spool/wwwoffle
+-CONFDIR=/var/spool/wwwoffle
++INSTDIR=${PREFIX}
++SPOOLDIR=/var/wwwoffle
++CONFDIR=${PREFIX}/etc/wwwoffle
+ 
+ # For Cygwin (win32)
+ #INSTDIR=/wwwoffle
+@@ -37,13 +37,13 @@
+ ########
+ 
+ CC=gcc
+-CFLAGS=-O2 -Wall -g
++CFLAGS=-O2 -Wall
+ 
+ # This is used in the FreeBSD port (http://www.freebsd.org/ports/)
+ #CFLAGS=-O2 -Wall
+ 
+ LD=gcc
+-LDFLAGS=-g
++LDFLAGS=-s
+ 
+ # For HP/UX this is a good idea.
+ #LDFLAGS=
+@@ -56,7 +56,7 @@
+ ########
+ 
+ INCLUDE=
+-LIBRARY=
++LIBRARY=	-L/usr/local/v6/lib -linet6
+ 
+ # For Solaris you need the following instead.
+ #LIBRARY=-lnsl -lsocket
+@@ -272,25 +272,25 @@
+ 	$(INSTALL) -c -m 644 wwwoffle.conf.man.install $(INSTDIR)/man/man5/wwwoffle.conf.5
+ 	[ -x $(INSTDIR)/man/man8 ] || $(INSTALL) -d $(INSTDIR)/man/man8
+ 	$(INSTALL) -c -m 644 wwwoffled.man $(INSTDIR)/man/man8/wwwoffled.8
+-	[ -x $(INSTDIR)/doc/wwwoffle ] || $(INSTALL) -d $(INSTDIR)/doc/wwwoffle
++	[ -x $(INSTDIR)/share/doc/wwwoffle ] || $(INSTALL) -d $(INSTDIR)/share/doc/wwwoffle
+ 	for file in CHANGES.CONF CONVERT COPYING FAQ INSTALL NEWS README* UPGRADE ; do \
+-	  $(INSTALL) -c -m 644 $$file $(INSTDIR)/doc/wwwoffle/$$file ;\
++	  $(INSTALL) -c -m 644 $$file $(INSTDIR)/share/doc/wwwoffle/$$file ;\
+ 	done
+ 	[ "x$(LANG)" = "x" ] || [ ! -d lang-$(LANG) ] || ( cd lang-$(LANG) && \
+ 	  for file in CHANGES.CONF CONVERT COPYING FAQ INSTALL NEWS README* UPGRADE ; do \
+-	    [ ! -f $$file ] || $(INSTALL) -c -m 644 $$file $(INSTDIR)/doc/wwwoffle/$$file-$(LANG) ;\
++	    [ ! -f $$file ] || $(INSTALL) -c -m 644 $$file $(INSTDIR)/share/doc/wwwoffle/$$file-$(LANG) ;\
+ 	  done )
+ 
+ 
+ install_doc-win32 :
+ 	[ -x $(INSTDIR)/doc ] || $(INSTALL) -d $(INSTDIR)/doc
+ 	for file in CHANGES.CONF COPYING FAQ INSTALL NEWS README* ; do \
+-	  $(INSTALL) -c -m 644 $$file $(INSTDIR)/doc/$$file ;\
++	  $(INSTALL) -c -m 644 $$file $(INSTDIR)/share/doc/$$file ;\
+ 	done
+ 	$(INSTALL) -c -m 644 README.win32 $(CONFDIR)/README.win32
+ 	[ "x$(LANG)" = "x" ] || [ ! -d lang-$(LANG) ] || ( cd lang-$(LANG) && \
+ 	  for file in CHANGES.CONF COPYING FAQ INSTALL NEWS README* ; do \
+-	    [ ! -f $$file ] || $(INSTALL) -c -m 644 $$file $(INSTDIR)/doc/wwwoffle/$$file-$(LANG) ;\
++	    [ ! -f $$file ] || $(INSTALL) -c -m 644 $$file $(INSTDIR)/share/doc/wwwoffle/$$file-$(LANG) ;\
+ 	  done )
+ 
+ install_cache : endian-cache
+@@ -348,7 +348,7 @@
+ 	[    -f $(CONFDIR)/wwwoffle.conf ] || $(INSTALL) -c -m 640 wwwoffle.conf.install $(CONFDIR)/wwwoffle.conf
+ 
+ install_fixup-win32:
+-	for file in $(INSTDIR)/doc/* $(CONFDIR)/README.win32 ; do \
++	for file in $(INSTDIR)/share/doc/* $(CONFDIR)/README.win32 ; do \
+ 	  [ -f $$file ] && awk '{print $$0 "\r";}' < $$file > $$file.txt && rm -f $$file ;\
+ 	done
+ 	for file in $(CONFDIR)/wwwoffle.conf ; do \
