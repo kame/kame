@@ -87,7 +87,7 @@ main(argc, argv)
 		warn("setsockopt(IPV6_HOPLIMIT %d)", hlim); /* assert? */
 	}
 
-	if (connect(s, res->ai_addr, res->ai_addr->sa_len) < 0)
+	if (connect(s, res->ai_addr, res->ai_addrlen) < 0)
 		err(1, "connect");
 
 	printf("connect OK\n");
