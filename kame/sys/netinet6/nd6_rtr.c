@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.71 2001/01/23 18:07:24 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.72 2001/01/24 03:10:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1438,12 +1438,12 @@ in6_ifadd(ifp, in6, addr, prefixlen, onlink, vltime, pltime)
 	in6_len2mask(&mask, prefixlen);
 
 	/*
-	 * find link-local address (will be interface ID).
+	 * find a link-local address (will be interface ID).
 	 * Is it really mandatory? Theoretically, a global or a site-local
 	 * address can be configured without a link-local address, if we
 	 * have a unique interface identifier...
 	 *
-	 * it is not mandatory to have link-local address, we can generate
+	 * it is not mandatory to have a link-local address, we can generate
 	 * interface identifier on the fly.  we do this because:
 	 * (1) it should be the easiest way to find interface identifier.
 	 * (2) RFC2462 5.4 suggesting the use of the same interface identifier
