@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.58 2002/09/08 01:12:30 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.59 2003/04/18 08:21:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -281,7 +281,7 @@ daemon_main(int argc, char **argv)
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_family = family;
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = 0;
+	hints.ai_protocol = IPPROTO_TCP;	/* SCTP? */
 	error = getaddrinfo(NULL, service, &hints, &res);
 	if (error)
 		exit_failure("getaddrinfo: %s", gai_strerror(error));
