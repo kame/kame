@@ -1023,7 +1023,7 @@ in_addmulti(ap, ifp)
 				(inm, newhead, newmode, newnumsrc)) > 0) {
 		    /* State-Change Report will not be sent. Just return
 		     * immediately. */
-		    /* Each ias linked from newhead is used by new curnead,
+		    /* Each ias linked from newhead is used by new curhead,
 		     * so only newhead is freed. */
 		    FREE(newhead, M_MSFILTER);
 		    *error = 0; /* to make caller behave as normal */
