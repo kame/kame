@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.139 2001/08/14 14:51:35 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.140 2001/08/16 06:29:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -588,9 +588,17 @@ t2isakmpsa(trns, sa)
 			int type = (int)ntohs(d->lorv);
 			switch (type) {
 			case OAKLEY_ATTR_SA_LD_TYPE_SEC:
-			case OAKLEY_ATTR_SA_LD_TYPE_KB:
 				life_t = type;
 				break;
+			case OAKLEY_ATTR_SA_LD_TYPE_KB:
+#if 0
+				life_t = type;
+				break;
+#else
+				plog(LLV_ERROR, LOCATION, NULL,
+				    "byte lifetime not supported\n");
+				break;
+#endif
 			default:
 				life_t = OAKLEY_ATTR_SA_LD_TYPE_DEFAULT;
 				break;
@@ -616,6 +624,7 @@ t2isakmpsa(trns, sa)
 					goto err;
 				}
 				break;
+#if 0
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
 				sa->lifebyte = ipsecdoi_set_ld(val);
 				vfree(val);
@@ -625,6 +634,7 @@ t2isakmpsa(trns, sa)
 					goto err;
 				}
 				break;
+#endif
 			default:
 				vfree(val);
 				plog(LLV_ERROR, LOCATION, NULL,
@@ -1973,7 +1983,9 @@ check_attr_isakmp(trns)
 		case OAKLEY_ATTR_SA_LD_TYPE:
 			switch (lorv) {
 			case OAKLEY_ATTR_SA_LD_TYPE_SEC:
+#if 0
 			case OAKLEY_ATTR_SA_LD_TYPE_KB:
+#endif
 				break;
 			default:
 				plog(LLV_ERROR, LOCATION, NULL,
@@ -2135,7 +2147,9 @@ ahmismatch:
 
 			switch (lorv) {
 			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
+#if 0
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
+#endif
 				break;
 			default:
 				plog(LLV_ERROR, LOCATION, NULL,
@@ -2271,7 +2285,9 @@ check_attr_ipcomp(trns)
 
 			switch (lorv) {
 			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
+#if 0
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
+#endif
 				break;
 			default:
 				plog(LLV_ERROR, LOCATION, NULL,
@@ -3608,9 +3624,17 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			int type = ntohs(d->lorv);
 			switch (type) {
 			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
-			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
 				life_t = type;
 				break;
+			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
+#if 0
+				life_t = type;
+				break;
+#else
+				plog(LLV_ERROR, LOCATION, NULL,
+				    "byte lifetime not supported\n");
+				break;
+#endif
 			default:
 				plog(LLV_WARNING, LOCATION, NULL,
 					"invalid life duration type. "
@@ -3674,6 +3698,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 					goto end;
 				}
 				break;
+#if 0
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
 				t = ipsecdoi_set_ld(ld_buf);
 				vfree(ld_buf);
@@ -3694,6 +3719,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 					goto end;
 				}
 				break;
+#endif
 			default:
 				vfree(ld_buf);
 				plog(LLV_ERROR, LOCATION, NULL,
