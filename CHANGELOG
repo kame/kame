@@ -1,6 +1,13 @@
-$KAME: CHANGELOG,v 1.2459 2003/08/18 18:32:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2460 2003/08/20 13:34:17 keiichi Exp $
 
 <200308>
+Wed Aug 20 22:31:22 JST 2003	keiichi@iij.ad.jp
+	* kame/kame/sys/netinet6/mip6_mncore.c,mip6_mncore.h,mip6_icmp6.c
+	  kame/kame/sys/netinet6/nd6.c
+	  kame/kame/kame/had/mpa.c
+	sending/receiving Mobile Prefix Solicitation/Advertisement is
+	supported.
+
 2003-08-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6relay.c: fixed a missing initialization.
 	Without this fix, dhcp6relay could crash when it has no global
