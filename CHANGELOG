@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1169 2000/07/31 19:06:53 sakane Exp $
+$KAME: CHANGELOG,v 1.1170 2000/08/01 13:59:28 jinmei Exp $
 
 <200007>
+2000-08-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netiso/tp_inet.c (tpip_output_dg):
+	* bsdi4/sys/netiso/tp_inet.c (tpip_ctlinput):
+	adjusted arguments to ip_output() and in_pcbnotify() for the
+	KAME code.
+
 Tue Aug  1 04:03:29 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	No weak key check perform on racoon.  She leaves this check to kernel.
