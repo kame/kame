@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.55 2002/10/25 05:11:05 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.56 2002/11/01 03:31:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -755,7 +755,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 		    && SA6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
 			/* home registration. */
 			mbu->mbu_paddr = mha_prefered->mha_gaddr;
-			if ((mbu->mbu_state & MIP6_BU_STATE_WAITSENT) != 0) {
+			if (!MIP6_IS_BU_BOUND_STATE(mbu)) {
 				if (mip6_bu_send_bu(mbu)) {
 					mip6log((LOG_ERR,
 						 "%s:%d: "

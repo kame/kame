@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.55 2002/08/05 11:49:17 k-sugyou Exp $	*/
+/*	$KAME: mip6.h,v 1.56 2002/11/01 03:31:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -69,6 +69,7 @@ struct mip6_req {
 #define MIP6_DHAAD_RETRIES         3
 #define MIP6_BA_INITIAL_TIMEOUT    1
 #define MIP6_BA_MAX_TIMEOUT        256
+#define MIP6_BU_MAX_BACKOFF        7
 
 /* Binding Ack status code. */
 #define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */

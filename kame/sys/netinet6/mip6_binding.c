@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.146 2002/10/25 05:11:05 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.147 2002/11/01 03:31:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -276,12 +276,6 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	if (mbu->mbu_expire < time_second)
 		mbu->mbu_expire = 0x7fffffff;
 	mbu->mbu_refresh = mbu->mbu_lifetime;
-	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-	/* sanity check for overflow */
-	if (mbu->mbu_refexpire < time_second)
-		mbu->mbu_refexpire = 0x7fffffff;
-	mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
-	mbu->mbu_retrans = time_second + mbu->mbu_acktimeout;
 	/* Sequence Number SHOULD start at a random value */
 	mbu->mbu_seqno = (u_int16_t)arc4random();
 	mbu->mbu_hif = sc;
@@ -411,60 +405,100 @@ mip6_home_registration(sc)
 				 */
 
 				mip6_bu_list_insert(&sc->hif_bu_list, mbu);
+
+				/* XXX */
+				if (sc->hif_location != HIF_LOCATION_HOME)
+					mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_MOVEMENT,
+					    NULL);
+				else
+					mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME,
+					    NULL);
 			} else {
-				/* exist */
-				int32_t coa_lifetime, prefix_lifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-				long time_second = time.tv_sec;
-#endif
-
-				/*
-				 * a binding update entry exists.
-				 * update information.
-				 */
-
-				/* update coa. */
-				if (sc->hif_location == HIF_LOCATION_HOME) {
-					/* un-registration. */
-					mbu->mbu_coa = mbu->mbu_haddr;
-					mbu->mbu_pri_fsm_state
-					    = MIP6_BU_PRI_FSM_STATE_WAITD;
-				} else {
-					/* registration. */
-					mbu->mbu_coa = hif_coa;
-					mbu->mbu_pri_fsm_state
-					    = MIP6_BU_PRI_FSM_STATE_WAITA;
-				}
-
-				/* update lifetime. */
-				coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa.sin6_addr);
-				prefix_lifetime = mip6_subnet_prefix_list_get_minimum_lifetime(&ms->ms_mspfx_list);
-				if (coa_lifetime < prefix_lifetime) {
-					mbu->mbu_lifetime = coa_lifetime;
-				} else {
-					mbu->mbu_lifetime = prefix_lifetime;
-				}
-				mbu->mbu_expire
-					= time_second + mbu->mbu_lifetime;
-				/* sanity check for overflow */
-				if (mbu->mbu_expire < time_second)
-					mbu->mbu_expire = 0x7fffffff;
-				mbu->mbu_refresh = mbu->mbu_lifetime;
-				mbu->mbu_refexpire
-					= time_second + mbu->mbu_refresh;
-				/* sanity check for overflow */
-				if (mbu->mbu_refexpire < time_second)
-					mbu->mbu_refexpire = 0x7fffffff;
-				mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
-				mbu->mbu_retrans
-					= time_second + mbu->mbu_acktimeout;
-				/* mbu->mbu_flags |= IP6MU_DAD ;*/
+				if (sc->hif_location != HIF_LOCATION_HOME)
+					mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_MOVEMENT,
+					    NULL);
+				else
+					mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME,
+					    NULL);
 			}
-			mbu->mbu_state |= (MIP6_BU_STATE_WAITACK|MIP6_BU_STATE_WAITSENT);
 		}
 	}
 
 	return (0);
+}
+
+int
+mip6_home_registration2(mbu)
+	struct mip6_bu *mbu;
+{
+	int error;
+	struct hif_subnet *hs;
+	struct mip6_subnet *ms;
+	int32_t coa_lifetime, prefix_lifetime;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	struct timeval mono_time;
+#endif
+
+	/* sanity check. */
+	if (mbu == NULL)
+		return (EINVAL);
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	mono_time.tv_sec = time_second;
+#endif
+
+	/*
+	 * a binding update entry exists. update information.
+	 */
+
+	/* update CoA. */
+	if (mbu->mbu_hif->hif_location == HIF_LOCATION_HOME) {
+		/* home de-registration. */
+		mbu->mbu_coa = mbu->mbu_haddr;
+	} else {
+		/* home registration. */
+		mbu->mbu_coa = hif_coa;
+	}
+
+	/* XXX */
+	ms = NULL;
+	for (hs = TAILQ_FIRST(&mbu->mbu_hif->hif_hs_list_home);
+	     hs;
+	     hs = TAILQ_NEXT(hs, hs_entry)) {
+		if ((ms = hs->hs_ms) == NULL) {
+			/* must not happen. */
+			return (EINVAL);
+		} else {
+			break;
+		}
+	}
+	if (ms == NULL)
+		return (EINVAL);
+
+	/* update lifetime. */
+	coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa.sin6_addr);
+	prefix_lifetime
+	    = mip6_subnet_prefix_list_get_minimum_lifetime(&ms->ms_mspfx_list);
+	if (coa_lifetime < prefix_lifetime) {
+		mbu->mbu_lifetime = coa_lifetime;
+	} else {
+		mbu->mbu_lifetime = prefix_lifetime;
+	}
+	mbu->mbu_expire = mono_time.tv_sec + mbu->mbu_lifetime;
+	/* sanity check for overflow */
+	if (mbu->mbu_expire < mono_time.tv_sec)
+		mbu->mbu_expire = 0x7fffffff;
+	mbu->mbu_refresh = mbu->mbu_lifetime;
+	/* mbu->mbu_flags |= IP6MU_DAD ;*/
+
+	/* send a binding update. */
+	error = mip6_bu_send_bu(mbu);
+
+	return (error);
 }
 
 int
@@ -521,10 +555,6 @@ mip6_bu_list_notify_binding_change(sc)
 		if (mbu->mbu_expire < time_second)
 			mbu->mbu_expire = 0x7fffffff;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-		/* sanity check for overflow */
-		if (mbu->mbu_refexpire < time_second)
-			mbu->mbu_refexpire = 0x7fffffff;
 		if (mip6_bu_fsm(mbu,
 			MIP6_BU_PRI_FSM_EVENT_MOVEMENT, NULL) != 0) {
 			mip6log((LOG_ERR,
@@ -605,7 +635,7 @@ mip6_bu_timeout(arg)
 					 * the home registration
 					 * should not be removed.
 					 */
-					mip6_home_registration(mbu->mbu_hif);
+					mip6_home_registration2(mbu);
 				} else {
 					error = mip6_bu_list_remove(
 						&sc->hif_bu_list, mbu);
@@ -624,81 +654,37 @@ mip6_bu_timeout(arg)
 			if ((mbu->mbu_state & MIP6_BU_STATE_BUNOTSUPP) != 0)
 				continue;
 
-		if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-			/* check ack status */
-			if ((mbu->mbu_flags & IP6MU_ACK)
-			    && ((mbu->mbu_state & MIP6_BU_STATE_WAITACK) != 0)
+			/* check timeout. */
+			if ((mbu->mbu_retrans != 0)
 			    && (mbu->mbu_retrans < mono_time.tv_sec)) {
-				mbu->mbu_acktimeout *= 2;
-				if (mbu->mbu_acktimeout > MIP6_BA_MAX_TIMEOUT)
-					mbu->mbu_acktimeout
-						= MIP6_BA_MAX_TIMEOUT;
-				mbu->mbu_retrans
-				    = mono_time.tv_sec + mbu->mbu_acktimeout;
-				mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
-			}
-
-			/* refresh check */
-			if (mbu->mbu_refexpire < mono_time.tv_sec) {
-				/* refresh binding */
-				mbu->mbu_refexpire
-				    = mono_time.tv_sec + mbu->mbu_refresh;
-				/* sanity check for overflow */
-				if (mbu->mbu_refexpire < mono_time.tv_sec)
-					mbu->mbu_refexpire = 0x7fffffff;
-				if (mbu->mbu_flags & IP6MU_ACK) {
-					mbu->mbu_acktimeout
-					    = MIP6_BA_INITIAL_TIMEOUT;
-					mbu->mbu_retrans
-					    = mono_time.tv_sec
-					    + mbu->mbu_acktimeout;
-					mbu->mbu_state
-						|= MIP6_BU_STATE_WAITACK;
+				/* order is important. */
+				if(MIP6_IS_BU_RR_STATE(mbu)) {
+					/* retransmit RR signals. */
+					error = mip6_bu_fsm(mbu,
+					    MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER,
+					    NULL);
+				} else if (((mbu->mbu_flags & IP6MU_ACK) != 0)
+				    && MIP6_IS_BU_WAITA_STATE(mbu)) {
+					/* retransmit a binding update
+					 * to register. */
+					error = mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_RETRANS_TIMER,
+					    NULL);
+				} else if (MIP6_IS_BU_BOUND_STATE(mbu)) {
+					/* retransmit a binding update
+					 * for to refresh binding. */
+					error = mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_REFRESH_TIMER,
+					    NULL);
 				}
-				mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
-			}
-
-			/* send pending BUs */
-			if ((mbu->mbu_state & MIP6_BU_STATE_WAITSENT) != 0) {
-				if (mip6_bu_send_bu(mbu)) {
-					mip6log((LOG_ERR,
-						 "%s:%d: "
-						 "sending a binding update "
-						 "from %s(%s) to %s failed.\n",
-						 __FILE__, __LINE__,
-						 ip6_sprintf(&mbu->mbu_haddr.sin6_addr),
-						 ip6_sprintf(&mbu->mbu_coa.sin6_addr),
-						 ip6_sprintf(&mbu->mbu_paddr.sin6_addr)));
-				}
-			}
-		} else {
-			/* check refresh timer. */
-			if (mbu->mbu_refexpire < mono_time.tv_sec) {
-				if (mip6_bu_fsm(mbu,
-					MIP6_BU_PRI_FSM_EVENT_REFRESH_TIMER,
-					NULL)) {
+				if (error) {
 					mip6log((LOG_ERR,
 					    "%s:%d: "
-					    "primary fsm state transition "
-					    "filed.\n",
+					    "fsm state transition filed.\n",
 					    __FILE__, __LINE__));
 					/* continue, anyway... */
 				}
 			}
-
-			/* check retransmission timer. */
-			if (mbu->mbu_retrans < mono_time.tv_sec) {
-				if (MIP6_IS_BU_RR_STATE(mbu)) {
-					error = mip6_bu_fsm(mbu,
-					    MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER,
-					    NULL);
-				} else {
-					error = mip6_bu_fsm(mbu,
-					    MIP6_BU_PRI_FSM_EVENT_RETRANS_TIMER,
-					    NULL);
-				}
-			}
-		}
 		}
 	}
 
@@ -715,38 +701,73 @@ mip6_bu_send_bu(mbu)
 	struct mip6_bu *mbu;
 {
 	struct mbuf *m;
-	int error = 0;
+	struct ip6_pktopts opt;
+	int error;
+
+	/* sanity check. */
+	if (mbu == NULL)
+		return (EINVAL);
+
+	/* init local variables. */
+	error = 0;
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr)) {
+		/* we do not know where to send a binding update. */
 		if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 			mip6log((LOG_INFO,
-				 "%s:%d: "
-				 "no home agent.  start ha discovery.\n",
-				 __FILE__, __LINE__));
-			mip6_icmp6_ha_discov_req_output(mbu->mbu_hif);
+			    "%s:%d: "
+			    "no home agent.  start DHAAD.\n",
+			    __FILE__, __LINE__));
+			error = mip6_icmp6_ha_discov_req_output(mbu->mbu_hif);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: failed to send DHAAD request.\n",
+				    __FILE__, __LINE__));
+				/* continue, anyway. */
+			}
+			/*
+			 * a binding update will be sent immediately
+			 * after receiving DHAAD reply.
+			 */
+			goto bu_send_bu_end;
 		}
-
-		/* return immediately.  we need WAITSENT flag being set. */
-		return (0);
+		panic("a peer address must be known when sending a binding update.");
 	}
 
-	/* create ipv6 header to send a binding update destination opt */
+	/* create an ipv6 header to send a binding update. */
 	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr,
-			       IPPROTO_NONE, 0);
+	    IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
-			 "%s:%d: memory allocation failed.\n",
-			 __FILE__, __LINE__));
+		    "%s:%d: memory allocation failed.\n",
+		    __FILE__, __LINE__));
 		error = ENOBUFS;
-		goto send_bu_end;
+		goto bu_send_bu_end;
 	}
 
-	/* output a null packet. */
-	if (!ip6_setpktaddrs(m, &mbu->mbu_haddr, &mbu->mbu_paddr)) {
+	/* initialize packet options structure. */
+	init_ip6pktopts(&opt);
+
+	/* create a binding update mobility header. */
+	error = mip6_ip6mu_create(&opt.ip6po_mobility, &mbu->mbu_haddr,
+	    &mbu->mbu_paddr, mbu->mbu_hif);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: a binding update mobility header "
+		    "creation failed (%d).\n",
+		    __FILE__, __LINE__, error));
 		m_freem(m);
-		goto send_bu_end;
+		goto free_ip6pktopts;
 	}
+
+	/* send a binding update. */
 	mip6stat.mip6s_obu++;
+	if (!ip6_setpktaddrs(m, &mbu->mbu_haddr, &mbu->mbu_paddr)) {
+		/* should not happen. */
+		m_freem(m);
+		error = EINVAL;
+		goto free_ip6pktopts;
+	}
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -754,15 +775,14 @@ mip6_bu_send_bu(mbu)
 			 "when sending NULL packet to send BU.\n",
 			 __FILE__, __LINE__,
 			 error));
-		goto send_bu_end;
+		goto free_ip6pktopts;
 	}
 
- send_bu_end:
-	/*
-	 * XXX when we reset waitsent flag ?  is it correct to clear here ?
-	 */
-	/* mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT; */
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
 
+ bu_send_bu_end:
 	return (error);
 }
 
@@ -1937,9 +1957,7 @@ mip6_bu_print(mbu)
 		 "lifetime   %lu\n"
 		 "remain     %lld\n"
 		 "refresh    %lu\n"
-		 "refremain  %lld\n"
-		 "acktimeout %lu\n"
-		 "ackremain  %lld\n"
+		 "retrans    %lld\n"
 		 "seqno      %u\n"
 		 "flags      0x%x\n"
 		 "state      0x%x\n"
@@ -1952,8 +1970,6 @@ mip6_bu_print(mbu)
 		 (u_long)mbu->mbu_lifetime,
 		 (long long)mbu->mbu_expire,
 		 (u_long)mbu->mbu_refresh,
-		 (long long)mbu->mbu_refexpire,
-		 (u_long)mbu->mbu_acktimeout,
 		 (long long)mbu->mbu_retrans,
 		 mbu->mbu_seqno,
 		 mbu->mbu_flags,
@@ -2036,7 +2052,12 @@ mip6_process_br(m, opt)
 	/* sanity check for overflow */
 	if (mbu->mbu_expire < time_second)
 		mbu->mbu_expire = 0x7fffffff;
-	mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
+	if(mip6_bu_send_bu(mbu)) {
+		mip6log((LOG_ERR,
+		    "%s:%d: failed to send a binding update.\n",
+		    __FILE__, __LINE__));
+		/* continue. */
+	}
 
 	/*
 	 * TOXO: XXX
@@ -2997,10 +3018,6 @@ mip6_route_optimize(m)
 		if (mbu->mbu_expire < time_second)
 			mbu->mbu_expire = 0x7fffffff;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-		/* sanity check for overflow */
-		if (mbu->mbu_refexpire < time_second)
-			mbu->mbu_refexpire = 0x7fffffff;
 #endif
 	}
 	mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_MOVEMENT, NULL);

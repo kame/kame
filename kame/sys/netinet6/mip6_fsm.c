@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.13 2002/10/28 11:10:50 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.14 2002/11/01 03:31:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -102,6 +102,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 	struct ip6m_binding_ack *ip6ma;
 	struct ip6m_binding_error *ip6me;
 	struct icmp6_hdr *icmp6;
+	struct hif_softc *hif;
 
 	/* sanity check. */
 	if (mbu == NULL)
@@ -118,6 +119,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 	ip6ma = (struct ip6m_binding_ack *)data;
 	ip6me = (struct ip6m_binding_error *)data;
 	icmp6 = (struct icmp6_hdr *)data;
+	hif = (struct hif_softc *)data;
 
 	error = 0;
 
@@ -126,7 +128,23 @@ mip6_bu_pri_fsm(mbu, event, data)
 		switch (event) {
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-				/* XXX home registration. */
+				/*
+				 * Send BU,
+				 * Reset retransmission counter,
+				 * Start retransmission timer,
+				 * XXX Start failure timer.
+				 */
+				mbu->mbu_retrans_count = 0;
+
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITA;
@@ -148,7 +166,6 @@ mip6_bu_pri_fsm(mbu, event, data)
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_RRINIT;
 			}
-
 			break;
 
 		case MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB:
@@ -173,6 +190,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 				/*
 				 * if A flag is set,
 				 *   Send BU,
+				 *   Reset retransmission counter,
 				 *   Start retransmission timer,
 				 *   Start failure timer.
 				 */
@@ -196,7 +214,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					return (error);
 				}
 
-				mbu->mbu_refexpire
+				mbu->mbu_retrans
 				    = mono_time.tv_sec + mbu->mbu_lifetime;
 
 				*mbu_pri_fsm_state
@@ -210,6 +228,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Stop RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
@@ -232,9 +251,11 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Start RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
+
 			if (error == 0) {
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_RR,
@@ -258,6 +279,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Stop RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
@@ -279,6 +301,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Stop RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
@@ -306,6 +329,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 				/*
 				 * if A flag is set,
 				 *   Send BU,
+				 *   Reset retransmission counter,
 				 *   Start retransmission timer,
 				 *   Start failure timer.
 				 */
@@ -329,7 +353,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					return (error);
 				}
 
-				mbu->mbu_refresh
+				mbu->mbu_retrans
 				    = mono_time.tv_sec + mbu->mbu_lifetime;
 
 				*mbu_pri_fsm_state
@@ -343,6 +367,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Stop RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
@@ -365,9 +390,11 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Start RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
+
 			if (error == 0) {
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_RR,
@@ -392,9 +419,11 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Start Home RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
+
 			if (error == 0) {
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_HOME_RR,
@@ -418,6 +447,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Stop RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
@@ -443,21 +473,49 @@ mip6_bu_pri_fsm(mbu, event, data)
 		case MIP6_BU_PRI_FSM_EVENT_BA:
 			/* XXX */
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+				/*
+				 * (Process BA,)
+				 * Stop timer,
+				 * Reset retransmission counter,
+				 * Start refresh timer.
+				 */
+
 				/* XXX home registration completed. */
+
+				mip6_bu_stop_timers(mbu);
+				
+				mbu->mbu_retrans_count = 0;
+
+				mbu->mbu_retrans
+				    = mono_time.tv_sec
+				    + mbu->mbu_refresh;
+
+				*mbu_pri_fsm_state
+				    = MIP6_BU_PRI_FSM_STATE_BOUND;
 			} else {
 				/* XXX no code yet. */
 			}
 			break;
 
 		case MIP6_BU_PRI_FSM_EVENT_RETRANS_TIMER:
-			/* XXX */
 			/*
 			 * Send BU,
 			 * Start retransmittion timer.
 			 */
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-
-				/* XXX home registration retry. */
+				/*
+				 * Send BU,
+				 * Start retransmittion timer.
+				 */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITA;
@@ -472,10 +530,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 				}
 
 				if (mbu->mbu_retrans_count++
-				    > MIP6_MAX_RETRANS) {
+				    > MIP6_BU_MAX_BACKOFF)
 					mbu->mbu_retrans_count
-					    = MIP6_MAX_RETRANS;
-				}
+					    = MIP6_BU_MAX_BACKOFF;
 				mbu->mbu_retrans
 				    = mono_time.tv_sec
 				    + (1 << mbu->mbu_retrans_count);
@@ -502,15 +559,33 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-
-				/* XXX home registration. */
+				/*
+				 * Send BU,
+				 * Reset retrans counter,
+				 * Start retransmittion timer,
+				 * XXX Start failure timer.
+				 */
+				mbu->mbu_retrans_count = 0;
+				
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITA;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start RR.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_RR,
 				    data);
@@ -529,15 +604,32 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+				/*
+				 * Send BU,
+				 * Reset retrans counter,
+				 * Start retransmittion timer.
+				 */
+				mbu->mbu_retrans_count = 0;
 
-				/* XXX returning home. */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITD;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start Home RR.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_HOME_RR,
 				    data);
@@ -549,6 +641,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					    __FILE__, __LINE__));
 					return (error);
 				}
+
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_RRDEL;
 			}
@@ -561,7 +654,25 @@ mip6_bu_pri_fsm(mbu, event, data)
 		case MIP6_BU_PRI_FSM_EVENT_BA:
 			/* XXX */
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+				/*
+				 * (Process BA,)
+				 * Stop timer,
+				 * Reset retrans count,
+				 * Start refresh timer.
+				 */
+
 				/* XXX home registration completed. */
+
+				mip6_bu_stop_timers(mbu);
+				
+				mbu->mbu_retrans_count = 0;
+
+				mbu->mbu_retrans
+				    = mono_time.tv_sec
+				    + mbu->mbu_refresh;
+
+				*mbu_pri_fsm_state
+				    = MIP6_BU_PRI_FSM_STATE_BOUND;
 			} else {
 				/* XXX no code yet. */
 			}
@@ -574,12 +685,27 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Start retransmittion timer.
 			 */
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-
-				/* XXX home registration retry. */
+				/*
+				 * Send BU,
+				 * Start retransmittion timer.
+				 */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITAR;
 			} else {
+				/*
+				 * Send BU,
+				 * Start retransmission timer.
+				 */
 				error = mip6_bu_send_cbu(mbu);
 				if (error) {
 					mip6log((LOG_ERR,
@@ -590,10 +716,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 				}
 
 				if (mbu->mbu_retrans_count++
-				    > MIP6_MAX_RETRANS) {
+				    > MIP6_BU_MAX_BACKOFF)
 					mbu->mbu_retrans_count
-					    = MIP6_MAX_RETRANS;
-				}
+					    = MIP6_BU_MAX_BACKOFF;
 				mbu->mbu_retrans
 				    = mono_time.tv_sec
 				    + (1 << mbu->mbu_retrans_count);
@@ -620,13 +745,28 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+				/*
+				 * Send BU,
+				 * Reset retrans counter,
+				 * Start retransmittion timer.
+				 */
+				mbu->mbu_retrans_count = 0;
 
-				/* XXX home registration. */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITA;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start RR.
 				 */
 				error = mip6_bu_sec_fsm(mbu,
@@ -647,15 +787,32 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+				/*
+				 * Send BU,
+				 * Reset retrans counter,
+				 * Start retransmittion timer.
+				 */
+				mbu->mbu_retrans_count = 0;
 
-				/* XXX returning home. */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITD;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start Home RR.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_HOME_RR,
 				    data);
@@ -667,6 +824,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					    __FILE__, __LINE__));
 					return (error);
 				}
+
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_RRDEL;
 			}
@@ -692,12 +850,27 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Start retransmittion timer.
 			 */
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-
-				/* XXX home de-registration retry. */
+				/*
+				 * Send BU,
+				 * Start retransmittion timer.
+				 */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITD;
 			} else {
+				/*
+				 * Send BU,
+				 * Start retransmittion timer.
+				 */
 				error = mip6_bu_send_cbu(mbu);
 				if (error) {
 					mip6log((LOG_ERR,
@@ -708,10 +881,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 				}
 
 				if (mbu->mbu_retrans_count++
-				    > MIP6_MAX_RETRANS) {
+				    > MIP6_BU_MAX_BACKOFF)
 					mbu->mbu_retrans_count
-					    = MIP6_MAX_RETRANS;
-				}
+					    = MIP6_BU_MAX_BACKOFF;
 				mbu->mbu_retrans
 				    = mono_time.tv_sec
 				    + (1 << mbu->mbu_retrans_count);
@@ -738,13 +910,32 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+				/*
+				 * XXX
+				 * Stop timers,
+				 * Reset retrainsmission counter,
+				 * Start retransmission timer,
+				 * XXX Start failure timer.
+				 */
+				mip6_bu_stop_timers(mbu);
 
-				/* XXX home registration. */
+				mbu->mbu_retrans_count = 0;
+
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITA;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start RR.
 				 */
 				error = mip6_bu_sec_fsm(mbu,
@@ -758,35 +949,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 					    __FILE__, __LINE__));
 					return (error);
 				}
+
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_RRINIT;
-			}
-			break;
-
-		case MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME:
-			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-
-				/* XXX returning home. */
-
-				*mbu_pri_fsm_state
-				    = MIP6_BU_PRI_FSM_STATE_WAITD;
-			} else {
-				/*
-				 * Start Home RR.
-				 */
-				error = mip6_bu_sec_fsm(mbu,
-				    MIP6_BU_SEC_FSM_EVENT_START_HOME_RR,
-				    data);
-				if (error) {
-					mip6log((LOG_ERR,
-					    "%s:%d: "
-					    "second fsm state transition "
-					    "failed.\n",
-					    __FILE__, __LINE__));
-					return (error);
-				}
-				*mbu_pri_fsm_state
-				    = MIP6_BU_PRI_FSM_STATE_RRDEL;
 			}
 			break;
 		}
@@ -799,6 +964,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 				/*
 				 * if A flag is set,
 				 *   Send BU,
+				 *   Stop timers,
 				 *   Start retransmission timer,
 				 *   Start failure timer.
 				 */
@@ -810,8 +976,11 @@ mip6_bu_pri_fsm(mbu, event, data)
 			} else {
 				/*
 				 * if A flag is not set,
+				 *   Stop timers,
 				 *   Send BU.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_send_cbu(mbu);
 				if (error) {
 					mip6log((LOG_ERR,
@@ -832,6 +1001,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Stop RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
@@ -854,9 +1024,11 @@ mip6_bu_pri_fsm(mbu, event, data)
 			 * Start RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
+
 			if (error == 0) {
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_RR,
@@ -874,39 +1046,13 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			break;
 
-		case MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME:
-			/*
-			 * Stop timers,
-			 * Stop RR,
-			 * Start Home RR.
-			 */
-			mip6_bu_stop_timers(mbu);
-			error = mip6_bu_sec_fsm(mbu,
-			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
-			    data);
-			if (error == 0) {
-				error = mip6_bu_sec_fsm(mbu,
-				    MIP6_BU_SEC_FSM_EVENT_START_HOME_RR,
-				    data);
-			}
-			if (error) {
-				mip6log((LOG_ERR,
-				    "%s:%d: "
-				    "second fsm state transition failed.\n",
-				    __FILE__, __LINE__));
-				return (error);
-			}
-
-			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRDEL;
-
-			break;
-
 		case MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB:
 			/*
 			 * Stop timers,
 			 * Stop RR.
 			 */
 			mip6_bu_stop_timers(mbu);
+
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_STOP_RR,
 			    data);
@@ -933,14 +1079,36 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-				/* XXX home registration. */
+				/*
+				 * Stop timer,
+				 * Send BU,
+				 * Reset retransmission counter,
+				 * Start retransmission timer,
+				 * XXX Start failure timer.
+				 */
+				mip6_bu_stop_timers(mbu);
+
+				mbu->mbu_retrans_count = 0;
+
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITA;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start RR.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_RR,
 				    data);
@@ -960,14 +1128,36 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-				/* XXX home de-registration. */
+				/*
+				 * Stop timer,
+				 * Send BU,
+				 * Reset retransmission counter,
+				 * Start retransmission timer,
+				 * XXX Start failure timer.
+				 */
+				mip6_bu_stop_timers(mbu);
+
+				mbu->mbu_retrans_count = 0;
+
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITD;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start RR.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_HOME_RR,
 				    data);
@@ -987,14 +1177,29 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_REFRESH_TIMER:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-				/* XXX home registration refresh. */
+				/*
+				 * Send BU,
+				 * Start retransmission timer.
+				 */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITAR;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start RR.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_RR,
 				    data);
@@ -1014,14 +1219,36 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 		case MIP6_BU_PRI_FSM_EVENT_UNVERIFIED_HAO:
 			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-				/* XXX home registration. */
+				/*
+				 * Stop timer,
+				 * Send BU,
+				 * Reset retransmission counter,
+				 * Start retransmission timer,
+				 * XXX Start failure timer.
+				 */
+				mip6_bu_stop_timers(mbu);
+
+				mbu->mbu_retrans_count = 0;
+
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed.\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
 
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_WAITA;
 			} else {
 				/*
+				 * Stop timers,
 				 * Start RR.
 				 */
+				mip6_bu_stop_timers(mbu);
+
 				error = mip6_bu_sec_fsm(mbu,
 				    MIP6_BU_SEC_FSM_EVENT_START_RR,
 				    data);
@@ -1046,6 +1273,38 @@ mip6_bu_pri_fsm(mbu, event, data)
 	}
 
 	return (0);
+}
+
+static int
+mip6_bu_pri_fsm_home_registration(mbu)
+	struct mip6_bu *mbu;
+{
+	int error;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	struct timeval mono_time;
+#endif
+
+	/* sanity check. */
+	if (mbu == NULL)
+		return (EINVAL);
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	mono_time.tv_sec = time_second;
+#endif
+
+	error = mip6_home_registration2(mbu);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: sending a home registration failed.\n",
+		    __FILE__, __LINE__, error));
+		/* continue and try again. */
+	}
+
+	if (mbu->mbu_retrans_count++ > MIP6_BU_MAX_BACKOFF)
+		mbu->mbu_retrans_count = MIP6_BU_MAX_BACKOFF;
+	mbu->mbu_retrans = mono_time.tv_sec + (1 << mbu->mbu_retrans_count);
+
+	return (error);
 }
 
 int
@@ -1148,6 +1407,16 @@ mip6_bu_sec_fsm(mbu, event, data)
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_WAITH;
 			break;
 
+		case MIP6_BU_SEC_FSM_EVENT_STOP_RR:
+			/*
+			 * Stop timers.
+			 */
+			mip6_bu_stop_timers(mbu);
+
+			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_START;
+
+			break;
+
 		case MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER:
 			/*
 			 * Send HoTI,
@@ -1197,6 +1466,16 @@ mip6_bu_sec_fsm(mbu, event, data)
 
 			break;
 
+		case MIP6_BU_SEC_FSM_EVENT_STOP_RR:
+			/*
+			 * Stop timers.
+			 */
+			mip6_bu_stop_timers(mbu);
+
+			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_START;
+
+			break;
+
 		case MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER:
 			/*
 			 * Send HoTI,
@@ -1238,6 +1517,16 @@ mip6_bu_sec_fsm(mbu, event, data)
 				    __FILE__, __LINE__));
 				return (error);
 			}
+
+			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_START;
+
+			break;
+
+		case MIP6_BU_SEC_FSM_EVENT_STOP_RR:
+			/*
+			 * Stop timers.
+			 */
+			mip6_bu_stop_timers(mbu);
 
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_START;
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.35 2002/09/30 10:21:39 k-sugyou Exp $	*/
+/*	$KAME: ip6.h,v 1.36 2002/11/01 03:31:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -401,6 +401,10 @@ struct ip6m_binding_error {
 	struct in6_addr ip6me_addr;
 	/* followed by mobility options */
 } __attribute__((__packed__));
+
+/* Binding Error status codes */
+#define IP6ME_UNVERIFIED_HAO	1
+#define IP6ME_UNKNOWN_TYPE	2
 
 /* Mobility options */
 struct ip6m_opt {

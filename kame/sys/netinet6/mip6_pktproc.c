@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.75 2002/10/31 14:06:20 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.76 2002/11/01 03:31:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -970,7 +970,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		if (ip6ma->ip6ma_status == IP6MA_STATUS_SEQNO_TOO_SMALL) {
 			/* seqno is too small.  adjust it and resend. */
 			mbu->mbu_seqno = ntohs(ip6ma->ip6ma_seqno) + 1;
-			mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
+			/* XXX */
+			mip6_bu_send_bu(mbu);
 			return (0);
 		}
 
@@ -991,9 +992,6 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	/*
 	 * the binding update has been accepted.
 	 */
-
-	/* reset WAIT_ACK state. */
-	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
 
 	/* update lifetime and refresh time. */
 	lifetime = htons(ip6ma->ip6ma_lifetime) << 2;	/* units of 4 secs */
@@ -1016,10 +1014,6 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	else
 		refresh = lifetime;
 	mbu->mbu_refresh = refresh;
-	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-	/* sanity check for overflow */
-        if (mbu->mbu_refexpire < time_second)
-                mbu->mbu_refexpire = 0x7fffffff;
         if (mbu->mbu_refresh > mbu->mbu_expire)
                 mbu->mbu_refresh = mbu->mbu_expire;
 	if (mbu->mbu_flags & IP6MU_HOME) {
@@ -1118,8 +1112,10 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				 "%s:%d: send a unsolicited na to %s\n",
 				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
 		}
-		} else if (mbu->mbu_pri_fsm_state
-			   == MIP6_BU_PRI_FSM_STATE_WAITA) {
+		} else if ((mbu->mbu_pri_fsm_state
+			   == MIP6_BU_PRI_FSM_STATE_WAITA)
+			   || (mbu->mbu_pri_fsm_state
+			   == MIP6_BU_PRI_FSM_STATE_WAITAR)) {
 			if (lifetime == 0) {
 				mip6log((LOG_WARNING,
 					 "%s:%d: lifetime are zero.\n",
@@ -1127,8 +1123,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				/* XXX ignored */
 			}
 			/* home registration completed */
-			mbu->mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_BOUND;
-
+			error = mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_BA, NULL);
 			/* create tunnel to HA */
 			error = mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
 						    mbu,
@@ -1151,7 +1146,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				m_freem(m);
 				return (error);
 			}
-		} else if (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND) {
+		} else if (MIP6_IS_BU_BOUND_STATE(mbu)) {
 			/* nothing to do. */
 		} else {
 			mip6log((LOG_NOTICE,
@@ -1481,7 +1476,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	hrmbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if ((mbu == NULL) &&
 	    (hrmbu != NULL) &&
-	    (hrmbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND)) {
+	    (MIP6_IS_BU_BOUND_STATE(hrmbu))) {
 		/* XXX */
 		/* create a binding update entry and send CoTI/HoTI. */
 		return (0);
@@ -1514,11 +1509,6 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 			 "%s:%d: the peer addr is unspecified.\n",
 			 __FILE__, __LINE__));
 		mip6_icmp6_ha_discov_req_output(sc);
-		return (0);
-	}
-	if ((mbu->mbu_flags & IP6MU_HOME) /* XXX */
-	    && (mbu->mbu_state & MIP6_BU_STATE_WAITSENT) == 0) {
-		/* no need to send. */
 		return (0);
 	}
 
@@ -1600,7 +1590,6 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 #if 0 /* XXX MIPv6 Issue 58 */
 		ip6mu->ip6mu_lifetime =
 		    htons((u_int16_t)(mbu->mbu_lifetime >> 2));	/* units 4 secs */
@@ -1678,9 +1667,6 @@ mip6_hexdump("MN: K_bu: ", sizeof(key_bu), key_bu);
 					IPPROTO_MOBILITY, (char *)ip6mu);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mu;
-
-	/* hoping that the binding update will be sent with no accident. */
-	mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT;
 
 	return (0);
 }

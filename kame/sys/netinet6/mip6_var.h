@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.63 2002/10/25 05:11:06 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.64 2002/11/01 03:31:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -143,8 +143,6 @@ struct mip6_bu {
 	u_int16_t           mbu_lifetime;   /* BU lifetime */
 	time_t              mbu_expire;     /* expiration time of this BU. */
 	u_int16_t           mbu_refresh;    /* refresh frequency */
-	time_t              mbu_refexpire;  /* expiration time of refresh. */
-	u_int32_t           mbu_acktimeout; /* current ack timo value */
 	u_int16_t           mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
 	mip6_cookie_t       mbu_mobile_cookie;
@@ -161,8 +159,8 @@ struct mip6_bu {
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
 };
-#define MIP6_BU_STATE_WAITSENT    0x01
-#define MIP6_BU_STATE_WAITACK     0x02
+/* #define MIP6_BU_STATE_WAITSENT    0x01 */
+/* #define MIP6_BU_STATE_WAITACK     0x02 */
 #define MIP6_BU_STATE_BUNOTSUPP   0x04
 #define MIP6_BU_STATE_MIP6NOTSUPP 0x80
 
@@ -179,6 +177,10 @@ struct mip6_bu {
 	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
 	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND)	\
 	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO))
+#define MIP6_IS_BU_WAITA_STATE(mbu)					\
+	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITA)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD))
 #define MIP6_IS_BU_RR_STATE(mbu)					\
 	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRINIT)	\
 	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO)	\
