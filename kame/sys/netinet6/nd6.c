@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.96 2001/02/02 14:23:41 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.97 2001/02/02 14:27:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -754,7 +754,7 @@ regen_tmpaddr(ia6)
 
 		if ((e = in6_tmpifadd(public_ifa6, 0)) != 0) {
 			log(LOG_NOTICE, "regen_tmpaddr: failed to create a new"
-			    "tmp addr,errno=%d\n", e);
+			    " tmp addr,errno=%d\n", e);
 			return(-1);
 		}
 		return(0);
