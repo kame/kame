@@ -1,4 +1,4 @@
-/*      $Id: babymdd.c,v 1.5 2005/03/01 17:38:01 ryuji Exp $  */
+/*      $Id: babymdd.c,v 1.6 2005/03/01 17:42:40 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -187,7 +187,7 @@ main (argc, argv)
 
         /* open syslog */
         openlog("shisad(baby)", 0, LOG_DAEMON);
-        syslog(LOG_INFO, "Baby start !!\n");
+        syslog(LOG_INFO, "babymdd start !!\n");
 
 	/* mdd initialization */
 	LIST_INIT(&babyinfo.ifinfo_head);
@@ -230,11 +230,10 @@ main (argc, argv)
 		 * available interfaces 
 		 */
 		char ifname[IFNAMSIZ];
-		while ((ifname = if_indextoname(++argc, NULL)) != NULL) {
+		while (if_indextoname(++argc, ifname) != NULL) {
 			ifinfo = init_if(ifname);
 			if (ifinfo)
 				ifinfo->priority = priority++;
-
 		}
 
 	} else {
@@ -1294,7 +1293,7 @@ send_rs(struct if_info  *ifinfo) {
 	
 	if (sendmsg(icmpsock, &msg, 0) < 0) {
 		if (DEBUGHIGH)
-			syslog(LOG_ERR, "%s sendmsg: %s\n",  
+			syslog(LOG_ERR, "%s sendmsg() %s\n",  
 			       __FUNCTION__, strerror(errno));
 	}
 
