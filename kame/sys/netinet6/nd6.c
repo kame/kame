@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.298 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.299 2002/09/20 13:56:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -643,8 +643,7 @@ nd6_timer(ignored_arg)
 			if (regen)
 				goto addrloop; /* XXX: see below */
 		}
-		if ((ia6->ia6_flags & IN6_IFF_DEPRECATED) != 0 ||
-		    IFA6_IS_DEPRECATED(ia6)) {
+		if (IFA6_IS_DEPRECATED(ia6)) {
 			int oldflags = ia6->ia6_flags;
 
 			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
