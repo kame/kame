@@ -1,7 +1,10 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.29 1999/11/26 08:36:42 itojun Exp $
+$Id: TODO,v 1.30 1999/12/02 07:37:22 itojun Exp $
 
+
+Caveats:
+- can't ping6 my own interface.
 
 Things we can do with the current code:
 - ip6 layer
