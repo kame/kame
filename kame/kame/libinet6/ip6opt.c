@@ -546,7 +546,8 @@ inet6_opt_finish(void *extbuf, size_t extlen, int prevlen)
 int
 inet6_opt_set_val(void *databuf, size_t offset, void *val, int vallen)
 {
-	memcpy(databuf + offset, val, vallen);
+
+	memcpy((u_int8_t *)databuf + offset, val, vallen);
 	return(offset + vallen);
 }
 
@@ -701,8 +702,9 @@ inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 int
 inet6_opt_get_val(void *databuf, size_t offset, void *val, int vallen)
 {
+
 	/* we can't assume alignment here */
-	memcpy(val, databuf + offset, vallen);
+	memcpy(val, (u_int8_t *)databuf + offset, vallen);
 
 	return(offset + vallen);
 }
