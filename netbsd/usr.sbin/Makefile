@@ -6,9 +6,7 @@ SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat mld6query mping \
 	traceroute6 rtsold rtadvd rip6query lpr natptconfig natptd natptlog
 SUBDIR+=racoon
 SUBDIR+=pvcbridge pvcsif pvctxctl
-.if ${MACHINE_ARCH} == "i386"
 SUBDIR+=altqd
-.endif
 #SUBDIR+=inet6d
 
 SUBDIR+=mip6config mip6stat
