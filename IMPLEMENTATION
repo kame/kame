@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.218 2001/05/28 00:05:21 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.219 2001/05/28 00:07:43 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -120,8 +120,6 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
     * 15/12 drafts are not explicit about padding and string termination.
       at IETF48, the author confirmed that there's no padding/termination
       (and extensions can appear unaligned).  our code follows the comment.
-draft-itojun-ipv6-tcp-to-anycast-00.txt:
-	Disconnecting TCP connection toward IPv6 anycast address
 draft-ietf-ipngwg-rfc2553bis-03.txt:
 	Basic Socket Interface Extensions for IPv6 (revised)
 draft-ietf-ipngwg-rfc2292bis-02.txt:
@@ -149,6 +147,8 @@ draft-ietf-dnsext-mdns-00.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
       near future, so don't rely upon it.
+draft-itojun-ipv6-tcp-to-anycast-00.txt:
+	Disconnecting TCP connection toward IPv6 anycast address
 draft-itojun-ipv6-transition-abuse-02.txt:
 	Possible abuse against IPv6 transition technologies (expired)
     * KAME does not implement RFC1933/2893 automatic tunnel.
