@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.157 2003/04/22 06:29:49 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.158 2003/05/08 05:17:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1278,12 +1278,12 @@ free:
  * numeric hostname
  */
 static int
-explore_numeric(pai, hostname, servname, res, ohostname)
+explore_numeric(pai, hostname, servname, res, canonname)
 	const struct addrinfo *pai;
 	const char *hostname;
 	const char *servname;
 	struct addrinfo **res;
-	const char *ohostname;
+	const char *canonname;
 {
 	const struct afd *afd;
 	struct addrinfo *cur;
@@ -1326,7 +1326,7 @@ explore_numeric(pai, hostname, servname, res, ohostname)
 					 * the canonical name, based on a
 					 * clarification in rfc2553bis-03.
 					 */
-					GET_CANONNAME(cur->ai_next, ohostname);
+					GET_CANONNAME(cur->ai_next, canonname);
 				}
 				while (cur && cur->ai_next)
 					cur = cur->ai_next;
