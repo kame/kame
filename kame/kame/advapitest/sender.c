@@ -1,3 +1,4 @@
+/*	$KAME: sender.c,v 1.4 2000/09/27 02:53:15 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
