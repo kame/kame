@@ -424,7 +424,7 @@ igmp_input(m, va_alist)
 		return;
 	}
 	igmplen = ip->ip_len - iphlen;
-#ifdef m_pulldown
+#ifdef PULLDOWN_TEST
 	if ((n = m_pulldown(m, iphlen, igmplen, &off)) == NULL) {
 		++igmpstat.igps_rcv_query_fails;
 		m_freem(m);
