@@ -583,32 +583,6 @@ bad:
  * Handles [gs]etsockopt() calls.
  ----------------------------------------------------------------------*/
 
-#if __FreeBSD__
-int rip6_ctloutput(struct socket *so, struct sockopt *sopt)
-{
-  register struct inpcb *inp = sotoinpcb(so);
-  int op;
-  int level;
-  int optname;
-  int optval;
-
-  DPRINTF(FINISHED, ("rip6_ctloutput(so=%08x, sopt=%08x)\n",
-		       OSDEP_PCAST(so), OSDEP_PCAST(sopt)));
-
-  switch(sopt->sopt_dir) {
-    case SOPT_GET:
-      op = PRCO_GETOPT;
-      break;
-    case SOPT_SET:
-      op = PRCO_SETOPT;
-      break;
-    default:
-      RETURN_ERROR(EINVAL);
-  };
-
-  level = sopt->sopt_level;
-  optname = sopt->sopt_name;
-#else /* __FreeBSD__ */
 int
 rip6_ctloutput (op, so, level, optname, m)
      int op;
@@ -619,161 +593,51 @@ rip6_ctloutput (op, so, level, optname, m)
   register struct inpcb *inp = sotoinpcb(so);
 
   DPRINTF(FINISHED, ("rip6_ctloutput(op=%x,so,level=%x,optname=%x,m)\n", op, level, optname));
-#endif /* __FreeBSD__ */
 
-  if ((level != IPPROTO_IP) && (level != IPPROTO_IPV6) && (level != IPPROTO_ICMPV6)) {
-#if !__FreeBSD__
+  if ((level != IPPROTO_IPV6) && (level != IPPROTO_ICMPV6)) {
       if (op == PRCO_SETOPT && *m)
 	(void)m_free(*m);
-#endif /* !__FreeBSD__ */
       RETURN_ERROR(EINVAL);
   }
 
   switch (optname) {
     case IPV6_CHECKSUM:
       if (op == PRCO_SETOPT || op == PRCO_GETOPT) {
-#if __FreeBSD__
-        if (!sopt->sopt_val || (sopt->sopt_valsize != sizeof(int)))
-	  RETURN_ERROR(EINVAL);
         if (op == PRCO_SETOPT) {
-          int error = sooptcopyin(sopt, &optval, sizeof(int), sizeof(int));
-          if (error)
-	    RETURN_VALUE(error);
-          inp->inp_csumoffset = optval;
-
-	  return 0;
-        } else
-          return sooptcopyout(sopt, &inp->inp_csumoffset, sizeof(int));
-#else /* __FreeBSD__ */
-        if (!m || !*m || (*m)->m_len != sizeof(int))
-	  RETURN_ERROR(EINVAL);
-        if (op == PRCO_SETOPT) {
+          if (!m || !*m || (*m)->m_len != sizeof(int))
+	    RETURN_ERROR(EINVAL);
           inp->inp_csumoffset = *(mtod(*m, int *));
           m_freem(*m);
         } else {
+	  *m = m_get(M_WAIT, M_SOOPTS);
           (*m)->m_len = sizeof(int);
           *(mtod(*m, int *)) = inp->inp_csumoffset;
-        };
-#endif /* __FreeBSD__ */
+        }
         return 0;
-      };
+      }
       break;
+
     case ICMP6_FILTER:
       if (op == PRCO_SETOPT || op == PRCO_GETOPT) {
-#if __FreeBSD__
-        if (!sopt->sopt_val || (sopt->sopt_valsize !=
-            sizeof(struct icmp6_filter)))
-	  RETURN_ERROR(EINVAL);
         if (op == PRCO_SETOPT) {
-          struct icmp6_filter icmp6_filter;
-          int error = sooptcopyin(sopt, &icmp6_filter,
-            sizeof(struct icmp6_filter), sizeof(struct icmp6_filter));
-          if (error)
-            return error;
-
-          bcopy(&icmp6_filter, inp->inp_icmp6filt, sizeof(icmp6_filter));
-
-          return 0;
-        } else
-          return sooptcopyout(sopt, inp->inp_icmp6filt,
-            sizeof(struct icmp6_filter));
-#else /* __FreeBSD__ */
-        if (!m || !*m || (*m)->m_len != sizeof(struct icmp6_filter))
-	  RETURN_ERROR(EINVAL);
-        if (op == PRCO_SETOPT) {
+          if (!m || !*m || (*m)->m_len != sizeof(struct icmp6_filter))
+	    RETURN_ERROR(EINVAL);
 	  bcopy(mtod(*m, struct icmp6_filter *), inp->inp_icmp6filt,
 		sizeof(struct icmp6_filter));
           m_freem(*m);
         } else {
+	  *m = m_get(M_WAIT, M_SOOPTS);
           (*m)->m_len = sizeof(struct icmp6_filter);
           *mtod(*m, struct icmp6_filter *) = *inp->inp_icmp6filt;
         };
         return 0;
-#endif /* __FreeBSD__ */
-      };
+      }
       break;
 
-/* Should this be obsoleted? */
-    case IP_HDRINCL:
-      if (op == PRCO_SETOPT || op == PRCO_GETOPT)
-	{
-#if __FreeBSD__
-        if (!sopt->sopt_val || (sopt->sopt_valsize != sizeof(int)))
-	  RETURN_ERROR(EINVAL);
-        if (op == PRCO_SETOPT) {
-          int error = sooptcopyin(sopt, &optval, sizeof(int), sizeof(int));
-          if (error)
-            return error;
-
-          if (optval)
-            inp->inp_flags |= INP_HDRINCL;
-          else
-            inp->inp_flags &= ~INP_HDRINCL;
-
-          return 0;
-        } else {
-          optval = (inp->inp_flags & INP_HDRINCL) ? 1 : 0;
-          return sooptcopyout(sopt, &optval, sizeof(int));
-        };
-#else /* __FreeBSD__ */
-	  if (m == 0 || *m == 0 || (*m)->m_len != sizeof(int))
-	    RETURN_ERROR(EINVAL);
-	  if (op == PRCO_SETOPT)
-	    {
-	      if (*mtod(*m, int *))
-		inp->inp_flags |= INP_HDRINCL;
-	      else inp->inp_flags &= ~INP_HDRINCL;
-	      m_free(*m);
-	    }
-	  else
-	    {
-	      (*m)->m_len = sizeof(int);
-	      *(mtod(*m, int *)) = (inp->inp_flags & INP_HDRINCL) ? 1 : 0;
-	    }
-	  return 0;
-#endif /* __FreeBSD__ */
-	}
-      break;
-
-#ifdef MRT_INIT
     default:
-      if (optname >= MRT_INIT) {
-#else /* MRT_INIT */
-    case DVMRP_INIT:
-    case DVMRP_DONE:
-    case DVMRP_ADD_VIF:
-    case DVMRP_DEL_VIF:
-    case DVMRP_ADD_LGRP:
-    case DVMRP_DEL_LGRP:
-    case DVMRP_ADD_MRT:
-    case DVMRP_DEL_MRT:
-      {
-#endif /* MRT_INIT */
-#ifdef MROUTING
-/* Be careful here! */
-/*      if (op == PRCO_SETOPT)
-	{
-	  error = ipv6_mrouter_cmd(optname, so, *m);
-	  if (*m)
-	    (void)m_free(*m);
-	}
-      else error = EINVAL;
-      return (error);*/
-	RETURN_ERROR(EOPNOTSUPP);
-#else /* MROUTING */
-#if !__FreeBSD__
-      if (op == PRCO_SETOPT && *m)
-	(void)m_free(*m);
-#endif /* !__FreeBSD__ */
-      RETURN_ERROR(EOPNOTSUPP);
-#endif /* MROUTING */
-      };
+      break;
   }
-#if __FreeBSD__
-  return ip6_ctloutput(so, sopt);
-#else /* __FreeBSD__ */
   return ip6_ctloutput(op, so, level, optname, m);
-#endif /* __FreeBSD__ */
 }
 
 #if __GNUC__ && __GNUC__ >= 2 && __OPTIMIZE__ && !__FreeBSD__
