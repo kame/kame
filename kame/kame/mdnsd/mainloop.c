@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.40 2000/07/31 18:06:32 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.41 2000/07/31 18:11:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -246,6 +246,9 @@ conf_mediator(sd)
 		if (!isprint(*p))
 			return -1;
 	}
+	/* overrun */
+	if (p >= &msg->serveraddr[sizeof(msg->serveraddr)])
+		return -1;
 	if (*p != '\0')
 		return -1;
 
