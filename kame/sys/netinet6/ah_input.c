@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.15 2000/02/22 14:04:14 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.16 2000/02/23 09:50:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -534,6 +534,7 @@ ah6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct ah), IPPROTO_DONE);
+	ip6 = mtod(m, struct ip6_hdr *);
 
 	ah = (struct ah *)(((caddr_t)ip6) + off);
 #else
