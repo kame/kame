@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_network.c,v 1.4 2002/07/10 07:41:46 ono Exp $	*/
+/*	$KAME: vrrp_network.c,v 1.5 2002/08/23 12:25:47 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -352,7 +352,13 @@ vrrp_network_send_icmp_packet(char *p, int len, int ifindex)
 
     ret = sendmsg(sd, &m, 0);
     close(sd);
-    return len == ret ? 0 : -1;
+
+    if (len != ret) {
+	    syslog(LOG_DEBUG, "vrrp_network_send_icmp_packet sendmsg failed(len=%d,ret=%d)", len, ret);
+	    return -1;
+    }
+
+    return 0;
 }
 
       

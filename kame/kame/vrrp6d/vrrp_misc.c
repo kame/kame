@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_misc.c,v 1.5 2002/07/10 07:41:45 ono Exp $	*/
+/*	$KAME: vrrp_misc.c,v 1.6 2002/08/23 12:25:47 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -399,7 +399,8 @@ vrrp_misc_log(int priority, const char *message, ...)
 	va_end(arg);
 
 	if (optflag_f) {
-		printf("%s\n", buf);
+		if (priority < LOG_DEBUG || optflag_d)
+			printf("%s\n", buf);
 	} else {
 #undef syslog
 		syslog(priority, "%s", buf);
