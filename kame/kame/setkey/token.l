@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.43 2003/07/25 09:35:28 itojun Exp $	*/
+/*	$KAME: token.l,v 1.44 2003/10/21 07:20:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -136,7 +136,7 @@ tagged		{ return(TAGGED); }
 			/* count up for nl */
 			    {
 				char *p;
-				for (p = yytext; *p != NULL; p++)
+				for (p = yytext; *p != 0; p++)
 					if (*p == '\n')
 						lineno++;
 			    }
@@ -246,7 +246,7 @@ any		{ return(ANY); }
 {quotedstring}	{
 			char *p = yytext;
 			while (*++p != '"') ;
-			*p = NULL;
+			*p = 0;
 			yytext++;
 			yylval.val.len = yyleng - 2;
 			yylval.val.buf = strdup(yytext);
