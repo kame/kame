@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2182 2002/06/07 13:45:01 itojun Exp $
+$KAME: CHANGELOG,v 1.2183 2002/06/10 12:00:16 jinmei Exp $
 
 <200206>
+2002-06-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/ports/ppp/: made the interface ID selection more
+	compliant to RFC 2472;
+	- first IEEE EUI-48/64 identifiers are checked
+	- use the full 64 bits when generating a random ID
+
 Fri Jun  7 22:44:34 JST 2002  itojun@iijlab.net
 	* sys/netinet/ip_input.c: look at rmx_mtu on IPsec tunnel MTU
 	  computation.  From: David Waitzman <djw@bbn.com>
