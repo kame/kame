@@ -148,6 +148,7 @@ product SMC 8016		0x0105 SMC 8016 EtherCard
 /* Lucent WaveLAN/IEEE */
 product LUCENT WAVELAN_IEEE	0x0002	WaveLAN/IEEE
 
+/* Bay Networks */
 product BAY STACK_650	0x804	BayStack 650 Wireless LAN
 
 /* Cards we know only by their cis */
