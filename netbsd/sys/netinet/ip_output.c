@@ -743,8 +743,10 @@ skip_ipsec:
 	}
 
 	error = ip_fragment(m, ifp, mtu);
-	if (error == EMSGSIZE)
+	if (error) {
+		m = NULL;
 		goto bad;
+	}
 
 	for (; m; m = m0) {
 		m0 = m->m_nextpkt;
@@ -883,9 +885,20 @@ sendorfree:
 	 * any of them.
 	 */
 	s = splnet();
-	if (ifp->if_snd.ifq_maxlen - ifp->if_snd.ifq_len < fragments)
+	if (ifp->if_snd.ifq_maxlen - ifp->if_snd.ifq_len < fragments &&
+	    error == 0) {
 		error = ENOBUFS;
+		ipstat.ips_odropped++;
+		IFQ_INC_DROPS(&ifp->if_snd);
+	}
 	splx(s);
+	if (error) {
+		for (m = m0; m; m = m0) {
+			m0 = m->m_nextpkt;
+			m->m_nextpkt = NULL;
+			m_freem(m);
+		}
+	}
 
 	return (error);
 }

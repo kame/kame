@@ -4882,8 +4882,10 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 #else
 	error = ip_fragment(m0, ifp, ifp->if_mtu);
 #endif
-	if (error == EMSGSIZE)
+	if (error) {
+		m0 = NULL;
 		goto bad;
+	}
 
 	for (m0 = m1; m0; m0 = m1) {
 		m1 = m0->m_nextpkt;
