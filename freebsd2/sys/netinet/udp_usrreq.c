@@ -581,10 +581,14 @@ udp_usrreq(so, req, m, addr, control)
 		((struct inpcb *) so->so_pcb)->inp_ip_ttl = ip_defttl;
 #ifdef IPSEC
 		inp = (struct inpcb *)so->so_pcb;
-		if (inp && (error = ipsec_init_policy(&inp->inp_sp_in)) != 0)
+		if (inp && (error = ipsec_init_policy(&inp->inp_sp_in)) != 0) {
+			in_pcbdetach(inp);
 			break;
-		if (inp && (error = ipsec_init_policy(&inp->inp_sp_out)) != 0)
+		}
+		if (inp && (error = ipsec_init_policy(&inp->inp_sp_out)) != 0) {
+			in_pcbdetach(inp);
 			break;
+		}
 #endif /*IPSEC*/
 		break;
 

@@ -384,11 +384,15 @@ rip_usrreq(so, req, m, nam, control)
 		inp->inp_ip_p = (int)nam;
 #ifdef IPSEC
 		error = ipsec_init_policy(&inp->inp_sp_in);
-		if (error)
+		if (error) {
+			in_pcbdetach(inp);
 			break;
+		}
 		error = ipsec_init_policy(&inp->inp_sp_out);
-		if (error)
+		if (error) {
+			in_pcbdetach(inp);
 			break;
+		}
 #endif /*IPSEC*/
 		break;
 
