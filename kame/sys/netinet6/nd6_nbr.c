@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.60 2001/02/10 14:30:19 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.61 2001/02/10 16:06:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1428,12 +1428,6 @@ nd6_dad_ns_input(ifa)
 	taddr6 = &ia->ia_addr.sin6_addr;
 	duplicate = 0;
 	dp = nd6_dad_find(ifa);
-
-	/*
-	 * If it is from myself, ignore this.
-	 */
-	if (ifp && (ifp->if_flags & IFF_LOOPBACK))
-		return;
 
 	/* Quickhack - completely ignore DAD NS packets */
 	if (dad_ignore_ns) {
