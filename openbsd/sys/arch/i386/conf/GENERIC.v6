@@ -33,6 +33,6 @@ option		HFSC_RIO	# rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
 option		CDNR		# diffserv traffic conditioner
 option		BLUE		# blue by wu-chang feng
 
-# mobile-ip6 options
+# mobile-ip6 options - NOT TESTED
 #option		MIP6
 #option		MIP6_DEBUG
