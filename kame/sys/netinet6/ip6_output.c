@@ -721,7 +721,7 @@ skip_ipsec2:;
 			sin6_fin->sin6_len = sizeof(struct sockaddr_in6);
 			sin6_fin->sin6_addr = finaldst;
 
-#if 0
+#ifdef __FreeBSD__
 			rtcalloc((struct route *)ro_pmtu);
 #else
 			rtalloc((struct route *)ro_pmtu);

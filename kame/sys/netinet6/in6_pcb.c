@@ -577,7 +577,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, errorp)
 						     ->ro_dst, 0);
 #endif /*__bsdi__*/
 			} else {
-#if 0 /* XXX Is this correct? */
+#ifdef __FreeBSD__
 				rtcalloc((struct route *)ro);
 #else
 				rtalloc((struct route *)ro);
