@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.38 2000/09/22 18:03:09 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.39 2000/10/11 19:54:08 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -268,6 +268,8 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>secrecy		{ YYD; yylval.num = IPSECDOI_SIT_SECRECY; return(SITUATIONTYPE); }
 <S_RMTS>integrity	{ YYD; yylval.num = IPSECDOI_SIT_INTEGRITY; return(SITUATIONTYPE); }
 <S_RMTS>identifier	{ YYD; return(IDENTIFIER); }
+<S_RMTS>my_identifier	{ YYD; return(MY_IDENTIFIER); }
+<S_RMTS>peers_identifier	{ YYD; return(PEERS_IDENTIFIER); }
 <S_RMTS>certificate_type	{ YYD; return(CERTIFICATE_TYPE); }
 <S_RMTS>x509		{ YYD; yylval.num = ISAKMP_CERT_X509SIGN; return(CERT_X509); }
 <S_RMTS>peers_certfile	{ YYD; return(PEERS_CERTFILE); }
@@ -395,12 +397,12 @@ rsaenc		{ YYD; yylval.num = algtype_rsaenc;	return(ALGORITHMTYPE); }
 rsarev		{ YYD; yylval.num = algtype_rsarev;	return(ALGORITHMTYPE); }
 
 	/* identifier type */
-vendor_id	{ YYD; return(VENDORID); }
-user_fqdn	{ YYD; yylval.num = LC_IDENTTYPE_USERFQDN; return(IDENTIFIERTYPE); }
-fqdn		{ YYD; yylval.num = LC_IDENTTYPE_FQDN; return(IDENTIFIERTYPE); }
-keyid		{ YYD; yylval.num = LC_IDENTTYPE_KEYID; return(IDENTIFIERTYPE); }
-address		{ YYD; yylval.num = LC_IDENTTYPE_ADDRESS; return(IDENTIFIERTYPE); }
-certname	{ YYD; yylval.num = LC_IDENTTYPE_CERTNAME; return(IDENTIFIERTYPE); }
+user_fqdn	{ YYD; yylval.num = IDTYPE_USERFQDN; return(IDENTIFIERTYPE); }
+fqdn		{ YYD; yylval.num = IDTYPE_FQDN; return(IDENTIFIERTYPE); }
+keyid		{ YYD; yylval.num = IDTYPE_KEYID; return(IDENTIFIERTYPE); }
+address		{ YYD; yylval.num = IDTYPE_ADDRESS; return(IDENTIFIERTYPE); }
+asn1dn		{ YYD; yylval.num = IDTYPE_ASN1DN; return(IDENTIFIERTYPE); }
+certname	{ YYD; yywarn("certname will be obsoleted in near future."); yylval.num = IDTYPE_ASN1DN; return(IDENTIFIERTYPE); }
 
 	/* units */
 B|byte|bytes		{ YYD; yylval.num = CF_UNITTYPE_B; return(UNITTYPE); }

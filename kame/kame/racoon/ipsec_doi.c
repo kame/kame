@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.115 2000/10/04 17:40:59 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.116 2000/10/11 19:54:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,6 +138,8 @@ static int setph1trns __P((struct isakmpsa *, caddr_t));
 static int setph1attr __P((struct isakmpsa *, caddr_t));
 static vchar_t *setph2proposal0 __P((const struct ph2handle *,
 	const struct saprop *, const struct saproto *));
+
+static vchar_t *getidval __P((int, vchar_t *));
 
 /*%%%*/
 /*
@@ -2969,54 +2971,90 @@ ipsecdoi_setid1(iph1)
 {
 	vchar_t *ret = NULL;
 	struct ipsecdoi_id_b id_b;
-	vchar_t *ident, idtmp;
+	vchar_t *ident = NULL;
 
 	/* init */
 	id_b.proto_id = 0;
 	id_b.port = 0;
-	ident = NULL;
 
-	switch (iph1->rmconf->identtype) {
-	case LC_IDENTTYPE_FQDN:
-	case LC_IDENTTYPE_USERFQDN:
-	case LC_IDENTTYPE_KEYID:
-		id_b.type = idtype2doi(iph1->rmconf->identtype);
-		ident = lcconf->ident[iph1->rmconf->identtype];
+	switch (iph1->rmconf->idvtype) {
+	case IDTYPE_FQDN:
+		id_b.type = IPSECDOI_ID_FQDN;
+		ident = getidval(iph1->rmconf->idvtype, iph1->rmconf->idv);
+		if (!ident) {
+			plog(logp, LOCATION, NULL,
+				"failed to get ID value.\n");
+			goto err;
+		}
+		break;
+	case IDTYPE_USERFQDN:
+		id_b.type = IPSECDOI_ID_USER_FQDN;
+		ident = getidval(iph1->rmconf->idvtype, iph1->rmconf->idv);
+		if (!ident) {
+			plog(logp, LOCATION, NULL,
+				"failed to get ID value.\n");
+			goto err;
+		}
+		break;
+	case IDTYPE_KEYID:
+		id_b.type = IPSECDOI_ID_KEY_ID;
+		ident = getidval(iph1->rmconf->idvtype, iph1->rmconf->idv);
+		if (!ident) {
+			plog(logp, LOCATION, NULL,
+				"failed to get ID value.\n");
+			goto err;
+		}
 		break;
 #ifdef HAVE_SIGNING_C
-	case LC_IDENTTYPE_CERTNAME:
+	case IDTYPE_ASN1DN:
 		id_b.type = IPSECDOI_ID_DER_ASN1_DN;
-		if (oakley_getmycert(iph1) < 0)
-			goto err;
-		ident = eay_get_x509asn1subjectname(&iph1->cert->cert);
+		if (iph1->rmconf->idv) {
+			/* XXX it must be encode to asn1dn. */
+			ident = vdup(iph1->rmconf->idv);
+		} else {
+			if (oakley_getmycert(iph1) < 0)
+				goto err;
+			ident = eay_get_x509asn1subjectname(&iph1->cert->cert);
+		}
 		break;
 #endif
-	case LC_IDENTTYPE_ADDRESS:
+	case IDTYPE_ADDRESS:
 	default:
 		/* use IP address */
 		switch (iph1->local->sa_family) {
 		case AF_INET:
 			id_b.type = IPSECDOI_ID_IPV4_ADDR;
 			id_b.port = ((struct sockaddr_in *)iph1->local)->sin_port;
-			idtmp.l = sizeof(struct in_addr);
-			idtmp.v = (caddr_t)&((struct sockaddr_in *)iph1->local)->sin_addr;
+			ident = vmalloc(sizeof(struct in_addr));
+			if (!ident) {
+				plog(logp, LOCATION, NULL,
+					"failed to get ID value.\n");
+				goto err;
+			}
+			memcpy(ident->v,
+			    &((struct sockaddr_in *)iph1->local)->sin_addr,
+			    ident->l);
 			break;
 #ifdef INET6
 		case AF_INET6:
 			id_b.type = IPSECDOI_ID_IPV6_ADDR;
 			id_b.port = ((struct sockaddr_in6 *)iph1->local)->sin6_port;
-			idtmp.l = sizeof(struct in6_addr);
-			idtmp.v = (caddr_t)&((struct sockaddr_in6 *)iph1->local)->sin6_addr;
+			ident = vmalloc(sizeof(struct in6_addr));
+			if (!ident) {
+				plog(logp, LOCATION, NULL,
+					"failed to get ID value.\n");
+				goto err;
+			}
+			memcpy(ident->v,
+			    &((struct sockaddr_in6 *)iph1->local)->sin6_addr,
+			    ident->l);
 			break;
 #endif
 		default:
-			plog(logp, LOCATION, NULL,
-				"invalid address family.\n");
+			plog(logp, LOCATION, NULL, "invalid address family.\n");
 			goto err;
 		}
-
 		id_b.proto_id = IPPROTO_UDP;
-		ident = &idtmp;
 	}
 
 	ret = vmalloc(sizeof(id_b) + ident->l);
@@ -3034,12 +3072,96 @@ ipsecdoi_setid1(iph1)
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL,
 			"use ID type of %s\n", s_ipsecdoi_ident(id_b.type)));
+	if (ident)
+		vfree(ident);
 	return 0;
 
 err:
-	plog(logp, LOCATION, NULL,
-		"failed get my ID\n");
+	if (ident)
+		vfree(ident);
+	plog(logp, LOCATION, NULL, "failed get my ID\n");
 	return -1;
+}
+
+static vchar_t *
+getidval(type, val)
+	int type;
+	vchar_t *val;
+{
+	vchar_t *new = NULL;
+
+	if (val)
+		new = vdup(val);
+	else if (lcconf->ident[type])
+		new = vdup(lcconf->ident[type]);
+
+	return new;
+}
+
+/* it's only called by cfparse.y. */
+int
+set_identifier(vpp, type, value)
+	vchar_t **vpp, *value;
+	int type;
+{
+	vchar_t *new = NULL;
+
+	/* simply return if value is null. */
+	if (!value)
+		return 0;
+
+	switch (type) {
+	case IDTYPE_FQDN:
+	case IDTYPE_USERFQDN:
+		/* length is adjusted since QUOTEDSTRING teminates NULL. */
+		new = vmalloc(value->l - 1);
+		if (new == NULL)
+			return -1;
+		memcpy(new->v, value->v, new->l);
+		break;
+	case IDTYPE_KEYID:
+	{
+		FILE *fp;
+		char b[512];
+		int tlen, len;
+		vchar_t *p;
+
+		fp = fopen(value->v, "r");
+		if (fp == NULL) {
+			plog(logp, LOCATION, NULL, "can not open %s", value->v);
+			return -1;
+		}
+		tlen = 0;
+		while ((len = fread(b, sizeof(b), 1, fp)) != 0) {
+			p = realloc(new, tlen + len);
+			if (!p) {
+				fclose(fp);
+				if (new)
+					vfree(new);
+				return -1;
+			}
+			memcpy(new + tlen, b, len);
+			tlen += len;
+		}
+		break;
+	}
+	case IDTYPE_ADDRESS:
+		/* XXX get from node's address */
+		/* but should be defined here */
+		break;
+	case IDTYPE_ASN1DN:
+		plog(logp, LOCATION, NULL, "asn1dn not supported yet.");
+		/* new = xxx_asn1encode(value); */
+		new = vmalloc(value->l);
+		if (new == NULL)
+			return -1;
+		memcpy(new->v, value->v, value->l);
+		break;
+	}
+
+	*vpp = new;
+
+	return 0;
 }
 
 /*
@@ -3053,11 +3175,7 @@ int
 ipsecdoi_setid2(iph2)
 	struct ph2handle *iph2;
 {
-	vchar_t *ident = NULL;
 	struct secpolicy *sp;
-
-	/* init */
-	ident = lcconf->ident[iph2->sainfo->myidenttype];
 
 	/* check there is phase 2 handler ? */
 	sp = getspbyspid(iph2->spid);
@@ -3068,7 +3186,7 @@ ipsecdoi_setid2(iph2)
 		return -1;
 	}
 
-	if (ident == NULL) {
+	if (!iph2->sainfo->idv) {
 		iph2->id = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.src,
 					sp->spidx.prefs, sp->spidx.ul_proto);
 		if (iph2->id == NULL) {
@@ -3082,20 +3200,29 @@ ipsecdoi_setid2(iph2)
 				s_ipsecdoi_ident(((struct ipsecdoi_id_b *)iph2->id->v)->type)));
 	} else {
 		struct ipsecdoi_id_b id_b;
+		vchar_t *ident;
 
-		id_b.type = idtype2doi(iph2->sainfo->myidenttype);
+		id_b.type = idtype2doi(iph2->sainfo->idvtype);
 		id_b.proto_id = 0;
 		id_b.port = 0;
 
+		ident = getidval(iph2->sainfo->idvtype, iph2->sainfo->idv);
+		if (!ident) {
+			plog(logp, LOCATION, NULL,
+				"failed to get ID value.\n");
+			return -1;
+		}
 		iph2->id = vmalloc(sizeof(id_b) + ident->l);
 		if (iph2->id == NULL) {
 			plog(logp, LOCATION, NULL,
 				"failed to get ID buffer.\n");
+			vfree(ident);
 			return -1;
 		}
 
 		memcpy(iph2->id->v, &id_b, sizeof(id_b));
 		memcpy(iph2->id->v + sizeof(id_b), ident->v, ident->l);
+		vfree(ident);
 	}
 
 	/* remote side */
@@ -3581,3 +3708,27 @@ ipsecdoi_authalg2trnsid(alg)
 	}
 	return -1;
 }
+
+static int rm_idtype2doi[] = {
+	IPSECDOI_ID_FQDN,
+	IPSECDOI_ID_USER_FQDN,
+	IPSECDOI_ID_KEY_ID,
+	-1,	/* it's type of "address"
+		 * it expands into 4 types by another function. */
+	IPSECDOI_ID_DER_ASN1_DN,
+};
+
+/*
+ * convert idtype to DOI value.
+ * OUT	-1   : NG
+ *	other: converted.
+ */
+int
+idtype2doi(idtype)
+	int idtype;
+{
+	if (ARRAYLEN(rm_idtype2doi) > idtype)
+		return rm_idtype2doi[idtype];
+	return -1;
+}
+

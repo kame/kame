@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.73 2000/10/04 03:26:09 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.74 2000/10/11 19:54:07 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -130,7 +130,7 @@ static int expand_isakmpspec __P((int, int, int *,
 	/* include */
 %token INCLUDE
 	/* self information */
-%token IDENTIFIER IDENTIFIERTYPE VENDORID
+%token IDENTIFIER VENDORID
 	/* logging */
 %token LOGGING LOGLEV
 	/* padding */
@@ -152,6 +152,7 @@ static int expand_isakmpspec __P((int, int, int *,
 %token REMOTE ANONYMOUS
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
 %token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE VERIFY_CERT SEND_CERT SEND_CR
+%token IDENTIFIERTYPE MY_IDENTIFIER PEERS_IDENTIFIER
 %token CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE INITIAL_CONTACT
 %token PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL
@@ -180,6 +181,7 @@ static int expand_isakmpspec __P((int, int, int *,
 %type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE
 %type <num> CERTTYPE CERT_X509 PROPOSAL_CHECK_LEVEL
 %type <val> QUOTEDSTRING HEXSTRING ADDRSTRING STATICSA_STATEMENT sainfo_id
+%type <val> identifierstring
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
 %type <saddr> remote_index
@@ -251,6 +253,8 @@ identifier_stmt
 		QUOTEDSTRING EOS
 	|	IDENTIFIERTYPE QUOTEDSTRING EOS
 		{
+			yywarn("WARNINIG: identifier should be defined at each remote directives.");
+			yywarn("WARNINIG: it will be obsoleted near future.");
 			$2->l--;	/* nuke '\0' */
 			lcconf->ident[$1] = $2;
 			if (lcconf->ident[$1] == NULL) {
@@ -779,7 +783,7 @@ sainfo_id
 		{
 			struct ipsecdoi_id_b *id_b;
 
-			if ($1 == LC_IDENTTYPE_CERTNAME) {
+			if ($1 == IDTYPE_ASN1DN) {
 				yyerror("id type forbidden: %d", $1);
 				return -1;
 			}
@@ -837,12 +841,25 @@ sainfo_spec
 		algorithms EOS
 	|	IDENTIFIER IDENTIFIERTYPE
 		{
-			if ($2 == LC_IDENTTYPE_CERTNAME) {
+			yywarn("identifier should not be used, instead use \"my_identifier\".");
+			if ($2 == IDTYPE_ASN1DN) {
 				yyerror("id type forbidden: %d", $2);
 				return -1;
 			}
-
-			cur_sainfo->myidenttype = $2;
+			cur_sainfo->idvtype = $2;
+		}
+		EOS
+	|	MY_IDENTIFIER IDENTIFIERTYPE QUOTEDSTRING
+		{
+			if ($2 == IDTYPE_ASN1DN) {
+				yyerror("id type forbidden: %d", $2);
+				return -1;
+			}
+			if (set_identifier(&cur_sainfo->idv, $2, $3) != 0) {
+				yyerror("failed to set identifer.\n");
+				return -1;
+			}
+			cur_sainfo->idvtype = $2;
 		}
 		EOS
 	;
@@ -935,7 +952,7 @@ remote_statement
 		}
 		BOC remote_specs EOC
 		{
-			if (cur_rmconf->identtype == LC_IDENTTYPE_CERTNAME
+			if (cur_rmconf->idvtype == IDTYPE_ASN1DN
 			 && cur_rmconf->mycertfile == NULL) {
 				yyerror("id type mismatched due to "
 					"no CERT defined.\n");
@@ -1021,7 +1038,27 @@ remote_spec
 	|	VERIFY_CERT SWITCH EOS { cur_rmconf->verify_cert = $2; }
 	|	SEND_CERT SWITCH EOS { cur_rmconf->send_cert = $2; }
 	|	SEND_CR SWITCH EOS { cur_rmconf->send_cr = $2; }
-	|	IDENTIFIER IDENTIFIERTYPE EOS { cur_rmconf->identtype = $2; }
+	|	IDENTIFIER IDENTIFIERTYPE EOS
+		{
+			yywarn("identifier should not be used, instead use \"my_identifier\".");
+			cur_rmconf->idvtype = $2;
+		}
+	|	MY_IDENTIFIER IDENTIFIERTYPE identifierstring EOS
+		{
+			if (set_identifier(&cur_rmconf->idv, $2, $3) != 0) {
+				yyerror("failed to set identifer.\n");
+				return -1;
+			}
+			cur_rmconf->idvtype = $2;
+		}
+	|	PEERS_IDENTIFIER IDENTIFIERTYPE identifierstring EOS
+		{
+			if (set_identifier(&cur_rmconf->idv_p, $2, $3) != 0) {
+				yyerror("failed to set identifer.\n");
+				return -1;
+			}
+			cur_rmconf->idvtype_p = $2;
+		}
 	|	NONCE_SIZE NUMBER EOS { cur_rmconf->nonce_size = $2; }
 	|	DH_GROUP
 		{
@@ -1103,6 +1140,7 @@ cert_spec
 #endif
 		}
 		EOS
+	;
 dh_group_num
 	:	ALGORITHMTYPE
 		{
@@ -1121,6 +1159,10 @@ dh_group_num
 				return -1;
 			}
 		}
+	;
+identifierstring
+	:	/* nothing */ { $$ = NULL; }
+	|	QUOTEDSTRING { $$ = $1; }
 	;
 isakmpproposal_specs
 	:	/* nothing */

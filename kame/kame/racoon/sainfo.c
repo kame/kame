@@ -1,4 +1,4 @@
-/*	$KAME: sainfo.c,v 1.11 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: sainfo.c,v 1.12 2000/10/11 19:54:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,7 +111,7 @@ newsainfo()
 	if (new == NULL)
 		return NULL;
 
-	new->myidenttype = LC_IDENTTYPE_ADDRESS;
+	new->idvtype = IDTYPE_ADDRESS;
 	new->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
 	new->lifebyte = IPSECDOI_ATTR_SA_LD_KB_MAX;
 

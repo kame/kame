@@ -1,4 +1,4 @@
-/*	$KAME: localconf.h,v 1.19 2000/10/04 17:41:01 itojun Exp $	*/
+/*	$KAME: localconf.h,v 1.20 2000/10/11 19:54:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,13 +40,6 @@
 #define LC_PATHTYPE_CERT	2
 #define LC_PATHTYPE_MAX		3
 
-#define LC_IDENTTYPE_FQDN		0
-#define LC_IDENTTYPE_USERFQDN		1
-#define LC_IDENTTYPE_KEYID		2
-#define LC_IDENTTYPE_ADDRESS		3
-#define LC_IDENTTYPE_CERTNAME		4
-#define LC_IDENTTYPE_MAX		5
-
 #define LC_DEFAULT_PAD_MAXSIZE		20
 #define LC_DEFAULT_PAD_RANDOM		TRUE
 #define LC_DEFAULT_PAD_RANDOMLEN	FALSE
@@ -59,6 +52,8 @@
 #define LC_DEFAULT_WAIT_PH2COMPLETE	10
 
 #define LC_DEFAULT_SECRETSIZE	16	/* 128 bits */
+
+#define LC_IDENTTYPE_MAX	5	/* XXX */
 
 struct localconf {
 	char *racoon_conf;
@@ -110,7 +105,5 @@ extern void flushlcconf __P((void));
 extern vchar_t *getpskbyname __P((vchar_t *));
 extern vchar_t *getpskbyaddr __P((struct sockaddr *));
 extern void getpathname __P((char *, int, int, const char *));
-extern int doi2idtype __P((int));
-extern int idtype2doi __P((int));
 extern int sittype2doi __P((int));
 extern int doitype2doi __P((int));

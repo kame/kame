@@ -1,4 +1,4 @@
-/*	$KAME: localconf.c,v 1.26 2000/10/04 17:41:01 itojun Exp $	*/
+/*	$KAME: localconf.c,v 1.27 2000/10/11 19:54:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -270,6 +270,7 @@ getpathname(path, len, type, name)
 		plog(logp, LOCATION, NULL, "filename: %s\n", path));
 }
 
+#if 0 /* DELETEIT */
 static int lc_doi2idtype[] = {
 	-1,
 	-1,
@@ -298,28 +299,7 @@ doi2idtype(idtype)
 		return lc_doi2idtype[idtype];
 	return -1;
 }
-
-static int lc_idtype2doi[] = {
-	IPSECDOI_ID_FQDN,
-	IPSECDOI_ID_USER_FQDN,
-	IPSECDOI_ID_KEY_ID,
-	-1,	/* if type is "address", it expands to 4 types. */
-	IPSECDOI_ID_DER_ASN1_DN,
-};
-
-/*
- * convert idtype to DOI value.
- * OUT	-1   : NG
- *	other: converted.
- */
-int
-idtype2doi(idtype)
-	int idtype;
-{
-	if (ARRAYLEN(lc_idtype2doi) > idtype)
-		return lc_idtype2doi[idtype];
-	return -1;
-}
+#endif
 
 static int lc_sittype2doi[] = {
 	IPSECDOI_SIT_IDENTITY_ONLY,

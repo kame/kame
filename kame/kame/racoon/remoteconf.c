@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.16 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: remoteconf.c,v 1.17 2000/10/11 19:54:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,7 +152,8 @@ newrmconf()
 	/* set default */
 	new->doitype = IPSEC_DOI;
 	new->sittype = IPSECDOI_SIT_IDENTITY_ONLY;
-	new->identtype = LC_IDENTTYPE_ADDRESS;
+	new->idvtype = IDTYPE_ADDRESS;
+	new->idvtype_p = IDTYPE_ADDRESS;
 	new->nonce_size = DEFAULT_NONCE_SIZE;
 	new->keepalive = FALSE;
 	new->ini_contact = TRUE;

@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.18 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: remoteconf.h,v 1.19 2000/10/11 19:54:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,7 +47,12 @@ struct remoteconf {
 					 * is a type to be sent first. */
 	int doitype;			/* doi type */
 	int sittype;			/* situation type */
-	int identtype;			/* identifier type, see localconf.h */
+
+	int idvtype;			/* my identifier type */
+	vchar_t *idv;			/* my identifier */
+	int idvtype_p;			/* peer's identifier type */
+	vchar_t *idv_p;			/* peer's identifier */
+
 	int certtype;			/* certificate type if need */
 	char *mycertfile;		/* file name of my certificate */
 	char *myprivfile;		/* file name of my private key file */

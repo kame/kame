@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.53 2000/09/30 15:15:53 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.54 2000/10/11 19:54:08 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -165,14 +165,9 @@ other configuration file can be included.
 .El
 .\"
 .Ss Identifier Specification
-.Bl -tag -width Ds -compact
-.It Ic identifier Ic user_fqdn Ar string ;
-defines my USER_FQDN included ID payload.
-.It Ic identifier Ic fqdn Ar string ;
-defines my FQDN included ID payload.
-.It Ic identifier Ic keyid Ar file ;
-defines my KEY_ID included ID payload.
-.El
+is obsoleted.  It must be defined at each
+.Ic remote
+directives.
 .\"
 .Ss Timer Specification
 .Bl -tag -width Ds -compact
@@ -251,15 +246,39 @@ means to use SIT_IDENTITY_ONLY specifyed RFC 2407.
 You can omit it.
 .\"
 .It Ic identifier Ar idtype ;
-specifies ID type to use in phase 1 negotiation.
-The following type can be defined as
+is obsoleted.  Instead, use
+.Ic my_identifier .
+.\"
+.It Ic my_identifier Ar idtype ... ;
+specifies my identifier and its type to use in phase 1 negotiation.
+.Ic address, fqdn , user_fqdn , keyid and asn1dn
+can be used as
 .Ar idtype .
-.Ic address
-is default.
-.Ic fqdn , user_fqdn , keyid and certname
-are linked to
-.Ic identifier
-directive.
+Each usage are the following.
+.Bl -tag -width Ds -compact
+.It Ic identifier Ic address Bq Ar address ;
+defines the type of IP address.
+It is default if you don't specify the identifier.
+.It Ic identifier Ic user_fqdn Ar string ;
+defines the type of USER_FQDN.
+.It Ic identifier Ic fqdn Ar string ;
+defines the type of FQDN.
+.It Ic identifier Ic keyid Ar file ;
+defines the type of KEY_ID.
+.It Ic identifier Ic asn1dn Bq Ar string ;
+defines the type of ASN.1 distinguished name.  If
+.Ar string
+is omitted,
+.Xr racoon 8
+will get DN from the certificate.
+.El 
+.\"
+.It Ic peers_identifier Ar idtype ... ;
+specifies peer's identifier like
+.Ic my_identifier .
+If it is not defined then
+.Xr racoon 8
+will not verify the peer's identifier in ID payload transmitted from the peer.
 .\"
 .It Ic certificate_type Ar certspec ;
 specifies a certificate specification.
