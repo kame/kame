@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.28 2005/02/27 03:51:40 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.29 2005/02/27 03:53:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -155,8 +155,7 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 				    &iapdc->iapd_pif_list, ifp, &ia->ctl,
 				    callback)) {
 					dprintf(LOG_NOTICE, FNAME,
-					    "failed to update a prefix"
-					    "%s/%d",
+					    "failed to update a prefix %s/%d",
 					    in6addr2str(&siav->val_prefix6.addr, 0),
 					    siav->val_prefix6.plen);
 				}
@@ -166,8 +165,7 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 				if (update_address(ia, &siav->val_prefix6, ifp,
 				    &ia->ctl, callback)) {
 					dprintf(LOG_NOTICE, FNAME,
-					    "failed to update"
-					    "an address %s",
+					    "failed to update an address %s",
 					    in6addr2str(&siav->val_prefix6.addr, 0));
 				}
 				break;
