@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.104 2001/03/02 16:31:29 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.105 2001/03/06 09:16:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1632,7 +1632,14 @@ nd6_prefix_onlink(pr)
 		/* explicitly set in case ifa_flags does not set the flag. */
 		rtflags |= RTF_CLONING;
 	} else {
-		/* explicitly clear in case ifa_flags sets the flag. */
+		/*
+		 * set the gateway flag to prevent nd6_rtrequest() from setting
+		 * RTF_LLINFO (which annoys the ndp(8) command).
+		 */
+		rtflags |= RTF_GATEWAY;
+		/*
+		 * explicitly clear the cloning bit in case ifa_flags sets it.
+		 */
 		rtflags &= ~RTF_CLONING;
 	}
 	error = rtrequest(RTM_ADD, (struct sockaddr *)&pr->ndpr_prefix,
