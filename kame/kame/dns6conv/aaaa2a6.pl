@@ -47,6 +47,6 @@ while (<ZONE>) {
 	    exit(1);
 	}
 	chop($prefix);
-	print "$name\t$ttl IN A6 $beg $prefix\t$pname\n";
+	printf "%-12s%4s IN A6 $beg %-24s$pname\n", $name, $ttl, $prefix;
     }
 }
