@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.19 2000/06/13 05:41:04 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.20 2000/06/16 12:44:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,6 +34,10 @@
 
 /*
  * OS dependencies:
+ *
+ * - struct rt_addrinfo
+ *   all *BSDs except bsdi4 only have two members; rti_addrs and rti_info[].
+ *   bsdi4 has additional members; rti_flags, rti_ifa, rti_ifp, and rti_rtm.
  *
  * - side effects of rtrequest[1](RTM_DELETE)
  *	BSDI[34]: delete all cloned routes underneath the route.
