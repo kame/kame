@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.75 2004/01/03 00:00:07 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.76 2004/01/03 00:06:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,9 +108,13 @@ int main __P((int, char **));
 
 /* static variables and functions */
 static int mobile_node = 0;
+#ifndef SMALL
 static int do_dump;
 static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurable */
+#endif
+#if 0
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
+#endif
 
 #if 0
 static int ifreconfig __P((char *));
@@ -118,7 +122,9 @@ static int ifreconfig __P((char *));
 static int make_packet __P((struct ifinfo *));
 static struct timeval *rtsol_check_timer __P((void));
 
+#ifndef SMALL
 static void rtsold_set_dump_file __P((int));
+#endif
 static void usage __P((char *));
 
 int
@@ -223,8 +229,10 @@ main(int argc, char **argv)
 	if (getinet6sysctl(IPV6CTL_FORWARDING))
 		warnx("kernel is configured as a router, not a host");
 
+#ifndef SMALL
 	/* initialization to dump internal status to a file */
 	signal(SIGUSR1, rtsold_set_dump_file);
+#endif
 
 	if (!fflag)
 		daemon(0, 0);		/* act as a daemon */
@@ -304,6 +312,7 @@ main(int argc, char **argv)
 		/*NOTREACHED*/
 	}
 
+#if 0
 	/* dump the current pid */
 	if (!once) {
 		pid_t pid = getpid();
@@ -318,6 +327,7 @@ main(int argc, char **argv)
 			fclose(fp);
 		}
 	}
+#endif
 
 #if 0
 	/* revoke privilege */
@@ -342,10 +352,12 @@ main(int argc, char **argv)
 		memcpy(selectfdp, fdsetp, fdmasks);
 #endif
 
+#ifndef SMALL
 		if (do_dump) {	/* SIGUSR1 */
 			do_dump = 0;
 			rtsold_dump_file(dumpfilename);
 		}
+#endif
 
 		timeout = rtsol_check_timer();
 
@@ -754,11 +766,13 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 /* timer related utility functions */
 #define MILLION 1000000
 
+#ifndef SMALL
 static void
 rtsold_set_dump_file(int sig)
 {
 	do_dump = 1;
 }
+#endif
 
 static void
 usage(char *progname)
