@@ -43,7 +43,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)pac.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/pac/pac.c,v 1.10 1999/08/28 01:16:57 peter Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/pac/pac.c,v 1.10.2.1 2001/02/28 14:57:33 dwmalone Exp $";
 #endif /* not lint */
 
 /*
@@ -450,7 +450,8 @@ chkprinter(s)
 	case PCAPERR_TCLOOP:
 		fatal(pp, "%s", pcaperr(stat));
 	}
-	acctfile = pp->acct_file;
+	if ((acctfile = pp->acct_file) == NULL)
+		errx(3, "accounting not enabled for printer %s", s);
 	if (!pflag && pp->price100)
 		price = pp->price100/10000.0;
 	sumfile = (char *) calloc(sizeof(char), strlen(acctfile)+5);

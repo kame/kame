@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)rmjob.c	8.2 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/common_source/rmjob.c,v 1.12 1999/08/28 01:16:48 peter Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/common_source/rmjob.c,v 1.12.2.3 2001/03/13 20:36:33 gad Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -69,7 +69,7 @@ static const char rcsid[] =
 static char	root[] = "root";
 static int	all = 0;		/* eliminate all files (root only) */
 static int	cur_daemon;		/* daemon's pid */
-static char	current[40];		/* active control file name */
+static char	current[7+MAXHOSTNAMELEN];  /* active control file name */
 
 extern uid_t	uid, euid;		/* real and effective user id's */
 
@@ -211,8 +211,6 @@ process(pp, file)
 		case 'U':  /* unlink associated files */
 			if (strchr(line+1, '/') || strncmp(line+1, "df", 2))
 				break;
-			if (from != host)
-				printf("%s: ", host);
 			do_unlink(line+1);
 		}
 	}
@@ -316,7 +314,7 @@ void
 rmremote(pp)
 	const struct printer *pp;
 {
-	int i, rem, niov, totlen;
+	int i, elem, firstreq, niov, rem, totlen;
 	char buf[BUFSIZ];
 	void (*savealrm)(int);
 	struct iovec *iov;
@@ -340,24 +338,31 @@ rmremote(pp)
 	 * us to process requests of indeterminate length without
 	 * applying an arbitrary limit.  Arbitrary Limits Are Bad (tm).
 	 */
-	niov = 4 + 2 * users + requests + 1;
+	if (users > 0)
+		niov = 4 + 2 * users + requests + 1;
+	else
+		niov = 4 + requests + 1;
 	iov = malloc(niov * sizeof *iov);
 	if (iov == 0)
-		fatal(pp, "out of memory");
+		fatal(pp, "out of memory in rmremote()");
 	iov[0].iov_base = "\5";
 	iov[1].iov_base = pp->remote_queue;
 	iov[2].iov_base = " ";
 	iov[3].iov_base = all ? "-all" : person;
+	elem = 4;
 	for (i = 0; i < users; i++) {
-		iov[4 + 2 * i].iov_base = " ";
-		iov[4 + 2 * i + 1].iov_base = user[i];
+		iov[elem].iov_base = " ";
+		iov[elem + 1].iov_base = user[i];
+		elem += 2;
 	}
+	firstreq = elem;
 	for (i = 0; i < requests; i++) {
-		asprintf(&iov[4 + 2 * users + i].iov_base, " %d", requ[i]);
-		if (iov[4 + 2 * users + i].iov_base == 0)
-			fatal(pp, "out of memory");
+		asprintf(&iov[elem].iov_base, " %d", requ[i]);
+		if (iov[elem].iov_base == 0)
+			fatal(pp, "out of memory in rmremote()");
+		elem++;
 	}
-	iov[4 + 2 * users + requests].iov_base = "\n";
+	iov[elem++].iov_base = "\n";
 	for (totlen = i = 0; i < niov; i++)
 		totlen += (iov[i].iov_len = strlen(iov[i].iov_base));
 
@@ -377,7 +382,7 @@ rmremote(pp)
 		(void) close(rem);
 	}
 	for (i = 0; i < requests; i++)
-		free(iov[4 + 2 * users + i].iov_base);
+		free(iov[firstreq + i].iov_base);
 	free(iov);
 }
 

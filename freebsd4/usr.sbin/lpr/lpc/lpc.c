@@ -43,7 +43,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)lpc.c	8.3 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/lpc/lpc.c,v 1.13.2.1 2000/07/03 06:23:49 ps Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/lpc/lpc.c,v 1.13.2.3 2000/12/26 22:31:45 gad Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -138,9 +138,9 @@ intr(signo)
 }
 
 static char *
-lpc_prompt()
+lpc_prompt(void)
 {
-	return("lpc> ");
+	return ("lpc> ");
 }
 
 /*
@@ -334,6 +334,7 @@ ingroup(grname)
 	char *grname;
 {
 	static struct group *gptr=NULL;
+	static int ngroups = 0;
 	static gid_t groups[NGROUPS];
 	register gid_t gid;
 	register int i;
@@ -343,11 +344,12 @@ ingroup(grname)
 			warnx("warning: unknown group '%s'", grname);
 			return(0);
 		}
-		if (getgroups(NGROUPS, groups) < 0)
+		ngroups = getgroups(NGROUPS, groups);
+		if (ngroups < 0)
 			err(1, "getgroups");
 	}
 	gid = gptr->gr_gid;
-	for (i = 0; i < NGROUPS; i++)
+	for (i = 0; i < ngroups; i++)
 		if (gid == groups[i])
 			return(1);
 	return(0);

@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)syslog.conf.5	8.1 (Berkeley) 6/9/93
-.\" $FreeBSD: src/usr.sbin/syslogd/syslog.conf.5,v 1.16.2.1 2000/10/30 11:42:27 dwmalone Exp $
+.\" $FreeBSD: src/usr.sbin/syslogd/syslog.conf.5,v 1.16.2.3 2001/04/03 16:25:59 cwt Exp $
 .\"
 .Dd June 9, 1993
 .Dt SYSLOG.CONF 5
@@ -100,9 +100,9 @@ are case insensitive.
 The
 .Em facility
 describes the part of the system generating the message, and is one of
-the following keywords: auth, authpriv, cron, daemon, ftp, kern, lpr, mail,
-mark, news, ntp, syslog, user, uucp, security and local0 through local7.
-These keywords (with the exception of mark) correspond to the
+the following keywords: auth, authpriv, console, cron, daemon, ftp, kern, 
+lpr, mail, mark, news, ntp, security, syslog, user, uucp and local0 through 
+local7. These keywords (with the exception of mark) correspond to the
 similar
 .Dq Dv LOG_
 values specified to the
@@ -117,8 +117,7 @@ may be used to specify exactly what is logged.
 The default set of comparison flags are
 .Dq =>
 (or, if you prefer,
-.Do >=
-.Dc ),
+.Dq >= ) ,
 which means that messages from the specified
 .Em facility
 list of a priority
@@ -390,6 +389,9 @@ auth.*					|exec /usr/local/sbin/authfilter
 
 # Log all security messages to a separate file.
 security.*						/var/log/security
+
+# Log all writes to /dev/console to a separate file.
+console.*						/var/log/console.log
 .Ed
 .Sh IMPLEMENTATION NOTES
 The

@@ -40,7 +40,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/common_source/printcap.c,v 1.6 1999/08/28 01:16:48 peter Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/common_source/printcap.c,v 1.6.2.1 2000/12/26 18:17:26 gad Exp $";
 #endif /* not lint */
 
 #include <errno.h>
@@ -251,6 +251,8 @@ getprintcap_int(bp, pp)
 			    &pp->remote_queue));
 	CHK(capdb_getaltstr(bp, "sd", "spool.dir", _PATH_DEFSPOOL,
 			    &pp->spool_dir));
+	CHK(capdb_getaltstr(bp, "sr", "stat.recv", 0, &pp->stat_recv));
+	CHK(capdb_getaltstr(bp, "ss", "stat.send", 0, &pp->stat_send));
 	CHK(capdb_getaltstr(bp, "st", "spool.status", DEFSTAT,
 			    &pp->status_file));
 	CHK(capdb_getaltstr(bp, "tr", "job.trailer", 0, &pp->trailer));
@@ -346,6 +348,8 @@ free_printer(struct printer *pp)
 	cfree(pp->remote_host);
 	cfree(pp->remote_queue);
 	cfree(pp->spool_dir);
+	cfree(pp->stat_recv);
+	cfree(pp->stat_send);
 	cfree(pp->status_file);
 	cfree(pp->trailer);
 	cfree(pp->mode_set);

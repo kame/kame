@@ -31,7 +31,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/usr.sbin/lpr/lp/lp.1,v 1.12 2000/03/08 10:13:50 sheldonh Exp $
+.\" $FreeBSD: src/usr.sbin/lpr/lp/lp.1,v 1.12.2.2 2000/12/27 16:23:14 ru Exp $
 .\"
 .Dd January 22, 1995
 .Dt LP 1
@@ -40,14 +40,14 @@
 .Nm lp
 .Nd front-end to the print spooler
 .Sh SYNOPSIS
-.Nm lp
+.Nm
 .Op Fl cs
 .Op Fl o Ar option
 .Op Fl d Ar printer
 .Op Fl n Ar num
 .Op Ar name ...
 .Sh DESCRIPTION
-.Nm Lp
+.Nm \&Lp
 is a front-end to the print spooler as required by the
 .St -p1003.2
 specification.  It effectively invokes
@@ -107,8 +107,7 @@ specification.
 This implementation of the
 .Nm
 command has been written by
-.if t J\(:org Wunsch.
-.if n Joerg Wunsch.
+.An J\(:org Wunsch .
 .Sh BUGS
 The
 .St -p1003.2

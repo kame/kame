@@ -43,7 +43,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)printjob.c	8.7 (Berkeley) 5/10/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/lpd/printjob.c,v 1.22.2.1 2000/06/24 22:48:15 mpp Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/lpd/printjob.c,v 1.22.2.10 2000/12/26 21:34:03 gad Exp $";
 #endif /* not lint */
 
 
@@ -95,6 +95,7 @@ static dev_t	 fdev;		/* device of file pointed to by symlink */
 static ino_t	 fino;		/* inode of file pointed to by symlink */
 static FILE	*cfp;		/* control file */
 static int	 child;		/* id of any filters */
+static int	 job_dfcnt;	/* count of datafiles in current user job */
 static int	 lfd;		/* lock file descriptor */
 static int	 ofd;		/* output filter file descriptor */
 static int	 ofilter;	/* id of output filter, if any */
@@ -106,7 +107,7 @@ static char	 title[80];	/* ``pr'' title */
 static char      locale[80];    /* ``pr'' locale */
 
 static char	class[32];		/* classification field */
-static char	fromhost[32];		/* user's host machine */
+static char	fromhost[MAXHOSTNAMELEN];	/* user's host machine */
 				/* indentation size in static characters */
 static char	indent[10] = "-i0";
 static char	jobname[100];		/* job or file name */
@@ -114,7 +115,8 @@ static char	length[10] = "-l";	/* page length in lines */
 static char	logname[32];		/* user's login name */
 static char	pxlength[10] = "-y";	/* page length in pixels */
 static char	pxwidth[10] = "-x";	/* page width in pixels */
-static char	tempfile[] = "errsXXXXXX"; /* file name for filter errors */
+/* tempstderr is the filename used to catch stderr from exec-ing filters */
+static char	tempstderr[] = "errs.XXXXXXX";
 static char	width[10] = "-w";	/* page width in static characters */
 #define TFILENAME "fltXXXXXX"
 static char	tfile[] = TFILENAME;	/* file name for filter output */
@@ -147,12 +149,13 @@ printjob(pp)
 	struct printer *pp;
 {
 	struct stat stb;
-	register struct queue *q, **qp;
-	struct queue **queue;
+	register struct jobqueue *q, **qp;
+	struct jobqueue **queue;
 	register int i, nitems;
 	off_t pidoff;
-	int errcnt, count = 0;
+	int errcnt, jobcount, tempfd;
 
+	jobcount = 0;
 	init(pp); /* set up capabilities */
 	(void) write(1, "", 1);	/* ack that daemon is started */
 	(void) close(2);			/* set up log file */
@@ -167,8 +170,6 @@ printjob(pp)
 	signal(SIGINT, abortpr);
 	signal(SIGQUIT, abortpr);
 	signal(SIGTERM, abortpr);
-
-	(void) mktemp(tempfile);
 
 	/*
 	 * uses short form file names
@@ -217,6 +218,21 @@ printjob(pp)
 			syslog(LOG_ERR, "%s: %s: %m", pp->printer,
 			       pp->lock_file);
 	}
+
+	/* create a file which will be used to hold stderr from filters */
+	if ((tempfd = mkstemp(tempstderr)) == -1) {
+		syslog(LOG_ERR, "%s: mkstemp(%s): %m", pp->printer,
+		       tempstderr);
+		exit(1);
+	}
+	if ((i = fchmod(tempfd, 0664)) == -1) {
+		syslog(LOG_ERR, "%s: fchmod(%s): %m", pp->printer,
+		       tempstderr);
+		exit(1);
+	}
+	/* lpd doesn't need it to be open, it just needs it to exist */
+	close(tempfd);
+
 	openpr(pp);			/* open printer or remote */
 again:
 	/*
@@ -226,20 +242,20 @@ again:
 	 */
 	for (qp = queue; nitems--; free((char *) q)) {
 		q = *qp++;
-		if (stat(q->q_name, &stb) < 0)
+		if (stat(q->job_cfname, &stb) < 0)
 			continue;
 		errcnt = 0;
 	restart:
 		(void) lseek(lfd, pidoff, 0);
-		(void) snprintf(line, sizeof(line), "%s\n", q->q_name);
+		(void) snprintf(line, sizeof(line), "%s\n", q->job_cfname);
 		i = strlen(line);
 		if (write(lfd, line, i) != i)
 			syslog(LOG_ERR, "%s: %s: %m", pp->printer,
 			       pp->lock_file);
 		if (!pp->remote)
-			i = printit(pp, q->q_name);
+			i = printit(pp, q->job_cfname);
 		else
-			i = sendit(pp, q->q_name);
+			i = sendit(pp, q->job_cfname);
 		/*
 		 * Check to see if we are supposed to stop printing or
 		 * if we are to rebuild the queue.
@@ -259,8 +275,8 @@ again:
 				break;
 			}
 		}
-		if (i == OK)		/* file ok and printed */
-			count++;
+		if (i == OK)		/* all files of this job printed */
+			jobcount++;
 		else if (i == REPRINT && ++errcnt < 5) {
 			/* try reprinting the job */
 			syslog(LOG_INFO, "restarting %s", pp->printer);
@@ -281,12 +297,12 @@ again:
 			syslog(LOG_WARNING, "%s: job could not be %s (%s)", 
 			       pp->printer,
 			       pp->remote ? "sent to remote host" : "printed",
-			       q->q_name);
+			       q->job_cfname);
 			if (i == REPRINT) {
 				/* ensure we don't attempt this job again */
-				(void) unlink(q->q_name);
-				q->q_name[0] = 'd';
-				(void) unlink(q->q_name);
+				(void) unlink(q->job_cfname);
+				q->job_cfname[0] = 'd';
+				(void) unlink(q->job_cfname);
 				if (logname[0])
 					sendmail(pp, logname, FATALERR);
 			}
@@ -303,7 +319,7 @@ again:
 	}
 	if (nitems == 0) {		/* no more work to do */
 	done:
-		if (count > 0) {	/* Files actually printed */
+		if (jobcount > 0) {	/* jobs actually printed */
 			if (!pp->no_formfeed && !pp->tof)
 				(void) write(ofd, pp->form_feed,
 					     strlen(pp->form_feed));
@@ -313,7 +329,7 @@ again:
 		}
 		(void) close(ofd);
 		(void) wait(NULL);
-		(void) unlink(tempfile);
+		(void) unlink(tempstderr);
 		exit(0);
 	}
 	goto again;
@@ -339,8 +355,10 @@ printit(pp, file)
 {
 	register int i;
 	char *cp;
-	int bombed = OK;
+	int bombed, didignorehdr;
 
+	bombed = OK;
+	didignorehdr = 0;
 	/*
 	 * open control file; ignore if no longer there.
 	 */
@@ -356,6 +374,9 @@ printit(pp, file)
 	sprintf(&width[2], "%ld", pp->page_width);
 	strcpy(indent+2, "0");
 
+	/* initialize job-specific count of datafiles processed */
+	job_dfcnt = 0;
+	
 	/*
 	 *      read the control file for work to do
 	 *
@@ -485,7 +506,22 @@ printit(pp, file)
 			continue;
 
 		default:	/* some file to print */
-			switch (i = print(pp, line[0], line+1)) {
+			/* only lowercase cmd-codes include a file-to-print */
+			if ((line[0] < 'a') || (line[0] > 'z')) {
+				/* ignore any other lines */
+				if (lflag <= 1)
+					continue;
+				if (!didignorehdr) {
+					syslog(LOG_INFO, "%s: in %s :",
+					       pp->printer, file);
+					didignorehdr = 1;
+				}
+				syslog(LOG_INFO, "%s: ignoring line: '%c' %s",
+				       pp->printer, line[0], &line[1]);
+				continue;
+			}
+			i = print(pp, line[0], line+1);
+			switch (i) {
 			case ERROR:
 				if (bombed == OK)
 					bombed = FATALERR;
@@ -558,12 +594,15 @@ print(pp, format, file)
 	int fi, fo;
 	FILE *fp;
 	char *av[15], buf[BUFSIZ];
-	int pid, p[2], stopped = 0;
+	int pid, p[2], stopped;
 	union wait status;
 	struct stat stb;
 
-	if (lstat(file, &stb) < 0 || (fi = open(file, O_RDONLY)) < 0)
+	if (lstat(file, &stb) < 0 || (fi = open(file, O_RDONLY)) < 0) {
+		syslog(LOG_INFO, "%s: unable to open %s ('%c' line)",
+		       pp->printer, file, format);
 		return(ERROR);
+	}
 	/*
 	 * Check to see if data file is a symbolic link. If so, it should
 	 * still point to the same file or someone is trying to print
@@ -572,6 +611,11 @@ print(pp, format, file)
 	if ((stb.st_mode & S_IFMT) == S_IFLNK && fstat(fi, &stb) == 0 &&
 	    (stb.st_dev != fdev || stb.st_ino != fino))
 		return(ACCESS);
+
+	job_dfcnt++;		/* increment datafile counter for this job */
+	stopped = 0;		/* output filter is not stopped */
+
+	/* everything seems OK, start it up */
 	if (!pp->no_formfeed && !pp->tof) { /* start on a fresh page */
 		(void) write(ofd, pp->form_feed, strlen(pp->form_feed));
 		pp->tof = 1;
@@ -733,7 +777,9 @@ start:
 	if ((child = dofork(pp, DORETURN)) == 0) { /* child */
 		dup2(fi, 0);
 		dup2(fo, 1);
-		n = open(tempfile, O_WRONLY|O_CREAT|O_TRUNC, 0664);
+		/* setup stderr for the filter (child process)
+		 * so it goes to our temporary errors file */
+		n = open(tempstderr, O_WRONLY|O_TRUNC, 0664);
 		if (n >= 0)
 			dup2(n, 2);
 		closelog();
@@ -758,8 +804,8 @@ start:
 	}
 	pp->tof = 0;
 
-	/* Copy filter output to "lf" logfile */
-	if ((fp = fopen(tempfile, "r"))) {
+	/* Copy the filter's output to "lf" logfile */
+	if ((fp = fopen(tempstderr, "r"))) {
 		while (fgets(buf, sizeof(buf), fp))
 			fputs(buf, stderr);
 		fclose(fp);
@@ -803,6 +849,10 @@ sendit(pp, file)
 	 */
 	if ((cfp = fopen(file, "r")) == NULL)
 		return(OK);
+
+	/* initialize job-specific count of datafiles processed */
+	job_dfcnt = 0;
+
 	/*
 	 *      read the control file for work to do
 	 *
@@ -832,11 +882,15 @@ sendit(pp, file)
 				i = i * 10 + (*cp++ - '0');
 			fino = i;
 		} else if (line[0] == 'H') {
-			strcpy(fromhost, line+1);
-			if (class[0] == '\0')
+			strncpy(fromhost, line+1, sizeof(fromhost) - 1);
+			fromhost[sizeof(fromhost) - 1] = '\0';
+			if (class[0] == '\0') {
 				strncpy(class, line+1, sizeof(class) - 1);
+				class[sizeof(class) - 1] = '\0';
+			}
 		} else if (line[0] == 'P') {
 			strncpy(logname, line+1, sizeof(logname) - 1);
+			logname[sizeof(logname) - 1] = '\0';
 			if (pp->restricted) { /* restricted */
 				if (getpwnam(logname) == NULL) {
 					sendmail(pp, line+1, NOACCT);
@@ -846,6 +900,7 @@ sendit(pp, file)
 			}
 		} else if (line[0] == 'I') {
 			strncpy(indent+2, line+1, sizeof(indent) - 3);
+			indent[2 + sizeof(indent) - 3] = '\0';
 		} else if (line[0] >= 'a' && line[0] <= 'z') {
 			strcpy(last, line);
 			while ((i = getline(cfp)) != 0)
@@ -899,6 +954,7 @@ sendfile(pp, type, file, format)
 {
 	register int f, i, amt;
 	struct stat stb;
+	FILE *fp;
 	char buf[BUFSIZ];
 	int sizerr, resp, closedpr;
 
@@ -913,6 +969,9 @@ sendfile(pp, type, file, format)
 	    (stb.st_dev != fdev || stb.st_ino != fino))
 		return(ACCESS);
 
+	job_dfcnt++;		/* increment datafile counter for this job */
+
+	/* everything seems OK, start it up */
 	sizerr = 0;
 	closedpr = 0;
 	if (type == '\3') {
@@ -953,8 +1012,9 @@ sendfile(pp, type, file, format)
 			if ((ifilter = dofork(pp, DORETURN)) == 0) { /* child */
 				dup2(f, 0);
 				dup2(tfd, 1);
-				n = open(tempfile, O_WRONLY|O_CREAT|O_TRUNC,
-					 TEMP_FILE_MODE);
+				/* setup stderr for the filter (child process)
+				 * so it goes to our temporary errors file */
+				n = open(tempstderr, O_WRONLY|O_TRUNC, 0664);
 				if (n >= 0)
 					dup2(n, 2);
 				closelog();
@@ -971,6 +1031,13 @@ sendfile(pp, type, file, format)
 				while ((pid = wait((int *)&status)) > 0 &&
 					pid != ifilter)
 					;
+			/* Copy the filter's output to "lf" logfile */
+			if ((fp = fopen(tempstderr, "r"))) {
+				while (fgets(buf, sizeof(buf), fp))
+					fputs(buf, stderr);
+				fclose(fp);
+			}
+			/* process the return-code from the filter */
 			switch (status.w_retcode) {
 			case 0:
 				break;
@@ -1051,6 +1118,8 @@ sendfile(pp, type, file, format)
 	}
 	if (i)
 		pstatus(pp, "sending to %s", pp->remote_host);
+	if (type == '\3')
+		trstat_init(pp, file, job_dfcnt);
 	for (i = 0; i < stb.st_size; i += BUFSIZ) {
 		amt = BUFSIZ;
 		if (i + amt > stb.st_size)
@@ -1089,6 +1158,9 @@ sendfile(pp, type, file, format)
 	}
 	if (closedpr)
 		openpr(pp);
+	if (type == '\3')
+		trstat_write(pp, TR_SENDING, stb.st_size, logname,
+				 pp->remote_host, fromhost);
 	return(OK);
 }
 
@@ -1280,8 +1352,8 @@ sendmail(pp, user, bombed)
 			cp = "NOACCT";
 			break;
 		case FILTERERR:
-			if (stat(tempfile, &stb) < 0 || stb.st_size == 0 ||
-			    (fp = fopen(tempfile, "r")) == NULL) {
+			if (stat(tempstderr, &stb) < 0 || stb.st_size == 0
+			    || (fp = fopen(tempstderr, "r")) == NULL) {
 				printf("\nhad some errors and may not have printed\n");
 				break;
 			}
@@ -1329,7 +1401,7 @@ dofork(pp, action)
 		 */
 		if (pid == 0) {
 			if ((pwd = getpwuid(pp->daemon_user)) == NULL) {
-				syslog(LOG_ERR, "Can't lookup default daemon uid (%d) in password file",
+				syslog(LOG_ERR, "Can't lookup default daemon uid (%ld) in password file",
 				    pp->daemon_user);
 				break;
 			}
@@ -1360,7 +1432,8 @@ static void
 abortpr(signo)
 	int signo;
 {
-	(void) unlink(tempfile);
+
+	(void) unlink(tempstderr);
 	kill(0, SIGINT);
 	if (ofilter > 0)
 		kill(ofilter, SIGCONT);
