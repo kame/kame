@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.8 2003/09/02 09:48:44 suz Exp $	*/
+/*	$KAME: callout.c,v 1.9 2004/06/09 19:09:58 suz Exp $	*/
 
 /*
  * The mrouted program is covered by the license in the accompanying file
@@ -308,11 +308,10 @@ timer_clearTimer(timer_id)
     print_Q();
 }
 
-#ifdef CALLOUT_DEBUG2
 /*
  * debugging utility
  */
-
+#ifdef CALLOUT_DEBUG2
 static void
 print_Q()
 {
@@ -323,3 +322,16 @@ print_Q()
 	log_msg(LOG_DEBUG, 0, "(%d,%d) ", ptr->id, ptr->time);
 }
 #endif				/* CALLOUT_DEBUG2 */
+
+int
+dump_callout_Q(fp)
+    FILE           *fp;
+{
+    struct timeout_q *ptr;
+    fprintf(fp, "--------------------CallOut Timer Queue-----------------\n");
+    fprintf(fp, "%s\t%s\n", "TimerID", "Expiry-Time[s]");
+    for (ptr = Q; ptr; ptr = ptr->next)
+	fprintf(fp, "#%d\t%d\n", ptr->id, ptr->time);
+
+    return TRUE;
+}

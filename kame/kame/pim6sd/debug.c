@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.60 2004/06/09 15:21:51 suz Exp $	*/
+/*	$KAME: debug.c,v 1.61 2004/06/09 19:09:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -95,6 +95,7 @@ static char     dumpfilename[] = _PATH_PIM6D_DUMP;
 static char     cachefilename[] = _PATH_PIM6D_CACHE;	/* TODO: notused */
 static char	statfilename[] = _PATH_PIM6D_STAT;
 
+extern int dump_callout_Q __P((FILE *));
 static char *sec2str __P((time_t));
 
 static char *
@@ -315,6 +316,7 @@ fdump(i)
 	dump_mldgroups(fp);
 	dump_pim_mrt(fp);
 	dump_rp_set(fp);
+	dump_callout_Q(fp);
 	(void) fclose(fp);
     }
 }
@@ -602,15 +604,17 @@ dump_mldgroups(fp)
 
 	fprintf(fp, "Reported MLD Group\n");
 	fprintf(fp, " %-3s %6s %s\n", "Mif", "PhyIF",
-		"Group(Timer,MLD-version,Filter-mode)/Source(Timer)");
+		"Group(Group-Timer,MLD-ver(Filter-Mode,Compat-Timer))/"
+		"Source(TimerID)");
 
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 		for (grp = v->uv_groups; grp; grp = grp->al_next) {
-			fprintf(fp, " %-3u %6s %s (%lu %s %s)\n", vifi,
+			fprintf(fp, " %-3u %6s %s (#%lu (%s %s #%lu))\n", vifi,
 			    (v->uv_flags & MIFF_REGISTER) ? "regist" : v->uv_name,
-			    sa6_fmt(&grp->al_addr), (u_long) grp->al_timer,
+			    sa6_fmt(&grp->al_addr), grp->al_timerid,
 			    grp->comp_mode == MLDv2 ? "v2" : "v1",
-			    grp->filter_mode == MODE_IS_INCLUDE ? "IN" : "EX");
+			    grp->filter_mode == MODE_IS_INCLUDE ? "IN" : "EX",
+			    grp->al_comp);
 
 			src = grp->sources;
 			if (src == NULL) {
@@ -619,9 +623,9 @@ dump_mldgroups(fp)
 				continue;
 			}
 			for ( ; src; src = src->al_next) {
-				fprintf(fp, " %-3s %6s   %s (%lu)\n", "", "",
+				fprintf(fp, " %-3s %6s   %s (#%lu)\n", "", "",
 					sa6_fmt(&src->al_addr),
-					(u_long) src->al_timer);
+					src->al_timerid);
 			}
 		}
 	}
@@ -1065,5 +1069,6 @@ dump_rp_set(fp)
 			    rp_grp_entry->advholdtime, rp_grp_entry->holdtime);
 	}
     }
+    fprintf(fp, "\n");
     return (TRUE);
 }
