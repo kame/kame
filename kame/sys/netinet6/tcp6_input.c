@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.20 2000/02/22 14:04:35 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.21 2000/02/25 02:05:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -617,22 +617,6 @@ findpcb:
 	else
 		thwin = th->th_win;
 
-	/* save packet options if user wanted */
-	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-		struct ip6_recvpktopts opts;
-
-		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
-		if (in6p->in6p_inputopts)
-			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
-		if (opts.head) {
-			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
-					    NULL, opts.head)
-			    == 0)
-				m_freem(opts.head);
-		}
-	}
-
 	so = in6p->in6p_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
 		struct ip6_recvpktopts newopts;
@@ -717,21 +701,6 @@ findpcb:
 				in6p->in6p_outputopts =
 					ip6_copypktopts(oin6p->in6p_outputopts,
 							M_NOWAIT);
-
-			if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-				bzero(&newopts, sizeof(newopts));
-				ip6_savecontrol(in6p, ip6, m, &newopts,
-						&in6p->in6p_inputopts);
-				if (in6p->in6p_inputopts)
-					ip6_update_recvpcbopt(in6p->in6p_inputopts,
-							      &newopts);
-				if (newopts.head) {
-					if (sbappendcontrol(&so->so_rcv, NULL,
-							    newopts.head)
-					    == 0)
-						m_freem(newopts.head);
-				}
-			}
 #ifdef IPSEC
 			/* copy old policy into new socket's */
 			if (ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp,
@@ -751,6 +720,22 @@ findpcb:
 	}
 
 after_listen:
+	/* save packet options if user wanted */
+	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
+		struct ip6_recvpktopts opts;
+
+		bzero(&opts, sizeof(opts));
+		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		if (in6p->in6p_inputopts)
+			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
+		if (opts.head) {
+			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
+					    NULL, opts.head)
+			    == 0)
+				m_freem(opts.head);
+		}
+	}
+
 	/*
 	 * Segment received on connection.
 	 * Reset idle time and keep-alive timer.
