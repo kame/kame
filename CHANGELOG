@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.342 1999/12/15 08:11:16 itojun Exp $
+$Id: CHANGELOG,v 1.343 1999/12/15 17:58:14 sumikawa Exp $
 
 <199912>
+Thu Dec 16 02:55:23 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/XFree86: Upgrade to 3.3.5(not tested).
+	  submitted by ume@mahoroba.org.
+
 Wed Dec 15 17:09:45 JST 1999  shin@kame.net, itojun@iijlab.net
 	* sys/netinet6 (bunch of places): do not overwrite traffic class
 	  bits when setting IP version field on IPv6 header.
