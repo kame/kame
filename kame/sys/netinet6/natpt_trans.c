@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.36 2001/06/13 04:31:18 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.37 2001/06/13 04:38:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -449,7 +449,7 @@ translatingPYLD4To4(struct _cv *cv4to)
 		mbf->m_pkthdr.len += delta;
 	}
 
-	if ((ts = cv4to->ats->suit.tcp) == NULL))
+	if ((ts = cv4to->ats->suit.tcp) == NULL)
 	    return ;
 
 	th_seq = th4->th_seq;
