@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.21 2002/02/17 10:16:33 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.22 2002/10/02 10:15:20 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -206,7 +206,7 @@ shows with long format.
 is a number, and if this option is specified,
 .Nm
 shows the information shown with
-.Sy xlate
+.Sq xlate
 subcommand regularly in specified second interval.
 .El
 .Pp
@@ -224,8 +224,9 @@ section below for more detail.
 .It Xo Sy variables
 .Xc
 Show variables that was set by
-.Sy set
-subcommand.
+.Sq set
+subcommand.  See
+.Xr natpt.conf 5 .
 .It Xo Sy mapping
 .Xc
 Show current translation status.  Status is displayed as
