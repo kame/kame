@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.320 2002/10/04 12:00:44 suz Exp $	*/
+/*	$KAME: in6.c,v 1.321 2002/10/09 08:13:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3335,6 +3335,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 {
 	struct mbuf *m = NULL;
 	struct in6_multi *in6m;
+	struct ifmultiaddr *ifma = NULL;
 	struct ifreq ifr;
 	struct i6as_head *newhead = NULL;/* this becomes new i6ms_cur->head */
 	u_int curmode;			/* current filter mode */
@@ -3476,24 +3477,25 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		splx(s);
 		return NULL;
 	    }
-	    bcopy(ap, &in6m->in6m_sa, ap->sin6_len);
-	    in6m->in6m_ifp = ifp;
-	    in6m->in6m_ifma->ifma_refcount = 1;
-	    in6m->in6m_timer = 0;
-
-	    /*
-	     * Ask the network driver to update its multicast reception filter
-	     * appropriately for the new address.
-	     */
-	    bcopy(ap, &ifr.ifr_addr, ap->sin6_len);
-	    if ((ifp->if_ioctl == NULL) ||
-		(*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) {
-		LIST_REMOVE(in6m, in6m_entry);
-		free(in6m, M_IPMADDR);
-		*error = EINVAL /*???*/;
+	    *error = if_addmulti(ifp, (struct sockaddr *)ap, &ifma);
+	    if (*error) {
 		splx(s);
 		return NULL;
 	    }
+	    if (ifma->ifma_protospec != NULL) {
+#ifdef MLDV2_DEBUG
+		printf("in6_modmulti: there's a corresponding if_multiaddr although IN6_LOOKUP_MULTI fails \n");
+#endif
+		splx(s);
+		return NULL;
+	    }
+
+	    bzero(in6m, sizeof(*in6m));
+	    bcopy(ap, &in6m->in6m_sa, ap->sin6_len);
+	    in6m->in6m_ifp = ifp;
+	    in6m->in6m_ifma = ifma;
+	    ifma->ifma_protospec = in6m;
+	    LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
 
 	    for (rti = Head6; rti != 0; rti = rti->rt6i_next) {
 		if (rti->rt6i_ifp == in6m->in6m_ifp) {
@@ -3501,15 +3503,15 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		    break;
 		}
 	    }
-	    if (rti == 0) {
+	    if (rti == NULL) {
 		if ((rti = rt6i_init(in6m->in6m_ifp)) == NULL) {
 		    LIST_REMOVE(in6m, in6m_entry);
 		    free(in6m, M_IPMADDR);
 		    *error = ENOBUFS;
 		    splx(s);
 		    return NULL;
-	    	} else
-		    in6m->in6m_rti = rti;
+	    	}
+		in6m->in6m_rti = rti;
 	    }
 
 	    in6m->in6m_source = NULL;

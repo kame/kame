@@ -1320,6 +1320,7 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 {
 	struct mbuf *m = NULL;
 	struct in_multi *inm;
+	struct ifmultiaddr *ifma = NULL;
 	struct ifreq ifr;
 	struct ias_head *newhead = NULL;/* this becomes new ims_cur->head */
 	u_int curmode;			/* current filter mode */
@@ -1463,25 +1464,26 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 		splx(s);
 		return NULL;
 	    }
-	    inm->inm_addr = *ap;
-	    inm->inm_ifp = ifp;
-	    inm->inm_ifma->ifma_refcount = 1;
-	    inm->inm_timer = 0;
-	    /*
-	     * Ask the network driver to update its multicast reception filter
-	     * appropriately for the new address.
-	     */
-	    satosin(&ifr.ifr_addr)->sin_len = sizeof(struct sockaddr_in);
-	    satosin(&ifr.ifr_addr)->sin_family = AF_INET;
-	    satosin(&ifr.ifr_addr)->sin_addr = *ap;
-	    if ((ifp->if_ioctl == NULL) ||
-		(*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) {
-		LIST_REMOVE(inm, inm_list);
-		free(inm, M_IPMADDR);
-		*error = EINVAL /*???*/;
+
+	    *error = if_addmulti(ifp, (struct sockaddr *)ap, &ifma);
+	    if (*error) {
 		splx(s);
 		return NULL;
 	    }
+	    if (ifma->ifma_protospec != NULL) {
+#ifdef IGMPV3_DEBUG
+		printf("in_modmulti: there's a corresponding if_multiaddr although IN_LOOKUP_MULTI fails \n");
+#endif
+		splx(s);
+		return NULL;
+	    }
+
+	    bzero(inm, sizeof(*inm));
+	    inm->inm_addr = *ap;
+	    inm->inm_ifp = ifp;
+	    inm->inm_ifma = ifma;
+	    ifma->ifma_protospec = inm;
+	    LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
 
 	    for (rti = Head; rti != 0; rti = rti->rti_next) {
 		if (rti->rti_ifp == inm->inm_ifp) {
@@ -1489,15 +1491,15 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 		    break;
 		}
 	    }
-	    if (rti == 0) {
+	    if (rti == NULL) {
 		if ((rti = rti_init(inm->inm_ifp)) == NULL) {
 		    LIST_REMOVE(inm, inm_list);
 		    free(inm, M_IPMADDR);
 		    *error = ENOBUFS;
 		    splx(s);
 		    return NULL;
-	    	} else
-		    inm->inm_rti = rti;
+	    	}
+		inm->inm_rti = rti;
 	    }
 
 	    inm->inm_source = NULL;
