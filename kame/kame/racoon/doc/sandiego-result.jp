@@ -13,6 +13,11 @@ vs bluesteel
 	うまくいかなかった。
 	initiator: 鍵できたけど ping しても向こうが返事せず。
 		再戦予定
+	transport やろうとしたら敵が tunnel mode をネゴってた。
+	tunnel の時は敵が内側のアドレスを間違ってた。
+	と言う分けで OK.
+
+	やっぱりネゴったポリシを突っ込む方が楽っす…
 
 vs racoon
 	rekey問題を解決したあと
