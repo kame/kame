@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.62 2002/05/01 04:21:08 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.63 2002/05/01 04:55:08 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -456,7 +456,7 @@ client6_sleep()
 	if (ret == -1) { 
 		if (errno == EINTR && signaled) {
 			dprintf(LOG_INFO,
-				"client6_sleep: signal from a user recieved."
+				"client6_sleep: signal from a user received."
 				" activate DHCPv6.");
 			goto activate;
 		}
