@@ -1,9 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.109 1999/09/13 03:29:21 itojun Exp $
+$Id: CHANGELOG,v 1.110 1999/09/13 11:43:26 itojun Exp $
 
 
 <199909>
+Mon Sep 13 20:42:07 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/in6_ifattach.c: do not use IEEE802/EUI64 addr
+	  with u bit != 0, as source of interface id for pseudo interfaces.
+	  this is because IEEE802/EUI64 addr with u bit != 0 is not globally
+	  unique (there are such ethernet cards exist - yes, I have one).
+
+Mon Sep 13 20:41:07 JST 1999  shin@kame.net
+	* */sys/netinet/raw_ip.c, */sys/netinet/udp_usrreq.c,
+	  kame/sys/netinet6/raw_ip6.c, kame/sys/netinet6/udp6_usrreq.c:
+	  on PRU_ATTACH, call in6_pcbdetach if ipsec policy initialization
+	  is failed.  this fixes memory leakage during heavy use of socket
+	  interface.
+
 Mon Sep 13 12:26:07 JST 1999  itojun@iijlab.net
 	* netbsd/sys/dev/pcmcia/if_wi*, netbsd/usr.sbin/wiconfig:
 	  WaveLan driver from NetBSD-current.  Works fine with IPv6 as we've
