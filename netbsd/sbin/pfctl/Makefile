@@ -8,8 +8,8 @@ SRCS+=	pfctl_radix.c pfctl_table.c pfctl_qstats.c
 YFLAGS=
 MAN=	pfctl.8
 
-LDADD+=	-lm -lmd
-DPADD+=	${LIBM} ${LIBMD}
+LDADD+=	-lm
+DPADD+=	${LIBM}
 
 SRCS+=	arc4random.c
 
