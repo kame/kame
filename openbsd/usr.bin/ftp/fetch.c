@@ -102,6 +102,7 @@ url_get(origline, proxyenv, outfile)
 	volatile int s;
 	size_t len;
 	char c, *cp, *ep, *portnum, *path, buf[4096];
+	char pbuf[NI_MAXSERV];
 	const char *savefile;
 	char *line, *proxy, *host, *port;
 	char *hosttail;
@@ -316,6 +317,13 @@ again:
 			continue;
 		}
 
+		/* get port in numeric */
+		if (getnameinfo(res->ai_addr, res->ai_addrlen, NULL, 0,
+		    pbuf, sizeof(pbuf), NI_NUMERICSERV) == 0)
+			port = pbuf;
+		else
+			port = NULL;
+
 		break;
 	}
 	freeaddrinfo(res0);
@@ -337,12 +345,14 @@ again:
 	}
 	if (strchr(host, ':')) {
 		snprintf(buf, sizeof(buf),
-		    "GET %s%s HTTP/1.0\r\nHost: [%s]:%s\r\n\r\n",
-		    proxy ? "" : "/", path, host, port);
+		    "GET %s%s HTTP/1.0\r\nHost: [%s]%s%s\r\n\r\n",
+		    proxy ? "" : "/", path, host,
+		    port ? ":" : "", port ? port : "");
 	} else {
 		snprintf(buf, sizeof(buf),
-		    "GET %s%s HTTP/1.0\r\nHost: %s:%s\r\n\r\n",
-		    proxy ? "" : "/", path, host, port);
+		    "GET %s%s HTTP/1.0\r\nHost: %s%s%s\r\n\r\n",
+		    proxy ? "" : "/", path, host,
+		    port ? ":" : "", port ? port : "");
 	}
 	len = strlen(buf);
 	if (write(s, buf, len) < len) {
