@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.56 2001/07/26 08:34:29 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.57 2001/07/27 23:33:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,6 +133,14 @@
  *		timeout() is obsoleted, use callout_xx (sys/callout.h)
  *	OpenBSD 2.8
  *		timeout_{add,set,del} is encouraged (sys/timeout.h)
+ *
+ * - kernel internal time structure
+ *	FreeBSD 2, NetBSD, OpenBSD, BSD/OS
+ *		mono_time.tv_u?sec, time.tv_u?sec
+ *	FreeBSD [23]
+ *		time_second
+ *	if you need portability, #ifdef out FreeBSD[23], or use microtime(&tv)
+ *	then touch tv.tv_sec.
  *
  * - sysctl
  *	NetBSD, OpenBSD
