@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.24 2004/02/05 12:38:10 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.25 2004/02/06 10:06:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -88,6 +88,7 @@ int
 mip6_process_hrbu(bi)
 	struct mip6_bc *bi;
 {
+	struct sockaddr_in6 addr_sa;
 	struct ifaddr *destifa = NULL;
 	struct ifnet *destifp = NULL;
 	struct nd_prefix *pr, *llpr = NULL;
@@ -105,7 +106,16 @@ mip6_process_hrbu(bi)
 	bi->mbc_status = IP6_MH_BAS_ACCEPTED;
 
 	/* find the interface which the destination address belongs to. */
-	destifa = ifa_ifwithaddr((struct sockaddr *)&bi->mbc_addr);
+	bzero(&addr_sa, sizeof(addr_sa));
+	addr_sa.sin6_len = sizeof(addr_sa);
+	addr_sa.sin6_family = AF_INET6;
+	addr_sa.sin6_addr = bi->mbc_addr;
+	/* XXX ? */
+	if (in6_recoverscope(&addr_sa, &addr_sa.sin6_addr, NULL))
+		panic("mip6_process_hrbu: recovering scope");
+	if (in6_embedscope(&addr_sa.sin6_addr, &addr_sa))
+		panic("mip6_process_hrbu: embedding scope");
+	destifa = ifa_ifwithaddr((struct sockaddr *)&addr_sa);
 	if (!destifa) {
 		bi->mbc_status = IP6_MH_BAS_NOT_HOME_SUBNET;
 		bi->mbc_send_ba = 1;
@@ -321,6 +331,7 @@ int
 mip6_process_hurbu(bi)
 	struct mip6_bc *bi;
 {
+	struct sockaddr_in6 addr_sa;
 	struct ifaddr *destifa = NULL;
 	struct ifnet *destifp = NULL;
 	struct mip6_bc *mbc;
@@ -329,7 +340,16 @@ mip6_process_hurbu(bi)
 	int error = 0;
 
 	/* find the interface which the destination address belongs to. */
-	destifa = ifa_ifwithaddr((struct sockaddr *)&bi->mbc_addr);
+	bzero(&addr_sa, sizeof(addr_sa));
+	addr_sa.sin6_len = sizeof(addr_sa);
+	addr_sa.sin6_family = AF_INET6;
+	addr_sa.sin6_addr = bi->mbc_addr;
+	/* XXX ? */
+	if (in6_recoverscope(&addr_sa, &addr_sa.sin6_addr, NULL))
+		panic("mip6_process_hrbu: recovering scope");
+	if (in6_embedscope(&addr_sa.sin6_addr, &addr_sa))
+		panic("mip6_process_hrbu: embedding scope");
+	destifa = ifa_ifwithaddr((struct sockaddr *)&addr_sa);
 	if (!destifa) {
 		bi->mbc_status = IP6_MH_BAS_NOT_HOME_SUBNET;
 		bi->mbc_send_ba = 1;
