@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.64 2002/05/01 10:38:58 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.65 2002/05/01 10:43:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -544,6 +544,13 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 	 * attach necessary options
 	 */
 	dhcp6_init_options(&roptinfo);
+
+	/*
+	 * if we're reacting to a solicit with a rapid commit option,
+	 * add the option in the reply as well.
+	 */
+	if (origmsg->dh6_msgtype == DH6_SOLICIT)
+		roptinfo.rapidcommit = 1;
 
 	/* server information option */
 	roptinfo.serverID = server_duid;
