@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.26 1999/11/03 05:56:36 itojun Exp $
+$Id: TODO,v 1.27 1999/11/21 14:23:12 itojun Exp $
 
 
 Things we can do with the current code:
@@ -33,6 +33,8 @@ Things we can't do with the current code:
   (string too long on wtmp?)
   workaround: run sshd -4, then sshd -6.  strangely enough no error will
   be raised with this configuration.
+- due to library twists, behavior of ifconfig for IPv6 network name does not
+  work.  it will be fixed once libinet6 is integrated into libc.
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
