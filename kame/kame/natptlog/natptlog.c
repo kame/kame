@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.4 2000/02/18 11:39:57 fujisawa Exp $
+ *	$Id: natptlog.c,v 1.5 2000/02/18 16:28:31 itojun Exp $
  */
 
 #include <stdio.h>
@@ -60,7 +60,7 @@
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_log.h>
 
-#include "../natptconfig/showsubs.h"
+#include "showsubs.h"
 
 
 /*
