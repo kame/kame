@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.110 2003/11/27 14:14:30 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.111 2003/12/04 12:01:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -400,9 +400,12 @@ ip6_mrouter_get(so, sopt)
 		return (EACCES);
 
 	switch (sopt->sopt_name) {
-		case MRT6_PIM:
-			error = sooptcopyout(sopt, &pim6, sizeof(pim6));
-			break;
+	case MRT6_PIM:
+		error = sooptcopyout(sopt, &pim6, sizeof(pim6));
+		break;
+	default:
+		error = EOPNOTSUPP;
+		break;
 	}
 	return (error);
 }
@@ -445,7 +448,7 @@ mrt6_ioctl(cmd, data)
 	case SIOCGETMIFCNT_IN6:
 		return (get_mif6_cnt((struct sioc_mif_req6 *)data));
 	default:
-		return (EINVAL);
+		return (EOPNOTSUPP);
 	}
 }
 
