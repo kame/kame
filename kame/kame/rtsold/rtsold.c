@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.68 2003/10/05 00:09:37 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.69 2003/10/05 00:14:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -295,6 +295,10 @@ main(int argc, char **argv)
 		exit(1);
 		/*NOTREACHED*/
 	}
+
+	/* revoke privilege */
+	seteuid(getuid());
+	setuid(getuid());
 
 	/* dump the current pid */
 	if (!once) {
