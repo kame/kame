@@ -104,7 +104,7 @@
 
 #include <net/net_osdep.h>
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
 static int faithioctl __P((struct ifnet *, int, caddr_t));
 #else
 static int faithioctl __P((struct ifnet *, u_long, caddr_t));
@@ -113,9 +113,11 @@ int faithoutput __P((struct ifnet *, register struct mbuf *, struct sockaddr *,
 	register struct rtentry *));
 static void faithrtrequest __P((int, struct rtentry *, struct sockaddr *));
 
-void faithattach __P((void *));
 #ifdef __FreeBSD__
+void faithattach __P((void *));
 PSEUDO_SET(faithattach, if_faith);
+#else
+void faithattach __P((int));
 #endif
 
 static struct ifnet faithif[NFAITH];
@@ -125,7 +127,11 @@ static struct ifnet faithif[NFAITH];
 /* ARGSUSED */
 void
 faithattach(faith)
+#ifdef __FreeBSD__
 	void *faith;
+#else
+	int faith;
+#endif
 {
 	register struct ifnet *ifp;
 	register int i;
@@ -265,7 +271,7 @@ faithrtrequest(cmd, rt, sa)
 static int
 faithioctl(ifp, cmd, data)
 	register struct ifnet *ifp;
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
 	int cmd;
 #else
 	u_long cmd;

@@ -107,7 +107,11 @@
 
 #include <net/net_osdep.h>
 
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+static int dummyioctl __P((struct ifnet *, int, caddr_t));
+#else
 static int dummyioctl __P((struct ifnet *, u_long, caddr_t));
+#endif
 int dummyoutput __P((struct ifnet *, register struct mbuf *, struct sockaddr *,
 	register struct rtentry *));
 #ifdef __bsdi__
@@ -116,9 +120,11 @@ static void dummyrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 static void dummyrtrequest __P((int, struct rtentry *, struct sockaddr *));
 #endif
 
-void dummyattach __P((int));
 #ifdef __FreeBSD__
+void dummyattach __P((void *));
 PSEUDO_SET(dummyattach, if_dummy);
+#else
+void dummyattach __P((int));
 #endif
 
 #ifdef TINY_DUMMYMTU
@@ -132,7 +138,11 @@ static struct	ifnet dummyif[NDUMMY];
 /* ARGSUSED */
 void
 dummyattach(dummy)
+#ifdef __FreeBSD__
+	void *dummy;
+#else
 	int dummy;
+#endif
 {
 	register struct ifnet *ifp;
 	register int i;
@@ -311,7 +321,11 @@ dummyrtrequest(cmd, rt, sa)
 static int
 dummyioctl(ifp, cmd, data)
 	register struct ifnet *ifp;
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+	int cmd;
+#else
 	u_long cmd;
+#endif
 	caddr_t data;
 {
 	register struct ifaddr *ifa;

@@ -83,6 +83,18 @@
  *	FreeBSD 2, FreeBSD 3
  *		linker hack
  *
+ * - if_ioctl
+ *	NetBSD, FreeBSD 3
+ *		2nd argument is u_long cmd
+ *	FreeBSD 2
+ *		2nd argument is int cmd
+ * - if attach routines
+ *	NetBSD
+ *		void xxattach(int);
+ *	FreeBSD 2, FreeBSD 3
+ *		void xxattach(void *);
+ *		PSEUDO_SET(xxattach, if_xx);
+ *
  * - ovbcopy()
  *	in NetBSD 1.4 or later, ovbcopy() is not supplied in the kernel.
  *	bcopy() is safe against overwrites.

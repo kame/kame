@@ -68,6 +68,10 @@ extern struct gif_softc *gif;
 void gif_input __P((struct mbuf *, int, struct ifnet *));
 int gif_output __P((struct ifnet *, struct mbuf *,
 		    struct sockaddr *, struct rtentry *));
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+int gif_ioctl __P((struct ifnet *, int, caddr_t));
+#else
 int gif_ioctl __P((struct ifnet *, u_long, caddr_t));
+#endif
 
 #endif /* _NET_IF_GIF_H_ */

@@ -85,7 +85,11 @@
 
 #if NGIF > 0
 
+#ifdef __FreeBSD__
 void gifattach __P((void *));
+#else
+void gifattach __P((int));
+#endif
 
 /*
  * gif global variable definitions
@@ -95,7 +99,11 @@ struct gif_softc *gif = 0;
 
 void
 gifattach(dummy)
+#ifdef __FreeBSD__
 	void *dummy;
+#else
+	int dummy;
+#endif
 {
 	register struct gif_softc *sc;
 	register int i;
@@ -322,7 +330,11 @@ gif_input(m, af, gifp)
 int
 gif_ioctl(ifp, cmd, data)
 	struct ifnet *ifp;
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+	int cmd;
+#else
 	u_long cmd;
+#endif
 	caddr_t data;
 {
 	struct gif_softc *sc  = (struct gif_softc*)ifp;
