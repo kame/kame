@@ -709,8 +709,12 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 				 */
 #ifdef __OpenBSD__
 				*m0 = m_copym2(m, 0, h->ip_hl << 2, M_NOWAIT);
-#else
+#elif defined(__NetBSD__)
 				*m0 = m_dup(m, 0, h->ip_hl << 2, M_NOWAIT);
+#elif defined(__FreeBSD__)
+				*m0 = m_dup(m, M_NOWAIT);
+				m_adj(*m0, (h->ip_hl << 2) -
+				    (*m0)->m_pkthdr.len);
 #endif
 				if (*m0 == NULL)
 					goto no_mem;

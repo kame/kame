@@ -130,7 +130,8 @@
 
 MALLOC_DEFINE(M_PF, "pf", "PF packet filter");
 
-#undef ALTQ /* for now */
+#define	MIN(a,b) (((a)<(b))?(a):(b))
+#define	MAX(a,b) (((a)>(b))?(a):(b))
 #endif
 
 
@@ -1337,7 +1338,11 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 		h6->ip6_vfc |= IPV6_VERSION;
 		h6->ip6_hlim = IPV6_DEFHLIM;
 
+#ifdef __FreeBSD__
+		ip6_output(m, NULL, NULL, 0, NULL, NULL, NULL);
+#else
 		ip6_output(m, NULL, NULL, 0, NULL, NULL);
+#endif
 #endif /* INET6 */
 	}
 }
@@ -2121,7 +2126,14 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 				return (0);
 		}
 #elif defined(__FreeBSD__)
-#error notyet
+		inp = in_pcblookup_hash(tb, saddr->v4, sport, daddr->v4, dport,
+		   0, NULL);
+		if (inp == NULL) {
+			inp = in_pcblookup_hash(tb, saddr->v4, sport,
+			    daddr->v4, dport, 1, NULL);
+			if (inp == NULL)
+				return (0);
+		}
 #endif
 		break;
 #ifdef INET6
@@ -2151,7 +2163,13 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 				return (0);
 		}
 #elif defined(__FreeBSD__)
-#error notyet
+		inp = in6_pcblookup_hash(tb, &s, sport, &d, dport, 0, NULL);
+		if (inp == NULL) {
+			inp = in6_pcblookup_hash(tb, &s, sport, &d, dport,
+			    1, NULL);
+			if (inp == NULL)
+				return (0);
+		}
 #endif
 		break;
 	}
@@ -4718,8 +4736,10 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 		}
 #ifdef __OpenBSD__
 		m0 = m_copym2(*m, 0, M_COPYALL, M_NOWAIT);
-#else
+#elif defined(__NetBSD__)
 		m0 = m_dup(*m, 0, M_COPYALL, M_NOWAIT);
+#elif defined(__FreeBSD__)
+		m0 = m_dup(*m, M_NOWAIT);
 #endif
 		if (m0 == NULL)
 			return;
@@ -4903,8 +4923,10 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 		}
 #ifdef __OpenBSD__
 		m0 = m_copym2(*m, 0, M_COPYALL, M_NOWAIT);
-#else
+#elif defined(__NetBSD__)
 		m0 = m_dup(*m, 0, M_COPYALL, M_NOWAIT);
+#elif defined(__FreeBSD__)
+		m0 = m_dup(*m, M_NOWAIT);
 #endif
 		if (m0 == NULL)
 			return;
@@ -4931,7 +4953,11 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 		if (mtag == NULL)
 			goto bad;
 		m_tag_prepend(m0, mtag);
+#ifdef __FreeBSD__
+		ip6_output(m0, NULL, NULL, NULL, NULL, NULL, NULL);
+#else
 		ip6_output(m0, NULL, NULL, NULL, NULL, NULL);
+#endif
 		return;
 	}
 

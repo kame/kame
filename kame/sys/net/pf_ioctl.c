@@ -62,6 +62,9 @@
 #include <sys/pool.h>
 #endif
 #include <sys/malloc.h>
+#ifdef __FreeBSD__
+#include <sys/conf.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -85,29 +88,6 @@
 #include <altq/altq.h>
 #endif
 
-#ifdef __FreeBSD__
-#define splsoftnet()	splnet()
-PSEUDO_SET(pfattach, pf);
-
-#define CDEV_MAJOR 200
-static struct cdevsw pf_cdevsw = {
-	/* open */	pfopen,
-	/* close */	pfclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	tunioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"pf",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
-	/* bmaj */	-1
-};
-#endif
-
 void			 pfattach(int);
 int			 pfopen(dev_t, int, int, struct proc *);
 int			 pfclose(dev_t, int, int, struct proc *);
@@ -119,6 +99,29 @@ void			 pf_mv_pool(struct pf_palist *, struct pf_palist *);
 void			 pf_empty_pool(struct pf_palist *);
 int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
 void			 pf_tag_purge(void);
+
+#ifdef __FreeBSD__
+#define splsoftnet()	splnet()
+PSEUDO_SET(pfattach, pf);
+
+#define CDEV_MAJOR 200
+static struct cdevsw pf_cdevsw = {
+	/* open */	pfopen,
+	/* close */	pfclose,
+	/* read */	noread,
+	/* write */	nowrite,
+	/* ioctl */	pfioctl,
+	/* poll */	nopoll,
+	/* mmap */	nommap,
+	/* strategy */	nostrategy,
+	/* name */	"pf",
+	/* maj */	CDEV_MAJOR,
+	/* dump */	nodump,
+	/* psize */	nopsize,
+	/* flags */	0,
+	/* bmaj */	-1
+};
+#endif
 
 #ifdef __OpenBSD__
 extern struct timeout	 pf_expire_to;
@@ -1434,6 +1437,9 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	}
 
 	case DIOCGETLIMIT: {
+#ifdef __FreeBSD__
+		error = EOPNOTSUPP;
+#else
 		struct pfioc_limit	*pl = (struct pfioc_limit *)addr;
 
 		if (pl->index < 0 || pl->index >= PF_LIMIT_MAX) {
@@ -1441,10 +1447,14 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			goto fail;
 		}
 		pl->limit = pf_pool_limits[pl->index].limit;
+#endif
 		break;
 	}
 
 	case DIOCSETLIMIT: {
+#ifdef __FreeBSD__
+		error = EOPNOTSUPP;
+#else
 		struct pfioc_limit	*pl = (struct pfioc_limit *)addr;
 		int			 old_limit;
 
@@ -1466,6 +1476,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		pf_pool_limits[pl->index].limit = pl->limit;
 		pl->limit = old_limit;
 		break;
+#endif
 	}
 
 	case DIOCSETDEBUG: {
