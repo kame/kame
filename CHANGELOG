@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1748 2001/06/27 17:38:29 itojun Exp $
+$KAME: CHANGELOG,v 1.1749 2001/06/28 01:28:49 itojun Exp $
 
 <200106>
+Thu Jun 28 10:23:01 JST 2001  itojun@iijlab.net
+	* netbsd/sys/netinet/udp_usrreq.c: correct UDP over IPv6 reception
+	  when the packet is destined to a linklocal address.
+
 Thu Jun 28 02:33:07 JST 2001  itojun@iijlab.net
 	* sys/netinet6/nd6.c: refresh default router list on nd6_detach(),
 	  only if we are an autoconfigured host.  bug was that, we will lose
