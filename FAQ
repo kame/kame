@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.48 2001/08/02 15:31:09 itojun Exp $
+$KAME: FAQ,v 1.49 2001/08/02 15:48:16 itojun Exp $
 
 
 GENERAL
@@ -422,7 +422,7 @@ Q: Why don't KAME's getaddrinfo/getnameinfo support PF_LOCAL?
 
 	getaddrinfo/getnameinfo behavior itself is rather vaguely
 	defined in the standards (POSIX drafts as well as RFC2553/bis),
-	and we don't want to add more jitter to it.
+	and we don't want to add more jitter to them.
 
 	If it is really really necessary to play with it, we can probably
 	do that on KAME tree - but not on *BSD-current nor *BSD official
