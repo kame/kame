@@ -1,6 +1,8 @@
+.\"	$KAME: inet6_rth_space.3,v 1.2 2000/05/17 14:13:15 itojun Exp $
+.\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
-.\" 
+.\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
 .\" are met:
@@ -12,7 +14,7 @@
 .\" 3. Neither the name of the project nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
-.\" 
+.\"
 .\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
 .\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 .\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -24,8 +26,6 @@
 .\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
-.\"
-.\"     $Id: inet6_rth_space.3,v 1.1 2000/02/05 13:21:10 jinmei Exp $
 .\"
 .Dd February 5, 2000
 .Dt INET6_RTH_SPACE 3
@@ -68,7 +68,7 @@ Three functions build a Routing header:
 returns #bytes required for Routing header
 .It Fn inet6_rth_init
 initializes buffer data for Routing header
-.It Fn inet6_rth_add 
+.It Fn inet6_rth_add
 adds one IPv6 address to the Routing header
 .El
 .Pp
@@ -126,7 +126,7 @@ Routing header of the specified type and sets ip6r_len based on the
 parameter.
 .Li bp_len
 is only used to verify that the buffer is
-large enough. 
+large enough.
 The ip6r0_segleft field is set to zero;
 .Fn inet6_rth_add
 will increment it.
@@ -173,7 +173,7 @@ The return value of the function is 0 on success, or -1 upon an error.
 .Ss inet6_rth_segments
 .Fn inet6_rth_segments
 returns the number of segments
-.Po 
+.Po
 addresses
 .Pc
 contained in the Routing header described by
