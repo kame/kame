@@ -97,5 +97,8 @@ autobuild:
 	esac
 	@echo -n '${.TARGET} done at '
 	@date
+.if defined(AUTOBUILD_COOKIE)
+	touch ${AUTOBUILD_COOKIE}
+.endif
 
 .include "Makefile.inc"
