@@ -820,6 +820,7 @@ in6_control(so, cmd, data, ifp)
 		if ((ifp->if_flags & IFF_POINTOPOINT) &&
 		    (ifra->ifra_dstaddr.sin6_family == AF_INET6)) {
 			in6_ifscrub(ifp, ia);
+			oldaddr = ia->ia_dstaddr;
 			ia->ia_dstaddr = ifra->ifra_dstaddr;
 			/* link-local index check: should be a separate function? */
 			if (IN6_IS_ADDR_LINKLOCAL(&ia->ia_dstaddr.sin6_addr)) {
