@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.698 2000/03/17 16:17:23 itojun Exp $
+$Id: CHANGELOG,v 1.699 2000/03/17 16:38:17 itojun Exp $
 
 <200003>
 Sat Mar 18 01:16:26 JST 2000  itojun@iiljab.net
-	* netbsd/pkgsrc/{net/mtr,www/lynx}: mark them BROKEN for vulnerability
-	  reported on bugtraq.
+	* ports/packages for mtr and lynx: mark them BROKEN for vulnerability
+	  reported on bugtraq.  we recommend you to remove them from your KAME
+	  box by using pkg_delete(8), if you have installed them.
 
 Thu Mar 16 22:33:52 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/lib/libinet6/getaddrinfo.c: in res_queryN,
