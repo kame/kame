@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.24 2000/04/04 08:48:25 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.25 2000/06/05 00:41:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,7 +180,14 @@ int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *));
 #else
 int	in6_pcbsetport __P((struct in6_addr *, struct in6pcb *));
 #endif
-
+#ifdef HAVE_NRL_INPCB
+int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
+	struct inpcb *));
+#else
+int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
+	struct in6pcb *));
+#endif
+int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *));
 
 #ifndef TCP6
 extern struct rtentry *

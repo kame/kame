@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.18 2000/06/04 17:17:44 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.19 2000/06/08 23:47:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -607,3 +607,90 @@ in6_pcbsetport(laddr, inp, p)
 	return(0);
 }
 #endif
+
+/*
+ * generate kernel-internal form (scopeid embedded into s6_addr16[1]).
+ * If the address scope of is link-local, embed the interface index in the
+ * address.  The routine determines our precedence
+ * between advanced API scope/interface specification and basic API
+ * specification.
+ *
+ * this function should be nuked in the future, when we get rid of
+ * embedded scopeid thing.
+ */
+int
+in6_embedscope(in6, sin6, in6p)
+	struct in6_addr *in6;
+	const struct sockaddr_in6 *sin6;
+#ifdef HAVE_NRL_INPCB
+	struct inpcb *in6p;
+#define in6p_outputopts	inp_outputopts6
+#define in6p_moptions	inp_moptions6
+#else
+	struct in6pcb *in6p;
+#endif
+{
+	*in6 = sin6->sin6_addr;
+
+	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
+		/*
+		 * KAME assumption: link id == interface id
+		 */
+
+		/* XXX boundary check is assumed to be already done. */
+		/* XXX sin6_scope_id is weaker than advanced-api. */
+		struct in6_pktinfo *pi;
+
+		if (in6p->in6p_outputopts &&
+		    (pi = in6p->in6p_outputopts->ip6po_pktinfo) &&
+		    pi->ipi6_ifindex) {
+			in6->s6_addr16[1] = htons(pi->ipi6_ifindex);
+		} else if (IN6_IS_ADDR_MULTICAST(in6)
+			&& in6p->in6p_moptions
+			&& in6p->in6p_moptions->im6o_multicast_ifp) {
+			in6->s6_addr16[1] =
+				htons(in6p->in6p_moptions->im6o_multicast_ifp->if_index);
+		} else if (sin6->sin6_scope_id) {
+			/* boundary check */
+			if (sin6->sin6_scope_id < 0 ||
+			    if_index < sin6->sin6_scope_id)
+				return ENXIO;  /* XXX EINVAL? */
+			in6->s6_addr16[1] = htons(sin6->sin6_scope_id & 0xffff);
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * generate standard sockaddr_in6 from embedded form.
+ * touches sin6_addr and sin6_scope_id only.
+ *
+ * this function should be nuked in the future, when we get rid of
+ * embedded scopeid thing.
+ */
+int
+in6_recoverscope(sin6, in6)
+	struct sockaddr_in6 *sin6;
+	const struct in6_addr *in6;
+{
+	u_int32_t scopeid;
+
+	sin6->sin6_addr = *in6;
+	sin6->sin6_scope_id = 0;
+	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
+		/*
+		 * KAME assumption: link id == interface id
+		 */
+		scopeid = ntohs(in6->s6_addr16[1]);
+		if (scopeid) {
+			/* sanity check */
+			if (scopeid < 0 || if_index < scopeid)
+				return ENXIO;
+			sin6->sin6_addr.s6_addr16[1] = 0;
+			sin6->sin6_scope_id = scopeid;
+		}
+	}
+
+	return 0;
+}
