@@ -949,6 +949,24 @@ rt_stats(off)
 		rtstat.rts_unreach, plural(rtstat.rts_unreach));
 	printf("\t%u use%s of a wildcard route\n",
 		rtstat.rts_wildcard, plural(rtstat.rts_wildcard));
+	printf("\t%llu ART lookup%s\n",
+		(unsigned long long)rtstat.rts_art_lookups,
+		plural(rtstat.rts_art_lookups));
+	printf("\t%llu ART invalid result%s\n",
+		(unsigned long long)rtstat.rts_art_invalid,
+		plural(rtstat.rts_art_invalid));
+	printf("\t%llu ART mismatched result%s\n",
+		(unsigned long long)rtstat.rts_art_mismatch,
+		plural(rtstat.rts_art_mismatch));
+	printf("\t%llu ART table allocation%s\n",
+		(unsigned long long)rtstat.rts_art_alloc,
+		plural(rtstat.rts_art_alloc));
+	printf("\t%llu ART table free%s\n",
+		(unsigned long long)rtstat.rts_art_free,
+		plural(rtstat.rts_art_free));
+	printf("\t%llu ART table%s\n",
+		(unsigned long long)rtstat.rts_art_table,
+		plural(rtstat.rts_art_table));
 }
 short ns_nullh[] = {0,0,0};
 short ns_bh[] = {-1,-1,-1};
