@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.7 2001/12/18 03:10:43 jinmei Exp $
+ * $KAME: mld6v2.c,v 1.8 2002/01/20 15:23:45 suz Exp $
  */
 
 /*
@@ -344,6 +344,12 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 	return;
 
     dstp = (struct sockaddr_in6 *) sndmh.msg_name;
+
+#ifdef __KAME__
+    if (IN6_IS_ADDR_LINKLOCAL(&dstp->sin6_addr) || 
+	IN6_IS_ADDR_MC_LINKLOCAL(&dstp->sin6_addr))
+	dstp->sin6_scope_id = index;
+#endif
 
     if (sendmsg(mld6_socket, &sndmh, 0) < 0)
     {
