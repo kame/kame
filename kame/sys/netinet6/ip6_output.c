@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.217 2001/08/28 08:51:35 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.218 2001/09/07 08:26:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3500,6 +3500,9 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 	for (; control->m_len; control->m_data += CMSG_ALIGN(cm->cmsg_len),
 		     control->m_len -= CMSG_ALIGN(cm->cmsg_len)) {
 		int error;
+
+		if (control->m_len < CMSG_LEN(0))
+			return(EINVAL);
 
 		cm = mtod(control, struct cmsghdr *);
 		if (cm->cmsg_len == 0 || cm->cmsg_len > control->m_len)
