@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1177 2000/08/03 15:17:11 itojun Exp $
+$KAME: CHANGELOG,v 1.1178 2000/08/06 03:34:53 sumikawa Exp $
 
 <200007>
+Sun Aug  6 05:41:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd4: we now start to support 4.1-RELEASE.
+
 Fri Aug  4 00:16:00 JST 2000  itojun@iijlab.net
 	* kame/ping6/ping6.c: support icmp6 node information
 	  "supported query types" query, by ping6 -t.
