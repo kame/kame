@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/ipsec.h,v 1.4.2.1 2000/07/15 07:14:35 kris Exp $	*/
-/*	$KAME: ipsec.h,v 1.1.1.2 2000/08/05 16:43:02 sumikawa Exp $	*/
+/*	$KAME: ipsec.h,v 1.36 2000/08/02 17:58:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,7 +107,7 @@ struct secspacq {
 
 	struct secpolicyindex spidx;
 
-	u_int32_t tick;		/* for lifetime */
+	long created;		/* for lifetime */
 	int count;		/* for lifetime */
 	/* XXX: here is mbuf place holder to be sent ? */
 };
@@ -318,7 +318,7 @@ extern caddr_t ipsec_set_policy __P((char *, int));
 extern int ipsec_get_policylen __P((caddr_t));
 extern char *ipsec_dump_policy __P((caddr_t, char *));
 
-extern char *ipsec_strerror __P((void));
+extern const char *ipsec_strerror __P((void));
 #endif /*!_KERNEL*/
 
 #endif /*_NETINET6_IPSEC_H_*/
