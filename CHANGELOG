@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1649 2001/04/17 18:38:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1650 2001/04/17 18:40:14 jinmei Exp $
 
 <200104>
 2001-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -9,7 +9,7 @@ $KAME: CHANGELOG,v 1.1649 2001/04/17 18:38:31 jinmei Exp $
 	    rather harmful.
 	  - ignore queries if the receiving node is the querier.
 	  - removed a redundant check in accept_listener_query().
-	  - removed the al_old member the listaddr structure, and all
+	  - removed the al_old member of the listaddr structure, and all
 	    references to the member.  This should be safe, because there
 	    is effectively no use of the member.  This change should also
 	    make the code more conformant to RFC 2710.
