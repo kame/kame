@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.198 2004/11/28 05:57:44 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.199 2004/11/28 08:22:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4588,8 +4588,10 @@ res_queryN(name, target)
 		answer = t->answer;
 		anslen = t->anslen;
 #ifdef DEBUG
-		if (_res.options & RES_DEBUG)
-			printf(";; res_query(%s, %d, %d)\n", name, class, type);
+		if (_res.options & RES_DEBUG) {
+			printf(";; res_query(%s, %d, %d)\n",
+			    name, class, type);
+		}
 #endif
 
 		n = res_mkquery(QUERY, name, class, type, NULL, 0, NULL,
@@ -4641,19 +4643,17 @@ res_queryN(name, target)
 		}
 
 #ifdef DEBUG
-		if (n < 0 && _res.options & RES_DEBUG)
-				printf(";; res_query: send error\n");
-			h_errno = TRY_AGAIN;
-			return (n);
-		}
+		if (n < 0 && ((_res.options & RES_DEBUG)))
+			printf(";; res_query: send error\n");
 #endif
 
 		if (n < 0 || hp->rcode != NOERROR || ntohs(hp->ancount) == 0) {
 			rcode = hp->rcode;	/* record most recent error */
 #ifdef DEBUG
-			if (_res.options & RES_DEBUG)
-				printf(";; rcode = %u, ancount=%u\n", hp->rcode,
-				    ntohs(hp->ancount));
+			if ((_res.options & RES_DEBUG)) {
+				printf(";; rcode = %u, ancount=%u\n",
+				    hp->rcode, ntohs(hp->ancount));
+			}
 #endif
 			continue;
 		}
