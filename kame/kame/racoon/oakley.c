@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.79 2001/04/03 15:51:56 thorpej Exp $	*/
+/*	$KAME: oakley.c,v 1.80 2001/04/06 01:49:36 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2468,9 +2468,9 @@ oakley_delivm(ivm)
 		return;
 
 	if (ivm->iv != NULL)
-		racoon_free(ivm->iv);
+		vfree(ivm->iv);
 	if (ivm->ive != NULL)
-		racoon_free(ivm->ive);
+		vfree(ivm->ive);
 	racoon_free(ivm);
 
 	return;
