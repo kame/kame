@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.41 2000/04/17 08:10:52 jinmei Exp $
+	$Id: PORTABILITY,v 1.42 2000/05/13 22:30:30 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -292,3 +292,7 @@ across those possibilities.
   which would be much simpler. This is because BSDI4 has improved
   kernel code of handling routing sockets. We will eventually merge
   this improvement into other OSes.
+
+- (Not really a portability issue)  Fixes/improvements to libpcap and tcpdump
+  should be sent to itojun, or patches@tcpdump.org.  We no longer maintain
+  libpcap/tcpdump under "kame" directory.  http://www.tcpdump.org/
