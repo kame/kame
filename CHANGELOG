@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.918 2000/05/22 16:49:04 fujisawa Exp $
+$Id: CHANGELOG,v 1.919 2000/05/22 22:15:12 sakane Exp $
 
 <200005>
+Tue May 23 07:14:59 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	some fixes.
+	- initialize prefixlen at ipsecdoi_id2sockaddr.
+	- check sainfo duplicated.
+	- improve sainfo2str() to return "anonymous" if sainfo is anonymous
+	  record.
+	- fix to parase port number specification.
+	- change output level during parsing payload.
+
 Tue May 23 01:46:39 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* Remove "options PM" from GENERIC.v6.
 
