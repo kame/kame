@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2431 2003/07/08 10:03:59 ono Exp $
+$KAME: CHANGELOG,v 1.2432 2003/07/10 03:56:28 sakane Exp $
 
 <200307>
 2003-07-08  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
@@ -41,6 +41,13 @@ Tue Jul  1 11:56:46 JST 2003  itojun@iijlab.net
 	  interface removal, by ono@kame
 
 <200306>
+Mon Jun 30 20:01:18 2003 JST sakane@kame.net
+	* kame/racoon
+	racoon left a re-send schedule, but called unbindph12() after it
+	finished IPsec-SA negotiation.  the re-send routine would use ph1
+	handler, but it would be NULL, then it caused a crush.  the report
+	from <robert_kw@yahoo.com>
+
 Sun Jun 29 16:01:35 JST 2003 sakane@kame.net
 	* kame/sys/netkey/{key.[ch],keydb.[ch]}
 	* kame/sys/netinet6/ipsec.[ch]:
