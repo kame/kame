@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.23 2000/02/09 10:45:00 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.24 2000/02/14 08:53:22 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -724,20 +724,20 @@ ip6_stats(off, name)
 #define PRINT_SCOPESTAT(s,i) do {\
 		switch(i) { /* XXX hardcoding in each case */\
 		case 1:\
-			p(s, "\t\t%qu node-local%s\n");\
+			p(s, "\t\t%llu node-local%s\n");\
 			break;\
 		case 2:\
-			p(s,"\t\t%qu link-local%s\n");\
+			p(s, "\t\t%llu link-local%s\n");\
 			break;\
 		case 5:\
-			p(s,"\t\t%qu site-local%s\n");\
+			p(s, "\t\t%llu site-local%s\n");\
 			break;\
 		case 14:\
-			p(s,"\t\t%qu global%s\n");\
+			p(s, "\t\t%llu global%s\n");\
 			break;\
 		default:\
-			printf("\t\t%qu addresses scope=%x\n",\
-			       ip6stat.s, i);\
+			printf("\t\t%llu addresses scope=%x\n",\
+			       (unsigned long long)ip6stat.s, i);\
 		}\
 	} while(0);
 
