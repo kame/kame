@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_ioctl.c,v 1.70 2003/06/23 02:33:39 cedric Exp $ */
+/*	$OpenBSD: pf_ioctl.c,v 1.76 2003/07/19 13:08:58 cedric Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -440,7 +440,7 @@ pf_empty_pool(struct pf_palist *poola)
 	struct pf_pooladdr	*empty_pool_pa;
 
 	while ((empty_pool_pa = TAILQ_FIRST(poola)) != NULL) {
-		pf_dynaddr_remove(&empty_pool_pa->addr.addr);
+		pf_dynaddr_remove(&empty_pool_pa->addr);
 		TAILQ_REMOVE(poola, empty_pool_pa, entries);
 #ifdef __FreeBSD__
 		free(empty_pool_pa, M_PF);
@@ -1799,8 +1799,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			break;
 		}
 #endif /* INET6 */
-		if (pp->addr.addr.addr.type != PF_ADDR_ADDRMASK &&
-		    pp->addr.addr.addr.type != PF_ADDR_DYNIFTL) {
+		if (pp->addr.addr.type != PF_ADDR_ADDRMASK &&
+		    pp->addr.addr.type != PF_ADDR_DYNIFTL) {
 			error = EINVAL;
 			break;
 		}
@@ -1826,8 +1826,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				break;
 			}
 		}
-		if (pf_dynaddr_setup(&pa->addr.addr, pp->af)) {
-			pf_dynaddr_remove(&pa->addr.addr);
+		if (pf_dynaddr_setup(&pa->addr, pp->af)) {
+			pf_dynaddr_remove(&pa->addr);
 #ifdef __FreeBSD__
 			free(pa, M_PF);
 #else
@@ -1881,7 +1881,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			break;
 		}
 		bcopy(pa, &pp->addr, sizeof(struct pf_pooladdr));
-		pf_dynaddr_copyout(&pp->addr.addr.addr);
+		pf_dynaddr_copyout(&pp->addr.addr);
 		splx(s);
 		break;
 	}
@@ -1895,8 +1895,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			break;
 		}
-		if (pca->addr.addr.addr.type != PF_ADDR_ADDRMASK &&
-		    pca->addr.addr.addr.type != PF_ADDR_DYNIFTL) {
+		if (pca->addr.addr.type != PF_ADDR_ADDRMASK &&
+		    pca->addr.addr.type != PF_ADDR_DYNIFTL) {
 			error = EINVAL;
 			break;
 		}
@@ -1954,8 +1954,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				}
 			} else
 				newpa->ifp = NULL;
-			if (pf_dynaddr_setup(&newpa->addr.addr, pca->af)) {
-				pf_dynaddr_remove(&newpa->addr.addr);
+			if (pf_dynaddr_setup(&newpa->addr, pca->af)) {
+				pf_dynaddr_remove(&newpa->addr);
 #ifdef __FreeBSD__
 				free(newpa, M_PF);
 #else
@@ -1989,7 +1989,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (pca->action == PF_CHANGE_REMOVE) {
 			TAILQ_REMOVE(&pool->list, oldpa, entries);
-			pf_dynaddr_remove(&oldpa->addr.addr);
+			pf_dynaddr_remove(&oldpa->addr);
 #ifdef __FreeBSD__
 			free(oldpa, M_PF);
 #else
@@ -2007,7 +2007,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		}
 
 		pool->cur = TAILQ_FIRST(&pool->list);
-		PF_ACPY(&pool->counter, &pool->cur->addr.addr.v.a.addr,
+		PF_ACPY(&pool->counter, &pool->cur->addr.v.a.addr,
 		    pca->af);
 		splx(s);
 		break;

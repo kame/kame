@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfctl_parser.c,v 1.167 2003/07/04 11:05:44 henning Exp $ */
+/*	$OpenBSD: pfctl_parser.c,v 1.170 2003/07/19 13:08:58 cedric Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -417,14 +417,14 @@ print_pool(struct pf_pool *pool, u_int16_t p1, u_int16_t p2,
 		case PF_NAT:
 		case PF_RDR:
 		case PF_BINAT:
-			print_addr(&pooladdr->addr.addr, af, 0);
+			print_addr(&pooladdr->addr, af, 0);
 			break;
 		case PF_PASS:
-			if (PF_AZERO(&pooladdr->addr.addr.v.a.addr, af))
+			if (PF_AZERO(&pooladdr->addr.v.a.addr, af))
 				printf("%s", pooladdr->ifname);
 			else {
 				printf("(%s ", pooladdr->ifname);
-				print_addr(&pooladdr->addr.addr, af, 0);
+				print_addr(&pooladdr->addr, af, 0);
 				printf(")");
 			}
 			break;
@@ -780,6 +780,42 @@ print_rule(struct pf_rule *r, int verbose)
 		print_pool(&r->rpool, r->rpool.proxy_port[0],
 		    r->rpool.proxy_port[1], r->af, r->action);
 	}
+	printf("\n");
+}
+
+void
+print_tabledef(const char *name, int flags, int addrs,
+    struct node_tinithead *nodes)
+{
+	struct node_tinit	*ti, *nti;
+	struct node_host	*h;
+
+	printf("table <%s>", name);
+	if (flags & PFR_TFLAG_CONST)
+		printf(" const");
+	if (flags & PFR_TFLAG_PERSIST)
+		printf(" persist");
+	SIMPLEQ_FOREACH(ti, nodes, entries) {
+		if (ti->file) {
+			printf(" file \"%s\"", ti->file);
+			continue;
+		}
+		printf(" {");
+		for(;;) {
+			for (h = ti->host; h != NULL; h = h->next) {
+				printf(h->not ? " !" : " ");
+				print_addr(&h->addr, h->af, 0);
+			}
+			nti = SIMPLEQ_NEXT(ti, entries);
+			if (nti != NULL && nti->file == NULL)
+				ti = nti;	/* merge lists */
+			else
+				break;
+		}
+		printf(" }");
+	}
+	if (addrs && SIMPLEQ_EMPTY(nodes))
+		printf(" { }");
 	printf("\n");
 }
 
@@ -1201,35 +1237,40 @@ host_dns(const char *s, int v4mask, int v6mask)
 int
 append_addr(struct pfr_buffer *b, char *s, int test)
 {
-	return append_addr_not(b, s, test, 0);
-}
-
-/*
- * same as previous function, but with the ability to "negate" the result.
- * not:
- *	setting it to 1 is equivalent to adding "!" in front of parameter s.
- */
-int
-append_addr_not(struct pfr_buffer *b, char *s, int test, int not)
-{
-	char			 buf[256], *r;
-	int			 bits;
-	struct node_host	*n, *h;
-	struct pfr_addr		 addr;
+	char			 *r;
+	struct node_host	*h, *n;
+	int			 rv, not = 0;
 
 	for (r = s; *r == '!'; r++)
 		not = !not;
-	if (strlcpy(buf, r, sizeof(buf)) >= sizeof(buf)) {
-		errno = EINVAL;
-		return (-1);
-	}
-	if ((n = host(buf)) == NULL) {
+	if ((n = host(r)) == NULL) {
 		errno = 0;
 		return (-1);
 	}
+	rv = append_addr_host(b, n, test, not);
+	do {
+		h = n;
+		n = n->next;
+		free(h);
+	} while (n != NULL);
+	return (rv);
+}
+
+/*
+ * same as previous function, but with a pre-parsed input and the ability
+ * to "negate" the result. Does not free the node_host list.
+ * not:
+ *      setting it to 1 is equivalent to adding "!" in front of parameter s.
+ */
+int
+append_addr_host(struct pfr_buffer *b, struct node_host *n, int test, int not)
+{
+	int			 bits;
+	struct pfr_addr		 addr;
+
 	do {
 		bzero(&addr, sizeof(addr));
-		addr.pfra_not = not;
+		addr.pfra_not = n->not ^ not;
 		addr.pfra_af = n->af;
 		addr.pfra_net = unmask(&n->addr.v.a.mask, n->af);
 		switch (n->af) {
@@ -1253,10 +1294,7 @@ append_addr_not(struct pfr_buffer *b, char *s, int test, int not)
 		}
 		if (pfr_buf_add(b, &addr))
 			return (-1);
-		h = n;
-		n = n->next;
-		free(h);
-	} while (n != NULL);
+	} while ((n = n->next) != NULL);
 
 	return (0);
 }
