@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.302 2002/10/09 20:21:28 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.303 2002/10/09 20:26:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,6 +249,7 @@ void
 nd6_setmtu(ifp)
 	struct ifnet *ifp;
 {
+
 	nd6_setmtu0(ifp, ND_IFINFO(ifp));
 }
 
