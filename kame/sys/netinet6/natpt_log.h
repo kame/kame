@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.h,v 1.9 2002/02/21 21:12:54 sumikawa Exp $	*/
+/*	$KAME: natpt_log.h,v 1.10 2002/02/22 15:02:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -58,7 +58,7 @@ struct	l_att {
 /* Header at beginning of each lbuf */
 #ifndef IN6ADDRSZ
 #define IN6ADDRSZ	16	/* IPv6 T_AAAA */
-#define INT16SZ	2	/* for systems without 16-bit ints	*/
+#define INT16SZ	2	/* for systems without 16-bit ints */
 #endif
 
 #define LBFSZ	(MHLEN - sizeof(struct l_hdr))	/* LBUF payload within MBUF */
@@ -107,4 +107,4 @@ struct	lbuf {
 #define l_addr	l_dat.__laddr
 #define l_msg	l_dat.__laddr.__msg
 
-#endif	/* !_NATPT_LOG_H	*/
+#endif	/* !_NATPT_LOG_H */

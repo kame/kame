@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.44 2002/02/22 14:45:23 sumikawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.45 2002/02/22 15:02:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -331,7 +331,7 @@ natpt_setRules(caddr_t addr)
 	if (cst->rnum == 0) {
 		TAILQ_INSERT_HEAD(&csl_head, cst, csl_list);
 	} else if (cst->rnum < 0) {
-		cst->rnum = 65535;		/* set number forcibly.	*/
+		cst->rnum = 65535;		/* set number forcibly. */
 		TAILQ_INSERT_TAIL(&csl_head, cst, csl_list);
 	} else {
 		struct cSlot	*csl;

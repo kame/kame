@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.39 2002/02/22 14:43:33 sumikawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.40 2002/02/22 15:02:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -321,7 +321,7 @@ natpt_openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 	if (ats == NULL)
 		return (NULL);
 
-	/* Should we think about UDP?	*/
+	/* Should we think about UDP? */
 	MALLOC(ts, struct tcpstate *, sizeof(struct tcpstate), M_NATPT, M_NOWAIT);
 	if (ts == NULL) {
 		FREE(ats, M_NATPT);
@@ -824,8 +824,9 @@ natpt_hashSin4(struct sockaddr_in *sin4)
 }
 
 
-/*	CAUTION								*/
-/*	This hash routine is byte order sensitive.  Be Careful.		*/
+/*
+ * CAUTION: This hash routine is byte order sensitive.  Be Careful.
+ */
 
 static int
 natpt_hashPJW(u_char *s, int len)
@@ -958,13 +959,13 @@ natpt_init_tslot()
 	timeout(natpt_expireTSlot, (caddr_t)0, tSlotTimer);
 	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer);
 
-	maxFragment = 120;				/* [sec]	*/
+	maxFragment = 120;				/* [sec] */
 
-	natpt_TCPT_2MSL	  = 120;			/* [sec]	*/
-	natpt_tcp_maxidle = 600;			/* [sec]	*/
+	natpt_TCPT_2MSL	  = 120;			/* [sec] */
+	natpt_tcp_maxidle = 600;			/* [sec] */
 
 	maxTTLicmp = maxTTLudp = natpt_TCPT_2MSL;
-	maxTTLtcp  = maxTTLany = 86400;			/* [sec]	*/
+	maxTTLtcp  = maxTTLany = 86400;			/* [sec] */
 
 	TAILQ_INIT(&frg_head);
 	TAILQ_INIT(&tsl_head);

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.77 2002/02/21 19:09:17 sumikawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.78 2002/02/22 15:02:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -127,7 +127,7 @@ struct ulc4 {
 };
 
 
-extern	int	udpcksum;	/* defined in netinet/udp_usrreq.c	*/
+extern	int	udpcksum;	/* defined in netinet/udp_usrreq.c */
 
 #ifdef __FreeBSD__
 MALLOC_DECLARE(M_NATPT);
@@ -1967,7 +1967,7 @@ natpt_parseFTPdialogue(caddr_t kb, caddr_t kk, struct ftpparam *ftp6)
 			u.cmd = u.cmd * 10 + *kb - '0';
 		}
 	} else
-		return (NULL);	/* neither ftp command nor ftp reply	*/
+		return (NULL);	/* neither ftp command nor ftp reply */
 
 	while ((kb < kk) && (*kb == ' '))
 		kb++;
@@ -2450,7 +2450,7 @@ natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 		frg6->ip6f_ident |= ntohs(ip4->ip_id);
 		HTONL(frg6->ip6f_ident);
 
-		/* Get last fragmented packet length from given ip header.	*/
+		/* Get last fragmented packet length from given ip header. */
 		if (!needFragment(cv4)
 		    && ((ip4->ip_off & IP_OFFMASK) != 0)
 		    && ((ip4->ip_off & IP_MF) == 0))

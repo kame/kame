@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.24 2002/02/01 15:14:23 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.25 2002/02/22 15:02:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -40,7 +40,7 @@ extern struct in6_addr	natpt_prefix;
  *
  */
 
-/*  natpt_dispatch.c  */
+/*  natpt_dispatch.c */
 caddr_t		 natpt_pyldaddr		__P((struct ip6_hdr *, caddr_t, int *, struct ip6_frag **));
 int		 natpt_setPrefix	__P((caddr_t));
 int		 natpt_setValue		__P((caddr_t));
@@ -49,7 +49,7 @@ int		 natpt_testLog		__P((caddr_t));
 int		 natpt_break		__P((void));
 
 
-/*  natpt_log.c	 */
+/*  natpt_log.c */
 void		 natpt_logMsg		__P((int, char *, ...));
 void		 natpt_logMBuf		__P((int, struct mbuf *, ...));
 void		 natpt_logIp4		__P((int, struct ip *, ...));
@@ -59,7 +59,7 @@ int		 natpt_logIN6addr	__P((int, char *, struct in6_addr *));
 struct mbuf	*natpt_lbuf		__P((int, int, size_t));
 
 
-/*  natpt_rule.c  */
+/*  natpt_rule.c */
 struct cSlot	*natpt_lookForRule4	__P((struct pcv *));
 struct cSlot	*natpt_lookForRule6	__P((struct pcv *));
 int		 natpt_setRules		__P((caddr_t));
@@ -71,7 +71,7 @@ int		 natpt_setOnOff		__P((int));
 void		 natpt_init_rule	__P((void));
 
 
-/*  natpt_trans.c  */
+/*  natpt_trans.c */
 struct mbuf	*natpt_translateIPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateIPv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateIPv4To4	__P((struct pcv *, struct pAddr *));
@@ -80,7 +80,7 @@ struct mbuf	*natpt_translateFragment4to6 __P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateFragment4to4 __P((struct pcv *, struct pAddr *));
 
 
-/*  natpt_tslot.c  */
+/*  natpt_tslot.c */
 struct tSlot	*natpt_lookForHash4	__P((struct pcv *));
 struct tSlot	*natpt_lookForHash6	__P((struct pcv *));
 struct tSlot	*natpt_internHash4	__P((struct cSlot *, struct pcv *));
@@ -98,6 +98,6 @@ struct tSlot	*natpt_lookForFragment4	__P((struct pcv *));
 void		 natpt_init_tslot	__P((void));
 
 
-/*  natpt_usrreq.c  */
+/*  natpt_usrreq.c */
 void		 natpt_input		__P((struct mbuf *, struct sockproto *,
 					     struct sockaddr *, struct sockaddr *));

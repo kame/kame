@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.38 2002/02/21 21:17:31 sumikawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.39 2002/02/22 15:02:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -186,25 +186,25 @@ union inaddr {
 
 struct fragment {
 	TAILQ_ENTRY(fragment)	frg_list;
-	u_int8_t	 fg_family;		/* AF_INET{,6} (sa_family_t)	*/
-	u_int8_t	 fg_proto;		/* protocol			*/
-	u_short		 fg_id;		/* identification in v4 header	*/
-	union inaddr	 fg_src;		/* source address		*/
-	union inaddr	 fg_dst;		/* destination address		*/
+	u_int8_t	 fg_family;		/* AF_INET{,6} (sa_family_t) */
+	u_int8_t	 fg_proto;		/* protocol */
+	u_short		 fg_id;		/* identification in v4 header */
+	union inaddr	 fg_src;		/* source address */
+	union inaddr	 fg_dst;		/* destination address */
 	struct tSlot	*tslot;
 	time_t		 tstamp;
 };
 
 
 struct pAddr {
-	u_char		sa_family;	/* address family	*/
+	u_char		sa_family;	/* address family */
 
-	u_char		pType;		/* port range type	*/
+	u_char		pType;		/* port range type */
 #define	PORT_MINUS		1
 #define	PORT_COLON		2
 
 	u_char		prefix;		/* address mask length */
-	u_char		aType;		/* address type	*/
+	u_char		aType;		/* address type */
 #define	ADDR_ANY		0
 #define	ADDR_SINGLE		1
 #define	ADDR_MASK		2
@@ -227,7 +227,7 @@ struct pAddr {
 };
 
 
-struct mAddr					/* sizeof(): 60[byte]	*/
+struct mAddr					/* sizeof(): 60[byte] */
 {
 	struct pAddr	saddr;
 #define	Local			local.saddr
@@ -239,13 +239,13 @@ struct mAddr					/* sizeof(): 60[byte]	*/
 };
 
 
-/* Configuration slot entry						*/
+/* Configuration slot entry */
 
-struct cSlot					/* sizeof(): 144[byte]	*/
+struct cSlot					/* sizeof(): 144[byte] */
 {
 	TAILQ_ENTRY(cSlot)	csl_list;
 
-	int		 rnum;		/* rule number			*/
+	int		 rnum;		/* rule number */
 
 	u_char		 proto;
 #define	NATPT_ICMPV6		0x01
@@ -259,7 +259,7 @@ struct cSlot					/* sizeof(): 144[byte]	*/
 #define	NATPT_REDIRECT_PORT	0x04
 #define	NATPT_BIDIR		0x10
 
-	u_short		 cport;		/* current port, with host byte order	*/
+	u_short		 cport;		/* current port, with host byte order */
 
 	time_t		 tstamp;
 	time_t		 lifetime;
@@ -270,27 +270,27 @@ struct cSlot					/* sizeof(): 144[byte]	*/
 };
 
 
-/* Translation slot entry						*/
+/* Translation slot entry */
 
-struct tSlot					/* sizeof(): 132[byte]	*/
+struct tSlot					/* sizeof(): 132[byte] */
 {
 	TAILQ_ENTRY(tSlot)	tsl_list;
-	TAILQ_ENTRY(tSlot)	tsl_hashl;	/* Hash chain.		*/
-	TAILQ_ENTRY(tSlot)	tsl_hashr;	/* Hash chain.		*/
+	TAILQ_ENTRY(tSlot)	tsl_hashl;	/* Hash chain. */
+	TAILQ_ENTRY(tSlot)	tsl_hashr;	/* Hash chain. */
 
-	u_char		 ip_p;			/* next level protocol	*/
+	u_char		 ip_p;			/* next level protocol */
 
 	u_short		 hvl;
 	u_short		 hvr;
 	struct pAddr	 local;
 	struct pAddr	 remote;
 	time_t		 tstamp;
-	u_long		 fromto;		/* counter	*/
-	u_long		 tofrom;		/* counter	*/
+	u_long		 fromto;		/* counter */
+	u_long		 tofrom;		/* counter */
 
 	/* This pointer is used in order to open connection from FTP
 	 * server when FTP non passive mode.
-	 */
+ */
 	struct cSlot	*csl;
 	union {
 		struct {
@@ -303,21 +303,21 @@ struct tSlot					/* sizeof(): 132[byte]	*/
 };
 
 
-struct tcpstate					/* sizeof(): 32[byte]	*/
+struct tcpstate					/* sizeof(): 32[byte] */
 {
 	u_char		state;		/* tcp status */
 	char		ftpstate;
 	char		rewrite[2];
 
-	u_short		lport;		/* FTP PORT command argument	*/
+	u_short		lport;		/* FTP PORT command argument */
 	u_short		rport;		/* port connected from outside */
 
-	long		delta[2];	/* [0]: outgoingDelta		*/
-					/*	outgoingSeq - increment	*/
-					/*	incomingAck - decrement	*/
-					/* [1]: incomingDelta		*/
-					/*	incomingSeq - increment	*/
-					/*	outgoingAck - decrement	*/
+	long		delta[2];	/* [0]: outgoingDelta */
+					/*	outgoingSeq - increment */
+					/*	incomingAck - decrement */
+					/* [1]: incomingDelta */
+					/*	incomingSeq - increment */
+					/*	outgoingAck - decrement */
 
 	u_int32_t	seq[2];
 	u_int32_t	ack[2];
