@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.26 2002/02/04 06:20:30 jinmei Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.27 2002/07/31 10:59:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,9 +182,7 @@ struct ip6protosw {
 #endif
 };
 
-#ifdef __NetBSD__
 extern struct ip6protosw inet6sw[];
-#endif
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 void pfctlinput2 __P((int, struct sockaddr *, void *));
