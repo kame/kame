@@ -1,9 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2239 2002/09/26 07:12:28 itojun Exp $
+$KAME: CHANGELOG,v 1.2240 2002/09/26 09:22:26 itojun Exp $
 
 <200209>
 Thu Sep 26 16:11:08 JST 2002  itojun@iijlab.net
-	* netbsd: switch to 1.6
+	* netbsd: switch to 1.6.  note:
+	  - NATPT and IP6FW are dropped from support list
+	  - syscall # for sctp_peeloff have changed
+	  - "pseudo-device altq" went away
+	  - of course, need some more testing
 
 Mon Sep 23 22:21:41 JST 2002  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: pad length for PADN option header before
