@@ -6,12 +6,16 @@
 .Nd display or control ATM PVC bridging between two PVC sub interfaces
 .Sh SYNOPSIS
 .Nm pvcbridge
-.Op add|delete
+.Op get
+.Ar interface
+.Nm pvcbridge
+.Li add
 .Ar interface1
 .Ar interface2
 .Nm pvcbridge
-.Op get
-.Ar interface
+.Li delete
+.Ar interface1
+.Ar interface2
 .Sh DESCRIPTION
 .Nm 
 displays or controls bridging between two PVC sub interfaces.
@@ -21,28 +25,37 @@ interfaces.
 An ATM VC should be assgined to each PVC sub interface by 
 .Xr pvctxctl 8 .
 .Pp
-With the first form,
-.Nm
-sets or deletes bridging between the given two ATM PVC sub interfaces.
-With the second form, 
+With keyword
+.Dq Li get ,
 .Nm 
 displays the current bridge setting of the given PVC sub interface.
 The
 .Ar inerface
 parameter must be an ATM PVC sub interface created by
 .Xr pvcsif 8 .
-
+With keyword
+.Dq Li add
+or
+.Dq Li delete ,
+.Nm
+sets or deletes bridging between the given two ATM PVC sub interfaces.
+With no keyword,
+.Dq Li get
+is assumed.
+.\"
 .Sh EXAMPLE
 For example, to set up bridging between VC:201 on en0 and VC:202 on en1:
 .Pp
-.Dl # pvcsif en0      			# creates pvc0
-.Dl # ifconfig pvc0 up			# up pvc0
-.Dl # pvctxctl pvc0 201 -b 45M		# assign vc
-.Dl # pvcsif en1      			# creates pvc1
-.Dl # ifconfig pvc1 up			# up pvc1
-.Dl # pvctxctl pvc1 202 -b 45M		# assign vc
-.Dl # pvcbridge pvc0 pvc1		# set bridging
-
+.Bd -literal
+# pvcsif en0      		# creates pvc0
+# ifconfig pvc0 up		# up pvc0
+# pvctxctl pvc0 201 -b 45M	# assign vc
+# pvcsif en1      		# creates pvc1
+# ifconfig pvc1 up		# up pvc1
+# pvctxctl pvc1 202 -b 45M	# assign vc
+# pvcbridge pvc0 pvc1		# set bridging
+.Ed
+.\"
 .Sh SEE ALSO
 .Xr ifconfig 8 , 
 .Xr pvcsif 8 ,
