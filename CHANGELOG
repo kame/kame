@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1275 2000/09/14 00:25:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1276 2000/09/14 01:44:05 sumikawa Exp $
 
 <200009>
+Thu Sep 14 10:40:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd3/ports/lfp: upgrade to 2.2.6.
+
 Thu Sep 14 09:24:47 JST 2000  itojun@iijlab.net
 	* kame/faithd: repair EPRT translation.  cope with PASV result
 	  without paren.
