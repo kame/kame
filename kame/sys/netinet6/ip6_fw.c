@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.10 2000/02/22 14:04:21 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.11 2000/03/10 04:22:18 k-sugyou Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -14,7 +14,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.10 2000/02/22 14:04:21 itojun Exp $
+ *	$Id: ip6_fw.c,v 1.11 2000/03/10 04:22:18 k-sugyou Exp $
  */
 
 /*
@@ -813,6 +813,8 @@ got_match:
 		  }
 #endif
 		default:	/* Send an ICMP unreachable using code */
+			if (oif)
+				(*m)->m_pkthdr.rcvif = oif;
 			icmp6_error(*m, ICMP6_DST_UNREACH,
 			    rule->fw_reject_code, 0);
 			*m = NULL;
