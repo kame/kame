@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.26 2001/09/18 13:02:44 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.27 2001/09/21 08:46:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,6 +32,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -54,6 +55,10 @@
 #include <netinet6/ip6_var.h>
 
 #include <netinet/icmp6.h>
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
 
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr0 *));
@@ -153,7 +158,64 @@ ip6_rthdr0(m, ip6, rh0)
 	struct in6_addr *nextaddr, tmpaddr;
 
 	if (rh0->ip6r0_segleft == 0)
+#ifdef MIP6
+	{
+		struct hif_softc *sc;
+		struct mip6_bu *mbu;
+		int lastindex, optim = 0;
+		struct in6_addr *prevhop;
+		struct mbuf *n;
+		struct ip6aux *ip6a;
+
+		if (!MIP6_IS_MN)
+			return (0);
+
+		/*
+		 * check if the ip6_dst is my home address or not.  if
+		 * true, check if the previous hop is the coa of the
+		 * home address stored in the ip6_dst field.  if above
+		 * two is true, this packet is route optimized packet.
+		 */
+		for (sc = TAILQ_FIRST(&hif_softc_list);
+		     sc;
+		     sc = TAILQ_NEXT(sc, hif_entry)) {
+			for (mbu = LIST_FIRST(&sc->hif_bu_list);
+			     mbu;
+			     mbu = LIST_NEXT(mbu, mbu_entry)) {
+				if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)
+					continue;
+
+				/* XXX registration status ? */
+
+				/* check the final dest is a home address. */
+				if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
+							&mbu->mbu_haddr))
+					continue;
+
+				/* check the last hop is a coa. */
+				lastindex = rh0->ip6r0_len / 2;
+				prevhop = (struct in6_addr *)(rh0 + 1)
+					+ lastindex - 1;
+				if (!IN6_ARE_ADDR_EQUAL(prevhop,
+							&mbu->mbu_coa))
+					continue;
+
+				/*
+				 * route is already optimized.  set
+				 * optimized flag in m_aux.
+				 */
+				n = ip6_addaux(m);
+				if (n) {
+					ip6a = mtod(n, struct ip6aux *);
+					ip6a->ip6a_flags = IP6A_ROUTEOPTIMIZED;
+				}
+			}
+		}
+		return (0);
+	}
+#else /* MIP6 */
 		return(0);
+#endif /* MIP6 */
 
 	if (rh0->ip6r0_len % 2
 #ifdef COMPAT_RFC1883

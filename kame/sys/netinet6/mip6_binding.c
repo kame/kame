@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.15 2001/09/20 08:27:11 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.16 2001/09/21 08:46:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2325,8 +2325,10 @@ mip6_tunnel_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
+#if 0
 	struct mbuf *n;
 	struct ip6aux *ip6a;
+#endif
 	struct ip6_hdr *ip6;
 	int s, af = 0;
 	u_int32_t otos;
@@ -2346,6 +2348,7 @@ mip6_tunnel_input(mp, offp, proto)
 				return (IPPROTO_DONE);
 		}
 
+#if 0
 		/* Tell MN that this packet was tunnelled. */
 		n = ip6_addaux(m);
 		if (!n) {
@@ -2357,6 +2360,7 @@ mip6_tunnel_input(mp, offp, proto)
 			goto bad;
 		}
 		ip6a->ip6a_flags |= IP6A_MIP6TUNNELED;
+#endif
 
 		ip6 = mtod(m, struct ip6_hdr *);
 
@@ -2519,74 +2523,87 @@ mip6_route_optimize(m)
 		return (0);
 	}
 
-	n = ip6_findaux(m);
-	if (!n) {
-		/* not tunneled packet.  no need to optimize route. */
-		return (0);
-	}
-	ip6a = mtod(n, struct ip6aux *);
-	if ((ip6a->ip6a_flags & IP6A_MIP6TUNNELED) == 0) {
-		/* not tunneled packet.  no need to optimize route. */
-		return (0);
-	}
-
 	ip6 = mtod(m, struct ip6_hdr *);
+	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
+		return (0);
+	}
 	
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		/*
-		 * find a mip6_prefix which has a home address of received
-		 * packet.
-		 */
-		mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
-						       &ip6->ip6_dst);
-		if (mpfx == NULL) {
-			/*
-			 * no related prefix found.  this packet is
-			 * destined to another address of this node
-			 * that is not a home address.
-			 */
+	n = ip6_findaux(m);
+	if (n) {
+		ip6a = mtod(n, struct ip6aux *);
+		if (ip6a->ip6a_flags & IP6A_ROUTEOPTIMIZED) {
+			/* no need to optimize route. */
 			return (0);
 		}
+	}
+	/*
+	 * this packet has no rthdr or has a rthdr not related mip6
+	 * route optimization.
+	 */
 
+	/* check if we are home. */
+	sc = hif_list_find_withhaddr(&ip6->ip6_dst);
+	if (sc == NULL) {
+		/* this dst addr is not one of our home addresses. */
+		return (0);
+	}
+	if (sc->hif_location == HIF_LOCATION_HOME) {
+		/* we are home.  no route optimization is required. */
+		return (0);
+	}
+
+	/*
+	 * find a mip6_prefix which has a home address of received
+	 * packet.
+	 */
+	mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
+					       &ip6->ip6_dst);
+	if (mpfx == NULL) {
 		/*
-		 * search all BUs including peer address.
+		 * no related prefix found.  this packet is
+		 * destined to another address of this node
+		 * that is not a home address.
 		 */
-		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-						  &ip6->ip6_src);
-		/*
-		 * if no BU entry is found, this is a first packet
-		 * from the peer.  create an BU entry.
-		 */
+		return (0);
+	}
+
+	/*
+	 * search all BUs including peer address.
+	 */
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
+					  &ip6->ip6_src);
+	/*
+	 * if no BU entry is found, this is a first packet
+	 * from the peer.  create an BU entry.
+	 */
+	if (mbu == NULL) {
+		mbu = mip6_bu_create(&ip6->ip6_src,
+				     mpfx,
+				     &hif_coa,
+				     0, sc);
 		if (mbu == NULL) {
-			mbu = mip6_bu_create(&ip6->ip6_src,
-					     mpfx,
-					     &hif_coa,
-					     0, sc);
-			if (mbu == NULL) {
-				error = ENOMEM;
-				goto bad;
-			}
-			mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
+			error = ENOMEM;
+			goto bad;
+		}
+		mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
 
 #ifndef BUOLDTIMER
-			mip6_bu_list_insert(&sc->hif_bu_list, mbu);
+		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 #else
-			LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
+		LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
 #endif
+	} else {
+		mbu->mbu_coa = hif_coa;
+		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
+		if (coa_lifetime < mpfx->mpfx_lifetime) {
+			mbu->mbu_lifetime = coa_lifetime;
 		} else {
-			mbu->mbu_coa = hif_coa;
-			coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
-			if (coa_lifetime < mpfx->mpfx_lifetime) {
-				mbu->mbu_lifetime = coa_lifetime;
-			} else {
-				mbu->mbu_lifetime = mpfx->mpfx_lifetime;
-			}
-			mbu->mbu_remain = mbu->mbu_lifetime;
-			mbu->mbu_refresh = mbu->mbu_lifetime;
-			mbu->mbu_refremain = mbu->mbu_refresh;
-			mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
+			mbu->mbu_lifetime = mpfx->mpfx_lifetime;
 		}
+		mbu->mbu_remain = mbu->mbu_lifetime;
+		mbu->mbu_refresh = mbu->mbu_lifetime;
+		mbu->mbu_refremain = mbu->mbu_refresh;
+		mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
 	}
 
 	return (0);
