@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.49 2005/01/12 06:06:11 suz Exp $	*/
+/*	$KAME: config.c,v 1.50 2005/04/01 12:43:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -451,7 +451,6 @@ configure_host(hostlist)
 		}
 		memset(hconf, 0, sizeof(*hconf));
 		TAILQ_INIT(&hconf->prefix_list);
-		TAILQ_INIT(&hconf->prefix_binding_list);
 		TAILQ_INIT(&hconf->addr_list);
 		hconf->next = host_conflist0;
 		host_conflist0 = hconf;

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.38 2005/01/12 06:06:11 suz Exp $	*/
+/*	$KAME: config.h,v 1.39 2005/04/01 12:43:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -192,21 +192,17 @@ struct host_conf {
 
 	char *name;		/* host name to identify the host */
 	struct duid duid;	/* DUID for the host */
-	/* delegated prefixes for the host */
-	/* struct dhcp6_list prefix_list; */
-	struct dhcp6_list prefix_list;
 
-	/* bindings of delegated prefixes */
-	struct dhcp6_list prefix_binding_list;
+	/* prefixes to be delegated to the host */
+	struct dhcp6_list prefix_list;
+	/* address to be assigned for the host */
+	struct dhcp6_list addr_list;
 
 	/* secret key shared with the client for delayed authentication */
 	struct keyinfo *delayedkey;
 	/* previous replay detection value from the client */
 	int saw_previous_rd;	/* if we remember the previous value */
 	u_int64_t previous_rd;
-
-	/* address binding for the host */
-	struct dhcp6_list addr_list;
 };
 
 /* DHCPv6 authentication information */
