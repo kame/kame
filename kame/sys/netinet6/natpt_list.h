@@ -1,4 +1,4 @@
-/*	$KAME: natpt_list.h,v 1.6 2000/04/06 08:30:47 sumikawa Exp $	*/
+/*	$KAME: natpt_list.h,v 1.7 2000/10/29 11:48:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,7 +70,7 @@ static	Cell	*_getEmptyCell	__P((void));
 
 #ifdef _KERNEL
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
+MALLOC_DECLARE(M_NATPT);
 #endif	/* defined(__FreeBSD__) && __FreeBSD__ >= 3	*/
 #endif	/* defined(_KERNEL)	*/
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.12 2000/10/17 14:23:56 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.13 2000/10/29 11:48:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,7 @@ static int	 _hash_pjw			__P((u_char *, int));
 
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
+MALLOC_DECLARE(M_NATPT);
 #endif
 
 

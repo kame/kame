@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.18 2000/10/17 14:23:55 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.19 2000/10/29 11:48:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,7 +125,7 @@ static	int	 adjustChecksum			__P((int, u_char *, int, u_char *, int));
 
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
+MALLOC_DECLARE(M_NATPT);
 #endif
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.14 2000/10/17 14:23:55 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.15 2000/10/29 11:48:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,7 +116,7 @@ struct _tSlot		*lookForFragmented	__P((struct _cv *, int));
 #endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
+MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
 #endif
 
 
