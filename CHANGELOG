@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.59 1999/08/24 17:04:21 jinmei Exp $
+$Id: CHANGELOG,v 1.60 1999/08/24 17:32:33 sumikawa Exp $
 
 <199908>
+Wed Aug 25 02:31:54 JST 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/pfs: add pfs(personal file system)
+
 1999-08-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6dd/debug.c (dump_lcl_grp): added to show status of
 	local listeners with some timer values.
