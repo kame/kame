@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1205 2000/08/15 14:46:41 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1206 2000/08/16 03:03:20 jinmei Exp $
 
 <200008>
+2000-08-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sbin/ifconfig/ifconfig.c: set some IPv6 related parameters
+	to a correct variable. Without this fix, for example, an IPv6
+	anycast address couldn't be configured with the ifconfing command.
+
 Tue Aug 15 22:28:09 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/apache13: apache 1.3.12 + latest IPv6 patch
 	* freebsd3/ports/mrt: mrt 2.2.2a-Aug11
