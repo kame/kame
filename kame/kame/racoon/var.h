@@ -1,4 +1,4 @@
-/*	$KAME: var.h,v 1.9 2001/04/03 15:51:57 thorpej Exp $	*/
+/*	$KAME: var.h,v 1.10 2001/04/03 16:56:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,8 +89,6 @@ do { \
 	for (elm = LIST_FIRST(head); elm; elm = LIST_NEXT(elm, field))
 #endif
 
-#ifdef GC
 #include "gcmalloc.h"
-#endif
 
 #endif /*!defined(_VAR_H_)*/
