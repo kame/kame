@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.755 2000/04/08 02:40:32 itojun Exp $
+$Id: CHANGELOG,v 1.755.2.1 2000/04/13 12:01:19 jinmei Exp $
 
 <200003>
+2000-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/sys/netinet/tcp_input.c (tcp_input): do not call
+	ND6_HINT() if the connection status is LISTEN.
+
+2000-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_nud_hint): do not change a
+	neighbor's status unless the old status is probably reachable
+	(i.e. the link-layer address has already been resolved).
+	In response to: KAME PR sys/235.
+
 Sat Apr  8 09:49:57 JST 2000  itojun@iijlab.net
 	* gated-ipv6 ports/pkgsrc (netbsd/freebsd[23]): upgrade to 3/9 snapshot.
 
