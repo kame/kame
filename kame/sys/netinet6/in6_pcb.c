@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.56 2000/07/03 13:23:28 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.57 2000/07/07 10:27:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -722,18 +722,20 @@ in6_pcbrtentry(in6p)
 	struct in6pcb *in6p;
 {
 	struct route_in6 *ro;
+	struct sockaddr_in6 *dst6;
 
 	ro = &in6p->in6p_route;
+	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
 
 	if (ro->ro_rt == NULL) {
 		/*
 		 * No route yet, so try to acquire one.
 		 */
 		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
-			bzero(&ro->ro_dst, sizeof(ro->ro_dst));
-			ro->ro_dst.sin6_family = AF_INET6;
-			ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-			satosin6(&ro->ro_dst)->sin6_addr = in6p->in6p_faddr;
+			bzero(dst6, sizeof(*dst6));
+			dst6->sin6_family = AF_INET6;
+			dst6->sin6_len = sizeof(struct sockaddr_in6);
+			dst6->sin6_addr = in6p->in6p_faddr;
 			rtalloc((struct route *)ro);
 		}
 	}
