@@ -65,6 +65,7 @@
  */
 
 #define PULLDOWN_STAT
+/*#define PULLDOWN_DEBUG*/
 
 #ifdef PULLDOWN_STAT
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -93,9 +94,6 @@
  *
  * XXX M_TRAILINGSPACE/M_LEADINGSPACE on shared cluster (sharedcluster)
  */
-#if 0
-#define PULLDOWN_DEBUG
-#endif
 struct mbuf *
 m_pulldown(m, off, len, offp)
 	struct mbuf *m;
