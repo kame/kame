@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.356 1999/12/21 12:53:01 sakane Exp $
+$Id: CHANGELOG,v 1.357 1999/12/21 15:46:02 itojun Exp $
 
 <199912>
+Wed Dec 22 00:37:56 JST 1999  itojun@iijlab.net
+	* many platforms:
+	  be paranoid about malicious use of v4 mapped addr on v6 packet.
+	  malicious party may try to use v4 mapped addr as source/dest to
+	  confuse tcp/udp layer, or to bypass security checks,
+	  for example, naive stack can mistakingly think a packet with
+	  src = ::ffff:127.0.0.1 is from local node.
+
+	  changed:
+	  tcp/udp/rawip layer for bsdi4, netbsd, freebsd2, bsdi3
+	  ip6 layer (ip6 input and routing header processing) for all OS.
+	  the latter change can be controversial.
+
 Tue Dec 21 00:44:22 PST 1999 sakane@ydc.co.jp
 	* kame/sys/netinet6/ipsec.c:
 	Limitedly dealing with upper layer protocol and port number
