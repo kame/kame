@@ -43,13 +43,14 @@
 #include <arpa/inet.h>
 
 int sock;
-void sock_open(void);
-void dump(void);
+int main __P((int, char **));
+void sock_open __P((void));
+void dump __P((void));
 
 int
 main(argc, argv)
 	int argc;
-	char *argv[];
+	char **argv;
 {
 	fd_set *fdsetp;
 	size_t nfdset;
@@ -62,26 +63,38 @@ main(argc, argv)
 	if (argc == 1)
 		ICMP6_FILTER_SETPASSALL(&filt);
 	else {
-		int type;
+		unsigned long type;
+		char *p;
 
 		ICMP6_FILTER_SETBLOCKALL(&filt);
 		argc--; argv++;
 		while (argc-- > 0) {
-			type = atoi(*argv);
+			p = NULL;
+			type = strtoul(*argv, &p, 0);
+			if (!**argv || *p) {
+				errx(1, "invalid argument");
+				/*NOTREACHED*/
+			}
+			if (type < 0 || type > 255) {
+				errx(1, "invalid argument");
+				/*NOTREACHED*/
+			}
 			ICMP6_FILTER_SETPASS(type, &filt);
 			argv++;
 		}
 	}
 	if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 			sizeof(filt)) < 0) {
-		perror("setsockopt(ICMP6_FILTER)");
-		exit(-1);
+		err(1, "setsockopt(ICMP6_FILTER)");
+		/*NOTREACHED*/
 	}
 #endif /*ICMP6_FILTER*/
 
 	nfdset = howmany(sock, NFDBITS);
-	if ((fdsetp = malloc(nfdset)) == NULL)
+	if ((fdsetp = malloc(nfdset)) == NULL) {
 		err(1, "malloc");
+		/*NOTREACHED*/
+	}
 	memset(fdsetp, 0, nfdset);
 	for (;;) {
 		FD_SET(sock, fdsetp);
@@ -231,13 +244,17 @@ sock_open()
 {
 	struct sockaddr_in6 me;
 	
-	if ((sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0)
+	if ((sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
 		err(1, "socket");
+		/*NOTREACHED*/
+	}
 
 	memset(&me, 0, sizeof(struct sockaddr_in6));
 	me.sin6_len = sizeof(struct sockaddr_in6);
 	me.sin6_family = AF_INET6;
 
-	if (bind(sock, (struct sockaddr *)&me, sizeof(me)) < 0)
+	if (bind(sock, (struct sockaddr *)&me, sizeof(me)) < 0) {
 		err(1, "bind");
+		/*NOTREACHED*/
+	}
 }
