@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.178 2000/12/27 11:47:11 sakane Exp $	*/
+/*	$KAME: key.c,v 1.179 2000/12/28 00:48:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1764,7 +1764,7 @@ key_spdadd(so, m, mhp)
 
 	microtime(&tv);
 	newsp->created = tv.tv_sec;
-	newsp->lastused = 0;
+	newsp->lastused = tv.tv_sec;
 	newsp->lifetime = lft ? lft->sadb_lifetime_addtime : 0;
 	newsp->validtime = lft ? lft->sadb_lifetime_usetime : 0;
 
