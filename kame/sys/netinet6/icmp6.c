@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.95 2000/05/17 11:25:22 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.96 2000/05/17 11:31:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1226,6 +1226,14 @@ ni6_input(m, off)
 			}
 			if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &sin6.sin6_addr))
 				break;
+			/*
+			 * XXX if we are to allow other cases, we should really
+			 * be careful about scope here.
+			 * basically, we should disallow queries toward IPv6
+			 * destination X with subject Y, if scope(X) > scope(Y).
+			 * if we allow scope(X) > scope(Y), it will result in
+			 * information leakage across scope boundary.
+			 */
 			goto bad;
 
 		case ICMP6_NI_SUBJ_FQDN:
