@@ -1,6 +1,11 @@
-$Id: CHANGELOG,v 1.493 2000/01/27 17:07:06 jinmei Exp $
+$Id: CHANGELOG,v 1.494 2000/01/28 03:03:31 jinmei Exp $
 
 <200001>
+2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/advapitest: was added mainly for debugging. The tools
+	would also be useful as references for developing an "advanced"
+	IPv6 application using the advanced API (RFC2292 or 2292bis).
+
 2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_pcb.h (and many related places):
 	  changed the type of the in6p_inputopts member of the in[6]pcb
