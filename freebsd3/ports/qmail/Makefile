@@ -3,28 +3,31 @@
 # Date created:		25 May 1998
 # Whom:			Mario S F Ferreira <lioux@gns.com.br> et al.
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:29 itojun Exp $
+# $FreeBSD: ports/mail/qmail/Makefile,v 1.12 1999/10/07 03:01:45 cpiazza Exp $
+# $Id: Makefile,v 1.2 1999/12/07 08:18:10 sumikawa Exp $
 #
 
 DISTNAME=	qmail-1.03
 CATEGORIES=	mail
-MASTER_SITES=	ftp://koobera.math.uic.edu/pub/software/ \
-		ftp://ftp.hpcl.titech.ac.jp/qmail/ \
-		ftp://ftp.net.ohio-state.edu/pub/networking/mail/qmail/ \
+MASTER_SITES=	ftp://ftp.net.ohio-state.edu/pub/networking/mail/qmail/ \
 		ftp://ftp.ntnu.no/pub/unix/mail/qmail/ \
-		ftp://ftp.mira.net.au/pub/unix/mail/qmail/ \
+		ftp://ftp.mira.net.au/unix/mail/qmail/ \
 		ftp://ftp.id.wustl.edu/pub/qmail/ \
-		ftp://ftp.pipex.net/mirrors/qmail/ \
-		ftp://ftp.jp.qmail.org/qmail/
-# These patches may not apply to versions after 1.02
-#PATCH_SITES=	http://hippo.ail-inc.co.jp/air/ports/patches/
-#PATCHFILES=	patch-qmail-date-localtime.gz \
-#		patch-qmail-smtpd.gz
-PATCH_SITES=	http://www.rcac.tdi.co.jp/fujiwara/
-PATCHFILES=	qmail-1.03-v6-980618.diff
-PATCH_DIST_STRIP=	-p1
+		ftp://mirror.uk.uu.net/pub/qmail/ \
+		ftp://ftp.jp.qmail.org/qmail/ \
+		http://ftp.rifkin.technion.ac.il/pub/qmail/ \
+		http://koobera.math.uic.edu/www/software/ \
+		http://pobox.com/~djb/software/ 
 
-MAINTAINER=	lioux@gns.com.br
+# Patch necessary to cope with non-RFC >512 dns entries
+# Since AOL has been using those, the problem has skyrocketed from minor to
+# groundzero. qmail being RFC compliant need to be "fixed" to work with those
+PATCH_SITES=	http://www.ckdhr.com/ckd/ \
+		http://www.rcac.tdi.co.jp/fujiwara/
+PATCHFILES=	qmail-103.patch qmail-1.03-v6-980618.diff
+PATCH_DIST_STRIP+=	-p1
+
+MAINTAINER=	sumikawa@kame.net
 
 # A normal qmail installation puts everything into /var/qmail/.
 # If you want to install to /usr/local/, then "/usr/local/qmail" is
@@ -92,7 +95,7 @@ NO_MTREE=	yes
 
 do-configure:
 	@# Create/Check the necessary groups/users
-	@PKG_PREFIX=${PREFIX} /usr/bin/perl ${PKGDIR}/INSTALL
+	@PKG_PREFIX=${PREFIX} ${PERL5} ${PKGDIR}/INSTALL
 	@${ECHO} ${CC} ${CFLAGS} > ${WRKSRC}/conf-cc
 	@${ECHO} ${PREFIX} > ${WRKSRC}/conf-qmail
 
@@ -100,7 +103,7 @@ post-patch: thereal-post-patch
 
 do-install:
 	@# Check again, just in case (ideally should error if not found)
-	@PKG_PREFIX=${PREFIX} /usr/bin/perl ${PKGDIR}/INSTALL
+	@PKG_PREFIX=${PREFIX} ${PERL5} ${PKGDIR}/INSTALL
 	@${MKDIR} ${PREFIX}/${DOCDIR} ${PREFIX}/configure
 	@cd ${WRKSRC} ; ./install
 	@${INSTALL_PROGRAM} ${CONFIGUREFILES} ${PREFIX}/configure
@@ -141,7 +144,7 @@ thereal-post-patch:
 	if [ `dirname $i` != ${FILESDIR} ] ; \
 	then \
 		${CP} $i.sh $i.sh.orig; \
-		(head -c `expr \`ls -l $i.sh.orig \
+		(head -c `${EXPR} \`ls -l $i.sh.orig \
 		    | ${AWK} '{print $$5}'\` - 1` $i.sh.orig ; ${ECHO} '&') \
 		    > $i.sh ; \
 	fi
