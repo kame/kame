@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.76 2001/11/16 09:48:52 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.77 2001/11/16 11:51:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1458,6 +1458,14 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct mip6_bu *hrmbu;
 	int error = 0;
 
+	/*
+	 * do not send a binding update destination option to the
+	 * multicast destination.
+	 */
+	if (IN6_IS_ADDR_MULTICAST(dst))
+		return (0);
+
+	/* find existing binding update entry for this destination. */
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
 	hrmbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if ((mbu == NULL) && (hrmbu != NULL) &&
