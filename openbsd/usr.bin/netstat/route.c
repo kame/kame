@@ -718,6 +718,7 @@ netname6(sa6, mask)
 #else
 	int flag = 0;
 #endif
+	int error;
 
 	sin6 = *sa6;
 	
@@ -789,8 +790,11 @@ netname6(sa6, mask)
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
-	getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, hbuf, sizeof(hbuf),
-		    NULL, 0, flag);
+	error = getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+	    hbuf, sizeof(hbuf), NULL, 0, flag);
+	if (error)
+		snprintf(hbuf, sizeof(hbuf), "invalid");
+
 	snprintf(line, sizeof(line), "%s/%d", hbuf, masklen);
 	return line;
 }
