@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.108 2001/03/30 01:43:55 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.109 2001/03/30 01:44:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2063,11 +2063,11 @@ in6_ifadd(pr, ifid)
 	ifra.ifra_addr.sin6_addr.s6_addr32[0]
 		|= (ifid->s6_addr32[0] & ~mask.s6_addr32[0]);
 	ifra.ifra_addr.sin6_addr.s6_addr32[1]
-		|= (ifid->s6_addr32[1] & ~mask.s6_addr32[0]);
+		|= (ifid->s6_addr32[1] & ~mask.s6_addr32[1]);
 	ifra.ifra_addr.sin6_addr.s6_addr32[2]
-		|= (ifid->s6_addr32[2] & ~mask.s6_addr32[0]);
+		|= (ifid->s6_addr32[2] & ~mask.s6_addr32[2]);
 	ifra.ifra_addr.sin6_addr.s6_addr32[3]
-		|= (ifid->s6_addr32[3] & ~mask.s6_addr32[0]);
+		|= (ifid->s6_addr32[3] & ~mask.s6_addr32[3]);
 	    
 	/* new prefix mask. */
 	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
