@@ -166,6 +166,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define F_NODEADDR	0x0800
 #define F_FQDN		0x1000
 #define F_INTERFACE	0x2000
+#define F_SRCADDR	0x4000
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -193,6 +194,7 @@ char BSPACE = '\b';		/* characters written for flood */
 char DOT = '.';
 char *hostname;
 int ident;			/* process id to identify our packets */
+struct in6_addr srcaddr;
 
 /* counters */
 long npackets;			/* max packets to transmit */
@@ -256,6 +258,8 @@ main(argc, argv)
 	int ip6optlen = 0;
 	struct cmsghdr *scmsgp = NULL;
 	int sockbufsize = 0;
+	int usepktinfo = 0;
+	struct in6_pktinfo *pktinfo = NULL;
 #ifdef IPSEC_POLICY_IPSEC
 	char *policy_in = NULL;
 	char *policy_out = NULL;
@@ -268,12 +272,12 @@ main(argc, argv)
 	preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
 #ifndef IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRrs:vwW")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRrS:s:vwW")) != EOF)
 #else
 #ifdef IPSEC_POLICY_IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRrs:vwWP:")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRrS:s:vwWP:")) != EOF)
 #else
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRrs:vwWAE")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRrS:s:vwWAE")) != EOF)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 		switch(ch) {
@@ -343,6 +347,9 @@ main(argc, argv)
 		case 'I':
 			ifname = optarg;
 			options |= F_INTERFACE;
+#ifndef USE_SIN6_SCOPE_ID
+			usepktinfo++;
+#endif
 			break;
 		case 'i':		/* wait between sending packets */
 			interval = strtol(optarg, &e, 10);
@@ -368,6 +375,13 @@ main(argc, argv)
 			break;
 		case 'R':
 			options |= F_RROUTE;
+			break;
+		case 'S':
+			/* XXX: use getaddrinfo? */
+			if (inet_pton(AF_INET6, optarg, (void *)&srcaddr) != 1)
+				errx(1, "invalid IPv6 address: %s", optarg);
+			options |= F_SRCADDR;
+			usepktinfo++;
 			break;
 		case 's':		/* size of packet to send */
 			datalen = strtol(optarg, &e, 10);
@@ -529,11 +543,9 @@ main(argc, argv)
 	if (options & F_RROUTE)
 		errx(1, "record route not available in this implementation");
 
-	/* Outgoing interface */
-#ifndef USE_SIN6_SCOPE_ID
-	if (options & F_INTERFACE)
+	/* Specify the outgoing interface and/or the source address */
+	if (usepktinfo)
 		ip6optlen += CMSG_SPACE(sizeof(struct in6_pktinfo));
-#endif
 
 	if (hoplimit != -1)
 		ip6optlen += CMSG_SPACE(sizeof(int));
@@ -546,24 +558,30 @@ main(argc, argv)
 		smsghdr.msg_controllen = ip6optlen;
 		scmsgp = (struct cmsghdr *)scmsg;
 	}
-	if (options & F_INTERFACE) {
-#ifndef USE_SIN6_SCOPE_ID
-		struct in6_pktinfo *pktinfo =
-			(struct in6_pktinfo *)(CMSG_DATA(scmsgp));
-
-		if ((pktinfo->ipi6_ifindex = if_nametoindex(ifname)) == 0)
-			errx(1, "%s: invalid interface name", ifname);
-		bzero(&pktinfo->ipi6_addr, sizeof(struct in6_addr));
+	if (usepktinfo) {
+		pktinfo = (struct in6_pktinfo *)(CMSG_DATA(scmsgp));
+		memset(pktinfo, 0, sizeof(*pktinfo));
 		scmsgp->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 		scmsgp->cmsg_level = IPPROTO_IPV6;
 		scmsgp->cmsg_type = IPV6_PKTINFO;
-
 		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
+	}
+
+	/* set the outgoing interface */
+	if (ifname) {
+#ifndef USE_SIN6_SCOPE_ID
+		/* pktinfo must have already been allocated */
+		if ((pktinfo->ipi6_ifindex = if_nametoindex(ifname)) == 0)
+			    errx(1, "%s: invalid interface name", ifname);
 #else
 		if ((dst.sin6_scope_id = if_nametoindex(ifname)) == 0)
 			errx(1, "%s: invalid interface name", ifname);
 #endif
 	}
+	/* set the source address */
+	if (options & F_SRCADDR)/* pktinfo must be valid */
+		pktinfo->ipi6_addr = srcaddr;
+
 	if (hoplimit != -1) {
 		scmsgp->cmsg_len = CMSG_LEN(sizeof(int));
 		scmsgp->cmsg_level = IPPROTO_IPV6;
@@ -618,7 +636,7 @@ main(argc, argv)
 		if (setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTOPTIONS,
 			       (void *)smsghdr.msg_control,
 			       smsghdr.msg_controllen)) {
-			err(1, "UDP setsockopt");
+			err(1, "UDP setsockopt(IPV6_PKTOPTIONS)");
 		}
 #else
 		src.sin6_scope_id = dst.sin6_scope_id;
@@ -1537,7 +1555,7 @@ usage()
 #endif
 #endif		      
 		      "] [-a [alsg]] [-b sockbufsiz] [-c count] [-I interface]\n\
-             [-i wait] [-l preload] [-p pattern] [-s packetsize]\n\
-             [-h hoplimit] host [hosts...]\n");
+             [-i wait] [-l preload] [-p pattern] [-S sourceaddr]\n\
+             [-s packetsize] [-h hoplimit] host [hosts...]\n");
 	exit(1);
 }
