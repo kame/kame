@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.158 2000/11/17 19:55:24 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.159 2000/11/29 09:09:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2448,31 +2448,12 @@ icmp6_redirect_input(m, off)
 	/* finally update cached route in each socket via pfctlinput */
     {
 	struct sockaddr_in6 sdst;
-#if 1
-#else
-	struct ip6protosw *pr;
-#endif
 
 	bzero(&sdst, sizeof(sdst));
 	sdst.sin6_family = AF_INET6;
 	sdst.sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&reddst6, &sdst.sin6_addr, sizeof(struct in6_addr));
-#if 1
 	pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&sdst);
-#else
-	/*
-	 * do not use pfctlinput() here, we have different prototype for
-	 * xx_ctlinput() in ip6proto.
-	 */
-	for (pr = (struct ip6protosw *)inet6domain.dom_protosw;
-	     pr < (struct ip6protosw *)inet6domain.dom_protoswNPROTOSW;
-	     pr++) {
-		if (pr->pr_ctlinput) {
-			(*pr->pr_ctlinput)(PRC_REDIRECT_HOST,
-				(struct sockaddr *)&sdst, NULL, NULL, 0);
-		}
-	}
-#endif
 #ifdef IPSEC
 	key_sa_routechange((struct sockaddr *)&sdst);
 #endif
