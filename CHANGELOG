@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1954 2001/10/27 10:07:22 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1955 2001/10/29 15:02:52 sakane Exp $
 
 <200110>
+Tue Oct 30 00:01:35 JST 2001 sakane@kame.net
+	* kame/sys/netkey/key.c:
+	the system wide policy should be returned when no policy found
+	in the SPD.  the packet was rejected in ipsec[46]_tunnel_validate().
+
 2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{defs,rule,transtslot}.[ch]:
 	  kame/kame/natptconfig/{cfparse,misc,showsubs,yylex}.[cy]:
