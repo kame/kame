@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.881 2000/05/16 14:08:11 itojun Exp $
+$Id: CHANGELOG,v 1.882 2000/05/16 14:19:25 itojun Exp $
 
 <200005>
 Tue May 16 23:05:56 JST 2000  itojun@iijlab.net
@@ -10,7 +10,7 @@ Tue May 16 23:05:56 JST 2000  itojun@iijlab.net
 	  models in this arena: cisco (use addr/plen) and gated (advert
 	  dest/128 only, not addr/128).  the code supports both behavior,
 	  switchable at compilation time.  we may need to revisit the code
-	  later.
+	  later.  Comments from suz on p2p routing model.
 
 Tue May 16 09:44:50 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/ftp/fetch.c: parse RFC2372 ftp URL correctly.
