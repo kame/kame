@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1641 2001/04/07 11:05:38 jinmei Exp $
+$KAME: CHANGELOG,v 1.1642 2001/04/07 11:46:20 jinmei Exp $
 
 <200104>
+2001-04-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/in_proto.c (inetsw[]): set ipsec_sysctl
+	correctly.  Without this, "netstat -p ipsec -s" does not work.
+
 2001-04-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/tcp_input.c (tcp_peer_mss): avoided
 	IPv6 fragmentation when IPV6_USE_MIN_MTU is required.
