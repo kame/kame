@@ -19,16 +19,6 @@ CPPFLAGS+=-DHAVE_OPENSSL_PEM_H=1
 .if exists(/usr/local/ssl/include/openssl/x509.h) || exists(/usr/pkg/include/openssl/x509.h)
 CPPFLAGS+=-DHAVE_OPENSSL_X509_H=1
 .endif
-.if exists(/usr/local/ssl/include/openssl/rc5.h) || exists(/usr/pkg/include/openssl/rc5.h)
-CPPFLAGS+=-DHAVE_OPENSSL_RC5_H=1
-.else
-CPPFLAGS+=-DNO_RC5=1
-.endif
-.if exists(/usr/local/ssl/include/openssl/idea.h) || exists(/usr/pkg/include/openssl/idea.h)
-CPPFLAGS+=-DHAVE_OPENSSL_IDEA_H=1
-.else
-CPPFLAGS+=-DNO_IDEA=1
-.endif
 
 .if exists(/usr/pkg/include/ssleay/opensslv.h) || exists(/usr/pkg/include/openssl/opensslv.h) || exists(/usr/local/ssl/include/openssl/opensslv.h)
 CPPFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
