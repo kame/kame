@@ -1,11 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.995 2000/06/11 15:31:02 jinmei Exp $
+$Id: CHANGELOG,v 1.996 2000/06/11 17:47:35 jinmei Exp $
 
 <200006>
 2000-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd*/usr.[s]bin/netstat/inet6.c (icmp6_stats): printed new
+	statistics counters about error messages (see below).
+
+2000-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet/icmp6.h: added a new structure icmp6errstat{}
+	to count more precise statistics of error messages to be generated.
+	* kame/sys/netinet6/icmp6.c (icmp6_errcount): added as a new
+	function in order to count the precise statistics.
+
+2000-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/usr.[s]bin/netstat/inet6.c (ip6_stats): printed new
-	statistic counters of forward cache for incoming packets (see
+	statistics counters of forward cache for incoming packets (see
 	below).
 
 2000-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
