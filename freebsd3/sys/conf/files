@@ -1,0 +1,697 @@
+#
+# The long compile-with and dependency lines are required because of
+# limitations in config: backslash-newline doesn't work in strings, and
+# dependency lines other than the first are silently ignored.
+#
+aicasm				optional	ahc	device-driver	   \
+	dependency 	"$S/dev/aic7xxx/*.[chyl]"			   \
+	compile-with	"${MAKE} -f $S/dev/aic7xxx/Makefile MAKESRCPATH=$S/dev/aic7xxx" \
+	no-obj no-implicit-rule						   \
+	clean		"aicasm aicasm_gram.c aicasm_scan.c y.tab.h"
+aic7xxx_{seq,reg}.h		optional	ahc	device-driver	   \
+	compile-with	"./aicasm ${INCLUDES} -o aic7xxx_seq.h -r aic7xxx_reg.h $S/dev/aic7xxx/aic7xxx.seq"   \
+	no-obj no-implicit-rule before-depend				   \
+	clean		"aic7xxx_seq.h aic7xxx_reg.h"			   \
+	dependency	"$S/dev/aic7xxx/aic7xxx.{reg,seq} $S/cam/scsi/scsi_message.h aicasm"
+device_if.o			standard				\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+device_if.c			standard				\
+	dependency	"$S/kern/makedevops.pl $S/kern/device_if.m"	\
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/kern/device_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"device_if.c"
+device_if.h			standard				\
+	dependency	"$S/kern/makedevops.pl $S/kern/device_if.m"	\
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/kern/device_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"device_if.h"
+bus_if.o			standard				\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+bus_if.c			standard				\
+	dependency	"$S/kern/makedevops.pl $S/kern/bus_if.m"	\
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/kern/bus_if.m"	\
+	no-obj no-implicit-rule before-depend local			\
+	clean		"bus_if.c"
+bus_if.h			standard				\ 
+	dependency	"$S/kern/makedevops.pl $S/kern/bus_if.m"	\
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/kern/bus_if.m"	\
+	no-obj no-implicit-rule before-depend				\
+	clean		"bus_if.h"
+coda/coda_namecache.c	optional vcoda
+coda/coda_fbsd.c	optional vcoda
+coda/coda_psdev.c	optional vcoda
+coda/coda_subr.c	optional vcoda
+coda/coda_venus.c	optional vcoda
+coda/coda_vfsops.c	optional vcoda
+coda/coda_vnops.c	optional vcoda
+cam/cam.c		optional scbus
+cam/cam_xpt.c		optional scbus
+cam/cam_extend.c	optional scbus
+cam/cam_queue.c		optional scbus
+cam/cam_periph.c	optional scbus
+cam/cam_sim.c		optional scbus
+cam/scsi/scsi_all.c	optional scbus
+cam/scsi/scsi_da.c	optional da
+cam/scsi/scsi_pt.c	optional pt
+cam/scsi/scsi_sa.c	optional sa
+cam/scsi/scsi_cd.c	optional cd
+cam/scsi/scsi_ch.c	optional ch
+cam/scsi/scsi_pass.c	optional pass
+cam/scsi/scsi_scan.c	optional scan
+cam/scsi/scsi_target.c	optional targ
+cam/scsi/scsi_targ_bh.c	optional targbh
+ddb/db_access.c		optional ddb
+ddb/db_kld.c		optional ddb
+ddb/db_aout.c		optional ddb
+ddb/db_break.c		optional ddb
+ddb/db_command.c	optional ddb
+ddb/db_examine.c	optional ddb
+ddb/db_expr.c		optional ddb
+ddb/db_input.c		optional ddb
+ddb/db_lex.c		optional ddb
+ddb/db_output.c		optional ddb
+ddb/db_print.c		optional ddb
+ddb/db_ps.c		optional ddb
+ddb/db_run.c		optional ddb
+ddb/db_sym.c		optional ddb
+ddb/db_trap.c		optional ddb
+ddb/db_variables.c	optional ddb
+ddb/db_watch.c		optional ddb
+ddb/db_write_cmd.c	optional ddb
+dev/advansys/advansys.c	optional adv device-driver
+dev/advansys/advlib.c	optional adv device-driver
+dev/advansys/advmcode.c	optional adv device-driver
+dev/advansys/adwcam.c	optional adw device-driver
+dev/advansys/adwlib.c	optional adw device-driver
+dev/advansys/adwmcode.c	optional adw device-driver
+dev/aha/aha.c		optional aha device-driver
+dev/aic7xxx/aic7xxx.c	optional ahc device-driver		\
+	dependency	"aic7xxx_{reg,seq}.h"
+dev/aic7xxx/93cx6.c	optional ahc device-driver
+dev/buslogic/bt.c	optional bt  device-driver
+dev/ccd/ccd.c		optional ccd device-driver
+dev/isp/isp_freebsd.c	optional isp device-driver
+dev/isp/isp.c		optional isp device-driver
+#dev/dpt/dpt_control.c	optional dpt device-driver
+dev/dpt/dpt_scsi.c	optional dpt device-driver
+dev/en/midway.c		optional en device-driver
+dev/hea/eni.c		optional hea device-driver
+dev/hea/eni_buffer.c	optional hea device-driver
+dev/hea/eni_globals.c	optional hea device-driver
+dev/hea/eni_if.c	optional hea device-driver
+dev/hea/eni_init.c	optional hea device-driver
+dev/hea/eni_intr.c	optional hea device-driver
+dev/hea/eni_receive.c	optional hea device-driver
+dev/hea/eni_transmit.c	optional hea device-driver
+dev/hea/eni_vcm.c	optional hea device-driver
+dev/hfa/fore_buffer.c	optional hfa device-driver
+dev/hfa/fore_command.c	optional hfa device-driver
+dev/hfa/fore_globals.c	optional hfa device-driver
+dev/hfa/fore_if.c	optional hfa device-driver
+dev/hfa/fore_init.c	optional hfa device-driver
+dev/hfa/fore_intr.c	optional hfa device-driver
+dev/hfa/fore_load.c	optional hfa device-driver
+dev/hfa/fore_output.c	optional hfa device-driver
+dev/hfa/fore_receive.c	optional hfa device-driver
+dev/hfa/fore_stats.c	optional hfa device-driver
+dev/hfa/fore_timer.c	optional hfa device-driver
+dev/hfa/fore_transmit.c	optional hfa device-driver
+dev/hfa/fore_vcm.c	optional hfa device-driver
+dev/pdq/pdq.c		optional fea device-driver
+dev/pdq/pdq_ifsubr.c	optional fea device-driver
+dev/pdq/pdq.c		optional fpa device-driver
+dev/pdq/pdq_ifsubr.c	optional fpa device-driver
+dev/ppbus/lpt.c	optional lpt
+dev/ppbus/ppb_base.c	optional ppbus
+dev/ppbus/ppb_1284.c	optional ppbus
+dev/ppbus/ppb_msq.c	optional ppbus
+dev/ppbus/ppbconf.c	optional ppbus
+dev/ppbus/ppi.c		optional ppi
+dev/ppbus/pps.c		optional pps
+dev/ppbus/vpo.c		optional vpo
+dev/ppbus/vpoio.c	optional vpo
+dev/ppbus/immio.c	optional vpo
+dev/ppbus/if_plip.c	optional plip
+dev/ppbus/lpbb.c	optional lpbb
+smbus_if.o		optional smbus					\
+	dependency	"smbus_if.c smbus_if.h"				\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+smbus_if.c		optional smbus					\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/smbus/smbus_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/smbus/smbus_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"smbus_if.c"
+smbus_if.h		optional smbus					\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/smbus/smbus_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/smbus/smbus_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"smbus_if.h"
+dev/smbus/smbconf.c	optional smbus
+dev/smbus/smbus.c	optional smbus
+dev/smbus/smb.c		optional smb
+dev/iicbus/iicbb.c	optional iicbb
+iicbb_if.o		optional iicbb					\
+	dependency	"iicbb_if.c"					\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+iicbb_if.c		optional iicbb					\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/iicbus/iicbb_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/iicbus/iicbb_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"iicbb_if.c"
+iicbb_if.h		optional iicbb					\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/iicbus/iicbb_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/iicbus/iicbb_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"iicbb_if.h"
+dev/iicbus/iicsmb.c	optional iicsmb					\
+	dependency	"iicbus_if.h"
+iicbus_if.o		optional iicbus					\
+	dependency	"iicbus_if.c iicbus_if.h"			\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+iicbus_if.c		optional iicbus					\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/iicbus/iicbus_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/iicbus/iicbus_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"iicbus_if.c"
+iicbus_if.h		optional iicbus					\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/iicbus/iicbus_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/iicbus/iicbus_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"iicbus_if.h"
+dev/iicbus/iiconf.c	optional iicbus
+dev/iicbus/iicbus.c	optional iicbus
+dev/iicbus/if_ic.c	optional ic
+dev/iicbus/iic.c	optional iic
+dev/vinum/vinum.c		optional vinum device-driver
+dev/vinum/vinumconfig.c		optional vinum device-driver
+dev/vinum/vinumdaemon.c		optional vinum device-driver
+dev/vinum/vinuminterrupt.c	optional vinum device-driver
+dev/vinum/vinumio.c		optional vinum device-driver
+dev/vinum/vinumioctl.c		optional vinum device-driver
+dev/vinum/vinumlock.c		optional vinum device-driver
+dev/vinum/vinummemory.c		optional vinum device-driver
+dev/vinum/vinumparser.c		optional vinum device-driver
+dev/vinum/vinumrequest.c	optional vinum device-driver
+dev/vinum/vinumrevive.c		optional vinum device-driver
+dev/vinum/vinumstate.c		optional vinum device-driver
+dev/vinum/vinumutil.c		optional vinum device-driver
+dev/vn/vn.c			optional vn
+dev/vx/if_vx.c			optional vx  device-driver
+gnu/ext2fs/ext2_alloc.c		optional ext2fs
+gnu/ext2fs/ext2_balloc.c	optional ext2fs
+gnu/ext2fs/ext2_inode.c		optional ext2fs
+gnu/ext2fs/ext2_inode_cnv.c	optional ext2fs
+gnu/ext2fs/ext2_linux_balloc.c	optional ext2fs
+gnu/ext2fs/ext2_linux_ialloc.c	optional ext2fs
+gnu/ext2fs/ext2_lookup.c	optional ext2fs
+gnu/ext2fs/ext2_subr.c		optional ext2fs
+gnu/ext2fs/ext2_vfsops.c	optional ext2fs
+gnu/ext2fs/ext2_vnops.c		optional ext2fs
+# device drivers
+i4b/driver/i4b_trace.c	 optional i4btrc	device-driver
+i4b/driver/i4b_rbch.c	 optional i4brbch	device-driver
+i4b/driver/i4b_tel.c	 optional i4btel	device-driver
+i4b/driver/i4b_ipr.c	 optional i4bipr	
+i4b/driver/i4b_ctl.c     optional i4bctl        device-driver
+i4b/driver/i4b_isppp.c   optional i4bisppp      device-driver
+net/if_spppsubr.c        optional sppp
+# needed by i4bipr
+net/slcompress.c         optional i4bipr
+# tina-dd control driver
+i4b/tina-dd/i4b_tina_dd.c optional tina		device-driver
+# support 
+i4b/layer2/i4b_mbuf.c	 optional i4btrc	device-driver
+# Q.921 handler
+i4b/layer2/i4b_l2.c	 optional i4bq921
+i4b/layer2/i4b_l2fsm.c	 optional i4bq921
+i4b/layer2/i4b_uframe.c	 optional i4bq921
+i4b/layer2/i4b_tei.c	 optional i4bq921
+i4b/layer2/i4b_sframe.c	 optional i4bq921
+i4b/layer2/i4b_iframe.c	 optional i4bq921
+i4b/layer2/i4b_l2timer.c optional i4bq921
+i4b/layer2/i4b_util.c	 optional i4bq921
+i4b/layer2/i4b_lme.c	 optional i4bq921
+# Q.931 handler
+i4b/layer3/i4b_q931.c	 optional i4bq931
+i4b/layer3/i4b_l3fsm.c	 optional i4bq931
+i4b/layer3/i4b_l3timer.c optional i4bq931
+i4b/layer3/i4b_l2if.c	 optional i4bq931
+i4b/layer3/i4b_l4if.c	 optional i4bq931
+i4b/layer3/i4b_q932fac.c optional i4bq931
+# isdn device driver, interface to i4bd
+i4b/layer4/i4b_i4bdrv.c	 optional i4b		device-driver
+i4b/layer4/i4b_l4.c	 optional i4b		device-driver
+i4b/layer4/i4b_l4mgmt.c	 optional i4b		device-driver
+i4b/layer4/i4b_l4timer.c optional i4b		device-driver
+isofs/cd9660/cd9660_bmap.c	optional cd9660
+isofs/cd9660/cd9660_lookup.c	optional cd9660
+isofs/cd9660/cd9660_node.c	optional cd9660
+isofs/cd9660/cd9660_rrip.c	optional cd9660
+isofs/cd9660/cd9660_util.c	optional cd9660
+isofs/cd9660/cd9660_vfsops.c	optional cd9660
+isofs/cd9660/cd9660_vnops.c	optional cd9660
+kern/imgact_aout.c	standard
+kern/imgact_elf.c	standard
+kern/imgact_gzip.c	optional gzip
+kern/imgact_shell.c	standard
+kern/inflate.c		optional gzip
+kern/init_main.c	standard
+kern/init_sysent.c	standard
+kern/kern_intr.c	standard
+kern/kern_module.c	standard
+kern/kern_linker.c	standard
+kern/link_aout.c	standard
+kern/link_elf.c		standard
+kern/kern_acct.c	standard
+kern/kern_clock.c	standard
+kern/kern_conf.c	standard
+kern/kern_descrip.c	standard
+kern/kern_environment.c	standard
+kern/kern_exec.c	standard
+kern/kern_exit.c	standard
+kern/kern_fork.c	standard
+kern/kern_ktrace.c	standard
+kern/kern_lkm.c		optional lkm
+kern/kern_lock.c	standard
+kern/kern_lockf.c	standard
+kern/kern_malloc.c	standard
+kern/kern_mib.c		standard
+kern/kern_ntptime.c	standard
+kern/kern_physio.c	standard
+kern/kern_proc.c	standard
+kern/kern_prot.c	standard
+kern/kern_resource.c	standard
+kern/kern_shutdown.c	standard
+kern/kern_sig.c		standard
+kern/kern_subr.c	standard
+kern/kern_synch.c	standard
+kern/kern_syscalls.c	standard
+kern/kern_sysctl.c	standard
+kern/kern_time.c	standard
+kern/kern_timeout.c	standard
+kern/kern_xxx.c		standard
+kern/md5c.c		standard
+kern/subr_autoconf.c	standard
+kern/subr_bus.c			standard
+kern/subr_devstat.c	standard
+kern/subr_diskslice.c	standard
+kern/subr_dkbad.c	standard
+kern/subr_log.c		standard
+kern/subr_module.c	standard
+kern/subr_prf.c		standard
+kern/subr_prof.c	standard
+kern/subr_rlist.c	standard
+kern/subr_scanf.c	standard
+kern/subr_xxx.c		standard
+kern/sys_generic.c	standard
+kern/sys_pipe.c		standard
+kern/sys_process.c	standard
+kern/subr_rman.c		standard
+kern/sys_socket.c	standard
+kern/sysv_ipc.c		standard
+kern/sysv_msg.c		optional sysvmsg
+kern/sysv_sem.c		optional sysvsem
+kern/sysv_shm.c		optional sysvshm
+kern/tty.c		standard
+kern/tty_compat.c	standard
+kern/tty_conf.c		standard
+kern/tty_pty.c		optional pty
+kern/tty_snoop.c	optional snp
+kern/tty_subr.c		standard
+kern/tty_tb.c		optional tb
+kern/tty_tty.c		standard
+kern/uipc_domain.c	standard
+kern/uipc_mbuf.c	standard
+kern/uipc_proto.c	standard
+kern/uipc_socket.c	standard
+kern/uipc_socket2.c	standard
+kern/uipc_syscalls.c	standard
+kern/uipc_usrreq.c	standard
+kern/vfs_bio.c		standard
+kern/vfs_cache.c	standard
+kern/vfs_cluster.c	standard
+kern/vfs_conf.c		standard
+kern/vfs_default.c	standard
+kern/vfs_init.c		standard
+kern/vfs_lookup.c	standard
+kern/vfs_subr.c		standard
+kern/vfs_syscalls.c	standard
+kern/vfs_vnops.c	standard
+kern/kern_threads.c	standard
+kern/vfs_aio.c		standard
+miscfs/deadfs/dead_vnops.c	standard
+miscfs/devfs/devfs_tree.c	optional devfs
+miscfs/devfs/devfs_vfsops.c	optional devfs
+miscfs/devfs/devfs_vnops.c	optional devfs
+miscfs/fdesc/fdesc_vfsops.c	optional fdesc
+miscfs/fdesc/fdesc_vnops.c	optional fdesc
+miscfs/fifofs/fifo_vnops.c	standard
+miscfs/kernfs/kernfs_vfsops.c	optional kernfs
+miscfs/kernfs/kernfs_vnops.c	optional kernfs
+miscfs/nullfs/null_subr.c	optional nullfs
+miscfs/nullfs/null_vfsops.c	optional nullfs
+miscfs/nullfs/null_vnops.c	optional nullfs
+miscfs/portal/portal_vfsops.c	optional portal
+miscfs/portal/portal_vnops.c	optional portal
+miscfs/procfs/procfs_ctl.c	optional procfs
+miscfs/procfs/procfs_fpregs.c	standard
+miscfs/procfs/procfs_map.c	optional procfs
+miscfs/procfs/procfs_mem.c	standard
+miscfs/procfs/procfs_note.c	optional procfs
+miscfs/procfs/procfs_regs.c	standard
+miscfs/procfs/procfs_status.c	optional procfs
+miscfs/procfs/procfs_subr.c	optional procfs
+miscfs/procfs/procfs_type.c	optional procfs
+miscfs/procfs/procfs_vfsops.c	optional procfs
+miscfs/procfs/procfs_vnops.c	optional procfs
+miscfs/specfs/spec_vnops.c	standard
+miscfs/umapfs/umap_subr.c	optional umapfs
+miscfs/umapfs/umap_vfsops.c	optional umapfs
+miscfs/umapfs/umap_vnops.c	optional umapfs
+miscfs/union/union_subr.c	optional union
+miscfs/union/union_vfsops.c	optional union
+miscfs/union/union_vnops.c	optional union
+msdosfs/msdosfs_conv.c		optional msdosfs
+msdosfs/msdosfs_denode.c	optional msdosfs
+msdosfs/msdosfs_fat.c		optional msdosfs
+msdosfs/msdosfs_lookup.c	optional msdosfs
+msdosfs/msdosfs_vfsops.c	optional msdosfs
+msdosfs/msdosfs_vnops.c		optional msdosfs
+ntfs/ntfs_vfsops.c		optional ntfs
+ntfs/ntfs_vnops.c		optional ntfs
+ntfs/ntfs_subr.c		optional ntfs
+ntfs/ntfs_compr.c		optional ntfs
+ntfs/ntfs_ihash.c		optional ntfs
+net/bpf.c		optional bpfilter
+net/bpf_filter.c	optional bpfilter
+net/bridge.c		optional bridge
+net/bsd_comp.c		optional ppp_bsdcomp
+#net/hostcache.c		standard
+net/if.c		standard
+net/if_atmsubr.c	optional atm
+net/if_disc.c		optional disc
+net/if_ethersubr.c	optional ether
+net/if_fddisubr.c	optional fddi
+net/if_loop.c		optional loop
+net/if_media.c		standard
+net/if_mib.c		standard
+net/if_ppp.c		optional ppp
+net/if_sl.c		optional sl
+net/if_spppsubr.c	optional sppp
+net/if_tun.c		optional tun
+net/if_vlan.c		optional vlan
+net/ppp_deflate.c	optional ppp_deflate
+net/ppp_tty.c		optional ppp
+net/radix.c		standard
+net/raw_cb.c		standard
+net/raw_usrreq.c	standard
+net/route.c		standard
+net/rtsock.c		standard
+net/slcompress.c	optional ppp
+net/slcompress.c	optional sl
+net/zlib.c		optional ppp_deflate
+netatalk/aarp.c		optional netatalk
+netatalk/at_control.c	optional netatalk
+netatalk/at_proto.c	optional netatalk
+netatalk/at_rmx.c	optional netatalkdebug
+netatalk/ddp_input.c	optional netatalk
+netatalk/ddp_output.c	optional netatalk
+netatalk/ddp_usrreq.c	optional netatalk
+netatm/atm_aal5.c		optional atm_core
+netatm/atm_cm.c			optional atm_core
+netatm/atm_device.c		optional atm_core
+netatm/atm_if.c			optional atm_core
+netatm/atm_proto.c		optional atm_core
+netatm/atm_signal.c		optional atm_core
+netatm/atm_socket.c		optional atm_core
+netatm/atm_subr.c		optional atm_core
+netatm/atm_usrreq.c		optional atm_core
+netatm/ipatm/ipatm_event.c	optional atm_ip atm_core
+netatm/ipatm/ipatm_if.c		optional atm_ip atm_core
+netatm/ipatm/ipatm_input.c	optional atm_ip atm_core
+netatm/ipatm/ipatm_load.c	optional atm_ip atm_core
+netatm/ipatm/ipatm_output.c	optional atm_ip atm_core
+netatm/ipatm/ipatm_usrreq.c	optional atm_ip atm_core
+netatm/ipatm/ipatm_vcm.c	optional atm_ip atm_core
+netatm/sigpvc/sigpvc_if.c	optional atm_sigpvc atm_core
+netatm/sigpvc/sigpvc_subr.c	optional atm_sigpvc atm_core
+netatm/spans/spans_arp.c	optional atm_spans atm_core	\
+	dependency	"spans_xdr.h"
+netatm/spans/spans_cls.c	optional atm_spans atm_core
+netatm/spans/spans_if.c		optional atm_spans atm_core
+netatm/spans/spans_kxdr.c	optional atm_spans atm_core
+netatm/spans/spans_msg.c	optional atm_spans atm_core
+netatm/spans/spans_print.c	optional atm_spans atm_core
+netatm/spans/spans_proto.c	optional atm_spans atm_core
+netatm/spans/spans_subr.c	optional atm_spans atm_core
+netatm/spans/spans_util.c	optional atm_spans atm_core
+spans_xdr.h			optional atm_spans atm_core	\
+        before-depend						\
+        dependency      "$S/netatm/spans/spans_xdr.x"		\
+        compile-with    "rpcgen -h -C $S/netatm/spans/spans_xdr.x > spans_xdr.h" \
+        clean           "spans_xdr.h"				\
+        no-obj no-implicit-rule 
+spans_xdr.c			optional atm_spans atm_core	\
+        before-depend						\
+        dependency      "$S/netatm/spans/spans_xdr.x"		\
+        compile-with    "rpcgen -c -C $S/netatm/spans/spans_xdr.x > spans_xdr.c" \
+        clean           "spans_xdr.c"				\
+        no-obj no-implicit-rule local
+spans_xdr.o			optional atm_spans atm_core	\
+        dependency      "$S/netatm/spans/spans_xdr.x"		\
+	compile-with	"${NORMAL_C}"				\
+	no-implicit-rule local
+netatm/uni/q2110_sigaa.c	optional atm_uni atm_core
+netatm/uni/q2110_sigcpcs.c	optional atm_uni atm_core
+netatm/uni/q2110_subr.c		optional atm_uni atm_core
+netatm/uni/qsaal1_sigaa.c	optional atm_uni atm_core
+netatm/uni/qsaal1_sigcpcs.c	optional atm_uni atm_core
+netatm/uni/qsaal1_subr.c	optional atm_uni atm_core
+netatm/uni/sscf_uni.c		optional atm_uni atm_core
+netatm/uni/sscf_uni_lower.c	optional atm_uni atm_core
+netatm/uni/sscf_uni_upper.c	optional atm_uni atm_core
+netatm/uni/sscop.c		optional atm_uni atm_core
+netatm/uni/sscop_lower.c	optional atm_uni atm_core
+netatm/uni/sscop_pdu.c		optional atm_uni atm_core
+netatm/uni/sscop_sigaa.c	optional atm_uni atm_core
+netatm/uni/sscop_sigcpcs.c	optional atm_uni atm_core
+netatm/uni/sscop_subr.c		optional atm_uni atm_core
+netatm/uni/sscop_timer.c	optional atm_uni atm_core
+netatm/uni/sscop_upper.c	optional atm_uni atm_core
+netatm/uni/uni_load.c		optional atm_uni atm_core
+netatm/uni/uniarp.c		optional atm_uni atm_core
+netatm/uni/uniarp_cache.c	optional atm_uni atm_core
+netatm/uni/uniarp_input.c	optional atm_uni atm_core
+netatm/uni/uniarp_output.c	optional atm_uni atm_core
+netatm/uni/uniarp_timer.c	optional atm_uni atm_core
+netatm/uni/uniarp_vcm.c		optional atm_uni atm_core
+netatm/uni/uniip.c		optional atm_uni atm_core
+netatm/uni/unisig_decode.c	optional atm_uni atm_core
+netatm/uni/unisig_encode.c	optional atm_uni atm_core
+netatm/uni/unisig_if.c		optional atm_uni atm_core
+netatm/uni/unisig_mbuf.c	optional atm_uni atm_core
+netatm/uni/unisig_msg.c		optional atm_uni atm_core
+netatm/uni/unisig_print.c	optional atm_uni atm_core
+netatm/uni/unisig_proto.c	optional atm_uni atm_core
+netatm/uni/unisig_sigmgr_state.c	optional atm_uni atm_core
+netatm/uni/unisig_subr.c	optional atm_uni atm_core
+netatm/uni/unisig_util.c	optional atm_uni atm_core
+netatm/uni/unisig_vc_state.c	optional atm_uni atm_core
+netinet/fil.c		optional ipfilter inet
+netinet/if_atm.c	optional atm
+netinet/if_ether.c	optional ether
+netinet/igmp.c		optional inet
+netinet/in.c		optional inet
+#netinet/in_hostcache.c	optional inet
+netinet/in_pcb.c	optional inet
+netinet/in_proto.c	optional inet
+netinet/in_rmx.c	optional inet
+netinet/ip_auth.c	optional ipfilter inet
+netinet/ip_divert.c	optional ipdivert
+netinet/ip_dummynet.c  optional dummynet
+netinet/ip_fil.c	optional ipfilter inet
+netinet/ip_flow.c	optional inet
+netinet/ip_frag.c	optional ipfilter inet
+netinet/ip_fw.c		optional ipfirewall
+netinet/ip_icmp.c	optional inet
+netinet/ip_input.c	optional inet
+netinet/ip_log.c	optional ipfilter inet
+netinet/ip_mroute.c	optional inet
+netinet/ip_nat.c	optional ipfilter inet
+netinet/ip_output.c	optional inet
+netinet/ip_proxy.c	optional ipfilter inet
+netinet/ip_state.c	optional ipfilter inet
+netinet/mlf_ipl.c	optional ipfilter inet
+netinet/raw_ip.c	optional inet
+netinet/tcp_debug.c	optional tcpdebug
+netinet/tcp_input.c	optional inet
+netinet/tcp_output.c	optional inet
+netinet/tcp_subr.c	optional inet
+netinet/tcp_timer.c	optional inet
+netinet/tcp_usrreq.c	optional inet
+netinet/udp_usrreq.c	optional inet
+netipx/ipx.c		optional ipx
+netipx/ipx_cksum.c	optional ipx
+netipx/ipx_input.c	optional ipx
+netipx/ipx_ip.c		optional ipx
+netipx/ipx_outputfl.c	optional ipx
+netipx/ipx_pcb.c	optional ipx
+netipx/ipx_proto.c	optional ipx
+netipx/ipx_tun.c	optional ipx
+netipx/ipx_usrreq.c	optional ipx
+netipx/spx_debug.c	optional ipx
+netipx/spx_usrreq.c	optional ipx
+netkey/key.c		optional key
+netkey/key_debug.c	optional key_debug
+netnatm/natm.c		optional natm
+netnatm/natm_pcb.c	optional natm
+netnatm/natm_proto.c	optional natm
+netns/idp_usrreq.c	optional ns
+netns/ns.c		optional ns
+netns/ns_error.c	optional ns
+netns/ns_input.c	optional ns
+netns/ns_ip.c		optional ns
+netns/ns_output.c	optional ns
+netns/ns_pcb.c		optional ns
+netns/ns_proto.c	optional ns
+netns/spp_debug.c	optional ns
+netns/spp_usrreq.c	optional ns
+nfs/nfs_bio.c		optional nfs
+nfs/nfs_node.c		optional nfs
+nfs/nfs_nqlease.c	optional nfs
+nfs/nfs_serv.c		optional nfs
+nfs/nfs_socket.c	optional nfs
+nfs/nfs_srvcache.c	optional nfs
+nfs/nfs_subs.c		optional nfs
+nfs/nfs_syscalls.c	optional nfs
+nfs/nfs_vfsops.c	optional nfs
+nfs/nfs_vnops.c		optional nfs
+nfs/bootp_subr.c	optional bootp
+nfs/krpc_subr.c		optional bootp
+pccard/pccard.c		optional card
+pccard/pccard_beep.c	optional card
+pccard/pcic.c		optional pcic device-driver
+pci/pcic_p.c		optional pcic device-driver
+pci/adv_pci.c		optional adv device-driver
+pci/adw_pci.c		optional adw device-driver
+pci/ahc_pci.c		optional ahc device-driver			\
+	dependency	"aic7xxx_reg.h $S/pci/ahc_pci.c"
+pci/brooktree848.c	optional bktr device-driver
+pci/bt848_i2c.c		optional bktr device-driver
+pci/bt_pci.c		optional bt device-driver
+pci/dpt_pci.c		optional pci dpt device-driver
+pci/cy_pci.c		optional cy device-driver
+pci/if_ax.c		optional ax device-driver
+pci/if_de.c		optional de device-driver
+pci/if_ed_p.c		optional ed device-driver
+pci/if_en_pci.c		optional en device-driver
+pci/if_fxp.c		optional fxp device-driver
+pci/if_lnc_p.c		optional lnc device-driver
+pci/if_mx.c		optional mx device-driver
+pci/if_pn.c		optional pn device-driver
+pci/if_fpa.c		optional fpa device-driver
+pci/if_rl.c		optional rl device-driver
+pci/if_sr_p.c		optional sr device-driver
+pci/if_ti.c		optional ti device-driver
+pci/if_tl.c		optional tl device-driver
+pci/if_tx.c		optional tx device-driver
+pci/if_vr.c		optional vr device-driver
+pci/if_vx_pci.c		optional vx device-driver
+pci/if_wb.c		optional wb device-driver
+pci/if_xl.c		optional xl device-driver
+pci/isp_pci.c		optional isp device-driver
+pci/meteor.c		optional meteor device-driver
+pci/ncr.c		optional ncr device-driver
+pci/pci.c		optional pci device-driver
+pci/pci_compat.c	optional pci
+pci/pcisupport.c	optional pci
+pci/wdc_p.c		optional wdc device-driver
+pci/simos.c		optional simos device-driver
+pci/xrpu.c		optional xrpu device-driver
+posix4/posix4_mib.c	standard
+posix4/p1003_1b.c	standard
+posix4/ksched.c	optional _kposix_priority_scheduling
+ufs/ffs/ffs_alloc.c	optional ffs
+ufs/ffs/ffs_alloc.c	optional mfs
+ufs/ffs/ffs_balloc.c	optional ffs
+ufs/ffs/ffs_balloc.c	optional mfs
+ufs/ffs/ffs_inode.c	optional ffs
+ufs/ffs/ffs_inode.c	optional mfs
+ufs/ffs/ffs_softdep_stub.c	standard
+ufs/ffs/ffs_softdep.c	optional softupdates
+ufs/ffs/ffs_subr.c	optional ffs
+ufs/ffs/ffs_subr.c	optional mfs
+ufs/ffs/ffs_tables.c	optional ffs
+ufs/ffs/ffs_tables.c	optional mfs
+ufs/ffs/ffs_vfsops.c	optional ffs
+ufs/ffs/ffs_vfsops.c	optional mfs
+ufs/ffs/ffs_vnops.c	optional ffs
+ufs/ffs/ffs_vnops.c	optional mfs
+ufs/mfs/mfs_vfsops.c	optional mfs
+ufs/mfs/mfs_vnops.c	optional mfs
+ufs/ufs/ufs_bmap.c	standard
+ufs/ufs/ufs_disksubr.c	standard
+ufs/ufs/ufs_ihash.c	standard
+ufs/ufs/ufs_inode.c	standard
+ufs/ufs/ufs_lookup.c	standard
+ufs/ufs/ufs_quota.c	standard
+ufs/ufs/ufs_vfsops.c	standard
+ufs/ufs/ufs_vnops.c	standard
+vm/default_pager.c	standard
+vm/device_pager.c	standard
+vm/swap_pager.c		standard
+vm/vm_fault.c		standard
+vm/vm_glue.c		standard
+vm/vm_init.c		standard
+vm/vm_kern.c		standard
+vm/vm_map.c		standard
+vm/vm_meter.c		standard
+vm/vm_mmap.c		standard
+vm/vm_object.c		standard
+vm/vm_page.c		standard
+vm/vm_pageout.c		standard
+vm/vm_pager.c		standard
+vm/vm_swap.c		standard
+vm/vm_unix.c		standard
+vm/vnode_pager.c	standard
+vm/vm_zone.c		standard
+#
+# USB support
+dev/pci/uhci_pci.c	optional uhci device-driver
+dev/pci/ohci_pci.c	optional ohci device-driver
+usb_if.o		optional usb device-driver			\
+	dependency	"usb_if.c"					\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+usb_if.c		optional usb device-driver			\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/usb/usb_if.m"	\
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/usb/usb_if.m"	\
+	no-obj no-implicit-rule before-depend local			\
+	clean		"usb_if.c"
+usb_if.h		optional usb device-driver			\ 
+	dependency	"$S/kern/makedevops.pl $S/dev/usb/usb_if.m"	\
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/usb/usb_if.m"	\
+	no-obj no-implicit-rule before-depend				\
+	clean		"usb_if.h"
+dev/usb/uhci.c		optional uhci device-driver
+dev/usb/ohci.c		optional ohci device-driver
+dev/usb/usb.c		optional usb device-driver
+dev/usb/usbdi.c		optional usb device-driver
+dev/usb/usbdi_util.c	optional usb device-driver
+#dev/usb/usb_mem.c	optional usb device-driver
+dev/usb/usb_subr.c	optional usb device-driver
+dev/usb/usb_quirks.c	optional usb device-driver
+dev/usb/hid.c		optional usb device-driver
+# ordering in the list of drivers below is important and should
+# be the inverse of the wanted one (MAKE_SET)
+dev/usb/ugen.c		optional ugen device-driver
+dev/usb/uhid.c		optional hid device-driver
+dev/usb/ums.c		optional ums device-driver
+dev/usb/ulpt.c		optional ulpt device-driver
+dev/usb/ukbd.c		optional ukbd device-driver
+dev/usb/uhub.c		optional uhub device-driver

@@ -1,0 +1,18 @@
+# This file tells what major numbers the various possible swap devices have.
+#
+#	$Id: devices.alpha,v 1.2 1998/09/18 18:40:59 dfr Exp $
+#
+wd	0
+wfd	1
+fd	2
+wt	3
+da	4
+st	5
+cd	6
+mcd	7
+vn	15
+scd	16
+pcd	17
+wcd	19
+od	20
+wst	24
