@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.48 2001/05/18 05:40:52 sakane Exp $
+.\"	$KAME: setkey.8,v 1.49 2001/05/18 05:49:51 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -403,6 +403,14 @@ NOTE:
 does not work against forwarding case at this moment,
 as it requires extra reassembly at forwarding node
 .Pq not implemented at this moment .
+We have many protocols in
+.Pa /etc/protocols ,
+but protocols except of TCP, UDP and ICMP may not be suitable to use with IPSec.
+You have to consider and be careful to use them.
+.Li icmp
+.Li tcp
+.Li udp
+all protocols 
 .\"
 .Pp
 .It Ar policy
