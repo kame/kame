@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.23 2000/01/10 22:42:13 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.24 2000/01/10 23:15:24 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -618,7 +618,7 @@ isakmp_ph1begin_r(msg, remote, etype)
 	etypeok = check_etypeok(rmconf, etype);
 	if (etypeok == NULL) {
 		plog(logp, LOCATION, remote,
-			"not acceptable %s\n", s_isakmp_etype(etype));
+			"not acceptable %s mode\n", s_isakmp_etype(etype));
 		return -1;
 	}
 
