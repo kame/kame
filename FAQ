@@ -1,40 +1,40 @@
 KAME FAQ
-$KAME: FAQ,v 1.30 2001/07/13 03:48:58 jinmei Exp $
+$KAME: FAQ,v 1.31 2001/07/13 05:47:15 itojun Exp $
 
 
 GENERAL
 =======
 Q: What is the KAME project?
-	KAME Project is a joint effort to create single solid software set,
+	The KAME Project is a joint effort to create single solid software set,
 	especially targeted at IPv6/IPsec.  Talented researchers from several
 	Japanese major companies joined the project.  This joint effort will
-	avoid unnecessary duplicated development in same area, and effectively
-	provides high quality, advanced featured package. 
+	avoid unnecessary duplicated development in the same area, and effectively
+	provides a high quality, advanced featured package. 
 
 	The project aims to revamp BSD sys/net* tree, and:
 
-	- to provide FREE IPv6 protocol stack for research/commercial use.
+	- to provide a FREE IPv6 protocol stack for research/commercial use.
 	  (under BSD copyright)
 	- to provide FREE IPsec to all over the world. (For free software,
 	  crypto export from Japan seems to be legal.)
-	- to provide the FREE reference code for advanced internetworking.
+	- to provide FREE reference code for advanced internetworking.
 	    (Advanced packet queuing, ATM, mobility, and whatever interesting.)
 
 	To understand more about the KAME project itself, please proceed to
 	http://www.kame.net/project-overview.html.
 
 Q: How can I contribute?
-	- Implementing "ports" or "pkgsrc" for IPv6 apps
-	  Sometimes it needs nontrivial steps to install IPv6 applications,
+	- Implement "ports" or "pkgsrc" for IPv6 apps
+	  Sometimes nontrivial steps are needed to install IPv6 applications,
 	  because IPv6 patches are redistributed separately from the original
 	  application.  Please create FreeBSD/OpenBSD "ports", or NetBSD
 	  "pkgsrc" and contribute those to *BSD projects.
 
-	- Submitting bug reports
+	- Submit bug reports
 	  PLEASE go through the top of http://www.kame.net/dev/send-pr.html
 	  and supply enough information.
 
-	- Reviewing documents
+	- Review documents
 	  Since the KAME core team does not have a native English speaker,
 	  documents in English include many typos, wording mistakes,
 	  and so forth.  We would be very grateful if you review our
@@ -42,7 +42,7 @@ Q: How can I contribute?
 
 Q: What is the standard document the KAME code is based upon?
 Which version of IPv6/IPsec does KAME support?
-	KAME project tries to support the latest specification as possible.
+	The KAME project tries to support the latest specification possible.
 
 	For list of currently-supported standard documents, please refer to
 	IMPLEMENTATION in the distribution kit, or
@@ -55,10 +55,10 @@ Q: Why does KAME separate ping6 from ping (for IPv4), and traceroute6 from
 	convenient to uniform the ping command for both IPv4 and
 	IPv6.  The followings are an answer to the request.
 
-	From a developer's point of view: since the underling raw socket API
+	From a developer's point of view: since the underlying raw socket API
 	is totally different between IPv4 and IPv6, we would end
 	up having two types of code base.  There would actually be
-	less benefit to uniform the two commands into a single
+	less benefit to unify the two commands into a single
 	command from the developer's standpoint.
 
 	From an operator's point of view: unlike ordinary network
@@ -76,7 +76,7 @@ Q: Are there other documents/FAQ lists I may want to check?
 	- Depending on which BSD you are using, you will want to check the
 	  project webpages, like http://www.openbsd.org/,
 	  http://www.netbsd.org/, or http://www.freebsd.org/.
-	- If you are using KAME patch kit (like weekly snap, not the integrated
+	- If you are using a KAME patch kit (like weekly snap, not the integrated
 	  *BSD releases), you really need to go through all the documents
 	  shipped in tar.gz.
 	- http://www.kame.net/ has links to a set of good documents.
@@ -87,7 +87,7 @@ Q: Are there other documents/FAQ lists I may want to check?
 
 INSTALLATION
 ============
-Q: I heard that *BSDs have integrated KAME code already.  Do I still need to
+Q: I heard that the *BSDs have integrated KAME code already.  Do I still need to
 install KAME patches?
 	Depends on your goal.  Roughly speaking,
 	- If you want IPv6 for normal day-to-day use, you will be happy with
@@ -98,27 +98,27 @@ install KAME patches?
 	http://www.kame.net/project-overview.html#release talks about this
 	topic in more detail.
 
-Q: I replaced kernel and rebooted, and lost IPv4 connectivity.  Why is it?
+Q: I replaced the kernel and rebooted, and lost IPv4 connectivity.  Why?
 	There are several possibilities, but it is almost always
-	due to the kernel configuration differences.  If you have
-	been using specific kernel configuration for your IPv4
-	kernel, and you have installed GENERIC.v6 kernel, you lost
+	due to kernel configuration differences.  If you have
+	been using a specific kernel configuration for your IPv4
+	kernel, and you have installed a GENERIC.v6 kernel, you lost
 	your special configurations.
 
-	One good way to dealing with this problem is to, (1) copy
+	One good way to deal with this problem is to, (1) copy
 	your original configuration file FOO into FOO.v6, (2)
-	incorporate difference between GENERIC and GENERIC.v6 into
+	incorporate the difference between GENERIC and GENERIC.v6 into
 	FOO.v6, (3) carefully look at FOO.v6 and configure a new
 	kernel from that one.
 
 Q: Is anything special required for network interface card drivers?
 	(freebsd and bsdi) For efficient processing of IPv6 chained headers,
-	KAME assumes that network driver will pass the packet to upper layers
+	KAME assumes the network driver will pass the packet to upper layers
 	(IPv6 code), in the following form:
 
 	(1) single internal mbuf
 	(2) single external mbuf
-	(3) multiple external mbuf
+	(3) multiple external mbufs
 
 	Some of traditional drivers will pass the packet to upper layers in
 	two linked internal mbufs.  In this case, the driver must be modified.
@@ -134,7 +134,7 @@ Q: Is anything special required for network interface card drivers?
 	and have IFF_MULTICAST properly set.  Also be sure to check if
 	the driver handles multicast ioctls, like SIOCADDMULTI.
 
-	Even though it is better to have hardware multicast packet
+	Even though it is better to have a hardware multicast packet
 	filter, it is not mandatory; in most cases it is just fine
 	to use promiscuous mode as the last resort, if there's no
 	multicast packet filter support.
@@ -142,10 +142,10 @@ Q: Is anything special required for network interface card drivers?
 
 OPERATION AND PROGRAMMING
 =========================
-Q: /etc/rc scripts does not work after replacing vanilla *BSD kernel by KAME
+Q: /etc/rc scripts do not work after replacing vanilla *BSD kernel by KAME
 kernel.
 	/etc/rc scripts usually use tools in /sbin, like /sbin/ifconfig.
-	In some cases, they do not work on KAME kernel.  Be very sure to
+	In some cases, they do not work on a KAME kernel.  Be very sure to
 	use tools in /usr/local/v6 instead.
 
 	Note, however, depending on the ordering of /etc/rc initialization,
@@ -160,30 +160,30 @@ s6_addr16[1] filled?
 	Due to the "scoped address" design in the IPv6 spec, the
 	kernel must treat link-local addresses in a special manner.
 	Link-local address has to be memorized with the incoming
-	interface.  KAME uses s6_addr16[1] to keep interface index
+	interface.  KAME uses s6_addr16[1] to keep the interface index
 	(ifp->if_index) in the kernel structure.
 
-	Note that this is only for the internal kernel structures.
+	Note that this is only for internal kernel structures.
 	Any data coming out of socket file descriptor is not
 	affected.  KAME uses advanced API (rfc2292) for passing/getting
 	interface index from/to userland.
 
 	Also note that this hack may go away in the near future,
-	by introduction of sin6_ifindex field in sockaddr_in6
+	by introduction of the sin6_ifindex field in sockaddr_in6
 	structure.
 
-	See IMPLEMENTATION document for a full description.
+	See the IMPLEMENTATION document for a full description.
 
 Q: Does KAME support site-local addresses?
 	Yes and no.
 
 	KAME can handle site-local address, but it is not aware of
-	site boundary.  Therefore, KAME cannot become a site-border
+	the site boundary.  Therefore, KAME cannot become a site-border
 	router.
 
-	Site-local address itself (the spec itself, not KAME) has
+	Site-local addressing (the spec itself, not KAME) has a
 	bunch of issues/twists to be solved, such as site-border management
-	and name servers.  We are trying very hard to solve it.
+	and name servers.  We are trying very hard to solve them.
 
 Q: How can I implement address-family independent applications?
 Q: How can I modify my application to support IPv6 as well as IPv4?
@@ -199,8 +199,8 @@ Q: How can I modify my application to support IPv6 as well as IPv4?
 Q: route6d dies with "IPV6_ADD_MEMBERSHIP" failure.
 	This error occurs when you have configured an interface
 	that is not capable of handling IPv6 packets.  This includes
-	slip interface (sl0) and some other interfaces.  Please
-	remove those interface from kernel configuration file.
+	the slip interface (sl0) and some other interfaces.  Please
+	remove those interfaces from the kernel configuration file.
 
 Q: Which IPv6 routing daemon should I use?
 	For easy installation, route6d (implemented by Akira Kato) is
@@ -208,22 +208,22 @@ Q: Which IPv6 routing daemon should I use?
 
 	For production use, try zebra from http://www.zebra.org/.
 
-Q: How can I connect my host to worldwide IPv6 network?
+Q: How can I connect my host to the worldwide IPv6 network?
 	Visit http://www.6bone.net/, all the information you need is there.
 
 	http://www.kame.net/newsletter/19981224/ has detailed discussions
-	on how you can be connected to 6bone.  It also has cgi script to
-	help you send connection request.
+	on how you can be connected to 6bone.  It also has a cgi script to
+	help you send a connection request.
 
 Q: When I invoke ifconfig or netstat, garbled output is generated.
 	I suspect that you are invoking old (original) ifconfig or netstat.
 
-	Currently KAME kit does not overwrite existing userland
+	Currently the KAME kit does not overwrite existing userland
 	tools.  Instead, tools provided by KAME will be installed
 	into /usr/local/v6/bin and alike.  Therefore, to use
 	IPv6-enabled tools, you must invoke /usr/local/v6/sbin/ifconfig
-	or such.  You can of course add /usr/local/v6/bin into your
-	command search path.  Consult manpage for your shell.
+	or such.  You can of course add /usr/local/v6/bin to your
+	command search path.  Consult the manpage for your shell.
 
 Q: How can I restrict RIPng route announcement for some of the interfaces?
 	First of all, you should choose appropriate routing daemon.
@@ -232,21 +232,21 @@ Q: How can I restrict RIPng route announcement for some of the interfaces?
 	so it has no configuration option for ignoring some of the
 	interfaces.  You cannot use this for the purpose.
 
-	hroute6d (contributed from Hitachi) has much complex
+	hroute6d (contributed from Hitachi) has a very complex
 	configuration file, which makes it possible to skip some
 	of the interfaces.
 
-	bgpd (contributed from Toshiba) also has the configuration
+	bgpd (contributed from Toshiba) also uses a configuration
 	file.  You can specify not to listen and/or advertise RIPng
 	messages on the specified interfaces.
 
 	Other routing daemons (zebra/mrt/whatever) may have
-	configuration option, so please refer to the document
+	configuration options, so please refer to the document
 	specific to the tool you chosen.
 
-Q: Would like to configure IPsec for IPv4 only, and I do not need IPv6.
+Q: I would like to configure IPsec for IPv4 only, and I do not need IPv6.
 Is it possible to configure KAME for this?
-	Of course, it should work.  Try configure kernel without
+	Of course, it should work.  Try configure a kernel without
 	"options INET6".
 
 	If it does not work well, add "options INET6" and ignore
@@ -255,8 +255,8 @@ Is it possible to configure KAME for this?
 
 Q: IPv6 ping from other OSes does not seem to work.
 	Are you using link-local address for that? (fe80::x) If
-	so, be sure to clear the 2nd 16-bit field to 0.  KAME kernel
-	uses those bits internally, and some older versions of ifconfig shows
+	so, be sure to clear the 2nd 16-bit field to 0.  KAME kernels
+	use those bits internally, and some older versions of ifconfig show
 	the value, but the value MUST NOT appear on the wire.
 
 	If ifconfig command shows that your KAME host has the
@@ -273,27 +273,27 @@ Q: IPv6 ping from other OSes does not seem to work.
 	(or ping6) link-local addresses.  This is to disambiguate link-local
 	addresses on multiple links.
 
-Q: How do I configure IPv6-over-IPv4 tunnel?
-	Simplest way to do this is to configure outer IPv4 address only, by the
+Q: How do I configure a IPv6-over-IPv4 tunnel?
+	The simplest way to do this is to configure outer IPv4 address only, by the
 	following command:
 
 	hostA# gifconfig gif0 a.a.a.1 b.b.b.1
 
 	hostB# gifconfig gif0 b.b.b.1 a.a.a.1
 
-	As a gif interface has link-local address, it is not
+	As a gif interface has a link-local address, it is not
 	necessary to configure inner IPv6 addresses.  Routing
 	daemons will work just fine and packets will get forwarded
-	between two routers.  If you are to configure global IPv6
-	address to these hosts, configure that to ethernet interface.
+	between the two routers.  If you want to configure a global IPv6
+	address on such a host, configure it to an ethernet interface.
 
 	NOTE: on netbsd and openbsd, gifconfig is integrated into ifconfig(8).
 
 Q: Some of my IPv6-ready programs show strange behavior after kernel update.
-	As IPv6 socket API is still an moving target, we KAME team
-	sometimes have to change the important structure definitions
-	used in socket API.  We experienced change in struct
-	sockaddr_in6 several times until now.
+	As the IPv6 socket API is still an moving target, the KAME team
+	sometimes have to change important structure definitions
+	used in the socket API.  We have experienced changes in struct
+	sockaddr_in6 several times already.
 
 	If you have installed your IPv6-ready programs before the
 	change, and the kernel is built from the KAME tree after
@@ -308,57 +308,58 @@ Q: Some of my IPv6-ready programs show strange behavior after kernel update.
 Q: How do I configure IPsec?
 	http://www.kame.net/newsletter/19980626/ covers the topic.
 
-Q: Would like to connect from IPv6-only host to IPv4-only host.
+Q: I would like to connect from an IPv6-only host to an IPv4-only host.
 	You MUST have a translator box between those two host, for
 	protocol conversion.  http://www.kame.net/newsletter/19981001/
 	covers the topic.
 
 	socks64, which is a modified version of socks5, can be used
-	so that IPv6-only host can make a proxy connection via
-	"socks64 server" on dual-stack host.  For implementation
+	so that IPv6-only host can make a proxy connection via a
+	"socks64 server" on a dual-stack host.  For implementation
 	please visit ftp://ftp.kame.net/pub/kame/misc/.
 
 Q: How can I enable FAITH IPv6-to-IPv4 tcp relay?
 	Please consult KAME faithd/README.* for details.
 
 Q: How do I configure ATM PVC?
-	KAME includes ATM PVC support, from ALTQ package.  No SVC support is
-	implemented.  Very limited variety of ATM cards are supported.
+	KAME includes ATM PVC support, from the ALTQ package.  No SVC support is
+	implemented.  A very limited variety of ATM cards are supported.
 
 	http://www.kame.net/newsletter/19980701/ covers this topic
 	(though it is a bit dated).
 
-Q: I think I have problem with tunnel, how to track it?
+Q: I think I have problem with my tunnel; how do I track it?
 	assume that your tunnel interface is "gif0".
 
 	try: ping6 -I gif0 -n ff02::1
 
-	if you get replies from two different node, your tunnel is
-	working right.  it can be routing problem.  the two nodes
-	are your node, and the peer's node.
+	If you get replies from two different nodes, your tunnel is
+	working right.  It can be routing problem.  The two nodes
+	are your node and the peer's node.
 
-	if you get replies from single node only, you have problem
-	in your tunnel.  it can be packet filter between your node
-	and peer (like firewall), IPv4 routing screwup, or anything.
-	you need to make sure that IPv4 protocol # 41 goes through.
-	if you have packet filter blocking you, ask your network
+	If you get replies from single node only, you have a problem
+	with your tunnel.  It could be a packet filter between your node
+	and peer (like a firewall), IPv4 routing screwup, or anything.
+	You need to make sure that IPv4 protocol # 41 goes through.
+	If you have a packet filter blocking you, ask your network
 	administrator to open up the filters.
 
-	another advise: always use "-n" when you try ping6 or
-	traceroute6.  reverse lookup can make it harder to track
+	Another hint: always use "-n" when you try ping6 or
+	traceroute6.  Reverse lookup timeouts can make it harder to track
 	down.
 
-Q: my operating system does not have gifconfig(8).
+Q: My operating system does not have gifconfig(8).
 	On NetBSD and OpenBSD, gifconfig(8) is integrated into ifconfig(8),
-	"tunnel" keyword (older OpenBSD releases use "giftunnel" keyword).
+	using the "tunnel" keyword (older OpenBSD releases use "giftunnel"
+        keyword).
 
-Q: would like to know the merge status of KAME kit to *BSD.
+Q: I would like to know the merge status of KAME kit to *BSD.
 	See http://www.kame.net/dev/cvsweb.cgi/kame/COVERAGE.
 
 Q: How can I differentiate IPv6 http connections from IPv4 ones on my
 web page?  (In other words, how can I provide dancing stuff for IPv6
 users only, like www.kame.net?)
-	If you are using apache webserver, you can refer to environment
+	If you are using an apache webserver, you can refer to environment
 	variable REMOTE_ADDR to know the address of the client (in textual
 	numeric representation).  For example, the following perl script
 	fragment would print "IPv6 <address>" or "not IPv6 <address>"
@@ -376,7 +377,7 @@ LICENSE AND CRYPTO EXPORT
 Q: What is the crypto export/import situation in Japan?
 	NOTE: the following description does not reflect intentions
 	of KAME participating companies, employers of KAME core
-	team or KAME contributors, or such.  KAME project and other
+	team or KAME contributors, or such.  The KAME project and other
 	parties are completely separate entity.  Please do not
 	misinterpret.
 
@@ -384,12 +385,12 @@ Q: What is the crypto export/import situation in Japan?
 	exporting/import crypto software, if it is done without
 	fee.
 
-	Japan seems to be in Wassenaar agreement, and Wassenaar
+	Japan seems to be in the Wassenaar agreement, and the Wassenaar
 	agreement is reflected to the Japan's export/import control
 	law.  It says that business parties must acquire approval
-	for crypto export order larger than 50000JPY.
+	for crypto export orders larger than 50000JPY.
 
-	We checked with several attorneys to get answers which vary
+	We checked with several attorneys to get answers which varied
 	widely.  The answer reflected how aggressive/defensive the
 	attorney is :-)
 
@@ -401,15 +402,15 @@ Q: Can I download KAME without infringing crypto law?
 	The question can be separated into two parts: export from
 	Japan and import to your country.
 
-	For export to Japan, it looks that there's no restriction,
+	For export from Japan, it looks that there's no restriction,
 	for free software.  See faqomatic:37 for more info.
 
 	For import to your country, please check "crypto law survey
 	page" for your country.  Please proceed to
 	http://cwis.kub.nl/~frw/people/koops/lawsurvy.htm.
 
-Q: Under what kind of license KAME kit is redistributed?
-	KAME kit itself obeys the following BSD-like AS-IS license.
+Q: Under what kind of license is the KAME kit redistributed?
+	The KAME kit itself obeys the following BSD-like AS-IS license.
 	Contributed or derived software may under other license,
 	so please look at each of the files.
 
@@ -462,7 +463,7 @@ Q: What is "KAME"?  Why did you choose the name?
 	JAIST university (http://www.jaist.ac.jp/).  One of core
 	member, itojun, got very tired of tracking bugs.  There
 	was big stuffed turtle (http://www.nui.org/Kame/) in the
-	laboratory.  itojun hugged the turtle and mumbled, "Mr
+	laboratory.  Itojun hugged the turtle and mumbled, "Mr
 	turtle please help me debug my code...".
 	(http://www.itojun.org/diary/19970930-1005/kame.html) This
 	is the real reason for the name.
