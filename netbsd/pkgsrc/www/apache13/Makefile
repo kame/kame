@@ -21,7 +21,7 @@ DISTFILES=		${DISTNAME}${EXTRACT_SUFX} \
 #			${SSL_DISTNAME}${EXTRACT_SUFX}
 
 PATCH_SITES=		ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=		apache-1.3.12-v6-20000815.diff.gz
+PATCHFILES=		apache-1.3.12-v6-20000908a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=		itojun@itojun.org
