@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.173 2001/07/23 16:18:44 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.174 2001/07/23 16:23:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1116,8 +1116,10 @@ nd6_free(rt, gc)
 			 */
 			pfxlist_onlink_check();
 
-			if (dr->installed)
-				defrouter_select();
+			/*
+			 * refresh default router list
+			 */
+			defrouter_select();
 		}
 		splx(s);
 	}
