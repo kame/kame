@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2201 2002/07/18 12:46:16 suz Exp $
+$KAME: CHANGELOG,v 1.2202 2002/07/25 04:49:30 jinmei Exp $
 
 <200207>
+2002-07-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getifaddrs.c (getifaddrs): tried
+	sysctl(NET_RT_IFLIST) up to several (currently 5) times.
+	This will make the behavior robuster if many addresses are added
+	after the size estimation of storage at the first sysctl.
+	From: Hajimu UMEMOTO <ume@mahoroba.org>
+
 Thu Jul 18 21:08:27 JST 2002 suz@crl.hitachi.co.jp
 	* netbsd, kame/sys/netinet/in_msf.[ch]: merged NetBSD IGMPv3 code 
 	  written by Hitoshi Asaeda@INRIA.
