@@ -523,7 +523,7 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			       M_MSFILTER, M_NOWAIT);
 			if (ias == NULL)
 				return ENOBUFS;
-			bcopy(&sin->sin_addr, &ias->ias_addr, sin->sin_len);
+			bcopy(sin, &ias->ias_addr, sin->sin_len);
 			ias->ias_refcount = 1;
 			if (INM_SOURCE_LIST(mode) == NULL) {
 				IAS_LIST_ALLOC(INM_SOURCE_LIST(mode));
