@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.74 2000/09/18 15:43:35 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.75 2000/09/19 15:19:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2413,11 +2413,11 @@ ipsec4_logpacketstr(ip, spi)
 	snprintf(buf, sizeof(buf), "packet(SPI=%u ", (u_int32_t)ntohl(spi));
 	while (p && *p)
 		p++;
-	snprintf(p, sizeof(buf) - (p - buf), "src=%d.%d.%d.%d",
+	snprintf(p, sizeof(buf) - (p - buf), "src=%u.%u.%u.%u",
 		s[0], s[1], s[2], s[3]);
 	while (p && *p)
 		p++;
-	snprintf(p, sizeof(buf) - (p - buf), " dst=%d.%d.%d.%d",
+	snprintf(p, sizeof(buf) - (p - buf), " dst=%u.%u.%u.%u",
 		d[0], d[1], d[2], d[3]);
 	while (p && *p)
 		p++;
