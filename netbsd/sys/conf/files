@@ -830,6 +830,7 @@ file net/pfil.c				pfil_hooks | ipfilter
 file net/ppp-deflate.c			ppp & ppp_deflate
 file net/ppp_tty.c			ppp
 file net/radix.c
+file net/radix_art.c			radix_art
 file net/raw_cb.c
 file net/raw_usrreq.c
 file net/route.c
@@ -893,6 +894,7 @@ file netinet/tcp_output.c		inet | inet6
 file netinet/tcp_subr.c			inet | inet6
 file netinet/tcp_timer.c		inet | inet6
 file netinet/tcp_usrreq.c		inet | inet6
+#file netinet/sctp_usrreq.c		inet
 file netinet/udp_usrreq.c		inet | inet6
 file netinet6/ah_core.c			ipsec
 file netinet6/ah_input.c		ipsec
@@ -921,12 +923,12 @@ file netinet6/ipcomp_core.c		ipsec
 file netinet6/ipcomp_input.c		ipsec
 file netinet6/ipcomp_output.c		ipsec
 file netinet6/ipsec.c			ipsec
-#file netinet6/mip6.c			inet6 & mip6
-#file netinet6/mip6_ha.c			inet6 & mip6
-#file netinet6/mip6_hooks.c		inet6 & mip6
-#file netinet6/mip6_io.c			inet6 & mip6
-#file netinet6/mip6_md.c			inet6 & mip6
-#file netinet6/mip6_mn.c			inet6 & mip6
+file netinet6/mip6.c			inet6 & mip6
+file netinet6/mip6_ha.c			inet6 & mip6
+file netinet6/mip6_hooks.c		inet6 & mip6
+file netinet6/mip6_io.c			inet6 & mip6
+file netinet6/mip6_md.c			inet6 & mip6
+file netinet6/mip6_mn.c			inet6 & mip6
 file netinet6/mld6.c			inet6
 file netinet6/nd6.c			inet6
 file netinet6/nd6_nbr.c			inet6
