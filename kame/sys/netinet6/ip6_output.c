@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.410 2004/01/09 11:05:26 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.411 2004/01/19 04:56:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -576,7 +576,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
  done_spd:
 #else
 	/* get a security policy for this packet */
-	if (so == NULL)
+	if ((flags & IPV6_FORWARDING) != 0)
+		sp = NULL;
+	else if (so == NULL)
 		sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
 	else
 		sp = ipsec6_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
