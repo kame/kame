@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.28 2000/01/12 20:17:05 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.29 2000/01/12 20:28:31 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -916,8 +916,8 @@ found:
 	/* duplicate the result for future modification */
 	r = dupipsecsa(q1);
 	r->ipsp = NULL;
-	delipsecsa(r->bundles);
-	r->bundles = NULL;
+	delipsecsa(r->next);
+	r->next = NULL;
 
 	delipsecsa(sa);
 	sa = NULL;
