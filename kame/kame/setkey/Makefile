@@ -64,6 +64,7 @@ CPPFLAGS+=-I${.CURDIR}/../libipsec -I${.OBJDIR}
 CFLAGS+=-DIPSEC_DEBUG -DINET6 -DYY_NO_UNPUT
 CFLAGS+=-I${.CURDIR}/../libipsec -I${.OBJDIR}
 .endif
+.if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+= -L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
 	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
@@ -73,6 +74,13 @@ DPADD+=	${.OBJDIR}/../libipsec/libipsec.a \
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+.else
+LDADD+= -L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
+	-L/usr/local/v6/lib -lipsec
+DPADD+=	${.OBJDIR}/../libipsec/libipsec.a \
+	${.OBJDIR}/../libipsec/obj/libipsec.a \
+	/usr/local/v6/lib/libipsec.a
+.endif
 CLEANFILES+=	scriptdump
 
 .if (${OPSYS} != "NetBSD")
