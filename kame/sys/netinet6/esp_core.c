@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.29 2000/08/28 16:49:16 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.30 2000/08/29 08:41:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,12 +88,18 @@ static int esp_null_encrypt __P((struct mbuf *, size_t, size_t,
 static int esp_descbc_mature __P((struct secasvar *));
 static int esp_descbc_ivlen __P((const struct esp_algorithm *,
 	struct secasvar *));
+#ifndef USE_BLOCKCRYPT
 static int esp_descbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_descbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
+#endif
 static int esp_des_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
+static int esp_des_blockdecrypt __P((const struct esp_algorithm *,
+	struct secasvar *, u_int8_t *, u_int8_t *));
+static int esp_des_blockencrypt __P((const struct esp_algorithm *,
+	struct secasvar *, u_int8_t *, u_int8_t *));
 static int esp_cbc_mature __P((struct secasvar *));
 #if 0
 static int esp_blowfish_cbc_decrypt __P((struct mbuf *, size_t,
@@ -163,8 +169,14 @@ esp_algorithm_lookup(idx)
 	static struct esp_algorithm esp_algorithms[] = {
 		{ 8, -1, esp_descbc_mature, 64, 64, sizeof(des_key_schedule),
 			"des-cbc",
-			esp_descbc_ivlen, esp_descbc_decrypt,
-			esp_descbc_encrypt, esp_des_schedule, },
+			esp_descbc_ivlen,
+#ifdef USE_BLOCKCRYPT
+			esp_cbc_decrypt, esp_cbc_encrypt,
+#else
+			esp_descbc_decrypt, esp_descbc_encrypt,
+#endif
+			esp_des_schedule,
+			esp_des_blockdecrypt, esp_des_blockencrypt, },
 		{ 8, 8, esp_cbc_mature, 192, 192, sizeof(des_key_schedule) * 3,
 			"3des-cbc",
 			esp_common_ivlen,
@@ -382,6 +394,7 @@ esp_descbc_ivlen(algo, sav)
 	return 8;
 }
 
+#ifndef USE_BLOCKCRYPT
 static int
 esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
@@ -505,10 +518,6 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
-		/*
-		 * draft-ietf-ipsec-ciph-des-derived-00.txt
-		 * uses sequence number field as IV field.
-		 */
 		ivoff = off + sizeof(struct esp);
 		bodyoff = off + sizeof(struct esp) + ivlen;
 		derived = 0;
@@ -567,6 +576,7 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 		m_freem(m);
 	return error;
 }
+#endif
 
 static int
 esp_des_schedule(algo, sav)
@@ -579,6 +589,36 @@ esp_des_schedule(algo, sav)
 		return EINVAL;
 	else
 		return 0;
+}
+
+static int
+esp_des_blockdecrypt(algo, sav, s, d)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+	u_int8_t *s;
+	u_int8_t *d;
+{
+
+	/* assumption: d has a good alignment */
+	bcopy(s, d, sizeof(DES_LONG) * 2);
+	des_encrypt((DES_LONG *)d, *(des_key_schedule *)sav->sched,
+	    DES_DECRYPT);
+	return 0;
+}
+
+static int
+esp_des_blockencrypt(algo, sav, s, d)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+	u_int8_t *s;
+	u_int8_t *d;
+{
+
+	/* assumption: d has a good alignment */
+	bcopy(s, d, sizeof(DES_LONG) * 2);
+	des_encrypt((DES_LONG *)d, *(des_key_schedule *)sav->sched,
+	    DES_ENCRYPT);
+	return 0;
 }
 
 static int
@@ -1351,9 +1391,61 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *scut;
 	int scutoff;
 	int i;
+	int blocklen;
+	int derived;
 
-	ivoff = off + sizeof(struct newesp);
-	bodyoff = off + sizeof(struct newesp) + ivlen;
+	if (ivlen != sav->ivlen || ivlen > sizeof(iv)) {
+		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: "
+		    "unsupported ivlen %d\n", algo->name, ivlen));
+		m_freem(m);
+		return EINVAL;
+	}
+
+	/* assumes blocklen == padbound */
+	blocklen = algo->padbound;
+
+	if (sav->flags & SADB_X_EXT_OLD) {
+		/* RFC 1827 */
+		ivoff = off + sizeof(struct esp);
+		bodyoff = off + sizeof(struct esp) + ivlen;
+		derived = 0;
+	} else {
+		/* RFC 2406 */
+		if (sav->flags & SADB_X_EXT_DERIV) {
+			/*
+			 * draft-ietf-ipsec-ciph-des-derived-00.txt
+			 * uses sequence number field as IV field.
+			 */
+			ivoff = off + sizeof(struct esp);
+			bodyoff = off + sizeof(struct esp) + sizeof(u_int32_t);
+			ivlen = sizeof(u_int32_t);
+			derived = 1;
+		} else {
+			ivoff = off + sizeof(struct newesp);
+			bodyoff = off + sizeof(struct newesp) + ivlen;
+			derived = 0;
+		}
+	}
+
+	/* grab iv */
+	m_copydata(m, ivoff, ivlen, iv);
+
+	/* extend iv */
+	if (ivlen == blocklen)
+		;
+	else if (ivlen == 4 && blocklen == 8) {
+		bcopy(&iv[0], &iv[4], 4);
+		iv[4] ^= 0xff;
+		iv[5] ^= 0xff;
+		iv[6] ^= 0xff;
+		iv[7] ^= 0xff;
+	} else {
+		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
+		    "unsupported ivlen/blocklen: %d %d\n",
+		    algo->name, ivlen, blocklen));
+		m_freem(m);
+		return EINVAL;
+	}
 
 	if (m->m_pkthdr.len < bodyoff) {
 		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: bad len %d/%d\n",
@@ -1361,23 +1453,10 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 		m_freem(m);
 		return EINVAL;
 	}
-	if ((m->m_pkthdr.len - bodyoff) % algo->padbound) {
+	if ((m->m_pkthdr.len - bodyoff) % blocklen) {
 		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: "
 		    "payload length must be multiple of %d\n",
-		    algo->name, algo->padbound));
-		m_freem(m);
-		return EINVAL;
-	}
-	if (sav->flags & SADB_X_EXT_OLD) {
-		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: "
-		    "unsupported ESP version\n", algo->name));
-		m_freem(m);
-		return EINVAL;
-	}
-	/* XXX maybe we should manage padbound/blocksize/ivlen separately */
-	if (ivlen != algo->padbound || ivlen != sav->ivlen) {
-		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: "
-		    "unsupported ivlen %d\n", algo->name, ivlen));
+		    algo->name, blocklen));
 		m_freem(m);
 		return EINVAL;
 	}
@@ -1385,7 +1464,6 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 	s = m;
 	d = d0 = dp = NULL;
 	soff = doff = sn = dn = 0;
-	m_copydata(m, ivoff, ivlen, iv);
 	ivp = sp = NULL;
 
 	/* skip bodyoff */
@@ -1407,17 +1485,17 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 
 	while (soff < m->m_pkthdr.len) {
 		/* source */
-		if (sn + ivlen <= s->m_len) {
+		if (sn + blocklen <= s->m_len) {
 			/* body is continuous */
 			sp = mtod(s, u_int8_t *) + sn;
 		} else {
 			/* body is non-continuous */
-			m_copydata(s, sn, ivlen, sbuf);
+			m_copydata(s, sn, blocklen, sbuf);
 			sp = sbuf;
 		}
 
 		/* destination */
-		if (!d || dn + ivlen > d->m_len) {
+		if (!d || dn + blocklen > d->m_len) {
 			if (d)
 				dp = d;
 			MGET(d, M_DONTWAIT, MT_DATA);
@@ -1440,7 +1518,7 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 			if (dp)
 				dp->m_next = d;
 			d->m_len = 0;
-			d->m_len = (M_TRAILINGSPACE(d) / ivlen) * ivlen;
+			d->m_len = (M_TRAILINGSPACE(d) / blocklen) * blocklen;
 			if (d->m_len > i)
 				d->m_len = i;
 			dn = 0;
@@ -1452,7 +1530,7 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 		/* xor */
 		p = ivp ? ivp : iv;
 		q = mtod(d, u_int8_t *) + dn;
-		for (i = 0; i < ivlen; i++)
+		for (i = 0; i < blocklen; i++)
 			q[i] ^= p[i];
 
 		/* next iv */
@@ -1462,8 +1540,8 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 		} else
 			ivp = sp;
 
-		sn += ivlen;
-		dn += ivlen;
+		sn += blocklen;
+		dn += blocklen;
 
 		while (s && sn >= s->m_len) {
 			sn -= s->m_len;
@@ -1507,9 +1585,67 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	struct mbuf *scut;
 	int scutoff;
 	int i;
+	int blocklen;
+	int derived;
 
-	ivoff = off + sizeof(struct newesp);
-	bodyoff = off + sizeof(struct newesp) + ivlen;
+	if (ivlen != sav->ivlen || ivlen > sizeof(iv)) {
+		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
+		    "unsupported ivlen %d\n", algo->name, ivlen));
+		m_freem(m);
+		return EINVAL;
+	}
+
+	/* assumes blocklen == padbound */
+	blocklen = algo->padbound;
+
+	if (sav->flags & SADB_X_EXT_OLD) {
+		/* RFC 1827 */
+		ivoff = off + sizeof(struct esp);
+		bodyoff = off + sizeof(struct esp) + ivlen;
+		derived = 0;
+	} else {
+		/* RFC 2406 */
+		if (sav->flags & SADB_X_EXT_DERIV) {
+			/*
+			 * draft-ietf-ipsec-ciph-des-derived-00.txt
+			 * uses sequence number field as IV field.
+			 */
+			ivoff = off + sizeof(struct esp);
+			bodyoff = off + sizeof(struct esp) + sizeof(u_int32_t);
+			ivlen = sizeof(u_int32_t);
+			derived = 1;
+		} else {
+			ivoff = off + sizeof(struct newesp);
+			bodyoff = off + sizeof(struct newesp) + ivlen;
+			derived = 0;
+		}
+	}
+
+	/* put iv into the packet.  if we are in derived mode, use seqno. */
+	if (derived)
+		m_copydata(m, ivoff, ivlen, iv);
+	else {
+		bcopy(sav->iv, iv, ivlen);
+		/* maybe it is better to overwrite dest, not source */
+		m_copyback(m, ivoff, ivlen, iv);
+	}
+
+	/* extend iv */
+	if (ivlen == blocklen)
+		;
+	else if (ivlen == 4 && blocklen == 8) {
+		bcopy(&iv[0], &iv[4], 4);
+		iv[4] ^= 0xff;
+		iv[5] ^= 0xff;
+		iv[6] ^= 0xff;
+		iv[7] ^= 0xff;
+	} else {
+		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
+		    "unsupported ivlen/blocklen: %d %d\n",
+		    algo->name, ivlen, blocklen));
+		m_freem(m);
+		return EINVAL;
+	}
 
 	if (m->m_pkthdr.len < bodyoff) {
 		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: bad len %d/%d\n",
@@ -1517,23 +1653,10 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		m_freem(m);
 		return EINVAL;
 	}
-	if ((m->m_pkthdr.len - bodyoff) % algo->padbound) {
+	if ((m->m_pkthdr.len - bodyoff) % blocklen) {
 		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
 		    "payload length must be multiple of %d\n",
 		    algo->name, algo->padbound));
-		m_freem(m);
-		return EINVAL;
-	}
-	if (sav->flags & SADB_X_EXT_OLD) {
-		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
-		    "unsupported ESP version\n", algo->name));
-		m_freem(m);
-		return EINVAL;
-	}
-	/* XXX maybe we should manage padbound/blocksize/ivlen separately */
-	if (ivlen != algo->padbound || ivlen != sav->ivlen) {
-		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
-		    "unsupported ivlen %d\n", algo->name, ivlen));
 		m_freem(m);
 		return EINVAL;
 	}
@@ -1541,9 +1664,6 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	s = m;
 	d = d0 = dp = NULL;
 	soff = doff = sn = dn = 0;
-	/* initialize iv - maybe it is better to overwrite dest, not source */
-	m_copyback(m, ivoff, ivlen, sav->iv);
-	bcopy(sav->iv, iv, ivlen);
 	ivp = sp = NULL;
 
 	/* skip bodyoff */
@@ -1565,17 +1685,17 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	while (soff < m->m_pkthdr.len) {
 		/* source */
-		if (sn + ivlen <= s->m_len) {
+		if (sn + blocklen <= s->m_len) {
 			/* body is continuous */
 			sp = mtod(s, u_int8_t *) + sn;
 		} else {
 			/* body is non-continuous */
-			m_copydata(s, sn, ivlen, sbuf);
+			m_copydata(s, sn, blocklen, sbuf);
 			sp = sbuf;
 		}
 
 		/* destination */
-		if (!d || dn + ivlen > d->m_len) {
+		if (!d || dn + blocklen > d->m_len) {
 			if (d)
 				dp = d;
 			MGET(d, M_DONTWAIT, MT_DATA);
@@ -1598,7 +1718,7 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 			if (dp)
 				dp->m_next = d;
 			d->m_len = 0;
-			d->m_len = (M_TRAILINGSPACE(d) / ivlen) * ivlen;
+			d->m_len = (M_TRAILINGSPACE(d) / blocklen) * blocklen;
 			if (d->m_len > i)
 				d->m_len = i;
 			dn = 0;
@@ -1607,7 +1727,7 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		/* xor */
 		p = ivp ? ivp : iv;
 		q = sp;
-		for (i = 0; i < ivlen; i++)
+		for (i = 0; i < blocklen; i++)
 			q[i] ^= p[i];
 
 		/* encrypt */
@@ -1616,8 +1736,8 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		/* next iv */
 		ivp = mtod(d, u_int8_t *) + dn;
 
-		sn += ivlen;
-		dn += ivlen;
+		sn += blocklen;
+		dn += blocklen;
 
 		while (s && sn >= s->m_len) {
 			sn -= s->m_len;
