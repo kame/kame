@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.5 2000/10/29 13:31:08 fujisawa Exp $
+ *	$Id: defs.h,v 1.6 2000/10/29 13:57:07 fujisawa Exp $
  */
 
 #ifndef TRUE
@@ -57,7 +57,10 @@
 #define	DEBUG_XMALLOC		0x00000800
 
 #define	DEBUG_SOCKET		0x00010000
-#define	DEBUG_NS		0x00020000
+#define	DEBUG_SELECT		0x00020000
+
+#define	DEBUG_DFA		0x00100000
+#define	DEBUG_NS		0x00200000
 
 #define	NOSYSLOG		0x40000000
 #define	LOGTOSTDERR		0x80000000
@@ -103,33 +106,6 @@ struct sdesc
     struct msgHndl	*response;	/* pointer to server response	*/
     struct msgHndl	*responseQ;	/* pointer to old response	*/
     struct svrInfo	*server;	/* nameserver info		*/
-};
-
-
-enum
-{
-    STSstart,
-    STSqueryA1,
-    STSqueryA4,
-    STSqueryANY1,
-    STSqueryANY4,
-    STSqueryCNAME1,
-    STSqueryCNAME4,
-    STSqueryCNAMEend,
-    STSqueryPTR4,
-    STSqueryPTR6,
-    STSqueryANYPTR6,
-    STSqueryANYPTR4,
-    STSqueryAgain1,
-    STSqueryAgain4,
-    /*	STSqueryPTR64,			*/
-    /*	STSqueryCNAME4,			*/
-    /*	STSqueryCNAME6,			*/
-    STSconvertA1A4,
-    STSconvertA4A1,
-    STSconvertCNAME1A4,
-    STSend,
-    STSunknown,
 };
 
 

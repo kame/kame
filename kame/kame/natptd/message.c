@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: message.c,v 1.3 2000/10/29 13:31:09 fujisawa Exp $
+ *	$Id: message.c,v 1.4 2000/10/29 13:57:07 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -52,6 +52,7 @@
 #include <netinet6/natpt_list.h>
 
 #include "defs.h"
+#include "message.h"
 #include "misc.h"
 
 
@@ -80,7 +81,9 @@ void		 relayResponse		__P((struct sdesc *));
 void		 relayResponseSubs	__P((int, struct sockaddr *, struct msgHndl *));
 
 int		 msgHndlDfaQry		__P((struct msgHndl *));
+int		 msgHndlDfaQrySubs	__P((struct msgHndl *));
 int		 msgHndlDfaRsp		__P((struct msgHndl *, struct msgHndl *));
+int		 msgHndlDfaRspSubs	__P((struct msgHndl *, struct msgHndl *));
 
 int		 composeQuestion	__P((struct msgHndl *, struct dnpComp *));
 int		 composeRR		__P((Cell *, struct dnpComp *));
@@ -489,7 +492,7 @@ processResponse(struct sdesc *desc)
 	queryCNAMEend(desc);
 	break;
 
-      case STSqueryANYPTR4:
+      case STSqueryPTR4:
 	queryANYPTR4(desc);
 	break;
 
@@ -757,6 +760,19 @@ relayResponseSubs(int sockfd, struct sockaddr *client, struct msgHndl *rsp)
 int
 msgHndlDfaQry(struct msgHndl *qry)
 {
+    int		sts;
+
+    sts = msgHndlDfaQrySubs(qry);
+    if (isDebug(DEBUG_DFA))
+	log(LOG_DEBUG, "DFAstatusQ %s => %s", typ2str(NULL, qry->b.qtype), dfasts[sts]);
+
+    return (sts);
+}
+
+
+int
+msgHndlDfaQrySubs(struct msgHndl *qry)
+{
     switch (qry->b.qtype)
     {
       case T_A:
@@ -768,12 +784,8 @@ msgHndlDfaQry(struct msgHndl *qry)
 	else					return (STSqueryA4);
 
       case T_PTR:
-	if (qry->b.T_PTR6)
-	    if (isOn(useTAny))			return (STSqueryANYPTR6);
-	    else				return (STSqueryPTR6);
-	else
-	    if (isOn(useTAny))			return (STSqueryANYPTR4);
-	    else				return (STSqueryPTR4);
+	if (qry->b.T_PTR6)			return (STSqueryPTR6);
+	else					return (STSqueryPTR4);
     }
 
     return (STSunknown);
@@ -782,6 +794,19 @@ msgHndlDfaQry(struct msgHndl *qry)
 
 int
 msgHndlDfaRsp(struct msgHndl *qry, struct msgHndl *rsp)
+{
+    int		sts;
+
+    sts = msgHndlDfaRspSubs(qry, rsp);
+    if (isDebug(DEBUG_DFA))
+	log(LOG_DEBUG, "DFAstatusR %s => %s", dfasts[qry->b.dfasts], dfasts[sts]);
+
+    return (sts);
+}
+
+
+int
+msgHndlDfaRspSubs(struct msgHndl *qry, struct msgHndl *rsp)
 {
     if (rsp->hdr.rcode != 0)
 	return (STSend);		/* In case some error occured	*/
@@ -820,9 +845,14 @@ msgHndlDfaRsp(struct msgHndl *qry, struct msgHndl *rsp)
 	if (ntohs(rsp->hdr.ancount) == 0)		return (STSqueryCNAMEend);
 	return (STSqueryCNAME4);
 
+      case STSqueryPTR4:				return (STSqueryPTR4);
+      case STSqueryPTR6:				return (STSqueryPTR6);
+
+#if	0
       case STSqueryANYPTR4:			/* PTR4 -> ANY (PTR4)		*/
 	if (rsp->b.t_ptr4)				return (STSend);
 	break;
+#endif
     }
 
     return (STSunknown);
