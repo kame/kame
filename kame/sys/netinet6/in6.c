@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.191 2001/07/02 08:56:38 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.192 2001/07/15 04:20:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -977,7 +977,7 @@ in6_update_ifa(ifp, ifra, ia)
 	if (ia == NULL) {
 		hostIsNew = 1;
 		ia = (struct in6_ifaddr *)
-			malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
+			malloc(sizeof(*ia), M_IFADDR, M_NOWAIT);
 		if (ia == NULL)
 			return (ENOBUFS);
 		bzero((caddr_t)ia, sizeof(*ia));
