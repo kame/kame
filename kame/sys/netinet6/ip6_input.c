@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.349 2004/11/11 22:34:46 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.350 2004/12/01 05:07:16 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -223,6 +223,10 @@ static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
 extern int natpt_enable;
 extern int natpt_in6 __P((struct mbuf *, struct mbuf **));
 extern void ip_forward __P((struct mbuf *, int, struct sockaddr_in *));
+#endif
+
+#if (defined(__NetBSD__) || defined(__OpenBSD__)) && defined(IFT_IST)
+int fill_isatap_rtrlist(void *, size_t *, size_t);
 #endif
 
 /*
@@ -2200,7 +2204,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    &ip6_use_defzone);
 	case IPV6CTL_MAXFRAGS:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_maxfrags);
-#ifdef ISATAP
+#ifdef IFT_IST
 	case IPV6CTL_ISATAPRTR:
 		return fill_isatap_rtrlist(oldp, oldlenp,
 					   oldlenp ? *oldlenp : 0);

@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.1 2004/11/30 18:05:40 suz Exp $	*/
+/*	$KAME: if_ist.c,v 1.2 2004/12/01 05:07:16 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -73,7 +73,6 @@
 #include <net/route.h>
 #include <net/netisr.h>
 #include <net/if_types.h>
-#include <net/if_ist.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -95,6 +94,7 @@
 #include <machine/stdarg.h>
 
 #include <net/net_osdep.h>
+#include <net/if_ist.h>
 
 #ifdef __FreeBSD__
 #include "bpf.h"
@@ -208,7 +208,8 @@ istattach(dummy)
 		sc = &ist[i];
 		bzero(sc, sizeof(*sc));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-		sprintf(sc->sc_if.if_xname, "ist%d", i);
+		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
+		     "ist%d", i);
 #elif defined(__FreeBSD__) && __FreeBSD_version >= 502010
 		if_initname(&sc->sc_if, "ist", i);
 #else
@@ -1052,8 +1053,11 @@ ist_ioctl(ifp, cmd, data)
 			error = EAFNOSUPPORT;
 		break;
 	case SIOCSISATAPRTR:
-#if defined(__NetBSD__) || defined(__OpenBSD__)	 
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+#ifdef __NetBSD__
+		if (p && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
+			break;
+#elif defined(__OpenBSD__)
+		if (p && (error = suser(p, 0)) != 0)
 			break;
 #endif	 
 
@@ -1091,11 +1095,13 @@ ist_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCDISATAPRTR:
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+#ifdef __NetBSD__
+		if (p && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
 			break;
-#endif
-
+#elif defined(__OpenBSD__)
+		if (p && (error = suser(p, 0)) != 0)
+			break;
+#endif	 
 		/* check the given ISATAP router address */	 
 		if (ifr->ifr_addr.sa_family != AF_INET) {
 			error = EAFNOSUPPORT;
