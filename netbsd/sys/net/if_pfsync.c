@@ -26,6 +26,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef _KERNEL_OPT
+#include "opt_inet.h"
+#endif
+
 #include "bpfilter.h"
 #include "pfsync.h"
 
@@ -114,7 +118,11 @@ pfsyncattach(int npfsync)
 	if_alloc_sadl(ifp);
 
 #if NBPFILTER > 0
+#ifdef __OpenBSD__
 	bpfattach(&pfsyncif.sc_if.if_bpf, ifp, DLT_PFSYNC, PFSYNC_HDRLEN);
+#else
+	bpfattach(ifp, DLT_PFSYNC, PFSYNC_HDRLEN);
+#endif
 #endif
 }
 
@@ -128,7 +136,11 @@ pfsyncstart(struct ifnet *ifp)
 	int s;
 
 	for (;;) {
+#ifdef __OpenBSD__
 		s = splimp();
+#else
+		s = splnet();
+#endif
 		IF_DROP(&ifp->if_snd);
 		IF_DEQUEUE(&ifp->if_snd, m);
 		splx(s);

@@ -65,6 +65,9 @@
 #define DLT_HIPPI	15	/* HIPPI */
 #define DLT_HDLC	16	/* HDLC framing */
 
+#define DLT_PFSYNC	18	/* Packet filter state syncing */
+#define DLT_PFLOG	117	/* Packet filter logging, by pcap people */
+
 /* NetBSD-specific types */
 #define	DLT_PPP_SERIAL	50	/* PPP over serial (async and sync) */
 #define	DLT_PPP_ETHER	51	/* XXX - depreceated! PPP over Ethernet; session only, w/o ether header */
