@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.126 2002/04/05 15:48:43 jinmei Exp $
+$KAME: COVERAGE,v 1.127 2002/04/05 15:50:14 jinmei Exp $
 
 
 x: supported/integrated
