@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.86 2000/07/15 12:41:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.87 2000/07/17 01:34:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1766,6 +1766,13 @@ isakmp_p2ph(buf, gen)
 	vchar_t **buf;
 	struct isakmp_gen *gen;
 {
+	/* XXX to be checked in each functions for logging. */
+	if (*buf) {
+		plog(logp, LOCATION, NULL,
+			"ignore this payload, same payload type exist.\n");
+		return -1;
+	}
+
 	*buf = vmalloc(ntohs(gen->len) - sizeof(*gen));
 	if (*buf == NULL) {
 		plog(logp, LOCATION, NULL,
