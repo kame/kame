@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.28 2002/10/04 05:46:43 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.29 2003/01/08 05:36:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,7 @@
 
 #include <net/raw_cb.h>
 #include <net/route.h>
+#include <netinet/in.h>
 
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
