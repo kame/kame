@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.361 2004/07/07 10:16:04 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.362 2004/07/26 07:47:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2254,7 +2254,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			if (rt->rt_gwroute == 0)
 				goto lookup;
 			if (((rt = rt->rt_gwroute)->rt_flags & RTF_UP) == 0) {
-#if defined(__FreeBSD__) && __FreeBSD_version_ >= 502010
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
 				RT_LOCK(rt);
 #endif
 				rtfree(rt); rt = rt0;
