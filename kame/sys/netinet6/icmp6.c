@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.374 2004/02/16 09:00:49 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.375 2004/02/16 09:03:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,6 +101,7 @@
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/mld6_var.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
