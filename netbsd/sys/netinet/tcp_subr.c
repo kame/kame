@@ -1187,9 +1187,6 @@ tcp6_ctlinput(cmd, sa, d)
 			finaldst.s6_addr16[1] =
 			    htons(m->m_pkthdr.rcvif->if_index);
 		}
-		bcopy(&ip6->ip6_src, &s, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	} else {
 		m = NULL;
 		ip6 = NULL;
