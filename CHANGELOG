@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1138 2000/07/19 12:35:54 itojun Exp $
+$Id: CHANGELOG,v 1.1139 2000/07/19 13:26:26 itojun Exp $
 
 <200006>
+Wed Jul 19 22:22:47 JST 2000  itojun@iiljab.net
+	* kame/rtsold/rtsol.c, kame/rtadvd/rtadvd.c: ip6_var.h requires
+	  sys/queue.h.
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 7/17 weekly snap.
+
 Mon Jul 17 18:45:11 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: allow ESP with no authentication.  it was
 	  mistakenly forbidden with the recent key.c change.
