@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1916 2001/10/16 14:59:20 sakane Exp $
+$KAME: CHANGELOG,v 1.1917 2001/10/16 15:07:18 sakane Exp $
 
 <200110>
+Wed Oct 17 00:03:54 JST 2001 sakane@kame.net
+	* kame/kame/racoon:
+	fixed the internal value of the wild card of the upper layer protocol.
+	the value of the wile card is differnt between the kernel and IKE
+	protocol.  reported by <gunther@aurora.regenstrief.org>.
+
 Tue Oct 16 23:56:34 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
 	to compare the policy between own policy and peer's policy in the
