@@ -1,9 +1,6 @@
 include	"arch/wgrisc/conf/GENERIC"
 
 options 	INET6		# IPV6
-#options 	IPSEC		# IP security
-#options 	IPSEC_ESP	# IP security (encryption part; define w/ IPSEC)
-#options 	IPSEC_DEBUG	# debug for IP security
 
 # for IPv6
 pseudo-device	gif		4
