@@ -420,7 +420,7 @@ get(host)
 	sin->sin6_addr = ((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
 	dump(&sin->sin6_addr);
 	if (found_entry == 0) {
-		getnameinfo((struct sockaddr *)&sin, sin->sin6_len, host_buf,
+		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
 			    sizeof(host_buf), NULL ,0,
 			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		printf("%s (%s) -- no entry\n", host, host_buf);
@@ -474,12 +474,14 @@ delete:
 		printf("cannot locate %s\n", host);
 		return (1);
 	}
-	if (rtmsg(RTM_DELETE) == 0)
-		printf("%s (%s) deleted\n", host,
-		       getnameinfo((struct sockaddr *)&sin, 
-				   sin->sin6_len, host_buf,
-				   sizeof(host_buf), NULL, 0,
-				   NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0)));
+	if (rtmsg(RTM_DELETE) == 0) {
+	       getnameinfo((struct sockaddr *)sin, 
+			   sin->sin6_len, host_buf,
+			   sizeof(host_buf), NULL, 0,
+			   NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+		printf("%s (%s) deleted\n", host, host_buf);
+	}
+
 	return 0;
 }
 
