@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.208 1999/10/22 07:04:46 jinmei Exp $
+$Id: CHANGELOG,v 1.209 1999/10/24 00:14:31 itojun Exp $
 
 <199910>
+Sat Oct 23 17:11:39 PDT 1999  itojun@iijlab.net
+	* {netbsd,freebsd2}/sbin/ifconfig: show IPv6 link-local addresses in
+	  KAME extended IPv6 numeric address format, like fe80::1@ne0
+	  (experimental).
+
 1999-10-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd: added a configuration option to handle
 	site-local addresses in RIPng. See bgpd.conf(5).
