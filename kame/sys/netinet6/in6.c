@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.56 2000/03/02 07:11:00 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.57 2000/03/06 04:39:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2382,6 +2382,14 @@ in6_if_up(ifp)
 	case IFT_FAITH:
 		type = IN6_IFT_P2P;
 		in6_ifattach(ifp, type, 0, 1);
+		break;
+	case IFT_STF:
+		/*
+		 * This is VERY awkward to call nd6_ifattach while we will
+		 * not do ND at all on the interface.  It is necessary for
+		 * initializing default hoplimit, and ND mtu.
+		 */
+		nd6_ifattach(ifp);
 		break;
 	case IFT_ETHER:
 	case IFT_FDDI:

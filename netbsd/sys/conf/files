@@ -412,6 +412,7 @@ pseudo-device altq: ifnet
 pseudo-device gif: ifnet
 pseudo-device faith: ifnet
 pseudo-device dummy: ifnet
+pseudo-device stf: ifnet
 
 pseudo-device sequencer
 
@@ -558,6 +559,7 @@ file netkey/keysock.c			ipsec
 file net/if_dummy.c			dummy			needs-count
 file net/if_faith.c			faith			needs-count
 file net/if_gif.c			gif			needs-count
+file net/if_stf.c			stf & inet & inet6	needs-flag
 file netinet/ip_ecn.c			inet | inet6
 file netinet/in_gif.c			gif & inet
 file netinet/in4_cksum.c		inet
