@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.77 2003/07/01 23:38:45 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.78 2003/07/03 05:29:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,7 +87,7 @@
 #endif
 
 /* 0.9.7 stuff? */
-#ifndef GENERAL_NAMES
+#if OPENSSL_VERSION_NUMBER < 0x0090700fL
 typedef STACK_OF(GENERAL_NAME) GENERAL_NAMES;
 #endif
 
