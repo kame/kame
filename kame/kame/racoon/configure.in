@@ -55,7 +55,7 @@ AC_MSG_CHECKING(if --enable-gssapi option is specified)
 AC_ARG_ENABLE(rc5,
         [  --enable-gssapi         enable GSS-API authentication],
         [], [enable_gssapi=no])
-if test $enable_gssapi = "yes"; then
+if test "x$enable_gssapi" = "xyes"; then
 	AC_DEFINE(HAVE_GSSAPI)
 fi
 AC_MSG_RESULT($enable_gssapi)

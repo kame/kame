@@ -1163,7 +1163,7 @@ else
   enable_gssapi=no
 fi
 
-if test $enable_gssapi = "yes"; then
+if test "x$enable_gssapi" = "xyes"; then
 	cat >> confdefs.h <<\EOF
 #define HAVE_GSSAPI 1
 EOF
