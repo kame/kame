@@ -411,13 +411,7 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 	bzero(&spidx, sizeof(spidx));
 
 	/* make a index to look for a policy */
-	if ((flag & IP_FORWARDING) == IP_FORWARDING) {
-		/* Case: IP forwarding */
-		*error = ipsec_setspidx_mbuf(&spidx, dir, AF_INET, m);
-	} else {
-		/* Case: ICMP echo reply */
-		*error = ipsec_setspidx_mbuf(&spidx, dir, AF_INET, m);
-	}
+	*error = ipsec_setspidx_mbuf(&spidx, dir, AF_INET, m);
 
 	if (*error != 0)
 		return NULL;
@@ -628,13 +622,7 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 	bzero(&spidx, sizeof(spidx));
 
 	/* make a index to look for a policy */
-	if ((flag & IP_FORWARDING) == IP_FORWARDING) {
-		/* Case: IP forwarding */
-		*error = ipsec_setspidx_mbuf(&spidx, dir, AF_INET6, m);
-	} else {
-		/* Case: ICMP echo reply */
-		*error = ipsec_setspidx_mbuf(&spidx, dir, AF_INET6, m);
-	}
+	*error = ipsec_setspidx_mbuf(&spidx, dir, AF_INET6, m);
 
 	if (*error != 0)
 		return NULL;
