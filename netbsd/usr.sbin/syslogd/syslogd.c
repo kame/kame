@@ -1,4 +1,4 @@
-/*	$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $	*/
+/*	$NetBSD: syslogd.c,v 1.51.2.1 2002/05/25 17:44:49 perry Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993, 1994
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1988, 1993, 1994\n\
 #if 0
 static char sccsid[] = "@(#)syslogd.c	8.3 (Berkeley) 4/4/94";
 #else
-__RCSID("$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $");
+__RCSID("$NetBSD: syslogd.c,v 1.51.2.1 2002/05/25 17:44:49 perry Exp $");
 #endif
 #endif /* not lint */
 
@@ -96,6 +96,7 @@ __RCSID("$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $");
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <locale.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -104,10 +105,20 @@ __RCSID("$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $");
 #include <unistd.h>
 #include <utmp.h>
 #include <util.h>
+#include <pwd.h>
+#include <grp.h>
+#include <stdarg.h>
 #include "pathnames.h"
 
 #define SYSLOG_NAMES
 #include <sys/syslog.h>
+
+#ifdef LIBWRAP
+#include <tcpd.h>
+
+int allow_severity = LOG_AUTH|LOG_INFO;
+int deny_severity = LOG_AUTH|LOG_WARNING;
+#endif
 
 char	*ConfFile = _PATH_LOGCONF;
 char	ctty[] = _PATH_CONSOLE;
@@ -185,6 +196,7 @@ struct	filed *Files;
 struct	filed consfile;
 
 int	Debug;			/* debug flag */
+int	daemonized = 0;		/* we are not daemonized yet */
 char	LocalHostName[MAXHOSTNAMELEN+1];	/* our hostname */
 char	*LocalDomain;		/* our local domain name */
 int	*finet = NULL;			/* Internet datagram sockets */
@@ -192,6 +204,7 @@ int	Initialized = 0;	/* set when we have initialized ourselves */
 int	MarkInterval = 20 * 60;	/* interval between marks in seconds */
 int	MarkSeq = 0;		/* mark sequence number */
 int	SecureMode = 0;		/* listen only on unix domain socks */
+int	UseNameService = 1;	/* make domain name queries */
 int	NumForwards = 0;	/* number of forwarding actions in conf file */
 char	**LogPaths;		/* array of pathnames to read messages from */
 
@@ -204,7 +217,7 @@ void	fprintlog __P((struct filed *, int, char *));
 int	getmsgbufsize __P((void));
 int*	socksetup __P((int));
 void	init __P((int));
-void	logerror __P((char *));
+void	logerror __P((const char *, ...));
 void	logmsg __P((int, char *, char *, int));
 void	printline __P((char *, char *));
 void	printsys __P((char *));
@@ -227,9 +240,35 @@ main(argc, argv)
 	struct sockaddr_storage frominet;
 	char *p, *line, **pp;
 	struct pollfd *readfds;
+	uid_t uid = 0;
+	gid_t gid = 0;
+	char *user = NULL;
+	char *group = NULL;
+	char *root = "/";
+	char *endp;
+	struct group   *gr;
+	struct passwd  *pw;
+	
 
-	while ((ch = getopt(argc, argv, "dsf:m:p:P:")) != -1)
+	(void)setlocale(LC_ALL, "");
+
+	while ((ch = getopt(argc, argv, "dnsf:m:p:P:u:g:t:")) != -1)
 		switch(ch) {
+		case 'u':
+			user = optarg;
+			if (*user == '\0')
+				usage();
+			break;
+		case 'g':
+			group = optarg;
+			if (*group == '\0')
+				usage();
+			break;
+		case 't':
+			root = optarg;
+			if (*root == '\0')
+				usage();
+			break;
 		case 'd':		/* debug */
 			Debug++;
 			break;
@@ -238,6 +277,9 @@ main(argc, argv)
 			break;
 		case 'm':		/* mark interval */
 			MarkInterval = atoi(optarg) * 60;
+			break;
+		case 'n':		/* turn off DNS queries */
+			UseNameService = 0;
 			break;
 		case 'p':		/* path */
 			logpath_add(&LogPaths, &funixsize, 
@@ -257,10 +299,46 @@ main(argc, argv)
 	if ((argc -= optind) != 0)
 		usage();
 
-	if (!Debug)
-		(void)daemon(0, 0);
-	else
-		setlinebuf(stdout);
+	setlinebuf(stdout);
+
+	if (user != NULL) {
+		if (isdigit((unsigned char)*user)) {
+			uid = (uid_t)strtoul(user, &endp, 0);
+			if (*endp != '\0')
+	    			goto getuser;
+		} else {
+getuser:
+			if ((pw = getpwnam(user)) != NULL) {
+				uid = pw->pw_uid;
+			} else {
+				errno = 0;  
+				logerror("Cannot find user `%s'", user);
+				die (0);
+			}
+		}
+	}
+
+	if (group != NULL) {
+		if (isdigit((unsigned char)*group)) {
+			gid = (gid_t)strtoul(group, &endp, 0);
+			if (*endp != '\0')
+	    			goto getgroup;
+		} else {
+getgroup:
+			if ((gr = getgrnam(group)) != NULL) {
+				gid = gr->gr_gid;
+			} else {
+				errno = 0;
+				logerror("Cannot find group `%s'", group);
+				die(0);
+			}
+		}
+	}
+
+	if (access (root, F_OK | R_OK)) {
+		logerror ("Cannot access `%s'", root);
+		die (0);
+	}
 
 	consfile.f_type = F_CONSOLE;
 	(void)strcpy(consfile.f_un.f_fname, ctty);
@@ -277,7 +355,7 @@ main(argc, argv)
 	linesize++;
 	line = malloc(linesize);
 	if (line == NULL) {
-		logerror("couldn't allocate line buffer");
+		logerror("Couldn't allocate line buffer");
 		die(0);
 	}
 	(void)signal(SIGTERM, die);
@@ -295,11 +373,11 @@ main(argc, argv)
 		    &funixmaxsize, _PATH_LOG);
 	funix = (int *)malloc(sizeof(int) * funixsize);
 	if (funix == NULL) {
-		logerror("couldn't allocate funix descriptors");
+		logerror("Couldn't allocate funix descriptors");
 		die(0);
 	}
 	for (j = 0, pp = LogPaths; *pp; pp++, j++) {
-		dprintf("making unix dgram socket %s\n", *pp);
+		dprintf("Making unix dgram socket `%s'\n", *pp);
 		unlink(*pp);
 		memset(&sunx, 0, sizeof(sunx));
 		sunx.sun_family = AF_LOCAL;
@@ -308,31 +386,21 @@ main(argc, argv)
 		if (funix[j] < 0 || bind(funix[j],
 		    (struct sockaddr *)&sunx, SUN_LEN(&sunx)) < 0 ||
 		    chmod(*pp, 0666) < 0) {
-			int serrno = errno;
-			(void)snprintf(line, sizeof line,
-			    "cannot create %s", *pp);
-			errno = serrno;
-			logerror(line);
-			errno = serrno;
-			dprintf("cannot create %s (%d)\n", *pp, errno);
+			logerror("Cannot create `%s'", *pp);
 			die(0);
 		}
-		dprintf("listening on unix dgram socket %s\n", *pp);
+		dprintf("Listening on unix dgram socket `%s'\n", *pp);
 	}
 
 	init(0);
 
 	if ((fklog = open(_PATH_KLOG, O_RDONLY, 0)) < 0) {
-		dprintf("can't open %s (%d)\n", _PATH_KLOG, errno);
+		dprintf("Can't open `%s' (%d)\n", _PATH_KLOG, errno);
 	} else {
-		dprintf("listening on kernel log %s\n", _PATH_KLOG);
+		dprintf("Listening on kernel log `%s'\n", _PATH_KLOG);
 	}
 
-	/* tuck my process id away, if i'm not in debug mode */
-	if (Debug == 0)
-		pidfile(NULL);
-
-	dprintf("off & running....\n");
+	dprintf("Off & running....\n");
 
 	(void)signal(SIGHUP, init);
 
@@ -340,7 +408,7 @@ main(argc, argv)
 	readfds = (struct pollfd *)malloc(sizeof(struct pollfd) *
 			(funixsize + (finet ? *finet : 0) + 1));
 	if (readfds == NULL) {
-		logerror("couldn't allocate pollfds");
+		logerror("Couldn't allocate pollfds");
 		die(0);
 	}
 	nfds = 0;
@@ -363,6 +431,39 @@ main(argc, argv)
 		readfds[nfds++].events = POLLIN | POLLPRI;
 	}
 
+	/* 
+	 * All files are open, we can drop privileges and chroot
+	 */
+	dprintf ("Attempt to chroot to `%s'\n", root);  
+	if (chroot (root)) {
+		logerror ("Failed to chroot to `%s'", root);
+		die(0);
+	}
+	dprintf ("Attempt to set GID/EGID to `%d'\n", gid);  
+	if (setgid (gid) || setegid (gid)) {
+		logerror ("Failed to set gid to `%d'", gid);
+		die(0);
+	}
+	dprintf ("Attempt to set UID/EUID to `%d'\n", uid);  
+	if (setuid (uid) || seteuid (uid)) {
+		logerror ("Failed to set uid to `%d'", uid);
+		die(0);
+	}
+
+	/* 
+	 * We cannot detach from the terminal before we are sure we won't 
+	 * have a fatal error, because error message would not go to the
+	 * terminal and would not be logged because syslogd dies. 
+	 * All die() calls are behind us, we can call daemon()
+	 */
+	if (!Debug) {
+		(void)daemon(0, 0);
+		daemonized = 1;
+
+		/* tuck my process id away, if i'm not in debug mode */
+		pidfile(NULL);
+	}
+
 	for (;;) {
 		int rv;
 
@@ -371,19 +472,19 @@ main(argc, argv)
 			continue;
 		if (rv < 0) {
 			if (errno != EINTR)
-				logerror("poll");
+				logerror("poll() failed");
 			continue;
 		}
-		dprintf("got a message (%d)\n", rv);
+		dprintf("Got a message (%d)\n", rv);
 		if (fklog >= 0 &&
 		    (readfds[nfklogix].revents & (POLLIN | POLLPRI))) {
-			dprintf("kernel log active\n");
+			dprintf("Kernel log active\n");
 			i = read(fklog, line, linesize - 1);
 			if (i > 0) {
 				line[i] = '\0';
 				printsys(line);
 			} else if (i < 0 && errno != EINTR) {
-				logerror("klog");
+				logerror("klog failed");
 				fklog = -1;
 			}
 		}
@@ -392,7 +493,7 @@ main(argc, argv)
 			    (POLLIN | POLLPRI)) == 0)
 				continue;
 
-			dprintf("unix socket (%s) active\n", *pp);
+			dprintf("Unix socket (%s) active\n", *pp);
 			len = sizeof(fromunix);
 			i = recvfrom(funix[j], line, MAXLINE, 0,
 			    (struct sockaddr *)&fromunix, &len);
@@ -400,30 +501,44 @@ main(argc, argv)
 				line[i] = '\0';
 				printline(LocalHostName, line);
 			} else if (i < 0 && errno != EINTR) {
-				char buf[MAXPATHLEN];
-				int serrno = errno;
-
-				(void)snprintf(buf, sizeof buf,
-				    "recvfrom unix %s", *pp);
-				errno = serrno;
-				logerror(buf);
+				logerror("recvfrom() unix `%s'", *pp);
 			}
 		}
 		if (finet && !SecureMode) {
 			for (j = 0; j < *finet; j++) {
 		    		if (readfds[nfinetix[j]].revents &
 				    (POLLIN | POLLPRI)) {
+#ifdef LIBWRAP
+					struct request_info req;
+#endif
+					int reject = 0;
+
 					dprintf("inet socket active\n");
+
+#ifdef LIBWRAP
+					request_init(&req, RQ_DAEMON, "syslogd",
+					    RQ_FILE, finet[j + 1], NULL);
+					fromhost(&req);
+					reject = !hosts_access(&req);
+					if (reject)
+						dprintf("access denied\n");
+#endif
+
 					len = sizeof(frominet);
 					i = recvfrom(finet[j+1], line, MAXLINE,
 					    0, (struct sockaddr *)&frominet,
 					    &len);
-					if (i > 0) {
-						line[i] = '\0';
+					if (i == 0 || (i < 0 && errno == EINTR))
+						continue;
+					else if (i < 0) {
+						logerror("recvfrom inet");
+						continue;
+					}
+
+					line[i] = '\0';
+					if (!reject)
 						printline(cvthname(&frominet),
 						    line);
-					} else if (i < 0 && errno != EINTR)
-						logerror("recvfrom inet");
 				}
 			}
 		}
@@ -433,11 +548,10 @@ main(argc, argv)
 void
 usage()
 {
-	extern char *__progname;
 
 	(void)fprintf(stderr,
-"usage: %s [-ds] [-f conffile] [-m markinterval] [-P logpathfile] [-p logpath1] [-p logpath2 ..]\n",
-	    __progname);
+"usage: %s [-dns] [-f config_file] [-g group] [-m mark_interval]\n\t[-P file_list] [-p log_socket [-p log_socket2 ...]]\n\t[-t chroot_dir] [-u user]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -454,21 +568,23 @@ logpath_add(lp, szp, maxszp, new)
 	char *new;
 {
 
-	dprintf("adding %s to the %p logpath list\n", new, *lp);
+	dprintf("Adding `%s' to the %p logpath list\n", new, *lp);
 	if (*szp == *maxszp) {
 		if (*maxszp == 0) {
 			*maxszp = 4;	/* start of with enough for now */
 			*lp = NULL;
-		}
-		else
+		} else
 			*maxszp *= 2;
 		*lp = realloc(*lp, sizeof(char *) * (*maxszp + 1));
 		if (*lp == NULL) {
-			logerror("couldn't allocate line buffer");
+			logerror("Couldn't allocate line buffer");
 			die(0);
 		}
 	}
-	(*lp)[(*szp)++] = new;
+	if (((*lp)[(*szp)++] = strdup(new)) == NULL) {
+		logerror("Couldn't allocate logpath");
+		die(0);
+	}
 	(*lp)[(*szp)] = NULL;		/* always keep it NULL terminated */
 }
 
@@ -486,11 +602,7 @@ logpath_fileadd(lp, szp, maxszp, file)
 
 	fp = fopen(file, "r");
 	if (fp == NULL) {
-		int serrno = errno;
-
-		dprintf("can't open %s (%d)\n", file, errno);
-		errno = serrno;
-		logerror("could not open socket file list");
+		logerror("Could not open socket file list `%s'", file);
 		die(0);
 	}
 
@@ -532,8 +644,9 @@ printline(hname, msg)
 
 	q = line;
 
-	while ((c = *p++ & 0177) != '\0' &&
-	    q < &line[sizeof(line) - 2])
+	while ((c = *p++) != '\0' &&
+	    q < &line[sizeof(line) - 2]) {
+		c &= 0177;
 		if (iscntrl(c))
 			if (c == '\n')
 				*q++ = ' ';
@@ -545,6 +658,7 @@ printline(hname, msg)
 			}
 		else
 			*q++ = c;
+	}
 	*q = '\0';
 
 	logmsg(pri, line, hname, 0);
@@ -665,7 +779,7 @@ logmsg(pri, msg, from, flags)
 		    !strcmp(from, f->f_prevhost)) {
 			(void)strncpy(f->f_lasttime, timestamp, 15);
 			f->f_prevcount++;
-			dprintf("msg repeated %d times, %ld sec of %d\n",
+			dprintf("Msg repeated %d times, %ld sec of %d\n",
 			    f->f_prevcount, (long)(now - f->f_time),
 			    repeatinterval[f->f_repeatcount]);
 			/*
@@ -796,7 +910,7 @@ fprintlog(f, flags, msg)
 			}
 			if (lsent != l) {
 				f->f_type = F_UNUSED;
-				logerror("sendto");
+				logerror("sendto() failed");
 			}
 		}
 		break;
@@ -946,6 +1060,9 @@ cvthname(f)
 		return ("???");
 	}
 
+	if (!UseNameService)
+		return (ip);
+
 	error = getnameinfo((struct sockaddr*)f, ((struct sockaddr*)f)->sa_len,
 			host, sizeof host, NULL, 0, niflag);
 	if (error) {
@@ -972,7 +1089,7 @@ domark(signo)
 
 	for (f = Files; f; f = f->f_next) {
 		if (f->f_prevcount && now >= REPEATTIME(f)) {
-			dprintf("flush %s: repeated %d times, %d sec.\n",
+			dprintf("Flush %s: repeated %d times, %d sec.\n",
 			    TypeNames[f->f_type], f->f_prevcount,
 			    repeatinterval[f->f_repeatcount]);
 			fprintlog(f, 0, (char *)NULL);
@@ -986,19 +1103,32 @@ domark(signo)
  * Print syslogd errors some place.
  */
 void
-logerror(type)
-	char *type;
+logerror(const char *fmt, ...)
 {
-	char buf[100];
+	va_list ap;
+	char tmpbuf[BUFSIZ];
+	char buf[BUFSIZ];
+
+	va_start(ap, fmt);
+
+	(void)vsnprintf(tmpbuf, sizeof(tmpbuf), fmt, ap);
+
+	va_end(ap);
 
 	if (errno)
-		(void)snprintf(buf,
-		    sizeof(buf), "syslogd: %s: %s", type, strerror(errno));
+		(void)snprintf(buf, sizeof(buf), "syslogd: %s: %s", 
+		    tmpbuf, strerror(errno));
 	else
-		(void)snprintf(buf, sizeof(buf), "syslogd: %s", type);
-	errno = 0;
-	dprintf("%s\n", buf);
-	logmsg(LOG_SYSLOG|LOG_ERR, buf, LocalHostName, ADDDATE);
+		(void)snprintf(buf, sizeof(buf), "syslogd: %s", tmpbuf);
+
+	if (daemonized) 
+		logmsg(LOG_SYSLOG|LOG_ERR, buf, LocalHostName, ADDDATE);
+	if (!daemonized && Debug)
+		dprintf("%s\n", buf);
+	if (!daemonized && !Debug)
+		printf("%s\n", buf);
+
+	return;
 }
 
 void
@@ -1006,19 +1136,18 @@ die(signo)
 	int signo;
 {
 	struct filed *f;
-	char buf[100], **p;
+	char **p;
 
 	for (f = Files; f != NULL; f = f->f_next) {
 		/* flush any pending output */
 		if (f->f_prevcount)
 			fprintlog(f, 0, (char *)NULL);
 	}
-	if (signo) {
-		dprintf("syslogd: exiting on signal %d\n", signo);
-		(void)snprintf(buf, sizeof buf, "exiting on signal %d", signo);
-		errno = 0;
-		logerror(buf);
-	}
+	errno = 0;
+	if (signo)
+		logerror("Exiting on signal %d", signo);
+	else
+		logerror("Fatal error, exiting");
 	for (p = LogPaths; p && *p; p++)
 		unlink(*p);
 	exit(0);
@@ -1072,7 +1201,7 @@ init(signo)
 	if (finet) {
 		for (i = 0; i < *finet; i++) {
 			if (close(finet[i+1]) < 0) {
-				logerror("close");
+				logerror("close() failed");
 				die(0);
 			}
 		}
@@ -1086,7 +1215,7 @@ init(signo)
 
 	/* open the configuration file */
 	if ((cf = fopen(ConfFile, "r")) == NULL) {
-		dprintf("cannot open %s\n", ConfFile);
+		dprintf("Cannot open `%s'\n", ConfFile);
 		*nextp = (struct filed *)calloc(1, sizeof(*f));
 		cfline("*.ERR\t/dev/console", *nextp);
 		(*nextp)->f_next = (struct filed *)calloc(1, sizeof(*f));
@@ -1156,13 +1285,13 @@ init(signo)
 		if (SecureMode) {
 			for (i = 0; i < *finet; i++) {
 				if (shutdown(finet[i+1], SHUT_RD) < 0) {
-					logerror("shutdown");
+					logerror("shutdown() failed");
 					die(0);
 				}
 			}
 		} else
-			dprintf("listening on inet and/or inet6 socket\n");
-		dprintf("sending on inet and/or inet6 socket\n");
+			dprintf("Listening on inet and/or inet6 socket\n");
+		dprintf("Sending on inet and/or inet6 socket\n");
 	}
 
 	logmsg(LOG_SYSLOG|LOG_INFO, "syslogd: restart", LocalHostName, ADDDATE);
@@ -1180,7 +1309,8 @@ cfline(line, f)
 	struct addrinfo hints, *res;
 	int    error, i, pri;
 	char   *bp, *p, *q;
-	char   buf[MAXLINE], ebuf[100];
+	char   buf[MAXLINE];
+	int    sp_err;
 
 	dprintf("cfline(%s)\n", line);
 
@@ -1190,6 +1320,58 @@ cfline(line, f)
 	memset(f, 0, sizeof(*f));
 	for (i = 0; i <= LOG_NFACILITIES; i++)
 		f->f_pmask[i] = INTERNAL_NOPRI;
+	
+	/* 
+	 * There should not be any space before the log facility.
+	 * Check this is okay, complain and fix if it is not.
+	 */
+	q = line;
+	if (isblank((unsigned char)*line)) {
+		errno = 0;
+		logerror(
+		    "Warning: `%s' space or tab before the log facility",
+		    line);
+		/* Fix: strip all spaces/tabs before the log facility */
+		while (*q++ && isblank((unsigned char)*q));
+		line = q; 
+	}
+
+	/* 
+	 * q is now at the first char of the log facility
+	 * There should be at least one tab after the log facility 
+	 * Check this is okay, and complain and fix if it is not.
+	 */
+	q = line + strlen(line);
+	while (!isblank((unsigned char)*q) && (q != line))
+		q--;
+	if ((q == line) && strlen(line)) { 
+		/* No tabs or space in a non empty line: complain */
+		errno = 0;
+		logerror(
+		    "Error: `%s' log facility or log target missing",
+		    line);
+	}
+	
+	/* q is at the end of the blank between the two fields */
+	sp_err = 0;
+	while (isblank((unsigned char)*q) && (q != line))
+		if (*q-- == ' ')
+			sp_err = 1;
+
+	if (sp_err) {
+		/* 
+		 * A space somewhere between the log facility 
+		 * and the log target: complain 
+		 */
+		errno = 0;
+		logerror(
+		    "Warning: `%s' space found where tab is expected",
+		    line);
+		/* ... and fix the problem: replace all spaces by tabs */
+		while (*++q && isblank((unsigned char)*q))
+			if (*q == ' ')
+				*q='\t';	
+	}	
 
 	/* scan through the list of selectors */
 	for (p = line; *p && *p != '\t';) {
@@ -1213,9 +1395,8 @@ cfline(line, f)
 		else {
 			pri = decode(buf, prioritynames);
 			if (pri < 0) {
-				(void)snprintf(ebuf, sizeof ebuf,
-				    "unknown priority name \"%s\"", buf);
-				logerror(ebuf);
+				errno = 0;
+				logerror("Unknown priority name `%s'", buf);
 				return;
 			}
 		}
@@ -1231,10 +1412,9 @@ cfline(line, f)
 			else {
 				i = decode(buf, facilitynames);
 				if (i < 0) {
-					(void)snprintf(ebuf, sizeof ebuf,
-					    "unknown facility name \"%s\"",
+					errno = 0;
+					logerror("Unknown facility name `%s'",
 					    buf);
-					logerror(ebuf);
 					return;
 				}
 				f->f_pmask[i >> 3] = pri;
@@ -1247,7 +1427,8 @@ cfline(line, f)
 	}
 
 	/* skip to action part */
-	while (*p == '\t')
+	sp_err = 0;
+	while ((*p == '\t') || (*p == ' '))
 		p++;
 
 	switch (*p)
@@ -1348,7 +1529,7 @@ getmsgbufsize()
 	mib[1] = KERN_MSGBUFSIZE;
 	size = sizeof msgbufsize;
 	if (sysctl(mib, 2, &msgbufsize, &size, NULL, 0) == -1) {
-		dprintf("couldn't get kern.msgbufsize\n");
+		dprintf("Couldn't get kern.msgbufsize\n");
 		return (0);
 	}
 	return (msgbufsize);
@@ -1380,7 +1561,7 @@ socksetup(af)
 		continue;
 	socks = malloc ((maxs+1) * sizeof(int));
 	if (!socks) {
-		logerror("couldn't allocate memory for sockets");
+		logerror("Couldn't allocate memory for sockets");
 		die(0);
 	}
 
@@ -1389,12 +1570,12 @@ socksetup(af)
 	for (r = res; r; r = r->ai_next) {
 		*s = socket(r->ai_family, r->ai_socktype, r->ai_protocol);
 		if (*s < 0) {
-			logerror("socket");
+			logerror("socket() failed");
 			continue;
 		}
 		if (!SecureMode && bind(*s, r->ai_addr, r->ai_addrlen) < 0) {
+			logerror("bind() failed");
 			close (*s);
-			logerror("bind");
 			continue;
 		}
 

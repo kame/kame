@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.9.8.1 2000/10/17 19:50:31 tv Exp $
+#	$NetBSD: Makefile,v 1.10 2000/10/11 20:23:57 is Exp $
 
 PROG=	tcpdchk
 SRCS=	tcpdchk.c fakelog.c inetcf.c scaffold.c percent_m.c

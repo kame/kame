@@ -1,4 +1,4 @@
-/*	$NetBSD: traceroute.c,v 1.39.4.2 2000/10/18 02:06:04 tv Exp $	*/
+/*	$NetBSD: traceroute.c,v 1.45 2002/01/12 02:42:58 yamt Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997
@@ -29,7 +29,7 @@ static const char rcsid[] =
 #else
 __COPYRIGHT("@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n");
-__RCSID("$NetBSD: traceroute.c,v 1.39.4.2 2000/10/18 02:06:04 tv Exp $");
+__RCSID("$NetBSD: traceroute.c,v 1.45 2002/01/12 02:42:58 yamt Exp $");
 #endif
 #endif
 
@@ -246,6 +246,7 @@ __RCSID("$NetBSD: traceroute.c,v 1.39.4.2 2000/10/18 02:06:04 tv Exp $");
 
 #include "ifaddrlist.h"
 #include "savestr.h"
+#include "as.h"
 
 /* Maximum number of gateways (include room for one noop) */
 #define NGATEWAYS ((int)((MAX_IPOPTLEN - IPOPT_MINOFF - 1) / sizeof(u_int32_t)))
@@ -309,6 +310,9 @@ int verbose;
 int waittime = 5;		/* time to wait for response (in seconds) */
 int nflag;			/* print addresses numerically */
 int dump;
+int as_path;			/* print as numbers for each hop */
+char *as_server = NULL;
+void *asn;
 int useicmp;			/* use icmp echo instead of udp packets */
 #ifdef CANT_HACK_CKSUM
 int docksum = 0;		/* don't calculate checksums */
@@ -353,6 +357,7 @@ void	freehostinfo(struct hostinfo *);
 void	getaddr(u_int32_t *, char *);
 struct	hostinfo *gethostinfo(char *);
 u_short	in_cksum(u_short *, int);
+u_short	in_cksum2(u_short, u_short *, int);
 char	*inetname(struct in_addr);
 int	main(int, char **);
 int	packet_ok(u_char *, int, struct sockaddr_in *, int);
@@ -400,8 +405,17 @@ main(int argc, char **argv)
 		prog = argv[0];
 
 	opterr = 0;
-	while ((op = getopt(argc, argv, "dDFPInlrvxf:g:i:m:p:q:s:t:w:")) != -1)
+	while ((op = getopt(argc, argv, "aA:dDFPInlrvxf:g:i:m:p:q:s:t:w:")) != -1)
 		switch (op) {
+
+		case 'a':
+			as_path = 1;
+			break;
+
+		case 'A':
+			as_path = 1;
+			as_server = optarg;
+			break;
 
 		case 'd':
 			options |= SO_DEBUG;
@@ -873,6 +887,16 @@ main(int argc, char **argv)
 	}
 #endif
 
+	if (as_path) {
+		asn = as_setup(as_server);
+		if (asn == NULL) {
+			Fprintf(stderr, "%s: as_setup failed, AS# lookups disabled\n", 
+				prog);
+			(void)fflush(stderr);
+			as_path = 0;
+		}
+	}
+
 	setuid(getuid());
 	Fprintf(stderr, "%s to %s (%s)",
 	    prog, hostname, inet_ntoa(to->sin_addr));
@@ -997,6 +1021,10 @@ again:
 		    (unreachable > 0 && unreachable >= ((nprobes + 1) / 2)))
 			break;
 	}
+
+	if (as_path)
+		as_shutdown(asn);
+
 	exit(0);
 }
 
@@ -1012,7 +1040,7 @@ wait_for_reply(register int sock, register struct sockaddr_in *fromp,
 	int fromlen = sizeof(*fromp);
 	int retval;
 
-	nfds = howmany(sock + 1, NFDBITS);
+	nfds = howmany(sock + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdsp = malloc(nfds)) == NULL) {
 		Fprintf(stderr, "%s: malloc: %s\n", prog, strerror(errno));
 		exit(1);
@@ -1024,6 +1052,11 @@ wait_for_reply(register int sock, register struct sockaddr_in *fromp,
 	wait.tv_usec = tp->tv_usec;
 	(void)gettimeofday(&now, &tz);
 	tvsub(&wait, &now);
+
+	if (wait.tv_sec < 0) {
+		wait.tv_sec = 0;
+		wait.tv_usec = 0;
+	}
 
 	retval = select(sock + 1, fdsp, NULL, NULL, &wait);
 	free(fdsp);
@@ -1067,7 +1100,6 @@ send_probe(register int seq, int ttl, register struct timeval *tp)
 {
 	register int cc;
 	register struct udpiphdr * ui;
-	struct ip tip;
 	int oldmtu = packlen;
 
 again:
@@ -1113,22 +1145,28 @@ again:
 			if (outicmp->icmp_cksum == 0)
 				outicmp->icmp_cksum = 0xffff;
 		} else {
-			/* Checksum (must save and restore ip header) */
-			tip = *outip;
+			u_short sum;
+			struct {
+				struct in_addr src;
+				struct in_addr dst;
+				u_int8_t zero;
+				u_int8_t protocol;
+				u_int16_t len;
+			} __attribute__((__packed__)) phdr;
+
+			/* Checksum */
 			ui = (struct udpiphdr *)outip;
-#ifndef __NetBSD__
-			ui->ui_next = 0;
-			ui->ui_prev = 0;
-			ui->ui_x1 = 0;
-#else
-			memset(ui->ui_x1, 0, sizeof(ui->ui_x1));
-#endif
-			ui->ui_len = outudp->uh_ulen;
+			memset(&phdr, 0, sizeof(phdr));
+			phdr.src = ui->ui_src;
+			phdr.dst = ((struct sockaddr_in *)&whereto)->sin_addr;
+			phdr.protocol = ui->ui_pr;
+			phdr.len = outudp->uh_ulen;
 			outudp->uh_sum = 0;
-			outudp->uh_sum = in_cksum((u_short *)ui, packlen);
+			sum = in_cksum2(0, (u_short *)&phdr, sizeof(phdr));
+			sum = in_cksum2(sum, (u_short *)outudp, ntohs(outudp->uh_ulen));
+			outudp->uh_sum = ~sum;
 			if (outudp->uh_sum == 0)
 				outudp->uh_sum = 0xffff;
-			*outip = tip;
 		}
 	}
 
@@ -1339,6 +1377,9 @@ print(register u_char *buf, register int cc, register struct sockaddr_in *from)
 	hlen = ip->ip_hl << 2;
 	cc -= hlen;
 
+	if (as_path)
+		Printf(" [AS%d]", as_lookup(asn, &from->sin_addr));
+
 	if (nflag)
 		Printf(" %s", inet_ntoa(from->sin_addr));
 	else
@@ -1349,16 +1390,23 @@ print(register u_char *buf, register int cc, register struct sockaddr_in *from)
 		Printf(" %d bytes to %s", cc, inet_ntoa (ip->ip_dst));
 }
 
+u_short
+in_cksum(u_short *addr, int len)
+{
+
+	return ~in_cksum2(0, addr, len);
+}
+
 /*
  * Checksum routine for Internet Protocol family headers (C Version)
  */
 u_short
-in_cksum(register u_short *addr, register int len)
+in_cksum2(u_short seed, register u_short *addr, register int len)
 {
 	register int nleft = len;
 	register u_short *w = addr;
 	register u_short answer;
-	register int sum = 0;
+	register int sum = seed;
 
 	/*
 	 *  Our algorithm is simple, using a 32 bit accumulator (sum),
@@ -1380,7 +1428,7 @@ in_cksum(register u_short *addr, register int len)
 	 */
 	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
 	sum += (sum >> 16);			/* add carry */
-	answer = ~sum;				/* truncate to 16 bits */
+	answer = sum;				/* truncate to 16 bits */
 	return (answer);
 }
 
@@ -1562,9 +1610,9 @@ usage(void)
 	extern char version[];
 
 	Fprintf(stderr, "Version %s\n", version);
-	Fprintf(stderr, "Usage: %s [-dDFPIlnrvx] [-g gateway] [-i iface] \
-[-f first_ttl] [-m max_ttl]\n\t[ -p port] [-q nqueries] [-s src_addr] [-t tos] \
-[-w waittime]\n\thost [packetlen]\n",
+	Fprintf(stderr, "Usage: %s [-adDFPIlnrvx] [-g gateway] [-i iface] \
+[-f first_ttl]\n\t[-m max_ttl] [-p port] [-q nqueries] [-s src_addr] [-t tos]\n\t\
+[-w waittime] [-A as_server] host [packetlen]\n",
 	    prog);
 	exit(1);
 }

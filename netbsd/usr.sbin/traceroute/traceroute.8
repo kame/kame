@@ -1,4 +1,4 @@
-.\" $NetBSD: traceroute.8,v 1.10.2.1 2000/11/03 18:48:16 tv Exp $
+.\" $NetBSD: traceroute.8,v 1.17 2002/02/08 01:38:57 ross Exp $
 .\"
 .\" Copyright (c) 1989, 1995, 1996, 1997
 .\"	The Regents of the University of California.  All rights reserved.
@@ -15,7 +15,7 @@
 .\" IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
 .\" WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 .\"
-.\"	Header: traceroute.8,v 1.11 97/04/22 13:45:13 leres Exp 
+.\"	Header: traceroute.8,v 1.11 97/04/22 13:45:13 leres Exp
 .\"
 .TH TRACEROUTE 8 "22 April 1997"
 .UC 6
@@ -25,44 +25,49 @@ traceroute \- print the route packets take to network host
 .na
 .B traceroute
 [
-.B \-DFPIdlnrvx
+.B \-aDFPIdlnrvx
 ] [
 .B \-f
 .I first_ttl
-] [
-.B \-g
-.I gateway
 ]
 .br
 .ti +8
 [
+.B \-g
+.I gateway
+] [
 .B \-i
 .I iface
 ] [
 .B \-m
 max_ttl
-] [
-.B \-p
-.I port
 ]
 .br
 .ti +8
 [
+.B \-p
+.I port
+] [
 .B \-q
 .I nqueries
 ] [
 .B \-s
 .I src_addr
-] [
-.B \-t
-.I tos
 ]
 .br
 .ti +8
 [
+.B \-t
+.I tos
+] [
 .B \-w
 .I waittime
+] [
+.B \-A
+.I as_server
 ]
+.br
+.ti +8
 .I host
 [
 .I packetlen
@@ -85,6 +90,12 @@ name.
 .PP
 Other options are:
 .TP
+.B \-a
+Turn on AS# lookups for each hop encountered.
+.TP
+.B \-A
+Turn on AS# lookups and use the given server instead of the default.
+.TP
 .B \-d
 Turn on socket-level debugging.
 .TP
@@ -92,7 +103,7 @@ Turn on socket-level debugging.
 Dump the packet data to standard error before transmitting it.
 .TP
 .B \-f
-Set the initial time-to-live used in the first outgoing probe packet. 
+Set the initial time-to-live used in the first outgoing probe packet.
 .TP
 .B \-F
 Set the "don't fragment" bit.
@@ -112,7 +123,7 @@ Use ICMP ECHO instead of UDP datagrams.
 .TP
 .B \-l
 Display the ttl value of the returned packet.  This is useful for
-checking for assymetric routing.
+checking for asymmetric routing.
 .TP
 .B \-m
 Set the max time-to-live (max number of hops) used in outgoing probe
@@ -139,6 +150,10 @@ to pick an unused port range.
 Set the "don't fragment" bit, and use the next hop mtu each time we get
 the "need fragmentation" error, thus probing the path MTU.
 .TP
+.B \-q
+Set the number of probe packets sent for each hop.  By default, traceroute
+sends three probe packets.
+.TP
 .B \-r
 Bypass the normal routing tables and send directly to a host on an attached
 network.
@@ -146,7 +161,7 @@ If the host is not on a directly-attached network,
 an error is returned.
 This option can be used to ping a local host through an interface
 that has no route through it (e.g., after the interface was dropped by
-.IR routed (8C)).
+.IR routed (8)).
 .TP
 .B \-s
 Use the following IP address (which usually is given as an IP number, not
@@ -202,7 +217,7 @@ packets with a small ttl (time to live) then listening for an
 ICMP "time exceeded" reply from a gateway.  We start our probes
 with a ttl of one and increase by one until we get an ICMP "port
 unreachable" (which means we got to "host") or hit a max (which
-defaults to 30 hops & can be changed with the
+defaults to 30 hops \*[Am] can be changed with the
 .B \-m
 flag).  Three
 probes (change with
@@ -244,7 +259,7 @@ traceroute to nis.nsf.net (35.1.1.48), 30 hops max, 38 byte packet
 .fi
 .RE
 
-Note that lines 2 & 3 are the same.  This is due to a buggy
+Note that lines 2 \*[Am] 3 are the same.  This is due to a buggy
 kernel on the 2nd hop system \- lbl-csam.arpa \- that forwards
 packets with a zero ttl (a bug in the distributed version
 of 4.3BSD).  Note that you have to guess what path
@@ -278,14 +293,14 @@ traceroute to allspice.lcs.mit.edu (18.26.0.115), 30 hops max
 .fi
 .RE
 
-Note that the gateways 12, 14, 15, 16 & 17 hops away
+Note that the gateways 12, 14, 15, 16 \*[Am] 17 hops away
 either don't send ICMP "time exceeded" messages or send them
 with a ttl too small to reach us.  14 \- 17 are running the
 MIT C Gateway code that doesn't send "time exceeded"s.  God
 only knows what's going on with 12.
 .PP
 The silent gateway 12 in the above may be the result of a bug in
-the 4.[23]BSD network code (and its derivatives):  4.x (x <= 3)
+the 4.[23]BSD network code (and its derivatives):  4.x (x \*[Le] 3)
 sends an unreachable message using whatever ttl remains in the
 original datagram.  Since, for gateways, the remaining ttl is
 zero, the ICMP "time exceeded" is guaranteed to not make it back
@@ -319,7 +334,7 @@ ICMP reply.  So, the reply will time out on the return path
 ICMP's) until we probe with a ttl that's at least twice the path
 length.  I.e., rip is really only 7 hops away.  A reply that
 returns with a ttl of 1 is a clue this problem exists.
-Traceroute prints a "!" after the time if the ttl is <= 1.
+Traceroute prints a "!" after the time if the ttl is \*[Le] 1.
 Since vendors ship a lot of obsolete (DEC's Ultrix, Sun 3.x) or
 non-standard (HPUX) software, expect to see this problem
 frequently and/or take care picking the target host of your
@@ -338,7 +353,7 @@ or
 ever occur and the associated gateway is busted if you see one),
 .B !X
 (communication administratively prohibited), or
-.B !<N>
+.B !\*[Lt]N\*[Gt]
 (ICMP unreachable code N).
 If almost all the probes result in some kind of unreachable, traceroute
 will give up and exit.
@@ -380,3 +395,7 @@ The current version is available via anonymous ftp:
 .RE
 .SH BUGS
 Please send bug reports to traceroute@ee.lbl.gov.
+.PP
+The AS number capability reports information that may sometimes be
+inaccurate due to discrepancies between the contents of the routing
+database server and the current state of the Internet.
