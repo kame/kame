@@ -13,6 +13,7 @@ LDADD+=	-lkvm
 DPADD+=	${LIBKVM}
 
 MAN=	rtsold.8
+MLINKS=	rtsold.8 rtsol.8
 
 .PATH:	${SRCDIR}
 
