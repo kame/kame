@@ -609,9 +609,6 @@ lostconn(signo)
 static void
 inithosts()
 {
-	FILE *fp;
-	char *cp;
-	struct hostent *hp;
 	struct ftphost *hrp, *lhrp;
 	char line[1024];
 	struct addrinfo hints, *res;
