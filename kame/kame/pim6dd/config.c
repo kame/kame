@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: config.c,v 1.4 2000/02/23 06:04:42 jinmei Exp $
+ *  $Id: config.c,v 1.5 2000/02/23 06:44:45 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -106,7 +106,7 @@ config_vifs_from_kernel()
 	    continue;
 	}
 
-	memcpy(&addr, &ifa->ifa_addr, sizeof(struct sockaddr_in6));
+	memcpy(&addr, ifa->ifa_addr, sizeof(struct sockaddr_in6));
 	
 	flags = ifa->ifa_flags;
 	if ((flags & (IFF_LOOPBACK | IFF_MULTICAST)) != IFF_MULTICAST)
