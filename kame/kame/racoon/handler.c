@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.44 2001/03/05 18:37:06 thorpej Exp $	*/
+/*	$KAME: handler.c,v 1.45 2001/03/06 20:41:02 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -207,10 +207,10 @@ delph1(iph1)
 
 	VPTRINIT(iph1->authstr);
 
-	if (iph1->sce)
-		SCHED_KILL(iph1->sce);
-	if (iph1->scr)
-		SCHED_KILL(iph1->scr);
+	sched_scrub_param(iph1);
+	iph1->sce = NULL;
+	iph1->scr = NULL;
+
 	VPTRINIT(iph1->sendbuf);
 
 	flush_recvedpkt(iph1->rlist);
@@ -456,10 +456,10 @@ void
 initph2(iph2)
 	struct ph2handle *iph2;
 {
-	if (iph2->sce)
-		SCHED_KILL(iph2->sce);
-	if (iph2->scr)
-		SCHED_KILL(iph2->scr);
+
+	sched_scrub_param(iph2);
+	iph2->sce = NULL;
+	iph2->scr = NULL;
 
 	VPTRINIT(iph2->sendbuf);
 
