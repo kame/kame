@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.222 2004/06/02 05:53:16 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.223 2004/07/14 02:35:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3007,6 +3007,11 @@ ipsec4_output(state, sp, flags)
 			}
 			ip = mtod(state->m, struct ip *);
 
+			/*
+			 * XXX the code is not effective, as ip->ip_dst
+			 * is equal to dst4->sin_addr (dst on SA).
+			 * need some way to flush route cache
+			 */
 			state->ro = &isr->sav->sah->sa_route;
 			state->dst = (struct sockaddr *)&state->ro->ro_dst;
 			dst4 = (struct sockaddr_in *)state->dst;
@@ -3420,6 +3425,11 @@ ipsec6_output_tunnel(state, sp, flags)
 			}
 			ip6 = mtod(state->m, struct ip6_hdr *);
 
+			/*
+			 * XXX the code is not effective, as ip->ip_dst
+			 * is equal to dst4->sin_addr (dst on SA).
+			 * need some way to flush route cache
+			 */
 			state->ro = &isr->sav->sah->sa_route;
 			state->dst = (struct sockaddr *)&state->ro->ro_dst;
 			dst6 = (struct sockaddr_in6 *)state->dst;
@@ -3565,6 +3575,11 @@ ipsec6_output_tunnel(state, sp, flags)
 
 			/* XXX duplicated code. */
 
+			/*
+			 * XXX the code is not effective, as ip->ip_dst
+			 * is equal to dst4->sin_addr (dst on SA).
+			 * need some way to flush route cache
+			 */
 			state->ro = &isr->sav->sah->sa_route;
 			state->dst = (struct sockaddr *)&state->ro->ro_dst;
 			dst6 = (struct sockaddr_in6 *)state->dst;
