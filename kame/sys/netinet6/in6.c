@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.347 2003/08/14 08:24:32 kjc Exp $	*/
+/*	$KAME: in6.c,v 1.348 2003/08/15 06:30:10 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2728,10 +2728,8 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	     */
 	    if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
 		if (numsrc != 0) {
-#ifdef MLDV2_DEBUG
-		    printf("in6_modmulti: source filter not supported for %s\n",
-			   ip6_sprintf(&in6m->in6m_sa.sin6_addr));
-#endif
+		    mldlog((LOG_DEBUG, "in6_modmulti: source filter not supported for %s\n",
+			   ip6_sprintf(&in6m->in6m_sa.sin6_addr)));
 		    splx(s);
 		    *error = EINVAL;
 		    return NULL; /* source filter is not supported for
@@ -3037,18 +3035,14 @@ in6_addmulti(maddr6, ifp, errorp)
 			return NULL;
 		}
 		if (newhead != NULL) {
-#ifdef MLDV2_DEBUG
-			printf("in6_addmultisrc: non-NULL newhead\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_addmultisrc: non-NULL newhead\n"));
 			/*
 			 * Merge new source list to current pending report's 
 			 * source list.
 			 */
 			if ((*errorp = in6_merge_msf_state
 					(in6m, newhead, newmode, newnumsrc)) > 0) {
-#ifdef MLDV2_DEBUG
-				printf("in6_addmultisrc: in6_merge_msf_state failed\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_addmultisrc: in6_merge_msf_state failed\n"));
 				/* 
 				 * State-Change Report will not be sent. Just 
 				 * return immediately. 
@@ -3061,9 +3055,7 @@ in6_addmulti(maddr6, ifp, errorp)
 				return in6m;
 			}
 		} else {
-#ifdef MLDV2_DEBUG
-			printf("in6_addmultisrc: NULL newhead\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_addmultisrc: NULL newhead\n"));
 			/* Only newhead was merged in a former function. */
 			in6m->in6m_source->i6ms_mode = newmode;
 			in6m->in6m_source->i6ms_cur->numsrc = newnumsrc;
@@ -3084,21 +3076,15 @@ in6_addmulti(maddr6, ifp, errorp)
 					else
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
-#ifdef MLDV2_DEBUG
-				printf("in6_addmultisrc: send current status\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_addmultisrc: send current status\n"));
 				mld_send_state_change_report
 					(&m, &buflen, in6m, type, timer_init);
 			}
-#ifdef MLDV2_DEBUG
 			 else {
-				printf("in6_addmultisrc: do nothing since there's no change (mode=%d->%d, numsrc=%d->%d)\n", curmode, newmode, curnumsrc, newnumsrc);
+				mldlog((LOG_DEBUG, "in6_addmultisrc: do nothing since there's no change (mode=%d->%d, numsrc=%d->%d)\n", curmode, newmode, curnumsrc, newnumsrc));
 			}
-#endif
 		} else {
-#ifdef MLDV2_DEBUG
-			printf("in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n"));
 			/*
 			 * If MSF's pending records exist, they must be deleted.
 			 * Otherwise, ALW or BLK record will be blocked or pending
@@ -3186,9 +3172,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		mld_send_state_change_report
 			(&m, &buflen, in6m, type, timer_init);
 	} else {
-#ifdef MLDV2_DEBUG
-		printf("in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n");
-#endif
+		mldlog((LOG_DEBUG, "in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n"));
 		/*
 		 * If MSF's pending records exist, they must be deleted.
 		 */
@@ -3273,9 +3257,7 @@ in6_delmulti(in6m)
 	if (newhead != NULL) {
 		if ((*error = in6_merge_msf_state
 				(in6m, newhead, newmode, newnumsrc)) > 0) {
-#ifdef MLDV2_DEBUG
-			printf("in6_delmulti: state-change report not sent, (error=%d)\n", *error);
-#endif
+			mldlog((LOG_DEBUG, "in6_delmulti: state-change report not sent, (error=%d)\n", *error));
 			/* State-Change Report will not be sent. Just return 
 			 * immediately. */
 			FREE(newhead, M_MSFILTER);
@@ -3420,10 +3402,8 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	     */
 	    if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
 		if (numsrc != 0) {
-#ifdef MLDV2_DEBUG
-		    printf("in6_modmulti: source filter not supported for %s\n",
-			   ip6_sprintf(&in6m->in6m_sa.sin6_addr));
-#endif
+		    mldlog((LOG_DEBUG, "in6_modmulti: source filter not supported for %s\n",
+			   ip6_sprintf(&in6m->in6m_sa.sin6_addr)));
 		    splx(s);
 		    *error = EINVAL;
 		    return NULL; /* source filter is not supported for
@@ -3538,9 +3518,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		return NULL;
 	    }
 	    if (ifma->ifma_protospec != NULL) {
-#ifdef MLDV2_DEBUG
-		printf("in6_modmulti: there's a corresponding if_multiaddr although IN6_LOOKUP_MULTI fails \n");
-#endif
+		mldlog((LOG_DEBUG, "in6_modmulti: there's a corresponding if_multiaddr although IN6_LOOKUP_MULTI fails \n"));
 		free(in6m, M_IPMADDR);
 		splx(s);
 		return NULL;

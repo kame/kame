@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.8 2003/06/06 05:54:06 itojun Exp $	*/
+/*	$KAME: mld6_var.h,v 1.9 2003/08/15 06:30:11 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -81,6 +81,9 @@
 #define	MLD_DEF_QUERY		10	/* v1 Max. Response Time (sec.) */
 
 extern	struct router6_info *Head6;
+extern int mld_debug;
+
+#define mldlog(x)	do { if (mld_debug) log x; } while (/*CONSTCOND*/ 0)
 
 void	mld6_init(void);
 struct	router6_info * rt6i_init(struct ifnet *);

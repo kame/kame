@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.17 2003/05/09 08:40:55 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.18 2003/08/15 06:30:10 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -254,9 +254,7 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	fnumsrc = &iasl->numsrc;
 	/* the number of sources is limited */
 	if (*fnumsrc >= mldmaxsrcfilter) {
-#ifdef MLDV2_DEBUG
-		printf("in6_addmultisrc: number of source already reached max filter count.\n");
-#endif
+		mldlog((LOG_DEBUG, "in6_addmultisrc: number of source already reached max filter count.\n"));
 		return EINVAL; /* XXX */
 	}
 
@@ -283,9 +281,7 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			 * This is implementation specific issue.
 			 */
 			++i; /* adjusted the number of srcs */
-#ifdef MLDV2_DEBUG
-			printf("in6_addmultisrc: number of source is over max filter count. Adjusted.\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_addmultisrc: number of source is over max filter count. Adjusted.\n"));
 			break;
 		}
 	}
@@ -309,9 +305,7 @@ after_source_list_addition:
 		*fnumsrc += j;
 	error = in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc);
 	if (error != 0) {
-#ifdef MLDV2_DEBUG
-		printf("in6_addmultisrc: in6_get_new_msf_state returns %d\n", error);
-#endif
+		mldlog((LOG_DEBUG, "in6_addmultisrc: in6_get_new_msf_state returns %d\n", error));
 		if ((mode == MCAST_EXCLUDE) && init)
 			--in6m->in6m_source->i6ms_excnt;
 		if (numsrc != 0) {
@@ -377,13 +371,11 @@ in6_delmultisrc(in6m, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 		ref_count = in6_merge_msf_source_addr(iasl, SIN6(&ss[i]),
 						     IMS_DELETE_SOURCE);
 		if (ref_count < 0) {
-#ifdef MLDV2_DEBUG
-			printf("in6_delmultisrc: found source %s not exist in %s mode?\n",
+			mldlog((LOG_DEBUG, "in6_delmultisrc: found source %s not exist in %s mode?\n",
 			       ip6_sprintf(&SIN6(&ss[i])->sin6_addr),
 			       mode == MCAST_INCLUDE ? "include" :
 			       mode == MCAST_EXCLUDE ? "exclude" :
-			       "???");
-#endif
+			       "???"));
 			in6_undomultisrc(in6m, i, ss, mode, IMS_DELETE_SOURCE);
 			return EADDRNOTAVAIL;
 		} 
@@ -415,9 +407,7 @@ after_source_list_deletion:
 	}
 	error = in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc);
 	if (error != 0) {
-#ifdef MLDV2_DEBUG
-		printf("in6_delmultisrc: in6_get_new_msf_state returns %d\n", error);
-#endif
+		mldlog((LOG_DEBUG, "in6_delmultisrc: in6_get_new_msf_state returns %d\n", error));
 		if ((mode == MCAST_EXCLUDE) && final)
 			++in6m->in6m_source->i6ms_excnt;
 		if (numsrc != 0) {
@@ -569,9 +559,7 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 	fnumsrc = &iasl->numsrc;
 	/* the number of sources is limited */
 	if (*fnumsrc >= mldmaxsrcfilter) {
-#ifdef MLDV2_DEBUG
-		printf("in6_modmultisrc: number of source already reached max filter count.\n");
-#endif
+		mldlog((LOG_DEBUG, "in6_modmultisrc: number of source already reached max filter count.\n"));
 		return EINVAL; /* XXX */
 	}
 
@@ -601,9 +589,7 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			 * This is implementation specific issue.
 			 */
 			++i; /* adjusted the number of sources */
-#ifdef MLDV2_DEBUG
-			printf("in6_modmultisrc: number of source is over max filter count. Adjusted.\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_modmultisrc: number of source is over max filter count. Adjusted.\n"));
 			break;
 		}
 	}
@@ -632,9 +618,7 @@ after_source_list_modification:
 
 	error = in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc);
 	if (error != 0) {
-#ifdef MLDV2_DEBUG
-		printf("in6_modmultisrc: in6_get_new_msf_state error %d\n", error);
-#endif
+		mldlog((LOG_DEBUG, "in6_modmultisrc: in6_get_new_msf_state error %d\n", error));
 		if (old_mode != mode && mode == MCAST_INCLUDE)
 			++in6m->in6m_source->i6ms_excnt;
 		else if (old_mode != mode && mode == MCAST_EXCLUDE)
@@ -705,7 +689,7 @@ in6_undomultisrc(in6m, numsrc, ss, mode, req)
 				continue;
 			if (SS_CMP(&ias->i6as_addr, >, &ss[i])) {
 				/* XXX strange. this should never occur. */
-				printf("in6_undomultisrc: list corrupted. panic!\n");
+				mldlog((LOG_DEBUG, "in6_undomultisrc: list corrupted. panic!\n"));
 				continue; /* XXX */
 			}
 
@@ -753,9 +737,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		/* IN{NULL} -> EX{NULL} */
 		if (LIST_EMPTY(in6mm_src->i6ms_cur->head)) {
 			if (in6mm_src->i6ms_mode == MCAST_INCLUDE) {
-#ifdef MLDV2_DEBUG
-				printf("case 1.1:IN{NULL}->EX{NULL}\n");
-#endif
+				mldlog((LOG_DEBUG, "case 1.1:IN{NULL}->EX{NULL}\n"));
 				in6_clear_all_pending_report(in6m);
 
 				/*
@@ -772,9 +754,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 		/* IN{non NULL} -> EX{NULL} */
 		if (in6mm_src->i6ms_mode == MCAST_INCLUDE) {
-#ifdef MLDV2_DEBUG
-			printf("case 1.2:IN{non-NULL}->EX{NULL}\n");
-#endif
+			mldlog((LOG_DEBUG, "case 1.2:IN{non-NULL}->EX{NULL}\n"));
 			in6_clear_all_pending_report(in6m);
 
 			/* To make TO_EX transmission */
@@ -786,9 +766,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 		/* EX{non NULL} -> EX{NULL} */
 		if (in6mm_src->i6ms_ex != NULL) {
-#ifdef MLDV2_DEBUG
-			printf("case 1.3:EX{non-NULL}->EX{NULL}\n");
-#endif
+			mldlog((LOG_DEBUG, "case 1.3:EX{non-NULL}->EX{NULL}\n"));
 			filter = REPORT_FILTER2;
 			LIST_FOREACH(ex_ias, in6mm_src->i6ms_ex->head,
 				     i6as_list) {
@@ -820,9 +798,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		/* EX{NULL} -> IN{NULL} */
 		if (LIST_EMPTY(in6mm_src->i6ms_cur->head)) {
 			if (in6mm_src->i6ms_mode == MCAST_EXCLUDE) {
-#ifdef MLDV2_DEBUG
-				printf("case 2.1: EX{NULL}->IN{NULL}\n");
-#endif
+				mldlog((LOG_DEBUG, "case 2.1: EX{NULL}->IN{NULL}\n"));
 				in6_clear_all_pending_report(in6m);
 
 				/*
@@ -839,9 +815,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 		/* EX{non NULL} -> IN{NULL} */
 		if (in6mm_src->i6ms_mode == MCAST_EXCLUDE) {
-#ifdef MLDV2_DEBUG
-			printf("case 2.2: EX{non-NULL}->IN{NULL}\n");
-#endif
+			mldlog((LOG_DEBUG, "case 2.2: EX{non-NULL}->IN{NULL}\n"));
 			filter = REPORT_FILTER4;
 			in6_clear_all_pending_report(in6m);
 
@@ -853,9 +827,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		}
 
 		/* IN{non NULL} -> IN{NULL} */
-#ifdef MLDV2_DEBUG
-		printf("case 2.3: IN{non-NULL}->IN{NULL}\n");
-#endif
+		mldlog((LOG_DEBUG, "case 2.3: IN{non-NULL}->IN{NULL}\n"));
 		filter = REPORT_FILTER1;
 		LIST_FOREACH(in_ias, in6mm_src->i6ms_cur->head, i6as_list) {
 			error = in6_merge_pending_report(in6m, in_ias,
@@ -882,9 +854,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 	/* Case 3: Source list of EXCLUDE filter is set for this group. */
 	if (IN6M_LIST_EMPTY(in)) {
-#ifdef MLDV2_DEBUG
-		printf("case 3: Source list of EXCLUDE filter is set for this group\n");
-#endif
+		mldlog((LOG_DEBUG, "case 3: Source list of EXCLUDE filter is set for this group\n"));
 		/* IN{NULL} -> EX{non NULL} or EX{NULL} -> EX{non NULL} */
 		if (LIST_EMPTY(in6mm_src->i6ms_cur->head)) {
 			error = in6_copy_msf_source_list(in6mm_src->i6ms_ex,
@@ -895,16 +865,12 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 			i = in6mm_src->i6ms_cur->numsrc;
 			if (in6mm_src->i6ms_mode == MCAST_INCLUDE) {
-#ifdef MLDV2_DEBUG
-				printf("case 3.1:IN{NULL}->EX{non-NULL}\n");
-#endif
+				mldlog((LOG_DEBUG, "case 3.1:IN{NULL}->EX{non-NULL}\n"));
 				filter = REPORT_FILTER3;
 				cmd = CHANGE_TO_EXCLUDE_MODE;
 				in6_clear_all_pending_report(in6m);
 			} else {
-#ifdef MLDV2_DEBUG
-				printf("case 3.2:EX{NULL}->EX{non-NULL}\n");
-#endif
+				mldlog((LOG_DEBUG, "case 3.2:EX{NULL}->EX{non-NULL}\n"));
 				filter = REPORT_FILTER2;
 				cmd = BLOCK_OLD_SOURCES;
 			}
@@ -930,9 +896,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 		/* EX{non NULL} -> EX{non NULL} */
 		if (in6mm_src->i6ms_mode == MCAST_EXCLUDE) {
-#ifdef MLDV2_DEBUG
-			printf("case 3.3:EX{non-NULL}->EX{non-NULL}\n");
-#endif
+			mldlog((LOG_DEBUG, "case 3.3:EX{non-NULL}->EX{non-NULL}\n"));
 			filter = REPORT_FILTER2;
 			error = in6_merge_msf_head(in6m, in6mm_src->i6ms_ex,
 						   in6mm_src->i6ms_excnt, filter);
@@ -954,9 +918,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		}
 
 		/* IN{non NULL} -> EX{non NULL} */
-#ifdef MLDV2_DEBUG
-		printf("case 3.4:IN{non-NULL}->EX{non-NULL}\n");
-#endif
+		mldlog((LOG_DEBUG, "case 3.4:IN{non-NULL}->EX{non-NULL}\n"));
 		filter = REPORT_FILTER3;
 		in6_free_msf_source_list(in6mm_src->i6ms_cur->head);
 		in6mm_src->i6ms_cur->numsrc = 0;
@@ -1004,15 +966,11 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 			i = in6mm_src->i6ms_cur->numsrc;
 			if (in6m->in6m_source->i6ms_mode == MCAST_INCLUDE) {
-#ifdef MLDV2_DEBUG
-				printf("case 4.1:IN{NULL}->IN{non-NULL}\n");
-#endif
+				mldlog((LOG_DEBUG, "case 4.1:IN{NULL}->IN{non-NULL}\n"));
 				filter = REPORT_FILTER1;
 				cmd = ALLOW_NEW_SOURCES;
 			} else {
-#ifdef MLDV2_DEBUG
-				printf("case 4.2:EX{NULL}->IN{non-NULL}\n");
-#endif
+				mldlog((LOG_DEBUG, "case 4.2:EX{NULL}->IN{non-NULL}\n"));
 				filter = REPORT_FILTER4;
 				cmd = CHANGE_TO_INCLUDE_MODE;
 				in6_clear_all_pending_report(in6m);
@@ -1039,9 +997,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 		/* IN{non NULL} -> IN{non NULL} */
 		if (in6mm_src->i6ms_mode == MCAST_INCLUDE) {
-#ifdef MLDV2_DEBUG
-			printf("case 4.3:IN{non NULL}->IN{non-NULL}\n");
-#endif
+			mldlog((LOG_DEBUG, "case 4.3:IN{non NULL}->IN{non-NULL}\n"));
 			filter = REPORT_FILTER1;
 			error = in6_merge_msf_head(in6m, in6mm_src->i6ms_in,
 						   (u_int)0, filter);
@@ -1062,9 +1018,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		}
 
 		/* EX{non NULL} -> IN{non NULL} (since EX list was left) */
-#ifdef MLDV2_DEBUG
-		printf("case 4.4:EX{non NULL}->IN{non-NULL}\n");
-#endif
+		mldlog((LOG_DEBUG, "case 4.4:EX{non NULL}->IN{non-NULL}\n"));
 		filter = REPORT_FILTER4;
 		in6_free_msf_source_list(in6mm_src->i6ms_cur->head);
 		in6mm_src->i6ms_cur->numsrc = 0;
@@ -1100,9 +1054,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 	}
 
 	/* Case 5: INCLUDE and EXCLUDE source lists coexist with this group. */
-#ifdef MLDV2_DEBUG
-	printf("case 5: INCLUDE and EXCLUDE source lists coexist with this group.\n");
-#endif
+	mldlog((LOG_DEBUG, "case 5: INCLUDE and EXCLUDE source lists coexist with this group.\n"));
 	LIST_FIRST(&inhead) = LIST_FIRST(in6mm_src->i6ms_in->head);
 	LIST_FIRST(&exhead) = LIST_FIRST(in6mm_src->i6ms_ex->head);
 	MALLOC(*newhead, struct i6as_head *, sizeof(struct i6as_head),
@@ -1258,9 +1210,7 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 					/* XXX But do we really clear pending
 					 * report? */
 					in6_clear_pending_report(in6m, filter);
-#ifdef MLDV2_DEBUG
-					printf("in6_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+					mldlog((LOG_DEBUG, "in6_merge_msf_head: merge fail for FILTER%d\n", filter));
 					return error;
 				}
 				curias->i6as_refcount = 0;
@@ -1274,9 +1224,7 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 			if (newias == NULL) {
 				in6_undo_new_msf_curhead(in6m, &ias->i6as_addr);
 				in6_clear_pending_report(in6m, filter); /*XXX*/
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_msf_head: malloc fail\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_msf_head: malloc fail\n"));
 				return ENOBUFS;
 			}
 			if (filter == REPORT_FILTER1)
@@ -1288,9 +1236,7 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 			if (error != 0) {
 				in6_undo_new_msf_curhead(in6m, &ias->i6as_addr);
 				in6_clear_pending_report(in6m, filter); /*XXX*/
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_msf_head: merge fail for FILTER%d\n", filter));
 				return error;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1310,9 +1256,7 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 				in6_undo_new_msf_curhead
 						(in6m, &curias->i6as_addr);
 				in6_clear_pending_report(in6m, filter); /*XXX*/
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_msf_head: merge fail for FILTER%d\n", filter));
 				return error;
 			}
 			curias->i6as_refcount = 0;
@@ -1330,9 +1274,7 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 		MALLOC(newias, struct in6_addr_source *, sizeof(*newias),
 		       M_MSFILTER, M_NOWAIT);
 		if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-			printf("in6_merge_msf_head: malloc fail\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_merge_msf_head: malloc fail\n"));
 			in6_undo_new_msf_curhead(in6m, &ias->i6as_addr);
 			in6_clear_pending_report(in6m, filter); /* XXX */
 			return ENOBUFS;
@@ -1346,9 +1288,7 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 		if (error != 0) {
 			in6_undo_new_msf_curhead(in6m, &ias->i6as_addr);
 			in6_clear_pending_report(in6m, filter); /* XXX */
-#ifdef MLDV2_DEBUG
-			printf("in6_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+			mldlog((LOG_DEBUG, "in6_merge_msf_head: merge fail for FILTER%d\n", filter));
 			return error;
 		}
 		bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1444,9 +1384,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 		}
 	} else
 		return EOPNOTSUPP; /* never occured... */
-#ifdef MLDV2_DEBUG
-	printf("in6_merge_msf_state: REPORT_FILTER%d\n", filter);
-#endif
+	mldlog((LOG_DEBUG, "in6_merge_msf_state: REPORT_FILTER%d\n", filter));
 
 	/*
 	 * If some error, e.g., ENOBUFS, will be occured later, State-Change
@@ -1471,7 +1409,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 				error = in6_merge_pending_report
 						(in6m, ias, ALLOW_NEW_SOURCES);
 				if (error != 0) {
-					printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+					mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 					goto giveup;
 				}
 				++chg_flag;
@@ -1484,7 +1422,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 							(in6m, newias,
 							CHANGE_TO_EXCLUDE_MODE);
 					if (error != 0) {
-						printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+						mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 						goto giveup;
 					}
 					++chg_flag;
@@ -1499,7 +1437,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 						(in6m, newias,
 						BLOCK_OLD_SOURCES);
 				if (error != 0) {
-					printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+					mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 					goto giveup;
 				}
 				++chg_flag;
@@ -1508,7 +1446,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 						(in6m, newias,
 						CHANGE_TO_EXCLUDE_MODE);
 				if (error != 0) {
-					printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+					mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 					goto giveup;
 				}
 				++chg_flag;
@@ -1517,7 +1455,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 			break;
 		}
 		if (error) {
-			printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+			mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 			goto giveup;
 		}
 
@@ -1528,7 +1466,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 						(in6m, newias,
 						 BLOCK_OLD_SOURCES);
 				if (error != 0) {
-					printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+					mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 					goto giveup;
 				}
 				++chg_flag;
@@ -1537,7 +1475,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 						(in6m, newias,
 						 CHANGE_TO_EXCLUDE_MODE);
 				if (error != 0) {
-					printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+					mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 					goto giveup;
 				}
 				++chg_flag;
@@ -1545,7 +1483,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 		}
 	}
 	if (error != 0) {
-		printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+		mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 		goto giveup;
 	}
 
@@ -1557,7 +1495,7 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 			error = in6_merge_pending_report
 					(in6m, ias, ALLOW_NEW_SOURCES);
 			if (error != 0) {
-				printf("in6_merge_msf_state: giveup!(line %d)\n", __LINE__);
+				mldlog((LOG_DEBUG, "in6_merge_msf_state: giveup!(line %d)\n", __LINE__));
 				goto giveup;
 			}
 			++chg_flag;
@@ -1618,9 +1556,7 @@ giveup:
 			}
 		}
 	} else {
-#ifdef MLDV2_DEBUG
-		printf("in6_merge_msf_state: Pending source list merge failed. State-Change Report won't be sent.\n");
-#endif
+		mldlog((LOG_DEBUG, "in6_merge_msf_state: Pending source list merge failed. State-Change Report won't be sent.\n"));
 		in6_clear_pending_report(in6m, filter);
 	}
 
@@ -1706,9 +1642,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				/*
 				 * We don't remove i6ms_alw created above,
 				 * since it may be needed to re-create later.
@@ -1727,9 +1661,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1742,9 +1674,7 @@ in6_merge_pending_report(in6m, ias, type)
 						(in6m->in6m_source->i6ms_alw,
 						 &ias->i6as_addr,
 						 IMS_ADD_SOURCE)) < 0) {
-#ifdef MLDV2_DEBUG
-			printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++in6m->in6m_source->i6ms_alw->numsrc;
@@ -1764,9 +1694,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1779,9 +1707,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1794,9 +1720,7 @@ in6_merge_pending_report(in6m, ias, type)
 						(in6m->in6m_source->i6ms_blk,
 						 &ias->i6as_addr,
 						 IMS_ADD_SOURCE)) < 0) {
-#ifdef MLDV2_DEBUG
-			printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++in6m->in6m_source->i6ms_blk->numsrc;
@@ -1813,9 +1737,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1828,9 +1750,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1843,9 +1763,7 @@ in6_merge_pending_report(in6m, ias, type)
 						(in6m->in6m_source->i6ms_toin,
 						 &ias->i6as_addr,
 						 IMS_ADD_SOURCE)) < 0) {
-#ifdef MLDV2_DEBUG
-			printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++in6m->in6m_source->i6ms_toin->numsrc;
@@ -1859,9 +1777,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1874,9 +1790,7 @@ in6_merge_pending_report(in6m, ias, type)
 			MALLOC(newias, struct in6_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-				printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+				mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(&ias->i6as_addr, &newias->i6as_addr,
@@ -1889,9 +1803,7 @@ in6_merge_pending_report(in6m, ias, type)
 						(in6m->in6m_source->i6ms_toex,
 						 &ias->i6as_addr,
 						 IMS_ADD_SOURCE)) < 0) {
-#ifdef MLDV2_DEBUG
-			printf("in6_merge_pending_report: ENOBUFS\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++in6m->in6m_source->i6ms_toex->numsrc;
@@ -1926,9 +1838,7 @@ in6_copy_msf_source_list(iasl, newiasl, refcount)
 		if (newias == NULL) {
 			in6_free_msf_source_list(newiasl->head);
 			newiasl->numsrc = 0;
-#ifdef MLDV2_DEBUG
-			printf("in6_copy_msf_source_list: ENOBUFS\n");
-#endif
+			mldlog((LOG_DEBUG, "in6_copy_msf_source_list: ENOBUFS\n"));
 			return ENOBUFS;
 		}
 		if (LIST_EMPTY(newiasl->head)) {
@@ -2084,10 +1994,8 @@ in6_merge_msf_source_addr(iasl, src, req)
 
 		/* here's the place to insert the source address entry */
 		if (req != IMS_ADD_SOURCE) {
-#ifdef MLDV2_DEBUG
-			printf("in_merge_msf_source_addr: %s cannot be deleted!?\n",
-			       ip6_sprintf(SIN6_ADDR(src)));
-#endif
+			mldlog((LOG_DEBUG, "in_merge_msf_source_addr: %s cannot be deleted!?\n",
+			       ip6_sprintf(SIN6_ADDR(src))));
 			return -1;
 		}
 		MALLOC(newias, struct in6_addr_source *,
@@ -2105,17 +2013,13 @@ in6_merge_msf_source_addr(iasl, src, req)
 	 * as there's no source address at all.
 	 */
 	if (req != IMS_ADD_SOURCE) {
-#ifdef MLDV2_DEBUG
-		printf("in6_merge_msf_source_addr: source address cannot be deleted? (really occurs?)\n");
-#endif
+		mldlog((LOG_DEBUG, "in6_merge_msf_source_addr: source address cannot be deleted? (really occurs?)\n"));
 		return -1;
 	}
 	MALLOC(newias, struct in6_addr_source *,
 		sizeof(*newias), M_MSFILTER, M_NOWAIT);
 	if (newias == NULL) {
-#ifdef MLDV2_DEBUG
-		printf("in_merge_msf_source_addr: %s cannot be deleted!?\n", ip6_sprintf(SIN6_ADDR(src)));
-#endif
+		mldlog((LOG_DEBUG, "in_merge_msf_source_addr: %s cannot be deleted!?\n", ip6_sprintf(SIN6_ADDR(src))));
 		return -1;
 	}
 
@@ -2163,17 +2067,13 @@ sock6_setmopt_srcfilter(sop, grpfp)
 
 	error = copyin((void *)*grpfp, (void *)&ogrpf, GROUP_FILTER_SIZE(0));
 	if (error != 0) {
-#ifdef MLDV2_DEBUG
-		printf("sock6_setmopt_srcfilter: copyin error.\n");
-#endif
+		mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: copyin error.\n"));
 		return error;
 	}
 	grpf = &ogrpf;
 
 	if (grpf->gf_numsrc >= mldsomaxsrc) {
-#ifdef MLDV2_DEBUG
-		printf("sock6_setmopt_srcfilter: the number of sources is reached to max count.\n");
-#endif
+		mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: the number of sources is reached to max count.\n"));
 		return EINVAL;
 	}
 	if (grpf->gf_group.ss_family != AF_INET &&
@@ -2470,7 +2370,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			in6_delmulti(imm->i6mm_maddr, &error, 0, NULL,
 				     MCAST_EXCLUDE, final);
 			if (error != 0) {
-				printf("sock6_setmopt_srcfilter: error must be 0! panic!\n");
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: error must be 0! panic!\n"));
 				splx(s);
 				return error;
 			}
@@ -2478,9 +2378,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			in6_delmulti(imm->i6mm_maddr, &error, old_num,
 				     old_ss, old_mode, final);
 			if (error != 0) {
-#ifdef MLDV2_DEBUG
-				printf("sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> IN{NULL}\n", error);
-#endif
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> IN{NULL}\n", error));
 				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				if (old_num != 0)
 					FREE(old_ss, M_IPMOPTS);
@@ -2501,9 +2399,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 					     0, NULL, MCAST_EXCLUDE, init);
 		}
 		if (error != 0) {
-#ifdef MLDV2_DEBUG
-			printf("sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> EX{NULL} or IN{NULL} -> EX{NULL}\n", error);
-#endif
+			mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> EX{NULL} or IN{NULL} -> EX{NULL}\n", error));
 			in6_undomopt_source_list(msf, grpf->gf_fmode);
 			if (old_num != 0)
 				FREE(old_ss, M_IPMOPTS);
@@ -2518,16 +2414,14 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	} else {
 		if (add_num == 0) { /* only delete some sources */
 			if (imm == NULL) {
-				printf("sock6_setmopt_srcfilter: NULL pointer?\n");
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: NULL pointer?\n"));
 				splx(s);
 				return EOPNOTSUPP;
 			}
 			in6_delmulti(imm->i6mm_maddr, &error, old_num,
 				     old_ss, old_mode, final);
 			if (error != 0) {
-#ifdef MLDV2_DEBUG
-				printf("sock6_setmopt_srcfilter: in6_delmulti retuned error=%d. undo.\n", error);
-#endif
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: in6_delmulti retuned error=%d. undo.\n", error));
 				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				FREE(old_ss, M_IPMOPTS);
 				if (ss_src != NULL)
@@ -2543,9 +2437,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 					     old_ss, old_mode, init,
 					     msf->msf_grpjoin);
 			if (error != 0) {
-#ifdef MLDV2_DEBUG
-				printf("sock6_setmopt_srcfilter: in6_modmulti returned error=%d. undo.\n", error);
-#endif
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: in6_modmulti returned error=%d. undo.\n", error));
 				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				if (old_num != 0)
 					FREE(old_ss, M_IPMOPTS);
@@ -2652,9 +2544,7 @@ sock6_getmopt_srcfilter(sop, grpfp)
 
 	if ((error = copyin((void *)*grpfp, (void *)&ogrpf,
 			GROUP_FILTER_SIZE(0))) != 0) {
-#ifdef MLDV2_DEBUG
-		printf("sock6_getmopt_srcfilter: copyin error.\n");
-#endif
+		mldlog((LOG_DEBUG, "sock6_getmopt_srcfilter: copyin error.\n"));
 		return error;
 	} else
 		grpf = &ogrpf;
