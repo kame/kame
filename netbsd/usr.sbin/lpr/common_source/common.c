@@ -1,4 +1,4 @@
-/*	$NetBSD: common.c,v 1.14 1998/07/09 18:35:35 msaitoh Exp $	*/
+/*	$NetBSD: common.c,v 1.20.4.1 2001/04/26 08:12:47 he Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -43,7 +43,7 @@
 #if 0
 static char sccsid[] = "@(#)common.c	8.5 (Berkeley) 4/28/95";
 #else
-__RCSID("$NetBSD: common.c,v 1.14 1998/07/09 18:35:35 msaitoh Exp $");
+__RCSID("$NetBSD: common.c,v 1.20.4.1 2001/04/26 08:12:47 he Exp $");
 #endif
 #endif /* not lint */
 
@@ -112,14 +112,7 @@ long	 XC;		/* flags to clear for local mode */
 long	 XS;		/* flags to set for local mode */
 
 char	line[BUFSIZ];
-char	*bp;		/* pointer into printcap buffer. */
-char	*name;		/* program name */
-char	*printer;	/* printer name */
-			/* host machine name */
-char	host[MAXHOSTNAMELEN + 1];
-char	*from = host;	/* client's machine name */
 int	remote;		/* true if sending files to a remote host */
-char	*printcapdb[2] = { _PATH_PRINTCAP, 0 };
 
 extern uid_t	uid, euid;
 
@@ -136,9 +129,9 @@ getport(rhost, rport)
 	int rport;
 {
 	struct addrinfo hints, *res, *r;
-	int lport = IPPORT_RESERVEDMAX;
-	int error, s;
-	int timo = 1;
+	u_int timo = 1;
+	int s, lport = IPPORT_RESERVED - 1;
+	int error;
 	int refuse, trial;
 	char pbuf[NI_MAXSERV];
 
@@ -156,7 +149,7 @@ getport(rhost, rport)
 		snprintf(pbuf, sizeof(pbuf), "printer");
 	error = getaddrinfo(rhost, pbuf, &hints, &res);
 	if (error)
-		fatal(gai_strerror(error));
+		fatal("printer/tcp: %s", gai_strerror(error));
 
 	/*
 	 * Try connecting to the server.
@@ -171,7 +164,7 @@ retryport:
 		s = rresvport_af(&lport, r->ai_family);
 		seteuid(uid);
 		if (s < 0)
-			continue;
+			return(-1);
 		if (connect(s, r->ai_addr, r->ai_addrlen) < 0) {
 			error = errno;
 			(void)close(s);
@@ -238,20 +231,21 @@ getq(namelist)
 	struct queue *q, **queue;
 	struct stat stbuf;
 	DIR *dirp;
-	int nitems, arraysz;
+	u_int nitems, arraysz;
 
 	seteuid(euid);
-	if ((dirp = opendir(SD)) == NULL)
+	dirp = opendir(SD);
+	seteuid(uid);
+	if (dirp == NULL)
 		return(-1);
 	if (fstat(dirp->dd_fd, &stbuf) < 0)
 		goto errdone;
-	seteuid(uid);
 
 	/*
 	 * Estimate the array size by taking the size of the directory file
 	 * and dividing it by a multiple of the minimum size entry. 
 	 */
-	arraysz = (stbuf.st_size / 24);
+	arraysz = (int)(stbuf.st_size / 24);
 	queue = (struct queue **)malloc(arraysz * sizeof(struct queue *));
 	if (queue == NULL)
 		goto errdone;
@@ -261,8 +255,10 @@ getq(namelist)
 		if (d->d_name[0] != 'c' || d->d_name[1] != 'f')
 			continue;	/* daemon control files only */
 		seteuid(euid);
-		if (stat(d->d_name, &stbuf) < 0)
+		if (stat(d->d_name, &stbuf) < 0) {
+			seteuid(uid);
 			continue;	/* Doesn't exist */
+		}
 		seteuid(uid);
 		q = (struct queue *)malloc(sizeof(time_t)+strlen(d->d_name)+1);
 		if (q == NULL)
@@ -275,7 +271,7 @@ getq(namelist)
 		 */
 		if (++nitems > arraysz) {
 			arraysz *= 2;
-			queue = (struct queue **)realloc((char *)queue,
+			queue = (struct queue **)realloc(queue,
 				arraysz * sizeof(struct queue *));
 			if (queue == NULL)
 				goto errdone;
@@ -316,7 +312,7 @@ compar(p1, p2)
 char *
 checkremote()
 {
-	char name[MAXHOSTNAMELEN + 1];
+	char hname[NI_MAXHOST];
 	struct addrinfo hints, *res;
 	static char errbuf[128];
 	int error;
@@ -324,39 +320,40 @@ checkremote()
 	remote = 0;	/* assume printer is local */
 	if (RM != NULL) {
 		/* get the official name of the local host */
-		gethostname(name, sizeof(name));
-		name[sizeof(name)-1] = '\0';
+		gethostname(hname, sizeof(hname));
+		hname[sizeof(hname)-1] = '\0';
 
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_flags = AI_CANONNAME;
-		hints.ai_family = AF_UNSPEC;
+		hints.ai_family = PF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 		res = NULL;
-		error = getaddrinfo(name, NULL, &hints, &res);
+		error = getaddrinfo(hname, NULL, &hints, &res);
 		if (error || !res->ai_canonname) {
 			(void)snprintf(errbuf, sizeof(errbuf),
-				"unable to get official name for local machine %s: %s",
-				name, gai_strerror(error));
+			    "unable to get official name for local machine %s: "
+			    "%s", hname, gai_strerror(error));
 			if (res)
 				freeaddrinfo(res);
 			return errbuf;
 		} else {
-			strncpy(name, res->ai_canonname, sizeof(name) - 1);
-			name[sizeof(name) - 1] = '\0';
-			freeaddrinfo(res);
+			(void)strncpy(hname, res->ai_canonname,
+			    sizeof(hname) - 1);
+			hname[sizeof(hname) - 1] = '\0';
 		}
-  
+		freeaddrinfo(res);
+
 		/* get the official name of RM */
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_flags = AI_CANONNAME;
-		hints.ai_family = AF_UNSPEC;
+		hints.ai_family = PF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 		res = NULL;
 		error = getaddrinfo(RM, NULL, &hints, &res);
 		if (error || !res->ai_canonname) {
 			(void)snprintf(errbuf, sizeof(errbuf),
-				"unable to get official name for local machine %s: %s",
-				RM, gai_strerror(error));
+			    "unable to get official name for local machine %s: "
+			    "%s", RM, gai_strerror(error));
 			if (res)
 				freeaddrinfo(res);
 			return errbuf;
@@ -366,7 +363,7 @@ checkremote()
 		 * if the two hosts are not the same,
 		 * then the printer must be remote.
 		 */
-		if (strcasecmp(name, res->ai_canonname) != 0)
+		if (strcasecmp(hname, res->ai_canonname) != 0)
 			remote = 1;
 
 		freeaddrinfo(res);
@@ -386,36 +383,4 @@ delay(n)
 	tdelay.tv_sec = n / 1000;
 	tdelay.tv_usec = n * 1000 % 1000000;
 	(void) select(0, (fd_set *)0, (fd_set *)0, (fd_set *)0, &tdelay);
-}
-
-#ifdef __STDC__
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
-
-void
-#ifdef __STDC__
-fatal(const char *msg, ...)
-#else
-fatal(msg, va_alist)
-	char *msg;
-        va_dcl
-#endif
-{
-	va_list ap;
-#ifdef __STDC__
-	va_start(ap, msg);
-#else
-	va_start(ap);
-#endif
-	if (from != host)
-		(void)printf("%s: ", host);
-	(void)printf("%s: ", name);
-	if (printer)
-		(void)printf("%s: ", printer);
-	(void)vprintf(msg, ap);
-	va_end(ap);
-	(void)putchar('\n');
-	exit(1);
 }
