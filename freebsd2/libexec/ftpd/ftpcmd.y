@@ -316,6 +316,12 @@ cmd
 			if (i)
 				goto parsefail;
 			memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
+			if (his_addr.su_family == AF_INET6
+			 && data_dest.su_family == AF_INET6) {
+				/* XXX more sanity checks! */
+				data_dest.su_sin6.sin6_scope_id =
+					his_addr.su_sin6.sin6_scope_id;
+			}
 			free(tmp);
 			tmp = NULL;
 
@@ -835,8 +841,14 @@ host_long_port
 			p[0] = $15; p[1] = $17;
 			a = (char *)&data_dest.su_sin.sin_addr;
 			a[0] =  $5;  a[1] =  $7;  a[2] =  $9;  a[3] = $11;
-			if ($1 != 4 || $3 != 4 || $13 != 2)
+			if ($1 != 4 || $3 != 4 || $13 != 2) {
 				memset(&data_dest, 0, sizeof(data_dest));
+				if (his_addr.su_family == AF_INET6) {
+					/* XXX more sanity checks! */
+					data_dest.su_sin6.sin6_scope_id =
+						his_addr.su_sin6.sin6_scope_id;
+				}
+			}
 		}
 	;
 

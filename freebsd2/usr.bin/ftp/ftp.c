@@ -1132,6 +1132,12 @@ initconn()
 	u_int pal, prt[2];
 	char *pasvcmd;
 
+	if (myctladdr.su_family == AF_INET6
+	 && (IN6_IS_ADDR_LINKLOCAL(&myctladdr.su_sin6.sin6_addr)
+	  || IN6_IS_ADDR_SITELOCAL(&myctladdr.su_sin6.sin6_addr))) {
+		warnx("use of scoped address can be troublesome");
+	}
+
 	if (passivemode) {
 		data_addr = myctladdr;
 		data = socket(data_addr.su_family, SOCK_STREAM, 0);
