@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.147 2002/11/01 03:31:30 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.148 2002/11/01 09:35:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -635,7 +635,9 @@ mip6_bu_timeout(arg)
 					 * the home registration
 					 * should not be removed.
 					 */
-					mip6_home_registration2(mbu);
+					mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_RETRANS_TIMER,
+					    NULL);
 				} else {
 					error = mip6_bu_list_remove(
 						&sc->hif_bu_list, mbu);
@@ -3020,7 +3022,7 @@ mip6_route_optimize(m)
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 #endif
 	}
-	mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_MOVEMENT, NULL);
+	mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET, NULL);
 
 	return (0);
  bad:

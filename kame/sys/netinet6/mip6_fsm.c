@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.15 2002/11/01 05:57:36 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.16 2002/11/01 09:35:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -169,6 +169,25 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 			break;
 
+		case MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET:
+			/*
+			 * Start RR.
+			 */
+			error = mip6_bu_sec_fsm(mbu,
+			    MIP6_BU_SEC_FSM_EVENT_START_RR,
+			    data);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "secondary fsm transition failed.\n",
+				    __FILE__, __LINE__, error));
+				return (error);
+			}
+
+			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRINIT;
+
+			break;
+
 		case MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB:
 			/*
 			 * Stop timers.
@@ -293,6 +312,25 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
+
+			break;
+
+		case MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET:
+			/*
+			 * Start RR.
+			 */
+			error = mip6_bu_sec_fsm(mbu,
+			    MIP6_BU_SEC_FSM_EVENT_START_RR,
+			    data);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "secondary fsm transition failed.\n",
+				    __FILE__, __LINE__, error));
+				return (error);
+			}
+
+			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRINIT;
 
 			break;
 
@@ -439,6 +477,25 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRDEL;
+
+			break;
+
+		case MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET:
+			/*
+			 * Start RR.
+			 */
+			error = mip6_bu_sec_fsm(mbu,
+			    MIP6_BU_SEC_FSM_EVENT_START_RR,
+			    data);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "secondary fsm transition failed.\n",
+				    __FILE__, __LINE__, error));
+				return (error);
+			}
+
+			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRREDO;
 
 			break;
 
@@ -647,6 +704,25 @@ mip6_bu_pri_fsm(mbu, event, data)
 				    = MIP6_BU_PRI_FSM_STATE_RRDEL;
 			}
 			break;
+
+		case MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET:
+			/*
+			 * Start RR.
+			 */
+			error = mip6_bu_sec_fsm(mbu,
+			    MIP6_BU_SEC_FSM_EVENT_START_RR,
+			    data);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "secondary fsm transition failed.\n",
+				    __FILE__, __LINE__, error));
+				return (error);
+			}
+
+			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRINIT;
+
+			break;
 		}
 		break;
 
@@ -829,6 +905,25 @@ mip6_bu_pri_fsm(mbu, event, data)
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_RRDEL;
 			}
+			break;
+
+		case MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET:
+			/*
+			 * Start RR.
+			 */
+			error = mip6_bu_sec_fsm(mbu,
+			    MIP6_BU_SEC_FSM_EVENT_START_RR,
+			    data);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "secondary fsm transition failed.\n",
+				    __FILE__, __LINE__, error));
+				return (error);
+			}
+
+			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRREDO;
+
 			break;
 		}
 		break;
@@ -1174,6 +1269,25 @@ mip6_bu_pri_fsm(mbu, event, data)
 				*mbu_pri_fsm_state
 				    = MIP6_BU_PRI_FSM_STATE_RRDEL;
 			}
+			break;
+
+		case MIP6_BU_PRI_FSM_EVENT_REVERSE_PACKET:
+			/*
+			 * Start RR.
+			 */
+			error = mip6_bu_sec_fsm(mbu,
+			    MIP6_BU_SEC_FSM_EVENT_START_RR,
+			    data);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "secondary fsm transition failed.\n",
+				    __FILE__, __LINE__, error));
+				return (error);
+			}
+
+			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_RRREDO;
+
 			break;
 
 		case MIP6_BU_PRI_FSM_EVENT_REFRESH_TIMER:
