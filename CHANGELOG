@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2135 2002/04/24 02:37:56 jinmei Exp $
+$KAME: CHANGELOG,v 1.2136 2002/04/24 07:49:00 jinmei Exp $
 
 <200204>
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c (main): changed the behaivor of the -m
+	option as follows:
+	  - when the option is specified once, the default behavior (send
+	    packets at the minimum MTU) will be disabled for unicast
+	    packets.
+	  - when the option is more than once, it will be disabled for both
+	    unicast and multicast packets.
+
 2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (ifinfo): used the new member of the
 	nd_ifinfo structure (see the next log entry) to see if the
