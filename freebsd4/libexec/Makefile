@@ -1,3 +1,3 @@
-SUBDIR+=tftpd
+SUBDIR+=
 
 .include <bsd.subdir.mk>
