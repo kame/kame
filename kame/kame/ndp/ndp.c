@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.105 2004/01/08 06:50:37 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.106 2004/02/03 10:15:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1085,9 +1085,20 @@ rtrlist()
 	ep = (struct in6_defrouter *)(buf + l);
 	for (p = (struct in6_defrouter *)buf; p < ep; p++) {
 		int rtpref;
+		struct sockaddr_in6 rtaddr;
 
-		if (getnameinfo((struct sockaddr *)&p->rtaddr,
-		    p->rtaddr.sin6_len, host_buf, sizeof(host_buf), NULL, 0,
+		bzero(&rtaddr, sizeof(rtaddr));
+		rtaddr.sin6_len = sizeof(rtaddr);
+		rtaddr.sin6_addr = p->rtaddr;
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(&p->rtaddr)) {
+			rtaddr.sin6_scope_id =
+			    ntohs(*(u_int16_t *)&p->rtaddr.s6_addr[2]);
+			*(u_int16_t *)&p->rtaddr.s6_addr[2] = 0;
+		}
+#endif
+		if (getnameinfo((struct sockaddr *)&rtaddr.sin6_addr,
+		    rtaddr.sin6_len, host_buf, sizeof(host_buf), NULL, 0,
 		    (nflag ? NI_NUMERICHOST : 0)) != 0)
 			strlcpy(host_buf, "?", sizeof(host_buf));
 
