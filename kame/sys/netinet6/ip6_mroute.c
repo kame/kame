@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.35 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.36 2000/12/22 09:41:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1511,6 +1511,7 @@ ip6_mdq(m, ifp, rt)
 				case MRT6_INIT:
 					im = mtod(mm, struct mrt6msg *);
 					im->im6_msgtype = MRT6MSG_WRONGMIF;
+					im->im6_mbz = 0;
 					break;
 				default:
 					m_freem(mm);
