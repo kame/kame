@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.848 2000/05/01 10:39:01 itojun Exp $
+$Id: CHANGELOG,v 1.849 2000/05/04 04:11:13 itojun Exp $
 
 <200005>
+Thu May  4 13:10:16 JST 2000  itojun@iijlab.net
+	* openbsd/lib/libinet6/getaddrinfo.c: translate resolver error codes
+	  in h_errno into getaddrinfo error code.  without this, EAI_FAIL
+	  is always returned and it made no sense.
+	  From: deraadt@openbsd.org
+
 Mon May  1 19:38:32 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/5/1 weekly snap.
 
