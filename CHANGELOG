@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2610 2004/05/23 16:13:32 suz Exp $
+$KAME: CHANGELOG,v 1.2611 2004/05/26 03:01:47 itojun Exp $
 
 <200405>
+Wed May 26 11:58:56 JST 2004 itojun@iijlab.net
+	* sys/netkey/keysock.c: support tons of pfkey messages generated
+	  at once.  used only for DUMP and SPDDUMP only.
+	
 2004-05-23  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/mld6v2_proto.c: don't send MLDv1 Query even 
 	  in MLDv1-compat mode to prevent MLDv2 hosts from unnecessarily 
