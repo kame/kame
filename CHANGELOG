@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.641 2000/03/01 07:08:39 itojun Exp $
+$Id: CHANGELOG,v 1.642 2000/03/01 09:37:05 sumikawa Exp $
 
 <200003>
+Wed Mar  1 18:36:27 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/emacs: upgrade to 20.6.
+
 Wed Mar  1 12:38:07 JST 2000  itojun@iijlab.net
 	* libpcap/gencode.c: fix "ip host foo" or "ip6 host foo" where foo has
 	  both A and AAAA.  From: Bill Fenner, FreeBSD PR: 17083
