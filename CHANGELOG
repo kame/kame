@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.52 1999/08/24 09:23:24 itojun Exp $
+$Id: CHANGELOG,v 1.53 1999/08/24 09:30:01 itojun Exp $
 
 <199908>
 Tue Aug 24 18:19:19 JST 1999  itojun@iijlb.net
@@ -10,8 +10,8 @@ Tue Aug 24 18:19:19 JST 1999  itojun@iijlb.net
 	  to nuke all assockated syn cache entries when listening socket
 	  goes away.
 	  
-	  NOTE: On 4.4BSD, it was able to run SYN-SYNACK-ACK handshake even if
-	  listening socket goes away in the middle (as sonewconn is called
+	  NOTE: On 4.4BSD, it was possible to run SYN-SYNACK-ACK handshake even
+	  if listening socket goes away in the middle (as sonewconn is called
 	  right after SYN reception).  After introduction of syn cache,
 	  the behavior was changed (if listening socket goes away in the
 	  middle, no negotiation will be successful).
