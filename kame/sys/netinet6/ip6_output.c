@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.375 2003/06/20 12:54:43 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.376 2003/06/20 15:29:05 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4850,9 +4850,6 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		opt->ip6po_prefer_tempaddr = preftemp;
 		break;
 
-#if 0
-	case IPV6_REACHCONF:	/* obsolete */
-#endif
 	default:
 		return (ENOPROTOOPT);
 	} /* end of switch */
