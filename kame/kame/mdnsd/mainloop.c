@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.32 2000/05/31 17:20:27 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.33 2000/05/31 17:27:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -496,25 +496,30 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 				continue;
 			if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr))
 				continue;
-#if 1
+
 			/* XXX be careful about scope issue! */
-			if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))
-				continue;
-#endif
+			if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
+				if (!lflag)
+					continue;
+				if (strcmp(ifa->ifa_name, intface) != 0)
+					continue;
+			}
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+				if (!lflag)
+					continue;
+				if (strcmp(ifa->ifa_name, intface) != 0)
+					continue;
+
 				in6 = sin6->sin6_addr;
 				if (*(u_int16_t *)&in6.s6_addr[2])
 					in6.s6_addr[2] = in6.s6_addr[3] = 0;
 				alen = sizeof(in6);
 				abuf = (char *)&in6;
-#if 1
-				/* XXX be careful about scope issue! */
-				continue;
-#endif
 			} else {
 				alen = sizeof(sin6->sin6_addr);
 				abuf = (char *)&sin6->sin6_addr;
 			}
+
 			ntype = T_AAAA;
 			nclass = C_IN;
 			break;

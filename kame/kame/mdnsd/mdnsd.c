@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.21 2000/05/31 16:56:21 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.22 2000/05/31 17:27:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -65,6 +65,7 @@ static int mcasthops = 1;
 static int mcastloop = 0;
 int dflag = 0;
 int fflag = 0;
+int lflag = 0;
 struct timeval hz = { 1, 0 };	/* timeout every 1 second */
 static int mflag;
 #ifdef NI_WITHSCOPEID
@@ -92,7 +93,7 @@ main(argc, argv)
 	struct sockdb *sd;
 	int nsock;
 
-	while ((ch = getopt(argc, argv, "46d:Dfh:i:mp:P:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46d:Dfh:i:lmp:P:")) != EOF) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -117,7 +118,14 @@ main(argc, argv)
 			hostname = optarg;
 			break;
 		case 'i':
+			if (if_nametoindex(optarg) == 0) {
+				errx(1, "%s: invalid interface", optarg);
+				/*NOTREACHED*/
+			}
 			intface = optarg;
+			break;
+		case 'l':
+			lflag++;
 			break;
 		case 'm':
 			mflag++;
@@ -253,7 +261,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-"usage: mdnsd [-46Dfm] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
+"usage: mdnsd [-46Dflm] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
 "             -i iface [userv...]\n");
 }
 

@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.17 2000/05/31 17:20:27 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.18 2000/05/31 17:27:11 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -37,7 +37,7 @@
 .Sh SYNOPSIS
 .Nm mdnsd
 .Bk -words
-.Op Fl 46Dfm
+.Op Fl 46Dflm
 .Ek
 .Bk -words
 .Op Fl d Ar dnsserv
@@ -118,6 +118,10 @@ will be used.
 .Ar intface
 specifies outgoing interface for multicast queries.
 The flag is mandatory.
+.It Fl l
+Advertise scoped addresses on replies.
+Care must be taken if you enable it,
+scoped address and DNS are not really friendly.
 .It Fl m
 Be compatible with
 .Dq mediator
