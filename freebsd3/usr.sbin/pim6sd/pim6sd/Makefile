@@ -43,6 +43,7 @@ DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 LDADD+=	-ll -ly
 DPADD+=	${LIBL} ${LIBY}
 
+MAN1=	pim6stat.1
 MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
 
