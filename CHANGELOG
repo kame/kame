@@ -1,12 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.646 2000/03/02 07:45:33 itojun Exp $
+$Id: CHANGELOG,v 1.647 2000/03/02 07:46:08 itojun Exp $
 
 <200003>
 Thu Mar  2 16:44:18 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6.c: for IPv6 address, don't configure broadcast
 	  address (ifa_dstaddr) in ifaddr structure.  this is to avoid
 	  returning broadcast addresses via routing socket.
+	  From: Hideaki YOSHIFUJI <yoshfuji@ecei.tohoku.ac.jp>
 
 2000-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ifmcstat/ifmcstat.c (ifname): corrected invalid access
