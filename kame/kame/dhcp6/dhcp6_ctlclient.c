@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctlclient.c,v 1.2 2004/09/07 04:37:13 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctlclient.c,v 1.3 2004/09/07 04:47:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -457,6 +457,11 @@ make_start_command(argc, argv, bpp, lenp)
 		return (-1);
 	}
 
+	if (ctltype != CTLCLIENT) {
+		warnx("client-only command is specified for a server");
+		return (-1);
+	}
+
 	if (strcmp(argv[0], "interface") == 0) {
 		if (put32(bpp, lenp, DHCP6CTL_INTERFACE))
 			goto fail;
@@ -487,6 +492,11 @@ make_stop_command(argc, argv, bpp, lenp)
 
 	if (argc == 0)
 		return (0);
+
+	if (ctltype != CTLCLIENT) {
+		warnx("client-only command is specified for a server");
+		return (-1);
+	}
 
 	if (strcmp(argv[0], "interface") == 0) {
 		if (put32(bpp, lenp, DHCP6CTL_INTERFACE))
