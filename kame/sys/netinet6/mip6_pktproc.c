@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.109 2003/02/24 02:57:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.110 2003/02/24 11:24:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -937,12 +937,15 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		u_int8_t key_bm[MIP6_KBM_LEN];
 		u_int8_t authdata[MIP6_AUTHENTICATOR_LEN];
 		u_int16_t cksum_backup;
+		int ignore_co_nonce;
+		ignore_co_nonce = SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, &mbu->mbu_coa);
 
 		cksum_backup = ip6ma->ip6ma_cksum;
 		ip6ma->ip6ma_cksum = 0;
 		/* Calculate Kbm */
 		mip6_calculate_kbm(&mbu->mbu_home_token,
-				   &mbu->mbu_careof_token, key_bm);
+				   ignore_co_nonce ? NULL : &mbu->mbu_careof_token,
+				   key_bm);
 		/* Calculate Authenticator */
 		mip6_calculate_authenticator(key_bm, authdata,
 			&mbu->mbu_coa.sin6_addr, &ip6->ip6_dst,
@@ -1494,7 +1497,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int ip6mu_size, pad;
 	int bu_size = 0, nonce_size = 0, auth_size = 0;
 	struct mip6_bu *mbu, *hrmbu;
-	int need_rr = 0;
+	int need_rr = 0, ignore_co_nonce = 0;
 	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -1596,9 +1599,7 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		/* this binding update is for home un-registration. */
 		ip6mu->ip6mu_lifetime = 0;
 		if (need_rr) {
-			mbu->mbu_careof_nonce_index = mbu->mbu_home_nonce_index;
-			bcopy(&mbu->mbu_home_token, &mbu->mbu_careof_token,
-			      sizeof(mbu->mbu_careof_token));
+			ignore_co_nonce = 1;
 		}
 	} else {
 		struct mip6_prefix *mpfx;
@@ -1656,8 +1657,10 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
 		SET_NETVAL_S(&mopt_nonce->ip6mon_home_nonce_index,
 			     mbu->mbu_home_nonce_index);
-		SET_NETVAL_S(&mopt_nonce->ip6mon_careof_nonce_index,
-			     mbu->mbu_careof_nonce_index);
+		if (!ignore_co_nonce) {
+			SET_NETVAL_S(&mopt_nonce->ip6mon_careof_nonce_index,
+				     mbu->mbu_careof_nonce_index);
+		}
 
 		/* Auth. data */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
@@ -1675,7 +1678,9 @@ mip6_hexdump("MN: Home keygen token: ", sizeof(mbu->mbu_home_token), (caddr_t)&m
 mip6_hexdump("MN: Care-of keygen token: ", sizeof(mbu->mbu_careof_token), (caddr_t)&mbu->mbu_careof_token);
 #endif
 		/* Calculate Kbm */
-		mip6_calculate_kbm(&mbu->mbu_home_token, &mbu->mbu_careof_token, key_bm);
+		mip6_calculate_kbm(&mbu->mbu_home_token,
+				   ignore_co_nonce ? NULL : &mbu->mbu_careof_token,
+				   key_bm);
 #ifdef RR_DBG
 mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 #endif
