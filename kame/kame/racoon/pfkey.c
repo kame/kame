@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.89 2000/11/08 17:56:23 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.90 2000/11/15 08:04:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1963,8 +1963,10 @@ pk_checkalg(class, calg, keylen)
 		sup = SADB_EXT_SUPPORTED_AUTH;
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
-		plog(logp, LOCATION, NULL,
-			"WARNING: compression algorithm can not be checked.\n");
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"WARNING: compression algorithm "
+				"can not be checked.\n"));
 		return 0;
 	default:
 		plog(logp, LOCATION, NULL, "ERROR: invalid algorithm class.\n");
