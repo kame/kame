@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.95 2002/06/03 03:26:11 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.96 2002/06/03 03:30:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -598,9 +598,9 @@ dump(addr, cflag)
 
 	/* Print header */
 	if (!tflag && !cflag)
-		printf("%-*.*s %-*.*s %*.*s %-9.9s %1s %4s\n",
+		printf("%-*.*s %-*.*s %*.*s %-9.9s %1s %5s\n",
 		    W_ADDR, W_ADDR, "Neighbor", W_LL, W_LL, "Linklayer Address",
-		    W_IF, W_IF, "Netif", "Expire", "S", "Flgs");
+		    W_IF, W_IF, "Netif", "Expire", "S", "Flags");
 
 again:;
 	mib[0] = CTL_NET;
@@ -663,8 +663,7 @@ again:;
 #endif
 		}
 		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
-			    sizeof(host_buf), NULL, 0,
-			    (nflag ? NI_NUMERICHOST : 0));
+		    sizeof(host_buf), NULL, 0, (nflag ? NI_NUMERICHOST : 0));
 		if (cflag) {
 #ifdef RTF_WASCLONED
 			if (rtm->rtm_flags & RTF_WASCLONED)
