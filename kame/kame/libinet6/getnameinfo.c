@@ -236,7 +236,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			if (flags & NI_WITHSCOPEID)
 #endif /* !ALWAYS_WITHSCOPE */
 			{
-				char scopebuf[MAXHOSTNAMELEN], *s;
+				char scopebuf[MAXHOSTNAMELEN];
 				int scopelen;
 
 				/* ip6_sa2str never fails */
@@ -341,6 +341,6 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	}
 
 	/* last resort */
-	return(snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id));
+	return(snprintf(buf, bufsiz, "%u", sa6->sin6_scope_id));
 }
 #endif 
