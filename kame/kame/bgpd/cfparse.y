@@ -1570,7 +1570,6 @@ aggr_proto_config(attr, aggregated)
 	struct ifinfo *ifp;
 	struct sockaddr_in6 *peeraddr;
 	int peeras;
-	struct rtproto *rtp = NULL;
 	struct rpcb *asp = NULL, *bnp;
 
 	proto = (struct yy_rtproto *)attr->attru.data;
@@ -1586,9 +1585,6 @@ aggr_proto_config(attr, aggregated)
 			      proto->rtpu.ifname);
 			return(-1);
 		}
-
-		rtp->rtp_type = RTPROTO_IF;
-		rtp->rtp_if = ifp;
 
 		if (add_protoaggr(attr, aggregated, RTPROTO_IF, (void *)ifp))
 			return(-1);
