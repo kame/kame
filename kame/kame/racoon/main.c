@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.4 2000/02/16 07:29:41 sakane Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.5 2000/04/25 06:02:38 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -42,6 +42,7 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#include <paths.h>
 
 #include "var.h"
 #include "misc.h"
@@ -128,11 +129,33 @@ main(ac, av)
 	parse(ac, av);
 
 #if 0
-	if (!f_debugcmd) {
+	if (!(debug & DEBUG_DEBUG)) {
+		char *pid_file = _PATH_VARRUN "racoon.pid";
+		pid_t pid;
+		FILE *fp;
+
 		if (daemon(0, 0) < 0) {
 			plog(logp, LOCATION, NULL,
 				"failed to be daemon. (%s)\n", strerror(errno));
 			exit(1);
+		}
+		/*
+		 * In case somebody has started inetd manually, we need to
+		 * clear the logname, so that old servers run as root do not
+		 * get the user's logname..
+		 */
+		if (setlogin("") < 0) {
+			plog(logp, LOCATION, NULL,
+				"cannot clear logname: %s\n", strerror(errno));
+			/* no big deal if it fails.. */
+		}
+		pid = getpid();
+		fp = fopen(pid_file, "w");
+		if (fp) {
+			fprintf(fp, "%ld\n", (long)pid);
+			fclose(fp);
+		} else {
+			plog(logp, LOCATION, NULL, "cannot open %s", pid_file);
 		}
 	} else
 		close(0);
