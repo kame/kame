@@ -1,4 +1,4 @@
-/*	$KAME: libaltq2.c,v 1.3 2001/08/16 10:39:16 kjc Exp $	*/
+/*	$KAME: libaltq2.c,v 1.4 2001/08/22 08:47:54 itojun Exp $	*/
 /*
  * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -42,6 +42,7 @@
 #else
 #include <varargs.h>
 #endif
+#include <string.h>
 
 #include "altq_qop.h"
 
