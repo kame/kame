@@ -3888,15 +3888,15 @@ match_msf4_per_socket(inp, src, dst)
 	struct sock_msf_source *msfsrc;
 	
 	/*
-	 * Receive multicast data which fits MSF condition.
-	 * Broadcast data needs no further check.
+	 * Broadcast data should be accepted; this function assumes that 
+	 * dst is not a normal unicast address.
 	 */
 #ifdef FreeBSD
 	if (!IN_MULTICAST(ntohl(dst->s_addr)))
 #else
 	if (!IN_MULTICAST(dst->s_addr))
 #endif
-		return 0;
+		return 1;
 		
 	if ((imo = inp->inp_moptions) == NULL)
 		return 0;
