@@ -690,7 +690,7 @@ getnbrinfo(addr, ifindex, warning)
 	nbi.addr = *addr;
 	if (ioctl(s, SIOCGNBRINFO_IN6, (caddr_t)&nbi) < 0) {
 		if (warning)
-			warn("ioctl");
+			warn("ioctl(SIOCGNBRINFO_IN6)");
 		close(s);
 		return(NULL);
 	}
