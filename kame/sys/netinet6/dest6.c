@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.47 2002/08/07 10:13:26 k-sugyou Exp $	*/
+/*	$KAME: dest6.c,v 1.48 2002/08/08 07:51:40 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,7 +206,7 @@ dest6_input(mp, offp, proto)
 				 * includes in this HAO.
 				 */
 				if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa,
-				    &home_sa))
+				    src_sa))
 					verified = 1;
 			}
 			/*
