@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.93 2001/03/21 22:18:55 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.94 2001/03/21 22:38:29 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -487,14 +487,7 @@ policy_spec
 	:	PFS_GROUP dh_group_num
 		{
 			/*
-			int doi;
-
-			doi = algtype2doi(algclass_isakmp_dh, $2);
-			if (doi == -1) {
-				yyerror("must be DH group");
-				return -1;
-			}
-			cur_spidx->policy->pfs_group = doi;
+			cur_spidx->policy->pfs_group = $2;
 			*/
 		}
 		EOS
@@ -788,14 +781,7 @@ sainfo_specs
 sainfo_spec
 	:	PFS_GROUP dh_group_num
 		{
-			int doi;
-
-			doi = algtype2doi(algclass_isakmp_dh, $2);
-			if (doi == -1) {
-				yyerror("must be DH group");
-				return -1;
-			}
-			cur_sainfo->pfs_group = doi;
+			cur_sainfo->pfs_group = $2;
 		}
 		EOS
 	|	LIFETIME LIFETYPE_TIME NUMBER unittype_time
