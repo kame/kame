@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2244 2002/10/07 13:19:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2245 2002/10/08 08:08:09 itojun Exp $
 
 <200210>
+Tue Oct  8 17:05:56 JST 2002  itojun@iijlab.net
+	* sys/net/if_*.c: drop support for cloning interfaces, to free us from
+	  coping with *BSD differences.  it is not our goal to cope with *BSD
+	  differences, our goal is to provide high-quality networking code.
+	  it's pity that *BSDs have a lot of differences...
+
 2002-10-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/net/route.h: experimentally added a trailing pad in
 	the route structure instead of having the sockaddr_storage
