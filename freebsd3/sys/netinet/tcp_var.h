@@ -416,8 +416,7 @@ struct tcpcb *
 void	 tcp_ctlinput __P((int, struct sockaddr *, void *));
 #ifdef INET6
 struct ip6_hdr;
-void	 tcp6_ctlinput __P((int, struct sockaddr *, struct ip6_hdr *,
-			    struct mbuf *, int));
+void	 tcp6_ctlinput __P((int, struct sockaddr *, void *));
 #endif
 int	 tcp_ctloutput __P((struct socket *, struct sockopt *));
 struct tcpcb *

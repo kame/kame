@@ -653,14 +653,12 @@ tcp_notify(inp, error)
 
 #if defined(INET6) && !defined(TCP6)
 void
-tcp6_ctlinput(cmd, sa, ip6, m, off)
+tcp6_ctlinput(cmd, sa, d)
 	int cmd;
 	struct sockaddr *sa;
-	struct ip6_hdr *ip6;
-	struct mbuf *m;
-	int off;
+	void *d;
 {
-	(void)tcp_ctlinput(cmd, sa, (void *)ip6);
+	(void)tcp_ctlinput(cmd, sa, NULL);	/*XXX*/
 }
 #endif
 

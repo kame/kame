@@ -68,8 +68,7 @@
 #ifdef KERNEL
 extern struct	pr_usrreqs udp6_usrreqs;
 
-void	udp6_ctlinput __P((int, struct sockaddr *, struct ip6_hdr *,
-			   struct mbuf *, int));
+void	udp6_ctlinput __P((int, struct sockaddr *, void *));
 int	udp6_input __P((struct mbuf **, int *, int));
 int	udp6_output __P((struct inpcb *inp, struct mbuf *m,
 			struct sockaddr *addr, struct mbuf *control,

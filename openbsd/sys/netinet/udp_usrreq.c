@@ -89,6 +89,7 @@ extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
+#include <netinet6/ip6protosw.h>
 
 #ifndef CREATE_IPV6_MAPPED
 #define CREATE_IPV6_MAPPED(a6, a4) \
@@ -680,17 +681,29 @@ udp_notify(inp, errno)
 
 #if defined(INET6) && !defined(TCP6)
 void
-udp6_ctlinput(cmd, sa, ip6, m, off)
+udp6_ctlinput(cmd, sa, d)
 	int cmd;
 	struct sockaddr *sa;
+	void *d;
+{
+	struct sockaddr_in6 sa6;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
-{
-	struct sockaddr_in6 sa6;
 
 	if (sa->sa_family != AF_INET6)
 		return;
+
+	/* decode parameter from icmp6. */
+	if (d != NULL) {
+		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		ip6 = ip6cp->ip6c_ip6;
+		m = ip6cp->ip6c_m;
+		off = ip6cp->ip6c_off;
+	} else {
+		ip6 = NULL;
+		m = NULL;
+	}
 
 	/* translate addresses into internal form */
 	sa6 = *(struct sockaddr_in6 *)sa;
