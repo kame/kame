@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/20 12:57:12 $
+			$Date: 1999/08/20 13:01:24 $
 
 1. IPv6
 
@@ -1003,9 +1003,10 @@ Here are some points to be noted:
 - pfkey is modified to support IPComp.  However, there's no official
   SA type number assignment yet.  Portability with other IPComp
   stack is questionable (anyway, who else implement IPComp on UN*X?).
-- Spec says that IPComp output must be performed before IPsec output
-  processing.  However, with manual SPD setting, you can violate this
-  ordering requirement (KAME code is too generic, maybe).
+- Spec says that IPComp output processing must be performed before IPsec
+  output processing, to achieve better compression ratio and "stir" data
+  stream before encryption.  However, with manual SPD setting, you are able to
+  violate the ordering requirement (KAME code is too generic, maybe).
 - Though MTU can be significantly decreased by using IPComp, no special
   consideration is made about path MTU (spec talks nothing about MTU
   consideration).  IPComp is designed for serial links, not ethernet-like
