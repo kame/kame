@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.12 2000/07/04 12:49:18 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.13 2000/07/16 08:25:51 sakane Exp $ */
 
 /* local configuration */
 
@@ -48,7 +48,8 @@
 #define LC_IDENTTYPE_MAX	6
 
 #define LC_DEFAULT_PAD_MAXSIZE		20
-#define LC_DEFAULT_PAD_RANDOM		FALSE
+#define LC_DEFAULT_PAD_RANDOM		TRUE
+#define LC_DEFAULT_PAD_RANDOMLEN	FALSE
 #define LC_DEFAULT_PAD_STRICT		FALSE
 #define LC_DEFAULT_PAD_EXCLTAIL		FALSE
 #define LC_DEFAULT_RETRY_COUNTER	5
@@ -79,6 +80,7 @@ struct localconf {
 	vchar_t *ident[LC_IDENTTYPE_MAX]; /* base of Identifier payload. */
 
 	int pad_random;
+	int pad_randomlen;
 	int pad_maxsize;
 	int pad_strict;
 	int pad_excltail;

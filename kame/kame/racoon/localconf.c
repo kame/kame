@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.16 2000/07/14 12:54:11 kjc Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.17 2000/07/16 08:25:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -106,6 +106,7 @@ setdefault()
 	lcconf->port_admin = PORT_ADMIN;
 	lcconf->default_af = AF_INET;
 	lcconf->pad_random = LC_DEFAULT_PAD_RANDOM;
+	lcconf->pad_randomlen = LC_DEFAULT_PAD_RANDOMLEN;
 	lcconf->pad_maxsize = LC_DEFAULT_PAD_MAXSIZE;
 	lcconf->pad_strict = LC_DEFAULT_PAD_STRICT;
 	lcconf->pad_excltail = LC_DEFAULT_PAD_EXCLTAIL;

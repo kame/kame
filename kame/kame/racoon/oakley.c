@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.40 2000/06/27 16:56:34 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.41 2000/07/16 08:25:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2063,9 +2063,9 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	memset(ivep->v, 0, ivep->l);
 	memcpy(ivep->v, (caddr_t)&msg->v[msg->l - CBC_BLOCKLEN], CBC_BLOCKLEN);
 
-	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL, "IV saved: "));
+	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL,
+		"IV was saved for next processing: "));
 	YIPSDEBUG(DEBUG_CRYPT, PVDUMP(ivep));
-	YIPSDEBUG(DEBUG_CRYPT, plog(logp, LOCATION, NULL, "IV not sync yet\n"));
 
 	pl = msg->v + sizeof(struct isakmp);
 
@@ -2211,8 +2211,10 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
         if (padlen) {
                 int i;
 		char *p = &buf->v[len];
-                for (i = 0; i < padlen; i++)
-                        *p++ = (char)random();
+		if (lcconf->pad_random) {
+			for (i = 0; i < padlen; i++)
+				*p++ = (char)random();
+		}
         }
         memcpy(buf->v, pl, len);
 
@@ -2298,7 +2300,7 @@ oakley_padlen(len)
 
 	padlen = 8 - len % 8;
 
-	if (lcconf->pad_random)
+	if (lcconf->pad_randomlen)
 		padlen += ((random() % (lcconf->pad_maxsize + 1) + 1) * base);
 
 	return padlen;
