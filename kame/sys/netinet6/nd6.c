@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.90 2001/01/21 08:00:10 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.91 2001/01/23 07:55:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1218,7 +1218,7 @@ nd6_rtrequest(req, rt, sa)
 #endif
 		/* FALLTHROUGH */
 	case RTM_RESOLVE:
-		if ((ifp->if_flags & IFF_POINTOPOINT) == 0) {
+		if ((ifp->if_flags & (IFF_POINTOPOINT | IFF_LOOPBACK)) == 0) {
 			/*
 			 * Address resolution isn't necessary for a point to
 			 * point link, so we can skip this test for a p2p link.
@@ -1226,7 +1226,8 @@ nd6_rtrequest(req, rt, sa)
 			if (gate->sa_family != AF_LINK ||
 			    gate->sa_len < sizeof(null_sdl)) {
 				log(LOG_DEBUG,
-				    "nd6_rtrequest: bad gateway value\n");
+				    "nd6_rtrequest: bad gateway value: %s\n",
+				    if_name(ifp));
 				break;
 			}
 			SDL(gate)->sdl_type = ifp->if_type;
