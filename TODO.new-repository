@@ -1,6 +1,6 @@
 TODOs for new repository
 KAME project
-$Id: TODO.new-repository,v 1.4 1999/08/16 03:59:10 itojun Exp $
+$Id: TODO.new-repository,v 1.5 1999/08/20 12:49:26 itojun Exp $
 
 
 kernel part:
@@ -10,7 +10,6 @@ kernel part:
 	KAME/BSDI3 compiles fine
 - update netpm/ptr for KNF
 - update netpm/ptr for better kernel-user interface (do not occupy IPPROTO_xx)
-- merge in recent rrenum fixes to shared tree
 - share and support ALTQ 1.2
 	KAME/FreeBSD228 supports this
 - support ip6fw on platforms
