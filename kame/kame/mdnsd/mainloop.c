@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.70 2001/07/04 04:59:32 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.71 2001/07/04 05:02:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -104,7 +104,7 @@
 
 static int recv_dns __P((struct sockdb *));
 static int recv_dns0 __P((struct sockdb *, int));
-static void recv_icmp6 __P((struct sockdb *));
+static int recv_icmp6 __P((struct sockdb *));
 static int conf_mediator __P((struct sockdb *));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
@@ -183,7 +183,7 @@ mainloop()
 			sd = sock2sockdb(i);
 			switch (sd->type) {
 			case S_MEDIATOR:
-				conf_mediator(sd);
+				(void)conf_mediator(sd);
 				break;
 			case S_TCP:
 				nsd = newsockdb(accept(sd->s, NULL, 0), sd->af);
@@ -197,10 +197,10 @@ mainloop()
 				}
 				break;
 			case S_ICMP6:
-				recv_icmp6(sd);
+				(void)recv_icmp6(sd);
 				break;
 			default:
-				recv_dns(sd);
+				(void)recv_dns(sd);
 				break;
 			}
 		}
@@ -307,7 +307,7 @@ recv_dns0(sd, vclen)
 /*
  * process inbound ICMPv6-formatted packet.
  */
-static void
+static int
 recv_icmp6(sd)
 	struct sockdb *sd;
 {
@@ -329,7 +329,7 @@ recv_icmp6(sd)
 	if (sizeof(*icmp6) > l) {
 		if (dflag)
 			printf("ICMPv6: too short from %s\n", hbuf);
-		return;
+		return 0;
 	}
 	icmp6 = (struct icmp6_hdr *)buf;
 
@@ -342,7 +342,7 @@ recv_icmp6(sd)
 	    icmp6->icmp6_code == ICMP6_NI_SUCCESS)
 		getans_icmp6(buf, l, (struct sockaddr *)&from);
 
-	return;
+	return 0;
 }
 
 static int
