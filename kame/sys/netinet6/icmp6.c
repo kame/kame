@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.348 2003/06/03 05:17:51 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.349 2003/06/03 10:06:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2988,7 +2988,7 @@ icmp6_redirect_output(m0, rt)
 	icmp6_errcount(&icmp6stat.icp6s_outerrhist, ND_REDIRECT, 0);
 
 	/* if we are not router, we don't send icmp6 redirect */
-	if (!ip6_forwarding || ip6_accept_rtadv)
+	if (!ip6_forwarding)
 		goto fail;
 
 	/* sanity check */
