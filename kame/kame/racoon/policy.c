@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.36 2001/03/22 23:53:16 thorpej Exp $	*/
+/*	$KAME: policy.c,v 1.37 2001/03/23 00:28:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,7 +67,7 @@ getsp(spidx)
 	struct secpolicy *p;
 
 	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
-		if (!cmpspidx(spidx, &p->spidx))
+		if (!cmpspidxstrict(spidx, &p->spidx))
 			return p;
 	}
 
@@ -88,7 +88,7 @@ getsp_r(spidx)
 	struct secpolicy *p;
 
 	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
-		if (!cmpspidx_wild(spidx, &p->spidx))
+		if (!cmpspidxwild(spidx, &p->spidx))
 			return p;
 	}
 
@@ -189,6 +189,36 @@ cmpspidx(a, b)
 	 || a->ul_proto != b->ul_proto)
 		return 1;
 
+	if (cmpsaddr((struct sockaddr *)&a->src,
+			   (struct sockaddr *)&b->src))
+		return 1;
+	if (cmpsaddr((struct sockaddr *)&a->dst,
+			   (struct sockaddr *)&b->dst))
+		return 1;
+
+	return 0;
+}
+
+/*
+ * compare policyindex.
+ * a: subject b: db
+ * OUT:	0:	equal
+ *	1:	not equal
+ */
+int
+cmpspidxstrict(a, b)
+	struct policyindex *a, *b;
+{
+	plog(LLV_DEBUG, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
+	plog(LLV_DEBUG, LOCATION, NULL, "db :%p: %s\n", b, spidx2str(b));
+
+	/* XXX don't check direction now, but it's to be checked carefully. */
+	if (a->dir != b->dir
+	 || a->prefs != b->prefs
+	 || a->prefd != b->prefd
+	 || a->ul_proto != b->ul_proto)
+		return 1;
+
 	if (cmpsaddrstrict((struct sockaddr *)&a->src,
 			   (struct sockaddr *)&b->src))
 		return 1;
@@ -206,7 +236,7 @@ cmpspidx(a, b)
  *	1:	not equal
  */
 int
-cmpspidx_wild(a, b)
+cmpspidxwild(a, b)
 	struct policyindex *a, *b;
 {
 	struct sockaddr_storage sa1, sa2;
