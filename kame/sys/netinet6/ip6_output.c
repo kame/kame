@@ -2895,8 +2895,6 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			    cm->cmsg_len < CMSG_LEN(*CMSG_DATA(cm)))
 				return(EINVAL);
 
-			opt->ip6po_nexthop = (struct sockaddr *)CMSG_DATA(cm);
-
 			if (needcopy) {
 				opt->ip6po_nexthop =
 					malloc(*CMSG_DATA(cm),
