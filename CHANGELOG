@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1171 2000/08/01 14:54:19 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1172 2000/08/02 12:58:30 itojun Exp $
 
 <200007>
 Tue Aug  1 23:53:36 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -147,6 +147,7 @@ Mon Jul 24 23:34:26 JST 2000  itojun@iijlab.net
 Mon Jul 24 09:31:25 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6.h: try to provide binary backward compatibility for
 	  RFC2292 API, deployed into freebsd40/netbsd15/openbsd27.
+	  TODO: check 2292/bis-on-TCP behavior.
 	  PLEASE RECOMPILE ALL KAME USERLAND BINARIES.
 
 Mon Jul 24 08:22:29 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
