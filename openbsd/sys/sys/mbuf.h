@@ -206,7 +206,6 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_dat; \
 		(m)->m_flags = 0; \
-		(m)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	} else \
 		(m) = m_retry((how), (type)); \
 }
@@ -220,6 +219,7 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
+		(m)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	} else \
 		(m) = m_retryhdr((how), (type)); \
 }
