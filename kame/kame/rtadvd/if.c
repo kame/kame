@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.9 2000/05/27 11:30:43 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.10 2000/06/13 05:17:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,9 +38,7 @@
 #ifdef __FreeBSD__
 # include <net/ethernet.h>
 #endif
-#ifdef __bsdi__
-# include <ifaddrs.h>
-#endif
+#include <ifaddrs.h>
 #ifdef __NetBSD__
 #include <net/if_ether.h>
 #endif
@@ -148,7 +146,7 @@ if_nametosdl(char *name)
 int
 if_getmtu(char *name)
 {
-#ifndef __bsdi__
+#if 0
 	struct ifreq ifr;
 	int s;
 
