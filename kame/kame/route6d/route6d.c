@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.3 1999/09/02 09:05:18 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.4 1999/09/02 12:18:10 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.3 1999/09/02 09:05:18 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.4 1999/09/02 12:18:10 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2159,16 +2159,14 @@ addroute(rrt, gw, ifcp)
 	if (nflag)
 		return 0;
 
+	memset(buf, 0, sizeof(buf));
 	rtm = (struct rt_msghdr *)buf;
-	len = sizeof(struct rt_msghdr) + 3 * sizeof(struct sockaddr_in6);
-	memset(rtm, 0, len);
 	rtm->rtm_type = RTM_ADD;
 	rtm->rtm_version = RTM_VERSION;
 	rtm->rtm_seq = ++seq;
 	rtm->rtm_pid = pid;
 	rtm->rtm_flags = rrt->rrt_flags & RTF_ROUTE_H;
 	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
-	rtm->rtm_msglen = len;
 	rtm->rtm_rmx.rmx_hopcount = np->rip6_metric - 1;
 	rtm->rtm_inits = RTV_HOPCOUNT;
 	sin = (struct sockaddr_in6 *)&buf[sizeof(struct rt_msghdr)];
@@ -2187,9 +2185,11 @@ addroute(rrt, gw, ifcp)
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = *(plen2mask(np->rip6_plen));
 	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
+
+	len = (char *)sin - (char *)buf;
+	rtm->rtm_msglen = len;
 	if (write(rtsock, buf, len) > 0)
 		return 0;
-
 
 	if (errno == EEXIST) {
 		trace(0, "ADD: Route already exists %s/%d gw %s\n",
@@ -2226,16 +2226,14 @@ delroute(np, gw)
 	if (nflag)
 		return 0;
 
+	memset(buf, 0, sizeof(buf));
 	rtm = (struct rt_msghdr *)buf;
-	len = sizeof(struct rt_msghdr) + 3 * sizeof(struct sockaddr_in6);
-	memset(rtm, 0, len);
 	rtm->rtm_type = RTM_DELETE;
 	rtm->rtm_version = RTM_VERSION;
 	rtm->rtm_seq = ++seq;
 	rtm->rtm_pid = pid;
 	rtm->rtm_flags = RTF_UP | RTF_GATEWAY;
 	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
-	rtm->rtm_msglen = len;
 	sin = (struct sockaddr_in6 *)&buf[sizeof(struct rt_msghdr)];
 	/* Destination */
 	sin->sin6_len = sizeof(struct sockaddr_in6);
@@ -2252,6 +2250,9 @@ delroute(np, gw)
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = *(plen2mask(np->rip6_plen));
 	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
+
+	len = (char *)sin - (char *)buf;
+	rtm->rtm_msglen = len;
 	if (write(rtsock, buf, len) >= 0)
 		return 0;
 
