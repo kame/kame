@@ -665,6 +665,16 @@ extern int inet6_rthdr_reverse __P((const struct cmsghdr *, struct cmsghdr *));
 extern int inet6_rthdr_segments __P((const struct cmsghdr *));
 extern struct in6_addr *inet6_rthdr_getaddr __P((struct cmsghdr *, int));
 extern int inet6_rthdr_getflags __P((const struct cmsghdr *, int));
+
+extern int inet6_opt_next __P((void *, size_t, int, u_int8_t *,
+			       size_t *, void **));
+extern int inet6_opt_find __P((void *, size_t, int, u_int8_t,
+			  size_t *, void **));
+extern int inet6_opt_get_val __P((void *, size_t, void *, int));
+#ifdef notyet
+extern int inet6_rth_segments __P((const void *));
+extern struct in6_addr *inet6_rth_getaddr __P((const void *, int));
+#endif
 __END_DECLS
 
 #endif /* !_NETINET6_IN6_H_ */
