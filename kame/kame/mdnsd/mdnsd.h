@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.18 2001/03/28 07:08:29 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.19 2001/05/02 11:07:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -33,6 +33,7 @@
 #define MDNS_GROUP4	"239.255.255.253"
 #define MDNS_GROUP6	"ff02::1"	/* XXX not declared in i-d */
 #define MDNS_LOCALDOM	"local.arpa."
+#define MDNS_TIMEO	5		/* XXX better value? */
 
 extern u_int16_t dnsid;
 extern const char *srcport;

@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.48 2001/05/02 10:44:24 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.49 2001/05/02 11:07:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -997,6 +997,8 @@ relay(sd, buf, len, from)
 	if (hp->qr == 0 && hp->opcode == QUERY) {
 		/* query - relay it */
 		qc = newqcache(from, buf, len);
+		gettimeofday(&qc->ttq, NULL);
+		qc->ttq.tv_sec += MDNS_TIMEO;
 		qc->sd = sd;
 
 		ord = hp->rd;

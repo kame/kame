@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.9 2000/05/31 14:56:13 itojun Exp $	*/
+/*	$KAME: db.c,v 1.10 2001/05/02 11:07:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -43,6 +43,9 @@
 #include <errno.h>
 #include <string.h>
 
+#include <arpa/nameser.h>
+#include <arpa/inet.h>
+
 #include "mdnsd.h"
 #include "db.h"
 
@@ -57,12 +60,36 @@ struct sockhead sockdb;
 int
 dbtimeo()
 {
+	struct qcache *qc, *nqc;
 	struct scache *sc, *nsc;
 	struct nsdb *ns, *nns;
 	struct timeval tv;
 	int errcnt;
 
 	(void)gettimeofday(&tv, NULL);
+
+	/* check query cache */
+	errcnt = 0;
+	for (qc = LIST_FIRST(&qcache); qc; qc = nqc) {
+		HEADER *hp;
+
+		nqc = LIST_NEXT(qc, link);
+
+		if (qc->ttq.tv_sec > tv.tv_sec)
+			continue;
+		if (qc->ttq.tv_sec == tv.tv_sec && qc->ttq.tv_usec > tv.tv_usec)
+			continue;
+
+		/* send NXDOMAIN to querier */
+		hp = (HEADER *)qc->qbuf;
+		hp->rcode = NXDOMAIN;
+		if (sendto(qc->sd->s, qc->qbuf, qc->qlen, 0,
+		    (struct sockaddr *)&qc->from, qc->from.ss_len) < 0)
+			errcnt++;
+
+		dprintf("query %p expired\n", qc);
+		delqcache(qc);
+	}
 
 	/* check transmit queue */
 	errcnt = 0;
