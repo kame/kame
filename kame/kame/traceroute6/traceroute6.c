@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.34 2000/11/24 07:47:18 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.35 2000/11/24 11:19:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -783,7 +783,7 @@ main(argc, argv)
 	 */
 	if (getnameinfo((struct sockaddr *)&Dst, Dst.sin6_len, hbuf,
 			sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag))
-		strcpy(hbuf, "(invalid)");
+		strlcpy(hbuf, "(invalid)", sizeof(hbuf));
 	Fprintf(stderr, "traceroute6");
 	Fprintf(stderr, " to %s (%s)", hostname, hbuf);
 	if (source)
@@ -1070,7 +1070,7 @@ packet_ok(mhdr, cc, seq)
 			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
 			    hbuf, sizeof(hbuf), NULL, 0,
 			    NI_NUMERICHOST | niflag) != 0)
-				strcpy(hbuf, "invalid");
+				strlcpy(hbuf, "invalid", sizeof(hbuf));
 			Printf("packet too short (%d bytes) from %s\n", cc,
 			    hbuf);
 		}
@@ -1084,7 +1084,7 @@ packet_ok(mhdr, cc, seq)
 			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
 			    hbuf, sizeof(hbuf), NULL, 0,
 			    NI_NUMERICHOST | niflag) != 0)
-				strcpy(hbuf, "invalid");
+				strlcpy(hbuf, "invalid", sizeof(hbuf));
 			Printf("data too short (%d bytes) from %s\n", cc, hbuf);
 		}
 		return(0);
@@ -1142,7 +1142,7 @@ packet_ok(mhdr, cc, seq)
 
 		if (getnameinfo((struct sockaddr *)from, from->sin6_len,
 		    sbuf, sizeof(sbuf), NULL, 0, NI_NUMERICHOST | niflag) != 0)
-			strcpy(sbuf, "invalid");
+			strlcpy(sbuf, "invalid", sizeof(hbuf));
 		Printf("\n%d bytes from %s to %s", cc, sbuf,
 		    rcvpktinfo ? inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
 					dbuf, sizeof(dbuf))
@@ -1221,7 +1221,7 @@ print(mhdr, cc)
 
 	if (getnameinfo((struct sockaddr *)from, from->sin6_len,
 	    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag) != 0)
-		strcpy(hbuf, "invalid");
+		strlcpy(hbuf, "invalid", sizeof(hbuf));
 	if (nflag)
 		Printf(" %s", hbuf);
 	else if (lflag)
@@ -1278,7 +1278,7 @@ inetname(sa)
 		first = 0;
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
 		    (cp = index(domain, '.')))
-			(void) strcpy(domain, cp + 1);
+			(void) strlcpy(domain, cp + 1, sizeof(domain));
 		else
 			domain[0] = 0;
 	}
@@ -1297,7 +1297,7 @@ inetname(sa)
 
 	if (getnameinfo(sa, sa->sa_len, line, sizeof(line), NULL, 0,
 	    NI_NUMERICHOST | niflag) != 0)
-		strcpy(line, "invalid");
+		strlcpy(line, "invalid", sizeof(line));
 	return line;
 }
 
