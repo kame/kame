@@ -235,7 +235,8 @@ do {									\
     }									\
     else {								\
 	if ((m)->m_len < (off) + (hlen)) {				\
-		ip6stat.ip6s_toosmall++;				\
+		ip6stat.ip6s_tooshort++;				\
+		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_truncated);	\
 		m_freem(m);						\
 		return ret;						\
 	}								\
