@@ -813,7 +813,7 @@ netname6(sa6, mask)
 	sin6 = *sa6;
 	if (mask) {
 		masklen = 0;
-		lim = (u_char *)mask + 16;
+		lim = (u_char *)(mask + 1);
 		for (p = (u_char *)mask, q = (u_char *)&sin6.sin6_addr;
 		     p < lim;
 		     p++, q++) {
