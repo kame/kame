@@ -1,4 +1,4 @@
-/*	$KAME: policy_parse.y,v 1.12 2002/07/31 06:59:51 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.13 2003/06/27 03:37:31 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -306,6 +306,9 @@ init_x_policy()
 	p->sadb_x_policy_type = p_type;
 	p->sadb_x_policy_dir = p_dir;
 	p->sadb_x_policy_reserved = 0;
+	p->sadb_x_policy_id = 0;
+	p->sadb_x_policy_reserved2 = 0;
+
 	offset = tlen;
 
 	__ipsec_errcode = EIPSEC_NO_ERROR;
