@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.9 2000/12/15 15:41:40 sakane Exp $	*/
+/*	$KAME: plog.c,v 1.10 2000/12/16 14:18:37 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,14 +68,17 @@ static char *logfile = NULL;
 
 static char *plog_common __P((int, const char *, const char *));
 
-static char *pritag[] = {
-	"(not defined)",
-	"INFO",
-	"NOTIFY",
-	"WARNING",
-	"ERROR",
-	"DEBUG",
-	"DEBUG2",
+static struct plogtags {
+	char *name;
+	int priority;
+} ptab[] = {
+	{ "(not defined)",	0, },
+	{ "INFO",		LOG_INFO, },
+	{ "NOTIFY",		LOG_INFO, },
+	{ "WARNING",		LOG_INFO, },
+	{ "ERROR",		LOG_INFO, },
+	{ "DEBUG",		LOG_DEBUG, },
+	{ "DEBUG2",		LOG_DEBUG, },
 };
 
 static char *
@@ -101,8 +104,8 @@ plog_common(pri, fmt, func)
 		reslen -= len;
 	}
 
-	if (pri < ARRAYLEN(pritag)) {
-		len = snprintf(p, reslen, "%s: ", pritag[pri]);
+	if (pri < ARRAYLEN(ptab)) {
+		len = snprintf(p, reslen, "%s: ", ptab[pri].name);
 		p += len;
 		reslen -= len;
 	}
@@ -129,8 +132,12 @@ plog(int pri, const char *func, struct sockaddr *sa, const char *fmt, ...)
 
 	if (logfile)
 		log_vaprint(logp, newfmt, ap);
-	else
-		vsyslog(pri, newfmt, ap);
+	else {
+		if (pri < ARRAYLEN(ptab))
+			vsyslog(ptab[pri].priority, newfmt, ap);
+		else
+			vsyslog(LOG_ALERT, newfmt, ap);
+	}
 	va_end(ap);
 }
 
@@ -140,6 +147,8 @@ plogv(int pri, const char *func, struct sockaddr *sa,
 {
 	char *newfmt;
 
+	if (pri < ARRAYLEN(ptab))
+		return;
 	if (pri > loglevel)
 		return;
 
@@ -150,8 +159,12 @@ plogv(int pri, const char *func, struct sockaddr *sa,
 
 	if (logfile)
 		log_vaprint(logp, newfmt, ap);
-	else
-		vsyslog(pri, newfmt, ap);
+	else {
+		if (pri < ARRAYLEN(ptab))
+			vsyslog(ptab[pri].priority, newfmt, ap);
+		else
+			vsyslog(LOG_ALERT, newfmt, ap);
+	}
 }
 
 void
