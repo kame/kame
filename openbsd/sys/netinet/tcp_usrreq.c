@@ -82,6 +82,11 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/tcp_debug.h>
 #include <dev/rndvar.h>
 
+#ifdef INET6
+#include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
+#endif
+
 /*
  * TCP protocol interface to socket abstraction.
  */
@@ -796,10 +801,18 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	case AF_INET6:
 		is_ipv6 = 1;
 		fin6 = (struct sockaddr_in6 *)&tir.faddr;
+		if (ip6_use_defzone && fin6->sin6_scope_id == 0) {
+			fin6->sin6_scope_id =
+				scope6_addr2default(&fin6->sin6_addr);
+		}
 		error = in6_embedscope(&f6, fin6);
 		if (error)
 			return EINVAL;	/*?*/
 		lin6 = (struct sockaddr_in6 *)&tir.laddr;
+		if (ip6_use_defzone && lin6->sin6_scope_id == 0) {
+			lin6->sin6_scope_id =
+				scope6_addr2default(&lin6->sin6_addr);
+		}
 		error = in6_embedscope(&l6, lin6);
 		if (error)
 			return EINVAL;	/*?*/
