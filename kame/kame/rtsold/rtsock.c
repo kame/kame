@@ -1,4 +1,4 @@
-/*	$KAME: rtsock.c,v 1.2 2000/10/10 06:36:19 itojun Exp $	*/
+/*	$KAME: rtsock.c,v 1.3 2000/10/10 08:46:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -156,11 +156,11 @@ rtsock_input_ifannounce(s, rtm, lim)
 		 * and call ifreconfig() to enable the interface again.
 		 */
 		warnmsg(LOG_INFO, __FUNCTION__,
-		    "interface %s arrived", ifan->ifan_name);
+		    "interface %s inserted", ifan->ifan_name);
 		break;
 	case IFAN_DEPARTURE:
-		warnmsg(LOG_INFO, __FUNCTION__,
-		    "interface %s departed", ifan->ifan_name);
+		warnmsg(LOG_WARNING, __FUNCTION__,
+		    "interface %s removed", ifan->ifan_name);
 		ifinfo = find_ifinfo(ifan->ifan_index);
 		if (ifinfo) {
 			if (dflag > 1) {
