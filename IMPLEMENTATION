@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/03 03:33:39 $
+			$Date: 1999/11/05 09:18:45 $
 
 1. IPv6
 
@@ -1073,8 +1073,11 @@ Here are some points to be noted:
   consideration).  IPComp is designed for serial links, not ethernet-like
   medium, it seems.
 - You can change compression ratio on outbound packet, by changing
-  deflate_policy in sys/netinet6/ipcomp_core.c (should it be sysctl accessible?
-  or per-SAD configurable?)
+  deflate_policy in sys/netinet6/ipcomp_core.c.  You can also change history
+  buffer size by changing deflate_window in the same source code.
+  (should it be sysctl accessible?  or per-SAD configurable?)
+- Tunnel mode IPComp is not working right.  KAME box can generate tunnelled
+  IPComp packet, however, cannot accept tunneled IPComp packet.
 
 6. ALTQ
 
