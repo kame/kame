@@ -1,3 +1,5 @@
+/*	$NetBSD: if_cnwioctl.h,v 1.2 1999/11/29 12:54:00 itojun Exp $	*/
+
 /*
  * Copyright (c) 1996, 1997 Berkeley Software Design, Inc.
  * All rights reserved.
@@ -32,6 +34,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ *	PAO2 Id: if_cnwioctl.h,v 1.1.8.1 1998/12/05 22:47:11 itojun Exp
  *
  * Paul Borman, December 1996
  *

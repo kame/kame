@@ -1,4 +1,4 @@
-#	$NetBSD: files.pcmcia,v 1.14 1999/01/01 19:30:03 christos Exp $
+#	$NetBSD: files.pcmcia,v 1.28.2.1 2000/07/14 14:37:41 onoe Exp $
 #
 # Config.new file and device description for machine-independent PCMCIA code.
 # Included by ports that need it.
@@ -28,14 +28,22 @@ file	dev/pcmcia/if_ne_pcmcia.c		ne_pcmcia
 attach	aic at pcmcia with aic_pcmcia
 file	dev/pcmcia/aic_pcmcia.c			aic_pcmcia
 
+# NCR 53c80-based cards
+attach	nca at pcmcia with nca_pcmcia
+file	dev/pcmcia/nca_pcmcia.c			nca_pcmcia
+
+# NCR 53c406-based cards
+attach	esp at pcmcia with esp_pcmcia
+file	dev/pcmcia/esp_pcmcia.c			esp_pcmcia
+
 attach	com at pcmcia with com_pcmcia
 file	dev/pcmcia/com_pcmcia.c			com_pcmcia
 
 # Digital RoamAbout / Lucent WaveLAN PCMCIA card
-device	wl: arp, ether, ifnet
 attach	wl at pcmcia with wl_pcmcia
 file	dev/pcmcia/if_wl_pcmcia.c		wl_pcmcia
-defopt	opt_wl_pcmcia.h		WL_TIMER WLP_CC_DEBUG WL_DEBUG MMC_STATUS WL_IFCNTRS WL_TIMING
+defopt	opt_wl_pcmcia.h		WL_TIMER WLP_CC_DEBUG WL_DEBUG MMC_STATUS
+				WL_IFCNTRS WL_TIMING
 
 # PCMCIA IDE controller
 attach	wdc at pcmcia with wdc_pcmcia
@@ -69,11 +77,28 @@ device wi: arp, ether, ifnet
 attach wi at pcmcia
 file	dev/pcmcia/if_wi.c			wi
 
+# Megaherz combo cards
+device	mhzc { }
+attach	mhzc at pcmcia
+attach	com at mhzc with com_mhzc
+attach	sm at mhzc with sm_mhzc
+file	dev/pcmcia/mhzc.c			mhzc | com_mhzc | sm_mhzc
+						    needs-flag
+
+# Raylink/WebGear WLAN IEEE 802.11 FH
+device	ray: arp, ether, ifnet
+attach	ray at pcmcia
+file	dev/pcmcia/if_ray.c			ray
+
 # AMD 79c930-based 802.11 cards (including BayStack 650 FH card).
-device awi: arp, ether, ifnet
 attach awi at pcmcia with awi_pcmcia
-
 file	dev/pcmcia/if_awi_pcmcia.c		awi_pcmcia
-file	dev/ic/awi.c				awi
-file	dev/ic/am79c930.c			awi
 
+# Xircom Ethernet cards
+device	xi: arp, ether, ifnet, mii
+attach	xi at pcmcia with xi_pcmcia
+file	dev/pcmcia/if_xi.c			xi_pcmcia
+
+# IBM Tropic-based Token Ring cards
+attach	tr at pcmcia with tr_pcmcia
+file	dev/pcmcia/if_tr_pcmcia.c		tr_pcmcia

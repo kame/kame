@@ -1,4 +1,4 @@
-/* $NetBSD: lemac.c,v 1.11 1999/02/28 17:10:53 explorer Exp $ */
+/* $NetBSD: lemac.c,v 1.14 2000/05/12 16:45:42 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1997 Matt Thomas <matt@3am-software.com>
@@ -334,10 +334,9 @@ lemac_input(
 	return;
     }
 #endif
-    m->m_pkthdr.len = m->m_len = length - sizeof(eh);
-    m->m_data += sizeof(eh);
+    m->m_pkthdr.len = m->m_len = length;
     m->m_pkthdr.rcvif = &sc->sc_if;
-    ether_input(&sc->sc_if, &eh, m);
+    (*sc->sc_if.if_input)(&sc->sc_if, m);
 }
 
 static void
@@ -460,19 +459,10 @@ lemac_multicast_op(
     const u_char *mca,
     int enable)
 {
-    u_int idx, bit, crc = 0xFFFFFFFFUL;
-    static const u_int crctab[] = {
-	0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
-	0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
-	0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
-	0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
-    };
+    u_int idx, bit, crc;
 
-    for (idx = 0; idx < 6; idx++) {
-	crc ^= *mca++;
-	crc = (crc >> 4) ^ crctab[crc & 0xf];
-	crc = (crc >> 4) ^ crctab[crc & 0xf];
-    }
+    crc = ether_crc32_le(mca, ETHER_ADDR_LEN);
+
     /*
      * The following two lines convert the N bit index into a longword index
      * and a longword mask.  
@@ -1043,10 +1033,8 @@ lemac_ifattach(
 	   sc->sc_lastpage * 2 + 2,
 	   lemac_modes[sc->sc_flags & LEMAC_MODE_MASK]);
 
-    ifp->if_baudrate = 10000000;
     ifp->if_softc = (void *) sc;
     ifp->if_start = lemac_ifstart;
-    ifp->if_output = ether_output;
     ifp->if_ioctl = lemac_ifioctl;
 
     ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_en_pci.c,v 1.12 1999/03/24 18:47:51 cgd Exp $	*/
+/*	$NetBSD: if_en_pci.c,v 1.13 1999/07/01 08:12:46 itojun Exp $	*/
 
 /*
  *

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tl.c,v 1.23 1999/03/25 16:15:00 bouyer Exp $	*/
+/*	$NetBSD: if_tl.c,v 1.32 2000/03/23 07:01:39 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
@@ -302,6 +302,9 @@ tl_pci_attach(parent, self, aux)
 
 	printf("\n");
 
+	callout_init(&sc->tl_tick_ch);
+	callout_init(&sc->tl_restart_ch);
+
 	tp = tl_lookup_product(pa->pa_id);
 	if (tp == NULL)
 		panic("tl_pci_attach: impossible");
@@ -428,7 +431,8 @@ tl_pci_attach(parent, self, aux)
 	sc->tl_mii.mii_statchg = tl_statchg;
 	ifmedia_init(&sc->tl_mii.mii_media, IFM_IMASK, tl_mediachange,
 	    tl_mediastatus);
-	mii_phy_probe(self, &sc->tl_mii, 0xffffffff);
+	mii_attach(self, &sc->tl_mii, 0xffffffff, MII_PHY_ANY,
+	    MII_OFFSET_ANY, 0);
 	if (LIST_FIRST(&sc->tl_mii.mii_phys) == NULL) { 
 		ifmedia_add(&sc->tl_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->tl_mii.mii_media, IFM_ETHER|IFM_NONE);
@@ -459,7 +463,7 @@ tl_reset(sc)
 
 	/* read stats */
 	if (sc->tl_if.if_flags & IFF_RUNNING) {
-		untimeout(tl_ticks, sc);
+		callout_stop(&sc->tl_tick_ch);
 		tl_read_stats(sc);
 	}
 	/* Reset adapter */
@@ -513,8 +517,11 @@ static void tl_shutdown(v)
 	DELAY(100000);
 
 	/* stop statistics reading loop, read stats */ 
-	untimeout(tl_ticks, sc);
+	callout_stop(&sc->tl_tick_ch);
 	tl_read_stats(sc);
+
+	/* Down the MII. */
+	mii_down(&sc->tl_mii);
 
 	/* deallocate memory allocations */
 	for (i=0; i< TL_NBUF; i++) {
@@ -637,7 +644,7 @@ static int tl_init(sc)
 	mii_mediachg(&sc->tl_mii);
 
 	/* start ticks calls */
-	timeout(tl_ticks, sc, hz);
+	callout_reset(&sc->tl_tick_ch, hz, tl_ticks, sc);
 	/* write adress of Rx list and enable interrupts */
 	TL_HR_WRITE(sc, TL_HOST_CH_PARM, vtophys(&sc->Rx_list[0].hw_list));
 	TL_HR_WRITE(sc, TL_HOST_CMD,
@@ -806,8 +813,6 @@ tl_statchg(self)
 	else
 		reg &= ~TL_NETCOMMAND_DUPLEX;
 	tl_intreg_write_byte(sc, TL_INT_NET + TL_INT_NetCmd, reg);
-
-	/* XXX Update ifp->if_baudrate */
 }
 
 void tl_i2c_set(v, bit)
@@ -948,8 +953,7 @@ tl_intr(v)
 					continue;
 				}
 				m->m_pkthdr.rcvif = ifp;
-				m->m_pkthdr.len = m->m_len =
-					size - sizeof(struct ether_header);
+				m->m_pkthdr.len = m->m_len = size;
 				eh = mtod(m, struct ether_header *);
 #ifdef TLDEBUG_RX
 				printf("tl_intr: Rx packet:\n");
@@ -974,8 +978,7 @@ tl_intr(v)
 					}
 				}
 #endif /* NBPFILTER > 0 */
-				m->m_data += sizeof(struct ether_header);
-				ether_input(ifp, eh, m);
+				(*ifp->if_input)(ifp, m);
 			}
 		}
 #ifdef TLDEBUG_RX
@@ -986,7 +989,7 @@ tl_intr(v)
 			    sc->sc_dev.dv_xname);
 			tl_reset(sc);
 			/* shedule reinit of the board */
-			timeout(tl_restart, sc, 1);
+			callout_reset(&sc->tl_restart_ch, 1, tl_restart, sc);
 			return(1);
 		}
 #endif
@@ -1078,7 +1081,7 @@ tl_intr(v)
 			    TL_HR_READ(sc, TL_HOST_CH_PARM));
 			tl_reset(sc);
 			/* shedule reinit of the board */
-			timeout(tl_restart, sc, 1);
+			callout_reset(&sc->tl_restart_ch, 1, tl_restart, sc);
 			return(1);
 		} else {
 			u_int8_t netstat;
@@ -1534,7 +1537,7 @@ static void tl_ticks(v)
 	}
 
 	/* read statistics every seconds */
-	timeout(tl_ticks, v, hz);
+	callout_reset(&sc->tl_tick_ch, hz, tl_ticks, sc);
 }
 
 static void

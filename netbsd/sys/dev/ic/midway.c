@@ -1,4 +1,4 @@
-/*	$NetBSD: midway.c,v 1.38 1999/02/12 00:57:42 thorpej Exp $	*/
+/*	$NetBSD: midway.c,v 1.40.4.1 2000/10/17 20:32:33 tv Exp $	*/
 /*	(sync'd to midway.c 1.68)	*/
 
 /*
@@ -174,6 +174,7 @@
 #include <netnatm/natm.h>
 #endif
 
+
 #if !defined(__FreeBSD__)
 #include <machine/bus.h>
 
@@ -210,10 +211,10 @@
 
 #ifdef ATM_PVCEXT
 # ifndef NATM
-   /* this is for __KAME__ */
+   /* this is for for __KAME__ */
 #  include <netinet/in.h>
 # endif
-# if defined(__KAME__) && defined(INET6)
+# if defined (__KAME__) && defined(INET6)
 #  include <netinet6/in6_ifattach.h>
 # endif
 #endif /*ATM_PVCEXT*/
@@ -1225,10 +1226,8 @@ caddr_t data;
 	case SIOCSIFFLAGS: 
 #ifdef ATM_PVCEXT
 	  	/* point-2-point pvc is allowed to change if_flags */
-		if (((ifp->if_flags & IFF_UP)
-		     && !(ifp->if_flags & IFF_RUNNING))
-		    ||  (!(ifp->if_flags & IFF_UP)
-			 && (ifp->if_flags & IFF_RUNNING))) {
+		if (((ifp->if_flags & IFF_UP) && !(ifp->if_flags & IFF_RUNNING))
+		||  (!(ifp->if_flags & IFF_UP) && (ifp->if_flags & IFF_RUNNING))) {
 			en_reset(sc);
 			en_init(sc);
 		}
@@ -1327,22 +1326,6 @@ caddr_t data;
 		if ((error = suser(curproc->p_ucred, &curproc->p_acflag)) == 0)
 			error = en_pvctx(sc, (struct pvctxreq *)data);
 		break;
-
-	case SIOCGPVCFWD:
-	{
-		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
-		error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2, 2);
-		break;
-	}	
-
-	case SIOCSPVCFWD:
-	{
-		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
-		if ((error = suser(curproc->p_ucred, &curproc->p_acflag)) == 0)
-			error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2,
-					    req->pvc_op);
-		break;
-	}
 
 #endif /* ATM_PVCEXT */
 
@@ -1521,7 +1504,6 @@ struct en_softc *sc;
 	break;		/* >>> exit 'while(1)' here <<< */
       m_freem(m);
     }
-
     sc->txslot[lcv].mbsize = 0;
   }
 
@@ -4018,6 +4000,7 @@ static int en_pvctxget(sc, pvcreq)
 		sprintf(pvcreq->pvc_ifname, "%s%d",
 			sc->enif.if_name, sc->enif.if_unit);
 #endif
+
 		pvcsif = (struct pvcsif *)ifp;
 		pvcreq->pvc_aph = pvcsif->sif_aph;
 		vci = pvcsif->sif_vci;

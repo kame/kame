@@ -1,4 +1,4 @@
-/*	$NetBSD: if_wivar.h,v 1.3 2000/02/04 07:48:29 explorer Exp $	*/
+/*	$NetBSD: if_wivar.h,v 1.9.4.2 2000/07/21 18:52:11 onoe Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -30,8 +30,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- *	$Id: if_wivar.h,v 1.3 2000/02/04 07:48:29 explorer Exp $
  */
 
 
@@ -47,18 +45,21 @@ struct wi_softc	{
 	struct pcmcia_function *sc_pf;
 	struct pcmcia_io_handle sc_pcioh;
 	int sc_iowin;
+	int sc_enabled;
+	int sc_prism2;
 
 	bus_space_tag_t		wi_btag;
 	bus_space_handle_t	wi_bhandle;
 
+	struct callout		wi_inquire_ch;
+
   	void *sc_sdhook;	/* saved shutdown hook for card */
 	void *sc_ih;
-	u_int8_t		sc_macaddr[6];
+	u_int8_t		sc_macaddr[ETHER_ADDR_LEN];
 	
-	struct ifmedia		ifmedia;
+	struct ifmedia		sc_media;
 	int			wi_tx_data_id;
 	int			wi_tx_mgmt_id;
-	int			wi_gone;
 	int			wi_if_flags;
 	u_int16_t		wi_ptype;
 	u_int16_t		wi_portnum;
@@ -70,17 +71,15 @@ struct wi_softc	{
 	u_int16_t		wi_channel;
 	u_int16_t		wi_pm_enabled;
 	u_int16_t		wi_max_sleep;
-	char			wi_node_name[32];
-	char			wi_net_name[32];
-	char			wi_ibss_name[32];
+
+	struct ieee80211_nwid	wi_nodeid;
+	struct ieee80211_nwid	wi_netid;
+	struct ieee80211_nwid	wi_ibssid;
+
 	u_int8_t		wi_txbuf[1596];
 	int                     wi_has_wep;
 	int                     wi_use_wep;
 	int                     wi_tx_key;
 	struct wi_ltv_keys      wi_keys;
 	struct wi_counters	wi_stats;
-
-	int			wi_resource; /* Resources alloc'ed on attach */
-#define WI_RES_IO	1
-#define WI_RES_NET	2
 };
