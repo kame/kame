@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.14 2000/12/04 06:45:30 itojun Exp $	*/
+/*	$KAME: pim6.c,v 1.15 2001/03/21 23:04:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -224,7 +224,7 @@ pim6_read(f, rfd)
     register int omask;
 #endif
 
-	pim6_recvlen = recvmsg(pim6_socket,&rcvmhpim,0);
+	pim6_recvlen = recvmsg(f, &rcvmhpim,0);
 
     if (pim6_recvlen < 0) {
         if (errno != EINTR)
