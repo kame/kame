@@ -237,12 +237,13 @@ in6_pcbbind(inp, nam, p)
 		if ((e = in6_pcbsetport(&inp->in6p_laddr, inp, p)) != 0)
 			return(e);
 	}
-	else
+	else {
 		inp->inp_lport = lport;
-	if (in_pcbinshash(inp) != 0) {
-		inp->in6p_laddr = in6addr_any;
-		inp->inp_lport = 0;
-		return (EAGAIN);
+		if (in_pcbinshash(inp) != 0) {
+			inp->in6p_laddr = in6addr_any;
+			inp->inp_lport = 0;
+			return (EAGAIN);
+		}
 	}
 	inp->in6p_flowinfo = sin6 ? sin6->sin6_flowinfo : 0;	/*XXX*/
 	return(0);
