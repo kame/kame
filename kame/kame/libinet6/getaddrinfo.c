@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.115 2001/07/04 16:45:10 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.116 2001/07/05 04:29:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -903,6 +903,8 @@ log_reorder(start, end, numeric, n)
 	strncpy(sun.sun_path, PATH_STATFILE, sizeof(sun.sun_path));
 	sendto(s, &stat, sizeof(stat), 0, (struct sockaddr *)&sun,
 	       sizeof(sun));
+
+	close(s);
 }
 #endif /* USE_LOG_REORDER */
 
