@@ -1,0 +1,8 @@
+# $FreeBSD: src/sys/modules/netgraph/fec/sample_startup,v 1.1 2002/10/29 19:12:44 julian Exp $
+kldload ./ng_fec.ko
+ngctl mkpeer fec dummy fec
+ngctl msg fec0: add_iface '"dc0"'
+ngctl msg fec0: add_iface '"dc1"'
+ngctl msg fec0: add_iface '"dc2"'
+ngctl msg fec0: add_iface '"dc3"'
+ngctl msg fec0: set_mode_inet

@@ -1,0 +1,91 @@
+# kern.pre.mk
+#
+# Unified Makefile for building kernels.  This includes all the definitions
+# that need to be included before %BEFORE_DEPEND
+#
+# $FreeBSD: src/sys/conf/kern.pre.mk,v 1.21 2002/10/19 22:24:43 mux Exp $
+#
+
+# Can be overridden by makeoptions or /etc/make.conf
+KERNEL_KO?=	kernel
+KERNEL?=	kernel
+KODIR?=		/boot/${KERNEL}
+
+M=	${MACHINE_ARCH}
+
+AWK?=		awk
+NM?=		nm
+OBJCOPY?=	objcopy
+SIZE?=		size
+
+COPTFLAGS?=-O -pipe
+.if !defined(NO_CPU_COPTFLAGS)
+COPTFLAGS+= ${_CPUCFLAGS}
+.endif
+INCLUDES= -nostdinc -I- ${INCLMAGIC} -I. -I$S -I$S/dev
+
+# This hack lets us use the Intel ACPICA code without spamming a new 
+# include path into 100+ source files.
+INCLUDES+= -I$S/contrib/dev/acpica
+
+# ... and the same for ipfilter
+INCLUDES+= -I$S/contrib/ipfilter
+
+COPTS=	${INCLUDES} -D_KERNEL -include opt_global.h
+CFLAGS=	${COPTFLAGS} ${CWARNFLAGS} ${DEBUG} ${COPTS} -fno-common
+
+# XXX LOCORE means "don't declare C stuff" not "for locore.s".
+ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${CFLAGS}
+
+.if defined(PROFLEVEL) && ${PROFLEVEL} >= 1
+CFLAGS+=	-DGPROF -falign-functions=16
+.if ${PROFLEVEL} >= 2
+CFLAGS+=	-DGPROF4 -DGUPROF
+# XXX -Wno-inline is to break some warnings.
+PROF=	-finstrument-functions -Wno-inline
+.else
+PROF=	-pg
+.endif
+.endif
+DEFINED_PROF=	${PROF}
+WERROR?=	-Werror
+
+# Put configuration-specific C flags last (except for ${PROF}) so that they
+# can override the others.
+CFLAGS+=	${CONF_CFLAGS}
+
+NORMAL_C= ${CC} -c ${CFLAGS} ${WERROR} ${PROF} ${.IMPSRC}
+NORMAL_S= ${CC} -c ${ASM_CFLAGS} ${WERROR} ${.IMPSRC}
+PROFILE_C= ${CC} -c ${CFLAGS} ${WERROR} ${.IMPSRC}
+NORMAL_C_NOWERROR= ${CC} -c ${CFLAGS} ${PROF} ${.IMPSRC}
+
+NORMAL_M= ${AWK} -f $S/tools/makeobjops.awk ${.IMPSRC} -c ; \
+	  ${CC} -c ${CFLAGS} ${WERROR} ${PROF} ${.PREFIX}.c
+
+GEN_CFILES= $S/$M/$M/genassym.c
+SYSTEM_CFILES= vnode_if.c hints.c env.c config.c
+SYSTEM_SFILES= $S/$M/$M/locore.s
+SYSTEM_DEP= Makefile ${SYSTEM_OBJS}
+SYSTEM_OBJS= locore.o vnode_if.o ${OBJS} hints.o env.o config.o hack.So
+SYSTEM_LD= @${LD} ${FMT} -Bdynamic -T $S/conf/ldscript.$M \
+	-warn-common -export-dynamic -dynamic-linker /red/herring \
+	-o ${.TARGET} -X ${SYSTEM_OBJS} vers.o
+SYSTEM_LD_TAIL= @${OBJCOPY} --strip-symbol gcc2_compiled. ${.TARGET} ; \
+	${SIZE} ${FMT} ${.TARGET} ; chmod 755 ${.TARGET}
+SYSTEM_DEP+= $S/conf/ldscript.$M
+
+# MKMODULESENV is set here so that port makefiles can augment
+# them.
+
+MKMODULESENV=	MAKEOBJDIRPREFIX=${.OBJDIR}/modules KMODDIR=${KODIR}
+.if (${KERN_IDENT} == LINT)
+MKMODULESENV+=	ALL_MODULES=LINT
+.endif
+.if defined(MODULES_OVERRIDE)
+MKMODULESENV+=	MODULES_OVERRIDE="${MODULES_OVERRIDE}"
+.endif
+.if defined(DEBUG)
+MKMODULESENV+=	DEBUG="${DEBUG}" DEBUG_FLAGS="${DEBUG}"
+.endif
+
+all:	${KERNEL_KO}
