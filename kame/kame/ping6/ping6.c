@@ -777,7 +777,7 @@ main(argc, argv)
 #if defined(SO_SNDBUF) && defined(SO_RCVBUF)
 	if (sockbufsize) {
 		if (datalen > sockbufsize)
-			warnx("you need -b to increae socket buffer size");
+			warnx("you need -b to increase socket buffer size");
 		if (setsockopt(s, SOL_SOCKET, SO_SNDBUF, &sockbufsize,
 			       sizeof(sockbufsize)) < 0)
 			err(1, "setsockopt(SO_SNDBUF)");
