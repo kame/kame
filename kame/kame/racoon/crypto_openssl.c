@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.30 2000/08/24 00:16:22 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.31 2000/08/24 00:24:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -101,7 +101,11 @@ eay_check_x509cert(cert, CApath)
 	X509_STORE *cert_ctx = NULL;
 	X509_LOOKUP *lookup = NULL;
 	X509 *x509 = NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x00905100L
 	X509_STORE_CTX *csc;
+#else
+	X509_STORE_CTX csc;
+#endif
 	int error = -1;
 
 	/* XXX define only functions required. */
@@ -156,12 +160,18 @@ eay_check_x509cert(cert, CApath)
 	if (x509 == NULL)
 		goto end;
 
+#if OPENSSL_VERSION_NUMBER >= 0x00905100L
 	csc = X509_STORE_CTX_new();
 	if (csc == NULL)
 		goto end;
 	X509_STORE_CTX_init(csc, cert_ctx, x509, NULL);
 	error = X509_verify_cert(csc);
 	X509_STORE_CTX_cleanup(csc);
+#else
+	X509_STORE_CTX_init(&csc, cert_ctx, x509, NULL);
+	error = X509_verify_cert(&csc);
+	X509_STORE_CTX_cleanup(&csc);
+#endif
 
 	/*
 	 * if x509_verify_cert() is successful then the value of error is
@@ -204,9 +214,11 @@ cb_check_cert(ok, ctx)
 		switch (ctx->error) {
 		case X509_V_ERR_CERT_HAS_EXPIRED:
 		case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+#if OPENSSL_VERSION_NUMBER >= 0x00905100L
 		case X509_V_ERR_INVALID_CA:
 		case X509_V_ERR_PATH_LENGTH_EXCEEDED:
 		case X509_V_ERR_INVALID_PURPOSE:
+#endif
 			ok = 1;
 			alarm = "WARNING";
 			break;
