@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.76 2002/02/04 14:24:50 jinmei Exp $	*/
+/*	$KAME: ip_encap.c,v 1.77 2002/02/05 01:04:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -889,7 +889,8 @@ encap6_ctlinput(cmd, sa, d0)
 		 * Check to see if we have a valid encap configuration.
 		 */
 		if (0) {	/* XXX: does not seem to work! */
-			match = encap6_lookup(m, off, nxt, sa6_src,
+			match = encap6_lookup(m, off, nxt,
+					      (struct sockaddr_in6 *)sa6_src,
 					      (struct sockaddr_in6 *)sa,
 					      OUTBOUND);
 
