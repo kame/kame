@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.5 2000/01/09 01:31:23 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.6 2000/01/10 17:27:15 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -932,6 +932,7 @@ t2ipsecsa(trns, sa)
 end:
 	return error;
 }
+
 /*
  * get proposal pairs from SA payload.
  * tiny check for proposal payload.
