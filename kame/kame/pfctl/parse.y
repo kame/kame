@@ -863,14 +863,14 @@ tabledef	: TABLE '<' STRING '>' table_opts {
 			if (pf->loadopt & PFCTL_FLAG_TABLE)
 				if (process_tabledef($3, &$5))
 					YYERROR;
-			for (ti = SIMPLEQ_FIRST(&$5.init_nodes); ti; ti = nti) {
+			for (ti = TAILQ_FIRST(&$5.init_nodes); ti; ti = nti) {
 				if (ti->file)
 					free(ti->file);
 				for (h = ti->host; h != NULL; h = nh) {
 					nh = h->next;
 					free(h);
 				}
-				nti = SIMPLEQ_NEXT(ti, entries);
+				nti = TAILQ_NEXT(ti, entries);
 				free (ti);
 			}
 		}
@@ -878,14 +878,14 @@ tabledef	: TABLE '<' STRING '>' table_opts {
 
 table_opts	:	{
 			bzero(&table_opts, sizeof table_opts);
-			SIMPLEQ_INIT(&table_opts.init_nodes);
+			TAILQ_INIT(&table_opts.init_nodes);
 		}
 		   table_opts_l
 			{ $$ = table_opts; }
 		| /* empty */
 			{
 			bzero(&table_opts, sizeof table_opts);
-			SIMPLEQ_INIT(&table_opts.init_nodes);
+			TAILQ_INIT(&table_opts.init_nodes);
 			$$ = table_opts;
 		}
 		;
@@ -931,7 +931,7 @@ table_opt	: STRING		{
 			if (!(ti = calloc(1, sizeof(*ti))))
 				err(1, "table_opt: calloc");
 			ti->host = $2;
-			SIMPLEQ_INSERT_TAIL(&table_opts.init_nodes, ti,
+			TAILQ_INSERT_TAIL(&table_opts.init_nodes, ti,
 			    entries);
 			table_opts.init_addr = 1;
 		}
@@ -941,7 +941,7 @@ table_opt	: STRING		{
 			if (!(ti = calloc(1, sizeof(*ti))))
 				err(1, "table_opt: calloc");
 			ti->file = $2;
-			SIMPLEQ_INSERT_TAIL(&table_opts.init_nodes, ti,
+			TAILQ_INSERT_TAIL(&table_opts.init_nodes, ti,
 			    entries);
 			table_opts.init_addr = 1;
 		}
@@ -3177,7 +3177,7 @@ process_tabledef(char *name, struct table_opts *opts)
 
 	bzero(&ab, sizeof(ab));
 	ab.pfrb_type = PFRB_ADDRS;
-	SIMPLEQ_FOREACH(ti, &opts->init_nodes, entries) {
+	TAILQ_FOREACH(ti, &opts->init_nodes, entries) {
 		if (ti->file)
 			if (pfr_buf_load(&ab, ti->file, 0, append_addr)) {
 				if (errno)
