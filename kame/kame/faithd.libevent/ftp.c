@@ -648,7 +648,7 @@ cmdin(s, event, arg)
 	cmd[p - relay->cli.buf] = '\0';
 
 	/* commands that are not relayed */
-	if (strcasecmp(cmd, "EPSV") == 0 && strcasestr(relay->cli.buf, "ALL")) {
+	if (strncasecmp(relay->cli.buf, "EPSV ALL", 8) == 0) {
 		relay->ser.len = snprintf(relay->ser.buf,
 		    sizeof(relay->ser.buf), "502 not implemented.\r\n");
 		event_add(&relay->cli.outbound, NULL);
