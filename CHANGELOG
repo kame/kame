@@ -1,7 +1,12 @@
-			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2453 2003/08/06 19:55:17 jinmei Exp $
+$KAME: CHANGELOG,v 1.2454 2003/08/07 02:48:35 t-momose Exp $
 
 <200308>
+2003-08-07  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+	* kame/kame/had/mpa.c,haadisc.c
+	A home address should be passed in the source address of a mobile
+	solicit pakcet. This problem was reported and donated the code by
+	Kenichi Yajima <yajima@netlab.nec.co.jp>
+	
 2003-08-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/cftoken.l: use a stronger lexical check for
 	interface names.
