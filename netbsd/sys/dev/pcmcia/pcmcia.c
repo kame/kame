@@ -1,4 +1,3 @@
-
 /*	$NetBSD: pcmcia.c,v 1.13 1998/12/24 04:51:59 marc Exp $	*/
 
 #define	PCMCIADEBUG
