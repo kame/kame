@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.59 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.60 2001/01/11 11:00:18 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,7 +407,7 @@ ip6_forward(m, srcrt)
 
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
-			/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_noroute) */
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_noroute);
 			if (mcopy) {
 				icmp6_error(mcopy, ICMP6_DST_UNREACH,
 					    ICMP6_DST_UNREACH_NOROUTE, 0);
@@ -433,7 +433,7 @@ ip6_forward(m, srcrt)
 #endif
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
-			/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_noroute) */
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_noroute);
 			if (mcopy) {
 				icmp6_error(mcopy, ICMP6_DST_UNREACH,
 					    ICMP6_DST_UNREACH_NOROUTE, 0);
