@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.19 2000/09/20 20:26:31 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.20 2000/09/20 22:28:02 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -63,7 +63,7 @@ vs Cryptek
 	  invalid-payload.
 
 vs SSH (IPv6)
-	phase 1: responder, aggressive
+	phase 1: aggressive
 	  either of the following:
 	    preshared, blowfish, md5, DH group 2
 	    preshared, 3des, sha1, DH group 2
@@ -131,13 +131,13 @@ vs Ericsson
 	- no fragment tests as Ericsson side would panic.
 
 vs Linux FreeSWAN
-	phase 1: responder, main
+	phase 1: main
 	    preshared, 3des-cbc, md5, DH group 2, lifetime 1h
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-md5, tunnel mode, lifetime 1h, PFS 2
 
 	rekey test:
-	phase 1: responder, main
+	phase 1: main
 	    preshared, 3des-cbc, md5, DH group 2, lifetime 1m
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-md5, tunnel mode, lifetime 20s, PFS 2
@@ -171,12 +171,12 @@ vs HiFn
 	  response last phase 2 packet.
 
 vs NxNetworks
-	phase 1: responder, main
+	phase 1: main
 	    preshared, 3des-cbc, sha1, DH group 2
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-sha1, tunnel mode, PFS 2
 
-	phase 1: responder, main
+	phase 1: main
 	    preshared, 3des-cbc, md5, DH group 2
 	phase 2: PFS group 2
 	    ESP blowfish, hmac-md5, tunnel mode, no PFS
@@ -186,10 +186,30 @@ vs NxNetworks
 	- phase 2 ID: (KAME) the gw itself (NxNet) net10 addr behind NxNet
 
 vs Intel (Packet Protect Pro/100S)
-	phase 1: responder, main
+	phase 1: main
 	    preshared, 3des-cbc, sha1, DH group 2
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-md5, transport mode, no PFS
 
 	Notes:
 	- fragmented ping works fine, large ftp transfer went well too
+
+vs NetLock
+	phase 1: main
+	    preshared, des-cbc, md5, DH group 1
+	phase 2: PFS group 2
+	    ESP des-cbc, hmac-md5, tunnel mode, no PFS
+
+	phase 1: main
+	    preshared, 3des-cbc, sha1, DH group 1
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-md5, tunnel mode, no PFS
+
+	phase 1: main
+	    preshared, 3des-cbc, sha1, DH group 1
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-md5, transport mode, no PFS
+
+	Notes:
+	- fragmented ping works fine, large ftp transfer went well too
+	- BSD userland (or socket layer?) limits UDP echo size to 4k
