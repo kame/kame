@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.393 2000/01/01 19:05:45 itojun Exp $
+$Id: CHANGELOG,v 1.394 2000/01/02 13:09:05 itojun Exp $
 
 <200001>
+Sun Jan  2 22:07:54 JST 2000  itojun@iijlab.net
+	* kame/tcpdump/isakmp.h, kame/racoon/isakmp.h:
+	  avoid use of bitfield on packet format definition.  it is
+	  non-portable.
+	* kame/Makefile.inc: added it to share definitions across top-level
+	  Makefile and platform Makefile (like netbsd/Makefile).
+	  NOTE: if you use anoncvs, you may need to checkout Makefile.inc
+	  manually.
+
 Sun Jan  2 03:46:57 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.[ch]: add net.inet6.icmp6.nodeinfo sysctl MIB,
 	  which enables/disables node information query processing in the
