@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.13 2001/06/27 07:13:39 art Exp $
+#	$OpenBSD: Makefile,v 1.14 2002/02/17 07:52:38 hugh Exp $
 
 PROG=	systat
 
@@ -20,6 +20,11 @@ LDADD+= -L${.CURDIR}/../../lib/libinet6 \
 DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+
+.if (${MACHINE_ARCH} == "vax")
+cmds.o:
+	${CC} ${CFLAGS} ${CPPFLAGS} -O0 -c $<
+.endif
 
 .include <bsd.prog.mk>
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.26 2001/09/04 23:35:59 millert Exp $	*/
+/*	$OpenBSD: if.c,v 1.29 2002/02/16 21:27:50 millert Exp $	*/
 /*	$NetBSD: if.c,v 1.16.4.2 1996/06/07 21:46:46 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)if.c	8.2 (Berkeley) 2/21/94";
 #else
-static char *rcsid = "$OpenBSD: if.c,v 1.26 2001/09/04 23:35:59 millert Exp $";
+static char *rcsid = "$OpenBSD: if.c,v 1.29 2002/02/16 21:27:50 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -71,8 +71,8 @@ static char *rcsid = "$OpenBSD: if.c,v 1.26 2001/09/04 23:35:59 millert Exp $";
 #define	YES	1
 #define	NO	0
 
-static void sidewaysintpr __P((u_int, u_long));
-static void catchalarm __P((int));
+static void sidewaysintpr(u_int, u_long);
+static void catchalarm(int);
 
 /*
  * Print a description of the network interfaces.
@@ -137,7 +137,7 @@ intpr(interval, ifnetaddr)
 #ifdef INET6
 		struct sockaddr_in6 *sin6;
 #endif
-		register char *cp;
+		char *cp;
 		int n, m;
 
 		if (ifaddraddr == 0) {
@@ -216,7 +216,7 @@ intpr(interval, ifnetaddr)
 				if (aflag) {
 					u_long multiaddr;
 					struct in_multi inm;
-		
+
 					multiaddr = (u_long)ifaddr.in.ia_multiaddrs.lh_first;
 					while (multiaddr != 0) {
 						kread(multiaddr, (char *)&inm,
@@ -259,7 +259,7 @@ intpr(interval, ifnetaddr)
 					u_long multiaddr;
 					struct in6_multi inm;
 					char hbuf[INET6_ADDRSTRLEN];
-		
+
 					multiaddr = (u_long)ifaddr.in6.ia6_multiaddrs.lh_first;
 					while (multiaddr != 0) {
 						kread(multiaddr, (char *)&inm,
@@ -391,8 +391,8 @@ sidewaysintpr(interval, off)
 {
 	struct ifnet ifnet;
 	u_long firstifnet;
-	register struct iftot *ip, *total;
-	register int line;
+	struct iftot *ip, *total;
+	int line;
 	struct iftot *lastif, *sum, *interesting;
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
 	sigset_t emptyset;

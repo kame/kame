@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet6.c,v 1.15 2001/06/13 02:29:15 itojun Exp $	*/
+/*	$OpenBSD: inet6.c,v 1.19 2002/02/19 18:38:02 mpech Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$OpenBSD: inet6.c,v 1.15 2001/06/13 02:29:15 itojun Exp $");*/
+/*__RCSID("$OpenBSD: inet6.c,v 1.19 2002/02/19 18:38:02 mpech Exp $");*/
 /*__RCSID("KAME Id: inet6.c,v 1.10 2000/02/09 10:49:31 itojun Exp");*/
 #endif
 #endif /* not lint */
@@ -80,8 +80,8 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 
 struct	socket sockb;
 
-char	*inet6name __P((struct in6_addr *));
-void	inet6print __P((struct in6_addr *, int, char *));
+char	*inet6name(struct in6_addr *);
+void	inet6print(struct in6_addr *, int, char *);
 
 static	char *ip6nh[] = {
 	"hop by hop",
@@ -103,7 +103,7 @@ static	char *ip6nh[] = {
 	"#16",
 	"UDP",
 	"#18",
-	"#19",	
+	"#19",
 	"#20",
 	"#21",
 	"IDP",
@@ -113,7 +113,7 @@ static	char *ip6nh[] = {
 	"#26",
 	"#27",
 	"#28",
-	"TP",	
+	"TP",
 	"#30",
 	"#31",
 	"#32",
@@ -123,7 +123,7 @@ static	char *ip6nh[] = {
 	"#36",
 	"#37",
 	"#38",
-	"#39",	
+	"#39",
 	"#40",
 	"IP6",
 	"#42",
@@ -133,7 +133,7 @@ static	char *ip6nh[] = {
 	"#46",
 	"#47",
 	"#48",
-	"#49",	
+	"#49",
 	"ESP",
 	"AH",
 	"#52",
@@ -143,7 +143,7 @@ static	char *ip6nh[] = {
 	"#56",
 	"#57",
 	"ICMP6",
-	"no next header",	
+	"no next header",
 	"destination option",
 	"#61",
 	"#62",
@@ -153,7 +153,7 @@ static	char *ip6nh[] = {
 	"#66",
 	"#67",
 	"#68",
-	"#69",	
+	"#69",
 	"#70",
 	"#71",
 	"#72",
@@ -163,7 +163,7 @@ static	char *ip6nh[] = {
 	"#76",
 	"#77",
 	"#78",
-	"#79",	
+	"#79",
 	"ISOIP",
 	"#81",
 	"#82",
@@ -173,7 +173,7 @@ static	char *ip6nh[] = {
 	"#86",
 	"#87",
 	"#88",
-	"OSPF",	
+	"OSPF",
 	"#80",
 	"#91",
 	"#92",
@@ -183,7 +183,7 @@ static	char *ip6nh[] = {
 	"#96",
 	"Ethernet",
 	"#98",
-	"#99",	
+	"#99",
 	"#100",
 	"#101",
 	"#102",
@@ -193,7 +193,7 @@ static	char *ip6nh[] = {
 	"#106",
 	"#107",
 	"#108",
-	"#109",	
+	"#109",
 	"#110",
 	"#111",
 	"#112",
@@ -203,7 +203,7 @@ static	char *ip6nh[] = {
 	"#116",
 	"#117",
 	"#118",
-	"#119",	
+	"#119",
 	"#120",
 	"#121",
 	"#122",
@@ -213,7 +213,7 @@ static	char *ip6nh[] = {
 	"#126",
 	"#127",
 	"#128",
-	"#129",	
+	"#129",
 	"#130",
 	"#131",
 	"#132",
@@ -223,7 +223,7 @@ static	char *ip6nh[] = {
 	"#136",
 	"#137",
 	"#138",
-	"#139",	
+	"#139",
 	"#140",
 	"#141",
 	"#142",
@@ -233,7 +233,7 @@ static	char *ip6nh[] = {
 	"#146",
 	"#147",
 	"#148",
-	"#149",	
+	"#149",
 	"#150",
 	"#151",
 	"#152",
@@ -243,7 +243,7 @@ static	char *ip6nh[] = {
 	"#156",
 	"#157",
 	"#158",
-	"#159",	
+	"#159",
 	"#160",
 	"#161",
 	"#162",
@@ -253,7 +253,7 @@ static	char *ip6nh[] = {
 	"#166",
 	"#167",
 	"#168",
-	"#169",	
+	"#169",
 	"#170",
 	"#171",
 	"#172",
@@ -263,7 +263,7 @@ static	char *ip6nh[] = {
 	"#176",
 	"#177",
 	"#178",
-	"#179",	
+	"#179",
 	"#180",
 	"#181",
 	"#182",
@@ -273,7 +273,7 @@ static	char *ip6nh[] = {
 	"#186",
 	"#187",
 	"#188",
-	"#189",	
+	"#189",
 	"#180",
 	"#191",
 	"#192",
@@ -283,7 +283,7 @@ static	char *ip6nh[] = {
 	"#196",
 	"#197",
 	"#198",
-	"#199",	
+	"#199",
 	"#200",
 	"#201",
 	"#202",
@@ -293,7 +293,7 @@ static	char *ip6nh[] = {
 	"#206",
 	"#207",
 	"#208",
-	"#209",	
+	"#209",
 	"#210",
 	"#211",
 	"#212",
@@ -303,7 +303,7 @@ static	char *ip6nh[] = {
 	"#216",
 	"#217",
 	"#218",
-	"#219",	
+	"#219",
 	"#220",
 	"#221",
 	"#222",
@@ -313,7 +313,7 @@ static	char *ip6nh[] = {
 	"#226",
 	"#227",
 	"#228",
-	"#229",	
+	"#229",
 	"#230",
 	"#231",
 	"#232",
@@ -323,7 +323,7 @@ static	char *ip6nh[] = {
 	"#236",
 	"#237",
 	"#238",
-	"#239",	
+	"#239",
 	"#240",
 	"#241",
 	"#242",
@@ -333,7 +333,7 @@ static	char *ip6nh[] = {
 	"#246",
 	"#247",
 	"#248",
-	"#249",	
+	"#249",
 	"#250",
 	"#251",
 	"#252",
@@ -413,7 +413,7 @@ ip6_stats(off, name)
 	p(ip6s_m1, "\t\t%llu one mbuf%s\n");
 	for (first = 1, i = 0; i < 32; i++) {
 		char ifbuf[IFNAMSIZ];
-		if (ip6stat.ip6s_m2m[i] != 0) {		
+		if (ip6stat.ip6s_m2m[i] != 0) {
 			if (first) {
 				printf("\t\ttwo or more mbuf:\n");
 				first = 0;
@@ -584,7 +584,7 @@ static	char *icmp6names[] = {
 	"#16",
 	"#17",
 	"#18",
-	"#19",	
+	"#19",
 	"#20",
 	"#21",
 	"#22",
@@ -594,7 +594,7 @@ static	char *icmp6names[] = {
 	"#26",
 	"#27",
 	"#28",
-	"#29",	
+	"#29",
 	"#30",
 	"#31",
 	"#32",
@@ -604,7 +604,7 @@ static	char *icmp6names[] = {
 	"#36",
 	"#37",
 	"#38",
-	"#39",	
+	"#39",
 	"#40",
 	"#41",
 	"#42",
@@ -614,7 +614,7 @@ static	char *icmp6names[] = {
 	"#46",
 	"#47",
 	"#48",
-	"#49",	
+	"#49",
 	"#50",
 	"#51",
 	"#52",
@@ -624,7 +624,7 @@ static	char *icmp6names[] = {
 	"#56",
 	"#57",
 	"#58",
-	"#59",	
+	"#59",
 	"#60",
 	"#61",
 	"#62",
@@ -634,7 +634,7 @@ static	char *icmp6names[] = {
 	"#66",
 	"#67",
 	"#68",
-	"#69",	
+	"#69",
 	"#70",
 	"#71",
 	"#72",
@@ -644,7 +644,7 @@ static	char *icmp6names[] = {
 	"#76",
 	"#77",
 	"#78",
-	"#79",	
+	"#79",
 	"#80",
 	"#81",
 	"#82",
@@ -654,7 +654,7 @@ static	char *icmp6names[] = {
 	"#86",
 	"#87",
 	"#88",
-	"#89",	
+	"#89",
 	"#80",
 	"#91",
 	"#92",
@@ -664,7 +664,7 @@ static	char *icmp6names[] = {
 	"#96",
 	"#97",
 	"#98",
-	"#99",	
+	"#99",
 	"#100",
 	"#101",
 	"#102",
@@ -674,7 +674,7 @@ static	char *icmp6names[] = {
 	"#106",
 	"#107",
 	"#108",
-	"#109",	
+	"#109",
 	"#110",
 	"#111",
 	"#112",
@@ -684,7 +684,7 @@ static	char *icmp6names[] = {
 	"#116",
 	"#117",
 	"#118",
-	"#119",	
+	"#119",
 	"#120",
 	"#121",
 	"#122",
@@ -694,7 +694,7 @@ static	char *icmp6names[] = {
 	"#126",
 	"#127",
 	"echo",
-	"echo reply",	
+	"echo reply",
 	"multicast listener query",
 	"multicast listener report",
 	"multicast listener done",
@@ -714,7 +714,7 @@ static	char *icmp6names[] = {
 	"#146",
 	"#147",
 	"#148",
-	"#149",	
+	"#149",
 	"#150",
 	"#151",
 	"#152",
@@ -724,7 +724,7 @@ static	char *icmp6names[] = {
 	"#156",
 	"#157",
 	"#158",
-	"#159",	
+	"#159",
 	"#160",
 	"#161",
 	"#162",
@@ -734,7 +734,7 @@ static	char *icmp6names[] = {
 	"#166",
 	"#167",
 	"#168",
-	"#169",	
+	"#169",
 	"#170",
 	"#171",
 	"#172",
@@ -744,7 +744,7 @@ static	char *icmp6names[] = {
 	"#176",
 	"#177",
 	"#178",
-	"#179",	
+	"#179",
 	"#180",
 	"#181",
 	"#182",
@@ -754,7 +754,7 @@ static	char *icmp6names[] = {
 	"#186",
 	"#187",
 	"#188",
-	"#189",	
+	"#189",
 	"#180",
 	"#191",
 	"#192",
@@ -764,7 +764,7 @@ static	char *icmp6names[] = {
 	"#196",
 	"#197",
 	"#198",
-	"#199",	
+	"#199",
 	"#200",
 	"#201",
 	"#202",
@@ -774,7 +774,7 @@ static	char *icmp6names[] = {
 	"#206",
 	"#207",
 	"#208",
-	"#209",	
+	"#209",
 	"#210",
 	"#211",
 	"#212",
@@ -784,7 +784,7 @@ static	char *icmp6names[] = {
 	"#216",
 	"#217",
 	"#218",
-	"#219",	
+	"#219",
 	"#220",
 	"#221",
 	"#222",
@@ -794,7 +794,7 @@ static	char *icmp6names[] = {
 	"#226",
 	"#227",
 	"#228",
-	"#229",	
+	"#229",
 	"#230",
 	"#231",
 	"#232",
@@ -804,7 +804,7 @@ static	char *icmp6names[] = {
 	"#236",
 	"#237",
 	"#238",
-	"#239",	
+	"#239",
 	"#240",
 	"#241",
 	"#242",
@@ -814,7 +814,7 @@ static	char *icmp6names[] = {
 	"#246",
 	"#247",
 	"#248",
-	"#249",	
+	"#249",
 	"#250",
 	"#251",
 	"#252",
@@ -832,7 +832,7 @@ icmp6_stats(off, name)
 	char *name;
 {
 	struct icmp6stat icmp6stat;
-	register int i, first;
+	int i, first;
 
 	if (off == 0)
 		return;
@@ -930,7 +930,7 @@ icmp6_ifstats(ifname)
 	}
 
 	p(ifs6_in_msg, "\t%llu total input message%s\n");
-	p(ifs6_in_error, "\t%llu total input error message%s\n"); 
+	p(ifs6_in_error, "\t%llu total input error message%s\n");
 	p(ifs6_in_dstunreach, "\t%llu input destination unreachable error%s\n");
 	p(ifs6_in_adminprohib, "\t%llu input administratively prohibited error%s\n");
 	p(ifs6_in_timeexceed, "\t%llu input time exceeded error%s\n");
@@ -1040,7 +1040,7 @@ rip6_stats(off, name)
 
 void
 inet6print(in6, port, proto)
-	register struct in6_addr *in6;
+	struct in6_addr *in6;
 	int port;
 	char *proto;
 {
@@ -1084,10 +1084,10 @@ char *
 inet6name(in6p)
 	struct in6_addr *in6p;
 {
-	register char *cp;
+	char *cp;
 	static char line[NI_MAXHOST];
 	struct hostent *hp;
-	static char domain[MAXHOSTNAMELEN + 1];
+	static char domain[MAXHOSTNAMELEN];
 	static int first = 1;
 	char hbuf[NI_MAXHOST];
 	struct sockaddr_in6 sin6;
@@ -1099,7 +1099,7 @@ inet6name(in6p)
 
 	if (first && !nflag) {
 		first = 0;
-		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
+		if (gethostname(domain, sizeof(domain)) == 0 &&
 		    (cp = index(domain, '.')))
 			(void) strcpy(domain, cp + 1);
 		else

@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet.c,v 1.53 2001/08/26 09:42:04 brian Exp $	*/
+/*	$OpenBSD: inet.c,v 1.58 2002/02/19 21:11:23 miod Exp $	*/
 /*	$NetBSD: inet.c,v 1.14 1995/10/03 21:42:37 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-static char *rcsid = "$OpenBSD: inet.c,v 1.53 2001/08/26 09:42:04 brian Exp $";
+static char *rcsid = "$OpenBSD: inet.c,v 1.58 2002/02/19 21:11:23 miod Exp $";
 #endif
 #endif /* not lint */
 
@@ -92,13 +92,13 @@ struct	inpcb inpcb;
 struct	tcpcb tcpcb;
 struct	socket sockb;
 
-static void protopr0 __P((u_long, char *, int));
+static void protopr0(u_long, char *, int);
 
-char	*inetname __P((struct in_addr *));
-void	inetprint __P((struct in_addr *, int, char *, int));
+char	*inetname(struct in_addr *);
+void	inetprint(struct in_addr *, int, char *, int);
 #ifdef INET6
-char	*inet6name __P((struct in6_addr *));
-void	inet6print __P((struct in6_addr *, int, char *, int));
+char	*inet6name(struct in6_addr *);
+void	inet6print(struct in6_addr *, int, char *, int);
 #endif
 
 /*
@@ -132,10 +132,10 @@ protopr0(off, name, af)
 	int af;
 {
 	struct inpcbtable table;
-	register struct inpcb *head, *next, *prev;
+	struct inpcb *head, *next, *prev;
 	struct inpcb inpcb;
 	int istcp;
-	static int first = 1;
+	int first = 1;
 	char *name0;
 	char namebuf[20];
 
@@ -295,7 +295,7 @@ tcp_stats(off, name)
 	p(tcps_rcvbadsum, "\t\t%u discarded for bad checksum%s\n");
 	p(tcps_rcvbadoff, "\t\t%u discarded for bad header offset field%s\n");
 	p1(tcps_rcvshort, "\t\t%u discarded because packet too short\n");
-	p1(tcps_rcvnosec, "\t\t%u discarded for missing IPSec protection\n");
+	p1(tcps_rcvnosec, "\t\t%u discarded for missing IPsec protection\n");
 	p(tcps_inhwcsum, "\t\t%u packet%s hardware-checksummed\n");
 	p(tcps_connattempt, "\t%u connection request%s\n");
 	p(tcps_accepts, "\t%u connection accept%s\n");
@@ -362,7 +362,7 @@ udp_stats(off, name)
 	p(udps_outhwcsum, "\t%lu output packet%s hardware-checksummed\n");
 	p1(udps_noport, "\t%lu dropped due to no socket\n");
 	p(udps_noportbcast, "\t%lu broadcast/multicast datagram%s dropped due to no socket\n");
-	p1(udps_nosec, "\t%lu dropped due to missing IPSec protection\n");
+	p1(udps_nosec, "\t%lu dropped due to missing IPsec protection\n");
 	p1(udps_fullsock, "\t%lu dropped due to full socket buffers\n");
 	delivered = udpstat.udps_ipackets -
 		    udpstat.udps_hdrops -
@@ -465,7 +465,7 @@ icmp_stats(off, name)
 	char *name;
 {
 	struct icmpstat icmpstat;
-	register int i, first;
+	int i, first;
 
 	if (off == 0)
 		return;
@@ -524,14 +524,14 @@ igmp_stats(off, name)
 #define	py(f, m) if (igmpstat.f || sflag <= 1) \
     printf(m, igmpstat.f, igmpstat.f != 1 ? "ies" : "y")
 	p(igps_rcv_total, "\t%lu message%s received\n");
-        p(igps_rcv_tooshort, "\t%lu message%s received with too few bytes\n");
-        p(igps_rcv_badsum, "\t%lu message%s received with bad checksum\n");
-        py(igps_rcv_queries, "\t%lu membership quer%s received\n");
-        py(igps_rcv_badqueries, "\t%lu membership quer%s received with invalid field(s)\n");
-        p(igps_rcv_reports, "\t%lu membership report%s received\n");
-        p(igps_rcv_badreports, "\t%lu membership report%s received with invalid field(s)\n");
-        p(igps_rcv_ourreports, "\t%lu membership report%s received for groups to which we belong\n");
-        p(igps_snd_reports, "\t%lu membership report%s sent\n");
+	p(igps_rcv_tooshort, "\t%lu message%s received with too few bytes\n");
+	p(igps_rcv_badsum, "\t%lu message%s received with bad checksum\n");
+	py(igps_rcv_queries, "\t%lu membership quer%s received\n");
+	py(igps_rcv_badqueries, "\t%lu membership quer%s received with invalid field(s)\n");
+	p(igps_rcv_reports, "\t%lu membership report%s received\n");
+	p(igps_rcv_badreports, "\t%lu membership report%s received with invalid field(s)\n");
+	p(igps_rcv_ourreports, "\t%lu membership report%s received for groups to which we belong\n");
+	p(igps_snd_reports, "\t%lu membership report%s sent\n");
 #undef p
 #undef py
 }
@@ -549,17 +549,17 @@ getrpcportnam(port, proto)
 	int proto;
 {
 	struct sockaddr_in server_addr;
-	register struct hostent *hp;
+	struct hostent *hp;
 	static struct pmaplist *head;
 	int socket = RPC_ANYSOCK;
 	struct timeval minutetimeout;
-	register CLIENT *client;
+	CLIENT *client;
 	struct rpcent *rpc;
 	static int first;
 	static struct rpcnams *rpcn;
 	struct rpcnams *n;
 	char num[20];
-	
+
 	if (first == 0) {
 		first = 1;
 		memset((char *)&server_addr, 0, sizeof server_addr);
@@ -614,7 +614,7 @@ getrpcportnam(port, proto)
  */
 void
 inetprint(in, port, proto, local)
-	register struct in_addr *in;
+	struct in_addr *in;
 	in_port_t port;
 	char *proto;
 	int local;
@@ -650,16 +650,16 @@ char *
 inetname(inp)
 	struct in_addr *inp;
 {
-	register char *cp;
+	char *cp;
 	static char line[50];
 	struct hostent *hp;
 	struct netent *np;
-	static char domain[MAXHOSTNAMELEN + 1];
+	static char domain[MAXHOSTNAMELEN];
 	static int first = 1;
 
 	if (first && !nflag) {
 		first = 0;
-		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
+		if (gethostname(domain, sizeof(domain)) == 0 &&
 		    (cp = strchr(domain, '.')))
 			(void) strcpy(domain, cp + 1);
 		else
@@ -704,15 +704,15 @@ inetname(inp)
  */
 void
 ah_stats(off, name)
-        u_long off;
-        char *name;
+	u_long off;
+	char *name;
 {
-        struct ahstat ahstat;
+	struct ahstat ahstat;
 
-        if (off == 0)
-                return;
-        kread(off, (char *)&ahstat, sizeof (ahstat));
-        printf("%s:\n", name);
+	if (off == 0)
+		return;
+	kread(off, (char *)&ahstat, sizeof (ahstat));
+	printf("%s:\n", name);
 
 #define p(f, m) if (ahstat.f || sflag <= 1) \
     printf(m, ahstat.f, plural(ahstat.f))
@@ -721,17 +721,17 @@ ah_stats(off, name)
 
 	p1(ahs_input, "\t%u input AH packets\n");
 	p1(ahs_output, "\t%u output AH packets\n");
-        p(ahs_nopf, "\t%u packet%s from unsupported protocol families\n");
-        p(ahs_hdrops, "\t%u packet%s shorter than header shows\n");
-        p(ahs_pdrops, "\t%u packet%s dropped due to policy\n");
-        p(ahs_notdb, "\t%u packet%s for which no TDB was found\n");
-        p(ahs_badkcr, "\t%u input packet%s that failed to be processed\n");
-        p(ahs_badauth, "\t%u packet%s that failed verification received\n");
-        p(ahs_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");
-        p(ahs_qfull, "\t%u packet%s were dropped due to full output queue\n");
-        p(ahs_wrap, "\t%u packet%s where counter wrapping was detected\n");
-        p(ahs_replay, "\t%u possibly replayed packet%s received\n");
-        p(ahs_badauthl, "\t%u packet%s with bad authenticator length received\n");
+	p(ahs_nopf, "\t%u packet%s from unsupported protocol families\n");
+	p(ahs_hdrops, "\t%u packet%s shorter than header shows\n");
+	p(ahs_pdrops, "\t%u packet%s dropped due to policy\n");
+	p(ahs_notdb, "\t%u packet%s for which no TDB was found\n");
+	p(ahs_badkcr, "\t%u input packet%s that failed to be processed\n");
+	p(ahs_badauth, "\t%u packet%s that failed verification received\n");
+	p(ahs_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");
+	p(ahs_qfull, "\t%u packet%s were dropped due to full output queue\n");
+	p(ahs_wrap, "\t%u packet%s where counter wrapping was detected\n");
+	p(ahs_replay, "\t%u possibly replayed packet%s received\n");
+	p(ahs_badauthl, "\t%u packet%s with bad authenticator length received\n");
 	p(ahs_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
 	p(ahs_toobig, "\t%u packet%s got larger than max IP packet size\n");
 	p(ahs_crypto, "\t%u packet%s that failed crypto processing\n");
@@ -750,13 +750,12 @@ etherip_stats(off, name)
 	u_long off;
 	char *name;
 {
-        struct etheripstat etheripstat;
+	struct etheripstat etheripstat;
 
-	
-        if (off == 0)
-                return;
-        kread(off, (char *)&etheripstat, sizeof (etheripstat));
-        printf("%s:\n", name);
+	if (off == 0)
+		return;
+	kread(off, (char *)&etheripstat, sizeof (etheripstat));
+	printf("%s:\n", name);
 
 #define p(f, m) if (etheripstat.f || sflag <= 1) \
     printf(m, etheripstat.f, plural(etheripstat.f))
@@ -779,34 +778,33 @@ etherip_stats(off, name)
  */
 void
 esp_stats(off, name)
-        u_long off;
-        char *name;
+	u_long off;
+	char *name;
 {
-        struct espstat espstat;
+	struct espstat espstat;
 
-	
-        if (off == 0)
-                return;
-        kread(off, (char *)&espstat, sizeof (espstat));
-        printf("%s:\n", name);
+	if (off == 0)
+		return;
+	kread(off, (char *)&espstat, sizeof (espstat));
+	printf("%s:\n", name);
 
 #define p(f, m) if (espstat.f || sflag <= 1) \
     printf(m, espstat.f, plural(espstat.f))
 
 	p(esps_input, "\t%u input ESP packet%s\n");
 	p(esps_output, "\t%u output ESP packet%s\n");
-        p(esps_nopf, "\t%u packet%s from unsupported protocol families\n");
-        p(esps_hdrops, "\t%u packet%s shorter than header shows\n");
-        p(esps_pdrops, "\t%u packet%s dropped due to policy\n");
-        p(esps_notdb, "\t%u packet%s for which no TDB was found\n");
-        p(esps_badkcr, "\t%u input packet%s that failed to be processed\n");
-        p(esps_badenc, "\t%u packet%s with bad encryption received\n");
-        p(esps_badauth, "\t%u packet%s that failed verification received\n");
-        p(esps_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");   
-        p(esps_qfull, "\t%u packet%s were dropped due to full output queue\n");
-        p(esps_wrap, "\t%u packet%s where counter wrapping was detected\n");
-        p(esps_replay, "\t%u possibly replayed packet%s received\n"); 
-        p(esps_badilen, "\t%u packet%s with bad payload size or padding received\n");
+	p(esps_nopf, "\t%u packet%s from unsupported protocol families\n");
+	p(esps_hdrops, "\t%u packet%s shorter than header shows\n");
+	p(esps_pdrops, "\t%u packet%s dropped due to policy\n");
+	p(esps_notdb, "\t%u packet%s for which no TDB was found\n");
+	p(esps_badkcr, "\t%u input packet%s that failed to be processed\n");
+	p(esps_badenc, "\t%u packet%s with bad encryption received\n");
+	p(esps_badauth, "\t%u packet%s that failed verification received\n");
+	p(esps_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");
+	p(esps_qfull, "\t%u packet%s were dropped due to full output queue\n");
+	p(esps_wrap, "\t%u packet%s where counter wrapping was detected\n");
+	p(esps_replay, "\t%u possibly replayed packet%s received\n");
+	p(esps_badilen, "\t%u packet%s with bad payload size or padding received\n");
 	p(esps_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
 	p(esps_toobig, "\t%u packet%s got larger than max IP packet size\n");
 	p(esps_crypto, "\t%u packet%s that failed crypto processing\n");
@@ -821,25 +819,25 @@ esp_stats(off, name)
  */
 void
 ipip_stats(off, name)
-        u_long off;
-        char *name;
+	u_long off;
+	char *name;
 {
-        struct ipipstat ipipstat;
+	struct ipipstat ipipstat;
 
-        if (off == 0)
-                return;
-        kread(off, (char *)&ipipstat, sizeof (ipipstat));
-        printf("%s:\n", name);
+	if (off == 0)
+		return;
+	kread(off, (char *)&ipipstat, sizeof (ipipstat));
+	printf("%s:\n", name);
 
 #define p(f, m) if (ipipstat.f || sflag <= 1) \
     printf(m, ipipstat.f, plural(ipipstat.f))
 
-        p(ipips_ipackets, "\t%u total input packet%s\n");
-        p(ipips_opackets, "\t%u total output packet%s\n");
-        p(ipips_hdrops, "\t%u packet%s shorter than header shows\n");
-        p(ipips_pdrops, "\t%u packet%s dropped due to policy\n");
-        p(ipips_spoof, "\t%u packet%s with possibly spoofed local addresses\n");
-        p(ipips_qfull, "\t%u packet%s were dropped due to full output queue\n");
+	p(ipips_ipackets, "\t%u total input packet%s\n");
+	p(ipips_opackets, "\t%u total output packet%s\n");
+	p(ipips_hdrops, "\t%u packet%s shorter than header shows\n");
+	p(ipips_pdrops, "\t%u packet%s dropped due to policy\n");
+	p(ipips_spoof, "\t%u packet%s with possibly spoofed local addresses\n");
+	p(ipips_qfull, "\t%u packet%s were dropped due to full output queue\n");
 	p(ipips_ibytes, "\t%qu input byte%s\n");
 	p(ipips_obytes, "\t%qu output byte%s\n");
 	p(ipips_family, "\t%u protocol family mismatches\n");
@@ -857,7 +855,6 @@ ipcomp_stats(off, name)
 {
 	struct ipcompstat ipcompstat;
 
-	
 	if (off == 0)
 		return;
 	kread(off, (char *)&ipcompstat, sizeof (ipcompstat));
@@ -873,7 +870,7 @@ ipcomp_stats(off, name)
 	p(ipcomps_pdrops, "\t%u packet%s dropped due to policy\n");
 	p(ipcomps_notdb, "\t%u packet%s for which no TDB was found\n");
 	p(ipcomps_badkcr, "\t%u input packet%s that failed to be processed\n");
-	p(ipcomps_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");   
+	p(ipcomps_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");
 	p(ipcomps_qfull, "\t%u packet%s were dropped due to full output queue\n");
 	p(ipcomps_wrap, "\t%u packet%s where counter wrapping was detected\n");
 	p(ipcomps_invalid, "\t%u packet%s attempted to use an invalid tdb\n");

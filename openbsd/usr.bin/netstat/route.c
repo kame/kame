@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.42 2001/10/09 09:21:10 brian Exp $	*/
+/*	$OpenBSD: route.c,v 1.45 2002/02/16 21:27:50 millert Exp $	*/
 /*	$NetBSD: route.c,v 1.15 1996/05/07 02:55:06 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-static char *rcsid = "$OpenBSD: route.c,v 1.42 2001/10/09 09:21:10 brian Exp $";
+static char *rcsid = "$OpenBSD: route.c,v 1.45 2002/02/16 21:27:50 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -127,15 +127,15 @@ struct	radix_mask rmask;
 
 int	NewTree = 0;
 
-static struct sockaddr *kgetsa __P((struct sockaddr *));
-static void p_tree __P((struct radix_node *));
-static void p_rtnode __P(());
-static void ntreestuff __P(());
-static void np_rtentry __P((struct rt_msghdr *));
-static void p_sockaddr __P((struct sockaddr *, struct sockaddr *, int, int));
-static void p_flags __P((int, char *));
-static void p_rtentry __P((struct rtentry *));
-static void encap_print __P((struct rtentry *));
+static struct sockaddr *kgetsa(struct sockaddr *);
+static void p_tree(struct radix_node *);
+static void p_rtnode();
+static void ntreestuff();
+static void np_rtentry(struct rt_msghdr *);
+static void p_sockaddr(struct sockaddr *, struct sockaddr *, int, int);
+static void p_flags(int, char *);
+static void p_rtentry(struct rtentry *);
+static void encap_print(struct rtentry *);
 
 /*
  * Print routing tables.
@@ -197,7 +197,7 @@ pr_family(af)
 	case AF_INET6:
 		afname = "Internet6";
 		break;
-#endif 
+#endif
 	case AF_NS:
 		afname = "XNS";
 		break;
@@ -268,13 +268,13 @@ pr_encaphdr()
 	if (Aflag)
 		printf("%-*s ", PLEN, "Address");
 	printf("%-18s %-5s %-18s %-5s %-5s %-22s\n",
-	    "Source", "Port", "Destination", 
+	    "Source", "Port", "Destination",
 	    "Port", "Proto", "SA(Address/Proto/Type/Direction)");
 }
 
 static struct sockaddr *
 kgetsa(dst)
-	register struct sockaddr *dst;
+	struct sockaddr *dst;
 {
 
 	kget(dst, pt_u.u_sa);
@@ -358,7 +358,7 @@ ntreestuff()
 	size_t needed;
 	int mib[6];
 	char *buf, *next, *lim;
-	register struct rt_msghdr *rtm;
+	struct rt_msghdr *rtm;
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -374,7 +374,7 @@ ntreestuff()
 		printf("out of space\n");
 		exit(1);
 	}
-        if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
 		perror("sysctl of routing table");
 		exit(1);
 	}
@@ -387,9 +387,9 @@ ntreestuff()
 
 static void
 np_rtentry(rtm)
-	register struct rt_msghdr *rtm;
+	struct rt_msghdr *rtm;
 {
-	register struct sockaddr *sa = (struct sockaddr *)(rtm + 1);
+	struct sockaddr *sa = (struct sockaddr *)(rtm + 1);
 #ifdef notdef
 	static int masks_done, banner_printed;
 #endif
@@ -431,14 +431,14 @@ p_sockaddr(sa, mask, flags, width)
 	int flags, width;
 {
 	char workbuf[128], *cplim;
-	register char *cp = workbuf;
+	char *cp = workbuf;
 	size_t n;
 
 	switch (sa->sa_family) {
 	case AF_INET:
 	    {
-		register struct sockaddr_in *sin = (struct sockaddr_in *)sa;
-		register struct sockaddr_in *msin = (struct sockaddr_in *)mask;
+		struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+		struct sockaddr_in *msin = (struct sockaddr_in *)mask;
 
 		cp = (sin->sin_addr.s_addr == 0) ? "default" :
 		      ((flags & RTF_HOST) || mask == NULL ?
@@ -477,7 +477,7 @@ p_sockaddr(sa, mask, flags, width)
 			cp = netname6(sa6, NULL);
 		break;
 	    }
-#endif 
+#endif
 
 	case AF_NS:
 		cp = ns_print(sa);
@@ -486,10 +486,10 @@ p_sockaddr(sa, mask, flags, width)
 	case AF_IPX:
 		cp = ipx_print(sa);
 		break;
-		
+
 	case AF_LINK:
 	    {
-		register struct sockaddr_dl *sdl = (struct sockaddr_dl *)sa;
+		struct sockaddr_dl *sdl = (struct sockaddr_dl *)sa;
 
 		if (sdl->sdl_nlen == 0 && sdl->sdl_alen == 0 &&
 		    sdl->sdl_slen == 0)
@@ -498,8 +498,8 @@ p_sockaddr(sa, mask, flags, width)
 		else switch (sdl->sdl_type) {
 		case IFT_ETHER:
 		    {
-			register int i;
-			register u_char *lla = (u_char *)sdl->sdl_data +
+			int i;
+			u_char *lla = (u_char *)sdl->sdl_data +
 			    sdl->sdl_nlen;
 
 			cplim = "";
@@ -532,7 +532,7 @@ p_sockaddr(sa, mask, flags, width)
 	    }
 	default:
 	    {
-		register u_char *s = (u_char *)sa->sa_data, *slim;
+		u_char *s = (u_char *)sa->sa_data, *slim;
 
 		slim = sa->sa_len + (u_char *) sa;
 		cplim = cp + sizeof(workbuf) - 6;
@@ -573,11 +573,11 @@ p_sockaddr(sa, mask, flags, width)
 
 static void
 p_flags(f, format)
-	register int f;
+	int f;
 	char *format;
 {
 	char name[33], *flags;
-	register struct bits *p = bits;
+	struct bits *p = bits;
 
 	for (flags = name; p->b_mask; p++)
 		if (p->b_mask & f)
@@ -588,7 +588,7 @@ p_flags(f, format)
 
 static void
 p_rtentry(rt)
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	static struct ifnet ifnet, *lastif;
 	struct sockaddr_storage sock1, sock2;
@@ -629,31 +629,31 @@ p_rtentry(rt)
 			rt->rt_nodes[0].rn_dupedkey ? " =>" : "");
 	}
 	putchar('\n');
- 	if (vflag) {
- 		printf("\texpire   %10lu%c  recvpipe %10ld%c  "
+	if (vflag) {
+		printf("\texpire   %10lu%c  recvpipe %10ld%c  "
 		       "sendpipe %10ld%c\n",
- 			rt->rt_rmx.rmx_expire, 
- 			(rt->rt_rmx.rmx_locks & RTV_EXPIRE) ? 'L' : ' ',
- 			rt->rt_rmx.rmx_recvpipe,
- 			(rt->rt_rmx.rmx_locks & RTV_RPIPE) ? 'L' : ' ',
- 			rt->rt_rmx.rmx_sendpipe,
- 			(rt->rt_rmx.rmx_locks & RTV_SPIPE) ? 'L' : ' ');
- 		printf("\tssthresh %10lu%c  rtt      %10ld%c  "
+			rt->rt_rmx.rmx_expire,
+			(rt->rt_rmx.rmx_locks & RTV_EXPIRE) ? 'L' : ' ',
+			rt->rt_rmx.rmx_recvpipe,
+			(rt->rt_rmx.rmx_locks & RTV_RPIPE) ? 'L' : ' ',
+			rt->rt_rmx.rmx_sendpipe,
+			(rt->rt_rmx.rmx_locks & RTV_SPIPE) ? 'L' : ' ');
+		printf("\tssthresh %10lu%c  rtt      %10ld%c  "
 		       "rttvar   %10ld%c\n",
- 			rt->rt_rmx.rmx_ssthresh, 
- 			(rt->rt_rmx.rmx_locks & RTV_SSTHRESH) ? 'L' : ' ',
- 			rt->rt_rmx.rmx_rtt, 
- 			(rt->rt_rmx.rmx_locks & RTV_RTT) ? 'L' : ' ',
- 			rt->rt_rmx.rmx_rttvar, 
+			rt->rt_rmx.rmx_ssthresh,
+			(rt->rt_rmx.rmx_locks & RTV_SSTHRESH) ? 'L' : ' ',
+			rt->rt_rmx.rmx_rtt,
+			(rt->rt_rmx.rmx_locks & RTV_RTT) ? 'L' : ' ',
+			rt->rt_rmx.rmx_rttvar,
 			(rt->rt_rmx.rmx_locks & RTV_RTTVAR) ? 'L' : ' ');
- 	}	
+	}	
 }
 
 char *
 routename(in)
 	in_addr_t in;
 {
-	register char *cp;
+	char *cp;
 	static char line[MAXHOSTNAMELEN];
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN];
@@ -875,15 +875,16 @@ short ns_bh[] = {-1,-1,-1};
 
 char *
 ns_print(sa)
-	register struct sockaddr *sa;
+	struct sockaddr *sa;
 {
-	register struct sockaddr_ns *sns = (struct sockaddr_ns*)sa;
+	struct sockaddr_ns *sns = (struct sockaddr_ns*)sa;
 	struct ns_addr work;
 	union { union ns_net net_e; u_long long_e; } net;
 	in_port_t port;
 	static char mybuf[50], cport[10], chost[25];
 	char *host = "";
-	register char *p; register u_char *q;
+	char *p;
+	u_char *q;
 
 	work = sns->sns_addr;
 	port = ntohs(work.x_port);
@@ -925,7 +926,7 @@ char *
 ns_phost(sa)
 	struct sockaddr *sa;
 {
-	register struct sockaddr_ns *sns = (struct sockaddr_ns *)sa;
+	struct sockaddr_ns *sns = (struct sockaddr_ns *)sa;
 	struct sockaddr_ns work;
 	static union ns_net ns_zeronet;
 	char *p;
@@ -944,15 +945,15 @@ u_short ipx_bh[] = {0xffff,0xffff,0xffff};
 
 char *
 ipx_print(sa)
-	register struct sockaddr *sa;
+	struct sockaddr *sa;
 {
-	register struct sockaddr_ipx *sipx = (struct sockaddr_ipx*)sa;
+	struct sockaddr_ipx *sipx = (struct sockaddr_ipx*)sa;
 	struct ipx_addr work;
 	union { union ipx_net net_e; u_long long_e; } net;
 	in_port_t port;
 	static char mybuf[50], cport[10], chost[25];
 	char *host = "";
-	register char *q;
+	char *q;
 
 	work = sipx->sipx_addr;
 	port = ntohs(work.ipx_port);
@@ -992,7 +993,7 @@ char *
 ipx_phost(sa)
 	struct sockaddr *sa;
 {
-	register struct sockaddr_ipx *sipx = (struct sockaddr_ipx *)sa;
+	struct sockaddr_ipx *sipx = (struct sockaddr_ipx *)sa;
 	struct sockaddr_ipx work;
 	static union ipx_net ipx_zeronet;
 	char *p;
@@ -1008,10 +1009,10 @@ ipx_phost(sa)
 
 static void
 encap_print(rt)
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	struct sockaddr_encap sen1, sen2, sen3;
-        struct ipsec_policy ipo;
+	struct ipsec_policy ipo;
 
 #ifdef INET6
 	struct sockaddr_in6 s61, s62;
@@ -1022,15 +1023,15 @@ encap_print(rt)
 	bcopy(kgetsa(rt_mask(rt)), &sen2, sizeof(sen2));
 	bcopy(kgetsa(rt->rt_gateway), &sen3, sizeof(sen3));
 
-        if (sen1.sen_type == SENT_IP4)
+	if (sen1.sen_type == SENT_IP4)
 	{
-	    printf("%-18s %-5u ", netname(sen1.sen_ip_src.s_addr, 
-				          sen2.sen_ip_src.s_addr),
-	           ntohs(sen1.sen_sport));
+	    printf("%-18s %-5u ", netname(sen1.sen_ip_src.s_addr,
+					  sen2.sen_ip_src.s_addr),
+		   ntohs(sen1.sen_sport));
 
-	    printf("%-18s %-5u %-5u ", netname(sen1.sen_ip_dst.s_addr, 
+	    printf("%-18s %-5u %-5u ", netname(sen1.sen_ip_dst.s_addr,
 					       sen2.sen_ip_dst.s_addr),
-	           ntohs(sen1.sen_dport), sen1.sen_proto);
+		   ntohs(sen1.sen_dport), sen1.sen_proto);
 	}
 
 #ifdef INET6
@@ -1054,73 +1055,73 @@ encap_print(rt)
 	    bcopy(&sen2.sen_ip6_dst, &s62.sin6_addr, sizeof(struct in6_addr));
 
 	    printf("%-42s %-5u %-5u ", netname6(&s61, &s62.sin6_addr),
-	           ntohs(sen1.sen_ip6_dport), sen1.sen_ip6_proto);
+		   ntohs(sen1.sen_ip6_dport), sen1.sen_ip6_proto);
 	}
 #endif /* INET6 */
 
 	if (sen3.sen_type == SENT_IPSP)
-        {
-            char hostn[NI_MAXHOST];
+	{
+	    char hostn[NI_MAXHOST];
 
 	    kget(sen3.sen_ipsp, ipo);
 
-            getnameinfo(&ipo.ipo_dst.sa, ipo.ipo_dst.sa.sa_len,
-                        hostn, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+	    getnameinfo(&ipo.ipo_dst.sa, ipo.ipo_dst.sa.sa_len,
+			hostn, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 	    printf("%s", hostn);
 
-            printf("/%-u", ipo.ipo_sproto);
+	    printf("/%-u", ipo.ipo_sproto);
 
-            switch (ipo.ipo_type)
-            {
-                case IPSP_IPSEC_REQUIRE:
-                    printf("/require");
-                    break;
+	    switch (ipo.ipo_type)
+	    {
+		case IPSP_IPSEC_REQUIRE:
+		    printf("/require");
+		    break;
 
-                case IPSP_IPSEC_ACQUIRE:
-                    printf("/acquire");
-                    break;
+		case IPSP_IPSEC_ACQUIRE:
+		    printf("/acquire");
+		    break;
 
-                case IPSP_IPSEC_USE:
-                    printf("/use");
-                    break;
+		case IPSP_IPSEC_USE:
+		    printf("/use");
+		    break;
 
-                case IPSP_IPSEC_DONTACQ:
-                    printf("/dontacq");
-                    break;
+		case IPSP_IPSEC_DONTACQ:
+		    printf("/dontacq");
+		    break;
 
-                case IPSP_PERMIT:
-                    printf("/permit");
-                    break;
+		case IPSP_PERMIT:
+		    printf("/permit");
+		    break;
 
-                case IPSP_DENY:
-                    printf("/deny");
-                    break;
+		case IPSP_DENY:
+		    printf("/deny");
+		    break;
 
-                default:
-                    printf("/<unknown type!>");
-            }
+		default:
+		    printf("/<unknown type!>");
+	    }
 
-            if ((ipo.ipo_addr.sen_type == SENT_IP4 &&
-                 ipo.ipo_addr.sen_direction == IPSP_DIRECTION_IN) ||
-                (ipo.ipo_addr.sen_type == SENT_IP6 &&
-                 ipo.ipo_addr.sen_ip6_direction == IPSP_DIRECTION_IN))
-              printf("/in\n");
-            else
-              if ((ipo.ipo_addr.sen_type == SENT_IP4 &&
-                   ipo.ipo_addr.sen_direction == IPSP_DIRECTION_OUT) ||
-                  (ipo.ipo_addr.sen_type == SENT_IP6 &&
-                   ipo.ipo_addr.sen_ip6_direction == IPSP_DIRECTION_OUT))
-                printf("/out\n");
-              else
-                printf("/<unknown>\n");
-        }
+	    if ((ipo.ipo_addr.sen_type == SENT_IP4 &&
+		 ipo.ipo_addr.sen_direction == IPSP_DIRECTION_IN) ||
+		(ipo.ipo_addr.sen_type == SENT_IP6 &&
+		 ipo.ipo_addr.sen_ip6_direction == IPSP_DIRECTION_IN))
+	      printf("/in\n");
+	    else
+	      if ((ipo.ipo_addr.sen_type == SENT_IP4 &&
+		   ipo.ipo_addr.sen_direction == IPSP_DIRECTION_OUT) ||
+		  (ipo.ipo_addr.sen_type == SENT_IP6 &&
+		   ipo.ipo_addr.sen_ip6_direction == IPSP_DIRECTION_OUT))
+		printf("/out\n");
+	      else
+		printf("/<unknown>\n");
+	}
 }
 
 void
 upHex(p0)
 	char *p0;
 {
-	register char *p = p0;
+	char *p = p0;
 	for (; *p; p++) switch (*p) {
 
 	case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.27 2001/08/26 09:42:04 brian Exp $	*/
+/*	$OpenBSD: main.c,v 1.30 2002/02/16 21:27:50 millert Exp $	*/
 /*	$NetBSD: main.c,v 1.9 1996/05/07 02:55:02 thorpej Exp $	*/
 
 /*
@@ -44,7 +44,7 @@ char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-static char *rcsid = "$OpenBSD: main.c,v 1.27 2001/08/26 09:42:04 brian Exp $";
+static char *rcsid = "$OpenBSD: main.c,v 1.30 2002/02/16 21:27:50 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -175,7 +175,7 @@ struct nlist nl[] = {
 	{ "_mbpool" },
 #define N_MCLPOOL	52
 	{ "_mclpool" },
-#define N_IPCOMPSTAT    53
+#define N_IPCOMPSTAT	53
 	{ "_ipcompstat" },
 #define N_RIP6STAT	54
 	{ "_rip6stat" },
@@ -208,8 +208,8 @@ struct protox {
 	  ipip_stats,	"ipencap" },
 	{ -1,		N_ETHERIPSTAT,	1,	0,
 	  etherip_stats,"etherip" },
-	{ -1,           N_IPCOMPSTAT,   1,      0,
-	  ipcomp_stats, "ipcomp" },
+	{ -1,		N_IPCOMPSTAT,	1,	0,
+	  ipcomp_stats,	"ipcomp" },
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
@@ -279,10 +279,10 @@ struct protox *protoprotox[] = { protox, ipxprotox, nsprotox, isoprotox, atalkpr
 struct protox *protoprotox[] = { protox, ip6protox, ipxprotox, nsprotox, isoprotox, atalkprotox, NULL };
 #endif
 
-static void printproto __P((struct protox *, char *));
-static void usage __P((void));
-static struct protox *name2protox __P((char *));
-static struct protox *knownname __P((char *));
+static void printproto(struct protox *, char *);
+static void usage(void);
+static struct protox *name2protox(char *);
+static struct protox *knownname(char *);
 
 kvm_t *kvmd;
 
@@ -293,8 +293,8 @@ main(argc, argv)
 {
 	extern char *optarg;
 	extern int optind;
-	register struct protoent *p;
-	register struct protox *tp = NULL; /* for printing cblocks & stats */
+	struct protoent *p;
+	struct protox *tp = NULL; /* for printing cblocks & stats */
 	int ch;
 	char *nlistf = NULL, *memf = NULL;
 	char buf[_POSIX2_LINE_MAX];
@@ -546,7 +546,7 @@ main(argc, argv)
  */
 static void
 printproto(tp, name)
-	register struct protox *tp;
+	struct protox *tp;
 	char *name;
 {
 	void (*pr)();

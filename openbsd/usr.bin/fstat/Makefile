@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.5 1999/06/23 12:56:18 art Exp $
+#	$OpenBSD: Makefile,v 1.8 2001/06/27 06:16:49 art Exp $
 
 PROG=	fstat
 DPADD=	${LIBKVM}
@@ -16,7 +16,3 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>
-
-.if defined(UVM) && (${UVM} == "yes")
-CFLAGS+=-DUVM
-.endif
