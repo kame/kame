@@ -1,8 +1,8 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/5/93
-# $FreeBSD: src/sbin/route/Makefile,v 1.11 1999/12/15 05:13:21 shin Exp $
+# $FreeBSD: src/sbin/route/Makefile,v 1.11.2.1 2001/04/25 10:58:49 ru Exp $
 
 PROG=	route
-MAN8=	route.8
+MAN=	route.8
 SRCS=	route.c keywords.h
 CFLAGS+=-I. -Wall -DNS
 CFLAGS+=-DINET6
