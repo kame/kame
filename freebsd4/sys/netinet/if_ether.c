@@ -298,8 +298,10 @@ arp_rtdrain(rt, rtt)
 	struct llinfo_arp *la;
 	struct sockaddr_dl *sdl;
 
-	if ((la = (struct llinfo_arp *)rt->rt_llinfo) == NULL)
-		panic("arp_rtdrain: not an arp entry");
+	if ((la = (struct llinfo_arp *)rt->rt_llinfo) == NULL) {
+		printf("arp_rtdrain: null llinfo (rt=%p)\n", rt);
+		return;		/* XXX */
+	}
 
 	/* if the arp entry has been resolved, just keep it. */
 	sdl = (struct sockaddr_dl *)rt->rt_gateway;
