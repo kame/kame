@@ -1804,7 +1804,6 @@ number		: STRING			{
 		;
 
 dynaddr		: '(' STRING ')'		{
-#ifdef __OpenBSD__
 			if (ifa_exists($2) == NULL) {
 				yyerror("interface %s does not exist", $2);
 				YYERROR;
@@ -1824,10 +1823,6 @@ dynaddr		: '(' STRING ')'		{
 			}
 			$$->next = NULL;
 			$$->tail = $$;
-#else
-			yyerror("not supported");
-			YYERROR;
-#endif
 		}
 		;
 
