@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.14 2001/02/08 10:07:55 inoue Exp $
+$Id: INSTALL,v 1.15 2001/04/02 06:56:20 jinmei Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -105,3 +105,14 @@ E-4. There are batch of documents installed into /usr/local/v6/man
      and /usr/local/v6/share/doc.  Please read them as necessary.
      If you wish to develop your own programs, we suggest you to read through
      supplied documents, RFCs, and other documents to learn how.
+
+E-5. /etc/rc.d/network executes "route -n flush" by default, which removes
+     preinstalled IPv6 routes, specifically, a route for fe80::%lo0/64.
+     Although this would not be so harmful for daily use, you might want to
+     change the line as follows:
+     route -n flush -inet
+     so that only IPv6 routes would be removed, or add the following
+     line in /etc/rc.conf:
+     flushroutes=NO
+     Note that the latter approach suppresses the flush of IPv4
+     routes.
