@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.101 2004/05/13 13:52:59 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.102 2004/05/13 13:57:04 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1755,7 +1755,7 @@ dhcp6_set_options(bp, ep, optinfo)
 
 		if ((tmpbuf = malloc(optlen)) == NULL) {
 			dprintf(LOG_ERR, FNAME,
-			    "memory allocation failed for DNS options");
+			    "memory allocation failed for DNS name options");
 			goto fail;
 		}
 		cp = tmpbuf;
@@ -1819,12 +1819,12 @@ dhcp6_set_options(bp, ep, optinfo)
 		}
 		if ((tmpbuf = malloc(optlen)) == NULL) {
 			dprintf(LOG_NOTICE, FNAME,
-			    "memory allocation failed for DNS options");
+			    "memory allocation failed for IA_PD options");
 			goto fail;
 		}
 		if (copyout_option(tmpbuf, tmpbuf + optlen, op) < 0) {
 			dprintf(LOG_ERR, FNAME,
-			    "failed to construct an option");
+			    "failed to construct an IA_PD option");
 			goto fail;
 		}
 		memcpy(p, tmpbuf, optlen);
