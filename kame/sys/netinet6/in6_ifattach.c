@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.53 2000/04/16 14:01:42 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.54 2000/04/18 08:19:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,6 +59,7 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
+#include <netinet6/scope6_var.h>
 
 #include <net/net_osdep.h>
 
@@ -829,6 +830,9 @@ statinit:;
 
 	/* initialize NDP variables */
 	nd6_ifattach(ifp);
+
+	/* initialize scope identifiers */
+	scope6_ifattach(ifp);
 }
 
 /*
