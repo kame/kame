@@ -940,13 +940,7 @@ send:
 		}
 #ifdef INET6
 		else if (tp->t_in6pcb) {
-			ip->ip_ttl = tp->t_in6pcb->in6p_ip6.ip6_hlim;
-			/*
-			 * XXX ip6_hlim can be 0 if there's no IPv6
-			 * configuration
-			 */
-			if (ip->ip_ttl == 0)
-				ip->ip_ttl = ip_defttl;
+			ip->ip_ttl = in6_selecthlim(tp->t_in6pcb, NULL); /*XXX*/
 			ip->ip_tos = 0;	/*XXX*/
 		}
 #endif

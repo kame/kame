@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.17 2000/11/05 15:22:30 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.18 2000/11/06 00:08:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -350,7 +350,7 @@ udp6_output(in6p, m, addr6, control)
 
 		ip->ip_len = plen;
 		ip->ip_p = IPPROTO_UDP;
-		ip->ip_ttl = in6p->in6p_hops;	/*XXX*/
+		ip->ip_ttl = in6_selecthlim(in6p, NULL);	/*XXX*/
 		ip->ip_tos = 0;			/*XXX*/
 		bcopy(&laddr->s6_addr[12], &ip->ip_src, sizeof(ip->ip_src));
 		bcopy(&faddr->s6_addr[12], &ip->ip_dst, sizeof(ip->ip_dst));
