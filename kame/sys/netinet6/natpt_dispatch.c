@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.33 2001/12/12 13:14:32 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.34 2001/12/12 14:15:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -286,51 +286,6 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 				return (IPPROTO_MAX);	/* discard this packet */
 		}
 	}
-
-#if 0
-	/* revised version */
-	if (!isFragment or fristFragmentedPacket) {
-		rewrite TCPheader;
-		rewrite TCPpayload if can;
-		recheck Fragment is needed or not;
-
-		if (!needFragment)
-			nonFragment4 -> nonFratment6;
-		else
-			nonFragment4 -> Fragment6, Fragment6;
-	} else {
-		if (!needFragment)
-			Fragment4 -> Fragment6;
-		else
-			Fragment4 -> Fragment6, Fragment6;
-	}
-
-	/* Original version */
-	if (!isFragment)
-		if (!needFragment)
-			-- in case 0 <= packet size <= 1280
-			nonFragment4 -> nonFragment6;		-- rewrite TCP header
-								-- rewrite TCP payload
-		else
-			-- in case 1280 <= packet size <= 1500
-			nonFragment4 -> Fragment6, Fragment6;	-- rewrite TCP header
-	else
-		if (fristFragmentedPacket)
-			if (!needFragment)
-				-- in case 0 <= packet size <= 1280
-				Fragment4 -> Fragment6;		-- rewiret TCP header
-			else
-				-- in case 1280 < packet size <= 1500
-				Fragment4 -> Fragment6, Fragment6;
-		else
-			if (!needFragment)
-				-- in case 0 <= packet size <= 1280
-				Fragment4 -> Fragment6;
-			else
-				-- in case 1280 < packet size <= 1500
-				Fragment4 -> Fragment6, Fragment6;
-
-#endif
 
 	return (IPPROTO_IPV6);
 }
