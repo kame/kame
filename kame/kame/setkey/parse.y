@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.11 1999/12/06 09:15:43 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.12 1999/12/08 13:26:19 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -106,6 +106,14 @@ extern void yyerror __P((char *));
 %token SPDADD SPDDELETE SPDDUMP SPDFLUSH
 %token F_POLICY PL_REQUESTS
 
+%type <num> PORT PREFIX EXTENSION MODE
+%type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
+%type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
+%type <num> DECSTRING
+%type <val> IP4_ADDRESS IP6_ADDRESS PL_REQUESTS
+%type <val> key_string policy_requests
+%type <val> QUOTEDSTRING HEXSTRING
+
 %%
 commands
 	:	/*NOTHING*/
@@ -177,7 +185,7 @@ protocol_spec
 	|	PR_ESP
 		{
 			p_satype = SADB_SATYPE_ESP;
-			if ($1.num == 1)
+			if ($1 == 1)
 				p_ext |= SADB_X_EXT_OLD;
 			else
 				p_ext &= ~SADB_X_EXT_OLD;
@@ -185,7 +193,7 @@ protocol_spec
 	|	PR_AH
 		{
 			p_satype = SADB_SATYPE_AH;
-			if ($1.num == 1)
+			if ($1 == 1)
 				p_ext |= SADB_X_EXT_OLD;
 			else
 				p_ext &= ~SADB_X_EXT_OLD;
@@ -197,18 +205,18 @@ protocol_spec
 	;
 	
 spi
-	:	DECSTRING { p_spi = $1.num; }
+	:	DECSTRING { p_spi = $1; }
 	|	HEXSTRING
 		{
 			caddr_t bp;
-			caddr_t yp = $1.val.buf;
+			caddr_t yp = $1.buf;
 			char buf0[4], buf[4];
 			int i, j;
 
 			/* sanity check */
-			if ($1.val.len > 4) {
+			if ($1.len > 4) {
 				yyerror("SPI too big.");
-				free($1.val.buf);
+				free($1.buf);
 				return -1;
 			}
 
@@ -221,13 +229,13 @@ spi
 			/* initialize */
 			for (i = 0; i < 4; i++) buf[i] = 0;
 
-			for (j = $1.val.len - 1, i = 3; j >= 0; j--, i--)
+			for (j = $1.len - 1, i = 3; j >= 0; j--, i--)
 				buf[i] = buf0[j];
 
 			/* XXX: endian */
 			p_spi = ntohl(*(u_int32_t *)buf);
 
-			free($1.val.buf);
+			free($1.buf);
 		}
 	;
 
@@ -247,16 +255,16 @@ ah_spec
 	;
 
 ipcomp_spec
-	:	F_COMP ALG_COMP { p_alg_enc = $2.num; }
-	|	F_COMP ALG_COMP { p_alg_enc = $2.num; }
+	:	F_COMP ALG_COMP { p_alg_enc = $2; }
+	|	F_COMP ALG_COMP { p_alg_enc = $2; }
 		F_RAWCPI { p_ext |= SADB_X_EXT_RAWCPI; }
 	;
 
 enc_alg
-	:	ALG_ENC { p_alg_enc = $1.num; }
+	:	ALG_ENC { p_alg_enc = $1; }
 	|	ALG_ENC_DESDERIV
 		{
-			p_alg_enc = $1.num;
+			p_alg_enc = $1;
 			if (p_ext & SADB_X_EXT_OLD) {
 				yyerror("algorithm mismatched.");
 				return -1;
@@ -265,7 +273,7 @@ enc_alg
 		}
 	|	ALG_ENC_DES32IV
 		{
-			p_alg_enc = $1.num;
+			p_alg_enc = $1;
 			if (!(p_ext & SADB_X_EXT_OLD)) {
 				yyerror("algorithm mismatched.");
 				return -1;
@@ -284,7 +292,7 @@ enc_key
 		}
 	|	key_string
 		{
-			p_key_enc_len = $1.val.len;
+			p_key_enc_len = $1.len;
 			p_key_enc = pp_key;
 
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_ENCRYPT,
@@ -297,7 +305,7 @@ enc_key
 	;
 
 auth_alg
-	:	ALG_AUTH { p_alg_auth = $1.num; }
+	:	ALG_AUTH { p_alg_auth = $1; }
 	;
 
 auth_key
@@ -310,7 +318,7 @@ auth_key
 		}
 	|	key_string
 		{
-			p_key_auth_len = $1.val.len;
+			p_key_auth_len = $1.len;
 			p_key_auth = pp_key;
 
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_AUTH,
@@ -325,20 +333,20 @@ auth_key
 key_string
 	:	QUOTEDSTRING
 		{
-			pp_key = $1.val.buf;
+			pp_key = $1.buf;
 			/* free pp_key later */
 		}
 	|	HEXSTRING
 		{
 			caddr_t bp;
-			caddr_t yp = $1.val.buf;
+			caddr_t yp = $1.buf;
 
-			if ((pp_key = malloc($1.val.len)) == 0) {
-				free($1.val.buf);
+			if ((pp_key = malloc($1.len)) == 0) {
+				free($1.buf);
 				yyerror(strerror(errno));
 				return -1;
 			}
-			memset(pp_key, 0, $1.val.len);
+			memset(pp_key, 0, $1.len);
 
 			bp = pp_key;
 			while (*yp) {
@@ -346,7 +354,7 @@ key_string
 				yp += 2, bp++;
 			}
 
-			free($1.val.buf);
+			free($1.buf);
 		}
 	;
 
@@ -356,10 +364,10 @@ extension_spec
 	;
 
 extension
-	:	F_EXT EXTENSION { p_ext |= $2.num; }
-	|	F_MODE MODE { p_mode = $2.num; }
+	:	F_EXT EXTENSION { p_ext |= $2; }
+	|	F_MODE MODE { p_mode = $2; }
 	|	F_MODE ANY { p_mode = IPSEC_MODE_ANY; }
-	|	F_REQID DECSTRING { p_reqid = $2.num; }
+	|	F_REQID DECSTRING { p_reqid = $2; }
 	|	F_REPLAY DECSTRING
 		{
 			if (p_ext & SADB_X_EXT_OLD) {
@@ -367,10 +375,10 @@ extension
 				        "only use on new spec.");
 				return -1;
 			}
-			p_replay = $2.num;
+			p_replay = $2;
 		}
-	|	F_LIFETIME_HARD DECSTRING { p_lt_hard = $2.num; }
-	|	F_LIFETIME_SOFT DECSTRING { p_lt_soft = $2.num; }
+	|	F_LIFETIME_HARD DECSTRING { p_lt_hard = $2; }
+	|	F_LIFETIME_SOFT DECSTRING { p_lt_soft = $2; }
 	;
 
 	/* definition about command for SPD management */
@@ -420,17 +428,31 @@ sp_selector_spec
 		prefix { p_prefd = pp_prefix; }
 		port { _INPORTBYSA(p_dst) = htons(pp_port); }
 		upper_spec
+		{
+			switch (p_upper) {
+			case IPPROTO_ICMP:
+			case IPPROTO_ICMPV6:
+				if (_INPORTBYSA(p_src) != IPSEC_PORT_ANY
+				 || _INPORTBYSA(p_dst) != IPSEC_PORT_ANY) {
+					yyerror("port number must be \"any\".");
+					return -1;
+				}
+				break;
+			default:
+				break;
+			}
+		}
 	;
 
 ipaddress
 	:	IP4_ADDRESS
 		{
 			struct sockaddr_in *in;
-			u_int sa_len = $1.val.len;
+			u_int sa_len = $1.len;
 
 			if ((in = (struct sockaddr_in *)malloc(sa_len)) == 0) {
 				yyerror(strerror(errno));
-				free($1.val.buf);
+				free($1.buf);
 				return -1;
 			}
 			memset((caddr_t)in, 0, sa_len);
@@ -438,19 +460,19 @@ ipaddress
 			in->sin_family = PF_INET;
 			in->sin_len = sa_len;
 			in->sin_port = IPSEC_PORT_ANY;
-			(void)inet_pton(PF_INET, $1.val.buf, &in->sin_addr);
+			(void)inet_pton(PF_INET, $1.buf, &in->sin_addr);
 
 			pp_addr = (struct sockaddr *)in;
-			free($1.val.buf);
+			free($1.buf);
 		}
 	|	IP6_ADDRESS
 		{
 #ifdef INET6
 			struct sockaddr_in6 *in6;
-			u_int sa_len = $1.val.len;
+			u_int sa_len = $1.len;
 
 			if ((in6 = (struct sockaddr_in6 *)malloc(sa_len)) == 0) {
-				free($1.val.buf);
+				free($1.buf);
 				yyerror(strerror(errno));
 				return -1;
 			}
@@ -459,31 +481,31 @@ ipaddress
 			in6->sin6_family = PF_INET6;
 			in6->sin6_len = sa_len;
 			in6->sin6_port = IPSEC_PORT_ANY;
-			(void)inet_pton(PF_INET6, $1.val.buf,
+			(void)inet_pton(PF_INET6, $1.buf,
 					&in6->sin6_addr);
 
 			pp_addr = (struct sockaddr *)in6;
 #else
 			yyerror("IPv6 address not supported");
 #endif
-			free($1.val.buf);
+			free($1.buf);
 		}
 	;
 
 prefix
 	:	/*NOTHING*/ { pp_prefix = ~0; }
-	|	PREFIX { pp_prefix = $1.num; }
+	|	PREFIX { pp_prefix = $1; }
 	;
 
 port
 	:	/*NOTHING*/ { pp_port = IPSEC_PORT_ANY; }
-	|	PORT { pp_port = $1.num; }
+	|	PORT { pp_port = $1; }
 	|	PORTANY { pp_port = IPSEC_PORT_ANY; }
 	;
 
 upper_spec
-	:	DECSTRING { p_upper = $1.num; }
-	|	UP_PROTO { p_upper = $1.num; }
+	:	DECSTRING { p_upper = $1; }
+	|	UP_PROTO { p_upper = $1; }
 	|	PR_ESP { p_upper = IPPROTO_ESP; };
 	|	PR_AH { p_upper = IPPROTO_AH; };
 	|	PR_IPCOMP { p_upper = IPPROTO_IPCOMP; };
@@ -493,9 +515,9 @@ upper_spec
 policy_spec
 	:	F_POLICY policy_requests
 		{
-			p_policy = ipsec_set_policy($2.val.buf, $2.val.len);
+			p_policy = ipsec_set_policy($2.buf, $2.len);
 			if (p_policy == NULL) {
-				free($2.val.buf);
+				free($2.buf);
 				p_policy = NULL;
 				yyerror(ipsec_strerror());
 				return -1;
@@ -503,7 +525,7 @@ policy_spec
 
 			p_policy_len = ipsec_get_policylen(p_policy);
 
-			free($2.val.buf);
+			free($2.buf);
 		}
 	;
 
