@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.331 2003/08/09 17:06:41 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.332 2003/08/20 13:31:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,6 +106,7 @@
 #include <net/if_hif.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_mncore.h>
 #include <netinet6/mip6_hacore.h>
 #endif /* MIP6 */
 
@@ -724,6 +725,31 @@ nd6_timer(ignored_arg)
 				if (regen_tmpaddr(ia6) == 0)
 					regen = 1;
 			}
+
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+		{
+			struct hif_softc *hif;
+			struct mip6_bu *mbu;
+			struct sockaddr_in6 haddr;
+
+			haddr = ia6->ia_addr;
+			if (in6_addr2zoneid(ia6->ia_ifp, &haddr.sin6_addr,
+			    &haddr.sin6_scope_id))
+				goto purge;
+			if (in6_embedscope(&haddr.sin6_addr, &haddr))
+				goto purge;
+			for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+			     hif = TAILQ_NEXT(hif, hif_entry)) {
+				mbu = mip6_bu_list_find_home_registration(
+				    &hif->hif_bu_list, &haddr);
+				if (mbu) {
+					mip6_bu_list_remove(&hif->hif_bu_list,
+					    mbu);
+				}
+			}
+		}
+		purge:
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 			in6_purgeaddr(&ia6->ia_ifa);
 

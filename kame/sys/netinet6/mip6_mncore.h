@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.9 2003/08/14 10:06:07 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.10 2003/08/20 13:31:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -75,11 +75,13 @@ int mip6_ifa_need_dad(struct in6_ifaddr *);
 int mip6_route_optimize(struct mbuf *);
 
 /* binding update entry processing. */
+int mip6_bu_list_remove(struct mip6_bu_list *, struct mip6_bu *);
 int mip6_bu_list_remove_all(struct mip6_bu_list *, int);
 struct mip6_bu *mip6_bu_list_find_home_registration(struct mip6_bu_list *,
     struct sockaddr_in6 *);
 struct mip6_bu *mip6_bu_list_find_withpaddr(struct mip6_bu_list *,
     struct sockaddr_in6 *, struct sockaddr_in6 *);
+int mip6_home_registration(struct hif_softc *);
 int mip6_home_registration2(struct mip6_bu *);
 int mip6_bu_encapcheck(const struct mbuf *, int, int, void *);
 int mip6_bu_fsm(struct mip6_bu *, int, void *);

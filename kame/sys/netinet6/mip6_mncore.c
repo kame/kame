@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.25 2003/08/15 12:49:55 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.26 2003/08/20 13:31:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -118,8 +118,6 @@ static struct mip6_bu *mip6_bu_create(const struct sockaddr_in6 *,
     struct mip6_prefix *, struct sockaddr_in6 *, u_int16_t,
     struct hif_softc *);
 static int mip6_bu_list_insert(struct mip6_bu_list *, struct mip6_bu *);
-static int mip6_bu_list_remove(struct mip6_bu_list *, struct mip6_bu *);
-static int mip6_home_registration(struct hif_softc *);
 static int mip6_bu_list_notify_binding_change(struct hif_softc *, int);
 static int64_t mip6_coa_get_lifetime(struct in6_addr *);
 static void mip6_bu_update_firewallstate(struct mip6_bu *);
@@ -1490,7 +1488,7 @@ mip6_bu_list_insert(bu_list, mbu)
 	return (0);
 }
 
-static int
+int
 mip6_bu_list_remove(mbu_list, mbu)
 	struct mip6_bu_list *mbu_list;
 	struct mip6_bu *mbu;
@@ -1592,7 +1590,7 @@ mip6_bu_list_find_withpaddr(bu_list, paddr, haddr)
 	return (mbu);
 }
 
-static int
+int
 mip6_home_registration(sc)
 	struct hif_softc *sc;
 {

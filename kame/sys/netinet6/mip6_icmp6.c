@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.74 2003/08/20 09:24:42 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.75 2003/08/20 13:31:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -880,6 +880,8 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	struct nd_opt_hdr *ndopt;
 	struct nd_opt_prefix_info *ndopt_pi;
 	struct sockaddr_in6 prefix_sa;
+	struct in6_aliasreq ifra;
+	struct in6_ifaddr *ia6;
 	struct mip6_prefix *mpfx;
 	struct mip6_ha *mha;
 	struct hif_softc *hif;
@@ -1036,7 +1038,6 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		mpfx = mip6_prefix_list_find_withprefix(&prefix_sa,
 		    ndopt_pi->nd_opt_pi_prefix_len);
 		if (mpfx == NULL) {
-#if 0
 			mpfx = mip6_prefix_create(&prefix_sa,
 			    ndopt_pi->nd_opt_pi_prefix_len,
 			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
@@ -1048,10 +1049,53 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
 			mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
 
-			/* XXX a new home address configuration and
-			 * home registration. */
-#endif
+			mip6_prefix_haddr_assign(mpfx, hif); /* XXX */
 
+			/* construct in6_aliasreq. */
+			bzero(&ifra, sizeof(ifra));
+			bcopy(if_name((struct ifnet *)hif), ifra.ifra_name,
+			    sizeof(ifra.ifra_name));
+			ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
+			ifra.ifra_addr.sin6_family = AF_INET6;
+			ifra.ifra_addr.sin6_addr = mpfx->mpfx_haddr.sin6_addr;
+			ifra.ifra_prefixmask.sin6_len
+			    = sizeof(struct sockaddr_in6);
+			ifra.ifra_prefixmask.sin6_family = AF_INET6;
+			ifra.ifra_flags = IN6_IFF_HOME | IN6_IFF_AUTOCONF;
+			in6_prefixlen2mask(&ifra.ifra_prefixmask.sin6_addr,
+			    128);
+			ifra.ifra_lifetime.ia6t_vltime = mpfx->mpfx_vltime;
+			ifra.ifra_lifetime.ia6t_pltime = mpfx->mpfx_pltime;
+			if (ifra.ifra_lifetime.ia6t_vltime
+			    == ND6_INFINITE_LIFETIME)
+				ifra.ifra_lifetime.ia6t_expire = 0;
+			else
+				ifra.ifra_lifetime.ia6t_expire
+				    = mono_time.tv_sec
+				    + ifra.ifra_lifetime.ia6t_vltime;
+			if (ifra.ifra_lifetime.ia6t_pltime
+			    == ND6_INFINITE_LIFETIME)
+				ifra.ifra_lifetime.ia6t_preferred = 0;
+			else
+				ifra.ifra_lifetime.ia6t_preferred
+				    = mono_time.tv_sec
+				    + ifra.ifra_lifetime.ia6t_pltime;
+			ia6 = in6ifa_ifpwithaddr((struct ifnet *)hif,
+			    &ifra.ifra_addr.sin6_addr);
+
+			/* assign a new home address. */
+			error = in6_update_ifa((struct ifnet *)hif, &ifra,
+			    ia6);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: add address (%s) failed. errno = %d\n",
+				    __FILE__, __LINE__,
+				    ip6_sprintf(&ifra.ifra_addr.sin6_addr),
+				    error));
+				goto freeit;
+			}
+
+			mip6_home_registration(hif); /* XXX */
 		} else {
 			mpfx->mpfx_vltime
 			    = ntohl(ndopt_pi->nd_opt_pi_valid_time);
@@ -1065,7 +1109,6 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
 			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
 
-			/* XXX address lifetimes update. */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 			for (ifa = ((struct ifnet *)hif)->if_addrlist; ifa;
 			     ifa = ifa->ifa_next)
