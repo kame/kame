@@ -185,9 +185,11 @@ int	timingout;
 int	toomany = TOOMANY;
 int	maxchild = MAXCPM;
 int	maxcpm = MAXCHILD;
-struct	servent *sp;
 struct	rpcent *rpc;
-struct	in_addr bind_address;
+char *bind_address = NULL;
+#ifdef INET6
+char *bind_address6 = NULL;
+#endif
 
 struct	servtab {
 	char	*se_service;		/* name of service */
@@ -210,7 +212,8 @@ struct	servtab {
 	char	*se_policy;		/* IPsec poilcy string */
 #endif
 	int	se_fd;			/* open descriptor */
-	struct	sockaddr_in se_ctrladdr;/* bound address */
+	int	se_family;		/* address family */
+	struct	sockaddr_storage se_ctrladdr;/* bound address */
 	u_char	se_type;		/* type: normal, mux, or mux+ */
 	u_char	se_checked;		/* looked at during merge */
 	u_char	se_accept;		/* i.e., wait/nowait mode */
@@ -339,11 +342,12 @@ main(argc, argv, envp)
 	int tmpint, ch, dofork;
 	pid_t pid;
 	char buf[50];
-	struct  sockaddr_in peer;
+	struct  sockaddr_storage peer;
 	int i;
 #ifdef LOGIN_CAP
 	login_cap_t *lc = NULL;
 #endif
+	char hbuf[MAXHOSTNAMELEN];
 
 
 #ifdef OLD_SETPROCTITLE
@@ -357,7 +361,6 @@ main(argc, argv, envp)
 
 	openlog("inetd", LOG_PID | LOG_NOWAIT, LOG_DAEMON);
 
-	bind_address.s_addr = htonl(INADDR_ANY);
 	while ((ch = getopt(argc, argv, "dlR:a:c:C:p:")) != -1)
 		switch(ch) {
 		case 'd':
@@ -380,12 +383,24 @@ main(argc, argv, envp)
 				"-C %s: bad value for maximum children/minute");
 			break;
 		case 'a':
-			if (!inet_aton(optarg, &bind_address)) {
-				syslog(LOG_ERR,
-			         "-a %s: invalid IP address", optarg);
+		    {
+			struct in_addr a4;
+#ifdef INET6
+			struct in6_addr a6;
+#endif
+
+			if (inet_pton(AF_INET, optarg, &a4) == 1)
+				bind_address = optarg;
+#ifdef INET6
+			else if (inet_pton(AF_INET6, optarg, &a6) == 1)
+				bind_address6 = optarg;
+#endif
+			else {
+				syslog(LOG_ERR, "-a %s: invalid address",
+					optarg);
 				exit(EX_USAGE);
 			}
-			break;
+		    }
 		case 'p':
 			pid_file = optarg;
 			break;
@@ -500,9 +515,11 @@ main(argc, argv, envp)
 					close(ctrl);
 					continue;
 				}
+				getnameinfo((struct sockaddr *)&peer, i,
+					hbuf, sizeof(hbuf), NULL, 0,
+					NI_NUMERICHOST);
 				syslog(LOG_INFO,"%s from %s",
-					sep->se_service,
-					inet_ntoa(peer.sin_addr));
+					sep->se_service, hbuf);
 			    }
 		    } else
 			    ctrl = sep->se_fd;
@@ -821,17 +838,40 @@ config(signo)
 			continue;
 		}
 		if (!sep->se_rpc) {
-			sp = getservbyname(sep->se_service, sep->se_proto);
-			if (sp == 0) {
-				syslog(LOG_ERR, "%s/%s: unknown service",
-			    	sep->se_service, sep->se_proto);
+			struct addrinfo hints, *res;
+			int e;
+			char *s;
+
+			memset(&hints, 0, sizeof(hints));
+			hints.ai_family = sep->se_family;
+			hints.ai_socktype = sep->se_socktype;
+			hints.ai_flags = AI_PASSIVE;
+			switch (hints.ai_family) {
+			case AF_INET:
+				s = bind_address;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				s = bind_address6;
+				break;
+#endif
+			default:
+				syslog(LOG_ERR, "%s/%s: unsupported af %d",
+					sep->se_service, sep->se_proto,
+					hints.ai_family);
 				sep->se_checked = 0;
 				continue;
 			}
-			if (sp->s_port != sep->se_ctrladdr.sin_port) {
-				sep->se_ctrladdr.sin_family = AF_INET;
-				sep->se_ctrladdr.sin_addr = bind_address;
-				sep->se_ctrladdr.sin_port = sp->s_port;
+			e = getaddrinfo(s, sep->se_service, &hints, &res);
+			if (e) {
+				syslog(LOG_ERR, "%s/%s: unknown service",
+					sep->se_service, sep->se_proto);
+				sep->se_checked = 0;
+				continue;
+			}
+			if (memcmp(&sep->se_ctrladdr, res->ai_addr, res->ai_addrlen) != 0) {
+				memcpy(&sep->se_ctrladdr, res->ai_addr,
+					res->ai_addrlen);
 				if (sep->se_fd >= 0)
 					close_sep(sep);
 			}
@@ -927,7 +967,7 @@ setup(sep)
 {
 	int on = 1;
 
-	if ((sep->se_fd = socket(AF_INET, sep->se_socktype, 0)) < 0) {
+	if ((sep->se_fd = socket(sep->se_family, sep->se_socktype, 0)) < 0) {
 		if (debug)
 			warn("socket failed on %s/%s",
 				sep->se_service, sep->se_proto);
@@ -937,7 +977,7 @@ setup(sep)
 	}
 #define	turnon(fd, opt) \
 setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
-	if (strcmp(sep->se_proto, "tcp") == 0 && (options & SO_DEBUG) &&
+	if (strncmp(sep->se_proto, "tcp", 3) == 0 && (options & SO_DEBUG) &&
 	    turnon(sep->se_fd, SO_DEBUG) < 0)
 		syslog(LOG_ERR, "setsockopt (SO_DEBUG): %m");
 	if (turnon(sep->se_fd, SO_REUSEADDR) < 0)
@@ -955,7 +995,7 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 	ipsecsetup(sep);
 #endif
 	if (bind(sep->se_fd, (struct sockaddr *)&sep->se_ctrladdr,
-	    sizeof (sep->se_ctrladdr)) < 0) {
+	    sep->se_ctrladdr.ss_len) < 0) {
 		if (debug)
 			warn("bind failed on %s/%s",
 				sep->se_service, sep->se_proto);
@@ -970,7 +1010,8 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 		return;
 	}
         if (sep->se_rpc) {
-                int i, len = sizeof(struct sockaddr);
+                int i, len = sizeof(sep->se_ctrladdr);
+		u_short port;
 
                 if (getsockname(sep->se_fd,
 				(struct sockaddr*)&sep->se_ctrladdr, &len) < 0){
@@ -984,10 +1025,22 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
                         print_service("REG ", sep);
                 for (i = sep->se_rpc_lowvers; i <= sep->se_rpc_highvers; i++) {
                         pmap_unset(sep->se_rpc_prog, i);
+			switch (sep->se_family) {
+			case AF_INET:
+				port = ((struct sockaddr_in *)&sep->se_ctrladdr)->sin_port;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				port = ((struct sockaddr_in6 *)&sep->se_ctrladdr)->sin6_port;
+				break;
+#endif
+			default:
+				port = 0;
+			}
                         pmap_set(sep->se_rpc_prog, i,
                                  (sep->se_socktype == SOCK_DGRAM)
                                  ? IPPROTO_UDP : IPPROTO_TCP,
-                                 ntohs(sep->se_ctrladdr.sin_port));
+                                 ntohs(port));
                 }
 
         }
@@ -1008,6 +1061,22 @@ ipsecsetup(sep)
 	int len;
 	char *buf;
 	char *policy;
+	int level, opt;
+
+	switch (sep->se_family) {
+	case AF_INET:
+		level = IPPROTO_IP;
+		opt = IP_IPSEC_POLICY;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		level = IPPROTO_IPV6;
+		opt = IPV6_IPSEC_POLICY;
+		break;
+#endif
+	default:
+		return;
+	}
 
 	if (!sep->se_policy || sep->se_policy[0] == '\0')
 		policy = "entrust";
@@ -1017,10 +1086,10 @@ ipsecsetup(sep)
 	len = ipsec_get_policylen(policy);
 	if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
 		ipsec_set_policy(buf, len, policy);
-		if (setsockopt(sep->se_fd, IPPROTO_IP, IP_IPSEC_POLICY,
+		if (setsockopt(sep->se_fd, level, opt,
 				buf, len) < 0) {
-			syslog(LOG_ERR, "setsockopt (IP_IPSEC_POLICY, %s): %m",
-				policy);
+			syslog(LOG_ERR, "%s/%s: ipsec initialization failed; %s",
+				sep->se_service, sep->se_proto, policy);
 		}
 		free(buf);
 	} else
@@ -1165,6 +1234,9 @@ getconfigent()
 #ifdef IPSEC
 	char *policy = NULL;
 #endif
+	struct sockaddr_storage baddr;
+	struct addrinfo hints, *res;
+	int e;
 
 more:
 	while ((cp = nextline(fconfig)) != NULL) {
@@ -1239,15 +1311,56 @@ more:
 	} else {
 		sep->se_proto = newstr(arg);
 	}
+
+	s = strchr(sep->se_proto, '/');
+	if (s && s > sep->se_proto)
+		s--;
+	else if (!s && strlen(sep->se_proto))
+		s = &sep->se_proto[strlen(sep->se_proto) - 1];
+	else
+		s = NULL;
+	if (!s) {
+		syslog(LOG_ERR, "bad protocol specifier; %s\n",
+			sep->se_proto);
+		freeconfig(sep);
+		goto more;
+	}
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = sep->se_socktype;
+	switch (*s) {
+	case '4':
+		sep->se_family = hints.ai_family = AF_INET;
+		s = bind_address;
+		break;
+#ifdef INET6
+	case '6':
+		sep->se_family = hints.ai_family = AF_INET6;
+		s = bind_address6;
+		break;
+#endif
+	default:
+		/* will be AF_INET6 */
+		sep->se_family = hints.ai_family = AF_INET;
+		s = bind_address;
+		break;
+	}
+	hints.ai_flags = AI_PASSIVE;
+	e = getaddrinfo(s, "0", &hints, &res);
+	if (e) {
+		syslog(LOG_ERR, "bad bind address; %s\n", s);
+		freeconfig(sep);
+		goto more;
+	}
+	memcpy(&baddr, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+
         if (strncmp(sep->se_proto, "rpc/", 4) == 0) {
                 memmove(sep->se_proto, sep->se_proto + 4,
                     strlen(sep->se_proto) + 1 - 4);
                 sep->se_rpc = 1;
                 sep->se_rpc_prog = sep->se_rpc_lowvers =
 			sep->se_rpc_lowvers = 0;
-                sep->se_ctrladdr.sin_family = AF_INET;
-                sep->se_ctrladdr.sin_port = 0;
-                sep->se_ctrladdr.sin_addr = bind_address;
+		memcpy(&sep->se_ctrladdr, &baddr, baddr.ss_len);
                 if ((versp = rindex(sep->se_service, '/'))) {
                         *versp++ = '\0';
                         switch (sscanf(versp, "%d-%d",
@@ -1310,7 +1423,7 @@ more:
 		 * since they don't have an assigned port to listen on.
 		 */
 		sep->se_accept = 1;
-		if (strcmp(sep->se_proto, "tcp")) {
+		if (strncmp(sep->se_proto, "tcp", 3)) {
 			syslog(LOG_ERR,
 				"%s: bad protocol for tcpmux service %s",
 				CONFIG, sep->se_service);
@@ -1502,14 +1615,17 @@ inetd_setproctitle(a, s)
 {
 	int size;
 	char *cp;
-	struct sockaddr_in sin;
+	struct sockaddr_storage sin;
 	char buf[80];
+	char hbuf[MAXHOSTNAMELEN];
 
 	cp = Argv[0];
 	size = sizeof(sin);
-	if (getpeername(s, (struct sockaddr *)&sin, &size) == 0)
-		(void) sprintf(buf, "-%s [%s]", a, inet_ntoa(sin.sin_addr));
-	else
+	if (getpeername(s, (struct sockaddr *)&sin, &size) == 0) {
+		getnameinfo((struct sockaddr *)&sin, size, hbuf, sizeof(hbuf),
+			NULL, 0, NI_NUMERICHOST);
+		(void) sprintf(buf, "-%s [%s]", a, hbuf);
+	} else
 		(void) sprintf(buf, "-%s", a);
 	strncpy(cp, buf, LastArg - cp);
 	cp += strlen(cp);
@@ -1523,13 +1639,16 @@ inetd_setproctitle(a, s)
 	int s;
 {
 	int size;
-	struct sockaddr_in sin;
+	struct sockaddr_storage sin;
 	char buf[80];
+	char hbuf[MAXHOSTNAMELEN];
 
 	size = sizeof(sin);
-	if (getpeername(s, (struct sockaddr *)&sin, &size) == 0)
-		(void) sprintf(buf, "%s [%s]", a, inet_ntoa(sin.sin_addr));
-	else
+	if (getpeername(s, (struct sockaddr *)&sin, &size) == 0) {
+		getnameinfo((struct sockaddr *)&sin, size, hbuf, sizeof(hbuf),
+			NULL, 0, NI_NUMERICHOST);
+		(void) sprintf(buf, "%s [%s]", a, hbuf);
+	} else
 		(void) sprintf(buf, "%s", a);
 	setproctitle("%s", buf);
 }
@@ -1558,21 +1677,40 @@ echo_stream(s, sep)		/* Echo service -- echo data back */
 }
 
 int check_loop(sin, sep)
-	struct sockaddr_in *sin;
+	struct sockaddr *sin;
 	struct servtab *sep;
 {
 	struct servtab *se2;
+	u_short port[2];
+	char hbuf[MAXHOSTNAMELEN];
 
 	for (se2 = servtab; se2; se2 = se2->se_next) {
 		if (!se2->se_bi || se2->se_socktype != SOCK_DGRAM)
 			continue;
+		if (sin->sa_family != se2->se_ctrladdr.ss_family)
+			continue;
+		switch (sin->sa_family) {
+		case AF_INET:
+			port[0] = ((struct sockaddr_in *)sin)->sin_port;
+			port[1] = ((struct sockaddr_in *)&se2->se_ctrladdr)->sin_port;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			port[0] = ((struct sockaddr_in6 *)sin)->sin6_port;
+			port[1] = ((struct sockaddr_in6 *)&se2->se_ctrladdr)->sin6_port;
+			break;
+#endif
+		default:
+			continue;
+		}
 
-		if (sin->sin_port == se2->se_ctrladdr.sin_port) {
+		if (port[0] == port[1]) {
+			getnameinfo(sin, sin->sa_len, hbuf, sizeof(hbuf),
+				NULL, 0, NI_NUMERICHOST);
 			syslog(LOG_WARNING,
 			       "%s/%s:%s/%s loop request REFUSED from %s",
 			       sep->se_service, sep->se_proto,
-			       se2->se_service, se2->se_proto,
-			       inet_ntoa(sin->sin_addr));
+			       se2->se_service, se2->se_proto, hbuf);
 			return 1;
 		}
 	}
@@ -1587,18 +1725,18 @@ echo_dg(s, sep)			/* Echo service -- echo data back */
 {
 	char buffer[BUFSIZE];
 	int i, size;
-	struct sockaddr_in sin;
+	struct sockaddr_storage sin;
 
 	size = sizeof(sin);
 	if ((i = recvfrom(s, buffer, sizeof(buffer), 0,
 			  (struct sockaddr *)&sin, &size)) < 0)
 		return;
 
-	if (check_loop(&sin, sep))
+	if (check_loop((struct sockaddr *)&sin, sep))
 		return;
 
 	(void) sendto(s, buffer, i, 0, (struct sockaddr *)&sin,
-		      sizeof(sin));
+		      size);
 }
 
 /* ARGSUSED */
@@ -1687,7 +1825,7 @@ chargen_dg(s, sep)		/* Character generator */
 	int s;
 	struct servtab *sep;
 {
-	struct sockaddr_in sin;
+	struct sockaddr_storage sin;
 	static char *rs;
 	int len, size;
 	char text[LINESIZ+2];
@@ -1702,7 +1840,7 @@ chargen_dg(s, sep)		/* Character generator */
 		     (struct sockaddr *)&sin, &size) < 0)
 		return;
 
-	if (check_loop(&sin, sep))
+	if (check_loop((struct sockaddr *)&sin, sep))
 		return;
 
 	if ((len = endring - rs) >= LINESIZ)
@@ -1716,7 +1854,7 @@ chargen_dg(s, sep)		/* Character generator */
 	text[LINESIZ] = '\r';
 	text[LINESIZ + 1] = '\n';
 	(void) sendto(s, text, sizeof(text), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+		      (struct sockaddr *)&sin, size);
 }
 
 /*
@@ -1761,7 +1899,7 @@ machtime_dg(s, sep)
 	struct servtab *sep;
 {
 	long result;
-	struct sockaddr_in sin;
+	struct sockaddr_storage sin;
 	int size;
 
 	size = sizeof(sin);
@@ -1769,12 +1907,12 @@ machtime_dg(s, sep)
 		     (struct sockaddr *)&sin, &size) < 0)
 		return;
 
-	if (check_loop(&sin, sep))
+	if (check_loop((struct sockaddr *)&sin, sep))
 		return;
 
 	result = machtime();
 	(void) sendto(s, (char *) &result, sizeof(result), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+		      (struct sockaddr *)&sin, size);
 }
 
 /* ARGSUSED */
@@ -1800,7 +1938,7 @@ daytime_dg(s, sep)		/* Return human-readable time of day */
 {
 	char buffer[256];
 	time_t clock;
-	struct sockaddr_in sin;
+	struct sockaddr_storage sin;
 	int size;
 
 	clock = time((time_t *) 0);
@@ -1810,12 +1948,12 @@ daytime_dg(s, sep)		/* Return human-readable time of day */
 		     (struct sockaddr *)&sin, &size) < 0)
 		return;
 
-	if (check_loop(&sin, sep))
+	if (check_loop((struct sockaddr *)&sin, sep))
 		return;
 
 	(void) sprintf(buffer, "%.24s\r\n", ctime(&clock));
 	(void) sendto(s, buffer, strlen(buffer), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+		      (struct sockaddr *)&sin, size);
 }
 
 /*
@@ -1948,7 +2086,7 @@ typedef struct CTime {
 } CTime;
 
 typedef struct CHash {
-	struct in_addr	ch_Addr;
+	struct sockaddr_storage	ch_Addr;
 	time_t		ch_LTime;
 	char		*ch_Service;
 	CTime		ch_Times[CHTSIZE];
@@ -1961,9 +2099,10 @@ cpmip(sep, ctrl)
 	struct servtab *sep;
 	int ctrl;
 {
-	struct sockaddr_in rsin;
+	struct sockaddr_storage rsin;
 	int rsinLen = sizeof(rsin);
 	int r = 0;
+	char hbuf[MAXHOSTNAMELEN];
 
 	/*
 	 * If getpeername() fails, just let it through (if logging is
@@ -1981,11 +2120,26 @@ cpmip(sep, ctrl)
 
 		{
 			char *p;
-			int i;
+			int i, l;
 
-			for (i = 0, p = (char *)&rsin.sin_addr; 
-			    i < sizeof(rsin.sin_addr); 
-			    ++i, ++p) {
+			switch (rsin.ss_family) {
+			case AF_INET:
+				p = (char *)&((struct sockaddr_in *)&rsin)->sin_addr;
+				l = sizeof(struct in_addr);
+				break;
+#ifdef INET6
+			case AF_INET6:
+				p = (char *)&((struct sockaddr_in6 *)&rsin)->sin6_addr;
+				l = sizeof(struct in6_addr);
+				break;
+#endif
+			default:
+				p = (char *)&rsin;
+				l = rsinLen;
+				break;
+			}
+
+			for (i = 0; i < l; i++, p++) {
 				hv = (hv << 5) ^ (hv >> 23) ^ *p;
 			}
 			hv = (hv ^ (hv >> 16));
@@ -1993,9 +2147,11 @@ cpmip(sep, ctrl)
 		for (i = 0; i < 5; ++i) {
 			CHash *ch = &CHashAry[(hv + i) & CPMHMASK];
 
-			if (rsin.sin_addr.s_addr == ch->ch_Addr.s_addr &&
-			    ch->ch_Service && strcmp(sep->se_service,
-			    ch->ch_Service) == 0) {
+			if (rsin.ss_family == ch->ch_Addr.ss_family
+			 && rsin.ss_len == ch->ch_Addr.ss_len
+			 && memcmp(&rsin, &ch->ch_Addr, rsin.ss_len) == 0
+			 && ch->ch_Service
+			 && strcmp(sep->se_service, ch->ch_Service) == 0) {
 				chBest = ch;
 				break;
 			}
@@ -2004,15 +2160,17 @@ cpmip(sep, ctrl)
 				chBest = ch;
 			}
 		}
-		if (rsin.sin_addr.s_addr != chBest->ch_Addr.s_addr ||
-		    chBest->ch_Service == NULL ||
-		    strcmp(sep->se_service, chBest->ch_Service) != 0) {
-			chBest->ch_Addr = rsin.sin_addr;
+		if (rsin.ss_family != chBest->ch_Addr.ss_family
+		 || rsin.ss_len != chBest->ch_Addr.ss_len
+		 || memcmp(&rsin, &chBest->ch_Addr, rsin.ss_len) != 0
+		 || chBest->ch_Service == NULL
+		 || strcmp(sep->se_service, chBest->ch_Service) != 0) {
+			chBest->ch_Addr = rsin;
 			if (chBest->ch_Service)
 				free(chBest->ch_Service);
 			chBest->ch_Service = strdup(sep->se_service);
 			bzero(chBest->ch_Times, sizeof(chBest->ch_Times));
-		} 
+		}
 		chBest->ch_LTime = t;
 		{
 			CTime *ct = &chBest->ch_Times[ticks % CHTSIZE];
@@ -2031,9 +2189,11 @@ cpmip(sep, ctrl)
 		}
 		if (cnt * (CHTSIZE * CHTGRAN) / 60 > sep->se_maxcpm) {
 			r = -1;
+			getnameinfo((struct sockaddr *)&rsin, rsinLen,
+				hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST);
 			syslog(LOG_ERR,
 			    "%s from %s exceeded counts/min (limit %d/min)",
-			    sep->se_service, inet_ntoa(rsin.sin_addr), 
+			    sep->se_service, hbuf,
 			    sep->se_maxcpm);
 		}
 	}

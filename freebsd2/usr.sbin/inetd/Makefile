@@ -6,6 +6,7 @@ MLINKS=	inetd.8 inetd.conf.5
 
 COPTS+=	-Wall -DLOGIN_CAP
 #COPTS+=	-DSANITY_CHECK
+COPTS+=	-Dss_family=__ss_family -Dss_len=__ss_len -DINET6
 
 DPADD+=	${LIBUTIL}
 LDADD+=	-lutil
