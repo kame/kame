@@ -484,6 +484,13 @@ tcp6_input(mp, offp, proto)
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct tcp6hdr), IPPROTO_DONE);
 	ip6 = mtod(m, struct ip6_hdr *);
 
+	/* Be proactive about malicious use of IPv4 mapped address */
+	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
+	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
+		/* XXX stat */
+		goto drop;
+	}
+
 	/*
 	 * Checksum extended TCP6 header and data.
 	 */
