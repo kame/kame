@@ -165,10 +165,10 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ECN,
 
 static int ipsec_setspidx_mbuf
 	__P((struct secpolicyindex *, u_int, u_int, struct mbuf *));
-static u_int16_t ipsec6_get_ulp __P((struct mbuf *m));
 static void ipsec4_setspidx_inpcb __P((struct mbuf *, struct inpcb *pcb));
 static void ipsec4_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #ifdef INET6
+static u_int16_t ipsec6_get_ulp __P((struct mbuf *m));
 static void ipsec6_setspidx_in6pcb __P((struct mbuf *, struct in6pcb *pcb));
 static void ipsec6_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #endif
@@ -812,6 +812,7 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 	return EINVAL;
 }
 
+#ifdef INET6
 /*
  * Get the number of upper layer protocol.
  * Assumed all extension headers are in single mbuf.
@@ -875,6 +876,7 @@ ipsec6_get_ulp(m)
 
 	return IPSEC_PORT_ANY;
 }
+#endif
 
 static void
 ipsec4_setspidx_inpcb(m, pcb)
