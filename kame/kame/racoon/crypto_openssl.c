@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.32 2000/08/24 11:03:48 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.33 2000/08/25 12:12:10 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1536,7 +1536,6 @@ err:
 }
 #endif
 
-#if 1
 int
 eay_bn2v(var, bn)
 	vchar_t **var;
@@ -1550,41 +1549,3 @@ eay_bn2v(var, bn)
 
 	return 0;
 }
-#else
-int
-eay_bn2v(var, bn)
-	vchar_t **var;
-	BIGNUM *bn;
-{
-	int i;
-	BN_ULONG *p;
-
-	*var = vmalloc(bn->top * BN_BYTES);
-	if (*var == NULL)
-		return(-1);
-	p = (BN_ULONG *)(*var)->v;
-
-	/* scan from most significant word (BN_ULONG) */
-	for (i = bn->top - 1; 0 <= i; i--) {
-#if BN_BYTES == 2
-		*p++ = htons(bn->d[i]);
-#else
-# if BN_BYTES == 4
-		*p++ = htonl(bn->d[i]);
-# else
-	    {
-		u_char *q;
-		int j;
-		q = (u_char *)p;
-		for (j = BN_BYTES - 1; 0 <= j; j++) {
-			*q++ = (bn->d[i] >> (j * 8)) & 0xff;
-		}
-		p++;
-	    }
-# endif
-#endif
-	}
-
-	return(0);
-}
-#endif
