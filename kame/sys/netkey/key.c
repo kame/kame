@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.76 2000/03/27 05:11:04 sumikawa Exp $	*/
+/*	$KAME: key.c,v 1.77 2000/04/06 05:41:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1454,6 +1454,7 @@ key_spdadd(mhp)
 
 	if ((newsp->id = key_getnewspid()) == 0) {
 		msg0->sadb_msg_errno = ENOBUFS;
+		keydb_delsecpolicy(newsp);
 		return NULL;
 	}
 
@@ -1464,6 +1465,34 @@ key_spdadd(mhp)
 	                dst0->sadb_address_prefixlen,
 	                src0->sadb_address_proto,
 	                &newsp->spidx);
+
+	/* sanity check on addr pair */
+	if (((struct sockaddr *)(src0 + 1))->sa_family !=
+			((struct sockaddr *)(dst0+ 1))->sa_family) {
+		msg0->sadb_msg_errno = EINVAL;
+		keydb_delsecpolicy(newsp);
+		return NULL;
+	}
+#if 1
+	if (newsp->req && newsp->req->saidx.src.ss_family) {
+		struct sockaddr *sa;
+		sa = (struct sockaddr *)(src0 + 1);
+		if (sa->sa_family != newsp->req->saidx.src.ss_family) {
+			msg0->sadb_msg_errno = EINVAL;
+			keydb_delsecpolicy(newsp);
+			return NULL;
+		}
+	}
+	if (newsp->req && newsp->req->saidx.dst.ss_family) {
+		struct sockaddr *sa;
+		sa = (struct sockaddr *)(dst0 + 1);
+		if (sa->sa_family != newsp->req->saidx.dst.ss_family) {
+			msg0->sadb_msg_errno = EINVAL;
+			keydb_delsecpolicy(newsp);
+			return NULL;
+		}
+	}
+#endif
 
 	newsp->refcnt = 1;	/* do not reclaim until I say I do */
 	newsp->state = IPSEC_SPSTATE_ALIVE;
@@ -1495,6 +1524,7 @@ key_spdadd(mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_spdadd: No more memory.\n");
 #endif
+		/* newsp persists in the kernel */
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
