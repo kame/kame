@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.39 2000/04/13 06:59:11 jinmei Exp $
+	$Id: PORTABILITY,v 1.40 2000/04/14 09:52:09 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -206,11 +206,15 @@ across those possibilities.
 
 - RFC2553 defines sockaddr_storage to have __ss_{family,len} member.  During
   the discusson for the draft on ipngwg, ss_len was proposed and final result
-  was not very clear.  Therefore, you can see both definition on operating
-  system platforms.  The most portable way of dealing with it is to:
+  was not very clear.  X/Open document mentions ss_len, not __ss_len.
+  Therefore, you can see both definition on operating system platforms.
+  The most portable way of dealing with it is to:
   (1) have -Dss_len=__ss_len to unify all occurences (including header file)
   into __ss_len, or (2) never touch __ss_len.  cast to sockaddr * and use
   sa_len.
+
+  Next version of RFC2553 (RFC2553bis) will define ss_len (not __ss_len),
+  and be synchronized better with X/Open document.
 
 - Never, never touch the __u6_addr{,8,16,32} member in struct in6_addr
   directly.  Symbols starting with "__" are NOT supposed to be used.
