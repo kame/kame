@@ -497,6 +497,14 @@ print_rip_dump(FILE *fp)
 			fprintf(fp, " DEFRT_ORIGINATE");
 		fputc('\n', fp);
 
+		/* statistics */
+		fprintf(fp, "  Responses: in/out/fail: %qu/%qu/%qu\n",
+			ripif->rip_responsercvd, ripif->rip_responsesent,
+			ripif->rip_respfail);
+		fprintf(fp, "  Requests: in/out/fail: %qu/%qu/%qu\n",
+			ripif->rip_requestsent, ripif->rip_requestrcvd,
+			ripif->rip_reqsentfail);
+
 		/* RIPng routing table */
 		fprintf(fp, "  RIPng routing table\n");		
 		dump_rip_rtable(fp, ripif->rip_adj_ribs_in);
