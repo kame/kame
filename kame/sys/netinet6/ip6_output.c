@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.135 2000/11/30 03:36:40 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.136 2000/12/02 15:54:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,6 +95,9 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#include <net/pfil.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -221,6 +224,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	int hdrsplit = 0;
 	int needipsec = 0;
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+	struct packet_filter_hook *pfh;
+	struct mbuf *m1;
+	int rv;
+#endif /* PFIL_HOOKS */
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
@@ -987,6 +995,25 @@ skip_ipsec2:;
 		m->m_pkthdr.rcvif = NULL;
 	}
 
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+	/*
+	 * Run through list of hooks for output packets.
+	 */
+	m1 = m;
+	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
+	for (; pfh; pfh = pfh->pfil_link.tqe_next)
+		if (pfh->pfil_func) {
+		    	rv = pfh->pfil_func(ip6, sizeof(*ip6), ifp, 1, &m1);
+			if (rv) {
+				error = EHOSTUNREACH;
+				goto done;
+			}
+			m = m1;
+			if (m == NULL)
+				goto done;
+			ip6 = mtod(m, struct ip6_hdr *);
+		}
+#endif /* PFIL_HOOKS */
 	/*
 	 * Send the packet to the outgoing interface.
 	 * If necessary, do IPv6 fragmentation before sending.
