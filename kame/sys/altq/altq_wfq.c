@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.c,v 1.13 2004/04/17 10:54:49 kjc Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.14 2005/04/13 03:44:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -32,11 +32,9 @@
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 #ifdef ALTQ_WFQ
@@ -671,13 +669,7 @@ wfqclose(dev, flag, fmt, p)
 #endif
 	while ((wfqp = wfq_list) != NULL) {
 		ifp = wfqp->ifq->altq_ifp;
-#if defined(__NetBSD__) || defined(__OpenBSD__)\
-    || (defined(__FreeBSD__) && __FreeBSD_version >= 501113)
 		sprintf(iface.wfq_ifacename, "%s", ifp->if_xname);
-#else
-		sprintf(iface.wfq_ifacename, "%s%d",
-			ifp->if_name, ifp->if_unit);
-#endif
 		wfq_ifdetach(&iface);
 	}
 	splx(s);

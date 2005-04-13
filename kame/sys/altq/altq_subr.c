@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.23 2004/04/20 16:10:06 itojun Exp $	*/
+/*	$KAME: altq_subr.c,v 1.24 2005/04/13 03:44:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -28,11 +28,9 @@
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 

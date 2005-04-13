@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.18 2005/02/10 05:22:41 kjc Exp $	*/
+/*	$KAME: altq_rio.c,v 1.19 2005/04/13 03:44:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1998-2003
@@ -60,11 +60,9 @@
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 #ifdef ALTQ_RIO	/* rio is enabled by ALTQ_RIO option in opt_altq.h */

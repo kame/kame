@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.c,v 1.10 2004/04/18 11:00:36 jinmei Exp $	*/
+/*	$KAME: altq_jobs.c,v 1.11 2005/04/13 03:44:25 suz Exp $	*/
 /*
  * Copyright (c) 2001, the Rector and Board of Visitors of the
  * University of Virginia.
@@ -59,11 +59,9 @@
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 
@@ -81,11 +79,7 @@
 #include <sys/queue.h>
 
 #ifdef __FreeBSD__
-#if __FreeBSD_version >= 500000
 #include <sys/limits.h>
-#elif __FreeBSD_version >= 490000
-#include <machine/limits.h>
-#endif
 #endif
 
 #include <net/if.h>

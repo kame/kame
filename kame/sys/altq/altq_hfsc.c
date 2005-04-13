@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.25 2004/04/17 10:54:48 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.26 2005/04/13 03:44:24 suz Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -43,11 +43,9 @@
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 
@@ -689,14 +687,8 @@ hfsc_enqueue(struct ifaltq *ifq, struct mbuf *m, struct altq_pktattr *pktattr)
 	/* grab class set by classifier */
 	if ((m->m_flags & M_PKTHDR) == 0) {
 		/* should not happen */
-#if defined(__NetBSD__) || defined(__OpenBSD__)\
-    || (defined(__FreeBSD__) && __FreeBSD_version >= 501113)
 		printf("altq: packet for %s does not have pkthdr\n",
 		    ifq->altq_ifp->if_xname);
-#else
-		printf("altq: packet for %s%d does not have pkthdr\n",
-		    ifq->altq_ifp->if_name, ifq->altq_ifp->if_unit);
-#endif
 		m_freem(m);
 		return (ENOBUFS);
 	}

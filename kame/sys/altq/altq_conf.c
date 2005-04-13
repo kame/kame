@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.23 2004/04/17 10:54:48 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.24 2005/04/13 03:44:24 suz Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -28,11 +28,9 @@
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 
@@ -45,9 +43,6 @@
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/errno.h>
-#if defined(__FreeBSD__) && (__FreeBSD_version < 400000) && defined(DEVFS)
-#include <sys/devfsext.h>
-#endif /*DEVFS*/
 #include <net/if.h>
 
 #include <altq/altq.h>
@@ -95,7 +90,7 @@ altqdev_decl(jobs);
 /*
  * altq minor device (discipline) table
  */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502103
+#ifdef __FreeBSD__
 static struct altqsw altqsw[] = {				/* minor */
 	{"altq"},						/* 0 (reserved) */
 #ifdef ALTQ_CBQ
@@ -240,28 +235,10 @@ static void altq_drvinit(void *);
 cdev_decl(altq);
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #define	CDEV_MAJOR 96		/* FreeBSD official number */
 
 static struct cdevsw altq_cdevsw =
-#if (__FreeBSD_version < 400000)
-        { altqopen,	altqclose,	noread,	        nowrite,
-	  altqioctl,	nostop,		nullreset,	nodevtotty,
- 	  seltrue,	nommap,		NULL,	"altq",	NULL,	  -1 };
-#elif (__FreeBSD_version < 500000)
-        { altqopen,	altqclose,	noread,	        nowrite,
-	  altqioctl,	seltrue,	nommap,		nostrategy,
-	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0,  -1 };
-#elif (__FreeBSD_version < 501000)
-        { altqopen,	altqclose,	noread,	        nowrite,
-	  altqioctl,	seltrue,	nommap,		nostrategy,
-	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0 };
-#elif (__FreeBSD_version < 502103)
-	{ CDEV_MAJOR,	0, 		"altq",
-	  altqopen,	altqclose,	noread,	        nowrite,
-	  altqioctl,	nopoll,		nommap,		nostrategy,
-	  nodump,	nokqfilter };
-#else
 	{ 
 	  .d_version = 	D_VERSION,
 	  .d_open = 	altqopen,
@@ -269,17 +246,16 @@ static struct cdevsw altq_cdevsw =
 	  .d_ioctl = 	altqioctl,
 	  .d_name = 	"altq"
 	};
-#endif
 #endif /* __FreeBSD__ */
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 static
 #endif
 int
 altqopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+#ifdef __FreeBSD__
 	struct thread *p;
 #else
 	struct proc *p;
@@ -295,14 +271,14 @@ altqopen(dev, flag, fmt, p)
 	return ENXIO;
 }
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 static
 #endif
 int
 altqclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+#ifdef __FreeBSD__
 	struct thread *p;
 #else
 	struct proc *p;
@@ -318,7 +294,7 @@ altqclose(dev, flag, fmt, p)
 	return ENXIO;
 }
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 static
 #endif
 int
@@ -327,7 +303,7 @@ altqioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+#ifdef __FreeBSD__
 	struct thread *p;
 #else
 	struct proc *p;
@@ -383,83 +359,33 @@ altqioctl(dev, cmd, addr, flag, p)
 	return ENXIO;
 }
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 static int altq_devsw_installed = 0;
 #endif
 
 #ifdef __FreeBSD__
-#if (__FreeBSD_version < 400000)
-#ifdef DEVFS
-static	void *altq_devfs_token[sizeof (altqsw) / sizeof (altqsw[0])];
-#endif
-
-static void
-altq_drvinit(unused)
-	void *unused;
-{
-	dev_t dev;
-#ifdef DEVFS
-	int i;
-#endif
-
-	if (!altq_devsw_installed) {
-		dev = makedev(CDEV_MAJOR,0);
-#if defined(__FreeBSD__) && __FreeBSD_version < 501000
-		cdevsw_add(&dev,&altq_cdevsw,NULL);
-#endif
-		altq_devsw_installed = 1;
-#ifdef DEVFS
-		for (i=0; i<naltqsw; i++)
-			altq_devfs_token[i] =
-				devfs_add_devswf(&altq_cdevsw, i, DV_CHR,
-						 0, 0, 0644, altqsw[i].d_name);
-#endif
-		printf("altq: major number is %d\n", CDEV_MAJOR);
-	}
-}
-
-#else /* FreeBSD 4.x or 5.x */
-
 static void
 altq_drvinit(unused)
 	void *unused;
 {
 	int unit;
 
-#if __FreeBSD_version > 500000
 #if 0
 	mtx_init(&altq_mtx, "altq global lock", MTX_DEF);
 #endif
-#endif
-#if __FreeBSD_version < 501000
-	cdevsw_add(&altq_cdevsw);
-#endif
 	altq_devsw_installed = 1;
-#if __FreeBSD_version < 502103
-	printf("altq: major number is %d\n", CDEV_MAJOR);
-#else
 	printf("altq: attached. Major number assigned automatically.\n");
-#endif
 
 	/* create minor devices */
 	for (unit = 0; unit < naltqsw; unit++) {
-#if __FreeBSD_version < 500000
-		make_dev(&altq_cdevsw, unit, 0, 0, 0644,
-			 altqsw[unit].d_name);
-#elif __FreeBSD_version < 502103
-		if (unit == 0 || altqsw[unit].d_open != noopen)
-			make_dev(&altq_cdevsw, unit, UID_ROOT, GID_WHEEL, 0644,
-				 "altq/%s", altqsw[unit].d_name);
-#else
 		if (unit == 0 || altqsw[unit].d_open != NULL)
 			altqsw[unit].dev = make_dev(&altq_cdevsw, unit,
 			    UID_ROOT, GID_WHEEL, 0644, "altq/%s",
 			    altqsw[unit].d_name);
-#endif
 	}
 }
 
-#endif /* FreeBSD 4.x or 5.x */
+#endif /* FreeBSD */
 
 SYSINIT(altqdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,altq_drvinit,NULL)
 

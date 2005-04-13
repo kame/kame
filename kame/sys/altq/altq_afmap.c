@@ -1,4 +1,4 @@
-/*	$KAME: altq_afmap.c,v 1.11 2004/04/17 10:54:48 kjc Exp $	*/
+/*	$KAME: altq_afmap.c,v 1.12 2005/04/13 03:44:24 suz Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -35,11 +35,9 @@
  */
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
-#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 #ifdef ALTQ_AFMAP
@@ -337,7 +335,7 @@ int
 afmopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+#ifdef __FreeBSD__
 	struct thread *p;
 #else
 	struct proc *p;
@@ -350,7 +348,7 @@ int
 afmclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+#ifdef __FreeBSD__
 	struct thread *p;
 #else
 	struct proc *p;
@@ -364,13 +362,7 @@ afmclose(dev, flag, fmt, p)
 	     head = head->afh_chain.le_next) {
 
 		/* call interface to clean up maps */
-#if defined(__NetBSD__) || defined(__OpenBSD__)\
-    || (defined(__FreeBSD__) && __FreeBSD_version >= 501113)
 		sprintf(fmap.af_ifname, "%s", head->afh_ifp->if_xname);
-#else
-		sprintf(fmap.af_ifname, "%s%d",
-			head->afh_ifp->if_name, head->afh_ifp->if_unit);
-#endif
 		err = afmioctl(dev, AFM_CLEANFMAP, (caddr_t)&fmap, flag, p);
 		if (err && error == 0)
 			error = err;
@@ -385,7 +377,7 @@ afmioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+#ifdef __FreeBSD__
 	struct thread *p;
 #else
 	struct proc *p;
