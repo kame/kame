@@ -825,11 +825,7 @@ in_ifinit(ifp, ia, sin, scrub)
 		struct in_addr addr;
 
 		addr.s_addr = htonl(INADDR_ALLHOSTS_GROUP);
-#ifdef IGMPV3
-		in_addmulti(&addr, ifp, 0, NULL, MCAST_EXCLUDE, 0, &error);
-#else
 		in_addmulti(&addr, ifp);
-#endif
 	}
 	return (error);
 }
@@ -881,51 +877,21 @@ in_broadcast(in, ifp)
  * and the number of source is not 0.
  */
 struct in_multi *
-#ifdef IGMPV3
-in_addmulti(ap, ifp, numsrc, ss, mode, init, error)
-#else
 in_addmulti(ap, ifp)
-#endif
 	register struct in_addr *ap;
 	register struct ifnet *ifp;
-#ifdef IGMPV3
-	u_int16_t numsrc;
-	struct sockaddr_storage *ss;
-	u_int mode;			/* requested filter mode by socket */
-	int init;			/* indicate initial join by socket */
-	int *error;			/* return code of each sub routine */
-#endif
 {
+#ifdef IGMPV3
+	int error;
+
+	return in_addmulti2(ap, ifp, 0, NULL, MCAST_EXCLUDE, 1, &error);
+#else
 	register struct in_multi *inm;
 	struct sockaddr_in sin;
 	struct ifmultiaddr *ifma;
-#ifdef IGMPV3
-	struct mbuf *m = NULL;
-	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
-	u_int curmode;			/* current filter mode */
-	u_int newmode;			/* newly calculated filter mode */
-	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
-	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
-	int timer_init = 1;		/* indicate timer initialization */
-	int buflen = 0;
-	u_int8_t type = 0;		/* State-Change report type */
-	struct router_info *rti;
-#else
 	int dummy;			/* dummy */
 	int *error = &dummy;		/* dummy */
-#endif
 	int s = splnet();
-
-#ifdef IGMPV3
-	/*
-	 * MCAST_INCLUDE with empty source list means (*,G) leave.
-	 */
-	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
-	    *error = EINVAL;
-	    splx(s);
-	    return NULL;
-	}
-#endif
 
 	/*
 	 * Call generic routine to add membership or increment
@@ -947,7 +913,125 @@ in_addmulti(ap, ifp)
 	 * a new record.  Otherwise, we are done.
 	 */
 	if (ifma->ifma_protospec != 0) {
+		splx(s);
+		return ifma->ifma_protospec;
+	}
+
+	/* XXX - if_addmulti uses M_WAITOK.  Can this really be called
+	   at interrupt time?  If so, need to fix if_addmulti. XXX */
+	inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR,
+	    M_NOWAIT | M_ZERO);
+	if (inm == NULL) {
+		*error = ENOBUFS;
+		splx(s);
+		return (NULL);
+	}
+
+	inm->inm_addr = *ap;
+	inm->inm_ifp = ifp;
+	inm->inm_ifma = ifma;
+	ifma->ifma_refcount = 1;
+	ifma->ifma_protospec = inm;
+	LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
+
+	/*
+	 * Let IGMP know that we have joined a new IP multicast group.
+	 */
+	igmp_joingroup(inm);
+	splx(s);
+	return (inm);
+#endif
+}
+
+/*
+ * Delete a multicast address record.
+ */
+void
+in_delmulti(inm)
+	register struct in_multi *inm;
+{
 #ifdef IGMPV3
+	int error;
+
+	return in_delmulti2(inm, 0, NULL, MCAST_EXCLUDE, 1, &error);
+#else
+	struct ifmultiaddr *ifma = inm->inm_ifma;
+	struct in_multi my_inm;
+	int s = splnet();
+
+	my_inm.inm_ifp = NULL ; /* don't send the leave msg */
+	if (ifma->ifma_refcount == 1) {
+		/*
+		 * No remaining claims to this record; let IGMP know that
+		 * we are leaving the multicast group.
+		 * But do it after the if_delmulti() which might reset
+		 * the interface and nuke the packet.
+		 */
+		my_inm = *inm ;
+		ifma->ifma_protospec = 0;
+		LIST_REMOVE(inm, inm_link);
+		free(inm, M_IPMADDR);
+	}
+	/* XXX - should be separate API for when we have an ifma? */
+	if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+	if (my_inm.inm_ifp != NULL)
+		igmp_leavegroup(&my_inm);
+	splx(s);
+#endif
+}
+
+#ifdef IGMPV3
+struct in_multi *
+in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
+	register struct in_addr *ap;
+	register struct ifnet *ifp;
+	u_int16_t numsrc;
+	struct sockaddr_storage *ss;
+	u_int mode;			/* requested filter mode by socket */
+	int init;			/* indicate initial join by socket */
+	int *error;			/* return code of each sub routine */
+{
+	register struct in_multi *inm;
+	struct sockaddr_in sin;
+	struct ifmultiaddr *ifma;
+	struct mbuf *m = NULL;
+	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
+	u_int curmode;			/* current filter mode */
+	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
+	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
+	int timer_init = 1;		/* indicate timer initialization */
+	int buflen = 0;
+	u_int8_t type = 0;		/* State-Change report type */
+	struct router_info *rti;
+	int s = splnet();
+
+	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
+	    *error = EINVAL;
+	    splx(s);
+	    return NULL;
+	}
+
+	/*
+	 * Call generic routine to add membership or increment
+	 * refcount.  It wants addresses in the form of a sockaddr,
+	 * so we build one here (being careful to zero the unused bytes).
+	 */
+	bzero(&sin, sizeof sin);
+	sin.sin_family = AF_INET;
+	sin.sin_len = sizeof sin;
+	sin.sin_addr = *ap;
+	*error = if_addmulti(ifp, (struct sockaddr *)&sin, &ifma);
+	if (*error) {
+		splx(s);
+		return 0;
+	}
+
+	/*
+	 * If ifma->ifma_protospec is null, then if_addmulti() created
+	 * a new record.  Otherwise, we are done.
+	 */
+	if (ifma->ifma_protospec != 0) {
 		inm = (struct in_multi *) ifma->ifma_protospec;
 		/*
 		 * Found it; merge source addresses in inm_source and send
@@ -1025,7 +1109,6 @@ in_addmulti(ap, ifp)
 			 in_clear_all_pending_report(inm);
 		 }
 		 *error = 0;
-#endif
 		splx(s);
 		return ifma->ifma_protospec;
 	}
@@ -1050,7 +1133,6 @@ in_addmulti(ap, ifp)
 	/*
 	 * Let IGMP know that we have joined a new IP multicast group.
 	 */
-#ifdef IGMPV3
 	    SLIST_FOREACH(rti, &router_info_head, rti_list) {
 		if (rti->rti_ifp == inm->inm_ifp) {
 		    inm->inm_rti = rti;
@@ -1112,40 +1194,26 @@ in_addmulti(ap, ifp)
 		igmp_joingroup(inm);
 	    }
 	    *error = 0;
-#else
-	igmp_joingroup(inm);
-#endif
-#ifdef IGMPV3
+
 	if (newhead != NULL)
 	    /* Each ias is linked from new curhead, so only newhead (not
 	     * ias_list) is freed */
 	    FREE(newhead, M_MSFILTER);
-#endif
 
 	splx(s);
 	return (inm);
 }
 
-/*
- * Delete a multicast address record.
- */
 void
-#ifdef IGMPV3
-in_delmulti(inm, numsrc, ss, mode, final, error)
-#else
-in_delmulti(inm)
-#endif
+in_delmulti2(inm, numsrc, ss, mode, final, error)
 	register struct in_multi *inm;
-#ifdef IGMPV3
 	u_int16_t numsrc;
 	struct sockaddr_storage *ss;
 	u_int mode;			/* requested filter mode by socket */
 	int final;			/* indicate complete leave by socket */
 	int *error;			/* return code of each sub routine */
-#endif
 {
 	struct ifmultiaddr *ifma = inm->inm_ifma;
-#ifdef IGMPV3
 	struct mbuf *m = NULL;
 	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
@@ -1156,12 +1224,8 @@ in_delmulti(inm)
 	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct ifreq ifr;
-#else
-	struct in_multi my_inm;
-#endif
 	int s = splnet();
 
-#ifdef IGMPV3
 	bzero(&ifr, sizeof(ifr));
 	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
 		*error = EINVAL;
@@ -1288,36 +1352,16 @@ in_delmulti(inm)
 	*error = 0;
 	if (newhead != NULL)
 		FREE(newhead, M_MSFILTER);
-#else
-	my_inm.inm_ifp = NULL ; /* don't send the leave msg */
-	if (ifma->ifma_refcount == 1) {
-		/*
-		 * No remaining claims to this record; let IGMP know that
-		 * we are leaving the multicast group.
-		 * But do it after the if_delmulti() which might reset
-		 * the interface and nuke the packet.
-		 */
-		my_inm = *inm ;
-		ifma->ifma_protospec = 0;
-		LIST_REMOVE(inm, inm_link);
-		free(inm, M_IPMADDR);
-	}
-	/* XXX - should be separate API for when we have an ifma? */
-	if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
-	if (my_inm.inm_ifp != NULL)
-		igmp_leavegroup(&my_inm);
-#endif
 	splx(s);
 }
 
-#ifdef IGMPV3
 /*
  * Add an address to the list of IP multicast addresses for a given interface.
  * Add source addresses to the list also, if upstream router is IGMPv3 capable
  * and the number of source is not 0.
  */
 struct in_multi *
-in_modmulti(ap, ifp, numsrc, ss, mode,
+in_modmulti2(ap, ifp, numsrc, ss, mode,
 		old_num, old_ss, old_mode, init, grpjoin, error)
 	struct in_addr *ap;
 	struct ifnet *ifp;

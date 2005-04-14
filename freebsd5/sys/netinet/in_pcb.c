@@ -909,7 +909,7 @@ in_pcbpurgeif0(pcbinfo, ifp)
 						continue;
 					}
 					final = 1;
-					in_delmulti(imo->imo_membership[i],
+					in_delmulti2(imo->imo_membership[i],
 						    numsrc, del_ss, mode,
 						    final, &error);
 					if (del_ss != NULL)

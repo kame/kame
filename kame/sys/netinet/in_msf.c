@@ -2185,8 +2185,8 @@ ip_setmopt_srcfilter(sop, imsfp)
 	}
 
 	/*
-	 * Prepare sock_storage for in_addmulti(), in_delmulti(), and
-	 * in_modmulti(). Inputted sources are sorted below.
+	 * Prepare sock_storage for in_addmulti2(), in_delmulti2(), and
+	 * in_modmulti2(). Inputted sources are sorted below.
 	 */
 	if (imsf->imsf_numsrc != 0) {
 		IAS_LIST_ALLOC(iasl);
@@ -2320,7 +2320,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 		final = 1;
 		if (imop->imo_msf[i]->msf_grpjoin != 0) {
 			/* EX{NULL} -> IN{NULL} */
-			in_delmulti(imop->imo_membership[i], 0, NULL,
+			in_delmulti2(imop->imo_membership[i], 0, NULL,
 					MCAST_EXCLUDE, final, &error);
 			if (error != 0) {
 				printf("in_setmopt_srcfilter: error must be 0! panic!\n");
@@ -2329,7 +2329,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 			}
 		} else {
 			/* IN{non NULL}/EX{non NULL} -> IN{NULL} */
-			in_delmulti(imop->imo_membership[i], old_num, old_ss,
+			in_delmulti2(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
 				igmplog((LOG_DEBUG, "in_setmopt_srcfilter: "
@@ -2349,13 +2349,13 @@ ip_setmopt_srcfilter(sop, imsfp)
 		if (old_num > 0) {
 			/* IN{non NULL}/EX{non NULL} -> EX{NULL} */
 			imop->imo_membership[i] =
-				in_modmulti(&imsf->imsf_multiaddr, ifp,
+				in_modmulti2(&imsf->imsf_multiaddr, ifp,
 					0, NULL, MCAST_EXCLUDE, old_num, old_ss,
 					old_mode, init, 0, &error);
 		} else {
 			/* IN{NULL} -> EX{NULL} */
 			imop->imo_membership[i] =
-				in_addmulti(&imsf->imsf_multiaddr, ifp,
+				in_addmulti2(&imsf->imsf_multiaddr, ifp,
 					0, NULL, MCAST_EXCLUDE, init, &error);
 		}
 		if (error != 0) {
@@ -2387,11 +2387,11 @@ ip_setmopt_srcfilter(sop, imsfp)
 				splx(s);
 				return EOPNOTSUPP;
 			}
-			in_delmulti(imop->imo_membership[i], old_num, old_ss,
+			in_delmulti2(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
 				igmplog((LOG_DEBUG, "in_setmcast_srcfilter: "
-					"in_delmulti retuned error=%d. undo.\n",
+					"in_delmulti2 retuned error=%d. undo.\n",
 					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], imsf->imsf_fmode);
@@ -2403,14 +2403,14 @@ ip_setmopt_srcfilter(sop, imsfp)
 			}
 		} else {
 			imop->imo_membership[i] =
-				in_modmulti(&imsf->imsf_multiaddr, ifp,
+				in_modmulti2(&imsf->imsf_multiaddr, ifp,
 					imsf->imsf_numsrc, ss_src,
 					imsf->imsf_fmode, old_num, old_ss,
 					old_mode, init,
 					imop->imo_msf[i]->msf_grpjoin, &error);
 			if (error != 0) {
 				igmplog((LOG_DEBUG, "in_setmopt_srcfilter: "
-					"in_modmulti returned error=%d. undo.\n",
+					"in_modmulti2 returned error=%d. undo.\n",
 					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], imsf->imsf_fmode);
@@ -2770,8 +2770,8 @@ sock_setmopt_srcfilter(sop, grpfp)
 	}
 
 	/*
-	 * Prepare sock_storage for in_addmulti(), in_delmulti(), and
-	 * in_modmulti(). Inputted source lists are sorted below.
+	 * Prepare sock_storage for in_addmulti2(), in_delmulti2(), and
+	 * in_modmulti2(). Inputted source lists are sorted below.
 	 */
 	if (grpf->gf_numsrc != 0) {
 		IAS_LIST_ALLOC(iasl);
@@ -2900,7 +2900,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 	if ((grpf->gf_fmode == MCAST_INCLUDE) && (grpf->gf_numsrc == 0)) {
 		final = 1;
 		if (imop->imo_msf[i]->msf_grpjoin != 0) {
-			in_delmulti(imop->imo_membership[i], 0, NULL,
+			in_delmulti2(imop->imo_membership[i], 0, NULL,
 				    MCAST_EXCLUDE, final, &error);
 			if (error != 0) {
 				printf("sock_setmopt_srcfilter: error must be 0! panic!\n");
@@ -2908,7 +2908,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 				return error;
 			}
 		} else {
-			in_delmulti(imop->imo_membership[i], old_num, old_ss,
+			in_delmulti2(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
 				igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: "
@@ -2927,12 +2927,12 @@ sock_setmopt_srcfilter(sop, grpfp)
 					(grpf->gf_numsrc == 0)) {
 		if (old_num > 0) {
 			imop->imo_membership[i] =
-				in_modmulti(&in_grp->sin_addr, ifp,
+				in_modmulti2(&in_grp->sin_addr, ifp,
 					0, NULL, MCAST_EXCLUDE, old_num, old_ss,
 					old_mode, init, 0, &error);
 		} else {
 			imop->imo_membership[i] =
-				in_addmulti(&in_grp->sin_addr, ifp,
+				in_addmulti2(&in_grp->sin_addr, ifp,
 					0, NULL, MCAST_EXCLUDE, init, &error);
 		}
 		if (error != 0) {
@@ -2955,11 +2955,11 @@ sock_setmopt_srcfilter(sop, grpfp)
 				splx(s);
 				return EOPNOTSUPP;
 			}
-			in_delmulti(imop->imo_membership[i], old_num, old_ss,
+			in_delmulti2(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
 				igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: "
-					"in_delmulti retuned error=%d. undo.\n",
+					"in_delmulti2 retuned error=%d. undo.\n",
 					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], grpf->gf_fmode);
@@ -2971,14 +2971,14 @@ sock_setmopt_srcfilter(sop, grpfp)
 			}
 		} else {
 			imop->imo_membership[i] =
-				in_modmulti(&in_grp->sin_addr, ifp,
+				in_modmulti2(&in_grp->sin_addr, ifp,
 					grpf->gf_numsrc, ss_src,
 					grpf->gf_fmode, old_num, old_ss,
 					old_mode, init,
 					imop->imo_msf[i]->msf_grpjoin, &error);
 			if (error != 0) {
 				igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: "
-					"in_modmulti returned error=%d. undo.\n",
+					"in_modmulti2 returned error=%d. undo.\n",
 					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], grpf->gf_fmode);
