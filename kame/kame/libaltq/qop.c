@@ -1,4 +1,4 @@
-/*	$KAME: qop.c,v 1.12 2002/10/26 06:59:53 kjc Exp $	*/
+/*	$KAME: qop.c,v 1.13 2005/04/14 06:22:33 suz Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -31,7 +31,7 @@
 #include <sys/ioctl.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
-#if defined(__FreeBSD__) && (__FreeBSD_version > 300000)
+#ifdef __FreeBSD__
 #include <sys/linker.h>
 #endif
 
@@ -1406,13 +1406,13 @@ qop_rio_set_defaults(struct redparams *params)
 int
 open_module(const char *devname, int flags)
 {
-#if defined(__FreeBSD__) && (__FreeBSD_version > 300000)
+#ifdef __FreeBSD__
 	char modname[64], filename[MAXPATHLEN], *cp;
 	int fd;
 #endif
 	struct stat sbuf;
 
-#if (__FreeBSD_version > 500000)
+#ifdef __FreeBSD__
 	/* the device is dynamically created by devfs */
 #else
 	/* check if the altq device exists */
@@ -1422,7 +1422,7 @@ open_module(const char *devname, int flags)
 	}
 #endif
 
-#if defined(__FreeBSD__) && (__FreeBSD_version > 300000)
+#ifdef __FreeBSD__
 	/* turn discipline name into module name */
 	strlcpy(modname, "altq_", sizeof(modname));
 	if ((cp = strrchr(devname, '/')) == NULL)
@@ -1430,11 +1430,7 @@ open_module(const char *devname, int flags)
 	strlcat(modname, cp + 1, sizeof(modname));
 
 	/* check if the kld module exists */
-#if (__FreeBSD_version > 500000)
 	snprintf(filename, sizeof(filename), "/boot/kernel/%s.ko", modname);
-#else
-	snprintf(filename, sizeof(filename), "/modules/%s.ko", modname);
-#endif
 	if (stat(filename, &sbuf) < 0) {
 		/* module file doesn't exist */
 		return (-1);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.151 2005/02/21 09:54:43 t-momose Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.152 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,7 +78,7 @@
 #include <netinet6/in6_pcb.h>
 #endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 #include "pf.h"
 #endif
 
@@ -98,15 +98,11 @@
 #if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 #include <netinet6/ip6_fw.h>
 #endif
-#if ((defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000))
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 #include <net/pfil.h>
 #endif
 
 #include <net/net_osdep.h>
-
-#if defined(__FreeBSD__) && __FreeBSD__ > 4 && __FreeBSD_version < 500000
-extern int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf **));
-#endif
 
 #ifdef NEW_STRUCT_ROUTE
 struct	route ip6_forward_rt;
@@ -114,7 +110,7 @@ struct	route ip6_forward_rt;
 struct	route_in6 ip6_forward_rt;
 #endif
 
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 extern struct pfil_head inet6_pfil_hook;	/* XXX */
 #endif
 
@@ -364,10 +360,7 @@ ip6_forward(m, srcrt)
 		 * now tunnel mode headers are added.  we are originating
 		 * packet instead of forwarding the packet.  
 		 */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL,
-		    NULL);
-#elif defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL,
 		    NULL);
 #else
@@ -459,12 +452,7 @@ ip6_forward(m, srcrt)
 			}
 
 			/* this probably fails but give it a try again */
-#if defined(__FreeBSD__) && __FreeBSD_version < 502000
-			rtalloc_ign((struct route *)&ip6_forward_rt,
-				    RTF_PRCLONING);
-#else
 			rtalloc((struct route *)&ip6_forward_rt);
-#endif
 		}
 
 		if (ip6_forward_rt.ro_rt == 0) {
@@ -486,11 +474,7 @@ ip6_forward(m, srcrt)
 		}
 		dst->sin6_addr = ip6->ip6_dst;
 		dst->sin6_scope_id = 0;	/* XXX */
-#if defined(__FreeBSD__) && __FreeBSD_version < 502000
-		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
-#else
 		rtalloc((struct route *)&ip6_forward_rt);
-#endif
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_noroute);
@@ -755,19 +739,7 @@ ip6_forward(m, srcrt)
 	if (m == NULL)
 		goto freecopy;
 	ip6 = mtod(m, struct ip6_hdr *);
-#elif (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
-	/* Jump over all PFIL processing if hooks are not active. */
-	if (inet6_pfil_hook.ph_busy_count == -1)
-		goto pass;
-
-	/* Run through list of hooks for output packets. */
-	error = pfil_run_hooks(&inet6_pfil_hook, &m, rt->rt_ifp, PFIL_OUT, NULL);
-	if (error != 0)
-		goto senderr;
-	if (m == NULL)
-		goto freecopy;
-	ip6 = mtod(m, struct ip6_hdr *);
-#elif (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#elif defined(__FreeBSD__)
 	/* Jump over all PFIL processing if hooks are not active. */
 	if (inet6_pfil_hook.ph_busy_count == -1)
 		goto pass;
@@ -781,25 +753,7 @@ ip6_forward(m, srcrt)
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* PFIL_HOOKS */
 
-#if defined(__FreeBSD__) && __FreeBSD__ > 4 && __FreeBSD_version < 500000
-	/* 
-	 * Check if we want to allow this packet to be processed.
-	 * Consider it to be bad if not.
-	 */
-	if (fr_checkp) {
-		struct mbuf	*m1 = m;
-
-		if ((*fr_checkp)((struct ip *)ip6, sizeof(*ip6),
-				 rt->rt_ifp, 1, &m1) != 0)
-			goto freecopy;
-		m = m1;
-		if (m == NULL)
-			goto freecopy;
-		ip6 = mtod(m, struct ip6_hdr *);
-	}
-#endif
-
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 pass:
 #endif
 	error = nd6_output(rt->rt_ifp, origifp, m, dst, rt);
@@ -817,7 +771,7 @@ pass:
 		}
 	}
 
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000) || NPF > 0
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__) || NPF > 0
  senderr:
 #endif
 	if (mcopy == NULL)

@@ -282,13 +282,7 @@ char *ifname(ifp)
 #endif
 
 	KREAD(ifp, &ifnet, struct ifnet);
-#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 	strlcpy(buf, ifnet.if_xname, sizeof(buf));
-#else
-	KREAD(ifnet.if_name, ifnamebuf, sizeof(ifnamebuf));
-	snprintf(buf, sizeof(buf), "%s%d", ifnamebuf,
-		 ifnet.if_unit); /* does snprintf allow overlap copy?? */
-#endif
 	return buf;
 }
 
@@ -303,7 +297,7 @@ void kread(addr, buf, len)
 	}
 }
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 void acmc(am)
 	struct ether_multi *am;
 {
@@ -367,13 +361,8 @@ if6_addrlist(ifap)
 
 		KREAD(ifap0, &ifa, struct ifaddr);
 		KREAD(ifa.ifa_ifp, &ifnet, struct ifnet);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		if (TAILQ_FIRST(&ifnet.if_multiaddrs))
 			ifmp = TAILQ_FIRST(&ifnet.if_multiaddrs);
-#else
-		if (ifnet.if_multiaddrs.lh_first)
-			ifmp = ifnet.if_multiaddrs.lh_first;
-#endif
 		while (ifmp) {
 			KREAD(ifmp, &ifm, struct ifmultiaddr);
 			if (ifm.ifma_addr == NULL)
@@ -390,11 +379,7 @@ if6_addrlist(ifap)
 			       ether_ntoa((struct ether_addr *)LLADDR(&sdl)),
 			       ifm.ifma_refcount);
 		    nextmulti:
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 			ifmp = TAILQ_NEXT(&ifm, ifma_link);
-#else
-			ifmp = ifm.ifma_link.le_next;
-#endif
 		}
 	}
 #else
@@ -571,13 +556,8 @@ if_addrlist(ifap)
 
 		KREAD(ifap0, &ifa, struct ifaddr);
 		KREAD(ifa.ifa_ifp, &ifnet, struct ifnet);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		if (TAILQ_FIRST(&ifnet.if_multiaddrs))
 			ifmp = TAILQ_FIRST(&ifnet.if_multiaddrs);
-#else
-		if (ifnet.if_multiaddrs.lh_first)
-			ifmp = ifnet.if_multiaddrs.lh_first;
-#endif
 		while (ifmp) {
 			KREAD(ifmp, &ifm, struct ifmultiaddr);
 			if (ifm.ifma_addr == NULL)
@@ -594,11 +574,7 @@ if_addrlist(ifap)
 			       ether_ntoa((struct ether_addr *)LLADDR(&sdl)),
 			       ifm.ifma_refcount);
 		    nextmulti:
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 			ifmp = TAILQ_NEXT(&ifm, ifma_link);
-#else
-			ifmp = ifm.ifma_link.le_next;
-#endif
 		}
 	}
 #else /* !FreeBSD */

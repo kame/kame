@@ -1,4 +1,4 @@
-/*      $KAME: mdd_probe.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
+/*      $KAME: mdd_probe.c,v 1.3 2005/04/14 06:22:36 suz Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -42,9 +42,9 @@
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/route.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 
 #include <netinet/in.h>
 #include <netinet/icmp6.h>

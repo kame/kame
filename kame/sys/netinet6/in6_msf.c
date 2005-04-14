@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.33 2004/12/27 10:19:29 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.34 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2087,7 +2087,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		ifp = ro.ro_rt->rt_ifp;
 		rtfree(ro.ro_rt);
 	} else {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 		ifp = ifnet_byindex(grpf->gf_interface);
 #else
 		ifp = ifindex2ifnet[grpf->gf_interface];
@@ -2537,7 +2537,7 @@ sock6_getmopt_srcfilter(sop, grpfp)
 	if (grpf->gf_interface == 0)
 		ifp = NULL;
 	else {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 		ifp = ifnet_byindex(grpf->gf_interface);
 #else
 		ifp = ifindex2ifnet[grpf->gf_interface];
@@ -2834,11 +2834,7 @@ dump_in6_multisrc(void)
 		struct in6_multi_source *ims = NULL;
 
 		log(LOG_DEBUG, "interface %s\n", if_name(ifp));
-#if __FreeBSD_version >= 503000
 		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) 
-#else
-		LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) 
-#endif
 		{
 			if (ifma->ifma_addr == NULL) {
 				log(LOG_DEBUG, "\tEnd of Group\n");

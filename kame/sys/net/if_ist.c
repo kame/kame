@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.7 2005/03/23 10:03:22 suz Exp $	*/
+/*	$KAME: if_ist.c,v 1.8 2005/04/14 06:22:37 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -140,7 +140,7 @@ extern struct domain inetdomain;
 struct protosw in_ist_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   in_ist_input,
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
   (pr_output_t *)rip_output,
 #else
   rip_output,
@@ -208,14 +208,11 @@ istattach(dummy)
 	for (i = 0; i < nist; i++) {
 		sc = &ist[i];
 		bzero(sc, sizeof(*sc));
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
-		     "ist%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 		if_initname(&sc->sc_if, "ist", i);
 #else
-		sc->sc_if.if_name = "ist";
-		sc->sc_if.if_unit = i;
+		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
+		     "ist%d", i);
 #endif
 
 		p = encap_attach_func(AF_INET, IPPROTO_IPV6, ist_encapcheck,
@@ -881,7 +878,7 @@ in_ist_input(m, va_alist)
 	struct ip *ip;
 	struct ip6_hdr *ip6;
 	u_int8_t otos, itos;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 #endif
 	int isr;
@@ -995,7 +992,7 @@ in_ist_input(m, va_alist)
 	ifq = &ip6intrq;
 	isr = NETISR_IPV6;
 
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifdef __FreeBSD__
 	if (!IF_HANDOFF(ifq, m, NULL))
 		return;
 #else
@@ -1016,7 +1013,7 @@ in_ist_input(m, va_alist)
 	schednetisr(isr);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	splx(s);
 #endif
 }

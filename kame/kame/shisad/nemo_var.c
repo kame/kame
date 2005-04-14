@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.5 2005/02/12 15:22:40 t-momose Exp $  */
+/*      $KAME: nemo_var.c,v 1.6 2005/04/14 06:22:36 suz Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -45,9 +45,9 @@
 
 #include <net/if.h>
 #include <net/if_dl.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/route.h>
 #include <net/mipsock.h>
 

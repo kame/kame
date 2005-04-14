@@ -2693,7 +2693,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 		ifp = ro.ro_rt->rt_ifp;
 		rtfree(ro.ro_rt);
 	} else {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		ifp = ifnet_byindex(grpf->gf_interface);
 #else
 		ifp = ifindex2ifnet[grpf->gf_interface];
@@ -3107,7 +3107,7 @@ sock_getmopt_srcfilter(sop, grpfp)
 	if (grpf->gf_interface == 0)
 		ifp = NULL;
 	else {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		ifp = ifnet_byindex(grpf->gf_interface);
 #else
 		ifp = ifindex2ifnet[grpf->gf_interface];

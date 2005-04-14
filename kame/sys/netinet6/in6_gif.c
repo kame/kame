@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.114 2004/12/27 05:41:17 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.115 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,7 +59,7 @@
 #endif
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#ifdef __FreeBSD__
 #include <net/pfil.h>
 #endif
 #include <net/route.h>
@@ -402,9 +402,7 @@ in6_gif_output(ifp, family, m)
 #else
 	p = (pktopt.ip6po_nexthop) ? &pktopt : NULL;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-	error = ip6_output(m, p, &sc->gif_ro6, flags, 0, NULL, NULL);
-#elif defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 	error = ip6_output(m, p, &sc->gif_ro6, flags, 0, NULL, NULL);
 #else
 	error = ip6_output(m, p, &sc->gif_ro6, flags, 0, NULL);

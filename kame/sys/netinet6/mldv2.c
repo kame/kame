@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.34 2005/01/01 01:44:52 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.35 2005/04/14 06:22:41 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -665,12 +665,8 @@ mldv1_query:
 	if (timer == 0 && mldh->mld_maxdelay)
 		timer = 1;
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
-#elif defined(__FreeBSD__)
-	for (ifma = LIST_FIRST(&ifp->if_multiaddrs);
-	     ifma;
-	     ifma = LIST_NEXT(ifma, ifma_link))
 #else
 	IFP_TO_IA6(ifp, ia);
 	if (ia == NULL)

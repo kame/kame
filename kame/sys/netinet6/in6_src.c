@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.152 2004/12/27 05:41:17 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.153 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,13 +133,13 @@
 extern struct ifnet loif[NLOOP];
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 static struct mtx addrsel_lock;
 #define ADDRSEL_LOCK_INIT()     mtx_init(&addrsel_lock, "addrsel_lock", NULL, MTX_DEF)
 #define ADDRSEL_LOCK()          mtx_lock(&addrsel_lock)
 #define ADDRSEL_UNLOCK()        mtx_unlock(&addrsel_lock)
 #define ADDRSEL_LOCK_ASSERT()   mtx_assert(&addrsel_lock, MA_OWNED)
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif /* __FreeBSD__ */
 
 #define ADDR_LABEL_NOTAPP (-1)
 struct in6_addrpolicy defaultaddrpolicy;
@@ -668,7 +668,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	/* If the caller specify the outgoing interface explicitly, use it. */
 	if (opts && (pi = opts->ip6po_pktinfo) != NULL && pi->ipi6_ifindex) {
 		/* XXX boundary check is assumed to be already done. */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 		ifp = ifnet_byindex(pi->ipi6_ifindex);
 #else
 		ifp = ifindex2ifnet[pi->ipi6_ifindex];
@@ -794,10 +794,8 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 #ifdef __FreeBSD__
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
 						     ->ro_dst, 0, 0UL);
-#if __FreeBSD_version >= 502010
 				if (ro->ro_rt)
 					RT_UNLOCK(ro->ro_rt);
-#endif
 #else
 #ifdef RADIX_MPATH
 				rtalloc_mpath((struct route *)ro,
@@ -978,11 +976,7 @@ int
 in6_pcbsetport(laddr, inp, p)
 	struct in6_addr *laddr;
 	struct inpcb *inp;
-#if __FreeBSD_version >= 503000
 	struct ucred *p;
-#else
-	struct proc *p;
-#endif
 {
 	struct socket *so = inp->inp_socket;
 	u_int16_t lport = 0, first, last, *lastport;
@@ -1001,11 +995,7 @@ in6_pcbsetport(laddr, inp, p)
 		lastport = &pcbinfo->lasthi;
 	} else if (inp->inp_flags & INP_LOWPORT) {
 #ifdef __FreeBSD__
-#if __FreeBSD_version >= 503000
 		if ((error = suser_cred(p, 0)))
-#else
-		if (p && (error = suser(p)))
-#endif
 #else
 		if (p && (error = suser(p->p_ucred, &p->p_acflag)))
 #endif
@@ -1115,7 +1105,7 @@ in6_embedscope(in6, sin6)
 		if (zoneid) {
 			if (if_indexlim <= zoneid)
 				return (ENXIO);  /* XXX EINVAL? */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 			ifp = ifnet_byindex(zoneid);
 #else
 			ifp = ifindex2ifnet[zoneid];
@@ -1164,7 +1154,7 @@ in6_recoverscope(sin6, in6, ifp)
 			/* sanity check */
 			if (zoneid < 0 || if_indexlim <= zoneid)
 				return ENXIO;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 			if (!ifnet_byindex(zoneid))
 #else
 			if (!ifindex2ifnet[zoneid])
@@ -1194,9 +1184,9 @@ in6_clearscope(addr)
 void
 addrsel_policy_init()
 {
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_LOCK_INIT();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 
 	init_policy_queue();
 
@@ -1211,18 +1201,18 @@ lookup_addrsel_policy(key)
 {
 	struct in6_addrpolicy *match = NULL;
 
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_LOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 	match = match_addrsel_policy(key);
 
 	if (match == NULL)
 		match = &defaultaddrpolicy;
 	else
 		match->use++;
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_UNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 
 	return (match);
 }
@@ -1375,9 +1365,9 @@ add_addrsel_policyent(newpolicy)
 {
 	struct addrsel_policyent *new, *pol;
 
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_LOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 
 	/* duplication check */
 	for (pol = TAILQ_FIRST(&addrsel_policytab); pol;
@@ -1386,9 +1376,9 @@ add_addrsel_policyent(newpolicy)
 		    &pol->ape_policy.addr.sin6_addr) &&
 		    IN6_ARE_ADDR_EQUAL(&newpolicy->addrmask.sin6_addr,
 		    &pol->ape_policy.addrmask.sin6_addr)) {
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 			ADDRSEL_UNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 			return (EEXIST);	/* or override it? */
 		}
 	}
@@ -1401,9 +1391,9 @@ add_addrsel_policyent(newpolicy)
 	new->ape_policy = *newpolicy;
 
 	TAILQ_INSERT_TAIL(&addrsel_policytab, new, ape_entry);
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_UNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 
 	return (0);
 }
@@ -1414,9 +1404,9 @@ delete_addrsel_policyent(key)
 {
 	struct addrsel_policyent *pol;
 
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_LOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 
 	/* search for the entry in the table */
 	for (pol = TAILQ_FIRST(&addrsel_policytab); pol;
@@ -1429,16 +1419,16 @@ delete_addrsel_policyent(key)
 		}
 	}
 	if (pol == NULL) {
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 		ADDRSEL_UNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 		return (ESRCH);
 	}
 
 	TAILQ_REMOVE(&addrsel_policytab, pol, ape_entry);
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_UNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 
 	return (0);
 }
@@ -1451,21 +1441,21 @@ walk_addrsel_policy(callback, w)
 	struct addrsel_policyent *pol;
 	int error = 0;
 
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_LOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 	for (pol = TAILQ_FIRST(&addrsel_policytab); pol;
 	     pol = TAILQ_NEXT(pol, ape_entry)) {
 		if ((error = (*callback)(&pol->ape_policy, w)) != 0) {
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 			ADDRSEL_UNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 			return (error);
 		}
 	}
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 	ADDRSEL_UNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502010 */
+#endif
 
 	return (error);
 }

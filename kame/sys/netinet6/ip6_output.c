@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.467 2005/03/14 09:13:33 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.468 2005/04/14 06:22:41 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -107,10 +107,10 @@
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
 #endif
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 4)
-#include "pf.h"
-#else
+#ifdef __FreeBSD__
 #define NPF 0
+#else
+#include "pf.h"
 #endif
 
 #include <sys/param.h>
@@ -129,7 +129,7 @@
 
 #include <net/if.h>
 #include <net/route.h>
-#if defined(__NetBSD__) && defined(PFIL_HOOKS) || (defined(__FreeBSD__) && __FreeBSD_version > 502000)
+#if defined(__NetBSD__) && defined(PFIL_HOOKS) || defined(__FreeBSD__)
 #include <net/pfil.h>
 #endif
 
@@ -158,7 +158,7 @@
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 #include <netinet/tcp_var.h>
 #endif
 
@@ -206,7 +206,7 @@ extern int ipsec_ipcomp_default_level;
  
 #include <net/net_osdep.h>
 
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 extern struct pfil_head inet6_pfil_hook;	/* XXX */
 #endif
 
@@ -280,7 +280,7 @@ extern struct ifnet loif[NLOOP];
  * which is rt_rmx.rmx_mtu.
  */
 int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 ip6_output(m0, opt, ro, flags, im6o, ifpp, inp)
 #elif defined(__NetBSD__)
 ip6_output(m0, opt, ro, flags, im6o, so, ifpp)
@@ -300,7 +300,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct socket *so;
 #endif
 	struct ifnet **ifpp;		/* XXX: just for statistics */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 	struct inpcb *inp;
 #endif
 {
@@ -361,11 +361,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	struct secpolicy *sp = NULL;
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000) && !defined(__NetBSD__)
-	/* for AH processing. stupid to have "socket" variable in IP layer... */
-	so = ipsec_getsocket(m);
-	(void)ipsec_setsocket(m, NULL);
-#endif
 #endif
 #endif /* IPSEC || FAST_IPSEC */
 
@@ -1390,17 +1385,7 @@ skip_ipsec2:;
 	if (m == NULL)
 		goto done;
 	ip6 = mtod(m, struct ip6_hdr *);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
-	/* Jump over all PFIL processing if hooks are not active .*/
-	if (inet6_pfil_hook.ph_busy_count == -1)
-		goto passout;
-
-	/* Run through list of hooks for output packets. */
-	error = pfil_run_hooks(&inet6_pfil_hook, &m, ifp, PFIL_OUT, inp);
-	if (error != 0 || m == NULL)
-		goto done;
-	ip6 = mtod(m, struct ip6_hdr *);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#elif defined(__FreeBSD__)
 	/* Jump over all PFIL processing if hooks are not active .*/
 	if (inet6_pfil_hook.ph_busy_count == -1)
 		goto passout;
@@ -1412,7 +1397,7 @@ skip_ipsec2:;
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* PFIL_HOOKS */
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 passout:
 #endif
 	/*
@@ -1512,7 +1497,7 @@ passout:
 		u_char nextproto;
 		struct ip6ctlparam ip6cp;
 		u_int32_t mtu32;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 		int qslots = ifp->if_snd.ifq_maxlen - ifp->if_snd.ifq_len;
 #endif
 
@@ -1539,7 +1524,7 @@ passout:
 			goto bad;
 		}
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 		/*
 		 * Verify that we have any chance at all of being able to queue
 		 *      the packet or packet fragments
@@ -1897,7 +1882,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 	u_int32_t mtu = 0;
 	int alwaysfrag = 0;
 	int error = 0;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 	struct in_conninfo inc;
 
 	bzero(&inc, sizeof(inc));
@@ -1957,13 +1942,10 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 			 * field isn't locked).
 			 */
 			mtu = ifmtu;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 			tcp_hc_updatemtu(&inc, mtu);
 #else
-#if defined(__FreeBSD__) && __FreeBSD_version < 502000
-			if (!(ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU))
-#endif
-				ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
+			ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
 #endif
 		}
 	} else if (ifp) {
@@ -2007,22 +1989,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 	int error, optval;
 	int level, op, optname;
 	int optlen;
-#if __FreeBSD_version >= 500000
 	struct thread *p;
-#else
-	struct proc *p;
-#endif
 
 	if (sopt) {
 		level = sopt->sopt_level;
 		op = sopt->sopt_dir;
 		optname = sopt->sopt_name;
 		optlen = sopt->sopt_valsize;
-#if __FreeBSD_version >= 500000
 		p = sopt->sopt_td;
-#else
-		p = sopt->sopt_p;
-#endif
 	} else {
 		panic("ip6_ctloutput: arg soopt is NULL");
 	}
@@ -2479,21 +2453,13 @@ do { \
 					break;
 				}
 				/* XXX */
-#if __FreeBSD_version >= 500000
 				MGET(m, sopt->sopt_td ? M_WAIT : M_DONTWAIT, MT_HEADER);
-#else
-				MGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT, MT_HEADER);
-#endif
 				if (m == 0) {
 					error = ENOBUFS;
 					break;
 				}
 				if (sopt->sopt_valsize > MLEN) {
-#if __FreeBSD_version >= 500000
 					MCLGET(m, sopt->sopt_td ? M_WAIT : M_DONTWAIT);
-#else
-					MCLGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT);
-#endif
 					if ((m->m_flags & M_EXT) == 0) {
 						m_free(m);
 						error = ENOBUFS;
@@ -3222,11 +3188,7 @@ ip6_pcbopts(pktopt, m, so)
 	struct ip6_pktopts *opt = *pktopt;
 	int error = 0;
 #ifdef __FreeBSD__
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	struct thread *p = sopt->sopt_td;
-#else
-	struct proc *p = sopt->sopt_p;
-#endif
 #else
 	struct proc *p = curproc;	/* XXX */
 #endif
@@ -3641,7 +3603,7 @@ ip6_setmoptions(optname, im6op, m)
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 		ifp = ifnet_byindex(ifindex);
 #else
 		ifp = ifindex2ifnet[ifindex];
@@ -3732,7 +3694,7 @@ ip6_setmoptions(optname, im6op, m)
 				break;
 			}
 			ifp = ro.ro_rt->rt_ifp;
-#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+#ifdef __FreeBSD__
 			RTFREE(ro.ro_rt);
 #else
 			rtfree(ro.ro_rt);
@@ -3746,7 +3708,7 @@ ip6_setmoptions(optname, im6op, m)
 				error = ENXIO;	/* XXX EINVAL? */
 				break;
 			}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 			ifp = ifnet_byindex(mreq->ipv6mr_interface);
 #else
 			ifp = ifindex2ifnet[mreq->ipv6mr_interface];
@@ -3840,7 +3802,7 @@ ip6_setmoptions(optname, im6op, m)
 		if (mreq->ipv6mr_interface == 0)
 			ifp = NULL;
 		else {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 			ifp = ifnet_byindex(mreq->ipv6mr_interface);
 #else
 			ifp = ifindex2ifnet[mreq->ipv6mr_interface];
@@ -4525,7 +4487,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 			 return (ENXIO);
 		}
 		if (pktinfo->ipi6_ifindex) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 			ifp = ifnet_byindex(pktinfo->ipi6_ifindex);
 #else
 			ifp = ifindex2ifnet[pktinfo->ipi6_ifindex];
@@ -4920,11 +4882,7 @@ ip6_mloopback(ifp, m, dst)
 #endif
 
 #ifdef __FreeBSD__
-#if (__FreeBSD_version >= 410000)
 	(void)if_simloop(ifp, copym, dst->sin6_family, 0);
-#else
-	(void)if_simloop(ifp, copym, (struct sockaddr *)dst, NULL);
-#endif
 #else
 	(void)looutput(ifp, copym, (struct sockaddr *)dst, NULL);
 #endif
@@ -5035,7 +4993,7 @@ in6_getmopt_ifargs(optname, ifp, ia_grp, index)
 			*ifp = ro.ro_rt->rt_ifp;
 			rtfree(ro.ro_rt);
 		} else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 			*ifp = ifnet_byindex(index);
 #else
 			*ifp = ifindex2ifnet[index];
@@ -5061,7 +5019,7 @@ in6_getmopt_ifargs(optname, ifp, ia_grp, index)
 		if (index == 0)
 			*ifp = NULL;
 		else {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 			*ifp = ifnet_byindex(index);
 #else
 			*ifp = ifindex2ifnet[index];

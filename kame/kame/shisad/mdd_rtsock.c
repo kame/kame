@@ -1,4 +1,4 @@
-/*      $KAME: mdd_rtsock.c,v 1.1 2004/12/09 02:18:40 t-momose Exp $  */
+/*      $KAME: mdd_rtsock.c,v 1.2 2005/04/14 06:22:36 suz Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -36,7 +36,7 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif 
 #include <net/if_dl.h>

@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.10 2005/03/10 23:30:36 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.11 2005/04/14 06:22:38 suz Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,9 +29,9 @@
  * SUCH DAMAGE.
  */
 
-#if __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_mip6.h"
-#endif
+#endif /* __FreeBSD__ */
 #include "mip.h"
 
 #include <sys/param.h>
@@ -74,19 +74,11 @@ static struct	sockproto mips_proto = { PF_MOBILITY, };
 
 #ifdef __FreeBSD__
 static int mips_abort(struct socket *);
-#if __FreeBSD_version >= 503000
 static int mips_attach(struct socket *, int, struct thread *);
 static int mips_bind(struct socket *, struct sockaddr *, struct thread *);
 static int mips_connect(struct socket *, struct sockaddr *, struct thread *);
 static int mips_send(struct socket *, int, struct mbuf *, struct sockaddr *,
     struct mbuf *, struct thread *);
-#else /* __FreeBSD_version >= 503000 */
-static int mips_attach(struct socket *, int, struct proc *);
-static int mips_bind(struct socket *, struct sockaddr *, struct proc *);
-static int mips_connect(struct socket *, struct sockaddr *, struct proc *);
-static int mips_send(struct socket *, int, struct mbuf *, struct sockaddr *,
-    struct mbuf *, struct proc *);
-#endif /* __FreeBSD_version >= 503000 */
 static int mips_detach(struct socket *);
 static int mips_disconnect(struct socket *);
 static int mips_peeraddr(struct socket *, struct sockaddr **);
@@ -128,11 +120,7 @@ static int
 mips_attach(so, proto, p)
 	struct socket *so;
 	int proto;
-#if __FreeBSD_version >= 503000
 	struct thread *p;
-#else
-	struct proc *p;
-#endif
 {
 	struct rawcb *rp;
 	int s, error;
@@ -175,11 +163,7 @@ static int
 mips_bind(so, nam, p)
 	struct socket *so;
 	struct sockaddr *nam;
-#if __FreeBSD_version >= 503000
 	struct thread *p;
-#else
-	struct proc *p;
-#endif
 {
 	int s, error;
 
@@ -193,11 +177,7 @@ static int
 mips_connect(so, nam, p)
 	struct socket *so;
 	struct sockaddr *nam;
-#if __FreeBSD_version >= 503000
 	struct thread *p;
-#else
-	struct proc *p;
-#endif
 {
 	int s, error;
 
@@ -268,11 +248,7 @@ mips_send(so, flags, m, nam, control, p)
 	struct mbuf *m;
 	struct sockaddr *nam;
 	struct mbuf *control;
-#if __FreeBSD_version >= 503000
 	struct thread *p;
-#else
-	struct proc *p;
-#endif
 {
 	int s, error;
 
@@ -780,7 +756,7 @@ extern struct domain mipdomain;		/* or at least forward */
 static struct protosw mipsw[] = {
 { SOCK_RAW,	&mipdomain,	0,		PR_ATOMIC|PR_ADDR,
   0,		mips_output,	raw_ctlinput,	0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   0,
 #else
   mips_usrreq,
@@ -789,9 +765,7 @@ static struct protosw mipsw[] = {
 #ifndef __FreeBSD__
   0/*sysctl_rtable*/
 #else
-# if __FreeBSD__ >= 3
   &mip_usrreqs
-# endif
 #endif
 }
 };

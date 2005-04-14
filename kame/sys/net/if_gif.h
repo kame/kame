@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.38 2004/12/09 02:18:54 t-momose Exp $	*/
+/*	$KAME: if_gif.h,v 1.39 2005/04/14 06:22:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,7 +49,7 @@
 
 struct encaptab;
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 extern	void (*ng_gif_input_p)(struct ifnet *ifp, struct mbuf **mp,
 		int af);
 extern	void (*ng_gif_input_orphan_p)(struct ifnet *ifp, struct mbuf *m,
@@ -82,7 +82,7 @@ struct gif_softc {
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
 	void	*gif_si;	/* softintr handle */
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	void		*gif_netgraph;	/* ng_gif(4) netgraph node info */
 #endif
 

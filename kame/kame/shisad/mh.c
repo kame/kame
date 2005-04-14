@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.20 2005/03/11 06:44:32 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.21 2005/04/14 06:22:36 suz Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -49,9 +49,9 @@
 #include <net/if_dl.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/mipsock.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>

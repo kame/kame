@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.206 2004/12/09 02:19:04 t-momose Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.207 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1088,7 +1088,7 @@ in6_ifdetach(ifp)
 	sin6.sin6_scope_id = 0;	/* XXX */
 #endif
 	if (rt_tables[AF_INET6] != NULL) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 		RADIX_NODE_HEAD_LOCK(rt_tables[AF_INET6]);
 #endif
 #ifndef __FreeBSD__
@@ -1101,7 +1101,7 @@ in6_ifdetach(ifp)
 			    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 			rtfree(rt);
 		}
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 		RADIX_NODE_HEAD_UNLOCK(rt_tables[AF_INET6]);
 #endif
 	}

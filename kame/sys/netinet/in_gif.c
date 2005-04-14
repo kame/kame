@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.96 2004/12/27 05:41:16 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.97 2005/04/14 06:22:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,7 +109,7 @@ extern struct domain inetdomain;
 struct protosw in_gif_protosw =
 { SOCK_RAW,	&inetdomain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
   in_gif_input, 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
   (pr_output_t*)rip_output, 
 #else
   rip_output,
@@ -362,7 +362,7 @@ in_gif_output(ifp, family, m)
 	}
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+#ifdef __FreeBSD__
 			 , NULL
 #endif
 			 );

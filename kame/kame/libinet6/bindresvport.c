@@ -1,4 +1,4 @@
-/*	$KAME: bindresvport.c,v 1.4 2001/08/20 02:32:40 itojun Exp $	*/
+/*	$KAME: bindresvport.c,v 1.5 2005/04/14 06:22:33 suz Exp $	*/
 
 /*
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for
@@ -46,9 +46,7 @@ static char *rcsid = "$OpenBSD: bindresvport.c,v 1.11 1999/12/17 19:22:08 deraad
 #include <netinet/in.h>
 #include <errno.h>
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__)
 #include <rpc/rpc.h>
-#endif
 
 /*
  * Bind a socket to a privileged IP port

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.54 2005/03/18 10:31:17 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.55 2005/04/14 06:22:32 suz Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -34,7 +34,7 @@
 #include <sys/uio.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 

@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.13 2003/05/17 18:25:38 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.14 2005/04/14 06:22:34 suz Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -90,11 +90,9 @@ const char *hostalias __P((const char *));
 extern int res_opt __P((int, u_char *, int, int));
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 int	res_queryN __P((const char *, struct res_target *));
 int	res_searchN __P((const char *, struct res_target *));
 int	res_querydomainN __P((const char *, const char *, struct res_target *));
-#endif
 
 int h_errno;
 
@@ -530,7 +528,7 @@ hostalias(name)
 	 * forbid hostaliases for setuid binray, due to possible security
 	 * breach.
 	 */
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 	if (issetugid())
 #else
 	if (getuid() != geteuid() || getgid() != getegid())

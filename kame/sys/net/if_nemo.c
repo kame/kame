@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.c,v 1.2 2005/01/17 15:05:01 mitsuya Exp $	*/
+/*	$KAME: if_nemo.c,v 1.3 2005/04/14 06:22:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -43,16 +43,14 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/errno.h>
-#if defined(__FreeBSD__) || __FreeBSD__ >= 3
-/*nothing*/
-#else
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
@@ -98,7 +96,7 @@
 #include <net/if_nemo.h>
 
 #include "nemo.h"
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -156,14 +154,11 @@ nemoattach(dummy)
 	    M_DEVBUF, M_WAIT);
 	bzero(sc, nnemo * sizeof(struct nemo_softc));
 	for (i = 0; i < nnemo; sc++, i++) {
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		snprintf(sc->nemo_if.if_xname, sizeof(sc->nemo_if.if_xname),
-		    "nemo%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 		if_initname(&sc->nemo_if, "nemo", i);
 #else
-		sc->nemo_if.if_name = "nemo";
-		sc->nemo_if.if_unit = i;
+		snprintf(sc->nemo_if.if_xname, sizeof(sc->nemo_if.if_xname),
+		    "nemo%d", i);
 #endif
 		nemoattach0(sc);
 		LIST_INSERT_HEAD(&nemo_softc_list, sc, nemo_list);
@@ -191,7 +186,7 @@ nemoattach0(sc)
 #ifdef __NetBSD__
 	sc->nemo_if.if_dlt = DLT_NULL;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	IFQ_SET_MAXLEN(&sc->nemo_if.if_snd, IFQ_MAXLEN);
 #endif
 	IFQ_SET_READY(&sc->nemo_if.if_snd);
@@ -342,7 +337,7 @@ nemo_output(ifp, m, dst, rt)
 	int s;
 	struct m_tag *mtag;
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 #endif
@@ -364,7 +359,7 @@ nemo_output(ifp, m, dst, rt)
 
 	mtag = m_tag_get(PACKET_TAG_GIF, sizeof(struct ifnet *), M_NOWAIT);
 	if (!mtag) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		_IF_DROP(&ifp->if_snd);
 #else
 		IF_DROP(&ifp->if_snd);
@@ -411,7 +406,7 @@ nemo_output(ifp, m, dst, rt)
 	*mtod(m, int *) = dst->sa_family;
 
 	s = splnet();
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifdef __FreeBSD__
 	IFQ_ENQUEUE(&ifp->if_snd, m, error);
 #else
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
@@ -529,7 +524,7 @@ nemo_input(m, af, ifp)
 	int af;
 	struct ifnet *ifp;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 #endif
 	int isr;
@@ -582,7 +577,7 @@ nemo_input(m, af, ifp)
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ipintrq;
 #endif
 		isr = NETISR_IP;
@@ -608,7 +603,7 @@ nemo_input(m, af, ifp)
 		return;
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	if (!IF_HANDOFF(ifq, m, NULL))
 		return;
 #else
@@ -631,7 +626,7 @@ nemo_input(m, af, ifp)
 	/* we need schednetisr since the address family may change */
 	schednetisr(isr);
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	splx(s);
 #endif
 	return;
@@ -642,11 +637,7 @@ nemo_input(m, af, ifp)
 int
 nemo_ioctl(ifp, cmd, data)
 	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
 	u_long cmd;
-#endif
 	caddr_t data;
 {
 	struct nemo_softc *sc  = (struct nemo_softc*)ifp;
@@ -667,7 +658,7 @@ nemo_ioctl(ifp, cmd, data)
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:	/* IP supports Multicast */
@@ -681,7 +672,7 @@ nemo_ioctl(ifp, cmd, data)
 			error = EAFNOSUPPORT;
 			break;
 		}
-#endif /*not FreeBSD3*/
+#endif /* not FreeBSD */
 		break;
 
 #ifdef	SIOCSIFMTU /* xxx */

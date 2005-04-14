@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.155 2005/02/10 03:00:19 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.156 2005/04/14 06:22:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -614,7 +614,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 	ip6_output(m, NULL, &ro, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL, NULL);
 #elif defined(__NetBSD__)
 	ip6_output(m, NULL, &ro, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL, NULL);
@@ -1130,7 +1130,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 	ip6_output(m, NULL, &ro, 0, &im6o, NULL, NULL);
 #elif defined(__NetBSD__)
 	ip6_output(m, NULL, &ro, 0, &im6o, NULL, NULL);
@@ -1305,9 +1305,9 @@ nd6_dad_start(ifa, delay)
 		return;
 	}
 	bzero(dp, sizeof(*dp));
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	callout_init(&dp->dad_timer_ch, 0);
-#elif defined(__NetBSD__) || defined(__FreeBSD__)
+#elif defined(__NetBSD__)
 	callout_init(&dp->dad_timer_ch);
 #elif defined(__OpenBSD__)
 	bzero(&dp->dad_timer_ch, sizeof(dp->dad_timer_ch));

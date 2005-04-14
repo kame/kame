@@ -1,4 +1,4 @@
-/*	$KAME: getifaddrs.c,v 1.10 2002/07/25 04:46:15 jinmei Exp $	*/
+/*	$KAME: getifaddrs.c,v 1.11 2005/04/14 06:22:33 suz Exp $	*/
 
 /*
  * Copyright (c) 1995, 1999
@@ -75,9 +75,7 @@
 #define	HAVE_IFAM_DATA
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
 #define	HAVE_IFM_DATA
-#endif
 
 #define MAX_SYSCTL_TRY 5
 

@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.23 2004/08/24 01:35:20 suz Exp $	*/
+/*	$KAME: mtrace6.c,v 1.24 2005/04/14 06:22:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -37,7 +37,7 @@
 #include <sys/queue.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 

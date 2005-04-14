@@ -1,4 +1,4 @@
-/*	$KAME: ip6addrctl.c,v 1.3 2003/12/16 08:14:28 suz Exp $	*/
+/*	$KAME: ip6addrctl.c,v 1.4 2005/04/14 06:22:33 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -37,9 +37,9 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>

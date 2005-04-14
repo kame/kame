@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.21 2003/05/17 18:13:36 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.22 2005/04/14 06:22:37 suz Exp $ (LBL)";
 #endif
 
 /*
@@ -224,7 +224,7 @@ static const char rcsid[] =
 #include <ctype.h>
 #include <errno.h>
 #ifdef HAVE_MALLOC_H
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <malloc.h>
 #endif
 #endif
@@ -1080,7 +1080,7 @@ send_probe(register int seq, int ttl, register struct timeval *tp)
 			tip = *outip;
 			ui = (struct udpiphdr *)outip;
 #ifdef HAVE_UDPIPHDR_NEXT
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 			ui->ui_next = 0;
 			ui->ui_prev = 0;
 #endif

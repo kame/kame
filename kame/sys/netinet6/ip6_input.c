@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.358 2005/03/18 13:47:26 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.359 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,7 +104,7 @@
 #include <net/if_dl.h>
 #include <net/route.h>
 #include <net/netisr.h>
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 502000)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 #include <net/pfil.h>
 #endif
 #ifdef __FreeBSD__
@@ -152,7 +152,7 @@
 #ifndef __FreeBSD__
 #include "bpfilter.h"
 #endif
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 #include "pf.h"
 #endif
 
@@ -171,9 +171,7 @@ extern struct domain inet6domain;
 u_char ip6_protox[IPPROTO_MAX];
 static int ip6qmaxlen = IFQ_MAXLEN;
 struct in6_ifaddr *in6_ifaddr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4 && __FreeBSD_version < 501000)
 struct ifqueue ip6intrq;
-#endif
 
 #if defined(__NetBSD__)
 extern struct ifnet loif[NLOOP];
@@ -191,7 +189,7 @@ int ip6_sourcecheck_interval;		/* XXX */
 const int int6intrq_present = 1;
 #endif
 
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 503000)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 struct pfil_head inet6_pfil_hook;
 #endif
 
@@ -252,14 +250,8 @@ ip6_init()
 		    pr->pr_protocol && pr->pr_protocol != IPPROTO_RAW)
 			ip6_protox[pr->pr_protocol] = pr - inet6sw;
 	ip6intrq.ifq_maxlen = ip6qmaxlen;
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 502000)
+#ifdef __FreeBSD__
 	netisr_register(NETISR_IPV6, ip6_input, &ip6intrq, 0);
-#elif (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
-	netisr_register(NETISR_IPV6, ip6_input, &ip6intrq);
-#elif defined(__FreeBSD__)
-	register_netisr(NETISR_IPV6, ip6intr);
-#endif
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	mtx_init(&ip6intrq.ifq_mtx, "ip6_inq", NULL, MTX_DEF);
 #endif
 	scope6_init();
@@ -275,7 +267,7 @@ ip6_init()
 	ip6_init2((void *)0);
 #endif
 
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 503000)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 	/* Register our Packet Filter hook. */
 	inet6_pfil_hook.ph_type = PFIL_TYPE_AF;
 	inet6_pfil_hook.ph_af   = AF_INET6;
@@ -292,10 +284,10 @@ ip6_init2(dummy)
 {
 
 	/* nd6_timer_init */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	callout_init(&nd6_timer_ch, 0);
 	callout_reset(&nd6_timer_ch, hz, nd6_timer, NULL);
-#elif defined(__NetBSD__) || defined(__FreeBSD__)
+#elif defined(__NetBSD__)
 	callout_init(&nd6_timer_ch);
 	callout_reset(&nd6_timer_ch, hz, nd6_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -307,13 +299,13 @@ ip6_init2(dummy)
 #endif
 
 	/* timer for regeneranation of temporary addresses randomize ID */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	callout_init(&in6_tmpaddrtimer_ch, 0);
 	callout_reset(&in6_tmpaddrtimer_ch,
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
 		       ip6_temp_regen_advance) * hz,
 		      in6_tmpaddrtimer, NULL);
-#elif defined(__NetBSD__) || defined(__FreeBSD__)
+#elif defined(__NetBSD__)
 	callout_init(&in6_tmpaddrtimer_ch);
 	callout_reset(&in6_tmpaddrtimer_ch,
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
@@ -391,7 +383,7 @@ ip6_input(m)
 	struct mbuf *mhist;	/* onion peeling history */
 	caddr_t hist;
 #endif
-#if defined(PFIL_HOOKS) && (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#if defined(PFIL_HOOKS) && defined(__FreeBSD__)
 	struct sockaddr_in6 sa6;
 	u_int32_t srczone, dstzone;
 	struct packet_filter_hook *pfh;
@@ -500,7 +492,7 @@ ip6_input(m)
 		goto bad;
 	}
 
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 503000)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 	/*
 	 * Run through list of hooks for input packets.  If there are any
 	 * filters which require that additional packets in the flow are
@@ -521,14 +513,14 @@ ip6_input(m)
 		struct in6_addr odst;
 
 		odst = ip6->ip6_dst;
-#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+#ifdef __FreeBSD__
 		/* Jump over all PFIL processing if hooks are not active. */
 		if (inet6_pfil_hook.ph_busy_count == -1)
 			goto passin;
 #endif
 		if (pfil_run_hooks(&inet6_pfil_hook, &m, m->m_pkthdr.rcvif,
 				   PFIL_IN
-#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+#ifdef __FreeBSD__
 				   , NULL
 #endif
 				   ) != 0)
@@ -539,7 +531,7 @@ ip6_input(m)
 		srcrt = !IN6_ARE_ADDR_EQUAL(&odst, &ip6->ip6_dst);
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+#ifdef __FreeBSD__
 passin:
 #endif
 #endif /* PFIL_HOOKS */
@@ -749,11 +741,7 @@ passin:
 		dst6->sin6_addr = ip6->ip6_dst;
 		dst6->sin6_scope_id = 0; /* XXX */
 
-#if defined(__FreeBSD__) && __FreeBSD_version < 502000
-		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
-#else
 		rtalloc((struct route *)&ip6_forward_rt);
-#endif
 	}
 
 #define rt6_key(r) ((struct sockaddr_in6 *)((r)->rt_nodes->rn_key))

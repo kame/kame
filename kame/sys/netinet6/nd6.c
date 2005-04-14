@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.375 2005/04/04 09:14:58 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.376 2005/04/14 06:22:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,11 +83,7 @@
 #endif
 
 #if defined(__FreeBSD__)
-#if __FreeBSD_version >= 500000
 #include <net/fddi.h>
-#else
-#include <netinet/if_fddi.h>
-#endif
 #endif
 
 #ifdef __OpenBSD__
@@ -110,10 +106,8 @@
 #endif /* NMIP > 0 */
 #endif /* MIP6 */
   
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
+#ifdef __FreeBSD__
 #include <sys/limits.h>
-#elif defined(__FreeBSD__)
-#include <machine/limits.h>
 #endif
 
 #ifndef __OpenBSD__
@@ -162,7 +156,7 @@ struct nd_prhead nd_prefix = { 0 };
 int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
 static struct sockaddr_in6 all1_sa;
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 static int nd6_is_new_addr_neighbor __P((struct sockaddr_in6 *,
 	struct ifnet *));
 #endif
@@ -225,11 +219,7 @@ nd6_init()
 	/* start timer */
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #ifdef __FreeBSD__
-#if __FreeBSD_version >= 503000
 	callout_init(&nd6_slowtimo_ch, 0);
-#else
-	callout_init(&nd6_slowtimo_ch);
-#endif
 #endif
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
@@ -988,7 +978,7 @@ nd6_lookup(addr6, create, ifp)
 		 * interface route.
 		 */
 		if (create) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 			RTFREE_LOCKED(rt);
 #else
 			RTFREE(rt);
@@ -1034,7 +1024,7 @@ nd6_lookup(addr6, create, ifp)
 			}
 			if (rt == NULL)
 				return (NULL);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 			RT_LOCK(rt);
 #endif
 			if (rt->rt_llinfo) {
@@ -1045,7 +1035,7 @@ nd6_lookup(addr6, create, ifp)
 		} else
 			return (NULL);
 	}
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 	RT_LOCK_ASSERT(rt);
 	RT_REMREF(rt);
 #else
@@ -1076,18 +1066,18 @@ nd6_lookup(addr6, create, ifp)
 			    ip6_sprintf(addr6),
 			    ifp ? if_name(ifp) : "unspec"));
 		}
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 		RT_UNLOCK(rt);
 #endif
 		return (NULL);
 	}
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 	RT_UNLOCK(rt);
 #endif
 	return (rt);
 }
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 /*
  * Test whether a given IPv6 address is a neighbor or not, ignoring
  * the actual neighbor cache.  The neighbor cache is ignored in order
@@ -1171,7 +1161,7 @@ nd6_is_addr_neighbor(addr, ifp)
 {
 	struct rtentry *rt;
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 	if (nd6_is_new_addr_neighbor(addr, ifp))
 		return (1);
 #else
@@ -1438,7 +1428,7 @@ nd6_rtrequest(req, rt, info)
 	struct ifaddr *ifa;
 	int mine = 0;
 
-#if defined(__FreeBSD__) && __FreeBSD_version > 502010
+#ifdef __FreeBSD__
 	RT_LOCK_ASSERT(rt);
 #endif
 
@@ -1458,7 +1448,7 @@ nd6_rtrequest(req, rt, info)
 
 	if (req == RTM_RESOLVE &&
 	    (nd6_need_cache(ifp) == 0 || /* stf case */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 	     !nd6_is_new_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp)
 #else
 	     !nd6_is_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp)
@@ -1569,9 +1559,9 @@ nd6_rtrequest(req, rt, info)
 		nd6_allocated++;
 		bzero(ln, sizeof(*ln));
 		ln->ln_rt = rt;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		callout_init(&ln->ln_timer_ch, 0);
-#elif defined(__NetBSD__) || defined(__FreeBSD__)
+#elif defined(__NetBSD__)
 		callout_init(&ln->ln_timer_ch);
 #elif defined(__OpenBSD__)
 		timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
@@ -2389,7 +2379,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	/*
 	 * next hop determination.  This routine is derived from ether_output.
 	 */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 again:
 #endif
 	if (rt) {
@@ -2402,14 +2392,14 @@ again:
 			    1)) != NULL)
 #endif
 			{
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 				RT_REMREF(rt);
 				RT_UNLOCK(rt);
 #else
 				rt->rt_refcnt--;
 #endif
 				if (rt->rt_ifp != ifp)
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 					/*
 					 * XXX maybe we should update ifp too,
 					 * but the original code didn't and I
@@ -2450,7 +2440,7 @@ again:
 			if (rt->rt_gwroute == 0)
 				goto lookup;
 			if (((rt = rt->rt_gwroute)->rt_flags & RTF_UP) == 0) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 				RT_LOCK(rt);
 #endif
 				rtfree(rt); rt = rt0;
@@ -2462,7 +2452,7 @@ again:
 #endif
 				if ((rt = rt->rt_gwroute) == 0)
 					senderr(EHOSTUNREACH);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 				RT_UNLOCK(rt);
 #endif
 #ifdef __NetBSD__

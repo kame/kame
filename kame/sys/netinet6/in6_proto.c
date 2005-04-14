@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.158 2005/03/18 10:23:05 suz Exp $	*/
+/*	$KAME: in6_proto.c,v 1.159 2005/04/14 06:22:40 suz Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -95,7 +95,7 @@
 #endif
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#ifdef __FreeBSD__
 #include <net/pfil.h>
 #endif
 #include <net/radix.h>

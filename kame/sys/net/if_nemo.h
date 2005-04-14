@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.h,v 1.1 2004/12/09 02:18:58 t-momose Exp $	*/
+/*	$KAME: if_nemo.h,v 1.2 2005/04/14 06:22:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,7 +37,7 @@
 #define _NET_IF_GIF_H_
 
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #if defined(_KERNEL) && !defined(_LKM)
 #include "opt_inet.h"
 #include "opt_mip6.h"
@@ -49,7 +49,7 @@
 
 struct encaptab;
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 extern	void (*ng_nemo_input_p)(struct ifnet *ifp, struct mbuf **mp,
 		int af);
 extern	void (*ng_nemo_input_orphan_p)(struct ifnet *ifp, struct mbuf *m,
@@ -82,7 +82,7 @@ struct nemo_softc {
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
 	void	*nemo_si;	/* softintr handle */
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	void		*nemo_netgraph;	/* ng_nemo(4) netgraph node info */
 #endif
 
@@ -110,11 +110,7 @@ void nemo_input __P((struct mbuf *, int, struct ifnet *));
 #endif
 int nemo_output __P((struct ifnet *, struct mbuf *,
 		    struct sockaddr *, struct rtentry *));
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-int nemo_ioctl __P((struct ifnet *, int, caddr_t));
-#else
 int nemo_ioctl __P((struct ifnet *, u_long, caddr_t));
-#endif
 int nemo_set_tunnel __P((struct ifnet *, struct sockaddr *, struct sockaddr *));
 void nemo_delete_tunnel __P((struct ifnet *));
 #ifdef __OpenBSD__

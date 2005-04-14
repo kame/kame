@@ -50,9 +50,9 @@
 #include <netinet/udp.h>
 #include <netinet/ip6.h>
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 
 #include <arpa/inet.h>
 #include <sys/ioctl.h>

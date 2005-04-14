@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.137 2005/03/18 12:54:05 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.138 2005/04/14 06:22:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -789,7 +789,7 @@ add_m6if(mifcp)
 	 * XXX: some OSes can remove ifp and clear ifindex2ifnet[id]
 	 * even for id between 0 and if_index.
 	 */
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#if defined(__FreeBSD__)
 	ifp = ifnet_byindex(mifcp->mif6c_pifi);
 #else
 	ifp = ifindex2ifnet[mifcp->mif6c_pifi];
@@ -807,13 +807,11 @@ add_m6if(mifcp)
 		ifp = &multicast_register_if;
 
 		if (reg_mif_num == (mifi_t)-1) {
-#if defined(__NetBSD__) || defined(__OpenBSD__) 
-			strlcpy(ifp->if_xname, "register_mif",
-			    sizeof(ifp->if_xname));
-#elif defined(__FreeBSD__) && __FreeBSD_version > 502000
+#ifdef __FreeBSD__
 			if_initname(ifp, "register_mif", 0);
 #else
-			ifp->if_name = "register_mif";
+			strlcpy(ifp->if_xname, "register_mif",
+			    sizeof(ifp->if_xname));
 #endif
 			ifp->if_flags |= IFF_LOOPBACK;
 			ifp->if_index = mifcp->mif6c_mifi;

@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.16 2005/03/02 02:47:52 t-momose Exp $  */
+/*      $KAME: common.c,v 1.17 2005/04/14 06:22:35 suz Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -44,10 +44,10 @@
 
 #include <net/if.h>
 #include <net/if_types.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #include <net/ethernet.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #ifdef __NetBSD__
 #include <net/if_ether.h>
 #endif /* __NetBSD__ */

@@ -127,13 +127,10 @@ pfsyncattach(int npfsync)
 	pfsyncif.sc_ptr = NULL;
 	pfsyncif.sc_count = 8;
 	ifp = &pfsyncif.sc_if;
-#ifndef __FreeBSD__
-	strlcpy(ifp->if_xname, "pfsync0", sizeof ifp->if_xname);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 502000
+#ifdef __FreeBSD__
 	if_initname(ifp, "pfsync", 0);
 #else
-	ifp->if_name = "pfsync";
-	ifp->if_unit = 0;
+	strlcpy(ifp->if_xname, "pfsync0", sizeof ifp->if_xname);
 #endif
 	ifp->if_softc = &pfsyncif;
 	ifp->if_ioctl = pfsyncioctl;
@@ -150,7 +147,7 @@ pfsyncattach(int npfsync)
 	pfsync_setmtu(&pfsyncif, MCLBYTES);
 #ifdef __OpenBSD__
 	timeout_set(&pfsyncif.sc_tmo, pfsync_timeout, &pfsyncif);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 5
+#elif defined(__FreeBSD__)
 	callout_init(&pfsyncif.sc_tmo, 0);
 #else
 	callout_init(&pfsyncif.sc_tmo);
@@ -185,13 +182,13 @@ pfsyncstart(struct ifnet *ifp)
 #else
 		s = splnet();
 #endif
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifdef __FreeBSD__
 		IFQ_LOCK(&ifp->if_snd);
 #else
 		IF_DROP(&ifp->if_snd);
 #endif
 		IF_DEQUEUE(&ifp->if_snd, m);
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifdef __FreeBSD__
 		IFQ_UNLOCK(&ifp->if_snd);
 #endif
 		splx(s);

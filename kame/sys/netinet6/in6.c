@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.388 2005/03/14 08:53:36 suz Exp $	*/
+/*	$KAME: in6.c,v 1.389 2005/04/14 06:22:39 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -216,7 +216,7 @@ const struct in6_addr in6mask128 = IN6MASK128;
 const struct sockaddr_in6 sa6_any =
 	{ sizeof(sa6_any), AF_INET6, 0, 0, IN6ADDR_ANY_INIT, 0};
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 static int in6_lifaddr_ioctl(struct socket *, u_long, caddr_t,
 	struct ifnet *, struct thread *);
 #else
@@ -286,11 +286,11 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	 *      omit the second report?
 	 */
 	if (nrt) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 		RT_LOCK(nrt);
 #endif
 		rt_newaddrmsg(cmd, ifa, e, nrt);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 		if (cmd == RTM_DELETE) {
 			rtfree(nrt);
 		} else {
@@ -391,7 +391,7 @@ in6_ifremloop(struct ifaddr *ifa)
 			      , 0
 #endif /* __FreeBSD__ */
 			);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 		if (rt != NULL) {
 			if ((rt->rt_flags & RTF_HOST) != 0 &&
 			    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0) {
@@ -452,7 +452,7 @@ in6_mask2len(mask, lim0)
 #define ia62ifa(ia6)	(&((ia6)->ia_ifa))
 
 int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 in6_control(so, cmd, data, ifp, p)
 	struct	socket *so;
 	u_long cmd;
@@ -910,7 +910,7 @@ in6_control(so, cmd, data, ifp, p)
 		 * that is, this address might make other addresses detached.
 		 */
 		pfxlist_onlink_check();
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 		if (error == 0 && ia)
 			EVENTHANDLER_INVOKE(ifaddr_event, ifp);
 #endif
@@ -940,7 +940,7 @@ in6_control(so, cmd, data, ifp, p)
 		in6_purgeaddr(&ia->ia_ifa);
 		if (pr && pr->ndpr_refcnt == 0)
 			prelist_remove(pr);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 		EVENTHANDLER_INVOKE(ifaddr_event, ifp);
 #endif
 #if defined(__NetBSD__) && defined(PFIL_HOOKS)
@@ -1125,7 +1125,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		LIST_INIT(&ia->ia6_mbul_list);
 #endif /* MIP6 && NMIP > 0 */
 		/* Initialize the address and masks, and put time stamp */
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 501000)
+#ifdef __FreeBSD__
 		IFA_LOCK_INIT(&ia->ia_ifa);
 #endif
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
@@ -1151,7 +1151,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			oia->ia_next = ia;
 		} else
 			in6_ifaddr = ia;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 		/* gain a refcnt for the link from in6_ifaddr */
 		IFAREF(&ia->ia_ifa);
 #endif
@@ -1347,7 +1347,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 			    32 / 8)) {
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 				RTFREE_LOCKED(rt);
 #else
 				RTFREE(rt);
@@ -1379,7 +1379,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (error)
 				goto cleanup;
 		} else {
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 			RTFREE_LOCKED(rt);
 #else
 			RTFREE(rt);
@@ -1456,7 +1456,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 			    32 / 8)) {
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 				RTFREE_LOCKED(rt);
 #else
 				RTFREE(rt);
@@ -1487,7 +1487,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (error)
 				goto cleanup;
 		} else {
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+#ifdef __FreeBSD__
 			RTFREE_LOCKED(rt);
 #else
 			RTFREE(rt);
@@ -1737,7 +1737,7 @@ in6_purgeif(ifp)
  * address encoding scheme. (see figure on page 8)
  */
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 	struct socket *so;
 	u_long cmd;

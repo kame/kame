@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.28 2004/11/11 22:34:44 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.29 2005/04/14 06:22:37 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -149,13 +149,10 @@ dummyattach(dummy)
 
 	for (i = 0; i < NDUMMY; i++) {
 		ifp = &dummyif[i];
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		sprintf(ifp->if_xname, "dummy%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 		if_initname(ifp, "dummy", i);
 #else
-		ifp->if_name = "dummy";
-		ifp->if_unit = i;
+		sprintf(ifp->if_xname, "dummy%d", i);
 #endif
 		ifp->if_softc = NULL;
 		ifp->if_mtu = DUMMYMTU;
@@ -193,7 +190,7 @@ dummyoutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 	struct ifqueue *ifq = 0;
 #endif
@@ -246,7 +243,7 @@ dummyoutput(ifp, m, dst, rt)
 
 #ifdef INET
 	case AF_INET:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ipintrq;
 #endif
 		isr = NETISR_IP;
@@ -254,7 +251,7 @@ dummyoutput(ifp, m, dst, rt)
 #endif
 #ifdef IPX
 	case AF_IPX:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ipxintrq;
 #endif
 		isr = NETISR_IPX;
@@ -262,7 +259,7 @@ dummyoutput(ifp, m, dst, rt)
 #endif
 #ifdef INET6
 	case AF_INET6:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ip6intrq;
 #endif
 		isr = NETISR_IPV6;
@@ -270,7 +267,7 @@ dummyoutput(ifp, m, dst, rt)
 #endif
 #ifdef NS
 	case AF_NS:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &nsintrq;
 #endif
 		isr = NETISR_NS;
@@ -278,7 +275,7 @@ dummyoutput(ifp, m, dst, rt)
 #endif
 #ifdef ISO
 	case AF_ISO:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &clnlintrq;
 #endif
 		isr = NETISR_ISO;
@@ -286,7 +283,7 @@ dummyoutput(ifp, m, dst, rt)
 #endif
 #ifdef NETATALK
 	case AF_APPLETALK:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 	        ifq = &atintrq2;
 #endif
 		isr = NETISR_ATALK;
@@ -299,7 +296,7 @@ dummyoutput(ifp, m, dst, rt)
 		return (EAFNOSUPPORT);
 	}
 
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifdef __FreeBSD__
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	netisr_queue(isr, m);
@@ -334,15 +331,6 @@ dummyrtrequest(cmd, rt, info)
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
-#if defined(__FreeBSD__) && __FreeBSD_version < 502000
-		/*
-		 * For optimal performance, the send and receive buffers
-		 * should be at least twice the MTU plus a little more for
-		 * overhead.
-		 */
-		rt->rt_rmx.rmx_recvpipe =
-			rt->rt_rmx.rmx_sendpipe = 3 * DUMMYMTU;
-#endif
 	}
 }
 

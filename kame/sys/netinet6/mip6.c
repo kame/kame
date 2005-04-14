@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.216 2005/03/01 18:17:22 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.217 2005/04/14 06:22:41 suz Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 #include "opt_ipsec.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -43,7 +43,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
@@ -372,7 +372,7 @@ mip6_tunnel_input(mp, offp, proto)
 	struct in6_addr src, dst;
 	struct mip6_bul_internal *bul, *cnbul;
 #endif /* NMIP > 0 */
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 #endif
 
@@ -414,11 +414,11 @@ mip6_tunnel_input(mp, offp, proto)
 
 #ifdef __NetBSD__
 		s = splnet();
-#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#elif defined(__OpenBSD__)
 		s = splimp();
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		if (!IF_HANDOFF(&ip6intrq, m, NULL))
 			goto bad;
 #else
@@ -430,7 +430,7 @@ mip6_tunnel_input(mp, offp, proto)
 		IF_ENQUEUE(&ip6intrq, m);
 #endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 		splx(s);
 #endif
 		break;
@@ -813,7 +813,7 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	struct mip6_bul_internal *mbul;
 
 #if 0
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#ifdef __FreeBSD__
 	mipsc = (struct mip_softc *)ifnet_byindex(hoa_ifindex);
 #else
 	mipsc = (struct mip_softc *)ifindex2ifnet[hoa_ifindex];
@@ -952,10 +952,8 @@ mip6_bul_remove_all()
 	s = splnet();
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502000
-	IFNET_RLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502000 */
 #ifdef __FreeBSD__
+	IFNET_RLOCK();
 	TAILQ_FOREACH(ifp, &ifnet, if_link)
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
 	TAILQ_FOREACH(ifp, &ifnet, if_list)
@@ -981,9 +979,9 @@ mip6_bul_remove_all()
 			}
 		}
 	}
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502000
+#ifdef __FreeBSD__
 	IFNET_RUNLOCK();
-#endif /* __FreeBSD__ && __FreeBSD_version >= 502000 */
+#endif /* __FreeBSD__ */
 
 	splx(s);
 }
@@ -1355,12 +1353,8 @@ mip6_bc_proxy_control(target, local, cmd)
 	{
 		struct ifaddr *ifa_dl;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa_dl = ifp->if_addrlist; ifa_dl; ifa_dl = ifa->ifa_next)
-#else
 		for (ifa_dl = ifp->if_addrlist.tqh_first; ifa_dl;
 		     ifa_dl = ifa_dl->ifa_list.tqe_next)
-#endif
 			if (ifa_dl->ifa_addr->sa_family == AF_LINK)
 				break;
 
@@ -1502,9 +1496,7 @@ mip6_encapsulate(mm, osrc, odst)
 #ifdef IPV6_MINMTU
                 /* XXX */
 	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		, NULL, NULL
-#elif defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 		, NULL, NULL
 #else
 		, NULL
@@ -1512,9 +1504,7 @@ mip6_encapsulate(mm, osrc, odst)
 		));
 #else
 	return (ip6_output(m, 0, 0, 0, 0
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		, NULL, NULL
-#elif defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 		, NULL, NULL
 #else
 		, NULL

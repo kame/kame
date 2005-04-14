@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.25 2004/12/09 05:19:57 suz Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.26 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -164,11 +164,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		}
 	}
 
-	if (!rt->rt_rmx.rmx_mtu 
-#if defined(__FreeBSD__) && __FreeBSD_version < 502000
-	    && !(rt->rt_rmx.rmx_locks & RTV_MTU)
-#endif
-	    && rt->rt_ifp)
+	if (!rt->rt_rmx.rmx_mtu && rt->rt_ifp)
 		rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
 
 	ret = rn_addroute(v_arg, n_arg, head, treenodes);
@@ -197,7 +193,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 				ret = rn_addroute(v_arg, n_arg, head,
 					treenodes);
 			}
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 			RTFREE_LOCKED(rt2);
 #else
 			RTFREE(rt2);
@@ -230,7 +226,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 			    rt2->rt_ifp == rt->rt_ifp) {
 				ret = rt2->rt_nodes;
 			}
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 			RTFREE_LOCKED(rt2);
 #else
 			RTFREE(rt2);

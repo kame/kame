@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.271 2004/12/09 10:34:54 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.272 2005/04/14 06:22:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -532,7 +532,7 @@ defrouter_addreq(new)
 	    (struct sockaddr *)&gate, (struct sockaddr *)&mask,
 	    RTF_GATEWAY, &newrt);
 	if (newrt) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 		RT_LOCK(newrt);
 		nd6_rtmsg(RTM_ADD, newrt); /* tell user process */
 		RT_REMREF(newrt);
@@ -1831,7 +1831,7 @@ nd6_prefix_onlink(pr)
 	}
 
 	if (rt != NULL) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 		RT_LOCK(rt);
 		RT_REMREF(rt);
 		RT_UNLOCK(rt);
@@ -2273,11 +2273,11 @@ rt6_flush(gateway, ifp)
 		return;
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 	RADIX_NODE_HEAD_LOCK(rnh);
 #endif
 	rnh->rnh_walktree(rnh, rt6_deleteroute, (void *)gateway);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 	RADIX_NODE_HEAD_UNLOCK(rnh);
 #endif
 	splx(s);
@@ -2326,7 +2326,7 @@ nd6_setdefaultiface(ifindex)
 
 	if (ifindex < 0 || if_indexlim <= ifindex)
 		return (EINVAL);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 	if (ifindex != 0 && !ifnet_byindex(ifindex))
 #else
 	if (ifindex != 0 && !ifindex2ifnet[ifindex])
@@ -2336,7 +2336,7 @@ nd6_setdefaultiface(ifindex)
 	if (nd6_defifindex != ifindex) {
 		nd6_defifindex = ifindex;
 		if (nd6_defifindex > 0) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 			nd6_defifp = ifnet_byindex(nd6_defifindex);
 #else
 			nd6_defifp = ifindex2ifnet[nd6_defifindex];

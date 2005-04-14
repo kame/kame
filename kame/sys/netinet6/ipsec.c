@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.232 2005/03/09 14:14:13 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.233 2005/04/14 06:22:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,7 +103,7 @@
 #include <netkey/keydb.h>
 #include <netkey/key_debug.h>
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 #include <machine/in_cksum.h>
 #endif
 #include <net/net_osdep.h>
@@ -115,7 +115,7 @@
 #include <netinet6/mip6_var.h>
 #endif /* MIP6 */ 
 
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 4)
+#ifndef __FreeBSD__
 #include "pf.h"
 #endif
 #if NPF > 0
@@ -2336,14 +2336,8 @@ ipsec4_encapsulate(m, sav)
 	}
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	ip->ip_id = htons(ip_randomid());
-#elif (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#else
 	ip->ip_id = ip_newid();
-#else
-#ifdef RANDOM_IP_ID
-	ip->ip_id = htons(ip_randomid());
-#else
-	ip->ip_id = htons(ip_id++);
-#endif
 #endif
 	bcopy(&((struct sockaddr_in *)&sav->sah->saidx.src)->sin_addr,
 		&ip->ip_src, sizeof(ip->ip_src));

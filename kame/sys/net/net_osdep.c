@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.14 2004/05/26 07:51:27 itojun Exp $	*/
+/*	$KAME: net_osdep.c,v 1.15 2005/04/14 06:22:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,7 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/errno.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
@@ -51,7 +51,7 @@
 
 #include <net/net_osdep.h>
 
-#if !(defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 502000))
+#if 0
 const char *
 if_name(ifp)
 	struct ifnet *ifp;

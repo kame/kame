@@ -1,4 +1,4 @@
-/*	$Id: if_mip.c,v 1.3 2005/03/01 18:17:22 t-momose Exp $	*/
+/*	$Id: if_mip.c,v 1.4 2005/04/14 06:22:38 suz Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -63,7 +63,7 @@
 #include <net/if_mip.h>
 
 #include "mip.h"
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -106,15 +106,11 @@ mipattach(dummy)
 	sc = malloc(NMIP * sizeof(struct mip_softc), M_DEVBUF, M_WAITOK);
 	bzero(sc, NMIP * sizeof(struct mip_softc));
 	for (i = 0 ; i < NMIP; sc++, i++) {
-#if defined(__NetBSD__)
-		sprintf(sc->mip_if.if_xname, "mip%d", i);
-#elif defined(__OpenBSD__)
-		snprintf(sc->mip_if.if_xname, sizeof sc->mip_if.if_xname, "mip%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 		if_initname(&sc->mip_if, "mip", i);
 #else
-		sc->mip_if.if_name = "mip";
-		sc->mip_if.if_unit = i;
+		snprintf(sc->mip_if.if_xname, sizeof(sc->mip_if.if_xname),
+		    "mip%d", i);
 #endif
 		sc->mip_if.if_flags = IFF_MULTICAST | IFF_SIMPLEX;
 		sc->mip_if.if_mtu = MIP_MTU;
@@ -124,7 +120,7 @@ mipattach(dummy)
 #ifdef __NetBSD__
 		sc->mip_if.if_dlt = DLT_NULL;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		IFQ_SET_MAXLEN(&sc->mip_if.if_snd, ifqmaxlen);
 		IFQ_SET_READY(&sc->mip_if.if_snd);
 #endif
@@ -275,7 +271,7 @@ mip_output(ifp, m, dst, rt)
 #ifdef IPV6_MINMTU
 		/* XXX */
 		return (ip6_output(m, 0, 0, IPV6_MINMTU, 0
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 		    , &ifp, NULL
 #elif defined(__NetBSD__)
 		    , NULL, &ifp
@@ -285,7 +281,7 @@ mip_output(ifp, m, dst, rt)
 		    ));
 #else
 		return (ip6_output(m, 0, 0, 0, 0
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 		    , &ifp, NULL
 #elif defined(__NetBSD__)
 		    , NULL, &ifp
@@ -309,11 +305,7 @@ mip_output(ifp, m, dst, rt)
 int
 mip_ioctl(ifp, cmd, data)
 	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
 	u_long cmd;
-#endif
 	caddr_t data;
 {
 	int s, error;
@@ -371,7 +363,7 @@ mip_ioctl(ifp, cmd, data)
 		
 #ifdef __FreeBSD__
 		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
+#else
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) 
 #endif
 		{

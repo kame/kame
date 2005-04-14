@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.40 2004/11/11 22:34:45 suz Exp $	*/
+/*	$KAME: if_faith.c,v 1.41 2005/04/14 06:22:37 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -139,13 +139,10 @@ faithattach(faith)
 	for (i = 0; i < NFAITH; i++) {
 		ifp = &faithif[i];
 		bzero(ifp, sizeof(faithif[i]));
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		sprintf(ifp->if_xname, "faith%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 		if_initname(ifp, "faith", i);
 #else
-		ifp->if_name = "faith";
-		ifp->if_unit = i;
+		sprintf(ifp->if_xname, "faith%d", i);
 #endif
 		ifp->if_mtu = FAITHMTU;
 		/* Change to BROADCAST experimentaly to announce its prefix. */
@@ -182,7 +179,7 @@ faithoutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 	struct ifqueue *ifq = NULL;
 #endif
@@ -233,7 +230,7 @@ faithoutput(ifp, m, dst, rt)
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ipintrq;
 #endif
 		isr = NETISR_IP;
@@ -241,7 +238,7 @@ faithoutput(ifp, m, dst, rt)
 #endif
 #ifdef INET6
 	case AF_INET6:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ip6intrq;
 #endif
 		isr = NETISR_IPV6;
@@ -256,7 +253,7 @@ faithoutput(ifp, m, dst, rt)
 
 	m->m_pkthdr.rcvif = ifp;
 
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifdef __FreeBSD__
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	netisr_queue(isr, m);
@@ -291,15 +288,6 @@ faithrtrequest(cmd, rt, info)
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
-#if defined(__FreeBSD__) && __FreeBSD_version < 502000
-		/*
-		 * For optimal performance, the send and receive buffers
-		 * should be at least twice the MTU plus a little more for
-		 * overhead.
-		 */
-		rt->rt_rmx.rmx_recvpipe =
-			rt->rt_rmx.rmx_sendpipe = 3 * FAITHMTU;
-#endif
 	}
 }
 

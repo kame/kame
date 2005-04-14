@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.11 2005/03/10 23:43:26 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.12 2005/04/14 06:22:36 suz Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -50,9 +50,9 @@
 
 #include <net/if.h>
 #include <net/if_dl.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/route.h>
 #include <net/mipsock.h>
 #include <netinet/in.h>

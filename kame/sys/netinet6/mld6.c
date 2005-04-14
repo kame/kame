@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.110 2004/12/27 05:41:18 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.111 2005/04/14 06:22:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -512,12 +512,8 @@ mld_input(m, off)
 		 */
 		timer = ntohs(mldh->mld_maxdelay);
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
-#elif defined(__FreeBSD__)
-		for (ifma = LIST_FIRST(&ifp->if_multiaddrs);
-		     ifma;
-		     ifma = LIST_NEXT(ifma, ifma_link))
 #else
 		IFP_TO_IA6(ifp, ia);
 		if (ia == NULL)
@@ -971,11 +967,7 @@ in6_addmulti(maddr6, ifp, errorp, delay)
 	}
 	LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
 
-#if __FreeBSD_version >= 500000
 	callout_init(in6m->in6m_timer_ch, 0);
-#else
-	callout_init(in6m->in6m_timer_ch);
-#endif
 	in6m->in6m_timer = delay;
 	if (in6m->in6m_timer > 0) {
 		in6m->in6m_state = MLD_REPORTPENDING;

@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.214 2005/03/11 14:22:35 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.215 2005/04/14 06:22:33 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,7 +121,7 @@
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <netdb.h>
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 #include <pthread.h>
 #endif
 #include <resolv.h>
@@ -373,7 +373,7 @@ static const struct ai_errlist {
 	{ NULL,						-1 },
 };
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 /*
  * XXX: Many dependencies are not thread-safe.  So, we share lock between
  * getaddrinfo() and getipnodeby*().  Still, we cannot use
@@ -3918,7 +3918,7 @@ res_querydomainN(name, domain, target)
 	return (res_queryN(longname, target));
 }
 
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#elif defined(__FreeBSD__)
 #include <stdarg.h>
 #include <nsswitch.h>
 

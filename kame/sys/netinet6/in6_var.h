@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.107 2005/03/14 08:53:36 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.108 2005/04/14 06:22:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -596,7 +596,7 @@ struct	in6_multi {
 #elif defined(__OpenBSD__)
 	struct timeout *in6m_timer_ch;
 #endif
-#endif
+#endif /* MLDv2 */
 };
 
 #define IN6M_TIMER_UNDEF -1
@@ -625,8 +625,6 @@ struct	in6_multistep {
  */
 
 #ifdef __FreeBSD__
-
-#if __FreeBSD_version >= 500000
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
 /* struct in6_addr addr; */					\
 /* struct ifnet *ifp; */					\
@@ -641,23 +639,6 @@ do { \
 	} \
 	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
 } while(0)
-#else
-#define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
-/* struct in6_addr addr; */					\
-/* struct ifnet *ifp; */					\
-/* struct in6_multi *in6m; */					\
-do { \
-	struct ifmultiaddr *ifma; \
-	for (ifma = (ifp)->if_multiaddrs.lh_first; ifma; \
-	     ifma = ifma->ifma_link.le_next) { \
-		if (ifma->ifma_addr->sa_family == AF_INET6 \
-		    && IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)ifma->ifma_addr)->sin6_addr, \
-					  &(addr))) \
-			break; \
-	} \
-	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
-} while(0)
-#endif /* not FreeBSD5 */
 
 /*
  * Macro to step through all of the in6_multi records, one at a time.
@@ -777,7 +758,7 @@ struct	in6_multi *in6_modmulti2(struct in6_addr *, struct ifnet *,
 
 
 int	in6_mask2len __P((struct in6_addr *, u_char *));
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 int	in6_control(struct socket *, u_long, caddr_t, struct ifnet *,
 		    struct thread *);
 #else

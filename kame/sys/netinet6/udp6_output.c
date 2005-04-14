@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.82 2004/12/27 05:41:19 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.83 2005/04/14 06:22:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,7 +85,7 @@
 #include <sys/syslog.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#ifdef __FreeBSD__
 #include <net/pfil.h>
 #endif
 #include <net/route.h>
@@ -143,11 +143,7 @@ udp6_output(in6p, m, addr6, control, p)
 	struct mbuf *m;
 	struct mbuf *control;
 	struct sockaddr *addr6;
-#if __FreeBSD_version >= 500000
 	struct thread *p;
-#else
-	struct proc *p;
-#endif
 #elif defined(__NetBSD__)
 int
 udp6_output(in6p, m, addr6, control, p)
@@ -347,7 +343,7 @@ udp6_output(in6p, m, addr6, control)
 		}
 		if (in6p->in6p_lport == 0 &&
 		    (error = in6_pcbsetport(laddr6, in6p,
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 			p->td_ucred
 #else
 			p

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.113 2004/12/09 02:18:54 t-momose Exp $	*/
+/*	$KAME: if_gif.c,v 1.114 2005/04/14 06:22:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,7 +68,7 @@
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
-#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#ifdef __FreeBSD__
 #include <net/pfil.h>
 #endif
 
@@ -159,14 +159,11 @@ gifattach(dummy)
 	    M_DEVBUF, M_WAITOK);
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		snprintf(sc->gif_if.if_xname, sizeof(sc->gif_if.if_xname),
-		    "gif%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 		if_initname(&sc->gif_if, "gif", i);
 #else
-		sc->gif_if.if_name = "gif";
-		sc->gif_if.if_unit = i;
+		snprintf(sc->gif_if.if_xname, sizeof(sc->gif_if.if_xname),
+		    "gif%d", i);
 #endif
 		gifattach0(sc);
 		LIST_INSERT_HEAD(&gif_softc_list, sc, gif_list);
@@ -345,7 +342,7 @@ gif_output(ifp, m, dst, rt)
 	int s;
 	struct m_tag *mtag;
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 #endif
@@ -375,7 +372,7 @@ gif_output(ifp, m, dst, rt)
 
 	mtag = m_tag_get(PACKET_TAG_GIF, sizeof(struct ifnet *), M_NOWAIT);
 	if (!mtag) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		_IF_DROP(&ifp->if_snd);
 #else
 		IF_DROP(&ifp->if_snd);
@@ -422,7 +419,7 @@ gif_output(ifp, m, dst, rt)
 	*mtod(m, int *) = dst->sa_family;
 
 	s = splnet();
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifdef __FreeBSD__
 	IFQ_ENQUEUE(&ifp->if_snd, m, error);
 #else
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
@@ -540,7 +537,7 @@ gif_input(m, af, ifp)
 	int af;
 	struct ifnet *ifp;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 	struct ifqueue *ifq = NULL;
 #endif
@@ -593,7 +590,7 @@ gif_input(m, af, ifp)
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ipintrq;
 #endif
 		isr = NETISR_IP;
@@ -601,7 +598,7 @@ gif_input(m, af, ifp)
 #endif
 #ifdef INET6
 	case AF_INET6:
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &ip6intrq;
 #endif
 		isr = NETISR_IPV6;
@@ -612,7 +609,7 @@ gif_input(m, af, ifp)
 		m = gif_eon_decap(ifp, m);
 		if (!m)
 			return;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#ifndef __FreeBSD__
 		ifq = &clnlintrq;
 #endif
 		isr = NETISR_ISO;
@@ -623,7 +620,7 @@ gif_input(m, af, ifp)
 		return;
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	netisr_queue(isr, m);

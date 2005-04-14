@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.26 2005/03/14 06:40:43 mitsuya Exp $	*/
+/*	$KAME: fsm.c,v 1.27 2005/04/14 06:22:35 suz Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -40,7 +40,7 @@
 #include <sys/syslog.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <net/if_dl.h>

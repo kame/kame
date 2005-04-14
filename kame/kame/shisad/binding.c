@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.11 2005/03/10 23:43:26 t-momose Exp $	*/
+/*      $KAME: binding.c,v 1.12 2005/04/14 06:22:35 suz Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -39,9 +39,9 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/mipsock.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>

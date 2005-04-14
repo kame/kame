@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.91 2004/11/11 22:34:45 suz Exp $	*/
+/*	$KAME: ah_input.c,v 1.92 2005/04/14 06:22:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,7 +58,7 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <net/netisr.h>
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
 #include <net/pfil.h>
 #endif
 #include <machine/cpu.h>
@@ -129,7 +129,7 @@ ah4_input(m, va_alist)
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
 	size_t hlen;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 #endif
 #ifndef __FreeBSD__
@@ -498,11 +498,11 @@ ah4_input(m, va_alist)
 
 #ifdef __NetBSD__
 		s = splnet();
-#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#elif defined(__OpenBSD__)
 		s = splimp();
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#ifdef __FreeBSD__
 		if (netisr_queue(NETISR_IP, m)) {	/* (0) on success. */
 			ipsecstat.in_inval++;
 			m = NULL;
@@ -693,7 +693,7 @@ ah6_input(mp, offp, proto)
 	u_int8_t cksum[AH_MAXSUMSIZE];
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 #endif
 	size_t stripsiz = 0;
@@ -966,10 +966,10 @@ ah6_input(mp, offp, proto)
 
 #ifdef __NetBSD__
 		s = splnet();
-#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#elif defined(__OpenBSD__)
 		s = splimp();
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 		if (netisr_queue(NETISR_IPV6, m)) {	/* (0) on success. */
 			ipsec6stat.in_inval++;
 			m = NULL;

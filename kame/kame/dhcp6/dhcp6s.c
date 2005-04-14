@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.156 2005/03/31 12:44:09 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.157 2005/04/14 06:22:32 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -47,7 +47,7 @@
 #include <errno.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 

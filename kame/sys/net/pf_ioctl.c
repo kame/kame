@@ -91,15 +91,9 @@
 #include <net/net_osdep.h>
 
 void			 pfattach(int);
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
 int			 pfopen(dev_t, int, int, struct thread *);
 int			 pfclose(dev_t, int, int, struct thread *);
 int			 pfioctl(dev_t, u_long, caddr_t, int, struct thread *);
-#else
-int			 pfopen(dev_t, int, int, struct proc *);
-int			 pfclose(dev_t, int, int, struct proc *);
-int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
-#endif
 struct pf_pool		*pf_get_pool(char *, char *, u_int32_t,
 			    u_int8_t, u_int8_t, u_int8_t, u_int8_t, u_int8_t);
 int			 pf_get_ruleset_number(u_int8_t);
@@ -113,23 +107,8 @@ PSEUDO_SET(pfattach, pf);
 
 #define CDEV_MAJOR 200
 static struct cdevsw pf_cdevsw = {
-#if __FreeBSD_version < 502000
-	.d_open =	pfopen,
-	.d_close =	pfclose,
-	.d_write =	nowrite,
-	.d_poll  =	nopoll,
-	.d_mmap =	nommap,
-	.d_strategy =	nostrategy,
-	.d_dump =	nodump,
-	.d_kqfilter =	nokqfilter,
-	.d_maj =	CDEV_MAJOR,
-#endif
 	.d_ioctl =	pfioctl,
 	.d_name =	"pf",
-#if __FreeBSD_version < 502000
-	.d_psize =	nopsize,
-	.d_flags =	0,
-#endif
 };
 #endif
 
@@ -215,7 +194,7 @@ pfattach(int num)
 #ifdef __OpenBSD__
 	timeout_set(&pf_expire_to, pf_purge_timeout, &pf_expire_to);
 	timeout_add(&pf_expire_to, timeout[PFTM_INTERVAL] * hz);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 5
+#elif defined(__FreeBSD__)
 	callout_init(&pf_expire_to, 0);
 	callout_reset(&pf_expire_to, timeout[PFTM_INTERVAL] * hz,
 	    pf_purge_timeout, &pf_expire_to);
@@ -234,7 +213,7 @@ pfattach(int num)
 }
 
 int
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#ifdef __FreeBSD__
 pfopen(dev_t dev, int flags, int fmt, struct thread *p)
 #else
 pfopen(dev_t dev, int flags, int fmt, struct proc *p)
@@ -246,7 +225,7 @@ pfopen(dev_t dev, int flags, int fmt, struct proc *p)
 }
 
 int
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#ifdef __FreeBSD__
 pfclose(dev_t dev, int flags, int fmt, struct thread *p)
 #else
 pfclose(dev_t dev, int flags, int fmt, struct proc *p)
@@ -631,7 +610,7 @@ pf_qid_unref(u_int32_t qid)
 #endif /* ALTQ */
 
 int
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#ifdef __FreeBSD__
 pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *p)
 #else
 pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.120 2005/02/02 12:35:57 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.121 2005/04/14 06:22:38 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -179,7 +179,7 @@ extern struct domain inetdomain;
 struct protosw in_stf_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   in_stf_input,
-#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#ifdef __FreeBSD__
  (pr_output_t *)rip_output,
 #else
   rip_output,
@@ -240,14 +240,11 @@ stfattach(dummy)
 	for (i = 0; i < nstf; i++) {
 		sc = &stf[i];
 		bzero(sc, sizeof(*sc));
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
-			"stf%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 		if_initname(&sc->sc_if, "stf", i);
 #else
-		sc->sc_if.if_name = "stf";
-		sc->sc_if.if_unit = i;
+		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
+			"stf%d", i);
 #endif
 
 		p = encap_attach_func(AF_INET, IPPROTO_IPV6, stf_encapcheck,
@@ -701,7 +698,7 @@ stf_output(ifp, m, dst, rt)
 
 	ifp->if_opackets++;
 	return ip_output(m, NULL, &sc->sc_ro, 0, NULL
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+#ifdef __FreeBSD__
 			, NULL
 #endif
 			);
@@ -889,7 +886,7 @@ in_stf_input(m, va_alist)
 	struct ip *ip;
 	struct ip6_hdr *ip6;
 	u_int8_t otos, itos;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	int s;
 #endif
 	int isr;
@@ -1003,15 +1000,11 @@ in_stf_input(m, va_alist)
 	ifq = &ip6intrq;
 	isr = NETISR_IPV6;
 
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifdef __FreeBSD__
 	if (!IF_HANDOFF(ifq, m, NULL))
 		return;
 #else
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splnet();
-#else
-	s = splimp();
-#endif
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);
@@ -1024,7 +1017,7 @@ in_stf_input(m, va_alist)
 	schednetisr(isr);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifndef __FreeBSD__
 	splx(s);
 #endif
 }

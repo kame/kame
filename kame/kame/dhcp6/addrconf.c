@@ -1,4 +1,4 @@
-/*	$KAME: addrconf.c,v 1.4 2005/03/29 14:13:29 jinmei Exp $	*/
+/*	$KAME: addrconf.c,v 1.5 2005/04/14 06:22:32 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -35,7 +35,7 @@
 #include <sys/ioctl.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 

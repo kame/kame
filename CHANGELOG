@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2746 2005/04/14 02:25:48 suz Exp $
+$KAME: CHANGELOG,v 1.2747 2005/04/14 06:22:31 suz Exp $
 
 <200504>
 2005-04-14  SUZUKI, Shinsuke <suz@kame.net>
@@ -15,6 +15,9 @@ $KAME: CHANGELOG,v 1.2746 2005/04/14 02:25:48 suz Exp $
 
 	* freebsd5/sys/netinet/ip_output.c: specifies spl()s as done in 
 	  original FreeBSD5
+
+	* kame/*: remove freebsd[234]-specific code, since they are no longer
+	  supported in KAME-SNAP
 
 2005-04-05  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/ufs/ffs/ffs_inode.c: FreeBSD Security Advisory

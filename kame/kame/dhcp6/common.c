@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.125 2005/03/20 06:46:09 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.126 2005/04/14 06:22:32 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -45,7 +45,7 @@
 #endif
 #include <net/if.h>
 #include <net/if_types.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <net/if_dl.h>

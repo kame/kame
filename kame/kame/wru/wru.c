@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.12 2003/05/17 18:12:41 itojun Exp $	*/
+ /*	$KAME: wru.c,v 1.13 2005/04/14 06:22:37 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -37,7 +37,7 @@
 #include <sys/queue.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <net/if_dl.h>
@@ -66,9 +66,6 @@
 #endif
 #ifndef NI_NODENAME_FLAG_VALIDTTL
 #define NI_NODENAME_FLAG_VALIDTTL NI_FQDN_FLAG_VALIDTTL
-#endif
-#if defined(__FreeBSD__) && __FreeBSD__ <= 3
-#define socklen_t	int
 #endif
 
 static void update_nonce __P((u_int8_t *, size_t));

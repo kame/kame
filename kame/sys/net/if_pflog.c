@@ -129,13 +129,10 @@ pflogattach(int npflog)
 
 	for (i = 0; i < NPFLOG; i++) {
 		ifp = &pflogif[i].sc_if;
-#ifndef __FreeBSD__
-		snprintf(ifp->if_xname, sizeof ifp->if_xname, "pflog%d", i);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 502000
+#ifdef __FreeBSD__
 		if_initname(ifp, "pflog", i);
 #else
-		ifp->if_name = "pflog";
-		ifp->if_unit = i;
+		snprintf(ifp->if_xname, sizeof ifp->if_xname, "pflog%d", i);
 #endif
 		ifp->if_softc = &pflogif[i];
 		ifp->if_mtu = PFLOGMTU;
@@ -177,13 +174,13 @@ pflogstart(struct ifnet *ifp)
 #else
 		s = splnet();
 #endif
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifdef __FreeBSD__
 		IFQ_LOCK(&ifp->if_snd);
 #else
 		IF_DROP(&ifp->if_snd);
 #endif
 		IF_DEQUEUE(&ifp->if_snd, m);
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#ifdef __FreeBSD__
 		IFQ_UNLOCK(&ifp->if_snd);
 #endif
 		splx(s);

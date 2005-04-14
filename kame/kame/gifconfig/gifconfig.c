@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.19 2001/11/13 12:38:45 jinmei Exp $	*/
+/*	$KAME: gifconfig.c,v 1.20 2005/04/14 06:22:33 suz Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -57,9 +57,9 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>

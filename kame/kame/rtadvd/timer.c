@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.10 2004/10/12 05:38:57 suz Exp $	*/
+/*	$KAME: timer.c,v 1.11 2005/04/14 06:22:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -35,11 +35,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(__FreeBSD__) && __FreeBSD_version < 500000
-#include <sys/queue.h>
-#else
 #include <search.h>
-#endif
 #include "timer.h"
 
 static struct rtadvd_timer timer_head;

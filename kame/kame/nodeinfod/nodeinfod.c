@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.30 2002/05/24 08:48:04 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.31 2005/04/14 06:22:34 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -56,11 +56,6 @@
 #include <openssl/md5.h>
 #endif
 #include <ctype.h>
-
-/* portability */
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-#define socklen_t       int
-#endif
 
 int main __P((int, char **));
 void usage __P((void));

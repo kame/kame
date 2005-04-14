@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.46 2004/12/27 05:41:16 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.47 2005/04/14 06:22:37 suz Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -67,16 +67,14 @@
 
 /*#define PULLDOWN_DEBUG*/
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 501000
+#ifdef __FreeBSD__
 #include "opt_mac.h"
 #endif
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/kernel.h>
-#endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 501000
 #include <sys/lock.h>
 #include <sys/mac.h>
 #endif
@@ -88,7 +86,7 @@
 static struct mbuf *m_dup1 __P((struct mbuf *, int, int, int));
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 MALLOC_DEFINE(M_PACKET_TAGS, "packet tags", "Packet tags");
 #endif
 
@@ -218,7 +216,7 @@ m_pulldown(m, off, len, offp)
 		return NULL;	/* mbuf chain too short */
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	sharedcluster = !M_WRITABLE(n);
 #else
 	sharedcluster = M_READONLY(n);
@@ -426,7 +424,7 @@ m_tag_free(t)
 	struct m_tag *t;
 {
 
-#if defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 #ifdef MAC
 	if (t->m_tag_id == PACKET_TAG_MACLABEL)
 		mac_destroy_mbuf_tag(t);
@@ -533,7 +531,7 @@ m_tag_copy(t)
 	if (p == NULL)
 		return (NULL);
 
-#if defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef __FreeBSD__
 #ifdef MAC
 	/*
 	 * XXXMAC: we should probably pass off the initialization, and
