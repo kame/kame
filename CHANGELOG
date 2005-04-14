@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2743 2005/04/05 05:23:01 suz Exp $
+$KAME: CHANGELOG,v 1.2744 2005/04/14 01:14:52 suz Exp $
 
 <200504>
+2005-04-14  SUZUKI, Shinsuke <suz@kame.net>
+	* freebsd5/sys/netinet/igmp.c, igmp_var.h: reflect the following 
+	  MLDv2 changes into the FreeBSD5's IGMPv3 implementation.
+	- fixs a kernel crash by an IGMPv3 Query (2005-01-01)
+	- retransmits IGMPv3 report RobustnessVariable times (2004-12-31)
+	- corrects an MLD-query handling when MaxResponseCode=0 (2004-12-27)
+	- introduces a sysctl option to force IGMP version (2004-07-09)
+
 2005-04-05  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/ufs/ffs/ffs_inode.c: FreeBSD Security Advisory
 	 FreeBSD-SA-05:02.sendfile

@@ -112,7 +112,14 @@ SLIST_HEAD(, router_info) router_info_head;
 static struct igmpstat igmpstat;
 int igmpmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int igmpsomaxsrc = SO_MAX_SOURCE_FILTER;
-int igmpalways_v3 = 0;
+/* 
+ * igmp_version:
+ *	0: igmpv3 with compat-mode
+ *	1: igmpv1 only
+ *	2: igmpv2 only
+ *	3: igmpv3 without compat-mode
+ */
+int igmp_version = 0;
 
 SYSCTL_STRUCT(_net_inet_igmp, IGMPCTL_STATS, stats, CTLFLAG_RW, &igmpstat,
     igmpstat, "");
@@ -120,8 +127,8 @@ SYSCTL_INT(_net_inet_igmp, IGMPCTL_MAXSRCFILTER, maxsrcfilter, CTLFLAG_RW,
 	&igmpmaxsrcfilter, IP_MAX_SOURCE_FILTER, "");
 SYSCTL_INT(_net_inet_igmp, IGMPCTL_SOMAXSRC, somaxsrc, CTLFLAG_RW,
 	&igmpsomaxsrc, SO_MAX_SOURCE_FILTER, "");
-SYSCTL_INT(_net_inet_igmp, IGMPCTL_ALWAYS_V3, always_v3, CTLFLAG_RW,
-	&igmpalways_v3, 0, "");
+SYSCTL_INT(_net_inet_igmp, IGMPCTL_VERSION, igmp_version, CTLFLAG_RW,
+	&igmp_version, 0, "");
 
 /*
  * igmp_mtx protects all mutable global variables in igmp.c, as well as
@@ -197,12 +204,12 @@ static int addrlen = sizeof(struct in_addr);
 	(m)->m_pkthdr.rcvif = (struct ifnet *)0; \
 } while(0)
  
-int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
+static int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
 			int, u_int8_t);
-void igmp_set_hostcompat(struct ifnet *, struct router_info *, int);
-int igmp_record_queried_source(struct in_multi *, struct igmp *, int);
-void igmp_send_all_current_state_report(struct ifnet *);
-int igmp_send_current_state_report(struct mbuf **, int *, struct in_multi *);
+static void igmp_set_hostcompat(struct ifnet *, struct router_info *, int);
+static int igmp_record_queried_source(struct in_multi *, struct igmp *, int);
+static void igmp_send_all_current_state_report(struct ifnet *);
+static int igmp_send_current_state_report(struct mbuf **, int *, struct in_multi *);
 int igmp_create_group_record(struct mbuf *, int *, struct in_multi *,
 			     u_int16_t, u_int16_t *, u_int8_t);
 void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
@@ -279,7 +286,23 @@ rti_init(ifp)
 	rti->rti_qrv = IGMP_DEF_RV;
 	rti->rti_qqi = IGMP_DEF_QI;
 	rti->rti_qri = IGMP_DEF_QRI / IGMP_TIMER_SCALE;
-	rti->rti_type = IGMP_v3_ROUTER;
+	switch (igmp_version) {
+	case 0:
+		rti->rti_type = IGMP_v3_ROUTER;
+		break;
+	case 1:
+		rti->rti_type = IGMP_v1_ROUTER;
+		break;
+	case 2:
+		rti->rti_type = IGMP_v2_ROUTER;
+		break;
+	case 3:
+		rti->rti_type = IGMP_v3_ROUTER;
+		break;
+	default:
+		/* impossible */
+		break;
+	}
 #endif
 	SLIST_INSERT_HEAD(&router_info_head, rti, rti_list);
 	return (rti);
@@ -390,6 +413,7 @@ igmp_input(register struct mbuf *m, int off)
 	register struct ifnet *ifp = m->m_pkthdr.rcvif;
 	register int minlen;
 	int query_ver;
+	int query_type;
 	register struct in_multi *inm;
 	register struct in_ifaddr *ia;
 	struct in_multistep step;
@@ -407,8 +431,7 @@ igmp_input(register struct mbuf *m, int off)
 	 */
 	if (ip->ip_len > ifp->if_mtu) {
 		++igmpstat.igps_rcv_toolong;
-		m_freem(m);
-		return;
+		goto end;
 	}
 	minlen = iphlen + IGMP_MINLEN;
 	if ((m->m_flags & M_EXT || m->m_len < minlen) &&
@@ -425,8 +448,7 @@ igmp_input(register struct mbuf *m, int off)
 	igmp = mtod(m, struct igmp *);
 	if (in_cksum(m, igmplen)) {
 		++igmpstat.igps_rcv_badsum;
-		m_freem(m);
-		return;
+		goto end;
 	}
 	m->m_data -= iphlen;
 	m->m_len += iphlen;
@@ -441,8 +463,7 @@ igmp_input(register struct mbuf *m, int off)
 	mtx_unlock(&igmp_mtx);
 	if (rti == NULL) {
 		++igmpstat.igps_rcv_query_fails;
-		m_freem(m);
-		return;	/* XXX */
+		goto end; /* XXX */
 	}
 
 	/*
@@ -465,8 +486,12 @@ igmp_input(register struct mbuf *m, int off)
 		 * IGMPv3 Query: length >= 12 octets
 		 * IGMPv1 and v2 implementation must accept only the first 8
 		 * octets of the query message.
+		 *
+		 * if sysctl variable "igmp_version" is set to 1 or 2,
+		 * query-type will be IGMPv1 or v2 respectively, regardless of
+		 * the packet size.
 		 */
-		if (igmplen == IGMP_MINLEN)
+		if (igmplen == IGMP_MINLEN || igmp_version == 2)
 			query_ver = IGMP_v2_QUERY; /* or IGMP_v1_QUERY */
 #ifdef IGMPV3
 		else if (igmplen >= IGMP_V3_QUERY_MINLEN)
@@ -474,8 +499,7 @@ igmp_input(register struct mbuf *m, int off)
 #endif
 		else { /* igmplen > 8 && igmplen < 12 */
 			++igmpstat.igps_rcv_badqueries; /* invalid query */
-			m_freem(m);
-			return;
+			goto end;
 		}
 
 		if (ifp->if_flags & IFF_LOOPBACK)
@@ -494,7 +518,7 @@ igmp_input(register struct mbuf *m, int off)
 			rti->rti_type = IGMP_v1_ROUTER;
 			rti->rti_time = 0;
 #else
-			if (igmpalways_v3 == 0)
+			if (igmp_version == 0)
 				igmp_set_hostcompat(ifp, rti, query_ver);
 #endif
 			mtx_unlock(&igmp_mtx);
@@ -504,36 +528,94 @@ igmp_input(register struct mbuf *m, int off)
 			if (ip->ip_dst.s_addr != igmp_all_hosts_group ||
 			    igmp->igmp_group.s_addr != 0) {
 				++igmpstat.igps_rcv_badqueries;
-				m_freem(m);
-				return;
+				goto end;
 			}
 			++igmpstat.igps_rcv_v1_queries;
-		/*
-		 * Note if IGMPv2's igmp_code is 0, that message must
-		 * not be correct query msg. This means correct v2 query
-		 * must come through this "else" routine.
-		 */
-		} else {
-			if (query_ver == IGMP_v2_QUERY) {
-				++igmpstat.igps_rcv_v2_queries;
-				if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
-					++igmpstat.igps_rcv_badqueries;
-					m_freem(m);
-					return;
-				}
+			goto igmpv1_query;
+			/*
+			 * Note if IGMPv2's igmp_code is 0, that message must
+			 * not be correct query msg. This means correct v2 query
+			 * must go through the following "if" statement.
+			 */
+		}
+		if (query_ver == IGMP_v2_QUERY) {
+			++igmpstat.igps_rcv_v2_queries;
+			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
+				++igmpstat.igps_rcv_badqueries;
+				goto end;
 			}
+			goto igmpv2_query;
 		}
 
-		/*
-		 * Adjust timer for scheduling responses to IGMPv2 query.
-		 */
-		if (query_ver != IGMP_v2_QUERY)
-			goto igmpv3_query;
-
 #ifdef IGMPV3
+		/*
+		 * Adjust timer for scheduling responses to IGMPv3 query.
+		 */
+		if (query_ver != IGMP_v3_QUERY)
+			goto end;
+		++igmpstat.igps_rcv_v3_queries;
+
+		/* Check query types and keep source list if needed. */
+		if (igmp->igmp_group.s_addr == INADDR_ANY) {
+			if (igmp->igmp_numsrc != 0) {
+				++igmpstat.igps_rcv_badqueries;
+				goto end;
+			}
+			if (ip->ip_dst.s_addr != htonl(INADDR_ALLHOSTS_GROUP)) {
+				++igmpstat.igps_rcv_badqueries;
+				goto end;
+			}
+			query_type = IGMP_V3_GENERAL_QUERY;
+			goto set_timer;
+		}
+		if (IN_MULTICAST(ntohl(igmp->igmp_group.s_addr))) {
+			if (igmp->igmp_numsrc == 0) {
+				query_type = IGMP_V3_GROUP_QUERY;
+			} else {
+				query_type = IGMP_V3_GROUP_SOURCE_QUERY;
+			}
+			goto set_timer;
+		}
+		++igmpstat.igps_rcv_badqueries;
+		goto end;
+
+set_timer:
+#ifdef MROUTING /* XXX */
+		if (ip_mrouter != NULL) {
+			if (IGMP_SFLAG(igmp->igmp_rtval) != 0) {
+			/* XXX not yet */
+			/* suppress the normal timer updates */
+			}
+		} else {
+			/* XXX not yet */
+			/* suppress the querier election or the normal
+			 * "host-side" processing of a Query */
+		}
+#endif
+
+		/* 
+		 * Dispatch this query to make an appropriate
+		 * version's reply.
+		 */
+		if (rti->rti_type == IGMP_v1_ROUTER)
+			goto igmpv1_query;
+		else if (rti->rti_type == IGMP_v2_ROUTER)
+			goto igmpv2_query;
+
+		mtx_lock(&igmp_mtx);
+		error = igmp_set_timer(ifp, rti, igmp, igmplen, query_type);
+		mtx_unlock(&igmp_mtx);
+		if (error != 0) {
+#ifdef IGMPV3_DEBUG
+			printf("igmp_input: receive bad query\n");
+#endif
+			goto end;
+		}
+#endif /* IGMPV3 */
+		break;
+
 igmpv1_query:
 igmpv2_query:
-#endif
 		/*
 		 * - Start the timers in all of our membership records
 		 *   that the query applies to for the interface on
@@ -555,10 +637,9 @@ igmpv2_query:
 			     igmp->igmp_group.s_addr == inm->inm_addr.s_addr)) {
 				if (inm->inm_timer == 0 ||
 				    inm->inm_timer > timer) {
-					inm->inm_state = 
-						IGMP_IREPORTEDLAST;
+					inm->inm_state = IGMP_IREPORTEDLAST;
 					inm->inm_timer =
-						IGMP_RANDOM_DELAY(timer);
+					    IGMP_RANDOM_DELAY(timer);
 					igmp_timers_are_running = 1;
 				}
 			}
@@ -571,82 +652,13 @@ igmpv2_query:
 		 * General Query is received.
 		*/
 		mtx_lock(&igmp_mtx);
-		if (igmpalways_v3 == 0 &&
-		    igmp->igmp_group.s_addr == INADDR_ANY)
-			igmp_set_hostcompat(ifp, rti, query_ver);
+		if (igmp->igmp_group.s_addr == INADDR_ANY) {
+		    if (igmp_version == 3)
+			goto end;
+		    igmp_set_hostcompat(ifp, rti, query_ver);
+		}
 		mtx_unlock(&igmp_mtx);
 #endif
-		break;
-
-igmpv3_query:
-#ifdef IGMPV3
-		/*
-		 * Adjust timer for scheduling responses to IGMPv3 query.
-		 */
-		if (query_ver == IGMP_v3_QUERY) {
-			u_int8_t query_type;
-
-			++igmpstat.igps_rcv_v3_queries;
-
-			/*
-			 * Check query types and keep source list if needed.
-			 */
-			if (igmp->igmp_group.s_addr == INADDR_ANY &&
-					(igmp->igmp_numsrc == 0)) {
-				if (ip->ip_dst.s_addr
-					!= htonl(INADDR_ALLHOSTS_GROUP)) {
-					++igmpstat.igps_rcv_badqueries;
-					m_freem(m);
-					return;
-				}
-				query_type = IGMP_V3_GENERAL_QUERY;
-			} else if (IN_MULTICAST(ntohl(igmp->igmp_group.s_addr)) &&
-					(igmp->igmp_numsrc == 0))
-				query_type = IGMP_V3_GROUP_QUERY;
-			else if (IN_MULTICAST(ntohl(igmp->igmp_group.s_addr)) &&
-					(ntohs(igmp->igmp_numsrc) > 0))
-				query_type = IGMP_V3_GROUP_SOURCE_QUERY;
-			else {
-				++igmpstat.igps_rcv_badqueries;
-				m_freem(m);
-				return;
-			}
-
-#ifdef MROUTING /* XXX */
-			if (ip_mrouter != NULL) {
-				if (IGMP_SFLAG(igmp->igmp_rtval) != 0) {
-				/* XXX not yet */
-				/* suppress the normal timer updates */
-				}
-			} else {
-				/* XXX not yet */
-				/* suppress the querier election or the normal
-				 * "host-side" processing of a Query */
-			}
-#endif
-
-			/* 
-			 * Dispatch this query to make an appropriate
-			 * version's reply.
-			 */
-			if (rti->rti_type == IGMP_v1_ROUTER)
-				goto igmpv1_query;
-			else if (rti->rti_type == IGMP_v2_ROUTER)
-				goto igmpv2_query;
-
-			mtx_lock(&igmp_mtx);
-			error = igmp_set_timer(ifp, rti, igmp, igmplen, query_type);
-			mtx_unlock(&igmp_mtx);
-			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-				printf("igmp_input: receive bad query\n");
-#endif
-				m_freem(m);
-				return;
-			}
-		}
-#endif /* IGMPV3 */
-
 		break;
 
 	case IGMP_V1_MEMBERSHIP_REPORT:
@@ -706,6 +718,10 @@ igmpv3_query:
 	 * on a raw IGMP socket.
 	 */
 	rip_input(m, off);
+
+end:
+	m_freem(m);
+	return;
 }
 
 void
@@ -802,62 +818,75 @@ igmp_fasttimo(void)
 	IN_FIRST_MULTI(step, inm);
 	ifp = inm->inm_ifp;
 	while (inm != NULL) {
-		if (inm->inm_timer == 0) {
-			/* do nothing */
-		} else if (--inm->inm_timer == 0) {
-			if (inm->inm_state == IGMP_IREPORTEDLAST) {
-				igmp_sendpkt(inm, inm->inm_rti->rti_type, 0);
-				inm->inm_state = IGMP_IREPORTEDLAST;
-#ifdef IGMPV3
-			} else if ((inm->inm_state
-					== IGMP_G_QUERY_PENDING_MEMBER) ||
-				   (inm->inm_state
-					== IGMP_SG_QUERY_PENDING_MEMBER)) {
-				if ((cm != NULL) && (ifp != inm->inm_ifp)) {
-					igmp_sendbuf(cm, ifp);
-					cm = NULL;
-				}
-				(void)igmp_send_current_state_report
-						(&cm, &cbuflen, inm);
-				ifp = inm->inm_ifp;
-#endif
-			}
-		} else {
+		if (inm->inm_timer == 0)
+			goto state_change_timer; /* do nothing */
+		--inm->inm_timer;
+		if (inm->inm_timer > 0) {
 			igmp_timers_are_running = 1;
+			goto state_change_timer;
 		}
 
+		/* Current-State Record timer */
+		if (inm->inm_state == IGMP_IREPORTEDLAST) {
+			igmp_sendpkt(inm, inm->inm_rti->rti_type, 0);
+			inm->inm_state = IGMP_IREPORTEDLAST;
 #ifdef IGMPV3
-		if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
-			; /* skip */
-		else if (inm->inm_source->ims_timer == 0)
-			; /* do nothing */
-		else if (--inm->inm_source->ims_timer == 0) {
-			if ((sm != NULL) && (ifp != inm->inm_ifp)) {
-				igmp_sendbuf(sm, ifp);
-				sm = NULL;
+		} else if ((inm->inm_state == IGMP_G_QUERY_PENDING_MEMBER) ||
+			   (inm->inm_state == IGMP_SG_QUERY_PENDING_MEMBER)) {
+			if ((cm != NULL) && (ifp != inm->inm_ifp)) {
+				igmp_sendbuf(cm, ifp);
+				cm = NULL;
 			}
-			/* Check if this report was pending Source-List-Change
-			 * report or not. It is only the case that robvar was
-			 * not reduced here. (XXX rarely, QRV may be changed
-			 * in a same timing.) */
-			if (inm->inm_source->ims_robvar
-					== inm->inm_rti->rti_qrv) {
-				igmp_send_state_change_report(&sm, &sbuflen,
-						inm, (u_int8_t)0, (int)1);
-				sm = NULL;
-			} else if (inm->inm_source->ims_robvar > 0) {
-				igmp_send_state_change_report(&sm, &sbuflen,
-						inm, (u_int8_t)0, (int)0);
-				ifp = inm->inm_ifp;
-			}
-			if (inm->inm_source->ims_robvar != 0) {
-				inm->inm_source->ims_timer = IGMP_RANDOM_DELAY
-						(IGMP_UNSOL_INTVL * PR_FASTHZ);
-				state_change_timers_are_running = 1;
-			}
-		} else
-			state_change_timers_are_running = 1;
+			(void)igmp_send_current_state_report(&cm, &cbuflen, inm);
+			ifp = inm->inm_ifp;
 #endif
+		}
+
+state_change_timer:
+#ifdef IGMPV3
+		/* State-Change Record timer */
+		if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
+			goto next_inm; /* skip */
+
+		if (inm->inm_source->ims_timer == 0)
+			goto next_inm; /* skip */
+
+		--inm->inm_source->ims_timer;
+		if (inm->inm_source->ims_timer == 0) {
+			state_change_timers_are_running = 1;
+			goto next_inm;
+		}
+
+		if ((sm != NULL) && (ifp != inm->inm_ifp)) {
+			igmp_sendbuf(sm, ifp);
+			sm = NULL;
+		}
+		/* 
+		 * Check if this report was pending Source-List-Change
+		 * report or not. It is only the case that robvar was
+		 * not reduced here. (XXX rarely, QRV may be changed
+		 * in a same timing.)
+		 */
+		if (inm->inm_source->ims_robvar == inm->inm_rti->rti_qrv) {
+			/* 
+			 * immediately advertise the calculated IGMP report,
+			 * so that you don't have to update ifp for the buffered
+			 * IGMP report message
+			 */
+			igmp_send_state_change_report(&sm, &sbuflen, inm, 0, 1);
+			sm = NULL;
+		} else if (inm->inm_source->ims_robvar > 0) {
+			igmp_send_state_change_report(&sm, &sbuflen, inm, 0, 0);
+			ifp = inm->inm_ifp;
+		}
+
+		if (inm->inm_source->ims_robvar != 0) {
+			inm->inm_source->ims_timer =
+			    IGMP_RANDOM_DELAY(IGMP_UNSOL_INTVL * PR_FASTHZ);
+			state_change_timers_are_running = 1;
+		}
+#endif
+next_inm:
 		IN_NEXT_MULTI(step, inm);
 	}
 #ifdef IGMPV3
@@ -886,12 +915,44 @@ igmp_slowtimo(void)
 		}
 #else
 		if ((rti->rti_timer1 == 0) && (rti->rti_timer2 == 0)) {
-			if (rti->rti_type != IGMP_v3_ROUTER)
-				rti->rti_type = IGMP_v3_ROUTER;
+			switch (igmp_version) {
+			case 1:
+				if (rti->rti_type != IGMP_v1_ROUTER)
+					rti->rti_type = IGMP_v1_ROUTER;
+				break;
+			case 2:
+				if (rti->rti_type != IGMP_v2_ROUTER)
+					rti->rti_type = IGMP_v2_ROUTER;
+				break;
+			case 0:
+			case 3:
+				if (rti->rti_type != IGMP_v3_ROUTER)
+					rti->rti_type = IGMP_v3_ROUTER;
+				break;
+			default:
+				/* impossible */
+				break;
+			}
 		} else if ((rti->rti_timer1 == 0) && (rti->rti_timer2 > 0)) {
 			--rti->rti_timer2;
-			if (rti->rti_type != IGMP_v2_ROUTER)
-				rti->rti_type = IGMP_v2_ROUTER;
+			switch (igmp_version) {
+			case 1:
+				if (rti->rti_type != IGMP_v1_ROUTER)
+					rti->rti_type = IGMP_v1_ROUTER;
+				break;
+			case 2:
+				if (rti->rti_type != IGMP_v2_ROUTER)
+					rti->rti_type = IGMP_v2_ROUTER;
+				break;
+			case 0:
+			case 3:
+				if (rti->rti_type != IGMP_v2_ROUTER)
+					rti->rti_type = IGMP_v2_ROUTER;
+				break;
+			default:
+				/* impossible */
+				break;
+			}
 		} else if (rti->rti_timer1 > 0) {
 			--rti->rti_timer1;
 			if (rti->rti_timer2 > 0)
@@ -1023,7 +1084,7 @@ igmp_sendbuf(m, ifp)
 /*
  * Timer adjustment on reception of an IGMPv3 Query.
  */
-int
+static int
 igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 	struct ifnet *ifp;
 	struct router_info *rti;
@@ -1043,7 +1104,7 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 	 * Parse QRV, QQI, and QRI timer values.
 	 */
 	if (((rti->rti_qrv = IGMP_QRV(igmp->igmp_rtval)) == 0) ||
-				(rti->rti_qrv > 7))
+	    (rti->rti_qrv > 7))
 	    rti->rti_qrv = IGMP_DEF_RV;
 	if ((igmp->igmp_qqi > 0) && (igmp->igmp_qqi < 128))
 	    rti->rti_qqi = igmp->igmp_qqi;
@@ -1059,7 +1120,13 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 	else
 	    rti->rti_qri /= IGMP_TIMER_SCALE;
 
-	if ((igmp->igmp_code > 0) && (igmp->igmp_code < 128))
+	if (igmp->igmp_code == 0)
+	    /*
+	     * XXX: this interval prevents an IGMP-report flooding caused by 
+	     * an IGMP-query with Max-Reponce-Code=0 (KAME local design)
+	     */
+	     timer = 10;
+	else if (igmp->igmp_code < 128)
 	    timer = igmp->igmp_code;
 	else
 	    timer = (IGMP_MANT(igmp->igmp_code) | 0x10)
@@ -1154,21 +1221,24 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 		break;
 	    }
 	    /* Queried sources are augmented. */
-	    if ((error = igmp_record_queried_source(inm, igmp, igmplen)) > 0) {
+	    error = igmp_record_queried_source(inm, igmp, igmplen);
+	    if (error > 0) {
 		if (error == EOPNOTSUPP)
 		    ++igmpstat.igps_rcv_badqueries;
 		else
 		    ++igmpstat.igps_rcv_query_fails;
 		splx(s);
 		return error;
-	    } else if (error == 0) {
-		if (inm->inm_timer != 0)
-			inm->inm_timer = min(inm->inm_timer, timer_g);
-		else {
-			igmp_timers_are_running = 1;
-			inm->inm_timer = timer_g;
-		}
-		inm->inm_state = IGMP_SG_QUERY_PENDING_MEMBER;
+	    }
+	    if (error < 0)
+	    	break;	/* no need to do any additional things */
+
+	    inm->inm_state = IGMP_SG_QUERY_PENDING_MEMBER;
+	    if (inm->inm_timer != 0)
+		inm->inm_timer = min(inm->inm_timer, timer_g);
+	    else {
+		igmp_timers_are_running = 1;
+		inm->inm_timer = timer_g;
 	    }
 	    break;
 
@@ -1183,7 +1253,7 @@ next_multi:
 /*
  * Set IGMP Host Compatibility Mode.
  */
-void
+static void
 igmp_set_hostcompat(ifp, rti, query_ver)
 	struct ifnet *ifp;
 	struct router_info *rti;
@@ -1224,18 +1294,18 @@ igmp_set_hostcompat(ifp, rti, query_ver)
 
 /*
  * Parse source addresses from IGMPv3 Group-and-Source-Specific Query message
- * and merge them in a recorded source list.
+ * and merge them in a recorded source list as specified in RFC3810 6.3 (3).
+ * If the recorded source list cannot be kept in memory, return an error code.
  * If no pending source was recorded, return -1.
  * If some source was recorded as a reply for Group-and-Source-Specific Query,
  * return 0.
  */ 
-int
+static int
 igmp_record_queried_source(inm, igmp, igmplen)
 	struct in_multi *inm;
 	struct igmp *igmp;
 	int igmplen;
 {
-	struct in_addr_source *curias;
 	u_int16_t numsrc, i;
 	int ref_count;
 	struct sockaddr_in sin;
@@ -1251,85 +1321,21 @@ igmp_record_queried_source(inm, igmp, igmplen)
 	    sin.sin_family = AF_INET;
 	    sin.sin_len = sizeof(sin);
 	    sin.sin_addr = igmp->src[i];
-
-	    if (inm->inm_source->ims_grpjoin > 0) {
-		if ((ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_rec,
-					 &sin, IMS_ADD_SOURCE)) < 0) {
-		    in_free_msf_source_list(inm->inm_source->ims_rec->head);
-		    inm->inm_source->ims_rec->numsrc = 0;
-		    return ENOBUFS;
-		}
-		if (ref_count == 1)
-		    ++inm->inm_source->ims_rec->numsrc;
-		recorded = 1;
+	    if (match_msf4_per_if(inm, &sin.sin_addr, &inm->inm_addr) == 0)
 		continue;
-	    }
 
-	    LIST_FOREACH(curias, inm->inm_source->ims_cur->head, ias_list) {
-		/* sanity check */
-		if (curias->ias_addr.sin_family != sin.sin_family)
-		    continue;
-
-		if (SS_CMP(&curias->ias_addr, <, &sin))
-		    continue;
-
-		if (SS_CMP(&curias->ias_addr, ==, &sin)) {
-		    if (inm->inm_source->ims_mode != MCAST_INCLUDE)
-			break;
-		    ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_rec,
+	    ref_count = in_merge_msf_source_addr(inm->inm_source->ims_rec,
 					 &sin, IMS_ADD_SOURCE);
-		    if (ref_count < 0) {
+	    if (ref_count < 0) {
+	    	if (inm->inm_source->ims_rec->numsrc)
 			in_free_msf_source_list(inm->inm_source->ims_rec->head);
-			inm->inm_source->ims_rec->numsrc = 0;
-			return ENOBUFS;
-		    }
-		    if (ref_count == 1)
-			++inm->inm_source->ims_rec->numsrc;
-		    recorded = 1;
-		    break;
-		}
-
-		/* curias->ias_addr > sin */
-		if (inm->inm_source->ims_mode == MCAST_EXCLUDE) {
-		    ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_rec,
-					 &sin, IMS_ADD_SOURCE);
-		    if (ref_count < 0) {
-			in_free_msf_source_list(inm->inm_source->ims_rec->head);
-			inm->inm_source->ims_rec->numsrc = 0;
-			return ENOBUFS;
-		    }
-		    if (ref_count == 1)
-			++inm->inm_source->ims_rec->numsrc;
-		    recorded = 1;
-		}
-
-		break;
+		inm->inm_source->ims_rec->numsrc = 0;
+		return ENOBUFS;
 	    }
+	    if (ref_count == 1)
+		++inm->inm_source->ims_rec->numsrc; /* new entry */
 
-	    if (!curias) {
-		if (inm->inm_source->ims_mode == MCAST_EXCLUDE) {
-		    ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_rec,
-					 &sin, IMS_ADD_SOURCE);
-		    if (ref_count < 0) {
-			in_free_msf_source_list(inm->inm_source->ims_rec->head);
-			inm->inm_source->ims_rec->numsrc = 0;
-			return ENOBUFS;
-		    }
-		    if (ref_count == 1)
-			++inm->inm_source->ims_rec->numsrc;
-		    recorded = 1;
-		}
-	    }
-	}
-
-	if (i != numsrc) {
-	    in_free_msf_source_list(inm->inm_source->ims_rec->head);
-	    inm->inm_source->ims_rec->numsrc = 0;
-	    return EOPNOTSUPP; /* XXX */
+	    recorded = 1;
 	}
 
 	return ((recorded == 0) ? -1 : 0);
@@ -1338,7 +1344,7 @@ igmp_record_queried_source(inm, igmp, igmplen)
 /*
  * Send Current-State Report for General Query response.
  */
-void
+static void
 igmp_send_all_current_state_report(ifp)
 	struct ifnet *ifp;
 {
@@ -1366,7 +1372,7 @@ next_multi:
  * Send Current-State Report for Group- and Group-and-Source-Sepcific Query
  * response.
  */
-int
+static int
 igmp_send_current_state_report(m0, buflenp, inm)
 	struct mbuf **m0;	/* mbuf is inherited to put multiple group
 				 * records in one message */

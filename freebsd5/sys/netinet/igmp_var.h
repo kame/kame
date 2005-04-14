@@ -190,7 +190,7 @@ SYSCTL_DECL(_net_inet_igmp);
 #define	IGMPCTL_DROPWITHNORA	3	/* kern drops IGMP with no Rtr Alert */
 #define	IGMPCTL_MAXSRCFILTER	4	/* max sources per group per interface*/
 #define	IGMPCTL_SOMAXSRC	5	/* max sources per socket per group */
-#define	IGMPCTL_ALWAYS_V3	6
+#define	IGMPCTL_VERSION		6
 #define	IGMPCTL_MAXID		6
 
 #define IGMPCTL_NAMES { \
