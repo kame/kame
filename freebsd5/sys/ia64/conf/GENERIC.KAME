@@ -158,9 +158,8 @@ device		bpf		# Berkeley packet filter
 
 # KAME extensions
 #
-# IPSEC does not work due to FAST_IPSEC changes
-#options 	IPSEC			#IP security
-#options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
+options 	IPSEC			#IP security
+options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 #options 	ENABLE_DEFAULT_SCOPE
