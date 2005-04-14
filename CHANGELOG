@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2744 2005/04/14 01:14:52 suz Exp $
+$KAME: CHANGELOG,v 1.2745 2005/04/14 02:02:10 suz Exp $
 
 <200504>
 2005-04-14  SUZUKI, Shinsuke <suz@kame.net>
@@ -9,6 +9,9 @@ $KAME: CHANGELOG,v 1.2744 2005/04/14 01:14:52 suz Exp $
 	- retransmits IGMPv3 report RobustnessVariable times (2004-12-31)
 	- corrects an MLD-query handling when MaxResponseCode=0 (2004-12-27)
 	- introduces a sysctl option to force IGMP version (2004-07-09)
+
+	* freebsd5/sys/netinet/ip_output.c: specifies spl()s as done in 
+	  original FreeBSD5
 
 2005-04-05  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/ufs/ffs/ffs_inode.c: FreeBSD Security Advisory

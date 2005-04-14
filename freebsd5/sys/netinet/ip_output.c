@@ -1808,11 +1808,13 @@ ip_setmoptions(sopt, imop)
 			error = EINVAL;
 			break;
 		}
-
+		s = splimp();
 		if ((error = ip_getmopt_ifargs(sopt, &ifp,
 						&mreq.imr_multiaddr,
-						&mreq.imr_interface)) != 0)
+						&mreq.imr_interface)) != 0) {
+			splx(s);
 			break;
+		}
 
 		/*
 		 * See if the membership already exists or if all the
@@ -1844,13 +1846,16 @@ ip_setmoptions(sopt, imop)
 		 * msf entry list. This is needed to indicate current msf state.
 		 */
 		IMO_MSF_ALLOC(imo->imo_msf[i]);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
 		init = 1;
 		if ((imo->imo_membership[i] =
 		    in_addmulti(&mreq.imr_multiaddr, ifp, 0, NULL,
 				MCAST_EXCLUDE, init, &error)) == NULL) {
 			IMO_MSF_FREE(imo->imo_msf[i]);
+			splx(s);
 			break;
 		}
 #else
@@ -1885,8 +1890,10 @@ ip_setmoptions(sopt, imop)
 		s = splimp();
 
 		if ((error = ip_getmopt_ifargs(sopt, &ifp, NULL,
-						&mreq.imr_interface)) != 0)
+						&mreq.imr_interface)) != 0) {
+			splx(s);
 			break;
+		}
 
 		/*
 		 * Find the membership in the membership array.
@@ -1914,6 +1921,7 @@ ip_setmoptions(sopt, imop)
 			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
 			if (del_ss != NULL)
 				FREE(del_ss, M_IPMOPTS);
+			splx(s);
 			break;
 		}
 
@@ -1938,13 +1946,17 @@ ip_setmoptions(sopt, imop)
 			imo->imo_msf[i-1] = imo->imo_msf[i];
 		}
 		--imo->imo_num_memberships;
+		splx(s);
 		break;
 
 #ifdef IGMPV3
 	case MCAST_JOIN_GROUP:
+		s = splimp();
 		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, NULL);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
 		/*
 		 * See if all the membership slots are full.
 		 */
@@ -1955,10 +1967,12 @@ ip_setmoptions(sopt, imop)
 		}
 		if (i < imo->imo_num_memberships) {
 			error = EADDRINUSE;
+			splx(s);
 			break;
 		}
 		if (i == IP_MAX_MEMBERSHIPS) {
 			error = ETOOMANYREFS;
+			splx(s);
 			break;
 		}
 
@@ -1967,24 +1981,32 @@ ip_setmoptions(sopt, imop)
 		 * address list for the given interface.
 		 */
 		IMO_MSF_ALLOC(imo->imo_msf[i]);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
 		init = 1;
 		if ((imo->imo_membership[i] =
 		    in_addmulti(&SIN(&ss_grp)->sin_addr, ifp, 0, NULL,
 		    		MCAST_EXCLUDE, init, &error)) == NULL) {
 			IMO_MSF_FREE(imo->imo_msf[i]);
+			splx(s);
 			break;
 		}
 
 		imo->imo_msf[i]->msf_grpjoin = 1;
 		++imo->imo_num_memberships;
+		splx(s);
 		break;
 
 	case MCAST_LEAVE_GROUP:
+		s = splimp();
 		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, NULL);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
+
 		/*
 		 * Find the membership in the membership array.
 		 */
@@ -1996,6 +2018,7 @@ ip_setmoptions(sopt, imop)
 		}
 		if (i == imo->imo_num_memberships) {
 			error = EADDRNOTAVAIL;
+			splx(s);
 			break;
 		}
 
@@ -2005,6 +2028,7 @@ ip_setmoptions(sopt, imop)
 			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
 			if (del_ss != NULL)
 				FREE(del_ss, M_IPMOPTS);
+			splx(s);
 			break;
 		}
 
@@ -2031,9 +2055,13 @@ ip_setmoptions(sopt, imop)
 
 	case IP_ADD_SOURCE_MEMBERSHIP:
 	case MCAST_JOIN_SOURCE_GROUP:
+		s = splimp();
 		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
+
 		/*
 		 * Find the membership in the membership array.
 		 */
@@ -2044,6 +2072,7 @@ ip_setmoptions(sopt, imop)
 		}
 		if (i == IP_MAX_MEMBERSHIPS) {
 			error = ETOOMANYREFS;
+			splx(s);
 			break;
 		}
 		if (i < imo->imo_num_memberships) {
@@ -2053,6 +2082,7 @@ ip_setmoptions(sopt, imop)
 			 */
 			if (imo->imo_msf[i]->msf_grpjoin != 0) {
 				error = EINVAL;
+				splx(s);
 				break;
 			}
 			/*
@@ -2060,6 +2090,7 @@ ip_setmoptions(sopt, imop)
 			 */
 			if (imo->imo_msf[i]->msf_blknumsrc != 0) {
 				error = EINVAL;
+				splx(s);
 				break;
 			}
 			/*
@@ -2069,13 +2100,16 @@ ip_setmoptions(sopt, imop)
 			 */
 			if (imo->imo_msf[i]->msf_numsrc >= igmpsomaxsrc) {
 				error = ENOBUFS;
+				splx(s);
 				break;
 			}
 			init = 0;
 		} else {
 			IMO_MSF_ALLOC(imo->imo_msf[i]);
-			if (error != 0)
+			if (error != 0) {
+				splx(s);
 				break;
+			}
 			init = 1;
 		}
 
@@ -2091,6 +2125,7 @@ ip_setmoptions(sopt, imop)
 		if (error != 0) {
 			if (init)
 				IMO_MSF_FREE(imo->imo_msf[i]);
+			splx(s);
 			break;
 		}
 
@@ -2106,19 +2141,25 @@ ip_setmoptions(sopt, imop)
 				    &ss_src, MCAST_INCLUDE, init, &error);
 		if (imo->imo_membership[i] == NULL) {
 			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			splx(s);
 			break;
 		}
 		in_cleanmopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
 
 		if (init)
 			++imo->imo_num_memberships;
+		splx(s);
 		break;
 
 	case IP_DROP_SOURCE_MEMBERSHIP:
 	case MCAST_LEAVE_SOURCE_GROUP:
+		s = splimp();
 		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
+
 		/*
 		 * Find the membership in the membership array.
 		 */
@@ -2130,6 +2171,7 @@ ip_setmoptions(sopt, imop)
 		}
 		if (i == imo->imo_num_memberships) {
 			error = EADDRNOTAVAIL;
+			splx(s);
 			break;
 		}
 
@@ -2145,12 +2187,15 @@ ip_setmoptions(sopt, imop)
 		if ((imo->imo_msf[i]->msf_grpjoin != 0) ||
 				(imo->imo_msf[i]->msf_blknumsrc != 0)) {
 			error = EINVAL;
+			splx(s);
 			break;
 		}
 		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
 					       sopt->sopt_name);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
 		if (imo->imo_msf[i]->msf_numsrc == 0)
 			final = 1;
 		else
@@ -2166,6 +2211,7 @@ ip_setmoptions(sopt, imop)
 		if (error != 0) {
 			printf("ip_setmoptions: error must be 0! panic!\n");
 			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			splx(s);
 			break; /* strange... */
 		}
 		in_cleanmopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
@@ -2183,13 +2229,18 @@ ip_setmoptions(sopt, imop)
 			}
 			--imo->imo_num_memberships;
 		}
+		splx(s);
 		break;
 
 	case IP_BLOCK_SOURCE:
 	case MCAST_BLOCK_SOURCE:
+		s = splimp();
 		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
+
 		/*
 		 * Find the membership in the membership array.
 		 */
@@ -2200,6 +2251,7 @@ ip_setmoptions(sopt, imop)
 		}
 		if (i == IP_MAX_MEMBERSHIPS) {
 			error = ETOOMANYREFS;
+			splx(s);
 			break;
 		}
 		if (i < imo->imo_num_memberships) {
@@ -2208,17 +2260,21 @@ ip_setmoptions(sopt, imop)
 			 */
 			if (imo->imo_msf[i]->msf_numsrc != 0) {
 				error = EINVAL;
+				splx(s);
 				break;
 			}
 			if (imo->imo_msf[i]->msf_blknumsrc >= igmpsomaxsrc) {
 				error = ENOBUFS;
+				splx(s);
 				break;
 			}
 			init = 0;
 		} else {
 			IMO_MSF_ALLOC(imo->imo_msf[i]);
-			if (error != 0)
+			if (error != 0) {
+				splx(s);
 				break;
+			}
 			init = 1;
 		}
 
@@ -2234,6 +2290,7 @@ ip_setmoptions(sopt, imop)
 		if (error != 0) {
 			if (init)
 				IMO_MSF_FREE(imo->imo_msf[i]);
+			splx(s);
 			break;
 		}
 
@@ -2253,6 +2310,7 @@ ip_setmoptions(sopt, imop)
 			if (imo->imo_membership[i] == NULL) {
 				in_undomopt_source_addr
 					(imo->imo_msf[i], sopt->sopt_name);
+				splx(s);
 				break;
 			}
 		} else {
@@ -2265,6 +2323,7 @@ ip_setmoptions(sopt, imop)
 			if (imo->imo_membership[i] == NULL) {
 				in_undomopt_source_addr
 					(imo->imo_msf[i], sopt->sopt_name);
+				splx(s);
 				break;
 			}
 			imo->imo_msf[i]->msf_grpjoin = 0;
@@ -2273,13 +2332,18 @@ ip_setmoptions(sopt, imop)
 
 		if (init)
 			++imo->imo_num_memberships;
+		splx(s);
 		break;
 
 	case IP_UNBLOCK_SOURCE:
 	case MCAST_UNBLOCK_SOURCE:
+		s = splimp();
 		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
+
 		/*
 		 * Find the membership in the membership array.
 		 */
@@ -2291,6 +2355,7 @@ ip_setmoptions(sopt, imop)
 		}
 		if (i == imo->imo_num_memberships) {
 			error = EADDRNOTAVAIL;
+			splx(s);
 			break;
 		}
 
@@ -2306,12 +2371,15 @@ ip_setmoptions(sopt, imop)
 		if ((imo->imo_msf[i]->msf_grpjoin != 0) ||
 				(imo->imo_msf[i]->msf_numsrc != 0)) {
 			error = EINVAL;
+			splx(s);
 			break;
 		}
 		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
 					       sopt->sopt_name);
-		if (error != 0)
+		if (error != 0) {
+			splx(s);
 			break;
+		}
 		if (imo->imo_msf[i]->msf_blknumsrc == 0)
 			final = 1;
 		else
@@ -2327,6 +2395,7 @@ ip_setmoptions(sopt, imop)
 		if (error != 0) {
 			printf("ip_setmoptions: error must be 0! panic!\n");
 			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			splx(s);
 			break; /* strange... */
 		}
 		in_cleanmopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
@@ -2343,6 +2412,7 @@ ip_setmoptions(sopt, imop)
 			}
 			--imo->imo_num_memberships;
 		}
+		splx(s);
 		break;
 #endif /* IGMPV3 */
 
