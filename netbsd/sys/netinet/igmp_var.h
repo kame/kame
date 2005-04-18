@@ -218,6 +218,7 @@ extern void	igmp_send_state_change_report __P((struct mbuf **, int *,
 				struct in_multi *, u_int8_t, int));
 extern int	igmp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 extern void igmp_purgeif __P((struct ifnet *));
+extern int	is_igmp_target(struct in_addr *);
 #endif /* _KERNEL */
 
 #endif /* _NETINET_IGMP_VAR_H_ */
