@@ -366,8 +366,9 @@ igmp_get_router_alert(m)
 		return -1;
 	}
 
-	if (((m->m_flags & M_EXT) && (ip->ip_src.s_addr & IN_CLASSA_NET) == 0)
-				|| m->m_len < minlen) {
+	if (((m->m_flags & M_EXT) &&
+	    (ntohl(ip->ip_src.s_addr) & IN_CLASSA_NET) == 0) ||
+	    m->m_len < minlen) {
 		if ((m = m_pullup(m, minlen)) == 0) {
 			++igmpstat.igps_rcv_tooshort;
 			return -1;

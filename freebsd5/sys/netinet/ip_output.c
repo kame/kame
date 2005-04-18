@@ -158,11 +158,6 @@ int	ip_optcopy(struct ip *, struct ip *);
 
 extern	struct protosw inetsw[];
 
-#ifdef IGMPV3
-#define SIN(x)	((struct sockaddr_in *)(x))
-#define SIN_ADDR_H(x)	(ntohl(SIN(x)->sin_addr.s_addr))
-#endif
-
 /*
  * IP output.  The packet in mbuf chain m contains a skeletal IP
  * header (with len, off, ttl, proto, tos, src, dst).
@@ -2802,7 +2797,7 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 		sin_grp->sin_len = sizeof(*sin_grp);
 		sin_grp->sin_family = AF_INET;
 
-		if (!IN_MULTICAST(SIN_ADDR_H(sin_grp))) {
+		if (!IN_MULTICAST(ntohl(sin_grp->sin_addr.s_addr))) {
 			error = EINVAL;
 			break;
 		}
@@ -2841,8 +2836,8 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 		/*
 		 * Group must be a valid IP multicast address.
 		 */
-		if (!IN_MULTICAST(SIN_ADDR_H(sin_grp)) ||
-				IN_LOCAL_GROUP(SIN_ADDR_H(sin_grp))) {
+		if (!IN_MULTICAST(ntohl(sin_grp->sin_addr.s_addr)) ||
+		    !IN_LOCAL_GROUP(ntohl(sin_grp->sin_addr.s_addr))) {
 			error = EINVAL;
 			break;
 		}
@@ -2850,9 +2845,12 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 		 * If no source address was provided or was class-d, bad
 		 * class, return error.
 		 */
-		if (IN_MULTICAST(SIN_ADDR_H(sin_src)) ||
-			    IN_BADCLASS(SIN_ADDR_H(sin_src)) ||
-			    (SIN_ADDR_H(sin_src) & IN_CLASSA_NET) == 0) {
+		if ((ntohl(sin_src->sin_addr.s_addr) & IN_CLASSA_NET) == 0) {
+			error = EINVAL;
+			break;
+		}
+		if (IN_MULTICAST(ntohl(sin_src->sin_addr.s_addr)) ||
+		    IN_BADCLASS(ntohl(sin_src->sin_addr.s_addr))) {
 			error = EINVAL;
 			break;
 		}
@@ -2891,17 +2889,20 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 		sin_grp->sin_len = sizeof(*sin_grp);
 		sin_grp->sin_family = AF_INET;
 
-		if (!IN_MULTICAST(SIN_ADDR_H(sin_grp)) ||
-			IN_LOCAL_GROUP(SIN_ADDR_H(sin_grp))) {
+		if (!IN_MULTICAST(ntohl(sin_grp->sin_addr.s_addr)) ||
+		    IN_LOCAL_GROUP(ntohl(sin_grp->sin_addr.s_addr))) {
 #ifdef IGMPV3_DEBUG
 			printf("invalid group %s specified\n", inet_ntoa(sin_grp->sin_addr));
 #endif
 			error = EINVAL;
 			break;
 		}
-		if (IN_MULTICAST(SIN_ADDR_H(sin_src)) ||
-		    IN_BADCLASS(SIN_ADDR_H(sin_src)) ||
-		    (SIN_ADDR_H(sin_src) & IN_CLASSA_NET) == 0) {
+		if ((ntohl(sin_src->sin_addr.s_addr) & IN_CLASSA_NET) == 0) {
+			error = EINVAL;
+			break;
+		}
+		if (IN_MULTICAST(ntohl(sin_src->sin_addr.s_addr)) ||
+		    IN_BADCLASS(ntohl(sin_src->sin_addr.s_addr))) {
 #ifdef IGMPV3_DEBUG
 			printf("invalid source %s specified\n", inet_ntoa(sin_src->sin_addr));
 #endif

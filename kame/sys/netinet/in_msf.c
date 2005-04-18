@@ -104,17 +104,6 @@ static int in_copy_msf_source_list(struct in_addr_slist *,
 #define in_hosteq(s,t)	((s).s_addr == (t).s_addr)
 #endif
 
-#ifndef IN_LOCAL_GROUP
-#define IN_LOCAL_GROUP(i) ((ntohl(i) & 0xffffff00) == \
-			   0xe0000000)
-#endif
-
-#ifdef __FreeBSD__
-/* redefine IN_MULTICAST considering byteorder */
-#undef  IN_MULTICAST
-#define IN_MULTICAST(i)	IN_CLASSD(htonl(i))
-#endif
-
 #ifndef in_nullhost
 #define in_nullhost(x)  ((x).s_addr == INADDR_ANY)
 #endif
@@ -2074,14 +2063,28 @@ ip_setmopt_srcfilter(sop, imsfp)
 	} else
 		imsf = &oimsf;
 
-	if ((imsf->imsf_numsrc >= igmpsomaxsrc) ||
-			 !IN_MULTICAST(imsf->imsf_multiaddr.s_addr)) {
+	if ((imsf->imsf_numsrc >= igmpsomaxsrc)) {
 		igmplog((LOG_DEBUG, "ip_setmopt_srcfilter: "
-			"the number of sources or group address is invalid\n"));
+			"the number of sources is invalid\n"));
 		return EINVAL;
 	}
-	if ((imsf->imsf_numsrc != 0) &&
-			IN_LOCAL_GROUP(imsf->imsf_multiaddr.s_addr))
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	if (!IN_MULTICAST(imsf->imsf_multiaddr.s_addr))
+#else
+	if (!IN_MULTICAST(ntohl(imsf->imsf_multiaddr.s_addr)))
+#endif
+	{
+		igmplog((LOG_DEBUG, "ip_setmopt_srcfilter: "
+			"the group address is invalid\n"));
+		return EINVAL;
+	}
+	if (imsf->imsf_numsrc != 0)
+		return EINVAL;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	if (IN_LOCAL_GROUP(imsf->imsf_multiaddr.s_addr))
+#else
+	if (IN_LOCAL_GROUP(ntohl(imsf->imsf_multiaddr.s_addr)))
+#endif
 		return EINVAL;
 
 	/*
@@ -2205,12 +2208,23 @@ ip_setmopt_srcfilter(sop, imsfp)
 				       sizeof(src.sin_addr));
 			if (error != 0) /* EFAULT */
 				break;
-			if (IN_MULTICAST(SIN_ADDR(&src)) ||
-			    IN_BADCLASS(SIN_ADDR(&src)) ||
-			    (SIN_ADDR(&src) & IN_CLASSA_NET) == 0) {
+
+			if ((ntohl(src.sin_addr.s_addr) & IN_CLASSA_NET) == 0) {
 				error = EINVAL;
 				break;
 			}
+#ifdef __FreeBSD__
+			if (IN_MULTICAST(ntohl(src.sin_addr.s_addr)) ||
+			    IN_BADCLASS(ntohl(src.sin_addr.s_addr)))
+#else
+			if (IN_MULTICAST(src.sin_addr.s_addr) ||
+			    IN_BADCLASS(src.sin_addr.s_addr))
+#endif
+			{
+				error = EINVAL;
+				break;
+			}
+
 			/*
 			 * Sort and validate source lists. Duplicate addresses
 			 * can be checked here.
@@ -2666,9 +2680,15 @@ sock_setmopt_srcfilter(sop, grpfp)
 		return EPFNOSUPPORT;
 
 	in_grp = SIN(&grpf->gf_group);
-	if (!IN_MULTICAST(SIN_ADDR(in_grp)))
+	if ((grpf->gf_numsrc != 0))
 		return EINVAL;
-	if ((grpf->gf_numsrc != 0) && IN_LOCAL_GROUP(SIN_ADDR(in_grp)))
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	if (!IN_MULTICAST(in_grp->sin_addr.s_addr) ||
+	    IN_LOCAL_GROUP(in_grp->sin_addr.s_addr))
+#else
+	if (!IN_MULTICAST(ntohl(in_grp->sin_addr.s_addr)) ||
+	    IN_LOCAL_GROUP(ntohl(in_grp->sin_addr.s_addr)))
+#endif
 		return EINVAL;
 
 	/*
@@ -2786,12 +2806,22 @@ sock_setmopt_srcfilter(sop, grpfp)
 				       (void *)&src, sizeof(struct sockaddr_in));
 			if (error != 0) /* EFAULT */
 				break;
-			if (IN_MULTICAST(SIN_ADDR(&src)) ||
-			    IN_BADCLASS(SIN_ADDR(&src)) ||
-			    (SIN_ADDR(&src) & IN_CLASSA_NET) == 0) {
+			if ((ntohl(src.sin_addr.s_addr) & IN_CLASSA_NET) == 0) {
 				error = EINVAL;
 				break;
 			}
+#ifdef __FreeBSD__
+			if (IN_MULTICAST(ntohl(src.sin_addr.s_addr)) ||
+			    IN_BADCLASS(ntohl(src.sin_addr.s_addr)))
+#else
+			if (IN_MULTICAST(src.sin_addr.s_addr) ||
+			    IN_BADCLASS(src.sin_addr.s_addr))
+#endif
+			{
+				error = EINVAL;
+				break;
+			}
+
 			/*
 			 * Sort and validate source lists. Duplicate addresses
 			 * can be checked here.
@@ -3123,7 +3153,11 @@ sock_getmopt_srcfilter(sop, grpfp)
 
 	if (grpf->gf_group.ss_family == AF_INET) {
 		in_grp = SIN(&grpf->gf_group);
-		if (!IN_MULTICAST(SIN_ADDR(in_grp)))
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		if (!IN_MULTICAST(in_grp->sin_addr.s_addr))
+#else
+		if (!IN_MULTICAST(ntohl(in_grp->sin_addr.s_addr)))
+#endif
 			return EINVAL;
 	} else
 		return EPFNOSUPPORT;
@@ -3851,7 +3885,11 @@ match_msf4_per_if(inm, src, dst)
 	/* inms is NULL only in case of 224.0.0.0/24 */
 	if (inms == NULL) {
 		/* assumes 224.0.0.0/24 case has already been eliminated */
-		if (IN_LOCAL_GROUP(dst))
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		if (IN_LOCAL_GROUP(dst->s_addr))
+#else
+		if (IN_LOCAL_GROUP(ntohl(dst->s_addr)))
+#endif
 			return 1;
 		igmplog((LOG_DEBUG, "grp found, but src is NULL. impossible\n"));
 		return 0;
@@ -3899,10 +3937,10 @@ match_msf4_per_socket(inp, src, dst)
 	 * Broadcast data should be accepted; this function assumes that 
 	 * dst is not a normal unicast address.
 	 */
-#ifdef FreeBSD
-	if (!IN_MULTICAST(ntohl(dst->s_addr)))
-#else
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	if (!IN_MULTICAST(dst->s_addr))
+#else
+	if (!IN_MULTICAST(ntohl(dst->s_addr)))
 #endif
 		return 1;
 		
