@@ -611,10 +611,6 @@ in_purgeaddr(ifa, ifp)
 	struct ifnet *ifp;
 {
 	struct in_ifaddr *ia = (void *) ifa;
-#ifdef IGMPV3
-	int final = 1;
-	int error;
-#endif
 
 	in_ifscrub(ifp, ia);
 	LIST_REMOVE(ia, ia_hash);
@@ -622,12 +618,7 @@ in_purgeaddr(ifa, ifp)
 	IFAFREE(&ia->ia_ifa);
 	TAILQ_REMOVE(&in_ifaddrhead, ia, ia_list);
 	if (ia->ia_allhosts != NULL)
-#ifdef IGMPV3
-		in_delmulti(ia->ia_allhosts, 0, NULL, MCAST_EXCLUDE,
-			    final, &error);
-#else
 		in_delmulti(ia->ia_allhosts);
-#endif
 	IFAFREE(&ia->ia_ifa);
 	in_setmaxmtu();
 }
@@ -940,12 +931,7 @@ in_ifinit(ifp, ia, sin, scrub)
 		struct in_addr addr;
 
 		addr.s_addr = INADDR_ALLHOSTS_GROUP;
-#ifdef IGMPV3
-		ia->ia_allhosts = in_addmulti(&addr, ifp, 0, NULL,
-						MCAST_EXCLUDE, 0, &error);
-#else
 		ia->ia_allhosts = in_addmulti(&addr, ifp);
-#endif
 	}
 	return (error);
 bad:
@@ -1114,25 +1100,135 @@ in_broadcast(in, ifp)
  * and the number of source is not 0.
  */
 struct in_multi *
-#ifdef IGMPV3
-in_addmulti(ap, ifp, numsrc, ss, mode, init, error)
-#else
 in_addmulti(ap, ifp)
-#endif
 	struct in_addr *ap;
 	struct ifnet *ifp;
+{
 #ifdef IGMPV3
+	int error;
+	return in_addmulti2(ap, ifp, 0, NULL, MCAST_EXCLUDE, 1, &error);
+#else
+	struct in_multi *inm;
+	struct ifreq ifr;
+	struct in_ifaddr *ia;
+	int dummy;			/* dummy */
+	int *error = &dummy;		/* dummy */
+	int s = splsoftnet();
+
+	/*
+	 * See if address already in list.
+	 */
+	IN_LOOKUP_MULTI(*ap, ifp, inm);
+
+	if (inm != NULL) {
+		++inm->inm_refcount;
+	} else {
+	    /*
+	     * New address; allocate a new multicast record and link it into
+	     * the interface's multicast list.
+	     */
+	    inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR, M_NOWAIT);
+	    if (inm == NULL) {
+		*error = ENOBUFS;
+		splx(s);
+		return (NULL);
+	    }
+	    inm->inm_addr = *ap;
+	    inm->inm_ifp = ifp;
+	    inm->inm_refcount = 1;
+	    inm->inm_timer = 0;
+	    IFP_TO_IA(ifp, ia);
+	    if (ia == NULL) {
+		free(inm, M_IPMADDR);
+		*error = ENOBUFS /*???*/;
+		splx(s);
+		return (NULL);
+	    }
+	    inm->inm_ia = ia;
+	    IFAREF(&inm->inm_ia->ia_ifa);
+	    LIST_INSERT_HEAD(&ia->ia_multiaddrs, inm, inm_list);
+	    /*
+	     * Ask the network driver to update its multicast reception filter
+	     * appropriately for the new address.
+	     */
+	    satosin(&ifr.ifr_addr)->sin_len = sizeof(struct sockaddr_in);
+	    satosin(&ifr.ifr_addr)->sin_family = AF_INET;
+	    satosin(&ifr.ifr_addr)->sin_addr = *ap;
+	    if ((ifp->if_ioctl == NULL) ||
+		(*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) {
+		LIST_REMOVE(inm, inm_list);
+		free(inm, M_IPMADDR);
+		*error = EINVAL /*???*/;
+		splx(s);
+		return (NULL);
+	    }
+
+	    igmp_joingroup(inm);
+	}
+	splx(s);
+	return (inm);
+#endif
+}
+
+/*
+ * Delete a multicast address record.
+ */
+void
+in_delmulti(inm)
+	struct in_multi *inm;
+{
+#ifdef IGMPV3
+	int error;
+	return in_delmulti2(inm, 0, NULL, MCAST_EXCLUDE, 1, &error);
+#else
+	struct ifreq ifr;
+	int s = splsoftnet();
+
+	if (--inm->inm_refcount == 0) {
+		/*
+		 * No remaining claims to this record; let IGMP know that
+		 * we are leaving the multicast group.
+		 */
+		igmp_leavegroup(inm);
+		/*
+		 * Unlink from list.
+		 */
+		LIST_REMOVE(inm, inm_list);
+		in_multientries--;
+		/*
+		 * Notify the network driver to update its multicast reception
+		 * filter.
+		 */
+		satosin(&ifr.ifr_addr)->sin_family = AF_INET;
+		satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
+		(*inm->inm_ifp->if_ioctl)(inm->inm_ifp, SIOCDELMULTI,
+							     (caddr_t)&ifr);
+		pool_put(&inmulti_pool, inm);
+	}
+
+	splx(s);
+#endif
+}
+
+#ifdef IGMPV3
+/*
+ * Add an address to the list of IP multicast addresses for a given interface.
+ * Add source addresses to the list also, if upstream router is IGMPv3 capable
+ * and the number of source is not 0.
+ */
+struct in_multi *
+in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
+	struct in_addr *ap;
+	struct ifnet *ifp;
 	u_int16_t numsrc;
 	struct sockaddr_storage *ss;
 	u_int mode;			/* requested filter mode by socket */
 	int init;			/* indicate initial join by socket */
 	int *error;			/* return code of each sub routine */
-#endif
 {
 	struct in_multi *inm;
 	struct ifreq ifr;
 	struct in_ifaddr *ia;
-#ifdef IGMPV3
 	struct mbuf *m = NULL;
 	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
@@ -1143,10 +1239,6 @@ in_addmulti(ap, ifp)
 	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct router_info *rti;
-#else
-	int dummy;			/* dummy */
-	int *error = &dummy;		/* dummy */
-#endif
 	int s = splsoftnet();
 
 	/*
@@ -1154,7 +1246,6 @@ in_addmulti(ap, ifp)
 	 */
 	IN_LOOKUP_MULTI(*ap, ifp, inm);
 
-#ifdef IGMPV3
 	/*
 	 * MCAST_INCLUDE with empty source list means (*,G) leave.
 	 */
@@ -1163,17 +1254,15 @@ in_addmulti(ap, ifp)
 	    splx(s);
 	    return NULL;
 	}
-#endif
 
 	if (inm != NULL) {
-#ifdef IGMPV3
 	    /*
 	     * Found it; merge source addresses in inm_source and send
 	     * State-Change Report if needed, and increment the reference
 	     * count. just increment the refrence count if group address
 	     * is local.
 	     */
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		++inm->inm_refcount;
 		splx(s);
 		return inm;
@@ -1246,7 +1335,6 @@ in_addmulti(ap, ifp)
 	     * refcount.
 	     */
 	    if (init)
-#endif
 		++inm->inm_refcount;
 	} else {
 	    /*
@@ -1289,8 +1377,7 @@ in_addmulti(ap, ifp)
 		return (NULL);
 	    }
 
-#ifdef IGMPV3
-	    for (rti = rti_head; rti != 0; rti = rti->rti_next) {
+	    LIST_FOREACH(rti, &rti_head, rti_link) {
 		if (rti->rti_ifp == inm->inm_ifp) {
 		    inm->inm_rti = rti;
 		    break;
@@ -1308,7 +1395,7 @@ in_addmulti(ap, ifp)
 	    }
 
 	    inm->inm_source = NULL;
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		splx(s);
 		return inm;
 	    }
@@ -1349,16 +1436,11 @@ in_addmulti(ap, ifp)
 		igmp_joingroup(inm);
 	    }
 	    *error = 0;
-#else
-	    igmp_joingroup(inm);
-#endif /* IGMPV3 */
 	}
-#ifdef IGMPV3
 	if (newhead != NULL)
 	    /* Each ias is linked from new curhead, so only newhead (not
 	     * ias_list) is freed */
 	    FREE(newhead, M_MSFILTER);
-#endif
 
 	splx(s);
 	return (inm);
@@ -1368,22 +1450,15 @@ in_addmulti(ap, ifp)
  * Delete a multicast address record.
  */
 void
-#ifdef IGMPV3
-in_delmulti(inm, numsrc, ss, mode, final, error)
-#else
-in_delmulti(inm)
-#endif
+in_delmulti2(inm, numsrc, ss, mode, final, error)
 	struct in_multi *inm;
-#ifdef IGMPV3
 	u_int16_t numsrc;
 	struct sockaddr_storage *ss;
 	u_int mode;			/* requested filter mode by socket */
 	int final;			/* indicate complete leave by socket */
 	int *error;			/* return code of each sub routine */
-#endif
 {
 	struct ifreq ifr;
-#ifdef IGMPV3
 	struct mbuf *m = NULL;
 	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
@@ -1393,16 +1468,14 @@ in_delmulti(inm)
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
-#endif
 	int s = splsoftnet();
 
-#ifdef IGMPV3
 	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
 		*error = EINVAL;
 		splx(s);
 		return;
 	}
-	if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	if (!is_igmp_target(&inm->inm_addr)) {
 		if (--inm->inm_refcount == 0) {
 			/*
 			 * Unlink from list.
@@ -1511,41 +1584,17 @@ in_delmulti(inm)
 	*error = 0;
 	if (newhead != NULL)
 		FREE(newhead, M_MSFILTER);
-#else
-	if (--inm->inm_refcount == 0) {
-		/*
-		 * No remaining claims to this record; let IGMP know that
-		 * we are leaving the multicast group.
-		 */
-		igmp_leavegroup(inm);
-		/*
-		 * Unlink from list.
-		 */
-		LIST_REMOVE(inm, inm_list);
-		in_multientries--;
-		/*
-		 * Notify the network driver to update its multicast reception
-		 * filter.
-		 */
-		satosin(&ifr.ifr_addr)->sin_family = AF_INET;
-		satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
-		(*inm->inm_ifp->if_ioctl)(inm->inm_ifp, SIOCDELMULTI,
-							     (caddr_t)&ifr);
-		pool_put(&inmulti_pool, inm);
-	}
-#endif
 
 	splx(s);
 }
 
-#ifdef IGMPV3
 /*
  * Add an address to the list of IP multicast addresses for a given interface.
  * Add source addresses to the list also, if upstream router is IGMPv3 capable
  * and the number of source is not 0.
  */
 struct in_multi *
-in_modmulti(ap, ifp, numsrc, ss, mode,
+in_modmulti2(ap, ifp, numsrc, ss, mode,
 		old_num, old_ss, old_mode, init, grpjoin, error)
 	struct in_addr *ap;
 	struct ifnet *ifp;
@@ -1591,7 +1640,7 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 	     * If requested multicast address is local address, update
 	     * the condition, join or leave, based on a requested filter.
 	     */
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		if (numsrc != 0) {
 		    splx(s);
 		    *error = EINVAL;
@@ -1687,7 +1736,7 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 	     * join a local group address with some filtered address, return.
 	     */
 	    if ((old_num != 0) ||
-	    		(IN_LOCAL_GROUP(ap->s_addr) && numsrc != 0)) {
+	    		(!is_igmp_target(&ap->s_addr) && numsrc != 0)) {
 		*error = EINVAL;
 		splx(s);
 		return NULL;
@@ -1733,7 +1782,7 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 		return NULL;
 	    }
 
-	    for (rti = rti_head; rti != 0; rti = rti->rti_next) {
+	    LIST_FOREACH(rti, &rti_head, rti_link) {
 		if (rti->rti_ifp == inm->inm_ifp) {
 		    inm->inm_rti = rti;
 		    break;
@@ -1751,7 +1800,7 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 	    }
 
 	    inm->inm_source = NULL;
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		splx(s);
 		return inm;
 	    }
