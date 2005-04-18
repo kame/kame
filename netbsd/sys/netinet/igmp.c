@@ -100,7 +100,7 @@ MALLOC_DEFINE(M_MSFILTER, "msfilter", "multicast source filter");
 struct pool igmp_rti_pool;
 struct igmpstat igmpstat;
 int igmp_timers_are_running;
-static LIST_HEAD(, router_info) rti_head = LIST_HEAD_INITIALIZER(rti_head);
+LIST_HEAD(, router_info) rti_head = LIST_HEAD_INITIALIZER(rti_head);
 
 int interface_timers_are_running;
 int state_change_timers_are_running;
