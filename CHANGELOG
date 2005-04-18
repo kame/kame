@@ -1,9 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2749 2005/04/18 17:44:59 suz Exp $
+$KAME: CHANGELOG,v 1.2750 2005/04/18 23:10:31 suz Exp $
 
 <200504>
 2005-04-19  SUZUKI, Shinsuke <suz@kame.net>
-	* *bsd/sys/netinet/igmp.c, igmp_var.h, in.[ch], ip_output.c: 
+	* *bsd/sys/netinet/igmp.c, igmp_var.h, in.[ch], ip_output.c,
+	  kame/sys/netient/in_msf.c: 
 	  IGMPv3 treats 224.0.0.x(x!=1) as a normal IPv4 multicast address,
 	  as specified in RFC3766.
 
