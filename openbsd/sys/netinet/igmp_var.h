@@ -177,5 +177,6 @@ int	igmp_get_router_alert(struct mbuf *);
 void	igmp_send_state_change_report(struct mbuf **, int *,
 				struct in_multi *, u_int8_t, int);
 int	igmp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
+int	is_igmp_target(struct in_addr *);
 #endif /* _KERNEL */
 #endif /* _NETINET_IGMP_VAR_H_ */

@@ -177,6 +177,7 @@ void	igmp_slowtimo(void);
 int	igmp_get_router_alert(struct mbuf *);
 void	igmp_send_state_change_report(struct mbuf **, int *,
 				      struct in_multi *, u_int8_t, int);
+int	is_igmp_target(struct in_addr *);
 
 SYSCTL_DECL(_net_inet_igmp);
 

@@ -1133,7 +1133,7 @@ in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
 	     * count. just increment the refrence count if group address
 	     * is local.
 	     */
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		++inm->inm_refcount;
 		splx(s);
 		return inm;
@@ -1266,7 +1266,7 @@ in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
 	    }
 
 	    inm->inm_source = NULL;
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		splx(s);
 		return inm;
 	    }
@@ -1349,7 +1349,7 @@ in_delmulti2(inm, numsrc, ss, mode, final, error)
 		splx(s);
 		return;
 	}
-	if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	if (!is_igmp_target(&inm->inm_addr)) {
 		if (--inm->inm_refcount == 0) {
 			/*
 			 * Unlink from list.
@@ -1512,7 +1512,7 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 	     * If requested multicast address is local address, update
 	     * the condition, join or leave, based on a requested filter.
 	     */
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		if (numsrc != 0) {
 		    splx(s);
 		    *error = EINVAL;
@@ -1607,7 +1607,7 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 	     * join a local group address with some filtered address, return.
 	     */
 	    if ((old_num != 0) ||
-	    		(IN_LOCAL_GROUP(ap->s_addr) && numsrc != 0)) {
+	    		(!is_igmp_target(&ap->s_addr) && numsrc != 0)) {
 		*error = EINVAL;
 		splx(s);
 		return NULL;
@@ -1671,7 +1671,7 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 	    }
 
 	    inm->inm_source = NULL;
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr)) {
+	    if (!is_igmp_target(&inm->inm_addr)) {
 		splx(s);
 		return inm;
 	    }

@@ -2700,7 +2700,7 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		 * Group must be a valid IP multicast address.
 		 */
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr) ||
-				IN_LOCAL_GROUP(sin_grp->sin_addr.s_addr)) {
+		    !is_igmp_target(&sin_grp->sin_addr)) {
 #ifdef IGMPV3_DEBUG
 			printf("invalid group %s specified\n", inet_ntoa(sin_grp->sin_addr));
 #endif
@@ -2760,7 +2760,7 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin_grp->sin_family = AF_INET;
 
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr) ||
-				IN_LOCAL_GROUP(sin_grp->sin_addr.s_addr)) {
+		    !is_igmp_target(&sin_grp->sin_addr)) {
 			error = EINVAL;
 			break;
 		}

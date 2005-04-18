@@ -846,7 +846,7 @@ igmp_fasttimo(void)
 state_change_timer:
 #ifdef IGMPV3
 		/* State-Change Record timer */
-		if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
+		if (!is_igmp_target(&inm->inm_addr))
 			goto next_inm; /* skip */
 
 		if (inm->inm_source->ims_timer == 0)
@@ -1154,8 +1154,7 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 
 	IN_FIRST_MULTI(step, inm);
 	while (inm != NULL) {
-	    if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr))
-	        || inm->inm_ifp != ifp)
+	    if (!is_igmp_target(&inm->inm_addr) || inm->inm_ifp != ifp)
 		goto next_multi;
 
 	    if ((inm->inm_source->ims_grpjoin == 0) &&
@@ -1357,7 +1356,7 @@ igmp_send_all_current_state_report(ifp)
 	IN_FIRST_MULTI(step, inm);
 	while (inm != NULL) {
 		if (inm->inm_ifp != ifp ||
-		    IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
+		    !is_igmp_target(&inm->inm_addr))
 			goto next_multi;
 
 		if (igmp_send_current_state_report(&m, &buflen, inm) != 0)
@@ -1389,7 +1388,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	u_int8_t type = 0;
 	int error = 0;
 
-	if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)) ||
+	if (!is_igmp_target(&inm->inm_addr) ||
 		(inm->inm_ifp->if_flags & IFF_LOOPBACK) != 0)
 	    return 0;
 
@@ -1537,7 +1536,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	int buflen = 0;
 	int error = 0;
 
-	if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)) ||
+	if (!is_igmp_target(&inm->inm_addr) ||
 		(inm->inm_ifp->if_flags & IFF_LOOPBACK) != 0)
 	    return;
 
@@ -1883,7 +1882,7 @@ igmp_cancel_pending_response(ifp, rti)
 	while (inm != NULL) {
 	    if (inm->inm_ifp != ifp)
 		goto next_multi;
-	    if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
+	    if (!is_igmp_target(&inm->inm_addr))
 		goto next_multi;
 	    if (inm->inm_source == NULL)
 		goto next_multi;
@@ -1918,5 +1917,16 @@ igmp_cancel_pending_response(ifp, rti)
 next_multi:
 	    IN_NEXT_MULTI(step, inm);
 	}
+}
+
+int
+is_igmp_target(grp)
+	struct in_addr *grp;
+{
+	if (!IN_MULTICAST(ntohl(grp->s_addr)))
+		return 0;
+	if (grp->s_addr == igmp_all_hosts_group)
+		return 0;
+	return 1;
 }
 #endif /* IGMPV3 */
