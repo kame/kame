@@ -246,17 +246,16 @@ struct in_multistep {
 
 int	in_ifinit(struct ifnet *,
 	    struct in_ifaddr *, struct sockaddr_in *, int);
-#ifdef IGMPV3
-struct	in_multi * in_addmulti(struct in_addr *, struct ifnet *,
-		u_int16_t, struct sockaddr_storage *, u_int, int, int *);
-void	in_delmulti(struct in_multi *, u_int16_t,
-		struct sockaddr_storage *, u_int, int, int *);
-struct	in_multi * in_modmulti(struct in_addr *, struct ifnet *, u_int16_t,
-		struct sockaddr_storage *, u_int, u_int16_t,
-		struct sockaddr_storage *, u_int, int, u_int, int *);
-#else
 struct	in_multi *in_addmulti(struct in_addr *, struct ifnet *);
 void	in_delmulti(struct in_multi *);
+#ifdef IGMPV3
+struct	in_multi * in_addmulti2(struct in_addr *, struct ifnet *,
+		u_int16_t, struct sockaddr_storage *, u_int, int, int *);
+void	in_delmulti2(struct in_multi *, u_int16_t,
+		struct sockaddr_storage *, u_int, int, int *);
+struct	in_multi * in_modmulti2(struct in_addr *, struct ifnet *, u_int16_t,
+		struct sockaddr_storage *, u_int, u_int16_t,
+		struct sockaddr_storage *, u_int, int, u_int, int *);
 #endif
 void	in_ifscrub(struct ifnet *, struct in_ifaddr *);
 int	in_control(struct socket *, u_long, caddr_t, struct ifnet *);
