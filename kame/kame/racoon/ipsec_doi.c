@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.171 2004/12/09 03:53:53 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.172 2005/04/18 03:48:32 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -621,7 +621,7 @@ t2isakmpsa(trns, sa)
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
 				sa->lifebyte = ipsecdoi_set_ld(val);
 				vfree(val);
-				if (sa->lifetime == 0) {
+				if (sa->lifebyte == 0) {
 					plog(LLV_ERROR, LOCATION, NULL,
 						"invalid life duration.\n");
 					goto err;
