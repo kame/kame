@@ -288,7 +288,7 @@ rti_delete(ifp)
 {
 	struct router_info *rti, *nxt;
 
-	for (rti = LIST_FIRST(&rti_head); rti; rti = nxt) {
+	LIST_FOREACH(rti, &rti_head, rti_link) {
 		nxt = LIST_NEXT(rti, rti_link);
 		if (rti->rti_ifp == ifp) {
 			LIST_REMOVE(rti, rti_link);
@@ -872,7 +872,7 @@ igmp_fasttimo()
 #ifdef IGMPV3
 	if (interface_timers_are_running) {
 		interface_timers_are_running = 0;
-		for (rti = rti_head; rti; rti = rti->rti_next) {
+		LIST_FOREACH(rti, &rti_head, rti_link) {
 			if (rti->rti_timer3 == 0)
 				; /* do nothing */
 			else if (--rti->rti_timer3 == 0)
@@ -1491,7 +1491,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	int buflen;
 	u_int16_t max_len;
 	u_int16_t numsrc, src_once, src_done = 0;
-	u_int8_t type;
+	u_int8_t type = 0;
 	int error = 0;
 
 	if (IN_LOCAL_GROUP(inm->inm_addr.s_addr) ||

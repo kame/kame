@@ -164,6 +164,8 @@ __KERNEL_RCSID(0, "$NetBSD: in.c,v 1.93.2.1 2004/07/10 12:42:37 tron Exp $");
 #include <net/pfil.h>
 #endif
 
+extern LIST_HEAD(, router_info) rti_head;
+
 #ifdef INET
 static u_int in_mask2len __P((struct in_addr *));
 static void in_len2mask __P((struct in_addr *, u_int));
