@@ -1748,7 +1748,7 @@ ip_setmoptions(optname, imop, m)
 			break;
 		init = 1;
 		if ((imo->imo_membership[i] =
-		    in_addmulti(&mreq->imr_multiaddr, ifp, 0, NULL,
+		    in_addmulti2(&mreq->imr_multiaddr, ifp, 0, NULL,
 				MCAST_EXCLUDE, init, &error)) == NULL) {
 			IMO_MSF_FREE(imo->imo_msf[i]);
 			break;
@@ -1814,7 +1814,7 @@ ip_setmoptions(optname, imop, m)
 		}
 
 		final = 1;
-		in_delmulti(imo->imo_membership[i], numsrc, del_ss, mode,
+		in_delmulti2(imo->imo_membership[i], numsrc, del_ss, mode,
 			    final, &error);
 		if (del_ss != NULL)
 			FREE(del_ss, M_IPMOPTS);
@@ -1868,7 +1868,7 @@ ip_setmoptions(optname, imop, m)
 			break;
 		init = 1;
 		if ((imo->imo_membership[i] =
-		    in_addmulti(&SIN(&ss_grp)->sin_addr, ifp, 0, NULL,
+		    in_addmulti2(&SIN(&ss_grp)->sin_addr, ifp, 0, NULL,
 		    		MCAST_EXCLUDE, init, &error)) == NULL) {
 			IMO_MSF_FREE(imo->imo_msf[i]);
 			break;
@@ -1907,7 +1907,7 @@ ip_setmoptions(optname, imop, m)
 		}
 
 		final = 1;
-		in_delmulti(imo->imo_membership[i], numsrc, del_ss, mode,
+		in_delmulti2(imo->imo_membership[i], numsrc, del_ss, mode,
 			    final, &error);
 		if (del_ss != NULL)
 			FREE(del_ss, M_IPMOPTS);
@@ -2000,7 +2000,7 @@ ip_setmoptions(optname, imop, m)
 		 */
 		numsrc = 1;
 		imo->imo_membership[i] =
-			in_addmulti(&SIN(&ss_grp)->sin_addr, ifp, numsrc,
+			in_addmulti2(&SIN(&ss_grp)->sin_addr, ifp, numsrc,
 				    &ss_src, MCAST_INCLUDE, init, &error);
 		if (imo->imo_membership[i] == NULL) {
 			in_undomopt_source_addr(imo->imo_msf[i], optname);
@@ -2060,7 +2060,7 @@ ip_setmoptions(optname, imop, m)
 		 * membership points.
 		 */
 		numsrc = 1;
-		in_delmulti(imo->imo_membership[i], numsrc, &ss_src,
+		in_delmulti2(imo->imo_membership[i], numsrc, &ss_src,
 				MCAST_INCLUDE, final, &error);
 		if (error != 0) {
 			printf("ip_setmoptions: error must be 0! panic!\n");
@@ -2146,7 +2146,7 @@ ip_setmoptions(optname, imop, m)
 		if (imo->imo_msf[i]->msf_grpjoin == 0) {
 			/* IN{NULL}/EX{non NULL} -> EX{non NULL} */
 			imo->imo_membership[i] =
-				in_addmulti(&SIN(&ss_grp)->sin_addr, ifp,
+				in_addmulti2(&SIN(&ss_grp)->sin_addr, ifp,
 					    numsrc, &ss_src, MCAST_EXCLUDE,
 					    init, &error);
 			if (imo->imo_membership[i] == NULL) {
@@ -2157,7 +2157,7 @@ ip_setmoptions(optname, imop, m)
 		} else {
 			/* EX{NULL} -> EX{non NULL} */
 			imo->imo_membership[i] =
-				in_modmulti(&SIN(&ss_grp)->sin_addr,
+				in_modmulti2(&SIN(&ss_grp)->sin_addr,
 					    ifp, numsrc, &ss_src, MCAST_EXCLUDE,
 					    0, NULL, MCAST_EXCLUDE, init,
 					    imo->imo_msf[i]->msf_grpjoin, &error);
@@ -2222,7 +2222,7 @@ ip_setmoptions(optname, imop, m)
 		 * membership points.
 		 */
 		numsrc = 1;
-		in_delmulti(imo->imo_membership[i], numsrc, &ss_src,
+		in_delmulti2(imo->imo_membership[i], numsrc, &ss_src,
 				MCAST_EXCLUDE, final, &error);
 		if (error != 0) {
 			printf("ip_setmoptions: error must be 0! panic!\n");
@@ -2350,7 +2350,7 @@ ip_freemoptions(imo)
 			}
 
 			final = 1;
-			in_delmulti(imo->imo_membership[i], numsrc, del_ss,
+			in_delmulti2(imo->imo_membership[i], numsrc, del_ss,
 				    mode, final, &error);
 			if (del_ss != NULL)
 				FREE(del_ss, M_IPMOPTS);
@@ -2582,7 +2582,7 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		 * Group must be a valid IP multicast address.
 		 */
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr) ||
-				IN_LOCAL_GROUP(sin_grp->sin_addr.s_addr)) {
+		    !is_igmp_target(&sin_grp->sin_addr)) {
 #ifdef IGMPV3_DEBUG
 			printf("invalid group %s specified\n", inet_ntoa(sin_grp->sin_addr));
 #endif
@@ -2642,7 +2642,7 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin_grp->sin_family = AF_INET;
 
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr) ||
-				IN_LOCAL_GROUP(sin_grp->sin_addr.s_addr)) {
+		    !is_igmp_target(&sin_grp->sin_addr)) {
 			error = EINVAL;
 			break;
 		}
