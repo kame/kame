@@ -522,7 +522,6 @@ udp_input(struct mbuf *m, ...)
 
 			/*
 			 * Receive multicast data which fits MSF condition.
-			 * Broadcast data needs no further check.
 			 */
 #ifdef IGMPV3
 			if (ip) {
