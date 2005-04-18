@@ -2837,7 +2837,7 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 		 * Group must be a valid IP multicast address.
 		 */
 		if (!IN_MULTICAST(ntohl(sin_grp->sin_addr.s_addr)) ||
-		    !IN_LOCAL_GROUP(ntohl(sin_grp->sin_addr.s_addr))) {
+		    IN_LOCAL_GROUP(ntohl(sin_grp->sin_addr.s_addr))) {
 			error = EINVAL;
 			break;
 		}
