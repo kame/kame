@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2748 2005/04/18 07:40:26 suz Exp $
+$KAME: CHANGELOG,v 1.2749 2005/04/18 17:44:59 suz Exp $
 
 <200504>
+2005-04-19  SUZUKI, Shinsuke <suz@kame.net>
+	* *bsd/sys/netinet/igmp.c, igmp_var.h, in.[ch], ip_output.c: 
+	  IGMPv3 treats 224.0.0.x(x!=1) as a normal IPv4 multicast address,
+	  as specified in RFC3766.
+
+	* openbsd/sys/netinet/in.c, in_var.h, ip_output.c,
+	* netbsd/sys/netinet/igmp.c, igmp_var.h, in.c, in_pcb.c, in_var.h,
+	  ip_output.c: reflect the following MLDv2 changes into the 
+	  NetBSD/OpenBSD's IGMPv3 implementation.
+	- renames IGMPv3-ready in_multi{} manipulation functions (2004-02-05)
+
 2005-04-18  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/netinet/igmp.c, in.c, ip_output.c,
 	  kame/sys/netinet/in_msf.c: fixed the byte order of an IPv4 address 
