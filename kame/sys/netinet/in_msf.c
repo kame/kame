@@ -2080,11 +2080,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 	}
 	if (imsf->imsf_numsrc != 0)
 		return EINVAL;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	if (IN_LOCAL_GROUP(imsf->imsf_multiaddr.s_addr))
-#else
-	if (IN_LOCAL_GROUP(ntohl(imsf->imsf_multiaddr.s_addr)))
-#endif
+	if (!is_igmp_target(&imsf->imsf_multiaddr))
 		return EINVAL;
 
 	/*
@@ -2683,12 +2679,12 @@ sock_setmopt_srcfilter(sop, grpfp)
 	if ((grpf->gf_numsrc != 0))
 		return EINVAL;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	if (!IN_MULTICAST(in_grp->sin_addr.s_addr) ||
-	    IN_LOCAL_GROUP(in_grp->sin_addr.s_addr))
+	if (!IN_MULTICAST(in_grp->sin_addr.s_addr))
 #else
-	if (!IN_MULTICAST(ntohl(in_grp->sin_addr.s_addr)) ||
-	    IN_LOCAL_GROUP(ntohl(in_grp->sin_addr.s_addr)))
+	if (!IN_MULTICAST(ntohl(in_grp->sin_addr.s_addr)))
 #endif
+		return EINVAL;
+	if (!is_igmp_target(&in_grp->sin_addr))
 		return EINVAL;
 
 	/*
@@ -3884,12 +3880,8 @@ match_msf4_per_if(inm, src, dst)
 	inms = inm->inm_source;
 	/* inms is NULL only in case of 224.0.0.0/24 */
 	if (inms == NULL) {
-		/* assumes 224.0.0.0/24 case has already been eliminated */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		if (IN_LOCAL_GROUP(dst->s_addr))
-#else
-		if (IN_LOCAL_GROUP(ntohl(dst->s_addr)))
-#endif
+		/* assumes 224.0.0.1 case has already been eliminated */
+		if (!is_igmp_target(&dst))
 			return 1;
 		igmplog((LOG_DEBUG, "grp found, but src is NULL. impossible\n"));
 		return 0;
