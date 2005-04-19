@@ -195,13 +195,13 @@ static int igmp_record_queried_source __P((struct in_multi *, struct igmp *,
 static void igmp_send_all_current_state_report __P((struct ifnet *));
 int igmp_send_current_state_report __P((struct mbuf **, int *,
 				struct in_multi *));
-static int rti_fill __P((struct in_multi *));
 static int igmp_create_group_record __P((struct mbuf *, int *,
 			 struct in_multi *, u_int16_t, u_int16_t *, u_int8_t));
 static void igmp_cancel_pending_response __P((struct ifnet *,
 				 struct router_info *));
 #endif
 static struct router_info *rti_find __P((struct ifnet *));
+static int rti_fill __P((struct in_multi *));
 static void rti_delete __P((struct ifnet *));
 
 void
@@ -935,64 +935,69 @@ igmp_fasttimo()
 	ifp = inm->inm_ifp;
 	while (inm != NULL) {
 		if (inm->inm_timer == 0)
-			; /* do nothing */
-		else if (--inm->inm_timer == 0) {
-			if (inm->inm_state == IGMP_DELAYING_MEMBER) {
-				if (inm->inm_rti->rti_type == IGMP_v1_ROUTER)
-					igmp_sendpkt(inm,
-					    IGMP_v1_HOST_MEMBERSHIP_REPORT);
-				else
-					igmp_sendpkt(inm,
-					    IGMP_v2_HOST_MEMBERSHIP_REPORT);
-				inm->inm_state = IGMP_IDLE_MEMBER;
-#ifdef IGMPV3
-			} else if ((inm->inm_state
-					== IGMP_G_QUERY_PENDING_MEMBER) ||
-				   (inm->inm_state
-					== IGMP_SG_QUERY_PENDING_MEMBER)) {
-				if ((cm != NULL) && (ifp != inm->inm_ifp)) {
-					igmp_sendbuf(cm, ifp);
-					cm = NULL;
-				}
-				(void)igmp_send_current_state_report
-						(&cm, &cbuflen, inm);
-				ifp = inm->inm_ifp;
-#endif
-			}
-		} else
-			igmp_timers_are_running = 1;
+			goto state_change_timer; /* do nothing */
 
+		--inm->inm_timer;
+		if (inm->inm_timer > 0) {
+			igmp_timers_are_running = 1;
+			goto state_change_timer;
+		}
+		if (inm->inm_state == IGMP_DELAYING_MEMBER) {
+			int type;
+			if (inm->inm_rti->rti_type == IGMP_v1_ROUTER)
+				type = IGMP_v1_HOST_MEMBERSHIP_REPORT;
+			else
+				type = IGMP_v2_HOST_MEMBERSHIP_REPORT;
+			igmp_sendpkt(inm, type);
+			inm->inm_state = IGMP_IDLE_MEMBER;
+#ifdef IGMPV3
+		} else if ((inm->inm_state == IGMP_G_QUERY_PENDING_MEMBER) ||
+			   (inm->inm_state == IGMP_SG_QUERY_PENDING_MEMBER)) {
+			if ((cm != NULL) && (ifp != inm->inm_ifp)) {
+				igmp_sendbuf(cm, ifp);
+				cm = NULL;
+			}
+			igmp_send_current_state_report(&cm, &cbuflen, inm);
+			ifp = inm->inm_ifp;
+#endif
+		}
+
+state_change_timer:
 #ifdef IGMPV3
 		if (!is_igmp_target(&inm->inm_addr))
-			; /* skip */
-		else if (inm->inm_source->ims_timer == 0)
-			; /* do nothing */
-		else if (--inm->inm_source->ims_timer == 0) {
-			if ((sm != NULL) && (ifp != inm->inm_ifp)) {
-				igmp_sendbuf(sm, ifp);
-				sm = NULL;
-			}
-			/* Check if this report was pending Source-List-Change
-			 * report or not. It is only the case that robvar was
-			 * not reduced here. (XXX rarely, QRV may be changed
-			 * in a same timing.) */
-			if (inm->inm_source->ims_robvar
-					== inm->inm_rti->rti_qrv) {
-				igmp_send_state_change_report(&sm, &sbuflen,
-						inm, (u_int8_t)0, (int)1);
-				sm = NULL;
-			} else if (inm->inm_source->ims_robvar > 0) {
-				igmp_send_state_change_report(&sm, &sbuflen,
-						inm, (u_int8_t)0, (int)0);
-				ifp = inm->inm_ifp;
-			}
-			if (inm->inm_source->ims_robvar != 0) {
-				inm->inm_source->ims_timer = IGMP_RANDOM_DELAY
-						(IGMP_UNSOL_INTVL * PR_FASTHZ);
-				state_change_timers_are_running = 1;
-			}
-		} else
+			goto next_inm; /* skip */
+
+		if (inm->inm_source->ims_timer == 0)
+			goto next_inm; /* skip */
+
+		--inm->inm_source->ims_timer;
+		if (inm->inm_source->ims_timer > 0) {
 			state_change_timers_are_running = 1;
+			goto next_inm;
+		}
+
+		if ((sm != NULL) && (ifp != inm->inm_ifp)) {
+			igmp_sendbuf(sm, ifp);
+			sm = NULL;
+		}
+		/*
+		 * Check if this report was pending Source-List-Change report or
+		 * not. It is only the case that robvar was not reduced here. 
+		 * (XXX rarely, QRV may be changed in a same timing.)
+		 */
+		if (inm->inm_source->ims_robvar == inm->inm_rti->rti_qrv) {
+			igmp_send_state_change_report(&sm, &sbuflen, inm, 0, 1);
+			sm = NULL;
+		} else if (inm->inm_source->ims_robvar > 0) {
+			igmp_send_state_change_report(&sm, &sbuflen, inm, 0, 0);
+			ifp = inm->inm_ifp;
+		}
+		if (inm->inm_source->ims_robvar != 0) {
+			inm->inm_source->ims_timer =
+			     IGMP_RANDOM_DELAY(IGMP_UNSOL_INTVL * PR_FASTHZ);
+			state_change_timers_are_running = 1;
+		}
+next_inm:
 #endif
 		IN_NEXT_MULTI(step, inm);
 	}
