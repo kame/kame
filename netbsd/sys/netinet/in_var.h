@@ -336,17 +336,16 @@ int	in_ifinit __P((struct ifnet *,
 void	in_savemkludge __P((struct in_ifaddr *));
 void	in_restoremkludge __P((struct in_ifaddr *, struct ifnet *));
 void	in_purgemkludge __P((struct ifnet *));
-#ifdef IGMPV3
-struct	in_multi * in_addmulti __P((struct in_addr *, struct ifnet *,
-		u_int16_t, struct sockaddr_storage *, u_int, int, int *));
-void	in_delmulti __P((struct in_multi *, u_int16_t,
-		struct sockaddr_storage *, u_int, int, int *));
-struct	in_multi * in_modmulti __P((struct in_addr *, struct ifnet *, u_int16_t,
-		struct sockaddr_storage *, u_int, u_int16_t,
-		struct sockaddr_storage *, u_int, int, u_int, int *));
-#else
 struct	in_multi *in_addmulti __P((struct in_addr *, struct ifnet *));
 void	in_delmulti __P((struct in_multi *));
+#ifdef IGMPV3
+struct	in_multi * in_addmulti2 __P((struct in_addr *, struct ifnet *,
+		u_int16_t, struct sockaddr_storage *, u_int, int, int *));
+void	in_delmulti2 __P((struct in_multi *, u_int16_t,
+		struct sockaddr_storage *, u_int, int, int *));
+struct	in_multi * in_modmulti2 __P((struct in_addr *, struct ifnet *, u_int16_t,
+		struct sockaddr_storage *, u_int, u_int16_t,
+		struct sockaddr_storage *, u_int, int, u_int, int *));
 #endif
 void	in_ifscrub __P((struct ifnet *, struct in_ifaddr *));
 void	in_setmaxmtu __P((void));
