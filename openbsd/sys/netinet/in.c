@@ -1607,7 +1607,7 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 	     * join a local group address with some filtered address, return.
 	     */
 	    if ((old_num != 0) ||
-	    		(!is_igmp_target(&ap->s_addr) && numsrc != 0)) {
+	    		(!is_igmp_target(ap) && numsrc != 0)) {
 		*error = EINVAL;
 		splx(s);
 		return NULL;

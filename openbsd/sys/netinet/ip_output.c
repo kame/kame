@@ -84,6 +84,7 @@
 #include <netinet/in_pcb.h>
 #ifdef IGMPV3
 #include <netinet/in_msf.h>
+#include <netinet/igmp_var.h>
 #endif
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
