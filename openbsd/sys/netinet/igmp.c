@@ -1203,7 +1203,13 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 	else
 	    rti->rti_qri /= IGMP_TIMER_SCALE;
 
-	if ((igmp->igmp_code > 0) && (igmp->igmp_code < 128))
+	if (igmp->igmp_code == 0)
+	    /*
+	     * XXX: this interval prevents an IGMP-report flooding caused by
+	     * an IGMP-query with Max-Response-Code=0 (KAME local design)
+	     */
+	    timer = 10;
+	else if (igmp->igmp_code < 128)
 	    timer = igmp->igmp_code;
 	else
 	    timer = (IGMP_MANT(igmp->igmp_code) | 0x10)
