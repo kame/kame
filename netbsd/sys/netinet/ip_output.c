@@ -158,6 +158,7 @@ __KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.130 2004/03/02 02:28:28 thorpej Exp 
 #include <netinet/ip.h>
 #ifdef IGMPV3
 #include <netinet/in_msf.h>
+#include <netinet/igmp_var.h>
 #endif
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
