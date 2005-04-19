@@ -719,6 +719,7 @@ igmpv2_query:
 	 * on a raw IGMP socket.
 	 */
 	rip_input(m, off);
+	return;
 
 end:
 	m_freem(m);

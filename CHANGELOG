@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2750 2005/04/18 23:10:31 suz Exp $
+$KAME: CHANGELOG,v 1.2751 2005/04/19 05:35:18 suz Exp $
 
 <200504>
 2005-04-19  SUZUKI, Shinsuke <suz@kame.net>
@@ -13,6 +13,9 @@ $KAME: CHANGELOG,v 1.2750 2005/04/18 23:10:31 suz Exp $
 	  ip_output.c: reflect the following MLDv2 changes into the 
 	  NetBSD/OpenBSD's IGMPv3 implementation.
 	- renames IGMPv3-ready in_multi{} manipulation functions (2004-02-05)
+
+	* freebsd5/sys/netinet/igmp.c: fixed a kernel crash by an IGMP packet
+	(a bug introduced in the change at 2005-04-14)
 
 2005-04-18  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/netinet/igmp.c, in.c, ip_output.c,
