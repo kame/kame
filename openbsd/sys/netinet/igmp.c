@@ -152,15 +152,17 @@ static int addrlen = sizeof(struct in_addr);
 } while (0)
 
 void igmp_sendpkt(struct in_multi *, int, in_addr_t);
-int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
+#ifdef IGMPV3
+static int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
 		   int, u_int8_t);
-void igmp_set_hostcompat(struct ifnet *, struct router_info *, int);
-int igmp_record_queried_source(struct in_multi *, struct igmp *, int);
-void igmp_send_all_current_state_report(struct ifnet *);
+static void igmp_set_hostcompat(struct ifnet *, struct router_info *, int);
+static int igmp_record_queried_source(struct in_multi *, struct igmp *, int);
+static void igmp_send_all_current_state_report(struct ifnet *);
 int igmp_send_current_state_report(struct mbuf **, int *, struct in_multi *);
 int igmp_create_group_record(struct mbuf *, int *, struct in_multi *,
 			     u_int16_t, u_int16_t *, u_int8_t);
-void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
+static void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
+#endif
 static int rti_fill(struct in_multi *);
 static struct router_info * rti_find(struct ifnet *);
 
@@ -1167,7 +1169,7 @@ igmp_sendbuf(m, ifp)
 /*
  * Timer adjustment on reception of an IGMPv3 Query.
  */
-int
+static int
 igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 	struct ifnet *ifp;
 	struct router_info *rti;
@@ -1331,7 +1333,7 @@ next_multi:
 /*
  * Set IGMP Host Compatibility Mode.
  */
-void
+static void
 igmp_set_hostcompat(ifp, rti, query_ver)
 	struct ifnet *ifp;
 	struct router_info *rti;
@@ -1377,7 +1379,7 @@ igmp_set_hostcompat(ifp, rti, query_ver)
  * If some source was recorded as a reply for Group-and-Source-Specific Query,
  * return 0.
  */ 
-int
+static int
 igmp_record_queried_source(inm, igmp, igmplen)
 	struct in_multi *inm;
 	struct igmp *igmp;
@@ -1485,7 +1487,7 @@ igmp_record_queried_source(inm, igmp, igmplen)
 /*
  * Send Current-State Report for General Query response.
  */
-void
+static void
 igmp_send_all_current_state_report(ifp)
 	struct ifnet *ifp;
 {
@@ -2008,7 +2010,7 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
  * Cancel all IGMPv3 pending response and retransmission timers on an
  * interface.
  */
-void
+static void
 igmp_cancel_pending_response(ifp, rti)
 	struct ifnet *ifp;
 	struct router_info *rti;
