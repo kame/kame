@@ -113,7 +113,7 @@ struct igmpstat {
 #define	IGMPCTL_DROPWITHNORA	2	/* kern drops IGMP with no Rtr Alert */
 #define	IGMPCTL_MAXSRCFILTER	3	/* max sources per group per interface*/
 #define	IGMPCTL_SOMAXSRC	4	/* max sources per socket per group */
-#define	IGMPCTL_ALWAYS_V3	5
+#define	IGMPCTL_VERSION		5
 #define	IGMPCTL_MAXID		6
 
 #define	IGMPCTL_NAMES { \
@@ -122,7 +122,7 @@ struct igmpstat {
 	{ "dropwithnora", CTLTYPE_INT }, \
 	{ "maxsrcfilter", CTLTYPE_INT }, \
 	{ "somaxsrc", CTLTYPE_INT }, \
-	{ "always_v3", CTLTYPE_INT }, \
+	{ "version", CTLTYPE_INT }, \
 }
 
 /*

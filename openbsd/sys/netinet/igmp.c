@@ -79,7 +79,14 @@ int igmpsendwithra = 0;
 int igmpdropwithnora = 0;	/* accept packets with no Router Alert option */
 int igmpmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int igmpsomaxsrc = SO_MAX_SOURCE_FILTER;
-int igmpalways_v3 = 0;
+/* 
+ * igmp_version:
+ *	0: igmpv3 with compat-mode
+ *	1: igmpv1 only
+ *	2: igmpv2 only
+ *	3: igmpv3 without compat-mode
+ */
+int igmp_version = 0;
 static struct mbuf *router_alert;
 #ifdef IGMPV3
 static int qhdrlen = IGMP_v3_QUERY_MINLEN;
@@ -205,7 +212,23 @@ rti_init(ifp)
 	rti->rti_qrv = IGMP_DEF_RV;
 	rti->rti_qqi = IGMP_DEF_QI;
 	rti->rti_qri = IGMP_DEF_QRI / IGMP_TIMER_SCALE;
-	rti->rti_type = IGMP_v3_ROUTER;
+	switch (igmp_version) {
+	case 0:
+		rti->rti_type = IGMP_v3_ROUTER;
+		break;
+	case 1:
+		rti->rti_type = IGMP_v1_ROUTER;
+		break;
+	case 2:
+		rti->rti_type = IGMP_v2_ROUTER;
+		break;
+	case 3:
+		rti->rti_type = IGMP_v3_ROUTER;
+		break;
+	default:
+		/* impossible */
+		break;
+	}
 #endif
 	rti->rti_next = rti_head;
 	rti_head = rti;
@@ -432,8 +455,12 @@ igmp_input(struct mbuf *m, ...)
 		 * IGMPv3 Query: length >= 12 octets
 		 * IGMPv1 and v2 implementation must accept only the first 8
 		 * octets of the query message.
+		 *
+		 * if sysctl variable "igmp_version" is set to 1 or 2,
+		 * query-type will be IGMPv1 or v2 respectively, regardless of
+		 * the packet size.
 		 */
-		if (igmplen == IGMP_MINLEN)
+		if (igmplen == IGMP_MINLEN || igmp_version == 2)
 			query_ver = IGMP_v2_QUERY; /* or IGMP_v1_QUERY */
 #ifdef IGMPV3
 		else if (igmplen >= IGMP_v3_QUERY_MINLEN)
@@ -489,7 +516,7 @@ start_v1:
 #ifndef IGMPV3
 			rti->rti_age = 0;
 #else
-			if (igmpalways_v3 == 0)
+			if (igmp_version == 0)
 				igmp_set_hostcompat(ifp, rti, query_ver);
 #endif
 		/*
@@ -566,7 +593,7 @@ start_v2:
 			 * Querier Present Timeout seconds whenever an IGMPv2
 			 * General Query is received.
 			 */
-			if (igmpalways_v3 == 0 &&
+			if (igmp_version == 0 &&
 			    igmp->igmp_group.s_addr == INADDR_ANY)
 				igmp_set_hostcompat(ifp, rti, query_ver);
 #endif
@@ -958,12 +985,41 @@ igmp_slowtimo()
 		}
 #else
 		if ((rti->rti_timer1 == 0) && (rti->rti_timer2 == 0)) {
-			if (rti->rti_type != IGMP_v3_ROUTER)
-				rti->rti_type = IGMP_v3_ROUTER;
+			switch (igmp_version) {
+			case 1:
+				if (rti->rti_type != IGMP_v1_ROUTER)
+					rti->rti_type = IGMP_v1_ROUTER;
+				break;
+			case 2:
+				if (rti->rti_type != IGMP_v2_ROUTER)
+					rti->rti_type = IGMP_v2_ROUTER;
+				break;
+			case 0:
+			case 3:
+				if (rti->rti_type != IGMP_v3_ROUTER)
+					rti->rti_type = IGMP_v3_ROUTER;
+				break;
+			default:
+				/* impossible */
+				break;
+			}
 		} else if ((rti->rti_timer1 == 0) && (rti->rti_timer2 > 0)) {
 			--rti->rti_timer2;
-			if (rti->rti_type != IGMP_v2_ROUTER)
-				rti->rti_type = IGMP_v2_ROUTER;
+			switch (igmp_version) {
+			case 1:
+				if (rti->rti_type != IGMP_v1_ROUTER)
+					rti->rti_type = IGMP_v1_ROUTER;
+				break;
+			case 0:
+			case 2:
+			case 3:
+				if (rti->rti_type != IGMP_v2_ROUTER)
+					rti->rti_type = IGMP_v2_ROUTER;
+				break;
+			default:
+				/* impossible */
+				break;
+			}
 		} else if (rti->rti_timer1 > 0) {
 			--rti->rti_timer1;
 			if (rti->rti_timer2 > 0)
@@ -2029,9 +2085,9 @@ igmp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 				   &igmpsomaxsrc);
 		break;
-	case IGMPCTL_ALWAYS_V3:
+	case IGMPCTL_VERSION:
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
-				   &igmpalways_v3);
+				   &igmp_version);
 		break;
 	default:
 		error = ENOPROTOOPT;
