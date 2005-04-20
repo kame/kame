@@ -204,6 +204,7 @@ static int addrlen = sizeof(struct in_addr);
 	(m)->m_pkthdr.rcvif = (struct ifnet *)0; \
 } while(0)
  
+#ifdef IGMPV3
 static int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
 			int, u_int8_t);
 static void igmp_set_hostcompat(struct ifnet *, struct router_info *, int);
@@ -213,6 +214,7 @@ static int igmp_send_current_state_report(struct mbuf **, int *, struct in_multi
 int igmp_create_group_record(struct mbuf *, int *, struct in_multi *,
 			     u_int16_t, u_int16_t *, u_int8_t);
 void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
+#endif
 
 /*
  * XXXRW: can we define these such that these can be made const?  In any
@@ -414,13 +416,13 @@ igmp_input(register struct mbuf *m, int off)
 	register struct ifnet *ifp = m->m_pkthdr.rcvif;
 	register int minlen;
 	int query_ver;
-	int query_type;
 	register struct in_multi *inm;
 	register struct in_ifaddr *ia;
 	struct in_multistep step;
 	struct router_info *rti;
 	int timer; /** timer value in the igmp query header **/
 #ifdef IGMPV3
+	int query_type;
 	int error;
 #endif
 
@@ -887,8 +889,8 @@ state_change_timer:
 			    IGMP_RANDOM_DELAY(IGMP_UNSOL_INTVL * PR_FASTHZ);
 			state_change_timers_are_running = 1;
 		}
-#endif
 next_inm:
+#endif
 		IN_NEXT_MULTI(step, inm);
 	}
 #ifdef IGMPV3
