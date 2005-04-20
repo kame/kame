@@ -127,7 +127,7 @@ SYSCTL_INT(_net_inet_igmp, IGMPCTL_MAXSRCFILTER, maxsrcfilter, CTLFLAG_RW,
 	&igmpmaxsrcfilter, IP_MAX_SOURCE_FILTER, "");
 SYSCTL_INT(_net_inet_igmp, IGMPCTL_SOMAXSRC, somaxsrc, CTLFLAG_RW,
 	&igmpsomaxsrc, SO_MAX_SOURCE_FILTER, "");
-SYSCTL_INT(_net_inet_igmp, IGMPCTL_VERSION, igmp_version, CTLFLAG_RW,
+SYSCTL_INT(_net_inet_igmp, IGMPCTL_VERSION, version, CTLFLAG_RW,
 	&igmp_version, 0, "");
 
 /*
