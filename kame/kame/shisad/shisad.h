@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.9 2005/02/17 10:17:21 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.10 2005/04/20 04:10:25 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -356,7 +356,6 @@ struct binding_cache {
 LIST_HEAD(binding_cache_head, binding_cache);
 
 extern int debug, numerichost;
-const char *ip6_sprintf(const struct in6_addr *addr);
 
 /* mh.c */
 void mhsock_open(void);
@@ -443,6 +442,7 @@ int nemo_ifflag_get(char *);
 #endif /* MIP_NEMO */
 
 /* common.c */
+struct mip_msghdr;
 int  mipsock_input_common(int);
 void mipsock_open(void);
 int  mipsock_nodetype_request(u_int8_t, u_int8_t);
@@ -515,4 +515,8 @@ void nemo_parse_conf(char *);
 void command_show_pt(int, char *);
 
 #endif /* MIP_NEMO */
+
+/* other utility functions */
+char *hexdump(void *, size_t);
+const char *ip6_sprintf(const struct in6_addr *addr);
 #endif /* _SHISAD_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.12 2005/04/14 06:22:36 suz Exp $	*/
+/*	$KAME: mnd.c,v 1.13 2005/04/20 04:10:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -946,6 +946,10 @@ send_haadreq(hoainfo, hoa_plen, src)
 	cmsgptr->cmsg_type = IPV6_PKTINFO;
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+	if (debug)
+		syslog(LOG_INFO, "send DHAAD req from %s to %s\n",
+		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
+		
 	
 #if defined(MIP_MN) && defined(MIP_NEMO)
 	if (ar_sin6) { 

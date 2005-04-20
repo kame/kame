@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.4 2005/04/14 06:22:36 suz Exp $  */
+/*      $KAME: network.c,v 1.5 2005/04/20 04:10:25 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -32,7 +32,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <netdb.h>
 
 #include <syslog.h>
 #include <sys/param.h>
@@ -1008,40 +1007,3 @@ send_na(dest, mif)
 
 #endif
 
-const char *
-ip6_sprintf(addr)
-	const struct in6_addr *addr;
-{
-	static int ip6round = 0;
-	static char ip6buf[8][NI_MAXHOST];
-	struct sockaddr_in6 sin6;
-	int flags = 0;
-
-	if (numerichost)
-		flags |= NI_NUMERICHOST;
-
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(sin6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *addr;
-
-	/*
-	 * XXX: This is a special workaround for KAME kernels.
-	 * sin6_scope_id field of SA should be set in the future.
-	 */
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) ||
-	    IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr) ||
-	    IN6_IS_ADDR_MC_NODELOCAL(&sin6.sin6_addr)) {
-		/* XXX: override is ok? */
-		sin6.sin6_scope_id = (u_int32_t)ntohs(*(u_short *)&sin6.sin6_addr.s6_addr[2]);
-		*(u_short *)&sin6.sin6_addr.s6_addr[2] = 0;
-	}
-
-	ip6round = (ip6round + 1) & 7;
-
-	if (getnameinfo((struct sockaddr *)&sin6, sizeof(sin6),
-			ip6buf[ip6round], NI_MAXHOST, NULL, 0, flags) != 0)
-		return ("?");
-
-	return (ip6buf[ip6round]);
-}
