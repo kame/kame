@@ -27,7 +27,7 @@
 SRCDIR=	${.CURDIR}/../../../kame/shisad
 
 PROG=	babymdd
-SRCS=	babymdd.c network.c
+SRCS=	babymdd.c network.c util.c
 CFLAGS+= -g -Wall -Werror -DTEST -DMIP_MN
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 

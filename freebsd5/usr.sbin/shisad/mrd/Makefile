@@ -27,7 +27,7 @@
 SRCDIR=	${.CURDIR}/../../../kame/shisad
 
 PROG=	mrd
-SRCS=	mnd.c callout.c mh.c fsm.c binding.c network.c  common.c fdlist.c command.c nemo_var.c
+SRCS=	mnd.c rr.c callout.c mh.c fsm.c binding.c network.c  common.c fdlist.c command.c nemo_var.c util.c
 #CFLAGS+= -g -Wall -Werror -DMIP_MN -DMIP_NEMO  -DMIP_MCOA
 CFLAGS+= -g -Wall -Werror -DMIP_MN -DMIP_NEMO 
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}

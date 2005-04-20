@@ -28,7 +28,7 @@ SRCDIR=	${.CURDIR}/../../../kame/shisad
 
 PROG=	had
 SRCS=	had.c  callout.c common.c  mh.c \
-	binding.c fdlist.c command.c network.c
+	binding.c fdlist.c command.c network.c util.c
 CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 

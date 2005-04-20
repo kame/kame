@@ -27,7 +27,7 @@
 SRCDIR=	${.CURDIR}/../../../kame/shisad
 
 PROG=	nemonetd
-SRCS=	nemo_netconfig.c network.c 
+SRCS=	nemo_netconfig.c network.c util.c
 CFLAGS+= -g -Wall -Werror  -DMIP_NEMO #-DMIP_MCOA
 
 #LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
