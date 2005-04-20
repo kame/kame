@@ -1,4 +1,4 @@
-/*      $KAME: rr.c,v 1.1 2005/04/20 04:10:25 t-momose Exp $  */
+/*      $KAME: rr.c,v 1.2 2005/04/20 08:37:25 t-momose Exp $  */
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
  *
@@ -32,6 +32,7 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/time.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6mh.h>
@@ -48,6 +49,7 @@
 struct mip6_nonces_info nonces_array[MIP6_NONCE_HISTORY];
 struct mip6_nonces_info *nonces_head;
 #endif
+
 void
 mip6_calculate_kbm(home_token, careof_token, kbm)
         mip6_token_t *home_token;
@@ -165,8 +167,6 @@ generate_nonces(ninfo)
 
 	return (ninfo);
 };
-
-
 
 struct mip6_nonces_info *
 get_nonces(index)
