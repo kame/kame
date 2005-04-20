@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2753 2005/04/19 06:55:22 suz Exp $
+$KAME: CHANGELOG,v 1.2754 2005/04/20 01:28:25 suz Exp $
 
 <200504>
+2005-04-20  SUZUKI, Shinsuke <suz@kame.net>
+	* freebsd5/sys/net/if.c: FreeBSD Security Advisory
+	 FreeBSD-SA-05:04.ifconf
+
 2005-04-19  SUZUKI, Shinsuke <suz@kame.net>
 	* *bsd/sys/netinet/igmp.c, igmp_var.h, in.[ch], ip_output.c,
 	  kame/sys/netient/in_msf.c: 
