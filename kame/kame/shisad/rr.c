@@ -1,4 +1,4 @@
-/*      $KAME: rr.c,v 1.2 2005/04/20 08:37:25 t-momose Exp $  */
+/*      $KAME: rr.c,v 1.3 2005/04/21 13:57:15 t-momose Exp $  */
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
  *
@@ -142,8 +142,10 @@ init_nonces()
 	nonces_head = &nonces_array[0];
 	
 	/* ajusting next pointer */
-	for (i = 0; i < (MIP6_NONCE_HISTORY - 1); i++) 
+	for (i = 0; i < (MIP6_NONCE_HISTORY - 1); i++) {
 		nonces_array[i].next  = &nonces_array[i + 1];
+		LIST_INIT(&nonces_array[i].nb_head);
+	}
 	nonces_array[MIP6_NONCE_HISTORY - 1].next = &nonces_array[0];
 	
 	/* ajusting prev pointer */
@@ -154,11 +156,17 @@ init_nonces()
 	nonces_head = generate_nonces(&nonces_array[0]);
 };
 
-
 struct mip6_nonces_info *
 generate_nonces(ninfo)
 	struct mip6_nonces_info *ninfo;
 {
+	struct mip6_nonce_blockedbce *nb;
+
+	while ((nb = LIST_FIRST(&ninfo->nb_head))) {
+		LIST_REMOVE(nb, nb_entry);
+		mip6_bc_delete(nb->nb_bc);
+		free(nb);
+	}
 	(void)RAND_pseudo_bytes(ninfo->node_key, MIP6_NODEKEY_SIZE);
 	(void)RAND_pseudo_bytes(ninfo->nonce, MIP6_NONCE_SIZE);
 
@@ -167,6 +175,38 @@ generate_nonces(ninfo)
 
 	return (ninfo);
 };
+
+void
+retain_bc_to_nonce(ninfo, bce)
+	struct mip6_nonces_info *ninfo;
+	struct binding_cache *bce;
+{
+	struct mip6_nonce_blockedbce *nb;
+
+	if ((nb = malloc(sizeof(struct mip6_nonce_blockedbce))) == NULL)
+		return;
+
+	memset(nb, 0, sizeof(struct mip6_nonce_blockedbce));
+	nb->nb_bc = bce;
+	bce->bc_refcnt++;
+	LIST_INSERT_HEAD(&ninfo->nb_head, nb, nb_entry);
+}
+
+int
+check_nonce_reuse(ninfo, hoa, coa)
+	struct mip6_nonces_info *ninfo;
+	struct in6_addr *hoa, *coa;
+{
+	struct mip6_nonce_blockedbce *nb;
+
+	LIST_FOREACH(nb, &ninfo->nb_head, nb_entry) {
+		if (IN6_ARE_ADDR_EQUAL(hoa, &nb->nb_bc->bc_hoa)) {
+			return (1);
+		}
+	}
+
+	return (0);
+}
 
 struct mip6_nonces_info *
 get_nonces(index)

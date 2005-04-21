@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.10 2005/04/20 04:10:25 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.11 2005/04/21 13:57:15 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -146,6 +146,14 @@ struct mip6_hpfxl {
 };
 LIST_HEAD(mip6_hpfx_list, mip6_hpfxl);
 
+/* mip6_nonce_addrs structure is chained from mip6_nonces_info
+ */
+struct binding_cache;
+struct mip6_nonce_blockedbce {
+	LIST_ENTRY(mip6_nonce_blockedbce)	nb_entry;
+	struct binding_cache	*nb_bc;
+};
+
 /* For Correspondent Node */
 struct mip6_nonces_info {
 	struct mip6_nonces_info *next, *prev;
@@ -153,6 +161,7 @@ struct mip6_nonces_info {
 	u_int8_t  nonce[MIP6_NONCE_SIZE];
 	u_int8_t  node_key[MIP6_NODEKEY_SIZE];
 	time_t	  nonce_lasttime; /*  generated time */
+	LIST_HEAD(, mip6_nonce_blockedbce) nb_head;
 };
 
 /*
@@ -331,9 +340,11 @@ struct mip6_mobility_options {
 struct binding_cache {
         LIST_ENTRY(binding_cache) bc_entry;
         struct in6_addr       bc_hoa;       /* peer home address */
-        struct in6_addr       bc_coa;      /* peer coa */
+        struct in6_addr       bc_coa;       /* peer coa */
         struct in6_addr       bc_myaddr;    /* my addr (needed?) */
-        u_int8_t              bc_status;    /* BA statue */
+        u_int8_t              bc_state;     /* state of this bce */
+#define BC_STATE_VALID		0
+#define BC_STATE_DEPRECATED	1	
         u_int16_t             bc_flags;     /* recved BU flags */
         u_int16_t             bc_seqno;     /* recved BU seqno */
         u_int32_t             bc_lifetime;  /* recved BU lifetime */
@@ -341,12 +352,15 @@ struct binding_cache {
         time_t                bc_expire;    /* expiration time of this BC. */
         CALLOUT_HANDLE        bc_refresh;   /* callout handle for retrans */
         u_int8_t              bc_refresh_count;
-
+	u_int8_t	      bc_authmethod;
+#define BC_AUTH_NONE		0
+#define BC_AUTH_IPSEC		1
+#define BC_AUTH_RR		2
 
 	/* valid only when BUF_HOME */
         void                  *bc_dad;      /* dad handler */
         time_t                bc_mpa_exp;   /* expiration time for MPA */
-        struct binding_cache  *bc_llmbc;
+        struct binding_cache *bc_llmbc;
         u_int32_t             bc_refcnt;
         u_int                 bc_brr_sent;
 #ifdef MIP_MCOA
@@ -383,6 +397,9 @@ int  send_cot(struct ip6_mh_careof_test_init *, struct in6_addr *,
 	     struct in6_addr *);
 int  send_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *, struct in6_addr *, 
 	    struct ip6_mh_binding_update *, mip6_kbm_t *, u_int8_t, u_int16_t, u_int16_t, int, u_int16_t);
+int send_mps(struct mip6_hpfxl *);
+
+/* rr.c */
 void mip6_calculate_kbm(mip6_token_t *, mip6_token_t *, mip6_kbm_t *);
 void mip6_calculate_authenticator(mip6_kbm_t *, struct in6_addr *, 
     struct in6_addr *, caddr_t, size_t, int, size_t, mip6_authenticator_t *);
@@ -391,8 +408,8 @@ struct mip6_nonces_info * generate_nonces(struct mip6_nonces_info *);
 void init_nonces (void);
 void create_keygentoken(struct in6_addr *, struct mip6_nonces_info *, 
 			u_int8_t *, u_int8_t);
-
-int send_mps(struct mip6_hpfxl *);
+void retain_bc_to_nonce(struct mip6_nonces_info *, struct binding_cache *);
+int check_nonce_reuse(struct mip6_nonces_info *, struct in6_addr *, struct in6_addr *);
 
 /* binding.c */
 struct binding_update_list *bul_get(struct in6_addr *, struct in6_addr *);
@@ -422,7 +439,7 @@ void command_show_kbul(int, char *);
 struct binding_cache *mip6_bc_lookup(struct in6_addr *, struct in6_addr *, 
     u_int16_t);
 struct binding_cache *mip6_bc_add(struct in6_addr *, struct in6_addr *, 
-    struct in6_addr *, u_int32_t, u_int16_t, u_int16_t, u_int16_t);
+    struct in6_addr *, u_int32_t, u_int16_t, u_int16_t, u_int16_t, u_int8_t);
 
 /* network.c */
 int set_ip6addr(char *, struct in6_addr *, int, int);

@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.12 2005/04/14 06:22:35 suz Exp $	*/
+/*      $KAME: binding.c,v 1.13 2005/04/21 13:57:15 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -124,11 +124,12 @@ mip6_flush_kernel_bc()
 }
 
 struct binding_cache *
-mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid)
+mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 	struct in6_addr *hoa, *coa, *recvaddr;
-        u_int32_t lifetime;
+	u_int32_t lifetime;
 	u_int16_t flags;
-        u_int16_t seqno, bid;
+	u_int16_t seqno, bid;
+	u_int8_t authmethod;
 {
 	struct binding_cache *bc;
 	time_t now;
@@ -167,6 +168,9 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid)
 	bc->bc_lifetime = lifetime;
 	bc->bc_flags = flags;
 	bc->bc_seqno = seqno;
+	bc->bc_state = BC_STATE_VALID;
+	bc->bc_refcnt = 0;
+	bc->bc_authmethod = authmethod;
 #ifdef MIP_MCOA
 	bc->bc_bid = bid;
 #endif /* MIP_MCOA */
@@ -175,6 +179,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid)
 	mipscok_bc_request(bc, MIPM_BC_ADD);
 	
         LIST_INSERT_HEAD(&bchead, bc, bc_entry);
+	bc->bc_refcnt++;
  done:
 
 	bc->bc_expire = now + bc->bc_lifetime;
@@ -206,18 +211,33 @@ mip6_bc_delete(bcreq)
 	if (bc == NULL)
 		return;
 #endif /* 1 */
-	if (bc->bc_llmbc)
-		mip6_bc_delete(bc->bc_llmbc);
+
+	switch (bc->bc_state) {
+	case BC_STATE_VALID:
+		if (bc->bc_llmbc) {
+			mip6_bc_delete(bc->bc_llmbc);
+			bc->bc_llmbc = NULL;
+		}
 	
-	/* stop timer */
-	mip6_bc_stop_refresh_timer(bc);
+		/* stop timer */
+		mip6_bc_stop_refresh_timer(bc);
 
-	/* delete BC into the kernel via mipsock */
-	mipscok_bc_request(bc, MIPM_BC_REMOVE);
+		/* delete BC into the kernel via mipsock */
+		mipscok_bc_request(bc, MIPM_BC_REMOVE);
 
-	LIST_REMOVE(bc, bc_entry); 
-	free(bc);
-
+		LIST_REMOVE(bc, bc_entry); 
+		if (bc->bc_authmethod == BC_AUTH_RR) {
+			bc->bc_state = BC_STATE_DEPRECATED;
+			break;
+		}
+		/* Fall through */
+	case BC_STATE_DEPRECATED:
+		if (--bc->bc_refcnt == 0) {
+			free(bc);
+		}
+		break;
+	}
+		
 	return;
 };
 
@@ -259,6 +279,8 @@ command_show_bc(s, line)
 
 	now = time(NULL);
         for (bc = LIST_FIRST(&bchead); bc; bc = LIST_NEXT(bc, bc_entry)) {
+		if (bc->bc_state != BC_STATE_VALID)
+			continue;
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_hoa));
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_coa));
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_myaddr));

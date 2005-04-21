@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.22 2005/04/20 04:10:25 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.23 2005/04/21 13:57:15 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -552,6 +552,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	struct in6_addr *coa = NULL, *retcoa = NULL;
 #ifdef MIP_CN
         mip6_token_t home_token, careof_token;
+	struct mip6_nonces_info *home_nonces = NULL, *careof_nonces = NULL;
 #endif /* MIP_CN */
 	mip6_kbm_t *kbm = NULL;
 	u_int16_t flags;
@@ -560,6 +561,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	int retcode = -1;
 	int statuscode = IP6_MH_BAS_ACCEPTED;
 	u_int16_t bid = 0;
+	int authmethod = BC_AUTH_NONE; 
 
 	/* Shisa Statistics: BU messages */
 	mip6stat.mip6s_bu++;
@@ -630,7 +632,6 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		int cnnonce = 0;
 		u_int16_t cksum;
 		mip6_authenticator_t authenticator;
-		struct mip6_nonces_info *home_nonces, *careof_nonces;
 
 /* 9.5.1
    If the Home Registration (H) bit is set, the Nonce Indices mobility
@@ -666,6 +667,10 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			cnnonce = 1;
 		}
 		
+		if ((home_nonces && check_nonce_reuse(home_nonces, hoa, coa)) ||
+		    (careof_nonces && check_nonce_reuse(careof_nonces, hoa, coa)))
+			statuscode = IP6_MH_BAS_NI_EXPIRED;
+
 		if (statuscode != IP6_MH_BAS_ACCEPTED)
 			goto sendba;
 
@@ -705,6 +710,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		}
 		if (lifetime > MIP6_MAX_RR_BINDING_LIFE)
 			lifetime = MIP6_MAX_RR_BINDING_LIFE;
+		authmethod = BC_AUTH_RR;
 #endif /* MIP_CN */
 	} else {
 #ifdef MIP_CN
@@ -733,7 +739,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		}
 #elif defined(MIP_HA)
 		/* go thorough (assuming IPsec protection in the kernel) */
-		;
+		authmethod = BC_AUTH_IPSEC;
 #endif /* MIP_CN */ 
 	}
 
@@ -809,7 +815,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #endif /* MIP_NEMO */
 
 	/* if 'H' flags is disabled suddenly, sending BA */
-	if (!(flags & IP6_MH_BU_HOME) && 
+	if (!(flags & IP6_MH_BU_HOME) &&
 	    (bc && (bc->bc_flags & IP6_MH_BU_HOME))) {
 		statuscode = IP6_MH_BAS_REG_NOT_ALLOWED;
 		goto sendba;
@@ -863,7 +869,6 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	}
 #endif /* MIP_NEMO */
 
-
 #endif /* MIP_HA */
 
 	/* Requesitng to delete binding (de-registration) */
@@ -875,9 +880,16 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			   the address is used for updating tunnel SA 
 			   Does it work on MCOA case ?
 			 */
+#ifdef MIP_CN
+			if (home_nonces)
+				retain_bc_to_nonce(home_nonces, bc);
+			if (careof_nonces)
+				retain_bc_to_nonce(careof_nonces, bc);
+#endif /* MIP_CN */
 			mip6_bc_delete(bc);
 			syslog(LOG_INFO,
-			       "binding cache has been deleted\n");
+			       "binding cache has been deleted. HoA:[%s], CoA[%s]\n",
+			       ip6_sprintf(hoa), ip6_sprintf(coa));
 		} else {
 #ifdef MIP_HA
 			/* 10.3.2 */
@@ -895,7 +907,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		lifetime = 0;	/* Returned lifetime in BA must be zero */
 	} else {
 		/* Requesitng to cache binding (registration) */
-		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid);
+		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid, authmethod);
 		if (flags & IP6_MH_BU_LLOCAL) {
 			struct in6_addr llhoa;
 
@@ -903,7 +915,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			llhoa.s6_addr[0] = 0xfe;
 			llhoa.s6_addr[1] = 0x80;
 			memcpy(&llhoa.s6_addr[8], &hoa->s6_addr[8], 8);
-			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid);
+			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid, authmethod);
 		}
 	}
 	retcode = 0;
