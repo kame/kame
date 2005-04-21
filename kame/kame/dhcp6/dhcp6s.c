@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.157 2005/04/14 06:22:32 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.158 2005/04/21 02:25:44 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2011,6 +2011,7 @@ update_ia(msgtype, iap, retlist, optinfo)
 		struct dhcp6_list ialist;
 		struct dhcp6_listval *lv;
 		struct dhcp6_prefix prefix;
+		struct dhcp6_statefuladdr saddr;
 		struct dhcp6_ia ia;
 
 		TAILQ_INIT(&ialist);
@@ -2056,25 +2057,25 @@ update_ia(msgtype, iap, retlist, optinfo)
 				if (lv->type != DHCP6_LISTVAL_STATEFULADDR6)
 					continue;
 
-				prefix = lv->val_prefix6;
+				saddr = lv->val_statefuladdr6;
 				blv = dhcp6_find_listval(&binding->val_list,
-				    DHCP6_LISTVAL_STATEFULADDR6, &prefix, 0);
+				    DHCP6_LISTVAL_STATEFULADDR6, &saddr, 0);
 				if (blv == NULL) {
 					dprintf(LOG_DEBUG, FNAME,
 					    "%s is not found in %s",
-					    in6addr2str(&prefix.addr, 0),
+					    in6addr2str(&saddr.addr, 0),
 					    bindingstr(binding));
-					prefix.pltime = 0;
-					prefix.vltime = 0;
+					saddr.pltime = 0;
+					saddr.vltime = 0;
 				} else {
-					prefix.pltime =
-					    blv->val_prefix6.pltime;
-					prefix.vltime =
-					    blv->val_prefix6.vltime;
+					saddr.pltime =
+					    blv->val_statefuladdr6.pltime;
+					saddr.vltime =
+					    blv->val_statefuladdr6.pltime;
 				}
 
 				if (dhcp6_add_listval(&ialist,
-				    DHCP6_LISTVAL_STATEFULADDR6, &prefix, NULL)
+				    DHCP6_LISTVAL_STATEFULADDR6, &saddr, NULL)
 				    == NULL) {
 					dprintf(LOG_NOTICE, FNAME,
 					    "failed  to copy binding info");
@@ -2552,8 +2553,10 @@ update_binding_duration(binding)
 
 			switch (binding->iatype) {
 			case DHCP6_LISTVAL_IAPD:
-			case DHCP6_LISTVAL_IANA:
 				lifetime = iav->val_prefix6.vltime;
+				break;
+			case DHCP6_LISTVAL_IANA:
+				lifetime = iav->val_statefuladdr6.vltime;
 				break;
 			default:
 				dprintf(LOG_ERR, FNAME, "unsupported IA type");

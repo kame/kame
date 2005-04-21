@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.126 2005/04/14 06:22:32 suz Exp $	*/
+/*	$KAME: common.c,v 1.127 2005/04/21 02:25:44 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -215,7 +215,7 @@ dhcp6_find_listval(head, type, val, option)
 			}
 			break;
 		case DHCP6_LISTVAL_STATEFULADDR6:
-			if (IN6_ARE_ADDR_EQUAL(&lv->val_prefix6.addr,
+			if (IN6_ARE_ADDR_EQUAL(&lv->val_statefuladdr6.addr,
 			    &((struct dhcp6_prefix *)val)->addr)) {
 				return (lv);
 			}
@@ -267,8 +267,10 @@ dhcp6_add_listval(head, type, val, sublist)
 		lv->val_addr6 = *(struct in6_addr *)val;
 		break;
 	case DHCP6_LISTVAL_PREFIX6:
-	case DHCP6_LISTVAL_STATEFULADDR6:
 		lv->val_prefix6 = *(struct dhcp6_prefix *)val;
+		break;
+	case DHCP6_LISTVAL_STATEFULADDR6:
+		lv->val_statefuladdr6 = *(struct dhcp6_statefuladdr *)val;
 		break;
 	case DHCP6_LISTVAL_IAPD:
 	case DHCP6_LISTVAL_IANA:
@@ -2676,10 +2678,10 @@ copyout_option(p, ep, optval)
 		break;
 	case DHCP6_LISTVAL_STATEFULADDR6:
 		ia_addr.dh6_ia_addr_preferred_time =
-		    htonl(optval->val_prefix6.pltime);
+		    htonl(optval->val_statefuladdr6.pltime);
 		ia_addr.dh6_ia_addr_valid_time =
-		    htonl(optval->val_prefix6.vltime);
-		ia_addr.dh6_ia_addr_addr = optval->val_prefix6.addr;
+		    htonl(optval->val_statefuladdr6.vltime);
+		ia_addr.dh6_ia_addr_addr = optval->val_statefuladdr6.addr;
 		break;
 	case DHCP6_LISTVAL_STCODE:
 		stcodeopt.dh6_stcode_code = htons(optval->val_num16);
