@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.46 2005/03/06 16:04:17 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.47 2005/04/21 18:36:21 nishida Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -2143,7 +2143,7 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 		ip->ip_hl = (sizeof(struct ip) >> 2);
 		if (nofragment_flag) {
 #if defined(WITH_CONVERT_IP_OFF) || defined(__FreeBSD__)
-#ifdef __OpenBSD__
+#if defined( __OpenBSD__) || defined(__NetBSD__)
 			/* OpenBSD has WITH_CONVERT_IP_OFF defined?? */
 			ip->ip_off = htons(IP_DF);
 #else
@@ -2167,7 +2167,7 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 #else
 		ip->ip_ttl = inp->inp_ip_ttl;
 #endif
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 		ip->ip_len = htons(m->m_pkthdr.len);
 #else
 		ip->ip_len = m->m_pkthdr.len;
@@ -2295,6 +2295,10 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 #if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
 				, (struct inpcb *)NULL
 #endif
+#if defined(__NetBSD__)
+                                ,(struct socket *)inp->sctp_socket
+#endif
+
 );
 		if ((ro->ro_rt) && (have_mtu) && (net) && (have_mtu > net->mtu)) {
 			ro->ro_rt->rt_ifp->if_mtu = have_mtu;
@@ -8268,14 +8272,14 @@ sctp_send_shutdown_complete2(struct mbuf *m, int iphlen, struct sctphdr *sh)
 		}
 #endif
 		/* set IPv4 length */
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__)
 		iph_out->ip_len = mout->m_pkthdr.len;
 #else
 		iph_out->ip_len = htons(mout->m_pkthdr.len);
 #endif
 		/* out it goes */
 		ip_output(mout, 0, &ro, IP_RAWOUTPUT, NULL
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)  || defined(__NetBSD__)
 		    , NULL
 #endif
 		    );
@@ -9236,14 +9240,14 @@ sctp_send_abort(struct mbuf *m, int iphlen, struct sctphdr *sh, uint32_t vtag,
                 }
 #endif
 		/* set IPv4 length */
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__)
 		iph_out->ip_len = mout->m_pkthdr.len;
 #else
 		iph_out->ip_len = htons(mout->m_pkthdr.len);
 #endif
 		/* out it goes */
 		(void)ip_output(mout, 0, &ro, IP_RAWOUTPUT, NULL
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000) || defined(__NetBSD__)
 		    , NULL
 #endif
 		    );
@@ -9351,13 +9355,13 @@ sctp_send_operr_to(struct mbuf *m, int iphlen,
 		out->ip_sum = 0;
 		out->ip_src = iph->ip_dst;
 		out->ip_dst = iph->ip_src;
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__)
 		out->ip_len = scm->m_pkthdr.len;
 #else
 		out->ip_len = htons(scm->m_pkthdr.len);
 #endif
 		retcode = ip_output(scm, 0, &ro, IP_RAWOUTPUT, NULL
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000) || defined(__NetBSD__)
 		    , NULL
 #endif
 			);
