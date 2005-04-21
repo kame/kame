@@ -1,4 +1,4 @@
-/*	$KAME: esp_aesctr.c,v 1.2 2003/07/20 00:29:37 itojun Exp $	*/
+/*	$KAME: esp_aesctr.c,v 1.3 2005/04/21 05:40:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -57,7 +57,7 @@
 union cblock {
 	struct {
 		u_int8_t nonce[4];
-		u_int8_t iv[16];
+		u_int8_t iv[8];
 		u_int32_t ctr;
 	} v __attribute__((__packed__));
 	u_int8_t cblock[16];
