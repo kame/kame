@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.26 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.27 2005/04/23 07:13:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -186,10 +186,15 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 				rt2->rt_flags & RTF_HOST &&
 				rt2->rt_gateway &&
 				rt2->rt_gateway->sa_family == AF_LINK) {
+#ifdef __FreeBSD__
+				rtexpunge(rt2);
+				RTFREE_LOCKED(rt2);
+#else
 				rtrequest(RTM_DELETE,
 					  (struct sockaddr *)rt_key(rt2),
 					  rt2->rt_gateway,
 					  rt_mask(rt2), rt2->rt_flags, 0);
+#endif
 				ret = rn_addroute(v_arg, n_arg, head,
 					treenodes);
 			}
@@ -304,6 +309,9 @@ in6_clsroute(struct radix_node *rn, struct radix_node_head *head)
 		rt->rt_flags |= RTPRF_OURS;
 		rt->rt_rmx.rmx_expire = time_second + rtq_reallyold;
 	} else {
+#ifdef __FreeBSD__
+		rtexpunge(rt);
+#else
 		struct rtentry *dummy;
 
 		/*
@@ -314,6 +322,7 @@ in6_clsroute(struct radix_node *rn, struct radix_node_head *head)
 			  (struct sockaddr *)rt_key(rt),
 			  rt->rt_gateway, rt_mask(rt),
 			  rt->rt_flags, &dummy);
+#endif
 	}
 }
 

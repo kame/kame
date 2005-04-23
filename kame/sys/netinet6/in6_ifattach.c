@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.207 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.208 2005/04/23 07:13:52 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1090,19 +1090,20 @@ in6_ifdetach(ifp)
 	if (rt_tables[AF_INET6] != NULL) {
 #ifdef __FreeBSD__
 		RADIX_NODE_HEAD_LOCK(rt_tables[AF_INET6]);
-#endif
-#ifndef __FreeBSD__
-		rt = rtalloc1((struct sockaddr *)&sin6, 0);
-#else
 		rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
-#endif
+		if (rt) {
+			if (rt->rt_ifp == ifp)
+				rtexpunge(rt);
+			RTFREE_LOCKED(rt);
+		}
+		RADIX_NODE_HEAD_UNLOCK(rt_tables[AF_INET6]);
+#else
+		rt = rtalloc1((struct sockaddr *)&sin6, 0);
 		if (rt && rt->rt_ifp == ifp) {
 			rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
 			    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 			rtfree(rt);
 		}
-#ifdef __FreeBSD__
-		RADIX_NODE_HEAD_UNLOCK(rt_tables[AF_INET6]);
 #endif
 	}
 }
