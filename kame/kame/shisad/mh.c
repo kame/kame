@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.23 2005/04/21 13:57:15 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.24 2005/04/25 08:09:02 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -881,10 +881,12 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			   Does it work on MCOA case ?
 			 */
 #ifdef MIP_CN
-			if (home_nonces)
+			if (home_nonces && (authmethod == BC_AUTH_IPSEC))
 				retain_bc_to_nonce(home_nonces, bc);
-			if (careof_nonces)
+			if (careof_nonces && (authmethod == BC_AUTH_IPSEC))
 				retain_bc_to_nonce(careof_nonces, bc);
+			if (!home_nonces && !careof_noces)
+				mip6_bc_delete(bc);
 #endif /* MIP_CN */
 			mip6_bc_delete(bc);
 			syslog(LOG_INFO,
