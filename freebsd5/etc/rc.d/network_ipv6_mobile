@@ -95,8 +95,13 @@ network_ipv6_mobile_start()
 		done
 		echo -n ' cnd'
 		cnd -n
-		echo -n ' rtsold'
-		rtsold -a -m
+		if [ X${ipv6_mobile_interfaces} = X ]; then
+			echo -n ' rtsold'
+			rtsold -a -m
+		else
+			echo -n ' rtsold'
+			rtsold -m ${ipv6_mobile_interfaces}
+		fi
 		;;
 	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
 		case ${ipv6_mobile_home_interface} in
