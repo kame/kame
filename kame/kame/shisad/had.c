@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.14 2005/04/14 06:22:36 suz Exp $	*/
+/*	$KAME: had.c,v 1.15 2005/04/25 01:40:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -685,6 +685,7 @@ terminate(dummy)
 	int dummy;
 {
 	mip6_flush_kernel_bc();
+	mipsock_nodetype_request(MIP6_NODETYPE_HOME_AGENT, 0);
 	unlink(pid_file);
 	exit(1);
 }

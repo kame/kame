@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.5 2005/04/14 06:22:35 suz Exp $	*/
+/*	$KAME: cnd.c,v 1.6 2005/04/25 01:40:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -232,6 +232,7 @@ terminate(dummy)
 	int dummy;
 {
 	mip6_flush_kernel_bc();
+	mipsock_nodetype_request(MIP6_NODETYPE_CORRESPONDENT_NODE, 0);
 	unlink(pid_file);
 	exit(1);
 }
