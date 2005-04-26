@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.389 2005/04/14 06:22:39 suz Exp $	*/
+/*	$KAME: in6.c,v 1.390 2005/04/26 15:42:23 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1131,7 +1131,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 		ia->ia_addr.sin6_family = AF_INET6;
 		ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
-		ia->ia6_createtime = ia->ia6_updatetime = time_second;
+		ia->ia6_createtime = time_second;
 		if ((ifp->if_flags & (IFF_POINTOPOINT | IFF_LOOPBACK)) != 0) {
 			/*
 			 * XXX: some functions expect that ifa_dstaddr is not
@@ -1158,6 +1158,9 @@ in6_update_ifa(ifp, ifra, ia, flags)
 
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
 	}
+
+	/* update timestamp */
+	ia->ia6_updatetime = time_second;
 
 	/* set prefix mask */
 	if (ifra->ifra_prefixmask.sin6_len) {
