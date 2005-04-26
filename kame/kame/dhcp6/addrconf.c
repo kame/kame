@@ -1,4 +1,4 @@
-/*	$KAME: addrconf.c,v 1.5 2005/04/14 06:22:32 suz Exp $	*/
+/*	$KAME: addrconf.c,v 1.6 2005/04/26 14:12:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -385,5 +385,5 @@ na_ifaddrconf(cmd, sa)
 	sin6.sin6_addr = addr->addr;
 
 	return (ifaddrconf(cmd, sa->dhcpif->ifname, &sin6, 128,
-	    addr->vltime, addr->pltime));
+	    addr->pltime, addr->vltime));
 }
