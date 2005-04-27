@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.39 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.40 2005/04/27 11:35:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -816,8 +816,8 @@ got_match:
 
 			ti.ip6 = *ip6;
 			ti.th = *tcp;
-			NTOHL(ti.th.th_seq);
-			NTOHL(ti.th.th_ack);
+			ti.th.th_seq = ntohl(ti.th.th_seq);
+			ti.th.th_ack = ntohl(ti.th.th_ack);
 			ti.ip6.ip6_nxt = IPPROTO_TCP;
 			if (ti.th.th_flags & TH_ACK) {
 				ack = 0;
