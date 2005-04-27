@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.24 2005/04/25 08:09:02 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.25 2005/04/27 01:54:05 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -885,7 +885,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 				retain_bc_to_nonce(home_nonces, bc);
 			if (careof_nonces && (authmethod == BC_AUTH_IPSEC))
 				retain_bc_to_nonce(careof_nonces, bc);
-			if (!home_nonces && !careof_noces)
+			if (!home_nonces && !careof_nonces)
 				mip6_bc_delete(bc);
 #endif /* MIP_CN */
 			mip6_bc_delete(bc);
