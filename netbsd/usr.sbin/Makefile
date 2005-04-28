@@ -7,7 +7,7 @@ SUBDIR+=faithd icmp6dump ifmcstat mld6query mping \
 SUBDIR+=pvcsif pvctxctl
 SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
-SUBDIR+=racoon
+#SUBDIR+=racoon
 SUBDIR+=dhcp6
 SUBDIR+=shisad
 

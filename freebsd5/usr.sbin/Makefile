@@ -3,7 +3,7 @@ SUBDIR+=faithd hroute6d icmp6dump \
 	rrenumd rtadvd rtsold setkey traceroute traceroute6
 #SUBDIR+=altqd pvcbridge pvcsif pvctxctl tbrconfig
 SUBDIR+=ifmcstat
-SUBDIR+=racoon
+#SUBDIR+=racoon
 SUBDIR+=ip6addrctl
 SUBDIR+=dhcp6
 SUBDIR+=shisad
