@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.160 2005/04/14 06:22:32 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.161 2005/04/28 15:05:52 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -588,7 +588,7 @@ client6_mainloop()
 				    strerror(errno));
 				exit(1);
 			}
-			break;
+			continue;
 		case 0:	/* timeout */
 			break;	/* dhcp6_check_timer() will treat the case */
 		default:
