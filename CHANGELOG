@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2760 2005/04/28 07:14:48 sakane Exp $
+$KAME: CHANGELOG,v 1.2761 2005/04/28 15:06:43 jinmei Exp $
 
 <200504>
+2005-04-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c (client6_mainloop): corrected error
+	handling for select(2) in order to avoid unexpected blocking when
+	receiving a signal.
+
 Thu Apr 28 16:12:38 JST 2005 sakane@tanu.org
 	* freebsd[45]/usr.sbin/Makefile,netbsd/usr.sbin/Makefile:
 	racoon was removed from the make list.
