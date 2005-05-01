@@ -68,9 +68,12 @@ network_ipv6_mobile_start()
 		;;
 	esac
 
+	echo -n ' cnd'
+	cnd -n
+
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
-		${SYSCTL_W} net.inet6.ip6.accept_rtadv=1
+		${SYSCTL_W} net.inet6.ip6.accept_rtadv=1 > /dev/null
 		# setup SPD/SA
 		if [ `${SYSCTL_N} net.inet6.mip6.use_ipsec` = "1" ]; then
 			for node_dir in ${ipv6_mobile_config_dir:=/usr/local/v6/etc/mobileip6}/*
@@ -93,15 +96,8 @@ network_ipv6_mobile_start()
 		do
 			${ipv6_mobile_mdd_program} -h ${mip_interface}
 		done
-		echo -n ' cnd'
-		cnd -n
-		if [ X${ipv6_mobile_interfaces} = X ]; then
-			echo -n ' rtsold'
-			rtsold -a -m
-		else
-			echo -n ' rtsold'
-			rtsold -m ${ipv6_mobile_interfaces}
-		fi
+		echo -n ' rtsold'
+		rtsold -a -m
 		;;
 	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
 		case ${ipv6_mobile_home_interface} in
@@ -129,8 +125,6 @@ network_ipv6_mobile_start()
 
 			echo -n ' had'
 			had -n -i ${ipv6_mobile_home_interface}
-			echo -n ' cnd'
-			cnd -n
 			echo -n ' rtadvd'
 			rtadvd -m ${ipv6_mobile_home_interface}
 			# take in Router Advertisement
@@ -138,9 +132,6 @@ network_ipv6_mobile_start()
 			;;
 		esac
 		;;
-	*)
-		echo -n ' cnd'
-		cnd -n
 	esac
 
 	echo ''
