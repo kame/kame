@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.359 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.360 2005/05/02 10:03:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,9 +106,6 @@
 #include <net/netisr.h>
 #if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
 #include <net/pfil.h>
-#endif
-#ifdef __FreeBSD__
-#include <net/intrq.h>
 #endif
 
 #include <netinet/in.h>
