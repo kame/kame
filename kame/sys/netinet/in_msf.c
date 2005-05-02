@@ -3881,7 +3881,7 @@ match_msf4_per_if(inm, src, dst)
 	/* inms is NULL only in case of 224.0.0.0/24 */
 	if (inms == NULL) {
 		/* assumes 224.0.0.1 case has already been eliminated */
-		if (!is_igmp_target(&dst))
+		if (!is_igmp_target(dst))
 			return 1;
 		igmplog((LOG_DEBUG, "grp found, but src is NULL. impossible\n"));
 		return 0;
