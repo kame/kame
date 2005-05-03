@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.35 2005/01/12 06:06:10 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.36 2005/05/03 06:46:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -128,7 +128,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %type <list> ianaconf_list ianaconf
 %type <list> authparam_list authparam
 %type <list> keyparam_list keyparam
-%type <prefix> prefixparam
+%type <prefix> addressparam prefixparam
 
 %%
 statements:
@@ -429,11 +429,10 @@ declaration:
 
 			$$ = l;
 		}
-	|	ADDRESS prefixparam EOS
+	|	ADDRESS addressparam EOS
 		{
 			struct cf_list *l;
 
-			$2->plen = 128;	/* XXX */
 			MAKE_CFLIST(l, DECL_ADDRESS, $2,NULL);
 
 			$$ = l;
@@ -568,6 +567,65 @@ dhcpoption:
 			$$ = l;
 		}
 	;
+
+addressparam:
+		STRING duration
+		{
+			struct dhcp6_prefix pconf0, *pconf;		
+
+			memset(&pconf0, 0, sizeof(pconf0));
+			if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {
+				yywarn("invalid IPv6 address: %s", $1);
+				free($1);
+				return (-1);
+			}
+			free($1);
+			/* validate other parameters later */
+			pconf0.plen = 128; /* XXX this field is ignored */
+			if ($2 < 0)
+				pconf0.pltime = DHCP6_DURATITION_INFINITE;
+			else
+				pconf0.pltime = (u_int32_t)$2;
+			pconf0.vltime = pconf0.pltime;
+
+			if ((pconf = malloc(sizeof(*pconf))) == NULL) {
+				yywarn("can't allocate memory");
+				return (-1);
+			}
+			*pconf = pconf0;
+
+			$$ = pconf;
+		}
+	|	STRING duration duration
+		{
+			struct dhcp6_prefix pconf0, *pconf;		
+
+			memset(&pconf0, 0, sizeof(pconf0));
+			if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {
+				yywarn("invalid IPv6 address: %s", $1);
+				free($1);
+				return (-1);
+			}
+			free($1);
+			/* validate other parameters later */
+			pconf0.plen = 128; /* XXX */
+			if ($2 < 0)
+				pconf0.pltime = DHCP6_DURATITION_INFINITE;
+			else
+				pconf0.pltime = (u_int32_t)$2;
+			if ($3 < 0)
+				pconf0.vltime = DHCP6_DURATITION_INFINITE;
+			else
+				pconf0.vltime = (u_int32_t)$3;
+
+			if ((pconf = malloc(sizeof(*pconf))) == NULL) {
+				yywarn("can't allocate memory");
+				return (-1);
+			}
+			*pconf = pconf0;
+
+			$$ = pconf;
+		}
 
 prefixparam:
 		STRING SLASH NUMBER duration
@@ -738,7 +796,7 @@ ianaconf_list:
 	;
 
 ianaconf:
-	 	ADDRESS prefixparam EOS
+	 	ADDRESS addressparam EOS
 		{
 			struct cf_list *l;
 
