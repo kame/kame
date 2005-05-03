@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.50 2005/04/01 12:43:36 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.51 2005/05/03 06:20:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -1185,35 +1185,45 @@ configure_commit()
 	struct ia_conf *iac;
 
 	/* commit interface configuration */
-	for (ifc = dhcp6_ifconflist; ifc; ifc = ifc->next) {
-		if ((ifp = find_ifconfbyname(ifc->ifname)) != NULL) {
-			ifp->send_flags = ifc->send_flags;
+	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
+		/* re-initialization */
+		ifp->send_flags = 0;
+		ifp->allow_flags = 0;
+		dhcp6_clear_list(&ifp->reqopt_list);
+		clear_iaconf(&ifp->iaconf_list);
+		ifp->server_pref = DH6OPT_PREF_UNDEF;
+		if (ifp->scriptpath != NULL)
+			free(ifp->scriptpath);
+		ifp->scriptpath = NULL;
+		ifp->authproto = DHCP6_AUTHPROTO_UNDEF;
+		ifp->authalgorithm = DHCP6_AUTHALG_UNDEF; 
+		ifp->authrdm = DHCP6_AUTHRDM_UNDEF;
 
-			ifp->allow_flags = ifc->allow_flags;
+		for (ifc = dhcp6_ifconflist; ifc; ifc = ifc->next) {
+			if (strcmp(ifp->ifname, ifc->ifname) == 0)
+				break;
+		}
+		if (ifc == NULL)
+			continue;
 
-			dhcp6_clear_list(&ifp->reqopt_list);
-			dhcp6_move_list(&ifp->reqopt_list, &ifc->reqopt_list);
+		/* copy new configuration */
+		ifp->send_flags = ifc->send_flags;
+		ifp->allow_flags = ifc->allow_flags;
+		while ((iac = TAILQ_FIRST(&ifc->iaconf_list)) != NULL) {
+			TAILQ_REMOVE(&ifc->iaconf_list, iac, link);
+			TAILQ_INSERT_TAIL(&ifp->iaconf_list,
+			    iac, link);
+		}
+		ifp->server_pref = ifc->server_pref;
+		ifp->scriptpath = ifc->scriptpath;
 
-			clear_iaconf(&ifp->iaconf_list);
-			while ((iac = TAILQ_FIRST(&ifc->iaconf_list))
-			    != NULL) {
-				TAILQ_REMOVE(&ifc->iaconf_list, iac, link);
-				TAILQ_INSERT_TAIL(&ifp->iaconf_list,
-				    iac, link);
-			}
-
-			ifp->server_pref = ifc->server_pref;
-
-			ifp->scriptpath = ifc->scriptpath;
-			ifc->scriptpath = NULL;
-
-			if (ifc->authinfo != NULL) {
-				ifp->authproto = ifc->authinfo->protocol;
-				ifp->authalgorithm = ifc->authinfo->algorithm;
-				ifp->authrdm = ifc->authinfo->rdm;
-			}
+		if (ifc->authinfo != NULL) {
+			ifp->authproto = ifc->authinfo->protocol;
+			ifp->authalgorithm = ifc->authinfo->algorithm;
+			ifp->authrdm = ifc->authinfo->rdm;
 		}
 	}
+
 	clear_ifconf(dhcp6_ifconflist);
 	dhcp6_ifconflist = NULL;
 
