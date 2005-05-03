@@ -1,5 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2761 2005/04/28 15:06:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.2762 2005/05/03 07:00:25 jinmei Exp $
+
+<200505>
+2005-05-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/cfparse.y: corrected "address parameters" so
+	that we don't have to specify the meaningless (but mandatory)
+	prefix length in the context of IA_NA.
+
+2005-05-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/config.c (configure_commit): made sure that
+	interface parameters are initialized with the default values even
+	if the interface is not explicitly configured in the configuration
+	file.  This particularly made sure that the preference option is
+	not included unless explicitly specified.  A memory leakage for
+	the client when specifying a script file was also fixed.
 
 <200504>
 2005-04-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
