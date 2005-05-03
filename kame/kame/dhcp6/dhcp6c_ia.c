@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.30 2005/03/02 07:20:14 suz Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.31 2005/05/03 10:51:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -579,10 +579,10 @@ ia_timo(arg)
 	case IAS_RENEW:
 		ia->state = IAS_REBIND;
 		dhcpstate = DHCP6S_REBIND;
-		duidfree(&ia->serverid);
 
 		/*
-		 * We don't need a timer for the IA.  We'll just wait for a
+		/* We need keep DUID for sending Release in this state.
+		 * But we don't need a timer for the IA.  We'll just wait for a
 		 * reply for the REBIND until all associated configuration
 		 * parameters for this IA expire.
 		 */
