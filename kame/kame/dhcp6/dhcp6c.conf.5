@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.29 2005/02/03 19:41:31 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.30 2005/05/03 06:54:26 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -265,9 +265,11 @@ Its format is as follows:
 .Xc
 .Ar type
 is a string for the type of this IA.
-The current implementation only supports
-.Ic pd 
-(prefix delegation) as the type.
+The current implementation supports
+.Ql Ic na
+(non-temporary address allocation)
+.Ql Ic pd 
+(prefix delegation) for the IA type.
 .Ar ID
 is a decimal number of IAID.
 If omitted, the value 0 will be used by default.
@@ -275,6 +277,36 @@ If omitted, the value 0 will be used by default.
 is a sequence of statements that specifies configuration parameters
 for this IA.
 Each statement may or may not be specific to the type of IA.
+.Pp
+The followings are possible
+.Ar substatements
+for an IA of type
+.Ic na .
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic address Ar ipv6-address pltime Op Ar vltime ;
+.Xc
+specifies an address and related parameters that the client wants to be
+allocated.
+Multiple addresses can be specified, each of which is described as a
+separate
+.Ic address
+substatement.
+.Nm dhcp6c
+will include all the addresses
+.Pq and related parameters
+in Solicit messages,
+as an IA_NA prefix option encapsulated in the corresponding IA_NA
+option.
+Note, however, that the server may or may not respect the specified
+prefix parameters.
+For parameters of the
+.Ic address
+substatement,
+see
+.Xr dhcp6s.conf 5 .
+.El
+.Pp
 The followings are possible
 .Ar substatements
 for an IA of type
