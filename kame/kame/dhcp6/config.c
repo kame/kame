@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.51 2005/05/03 06:20:24 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.52 2005/05/03 10:47:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -1216,6 +1216,7 @@ configure_commit()
 		}
 		ifp->server_pref = ifc->server_pref;
 		ifp->scriptpath = ifc->scriptpath;
+		ifc->scriptpath = NULL;
 
 		if (ifc->authinfo != NULL) {
 			ifp->authproto = ifc->authinfo->protocol;
