@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.55 2005/04/14 06:22:32 suz Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.56 2005/05/03 06:41:53 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -551,8 +551,7 @@ relay6_recv(s, fromclient)
 
 	dh6 = (struct dhcp6 *)rdatabuf;
 	dprintf(LOG_DEBUG, FNAME, "received %s from %s",
-	    dhcp6msgstr(dh6->dh6_msgtype),
-	    addr2str((struct sockaddr *)&from));
+	    dhcp6msgstr(dh6->dh6_msgtype), addr2str((struct sockaddr *)&from));
 
 	/*
 	 * Relay the packet according to the type.  A client message or
