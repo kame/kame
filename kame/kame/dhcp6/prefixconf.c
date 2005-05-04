@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.31 2005/04/14 06:22:32 suz Exp $	*/
+/*	$KAME: prefixconf.c,v 1.32 2005/05/04 11:26:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -218,7 +218,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 	}
 
 	/*
-	 * If the new vltime is 0, this prefix immediatly expires.
+	 * If the new vltime is 0, this prefix immediately expires.
 	 * Otherwise, set up or update the associated timer.
 	 */
 	switch (sp->prefix.vltime) {

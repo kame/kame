@@ -1,4 +1,4 @@
-/*	$KAME: addrconf.c,v 1.6 2005/04/26 14:12:38 jinmei Exp $	*/
+/*	$KAME: addrconf.c,v 1.7 2005/05/04 11:26:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -175,7 +175,7 @@ update_address(ia, addr, dhcpifp, ctlp, callback)
 		na_ifaddrconf(IFADDRCONF_ADD, sa);
 
 	/*
-	 * If the new vltime is 0, this address immediatly expires.
+	 * If the new vltime is 0, this address immediately expires.
 	 * Otherwise, set up or update the associated timer.
 	 */
 	switch (sa->addr.vltime) {
