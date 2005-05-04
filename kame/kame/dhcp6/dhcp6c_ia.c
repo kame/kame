@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.31 2005/05/03 10:51:46 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.32 2005/05/04 06:09:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -581,7 +581,7 @@ ia_timo(arg)
 		dhcpstate = DHCP6S_REBIND;
 
 		/*
-		/* We need keep DUID for sending Release in this state.
+		 * We need keep DUID for sending Release in this state.
 		 * But we don't need a timer for the IA.  We'll just wait for a
 		 * reply for the REBIND until all associated configuration
 		 * parameters for this IA expire.
