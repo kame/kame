@@ -201,7 +201,7 @@ SYSCTL_DECL(_net_inet_igmp);
 	{ "dropwithnora", CTLTYPE_INT }, \
 	{ "maxsrcfilter", CTLTYPE_INT }, \
 	{ "somaxsrc", CTLTYPE_INT }, \
-	{ "always_v3", CTLTYPE_INT }, \
+	{ "version", CTLTYPE_INT }, \
 }
 
 #endif
