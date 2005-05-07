@@ -1921,6 +1921,7 @@ next_multi:
 	    IN_NEXT_MULTI(step, inm);
 	}
 }
+#endif /* IGMPV3 */
 
 int
 is_igmp_target(grp)
@@ -1932,4 +1933,3 @@ is_igmp_target(grp)
 		return 0;
 	return 1;
 }
-#endif /* IGMPV3 */
