@@ -26,9 +26,9 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)route.8	8.3 (Berkeley) 3/19/94
-.\" $FreeBSD: src/sbin/route/route.8,v 1.38 2004/07/02 21:45:05 ru Exp $
+.\" $FreeBSD: src/sbin/route/route.8,v 1.38.2.2 2005/02/12 15:23:54 brueffer Exp $
 .\"
-.Dd November 10, 2003
+.Dd November 4, 2004
 .Dt ROUTE 8
 .Os
 .Sh NAME
@@ -412,3 +412,13 @@ utility appeared in
 The first paragraph may have slightly exaggerated
 .Xr routed 8 Ns 's
 abilities.
+.Pp
+Currently, routes with the
+.Dv RTF_BLACKHOLE
+flag set need to have the gateway set to an instance of the
+.Xr lo 4
+driver, using the
+.Fl iface
+option, for the flag to have any effect; unless IP fast forwarding
+is enabled, in which case the meaning of the flag will always
+be honored.

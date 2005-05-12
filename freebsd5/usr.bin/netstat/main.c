@@ -44,7 +44,7 @@ static char sccsid[] = "@(#)main.c	8.4 (Berkeley) 3/1/94";
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/usr.bin/netstat/main.c,v 1.69 2004/07/26 20:18:11 charnier Exp $");
+__FBSDID("$FreeBSD: src/usr.bin/netstat/main.c,v 1.69.2.1 2005/03/21 16:05:36 glebius Exp $");
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -136,6 +136,8 @@ static struct nlist nl[] = {
 	{ "_mbuf_lowm" },
 #define	N_CLLO		32
 	{ "_clust_lowm" },
+#define N_CARPSTAT	33
+	{ "_carpstats" },
 	{ "" },
 };
 
@@ -171,6 +173,8 @@ struct protox {
 	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
 	{ -1,		-1,		1,	protopr,
 	  pim_stats,	NULL,		"pim",	IPPROTO_PIM },
+	{ -1,		N_CARPSTAT,	1,	0,
+	  carp_stats,	NULL,		"carp",		0},
 	{ -1,		-1,		0,	NULL,
 	  NULL,		NULL,		NULL,	0 }
 };

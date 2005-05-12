@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)netstat.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/usr.bin/netstat/netstat.h,v 1.40 2004/05/31 21:46:06 bmilekic Exp $
+ * $FreeBSD: src/usr.bin/netstat/netstat.h,v 1.40.2.1 2005/03/21 16:05:36 glebius Exp $
  */
 
 #include <sys/cdefs.h>
@@ -71,6 +71,7 @@ void	ip_stats(u_long, const char *, int);
 void	icmp_stats(u_long, const char *, int);
 void	igmp_stats(u_long, const char *, int);
 void	pim_stats(u_long, const char *, int);
+void	carp_stats (u_long, const char *, int);
 #ifdef IPSEC
 void	ipsec_stats(u_long, const char *, int);
 #endif

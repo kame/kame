@@ -26,7 +26,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)ifconfig.8	8.3 (Berkeley) 1/5/94
-.\" $FreeBSD: src/sbin/ifconfig/ifconfig.8,v 1.85 2004/07/27 09:51:49 yar Exp $
+.\" $FreeBSD: src/sbin/ifconfig/ifconfig.8,v 1.85.2.2 2005/03/22 12:36:28 brueffer Exp $
 .\"
 .Dd July 26, 2004
 .Dt IFCONFIG 8
@@ -328,7 +328,7 @@ Some drivers may not be able to enable these flags independently
 of each other, so setting one may also set the other.
 The driver will offload as much checksum work as it can reliably
 support, the exact level of offloading varies between drivers.
-.It Fl rxcsum , Fl txcsum
+.It Fl rxcsum , txcsum
 If the driver supports user-configurable checksum offloading,
 disable receive (or transmit) checksum offloading on the interface.
 These settings may not always be independent of each other.
@@ -459,7 +459,7 @@ Note that this must be issued on a physical interface associated with
 not on a
 .Xr vlan 4
 interface itself.
-.It Fl vlanmtu , Fl vlanhwtag
+.It Fl vlanmtu , vlanhwtag
 If the driver offers user-configurable VLAN support, disable
 reception of extended frames or tag processing in hardware,
 respectively.
@@ -851,7 +851,9 @@ the kernel may act very oddly.
 Do this at your own risk.
 .Sh SEE ALSO
 .Xr netstat 1 ,
+.Xr carp 4 ,
 .Xr netintro 4 ,
+.Xr polling 4 ,
 .Xr vlan 4 ,
 .\" .Xr eon 5 ,
 .Xr rc 8 ,

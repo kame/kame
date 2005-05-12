@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.88.2.2 2004/09/30 23:36:07 dougb Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.88.2.6 2005/03/07 21:34:50 phk Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -30,6 +30,8 @@
     crypto
     ..
     dev
+        acpica
+        ..
         an
         ..
         bktr
@@ -37,6 +39,8 @@
         firewire
         ..
         ic
+        ..
+        ieee488
         ..
         iicbus
         ..
@@ -94,12 +98,16 @@
         ..
         raid3
         ..
+        shsec
+        ..
         stripe
         ..
     ..
     gnu
         posix
         ..
+    ..
+    gpib
     ..
     isofs
         cd9660
@@ -137,6 +145,8 @@
         bluetooth
             include
             ..
+        ..
+        netflow
         ..
     ..
     netinet
