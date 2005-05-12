@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.162 2004/12/27 08:17:39 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.163 2005/05/12 18:41:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -485,6 +485,9 @@ rip6_output(m, va_alist)
 	va_end(ap);
 
 	in6p = sotoin6pcb(so);
+#ifdef __FreeBSD__
+	INP_LOCK(in6p);
+#endif
 
 	priv = 0;
 #if defined(__NetBSD__) || defined(__FreeBSD__)
@@ -632,6 +635,9 @@ rip6_output(m, va_alist)
 		ip6_clearpktopts(&opt, -1);
 		m_freem(control);
 	}
+#ifdef __FreeBSD__
+	INP_UNLOCK(in6p);
+#endif
 	return (error);
 }
 

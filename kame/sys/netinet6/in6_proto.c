@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.159 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: in6_proto.c,v 1.160 2005/05/12 18:41:18 suz Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -67,6 +67,7 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_carp.h"
 #include "opt_sctp.h"
 #include "opt_dccp.h"
 #include "opt_mip6.h"
@@ -187,6 +188,10 @@
 #include <netinet6/ipcomp.h>
 #endif
 #endif /* IPSEC */
+
+#ifdef DEV_CARP
+#include <netinet/ip_carp.h>
+#endif
 
 #ifdef MIP6
 #include <netinet6/mip6_var.h>
@@ -503,6 +508,14 @@ struct ip6protosw inet6sw[] = {
   &rip6_usrreqs
 #endif
 },
+#ifdef DEV_CARP
+{ SOCK_RAW,	&inet6domain,	IPPROTO_CARP,	PR_ATOMIC|PR_ADDR,
+  carp6_input,	rip6_output,	0,		rip6_ctloutput,
+  0,
+  0,            0,              0,              0,
+  &rip6_usrreqs
+},
+#endif /* DEV_CARP */
 /* raw wildcard */
 { SOCK_RAW,	&inet6domain,	0,		PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   rip6_input,	rip6_output,	0,		rip6_ctloutput,

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.402 2005/04/14 06:22:39 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.403 2005/05/12 18:41:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -169,6 +169,7 @@ struct icmp6stat icmp6stat;
 #ifdef __OpenBSD__
 extern struct inpcbtable rawin6pcbtable;
 #elif __FreeBSD__
+extern struct inpcbinfo ripcbinfo;
 extern struct inpcbhead ripcb;
 #else
 extern struct inpcbtable raw6cbtable;
@@ -2247,6 +2248,7 @@ icmp6_rip6_input(mp, off)
 	}
 
 #ifdef __FreeBSD__
+	INP_INFO_RLOCK(&ripcbinfo);
 	LIST_FOREACH(in6p, &ripcb, inp_list)
 #elif defined(__OpenBSD__)
 	for (in6p = rawin6pcbtable.inpt_queue.cqh_first;
@@ -2260,31 +2262,50 @@ icmp6_rip6_input(mp, off)
 		in6p = (struct in6pcb *)inph;
 #endif
 #ifdef __FreeBSD__
-		if ((in6p->inp_vflag & INP_IPV6) == 0)
+		INP_LOCK(in6p);
+		if ((in6p->inp_vflag & INP_IPV6) == 0) {
+	docontinue:
+			INP_UNLOCK(in6p);
 			continue;
+		}
 #endif
 #ifdef HAVE_NRL_INPCB
 		if (!(in6p->in6p_flags & INP_IPV6))
-			continue;
+			goto docontinue;
 #endif
 #ifdef __FreeBSD__
 		if (in6p->inp_ip_p != IPPROTO_ICMPV6)
+			goto docontinue;
 #elif defined(HAVE_NRL_INPCB)
 		if (in6p->inp_ipv6.ip6_nxt != IPPROTO_ICMPV6)
+			continue;
 #else
 		if (in6p->in6p_ip6.ip6_nxt != IPPROTO_ICMPV6)
-#endif
 			continue;
+#endif
 		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
 		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst))
+#ifdef __FreeBSD__
+			goto docontinue;
+#else
 			continue;
+#endif
 		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) &&
 		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src))
+#ifdef __FreeBSD__
+			goto docontinue;
+#else
 			continue;
+#endif
 		if (in6p->in6p_icmp6filt &&
 		    ICMP6_FILTER_WILLBLOCK(icmp6->icmp6_type,
 		    in6p->in6p_icmp6filt))
+#ifdef __FreeBSD__
+			goto docontinue;
+#else
 			continue;
+#endif
+
 #ifdef MLDV2
 		/*
 		 * every multicast packet (except multicast routing related
@@ -2301,7 +2322,11 @@ icmp6_rip6_input(mp, off)
 			    icmp6->icmp6_type != MLD_LISTENER_DONE) {
 				if (match_msf6_per_socket(in6p, &ip6->ip6_src,
 							  &ip6->ip6_dst) == 0) {
+#ifdef __FreeBSD__
+					goto docontinue;
+#else
 					continue;
+#endif
 				}
 			}
 		}
@@ -2360,6 +2385,9 @@ icmp6_rip6_input(mp, off)
 					sorwakeup(last->in6p_socket);
 				opts = NULL;
 			}
+#ifdef __FreeBSD__
+			INP_UNLOCK(last);
+#endif
 		}
 		last = in6p;
 	}
@@ -2398,10 +2426,16 @@ icmp6_rip6_input(mp, off)
 				m_freem(opts);
 		} else
 			sorwakeup(last->in6p_socket);
+#ifdef __FreeBSD__
+		INP_UNLOCK(last);
+#endif
 	} else {
 		m_freem(m);
 		ip6stat.ip6s_delivered--;
 	}
+#ifdef __FreeBSD__
+	INP_INFO_RUNLOCK(&ripcbinfo);
+#endif
 	return IPPROTO_DONE;
 }
 

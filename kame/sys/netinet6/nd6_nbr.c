@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.156 2005/04/14 06:22:42 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.157 2005/05/12 18:41:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_carp.h"
 #include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
@@ -98,6 +99,10 @@
 #endif /* NMIP > 0 */
 #endif /* MIP6 */
 
+#ifdef DEV_CARP
+#include <netinet/ip_carp.h>
+#endif
+
 #include <net/net_osdep.h>
 
 #define SDL(s) ((struct sockaddr_dl *)s)
@@ -131,7 +136,7 @@ nd6_ns_input(m, off, icmp6len)
 	struct in6_addr saddr6, daddr6, taddr6;
 	struct sockaddr_in6 taddr6sa;
 	char *lladdr = NULL;
-	struct ifaddr *ifa;
+	struct ifaddr *ifa = NULL;
 	int lladdrlen = 0;
 	int anycast = 0, proxy = 0, tentative = 0;
 	int router = ip6_forwarding;
@@ -237,7 +242,14 @@ nd6_ns_input(m, off, icmp6len)
 	 * (3) "tentative" address on which DAD is being performed.
 	 */
 	/* (1) and (3) check. */
+#ifdef DEV_CARP
+	if (ifp->if_carp)
+		ifa = carp_iamatch6(ifp->if_carp, &taddr6);
+	if (!ifa)
+		ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6);
+#else
 	ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6);
+#endif
 
 	/* (2) check. */
 	if (!ifa) {
@@ -1094,9 +1106,16 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 		 * lladdr in sdl0.  If we are not proxying (sending NA for
 		 * my address) use lladdr configured for the interface.
 		 */
-		if (sdl0 == NULL)
+		if (sdl0 == NULL) {
+#ifdef DEV_CARP
+			if (ifp->if_carp)
+				mac = carp_macmatch6(ifp->if_carp, m, taddr6);
+			if (mac == NULL)
+				mac = nd6_ifptomac(ifp);
+#else
 			mac = nd6_ifptomac(ifp);
-		else if (sdl0->sa_family == AF_LINK) {
+#endif
+		} else if (sdl0->sa_family == AF_LINK) {
 			struct sockaddr_dl *sdl;
 			sdl = (struct sockaddr_dl *)sdl0;
 			if (sdl->sdl_alen == ifp->if_addrlen)
@@ -1172,6 +1191,9 @@ nd6_ifptomac(ifp)
 #endif
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:
+#endif
+#ifdef IFT_CARP
+	case IFT_CARP:
 #endif
 #ifdef __NetBSD__
 		return LLADDR(ifp->if_sadl);

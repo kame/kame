@@ -512,7 +512,7 @@ key_abort(struct socket *so)
  * derived from net/rtsock.c:rts_attach()
  */
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 key_attach(struct socket *so, int proto, struct thread *p)
 #else
 key_attach(struct socket *so, int proto, struct proc *p)
@@ -565,7 +565,7 @@ key_attach(struct socket *so, int proto, struct proc *p)
  * derived from net/rtsock.c:rts_bind()
  */
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__)
 key_bind(struct socket *so, struct sockaddr *nam, struct thread *p)
 #else
 key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)

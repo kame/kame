@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.208 2005/04/23 07:13:52 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.209 2005/05/12 18:41:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -879,6 +879,10 @@ in6_ifattach(ifp, altifp)
 #endif
 #ifdef IFT_PFSYNC
 	case IFT_PFSYNC:
+		return;
+#endif
+#ifdef IFT_CARP
+	case IFT_CARP:
 		return;
 #endif
 	}
