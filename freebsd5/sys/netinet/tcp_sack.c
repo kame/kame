@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,10 +27,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_sack.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_sack.c,v 1.3 2004/08/17 22:05:54 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp_sack.c,v 1.3.2.5 2005/02/27 21:43:54 ps Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -163,13 +163,20 @@ struct tcphdr tcp_savetcp;
 
 extern struct uma_zone *sack_hole_zone;
 
+SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack, CTLFLAG_RW, 0, "TCP SACK");
+int tcp_do_sack = 1;
+SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, enable, CTLFLAG_RW,
+	&tcp_do_sack, 0, "Enable/Disable TCP SACK support");
+TUNABLE_INT("net.inet.tcp.sack.enable", &tcp_do_sack);
+
 /*
  * This function is called upon receipt of new valid data (while not in header
  * prediction mode), and it updates the ordered list of sacks.
  */
 void
-tcp_update_sack_list(tp)
+tcp_update_sack_list(tp, rcv_laststart, rcv_lastend)
 	struct tcpcb *tp;
+	tcp_seq rcv_laststart, rcv_lastend;
 {
 	/*
 	 * First reported block MUST be the most recent one.  Subsequent
@@ -199,10 +206,10 @@ tcp_update_sack_list(tp)
 	tp->rcv_numsacks -= count;
 	if (tp->rcv_numsacks == 0) { /* no sack blocks currently (fast path) */
 		tcp_clean_sackreport(tp);
-		if (SEQ_LT(tp->rcv_nxt, tp->rcv_laststart)) {
+		if (SEQ_LT(tp->rcv_nxt, rcv_laststart)) {
 			/* ==> need first sack block */
-			tp->sackblks[0].start = tp->rcv_laststart;
-			tp->sackblks[0].end = tp->rcv_lastend;
+			tp->sackblks[0].start = rcv_laststart;
+			tp->sackblks[0].end = rcv_lastend;
 			tp->rcv_numsacks = 1;
 		}
 		return;
@@ -210,14 +217,14 @@ tcp_update_sack_list(tp)
 	/* Otherwise, sack blocks are already present. */
 	for (i = 0; i < tp->rcv_numsacks; i++)
 		tp->sackblks[i] = temp[i]; /* first copy back sack list */
-	if (SEQ_GEQ(tp->rcv_nxt, tp->rcv_lastend))
+	if (SEQ_GEQ(tp->rcv_nxt, rcv_lastend))
 		return;     /* sack list remains unchanged */
 	/*
 	 * From here, segment just received should be (part of) the 1st sack.
 	 * Go through list, possibly coalescing sack block entries.
 	 */
-	firstsack.start = tp->rcv_laststart;
-	firstsack.end = tp->rcv_lastend;
+	firstsack.start = rcv_laststart;
+	firstsack.end = rcv_lastend;
 	for (i = 0; i < tp->rcv_numsacks; i++) {
 		sack = tp->sackblks[i];
 		if (SEQ_LT(sack.end, firstsack.start) ||
@@ -474,9 +481,14 @@ tcp_free_sackholes(struct tcpcb *tp)
 }
 
 /*
- * Checks for partial ack.  If partial ack arrives, turn off retransmission
- * timer, deflate the window, do not clear tp->t_dupacks, and return 1.
- * If the ack advances at least to tp->snd_recover, return 0.
+ * Partial ack handling within a sack recovery episode. 
+ * Keeping this very simple for now. When a partial ack
+ * is received, force snd_cwnd to a value that will allow
+ * the sender to transmit no more than 2 segments.
+ * If necessary, a better scheme can be adopted at a 
+ * later point, but for now, the goal is to prevent the
+ * sender from bursting a large amount of data in the midst
+ * of sack recovery.
  */
 void
 tcp_sack_partialack(tp, th)
@@ -484,27 +496,19 @@ tcp_sack_partialack(tp, th)
 	struct tcphdr *th;
 {
 	INP_LOCK_ASSERT(tp->t_inpcb);
-	u_long  ocwnd = tp->snd_cwnd;
+	int num_segs = 1;
+	int sack_bytes_rxmt = 0;
 
 	callout_stop(tp->tt_rexmt);
 	tp->t_rtttime = 0;
-	/*
-	 * Set snd_cwnd to one segment beyond acknowledged offset
-	 * (tp->snd_una has not yet been updated when this function is called.)
-	 */
-	/*
-	 * Should really be
-	 * min(tp->snd_cwnd, tp->t_maxseg + (th->th_ack - tp->snd_una))
-	 */
-	tp->snd_cwnd = tp->t_maxseg + (th->th_ack - tp->snd_una);
+	/* send one or 2 segments based on how much new data was acked */
+	if (((th->th_ack - tp->snd_una) / tp->t_maxseg) > 2)
+		num_segs = 2;
+	(void)tcp_sack_output(tp, &sack_bytes_rxmt);
+	tp->snd_cwnd = sack_bytes_rxmt + (tp->snd_nxt - tp->sack_newdata) +
+		num_segs * tp->t_maxseg;
 	tp->t_flags |= TF_ACKNOW;
 	(void) tcp_output(tp);
-	tp->snd_cwnd = ocwnd;
-	/*
-	 * Partial window deflation.  Relies on fact that tp->snd_una
-	 * not updated yet.
-	 */
-	tp->snd_cwnd -= (th->th_ack - tp->snd_una - tp->t_maxseg);
 }
 
 #ifdef TCP_SACK_DEBUG
@@ -528,29 +532,29 @@ tcp_print_holes(struct tcpcb *tp)
  * NULL otherwise.
  */
 struct sackhole *
-tcp_sack_output(struct tcpcb *tp)
+tcp_sack_output(struct tcpcb *tp, int *sack_bytes_rexmt)
 {
-	struct sackhole *p;
+	struct sackhole *p = NULL;
 
 	INP_LOCK_ASSERT(tp->t_inpcb);
 	if (!tp->sack_enable)
 		return (NULL);
-	p = tp->snd_holes;
-	while (p) {
+	*sack_bytes_rexmt = 0;
+	for (p = tp->snd_holes; p ; p = p->next) {
 		if (SEQ_LT(p->rxmit, p->end)) {
 			if (SEQ_LT(p->rxmit, tp->snd_una)) {/* old SACK hole */
-				p = p->next;
 				continue;
 			}
 #ifdef TCP_SACK_DEBUG
 			if (p)
 				tcp_print_holes(tp);
 #endif
-			return (p);
+			*sack_bytes_rexmt += (p->rxmit - p->start);
+			break;
 		}
-		p = p->next;
+		*sack_bytes_rexmt += (p->rxmit - p->start);
 	}
-	return (NULL);
+	return (p);
 }
 
 /*
@@ -587,4 +591,3 @@ tcp_sack_adjust(struct tcpcb *tp)
 	tp->snd_nxt = tp->rcv_lastsack;
 	return;
 }
-

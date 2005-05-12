@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2000
  * Dr. Duncan McLennan Barclay, dmlb@ragnet.demon.co.uk.
  *
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ray/if_ray.c,v 1.72 2004/08/13 23:39:07 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ray/if_ray.c,v 1.72.2.1 2005/01/30 00:59:59 imp Exp $");
 
 /*	$NetBSD: if_ray.c,v 1.12 2000/02/07 09:36:27 augustss Exp $	*/
 /* 

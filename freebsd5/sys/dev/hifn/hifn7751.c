@@ -1,6 +1,6 @@
 /*	$OpenBSD: hifn7751.c,v 1.120 2002/05/17 00:33:34 deraadt Exp $	*/
 
-/*
+/*-
  * Invertex AEON / Hifn 7751 driver
  * Copyright (c) 1999 Invertex Inc. All rights reserved.
  * Copyright (c) 1999 Theo de Raadt
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.28 2004/07/04 16:11:01 stefanf Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.28.2.3 2005/01/30 00:59:44 imp Exp $");
 
 /*
  * Driver for various Hifn encryption processors.
@@ -249,6 +249,84 @@ default_harvest(struct rndtest_state *rsp, void *buf, u_int count)
 	random_harvest(buf, count, count*NBBY, 0, RANDOM_PURE);
 }
 
+static u_int
+checkmaxmin(device_t dev, const char *what, u_int v, u_int min, u_int max)
+{
+	if (v > max) {
+		device_printf(dev, "Warning, %s %u out of range, "
+			"using max %u\n", what, v, max);
+		v = max;
+	} else if (v < min) {
+		device_printf(dev, "Warning, %s %u out of range, "
+			"using min %u\n", what, v, min);
+		v = min;
+	}
+	return v;
+}
+
+/*
+ * Select PLL configuration for 795x parts.  This is complicated in
+ * that we cannot determine the optimal parameters without user input.
+ * The reference clock is derived from an external clock through a
+ * multiplier.  The external clock is either the host bus (i.e. PCI)
+ * or an external clock generator.  When using the PCI bus we assume
+ * the clock is either 33 or 66 MHz; for an external source we cannot
+ * tell the speed.
+ *
+ * PLL configuration is done with a string: "pci" for PCI bus, or "ext"
+ * for an external source, followed by the frequency.  We calculate
+ * the appropriate multiplier and PLL register contents accordingly.
+ * When no configuration is given we default to "pci66" since that
+ * always will allow the card to work.  If a card is using the PCI
+ * bus clock and in a 33MHz slot then it will be operating at half
+ * speed until the correct information is provided.
+ */
+static void
+hifn_getpllconfig(device_t dev, u_int *pll)
+{
+	const char *pllspec;
+	u_int freq, mul, fl, fh;
+	u_int32_t pllconfig;
+	char *nxt;
+
+	if (resource_string_value("hifn", device_get_unit(dev),
+	    "pllconfig", &pllspec))
+		pllspec = "pci66";
+	fl = 33, fh = 66;
+	pllconfig = 0;
+	if (strncmp(pllspec, "ext", 3) == 0) {
+		pllspec += 3;
+		pllconfig |= HIFN_PLL_REF_SEL;
+		switch (pci_get_device(dev)) {
+		case PCI_PRODUCT_HIFN_7955:
+		case PCI_PRODUCT_HIFN_7956:
+			fl = 20, fh = 100;
+			break;
+#ifdef notyet
+		case PCI_PRODUCT_HIFN_7954:
+			fl = 20, fh = 66;
+			break;
+#endif
+		}
+	} else if (strncmp(pllspec, "pci", 3) == 0)
+		pllspec += 3;
+	freq = strtoul(pllspec, &nxt, 10);
+	if (nxt == pllspec)
+		freq = 66;
+	else
+		freq = checkmaxmin(dev, "frequency", freq, fl, fh);
+	/*
+	 * Calculate multiplier.  We target a Fck of 266 MHz,
+	 * allowing only even values, possibly rounded down.
+	 * Multipliers > 8 must set the charge pump current.
+	 */
+	mul = checkmaxmin(dev, "PLL divisor", (266 / freq) &~ 1, 2, 12);
+	pllconfig |= (mul / 2 - 1) << HIFN_PLL_ND_SHIFT;
+	if (mul > 8)
+		pllconfig |= HIFN_PLL_IS;
+	*pll = pllconfig;
+}
+
 /*
  * Attach an interface that successfully probed.
  */
@@ -292,8 +370,15 @@ hifn_attach(device_t dev)
 	 */
 	if (pci_get_vendor(dev) == PCI_VENDOR_HIFN &&
 	    (pci_get_device(dev) == PCI_PRODUCT_HIFN_7955 ||
-	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7956))
+	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7956)) {
 		sc->sc_flags |= HIFN_IS_7956 | HIFN_HAS_AES;
+		/*
+		 * Select PLL configuration.  This depends on the
+		 * bus and board design and must be manually configured
+		 * if the default setting is unacceptable.
+		 */
+		hifn_getpllconfig(dev, &sc->sc_pllconfig);
+	}
 
 	/*
 	 * Configure support for memory-mapped access to
@@ -465,10 +550,15 @@ hifn_attach(device_t dev)
 		rbase = 'M';
 		rseg /= 1024;
 	}
-	device_printf(sc->sc_dev, "%s, rev %u, %d%cB %cram, %u sessions\n",
+	device_printf(sc->sc_dev, "%s, rev %u, %d%cB %cram",
 		hifn_partname(sc), rev,
-		rseg, rbase, sc->sc_drammodel ? 'd' : 's',
-		sc->sc_maxses);
+		rseg, rbase, sc->sc_drammodel ? 'd' : 's');
+	if (sc->sc_flags & HIFN_IS_7956)
+		printf(", pll=0x%x<%s clk, %ux mult>",
+			sc->sc_pllconfig,
+			sc->sc_pllconfig & HIFN_PLL_REF_SEL ? "ext" : "pci",
+			2 + 2*((sc->sc_pllconfig & HIFN_PLL_ND) >> 11));
+	printf("\n");
 
 	sc->sc_cid = crypto_get_driverid(0);
 	if (sc->sc_cid < 0) {
@@ -1090,10 +1180,28 @@ hifn_init_pci_registers(struct hifn_softc *sc)
 
 
 	if (sc->sc_flags & HIFN_IS_7956) {
+		u_int32_t pll;
+
 		WRITE_REG_0(sc, HIFN_0_PUCNFG, HIFN_PUCNFG_COMPSING |
 		    HIFN_PUCNFG_TCALLPHASES |
 		    HIFN_PUCNFG_TCDRVTOTEM | HIFN_PUCNFG_BUS32);
-		WRITE_REG_1(sc, HIFN_1_PLL, HIFN_PLL_7956);
+
+		/* turn off the clocks and insure bypass is set */
+		pll = READ_REG_1(sc, HIFN_1_PLL);
+		pll = (pll &~ (HIFN_PLL_PK_CLK_SEL | HIFN_PLL_PE_CLK_SEL))
+		    | HIFN_PLL_BP;
+		WRITE_REG_1(sc, HIFN_1_PLL, pll);
+		DELAY(10*1000);		/* 10ms */
+		/* change configuration */
+		pll = (pll &~ HIFN_PLL_CONFIG) | sc->sc_pllconfig;
+		WRITE_REG_1(sc, HIFN_1_PLL, pll);
+		DELAY(10*1000);		/* 10ms */
+		/* disable bypass */
+		pll &= ~HIFN_PLL_BP;
+		WRITE_REG_1(sc, HIFN_1_PLL, pll);
+		/* enable clocks with new configuration */
+		pll |= HIFN_PLL_PK_CLK_SEL | HIFN_PLL_PE_CLK_SEL;
+		WRITE_REG_1(sc, HIFN_1_PLL, pll);
 	} else {
 		WRITE_REG_0(sc, HIFN_0_PUCNFG, HIFN_PUCNFG_COMPSING |
 		    HIFN_PUCNFG_DRFR_128 | HIFN_PUCNFG_TCALLPHASES |
@@ -1465,7 +1573,7 @@ hifn_write_command(struct hifn_command *cmd, u_int8_t *buf)
 	base_cmd->total_dest_count = htole16(dlen & HIFN_BASE_CMD_LENMASK_LO);
 	dlen >>= 16;
 	slen >>= 16;
-	base_cmd->session_num = htole16(cmd->session_num |
+	base_cmd->session_num = htole16(
 	    ((slen << HIFN_BASE_CMD_SRCLEN_S) & HIFN_BASE_CMD_SRCLEN_M) |
 	    ((dlen << HIFN_BASE_CMD_DSTLEN_S) & HIFN_BASE_CMD_DSTLEN_M));
 	buf_pos += sizeof(hifn_base_command_t);
@@ -2207,17 +2315,44 @@ hifn_newsession(void *arg, u_int32_t *sidp, struct cryptoini *cri)
 {
 	struct cryptoini *c;
 	struct hifn_softc *sc = arg;
-	int i, mac = 0, cry = 0;
+	int mac = 0, cry = 0, sesn;
+	struct hifn_session *ses = NULL;
 
 	KASSERT(sc != NULL, ("hifn_newsession: null softc"));
 	if (sidp == NULL || cri == NULL || sc == NULL)
 		return (EINVAL);
 
-	for (i = 0; i < sc->sc_maxses; i++)
-		if (sc->sc_sessions[i].hs_state == HS_STATE_FREE)
-			break;
-	if (i == sc->sc_maxses)
-		return (ENOMEM);
+	if (sc->sc_sessions == NULL) {
+		ses = sc->sc_sessions = (struct hifn_session *)malloc(
+		    sizeof(*ses), M_DEVBUF, M_NOWAIT);
+		if (ses == NULL)
+			return (ENOMEM);
+		sesn = 0;
+		sc->sc_nsessions = 1;
+	} else {
+		for (sesn = 0; sesn < sc->sc_nsessions; sesn++) {
+			if (!sc->sc_sessions[sesn].hs_used) {
+				ses = &sc->sc_sessions[sesn];
+				break;
+			}
+		}
+
+		if (ses == NULL) {
+			sesn = sc->sc_nsessions;
+			ses = (struct hifn_session *)malloc((sesn + 1) *
+			    sizeof(*ses), M_DEVBUF, M_NOWAIT);
+			if (ses == NULL)
+				return (ENOMEM);
+			bcopy(sc->sc_sessions, ses, sesn * sizeof(*ses));
+			bzero(sc->sc_sessions, sesn * sizeof(*ses));
+			free(sc->sc_sessions, M_DEVBUF);
+			sc->sc_sessions = ses;
+			ses = &sc->sc_sessions[sesn];
+			sc->sc_nsessions++;
+		}
+	}
+	bzero(ses, sizeof(*ses));
+	ses->hs_used = 1;
 
 	for (c = cri; c != NULL; c = c->cri_next) {
 		switch (c->cri_alg) {
@@ -2233,7 +2368,7 @@ hifn_newsession(void *arg, u_int32_t *sidp, struct cryptoini *cri)
 		case CRYPTO_3DES_CBC:
 		case CRYPTO_AES_CBC:
 			/* XXX this may read fewer, does it matter? */
-			read_random(sc->sc_sessions[i].hs_iv,
+			read_random(ses->hs_iv,
 				c->cri_alg == CRYPTO_AES_CBC ?
 					HIFN_AES_IV_LENGTH : HIFN_IV_LENGTH);
 			/*FALLTHROUGH*/
@@ -2249,8 +2384,7 @@ hifn_newsession(void *arg, u_int32_t *sidp, struct cryptoini *cri)
 	if (mac == 0 && cry == 0)
 		return (EINVAL);
 
-	*sidp = HIFN_SID(device_get_unit(sc->sc_dev), i);
-	sc->sc_sessions[i].hs_state = HS_STATE_USED;
+	*sidp = HIFN_SID(device_get_unit(sc->sc_dev), sesn);
 
 	return (0);
 }
@@ -2272,7 +2406,7 @@ hifn_freesession(void *arg, u_int64_t tid)
 		return (EINVAL);
 
 	session = HIFN_SESSION(sid);
-	if (session >= sc->sc_maxses)
+	if (session >= sc->sc_nsessions)
 		return (EINVAL);
 
 	bzero(&sc->sc_sessions[session], sizeof(sc->sc_sessions[session]));
@@ -2293,7 +2427,7 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 	}
 	session = HIFN_SESSION(crp->crp_sid);
 
-	if (sc == NULL || session >= sc->sc_maxses) {
+	if (sc == NULL || session >= sc->sc_nsessions) {
 		err = EINVAL;
 		goto errout;
 	}
@@ -2381,10 +2515,6 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 		switch (enccrd->crd_alg) {
 		case CRYPTO_ARC4:
 			cmd->cry_masks |= HIFN_CRYPT_CMD_ALG_RC4;
-			if ((enccrd->crd_flags & CRD_F_ENCRYPT)
-			    != sc->sc_sessions[session].hs_prev_op)
-				sc->sc_sessions[session].hs_state =
-				    HS_STATE_USED;
 			break;
 		case CRYPTO_DES_CBC:
 			cmd->cry_masks |= HIFN_CRYPT_CMD_ALG_DES |
@@ -2442,6 +2572,7 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 			cmd->cry_masks |= HIFN_CRYPT_CMD_NEW_KEY;
 		cmd->ck = enccrd->crd_key;
 		cmd->cklen = enccrd->crd_klen >> 3;
+		cmd->cry_masks |= HIFN_CRYPT_CMD_NEW_KEY;
 
 		/* 
 		 * Need to specify the size for the AES key in the masks.
@@ -2463,9 +2594,6 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 				goto errout;
 			}
 		}
-
-		if (sc->sc_sessions[session].hs_state == HS_STATE_USED)
-			cmd->cry_masks |= HIFN_CRYPT_CMD_NEW_KEY;
 	}
 
 	if (maccrd) {
@@ -2495,9 +2623,8 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 			break;
 		}
 
-		if ((maccrd->crd_alg == CRYPTO_SHA1_HMAC ||
-		     maccrd->crd_alg == CRYPTO_MD5_HMAC) &&
-		    sc->sc_sessions[session].hs_state == HS_STATE_USED) {
+		if (maccrd->crd_alg == CRYPTO_SHA1_HMAC ||
+		     maccrd->crd_alg == CRYPTO_MD5_HMAC) {
 			cmd->mac_masks |= HIFN_MAC_CMD_NEW_KEY;
 			bcopy(maccrd->crd_key, cmd->mac, maccrd->crd_klen >> 3);
 			bzero(cmd->mac + (maccrd->crd_klen >> 3),
@@ -2511,11 +2638,6 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 
 	err = hifn_crypto(sc, cmd, crp, hint);
 	if (!err) {
-		if (enccrd)
-			sc->sc_sessions[session].hs_prev_op =
-				enccrd->crd_flags & CRD_F_ENCRYPT;
-		if (sc->sc_sessions[session].hs_state == HS_STATE_USED)
-			sc->sc_sessions[session].hs_state = HS_STATE_KEY;
 		return 0;
 	} else if (err == ERESTART) {
 		/*
@@ -2612,11 +2734,6 @@ hifn_abort(struct hifn_softc *sc)
 	}
 	dma->resk = i; dma->resu = u;
 
-	/* Force upload of key next time */
-	for (i = 0; i < sc->sc_maxses; i++)
-		if (sc->sc_sessions[i].hs_state == HS_STATE_KEY)
-			sc->sc_sessions[i].hs_state = HS_STATE_USED;
-	
 	hifn_reset_board(sc, 1);
 	hifn_init_dma(sc);
 	hifn_init_pci_registers(sc);

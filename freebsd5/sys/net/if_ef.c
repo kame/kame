@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_ef.c,v 1.32 2004/07/28 06:48:36 kan Exp $
+ * $FreeBSD: src/sys/net/if_ef.c,v 1.32.2.1 2005/03/31 14:58:36 sobomax Exp $
  */
 
 #include "opt_inet.h"
@@ -59,6 +59,15 @@
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
+#endif
+
+/* If none of the supported layers is enabled explicitly enable them all */
+#if !defined(ETHER_II) && !defined(ETHER_8023) && !defined(ETHER_8022) && \
+    !defined(ETHER_SNAP)
+#define	ETHER_II	1
+#define	ETHER_8023	1
+#define	ETHER_8022	1
+#define	ETHER_SNAP	1
 #endif
 
 /* internal frame types */

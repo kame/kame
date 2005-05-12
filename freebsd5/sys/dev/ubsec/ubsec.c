@@ -1,6 +1,6 @@
 /*	$OpenBSD: ubsec.c,v 1.115 2002/09/24 18:33:26 jason Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2000 Jason L. Wright (jason@thought.net)
  * Copyright (c) 2000 Theo de Raadt (deraadt@openbsd.org)
  * Copyright (c) 2001 Patrik Lindergren (patrik@ipunplugged.com)
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ubsec/ubsec.c,v 1.29 2004/05/30 20:08:45 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ubsec/ubsec.c,v 1.29.2.2 2005/03/03 05:02:14 obrien Exp $");
 
 /*
  * uBsec 5[56]01, 58xx hardware crypto accelerator
@@ -199,11 +199,11 @@ ubsec_probe(device_t dev)
 	if (pci_get_vendor(dev) == PCI_VENDOR_SUN &&
 	    (pci_get_device(dev) == PCI_PRODUCT_SUN_5821 ||
 	     pci_get_device(dev) == PCI_PRODUCT_SUN_SCA1K))
-		return (0);
+		return (BUS_PROBE_DEFAULT);
 	if (pci_get_vendor(dev) == PCI_VENDOR_BLUESTEEL &&
 	    (pci_get_device(dev) == PCI_PRODUCT_BLUESTEEL_5501 ||
 	     pci_get_device(dev) == PCI_PRODUCT_BLUESTEEL_5601))
-		return (0);
+		return (BUS_PROBE_DEFAULT);
 	if (pci_get_vendor(dev) == PCI_VENDOR_BROADCOM &&
 	    (pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5801 ||
 	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5802 ||
@@ -213,7 +213,7 @@ ubsec_probe(device_t dev)
 	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5822 ||
 	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5823
 	     ))
-		return (0);
+		return (BUS_PROBE_DEFAULT);
 	return (ENXIO);
 }
 

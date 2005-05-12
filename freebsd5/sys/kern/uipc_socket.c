@@ -1,6 +1,6 @@
-/*
+/*-
  * Copyright (c) 2004 The FreeBSD Foundation
- * Copyright (c) 2004 Robert Watson
+ * Copyright (c) 2004-2005 Robert N. M. Watson
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_socket.c,v 1.208.2.3.2.2 2004/11/04 01:17:31 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_socket.c,v 1.208.2.18 2005/03/31 22:35:23 sobomax Exp $");
 
 #include "opt_inet.h"
 #include "opt_sctp.h"
@@ -69,10 +69,6 @@ __FBSDID("$FreeBSD: src/sys/kern/uipc_socket.c,v 1.208.2.3.2.2 2004/11/04 01:17:
 static int	soreceive_rcvoob(struct socket *so, struct uio *uio,
 		    int flags);
 
-#ifdef INET
-static int	 do_setopt_accept_filter(struct socket *so, struct sockopt *sopt);
-#endif
-
 static void	filt_sordetach(struct knote *kn);
 static int	filt_soread(struct knote *kn, long hint);
 static void	filt_sowdetach(struct knote *kn);
@@ -95,8 +91,11 @@ MALLOC_DEFINE(M_PCB, "pcb", "protocol control block");
 SYSCTL_DECL(_kern_ipc);
 
 static int somaxconn = SOMAXCONN;
-SYSCTL_INT(_kern_ipc, KIPC_SOMAXCONN, somaxconn, CTLFLAG_RW,
-    &somaxconn, 0, "Maximum pending socket connection queue size");
+static int somaxconn_sysctl(SYSCTL_HANDLER_ARGS);
+/* XXX: we dont have SYSCTL_SHORT */
+SYSCTL_PROC(_kern_ipc, KIPC_SOMAXCONN, somaxconn, CTLTYPE_UINT | CTLFLAG_RW,
+    0, sizeof(int), somaxconn_sysctl, "I", "Maximum pending socket connection "
+    "queue size");
 static int numopensockets;
 SYSCTL_INT(_kern_ipc, OID_AUTO, numopensockets, CTLFLAG_RD,
     &numopensockets, 0, "Number of open sockets");
@@ -122,9 +121,6 @@ MTX_SYSINIT(accept_mtx, &accept_mtx, "accept", MTX_DEF);
 /*
  * so_global_mtx protects so_gencnt, numopensockets, and the per-socket
  * so_gencnt field.
- *
- * XXXRW: These variables might be better manipulated using atomic operations
- * for improved efficiency.
  */
 static struct mtx so_global_mtx;
 MTX_SYSINIT(so_global_mtx, &so_global_mtx, "so_glabel", MTX_DEF);
@@ -149,18 +145,13 @@ struct socket *
 soalloc(int mflags)
 {
 	struct socket *so;
-#ifdef MAC
-	int error;
-#endif
 
 	so = uma_zalloc(socket_zone, mflags | M_ZERO);
 	if (so != NULL) {
 #ifdef MAC
-		error = mac_init_socket(so, mflags);
-		if (error != 0) {
+		if (mac_init_socket(so, mflags) != 0) {
 			uma_zfree(socket_zone, so);
-			so = NULL;
-			return so;
+			return (NULL);
 		}
 #endif
 		SOCKBUF_LOCK_INIT(&so->so_snd, "so_snd");
@@ -172,7 +163,7 @@ soalloc(int mflags)
 		++numopensockets;
 		mtx_unlock(&so_global_mtx);
 	}
-	return so;
+	return (so);
 }
 
 /*
@@ -275,17 +266,23 @@ sodealloc(struct socket *so)
 	SOCKBUF_LOCK_DESTROY(&so->so_rcv);
 	/* sx_destroy(&so->so_sxlock); */
 	uma_zfree(socket_zone, so);
-	/*
-	 * XXXRW: Seems like a shame to grab the mutex again down here, but
-	 * we don't want to decrement the socket count until after we free
-	 * the socket, and we can't increment the gencnt on the socket after
-	 * we free, it so...
-	 */
 	mtx_lock(&so_global_mtx);
 	--numopensockets;
 	mtx_unlock(&so_global_mtx);
 }
 
+/*
+ * solisten() transitions a socket from a non-listening state to a listening
+ * state, but can also be used to update the listen queue depth on an
+ * existing listen socket.  The protocol will call back into the sockets
+ * layer using solisten_proto_check() and solisten_proto() to check and set
+ * socket-layer listen state.  Call backs are used so that the protocol can
+ * acquire both protocol and socket layer locks in whatever order is reuiqred
+ * by the protocol.
+ *
+ * Protocol implementors are advised to hold the socket lock across the
+ * socket-layer test and set to avoid races at the socket layer.
+ */
 int
 solisten(so, backlog, td)
 	struct socket *so;
@@ -298,19 +295,6 @@ solisten(so, backlog, td)
 	short oldopt,oldqlimit;
 	s = splnet();
 #endif /* SCTP */
-
-	/*
-	 * XXXRW: Ordering issue here -- perhaps we need to set
-	 * SO_ACCEPTCONN before the call to pru_listen()?
-	 * XXXRW: General atomic test-and-set concerns here also.
-	 */
-	if (so->so_state & (SS_ISCONNECTED | SS_ISCONNECTING |
-			    SS_ISDISCONNECTING)) {
-#ifdef SCTP
-		splx(s);
-#endif
-		return (EINVAL);
-	}
 
 #ifdef SCTP
 	oldopt = so->so_options;
@@ -337,20 +321,41 @@ solisten(so, backlog, td)
 #endif /* SCTP */
 		return (error);
 	}
-	ACCEPT_LOCK();
-	if (TAILQ_EMPTY(&so->so_comp)) {
-		SOCK_LOCK(so);
-		so->so_options |= SO_ACCEPTCONN;
-		SOCK_UNLOCK(so);
-	}
+	/*
+	 * XXXRW: The following state adjustment should occur in
+	 * solisten_proto(), but we don't currently pass the backlog request
+	 * to the protocol via pru_listen().
+	 */
 	if (backlog < 0 || backlog > somaxconn)
 		backlog = somaxconn;
 	so->so_qlimit = backlog;
-	ACCEPT_UNLOCK();
 #ifdef SCTP
 	splx(s);
-#endif
+#endif /* SCTP */
 	return (0);
+}
+
+int
+solisten_proto_check(so)
+	struct socket *so;
+{
+
+	SOCK_LOCK_ASSERT(so);
+
+	if (so->so_state & (SS_ISCONNECTED | SS_ISCONNECTING |
+	    SS_ISDISCONNECTING))
+		return (EINVAL);
+	return (0);
+}
+
+void
+solisten_proto(so)
+	struct socket *so;
+{
+
+	SOCK_LOCK_ASSERT(so);
+
+	so->so_options |= SO_ACCEPTCONN;
 }
 
 /*
@@ -566,10 +571,19 @@ soconnect(so, nam, td)
 	 */
 	if (so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING) &&
 	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) ||
-	    (error = sodisconnect(so))))
+	    (error = sodisconnect(so)))) {
 		error = EISCONN;
-	else
+	} else {
+		SOCK_LOCK(so);
+		/*
+		 * Prevent accumulated error from previous connection
+		 * from biting us.
+		 */
+		so->so_error = 0;
+		SOCK_UNLOCK(so);
 		error = (*so->so_proto->pr_usrreqs->pru_connect)(so, nam, td);
+	}
+
 	return (error);
 }
 
@@ -898,8 +912,8 @@ out:
  * data from a socket.  For more complete comments, see soreceive(), from
  * which this code originated.
  *
- * XXXRW: Note that soreceive_rcvoob(), unlike the remainder of soreiceve(),
- * is unable to return an mbuf chain to the caller.
+ * Note that soreceive_rcvoob(), unlike the remainder of soreceive(), is
+ * unable to return an mbuf chain to the caller.
  */
 static int
 soreceive_rcvoob(so, uio, flags)
@@ -1032,7 +1046,8 @@ soreceive(so, psa, uio, mp0, controlp, flagsp)
 		return (soreceive_rcvoob(so, uio, flags));
 	if (mp != NULL)
 		*mp = NULL;
-	if (so->so_state & SS_ISCONFIRMING && uio->uio_resid)
+	if ((pr->pr_flags & PR_WANTRCVD) && (so->so_state & SS_ISCONFIRMING)
+	    && uio->uio_resid)
 		(*pr->pr_usrreqs->pru_rcvd)(so, 0);
 
 	SOCKBUF_LOCK(&so->so_rcv);
@@ -1461,10 +1476,16 @@ sorflush(so)
 	struct sockbuf *sb = &so->so_rcv;
 	struct protosw *pr = so->so_proto;
 	struct sockbuf asb;
+	/*
+	 * XXX: This variable is for an ugly workaround to fix problem,
+         * that was fixed in rev. 1.137 of sys/socketvar.h, and keep ABI
+         * compatibility.
+	 */
+	short save_sb_state;
 
 	/*
-	 * XXXRW: This is quite ugly.  The existing code made a copy of the
-	 * socket buffer, then zero'd the original to clear the buffer
+	 * XXXRW: This is quite ugly.  Previously, this code made a copy of
+	 * the socket buffer, then zero'd the original to clear the buffer
 	 * fields.  However, with mutexes in the socket buffer, this causes
 	 * problems.  We only clear the zeroable bits of the original;
 	 * however, we have to initialize and destroy the mutex in the copy
@@ -1485,11 +1506,13 @@ sorflush(so)
 	 * Invalidate/clear most of the sockbuf structure, but leave
 	 * selinfo and mutex data unchanged.
 	 */
+	save_sb_state = sb->sb_state;
 	bzero(&asb, offsetof(struct sockbuf, sb_startzero));
 	bcopy(&sb->sb_startzero, &asb.sb_startzero,
 	    sizeof(*sb) - offsetof(struct sockbuf, sb_startzero));
 	bzero(&sb->sb_startzero,
 	    sizeof(*sb) - offsetof(struct sockbuf, sb_startzero));
+	sb->sb_state = save_sb_state;
 	SOCKBUF_UNLOCK(sb);
 
 	SOCKBUF_LOCK_INIT(&asb, "so_rcv");
@@ -1498,128 +1521,6 @@ sorflush(so)
 	sbrelease(&asb, so);
 	SOCKBUF_LOCK_DESTROY(&asb);
 }
-
-#ifdef INET
-static int
-do_setopt_accept_filter(so, sopt)
-	struct	socket *so;
-	struct	sockopt *sopt;
-{
-	struct accept_filter_arg	*afap;
-	struct accept_filter	*afp;
-	struct so_accf	*newaf;
-	int	error = 0;
-
-	newaf = NULL;
-	afap = NULL;
-
-	/*
-	 * XXXRW: Configuring accept filters should be an atomic test-and-set
-	 * operation to prevent races during setup and attach.  There may be
-	 * more general issues of racing and ordering here that are not yet
-	 * addressed by locking.
-	 */
-	/* do not set/remove accept filters on non listen sockets */
-	SOCK_LOCK(so);
-	if ((so->so_options & SO_ACCEPTCONN) == 0) {
-		SOCK_UNLOCK(so);
-		return (EINVAL);
-	}
-
-	/* removing the filter */
-	if (sopt == NULL) {
-		if (so->so_accf != NULL) {
-			struct so_accf *af = so->so_accf;
-			if (af->so_accept_filter != NULL &&
-				af->so_accept_filter->accf_destroy != NULL) {
-				af->so_accept_filter->accf_destroy(so);
-			}
-			if (af->so_accept_filter_str != NULL) {
-				FREE(af->so_accept_filter_str, M_ACCF);
-			}
-			FREE(af, M_ACCF);
-			so->so_accf = NULL;
-		}
-		so->so_options &= ~SO_ACCEPTFILTER;
-		SOCK_UNLOCK(so);
-		return (0);
-	}
-	SOCK_UNLOCK(so);
-
-	/*-
-	 * Adding a filter.
-	 *
-	 * Do memory allocation, copyin, and filter lookup now while we're
-	 * not holding any locks.  Avoids sleeping with a mutex, as well as
-	 * introducing a lock order between accept filter locks and socket
-	 * locks here.
-	 */
-	MALLOC(afap, struct accept_filter_arg *, sizeof(*afap), M_TEMP,
-	    M_WAITOK);
-	/* don't put large objects on the kernel stack */
-	error = sooptcopyin(sopt, afap, sizeof *afap, sizeof *afap);
-	afap->af_name[sizeof(afap->af_name)-1] = '\0';
-	afap->af_arg[sizeof(afap->af_arg)-1] = '\0';
-	if (error) {
-		FREE(afap, M_TEMP);
-		return (error);
-	}
-	afp = accept_filt_get(afap->af_name);
-	if (afp == NULL) {
-		FREE(afap, M_TEMP);
-		return (ENOENT);
-	}
-
-	/*
-	 * Allocate the new accept filter instance storage.  We may have to
-	 * free it again later if we fail to attach it.  If attached
-	 * properly, 'newaf' is NULLed to avoid a free() while in use.
-	 */
-	MALLOC(newaf, struct so_accf *, sizeof(*newaf), M_ACCF, M_WAITOK |
-	    M_ZERO);
-	if (afp->accf_create != NULL && afap->af_name[0] != '\0') {
-		int len = strlen(afap->af_name) + 1;
-		MALLOC(newaf->so_accept_filter_str, char *, len, M_ACCF,
-		    M_WAITOK);
-		strcpy(newaf->so_accept_filter_str, afap->af_name);
-	}
-
-	SOCK_LOCK(so);
-	/* must remove previous filter first */
-	if (so->so_accf != NULL) {
-		error = EINVAL;
-		goto out;
-	}
-	/*
-	 * Invoke the accf_create() method of the filter if required.
-	 * XXXRW: the socket mutex is held over this call, so the create
-	 * method cannot block.  This may be something we have to change, but
-	 * it would require addressing possible races.
-	 */
-	if (afp->accf_create != NULL) {
-		newaf->so_accept_filter_arg =
-		    afp->accf_create(so, afap->af_arg);
-		if (newaf->so_accept_filter_arg == NULL) {
-			error = EINVAL;
-			goto out;
-		}
-	}
-	newaf->so_accept_filter = afp;
-	so->so_accf = newaf;
-	so->so_options |= SO_ACCEPTFILTER;
-	newaf = NULL;
-out:
-	SOCK_UNLOCK(so);
-	if (newaf != NULL) {
-		if (newaf->so_accept_filter_str != NULL)
-			FREE(newaf->so_accept_filter_str, M_ACCF);
-		FREE(newaf, M_ACCF);
-	}
-	if (afap != NULL)
-		FREE(afap, M_TEMP);
-	return (error);
-}
-#endif /* INET */
 
 /*
  * Perhaps this routine, and sooptcopyout(), below, ought to come in
@@ -1797,15 +1698,15 @@ sosetopt(so, sopt)
 				goto bad;
 
 			/* assert(hz > 0); */
-			if (tv.tv_sec < 0 || tv.tv_sec > SHRT_MAX / hz ||
+			if (tv.tv_sec < 0 || tv.tv_sec > INT_MAX / hz ||
 			    tv.tv_usec < 0 || tv.tv_usec >= 1000000) {
 				error = EDOM;
 				goto bad;
 			}
 			/* assert(tick > 0); */
-			/* assert(ULONG_MAX - SHRT_MAX >= 1000000); */
+			/* assert(ULONG_MAX - INT_MAX >= 1000000); */
 			val = (u_long)(tv.tv_sec * hz) + tv.tv_usec / tick;
-			if (val > SHRT_MAX) {
+			if (val > INT_MAX) {
 				error = EDOM;
 				goto bad;
 			}
@@ -1920,11 +1821,6 @@ sogetopt(so, sopt)
 #endif
 
 		case SO_LINGER:
-			/*
-			 * XXXRW: We grab the lock here to get a consistent
-			 * snapshot of both fields.  This may not really
-			 * be necessary.
-			 */
 			SOCK_LOCK(so);
 			l.l_onoff = so->so_options & SO_LINGER;
 			l.l_linger = so->so_linger;
@@ -2301,7 +2197,25 @@ socheckuid(struct socket *so, uid_t uid)
 
 	if (so == NULL)
 		return (EPERM);
-	if (so->so_cred->cr_uid == uid)
-		return (0);
-	return (EPERM);
+	if (so->so_cred->cr_uid != uid)
+		return (EPERM);
+	return (0);
+}
+
+static int
+somaxconn_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+	int val;
+
+	val = somaxconn;
+	error = sysctl_handle_int(oidp, &val, sizeof(int), req);
+	if (error || !req->newptr )
+		return (error);
+
+	if (val < 1 || val > SHRT_MAX)
+		return (EINVAL);
+
+	somaxconn = val;
+	return (0);
 }

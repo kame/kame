@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_rl.c,v 1.145 2004/08/09 20:22:17 green Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_rl.c,v 1.145.2.3 2005/03/01 08:11:51 imp Exp $");
 
 /*
  * RealTek 8129/8139 PCI NIC driver
@@ -174,47 +174,47 @@ static struct rl_type rl_devs[] = {
 	{ 0, 0, 0, NULL }
 };
 
-static int rl_attach		(device_t);
-static int rl_detach		(device_t);
-static void rl_dma_map_rxbuf	(void *, bus_dma_segment_t *, int, int);
-static void rl_dma_map_txbuf	(void *, bus_dma_segment_t *, int, int);
-static void rl_eeprom_putbyte	(struct rl_softc *, int);
-static void rl_eeprom_getword	(struct rl_softc *, int, uint16_t *);
-static int rl_encap		(struct rl_softc *, struct mbuf * );
-static int rl_list_tx_init	(struct rl_softc *);
-static int rl_ifmedia_upd	(struct ifnet *);
-static void rl_ifmedia_sts	(struct ifnet *, struct ifmediareq *);
-static int rl_ioctl		(struct ifnet *, u_long, caddr_t);
-static void rl_intr		(void *);
-static void rl_init		(void *);
-static void rl_init_locked	(struct rl_softc *sc);
-static void rl_mii_send		(struct rl_softc *, uint32_t, int);
-static void rl_mii_sync		(struct rl_softc *);
-static int rl_mii_readreg	(struct rl_softc *, struct rl_mii_frame *);
-static int rl_mii_writereg	(struct rl_softc *, struct rl_mii_frame *);
-static int rl_miibus_readreg	(device_t, int, int);
-static void rl_miibus_statchg	(device_t);
-static int rl_miibus_writereg	(device_t, int, int, int);
+static int rl_attach(device_t);
+static int rl_detach(device_t);
+static void rl_dma_map_rxbuf(void *, bus_dma_segment_t *, int, int);
+static void rl_dma_map_txbuf(void *, bus_dma_segment_t *, int, int);
+static void rl_eeprom_putbyte(struct rl_softc *, int);
+static void rl_eeprom_getword(struct rl_softc *, int, uint16_t *);
+static int rl_encap(struct rl_softc *, struct mbuf * );
+static int rl_list_tx_init(struct rl_softc *);
+static int rl_ifmedia_upd(struct ifnet *);
+static void rl_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+static int rl_ioctl(struct ifnet *, u_long, caddr_t);
+static void rl_intr(void *);
+static void rl_init(void *);
+static void rl_init_locked(struct rl_softc *sc);
+static void rl_mii_send(struct rl_softc *, uint32_t, int);
+static void rl_mii_sync(struct rl_softc *);
+static int rl_mii_readreg(struct rl_softc *, struct rl_mii_frame *);
+static int rl_mii_writereg(struct rl_softc *, struct rl_mii_frame *);
+static int rl_miibus_readreg(device_t, int, int);
+static void rl_miibus_statchg(device_t);
+static int rl_miibus_writereg(device_t, int, int, int);
 #ifdef DEVICE_POLLING
-static void rl_poll		(struct ifnet *ifp, enum poll_cmd cmd,
+static void rl_poll(struct ifnet *ifp, enum poll_cmd cmd,
 				 int count);
-static void rl_poll_locked	(struct ifnet *ifp, enum poll_cmd cmd,
+static void rl_poll_locked(struct ifnet *ifp, enum poll_cmd cmd,
 				 int count);
 #endif
-static int rl_probe		(device_t);
-static void rl_read_eeprom	(struct rl_softc *, uint8_t *, int, int, int);
-static void rl_reset		(struct rl_softc *);
-static int rl_resume		(device_t);
-static void rl_rxeof		(struct rl_softc *);
-static void rl_setmulti		(struct rl_softc *);
-static void rl_shutdown		(device_t);
-static void rl_start		(struct ifnet *);
-static void rl_start_locked	(struct ifnet *);
-static void rl_stop		(struct rl_softc *);
-static int rl_suspend		(device_t);
-static void rl_tick		(void *);
-static void rl_txeof		(struct rl_softc *);
-static void rl_watchdog		(struct ifnet *);
+static int rl_probe(device_t);
+static void rl_read_eeprom(struct rl_softc *, uint8_t *, int, int, int);
+static void rl_reset(struct rl_softc *);
+static int rl_resume(device_t);
+static void rl_rxeof(struct rl_softc *);
+static void rl_setmulti(struct rl_softc *);
+static void rl_shutdown(device_t);
+static void rl_start(struct ifnet *);
+static void rl_start_locked(struct ifnet *);
+static void rl_stop(struct rl_softc *);
+static int rl_suspend(device_t);
+static void rl_tick(void *);
+static void rl_txeof(struct rl_softc *);
+static void rl_watchdog(struct ifnet *);
 
 #ifdef RL_USEIOSPACE
 #define RL_RES			SYS_RES_IOPORT
@@ -772,7 +772,7 @@ rl_probe(device_t dev)
 			}
 
 			device_set_desc(dev, t->rl_name);
-			return (0);
+			return (BUS_PROBE_DEFAULT);
 		}
 		t++;
 	}
@@ -1232,6 +1232,14 @@ rl_txeof(struct rl_softc *sc)
 		bus_dmamap_destroy(sc->rl_tag, RL_LAST_DMAMAP(sc));
 		m_freem(RL_LAST_TXMBUF(sc));
 		RL_LAST_TXMBUF(sc) = NULL;
+		/*
+		 * If there was a transmit underrun, bump the TX threshold.
+		 * Make sure not to overflow the 63 * 32byte we can address
+		 * with the 6 available bit.
+		 */
+		if ((txstat & RL_TXSTAT_TX_UNDERRUN) &&
+		    (sc->rl_txthresh < 2016))
+			sc->rl_txthresh += 32;
 		if (txstat & RL_TXSTAT_TX_OK)
 			ifp->if_opackets++;
 		else {
@@ -1244,12 +1252,8 @@ rl_txeof(struct rl_softc *sc)
 			/* error recovery */
 			rl_reset(sc);
 			rl_init_locked(sc);
-			/*
-			 * If there was a transmit underrun,
-			 * bump the TX threshold.
-			 */
-			if (txstat & RL_TXSTAT_TX_UNDERRUN)
-				sc->rl_txthresh = oldthresh + 32;
+			/* restore original threshold */
+			sc->rl_txthresh = oldthresh;
 			return;
 		}
 		RL_INC(sc->rl_cdata.last_tx);

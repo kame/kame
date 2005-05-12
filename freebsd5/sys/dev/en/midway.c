@@ -1,8 +1,7 @@
 /*	$NetBSD: midway.c,v 1.30 1997/09/29 17:40:38 chuck Exp $	*/
 /*	(sync'd to midway.c 1.68)	*/
 
-/*
- *
+/*-
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.
  *
@@ -33,7 +32,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/en/midway.c,v 1.63 2004/08/02 00:18:34 green Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/en/midway.c,v 1.63.2.1 2005/01/30 00:59:39 imp Exp $");
 
 /*
  *

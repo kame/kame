@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998-2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/re/if_re.c,v 1.28.2.5 2004/10/12 21:51:20 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/re/if_re.c,v 1.28.2.11 2005/03/31 17:38:39 cognet Exp $");
 
 /*
  * RealTek 8139C+/8169/8169S/8110S PCI NIC driver
@@ -166,6 +166,8 @@ static struct rl_type re_devs[] = {
 		"RealTek 8169 Gigabit Ethernet" },
 	{ RT_VENDORID, RT_DEVICEID_8169, RL_HWREV_8169S,
 		"RealTek 8169S Single-chip Gigabit Ethernet" },
+	{ RT_VENDORID, RT_DEVICEID_8169, RL_HWREV_8169SB,
+		"RealTek 8169SB Single-chip Gigabit Ethernet" },
 	{ RT_VENDORID, RT_DEVICEID_8169, RL_HWREV_8110S,
 		"RealTek 8110S Single-chip Gigabit Ethernet" },
 	{ COREGA_VENDORID, COREGA_DEVICEID_CGLAPCIGT, RL_HWREV_8169S,
@@ -184,6 +186,7 @@ static struct rl_hwrev re_hwrevs[] = {
 	{ RL_HWREV_8139CPLUS, RL_8139CPLUS, "C+"},
 	{ RL_HWREV_8169, RL_8169, "8169"},
 	{ RL_HWREV_8169S, RL_8169, "8169S"},
+	{ RL_HWREV_8169SB, RL_8169, "8169SB"},
 	{ RL_HWREV_8110S, RL_8169, "8110S"},
 	{ RL_HWREV_8100, RL_8139, "8100"},
 	{ RL_HWREV_8101, RL_8139, "8101"},
@@ -714,6 +717,7 @@ re_diag(sc)
 
 	CSR_WRITE_2(sc, RL_ISR, 0xFFFF);
 	RL_UNLOCK(sc);
+	/* XXX: re_diag must not be called when in ALTQ mode */
 	IF_HANDOFF(&ifp->if_snd, m0, ifp);
 	RL_LOCK(sc);
 	m0 = NULL;
@@ -1192,7 +1196,7 @@ re_attach(dev)
 	ifp->if_ioctl = re_ioctl;
 	ifp->if_capabilities = IFCAP_VLAN_MTU;
 	ifp->if_start = re_start;
-	ifp->if_hwassist = RE_CSUM_FEATURES;
+	ifp->if_hwassist = /*RE_CSUM_FEATURES*/0;
 	ifp->if_capabilities |= IFCAP_HWCSUM|IFCAP_VLAN_HWTAGGING;
 #ifdef DEVICE_POLLING
 	ifp->if_capabilities |= IFCAP_POLLING;
@@ -1203,8 +1207,10 @@ re_attach(dev)
 		ifp->if_baudrate = 1000000000;
 	else
 		ifp->if_baudrate = 100000000;
-	ifp->if_snd.ifq_maxlen = RL_IFQ_MAXLEN;
-	ifp->if_capenable = ifp->if_capabilities;
+	IFQ_SET_MAXLEN(&ifp->if_snd,  RL_IFQ_MAXLEN);
+	ifp->if_snd.ifq_drv_maxlen = RL_IFQ_MAXLEN;
+	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_capenable = ifp->if_capabilities & ~IFCAP_HWCSUM;
 
 	callout_handle_init(&sc->rl_stat_ch);
 
@@ -1284,7 +1290,6 @@ re_detach(dev)
 		 * anymore.
 		 */
 		ifp->if_flags &= ~IFF_UP;
-		ether_ifdetach(ifp);
 	}
 	if (sc->rl_miibus)
 		device_delete_child(dev, sc->rl_miibus);
@@ -1786,7 +1791,7 @@ re_poll_locked(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	re_rxeof(sc);
 	re_txeof(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		re_start_locked(ifp);
 
 	if (cmd == POLL_AND_CHECK_STATUS) { /* also check status register */
@@ -1870,7 +1875,7 @@ re_intr(arg)
 		}
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		re_start_locked(ifp);
 
 done_locked:
@@ -2007,7 +2012,7 @@ re_start_locked(ifp)
 {
 	struct rl_softc		*sc;
 	struct mbuf		*m_head = NULL;
-	int			idx;
+	int			idx, queued = 0;
 
 	sc = ifp->if_softc;
 
@@ -2016,12 +2021,12 @@ re_start_locked(ifp)
 	idx = sc->rl_ldata.rl_tx_prodidx;
 
 	while (sc->rl_ldata.rl_tx_mbuf[idx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (re_encap(sc, &m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
+			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
@@ -2031,7 +2036,12 @@ re_start_locked(ifp)
 		 * to him.
 		 */
 		BPF_MTAP(ifp, m_head);
+
+		queued++;
 	}
+
+	if (queued == 0)
+		return;
 
 	/* Flush the TX descriptors */
 

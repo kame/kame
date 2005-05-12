@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/if_loop.c,v 1.101.2.1 2004/09/15 15:14:18 andre Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.101.2.2 2005/01/31 23:26:23 imp Exp $
  */
 
 /*

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994 Herb Peyerl <hpeyerl@novatel.ca>
  * All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx.c,v 1.51 2004/08/14 00:12:42 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx.c,v 1.51.2.1 2005/01/30 01:00:12 imp Exp $");
 
 /*
  * Created from if_ep.c driver by Fred Gray (fgray@rice.edu) to support

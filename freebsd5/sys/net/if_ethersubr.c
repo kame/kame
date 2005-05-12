@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.177.2.1 2004/10/16 07:04:49 scottl Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.177.2.5 2005/03/31 14:58:36 sobomax Exp $
  */
 
 #include "opt_atalk.h"
@@ -37,6 +37,7 @@
 #include "opt_bdg.h"
 #include "opt_mac.h"
 #include "opt_netgraph.h"
+#include "opt_carp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,13 +74,17 @@
 #include <netinet6/nd6.h>
 #endif
 
+#ifdef DEV_CARP
+#include <netinet/ip_carp.h>
+#endif
+
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
+#endif
 int (*ef_inputp)(struct ifnet*, struct ether_header *eh, struct mbuf *m);
 int (*ef_outputp)(struct ifnet *ifp, struct mbuf **mp,
 		struct sockaddr *dst, short *tp, int *hlen);
-#endif
 
 #ifdef NETATALK
 #include <netatalk/at.h>
@@ -228,7 +233,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	    if ( aa->aa_flags & AFA_PHASE2 ) {
 		struct llc llc;
 
-		M_PREPEND(m, LLC_SNAPFRAMELEN, M_TRYWAIT);
+		M_PREPEND(m, LLC_SNAPFRAMELEN, M_DONTWAIT);
 		if (m == NULL)
 			senderr(ENOBUFS);
 		llc.llc_dsap = llc.llc_ssap = LLC_SNAP_LSAP;
@@ -317,6 +322,12 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 			return (0);	/* XXX */
 		}
 	}
+
+#ifdef DEV_CARP
+	if (ifp->if_carp &&
+	    (error = carp_output(ifp, m, dst, NULL)))
+		goto bad;
+#endif
 
 	/* Handle ng_ether(4) processing, if any */
 	if (ng_ether_output_p != NULL) {
@@ -657,6 +668,19 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 
 	if (!(BDG_ACTIVE(ifp)) &&
 	    !(ether_type == ETHERTYPE_VLAN && ifp->if_nvlans > 0)) {
+#ifdef DEV_CARP
+		/*
+		 * XXX: Okay, we need to call carp_forus() and - if it is for
+		 * us jump over code that does the normal check
+		 * "ac_enaddr == ether_dhost". The check sequence is a bit
+		 * different from OpenBSD, so we jump over as few code as
+		 * possible, to catch _all_ sanity checks. This needs
+		 * evaluation, to see if the carp ether_dhost values break any
+		 * of these checks!
+		 */
+		if (ifp->if_carp && carp_forus(ifp->if_carp, eh->ether_dhost))
+			goto pre_stats;
+#endif
 		/*
 		 * Discard packet if upper layers shouldn't see it because it
 		 * was unicast to a different Ethernet address. If the driver
@@ -679,6 +703,9 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 		}
 	}
 
+#ifdef DEV_CARP
+pre_stats:
+#endif
 	/* Discard packet if interface is not up */
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);

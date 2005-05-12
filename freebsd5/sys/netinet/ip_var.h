@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 /*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,7 +58,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.89.2.2 2004/09/23 16:38:53 andre Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.89.2.4 2005/01/31 23:26:36 imp Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -212,6 +213,7 @@ extern int	igmpsomaxsrc;		/* maximum num .of msf per socket */
 
 int	 ip_ctloutput(struct socket *, struct sockopt *sopt);
 void	 ip_drain(void);
+void	 ip_fini(void *xtp);
 int	 ip_fragment(struct ip *ip, struct mbuf **m_frag, int mtu,
 	    u_long if_hwassist_flags, int sw_csum);
 void	 ip_freemoptions(struct ip_moptions *);

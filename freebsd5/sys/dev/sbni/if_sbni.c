@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997-2001 Granch, Ltd. All rights reserved.
  * Author: Denis I.Timofeev <timofeev@granch.ru>
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.18 2004/08/13 23:41:00 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.18.2.1 2005/01/30 01:00:01 imp Exp $");
 
 /*
  * Device driver for Granch SBNI12 leased line adapters

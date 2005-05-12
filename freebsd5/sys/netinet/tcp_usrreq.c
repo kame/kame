@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.107 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.107.2.3 2005/04/01 05:38:58 rwatson Exp $
  */
 
 #include "opt_ipsec.h"
@@ -302,10 +302,15 @@ tcp_usr_listen(struct socket *so, struct thread *td)
 	const int inirw = INI_WRITE;
 
 	COMMON_START();
-	if (inp->inp_lport == 0)
+	SOCK_LOCK(so);
+	error = solisten_proto_check(so);
+	if (error == 0 && inp->inp_lport == 0)
 		error = in_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
-	if (error == 0)
+	if (error == 0) {
 		tp->t_state = TCPS_LISTEN;
+		solisten_proto(so);
+	}
+	SOCK_UNLOCK(so);
 	COMMON_END(PRU_LISTEN);
 }
 
@@ -319,14 +324,19 @@ tcp6_usr_listen(struct socket *so, struct thread *td)
 	const int inirw = INI_WRITE;
 
 	COMMON_START();
-	if (inp->inp_lport == 0) {
+	SOCK_LOCK(so);
+	error = solisten_proto_check(so);
+	if (error == 0 && inp->inp_lport == 0) {
 		inp->inp_vflag &= ~INP_IPV4;
 		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0)
 			inp->inp_vflag |= INP_IPV4;
 		error = in6_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
 	}
-	if (error == 0)
+	if (error == 0) {
 		tp->t_state = TCPS_LISTEN;
+		solisten_proto(so);
+	}
+	SOCK_UNLOCK(so);
 	COMMON_END(PRU_LISTEN);
 }
 #endif /* INET6 */
@@ -692,7 +702,9 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 				tp->t_flags &= ~TF_MORETOCOME;
 		}
 	} else {
+		SOCKBUF_LOCK(&so->so_snd);
 		if (sbspace(&so->so_snd) < -512) {
+			SOCKBUF_UNLOCK(&so->so_snd);
 			m_freem(m);
 			error = ENOBUFS;
 			goto out;
@@ -705,7 +717,8 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 		 * of data past the urgent section.
 		 * Otherwise, snd_up should be one lower.
 		 */
-		sbappendstream(&so->so_snd, m);
+		sbappendstream_locked(&so->so_snd, m);
+		SOCKBUF_UNLOCK(&so->so_snd);
 		if (nam && tp->t_state < TCPS_SYN_SENT) {
 			/*
 			 * Do implied connect if not yet connected,

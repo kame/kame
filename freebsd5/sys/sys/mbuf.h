@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.157.2.2 2004/10/15 21:45:13 jmg Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.157.2.6 2005/03/21 16:05:36 glebius Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -122,7 +122,7 @@ struct m_ext {
 		    (void *, void *);
 	void	*ext_args;		/* optional argument pointer */
 	u_int	ext_size;		/* size of buffer, for ext_free */
-	u_int	*ref_cnt;		/* pointer to ref count info */
+	volatile u_int *ref_cnt;	/* pointer to ref count info */
 	int	ext_type;		/* type of external storage */
 };
 
@@ -311,16 +311,34 @@ struct mbstat {
  * MEXT_REM_REF(m): remove reference to m_ext object.
  *
  * MEXT_ADD_REF(m): add reference to m_ext object already
- *     referred to by (m).
+ *     referred to by (m). XXX Note that it is VERY important that you
+ *     always set the second mbuf's m_ext.ref_cnt to point to the first
+ *     one's (i.e., n->m_ext.ref_cnt = m->m_ext.ref_cnt) AFTER you run
+ *     MEXT_ADD_REF(m).  This is because m might have a lazy initialized
+ *     ref_cnt (NULL) before this is run and it will only be looked up
+ *     from here.  We should make MEXT_ADD_REF() always take two mbufs
+ *     as arguments so that it can take care of this itself.
  */
-#define	MEXT_IS_REF(m)	(*((m)->m_ext.ref_cnt) > 1)
+#define	MEXT_IS_REF(m)	(((m)->m_ext.ref_cnt != NULL)			\
+    && (*((m)->m_ext.ref_cnt) > 1))
 
 #define	MEXT_REM_REF(m) do {						\
+	KASSERT((m)->m_ext.ref_cnt != NULL, ("m_ext refcnt lazy NULL")); \
 	KASSERT(*((m)->m_ext.ref_cnt) > 0, ("m_ext refcnt < 0"));	\
 	atomic_subtract_int((m)->m_ext.ref_cnt, 1);			\
 } while(0)
 
-#define	MEXT_ADD_REF(m)	atomic_add_int((m)->m_ext.ref_cnt, 1)
+#define	MEXT_ADD_REF(m) do {						\
+	if ((m)->m_ext.ref_cnt == NULL) {				\
+		KASSERT((m)->m_ext.ext_type == EXT_CLUSTER ||		\
+		    (m)->m_ext.ext_type == EXT_PACKET,			\
+		    ("Unexpected mbuf type has lazy refcnt"));		\
+		(m)->m_ext.ref_cnt = (u_int *)uma_find_refcnt(		\
+		    zone_clust, (m)->m_ext.ext_buf);			\
+		*((m)->m_ext.ref_cnt) = 2;				\
+	} else								\
+		atomic_add_int((m)->m_ext.ref_cnt, 1);			\
+} while (0)
 
 #ifdef WITNESS
 #define MBUF_CHECKSLEEP(how) do {					\
@@ -335,7 +353,7 @@ struct mbstat {
 /*
  * Network buffer allocation API
  *
- * The rest of it is defined in kern/subr_mbuf.c
+ * The rest of it is defined in kern/kern_mbuf.c
  */
 
 extern uma_zone_t	zone_mbuf;
@@ -675,10 +693,11 @@ struct	mbuf	*m_uiotombuf(struct uio *, int, int);
 #define	PACKET_TAG_RTSOCKFAM			25 /* rtsock sa family */
 #define	PACKET_TAG_PF_TRANSLATE_LOCALHOST	26 /* PF translate localhost */
 #define	PACKET_TAG_IPOPTIONS			27 /* Saved IP options */
+#define	PACKET_TAG_CARP                         28 /* CARP info */
 
-#define PACKET_TAG_INET6			28 /* IPv6 info */
-#define PACKET_TAG_ESP				29 /* ESP information */
-#define	PACKET_TAG_MAX				30
+#define PACKET_TAG_INET6			29 /* IPv6 info */
+#define PACKET_TAG_ESP				30 /* ESP information */
+#define	PACKET_TAG_MAX				31
 
 /* Packet tag routines. */
 struct	m_tag	*m_tag_alloc(u_int32_t, int, int, int);

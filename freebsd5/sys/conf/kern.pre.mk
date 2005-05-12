@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/kern.pre.mk,v 1.56 2004/08/13 14:30:26 ru Exp $
+# $FreeBSD: src/sys/conf/kern.pre.mk,v 1.56.2.1 2005/03/16 17:51:56 obrien Exp $
 
 # Part of a unified Makefile for building kernels.  This part contains all
 # of the definitions that need to be before %BEFORE_DEPEND.
@@ -28,7 +28,7 @@ COPTFLAGS?=-O2 -pipe
 . else
 COPTFLAGS?=-O -pipe
 . endif
-. if ${COPTFLAGS:M-O[23s]} != ""
+. if !empty(COPTFLAGS:M-O[23s]) && empty(COPTFLAGS:M-fno-strict-aliasing)
 COPTFLAGS+= -fno-strict-aliasing
 . endif
 .endif

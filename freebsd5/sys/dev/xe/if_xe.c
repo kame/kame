@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Portions of this software were derived from Werner Koch's xirc2ps driver
  * for Linux under the terms of the following license (from v1.30 of the
  * xirc2ps driver):
@@ -57,7 +57,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/xe/if_xe.c,v 1.52 2004/08/14 00:15:26 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/xe/if_xe.c,v 1.52.2.1 2005/01/30 01:00:13 imp Exp $");
 
 /*		
  * FreeBSD device driver for Xircom CreditCard PCMCIA Ethernet adapters.  The

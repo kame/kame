@@ -23,7 +23,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/sparc64/conf/GENERIC,v 1.78.2.3 2004/09/22 19:23:39 andre Exp $
+# $FreeBSD: src/sys/sparc64/conf/GENERIC,v 1.78.2.8 2005/04/01 12:46:27 sobomax Exp $
 
 machine		sparc64
 cpu		SUN4U
@@ -113,18 +113,21 @@ device		ses		# SCSI Environmental Services (and SAF-TE)
 #device		splash		# Splash screen and screen saver support
 #options 	KBD_INSTALL_CDEV # install a CDEV entry in /dev
 
-device		ofw_console	# Open Firmware console device
+#device		ofw_console	# Open Firmware console device
 
 # Builtin hardware
+device		auxio		# auxiliary I/O device
 device		genclock	# Generic clock interface
 device		eeprom		# eeprom (really a front-end for the MK48Txx)
 device		"mk48txx"	# Mostek MK48T02, MK48T08, MK48T59 clock
+device		rtc		# rtc (really a front-end for the MC146818)
+device		"mc146818"	# Motorola MC146818 and compatible clocks
 
 # Serial (COM) ports
-device		sab		# Siemens SAB82532 based serial ports
-device		zs		# Zilog 8530 based serial ports
-#device		uart		# Multi-uart driver
-#device		puc		# Multi-channel uarts
+#device		sab		# Siemens SAB82532 based serial ports
+#device		zs		# Zilog 8530 based serial ports
+device		uart		# Multi-uart driver
+device		puc		# Multi-channel uarts
 
 # Parallel port
 #device		ppc
@@ -181,6 +184,7 @@ device		faith	1	# IPv6-to-IPv4 relaying (translation)
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
+# Note that 'bpf' is required for DHCP.
 device		bpf	4	# Berkeley packet filter
 
 # USB support
@@ -199,6 +203,7 @@ device		bpf	4	# Berkeley packet filter
 # USB Ethernet, requires mii
 #device		aue		# ADMtek USB Ethernet
 #device		axe		# ASIX Electronics USB Ethernet
+#device		cdce		# Generic USB over Ethernet
 #device		cue		# CATC USB Ethernet
 #device		kue		# Kawasaki LSI USB Ethernet
 #device		rue		# RealTek RTL8150 USB Ethernet

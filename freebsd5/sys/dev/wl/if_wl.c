@@ -1,4 +1,4 @@
-/* 
+/*-
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -173,7 +173,7 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/wl/if_wl.c,v 1.63 2004/05/30 20:08:46 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/wl/if_wl.c,v 1.63.2.1 2005/01/30 01:00:13 imp Exp $");
 
 
 /*

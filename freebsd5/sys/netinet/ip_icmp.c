@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.96.2.1 2004/09/23 16:38:53 andre Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.96.2.2 2005/01/31 23:26:35 imp Exp $
  */
 
 #include "opt_ipsec.h"

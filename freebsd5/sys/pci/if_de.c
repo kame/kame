@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_de.c,v 1.158.4.1 2004/10/23 03:12:33 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_de.c,v 1.158.2.3 2005/03/01 08:11:51 imp Exp $");
 
 #define	TULIP_HDR_DATA
 
@@ -3262,7 +3262,8 @@ tulip_reset(
 	printf("%s: tulip_reset: additional reset needed?!?\n",
 	       sc->tulip_xname);
 #endif
-    tulip_media_print(sc);
+    if (bootverbose)
+	    tulip_media_print(sc);
     if (sc->tulip_features & TULIP_HAVE_DUALSENSE)
 	TULIP_CSR_WRITE(sc, csr_sia_status, TULIP_CSR_READ(sc, csr_sia_status));
 
@@ -4993,7 +4994,7 @@ tulip_pci_probe(device_t dev)
     }
     if (name) {
 	device_set_desc(dev, name);
-	return -200;
+	return BUS_PROBE_LOW_PRIORITY;
     }
     return ENXIO;
 }

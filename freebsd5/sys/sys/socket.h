@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1985, 1986, 1988, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.83 2004/08/11 10:18:49 andre Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.83.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_SOCKET_H_

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
- * $FreeBSD: src/sys/netinet/in_proto.c,v 1.73 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/in_proto.c,v 1.73.2.2 2005/03/21 16:05:35 glebius Exp $
  */
 
 #include "opt_ipdivert.h"
@@ -42,6 +42,7 @@
 #include "opt_sctp.h"
 #include "opt_dccp.h"
 #include "opt_pf.h"
+#include "opt_carp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -117,6 +118,10 @@ extern struct pr_usrreqs natpt_usrreqs;
 #ifdef DEV_PFSYNC
 #include <net/pfvar.h>
 #include <net/if_pfsync.h>
+#endif
+
+#ifdef DEV_CARP
+#include <netinet/ip_carp.h>
 #endif
 
 extern	struct domain inetdomain;
@@ -309,6 +314,14 @@ struct protosw inetsw[] = {
   &rip_usrreqs
 },
 #endif	/* DEV_PFSYNC */
+#ifdef DEV_CARP
+{ SOCK_RAW,	&inetdomain,	IPPROTO_CARP,	PR_ATOMIC|PR_ADDR,
+  carp_input,	(pr_output_t*)rip_output,	0,	rip_ctloutput,
+  0,
+  0,		0,		0,		0,
+  &rip_usrreqs
+},
+#endif /* DEV_CARP */
 	/* raw wildcard */
 { SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   rip_input,	0,		0,		rip_ctloutput,
@@ -366,4 +379,7 @@ SYSCTL_NODE(_net_inet, IPPROTO_DIVERT,	divert,	CTLFLAG_RW, 0,	"DIVERT");
 #endif
 #ifdef PIM
 SYSCTL_NODE(_net_inet, IPPROTO_PIM,    pim,    CTLFLAG_RW, 0,  "PIM");
+#endif
+#ifdef DEV_CARP
+SYSCTL_NODE(_net_inet, IPPROTO_CARP,    carp,    CTLFLAG_RW, 0,  "CARP");
 #endif

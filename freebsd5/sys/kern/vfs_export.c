@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_export.c,v 1.327 2004/07/12 08:14:08 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_export.c,v 1.327.2.2 2005/01/31 23:26:18 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/dirent.h>
@@ -129,6 +129,10 @@ vfs_hang_addrlist(mp, nep, argp)
 	saddr = (struct sockaddr *) (np + 1);
 	if ((error = copyin(argp->ex_addr, saddr, argp->ex_addrlen)))
 		goto out;
+	if (saddr->sa_family > AF_MAX) {
+		error = EINVAL;
+		goto out;
+	}
 	if (saddr->sa_len > argp->ex_addrlen)
 		saddr->sa_len = argp->ex_addrlen;
 	if (argp->ex_masklen) {

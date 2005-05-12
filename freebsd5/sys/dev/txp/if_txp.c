@@ -1,6 +1,6 @@
 /*	$OpenBSD: if_txp.c,v 1.48 2001/06/27 06:34:50 kjc Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2001
  *	Jason L. Wright <jason@thought.net>, Theo de Raadt, and
  *	Aaron Campbell <aaron@monkey.org>.  All rights reserved.
@@ -35,14 +35,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.27 2004/08/13 23:53:36 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.27.2.2 2005/03/03 05:02:14 obrien Exp $");
 
 /*
  * Driver for 3c990 (Typhoon) Ethernet ASIC
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.27 2004/08/13 23:53:36 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.27.2.2 2005/03/03 05:02:14 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -94,7 +94,7 @@ __FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.27 2004/08/13 23:53:36 rwatson 
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.27 2004/08/13 23:53:36 rwatson Exp $";
+  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.27.2.2 2005/03/03 05:02:14 obrien Exp $";
 #endif
 
 /*
@@ -202,7 +202,7 @@ txp_probe(dev)
 		if ((pci_get_vendor(dev) == t->txp_vid) &&
 		    (pci_get_device(dev) == t->txp_did)) {
 			device_set_desc(dev, t->txp_name);
-			return(0);
+			return(BUS_PROBE_DEFAULT);
 		}
 		t++;
 	}

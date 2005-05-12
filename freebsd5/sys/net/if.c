@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,13 +27,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/if.c,v 1.199.2.7.2.2 2004/10/30 22:01:43 rwatson Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.199.2.14.2.1 2005/04/15 01:52:03 cperciva Exp $
  */
 
 #include "opt_compat.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #include "opt_mac.h"
+#include "opt_carp.h"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -77,6 +78,9 @@
 #endif
 #ifdef INET
 #include <netinet/if_ether.h>
+#endif
+#ifdef DEV_CARP
+#include <netinet/ip_carp.h>
 #endif
 
 struct mbuf *(*tbr_dequeue_ptr)(struct ifaltq *, int) = NULL;
@@ -381,7 +385,7 @@ if_attach(struct ifnet *ifp)
 	TAILQ_INIT(&ifp->if_multiaddrs);
 	knlist_init(&ifp->if_klist, NULL);
 	getmicrotime(&ifp->if_lastchange);
-	ifp->if_data.ifi_epoch = time_second;
+	ifp->if_data.ifi_epoch = time_uptime;
 
 #ifdef MAC
 	mac_init_ifnet(ifp);
@@ -439,7 +443,7 @@ if_attach(struct ifnet *ifp)
 		sdl->sdl_data[--namelen] = 0xff;
 	ifa->ifa_refcnt = 1;
 	TAILQ_INSERT_HEAD(&ifp->if_addrhead, ifa, ifa_link);
-	ifp->if_broadcastaddr = 0; /* reliably crash if used uninitialized */
+	ifp->if_broadcastaddr = NULL; /* reliably crash if used uninitialized */
 	ifp->if_snd.altq_type = 0;
 	ifp->if_snd.altq_disc = NULL;
 	ifp->if_snd.altq_flags &= ALTQF_CANTCHANGE;
@@ -532,6 +536,12 @@ if_detach(struct ifnet *ifp)
  	int found;
 
 	EVENTHANDLER_INVOKE(ifnet_departure_event, ifp);
+#ifdef DEV_CARP
+	/* Maybe hook to the generalized departure handler above?!? */
+	if (ifp->if_carp)
+		carp_ifdetach(ifp);
+#endif
+
 	/*
 	 * Remove routes and flush queues.
 	 */
@@ -936,6 +946,10 @@ if_unroute(struct ifnet *ifp, int flag, int fam)
 		if (fam == PF_UNSPEC || (fam == ifa->ifa_addr->sa_family))
 			pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
 	if_qflush(&ifp->if_snd);
+#ifdef DEV_CARP
+	if (ifp->if_carp)
+		carp_carpdev_state(ifp->if_carp);
+#endif
 	rt_ifmsg(ifp);
 }
 
@@ -954,6 +968,10 @@ if_route(struct ifnet *ifp, int flag, int fam)
 	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 		if (fam == PF_UNSPEC || (fam == ifa->ifa_addr->sa_family))
 			pfctlinput(PRC_IFUP, ifa->ifa_addr);
+#ifdef DEV_CARP
+	if (ifp->if_carp)
+		carp_carpdev_state(ifp->if_carp);
+#endif
 	rt_ifmsg(ifp);
 #ifdef INET6
 	in6_if_up(ifp);
@@ -1517,6 +1535,10 @@ ifconf(u_long cmd, caddr_t data)
 	/* Limit initial buffer size to MAXPHYS to avoid DoS from userspace. */
 	max_len = MAXPHYS - 1;
 
+	/* Prevent hostile input from being able to crash the system */
+	if (ifc->ifc_len <= 0)
+		return (EINVAL);
+
 again:
 	if (ifc->ifc_len <= max_len) {
 		max_len = ifc->ifc_len;
@@ -1936,15 +1958,15 @@ if_start(struct ifnet *ifp)
 {
 
 	NET_ASSERT_GIANT();
-                
-        if ((ifp->if_flags & IFF_NEEDSGIANT) != 0 && debug_mpsafenet != 0) {
-                if (mtx_owned(&Giant))
-                        (*(ifp)->if_start)(ifp);
-                else
+
+	if ((ifp->if_flags & IFF_NEEDSGIANT) != 0 && debug_mpsafenet != 0) {
+		if (mtx_owned(&Giant))
+			(*(ifp)->if_start)(ifp);
+		else
 			taskqueue_enqueue(taskqueue_swi_giant,
 			    &ifp->if_starttask);
-        } else
-                (*(ifp)->if_start)(ifp);
+	} else
+		(*(ifp)->if_start)(ifp);
 }
 
 static void

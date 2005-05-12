@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Wind River Systems
  * Copyright (c) 1997, 1998, 1999, 2000, 2001
  *	Bill Paul <william.paul@windriver.com>.  All rights reserved.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.34 2004/08/13 23:18:01 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.34.2.2 2005/01/30 00:59:52 imp Exp $");
 
 /*
  * Level 1 LXT1001 gigabit ethernet driver for FreeBSD. Public
@@ -1051,8 +1051,9 @@ lge_tick(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 			sc->lge_link++;
-			if (IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_SX||
-			    IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_T)
+			if (bootverbose &&
+		  	    (IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_SX||
+			    IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_T))
 				printf("lge%d: gigabit link up\n",
 				    sc->lge_unit);
 			if (ifp->if_snd.ifq_head != NULL)

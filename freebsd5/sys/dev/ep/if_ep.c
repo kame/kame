@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994 Herb Peyerl <hpeyerl@novatel.ca>
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep.c,v 1.133 2004/05/23 16:11:47 mux Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep.c,v 1.133.2.2 2005/02/01 21:45:16 imp Exp $");
 
 /*
  *	Modified from the FreeBSD 1.1.5.1 version by:
@@ -128,7 +128,7 @@ eeprom_rdy(struct ep_softc *sc)
  * before
  */
 int
-get_e(struct ep_softc *sc, u_int16_t offset, u_int16_t *result)
+get_e(struct ep_softc *sc, uint16_t offset, uint16_t *result)
 {
 
 	if (eeprom_rdy(sc))
@@ -149,11 +149,11 @@ int
 ep_get_macaddr(struct ep_softc *sc, u_char *addr)
 {
 	int i;
-	u_int16_t result;
+	uint16_t result;
 	int error;
-	u_int16_t *macaddr;
+	uint16_t *macaddr;
 
-	macaddr = (u_int16_t *) addr;
+	macaddr = (uint16_t *) addr;
 
 	GO_WINDOW(sc, 0);
 	for (i = EEPROM_NODE_ADDR_0; i <= EEPROM_NODE_ADDR_2; i++) {
@@ -172,7 +172,7 @@ ep_alloc(device_t dev)
 	struct ep_softc *sc = device_get_softc(dev);
 	int rid;
 	int error = 0;
-	u_int16_t result;
+	uint16_t result;
 
 	rid = 0;
 	sc->iobase = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
@@ -221,7 +221,7 @@ bad:
 void
 ep_get_media(struct ep_softc *sc)
 {
-	u_int16_t config;
+	uint16_t config;
 
 	GO_WINDOW(sc, 0);
 	config = CSR_READ_2(sc, EP_W0_CONFIG_CTRL);

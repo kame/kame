@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.103.2.1 2004/10/09 15:20:18 mlaier Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.103.2.3 2005/03/03 04:16:17 avatar Exp $");
 
 /*
  * SiS 900/SiS 7016 fast ethernet PCI NIC driver. Datasheets are
@@ -1544,7 +1544,7 @@ sis_newbuf(sc, c, m)
 	bus_dmamap_load(sc->sis_tag, c->sis_map,
 	    mtod(m, void *), MCLBYTES,
 	    sis_dma_map_desc_ptr, c, 0);
-	bus_dmamap_sync(sc->sis_tag, c->sis_map, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->sis_tag, c->sis_map, BUS_DMASYNC_PREREAD);
 
 	return(0);
 }

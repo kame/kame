@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.66 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.66.2.6 2005/01/31 23:26:37 imp Exp $
  */
 
 #include "opt_inet6.h"
@@ -130,27 +130,11 @@ int	tcp_maxidle;
 void
 tcp_slowtimo()
 {
-	int s;
 
-	s = splnet();
 	tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
-	splx(s);
 	INP_INFO_WLOCK(&tcbinfo);
 	(void) tcp_timer_2msl_tw(0);
 	INP_INFO_WUNLOCK(&tcbinfo);
-}
-
-/*
- * Cancel all timers for TCP tp.
- */
-void
-tcp_canceltimers(tp)
-	struct tcpcb *tp;
-{
-	callout_stop(tp->tt_2msl);
-	callout_stop(tp->tt_persist);
-	callout_stop(tp->tt_keep);
-	callout_stop(tp->tt_rexmt);
 }
 
 int	tcp_syn_backoff[TCP_MAXRXTSHIFT + 1] =
@@ -170,22 +154,18 @@ tcp_timer_delack(xtp)
 	void *xtp;
 {
 	struct tcpcb *tp = xtp;
-	int s;
 	struct inpcb *inp;
 
-	s = splnet();
 	INP_INFO_RLOCK(&tcbinfo);
 	inp = tp->t_inpcb;
-	if (!inp) {
+	if (inp == NULL) {
 		INP_INFO_RUNLOCK(&tcbinfo);
-		splx(s);
 		return;
 	}
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&tcbinfo);
 	if (callout_pending(tp->tt_delack) || !callout_active(tp->tt_delack)) {
 		INP_UNLOCK(inp);
-		splx(s);
 		return;
 	}
 	callout_deactivate(tp->tt_delack);
@@ -194,7 +174,6 @@ tcp_timer_delack(xtp)
 	tcpstat.tcps_delack++;
 	(void) tcp_output(tp);
 	INP_UNLOCK(inp);
-	splx(s);
 }
 
 void
@@ -202,19 +181,16 @@ tcp_timer_2msl(xtp)
 	void *xtp;
 {
 	struct tcpcb *tp = xtp;
-	int s;
 	struct inpcb *inp;
 #ifdef TCPDEBUG
 	int ostate;
 
 	ostate = tp->t_state;
 #endif
-	s = splnet();
 	INP_INFO_WLOCK(&tcbinfo);
 	inp = tp->t_inpcb;
-	if (!inp) {
+	if (inp == NULL) {
 		INP_INFO_WUNLOCK(&tcbinfo);
-		splx(s);
 		return;
 	}
 	INP_LOCK(inp);
@@ -222,7 +198,6 @@ tcp_timer_2msl(xtp)
 	if (callout_pending(tp->tt_2msl) || !callout_active(tp->tt_2msl)) {
 		INP_UNLOCK(tp->t_inpcb);
 		INP_INFO_WUNLOCK(&tcbinfo);
-		splx(s);
 		return;
 	}
 	callout_deactivate(tp->tt_2msl);
@@ -247,9 +222,14 @@ tcp_timer_2msl(xtp)
 	if (tp)
 		INP_UNLOCK(inp);
 	INP_INFO_WUNLOCK(&tcbinfo);
-	splx(s);
 }
 
+/*
+ * The timed wait lists contain references to each of the TCP sessions
+ * currently TIME_WAIT state.  The list pointers, including the list pointers
+ * in each tcptw structure, are protected using the global tcbinfo lock,
+ * which must be held over list iteration and modification.
+ */
 struct twlist {
 	LIST_HEAD(, tcptw)	tw_list;
 	struct tcptw	tw_tail;
@@ -277,6 +257,8 @@ tcp_timer_2msl_reset(struct tcptw *tw, int timeo)
 	int i;
 	struct tcptw *tw_tail;
 
+	INP_INFO_WLOCK_ASSERT(&tcbinfo);
+	INP_LOCK_ASSERT(tw->tw_inpcb);
 	if (tw->tw_time != 0)
 		LIST_REMOVE(tw, tw_2msl);
 	tw->tw_time = timeo + ticks;
@@ -289,6 +271,7 @@ void
 tcp_timer_2msl_stop(struct tcptw *tw)
 {
 
+	INP_INFO_WLOCK_ASSERT(&tcbinfo);
 	if (tw->tw_time != 0)
 		LIST_REMOVE(tw, tw_2msl);
 }
@@ -300,6 +283,7 @@ tcp_timer_2msl_tw(int reuse)
 	struct twlist *twl;
 	int i;
 
+	INP_INFO_WLOCK_ASSERT(&tcbinfo);
 	for (i = 0; i < 2; i++) {
 		twl = tw_2msl_list[i];
 		tw_tail = &twl->tw_tail;

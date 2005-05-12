@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_seq.h	8.3 (Berkeley) 6/21/95
- * $FreeBSD: src/sys/netinet/tcp_seq.h,v 1.22 2004/06/23 21:04:37 ps Exp $
+ * $FreeBSD: src/sys/netinet/tcp_seq.h,v 1.22.2.1 2005/01/31 23:26:36 imp Exp $
  */
 
 #ifndef _NETINET_TCP_SEQ_H_

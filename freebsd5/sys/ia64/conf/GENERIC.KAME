@@ -24,7 +24,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/ia64/conf/GENERIC,v 1.66.2.3 2004/09/22 19:23:38 andre Exp $
+# $FreeBSD: src/sys/ia64/conf/GENERIC,v 1.66.2.6 2005/04/01 12:46:26 sobomax Exp $
 
 machine		ia64
 cpu		ITANIUM
@@ -100,7 +100,7 @@ device		ses		# Environmental Services (and SAF-TE)
 device		aac		# Adaptec FSA RAID
 device		aacp		# SCSI passthrough for aac (requires CAM)
 device		amr		# AMI MegaRAID
-device		ida		# Compaq Smart RAID
+#device		ida		# Compaq Smart RAID
 device		mlx		# Mylex DAC960 family
 
 # USB host controllers and peripherals
@@ -133,6 +133,7 @@ device		xl		# 3Com 3c90x ("Boomerang", "Cyclone")
 
 # USB Ethernet
 device		aue		# ADMtek USB Ethernet
+device		cdce		# Generic USB over Ethernet
 device		cue		# CATC USB Ethernet
 device		kue		# Kawasaki LSI USB Ethernet
 
@@ -154,6 +155,7 @@ device		uart		# Serial port (UART)
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
+# Note that 'bpf' is required for DHCP.
 device		bpf		# Berkeley packet filter
 
 # KAME extensions

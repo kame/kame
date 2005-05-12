@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.943.2.4 2004/09/22 19:23:37 andre Exp $
+# $FreeBSD: src/sys/conf/files,v 1.943.2.15 2005/04/01 12:46:25 sobomax Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -57,6 +57,7 @@ usbdevs.h			optional usb				   \
 	clean		"usbdevs.h"
 kern/device_if.m		standard
 kern/bus_if.m			standard
+kern/cpufreq_if.m		standard
 kern/clock_if.m			optional genclock
 kern/linker_if.m		standard
 cam/cam.c		optional scbus
@@ -294,6 +295,7 @@ dev/acpica/acpi_powerres.c	optional acpi
 dev/acpica/acpi_quirk.c		optional acpi
 dev/acpica/acpi_resource.c	optional acpi
 dev/acpica/acpi_thermal.c	optional acpi
+dev/acpica/acpi_throttle.c	optional acpi
 dev/acpica/acpi_timer.c		optional acpi
 dev/acpica/Osd/OsdDebug.c	optional acpi
 dev/acpica/Osd/OsdHardware.c	optional acpi
@@ -396,6 +398,7 @@ dev/cy/cy_isa.c		optional cy isa
 dev/cy/cy_pci.c		optional cy pci
 dev/dcons/dcons.c	optional dcons
 dev/dcons/dcons_crom.c	optional dcons_crom
+dev/dcons/dcons_os.c	optional dcons
 dev/digi/digi.c		optional digi
 dev/digi/digi_isa.c	optional digi isa
 dev/digi/digi_pci.c	optional digi pci
@@ -505,6 +508,9 @@ dev/ida/ida_eisa.c	optional ida eisa
 dev/ida/ida_pci.c	optional ida pci
 dev/ie/if_ie.c		optional ie isa nowerror
 dev/ie/if_ie_isa.c	optional ie isa
+dev/ieee488/ibfoo.c	optional pcii
+dev/ieee488/pcii.c	optional pcii
+dev/ieee488/upd7210.c	optional pcii
 dev/iicbus/iicbb_if.m	optional iicbb
 dev/iicbus/iicbus_if.m	optional iicbus
 dev/iicbus/if_ic.c	optional ic
@@ -544,6 +550,7 @@ dev/ncv/ncr53c500_pccard.c	optional ncv pccard
 dev/nsp/nsp.c		optional nsp
 dev/nsp/nsp_pccard.c	optional nsp card
 dev/nsp/nsp_pccard.c	optional nsp pccard
+dev/mc146818/mc146818.c	optional mc146818
 dev/mca/mca_bus.c	optional mca
 dev/mcd/mcd.c		optional mcd isa nowerror
 dev/mcd/mcd_isa.c	optional mcd isa nowerror
@@ -641,6 +648,7 @@ dev/puc/puc.c		optional puc
 dev/puc/puc_ebus.c	optional puc ebus
 dev/puc/puc_pci.c	optional puc pci
 dev/puc/puc_pccard.c	optional puc pccard
+dev/puc/puc_sbus.c	optional puc fhc
 dev/puc/puc_sbus.c	optional puc sbus
 dev/puc/pucdata.c	optional puc pci
 dev/random/harvest.c	standard
@@ -750,12 +758,14 @@ dev/sym/sym_hipd.c	optional sym					\
 	dependency	"$S/dev/sym/sym_{conf,defs}.h"
 dev/syscons/blank/blank_saver.c	optional blank_saver
 dev/syscons/daemon/daemon_saver.c optional daemon_saver
+dev/syscons/dragon/dragon_saver.c optional dragon_saver
 dev/syscons/fade/fade_saver.c	optional fade_saver
 dev/syscons/fire/fire_saver.c	optional fire_saver
 dev/syscons/green/green_saver.c	optional green_saver
 dev/syscons/logo/logo_saver.c	optional logo_saver
 dev/syscons/logo/logo.c		optional logo_saver
 dev/syscons/rain/rain_saver.c	optional rain_saver
+dev/syscons/snake/snake_saver.c	optional snake_saver
 dev/syscons/star/star_saver.c	optional star_saver
 dev/syscons/warp/warp_saver.c	optional warp_saver
 dev/tdfx/tdfx_pci.c	optional tdfx pci
@@ -793,6 +803,7 @@ dev/usb/usb_if.m	optional usb
 dev/usb/hid.c		optional usb
 dev/usb/if_aue.c	optional aue
 dev/usb/if_axe.c	optional axe
+dev/usb/if_cdce.c	optional cdce
 dev/usb/if_cue.c	optional cue
 dev/usb/if_udav.c	optional udav
 dev/usb/if_kue.c	optional kue
@@ -955,6 +966,7 @@ geom/mirror/g_mirror_ctl.c	optional geom_mirror
 geom/nop/g_nop.c	optional geom_nop
 geom/raid3/g_raid3.c		optional geom_raid3
 geom/raid3/g_raid3_ctl.c	optional geom_raid3
+geom/shsec/g_shsec.c	optional geom_shsec
 geom/stripe/g_stripe.c	optional geom_stripe
 geom/uzip/g_uzip.c	optional geom_uzip
 geom/geom_aes.c		optional geom_aes
@@ -1078,6 +1090,7 @@ kern/kern_clock.c	standard
 kern/kern_condvar.c	standard
 kern/kern_conf.c	standard
 kern/kern_context.c	standard
+kern/kern_cpu.c		standard
 kern/kern_descrip.c	standard
 kern/kern_poll.c	optional device_polling
 kern/kern_environment.c	standard
@@ -1260,6 +1273,8 @@ net/if_media.c		standard
 net/if_mib.c		standard
 net/if_ppp.c		optional ppp
 net/if_sl.c		optional sl
+net/if_spppfr.c		optional sppp
+net/if_spppfr.c		optional i4bisppp
 net/if_spppsubr.c	optional sppp
 net/if_spppsubr.c	optional i4bisppp
 net/if_stf.c		count stf
@@ -1458,6 +1473,8 @@ netgraph/ng_lmi.c	optional netgraph_lmi
 netgraph/ng_l2tp.c	optional netgraph_l2tp
 netgraph/ng_mppc.c	optional netgraph_mppc_compression
 netgraph/ng_mppc.c	optional netgraph_mppc_encryption
+netgraph/netflow/ng_netflow.c	optional netgraph_netflow
+netgraph/netflow/netflow.c	optional netgraph_netflow
 crypto/rc4/rc4.c	optional wlan
 crypto/rc4/rc4.c	optional netgraph_mppc_encryption
 crypto/sha1.c		optional netgraph_mppc_encryption
@@ -1487,6 +1504,8 @@ netinet/if_atm.c	optional atm
 netinet/if_ether.c	optional ether
 netinet/igmp.c		optional inet
 netinet/in.c		optional inet
+netinet/ip_carp.c	optional carp
+crypto/sha1.c		optional carp
 netinet/in_gif.c	optional gif inet
 netinet/in_msf.c	optional igmpv3
 netinet/in_msf.c	optional mldv2

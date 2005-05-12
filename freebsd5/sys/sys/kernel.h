@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kernel.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/kernel.h,v 1.117.2.1 2004/09/03 03:09:54 rwatson Exp $
+ * $FreeBSD: src/sys/sys/kernel.h,v 1.117.2.3 2005/02/14 11:23:43 obrien Exp $
  */
 
 #ifndef _SYS_KERNEL_H_
@@ -132,6 +132,7 @@ enum sysinit_sub_id {
 	SI_SUB_SOFTINTR		= 0x2800001,	/* start soft interrupt thread */
 	SI_SUB_DEVFS		= 0x2F00000,	/* devfs ready for devices */
 	SI_SUB_INIT_IF		= 0x3000000,	/* prep for net interfaces */
+	SI_SUB_NETGRAPH		= 0x3010000,	/* Let Netgraph initialize */
 	SI_SUB_DRIVERS		= 0x3100000,	/* Let Drivers initialize */
 	SI_SUB_CONFIGURE	= 0x3800000,	/* Configure devices */
 	SI_SUB_VFS		= 0x4000000,	/* virtual filesystem*/
@@ -188,7 +189,7 @@ enum sysinit_elem_order {
  * to discern SYSINIT's which take non-constant data pointers and
  * SYSINIT's which take constant data pointers,
  *
- * The C_* macros take functions expecting const void * arguments 
+ * The C_* macros take functions expecting const void * arguments
  * while the non-C_* macros take functions expecting just void * arguments.
  *
  * With -Wcast-qual on, the compiler issues warnings:
@@ -265,6 +266,10 @@ void	sysinit_add(struct sysinit **set, struct sysinit **set_end);
  * loader.conf(5) for any tunables or conflicts will result.
  */
 
+/*
+ * int
+ * please avoid using for new tunables!
+ */
 extern void tunable_int_init(void *);
 struct tunable_int {
 	const char *path;
@@ -285,6 +290,56 @@ struct tunable_int {
 
 #define	TUNABLE_INT_FETCH(path, var)	getenv_int((path), (var))
 
+/*
+ * long
+ */
+extern void tunable_long_init(void *);
+struct tunable_long {
+	const char *path;
+	long *var;
+};
+#define	TUNABLE_LONG(path, var)					\
+	_TUNABLE_LONG((path), (var), __LINE__)
+#define _TUNABLE_LONG(path, var, line)				\
+	__TUNABLE_LONG((path), (var), line)
+
+#define	__TUNABLE_LONG(path, var, line)				\
+	static struct tunable_long __tunable_long_ ## line = {	\
+		path,						\
+		var,						\
+	};							\
+	SYSINIT(__Tunable_init_ ## line, SI_SUB_TUNABLES, SI_ORDER_MIDDLE, \
+	     tunable_long_init, &__tunable_long_ ## line)
+
+#define	TUNABLE_LONG_FETCH(path, var)	getenv_long((path), (var))
+
+/*
+ * unsigned long
+ */
+extern void tunable_ulong_init(void *);
+struct tunable_ulong {
+	const char *path;
+	unsigned long *var;
+};
+#define	TUNABLE_ULONG(path, var)				\
+	_TUNABLE_ULONG((path), (var), __LINE__)
+#define _TUNABLE_ULONG(path, var, line)				\
+	__TUNABLE_ULONG((path), (var), line)
+
+#define	__TUNABLE_ULONG(path, var, line)			\
+	static struct tunable_ulong __tunable_ulong_ ## line = {\
+		path,						\
+		var,						\
+	};							\
+	SYSINIT(__Tunable_init_ ## line, SI_SUB_TUNABLES, SI_ORDER_MIDDLE, \
+	     tunable_ulong_init, &__tunable_ulong_ ## line)
+
+#define	TUNABLE_ULONG_FETCH(path, var)	getenv_ulong((path), (var))
+
+/*
+ * Quad (64-bit)
+ * please avoid using for new tunables!
+ */
 extern void tunable_quad_init(void *);
 struct tunable_quad {
 	const char *path;

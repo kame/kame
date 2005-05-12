@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan.c,v 1.73 2004/08/15 06:24:42 jmg Exp $
+ * $FreeBSD: src/sys/net/if_vlan.c,v 1.73.2.2 2005/01/31 23:26:23 imp Exp $
  */
 
 /*
@@ -134,8 +134,8 @@ static	int vlan_clone_match(struct if_clone *, const char *);
 static	int vlan_clone_create(struct if_clone *, char *, size_t);
 static	int vlan_clone_destroy(struct if_clone *, struct ifnet *);
 
-struct if_clone vlan_cloner = IFC_CLONE_INITIALIZER(VLANNAME, NULL, IF_MAXUNIT,
-    NULL, vlan_clone_match, vlan_clone_create, vlan_clone_destroy);
+static	struct if_clone vlan_cloner = IFC_CLONE_INITIALIZER(VLANNAME, NULL,
+    IF_MAXUNIT, NULL, vlan_clone_match, vlan_clone_create, vlan_clone_destroy);
 
 /*
  * Program our multicast filter. What we're actually doing is
@@ -365,7 +365,7 @@ vlan_clone_create(struct if_clone *ifc, char *name, size_t len)
 
 	ifp->if_softc = ifv;
 	/*
-	 * Set the name manually rather then using if_initname because
+	 * Set the name manually rather than using if_initname because
 	 * we don't conform to the default naming convention for interfaces.
 	 */
 	strlcpy(ifp->if_xname, name, IFNAMSIZ);

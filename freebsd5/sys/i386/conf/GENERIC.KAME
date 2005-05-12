@@ -22,7 +22,7 @@
 # If you are in doubt as to the purpose or necessity of a line, check first
 # in NOTES.
 #
-# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.413.2.6.2.2 2004/10/24 18:02:52 scottl Exp $
+# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.413.2.13 2005/04/02 16:37:58 scottl Exp $
 
 machine		i386
 cpu		I486_CPU
@@ -66,7 +66,7 @@ options 	AHD_REG_PRETTY_PRINT	# Print register bitfields in debug
 					# output.  Adds ~215k to driver.
 options 	ADAPTIVE_GIANT		# Giant mutex is adaptive.
 
-device		apic		# I/O APIC
+device		apic			# I/O APIC
 
 # Bus support.  Do not remove isa, even if you have no isa slots
 device		isa
@@ -117,6 +117,7 @@ device		ses		# SCSI Environmental Services (and SAF-TE)
 
 # RAID controllers interfaced to the SCSI subsystem
 device		amr		# AMI MegaRAID
+device		arcmsr		# Areca SATA II RAID
 device		asr		# DPT SmartRAID V, VI and Adaptec SCSI RAID
 device		ciss		# Compaq Smart RAID 5*
 device		dpt		# DPT Smartcache III, IV - See NOTES for options
@@ -252,11 +253,13 @@ device		faith	1	# IPv6-to-IPv4 relaying (translation)
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
+# Note that 'bpf' is required for DHCP.
 device		bpf	4	# Berkeley packet filter
 
 # USB support
 device		uhci		# UHCI PCI->USB interface
 device		ohci		# OHCI PCI->USB interface
+#device		ehci		# EHCI PCI->USB interface (USB 2.0)
 device		usb		# USB Bus (required)
 #device		udbp		# USB Double Bulk Pipe devices
 device		ugen		# Generic
@@ -270,6 +273,7 @@ device		uscanner	# Scanners
 # USB Ethernet, requires mii
 device		aue		# ADMtek USB Ethernet
 device		axe		# ASIX Electronics USB Ethernet
+device		cdce		# Generic USB over Ethernet
 device		cue		# CATC USB Ethernet
 device		kue		# Kawasaki LSI USB Ethernet
 device		rue		# RealTek RTL8150 USB Ethernet

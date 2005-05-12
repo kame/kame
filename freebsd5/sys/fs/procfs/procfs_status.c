@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -31,11 +31,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
- *
- * From:
- *	$Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.52 2004/04/07 20:46:02 imp Exp $
+ * From: $Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.52.2.4 2005/03/01 09:30:16 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

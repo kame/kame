@@ -55,7 +55,7 @@
 /*
  *      @(#)netdb.h	8.1 (Berkeley) 6/2/93
  *      From: Id: netdb.h,v 8.9 1996/11/19 08:39:29 vixie Exp $
- * $FreeBSD: src/include/netdb.h,v 1.32 2004/02/25 21:03:44 green Exp $
+ * $FreeBSD: src/include/netdb.h,v 1.32.2.1 2005/02/03 07:47:55 ume Exp $
  */
 
 #ifndef _NETDB_H_
@@ -176,12 +176,12 @@ struct addrinfo {
  */
 #define	AI_PASSIVE	0x00000001 /* get address to use bind() */
 #define	AI_CANONNAME	0x00000002 /* fill ai_canonname */
-#define	AI_NUMERICHOST	0x00000004 /* prevent name resolution */
+#define	AI_NUMERICHOST	0x00000004 /* prevent host name resolution */
 #define	AI_NUMERICSERV	0x00000008 /* prevent service name resolution */
-/* valid flags for getaddrinfo (not a standard def, apps should not use it) */
+/* valid flags for addrinfo (not a standard def, apps should not use it) */
 #define AI_MASK \
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV | \
-     AI_ADDRCONFIG)
+    AI_ADDRCONFIG)
 
 #if unsupported
 /*

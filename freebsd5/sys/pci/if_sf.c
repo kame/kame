@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -31,12 +31,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.72.2.1 2004/09/02 20:57:40 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.72.2.6 2005/03/01 08:11:51 imp Exp $");
 
 /*
  * Adaptec AIC-6915 "Starfire" PCI fast ethernet driver for FreeBSD.
  * Programming manual is available from:
- * ftp.adaptec.com:/pub/BBS/userguides/aic6915_pg.pdf.
+ * http://download.adaptec.com/pdfs/user_guides/aic6915_pg.pdf.
  *
  * Written by Bill Paul <wpaul@ctr.columbia.edu>
  * Department of Electical Engineering
@@ -128,46 +128,50 @@ static struct sf_type sf_devs[] = {
 	{ 0, 0, NULL }
 };
 
-static int sf_probe		(device_t);
-static int sf_attach		(device_t);
-static int sf_detach		(device_t);
-static void sf_intr		(void *);
-static void sf_stats_update	(void *);
-static void sf_rxeof		(struct sf_softc *);
-static void sf_txeof		(struct sf_softc *);
-static int sf_encap		(struct sf_softc *,
-					struct sf_tx_bufdesc_type0 *,
-					struct mbuf *);
-static void sf_start		(struct ifnet *);
-static int sf_ioctl		(struct ifnet *, u_long, caddr_t);
-static void sf_init		(void *);
-static void sf_stop		(struct sf_softc *);
-static void sf_watchdog		(struct ifnet *);
-static void sf_shutdown		(device_t);
-static int sf_ifmedia_upd	(struct ifnet *);
-static void sf_ifmedia_sts	(struct ifnet *, struct ifmediareq *);
-static void sf_reset		(struct sf_softc *);
-static int sf_init_rx_ring	(struct sf_softc *);
-static void sf_init_tx_ring	(struct sf_softc *);
-static int sf_newbuf		(struct sf_softc *,
-					struct sf_rx_bufdesc_type0 *,
-					struct mbuf *);
-static void sf_setmulti		(struct sf_softc *);
-static int sf_setperf		(struct sf_softc *, int, caddr_t);
-static int sf_sethash		(struct sf_softc *, caddr_t, int);
+static int sf_probe(device_t);
+static int sf_attach(device_t);
+static int sf_detach(device_t);
+static void sf_intr(void *);
+static void sf_stats_update(void *);
+static void sf_rxeof(struct sf_softc *);
+static void sf_txeof(struct sf_softc *);
+static int sf_encap(struct sf_softc *, struct sf_tx_bufdesc_type0 *,
+		struct mbuf *);
+static void sf_start(struct ifnet *);
+static int sf_ioctl(struct ifnet *, u_long, caddr_t);
+static void sf_init(void *);
+static void sf_stop(struct sf_softc *);
+static void sf_watchdog(struct ifnet *);
+static void sf_shutdown(device_t);
+static int sf_ifmedia_upd(struct ifnet *);
+static void sf_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+static void sf_reset(struct sf_softc *);
+static int sf_init_rx_ring(struct sf_softc *);
+static void sf_init_tx_ring(struct sf_softc *);
+static int sf_newbuf(struct sf_softc *, struct sf_rx_bufdesc_type0 *,
+		struct mbuf *);
+static void sf_setmulti(struct sf_softc *);
+static int sf_setperf(struct sf_softc *, int, caddr_t);
+static int sf_sethash(struct sf_softc *, caddr_t, int);
 #ifdef notdef
-static int sf_setvlan		(struct sf_softc *, int, u_int32_t);
+static int sf_setvlan(struct sf_softc *, int, u_int32_t);
 #endif
 
-static u_int8_t sf_read_eeprom	(struct sf_softc *, int);
+static u_int8_t sf_read_eeprom(struct sf_softc *, int);
 
-static int sf_miibus_readreg	(device_t, int, int);
-static int sf_miibus_writereg	(device_t, int, int, int);
-static void sf_miibus_statchg	(device_t);
+static int sf_miibus_readreg(device_t, int, int);
+static int sf_miibus_writereg(device_t, int, int, int);
+static void sf_miibus_statchg(device_t);
+#ifdef DEVICE_POLLING
+static void sf_poll(struct ifnet *ifp, enum poll_cmd cmd,
+				 int count);
+static void sf_poll_locked(struct ifnet *ifp, enum poll_cmd cmd,
+				 int count);
+#endif /* DEVICE_POLLING */
 
-static u_int32_t csr_read_4	(struct sf_softc *, int);
-static void csr_write_4		(struct sf_softc *, int, u_int32_t);
-static void sf_txthresh_adjust	(struct sf_softc *);
+static u_int32_t csr_read_4(struct sf_softc *, int);
+static void csr_write_4(struct sf_softc *, int, u_int32_t);
+static void sf_txthresh_adjust(struct sf_softc *);
 
 #ifdef SF_USEIOSPACE
 #define SF_RES			SYS_RES_IOPORT
@@ -534,6 +538,10 @@ sf_ioctl(ifp, command, data)
 		mii = device_get_softc(sc->sf_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
+	case SIOCSIFCAP:
+		ifp->if_capenable &= ~IFCAP_POLLING;
+		ifp->if_capenable |= ifr->ifr_reqcap & IFCAP_POLLING;
+		break;
 	default:
 		error = ether_ioctl(ifp, command, data);
 		break;
@@ -593,27 +601,27 @@ sf_probe(dev)
 			case AD_SUBSYSID_62011_REV1:
 				device_set_desc(dev,
 				    "Adaptec ANA-62011 10/100BaseTX");
-				return(0);
+				return (BUS_PROBE_DEFAULT);
 			case AD_SUBSYSID_62022:
 				device_set_desc(dev,
 				    "Adaptec ANA-62022 10/100BaseTX");
-				return(0);
+				return (BUS_PROBE_DEFAULT);
 			case AD_SUBSYSID_62044_REV0:
 			case AD_SUBSYSID_62044_REV1:
 				device_set_desc(dev,
 				    "Adaptec ANA-62044 10/100BaseTX");
-				return(0);
+				return (BUS_PROBE_DEFAULT);
 			case AD_SUBSYSID_62020:
 				device_set_desc(dev,
 				    "Adaptec ANA-62020 10/100BaseFX");
-				return(0);
+				return (BUS_PROBE_DEFAULT);
 			case AD_SUBSYSID_69011:
 				device_set_desc(dev,
 				    "Adaptec ANA-69011 10/100BaseTX");
-				return(0);
+				return (BUS_PROBE_DEFAULT);
 			default:
 				device_set_desc(dev, t->sf_name);
-				return(0);
+				return (BUS_PROBE_DEFAULT);
 				break;
 			}
 		}
@@ -713,7 +721,13 @@ sf_attach(dev)
 	ifp->if_watchdog = sf_watchdog;
 	ifp->if_init = sf_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = SF_TX_DLIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, SF_TX_DLIST_CNT - 1);
+	ifp->if_snd.ifq_drv_maxlen = SF_TX_DLIST_CNT - 1;
+	IFQ_SET_READY(&ifp->if_snd);
+#ifdef DEVICE_POLLING
+	ifp->if_capabilities |= IFCAP_POLLING;
+#endif /* DEVICE_POLLING */
+	ifp->if_capenable = ifp->if_capabilities;
 
 	/*
 	 * Call MI attach routine.
@@ -903,6 +917,14 @@ sf_rxeof(sc)
 	while (cmpconsidx != cmpprodidx) {
 		struct mbuf		*m0;
 
+#ifdef DEVICE_POLLING
+		if (ifp->if_flags & IFF_POLLING) {
+			if (sc->rxcycles <= 0)
+				break;
+			sc->rxcycles--;
+		}
+#endif /* DEVICE_POLLING */
+
 		cur_rx = &sc->sf_ldata->sf_rx_clist[cmpconsidx];
 		desc = &sc->sf_ldata->sf_rx_dlist_big[cur_rx->sf_endidx];
 		m = desc->sf_mbuf;
@@ -1010,6 +1032,63 @@ sf_txthresh_adjust(sc)
 	}
 }
 
+#ifdef DEVICE_POLLING
+static void
+sf_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+{
+	struct sf_softc *sc = ifp->if_softc;
+
+	SF_LOCK(sc);
+	sf_poll_locked(ifp, cmd, count);
+	SF_UNLOCK(sc);
+}
+
+static void
+sf_poll_locked(struct ifnet *ifp, enum poll_cmd cmd, int count)
+{
+	struct sf_softc *sc = ifp->if_softc;
+
+	SF_LOCK_ASSERT(sc);
+
+	if (!(ifp->if_capenable & IFCAP_POLLING)) {
+		ether_poll_deregister(ifp);
+		cmd = POLL_DEREGISTER;
+	}
+
+	if (cmd == POLL_DEREGISTER) {
+		/* Final call, enable interrupts. */
+		csr_write_4(sc, SF_IMR, SF_INTRS);
+		return;
+	}
+
+	sc->rxcycles = count;
+	sf_rxeof(sc);
+	sf_txeof(sc);
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
+		sf_start(ifp);
+
+	if (cmd == POLL_AND_CHECK_STATUS) {
+		u_int32_t status;
+
+		status = csr_read_4(sc, SF_ISR);
+		if (status)
+			csr_write_4(sc, SF_ISR, status);
+
+		if (status & SF_ISR_TX_LOFIFO)
+			sf_txthresh_adjust(sc);
+
+		if (status & SF_ISR_ABNORMALINTR) {
+			if (status & SF_ISR_STATSOFLOW) {
+				untimeout(sf_stats_update, sc,
+				    sc->sf_stat_ch);
+				sf_stats_update(sc);
+			} else
+				sf_init(sc);
+		}
+	}
+}
+#endif /* DEVICE_POLLING */
+
 static void
 sf_intr(arg)
 	void			*arg;
@@ -1022,6 +1101,19 @@ sf_intr(arg)
 	SF_LOCK(sc);
 
 	ifp = &sc->arpcom.ac_if;
+
+#ifdef DEVICE_POLLING
+	if (ifp->if_flags & IFF_POLLING)
+		goto done_locked;
+
+	if ((ifp->if_capenable & IFCAP_POLLING) &&
+	    ether_poll_register(sf_poll, ifp)) {
+		/* OK, disable interrupts. */
+		csr_write_4(sc, SF_IMR, 0x00000000);
+		sf_poll_locked(ifp, 0, 1);
+		goto done_locked;
+	}
+#endif /* DEVICE_POLLING */
 
 	if (!(csr_read_4(sc, SF_ISR_SHADOW) & SF_ISR_PCIINT_ASSERTED)) {
 		SF_UNLOCK(sc);
@@ -1063,9 +1155,12 @@ sf_intr(arg)
 	/* Re-enable interrupts. */
 	csr_write_4(sc, SF_IMR, SF_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		sf_start(ifp);
 
+#ifdef DEVICE_POLLING
+done_locked:
+#endif /* DEVICE_POLLING */
 	SF_UNLOCK(sc);
 }
 
@@ -1162,6 +1257,13 @@ sf_init(xsc)
 
 	/* Enable autopadding of short TX frames. */
 	SF_SETBIT(sc, SF_MACCFG_1, SF_MACCFG1_AUTOPAD);
+
+#ifdef DEVICE_POLLING
+	/* Disable interrupts if we are polling. */
+	if (ifp->if_flags & IFF_POLLING)
+		csr_write_4(sc, SF_IMR, 0x00000000);
+	else
+#endif /* DEVICE_POLLING */
 
 	/* Enable interrupts. */
 	csr_write_4(sc, SF_IMR, SF_INTRS);
@@ -1284,13 +1386,13 @@ sf_start(ifp)
 			cur_tx = NULL;
 			break;
 		}
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		cur_tx = &sc->sf_ldata->sf_tx_dlist[i];
 		if (sf_encap(sc, cur_tx, m_head)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
+			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			cur_tx = NULL;
 			break;
@@ -1339,6 +1441,10 @@ sf_stop(sc)
 
 	untimeout(sf_stats_update, sc, sc->sf_stat_ch);
 
+#ifdef DEVICE_POLLING
+	ether_poll_deregister(ifp);
+#endif /* DEVICE_POLLING */
+	
 	csr_write_4(sc, SF_GEN_ETH_CTL, 0);
 	csr_write_4(sc, SF_CQ_CONSIDX, 0);
 	csr_write_4(sc, SF_CQ_PRODIDX, 0);
@@ -1410,7 +1516,7 @@ sf_stats_update(xsc)
 	if (!sc->sf_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->sf_link++;
-		if (ifp->if_snd.ifq_head != NULL)
+		if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 			sf_start(ifp);
 	}
 
@@ -1436,7 +1542,7 @@ sf_watchdog(ifp)
 	sf_reset(sc);
 	sf_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		sf_start(ifp);
 
 	SF_UNLOCK(sc);

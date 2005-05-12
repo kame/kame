@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.c	8.3.1.1 (Berkeley) 2/23/95
- * $FreeBSD: src/sys/net/route.c,v 1.106.2.1 2004/09/02 14:49:34 csjp Exp $
+ * $FreeBSD: src/sys/net/route.c,v 1.106.2.2 2005/01/31 23:26:23 imp Exp $
  */
 
 #include "opt_inet.h"

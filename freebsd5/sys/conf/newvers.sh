@@ -28,12 +28,12 @@
 # SUCH DAMAGE.
 #
 #	@(#)newvers.sh	8.1 (Berkeley) 4/20/94
-# $FreeBSD: src/sys/conf/newvers.sh,v 1.62.2.15.2.5 2004/11/04 18:51:30 scottl Exp $
+# $FreeBSD: src/sys/conf/newvers.sh,v 1.62.2.18.2.5 2005/05/06 04:12:22 kensmith Exp $
 
 TYPE="FreeBSD"
-REVISION="5.3"
+REVISION="5.4"
 BRANCH="RELEASE"
-RELEASE=5.3-RELEASE
+RELEASE=5.4-RELEASE
 VERSION="${TYPE} ${RELEASE}"
 
 if [ "X${PARAMFILE}" != "X" ]; then
@@ -63,7 +63,7 @@ done
 
 # no copyright found, use a dummy
 if [ X"$COPYRIGHT" = X ]; then
-	COPYRIGHT="/*
+	COPYRIGHT="/*-
  * Copyright (c) 1992-$year The FreeBSD Project.
  * All rights reserved.
  *
@@ -81,7 +81,7 @@ then
 fi
 
 touch version
-v=`cat version` u=${USER-root} d=`pwd` h=${HOSTNAME-`hostname`} t=`date`
+v=`cat version` u=${USER:-root} d=`pwd` h=${HOSTNAME:-`hostname`} t=`date`
 i=`${MAKE:-make} -V KERN_IDENT`
 cat << EOF > vers.c
 $COPYRIGHT

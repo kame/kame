@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.201.2.1.2.1 2004/10/21 09:30:47 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.201.2.15.2.1 2005/05/07 03:58:25 cperciva Exp $
  */
 
 #include "opt_compat.h"
@@ -94,7 +94,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netipsec/key.h>
+#include <netkey/key.h>
 #endif /*IPSEC*/
 
 #ifdef FAST_IPSEC
@@ -205,11 +205,6 @@ SYSCTL_INT(_net_inet_tcp_inflight, OID_AUTO, max, CTLFLAG_RW,
 static int	tcp_inflight_stab = 20;
 SYSCTL_INT(_net_inet_tcp_inflight, OID_AUTO, stab, CTLFLAG_RW,
     &tcp_inflight_stab, 0, "Inflight Algorithm Stabilization 20 = 2 packets");
-
-SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack, CTLFLAG_RW, 0, "TCP SACK");
-int tcp_do_sack = 1;
-SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, enable, CTLFLAG_RW,
-    &tcp_do_sack, 0, "Enable/Disable TCP SACK support");
 
 uma_zone_t sack_hole_zone;
 
@@ -328,6 +323,8 @@ tcpip_fillheaders(inp, ip_ptr, tcp_ptr)
 	void *tcp_ptr;
 {
 	struct tcphdr *th = (struct tcphdr *)tcp_ptr;
+
+	INP_LOCK_ASSERT(inp);
 
 #ifdef INET6
 	if ((inp->inp_vflag & INP_IPV6) != 0) {
@@ -620,11 +617,6 @@ tcp_newtcpcb(inp)
 		tcp_mssdflt;
 
 	/* Set up our timeouts. */
-	/*
-	 * XXXRW: Are these actually MPSAFE?  I think so, but need to
-	 * review the timed wait code, as it has some list variables,
-	 * etc, that are global.
-	 */
 	callout_flag = debug_mpsafenet ? CALLOUT_MPSAFE : 0;
 	callout_init(tp->tt_rexmt = &tm->tcpcb_mem_rexmt, callout_flag);
 	callout_init(tp->tt_persist = &tm->tcpcb_mem_persist, callout_flag);
@@ -674,6 +666,7 @@ tcp_drop(tp, errno)
 {
 	struct socket *so = tp->t_inpcb->inp_socket;
 
+	INP_LOCK_ASSERT(tp->t_inpcb);
 	if (TCPS_HAVERCVDSYN(tp->t_state)) {
 		tp->t_state = TCPS_CLOSED;
 		(void) tcp_output(tp);
@@ -696,6 +689,8 @@ tcp_discardcb(tp)
 #ifdef INET6
 	int isipv6 = (inp->inp_vflag & INP_IPV6) != 0;
 #endif /* INET6 */
+
+	INP_LOCK_ASSERT(inp);
 
 	/*
 	 * Make sure that all of our timers are stopped before we
@@ -792,6 +787,8 @@ tcp_close(tp)
 	struct socket *so = inp->inp_socket;
 #endif
 
+	INP_LOCK_ASSERT(inp);
+
 	tcp_discardcb(tp);
 #ifdef INET6
 	if (INP_CHECK_SOCKAF(so, AF_INET6))
@@ -856,6 +853,8 @@ tcp_notify(inp, error)
 {
 	struct tcpcb *tp = (struct tcpcb *)inp->inp_ppcb;
 
+	INP_LOCK_ASSERT(inp);
+
 	/*
 	 * Ignore some errors if we are hooked up.
 	 * If connection hasn't completed, has retransmitted several times,
@@ -872,7 +871,7 @@ tcp_notify(inp, error)
 	if (tp->t_state == TCPS_ESTABLISHED &&
 	    (error == EHOSTUNREACH || error == ENETUNREACH ||
 	     error == EHOSTDOWN)) {
-		return inp;
+		return (inp);
 	} else if ((tp->t_state == TCPS_SYN_SENT ||
 	    tp->t_state == TCPS_SYN_RECEIVED) &&
 	    (error == EHOSTUNREACH || error == EHOSTDOWN)) {
@@ -884,7 +883,7 @@ tcp_notify(inp, error)
 		return (struct inpcb *)0;
 	} else {
 		tp->t_softerror = error;
-		return inp;
+		return (inp);
 	}
 #if 0
 	wakeup( &so->so_timeo);
@@ -909,11 +908,11 @@ tcp_pcblist(SYSCTL_HANDLER_ARGS)
 		n = tcbinfo.ipi_count;
 		req->oldidx = 2 * (sizeof xig)
 			+ (n + n/8) * sizeof(struct xtcpcb);
-		return 0;
+		return (0);
 	}
 
 	if (req->newptr != NULL)
-		return EPERM;
+		return (EPERM);
 
 	/*
 	 * OK, now we're committed to doing something.
@@ -936,11 +935,11 @@ tcp_pcblist(SYSCTL_HANDLER_ARGS)
 	xig.xig_sogen = so_gencnt;
 	error = SYSCTL_OUT(req, &xig, sizeof xig);
 	if (error)
-		return error;
+		return (error);
 
 	inp_list = malloc(n * sizeof *inp_list, M_TEMP, M_WAITOK);
 	if (inp_list == NULL)
-		return ENOMEM;
+		return (ENOMEM);
 
 	s = splnet();
 	INP_INFO_RLOCK(&tcbinfo);
@@ -974,6 +973,8 @@ tcp_pcblist(SYSCTL_HANDLER_ARGS)
 		if (inp->inp_gencnt <= gencnt) {
 			struct xtcpcb xt;
 			caddr_t inp_ppcb;
+
+			bzero(&xt, sizeof(xt));
 			xt.xt_len = sizeof xt;
 			/* XXX should avoid extra copy */
 			bcopy(inp, &xt.xt_inp, sizeof *inp);
@@ -1013,7 +1014,7 @@ tcp_pcblist(SYSCTL_HANDLER_ARGS)
 		error = SYSCTL_OUT(req, &xig, sizeof xig);
 	}
 	free(inp_list, M_TEMP);
-	return error;
+	return (error);
 }
 
 SYSCTL_PROC(_net_inet_tcp, TCPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
@@ -1070,6 +1071,7 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct xucred xuc;
 	struct sockaddr_in6 addrs[2];
+	struct in6_addr a6[2];
 	struct inpcb *inp;
 	int error, s, mapped = 0;
 
@@ -1088,6 +1090,13 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 			mapped = 1;
 		else
 			return (EINVAL);
+	} else {
+		error = in6_embedscope(&a6[0], &addrs[0], NULL, NULL);
+		if (error)
+			return (EINVAL);
+		error = in6_embedscope(&a6[1], &addrs[1], NULL, NULL);
+		if (error)
+			return (EINVAL);
 	}
 	s = splnet();
 	INP_INFO_RLOCK(&tcbinfo);
@@ -1099,10 +1108,8 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 			addrs[0].sin6_port,
 			0, NULL);
 	else
-		inp = in6_pcblookup_hash(&tcbinfo, &addrs[1].sin6_addr,
-				 addrs[1].sin6_port,
-				 &addrs[0].sin6_addr, addrs[0].sin6_port,
-				 0, NULL);
+		inp = in6_pcblookup_hash(&tcbinfo, &a6[1], addrs[1].sin6_port,
+			&a6[0], addrs[0].sin6_port, 0, NULL);
 	if (inp == NULL) {
 		error = ENOENT;
 		goto outunlocked;
@@ -1327,16 +1334,19 @@ tcp6_ctlinput(cmd, sa, d)
  * between seeding of isn_secret.  This is normally set to zero,
  * as reseeding should not be necessary.
  *
+ * Locking of the global variables isn_secret, isn_last_reseed, isn_offset,
+ * isn_offset_old, and isn_ctx is performed using the TCP pcbinfo lock.  In
+ * general, this means holding an exclusive (write) lock.
  */
 
 #define ISN_BYTES_PER_SECOND 1048576
 #define ISN_STATIC_INCREMENT 4096
 #define ISN_RANDOM_INCREMENT (4096 - 1)
 
-u_char isn_secret[32];
-int isn_last_reseed;
-u_int32_t isn_offset, isn_offset_old;
-MD5_CTX isn_ctx;
+static u_char isn_secret[32];
+static int isn_last_reseed;
+static u_int32_t isn_offset, isn_offset_old;
+static MD5_CTX isn_ctx;
 
 tcp_seq
 tcp_new_isn(tp)
@@ -1344,6 +1354,9 @@ tcp_new_isn(tp)
 {
 	u_int32_t md5_buffer[4];
 	tcp_seq new_isn;
+
+	INP_INFO_WLOCK_ASSERT(&tcbinfo);
+	INP_LOCK_ASSERT(tp->t_inpcb);
 
 	/* Seed if this is the first use, reseed if requested. */
 	if ((isn_last_reseed == 0) || ((tcp_isn_reseed_interval > 0) &&
@@ -1377,7 +1390,7 @@ tcp_new_isn(tp)
 	isn_offset += ISN_STATIC_INCREMENT +
 		(arc4random() & ISN_RANDOM_INCREMENT);
 	new_isn += isn_offset;
-	return new_isn;
+	return (new_isn);
 }
 
 /*
@@ -1391,13 +1404,15 @@ tcp_isn_tick(xtp)
 {
 	u_int32_t projected_offset;
 
-	projected_offset = isn_offset_old + ISN_BYTES_PER_SECOND / hz;
+	INP_INFO_WLOCK(&tcbinfo);
+	projected_offset = isn_offset_old + ISN_BYTES_PER_SECOND / 100;
 
 	if (projected_offset > isn_offset)
 		isn_offset = projected_offset;
 
 	isn_offset_old = isn_offset;
-	callout_reset(&isn_callout, 1, tcp_isn_tick, NULL);
+	callout_reset(&isn_callout, hz/100, tcp_isn_tick, NULL);
+	INP_INFO_WUNLOCK(&tcbinfo);
 }
 
 /*
@@ -1411,6 +1426,7 @@ tcp_quench(inp, errno)
 {
 	struct tcpcb *tp = intotcpcb(inp);
 
+	INP_LOCK_ASSERT(inp);
 	if (tp != NULL)
 		tp->snd_cwnd = tp->t_maxseg;
 	return (inp);
@@ -1428,11 +1444,12 @@ tcp_drop_syn_sent(inp, errno)
 {
 	struct tcpcb *tp = intotcpcb(inp);
 
+	INP_LOCK_ASSERT(inp);
 	if (tp != NULL && tp->t_state == TCPS_SYN_SENT) {
 		tcp_drop(tp, errno);
-		return (struct inpcb *)0;
+		return (NULL);
 	}
-	return inp;
+	return (inp);
 }
 
 /*
@@ -1457,6 +1474,7 @@ tcp_mtudisc(inp, errno)
 #endif /* INET6 */
 	bzero(&tao, sizeof(tao));
 
+	INP_LOCK_ASSERT(inp);
 	if (tp != NULL) {
 #ifdef INET6
 		isipv6 = (tp->t_inpcb->inp_vflag & INP_IPV6) != 0;
@@ -1477,7 +1495,7 @@ tcp_mtudisc(inp, errno)
 				isipv6 ? tcp_v6mssdflt :
 #endif /* INET6 */
 				tcp_mssdflt;
-			return inp;
+			return (inp);
 		}
 		mss = maxmtu -
 #ifdef INET6
@@ -1513,7 +1531,7 @@ tcp_mtudisc(inp, errno)
 		 * recomputed.  For Further Study.
 		 */
 		if (tp->t_maxopd <= mss)
-			return inp;
+			return (inp);
 		tp->t_maxopd = mss;
 
 		if ((tp->t_flags & (TF_REQ_TSTMP|TF_NOOPT)) == TF_REQ_TSTMP &&
@@ -1539,7 +1557,7 @@ tcp_mtudisc(inp, errno)
 		tp->snd_nxt = tp->snd_una;
 		tcp_output(tp);
 	}
-	return inp;
+	return (inp);
 }
 
 /*
@@ -1638,10 +1656,10 @@ ipsec_hdrsiz_tcp(tp)
 	struct tcphdr *th;
 
 	if ((tp == NULL) || ((inp = tp->t_inpcb) == NULL))
-		return 0;
+		return (0);
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (!m)
-		return 0;
+		return (0);
 
 #ifdef INET6
 	if ((inp->inp_vflag & INP_IPV6) != 0) {
@@ -1662,13 +1680,13 @@ ipsec_hdrsiz_tcp(tp)
 	}
 
 	m_free(m);
-	return hdrsiz;
+	return (hdrsiz);
 }
 #endif /*IPSEC*/
 
 /*
  * Move a TCP connection into TIME_WAIT state.
- *    tcbinfo is unlocked.
+ *    tcbinfo is locked.
  *    inp is locked, and is unlocked before returning.
  */
 void
@@ -1679,6 +1697,9 @@ tcp_twstart(tp)
 	struct inpcb *inp;
 	int tw_time, acknow;
 	struct socket *so;
+
+	INP_INFO_WLOCK_ASSERT(&tcbinfo);	/* tcp_timer_2msl_reset(). */
+	INP_LOCK_ASSERT(tp->t_inpcb);
 
 	tw = uma_zalloc(tcptw_zone, M_NOWAIT);
 	if (tw == NULL) {
@@ -1759,6 +1780,10 @@ tcp_twstart(tp)
  * Determine if the ISN we will generate has advanced beyond the last
  * sequence number used by the previous connection.  If so, indicate
  * that it is safe to recycle this tw socket by returning 1.
+ *
+ * XXXRW: This function should assert the inpcb lock as it does multiple
+ * non-atomic reads from the tcptw, but is currently called without it from
+ * in_pcb.c:in_pcblookup_local().
  */
 int
 tcp_twrecycleable(struct tcptw *tw)
@@ -1770,9 +1795,9 @@ tcp_twrecycleable(struct tcptw *tw)
 	new_irs += (ticks - tw->t_starttime) * (MS_ISN_BYTES_PER_SECOND / hz);
 
 	if (SEQ_GT(new_iss, tw->snd_nxt) && SEQ_GT(new_irs, tw->rcv_nxt))
-		return 1;
+		return (1);
 	else
-		return 0;
+		return (0);
 }
 
 struct tcptw *
@@ -1781,6 +1806,9 @@ tcp_twclose(struct tcptw *tw, int reuse)
 	struct inpcb *inp;
 
 	inp = tw->tw_inpcb;
+	INP_INFO_WLOCK_ASSERT(&tcbinfo);	/* tcp_timer_2msl_stop(). */
+	INP_LOCK_ASSERT(inp);
+
 	tw->tw_inpcb = NULL;
 	tcp_timer_2msl_stop(tw);
 	inp->inp_ppcb = NULL;
@@ -1813,6 +1841,8 @@ tcp_twrespond(struct tcptw *tw, int flags)
 	struct ip6_hdr *ip6 = NULL;
 	int isipv6 = inp->inp_inc.inc_isipv6;
 #endif
+
+	INP_LOCK_ASSERT(inp);
 
 	m = m_gethdr(M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
@@ -1959,6 +1989,8 @@ tcp_xmit_bandwidth_limit(struct tcpcb *tp, tcp_seq ack_seq)
 	u_long bw;
 	u_long bwnd;
 	int save_ticks;
+
+	INP_LOCK_ASSERT(tp->t_inpcb);
 
 	/*
 	 * If inflight_enable is disabled in the middle of a tcp connection,
@@ -2169,3 +2201,101 @@ tcp_signature_compute(struct mbuf *m, int off0, int len, int optlen,
 	return (0);
 }
 #endif /* TCP_SIGNATURE */
+
+static int
+sysctl_drop(SYSCTL_HANDLER_ARGS)
+{
+	/* addrs[0] is a foreign socket, addrs[1] is a local one. */
+	struct sockaddr_storage addrs[2];
+	struct inpcb *inp;
+	struct tcpcb *tp;
+	struct sockaddr_in *fin, *lin;
+#ifdef INET6
+	struct sockaddr_in6 *fin6, *lin6;
+	struct in6_addr f6, l6;
+#endif
+	int error;
+
+	inp = NULL;
+	fin = lin = NULL;
+#ifdef INET6
+	fin6 = lin6 = NULL;
+#endif
+	error = 0;
+
+	if (req->oldptr != NULL || req->oldlen != 0)
+		return (EINVAL);
+	if (req->newptr == NULL)
+		return (EPERM);
+	if (req->newlen < sizeof(addrs))
+		return (ENOMEM);
+	error = SYSCTL_IN(req, &addrs, sizeof(addrs));
+	if (error)
+		return (error);
+
+	switch (addrs[0].ss_family) {
+#ifdef INET6
+	case AF_INET6:
+		fin6 = (struct sockaddr_in6 *)&addrs[0];
+		lin6 = (struct sockaddr_in6 *)&addrs[1];
+		if (fin6->sin6_len != sizeof(struct sockaddr_in6) ||
+		    lin6->sin6_len != sizeof(struct sockaddr_in6))
+			return (EINVAL);
+		if (IN6_IS_ADDR_V4MAPPED(&fin6->sin6_addr)) {
+			if (!IN6_IS_ADDR_V4MAPPED(&lin6->sin6_addr))
+				return (EINVAL);
+			in6_sin6_2_sin_in_sock((struct sockaddr *)&addrs[0]);
+			in6_sin6_2_sin_in_sock((struct sockaddr *)&addrs[1]);
+			fin = (struct sockaddr_in *)&addrs[0];
+			lin = (struct sockaddr_in *)&addrs[1];
+			break;
+		}
+		error = in6_embedscope(&f6, fin6, NULL, NULL);
+		if (error)
+			return (EINVAL);
+		error = in6_embedscope(&l6, lin6, NULL, NULL);
+		if (error)
+			return (EINVAL);
+		break;
+#endif
+	case AF_INET:
+		fin = (struct sockaddr_in *)&addrs[0];
+		lin = (struct sockaddr_in *)&addrs[1];
+		if (fin->sin_len != sizeof(struct sockaddr_in) ||
+		    lin->sin_len != sizeof(struct sockaddr_in))
+			return (EINVAL);
+		break;
+	default:
+		return (EINVAL);
+	}
+	INP_INFO_WLOCK(&tcbinfo);
+	switch (addrs[0].ss_family) {
+#ifdef INET6
+	case AF_INET6:
+		inp = in6_pcblookup_hash(&tcbinfo, &f6, fin6->sin6_port,
+		    &l6, lin6->sin6_port, 0, NULL);
+		break;
+#endif
+	case AF_INET:
+		inp = in_pcblookup_hash(&tcbinfo, fin->sin_addr, fin->sin_port,
+		    lin->sin_addr, lin->sin_port, 0, NULL);
+		break;
+	}
+	if (inp != NULL) {
+		INP_LOCK(inp);
+		if ((tp = intotcpcb(inp)) &&
+		    ((inp->inp_socket->so_options & SO_ACCEPTCONN) == 0)) {
+			tp = tcp_drop(tp, ECONNABORTED);
+			if (tp != NULL)
+				INP_UNLOCK(inp);
+		} else
+			INP_UNLOCK(inp);
+	} else
+		error = ESRCH;
+	INP_INFO_WUNLOCK(&tcbinfo);
+	return (error);
+}
+
+SYSCTL_PROC(_net_inet_tcp, TCPCTL_DROP, drop,
+    CTLTYPE_STRUCT|CTLFLAG_WR|CTLFLAG_SKIP, NULL,
+    0, sysctl_drop, "", "Drop TCP connection");

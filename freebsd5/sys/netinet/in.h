@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/in.h,v 1.87 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.87.2.2 2005/03/21 16:05:35 glebius Exp $
  */
 
 /*
@@ -268,6 +268,7 @@ __END_DECLS
 #define	IPPROTO_GMTP		100		/* GMTP*/
 #define	IPPROTO_IPCOMP		108		/* payload compression (IPComp) */
 #define	IPPROTO_PIM		103		/* Protocol Independent Mcast */
+#define	IPPROTO_CARP		112		/* CARP */
 #define	IPPROTO_PGM		113		/* PGM */
 #define IPPROTO_SCTP		132		/* SCTP (RFC2960) */
 /* 134-254: Partly Unassigned */
@@ -392,6 +393,7 @@ __END_DECLS
 #define	INADDR_UNSPEC_GROUP	(u_int32_t)0xe0000000	/* 224.0.0.0 */
 #define	INADDR_ALLHOSTS_GROUP	(u_int32_t)0xe0000001	/* 224.0.0.1 */
 #define	INADDR_ALLRTRS_GROUP	(u_int32_t)0xe0000002	/* 224.0.0.2 */
+#define	INADDR_CARP_GROUP	(u_int32_t)0xe0000012	/* 224.0.0.18 */
 #define	INADDR_NEW_ALLRTRS_GROUP	(u_int32_t)0xe0000016	/* 224.0.0.22 */
 #define	INADDR_PFSYNC_GROUP	(u_int32_t)0xe00000f0	/* 224.0.0.240 */
 #define	INADDR_ALLMDNS_GROUP	(u_int32_t)0xe00000fb	/* 224.0.0.251 */

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Dag-Erling Coïdan Smørgrav
  * Copyright (c) 1999 Pierre Beyssac
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.84 2004/08/16 08:19:18 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.84.2.4 2005/03/31 22:27:16 sobomax Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -92,10 +92,10 @@ extern int ncpus;
 #endif /* __i386__ || __amd64__ */
 
 #include "opt_compat.h"
-#if !COMPAT_LINUX32				/* XXX */
-#include <machine/../linux/linux.h>
-#else
+#ifdef COMPAT_LINUX32				/* XXX */
 #include <machine/../linux32/linux.h>
+#else
+#include <machine/../linux/linux.h>
 #endif
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
@@ -424,13 +424,12 @@ linprocfs_dostat(PFS_FILL_ARGS)
 	    T2J(cp_time[CP_NICE]),
 	    T2J(cp_time[CP_SYS] /*+ cp_time[CP_INTR]*/),
 	    T2J(cp_time[CP_IDLE]));
-	if (mp_ncpus > 1)
-		for (i = 0; i < mp_ncpus; ++i)
-			sbuf_printf(sb, "cpu%d %ld %ld %ld %ld\n", i,
-			    T2J(cp_time[CP_USER]) / mp_ncpus,
-			    T2J(cp_time[CP_NICE]) / mp_ncpus,
-			    T2J(cp_time[CP_SYS]) / mp_ncpus,
-			    T2J(cp_time[CP_IDLE]) / mp_ncpus);
+	for (i = 0; i < mp_ncpus; ++i)
+		sbuf_printf(sb, "cpu%d %ld %ld %ld %ld\n", i,
+		    T2J(cp_time[CP_USER]) / mp_ncpus,
+		    T2J(cp_time[CP_NICE]) / mp_ncpus,
+		    T2J(cp_time[CP_SYS]) / mp_ncpus,
+		    T2J(cp_time[CP_IDLE]) / mp_ncpus);
 	sbuf_printf(sb,
 	    "disk 0 0 0 0\n"
 	    "page %u %u\n"

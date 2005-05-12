@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988 Stephen Deering.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
- * $FreeBSD: src/sys/netinet/igmp.c,v 1.46 2004/06/11 03:42:37 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/igmp.c,v 1.46.2.1 2005/01/31 23:26:35 imp Exp $
  */
 
 /*

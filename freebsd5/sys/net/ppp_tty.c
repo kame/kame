@@ -1,7 +1,8 @@
 /*
  * ppp_tty.c - Point-to-Point Protocol (PPP) driver for asynchronous
  * 	       tty devices.
- *
+ */
+/*-
  * Copyright (c) 1989 Carnegie Mellon University.
  * All rights reserved.
  *
@@ -70,7 +71,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.61 2004/07/15 20:47:41 phk Exp $ */
+/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.61.2.1 2005/01/31 23:26:23 imp Exp $ */
 
 #include "opt_ppp.h"		/* XXX for ppp_defs.h */
 
