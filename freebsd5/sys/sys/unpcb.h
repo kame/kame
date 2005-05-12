@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unpcb.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/unpcb.h,v 1.17 2004/04/07 04:19:50 imp Exp $
+ * $FreeBSD: src/sys/sys/unpcb.h,v 1.17.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_UNPCB_H_

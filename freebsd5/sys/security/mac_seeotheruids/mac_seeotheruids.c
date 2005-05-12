@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_seeotheruids/mac_seeotheruids.c,v 1.6 2004/02/22 00:33:12 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_seeotheruids/mac_seeotheruids.c,v 1.6.2.1 2005/01/22 19:18:15 rwatson Exp $
  */
 
 /*
@@ -115,6 +115,9 @@ mac_seeotheruids_check(struct ucred *u1, struct ucred *u2)
 	}
 
 	if (u1->cr_ruid == u2->cr_ruid)
+		return (0);
+
+	if (suser_cred(u1, 0) == 0)
 		return (0);
 
 	return (ESRCH);

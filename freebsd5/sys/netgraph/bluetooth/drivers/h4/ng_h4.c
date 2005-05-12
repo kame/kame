@@ -1,6 +1,8 @@
 /*
  * ng_h4.c
- *
+ */
+
+/*-
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -24,9 +26,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
+ */
+
+/*
  * $Id: ng_h4.c,v 1.5 2003/05/10 05:51:25 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4.c,v 1.10 2004/06/26 08:44:04 phk Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4.c,v 1.10.2.2 2005/01/31 23:26:32 imp Exp $
  * 
  * Based on:
  * ---------
@@ -112,7 +116,6 @@ static ng_disconnect_t		ng_h4_disconnect;
 /* Other stuff */
 static void	ng_h4_timeout		(node_p);
 static void	ng_h4_untimeout		(node_p);
-static void	ng_h4_queue_timeout	(void *);
 static void	ng_h4_process_timeout	(node_p, hook_p, void *, int);
 static int	ng_h4_mod_event		(module_t, int, void *);
 
@@ -175,7 +178,7 @@ ng_h4_open(struct cdev *dev, struct tty *tp)
 	sc->got = 0;
 
 	NG_BT_MBUFQ_INIT(&sc->outq, NG_H4_DEFAULTQLEN);
-	callout_handle_init(&sc->timo);
+	ng_callout_init(&sc->timo);
 
 	/* Setup netgraph node */
 	error = ng_make_node_common(&typestruct, &sc->node);
@@ -955,8 +958,7 @@ ng_h4_timeout(node_p node)
 {
 	ng_h4_info_p	sc = (ng_h4_info_p) NG_NODE_PRIVATE(node);
 
-	NG_NODE_REF(node);
-	sc->timo = timeout(ng_h4_queue_timeout, node, 1);
+	ng_callout(&sc->timo, node, NULL, 1, ng_h4_process_timeout, NULL, 0);
 	sc->flags |= NG_H4_TIMEOUT;
 } /* ng_h4_timeout */
 
@@ -970,24 +972,8 @@ ng_h4_untimeout(node_p node)
 	ng_h4_info_p	sc = (ng_h4_info_p) NG_NODE_PRIVATE(node);
 
 	sc->flags &= ~NG_H4_TIMEOUT;
-	untimeout(ng_h4_queue_timeout, node, sc->timo);
-	NG_NODE_UNREF(node);
+	ng_uncallout(&sc->timo, node);
 } /* ng_h4_untimeout */
-
-/*
- * OK, timeout has happend, so queue function to process it
- */
-
-static void
-ng_h4_queue_timeout(void *context)
-{
-	node_p	node = (node_p) context;
-
-	if (NG_NODE_IS_VALID(node))
-		ng_send_fn(node, NULL, &ng_h4_process_timeout, NULL, 0);
-
-	NG_NODE_UNREF(node);
-} /* ng_h4_queue_timeout */
 
 /*
  * Timeout processing function.

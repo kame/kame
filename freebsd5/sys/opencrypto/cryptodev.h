@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptodev.h,v 1.9 2004/02/02 17:06:34 phk Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/cryptodev.h,v 1.9.2.1 2005/01/31 23:26:48 imp Exp $	*/
 /*	$OpenBSD: cryptodev.h,v 1.31 2002/06/11 11:14:29 beck Exp $	*/
 
-/*
+/*-
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
  * This code was written by Angelos D. Keromytis in Athens, Greece, in

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_extern.h	8.6 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_extern.h,v 1.57 2004/07/30 22:08:52 phk Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_extern.h,v 1.57.2.1 2005/02/28 10:33:20 delphij Exp $
  */
 
 #ifndef _UFS_FFS_EXTERN_H
@@ -62,7 +62,6 @@ ufs2_daddr_t ffs_blkpref_ufs2(struct inode *, ufs_lbn_t, int, ufs2_daddr_t *);
 int	ffs_checkfreefile(struct fs *, struct vnode *, ino_t);
 void	ffs_clrblock(struct fs *, u_char *, ufs1_daddr_t);
 void	ffs_clusteracct	(struct fs *, struct cg *, ufs1_daddr_t, int);
-vfs_fhtovp_t ffs_fhtovp;
 int	ffs_flushfiles(struct mount *, int, struct thread *);
 void	ffs_fragacct(struct fs *, int, int32_t [], int);
 int	ffs_freefile(struct fs *, struct vnode *, ino_t, int);
@@ -78,16 +77,12 @@ void	ffs_snapremove(struct vnode *vp);
 int	ffs_snapshot(struct mount *mp, char *snapfile);
 void	ffs_snapshot_mount(struct mount *mp);
 void	ffs_snapshot_unmount(struct mount *mp);
-vfs_statfs_t ffs_statfs;
-vfs_sync_t ffs_sync;
 int	ffs_truncate(struct vnode *, off_t, int, struct ucred *, struct thread *);
-vfs_unmount_t ffs_unmount;
 int	ffs_update(struct vnode *, int);
 int	ffs_valloc(struct vnode *, int, struct ucred *, struct vnode **);
 
 int	ffs_vfree(struct vnode *, ino_t, int);
 vfs_vget_t ffs_vget;
-vfs_vptofh_t ffs_vptofh;
 
 extern vop_t **ffs_vnodeop_p;
 extern vop_t **ffs_specop_p;

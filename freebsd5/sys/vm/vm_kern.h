@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_kern.h,v 1.27 2004/04/06 20:15:36 imp Exp $
+ * $FreeBSD: src/sys/vm/vm_kern.h,v 1.27.2.1 2005/01/31 23:27:02 imp Exp $
  */
 
 #ifndef _VM_VM_KERN_H_

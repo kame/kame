@@ -1,7 +1,7 @@
 /*	$NetBSD: ip_gre.c,v 1.29 2003/09/05 23:02:43 itojun Exp $ */
-/*	 $FreeBSD: src/sys/netinet/ip_gre.c,v 1.17 2004/08/16 18:32:07 rwatson Exp $ */
+/*	 $FreeBSD: src/sys/netinet/ip_gre.c,v 1.17.2.1 2005/01/31 23:26:35 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

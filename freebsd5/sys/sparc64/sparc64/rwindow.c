@@ -26,16 +26,16 @@
  * SUCH DAMAGE.
  *
  *	from: BSDI: trap.c,v 1.17.2.9 1999/10/19 15:29:52 cp Exp
- * $FreeBSD: src/sys/sparc64/sparc64/rwindow.c,v 1.7 2002/10/25 16:00:47 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/rwindow.c,v 1.7.8.1 2005/02/05 01:02:50 das Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
-#include <sys/user.h>
 
 #include <machine/frame.h>
+#include <machine/pcb.h>
 
 CTASSERT((1 << RW_SHIFT) == sizeof(struct rwindow));
 

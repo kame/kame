@@ -1,6 +1,8 @@
-/*
- * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
- * All rights reserved.
+/*-
+ * Copyright (c) 2004, 2005,
+ *     Bosko Milekic <bmilekic@FreeBSD.org>.  All rights reserved.
+ * Copyright (c) 2002, 2003, 2004, 2005,
+ *     Jeffrey Roberson <jeff@FreeBSD.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/vm/uma.h,v 1.19 2004/08/02 00:18:35 green Exp $
+ * $FreeBSD: src/sys/vm/uma.h,v 1.19.2.3 2005/02/16 21:53:08 bmilekic Exp $
  *
  */
 

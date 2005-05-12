@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
  *
@@ -56,7 +56,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)protosw.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/netinet/ipprotosw.h,v 1.5 2004/04/07 20:46:13 imp Exp $
+ * $FreeBSD: src/sys/netinet/ipprotosw.h,v 1.5.2.1 2005/01/31 23:26:36 imp Exp $
  */
 
 #ifndef _NETINET_IPPROTOSW_H_

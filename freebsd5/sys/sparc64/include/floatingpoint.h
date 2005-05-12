@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 David O'Brien <obrien@FreeBSD.org>.
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/floatingpoint.h,v 1.1 2002/02/10 14:27:20 obrien Exp $
+ * $FreeBSD: src/sys/sparc64/include/floatingpoint.h,v 1.1.8.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _FLOATINGPOINT_H_

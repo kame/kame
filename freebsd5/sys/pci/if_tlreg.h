@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tlreg.h,v 1.19 2003/11/14 19:00:32 sam Exp $
+ * $FreeBSD: src/sys/pci/if_tlreg.h,v 1.19.4.1 2005/01/31 23:26:51 imp Exp $
  */
 
 

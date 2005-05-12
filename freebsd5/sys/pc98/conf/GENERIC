@@ -16,7 +16,7 @@
 # If you are in doubt as to the purpose or necessity of a line, check first
 # in NOTES.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.255.2.4 2004/09/22 19:23:39 andre Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.255.2.7 2005/04/02 04:01:08 nyan Exp $
 
 machine		pc98
 #cpu		I386_CPU		# Do not enable with other cpu types
@@ -222,11 +222,13 @@ device		faith		# IPv6-to-IPv4 relaying (translation)
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
+# Note that 'bpf' is required for DHCP.
 device		bpf		# Berkeley packet filter
 
 # USB support
 #device		uhci		# UHCI PCI->USB interface
 #device		ohci		# OHCI PCI->USB interface
+#device		ehci		# EHCI PCI->USB interface (USB 2.0)
 #device		usb		# USB Bus (required)
 #device		udbp		# USB Double Bulk Pipe devices
 #device		ugen		# Generic
@@ -240,6 +242,7 @@ device		bpf		# Berkeley packet filter
 # USB Ethernet, requires mii
 #device		aue		# ADMtek USB Ethernet
 #device		axe		# ASIX Electronics USB Ethernet
+#device		cdce		# Generic USB over Ethernet
 #device		cue		# CATC USB Ethernet
 #device		kue		# Kawasaki LSI USB Ethernet
 #device		rue		# RealTek RTL8150 USB Ethernet

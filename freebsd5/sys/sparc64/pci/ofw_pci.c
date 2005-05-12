@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000 Matthew R. Green
  * Copyright (c) 2001 - 2003 by Thomas Moestl <tmm@FreeBSD.org>
  * All rights reserved.
@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: psycho.c,v 1.35 2001/09/10 16:17:06 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/pci/ofw_pci.c,v 1.14 2004/05/08 13:53:47 marius Exp $
+ * $FreeBSD: src/sys/sparc64/pci/ofw_pci.c,v 1.14.2.1 2005/01/31 23:26:54 imp Exp $
  */
 
 #include "opt_ofw_pci.h"

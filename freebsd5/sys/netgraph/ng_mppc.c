@@ -1,7 +1,8 @@
-
 /*
  * ng_mppc.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-2000 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -37,7 +38,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_mppc.c,v 1.4 1999/11/25 00:10:12 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_mppc.c,v 1.21 2004/05/29 00:51:11 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_mppc.c,v 1.21.2.1 2005/01/31 23:26:29 imp Exp $
  */
 
 /*

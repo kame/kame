@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_subs.c,v 1.4 2004/02/27 19:37:43 rees Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_subs.c,v 1.4.2.1 2005/01/31 23:26:45 imp Exp $ */
 /* $Id: nfs4_subs.c,v 1.52 2003/11/05 14:58:59 rees Exp $ */
 
-/*
+/*-
  * copyright (c) 2003
  * the regents of the university of michigan
  * all rights reserved

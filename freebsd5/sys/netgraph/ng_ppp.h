@@ -1,7 +1,8 @@
-
 /*
  * ng_ppp.h
- *
+ */
+
+/*-
  * Copyright (c) 1996-2000 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ppp.h,v 1.10 2003/11/11 12:30:37 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ppp.h,v 1.10.4.1 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_ppp.h,v 1.8 1999/01/25 02:40:02 archie Exp $
  */
 

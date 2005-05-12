@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Andre Oppermann, Internet Business Solutions AG
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw_pfil.c,v 1.1.2.7 2004/10/03 17:04:40 mlaier Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw_pfil.c,v 1.1.2.8.2.1 2005/04/08 12:37:59 glebius Exp $
  */
 
 #if !defined(KLD_MODULE)
@@ -129,8 +129,10 @@ again:
 		if (divert) {
 			*m0 = NULL;
 			return 0;	/* packet consumed */
-		} else
+		} else {
+			args.rule = NULL;
 			goto again;	/* continue with packet */
+		}
 	}
 
 #ifdef IPFIREWALL_FORWARD
@@ -214,8 +216,10 @@ again:
 		if (divert) {
 			*m0 = NULL;
 			return 0;	/* packet consumed */
-		} else
+		} else {
+			args.rule = NULL;
 			goto again;	/* continue with packet */
+		}
         }
 
 #ifdef IPFIREWALL_FORWARD

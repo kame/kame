@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, Henrik Vestergaard Draboel
  * All rights reserved.
  *
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/priority.h,v 1.2 2001/09/05 01:22:14 obrien Exp $
+ * $FreeBSD: src/sys/sys/priority.h,v 1.2.8.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_PRIORITY_H_

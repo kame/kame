@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)reboot.h	8.3 (Berkeley) 12/13/94
- * $FreeBSD: src/sys/sys/reboot.h,v 1.24 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/reboot.h,v 1.24.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_REBOOT_H_

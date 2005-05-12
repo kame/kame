@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996
  *	The President and Fellows of Harvard College. All rights reserved.
  * Copyright (c) 1992, 1993
@@ -68,7 +68,7 @@
  *	from: @(#)cache.c	8.2 (Berkeley) 10/30/93
  *	from: NetBSD: cache.c,v 1.5 2000/12/06 01:47:50 mrg Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/cache.c,v 1.19 2004/04/07 05:00:01 imp Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/cache.c,v 1.19.2.1 2005/01/31 23:26:55 imp Exp $
  */
 
 #include <sys/param.h>

@@ -1,6 +1,8 @@
 /*
  * ng_btsocket_rfcomm.c
- *
+ */
+
+/*-
  * Copyright (c) 2001-2003 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket_rfcomm.c,v 1.28 2003/09/14 23:29:06 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_rfcomm.c,v 1.12.4.1 2004/10/21 09:30:47 rwatson Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_rfcomm.c,v 1.12.2.3 2005/03/07 13:08:04 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -798,6 +800,7 @@ ng_btsocket_rfcomm_listen(struct socket *so, struct thread *td)
 	ng_btsocket_rfcomm_session_p	 s = NULL;
 	struct socket			*l2so = NULL;
 	int				 error;
+	int				 socreate_error;
 
 	if (pcb == NULL)
 		return (EINVAL);
@@ -814,14 +817,18 @@ ng_btsocket_rfcomm_listen(struct socket *so, struct thread *td)
 	 * session.
 	 */
 
-	error = socreate(PF_BLUETOOTH, &l2so, SOCK_SEQPACKET,
+	socreate_error = socreate(PF_BLUETOOTH, &l2so, SOCK_SEQPACKET,
 			BLUETOOTH_PROTO_L2CAP, td->td_ucred, td);
 
-	/* 
-	 * Look for the session in LISTENING state. There can only be one.
+	/*
+	 * Transition the socket and session into the LISTENING state.  Check
+	 * for collisions first, as there can only be one.
 	 */
-
 	mtx_lock(&ng_btsocket_rfcomm_sessions_mtx);
+	SOCK_LOCK(so);
+	error = solisten_proto_check(so);
+	if (error != 0)
+		goto out;
 
 	LIST_FOREACH(s, &ng_btsocket_rfcomm_sessions, next)
 		if (s->state == NG_BTSOCKET_RFCOMM_SESSION_LISTENING)
@@ -833,10 +840,9 @@ ng_btsocket_rfcomm_listen(struct socket *so, struct thread *td)
 		 * L2CAP socket. If l2so == NULL then error has the error code 
 		 * from socreate()
 		 */
-
 		if (l2so == NULL) {
-			mtx_unlock(&ng_btsocket_rfcomm_sessions_mtx);
-			return (error);
+			error = socreate_error;
+			goto out;
 		}
 
 		/* 
@@ -846,21 +852,23 @@ ng_btsocket_rfcomm_listen(struct socket *so, struct thread *td)
 		 * XXX FIXME Note that currently there is no way to adjust MTU
 		 * for the default session.
 		 */
-
 		error = ng_btsocket_rfcomm_session_create(&s, l2so,
 					NG_HCI_BDADDR_ANY, NULL, td);
-		if (error != 0) {
-			mtx_unlock(&ng_btsocket_rfcomm_sessions_mtx);
-			soclose(l2so);
-
-			return (error);
-		}
-	} else if (l2so != NULL)
-		soclose(l2so); /* we don't need new L2CAP socket */
-
+		if (error != 0)
+			goto out;
+		l2so = NULL;
+	}
+	solisten_proto(so);
+out:
+	SOCK_UNLOCK(so);
 	mtx_unlock(&ng_btsocket_rfcomm_sessions_mtx);
-
-	return (0);
+	/*
+	 * If we still have an l2so reference here, it's unneeded, so release
+	 * it.
+	 */
+	if (l2so != NULL)
+		soclose(l2so);
+	return (error);
 } /* ng_btsocket_listen */
 
 /*

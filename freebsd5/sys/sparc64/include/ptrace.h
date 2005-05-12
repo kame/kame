@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/sparc64/include/ptrace.h,v 1.7 2004/04/07 05:00:00 imp Exp $
+ * $FreeBSD: src/sys/sparc64/include/ptrace.h,v 1.7.2.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef	_MACHINE_PTRACE_H_

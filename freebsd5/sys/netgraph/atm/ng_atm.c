@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -25,12 +25,14 @@
  * SUCH DAMAGE.
  *
  * Author: Hartmut Brandt <harti@freebsd.org>
- *
+ */
+
+/*
  * Netgraph module to connect NATM interfaces to netgraph.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/ng_atm.c,v 1.11 2004/07/28 06:54:55 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/ng_atm.c,v 1.11.2.1 2005/01/31 23:26:30 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

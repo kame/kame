@@ -1,7 +1,8 @@
-
 /*
  * ng_ksocket.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.46.2.1 2004/09/07 23:09:37 rwatson Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.46.2.4.2.1 2005/04/25 17:24:36 glebius Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -95,7 +96,6 @@ typedef struct ng_ksocket_private *priv_p;
 #define	KSF_EOFSEEN	0x00000004	/* Have sent 0-length EOF mbuf */
 #define	KSF_CLONED	0x00000008	/* Cloned from an accepting socket */
 #define	KSF_EMBRYONIC	0x00000010	/* Cloned node with no hooks yet */
-#define	KSF_SENDING	0x00000020	/* Sending on socket */
 
 /* Netgraph node methods */
 static ng_constructor_t	ng_ksocket_constructor;
@@ -596,6 +596,14 @@ ng_ksocket_newhook(node_p node, hook_p hook, const char *name0)
 
 	/* OK */
 	priv->hook = hook;
+
+	/*
+	 * In case of misconfigured routing a packet may reenter
+	 * ksocket node recursively. Decouple stack to avoid possible
+	 * panics about sleeping with locks held.
+	 */
+	NG_HOOK_FORCE_QUEUE(hook);
+
 	return(0);
 }
 
@@ -897,25 +905,22 @@ ng_ksocket_rcvdata(hook_p hook, item_p item)
 	struct mbuf *m;
 	struct sa_tag *stag;
 
-	/* Avoid reentrantly sending on the socket */
-	if ((priv->flags & KSF_SENDING) != 0) {
-		NG_FREE_ITEM(item);
-		return (EDEADLK);
-	}
-
 	/* Extract data */
 	NGI_GET_M(item, m);
 	NG_FREE_ITEM(item);
 
-	/* Look if socket address is stored in packet tags */
-	if ((stag = (struct sa_tag *)m_tag_locate(m, NGM_KSOCKET_COOKIE,
-	    NG_KSOCKET_TAG_SOCKADDR, NULL)) != NULL)
+	/*
+	 * Look if socket address is stored in packet tags.
+	 * If sockaddr is ours, or provided by a third party (zero id),
+	 * then we accept it.
+	 */
+	if (((stag = (struct sa_tag *)m_tag_locate(m, NGM_KSOCKET_COOKIE,
+	    NG_KSOCKET_TAG_SOCKADDR, NULL)) != NULL) &&
+	    (stag->id == NG_NODE_ID(node) || stag->id == 0))
 		sa = &stag->sa;
 
 	/* Send packet */
-	priv->flags |= KSF_SENDING;
 	error = (*so->so_proto->pr_usrreqs->pru_sosend)(so, sa, 0, m, 0, 0, td);
-	priv->flags &= ~KSF_SENDING;
 
 	return (error);
 }
@@ -1113,13 +1118,15 @@ ng_ksocket_incoming2(node_p node, hook_p hook, void *arg1, int waitflag)
 			struct sa_tag	*stag;
 
 			stag = (struct sa_tag *)m_tag_alloc(NGM_KSOCKET_COOKIE,
-			    NG_KSOCKET_TAG_SOCKADDR, sa->sa_len, M_NOWAIT);
+			    NG_KSOCKET_TAG_SOCKADDR, sizeof(ng_ID_t) +
+			    sa->sa_len, M_NOWAIT);
 			if (stag == NULL) {
 				FREE(sa, M_SONAME);
 				goto sendit;
 			}
 			bcopy(sa, &stag->sa, sa->sa_len);
 			FREE(sa, M_SONAME);
+			stag->id = NG_NODE_ID(node);
 			m_tag_prepend(m, &stag->tag);
 		}
 

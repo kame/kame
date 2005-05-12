@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_mmap.c,v 1.192 2004/08/05 07:04:33 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_mmap.c,v 1.192.2.2 2005/01/31 23:27:03 imp Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -120,8 +120,6 @@ sbrk(td, uap)
 	struct sbrk_args *uap;
 {
 	/* Not yet implemented */
-	/* mtx_lock(&Giant); */
-	/* mtx_unlock(&Giant); */
 	return (EOPNOTSUPP);
 }
 
@@ -141,8 +139,6 @@ sstk(td, uap)
 	struct sstk_args *uap;
 {
 	/* Not yet implemented */
-	/* mtx_lock(&Giant); */
-	/* mtx_unlock(&Giant); */
 	return (EOPNOTSUPP);
 }
 
@@ -1119,7 +1115,6 @@ vm_mmap_vnode(struct thread *td, vm_size_t objsize,
 		/*
 		 * Force device mappings to be shared.
 		 */
-		flags &= ~(MAP_PRIVATE|MAP_COPY);
 		flags |= MAP_SHARED;
 	} else {
 		error = EINVAL;

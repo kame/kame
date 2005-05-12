@@ -1,5 +1,5 @@
 /*	$OpenBSD: rijndael.c,v 1.12 2002/07/10 17:53:54 deraadt Exp $ */
-/**
+/*-
  * rijndael-alg-fst.c
  *
  * @version 3.0 (December 2000)
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/rijndael.c,v 1.3 2004/02/04 08:44:10 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/rijndael.c,v 1.3.2.1 2005/01/31 23:26:48 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

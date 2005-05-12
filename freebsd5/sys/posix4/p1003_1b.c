@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996, 1997, 1998
  *	HD Associates, Inc.  All rights reserved.
  *
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/posix4/p1003_1b.c,v 1.22 2003/06/11 06:28:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/posix4/p1003_1b.c,v 1.22.4.1 2005/01/31 23:26:52 imp Exp $");
 
 #include "opt_posix.h"
 

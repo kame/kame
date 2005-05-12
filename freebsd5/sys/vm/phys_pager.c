@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Peter Wemm
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/phys_pager.c,v 1.22 2004/04/25 07:58:59 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/phys_pager.c,v 1.22.2.1 2005/01/31 23:27:02 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

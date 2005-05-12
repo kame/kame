@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/sys/shm.h,v 1.19 2003/01/25 21:33:05 alfred Exp $ */
+/* $FreeBSD: src/sys/sys/shm.h,v 1.19.6.1 2005/01/31 23:26:57 imp Exp $ */
 /*	$NetBSD: shm.h,v 1.15 1994/06/29 06:45:17 cgd Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1994 Adam Glass
  * All rights reserved.
  *

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996 John S. Dyson
  * All rights reserved.
  *
@@ -18,7 +18,7 @@
  * 5. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/sys/pipe.h,v 1.28 2004/07/21 03:11:41 silby Exp $
+ * $FreeBSD: src/sys/sys/pipe.h,v 1.28.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_PIPE_H_

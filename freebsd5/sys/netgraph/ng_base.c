@@ -1,6 +1,8 @@
 /*
  * ng_base.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  *
@@ -36,7 +38,7 @@
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.84 2004/07/27 20:30:55 glebius Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.84.2.7 2005/03/16 13:24:53 glebius Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -1329,7 +1331,7 @@ ng_con_nodes(node_p node, const char *name, node_p node2, const char *name2)
 		return (error);
 	/* Allocate the other hook and link it up */
 	NG_ALLOC_HOOK(hook2);
-	if (hook == NULL) {
+	if (hook2 == NULL) {
 		TRAP_ERROR();
 		ng_destroy_hook(hook);	/* XXX check ref counts so far */
 		NG_HOOK_UNREF(hook);	/* including our ref */
@@ -1777,6 +1779,8 @@ ng_dequeue(struct ng_queue *ngq)
 	item_p item;
 	u_int		add_arg;
 
+	mtx_assert(&ngq->q_mtx, MA_OWNED);
+
 	if (CAN_GET_READ(ngq->q_flags)) {
 		/*
 		 * Head of queue is a reader and we have no write active.
@@ -1903,6 +1907,8 @@ ng_dequeue(struct ng_queue *ngq)
 static __inline void
 ng_queue_rw(struct ng_queue * ngq, item_p  item, int rw)
 {
+	mtx_assert(&ngq->q_mtx, MA_OWNED);
+
 	item->el_next = NULL;	/* maybe not needed */
 	*ngq->last = item;
 	/*
@@ -2430,6 +2436,7 @@ ng_apply_item(node_p node, item_p item)
 		&& (NGI_FN(item) != &ng_rmnode)) {
 			TRAP_ERROR();
 			error = EINVAL;
+			NG_FREE_ITEM(item);
 			break;
 		}
 		(*NGI_FN(item))(node, hook, NGI_ARG1(item), NGI_ARG2(item));
@@ -2988,7 +2995,7 @@ static moduledata_t netgraph_mod = {
 	ngb_mod_event,
 	(NULL)
 };
-DECLARE_MODULE(netgraph, netgraph_mod, SI_SUB_DRIVERS, SI_ORDER_MIDDLE);
+DECLARE_MODULE(netgraph, netgraph_mod, SI_SUB_NETGRAPH, SI_ORDER_MIDDLE);
 SYSCTL_NODE(_net, OID_AUTO, graph, CTLFLAG_RW, 0, "netgraph Family");
 SYSCTL_INT(_net_graph, OID_AUTO, abi_version, CTLFLAG_RD, 0, NG_ABI_VERSION,"");
 SYSCTL_INT(_net_graph, OID_AUTO, msg_version, CTLFLAG_RD, 0, NG_VERSION, "");
@@ -3587,7 +3594,7 @@ ng_send_fn(node_p node, hook_p hook, ng_item_fn *fn, void * arg1, int arg2)
  * Official timeout routines for Netgraph nodes.
  */
 static void
-ng_timeout_trapoline(void *arg)
+ng_callout_trapoline(void *arg)
 {
 	item_p item = arg;
 
@@ -3595,11 +3602,75 @@ ng_timeout_trapoline(void *arg)
 }
 
 
+int
+ng_callout(struct callout *c, node_p node, hook_p hook, int ticks,
+    ng_item_fn *fn, void * arg1, int arg2)
+{
+	item_p item;
+
+	if ((item = ng_getqblk()) == NULL)
+		return (ENOMEM);
+
+	item->el_flags = NGQF_FN | NGQF_WRITER;
+	NG_NODE_REF(node);		/* and one for the item */
+	NGI_SET_NODE(item, node);
+	if (hook) {
+		NG_HOOK_REF(hook);
+		NGI_SET_HOOK(item, hook);
+	}
+	NGI_FN(item) = fn;
+	NGI_ARG1(item) = arg1;
+	NGI_ARG2(item) = arg2;
+	callout_reset(c, ticks, &ng_callout_trapoline, item);
+	return (0);
+}
+
+/* A special modified version of untimeout() */
+int 
+ng_uncallout(struct callout *c, node_p node)
+{
+	item_p item;
+	int rval;
+	void *c_func;
+	
+	if (c == NULL)
+		return (0);
+	/* there must be an official way to do this */
+	mtx_lock_spin(&callout_lock);
+	c_func = c->c_func;
+	rval = callout_stop(c);
+	mtx_unlock_spin(&callout_lock);
+	item = c->c_arg;
+	/* Do an extra check */
+	if ((rval > 0) && (c_func == &ng_callout_trapoline) &&
+	    (NGI_NODE(item) == node)) {
+		/*
+		 * We successfully removed it from the queue before it ran
+		 * So now we need to unreference everything that was 
+		 * given extra references. (NG_FREE_ITEM does this).
+		 */
+		NG_FREE_ITEM(item);
+	}
+
+	return (rval);
+}
+
+/*
+ * Deprecated API ng_timeout/ng_untimeout, kept for compatibility.
+ */
+static void
+ng_timeout_trapoline(void *arg)
+{
+	item_p item = arg;
+
+	ng_snd_item(item, 0);
+}
+
 struct callout_handle
 ng_timeout(node_p node, hook_p hook, int ticks,
     ng_item_fn *fn, void * arg1, int arg2)
 {
-	item_p item;
+	item_p item;  
 
 	if ((item = ng_getqblk()) == NULL) {
 		struct callout_handle handle;
@@ -3607,7 +3678,7 @@ ng_timeout(node_p node, hook_p hook, int ticks,
 		return (handle);
 	}
 	item->el_flags = NGQF_FN | NGQF_WRITER;
-	NG_NODE_REF(node);		/* and one for the item */
+	NG_NODE_REF(node);              /* and one for the item */
 	NGI_SET_NODE(item, node);
 	if (hook) {
 		NG_HOOK_REF(hook);
@@ -3620,11 +3691,11 @@ ng_timeout(node_p node, hook_p hook, int ticks,
 }
 
 /* A special modified version of untimeout() */
-int 
+int
 ng_untimeout(struct callout_handle handle, node_p node)
 {
 	item_p item;
-	
+
 	if (handle.callout == NULL)
 		return (0);
 	mtx_lock_spin(&callout_lock);
@@ -3634,7 +3705,7 @@ ng_untimeout(struct callout_handle handle, node_p node)
 	    (callout_stop(handle.callout))) {
 		/*
 		 * We successfully removed it from the queue before it ran
-		 * So now we need to unreference everything that was 
+		 * So now we need to unreference everything that was
 		 * given extra references. (NG_FREE_ITEM does this).
 		 */
 		mtx_unlock_spin(&callout_lock);

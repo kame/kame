@@ -1,14 +1,14 @@
 /*-
  * Copyright (c) 1999-2002 Robert N. M. Watson
- * Copyright (c) 2001-2004 Networks Associates Technology, Inc.
+ * Copyright (c) 2001-2005 McAfee, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
  *
- * This software was developed for the FreeBSD Project in part by Network
- * Associates Laboratories, the Security Research Division of Network
- * Associates, Inc. under DARPA/SPAWAR contract N66001-01-C-8035 ("CBOSS"),
- * as part of the DARPA CHATS research program.
+ * This software was developed for the FreeBSD Project in part by McAfee
+ * Research, the Security Research Division of McAfee, Inc. under
+ * DARPA/SPAWAR contract N66001-01-C-8035 ("CBOSS"), as part of the DARPA
+ * CHATS research program.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_biba/mac_biba.c,v 1.80 2004/07/28 07:01:33 kan Exp $
+ * $FreeBSD: src/sys/security/mac_biba/mac_biba.c,v 1.80.2.2 2005/02/13 12:10:38 rwatson Exp $
  */
 
 /*
@@ -241,7 +241,8 @@ mac_biba_range_in_range(struct mac_biba *rangea, struct mac_biba *rangeb)
 }
 
 static int
-mac_biba_effective_in_range(struct mac_biba *effective, struct mac_biba *range)
+mac_biba_effective_in_range(struct mac_biba *effective,
+    struct mac_biba *range)
 {
 
 	KASSERT((effective->mb_flags & MAC_BIBA_FLAG_EFFECTIVE) != 0,
@@ -2761,7 +2762,6 @@ static struct mac_policy_ops mac_biba_ops =
 	.mpo_check_vnode_listextattr = mac_biba_check_vnode_listextattr,
 	.mpo_check_vnode_lookup = mac_biba_check_vnode_lookup,
 	.mpo_check_vnode_mmap = mac_biba_check_vnode_mmap,
-	.mpo_check_vnode_mprotect = mac_biba_check_vnode_mmap,
 	.mpo_check_vnode_open = mac_biba_check_vnode_open,
 	.mpo_check_vnode_poll = mac_biba_check_vnode_poll,
 	.mpo_check_vnode_read = mac_biba_check_vnode_read,

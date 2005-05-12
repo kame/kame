@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_outputfl.c,v 1.19 2003/06/11 05:25:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_outputfl.c,v 1.19.4.3 2005/02/25 13:20:42 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -91,14 +91,14 @@ ipx_outputfl(m0, ro, flags)
 			ifp = ia->ia_ifp;
 			goto gotif;
 		}
-		rtalloc(ro);
+		rtalloc_ign(ro, 0);
 	} else if ((ro->ro_rt->rt_flags & RTF_UP) == 0) {
 		/*
 		 * The old route has gone away; try for a new one.
 		 */
-		rtfree(ro->ro_rt);
+		RTFREE(ro->ro_rt);
 		ro->ro_rt = NULL;
-		rtalloc(ro);
+		rtalloc_ign(ro, 0);
 	}
 	if (ro->ro_rt == NULL || (ifp = ro->ro_rt->rt_ifp) == NULL) {
 		ipxstat.ipxs_noroute++;

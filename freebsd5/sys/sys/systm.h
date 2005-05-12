@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.213 2004/08/05 07:15:35 cperciva Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.213.2.4 2005/03/03 00:46:32 wes Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -53,7 +53,6 @@ extern const char *panicstr;	/* panic message */
 extern char version[];		/* system version */
 extern char copyright[];	/* system copyright */
 extern int kstack_pages;	/* number of kernel stack pages */
-extern int uarea_pages;		/* number of user struct pages */
 
 extern int nswap;		/* size of swap space */
 
@@ -62,6 +61,7 @@ extern struct mtx sellock;	/* select lock variable */
 extern struct cv selwait;	/* select conditional variable */
 
 extern long physmem;		/* physical memory */
+extern long realmem;		/* 'real' memory */
 
 extern struct cdev *rootdev;		/* root device */
 extern char *rootdevnames[2];	/* names of possible root devices */
@@ -127,6 +127,7 @@ int	ureadc(int, struct uio *);
 void	hashdestroy(void *, struct malloc_type *, u_long);
 void	*hashinit(int count, struct malloc_type *type, u_long *hashmask);
 void	*phashinit(int count, struct malloc_type *type, u_long *nentries);
+void	g_waitidle(void);
 
 #ifdef RESTARTABLE_PANICS
 void	panic(const char *, ...) __printflike(1, 2);
@@ -154,7 +155,7 @@ int	sprintf(char *buf, const char *, ...) __printflike(2, 3);
 int	uprintf(const char *, ...) __printflike(1, 2);
 int	vprintf(const char *, __va_list) __printflike(1, 0);
 int	vsnprintf(char *, size_t, const char *, __va_list) __printflike(3, 0);
-int	vsnrprintf(char *, size_t, int, const char *, __va_list) __printflike(4, 0); 
+int	vsnrprintf(char *, size_t, int, const char *, __va_list) __printflike(4, 0);
 int	vsprintf(char *buf, const char *, __va_list) __printflike(2, 0);
 int	ttyprintf(struct tty *, const char *, ...) __printflike(2, 3);
 int	sscanf(const char *, char const *, ...) __nonnull(1) __nonnull(2);
@@ -225,16 +226,18 @@ int	cr_canseesocket(struct ucred *cred, struct socket *so);
 char	*getenv(const char *name);
 void	freeenv(char *env);
 int	getenv_int(const char *name, int *data);
+long	getenv_long(const char *name, long *data);
+unsigned long getenv_ulong(const char *name, unsigned long *data);
 int	getenv_string(const char *name, char *data, int size);
 int	getenv_quad(const char *name, quad_t *data);
 int	setenv(const char *name, const char *value);
 int	unsetenv(const char *name);
 int	testenv(const char *name);
 
-#ifdef APM_FIXUP_CALLTODO 
+#ifdef APM_FIXUP_CALLTODO
 struct timeval;
-void	adjust_timeout_calltodo(struct timeval *time_change); 
-#endif /* APM_FIXUP_CALLTODO */ 
+void	adjust_timeout_calltodo(struct timeval *time_change);
+#endif /* APM_FIXUP_CALLTODO */
 
 #include <sys/libkern.h>
 
@@ -297,7 +300,7 @@ typedef void (*watchdog_tickle_fn)(void);
 
 extern watchdog_tickle_fn	wdog_tickler;
 
-/* 
+/*
  * Common `proc' functions are declared here so that proc.h can be included
  * less often.
  */

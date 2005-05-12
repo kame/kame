@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.92 2004/07/24 02:07:09 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.92.2.1 2005/01/31 23:26:47 imp Exp $");
 
 /*
  * Socket operations for use by nfs

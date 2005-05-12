@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.3 2004/04/07 20:46:16 imp Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.3.2.1 2005/01/31 23:26:45 imp Exp $ */
 /* $Id: nfs_socket.c,v 1.12 2003/11/05 14:59:01 rees Exp $ */
 
-/*
+/*-
  * copyright (c) 2003
  * the regents of the university of michigan
  * all rights reserved
@@ -25,7 +25,7 @@
  * advised of the possibility of such damages.
  */
 
-/*
+/*-
  * Copyright (c) 1989, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -60,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.3 2004/04/07 20:46:16 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.3.2.1 2005/01/31 23:26:45 imp Exp $");
 
 /*
  * Socket operations for use by nfs

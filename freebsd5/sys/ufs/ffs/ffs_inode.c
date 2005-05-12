@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.93 2004/07/28 06:41:26 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.93.2.1.2.1 2005/04/04 23:52:35 cperciva Exp $");
 
 #include "opt_quota.h"
 
@@ -274,6 +274,7 @@ ffs_truncate(vp, length, flags, cred, td)
 			    IO_EXT | IO_NORMAL : IO_NORMAL);
 			vinvalbuf(ovp, needextclean ? 0 : V_NORMAL,
 			    cred, td, 0, 0);
+			vnode_pager_setsize(vp, 0);
 			oip->i_flag |= IN_CHANGE | IN_UPDATE;
 			return (ffs_update(ovp, 0));
 		}

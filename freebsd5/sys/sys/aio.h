@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997 John S. Dyson.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -13,7 +13,7 @@
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
  *
- * $FreeBSD: src/sys/sys/aio.h,v 1.29 2002/01/06 21:03:39 alc Exp $
+ * $FreeBSD: src/sys/sys/aio.h,v 1.29.8.1 2005/01/31 23:26:55 imp Exp $
  */
 
 #ifndef _SYS_AIO_H_

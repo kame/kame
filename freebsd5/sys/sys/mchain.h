@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Boris Popov
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/mchain.h,v 1.7 2003/02/21 16:24:49 bmilekic Exp $
+ * $FreeBSD: src/sys/sys/mchain.h,v 1.7.6.1 2005/01/31 23:26:56 imp Exp $
  */
 #ifndef _SYS_MCHAIN_H_
 #define _SYS_MCHAIN_H_

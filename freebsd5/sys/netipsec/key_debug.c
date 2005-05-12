@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/key_debug.c,v 1.2 2003/09/29 22:57:43 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/key_debug.c,v 1.2.4.1 2005/01/31 23:26:41 imp Exp $	*/
 /*	$KAME: key_debug.c,v 1.26 2001/06/27 10:46:50 sakane Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *

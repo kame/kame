@@ -1,6 +1,8 @@
 /*
  * ng_gif.h
- *
+ */
+
+/*-
  * Copyright 2001 The Aerospace Corporation.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -60,7 +62,7 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_gif.h,v 1.4 2001/10/04 07:51:42 bde Exp $
+ * $FreeBSD: src/sys/netgraph/ng_gif.h,v 1.4.8.1 2005/01/31 23:26:29 imp Exp $
  */
 
 #ifndef _NETGRAPH_NG_GIF_H_

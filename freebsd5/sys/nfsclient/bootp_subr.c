@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Gordon Ross, Adam Glass
  * Copyright (c) 1992 Regents of the University of California.
  * All rights reserved.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.61 2004/07/28 21:54:57 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.61.2.2 2005/01/31 23:26:45 imp Exp $");
 
 #include "opt_bootp.h"
 
@@ -983,7 +983,7 @@ bootpc_fakeup_interface(struct bootpc_ifcontext *ifctx,
 	struct ifaddr *ifa;
 	struct sockaddr_dl *sdl;
 
-	GIANT_REQUIRED;		/* XXX until socket locking done */
+	NET_ASSERT_GIANT();
 
 	error = socreate(AF_INET, &ifctx->so, SOCK_DGRAM, 0, td->td_ucred, td);
 	if (error != 0)

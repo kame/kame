@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.225.2.5 2004/10/03 17:04:40 mlaier Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.225.2.11 2005/03/02 19:50:12 andre Exp $
  */
 
 #include "opt_ipfw.h"
@@ -96,11 +96,9 @@ static struct mbuf *ip_insertoptions(struct mbuf *, struct mbuf *, int *);
 static struct ifnet *ip_multicast_if(struct in_addr *, int *);
 static void	ip_mloopback
 	(struct ifnet *, struct mbuf *, struct sockaddr_in *, int);
-static int	ip_getmoptions
-	(struct sockopt *, struct ip_moptions *);
-static int	ip_pcbopts(int, struct mbuf **, struct mbuf *);
-static int	ip_setmoptions
-	(struct sockopt *, struct ip_moptions **);
+static int	ip_getmoptions(struct inpcb *, struct sockopt *);
+static int	ip_pcbopts(struct inpcb *, int, struct mbuf *);
+static int	ip_setmoptions(struct inpcb *, struct sockopt *);
 
 int	ip_optcopy(struct ip *, struct ip *);
 
@@ -706,18 +704,22 @@ spd_done:
 	/* Or forward to some other address? */
 	fwd_tag = m_tag_find(m, PACKET_TAG_IPFORWARD, NULL);
 	if (fwd_tag) {
+#ifndef IPFIREWALL_FORWARD_EXTENDED
 		if (!in_localip(ip->ip_src) && !in_localaddr(ip->ip_dst)) {
+#endif
 			dst = (struct sockaddr_in *)&ro->ro_dst;
 			bcopy((fwd_tag+1), dst, sizeof(struct sockaddr_in));
 			m->m_flags |= M_SKIP_FIREWALL;
 			m_tag_delete(m, fwd_tag);
 			goto again;
+#ifndef IPFIREWALL_FORWARD_EXTENDED
 		} else {
 			m_tag_delete(m, fwd_tag);
 			/* Continue. */
 		}
-	}
 #endif
+	}
+#endif /* IPFIREWALL_FORWARD */
 
 passout:
 	/* 127/8 must not appear on wire - RFC1122. */
@@ -1064,11 +1066,12 @@ ip_insertoptions(m, opt, phlen)
 			*phlen = 0;
 			return (m);
 		}
+		M_MOVE_PKTHDR(n, m);
 		n->m_pkthdr.rcvif = (struct ifnet *)0;
 #ifdef MAC
 		mac_create_mbuf_from_mbuf(m, n);
 #endif
-		n->m_pkthdr.len = m->m_pkthdr.len + optlen;
+		n->m_pkthdr.len += optlen;
 		m->m_len -= sizeof(struct ip);
 		m->m_data += sizeof(struct ip);
 		n->m_next = m;
@@ -1172,9 +1175,10 @@ ip_ctloutput(so, sopt)
 			m->m_len = sopt->sopt_valsize;
 			error = sooptcopyin(sopt, mtod(m, char *), m->m_len,
 					    m->m_len);
-			
-			return (ip_pcbopts(sopt->sopt_name, &inp->inp_options,
-					   m));
+			INP_LOCK(inp);
+			error = ip_pcbopts(inp, sopt->sopt_name, m);
+			INP_UNLOCK(inp);
+			return (error);
 		}
 
 		case IP_TOS:
@@ -1245,7 +1249,7 @@ ip_ctloutput(so, sopt)
 		case IP_MULTICAST_LOOP:
 		case IP_ADD_MEMBERSHIP:
 		case IP_DROP_MEMBERSHIP:
-			error = ip_setmoptions(sopt, &inp->inp_moptions);
+			error = ip_setmoptions(inp, sopt);
 			break;
 
 		case IP_PORTRANGE:
@@ -1389,7 +1393,7 @@ ip_ctloutput(so, sopt)
 		case IP_MULTICAST_LOOP:
 		case IP_ADD_MEMBERSHIP:
 		case IP_DROP_MEMBERSHIP:
-			error = ip_getmoptions(sopt, inp->inp_moptions);
+			error = ip_getmoptions(inp, sopt);
 			break;
 
 #if defined(IPSEC) || defined(FAST_IPSEC)
@@ -1427,24 +1431,26 @@ ip_ctloutput(so, sopt)
  * with destination address if source routed.
  */
 static int
-ip_pcbopts(optname, pcbopt, m)
-	int optname;
-	struct mbuf **pcbopt;
-	register struct mbuf *m;
+ip_pcbopts(struct inpcb *inp, int optname, struct mbuf *m)
 {
 	register int cnt, optlen;
 	register u_char *cp;
+	struct mbuf **pcbopt;
 	u_char opt;
+
+	INP_LOCK_ASSERT(inp);
+
+	pcbopt = &inp->inp_options;
 
 	/* turn off any old options */
 	if (*pcbopt)
 		(void)m_free(*pcbopt);
 	*pcbopt = 0;
-	if (m == (struct mbuf *)0 || m->m_len == 0) {
+	if (m == NULL || m->m_len == 0) {
 		/*
 		 * Only turning off any previous options.
 		 */
-		if (m)
+		if (m != NULL)
 			(void)m_free(m);
 		return (0);
 	}
@@ -1561,21 +1567,20 @@ ip_multicast_if(a, ifindexp)
  * Set the IP multicast options in response to user setsockopt().
  */
 static int
-ip_setmoptions(sopt, imop)
-	struct sockopt *sopt;
-	struct ip_moptions **imop;
+ip_setmoptions(struct inpcb *inp, struct sockopt *sopt)
 {
 	int error = 0;
 	int i;
 	struct in_addr addr;
 	struct ip_mreq mreq;
 	struct ifnet *ifp;
-	struct ip_moptions *imo = *imop;
+	struct ip_moptions *imo;
 	struct route ro;
 	struct sockaddr_in *dst;
 	int ifindex;
 	int s;
 
+	imo = inp->inp_moptions;
 	if (imo == NULL) {
 		/*
 		 * No multicast option buffer attached to the pcb;
@@ -1586,7 +1591,7 @@ ip_setmoptions(sopt, imop)
 
 		if (imo == NULL)
 			return (ENOBUFS);
-		*imop = imo;
+		inp->inp_moptions = imo;
 		imo->imo_multicast_ifp = NULL;
 		imo->imo_multicast_addr.s_addr = INADDR_ANY;
 		imo->imo_multicast_vif = -1;
@@ -1848,8 +1853,8 @@ ip_setmoptions(sopt, imop)
 	    imo->imo_multicast_ttl == IP_DEFAULT_MULTICAST_TTL &&
 	    imo->imo_multicast_loop == IP_DEFAULT_MULTICAST_LOOP &&
 	    imo->imo_num_memberships == 0) {
-		free(*imop, M_IPMOPTS);
-		*imop = NULL;
+		free(inp->inp_moptions, M_IPMOPTS);
+		inp->inp_moptions = NULL;
 	}
 
 	return (error);
@@ -1859,14 +1864,16 @@ ip_setmoptions(sopt, imop)
  * Return the IP multicast options in response to user getsockopt().
  */
 static int
-ip_getmoptions(sopt, imo)
-	struct sockopt *sopt;
-	register struct ip_moptions *imo;
+ip_getmoptions(struct inpcb *inp, struct sockopt *sopt)
 {
+	struct ip_moptions *imo;
 	struct in_addr addr;
 	struct in_ifaddr *ia;
 	int error, optval;
 	u_char coptval;
+
+	INP_LOCK(inp);
+	imo = inp->inp_moptions;
 
 	error = 0;
 	switch (sopt->sopt_name) {
@@ -1875,6 +1882,7 @@ ip_getmoptions(sopt, imo)
 			optval = imo->imo_multicast_vif;
 		else
 			optval = -1;
+		INP_UNLOCK(inp);
 		error = sooptcopyout(sopt, &optval, sizeof optval);
 		break;
 
@@ -1889,6 +1897,7 @@ ip_getmoptions(sopt, imo)
 			addr.s_addr = (ia == NULL) ? INADDR_ANY
 				: IA_SIN(ia)->sin_addr.s_addr;
 		}
+		INP_UNLOCK(inp);
 		error = sooptcopyout(sopt, &addr, sizeof addr);
 		break;
 
@@ -1897,6 +1906,7 @@ ip_getmoptions(sopt, imo)
 			optval = coptval = IP_DEFAULT_MULTICAST_TTL;
 		else
 			optval = coptval = imo->imo_multicast_ttl;
+		INP_UNLOCK(inp);
 		if (sopt->sopt_valsize == 1)
 			error = sooptcopyout(sopt, &coptval, 1);
 		else
@@ -1908,6 +1918,7 @@ ip_getmoptions(sopt, imo)
 			optval = coptval = IP_DEFAULT_MULTICAST_LOOP;
 		else
 			optval = coptval = imo->imo_multicast_loop;
+		INP_UNLOCK(inp);
 		if (sopt->sopt_valsize == 1)
 			error = sooptcopyout(sopt, &coptval, 1);
 		else
@@ -1915,9 +1926,12 @@ ip_getmoptions(sopt, imo)
 		break;
 
 	default:
+		INP_UNLOCK(inp);
 		error = ENOPROTOOPT;
 		break;
 	}
+	INP_UNLOCK_ASSERT(inp);
+
 	return (error);
 }
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990 University of Utah.
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/device_pager.c,v 1.75 2004/08/04 08:58:58 dfr Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/device_pager.c,v 1.75.2.1 2005/01/31 23:27:02 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)un.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/un.h,v 1.27 2004/04/07 04:19:50 imp Exp $
+ * $FreeBSD: src/sys/sys/un.h,v 1.27.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_UN_H_

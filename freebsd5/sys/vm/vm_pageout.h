@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pageout.h,v 1.39 2004/04/06 20:15:37 imp Exp $
+ * $FreeBSD: src/sys/vm/vm_pageout.h,v 1.39.2.2 2005/02/05 00:59:57 das Exp $
  */
 
 #ifndef _VM_VM_PAGEOUT_H_
@@ -96,12 +96,6 @@ extern void pagedaemon_wakeup(void);
 #define VM_WAITPFAULT vm_waitpfault()
 extern void vm_wait(void);
 extern void vm_waitpfault(void);
-
-/* XXX This is probably misplaced. */
-#ifndef NO_SWAPPING
-struct swdevt;
-void vm_proc_swapin_all(struct swdevt *);
-#endif	/* !NO_SWAPPING */
 
 #ifdef _KERNEL
 int vm_pageout_flush(vm_page_t *, int, int);

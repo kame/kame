@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netsmb/smb_subr.c,v 1.17 2003/06/11 05:32:09 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_subr.c,v 1.17.4.1 2005/01/31 23:26:44 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

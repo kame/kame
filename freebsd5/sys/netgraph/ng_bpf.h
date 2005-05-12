@@ -1,7 +1,8 @@
-
 /*
  * ng_bpf.h
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bpf.h,v 1.9 2004/01/26 14:05:31 harti Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bpf.h,v 1.9.2.1 2005/01/31 23:26:28 imp Exp $
  * $Whistle: ng_bpf.h,v 1.3 1999/12/03 20:30:23 archie Exp $
  */
 

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/sparc64/conf/NOTES,v 1.9 2004/08/16 23:21:06 marius Exp $
+# $FreeBSD: src/sys/sparc64/conf/NOTES,v 1.9.2.4 2005/02/17 01:06:04 marius Exp $
 #
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
@@ -42,11 +42,14 @@ device		fhc
 device		genclock	# Generic clock interface
 device		eeprom		# eeprom (really a front-end for the MK48Txx)
 device		"mk48txx"	# Mostek MK48T02, MK48T08, MK48T59 clock
+device		rtc		# rtc (really a front-end for the MC146818)
+device		"mc146818"	# Motorola MC146818 and compatible clocks
 
 #
 # Optional devices:
 #
 
+device		auxio		# auxiliary I/O device
 device		creator		# Creator, Creator3D and Elite3D graphics cards
 
 device		ofw_console	# Open Firmware console device
@@ -65,11 +68,11 @@ nodevice	atkbd
 nodevice	psm
 nodevice	vga
 nodevice	daemon_saver
+nodevice	snake_saver
 nodevice	star_saver
 nodevice	bktr
 nodevice	fdc
 nodevice	ppc
-nodevice	sound
 nodevice	"snd_ad1816"
 nodevice	"snd_als4000"
 nodevice	"snd_au88x0"

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -25,10 +25,12 @@
  * SUCH DAMAGE.
  *
  * Author: Harti Brandt <harti@freebsd.org>
- *
+ */
+
+/*
  * Netgraph module to connect NATM interfaces to netgraph.
  *
- * $FreeBSD: src/sys/netgraph/atm/ng_atm.h,v 1.4 2004/01/26 14:57:49 harti Exp $
+ * $FreeBSD: src/sys/netgraph/atm/ng_atm.h,v 1.4.2.1 2005/01/31 23:26:30 imp Exp $
  */
 #ifndef _NETGRAPH_ATM_NG_ATM_H_
 #define _NETGRAPH_ATM_NG_ATM_H_

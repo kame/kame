@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2002
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  *	All rights reserved.
@@ -30,8 +30,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/atm/ng_ccatm.h,v 1.1 2004/08/12 14:22:00 harti Exp $
- *
+ * $FreeBSD: src/sys/netgraph/atm/ng_ccatm.h,v 1.1.2.1 2005/01/31 23:26:30 imp Exp $
+ */
+
+/*
  * Interface to ng_ccatm
  */
 #ifndef _NETGRAPH_ATM_NG_CCATM_H_

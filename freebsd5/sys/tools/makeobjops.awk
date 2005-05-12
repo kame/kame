@@ -1,5 +1,6 @@
 #!/usr/bin/awk -f
-#
+
+#-
 # Copyright (c) 1992, 1993
 #        The Regents of the University of California.  All rights reserved.
 #
@@ -33,7 +34,7 @@
 # From src/sys/kern/makedevops.pl,v 1.12 1999/11/22 14:40:04 n_hibma Exp
 # From src/sys/kern/makeobjops.pl,v 1.8 2001/11/16 02:02:42 joe Exp
 #
-# $FreeBSD: src/sys/tools/makeobjops.awk,v 1.5 2004/07/11 16:14:24 dfr Exp $
+# $FreeBSD: src/sys/tools/makeobjops.awk,v 1.5.2.1 2005/01/31 23:26:59 imp Exp $
 
 #
 #   Script to produce kobj front-end sugar.

@@ -1,8 +1,9 @@
 /* MD5.H - header file for MD5C.C
- * $FreeBSD: src/sys/sys/md5.h,v 1.16 2002/06/24 14:18:39 mux Exp $
+ * $FreeBSD: src/sys/sys/md5.h,v 1.16.8.1 2005/01/31 23:26:56 imp Exp $
  */
 
-/* Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
+/*-
+ Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
 rights reserved.
 
 License to copy and use this software is granted provided that it

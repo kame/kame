@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)inode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/inode.h,v 1.46 2004/07/28 06:41:27 kan Exp $
+ * $FreeBSD: src/sys/ufs/ufs/inode.h,v 1.46.2.1 2005/01/31 23:27:01 imp Exp $
  */
 
 #ifndef _UFS_UFS_INODE_H_

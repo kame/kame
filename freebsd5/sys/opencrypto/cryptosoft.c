@@ -1,6 +1,6 @@
 /*	$OpenBSD: cryptosoft.c,v 1.35 2002/04/26 08:43:50 deraadt Exp $	*/
 
-/*
+/*-
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
  * This code was written by Angelos D. Keromytis in Athens, Greece, in
@@ -22,7 +22,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.7 2004/02/02 17:06:34 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.7.2.1 2005/01/31 23:26:48 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

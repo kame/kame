@@ -1,4 +1,4 @@
-/*
+/*-
  *
  * ===================================
  * HARP  |  Host ATM Research Platform
@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_var.h,v 1.8 2003/07/25 06:39:46 harti Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_var.h,v 1.8.4.1 2005/01/31 23:26:27 imp Exp $
  *
  */
 

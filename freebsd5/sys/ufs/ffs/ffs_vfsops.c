@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1991, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.240 2004/07/30 22:08:52 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.240.2.4 2005/02/28 10:33:20 delphij Exp $");
 
 #include "opt_mac.h"
 #include "opt_quota.h"
@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.240 2004/07/30 22:08:52 phk
 #include <vm/uma.h>
 #include <vm/vm_page.h>
 
-uma_zone_t uma_inode, uma_ufs1, uma_ufs2;
+static uma_zone_t uma_inode, uma_ufs1, uma_ufs2;
 
 static int	ffs_sbupdate(struct ufsmount *, int);
 static int	ffs_reload(struct mount *, struct thread *);
@@ -77,7 +77,12 @@ static void	ffs_ifree(struct ufsmount *ump, struct inode *ip);
 static vfs_init_t ffs_init;
 static vfs_uninit_t ffs_uninit;
 static vfs_extattrctl_t ffs_extattrctl;
+static vfs_unmount_t ffs_unmount;
 static vfs_omount_t ffs_omount;
+static vfs_statfs_t ffs_statfs;
+static vfs_fhtovp_t ffs_fhtovp;
+static vfs_vptofh_t ffs_vptofh;
+static vfs_sync_t ffs_sync;
 
 static struct vfsops ufs_vfsops = {
 	.vfs_extattrctl =	ffs_extattrctl,
@@ -291,6 +296,11 @@ ffs_omount(struct mount *mp, char *path, caddr_t data, struct thread *td)
 		 */
 		if (mp->mnt_flag & MNT_SOFTDEP)
 			mp->mnt_flag &= ~MNT_ASYNC;
+		/*
+		 * Keep MNT_ACLS flag if it is stored in superblock.
+		 */
+		if ((fs->fs_flags & FS_ACLS) != 0)
+			mp->mnt_flag |= MNT_ACLS;
 		/*
 		 * If not updating name, process export requests.
 		 */
@@ -804,6 +814,7 @@ out:
 	devvp->v_rdev->si_mountpoint = NULL;
 	if (bp)
 		brelse(bp);
+	vinvalbuf(devvp, V_SAVE, NOCRED, td, 0, 0);
 	/* XXX: see comment above VOP_OPEN. */
 #ifdef notyet
 	(void)VOP_CLOSE(devvp, ronly ? FREAD : FREAD | FWRITE, cred, td);
@@ -819,7 +830,7 @@ out:
 }
 
 #include <sys/sysctl.h>
-int bigcgs = 0;
+static int bigcgs = 0;
 SYSCTL_INT(_debug, OID_AUTO, bigcgs, CTLFLAG_RW, &bigcgs, 0, "");
 
 /*
@@ -915,7 +926,7 @@ ffs_oldfscompat_write(fs, ump)
 /*
  * unmount system call
  */
-int
+static int
 ffs_unmount(mp, mntflags, td)
 	struct mount *mp;
 	int mntflags;
@@ -1037,7 +1048,7 @@ ffs_flushfiles(mp, flags, td)
 /*
  * Get filesystem statistics.
  */
-int
+static int
 ffs_statfs(mp, sbp, td)
 	struct mount *mp;
 	struct statfs *sbp;
@@ -1087,7 +1098,7 @@ ffs_statfs(mp, sbp, td)
  *
  * Note: we are always called with the filesystem marked `MPBUSY'.
  */
-int
+static int
 ffs_sync(mp, waitfor, cred, td)
 	struct mount *mp;
 	int waitfor;
@@ -1369,7 +1380,7 @@ ffs_vget(mp, ino, flags, vpp)
  * - check that the given client host has export rights and return
  *   those rights via. exflagsp and credanonp
  */
-int
+static int
 ffs_fhtovp(mp, fhp, vpp)
 	struct mount *mp;
 	struct fid *fhp;
@@ -1390,7 +1401,7 @@ ffs_fhtovp(mp, fhp, vpp)
  * Vnode pointer to File handle
  */
 /* ARGSUSED */
-int
+static int
 ffs_vptofh(vp, fhp)
 	struct vnode *vp;
 	struct fid *fhp;

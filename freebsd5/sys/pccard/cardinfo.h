@@ -2,7 +2,8 @@
  *	Include file for PCMCIA user process interface
  *
  *-------------------------------------------------------------------------
- *
+ */
+/*-
  * Copyright (c) 1995 Andrew McRae.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +29,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/pccard/cardinfo.h,v 1.29 2003/04/23 23:39:21 imp Exp $ */
+/* $FreeBSD: src/sys/pccard/cardinfo.h,v 1.29.6.1 2005/01/31 23:26:49 imp Exp $ */
 
 #ifndef	_PCCARD_CARDINFO_H_
 #define	_PCCARD_CARDINFO_H_

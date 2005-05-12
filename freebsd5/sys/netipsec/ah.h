@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/ah.h,v 1.1 2002/10/16 02:10:07 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ah.h,v 1.1.10.1 2005/01/31 23:26:41 imp Exp $	*/
 /*	$KAME: ah.h,v 1.13 2000/10/18 21:28:00 itojun Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *

@@ -1,6 +1,8 @@
 /*
  * ng_hci.h
- *
+ */
+
+/*-
  * Copyright (c) 2001 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_hci.h,v 1.2 2003/03/18 00:09:37 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_hci.h,v 1.4 2004/08/10 00:38:50 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_hci.h,v 1.4.2.2 2005/01/31 23:26:33 imp Exp $
  */
 
 /*
@@ -1444,7 +1446,7 @@ typedef struct {
 	u_int8_t	page_scan_rep_mode;       /* page scan rep. mode */
 	u_int8_t	page_scan_period_mode;    /* page scan period mode */
 	u_int8_t	page_scan_mode;           /* page scan mode */
-	u_int8_t	class[NG_HCI_CLASS_SIZE]; /* unit class */
+	u_int8_t	uclass[NG_HCI_CLASS_SIZE];/* unit class */
 	u_int16_t	clock_offset;             /* clock offset */
 } __attribute__ ((packed)) ng_hci_inquiry_response;
 

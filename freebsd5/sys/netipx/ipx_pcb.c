@@ -1,4 +1,5 @@
-/*
+/*-
+ * Copyright (c) 2004-2005 Robert N. M. Watson
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.28.4.1 2004/10/21 09:30:47 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.28.2.14 2005/03/10 14:30:31 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,26 +53,30 @@ __FBSDID("$FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.28.4.1 2004/10/21 09:30:47 rwat
 #include <netipx/ipx_var.h>
 
 static struct	ipx_addr zeroipx_addr;
+static u_short	ipxpcb_lport_cache;
 
 int
 ipx_pcballoc(so, head, td)
 	struct socket *so;
-	struct ipxpcb *head;
+	struct ipxpcbhead *head;
 	struct thread *td;
 {
 	register struct ipxpcb *ipxp;
 
+	IPX_LIST_LOCK_ASSERT();
+
 	MALLOC(ipxp, struct ipxpcb *, sizeof *ipxp, M_PCB, M_NOWAIT | M_ZERO);
 	if (ipxp == NULL)
 		return (ENOBUFS);
+	IPX_LOCK_INIT(ipxp);
 	ipxp->ipxp_socket = so;
 	if (ipxcksum)
 		ipxp->ipxp_flags |= IPXP_CHECKSUM;
-	insque(ipxp, head);
+	LIST_INSERT_HEAD(head, ipxp, ipxp_list);
 	so->so_pcb = (caddr_t)ipxp;
 	return (0);
 }
-	
+
 int
 ipx_pcbbind(ipxp, nam, td)
 	register struct ipxpcb *ipxp;
@@ -80,6 +85,9 @@ ipx_pcbbind(ipxp, nam, td)
 {
 	register struct sockaddr_ipx *sipx;
 	u_short lport = 0;
+
+	IPX_LIST_LOCK_ASSERT();
+	IPX_LOCK_ASSERT(ipxp);
 
 	if (ipxp->ipxp_lport || !ipx_nullhost(ipxp->ipxp_laddr))
 		return (EINVAL);
@@ -90,7 +98,7 @@ ipx_pcbbind(ipxp, nam, td)
 		int tport = sipx->sipx_port;
 
 		sipx->sipx_port = 0;		/* yech... */
-		if (ifa_ifwithaddr((struct sockaddr *)sipx) == 0)
+		if (ifa_ifwithaddr((struct sockaddr *)sipx) == NULL)
 			return (EADDRNOTAVAIL);
 		sipx->sipx_port = tport;
 	}
@@ -109,11 +117,11 @@ ipx_pcbbind(ipxp, nam, td)
 noname:
 	if (lport == 0)
 		do {
-			ipxpcb.ipxp_lport++;
-			if ((ipxpcb.ipxp_lport < IPXPORT_RESERVED) ||
-			    (ipxpcb.ipxp_lport >= IPXPORT_WELLKNOWN))
-				ipxpcb.ipxp_lport = IPXPORT_RESERVED;
-			lport = htons(ipxpcb.ipxp_lport);
+			ipxpcb_lport_cache++;
+			if ((ipxpcb_lport_cache < IPXPORT_RESERVED) ||
+			    (ipxpcb_lport_cache >= IPXPORT_WELLKNOWN))
+				ipxpcb_lport_cache = IPXPORT_RESERVED;
+			lport = htons(ipxpcb_lport_cache);
 		} while (ipx_pcblookup(&zeroipx_addr, lport, 0));
 	ipxp->ipxp_lport = lport;
 	return (0);
@@ -136,6 +144,9 @@ ipx_pcbconnect(ipxp, nam, td)
 	register struct ipx_addr *dst;
 	register struct route *ro;
 	struct ifnet *ifp;
+
+	IPX_LIST_LOCK_ASSERT();
+	IPX_LOCK_ASSERT(ipxp);
 
 	ia = NULL;
 
@@ -180,10 +191,10 @@ ipx_pcbconnect(ipxp, nam, td)
 		    ro->ro_dst.sa_len = sizeof(ro->ro_dst);
 		    *dst = sipx->sipx_addr;
 		    dst->x_port = 0;
-		    rtalloc(ro);
+		    rtalloc_ign(ro, 0);
 	}
 	if (ipx_neteqnn(ipxp->ipxp_laddr.x_net, ipx_zeronet)) {
-		/* 
+		/*
 		 * If route is known or can be allocated now,
 		 * our src addr is taken from the i/f, else punt.
 		 */
@@ -212,7 +223,7 @@ ipx_pcbconnect(ipxp, nam, td)
 		ipxp->ipxp_laddr.x_net = satoipx_addr(ia->ia_addr).x_net;
 	}
 	if (ipx_nullhost(ipxp->ipxp_laddr)) {
-		/* 
+		/*
 		 * If route is known or can be allocated now,
 		 * our src addr is taken from the i/f, else punt.
 		 */
@@ -257,6 +268,9 @@ ipx_pcbdisconnect(ipxp)
 	struct ipxpcb *ipxp;
 {
 
+	IPX_LIST_LOCK_ASSERT();
+	IPX_LOCK_ASSERT(ipxp);
+
 	ipxp->ipxp_faddr = zeroipx_addr;
 	if (ipxp->ipxp_socket->so_state & SS_NOFDREF)
 		ipx_pcbdetach(ipxp);
@@ -268,13 +282,17 @@ ipx_pcbdetach(ipxp)
 {
 	struct socket *so = ipxp->ipxp_socket;
 
+	IPX_LIST_LOCK_ASSERT();
+	IPX_LOCK_ASSERT(ipxp);
+
 	ACCEPT_LOCK();
 	SOCK_LOCK(so);
-	so->so_pcb = 0;
+	so->so_pcb = NULL;
 	sotryfree(so);
 	if (ipxp->ipxp_route.ro_rt != NULL)
-		rtfree(ipxp->ipxp_route.ro_rt);
-	remque(ipxp);
+		RTFREE(ipxp->ipxp_route.ro_rt);
+	LIST_REMOVE(ipxp, ipxp_list);
+	IPX_LOCK_DESTROY(ipxp);
 	FREE(ipxp, M_PCB);
 }
 
@@ -284,13 +302,15 @@ ipx_setsockaddr(ipxp, nam)
 	struct sockaddr **nam;
 {
 	struct sockaddr_ipx *sipx, ssipx;
-	
+
 	sipx = &ssipx;
 	bzero((caddr_t)sipx, sizeof(*sipx));
 	sipx->sipx_len = sizeof(*sipx);
 	sipx->sipx_family = AF_IPX;
+	IPX_LOCK(ipxp);
 	sipx->sipx_addr = ipxp->ipxp_laddr;
-	*nam = sodupsockaddr((struct sockaddr *)sipx, M_NOWAIT);
+	IPX_UNLOCK(ipxp);
+	*nam = sodupsockaddr((struct sockaddr *)sipx, M_WAITOK);
 }
 
 void
@@ -299,69 +319,16 @@ ipx_setpeeraddr(ipxp, nam)
 	struct sockaddr **nam;
 {
 	struct sockaddr_ipx *sipx, ssipx;
-	
+
 	sipx = &ssipx;
-	bzero((caddr_t)sipx, sizeof(*sipx));
+	bzero(sipx, sizeof(*sipx));
 	sipx->sipx_len = sizeof(*sipx);
 	sipx->sipx_family = AF_IPX;
+	IPX_LOCK(ipxp);
 	sipx->sipx_addr = ipxp->ipxp_faddr;
-	*nam = sodupsockaddr((struct sockaddr *)sipx, M_NOWAIT);
+	IPX_UNLOCK(ipxp);
+	*nam = sodupsockaddr((struct sockaddr *)sipx, M_WAITOK);
 }
-
-/*
- * Pass some notification to all connections of a protocol
- * associated with address dst.  Call the
- * protocol specific routine to handle each connection.
- * Also pass an extra paramter via the ipxpcb. (which may in fact
- * be a parameter list!)
- */
-void
-ipx_pcbnotify(dst, errno, notify, param)
-	register struct ipx_addr *dst;
-	int errno;
-	void (*notify)(struct ipxpcb *);
-	long param;
-{
-	register struct ipxpcb *ipxp, *oinp;
-	int s = splimp();
-
-	for (ipxp = (&ipxpcb)->ipxp_next; ipxp != (&ipxpcb);) {
-		if (!ipx_hosteq(*dst,ipxp->ipxp_faddr)) {
-	next:
-			ipxp = ipxp->ipxp_next;
-			continue;
-		}
-		if (ipxp->ipxp_socket == 0)
-			goto next;
-		if (errno) 
-			ipxp->ipxp_socket->so_error = errno;
-		oinp = ipxp;
-		ipxp = ipxp->ipxp_next;
-		oinp->ipxp_notify_param = param;
-		(*notify)(oinp);
-	}
-	splx(s);
-}
-
-#ifdef notdef
-/*
- * After a routing change, flush old routing
- * and allocate a (hopefully) better one.
- */
-ipx_rtchange(ipxp)
-	struct ipxpcb *ipxp;
-{
-	if (ipxp->ipxp_route.ro_rt != NULL) {
-		rtfree(ipxp->ipxp_route.ro_rt);
-		ipxp->ipxp_route.ro_rt = NULL;
-		/*
-		 * A new route can be allocated the next time
-		 * output is attempted.
-		 */
-	}
-	/* SHOULD NOTIFY HIGHER-LEVEL PROTOCOLS */
-}
-#endif
 
 struct ipxpcb *
 ipx_pcblookup(faddr, lport, wildp)
@@ -369,12 +336,14 @@ ipx_pcblookup(faddr, lport, wildp)
 	u_short lport;
 	int wildp;
 {
-	register struct ipxpcb *ipxp, *match = 0;
+	register struct ipxpcb *ipxp, *match = NULL;
 	int matchwild = 3, wildcard;
 	u_short fport;
 
+	IPX_LIST_LOCK_ASSERT();
+
 	fport = faddr->x_port;
-	for (ipxp = (&ipxpcb)->ipxp_next; ipxp != (&ipxpcb); ipxp = ipxp->ipxp_next) {
+	LIST_FOREACH(ipxp, &ipxpcb_list, ipxp_list) {
 		if (ipxp->ipxp_lport != lport)
 			continue;
 		wildcard = 0;

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_param.h,v 1.19 2004/06/17 17:16:53 phk Exp $
+ * $FreeBSD: src/sys/vm/vm_param.h,v 1.19.2.1 2005/01/31 23:27:04 imp Exp $
  */
 
 /*

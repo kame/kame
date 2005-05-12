@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfsclient/nfsstats.h,v 1.64 2004/04/07 04:59:57 imp Exp $
+ * $FreeBSD: src/sys/nfsclient/nfsstats.h,v 1.64.2.1 2005/01/31 23:26:46 imp Exp $
  */
 
 #ifndef _NFSCLIENT_NFSSTATS_H_

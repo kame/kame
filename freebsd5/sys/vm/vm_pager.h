@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990 University of Utah.
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_pager.h	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_pager.h,v 1.47 2004/04/08 19:08:49 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.h,v 1.47.2.2 2005/02/25 17:26:33 alc Exp $
  */
 
 /*
@@ -48,14 +48,22 @@ TAILQ_HEAD(pagerlst, vm_object);
 
 struct bio;
 
+typedef void pgo_init_t(void);
+typedef vm_object_t pgo_alloc_t(void *, vm_ooffset_t, vm_prot_t, vm_ooffset_t);
+typedef void pgo_dealloc_t(vm_object_t);
+typedef int pgo_getpages_t(vm_object_t, vm_page_t *, int, int);
+typedef void pgo_putpages_t(vm_object_t, vm_page_t *, int, int, int *);
+typedef boolean_t pgo_haspage_t(vm_object_t, vm_pindex_t, int *, int *);
+typedef void pgo_pageunswapped_t(vm_page_t);
+
 struct pagerops {
-	void (*pgo_init)(void);		/* Initialize pager. */
-	vm_object_t (*pgo_alloc)(void *, vm_ooffset_t, vm_prot_t, vm_ooffset_t);	/* Allocate pager. */
-	void (*pgo_dealloc)(vm_object_t);	/* Disassociate. */
-	int (*pgo_getpages)(vm_object_t, vm_page_t *, int, int);	/* Get (read) page. */
-	void (*pgo_putpages)(vm_object_t, vm_page_t *, int, int, int *); /* Put (write) page. */
-	boolean_t (*pgo_haspage)(vm_object_t, vm_pindex_t, int *, int *); /* Does pager have page? */
-	void (*pgo_pageunswapped)(vm_page_t);
+	pgo_init_t	*pgo_init;		/* Initialize pager. */
+	pgo_alloc_t	*pgo_alloc;		/* Allocate pager. */
+	pgo_dealloc_t	*pgo_dealloc;		/* Disassociate. */
+	pgo_getpages_t	*pgo_getpages;		/* Get (read) page. */
+	pgo_putpages_t	*pgo_putpages;		/* Put (write) page. */
+	pgo_haspage_t	*pgo_haspage;		/* Does pager have page? */
+	pgo_pageunswapped_t *pgo_pageunswapped;
 };
 
 extern struct pagerops defaultpagerops;

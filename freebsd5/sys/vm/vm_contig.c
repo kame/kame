@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  *
@@ -32,7 +32,7 @@
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
  */
 
-/*
+/*-
  * Copyright (c) 1987, 1990 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -60,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_contig.c,v 1.38 2004/08/05 21:54:11 green Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_contig.c,v 1.38.2.4 2005/01/31 23:27:02 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -92,17 +92,18 @@ vm_contig_launder_page(vm_page_t m)
 	vm_page_t m_tmp;
 	struct vnode *vp;
 
+	object = m->object;
+	if (!VM_OBJECT_TRYLOCK(object))
+		return (EAGAIN);
 	if (vm_page_sleep_if_busy(m, TRUE, "vpctw0")) {
+		VM_OBJECT_UNLOCK(object);
 		vm_page_lock_queues();
 		return (EBUSY);
 	}
-	if (!VM_OBJECT_TRYLOCK(m->object))
-		return (EAGAIN);
 	vm_page_test_dirty(m);
 	if (m->dirty == 0 && m->hold_count == 0)
 		pmap_remove_all(m);
 	if (m->dirty) {
-		object = m->object;
 		if (object->type == OBJT_VNODE) {
 			vm_page_unlock_queues();
 			vp = object->handle;
@@ -123,7 +124,7 @@ vm_contig_launder_page(vm_page_t m)
 		}
 	} else if (m->hold_count == 0)
 		vm_page_cache(m);
-	VM_OBJECT_UNLOCK(m->object);
+	VM_OBJECT_UNLOCK(object);
 	return (0);
 }
 
@@ -250,12 +251,20 @@ again1:
 			vm_page_t m = &pga[i];
 
 			if ((m->queue - m->pc) == PQ_CACHE) {
+				if (m->hold_count != 0) {
+					start++;
+					goto again0;
+				}
 				object = m->object;
 				if (!VM_OBJECT_TRYLOCK(object)) {
 					start++;
 					goto again0;
 				}
-				vm_page_busy(m);
+				if ((m->flags & PG_BUSY) || m->busy != 0) {
+					VM_OBJECT_UNLOCK(object);
+					start++;
+					goto again0;
+				}
 				vm_page_free(m);
 				VM_OBJECT_UNLOCK(object);
 			}
@@ -280,7 +289,6 @@ again1:
 			    ("contigmalloc1: page %p was dirty", m));
 			m->wire_count = 0;
 			m->busy = 0;
-			m->object = NULL;
 		}
 		mtx_unlock_spin(&vm_page_queue_free_mtx);
 		vm_page_unlock_queues();
@@ -363,7 +371,6 @@ vm_contig_unqueue_free(vm_page_t m)
 	    ("contigmalloc2: page %p was dirty", m));
 	m->wire_count = 0;
 	m->busy = 0;
-	m->object = NULL;
 	return (error);
 }
 
@@ -455,10 +462,15 @@ cleanup_freed:
 				}
 			}
 			if (pqtype == PQ_CACHE) {
+				if (m->hold_count != 0)
+					goto retry;
 				object = m->object;
 				if (!VM_OBJECT_TRYLOCK(object))
 					goto retry;
-				vm_page_busy(m);
+				if ((m->flags & PG_BUSY) || m->busy != 0) {
+					VM_OBJECT_UNLOCK(object);
+					goto retry;
+				}
 				vm_page_free(m);
 				VM_OBJECT_UNLOCK(object);
 			}

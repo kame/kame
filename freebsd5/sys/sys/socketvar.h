@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.133.2.1.2.1 2004/10/21 09:30:48 rwatson Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.133.2.4 2005/03/07 13:08:05 rwatson Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -447,6 +447,7 @@ struct uio;
 /*
  * From uipc_socket and friends
  */
+int	do_setopt_accept_filter(struct socket *so, struct sockopt *sopt);
 int	so_setsockopt(struct socket *so, int level, int optname,
 	    void *optval, size_t optlen);
 int	sockargs(struct mbuf **mp, caddr_t buf, int buflen, int type);
@@ -512,6 +513,8 @@ void	soisconnecting(struct socket *so);
 void	soisdisconnected(struct socket *so);
 void	soisdisconnecting(struct socket *so);
 int	solisten(struct socket *so, int backlog, struct thread *td);
+void	solisten_proto(struct socket *so);
+int	solisten_proto_check(struct socket *so);
 struct socket *
 	sonewconn(struct socket *head, int connstatus);
 int	sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen);

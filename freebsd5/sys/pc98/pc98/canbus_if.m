@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 2002 KIYOHARA Takashi <kiyohara@kk.iij4u.or.jp>
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/pc98/pc98/canbus_if.m,v 1.2 2003/02/04 16:17:13 nyan Exp $
+# $FreeBSD: src/sys/pc98/pc98/canbus_if.m,v 1.2.8.1 2005/01/31 23:26:48 imp Exp $
 #
 
 #include <sys/bus.h>

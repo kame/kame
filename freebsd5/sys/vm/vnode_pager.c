@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990 University of Utah.
  * Copyright (c) 1991 The Regents of the University of California.
  * All rights reserved.
@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vnode_pager.c,v 1.196 2004/05/06 05:03:23 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vnode_pager.c,v 1.196.2.5 2005/02/24 07:39:42 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -143,6 +143,7 @@ vnode_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 		VM_OBJECT_LOCK(object);
 		if ((object->flags & OBJ_DEAD) == 0)
 			break;
+		vm_object_set_flag(object, OBJ_DISCONNECTWNT);
 		msleep(object, VM_OBJECT_MTX(object), PDROP | PVM, "vadead", 0);
 	}
 
@@ -191,6 +192,10 @@ vnode_pager_dealloc(object)
 
 	object->handle = NULL;
 	object->type = OBJT_DEAD;
+	if (object->flags & OBJ_DISCONNECTWNT) {
+		vm_object_clear_flag(object, OBJ_DISCONNECTWNT);
+		wakeup(object);
+	}
 	ASSERT_VOP_LOCKED(vp, "vnode_pager_dealloc");
 	vp->v_object = NULL;
 	vp->v_vflag &= ~(VV_TEXT | VV_OBJBUF);
@@ -243,7 +248,9 @@ vnode_pager_haspage(object, pindex, before, after)
 		reqblock = pindex * blocksperpage;
 	}
 	VM_OBJECT_UNLOCK(object);
+	mtx_lock(&Giant);
 	err = VOP_BMAP(vp, reqblock, NULL, &bn, after, before);
+	mtx_unlock(&Giant);
 	VM_OBJECT_LOCK(object);
 	if (err)
 		return TRUE;
@@ -391,7 +398,7 @@ vnode_pager_addr(vp, address, run)
 	int voffset;
 
 	GIANT_REQUIRED;
-	if ((int) address < 0)
+	if (address < 0)
 		return -1;
 
 	if (vp->v_mount == NULL)
@@ -523,7 +530,7 @@ vnode_pager_input_smlfs(object, m)
 
 
 /*
- * old style vnode pager output routine
+ * old style vnode pager input routine
  */
 static int
 vnode_pager_input_old(object, m)
@@ -1003,7 +1010,7 @@ vnode_pager_generic_putpages(vp, m, bytecount, flags, rtvals)
 	for (i = 0; i < count; i++)
 		rtvals[i] = VM_PAGER_AGAIN;
 
-	if ((int) m[0]->pindex < 0) {
+	if ((int64_t)m[0]->pindex < 0) {
 		printf("vnode_pager_putpages: attempt to write meta-data!!! -- 0x%lx(%lx)\n",
 			(long)m[0]->pindex, (u_long)m[0]->dirty);
 		rtvals[0] = VM_PAGER_BAD;

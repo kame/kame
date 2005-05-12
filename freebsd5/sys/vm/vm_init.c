@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -63,13 +63,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_init.c,v 1.44 2004/08/07 05:58:31 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_init.c,v 1.44.2.1.2.1 2005/04/28 23:41:38 kris Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/selinfo.h>
 #include <sys/pipe.h>
@@ -86,6 +87,11 @@ __FBSDID("$FreeBSD: src/sys/vm/vm_init.c,v 1.44 2004/08/07 05:58:31 alc Exp $");
 #include <vm/vm_extern.h>
 
 long physmem;
+
+static int exec_map_entries = 16;
+TUNABLE_INT("vm.exec_map_entries", &exec_map_entries);
+SYSCTL_INT(_vm, OID_AUTO, exec_map_entries, CTLFLAG_RD, &exec_map_entries, 0,
+    "Maximum number of simultaneous execs");
 
 /*
  * System initialization
@@ -188,7 +194,7 @@ again:
 				(nswbuf*MAXPHYS));
 	pager_map->system_map = 1;
 	exec_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr,
-				(16*(ARG_MAX+(PAGE_SIZE*3))));
+				(exec_map_entries*(ARG_MAX+(PAGE_SIZE*3))));
 	pipe_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr, maxpipekva);
 
 	/*

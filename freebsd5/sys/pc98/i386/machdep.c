@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.342.2.1 2004/09/09 10:03:20 julian Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.342.2.7 2005/03/07 13:53:39 nyan Exp $
  */
 
 #include "opt_atalk.h"
@@ -52,9 +52,16 @@
 #include "opt_perfmon.h"
 
 #include <sys/param.h>
+#include <sys/proc.h>
 #include <sys/systm.h>
-#include <sys/sysproto.h>
-#include <sys/signalvar.h>
+#include <sys/bio.h>
+#include <sys/buf.h>
+#include <sys/bus.h>
+#include <sys/callout.h>
+#include <sys/cons.h>
+#include <sys/cpu.h>
+#include <sys/eventhandler.h>
+#include <sys/exec.h>
 #include <sys/imgact.h>
 #include <sys/kdb.h>
 #include <sys/kernel.h>
@@ -63,34 +70,27 @@
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/memrange.h>
+#include <sys/msgbuf.h>
 #include <sys/mutex.h>
 #include <sys/pcpu.h>
-#include <sys/proc.h>
-#include <sys/bio.h>
-#include <sys/buf.h>
+#include <sys/ptrace.h>
 #include <sys/reboot.h>
-#include <sys/callout.h>
-#include <sys/msgbuf.h>
 #include <sys/sched.h>
-#include <sys/sysent.h>
+#include <sys/signalvar.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
+#include <sys/sysproto.h>
 #include <sys/ucontext.h>
 #include <sys/vmmeter.h>
-#include <sys/bus.h>
-#include <sys/eventhandler.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
-#include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
+#include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <vm/vm_extern.h>
-
-#include <sys/user.h>
-#include <sys/exec.h>
-#include <sys/cons.h>
+#include <vm/vm_param.h>
 
 #ifdef DDB
 #ifndef KDB
@@ -100,19 +100,29 @@
 #include <ddb/db_sym.h>
 #endif
 
+#ifdef PC98
+#include <pc98/pc98/pc98_machdep.h>
+#include <pc98/pc98/pc98.h>
+#else
+#include <isa/rtc.h>
+#endif
+
 #include <net/netisr.h>
 
+#include <machine/bootinfo.h>
+#include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/cputypes.h>
-#include <machine/reg.h>
-#include <machine/clock.h>
-#include <machine/specialreg.h>
-#include <machine/bootinfo.h>
 #include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/pc/bios.h>
-#include <machine/pcb_ext.h>		/* pcb.h included via sys/user.h */
+#include <machine/pcb.h>
+#include <machine/pcb_ext.h>
 #include <machine/proc.h>
+#include <machine/reg.h>
+#include <machine/sigframe.h>
+#include <machine/specialreg.h>
+#include <machine/vm86.h>
 #ifdef PERFMON
 #include <machine/perfmon.h>
 #endif
@@ -124,16 +134,6 @@
 #ifdef DEV_ISA
 #include <i386/isa/icu.h>
 #endif
-
-#ifdef PC98
-#include <pc98/pc98/pc98_machdep.h>
-#include <pc98/pc98/pc98.h>
-#else
-#include <isa/rtc.h>
-#endif
-#include <machine/vm86.h>
-#include <sys/ptrace.h>
-#include <machine/sigframe.h>
 
 /* Sanity check for __curthread() */
 CTASSERT(offsetof(struct pcpu, pc_curthread) == 0);
@@ -196,9 +196,7 @@ static void freebsd4_sendsig(sig_t catcher, int sig, sigset_t *mask,
 #endif
 
 long Maxmem = 0;
-#ifdef PC98
-int Maxmem_under16M = 0;
-#endif
+long realmem = 0;
 
 vm_paddr_t phys_avail[10];
 
@@ -231,6 +229,7 @@ cpu_startup(dummy)
 #endif
 	printf("real memory  = %ju (%ju MB)\n", ptoa((uintmax_t)Maxmem),
 	    ptoa((uintmax_t)Maxmem) / 1048576);
+	realmem = Maxmem;
 	/*
 	 * Display any holes after the first chunk of extended memory.
 	 */
@@ -1039,6 +1038,54 @@ cpu_boot(int howto)
 {
 }
 
+/* Get current clock frequency for the given cpu id. */
+int
+cpu_est_clockrate(int cpu_id, uint64_t *rate)
+{
+	register_t reg;
+	uint64_t tsc1, tsc2;
+
+	if (pcpu_find(cpu_id) == NULL || rate == NULL)
+		return (EINVAL);
+	if (!tsc_present)
+		return (EOPNOTSUPP);
+
+	/* If we're booting, trust the rate calibrated moments ago. */
+	if (cold) {
+		*rate = tsc_freq;
+		return (0);
+	}
+
+#ifdef SMP
+	/* Schedule ourselves on the indicated cpu. */
+	mtx_lock_spin(&sched_lock);
+	sched_bind(curthread, cpu_id);
+	mtx_unlock_spin(&sched_lock);
+#endif
+
+	/* Calibrate by measuring a short delay. */
+	reg = intr_disable();
+	tsc1 = rdtsc();
+	DELAY(1000);
+	tsc2 = rdtsc();
+	intr_restore(reg);
+
+#ifdef SMP
+	mtx_lock_spin(&sched_lock);
+	sched_unbind(curthread);
+	mtx_unlock_spin(&sched_lock);
+#endif
+
+	/*
+	 * Calculate the difference in readings, convert to Mhz, and
+	 * subtract 0.5% of the total.  Empirical testing has shown that
+	 * overhead in DELAY() works out to approximately this value.
+	 */
+	tsc2 -= tsc1;
+	*rate = tsc2 * 1000 - tsc2 * 5;
+	return (0);
+}
+
 /*
  * Shutdown the CPU as much as possible
  */
@@ -1253,7 +1300,6 @@ extern int has_f00f_bug;
 static struct i386tss dblfault_tss;
 static char dblfault_stack[PAGE_SIZE];
 
-extern  struct user	*proc0uarea;
 extern  vm_offset_t	proc0kstack;
 
 
@@ -1496,7 +1542,7 @@ DB_SHOW_COMMAND(idt, db_show_idt)
 	uintptr_t func;
 
 	ip = idt;
-	db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+	db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
 	for (idx = 0, quit = 0; idx < NIDT; idx++) {
 		func = (ip->gd_hioffset << 16 | ip->gd_looffset);
 		if (func != (uintptr_t)&IDTVEC(rsvd)) {
@@ -1782,15 +1828,7 @@ next_run: ;
 	physmap[physmap_idx] = 0x100000;
 	physmap[physmap_idx + 1] = physmap[physmap_idx] + extmem * 1024;
 
-#ifdef PC98
-        if ((under16 != 16 * 1024) && (extmem > 15 * 1024)) {
-		/* 15M - 16M region is cut off, so need to divide chunk */
-                physmap[physmap_idx + 1] = under16 * 1024;
-                physmap_idx += 2;
-                physmap[physmap_idx] = 0x1000000;
-                physmap[physmap_idx + 1] = physmap[2] + extmem * 1024;
-        }
-#else
+#ifndef PC98
 physmap_done:
 #endif
 	/*
@@ -1858,6 +1896,22 @@ physmap_done:
 	 */ 
 	if (atop(physmap[physmap_idx + 1]) < Maxmem)
 		physmap[physmap_idx + 1] = ptoa((vm_paddr_t)Maxmem);
+
+#ifdef PC98
+	/*
+	 * We need to divide chunk if Maxmem is larger than 16MB and
+	 * under 16MB area is not full of memory.
+	 * (1) system area (15-16MB region) is cut off
+	 * (2) extended memory is only over 16MB area (ex. Melco "HYPERMEMORY")
+	 */
+	if ((under16 != 16 * 1024) && (extmem > 15 * 1024)) {
+		/* 15M - 16M region is cut off, so need to divide chunk */
+		physmap[physmap_idx + 1] = under16 * 1024;
+		physmap_idx += 2;
+		physmap[physmap_idx] = 0x1000000;
+		physmap[physmap_idx + 1] = physmap[2] + extmem * 1024;
+	}
+#endif
 
 	/* call pmap initialization to make new kernel address space */
 	pmap_bootstrap(first, 0);
@@ -2002,7 +2056,6 @@ init386(first)
 	int gsel_tss, metadata_missing, off, x;
 	struct pcpu *pc;
 
-	proc0.p_uarea = proc0uarea;
 	thread0.td_kstack = proc0kstack;
 	thread0.td_pcb = (struct pcb *)
 	   (thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;

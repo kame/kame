@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988, 1989, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)termios.h	8.3 (Berkeley) 3/28/94
- * $FreeBSD: src/sys/sys/termios.h,v 1.19 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/termios.h,v 1.19.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_TERMIOS_H_

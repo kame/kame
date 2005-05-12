@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_portacl/mac_portacl.c,v 1.5 2004/05/15 20:55:19 cperciva Exp $
+ * $FreeBSD: src/sys/security/mac_portacl/mac_portacl.c,v 1.5.2.2 2004/12/22 09:39:08 rwatson Exp $
  */
 
 /*
@@ -61,24 +61,25 @@
 #include <sys/domain.h>
 #include <sys/kernel.h>
 #include <sys/libkern.h>
+#include <sys/lock.h>
 #include <sys/mac.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/protosw.h>
 #include <sys/queue.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/sysent.h>
-#include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/sbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/sx.h>
 #include <sys/sysctl.h>
 
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 
 #include <vm/vm.h>
 
@@ -99,6 +100,13 @@ SYSCTL_INT(_security_mac_portacl, OID_AUTO, suser_exempt, CTLFLAG_RW,
     &mac_portacl_suser_exempt, 0, "Privilege permits binding of any port");
 TUNABLE_INT("security.mac.portacl.suser_exempt",
     &mac_portacl_suser_exempt);
+
+static int	mac_portacl_autoport_exempt = 1;
+SYSCTL_INT(_security_mac_portacl, OID_AUTO, autoport_exempt, CTLFLAG_RW,
+    &mac_portacl_autoport_exempt, 0, "Allow automatic allocation through "
+    "binding port 0 if not IP_PORTRANGELOW");
+TUNABLE_INT("security.mac.portacl.autoport_exempt",
+    &mac_portacl_autoport_exempt);
 
 static int	mac_portacl_port_high = 1023;
 SYSCTL_INT(_security_mac_portacl, OID_AUTO, port_high, CTLFLAG_RW,
@@ -134,7 +142,7 @@ struct rule {
  * for the specified binding.
  */
 
-static struct sx			rule_sx;
+static struct mtx			rule_mtx;
 static TAILQ_HEAD(rulehead, rule)	rule_head;
 static char				rule_string[MAC_RULE_STRING_LEN];
 
@@ -157,7 +165,7 @@ static void
 destroy(struct mac_policy_conf *mpc)
 {
 
-	sx_destroy(&rule_sx);
+	mtx_destroy(&rule_mtx);
 	toast_rules(&rule_head);
 }
 
@@ -165,7 +173,7 @@ static void
 init(struct mac_policy_conf *mpc)
 {
 
-	sx_init(&rule_sx, "rule_sx");
+	mtx_init(&rule_mtx, "rule_mtx", NULL, MTX_DEF);
 	TAILQ_INIT(&rule_head);
 }
 
@@ -260,6 +268,12 @@ out:
 	return (error);
 }
 
+/*
+ * rule_printf() and rules_to_string() are unused currently because they rely
+ * on sbufs with auto-extension, which may sleep while holding a mutex.
+ * Instead, the non-canonical user-generated rule string is returned to the
+ * user when the rules are queried, which is faster anyway.
+ */
 #if 0
 static void
 rule_printf(struct sbuf *sb, struct rule *rule)
@@ -302,7 +316,7 @@ rules_to_string(void)
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
 	needcomma = 0;
-	sx_slock(&rule_sx);
+	mtx_lock(&rule_mtx);
 	for (rule = TAILQ_FIRST(&rule_head); rule != NULL;
 	    rule = TAILQ_NEXT(rule, r_entries)) {
 		if (!needcomma)
@@ -311,7 +325,7 @@ rules_to_string(void)
 			sbuf_printf(sb, ",");
 		rule_printf(sb, rule);
 	}
-	sx_sunlock(&rule_sx);
+	mtx_unlock(&rule_mtx);
 	sbuf_finish(sb);
 	temp = strdup(sbuf_data(sb), M_PORTACL);
 	sbuf_delete(sb);
@@ -328,7 +342,6 @@ sysctl_rules(SYSCTL_HANDLER_ARGS)
 {
 	char *string, *copy_string, *new_string;
 	struct rulehead head, save_head;
-	struct rule *rule;
 	int error;
 
 	new_string = NULL;
@@ -353,23 +366,11 @@ sysctl_rules(SYSCTL_HANDLER_ARGS)
 			goto out;
 
 		TAILQ_INIT(&save_head);
-		sx_xlock(&rule_sx);
-		/*
-		 * XXX: Unfortunately, TAILQ doesn't yet have a supported
-		 * assignment operator to copy one queue to another, due
-	 	 * to a self-referential pointer in the tailq header.
-		 * For now, do it the old-fashioned way.
-		 */
-		while ((rule = TAILQ_FIRST(&rule_head)) != NULL) {
-			TAILQ_REMOVE(&rule_head, rule, r_entries);
-			TAILQ_INSERT_HEAD(&save_head, rule, r_entries);
-		}
-		while ((rule = TAILQ_FIRST(&head)) != NULL) {
-			TAILQ_REMOVE(&head, rule, r_entries);
-			TAILQ_INSERT_HEAD(&rule_head, rule, r_entries);
-		}
+		mtx_lock(&rule_mtx);
+		TAILQ_CONCAT(&save_head, &rule_head, r_entries);
+		TAILQ_CONCAT(&rule_head, &head, r_entries);
 		strcpy(rule_string, string);
-		sx_xunlock(&rule_sx);
+		mtx_unlock(&rule_mtx);
 		toast_rules(&save_head);
 	}
 out:
@@ -396,7 +397,7 @@ rules_check(struct ucred *cred, int family, int type, u_int16_t port)
 		return (0);
 
 	error = EPERM;
-	sx_slock(&rule_sx);
+	mtx_lock(&rule_mtx);
 	for (rule = TAILQ_FIRST(&rule_head);
 	    rule != NULL;
 	    rule = TAILQ_NEXT(rule, r_entries)) {
@@ -423,7 +424,7 @@ rules_check(struct ucred *cred, int family, int type, u_int16_t port)
 			panic("rules_check: unknown rule type %d",
 			    rule->r_idtype);
 	}
-	sx_sunlock(&rule_sx);
+	mtx_unlock(&rule_mtx);
 
 	if (error != 0 && mac_portacl_suser_exempt != 0)
 		error = suser_cred(cred, 0);
@@ -441,6 +442,7 @@ check_socket_bind(struct ucred *cred, struct socket *so,
     struct label *socketlabel, struct sockaddr *sockaddr)
 {
 	struct sockaddr_in *sin;
+	struct inpcb *inp;
 	int family, type;
 	u_int16_t port;
 
@@ -467,6 +469,20 @@ check_socket_bind(struct ucred *cred, struct socket *so,
 	type = so->so_type;
 	sin = (struct sockaddr_in *) sockaddr;
 	port = ntohs(sin->sin_port);
+
+	/*
+	 * Sockets are frequently bound with a specific IP address but a port
+	 * number of '0' to request automatic port allocation.  This is often
+	 * desirable as long as IP_PORTRANGELOW isn't set, which might permit
+	 * automatic allocation of a "privileged" port.  The autoport exempt
+	 * flag exempts port 0 allocation from rule checking as long as a low
+	 * port isn't required.
+	 */
+	if (mac_portacl_autoport_exempt && port == 0) {
+		inp = sotoinpcb(so);
+		if ((inp->inp_flags & INP_LOWPORT) == 0)
+			return (0);
+	}
 
 	return (rules_check(cred, family, type, port));
 }

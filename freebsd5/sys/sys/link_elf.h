@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Paul Kranenburg
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/link_elf.h,v 1.25 2003/02/13 17:47:44 kan Exp $
+ * $FreeBSD: src/sys/sys/link_elf.h,v 1.25.6.1 2005/01/31 23:26:56 imp Exp $
  */
 
 /*

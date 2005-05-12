@@ -1,5 +1,5 @@
 /*	$OpenBSD: xform.c,v 1.16 2001/08/28 12:20:43 ben Exp $	*/
-/*
+/*-
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
  * Niels Provos (provos@physnet.uni-hamburg.de).
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/xform.c,v 1.2 2003/06/11 05:57:50 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/xform.c,v 1.2.4.1 2005/01/31 23:26:48 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

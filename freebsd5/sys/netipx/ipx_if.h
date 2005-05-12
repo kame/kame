@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -30,10 +30,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
+ *
  *	@(#)ipx_if.h
  *
- * $FreeBSD: src/sys/netipx/ipx_if.h,v 1.13 2003/03/04 23:19:53 jlemon Exp $
+ * $FreeBSD: src/sys/netipx/ipx_if.h,v 1.13.6.1 2005/01/31 23:26:42 imp Exp $
  */
 
 #ifndef _NETIPX_IPX_IF_H_

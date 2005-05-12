@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1985, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in_var.h,v 1.51 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/in_var.h,v 1.51.2.1 2005/01/31 23:26:35 imp Exp $
  */
 
 #ifndef _NETINET_IN_VAR_H_
@@ -159,6 +159,7 @@ struct in_multi {
 #ifdef _KERNEL
 
 #ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_inet);
 SYSCTL_DECL(_net_inet_ip);
 SYSCTL_DECL(_net_inet_raw);
 #endif

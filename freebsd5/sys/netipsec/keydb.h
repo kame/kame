@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/keydb.h,v 1.3.4.1 2004/09/30 20:11:46 mlaier Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/keydb.h,v 1.3.4.2 2005/01/31 23:26:41 imp Exp $	*/
 /*	$KAME: keydb.h,v 1.14 2000/08/02 17:58:26 sakane Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *

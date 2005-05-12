@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -28,7 +28,7 @@
  *
  * Customisation of signalling source to the NG environment.
  *
- * $FreeBSD: src/sys/netgraph/atm/uni/ng_uni_cust.h,v 1.2 2004/06/25 19:22:03 julian Exp $
+ * $FreeBSD: src/sys/netgraph/atm/uni/ng_uni_cust.h,v 1.2.2.3 2005/01/31 23:26:31 imp Exp $
  */
 
 #include <sys/param.h>
@@ -79,19 +79,19 @@ void ng_uni_free(enum unimem, void *, const char *, u_int);
  * Timers
  */
 struct uni_timer {
-	struct callout_handle c;
+	struct callout c;
 };
 
-#define	_TIMER_INIT(X,T)	callout_handle_init(&(X)->T.c)
+#define	_TIMER_INIT(X,T)	ng_callout_init(&(X)->T.c)
 #define	_TIMER_DESTROY(UNI,FIELD) _TIMER_STOP(UNI,FIELD)
 #define	_TIMER_STOP(UNI,FIELD) do {						\
-	ng_untimeout(FIELD.c, (UNI)->arg);					\
-	callout_handle_init(&FIELD.c);					\
+	ng_uncallout(&FIELD.c, (UNI)->arg);					\
     } while (0)
-#define	TIMER_ISACT(UNI,T)	((UNI)->T.c.callout != NULL)
+#define	TIMER_ISACT(UNI,T)	((UNI)->T.c.c_flags & (CALLOUT_ACTIVE |	\
+							CALLOUT_PENDING))
 #define	_TIMER_START(UNI,ARG,FIELD,DUE,FUNC) do {			\
 	_TIMER_STOP(UNI, FIELD);					\
-	FIELD.c = ng_timeout((UNI)->arg, NULL,				\
+	ng_callout(&FIELD.c, (UNI)->arg, NULL,				\
 	    hz * (DUE) / 1000, FUNC, (ARG), 0);				\
     } while (0)
 
@@ -102,7 +102,6 @@ _##T##_func(node_p node, hook_p hook, void *arg1, int arg2)		\
 {									\
 	struct uni *uni = (struct uni *)arg1;				\
 									\
-	callout_handle_init(&uni->T.c);					\
 	(F)(uni);							\
 	uni_work(uni);							\
 }
@@ -118,7 +117,6 @@ _##T##_func(node_p node, hook_p hook, void *arg1, int arg2)		\
 	struct call *call = (struct call *)arg1;			\
 	struct uni *uni = call->uni;					\
 									\
-	callout_handle_init(&call->T.c);				\
 	(F)(call);							\
 	uni_work(uni);							\
 }
@@ -134,7 +132,6 @@ _##T##_func(node_p node, hook_p hook, void *arg1, int arg2)		\
 	struct party *party = (struct party *)arg1;			\
 	struct uni *uni = party->call->uni;				\
 									\
-	callout_handle_init(&party->T.c);					\
 	(F)(party);							\
 	uni_work(uni);							\
 }

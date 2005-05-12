@@ -1,6 +1,8 @@
 /*-
  * ng_etf.c  Ethertype filter
- *
+ */
+
+/*-
  * Copyright (c) 2001, FreeBSD Incorporated 
  * All rights reserved.
  *
@@ -28,7 +30,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_etf.c,v 1.6 2004/06/26 22:24:16 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_etf.c,v 1.6.2.1 2005/01/31 23:26:28 imp Exp $
  */
 
 #include <sys/param.h>

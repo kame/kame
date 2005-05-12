@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,13 +27,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)syslog.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/syslog.h,v 1.24 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/syslog.h,v 1.24.2.2 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_SYSLOG_H_
 #define _SYS_SYSLOG_H_
 
 #define	_PATH_LOG	"/var/run/log"
+#define	_PATH_LOG_PRIV	"/var/run/logpriv"
 #define	_PATH_OLDLOG	"/dev/log"	/* backward compatibility */
 
 /*

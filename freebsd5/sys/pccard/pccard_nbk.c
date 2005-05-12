@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2001 M. Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.44 2003/06/12 04:46:42 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.44.4.1 2005/01/31 23:26:49 imp Exp $
  */
 
 /*

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/bio.h,v 1.139.2.1.2.1 2004/10/21 17:49:45 phk Exp $
+ * $FreeBSD: src/sys/sys/bio.h,v 1.139.2.4 2005/01/31 23:26:55 imp Exp $
  */
 
 #ifndef _SYS_BIO_H_
@@ -117,6 +117,7 @@ void bioq_disksort(struct bio_queue_head *ap, struct bio *bp);
 struct bio *bioq_first(struct bio_queue_head *head);
 void bioq_flush(struct bio_queue_head *head, struct devstat *stp, int error);
 void bioq_init(struct bio_queue_head *head);
+void bioq_insert_head(struct bio_queue_head *head, struct bio *bp);
 void bioq_insert_tail(struct bio_queue_head *head, struct bio *bp);
 void bioq_remove(struct bio_queue_head *head, struct bio *bp);
 

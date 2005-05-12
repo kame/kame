@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.h,v 1.3 2004/02/22 00:33:11 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.h,v 1.3.2.1 2005/01/26 11:21:51 rwatson Exp $
  */
 /*
  * Definitions for the TrustedBSD LOMAC integrity policy module.
@@ -59,7 +59,6 @@
 #define	MAC_LOMAC_TYPE_EQUAL	4	/* Equivilent to any
 					 * MAC_LOMAC_TYPE_LABEL. */
 
-/* XXXMAC: temporarily disabled because we still need struct oldmac. */
 /*
  * Structures and constants associated with a LOMAC Integrity policy.
  * mac_lomac represents a LOMAC label, with mb_type determining its properties,

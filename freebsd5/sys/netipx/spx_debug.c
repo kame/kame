@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/spx_debug.c,v 1.15 2003/06/11 05:25:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/spx_debug.c,v 1.15.4.1 2005/01/31 23:26:42 imp Exp $");
 
 #include "opt_inet.h"
 #include "opt_tcpdebug.h"

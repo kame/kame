@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 2003 Harti Brandt
  * Copyright 2003 Vincent Jardin
  * 	All rights reserved.
@@ -33,7 +33,7 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/atmpif/ng_atmpif.c,v 1.2 2004/05/29 00:51:14 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/atmpif/ng_atmpif.c,v 1.2.2.1 2005/01/31 23:26:31 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

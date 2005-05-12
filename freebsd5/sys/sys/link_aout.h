@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Paul Kranenburg
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/link_aout.h,v 1.24 2002/08/22 20:35:23 peter Exp $
+ * $FreeBSD: src/sys/sys/link_aout.h,v 1.24.8.1 2005/01/31 23:26:56 imp Exp $
  */
 
 /*

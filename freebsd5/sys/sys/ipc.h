@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ipc.h	8.4 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/ipc.h,v 1.24 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/ipc.h,v 1.24.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 /*

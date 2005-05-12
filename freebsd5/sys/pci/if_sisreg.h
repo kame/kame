@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.26 2003/12/25 22:14:25 phk Exp $
+ * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.26.2.1 2005/01/31 23:26:50 imp Exp $
  */
 
 /*

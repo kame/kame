@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Berkeley Software Design, Inc.
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_pcnreg.h,v 1.8 2003/11/14 19:00:31 sam Exp $
+ * $FreeBSD: src/sys/pci/if_pcnreg.h,v 1.8.4.1 2005/01/31 23:26:50 imp Exp $
  */
 
 /*

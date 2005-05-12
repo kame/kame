@@ -1,7 +1,9 @@
 
 /*
  * ng_ether.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-2000 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -37,7 +39,7 @@
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.38 2004/07/28 06:54:55 kan Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.38.2.2 2005/01/31 23:26:28 imp Exp $
  */
 
 /*
@@ -298,8 +300,6 @@ ng_ether_detach(struct ifnet *ifp)
 	const node_p node = IFP2NG(ifp);
 	const priv_p priv = NG_NODE_PRIVATE(node);
 
-	if (node == NULL)		/* no node (why not?), ignore */
-		return;
 	NG_NODE_REALLY_DIE(node);	/* Force real removal of node */
 	/*
 	 * We can't assume the ifnet is still around when we run shutdown
@@ -496,7 +496,7 @@ ng_ether_rcvdata(hook_p hook, item_p item)
 		return ng_ether_rcv_upper(node, m);
 	panic("%s: weird hook", __func__);
 #ifdef RESTARTABLE_PANICS /* so we don't get an error msg in LINT */
-	return NULL;
+	return (0);
 #endif
 }
 

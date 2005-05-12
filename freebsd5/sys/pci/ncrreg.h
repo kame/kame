@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/ncrreg.h,v 1.13 1999/08/28 00:51:03 peter Exp $
+** $FreeBSD: src/sys/pci/ncrreg.h,v 1.13.26.1 2005/01/31 23:26:51 imp Exp $
 **
 **  Device driver for the   NCR 53C810   PCI-SCSI-Controller.
 **
@@ -16,7 +16,8 @@
 **	mycroft@gnu.ai.mit.edu
 **
 **-------------------------------------------------------------------------
-**
+*/
+/*-
 ** Copyright (c) 1994 Wolfgang Stanglmeier.  All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without

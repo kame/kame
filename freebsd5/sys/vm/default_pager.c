@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, David Greenman
  * All rights reserved.
  *
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/default_pager.c,v 1.34 2003/08/06 12:05:48 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/default_pager.c,v 1.34.4.1 2005/01/31 23:27:02 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

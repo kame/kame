@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.153.2.1.2.1 2004/10/21 09:30:47 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.153.2.7 2005/03/28 12:29:35 maxim Exp $
  */
 
 #include "opt_ipsec.h"
@@ -59,6 +59,8 @@
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 #include <netinet/tcp_var.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -97,8 +99,13 @@ int	ipport_hilastauto  = IPPORT_HILASTAUTO;		/* 65535 */
 int	ipport_reservedhigh = IPPORT_RESERVED - 1;	/* 1023 */
 int	ipport_reservedlow = 0;
 
-/* Shall we allocate ephemeral ports in random order? */
-int	ipport_randomized = 1;
+/* Variables dealing with random ephemeral port allocation. */
+int	ipport_randomized = 1;	/* user controlled via sysctl */
+int	ipport_randomcps = 10;	/* user controlled via sysctl */
+int	ipport_randomtime = 45;	/* user controlled via sysctl */
+int	ipport_stoprandom = 0;	/* toggled by ipport_tick */
+int	ipport_tcpallocs;
+int	ipport_tcplastcount;
 
 #define RANGECHK(var, min, max) \
 	if ((var) < (min)) { (var) = (min); } \
@@ -141,8 +148,14 @@ SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedhigh,
 	   CTLFLAG_RW|CTLFLAG_SECURE, &ipport_reservedhigh, 0, "");
 SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedlow,
 	   CTLFLAG_RW|CTLFLAG_SECURE, &ipport_reservedlow, 0, "");
-SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomized,
-	   CTLFLAG_RW, &ipport_randomized, 0, "");
+SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomized, CTLFLAG_RW,
+	   &ipport_randomized, 0, "Enable random port allocation");
+SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomcps, CTLFLAG_RW,
+	   &ipport_randomcps, 0, "Maximum number of random port "
+	   "allocations before switching to a sequental one");
+SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomtime, CTLFLAG_RW,
+	   &ipport_randomtime, 0, "Minimum time to keep sequental port "
+	   "allocation before switching to a random one");
 
 /*
  * in_pcb.c: manage the Protocol Control Blocks.
@@ -266,6 +279,7 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, cred)
 	u_short lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 	int error, prison = 0;
+	int dorandom;
 
 	INP_INFO_WLOCK_ASSERT(pcbinfo);
 	INP_LOCK_ASSERT(inp);
@@ -394,6 +408,20 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, cred)
 			lastport = &pcbinfo->lastport;
 		}
 		/*
+		 * For UDP, use random port allocation as long as the user
+		 * allows it.  For TCP (and as of yet unknown) connections,
+		 * use random port allocation only if the user allows it AND
+		 * ipport_tick allows it.
+		 */
+		if (ipport_randomized &&
+			(!ipport_stoprandom || pcbinfo == &udbinfo))
+			dorandom = 1;
+		else
+			dorandom = 0;
+		/* Make sure to not include UDP packets in the count. */
+		if (pcbinfo != &udbinfo)
+			ipport_tcpallocs++;
+		/*
 		 * Simple check to ensure all ports are not used up causing
 		 * a deadlock here.
 		 *
@@ -404,7 +432,7 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, cred)
 			/*
 			 * counting down
 			 */
-			if (ipport_randomized)
+			if (dorandom)
 				*lastport = first -
 					    (arc4random() % (first - last));
 			count = first - last;
@@ -422,7 +450,7 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, cred)
 			/*
 			 * counting up
 			 */
-			if (ipport_randomized)
+			if (dorandom)
 				*lastport = first +
 					    (arc4random() % (last - first));
 			count = last - first;
@@ -593,14 +621,12 @@ in_pcbconnect_setup(inp, nam, laddrp, lportp, faddrp, fportp, oinpp, cred)
 		}
 		/*
 		 * If we found a route, use the address
-		 * corresponding to the outgoing interface
-		 * unless it is the loopback (in case a route
-		 * to our address on another net goes to loopback).
+		 * corresponding to the outgoing interface.
 		 */
-		if (sro.ro_rt && !(sro.ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
+		if (sro.ro_rt) {
 			ia = ifatoia(sro.ro_rt->rt_ifa);
-		if (sro.ro_rt)
 			RTFREE(sro.ro_rt);
+		}
 		if (ia == 0) {
 			bzero(&sa, sizeof(sa));
 			sa.sin_addr = faddr;
@@ -689,7 +715,7 @@ in_pcbdetach(inp)
 	if (so) {
 		ACCEPT_LOCK();
 		SOCK_LOCK(so);
-		so->so_pcb = 0;
+		so->so_pcb = NULL;
 		sotryfree(so);
 	}
 	if (inp->inp_options)
@@ -1180,4 +1206,27 @@ in_pcbsosetlabel(so)
 	SOCK_UNLOCK(so);
 	INP_UNLOCK(inp);
 #endif
+}
+
+/*
+ * ipport_tick runs once per second, determining if random port
+ * allocation should be continued.  If more than ipport_randomcps
+ * ports have been allocated in the last second, then we return to
+ * sequential port allocation. We return to random allocation only
+ * once we drop below ipport_randomcps for at least ipport_randomtime
+ * seconds.
+ */
+
+void
+ipport_tick(xtp)
+	void *xtp;
+{
+	if (ipport_tcpallocs > ipport_tcplastcount + ipport_randomcps) {
+		ipport_stoprandom = ipport_randomtime;
+	} else {
+		if (ipport_stoprandom > 0)
+			ipport_stoprandom--;
+	}
+	ipport_tcplastcount = ipport_tcpallocs;
+	callout_reset(&ipport_tick_callout, hz, ipport_tick, NULL);
 }

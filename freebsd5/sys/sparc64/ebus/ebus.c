@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000 Matthew R. Green
  * Copyright (c) 2001 Thomas Moestl <tmm@FreeBSD.org>
  * All rights reserved.
@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: ebus.c,v 1.26 2001/09/10 16:27:53 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/ebus/ebus.c,v 1.19 2004/08/12 17:41:32 marius Exp $
+ * $FreeBSD: src/sys/sparc64/ebus/ebus.c,v 1.19.2.1 2005/01/31 23:26:53 imp Exp $
  */
 
 /*

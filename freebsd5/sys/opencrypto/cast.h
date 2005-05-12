@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/opencrypto/cast.h,v 1.1 2002/10/04 20:31:22 sam Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/cast.h,v 1.1.10.1 2005/01/31 23:26:48 imp Exp $	*/
 /*      $OpenBSD: cast.h,v 1.2 2002/03/14 01:26:51 millert Exp $       */
 
-/*
+/*-
  *	CAST-128 in C
  *	Written by Steve Reid <sreid@sea-to-sky.net>
  *	100% Public Domain - no warranty

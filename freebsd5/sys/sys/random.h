@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/random.h,v 1.33 2002/10/04 20:34:08 sam Exp $
+ * $FreeBSD: src/sys/sys/random.h,v 1.33.8.1 2005/01/30 03:10:42 rwatson Exp $
  */
 
 #ifndef	_SYS_RANDOM_H_
@@ -33,6 +33,10 @@
 
 int read_random(void *, int);
 
+/*
+ * Note: if you add or remove members of esource, remember to also update the
+ * KASSERT regarding what valid members are in random_harvest_internal().
+ */
 enum esource {
 	RANDOM_START = 0,
 	RANDOM_WRITE = 0,

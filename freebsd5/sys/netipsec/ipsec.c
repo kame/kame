@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.8.2.1 2004/10/02 04:55:47 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.8.2.3 2005/03/22 19:25:32 ume Exp $	*/
 /*	$KAME: ipsec.c,v 1.103 2001/05/24 07:14:18 sakane Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -669,7 +669,7 @@ ipsec4_get_ulp(struct mbuf *m, struct secpolicyindex *spidx, int needport)
 			spidx->dst.sin.sin_port = uh.uh_dport;
 			return;
 		case IPPROTO_AH:
-			if (m->m_pkthdr.len > off + sizeof(ip6e))
+			if (off + sizeof(ip6e) > m->m_pkthdr.len)
 				goto done;
 			/* XXX sigh, this works but is totally bogus */
 			m_copydata(m, off, sizeof(ip6e), (caddr_t) &ip6e);

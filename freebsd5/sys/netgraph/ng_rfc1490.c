@@ -1,7 +1,8 @@
-
 /*
  * ng_rfc1490.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_rfc1490.c,v 1.23 2004/06/25 21:11:14 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_rfc1490.c,v 1.23.2.1 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_rfc1490.c,v 1.22 1999/11/01 09:24:52 julian Exp $
  */
 

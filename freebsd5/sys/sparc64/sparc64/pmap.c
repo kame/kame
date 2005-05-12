@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  * Copyright (c) 1994 John S. Dyson
@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *      from:   @(#)pmap.c      7.7 (Berkeley)  5/12/91
- * $FreeBSD: src/sys/sparc64/sparc64/pmap.c,v 1.139 2004/08/13 18:54:21 alc Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/pmap.c,v 1.139.2.3 2005/03/13 20:49:57 alc Exp $
  */
 
 /*
@@ -1022,11 +1022,10 @@ pmap_pinit(pmap_t pm)
 
 	VM_OBJECT_LOCK(pm->pm_tsb_obj);
 	for (i = 0; i < TSB_PAGES; i++) {
-		m = vm_page_grab(pm->pm_tsb_obj, i,
+		m = vm_page_grab(pm->pm_tsb_obj, i, VM_ALLOC_NOBUSY |
 		    VM_ALLOC_RETRY | VM_ALLOC_WIRED | VM_ALLOC_ZERO);
 
 		vm_page_lock_queues();
-		vm_page_flag_clear(m, PG_BUSY);
 		m->valid = VM_PAGE_BITS_ALL;
 		m->md.pmap = pm;
 		vm_page_unlock_queues();
@@ -1087,7 +1086,6 @@ pmap_release(pmap_t pm)
 		vm_page_lock_queues();
 		if (vm_page_sleep_if_busy(m, FALSE, "pmaprl"))
 			continue;
-		vm_page_busy(m);
 		KASSERT(m->hold_count == 0,
 		    ("pmap_release: freeing held tsb page"));
 		m->md.pmap = NULL;
@@ -1471,7 +1469,13 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 	if (dst_addr != src_addr)
 		return;
 	vm_page_lock_queues();
-	PMAP_LOCK(dst_pmap);
+	if (dst_pmap < src_pmap) {
+		PMAP_LOCK(dst_pmap);
+		PMAP_LOCK(src_pmap);
+	} else {
+		PMAP_LOCK(src_pmap);
+		PMAP_LOCK(dst_pmap);
+	}
 	if (len > PMAP_TSB_THRESH) {
 		tsb_foreach(src_pmap, dst_pmap, src_addr, src_addr + len,
 		    pmap_copy_tte);
@@ -1484,6 +1488,7 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 		tlb_range_demap(dst_pmap, src_addr, src_addr + len - 1);
 	}
 	vm_page_unlock_queues();
+	PMAP_UNLOCK(src_pmap);
 	PMAP_UNLOCK(dst_pmap);
 }
 
@@ -1507,12 +1512,14 @@ pmap_zero_page(vm_page_t m)
 		cpu_block_zero((void *)va, PAGE_SIZE);
 	} else {
 		PMAP_STATS_INC(pmap_nzero_page_oc);
+		PMAP_LOCK(kernel_pmap);
 		va = pmap_temp_map_1 + (m->md.color * PAGE_SIZE);
 		tp = tsb_kvtotte(va);
 		tp->tte_data = TD_V | TD_8K | TD_PA(pa) | TD_CP | TD_CV | TD_W;
 		tp->tte_vpn = TV_VPN(va, TS_8K);
 		cpu_block_zero((void *)va, PAGE_SIZE);
 		tlb_page_demap(kernel_pmap, va);
+		PMAP_UNLOCK(kernel_pmap);
 	}
 }
 
@@ -1537,12 +1544,14 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 		bzero((void *)(va + off), size);
 	} else {
 		PMAP_STATS_INC(pmap_nzero_page_area_oc);
+		PMAP_LOCK(kernel_pmap);
 		va = pmap_temp_map_1 + (m->md.color * PAGE_SIZE);
 		tp = tsb_kvtotte(va);
 		tp->tte_data = TD_V | TD_8K | TD_PA(pa) | TD_CP | TD_CV | TD_W;
 		tp->tte_vpn = TV_VPN(va, TS_8K);
 		bzero((void *)(va + off), size);
 		tlb_page_demap(kernel_pmap, va);
+		PMAP_UNLOCK(kernel_pmap);
 	}
 }
 
@@ -1608,6 +1617,7 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 			    PAGE_SIZE);
 		} else {
 			PMAP_STATS_INC(pmap_ncopy_page_doc);
+			PMAP_LOCK(kernel_pmap);
 			vdst = pmap_temp_map_1 + (mdst->md.color * PAGE_SIZE);
 			tp = tsb_kvtotte(vdst);
 			tp->tte_data =
@@ -1616,6 +1626,7 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 			ascopyfrom(ASI_PHYS_USE_EC, psrc, (void *)vdst,
 			    PAGE_SIZE);
 			tlb_page_demap(kernel_pmap, vdst);
+			PMAP_UNLOCK(kernel_pmap);
 		}
 	} else if (mdst->md.color == -1) {
 		if (msrc->md.color == DCACHE_COLOR(psrc)) {
@@ -1625,6 +1636,7 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 			    PAGE_SIZE);
 		} else {
 			PMAP_STATS_INC(pmap_ncopy_page_soc);
+			PMAP_LOCK(kernel_pmap);
 			vsrc = pmap_temp_map_1 + (msrc->md.color * PAGE_SIZE);
 			tp = tsb_kvtotte(vsrc);
 			tp->tte_data =
@@ -1633,9 +1645,11 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 			ascopyto((void *)vsrc, ASI_PHYS_USE_EC, pdst,
 			    PAGE_SIZE);
 			tlb_page_demap(kernel_pmap, vsrc);
+			PMAP_UNLOCK(kernel_pmap);
 		}
 	} else {
 		PMAP_STATS_INC(pmap_ncopy_page_oc);
+		PMAP_LOCK(kernel_pmap);
 		vdst = pmap_temp_map_1 + (mdst->md.color * PAGE_SIZE);
 		tp = tsb_kvtotte(vdst);
 		tp->tte_data =
@@ -1649,6 +1663,7 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 		cpu_block_copy((void *)vsrc, (void *)vdst, PAGE_SIZE);
 		tlb_page_demap(kernel_pmap, vdst);
 		tlb_page_demap(kernel_pmap, vsrc);
+		PMAP_UNLOCK(kernel_pmap);
 	}
 }
 

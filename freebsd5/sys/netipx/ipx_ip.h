@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
  *
  *	@(#)ipxip.h
  *
- * $FreeBSD: src/sys/netipx/ipx_ip.h,v 1.15 2002/03/20 02:39:13 alfred Exp $
+ * $FreeBSD: src/sys/netipx/ipx_ip.h,v 1.15.8.1 2005/01/31 23:26:42 imp Exp $
  */
 
 #ifndef _NETIPX_IPXIP_H_

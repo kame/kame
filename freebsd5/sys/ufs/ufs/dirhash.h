@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Ian Dowse.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ufs/ufs/dirhash.h,v 1.4 2003/01/01 18:48:59 schweikh Exp $
+ * $FreeBSD: src/sys/ufs/ufs/dirhash.h,v 1.4.6.1 2005/01/31 23:27:01 imp Exp $
  */
 
 #ifndef _UFS_UFS_DIRHASH_H_

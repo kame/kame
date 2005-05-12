@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsnode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/nfsclient/nfsnode.h,v 1.43 2004/04/14 23:23:55 peadar Exp $
+ * $FreeBSD: src/sys/nfsclient/nfsnode.h,v 1.43.2.1 2005/01/31 23:26:46 imp Exp $
  */
 
 #ifndef _NFSCLIENT_NFSNODE_H_

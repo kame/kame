@@ -1,7 +1,8 @@
-
 /*
  * ng_iface.h
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.h,v 1.6 2004/03/07 23:00:44 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.h,v 1.6.2.1 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_iface.h,v 1.5 1999/01/20 00:22:13 archie Exp $
  */
 

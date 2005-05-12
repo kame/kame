@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/pc98/i386/busiosubr.c,v 1.4 2003/09/23 08:22:33 nyan Exp $ */
+/* $FreeBSD: src/sys/pc98/i386/busiosubr.c,v 1.4.4.1 2005/01/31 23:26:48 imp Exp $ */
 /*	$NecBSD: busiosubr.c,v 1.30.4.4 1999/08/28 02:25:35 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1996, 1997, 1998
  *	NetBSD/pc98 porting staff. All rights reserved.

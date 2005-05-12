@@ -1,6 +1,8 @@
 /*
  * ng_iface.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -35,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.34 2004/07/14 20:24:21 rwatson Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.34.2.2 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_iface.c,v 1.33 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -727,6 +729,18 @@ ng_iface_rcvmsg(node_p node, item_p item, hook_p lasthook)
 		    }
 		default:
 			error = EINVAL;
+			break;
+		}
+		break;
+	case NGM_FLOW_COOKIE:
+		switch (msg->header.cmd) {
+		case NGM_LINK_IS_UP:
+			ifp->if_flags |= IFF_UP;
+			break;
+		case NGM_LINK_IS_DOWN:
+			ifp->if_flags &= ~IFF_UP;
+			break;
+		default:
 			break;
 		}
 		break;

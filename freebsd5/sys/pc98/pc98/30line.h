@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996.  FreeBSD(98) porting team.
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/30line.h,v 1.4 2000/10/15 04:54:17 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/30line.h,v 1.4.8.1 2005/01/31 23:26:48 imp Exp $
  */
 
 #ifndef __PC98_PC98_30LINE_H__

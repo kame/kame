@@ -25,12 +25,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_sis.c,v 1.14.2.1 2004/08/23 05:23:16 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_sis.c,v 1.14.2.3 2005/03/01 08:11:50 imp Exp $");
 
 #include "opt_bus.h"
-#ifndef PC98
-#include "opt_agp.h"
-#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -108,14 +105,7 @@ agp_sis_match(device_t dev)
 		return ("SiS 746 host to AGP bridge");
 	case 0x07601039:
 		return ("SiS 760 host to AGP bridge");
-#if defined(__amd64__) || defined(AGP_AMD64_GART)
-	case 0x10221039:	/* AMD64 */
-		return NULL;
-#endif
 	};
-
-	if (pci_get_vendor(dev) == 0x1039)
-		return ("SIS Generic host to PCI bridge");
 
 	return NULL;
 }
@@ -131,7 +121,7 @@ agp_sis_probe(device_t dev)
 	if (desc) {
 		device_verbose(dev);
 		device_set_desc(dev, desc);
-		return 0;
+		return BUS_PROBE_DEFAULT;
 	}
 
 	return ENXIO;

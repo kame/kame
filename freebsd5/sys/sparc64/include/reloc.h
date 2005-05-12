@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 John Birrell <jb@cimlogic.com.au>.
  * All rights reserved.
  *
@@ -29,5 +29,5 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/reloc.h,v 1.1 2001/11/18 17:56:46 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/reloc.h,v 1.1.8.1 2005/01/31 23:26:53 imp Exp $
  */

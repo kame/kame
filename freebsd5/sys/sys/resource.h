@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)resource.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resource.h,v 1.23 2004/06/13 22:07:58 das Exp $
+ * $FreeBSD: src/sys/sys/resource.h,v 1.23.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_RESOURCE_H_

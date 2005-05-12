@@ -40,7 +40,7 @@
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  * 	from: FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.167 2001/07/12
- * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.66.2.1 2004/09/30 17:26:51 kensmith Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.66.2.5 2005/03/12 06:00:07 obrien Exp $
  */
 
 #include "opt_pmap.h"
@@ -58,7 +58,6 @@
 #include <sys/sf_buf.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
-#include <sys/user.h>
 #include <sys/vmmeter.h>
 
 #include <dev/ofw/openfirm.h>
@@ -83,6 +82,7 @@
 #include <machine/md_var.h>
 #include <machine/ofw_machdep.h>
 #include <machine/ofw_mem.h>
+#include <machine/pcb.h>
 #include <machine/tlb.h>
 #include <machine/tstate.h>
 
@@ -111,15 +111,12 @@ PMAP_STATS_VAR(uma_nsmall_free);
 void
 cpu_exit(struct thread *td)
 {
-	struct md_utrap *ut;
 	struct proc *p;
 
 	p = td->td_proc;
 	p->p_md.md_sigtramp = NULL;
-	if ((ut = p->p_md.md_utrap) != NULL) {
-		ut->ut_refcnt--;
-		if (ut->ut_refcnt == 0)
-			free(ut, M_SUBPROC);
+	if (p->p_md.md_utrap != NULL) {
+		utrap_free(p->p_md.md_utrap);
 		p->p_md.md_utrap = NULL;
 	}
 }
@@ -200,7 +197,6 @@ cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 void
 cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 {
-	struct md_utrap *ut;
 	struct trapframe *tf;
 	struct frame *fp;
 	struct pcb *pcb1;
@@ -216,9 +212,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 		return;
 
 	p2->p_md.md_sigtramp = td1->td_proc->p_md.md_sigtramp;
-	if ((ut = td1->td_proc->p_md.md_utrap) != NULL)
-		ut->ut_refcnt++;
-	p2->p_md.md_utrap = ut;
+	p2->p_md.md_utrap = utrap_hold(td1->td_proc->p_md.md_utrap);
 
 	/* The pcb must be aligned on a 64-byte boundary. */
 	pcb1 = td1->td_pcb;
@@ -375,17 +369,19 @@ sf_buf_init(void *arg)
  * Get an sf_buf from the freelist. Will block if none are available.
  */
 struct sf_buf *
-sf_buf_alloc(struct vm_page *m, int pri)
+sf_buf_alloc(struct vm_page *m, int flags)
 {
 	struct sf_buf *sf;
 	int error;
 
 	mtx_lock(&sf_freelist.sf_lock);
 	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
+		if (flags & SFB_NOWAIT)
+			break;
 		sf_buf_alloc_want++;
 		mbstat.sf_allocwait++;
-		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM | pri,
-		    "sfbufa", 0);
+		error = msleep(&sf_freelist, &sf_freelist.sf_lock,
+		    (flags & SFB_CATCH) ? PCATCH | PVM : PVM, "sfbufa", 0);
 		sf_buf_alloc_want--;
 
 		/*

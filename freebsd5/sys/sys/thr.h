@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/thr.h,v 1.3.2.1 2004/10/09 15:12:33 mtm Exp $
+ * $FreeBSD: src/sys/sys/thr.h,v 1.3.2.2 2005/01/31 23:26:57 imp Exp $
  *
  */
 

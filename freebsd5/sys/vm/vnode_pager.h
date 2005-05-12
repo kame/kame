@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990 University of Utah.
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode_pager.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/vm/vnode_pager.h,v 1.18 2004/04/06 20:15:37 imp Exp $
+ * $FreeBSD: src/sys/vm/vnode_pager.h,v 1.18.2.1 2005/01/31 23:27:04 imp Exp $
  */
 
 #ifndef	_VNODE_PAGER_

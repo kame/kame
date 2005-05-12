@@ -1,7 +1,8 @@
-
 /*
  * ng_hole.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Julian Elisher <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_hole.c,v 1.13 2004/05/29 00:51:11 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_hole.c,v 1.13.2.1 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_hole.c,v 1.10 1999/11/01 09:24:51 julian Exp $
  */
 

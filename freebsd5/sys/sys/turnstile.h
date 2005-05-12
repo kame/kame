@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 John Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/turnstile.h,v 1.4 2004/04/06 19:08:40 jhb Exp $
+ * $FreeBSD: src/sys/sys/turnstile.h,v 1.4.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_TURNSTILE_H_

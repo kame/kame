@@ -1,6 +1,8 @@
-/*
- * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
- * All rights reserved.
+/*-
+ * Copyright (c) 2004, 2005,
+ *     Bosko Milekic <bmilekic@FreeBSD.org>.  All rights reserved.
+ * Copyright (c) 2002, 2003, 2004, 2005,
+ *     Jeffrey Roberson <jeff@FreeBSD.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,7 +48,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/uma_core.c,v 1.105.2.1 2004/10/16 01:41:34 green Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/uma_core.c,v 1.105.2.8 2005/02/16 21:53:08 bmilekic Exp $");
 
 /* I should really use ktr.. */
 /*
@@ -185,7 +187,11 @@ struct uma_bucket_zone bucket_zones[] = {
 #define	BUCKET_SHIFT	4
 #define	BUCKET_ZONES	((BUCKET_MAX >> BUCKET_SHIFT) + 1)
 
-uint8_t bucket_size[BUCKET_ZONES];
+/*
+ * bucket_size[] maps requested bucket sizes to zones that allocate a bucket
+ * of approximately the right size.
+ */
+static uint8_t bucket_size[BUCKET_ZONES];
 
 enum zfreeskip { SKIP_NONE, SKIP_DTOR, SKIP_FINI };
 
@@ -257,6 +263,13 @@ bucket_enable(void)
 		bucketdisable = 0;
 }
 
+/*
+ * Initialize bucket_zones, the array of zones of buckets of various sizes.
+ *
+ * For each zone, calculate the memory required for each bucket, consisting
+ * of the header and an array of pointers.  Initialize bucket_size[] to point
+ * the range of appropriate bucket sizes at the zone.
+ */
 static void
 bucket_init(void)
 {
@@ -277,12 +290,24 @@ bucket_init(void)
 	}
 }
 
+/*
+ * Given a desired number of entries for a bucket, return the zone from which
+ * to allocate the bucket.
+ */
+static struct uma_bucket_zone *
+bucket_zone_lookup(int entries)
+{
+	int idx;
+
+	idx = howmany(entries, 1 << BUCKET_SHIFT);
+	return (&bucket_zones[bucket_size[idx]]);
+}
+
 static uma_bucket_t
 bucket_alloc(int entries, int bflags)
 {
 	struct uma_bucket_zone *ubz;
 	uma_bucket_t bucket;
-	int idx;
 
 	/*
 	 * This is to stop us from allocating per cpu buckets while we're
@@ -290,11 +315,10 @@ bucket_alloc(int entries, int bflags)
 	 * boot pages.  This also prevents us from allocating buckets in
 	 * low memory situations.
 	 */
-
 	if (bucketdisable)
 		return (NULL);
-	idx = howmany(entries, 1 << BUCKET_SHIFT);
-	ubz = &bucket_zones[bucket_size[idx]];
+
+	ubz = bucket_zone_lookup(entries);
 	bucket = uma_zalloc_internal(ubz->ubz_zone, NULL, bflags);
 	if (bucket) {
 #ifdef INVARIANTS
@@ -311,10 +335,8 @@ static void
 bucket_free(uma_bucket_t bucket)
 {
 	struct uma_bucket_zone *ubz;
-	int idx;
 
-	idx = howmany(bucket->ub_entries, 1 << BUCKET_SHIFT);
-	ubz = &bucket_zones[bucket_size[idx]];
+	ubz = bucket_zone_lookup(bucket->ub_entries);
 	uma_zfree_internal(ubz->ubz_zone, bucket, NULL, SKIP_NONE);
 }
 
@@ -1917,9 +1939,19 @@ uma_zone_slab(uma_zone_t zone, int flags)
 	 * buckets there too we will recurse in kmem_alloc and bad
 	 * things happen.  So instead we return a NULL bucket, and make
 	 * the code that allocates buckets smart enough to deal with it
+	 *
+	 * XXX: While we want this protection for the bucket zones so that
+	 * recursion from the VM is handled (and the calling code that
+	 * allocates buckets knows how to deal with it), we do not want
+	 * to prevent allocation from the slab header zones (slabzone
+	 * and slabrefzone) if uk_recurse is not zero for them.  The
+	 * reason is that it could lead to NULL being returned for
+	 * slab header allocations even in the M_WAITOK case, and the
+	 * caller can't handle that.
 	 */
 	if (keg->uk_flags & UMA_ZFLAG_INTERNAL && keg->uk_recurse != 0)
-		return (NULL);
+		if ((zone != slabzone) && (zone != slabrefzone))
+			return (NULL);
 
 	slab = NULL;
 
@@ -2093,9 +2125,13 @@ uma_zalloc_bucket(uma_zone_t zone, int flags)
 		if (i != bucket->ub_cnt) {
 			int j;
 
-			for (j = i; j < bucket->ub_cnt; j++)
+			for (j = i; j < bucket->ub_cnt; j++) {
 				uma_zfree_internal(zone, bucket->ub_bucket[j],
 				    NULL, SKIP_FINI);
+#ifdef INVARIANTS
+				bucket->ub_bucket[j] = NULL;
+#endif
+			}
 			bucket->ub_cnt = i;
 		}
 		ZONE_LOCK(zone);

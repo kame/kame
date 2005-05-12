@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec_osdep.h,v 1.1 2003/09/29 22:47:45 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec_osdep.h,v 1.1.4.1 2005/01/31 23:26:41 imp Exp $	*/
 /*	$NetBSD: ipsec_osdep.h,v 1.1 2003/08/13 20:06:51 jonathan Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2003 Jonathan Stone (jonathan@cs.stanford.edu)
  *
  * Redistribution and use in source and binary forms, with or without

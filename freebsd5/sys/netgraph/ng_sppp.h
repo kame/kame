@@ -1,6 +1,8 @@
 /*
  * ng_sppp.h Netgraph to Sppp module.
- *
+ */
+
+/*-
  * Copyright (C) 2002-2004 Cronyx Engineering.
  * Copyright (C) 2002-2004 Roman Kurakin <rik@cronyx.ru>
  *
@@ -12,7 +14,7 @@
  * as long as this message is kept with the software, all derivative
  * works or modified versions.
  *
- * $FreeBSD: src/sys/netgraph/ng_sppp.h,v 1.1 2004/03/24 17:21:34 rik Exp $
+ * $FreeBSD: src/sys/netgraph/ng_sppp.h,v 1.1.2.1 2005/01/31 23:26:29 imp Exp $
  * Cronyx Id: ng_sppp.h,v 1.1.2.6 2004/03/01 15:17:21 rik Exp $
  */
 

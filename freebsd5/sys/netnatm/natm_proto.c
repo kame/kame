@@ -1,5 +1,5 @@
 /*	$NetBSD: natm_proto.c,v 1.3 1996/09/18 00:56:41 chuck Exp $	*/
-/*
+/*-
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netnatm/natm_proto.c,v 1.13 2003/11/08 22:28:40 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/netnatm/natm_proto.c,v 1.13.4.2 2005/02/25 17:50:31 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,6 +55,8 @@ __FBSDID("$FreeBSD: src/sys/netnatm/natm_proto.c,v 1.13 2003/11/08 22:28:40 sam 
 extern	struct domain natmdomain;
 
 static	void natm_init(void);
+
+NET_NEEDS_GIANT("netnatm");
 
 static struct protosw natmsw[] = {
 { SOCK_STREAM,	&natmdomain,	PROTO_NATMAAL5, PR_CONNREQUIRED,

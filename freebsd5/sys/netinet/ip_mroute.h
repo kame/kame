@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989 Stephen Deering.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_mroute.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/ip_mroute.h,v 1.23 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/ip_mroute.h,v 1.23.2.1 2005/01/31 23:26:36 imp Exp $
  */
 
 #ifndef _NETINET_IP_MROUTE_H_

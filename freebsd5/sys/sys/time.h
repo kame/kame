@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)time.h	8.5 (Berkeley) 5/4/95
- * $FreeBSD: src/sys/sys/time.h,v 1.65 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/time.h,v 1.65.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_TIME_H_

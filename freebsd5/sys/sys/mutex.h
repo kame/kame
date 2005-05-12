@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: mutex.h,v 2.7.2.35 2000/04/27 03:10:26 cp Exp $
- * $FreeBSD: src/sys/sys/mutex.h,v 1.73 2004/08/04 20:18:45 jhb Exp $
+ * $FreeBSD: src/sys/sys/mutex.h,v 1.73.2.3 2005/03/28 20:17:30 jhb Exp $
  */
 
 #ifndef _SYS_MUTEX_H_
@@ -103,8 +103,10 @@ void	mutex_init(void);
 void	_mtx_lock_sleep(struct mtx *m, struct thread *td, int opts,
 	    const char *file, int line);
 void	_mtx_unlock_sleep(struct mtx *m, int opts, const char *file, int line);
+#ifdef SMP
 void	_mtx_lock_spin(struct mtx *m, struct thread *td, int opts,
 	    const char *file, int line);
+#endif
 void	_mtx_unlock_spin(struct mtx *m, int opts, const char *file, int line);
 int	_mtx_trylock(struct mtx *m, int opts, const char *file, int line);
 void	_mtx_lock_flags(struct mtx *m, int opts, const char *file, int line);
@@ -113,7 +115,7 @@ void	_mtx_lock_spin_flags(struct mtx *m, int opts, const char *file,
 	     int line);
 void	_mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file,
 	     int line);
-#ifdef INVARIANT_SUPPORT
+#if defined(INVARIANTS) || defined(INVARIANT_SUPPORT)
 void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 #endif
 
@@ -161,6 +163,7 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
  * a deal.
  */
 #ifndef _get_spin_lock
+#ifdef SMP
 #define _get_spin_lock(mp, tid, opts, file, line) do {			\
 	struct thread *_tid = (tid);					\
 									\
@@ -172,6 +175,19 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 			_mtx_lock_spin((mp), _tid, (opts), (file), (line)); \
 	}								\
 } while (0)
+#else /* SMP */
+#define _get_spin_lock(mp, tid, opts, file, line) do {			\
+	struct thread *_tid = (tid);					\
+									\
+	critical_enter();						\
+	if ((mp)->mtx_lock == (uintptr_t)_tid)				\
+		(mp)->mtx_recurse++;					\
+	else {								\
+		KASSERT((mp)->mtx_lock == MTX_UNOWNED, ("corrupt spinlock")); \
+		(mp)->mtx_lock = (uintptr_t)_tid;			\
+	}								\
+} while (0)
+#endif /* SMP */
 #endif
 
 /*
@@ -196,6 +212,7 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
  * releasing a spin lock.  This includes the recursion cases.
  */
 #ifndef _rel_spin_lock
+#ifdef SMP
 #define _rel_spin_lock(mp) do {						\
 	if (mtx_recursed((mp)))						\
 		(mp)->mtx_recurse--;					\
@@ -203,6 +220,15 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 		_release_lock_quick((mp));				\
 	critical_exit();						\
 } while (0)
+#else /* SMP */
+#define _rel_spin_lock(mp) do {						\
+	if (mtx_recursed((mp)))						\
+		(mp)->mtx_recurse--;					\
+	else								\
+		(mp)->mtx_lock = MTX_UNOWNED;				\
+	critical_exit();						\
+} while (0)
+#endif /* SMP */
 #endif
 
 /*
@@ -283,15 +309,10 @@ extern struct mtx_pool *mtxpool_sleep;
 	_get_sleep_lock((m), curthread, (opts), LOCK_FILE, LOCK_LINE)
 #define	mtx_unlock_flags(m, opts)					\
 	_rel_sleep_lock((m), curthread, (opts), LOCK_FILE, LOCK_LINE)
-#ifndef SMPnotyet
 #define	mtx_lock_spin_flags(m, opts)					\
 	_get_spin_lock((m), curthread, (opts), LOCK_FILE, LOCK_LINE)
 #define	mtx_unlock_spin_flags(m, opts)					\
 	_rel_spin_lock((m))
-#else	/* SMP */
-#define	mtx_lock_spin_flags(m, opts)	critical_enter()
-#define	mtx_unlock_spin_flags(m, opts)	critical_exit()
-#endif	/* SMP */
 #endif	/* LOCK_DEBUG > 0 || MUTEX_NOINLINE */
 
 #define mtx_trylock_flags(m, opts)					\
@@ -374,6 +395,7 @@ extern	int debug_mpsafenet;		/* defined in net/netisr.c */
 	if (!debug_mpsafenet)						\
 		mtx_assert(&Giant, MA_OWNED);				\
 } while (0)
+#define	NET_CALLOUT_MPSAFE	(debug_mpsafenet ? CALLOUT_MPSAFE : 0)
 
 #define	UGAR(rval) do {							\
 	int _val = (rval);						\
@@ -403,12 +425,12 @@ struct mtx_args {
  * support as _mtx_assert() itself uses them and the latter implies that
  * _mtx_assert() must build.
  */
-#ifdef INVARIANT_SUPPORT
+#if defined(INVARIANTS) || defined(INVARIANT_SUPPORT)
 #define MA_OWNED	0x01
 #define MA_NOTOWNED	0x02
 #define MA_RECURSED	0x04
 #define MA_NOTRECURSED	0x08
-#endif /* INVARIANT_SUPPORT */
+#endif
 
 #ifdef INVARIANTS
 #define	mtx_assert(m, what)						\

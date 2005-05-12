@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.13 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.43.2.1 2004/09/03 15:19:06 jhb Exp $
+ * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.43.2.3 2005/02/28 16:04:53 delphij Exp $
  */
 
 #ifndef _UFS_FFS_FS_H_
@@ -206,7 +206,12 @@
 #define	FFS_DIR_FREE		 4	/* free specified dir inodes in map */
 #define	FFS_FILE_FREE		 5	/* free specified file inodes in map */
 #define	FFS_SET_FLAGS		 6	/* set filesystem flags */
-#define	FFS_MAXID		 7	/* number of valid ffs ids */
+#define	FFS_ADJ_NDIR		 7	/* adjust number of directories */
+#define	FFS_ADJ_NBFREE		 8	/* adjust number of free blocks */
+#define	FFS_ADJ_NIFREE		 9	/* adjust number of free inodes */
+#define	FFS_ADJ_NFFREE		10 	/* adjust number of free frags */
+#define	FFS_ADJ_NUMCLUSTERS	11	/* adjust number of free clusters */
+#define	FFS_MAXID		12	/* number of valid ffs ids */
 
 /*
  * Command structure passed in to the filesystem to adjust filesystem values.

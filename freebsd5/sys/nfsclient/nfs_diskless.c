@@ -33,7 +33,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.8 2004/07/28 21:54:57 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.8.2.1 2005/01/24 13:50:04 brian Exp $");
+
+#include "opt_bootp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copryight 1997 Sean Eric Fagan
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 /*
  * procfs ioctl definitions.
  *
- * $FreeBSD: src/sys/sys/pioctl.h,v 1.12 2002/08/04 01:06:58 mdodd Exp $
+ * $FreeBSD: src/sys/sys/pioctl.h,v 1.12.8.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_PIOCTL_H

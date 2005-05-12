@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.3 (Berkeley) 4/4/95
- * $FreeBSD: src/sys/sys/param.h,v 1.209.2.4 2004/10/03 17:04:41 mlaier Exp $
+ * $FreeBSD: src/sys/sys/param.h,v 1.209.2.10.2.1 2005/04/03 07:51:13 kensmith Exp $
  */
 
 #ifndef _SYS_PARAM_H_
@@ -55,7 +55,7 @@
  * scheme is:  <major><two digit minor><0 if release branch, otherwise 1>xx
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 503001	/* Master, propagated to newvers */
+#define __FreeBSD_version 504000	/* Master, propagated to newvers */
 
 #ifndef LOCORE
 #include <sys/types.h>

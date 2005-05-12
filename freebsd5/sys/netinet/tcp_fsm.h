@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_fsm.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/tcp_fsm.h,v 1.16 2004/04/07 20:46:13 imp Exp $
+ * $FreeBSD: src/sys/netinet/tcp_fsm.h,v 1.16.2.2 2005/01/31 23:26:36 imp Exp $
  */
 
 #ifndef _NETINET_TCP_FSM_H_
@@ -43,7 +43,7 @@
 #define	TCPS_CLOSED		0	/* closed */
 #define	TCPS_LISTEN		1	/* listening for connection */
 #define	TCPS_SYN_SENT		2	/* active, have sent syn */
-#define	TCPS_SYN_RECEIVED	3	/* have send and received syn */
+#define	TCPS_SYN_RECEIVED	3	/* have sent and received syn */
 /* states < TCPS_ESTABLISHED are those where connections not established */
 #define	TCPS_ESTABLISHED	4	/* established */
 #define	TCPS_CLOSE_WAIT		5	/* rcvd fin, waiting for close */

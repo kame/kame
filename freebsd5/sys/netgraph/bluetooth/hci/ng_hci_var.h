@@ -1,6 +1,8 @@
 /*
  * ng_hci_var.h
- *
+ */
+
+/*-
  * Copyright (c) 2001 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_hci_var.h,v 1.3 2003/04/26 22:35:21 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_var.h,v 1.4 2004/04/09 23:01:39 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_var.h,v 1.4.2.2 2005/01/31 23:26:33 imp Exp $
  */
 
 #ifndef _NETGRAPH_HCI_VAR_H_
@@ -148,7 +150,7 @@ typedef struct ng_hci_unit {
 
 	ng_hci_unit_buff_t		buffer;         /* buffer info */
 
-	struct callout_handle		cmd_timo;       /* command timeout */
+	struct callout			cmd_timo;       /* command timeout */
 	ng_bt_mbufq_t			cmdq;           /* command queue */
 #define NG_HCI_CMD_QUEUE_LEN		12		/* max. size of cmd q */
 
@@ -183,7 +185,7 @@ typedef struct ng_hci_unit_con {
 	u_int8_t			mode;            /* ACTIVE, HOLD ... */
 	u_int8_t			role;            /* MASTER/SLAVE */
 
-	struct callout_handle		con_timo;        /* con. timeout */
+	struct callout			con_timo;        /* con. timeout */
 
 	int				pending;         /* # of data pkts */
 	ng_bt_itemq_t			conq;            /* con. queue */

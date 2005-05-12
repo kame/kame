@@ -1,11 +1,13 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
  * can do whatever you want with this stuff. If we meet some day, and you think
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
- *
+ */
+
+/*
  * A very simple device driver for PCI cards based on Xilinx 6200 series
  * FPGA/RPU devices.  Current Functionality is to allow you to open and
  * mmap the entire thing into your program.
@@ -15,7 +17,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/xrpu.c,v 1.39 2004/06/16 09:47:20 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/xrpu.c,v 1.39.2.2 2005/03/01 08:11:52 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -213,7 +215,7 @@ xrpu_probe(device_t self)
 		return ENXIO;
 
 	device_set_desc(self, desc);
-	return 0;
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int

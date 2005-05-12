@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000, 2001 Boris Popov
  * All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netncp/ncp_login.c,v 1.5 2003/06/11 05:30:35 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_login.c,v 1.5.4.1 2005/01/31 23:26:43 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>

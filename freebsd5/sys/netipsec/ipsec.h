@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec.h,v 1.7 2004/02/11 04:26:03 bms Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec.h,v 1.7.2.1 2005/01/31 23:26:41 imp Exp $	*/
 /*	$KAME: ipsec.h,v 1.53 2001/11/20 08:32:38 itojun Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *

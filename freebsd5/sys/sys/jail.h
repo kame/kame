@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/jail.h,v 1.21 2004/04/26 19:46:52 bmilekic Exp $
+ * $FreeBSD: src/sys/sys/jail.h,v 1.21.2.2 2005/02/22 15:49:22 cperciva Exp $
  *
  */
 
@@ -83,6 +83,7 @@ extern int	jail_socket_unixiproute_only;
 extern int	jail_sysvipc_allowed;
 extern int	jail_getfsstat_jailrootonly;
 extern int	jail_allow_raw_sockets;
+extern int	jail_chflags_allowed;
 
 LIST_HEAD(prisonlist, prison);
 extern struct	prisonlist allprison;

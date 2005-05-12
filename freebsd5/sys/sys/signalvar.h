@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signalvar.h	8.6 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/signalvar.h,v 1.67 2004/07/13 07:20:09 davidxu Exp $
+ * $FreeBSD: src/sys/sys/signalvar.h,v 1.67.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_SIGNALVAR_H_

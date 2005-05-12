@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 2001
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -32,7 +32,7 @@
  *
  *	@(#)float.h	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: float.h,v 1.3 2001/09/21 20:48:02 eeh Exp
- * $FreeBSD: src/sys/sparc64/include/float.h,v 1.5 2004/04/25 02:36:29 das Exp $
+ * $FreeBSD: src/sys/sparc64/include/float.h,v 1.5.2.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_FLOAT_H_

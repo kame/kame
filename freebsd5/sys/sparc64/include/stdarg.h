@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 David E. O'Brien.  All rights reserved.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +35,7 @@
  *
  *	@(#)stdarg.h	8.2 (Berkeley) 9/27/93
  *	$NetBSD: stdarg.h,v 1.11 2000/07/23 21:36:56 mycroft Exp $
- * $FreeBSD: src/sys/sparc64/include/stdarg.h,v 1.6 2002/10/06 22:01:07 mike Exp $
+ * $FreeBSD: src/sys/sparc64/include/stdarg.h,v 1.6.8.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_STDARG_H_

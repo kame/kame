@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1996 Wolfgang Solfrank.
  * Copyright (C) 1996 TooLs GmbH.
  * All rights reserved.
@@ -54,7 +54,7 @@
  *
  *	from: $NetBSD: ofw_machdep.c,v 1.16 2001/07/20 00:07:14 eeh Exp $
  *
- * $FreeBSD: src/sys/sparc64/sparc64/ofw_bus.c,v 1.11 2004/08/16 15:45:27 marius Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/ofw_bus.c,v 1.11.2.1 2005/01/31 23:26:55 imp Exp $
  */
 
 /*

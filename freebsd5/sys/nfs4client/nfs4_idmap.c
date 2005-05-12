@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_idmap.c,v 1.4 2004/02/21 22:52:02 rees Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_idmap.c,v 1.4.2.1 2005/01/31 23:26:45 imp Exp $ */
 /* $Id: nfs4_idmap.c,v 1.4 2003/11/05 14:58:59 rees Exp $ */
 
-/*
+/*-
  * copyright (c) 2003
  * the regents of the university of michigan
  * all rights reserved

@@ -1,6 +1,8 @@
 /*-
  * ng_etf.h
- *
+ */
+
+/*-
  * Copyright (c) 2001, FreeBSD Incorporated 
  * All rights reserved.
  *
@@ -28,7 +30,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_etf.h,v 1.4 2004/01/26 14:05:31 harti Exp $
+ * $FreeBSD: src/sys/netgraph/ng_etf.h,v 1.4.2.1 2005/01/31 23:26:28 imp Exp $
  */
 
 #ifndef _NETGRAPH_NG_ETF_H_

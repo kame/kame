@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2001 Julian Elischer <julian@freebsd.org>
  * for the FreeBSD Foundation.
  *
@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  *
- * $FreeBSD: src/sys/sys/kse.h,v 1.26 2004/08/08 22:32:20 davidxu Exp $
+ * $FreeBSD: src/sys/sys/kse.h,v 1.26.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_KSE_H_

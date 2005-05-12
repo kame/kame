@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcicvar.h,v 1.29 2002/07/20 22:29:23 imp Exp $
+ * $FreeBSD: src/sys/pccard/pcicvar.h,v 1.29.8.1 2005/01/31 23:26:49 imp Exp $
  */
 
 /*

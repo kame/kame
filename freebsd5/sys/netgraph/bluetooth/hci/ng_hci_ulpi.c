@@ -1,6 +1,8 @@
 /*
  * ng_hci_ulpi.c
- *
+ */
+
+/*-
  * Copyright (c) Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_hci_ulpi.c,v 1.7 2003/09/08 18:57:51 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_ulpi.c,v 1.7 2004/04/27 16:38:14 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_ulpi.c,v 1.7.2.1 2005/01/31 23:26:33 imp Exp $
  */
 
 #include <sys/param.h>

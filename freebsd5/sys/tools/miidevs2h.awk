@@ -1,6 +1,7 @@
 #! /usr/bin/awk -f
 #	$NetBSD: devlist2h.awk,v 1.2 1998/09/05 14:42:06 christos Exp $
-#
+
+#-
 # Copyright (c) 1998 The NetBSD Foundation, Inc.
 # All rights reserved.
 #
@@ -64,7 +65,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/tools/miidevs2h.awk,v 1.5 2004/05/26 00:19:39 imp Exp $
+# $FreeBSD: src/sys/tools/miidevs2h.awk,v 1.5.2.1 2005/01/31 23:26:59 imp Exp $
 #
 function collectline(f, line) {
 	oparen = 0

@@ -25,12 +25,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_amd64.c,v 1.1 2004/08/16 12:25:48 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_amd64.c,v 1.1.2.4 2005/03/10 23:38:49 obrien Exp $");
 
 #include "opt_bus.h"
-#ifdef __i386__
-#include "opt_agp.h"
-#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -83,10 +80,12 @@ agp_amd64_match(device_t dev)
 	switch (pci_get_devid(dev)) {
 	case 0x74541022:
 		return ("AMD 8151 AGP graphics tunnel");
-	case 0x10221039:
+	case 0x07551039:
 		return ("SiS 755 host to AGP bridge");
 	case 0x02041106:
 		return ("VIA 8380 host to PCI bridge");
+	case 0x02821106:
+		return ("VIA K8T800Pro host to PCI bridge");
 	case 0x31881106:
 		return ("VIA 8385 host to PCI bridge");
 	};
@@ -104,7 +103,7 @@ agp_amd64_probe(device_t dev)
 	if ((desc = agp_amd64_match(dev))) {
 		device_verbose(dev);
 		device_set_desc(dev, desc);
-		return 0;
+		return BUS_PROBE_DEFAULT;
 	}
 
 	return ENXIO;

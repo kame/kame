@@ -1,6 +1,8 @@
 /*
  * netgraph.h
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -35,7 +37,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.43.2.1 2004/08/26 20:58:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.43.2.5 2005/03/16 13:31:53 glebius Exp $
  * $Whistle: netgraph.h,v 1.29 1999/11/01 07:56:13 julian Exp $
  */
 
@@ -946,6 +948,7 @@ _ngi_hook(item_p item, char *file, int line)
 				SAVE_LINE(item);			\
 				(error) = ng_snd_item((item), 1);	\
 			} else {					\
+				NG_FREE_ITEM(item);			\
 				(error) = EINVAL;			\
 			}						\
 		} else {						\
@@ -1074,6 +1077,13 @@ int	ng_rmtype(struct ng_type *tp);
 int	ng_snd_item(item_p item, int queue);
 int 	ng_send_fn(node_p node, hook_p hook, ng_item_fn *fn,
 	void *arg1, int arg2);
+int	ng_uncallout(struct callout *c, node_p node);
+int	ng_callout(struct callout *c, node_p node, hook_p hook, int ticks,
+	    ng_item_fn *fn, void * arg1, int arg2);
+/* We should mark callout mpsafe as soon as we mark netgraph ISR mpsafe */
+#define	ng_callout_init(c)	callout_init(c, 0)
+
+/* Deprecated functions kept for compatibility */
 int	ng_untimeout(struct callout_handle handle, node_p node);
 struct callout_handle
 	ng_timeout(node_p node, hook_p hook, int ticks,

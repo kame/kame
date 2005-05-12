@@ -1,7 +1,8 @@
-
 /*
  * ng_lmi.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_lmi.c,v 1.19 2004/06/25 19:22:03 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_lmi.c,v 1.19.2.2 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_lmi.c,v 1.38 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -345,9 +346,9 @@ nglmi_inquire(sc_p sc, int full)
 	*cptr++ = 0x00;		/* call reference */
 	*cptr++ = 0x75;		/* inquiry */
 
-	/* If we are Annex-D, there is this extra thing.. */
+	/* If we are Annex-D, add locking shift to codeset 5. */
 	if (ANNEXD(sc))
-		*cptr++ = 0x95;	/* ??? */
+		*cptr++ = 0x95;	/* locking shift */
 	/* Add a request type */
 	if (ANNEXA(sc))
 		*cptr++ = 0x51;	/* report type */

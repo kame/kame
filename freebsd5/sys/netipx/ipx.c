@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -30,12 +30,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
+ *
  *	@(#)ipx.c
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx.c,v 1.26.4.1 2004/09/03 03:12:58 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx.c,v 1.26.4.4 2005/03/10 14:38:19 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -50,8 +50,6 @@ __FBSDID("$FreeBSD: src/sys/netipx/ipx.c,v 1.26.4.1 2004/09/03 03:12:58 rwatson 
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
 #include <netipx/ipx_var.h>
-
-NET_NEEDS_GIANT("ipx");
 
 /*
  * XXXRW: Requires synchronization.
@@ -204,7 +202,7 @@ ipx_control(so, cmd, data, ifp, td)
 		}
 		IFAFREE((&oia->ia_ifa));
 		return (0);
-	
+
 	case SIOCAIFADDR:
 		dstIsNew = 0;
 		hostIsNew = 1;
@@ -241,7 +239,7 @@ ipx_control(so, cmd, data, ifp, td)
 static void
 ipx_ifscrub(ifp, ia)
 	register struct ifnet *ifp;
-	register struct ipx_ifaddr *ia; 
+	register struct ipx_ifaddr *ia;
 {
 	if (ia->ia_flags & IFA_ROUTE) {
 		if (ifp->if_flags & IFF_POINTOPOINT) {

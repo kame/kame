@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.26.2.3 2004/09/10 00:04:18 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.26.2.6 2005/02/23 15:03:56 ssouhlal Exp $");
 
 #include <opt_sched.h>
 
@@ -76,6 +76,7 @@ TUNABLE_INT("vm.idlezero_maxrun", &idlezero_maxrun);
 #define ZIDLE_LO(v)	((v) * 2 / 3)
 #define ZIDLE_HI(v)	((v) * 4 / 5)
 
+static boolean_t wakeup_needed = FALSE;
 static int zero_state;
 
 static int
@@ -130,43 +131,36 @@ void
 vm_page_zero_idle_wakeup(void)
 {
 
-	if (idlezero_enable && vm_page_zero_check())
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
+	if (wakeup_needed && vm_page_zero_check()) {
+		wakeup_needed = FALSE;
 		wakeup(&zero_state);
+	}
 }
 
 static void
 vm_pagezero(void __unused *arg)
 {
-	struct proc *p;
-	struct rtprio rtp;
 	struct thread *td;
-	int pages, pri;
 
 	td = curthread;
-	p = td->td_proc;
-	rtp.prio = RTP_PRIO_MAX;
-	rtp.type = RTP_PRIO_IDLE;
-	pages = 0;
-	mtx_lock_spin(&sched_lock);
-	rtp_to_pri(&rtp, td->td_ksegrp);
-	pri = td->td_priority;
-	mtx_unlock_spin(&sched_lock);
 	idlezero_enable = idlezero_enable_default;
 
 	for (;;) {
 		if (vm_page_zero_check()) {
-			pages += vm_page_zero_idle();
+			vm_page_zero_idle();
 #ifndef PREEMPTION
-			if (pages > idlezero_maxrun || sched_runnable()) {
+			if (sched_runnable()) {
 				mtx_lock_spin(&sched_lock);
 				mi_switch(SW_VOL, NULL);
 				mtx_unlock_spin(&sched_lock);
-				pages = 0;
 			}
 #endif
 		} else {
-			tsleep(&zero_state, pri, "pgzero", hz * 300);
-			pages = 0;
+			vm_page_lock_queues();
+			wakeup_needed = TRUE;
+			msleep(&zero_state, &vm_page_queue_mtx,
+			    PDROP | td->td_priority, "pgzero", hz * 300);
 		}
 	}
 }
@@ -177,6 +171,7 @@ static void
 pagezero_start(void __unused *arg)
 {
 	int error;
+	struct thread *td;
 
 	error = kthread_create(vm_pagezero, NULL, &pagezero_proc, RFSTOPPED, 0,
 	    "pagezero");
@@ -189,7 +184,11 @@ pagezero_start(void __unused *arg)
 	pagezero_proc->p_flag |= P_NOLOAD;
 	PROC_UNLOCK(pagezero_proc);
 	mtx_lock_spin(&sched_lock);
-	setrunqueue(FIRST_THREAD_IN_PROC(pagezero_proc), SRQ_BORING);
+	td = FIRST_THREAD_IN_PROC(pagezero_proc);
+	setrunqueue(td, SRQ_BORING);
+	td->td_ksegrp->kg_user_pri = PRI_MAX_IDLE;
+	sched_class(td->td_ksegrp, PRI_IDLE);
+	sched_prio(td, PRI_MAX_IDLE);
 	mtx_unlock_spin(&sched_lock);
 }
 SYSINIT(pagezero, SI_SUB_KTHREAD_VM, SI_ORDER_ANY, pagezero_start, NULL)

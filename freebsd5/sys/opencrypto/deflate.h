@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/opencrypto/deflate.h,v 1.1 2002/10/04 20:31:22 sam Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/deflate.h,v 1.1.10.1 2005/01/31 23:26:48 imp Exp $	*/
 /* $OpenBSD: deflate.h,v 1.3 2002/03/14 01:26:51 millert Exp $ */
 
-/*
+/*-
  * Copyright (c) 2001 Jean-Jacques Bernard-Gundol (jj@wabbitt.org)
  *
  * Redistribution and use in source and binary forms, with or without

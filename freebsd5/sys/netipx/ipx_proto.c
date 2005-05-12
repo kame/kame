@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_proto.c,v 1.17 2003/06/11 05:25:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_proto.c,v 1.17.4.2 2005/02/25 13:26:39 rwatson Exp $");
 
 #include "opt_ipx.h"
 
@@ -94,7 +94,7 @@ static struct protosw ipxsw[] = {
 };
 
 static struct	domain ipxdomain =
-    { AF_IPX, "network systems", 0, 0, 0, 
+    { AF_IPX, "network systems", 0, 0, 0,
       ipxsw, &ipxsw[sizeof(ipxsw)/sizeof(ipxsw[0])], 0,
       rn_inithead, 16, sizeof(struct sockaddr_ipx)};
 

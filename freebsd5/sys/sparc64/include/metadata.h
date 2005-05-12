@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Jake Burkholder.
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/metadata.h,v 1.4 2003/05/01 03:31:18 peter Exp $
+ * $FreeBSD: src/sys/sparc64/include/metadata.h,v 1.4.6.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_METADATA_H_

@@ -1,5 +1,5 @@
 /*      $OpenBSD: cast.c,v 1.2 2000/06/06 06:49:47 deraadt Exp $       */
-/*
+/*-
  *	CAST-128 in C
  *	Written by Steve Reid <sreid@sea-to-sky.net>
  *	100% Public Domain - no warranty
@@ -7,7 +7,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/cast.c,v 1.2 2003/06/11 05:57:50 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/cast.c,v 1.2.4.1 2005/01/31 23:26:48 imp Exp $");
 
 #include <sys/types.h>
 #include <opencrypto/cast.h>

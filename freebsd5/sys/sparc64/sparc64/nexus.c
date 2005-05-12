@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  * Copyright 2001 by Thomas Moestl <tmm@FreeBSD.org>.
  * All rights reserved.
@@ -30,7 +30,7 @@
  *
  * 	from: FreeBSD: src/sys/i386/i386/nexus.c,v 1.43 2001/02/09
  *
- * $FreeBSD: src/sys/sparc64/sparc64/nexus.c,v 1.15 2004/08/16 15:45:27 marius Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/nexus.c,v 1.15.2.1 2005/01/31 23:26:55 imp Exp $
  */
 
 #include <sys/param.h>

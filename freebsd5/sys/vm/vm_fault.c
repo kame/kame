@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1994 John S. Dyson
@@ -72,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_fault.c,v 1.192 2004/08/16 06:16:12 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_fault.c,v 1.192.2.4 2005/02/26 20:23:20 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -148,7 +148,7 @@ unlock_map(struct faultstate *fs)
 }
 
 static void
-_unlock_things(struct faultstate *fs, int dealloc)
+unlock_and_deallocate(struct faultstate *fs)
 {
 
 	vm_object_pip_wakeup(fs->object);
@@ -162,22 +162,17 @@ _unlock_things(struct faultstate *fs, int dealloc)
 		VM_OBJECT_UNLOCK(fs->first_object);
 		fs->first_m = NULL;
 	}
-	if (dealloc) {
-		vm_object_deallocate(fs->first_object);
-	}
+	vm_object_deallocate(fs->first_object);
 	unlock_map(fs);	
 	if (fs->vp != NULL) { 
+		mtx_lock(&Giant);
 		vput(fs->vp);
-		if (debug_mpsafevm)
-			mtx_unlock(&Giant);
+		mtx_unlock(&Giant);
 		fs->vp = NULL;
 	}
-	if (dealloc)
+	if (!fs->map->system_map)
 		VM_UNLOCK_GIANT();
 }
-
-#define unlock_things(fs) _unlock_things(fs, 0)
-#define unlock_and_deallocate(fs) _unlock_things(fs, 1)
 
 /*
  * TRYPAGER - used by vm_fault to calculate whether the pager for the
@@ -291,11 +286,14 @@ RetryFault:;
 	 *
 	 * XXX vnode_pager_lock() can block without releasing the map lock.
 	 */
-	mtx_lock(&Giant);
+	if (!fs.map->system_map)
+		mtx_lock(&Giant);
 	VM_OBJECT_LOCK(fs.first_object);
 	vm_object_reference_locked(fs.first_object);
 	fs.vp = vnode_pager_lock(fs.first_object);
-	if (fs.vp == NULL && debug_mpsafevm)
+	KASSERT(fs.vp == NULL || !fs.map->system_map,
+	    ("vm_fault: vnode-backed object mapped by system map"));
+	if (debug_mpsafevm && !fs.map->system_map)
 		mtx_unlock(&Giant);
 	vm_object_pip_add(fs.first_object, 1);
 
@@ -364,12 +362,36 @@ RetryFault:;
 			 */
 			if ((fs.m->flags & PG_BUSY) || fs.m->busy) {
 				vm_page_unlock_queues();
-				unlock_things(&fs);
-				vm_page_lock_queues();
-				if (!vm_page_sleep_if_busy(fs.m, TRUE, "vmpfw"))
+				VM_OBJECT_UNLOCK(fs.object);
+				if (fs.object != fs.first_object) {
+					VM_OBJECT_LOCK(fs.first_object);
+					vm_page_lock_queues();
+					vm_page_free(fs.first_m);
 					vm_page_unlock_queues();
+					vm_object_pip_wakeup(fs.first_object);
+					VM_OBJECT_UNLOCK(fs.first_object);
+					fs.first_m = NULL;
+				}
+				unlock_map(&fs);
+				if (fs.vp != NULL) {
+					mtx_lock(&Giant);
+					vput(fs.vp);
+					mtx_unlock(&Giant);
+					fs.vp = NULL;
+				}
+				VM_OBJECT_LOCK(fs.object);
+				if (fs.m == vm_page_lookup(fs.object,
+				    fs.pindex)) {
+					vm_page_lock_queues();
+					if (!vm_page_sleep_if_busy(fs.m, TRUE,
+					    "vmpfw"))
+						vm_page_unlock_queues();
+				}
+				vm_object_pip_wakeup(fs.object);
+				VM_OBJECT_UNLOCK(fs.object);
 				atomic_add_int(&cnt.v_intrans, 1);
-				VM_UNLOCK_GIANT();
+				if (!fs.map->system_map)
+					VM_UNLOCK_GIANT();
 				vm_object_deallocate(fs.first_object);
 				goto RetryFault;
 			}
@@ -923,7 +945,7 @@ vm_fault_prefault(pmap_t pmap, vm_offset_t addra, vm_map_entry_t entry)
 	vm_page_t m, mpte;
 	vm_object_t object;
 
-	if (!curthread || (pmap != vmspace_pmap(curthread->td_proc->p_vmspace)))
+	if (pmap != vmspace_pmap(curthread->td_proc->p_vmspace))
 		return;
 
 	object = entry->object.vm_object;
@@ -1053,8 +1075,6 @@ vm_fault_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
 
 	pmap = vm_map_pmap(map);
 
-	if (pmap != kernel_pmap)
-		mtx_lock(&Giant);
 	/*
 	 * Since the pages are wired down, we must be able to get their
 	 * mappings from the physical map system.
@@ -1070,8 +1090,6 @@ vm_fault_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			}
 		}
 	}
-	if (pmap != kernel_pmap)
-		mtx_unlock(&Giant);
 }
 
 /*

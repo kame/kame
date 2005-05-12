@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -26,10 +26,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.45.2.1 2004/09/02 21:18:09 rwatson Exp $
+ * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.45.2.3 2005/02/12 15:23:57 rwatson Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -338,12 +338,6 @@ rip6_output(m, va_alist)
 	va_end(ap);
 
 	in6p = sotoin6pcb(so);
-	/*
-	 * XXXRW: In IPv6, we don't start referencing the contents of the
-	 * inpcb until after all M_TRYWAIT allocations have finished.  We may
-	 * want to reorder this function to provide similar guarantees here,
-	 * so as to avoid holding a mutex over M_TRYWAIT.
-	 */
 	INP_LOCK(in6p);
 	stickyopt = in6p->in6p_outputopts;
 

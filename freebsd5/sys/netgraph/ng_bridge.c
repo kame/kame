@@ -1,7 +1,8 @@
-
 /*
  * ng_bridge.c
- *
+ */
+
+/*-
  * Copyright (c) 2000 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.28 2004/08/17 22:05:53 andre Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.28.2.3 2005/02/25 17:17:27 glebius Exp $
  */
 
 /*
@@ -127,7 +128,7 @@ static struct	ng_bridge_host *ng_bridge_get(priv_p priv, const u_char *addr);
 static int	ng_bridge_put(priv_p priv, const u_char *addr, int linkNum);
 static void	ng_bridge_rehash(priv_p priv);
 static void	ng_bridge_remove_hosts(priv_p priv, int linkNum);
-static void	ng_bridge_timeout(void *arg);
+static void	ng_bridge_timeout(node_p node, hook_p hook, void *arg1, int arg2);
 static const	char *ng_bridge_nodename(node_p node);
 
 /* Ethernet broadcast */
@@ -299,7 +300,7 @@ ng_bridge_constructor(node_p node)
 	MALLOC(priv, priv_p, sizeof(*priv), M_NETGRAPH_BRIDGE, M_NOWAIT | M_ZERO);
 	if (priv == NULL)
 		return (ENOMEM);
-	callout_init(&priv->timer, 0);
+	ng_callout_init(&priv->timer);
 
 	/* Allocate and initialize hash table, etc. */
 	MALLOC(priv->tab, struct ng_bridge_bucket *,
@@ -328,7 +329,7 @@ ng_bridge_constructor(node_p node)
 	priv->node = node;
 
 	/* Start timer; timer is always running while node is alive */
-	callout_reset(&priv->timer, hz, ng_bridge_timeout, priv->node);
+	ng_callout(&priv->timer, node, NULL, hz, ng_bridge_timeout, NULL, 0);
 
 	/* Done */
 	return (0);
@@ -753,16 +754,20 @@ ng_bridge_shutdown(node_p node)
 	const priv_p priv = NG_NODE_PRIVATE(node);
 
 	/*
-	 * Shut down everything except the timer. There's no way to
-	 * avoid another possible timeout event (it may have already
-	 * been dequeued), so we can't free the node yet.
+	 * Shut down everything including the timer.  Even if the
+	 * callout has already been dequeued and is about to be
+	 * run, ng_bridge_timeout() won't be fired as the node
+	 * is already marked NGF_INVALID, so we're safe to free
+	 * the node now.
 	 */
 	KASSERT(priv->numLinks == 0 && priv->numHosts == 0,
 	    ("%s: numLinks=%d numHosts=%d",
 	    __func__, priv->numLinks, priv->numHosts));
+	ng_uncallout(&priv->timer, node);
+	NG_NODE_SET_PRIVATE(node, NULL);
+	NG_NODE_UNREF(node);
 	FREE(priv->tab, M_NETGRAPH_BRIDGE);
-
-	/* NGF_INVALID flag is now set so node will be freed at next timeout */
+	FREE(priv, M_NETGRAPH_BRIDGE);
 	return (0);
 }
 
@@ -955,30 +960,14 @@ ng_bridge_remove_hosts(priv_p priv, int linkNum)
  * we decrement link->loopCount for those links being muted due to
  * a detected loopback condition, and we remove any hosts from
  * the hashtable whom we haven't heard from in a long while.
- *
- * If the node has the NGF_INVALID flag set, our job is to kill it.
  */
 static void
-ng_bridge_timeout(void *arg)
+ng_bridge_timeout(node_p node, hook_p hook, void *arg1, int arg2)
 {
-	const node_p node = arg;
 	const priv_p priv = NG_NODE_PRIVATE(node);
-	int s, bucket;
+	int bucket;
 	int counter = 0;
 	int linkNum;
-
-	/* If node was shut down, this is the final lingering timeout */
-	s = splnet();
-	if (NG_NODE_NOT_VALID(node)) {
-		FREE(priv, M_NETGRAPH_BRIDGE);
-		NG_NODE_SET_PRIVATE(node, NULL);
-		NG_NODE_UNREF(node);
-		splx(s);
-		return;
-	}
-
-	/* Register a new timeout, keeping the existing node reference */
-	callout_reset(&priv->timer, hz, ng_bridge_timeout, node);
 
 	/* Update host time counters and remove stale entries */
 	for (bucket = 0; bucket < priv->numBuckets; bucket++) {
@@ -1032,8 +1021,8 @@ ng_bridge_timeout(void *arg)
 	KASSERT(priv->numLinks == counter,
 	    ("%s: links: %d != %d", __func__, priv->numLinks, counter));
 
-	/* Done */
-	splx(s);
+	/* Register a new timeout, keeping the existing node reference */
+	ng_callout(&priv->timer, node, NULL, hz, ng_bridge_timeout, NULL, 0);
 }
 
 /*

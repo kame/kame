@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/resource.h,v 1.2 2001/07/31 06:05:04 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/resource.h,v 1.2.8.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_RESOURCE_H_

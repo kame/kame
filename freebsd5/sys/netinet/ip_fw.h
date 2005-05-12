@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Luigi Rizzo, Universita` di Pisa
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.89.2.2 2004/10/03 17:04:40 mlaier Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.89.2.3 2005/01/31 23:26:35 imp Exp $
  */
 
 #ifndef _IPFW2_H

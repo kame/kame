@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_amd.c,v 1.21 2004/08/16 12:23:53 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_amd.c,v 1.21.2.1 2005/03/01 08:11:50 imp Exp $");
 
 #include "opt_bus.h"
 
@@ -209,7 +209,7 @@ agp_amd_probe(device_t dev)
 	if (desc) {
 		device_verbose(dev);
 		device_set_desc(dev, desc);
-		return 0;
+		return BUS_PROBE_DEFAULT;
 	}
 
 	return ENXIO;

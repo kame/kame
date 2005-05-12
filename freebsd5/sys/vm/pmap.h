@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/pmap.h,v 1.69 2004/04/10 22:41:46 alc Exp $
+ * $FreeBSD: src/sys/vm/pmap.h,v 1.69.2.1 2005/01/31 23:27:02 imp Exp $
  */
 
 /*

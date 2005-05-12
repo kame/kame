@@ -1,7 +1,8 @@
-
 /*
  * ng_ksocket.h
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.10 2004/06/25 22:59:59 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.10.2.2 2005/02/19 14:35:01 glebius Exp $
  * $Whistle: ng_ksocket.h,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -99,6 +100,7 @@ enum {
 /* Structure for sockaddr tag */
 struct sa_tag {
 	struct m_tag	tag;
+	ng_ID_t		id;
 	struct sockaddr	sa;
 };
 

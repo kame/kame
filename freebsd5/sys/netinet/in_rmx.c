@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1994, 1995 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.51 2003/11/20 20:07:37 andre Exp $
+ * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.51.4.2 2005/02/14 13:20:30 ru Exp $
  */
 
 /*
@@ -178,7 +178,10 @@ in_clsroute(struct radix_node *rn, struct radix_node_head *head)
 	if ((rt->rt_flags & (RTF_LLINFO | RTF_HOST)) != RTF_HOST)
 		return;
 
-	if ((rt->rt_flags & (RTF_WASCLONED | RTPRF_OURS)) != RTF_WASCLONED)
+	if (rt->rt_flags & RTPRF_OURS)
+		return;
+
+	if (!(rt->rt_flags & (RTF_WASCLONED | RTF_DYNAMIC)))
 		return;
 
 	/*

@@ -1,6 +1,8 @@
 /*
  * ng_l2cap_ulpi.h
- *
+ */
+
+/*-
  * Copyright (c) Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_l2cap_ulpi.h,v 1.1 2002/11/24 19:47:06 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_ulpi.h,v 1.2 2003/05/10 21:44:41 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_ulpi.h,v 1.2.6.1 2005/01/31 23:26:34 imp Exp $
  */
 
 #ifndef _NETGRAPH_L2CAP_ULPI_H_

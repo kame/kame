@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/xmaciireg.h,v 1.3 2000/04/22 02:16:37 wpaul Exp $
+ * $FreeBSD: src/sys/pci/xmaciireg.h,v 1.3.8.1 2005/01/31 23:26:51 imp Exp $
  */
 
 /*

@@ -1,7 +1,8 @@
-
 /*
  * ng_echo.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Julian Elisher <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_echo.c,v 1.11 2004/05/29 00:51:10 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_echo.c,v 1.11.2.1 2005/01/31 23:26:28 imp Exp $
  * $Whistle: ng_echo.c,v 1.13 1999/11/01 09:24:51 julian Exp $
  */
 

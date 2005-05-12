@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/inflate.h,v 1.13 2002/03/26 08:29:40 phk Exp $
+ * $FreeBSD: src/sys/sys/inflate.h,v 1.13.8.1 2005/01/31 23:26:56 imp Exp $
  *
  */
 #ifndef	_SYS_INFLATE_H_

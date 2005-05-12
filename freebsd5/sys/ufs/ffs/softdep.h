@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998, 2000 Marshall Kirk McKusick. All Rights Reserved.
  *
  * The soft updates code is derived from the appendix of a University
@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)softdep.h	9.7 (McKusick) 6/21/00
- * $FreeBSD: src/sys/ufs/ffs/softdep.h,v 1.16 2002/07/19 07:29:38 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/softdep.h,v 1.16.8.1 2005/01/31 23:27:00 imp Exp $
  */
 
 #include <sys/queue.h>

@@ -1,6 +1,8 @@
-/*
- * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
- * All rights reserved.
+/*-
+ * Copyright (c) 2004, 2005,
+ *     Bosko Milekic <bmilekic@FreeBSD.org>.  All rights reserved.
+ * Copyright (c) 2002, 2003, 2004, 2005,
+ *     Jeffrey Roberson <jeff@FreeBSD.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/uma_dbg.c,v 1.15.2.1 2004/10/16 01:41:34 green Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/uma_dbg.c,v 1.15.2.4 2005/02/16 21:53:08 bmilekic Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

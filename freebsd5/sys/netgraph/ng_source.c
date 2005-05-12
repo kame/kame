@@ -1,6 +1,8 @@
 /*
  * ng_source.c
- *
+ */
+
+/*-
  * Copyright 2002 Sandvine Inc.
  * All rights reserved.
  *
@@ -36,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/ng_source.c,v 1.18 2004/07/20 17:15:37 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/ng_source.c,v 1.18.2.3 2005/01/31 23:26:29 imp Exp $");
 
 /*
  * This node is used for high speed packet geneneration.  It queues
@@ -87,7 +89,7 @@ struct privdata {
 	struct ng_source_stats		stats;
 	struct ifqueue			snd_queue;	/* packets to send */
 	struct ifnet			*output_ifp;
-	struct callout_handle		intr_ch;
+	struct callout			intr_ch;
 	u_int64_t			packets;	/* packets to send */
 	u_int32_t			queueOctets;
 };
@@ -219,8 +221,8 @@ ng_source_constructor(node_p node)
 	NG_NODE_SET_PRIVATE(node, sc);
 	sc->node = node;
 	sc->snd_queue.ifq_maxlen = 2048;	/* XXX not checked */
-	callout_handle_init(&sc->intr_ch);   /* XXX fix.. will
-						cause problems. */
+	ng_callout_init(&sc->intr_ch);
+
 	return (0);
 }
 
@@ -331,7 +333,7 @@ ng_source_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			timevalclear(&sc->stats.elapsedTime);
 			timevalclear(&sc->stats.endTime);
 			getmicrotime(&sc->stats.startTime);
-			sc->intr_ch = ng_timeout(node, NULL, 0,
+			ng_callout(&sc->intr_ch, node, NULL, 0,
 			    ng_source_intr, sc, 0);
 		    }
 		    break;
@@ -359,7 +361,7 @@ ng_source_rcvmsg(node_p node, item_p item, hook_p lasthook)
 				timevalclear(&sc->stats.elapsedTime);
 				timevalclear(&sc->stats.endTime);
 				getmicrotime(&sc->stats.startTime);
-				sc->intr_ch = ng_timeout(node, NULL, 0,
+				ng_callout(&sc->intr_ch, node, NULL, 0,
 				    ng_source_intr, sc, 0);
 			}
 			break;
@@ -586,7 +588,7 @@ static void
 ng_source_stop (sc_p sc)
 {
 	if (sc->node->nd_flags & NG_SOURCE_ACTIVE) {
-		ng_untimeout(sc->intr_ch, sc->node);
+		ng_uncallout(&sc->intr_ch, sc->node);
 		sc->node->nd_flags &= ~NG_SOURCE_ACTIVE;
 		getmicrotime(&sc->stats.endTime);
 		sc->stats.elapsedTime = sc->stats.endTime;
@@ -610,7 +612,6 @@ ng_source_intr(node_p node, hook_p hook, void *arg1, int arg2)
 
 	KASSERT(sc != NULL, ("%s: null node private", __func__));
 
-	callout_handle_init(&sc->intr_ch);
 	if (sc->packets == 0 || sc->output.hook == NULL
 	    || (sc->node->nd_flags & NG_SOURCE_ACTIVE) == 0) {
 		ng_source_stop(sc);
@@ -627,8 +628,8 @@ ng_source_intr(node_p node, hook_p hook, void *arg1, int arg2)
 	if (sc->packets == 0)
 		ng_source_stop(sc);
 	else
-		sc->intr_ch = ng_timeout(node, NULL, 0,
-		    ng_source_intr, sc, NG_SOURCE_INTR_TICKS);
+		ng_callout(&sc->intr_ch, node, NULL, NG_SOURCE_INTR_TICKS,
+		    ng_source_intr, sc, 0);
 }
 
 /*

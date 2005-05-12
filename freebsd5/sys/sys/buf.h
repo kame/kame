@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.167 2004/07/25 21:24:23 phk Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.167.2.1 2005/01/31 23:26:55 imp Exp $
  */
 
 #ifndef _SYS_BUF_H_

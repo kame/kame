@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Wind River Systems, Inc.
  * All rights reserved.
  * Written by: John Baldwin <jhb@FreeBSD.org>
@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/pcpu.h,v 1.13 2004/03/27 18:21:24 marcel Exp $
+ * $FreeBSD: src/sys/sys/pcpu.h,v 1.13.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_PCPU_H_

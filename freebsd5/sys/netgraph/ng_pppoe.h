@@ -1,7 +1,8 @@
-
 /*
  * ng_pppoe.h
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.20 2004/07/27 19:47:13 glebius Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.20.2.1 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_pppoe.h,v 1.7 1999/10/16 10:16:43 julian Exp $
  */
 

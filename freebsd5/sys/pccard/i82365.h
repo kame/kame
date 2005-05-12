@@ -7,7 +7,8 @@
  *
  * Updated 3/3/95 to include Cirrus Logic stuff.
  *-------------------------------------------------------------------------
- *
+ */
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  * Copyright (c) 1995 Andrew McRae.  All rights reserved.
  *
@@ -33,7 +34,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/i82365.h,v 1.28 2004/08/13 06:57:31 imp Exp $
+ * $FreeBSD: src/sys/pccard/i82365.h,v 1.28.2.1 2005/01/31 23:26:49 imp Exp $
  */
 
 #define	PCIC_I82365	0		/* Intel i82365SL-A/B or clone */

@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright (c) 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)lock.h	8.12 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/lockmgr.h,v 1.40 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/lockmgr.h,v 1.40.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef	_SYS_LOCKMGR_H_

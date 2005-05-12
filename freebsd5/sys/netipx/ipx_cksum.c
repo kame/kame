@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1982, 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_cksum.c,v 1.11 2004/07/28 06:58:23 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_cksum.c,v 1.11.2.2 2005/02/25 13:26:39 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/mbuf.h>
@@ -100,7 +100,7 @@ ipx_cksum(struct mbuf *m, int len) {
 			w++;
 			if (--len == 0)
 				break;
-		} 
+		}
 	}
 
 	ipx->ipx_tc = oldtc;

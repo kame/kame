@@ -1,4 +1,5 @@
-/*
+/*-
+ * Copyright (c) 2004-2005 Robert N. M. Watson
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +34,7 @@
  *
  *	@(#)ipx_pcb.h
  *
- * $FreeBSD: src/sys/netipx/ipx_pcb.h,v 1.18 2003/01/01 18:48:56 schweikh Exp $
+ * $FreeBSD: src/sys/netipx/ipx_pcb.h,v 1.18.6.5 2005/03/10 14:27:00 rwatson Exp $
  */
 
 #ifndef _NETIPX_IPX_PCB_H_
@@ -43,20 +44,29 @@
  * IPX protocol interface control block.
  */
 struct ipxpcb {
-	struct	ipxpcb *ipxp_next;	/* doubly linked list */
-	struct	ipxpcb *ipxp_prev;
-	struct	ipxpcb *ipxp_head;
+	LIST_ENTRY(ipxpcb) ipxp_list;
 	struct	socket *ipxp_socket;	/* back pointer to socket */
 	struct	ipx_addr ipxp_faddr;	/* destination address */
 	struct	ipx_addr ipxp_laddr;	/* socket's address */
 	caddr_t	ipxp_pcb;		/* protocol specific stuff */
 	struct	route ipxp_route;	/* routing information */
 	struct	ipx_addr ipxp_lastdst;	/* validate cached route for dg socks*/
-	long	ipxp_notify_param;	/* extra info passed via ipx_pcbnotify*/
 	short	ipxp_flags;
 	u_char	ipxp_dpt;		/* default packet type for ipx_output */
 	u_char	ipxp_rpt;		/* last received packet type by ipx_input() */
+	struct	mtx ipxp_mtx;
 };
+
+/*
+ * Additional IPX pcb-related types and variables.
+ */
+LIST_HEAD(ipxpcbhead, ipxpcb);
+extern struct ipxpcbhead ipxpcb_list;
+extern struct ipxpcbhead ipxrawpcb_list;
+
+#ifdef _KERNEL
+extern struct mtx	ipxpcb_list_mtx;
+#endif
 
 /* possible flags */
 
@@ -80,9 +90,7 @@ struct ipxpcb {
 #define	IPXRCVQ		40960
 
 #ifdef _KERNEL
-extern struct ipxpcb ipxpcb;			/* head of list */
-
-int	ipx_pcballoc(struct socket *so, struct ipxpcb *head,
+int	ipx_pcballoc(struct socket *so, struct ipxpcbhead *head,
 			  struct thread *p);
 int	ipx_pcbbind(struct ipxpcb *ipxp, struct sockaddr *nam,
 			 struct thread *p);
@@ -92,10 +100,21 @@ void	ipx_pcbdetach(struct ipxpcb *ipxp);
 void	ipx_pcbdisconnect(struct ipxpcb *ipxp);
 struct ipxpcb *
 	ipx_pcblookup(struct ipx_addr *faddr, int lport, int wildp);
-void	ipx_pcbnotify(struct ipx_addr *dst, int errno,
-			   void (*notify)(struct ipxpcb *), long param);
 void	ipx_setpeeraddr(struct ipxpcb *ipxp, struct sockaddr **nam);
 void	ipx_setsockaddr(struct ipxpcb *ipxp, struct sockaddr **nam);
+
+#define	IPX_LIST_LOCK_INIT()	mtx_init(&ipxpcb_list_mtx, "ipx_list_mtx", \
+				    NULL, MTX_DEF | MTX_RECURSE)
+#define	IPX_LIST_LOCK()		mtx_lock(&ipxpcb_list_mtx)
+#define	IPX_LIST_UNLOCK()	mtx_unlock(&ipxpcb_list_mtx)
+#define	IPX_LIST_LOCK_ASSERT()	mtx_assert(&ipxpcb_list_mtx, MA_OWNED)
+
+#define	IPX_LOCK_INIT(ipx)	mtx_init(&(ipx)->ipxp_mtx, "ipx_mtx", NULL, \
+				    MTX_DEF)
+#define	IPX_LOCK_DESTROY(ipx)	mtx_destroy(&(ipx)->ipxp_mtx)
+#define	IPX_LOCK(ipx)		mtx_lock(&(ipx)->ipxp_mtx)
+#define	IPX_UNLOCK(ipx)		mtx_unlock(&(ipx)->ipxp_mtx)
+#define	IPX_LOCK_ASSERT(ipx)	mtx_assert(&(ipx)->ipxp_mtx, MA_OWNED)
 #endif /* _KERNEL */
 
 #endif /* !_NETIPX_IPX_PCB_H_ */

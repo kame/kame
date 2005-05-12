@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Matthew R. Green
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  *
  *	from: NetBSD: iommuvar.h,v 1.9 2001/07/20 00:07:13 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/include/iommuvar.h,v 1.14 2003/07/10 23:27:35 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/iommuvar.h,v 1.14.4.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_IOMMUVAR_H_

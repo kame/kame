@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.158 2004/07/30 22:08:52 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.158.2.3 2005/01/31 23:26:46 imp Exp $");
 
 #include "opt_bootp.h"
 #include "opt_nfsroot.h"
@@ -239,7 +239,6 @@ nfs_statfs(struct mount *mp, struct statfs *sbp, struct thread *td)
 	struct mbuf *mreq, *mrep, *md, *mb;
 	struct nfsnode *np;
 	u_quad_t tquad;
-	int bsize;
 
 #ifndef nolint
 	sfp = NULL;
@@ -267,29 +266,17 @@ nfs_statfs(struct mount *mp, struct statfs *sbp, struct thread *td)
 	sbp->f_flags = nmp->nm_flag;
 	sbp->f_iosize = nfs_iosize(nmp);
 	if (v3) {
-		for (bsize = NFS_FABLKSIZE; ; bsize *= 2) {
-			sbp->f_bsize = bsize;
-			tquad = fxdr_hyper(&sfp->sf_tbytes);
-			if (((long)(tquad / bsize) > LONG_MAX) ||
-			    ((long)(tquad / bsize) < LONG_MIN))
-				continue;
-			sbp->f_blocks = tquad / bsize;
-			tquad = fxdr_hyper(&sfp->sf_fbytes);
-			if (((long)(tquad / bsize) > LONG_MAX) ||
-			    ((long)(tquad / bsize) < LONG_MIN))
-				continue;
-			sbp->f_bfree = tquad / bsize;
-			tquad = fxdr_hyper(&sfp->sf_abytes);
-			if (((long)(tquad / bsize) > LONG_MAX) ||
-			    ((long)(tquad / bsize) < LONG_MIN))
-				continue;
-			sbp->f_bavail = tquad / bsize;
-			sbp->f_files = (fxdr_unsigned(int32_t,
-			    sfp->sf_tfiles.nfsuquad[1]) & 0x7fffffff);
-			sbp->f_ffree = (fxdr_unsigned(int32_t,
-			    sfp->sf_ffiles.nfsuquad[1]) & 0x7fffffff);
-			break;
-		}
+		sbp->f_bsize = NFS_FABLKSIZE;
+		tquad = fxdr_hyper(&sfp->sf_tbytes);
+		sbp->f_blocks = tquad / NFS_FABLKSIZE;
+		tquad = fxdr_hyper(&sfp->sf_fbytes);
+		sbp->f_bfree = tquad / NFS_FABLKSIZE;
+		tquad = fxdr_hyper(&sfp->sf_abytes);
+		sbp->f_bavail = tquad / NFS_FABLKSIZE;
+		sbp->f_files = (fxdr_unsigned(int32_t,
+		    sfp->sf_tfiles.nfsuquad[1]) & 0x7fffffff);
+		sbp->f_ffree = (fxdr_unsigned(int32_t,
+		    sfp->sf_ffiles.nfsuquad[1]) & 0x7fffffff);
 	} else {
 		sbp->f_bsize = fxdr_unsigned(int32_t, sfp->sf_bsize);
 		sbp->f_blocks = fxdr_unsigned(int32_t, sfp->sf_blocks);
@@ -382,6 +369,11 @@ nfsmout:
  * - If nfs_diskless.mygateway is filled in, use that address as
  *   a default gateway.
  * - build the rootfs mount point and call mountnfs() to do the rest.
+ *
+ * It is assumed to be safe to read, modify, and write the nfsv3_diskless
+ * structure, as well as other global NFS client variables here, as
+ * nfs_mountroot() will be called once in the boot before any other NFS
+ * client activity occurs.
  */
 int
 nfs_mountroot(struct mount *mp, struct thread *td)
@@ -393,7 +385,7 @@ nfs_mountroot(struct mount *mp, struct thread *td)
 	u_long l;
 	char buf[128];
 
-	GIANT_REQUIRED;		/* XXX until socket locking done */
+	NET_ASSERT_GIANT();
 
 #if defined(BOOTP_NFSROOT) && defined(BOOTP)
 	bootpc_init();		/* use bootp to get nfs_diskless filled in */

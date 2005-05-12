@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Marcel Moolenaar
  * Copyright (c) 2002 Thomas Moestl
  * All rights reserved.
@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/dump_machdep.c,v 1.7 2003/12/26 14:30:19 obrien Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/dump_machdep.c,v 1.7.2.1 2005/01/31 23:26:55 imp Exp $
  */
 
 #include <sys/param.h>

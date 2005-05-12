@@ -1,4 +1,4 @@
-/*
+/*-
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_subr.c,v 1.16 2004/07/19 12:54:00 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_subr.c,v 1.16.2.1 2005/01/31 23:26:27 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

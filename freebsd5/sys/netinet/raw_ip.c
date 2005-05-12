@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.142.2.2 2004/10/14 11:45:26 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.142.2.4.2.1 2005/05/06 02:51:10 cperciva Exp $
  */
 
 #include "opt_inet6.h"
@@ -249,7 +249,8 @@ rip_output(struct mbuf *m, struct socket *so, u_long dst)
 	struct ip *ip;
 	int error;
 	struct inpcb *inp = sotoinpcb(so);
-	int flags = (so->so_options & SO_DONTROUTE) | IP_ALLOWBROADCAST;
+	int flags = ((so->so_options & SO_DONTROUTE) ? IP_ROUTETOIF : 0) |
+	    IP_ALLOWBROADCAST;
 
 	/*
 	 * If the user handed us a complete IP packet, use it.
@@ -846,6 +847,7 @@ rip_pcblist(SYSCTL_HANDLER_ARGS)
 		inp = inp_list[i];
 		if (inp->inp_gencnt <= gencnt) {
 			struct xinpcb xi;
+			bzero(&xi, sizeof(xi));
 			xi.xi_len = sizeof xi;
 			/* XXX should avoid extra copy */
 			bcopy(inp, &xi.xi_inp, sizeof *inp);

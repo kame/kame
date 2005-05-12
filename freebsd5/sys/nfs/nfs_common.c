@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfs/nfs_common.c,v 1.115 2004/04/07 04:59:56 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/nfs/nfs_common.c,v 1.115.2.1 2005/01/31 23:26:45 imp Exp $");
 
 /*
  * These functions support the macros and help fiddle mbuf chains for

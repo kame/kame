@@ -1,6 +1,8 @@
 /*
  * ng_gif_demux.h
- *
+ */
+
+/*-
  * Copyright 2001 The Aerospace Corporation.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_gif_demux.h,v 1.4 2003/03/05 19:24:22 peter Exp $
+ * $FreeBSD: src/sys/netgraph/ng_gif_demux.h,v 1.4.6.1 2005/01/31 23:26:29 imp Exp $
  */
 
 #ifndef _NETGRAPH_NG_GIF_DEMUX_H_

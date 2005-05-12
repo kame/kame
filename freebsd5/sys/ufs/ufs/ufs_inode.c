@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.54 2004/07/28 06:41:27 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.54.2.3 2005/03/01 11:32:32 phk Exp $");
 
 #include "opt_quota.h"
 #include "opt_ufs.h"

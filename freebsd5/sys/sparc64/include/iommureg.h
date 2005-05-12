@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  *	from: @(#)sbusreg.h	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: iommureg.h,v 1.6 2001/07/20 00:07:13 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/include/iommureg.h,v 1.5 2004/04/07 05:00:00 imp Exp $
+ * $FreeBSD: src/sys/sparc64/include/iommureg.h,v 1.5.2.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_IOMMUREG_H_

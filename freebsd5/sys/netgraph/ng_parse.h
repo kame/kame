@@ -1,7 +1,8 @@
-
 /*
  * ng_parse.h
- *
+ */
+
+/*-
  * Copyright (c) 1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -37,7 +38,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.h,v 1.2 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.10 2004/01/26 14:05:31 harti Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.10.2.2 2005/01/31 23:26:29 imp Exp $
  */
 
 #ifndef _NETGRAPH_NG_PARSE_H_
@@ -113,7 +114,7 @@
 
     Note that omitted fields and array elements get their default
     values ("bar" and ary[2]), and that the alignment is handled
-    automatically (the extra 00 byte after "num").  Also, since byte
+    automatically (the extra 00 byte after "alen").  Also, since byte
     order and alignment are inherently machine dependent, so is this
     conversion process.  The above example shows an x86 (little
     endian) encoding.  Also the above example is tricky because the

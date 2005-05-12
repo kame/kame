@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/ver.h,v 1.4 2002/11/07 16:07:46 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/ver.h,v 1.4.8.1 2005/02/28 12:40:36 marius Exp $
  */
 
 #ifndef	_MACHINE_VER_H_
@@ -69,5 +69,6 @@ extern char sparc64_model[];
 #define	CPU_IMPL_ULTRASPARCIIe	0x13
 #define	CPU_IMPL_ULTRASPARCIII	0x14
 #define	CPU_IMPL_ULTRASPARCIIIp	0x15
+#define	CPU_IMPL_ULTRASPARCIIIi	0x16
 
 #endif /* !_MACHINE_VER_H_ */

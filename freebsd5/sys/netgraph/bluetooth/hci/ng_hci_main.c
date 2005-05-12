@@ -1,6 +1,8 @@
 /*
  * ng_hci_main.c
- *
+ */
+
+/*-
  * Copyright (c) Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_hci_main.c,v 1.2 2003/03/18 00:09:36 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_main.c,v 1.4 2004/05/29 00:51:17 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_main.c,v 1.4.2.2 2005/01/31 23:26:33 imp Exp $
  */
 
 #include <sys/param.h>
@@ -132,7 +134,7 @@ ng_hci_constructor(node_p node)
 	NG_HCI_BUFF_SCO_SET(unit->buffer, 1, 10, 1);
 
 	/* Init command queue & command timeout handler */
-	callout_handle_init(&unit->cmd_timo);
+	ng_callout_init(&unit->cmd_timo);
 	NG_BT_MBUFQ_INIT(&unit->cmdq, NG_HCI_CMD_QUEUE_LEN);
 
 	/* Init lists */

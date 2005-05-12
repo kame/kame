@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996-1999 Eduardo Horvath
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,7 +21,7 @@
  *
  *	from: NetBSD: sbusreg.h,v 1.7 1999/06/07 05:28:03 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sbus/sbusreg.h,v 1.1 2002/02/13 16:11:36 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/sbus/sbusreg.h,v 1.1.8.1 2005/01/31 23:26:54 imp Exp $
  */
 
 #ifndef _SPARC64_SBUS_SBUSREG_H_

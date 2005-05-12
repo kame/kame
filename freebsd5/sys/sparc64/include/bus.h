@@ -69,7 +69,7 @@
  *	and
  *	from: FreeBSD: src/sys/alpha/include/bus.h,v 1.9 2001/01/09
  *
- * $FreeBSD: src/sys/sparc64/include/bus.h,v 1.33 2004/06/28 03:49:13 scottl Exp $
+ * $FreeBSD: src/sys/sparc64/include/bus.h,v 1.33.2.1 2005/02/25 22:59:31 scottl Exp $
  */
 
 #ifndef	_MACHINE_BUS_H_
@@ -988,6 +988,8 @@ struct bus_dma_methods {
 	    bus_size_t, bus_dmamap_callback_t *, void *, int);
 	int	(*dm_dmamap_load_mbuf)(bus_dma_tag_t, bus_dmamap_t,
 	    struct mbuf *, bus_dmamap_callback2_t *, void *, int);
+	int	(*dm_dmamap_load_mbuf_sg)(bus_dma_tag_t, bus_dmamap_t,
+	    struct mbuf *, bus_dma_segment_t *segs, int *nsegs, int);
 	int	(*dm_dmamap_load_uio)(bus_dma_tag_t, bus_dmamap_t, struct uio *,
 	    bus_dmamap_callback2_t *, void *, int);
 	void	(*dm_dmamap_unload)(bus_dma_tag_t, bus_dmamap_t);
@@ -1039,6 +1041,8 @@ int bus_dma_tag_destroy(bus_dma_tag_t);
 	((t)->dt_mt->dm_dmamap_load((t), (m), (p), (s), (cb), (cba), (f)))
 #define	bus_dmamap_load_mbuf(t, m, mb, cb, cba, f)			\
 	((t)->dt_mt->dm_dmamap_load_mbuf((t), (m), (mb), (cb), (cba), (f)))
+#define	bus_dmamap_load_mbuf_sg(t, m, mb, segs, nsegs, f)		\
+	((t)->dt_mt->dm_dmamap_load_mbuf_sg((t), (m), (mb), (segs), (nsegs), (f)))
 #define	bus_dmamap_load_uio(t, m, ui, cb, cba, f)			\
 	((t)->dt_mt->dm_dmamap_load_uio((t), (m), (ui), (cb), (cba), (f)))
 #define	bus_dmamap_unload(t, p)						\

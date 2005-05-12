@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 2002 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/statvfs.h,v 1.3 2002/08/21 16:20:01 mike Exp $
+ * $FreeBSD: src/sys/sys/statvfs.h,v 1.3.8.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_STATVFS_H_

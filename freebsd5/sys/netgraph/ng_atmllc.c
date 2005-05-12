@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003-2004 Benno Rice <benno@eloquent.com.au>
  * All Rights Reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_atmllc.c,v 1.2 2004/05/29 00:51:10 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_atmllc.c,v 1.2.2.1 2005/01/31 23:26:28 imp Exp $
  */
 
 #include <sys/param.h>

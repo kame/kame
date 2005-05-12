@@ -1,7 +1,7 @@
 /*	$NetBSD: ip_gre.h,v 1.5 2002/06/09 16:33:40 itojun Exp $ */
-/*	 $FreeBSD: src/sys/netinet/ip_gre.h,v 1.2 2002/10/16 22:27:27 alfred Exp $ */
+/*	 $FreeBSD: src/sys/netinet/ip_gre.h,v 1.2.10.1 2005/01/31 23:26:35 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

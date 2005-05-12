@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003-2004
  *	Hartmut Brandt
  * 	All rights reserved.
@@ -28,7 +28,7 @@
  *
  * Customisation of call control source to the NG environment.
  *
- * $FreeBSD: src/sys/netgraph/atm/ccatm/ng_ccatm_cust.h,v 1.1 2004/08/12 14:22:00 harti Exp $
+ * $FreeBSD: src/sys/netgraph/atm/ccatm/ng_ccatm_cust.h,v 1.1.2.1 2005/01/31 23:26:31 imp Exp $
  */
 
 #include <sys/param.h>

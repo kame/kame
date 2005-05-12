@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.222.2.2 2004/09/30 23:36:08 dougb Exp $
+# $FreeBSD: src/include/Makefile,v 1.222.2.8 2005/03/07 20:38:51 phk Exp $
 #
 # Doing a "make install" builds /usr/include.
 
@@ -34,16 +34,25 @@ LDIRS=	cam geom net net80211 netatalk netatm netgraph netinet netinet6 \
 	netipsec netipx netkey netnatm netncp netsmb nfs nfsclient nfsserver \
 	pccard posix4 sys vm
 
-LSUBDIRS=	cam/scsi dev/an dev/bktr dev/firewire dev/ic dev/iicbus \
-	dev/ofw dev/ppbus dev/smbus dev/usb dev/wi dev/utopia fs/devfs \
-	fs/fdescfs fs/fifofs fs/msdosfs fs/ntfs fs/nullfs fs/nwfs fs/portalfs \
-	fs/procfs fs/smbfs fs/udf fs/umapfs fs/unionfs \
+LSUBDIRS=	cam/scsi \
+	dev/acpica dev/an dev/bktr dev/firewire \
+	dev/ic dev/iicbus ${_dev_ieee488} dev/ofw \
+	dev/ppbus dev/smbus dev/usb dev/wi dev/utopia \
+	fs/devfs fs/fdescfs fs/fifofs fs/msdosfs fs/ntfs fs/nullfs \
+	fs/nwfs fs/portalfs fs/procfs fs/smbfs fs/udf fs/umapfs \
+	fs/unionfs \
 	geom/concat geom/gate geom/label geom/mirror geom/nop geom/raid3 \
-	geom/stripe \
-	isofs/cd9660 netatm/ipatm netatm/sigpvc netatm/spans netatm/uni \
-	netgraph/atm security/mac_biba security/mac_bsdextended \
-	security/mac_lomac security/mac_mls security/mac_partition \
+	geom/shsec geom/stripe \
+	isofs/cd9660 \
+	netatm/ipatm netatm/sigpvc netatm/spans netatm/uni \
+	netgraph/atm netgraph/netflow \
+	security/mac_biba security/mac_bsdextended security/mac_lomac \
+	security/mac_mls security/mac_partition \
 	ufs/ffs ufs/ufs
+
+.if !defined(NO_GPIB)
+_dev_ieee488=	dev/ieee488
+.endif
 
 .if !defined(NO_BLUETOOTH)
 LSUBSUBDIRS=	netgraph/bluetooth/include
@@ -104,7 +113,7 @@ compat:
 .endif
 
 copies:
-.for i in ${LDIRS} ${LSUBDIRS} crypto machine machine/pc
+.for i in ${LDIRS} ${LSUBDIRS} ${LSUBSUBDIRS} altq crypto machine machine/pc
 .if exists(${DESTDIR}${INCLUDEDIR}/$i)
 	cd ${DESTDIR}${INCLUDEDIR}/$i; \
 	for h in *.h; do \
@@ -112,11 +121,14 @@ copies:
 	done
 .endif
 .endfor
-.for i in ${LDIRS} ${LSUBDIRS:Ndev/bktr} ${LSUBSUBDIRS}
+.for i in ${LDIRS} ${LSUBDIRS:Ndev/acpica:Ndev/bktr} ${LSUBSUBDIRS}
 	cd ${.CURDIR}/../sys; \
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
 	    ${DESTDIR}${INCLUDEDIR}/$i
 .endfor
+	cd ${.CURDIR}/../sys/dev/acpica; \
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 acpiio.h \
+	    ${DESTDIR}${INCLUDEDIR}/dev/acpica
 	cd ${.CURDIR}/../sys/dev/bktr; \
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ioctl_*.h \
 	    ${DESTDIR}${INCLUDEDIR}/dev/bktr
@@ -149,12 +161,22 @@ symlinks:
 		ln -fs ../../../sys/$i/$$h ${DESTDIR}${INCLUDEDIR}/$i; \
 	done
 .endfor
-.for i in ${LSUBDIRS}
+.for i in ${LSUBDIRS:Ndev/acpica:Ndev/bktr}
 	cd ${.CURDIR}/../sys/$i; \
 	for h in *.h; do \
 		ln -fs ../../../../sys/$i/$$h ${DESTDIR}${INCLUDEDIR}/$i; \
 	done
 .endfor
+	cd ${.CURDIR}/../sys/dev/acpica; \
+	for h in acpiio.h; do \
+		ln -fs ../../../../sys/dev/acpica/$$h \
+		    ${DESTDIR}${INCLUDEDIR}/dev/acpica; \
+	done
+	cd ${.CURDIR}/../sys/dev/bktr; \
+	for h in ioctl_*.h; do \
+		ln -fs ../../../../sys/dev/bktr/$$h \
+		    ${DESTDIR}${INCLUDEDIR}/dev/bktr; \
+	done
 .for i in ${LSUBSUBDIRS}
 	cd ${.CURDIR}/../sys/$i; \
 	for h in *.h; do \

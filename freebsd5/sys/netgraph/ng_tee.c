@@ -1,7 +1,9 @@
 
 /*
  * ng_tee.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +38,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.31 2004/06/26 22:24:16 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.31.2.1 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_tee.c,v 1.18 1999/11/01 09:24:52 julian Exp $
  */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/event.h,v 1.26 2004/08/15 15:36:18 jmg Exp $
+ * $FreeBSD: src/sys/sys/event.h,v 1.26.2.2 2005/03/30 08:11:34 jmg Exp $
  */
 
 #ifndef _SYS_EVENT_H_
@@ -140,8 +140,6 @@ MALLOC_DECLARE(M_KQUEUE);
 #define KNOTE(list, hist, lock)		knote(list, hist, lock)
 #define KNOTE_LOCKED(list, hint)	knote(list, hint, 1)
 #define KNOTE_UNLOCKED(list, hint)	knote(list, hint, 0)
-#define KNOTE_STATUS_BEGIN(kn)		knote_status(kn, 1)
-#define KNOTE_STATUS_END(kn)		knote_status(kn, 0)
 
 /*
  * Flag indicating hint is a signal.  Used by EVFILT_SIGNAL, and also
@@ -200,14 +198,18 @@ struct proc;
 struct knlist;
 
 extern void	knote(struct knlist *list, long hint, int islocked);
-extern void	knote_status(struct knote *kn, int begin);
 extern void	knlist_add(struct knlist *knl, struct knote *kn, int islocked);
 extern void	knlist_remove(struct knlist *knl, struct knote *kn, int islocked);
 extern void	knlist_remove_inevent(struct knlist *knl, struct knote *kn);
 extern int	knlist_empty(struct knlist *knl);
 extern void	knlist_init(struct knlist *knl, struct mtx *mtx);
 extern void	knlist_destroy(struct knlist *knl);
-extern void	knlist_clear(struct knlist *knl, int islocked);
+extern void	knlist_cleardel(struct knlist *knl, struct thread *td,
+	int islocked, int killkn);
+#define knlist_clear(knl, islocked)				\
+		knlist_cleardel((knl), NULL, (islocked), 0)
+#define knlist_delete(knl, td, islocked)			\
+		knlist_cleardel((knl), (td), (islocked), 1)
 extern void	knote_fdclose(struct thread *p, int fd);
 extern int 	kqueue_register(struct kqueue *kq,
 		    struct kevent *kev, struct thread *p, int waitok);

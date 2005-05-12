@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netinet6/ipcomp6.h,v 1.2 2001/06/11 12:39:06 ume Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/ipcomp6.h,v 1.2.8.1 2005/01/31 23:26:39 imp Exp $	*/
 /*	$KAME: ipcomp.h,v 1.8 2000/09/26 07:55:14 itojun Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
  *

@@ -1,4 +1,4 @@
-/*
+/*-
  * Initial implementation:
  * Copyright (c) 2001 Robert Drehmel
  * All rights reserved.
@@ -6,7 +6,7 @@
  * As long as the above copyright statement and this notice remain
  * unchanged, you can do what ever you want with this file.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/identcpu.c,v 1.12 2004/04/30 14:04:21 marius Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/identcpu.c,v 1.12.2.2 2005/02/28 12:40:37 marius Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,6 +69,9 @@ cpu_identify(u_long vers, u_int freq, u_int id)
 		break;
 	case CPU_IMPL_ULTRASPARCIIIp:
 		impls = "UltraSparc-III+";
+		break;
+	case CPU_IMPL_ULTRASPARCIIIi:
+		impls = "UltraSparc-IIIi";
 		break;
 	default:
 		impls = NULL;

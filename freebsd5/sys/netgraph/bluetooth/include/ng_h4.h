@@ -1,6 +1,8 @@
 /*
  * ng_h4.h
- *
+ */
+
+/*-
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_h4.h,v 1.1 2002/11/24 19:47:05 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_h4.h,v 1.4 2004/05/10 02:24:55 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_h4.h,v 1.4.2.1 2005/01/31 23:26:33 imp Exp $
  * 
  * Based on:
  * ---------

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1991 The Regents of the University of California.
  * All rights reserved.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.h	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/sys/cons.h,v 1.36 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/cons.h,v 1.36.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _MACHINE_CONS_H_

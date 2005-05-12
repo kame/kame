@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
  *
  *	@(#)spx_timer.h
  *
- * $FreeBSD: src/sys/netipx/spx_timer.h,v 1.10 1999/08/28 00:49:44 peter Exp $
+ * $FreeBSD: src/sys/netipx/spx_timer.h,v 1.10.26.1 2005/01/31 23:26:42 imp Exp $
  */
 
 #ifndef _NETIPX_SPX_TIMER_H_

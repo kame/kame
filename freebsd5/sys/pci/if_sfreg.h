@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sfreg.h,v 1.10 2003/11/14 19:00:31 sam Exp $
+ * $FreeBSD: src/sys/pci/if_sfreg.h,v 1.10.4.3 2005/01/31 23:26:50 imp Exp $
  */
 
 /*
@@ -1046,6 +1046,9 @@ struct sf_softc {
 	int			sf_if_flags;
 	struct callout_handle	sf_stat_ch;
 	struct mtx		sf_mtx;
+#ifdef DEVICE_POLLING
+	int			rxcycles;
+#endif /* DEVICE_POLLING */
 };
 
 

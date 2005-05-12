@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994 David S. Miller, davem@nadzieja.rutgers.edu
  * Copyright (c) 1995 Paul Kranenburg
  * Copyright (c) 2001 Thomas Moestl <tmm@FreeBSD.org>
@@ -31,7 +31,7 @@
  *
  *	from: NetBSD: db_disasm.c,v 1.9 2000/08/16 11:29:42 pk Exp
  *
- * $FreeBSD: src/sys/sparc64/include/instr.h,v 1.6 2002/07/16 17:44:01 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/instr.h,v 1.6.8.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_INSTR_H_

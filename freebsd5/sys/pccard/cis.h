@@ -4,7 +4,8 @@
  *	structures and card information, not
  *	driver/process communication.
  *-------------------------------------------------------------------------
- *
+ */
+/*-
  * Copyright (c) 1995 Andrew McRae.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/cis.h,v 1.4 2000/04/26 15:36:24 iwasaki Exp $
+ * $FreeBSD: src/sys/pccard/cis.h,v 1.4.8.1 2005/01/31 23:26:49 imp Exp $
  *
  */
 

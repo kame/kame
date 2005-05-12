@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -26,10 +26,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.6 2004/04/07 20:46:16 imp Exp $
+ * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.6.2.1 2005/01/31 23:26:40 imp Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -58,7 +58,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.6 2004/04/07 20:46:16 imp Exp $
+ * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.6.2.1 2005/01/31 23:26:40 imp Exp $
  */
 
 #ifndef _NETINET_TCP6_VAR_H_

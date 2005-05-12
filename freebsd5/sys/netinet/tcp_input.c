@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.252 2004/08/17 22:05:54 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.252.2.14 2005/02/27 21:43:54 ps Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -132,6 +132,11 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, rfc3390, CTLFLAG_RW,
     &tcp_do_rfc3390, 0,
     "Enable RFC 3390 (Increasing TCP's Initial Congestion Window)");
 
+static int tcp_insecure_rst = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, insecure_rst, CTLFLAG_RW,
+    &tcp_insecure_rst, 0,
+    "Follow the old (insecure) criteria for accepting RST packets.");
+
 SYSCTL_NODE(_net_inet_tcp, OID_AUTO, reass, CTLFLAG_RW, 0,
 	    "TCP Segment Reassembly Queue");
 
@@ -224,6 +229,8 @@ tcp_reass(tp, th, tlenp, m)
 	struct socket *so = tp->t_inpcb->inp_socket;
 	int flags;
 
+	INP_LOCK_ASSERT(tp->t_inpcb);
+
 	/*
 	 * XXX: tcp_reass() is rather inefficient with its data structures
 	 * and should be rewritten (see NetBSD for optimizations).  While
@@ -231,10 +238,10 @@ tcp_reass(tp, th, tlenp, m)
 	 */
 
 	/*
-	 * Call with th==0 after become established to
+	 * Call with th==NULL after become established to
 	 * force pre-ESTABLISHED data up to user socket.
 	 */
-	if (th == 0)
+	if (th == NULL)
 		goto present;
 
 	/*
@@ -359,7 +366,6 @@ present:
 		flags = q->tqe_th->th_flags & TH_FIN;
 		nq = LIST_NEXT(q, tqe_q);
 		LIST_REMOVE(q, tqe_q);
-		/* Unlocked read. */
 		if (so->so_rcv.sb_state & SBS_CANTRCVMORE)
 			m_freem(q->tqe_m);
 		else
@@ -611,6 +617,7 @@ tcp_input(m, off0)
 	INP_INFO_WLOCK(&tcbinfo);
 	headlocked = 1;
 findpcb:
+	KASSERT(headlocked, ("tcp_input: findpcb: head not locked"));
 #ifdef IPFIREWALL_FORWARD
 	/* Grab info from PACKET_TAG_IPFORWARD tag prepended to the chain. */
 	fwd_tag = m_tag_find(m, PACKET_TAG_IPFORWARD, NULL);
@@ -997,7 +1004,7 @@ findpcb:
 		goto drop;
 	}
 after_listen:
-	KASSERT(headlocked, ("tcp_input(): after_listen head is not locked"));
+	KASSERT(headlocked, ("tcp_input: after_listen: head not locked"));
 	INP_LOCK_ASSERT(inp);
 
 	/* XXX temp debugging */
@@ -1100,8 +1107,6 @@ after_listen:
 	if (tp->sack_enable) {
 		/* Delete stale (cumulatively acked) SACK holes */
 		tcp_del_sackholes(tp, th);
-		tp->rcv_laststart = th->th_seq; /* last recv'd segment*/
-		tp->rcv_lastend = th->th_seq + tlen;
 	}
 
 	/*
@@ -1159,6 +1164,7 @@ after_listen:
 			      !IN_FASTRECOVERY(tp)))) {
 				KASSERT(headlocked, ("headlocked"));
 				INP_INFO_WUNLOCK(&tcbinfo);
+				headlocked = 0;
 				/*
 				 * this is a pure ack for outstanding data.
 				 */
@@ -1247,6 +1253,7 @@ after_listen:
 		    tlen <= sbspace(&so->so_rcv)) {
 			KASSERT(headlocked, ("headlocked"));
 			INP_INFO_WUNLOCK(&tcbinfo);
+			headlocked = 0;
 			/*
 			 * this is a pure, in-sequence data packet
 			 * with nothing on the reassembly queue and
@@ -1278,7 +1285,6 @@ after_listen:
 #endif
 			 * Add data to socket buffer.
 			 */
-			/* Unlocked read. */
 			SOCKBUF_LOCK(&so->so_rcv);
 			if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
 				m_freem(m);
@@ -1486,8 +1492,8 @@ after_listen:
 		}
 
 trimthenstep6:
-		KASSERT(headlocked,
-		    ("tcp_input(): trimthenstep6 head is not locked"));
+		KASSERT(headlocked, ("tcp_input: trimthenstep6: head not "
+		    "locked"));
 		INP_LOCK_ASSERT(inp);
 
 		/*
@@ -1616,8 +1622,9 @@ trimthenstep6:
 	 *      RFC 1337.
 	 */
 	if (thflags & TH_RST) {
-		if (SEQ_GEQ(th->th_seq, tp->last_ack_sent) &&
-		    SEQ_LT(th->th_seq, tp->last_ack_sent + tp->rcv_wnd)) {
+		if ((SEQ_GEQ(th->th_seq, tp->last_ack_sent) &&
+		    SEQ_LT(th->th_seq, tp->last_ack_sent + tp->rcv_wnd)) ||
+		    (tp->rcv_wnd == 0 && tp->last_ack_sent == th->th_seq)) {
 			switch (tp->t_state) {
 
 			case TCPS_SYN_RECEIVED:
@@ -1625,7 +1632,8 @@ trimthenstep6:
 				goto close;
 
 			case TCPS_ESTABLISHED:
-				if (tp->last_ack_sent != th->th_seq) {
+				if (tp->last_ack_sent != th->th_seq &&
+			 	    tcp_insecure_rst == 0) {
 					tcpstat.tcps_badrst++;
 					goto drop;
 				}
@@ -1980,15 +1988,11 @@ trimthenstep6:
 					tp->t_rtttime = 0;
 					if (tp->sack_enable) {
 						tcpstat.tcps_sack_recovery_episode++;
-						tp->snd_cwnd =
-						    tp->t_maxseg *
-						    tp->t_dupacks;
+						tp->sack_newdata = tp->snd_nxt;
+						tp->snd_cwnd = tp->t_maxseg;
 						(void) tcp_output(tp);
-						tp->snd_cwnd +=
-						    tp->snd_ssthresh;
 						goto drop;
 					}
-
 					tp->snd_nxt = th->th_ack;
 					tp->snd_cwnd = tp->t_maxseg;
 					(void) tcp_output(tp);
@@ -2099,8 +2103,8 @@ trimthenstep6:
 		}
 
 process_ACK:
-		KASSERT(headlocked,
-		    ("tcp_input(): process_ACK head is not locked"));
+		KASSERT(headlocked, ("tcp_input: process_ACK: head not "
+		    "locked"));
 		INP_LOCK_ASSERT(inp);
 
 		acked = th->th_ack - tp->snd_una;
@@ -2248,7 +2252,8 @@ process_ACK:
 		 */
 		case TCPS_CLOSING:
 			if (ourfinisacked) {
-				KASSERT(headlocked, ("headlocked"));
+				KASSERT(headlocked, ("tcp_input: process_ACK: "
+				    "head not locked"));
 				tcp_twstart(tp);
 				INP_INFO_WUNLOCK(&tcbinfo);
 				m_freem(m);
@@ -2283,7 +2288,7 @@ process_ACK:
 	}
 
 step6:
-	KASSERT(headlocked, ("tcp_input(): step6 head is not locked"));
+	KASSERT(headlocked, ("tcp_input: step6: head not locked"));
 	INP_LOCK_ASSERT(inp);
 
 	/*
@@ -2317,9 +2322,11 @@ step6:
 		 * soreceive.  It's hard to imagine someone
 		 * actually wanting to send this much urgent data.
 		 */
+		SOCKBUF_LOCK(&so->so_rcv);
 		if (th->th_urp + so->so_rcv.sb_cc > sb_max) {
 			th->th_urp = 0;			/* XXX */
 			thflags &= ~TH_URG;		/* XXX */
+			SOCKBUF_UNLOCK(&so->so_rcv);	/* XXX */
 			goto dodata;			/* XXX */
 		}
 		/*
@@ -2338,15 +2345,14 @@ step6:
 		 */
 		if (SEQ_GT(th->th_seq+th->th_urp, tp->rcv_up)) {
 			tp->rcv_up = th->th_seq + th->th_urp;
-			SOCKBUF_LOCK(&so->so_rcv);
 			so->so_oobmark = so->so_rcv.sb_cc +
 			    (tp->rcv_up - tp->rcv_nxt) - 1;
 			if (so->so_oobmark == 0)
 				so->so_rcv.sb_state |= SBS_RCVATMARK;
-			SOCKBUF_UNLOCK(&so->so_rcv);
 			sohasoutofband(so);
 			tp->t_oobflags &= ~(TCPOOB_HAVEDATA | TCPOOB_HADDATA);
 		}
+		SOCKBUF_UNLOCK(&so->so_rcv);
 		/*
 		 * Remove out of band data so doesn't get presented to user.
 		 * This can happen independent of advancing the URG pointer,
@@ -2368,7 +2374,7 @@ step6:
 			tp->rcv_up = tp->rcv_nxt;
 	}
 dodata:							/* XXX */
-	KASSERT(headlocked, ("tcp_input(): dodata head is not locked"));
+	KASSERT(headlocked, ("tcp_input: dodata: head not locked"));
 	INP_LOCK_ASSERT(inp);
 
 	/*
@@ -2406,7 +2412,6 @@ dodata:							/* XXX */
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += tlen;
 			ND6_HINT(tp);
-			/* Unlocked read. */
 			SOCKBUF_LOCK(&so->so_rcv);
 			if (so->so_rcv.sb_state & SBS_CANTRCVMORE)
 				m_freem(m);
@@ -2417,8 +2422,8 @@ dodata:							/* XXX */
 			thflags = tcp_reass(tp, th, &tlen, m);
 			tp->t_flags |= TF_ACKNOW;
 		}
-			if (tp->sack_enable)
-				tcp_update_sack_list(tp);
+		if (tp->sack_enable)
+			tcp_update_sack_list(tp, th->th_seq, th->th_seq + tlen);
 		/*
 		 * Note the amount of data that peer has sent into
 		 * our window, in order to estimate the sender's
@@ -2477,7 +2482,8 @@ dodata:							/* XXX */
 		 * standard timers.
 		 */
 		case TCPS_FIN_WAIT_2:
-			KASSERT(headlocked == 1, ("headlocked should be 1"));
+			KASSERT(headlocked == 1, ("tcp_input: dodata: "
+			    "TCP_FIN_WAIT_2: head not locked"));
 			tcp_twstart(tp);
 			INP_INFO_WUNLOCK(&tcbinfo);
 			return;
@@ -2493,6 +2499,7 @@ dodata:							/* XXX */
 		}
 	}
 	INP_INFO_WUNLOCK(&tcbinfo);
+	headlocked = 0;
 #ifdef TCPDEBUG
 	if (so->so_options & SO_DEBUG)
 		tcp_trace(TA_INPUT, ostate, tp, (void *)tcp_saveipgen,
@@ -2506,6 +2513,7 @@ dodata:							/* XXX */
 		(void) tcp_output(tp);
 
 check_delack:
+	KASSERT(headlocked == 0, ("tcp_input: check_delack: head locked"));
 	INP_LOCK_ASSERT(inp);
 	if (tp->t_flags & TF_DELACK) {
 		tp->t_flags &= ~TF_DELACK;
@@ -2516,6 +2524,7 @@ check_delack:
 	return;
 
 dropafterack:
+	KASSERT(headlocked, ("tcp_input: dropafterack: head not locked"));
 	/*
 	 * Generate an ACK dropping incoming segment if it occupies
 	 * sequence space, where the ACK reflects our state.
@@ -2544,13 +2553,14 @@ dropafterack:
 #endif
 	KASSERT(headlocked, ("headlocked should be 1"));
 	INP_INFO_WUNLOCK(&tcbinfo);
-	m_freem(m);
 	tp->t_flags |= TF_ACKNOW;
 	(void) tcp_output(tp);
 	INP_UNLOCK(inp);
+	m_freem(m);
 	return;
 
 dropwithreset:
+	KASSERT(headlocked, ("tcp_input: dropwithreset: head not locked"));
 	/*
 	 * Generate a RST, dropping incoming segment.
 	 * Make ACK acceptable to originator of segment.
@@ -2612,9 +2622,9 @@ drop:
 #endif
 	if (tp)
 		INP_UNLOCK(inp);
-	m_freem(m);
 	if (headlocked)
 		INP_INFO_WUNLOCK(&tcbinfo);
+	m_freem(m);
 	return;
 }
 
@@ -2783,6 +2793,8 @@ tcp_xmit_timer(tp, rtt)
 	int rtt;
 {
 	register int delta;
+
+	INP_LOCK_ASSERT(tp->t_inpcb);
 
 	tcpstat.tcps_rttupdated++;
 	tp->t_rttupdated++;
@@ -3229,6 +3241,10 @@ tcp_timewait(tw, to, th, m, tlen)
 #else
 	const int isipv6 = 0;
 #endif
+
+	/* tcbinfo lock required for tcp_twclose(), tcp_2msl_reset. */
+	INP_INFO_WLOCK_ASSERT(&tcbinfo);
+	INP_LOCK_ASSERT(tw->tw_inpcb);
 
 	thflags = th->th_flags;
 

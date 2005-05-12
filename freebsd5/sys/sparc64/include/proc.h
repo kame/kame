@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  *
@@ -28,7 +28,7 @@
  *
  *      from: @(#)proc.h        7.1 (Berkeley) 5/15/91
  *	from: FreeBSD: src/sys/i386/include/proc.h,v 1.11 2001/06/29
- * $FreeBSD: src/sys/sparc64/include/proc.h,v 1.12 2004/04/07 05:00:00 imp Exp $
+ * $FreeBSD: src/sys/sparc64/include/proc.h,v 1.12.2.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef	_MACHINE_PROC_H_

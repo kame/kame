@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/autoconf.c,v 1.10 2002/11/18 03:28:23 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/autoconf.c,v 1.10.8.1 2005/03/22 00:14:16 iedowse Exp $
  */
 
 #include "opt_isa.h"
@@ -41,12 +41,26 @@ extern device_t isa_bus_device;
 
 static device_t nexusdev;
 
-static void configure(void *);
+static void	configure_first(void *);
+static void	configure(void *);
+static void	configure_final(void *);
 
-SYSINIT(configure, SI_SUB_CONFIGURE, SI_ORDER_THIRD, configure, NULL);
+SYSINIT(configure1, SI_SUB_CONFIGURE, SI_ORDER_FIRST, configure_first, NULL);
+/* SI_ORDER_SECOND is hookable */
+SYSINIT(configure2, SI_SUB_CONFIGURE, SI_ORDER_THIRD, configure, NULL);
+/* SI_ORDER_MIDDLE is hookable */
+SYSINIT(configure3, SI_SUB_CONFIGURE, SI_ORDER_ANY, configure_final, NULL);
+
+/*
+ * Determine i/o configuration for a machine.
+ */
+static void
+configure_first(void *dummy)
+{
+}
 
 static void
-configure(void *v)
+configure(void *dummy)
 {
 
 	nexusdev = device_add_child(root_bus, "nexus", 0);
@@ -55,5 +69,11 @@ configure(void *v)
 	if (isa_bus_device != NULL)
 		isa_probe_children(isa_bus_device);
 #endif
+}
+
+static void
+configure_final(void *dummy)
+{
+
 	cold = 0;
 }

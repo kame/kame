@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh. All rights reserved.
  * Copyright (c) 1997 Ted Faber. All rights reserved.
  *
@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_pci.h,v 1.36 2002/09/29 23:37:07 imp Exp $
+ * $FreeBSD: src/sys/pccard/pcic_pci.h,v 1.36.8.1 2005/01/31 23:26:49 imp Exp $
  */
 
 /* Share the devid database with NEWCARD */

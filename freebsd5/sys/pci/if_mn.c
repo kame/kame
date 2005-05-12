@@ -1,13 +1,13 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
  * can do whatever you want with this stuff. If we meet some day, and you think
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
- *
- * $Id: if_mn.c,v 1.38 2003/06/11 06:24:36 obrien Exp $
- *
+ */
+
+/*
  * Driver for Siemens reference design card "Easy321-R1".
  *
  * This card contains a FALC54 E1/T1 framer and a MUNICH32X 32-channel HDLC
@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_mn.c,v 1.44 2004/06/21 21:57:31 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_mn.c,v 1.44.2.2 2005/03/01 08:11:51 imp Exp $");
 
 /*
  * Stuff to describe the MUNIC32X and FALC54 chips.
@@ -165,8 +165,8 @@ struct mn_softc;
 struct sockaddr;
 struct rtentry;
 
-static	int	mn_probe  (device_t self);
-static	int	mn_attach (device_t self);
+static	int	mn_probe(device_t self);
+static	int	mn_attach(device_t self);
 static	void	mn_create_channel(struct mn_softc *sc, int chan);
 static	int	mn_reset(struct mn_softc *sc);
 static	struct trxd * mn_alloc_desc(void);
@@ -1319,7 +1319,7 @@ mn_probe (device_t self)
 		return (ENXIO);
 
 	device_set_desc_copy(self, "Munich32X E1/T1 HDLC Controller");
-	return (0);
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int

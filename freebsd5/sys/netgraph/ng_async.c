@@ -1,7 +1,8 @@
-
 /*
  * ng_async.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_async.c,v 1.21 2004/07/04 16:11:02 stefanf Exp $
+ * $FreeBSD: src/sys/netgraph/ng_async.c,v 1.21.2.1 2005/01/31 23:26:28 imp Exp $
  * $Whistle: ng_async.c,v 1.17 1999/11/01 09:24:51 julian Exp $
  */
 

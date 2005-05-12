@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/ngatmbase.c,v 1.2 2003/12/08 01:18:04 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/ngatmbase.c,v 1.2.2.1 2005/01/31 23:26:30 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/module.h>

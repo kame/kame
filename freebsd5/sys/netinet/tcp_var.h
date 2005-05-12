@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.109 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.109.2.5 2005/03/14 08:08:19 maxim Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -195,11 +195,11 @@ struct tcpcb {
 	int	sack_enable;		/* enable SACK for this connection */
 	int	snd_numholes;		/* number of holes seen by sender */
 	struct sackhole *snd_holes;	/* linked list of holes (sorted) */
-	tcp_seq	rcv_laststart;		/* start of last segment recd. */
-	tcp_seq	rcv_lastend;		/* end of ... */
 	tcp_seq	rcv_lastsack;		/* last seq number(+1) sack'd by rcv'r*/
 	int	rcv_numsacks;		/* # distinct sack blks present */
 	struct sackblk sackblks[MAX_SACK_BLKS]; /* seq nos. of sack blocks */
+	tcp_seq sack_newdata;		/* New data xmitted in this recovery
+					   episode starts at this seq number */
 };
 
 #define IN_FASTRECOVERY(tp)	(tp->t_flags & TF_FASTRECOVERY)
@@ -499,7 +499,8 @@ struct	xtcpcb {
 #define	TCPCTL_DELACKTIME	12	/* time before sending delayed ACK */
 #define	TCPCTL_V6MSSDFLT	13	/* MSS default for IPv6 */
 #define	TCPCTL_SACK		14	/* Selective Acknowledgement,rfc 2018 */
-#define	TCPCTL_MAXID		15
+#define	TCPCTL_DROP		15	/* drop tcp connection */
+#define	TCPCTL_MAXID		16
 
 #define TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -523,6 +524,7 @@ struct	xtcpcb {
 #ifdef _KERNEL
 #ifdef SYSCTL_DECL
 SYSCTL_DECL(_net_inet_tcp);
+SYSCTL_DECL(_net_inet_tcp_sack);
 #endif
 
 extern	struct inpcbhead tcb;		/* head of queue of active tcpcb's */
@@ -539,7 +541,6 @@ extern	int ss_fltsz_local;
 
 extern	int tcp_do_sack;	/* SACK enabled/disabled */
 
-void	 tcp_canceltimers(struct tcpcb *);
 struct tcpcb *
 	 tcp_close(struct tcpcb *);
 void	 tcp_twstart(struct tcpcb *);
@@ -613,11 +614,11 @@ extern	u_long tcp_recvspace;
 tcp_seq tcp_new_isn(struct tcpcb *);
 
 int	 tcp_sack_option(struct tcpcb *,struct tcphdr *,u_char *,int);
-void	 tcp_update_sack_list(struct tcpcb *tp);
+void	 tcp_update_sack_list(struct tcpcb *tp, tcp_seq rcv_laststart, tcp_seq rcv_lastend);
 void	 tcp_del_sackholes(struct tcpcb *, struct tcphdr *);
 void	 tcp_clean_sackreport(struct tcpcb *tp);
 void	 tcp_sack_adjust(struct tcpcb *tp);
-struct sackhole *tcp_sack_output(struct tcpcb *tp);
+struct sackhole *tcp_sack_output(struct tcpcb *tp, int *sack_bytes_rexmt);
 void	 tcp_sack_partialack(struct tcpcb *, struct tcphdr *);
 void	 tcp_free_sackholes(struct tcpcb *tp);
 int	 tcp_newreno(struct tcpcb *, struct tcphdr *);

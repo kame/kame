@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/xrpuio.h,v 1.2 1999/08/28 00:52:12 peter Exp $
+ * $FreeBSD: src/sys/sys/xrpuio.h,v 1.2.26.1 2005/01/31 23:26:57 imp Exp $
  *
  */
 

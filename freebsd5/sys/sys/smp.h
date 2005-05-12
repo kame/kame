@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/smp.h,v 1.77.2.2 2004/09/09 09:56:59 julian Exp $
+ * $FreeBSD: src/sys/sys/smp.h,v 1.77.2.4.2.1 2005/05/01 05:38:14 dwhite Exp $
  */
 
 #ifndef _SYS_SMP_H_
@@ -100,7 +100,11 @@ void	forward_roundrobin(void);
 int	restart_cpus(cpumask_t);
 int	stop_cpus(cpumask_t);
 void	smp_rendezvous_action(void);
-extern	struct mtx smp_rv_mtx;
+extern	struct mtx smp_ipi_mtx;
+
+#ifdef KDB_STOP_NMI
+int	stop_cpus_nmi(cpumask_t);
+#endif 
 #endif /* SMP */
 void	smp_rendezvous(void (*)(void *), 
 		       void (*)(void *),

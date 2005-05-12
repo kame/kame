@@ -1,3 +1,4 @@
+#-
 # Copyright (c) 2001, 2003 by Thomas Moestl <tmm@FreeBSD.org>
 # All rights reserved.
 #
@@ -21,7 +22,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 # USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/sparc64/pci/ofw_pci_if.m,v 1.5 2004/08/12 17:41:32 marius Exp $
+# $FreeBSD: src/sys/sparc64/pci/ofw_pci_if.m,v 1.5.2.1 2005/01/31 23:26:54 imp Exp $
 
 #include <sys/bus.h>
 #include <machine/bus.h>

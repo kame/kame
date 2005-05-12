@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
  *
  *	@(#)spx_var.h
  *
- * $FreeBSD: src/sys/netipx/spx_var.h,v 1.9 1999/08/28 00:49:44 peter Exp $
+ * $FreeBSD: src/sys/netipx/spx_var.h,v 1.9.26.1 2005/01/31 23:26:42 imp Exp $
  */
 
 #ifndef _NETIPX_SPX_VAR_H_

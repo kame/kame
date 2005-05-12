@@ -1,4 +1,5 @@
-/*
+/*-
+ * Copyright (c) 2004-2005 Robert N. M. Watson
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_input.c,v 1.34 2003/11/08 22:28:40 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_input.c,v 1.34.4.15 2005/03/10 14:39:02 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -72,24 +73,29 @@ static int	ipxnetbios = 0;
 SYSCTL_INT(_net_ipx, OID_AUTO, ipxnetbios, CTLFLAG_RW,
 	   &ipxnetbios, 0, "");
 
-union	ipx_net ipx_zeronet;
-union	ipx_host ipx_zerohost;
+const union	ipx_net ipx_zeronet;
+const union	ipx_host ipx_zerohost;
 
-union	ipx_net	ipx_broadnet;
-union	ipx_host ipx_broadhost;
+const union	ipx_net	ipx_broadnet = { .s_net[0] = 0xffff,
+					    .s_net[1] = 0xffff };
+const union	ipx_host ipx_broadhost = { .s_host[0] = 0xffff,
+					    .s_host[1] = 0xffff,
+					    .s_host[2] = 0xffff };
 
 struct	ipxstat ipxstat;
 struct	sockaddr_ipx ipx_netmask, ipx_hostmask;
 
-static	u_short allones[] = {-1, -1, -1};
-
-struct	ipxpcb ipxpcb;
-struct	ipxpcb ipxrawpcb;
+/*
+ * IPX protocol control block (pcb) lists.
+ */
+struct mtx		ipxpcb_list_mtx;
+struct ipxpcbhead	ipxpcb_list;
+struct ipxpcbhead	ipxrawpcb_list;
 
 static int ipxqmaxlen = IFQ_MAXLEN;
 static	struct ifqueue ipxintrq;
 
-long	ipx_pexseq;
+long	ipx_pexseq;		/* Locked with ipxpcb_list_mtx. */
 
 static	int ipx_do_route(struct ipx_addr *src, struct route *ro);
 static	void ipx_undo_route(struct route *ro);
@@ -103,12 +109,13 @@ static	void ipxintr(struct mbuf *m);
 void
 ipx_init()
 {
-	ipx_broadnet = *(union ipx_net *)allones;
-	ipx_broadhost = *(union ipx_host *)allones;
 
 	read_random(&ipx_pexseq, sizeof ipx_pexseq);
-	ipxpcb.ipxp_next = ipxpcb.ipxp_prev = &ipxpcb;
-	ipxrawpcb.ipxp_next = ipxrawpcb.ipxp_prev = &ipxrawpcb;
+
+	LIST_INIT(&ipxpcb_list);
+	LIST_INIT(&ipxrawpcb_list);
+
+	IPX_LIST_LOCK_INIT();
 
 	ipx_netmask.sipx_len = 6;
 	ipx_netmask.sipx_addr.x_net = ipx_broadnet;
@@ -119,7 +126,7 @@ ipx_init()
 
 	ipxintrq.ifq_maxlen = ipxqmaxlen;
 	mtx_init(&ipxintrq.ifq_mtx, "ipx_inq", NULL, MTX_DEF);
-	netisr_register(NETISR_IPX, ipxintr, &ipxintrq, 0);
+	netisr_register(NETISR_IPX, ipxintr, &ipxintrq, NETISR_MPSAFE);
 }
 
 /*
@@ -133,14 +140,14 @@ ipxintr(struct mbuf *m)
 	struct ipx_ifaddr *ia;
 	int len;
 
-	GIANT_REQUIRED;
-
 	/*
 	 * If no IPX addresses have been set yet but the interfaces
 	 * are receiving, can't do anything with incoming packets yet.
 	 */
-	if (ipx_ifaddr == NULL)
-		goto bad;
+	if (ipx_ifaddr == NULL) {
+		m_freem(m);
+		return;
+	}
 
 	ipxstat.ipxs_total++;
 
@@ -153,12 +160,16 @@ ipxintr(struct mbuf *m)
 	/*
 	 * Give any raw listeners a crack at the packet
 	 */
-	for (ipxp = ipxrawpcb.ipxp_next; ipxp != &ipxrawpcb;
-	     ipxp = ipxp->ipxp_next) {
+	IPX_LIST_LOCK();
+	LIST_FOREACH(ipxp, &ipxrawpcb_list, ipxp_list) {
 		struct mbuf *m1 = m_copy(m, 0, (int)M_COPYALL);
-		if (m1 != NULL)
+		if (m1 != NULL) {
+			IPX_LOCK(ipxp);
 			ipx_input(m1, ipxp);
+			IPX_UNLOCK(ipxp);
+		}
 	}
+	IPX_LIST_UNLOCK();
 
 	ipx = mtod(m, struct ipx *);
 	len = ntohs(ipx->ipx_len);
@@ -170,7 +181,8 @@ ipxintr(struct mbuf *m)
 	 */
 	if (m->m_pkthdr.len < len) {
 		ipxstat.ipxs_tooshort++;
-		goto bad;
+		m_freem(m);
+		return;
 	}
 	if (m->m_pkthdr.len > len) {
 		if (m->m_len == m->m_pkthdr.len) {
@@ -182,7 +194,8 @@ ipxintr(struct mbuf *m)
 	if (ipxcksum && ipx->ipx_sum != 0xffff) {
 		if (ipx->ipx_sum != ipx_cksum(m, len)) {
 			ipxstat.ipxs_badsum++;
-			goto bad;
+			m_freem(m);
+			return;
 		}
 	}
 
@@ -194,8 +207,10 @@ ipxintr(struct mbuf *m)
 		if (ipxnetbios) {
 			ipx_output_type20(m);
 			return;
-		} else
-			goto bad;
+		} else {
+			m_freem(m);
+			return;
+		}
 	}
 
 	/*
@@ -212,7 +227,7 @@ ipxintr(struct mbuf *m)
 			 */
 			for (ia = ipx_ifaddr; ia != NULL; ia = ia->ia_next)
 				if((ia->ia_ifa.ifa_ifp == m->m_pkthdr.rcvif) &&
-				   ipx_neteq(ia->ia_addr.sipx_addr, 
+				   ipx_neteq(ia->ia_addr.sipx_addr,
 					     ipx->ipx_dna))
 					goto ours;
 
@@ -250,6 +265,7 @@ ours:
 	/*
 	 * Locate pcb for datagram.
 	 */
+	IPX_LIST_LOCK();
 	ipxp = ipx_pcblookup(&ipx->ipx_sna, ipx->ipx_dna.x_port, IPX_WILDCARD);
 	/*
 	 * Switch out to protocol's input routine.
@@ -259,17 +275,17 @@ ours:
 		if ((ipxp->ipxp_flags & IPXP_ALL_PACKETS) == 0)
 			switch (ipx->ipx_pt) {
 			case IPXPROTO_SPX:
+				IPX_LOCK(ipxp);
+				/* Will release both locks. */
 				spx_input(m, ipxp);
 				return;
 			}
+		IPX_LOCK(ipxp);
 		ipx_input(m, ipxp);
+		IPX_UNLOCK(ipxp);
 	} else
-		goto bad;
-
-	return;
-
-bad:
-	m_freem(m);
+		m_freem(m);
+	IPX_LIST_UNLOCK();
 }
 
 void
@@ -439,7 +455,7 @@ struct route *ro;
 	dst->sipx_family = AF_IPX;
 	dst->sipx_addr = *src;
 	dst->sipx_addr.x_port = 0;
-	rtalloc(ro);
+	rtalloc_ign(ro, 0);
 	if (ro->ro_rt == NULL || ro->ro_rt->rt_ifp == NULL) {
 		return (0);
 	}
@@ -467,8 +483,8 @@ struct ifnet *ifp;
 	/*
 	 * Give any raw listeners a crack at the packet
 	 */
-	for (ipxp = ipxrawpcb.ipxp_next; ipxp != &ipxrawpcb;
-	     ipxp = ipxp->ipxp_next) {
+	IPX_LIST_LOCK();
+	LIST_FOREACH(ipxp, &ipxrawpcb_list, ipxp_list) {
 		struct mbuf *m0 = m_copy(m, 0, (int)M_COPYALL);
 		if (m0 != NULL) {
 			register struct ipx *ipx;
@@ -482,8 +498,8 @@ struct ifnet *ifp;
 				if (ifp == ia->ia_ifp)
 					break;
 			if (ia == NULL)
-				ipx->ipx_sna.x_host = ipx_zerohost;  
-			else 
+				ipx->ipx_sna.x_host = ipx_zerohost;
+			else
 				ipx->ipx_sna.x_host =
 				    ia->ia_addr.sipx_addr.x_host;
 
@@ -495,7 +511,10 @@ struct ifnet *ifp;
 				}
 			    }
 			ipx->ipx_len = ntohl(m0->m_pkthdr.len);
+			IPX_LOCK(ipxp);
 			ipx_input(m0, ipxp);
+			IPX_UNLOCK(ipxp);
 		}
 	}
+	IPX_LIST_UNLOCK();
 }

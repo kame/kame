@@ -3,7 +3,8 @@
  *
  *	June 1995, Andrew McRae (andrew@mega.com.au)
  *-------------------------------------------------------------------------
- *
+ */
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  * Copyright (c) 1995 Andrew McRae.  All rights reserved.
  *
@@ -29,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard.c,v 1.163 2004/06/16 09:47:19 phk Exp $
+ * $FreeBSD: src/sys/pccard/pccard.c,v 1.163.2.1 2005/01/31 23:26:49 imp Exp $
  */
 
 #define OBSOLETE_IN_6

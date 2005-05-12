@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
  *
  *	@(#)spx.h
  *
- * $FreeBSD: src/sys/netipx/spx.h,v 1.17 2002/03/20 02:39:13 alfred Exp $
+ * $FreeBSD: src/sys/netipx/spx.h,v 1.17.8.2 2005/01/31 23:26:42 imp Exp $
  */
 
 #ifndef _NETIPX_SPX_H_
@@ -55,7 +55,7 @@ struct spxhdr {
 	u_short	spx_seq;	/* sequence number */
 	u_short	spx_ack;	/* acknowledge number */
 	u_short	spx_alo;	/* allocation number */
-};
+} __packed;
 
 /*
  * Definitions for NS(tm) Internet Datagram Protocol
@@ -64,7 +64,7 @@ struct spxhdr {
 struct spx {
 	struct ipx	si_i;
 	struct spxhdr 	si_s;
-};
+} __packed;
 struct spx_q {
 	struct spx_q	*si_next;
 	struct spx_q	*si_prev;

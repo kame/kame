@@ -1,7 +1,8 @@
 /*
  *  NEC MECIA controller.
  *-------------------------------------------------------------------------
- *
+ */
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/mecia.c,v 1.5 2004/03/17 17:50:52 njl Exp $
+ * $FreeBSD: src/sys/pccard/mecia.c,v 1.5.2.1 2005/01/31 23:26:49 imp Exp $
  *
  * Based heavily on the FreeBSD pcic driver's pcic98 support, derived
  * from PAO3 tree.  This copyright notice likely needs modification for

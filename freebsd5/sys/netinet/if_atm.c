@@ -1,6 +1,6 @@
 /*      $NetBSD: if_atm.c,v 1.6 1996/10/13 02:03:01 christos Exp $       */
 
-/*
+/*-
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.
@@ -32,7 +32,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netinet/if_atm.c,v 1.18 2004/08/16 18:32:07 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netinet/if_atm.c,v 1.18.2.1 2005/01/31 23:26:35 imp Exp $");
 
 /*
  * IP <=> ATM address resolution.

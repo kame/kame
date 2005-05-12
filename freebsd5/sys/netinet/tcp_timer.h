@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/tcp_timer.h,v 1.26 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.h,v 1.26.2.1 2005/01/31 23:26:37 imp Exp $
  */
 
 #ifndef _NETINET_TCP_TIMER_H_

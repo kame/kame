@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -25,14 +25,16 @@
  * SUCH DAMAGE.
  *
  * Author: Hartmut Brandt <harti@freebsd.org>
- *
+ */
+
+/*
  * This implements pools of DMA-able buffers that conserve DMA address space
  * by putting several buffers into one page and that allow to map between
  * 32-bit handles for the buffer and buffer addresses (to use 32-bit network
  * interfaces on 64bit machines). This assists network interfaces that may need
  * huge numbers of mbufs.
  *
- * $FreeBSD: src/sys/sys/mbpool.h,v 1.1 2003/07/15 08:59:37 harti Exp $
+ * $FreeBSD: src/sys/sys/mbpool.h,v 1.1.4.1 2005/01/31 23:26:56 imp Exp $
  */
 #ifndef _SYS_MBPOOL_H_
 #define	_SYS_MBPOOL_H_

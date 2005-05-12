@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_ihash.c,v 1.39 2004/06/16 09:47:25 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_ihash.c,v 1.39.2.1 2005/01/31 23:27:01 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

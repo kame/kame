@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/atm/ng_uni.h,v 1.1 2003/11/07 09:15:14 harti Exp $
+ * $FreeBSD: src/sys/netgraph/atm/ng_uni.h,v 1.1.4.1 2005/01/31 23:26:30 imp Exp $
  *
  * Netgraph module for UNI 4.0
  */

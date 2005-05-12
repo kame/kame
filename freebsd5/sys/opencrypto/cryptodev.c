@@ -1,6 +1,6 @@
 /*	$OpenBSD: cryptodev.c,v 1.52 2002/06/19 07:22:46 deraadt Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2001 Theo de Raadt
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.22 2004/08/10 03:26:17 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.22.2.1 2005/01/31 23:26:48 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

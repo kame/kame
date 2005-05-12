@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998-2002 Luigi Rizzo, Universita` di Pisa
  * Portions Copyright (c) 2000 Akamba Corp.
  * All rights reserved
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.83.2.1 2004/09/14 16:05:06 pjd Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.83.2.2 2005/01/31 23:26:35 imp Exp $
  */
 
 #define	DUMMYNET_DEBUG

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ioctl_compat.h	8.4 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/ioctl_compat.h,v 1.7 2004/06/21 22:57:16 phk Exp $
+ * $FreeBSD: src/sys/sys/ioctl_compat.h,v 1.7.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_IOCTL_COMPAT_H_

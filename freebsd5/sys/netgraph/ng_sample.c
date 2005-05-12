@@ -1,7 +1,8 @@
-
 /*
  * ng_sample.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.24 2004/07/29 08:05:02 glebius Exp $
+ * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.24.2.2 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_sample.c,v 1.13 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -203,7 +204,7 @@ ng_xxx_newhook(node_p node, hook_p hook, const char *name)
 	    NG_XXX_HOOK_DLCI_LEADIN, strlen(NG_XXX_HOOK_DLCI_LEADIN)) == 0) {
 		char *eptr;
 
-		cp = name + sizeof(NG_XXX_HOOK_DLCI_LEADIN);
+		cp = name + strlen(NG_XXX_HOOK_DLCI_LEADIN);
 		if (!isdigit(*cp) || (cp[0] == '0' && cp[1] != '\0'))
 			return (EINVAL);
 		dlci = (int)strtoul(cp, &eptr, 10);
@@ -216,10 +217,11 @@ ng_xxx_newhook(node_p node, hook_p hook, const char *name)
 				break;
 		if (chan == XXX_NUM_DLCIS) {
 			for (chan = 0; chan < XXX_NUM_DLCIS; chan++)
-				if (xxxp->channel[chan].dlci != -2)
-					continue;
+				if (xxxp->channel[chan].dlci == -2)
+					break;
 			if (chan == XXX_NUM_DLCIS)
 				return (ENOBUFS);
+			xxxp->channel[chan].dlci = dlci;
 		}
 		if (xxxp->channel[chan].hook != NULL)
 			return (EADDRINUSE);
@@ -391,7 +393,6 @@ ng_xxx_rcvdata(hook_p hook, item_p item )
 devintr()
 {
 	int error;
-				 * here */
 
 	/* get packet from device and send on */
 	m = MGET(blah blah)

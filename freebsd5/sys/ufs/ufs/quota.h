@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)quota.h	8.3 (Berkeley) 8/19/94
- * $FreeBSD: src/sys/ufs/ufs/quota.h,v 1.26 2004/04/07 03:47:20 imp Exp $
+ * $FreeBSD: src/sys/ufs/ufs/quota.h,v 1.26.2.1 2005/01/31 23:27:01 imp Exp $
  */
 
 #ifndef _UFS_UFS_QUOTA_H_

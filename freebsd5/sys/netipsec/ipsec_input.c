@@ -1,6 +1,6 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec_input.c,v 1.7.4.1 2004/09/15 15:14:19 andre Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec_input.c,v 1.7.4.2 2005/01/31 23:26:41 imp Exp $	*/
 /*	$OpenBSD: ipsec_input.c,v 1.63 2003/02/20 18:35:43 deraadt Exp $	*/
-/*
+/*-
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
  * Niels Provos (provos@physnet.uni-hamburg.de).

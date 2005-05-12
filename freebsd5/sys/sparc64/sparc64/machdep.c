@@ -33,7 +33,7 @@
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
  * 	from: FreeBSD: src/sys/i386/i386/machdep.c,v 1.477 2001/08/27
- * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.112.2.2 2004/10/07 22:18:35 kensmith Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.112.2.7 2005/03/03 00:46:32 wes Exp $
  */
 
 #include "opt_compat.h"
@@ -42,47 +42,45 @@
 #include "opt_msgbuf.h"
 
 #include <sys/param.h>
+#include <sys/malloc.h>
+#include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/bio.h>
+#include <sys/buf.h>
+#include <sys/bus.h>
+#include <sys/cpu.h>
 #include <sys/cons.h>
+#include <sys/eventhandler.h>
+#include <sys/exec.h>
 #include <sys/imgact.h>
+#include <sys/interrupt.h>
 #include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/linker.h>
 #include <sys/lock.h>
-#include <sys/malloc.h>
 #include <sys/msgbuf.h>
 #include <sys/mutex.h>
 #include <sys/pcpu.h>
-#include <sys/proc.h>
-#include <sys/reboot.h>
-#include <sys/bio.h>
-#include <sys/buf.h>
-#include <sys/bus.h>
-#include <sys/eventhandler.h>
-#include <sys/interrupt.h>
 #include <sys/ptrace.h>
+#include <sys/reboot.h>
 #include <sys/signalvar.h>
 #include <sys/smp.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/timetc.h>
-#include <sys/user.h>
 #include <sys/ucontext.h>
-#include <sys/user.h>
-#include <sys/ucontext.h>
-#include <sys/exec.h>
 
 #include <dev/ofw/openfirm.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
-#include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
+#include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <vm/vm_extern.h>
+#include <vm/vm_param.h>
 
 #include <ddb/ddb.h>
 
@@ -97,11 +95,12 @@
 #include <machine/metadata.h>
 #include <machine/ofw_machdep.h>
 #include <machine/ofw_mem.h>
-#include <machine/smp.h>
+#include <machine/pcb.h>
 #include <machine/pmap.h>
 #include <machine/pstate.h>
 #include <machine/reg.h>
 #include <machine/sigframe.h>
+#include <machine/smp.h>
 #include <machine/tick.h>
 #include <machine/tlb.h>
 #include <machine/tstate.h>
@@ -119,9 +118,9 @@ int kernel_tlb_slots;
 
 int cold = 1;
 long Maxmem;
+long realmem;
 
 char pcpu0[PCPU_PAGES * PAGE_SIZE];
-char uarea0[UAREA_PAGES * PAGE_SIZE];
 struct trapframe frame0;
 
 vm_offset_t kstack0;
@@ -200,6 +199,7 @@ cpu_startup(void *arg)
 		physsz += sparc64_memreg[i].mr_size;
 	printf("real memory  = %lu (%lu MB)\n", physsz,
 	    physsz / (1024 * 1024));
+	realmem = (long)physsz;
 
 	vm_ksubmap_init(&kmi);
 
@@ -364,8 +364,6 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	proc_linkup(&proc0, &ksegrp0, &thread0);
 	proc0.p_md.md_sigtramp = NULL;
 	proc0.p_md.md_utrap = NULL;
-	proc0.p_uarea = (struct user *)uarea0;
-	proc0.p_stats = &proc0.p_uarea->u_stats;
 	thread0.td_kstack = kstack0;
 	thread0.td_pcb = (struct pcb *)
 	    (thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
@@ -646,6 +644,8 @@ set_mcontext(struct thread *td, const mcontext_t *mc)
 		return (EINVAL);
 	tf = td->td_frame;
 	pcb = td->td_pcb;
+	/* Make sure the windows are spilled first. */
+	flushw();
 	wstate = tf->tf_wstate;
 	bcopy(mc, tf, sizeof(*tf));
 	tf->tf_wstate = wstate;
@@ -669,6 +669,14 @@ cpu_shutdown(void *args)
 	cpu_mp_shutdown();
 #endif
 	openfirmware_exit(args);
+}
+
+/* Get current clock frequency for the given cpu id. */
+int
+cpu_est_clockrate(int cpu_id, uint64_t *rate)
+{
+
+	return (ENXIO);
 }
 
 /*
@@ -746,7 +754,6 @@ void
 exec_setregs(struct thread *td, u_long entry, u_long stack, u_long ps_strings)
 {
 	struct trapframe *tf;
-	struct md_utrap *ut;
 	struct pcb *pcb;
 	struct proc *p;
 	u_long sp;
@@ -754,10 +761,8 @@ exec_setregs(struct thread *td, u_long entry, u_long stack, u_long ps_strings)
 	/* XXX no cpu_exec */
 	p = td->td_proc;
 	p->p_md.md_sigtramp = NULL;
-	if ((ut = p->p_md.md_utrap) != NULL) {
-		ut->ut_refcnt--;
-		if (ut->ut_refcnt == 0)
-			free(ut, M_SUBPROC);
+	if (p->p_md.md_utrap != NULL) {
+		utrap_free(p->p_md.md_utrap);
 		p->p_md.md_utrap = NULL;
 	}
 
@@ -839,4 +844,41 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
 	tf->tf_fsr = fpregs->fr_fsr;
 	tf->tf_gsr = fpregs->fr_gsr;
 	return (0);
+}
+
+struct md_utrap *
+utrap_alloc(void)
+{
+	struct md_utrap *ut;
+
+	ut = malloc(sizeof(struct md_utrap), M_SUBPROC, M_WAITOK | M_ZERO);
+	ut->ut_refcnt = 1;
+	return (ut);
+}
+
+void
+utrap_free(struct md_utrap *ut)
+{
+	int refcnt;
+
+	if (ut == NULL)
+		return;
+	mtx_pool_lock(mtxpool_sleep, ut);
+	ut->ut_refcnt--;
+	refcnt = ut->ut_refcnt;
+	mtx_pool_unlock(mtxpool_sleep, ut);
+	if (refcnt == 0)
+		free(ut, M_SUBPROC);
+}
+
+struct md_utrap *
+utrap_hold(struct md_utrap *ut)
+{
+
+	if (ut == NULL)
+		return (NULL);
+	mtx_pool_lock(mtxpool_sleep, ut);
+	ut->ut_refcnt++;
+	mtx_pool_unlock(mtxpool_sleep, ut);
+	return (ut);
 }

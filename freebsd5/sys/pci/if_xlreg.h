@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.50 2004/07/09 00:11:25 bms Exp $
+ * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.50.2.2 2005/01/31 23:26:51 imp Exp $
  */
 
 #define XL_EE_READ	0x0080	/* read, 5 bit address */
@@ -680,6 +680,7 @@ struct xl_stats {
 #define TC_DEVICEID_CYCLONE_10_100FX		0x905A
 #define TC_DEVICEID_TORNADO_10_100BT		0x9200
 #define TC_DEVICEID_TORNADO_10_100BT_920B	0x9201
+#define TC_DEVICEID_TORNADO_10_100BT_920B_WNM	0x9202
 #define TC_DEVICEID_HURRICANE_10_100BT_SERV	0x9800
 #define TC_DEVICEID_TORNADO_10_100BT_SERV	0x9805
 #define TC_DEVICEID_HURRICANE_SOHO100TX		0x7646

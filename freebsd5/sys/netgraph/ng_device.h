@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Mark Santcroos <marks@ripe.net>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *
- * $FreeBSD: src/sys/netgraph/ng_device.h,v 1.3 2004/06/29 15:46:12 marks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_device.h,v 1.3.2.2 2005/01/31 23:26:28 imp Exp $
  *
  */
 
@@ -31,12 +31,19 @@
 
 /* Node type name and magic cookie */
 #define NG_DEVICE_NODE_TYPE	"device"
-#define NGM_DEVICE_COOKIE	1009920473
+#define NGM_DEVICE_COOKIE	1091129178
+#define	NG_DEVICE_DEVNAME	"ngd"
 
+/* Netgraph control messages */
+enum {
+	NGM_DEVICE_GET_DEVNAME,
+};
+
+#if 0
 /* passing ioctl params */
 struct ngd_param_s {
 	        void * p;
 };
-
+#endif
 
 #endif /* _NETGRAPH_NG_DEVICE_H_ */

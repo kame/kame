@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)resourcevar.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resourcevar.h,v 1.45 2004/08/04 18:14:19 rwatson Exp $
+ * $FreeBSD: src/sys/sys/resourcevar.h,v 1.45.2.3 2005/03/01 09:30:19 obrien Exp $
  */
 
 #ifndef	_SYS_RESOURCEVAR_H_

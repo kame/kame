@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac/mac_internal.h,v 1.111 2004/02/26 03:51:04 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac/mac_internal.h,v 1.111.2.1 2005/01/29 20:18:32 rwatson Exp $
  */
 
 /*
@@ -65,7 +65,6 @@ extern int				mac_late;
 extern int				mac_enforce_network;
 extern int				mac_enforce_process;
 extern int				mac_enforce_socket;
-extern int				mac_enforce_sysv;
 extern int				mac_enforce_vm;
 #ifndef MAC_ALWAYS_LABEL_MBUF
 extern int				mac_labelmbufs;

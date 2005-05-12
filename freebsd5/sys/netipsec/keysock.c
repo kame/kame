@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/keysock.c,v 1.8 2004/06/23 01:58:22 bms Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/keysock.c,v 1.8.2.1 2005/01/31 23:26:41 imp Exp $	*/
 /*	$KAME: keysock.c,v 1.25 2001/08/13 20:07:41 itojun Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *

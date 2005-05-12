@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uio.h	8.5 (Berkeley) 2/22/94
- * $FreeBSD: src/sys/sys/uio.h,v 1.36 2004/07/10 15:42:16 phk Exp $
+ * $FreeBSD: src/sys/sys/uio.h,v 1.36.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_UIO_H_

@@ -1,7 +1,7 @@
 /*	$NetBSD: natm.h,v 1.1 1996/07/04 03:20:12 chuck Exp $	*/
-/* $FreeBSD: src/sys/netnatm/natm.h,v 1.9 2003/08/06 14:34:38 harti Exp $ */
+/* $FreeBSD: src/sys/netnatm/natm.h,v 1.9.4.1 2005/01/31 23:26:43 imp Exp $ */
 
-/*
+/*-
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.

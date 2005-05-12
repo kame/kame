@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  *	All rights reserved.
@@ -27,7 +27,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/atm/ngatmbase.h,v 1.2 2003/11/13 13:00:56 harti Exp $
+ * $FreeBSD: src/sys/netgraph/atm/ngatmbase.h,v 1.2.4.1 2005/01/31 23:26:30 imp Exp $
  *
  * In-kernel UNI stack message functions.
  */

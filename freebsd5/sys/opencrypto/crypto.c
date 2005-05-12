@@ -1,5 +1,5 @@
 /*	$OpenBSD: crypto.c,v 1.38 2002/06/11 11:14:29 beck Exp $	*/
-/*
+/*-
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
  * This code was written by Angelos D. Keromytis in Athens, Greece, in
@@ -21,7 +21,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/crypto.c,v 1.15 2004/05/30 20:27:18 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/crypto.c,v 1.15.2.1 2005/01/31 23:26:48 imp Exp $");
 
 #define	CRYPTO_TIMING				/* enable timing support */
 

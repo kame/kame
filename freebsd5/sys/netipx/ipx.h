@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
  *
  *	@(#)ipx.h
  *
- * $FreeBSD: src/sys/netipx/ipx.h,v 1.18 2004/06/22 21:46:49 bms Exp $
+ * $FreeBSD: src/sys/netipx/ipx.h,v 1.18.2.2 2005/01/31 23:26:42 imp Exp $
  */
 
 #ifndef _NETIPX_IPX_H_
@@ -145,7 +145,7 @@ struct ipx {
 	u_char	ipx_pt;		/* Packet Type (i.e. level 2 protocol) */
 	struct ipx_addr	ipx_dna;	/* Destination Network Address */
 	struct ipx_addr	ipx_sna;	/* Source Network Address */
-};
+} __packed;
 
 #define ipx_neteqnn(a,b) \
 	(((a).s_net[0] == (b).s_net[0]) && ((a).s_net[1] == (b).s_net[1]))

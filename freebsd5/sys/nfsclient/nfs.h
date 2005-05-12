@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfsclient/nfs.h,v 1.82 2004/07/06 09:12:02 alfred Exp $
+ * $FreeBSD: src/sys/nfsclient/nfs.h,v 1.82.2.2 2005/01/31 23:26:46 imp Exp $
  */
 
 #ifndef _NFSCLIENT_NFS_H_
@@ -155,7 +155,7 @@ struct vattr;
 struct nameidata;
 
 /*
- * The set of signals the interrupt an I/O in progress for NFSMNT_INT mounts.
+ * The set of signals that interrupt an I/O in progress for NFSMNT_INT mounts.
  * What should be in this set is open to debate, but I believe that since
  * I/O system calls on ufs are never interrupted by signals the set should
  * be minimal. My reasoning is that many current programs that use signals

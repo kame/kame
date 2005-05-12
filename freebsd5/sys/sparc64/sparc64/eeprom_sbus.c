@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1994 Gordon W. Ross
@@ -47,7 +47,7 @@
  *	from: @(#)clock.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: clock.c,v 1.41 2001/07/24 19:29:25 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/eeprom_sbus.c,v 1.7 2004/08/12 17:41:33 marius Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/eeprom_sbus.c,v 1.7.2.1 2005/01/31 23:26:55 imp Exp $
  */
 
 #include <sys/param.h>

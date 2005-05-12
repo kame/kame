@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.11 2004/07/30 22:08:52 phk Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.11.2.1 2005/01/31 23:26:45 imp Exp $ */
 /* $Id: nfs_vfsops.c,v 1.38 2003/11/05 14:59:01 rees Exp $ */
 
-/*
+/*-
  * copyright (c) 2003
  * the regents of the university of michigan
  * all rights reserved
@@ -25,7 +25,7 @@
  * advised of the possibility of such damages.
  */
 
-/*
+/*-
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -60,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.11 2004/07/30 22:08:52 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.11.2.1 2005/01/31 23:26:45 imp Exp $");
 
 #include "opt_bootp.h"
 #include "opt_nfsroot.h"

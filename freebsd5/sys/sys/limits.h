@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/limits.h,v 1.8 2004/04/07 04:19:49 imp Exp $
+ * $FreeBSD: src/sys/sys/limits.h,v 1.8.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_LIMITS_H_

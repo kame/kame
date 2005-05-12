@@ -1,6 +1,8 @@
 /*
  * ng_eiface.h
- *
+ */
+
+/*-
  * Copyright (c) 1999-2001, Vitaly V Belekhov
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * 	$FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.6 2003/12/17 13:03:32 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.6.2.2 2005/02/03 13:12:58 ru Exp $
  */
 
 #ifndef _NETGRAPH_NG_EIFACE_H_
@@ -38,7 +40,6 @@
 
 /* Interface base name */
 #define NG_EIFACE_EIFACE_NAME		"ngeth"
-#define NG_EIFACE_EIFACE_NAME_MAX	15
 
 /* My hook names */
 #define NG_EIFACE_HOOK_ETHER		"ether"
@@ -50,13 +51,9 @@
 
 /* Netgraph commands */
 enum {
-	NGM_EIFACE_GET_IFNAME = 1,	/* returns struct ng_eiface_ifname */
+	NGM_EIFACE_GET_IFNAME = 1,	/* get the interface name */
 	NGM_EIFACE_GET_IFADDRS,		/* returns list of addresses */
 	NGM_EIFACE_SET,			/* set ethernet address */
-};
-
-struct ng_eiface_ifname {
-	char    ngif_name[NG_EIFACE_EIFACE_NAME_MAX + 1];
 };
 
 #endif /* _NETGRAPH_NG_EIFACE_H_ */

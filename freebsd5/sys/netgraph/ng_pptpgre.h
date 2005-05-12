@@ -1,7 +1,8 @@
-
 /*
  * ng_pptpgre.h
- *
+ */
+
+/*-
  * Copyright (c) 1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.h,v 1.8 2004/04/26 14:26:54 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.h,v 1.8.2.1 2005/01/31 23:26:29 imp Exp $
  * $Whistle: ng_pptpgre.h,v 1.3 1999/12/08 00:11:36 archie Exp $
  */
 

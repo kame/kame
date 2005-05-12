@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/stdbool.h,v 1.6 2002/08/16 07:33:14 alfred Exp $
+ * $FreeBSD: src/include/stdbool.h,v 1.6.8.1 2005/02/27 11:17:19 marius Exp $
  */
 
 #ifndef _STDBOOL_H_
@@ -37,7 +37,7 @@
 #define	true	1
 
 #define	bool	_Bool
-#if __STDC_VERSION__ < 199901L && __GNUC__ < 3
+#if __STDC_VERSION__ < 199901L && __GNUC__ < 3 && !defined(__INTEL_COMPILER)
 typedef	int	_Bool;
 #endif
 

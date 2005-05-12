@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_isa.c,v 1.26 2004/08/13 06:57:31 imp Exp $
+ * $FreeBSD: src/sys/pccard/pcic_isa.c,v 1.26.2.1 2005/01/31 23:26:49 imp Exp $
  */
 
 #define OBSOLETE_IN_6

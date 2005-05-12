@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 2000 Marshall Kirk McKusick. All Rights Reserved.
  *
  * Further information about snapshots can be obtained from:
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.84 2004/07/28 06:41:27 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.84.2.3 2005/03/16 13:39:47 pb Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -451,7 +451,7 @@ loop:
 		loc = howmany(xp->i_size, fs->fs_bsize) - 1;
 		if (loc < NDADDR) {
 			len = fragroundup(fs, blkoff(fs, xp->i_size));
-			if (len < fs->fs_bsize) {
+			if (len != 0 && len < fs->fs_bsize) {
 				ffs_blkfree(copy_fs, vp, DIP(xp, i_db[loc]),
 				    len, xp->i_number);
 				blkno = DIP(xp, i_db[loc]);
@@ -731,7 +731,7 @@ cgaccount(cg, vp, nbp, passno)
 		nbp->b_flags |= B_VALIDSUSPWRT;
 	numblks = howmany(fs->fs_size, fs->fs_frag);
 	len = howmany(fs->fs_fpg, fs->fs_frag);
-	base = cg * fs->fs_fpg / fs->fs_frag;
+	base = cgbase(fs, cg) / fs->fs_frag;
 	if (base + len >= numblks)
 		len = numblks - base - 1;
 	loc = 0;

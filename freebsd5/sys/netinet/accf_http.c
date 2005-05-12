@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Paycounter, Inc.
  * Author: Alfred Perlstein <alfred@paycounter.com>, <alfred@FreeBSD.org>
  * All rights reserved.
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.15 2004/06/14 18:16:21 rwatson Exp $
+ *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.15.2.1 2005/01/31 23:26:34 imp Exp $
  */
 
 #define ACCEPT_FILTER_MOD

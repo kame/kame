@@ -23,7 +23,9 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
+ */
+
+/*
  * Implements bitmap resource lists.
  *
  *	Usage:
@@ -47,7 +49,7 @@
  *		that.  Managing something like 512MB worth of 4K blocks 
  *		eats around 32 KBytes of memory. 
  *
- * $FreeBSD: src/sys/sys/blist.h,v 1.8 2004/06/04 04:03:25 alc Exp $
+ * $FreeBSD: src/sys/sys/blist.h,v 1.8.2.1 2005/01/31 23:26:55 imp Exp $
  */
 
 #ifndef _SYS_BLIST_H_

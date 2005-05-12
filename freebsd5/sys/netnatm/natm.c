@@ -1,5 +1,5 @@
 /*	$NetBSD: natm.c,v 1.5 1996/11/09 03:26:26 chuck Exp $	*/
-/*
+/*-
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netnatm/natm.c,v 1.34.4.1 2004/10/21 09:30:48 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netnatm/natm.c,v 1.34.2.2 2005/01/31 23:26:43 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>

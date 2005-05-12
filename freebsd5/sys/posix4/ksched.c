@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996, 1997
  *	HD Associates, Inc.  All rights reserved.
  *
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/posix4/ksched.c,v 1.25 2003/09/13 18:46:24 nectar Exp $");
+__FBSDID("$FreeBSD: src/sys/posix4/ksched.c,v 1.25.4.1 2005/01/31 23:26:52 imp Exp $");
 
 #include "opt_posix.h"
 

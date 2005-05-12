@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/umtx.h,v 1.4 2004/07/02 00:40:07 marcel Exp $
+ * $FreeBSD: src/sys/sys/umtx.h,v 1.4.2.1 2005/01/31 23:26:57 imp Exp $
  *
  */
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.128.2.1.2.1 2004/10/26 17:28:36 bms Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.128.2.6 2005/03/21 16:05:35 glebius Exp $
  */
 
 /*
@@ -39,6 +39,7 @@
 #include "opt_inet.h"
 #include "opt_bdg.h"
 #include "opt_mac.h"
+#include "opt_carp.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -66,6 +67,10 @@
 
 #include <net/if_arc.h>
 #include <net/iso88025.h>
+
+#ifdef DEV_CARP
+#include <netinet/ip_carp.h>
+#endif
 
 #define SIN(s) ((struct sockaddr_in *)s)
 #define SDL(s) ((struct sockaddr_dl *)s)
@@ -162,6 +167,8 @@ arp_rtrequest(req, rt, info)
 	struct sockaddr *gate;
 	struct llinfo_arp *la;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
+	struct in_ifaddr *ia;
+	struct ifaddr *ifa;
 
 	RT_LOCK_ASSERT(rt);
 
@@ -250,8 +257,13 @@ arp_rtrequest(req, rt, info)
 		}
 #endif
 
-		if (SIN(rt_key(rt))->sin_addr.s_addr ==
-		    (IA_SIN(rt->rt_ifa))->sin_addr.s_addr) {
+		TAILQ_FOREACH(ia, &in_ifaddrhead, ia_link) {
+			if (ia->ia_ifp == rt->rt_ifp &&
+			    SIN(rt_key(rt))->sin_addr.s_addr ==
+			    (IA_SIN(ia))->sin_addr.s_addr)
+				break;
+		}
+		if (ia) {
 		    /*
 		     * This test used to be
 		     *	if (loif.if_flags & IFF_UP)
@@ -268,6 +280,17 @@ arp_rtrequest(req, rt, info)
 			if (useloopback)
 				rt->rt_ifp = loif;
 
+		    /*
+		     * make sure to set rt->rt_ifa to the interface
+		     * address we are using, otherwise we will have trouble
+		     * with source address selection.
+		     */
+			ifa = &ia->ia_ifa;
+			if (ifa != rt->rt_ifa) {
+				IFAFREE(rt->rt_ifa);
+				IFAREF(ifa);
+				rt->rt_ifa = ifa;
+			}
 		}
 		break;
 
@@ -527,8 +550,12 @@ in_arpinput(m)
 	struct sockaddr_dl *sdl;
 	struct sockaddr sa;
 	struct in_addr isaddr, itaddr, myaddr;
+	u_int8_t *enaddr = NULL;
 	int op, rif_len;
 	int req_len;
+#ifdef DEV_CARP
+	int carp_match = 0;
+#endif
 
 	req_len = arphdr_len2(ifp->if_addrlen, sizeof(struct in_addr));
 	if (m->m_len < req_len && (m = m_pullup(m, req_len)) == NULL) {
@@ -545,11 +572,24 @@ in_arpinput(m)
 	 * For a bridge, we want to check the address irrespective
 	 * of the receive interface. (This will change slightly
 	 * when we have clusters of interfaces).
+	 * If the interface does not match, but the recieving interface
+	 * is part of carp, we call carp_iamatch to see if this is a
+	 * request for the virtual host ip.
+	 * XXX: This is really ugly!
 	 */
-	LIST_FOREACH(ia, INADDR_HASH(itaddr.s_addr), ia_hash)
+	LIST_FOREACH(ia, INADDR_HASH(itaddr.s_addr), ia_hash) {
 		if ((do_bridge || (ia->ia_ifp == ifp)) &&
 		    itaddr.s_addr == ia->ia_addr.sin_addr.s_addr)
 			goto match;
+#ifdef DEV_CARP
+		if (ifp->if_carp != NULL &&
+		    carp_iamatch(ifp->if_carp, ia, &isaddr, &enaddr) &&
+		    itaddr.s_addr == ia->ia_addr.sin_addr.s_addr) {
+			carp_match = 1;
+			goto match;
+		}
+#endif
+	}
 	LIST_FOREACH(ia, INADDR_HASH(isaddr.s_addr), ia_hash)
 		if ((do_bridge || (ia->ia_ifp == ifp)) &&
 		    isaddr.s_addr == ia->ia_addr.sin_addr.s_addr)
@@ -569,8 +609,10 @@ in_arpinput(m)
 	if (!do_bridge || (ia = TAILQ_FIRST(&in_ifaddrhead)) == NULL)
 		goto drop;
 match:
+	if (!enaddr)
+		enaddr = (u_int8_t *)IF_LLADDR(ifp);
 	myaddr = ia->ia_addr.sin_addr;
-	if (!bcmp(ar_sha(ah), IF_LLADDR(ifp), ifp->if_addrlen))
+	if (!bcmp(ar_sha(ah), enaddr, ifp->if_addrlen))
 		goto drop;	/* it's from me, ignore it. */
 	if (!bcmp(ar_sha(ah), ifp->if_broadcastaddr, ifp->if_addrlen)) {
 		log(LOG_ERR,
@@ -578,7 +620,13 @@ match:
 		    inet_ntoa(isaddr));
 		goto drop;
 	}
-	if (isaddr.s_addr == myaddr.s_addr) {
+	/*
+	 * Warn if another host is using the same IP address, but only if the
+	 * IP address isn't 0.0.0.0, which is used for DHCP only, in which
+	 * case we suppress the warning to avoid false positive complaints of
+	 * potential misconfiguration.
+	 */
+	if (isaddr.s_addr == myaddr.s_addr && myaddr.s_addr != 0) {
 		log(LOG_ERR,
 		   "arp: %*D is using my IP address %s!\n",
 		   ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
@@ -591,7 +639,11 @@ match:
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
 		/* the following is not an error when doing bridging */
-		if (!do_bridge && rt->rt_ifp != ifp) {
+		if (!do_bridge && rt->rt_ifp != ifp
+#ifdef DEV_CARP
+		    && (ifp->if_type != IFT_CARP || !carp_match)
+#endif
+								) {
 			if (log_arp_wrong_iface)
 				log(LOG_ERR, "arp: %s is on %s but got reply from %*D on %s\n",
 				    inet_ntoa(isaddr),
@@ -687,7 +739,7 @@ reply:
 	if (itaddr.s_addr == myaddr.s_addr) {
 		/* I am the target */
 		(void)memcpy(ar_tha(ah), ar_sha(ah), ah->ar_hln);
-		(void)memcpy(ar_sha(ah), IF_LLADDR(ifp), ah->ar_hln);
+		(void)memcpy(ar_sha(ah), enaddr, ah->ar_hln);
 	} else {
 		la = arplookup(itaddr.s_addr, 0, SIN_PROXY);
 		if (la == NULL) {
@@ -714,7 +766,7 @@ reply:
 				goto drop;
 			}
 			(void)memcpy(ar_tha(ah), ar_sha(ah), ah->ar_hln);
-			(void)memcpy(ar_sha(ah), IF_LLADDR(ifp), ah->ar_hln);
+			(void)memcpy(ar_sha(ah), enaddr, ah->ar_hln);
 			rtfree(rt);
 
 			/*
@@ -852,6 +904,19 @@ arp_ifinit(ifp, ifa)
 	if (ntohl(IA_SIN(ifa)->sin_addr.s_addr) != INADDR_ANY)
 		arprequest(ifp, &IA_SIN(ifa)->sin_addr,
 				&IA_SIN(ifa)->sin_addr, IF_LLADDR(ifp));
+	ifa->ifa_rtrequest = arp_rtrequest;
+	ifa->ifa_flags |= RTF_CLONING;
+}
+
+void
+arp_ifinit2(ifp, ifa, enaddr)
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
+	u_char *enaddr;
+{
+	if (ntohl(IA_SIN(ifa)->sin_addr.s_addr) != INADDR_ANY)
+		arprequest(ifp, &IA_SIN(ifa)->sin_addr,
+				&IA_SIN(ifa)->sin_addr, enaddr);
 	ifa->ifa_rtrequest = arp_rtrequest;
 	ifa->ifa_flags |= RTF_CLONING;
 }

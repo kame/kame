@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/sparc64/include/param.h,v 1.18 2003/10/03 19:49:08 alc Exp $
+ * $FreeBSD: src/sys/sparc64/include/param.h,v 1.18.4.1 2005/02/05 01:01:54 das Exp $
  */
 
 /*
@@ -108,7 +108,6 @@
 #define KSTACK_PAGES		4	/* pages of kernel stack (with pcb) */
 #endif
 #define KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
-#define UAREA_PAGES		1	/* pages of user area */
 #define PCPU_PAGES		1
 
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Andre Oppermann, Internet Business Solutions AG
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fastfwd.c,v 1.17.2.3 2004/10/03 17:04:40 mlaier Exp $
+ * $FreeBSD: src/sys/netinet/ip_fastfwd.c,v 1.17.2.7 2005/03/31 17:03:45 glebius Exp $
  */
 
 /*
@@ -195,9 +195,9 @@ ip_fastforward(struct mbuf *m)
 	 * Is first mbuf large enough for ip header and is header present?
 	 */
 	if (m->m_len < sizeof (struct ip) &&
-	   (m = m_pullup(m, sizeof (struct ip))) == 0) {
+	   (m = m_pullup(m, sizeof (struct ip))) == NULL) {
 		ipstat.ips_toosmall++;
-		goto drop;
+		return 1;	/* mbuf already free'd */
 	}
 
 	ip = mtod(m, struct ip *);
@@ -221,7 +221,7 @@ ip_fastforward(struct mbuf *m)
 	if (hlen > m->m_len) {
 		if ((m = m_pullup(m, hlen)) == 0) {
 			ipstat.ips_badhlen++;
-			goto drop;
+			return 1;	/* mbuf already free'd */
 		}
 		ip = mtod(m, struct ip *);
 	}
@@ -428,6 +428,12 @@ passin:
 	ifp = ro.ro_rt->rt_ifp;
 
 	/*
+	 * Immediately drop blackholed traffic.
+	 */
+	if (ro.ro_rt->rt_flags & RTF_BLACKHOLE)
+		goto drop;
+
+	/*
 	 * Step 5: outgoing firewall packet processing
 	 */
 
@@ -583,9 +589,8 @@ passout:
 			} while ((m = m0) != NULL);
 			if (error) {
 				/* Reclaim remaining fragments */
-				for (; m; m = m0) {
+				for (m = m0; m; m = m0) {
 					m0 = m->m_nextpkt;
-					m->m_nextpkt = NULL;
 					m_freem(m);
 				}
 			} else

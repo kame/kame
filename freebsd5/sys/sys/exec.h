@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)exec.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/exec.h,v 1.31 2004/07/15 08:26:07 phk Exp $
+ * $FreeBSD: src/sys/sys/exec.h,v 1.31.2.1 2005/03/29 07:24:45 das Exp $
  */
 
 #ifndef _SYS_EXEC_H_
@@ -48,9 +48,9 @@
  */
 struct ps_strings {
 	char	**ps_argvstr;	/* first of 0 or more argument strings */
-	int	ps_nargvstr;	/* the number of argument strings */
+	unsigned int ps_nargvstr; /* the number of argument strings */
 	char	**ps_envstr;	/* first of 0 or more environment strings */
-	int	ps_nenvstr;	/* the number of environment strings */
+	unsigned int ps_nenvstr; /* the number of environment strings */
 };
 
 /*

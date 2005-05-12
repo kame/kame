@@ -1,4 +1,4 @@
-/*
+/*-
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_if.c,v 1.15 2003/07/29 13:32:10 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_if.c,v 1.15.4.1 2005/01/31 23:26:27 imp Exp $");
 
 #ifndef ATM_SPANS_MODULE
 #include "opt_atm.h"

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ucred.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/ucred.h,v 1.49.2.1 2004/09/03 06:11:59 julian Exp $
+ * $FreeBSD: src/sys/sys/ucred.h,v 1.49.2.2 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef _SYS_UCRED_H_

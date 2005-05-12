@@ -1,5 +1,5 @@
 /*	$OpenBSD: yukonreg.h,v 1.2 2003/08/12 05:23:06 nate Exp $ */
-/*
+/*-
  * Copyright (c) 2003 Nathan L. Binkert <binkertn@umich.edu>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -14,7 +14,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * $FreeBSD: src/sys/pci/yukonreg.h,v 1.1 2003/09/20 15:49:22 wilko Exp $
+ * $FreeBSD: src/sys/pci/yukonreg.h,v 1.1.6.1 2005/01/31 23:26:51 imp Exp $
  */
 
 /* General Purpose Status Register (GPSR) */

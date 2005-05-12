@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_meter.c,v 1.76 2004/08/16 06:16:12 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_meter.c,v 1.76.2.3 2005/02/23 17:33:22 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,7 +55,11 @@ __FBSDID("$FreeBSD: src/sys/vm/vm_meter.c,v 1.76 2004/08/16 06:16:12 alc Exp $")
 /*
  * Virtual memory MPSAFE temporary workarounds.
  */
+#if defined(__alpha__) || defined(__amd64__) || defined(__i386__)
+int debug_mpsafevm = 1;
+#else
 int debug_mpsafevm;
+#endif
 TUNABLE_INT("debug.mpsafevm", &debug_mpsafevm);
 SYSCTL_INT(_debug, OID_AUTO, mpsafevm, CTLFLAG_RD, &debug_mpsafevm, 0,
     "Enable/disable MPSAFE virtual memory support");

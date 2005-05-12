@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998-2003
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.44.2.3 2004/10/12 21:51:20 jmg Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.44.2.5 2005/03/24 16:41:48 des Exp $
  */
 
 /*
@@ -147,6 +147,7 @@
 
 #define RL_HWREV_8169		0x00000000
 #define RL_HWREV_8169S		0x04000000
+#define RL_HWREV_8169SB		0x10000000
 #define RL_HWREV_8110S		0x00800000
 #define RL_HWREV_8139		0x60000000
 #define RL_HWREV_8139A		0x70000000

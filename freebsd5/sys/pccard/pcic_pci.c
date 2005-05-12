@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2002 M. Warner Losh.  All Rights Reserved.
  * Copyright (c) 1997 Ted Faber All rights reserved.
  *
@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_pci.c,v 1.128 2004/03/17 17:50:52 njl Exp $
+ * $FreeBSD: src/sys/pccard/pcic_pci.c,v 1.128.2.1 2005/01/31 23:26:49 imp Exp $
  */
 
 #define OBSOLETE_IN_6

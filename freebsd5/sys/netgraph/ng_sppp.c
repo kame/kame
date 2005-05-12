@@ -1,6 +1,8 @@
 /*
  * ng_sppp.c Netgraph to Sppp module.
- *
+ */
+
+/*-
  * Copyright (C) 2002-2004 Cronyx Engineering.
  * Copyright (C) 2002-2004 Roman Kurakin <rik@cronyx.ru>
  *
@@ -15,7 +17,7 @@
  * Cronyx Id: ng_sppp.c,v 1.1.2.10 2004/03/01 15:17:21 rik Exp $
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/ng_sppp.c,v 1.4 2004/07/04 16:11:02 stefanf Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/ng_sppp.c,v 1.4.2.1 2005/01/31 23:26:29 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

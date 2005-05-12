@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/key.c,v 1.16.2.1 2004/10/02 04:55:47 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/key.c,v 1.16.2.2 2005/01/31 23:26:41 imp Exp $	*/
 /*	$KAME: key.c,v 1.191 2001/06/27 10:46:49 sakane Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *

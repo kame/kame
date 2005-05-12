@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb.h,v 1.9 2003/01/01 18:48:56 schweikh Exp $
+ * $FreeBSD: src/sys/netsmb/smb.h,v 1.9.6.1 2005/01/31 23:26:44 imp Exp $
  */
 
 /*

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -63,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_kern.c,v 1.120 2004/08/10 14:42:48 green Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_kern.c,v 1.120.2.2 2005/02/23 05:54:52 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -173,11 +173,10 @@ kmem_alloc(map, size)
 		vm_page_t mem;
 
 		mem = vm_page_grab(kernel_object, OFF_TO_IDX(offset + i),
-				VM_ALLOC_ZERO | VM_ALLOC_RETRY);
+		    VM_ALLOC_NOBUSY | VM_ALLOC_ZERO | VM_ALLOC_RETRY);
 		mem->valid = VM_PAGE_BITS_ALL;
 		vm_page_lock_queues();
 		vm_page_unmanage(mem);
-		vm_page_wakeup(mem);
 		vm_page_unlock_queues();
 	}
 	VM_OBJECT_UNLOCK(kernel_object);

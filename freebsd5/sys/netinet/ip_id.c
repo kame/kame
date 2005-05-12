@@ -1,6 +1,6 @@
 /* $OpenBSD: ip_id.c,v 1.2 1999/08/26 13:37:01 provos Exp $ */
 
-/*
+/*-
  * Copyright 1998 Niels Provos <provos@citi.umich.edu>
  * All rights reserved.
  *
@@ -34,7 +34,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_id.c,v 1.6 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/ip_id.c,v 1.6.2.1 2005/01/31 23:26:36 imp Exp $
  */
 
 /*

@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/proc.h,v 1.392.2.12.2.1 2004/10/22 19:13:07 scottl Exp $
+ * $FreeBSD: src/sys/sys/proc.h,v 1.392.2.19.2.1 2005/04/28 23:42:09 davidxu Exp $
  */
 
 #ifndef _SYS_PROC_H_
@@ -281,7 +281,6 @@ struct thread {
 	sigset_t	td_oldsigmask;	/* (k) Saved mask from pre sigpause. */
 	sigset_t	td_sigmask;	/* (c) Current signal mask. */
 	sigset_t	td_siglist;	/* (c) Sigs arrived, not delivered. */
-	sigset_t	*td_waitset;	/* (c) Wait set for sigwait. */
 	TAILQ_ENTRY(thread) td_umtx;	/* (c?) Link for when we're blocked. */
 	volatile u_int	td_generation;	/* (k) Enable detection of preemption */
 	stack_t		td_sigstk;	/* (k) Stack ptr and on-stack flag. */
@@ -376,6 +375,8 @@ struct thread {
 #define	TDP_SCHED2	0x00002000 /* Reserved for scheduler private use */
 #define	TDP_SCHED3	0x00004000 /* Reserved for scheduler private use */
 #define	TDP_SCHED4	0x00008000 /* Reserved for scheduler private use */
+#define	TDP_GEOM	0x00010000 /* Settle GEOM before finishing syscall */
+#define	TDP_SOFTDEP	0x00020000 /* Stuck processing softdep worklist */
 
 /*
  * Reasons that the current thread can not be run yet.
@@ -502,7 +503,7 @@ struct proc {
 					/* Accumulated stats for all threads? */
 	struct pstats	*p_stats;	/* (b) Accounting/statistics (CPU). */
 	struct plimit	*p_limit;	/* (c) Process limits. */
-	struct vm_object *p_upages_obj; /* (a) Upages object. */
+	struct vm_object *p_unused1;	/* (a) Former upages object */
 	struct sigacts	*p_sigacts;	/* (x) Signal actions, state (CPU). */
 	/*
 	 * The following don't make too much sense..
@@ -579,7 +580,7 @@ struct proc {
 	int		p_numksegrps;	/* (c) number of ksegrps */
 	struct mdproc	p_md;		/* Any machine-dependent fields. */
 	struct callout	p_itcallout;	/* (h + c) Interval timer callout. */
-	struct user	*p_uarea;	/* (k) Kernel VA of u-area (CPU). */
+	struct user	*p_unused2;	/* (k) Formerly U-area. */
 	u_short		p_acflag;	/* (c) Accounting flags. */
 	struct rusage	*p_ru;		/* (a) Exit information. XXX */
 	struct proc	*p_peers;	/* (r) */
@@ -623,6 +624,7 @@ struct proc {
 #define	P_SINGLE_BOUNDARY 0x400000 /* Threads should suspend at user boundary. */
 #define	P_JAILED	0x1000000 /* Process is in jail. */
 #define	P_INEXEC	0x4000000 /* Process is in execve(). */
+#define	P_STATCHILD	0x8000000 /* Child process stopped or exited. */
 
 #define	P_STOPPED		(P_STOPPED_SIG|P_STOPPED_SINGLE|P_STOPPED_TRACE)
 #define	P_SHOULDSTOP(p)		((p)->p_flag & P_STOPPED)
@@ -843,6 +845,9 @@ void	procinit(void);
 void	threadinit(void);
 void	proc_linkup(struct proc *p, struct ksegrp *kg, struct thread *td);
 void	proc_reparent(struct proc *child, struct proc *newparent);
+struct pstats *pstats_alloc(void);
+void	pstats_fork(struct pstats *src, struct pstats *dst);
+void	pstats_free(struct pstats *ps);
 int	securelevel_ge(struct ucred *cr, int level);
 int	securelevel_gt(struct ucred *cr, int level);
 void	setrunnable(struct thread *);

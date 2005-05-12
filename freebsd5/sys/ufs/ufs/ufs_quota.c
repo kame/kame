@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_quota.c,v 1.73 2004/07/26 07:24:04 cperciva Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_quota.c,v 1.73.2.1 2005/01/31 23:27:01 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

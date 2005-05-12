@@ -7,7 +7,9 @@
  *	controller slot number to allow multiple controllers
  *	to be accessed.
  *-------------------------------------------------------------------------
- *
+ */
+
+/*-
  * Copyright (c) 1995 Andrew McRae.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +34,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/slot.h,v 1.39 2004/06/16 09:47:19 phk Exp $
+ * $FreeBSD: src/sys/pccard/slot.h,v 1.39.2.1 2005/01/31 23:26:49 imp Exp $
  */
 
 #ifndef _PCCARD_SLOT_H

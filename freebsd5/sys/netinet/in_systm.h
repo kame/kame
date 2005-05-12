@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_systm.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_systm.h,v 1.11 2004/04/07 20:46:13 imp Exp $
+ * $FreeBSD: src/sys/netinet/in_systm.h,v 1.11.2.1 2005/01/31 23:26:35 imp Exp $
  */
 
 #ifndef _NETINET_IN_SYSTM_H_

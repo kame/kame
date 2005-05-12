@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/kdb.h,v 1.1 2004/07/10 18:40:12 marcel Exp $
+ * $FreeBSD: src/sys/sparc64/include/kdb.h,v 1.1.2.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_KDB_H_

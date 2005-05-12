@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvcache.c,v 1.39 2004/07/03 19:17:06 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvcache.c,v 1.39.2.1 2005/01/31 23:26:47 imp Exp $");
 
 /*
  * Reference: Chet Juszczak, "Improving the Performance and Correctness

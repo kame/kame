@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2001 Jason Evans <jasone@freebsd.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sx.h,v 1.20 2004/07/11 16:07:07 darrenr Exp $
+ * $FreeBSD: src/sys/sys/sx.h,v 1.20.2.1 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef	_SYS_SX_H_

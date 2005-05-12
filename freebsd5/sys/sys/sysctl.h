@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/sysctl.h,v 1.132 2004/07/28 07:08:39 kan Exp $
+ * $FreeBSD: src/sys/sys/sysctl.h,v 1.132.2.2 2005/03/03 00:46:32 wes Exp $
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -453,6 +453,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define HW_FLOATINGPT	10		/* int: has HW floating point? */
 #define HW_MACHINE_ARCH	11		/* string: machine architecture */
 #define	HW_MAXID	12		/* number of valid hw ids */
+#define	HW_REALMEM	13		/* int: 'real' memory */
 
 #define CTL_HW_NAMES { \
 	{ 0, 0 }, \
@@ -466,6 +467,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	{ "disknames", CTLTYPE_STRUCT }, \
 	{ "diskstats", CTLTYPE_STRUCT }, \
 	{ "floatingpoint", CTLTYPE_INT }, \
+	{ "realmem", CTLTYPE_ULONG }, \
 }
 
 /*

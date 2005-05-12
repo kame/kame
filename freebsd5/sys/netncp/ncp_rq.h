@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000, 2001 Boris Popov
  * All rights reserved.
  *
@@ -29,52 +29,30 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_rq.h,v 1.7 2003/02/26 21:25:55 fjoe Exp $
+ * $FreeBSD: src/sys/netncp/ncp_rq.h,v 1.7.6.2 2005/01/31 23:26:44 imp Exp $
  */
 #ifndef _NETNCP_NCP_RQ_H_
 #define _NETNCP_NCP_RQ_H_
 
-#include <machine/endian.h>
+#include <sys/endian.h>
 
 #define getb(buf,ofs) 		(((const u_int8_t *)(buf))[ofs])
 #define setb(buf,ofs,val)	(((u_int8_t*)(buf))[ofs])=val
 #define getbw(buf,ofs)		((u_int16_t)(getb(buf,ofs)))
 
-#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define	getwle(buf,ofs) (le16toh(*((u_int16_t*)(&((u_int8_t*)(buf))[ofs]))))
+#define	getdle(buf,ofs) (le32toh(*((u_int32_t*)(&((u_int8_t*)(buf))[ofs]))))
+#define	getwbe(buf,ofs) (be16toh(*((u_int16_t*)(&((u_int8_t*)(buf))[ofs]))))
+#define	getdbe(buf,ofs) (be32toh(*((u_int32_t*)(&((u_int8_t*)(buf))[ofs]))))
 
-#define getwle(buf,ofs) (*((u_int16_t*)(&((u_int8_t*)(buf))[ofs])))
-#define getdle(buf,ofs) (*((u_int32_t*)(&((u_int8_t*)(buf))[ofs])))
-#define getwbe(buf,ofs) (ntohs(getwle(buf,ofs)))
-#define getdbe(buf,ofs) (ntohl(getdle(buf,ofs)))
-
-#define setwle(buf,ofs,val) getwle(buf,ofs)=val
-#define setwbe(buf,ofs,val) getwle(buf,ofs)=htons(val)
-#define setdle(buf,ofs,val) getdle(buf,ofs)=val
-#define setdbe(buf,ofs,val) getdle(buf,ofs)=htonl(val)
-
-#else
-#error "Macros for Big-Endians are incomplete"
-#define getwle(buf,ofs) ((u_int16_t)(getb(buf, ofs) | (getb(buf, ofs + 1) << 8)))
-#define getdle(buf,ofs) ((u_int32_t)(getb(buf, ofs) | \
-				    (getb(buf, ofs + 1) << 8) | \
-				    (getb(buf, ofs + 2) << 16) | \
-				    (getb(buf, ofs + 3) << 24)))
-#define getwbe(buf,ofs) (*((u_int16_t*)(&((u_int8_t*)(buf))[ofs])))
-#define getdbe(buf,ofs) (*((u_int32_t*)(&((u_int8_t*)(buf))[ofs])))
-/*
-#define setwle(buf,ofs,val) getwle(buf,ofs)=val
-#define setdle(buf,ofs,val) getdle(buf,ofs)=val
-*/
-#define setwbe(buf,ofs,val) getwle(buf,ofs)=val
-#define setdbe(buf,ofs,val) getdle(buf,ofs)=val
-/*
-#define htoles(x)	((u_int16_t)(x))
-#define letohs(x)	((u_int16_t)(x))
-#define	htolel(x)	((u_int32_t)(x))
-#define	letohl(x)	((u_int32_t)(x))
-*/
-#endif
-
+#define	setwle(buf,ofs,val) \
+	(*((u_int16_t*)(&((u_int8_t*)(buf))[ofs])))=htole16(val)
+#define	setdle(buf,ofs,val) \
+	(*((u_int32_t*)(&((u_int8_t*)(buf))[ofs])))=htole32(val)
+#define	setwbe(buf,ofs,val) \
+	(*((u_int16_t*)(&((u_int8_t*)(buf))[ofs])))=htobe16(val)
+#define	setdbe(buf,ofs,val) \
+	(*((u_int32_t*)(&((u_int8_t*)(buf))[ofs])))=htobe32(val)
 
 #ifdef _KERNEL
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.283.2.7 2004/10/03 17:04:40 mlaier Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.283.2.13 2005/03/21 16:05:35 glebius Exp $
  */
 
 #include "opt_bootp.h"
@@ -35,9 +35,11 @@
 #include "opt_ipstealth.h"
 #include "opt_ipsec.h"
 #include "opt_mac.h"
+#include "opt_carp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/mac.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
@@ -65,6 +67,9 @@
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 #include <machine/in_cksum.h>
+#ifdef DEV_CARP
+#include <netinet/ip_carp.h>
+#endif
 
 #include <sys/socketvar.h>
 
@@ -186,6 +191,7 @@ SYSCTL_STRUCT(_net_inet_ip, IPCTL_STATS, stats, CTLFLAG_RW,
 
 static TAILQ_HEAD(ipqhead, ipq) ipq[IPREASS_NHASH];
 struct mtx ipqlock;
+struct callout ipport_tick_callout;
 
 #define	IPQ_LOCK()	mtx_lock(&ipqlock)
 #define	IPQ_UNLOCK()	mtx_unlock(&ipqlock)
@@ -246,7 +252,7 @@ ip_init()
 	TAILQ_INIT(&in_ifaddrhead);
 	in_ifaddrhashtbl = hashinit(INADDR_NHASH, M_IFADDR, &in_ifaddrhmask);
 	pr = pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
-	if (pr == 0)
+	if (pr == NULL)
 		panic("ip_init: PF_INET not found");
 
 	/* Initialize the entire ip_protox[] array to IPPROTO_RAW. */
@@ -279,11 +285,23 @@ ip_init()
 	maxnipq = nmbclusters / 32;
 	maxfragsperpacket = 16;
 
+	/* Start ipport_tick. */
+	callout_init(&ipport_tick_callout, CALLOUT_MPSAFE);
+	ipport_tick(NULL);
+	EVENTHANDLER_REGISTER(shutdown_pre_sync, ip_fini, NULL,
+		SHUTDOWN_PRI_DEFAULT);
+
 	/* Initialize various other remaining things. */
 	ip_id = time_second & 0xffff;
 	ipintrq.ifq_maxlen = ipqmaxlen;
 	mtx_init(&ipintrq.ifq_mtx, "ip_inq", NULL, MTX_DEF);
 	netisr_register(NETISR_IP, ip_input, &ipintrq, NETISR_MPSAFE);
+}
+
+void ip_fini(xtp)
+	void *xtp;
+{
+	callout_stop(&ipport_tick_callout);
 }
 
 /*
@@ -311,11 +329,11 @@ ip_input(struct mbuf *m)
   	
 	if (m->m_flags & M_FASTFWD_OURS) {
 		/*
-		 * ip_fastforward firewall changed dest to local.
-		 * We expect ip_len and ip_off in host byte order.
+		 * Firewall or NAT changed destination to local.
+		 * We expect ip_len and ip_off to be in host byte order.
 		 */
-		m->m_flags &= ~M_FASTFWD_OURS;	/* for reflected mbufs */
-		/* Set up some basic stuff */
+		m->m_flags &= ~M_FASTFWD_OURS;
+		/* Set up some basics that will be used later. */
 		ip = mtod(m, struct ip *);
 		hlen = ip->ip_hl << 2;
   		goto ours;
@@ -450,7 +468,19 @@ tooshort:
 		m->m_flags &= ~M_FASTFWD_OURS;
 		goto ours;
 	}
+#ifndef IPFIREWALL_FORWARD_EXTENDED
 	dchg = (m_tag_find(m, PACKET_TAG_IPFORWARD, NULL) != NULL);
+#else
+	if ((dchg = (m_tag_find(m, PACKET_TAG_IPFORWARD, NULL) != NULL)) != 0) {
+		/*
+		 * Directly ship on the packet.  This allows to forward packets
+		 * that were destined for us to some other directly connected
+		 * host.
+		 */
+		ip_forward(m, dchg);
+		return;
+	}
+#endif /* IPFIREWALL_FORWARD_EXTENDED */
 #endif /* IPFIREWALL_FORWARD */
 
 passin:
@@ -495,10 +525,17 @@ passin:
 	 * XXX - Checking is incompatible with IP aliases added
 	 * to the loopback interface instead of the interface where
 	 * the packets are received.
+	 *
+	 * XXX - This is the case for carp vhost IPs as well so we
+	 * insert a workaround. If the packet got here, we already
+	 * checked with carp_iamatch() and carp_forus().
 	 */
 	checkif = ip_checkinterface && (ipforwarding == 0) && 
 	    m->m_pkthdr.rcvif != NULL &&
 	    ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) &&
+#ifdef DEV_CARP
+	    !m->m_pkthdr.rcvif->if_carp &&
+#endif
 	    (dchg == 0);
 
 	/*
@@ -1010,10 +1047,10 @@ inserted:
 	 */
 	m = q;
 	t = m->m_next;
-	m->m_next = 0;
+	m->m_next = NULL;
 	m_cat(m, t);
 	nq = q->m_nextpkt;
-	q->m_nextpkt = 0;
+	q->m_nextpkt = NULL;
 	for (q = nq; q != NULL; q = nq) {
 		nq = q->m_nextpkt;
 		q->m_nextpkt = NULL;
@@ -1446,11 +1483,11 @@ ip_rtaddr(dst)
 	rtalloc_ign(&sro, RTF_CLONING);
 
 	if (sro.ro_rt == NULL)
-		return ((struct in_ifaddr *)0);
+		return (NULL);
 
 	ifa = ifatoia(sro.ro_rt->rt_ifa);
 	RTFREE(sro.ro_rt);
-	return ifa;
+	return (ifa);
 }
 
 /*
@@ -1499,13 +1536,13 @@ ip_srcroute(m0)
 
 	opts = (struct ipopt_tag *)m_tag_find(m0, PACKET_TAG_IPOPTIONS, NULL);
 	if (opts == NULL)
-		return ((struct mbuf *)0);
+		return (NULL);
 
 	if (opts->ip_nhops == 0)
-		return ((struct mbuf *)0);
+		return (NULL);
 	m = m_get(M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
-		return ((struct mbuf *)0);
+		return (NULL);
 
 #define OPTSIZ	(sizeof(opts->ip_srcrt.nop) + sizeof(opts->ip_srcrt.srcopt))
 
@@ -1740,7 +1777,7 @@ ip_forward(struct mbuf *m, int srcrt)
 			RTFREE(rt);
 	}
 
-	error = ip_output(m, (struct mbuf *)0, NULL, IP_FORWARDING, 0, NULL);
+	error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL);
 	if (error)
 		ipstat.ips_cantforward++;
 	else {

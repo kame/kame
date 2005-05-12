@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_stereg.h,v 1.16 2004/04/06 11:04:54 ru Exp $
+ * $FreeBSD: src/sys/pci/if_stereg.h,v 1.16.2.1 2005/01/31 23:26:50 imp Exp $
  */
 
 /*

@@ -1,8 +1,9 @@
 /* MD4.H - header file for MD4C.C
- * $FreeBSD: src/sys/sys/md4.h,v 1.1 2001/04/10 07:59:06 bp Exp $
+ * $FreeBSD: src/sys/sys/md4.h,v 1.1.10.1 2005/01/31 23:26:56 imp Exp $
  */
 
-/* Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
+/*-
+   Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
    rights reserved.
 
    License to copy and use this software is granted provided that it

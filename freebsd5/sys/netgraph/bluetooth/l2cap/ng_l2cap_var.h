@@ -1,6 +1,8 @@
 /*
  * ng_l2cap_var.h
- *
+ */
+
+/*-
  * Copyright (c) 2001 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_l2cap_var.h,v 1.2 2003/04/28 21:44:59 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_var.h,v 1.4 2004/04/09 23:01:40 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_var.h,v 1.4.2.2 2005/01/31 23:26:34 imp Exp $
  */
 
 #ifndef _NETGRAPH_L2CAP_VAR_H_
@@ -111,7 +113,7 @@ typedef struct ng_l2cap_con {
 
 	bdaddr_t			 remote;     /* remote unit address */
 	u_int16_t			 con_handle; /* ACL connection handle */
-	struct callout_handle		 con_timo;   /* connection timeout */
+	struct callout			 con_timo;   /* connection timeout */
 
 	u_int8_t			 ident;      /* last allocated ident */
 	TAILQ_HEAD(, ng_l2cap_cmd)	 cmd_list;   /* pending L2CAP cmds */
@@ -174,7 +176,7 @@ typedef struct ng_l2cap_cmd {
 	u_int8_t			 ident;     /* L2CAP command ident */
 	u_int32_t			 token;     /* L2CA message token */
 
-	struct callout_handle		 timo;      /* RTX/ERTX timeout */
+	struct callout			 timo;      /* RTX/ERTX timeout */
 
 	struct mbuf			*aux;       /* optional data */
 

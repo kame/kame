@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2002
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  *	All rights reserved.
@@ -30,13 +30,13 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/atm/ccatm/ng_ccatm.c,v 1.1 2004/08/12 14:22:00 harti Exp $
+ * $FreeBSD: src/sys/netgraph/atm/ccatm/ng_ccatm.c,v 1.1.2.1 2005/01/31 23:26:31 imp Exp $
  *
  * ATM call control and API
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/ccatm/ng_ccatm.c,v 1.1 2004/08/12 14:22:00 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/ccatm/ng_ccatm.c,v 1.1.2.1 2005/01/31 23:26:31 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

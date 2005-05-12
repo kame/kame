@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -30,12 +30,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
+ *
  *	@(#)ipx_ip.c
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_ip.c,v 1.36 2003/10/31 18:32:12 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_ip.c,v 1.36.4.3 2005/02/25 13:26:39 rwatson Exp $");
 
 /*
  * Software interface driver for encapsulating IPX in IP.
@@ -333,7 +333,7 @@ ipxip_route(so, sopt)
 	 */
 	bzero((caddr_t)&ro, sizeof(ro));
 	ro.ro_dst = *(struct sockaddr *)ip_dst;
-	rtalloc(&ro);
+	rtalloc_ign(&ro, 0);
 	if (ro.ro_rt == NULL || ro.ro_rt->rt_ifp == NULL) {
 		return (ENETUNREACH);
 	}
@@ -346,7 +346,7 @@ ipxip_route(so, sopt)
 		register struct in_ifaddr *ia;
 		struct ifnet *ifp = ro.ro_rt->rt_ifp;
 
-		for (ia = TAILQ_FIRST(&in_ifaddrhead); ia != NULL; 
+		for (ia = TAILQ_FIRST(&in_ifaddrhead); ia != NULL;
 		     ia = TAILQ_NEXT(ia, ia_link))
 			if (ia->ia_ifp == ifp)
 				break;
@@ -385,7 +385,7 @@ ipxip_route(so, sopt)
 			(struct ifnet *)ifn, sopt->sopt_td);
 
 	/* use any of our addresses */
-	satoipx_addr(ifr_ipxip.ifr_addr).x_host = 
+	satoipx_addr(ifr_ipxip.ifr_addr).x_host =
 			ipx_ifaddr->ia_addr.sipx_addr.x_host;
 
 	return (ipx_control(so, (int)SIOCSIFADDR, (caddr_t)&ifr_ipxip,

@@ -50,7 +50,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.153 2004/07/17 10:07:19 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.153.2.3 2004/11/13 13:02:49 nyan Exp $
  */
 
 #include "opt_fdc.h"
@@ -137,9 +137,9 @@ static struct fd_type fd_native_types[] =
 {
 { 0 },						/* FDT_NONE */
 { 0 },						/* FDT_360K */
-{ 15,2,0xFF,0x1B,80,2400,0,2,0x54,1,0,0 },	/* FDT_12M  */
+{ 15,2,0xFF,0x1B,80,2400,0,2,0x54,1,0,FL_MFM },	/* FDT_12M  */
 { 0 },						/* FDT_720K */
-{ 18,2,0xFF,0x1B,80,2880,2,2,0x54,1,0,0 },	/* FDT_144M */
+{ 18,2,0xFF,0x1B,80,2880,2,2,0x54,1,0,FL_MFM },	/* FDT_144M */
 { 0 },						/* FDT_288M */
 };
 
@@ -366,10 +366,6 @@ static void fd_turnon(struct fd_data *);
 static void fdc_reset(fdc_p);
 static int fd_in(struct fdc_data *, int *);
 static int out_fdc(struct fdc_data *, int);
-/*
- * The open function is named fdopen() to avoid confusion with fdopen()
- * in fd(4).  The difference is now only meaningful for debuggers.
- */
 static	d_open_t	fdopen;
 static	d_close_t	fdclose;
 static	d_strategy_t	fdstrategy;
@@ -903,7 +899,6 @@ fdc_detach(device_t dev)
 device_t
 fdc_add_child(device_t dev, const char *name, int unit)
 {
-	int flags;
 	struct fdc_ivars *ivar;
 	device_t child;
 
@@ -918,8 +913,6 @@ fdc_add_child(device_t dev, const char *name, int unit)
 	device_set_ivars(child, ivar);
 	ivar->fdunit = unit;
 	ivar->fdtype = FDT_NONE;
-	if (resource_int_value(name, unit, "flags", &flags) == 0)
-		device_set_flags(child, flags);
 	if (resource_disabled(name, unit))
 		device_disable(child);
 	return (child);

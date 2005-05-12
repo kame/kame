@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.243 2004/08/15 06:24:42 jmg Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.243.2.3 2005/03/01 11:32:32 phk Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -643,8 +643,7 @@ int	vinvalbuf(struct vnode *vp, int save, struct ucred *cred,
 int	vtruncbuf(struct vnode *vp, struct ucred *cred, struct thread *td,
 	    off_t length, int blksize);
 void	vprint(char *label, struct vnode *vp);
-int	vrecycle(struct vnode *vp, struct mtx *inter_lkp,
-	    struct thread *td);
+int	vrecycle(struct vnode *vp, void *dummyarg, struct thread *td);
 int	vn_close(struct vnode *vp,
 	    int flags, struct ucred *file_cred, struct thread *td);
 void	vn_finished_write(struct mount *mp);

@@ -1,4 +1,5 @@
-/*
+/*-
+ * Copyright (c) 2004-2005 Robert N. M. Watson
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.40.4.1 2004/10/21 09:30:47 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.40.2.10 2005/03/10 14:34:02 rwatson Exp $");
 
 #include "opt_ipx.h"
 
@@ -81,7 +82,7 @@ static	int ipx_connect(struct socket *so, struct sockaddr *nam,
 static	int ipx_detach(struct socket *so);
 static	int ipx_disconnect(struct socket *so);
 static	int ipx_send(struct socket *so, int flags, struct mbuf *m,
-		     struct sockaddr *addr, struct mbuf *control, 
+		     struct sockaddr *addr, struct mbuf *control,
 		     struct thread *td);
 static	int ipx_shutdown(struct socket *so);
 static	int ripx_attach(struct socket *so, int proto, struct thread *td);
@@ -115,8 +116,8 @@ ipx_input(m, ipxp)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct sockaddr_ipx ipx_ipx;
 
-	if (ipxp == NULL)
-		panic("No ipxpcb");
+	KASSERT(ipxp != NULL, ("ipx_input: NUL ipxpcb"));
+	IPX_LOCK_ASSERT(ipxp);
 	/*
 	 * Construct sockaddr format source address.
 	 * Stuff source address and datagram in user buffer.
@@ -129,7 +130,7 @@ ipx_input(m, ipxp)
 	if (ipx_neteqnn(ipx->ipx_sna.x_net, ipx_zeronet) && ifp != NULL) {
 		register struct ifaddr *ifa;
 
-		for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa != NULL; 
+		for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa != NULL;
 		     ifa = TAILQ_NEXT(ifa, ifa_link)) {
 			if (ifa->ifa_addr->sa_family == AF_IPX) {
 				ipx_ipx.sipx_addr.x_net =
@@ -139,28 +140,16 @@ ipx_input(m, ipxp)
 		}
 	}
 	ipxp->ipxp_rpt = ipx->ipx_pt;
-	if (!(ipxp->ipxp_flags & IPXP_RAWIN) ) {
+	if ((ipxp->ipxp_flags & IPXP_RAWIN) == 0) {
 		m->m_len -= sizeof(struct ipx);
 		m->m_pkthdr.len -= sizeof(struct ipx);
 		m->m_data += sizeof(struct ipx);
 	}
-	if (sbappendaddr(&ipxp->ipxp_socket->so_rcv, (struct sockaddr *)&ipx_ipx,
-	    m, (struct mbuf *)NULL) == 0)
-		goto bad;
-	sorwakeup(ipxp->ipxp_socket);
-	return;
-bad:
-	m_freem(m);
-}
-
-void
-ipx_abort(ipxp)
-	struct ipxpcb *ipxp;
-{
-	struct socket *so = ipxp->ipxp_socket;
-
-	ipx_pcbdisconnect(ipxp);
-	soisdisconnected(so);
+	if (sbappendaddr(&ipxp->ipxp_socket->so_rcv,
+	    (struct sockaddr *)&ipx_ipx, m, NULL) == 0)
+		m_freem(m);
+	else
+		sorwakeup(ipxp->ipxp_socket);
 }
 
 /*
@@ -173,6 +162,9 @@ ipx_drop(ipxp, errno)
 	int errno;
 {
 	struct socket *so = ipxp->ipxp_socket;
+
+	IPX_LIST_LOCK_ASSERT();
+	IPX_LOCK_ASSERT(ipxp);
 
 	/*
 	 * someday, in the IPX world
@@ -202,6 +194,8 @@ ipx_output(ipxp, m0)
 	struct mbuf *m;
 	struct mbuf *mprev = NULL;
 
+	IPX_LOCK_ASSERT(ipxp);
+
 	/*
 	 * Calculate data length.
 	 */
@@ -212,7 +206,7 @@ ipx_output(ipxp, m0)
 	/*
 	 * Make sure packet is actually of even length.
 	 */
-	
+
 	if (len & 1) {
 		m = mprev;
 		if ((m->m_flags & M_EXT) == 0 &&
@@ -295,7 +289,7 @@ ipx_output(ipxp, m0)
 						&satoipx_addr(ro->ro_dst);
 				dst->x_host = ipx->ipx_dna.x_host;
 			}
-			/* 
+			/*
 			 * Otherwise, we go through the same gateway
 			 * and dst is already set up.
 			 */
@@ -319,6 +313,7 @@ ipx_ctloutput(so, sopt)
 	int mask, error, optval;
 	short soptval;
 	struct ipx ioptval;
+	long seq;
 
 	error = 0;
 	if (ipxp == NULL)
@@ -338,10 +333,11 @@ ipx_ctloutput(so, sopt)
 		case SO_IPX_CHECKSUM:
 			mask = IPXP_CHECKSUM;
 			goto get_flags;
-			
+
 		case SO_HEADERS_ON_OUTPUT:
 			mask = IPXP_RAWOUT;
 		get_flags:
+			/* Unlocked read. */
 			soptval = ipxp->ipxp_flags & mask;
 			error = sooptcopyout(sopt, &soptval, sizeof soptval);
 			break;
@@ -350,16 +346,20 @@ ipx_ctloutput(so, sopt)
 			ioptval.ipx_len = 0;
 			ioptval.ipx_sum = 0;
 			ioptval.ipx_tc = 0;
+			IPX_LOCK(ipxp);
 			ioptval.ipx_pt = ipxp->ipxp_dpt;
 			ioptval.ipx_dna = ipxp->ipxp_faddr;
 			ioptval.ipx_sna = ipxp->ipxp_laddr;
+			IPX_UNLOCK(ipxp);
 			error = sooptcopyout(sopt, &soptval, sizeof soptval);
 			break;
 
 		case SO_SEQNO:
-			error = sooptcopyout(sopt, &ipx_pexseq, 
-					     sizeof ipx_pexseq);
+			IPX_LIST_LOCK();
+			seq = ipx_pexseq;
 			ipx_pexseq++;
+			IPX_LIST_UNLOCK();
+			error = sooptcopyout(sopt, &seq, sizeof seq);
 			break;
 
 		default:
@@ -387,10 +387,12 @@ ipx_ctloutput(so, sopt)
 					    sizeof optval);
 			if (error)
 				break;
+			IPX_LOCK(ipxp);
 			if (optval)
 				ipxp->ipxp_flags |= mask;
 			else
 				ipxp->ipxp_flags &= ~mask;
+			IPX_UNLOCK(ipxp);
 			break;
 
 		case SO_DEFAULT_HEADERS:
@@ -398,6 +400,7 @@ ipx_ctloutput(so, sopt)
 					    sizeof ioptval);
 			if (error)
 				break;
+			/* Unlocked write. */
 			ipxp->ipxp_dpt = ioptval.ipx_pt;
 			break;
 #ifdef IPXIP
@@ -417,12 +420,12 @@ static int
 ipx_usr_abort(so)
 	struct socket *so;
 {
-	int s;
 	struct ipxpcb *ipxp = sotoipxpcb(so);
 
-	s = splnet();
+	IPX_LIST_LOCK();
+	IPX_LOCK(ipxp);
 	ipx_pcbdetach(ipxp);
-	splx(s);
+	IPX_LIST_UNLOCK();
 	soisdisconnected(so);
 	ACCEPT_LOCK();
 	SOCK_LOCK(so);
@@ -436,15 +439,14 @@ ipx_attach(so, proto, td)
 	int proto;
 	struct thread *td;
 {
-	int error;
-	int s;
 	struct ipxpcb *ipxp = sotoipxpcb(so);
+	int error;
 
 	if (ipxp != NULL)
 		return (EINVAL);
-	s = splnet();
-	error = ipx_pcballoc(so, &ipxpcb, td);
-	splx(s);
+	IPX_LIST_LOCK();
+	error = ipx_pcballoc(so, &ipxpcb_list, td);
+	IPX_LIST_UNLOCK();
 	if (error == 0)
 		error = soreserve(so, ipxsendspace, ipxrecvspace);
 	return (error);
@@ -457,8 +459,14 @@ ipx_bind(so, nam, td)
 	struct thread *td;
 {
 	struct ipxpcb *ipxp = sotoipxpcb(so);
+	int error;
 
-	return (ipx_pcbbind(ipxp, nam, td));
+	IPX_LIST_LOCK();
+	IPX_LOCK(ipxp);
+	error = ipx_pcbbind(ipxp, nam, td);
+	IPX_UNLOCK(ipxp);
+	IPX_LIST_UNLOCK();
+	return (error);
 }
 
 static int
@@ -467,17 +475,21 @@ ipx_connect(so, nam, td)
 	struct sockaddr *nam;
 	struct thread *td;
 {
-	int error;
-	int s;
 	struct ipxpcb *ipxp = sotoipxpcb(so);
+	int error;
 
-	if (!ipx_nullhost(ipxp->ipxp_faddr))
-		return (EISCONN);
-	s = splnet();
+	IPX_LIST_LOCK();
+	IPX_LOCK(ipxp);
+	if (!ipx_nullhost(ipxp->ipxp_faddr)) {
+		error = EISCONN;
+		goto out;
+	}
 	error = ipx_pcbconnect(ipxp, nam, td);
-	splx(s);
 	if (error == 0)
 		soisconnected(so);
+out:
+	IPX_UNLOCK(ipxp);
+	IPX_LIST_UNLOCK();
 	return (error);
 }
 
@@ -485,14 +497,14 @@ static int
 ipx_detach(so)
 	struct socket *so;
 {
-	int s;
 	struct ipxpcb *ipxp = sotoipxpcb(so);
 
 	if (ipxp == NULL)
 		return (ENOTCONN);
-	s = splnet();
+	IPX_LIST_LOCK();
+	IPX_LOCK(ipxp);
 	ipx_pcbdetach(ipxp);
-	splx(s);
+	IPX_LIST_UNLOCK();
 	return (0);
 }
 
@@ -500,15 +512,21 @@ static int
 ipx_disconnect(so)
 	struct socket *so;
 {
-	int s;
 	struct ipxpcb *ipxp = sotoipxpcb(so);
+	int error;
 
-	if (ipx_nullhost(ipxp->ipxp_faddr))
-		return (ENOTCONN);
-	s = splnet();
+	IPX_LIST_LOCK();
+	IPX_LOCK(ipxp);
+	error = 0;
+	if (ipx_nullhost(ipxp->ipxp_faddr)) {
+		error = ENOTCONN;
+		goto out;
+	}
 	ipx_pcbdisconnect(ipxp);
-	splx(s);
 	soisdisconnected(so);
+out:
+	IPX_UNLOCK(ipxp);
+	IPX_LIST_UNLOCK();
 	return (0);
 }
 
@@ -519,7 +537,7 @@ ipx_peeraddr(so, nam)
 {
 	struct ipxpcb *ipxp = sotoipxpcb(so);
 
-	ipx_setpeeraddr(ipxp, nam); /* XXX what if alloc fails? */
+	ipx_setpeeraddr(ipxp, nam);
 	return (0);
 }
 
@@ -535,25 +553,36 @@ ipx_send(so, flags, m, nam, control, td)
 	int error;
 	struct ipxpcb *ipxp = sotoipxpcb(so);
 	struct ipx_addr laddr;
-	int s = 0;
 
+	/*
+	 * Attempt to only acquire the necessary locks: if the socket is
+	 * already connected, we don't need to hold the IPX list lock to be
+	 * used by ipx_pcbconnect() and ipx_pcbdisconnect(), just the IPX
+	 * pcb lock.
+	 */
 	if (nam != NULL) {
+		IPX_LIST_LOCK();
+		IPX_LOCK(ipxp);
 		laddr = ipxp->ipxp_laddr;
 		if (!ipx_nullhost(ipxp->ipxp_faddr)) {
+			IPX_UNLOCK(ipxp);
+			IPX_LIST_UNLOCK();
 			error = EISCONN;
 			goto send_release;
 		}
 		/*
 		 * Must block input while temporarily connected.
 		 */
-		s = splnet();
 		error = ipx_pcbconnect(ipxp, nam, td);
 		if (error) {
-			splx(s);
+			IPX_UNLOCK(ipxp);
+			IPX_LIST_UNLOCK();
 			goto send_release;
 		}
 	} else {
+		IPX_LOCK(ipxp);
 		if (ipx_nullhost(ipxp->ipxp_faddr)) {
+			IPX_UNLOCK(ipxp);
 			error = ENOTCONN;
 			goto send_release;
 		}
@@ -562,9 +591,11 @@ ipx_send(so, flags, m, nam, control, td)
 	m = NULL;
 	if (nam != NULL) {
 		ipx_pcbdisconnect(ipxp);
-		splx(s);
 		ipxp->ipxp_laddr = laddr;
-	}
+		IPX_UNLOCK(ipxp);
+		IPX_LIST_UNLOCK();
+	} else
+		IPX_UNLOCK(ipxp);
 
 send_release:
 	if (m != NULL)
@@ -587,7 +618,7 @@ ipx_sockaddr(so, nam)
 {
 	struct ipxpcb *ipxp = sotoipxpcb(so);
 
-	ipx_setsockaddr(ipxp, nam); /* XXX what if alloc fails? */
+	ipx_setsockaddr(ipxp, nam);
 	return (0);
 }
 
@@ -598,21 +629,26 @@ ripx_attach(so, proto, td)
 	struct thread *td;
 {
 	int error = 0;
-	int s;
 	struct ipxpcb *ipxp = sotoipxpcb(so);
 
 	if (td != NULL && (error = suser(td)) != 0)
 		return (error);
-	s = splnet();
-	error = ipx_pcballoc(so, &ipxrawpcb, td);
-	splx(s);
+	/*
+	 * We hold the IPX list lock for the duration as address parameters
+	 * of the IPX pcb are changed.  Since no one else holds a reference
+	 * to the ipxpcb yet, we don't need the ipxpcb lock here.
+	 */
+	IPX_LIST_LOCK();
+	error = ipx_pcballoc(so, &ipxrawpcb_list, td);
 	if (error)
-		return (error);
+		goto out;
+	ipxp = sotoipxpcb(so);
 	error = soreserve(so, ipxsendspace, ipxrecvspace);
 	if (error)
-		return (error);
-	ipxp = sotoipxpcb(so);
+		goto out;
 	ipxp->ipxp_faddr.x_host = ipx_broadhost;
 	ipxp->ipxp_flags = IPXP_RAWIN | IPXP_RAWOUT;
+out:
+	IPX_LIST_UNLOCK();
 	return (error);
 }

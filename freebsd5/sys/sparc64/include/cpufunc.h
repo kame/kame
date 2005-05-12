@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/cpufunc.h,v 1.18 2004/05/22 00:47:26 marius Exp $
+ * $FreeBSD: src/sys/sparc64/include/cpufunc.h,v 1.18.6.1 2005/04/30 16:17:23 marius Exp $
  */
 
 #ifndef	_MACHINE_CPUFUNC_H_
@@ -171,6 +171,23 @@ int fasword32(u_long asi, void *addr, uint32_t *val);
 	    : : "r" (val), "rI" (xor));					\
 } while (0)
 
+/*
+ * Macro intended to be used instead of wr(asr23, val, xor) for writing to
+ * the TICK_CMPR register in order to avoid a bug in BlackBird CPUs that
+ * can cause these writes to fail under certain condidtions which in turn
+ * causes the hardclock to stop. The workaround is to perform the write
+ * at the beginning of an I-Cache line directly followed by a dummy read.
+ */
+#define	wrtickcmpr(val, xor) ({						\
+	__asm __volatile(						\
+	"	ba,pt	%%xcc, 1f ;		"			\
+	"	 nop	 ;			"			\
+	"	.align	64 ;			"			\
+	"1:	wr	%0, %1, %%asr23 ;	"			\
+	"	rd	%%asr23, %%g0 ;		"			\
+	: : "r" (val), "rI" (xor));					\
+})
+
 static __inline void
 breakpoint(void)
 {
@@ -194,7 +211,8 @@ intr_disable(void)
  * between. We also need to disable interrupts completely.
  */
 #define	stxa_sync(va, asi, val) do {					\
-	u_long s = intr_disable();					\
+	u_long s;							\
+	s = intr_disable();						\
 	__asm __volatile("stxa %0, [%1] %2; membar #Sync"		\
 	    : : "r" (val), "r" (va), "n" (asi));			\
 	intr_restore(s);						\

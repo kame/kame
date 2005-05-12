@@ -1,6 +1,8 @@
 /*
  * ng_h4_var.h
- *
+ */
+
+/*-
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_h4_var.h,v 1.1 2002/11/24 19:46:55 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4_var.h,v 1.3 2003/11/14 03:45:29 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4_var.h,v 1.3.4.2 2005/01/31 23:26:32 imp Exp $
  * 
  * Based on:
  * ---------
@@ -92,7 +94,7 @@ typedef struct ng_h4_info {
 	u_int32_t		 want;	/* Number of bytes we want to receive */
 
 	hook_p			 hook;	/* Upstream hook */
-	struct callout_handle	 timo;	/* See man timeout(9) */
+	struct callout		 timo;	/* See man timeout(9) */
 } ng_h4_info_t;
 typedef ng_h4_info_t *		 ng_h4_info_p;
 

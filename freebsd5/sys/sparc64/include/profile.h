@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  *
  *	from: NetBSD: profile.h,v 1.9 1997/04/06 08:47:37 cgd Exp
  *	from: FreeBSD: src/sys/alpha/include/profile.h,v 1.4 1999/12/29
- * $FreeBSD: src/sys/sparc64/include/profile.h,v 1.6 2004/05/19 15:41:26 bde Exp $
+ * $FreeBSD: src/sys/sparc64/include/profile.h,v 1.6.2.2 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_PROFILE_H_
@@ -45,6 +45,19 @@ typedef u_long	fptrdiff_t;
 #define	MCOUNT_DECL(s)	register_t s;
 #define	MCOUNT_ENTER(s)	s = rdpr(pil); wrpr(pil, 0, 14)
 #define	MCOUNT_EXIT(s)	wrpr(pil, 0, s)
+
+void bintr(void);
+void btrap(void);
+void eintr(void);
+void user(void);
+
+#define	MCOUNT_FROMPC_USER(pc)					\
+	((pc < (uintfptr_t)VM_MAXUSER_ADDRESS) ? (uintfptr_t)user : pc)
+
+#define	MCOUNT_FROMPC_INTR(pc)					\
+	((pc >= (uintfptr_t)btrap && pc < (uintfptr_t)eintr) ?	\
+	    ((pc >= (uintfptr_t)bintr) ? (uintfptr_t)bintr :	\
+		(uintfptr_t)btrap) : ~0UL)
 
 void	mcount(uintfptr_t frompc, uintfptr_t selfpc);
 

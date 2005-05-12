@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -28,7 +28,7 @@
  *
  * Customisation of the SSCFU code to ng_sscfu.
  *
- * $FreeBSD: src/sys/netgraph/atm/sscfu/ng_sscfu_cust.h,v 1.1 2003/10/24 07:39:11 harti Exp $
+ * $FreeBSD: src/sys/netgraph/atm/sscfu/ng_sscfu_cust.h,v 1.1.4.1 2005/01/31 23:26:31 imp Exp $
  */
 #include <sys/param.h>
 #include <sys/types.h>

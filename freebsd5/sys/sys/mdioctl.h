@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -37,7 +37,7 @@
  *
  * From: src/sys/sys/vnioctl.h,v 1.4
  *
- * $FreeBSD: src/sys/sys/mdioctl.h,v 1.16 2004/08/09 06:45:20 jmg Exp $
+ * $FreeBSD: src/sys/sys/mdioctl.h,v 1.16.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_MDIOCTL_H_

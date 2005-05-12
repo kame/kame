@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.242.2.1 2004/09/02 01:12:20 csjp Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.242.2.3 2005/02/22 15:49:22 cperciva Exp $");
 
 #include "opt_mac.h"
 #include "opt_quota.h"
@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.242.2.1 2004/09/02 01:12:20 
 #include <sys/conf.h>
 #include <sys/acl.h>
 #include <sys/mac.h>
+#include <sys/jail.h>
 
 #include <machine/mutex.h>
 
@@ -493,13 +494,17 @@ ufs_setattr(ap)
 		if ((error = VOP_ACCESS(vp, VADMIN, cred, td)))
 			return (error);
 		/*
-		 * Unprivileged processes and privileged processes in
-		 * jail() are not permitted to unset system flags, or
-		 * modify flags if any system flags are set.
+		 * Unprivileged processes are not permitted to unset system
+		 * flags, or modify flags if any system flags are set.
 		 * Privileged non-jail processes may not modify system flags
 		 * if securelevel > 0 and any existing system flags are set.
+		 * Privileged jail processes behave like privileged non-jail
+		 * processes if the security.jail.chflags_allowed sysctl is
+		 * is non-zero; otherwise, they behave like unprivileged
+		 * processes.
 		 */
-		if (!suser_cred(cred, 0)) {
+		if (!suser_cred(cred,
+		    jail_chflags_allowed ? SUSER_ALLOWJAIL : 0)) {
 			if (ip->i_flags
 			    & (SF_NOUNLINK | SF_IMMUTABLE | SF_APPEND)) {
 				error = securelevel_gt(cred, 0);

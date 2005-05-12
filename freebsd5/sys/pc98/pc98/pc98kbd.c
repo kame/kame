@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 FreeBSD(98) port team.
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.27 2004/03/17 17:50:52 njl Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.27.2.1 2005/01/31 23:26:48 imp Exp $
  */
 
 #include "opt_kbd.h"

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)malloc.h	8.5 (Berkeley) 5/3/95
- * $FreeBSD: src/sys/sys/malloc.h,v 1.77 2004/07/19 06:21:26 green Exp $
+ * $FreeBSD: src/sys/sys/malloc.h,v 1.77.2.1 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef _SYS_MALLOC_H_

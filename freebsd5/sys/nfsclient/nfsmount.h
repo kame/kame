@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsmount.h	8.3 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsclient/nfsmount.h,v 1.27 2004/07/06 09:12:03 alfred Exp $
+ * $FreeBSD: src/sys/nfsclient/nfsmount.h,v 1.27.2.1 2005/01/31 23:26:46 imp Exp $
  */
 
 #ifndef _NFSCLIENT_NFSMOUNT_H_

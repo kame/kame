@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/rpc/rpcclnt.h,v 1.3 2004/04/07 05:00:00 imp Exp $ */
+/* $FreeBSD: src/sys/rpc/rpcclnt.h,v 1.3.2.1 2005/01/31 23:26:52 imp Exp $ */
 /*	$OpenBSD: nfsmount.h,v 1.11 2002/03/14 01:27:13 millert Exp $	*/
 /*	$NetBSD: nfsmount.h,v 1.10 1996/02/18 11:54:03 fvdl Exp $	*/
 
-/*
+/*-
  * copyright (c) 2003
  * the regents of the university of michigan
  * all rights reserved
@@ -26,7 +26,7 @@
  * advised of the possibility of such damages.
  */
 
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

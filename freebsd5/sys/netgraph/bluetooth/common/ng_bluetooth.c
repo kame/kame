@@ -1,6 +1,8 @@
 /*
  * bluetooth.c
- *
+ */
+
+/*-
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_bluetooth.c,v 1.3 2003/04/26 22:37:31 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/common/ng_bluetooth.c,v 1.4 2004/05/30 20:27:17 phk Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/common/ng_bluetooth.c,v 1.4.2.1 2005/01/31 23:26:32 imp Exp $
  */
 
 #include <sys/param.h>

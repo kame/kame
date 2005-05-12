@@ -1,6 +1,8 @@
 /*
  * ng_l2cap_prse.h
- *
+ */
+
+/*-
  * Copyright (c) 2001 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_l2cap_prse.h,v 1.2 2003/04/28 21:44:59 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_prse.h,v 1.3 2003/11/14 03:45:29 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_prse.h,v 1.3.4.1 2005/01/31 23:26:34 imp Exp $
  */
 
 /***************************************************************************

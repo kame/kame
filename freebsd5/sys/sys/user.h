@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)user.h	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/sys/user.h,v 1.61 2004/07/12 04:53:33 alfred Exp $
+ * $FreeBSD: src/sys/sys/user.h,v 1.61.2.2 2005/02/05 01:02:09 das Exp $
  */
 
 #ifndef _SYS_USER_H_
@@ -197,14 +197,12 @@ void fill_kinfo_proc(struct proc *, struct kinfo_proc *);
 #define	KI_LOCKBLOCK	0x00000004	/* proc blocked on lock ki_lockname */
 
 /*
- * Per process structure containing data that isn't needed in core
- * when the process isn't running (esp. when swapped out).
+ * This used to be the per-process structure containing data that
+ * isn't needed in core when the process is swapped out, but now it
+ * remains only for the benefit of a.out core dumps.
  */
 struct user {
 	struct	pstats u_stats;		/* *p_stats */
-	/*
-	 * Remaining field for a.out core dumps - not valid at other times!
-	 */
 	struct	kinfo_proc u_kproc;	/* eproc */
 };
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  * Copyright (c) 1994 John S. Dyson
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_pageout.c,v 1.261 2004/07/18 04:38:11 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_pageout.c,v 1.261.2.4 2005/02/28 01:29:46 alc Exp $");
 
 #include "opt_vm.h"
 #include <sys/param.h>
@@ -658,7 +658,8 @@ vm_pageout_scan(int pass)
 	struct thread *td;
 	vm_offset_t size, bigsize;
 	vm_object_t object;
-	int actcount;
+	int actcount, cache_cur, cache_first_failure;
+	static int cache_last_free;
 	int vnodes_skipped = 0;
 	int maxlaunder;
 
@@ -728,6 +729,7 @@ rescan0:
 		}
 
 		next = TAILQ_NEXT(m, pageq);
+		object = m->object;
 
 		/*
 		 * skip marker pages
@@ -747,7 +749,12 @@ rescan0:
 		 * Don't mess with busy pages, keep in the front of the
 		 * queue, most likely are being paged out.
 		 */
+		if (!VM_OBJECT_TRYLOCK(object)) {
+			addl_page_shortage++;
+			continue;
+		}
 		if (m->busy || (m->flags & PG_BUSY)) {
+			VM_OBJECT_UNLOCK(object);
 			addl_page_shortage++;
 			continue;
 		}
@@ -756,7 +763,7 @@ rescan0:
 		 * If the object is not being used, we ignore previous 
 		 * references.
 		 */
-		if (m->object->ref_count == 0) {
+		if (object->ref_count == 0) {
 			vm_page_flag_clear(m, PG_REFERENCED);
 			pmap_clear_reference(m);
 
@@ -772,6 +779,7 @@ rescan0:
 		} else if (((m->flags & PG_REFERENCED) == 0) &&
 			(actcount = pmap_ts_referenced(m))) {
 			vm_page_activate(m);
+			VM_OBJECT_UNLOCK(object);
 			m->act_count += (actcount + ACT_ADVANCE);
 			continue;
 		}
@@ -786,6 +794,7 @@ rescan0:
 			vm_page_flag_clear(m, PG_REFERENCED);
 			actcount = pmap_ts_referenced(m);
 			vm_page_activate(m);
+			VM_OBJECT_UNLOCK(object);
 			m->act_count += (actcount + ACT_ADVANCE + 1);
 			continue;
 		}
@@ -816,14 +825,10 @@ rescan0:
 			vm_page_dirty(m);
 		}
 
-		object = m->object;
-		if (!VM_OBJECT_TRYLOCK(object))
-			continue;
 		if (m->valid == 0) {
 			/*
 			 * Invalid pages can be easily freed
 			 */
-			vm_page_busy(m);
 			pmap_remove_all(m);
 			vm_page_free(m);
 			cnt.v_dfree++;
@@ -1018,12 +1023,20 @@ unlock_and_continue:
 		    ("vm_pageout_scan: page %p isn't active", m));
 
 		next = TAILQ_NEXT(m, pageq);
+		object = m->object;
+		if (!VM_OBJECT_TRYLOCK(object)) {
+			vm_pageq_requeue(m);
+			m = next;
+			continue;
+		}
+
 		/*
 		 * Don't deactivate pages that are busy.
 		 */
 		if ((m->busy != 0) ||
 		    (m->flags & PG_BUSY) ||
 		    (m->hold_count != 0)) {
+			VM_OBJECT_UNLOCK(object);
 			vm_pageq_requeue(m);
 			m = next;
 			continue;
@@ -1039,7 +1052,7 @@ unlock_and_continue:
 		 * Check to see "how much" the page has been used.
 		 */
 		actcount = 0;
-		if (m->object->ref_count != 0) {
+		if (object->ref_count != 0) {
 			if (m->flags & PG_REFERENCED) {
 				actcount += 1;
 			}
@@ -1060,15 +1073,15 @@ unlock_and_continue:
 		 * Only if an object is currently being used, do we use the
 		 * page activation count stats.
 		 */
-		if (actcount && (m->object->ref_count != 0)) {
+		if (actcount && (object->ref_count != 0)) {
 			vm_pageq_requeue(m);
 		} else {
 			m->act_count -= min(m->act_count, ACT_DECLINE);
 			if (vm_pageout_algorithm ||
-			    m->object->ref_count == 0 ||
+			    object->ref_count == 0 ||
 			    m->act_count == 0) {
 				page_shortage--;
-				if (m->object->ref_count == 0) {
+				if (object->ref_count == 0) {
 					pmap_remove_all(m);
 					if (m->dirty == 0)
 						vm_page_cache(m);
@@ -1081,6 +1094,7 @@ unlock_and_continue:
 				vm_pageq_requeue(m);
 			}
 		}
+		VM_OBJECT_UNLOCK(object);
 		m = next;
 	}
 
@@ -1090,18 +1104,35 @@ unlock_and_continue:
 	 * are considered basically 'free', moving pages from cache to free
 	 * does not effect other calculations.
 	 */
-	while (cnt.v_free_count < cnt.v_free_reserved) {
-		static int cache_rover = 0;
-
-		if ((m = vm_page_select_cache(cache_rover)) == NULL)
-			break;
-		cache_rover = (m->pc + PQ_PRIME2) & PQ_L2_MASK;
-		object = m->object;
-		VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
-		vm_page_busy(m);
-		vm_page_free(m);
-		VM_OBJECT_UNLOCK(object);
-		cnt.v_dfree++;
+	cache_cur = cache_last_free;
+	cache_first_failure = -1;
+	while (cnt.v_free_count < cnt.v_free_reserved && (cache_cur =
+	    (cache_cur + PQ_PRIME2) & PQ_L2_MASK) != cache_first_failure) {
+		TAILQ_FOREACH(m, &vm_page_queues[PQ_CACHE + cache_cur].pl,
+		    pageq) {
+			KASSERT(m->dirty == 0,
+			    ("Found dirty cache page %p", m));
+			KASSERT(!pmap_page_is_mapped(m),
+			    ("Found mapped cache page %p", m));
+			KASSERT((m->flags & PG_UNMANAGED) == 0,
+			    ("Found unmanaged cache page %p", m));
+			KASSERT(m->wire_count == 0,
+			    ("Found wired cache page %p", m));
+			if (m->hold_count == 0 && VM_OBJECT_TRYLOCK(object =
+			    m->object)) {
+				KASSERT((m->flags & PG_BUSY) == 0 &&
+				    m->busy == 0, ("Found busy cache page %p",
+				    m));
+				vm_page_free(m);
+				VM_OBJECT_UNLOCK(object);
+				cnt.v_dfree++;
+				cache_last_free = cache_cur;
+				cache_first_failure = -1;
+				break;
+			}
+		}
+		if (m == NULL && cache_first_failure == -1)
+			cache_first_failure = cache_cur;
 	}
 	vm_page_unlock_queues();
 #if !defined(NO_SWAPPING)
@@ -1232,6 +1263,7 @@ unlock_and_continue:
 static void
 vm_pageout_page_stats()
 {
+	vm_object_t object;
 	vm_page_t m,next;
 	int pcount,tpcount;		/* Number of pages to check */
 	static int fullintervalcount = 0;
@@ -1263,12 +1295,20 @@ vm_pageout_page_stats()
 		    ("vm_pageout_page_stats: page %p isn't active", m));
 
 		next = TAILQ_NEXT(m, pageq);
+		object = m->object;
+		if (!VM_OBJECT_TRYLOCK(object)) {
+			vm_pageq_requeue(m);
+			m = next;
+			continue;
+		}
+
 		/*
 		 * Don't deactivate pages that are busy.
 		 */
 		if ((m->busy != 0) ||
 		    (m->flags & PG_BUSY) ||
 		    (m->hold_count != 0)) {
+			VM_OBJECT_UNLOCK(object);
 			vm_pageq_requeue(m);
 			m = next;
 			continue;
@@ -1304,7 +1344,7 @@ vm_pageout_page_stats()
 				vm_pageq_requeue(m);
 			}
 		}
-
+		VM_OBJECT_UNLOCK(object);
 		m = next;
 	}
 }

@@ -1,6 +1,8 @@
 /*
  * ng_socket.c
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  *
@@ -35,7 +37,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.53.2.1 2004/09/02 15:41:44 rwatson Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.53.2.3 2005/02/07 19:50:34 glebius Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -252,6 +254,12 @@ ngc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		goto release;
 	}
 	m_copydata(m, 0, len, (char *)msg);
+
+	if (msg->header.version != NG_VERSION &&
+	    msg->header.version != 0 ) {
+		error = EINVAL;
+		goto release;
+	}
 
 #ifdef TRACE_MESSAGES
 	do {								

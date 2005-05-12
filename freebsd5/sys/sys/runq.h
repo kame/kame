@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Jake Burkholder <jake@FreeBSD.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/runq.h,v 1.4.8.1 2004/10/09 05:25:22 julian Exp $
+ * $FreeBSD: src/sys/sys/runq.h,v 1.4.8.2 2005/01/31 23:26:57 imp Exp $
  */
 
 #ifndef	_RUNQ_H_

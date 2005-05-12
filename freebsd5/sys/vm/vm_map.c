@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -63,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_map.c,v 1.360 2004/08/16 06:16:12 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_map.c,v 1.360.2.3 2005/02/23 06:52:56 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1009,10 +1009,13 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length,
 	vm_map_entry_t entry;
 	vm_offset_t end, st;
 
-	/* Request must fit within min/max VM address. */
+	/*
+	 * Request must fit within min/max VM address and must avoid
+	 * address wrap.
+	 */
 	if (start < map->min_offset)
 		start = map->min_offset;
-	if (start + length > map->max_offset)
+	if (start + length > map->max_offset || start + length < start)
 		return (1);
 
 	/* Empty tree means wide open address space. */
@@ -1033,10 +1036,11 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length,
 
 	/*
 	 * Root is the last node that might begin its gap before
-	 * start.
+	 * start, and this is the last comparison where address
+	 * wrap might be a problem.
 	 */
 	st = (start > map->root->end) ? start : map->root->end;
-	if (st + length <= map->root->end + map->root->adj_free) {
+	if (length <= map->root->end + map->root->adj_free - st) {
 		*addr = st;
 		goto found;
 	}
@@ -2482,8 +2486,6 @@ vmspace_fork(struct vmspace *vm1)
 	vm_map_entry_t new_entry;
 	vm_object_t object;
 
-	GIANT_REQUIRED;
-
 	vm_map_lock(old_map);
 
 	vm2 = vmspace_alloc(old_map->min_offset, old_map->max_offset);
@@ -2942,7 +2944,6 @@ vmspace_unshare(struct proc *p)
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
 
-	GIANT_REQUIRED;
 	if (oldvmspace->vm_refcnt == 1)
 		return;
 	newvmspace = vmspace_fork(oldvmspace);

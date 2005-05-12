@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000 Matthew R. Green
  * Copyright (c) 2001 - 2003 by Thomas Moestl <tmm@FreeBSD.org>
  * All rights reserved.
@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: psycho.c,v 1.39 2001/10/07 20:30:41 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/pci/psycho.c,v 1.52 2004/08/12 17:41:32 marius Exp $
+ * $FreeBSD: src/sys/sparc64/pci/psycho.c,v 1.52.2.1 2005/01/31 23:26:54 imp Exp $
  */
 
 /*

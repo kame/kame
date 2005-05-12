@@ -1,5 +1,5 @@
 /*	$OpenBSD: rmd160.c,v 1.3 2001/09/26 21:40:13 markus Exp $	*/
-/*
+/*-
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/rmd160.c,v 1.2 2003/06/11 05:57:50 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/rmd160.c,v 1.2.4.1 2005/01/31 23:26:48 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

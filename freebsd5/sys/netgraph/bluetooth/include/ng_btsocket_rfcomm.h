@@ -1,6 +1,8 @@
 /*
  * ng_btsocket_rfcomm.h
- *
+ */
+
+/*-
  * Copyright (c) 2001-2003 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket_rfcomm.h,v 1.10 2003/03/29 22:27:42 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_btsocket_rfcomm.h,v 1.2 2003/11/14 03:45:29 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_btsocket_rfcomm.h,v 1.2.4.2 2005/01/31 23:26:33 imp Exp $
  */
 
 #ifndef _NETGRAPH_BTSOCKET_RFCOMM_H_
@@ -40,7 +42,7 @@
 
 /* XXX FIXME this does not belong here */
 
-#define RFCOMM_DEFAULT_MTU		127
+#define RFCOMM_DEFAULT_MTU		667
 #define RFCOMM_MAX_MTU			1024
 
 #define RFCOMM_DEFAULT_CREDITS		7
@@ -216,9 +218,9 @@ struct rfcomm_mcc_pn
  *****************************************************************************/
 
 #define NG_BTSOCKET_RFCOMM_SENDSPACE \
-	(RFCOMM_MAX_CREDITS * RFCOMM_DEFAULT_MTU * 10)
+	(RFCOMM_MAX_CREDITS * RFCOMM_DEFAULT_MTU * 2)
 #define NG_BTSOCKET_RFCOMM_RECVSPACE \
-	(RFCOMM_MAX_CREDITS * RFCOMM_DEFAULT_MTU * 10)
+	(RFCOMM_MAX_CREDITS * RFCOMM_DEFAULT_MTU * 2)
 
 /*
  * Bluetooth RFCOMM session. One L2CAP connection == one RFCOMM session

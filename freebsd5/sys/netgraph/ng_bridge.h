@@ -1,7 +1,8 @@
-
 /*
  * ng_bridge.h
- *
+ */
+
+/*-
  * Copyright (c) 2000 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bridge.h,v 1.2 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bridge.h,v 1.2.8.1 2005/01/31 23:26:28 imp Exp $
  */
 
 #ifndef _NETGRAPH_NG_BRIDGE_H_

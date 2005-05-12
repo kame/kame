@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/netipsec/xform_ipcomp.c,v 1.7 2004/01/27 17:43:49 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/xform_ipcomp.c,v 1.7.2.1 2005/01/31 23:26:41 imp Exp $	*/
 /* $OpenBSD: ip_ipcomp.c,v 1.1 2001/07/05 12:08:52 jjbg Exp $ */
 
-/*
+/*-
  * Copyright (c) 2001 Jean-Jacques Bernard-Gundol (jj@wabbitt.org)
  *
  * Redistribution and use in source and binary forms, with or without

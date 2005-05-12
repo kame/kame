@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -32,7 +32,7 @@
  *
  *	@(#)ieee.h	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: ieee.h,v 1.1.1.1 1998/06/20 04:58:51 eeh Exp
- * $FreeBSD: src/sys/sparc64/include/ieee.h,v 1.2 2004/04/07 05:00:00 imp Exp $
+ * $FreeBSD: src/sys/sparc64/include/ieee.h,v 1.2.2.1 2005/01/31 23:26:53 imp Exp $
  */
 
 #ifndef _MACHINE_IEEE_H_

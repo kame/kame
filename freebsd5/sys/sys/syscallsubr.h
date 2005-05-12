@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Ian Dowse.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/syscallsubr.h,v 1.11 2004/07/17 21:06:36 dwmalone Exp $
+ * $FreeBSD: src/sys/sys/syscallsubr.h,v 1.11.2.4 2005/03/01 09:30:19 obrien Exp $
  */
 
 #ifndef _SYS_SYSCALLSUBR_H_
@@ -32,9 +32,9 @@
 #include <sys/uio.h>
 #include <sys/socket.h>
 
-struct sockaddr;
-struct msghdr;
 struct mbuf;
+struct msghdr;
+struct sockaddr;
 
 int	kern___getcwd(struct thread *td, u_char *buf, enum uio_seg bufseg,
 	    u_int buflen);
@@ -64,6 +64,8 @@ int	kern_mkfifo(struct thread *td, char *path, enum uio_seg pathseg,
 	    int mode);
 int	kern_mknod(struct thread *td, char *path, enum uio_seg pathseg,
 	    int mode, int dev);
+int     kern_nanosleep(struct thread *td, struct timespec *rqt,
+	    struct timespec *rmt);
 int	kern_open(struct thread *td, char *path, enum uio_seg pathseg,
 	    int flags, int mode);
 int	kern_ptrace(struct thread *td, int req, pid_t pid, void *addr,

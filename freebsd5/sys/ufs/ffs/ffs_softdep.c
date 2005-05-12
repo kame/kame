@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998, 2000 Marshall Kirk McKusick. All Rights Reserved.
  *
  * The soft updates code is derived from the appendix of a University
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.156 2004/08/08 13:21:54 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.156.2.3 2005/03/29 07:24:50 das Exp $");
 
 /*
  * For now we want the safety net that the DIAGNOSTIC and DEBUG flags provide.
@@ -542,6 +542,12 @@ SYSCTL_INT(_debug, OID_AUTO, inode_bitmap, CTLFLAG_RW, &stat_inode_bitmap, 0, ""
 SYSCTL_INT(_debug, OID_AUTO, direct_blk_ptrs, CTLFLAG_RW, &stat_direct_blk_ptrs, 0, "");
 SYSCTL_INT(_debug, OID_AUTO, dir_entry, CTLFLAG_RW, &stat_dir_entry, 0, "");
 #endif /* DEBUG */
+
+SYSCTL_DECL(_vfs_ffs);
+
+static int compute_summary_at_mount = 0;	/* Whether to recompute the summary at mount time */
+SYSCTL_INT(_vfs_ffs, OID_AUTO, compute_summary_at_mount, CTLFLAG_RW,
+	   &compute_summary_at_mount, 0, "Recompute summary at mount");
 
 /*
  * Add an item to the end of the work queue.
@@ -1197,10 +1203,13 @@ softdep_mount(devvp, mp, fs, cred)
 	mp->mnt_flag |= MNT_SOFTDEP;
 	/*
 	 * When doing soft updates, the counters in the
-	 * superblock may have gotten out of sync, so we have
-	 * to scan the cylinder groups and recalculate them.
+	 * superblock may have gotten out of sync. Recomputation
+	 * can take a long time and can be deferred for background
+	 * fsck.  However, the old behavior of scanning the cylinder
+	 * groups and recalculating them at mount time is available
+	 * by setting vfs.ffs.compute_summary_at_mount to one.
 	 */
-	if (fs->fs_clean != 0)
+	if (compute_summary_at_mount == 0 || fs->fs_clean != 0)
 		return (0);
 	bzero(&cstotal, sizeof cstotal);
 	for (cyl = 0; cyl < fs->fs_ncg; cyl++) {
@@ -5541,20 +5550,23 @@ request_cleanup(resource, islocked)
 	/*
 	 * We never hold up the filesystem syncer process.
 	 */
-	if (td == filesys_syncer)
+	if (td == filesys_syncer || (td->td_pflags & TDP_SOFTDEP))
 		return (0);
 	/*
 	 * First check to see if the work list has gotten backlogged.
 	 * If it has, co-opt this process to help clean up two entries.
 	 * Because this process may hold inodes locked, we cannot
 	 * handle any remove requests that might block on a locked
-	 * inode as that could lead to deadlock.
+	 * inode as that could lead to deadlock.  We set TDP_SOFTDEP
+	 * to avoid recursively processing the worklist.
 	 */
 	if (num_on_worklist > max_softdeps / 10) {
 		if (islocked)
 			FREE_LOCK(&lk);
+		td->td_pflags |= TDP_SOFTDEP;
 		process_worklist_item(NULL, LK_NOWAIT);
 		process_worklist_item(NULL, LK_NOWAIT);
+		td->td_pflags &= ~TDP_SOFTDEP;
 		stat_worklist_push += 2;
 		if (islocked)
 			ACQUIRE_LOCK(&lk);

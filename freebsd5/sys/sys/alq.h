@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/alq.h,v 1.4 2003/06/22 22:28:55 rwatson Exp $
+ * $FreeBSD: src/sys/sys/alq.h,v 1.4.4.1 2005/01/31 23:26:55 imp Exp $
  *
  */
 #ifndef _SYS_ALQ_H_

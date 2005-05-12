@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_vnops.c,v 1.6 2004/07/28 06:59:55 kan Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_vnops.c,v 1.6.2.1 2005/01/31 23:26:45 imp Exp $ */
 /* $Id: nfs_vnops.c,v 1.45 2003/11/05 14:59:02 rees Exp $ */
 
-/*
+/*-
  * copyright (c) 2003
  * the regents of the university of michigan
  * all rights reserved
@@ -60,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_vnops.c,v 1.6 2004/07/28 06:59:55 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_vnops.c,v 1.6.2.1 2005/01/31 23:26:45 imp Exp $");
 
 /*
  * vnode op calls for Sun NFS version 2 and 3

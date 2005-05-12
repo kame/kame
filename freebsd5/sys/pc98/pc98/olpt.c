@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990 William F. Jolitz, TeleMuse
  * All rights reserved.
  *
@@ -46,7 +46,7 @@
  * SUCH DAMAGE.
  *
  *	from: unknown origin, 386BSD 0.1
- * $FreeBSD: src/sys/pc98/pc98/olpt.c,v 1.26 2004/06/16 09:47:19 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/olpt.c,v 1.26.2.1 2005/01/31 23:26:48 imp Exp $
  */
 
 /*

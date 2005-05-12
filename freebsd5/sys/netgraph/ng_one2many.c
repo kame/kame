@@ -1,7 +1,8 @@
-
 /*
  * ng_one2many.c
- *
+ */
+
+/*-
  * Copyright (c) 2000 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +37,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_one2many.c,v 1.17 2004/06/26 22:24:16 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_one2many.c,v 1.17.2.3 2005/03/16 13:43:06 glebius Exp $
  */
 
 /*
@@ -68,6 +69,7 @@ struct ng_one2many_link {
 
 /* Per-node private data */
 struct ng_one2many_private {
+	node_p				node;		/* link to node */
 	struct ng_one2many_config	conf;		/* node configuration */
 	struct ng_one2many_link		one;		/* "one" hook */
 	struct ng_one2many_link		many[NG_ONE2MANY_MAX_LINKS];
@@ -87,9 +89,7 @@ static ng_disconnect_t	ng_one2many_disconnect;
 
 /* Other functions */
 static void		ng_one2many_update_many(priv_p priv);
-
-/* Store each hook's link number in the private field */
-#define LINK_NUM(hook)		(*(int16_t *)(&(hook)->private))
+static void		ng_one2many_notify(priv_p priv, uint32_t cmd);
 
 /******************************************************************
 		    NETGRAPH PARSE TYPES
@@ -193,7 +193,9 @@ ng_one2many_constructor(node_p node)
 	priv->conf.xmitAlg = NG_ONE2MANY_XMIT_ROUNDROBIN;
 	priv->conf.failAlg = NG_ONE2MANY_FAIL_MANUAL;
 
+	/* cross reference */
 	NG_NODE_SET_PRIVATE(node, priv);
+	priv->node = node;
 
 	/* Done */
 	return (0);
@@ -283,6 +285,7 @@ ng_one2many_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			}
 			switch (conf->failAlg) {
 			case NG_ONE2MANY_FAIL_MANUAL:
+			case NG_ONE2MANY_FAIL_NOTIFY:
 				break;
 			default:
 				error = EINVAL;
@@ -328,7 +331,7 @@ ng_one2many_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			linkNum = *((int32_t *)msg->data);
 			if (linkNum == NG_ONE2MANY_ONE_LINKNUM)
 				link = &priv->one;
-			else if (linkNum == 0
+			else if (linkNum >= 0
 			    && linkNum < NG_ONE2MANY_MAX_LINKS) {
 				link = &priv->many[linkNum];
 			} else {
@@ -356,6 +359,42 @@ ng_one2many_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			break;
 		}
 		break;
+	/*
+	 * One of our downstreams notifies us of link change. If we are
+	 * configured to listen to these message, then we remove/add
+	 * this hook from array of active hooks.
+	 */
+	case NGM_FLOW_COOKIE:
+	    {
+		int linkNum;
+
+		if (priv->conf.failAlg != NG_ONE2MANY_FAIL_NOTIFY)
+			break;
+
+		if (lasthook == NULL)
+			break;
+
+		linkNum = (intptr_t)NG_HOOK_PRIVATE(lasthook);
+		if (linkNum == NG_ONE2MANY_ONE_LINKNUM)
+			break;
+
+		KASSERT((linkNum >= 0 && linkNum < NG_ONE2MANY_MAX_LINKS),
+		    ("%s: linkNum=%d", __func__, linkNum));
+
+		switch (msg->header.cmd) {
+		case NGM_LINK_IS_UP:
+			priv->conf.enabledLinks[linkNum] = 1;
+			ng_one2many_update_many(priv);
+			break;
+		case NGM_LINK_IS_DOWN:
+			priv->conf.enabledLinks[linkNum] = 0;
+			ng_one2many_update_many(priv);
+			break;
+		default:
+			break;
+		}
+		break;
+	    }
 	default:
 		error = EINVAL;
 		break;
@@ -509,6 +548,7 @@ ng_one2many_disconnect(hook_p hook)
 static void
 ng_one2many_update_many(priv_p priv)
 {
+	uint16_t saveActive = priv->numActiveMany;
 	int linkNum;
 
 	/* Update list of which "many" links are up */
@@ -516,6 +556,7 @@ ng_one2many_update_many(priv_p priv)
 	for (linkNum = 0; linkNum < NG_ONE2MANY_MAX_LINKS; linkNum++) {
 		switch (priv->conf.failAlg) {
 		case NG_ONE2MANY_FAIL_MANUAL:
+		case NG_ONE2MANY_FAIL_NOTIFY:
 			if (priv->many[linkNum].hook != NULL
 			    && priv->conf.enabledLinks[linkNum]) {
 				priv->activeMany[priv->numActiveMany] = linkNum;
@@ -528,6 +569,12 @@ ng_one2many_update_many(priv_p priv)
 #endif
 		}
 	}
+
+	if (priv->numActiveMany == 0 && saveActive > 0)
+		ng_one2many_notify(priv, NGM_LINK_IS_DOWN);
+
+	if (saveActive == 0 && priv->numActiveMany > 0)
+		ng_one2many_notify(priv, NGM_LINK_IS_UP);
 
 	/* Update transmit algorithm state */
 	switch (priv->conf.xmitAlg) {
@@ -544,4 +591,19 @@ ng_one2many_update_many(priv_p priv)
 	}
 }
 
+/*
+ * Notify upstream if we are out of links, or we have at least one link.
+ */
+static void
+ng_one2many_notify(priv_p priv, uint32_t cmd)
+{
+	struct ng_mesg *msg;
+	int dummy_error = 0;
 
+	if (priv->one.hook == NULL)
+		return;
+
+	NG_MKMESSAGE(msg, NGM_FLOW_COOKIE, cmd, 0, M_NOWAIT);
+	if (msg != NULL)
+		NG_SEND_MSG_HOOK(dummy_error, priv->node, msg, priv->one.hook, 0);
+}

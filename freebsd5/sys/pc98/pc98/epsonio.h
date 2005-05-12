@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) KATO Takenori, 1996.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/epsonio.h,v 1.8 2001/07/14 04:14:29 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/epsonio.h,v 1.8.8.1 2005/01/31 23:26:48 imp Exp $
  */
 
 #ifndef __PC98_PC98_EPSONIO_H__

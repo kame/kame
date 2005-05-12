@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/sys/ptrace.h,v 1.25 2004/08/08 22:26:11 davidxu Exp $
+ * $FreeBSD: src/sys/sys/ptrace.h,v 1.25.6.1 2005/05/01 04:03:06 cperciva Exp $
  */
 
 #ifndef	_SYS_PTRACE_H_
@@ -100,6 +100,7 @@ struct ptrace_lwpinfo {
 	if ((p)->p_flag & P_TRACED && (p)->p_stops & (flag)) {	\
 		PROC_LOCK(p);					\
 		ptracestop((td), SIGTRAP);			\
+		PROC_UNLOCK(p);					\
 	}
 /*
  * The flags below are used for ptrace(2) tracing and have no relation

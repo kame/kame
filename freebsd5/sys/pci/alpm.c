@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/alpm.c,v 1.22 2004/03/17 17:50:53 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/alpm.c,v 1.22.2.1 2005/03/01 08:11:50 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -166,7 +166,7 @@ alpm_probe(device_t dev)
 			return (ENXIO);
 		}
 #endif
-		return (0);
+		return (BUS_PROBE_DEFAULT);
 	}
 
 	return (ENXIO);

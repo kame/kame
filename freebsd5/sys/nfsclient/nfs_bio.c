@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_bio.c,v 1.133.2.1 2004/10/09 17:11:22 das Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_bio.c,v 1.133.2.2 2005/01/31 23:26:46 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

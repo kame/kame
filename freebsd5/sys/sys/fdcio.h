@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1992-1994,2001 by Joerg Wunsch, Dresden
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  *
- * $FreeBSD: src/sys/sys/fdcio.h,v 1.17.8.1 2004/09/18 04:57:55 imp Exp $
+ * $FreeBSD: src/sys/sys/fdcio.h,v 1.17.8.3 2005/01/31 23:26:56 imp Exp $
  */
 
 #ifndef	_MACHINE_IOCTL_FD_H_
@@ -180,6 +180,29 @@ enum fd_drivetype {
  * XXX: but the kernel needs some of them for proper defaults and it would
  * XXX: should have been done 20 years ago to make sense.
  */
+#ifdef PC98
+#define FDF_3_1722 21,2,0xFF,0x04,82,0,2,2,0x0C,2,0,FL_MFM
+#define FDF_3_1476 18,2,0xFF,0x1B,82,0,2,2,0x54,1,0,FL_MFM
+#define FDF_3_1440 18,2,0xFF,0x1B,80,0,2,2,0x54,1,0,FL_MFM
+#define FDF_3_1200 15,2,0xFF,0x1B,80,0,0,2,0x54,1,0,FL_MFM
+#define FDF_3_820  10,2,0xFF,0x10,82,0,1,2,0x30,1,0,FL_MFM
+#define FDF_3_800  10,2,0xFF,0x10,80,0,1,2,0x30,1,0,FL_MFM
+#define FDF_3_720   9,2,0xFF,0x20,80,0,1,2,0x50,1,0,FL_MFM
+#define FDF_3_360   9,2,0xFF,0x20,40,0,1,2,0x50,1,0,FL_MFM|FL_2STEP
+#define FDF_3_640   8,2,0xFF,0x2A,80,0,1,2,0x50,1,0,FL_MFM
+#define FDF_3_1230  8,3,0xFF,0x35,77,0,0,2,0x74,1,0,FL_MFM
+#define FDF_3_1280  8,3,0xFF,0x35,80,0,0,2,0x74,1,0,FL_MFM
+#define FDF_3_1480  9,3,0xFF,0x35,82,0,0,2,0x47,1,0,FL_MFM
+#define FDF_3_1640 10,3,0xFF,0x1B,82,0,2,2,0x54,1,0,FL_MFM
+#define FDF_5_1200 15,2,0xFF,0x1B,80,0,0,2,0x54,1,0,FL_MFM
+#define FDF_5_820  10,2,0xFF,0x10,82,0,1,2,0x30,1,0,FL_MFM
+#define FDF_5_800  10,2,0xFF,0x10,80,0,1,2,0x30,1,0,FL_MFM
+#define FDF_5_720   9,2,0xFF,0x20,80,0,1,2,0x50,1,0,FL_MFM
+#define FDF_5_360   9,2,0xFF,0x20,40,0,1,2,0x50,1,0,FL_MFM|FL_2STEP
+#define FDF_5_640   8,2,0xFF,0x2A,80,0,1,2,0x50,1,0,FL_MFM
+#define FDF_5_1230  8,3,0xFF,0x35,77,0,0,2,0x74,1,0,FL_MFM
+#define FDF_5_1280  8,3,0xFF,0x35,80,0,0,2,0x74,1,0,FL_MFM
+#else /* PC98 */
 #define FDF_3_2880 36,2,0xFF,0x1B,80,0,FDC_1MBPS,002,0x4C,1,1,FL_MFM|FL_PERPND
 #define FDF_3_1722 21,2,0xFF,0x04,82,0,FDC_500KBPS,2,0x0C,2,0,FL_MFM
 #define FDF_3_1476 18,2,0xFF,0x1B,82,0,FDC_500KBPS,2,0x6C,1,0,FL_MFM
@@ -198,5 +221,6 @@ enum fd_drivetype {
 #define FDF_5_640   8,2,0xFF,0x2A,80,0,FDC_300KBPS,2,0x50,1,0,FL_MFM
 #define FDF_5_360   9,2,0xFF,0x23,40,0,FDC_300KBPS,2,0x50,1,0,FL_MFM
 /* XXX:                      0x2a ? */
+#endif
 
 #endif /* !_MACHINE_IOCTL_FD_H_ */

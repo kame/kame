@@ -1,7 +1,9 @@
 
 /*
  * ng_ether.h
- *
+ */
+
+/*-
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -36,7 +38,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.h,v 1.10 2004/02/20 08:26:27 pjd Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.h,v 1.10.2.1 2005/01/31 23:26:28 imp Exp $
  * $Whistle: ng_ether.h,v 1.1 1999/02/02 03:17:22 julian Exp $
  */
 

@@ -1,11 +1,11 @@
-/*
+/*-
  * Fowler / Noll / Vo Hash (FNV Hash)
  * http://www.isthe.com/chongo/tech/comp/fnv/
  *
  * This is an implementation of the algorithms posted above.
  * This file is placed in the public domain by Peter Wemm.
  *
- * $FreeBSD: src/sys/sys/fnv_hash.h,v 1.2 2001/03/20 02:10:18 peter Exp $
+ * $FreeBSD: src/sys/sys/fnv_hash.h,v 1.2.10.1 2005/01/31 23:26:56 imp Exp $
  */
 
 typedef u_int32_t Fnv32_t;

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.132 2004/07/19 06:21:27 green Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.132.2.3 2005/02/25 23:43:00 alc Exp $
  */
 
 /*
@@ -120,7 +120,7 @@ struct vm_page {
 	u_short wire_count;		/* wired down maps refs (P) */
 	short hold_count;		/* page hold count */
 	u_char	act_count;		/* page usage count */
-	u_char	busy;			/* page busy count */
+	u_char	busy;			/* page busy count (O) */
 	/* NOTE that these must support one bit per DEV_BSIZE in a page!!! */
 	/* so, on normal X86 kernels, they must be at least 8 bits wide */
 #if PAGE_SIZE == 4096
@@ -317,6 +317,7 @@ extern struct mtx vm_page_queue_mtx;
 #define	VM_ALLOC_ZERO		0x0040	/* Try to obtain a zeroed page */
 #define	VM_ALLOC_RETRY		0x0080	/* vm_page_grab() only */
 #define	VM_ALLOC_NOOBJ		0x0100	/* No associated object */
+#define	VM_ALLOC_NOBUSY		0x0200	/* Do not busy the page */
 
 void vm_page_flag_set(vm_page_t m, unsigned short bits);
 void vm_page_flag_clear(vm_page_t m, unsigned short bits);

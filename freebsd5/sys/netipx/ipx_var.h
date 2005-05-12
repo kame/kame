@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, Mike Mitchell
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_var.h
  *
- * $FreeBSD: src/sys/netipx/ipx_var.h,v 1.17 2003/03/04 23:19:53 jlemon Exp $
+ * $FreeBSD: src/sys/netipx/ipx_var.h,v 1.17.6.5 2005/02/25 13:14:47 rwatson Exp $
  */
 
 #ifndef _NETIPX_IPX_VAR_H_
@@ -66,19 +66,19 @@ SYSCTL_DECL(_net_ipx_ipx);
 extern int ipxcksum;
 extern long ipx_pexseq;
 extern struct ipxstat ipxstat;
-extern struct ipxpcb ipxrawpcb;
 extern struct pr_usrreqs ipx_usrreqs;
 extern struct pr_usrreqs ripx_usrreqs;
 extern struct sockaddr_ipx ipx_netmask;
 extern struct sockaddr_ipx ipx_hostmask;
 
-extern union ipx_net ipx_zeronet;
-extern union ipx_host ipx_zerohost;
-extern union ipx_net ipx_broadnet;
-extern union ipx_host ipx_broadhost;
+extern const union ipx_net ipx_zeronet;
+extern const union ipx_host ipx_zerohost;
+extern const union ipx_net ipx_broadnet;
+extern const union ipx_host ipx_broadhost;
 
 struct ifnet;
 struct ipx_addr;
+struct ipxpcb;
 struct mbuf;
 struct thread;
 struct route;
@@ -86,7 +86,6 @@ struct sockaddr;
 struct socket;
 struct sockopt;
 
-void	ipx_abort(struct ipxpcb *ipxp);
 u_short	ipx_cksum(struct mbuf *m, int len);
 int	ipx_control(struct socket *so, u_long cmd, caddr_t data,
 			 struct ifnet *ifp, struct thread *td);

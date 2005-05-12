@@ -1,6 +1,8 @@
-/*
- * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
- * All rights reserved.
+/*-
+ * Copyright (c) 2004, 2005,
+ *     Bosko Milekic <bmilekic@FreeBSD.org>.  All rights reserved.
+ * Copyright (c) 2002, 2003, 2004, 2005,
+ *     Jeffrey Roberson <jeff@FreeBSD.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/vm/uma_int.h,v 1.25 2004/07/29 15:25:40 bmilekic Exp $
+ * $FreeBSD: src/sys/vm/uma_int.h,v 1.25.2.4 2005/02/16 21:53:08 bmilekic Exp $
  *
  */
 
@@ -396,7 +398,7 @@ vsetslab(vm_offset_t va, uma_slab_t slab)
 {
 	vm_page_t p;
 
-	p = PHYS_TO_VM_PAGE(pmap_kextract((vm_offset_t)va));
+	p = PHYS_TO_VM_PAGE(pmap_kextract(va));
 	p->object = (vm_object_t)slab;
 	p->flags |= PG_SLAB;
 }
@@ -406,7 +408,7 @@ vsetobj(vm_offset_t va, vm_object_t obj)
 {
 	vm_page_t p;
 
-	p = PHYS_TO_VM_PAGE(pmap_kextract((vm_offset_t)va));
+	p = PHYS_TO_VM_PAGE(pmap_kextract(va));
 	p->object = obj;
 	p->flags &= ~PG_SLAB;
 }

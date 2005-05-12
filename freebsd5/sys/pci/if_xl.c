@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.179.2.1 2004/09/17 19:46:40 glebius Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.179.2.6 2005/03/01 08:11:52 imp Exp $");
 
 /*
  * 3Com 3c90x Etherlink XL PCI NIC driver
@@ -188,6 +188,8 @@ static struct xl_type xl_devs[] = {
 		"3Com 3c905C-TX Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_TORNADO_10_100BT_920B,
 		"3Com 3c920B-EMB Integrated Fast Etherlink XL" },
+	{ TC_VENDORID, TC_DEVICEID_TORNADO_10_100BT_920B_WNM,
+		"3Com 3c920B-EMB-WNM Integrated Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_HURRICANE_10_100BT_SERV,
 		"3Com 3c980 Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_TORNADO_10_100BT_SERV,
@@ -217,70 +219,65 @@ static struct xl_type xl_devs[] = {
 	{ 0, 0, NULL }
 };
 
-static int xl_probe		(device_t);
-static int xl_attach		(device_t);
-static int xl_detach		(device_t);
+static int xl_probe(device_t);
+static int xl_attach(device_t);
+static int xl_detach(device_t);
 
-static int xl_newbuf		(struct xl_softc *, struct xl_chain_onefrag *);
-static void xl_stats_update	(void *);
-static void xl_stats_update_locked
-				(struct xl_softc *);
-static int xl_encap		(struct xl_softc *, struct xl_chain *,
-						struct mbuf *);
-static void xl_rxeof		(struct xl_softc *);
-static int xl_rx_resync		(struct xl_softc *);
-static void xl_txeof		(struct xl_softc *);
-static void xl_txeof_90xB	(struct xl_softc *);
-static void xl_txeoc		(struct xl_softc *);
-static void xl_intr		(void *);
-static void xl_start		(struct ifnet *);
-static void xl_start_locked	(struct ifnet *);
-static void xl_start_90xB_locked
-				(struct ifnet *);
-static int xl_ioctl		(struct ifnet *, u_long, caddr_t);
-static void xl_init		(void *);
-static void xl_init_locked	(struct xl_softc *);
-static void xl_stop		(struct xl_softc *);
-static void xl_watchdog		(struct ifnet *);
-static void xl_shutdown		(device_t);
-static int xl_suspend		(device_t);
-static int xl_resume		(device_t);
+static int xl_newbuf(struct xl_softc *, struct xl_chain_onefrag *);
+static void xl_stats_update(void *);
+static void xl_stats_update_locked(struct xl_softc *);
+static int xl_encap(struct xl_softc *, struct xl_chain *, struct mbuf *);
+static void xl_rxeof(struct xl_softc *);
+static int xl_rx_resync(struct xl_softc *);
+static void xl_txeof(struct xl_softc *);
+static void xl_txeof_90xB(struct xl_softc *);
+static void xl_txeoc(struct xl_softc *);
+static void xl_intr(void *);
+static void xl_start(struct ifnet *);
+static void xl_start_locked(struct ifnet *);
+static void xl_start_90xB_locked(struct ifnet *);
+static int xl_ioctl(struct ifnet *, u_long, caddr_t);
+static void xl_init(void *);
+static void xl_init_locked(struct xl_softc *);
+static void xl_stop(struct xl_softc *);
+static void xl_watchdog(struct ifnet *);
+static void xl_shutdown(device_t);
+static int xl_suspend(device_t);
+static int xl_resume(device_t);
 
-static int xl_ifmedia_upd	(struct ifnet *);
-static void xl_ifmedia_sts	(struct ifnet *, struct ifmediareq *);
+static int xl_ifmedia_upd(struct ifnet *);
+static void xl_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
-static int xl_eeprom_wait	(struct xl_softc *);
-static int xl_read_eeprom	(struct xl_softc *, caddr_t, int, int, int);
-static void xl_mii_sync		(struct xl_softc *);
-static void xl_mii_send		(struct xl_softc *, u_int32_t, int);
-static int xl_mii_readreg	(struct xl_softc *, struct xl_mii_frame *);
-static int xl_mii_writereg	(struct xl_softc *, struct xl_mii_frame *);
+static int xl_eeprom_wait(struct xl_softc *);
+static int xl_read_eeprom(struct xl_softc *, caddr_t, int, int, int);
+static void xl_mii_sync(struct xl_softc *);
+static void xl_mii_send(struct xl_softc *, u_int32_t, int);
+static int xl_mii_readreg(struct xl_softc *, struct xl_mii_frame *);
+static int xl_mii_writereg(struct xl_softc *, struct xl_mii_frame *);
 
-static void xl_setcfg		(struct xl_softc *);
-static void xl_setmode		(struct xl_softc *, int);
-static void xl_setmulti		(struct xl_softc *);
-static void xl_setmulti_hash	(struct xl_softc *);
-static void xl_reset		(struct xl_softc *);
-static int xl_list_rx_init	(struct xl_softc *);
-static int xl_list_tx_init	(struct xl_softc *);
-static int xl_list_tx_init_90xB	(struct xl_softc *);
-static void xl_wait		(struct xl_softc *);
-static void xl_mediacheck	(struct xl_softc *);
-static void xl_choose_media	(struct xl_softc *sc, int *media);
-static void xl_choose_xcvr	(struct xl_softc *, int);
-static void xl_dma_map_addr	(void *, bus_dma_segment_t *, int, int);
-static void xl_dma_map_rxbuf	(void *, bus_dma_segment_t *, int, bus_size_t,
-						int);
-static void xl_dma_map_txbuf	(void *, bus_dma_segment_t *, int, bus_size_t,
-						int);
+static void xl_setcfg(struct xl_softc *);
+static void xl_setmode(struct xl_softc *, int);
+static void xl_setmulti(struct xl_softc *);
+static void xl_setmulti_hash(struct xl_softc *);
+static void xl_reset(struct xl_softc *);
+static int xl_list_rx_init(struct xl_softc *);
+static int xl_list_tx_init(struct xl_softc *);
+static int xl_list_tx_init_90xB(struct xl_softc *);
+static void xl_wait(struct xl_softc *);
+static void xl_mediacheck(struct xl_softc *);
+static void xl_choose_media(struct xl_softc *sc, int *media);
+static void xl_choose_xcvr(struct xl_softc *, int);
+static void xl_dma_map_addr(void *, bus_dma_segment_t *, int, int);
+static void xl_dma_map_rxbuf(void *, bus_dma_segment_t *, int, bus_size_t, int);
+static void xl_dma_map_txbuf(void *, bus_dma_segment_t *, int, bus_size_t, int);
 #ifdef notdef
-static void xl_testpacket	(struct xl_softc *);
+static void xl_testpacket(struct xl_softc *);
 #endif
 
-static int xl_miibus_readreg	(device_t, int, int);
-static int xl_miibus_writereg	(device_t, int, int, int);
-static void xl_miibus_statchg	(device_t);
-static void xl_miibus_mediainit	(device_t);
+static int xl_miibus_readreg(device_t, int, int);
+static int xl_miibus_writereg(device_t, int, int, int);
+static void xl_miibus_statchg(device_t);
+static void xl_miibus_mediainit(device_t);
 
 static device_method_t xl_methods[] = {
 	/* Device interface */
@@ -1060,7 +1057,7 @@ xl_probe(device_t dev)
 		if ((pci_get_vendor(dev) == t->xl_vid) &&
 		    (pci_get_device(dev) == t->xl_did)) {
 			device_set_desc(dev, t->xl_name);
-			return (0);
+			return (BUS_PROBE_DEFAULT);
 		}
 		t++;
 	}
@@ -1172,6 +1169,7 @@ xl_choose_xcvr(struct xl_softc *sc, int verbose)
 	case TC_DEVICEID_HURRICANE_656B:	/* 3c656B */
 	case TC_DEVICEID_TORNADO_656C:		/* 3c656C */
 	case TC_DEVICEID_TORNADO_10_100BT_920B:	/* 3c920B-EMB */
+	case TC_DEVICEID_TORNADO_10_100BT_920B_WNM:	/* 3c920B-EMB-WNM */
 		sc->xl_media = XL_MEDIAOPT_MII;
 		sc->xl_xcvr = XL_XCVR_MII;
 		if (verbose)
@@ -1269,7 +1267,8 @@ xl_attach(device_t dev)
 	    did == TC_DEVICEID_HURRICANE_656B)
 		sc->xl_flags |= XL_FLAG_INVERT_MII_PWR |
 		    XL_FLAG_INVERT_LED_PWR;
-	if (did == TC_DEVICEID_TORNADO_10_100BT_920B)
+	if (did == TC_DEVICEID_TORNADO_10_100BT_920B ||
+	    did == TC_DEVICEID_TORNADO_10_100BT_920B_WNM)
 		sc->xl_flags |= XL_FLAG_PHYOK;
 
 	switch (did) {
@@ -3033,8 +3032,8 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				CSR_WRITE_2(sc, XL_COMMAND,
 				    XL_CMD_RX_SET_FILT|rxfilt);
 				XL_SEL_WIN(7);
-			} else
-				if ((ifp->if_flags & IFF_RUNNING) == 0) {
+			} else {
+				if ((ifp->if_flags & IFF_RUNNING) == 0)
 					xl_init_locked(sc);
 			}
 		} else {
@@ -3112,10 +3111,14 @@ xl_watchdog(struct ifnet *ifp)
 	xl_reset(sc);
 	xl_init_locked(sc);
 
-	XL_UNLOCK(sc);
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd)) {
+		if (sc->xl_type == XL_TYPE_905B)
+			xl_start_90xB_locked(ifp);
+		else
+			xl_start_locked(ifp);
+	}
 
-	if (IFQ_DRV_IS_EMPTY(&ifp->if_snd))
-		(*ifp->if_start)(ifp);
+	XL_UNLOCK(sc);
 }
 
 /*

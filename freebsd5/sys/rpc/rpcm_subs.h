@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/rpc/rpcm_subs.h,v 1.2 2004/04/07 05:00:00 imp Exp $ */
+/* $FreeBSD: src/sys/rpc/rpcm_subs.h,v 1.2.2.1 2005/01/31 23:26:52 imp Exp $ */
 /*	$OpenBSD: nfsm_subs.h,v 1.11 2000/01/05 20:50:52 millert Exp $	*/
 /*	$NetBSD: nfsm_subs.h,v 1.10 1996/03/20 21:59:56 fvdl Exp $	*/
 
-/*
+/*-
  * copyright (c) 2003
  * the regents of the university of michigan
  * all rights reserved
@@ -26,7 +26,7 @@
  * advised of the possibility of such damages.
  */
 
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_nvidia.c,v 1.6 2004/05/30 20:00:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_nvidia.c,v 1.6.2.1 2005/03/01 08:11:50 imp Exp $");
 
 /*
  * Written using information gleaned from the
@@ -84,16 +84,16 @@ struct agp_nvidia_softc {
 	off_t			pg_offset;
 };
 
-static const char *	agp_nvidia_match	(device_t dev);
-static int		agp_nvidia_probe	(device_t);
-static int		agp_nvidia_attach	(device_t);
-static int		agp_nvidia_detach	(device_t);
-static u_int32_t	agp_nvidia_get_aperture	(device_t);
-static int		agp_nvidia_set_aperture	(device_t, u_int32_t);
-static int		agp_nvidia_bind_page	(device_t, int, vm_offset_t);
-static int		agp_nvidia_unbind_page	(device_t, int);
+static const char *agp_nvidia_match(device_t dev);
+static int agp_nvidia_probe(device_t);
+static int agp_nvidia_attach(device_t);
+static int agp_nvidia_detach(device_t);
+static u_int32_t agp_nvidia_get_aperture(device_t);
+static int agp_nvidia_set_aperture(device_t, u_int32_t);
+static int agp_nvidia_bind_page(device_t, int, vm_offset_t);
+static int agp_nvidia_unbind_page(device_t, int);
 
-static int		nvidia_init_iorr	(u_int32_t, u_int32_t);
+static int nvidia_init_iorr(u_int32_t, u_int32_t);
 
 static const char *
 agp_nvidia_match (device_t dev)
@@ -123,7 +123,7 @@ agp_nvidia_probe (device_t dev)
 	if (desc) {
 		device_verbose(dev);
 		device_set_desc(dev, desc);
-		return (0);
+		return (BUS_PROBE_DEFAULT);
 	}
 	return (ENXIO);
 }

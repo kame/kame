@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,7 +57,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_glue.c,v 1.202 2004/07/30 20:31:02 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_glue.c,v 1.202.2.5 2005/02/23 06:41:44 alc Exp $");
 
 #include "opt_vm.h"
 #include "opt_kstack_pages.h"
@@ -91,8 +91,6 @@ __FBSDID("$FreeBSD: src/sys/vm/vm_glue.c,v 1.202 2004/07/30 20:31:02 alc Exp $")
 #include <vm/vm_pager.h>
 #include <vm/swap_pager.h>
 
-#include <sys/user.h>
-
 extern int maxslp;
 
 /*
@@ -113,8 +111,6 @@ SYSINIT(scheduler, SI_SUB_RUN_SCHEDULER, SI_ORDER_ANY, scheduler, NULL)
 
 #ifndef NO_SWAPPING
 static void swapout(struct proc *);
-static void vm_proc_swapin(struct proc *p);
-static void vm_proc_swapout(struct proc *p);
 #endif
 
 /*
@@ -137,6 +133,11 @@ kernacc(addr, len, rw)
 
 	KASSERT((rw & ~VM_PROT_ALL) == 0,
 	    ("illegal ``rw'' argument to kernacc (%x)\n", rw));
+
+	if ((vm_offset_t)addr + len > kernel_map->max_offset ||
+	    (vm_offset_t)addr + len < (vm_offset_t)addr)
+		return (FALSE);
+
 	prot = rw;
 	saddr = trunc_page((vm_offset_t)addr);
 	eaddr = round_page((vm_offset_t)addr + len);
@@ -234,186 +235,6 @@ vsunlock(void *addr, size_t len)
 	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
 }
 
-/*
- * Create the U area for a new process.
- * This routine directly affects the fork perf for a process.
- */
-void
-vm_proc_new(struct proc *p)
-{
-	vm_page_t ma[UAREA_PAGES];
-	vm_object_t upobj;
-	vm_offset_t up;
-	vm_page_t m;
-	u_int i;
-
-	/*
-	 * Get a kernel virtual address for the U area for this process.
-	 */
-	up = kmem_alloc_nofault(kernel_map, UAREA_PAGES * PAGE_SIZE);
-	if (up == 0)
-		panic("vm_proc_new: upage allocation failed");
-	p->p_uarea = (struct user *)up;
-
-	/*
-	 * Allocate object and page(s) for the U area.
-	 */
-	upobj = vm_object_allocate(OBJT_DEFAULT, UAREA_PAGES);
-	p->p_upages_obj = upobj;
-	VM_OBJECT_LOCK(upobj);
-	for (i = 0; i < UAREA_PAGES; i++) {
-		m = vm_page_grab(upobj, i,
-		    VM_ALLOC_NORMAL | VM_ALLOC_RETRY | VM_ALLOC_WIRED);
-		ma[i] = m;
-
-		vm_page_lock_queues();
-		vm_page_wakeup(m);
-		m->valid = VM_PAGE_BITS_ALL;
-		vm_page_unlock_queues();
-	}
-	VM_OBJECT_UNLOCK(upobj);
-
-	/*
-	 * Enter the pages into the kernel address space.
-	 */
-	pmap_qenter(up, ma, UAREA_PAGES);
-}
-
-/*
- * Dispose the U area for a process that has exited.
- * This routine directly impacts the exit perf of a process.
- * XXX proc_zone is marked UMA_ZONE_NOFREE, so this should never be called.
- */
-void
-vm_proc_dispose(struct proc *p)
-{
-	vm_object_t upobj;
-	vm_offset_t up;
-	vm_page_t m;
-
-	upobj = p->p_upages_obj;
-	VM_OBJECT_LOCK(upobj);
-	if (upobj->resident_page_count != UAREA_PAGES)
-		panic("vm_proc_dispose: incorrect number of pages in upobj");
-	vm_page_lock_queues();
-	while ((m = TAILQ_FIRST(&upobj->memq)) != NULL) {
-		vm_page_busy(m);
-		vm_page_unwire(m, 0);
-		vm_page_free(m);
-	}
-	vm_page_unlock_queues();
-	VM_OBJECT_UNLOCK(upobj);
-	up = (vm_offset_t)p->p_uarea;
-	pmap_qremove(up, UAREA_PAGES);
-	kmem_free(kernel_map, up, UAREA_PAGES * PAGE_SIZE);
-	vm_object_deallocate(upobj);
-}
-
-#ifndef NO_SWAPPING
-/*
- * Allow the U area for a process to be prejudicially paged out.
- */
-static void
-vm_proc_swapout(struct proc *p)
-{
-	vm_object_t upobj;
-	vm_offset_t up;
-	vm_page_t m;
-
-	upobj = p->p_upages_obj;
-	VM_OBJECT_LOCK(upobj);
-	if (upobj->resident_page_count != UAREA_PAGES)
-		panic("vm_proc_dispose: incorrect number of pages in upobj");
-	vm_page_lock_queues();
-	TAILQ_FOREACH(m, &upobj->memq, listq) {
-		vm_page_dirty(m);
-		vm_page_unwire(m, 0);
-	}
-	vm_page_unlock_queues();
-	VM_OBJECT_UNLOCK(upobj);
-	up = (vm_offset_t)p->p_uarea;
-	pmap_qremove(up, UAREA_PAGES);
-}
-
-/*
- * Bring the U area for a specified process back in.
- */
-static void
-vm_proc_swapin(struct proc *p)
-{
-	vm_page_t ma[UAREA_PAGES];
-	vm_object_t upobj;
-	vm_offset_t up;
-	vm_page_t m;
-	int rv;
-	int i;
-
-	upobj = p->p_upages_obj;
-	VM_OBJECT_LOCK(upobj);
-	for (i = 0; i < UAREA_PAGES; i++) {
-		m = vm_page_grab(upobj, i, VM_ALLOC_NORMAL | VM_ALLOC_RETRY);
-		if (m->valid != VM_PAGE_BITS_ALL) {
-			rv = vm_pager_get_pages(upobj, &m, 1, 0);
-			if (rv != VM_PAGER_OK)
-				panic("vm_proc_swapin: cannot get upage");
-		}
-		ma[i] = m;
-	}
-	if (upobj->resident_page_count != UAREA_PAGES)
-		panic("vm_proc_swapin: lost pages from upobj");
-	vm_page_lock_queues();
-	TAILQ_FOREACH(m, &upobj->memq, listq) {
-		m->valid = VM_PAGE_BITS_ALL;
-		vm_page_wire(m);
-		vm_page_wakeup(m);
-	}
-	vm_page_unlock_queues();
-	VM_OBJECT_UNLOCK(upobj);
-	up = (vm_offset_t)p->p_uarea;
-	pmap_qenter(up, ma, UAREA_PAGES);
-}
-
-/*
- * Swap in the UAREAs of all processes swapped out to the given device.
- * The pages in the UAREA are marked dirty and their swap metadata is freed.
- */
-void
-vm_proc_swapin_all(struct swdevt *devidx)
-{
-	struct proc *p;
-	vm_object_t object;
-	vm_page_t m;
-
-retry:
-	sx_slock(&allproc_lock);
-	FOREACH_PROC_IN_SYSTEM(p) {
-		PROC_LOCK(p);
-		object = p->p_upages_obj;
-		if (object != NULL) {
-			VM_OBJECT_LOCK(object);
-			if (swap_pager_isswapped(object, devidx)) {
-				VM_OBJECT_UNLOCK(object);
-				sx_sunlock(&allproc_lock);
-				faultin(p);
-				PROC_UNLOCK(p);
-				VM_OBJECT_LOCK(object);
-				vm_page_lock_queues();
-				TAILQ_FOREACH(m, &object->memq, listq)
-					vm_page_dirty(m);
-				vm_page_unlock_queues();
-				swap_pager_freespace(object, 0,
-				    object->un_pager.swp.swp_bcount);
-				VM_OBJECT_UNLOCK(object);
-				goto retry;
-			}
-			VM_OBJECT_UNLOCK(object);
-		}
-		PROC_UNLOCK(p);
-	}
-	sx_sunlock(&allproc_lock);
-}
-#endif
-
 #ifndef KSTACK_MAX_PAGES
 #define KSTACK_MAX_PAGES 32
 #endif
@@ -467,13 +288,10 @@ vm_thread_new(struct thread *td, int pages)
 		/*
 		 * Get a kernel stack page.
 		 */
-		m = vm_page_grab(ksobj, i,
+		m = vm_page_grab(ksobj, i, VM_ALLOC_NOBUSY |
 		    VM_ALLOC_NORMAL | VM_ALLOC_RETRY | VM_ALLOC_WIRED);
 		ma[i] = m;
-		vm_page_lock_queues();
-		vm_page_wakeup(m);
 		m->valid = VM_PAGE_BITS_ALL;
-		vm_page_unlock_queues();
 	}
 	VM_OBJECT_UNLOCK(ksobj);
 	pmap_qenter(ks, ma, pages);
@@ -500,7 +318,6 @@ vm_thread_dispose(struct thread *td)
 		if (m == NULL)
 			panic("vm_thread_dispose: kstack already missing?");
 		vm_page_lock_queues();
-		vm_page_busy(m);
 		vm_page_unwire(m, 0);
 		vm_page_free(m);
 		vm_page_unlock_queues();
@@ -619,8 +436,6 @@ vm_forkproc(td, p2, td2, flags)
 {
 	struct proc *p1 = td->td_proc;
 
-	GIANT_REQUIRED;
-
 	if ((flags & RFPROC) == 0) {
 		/*
 		 * Divorce the memory, if it is shared, essentially
@@ -650,19 +465,6 @@ vm_forkproc(td, p2, td2, flags)
 		if (p1->p_vmspace->vm_shm)
 			shmfork(p1, p2);
 	}
-
-	/*
-	 * p_stats currently points at fields in the user struct.
-	 * Copy parts of p_stats; zero the rest of p_stats (statistics).
-	 */
-#define	RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
-
-	p2->p_stats = &p2->p_uarea->u_stats;
-	bzero(&p2->p_stats->pstat_startzero,
-	    (unsigned) RANGEOF(struct pstats, pstat_startzero, pstat_endzero));
-	bcopy(&p1->p_stats->pstat_startcopy, &p2->p_stats->pstat_startcopy,
-	    (unsigned) RANGEOF(struct pstats, pstat_startcopy, pstat_endcopy));
-#undef RANGEOF
 
 	/*
 	 * cpu_fork will copy and update the pcb, set up the kernel stack,
@@ -747,7 +549,6 @@ faultin(p)
 		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(p);
 
-		vm_proc_swapin(p);
 		FOREACH_THREAD_IN_PROC(p, td)
 			vm_thread_swapin(td);
 
@@ -1103,7 +904,6 @@ swapout(p)
 		TD_SET_SWAPPED(td);
 	mtx_unlock_spin(&sched_lock);
 
-	vm_proc_swapout(p);
 	FOREACH_THREAD_IN_PROC(p, td)
 		vm_thread_swapout(td);
 

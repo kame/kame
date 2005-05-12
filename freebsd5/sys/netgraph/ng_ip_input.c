@@ -1,6 +1,8 @@
 /*
  * ng_ip_input.c
- *
+ */
+
+/*-
  * Copyright 2001 The Aerospace Corporation.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,7 +64,7 @@
  * Author:		Brooks Davis <brooks@FreeBSD.org>
  * Derived from:	ng_hole.c
  *
- * $FreeBSD: src/sys/netgraph/ng_ip_input.c,v 1.3 2004/05/29 00:51:11 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ip_input.c,v 1.3.2.1 2005/01/31 23:26:29 imp Exp $
  */
 
 /*

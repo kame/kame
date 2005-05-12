@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Andre Oppermann, Internet Business Solutions AG
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/tcp_hostcache.c,v 1.7 2004/08/16 18:32:07 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_hostcache.c,v 1.7.2.2 2005/02/13 18:18:33 rwatson Exp $
  */
 
 /*
@@ -436,7 +436,8 @@ tcp_hc_get(struct in_conninfo *inc, struct hc_metrics_lite *hc_metrics_lite)
 
 /*
  * External function: lookup an entry in the hostcache and return the
- * discovered path mtu.  Returns null if no entry found or value not is set.
+ * discovered path mtu.  Returns null if no entry is found or value is not
+ * set.
  */
 u_long
 tcp_hc_getmtu(struct in_conninfo *inc)

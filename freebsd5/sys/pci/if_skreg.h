@@ -1,6 +1,6 @@
 /*	$OpenBSD: if_skreg.h,v 1.10 2003/08/12 05:23:06 nate Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -31,10 +31,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_skreg.h,v 1.20.2.2 2004/08/25 21:19:06 jmg Exp $
+ * $FreeBSD: src/sys/pci/if_skreg.h,v 1.20.2.5 2005/03/28 16:21:16 bz Exp $
  */
 
-/*
+/*-
  * Copyright (c) 2003 Nathan L. Binkert <binkertn@umich.edu>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -50,9 +50,17 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* Values to keep the different chip revisions apart */
-#define SK_GENESIS 0
-#define SK_YUKON 1
+/* Values to keep the different chip revisions apart (SK_CHIPVER). */
+#define SK_GENESIS		0x0A
+#define SK_YUKON		0xB0
+#define SK_YUKON_LITE		0xB1
+#define SK_YUKON_LP		0xB2
+#define SK_YUKON_FAMILY(x) ((x) & 0xB0)
+
+/* Known revisions in SK_CONFIG. */
+#define SK_YUKON_LITE_REV_A0	0x0 /* invented, see test in skc_attach. */
+#define SK_YUKON_LITE_REV_A1	0x3
+#define SK_YUKON_LITE_REV_A3	0x7
 
 /*
  * SysKonnect PCI vendor ID
@@ -1366,7 +1374,7 @@ struct sk_tx_desc {
  */
 #define SK_JUMBO_FRAMELEN	9018
 #define SK_JUMBO_MTU		(SK_JUMBO_FRAMELEN-ETHER_HDR_LEN-ETHER_CRC_LEN)
-#define SK_JSLOTS		384
+#define SK_JSLOTS		((SK_RX_RING_CNT * 3) / 2)
 
 #define SK_JRAWLEN (SK_JUMBO_FRAMELEN + ETHER_ALIGN)
 #define SK_JLEN (SK_JRAWLEN + (sizeof(u_int64_t) - \
@@ -1425,6 +1433,8 @@ struct sk_softc {
 	struct resource		*sk_res;	/* I/O or shared mem handle */
 	u_int8_t		sk_unit;	/* controller number */
 	u_int8_t		sk_type;
+	u_int8_t		sk_rev;
+	u_int8_t		spare;
 	char			*sk_vpd_prodname;
 	char			*sk_vpd_readonly;
 	u_int32_t		sk_rboff;	/* RAMbuffer offset */
@@ -1441,6 +1451,7 @@ struct sk_softc {
 #define	SK_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->sk_mtx, MA_OWNED)
 #define	SK_IF_LOCK(_sc)		SK_LOCK((_sc)->sk_softc)
 #define	SK_IF_UNLOCK(_sc)	SK_UNLOCK((_sc)->sk_softc)
+#define	SK_IF_LOCK_ASSERT(_sc)	SK_LOCK_ASSERT((_sc)->sk_softc)
 
 /* Softc for each logical interface */
 struct sk_if_softc {
@@ -1466,7 +1477,11 @@ struct sk_if_softc {
 	int			sk_if_flags;
 	SLIST_HEAD(__sk_jfreehead, sk_jpool_entry)	sk_jfree_listhead;
 	SLIST_HEAD(__sk_jinusehead, sk_jpool_entry)	sk_jinuse_listhead;
+	struct mtx		sk_jlist_mtx;
 };
+
+#define	SK_JLIST_LOCK(_sc)	mtx_lock(&(_sc)->sk_jlist_mtx)
+#define	SK_JLIST_UNLOCK(_sc)	mtx_unlock(&(_sc)->sk_jlist_mtx)
 
 #define SK_MAXUNIT	256
 #define SK_TIMEOUT	1000

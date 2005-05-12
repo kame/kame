@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)file.h	8.3 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/file.h,v 1.65 2004/06/19 11:38:00 phk Exp $
+ * $FreeBSD: src/sys/sys/file.h,v 1.65.2.3 2005/03/03 22:27:33 jhb Exp $
  */
 
 #ifndef _SYS_FILE_H_
@@ -173,7 +173,6 @@ int fget(struct thread *td, int fd, struct file **fpp);
 int fget_read(struct thread *td, int fd, struct file **fpp);
 int fget_write(struct thread *td, int fd, struct file **fpp);
 int fdrop(struct file *fp, struct thread *td);
-int fdrop_locked(struct file *fp, struct thread *td);
 
 /*
  * The socket operations are used a couple of places.
@@ -210,7 +209,7 @@ void fputsock(struct socket *sp);
 #define	fhold(fp)							\
 	do {								\
 		FILE_LOCK(fp);						\
-		fhold_locked(fp);					\
+		(fp)->f_count++;					\
 		FILE_UNLOCK(fp);					\
 	} while (0)
 
