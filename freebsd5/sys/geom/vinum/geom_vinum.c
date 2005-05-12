@@ -1,4 +1,4 @@
-/*
+/*-
  *  Copyright (c) 2004 Lukas Ertl
  *  All rights reserved.
  * 
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum.c,v 1.9.2.2 2004/10/07 17:51:06 le Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum.c,v 1.9.2.5 2005/01/31 23:26:01 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/bio.h>
@@ -503,11 +503,17 @@ gv_config(struct gctl_req *req, struct g_class *mp, char const *verb)
 	} else if (!strcmp(verb, "create")) {
 		gv_create(gp, req);
 
+	} else if (!strcmp(verb, "parityop")) {
+		gv_parityop(gp, req);
+
 	} else if (!strcmp(verb, "remove")) {
 		gv_remove(gp, req);
 
 	} else if (!strcmp(verb, "start")) {
 		gv_start_obj(gp, req);
+
+	} else if (!strcmp(verb, "setstate")) {
+		gv_setstate(gp, req);
 
 	} else
 		gctl_error(req, "Unknown verb parameter");

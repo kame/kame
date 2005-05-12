@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Robert Nordier
  * All rights reserved.
  * Copyright (c) 2001 Robert Drehmel
@@ -16,7 +16,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/sparc64/boot1/boot1.c,v 1.18 2004/08/16 15:45:25 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/sparc64/boot1/boot1.c,v 1.18.2.1 2005/01/30 00:59:15 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/dirent.h>

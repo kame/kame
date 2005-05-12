@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Atsushi Onoe <onoe@sm.sony.co.jp>
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/awi/if_awi_pccard.c,v 1.19 2004/05/27 03:49:40 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/awi/if_awi_pccard.c,v 1.19.2.1 2005/01/30 00:59:30 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

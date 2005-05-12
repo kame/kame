@@ -1,6 +1,6 @@
 /* drm_dma.c -- DMA IOCTL and function support -*- linux-c -*-
- * Created: Fri Mar 19 14:30:16 1999 by faith@valinux.com
- *
+ * Created: Fri Mar 19 14:30:16 1999 by faith@valinux.com */
+/*-
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_dma.h,v 1.8 2003/12/23 14:38:42 se Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_dma.h,v 1.8.2.1 2005/01/30 00:59:35 imp Exp $
  */
 
 #include "dev/drm/drmP.h"

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-card.c,v 1.25.2.1.2.1 2004/10/23 19:05:17 le Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-card.c,v 1.25.2.4 2005/02/02 22:51:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ata/ata-card.c,v 1.25.2.1.2.1 2004/10/23 19:05:1
 static const struct pccard_product ata_pccard_products[] = {
 	PCMCIA_CARD(FREECOM, PCCARDIDE, 0),
 	PCMCIA_CARD(EXP, EXPMULTIMEDIA, 0),
-	PCMCIA_CARD(IODATA, CBIDE2, 0),
+	PCMCIA_CARD(IODATA3, CBIDE2, 0),
 	PCMCIA_CARD(OEM2, CDROM1, 0),
 	PCMCIA_CARD(OEM2, IDE, 0),
 	PCMCIA_CARD(PANASONIC, KXLC005, 0),
@@ -105,11 +105,10 @@ ata_pccard_probe(device_t dev)
 {
     struct ata_channel *ch = device_get_softc(dev);
     struct resource *io, *altio;
-    int i, rid, len;
+    int i, rid;
 
     /* allocate the io range to get start and length */
     rid = ATA_IOADDR_RID;
-    len = bus_get_resource_count(dev, SYS_RES_IOPORT, rid);
     io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
 			    ATA_IOSIZE, RF_ACTIVE);
     if (!io)
@@ -125,7 +124,7 @@ ata_pccard_probe(device_t dev)
      * if we got more than the default ATA_IOSIZE ports, this is a device
      * where altio is located at offset 14 into "normal" io space.
      */
-    if (len > ATA_IOSIZE) {
+    if (rman_get_size(io) > ATA_IOSIZE) {
 	ch->r_io[ATA_ALTSTAT].res = io;
 	ch->r_io[ATA_ALTSTAT].offset = 14;
     }
@@ -161,10 +160,11 @@ ata_pccard_detach(device_t dev)
     free(ch->device[MASTER].param, M_ATA);
     ch->device[MASTER].param = NULL;
     ata_detach(dev);
-    bus_release_resource(dev, SYS_RES_IOPORT,
-			 ATA_ALTADDR_RID, ch->r_io[ATA_ALTSTAT].res);
-    bus_release_resource(dev, SYS_RES_IOPORT,
-			 ATA_IOADDR_RID, ch->r_io[ATA_DATA].res);
+    if (ch->r_io[ATA_ALTSTAT].res != ch->r_io[ATA_DATA].res)
+	bus_release_resource(dev, SYS_RES_IOPORT, ATA_ALTADDR_RID,
+			     ch->r_io[ATA_ALTSTAT].res);
+    bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID,
+			 ch->r_io[ATA_DATA].res);
     for (i = ATA_DATA; i < ATA_MAX_RES; i++)
 	ch->r_io[i].res = NULL;
     return 0;

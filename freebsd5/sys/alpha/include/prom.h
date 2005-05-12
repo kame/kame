@@ -1,6 +1,6 @@
 /* $NetBSD: prom.h,v 1.7 1997/04/06 08:47:37 cgd Exp $ */
 
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/alpha/include/prom.h,v 1.9 2003/02/20 20:54:43 phk Exp $
+ * $FreeBSD: src/sys/alpha/include/prom.h,v 1.9.6.1 2005/01/30 00:59:10 imp Exp $
  */
 
 #ifndef	ASSEMBLER

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1994 Christos Zoulas
  * All rights reserved.
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.71 2004/03/17 20:00:00 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.71.2.5 2005/03/01 09:30:15 obrien Exp $");
 
 #include "opt_mac.h"
 
@@ -57,13 +57,13 @@ __FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.71 2004/03/17 20:00:00 j
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/sem.h>
+#include <sys/signalvar.h>
 #include <sys/stat.h>
 #include <sys/sx.h>
 #include <sys/sysproto.h>
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/uio.h>
-#include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
 
@@ -618,10 +618,10 @@ svr4_sys_fchroot(td, uap)
 		return error;
 	}
 	VREF(vp);
-	FILEDESC_LOCK(fdp);
+	FILEDESC_LOCK_FAST(fdp);
 	vpold = fdp->fd_rdir;
 	fdp->fd_rdir = vp;
-	FILEDESC_UNLOCK(fdp);
+	FILEDESC_UNLOCK_FAST(fdp);
 	if (vpold != NULL)
 		vrele(vpold);
 	fdrop(fp, td);

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ia64/ia64/gdb_machdep.c,v 1.2 2004/08/07 21:40:52 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ia64/ia64/gdb_machdep.c,v 1.2.2.2 2005/02/14 08:18:16 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -128,7 +128,7 @@ gdb_cpu_getreg(int regnum, size_t *regsz)
 }
 
 void
-gdb_cpu_setreg(int regnum, register_t val)
+gdb_cpu_setreg(int regnum, void *val)
 {
 
 	switch (regnum) {

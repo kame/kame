@@ -1,6 +1,6 @@
 /* drm_fops.h -- File operations for DRM -*- linux-c -*-
- * Created: Mon Jan  4 08:58:31 1999 by faith@valinux.com
- *
+ * Created: Mon Jan  4 08:58:31 1999 by faith@valinux.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -29,7 +29,7 @@
  *    Daryll Strauss <daryll@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_fops.h,v 1.11 2004/06/16 09:46:42 phk Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_fops.h,v 1.11.2.1 2005/01/30 00:59:35 imp Exp $
  */
 
 #include "dev/drm/drmP.h"

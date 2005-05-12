@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.84.4.3 2004/10/30 22:01:43 rwatson Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.84.2.6 2005/03/21 16:05:35 glebius Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -68,6 +68,7 @@ struct	rtentry;
 struct	rt_addrinfo;
 struct	socket;
 struct	ether_header;
+struct	carp_if;
 #endif
 
 #include <sys/queue.h>		/* get TAILQ macros */
@@ -148,7 +149,7 @@ struct ifnet {
 		 */
 	struct	knlist if_klist;	/* events attached to this if */
 	int	if_pcount;		/* number of promiscuous listeners */
-	void	*if_carp;		/* carp (tbd) interface pointer */
+	struct	carp_if *if_carp;	/* carp interface structure */
 	struct	bpf_if *if_bpf;		/* packet filter structure */
 	u_short	if_index;		/* numeric abbreviation for this if  */
 	short	if_timer;		/* time 'til if_watchdog called */
@@ -230,7 +231,7 @@ typedef void if_init_f_t(void *);
 #define	if_lastchange	if_data.ifi_lastchange
 #define if_recvquota	if_data.ifi_recvquota
 #define	if_xmitquota	if_data.ifi_xmitquota
-#define if_rawoutput(if, m, sa) if_output(if, m, sa, (struct rtentry *)0)
+#define if_rawoutput(if, m, sa) if_output(if, m, sa, (struct rtentry *)NULL)
 
 /* for compatibility with other BSDs */
 #define	if_addrlist	if_addrhead
@@ -282,7 +283,7 @@ typedef void if_init_f_t(void *);
 #define	_IF_DEQUEUE(ifq, m) do { 				\
 	(m) = (ifq)->ifq_head; 					\
 	if (m) { 						\
-		if (((ifq)->ifq_head = (m)->m_nextpkt) == 0) 	\
+		if (((ifq)->ifq_head = (m)->m_nextpkt) == NULL)	\
 			(ifq)->ifq_tail = NULL; 		\
 		(m)->m_nextpkt = NULL; 				\
 		(ifq)->ifq_len--; 				\

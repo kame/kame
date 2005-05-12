@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2004 Pawel Jakub Dawidek <pjd@FreeBSD.org>
+ * Copyright (c) 2004-2005 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/concat/g_concat.c,v 1.18.2.2 2004/09/28 18:22:15 pjd Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/concat/g_concat.c,v 1.18.2.3.2.1 2005/04/06 13:08:24 pjd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -213,6 +213,7 @@ g_concat_access(struct g_provider *pp, int dr, int dw, int de)
 static void
 g_concat_start(struct bio *bp)
 {
+	struct bio_queue_head queue;
 	struct g_concat_softc *sc;
 	struct g_concat_disk *disk;
 	struct g_provider *pp;
@@ -250,6 +251,7 @@ g_concat_start(struct bio *bp)
 	addr = bp->bio_data;
 	end = offset + length;
 
+	bioq_init(&queue);
 	for (no = 0; no < sc->sc_ndisks; no++) {
 		disk = &sc->sc_disks[no];
 		if (disk->d_end <= offset)
@@ -264,10 +266,17 @@ g_concat_start(struct bio *bp)
 
 		cbp = g_clone_bio(bp);
 		if (cbp == NULL) {
+			for (cbp = bioq_first(&queue); cbp != NULL;
+			    cbp = bioq_first(&queue)) {
+				bioq_remove(&queue, cbp);
+				g_destroy_bio(cbp);
+			}
 			if (bp->bio_error == 0)
 				bp->bio_error = ENOMEM;
+			g_io_deliver(bp, bp->bio_error);
 			return;
 		}
+		bioq_insert_tail(&queue, cbp);
 		/*
 		 * Fill in the component buf structure.
 		 */
@@ -277,16 +286,21 @@ g_concat_start(struct bio *bp)
 		addr += len;
 		cbp->bio_length = len;
 		cbp->bio_to = disk->d_consumer->provider;
-		G_CONCAT_LOGREQ(cbp, "Sending request.");
-		g_io_request(cbp, disk->d_consumer);
+		cbp->bio_caller1 = disk;
 
 		if (length == 0)
 			break;
 	}
-
 	KASSERT(length == 0,
 	    ("Length is still greater than 0 (class=%s, name=%s).",
 	    bp->bio_to->geom->class->name, bp->bio_to->geom->name));
+	for (cbp = bioq_first(&queue); cbp != NULL; cbp = bioq_first(&queue)) {
+		bioq_remove(&queue, cbp);
+		G_CONCAT_LOGREQ(cbp, "Sending request.");
+		disk = cbp->bio_caller1;
+		cbp->bio_caller1 = NULL;
+		g_io_request(cbp, disk->d_consumer);
+	}
 }
 
 static void
@@ -570,12 +584,17 @@ g_concat_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	}
 	/*
 	 * Backward compatibility:
-	 * There was no md_provider field in earlier versions of metadata.
 	 */
+	/* There was no md_provider field in earlier versions of metadata. */
 	if (md.md_version < 3)
 		bzero(md.md_provider, sizeof(md.md_provider));
+	/* There was no md_provsize field in earlier versions of metadata. */
+	if (md.md_version < 4)
+		md.md_provsize = pp->mediasize;
 
 	if (md.md_provider[0] != '\0' && strcmp(md.md_provider, pp->name) != 0)
+		return (NULL);
+	if (md.md_provsize != pp->mediasize)
 		return (NULL);
 
 	/*
@@ -661,6 +680,8 @@ g_concat_ctl_create(struct gctl_req *req, struct g_class *mp)
 	md.md_no = 0;
 	md.md_all = *nargs - 1;
 	bzero(md.md_provider, sizeof(md.md_provider));
+	/* This field is not important here. */
+	md.md_provsize = 0;
 
 	/* Check all providers are valid */
 	for (no = 1; no < *nargs; no++) {

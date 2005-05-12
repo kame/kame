@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Alfred Perlstein <alfred@FreeBSD.org>
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_sem.c,v 1.12 2004/05/30 20:34:58 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_sem.c,v 1.12.2.3 2005/03/13 13:02:56 rwatson Exp $");
 
 #include "opt_posix.h"
 
@@ -131,6 +131,7 @@ void
 sem_ref(struct ksem *ks)
 {
 
+	mtx_assert(&sem_lock, MA_OWNED);
 	ks->ks_ref++;
 	DP(("sem_ref: ks = %p, ref = %d\n", ks, ks->ks_ref));
 }
@@ -140,6 +141,7 @@ void
 sem_rel(struct ksem *ks)
 {
 
+	mtx_assert(&sem_lock, MA_OWNED);
 	DP(("sem_rel: ks = %p, ref = %d\n", ks, ks->ks_ref - 1));
 	if (--ks->ks_ref == 0)
 		sem_free(ks);
@@ -154,6 +156,7 @@ id_to_sem(id)
 {
 	struct ksem *ks;
 
+	mtx_assert(&sem_lock, MA_OWNED);
 	DP(("id_to_sem: id = %0x,%p\n", id, (struct ksem *)id));
 	LIST_FOREACH(ks, &ksem_head, ks_entry) {
 		DP(("id_to_sem: ks = %p\n", ks));
@@ -169,6 +172,7 @@ sem_lookup_byname(name)
 {
 	struct ksem *ks;
 
+	mtx_assert(&sem_lock, MA_OWNED);
 	LIST_FOREACH(ks, &ksem_head, ks_entry)
 		if (ks->ks_name != NULL && strcmp(ks->ks_name, name) == 0)
 			return (ks);

@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/dev/ct/ct_machdep.h,v 1.5 2002/06/01 08:29:12 ru Exp $ */
+/* $FreeBSD: src/sys/dev/ct/ct_machdep.h,v 1.5.8.1 2005/01/30 00:59:33 imp Exp $ */
 /*	$NecBSD: ct_machdep.h,v 1.4.12.2 2001/06/20 06:13:34 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1995, 1996, 1997, 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.

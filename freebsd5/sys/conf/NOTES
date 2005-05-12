@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/NOTES,v 1.1261.2.6 2004/09/22 19:23:36 andre Exp $
+# $FreeBSD: src/sys/conf/NOTES,v 1.1261.2.19 2005/04/01 12:46:25 sobomax Exp $
 #
 # NOTES -- Lines that can be cut/pasted into kernel and hints configs.
 #
@@ -131,6 +131,7 @@ options 	GEOM_MIRROR		# Disk mirroring.
 options 	GEOM_NOP		# Test class.
 options 	GEOM_PC98		# NEC PC9800 partitioning
 options 	GEOM_RAID3		# RAID3 functionality.
+options 	GEOM_SHSEC		# Shared secret.
 options 	GEOM_STRIPE		# Disk striping.
 options 	GEOM_SUNLABEL		# Sun/Solaris partitioning
 options 	GEOM_UZIP		# Read-only compressed disks
@@ -300,6 +301,14 @@ options 	DDB_NUMSYM
 options 	GDB
 
 #
+# SYSCTL_DEBUG enables a 'sysctl' debug tree that can be used to dump the
+# contents of the registered sysctl nodes on the console.  It is disabled by
+# default because it generates excessively verbose consol output that can
+# interfere with serial console operation.
+#
+options 	SYSCTL_DEBUG
+
+#
 # KTRACE enables the system-call tracing facility ktrace(2).  To be more
 # SMP-friendly, KTRACE uses a worker thread to process most trace events
 # asynchronously to the thread generating the event.  This requires a
@@ -437,7 +446,7 @@ options 	LIBMCHAIN
 # also have the ALTQ_NOPCC option.
 options 	ALTQ
 options 	ALTQ_CBQ	# Class Bases Queueing
-options 	ALTQ_RED	# Random Early Drop
+options 	ALTQ_RED	# Random Early Detection
 options 	ALTQ_RIO	# RED In/Out
 options 	ALTQ_HFSC	# Hierarchical Packet Scheduler
 options 	ALTQ_CDNR	# Traffic conditioner
@@ -483,6 +492,7 @@ options 	NETGRAPH_LMI
 # MPPC compression requires proprietary files (not included)
 #options 	NETGRAPH_MPPC_COMPRESSION
 options 	NETGRAPH_MPPC_ENCRYPTION
+options		NETGRAPH_NETFLOW
 options 	NETGRAPH_ONE2MANY
 options 	NETGRAPH_PPP
 options 	NETGRAPH_PPPOE
@@ -513,6 +523,8 @@ device		musycc	# LMC/SBE LMC1504 quad T1/E1
 #  The `ether' device provides generic code to handle
 #  Ethernets; it is MANDATORY when an Ethernet device driver is
 #  configured or token-ring is enabled.
+#  The `vlan' device implements the VLAN tagging of Ethernet frames
+#  according to IEEE 802.1Q.  It requires `device miibus'.
 #  The `wlan' device provides generic code to support 802.11
 #  drivers, including host AP mode; it is MANDATORY for the wi
 #  driver and will eventually be required by all 802.11 drivers.
@@ -525,7 +537,7 @@ device		musycc	# LMC/SBE LMC1504 quad T1/E1
 #  The `bpf' device enables the Berkeley Packet Filter.  Be
 #  aware of the legal and administrative consequences of enabling this
 #  option.  The number of devices determines the maximum number of
-#  simultaneous BPF clients programs runnable.
+#  simultaneous BPF clients programs runnable.  DHCP requires bpf.
 #  The `disc' device implements a minimal network interface,
 #  which throws away all packets sent and never receives any.  It is
 #  included for testing purposes.  This shows up as the `ds' interface.
@@ -557,7 +569,7 @@ device		musycc	# LMC/SBE LMC1504 quad T1/E1
 # See pppd(8) for more details.
 #
 device		ether			#Generic Ethernet
-device		vlan			#VLAN support
+device		vlan			#VLAN support (needs miibus)
 device		wlan			#802.11 support
 device		token			#Generic TokenRing
 device		fddi			#Generic FDDI
@@ -573,6 +585,7 @@ device		gre			#IP over IP tunneling
 device		pf			#PF OpenBSD packet-filter firewall
 device		pflog			#logging support interface for PF
 device		pfsync			#synchronization interface for PF
+device		carp			#Common Address Redundancy Protocol
 device		ppp			#Point-to-point protocol
 options 	PPP_BSDCOMP		#PPP BSD-compress support
 options 	PPP_DEFLATE		#PPP zlib/deflate/gzip support
@@ -625,6 +638,11 @@ device		stf			#6to4 IPv6 over IPv4 encapsulation
 # to do some sort of policy routing or transparent proxying.  Used by
 # ``ipfw forward''.
 #
+# IPFIREWALL_FORWARD_EXTENDED enables full packet destination changing
+# including redirecting packets to local IP addresses and ports.  All
+# redirections apply to locally generated packets too.  Because of this
+# great care is required when crafting the ruleset.
+#
 # IPSTEALTH enables code to support stealth forwarding (i.e., forwarding
 # packets without touching the ttl).  This can be useful to hide firewalls
 # from traceroute and similar tools.
@@ -640,6 +658,7 @@ options 	IPFIREWALL_VERBOSE	#enable logging to syslogd(8)
 options 	IPFIREWALL_VERBOSE_LIMIT=100	#limit verbosity
 options 	IPFIREWALL_DEFAULT_TO_ACCEPT	#allow everything by default
 options		IPFIREWALL_FORWARD	#packet destination changes
+options		IPFIREWALL_FORWARD_EXTENDED	#all packet dest changes
 options 	IPV6FIREWALL		#firewall for IPv6
 options 	IPV6FIREWALL_VERBOSE
 options 	IPV6FIREWALL_VERBOSE_LIMIT=100
@@ -1189,11 +1208,13 @@ device		splash			# Splash screen and screen saver support
 # Various screen savers.
 device		blank_saver
 device		daemon_saver
+device		dragon_saver
 device		fade_saver
 device		fire_saver
 device		green_saver
 device		logo_saver
 device		rain_saver
+device		snake_saver
 device		star_saver
 device		warp_saver
 
@@ -1844,6 +1865,7 @@ device		sound
 #
 # snd_als4000:		Avance Logic ALS4000 PCI.
 # snd_ad1816:		Analog Devices AD1816 ISA PnP/non-PnP.
+# snd_audiocs:		Crystal Semiconductor CS4231 SBus/EBus.
 # snd_cmi:		CMedia CMI8338/CMI8738 PCI.
 # snd_cs4281:		Crystal Semiconductor CS4281 PCI.
 # snd_csa:		Crystal Semiconductor CS461x/428x PCI. (except
@@ -1877,6 +1899,7 @@ device		sound
 device		"snd_ad1816"
 device		"snd_als4000"
 #device		"snd_au88x0"
+#device		snd_audiocs
 device		snd_cmi
 device		"snd_cs4281"
 device		snd_csa
@@ -1901,6 +1924,15 @@ device		"snd_via82c686"
 device		snd_vibes
 #device		"snd_vortex1"
 device		snd_uaudio
+
+#
+# IEEE-488 hardware:
+#	pcii:	PCIIA cards (uPD7210 based isa cards)
+device pcii
+hint.pcii.0.at="isa"
+hint.pcii.0.port="0x2e1"
+hint.pcii.0.irq="5"
+hint.pcii.0.drq="1"
 
 # For non-pnp sound cards:
 hint.pcm.0.at="isa"
@@ -2193,7 +2225,7 @@ options 	HW_WDOG
 options 	SW_WATCHDOG
 
 #
-# Disable swapping of upages and stack pages.  This option removes all
+# Disable swapping of stack pages.  This option removes all
 # code which actually performs swapping, so it's not possible to turn
 # it back on at run-time.
 #
@@ -2283,6 +2315,11 @@ device		aue
 
 device		axe
 
+#
+# Devices which communicate using Ethernet over USB, particularly
+# Communication Device Class (CDC) Ethernet specification. Supports
+# Sharp Zaurus PDAs, some DOCSIS cable modems and so on.
+device		cdce
 #
 # CATC USB-EL1201A USB ethernet. Supports the CATC Netmate
 # and Netmate II, and the Belkin F5U111.

@@ -5,7 +5,7 @@
 #define	STG_STATICS
 #define	STG_IO_CONTROL_FLAGS	(STG_FIFO_INTERRUPTS | STG_WAIT_FOR_SELECT)
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30.c,v 1.12 2004/07/10 21:14:20 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30.c,v 1.12.2.1 2005/01/30 01:00:06 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

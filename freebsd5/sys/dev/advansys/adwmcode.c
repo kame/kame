@@ -1,4 +1,4 @@
-/*
+/*-
  * Downloadable microcode for Second Generation
  * Advanced Systems Inc. SCSI controllers
  *
@@ -16,7 +16,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/advansys/adwmcode.c,v 1.4 2003/08/24 17:48:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adwmcode.c,v 1.4.4.1 2005/01/30 00:59:23 imp Exp $");
 
 #include <sys/param.h>
 

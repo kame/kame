@@ -59,7 +59,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -87,7 +87,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/cia.c,v 1.43 2004/07/01 15:07:27 gallatin Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/cia.c,v 1.43.2.1 2005/01/30 00:59:12 imp Exp $");
 
 #include "opt_cpu.h"
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pcivar.h,v 1.64 2004/04/07 20:45:58 imp Exp $
+ * $FreeBSD: src/sys/dev/pci/pcivar.h,v 1.64.2.1 2005/01/30 00:59:58 imp Exp $
  *
  */
 

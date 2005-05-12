@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)radix.h	8.2 (Berkeley) 10/31/94
- * $FreeBSD: src/sys/net/radix.h,v 1.25 2004/04/18 11:48:35 luigi Exp $
+ * $FreeBSD: src/sys/net/radix.h,v 1.25.2.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _RADIX_H_

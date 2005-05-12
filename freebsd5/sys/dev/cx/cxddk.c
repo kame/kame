@@ -1,4 +1,4 @@
-/*
+/*-
  * Cronyx-Sigma Driver Development Kit.
  *
  * Copyright (C) 1998 Cronyx Engineering.
@@ -17,7 +17,7 @@
  * Cronyx Id: cxddk.c,v 1.1.2.2 2003/11/27 14:24:50 rik Exp $
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/cx/cxddk.c,v 1.1 2003/12/03 07:29:38 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/cx/cxddk.c,v 1.1.6.1 2005/01/30 00:59:34 imp Exp $");
 
 #include <dev/cx/machdep.h>
 #include <dev/cx/cxddk.h>

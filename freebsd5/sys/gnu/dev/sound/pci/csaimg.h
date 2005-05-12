@@ -1,4 +1,5 @@
-/****************************************************************************
+/*-
+ ****************************************************************************
  * "CWCIMAGE.H"-- For CS46XX. Ver 1.04
  *      Copyright 1998-2001 (c) Cirrus Logic Corp.
  *      Version 1.04
@@ -18,7 +19,7 @@
  *     Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139,
  *     USA.
  *
- * $FreeBSD: src/sys/gnu/dev/sound/pci/csaimg.h,v 1.1 2001/05/30 22:28:30 cg Exp $
+ * $FreeBSD: src/sys/gnu/dev/sound/pci/csaimg.h,v 1.1.10.1 2005/01/31 23:26:01 imp Exp $
  *
  ***************************************************************************/
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Poul-Henning Kamp.
  * Copyright (c) 1995 Jason R. Thorpe.
  * Copyright (c) 1990, 1993
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_ccd.c,v 1.152 2004/08/08 07:57:51 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_ccd.c,v 1.152.2.1 2005/01/31 23:26:00 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/kern.mk,v 1.42 2004/05/14 13:35:46 cognet Exp $
+# $FreeBSD: src/sys/conf/kern.mk,v 1.42.2.1 2005/03/16 18:54:36 obrien Exp $
 
 #
 # Warning flags for compiling the kernel and components of the kernel.
@@ -28,7 +28,8 @@ CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 # cache tag lines)
 #
 .if ${MACHINE_ARCH} == "i386" && ${CC} != "icc"
-CFLAGS+=	-mno-align-long-strings -mpreferred-stack-boundary=2
+CFLAGS+=	-mno-align-long-strings -mpreferred-stack-boundary=2 \
+		-mno-mmx -mno-3dnow -mno-sse -mno-sse2
 INLINE_LIMIT?=	8000
 .endif
 

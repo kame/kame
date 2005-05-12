@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/owi/if_wireg.h,v 1.1 2003/08/24 05:42:49 imp Exp $
+ * $FreeBSD: src/sys/dev/owi/if_wireg.h,v 1.1.4.1 2005/01/30 00:59:56 imp Exp $
  */
 
 #define WI_DELAY	5

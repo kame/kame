@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.15 2004/06/16 09:46:45 phk Exp $
+ * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.15.2.1 2005/02/27 20:55:46 mdodd Exp $
  */
 
 /*
@@ -126,6 +126,8 @@ struct ida_access {
 struct ida_softc {
 	device_t	dev;
 	int		unit;
+
+	struct callout	ch;
 	struct cdev *ida_dev_t;
 
 	int		regs_res_type;
@@ -152,6 +154,8 @@ struct ida_softc {
 	int		num_drives;
 	int		num_qcbs;
 	int		flags;
+
+	int		qactive;
 
 	struct		ida_hardware_qcb *hwqcbs;	/* HW QCB array */
 	struct		ida_qcb *qcbs;			/* kernel QCB array */

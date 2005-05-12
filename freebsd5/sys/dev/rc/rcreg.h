@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1995 by Pavel Antonov, Moscow, Russia.
  * Copyright (C) 1995 by Andrey A. Chernov, Moscow, Russia.
  * Copyright (C) 2002 by John Baldwin <jhb@FreeBSD.org>
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rc/rcreg.h,v 1.5 2002/10/23 15:53:09 jhb Exp $
+ * $FreeBSD: src/sys/dev/rc/rcreg.h,v 1.5.8.1 2005/01/30 00:59:59 imp Exp $
  */
 
 /*

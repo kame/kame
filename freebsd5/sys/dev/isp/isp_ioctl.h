@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/isp/isp_ioctl.h,v 1.11 2004/02/07 03:43:27 mjacob Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/isp/isp_ioctl.h,v 1.11.2.1 2005/01/30 00:59:47 imp Exp $ */
+/*-
  * Copyright (c) 2001 by Matthew Jacob
  *
  * Redistribution and use in source and binary forms, with or without

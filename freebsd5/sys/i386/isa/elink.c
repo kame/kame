@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994 Charles Hannum.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/elink.c,v 1.12 2003/06/02 16:32:54 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/elink.c,v 1.12.4.1 2005/01/31 23:26:05 imp Exp $");
 
 /*
  * Common code for dealing with 3COM ethernet cards.

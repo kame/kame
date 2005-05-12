@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/prof_machdep.c,v 1.21 2004/05/26 09:43:37 bde Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/prof_machdep.c,v 1.21.2.1 2005/02/27 21:43:15 obrien Exp $");
 
 #ifdef GUPROF
 #if 0
@@ -49,11 +49,7 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/prof_machdep.c,v 1.21 2004/05/26 09:43:3
 
 #include <machine/asmacros.h>
 
-#ifdef PC98
-#include <pc98/pc98/pc98.h>
-#else
 #include <i386/isa/isa.h>
-#endif
 #include <i386/isa/timerreg.h>
 
 #ifdef GUPROF

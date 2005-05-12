@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993, David Greenman
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/imgact_shell.c,v 1.26 2003/06/11 00:56:54 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/imgact_shell.c,v 1.26.4.3 2005/03/02 00:00:13 gad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,7 +73,27 @@ exec_shell_imgact(imgp)
 	/*
 	 * Find end of line; return if the line > MAXSHELLCMDLEN long.
 	 */
+#define	REL4_SCRIPT_OPTIONS  1
+#if REL4_SCRIPT_OPTIONS
+	/*
+	 * XXX - This behavior is not correct, but it matches what FreeBSD
+	 * has being doing since March 2000 (3.5-release, and all of the
+	 * 4.x releases), so we will continue to go with it for 5.4-release.
+	 * This behavior will certainly be changed before 6.0-release, and
+	 * might change for 5.5-release.
+	 */ 
 	for (ihp = &image_header[2]; *ihp != '\n' && *ihp != '#'; ++ihp) {
+#else
+	/*
+	 * XXX - This behavior is closer to correct, but it requires a
+	 * change to /bin/sh which is not ready yet, and which will also
+	 * require making another incompatible change here.  We will
+	 * not have all that tested in time for 5.4-release.  But this
+	 * is left here as a compile-time option, because attempting to
+	 * parse-out the comments causes a problem for some users.
+	 */ 
+	for (ihp = &image_header[2]; *ihp != '\n'; ++ihp) {
+#endif
 		if (ihp >= &image_header[MAXSHELLCMDLEN])
 			return(ENAMETOOLONG);
 	}

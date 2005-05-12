@@ -4,7 +4,7 @@
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
 #
-# $FreeBSD: src/sys/i386/conf/NOTES,v 1.1168.2.1.2.1 2004/10/24 18:02:52 scottl Exp $
+# $FreeBSD: src/sys/i386/conf/NOTES,v 1.1168.2.5.2.2 2005/05/01 05:38:13 dwhite Exp $
 #
 
 #
@@ -56,6 +56,16 @@ device		apic			# I/O apic
 # Optional:
 options		MPTABLE_FORCE_HTT	# Enable HTT CPUs with the MP Table
 options 	NO_MIXED_MODE		# Disable use of mixed mode
+
+#
+# Watchdog routines.
+#
+options 	MP_WATCHDOG
+
+# Debugging options.
+#
+options		KDB_STOP_NMI		# Stop CPUS using NMI instead of IPI
+
 
 
 #####################################################################
@@ -431,8 +441,6 @@ options 	TDFX_LINUX		# Enable Linuxulator support
 # Intel ACPICA code.  (Note that the Intel code must also have USE_DEBUGGER
 # defined when it is built).
 #
-# ACPI_MAX_THREADS sets the number of task threads started.
-#
 # ACPI_NO_SEMAPHORES makes the AcpiOs*Semaphore routines a no-op.
 #
 # ACPICA_PEDANTIC enables strict checking of AML.  Our default is to
@@ -444,7 +452,6 @@ options 	TDFX_LINUX		# Enable Linuxulator support
 
 device		acpi
 options 	ACPI_DEBUG
-options 	ACPI_MAX_THREADS=1
 #!options 	ACPI_NO_SEMAPHORES
 #!options 	ACPICA_PEDANTIC
 
@@ -588,6 +595,12 @@ device		ath_hal		# Atheros HAL (includes binary component)
 # ATA raid adapters
 #
 device		pst
+
+#
+# Areca 11xx and 12xx series of SATA II RAID controllers.
+# CAM is required.
+#
+device		arcmsr		# Areca SATA II RAID
 
 #
 # 3ware 9000 series PATA/SATA RAID controller driver and options.
@@ -1065,3 +1078,7 @@ options 	VM_KMEM_SIZE_SCALE
 
 # The I/O device
 device		io
+
+# asr old ioctls support, needed by raidutils
+
+options		ASR_COMPAT

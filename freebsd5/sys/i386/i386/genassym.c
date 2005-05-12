@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/genassym.c,v 1.148 2004/05/23 16:50:55 bde Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/genassym.c,v 1.148.2.1.2.1 2005/04/18 21:36:16 peter Exp $");
 
 #include "opt_apic.h"
 #include "opt_compat.h"
@@ -50,8 +50,8 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/genassym.c,v 1.148 2004/05/23 16:50:55 bde
 #include <sys/mutex.h>
 #include <sys/socket.h>
 #include <sys/resourcevar.h>
+#include <sys/signalvar.h>
 #include <sys/ucontext.h>
-#include <sys/user.h>
 #include <machine/bootinfo.h>
 #include <machine/tss.h>
 #include <sys/vmmeter.h>
@@ -59,7 +59,6 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/genassym.c,v 1.148 2004/05/23 16:50:55 bde
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
-#include <sys/user.h>
 #include <sys/proc.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -71,6 +70,7 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/genassym.c,v 1.148 2004/05/23 16:50:55 bde
 #include <machine/apicreg.h>
 #endif
 #include <machine/cpu.h>
+#include <machine/pcb.h>
 #include <machine/sigframe.h>
 #include <machine/vm86.h>
 #include <machine/proc.h>
@@ -79,7 +79,6 @@ ASSYM(P_VMSPACE, offsetof(struct proc, p_vmspace));
 ASSYM(VM_PMAP, offsetof(struct vmspace, vm_pmap));
 ASSYM(PM_ACTIVE, offsetof(struct pmap, pm_active));
 ASSYM(P_SFLAG, offsetof(struct proc, p_sflag));
-ASSYM(P_UAREA, offsetof(struct proc, p_uarea));
 
 ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
@@ -96,7 +95,6 @@ ASSYM(V_TRAP, offsetof(struct vmmeter, v_trap));
 ASSYM(V_SYSCALL, offsetof(struct vmmeter, v_syscall));
 ASSYM(V_INTR, offsetof(struct vmmeter, v_intr));
 /* ASSYM(UPAGES, UPAGES);*/
-ASSYM(UAREA_PAGES, UAREA_PAGES);
 ASSYM(KSTACK_PAGES, KSTACK_PAGES);
 ASSYM(PAGE_SIZE, PAGE_SIZE);
 ASSYM(NPTEPG, NPTEPG);
@@ -136,7 +134,7 @@ ASSYM(PCB_PSL, offsetof(struct pcb, pcb_psl));
 ASSYM(PCB_DBREGS, PCB_DBREGS);
 ASSYM(PCB_EXT, offsetof(struct pcb, pcb_ext));
 
-ASSYM(PCB_SPARE, offsetof(struct pcb, __pcb_spare));
+ASSYM(PCB_VM86, offsetof(struct pcb, pcb_vm86));
 ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
 ASSYM(PCB_SAVEFPU, offsetof(struct pcb, pcb_save));
 ASSYM(PCB_SAVEFPU_SIZE, sizeof(union savefpu));

@@ -1,9 +1,9 @@
-# $FreeBSD: src/sys/modules/sppp/Makefile,v 1.5 2002/06/17 05:40:49 jhay Exp $
+# $FreeBSD: src/sys/modules/sppp/Makefile,v 1.5.10.1 2005/01/25 16:26:25 rik Exp $
 
 .PATH: ${.CURDIR}/../../net
 
 KMOD=	sppp
-SRCS=	if_spppsubr.c slcompress.c
+SRCS=	if_spppfr.c if_spppsubr.c slcompress.c
 SRCS+=	opt_inet.h opt_inet6.h opt_ipx.h
 
 EXPORT_SYMS=	sppp_attach	\

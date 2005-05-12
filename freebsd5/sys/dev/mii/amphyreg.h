@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/amphyreg.h,v 1.1 1999/09/06 05:27:55 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/amphyreg.h,v 1.1.26.1 2005/01/30 00:59:53 imp Exp $
  */
 
 #ifndef _DEV_MII_AMTPHYREG_H_

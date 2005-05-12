@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/cam/scsi/scsi_dvcfg.h,v 1.1 2000/10/23 12:55:27 non Exp $	*/
+/*	$FreeBSD: src/sys/cam/scsi/scsi_dvcfg.h,v 1.1.10.1 2005/01/30 00:59:16 imp Exp $	*/
 /*	$NecBSD: scsi_dvcfg.h,v 1.4 1998/03/14 07:05:06 kmatsuda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1994, 1995, 1996, 1997, 1998
  *	NetBSD/pc98 porting staff. All rights reserved.

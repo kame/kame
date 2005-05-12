@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/vm86bios.s,v 1.30 2003/03/30 05:24:52 jake Exp $
+ * $FreeBSD: src/sys/i386/i386/vm86bios.s,v 1.30.10.1 2005/04/18 21:36:17 peter Exp $
  */
 
 #include "opt_npx.h"
@@ -38,8 +38,8 @@
 #define SCR_STACK	PCB_ESP
 #define SCR_PGTABLE	PCB_EBX
 #define SCR_ARGFRAME	PCB_EIP
-#define SCR_TSS0	PCB_SPARE
-#define SCR_TSS1	(PCB_SPARE+4)
+#define SCR_TSS0	PCB_VM86
+#define SCR_TSS1	(PCB_VM86+4)
 
 	.data
 	ALIGN_DATA

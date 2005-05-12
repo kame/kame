@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Dmitry Dicky diwil@dataart.com
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.23 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.23.2.2 2005/01/30 01:00:04 imp Exp $");
 
 #define PCI_VENDOR_FORTEMEDIA	0x1319
 #define PCI_DEVICE_FORTEMEDIA1	0x08011319
@@ -334,7 +334,8 @@ fm801ch_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->channel = c;
 	ch->buffer = b;
 	ch->dir = dir;
-	if (sndbuf_alloc(ch->buffer, fm801->parent_dmat, fm801->bufsz) == -1) return NULL;
+	if (sndbuf_alloc(ch->buffer, fm801->parent_dmat, fm801->bufsz) != 0)
+		return NULL;
 	return (void *)ch;
 }
 

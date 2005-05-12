@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2001 Jason Evans <jasone@freebsd.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_sx.c,v 1.24 2004/02/27 16:13:44 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_sx.c,v 1.24.2.1 2005/01/31 23:26:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

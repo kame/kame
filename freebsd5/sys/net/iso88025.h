@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998, Larry Lile
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/iso88025.h,v 1.13 2003/03/15 23:55:33 mdodd Exp $
+ * $FreeBSD: src/sys/net/iso88025.h,v 1.13.6.1 2005/01/31 23:26:23 imp Exp $
  *
  * Information gathered from tokenring@freebsd, /sys/net/ethernet.h and
  * the Mach token ring driver.

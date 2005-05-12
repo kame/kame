@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.ORG> wrote this file.  As long as you retain this notice you
@@ -8,7 +8,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_disk.c,v 1.80 2003/10/18 17:27:10 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_disk.c,v 1.80.4.2 2005/01/31 23:26:17 imp Exp $");
 
 #include "opt_geom.h"
 
@@ -101,6 +101,13 @@ bioq_flush(struct bio_queue_head *head, struct devstat *stp, int error)
 		bioq_remove(head, bp);
 		biofinish(bp, stp, error);
 	}
+}
+
+void
+bioq_insert_head(struct bio_queue_head *head, struct bio *bp)
+{
+
+	TAILQ_INSERT_HEAD(&head->queue, bp, bio_queue);
 }
 
 void

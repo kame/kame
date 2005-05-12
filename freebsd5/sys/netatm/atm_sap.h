@@ -1,4 +1,4 @@
-/*
+/*-
  *
  * ===================================
  * HARP  |  Host ATM Research Platform
@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_sap.h,v 1.2 1999/08/28 00:48:37 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_sap.h,v 1.2.26.1 2005/01/31 23:26:25 imp Exp $
  *
  */
 

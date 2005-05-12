@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Adrian Chadd
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -36,7 +36,7 @@
  *
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  *
- * $FreeBSD: src/sys/fs/procfs/procfs_rlimit.c,v 1.9 2004/02/04 21:52:54 jhb Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_rlimit.c,v 1.9.2.1 2005/01/31 23:25:58 imp Exp $
  */
 
 /*

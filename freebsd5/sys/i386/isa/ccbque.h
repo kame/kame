@@ -1,5 +1,5 @@
 /*	$NetBSD$	*/
-/*
+/*-
  * [NetBSD for NEC PC98 series]
  *  Copyright (c) 1994, 1995, 1996 NetBSD/pc98 porting staff.
  *  All rights reserved.
@@ -27,7 +27,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/ccbque.h,v 1.9 2002/03/20 07:39:47 alfred Exp $
+ * $FreeBSD: src/sys/i386/isa/ccbque.h,v 1.9.8.1 2005/01/31 23:26:05 imp Exp $
  */
 /*
  * Common command control queue funcs.

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -29,11 +29,11 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/ciphy.c,v 1.1.2.1 2004/09/14 21:22:33 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/ciphy.c,v 1.1.2.2 2005/01/30 00:59:54 imp Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/ciphy.c,v 1.1.2.1 2004/09/14 21:22:33 wpaul Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/ciphy.c,v 1.1.2.2 2005/01/30 00:59:54 imp Exp $");
 
 /*
  * Driver for the Cicada CS8201 10/100/1000 copper PHY.

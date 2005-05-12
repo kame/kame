@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, David Greenman
  * Copyright (c) 2001 Jonathan Lemon <jlemon@freebsd.org>
  * All rights reserved.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpreg.h,v 1.35 2003/05/14 20:33:41 mux Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpreg.h,v 1.35.6.1 2005/01/30 00:59:42 imp Exp $
  */
 
 #define FXP_VENDORID_INTEL	0x8086

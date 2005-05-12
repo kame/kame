@@ -23,12 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/locore.S,v 1.35 2004/08/07 21:55:15 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/locore.S,v 1.35.2.1 2004/11/09 03:40:51 marcel Exp $
  */
 
 #include <machine/asm.h>
 #include <machine/ia64_cpu.h>
-#include <machine/fpu.h>
 #include <machine/pte.h>
 #include <sys/syscall.h>
 #include <assym.s>
@@ -50,7 +49,7 @@ kstack:	.space KSTACK_PAGES * PAGE_SIZE
  * The EFI loader passes the physical address of the bootinfo block in
  * register r8.
  */
-ENTRY(__start, 1)
+ENTRY_NOPROFILE(__start, 1)
 	.prologue
 	.save	rp,r0
 	.body
@@ -155,7 +154,7 @@ END(fork_trampoline)
  * and issuing the EOI to the local SAPIC.
  */
 	.align	32
-ENTRY(os_boot_rendez,0)
+ENTRY_NOPROFILE(os_boot_rendez,0)
 	mov	r16=cr.ivr	// clear IRR bit
 	;;
 	srlz.d

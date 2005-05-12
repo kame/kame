@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.34.2.1 2004/09/02 06:12:19 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.34.2.2 2005/01/30 00:59:12 imp Exp $");
 
 #include "opt_isa.h"
 

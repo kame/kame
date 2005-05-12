@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_clock.c,v 1.172 2004/07/10 21:36:01 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_clock.c,v 1.172.2.3 2005/03/01 09:30:16 obrien Exp $");
 
 #include "opt_ntp.h"
 #include "opt_watchdog.h"
@@ -418,6 +418,8 @@ statclock(frame)
 				cp_time[CP_IDLE]++;
 		}
 	}
+	CTR4(KTR_SCHED, "statclock: %p(%s) prio %d stathz %d",
+	    td, td->td_proc->p_comm, td->td_priority, (stathz)?stathz:hz);
 
 	sched_clock(td);
 

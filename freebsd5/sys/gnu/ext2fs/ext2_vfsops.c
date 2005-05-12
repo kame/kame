@@ -1,10 +1,10 @@
-/*
+/*-
  *  modified for EXT2FS support in Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  */
-/*	
+/*-
  * Copyright (c) 1989, 1991, 1993, 1994	
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.126 2004/07/30 22:08:51 phk Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.126.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 #include <sys/param.h>

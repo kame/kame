@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ia64/disasm/disasm_extract.c,v 1.1 2003/10/23 06:01:52 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ia64/disasm/disasm_extract.c,v 1.1.4.1 2005/01/31 23:26:13 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,6 +1,6 @@
-/* $FreeBSD: src/sys/alpha/mcbus/mcpciareg.h,v 1.2 2001/02/13 22:44:21 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/mcbus/mcpciareg.h,v 1.2.8.1 2005/01/30 00:59:11 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 2000 by Matthew Jacob
  *
  * Redistribution and use in source and binary forms, with or without

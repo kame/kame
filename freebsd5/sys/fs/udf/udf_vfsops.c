@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf_vfsops.c,v 1.20 2004/07/30 22:08:51 phk Exp $
+ * $FreeBSD: src/sys/fs/udf/udf_vfsops.c,v 1.20.2.1 2005/02/25 17:59:45 rwatson Exp $
  */
 
 /* udf_vfsops.c */
@@ -550,7 +550,6 @@ udf_root(struct mount *mp, struct vnode **vpp, struct thread *td)
 
 	vp = *vpp;
 	vp->v_vflag |= VV_ROOT;
-	udfmp->root_vp = vp;
 
 	return (0);
 }

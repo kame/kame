@@ -38,9 +38,9 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/ia64/ia64/vm_machdep.c,v 1.84 2004/05/26 12:09:37 tmm Exp $
+ * $FreeBSD: src/sys/ia64/ia64/vm_machdep.c,v 1.84.2.2 2005/02/05 01:02:50 das Exp $
  */
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -85,6 +85,7 @@
 #include <machine/cpu.h>
 #include <machine/fpu.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -93,8 +94,6 @@
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
 #include <vm/vm_extern.h>
-
-#include <sys/user.h>
 
 #include <i386/include/psl.h>
 

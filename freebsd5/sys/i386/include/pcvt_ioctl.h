@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 2000 Hellmuth Michaelis
  * Copyright (c) 1992, 1995 Joerg Wunsch.
  * Copyright (c) 1992, 1993 Brian Dunford-Shore and Holger Veit.
@@ -49,7 +49,7 @@
  *
  *	Last Edit-Date: [Fri Mar 31 10:22:29 2000]
  *
- * $FreeBSD: src/sys/i386/include/pcvt_ioctl.h,v 1.16 2003/12/10 02:49:16 obrien Exp $
+ * $FreeBSD: src/sys/i386/include/pcvt_ioctl.h,v 1.16.2.1 2005/01/31 23:26:04 imp Exp $
  * 
  *---------------------------------------------------------------------------*/
 

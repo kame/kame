@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.43 2004/06/10 20:30:56 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.43.2.1 2005/01/07 20:36:00 jhb Exp $");
 
 #include "opt_kbd.h"
 #include "opt_atkbd.h"
@@ -1117,7 +1117,8 @@ probe_keyboard(KBDC kbdc, int flags)
 	 * to set the command byte to particular values.
 	 */
 	test_controller(kbdc);
-	test_kbd_port(kbdc);
+	if (!(flags & KB_CONF_NO_PROBE_TEST))
+		test_kbd_port(kbdc);
 
 	err = get_kbd_echo(kbdc);
 

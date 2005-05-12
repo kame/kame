@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.13 2003/12/08 07:59:18 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.13.2.1 2005/03/02 10:27:35 obrien Exp $");
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -53,7 +53,6 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.13 2003/12/08 07:59:18 obr
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/vnode.h>
 
 #ifdef __FreeBSD__
 
@@ -61,14 +60,15 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.13 2003/12/08 07:59:18 obr
 #include <machine/clock.h>              /* for DELAY */
 #include <pci/pcivar.h>
 #else
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#include <sys/selinfo.h>
 #include <dev/pci/pcivar.h>
 #endif
 
-#if (__FreeBSD_version >=300000)
 #include <machine/bus_memio.h>		/* for bus space */
 #include <machine/bus.h>
 #include <sys/bus.h>
-#endif
 #endif
 
 #ifdef __NetBSD__

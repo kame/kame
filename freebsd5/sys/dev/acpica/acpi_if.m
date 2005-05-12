@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 2004 Nate Lawson
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/acpica/acpi_if.m,v 1.2 2004/07/15 16:29:08 njl Exp $
+# $FreeBSD: src/sys/dev/acpica/acpi_if.m,v 1.2.2.1 2005/01/29 19:52:39 njl Exp $
 #
 
 #include <sys/bus.h>
@@ -106,6 +106,26 @@ METHOD ACPI_STATUS evaluate_object {
 	ACPI_STRING 	pathname;
 	ACPI_OBJECT_LIST *parameters;
 	ACPI_BUFFER	*ret;
+};
+
+#
+# Get the highest power state (D0-D3) that is usable for a device when
+# suspending/resuming.  If a bus calls this when suspending a device, it
+# must also call it when resuming.
+#
+# device_t bus:  parent bus for the device
+#
+# device_t dev:  check this device's appropriate power state
+#
+# int *dstate:  if successful, contains the highest valid sleep state
+#
+# Returns:  0 on success, ESRCH if device has no special state, or
+#   some other error value.
+#
+METHOD int pwr_for_sleep {
+	device_t	bus;
+	device_t	dev;
+	int		*dstate;
 };
 
 #

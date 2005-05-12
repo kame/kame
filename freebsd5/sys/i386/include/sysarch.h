@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.20 2004/04/07 20:46:05 imp Exp $
+ * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.20.2.1.2.1 2005/04/27 17:53:47 peter Exp $
  */
 
 /*
@@ -43,6 +43,16 @@
 #define I386_SET_IOPERM	4
 				/* xxxxx */
 #define I386_VM86	6
+#define I386_GET_FSBASE	7
+#define I386_SET_FSBASE	8
+#define I386_GET_GSBASE	9
+#define I386_SET_GSBASE	10
+
+/* These four only exist when running an i386 binary on amd64 */
+#define	_AMD64_GET_FSBASE	128
+#define	_AMD64_SET_FSBASE	129
+#define	_AMD64_GET_GSBASE	130
+#define	_AMD64_SET_GSBASE	131
 
 struct i386_ldt_args {
 	unsigned int start;
@@ -68,11 +78,20 @@ union descriptor;
 struct dbreg;
 
 __BEGIN_DECLS
+/* These four only exist when running an i386 binary on amd64 */
+int _amd64_get_fsbase(void **);
+int _amd64_get_gsbase(void **);
+int _amd64_set_fsbase(void *);
+int _amd64_set_gsbase(void *);
 int i386_get_ldt(int, union descriptor *, int);
 int i386_set_ldt(int, union descriptor *, int);
 int i386_get_ioperm(unsigned int, unsigned int *, int *);
 int i386_set_ioperm(unsigned int, unsigned int, int);
 int i386_vm86(int, void *);
+int i386_get_fsbase(void **);
+int i386_get_gsbase(void **);
+int i386_set_fsbase(void *);
+int i386_set_gsbase(void *);
 int i386_set_watch(int, unsigned int, int, int, struct dbreg *);
 int i386_clr_watch(int, struct dbreg *);
 int sysarch(int, void *);

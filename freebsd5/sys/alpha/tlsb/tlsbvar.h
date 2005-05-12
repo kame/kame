@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/tlsb/tlsbvar.h,v 1.4 2000/01/29 16:40:17 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/tlsbvar.h,v 1.4.26.1 2005/01/30 00:59:12 imp Exp $ */
 /* $NetBSD: tlsbvar.h,v 1.5 1998/05/13 23:23:23 thorpej Exp $ */
 
-/*
+/*-
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.14 2004/05/06 09:35:57 das Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.14.2.1 2005/02/05 01:02:47 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -34,7 +34,6 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.14 2004/05/06 09:35:57 
 #include <sys/proc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/user.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -47,6 +46,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.14 2004/05/06 09:35:57 
 #include <machine/fpu.h>
 #include <machine/inst.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/reg.h>
 
 #include <alpha/alpha/ieee_float.h>

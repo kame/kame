@@ -1,10 +1,10 @@
-/*
+/*-
  * (C) 1997 Luigi Rizzo (luigi@iet.unipi.it)
  *
  * This file contains information and macro definitions for
  * the ad1816 chip
  *
- * $FreeBSD: src/sys/dev/sound/isa/ad1816.h,v 1.1 1999/09/28 20:00:06 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/ad1816.h,v 1.1.12.1 2005/01/30 01:00:03 imp Exp $
  */
 
 /* AD1816 register macros */

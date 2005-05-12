@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 1999 Nicolas Souchu
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/ppbus/ppbus_if.m,v 1.2 2000/04/08 14:17:03 dfr Exp $
+# $FreeBSD: src/sys/dev/ppbus/ppbus_if.m,v 1.2.8.1 2005/01/30 00:59:58 imp Exp $
 #
 
 #include <sys/bus.h>

@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright (c) Comtrol Corporation <support@comtrol.com>
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rp/rpvar.h,v 1.6 2004/07/11 15:18:37 phk Exp $
+ * $FreeBSD: src/sys/dev/rp/rpvar.h,v 1.6.2.1 2005/01/30 01:00:00 imp Exp $
  */
 
 /*

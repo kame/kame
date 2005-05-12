@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.9 2004/01/28 08:02:15 truckman Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.9.2.1 2005/01/30 01:00:04 imp Exp $
  */
 
 #define SND_DMA(b) (sndbuf_getflags((b)) & SNDBUF_F_DMA)

@@ -1,6 +1,6 @@
 /*	$OpenBSD$	*/
 
-/*
+/*-
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
  * All rights reserved.
  *
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/rndtest/rndtest.c,v 1.4 2003/08/24 17:54:22 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/rndtest/rndtest.c,v 1.4.4.1 2005/01/30 01:00:00 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

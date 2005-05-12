@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.19 2004/01/18 19:29:04 yar Exp $
+ * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.19.2.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _NET_IF_VLAN_VAR_H_

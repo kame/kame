@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/gdb_machdep.c,v 1.1.2.1 2004/10/09 05:20:18 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/gdb_machdep.c,v 1.1.2.3 2005/02/14 08:18:16 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,15 +67,14 @@ gdb_cpu_getreg(int regnum, size_t *regsz)
 }
 
 void
-gdb_cpu_setreg(int regnum, register_t val)
+gdb_cpu_setreg(int regnum, void *val)
 {
 
-	val = __bswap32(val);
 	switch (regnum) {
 	case GDB_REG_PC:
-		kdb_thrctx->pcb_eip = val;
+		kdb_thrctx->pcb_eip = *(register_t *)val;
 		if (kdb_thread  == curthread)
-			kdb_frame->tf_eip = val;
+			kdb_frame->tf_eip = *(register_t *)val;
 	}
 }
 

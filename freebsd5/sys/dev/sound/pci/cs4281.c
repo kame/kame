@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
  *
@@ -37,7 +37,7 @@
 
 #include <dev/sound/pci/cs4281.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.20 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.20.2.1 2005/01/30 01:00:03 imp Exp $");
 
 #define CS4281_DEFAULT_BUFSZ 16384
 

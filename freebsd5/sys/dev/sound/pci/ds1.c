@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
@@ -33,7 +33,7 @@
 #include <dev/sound/pci/ds1.h>
 #include <dev/sound/pci/ds1-fw.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.40 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.40.2.2 2005/01/30 01:00:03 imp Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -490,7 +490,7 @@ ds1pchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel 
 	ch->fmt = AFMT_U8;
 	ch->spd = 8000;
 	ch->run = 0;
-	if (sndbuf_alloc(ch->buffer, sc->buffer_dmat, sc->bufsz) == -1)
+	if (sndbuf_alloc(ch->buffer, sc->buffer_dmat, sc->bufsz) != 0)
 		return NULL;
 	else {
 		ch->lsnum = sc->pslotfree;
@@ -621,7 +621,7 @@ ds1rchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel 
 	ch->dir = dir;
 	ch->fmt = AFMT_U8;
 	ch->spd = 8000;
-	if (sndbuf_alloc(ch->buffer, sc->buffer_dmat, sc->bufsz) == -1)
+	if (sndbuf_alloc(ch->buffer, sc->buffer_dmat, sc->bufsz) != 0)
 		return NULL;
 	else {
 		ch->slot = (ch->num == DS1_RECPRIMARY)? sc->rbank + 2: sc->rbank;

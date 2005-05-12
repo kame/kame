@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohci_pci.c,v 1.48 2004/08/04 12:18:39 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohci_pci.c,v 1.48.2.2 2005/01/30 00:59:41 imp Exp $
  */
 
 #define BOUNCE_BUFFER_TEST	0
@@ -239,8 +239,9 @@ fwohci_pci_init(device_t self)
 	cmd = pci_read_config(self, PCIR_COMMAND, 2);
 	cmd |= PCIM_CMD_MEMEN | PCIM_CMD_BUSMASTEREN | PCIM_CMD_MWRICEN |
 		PCIM_CMD_SERRESPEN | PCIM_CMD_PERRESPEN;
-#if 1
+#if 1  /* for broken hardware */
 	cmd &= ~PCIM_CMD_MWRICEN; 
+	cmd &= ~(PCIM_CMD_SERRESPEN | PCIM_CMD_PERRESPEN);
 #endif
 	pci_write_config(self, PCIR_COMMAND, cmd, 2);
 

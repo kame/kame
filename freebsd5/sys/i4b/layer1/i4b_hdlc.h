@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,15 +21,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_hdlc.h - software-HDLC header file
  *	--------------------------------------
  *
  *	$Id: i4b_hdlc.h,v 1.5 2000/08/28 07:41:19 hm Exp $
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_hdlc.h,v 1.5 2002/09/11 12:44:58 phk Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_hdlc.h,v 1.5.8.1 2005/01/31 23:26:09 imp Exp $
  *
  *	last edit-date: [Wed Jul 19 09:41:13 2000]
  *

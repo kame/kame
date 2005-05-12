@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/net/zlib.h,v 1.9 2002/05/29 20:24:09 phk Exp $	*/
+/* $FreeBSD: src/sys/net/zlib.h,v 1.9.8.1 2005/01/31 23:26:23 imp Exp $	*/
 
 /*
  * This file is derived from zlib.h and zconf.h from the zlib-1.0.4
@@ -16,7 +16,8 @@
 
 
 /* +++ zlib.h */
-/* zlib.h -- interface of the 'zlib' general purpose compression library
+/*-
+  zlib.h -- interface of the 'zlib' general purpose compression library
   version 1.0.4, Jul 24th, 1996.
 
   Copyright (C) 1995-1996 Jean-loup Gailly and Mark Adler
@@ -39,8 +40,8 @@
 
   Jean-loup Gailly        Mark Adler
   gzip@prep.ai.mit.edu    madler@alumni.caltech.edu
-
-
+*/
+/*
   The data format used by the zlib library is described by RFCs (Request for
   Comments) 1950 to 1952 in the files ftp://ds.internic.net/rfc/rfc1950.txt
   (zlib format), rfc1951.txt (deflate format) and rfc1952.txt (gzip format).

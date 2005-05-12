@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_mib.c,v 1.71 2004/04/05 21:03:34 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_mib.c,v 1.71.2.2 2005/03/03 00:46:31 wes Exp $");
 
 #include "opt_posix.h"
 
@@ -167,6 +167,15 @@ SYSCTL_PROC(_hw, HW_PHYSMEM, physmem, CTLTYPE_ULONG | CTLFLAG_RD,
 	0, 0, sysctl_hw_physmem, "LU", "");
 
 static int
+sysctl_hw_realmem(SYSCTL_HANDLER_ARGS)
+{
+	u_long val;
+	val = ctob(realmem);
+	return (sysctl_handle_long(oidp, &val, 0, req));
+}
+SYSCTL_PROC(_hw, HW_REALMEM, realmem, CTLTYPE_ULONG | CTLFLAG_RD,
+	0, 0, sysctl_hw_realmem, "LU", "");
+static int
 sysctl_hw_usermem(SYSCTL_HANDLER_ARGS)
 {
 	u_long val;
@@ -251,13 +260,12 @@ sysctl_kern_securelvl(SYSCTL_HANDLER_ARGS)
 
 	/*
 	 * If the process is in jail, return the maximum of the global and
-	 * local levels; otherwise, return the global level.
+	 * local levels; otherwise, return the global level.  Perform a
+	 * lockless read since the securelevel is an integer.
 	 */
-	if (pr != NULL) {
-		mtx_lock(&pr->pr_mtx);
+	if (pr != NULL)
 		level = imax(securelevel, pr->pr_securelevel);
-		mtx_unlock(&pr->pr_mtx);
-	} else
+	else
 		level = securelevel;
 	error = sysctl_handle_int(oidp, &level, 0, req);
 	if (error || !req->newptr)

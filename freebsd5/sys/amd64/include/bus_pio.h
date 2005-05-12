@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997 Justin Gibbs.
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/bus_pio.h,v 1.3 2003/05/12 02:44:37 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/bus_pio.h,v 1.3.6.1 2005/01/30 00:59:13 imp Exp $
  */
 
 #ifndef _AMD64_BUS_PIO_H_

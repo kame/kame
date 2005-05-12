@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.29 2004/05/30 20:08:34 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.29.2.1 2005/02/27 20:55:46 mdodd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,7 +74,13 @@ ida_v3_submit(struct ida_softc *ida, struct ida_qcb *qcb)
 static bus_addr_t
 ida_v3_done(struct ida_softc *ida)
 {
-	return (ida_inl(ida, R_DONE_FIFO));
+	bus_addr_t completed;
+
+	completed = ida_inl(ida, R_DONE_FIFO);
+	if (completed == -1) {
+		return (0);			/* fifo is empty */
+	}
+	return (completed);
 }
 
 static int
@@ -264,12 +270,21 @@ ida_pci_attach(device_t dev)
 		return (ENOMEM);
 	}
 
-	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
-	    /*boundary*/0, /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-	    /*highaddr*/BUS_SPACE_MAXADDR, /*filter*/NULL, /*filterarg*/NULL,
-	    /*maxsize*/MAXBSIZE, /*nsegments*/IDA_NSEG,
-	    /*maxsegsize*/BUS_SPACE_MAXSIZE_32BIT, /*flags*/BUS_DMA_ALLOCNOW,
-	    /*lockfunc*/NULL, /*lockarg*/NULL, &ida->parent_dmat);
+	error = bus_dma_tag_create(
+		/* parent	*/ NULL,
+		/* alignment	*/ 1,
+		/* boundary	*/ 0,
+		/* lowaddr	*/ BUS_SPACE_MAXADDR_32BIT,
+		/* highaddr	*/ BUS_SPACE_MAXADDR,
+		/* filter	*/ NULL,
+		/* filterarg	*/ NULL,
+		/* maxsize	*/ MAXBSIZE,
+		/* nsegments	*/ IDA_NSEG,
+		/* maxsegsize	*/ BUS_SPACE_MAXSIZE_32BIT,
+		/* flags	*/ BUS_DMA_ALLOCNOW,
+		/* lockfunc	*/ NULL,
+		/* lockarg	*/ NULL,
+		&ida->parent_dmat);
 	if (error != 0) {
 		device_printf(dev, "can't allocate DMA tag\n");
 		ida_free(ida);

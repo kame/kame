@@ -1,4 +1,4 @@
-/*
+/*-
  *********************************************************************
  *	FILE NAME  : amd.c
  *	     BY    : C.L. Huang 	(ching@tekram.com.tw)
@@ -30,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************
- * $FreeBSD: src/sys/dev/amd/amd.c,v 1.27 2004/05/30 20:08:25 phk Exp $
+ * $FreeBSD: src/sys/dev/amd/amd.c,v 1.27.2.1 2005/01/30 00:59:27 imp Exp $
  */
 
 /*

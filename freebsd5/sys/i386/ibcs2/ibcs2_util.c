@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994 Christos Zoulas
  * Copyright (c) 1995 Frank van der Linden
  * Copyright (c) 1995 Scott Bartram
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_util.c,v 1.17 2003/10/12 04:25:26 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_util.c,v 1.17.4.1 2005/01/31 23:26:03 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

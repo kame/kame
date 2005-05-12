@@ -1,4 +1,4 @@
-/*
+/*-
  * Product specific probe and attach routines for:
  *	aic7901 and aic7902 SCSI controllers
  *
@@ -46,7 +46,7 @@
 #include "aic79xx_inline.h"
 #else
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic79xx_pci.c,v 1.20.2.1 2004/09/02 15:31:21 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic79xx_pci.c,v 1.20.2.3 2005/02/16 23:38:34 gibbs Exp $");
 #include <dev/aic7xxx/aic79xx_osm.h>
 #include <dev/aic7xxx/aic79xx_inline.h>
 #endif
@@ -997,14 +997,14 @@ ahd_aic790X_setup(struct ahd_softc *ahd)
 
 		ahd->features |= AHD_RTI|AHD_NEW_IOCELL_OPTS
 			      |  AHD_NEW_DFCNTRL_OPTS|AHD_FAST_CDB_DELIVERY;
-		ahd->bugs |= AHD_LQOOVERRUN_BUG|AHD_EARLY_REQ_BUG
-			  |  AHD_BUSFREEREV_BUG;
+		ahd->bugs |= AHD_LQOOVERRUN_BUG|AHD_EARLY_REQ_BUG;
 
 		/*
 		 * Some issues have been resolved in the 7901B.
 		 */
 		if ((ahd->features & AHD_MULTI_FUNC) != 0)
-			ahd->bugs |= AHD_INTCOLLISION_BUG|AHD_ABORT_LQI_BUG;
+			ahd->bugs |= AHD_INTCOLLISION_BUG|AHD_ABORT_LQI_BUG
+				  |  AHD_BUSFREEREV_BUG;
 
 		/*
 		 * IO Cell paramter setup.

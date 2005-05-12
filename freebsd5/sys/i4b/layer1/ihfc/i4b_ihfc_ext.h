@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_ihfc_ext.h - ihfc common prototypes
  *	---------------------------------------
@@ -31,7 +32,7 @@
  *
  *      $Id: i4b_ihfc_ext.h,v 1.6 2000/08/20 07:14:08 hm Exp $
  *
- * $FreeBSD: src/sys/i4b/layer1/ihfc/i4b_ihfc_ext.h,v 1.1 2000/10/09 13:28:55 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/ihfc/i4b_ihfc_ext.h,v 1.1.10.1 2005/01/31 23:26:10 imp Exp $
  *
  *---------------------------------------------------------------------------*/
 

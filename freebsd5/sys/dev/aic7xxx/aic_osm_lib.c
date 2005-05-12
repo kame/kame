@@ -1,4 +1,4 @@
-/*
+/*-
  * FreeBSD OSM Library for the aic7xxx aic79xx based Adaptec SCSI controllers
  *
  * Copyright (c) 1994-2002 Justin T. Gibbs.
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic_osm_lib.c,v 1.3 2004/08/17 00:14:31 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic_osm_lib.c,v 1.3.2.1 2005/01/30 00:59:26 imp Exp $");
 
 static void	aic_recovery_thread(void *arg);
 

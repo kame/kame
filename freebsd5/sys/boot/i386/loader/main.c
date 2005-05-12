@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/i386/loader/main.c,v 1.29 2004/03/14 05:48:04 bde Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/i386/loader/main.c,v 1.29.2.1 2005/01/30 12:22:08 rwatson Exp $");
 
 /*
  * MD bootstrap main() and assorted miscellaneous
@@ -102,6 +102,8 @@ main(void)
 	setenv("console", "comconsole", 1);
     if (initial_howto & RB_MUTE)
 	setenv("console", "nullconsole", 1);
+    if (initial_howto & RB_MULTIPLE)
+	setenv("boot_multicons", "YES", 1);
     cons_probe();
 
     /*

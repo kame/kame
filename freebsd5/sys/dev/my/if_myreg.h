@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Myson Technology Inc.
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  *
  * Written by: yen_cw@myson.com.tw  available at: http://www.myson.com.tw/
  *
- * $FreeBSD: src/sys/dev/my/if_myreg.h,v 1.1 2002/04/04 05:22:13 julian Exp $
+ * $FreeBSD: src/sys/dev/my/if_myreg.h,v 1.1.10.1 2005/01/30 00:59:55 imp Exp $
  *
  * Myson MTD80x register definitions.
  *

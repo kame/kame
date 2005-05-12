@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/isp/ispmbox.h,v 1.46 2004/01/23 23:22:35 mjacob Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/isp/ispmbox.h,v 1.46.2.1 2005/01/30 00:59:48 imp Exp $ */
+/*-
  * Mailbox and Queue Entry Definitions for for Qlogic ISP SCSI adapters.
  *
  * Copyright (c) 1997, 1998, 1999, 2000 by Matthew Jacob

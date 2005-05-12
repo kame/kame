@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1996 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_mib.c,v 1.13 2003/10/31 18:32:08 brooks Exp $
+ * $FreeBSD: src/sys/net/if_mib.c,v 1.13.4.1.2.1 2005/05/06 02:51:10 cperciva Exp $
  */
 
 #include <sys/param.h>
@@ -90,6 +90,7 @@ sysctl_ifdata(SYSCTL_HANDLER_ARGS) /* XXX bad syntax! */
 		return ENOENT;
 
 	case IFDATA_GENERAL:
+		bzero(&ifmd, sizeof(ifmd));
 		strlcpy(ifmd.ifmd_name, ifp->if_xname, sizeof(ifmd.ifmd_name));
 
 #define COPY(fld) ifmd.ifmd_##fld = ifp->if_##fld

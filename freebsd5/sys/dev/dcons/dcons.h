@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2002
+/*-
+ * Copyright (C) 2002-2004
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -32,10 +32,10 @@
  * SUCH DAMAGE.
  * 
  * $Id: dcons.h,v 1.15 2003/10/23 15:05:31 simokawa Exp $
- * $FreeBSD: src/sys/dev/dcons/dcons.h,v 1.2 2004/02/16 07:25:46 simokawa Exp $
+ * $FreeBSD: src/sys/dev/dcons/dcons.h,v 1.2.2.2 2005/03/02 10:45:30 obrien Exp $
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_BOOT)
 #define	V volatile
 #else
 #define	V
@@ -74,7 +74,7 @@ struct dcons_ch {
 	u_int32_t size;
 	u_int32_t gen;
 	u_int32_t pos;
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_BOOT)
 	V u_int32_t *ptr;
 	V char *buf;
 #else
@@ -89,13 +89,18 @@ struct dcons_ch {
 #define STATE1		1
 #define STATE2		2
 
-#ifdef _KERNEL
-struct dcons_global {
-	struct consdev *cdev;
-	struct dcons_buf *buf;
-	size_t size;
-	bus_dma_tag_t dma_tag;
-	bus_dmamap_t dma_map;
+#if defined(_KERNEL) || defined(_BOOT)
+struct dcons_softc {
+        struct dcons_ch o, i;
+        int brk_state;
+#define DC_GDB  1
+        int flags;
+	void *dev;
 };
-extern struct dcons_global *dcons_conf;
+
+int	dcons_checkc(struct dcons_softc *);
+int	dcons_ischar(struct dcons_softc *);
+void	dcons_putc(struct dcons_softc *, int);
+int	dcons_load_buffer(struct dcons_buf *, int, struct dcons_softc *);
+void	dcons_init(struct dcons_buf *, int, struct dcons_softc *);
 #endif

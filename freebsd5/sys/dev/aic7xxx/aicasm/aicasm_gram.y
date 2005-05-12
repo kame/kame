@@ -1,5 +1,5 @@
 %{
-/*
+/*-
  * Parser for the Aic7xxx SCSI Host adapter sequencer assembler.
  *
  * Copyright (c) 1997, 1998, 2000 Justin T. Gibbs.
@@ -40,7 +40,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_gram.y#29 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_gram.y,v 1.23 2003/01/20 18:02:11 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_gram.y,v 1.23.6.1 2005/01/30 00:59:26 imp Exp $
  */
 
 #include <sys/types.h>

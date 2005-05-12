@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/ia64/include/asm.h,v 1.10 2003/05/16 21:26:41 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/include/asm.h,v 1.10.6.2 2005/01/31 23:26:14 imp Exp $ */
 /* From: NetBSD: asm.h,v 1.18 1997/11/03 04:22:06 ross Exp */
 
-/* 
+/* -
  * Copyright (c) 1991,1990,1989,1994,1995,1996 Carnegie Mellon University
  * All Rights Reserved.
  * 
@@ -43,12 +43,15 @@
 /*
  * MCOUNT
  */
-
-#if !defined(GPROF) && !defined(PROF)
-#define MCOUNT	/* nothing */
+#if defined(GPROF)
+#define	MCOUNT					\
+	alloc	out0 = ar.pfs, 8, 0, 4, 0;	\
+	mov	out1 = r1;			\
+	mov	out2 = b0;;			\
+	mov	out3 = r0;			\
+	br.call.sptk b0 = _mcount;;
 #else
-#define MCOUNT					\
-	br.call.sptk.many b7=_mcount
+#define	MCOUNT	/* nothing */
 #endif
 
 /*
@@ -61,7 +64,7 @@
 	.align	16;				\
 	.proc	_name_;				\
 _name_:;					\
-	.regstk	_n_args_, 0, 0, 0		\
+	.regstk	_n_args_, 0, 0, 0;		\
 	MCOUNT
 
 #define	ENTRY_NOPROFILE(_name_, _n_args_)	\

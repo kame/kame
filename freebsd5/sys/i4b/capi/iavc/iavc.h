@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Cubical Solutions Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,10 +21,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+
+/* capi/iavc/iavc.h	The AVM ISDN controllers' common declarations.
  *
- * capi/iavc/iavc.h	The AVM ISDN controllers' common declarations.
- *
- * $FreeBSD: src/sys/i4b/capi/iavc/iavc.h,v 1.2 2003/07/23 17:58:41 phk Exp $
+ * $FreeBSD: src/sys/i4b/capi/iavc/iavc.h,v 1.2.4.1 2005/01/31 23:26:07 imp Exp $
  */
 
 #ifndef _CAPI_IAVC_H_

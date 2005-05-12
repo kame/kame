@@ -1,4 +1,4 @@
-/*
+/*-
  * AMD Am83C30 serial communication controller registers.
  *
  * Copyright (C) 1996 Cronyx Engineering.
@@ -12,7 +12,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: am8530.h,v 1.1.2.2 2003/11/12 17:31:21 rik Exp $
- * $FreeBSD: src/sys/dev/ctau/am8530.h,v 1.1 2004/02/23 20:19:00 rik Exp $
+ * $FreeBSD: src/sys/dev/ctau/am8530.h,v 1.1.4.1 2005/01/30 00:59:33 imp Exp $
  */
 
 /*

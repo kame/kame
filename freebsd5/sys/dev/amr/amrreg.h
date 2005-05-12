@@ -53,7 +53,7 @@
  * SUCH DAMAGE.
  *
  *
- *      $FreeBSD: src/sys/dev/amr/amrreg.h,v 1.7 2002/10/30 22:00:11 emoore Exp $
+ *      $FreeBSD: src/sys/dev/amr/amrreg.h,v 1.7.8.1 2005/03/04 18:06:18 scottl Exp $
  */
 
 /********************************************************************************
@@ -82,7 +82,7 @@
 #define AMR_LIMITCMD		120		/* maximum count of outstanding commands */
 #define AMR_MAXLD      		40
 
-#define AMR_MAX_CHANNELS	4
+#define AMR_MAX_CHANNELS	8
 #define AMR_MAX_TARGETS		15
 #define AMR_MAX_LUNS		7
 #define AMR_MAX_SCSI_CMDS	(15 * AMR_MAX_CHANNELS)	/* one for every target? */

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-queue.c,v 1.32.2.4.2.1 2004/10/24 09:31:25 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-queue.c,v 1.32.2.6.2.1 2005/04/08 03:27:11 mdodd Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -216,6 +216,10 @@ ata_finish(struct ata_request *request)
 	ata_completed(request, 0);
     }
     else {
+	/* reset timeout and put on the proper taskqueue for completition */
+	if (!dumping && !(request->flags & ATA_R_TIMEOUT))
+	    callout_reset(&request->callout, request->timeout * hz,
+			  (timeout_t*)ata_timeout, request);
 	if (request->bio && !(request->flags & ATA_R_TIMEOUT)) {
 	    ATA_DEBUG_RQ(request, "finish bio_taskqueue");
 	    bio_taskqueue(request->bio, (bio_task_t *)ata_completed, request);
@@ -238,11 +242,15 @@ ata_completed(void *context, int dummy)
 
     /* if we had a timeout, reinit channel and deal with the falldown */
     if (request->flags & ATA_R_TIMEOUT) {
-
-	/* if reinit succeeded and retries still permit, reinject request */
-	if (ata_reinit(ch) && request->retries-- > 0 && request->device->param){
+	/*
+	 * if reinit succeeds, retries still permit and device didn't
+	 * get removed by the reinit, reinject request
+	 */
+	if (!ata_reinit(ch) && request->retries-- > 0
+	    && request->device->param){
 	    request->flags &= ~(ATA_R_TIMEOUT | ATA_R_DEBUG);
 	    request->flags |= (ATA_R_IMMEDIATE | ATA_R_REQUEUE);
+	    request->donecount = 0;
 	    ATA_DEBUG_RQ(request, "completed reinject");
 	    ata_queue_request(request);
 	    return;

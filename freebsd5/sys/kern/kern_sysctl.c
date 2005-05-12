@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_sysctl.c,v 1.159 2004/07/28 06:42:41 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_sysctl.c,v 1.159.2.1 2005/02/13 14:13:53 rwatson Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -466,6 +466,7 @@ SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_ANY, sysctl_register_all, 0);
  * {0,5,...}	return the description the "..." OID.
  */
 
+#ifdef SYSCTL_DEBUG
 static void
 sysctl_sysctl_debug_dump_node(struct sysctl_oid_list *l, int i)
 {
@@ -518,6 +519,7 @@ sysctl_sysctl_debug(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_sysctl, 0, debug, CTLTYPE_STRING|CTLFLAG_RD,
 	0, 0, sysctl_sysctl_debug, "-", "");
+#endif
 
 static int
 sysctl_sysctl_name(SYSCTL_HANDLER_ARGS)

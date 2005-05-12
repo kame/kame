@@ -105,11 +105,11 @@ extern struct ifqueue   ipintrq;		/* ip packet input queue */
 
 #if !defined(lint)
 /* static const char rcsid[] = "@(#)$Id: ip_auth.c,v 2.11.2.12 2001/07/18 14:57:08 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_auth.c,v 1.36 2004/06/22 05:20:30 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_auth.c,v 1.36.2.1 2005/03/13 18:08:56 rwatson Exp $";
 #endif
 
 
-#if (SOLARIS || defined(__sgi)) && defined(_KERNEL)
+#ifdef USE_MUTEX
 extern KRWLOCK_T ipf_auth, ipf_mutex;
 extern kmutex_t ipf_authmx;
 # if SOLARIS
@@ -283,11 +283,6 @@ ip_t *ip;
 
 		bo = ip->ip_len;
 		ip->ip_len = htons(bo);
-# if !SOLARIS && !defined(__NetBSD__) && !defined(__FreeBSD__)
-		/* 4.4BSD converts this ip_input.c, but I don't in solaris.c */
-		bo = ip->ip_id;
-		ip->ip_id = htons(bo);
-# endif
 		bo = ip->ip_off;
 		ip->ip_off = htons(bo);
 	}

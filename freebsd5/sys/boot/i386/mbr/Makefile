@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/mbr/Makefile,v 1.13 2004/04/28 21:31:21 ru Exp $
+# $FreeBSD: src/sys/boot/i386/mbr/Makefile,v 1.13.2.1 2004/12/02 19:01:44 yar Exp $
 
 PROG=	mbr
 STRIP=
@@ -6,8 +6,12 @@ BINMODE=${NOBINMODE}
 NOMAN=
 SRCS=	${PROG}.s
 
+# MBR flags: 0x80 -- try packet interface (also known as EDD or LBA)
+BOOT_MBR_FLAGS?=	0x80
+
 ORG=	0x600
 
+AFLAGS+=--defsym FLAGS=${BOOT_MBR_FLAGS}
 LDFLAGS=-N -e start -Ttext ${ORG} -Wl,-S,--oformat,binary
 
 .include <bsd.prog.mk>

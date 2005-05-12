@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_thread.c,v 1.1 2004/07/10 23:47:19 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_thread.c,v 1.1.2.3 2005/01/30 00:59:22 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,7 +41,12 @@ __FBSDID("$FreeBSD: src/sys/ddb/db_thread.c,v 1.1 2004/07/10 23:47:19 marcel Exp
 void
 db_print_thread(void)
 {
-	db_printf("[thread %ld]\n", (long)kdb_thread->td_tid);
+	pid_t pid;
+
+	pid = -1;
+	if (kdb_thread->td_proc != NULL)
+		pid = kdb_thread->td_proc->p_pid;
+	db_printf("[thread pid %d tid %ld ]\n", pid, (long)kdb_thread->td_tid);
 }
 
 void
@@ -88,7 +93,7 @@ db_show_threads(db_expr_t addr, boolean_t hasaddr, db_expr_t cnt, char *mod)
 	struct thread *thr;
 	int pager_quit;
 
-	db_setup_paging(db_simple_pager, &pager_quit, DB_LINES_PER_PAGE);
+	db_setup_paging(db_simple_pager, &pager_quit, db_lines_per_page);
 
 	pager_quit = 0;
 	thr = kdb_thr_first();

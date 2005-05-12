@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/mlphy.c,v 1.19 2004/05/03 13:01:34 andre Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/mlphy.c,v 1.19.2.1 2005/01/30 00:59:54 imp Exp $");
 
 /*
  * driver for Micro Linear 6692 PHYs

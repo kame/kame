@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.62 2004/08/16 07:28:16 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.62.2.1 2005/03/01 10:08:11 obrien Exp $");
 
 #include "opt_mac.h"
 
@@ -47,12 +47,12 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.62 2004/08/16 07:28:1
 
 #include "opt_compat.h"
 
-#if !COMPAT_LINUX32
-#include <machine/../linux/linux.h>
-#include <machine/../linux/linux_proto.h>
-#else
+#ifdef COMPAT_LINUX32
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#else
+#include <machine/../linux/linux.h>
+#include <machine/../linux/linux_proto.h>
 #endif
 
 #include <compat/linux/linux_util.h>
@@ -399,7 +399,7 @@ linux_ustat(struct thread *td, struct linux_ustat_args *args)
 	return (copyout(&lu, args->ubuf, sizeof(lu)));
 }
 
-#if defined(__i386__) || (defined(__amd64__) && COMPAT_LINUX32)
+#if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
 
 static int
 stat64_copyout(struct stat *buf, void *ubuf)
@@ -538,4 +538,4 @@ linux_fstat64(struct thread *td, struct linux_fstat64_args *args)
 	return (error);
 }
 
-#endif /* __i386__ || __amd64__ */
+#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */

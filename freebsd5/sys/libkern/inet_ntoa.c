@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1994, 1995 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/inet_ntoa.c,v 1.5 2003/06/11 05:23:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/inet_ntoa.c,v 1.5.4.1 2005/01/31 23:26:21 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

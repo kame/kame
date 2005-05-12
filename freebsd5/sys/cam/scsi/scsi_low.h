@@ -1,11 +1,11 @@
-/*	$FreeBSD: src/sys/cam/scsi/scsi_low.h,v 1.7 2004/07/10 20:54:01 marcel Exp $	*/
+/*	$FreeBSD: src/sys/cam/scsi/scsi_low.h,v 1.7.2.1 2005/01/30 00:59:16 imp Exp $	*/
 /*	$NecBSD: scsi_low.h,v 1.24.10.5 2001/06/26 07:31:46 honda Exp $	*/
 /*	$NetBSD$	*/
 
 #define	SCSI_LOW_DIAGNOSTIC
 #define	SCSI_LOW_ALT_QTAG_ALLOCATE
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1995, 1996, 1997, 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.

@@ -1,6 +1,6 @@
 /* $NetBSD: in_cksum.c,v 1.7 1997/09/02 13:18:15 thorpej Exp $ */
 
-/*
+/*-
  * Copyright (c) 1988, 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1996
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/in_cksum.c,v 1.4 2003/07/25 21:15:44 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/in_cksum.c,v 1.4.4.1 2005/01/30 00:59:13 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/mbuf.h>

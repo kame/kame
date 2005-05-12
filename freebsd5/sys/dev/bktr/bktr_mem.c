@@ -11,7 +11,7 @@
  *            time the bktr driver is loaded.
  */
 
-/*
+/*-
  * 1. Redistributions of source code must retain the
  * Copyright (c) 2000 Roger Hardiman
  * All rights reserved.
@@ -44,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_mem.c,v 1.11 2004/07/15 08:26:00 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_mem.c,v 1.11.2.2 2005/03/02 10:27:35 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -115,8 +115,8 @@ bktr_store_address(int unit, int type, vm_offset_t addr)
 {
 
 	if (unit < 0 || unit >= BKTR_MEM_MAX_DEVICES) {
-		printf("bktr_mem: Unit number %d invalid for memory type %d, address 0x%x\n",
-		       unit, type, addr);
+		printf("bktr_mem: Unit number %d invalid for memory type %d, address %p\n",
+		       unit, type, (void *) addr);
 		return;
 	}
 
@@ -142,8 +142,8 @@ bktr_store_address(int unit, int type, vm_offset_t addr)
 		memory_list[unit].addresses_stored = 1;
 		break;
 	default:
-		printf("bktr_mem: Invalid memory type %d for bktr%d, address 0x%xn",
-			type, unit, addr);
+		printf("bktr_mem: Invalid memory type %d for bktr%d, address %p\n",
+			type, unit, (void *)addr);
 		break;
 	}
 }

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, 1996
  *	Matt Thomas <matt@3am-software.com>.  All rights reserved.
  * Copyright (c) 1982, 1989, 1993
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.95 2004/06/15 23:57:41 mlaier Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.95.2.1 2005/01/31 23:26:22 imp Exp $
  */
 
 #include "opt_atalk.h"

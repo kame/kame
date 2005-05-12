@@ -1,7 +1,7 @@
 /*	$NecBSD: nsp_pisa.c,v 1.4 1999/04/15 01:35:54 kmatsuda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [Ported for FreeBSD]
  *  Copyright (c) 2000
  *      Noriaki Mitsunaga, Mitsuru Iwasaki and Takanori Watanabe.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp_pccard.c,v 1.20 2004/05/27 03:49:43 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp_pccard.c,v 1.20.2.1 2005/01/30 00:59:56 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>

@@ -1,7 +1,8 @@
 /* MD4C.C - RSA Data Security, Inc., MD4 message-digest algorithm
  */
 
-/* Copyright (C) 1990-2, RSA Data Security, Inc. All rights reserved.
+/*-
+   Copyright (C) 1990-2, RSA Data Security, Inc. All rights reserved.
 
    License to copy and use this software is granted provided that it
    is identified as the "RSA Data Security, Inc. MD4 Message-Digest
@@ -23,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/md4c.c,v 1.2 2003/06/11 00:56:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/md4c.c,v 1.2.4.1 2005/01/31 23:26:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

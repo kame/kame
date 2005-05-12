@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
 static char sccsid[] = "@(#)bsearch.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/bsearch.c,v 1.7 2004/04/07 20:46:10 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/bsearch.c,v 1.7.2.1 2005/01/31 23:26:21 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/libkern.h>

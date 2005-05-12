@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998-2002 Luigi Rizzo
  *
  * Work partly supported by: Cisco Systems, Inc. - NSITE lab, RTP, NC
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.c,v 1.82.2.2 2004/10/03 17:04:39 mlaier Exp $
+ * $FreeBSD: src/sys/net/bridge.c,v 1.82.2.4 2005/01/31 23:26:22 imp Exp $
  */
 
 /*
@@ -40,7 +40,7 @@
  *	net.link.ether.bridge.config
  * containing a list of interfaces each optionally followed by
  * a colon and the cluster it belongs to (1 is the default).
- * Separators can be * spaces, commas or tabs, e.g.
+ * Separators can be spaces, commas or tabs, e.g.
  *	net.link.ether.bridge.config="fxp0:2 fxp1:2 dc0 dc1:1"
  * Optionally bridged packets can be passed through the firewall,
  * this is controlled by the variable

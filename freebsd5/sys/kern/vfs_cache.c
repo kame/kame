@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_cache.c,v 1.87 2004/04/05 21:03:36 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_cache.c,v 1.87.2.1 2005/01/31 23:26:18 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

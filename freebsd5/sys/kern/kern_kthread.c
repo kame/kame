@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Peter Wemm <peter@FreeBSD.org>
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_kthread.c,v 1.32.4.1 2004/09/09 09:45:26 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_kthread.c,v 1.32.4.2 2005/01/31 23:26:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

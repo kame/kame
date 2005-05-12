@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -26,7 +26,7 @@
  *
  * Author: Hartmut Brandt <harti@freebsd.org>
  *
- * $FreeBSD: src/sys/dev/utopia/suni.h,v 1.1 2003/06/12 14:28:32 harti Exp $
+ * $FreeBSD: src/sys/dev/utopia/suni.h,v 1.1.4.1 2005/01/30 01:00:11 imp Exp $
  *
  * Register definitions for the following chips:
  *	PMC-Sierra PMC-5346 (S/UNI-LITE)

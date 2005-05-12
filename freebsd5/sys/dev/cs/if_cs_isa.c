@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997,1998 Maxim Bolotin and Oleg Sharoiko.
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/cs/if_cs_isa.c,v 1.5 2003/10/31 18:31:58 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/cs/if_cs_isa.c,v 1.5.4.1 2005/01/30 00:59:32 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

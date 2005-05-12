@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/ndis/subr_pe.c,v 1.7 2004/01/13 22:49:45 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/ndis/subr_pe.c,v 1.7.2.3 2005/03/31 04:24:36 wpaul Exp $");
 
 /*
  * This file contains routines for relocating and dynamically linking
@@ -53,6 +53,8 @@ __FBSDID("$FreeBSD: src/sys/compat/ndis/subr_pe.c,v 1.7 2004/01/13 22:49:45 obri
 #include <sys/errno.h>
 #ifdef _KERNEL
 #include <sys/systm.h>
+extern int ndis_strncasecmp(const char *, const char *, size_t);
+#define strncasecmp(a, b, c) ndis_strncasecmp(a, b, c)
 #else
 #include <stdio.h>
 #include <stdlib.h>
@@ -263,7 +265,7 @@ pe_directory_offset(imgbase, diridx)
 vm_offset_t
 pe_translate_addr(imgbase, rva)
 	vm_offset_t		imgbase;
-	uint32_t		rva;
+	vm_offset_t		rva;
 {
 	image_optional_header	opt_hdr;
 	image_section_header	*sect_hdr;
@@ -295,9 +297,9 @@ pe_translate_addr(imgbase, rva)
 		fixedlen += ((opt_hdr.ioh_sectalign - 1) -
 		    sect_hdr->ish_misc.ish_vsize) &
 		    (opt_hdr.ioh_sectalign - 1);
-		if (sect_hdr->ish_vaddr <= (u_int32_t)rva &&
+		if (sect_hdr->ish_vaddr <= (uint32_t)rva &&
 		    (sect_hdr->ish_vaddr + fixedlen) >
-		    (u_int32_t)rva)
+		    (uint32_t)rva)
 			break;
 		sect_hdr++;
 	}
@@ -366,7 +368,10 @@ pe_relocate(imgbase)
 	image_section_header	sect;
 	image_base_reloc	*relhdr;
 	uint16_t		rel, *sloc;
-	uint32_t		base, delta, *lloc;
+	vm_offset_t		base;
+	vm_size_t		delta;
+	uint32_t		*lloc;
+	uint64_t		*qloc;
 	int			i, count;
 	vm_offset_t		txt;
 
@@ -403,6 +408,13 @@ pe_relocate(imgbase)
 				    relhdr->ibr_vaddr + IMR_RELOFFSET(rel));
 				*sloc += (delta & 0xFFFF);
 				break;
+			case IMAGE_REL_BASED_DIR64:
+				qloc = (uint64_t *)pe_translate_addr(imgbase,
+				    relhdr->ibr_vaddr + IMR_RELOFFSET(rel));
+				*qloc = pe_translate_addr(imgbase,
+				    (*qloc - base));
+                                break;
+
 			default:
 				printf ("[%d]reloc type: %d\n",i,
 				    IMR_RELTYPE(rel));
@@ -421,6 +433,8 @@ pe_relocate(imgbase)
  * may be linked against several modules, typically HAL.dll, ntoskrnl.exe
  * and NDIS.SYS. For each module, there is a list of imported function
  * names and their addresses.
+ *
+ * Note: module names are case insensitive!
  */
 
 int
@@ -445,7 +459,7 @@ pe_get_import_descriptor(imgbase, desc, module)
 	while (imp_desc->iid_nameaddr) {
 		modname = (char *)pe_translate_addr(imgbase,
 		    imp_desc->iid_nameaddr);
-		if (!strncmp(module, modname, strlen(module))) {
+		if (!strncasecmp(module, modname, strlen(module))) {
 			bcopy((char *)imp_desc, (char *)desc,
 			    sizeof(image_import_descriptor));
 			return(0);
@@ -561,11 +575,19 @@ pe_functbl_match(functbl, name)
 
 	while (p->ipt_name != NULL) {
 		if (!strcmp(p->ipt_name, name))
-			return((vm_offset_t)p->ipt_func);
+			return((vm_offset_t)p->ipt_wrap);
 		p++;
 	}
 	printf ("no match for %s\n", name);
-	return((vm_offset_t)p->ipt_func);
+
+	/*
+	 * Return the wrapper pointer for this routine.
+	 * For x86, this is the same as the funcptr.
+	 * For amd64, this points to a wrapper routine
+	 * that does calling convention translation and
+	 * then invokes the underlying routine.
+	 */
+	return((vm_offset_t)p->ipt_wrap);
 }
 
 /*

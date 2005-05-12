@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Boris Popov
  * All rights reserved.
  *
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_mchain.c,v 1.16 2004/04/05 21:03:35 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_mchain.c,v 1.16.2.1 2005/01/31 23:26:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

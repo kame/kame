@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton.  All rights reserved.
  * Copyright (c) 1994, 1996 Christos Zoulas.  All rights reserved.
  *
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.49.2.1 2004/09/03 15:30:20 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.49.2.3 2005/03/29 07:24:48 das Exp $");
 
 #define COMPAT_43 1
 
@@ -2248,6 +2248,8 @@ svr4_do_getmsg(td, uap, fp)
 	}
 
 	if (uap->ctl) {
+		if (ctl.len > sizeof(sc))
+			ctl.len = sizeof(sc);
 		if (ctl.len != -1)
 			if ((error = copyout(&sc, ctl.buf, ctl.len)) != 0)
 				return error;

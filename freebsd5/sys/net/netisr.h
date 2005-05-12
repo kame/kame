@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)netisr.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/netisr.h,v 1.32 2004/06/09 02:48:23 rwatson Exp $
+ * $FreeBSD: src/sys/net/netisr.h,v 1.32.2.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _NET_NETISR_H_

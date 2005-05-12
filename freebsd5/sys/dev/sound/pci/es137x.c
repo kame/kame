@@ -1,4 +1,4 @@
-/*
+/*-
  * Support the ENSONIQ AudioPCI board and Creative Labs SoundBlaster PCI
  * boards based on the ES1370, ES1371 and ES1373 chips.
  *
@@ -59,7 +59,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/es137x.c,v 1.51 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/es137x.c,v 1.51.2.2 2005/01/30 01:00:04 imp Exp $");
 
 static int debug = 0;
 SYSCTL_INT(_debug, OID_AUTO, es_debug, CTLFLAG_RW, &debug, 0, "");
@@ -274,7 +274,8 @@ eschan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *c
 	ch->bufsz = es->bufsz;
 	ch->blksz = ch->bufsz / 2;
 	ch->num = ch->parent->num++;
-	if (sndbuf_alloc(ch->buffer, es->parent_dmat, ch->bufsz) == -1) return NULL;
+	if (sndbuf_alloc(ch->buffer, es->parent_dmat, ch->bufsz) != 0)
+		return NULL;
 	return ch;
 }
 

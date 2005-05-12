@@ -1,10 +1,10 @@
-/*
+/*-
  *  modified for Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  */
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_lookup.c	8.6 (Berkeley) 4/1/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_lookup.c,v 1.44 2004/04/07 20:46:03 imp Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_lookup.c,v 1.44.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 #include <sys/param.h>

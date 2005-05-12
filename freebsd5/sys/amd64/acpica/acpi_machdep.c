@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/acpica/acpi_machdep.c,v 1.15 2004/08/16 23:10:18 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/acpica/acpi_machdep.c,v 1.15.2.1 2004/11/07 20:24:05 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -60,4 +60,10 @@ int
 acpi_machdep_quirks(int *quirks)
 {
 	return (0);
+}
+
+void
+acpi_cpu_c1()
+{
+	__asm __volatile("sti; hlt");
 }

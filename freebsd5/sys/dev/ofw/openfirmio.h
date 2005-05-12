@@ -1,6 +1,6 @@
 /*	$NetBSD: openfirmio.h,v 1.4 2002/09/06 13:23:19 gehenna Exp $ */
 
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -34,7 +34,7 @@
  *
  *	@(#)openpromio.h	8.1 (Berkeley) 6/11/93
  *
- * $FreeBSD: src/sys/dev/ofw/openfirmio.h,v 1.4 2004/05/22 16:43:42 marius Exp $
+ * $FreeBSD: src/sys/dev/ofw/openfirmio.h,v 1.4.2.1 2005/01/30 00:59:56 imp Exp $
  */
 
 #ifndef _DEV_OFW_OPENFIRMIO_H_

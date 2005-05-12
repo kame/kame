@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994 Jan-Simon Pendry
  * Copyright (c) 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_subr.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/fs/unionfs/union_subr.c,v 1.79 2004/07/15 08:26:04 phk Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_subr.c,v 1.79.2.2 2005/02/27 02:32:37 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -1053,9 +1053,9 @@ union_vn_create(vpp, un, td)
 	struct componentname cn;
 
 	*vpp = NULLVP;
-	FILEDESC_LOCK(td->td_proc->p_fd);
+	FILEDESC_LOCK_FAST(td->td_proc->p_fd);
 	cmode = UN_FILEMODE & ~td->td_proc->p_fd->fd_cmask;
-	FILEDESC_UNLOCK(td->td_proc->p_fd);
+	FILEDESC_UNLOCK_FAST(td->td_proc->p_fd);
 
 	/*
 	 * Build a new componentname structure (for the same

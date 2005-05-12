@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  *
  *      @(#)bpfdesc.h	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/net/bpfdesc.h,v 1.27.2.1 2004/09/14 02:59:20 rwatson Exp $
+ * $FreeBSD: src/sys/net/bpfdesc.h,v 1.27.2.2 2005/01/31 23:26:22 imp Exp $
  */
 
 #ifndef _NET_BPFDESC_H_

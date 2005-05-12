@@ -1,4 +1,4 @@
-/*
+/*-
  *
  * ===================================
  * HARP  |  Host ATM Research Platform
@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_var.h,v 1.24 2003/10/31 18:32:10 brooks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_var.h,v 1.24.4.2 2005/03/07 13:08:04 rwatson Exp $
  *
  */
 
@@ -81,8 +81,8 @@ void		atm_aal5_init(void);
 	/* atm_cm.c */
 int		atm_cm_connect(Atm_endpoint *, void *, Atm_attributes *,
 			Atm_connection **);
-int		atm_cm_listen(Atm_endpoint *, void *, Atm_attributes *,
-			Atm_connection **);
+int		atm_cm_listen(struct socket *, Atm_endpoint *, void *,
+			Atm_attributes *, Atm_connection **);
 int		atm_cm_addllc(Atm_endpoint *, void *, struct attr_llc *,
 			Atm_connection *, Atm_connection **);
 int		atm_cm_addparty(Atm_connection *, int, struct t_atm_sap *);

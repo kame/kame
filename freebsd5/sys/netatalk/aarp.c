@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Robert N. M. Watson
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Copyright (c) 1990,1991,1994 Regents of The University of Michigan.
  * All Rights Reserved.
  *
@@ -48,7 +48,7 @@
  *	+1-313-764-2278
  *	netatalk@umich.edu
  *
- * $FreeBSD: src/sys/netatalk/aarp.c,v 1.33 2004/08/10 03:23:05 rwatson Exp $
+ * $FreeBSD: src/sys/netatalk/aarp.c,v 1.33.2.2 2005/03/13 13:08:36 rwatson Exp $
  */
 
 #include "opt_atalk.h"
@@ -221,7 +221,7 @@ aarpwhohas(struct ifnet *ifp, struct sockaddr_at *sat)
     if (aa->aa_flags & AFA_PHASE2) {
 	bcopy(atmulticastaddr, eh->ether_dhost, sizeof(eh->ether_dhost));
 	eh->ether_type = htons(sizeof(struct llc) + sizeof(struct ether_aarp));
-	M_PREPEND(m, sizeof(struct llc), M_TRYWAIT);
+	M_PREPEND(m, sizeof(struct llc), M_DONTWAIT);
 	if (m == NULL) {
 	    return;
 	}

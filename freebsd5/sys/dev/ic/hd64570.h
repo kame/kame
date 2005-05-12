@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 John Hay.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ic/hd64570.h,v 1.6 1999/08/28 00:45:13 peter Exp $
+ * $FreeBSD: src/sys/dev/ic/hd64570.h,v 1.6.12.1 2005/01/30 00:59:45 imp Exp $
  */
 #ifndef _HD64570_H_
 #define _HD64570_H_

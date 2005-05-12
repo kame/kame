@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Cubical Solutions Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * capi/iavc/iavc_pci.c
+ */
+
+/* capi/iavc/iavc_pci.c
  *		The AVM ISDN controllers' PCI bus attachment handling.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/capi/iavc/iavc_pci.c,v 1.9 2004/03/17 17:50:49 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/capi/iavc/iavc_pci.c,v 1.9.2.1 2005/01/31 23:26:07 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

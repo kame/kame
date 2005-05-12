@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * Copyright (c) 2000, Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2000, BSDi
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/pci/pci_cfgreg.c,v 1.106 2004/03/13 19:19:13 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/pci/pci_cfgreg.c,v 1.106.2.2 2005/02/14 03:01:58 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -325,4 +325,3 @@ pcireg_cfgopen(void)
 	devmax = 0;
 	return (cfgmech);
 }
-

@@ -31,12 +31,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_pc98.c,v 1.47 2004/08/08 07:57:51 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_pc98.c,v 1.47.2.1 2005/02/28 13:59:03 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/bio.h>
 #include <sys/lock.h>
@@ -135,7 +136,7 @@ g_pc98_modify(struct g_geom *gp, struct g_pc98_softc *ms, u_char *sec)
 }
 
 static int
-g_pc98_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
+g_pc98_ioctl(struct g_provider *pp, u_long cmd, void *data, int fflag, struct thread *td)
 {
 	struct g_geom *gp;
 	struct g_pc98_softc *ms;
@@ -149,6 +150,8 @@ g_pc98_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
 
 	switch(cmd) {
 	case DIOCSPC98: {
+		if (!(fflag & FWRITE))
+			return (EPERM);
 		DROP_GIANT();
 		g_topology_lock();
 		/* Validate and modify our slicer instance to match. */

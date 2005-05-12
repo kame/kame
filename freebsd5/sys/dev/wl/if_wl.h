@@ -1,4 +1,4 @@
-/* 
+/*-
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -18,7 +18,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/wl/if_wl.h,v 1.6 2003/04/16 17:29:00 jhay Exp $
+ * $FreeBSD: src/sys/dev/wl/if_wl.h,v 1.6.6.1 2005/01/30 01:00:13 imp Exp $
  */
 /* Definitions for WaveLAN driver */
 

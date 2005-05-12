@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)tss.h	5.4 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/amd64/include/tss.h,v 1.16 2004/04/05 21:25:51 imp Exp $
+ * $FreeBSD: src/sys/amd64/include/tss.h,v 1.16.6.1 2005/04/06 01:06:15 cperciva Exp $
  */
 
 #ifndef _MACHINE_TSS_H_
@@ -50,7 +50,6 @@ struct amd64tss {
 	u_int64_t	tss_rsp2 __packed; 	/* kernel stack pointer ring 2 */
 	u_int32_t	tss_rsvd1;
 	u_int32_t	tss_rsvd2;
-	u_int32_t	tss_rsvd3;
 	u_int64_t	tss_ist1 __packed;	/* Interrupt stack table 1 */
 	u_int64_t	tss_ist2 __packed;	/* Interrupt stack table 2 */
 	u_int64_t	tss_ist3 __packed;	/* Interrupt stack table 3 */

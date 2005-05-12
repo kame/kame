@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em.c,v 1.44.2.2 2004/10/15 22:12:59 tackerman Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em.c,v 1.44.2.8 2005/03/23 13:30:21 glebius Exp $*/
 
 #include <dev/em/if_em.h>
 
@@ -80,6 +80,7 @@ static em_vendor_info_t em_vendor_info_array[] =
         { 0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x1012, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0},
+        { 0x8086, 0x1014, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x1015, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x1016, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x1017, PCI_ANY_ID, PCI_ANY_ID, 0},
@@ -99,6 +100,7 @@ static em_vendor_info_t em_vendor_info_array[] =
         { 0x8086, 0x107A, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x107B, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x107C, PCI_ANY_ID, PCI_ANY_ID, 0},
+        { 0x8086, 0x108A, PCI_ANY_ID, PCI_ANY_ID, 0},
         /* required last entry */
         { 0, 0, 0, 0, 0}
 };
@@ -161,7 +163,8 @@ static void em_print_link_status(struct adapter *);
 static int  em_get_buf(int i, struct adapter *,
 		       struct mbuf *);
 static void em_enable_vlans(struct adapter *);
-static int  em_encap(struct adapter *, struct mbuf *);
+static void em_disable_vlans(struct adapter *);
+static int  em_encap(struct adapter *, struct mbuf **);
 static void em_smartspeed(struct adapter *);
 static int  em_82547_fifo_workaround(struct adapter *, int);
 static void em_82547_update_fifo_head(struct adapter *, int);
@@ -615,8 +618,14 @@ em_start_locked(struct ifnet *ifp)
                 IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
                 
                 if (m_head == NULL) break;
-                        
-		if (em_encap(adapter, m_head)) { 
+
+		/*
+		 * em_encap() can modify our pointer, and or make it NULL on
+		 * failure.  In that event, we can't requeue.
+		 */
+		if (em_encap(adapter, &m_head)) { 
+			if (m_head == NULL)
+				break;
 			ifp->if_flags |= IFF_OACTIVE;
 			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
 			break;
@@ -1156,19 +1165,6 @@ em_media_change(struct ifnet *ifp)
 	return(0);
 }
 
-static void
-em_tx_cb(void *arg, bus_dma_segment_t *seg, int nsegs, bus_size_t mapsize, int error)
-{
-        struct em_q *q = arg;
-
-        if (error)
-                return;
-        KASSERT(nsegs <= EM_MAX_SCATTER,
-                ("Too many DMA segments returned when mapping tx packet"));
-        q->nsegs = nsegs;
-        bcopy(seg, q->segs, nsegs * sizeof(seg[0]));
-}
-
 /*********************************************************************
  *
  *  This routine maps the mbufs to tx descriptors.
@@ -1176,12 +1172,14 @@ em_tx_cb(void *arg, bus_dma_segment_t *seg, int nsegs, bus_size_t mapsize, int e
  *  return 0 on success, positive on failure
  **********************************************************************/
 static int              
-em_encap(struct adapter *adapter, struct mbuf *m_head)
+em_encap(struct adapter *adapter, struct mbuf **m_headp)
 {
         u_int32_t       txd_upper;
         u_int32_t       txd_lower, txd_used = 0, txd_saved = 0;
         int             i, j, error;
         u_int64_t       address;
+
+	struct mbuf	*m_head;
 
 	/* For 82544 Workaround */
 	DESC_ARRAY              desc_array;
@@ -1193,10 +1191,14 @@ em_encap(struct adapter *adapter, struct mbuf *m_head)
 #else
         struct m_tag    *mtag;
 #endif   
-        struct em_q      q;
+	bus_dma_segment_t	segs[EM_MAX_SCATTER];
+	bus_dmamap_t		map;
+	int			nsegs;
         struct em_buffer   *tx_buffer = NULL;
         struct em_tx_desc *current_tx_desc = NULL;
         struct ifnet   *ifp = &adapter->interface_data.ac_if;
+
+	m_head = *m_headp;
 
         /*
          * Force a cleanup if number of TX descriptors
@@ -1213,22 +1215,22 @@ em_encap(struct adapter *adapter, struct mbuf *m_head)
         /*
          * Map the packet for DMA.
          */
-        if (bus_dmamap_create(adapter->txtag, BUS_DMA_NOWAIT, &q.map)) {
+        if (bus_dmamap_create(adapter->txtag, BUS_DMA_NOWAIT, &map)) {
                 adapter->no_tx_map_avail++;
                 return (ENOMEM);
         }
-        error = bus_dmamap_load_mbuf(adapter->txtag, q.map,
-                                     m_head, em_tx_cb, &q, BUS_DMA_NOWAIT);
+        error = bus_dmamap_load_mbuf_sg(adapter->txtag, map, m_head, segs,
+					&nsegs, BUS_DMA_NOWAIT);
         if (error != 0) {
                 adapter->no_tx_dma_setup++;
-                bus_dmamap_destroy(adapter->txtag, q.map);
+                bus_dmamap_destroy(adapter->txtag, map);
                 return (error);
         }
-        KASSERT(q.nsegs != 0, ("em_encap: empty packet"));
+        KASSERT(nsegs != 0, ("em_encap: empty packet"));
 
-        if (q.nsegs > adapter->num_tx_desc_avail) {
+        if (nsegs > adapter->num_tx_desc_avail) {
                 adapter->no_tx_desc_avail2++;
-                bus_dmamap_destroy(adapter->txtag, q.map);
+                bus_dmamap_destroy(adapter->txtag, map);
                 return (ENOBUFS);
         }
 
@@ -1250,28 +1252,67 @@ em_encap(struct adapter *adapter, struct mbuf *m_head)
         mtag = VLAN_OUTPUT_TAG(ifp, m_head);
 #endif
 
+	/*
+	 * When operating in promiscuous mode, hardware encapsulation for
+	 * packets is disabled.  This means we have to add the vlan
+	 * encapsulation in the driver, since it will have come down from the
+	 * VLAN layer with a tag instead of a VLAN header.
+	 */
+	if (mtag != NULL && adapter->em_insert_vlan_header) {
+		struct ether_vlan_header *evl;
+		struct ether_header eh;
+
+		m_head = m_pullup(m_head, sizeof(eh));
+		if (m_head == NULL) {
+			*m_headp = NULL;
+                	bus_dmamap_destroy(adapter->txtag, map);
+			return (ENOBUFS);
+		}
+		eh = *mtod(m_head, struct ether_header *);
+		M_PREPEND(m_head, sizeof(*evl), M_DONTWAIT);
+		if (m_head == NULL) {
+			*m_headp = NULL;
+                	bus_dmamap_destroy(adapter->txtag, map);
+			return (ENOBUFS);
+		}
+		m_head = m_pullup(m_head, sizeof(*evl));
+		if (m_head == NULL) {
+			*m_headp = NULL;
+                	bus_dmamap_destroy(adapter->txtag, map);
+			return (ENOBUFS);
+		}
+		evl = mtod(m_head, struct ether_vlan_header *);
+		bcopy(&eh, evl, sizeof(*evl));
+		evl->evl_proto = evl->evl_encap_proto;
+		evl->evl_encap_proto = htons(ETHERTYPE_VLAN);
+		evl->evl_tag = htons(VLAN_TAG_VALUE(mtag));
+		m_tag_delete(m_head, mtag);
+		mtag = NULL;
+		*m_headp = m_head;
+	}
+
         i = adapter->next_avail_tx_desc;
 	if (adapter->pcix_82544) {
 		txd_saved = i;
 		txd_used = 0;
 	}
-        for (j = 0; j < q.nsegs; j++) {
+        for (j = 0; j < nsegs; j++) {
 		/* If adapter is 82544 and on PCIX bus */
 		if(adapter->pcix_82544) {
 			array_elements = 0;
-			address = htole64(q.segs[j].ds_addr);
+			address = htole64(segs[j].ds_addr);
 			/* 
 			 * Check the Address and Length combination and 
 			 * split the data accordingly 
 			 */
                         array_elements = em_fill_descriptors(address,
-							     htole32(q.segs[j].ds_len),
+							     htole32(segs[j].ds_len),
 							     &desc_array);
 			for (counter = 0; counter < array_elements; counter++) {
                                 if (txd_used == adapter->num_tx_desc_avail) {
                                          adapter->next_avail_tx_desc = txd_saved;
                                           adapter->no_tx_desc_avail2++;
-					  bus_dmamap_destroy(adapter->txtag, q.map);
+					  bus_dmamap_destroy(adapter->txtag, map);
                                           return (ENOBUFS);
                                 }
                                 tx_buffer = &adapter->tx_buffer_area[i];
@@ -1292,9 +1333,9 @@ em_encap(struct adapter *adapter, struct mbuf *m_head)
 			tx_buffer = &adapter->tx_buffer_area[i];
 			current_tx_desc = &adapter->tx_desc_base[i];
 
-			current_tx_desc->buffer_addr = htole64(q.segs[j].ds_addr);
+			current_tx_desc->buffer_addr = htole64(segs[j].ds_addr);
 			current_tx_desc->lower.data = htole32(
-				adapter->txd_cmd | txd_lower | q.segs[j].ds_len);
+				adapter->txd_cmd | txd_lower | segs[j].ds_len);
 			current_tx_desc->upper.data = htole32(txd_upper);
 
 			if (++i == adapter->num_tx_desc)
@@ -1309,7 +1350,7 @@ em_encap(struct adapter *adapter, struct mbuf *m_head)
 		adapter->num_tx_desc_avail -= txd_used;
 	}
 	else {
-		adapter->num_tx_desc_avail -= q.nsegs;
+		adapter->num_tx_desc_avail -= nsegs;
 	}
 
 #if __FreeBSD_version < 500000
@@ -1327,8 +1368,8 @@ em_encap(struct adapter *adapter, struct mbuf *m_head)
         }
 
         tx_buffer->m_head = m_head;
-        tx_buffer->map = q.map;
-        bus_dmamap_sync(adapter->txtag, q.map, BUS_DMASYNC_PREWRITE);
+        tx_buffer->map = map;
+        bus_dmamap_sync(adapter->txtag, map, BUS_DMASYNC_PREWRITE);
 
         /*
          * Last Descriptor of Packet needs End Of Packet (EOP)
@@ -1486,28 +1527,27 @@ em_set_promisc(struct adapter * adapter)
 {
 
 	u_int32_t       reg_rctl;
-	u_int32_t       ctrl;
 	struct ifnet   *ifp = &adapter->interface_data.ac_if;
 
 	reg_rctl = E1000_READ_REG(&adapter->hw, RCTL);
-	ctrl = E1000_READ_REG(&adapter->hw, CTRL);
 
 	if (ifp->if_flags & IFF_PROMISC) {
 		reg_rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE);
 		E1000_WRITE_REG(&adapter->hw, RCTL, reg_rctl);
-		
 		/* Disable VLAN stripping in promiscous mode 
 		 * This enables bridging of vlan tagged frames to occur 
 		 * and also allows vlan tags to be seen in tcpdump
 		 */
-		ctrl &= ~E1000_CTRL_VME; 
-		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
-
+		if (ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
+			em_disable_vlans(adapter);
+		adapter->em_insert_vlan_header = 1;
 	} else if (ifp->if_flags & IFF_ALLMULTI) {
 		reg_rctl |= E1000_RCTL_MPE;
 		reg_rctl &= ~E1000_RCTL_UPE;
 		E1000_WRITE_REG(&adapter->hw, RCTL, reg_rctl);
-	}
+		adapter->em_insert_vlan_header = 0;
+	} else
+		adapter->em_insert_vlan_header = 0;
 
 	return;
 }
@@ -1516,6 +1556,7 @@ static void
 em_disable_promisc(struct adapter * adapter)
 {
 	u_int32_t       reg_rctl;
+	struct ifnet   *ifp = &adapter->interface_data.ac_if;
 
 	reg_rctl = E1000_READ_REG(&adapter->hw, RCTL);
 
@@ -1523,7 +1564,10 @@ em_disable_promisc(struct adapter * adapter)
 	reg_rctl &=  (~E1000_RCTL_MPE);
 	E1000_WRITE_REG(&adapter->hw, RCTL, reg_rctl);
 
-	em_enable_vlans(adapter);
+	if (ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
+		em_enable_vlans(adapter);
+	adapter->em_insert_vlan_header = 0;
+
 	return;
 }
 
@@ -1625,6 +1669,8 @@ em_local_timer(void *arg)
 static void
 em_print_link_status(struct adapter * adapter)
 {
+	struct ifnet *ifp = &adapter->interface_data.ac_if;
+
 	if (E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_LU) {
 		if (adapter->link_active == 0) {
 			em_get_speed_and_duplex(&adapter->hw, 
@@ -1637,6 +1683,11 @@ em_print_link_status(struct adapter * adapter)
 				"Full Duplex" : "Half Duplex"));
 			adapter->link_active = 1;
 			adapter->smartspeed = 0;
+			ifp->if_link_state = LINK_STATE_UP;
+#ifdef DEV_CARP
+			if (ifp->if_carp)
+				carp_carpdev_state(ifp->if_carp);
+#endif
 		}
 	} else {
 		if (adapter->link_active == 1) {
@@ -1644,6 +1695,11 @@ em_print_link_status(struct adapter * adapter)
 			adapter->link_duplex = 0;
 			printf("em%d: Link is Down\n", adapter->unit);
 			adapter->link_active = 0;
+			ifp->if_link_state = LINK_STATE_DOWN;
+#ifdef DEV_CARP
+			if (ifp->if_carp)
+				carp_carpdev_state(ifp->if_carp);
+#endif
 		}
 	}
 
@@ -1915,7 +1971,7 @@ em_setup_interface(device_t dev, struct adapter * adapter)
 	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
 #if __FreeBSD_version >= 500000
 	ifp->if_capabilities |= IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_MTU;
-	ifp->if_capenable |= IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_MTU;
+	ifp->if_capenable |= IFCAP_VLAN_MTU;
 #endif
 
 #ifdef DEVICE_POLLING
@@ -2056,13 +2112,6 @@ em_dma_malloc(struct adapter *adapter, bus_size_t size,
                 goto fail_0;
         }
 
-        r = bus_dmamap_create(dma->dma_tag, BUS_DMA_NOWAIT, &dma->dma_map);
-        if (r != 0) {
-                printf("em%d: em_dma_malloc: bus_dmamap_create failed; "
-                        "error %u\n", adapter->unit, r);
-                goto fail_1;
-        }
-
         r = bus_dmamem_alloc(dma->dma_tag, (void**) &dma->dma_vaddr,
                              BUS_DMA_NOWAIT, &dma->dma_map);
         if (r != 0) {
@@ -2090,8 +2139,6 @@ fail_3:
         bus_dmamap_unload(dma->dma_tag, dma->dma_map);
 fail_2:
         bus_dmamem_free(dma->dma_tag, dma->dma_vaddr, dma->dma_map);
-fail_1:
-        bus_dmamap_destroy(dma->dma_tag, dma->dma_map);
         bus_dma_tag_destroy(dma->dma_tag);
 fail_0:
         dma->dma_map = NULL;
@@ -2104,7 +2151,6 @@ em_dma_free(struct adapter *adapter, struct em_dma_alloc *dma)
 {
         bus_dmamap_unload(dma->dma_tag, dma->dma_map);
         bus_dmamem_free(dma->dma_tag, dma->dma_vaddr, dma->dma_map);
-        bus_dmamap_destroy(dma->dma_tag, dma->dma_map);
         bus_dma_tag_destroy(dma->dma_tag);
 }
 
@@ -2145,7 +2191,7 @@ em_setup_transmit_structures(struct adapter * adapter)
          * Setup DMA descriptor areas.
          */
         if (bus_dma_tag_create(NULL,                    /* parent */
-                               PAGE_SIZE, 0,            /* alignment, bounds */
+                               1, 0,                    /* alignment, bounds */
                                BUS_SPACE_MAXADDR,       /* lowaddr */ 
                                BUS_SPACE_MAXADDR,       /* highaddr */
                                NULL, NULL,              /* filter, filterarg */
@@ -2523,7 +2569,7 @@ em_allocate_receive_structures(struct adapter * adapter)
               sizeof(struct em_buffer) * adapter->num_rx_desc);
 
         error = bus_dma_tag_create(NULL,                /* parent */
-                               PAGE_SIZE, 0,            /* alignment, bounds */
+                               1, 0,                    /* alignment, bounds */
                                BUS_SPACE_MAXADDR,       /* lowaddr */
                                BUS_SPACE_MAXADDR,       /* highaddr */
                                NULL, NULL,              /* filter, filterarg */
@@ -2957,6 +3003,18 @@ em_enable_vlans(struct adapter *adapter)
 }
 
 static void
+em_disable_vlans(struct adapter *adapter)
+{
+	uint32_t ctrl;
+
+	ctrl = E1000_READ_REG(&adapter->hw, CTRL);
+	ctrl &= ~E1000_CTRL_VME;
+	E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
+
+	return;
+}
+
+static void
 em_enable_intr(struct adapter * adapter)
 {
 	E1000_WRITE_REG(&adapter->hw, IMS, (IMS_ENABLE_MASK));
@@ -2966,8 +3024,20 @@ em_enable_intr(struct adapter * adapter)
 static void
 em_disable_intr(struct adapter *adapter)
 {
-	E1000_WRITE_REG(&adapter->hw, IMC, 
-			(0xffffffff & ~E1000_IMC_RXSEQ));
+	/*
+	 * The first version of 82542 had an errata where when link was forced it
+	 * would stay up even up even if the cable was disconnected.  Sequence errors
+	 * were used to detect the disconnect and then the driver would unforce the link.
+	 * This code in the in the ISR.  For this to work correctly the Sequence error 
+	 * interrupt had to be enabled all the time.
+	 */
+
+	if (adapter->hw.mac_type == em_82542_rev2_0)
+	    E1000_WRITE_REG(&adapter->hw, IMC,
+	        (0xffffffff & ~E1000_IMC_RXSEQ));
+	else
+	    E1000_WRITE_REG(&adapter->hw, IMC,
+	        0xffffffff);
 	return;
 }
 

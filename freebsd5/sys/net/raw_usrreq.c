@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_usrreq.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.34.4.1 2004/10/21 09:30:46 rwatson Exp $
+ * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.34.2.2 2005/01/31 23:26:23 imp Exp $
  */
 
 #include <sys/param.h>

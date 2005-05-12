@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wavelan_ieee.h,v 1.18 2003/06/27 00:49:04 sam Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wavelan_ieee.h,v 1.18.4.1 2005/01/30 01:00:12 imp Exp $
  */
 
 #ifndef _IF_WAVELAN_IEEE_H

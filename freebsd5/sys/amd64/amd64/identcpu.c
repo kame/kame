@@ -2,8 +2,6 @@
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
  * Copyright (c) 1997 KATO Takenori.
- * Copyright (c) 2001 Tamotsu Hattori.
- * Copyright (c) 2001 Mitsuru IWASAKI.
  * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
@@ -41,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/identcpu.c,v 1.134 2004/06/08 01:20:37 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/identcpu.c,v 1.134.2.1 2005/02/14 10:12:09 obrien Exp $");
 
 #include "opt_cpu.h"
 

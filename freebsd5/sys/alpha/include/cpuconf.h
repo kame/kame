@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/alpha/include/cpuconf.h,v 1.12 2002/03/20 18:58:45 obrien Exp $ */
+/* $FreeBSD: src/sys/alpha/include/cpuconf.h,v 1.12.8.1 2005/01/30 00:59:10 imp Exp $ */
 /*	$NetBSD: cpuconf.h,v 1.7 1997/11/06 00:42:03 thorpej Exp $	*/
 #ifndef	_ALPHA_CPUCONF_H
 #define	_ALPHA_CPUCONF_H
-/*
+/*-
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Additional reworking by Matthew Jacob for NASA/Ames Research Center.
  * Copyright (c) 1997
  */

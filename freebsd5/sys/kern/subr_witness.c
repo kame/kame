@@ -82,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_witness.c,v 1.178.2.2 2004/09/14 03:51:20 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_witness.c,v 1.178.2.7 2005/03/02 20:17:39 jmg Exp $");
 
 #include "opt_ddb.h"
 #include "opt_witness.h"
@@ -191,7 +191,6 @@ static void	witness_display_list(void(*prnt)(const char *fmt, ...),
 static void	witness_display(void(*)(const char *fmt, ...));
 #endif
 
-MALLOC_DEFINE(M_WITNESS, "witness", "witness structure");
 SYSCTL_NODE(_debug, OID_AUTO, witness, CTLFLAG_RW, 0, "Witness Locking");
 
 /*
@@ -204,7 +203,6 @@ SYSCTL_NODE(_debug, OID_AUTO, witness, CTLFLAG_RW, 0, "Witness Locking");
  * turned on once it is turned off, however.
  */
 static int witness_watch = 1;
-TUNABLE_INT("debug.witness_watch", &witness_watch);
 TUNABLE_INT("debug.witness.watch", &witness_watch);
 SYSCTL_PROC(_debug_witness, OID_AUTO, watch, CTLFLAG_RW | CTLTYPE_INT, NULL, 0,
     sysctl_debug_witness_watch, "I", "witness is watching lock operations");
@@ -221,7 +219,6 @@ int	witness_kdb = 1;
 #else
 int	witness_kdb = 0;
 #endif
-TUNABLE_INT("debug.witness_kdb", &witness_kdb);
 TUNABLE_INT("debug.witness.kdb", &witness_kdb);
 SYSCTL_INT(_debug_witness, OID_AUTO, kdb, CTLFLAG_RW, &witness_kdb, 0, "");
 
@@ -232,7 +229,6 @@ SYSCTL_INT(_debug_witness, OID_AUTO, kdb, CTLFLAG_RW, &witness_kdb, 0, "");
  *	- locks are held when going to sleep.
  */
 int	witness_trace = 1;
-TUNABLE_INT("debug.witness_trace", &witness_trace);
 TUNABLE_INT("debug.witness.trace", &witness_trace);
 SYSCTL_INT(_debug_witness, OID_AUTO, trace, CTLFLAG_RW, &witness_trace, 0, "");
 #endif /* KDB */
@@ -242,7 +238,6 @@ int	witness_skipspin = 1;
 #else
 int	witness_skipspin = 0;
 #endif
-TUNABLE_INT("debug.witness_skipspin", &witness_skipspin);
 TUNABLE_INT("debug.witness.skipspin", &witness_skipspin);
 SYSCTL_INT(_debug_witness, OID_AUTO, skipspin, CTLFLAG_RDTUN,
     &witness_skipspin, 0, "");
@@ -352,8 +347,7 @@ static struct witness_order_list_entry order_lists[] = {
 	{ "turnstile chain", &lock_class_mtx_spin },
 	{ "td_contested", &lock_class_mtx_spin },
 	{ "callout", &lock_class_mtx_spin },
-	{ "entropy harvest", &lock_class_mtx_spin },
-	{ "entropy harvest buffers", &lock_class_mtx_spin },
+	{ "entropy harvest mutex", &lock_class_mtx_spin },
 	/*
 	 * leaf locks
 	 */
@@ -1726,6 +1720,27 @@ witness_list_lock(struct lock_instance *instance)
 	    instance->li_line);
 }
 
+#ifdef DDB
+static int
+witness_thread_has_locks(struct thread *td)
+{
+
+	return (td->td_sleeplocks != NULL);
+}
+
+static int
+witness_proc_has_locks(struct proc *p)
+{
+	struct thread *td;
+
+	FOREACH_THREAD_IN_PROC(p, td) {
+		if (witness_thread_has_locks(td))
+			return (1);
+	}
+	return (0);
+}
+#endif
+
 int
 witness_list_locks(struct lock_list_entry **lock_list)
 {
@@ -1919,6 +1934,29 @@ DB_SHOW_COMMAND(locks, db_witness_list)
 	} else {
 		td = curthread;
 		witness_list(td);
+	}
+}
+
+DB_SHOW_COMMAND(alllocks, db_witness_list_all)
+{
+	struct thread *td;
+	struct proc *p;
+
+	/*
+	 * It would be nice to list only threads and processes that actually
+	 * held sleep locks, but that information is currently not exported
+	 * by WITNESS.
+	 */
+	FOREACH_PROC_IN_SYSTEM(p) {
+		if (!witness_proc_has_locks(p))
+			continue;
+		FOREACH_THREAD_IN_PROC(p, td) {
+			if (!witness_thread_has_locks(td))
+				continue;
+			printf("Process %d (%s) thread %p (%d)\n", p->p_pid,
+			    p->p_comm, td, td->td_tid);
+			witness_list(td);
+		}
 	}
 }
 

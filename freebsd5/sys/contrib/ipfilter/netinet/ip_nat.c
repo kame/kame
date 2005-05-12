@@ -111,7 +111,7 @@ extern struct ifnet vpnif;
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_nat.c	1.11 6/5/96 (C) 1995 Darren Reed";
 /* static const char rcsid[] = "@(#)$Id: ip_nat.c,v 2.37.2.44 2001/07/21 07:17:22 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_nat.c,v 1.34 2004/06/21 22:46:35 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_nat.c,v 1.34.2.4 2005/03/13 18:08:56 rwatson Exp $";
 #endif
 
 nat_t	**nat_table[2] = { NULL, NULL },
@@ -132,7 +132,7 @@ u_long	fr_defnatage = DEF_NAT_AGE,
 	fr_defnaticmpage = 6;		/* 3 seconds */
 natstat_t nat_stats;
 int	fr_nat_lock = 0;
-#if	(SOLARIS || defined(__sgi)) && defined(_KERNEL)
+#ifdef USE_MUTEX
 extern	kmutex_t	ipf_rw;
 extern	KRWLOCK_T	ipf_nat;
 #endif
@@ -2613,8 +2613,10 @@ maskloop:
 		hv = NAT_HASH_FN(iph, 0, ipf_rdrrules_sz);
 		for (np = rdr_rules[hv]; np; np = np->in_rnext) {
 			if ((np->in_ifp && (np->in_ifp != ifp)) ||
-			    (np->in_p && (np->in_p != fin->fin_p)) ||
-			    (np->in_flags && !(nflags & np->in_flags)))
+			    (np->in_p && (np->in_p != fin->fin_p)))
+				continue;
+			if ((np->in_flags & IPN_RF) &&
+			    !(nflags & np->in_flags))
 				continue;
 			if (np->in_flags & IPN_FILTER) {
 				if (!nat_match(fin, np, ip))
@@ -2877,11 +2879,14 @@ void nat_log(nat, type)
 struct nat *nat;
 u_int type;
 {
+# ifndef LARGE_NAT
 	struct ipnat *np;
+	int rulen;
+# endif
 	struct natlog natl;
 	void *items[1];
 	size_t sizes[1];
-	int rulen, types[1];
+	int types[1];
 
 	natl.nl_inip = nat->nat_inip;
 	natl.nl_outip = nat->nat_outip;

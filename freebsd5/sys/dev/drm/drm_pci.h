@@ -5,7 +5,7 @@
  * \author Eric Anholt <anholt@FreeBSD.org>
  */
 
-/*
+/*-
  * Copyright 2003 Eric Anholt.
  * All Rights Reserved.
  *
@@ -27,7 +27,7 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/drm_pci.h,v 1.2 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_pci.h,v 1.2.4.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/drmP.h"

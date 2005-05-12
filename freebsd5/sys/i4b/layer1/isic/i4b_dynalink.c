@@ -1,4 +1,4 @@
-/*
+/*-
  *   Copyright (c) 1998 Martijn Plak. All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -27,8 +27,9 @@
  *   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  *   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  *   SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	isdn4bsd layer1 driver for Dynalink IS64PH isdn TA
  *	==================================================
@@ -37,7 +38,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_dynalink.c,v 1.7 2003/06/10 23:45:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_dynalink.c,v 1.7.4.1 2005/01/31 23:26:10 imp Exp $");
 
 /*	NOTES:
 	

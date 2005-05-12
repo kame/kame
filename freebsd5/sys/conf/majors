@@ -1,4 +1,7 @@
-# $FreeBSD: src/sys/conf/majors,v 1.201 2004/05/05 13:09:11 rik Exp $
+# $FreeBSD: src/sys/conf/majors,v 1.201.2.1 2005/01/30 02:32:17 rwatson Exp $
+#
+# Major numbers are now assigned in RELENG_4.  This file is left to
+# rot in peace in 5.x/6.x.
 #
 # This list is semi-obsoleted by DEVFS, but for now it still contains
 # the current allocation of device major numbers.

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Ian Dowse.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_msgbuf.c,v 1.2 2003/09/05 11:12:00 phk Exp $
+ * $FreeBSD: src/sys/kern/subr_msgbuf.c,v 1.2.4.1 2005/01/31 23:26:17 imp Exp $
  */
 
 /*

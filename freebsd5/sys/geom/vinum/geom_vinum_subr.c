@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_subr.c,v 1.6.2.2 2004/10/07 17:51:06 le Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_subr.c,v 1.6.2.4 2005/02/10 12:45:51 le Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -233,41 +233,6 @@ gv_format_config(struct gv_softc *sc, struct sbuf *sb, int ondisk, char *prefix)
 	}
 
 	return;
-}
-
-/*
- * Take a size in bytes and return a pointer to a string which represents the
- * size best.  If lj is != 0, return left justified, otherwise in a fixed 10
- * character field suitable for columnar printing.
- *
- * Note this uses a static string: it's only intended to be used immediately
- * for printing.
- */
-const char *
-gv_roughlength(off_t bytes, int lj)
-{
-	static char desc[16];
-	
-	/* Gigabytes. */
-	if (bytes > (off_t)MEGABYTE * 10000)
-		snprintf(desc, sizeof(desc), lj ? "%jd GB" : "%10jd GB",
-		    bytes / GIGABYTE);
-
-	/* Megabytes. */
-	else if (bytes > KILOBYTE * 10000)
-		snprintf(desc, sizeof(desc), lj ? "%jd MB" : "%10jd MB",
-		    bytes / MEGABYTE);
-
-	/* Kilobytes. */
-	else if (bytes > 10000)
-		snprintf(desc, sizeof(desc), lj ? "%jd kB" : "%10jd kB",
-		    bytes / KILOBYTE);
-
-	/* Bytes. */
-	else
-		snprintf(desc, sizeof(desc), lj ? "%jd  B" : "%10jd  B", bytes);
-
-	return (desc);
 }
 
 int
@@ -825,6 +790,8 @@ gv_kill_drive_thread(struct gv_drive *d)
 		while (!(d->flags & GV_DRIVE_THREAD_DEAD))
 			tsleep(d, PRIBIO, "gv_die", hz);
 		d->flags &= ~GV_DRIVE_THREAD_ACTIVE;
+		d->flags &= ~GV_DRIVE_THREAD_DIE;
+		d->flags &= ~GV_DRIVE_THREAD_DEAD;
 		mtx_destroy(&d->bqueue_mtx);
 	}
 }
@@ -838,6 +805,8 @@ gv_kill_plex_thread(struct gv_plex *p)
 		while (!(p->flags & GV_PLEX_THREAD_DEAD))
 			tsleep(p, PRIBIO, "gv_die", hz);
 		p->flags &= ~GV_PLEX_THREAD_ACTIVE;
+		p->flags &= ~GV_PLEX_THREAD_DIE;
+		p->flags &= ~GV_PLEX_THREAD_DEAD;
 		mtx_destroy(&p->bqueue_mtx);
 	}
 }
@@ -851,6 +820,8 @@ gv_kill_vol_thread(struct gv_volume *v)
 		while (!(v->flags & GV_VOL_THREAD_DEAD))
 			tsleep(v, PRIBIO, "gv_die", hz);
 		v->flags &= ~GV_VOL_THREAD_ACTIVE;
+		v->flags &= ~GV_VOL_THREAD_DIE;
+		v->flags &= ~GV_VOL_THREAD_DEAD;
 		mtx_destroy(&v->bqueue_mtx);
 	}
 }

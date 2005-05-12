@@ -1,3 +1,4 @@
+#-
 # Copyright (c) 2001, 2003 by Thomas Moestl <tmm@FreeBSD.org>
 # Copyright (c) 2004 by Marius Strobl <marius@FreeBSD.org>
 # All rights reserved.
@@ -22,7 +23,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 # USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/ofw/ofw_bus_if.m,v 1.1 2004/08/12 17:41:29 marius Exp $
+# $FreeBSD: src/sys/dev/ofw/ofw_bus_if.m,v 1.1.2.1 2005/01/30 00:59:56 imp Exp $
 
 #include <sys/bus.h>
 #include <machine/bus.h>

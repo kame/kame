@@ -1,7 +1,6 @@
 /*-
- * Copyright (c) 2004
- * 	Bosko Milekic <bmilekic@FreeBSD.org>.
- *	All rights reserved.
+ * Copyright (c) 2004, 2005,
+ * 	Bosko Milekic <bmilekic@FreeBSD.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,9 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the author nor the names of contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -30,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_mbuf.c,v 1.3 2004/08/02 00:18:35 green Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_mbuf.c,v 1.3.2.4 2005/02/16 22:21:35 bmilekic Exp $");
 
 #include "opt_mac.h"
 #include "opt_param.h"
@@ -123,6 +119,9 @@ static void	mb_fini_pack(void *, int);
 static void	mb_reclaim(void *);
 static void	mbuf_init(void *);
 
+/* Ensure that MSIZE doesn't break dtom() - it must be a power of 2 */
+CTASSERT((((MSIZE - 1) ^ MSIZE) + 1) >> 1 == MSIZE);
+
 /*
  * Initialize FreeBSD Network buffer allocation.
  */
@@ -135,7 +134,7 @@ mbuf_init(void *dummy)
 	 * Configure UMA zones for Mbufs, Clusters, and Packets.
 	 */
 	zone_mbuf = uma_zcreate("Mbuf", MSIZE, mb_ctor_mbuf, mb_dtor_mbuf,
-	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_MAXBUCKET);
+	    NULL, NULL, MSIZE - 1, UMA_ZONE_MAXBUCKET);
 	zone_clust = uma_zcreate("MbufClust", MCLBYTES, mb_ctor_clust,
 	    mb_dtor_clust, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_REFCNT);
 	if (nmbclusters > 0)
@@ -263,9 +262,7 @@ mb_ctor_clust(void *mem, int size, void *arg, int how)
 	m->m_ext.ext_args = NULL;
 	m->m_ext.ext_size = MCLBYTES;
 	m->m_ext.ext_type = EXT_CLUSTER;
-	m->m_ext.ref_cnt = (u_int *)uma_find_refcnt(zone_clust,
-	    m->m_ext.ext_buf);
-	*(m->m_ext.ref_cnt) = 1;
+	m->m_ext.ref_cnt = NULL;	/* Lazy counter assign. */
 	mbstat.m_mclusts += 1;	/* XXX */
 	return (0);
 }
@@ -338,7 +335,7 @@ mb_ctor_pack(void *mem, int size, void *arg, int how)
 	m->m_ext.ext_args = NULL;
 	m->m_ext.ext_size = MCLBYTES;
 	m->m_ext.ext_type = EXT_PACKET;
-	*(m->m_ext.ref_cnt) = 1;
+	m->m_ext.ref_cnt = NULL;	/* Lazy counter assign. */
 
 	if (flags & M_PKTHDR) {
 		m->m_pkthdr.rcvif = NULL;

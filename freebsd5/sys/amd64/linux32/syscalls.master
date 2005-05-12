@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/amd64/linux32/syscalls.master,v 1.1 2004/08/16 07:55:06 tjr Exp $
+ $FreeBSD: src/sys/amd64/linux32/syscalls.master,v 1.1.2.1 2005/03/31 22:17:42 sobomax Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from LINUX).
@@ -25,8 +25,12 @@
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
+#include <compat/linux/linux_sysproto.h>
 #include <amd64/linux32/linux.h>
 #include <amd64/linux32/linux32_proto.h>
+
+; Isn't pretty, but there seems to be no other way to trap nosys
+#define	nosys	linux_nosys
 
 ; #ifdef's, etc. may be included, and are copied to the output files.
 

@@ -15,9 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. The names of the authors may not be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -33,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/strvalid.c,v 1.3 2003/06/11 05:23:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/strvalid.c,v 1.3.4.2 2005/02/13 21:30:02 rwatson Exp $");
 
 #include <sys/types.h>
 #include <sys/libkern.h>
@@ -45,7 +42,7 @@ __FBSDID("$FreeBSD: src/sys/libkern/strvalid.c,v 1.3 2003/06/11 05:23:04 obrien 
 int
 strvalid(const char *buffer, size_t bufferlen)
 {
-	int i;
+	size_t i;
 
 	/* Must be NUL-terminated. */
 	for (i = 0; i < bufferlen; i++)

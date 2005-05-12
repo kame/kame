@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/ciphyreg.h,v 1.1.2.1 2004/09/14 21:22:33 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/ciphyreg.h,v 1.1.2.2 2005/01/30 00:59:54 imp Exp $
  */
 
 #ifndef _DEV_MII_CIPHYREG_H_

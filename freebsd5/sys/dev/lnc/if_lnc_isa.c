@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994-2000
  *	Paul Richards. All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_isa.c,v 1.18 2004/05/30 20:08:35 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_isa.c,v 1.18.2.1 2005/01/30 00:59:53 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

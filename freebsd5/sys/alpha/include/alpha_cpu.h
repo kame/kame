@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/alpha_cpu.h,v 1.10 2003/07/24 07:41:08 marcel Exp $ */
+/* $FreeBSD: src/sys/alpha/include/alpha_cpu.h,v 1.10.4.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: alpha_cpu.h,v 1.15 1997/09/20 19:02:34 mjacob Exp */
 
-/*
+/*-
  * Copyright (c) 1996 Carnegie-Mellon University.
  * All rights reserved.
  *

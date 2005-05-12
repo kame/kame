@@ -38,10 +38,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_resource.h,v 1.3 1999/08/28 00:51:19 peter Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_resource.h,v 1.3.10.1 2005/01/30 00:59:20 imp Exp $
  */
 
-/*
+/*-
  * Portions of this code derived from software contributed to the
  * FreeBSD Project by Mark Newton.
  * 

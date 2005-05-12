@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbdreg.h,v 1.6 2000/03/19 03:25:12 yokota Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbdreg.h,v 1.6.8.1 2005/01/07 20:36:00 jhb Exp $
  */
 
 #ifndef _DEV_KBD_ATKBDREG_H_
@@ -35,6 +35,7 @@
 #define KB_CONF_FAIL_IF_NO_KBD	(1 << 0) /* don't install if no kbd is found */
 #define KB_CONF_NO_RESET	(1 << 1) /* don't reset the keyboard */
 #define KB_CONF_ALT_SCANCODESET	(1 << 2) /* assume the XT type keyboard */
+#define	KB_CONF_NO_PROBE_TEST	(1 << 3) /* don't test keyboard during probe */
 
 #ifdef _KERNEL
 

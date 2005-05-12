@@ -1,7 +1,8 @@
 /*
  * Product specific probe and attach routines for:
  *      Adaptec 154x.
- *
+ */
+/*-
  * Copyright (c) 1999-2003 M. Warner Losh
  * All rights reserved.
  *
@@ -54,7 +55,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.29 2004/03/17 17:50:24 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.29.2.2 2005/03/02 09:38:19 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -122,7 +123,7 @@ aha_isa_probe(device_t dev)
 
 	port_rid = 0;
 	port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &port_rid,
-	  0, ~0, AHA_NREGS, RF_ACTIVE);
+	    0, ~0, AHA_NREGS, RF_ACTIVE);
 
 	if (port_res == NULL)
 		return (ENXIO);
@@ -150,7 +151,7 @@ aha_isa_probe(device_t dev)
 		    "settings for adapter at %#jx.  Failing probe\n",
 		    (uintmax_t)port_start);
 		aha_free(aha);
-		bus_release_resource(dev, SYS_RES_IOPORT, port_rid, 
+		bus_release_resource(dev, SYS_RES_IOPORT, port_rid,
 		    port_res);
 		return (ENXIO);
 	}

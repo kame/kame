@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Andrew Gallatin & Doug Rabson
  * All rights reserved.
  *
@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/t2.c,v 1.21 2004/07/01 15:07:27 gallatin Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/t2.c,v 1.21.2.1 2005/01/30 00:59:12 imp Exp $");
 
 #define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>

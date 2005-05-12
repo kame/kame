@@ -8,7 +8,7 @@
 	 NSP_READ_FIFO_INTERRUPTS | NSP_WRITE_FIFO_INTERRUPTS | \
 	 NSP_USE_MEMIO | NSP_WAIT_FOR_SELECT)
 
-/*
+/*-
  *  Copyright (c) 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.
  *
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.12 2004/07/10 21:06:08 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.12.2.1 2005/01/30 00:59:56 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

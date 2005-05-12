@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_disk.c,v 1.91 2004/08/08 07:57:51 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_disk.c,v 1.91.2.3 2005/02/28 18:42:01 phk Exp $");
 
 #include "opt_geom.h"
 
@@ -65,7 +65,7 @@ static g_start_t g_disk_start;
 static g_ioctl_t g_disk_ioctl;
 static g_dumpconf_t g_disk_dumpconf;
 
-struct g_class g_disk_class = {
+static struct g_class g_disk_class = {
 	.name = "DISK",
 	.version = G_VERSION,
 	.init = g_disk_init,
@@ -180,6 +180,8 @@ g_disk_kerneldump(struct bio *bp, struct disk *dp)
 	di.priv = dp;
 	di.blocksize = dp->d_sectorsize;
 	di.mediaoffset = gkd->offset;
+	if ((gkd->offset + gkd->length) > dp->d_mediasize)
+		gkd->length = dp->d_mediasize - gkd->offset;
 	di.mediasize = gkd->length;
 	error = set_dumper(&di);
 	g_io_deliver(bp, error);
@@ -212,7 +214,7 @@ g_disk_done(struct bio *bp)
 }
 
 static int
-g_disk_ioctl(struct g_provider *pp, u_long cmd, void * data, struct thread *td)
+g_disk_ioctl(struct g_provider *pp, u_long cmd, void * data, int fflag, struct thread *td)
 {
 	struct g_geom *gp;
 	struct disk *dp;
@@ -224,7 +226,7 @@ g_disk_ioctl(struct g_provider *pp, u_long cmd, void * data, struct thread *td)
 	if (dp->d_ioctl == NULL)
 		return (ENOIOCTL);
 	g_disk_lock_giant(dp);
-	error = dp->d_ioctl(dp, cmd, data, 0, td);
+	error = dp->d_ioctl(dp, cmd, data, fflag, td);
 	g_disk_unlock_giant(dp);
 	return(error);
 }
@@ -365,8 +367,10 @@ g_disk_destroy(void *ptr, int flag)
 	g_topology_assert();
 	dp = ptr;
 	gp = dp->d_geom;
-	gp->softc = NULL;
-	g_wither_geom(gp, ENXIO);
+	if (gp != NULL) {
+		gp->softc = NULL;
+		g_wither_geom(gp, ENXIO);
+	}
 	g_free(dp);
 }
 

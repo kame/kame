@@ -1,4 +1,4 @@
-/*-
+/*--
  * Copyright (c) 1997, Duke University
  * All rights reserved.
  *
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_cow.c,v 1.20 2004/04/03 09:16:26 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_cow.c,v 1.20.2.2 2005/03/09 18:59:20 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -138,7 +138,7 @@ socow_setup(struct mbuf *m0, struct uio *uio)
 	/*
 	 * Allocate an sf buf
 	 */
-	sf = sf_buf_alloc(pp, PCATCH);
+	sf = sf_buf_alloc(pp, SFB_CATCH);
 	if (!sf) {
 		vm_page_lock_queues();
 		vm_page_cowclear(pp);

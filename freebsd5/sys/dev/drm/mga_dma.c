@@ -1,6 +1,6 @@
 /* mga_dma.c -- DMA support for mga g200/g400 -*- linux-c -*-
- * Created: Mon Dec 13 01:50:01 1999 by jhartmann@precisioninsight.com
- *
+ * Created: Mon Dec 13 01:50:01 1999 by jhartmann@precisioninsight.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -32,7 +32,7 @@
  * Rewritten by:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_dma.c,v 1.10 2004/01/06 04:34:53 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_dma.c,v 1.10.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/mga.h"

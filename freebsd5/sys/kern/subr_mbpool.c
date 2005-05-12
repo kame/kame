@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_mbpool.c,v 1.2 2003/12/07 21:53:41 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_mbpool.c,v 1.2.2.1 2005/01/31 23:26:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>

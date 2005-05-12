@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/trap.c,v 1.267.2.2 2004/09/03 06:40:25 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/trap.c,v 1.267.2.2.4.1 2005/05/01 05:38:13 dwhite Exp $");
 
 /*
  * 386 Trap and System call handling
@@ -185,6 +185,14 @@ trap(frame)
 
 	atomic_add_int(&cnt.v_trap, 1);
 	type = frame.tf_trapno;
+
+#ifdef KDB_STOP_NMI
+	/* Handler for NMI IPIs used for debugging */
+	if (type == T_NMI) {
+	         if (ipi_nmi_handler() == 0)
+	                   goto out;
+	}
+#endif /* KDB_STOP_NMI */
 
 #ifdef KDB
 	if (kdb_active) {

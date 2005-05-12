@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996
  *	Matthias Drochner.  All rights reserved.
  *
@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/efi/libefi/efiboot.h,v 1.8 2003/08/02 08:22:03 marcel Exp $
+ * $FreeBSD: src/sys/boot/efi/libefi/efiboot.h,v 1.8.4.1 2005/01/30 00:59:14 imp Exp $
  */
 
 /*

@@ -22,8 +22,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * Functions to encode or decode struct dos_partition into a bytestream
+ */
+
+/* Functions to encode or decode struct dos_partition into a bytestream
  * of correct endianess and packing.  These functions do no validation
  * or sanity checking, they only pack/unpack the fields correctly.
  *
@@ -31,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_mbr_enc.c,v 1.2 2003/06/11 06:49:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_mbr_enc.c,v 1.2.4.1 2005/01/31 23:26:00 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/diskmbr.h>

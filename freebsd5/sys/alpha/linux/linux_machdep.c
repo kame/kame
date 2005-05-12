@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.33.2.1 2004/09/09 09:45:25 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.33.2.2 2005/02/05 01:02:48 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -36,10 +36,13 @@ __FBSDID("$FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.33.2.1 2004/09/09 09
 #include <sys/mount.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/resource.h>
+#include <sys/resourcevar.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/unistd.h>
-#include <sys/user.h>
+
+#include <machine/pcb.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1999-2000 by Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/net/if_tap.c,v 1.46.2.1 2004/09/20 05:49:40 rwatson Exp $
+ * $FreeBSD: src/sys/net/if_tap.c,v 1.46.2.3 2005/01/31 23:26:23 imp Exp $
  * $Id: if_tap.c,v 0.21 2000/07/23 21:46:02 max Exp $
  */
 
@@ -800,8 +800,8 @@ tapwrite(dev, uio, flag)
 {
 	struct tap_softc	*tp = dev->si_drv1;
 	struct ifnet		*ifp = &tp->tap_if;
-	struct mbuf		*top = NULL, **mp = NULL, *m = NULL;
-	int			 error = 0, tlen, mlen;
+	struct mbuf		*m;
+	int			 error = 0;
 
 	TAPDEBUG("%s writting, minor = %#x\n", 
 		ifp->if_xname, minor(dev));
@@ -815,42 +815,16 @@ tapwrite(dev, uio, flag)
 
 		return (EIO);
 	}
-	tlen = uio->uio_resid;
 
-	/* get a header mbuf */
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
-	if (m == NULL)
-		return (ENOBUFS);
-	mlen = MHLEN;
-
-	top = 0;
-	mp = &top;
-	while ((error == 0) && (uio->uio_resid > 0)) {
-		m->m_len = min(mlen, uio->uio_resid);
-		error = uiomove(mtod(m, void *), m->m_len, uio);
-		*mp = m;
-		mp = &m->m_next;
-		if (uio->uio_resid > 0) {
-			MGET(m, M_DONTWAIT, MT_DATA);
-			if (m == NULL) {
-				error = ENOBUFS;
-				break;
-			}
-			mlen = MLEN;
-		}
-	}
-	if (error) {
+	if ((m = m_uiotombuf(uio, M_DONTWAIT, 0)) == NULL) {
 		ifp->if_ierrors ++;
-		if (top)
-			m_freem(top);
 		return (error);
 	}
 
-	top->m_pkthdr.len = tlen;
-	top->m_pkthdr.rcvif = ifp;
+	m->m_pkthdr.rcvif = ifp;
 
 	/* Pass packet up to parent. */
-	(*ifp->if_input)(ifp, top);
+	(*ifp->if_input)(ifp, m);
 	ifp->if_ipackets ++; /* ibytes are counted in parent */
 
 	return (0);

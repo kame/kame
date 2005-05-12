@@ -1,6 +1,6 @@
 /*	$NetBSD: ntfs_vnops.c,v 1.23 1999/10/31 19:45:27 jdolecek Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_vnops.c,v 1.42 2004/04/07 20:46:01 imp Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_vnops.c,v 1.42.2.1 2005/01/31 23:25:57 imp Exp $
  *
  */
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 2000
@@ -31,7 +31,7 @@
  *	@(#)kernfs_vfsops.c	8.10 (Berkeley) 5/14/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_vfsops.c,v 1.33 2004/07/30 22:08:49 phk Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_vfsops.c,v 1.33.2.1 2005/01/31 23:25:55 imp Exp $
  */
 
 #include "opt_devfs.h"

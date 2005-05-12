@@ -1,11 +1,11 @@
-# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.56 2004/07/30 04:27:20 kan Exp $
+# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.56.2.2 2005/03/16 18:54:37 obrien Exp $
 
 FILES=		boot boot1 boot2
 
 NM?=		nm
 
 # A value of 0x80 enables LBA support.
-B1FLAGS=	0x80
+BOOT_BOOT1_FLAGS?=	0x80
 
 BOOT_COMCONSOLE_PORT?= 0x3f8
 BOOT_COMCONSOLE_SPEED?= 9600
@@ -26,8 +26,9 @@ CFLAGS=	-Os \
 	-fno-unit-at-a-time \
 	-mno-align-long-strings \
 	-mrtd \
+	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 \
 	-D${BOOT2_UFS} \
-	-DFLAGS=${B1FLAGS} \
+	-DFLAGS=${BOOT_BOOT1_FLAGS} \
 	-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
 	-DSIOFMT=${B2SIOFMT} \
 	-DSIOSPD=${BOOT_COMCONSOLE_SPEED} \

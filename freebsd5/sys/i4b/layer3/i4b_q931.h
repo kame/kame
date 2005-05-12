@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_q931.h - Q931 handling header file
  *	--------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer3/i4b_q931.h,v 1.10 2003/01/01 18:48:53 schweikh Exp $
+ * $FreeBSD: src/sys/i4b/layer3/i4b_q931.h,v 1.10.6.1 2005/01/31 23:26:12 imp Exp $
  *
  *      last edit-date: [Tue Mar 26 15:04:33 2002]
  *

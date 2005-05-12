@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000 Dave Boyce. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *      i4b_iwic - isdn4bsd Winbond W6692 driver
  *      ----------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/iwic/i4b_w6692.h,v 1.2 2001/01/21 10:12:50 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/iwic/i4b_w6692.h,v 1.2.10.1 2005/01/31 23:26:11 imp Exp $
  *
  *      last edit-date: [Sun Jan 21 11:09:46 2001]
  *

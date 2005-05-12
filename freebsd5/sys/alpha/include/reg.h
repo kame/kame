@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/reg.h,v 1.12 2002/08/29 06:17:46 jake Exp $ */
+/* $FreeBSD: src/sys/alpha/include/reg.h,v 1.12.8.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: reg.h,v 1.3 1997/04/06 08:47:40 cgd Exp */
 
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *

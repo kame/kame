@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2002 Benno Rice <benno@FreeBSD.org>
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_disk.c,v 1.14 2004/08/16 15:45:26 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_disk.c,v 1.14.2.1 2005/01/30 00:59:56 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

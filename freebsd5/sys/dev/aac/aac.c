@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac.c,v 1.101 2004/08/13 01:44:09 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac.c,v 1.101.2.5 2005/03/02 16:30:39 scottl Exp $");
 
 /*
  * Driver for the Adaptec 'FSA' family of PCI/SCSI RAID adapters.
@@ -57,7 +57,7 @@ __FBSDID("$FreeBSD: src/sys/dev/aac/aac.c,v 1.101 2004/08/13 01:44:09 scottl Exp
 #include <machine/resource.h>
 
 #include <dev/aac/aacreg.h>
-#include <dev/aac/aac_ioctl.h>
+#include <sys/aac_ioctl.h>
 #include <dev/aac/aacvar.h>
 #include <dev/aac/aac_tables.h>
 
@@ -1485,7 +1485,7 @@ aac_init(struct aac_softc *sc)
 			       1,			/* nsegments */
 			       AAC_FIB_COUNT *
 			       sizeof(struct aac_fib),	/* maxsegsize */
-			       BUS_DMA_ALLOCNOW,	/* flags */
+			       0,			/* flags */
 			       NULL, NULL,		/* No locking needed */
 			       &sc->aac_fib_dmat)) {
 		device_printf(sc->aac_dev, "can't allocate FIB DMA tag\n");;
@@ -1505,7 +1505,7 @@ aac_init(struct aac_softc *sc)
 			       8192 + sizeof(struct aac_common), /* maxsize */
 			       1,			/* nsegments */
 			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			       BUS_DMA_ALLOCNOW,	/* flags */
+			       0,			/* flags */
 			       NULL, NULL,		/* No locking needed */
 			       &sc->aac_common_dmat)) {
 		device_printf(sc->aac_dev,
@@ -1992,11 +1992,13 @@ aac_timeout(struct aac_softc *sc)
 {
 	struct aac_command *cm;
 	time_t deadline;
+	int timedout, code;
 
 	/*
 	 * Traverse the busy command list, bitch about late commands once
 	 * only.
 	 */
+	timedout = 0;
 	deadline = time_second - AAC_CMD_TIMEOUT;
 	TAILQ_FOREACH(cm, &sc->aac_busy, cm_link) {
 		if ((cm->cm_timestamp  < deadline)
@@ -2006,9 +2008,17 @@ aac_timeout(struct aac_softc *sc)
 				      "COMMAND %p TIMEOUT AFTER %d SECONDS\n",
 				      cm, (int)(time_second-cm->cm_timestamp));
 			AAC_PRINT_FIB(sc, cm->cm_fib);
+			timedout++;
 		}
 	}
 
+	if (timedout) {
+		code = AAC_GET_FWSTATUS(sc);
+		if (code != AAC_UP_AND_RUNNING) {
+			device_printf(sc->aac_dev, "WARNING! Controller is no "
+				      "longer running! code= 0x%x\n", code);
+		}
+	}
 	return;
 }
 

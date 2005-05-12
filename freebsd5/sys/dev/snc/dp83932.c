@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.15 2004/08/13 23:47:01 rwatson Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.15.2.2 2005/02/24 15:58:37 mlaier Exp $	*/
 /*	$NecBSD: dp83932.c,v 1.5 1999/07/29 05:08:44 kmatsuda Exp $	*/
 /*	$NetBSD: if_snc.c,v 1.18 1998/04/25 21:27:40 scottr Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Kouichi Matsuda.  All rights reserved.
  *
@@ -45,7 +45,7 @@
  * (64 * 16 bits) Microwire Serial EEPROM.
  */
 
-/*
+/*-
  * National Semiconductor  DP8393X SONIC Driver
  * Copyright (c) 1991   Algorithmics Ltd (http://www.algor.co.uk)
  * You may use, copy, and modify this program so long as you retain the
@@ -346,12 +346,6 @@ outloop:
 	M_ASSERTPKTHDR(m);
 
 	/*
-	 * If bpf is listening on this interface, let it
-	 * see the packet before we commit it to the wire.
-	 */
-	BPF_MTAP(ifp, m);
-
-	/*
 	 * If there is nothing in the o/p queue, and there is room in
 	 * the Tx ring, then send the packet directly.  Otherwise append
 	 * it to the o/p queue.
@@ -360,6 +354,16 @@ outloop:
 		IF_PREPEND(&ifp->if_snd, m);
 		return;
 	}
+
+	/*
+	 * If bpf is listening on this interface, let it see the packet
+	 * before we commit it to the wire, but only if we are really
+	 * committed to send it.
+	 *
+	 * XXX: Locking must protect m against premature m_freem() in
+	 * sonictxint().
+	 */
+	BPF_MTAP(ifp, m);
 
 	sc->mtd_prev = sc->mtd_free;
 	sc->mtd_free = mtd_next;

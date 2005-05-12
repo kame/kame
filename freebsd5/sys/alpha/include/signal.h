@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/signal.h,v 1.11 2002/11/16 06:35:51 deischen Exp $ */
+/* $FreeBSD: src/sys/alpha/include/signal.h,v 1.11.8.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: signal.h,v 1.3 1997/04/06 08:47:43 cgd Exp */
 
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *

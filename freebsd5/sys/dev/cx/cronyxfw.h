@@ -1,4 +1,4 @@
-/*
+/*-
  * Cronyx firmware definitions.
  *
  * Copyright (C) 1996 Cronyx Engineering.
@@ -12,7 +12,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: cronyxfw.h,v 1.1.2.1 2003/11/12 17:09:49 rik Exp $
- * $FreeBSD: src/sys/dev/cx/cronyxfw.h,v 1.1 2003/12/03 07:29:38 imp Exp $
+ * $FreeBSD: src/sys/dev/cx/cronyxfw.h,v 1.1.6.1 2005/01/30 00:59:34 imp Exp $
  */
 #define CRONYX_DAT_MAGIC 2001107011L	/* firmware file magic */
 

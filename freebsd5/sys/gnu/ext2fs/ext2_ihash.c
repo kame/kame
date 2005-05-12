@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_ihash.c	8.7 (Berkeley) 5/17/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_ihash.c,v 1.38 2004/06/16 09:47:06 phk Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_ihash.c,v 1.38.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 #include <sys/param.h>

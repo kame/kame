@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 The FreeBSD Project
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_kdb.c,v 1.5.2.1 2004/08/25 03:29:43 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_kdb.c,v 1.5.2.2.2.1 2005/05/01 05:38:14 dwhite Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,6 +39,18 @@ __FBSDID("$FreeBSD: src/sys/kern/subr_kdb.c,v 1.5.2.1 2004/08/25 03:29:43 rwatso
 
 #include <machine/kdb.h>
 #include <machine/pcb.h>
+
+#ifdef KDB_STOP_NMI
+#include <machine/smp.h>
+#endif
+
+/* 
+ * KDB_STOP_NMI requires SMP to pick up the right dependencies
+ * (And isn't useful on UP anyway) 
+ */
+#if defined(KDB_STOP_NMI) && !defined(SMP)
+#error "options KDB_STOP_NMI" requires "options SMP"
+#endif
 
 int kdb_active = 0;
 void *kdb_jmpbufp = NULL;
@@ -77,6 +89,19 @@ static int kdb_stop_cpus = 1;
 SYSCTL_INT(_debug_kdb, OID_AUTO, stop_cpus, CTLTYPE_INT | CTLFLAG_RW,
     &kdb_stop_cpus, 0, "");
 TUNABLE_INT("debug.kdb.stop_cpus", &kdb_stop_cpus);
+
+#ifdef KDB_STOP_NMI
+/* 
+ * Provide an alternate method of stopping other CPUs. If another CPU has
+ * disabled interrupts the conventional STOP IPI will be blocked. This 
+ * NMI-based stop should get through in that case.
+ */
+static int kdb_stop_cpus_with_nmi = 0;
+SYSCTL_INT(_debug_kdb, OID_AUTO, stop_cpus_with_nmi, CTLTYPE_INT | CTLFLAG_RW,
+    &kdb_stop_cpus_with_nmi, 0, "");
+TUNABLE_INT("debug.kdb.stop_cpus_with_nmi", &kdb_stop_cpus_with_nmi);
+#endif /* KDB_STOP_NMI */
+
 #endif
 
 static int
@@ -306,9 +331,27 @@ kdb_reenter(void)
 
 struct pcb *
 kdb_thr_ctx(struct thread *thr)
+#ifdef KDB_STOP_NMI
+{  
+  u_int		cpuid;
+  struct pcpu *pc;
+  
+  if (thr == curthread) 
+    return &kdb_pcb;
+
+  SLIST_FOREACH(pc, &cpuhead, pc_allcpu)  {
+    cpuid = pc->pc_cpuid;
+    if (pc->pc_curthread == thr && (atomic_load_acq_int(&stopped_cpus) & (1 << cpuid)))
+      return &stoppcbs[cpuid];
+  }
+
+  return  thr->td_pcb;
+}
+#else
 {
 	return ((thr == curthread) ? &kdb_pcb : thr->td_pcb);
 }
+#endif /* KDB_STOP_NMI */
 
 struct thread *
 kdb_thr_first(void)
@@ -409,7 +452,14 @@ kdb_trap(int type, int code, struct trapframe *tf)
 
 #ifdef SMP
 	if ((did_stop_cpus = kdb_stop_cpus) != 0)
+	  {
+#ifdef KDB_STOP_NMI
+	    if(kdb_stop_cpus_with_nmi)
+	      stop_cpus_nmi(PCPU_GET(other_cpus));
+	    else
+#endif /* KDB_STOP_NMI */
 		stop_cpus(PCPU_GET(other_cpus));
+	  }
 #endif
 
 	/* Let MD code do its thing first... */

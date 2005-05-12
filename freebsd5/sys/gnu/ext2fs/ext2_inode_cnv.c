@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 The University of Utah and
  * the Computer Systems Laboratory at the University of Utah (CSL).
  * All rights reserved.
@@ -19,7 +19,7 @@
  * improvements that they make and grant CSL redistribution rights.
  *
  *      Utah $Hdr$
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode_cnv.c,v 1.13 2004/02/18 14:08:25 tjr Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode_cnv.c,v 1.13.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 /*

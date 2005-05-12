@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996-2000 Distributed Processing Technology Corporation
  * Copyright (c) 2000-2001 Adaptec Corporation.
  * All rights reserved.
@@ -19,7 +19,7 @@
  * arising in any way out of the use of this driver software, even if advised
  * of the possibility of such damage.
  *
- * $FreeBSD: src/sys/dev/asr/dptsig.h,v 1.7 2002/05/14 21:59:10 obrien Exp $
+ * $FreeBSD: src/sys/dev/asr/dptsig.h,v 1.7.8.1 2005/01/30 00:59:28 imp Exp $
  */
 
 #ifndef __DPTSIG_H_

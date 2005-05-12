@@ -1,4 +1,4 @@
-/*
+/*-
  * CAM request queue management definitions.
  *
  * Copyright (c) 1997 Justin T. Gibbs.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_queue.h,v 1.8 2000/05/26 02:01:42 jake Exp $
+ * $FreeBSD: src/sys/cam/cam_queue.h,v 1.8.8.1 2005/01/30 00:59:16 imp Exp $
  */
 
 #ifndef _CAM_CAM_QUEUE_H

@@ -90,7 +90,7 @@ extern struct timeout ipfr_slowtimer_ch;
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_frag.c	1.11 3/24/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_frag.c,v 1.25 2004/06/21 22:46:35 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_frag.c,v 1.25.2.1 2005/03/13 18:08:56 rwatson Exp $";
 #endif
 
 
@@ -109,7 +109,7 @@ extern	timeout_id_t	ipfr_timer_id;
 extern	int	ipfr_timer_id;
 # endif
 #endif
-#if	(SOLARIS || defined(__sgi)) && defined(_KERNEL)
+#ifdef USE_MUTEX
 extern	KRWLOCK_T	ipf_frag, ipf_natfrag, ipf_nat, ipf_mutex;
 # if	SOLARIS
 extern	KRWLOCK_T	ipf_solaris;

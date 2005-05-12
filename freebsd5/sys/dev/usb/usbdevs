@@ -1,7 +1,8 @@
-$FreeBSD: src/sys/dev/usb/usbdevs,v 1.195.2.4 2004/09/20 05:28:08 sanpei Exp $
+$FreeBSD: src/sys/dev/usb/usbdevs,v 1.195.2.9 2005/04/01 12:46:26 sobomax Exp $
+/* $NetBSD: usbdevs,v 1.392 2004/12/29 08:38:44 imp Exp $ */
 
-/*
- * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
+/*-
+ * Copyright (c) 1998-2004 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -132,6 +133,7 @@ vendor DIGI2		0x04d0	Digi International
 vendor ITTCANON		0x04d1	ITT Canon
 vendor ALTEC		0x04d2	Altec Lansing Technologies
 vendor PANASONIC	0x04da	Panasonic (Matsushita)
+vendor SHARP		0x04dd	Sharp
 vendor IIYAMA		0x04e1	Iiyama
 vendor SHUTTLE		0x04e6	Shuttle Technology
 vendor SAMSUNG		0x04e8	Samsung Electronics
@@ -301,6 +303,7 @@ vendor BILLIONTON	0x08dd	Billionton Systems
 vendor EXTENDED		0x08e9	Extended Systems
 vendor MSYSTEMS		0x08ec	M-Systems
 vendor AUTHENTEC	0x08ff	AuthenTec
+vendor TRUMPION		0x090a	Trumpion Microelectronics
 vendor ALATION		0x0910	Alation Systems
 vendor GOHUBS		0x0921	GoHubs
 vendor BIOMETRIC	0x0929	American Biometric Company
@@ -349,6 +352,7 @@ vendor SMC3		0x0d5c  Standard Microsystems
 vendor PNY		0x0d7d	PNY
 vendor MSI		0x0db0	Micro Star International
 vendor HAWKING		0x0e66	Hawking Technologies
+vendor GMATE		0x0e7e	G.Mate, Inc
 vendor MICROTUNE	0x0f4d	Microtune, Inc.
 vendor QUALCOMM2	0x1004	Qualcomm
 vendor WESTERN		0x1058	Western Digital
@@ -358,6 +362,7 @@ vendor ASANTE		0x10bd	Asante
 vendor JRC		0x1145	Japan Radio Company
 vendor DELORME		0x1163	Delorme Publishing
 vendor ACERCM		0x1189	Acer Communications & Multimedia Inc.
+vendor TWINMOS		0x126f	TwinMOS
 vendor BELKIN2		0x1293	Belkin Components
 vendor MOBILITY		0x1342	Mobility
 vendor SHARK		0x13d2	Shark
@@ -372,6 +377,7 @@ vendor DLINK		0x2001	D-Link
 vendor VIDZMEDIA	0x3275	VidzMedia Pte Ltd
 vendor DAISY		0x3579	Daisy Technology
 vendor DELL		0x413c	Dell
+vendor SITECOM		0x6189	Sitecom
 vendor INTEL		0x8086	Intel
 vendor HP2		0xf003	Hewlett Packard
 
@@ -720,6 +726,9 @@ product	GENESYS GL641USB	0x0700	GL641USB CompactFlash Card Reader
 product	GENESYS GL641USB2IDE_2	0x0701	GL641USB USB-IDE Bridge No 2
 product	GENESYS GL641USB2IDE	0x0702	GL641USB USB-IDE Bridge
 
+/* G.Mate, Inc products */
+product GMATE YP3X00		0x1001	YP3X00 PDA
+
 /* HAL Corporation products */
 product HAL IMR001		0x0011	Crossam2+USB IR commander
 
@@ -768,11 +777,13 @@ product HP 840C			0x0604	DeskJet 840c
 product HP 2200C		0x0605	ScanJet 2200C
 product HP 5300C		0x0701	Scanjet 5300C
 product HP 4400C		0x0705	Scanjet 4400C
+product HP 2300D 		0x0b17	Laserjet 2300d
 product HP 970CSE		0x1004	Deskjet 970Cse
 product HP 5400C		0x1005	Scanjet 5400C
 product HP 930C			0x1204	DeskJet 930c
 product HP P2000U		0x1801	Inkjet P-2000U
 product HP 640C			0x2004	DeskJet 640c
+product HP 4670V		0x3005	ScanJet 4670v
 product HP P1100		0x3102	Photosmart P1100
 product HP HN210E		0x811c	Ethernet HN210E
 
@@ -1129,6 +1140,7 @@ product PROLIFIC RSAQ2		0x04bb	PL2303 Serial adapter (IODATA USB-RSAQ2)
 product PROLIFIC PL2303 	0x2303  PL2303 Serial adapter (ATEN/IOGEAR UC232A)
 product PROLIFIC PL2305		0x2305	Parallel printer adapter
 product PROLIFIC ATAPI4		0x2307	ATAPI-4 Bridge Controller
+product PROLIFIC PL2501		0x2501	PL2501 Host-Host interface
 
 /* Putercom products */
 product PUTERCOM UPA100		0x047e	USB-1284 BRIDGE
@@ -1175,6 +1187,13 @@ product SANYO SCP4900 		0x0701	Sanyo SCP-4900 USB Phone
 product SCANLOGIC SL11R		0x0002	SL11R IDE Adapter
 product SCANLOGIC 336CX		0x0300	Phantom 336CX - C3 scanner
 
+/* Sharp products */
+product SHARP SL5500		0x8004	Zaurus SL-5500 PDA
+product SHARP SLA300		0x8005	Zaurus SL-A300 PDA
+product SHARP SL5600		0x8006	Zaurus SL-5600 PDA
+product SHARP SLC700		0x8007	Zaurus SL-C700 PDA
+product SHARP SLC750		0x9031	Zaurus SL-C750 PDA
+
 /* Shuttle Technology products */
 product SHUTTLE EUSB		0x0001	E-USB Bridge
 product SHUTTLE EUSCSI		0x0002	eUSCSI Bridge
@@ -1205,6 +1224,9 @@ product SILICONPORTALS YAPPHONE	0x0201	YAP Phone
 
 /* Sirius Technologies products */
 product SIRIUS ROADSTER		0x0001	NetComm Roadster II 56 USB
+
+/* Sitecom products */
+product SITECOM LN029		0x182d	USB 2.0 Ethernet
 
 /* SmartBridges products */
 product SMARTBRIDGES SMARTLINK	0x0001	SmartLink USB ethernet adapter
@@ -1300,6 +1322,12 @@ product	TOSHIBA	POCKETPC_E740	0x0706	PocketPC e740
 /* Trek Technology products */
 product TREK THUMBDRIVE		0x1111	ThumbDrive
 product TREK THUMBDRIVE_8MB	0x9988	ThumbDrive_8MB
+
+/* Trumpion products */
+product TRUMPION C3310		0x1100	Comotron C3310 MP3 player
+
+/* TwinMOS */
+product TWINMOS MDIV		0x1325	Memory Disk IV
 
 /* Ultima products */
 product ULTIMA 1200UBPLUS	0x4002	1200 UB Plus scanner

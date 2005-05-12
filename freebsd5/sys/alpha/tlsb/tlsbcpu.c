@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/tlsb/tlsbcpu.c,v 1.5 2003/08/22 07:20:27 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/tlsbcpu.c,v 1.5.4.1 2005/01/30 00:59:12 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

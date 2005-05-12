@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.25 2004/05/30 20:08:41 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.25.2.1 2005/02/03 00:36:06 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.25 2004/05/30 20:08:41 phk
 #include <machine/bus.h>
 
 #include <dev/pccard/pccardvar.h>
+#include <dev/pccard/pccard_cis.h>
 #include <dev/sn/if_snvar.h>
 
 #include "card_if.h"
@@ -64,6 +65,15 @@ static int
 sn_pccard_match(device_t dev)
 {
 	const struct pccard_product *pp;
+	int		error;
+	uint32_t	fcn = PCCARD_FUNCTION_UNSPEC;
+
+	/* Make sure we're a network function */
+	error = pccard_get_function(dev, &fcn);
+	if (error != 0)
+		return (error);
+	if (fcn != PCCARD_FUNCTION_NETWORK)
+		return (ENXIO);
 
 	if ((pp = pccard_product_lookup(dev, sn_pccard_products,
 	    sizeof(sn_pccard_products[0]), NULL)) != NULL) {

@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/mpt/mpilib/mpi_cnfg.h,v 1.4 2003/06/03 17:47:48 mjacob Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/mpt/mpilib/mpi_cnfg.h,v 1.4.4.1 2005/01/30 00:59:54 imp Exp $ */
+/*-
  * Copyright (c) 2000, 2001 by LSI Logic Corporation
  *
  * Redistribution and use in source and binary forms, with or without

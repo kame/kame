@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_node.c,v 1.49 2004/07/03 16:56:45 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_node.c,v 1.49.2.2 2005/03/01 11:32:31 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

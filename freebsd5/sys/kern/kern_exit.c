@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.245.2.1.2.1 2004/10/28 02:49:32 kensmith Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.245.2.8.2.2 2005/04/28 23:45:03 davidxu Exp $");
 
 #include "opt_compat.h"
 #include "opt_ktrace.h"
@@ -76,7 +76,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.245.2.1.2.1 2004/10/28 02:49:32
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/uma.h>
-#include <sys/user.h>
 
 /* Required to be non-static for SysVR4 emulator */
 MALLOC_DEFINE(M_ZOMBIE, "zombie", "zombie proc status");
@@ -236,6 +235,13 @@ retry:
 	 */
 	fdfree(td);
 	mtx_unlock(&Giant);	
+
+	/*
+	 * If this thread tickled GEOM, we need to wait for the giggling to
+	 * stop before we return to userland
+	 */
+	if (td->td_pflags & TDP_GEOM)
+		g_waitidle();
 
 	/*
 	 * Remove ourself from our leader's peer list and wake our leader.
@@ -501,6 +507,15 @@ retry:
 	mtx_unlock_spin(&sched_lock);
 
 	wakeup(p->p_pptr);
+	/*
+	 * XXX hack, swap in parent process, please see TDP_WAKEPROC0
+	 * code, because TDP_WAKEPROC0 is only useful if thread is
+	 * leaving critical region, but here we never leave and
+	 * thread_exit() will call cpu_throw(), TDP_WAKEPROC0 is never
+	 * cleared.
+	 */
+	if (p->p_pptr->p_sflag & PS_SWAPINREQ)
+		wakeup(&proc0);
 	PROC_UNLOCK(p->p_pptr);
 
 	mtx_lock_spin(&sched_lock);
@@ -579,6 +594,11 @@ kern_wait(struct thread *td, pid_t pid, int *status, int options, struct rusage 
 	if (options &~ (WUNTRACED|WNOHANG|WCONTINUED|WLINUXCLONE))
 		return (EINVAL);
 loop:
+	if (q->p_flag & P_STATCHILD) {
+		PROC_LOCK(q);
+		q->p_flag &= ~P_STATCHILD;
+		PROC_UNLOCK(q);
+	}
 	nfound = 0;
 	sx_xlock(&proctree_lock);
 	LIST_FOREACH(p, &q->p_children, p_sibling) {
@@ -609,7 +629,7 @@ loop:
 			if (status)
 				*status = p->p_xstat;	/* convert to int */
 			if (rusage)
-				bcopy(p->p_ru, rusage, sizeof(struct rusage));
+				*rusage = *p->p_ru;
 
 			/*
 			 * If we got the child via a ptrace 'attach',
@@ -729,7 +749,11 @@ loop:
 	}
 	PROC_LOCK(q);
 	sx_xunlock(&proctree_lock);
-	error = msleep(q, &q->p_mtx, PWAIT | PCATCH, "wait", 0);
+	if (q->p_flag & P_STATCHILD) {
+		q->p_flag &= ~P_STATCHILD;
+		error = 0;
+	} else
+		error = msleep(q, &q->p_mtx, PWAIT | PCATCH, "wait", 0);
 	PROC_UNLOCK(q);
 	if (error)
 		return (error);	

@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/pte.h,v 1.4 1999/11/22 15:14:55 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/pte.h,v 1.4.26.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: pte.h,v 1.10 1997/09/02 19:07:22 thorpej Exp */
 
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *

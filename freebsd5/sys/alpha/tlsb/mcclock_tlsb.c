@@ -1,5 +1,5 @@
 /* $NetBSD: mcclock_tlsb.c,v 1.8 1998/05/13 02:50:29 thorpej Exp $ */
-/*
+/*-
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/tlsb/mcclock_tlsb.c,v 1.9 2003/08/22 07:20:27 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/mcclock_tlsb.c,v 1.9.4.1 2005/01/30 00:59:12 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

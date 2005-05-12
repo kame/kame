@@ -1,4 +1,5 @@
-/****************************************************************************
+/*-
+ ****************************************************************************
  *
  * Copyright (c) 1996-2000 Distributed Processing Technology Corporation
  * Copyright (c) 2000 Adaptec Corporation.
@@ -45,7 +46,7 @@
  * become a "Registered Developer" of the I2O SIG. This can be done by calling
  * 415-750-8352 in the US, or via http://www.i2osig.org.
  *
- * $FreeBSD: src/sys/dev/asr/i2odep.h,v 1.7 2002/05/15 12:25:11 brian Exp $
+ * $FreeBSD: src/sys/dev/asr/i2odep.h,v 1.7.8.1 2005/01/30 00:59:28 imp Exp $
  *
  **************************************************************************/
 

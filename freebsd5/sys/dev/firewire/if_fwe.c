@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/if_fwe.c,v 1.34 2004/08/12 03:02:16 rwatson Exp $
+ * $FreeBSD: src/sys/dev/firewire/if_fwe.c,v 1.34.2.1 2005/01/30 00:59:42 imp Exp $
  */
 
 #include "opt_inet.h"

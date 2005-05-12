@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/firewire.c,v 1.78 2004/07/28 06:20:01 kan Exp $
+ * $FreeBSD: src/sys/dev/firewire/firewire.c,v 1.78.2.2 2005/03/02 20:29:18 jmg Exp $
  *
  */
 
@@ -812,6 +812,7 @@ void fw_init(struct firewire_comm *fc)
 	fwb = (struct fw_bind *)malloc(sizeof (struct fw_bind), M_FW, M_NOWAIT);
 	if(fwb == NULL){
 		fw_xfer_free(xfer);
+		return;
 	}
 	xfer->act.hand = fw_vmaccess;
 	xfer->fc = fc;

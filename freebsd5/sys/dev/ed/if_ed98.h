@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) KATO Takenori, 1996.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed98.h,v 1.1 2000/08/17 12:15:43 nyan Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed98.h,v 1.1.10.1 2005/01/30 00:59:38 imp Exp $
  */
 
 /*

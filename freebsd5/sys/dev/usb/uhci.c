@@ -11,10 +11,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uhci.c,v 1.154 2004/08/02 20:53:31 iedowse Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uhci.c,v 1.154.2.5 2005/03/22 00:56:54 iedowse Exp $");
 
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -280,8 +280,8 @@ Static usbd_status	uhci_device_setintr(uhci_softc_t *sc,
 Static void		uhci_device_clear_toggle(usbd_pipe_handle pipe);
 Static void		uhci_noop(usbd_pipe_handle pipe);
 
-Static __inline__ uhci_soft_qh_t *uhci_find_prev_qh(uhci_soft_qh_t *,
-						    uhci_soft_qh_t *);
+Static __inline uhci_soft_qh_t *uhci_find_prev_qh(uhci_soft_qh_t *,
+						  uhci_soft_qh_t *);
 
 #ifdef USB_DEBUG
 Static void		uhci_dump_all(uhci_softc_t *);
@@ -391,7 +391,7 @@ struct usbd_pipe_methods uhci_device_isoc_methods = {
 	} while (0)
 #define uhci_active_intr_info(ii) ((ii)->list.le_prev != NULL)
 
-Static __inline__ uhci_soft_qh_t *
+Static __inline uhci_soft_qh_t *
 uhci_find_prev_qh(uhci_soft_qh_t *pqh, uhci_soft_qh_t *sqh)
 {
 	DPRINTFN(15,("uhci_find_prev_qh: pqh=%p sqh=%p\n", pqh, sqh));
@@ -646,6 +646,7 @@ uhci_allocx(struct usbd_bus *bus)
 		UXFER(xfer)->iinfo.sc = sc;
 		usb_init_task(&UXFER(xfer)->abort_task, uhci_timeout_task,
 		    xfer);
+		UXFER(xfer)->uhci_xfer_flags = 0;
 #ifdef DIAGNOSTIC
 		UXFER(xfer)->iinfo.isdone = 1;
 		xfer->busy_free = XFER_BUSY;
@@ -1370,6 +1371,7 @@ uhci_check_intr(uhci_softc_t *sc, uhci_intr_info_t *ii)
  done:
 	DPRINTFN(12, ("uhci_check_intr: ii=%p done\n", ii));
 	usb_uncallout(ii->xfer->timeout_handle, uhci_timeout, ii);
+	usb_rem_task(ii->xfer->pipe->device, &UXFER(ii->xfer)->abort_task);
 	uhci_idone(ii);
 }
 
@@ -1552,7 +1554,7 @@ uhci_waitintr(uhci_softc_t *sc, usbd_xfer_handle xfer)
 	for (; timo >= 0; timo--) {
 		usb_delay_ms(&sc->sc_bus, 1);
 		DPRINTFN(20,("uhci_waitintr: 0x%04x\n", UREAD2(sc, UHCI_STS)));
-		if (UREAD2(sc, UHCI_STS) & UHCI_STS_USBINT)
+		if (UREAD2(sc, UHCI_STS) & UHCI_STS_ALLINTRS)
 			uhci_intr1(sc);
 		if (xfer->status != USBD_IN_PROGRESS)
 			return;
@@ -1576,7 +1578,7 @@ uhci_poll(struct usbd_bus *bus)
 {
 	uhci_softc_t *sc = (uhci_softc_t *)bus;
 
-	if (UREAD2(sc, UHCI_STS) & UHCI_STS_USBINT)
+	if (UREAD2(sc, UHCI_STS) & UHCI_STS_ALLINTRS)
 		uhci_intr1(sc);
 }
 
@@ -1932,7 +1934,8 @@ uhci_device_bulk_abort(usbd_xfer_handle xfer)
 void
 uhci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 {
-	uhci_intr_info_t *ii = &UXFER(xfer)->iinfo;
+	struct uhci_xfer *uxfer = UXFER(xfer);
+	uhci_intr_info_t *ii = &uxfer->iinfo;
 	struct uhci_pipe *upipe = (struct uhci_pipe *)xfer->pipe;
 	uhci_softc_t *sc = (uhci_softc_t *)upipe->pipe.device->bus;
 	uhci_soft_td_t *std;
@@ -1945,8 +1948,8 @@ uhci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 		s = splusb();
 		xfer->status = status;	/* make software ignore it */
 		usb_uncallout(xfer->timeout_handle, uhci_timeout, xfer);
-		usb_transfer_complete(xfer);
 		usb_rem_task(xfer->pipe->device, &UXFER(xfer)->abort_task);
+		usb_transfer_complete(xfer);
 		splx(s);
 		return;
 	}
@@ -1955,9 +1958,28 @@ uhci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 		panic("uhci_abort_xfer: not in process context");
 
 	/*
+	 * If an abort is already in progress then just wait for it to
+	 * complete and return.
+	 */
+	if (uxfer->uhci_xfer_flags & UHCI_XFER_ABORTING) {
+		DPRINTFN(2, ("uhci_abort_xfer: already aborting\n"));
+		/* No need to wait if we're aborting from a timeout. */
+		if (status == USBD_TIMEOUT)
+			return;
+		/* Override the status which might be USBD_TIMEOUT. */
+		xfer->status = status;
+		DPRINTFN(2, ("uhci_abort_xfer: waiting for abort to finish\n"));
+		uxfer->uhci_xfer_flags |= UHCI_XFER_ABORTWAIT;
+		while (uxfer->uhci_xfer_flags & UHCI_XFER_ABORTING)
+			tsleep(&uxfer->uhci_xfer_flags, PZERO, "uhciaw", 0);
+		return;
+	}
+
+	/*
 	 * Step 1: Make interrupt routine and hardware ignore xfer.
 	 */
 	s = splusb();
+	uxfer->uhci_xfer_flags |= UHCI_XFER_ABORTING;
 	xfer->status = status;	/* make software ignore it */
 	usb_uncallout(xfer->timeout_handle, uhci_timeout, ii);
 	usb_rem_task(xfer->pipe->device, &UXFER(xfer)->abort_task);
@@ -1991,6 +2013,12 @@ uhci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 #ifdef DIAGNOSTIC
 	ii->isdone = 1;
 #endif
+	/* Do the wakeup first to avoid touching the xfer after the callback. */
+	uxfer->uhci_xfer_flags &= ~UHCI_XFER_ABORTING;
+	if (uxfer->uhci_xfer_flags & UHCI_XFER_ABORTWAIT) {
+		uxfer->uhci_xfer_flags &= ~UHCI_XFER_ABORTWAIT;
+		wakeup(&uxfer->uhci_xfer_flags);
+	}
 	usb_transfer_complete(xfer);
 	splx(s);
 }

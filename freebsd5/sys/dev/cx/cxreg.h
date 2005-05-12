@@ -1,4 +1,4 @@
-/*
+/*-
  * Defines for Cronyx-Sigma adapter, based on Cirrus Logic multiprotocol
  * controller RISC processor CL-CD2400/2401.
  *
@@ -13,7 +13,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: cxreg.h,v 1.1.2.1 2003/11/12 17:13:41 rik Exp $
- * $FreeBSD: src/sys/dev/cx/cxreg.h,v 1.1 2003/12/03 07:29:38 imp Exp $
+ * $FreeBSD: src/sys/dev/cx/cxreg.h,v 1.1.6.1 2005/01/30 00:59:34 imp Exp $
  */
 #define REVCL_MIN   7		/* CD2400 min. revision number G */
 #define REVCL_MAX   13		/* CD2400 max. revision number M */

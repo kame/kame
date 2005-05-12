@@ -75,7 +75,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/pmap.c,v 1.491.2.4 2004/10/10 19:07:59 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/pmap.c,v 1.491.2.7 2005/02/28 01:40:46 obrien Exp $");
 
 /*
  *	Manages physical address maps.
@@ -116,7 +116,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/pmap.c,v 1.491.2.4 2004/10/10 19:07:59 a
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/sx.h>
-#include <sys/user.h>
 #include <sys/vmmeter.h>
 #include <sys/sched.h>
 #include <sys/sysctl.h>
@@ -138,6 +137,7 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/pmap.c,v 1.491.2.4 2004/10/10 19:07:59 a
 #include <machine/cpu.h>
 #include <machine/cputypes.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/specialreg.h>
 #ifdef SMP
 #include <machine/smp.h>
@@ -631,7 +631,7 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 	if (smp_started) {
 		if (!(read_rflags() & PSL_I))
 			panic("%s: interrupts disabled", __func__);
-		mtx_lock_spin(&smp_rv_mtx);
+		mtx_lock_spin(&smp_ipi_mtx);
 	} else
 		critical_enter();
 	/*
@@ -652,7 +652,7 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 			smp_masked_invlpg(pmap->pm_active & other_cpus, va);
 	}
 	if (smp_started)
-		mtx_unlock_spin(&smp_rv_mtx);
+		mtx_unlock_spin(&smp_ipi_mtx);
 	else
 		critical_exit();
 }
@@ -667,7 +667,7 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	if (smp_started) {
 		if (!(read_rflags() & PSL_I))
 			panic("%s: interrupts disabled", __func__);
-		mtx_lock_spin(&smp_rv_mtx);
+		mtx_lock_spin(&smp_ipi_mtx);
 	} else
 		critical_enter();
 	/*
@@ -691,7 +691,7 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 			    sva, eva);
 	}
 	if (smp_started)
-		mtx_unlock_spin(&smp_rv_mtx);
+		mtx_unlock_spin(&smp_ipi_mtx);
 	else
 		critical_exit();
 }
@@ -705,7 +705,7 @@ pmap_invalidate_all(pmap_t pmap)
 	if (smp_started) {
 		if (!(read_rflags() & PSL_I))
 			panic("%s: interrupts disabled", __func__);
-		mtx_lock_spin(&smp_rv_mtx);
+		mtx_lock_spin(&smp_ipi_mtx);
 	} else
 		critical_enter();
 	/*
@@ -726,7 +726,7 @@ pmap_invalidate_all(pmap_t pmap)
 			smp_masked_invltlb(pmap->pm_active & other_cpus);
 	}
 	if (smp_started)
-		mtx_unlock_spin(&smp_rv_mtx);
+		mtx_unlock_spin(&smp_ipi_mtx);
 	else
 		critical_exit();
 }
@@ -1808,7 +1808,10 @@ retry:
 			if (pbits != obits) {
 				if (!atomic_cmpset_long(pte, obits, pbits))
 					goto retry;
-				anychanged = 1;
+				if (obits & PG_G)
+					pmap_invalidate_page(pmap, sva);
+				else
+					anychanged = 1;
 			}
 		}
 	}

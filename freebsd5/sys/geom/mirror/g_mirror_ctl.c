@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/mirror/g_mirror_ctl.c,v 1.4 2004/08/10 19:52:12 pjd Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/mirror/g_mirror_ctl.c,v 1.4.2.2 2005/01/08 16:26:54 pjd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -198,11 +198,13 @@ g_mirror_ctl_configure(struct gctl_req *req, struct g_class *mp)
 static void
 g_mirror_ctl_rebuild(struct gctl_req *req, struct g_class *mp)
 {
+	struct g_mirror_metadata md;
 	struct g_mirror_softc *sc;
 	struct g_mirror_disk *disk;
+	struct g_provider *pp;
 	const char *name;
 	char param[16];
-	int *nargs;
+	int error, *nargs;
 	u_int i;
 
 	g_topology_assert();
@@ -231,12 +233,12 @@ g_mirror_ctl_rebuild(struct gctl_req *req, struct g_class *mp)
 		name = gctl_get_asciiparam(req, param);
 		if (name == NULL) {
 			gctl_error(req, "No 'arg%u' argument.", i);
-			return;
+			continue;
 		}
 		disk = g_mirror_find_disk(sc, name);
 		if (disk == NULL) {
 			gctl_error(req, "No such provider: %s.", name);
-			return;
+			continue;
 		}
 		if (g_mirror_ndisks(sc, G_MIRROR_DISK_STATE_ACTIVE) == 1 &&
 		    disk->d_state == G_MIRROR_DISK_STATE_ACTIVE) {
@@ -250,16 +252,28 @@ g_mirror_ctl_rebuild(struct gctl_req *req, struct g_class *mp)
 			return;
 		}
 		/*
-		 * Do rebuild by resetting syncid and disconnecting disk.
-		 * It'll be retasted, connected to the mirror and
-		 * synchronized.
+		 * Do rebuild by resetting syncid, disconnecting the disk and
+		 * connecting it again.
 		 */
 		disk->d_sync.ds_syncid = 0;
 		if ((sc->sc_flags & G_MIRROR_DEVICE_FLAG_NOAUTOSYNC) != 0)
 			disk->d_flags |= G_MIRROR_DISK_FLAG_FORCE_SYNC;
 		g_mirror_update_metadata(disk);
+		pp = disk->d_consumer->provider;
+		error = g_mirror_read_metadata(disk->d_consumer, &md);
 		g_mirror_event_send(disk, G_MIRROR_DISK_STATE_DISCONNECTED,
 		    G_MIRROR_EVENT_WAIT);
+		if (error != 0) {
+			gctl_error(req, "Cannot read metadata from %s.",
+			    pp->name);
+			continue;
+		}
+		error = g_mirror_add_disk(sc, pp, &md);
+		if (error != 0) {
+			gctl_error(req, "Cannot reconnect component %s.",
+			    pp->name);
+			continue;
+		}
 	}
 }
 
@@ -464,12 +478,12 @@ g_mirror_ctl_remove(struct gctl_req *req, struct g_class *mp)
 		name = gctl_get_asciiparam(req, param);
 		if (name == NULL) {
 			gctl_error(req, "No 'arg%u' argument.", i);
-			return;
+			continue;
 		}
 		disk = g_mirror_find_disk(sc, name);
 		if (disk == NULL) {
 			gctl_error(req, "No such provider: %s.", name);
-			return;
+			continue;
 		}
 		g_mirror_event_send(disk, G_MIRROR_DISK_STATE_DESTROY,
 		    G_MIRROR_EVENT_WAIT);
@@ -512,22 +526,17 @@ g_mirror_ctl_deactivate(struct gctl_req *req, struct g_class *mp)
 		name = gctl_get_asciiparam(req, param);
 		if (name == NULL) {
 			gctl_error(req, "No 'arg%u' argument.", i);
-			return;
+			continue;
 		}
 		disk = g_mirror_find_disk(sc, name);
 		if (disk == NULL) {
 			gctl_error(req, "No such provider: %s.", name);
-			return;
+			continue;
 		}
-		/*
-		 * Do rebuild by resetting syncid and disconnecting disk.
-		 * It'll be retasted, connected to the mirror and
-		 * synchronized.
-		 */
 		disk->d_flags |= G_MIRROR_DISK_FLAG_INACTIVE;
 		disk->d_flags &= ~G_MIRROR_DISK_FLAG_FORCE_SYNC;
 		g_mirror_update_metadata(disk);
-		sc->sc_bump_syncid = G_MIRROR_BUMP_ON_FIRST_WRITE;
+		sc->sc_bump_id |= G_MIRROR_BUMP_SYNCID;
 		g_mirror_event_send(disk, G_MIRROR_DISK_STATE_DISCONNECTED,
 		    G_MIRROR_EVENT_WAIT);
 	}

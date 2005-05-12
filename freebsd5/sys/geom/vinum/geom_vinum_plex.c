@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_plex.c,v 1.8.2.2 2004/10/07 17:51:06 le Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_plex.c,v 1.8.2.6 2005/02/10 12:51:29 le Exp $");
 
 #include <sys/param.h>
 #include <sys/bio.h>
@@ -46,6 +46,10 @@ __FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_plex.c,v 1.8.2.2 2004/10/07 17
 static void gv_plex_completed_request(struct gv_plex *, struct bio *);
 static void gv_plex_normal_request(struct gv_plex *, struct bio *);
 static void gv_plex_worker(void *);
+static int gv_check_parity(struct gv_plex *, struct bio *,
+    struct gv_raid5_packet *);
+static int gv_normal_parity(struct gv_plex *, struct bio *,
+    struct gv_raid5_packet *);
 
 /* XXX: is this the place to catch dying subdisks? */
 static void
@@ -321,8 +325,9 @@ gv_plex_worker(void *arg)
 		} else if (bp->bio_cflags & GV_BIO_ONHOLD) {
 			/* Is it still locked out? */
 			if (gv_stripe_active(p, bp)) {
+				/* Park the bio on the waiting queue. */
 				mtx_lock(&p->bqueue_mtx);
-				TAILQ_INSERT_TAIL(&p->bqueue, bq, queue);
+				TAILQ_INSERT_TAIL(&p->wqueue, bq, queue);
 				mtx_unlock(&p->bqueue_mtx);
 			} else {
 				g_free(bq);
@@ -343,6 +348,85 @@ gv_plex_worker(void *arg)
 	wakeup(p);
 
 	kthread_exit(ENXIO);
+}
+
+static int
+gv_normal_parity(struct gv_plex *p, struct bio *bp, struct gv_raid5_packet *wp)
+{
+	struct bio *cbp, *pbp;
+	int finished, i;
+
+	finished = 1;
+
+	if (wp->waiting != NULL) {
+		pbp = wp->waiting;
+		wp->waiting = NULL;
+		cbp = wp->parity;
+		for (i = 0; i < wp->length; i++)
+			cbp->bio_data[i] ^= pbp->bio_data[i];
+		g_io_request(pbp, pbp->bio_caller2);
+		finished = 0;
+
+	} else if (wp->parity != NULL) {
+		cbp = wp->parity;
+		wp->parity = NULL;
+		g_io_request(cbp, cbp->bio_caller2);
+		finished = 0;
+	}
+
+	return (finished);
+}
+
+static int
+gv_check_parity(struct gv_plex *p, struct bio *bp, struct gv_raid5_packet *wp)
+{
+	struct bio *cbp, *pbp;
+	int err, finished, i;
+
+	err = 0;
+	finished = 1;
+
+	if (wp->waiting != NULL) {
+		pbp = wp->waiting;
+		wp->waiting = NULL;
+		g_io_request(pbp, pbp->bio_caller2);
+		finished = 0;
+
+	} else if (wp->parity != NULL) {
+		cbp = wp->parity;
+		wp->parity = NULL;
+
+		/* Check if the parity is correct. */
+		for (i = 0; i < wp->length; i++) {
+			if (bp->bio_data[i] != cbp->bio_data[i]) {
+				err = 1;
+				break;
+			}
+		}
+
+		/* The parity is not correct... */
+		if (err) {
+			bp->bio_parent->bio_error = EAGAIN;
+
+			/* ... but we rebuild it. */
+			if (bp->bio_parent->bio_cflags & GV_BIO_PARITY) {
+				g_io_request(cbp, cbp->bio_caller2);
+				finished = 0;
+			}
+		}
+
+		/*
+		 * Clean up the BIO we would have used for rebuilding the
+		 * parity.
+		 */
+		if (finished) {
+			bp->bio_parent->bio_inbed++;
+			g_destroy_bio(cbp);
+		}
+
+	}
+
+	return (finished);
 }
 
 void
@@ -371,8 +455,13 @@ gv_plex_completed_request(struct gv_plex *p, struct bio *bp)
 		}
 		if (TAILQ_EMPTY(&wp->bits)) {
 			bp->bio_parent->bio_completed += wp->length;
-			if (wp->lockbase != -1)
+			if (wp->lockbase != -1) {
 				TAILQ_REMOVE(&p->packets, wp, list);
+				/* Bring the waiting bios back into the game. */
+				mtx_lock(&p->bqueue_mtx);
+				TAILQ_CONCAT(&p->bqueue, &p->wqueue, queue);
+				mtx_unlock(&p->bqueue_mtx);
+			}
 			g_free(wp);
 		}
 
@@ -399,20 +488,19 @@ gv_plex_completed_request(struct gv_plex *p, struct bio *bp)
 
 		/* Handle parity data. */
 		if (TAILQ_EMPTY(&wp->bits)) {
-			if (wp->waiting != NULL) {
-				pbp = wp->waiting;
-				wp->waiting = NULL;
-				cbp = wp->parity;
-				for (i = 0; i < wp->length; i++)
-					cbp->bio_data[i] ^= pbp->bio_data[i];
-				g_io_request(pbp, pbp->bio_caller2);
-			} else if (wp->parity != NULL) {
-				cbp = wp->parity;
-				wp->parity = NULL;
-				g_io_request(cbp, cbp->bio_caller2);
-			} else {
+			if (bp->bio_parent->bio_cflags & GV_BIO_CHECK)
+				i = gv_check_parity(p, bp, wp);
+			else
+				i = gv_normal_parity(p, bp, wp);
+
+			/* All of our sub-requests have finished. */
+			if (i) {
 				bp->bio_parent->bio_completed += wp->length;
 				TAILQ_REMOVE(&p->packets, wp, list);
+				/* Bring the waiting bios back into the game. */
+				mtx_lock(&p->bqueue_mtx);
+				TAILQ_CONCAT(&p->bqueue, &p->wqueue, queue);
+				mtx_unlock(&p->bqueue_mtx);
 				g_free(wp);
 			}
 		}
@@ -464,6 +552,9 @@ gv_plex_normal_request(struct gv_plex *p, struct bio *bp)
 
 			if (bp->bio_cflags & GV_BIO_REBUILD)
 				err = gv_rebuild_raid5(p, wp, bp, addr,
+				    boff, bcount);
+			else if (bp->bio_cflags & GV_BIO_CHECK)
+				err = gv_check_raid5(p, wp, bp, addr,
 				    boff, bcount);
 			else
 				err = gv_build_raid5_req(p, wp, bp, addr,
@@ -569,11 +660,12 @@ gv_plex_normal_request(struct gv_plex *p, struct bio *bp)
 		 */
 		if (pbp->bio_driver1 != NULL &&
 		    gv_stripe_active(p, pbp)) {
+			/* Park the bio on the waiting queue. */
 			pbp->bio_cflags |= GV_BIO_ONHOLD;
 			bq = g_malloc(sizeof(*bq), M_WAITOK | M_ZERO);
 			bq->bp = pbp;
 			mtx_lock(&p->bqueue_mtx);
-			TAILQ_INSERT_TAIL(&p->bqueue, bq, queue);
+			TAILQ_INSERT_TAIL(&p->wqueue, bq, queue);
 			mtx_unlock(&p->bqueue_mtx);
 		} else
 			g_io_request(pbp, pbp->bio_caller2);
@@ -590,7 +682,6 @@ gv_plex_access(struct g_provider *pp, int dr, int dw, int de)
 
 	gp = pp->geom;
 
-	error = ENXIO;
 	LIST_FOREACH(cp, &gp->consumer, consumer) {
 		error = g_access(cp, dr, dw, de);
 		if (error) {
@@ -602,7 +693,7 @@ gv_plex_access(struct g_provider *pp, int dr, int dw, int de)
 			return (error);
 		}
 	}
-	return (error);
+	return (0);
 }
 
 static struct g_geom *
@@ -681,6 +772,17 @@ gv_plex_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 		if (p->vol_sc != NULL)
 			gv_update_vol_size(p->vol_sc, p->size);
 
+		/*
+		 * If necessary, create a bio queue mutex and a worker thread.
+		 */
+		if (mtx_initialized(&p->bqueue_mtx) == 0)
+			mtx_init(&p->bqueue_mtx, "gv_plex", NULL, MTX_DEF);
+		if (!(p->flags & GV_PLEX_THREAD_ACTIVE)) {
+			kthread_create(gv_plex_worker, p, NULL, 0, 0, "gv_p %s",
+			    p->name);
+			p->flags |= GV_PLEX_THREAD_ACTIVE;
+		}
+
 		return (NULL);
 
 	/* We need to create a new geom. */
@@ -694,6 +796,7 @@ gv_plex_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 
 		TAILQ_INIT(&p->packets);
 		TAILQ_INIT(&p->bqueue);
+		TAILQ_INIT(&p->wqueue);
 		mtx_init(&p->bqueue_mtx, "gv_plex", NULL, MTX_DEF);
 		kthread_create(gv_plex_worker, p, NULL, 0, 0, "gv_p %s",
 		    p->name);

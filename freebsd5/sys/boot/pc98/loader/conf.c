@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/pc98/loader/conf.c,v 1.2 2003/09/08 09:11:21 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/pc98/loader/conf.c,v 1.2.4.1 2004/11/10 08:55:57 nyan Exp $");
 
 #include <stand.h>
 #include <bootstrap.h>
@@ -83,9 +83,11 @@ struct fs_ops *file_system[] = {
  * rather than reading the file go first.
  */
 extern struct file_format	i386_elf;
+extern struct file_format	i386_elf_obj;
 
 struct file_format *file_formats[] = {
     &i386_elf,
+    &i386_elf_obj,
     NULL
 };
 

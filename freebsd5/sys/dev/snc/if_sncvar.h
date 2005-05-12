@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, David Greenman
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/snc/if_sncvar.h,v 1.2 2002/03/20 02:07:42 alfred Exp $
+ * $FreeBSD: src/sys/dev/snc/if_sncvar.h,v 1.2.8.1 2005/01/30 01:00:02 imp Exp $
  */
 
 /*

@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 1999 M. Warner Losh.
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/pccard/card_if.m,v 1.24 2004/05/28 02:23:10 imp Exp $
+# $FreeBSD: src/sys/dev/pccard/card_if.m,v 1.24.2.2 2005/02/03 00:30:02 imp Exp $
 #
 
 #include <sys/bus.h>
@@ -68,15 +68,15 @@ METHOD int set_memory_offset {
 	device_t  dev;
 	device_t  child;
 	int	  rid;
-	u_int32_t cardaddr;
-	u_int32_t *deltap;
+	uint32_t cardaddr;
+	uint32_t *deltap;
 }
 
 METHOD int get_memory_offset {
 	device_t  dev;
 	device_t  child;
 	int	  rid;
-	u_int32_t *offset;
+	uint32_t *offset;
 }
 
 #

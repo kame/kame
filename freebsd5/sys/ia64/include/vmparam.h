@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/ia64/include/vmparam.h,v 1.9 2004/04/07 20:46:08 imp Exp $ */
+/* $FreeBSD: src/sys/ia64/include/vmparam.h,v 1.9.2.1 2005/01/31 23:26:14 imp Exp $ */
 /* From: NetBSD: vmparam.h,v 1.6 1997/09/23 23:23:23 mjacob Exp */
 #ifndef	_MACHINE_VMPARAM_H
 #define	_MACHINE_VMPARAM_H
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.

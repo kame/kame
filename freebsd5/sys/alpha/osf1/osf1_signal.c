@@ -1,6 +1,6 @@
 /*	$NetBSD: osf1_signal.c,v 1.4 1998/05/20 16:35:01 chs Exp $
  */
-/*
+/*-
  * Copyright (c) 1998-1999 Andrew Gallatin
  * 
  * Taken from NetBSD's sys/compat/osf1/osf1_signal.c, which at the
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_signal.c,v 1.36 2004/01/03 23:36:31 davidxu Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_signal.c,v 1.36.2.2 2005/02/05 01:02:48 das Exp $");
 
 #include "opt_compat.h"
 #ifndef COMPAT_43
@@ -66,7 +66,6 @@ __FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_signal.c,v 1.36 2004/01/03 23:36:31 
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <sys/user.h>
 #include <sys/ptrace.h>
 #include <sys/cons.h>
 #include <machine/clock.h>
@@ -83,6 +82,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_signal.c,v 1.36 2004/01/03 23:36:31 
 #include <ddb/ddb.h>
 #include <alpha/alpha/db_instruction.h>
 #include <sys/vnode.h>
+#include <machine/pcb.h>
 
 #include <alpha/osf1/osf1_signal.h>
 #include <alpha/osf1/osf1_proto.h>

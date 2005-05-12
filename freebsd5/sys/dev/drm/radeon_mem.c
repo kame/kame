@@ -1,5 +1,5 @@
-/* radeon_mem.c -- Simple GART/fb memory manager for radeon -*- linux-c -*-
- *
+/* radeon_mem.c -- Simple GART/fb memory manager for radeon -*- linux-c -*- */
+/*-
  * Copyright (C) The Weather Channel, Inc.  2002.  All Rights Reserved.
  * 
  * The Weather Channel (TM) funded Tungsten Graphics to develop the
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/drm/radeon_mem.c,v 1.5 2004/06/11 03:26:59 anholt Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/drm/radeon_mem.c,v 1.5.2.1 2005/01/30 00:59:36 imp Exp $");
 
 #include "dev/drm/radeon.h"
 #include "dev/drm/drmP.h"

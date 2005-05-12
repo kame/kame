@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997 Justin T. Gibbs.
  * Copyright (c) 1997, 1998, 1999 Kenneth D. Merry.
  * All rights reserved.
@@ -31,7 +31,7 @@
  *	$NetBSD: ch.c,v 1.32 1998/01/12 09:49:12 thorpej Exp $
  *
  */
-/*
+/*-
  * Copyright (c) 1996, 1997 Jason R. Thorpe <thorpej@and.com>
  * All rights reserved.
  *
@@ -68,7 +68,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.40 2004/06/16 09:46:31 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.40.2.2 2005/03/30 14:52:03 ken Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -1157,6 +1157,8 @@ chgetelemstatus(struct cam_periph *periph,
 	 * Fill in the user status array.
 	 */
 	st_hdr = (struct read_element_status_header *)data;
+	pg_hdr = (struct read_element_status_page_header *)((uintptr_t)st_hdr +
+		  sizeof(struct read_element_status_header));
 	avail = scsi_2btoul(st_hdr->count);
 
 	if (avail != cesr->cesr_element_count) {

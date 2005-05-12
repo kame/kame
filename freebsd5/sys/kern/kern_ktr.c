@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_ktr.c,v 1.44 2004/07/23 17:41:44 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_ktr.c,v 1.44.2.1 2004/11/23 21:08:14 jhb Exp $");
 
 #include "opt_ddb.h"
 #include "opt_ktr.h"
@@ -266,8 +266,6 @@ static	struct tstate tstate;
 static	int db_ktr_verbose;
 static	int db_mach_vtrace(void);
 
-#define	NUM_LINES_PER_PAGE	18
-
 DB_SHOW_COMMAND(ktr, db_ktr_all)
 {
 	int quit;
@@ -284,7 +282,7 @@ DB_SHOW_COMMAND(ktr, db_ktr_all)
 			if (db_mach_vtrace() == 0)
 				break;
 	} else {
-		db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+		db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
 		while (!quit)
 			if (db_mach_vtrace() == 0)
 				break;

@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_subr.c,v 1.81.2.1 2004/09/13 06:26:57 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_subr.c,v 1.81.2.2 2005/02/28 19:32:24 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -204,7 +204,6 @@ g_modevent(module_t mod, int type, void *data)
 		if (error == 0)
 			error = hh->error;
 		if (error == 0) {
-			g_waitidle();
 			KASSERT(LIST_EMPTY(&hh->mp->geom),
 			    ("Unloaded class (%s) still has geom", hh->mp->name));
 		}

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Katsurajima Naoto <raven@katsurajima.seya.yokohama.jp>
  * Copyright (c) 2001 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/ich.h,v 1.3 2003/08/10 14:57:47 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/ich.h,v 1.3.4.1 2005/01/30 01:00:04 imp Exp $
  */
 
 #define PCIR_NAMBAR 0x10

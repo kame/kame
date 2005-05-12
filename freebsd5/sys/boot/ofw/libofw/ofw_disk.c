@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2000 Benno Rice.
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_disk.c,v 1.11 2004/01/04 23:27:31 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_disk.c,v 1.11.2.1 2005/01/30 00:59:15 imp Exp $");
 
 /*
  * Disk I/O routines using Open Firmware

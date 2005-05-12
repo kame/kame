@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2001 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	isic - I4B Siemens ISDN Chipset Driver for ELSA MicroLink ISDN/PCI
  *	==================================================================
@@ -33,7 +34,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_qs1p.c,v 1.13 2004/05/30 20:27:16 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_qs1p.c,v 1.13.2.1 2005/01/31 23:26:10 imp Exp $");
 
 #include "opt_i4b.h"
 

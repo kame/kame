@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 Taku YAMAMOTO <taku@cent.saitama-u.ac.jp>
+ * Copyright (c) 2000-2004 Taku YAMAMOTO <taku@tackymt.homeip.net>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,7 +51,7 @@
 
 #include <dev/sound/pci/maestro_reg.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro.c,v 1.23.2.1 2004/08/29 20:50:32 green Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro.c,v 1.23.2.2 2005/01/30 01:00:04 imp Exp $");
 
 #define inline __inline
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/uart/uart_bus.h,v 1.6 2004/06/24 10:07:28 phk Exp $
+ * $FreeBSD: src/sys/dev/uart/uart_bus.h,v 1.6.2.3 2005/01/30 06:16:37 marcel Exp $
  */
 
 #ifndef _DEV_UART_BUS_H_
@@ -80,6 +80,7 @@
 #define	UART_IOCTL_BREAK	1
 #define	UART_IOCTL_IFLOW	2
 #define	UART_IOCTL_OFLOW	3
+#define	UART_IOCTL_BAUD		4
 
 /*
  * UART class & instance (=softc)

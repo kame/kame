@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_init.c,v 1.2.2.2 2004/10/07 17:51:06 le Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_init.c,v 1.2.2.4 2005/02/10 12:49:39 le Exp $");
 
 #include <sys/param.h>
 #include <sys/bio.h>
@@ -56,6 +56,125 @@ struct gv_sync_args {
 	struct gv_plex *to;
 	off_t syncsize;
 };
+
+void
+gv_parityop(struct g_geom *gp, struct gctl_req *req)
+{
+	struct gv_softc *sc;
+	struct gv_plex *p;
+	struct bio *bp;
+	struct g_consumer *cp;
+	int error, *flags, type, *rebuild, rv;
+	char *plex;
+
+	rv = -1;
+
+	plex = gctl_get_param(req, "plex", NULL);
+	if (plex == NULL) {
+		gctl_error(req, "no plex given");
+		goto out;
+	}
+
+	flags = gctl_get_paraml(req, "flags", sizeof(*flags));
+	if (flags == NULL) {
+		gctl_error(req, "no flags given");
+		goto out;
+	}
+
+	rebuild = gctl_get_paraml(req, "rebuild", sizeof(*rebuild));
+	if (rebuild == NULL) {
+		gctl_error(req, "no rebuild op given");
+		goto out;
+	}
+
+	sc = gp->softc;
+	type = gv_object_type(sc, plex);
+	switch (type) {
+	case GV_TYPE_PLEX:
+		break;
+	case GV_TYPE_VOL:
+	case GV_TYPE_SD:
+	case GV_TYPE_DRIVE:
+	default:
+		gctl_error(req, "'%s' is not a plex", plex);
+		goto out;
+	}
+
+	p = gv_find_plex(sc, plex);
+	if (p->state != GV_PLEX_UP) {
+		gctl_error(req, "plex %s is not completely accessible",
+		    p->name);
+		goto out;
+	}
+
+	cp = p->consumer;
+	error = g_access(cp, 1, 1, 0);
+	if (error) {
+		gctl_error(req, "cannot access consumer");
+		goto out;
+	}
+	g_topology_unlock();
+
+	/* Reset the check pointer when using -f. */
+	if (*flags & GV_FLAG_F)
+		p->synced = 0;
+
+	bp = g_new_bio();
+	if (bp == NULL) {
+		gctl_error(req, "cannot create BIO - out of memory");
+		g_topology_lock();
+		error = g_access(cp, -1, -1, 0);
+		goto out;
+	}
+	bp->bio_cmd = BIO_WRITE;
+	bp->bio_done = NULL;
+	bp->bio_data = g_malloc(p->stripesize, M_WAITOK | M_ZERO);
+	bp->bio_cflags |= GV_BIO_CHECK;
+	if (*rebuild)
+		bp->bio_cflags |= GV_BIO_PARITY;
+	bp->bio_offset = p->synced;
+	bp->bio_length = p->stripesize;
+
+	/* Schedule it down ... */
+	g_io_request(bp, cp);
+
+	/* ... and wait for the result. */
+	error = biowait(bp, "gwrite");
+	g_free(bp->bio_data);
+	g_destroy_bio(bp);
+
+	if (error) {
+		/* Incorrect parity. */
+		if (error == EAGAIN)
+			rv = 1;
+
+		/* Some other error happened. */
+		else
+			gctl_error(req, "Parity check failed at offset 0x%jx, "
+			    "errno %d", (intmax_t)p->synced, error);
+
+	/* Correct parity. */
+	} else
+		rv = 0;
+
+	gctl_set_param(req, "offset", &p->synced, sizeof(p->synced));
+
+	/* Advance the checkpointer if there was no error. */
+	if (rv == 0)
+		p->synced += p->stripesize;
+
+	/* End of plex; reset the check pointer and signal it to the caller. */
+	if (p->synced >= p->size) {
+		p->synced = 0;
+		rv = -2;
+	}
+
+	g_topology_lock();
+	error = g_access(cp, -1, -1, 0);
+
+out:
+	gctl_set_param(req, "rv", &rv, sizeof(rv));
+}
 
 void
 gv_start_obj(struct g_geom *gp, struct gctl_req *req)
@@ -194,7 +313,7 @@ gv_sync(struct gv_volume *v)
 		sync->from = up;
 		sync->to = p;
 		sync->syncsize = GV_DFLT_SYNCSIZE;
-		kthread_create(gv_sync_td, sync, NULL, 0, 0, "sync_p '%s'",
+		kthread_create(gv_sync_td, sync, NULL, 0, 0, "gv_sync '%s'",
 		    p->name);
 	}
 }
@@ -244,7 +363,7 @@ gv_init_sd(struct gv_sd *s)
 	s->flags &= ~GV_SD_INITCANCEL;
 
 	/* Spawn the thread that does the work for us. */
-	kthread_create(gv_init_td, s, NULL, 0, 0, "init_sd %s", s->name);
+	kthread_create(gv_init_td, s, NULL, 0, 0, "gv_init %s", s->name);
 
 	return (0);
 }

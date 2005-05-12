@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/io_apic.c,v 1.11 2004/08/16 23:12:29 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/io_apic.c,v 1.11.2.2 2005/02/27 21:45:56 obrien Exp $");
 
 #include "opt_atpic.h"
 #include "opt_isa.h"
@@ -424,7 +424,7 @@ ioapic_config_intr(struct intsrc *isrc, enum intr_trigger trig,
 	 * them to be set to active low.
 	 *
 	 * XXX: Should we write to the ELCR if the trigger mode changes for
-	 * an EISA IRQ?
+	 * an EISA IRQ or an ISA IRQ with the ELCR present?
 	 */
 	if (intpin->io_bus == APIC_BUS_EISA)
 		pol = INTR_POLARITY_HIGH;
@@ -548,10 +548,11 @@ ioapic_create(uintptr_t addr, int32_t apic_id, int intbase)
 
 		/*
 		 * Assume that pin 0 on the first I/O APIC is an ExtINT pin
-		 * and that pins 1-15 are ISA interrupts.  Assume that all
+		 * if mixed mode is enabled and an ISA interrupt if not.
+		 * Assume that pins 1-15 are ISA interrupts and that all
 		 * other pins are PCI interrupts.
 		 */
-		if (intpin->io_vector == 0)
+		if (intpin->io_vector == 0 && mixed_mode_enabled)
 			ioapic_set_extint(io, i);
 		else if (intpin->io_vector < IOAPIC_ISA_INTS) {
 			intpin->io_bus = APIC_BUS_ISA;

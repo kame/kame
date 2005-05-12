@@ -5,7 +5,7 @@
 #define	NCV_STATICS
 #define	NCV_IO_CONTROL_FLAGS	(0)
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1995, 1996, 1997, 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500.c,v 1.10 2004/07/10 21:05:14 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500.c,v 1.10.2.1 2005/01/30 00:59:55 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

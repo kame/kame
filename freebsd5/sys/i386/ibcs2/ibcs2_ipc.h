@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Steven Wallace
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_ipc.h,v 1.7 2003/08/15 14:55:50 jhb Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_ipc.h,v 1.7.4.1 2005/01/31 23:26:03 imp Exp $
  */
 
 

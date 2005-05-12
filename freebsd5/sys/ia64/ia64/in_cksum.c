@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/ia64/ia64/in_cksum.c,v 1.3 2001/10/05 18:58:22 dfr Exp $ */
+/* $FreeBSD: src/sys/ia64/ia64/in_cksum.c,v 1.3.8.1 2005/01/31 23:26:13 imp Exp $ */
 /* $NetBSD: in_cksum.c,v 1.7 1997/09/02 13:18:15 thorpej Exp $ */
 
-/*
+/*-
  * Copyright (c) 1988, 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1996

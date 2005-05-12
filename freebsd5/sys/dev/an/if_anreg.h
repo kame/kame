@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_anreg.h,v 1.21 2003/12/30 01:07:12 ambrisko Exp $
+ * $FreeBSD: src/sys/dev/an/if_anreg.h,v 1.21.2.1 2005/01/30 00:59:28 imp Exp $
  */
 
 #define AN_TIMEOUT	65536

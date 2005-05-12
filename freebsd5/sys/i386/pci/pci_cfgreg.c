@@ -1,7 +1,8 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * Copyright (c) 2000, Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2000, BSDi
+ * Copyright (c) 2004, Scott Long <scottl@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/pci/pci_cfgreg.c,v 1.111 2004/07/04 16:11:02 stefanf Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/pci/pci_cfgreg.c,v 1.111.2.1 2005/01/31 23:26:07 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

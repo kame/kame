@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/geom/Makefile,v 1.12 2004/08/16 06:36:21 pjd Exp $
+# $FreeBSD: src/sys/modules/geom/Makefile,v 1.12.2.1 2005/03/01 13:32:16 pjd Exp $
 
 SUBDIR=	geom_apple \
 	geom_bde \
@@ -14,6 +14,7 @@ SUBDIR=	geom_apple \
 	geom_nop \
 	geom_pc98 \
 	geom_raid3 \
+	geom_shsec \
 	geom_stripe \
 	geom_sunlabel \
 	geom_uzip \

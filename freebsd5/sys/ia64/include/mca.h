@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/mca.h,v 1.5 2002/05/29 05:19:07 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/mca.h,v 1.5.8.1 2005/01/31 23:26:14 imp Exp $
  */
 
 #ifndef _MACHINE_MCA_H_

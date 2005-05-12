@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1994, 1997 Christos Zoulas.  
  * All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_fcntl.c,v 1.32.4.1 2004/09/03 15:30:20 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_fcntl.c,v 1.32.4.2 2005/01/30 00:59:20 imp Exp $");
 
 #include "opt_mac.h"
 

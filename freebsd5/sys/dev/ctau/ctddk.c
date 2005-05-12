@@ -1,4 +1,4 @@
-/*
+/*-
  * DDK library for Cronyx-Tau adapters.
  *
  * Copyright (C) 1998-1999 Cronyx Engineering.
@@ -21,7 +21,7 @@
  * Cronyx Id: ctddk.c,v 1.1.2.3 2003/11/14 16:55:36 rik Exp $
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ctau/ctddk.c,v 1.1 2004/02/23 20:19:00 rik Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ctau/ctddk.c,v 1.1.4.1 2005/01/30 00:59:33 imp Exp $");
 
 #include <dev/cx/machdep.h>
 #include <dev/ctau/ctddk.h>

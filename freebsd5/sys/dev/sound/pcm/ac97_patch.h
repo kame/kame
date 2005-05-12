@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 2003 FreeBSD, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/ac97_patch.h,v 1.2 2003/08/21 15:44:55 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/ac97_patch.h,v 1.2.4.1 2005/01/30 01:00:04 imp Exp $
  */
 
 typedef void (*ac97_patch)(struct ac97_info*);

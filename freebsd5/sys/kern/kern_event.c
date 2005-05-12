@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_event.c,v 1.79.2.3 2004/10/15 21:58:35 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_event.c,v 1.79.2.6 2005/03/25 16:28:04 jmg Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -444,7 +444,7 @@ filt_timerattach(struct knote *kn)
 	kn->kn_status &= ~KN_DETACHED;		/* knlist_add usually sets it */
 	MALLOC(calloutp, struct callout *, sizeof(*calloutp),
 	    M_KQUEUE, M_WAITOK);
-	callout_init(calloutp, 1);
+	callout_init(calloutp, CALLOUT_MPSAFE);
 	kn->kn_hook = calloutp;
 	callout_reset(calloutp, timertoticks(kn->kn_sdata), filt_timerexpire,
 	    kn);
@@ -497,9 +497,9 @@ kqueue(struct thread *td, struct kqueue_args *uap)
 	knlist_init(&kq->kq_sel.si_note, &kq->kq_lock);
 	TASK_INIT(&kq->kq_task, 0, kqueue_task, kq);
 
-	FILEDESC_LOCK(fdp);
+	FILEDESC_LOCK_FAST(fdp);
 	SLIST_INSERT_HEAD(&fdp->fd_kqlist, kq, kq_list);
-	FILEDESC_UNLOCK(fdp);
+	FILEDESC_UNLOCK_FAST(fdp);
 
 	FILE_LOCK(fp);
 	fp->f_flag = FREAD | FWRITE;
@@ -746,13 +746,13 @@ findkn:
 			KQ_GLOBAL_LOCK(&kq_global, haskqglobal);
 		}
 
+		FILEDESC_UNLOCK(fdp);
 		KQ_LOCK(kq);
 		if (kev->ident < kq->kq_knlistsize) {
 			SLIST_FOREACH(kn, &kq->kq_knlist[kev->ident], kn_link)
 				if (kev->filter == kn->kn_filter)
 					break;
 		}
-		FILEDESC_UNLOCK(fdp);
 	} else {
 		if ((kev->flags & EV_ADD) == EV_ADD)
 			kqueue_expand(kq, fops, kev->ident, waitok);
@@ -1391,9 +1391,9 @@ kqueue_close(struct file *fp, struct thread *td)
 
 	KQ_UNLOCK(kq);
 
-	FILEDESC_LOCK(fdp);
+	FILEDESC_LOCK_FAST(fdp);
 	SLIST_REMOVE(&fdp->fd_kqlist, kq, kqueue, kq_list);
-	FILEDESC_UNLOCK(fdp);
+	FILEDESC_UNLOCK_FAST(fdp);
 
 	knlist_destroy(&kq->kq_sel.si_note);
 	mtx_destroy(&kq->kq_lock);
@@ -1587,7 +1587,7 @@ knlist_destroy(struct knlist *knl)
  * knotes time to "settle".
  */
 void
-knlist_clear(struct knlist *knl, int islocked)
+knlist_cleardel(struct knlist *knl, struct thread *td, int islocked, int killkn)
 {
 	struct knote *kn;
 	struct kqueue *kq;
@@ -1603,15 +1603,20 @@ again:		/* need to reaquire lock since we have dropped it */
 	SLIST_FOREACH(kn, &knl->kl_list, kn_selnext) {
 		kq = kn->kn_kq;
 		KQ_LOCK(kq);
-		if ((kn->kn_status & KN_INFLUX) &&
-		    (kn->kn_status & KN_DETACHED) != KN_DETACHED) {
+		if ((kn->kn_status & KN_INFLUX)) {
 			KQ_UNLOCK(kq);
 			continue;
 		}
-		/* Make sure cleared knotes disappear soon */
-		kn->kn_flags |= (EV_EOF | EV_ONESHOT);
 		knlist_remove_kq(knl, kn, 1, 1);
-		KQ_UNLOCK(kq);
+		if (killkn) {
+			kn->kn_status |= KN_INFLUX | KN_DETACHED;
+			KQ_UNLOCK(kq);
+			knote_drop(kn, td);
+		} else {
+			/* Make sure cleared knotes disappear soon */
+			kn->kn_flags |= (EV_EOF | EV_ONESHOT);
+			KQ_UNLOCK(kq);
+		}
 		kq = NULL;
 	}
 
@@ -1628,8 +1633,6 @@ again:		/* need to reaquire lock since we have dropped it */
 		kq = NULL;
 		goto again;
 	}
-
-	SLIST_INIT(&knl->kl_list);
 
 	if (islocked)
 		mtx_assert(knl->kl_lock, MA_OWNED);

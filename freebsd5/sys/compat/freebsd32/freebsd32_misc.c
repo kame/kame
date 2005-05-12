@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/freebsd32/freebsd32_misc.c,v 1.23 2004/06/17 17:16:41 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/freebsd32/freebsd32_misc.c,v 1.23.2.4 2005/03/01 09:30:15 obrien Exp $");
 
 #include "opt_compat.h"
 
@@ -64,8 +64,6 @@ __FBSDID("$FreeBSD: src/sys/compat/freebsd32/freebsd32_misc.c,v 1.23 2004/06/17 
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 #include <sys/unistd.h>
-#include <sys/user.h>
-#include <sys/utsname.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
 
@@ -1297,6 +1295,37 @@ freebsd4_freebsd32_sigaction(struct thread *td,
 	return (error);
 }
 #endif
+
+int
+freebsd32_nanosleep(struct thread *td, struct freebsd32_nanosleep_args *uap)
+{
+	struct timespec32 rmt32, rqt32;
+	struct timespec rmt, rqt;
+	int error;
+
+	error = copyin(uap->rqtp, &rqt32, sizeof(rqt));
+	if (error)
+		return (error);
+
+	CP(rqt32, rqt, tv_sec);
+	CP(rqt32, rqt, tv_nsec);
+
+	if (uap->rmtp &&
+	    !useracc((caddr_t)uap->rmtp, sizeof(rmt), VM_PROT_WRITE))
+		return (EFAULT);
+	error = kern_nanosleep(td, &rqt, &rmt);
+	if (error && uap->rmtp) {
+		int error2;
+
+		CP(rmt, rmt32, tv_sec);
+		CP(rmt, rmt32, tv_nsec);
+
+		error2 = copyout(&rmt32, uap->rmtp, sizeof(rmt));
+		if (error2)
+			error = error2;
+	}
+	return (error);
+}
 
 #if 0
 

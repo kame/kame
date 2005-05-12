@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/if_clone.c,v 1.2.2.1 2004/09/20 07:12:21 brooks Exp $
+ * $FreeBSD: src/sys/net/if_clone.c,v 1.2.2.3 2005/02/27 15:57:16 maxim Exp $
  */
 
 #include <sys/param.h>
@@ -239,6 +239,9 @@ if_clone_list(struct if_clonereq *ifcr)
 	struct if_clone *ifc;
 	int buf_count, count, err = 0;
 
+	if (ifcr->ifcr_count < 0)
+		return (EINVAL);
+
 	IF_CLONERS_LOCK();
 	/*
 	 * Set our internal output buffer size.  We could end up not
@@ -261,12 +264,6 @@ if_clone_list(struct if_clonereq *ifcr)
 		/* Just asking how many there are. */
 		goto done;
 	}
-
-	if (ifcr->ifcr_count < 0) {
-		err = EINVAL;
-		goto done;
-	}
-
 	count = (if_cloners_count < buf_count) ?
 	    if_cloners_count : buf_count;
 

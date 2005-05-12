@@ -1,5 +1,5 @@
 /*	$NetBSD: osf1_mount.c,v 1.7 1998/05/20 16:34:29 chs Exp $	*/
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_mount.c,v 1.18 2003/11/16 21:53:05 kris Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_mount.c,v 1.18.4.1 2005/01/30 00:59:12 imp Exp $");
 
 #include "opt_mac.h"
 #include "opt_nfs.h"

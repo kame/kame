@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Orion Hodson <orion@freebsd.org>
  * All rights reserved.
  *
@@ -48,7 +48,7 @@
 #include <dev/sound/pcm/sound.h>
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder_rate.c,v 1.10 2003/04/20 17:08:56 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder_rate.c,v 1.10.6.1 2005/01/30 01:00:05 imp Exp $");
 
 #endif /* _KERNEL */
 

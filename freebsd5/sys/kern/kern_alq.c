@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_alq.c,v 1.10 2003/10/25 16:10:41 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_alq.c,v 1.10.4.1 2005/01/31 23:26:15 imp Exp $");
 
 #include "opt_mac.h"
 

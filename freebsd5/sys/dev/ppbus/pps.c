@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -15,7 +15,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppbus/pps.c,v 1.43 2004/07/09 13:42:05 cognet Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/pps.c,v 1.43.2.1 2005/01/30 00:59:58 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

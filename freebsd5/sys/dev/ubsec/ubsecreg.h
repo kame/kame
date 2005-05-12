@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/dev/ubsec/ubsecreg.h,v 1.5 2003/04/27 04:26:22 sam Exp $ */
+/* $FreeBSD: src/sys/dev/ubsec/ubsecreg.h,v 1.5.6.1 2005/01/30 01:00:09 imp Exp $ */
 /*	$OpenBSD: ubsecreg.h,v 1.27 2002/09/11 22:40:31 jason Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2000 Theo de Raadt
  * Copyright (c) 2001 Patrik Lindergren (patrik@ipunplugged.com)
  *

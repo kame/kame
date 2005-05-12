@@ -29,8 +29,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde_work.c,v 1.24 2004/03/05 22:42:17 jhb Exp $
- *
+ * $FreeBSD: src/sys/geom/bde/g_bde_work.c,v 1.24.2.1 2005/01/31 23:26:01 imp Exp $
+ */
+
+/*
  * This source file contains the state-engine which makes things happen in the
  * right order.
  *

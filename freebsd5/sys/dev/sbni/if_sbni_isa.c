@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997-2001 Granch, Ltd. All rights reserved.
  * Author: Denis I.Timofeev <timofeev@granch.ru>
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.12 2004/03/17 17:50:41 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.12.2.1 2005/01/30 01:00:01 imp Exp $");
 
 
 #include <sys/param.h>

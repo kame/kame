@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 George Reid <greid@ukug.uk.freebsd.org>
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright Luigi Rizzo, 1997,1998
@@ -29,7 +29,7 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.90.2.1 2004/10/15 05:14:10 njl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.90.2.4 2005/02/27 23:32:21 mdodd Exp $");
 
 /* board-specific include files */
 #include <dev/sound/isa/mss.h>
@@ -1131,7 +1131,8 @@ msschan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->channel = c;
 	ch->buffer = b;
 	ch->dir = dir;
-	if (sndbuf_alloc(ch->buffer, mss->parent_dmat, mss->bufsize) == -1) return NULL;
+	if (sndbuf_alloc(ch->buffer, mss->parent_dmat, mss->bufsize) != 0)
+		return NULL;
 	sndbuf_dmasetup(ch->buffer, (dir == PCMDIR_PLAY)? mss->drq1 : mss->drq2);
 	return ch;
 }
@@ -1824,8 +1825,10 @@ mss_resume(device_t dev)
 
 	if (mss->bd_id == MD_CS423X) {
 		/* Needed on IBM Thinkpad 600E */
-		chn_setformat(mss->pch.channel, mss->pch.channel->format);
-		chn_setspeed(mss->pch.channel, mss->pch.channel->speed);
+		mss_lock(mss);
+		mss_format(&mss->pch, mss->pch.channel->format);
+		mss_speed(&mss->pch, mss->pch.channel->speed);
+		mss_unlock(mss);
 	}
 
     	return 0;

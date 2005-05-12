@@ -1,4 +1,4 @@
-/*
+/*-
  *       Copyright (c) 2000-04 ICP vortex GmbH
  *       Copyright (c) 2002-04 Intel Corporation
  *       Copyright (c) 2003-04 Adaptec Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/iir/iir.c,v 1.10.2.1 2004/09/08 19:54:36 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/iir/iir.c,v 1.10.2.2 2005/01/30 00:59:47 imp Exp $");
 
 #define _IIR_C_
 

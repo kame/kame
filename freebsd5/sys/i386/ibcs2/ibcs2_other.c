@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Steven Wallace
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_other.c,v 1.15 2003/06/02 06:48:51 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_other.c,v 1.15.4.1 2005/01/31 23:26:03 imp Exp $");
 
 /*
  * IBCS2 compatibility module.

@@ -1,6 +1,6 @@
 /* mga_warp.c -- Matrox G200/G400 WARP engine management -*- linux-c -*-
- * Created: Thu Jan 11 21:29:32 2001 by gareth@valinux.com
- *
+ * Created: Thu Jan 11 21:29:32 2001 by gareth@valinux.com */
+/*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_warp.c,v 1.5 2003/08/19 02:57:31 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_warp.c,v 1.5.4.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/mga.h"

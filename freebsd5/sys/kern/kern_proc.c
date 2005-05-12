@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,11 +27,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
- * $FreeBSD: src/sys/kern/kern_proc.c,v 1.215.2.1 2004/09/09 10:03:19 julian Exp $
+ * $FreeBSD: src/sys/kern/kern_proc.c,v 1.215.2.6 2005/03/22 13:40:23 pjd Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_proc.c,v 1.215.2.1 2004/09/09 10:03:19 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_proc.c,v 1.215.2.6 2005/03/22 13:40:23 pjd Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
@@ -96,9 +96,7 @@ uma_zone_t proc_zone;
 uma_zone_t ithread_zone;
 
 int kstack_pages = KSTACK_PAGES;
-int uarea_pages = UAREA_PAGES;
 SYSCTL_INT(_kern, OID_AUTO, kstack_pages, CTLFLAG_RD, &kstack_pages, 0, "");
-SYSCTL_INT(_kern, OID_AUTO, uarea_pages, CTLFLAG_RD, &uarea_pages, 0, "");
 
 CTASSERT(sizeof(struct kinfo_proc) == KINFO_PROC_SIZE);
 
@@ -179,11 +177,11 @@ proc_init(void *mem, int size, int flags)
 
 	p = (struct proc *)mem;
 	p->p_sched = (struct p_sched *)&p[1];
-	vm_proc_new(p);
 	td = thread_alloc();
 	kg = ksegrp_alloc();
 	bzero(&p->p_mtx, sizeof(struct mtx));
 	mtx_init(&p->p_mtx, "process lock", NULL, MTX_DEF | MTX_DUPOK);
+	p->p_stats = pstats_alloc();
 	proc_linkup(p, kg, td);
 	sched_newproc(p, kg, td);
 	return (0);
@@ -206,7 +204,6 @@ proc_fini(void *mem, int size)
 	KASSERT((td != NULL), ("proc_fini: bad thread pointer"));
         kg = FIRST_KSEGRP_IN_PROC(p);
 	KASSERT((kg != NULL), ("proc_fini: bad kg pointer"));
-	vm_proc_dispose(p);
 	sched_destroyproc(p);
 	thread_free(td);
 	ksegrp_free(kg);
@@ -626,6 +623,7 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp)
 	struct tty *tp;
 	struct session *sp;
 	struct timeval tv;
+	struct ucred *cred;
 	struct sigacts *ps;
 
 	p = td->td_proc;
@@ -646,19 +644,24 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp)
 #endif
 	kp->ki_fd = p->p_fd;
 	kp->ki_vmspace = p->p_vmspace;
-	if (p->p_ucred) {
-		kp->ki_uid = p->p_ucred->cr_uid;
-		kp->ki_ruid = p->p_ucred->cr_ruid;
-		kp->ki_svuid = p->p_ucred->cr_svuid;
+	kp->ki_flag = p->p_flag;
+	cred = p->p_ucred;
+	if (cred) {
+		kp->ki_uid = cred->cr_uid;
+		kp->ki_ruid = cred->cr_ruid;
+		kp->ki_svuid = cred->cr_svuid;
 		/* XXX bde doesn't like KI_NGROUPS */
-		kp->ki_ngroups = min(p->p_ucred->cr_ngroups, KI_NGROUPS);
-		bcopy(p->p_ucred->cr_groups, kp->ki_groups,
+		kp->ki_ngroups = min(cred->cr_ngroups, KI_NGROUPS);
+		bcopy(cred->cr_groups, kp->ki_groups,
 		    kp->ki_ngroups * sizeof(gid_t));
-		kp->ki_rgid = p->p_ucred->cr_rgid;
-		kp->ki_svgid = p->p_ucred->cr_svgid;
+		kp->ki_rgid = cred->cr_rgid;
+		kp->ki_svgid = cred->cr_svgid;
+		/* If jailed(cred), emulate the old P_JAILED flag. */
+		if (jailed(cred))
+			kp->ki_flag |= P_JAILED;
 	}
-	if (p->p_sigacts) {
-		ps = p->p_sigacts;
+	ps = p->p_sigacts;
+	if (ps) {
 		mtx_lock(&ps->ps_mtx);
 		kp->ki_sigignore = ps->ps_sigignore;
 		kp->ki_sigcatch = ps->ps_sigcatch;
@@ -672,8 +675,6 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp)
 
 		kp->ki_size = vm->vm_map.size;
 		kp->ki_rssize = vmspace_resident_count(vm); /*XXX*/
-		if (p->p_sflag & PS_INMEM)
-			kp->ki_rssize += UAREA_PAGES;
 		FOREACH_THREAD_IN_PROC(p, td0) {
 			if (!TD_IS_SWAPPED(td0))
 				kp->ki_rssize += td0->td_kstack_pages;
@@ -769,7 +770,6 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp)
 		kp->ki_stat = SZOMB;
 	}
 	mtx_unlock_spin(&sched_lock);
-	sp = NULL;
 	tp = NULL;
 	if (p->p_pgrp) {
 		kp->ki_pgid = p->p_pgrp->pg_id;
@@ -808,13 +808,36 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp)
 	kp->ki_sigmask = td->td_sigmask;
 	kp->ki_xstat = p->p_xstat;
 	kp->ki_acflag = p->p_acflag;
-	kp->ki_flag = p->p_flag;
-	/* If jailed(p->p_ucred), emulate the old P_JAILED flag. */
-	if (jailed(p->p_ucred))
-		kp->ki_flag |= P_JAILED;
 	kp->ki_lock = p->p_lock;
 	if (p->p_pptr)
 		kp->ki_ppid = p->p_pptr->p_pid;
+}
+
+struct pstats *
+pstats_alloc(void)
+{
+
+	return (malloc(sizeof(struct pstats), M_SUBPROC, M_ZERO|M_WAITOK));
+}
+
+/*
+ * Copy parts of p_stats; zero the rest of p_stats (statistics).
+ */
+void
+pstats_fork(struct pstats *src, struct pstats *dst)
+{
+
+	bzero(&dst->pstat_startzero,
+	    __rangeof(struct pstats, pstat_startzero, pstat_endzero));
+	bcopy(&src->pstat_startcopy, &dst->pstat_startcopy,
+	    __rangeof(struct pstats, pstat_startcopy, pstat_endcopy));
+}
+
+void
+pstats_free(struct pstats *ps)
+{
+
+	free(ps, M_SUBPROC);
 }
 
 /*

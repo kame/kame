@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.47 2004/08/16 12:15:07 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.47.2.1 2005/03/01 10:08:11 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,12 +40,12 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.47 2004/08/16 12:15:
 
 #include "opt_compat.h"
 
-#if !COMPAT_LINUX32
-#include <machine/../linux/linux.h>
-#include <machine/../linux/linux_proto.h>
-#else
+#ifdef COMPAT_LINUX32
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#else
+#include <machine/../linux/linux.h>
+#include <machine/../linux/linux_proto.h>
 #endif
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_util.h>
@@ -120,7 +120,7 @@ bsd_to_linux_sigaction(struct sigaction *bsa, l_sigaction_t *lsa)
 {
 
 	bsd_to_linux_sigset(&bsa->sa_mask, &lsa->lsa_mask);
-#if COMPAT_LINUX32
+#ifdef COMPAT_LINUX32
 	lsa->lsa_handler = (uintptr_t)bsa->sa_handler;
 #else
 	lsa->lsa_handler = bsa->sa_handler;

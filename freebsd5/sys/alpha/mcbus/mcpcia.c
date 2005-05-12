@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.29 2004/07/01 15:07:26 gallatin Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.29.2.1 2005/01/30 00:59:11 imp Exp $");
 
 #define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>

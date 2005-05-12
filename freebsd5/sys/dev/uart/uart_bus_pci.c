@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_pci.c,v 1.4 2003/11/28 05:28:29 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_pci.c,v 1.4.4.1 2005/01/30 01:00:08 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

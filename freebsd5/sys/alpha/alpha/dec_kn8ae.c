@@ -1,5 +1,5 @@
 /* $NetBSD: dec_kn8ae.c,v 1.15 1998/02/13 00:12:50 thorpej Exp $ */
-/*
+/*-
  * Copyright (c) 1997 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.14 2003/08/17 06:42:07 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.14.4.1 2005/01/30 00:59:09 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

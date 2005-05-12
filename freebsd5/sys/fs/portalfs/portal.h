@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)portal.h	8.4 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/portalfs/portal.h,v 1.8 2004/04/07 20:46:01 imp Exp $
+ * $FreeBSD: src/sys/fs/portalfs/portal.h,v 1.8.2.1 2005/01/31 23:25:58 imp Exp $
  */
 
 struct portal_args {

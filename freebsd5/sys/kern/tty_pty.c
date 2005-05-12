@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/tty_pty.c,v 1.129 2004/07/15 20:47:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/tty_pty.c,v 1.129.2.1 2005/01/31 23:26:17 imp Exp $");
 
 /*
  * Pseudo-teletype Driver

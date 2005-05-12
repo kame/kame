@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, David Greenman
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.18 2004/03/03 07:33:43 obrien Exp $
+ * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.18.2.2 2005/02/02 22:44:25 imp Exp $
  */
 
 #ifndef SYS_DEV_ED_IF_EDVAR_H
@@ -76,7 +76,7 @@ struct ed_softc {
 
 	caddr_t mem_start;	/* NIC memory start address */
 	caddr_t mem_end;		/* NIC memory end address */
-	u_int32_t mem_size;	/* total NIC memory size */
+	uint32_t mem_size;	/* total NIC memory size */
 	caddr_t mem_ring;	/* start of RX ring-buffer (in NIC mem) */
 
 	u_char  mem_shared;	/* NIC memory is shared with host */
@@ -125,22 +125,22 @@ struct ed_softc {
 #define	ed_nic_insw(sc, port, addr, count) \
 	bus_space_read_multi_2(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->nic_offset + (port), (u_int16_t *)(addr), (count))
+		(sc)->nic_offset + (port), (uint16_t *)(addr), (count))
 
 #define	ed_nic_outsw(sc, port, addr, count) \
 	bus_space_write_multi_2(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->nic_offset + (port), (u_int16_t *)(addr), (count))
+		(sc)->nic_offset + (port), (uint16_t *)(addr), (count))
 
 #define	ed_nic_insl(sc, port, addr, count) \
 	bus_space_read_multi_4(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->nic_offset + (port), (u_int32_t *)(addr), (count))
+		(sc)->nic_offset + (port), (uint32_t *)(addr), (count))
 
 #define	ed_nic_outsl(sc, port, addr, count) \
 	bus_space_write_multi_4(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->nic_offset + (port), (u_int32_t *)(addr), (count))
+		(sc)->nic_offset + (port), (uint32_t *)(addr), (count))
 
 #define	ed_asic_inb(sc, port) \
 	bus_space_read_1(rman_get_bustag((sc)->port_res), \
@@ -173,22 +173,22 @@ struct ed_softc {
 #define	ed_asic_insw(sc, port, addr, count) \
 	bus_space_read_multi_2(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->asic_offset + (port), (u_int16_t *)(addr), (count))
+		(sc)->asic_offset + (port), (uint16_t *)(addr), (count))
 
 #define	ed_asic_outsw(sc, port, addr, count) \
 	bus_space_write_multi_2(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->asic_offset + (port), (u_int16_t *)(addr), (count))
+		(sc)->asic_offset + (port), (uint16_t *)(addr), (count))
 
 #define	ed_asic_insl(sc, port, addr, count) \
 	bus_space_read_multi_4(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->asic_offset + (port), (u_int32_t *)(addr), (count))
+		(sc)->asic_offset + (port), (uint32_t *)(addr), (count))
 
 #define	ed_asic_outsl(sc, port, addr, count) \
 	bus_space_write_multi_4(rman_get_bustag((sc)->port_res), \
 		rman_get_bushandle((sc)->port_res), \
-		(sc)->asic_offset + (port), (u_int32_t *)(addr), (count))
+		(sc)->asic_offset + (port), (uint32_t *)(addr), (count))
 
 void	ed_release_resources	(device_t);
 int	ed_alloc_port		(device_t, int, int);

@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/ieeefp.h,v 1.5 2000/05/10 19:41:40 jhb Exp $ */
+/* $FreeBSD: src/sys/alpha/include/ieeefp.h,v 1.5.8.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: ieeefp.h,v 1.2 1997/04/06 08:47:28 cgd Exp */
 
-/* 
+/*-
  * Written by J.T. Conklin, Apr 28, 1995
  * Public domain.
  */

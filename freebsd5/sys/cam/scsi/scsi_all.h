@@ -1,4 +1,4 @@
-/*
+/*-
  * Largely written by Julian Elischer (julian@tfs.com)
  * for TRW Financial Systems.
  *
@@ -14,7 +14,7 @@
  *
  * Ported to run under 386BSD by Julian Elischer (julian@tfs.com) Sept 1992
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.23 2003/04/30 00:35:22 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.23.6.1 2005/01/30 00:59:16 imp Exp $
  */
 
 /*

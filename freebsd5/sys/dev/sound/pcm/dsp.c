@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.77 2004/07/02 15:31:44 netchild Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.77.2.1 2005/01/30 01:00:04 imp Exp $");
 
 #define OLDPCM_IOCTL
 

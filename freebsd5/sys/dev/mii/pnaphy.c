@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Berkeley Software Design, Inc.
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@osd.bsdi.com>.  All rights reserved.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.14 2004/05/29 18:09:10 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.14.2.1 2005/01/30 00:59:54 imp Exp $");
 
 /*
  * driver for homePNA PHYs

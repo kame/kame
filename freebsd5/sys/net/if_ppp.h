@@ -1,6 +1,8 @@
 /*
  * if_ppp.h - Point-to-Point Protocol definitions.
- *
+ */
+
+/*-
  * Copyright (c) 1989 Carnegie Mellon University.
  * All rights reserved.
  *
@@ -16,7 +18,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/sys/net/if_ppp.h,v 1.14 1999/08/28 00:48:20 peter Exp $
+ * $FreeBSD: src/sys/net/if_ppp.h,v 1.14.26.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _IF_PPP_H_

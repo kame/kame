@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -68,7 +68,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.8 2004/05/30 17:57:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.8.2.1 2005/01/30 00:59:53 imp Exp $");
 
 /*
  * Driver for the Broadcom BCM5201/BCM5202 "Mini-Theta" PHYs.  This also

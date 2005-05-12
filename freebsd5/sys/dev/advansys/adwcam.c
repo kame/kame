@@ -1,4 +1,4 @@
-/*
+/*-
  * CAM SCSI interface for the the Advanced Systems Inc.
  * Second Generation SCSI controllers.
  *
@@ -44,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.18 2003/08/24 17:48:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.18.4.2 2005/01/30 00:59:23 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -871,6 +871,26 @@ adw_free(struct adw_softc *adw)
 		bus_dma_tag_destroy(adw->parent_dmat);
 	case 0:
 		break;
+	}
+	
+	if (adw->regs != NULL)
+		bus_release_resource(adw->device,
+				     adw->regs_res_type,
+				     adw->regs_res_id,
+				     adw->regs);
+
+	if (adw->irq != NULL)
+		bus_release_resource(adw->device,
+				     adw->irq_res_type,
+				     0, adw->irq);
+
+	if (adw->sim != NULL) {
+		if (adw->path != NULL) {
+			xpt_async(AC_LOST_DEVICE, adw->path, NULL);
+			xpt_free_path(adw->path);
+		}
+		xpt_bus_deregister(cam_sim_path(adw->sim));
+		cam_sim_free(adw->sim, /*free_devq*/TRUE);
 	}
 	free(adw->name, M_DEVBUF);
 	free(adw, M_DEVBUF);

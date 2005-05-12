@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fdc/fdc.c,v 1.283.2.3 2004/10/10 23:49:38 peadar Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fdc/fdc.c,v 1.283.2.7 2005/03/01 08:22:55 yongari Exp $");
 
 #include "opt_fdc.h"
 
@@ -466,6 +466,7 @@ fdc_cmd(struct fdc_data *fdc, int n_out, ...)
 				"cmd %x failed at out byte %d of %d\n",
 				cmd, n + 1, n_out);
 			fdc->flags |= FDC_NEEDS_RESET;
+			va_end(ap);
 			return fdc_err(fdc, msg);
 		}
 	}
@@ -478,9 +479,11 @@ fdc_cmd(struct fdc_data *fdc, int n_out, ...)
 				"cmd %02x failed at in byte %d of %d\n",
 				cmd, n + 1, n_in);
 			fdc->flags |= FDC_NEEDS_RESET;
+			va_end(ap);
 			return fdc_err(fdc, msg);
 		}
 	}
+	va_end(ap);
 	return (0);
 }
 
@@ -1392,7 +1395,7 @@ fd_start(struct bio *bp)
 }
 
 static int
-fd_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
+fd_ioctl(struct g_provider *pp, u_long cmd, void *data, int fflag, struct thread *td)
 {
 	struct fd_data *fd;
 	struct fdc_status *fsp;
@@ -1407,6 +1410,8 @@ fd_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
 		return (0);
 
 	case FD_STYPE:                  /* set drive type */
+		if (!(fflag & FWRITE))
+			return (EPERM);
 		/*
 		 * Allow setting drive type temporarily iff
 		 * currently unset.  Used for fdformat so any
@@ -1428,6 +1433,8 @@ fd_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
 		return (0);
 
 	case FD_SOPTS:			/* set drive options */
+		if (!(fflag & FWRITE))
+			return (EPERM);
 		fd->options = *(int *)data;
 		return (0);
 
@@ -1449,6 +1456,8 @@ fd_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
 		return (0);
 
 	case FD_FORM:
+		if (!(fflag & FWRITE))
+			return (EPERM);
 		if (((struct fd_formb *)data)->format_version !=
 		    FD_FORMAT_VERSION)
 			return (EINVAL); /* wrong version of formatting prog */
@@ -1656,7 +1665,6 @@ fdc_detach(device_t dev)
 device_t
 fdc_add_child(device_t dev, const char *name, int unit)
 {
-	int flags;
 	struct fdc_ivars *ivar;
 	device_t child;
 
@@ -1671,8 +1679,6 @@ fdc_add_child(device_t dev, const char *name, int unit)
 	device_set_ivars(child, ivar);
 	ivar->fdunit = unit;
 	ivar->fdtype = FDT_NONE;
-	if (resource_int_value(name, unit, "flags", &flags) == 0)
-		device_set_flags(child, flags);
 	if (resource_disabled(name, unit))
 		device_disable(child);
 	return (child);
@@ -1827,7 +1833,7 @@ fd_probe(device_t dev)
 				/* ...wait a moment... */
 				DELAY(300000);
 				/* make ctrlr happy: */
-				fdc_sense_int(fdc, 0, 0);
+				fdc_sense_int(fdc, NULL, NULL);
 			}
 		}
 
@@ -1844,7 +1850,7 @@ fd_probe(device_t dev)
 				DELAY(i == 0 ? 1000000 : 300000);
 
 				/* anything responding? */
-				if (fdc_sense_int(fdc, &st0, 0) == 0 &&
+				if (fdc_sense_int(fdc, &st0, NULL) == 0 &&
 				    (st0 & NE7_ST0_EC) == 0)
 					break; /* already probed succesfully */
 			}
@@ -1922,7 +1928,6 @@ fd_attach(device_t dev)
 	g_post_event(fd_attach2, fd, M_WAITOK, NULL);
 	fd->flags |= FD_EMPTY;
 	bioq_init(&fd->fd_bq);
-	return (0);
 
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
  * All Rights Reserved.
  *
@@ -21,7 +21,7 @@
  *	netatalk@itd.umich.edu
  */
 
-/* $FreeBSD: src/sys/netatalk/ddp_output.c,v 1.24 2004/06/13 02:50:05 rwatson Exp $ */
+/* $FreeBSD: src/sys/netatalk/ddp_output.c,v 1.24.2.2 2005/03/13 13:07:50 rwatson Exp $ */
 
 #include "opt_mac.h"
 
@@ -57,7 +57,7 @@ ddp_output(struct mbuf *m, struct socket *so)
     SOCK_UNLOCK(so);
 #endif
 
-    M_PREPEND(m, sizeof(struct ddpehdr), M_TRYWAIT);
+    M_PREPEND(m, sizeof(struct ddpehdr), M_DONTWAIT);
     if (m == NULL)
 	return (ENOBUFS);
 
@@ -200,7 +200,7 @@ ddp_route(struct mbuf *m, struct route *ro)
      * packets end up poorly aligned due to the three byte elap header.
      */
     if (!(aa->aa_flags & AFA_PHASE2)) {
-	MGET(m0, M_TRYWAIT, MT_HEADER);
+	MGET(m0, M_DONTWAIT, MT_HEADER);
 	if (m0 == NULL) {
 	    m_freem(m);
 	    printf("ddp_route: no buffers\n");

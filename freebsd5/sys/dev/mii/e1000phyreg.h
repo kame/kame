@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/mii/e1000phyreg.h,v 1.2 2003/09/20 10:53:08 wilko Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/mii/e1000phyreg.h,v 1.2.4.1 2005/01/30 00:59:54 imp Exp $ */
+/*-
  * Principal Author: Parag Patel
  * Copyright (c) 2001
  * All rights reserved.
@@ -30,7 +30,7 @@
  * Secondary Author: Matthew Jacob
  */
 
-/*
+/*-
  * Derived by information released by Intel under the following license:
  *
  * Copyright (c) 1999 - 2001, Intel Corporation 

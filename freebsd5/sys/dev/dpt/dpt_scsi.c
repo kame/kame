@@ -1,4 +1,4 @@
-/*
+/*-
  *       Copyright (c) 1997 by Simon Shapiro
  *       All Rights Reserved
  *
@@ -27,9 +27,9 @@
  * SUCH DAMAGE.
  */
 
-#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.48 2004/03/17 17:50:30 njl Exp $"
+#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.48.2.1 2005/01/30 00:59:35 imp Exp $"
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.48 2004/03/17 17:50:30 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.48.2.1 2005/01/30 00:59:35 imp Exp $");
 
 /*
  * dpt_scsi.c: SCSI dependant code for the DPT driver

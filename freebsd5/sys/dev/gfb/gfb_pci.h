@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  *
  * Copyright (c) 2000 Andrew Miklic
  *
- * $FreeBSD: src/sys/dev/gfb/gfb_pci.h,v 1.1 2001/11/01 08:26:30 obrien Exp $
+ * $FreeBSD: src/sys/dev/gfb/gfb_pci.h,v 1.1.10.1 2005/01/30 00:59:43 imp Exp $
  */
 
 #ifndef _PCI_GFB_H_

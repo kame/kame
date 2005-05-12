@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  *
  *      @(#)bpf.c	8.4 (Berkeley) 1/9/95
  *
- * $FreeBSD: src/sys/net/bpf.c,v 1.133.2.2 2004/10/11 03:45:21 green Exp $
+ * $FreeBSD: src/sys/net/bpf.c,v 1.133.2.9 2005/04/01 05:35:46 rwatson Exp $
  */
 
 #include "opt_bpf.h"
@@ -89,7 +89,10 @@ SYSCTL_INT(_debug, OID_AUTO, bpf_maxbufsize, CTLFLAG_RW,
 	&bpf_maxbufsize, 0, "");
 
 /*
- *  bpf_iflist is the list of interfaces; each corresponds to an ifnet
+ * bpf_iflist is a list of BPF interface structures, each corresponding to a
+ * specific DLT.  The same network interface might have several BPF interface
+ * structures registered by different layers in the stack (i.e., 802.11
+ * frames, ethernet frames, etc).
  */
 static LIST_HEAD(, bpf_if)	bpf_iflist;
 static struct mtx	bpf_mtx;		/* bpf global lock */
@@ -383,6 +386,7 @@ bpfclose(dev, flags, fmt, td)
 	if (d->bd_bif)
 		bpf_detachd(d);
 	mtx_unlock(&bpf_mtx);
+	selwakeuppri(&d->bd_sel, PRINET);
 #ifdef MAC
 	mac_destroy_bpfdesc(d);
 #endif /* MAC */
@@ -572,8 +576,10 @@ bpfwrite(dev, uio, ioflag)
 	if (error)
 		return (error);
 
-	if (datlen > ifp->if_mtu)
+	if (datlen > ifp->if_mtu) {
+		m_freem(m);
 		return (EMSGSIZE);
+	}
 
 	if (d->bd_hdrcmplt)
 		dst.sa_family = pseudo_AF_HDRCMPLT;
@@ -939,11 +945,11 @@ bpf_setf(d, fp)
 	struct bpf_insn *fcode, *old;
 	u_int flen, size;
 
-	old = d->bd_filter;
 	if (fp->bf_insns == NULL) {
 		if (fp->bf_len != 0)
 			return (EINVAL);
 		BPFD_LOCK(d);
+		old = d->bd_filter;
 		d->bd_filter = NULL;
 		reset_d(d);
 		BPFD_UNLOCK(d);
@@ -960,6 +966,7 @@ bpf_setf(d, fp)
 	if (copyin((caddr_t)fp->bf_insns, (caddr_t)fcode, size) == 0 &&
 	    bpf_validate(fcode, (int)flen)) {
 		BPFD_LOCK(d);
+		old = d->bd_filter;
 		d->bd_filter = fcode;
 		reset_d(d);
 		BPFD_UNLOCK(d);
@@ -1114,7 +1121,7 @@ filt_bpfread(kn, hint)
 	struct bpf_d *d = (struct bpf_d *)kn->kn_hook;
 	int ready;
 
-	BPFD_LOCK(d);
+	BPFD_LOCK_ASSERT(d);
 	ready = bpf_ready(d);
 	if (ready) {
 		kn->kn_data = d->bd_slen;
@@ -1126,7 +1133,6 @@ filt_bpfread(kn, hint)
 		    bpf_timed_out, d);
 		d->bd_state = BPF_WAITING;
 	}
-	BPFD_UNLOCK(d);
 
 	return (ready);
 }
@@ -1306,6 +1312,7 @@ catchpacket(d, pkt, pktlen, snaplen, cpfn)
 	struct bpf_hdr *hp;
 	int totlen, curlen;
 	int hdrlen = d->bd_bif->bif_hdrlen;
+	int do_wakeup = 0;
 
 	/*
 	 * Figure out how many bytes to move.  If the packet is
@@ -1336,7 +1343,7 @@ catchpacket(d, pkt, pktlen, snaplen, cpfn)
 			return;
 		}
 		ROTATE_BUFFERS(d);
-		bpf_wakeup(d);
+		do_wakeup = 1;
 		curlen = 0;
 	}
 	else if (d->bd_immediate || d->bd_state == BPF_TIMED_OUT)
@@ -1345,7 +1352,7 @@ catchpacket(d, pkt, pktlen, snaplen, cpfn)
 		 * already expired during a select call.  A packet
 		 * arrived, so the reader should be woken up.
 		 */
-		bpf_wakeup(d);
+		do_wakeup = 1;
 
 	/*
 	 * Append the bpf header.
@@ -1359,6 +1366,9 @@ catchpacket(d, pkt, pktlen, snaplen, cpfn)
 	 */
 	(*cpfn)(pkt, (u_char *)hp + hdrlen, (hp->bh_caplen = totlen - hdrlen));
 	d->bd_slen = curlen + totlen;
+
+	if (do_wakeup)
+		bpf_wakeup(d);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 M. Warner Losh <imp@village.org> 
  * All rights reserved.
  *
@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sn/if_snvar.h,v 1.5 2003/10/26 22:35:44 imp Exp $
+ * $FreeBSD: src/sys/dev/sn/if_snvar.h,v 1.5.4.1 2005/01/30 01:00:02 imp Exp $
  */
 
 #ifndef _IF_SNVAR_H

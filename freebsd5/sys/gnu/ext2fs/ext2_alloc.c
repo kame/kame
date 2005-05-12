@@ -1,10 +1,10 @@
-/*
+/*-
  *  modified for Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  */
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_alloc.c	8.8 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_alloc.c,v 1.38 2004/04/07 20:46:03 imp Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_alloc.c,v 1.38.2.1 2005/01/31 23:26:01 imp Exp $
  */
 
 #include <sys/param.h>

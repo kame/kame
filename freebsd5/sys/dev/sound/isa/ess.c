@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright 1997,1998 Luigi Rizzo.
  *
@@ -38,7 +38,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.31.2.1 2004/10/15 05:14:10 njl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.31.2.3 2005/01/30 01:00:03 imp Exp $");
 
 #define ESS_BUFFSIZE (4096)
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -557,7 +557,7 @@ esschan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->parent = sc;
 	ch->channel = c;
 	ch->buffer = b;
-	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsize) == -1)
+	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsize) != 0)
 		return NULL;
 	ch->dir = dir;
 	ch->hwch = 1;

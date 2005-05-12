@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_rman.c,v 1.35.2.1 2004/08/23 05:12:36 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_rman.c,v 1.35.2.2 2005/01/31 23:26:17 imp Exp $");
 
 #define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>

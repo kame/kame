@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/pci/ciareg.h,v 1.2 1999/08/28 00:39:01 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/pci/ciareg.h,v 1.2.10.1 2005/01/30 00:59:12 imp Exp $ */
 /* $NetBSD: ciareg.h,v 1.22 1998/06/06 20:40:14 thorpej Exp $ */
 
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *

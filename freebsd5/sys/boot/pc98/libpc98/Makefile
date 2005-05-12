@@ -1,7 +1,7 @@
-# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.20 2004/02/07 14:35:33 ru Exp $
+# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.20.2.1 2005/02/13 07:23:31 obrien Exp $
 #
 LIB=			pc98
-INTERNALLIB=		true
+INTERNALLIB=
 
 .PATH:	${.CURDIR}/../../i386/libi386
 

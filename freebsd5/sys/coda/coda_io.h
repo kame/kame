@@ -1,4 +1,4 @@
-/*
+/*-
  * 
  *             Coda: an Experimental Distributed File System
  *                              Release 3.1
@@ -27,11 +27,11 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_io.h,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $ 
- * $FreeBSD: src/sys/coda/coda_io.h,v 1.7 2002/05/16 21:25:34 trhodes Exp $
+ * $FreeBSD: src/sys/coda/coda_io.h,v 1.7.8.1 2005/01/30 00:59:17 imp Exp $
  * 
  */
 
-/* 
+/*-
  * Mach Operating System
  * Copyright (c) 1990 Carnegie-Mellon University
  * Copyright (c) 1989 Carnegie-Mellon University

@@ -1,6 +1,6 @@
 /* radeon_drv.c -- ATI Radeon driver -*- linux-c -*-
- * Created: Wed Feb 14 17:10:04 2001 by gareth@valinux.com
- *
+ * Created: Wed Feb 14 17:10:04 2001 by gareth@valinux.com */
+/*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/radeon_drv.c,v 1.9 2003/10/24 01:48:17 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/radeon_drv.c,v 1.9.4.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/radeon.h"
@@ -58,7 +58,7 @@
 #endif
 
 #ifdef __FreeBSD__
-DRIVER_MODULE(DRIVER_NAME, pci, DRM(driver), DRM(devclass), 0, 0);
+DRIVER_MODULE(radeon, pci, DRM(driver), DRM(devclass), 0, 0);
 #elif defined(__NetBSD__)
 CFDRIVER_DECL(radeon, DV_TTY, NULL);
 #endif /* __FreeBSD__ */

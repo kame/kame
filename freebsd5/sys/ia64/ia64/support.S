@@ -23,9 +23,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/support.S,v 1.21 2003/10/23 06:19:06 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/support.S,v 1.21.4.3 2005/01/31 23:26:13 imp Exp $
  */
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -68,7 +68,7 @@
  *	r15-r19	scratch
  *	ar.bsp	tranlated to new mode
  */
-ENTRY(ia64_change_mode, 0)
+ENTRY_NOPROFILE(ia64_change_mode, 0)
 	rsm	psr.i | psr.ic
 	mov	r19=ar.rsc		// save rsc while we change mode
 	tbit.nz	p6,p7=r14,17		// physical or virtual ?
@@ -891,12 +891,44 @@ ENTRY(copyerr, 0)
 	br.ret.sptk.few rp
 END(copyerr)
 
+#if defined(GPROF)
 /*
- * Support functions for handling of unaligned memory accesses.
+ * Important registers:
+ *      r8      structure return address
+ *      rp      our return address
+ *      in0     caller's ar.pfs
+ *      in1     caller's gp
+ *      in2     caller's rp
+ *      in3     GOT entry
+ *      ar.pfs  our pfs
  */
-ENTRY(spillfd, 2)
-	ldfd		f6 = [r32]
+ENTRY_NOPROFILE(_mcount, 4)
+	alloc		loc0 = ar.pfs, 4, 3, 2, 0
+	mov		loc1 = r8
+	mov		loc2 = rp
 	;;
-	stf.spill	[r33] = f6
-	br.ret.sptk	rp
-END(spillfd)
+	mov		out0 = in2
+	mov		out1 = rp
+	br.call.sptk	rp = __mcount
+	;;
+1:
+	mov		gp = in1
+	mov		r14 = ip
+	mov		b7 = loc2
+	;;
+	add		r14 = 2f - 1b, r14
+	mov		ar.pfs = loc0
+	mov		rp = in2
+	;;
+	mov		b7 = r14
+	mov		b6 = loc2
+	mov		r8 = loc1
+	mov		r14 = in0
+	br.ret.sptk	b7
+	;;
+2:
+	mov		ar.pfs = r14
+	br.sptk		b6
+	;;
+END(_mcount)
+#endif

@@ -132,7 +132,7 @@ extern	int	ip6_getpmtu(struct route_in6 *, struct route_in6 *,
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
 /* static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.42.2.34 2001/07/23 13:49:57 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.c,v 1.47.2.3 2004/10/03 17:04:38 mlaier Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.c,v 1.47.2.4 2005/03/13 18:08:56 rwatson Exp $";
 #endif
 
 extern	struct	protosw	inetsw[];
@@ -169,6 +169,8 @@ static	int	ipfr_fastroute6 __P((struct mbuf *, struct mbuf **,
 # endif
 # ifdef	__sgi
 extern	int		tcp_mtudisc;
+# endif
+# ifdef USE_MUTEX
 extern	kmutex_t        ipf_rw;
 extern	KRWLOCK_T	ipf_mutex;
 # endif

@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 1999 Doug Rabson
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/isa/isa_if.m,v 1.6 2000/04/08 14:17:07 dfr Exp $
+# $FreeBSD: src/sys/isa/isa_if.m,v 1.6.8.1 2005/01/31 23:26:15 imp Exp $
 #
 
 #include <sys/bus.h>

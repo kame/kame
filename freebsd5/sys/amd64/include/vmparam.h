@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vmparam.h	5.9 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/vmparam.h,v 1.44.4.1 2004/10/30 00:11:41 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/vmparam.h,v 1.44.2.1 2004/10/30 00:09:54 peter Exp $
  */
 
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Bernd Walter <ticso@freebsd.org>
  *
  * $URL: https://devel.bwct.de/svn/projects/ubser/ubser.c $
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  */
 
-/*
+/*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ubser.c,v 1.12 2004/08/15 23:39:18 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ubser.c,v 1.12.2.1 2005/01/30 01:00:09 imp Exp $");
 
 /*
  * BWCT serial adapter driver

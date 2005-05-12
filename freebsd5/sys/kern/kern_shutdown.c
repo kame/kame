@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.163.2.2 2004/09/10 00:04:17 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.163.2.4 2005/01/07 20:09:08 jhb Exp $");
 
 #include "opt_kdb.h"
 #include "opt_hw_wdog.h"
@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.163.2.2 2004/09/10 00:04:17
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/resourcevar.h>
+#include <sys/sched.h>
 #include <sys/smp.h>		/* smp_active */
 #include <sys/sysctl.h>
 #include <sys/sysproto.h>
@@ -249,14 +250,23 @@ doadump(void)
 }
 
 /*
- *  Go through the rigmarole of shutting down..
- * this used to be in machdep.c but I'll be dammned if I could see
- * anything machine dependant in it.
+ * Shutdown the system cleanly to prepare for reboot, halt, or power off.
  */
 static void
 boot(int howto)
 {
 	static int first_buf_printf = 1;
+
+#if defined(SMP)
+	/*
+	 * Bind us to CPU 0 so that all shutdown code runs there.  Some
+	 * systems don't shutdown properly (i.e., ACPI power off) if we
+	 * run on another processor.
+	 */
+	mtx_lock_spin(&sched_lock);
+	sched_bind(curthread, 0);
+	mtx_unlock_spin(&sched_lock);
+#endif
 
 	/* collect extra flags that shutdown_nice might have set */
 	howto |= shutdown_howto;
@@ -392,7 +402,10 @@ boot(int howto)
 	 * been completed.
 	 */
 	EVENTHANDLER_INVOKE(shutdown_post_sync, howto);
+
+	/* XXX This doesn't disable interrupts any more.  Reconsider? */
 	splhigh();
+
 	if ((howto & (RB_HALT|RB_DUMP)) == RB_DUMP && !cold && !dumping) 
 		doadump();
 

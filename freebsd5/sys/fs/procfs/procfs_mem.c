@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993 Sean Eric Fagan
  * Copyright (c) 1993
@@ -33,7 +33,7 @@
  *
  *	@(#)procfs_mem.c	8.5 (Berkeley) 6/15/94
  *
- * $FreeBSD: src/sys/fs/procfs/procfs_mem.c,v 1.59 2004/04/07 20:46:02 imp Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_mem.c,v 1.59.2.1 2005/01/31 23:25:58 imp Exp $
  */
 
 #include <sys/param.h>

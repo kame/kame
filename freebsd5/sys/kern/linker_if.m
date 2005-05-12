@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 2000 Doug Rabson
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/kern/linker_if.m,v 1.5 2003/09/20 17:39:32 dfr Exp $
+# $FreeBSD: src/sys/kern/linker_if.m,v 1.5.4.1 2005/01/31 23:26:17 imp Exp $
 #
 
 #include <sys/linker.h>

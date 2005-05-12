@@ -1,12 +1,12 @@
-/*
+/*-
  *  modified for Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_balloc.c,v 1.21 2003/10/29 07:35:53 marcel Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_balloc.c,v 1.21.4.1 2005/01/31 23:26:02 imp Exp $
  */
-/*
+/*-
  *  linux/fs/ext2/balloc.c
  *
  * Copyright (C) 1992, 1993, 1994, 1995

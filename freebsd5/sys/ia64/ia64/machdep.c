@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/ia64/ia64/machdep.c,v 1.185.2.1 2004/09/09 10:03:19 julian Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ia64/ia64/machdep.c,v 1.185.2.5 2005/03/14 20:23:03 marcel Exp $");
 
 #include "opt_compat.h"
 #include "opt_ddb.h"
@@ -33,62 +34,69 @@
 #include "opt_msgbuf.h"
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/eventhandler.h>
-#include <sys/kdb.h>
-#include <sys/sysproto.h>
-#include <sys/signalvar.h>
-#include <sys/imgact.h>
-#include <sys/kernel.h>
 #include <sys/proc.h>
-#include <sys/lock.h>
-#include <sys/pcpu.h>
-#include <sys/malloc.h>
-#include <sys/reboot.h>
+#include <sys/systm.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
-#include <sys/mbuf.h>
-#include <sys/vmmeter.h>
-#include <sys/msgbuf.h>
-#include <sys/exec.h>
-#include <sys/sysctl.h>
-#include <sys/uio.h>
-#include <sys/linker.h>
-#include <sys/random.h>
+#include <sys/bus.h>
 #include <sys/cons.h>
-#include <sys/uuid.h>
+#include <sys/cpu.h>
+#include <sys/eventhandler.h>
+#include <sys/exec.h>
+#include <sys/imgact.h>
+#include <sys/kdb.h>
+#include <sys/kernel.h>
+#include <sys/linker.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/mbuf.h>
+#include <sys/msgbuf.h>
+#include <sys/pcpu.h>
+#include <sys/ptrace.h>
+#include <sys/random.h>
+#include <sys/reboot.h>
+#include <sys/signalvar.h>
 #include <sys/syscall.h>
+#include <sys/sysctl.h>
+#include <sys/sysproto.h>
+#include <sys/ucontext.h>
+#include <sys/uio.h>
+#include <sys/uuid.h>
+#include <sys/vmmeter.h>
+#include <sys/vnode.h>
+
+#include <ddb/ddb.h>
+
 #include <net/netisr.h>
+
 #include <vm/vm.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
-#include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <sys/user.h>
-#include <sys/ptrace.h>
+
+#include <machine/bootinfo.h>
 #include <machine/clock.h>
 #include <machine/cpu.h>
-#include <machine/md_var.h>
-#include <machine/reg.h>
+#include <machine/efi.h>
+#include <machine/elf.h>
 #include <machine/fpu.h>
 #include <machine/mca.h>
+#include <machine/md_var.h>
+#include <machine/mutex.h>
 #include <machine/pal.h>
+#include <machine/pcb.h>
+#include <machine/reg.h>
 #include <machine/sal.h>
+#include <machine/sigframe.h>
 #ifdef SMP
 #include <machine/smp.h>
 #endif
-#include <machine/bootinfo.h>
-#include <machine/mutex.h>
-#include <machine/vmparam.h>
-#include <machine/elf.h>
-#include <ddb/ddb.h>
-#include <sys/vnode.h>
-#include <sys/ucontext.h>
-#include <machine/sigframe.h>
-#include <machine/efi.h>
 #include <machine/unwind.h>
+#include <machine/vmparam.h>
+
 #include <i386/include/specialreg.h>
 
 u_int64_t processor_frequency;
@@ -101,7 +109,6 @@ struct bootinfo bootinfo;
 
 struct pcpu early_pcpu;
 extern char kstack[]; 
-struct user *proc0uarea;
 vm_offset_t proc0kstack;
 
 extern u_int64_t kernel_text[], _end[];
@@ -136,6 +143,7 @@ SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL)
 struct msgbuf *msgbufp=0;
 
 long Maxmem = 0;
+long realmem = 0;
 
 vm_offset_t phys_avail[100];
 
@@ -239,6 +247,7 @@ cpu_startup(dummy)
 
 	/*
 	 * Display any holes after the first chunk of extended memory.
+	realmem = ia64_ptob(Maxmem);
 	 */
 	if (bootverbose) {
 		int indx;
@@ -283,6 +292,17 @@ cpu_boot(int howto)
 {
 
 	ia64_efi_runtime->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, 0);
+}
+
+/* Get current clock frequency for the given cpu id. */
+int
+cpu_est_clockrate(int cpu_id, uint64_t *rate)
+{
+
+	if (pcpu_find(cpu_id) == NULL || rate == NULL)
+		return (EINVAL);
+	*rate = processor_frequency;
+	return (0);
 }
 
 void
@@ -600,7 +620,8 @@ ia64_init(void)
 		printf("WARNING: loader(8) metadata is missing!\n");
 
 	/* Get FPSWA interface */
-	fpswa_interface = (FPSWA_INTERFACE*)IA64_PHYS_TO_RR7(bootinfo.bi_fpswa);
+	fpswa_interface = (bootinfo.bi_fpswa == 0) ? NULL :
+	    (FPSWA_INTERFACE *)IA64_PHYS_TO_RR7(bootinfo.bi_fpswa);
 
 	/* Init basic tunables, including hz */
 	init_param1();
@@ -726,11 +747,9 @@ ia64_init(void)
 
 	proc_linkup(&proc0, &ksegrp0, &thread0);
 	/*
-	 * Init mapping for u page(s) for proc 0
+	 * Init mapping for kernel stack for proc 0
 	 */
-	proc0uarea = (struct user *)pmap_steal_memory(UAREA_PAGES * PAGE_SIZE);
 	proc0kstack = (vm_offset_t)kstack;
-	proc0.p_uarea = proc0uarea;
 	thread0.td_kstack = proc0kstack;
 	thread0.td_pcb = (struct pcb *)
 	    (thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;

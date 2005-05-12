@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2001 Julian Elischer <julian@freebsd.org>.
  *  All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_thread.c,v 1.193.2.8 2004/10/09 04:49:58 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_thread.c,v 1.193.2.12 2005/03/25 23:57:08 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,8 +71,6 @@ SYSCTL_INT(_kern_threads, OID_AUTO, max_threads_hits, CTLFLAG_RD,
 	&max_threads_hits, 0, "");
 
 int virtual_cpu;
-
-#define RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
 
 TAILQ_HEAD(, thread) zombie_threads = TAILQ_HEAD_INITIALIZER(zombie_threads);
 TAILQ_HEAD(, ksegrp) zombie_ksegrps = TAILQ_HEAD_INITIALIZER(zombie_ksegrps);
@@ -665,8 +663,10 @@ thread_wait(struct proc *p)
 	KASSERT((p->p_numksegrps == 1), ("Multiple ksegrps in wait1()"));
 	FOREACH_THREAD_IN_PROC(p, td) {
 		if (td->td_standin != NULL) {
-			crfree(td->td_ucred);
-			td->td_ucred = NULL;
+			if (td->td_standin->td_ucred != NULL) {
+				crfree(td->td_standin->td_ucred);
+				td->td_standin->td_ucred = NULL;
+			}
 			thread_free(td->td_standin);
 			td->td_standin = NULL;
 		}
@@ -832,11 +832,10 @@ thread_single(int mode)
 						continue;
 					/*
 					 * maybe other inhibitted states too?
-					 * XXXKSE Is it totally safe to
-					 * suspend a non-interruptable thread?
 					 */
-					if (td2->td_inhibitors &
-					    (TDI_SLEEPING | TDI_SWAPPED))
+					if ((td2->td_flags & TDF_SINTR) &&
+					    (td2->td_inhibitors &
+					    (TDI_SLEEPING | TDI_SWAPPED)))
 						thread_suspend_one(td2);
 					break;
 				}

@@ -1,7 +1,7 @@
 /*	$NecBSD: tmc18c30_pisa.c,v 1.22 1998/11/26 01:59:21 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [Ported for FreeBSD]
  *  Copyright (c) 2000
  *      Noriaki Mitsunaga, Mitsuru Iwasaki and Takanori Watanabe.
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30_pccard.c,v 1.21 2004/05/27 03:49:44 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30_pccard.c,v 1.21.2.1 2005/01/30 01:00:06 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>

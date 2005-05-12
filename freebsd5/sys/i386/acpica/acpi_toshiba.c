@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_toshiba.c,v 1.13 2004/08/13 06:22:35 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_toshiba.c,v 1.13.2.2 2005/04/01 20:30:11 jhb Exp $");
 
 #include "opt_acpi.h"
 #include <sys/param.h>
@@ -36,6 +36,9 @@ __FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_toshiba.c,v 1.13 2004/08/13 06:22:3
 
 #include "acpi.h"
 #include <dev/acpica/acpivar.h>
+
+#define _COMPONENT	ACPI_OEM
+ACPI_MODULE_NAME("Toshiba")
 
 /*
  * Toshiba HCI interface definitions
@@ -210,11 +213,12 @@ TUNABLE_INT("hw.acpi.toshiba.enable_fn_keys", &enable_fn_keys);
  *          Dynabook Satellite 2455
  *          Dynabook SS 3500
  * TOS6207  Dynabook SS2110 Series
+ * TOS6208  SPA40
  */
 static int
 acpi_toshiba_probe(device_t dev)
 {
-	static char *tosh_ids[] = { "TOS6200", "TOS6207", NULL };
+	static char *tosh_ids[] = { "TOS6200", "TOS6207", "TOS6208", NULL };
 
 	if (acpi_disabled("toshiba") ||
 	    ACPI_ID_PROBE(device_get_parent(dev), dev, tosh_ids) == NULL ||

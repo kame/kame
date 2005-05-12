@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -26,7 +26,7 @@
  *
  * Author: Hartmut Brandt <harti@freebsd.org>
  *
- * $FreeBSD: src/sys/dev/utopia/utopia.h,v 1.3 2003/07/14 15:06:53 harti Exp $
+ * $FreeBSD: src/sys/dev/utopia/utopia.h,v 1.3.4.1 2005/01/30 01:00:11 imp Exp $
  */
 #ifndef _DEV_UTOPIA_UTOPIA_H
 #define	_DEV_UTOPIA_UTOPIA_H

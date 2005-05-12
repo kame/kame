@@ -13,9 +13,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ohci.c,v 1.144 2004/08/02 15:37:34 iedowse Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ohci.c,v 1.144.2.4 2005/03/22 00:56:54 iedowse Exp $");
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -998,6 +998,9 @@ ohci_allocx(struct usbd_bus *bus)
 	}
 	if (xfer != NULL) {
 		memset(xfer, 0, sizeof (struct ohci_xfer));
+		usb_init_task(&OXFER(xfer)->abort_task, ohci_timeout_task,
+		    xfer);
+		OXFER(xfer)->ohci_xfer_flags = 0;
 #ifdef DIAGNOSTIC
 		xfer->busy_free = XFER_BUSY;
 #endif
@@ -1360,7 +1363,8 @@ ohci_softintr(void *v)
 	usbd_xfer_handle xfer;
 	struct ohci_pipe *opipe;
 	int len, cc, s;
-
+	int i, j, iframes;
+	
 	DPRINTFN(10,("ohci_softintr: enter\n"));
 
 	sc->sc_bus.intr_context++;
@@ -1405,6 +1409,8 @@ ohci_softintr(void *v)
 			continue;
 		}
 		usb_uncallout(xfer->timeout_handle, ohci_timeout, xfer);
+		usb_rem_task(OXFER(xfer)->xfer.pipe->device,
+		    &OXFER(xfer)->abort_task);
 
 		len = std->len;
 		if (std->td.td_cbp != 0)
@@ -1500,21 +1506,31 @@ ohci_softintr(void *v)
 		if (opipe->aborting)
 			continue;
  
-		cc = OHCI_ITD_GET_CC(le32toh(sitd->itd.itd_flags));
-		if (cc == OHCI_CC_NO_ERROR) {
-			/* XXX compute length for input */
-			if (sitd->flags & OHCI_CALL_DONE) {
-				opipe->u.iso.inuse -= xfer->nframes;
-				/* XXX update frlengths with actual length */
-				/* XXX xfer->actlen = actlen; */
-				xfer->status = USBD_NORMAL_COMPLETION;
-				s = splusb();
-				usb_transfer_complete(xfer);
-				splx(s);
+		if (sitd->flags & OHCI_CALL_DONE) {
+			ohci_soft_itd_t *next;
+
+			opipe->u.iso.inuse -= xfer->nframes;
+			xfer->status = USBD_NORMAL_COMPLETION;
+		 	for (i = 0, sitd = xfer->hcpriv;;sitd = next) {
+				next = sitd->nextitd;
+				if (OHCI_ITD_GET_CC(sitd->itd.itd_flags) != OHCI_CC_NO_ERROR)
+					xfer->status = USBD_IOERROR;
+
+				if (xfer->status == USBD_NORMAL_COMPLETION) {
+					iframes = OHCI_ITD_GET_FC(sitd->itd.itd_flags);
+					for (j = 0; j < iframes; i++, j++) {
+						len = le16toh(sitd->itd.itd_offset[j]);
+						len =
+						   (OHCI_ITD_PSW_GET_CC(len) ==
+						    OHCI_CC_NOT_ACCESSED) ? 0 :
+						    OHCI_ITD_PSW_LENGTH(len);
+						xfer->frlengths[i] = len;
+					}
+				}
+				if (sitd->flags & OHCI_CALL_DONE)
+					break;
 			}
-		} else {
-			/* XXX Do more */
-			xfer->status = USBD_IOERROR;
+
 			s = splusb();
 			usb_transfer_complete(xfer);
 			splx(s);
@@ -1975,7 +1991,6 @@ ohci_timeout(void *addr)
 	}
 
 	/* Execute the abort in a process context. */
-	usb_init_task(&oxfer->abort_task, ohci_timeout_task, addr);
 	usb_add_task(oxfer->xfer.pipe->device, &oxfer->abort_task);
 }
 
@@ -2242,6 +2257,7 @@ ohci_close_pipe(usbd_pipe_handle pipe, ohci_soft_ed_t *head)
 void
 ohci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 {
+	struct ohci_xfer *oxfer = OXFER(xfer);
 	struct ohci_pipe *opipe = (struct ohci_pipe *)xfer->pipe;
 	ohci_softc_t *sc = (ohci_softc_t *)opipe->pipe.device->bus;
 	ohci_soft_ed_t *sed = opipe->sed;
@@ -2256,6 +2272,7 @@ ohci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 		s = splusb();
 		xfer->status = status;	/* make software ignore it */
 		usb_uncallout(xfer->timeout_handle, ohci_timeout, xfer);
+		usb_rem_task(xfer->pipe->device, &OXFER(xfer)->abort_task);
 		usb_transfer_complete(xfer);
 		splx(s);
 	}
@@ -2264,11 +2281,31 @@ ohci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 		panic("ohci_abort_xfer: not in process context");
 
 	/*
+	 * If an abort is already in progress then just wait for it to
+	 * complete and return.
+	 */
+	if (oxfer->ohci_xfer_flags & OHCI_XFER_ABORTING) {
+		DPRINTFN(2, ("ohci_abort_xfer: already aborting\n"));
+		/* No need to wait if we're aborting from a timeout. */
+		if (status == USBD_TIMEOUT)
+			return;
+		/* Override the status which might be USBD_TIMEOUT. */
+		xfer->status = status;
+		DPRINTFN(2, ("ohci_abort_xfer: waiting for abort to finish\n"));
+		oxfer->ohci_xfer_flags |= OHCI_XFER_ABORTWAIT;
+		while (oxfer->ohci_xfer_flags & OHCI_XFER_ABORTING)
+			tsleep(&oxfer->ohci_xfer_flags, PZERO, "ohciaw", 0);
+		return;
+	}
+
+	/*
 	 * Step 1: Make interrupt routine and hardware ignore xfer.
 	 */
 	s = splusb();
+	oxfer->ohci_xfer_flags |= OHCI_XFER_ABORTING;
 	xfer->status = status;	/* make software ignore it */
 	usb_uncallout(xfer->timeout_handle, ohci_timeout, xfer);
+	usb_rem_task(xfer->pipe->device, &OXFER(xfer)->abort_task);
 	splx(s);
 	DPRINTFN(1,("ohci_abort_xfer: stop ed=%p\n", sed));
 	sed->ed.ed_flags |= htole32(OHCI_ED_SKIP); /* force hardware skip */
@@ -2300,6 +2337,7 @@ ohci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 	p = xfer->hcpriv;
 #ifdef DIAGNOSTIC
 	if (p == NULL) {
+		oxfer->ohci_xfer_flags &= ~OHCI_XFER_ABORTING; /* XXX */
 		splx(s);
 		printf("ohci_abort_xfer: hcpriv is NULL\n");
 		return;
@@ -2336,6 +2374,12 @@ ohci_abort_xfer(usbd_xfer_handle xfer, usbd_status status)
 	/*
 	 * Step 5: Execute callback.
 	 */
+	/* Do the wakeup first to avoid touching the xfer after the callback. */
+	oxfer->ohci_xfer_flags &= ~OHCI_XFER_ABORTING;
+	if (oxfer->ohci_xfer_flags & OHCI_XFER_ABORTWAIT) {
+		oxfer->ohci_xfer_flags &= ~OHCI_XFER_ABORTWAIT;
+		wakeup(&oxfer->ohci_xfer_flags);
+	}
 	usb_transfer_complete(xfer);
 
 	splx(s);

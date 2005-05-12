@@ -95,7 +95,7 @@
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_state.c	1.8 6/5/96 (C) 1993-2000 Darren Reed";
 /* static const char rcsid[] = "@(#)$Id: ip_state.c,v 2.30.2.38 2001/07/23 13:49:46 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.c,v 1.33 2004/06/21 22:46:36 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.c,v 1.33.2.1 2005/03/13 18:08:56 rwatson Exp $";
 #endif
 
 #ifndef	MIN
@@ -108,7 +108,7 @@ static ipstate_t **ips_table = NULL;
 static int	ips_num = 0;
 static int	ips_wild = 0;
 static ips_stat_t ips_stats;
-#if	(SOLARIS || defined(__sgi)) && defined(_KERNEL)
+#ifdef USE_MUTEX
 extern	KRWLOCK_T	ipf_state, ipf_mutex;
 extern	kmutex_t	ipf_rw;
 #endif

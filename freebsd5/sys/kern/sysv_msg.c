@@ -1,4 +1,4 @@
-/*
+/*-
  * Implementation of SVID messages
  *
  * Author:  Daniel Boulet
@@ -18,7 +18,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sysv_msg.c,v 1.53 2004/05/30 20:34:58 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sysv_msg.c,v 1.53.2.3 2005/02/19 19:54:31 csjp Exp $");
 
 #include "opt_sysvipc.h"
 
@@ -142,6 +142,8 @@ msginit()
 	TUNABLE_INT_FETCH("kern.ipc.msgssz", &msginfo.msgssz);
 	msginfo.msgmax = msginfo.msgseg * msginfo.msgssz;
 	TUNABLE_INT_FETCH("kern.ipc.msgmni", &msginfo.msgmni);
+	TUNABLE_INT_FETCH("kern.ipc.msgmnb", &msginfo.msgmnb);
+	TUNABLE_INT_FETCH("kern.ipc.msgtql", &msginfo.msgtql);
 
 	msgpool = malloc(msginfo.msgmax, M_MSG, M_WAITOK);
 	if (msgpool == NULL)
@@ -1142,11 +1144,17 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_DECL(_kern_ipc);
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD, &msginfo.msgmax, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN, &msginfo.msgmni, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgmnb, CTLFLAG_RD, &msginfo.msgmnb, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgtql, CTLFLAG_RD, &msginfo.msgtql, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RDTUN, &msginfo.msgssz, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RDTUN, &msginfo.msgseg, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD, &msginfo.msgmax, 0,
+    "Maximum message size");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN, &msginfo.msgmni, 0,
+    "Number of message queue identifiers");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgmnb, CTLFLAG_RDTUN, &msginfo.msgmnb, 0,
+    "Maximum number of bytes in a queue");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgtql, CTLFLAG_RDTUN, &msginfo.msgtql, 0,
+    "Maximum number of messages in the system");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RDTUN, &msginfo.msgssz, 0,
+    "Size of a message segment");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RDTUN, &msginfo.msgseg, 0,
+    "Number of message segments");
 SYSCTL_PROC(_kern_ipc, OID_AUTO, msqids, CTLFLAG_RD,
     NULL, 0, sysctl_msqids, "", "Message queue IDs");

@@ -1,4 +1,4 @@
-/*
+/*-
  * Common functions for CAM "type" (peripheral) drivers.
  *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/cam_periph.c,v 1.56 2003/11/08 10:56:57 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/cam_periph.c,v 1.56.4.3 2005/03/12 10:01:39 delphij Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -126,7 +126,7 @@ cam_periph_alloc(periph_ctor_t *periph_ctor,
 	 * of our type assigned to this path, we are likely waiting for
 	 * final close on an old, invalidated, peripheral.  If this is
 	 * the case, queue up a deferred call to the peripheral's async
-	 * handler.  If it looks like a mistaken re-alloation, complain.
+	 * handler.  If it looks like a mistaken re-allocation, complain.
 	 */
 	if ((periph = cam_periph_find(path, name)) != NULL) {
 
@@ -444,6 +444,10 @@ camperiphfree(struct cam_periph *periph)
 	for (p_drv = periph_drivers; *p_drv != NULL; p_drv++) {
 		if (strcmp((*p_drv)->driver_name, periph->periph_name) == 0)
 			break;
+	}
+	if (*p_drv == NULL) {
+		printf("camperiphfree: attempt to free non-existant periph\n");
+		return;
 	}
 	
 	if (periph->periph_dtor != NULL)

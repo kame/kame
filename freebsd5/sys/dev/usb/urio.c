@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Iwasa Kazmi
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/urio.c,v 1.33 2004/08/15 23:39:18 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/urio.c,v 1.33.2.1 2005/01/30 01:00:10 imp Exp $");
 
 
 /*
@@ -67,9 +67,9 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/urio.c,v 1.33 2004/08/15 23:39:18 imp Exp $"
 #else
 #include <sys/select.h>
 #endif
-#include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/sysctl.h>
+#include <sys/uio.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>

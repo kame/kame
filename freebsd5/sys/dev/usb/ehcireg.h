@@ -1,7 +1,7 @@
 /*	$NetBSD: ehcireg.h,v 1.17 2004/06/23 06:45:56 mycroft Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ehcireg.h,v 1.5 2004/08/02 12:56:00 iedowse Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ehcireg.h,v 1.5.2.2 2005/01/30 01:00:09 imp Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -84,7 +84,7 @@
 
 #define EHCI_HCSPARAMS		0x04	/* RO Structural parameters */
 #define  EHCI_HCS_DEBUGPORT(x)	(((x) >> 20) & 0xf)
-#define  EHCI_HCS_P_INCICATOR(x) ((x) & 0x10000)
+#define  EHCI_HCS_P_INDICATOR(x) ((x) & 0x10000)
 #define  EHCI_HCS_N_CC(x)	(((x) >> 12) & 0xf) /* # of companion ctlrs */
 #define  EHCI_HCS_N_PCC(x)	(((x) >> 8) & 0xf) /* # of ports per comp. */
 #define  EHCI_HCS_PPC(x)	((x) & 0x10) /* port power control */
@@ -218,6 +218,7 @@ typedef struct {
 	ehci_link_t	qtd_altnext;
 	u_int32_t	qtd_status;
 #define EHCI_QTD_GET_STATUS(x)	(((x) >>  0) & 0xff)
+#define EHCI_QTD_SET_STATUS(x) ((x) <<  0)
 #define  EHCI_QTD_ACTIVE	0x80
 #define  EHCI_QTD_HALTED	0x40
 #define  EHCI_QTD_BUFERR	0x20

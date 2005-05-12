@@ -1,4 +1,4 @@
-/*
+/*-
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/atm_proto.c,v 1.11 2003/07/24 10:33:01 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/atm_proto.c,v 1.11.4.2 2005/02/25 17:50:31 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD: src/sys/netatm/atm_proto.c,v 1.11 2003/07/24 10:33:01 harti 
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
+
+NET_NEEDS_GIANT("netatm");
 
 struct protosw atmsw[] = {
 {	SOCK_DGRAM,				/* ioctl()-only */

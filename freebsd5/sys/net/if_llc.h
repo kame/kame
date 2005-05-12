@@ -1,6 +1,6 @@
 /*	$NetBSD: if_llc.h,v 1.12 1999/11/19 20:41:19 thorpej Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_llc.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_llc.h,v 1.10 2004/04/07 20:46:11 imp Exp $
+ * $FreeBSD: src/sys/net/if_llc.h,v 1.10.2.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _NET_IF_LLC_H_

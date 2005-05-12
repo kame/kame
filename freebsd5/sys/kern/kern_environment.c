@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_environment.c,v 1.34 2004/04/28 01:27:33 das Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_environment.c,v 1.34.2.2 2005/03/10 17:09:16 des Exp $");
 
 #include "opt_mac.h"
 
@@ -415,6 +415,36 @@ getenv_int(const char *name, int *data)
 }
 
 /*
+ * Return a long value from an environment variable.
+ */
+long
+getenv_long(const char *name, long *data)
+{
+	quad_t tmp;
+	long rval;
+
+	rval = getenv_quad(name, &tmp);
+	if (rval)
+		*data = (long) tmp;
+	return (rval);
+}
+
+/*
+ * Return an unsigned long value from an environment variable.
+ */
+unsigned long
+getenv_ulong(const char *name, unsigned long *data)
+{
+	quad_t tmp;
+	long rval;
+
+	rval = getenv_quad(name, &tmp);
+	if (rval)
+		*data = (unsigned long) tmp;
+	return (rval);
+}
+
+/*
  * Return a quad_t value from an environment variable.
  */
 int
@@ -428,12 +458,27 @@ getenv_quad(const char *name, quad_t *data)
 	if (value == NULL)
 		return (0);
 	iv = strtoq(value, &vtp, 0);
-	if ((vtp == value) || (*vtp != '\0')) {
+	if (vtp == value || (vtp[0] != '\0' && vtp[1] != '\0')) {
 		freeenv(value);
 		return (0);
 	}
-	freeenv(value);
+	switch (vtp[0]) {
+	case 't': case 'T':
+		iv *= 1024;
+	case 'g': case 'G':
+		iv *= 1024;
+	case 'm': case 'M':
+		iv *= 1024;
+	case 'k': case 'K':
+		iv *= 1024;
+	case '\0':
+		break;
+	default:
+		freeenv(value);
+		return (0);
+	}
 	*data = iv;
+	freeenv(value);
 	return (1);
 }
 
@@ -461,6 +506,22 @@ tunable_int_init(void *data)
 	struct tunable_int *d = (struct tunable_int *)data;
 
 	TUNABLE_INT_FETCH(d->path, d->var);
+}
+
+void
+tunable_long_init(void *data)
+{
+	struct tunable_long *d = (struct tunable_long *)data;
+
+	TUNABLE_LONG_FETCH(d->path, d->var);
+}
+
+void
+tunable_ulong_init(void *data)
+{
+	struct tunable_ulong *d = (struct tunable_ulong *)data;
+
+	TUNABLE_ULONG_FETCH(d->path, d->var);
 }
 
 void

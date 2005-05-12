@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/db_machdep.h,v 1.9 2004/07/10 23:47:18 marcel Exp $ */
+/* $FreeBSD: src/sys/alpha/include/db_machdep.h,v 1.9.2.1 2005/01/30 00:59:10 imp Exp $ */
 /* $NetBSD: db_machdep.h,v 1.6 1997/09/06 02:02:25 thorpej Exp $ */
 
-/*
+/*-
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
  *

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_ipr.c - isdn4bsd IP over raw HDLC ISDN network driver
  *	---------------------------------------------------------
@@ -54,7 +55,7 @@
  *---------------------------------------------------------------------------*/ 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.27.2.2 2004/10/14 11:48:05 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.27.2.3 2005/01/31 23:26:08 imp Exp $");
 
 #include "i4bipr.h"
 

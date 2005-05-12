@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * Copyright (c) 2000, Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2000, BSDi
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pci/pci.c,v 1.264 2004/07/02 13:42:36 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pci/pci.c,v 1.264.2.9 2005/04/01 22:53:42 jmg Exp $");
 
 #include "opt_bus.h"
 
@@ -59,6 +59,14 @@ __FBSDID("$FreeBSD: src/sys/dev/pci/pci.c,v 1.264 2004/07/02 13:42:36 imp Exp $"
 
 #include "pcib_if.h"
 #include "pci_if.h"
+
+#if (defined(__i386__) && !defined(PC98)) || defined(__amd64__) || \
+    defined (__ia64__)
+#include <contrib/dev/acpica/acpi.h>
+#include "acpi_if.h"
+#else
+#define ACPI_PWR_FOR_SLEEP(x, y, z)
+#endif
 
 static uint32_t		pci_mapbase(unsigned mapreg);
 static int		pci_maptype(unsigned mapreg);
@@ -169,7 +177,7 @@ uint32_t pci_numdevs = 0;
 SYSCTL_NODE(_hw, OID_AUTO, pci, CTLFLAG_RD, 0, "PCI bus tuning parameters");
 
 static int pci_enable_io_modes = 1;
-TUNABLE_INT("hw.pci.enable_io_modes", (int *)&pci_enable_io_modes);
+TUNABLE_INT("hw.pci.enable_io_modes", &pci_enable_io_modes);
 SYSCTL_INT(_hw_pci, OID_AUTO, enable_io_modes, CTLFLAG_RW,
     &pci_enable_io_modes, 1,
     "Enable I/O and memory bits in the config register.  Some BIOSes do not\n\
@@ -177,7 +185,7 @@ enable these bits correctly.  We'd like to do this all the time, but there\n\
 are some peripherals that this causes problems with.");
 
 static int pci_do_powerstate = 0;
-TUNABLE_INT("hw.pci.do_powerstate", (int *)&pci_do_powerstate);
+TUNABLE_INT("hw.pci.do_powerstate", &pci_do_powerstate);
 SYSCTL_INT(_hw_pci, OID_AUTO, do_powerstate, CTLFLAG_RW,
     &pci_do_powerstate, 0,
     "Power down devices into D3 state when no driver attaches to them.\n\
@@ -489,49 +497,73 @@ pci_set_powerstate_method(device_t dev, device_t child, int state)
 	struct pci_devinfo *dinfo = device_get_ivars(child);
 	pcicfgregs *cfg = &dinfo->cfg;
 	uint16_t status;
-	int result;
+	int result, oldstate, highest, delay;
+
+	if (cfg->pp.pp_cap == 0)
+		return (EOPNOTSUPP);
 
 	/*
-	 * Dx -> Dx is a nop always.
+	 * Optimize a no state change request away.  While it would be OK to
+	 * write to the hardware in theory, some devices have shown odd
+	 * behavior when going from D3 -> D3.
 	 */
-	if (pci_get_powerstate(child) == state)
+	oldstate = pci_get_powerstate(child);
+	if (oldstate == state)
 		return (0);
 
-	if (cfg->pp.pp_cap != 0) {
-		status = PCI_READ_CONFIG(dev, child, cfg->pp.pp_status, 2)
-		    & ~PCIM_PSTAT_DMASK;
-		result = 0;
-		switch (state) {
-		case PCI_POWERSTATE_D0:
-			status |= PCIM_PSTAT_D0;
-			break;
-		case PCI_POWERSTATE_D1:
-			if (cfg->pp.pp_cap & PCIM_PCAP_D1SUPP) {
-				status |= PCIM_PSTAT_D1;
-			} else {
-				result = EOPNOTSUPP;
-			}
-			break;
-		case PCI_POWERSTATE_D2:
-			if (cfg->pp.pp_cap & PCIM_PCAP_D2SUPP) {
-				status |= PCIM_PSTAT_D2;
-			} else {
-				result = EOPNOTSUPP;
-			}
-			break;
-		case PCI_POWERSTATE_D3:
-			status |= PCIM_PSTAT_D3;
-			break;
-		default:
-			result = EINVAL;
-		}
-		if (result == 0)
-			PCI_WRITE_CONFIG(dev, child, cfg->pp.pp_status, status,
-					 2);
-	} else {
-		result = ENXIO;
+	/*
+	 * The PCI power management specification states that after a state
+	 * transition between PCI power states, system software must
+	 * guarantee a minimal delay before the function accesses the device.
+	 * Compute the worst case delay that we need to guarantee before we
+	 * access the device.  Many devices will be responsive much more
+	 * quickly than this delay, but there are some that don't respond
+	 * instantly to state changes.  Transitions to/from D3 state require
+	 * 10ms, while D2 requires 200us, and D0/1 require none.  The delay
+	 * is done below with DELAY rather than a sleeper function because
+	 * this function can be called from contexts where we cannot sleep.
+	 */
+	highest = (oldstate > state) ? oldstate : state;
+	if (highest == PCI_POWERSTATE_D3)
+	    delay = 10000;
+	else if (highest == PCI_POWERSTATE_D2)
+	    delay = 200;
+	else
+	    delay = 0;
+	status = PCI_READ_CONFIG(dev, child, cfg->pp.pp_status, 2)
+	    & ~PCIM_PSTAT_DMASK;
+	result = 0;
+	switch (state) {
+	case PCI_POWERSTATE_D0:
+		status |= PCIM_PSTAT_D0;
+		break;
+	case PCI_POWERSTATE_D1:
+		if ((cfg->pp.pp_cap & PCIM_PCAP_D1SUPP) == 0)
+			return (EOPNOTSUPP);
+		status |= PCIM_PSTAT_D1;
+		break;
+	case PCI_POWERSTATE_D2:
+		if ((cfg->pp.pp_cap & PCIM_PCAP_D2SUPP) == 0)
+			return (EOPNOTSUPP);
+		status |= PCIM_PSTAT_D2;
+		break;
+	case PCI_POWERSTATE_D3:
+		status |= PCIM_PSTAT_D3;
+		break;
+	default:
+		return (EINVAL);
 	}
-	return(result);
+
+	if (bootverbose)
+		printf(
+		    "pci%d:%d:%d: Transition from D%d to D%d\n",
+		    dinfo->cfg.bus, dinfo->cfg.slot, dinfo->cfg.func,
+		    oldstate, state);
+
+	PCI_WRITE_CONFIG(dev, child, cfg->pp.pp_status, status, 2);
+	if (delay)
+		DELAY(delay);
+	return (0);
 }
 
 int
@@ -565,7 +597,7 @@ pci_get_powerstate_method(device_t dev, device_t child)
 		/* No support, device is always at D0 */
 		result = PCI_POWERSTATE_D0;
 	}
-	return(result);
+	return (result);
 }
 
 /*
@@ -919,7 +951,8 @@ pci_add_resources(device_t pcib, device_t bus, device_t dev)
 	}
 
 	if (cfg->intpin > 0 && PCI_INTERRUPT_VALID(cfg->intline)) {
-#if defined(__ia64__) || defined(__i386__) || defined(__amd64__)
+#if defined(__ia64__) || defined(__i386__) || defined(__amd64__) || \
+		defined(__alpha__)
 		/*
 		 * Try to re-route interrupts. Sometimes the BIOS or
 		 * firmware may leave bogus values in these registers.
@@ -1015,43 +1048,80 @@ pci_attach(device_t dev)
 int
 pci_suspend(device_t dev)
 {
-	int numdevs;
-	device_t *devlist;
-	device_t child;
+	int dstate, error, i, numdevs;
+	device_t acpi_dev, child, *devlist;
 	struct pci_devinfo *dinfo;
-	int i;
 
 	/*
-	 * Save the pci configuration space for each child.  We don't need
-	 * to do this, unless the BIOS suspend code powers down the bus and
-	 * the devices on the bus.
+	 * Save the PCI configuration space for each child and set the
+	 * device in the appropriate power state for this sleep state.
 	 */
+	acpi_dev = NULL;
+	if (pci_do_powerstate)
+		acpi_dev = devclass_get_device(devclass_find("acpi"), 0);
 	device_get_children(dev, &devlist, &numdevs);
 	for (i = 0; i < numdevs; i++) {
 		child = devlist[i];
 		dinfo = (struct pci_devinfo *) device_get_ivars(child);
 		pci_cfg_save(child, dinfo, 0);
 	}
+
+	/* Suspend devices before potentially powering them down. */
+	error = bus_generic_suspend(dev);
+	if (error) {
+		free(devlist, M_TEMP);
+		return (error);
+	}
+
+	/*
+	 * Always set the device to D3.  If ACPI suggests a different
+	 * power state, use it instead.  If ACPI is not present, the
+	 * firmware is responsible for managing device power.  Skip
+	 * children who aren't attached since they are powered down
+	 * separately.  Only manage type 0 devices for now.
+	 */
+	for (i = 0; acpi_dev && i < numdevs; i++) {
+		child = devlist[i];
+		dinfo = (struct pci_devinfo *) device_get_ivars(child);
+		if (device_is_attached(child) && dinfo->cfg.hdrtype == 0) {
+			dstate = PCI_POWERSTATE_D3;
+			ACPI_PWR_FOR_SLEEP(acpi_dev, child, &dstate);
+			pci_set_powerstate(child, dstate);
+		}
+	}
 	free(devlist, M_TEMP);
-	return (bus_generic_suspend(dev));
+	return (0);
 }
 
 int
 pci_resume(device_t dev)
 {
-	int numdevs;
-	device_t *devlist;
-	device_t child;
+	int i, numdevs;
+	device_t acpi_dev, child, *devlist;
 	struct pci_devinfo *dinfo;
-	int i;
 
 	/*
-	 * Restore the pci configuration space for each child.
+	 * Set each child to D0 and restore its PCI configuration space.
 	 */
+	acpi_dev = NULL;
+	if (pci_do_powerstate)
+		acpi_dev = devclass_get_device(devclass_find("acpi"), 0);
 	device_get_children(dev, &devlist, &numdevs);
 	for (i = 0; i < numdevs; i++) {
+		/*
+		 * Notify ACPI we're going to D0 but ignore the result.  If
+		 * ACPI is not present, the firmware is responsible for
+		 * managing device power.  Only manage type 0 devices for now.
+		 */
 		child = devlist[i];
 		dinfo = (struct pci_devinfo *) device_get_ivars(child);
+		if (acpi_dev && device_is_attached(child) &&
+		    dinfo->cfg.hdrtype == 0) {
+			ACPI_PWR_FOR_SLEEP(acpi_dev, child, NULL);
+			pci_set_powerstate(child, PCI_POWERSTATE_D0);
+		}
+
+		/* Now the device is powered up, restore its config space. */
 		pci_cfg_restore(child, dinfo);
 	}
 	free(devlist, M_TEMP);
@@ -1149,12 +1219,15 @@ static struct
 	{PCIC_NETWORK,		PCIS_NETWORK_TOKENRING,	"token ring"},
 	{PCIC_NETWORK,		PCIS_NETWORK_FDDI,	"fddi"},
 	{PCIC_NETWORK,		PCIS_NETWORK_ATM,	"ATM"},
+	{PCIC_NETWORK,		PCIS_NETWORK_ISDN,	"ISDN"},
 	{PCIC_DISPLAY,		-1,			"display"},
 	{PCIC_DISPLAY,		PCIS_DISPLAY_VGA,	"VGA"},
 	{PCIC_DISPLAY,		PCIS_DISPLAY_XGA,	"XGA"},
+	{PCIC_DISPLAY,		PCIS_DISPLAY_3D,	"3D"},
 	{PCIC_MULTIMEDIA,	-1,			"multimedia"},
 	{PCIC_MULTIMEDIA,	PCIS_MULTIMEDIA_VIDEO,	"video"},
 	{PCIC_MULTIMEDIA,	PCIS_MULTIMEDIA_AUDIO,	"audio"},
+	{PCIC_MULTIMEDIA,	PCIS_MULTIMEDIA_TELE,	"telephony"},
 	{PCIC_MEMORY,		-1,			"memory"},
 	{PCIC_MEMORY,		PCIS_MEMORY_RAM,	"RAM"},
 	{PCIC_MEMORY,		PCIS_MEMORY_FLASH,	"flash"},
@@ -1167,19 +1240,24 @@ static struct
 	{PCIC_BRIDGE,		PCIS_BRIDGE_PCMCIA,	"PCI-PCMCIA"},
 	{PCIC_BRIDGE,		PCIS_BRIDGE_NUBUS,	"PCI-NuBus"},
 	{PCIC_BRIDGE,		PCIS_BRIDGE_CARDBUS,	"PCI-CardBus"},
-	{PCIC_BRIDGE,		PCIS_BRIDGE_OTHER,	"PCI-unknown"},
+	{PCIC_BRIDGE,		PCIS_BRIDGE_RACEWAY,	"PCI-RACEway"},
 	{PCIC_SIMPLECOMM,	-1,			"simple comms"},
 	{PCIC_SIMPLECOMM,	PCIS_SIMPLECOMM_UART,	"UART"},	/* could detect 16550 */
 	{PCIC_SIMPLECOMM,	PCIS_SIMPLECOMM_PAR,	"parallel port"},
+	{PCIC_SIMPLECOMM,	PCIS_SIMPLECOMM_MULSER,	"multiport serial"},
+	{PCIC_SIMPLECOMM,	PCIS_SIMPLECOMM_MODEM,	"generic modem"},
 	{PCIC_BASEPERIPH,	-1,			"base peripheral"},
 	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_PIC,	"interrupt controller"},
 	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_DMA,	"DMA controller"},
 	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_TIMER,	"timer"},
 	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_RTC,	"realtime clock"},
+	{PCIC_BASEPERIPH,	PCIS_BASEPERIPH_PCIHOT,	"PCI hot-plug controller"},
 	{PCIC_INPUTDEV,		-1,			"input device"},
 	{PCIC_INPUTDEV,		PCIS_INPUTDEV_KEYBOARD,	"keyboard"},
 	{PCIC_INPUTDEV,		PCIS_INPUTDEV_DIGITIZER,"digitizer"},
 	{PCIC_INPUTDEV,		PCIS_INPUTDEV_MOUSE,	"mouse"},
+	{PCIC_INPUTDEV,		PCIS_INPUTDEV_SCANNER,	"scanner"},
+	{PCIC_INPUTDEV,		PCIS_INPUTDEV_GAMEPORT,	"gameport"},
 	{PCIC_DOCKING,		-1,			"docking station"},
 	{PCIC_PROCESSOR,	-1,			"processor"},
 	{PCIC_SERIALBUS,	-1,			"serial bus"},
@@ -1189,6 +1267,22 @@ static struct
 	{PCIC_SERIALBUS,	PCIS_SERIALBUS_USB,	"USB"},
 	{PCIC_SERIALBUS,	PCIS_SERIALBUS_FC,	"Fibre Channel"},
 	{PCIC_SERIALBUS,	PCIS_SERIALBUS_SMBUS,	"SMBus"},
+	{PCIC_WIRELESS,		-1,			"wireless controller"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_IRDA,	"iRDA"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_IR,	"IR"},
+	{PCIC_WIRELESS,		PCIS_WIRELESS_RF,	"RF"},
+	{PCIC_INTELLIIO,	-1,			"intelligent I/O controller"},
+	{PCIC_INTELLIIO,	PCIS_INTELLIIO_I2O,	"I2O"},
+	{PCIC_SATCOM,		-1,			"satellite communication"},
+	{PCIC_SATCOM,		PCIS_SATCOM_TV,		"sat TV"},
+	{PCIC_SATCOM,		PCIS_SATCOM_AUDIO,	"sat audio"},
+	{PCIC_SATCOM,		PCIS_SATCOM_VOICE,	"sat voice"},
+	{PCIC_SATCOM,		PCIS_SATCOM_DATA,	"sat data"},
+	{PCIC_CRYPTO,		-1,			"encrypt/decrypt"},
+	{PCIC_CRYPTO,		PCIS_CRYPTO_NETCOMP,	"network/computer crypto"},
+	{PCIC_CRYPTO,		PCIS_CRYPTO_NETCOMP,	"entertainment crypto"},
+	{PCIC_DASP,		-1,			"dasp"},
+	{PCIC_DASP,		PCIS_DASP_DPIO,		"DPIO module"},
 	{0, 0,		NULL}
 };
 
@@ -1483,7 +1577,7 @@ DB_SHOW_COMMAND(pciregs, db_pci_dump)
 	/*
 	 * Go through the list of devices and print out devices
 	 */
-	db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+	db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
 	for (error = 0, i = 0, quit = 0,
 	     dinfo = STAILQ_FIRST(devlist_head);
 	     (dinfo != NULL) && (error == 0) && (i < pci_numdevs) && !quit;
@@ -1575,7 +1669,7 @@ pci_alloc_map(device_t dev, device_t child, int type, int *rid,
 	resource_list_add(rl, type, *rid, start, end, count);
 	rle = resource_list_find(rl, type, *rid);
 	if (rle == NULL)
-		panic("pci_alloc_map: unexpedly can't find resource.");
+		panic("pci_alloc_map: unexpectedly can't find resource.");
 	rle->res = res;
 	if (bootverbose)
 		device_printf(child,
@@ -1814,11 +1908,6 @@ pci_cfg_restore(device_t dev, struct pci_devinfo *dinfo)
 	 * state D0.
 	 */
 	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		if (bootverbose)
-			printf(
-			    "pci%d:%d:%d: Transition from D%d to D0\n",
-			    dinfo->cfg.bus, dinfo->cfg.slot, dinfo->cfg.func,
-			    pci_get_powerstate(dev));
 		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
 	}
 	for (i = 0; i < dinfo->cfg.nummaps; i++)
@@ -1856,14 +1945,14 @@ pci_cfg_save(device_t dev, struct pci_devinfo *dinfo, int setstate)
 	dinfo->cfg.bios = pci_read_config(dev, PCIR_BIOS, 4);
 
 	/*
-	 * Some drivers apparently write to these registers w/o
-	 * updating our cahced copy.  No harm happens if we update the
-	 * copy, so do so here so we can restore them.  The COMMAND
-	 * register is modified by the bus w/o updating the cache.  This
-	 * should represent the normally writable portion of the 'defined'
-	 * part of type 0 headers.  In theory we also need to save/restore
-	 * the PCI capability structures we know about, but apart from power
-	 * we don't know any that are writable.
+	 * Some drivers apparently write to these registers w/o updating our
+	 * cached copy.  No harm happens if we update the copy, so do so here
+	 * so we can restore them.  The COMMAND register is modified by the
+	 * bus w/o updating the cache.  This should represent the normally
+	 * writable portion of the 'defined' part of type 0 headers.  In
+	 * theory we also need to save/restore the PCI capability structures
+	 * we know about, but apart from power we don't know any that are
+	 * writable.
 	 */
 	dinfo->cfg.subvendor = pci_read_config(dev, PCIR_SUBVEND_0, 2);
 	dinfo->cfg.subdevice = pci_read_config(dev, PCIR_SUBDEV_0, 2);
@@ -1882,34 +1971,25 @@ pci_cfg_save(device_t dev, struct pci_devinfo *dinfo, int setstate)
 	dinfo->cfg.revid = pci_read_config(dev, PCIR_REVID, 1);
 
 	/*
-	 * don't set the state for display devices and for memory devices
-	 * since bad things happen.  we should (a) have drivers that can easily
-	 * detach and (b) use generic drivers for these devices so that some
-	 * device actually attaches.  We need to make sure that when we
-	 * implement (a) we don't power the device down on a reattach.
+	 * don't set the state for display devices, base peripherals and
+	 * memory devices since bad things happen when they are powered down.
+	 * We should (a) have drivers that can easily detach and (b) use
+	 * generic drivers for these devices so that some device actually
+	 * attaches.  We need to make sure that when we implement (a) we don't
+	 * power the device down on a reattach.
 	 */
 	cls = pci_get_class(dev);
-	if (setstate && cls != PCIC_DISPLAY && cls != PCIC_MEMORY) {
+	if (setstate && cls != PCIC_DISPLAY && cls != PCIC_MEMORY &&
+	    cls != PCIC_BASEPERIPH) {
 		/*
-		 * PCI spec is clear that we can only go into D3 state from
-		 * D0 state.  Transition from D[12] into D0 before going
-		 * to D3 state.
+		 * PCI spec says we can only go into D3 state from D0 state.
+		 * Transition from D[12] into D0 before going to D3 state.
 		 */
 		ps = pci_get_powerstate(dev);
 		if (ps != PCI_POWERSTATE_D0 && ps != PCI_POWERSTATE_D3) {
-			if (bootverbose)
-				printf(
-				    "pci%d:%d:%d: Transition from D%d to D0\n",
-				    dinfo->cfg.bus, dinfo->cfg.slot,
-				    dinfo->cfg.func, ps);
 			pci_set_powerstate(dev, PCI_POWERSTATE_D0);
 		}
 		if (pci_get_powerstate(dev) != PCI_POWERSTATE_D3) {
-			if (bootverbose)
-				printf(
-				    "pci%d:%d:%d: Transition from D0 to D3\n",
-				    dinfo->cfg.bus, dinfo->cfg.slot,
-				    dinfo->cfg.func);
 			pci_set_powerstate(dev, PCI_POWERSTATE_D3);
 		}
 	}

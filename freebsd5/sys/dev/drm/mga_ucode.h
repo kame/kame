@@ -1,6 +1,6 @@
 /* mga_ucode.h -- Matrox G200/G400 WARP engine microcode -*- linux-c -*-
- * Created: Thu Jan 11 21:20:43 2001 by gareth@valinux.com
- *
+ * Created: Thu Jan 11 21:20:43 2001 by gareth@valinux.com */
+/*-
  * Copyright 1999 Matrox Graphics Inc.
  * All Rights Reserved.
  *
@@ -25,7 +25,7 @@
  * Kernel-based WARP engine management:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_ucode.h,v 1.1 2002/04/27 20:47:57 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_ucode.h,v 1.1.10.1 2005/01/30 00:59:36 imp Exp $
  */
 
 /*

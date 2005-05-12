@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996 - 2001 John Hay.
  * Copyright (c) 1996 SDL Communications, Inc.
  * All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sr/if_sr_isa.c,v 1.49 2003/08/24 18:17:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sr/if_sr_isa.c,v 1.49.4.1 2005/01/30 01:00:06 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

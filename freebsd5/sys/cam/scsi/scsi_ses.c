@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.29 2004/06/16 09:46:31 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.29.2.2 2005/04/01 12:40:25 delphij Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -363,7 +363,7 @@ sesregister(struct cam_periph *periph, void *arg)
 		return (CAM_REQ_CMP_ERR);
 	}
 
-	softc->ses_dev = make_dev(&ses_cdevsw, periph->unit_number,
+	softc->ses_dev = make_dev(&ses_cdevsw, unit2minor(periph->unit_number),
 	    UID_ROOT, GID_OPERATOR, 0600, "%s%d",
 	    periph->periph_name, periph->unit_number);
 	softc->ses_dev->si_drv1 = periph;

@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright (c) 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_lock.c,v 1.74.2.2 2004/09/03 15:45:31 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_lock.c,v 1.74.2.3 2005/01/31 23:26:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

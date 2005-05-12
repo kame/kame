@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_panasonic.c,v 1.3.2.1 2004/08/27 00:54:30 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_panasonic.c,v 1.3.2.2 2004/12/27 05:54:13 njl Exp $");
 
 #include "opt_acpi.h"
 #include <sys/param.h>
@@ -38,6 +38,9 @@ __FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_panasonic.c,v 1.3.2.1 2004/08/27 00
 
 #include "acpi.h"
 #include <dev/acpica/acpivar.h>
+
+#define _COMPONENT	ACPI_OEM
+ACPI_MODULE_NAME("Panasonic")
 
 /* Debug */
 #undef	ACPI_PANASONIC_DEBUG

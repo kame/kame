@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.7 2004/01/19 14:00:26 ru Exp $
+# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.7.2.1 2005/02/13 07:23:32 obrien Exp $
 
 .PATH:	${.CURDIR}/../../crypto/des \
 	${.CURDIR}/../../crypto/des/arch/${MACHINE_ARCH} \
@@ -19,7 +19,7 @@ SRCS=	vnode_if.h \
 	smbfs_vfsops.c smbfs_node.c smbfs_io.c smbfs_vnops.c \
 	smbfs_subr.c smbfs_smb.c
 
-NETSMBCRYPTO=yes
+NETSMBCRYPTO=
 
 .if defined(NETSMBCRYPTO)
 SRCS+=	des_ecb.c des_setkey.c

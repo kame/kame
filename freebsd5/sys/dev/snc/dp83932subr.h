@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932subr.h,v 1.2 2002/03/20 02:07:42 alfred Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932subr.h,v 1.2.8.1 2005/01/30 01:00:02 imp Exp $	*/
 /*	$NecBSD: dp83932subr.h,v 1.5 1999/02/02 00:47:25 kmatsuda Exp $	*/
 /*	$NetBSD$	*/
-  
-/*
+
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Kouichi Matsuda.  All rights reserved.
  *

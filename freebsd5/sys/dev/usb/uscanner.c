@@ -5,9 +5,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.57.2.1 2004/09/20 05:03:28 sanpei Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.57.2.3 2005/01/30 01:00:10 imp Exp $");
 
-/*
+/*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -135,6 +135,7 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_HP, USB_PRODUCT_HP_4100C }, 0 },
  {{ USB_VENDOR_HP, USB_PRODUCT_HP_4200C }, 0 },
  {{ USB_VENDOR_HP, USB_PRODUCT_HP_4300C }, 0 },
+ {{ USB_VENDOR_HP, USB_PRODUCT_HP_4670V }, 0 },
  {{ USB_VENDOR_HP, USB_PRODUCT_HP_S20 }, 0 },
  {{ USB_VENDOR_HP, USB_PRODUCT_HP_5200C }, 0 },
  {{ USB_VENDOR_HP, USB_PRODUCT_HP_5300C }, 0 },

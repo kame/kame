@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997 Justin Gibbs.
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/bus_memio.h,v 1.2 1999/08/28 00:38:40 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/bus_memio.h,v 1.2.26.1 2005/01/30 00:59:10 imp Exp $
  */
 
 #ifndef _ALPHA_BUS_MEMIO_H_

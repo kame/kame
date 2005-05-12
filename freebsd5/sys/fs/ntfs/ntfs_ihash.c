@@ -1,6 +1,6 @@
 /*	$NetBSD: ntfs_ihash.c,v 1.5 1999/09/30 16:56:40 jdolecek Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_ihash.c	8.7 (Berkeley) 5/17/95
- * $FreeBSD: src/sys/fs/ntfs/ntfs_ihash.c,v 1.20 2004/06/16 09:47:04 phk Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_ihash.c,v 1.20.2.1 2005/01/31 23:25:57 imp Exp $
  */
 
 #include <sys/param.h>

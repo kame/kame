@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright (c) 1992, 1994, 1995, 1996 Carnegie Mellon University
  * All Rights Reserved.
  * 
@@ -26,7 +26,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 /* __KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.22 1998/02/27 04:03:00 thorpej Exp $"); */
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/prom.c,v 1.28 2003/08/17 06:42:07 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/prom.c,v 1.28.4.2 2005/02/05 01:02:47 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -35,10 +35,10 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/prom.c,v 1.28 2003/08/17 06:42:07 marcel
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <sys/proc.h>
-#include <sys/user.h>
 #include <sys/cons.h>
 
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/prom.h>
 #include <machine/rpb.h>
 #include <machine/vmparam.h>

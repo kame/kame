@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_node.c,v 1.20 2004/07/10 21:21:13 marcel Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_node.c,v 1.20.2.3 2005/03/01 11:32:31 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>

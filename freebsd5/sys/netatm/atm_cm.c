@@ -1,4 +1,4 @@
-/*
+/*-
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/atm_cm.c,v 1.31 2003/07/26 14:20:37 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/atm_cm.c,v 1.31.4.2 2005/03/07 13:08:04 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -524,6 +524,7 @@ done:
  * atm_cm_release().
  *
  * Arguments:
+ *	so	optional socket pointer -- if present, will set listen state
  *	epp	pointer to endpoint definition structure
  *	token	endpoint's listen instance token
  *	ap	pointer to listening connection attributes
@@ -535,7 +536,8 @@ done:
  *
  */
 int
-atm_cm_listen(epp, token, ap, copp)
+atm_cm_listen(so, epp, token, ap, copp)
+	struct socket	*so;
 	Atm_endpoint	*epp;
 	void		*token;
 	Atm_attributes	*ap;
@@ -718,7 +720,13 @@ atm_cm_listen(epp, token, ap, copp)
 	/*
 	 * Now try to register the listening connection
 	 */
+	if (so != NULL)
+		SOCK_LOCK(so);
 	s = splnet();
+	if (so != NULL)
+		err = solisten_proto_check(so);
+	if (err)
+		goto donex;
 	if (atm_cm_match(cop->co_lattr, NULL) != NULL) {
 		/*
 		 * Can't have matching listeners
@@ -728,9 +736,13 @@ atm_cm_listen(epp, token, ap, copp)
 	}
 	cop->co_state = COS_LISTEN;
 	LINK2TAIL(cop, Atm_connection, atm_listen_queue, co_next);
+	if (so != NULL)
+		solisten_proto(so);
 
 donex:
 	(void) splx(s);
+	if (so != NULL)
+		SOCK_UNLOCK(so);
 
 done:
 	if (err) {

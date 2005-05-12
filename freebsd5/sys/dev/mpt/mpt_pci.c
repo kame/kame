@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.16 2004/03/17 17:50:37 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.16.2.1 2004/12/29 15:46:14 sobomax Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,6 +69,10 @@ __FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.16 2004/03/17 17:50:37 njl Exp
 
 #ifndef	PCI_PRODUCT_LSI_FC929
 #define	PCI_PRODUCT_LSI_FC929		0x0622
+#endif
+
+#ifndef	PCI_PRODUCT_LSI_FC929X
+#define	PCI_PRODUCT_LSI_FC929X		0x0626
 #endif
 
 #ifndef	PCI_PRODUCT_LSI_1030
@@ -157,6 +161,9 @@ mpt_probe(device_t dev)
 		break;
 	case PCI_PRODUCT_LSI_FC929:
 		desc = "LSILogic FC929 FC Adapter";
+		break;
+	case PCI_PRODUCT_LSI_FC929X:
+		desc = "LSILogic FC929X FC Adapter";
 		break;
 	case PCI_PRODUCT_LSI_1030:
 		desc = "LSILogic 1030 Ultra4 Adapter";

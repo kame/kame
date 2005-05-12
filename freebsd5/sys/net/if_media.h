@@ -1,7 +1,7 @@
 /*	$NetBSD: if_media.h,v 1.3 1997/03/26 01:19:27 thorpej Exp $	*/
-/* $FreeBSD: src/sys/net/if_media.h,v 1.28 2004/08/12 23:48:26 tackerman Exp $ */
+/* $FreeBSD: src/sys/net/if_media.h,v 1.28.2.2 2005/03/21 16:05:35 glebius Exp $ */
 
-/*
+/*-
  * Copyright (c) 1997
  *	Jonathan Stone and Jason R. Thorpe.  All rights reserved.
  *
@@ -227,6 +227,11 @@ int	ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr,
 #define IFM_ATM_UNASSIGNED	0x00000400	/* unassigned cells */
 
 /*
+ * CARP Common Address Redundancy Protocol
+ */
+#define	IFM_CARP	0x000000c0
+
+/*
  * Shared media sub-types
  */
 #define	IFM_AUTO	0		/* Autoselect best media */
@@ -299,6 +304,7 @@ struct ifmedia_description {
 	{ IFM_FDDI,		"FDDI" },				\
 	{ IFM_IEEE80211,	"IEEE 802.11 Wireless Ethernet" },	\
 	{ IFM_ATM,		"ATM" },				\
+	{ IFM_CARP,		"Common Address Redundancy Protocol" }, \
 	{ 0, NULL },							\
 }
 

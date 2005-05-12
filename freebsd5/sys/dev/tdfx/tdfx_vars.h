@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2001 by Coleman Kane <cokane@FreeBSD.org>
  * All rights reserved.
  *
@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/tdfx/tdfx_vars.h,v 1.9 2004/06/16 09:46:59 phk Exp $
+ *   $FreeBSD: src/sys/dev/tdfx/tdfx_vars.h,v 1.9.2.1 2005/01/30 01:00:07 imp Exp $
  */
 
 /* tdfx_vars.h -- constants and structs used in the tdfx driver

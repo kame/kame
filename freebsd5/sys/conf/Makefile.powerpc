@@ -1,7 +1,7 @@
 # Makefile.powerpc -- with config changes.
 # Copyright 1990 W. Jolitz
 #	from: @(#)Makefile.i386	7.1 5/10/91
-# $FreeBSD: src/sys/conf/Makefile.powerpc,v 1.270 2004/08/13 14:30:26 ru Exp $
+# $FreeBSD: src/sys/conf/Makefile.powerpc,v 1.270.2.1 2005/02/13 07:23:32 obrien Exp $
 #
 # Makefile for FreeBSD
 #
@@ -20,7 +20,7 @@
 %VERSREQ=	500013
 
 # Temporary stuff while we're still embryonic
-NO_MODULES?=	yes
+NO_MODULES=
 
 STD8X16FONT?=	iso
 

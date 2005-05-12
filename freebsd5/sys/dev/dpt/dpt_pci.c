@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_pci.c,v 1.30 2004/03/17 17:50:30 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_pci.c,v 1.30.2.1 2005/03/02 10:56:11 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -156,7 +156,6 @@ dpt_pci_attach (device_t dev)
 	s = splcam();
 
 	if (dpt_init(dpt) != 0) {
-		dpt_free(dpt);
 		error = ENXIO;
 		goto bad;
 	}
@@ -178,8 +177,7 @@ dpt_pci_attach (device_t dev)
 bad:
 	dpt_release_resources(dev);
 
-	if (dpt)
-		dpt_free(dpt);
+	dpt_free(dpt);
 
 	return (error);
 }

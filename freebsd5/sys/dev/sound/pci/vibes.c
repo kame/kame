@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
  *
@@ -36,7 +36,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/vibes.c,v 1.17 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/vibes.c,v 1.17.2.1 2005/01/30 01:00:04 imp Exp $");
 
 /* ------------------------------------------------------------------------- */
 /* Constants */

@@ -1,6 +1,6 @@
 /* drm_scatter.h -- IOCTLs to manage scatter/gather memory -*- linux-c -*-
- * Created: Mon Dec 18 23:20:54 2000 by gareth@valinux.com
- *
+ * Created: Mon Dec 18 23:20:54 2000 by gareth@valinux.com */
+/*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -27,7 +27,7 @@
  *   Gareth Hughes <gareth@valinux.com>
  *   Eric Anholt <anholt@FreeBSD.org>
  *
- * $FreeBSD: src/sys/dev/drm/drm_scatter.h,v 1.5 2003/08/19 02:57:31 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_scatter.h,v 1.5.4.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/drmP.h"

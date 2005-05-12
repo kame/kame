@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Scott Bartram
  * Copyright (c) 1995 Steven Wallace
  * All rights reserved.
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_ipc.c,v 1.21 2003/06/02 06:48:51 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_ipc.c,v 1.21.4.1 2005/01/31 23:26:03 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

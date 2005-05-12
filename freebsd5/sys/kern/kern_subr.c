@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_subr.c,v 1.88 2004/07/10 15:42:16 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_subr.c,v 1.88.2.2 2005/01/31 23:26:16 imp Exp $");
 
 #include "opt_zero.h"
 
@@ -138,6 +138,8 @@ uiomove(void *cp, int n, struct uio *uio)
 	    ("uiomove: mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove proc"));
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
+	    "Calling uiomove()");
 
 	save = td->td_pflags & TDP_DEADLKTREAT;
 	td->td_pflags |= TDP_DEADLKTREAT;

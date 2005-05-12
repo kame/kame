@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 The FreeBSD Project
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/proc.h,v 1.12 2003/10/23 06:41:59 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/proc.h,v 1.12.4.1 2005/01/31 23:26:14 imp Exp $
  */
 
 #ifndef _MACHINE_PROC_H_

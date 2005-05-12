@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000,2001 Jonathan Chen.
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/tdkphyreg.h,v 1.1 2000/10/19 08:34:32 jon Exp $
+ * $FreeBSD: src/sys/dev/mii/tdkphyreg.h,v 1.1.10.1 2005/01/30 00:59:54 imp Exp $
  */
 
 /*

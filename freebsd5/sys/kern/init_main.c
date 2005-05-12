@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Terrence R. Lambert
  * All rights reserved.
  *
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/init_main.c,v 1.246.2.2 2004/09/09 10:03:19 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/init_main.c,v 1.246.2.8 2005/03/07 17:03:17 des Exp $");
 
 #include "opt_init_path.h"
 #include "opt_mac.h"
@@ -80,7 +80,6 @@ __FBSDID("$FreeBSD: src/sys/kern/init_main.c,v 1.246.2.2 2004/09/09 10:03:19 jul
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
-#include <sys/user.h>
 #include <sys/copyright.h>
 
 void mi_startup(void);				/* Should be elsewhere */
@@ -91,7 +90,6 @@ static struct pgrp pgrp0;
 struct	proc proc0;
 struct	thread thread0;
 struct	ksegrp ksegrp0;
-static struct filedesc0 filedesc0;
 struct	vmspace vmspace0;
 struct	proc *initproc;
 
@@ -314,9 +312,8 @@ struct sysentvec null_sysvec = {
 static void
 proc0_init(void *dummy __unused)
 {
-	register struct proc		*p;
-	register struct filedesc0	*fdp;
-	register unsigned i;
+	struct proc *p;
+	unsigned i;
 	struct thread *td;
 	struct ksegrp *kg;
 
@@ -406,17 +403,8 @@ proc0_init(void *dummy __unused)
 	siginit(&proc0);
 
 	/* Create the file descriptor table. */
-	/* XXX this duplicates part of fdinit() */
-	fdp = &filedesc0;
-	p->p_fd = &fdp->fd_fd;
+	p->p_fd = fdinit(NULL);
 	p->p_fdtol = NULL;
-	mtx_init(&fdp->fd_fd.fd_mtx, FILEDESC_LOCK_DESC, NULL, MTX_DEF);
-	fdp->fd_fd.fd_refcnt = 1;
-	fdp->fd_fd.fd_cmask = CMASK;
-	fdp->fd_fd.fd_ofiles = fdp->fd_dfiles;
-	fdp->fd_fd.fd_ofileflags = fdp->fd_dfileflags;
-	fdp->fd_fd.fd_nfiles = NDFILE;
-	fdp->fd_fd.fd_map = fdp->fd_dmap;
 
 	/* Create the limits structures. */
 	p->p_limit = lim_alloc();
@@ -433,6 +421,8 @@ proc0_init(void *dummy __unused)
 	p->p_limit->pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = i / 3;
 	p->p_cpulimit = RLIM_INFINITY;
 
+	p->p_stats = pstats_alloc();
+
 	/* Allocate a prototype map so we have something to fork. */
 	pmap_pinit0(vmspace_pmap(&vmspace0));
 	p->p_vmspace = &vmspace0;
@@ -440,12 +430,6 @@ proc0_init(void *dummy __unused)
 	vm_map_init(&vmspace0.vm_map, p->p_sysent->sv_minuser,
 	    p->p_sysent->sv_maxuser);
 	vmspace0.vm_map.pmap = vmspace_pmap(&vmspace0);
-
-	/*
-	 * We continue to place resource usage info
-	 * in the user struct so that it's pageable.
-	 */
-	p->p_stats = &p->p_uarea->u_stats;
 
 	/*
 	 * Charge root for one process.
@@ -509,7 +493,7 @@ static char init_path[MAXPATHLEN] =
 #ifdef	INIT_PATH
     __XSTRING(INIT_PATH);
 #else
-    "/sbin/init:/sbin/oinit:/sbin/init.bak:/stand/sysinstall";
+    "/sbin/init:/sbin/oinit:/sbin/init.bak:/rescue/init:/stand/sysinstall";
 #endif
 SYSCTL_STRING(_kern, OID_AUTO, init_path, CTLFLAG_RD, init_path, 0,
 	"Path used to search the init process");

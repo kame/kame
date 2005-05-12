@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994-1995 Søren Schmidt
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.121 2004/08/16 07:28:16 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.121.2.2 2005/03/01 10:08:11 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,12 +58,12 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.121 2004/08/16 07:28:
 
 #include "opt_compat.h"
 
-#if !COMPAT_LINUX32
-#include <machine/../linux/linux.h>
-#include <machine/../linux/linux_proto.h>
-#else
+#ifdef COMPAT_LINUX32
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#else
+#include <machine/../linux/linux.h>
+#include <machine/../linux/linux_proto.h>
 #endif
 
 #include <compat/linux/linux_ioctl.h>
@@ -2088,7 +2088,7 @@ ifname_linux_to_bsd(const char *lxname, char *bsdname)
 static int
 linux_ifconf(struct thread *td, struct ifconf *uifc)
 {
-#if COMPAT_LINUX32
+#ifdef COMPAT_LINUX32
 	struct l_ifconf ifc;
 #else
 	struct ifconf ifc;

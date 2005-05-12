@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.177 2004/08/16 13:59:01 rwatson Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.177.6.1 2005/05/01 06:11:35 nyan Exp $
 # Options specific to the pc98 platform kernels
 
 AUTO_EOI_1		opt_auto_eoi.h
@@ -108,3 +108,6 @@ PC98			opt_global.h
 DEV_APIC		opt_apic.h
 DEV_MECIA		opt_mecia.h
 DEV_NPX			opt_npx.h
+
+# Debugging
+KDB_STOP_NMI		opt_global.h

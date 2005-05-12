@@ -18,7 +18,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.174.2.5 2004/09/22 19:23:36 andre Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.174.2.8 2005/04/01 12:46:25 sobomax Exp $
 
 machine		alpha
 cpu		EV4
@@ -90,7 +90,6 @@ device		ahc		# AHA2940 and onboard AIC7xxx devices
 device		isp		# Qlogic family
 device		ispfw		# Firmware module for Qlogic host adapters
 device		mpt		# LSI-Logic MPT-Fusion
-#device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets + those of `ncr')
 
 # SCSI peripherals
@@ -145,6 +144,7 @@ device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 # PCI Ethernet NICs that use the common MII bus controller code.
 device		miibus		# MII bus support
 device		dc		# DEC/Intel 21143 and workalikes
+device		em		# Intel PRO/1000 adapter Gigabit Ethernet Card
 device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
 device		pcn		# AMD Am79C97x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
@@ -186,6 +186,7 @@ device		ums		# Mouse
 # USB Ethernet
 device		aue		# ADMtek USB Ethernet
 device		axe		# ASIX Electronics USB Ethernet
+device		cdce		# Generic USB over Ethernet
 device		cue		# CATC USB Ethernet
 device		kue		# Kawasaki LSI USB Ethernet
 

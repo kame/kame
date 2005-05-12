@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
@@ -35,7 +35,7 @@
 
 #ifdef __FreeBSD__
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/firewire/fwdma.c,v 1.6 2004/03/26 23:17:10 simokawa Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/firewire/fwdma.c,v 1.6.2.1 2005/01/30 00:59:41 imp Exp $");
 #endif
 
 #include <sys/param.h>

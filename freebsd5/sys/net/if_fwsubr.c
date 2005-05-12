@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Doug Rabson
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_fwsubr.c,v 1.5.2.1 2004/08/24 14:19:33 rwatson Exp $
+ * $FreeBSD: src/sys/net/if_fwsubr.c,v 1.5.2.3 2005/03/28 13:05:40 gallatin Exp $
  */
 
 #include "opt_inet.h"
@@ -238,6 +238,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		enc = mtod(m, union fw_encap *);
 		enc->unfrag.ether_type = type;
 		enc->unfrag.lf = FW_ENCAP_UNFRAG;
+		enc->unfrag.reserved = 0;
 
 		/*
 		 * Byte swap the encapsulation header manually.
@@ -279,6 +280,8 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 			enc = mtod(m, union fw_encap *);
 			if (foff == 0) {
 				enc->firstfrag.lf = FW_ENCAP_FIRST;
+				enc->firstfrag.reserved1 = 0;
+				enc->firstfrag.reserved2 = 0;
 				enc->firstfrag.datagram_size = dsize - 1;
 				enc->firstfrag.ether_type = type;
 				enc->firstfrag.dgl = dgl;
@@ -287,6 +290,9 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 					enc->nextfrag.lf = FW_ENCAP_NEXT;
 				else
 					enc->nextfrag.lf = FW_ENCAP_LAST;
+				enc->nextfrag.reserved1 = 0;
+				enc->nextfrag.reserved2 = 0;
+				enc->nextfrag.reserved3 = 0;
 				enc->nextfrag.datagram_size = dsize - 1;
 				enc->nextfrag.fragment_offset = foff;
 				enc->nextfrag.dgl = dgl;

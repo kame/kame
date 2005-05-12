@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_sig.c,v 1.289.2.3.2.2 2004/10/30 02:57:28 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_sig.c,v 1.289.2.6.2.1 2005/04/28 23:42:09 davidxu Exp $");
 
 #include "opt_compat.h"
 #include "opt_ktrace.h"
@@ -84,7 +84,6 @@ static char	*expand_name(const char *, uid_t, pid_t);
 static int	killpg1(struct thread *td, int sig, int pgid, int all);
 static int	issignal(struct thread *p);
 static int	sigprop(int sig);
-static void	stop(struct proc *);
 static void	tdsigwakeup(struct thread *td, int sig, sig_t action);
 static int	filt_sigattach(struct knote *kn);
 static void	filt_sigdetach(struct knote *kn);
@@ -843,12 +842,11 @@ kern_sigtimedwait(struct thread *td, sigset_t waitset, siginfo_t *info,
     struct timespec *timeout)
 {
 	struct sigacts *ps;
-	sigset_t savedmask, sigset;
+	sigset_t savedmask;
 	struct proc *p;
-	int error;
-	int sig;
-	int hz;
-	int i;
+	int error, sig, hz, i, timevalid = 0;
+	struct timespec rts, ets, ts;
+	struct timeval tv;
 
 	p = td->td_proc;
 	error = 0;
@@ -858,6 +856,14 @@ kern_sigtimedwait(struct thread *td, sigset_t waitset, siginfo_t *info,
 	PROC_LOCK(p);
 	ps = p->p_sigacts;
 	savedmask = td->td_sigmask;
+	if (timeout) {
+		if (timeout->tv_nsec >= 0 && timeout->tv_nsec < 1000000000) {
+			timevalid = 1;
+			getnanouptime(&rts);
+		 	ets = rts;
+			timespecadd(&ets, timeout);
+		}
+	}
 
 again:
 	for (i = 1; i <= _SIG_MAXSIG; ++i) {
@@ -886,51 +892,51 @@ again:
 			i = 0;
 			mtx_unlock(&ps->ps_mtx);
 		}
-		if (sig) {
-			td->td_sigmask = savedmask;
-			signotify(td);
+		if (sig)
 			goto out;
-		}
 	}
 	if (error)
 		goto out;
-
-	td->td_sigmask = savedmask;
-	signotify(td);
-	sigset = td->td_siglist;
-	SIGSETOR(sigset, p->p_siglist);
-	SIGSETAND(sigset, waitset);
-	if (!SIGISEMPTY(sigset))
-		goto again;
 
 	/*
 	 * POSIX says this must be checked after looking for pending
 	 * signals.
 	 */
 	if (timeout) {
-		struct timeval tv;
-
-		if (timeout->tv_nsec < 0 || timeout->tv_nsec > 1000000000) {
+		if (!timevalid) {
 			error = EINVAL;
 			goto out;
 		}
-		if (timeout->tv_sec == 0 && timeout->tv_nsec == 0) {
+		getnanouptime(&rts);
+		if (timespeccmp(&rts, &ets, >=)) {
 			error = EAGAIN;
 			goto out;
 		}
-		TIMESPEC_TO_TIMEVAL(&tv, timeout);
+		ts = ets;
+		timespecsub(&ts, &rts);
+		TIMESPEC_TO_TIMEVAL(&tv, &ts);
 		hz = tvtohz(&tv);
 	} else
 		hz = 0;
 
-	td->td_waitset = &waitset;
+	td->td_sigmask = savedmask;
+	SIGSETNAND(td->td_sigmask, waitset);
+	signotify(td);
 	error = msleep(&ps, &p->p_mtx, PPAUSE|PCATCH, "sigwait", hz);
-	td->td_waitset = NULL;
-	if (error == 0) /* surplus wakeup ? */
-		error = EINTR;
+	if (timeout) {
+		if (error == ERESTART) {
+			/* timeout can not be restarted. */
+			error = EINTR;
+		} else if (error == EAGAIN) {
+			/* will calculate timeout by ourself. */
+			error = 0;
+		}
+	}
 	goto again;
 
 out:
+	td->td_sigmask = savedmask;
+	signotify(td);
 	if (sig) {
 		sig_t action;
 
@@ -945,6 +951,7 @@ out:
 		_STOPEVENT(p, S_SIG, sig);
 
 		SIGDELSET(td->td_siglist, sig);
+		bzero(info, sizeof(*info));
 		info->si_signo = sig;
 		info->si_code = 0;
 	}
@@ -1566,28 +1573,17 @@ sigtd(struct proc *p, int sig, int prop)
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
 	/*
-	 * First find a thread in sigwait state and signal belongs to
-	 * its wait set. POSIX's arguments is that speed of delivering signal
-	 * to sigwait thread is faster than delivering signal to user stack.
-	 * If we can not find sigwait thread, then find the first thread in
-	 * the proc that doesn't have this signal masked, an exception is
-	 * if current thread is sending signal to its process, and it does not
-	 * mask the signal, it should get the signal, this is another fast
-	 * way to deliver signal.
+	 * Check if current thread can handle the signal without
+	 * switching conetxt to another thread.
 	 */
+	if (curproc == p && !SIGISMEMBER(curthread->td_sigmask, sig))
+		return (curthread);
 	signal_td = NULL;
 	mtx_lock_spin(&sched_lock);
 	FOREACH_THREAD_IN_PROC(p, td) {
-		if (td->td_waitset != NULL &&
-		    SIGISMEMBER(*(td->td_waitset), sig)) {
-				mtx_unlock_spin(&sched_lock);
-				return (td);
-		}
 		if (!SIGISMEMBER(td->td_sigmask, sig)) {
-			if (td == curthread)
-				signal_td = curthread;
-			else if (signal_td == NULL)
-				signal_td = td;
+			signal_td = td;
+			break;
 		}
 	}
 	if (signal_td == NULL)
@@ -1688,9 +1684,6 @@ do_tdsignal(struct thread *td, int sig, sigtarget_t target)
 	} else {
 		if (!SIGISMEMBER(td->td_sigmask, sig))
 			siglist = &td->td_siglist;
-		else if (td->td_waitset != NULL &&
-			SIGISMEMBER(*(td->td_waitset), sig))
-			siglist = &td->td_siglist;
 		else
 			siglist = &p->p_siglist;
 	}
@@ -1716,11 +1709,7 @@ do_tdsignal(struct thread *td, int sig, sigtarget_t target)
 			mtx_unlock(&ps->ps_mtx);
 			return;
 		}
-		if (((td->td_waitset == NULL) &&
-		     SIGISMEMBER(td->td_sigmask, sig)) ||
-		    ((td->td_waitset != NULL) &&
-		     SIGISMEMBER(td->td_sigmask, sig) &&
-		     !SIGISMEMBER(*(td->td_waitset), sig)))
+		if (SIGISMEMBER(td->td_sigmask, sig))
 			action = SIG_HOLD;
 		else if (SIGISMEMBER(ps->ps_sigcatch, sig))
 			action = SIG_CATCH;
@@ -1762,11 +1751,6 @@ do_tdsignal(struct thread *td, int sig, sigtarget_t target)
 
 	SIGADDSET(*siglist, sig);
 	signotify(td);			/* uses schedlock */
-	if (siglist == &td->td_siglist && (td->td_waitset != NULL) &&
-	    action != SIG_HOLD) {
-		td->td_waitset = NULL;
-	}
-
 	/*
 	 * Defer further processing for signals which are held,
 	 * except that stopped processes must be continued by SIGCONT.
@@ -2262,21 +2246,6 @@ issignal(td)
 }
 
 /*
- * Put the argument process into the stopped state and notify the parent
- * via wakeup.  Signals are handled elsewhere.  The process must not be
- * on the run queue.  Must be called with the proc p locked.
- */
-static void
-stop(struct proc *p)
-{
-
-	PROC_LOCK_ASSERT(p, MA_OWNED);
-	p->p_flag |= P_STOPPED_SIG;
-	p->p_flag &= ~P_WAITED;
-	wakeup(p->p_pptr);
-}
-
-/*
  * MPSAFE
  */
 void
@@ -2293,8 +2262,16 @@ thread_stopped(struct proc *p)
 		n++;
 	if ((p->p_flag & P_STOPPED_SIG) && (n == p->p_numthreads)) {
 		mtx_unlock_spin(&sched_lock);
-		stop(p);
+		p->p_flag &= ~P_WAITED;
 		PROC_LOCK(p->p_pptr);
+		/*
+		 * Wake up parent sleeping in kern_wait(), also send
+		 * SIGCHLD to parent, but SIGCHLD does not guarantee
+		 * that parent will awake, because parent may masked
+		 * the signal.
+		 */
+		p->p_pptr->p_flag |= P_STATCHILD;
+		wakeup(p->p_pptr);
 		ps = p->p_pptr->p_sigacts;
 		mtx_lock(&ps->ps_mtx);
 		if ((ps->ps_flag & PS_NOCLDSTOP) == 0) {

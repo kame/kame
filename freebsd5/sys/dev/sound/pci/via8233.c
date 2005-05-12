@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Orion Hodson <orion@freebsd.org>
  * Portions of this code derived from via82c686.c:
  * 	Copyright (c) 2000 David Jones <dej@ox.org>
@@ -44,7 +44,7 @@
 
 #include <dev/sound/pci/via8233.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via8233.c,v 1.17 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via8233.c,v 1.17.2.2 2005/01/30 01:00:04 imp Exp $");
 
 #define VIA8233_PCI_ID 0x30591106
 
@@ -447,7 +447,7 @@ via8233wr_init(kobj_t obj, void *devinfo, struct snd_dbuf *b,
 	ch->rbase = VIA_WR_BASE(c->num);
 	via_wr(via, ch->rbase + VIA_WR_RP_SGD_FORMAT, WR_FIFO_ENABLE, 1);
 
-	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) == -1)
+	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) != 0)
 		return NULL;
 	via8233chan_sgdinit(via, ch, c->num);
 	via8233chan_reset(via, ch);
@@ -475,7 +475,7 @@ via8233dxs_init(kobj_t obj, void *devinfo, struct snd_dbuf *b,
 	ch->rbase = VIA_DXS_BASE(NDXSCHANS - 1 - via->n_dxs_registered);
 	via->n_dxs_registered++;
 
-	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) == -1)
+	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) != 0)
 		return NULL;
 	via8233chan_sgdinit(via, ch, NWRCHANS + c->num);
 	via8233chan_reset(via, ch);
@@ -496,7 +496,7 @@ via8233msgd_init(kobj_t obj, void *devinfo, struct snd_dbuf *b,
 	ch->dir = dir;
 	ch->rbase = VIA_MC_SGD_STATUS;
 
-	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) == -1)
+	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) != 0)
 		return NULL;
 	via8233chan_sgdinit(via, ch, NWRCHANS + c->num);
 	via8233chan_reset(via, ch);

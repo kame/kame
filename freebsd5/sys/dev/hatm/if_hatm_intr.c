@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/hatm/if_hatm_intr.c,v 1.16 2003/12/24 18:22:04 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/hatm/if_hatm_intr.c,v 1.16.2.1 2005/01/30 00:59:43 imp Exp $");
 
 /*
  * ForeHE driver.

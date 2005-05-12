@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, Boris Popov
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.34 2004/05/06 05:03:20 alc Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.34.2.1 2005/01/31 23:25:57 imp Exp $
  *
  */
 #include <sys/param.h>

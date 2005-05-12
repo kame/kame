@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.152 2004/06/19 22:24:16 bde Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.152.2.3 2005/03/29 07:24:38 das Exp $");
 
 #include "opt_cpu.h"
 #include "opt_debug_npx.h"
@@ -56,7 +56,6 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.152 2004/06/19 22:24:16 bde Exp $
 #include <sys/syslog.h>
 #endif
 #include <sys/signalvar.h>
-#include <sys/user.h>
 
 #include <machine/asmacros.h>
 #include <machine/cputypes.h>
@@ -109,6 +108,7 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.152 2004/06/19 22:24:16 bde Exp $
 #ifdef CPU_ENABLE_SSE
 #define	fxrstor(addr)		__asm("fxrstor %0" : : "m" (*(addr)))
 #define	fxsave(addr)		__asm __volatile("fxsave %0" : "=m" (*(addr)))
+#define	ldmxcsr(__csr)		__asm __volatile("ldmxcsr %0" : : "m" (__csr))
 #endif
 #define	start_emulating()	__asm("smsw %%ax; orb %0,%%al; lmsw %%ax" \
 				      : : "n" (CR0_TS) : "ax")
@@ -421,19 +421,15 @@ npx_attach(dev)
 	int flags;
 	register_t s;
 
-	if (resource_int_value("npx", 0, "flags", &flags) != 0)
-		flags = 0;
+	flags = device_get_flags(dev);
 
-	if (flags)
-		device_printf(dev, "flags 0x%x ", flags);
-	if (npx_irq13) {
-		device_printf(dev, "using IRQ 13 interface\n");
-	} else {
-		if (npx_ex16)
-			device_printf(dev, "INT 16 interface\n");
-		else
-			device_printf(dev, "WARNING: no FPU!\n");
-	}
+	if (npx_irq13)
+		device_printf(dev, "IRQ 13 interface\n");
+	else if (npx_ex16)
+		device_printf(dev, "INT 16 interface\n");
+	else
+		device_printf(dev, "WARNING: no FPU!\n");
+
 	npxinit(__INITIAL_NPXCW__);
 
 	if (npx_cleanstate_ready == 0) {
@@ -771,6 +767,9 @@ npxdna()
 {
 	struct pcb *pcb;
 	register_t s;
+#ifdef CPU_ENABLE_SSE
+	int mxcsr;
+#endif
 	u_short control;
 
 	if (!npx_exists)
@@ -805,6 +804,12 @@ npxdna()
 		fninit();
 		control = __INITIAL_NPXCW__;
 		fldcw(&control);
+#ifdef CPU_ENABLE_SSE
+		if (cpu_fxsr) {
+			mxcsr = __INITIAL_MXCSR__;
+			ldmxcsr(mxcsr);
+		}
+#endif
 		pcb->pcb_flags |= PCB_NPXINITDONE;
 	} else {
 		/*

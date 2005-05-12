@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)umap_vnops.c	8.6 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/fs/umapfs/umap_vnops.c,v 1.40 2004/04/07 20:46:02 imp Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap_vnops.c,v 1.40.2.1 2005/01/31 23:25:59 imp Exp $
  */
 
 /*

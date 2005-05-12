@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/genassym.c,v 1.44 2004/04/05 21:00:49 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/genassym.c,v 1.44.2.1 2005/02/05 01:04:53 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,12 +52,12 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/genassym.c,v 1.44 2004/04/05 21:00:49 im
 #include <sys/ktr.h>
 #include <machine/frame.h>
 #include <machine/chipset.h>
+#include <machine/pcb.h>
 #include <sys/vmmeter.h>
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
-#include <sys/user.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <nfs/nfsproto.h>

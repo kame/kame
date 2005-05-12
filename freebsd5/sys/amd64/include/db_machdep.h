@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/amd64/include/db_machdep.h,v 1.20.2.1 2004/10/10 18:54:30 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/db_machdep.h,v 1.20.2.2 2005/01/30 00:59:13 imp Exp $
  */
 
 #ifndef _MACHINE_DB_MACHDEP_H_

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_autoconf.c,v 1.21 2004/04/05 21:03:35 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_autoconf.c,v 1.21.2.1 2005/01/31 23:26:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

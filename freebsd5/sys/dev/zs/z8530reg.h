@@ -1,6 +1,6 @@
 /*	$NetBSD: z8530reg.h,v 1.8 1996/12/13 21:02:39 gwr Exp $ */
 
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -39,7 +39,7 @@
  *
  *	@(#)zsreg.h	8.1 (Berkeley) 6/11/93
  *
- * $FreeBSD: src/sys/dev/zs/z8530reg.h,v 1.3 2004/04/07 20:45:58 imp Exp $
+ * $FreeBSD: src/sys/dev/zs/z8530reg.h,v 1.3.2.1 2005/01/30 01:00:13 imp Exp $
  */
 
 /*

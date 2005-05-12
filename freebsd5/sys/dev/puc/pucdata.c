@@ -1,6 +1,6 @@
 /*	$NetBSD: pucdata.c,v 1.25 2001/12/16 22:23:01 thorpej Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1998, 1999 Christopher G. Demetriou.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.45 2004/05/17 12:57:30 rik Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.45.2.4 2005/02/17 19:55:15 wilko Exp $");
 
 /*
  * PCI "universal" communications card driver configuration data (used to
@@ -926,6 +926,15 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* NetMos 0S1P PCI: 0S, 1P */
+	{   "NetMos NM9805 1284 Printer port",
+		{   0x9710, 0x9805, 0,      0       },
+		{   0xffff, 0xffff, 0,      0       },
+		{
+			{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+		},
+	},
+
 	/*
 	 * This is the Middle Digital, Inc. PCI-Weasel, which
 	 * uses a PCI interface implemented in FPGA.
@@ -1200,6 +1209,58 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_UART, 0x010, 0xA00, COM_FREQ * 8, PUC_FLAGS_MEMORY },
 		{ PUC_PORT_TYPE_UART, 0x010, 0xC00, COM_FREQ * 8, PUC_FLAGS_MEMORY },
 		{ PUC_PORT_TYPE_UART, 0x010, 0xE00, COM_FREQ * 8, PUC_FLAGS_MEMORY },
+	    },
+	},
+
+	/*
+	 * Boca Research Turbo Serial 654 (4 serial port) card.
+	 * Appears to be the same as Chase Research PLC PCI-FAST4
+	 * and Perle PCI-FAST4 Multi-Port serial cards.
+	 */
+	{   "Boca Research Turbo Serial 654",
+	{   0x10b5, 0x9050, 0x12e0, 0x0031  },
+	{   0xffff, 0xffff, 0xffff, 0xffff  },
+	{
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 4 },
+		},
+	},
+
+	/*
+	 * Boca Research Turbo Serial 658 (8 serial port) card.
+	 * Appears to be the same as Chase Research PLC PCI-FAST8
+	 * and Perle PCI-FAST8 Multi-Port serial cards.
+	 */
+	{   "Boca Research Turbo Serial 658",
+	{   0x10b5, 0x9050, 0x12e0, 0x0021  },
+	{   0xffff, 0xffff, 0xffff, 0xffff  },
+	{
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x20, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x28, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x30, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x38, COM_FREQ * 4 },
+		},
+	},
+
+	{   "Dell RAC III Virtual UART",
+	    {	0x1028,	0x0008,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 128 },
+	    },
+	},
+
+	{   "Dell RAC IV/ERA Virtual UART",
+	    {	0x1028,	0x0012,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, DEFAULT_RCLK * 128 },
 	    },
 	},
 

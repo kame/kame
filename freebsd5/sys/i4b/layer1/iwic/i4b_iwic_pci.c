@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000 Dave Boyce. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *      i4b_iwic - isdn4bsd Winbond W6692 driver
  *      ----------------------------------------
@@ -31,7 +32,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_pci.c,v 1.12 2004/03/17 17:50:51 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_pci.c,v 1.12.2.2 2005/03/30 01:10:57 murray Exp $");
 
 #include "opt_i4b.h"
 
@@ -107,6 +108,7 @@ struct iwic_softc iwic_sc[IWIC_MAXUNIT];
  * Vendor ID: 1043 Device ID: 0675 SubVendor: 1043 SubDevice ID: 1702
  * Vendor ID: 1043 Device ID: 0675 SubVendor: 1043 SubDevice ID: 1707
  * Vendor ID: 1050 Device ID: 6692 SubVendor: 0675 SubDevice ID: 1702
+ * Vendor ID: 1043 Device ID: 0675 SubVendor: 0675 SubDevice ID: 1704
  *---------------------------------------------------------------------------*/
 
 static struct winids {
@@ -116,6 +118,7 @@ static struct winids {
 	const char *desc;
 } win_ids[] = {
  { 0x66921050, -1, -1,		"Generic Winbond W6692 ISDN PCI (0x66921050)"      },
+ { 0x06751043, 0x0675, 0x1704,	"Planet PCI ISDN Adapter (IA128P-STD) ASUS-HCF675" },
  { 0x66921050, 0x144F, 0x1707,	"Planet PCI ISDN Adapter (Model IA128P-STDV)"      },
  { 0x17020675, -1, -1,		"ASUSCOM P-IN100-ST-D (Winbond W6692, 0x17020675)" },
  { 0x17030675, -1, -1,		"ASUSCOM P-IN100-ST-D (Winbond W6692, 0x17030675)" },

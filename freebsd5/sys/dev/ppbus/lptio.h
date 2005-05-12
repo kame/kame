@@ -1,4 +1,4 @@
-/*
+/*-
  *  Copyright (C) 1994 Geoffrey M. Rehmet
  *
  *  This program is free software; you may redistribute it and/or
@@ -11,7 +11,7 @@
  *
  *	Geoff Rehmet, Rhodes University, South Africa <csgr@cs.ru.ac.za>
  *
- * $FreeBSD: src/sys/dev/ppbus/lptio.h,v 1.8 2000/05/20 05:45:04 obrien Exp $
+ * $FreeBSD: src/sys/dev/ppbus/lptio.h,v 1.8.10.1 2005/01/30 00:59:58 imp Exp $
  */
 
 #ifndef	_DEV_PPBUS_LPT_H_

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.93 2004/08/05 21:11:33 sos Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.93.2.1 2005/03/23 04:47:18 mdodd Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -61,7 +61,6 @@ static struct cdevsw ast_cdevsw = {
 	.d_ioctl =	ast_ioctl,
 	.d_strategy =	ast_strategy,
 	.d_name =	"ast",
-	.d_maj =	119,
 	.d_flags =	D_TAPE | D_TRACKCLOSE,
 };
 

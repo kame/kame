@@ -1,4 +1,4 @@
-/*
+/*-
  * FreeBSD, VLB/ISA product support functions
  *
  * Copyright (c) 2004 Justin T. Gibbs.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/ahc_isa.c,v 1.1.2.2.2.1 2004/10/24 17:10:57 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/ahc_isa.c,v 1.1.2.4 2005/01/30 00:59:25 imp Exp $");
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
 

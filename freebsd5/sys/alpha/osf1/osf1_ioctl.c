@@ -1,5 +1,5 @@
 /*	$NetBSD: osf1_ioctl.c,v 1.5 1996/10/13 00:46:53 christos Exp $	*/
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_ioctl.c,v 1.12 2003/10/31 18:31:55 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_ioctl.c,v 1.12.4.1 2005/01/30 00:59:11 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

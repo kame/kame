@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -31,11 +31,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
- *
- * From:
- *	$Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.52 2004/04/07 20:46:02 imp Exp $
+ * From: $Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.52.2.4 2005/03/01 09:30:16 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -174,6 +174,7 @@ int
 procfs_doproccmdline(PFS_FILL_ARGS)
 {
 	struct ps_strings pstr;
+	char **ps_argvstr;
 	int error, i;
 
 	/*
@@ -200,10 +201,21 @@ procfs_doproccmdline(PFS_FILL_ARGS)
 		    sizeof(pstr));
 		if (error)
 			return (error);
+		if (pstr.ps_nargvstr > ARG_MAX)
+			return (E2BIG);
+		ps_argvstr = malloc(pstr.ps_nargvstr * sizeof(char *),
+		    M_TEMP, M_WAITOK);
+		error = copyin((void *)pstr.ps_argvstr, ps_argvstr,
+		    pstr.ps_nargvstr * sizeof(char *));
+		if (error) {
+			free(ps_argvstr, M_TEMP);
+			return (error);
+		}
 		for (i = 0; i < pstr.ps_nargvstr; i++) {
-			sbuf_copyin(sb, pstr.ps_argvstr[i], 0);
+			sbuf_copyin(sb, ps_argvstr[i], 0);
 			sbuf_printf(sb, "%c", '\0');
 		}
+		free(ps_argvstr, M_TEMP);
 	}
 
 	return (0);

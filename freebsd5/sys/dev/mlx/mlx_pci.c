@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mlx/mlx_pci.c,v 1.19 2004/05/30 20:08:36 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mlx/mlx_pci.c,v 1.19.2.1 2005/03/29 07:24:42 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -214,10 +214,8 @@ mlx_pci_attach(device_t dev)
      * Do bus-independant initialisation.
      */
     error = mlx_attach(sc);
-    if (error != 0) {
-	mlx_free(sc);
+    if (error != 0)
 	return(error);
-    }
     
     /*
      * Start the controller.

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_tty.c,v 1.16 2004/07/15 20:47:39 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_tty.c,v 1.16.2.1 2005/01/30 01:00:08 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

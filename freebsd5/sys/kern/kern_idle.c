@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_idle.c,v 1.40.2.1 2004/09/09 09:56:58 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_idle.c,v 1.40.2.2 2005/02/23 14:52:49 ssouhlal Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -83,7 +83,9 @@ idle_setup(void *dummy)
 		td = FIRST_THREAD_IN_PROC(p);
 		TD_SET_CAN_RUN(td);
 		td->td_flags |= TDF_IDLETD;
-		td->td_priority = PRI_MAX_IDLE;
+		sched_class(td->td_ksegrp, PRI_IDLE);
+		td->td_ksegrp->kg_user_pri = PRI_MAX_IDLE;
+		sched_prio(td, PRI_MAX_IDLE);
 		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(p);
 #ifdef SMP

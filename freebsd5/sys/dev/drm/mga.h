@@ -1,6 +1,6 @@
 /* mga.h -- Matrox G200/G400 DRM template customization -*- linux-c -*-
- * Created: Thu Jan 11 21:29:32 2001 by gareth@valinux.com
- *
+ * Created: Thu Jan 11 21:29:32 2001 by gareth@valinux.com */
+/*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga.h,v 1.5 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga.h,v 1.5.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #ifndef __MGA_H__

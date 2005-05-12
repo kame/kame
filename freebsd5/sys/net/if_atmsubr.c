@@ -1,6 +1,6 @@
 /*      $NetBSD: if_atmsubr.c,v 1.10 1997/03/11 23:19:51 chuck Exp $       */
 
-/*
+/*-
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/net/if_atmsubr.c,v 1.35 2004/04/25 09:24:51 luigi Exp $");
+__FBSDID("$FreeBSD: src/sys/net/if_atmsubr.c,v 1.35.2.1 2005/01/31 23:26:22 imp Exp $");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"

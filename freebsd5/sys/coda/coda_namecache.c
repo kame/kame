@@ -1,4 +1,4 @@
-/*
+/*-
  *             Coda: an Experimental Distributed File System
  *                              Release 3.1
  * 
@@ -27,7 +27,7 @@
  * 
  * 	@(#) src/sys/coda/coda_namecache.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
  */
-/* 
+/*-
  * Mach Operating System
  * Copyright (c) 1990 Carnegie-Mellon University
  * Copyright (c) 1989 Carnegie-Mellon University
@@ -73,7 +73,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_namecache.c,v 1.20 2003/09/07 07:43:09 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_namecache.c,v 1.20.4.1 2005/01/30 00:59:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,5 +1,5 @@
-/* radeon_cp.c -- CP support for Radeon -*- linux-c -*-
- *
+/* radeon_cp.c -- CP support for Radeon -*- linux-c -*- */
+/*-
  * Copyright 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Fremont, California.
  * All Rights Reserved.
@@ -27,7 +27,7 @@
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/radeon_cp.c,v 1.11 2004/01/06 04:34:53 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/radeon_cp.c,v 1.11.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/radeon.h"

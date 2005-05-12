@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/compat/svr4/svr4_fuser.h,v 1.4 2000/08/31 22:54:04 obrien Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_fuser.h,v 1.4.8.1 2005/01/30 00:59:20 imp Exp $
  *	Derived from:
  *	$NetBSD: svr4_fuser.h,v 1.4 1998/09/04 19:54:38 christos Exp $	 */
 
@@ -41,7 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
+/*-
  * Portions of this code have been derived from code contributed to the
  * FreeBSD Project by Mark Newton.
  *

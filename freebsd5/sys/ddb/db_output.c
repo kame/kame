@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_output.c,v 1.31 2004/07/10 23:47:18 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_output.c,v 1.31.2.2 2005/01/30 00:59:21 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,8 +65,9 @@ db_expr_t	db_tab_stop_width = 8;		/* how wide are tab stops? */
 #define	NEXT_TAB(i) \
 	((((i) + db_tab_stop_width) / db_tab_stop_width) * db_tab_stop_width)
 db_expr_t	db_max_width = 79;		/* output line width */
+db_expr_t	db_lines_per_page = 20;		/* lines per page */
 static int	db_newlines;			/* # lines this page */
-static int	db_maxlines = -1;		/* max lines per page */
+static int	db_maxlines = -1;		/* max lines/page when paging */
 static db_page_calloutfcn_t *db_page_callout = NULL;
 static void	*db_page_callout_arg = NULL;
 static int	ddb_use_printf = 0;
@@ -143,6 +144,7 @@ db_putchar(c, arg)
 	}
 	else if (c == '\n') {
 	    /* Newline */
+	    db_force_whitespace();
 	    cnputc(c);
 	    db_output_position = 0;
 	    db_last_non_space = 0;
@@ -157,6 +159,7 @@ db_putchar(c, arg)
 	}
 	else if (c == '\r') {
 	    /* Return */
+	    db_force_whitespace();
 	    cnputc(c);
 	    db_output_position = 0;
 	    db_last_non_space = 0;
@@ -197,21 +200,33 @@ db_setup_paging(db_page_calloutfcn_t *callout, void *arg, int maxlines)
 void
 db_simple_pager(void *arg)
 {
-	int c;
+	int c, done;
 
 	db_printf("--More--\r");
-	for (;;) {
+	done = 0;
+	while (!done) {
 		c = cngetc();
 		switch (c) {
+		case 'e':
+		case 'j':
 		case '\n':
 			/* Just one more line. */
 			db_setup_paging(db_simple_pager, arg, 1);
-			return;
+			done++;
+			break;
+		case 'd':
+			/* Half a page. */
+			db_setup_paging(db_simple_pager, arg,
+			    db_lines_per_page / 2);
+			done++;
+			break;
+		case 'f':
 		case ' ':
 			/* Another page. */
 			db_setup_paging(db_simple_pager, arg,
-			    DB_LINES_PER_PAGE);
-			return;
+			    db_lines_per_page);
+			done++;
+			break;
 		case 'q':
 		case 'Q':
 		case 'x':
@@ -219,8 +234,8 @@ db_simple_pager(void *arg)
 			/* Quit */
 			if (arg != NULL) {
 				*(int *)arg = 1;
-				db_printf("\n");
-				return;
+				done++;
+				break;
 			}
 #if 0
 			/* FALLTHROUGH */
@@ -229,6 +244,7 @@ db_simple_pager(void *arg)
 #endif
 		}
 	}
+	db_printf("        \r");
 }
 
 /*

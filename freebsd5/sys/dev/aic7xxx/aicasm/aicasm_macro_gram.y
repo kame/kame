@@ -1,5 +1,5 @@
 %{
-/*
+/*-
  * Sub-parser for macro invocation in the Aic7xxx SCSI
  * Host adapter sequencer assembler.
  *
@@ -40,7 +40,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_macro_gram.y#5 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_macro_gram.y,v 1.2 2002/08/31 06:39:40 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_macro_gram.y,v 1.2.8.1 2005/01/30 00:59:26 imp Exp $
  */
 
 #include <sys/types.h>

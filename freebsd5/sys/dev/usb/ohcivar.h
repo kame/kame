@@ -1,7 +1,7 @@
 /*	$NetBSD: ohcivar.h,v 1.30 2001/12/31 12:20:35 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ohcivar.h,v 1.37 2004/08/02 15:37:35 iedowse Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ohcivar.h,v 1.37.2.2 2005/03/22 00:56:54 iedowse Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -157,6 +157,8 @@ struct ohci_xfer {
 	u_int32_t ohci_xfer_flags;
 };
 #define OHCI_ISOC_DIRTY  0x01
+#define OHCI_XFER_ABORTING	0x02	/* xfer is aborting. */
+#define OHCI_XFER_ABORTWAIT	0x04	/* abort completion is being awaited. */
 
 #define OXFER(xfer) ((struct ohci_xfer *)(xfer))
 

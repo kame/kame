@@ -1,4 +1,4 @@
-/*
+/*-
  * Device driver for Specialix range (SI/XIO) of serial line multiplexors.
  *
  * Copyright (C) 1990, 1992, 1998 Specialix International,
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/si/si.c,v 1.132 2004/07/28 06:21:53 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/si/si.c,v 1.132.2.1 2005/01/30 01:00:01 imp Exp $");
 
 #ifndef lint
 static const char si_copyright1[] =  "@(#) Copyright (C) Specialix International, 1990,1992,1998",

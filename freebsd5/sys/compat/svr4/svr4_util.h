@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1994 Christos Zoulas
  * All rights reserved.
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_util.h,v 1.7 2003/10/20 10:38:48 tjr Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_util.h,v 1.7.4.1 2005/01/30 00:59:20 imp Exp $
  */
 
 #ifndef	_SVR4_UTIL_H_

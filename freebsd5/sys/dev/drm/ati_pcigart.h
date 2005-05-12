@@ -1,6 +1,6 @@
 /* ati_pcigart.h -- ATI PCI GART support -*- linux-c -*-
- * Created: Wed Dec 13 21:52:19 2000 by gareth@valinux.com
- *
+ * Created: Wed Dec 13 21:52:19 2000 by gareth@valinux.com */
+/*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *   Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/ati_pcigart.h,v 1.3 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/ati_pcigart.h,v 1.3.4.1 2005/01/30 00:59:35 imp Exp $
  */
 
 #include "dev/drm/drmP.h"

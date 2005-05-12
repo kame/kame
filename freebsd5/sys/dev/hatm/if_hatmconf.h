@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -26,7 +26,7 @@
  *
  * Author: Hartmut Brandt <harti@freebsd.org>
  *
- * $FreeBSD: src/sys/dev/hatm/if_hatmconf.h,v 1.1 2003/06/17 16:12:50 harti Exp $
+ * $FreeBSD: src/sys/dev/hatm/if_hatmconf.h,v 1.1.4.1 2005/01/30 00:59:43 imp Exp $
  *
  * Default configuration
  */

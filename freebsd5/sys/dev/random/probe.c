@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/random/probe.c,v 1.2 2004/04/11 09:13:42 nyan Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/random/probe.c,v 1.2.2.1 2005/02/12 17:48:01 iedowse Exp $");
 
 #include <sys/types.h>
 #include <sys/malloc.h>
@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD: src/sys/dev/random/probe.c,v 1.2 2004/04/11 09:13:42 nyan Ex
 
 #if defined(__i386__) && !defined(PC98)
 #include <machine/cpufunc.h>
+#include <machine/cputypes.h>
 #endif
 
 #include <dev/random/randomdev.h>
@@ -55,6 +56,8 @@ random_ident_hardware(struct random_systat *systat)
 
 	/* Then go looking for hardware */
 #if defined(__i386__) && !defined(PC98)
+	if (cpu_class < CPUCLASS_586)
+		return;
 	do_cpuid(1, regs);
 	if ((regs[0] & 0xf) >= 3) {
 		do_cpuid(0xc0000000, regs);

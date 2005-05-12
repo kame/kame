@@ -1,3 +1,4 @@
+#-
 # KOBJ
 #
 # Copyright (c) 2000 Cameron Grant <cg@freebsd.org>
@@ -24,7 +25,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/sound/pcm/ac97_if.m,v 1.3 2002/05/01 03:07:40 obrien Exp $
+# $FreeBSD: src/sys/dev/sound/pcm/ac97_if.m,v 1.3.8.1 2005/01/30 01:00:04 imp Exp $
 #
 
 #include <dev/sound/pcm/sound.h>

@@ -1,7 +1,6 @@
 /*	$NetBSD: midwayvar.h,v 1.10 1997/03/20 21:34:46 chuck Exp $	*/
 
-/*
- *
+/*-
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.
  *
@@ -31,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/en/midwayvar.h,v 1.13 2003/08/07 15:04:25 jhb Exp $
+ * $FreeBSD: src/sys/dev/en/midwayvar.h,v 1.13.4.1 2005/01/30 00:59:39 imp Exp $
  */
 
 /*

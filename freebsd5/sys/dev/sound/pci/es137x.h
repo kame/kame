@@ -1,4 +1,4 @@
-/*
+/*-
  * This supports the ENSONIQ AudioPCI board based on the ES1370.
  *
  * Copyright (c) 1998 Joachim Kuebart <joki@kuebart.stuttgart.netsurf.de>
@@ -18,7 +18,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/dev/sound/pci/es137x.h,v 1.4 2000/04/05 00:38:00 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/es137x.h,v 1.4.8.1 2005/01/30 01:00:04 imp Exp $
  */
 
 #ifndef _ES1370_REG_H

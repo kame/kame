@@ -1,4 +1,4 @@
-/*
+/*-
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
  *
  * This software may be used, modified, copied, distributed, and sold, in
@@ -21,7 +21,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe.c,v 1.86 2004/08/13 23:08:08 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe.c,v 1.86.2.2 2005/02/03 00:34:46 imp Exp $");
 
 /*
  *
@@ -232,7 +232,7 @@ fe_simple_probe (struct fe_softc const * sc,
    address.  "Vendor" is an expected vendor code (first three bytes,)
    or a zero when nothing expected.  */
 int
-valid_Ether_p (u_char const * addr, unsigned vendor)
+fe_valid_Ether_p (u_char const * addr, unsigned vendor)
 {
 #ifdef FE_DEBUG
 	printf("fe?: validating %6D against %06x\n", addr, ":", vendor);
@@ -250,7 +250,7 @@ valid_Ether_p (u_char const * addr, unsigned vendor)
 	    case 0x020000:
 		/* Same as above, but a local address is allowed in
                    this context.  */
-		if ((addr[0] & 0x01) != 0) return 0;
+		if (ETHER_IS_MULTICAST(addr)) return 0;
 		break;
 	    default:
 		/* Make sure the vendor part matches if one is given.  */

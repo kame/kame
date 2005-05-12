@@ -1,6 +1,6 @@
-/* $FreeBSD: src/sys/alpha/mcbus/mcpciavar.h,v 1.3 2002/03/26 19:46:40 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/mcbus/mcpciavar.h,v 1.3.8.1 2005/01/30 00:59:11 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 1998, 2000 by Matthew Jacob
  *
  * Redistribution and use in source and binary forms, with or without

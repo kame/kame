@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright 1997,1998 Luigi Rizzo.
  *
@@ -38,7 +38,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.77 2004/07/16 03:59:54 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.77.2.2 2005/01/30 01:00:03 imp Exp $");
 
 #define SB_DEFAULT_BUFSZ	4096
 
@@ -585,7 +585,7 @@ sbchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *c
 	ch->channel = c;
 	ch->dir = dir;
 	ch->buffer = b;
-	if (sndbuf_alloc(ch->buffer, sb->parent_dmat, sb->bufsize) == -1)
+	if (sndbuf_alloc(ch->buffer, sb->parent_dmat, sb->bufsize) != 0)
 		return NULL;
 	sndbuf_dmasetup(ch->buffer, sb->drq);
 	return ch;

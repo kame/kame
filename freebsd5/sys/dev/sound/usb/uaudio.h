@@ -1,6 +1,6 @@
-/* $FreeBSD: src/sys/dev/sound/usb/uaudio.h,v 1.1 2002/07/21 17:28:50 nsayer Exp $ */
+/* $FreeBSD: src/sys/dev/sound/usb/uaudio.h,v 1.1.10.1 2005/01/30 01:00:05 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 2000-2002 Hiroyuki Aizu <aizu@navi.org>
  *
  * Redistribution and use in source and binary forms, with or without

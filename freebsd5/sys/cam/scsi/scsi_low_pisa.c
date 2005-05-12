@@ -1,6 +1,6 @@
 /*	$NecBSD: scsi_low_pisa.c,v 1.13.18.1 2001/06/08 06:27:48 honda Exp $	*/
 /*	$NetBSD$	*/
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1995, 1996, 1997, 1998
  *	NetBSD/pc98 porting staff. All rights reserved.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_low_pisa.c,v 1.7 2003/06/10 18:14:05 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_low_pisa.c,v 1.7.4.1 2005/01/30 00:59:16 imp Exp $");
 
 #ifdef	__NetBSD__
 #include <sys/param.h>

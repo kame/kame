@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  *
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/amd64/amd64/apic_vector.S,v 1.100 2004/05/24 12:08:56 bde Exp $
+ * $FreeBSD: src/sys/amd64/amd64/apic_vector.S,v 1.100.2.1 2005/02/14 09:22:20 obrien Exp $
  */
 
 /*
@@ -210,31 +210,16 @@ IDTVEC(invlrng)
  */
 	.text
 	SUPERALIGN_TEXT
-IDTVEC(hardclock)
+IDTVEC(ipi_intr_bitmap_handler)	
+	
 	PUSH_FRAME
 
 	movq	lapic, %rdx
 	movl	$0, LA_EOI(%rdx)	/* End Of Interrupt to APIC */
-
-	call	forwarded_hardclock
-	MEXITCOUNT
-	jmp	doreti
-
-/*
- * Forward statclock to another CPU.  Pushes a clockframe and calls
- * forwarded_statclock().
- */
-	.text
-	SUPERALIGN_TEXT
-IDTVEC(statclock)
-	PUSH_FRAME
-
-	movq	lapic, %rdx
-	movl	$0, LA_EOI(%rdx)	/* End Of Interrupt to APIC */
-
+	
 	FAKE_MCOUNT(TF_RIP(%rsp))
 
-	call	forwarded_statclock
+	call	ipi_bitmap_handler
 	MEXITCOUNT
 	jmp	doreti
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, Sean Eric Fagan
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sys_process.c,v 1.127 2004/08/08 22:26:11 davidxu Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sys_process.c,v 1.127.2.3 2005/03/29 07:24:45 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,8 +42,8 @@ __FBSDID("$FreeBSD: src/sys/kern/sys_process.c,v 1.127 2004/08/08 22:26:11 david
 #include <sys/vnode.h>
 #include <sys/ptrace.h>
 #include <sys/sx.h>
-#include <sys/user.h>
 #include <sys/malloc.h>
+#include <sys/signalvar.h>
 
 #include <machine/reg.h>
 
@@ -385,6 +385,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	case PT_CONTINUE:
 	case PT_TO_SCE:
 	case PT_TO_SCX:
+	case PT_SYSCALL:
 	case PT_DETACH:
 		sx_xlock(&proctree_lock);
 		proctree_locked = 1;
@@ -584,6 +585,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	case PT_CONTINUE:
 	case PT_TO_SCE:
 	case PT_TO_SCX:
+	case PT_SYSCALL:
 	case PT_DETACH:
 		/* Zero means do not send any signal */
 		if (data < 0 || data > _SIG_MAXSIG) {

@@ -1,4 +1,5 @@
-/*
+/*-
+ * Copyright (c) 2004, David Xu <davidxu@freebsd.org>
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_umtx.c,v 1.16 2004/07/12 15:28:31 mtm Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_umtx.c,v 1.16.2.1 2005/01/31 23:26:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

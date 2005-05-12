@@ -1,4 +1,4 @@
-/*
+/*-
  * FreeBSD platform specific driver option settings, data structures,
  * function declarations and includes.
  *
@@ -32,7 +32,7 @@
  *
  * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.h#23 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.h,v 1.14 2004/05/30 20:08:24 phk Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.h,v 1.14.2.1 2005/01/30 00:59:25 imp Exp $
  */
 
 #ifndef _AIC79XX_FREEBSD_H_

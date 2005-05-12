@@ -1,7 +1,7 @@
 /*	$NecBSD: ncr53c500_pisa.c,v 1.28 1998/11/26 01:59:11 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [Ported for FreeBSD]
  *  Copyright (c) 2000
  *      Noriaki Mitsunaga, Mitsuru Iwasaki and Takanori Watanabe.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.22 2004/05/27 03:49:42 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.22.2.1 2005/01/30 00:59:55 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>

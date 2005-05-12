@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 David Jones <dej@ox.org>
  * All rights reserved.
  *
@@ -33,7 +33,7 @@
 
 #include <dev/sound/pci/via82c686.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.31 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.31.2.2 2005/01/30 01:00:04 imp Exp $");
 
 #define VIA_PCI_ID 0x30581106
 #define	NSEGS		4	/* Number of segments in SGD table */
@@ -267,7 +267,7 @@ viachan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->buffer = b;
 	ch->dir = dir;
 
-	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) == -1)
+	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) != 0)
 		return NULL;
 	return ch;
 }

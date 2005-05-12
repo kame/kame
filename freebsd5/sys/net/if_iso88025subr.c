@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998, Larry Lile
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.65 2004/06/15 23:57:41 mlaier Exp $
+ * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.65.2.1 2005/01/31 23:26:23 imp Exp $
  *
  */
 

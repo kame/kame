@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
@@ -34,7 +34,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/neomagic.c,v 1.33 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/neomagic.c,v 1.33.2.1 2005/01/30 01:00:04 imp Exp $");
 
 /* -------------------------------------------------------------------- */
 

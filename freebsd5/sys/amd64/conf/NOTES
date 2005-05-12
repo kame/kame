@@ -4,7 +4,7 @@
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
 #
-# $FreeBSD: src/sys/amd64/conf/NOTES,v 1.18 2004/08/16 12:39:27 tjr Exp $
+# $FreeBSD: src/sys/amd64/conf/NOTES,v 1.18.2.4.2.2 2005/05/01 05:38:12 dwhite Exp $
 #
 
 #
@@ -41,6 +41,17 @@ machine		amd64
 device		atpic			# Optional legacy pic support
 device		mptable			# Optional MPSPEC mptable support
 options 	NO_MIXED_MODE		# Disable use of mixed mode
+
+#
+# Watchdog routines.
+#
+options 	MP_WATCHDOG
+
+# 
+# Debugging options.
+#
+options		KDB_STOP_NMI		# Stop CPUS using NMI instead of IPI
+
 
 
 #####################################################################
@@ -188,8 +199,6 @@ device		tdfx			# Enable 3Dfx Voodoo support
 # Intel ACPICA code.  (Note that the Intel code must also have USE_DEBUGGER
 # defined when it is built).
 #
-# ACPI_MAX_THREADS sets the number of task threads started.
-#
 # ACPI_NO_SEMAPHORES makes the AcpiOs*Semaphore routines a no-op.
 #
 # ACPICA_PEDANTIC enables strict checking of AML.  Our default is to
@@ -201,7 +210,6 @@ device		tdfx			# Enable 3Dfx Voodoo support
 
 device		acpi
 options 	ACPI_DEBUG
-options 	ACPI_MAX_THREADS=1
 #!options 	ACPI_NO_SEMAPHORES
 #!options 	ACPICA_PEDANTIC
 
@@ -250,11 +258,17 @@ device		wlan		# 802.11 layer
 #device	pst
 
 #
+# Areca 11xx and 12xx series of SATA II RAID controllers.
+# CAM is required.
+#
+device		arcmsr		# Areca SATA II RAID
+
+#
 # 3ware 9000 series PATA/SATA RAID controller driver and options.
 # The driver is implemented as a SIM, and so, needs the CAM infrastructure.
 #
-options		TWA_DEBUG		# 0-10; 10 prints the most messages.
-options		TWA_FLASH_FIRMWARE	# firmware image bundled when defined.
+options 	TWA_DEBUG		# 0-10; 10 prints the most messages.
+options 	TWA_FLASH_FIRMWARE	# firmware image bundled when defined.
 device		twa			# 3ware 9000 series PATA/SATA RAID
 
 #
@@ -283,8 +297,8 @@ device		ips
 # it's tested on a big-endian machine
 #
 device		safe		# SafeNet 1141
-options		SAFE_DEBUG	# enable debugging support: hw.safe.debug
-options		SAFE_RNDTEST	# enable rndtest support
+options 	SAFE_DEBUG	# enable debugging support: hw.safe.debug
+options 	SAFE_RNDTEST	# enable rndtest support
 
 #####################################################################
 
@@ -365,20 +379,20 @@ options 	ELSA_QS1PCI
 #	ifpi2 driver for AVM Fritz!Card PCI version 2
 #
 # AVM Fritz!Card PCI version 2
-#XXX#device  "ifpi2"
+#XXX#device	"ifpi2"
 #
 #---------------------------------------------------------------------------
 #	iwic driver for Winbond W6692 chipset
 #
 # ASUSCOM P-IN100-ST-D (and other Winbond W6692 based cards)
-#XXX#device  iwic
+#XXX#device	iwic
 #
 #---------------------------------------------------------------------------
 #	itjc driver for Siemens ISAC / TJNet Tiger300/320 chipset
 #
 # Traverse Technologies NETjet-S
 # Teles PCI-TJ
-#XXX#device  itjc
+#XXX#device	itjc
 #
 #---------------------------------------------------------------------------
 #	iavc driver (AVM active cards, needs i4bcapi driver!)
@@ -468,7 +482,7 @@ options 	COMPAT_IA32
 # Enable Linux ABI emulation
 #XXX#options 	COMPAT_LINUX
 
-# Enable 32-bit Linux ABI emulation (requires COMPAT_43 and IA32)
+# Enable 32-bit Linux ABI emulation (requires COMPAT_43 and COMPAT_IA32)
 options 	COMPAT_LINUX32
 
 # Enable the linux-like proc filesystem support (requires COMPAT_LINUX32

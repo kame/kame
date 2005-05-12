@@ -1,6 +1,6 @@
 /* r128_cce.c -- ATI Rage 128 driver -*- linux-c -*-
- * Created: Wed Apr  5 19:24:19 2000 by kevin@precisioninsight.com
- *
+ * Created: Wed Apr  5 19:24:19 2000 by kevin@precisioninsight.com */
+/*-
  * Copyright 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -27,7 +27,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/r128_cce.c,v 1.10 2004/01/06 04:34:53 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128_cce.c,v 1.10.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/r128.h"

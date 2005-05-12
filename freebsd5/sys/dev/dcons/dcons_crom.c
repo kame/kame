@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  * 
  * $Id: dcons_crom.c,v 1.8 2003/10/23 15:47:21 simokawa Exp $
- * $FreeBSD: src/sys/dev/dcons/dcons_crom.c,v 1.4 2004/05/30 20:08:30 phk Exp $
+ * $FreeBSD: src/sys/dev/dcons/dcons_crom.c,v 1.4.2.2 2005/03/02 10:45:30 obrien Exp $
  */
 
 #include <sys/param.h>
@@ -46,10 +46,19 @@
 #include <sys/bus.h>
 #include <machine/bus.h>
 
+#ifdef __DragonFly__
+#include <bus/firewire/firewire.h>
+#include <bus/firewire/firewirereg.h>
+#include <bus/firewire/iec13213.h>
+#include "dcons.h"
+#include "dcons_os.h"
+#else
 #include <dev/firewire/firewire.h>
 #include <dev/firewire/firewirereg.h>
 #include <dev/firewire/iec13213.h>
 #include <dev/dcons/dcons.h>
+#include <dev/dcons/dcons_os.h>
+#endif
 
 #include <sys/cons.h>
 

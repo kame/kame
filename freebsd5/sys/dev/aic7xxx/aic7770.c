@@ -1,4 +1,4 @@
-/*
+/*-
  * Product specific probe and attach routines for:
  * 	27/284X and aic7770 motherboard SCSI controllers
  *
@@ -46,7 +46,7 @@
 #include "aic7xxx_93cx6.h"
 #else
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.17 2004/07/13 16:06:19 stefanf Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.17.2.1 2005/01/30 00:59:25 imp Exp $");
 #include <dev/aic7xxx/aic7xxx_osm.h>
 #include <dev/aic7xxx/aic7xxx_inline.h>
 #include <dev/aic7xxx/aic7xxx_93cx6.h>

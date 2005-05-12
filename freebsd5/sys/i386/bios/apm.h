@@ -1,4 +1,4 @@
-/*
+/*-
  * APM (Advanced Power Management) BIOS Device Driver
  *
  * Copyright (c) 1994 UKAI, Fumitoshi.
@@ -15,7 +15,7 @@
  *
  * Sep, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- * $FreeBSD: src/sys/i386/bios/apm.h,v 1.4 2004/06/16 20:27:50 imp Exp $
+ * $FreeBSD: src/sys/i386/bios/apm.h,v 1.4.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 #define APM_NEVENTS 16

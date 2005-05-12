@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/pcb.h,v 1.10 2004/07/10 19:55:58 marcel Exp $ */
+/* $FreeBSD: src/sys/alpha/include/pcb.h,v 1.10.2.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: pcb.h,v 1.6 1997/04/06 08:47:33 cgd Exp */
 
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *

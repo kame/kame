@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/linux32/linux32_sysvec.c,v 1.3 2004/08/16 11:15:46 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/linux32/linux32_sysvec.c,v 1.3.2.2 2005/03/29 07:24:45 das Exp $");
 
 /* XXX we use functions that might not exist. */
 #include "opt_compat.h"
@@ -56,12 +56,12 @@ __FBSDID("$FreeBSD: src/sys/amd64/linux32/linux32_sysvec.c,v 1.3 2004/08/16 11:1
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/resourcevar.h>
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
-#include <sys/user.h>
 #include <sys/vnode.h>
 
 #include <vm/vm.h>
@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD: src/sys/amd64/linux32/linux32_sysvec.c,v 1.3 2004/08/16 11:1
 
 #include <machine/cpu.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/specialreg.h>
 
 #include <amd64/linux32/linux.h>
@@ -206,9 +207,9 @@ static int _bsd_to_linux_trapcode[] = {
 
 struct linux32_ps_strings {
 	u_int32_t ps_argvstr;	/* first of 0 or more argument strings */
-	int	ps_nargvstr;	/* the number of argument strings */
+	u_int ps_nargvstr;	/* the number of argument strings */
 	u_int32_t ps_envstr;	/* first of 0 or more environment strings */
-	int	ps_nenvstr;	/* the number of environment strings */
+	u_int ps_nenvstr;	/* the number of environment strings */
 };
 
 /*

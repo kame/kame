@@ -1,4 +1,4 @@
-/*
+/*-
  *             Coda: an Experimental Distributed File System
  *                              Release 3.1
  * 
@@ -27,7 +27,7 @@
  * 
  * 	@(#) src/sys/coda/coda_subr.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
  */
-/* 
+/*-
  * Mach Operating System
  * Copyright (c) 1989 Carnegie-Mellon University
  * All rights reserved.  The CMU software License Agreement specifies
@@ -52,7 +52,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_subr.c,v 1.29 2004/07/04 08:52:33 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_subr.c,v 1.29.2.1 2005/01/30 00:59:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -37,7 +37,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
+/*-
  * Copyright (c) 1996 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
  *
@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/amd64/include/bus_amd64.h,v 1.26 2003/09/23 08:22:33 nyan Exp $ */
+/* $FreeBSD: src/sys/amd64/include/bus_amd64.h,v 1.26.4.1 2005/01/30 00:59:13 imp Exp $ */
 
 #ifndef _AMD64_BUS_AMD64_H_
 #define _AMD64_BUS_AMD64_H_

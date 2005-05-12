@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
 #include <machine/asm.h>
 #else
 __KERNEL_RCSID(2, "$NetBSD: prom_disp.s,v 1.8 1997/11/03 04:22:03 ross Exp $");
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/prom_disp.s,v 1.5 2002/04/15 21:44:19 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/prom_disp.s,v 1.5.8.1 2005/01/30 00:59:10 imp Exp $");
 #endif
 
 	.globl	prom_dispatch_v

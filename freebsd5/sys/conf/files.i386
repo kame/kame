@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.504.4.1 2004/10/24 18:02:52 scottl Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.504.2.4 2005/04/02 16:37:57 scottl Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -75,10 +75,12 @@ compat/linux/linux_sysctl.c	optional	compat_linux
 compat/linux/linux_uid16.c	optional	compat_linux
 compat/linux/linux_util.c	optional	compat_linux
 compat/ndis/kern_ndis.c		optional	ndisapi pci
+compat/ndis/kern_windrv.c	optional	ndisapi pci
 compat/ndis/subr_hal.c		optional	ndisapi pci
 compat/ndis/subr_ndis.c		optional	ndisapi pci
 compat/ndis/subr_ntoskrnl.c	optional	ndisapi pci
 compat/ndis/subr_pe.c		optional	ndisapi pci
+compat/ndis/subr_usbd.c		optional	ndisapi pci
 compat/pecoff/imgact_pecoff.c	optional	pecoff_support
 compat/svr4/imgact_svr4.c	optional	compat_svr4
 compat/svr4/svr4_fcntl.c	optional	compat_svr4
@@ -123,6 +125,7 @@ crypto/des/des_ecb.c			optional	crypto
 crypto/des/des_setkey.c			optional	crypto
 dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_isa.c		optional	aic isa
+dev/arcmsr/arcmsr.c		optional	arcmsr pci
 dev/ar/if_ar.c			optional	ar
 dev/ar/if_ar_isa.c		optional	ar isa
 dev/ar/if_ar_pci.c		optional	ar pci

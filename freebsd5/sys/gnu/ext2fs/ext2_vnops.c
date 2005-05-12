@@ -1,10 +1,10 @@
-/*
+/*-
  *  modified for EXT2FS support in Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  */
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -39,7 +39,7 @@
  *
  *	@(#)ufs_vnops.c	8.7 (Berkeley) 2/3/94
  *	@(#)ufs_vnops.c 8.27 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.85 2004/08/15 06:24:40 jmg Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.85.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 #include "opt_suiddir.h"

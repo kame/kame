@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2000 Hellmuth Michaelis
  *
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch.
@@ -44,7 +44,7 @@
  *
  *	Last Edit-Date: [Sun Mar 26 10:38:52 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_vtf.c,v 1.14 2004/06/04 20:04:51 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_vtf.c,v 1.14.2.1 2005/01/31 23:26:06 imp Exp $
  *
  *---------------------------------------------------------------------------*/
 

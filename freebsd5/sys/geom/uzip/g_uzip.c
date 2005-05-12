@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/uzip/g_uzip.c,v 1.1.2.2 2004/09/20 06:07:19 fjoe Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/uzip/g_uzip.c,v 1.1.2.3 2004/12/03 22:21:20 fjoe Exp $");
 
 #include <sys/param.h>
 #include <sys/bio.h>
@@ -393,7 +393,7 @@ g_uzip_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	/*
 	 * Initialize softc and read offsets.
 	 */
-	sc = malloc(sizeof(*sc), M_GEOM_UZIP, M_WAITOK);
+	sc = malloc(sizeof(*sc), M_GEOM_UZIP, M_WAITOK | M_ZERO);
 	gp->softc = sc;
 	sc->blksz = ntohl(header->blksz);
 	sc->nblocks = ntohl(header->nblocks);

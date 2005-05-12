@@ -1,4 +1,4 @@
-/*                  
+/*-
  * Copyright (c) 1995, David Greenman
  * All rights reserved.
  *              
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.32 2004/06/02 22:59:57 mux Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.32.2.1 2005/01/30 00:59:42 imp Exp $
  */
 
 /*

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/gdb_machdep.h,v 1.1 2004/07/10 17:47:21 marcel Exp $
+ * $FreeBSD: src/sys/i386/include/gdb_machdep.h,v 1.1.2.2 2005/02/14 08:18:16 obrien Exp $
  */
 
 #ifndef _MACHINE_GDB_MACHDEP_H_
@@ -46,7 +46,7 @@ gdb_cpu_query(void)
 }
 
 void *gdb_cpu_getreg(int, size_t *);
-void gdb_cpu_setreg(int, register_t);
+void gdb_cpu_setreg(int, void *);
 int gdb_cpu_signal(int, int);
 
 #endif /* !_MACHINE_GDB_MACHDEP_H_ */

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_core.c,v 1.10 2004/07/10 21:16:01 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_core.c,v 1.10.2.3 2005/03/31 21:55:39 marius Exp $");
 
 #ifndef KLD_MODULE
 #include "opt_comconsole.h"
@@ -321,14 +321,16 @@ uart_bus_attach(device_t dev)
 	 */
 	sc->sc_rres = bus_alloc_resource(dev, sc->sc_rtype, &sc->sc_rrid,
 	    0, ~0, sc->sc_class->uc_range, RF_ACTIVE);
-	if (sc->sc_rres == NULL)
+	if (sc->sc_rres == NULL) {
+		mtx_destroy(&sc->sc_hwmtx);
 		return (ENXIO);
+	}
 	sc->sc_bas.bsh = rman_get_bushandle(sc->sc_rres);
 	sc->sc_bas.bst = rman_get_bustag(sc->sc_rres);
 
 	sc->sc_irid = 0;
 	sc->sc_ires = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->sc_irid,
-	    RF_ACTIVE);
+	    RF_ACTIVE | RF_SHAREABLE);
 	if (sc->sc_ires != NULL) {
 		error = BUS_SETUP_INTR(device_get_parent(dev), dev,
 		    sc->sc_ires, INTR_TYPE_TTY | INTR_FAST, uart_intr,
@@ -391,6 +393,11 @@ uart_bus_attach(device_t dev)
 	}
 
 	if (sc->sc_sysdev != NULL) {
+		if (sc->sc_sysdev->baudrate == 0) {
+			if (UART_IOCTL(sc, UART_IOCTL_BAUD,
+			    (intptr_t)&sc->sc_sysdev->baudrate) != 0)
+				sc->sc_sysdev->baudrate = -1;
+		}
 		switch (sc->sc_sysdev->type) {
 		case UART_DEV_CONSOLE:
 			device_printf(dev, "console");
@@ -433,6 +440,8 @@ uart_bus_attach(device_t dev)
 	}
 	bus_release_resource(dev, sc->sc_rtype, sc->sc_rrid, sc->sc_rres);
 
+	mtx_destroy(&sc->sc_hwmtx);
+
 	return (error);
 }
 
@@ -461,6 +470,8 @@ uart_bus_detach(device_t dev)
 		    sc->sc_ires);
 	}
 	bus_release_resource(dev, sc->sc_rtype, sc->sc_rrid, sc->sc_rres);
+
+	mtx_destroy(&sc->sc_hwmtx);
 
 	if (sc->sc_class->size > sizeof(*sc)) {
 		device_set_softc(dev, NULL);

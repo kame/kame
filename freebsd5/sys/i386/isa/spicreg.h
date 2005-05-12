@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000  Nick Sayer
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/spicreg.h,v 1.3 2004/02/21 19:42:55 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/spicreg.h,v 1.3.2.1 2005/01/31 23:26:05 imp Exp $
  *
  */
 

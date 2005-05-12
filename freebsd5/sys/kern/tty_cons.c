@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1991 The Regents of the University of California.
  * All rights reserved.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/tty_cons.c,v 1.127 2004/08/15 06:24:41 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/tty_cons.c,v 1.127.2.1 2005/01/31 23:26:17 imp Exp $");
 
 #include "opt_ddb.h"
 

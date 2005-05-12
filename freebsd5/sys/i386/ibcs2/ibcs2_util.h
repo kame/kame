@@ -1,5 +1,4 @@
-
-/*
+/*-
  * Copyright (c) 1994 Christos Zoulas
  * Copyright (c) 1995 Frank van der Linden
  * Copyright (c) 1995 Scott Bartram
@@ -30,7 +29,7 @@
  * from: svr4_util.h,v 1.5 1994/11/18 02:54:31 christos Exp
  * from: linux_util.h,v 1.2 1995/03/05 23:23:50 fvdl Exp
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_util.h,v 1.17 2003/10/12 04:25:26 tjr Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_util.h,v 1.17.4.1 2005/01/31 23:26:03 imp Exp $
  */
 
 /*

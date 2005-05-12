@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003-2004 HighPoint Technologies, Inc.
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/hptmv/osbsd.h,v 1.2 2004/10/24 08:38:29 scottl Exp $
+ * $FreeBSD: src/sys/dev/hptmv/osbsd.h,v 1.2.2.1 2005/01/30 00:59:44 imp Exp $
  */
 #ifndef _OSBSD_H_
 #define _OSBSD_H_

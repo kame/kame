@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  *
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/i386/i386/apic_vector.s,v 1.101 2004/05/26 07:43:41 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/apic_vector.s,v 1.101.2.1 2005/01/06 02:02:35 delphij Exp $
  */
 
 /*
@@ -227,7 +227,8 @@ IDTVEC(invlrng)
  */
 	.text
 	SUPERALIGN_TEXT
-IDTVEC(hardclock)
+IDTVEC(ipi_intr_bitmap_handler)	
+	
 	PUSH_FRAME
 	movl	$KDSEL, %eax	/* reload with kernel's data segment */
 	movl	%eax, %ds
@@ -237,61 +238,12 @@ IDTVEC(hardclock)
 
 	movl	lapic, %edx
 	movl	$0, LA_EOI(%edx)	/* End Of Interrupt to APIC */
-
-	pushl	$0		/* XXX convert trapframe to clockframe */
-	call	forwarded_hardclock
-	addl	$4, %esp	/* XXX convert clockframe to trapframe */
-	MEXITCOUNT
-	jmp	doreti
-
-/*
- * Forward statclock to another CPU.  Pushes a clockframe and calls
- * forwarded_statclock().
- */
-	.text
-	SUPERALIGN_TEXT
-IDTVEC(statclock)
-	PUSH_FRAME
-	movl	$KDSEL, %eax	/* reload with kernel's data segment */
-	movl	%eax, %ds
-	movl	%eax, %es
-	movl	$KPSEL, %eax
-	movl	%eax, %fs
-
-	movl	lapic, %edx
-	movl	$0, LA_EOI(%edx)	/* End Of Interrupt to APIC */
-
+	
 	FAKE_MCOUNT(TF_EIP(%esp))
 
 	pushl	$0		/* XXX convert trapframe to clockframe */
-	call	forwarded_statclock
+	call	ipi_bitmap_handler
 	addl	$4, %esp	/* XXX convert clockframe to trapframe */
-	MEXITCOUNT
-	jmp	doreti
-
-/*
- * Executed by a CPU when it receives an Xcpuast IPI from another CPU,
- *
- * The other CPU has already executed aston() or need_resched() on our
- * current process, so we simply need to ack the interrupt and return
- * via doreti to run ast().
- */
-
-	.text
-	SUPERALIGN_TEXT
-IDTVEC(cpuast)
-	PUSH_FRAME
-	movl	$KDSEL, %eax
-	movl	%eax, %ds		/* use KERNEL data segment */
-	movl	%eax, %es
-	movl	$KPSEL, %eax
-	movl	%eax, %fs
-
-	movl	lapic, %edx
-	movl	$0, LA_EOI(%edx)	/* End Of Interrupt to APIC */
-
-	FAKE_MCOUNT(TF_EIP(%esp))
-
 	MEXITCOUNT
 	jmp	doreti
 

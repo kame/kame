@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.16 2004/06/07 16:33:47 wpaul Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.16.2.1 2004/11/07 22:33:05 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,7 +96,6 @@ sio_pci_attach(dev)
 {
 	u_int32_t	type;
 	struct pci_ids	*id;
-	int		flags;
 
 	type = pci_get_devid(dev);
 	id = pci_ids;
@@ -105,9 +104,6 @@ sio_pci_attach(dev)
 	if (id->desc == NULL)
 		return (ENXIO);
 	sio_pci_kludge_unit(dev);
-	if (resource_int_value("sio", device_get_unit(dev), "flags", &flags)
-	     == 0)
-		device_set_flags(dev, flags);
 	return (sioattach(dev, id->rid, 0UL));
 }
 

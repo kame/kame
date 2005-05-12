@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/channel.h,v 1.30 2004/02/28 19:47:02 truckman Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/channel.h,v 1.30.2.1 2005/01/30 01:00:04 imp Exp $
  */
 
 struct pcmchan_children {

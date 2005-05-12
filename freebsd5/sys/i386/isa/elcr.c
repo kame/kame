@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/elcr.c,v 1.1 2004/05/04 20:07:45 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/elcr.c,v 1.1.2.1 2005/03/25 21:08:49 jhb Exp $");
 
 /*
  * The ELCR is a register that controls the trigger mode and polarity of
@@ -57,9 +57,7 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/elcr.c,v 1.1 2004/05/04 20:07:45 jhb Exp $"
 #define	ELCR_MASK(irq)	(1 << (irq))
 
 static int elcr_status;
-#ifdef INVARIANTS
-static int elcr_found;
-#endif
+int elcr_found;
 
 /*
  * Check to see if we have what looks like a valid ELCR.  We do this by
@@ -88,9 +86,7 @@ elcr_probe(void)
 	}
 	if (resource_disabled("elcr", 0))
 		return (ENXIO);
-#ifdef INVARIANTS
 	elcr_found = 1;
-#endif
 	return (0);
 }
 

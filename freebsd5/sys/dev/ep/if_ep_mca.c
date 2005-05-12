@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_mca.c,v 1.10 2004/07/22 07:11:15 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_mca.c,v 1.10.2.1 2005/02/01 21:45:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -75,7 +75,7 @@ static struct mca_ident ep_mca_devs[] = {
 #define EP_MCA_IOPORT_POS	MCA_ADP_POS(MCA_POS2)
 #define EP_MCA_IOPORT_MASK	0xfc
 #define EP_MCA_IOPORT_SIZE	EP_IOSIZE
-#define EP_MCA_IOPORT(pos)	((((u_int32_t)pos & EP_MCA_IOPORT_MASK) \
+#define EP_MCA_IOPORT(pos)	((((uint32_t)pos & EP_MCA_IOPORT_MASK) \
 					| 0x02) << 8)
 
 #define EP_MCA_IRQ_POS		MCA_ADP_POS(MCA_POS3)
@@ -90,9 +90,9 @@ static int
 ep_mca_probe(device_t dev)
 {
 	const char *desc;
-	u_int32_t iobase = 0;
-	u_int8_t irq = 0;
-	u_int8_t pos;
+	uint32_t iobase = 0;
+	uint8_t irq = 0;
+	uint8_t pos;
 
 	desc = mca_match_id(mca_get_id(dev), ep_mca_devs);
 	if (!desc)

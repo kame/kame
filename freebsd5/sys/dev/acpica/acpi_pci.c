@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * Copyright (c) 2000, Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2000, BSDi
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pci.c,v 1.23 2004/08/13 06:21:58 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pci.c,v 1.23.2.3 2005/01/30 00:59:23 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,6 +58,12 @@ struct acpi_pci_devinfo {
 };
 
 ACPI_SERIAL_DECL(pci_powerstate, "ACPI PCI power methods");
+
+/* Be sure that ACPI and PCI power states are equivalent. */
+CTASSERT(ACPI_STATE_D0 == PCI_POWERSTATE_D0);
+CTASSERT(ACPI_STATE_D1 == PCI_POWERSTATE_D1);
+CTASSERT(ACPI_STATE_D2 == PCI_POWERSTATE_D2);
+CTASSERT(ACPI_STATE_D3 == PCI_POWERSTATE_D3);
 
 static int	acpi_pci_attach(device_t dev);
 static int	acpi_pci_child_location_str_method(device_t cbdev,
@@ -183,25 +189,11 @@ acpi_pci_set_powerstate_method(device_t dev, device_t child, int state)
 {
 	ACPI_HANDLE h;
 	ACPI_STATUS status;
-	int acpi_state, old_state, error;
+	int old_state, error;
 
 	error = 0;
-	switch (state) {
-	case PCI_POWERSTATE_D0:
-		acpi_state = ACPI_STATE_D0;
-		break;
-	case PCI_POWERSTATE_D1:
-		acpi_state = ACPI_STATE_D1;
-		break;
-	case PCI_POWERSTATE_D2:
-		acpi_state = ACPI_STATE_D2;
-		break;
-	case PCI_POWERSTATE_D3:
-		acpi_state = ACPI_STATE_D3;
-		break;
-	default:
+	if (state < ACPI_STATE_D0 || state > ACPI_STATE_D3)
 		return (EINVAL);
-	}
 
 	/*
 	 * We set the state using PCI Power Management outside of setting
@@ -220,11 +212,11 @@ acpi_pci_set_powerstate_method(device_t dev, device_t child, int state)
 			goto out;
 	}
 	h = acpi_get_handle(child);
-	status = acpi_pwr_switch_consumer(h, acpi_state);
+	status = acpi_pwr_switch_consumer(h, state);
 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
 		device_printf(dev,
 		    "Failed to set ACPI power state D%d on %s: %s\n",
-		    acpi_state, acpi_name(h), AcpiFormatException(status));
+		    state, acpi_name(h), AcpiFormatException(status));
 	if (old_state > state)
 		error = pci_set_powerstate_method(dev, child, state);
 
@@ -280,8 +272,8 @@ acpi_pci_save_handle(ACPI_HANDLE handle, UINT32 level, void *context,
 
 	if (ACPI_FAILURE(acpi_GetInteger(handle, "_ADR", &address)))
 		return_ACPI_STATUS (AE_OK);
-	slot = address >> 16;
-	func = address & 0xffff;
+	slot = ACPI_ADR_PCI_SLOT(address);
+	func = ACPI_ADR_PCI_FUNC(address);
 	if (device_get_children((device_t)context, &devlist, &devcount) != 0)
 		return_ACPI_STATUS (AE_OK);
 	for (i = 0; i < devcount; i++) {

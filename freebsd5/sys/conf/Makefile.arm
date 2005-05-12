@@ -1,7 +1,7 @@
 # Makefile.arm -- with config changes.
 # Copyright 1990 W. Jolitz
 #	from: @(#)Makefile.i386	7.1 5/10/91
-# $FreeBSD: src/sys/conf/Makefile.arm,v 1.1 2004/05/14 11:49:40 cognet Exp $
+# $FreeBSD: src/sys/conf/Makefile.arm,v 1.1.2.1 2005/02/13 07:23:32 obrien Exp $
 #
 # Makefile for FreeBSD
 #
@@ -20,7 +20,7 @@
 %VERSREQ=	500013
 
 # Temporary stuff while we're still embryonic
-NO_MODULES?=	yes
+NO_MODULES=
 
 STD8X16FONT?=	iso
 

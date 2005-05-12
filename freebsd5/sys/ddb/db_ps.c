@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_ps.c,v 1.52.2.1 2004/09/09 10:03:18 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_ps.c,v 1.52.2.3 2005/02/05 01:02:27 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,8 +65,8 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
 	else
 		p = &proc0;
 
-	db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
-	db_printf("  pid   proc     uarea   uid  ppid  pgrp  flag   stat  wmesg    wchan  cmd\n");
+	db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
+	db_printf("  pid   proc     uid  ppid  pgrp  flag   stat  wmesg    wchan  cmd\n");
 	while (--np >= 0 && !quit) {
 		if (p == NULL) {
 			printf("oops, ran out of processes early!\n");
@@ -95,8 +95,8 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
 			state = "Unkn";
 			break;
 		}
-		db_printf("%5d %8p %8p %4d %5d %5d %07x %s",
-		    p->p_pid, (volatile void *)p, (void *)p->p_uarea, 
+		db_printf("%5d %8p %4d %5d %5d %07x %s",
+		    p->p_pid, (volatile void *)p,
 		    p->p_ucred != NULL ? p->p_ucred->cr_ruid : 0, pp->p_pid,
 		    p->p_pgrp != NULL ? p->p_pgrp->pg_id : 0, p->p_flag,
 		    state);

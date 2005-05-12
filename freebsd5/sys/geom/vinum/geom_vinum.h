@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/vinum/geom_vinum.h,v 1.2.2.1 2004/09/24 16:23:17 le Exp $
+ * $FreeBSD: src/sys/geom/vinum/geom_vinum.h,v 1.2.2.4 2004/12/08 20:41:44 le Exp $
  */
 
 #ifndef	_GEOM_VINUM_H_
@@ -38,6 +38,7 @@ void	gv_save_config(struct g_consumer *, struct gv_drive *,
 	    struct gv_softc *);
 
 /* geom_vinum_init.c */
+void	gv_parityop(struct g_geom *, struct gctl_req *);
 void	gv_start_obj(struct g_geom *, struct gctl_req *);
 
 /* geom_vinum_list.c */
@@ -52,6 +53,7 @@ void	gv_remove(struct g_geom *, struct gctl_req *);
 
 /* geom_vinum_state.c */
 int	gv_sdstatemap(struct gv_plex *);
+void	gv_setstate(struct g_geom *, struct gctl_req *);
 int	gv_set_drive_state(struct gv_drive *, int, int);
 int	gv_set_sd_state(struct gv_sd *, int, int);
 void	gv_update_sd_state(struct gv_sd *);
@@ -73,7 +75,6 @@ void	gv_kill_plex_thread(struct gv_plex *);
 void	gv_kill_vol_thread(struct gv_volume *);
 int	gv_object_type(struct gv_softc *, char *);
 void	gv_parse_config(struct gv_softc *, u_char *, int);
-const char	*gv_roughlength(off_t, int);
 int	gv_sd_to_drive(struct gv_softc *, struct gv_drive *, struct gv_sd *,
 	    char *, int);
 int	gv_sd_to_plex(struct gv_plex *, struct gv_sd *, int);

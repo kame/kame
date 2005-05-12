@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_trap.c,v 1.270.2.2 2004/09/03 06:40:25 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_trap.c,v 1.270.2.6 2005/03/01 09:30:18 obrien Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -95,9 +95,11 @@ userret(td, frame, oticks)
 #endif
 
 	/*
-	 * Let the scheduler adjust our priority etc.
+	 * If this thread tickled GEOM, we need to wait for the giggling to
+	 * stop before we return to userland
 	 */
-	sched_userret(td);
+	if (td->td_pflags & TDP_GEOM)
+		g_waitidle();
 
 	/*
 	 * We need to check to see if we have to exit or wait due to a
@@ -128,6 +130,11 @@ userret(td, frame, oticks)
 		mtx_unlock_spin(&sched_lock);
 		addupc_task(td, TRAPF_PC(frame), (u_int)ticks * psratio);
 	}
+
+	/*
+	 * Let the scheduler adjust our priority etc.
+	 */
+	sched_userret(td);
 }
 
 /*

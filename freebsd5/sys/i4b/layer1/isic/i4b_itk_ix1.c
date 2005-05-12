@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998, 1999 Martin Husemann <martin@rumolt.teuto.de>
  * All rights reserved.
  *
@@ -20,8 +20,9 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_itk_ix1.c - ITK ix1 micro passive card driver for isdn4bsd
  *	--------------------------------------------------------------
@@ -58,7 +59,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_itk_ix1.c,v 1.9 2004/03/17 17:50:50 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_itk_ix1.c,v 1.9.2.1 2005/01/31 23:26:10 imp Exp $");
 
 #include "opt_i4b.h"
 

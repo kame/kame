@@ -1,5 +1,5 @@
-/* sis.c -- sis driver -*- linux-c -*-
- *
+/* sis.c -- sis driver -*- linux-c -*- */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -23,7 +23,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/sis_drv.c,v 1.3 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/sis_drv.c,v 1.3.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/sis.h"

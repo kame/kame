@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 2004 M. Warner Losh
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/eisa/eisa_if.m,v 1.1 2004/06/09 16:56:22 imp Exp $
+# $FreeBSD: src/sys/dev/eisa/eisa_if.m,v 1.1.2.1 2005/01/30 00:59:38 imp Exp $
 #
 
 #include <sys/bus.h>

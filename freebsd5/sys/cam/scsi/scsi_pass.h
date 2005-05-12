@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1999 Kenneth D. Merry.
  * All rights reserved.
  *
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_pass.h,v 1.4 2001/03/27 05:45:11 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_pass.h,v 1.4.8.1 2005/01/30 00:59:17 imp Exp $
  */
 
 #ifndef _SCSI_PASS_H

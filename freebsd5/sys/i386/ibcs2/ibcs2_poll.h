@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Steven Wallace
  * All rights reserved.
  *
@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_poll.h,v 1.4 1999/08/28 00:43:59 peter Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_poll.h,v 1.4.26.1 2005/01/31 23:26:03 imp Exp $
  */
 
 

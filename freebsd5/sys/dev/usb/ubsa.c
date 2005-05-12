@@ -25,8 +25,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.14.2.1 2004/10/16 03:38:41 kan Exp $");
-/*
+__FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.14.2.2 2005/01/30 01:00:09 imp Exp $");
+/*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

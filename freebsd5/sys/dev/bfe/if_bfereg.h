@@ -1,5 +1,6 @@
-/* Copyright (c) 2003 Stuart Walsh */
-/*
+/*-
+ * Copyright (c) 2003 Stuart Walsh
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -21,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/dev/bfe/if_bfereg.h,v 1.3.2.1 2004/09/04 19:23:54 des Exp $ */
+/* $FreeBSD: src/sys/dev/bfe/if_bfereg.h,v 1.3.2.2 2005/01/30 00:59:30 imp Exp $ */
 
 #ifndef _BFE_H
 #define _BFE_H

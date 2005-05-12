@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999, 2000-2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_axereg.h,v 1.3 2004/05/23 12:35:24 iedowse Exp $
+ * $FreeBSD: src/sys/dev/usb/if_axereg.h,v 1.3.2.3 2005/04/01 12:46:25 sobomax Exp $
  */
 
 /*
@@ -93,13 +93,9 @@
 #define AXE_NOPHY				0xE0
 
 #define AXE_TIMEOUT		1000
-#define AXE_BUFSZ		1536
 #define AXE_MIN_FRAMELEN	60
 #define AXE_RX_FRAMES		1
 #define AXE_TX_FRAMES		1
-
-#define AXE_RX_LIST_CNT		1
-#define AXE_TX_LIST_CNT		1
 
 #define AXE_CTL_READ		0x01
 #define AXE_CTL_WRITE		0x02
@@ -121,26 +117,6 @@ struct axe_type {
 	u_int16_t		axe_did;
 };
 
-struct axe_softc;
-
-struct axe_chain {
-	struct axe_softc	*axe_sc;
-	usbd_xfer_handle	axe_xfer;
-	char			*axe_buf;
-	struct mbuf		*axe_mbuf;
-	int			axe_accum;
-	int			axe_idx;
-};
-
-struct axe_cdata {
-	struct axe_chain	axe_tx_chain[AXE_TX_LIST_CNT];
-	struct axe_chain	axe_rx_chain[AXE_RX_LIST_CNT];
-	int			axe_tx_prod;
-	int			axe_tx_cons;
-	int			axe_tx_cnt;
-	int			axe_rx_prod;
-};
-
 #define AXE_INC(x, y)		(x) = (x + 1) % y
 
 struct axe_softc {
@@ -160,9 +136,11 @@ struct axe_softc {
 	usbd_pipe_handle	axe_ep[AXE_ENDPT_MAX];
 	int			axe_unit;
 	int			axe_if_flags;
-	struct axe_cdata	axe_cdata;
+	struct ue_cdata		axe_cdata;
 	struct callout_handle	axe_stat_ch;
+#if __FreeBSD_version >= 500000
 	struct mtx		axe_mtx;
+#endif
 	char			axe_dying;
 	int			axe_link;
 	unsigned char		axe_ipgs[3];

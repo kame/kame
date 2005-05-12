@@ -1,4 +1,4 @@
-/*
+/*-
  * Data structures and definitions for CAM peripheral ("type") drivers.
  *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_periph.h,v 1.14 2004/07/15 08:25:59 phk Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.h,v 1.14.2.1 2005/01/30 00:59:16 imp Exp $
  */
 
 #ifndef _CAM_CAM_PERIPH_H

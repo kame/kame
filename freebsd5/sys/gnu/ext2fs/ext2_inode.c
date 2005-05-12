@@ -1,10 +1,10 @@
-/*
+/*-
  *  modified for Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  */
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.5 (Berkeley) 12/30/93
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.47 2004/04/07 20:46:03 imp Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.47.2.3 2005/03/01 11:32:31 phk Exp $
  */
 
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  * Copyright (c) 1994 John S. Dyson
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ia64/ia64/pmap.c,v 1.146 2004/08/09 20:44:41 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ia64/ia64/pmap.c,v 1.146.2.2 2005/01/31 23:26:13 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -776,8 +776,10 @@ pmap_enter_vhpt(struct ia64_lpte *pte, vm_offset_t va)
 	vhpte->pte_chain = ia64_tpa((vm_offset_t)pte);
 	ia64_mf();
 
-	if (!vhpte->pte_p && pte->pte_p)
+	if (!vhpte->pte_p && pte->pte_p) {
+		ia64_ptc_g(va, PAGE_SHIFT << 2);
 		pmap_install_pte(vhpte, pte);
+	}
 
 	mtx_unlock(&pmap_vhptmutex);
 }
@@ -794,8 +796,10 @@ pmap_update_vhpt(struct ia64_lpte *pte, vm_offset_t va)
 
 	mtx_lock(&pmap_vhptmutex);
 
-	if ((!vhpte->pte_p || vhpte->pte_tag == pte->pte_tag) && pte->pte_p)
+	if ((!vhpte->pte_p || vhpte->pte_tag == pte->pte_tag) && pte->pte_p) {
+		ia64_ptc_g(va, PAGE_SHIFT << 2);
 		pmap_install_pte(vhpte, pte);
+	}
 
 	mtx_unlock(&pmap_vhptmutex);
 }

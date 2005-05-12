@@ -23,10 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/locore.s,v 1.22 2002/10/25 19:10:55 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/locore.s,v 1.22.8.1 2005/01/30 00:59:09 imp Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *

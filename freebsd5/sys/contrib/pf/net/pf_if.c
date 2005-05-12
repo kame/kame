@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/contrib/pf/net/pf_if.c,v 1.5 2004/08/16 17:58:12 mlaier Exp $ */
+/*	$FreeBSD: src/sys/contrib/pf/net/pf_if.c,v 1.5.2.4 2005/02/25 06:48:58 yongari Exp $ */
 /*	$OpenBSD: pf_if.c,v 1.11 2004/03/15 11:38:23 cedric Exp $ */
 /* add	$OpenBSD: pf_if.c,v 1.19 2004/08/11 12:06:44 henning Exp $ */
 
@@ -157,12 +157,11 @@ pfi_initialize(void)
 #ifdef __FreeBSD__
 	PF_LOCK();
 	IFNET_RLOCK();
-	TAILQ_FOREACH(ifp, &ifnet, if_link)
-		if (ifp->if_dunit != IF_DUNIT_NONE) {
-			IFNET_RUNLOCK();
-			pfi_attach_ifnet(ifp);
-			IFNET_RLOCK();
-		}
+	TAILQ_FOREACH(ifp, &ifnet, if_link) {
+		IFNET_RUNLOCK();
+		pfi_attach_ifnet(ifp);
+		IFNET_RLOCK();
+	}
 	IFNET_RUNLOCK();
 	PF_UNLOCK();
 	pfi_dummy = pfi_if_create("notyet", pfi_self,
@@ -248,8 +247,7 @@ void
 pfi_attach_ifnet_event(void *arg __unused, struct ifnet *ifp)
 {
 	PF_LOCK();
-	if (ifp->if_dunit != IF_DUNIT_NONE)
-		pfi_attach_ifnet(ifp);
+	pfi_attach_ifnet(ifp);
 	PF_UNLOCK();
 }
 
@@ -341,8 +339,8 @@ pfi_attach_ifnet(struct ifnet *ifp)
 
 		/* add/modify interface */
 		if (p == NULL)
-			p = pfi_if_create(ifp->if_xname, q,
-			    realname?PFI_IFLAG_INSTANCE:PFI_IFLAG_PLACEHOLDER);
+			p = pfi_if_create(ifp->if_xname, q, PFI_IFLAG_INSTANCE |
+			    (realname?0:PFI_IFLAG_PLACEHOLDER));
 		else {
 			/* remove from the dummy group */
 			/* XXX: copy stats? We should not have any!!! */
@@ -354,10 +352,9 @@ pfi_attach_ifnet(struct ifnet *ifp)
 			q->pfik_addcnt++;
 			TAILQ_INSERT_TAIL(&q->pfik_grouphead, p,
 			    pfik_instances);
-			if (realname) {
+			if (realname)
 				p->pfik_flags &= ~PFI_IFLAG_PLACEHOLDER;
-				p->pfik_flags |= PFI_IFLAG_INSTANCE;
-			}
+			p->pfik_flags |= PFI_IFLAG_INSTANCE;
 		}
 		if (p == NULL)
 			panic("pfi_attach_ifnet: "
@@ -638,8 +635,16 @@ pfi_instance_add(struct ifnet *ifp, int net, int flags)
 		af = ia->ifa_addr->sa_family;
 		if (af != AF_INET && af != AF_INET6)
 			continue;
-#ifdef notyet
-		if (!(ia->ifa_flags & IFA_ROUTE))
+#ifdef __FreeBSD__
+		/*
+		 * XXX: For point-to-point interfaces, (ifname:0) and IPv4,
+		 *	jump over addresses without a proper route to work
+		 *	around a problem with ppp not fully removing the
+		 *	address used during IPCP.
+		 */
+		if ((ifp->if_flags & IFF_POINTOPOINT) &&
+		    !(ia->ifa_flags & IFA_ROUTE) &&
+		    (flags & PFI_AFLAG_NOALIAS) && (af == AF_INET))
 			continue;
 #endif
 		if ((flags & PFI_AFLAG_BROADCAST) && af == AF_INET6)
@@ -817,7 +822,14 @@ pfi_if_create(const char *name, struct pfi_kif *q, int flags)
 	p->pfik_flags = flags;
 	p->pfik_parent = q;
 #ifdef __FreeBSD__
-	p->pfik_tzero = time_second;
+	/*
+	 * It seems that the value of time_second is in unintialzied state when
+	 * pf sets interface statistics clear time in boot phase if pf was
+	 * statically linked to kernel. Instead of setting the bogus time value
+	 * have pfi_get_ifaces handle this case. In pfi_get_ifaces it uses
+	 * boottime.tv_sec if it sees the time is 0.
+	 */
+	p->pfik_tzero = time_second > 1 ? time_second : 0;
 #else
 	p->pfik_tzero = time.tv_sec;
 #endif
@@ -837,10 +849,13 @@ pfi_maybe_destroy(struct pfi_kif *p)
 	int		 i, j, k, s;
 	struct pfi_kif	*q = p->pfik_parent;
 
+#ifdef __FreeBSD__
+	if ((p->pfik_flags & (PFI_IFLAG_ATTACHED | PFI_IFLAG_GROUP)) ||
+	    ((p->pfik_rules > 0 || p->pfik_states > 0) &&
+	     (p->pfik_flags & PFI_IFLAG_PLACEHOLDER) == 0))
+#else
 	if ((p->pfik_flags & (PFI_IFLAG_ATTACHED | PFI_IFLAG_GROUP)) ||
 	    p->pfik_rules > 0 || p->pfik_states > 0)
-#ifdef __FreeBSD__
-		if (!(p->pfik_flags & PFI_IFLAG_PLACEHOLDER))
 #endif
 		return (0);
 
@@ -866,6 +881,7 @@ pfi_maybe_destroy(struct pfi_kif *p)
 	if (p->pfik_rules > 0 || p->pfik_states > 0) {
 		/* move back to the dummy group */
 		p->pfik_parent = pfi_dummy;
+		p->pfik_flags &= ~PFI_IFLAG_INSTANCE;
 		pfi_dummy->pfik_addcnt++;
 		TAILQ_INSERT_TAIL(&pfi_dummy->pfik_grouphead, p,
 		    pfik_instances);
@@ -904,11 +920,8 @@ pfi_dynamic_drivers(void)
  */
 
 	IFNET_RLOCK();
-	TAILQ_FOREACH(ifp, &ifnet, if_link) {
-		if (ifp->if_dunit == IF_DUNIT_NONE)
-			continue;
+	TAILQ_FOREACH(ifp, &ifnet, if_link)
 		pfi_newgroup(ifp->if_dname, PFI_IFLAG_DYNAMIC);
-	}
 	IFNET_RUNLOCK();
 #else
 	char		*buses[] = PFI_DYNAMIC_BUSES;

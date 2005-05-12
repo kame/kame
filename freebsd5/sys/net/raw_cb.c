@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_cb.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_cb.c,v 1.29.4.1 2004/10/21 09:30:46 rwatson Exp $
+ * $FreeBSD: src/sys/net/raw_cb.c,v 1.29.2.3 2005/01/31 23:26:23 imp Exp $
  */
 
 #include <sys/param.h>
@@ -102,7 +102,9 @@ raw_detach(rp)
 	SOCK_LOCK(so);
 	so->so_pcb = 0;
 	sotryfree(so);
+	mtx_lock(&rawcb_mtx);
 	LIST_REMOVE(rp, list);
+	mtx_unlock(&rawcb_mtx);
 #ifdef notdef
 	if (rp->rcb_laddr)
 		m_freem(dtom(rp->rcb_laddr));

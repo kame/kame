@@ -1,4 +1,4 @@
-/*
+/*-
  * Implementation of SCSI Direct Access Peripheral driver for CAM.
  *
  * Copyright (c) 1997 Justin T. Gibbs.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.171 2004/08/12 23:17:09 sanpei Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.171.2.1 2005/01/30 00:59:16 imp Exp $");
 
 #ifdef _KERNEL
 #include "opt_hw_wdog.h"

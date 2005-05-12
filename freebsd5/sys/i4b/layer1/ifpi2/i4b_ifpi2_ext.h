@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Gary Jennejohn. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,15 +21,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *      i4b_ifpi2 - Fritz!Card PCI Version 2 for split layers
  *      ------------------------------------------
  *
  *	$Id$
  *
- * $FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_ext.h,v 1.1 2001/12/22 09:22:02 gj Exp $
+ * $FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_ext.h,v 1.1.10.1 2005/01/31 23:26:09 imp Exp $
  *
  *
  *---------------------------------------------------------------------------*/

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *      i4b_l2fsm.h - layer 2 FSM
  *      -------------------------
  *
- * $FreeBSD: src/sys/i4b/layer2/i4b_l2fsm.h,v 1.8 2002/03/17 09:33:14 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer2/i4b_l2fsm.h,v 1.8.8.1 2005/01/31 23:26:12 imp Exp $
  *
  *      last edit-date: [Sat Mar  9 17:47:53 2002]
  *

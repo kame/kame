@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/iec13213.h,v 1.12 2004/05/22 16:14:17 dfr Exp $
+ * $FreeBSD: src/sys/dev/firewire/iec13213.h,v 1.12.2.1 2005/01/30 00:59:42 imp Exp $
  *
  */
 
@@ -217,12 +217,12 @@ uint16_t crom_crc(uint32_t *r, int);
 struct csrreg *crom_search_key(struct crom_context *, uint8_t);
 int crom_has_specver(uint32_t *, uint32_t, uint32_t);
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_BOOT)
 char *crom_desc(struct crom_context *, char *, int);
 #endif
 
 /* For CROM build */
-#if defined(_KERNEL) || defined(TEST)
+#if defined(_KERNEL) || defined(_BOOT) || defined(TEST)
 #define CROM_MAX_CHUNK_LEN 20
 struct crom_src {
 	struct csrhdr hdr;

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_global.h - i4b global include file
  *	--------------------------------------
  *
- * $FreeBSD: src/sys/i4b/include/i4b_global.h,v 1.12 2004/07/15 08:26:05 phk Exp $
+ * $FreeBSD: src/sys/i4b/include/i4b_global.h,v 1.12.2.1 2005/01/31 23:26:08 imp Exp $
  *
  *	last edit-date: [Sun Mar 17 09:55:26 2002]
  *

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_bitops.h,v 1.1 2003/08/25 01:39:47 marcel Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_bitops.h,v 1.1.4.1 2005/01/31 23:26:01 imp Exp $
  */
 
 #ifndef _SYS_GNU_EXT2FS_EXT2_BITOPS_H_

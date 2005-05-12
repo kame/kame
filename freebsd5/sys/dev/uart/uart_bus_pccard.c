@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  * Copyright (c) 2003 Norikatsu Shigemura, Takenori Watanabe All rights reserved.
  *
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_pccard.c,v 1.8 2004/05/27 03:49:44 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_pccard.c,v 1.8.2.1 2005/01/30 01:00:08 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

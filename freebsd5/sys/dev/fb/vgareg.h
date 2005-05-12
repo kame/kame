@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/vgareg.h,v 1.7 2004/06/16 09:46:43 phk Exp $
+ * $FreeBSD: src/sys/dev/fb/vgareg.h,v 1.7.2.1 2005/03/13 21:39:29 iedowse Exp $
  */
 
 #ifndef _DEV_FB_VGAREG_H_
@@ -69,6 +69,7 @@
 struct video_adapter;
 typedef struct vga_softc {
 	struct video_adapter	*adp;
+	void			*state_buf;
 #ifdef FB_INSTALL_CDEV
 	genfb_softc_t		gensc;
 #endif

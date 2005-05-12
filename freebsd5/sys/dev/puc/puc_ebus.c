@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/puc_ebus.c,v 1.3 2004/08/12 17:41:30 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc_ebus.c,v 1.3.2.1 2005/01/30 00:59:59 imp Exp $");
 
 #include "opt_puc.h"
 

@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Portions of this software have been derived from software contributed
  * to the FreeBSD Project by Mark Newton.
  *
@@ -66,7 +66,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_resource.c,v 1.16 2004/02/04 21:52:53 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_resource.c,v 1.16.2.1 2005/01/30 00:59:20 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_resource.c,v 1.16 2004/02/04 21:52:
 #include <sys/proc.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
+#include <sys/syscallsubr.h>
 
 #include <compat/svr4/svr4.h>
 #include <compat/svr4/svr4_types.h>

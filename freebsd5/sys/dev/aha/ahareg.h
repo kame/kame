@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic register and struct definitions for the Adaptech 1540, 1542,
  * 1640, 1642 SCSI host adapters. Product specific probe and attach
  * routines can be found in:
@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aha/ahareg.h,v 1.17 2003/11/13 04:14:53 imp Exp $
+ * $FreeBSD: src/sys/dev/aha/ahareg.h,v 1.17.4.2 2005/03/02 09:35:22 obrien Exp $
  */
 
 #ifndef _AHAREG_H_
@@ -390,11 +390,11 @@ struct aha_softc {
 	char			 model[32];
 	uint8_t			 boardid;
 	struct resource		*irq;
-	int			 irqrid;
 	struct resource		*port;
-	int			 portrid;
 	struct resource		*drq;
-	int			 drqrid;
+	int			irqrid;
+	int			portrid;
+	int			drqrid;
 	void			**ih;
 	device_t		 dev;
 };

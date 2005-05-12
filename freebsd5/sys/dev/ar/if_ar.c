@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 - 2001 John Hay.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar.c,v 1.65 2004/08/13 22:52:11 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar.c,v 1.65.2.1 2005/01/30 00:59:28 imp Exp $");
 
 /*
  * Programming assumptions and other issues.

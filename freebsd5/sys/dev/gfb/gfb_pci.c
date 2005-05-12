@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.13 2004/07/10 22:29:41 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.13.2.1 2005/01/30 00:59:43 imp Exp $");
 
 #include "opt_fb.h"
 

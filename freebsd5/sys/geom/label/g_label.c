@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2004 Pawel Jakub Dawidek <pjd@FreeBSD.org>
+ * Copyright (c) 2004-2005 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/label/g_label.c,v 1.7.2.3 2004/10/15 06:08:14 pjd Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/label/g_label.c,v 1.7.2.4 2005/03/01 14:22:30 pjd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -238,6 +238,20 @@ g_label_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 			    pp->name);
 			break;
 		}
+
+		/*
+		 * Backward compatibility:
+		 */
+		/*
+		 * There was no md_provsize field in earlier versions of
+		 * metadata.
+		 */
+		if (md.md_version < 2)
+			md.md_provsize = pp->mediasize;
+
+		if (md.md_provsize != pp->mediasize)
+			break;
+
 		g_label_create(NULL, mp, pp, md.md_label, G_LABEL_DIR,
 		    pp->mediasize - pp->sectorsize);
 	} while (0);

@@ -1,6 +1,6 @@
 /* drm_bufs.h -- Generic buffer template -*- linux-c -*-
- * Created: Thu Nov 23 03:10:50 2000 by gareth@valinux.com
- *
+ * Created: Thu Nov 23 03:10:50 2000 by gareth@valinux.com */
+/*-
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_bufs.h,v 1.10 2004/01/06 04:34:52 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_bufs.h,v 1.10.2.1 2005/01/30 00:59:35 imp Exp $
  */
 
 #include "dev/drm/drmP.h"

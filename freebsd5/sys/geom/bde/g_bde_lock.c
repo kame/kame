@@ -29,8 +29,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde_lock.c,v 1.12.4.1 2004/09/14 05:59:12 phk Exp $
- *
+ * $FreeBSD: src/sys/geom/bde/g_bde_lock.c,v 1.12.4.3 2005/01/31 23:26:01 imp Exp $
+ */
+
+/*
  * This souce file contains routines which operates on the lock sectors, both
  * for the kernel and the userland program gbde(1).
  *
@@ -367,7 +369,7 @@ g_bde_decrypt_lockx(struct g_bde_softc *sc, u_char *meta, off_t mediasize, u_int
 	if (error)
 		return (error);
 
-	/* If it points ito thin blue air, forget it */
+	/* If it points into thin blue air, forget it */
 	if (off + G_BDE_LOCKSIZE > (uint64_t)mediasize) {
 		off = 0;
 		return (EINVAL);

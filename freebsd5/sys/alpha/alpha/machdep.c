@@ -60,7 +60,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -88,7 +88,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.222.2.1 2004/09/09 10:03:17 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.222.2.7 2005/03/03 00:46:30 wes Exp $");
 
 #include "opt_compat.h"
 #include "opt_ddb.h"
@@ -97,59 +97,62 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.222.2.1 2004/09/09 10:03:1
 #include "opt_maxmem.h"
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/eventhandler.h>
-#include <sys/imgact.h>
-#include <sys/kdb.h>
-#include <sys/sysproto.h>
-#include <sys/ktr.h>
-#include <sys/signalvar.h>
-#include <sys/kernel.h>
 #include <sys/proc.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/pcpu.h>
-#include <sys/malloc.h>
-#include <sys/reboot.h>
+#include <sys/systm.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
 #include <sys/cons.h>
-#include <sys/mbuf.h>
-#include <sys/vmmeter.h>
-#include <sys/msgbuf.h>
+#include <sys/cpu.h>
+#include <sys/eventhandler.h>
 #include <sys/exec.h>
+#include <sys/imgact.h>
+#include <sys/kdb.h>
+#include <sys/kernel.h>
+#include <sys/ktr.h>
+#include <sys/linker.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/mbuf.h>
+#include <sys/msgbuf.h>
+#include <sys/mutex.h>
+#include <sys/pcpu.h>
+#include <sys/ptrace.h>
+#include <sys/reboot.h>
+#include <sys/signalvar.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
+#include <sys/sysproto.h>
+#include <sys/ucontext.h>
 #include <sys/uio.h>
-#include <sys/linker.h>
-#include <sys/cons.h>
+#include <sys/vmmeter.h>
+#include <sys/vnode.h>
+
 #include <net/netisr.h>
+
 #include <vm/vm.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
-#include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <sys/user.h>
-#include <sys/ptrace.h>
-#include <sys/ucontext.h>
-#include <machine/clock.h>
-#include <machine/md_var.h>
-#include <machine/fpu.h>
-#include <machine/pal.h>
-#include <machine/cpuconf.h>
-#include <machine/bootinfo.h>
-#include <machine/rpb.h>
-#include <machine/prom.h>
-#include <machine/chipset.h>
-#include <machine/vmparam.h>
-#include <machine/elf.h>
-#include <alpha/alpha/db_instruction.h>
-#include <sys/vnode.h>
-#include <machine/sigframe.h>
 
+#include <machine/bootinfo.h>
+#include <machine/chipset.h>
+#include <machine/clock.h>
+#include <machine/cpuconf.h>
+#include <machine/elf.h>
+#include <machine/fpu.h>
+#include <machine/md_var.h>
+#include <machine/pal.h>
+#include <machine/pcb.h>
+#include <machine/prom.h>
+#include <machine/rpb.h>
+#include <machine/sigframe.h>
+#include <machine/vmparam.h>
+
+#include <alpha/alpha/db_instruction.h>
 
 u_int64_t cycles_per_usec;
 u_int32_t cycles_per_sec;
@@ -160,7 +163,6 @@ struct bootinfo_kernel bootinfo;
 
 struct mtx icu_lock;
 
-struct	user *proc0uarea;
 vm_offset_t proc0kstack;
 
 char machine[] = "alpha";
@@ -192,6 +194,7 @@ SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL)
 struct msgbuf *msgbufp=0;
 
 long Maxmem = 0;
+long realmem = 0;
 
 long	totalphysmem;		/* total amount of physical memory in system */
 long	resvmem;		/* amount of memory reserved for PROM */
@@ -248,6 +251,7 @@ cpu_startup(dummy)
 #endif
 	printf("real memory  = %ld (%ld MB)\n", alpha_ptob(Maxmem),
 	    alpha_ptob(Maxmem) / 1048576);
+	realmem = alpha_ptob(Maxmem);
 
 	/*
 	 * Display any holes after the first chunk of extended memory.
@@ -339,7 +343,7 @@ identifycpu(void)
 		"EV3",			/* 1 */
 		"EV4 (21064)",		/* 2 */
 		"Simulation",		/* 3 */
-		"LCA Family",		/* 4 */
+		"LCA (21066/21068)",	/* 4 */
 		"EV5 (21164)",		/* 5 */
 		"EV45 (21064A)",	/* 6 */
 		"EV56 (21164A)",	/* 7 */
@@ -349,7 +353,8 @@ identifycpu(void)
 		"EV67 (21264A)",	/* 11 */
 		"EV68CB (21264C)"	/* 12 */
 		"EV68AL (21264B)",	/* 13 */
-		"EV68CX (21264D)"	/* 14 */
+		"EV68CX (21264D)",	/* 14 */
+		"EV7 (21364)"		/* 15 */
 	};
 
 	/*
@@ -848,11 +853,9 @@ alpha_init(pfn, ptb, bim, bip, biv)
 
 	proc_linkup(&proc0, &ksegrp0, &thread0);
 	/*
-	 * Init mapping for u page(s) for proc 0
+	 * Init mapping for kernel stack for proc 0
 	 */
-	proc0uarea = (struct user *)pmap_steal_memory(UAREA_PAGES * PAGE_SIZE);
 	proc0kstack = pmap_steal_memory(KSTACK_PAGES * PAGE_SIZE);
-	proc0.p_uarea = proc0uarea;
 	thread0.td_kstack = proc0kstack;
 	thread0.td_pcb = (struct pcb *)
 	    (thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
@@ -861,10 +864,10 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	 * Setup the per-CPU data for the bootstrap cpu.
 	 */
 	{
-		/* This is not a 'struct user' */
 		size_t sz = round_page(KSTACK_PAGES * PAGE_SIZE);
 		pcpup = (struct pcpu *) pmap_steal_memory(sz);
-		pcpu_init(pcpup, alpha_pal_whami(), sz);
+		pcpu_init(pcpup, 0, sz);
+		pcpup->pc_pal_id = alpha_pal_whami();
 		alpha_pal_wrval((u_int64_t) pcpup);
 		PCPU_GET(next_asn) = 1;	/* 0 used for proc0 pmap */
 		PCPU_SET(curthread, &thread0);
@@ -1718,6 +1721,14 @@ sigreturn(struct thread *td,
 void
 cpu_boot(int howto)
 {
+}
+
+/* Get current clock frequency for the given cpu id. */
+int
+cpu_est_clockrate(int cpu_id, uint64_t *rate)
+{
+
+	return (ENXIO);
 }
 
 /*

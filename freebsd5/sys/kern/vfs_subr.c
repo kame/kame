@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_subr.c,v 1.522.2.1 2004/08/30 08:09:06 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_subr.c,v 1.522.2.4.2.1 2005/05/06 02:51:09 cperciva Exp $");
 
 #include "opt_ddb.h"
 #include "opt_mac.h"
@@ -2601,17 +2601,13 @@ vop_revoke(ap)
  * Release the passed interlock if the vnode will be recycled.
  */
 int
-vrecycle(vp, inter_lkp, td)
-	struct vnode *vp;
-	struct mtx *inter_lkp;
-	struct thread *td;
+vrecycle(struct vnode *vp, void *dummyarg, struct thread *td)
 {
 
+	KASSERT(dummyarg == NULL,
+	    ("vrecycle with non-dummy arg %p", dummyarg));
 	VI_LOCK(vp);
 	if (vp->v_usecount == 0) {
-		if (inter_lkp) {
-			mtx_unlock(inter_lkp);
-		}
 		vgonel(vp, td);
 		return (1);
 	}
@@ -2899,6 +2895,7 @@ sysctl_vfs_conflist(SYSCTL_HANDLER_ARGS)
 
 	error = 0;
 	TAILQ_FOREACH(vfsp, &vfsconf, vfc_list) {
+		bzero(&xvfsp, sizeof(xvfsp));
 		vfsconf2x(vfsp, &xvfsp);
 		error = SYSCTL_OUT(req, &xvfsp, sizeof xvfsp);
 		if (error)
@@ -2943,6 +2940,7 @@ vfs_sysctl(SYSCTL_HANDLER_ARGS)
 				break;
 		if (vfsp == NULL)
 			return (EOPNOTSUPP);
+		bzero(&xvfsp, sizeof(xvfsp));
 		vfsconf2x(vfsp, &xvfsp);
 		return (SYSCTL_OUT(req, &xvfsp, sizeof(xvfsp)));
 	}
@@ -2962,6 +2960,7 @@ sysctl_ovfs_conf(SYSCTL_HANDLER_ARGS)
 	struct ovfsconf ovfs;
 
 	TAILQ_FOREACH(vfsp, &vfsconf, vfc_list) {
+		bzero(&ovfs, sizeof(ovfs));
 		ovfs.vfc_vfsops = vfsp->vfc_vfsops;	/* XXX used as flag */
 		strcpy(ovfs.vfc_name, vfsp->vfc_name);
 		ovfs.vfc_index = vfsp->vfc_typenum;

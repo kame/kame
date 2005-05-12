@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ufm.c,v 1.22 2004/08/15 23:39:18 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ufm.c,v 1.22.2.1 2005/01/30 01:00:10 imp Exp $");
 
 
 #include <sys/param.h>

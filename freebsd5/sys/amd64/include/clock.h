@@ -1,9 +1,9 @@
-/*
+/*-
  * Kernel interface to machine-dependent clock driver.
  * Garrett Wollman, September 1994.
  * This file is in the public domain.
  *
- * $FreeBSD: src/sys/amd64/include/clock.h,v 1.49 2003/11/17 08:58:14 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/clock.h,v 1.49.4.1 2005/01/30 00:59:13 imp Exp $
  */
 
 #ifndef _MACHINE_CLOCK_H_

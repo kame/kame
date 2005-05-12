@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002-2004 M. Warner Losh.
  * Copyright (c) 2000-2001 Jonathan Chen.
  * All rights reserved.
@@ -7,27 +7,26 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions, and the following disclaimer,
- *    without modification, immediately at the beginning of the file.
+ *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
  */
 
-/*
+/*-
  * Copyright (c) 1998, 1999 and 2000
  *      HAYAKAWA Koichi.  All rights reserved.
  *
@@ -76,7 +75,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pccbb/pccbb.c,v 1.117 2004/08/12 06:50:29 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pccbb/pccbb.c,v 1.117.2.2 2005/02/03 00:32:01 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -540,9 +539,7 @@ cbb_insert(struct cbb_softc *sc)
 	} else if (sockstate & CBB_STATE_CB_CARD) {
 		if (sc->cbdev != NULL) {
 			sc->flags &= ~CBB_16BIT_CARD;
-			if (CARD_ATTACH_CARD(sc->cbdev) != 0)
-				device_printf(sc->dev,
-				    "CardBus card activation failed\n");
+			CARD_ATTACH_CARD(sc->cbdev);
 		} else {
 			device_printf(sc->dev,
 			    "CardBus card inserted, but no cardbus bus.\n");

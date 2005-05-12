@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)null_subr.c	8.7 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/nullfs/null_subr.c,v 1.43 2004/07/10 21:20:11 marcel Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null_subr.c,v 1.43.2.1 2005/01/31 23:25:57 imp Exp $
  */
 
 #include <sys/param.h>

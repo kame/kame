@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Lukas Ertl
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/vinum/geom_vinum_raid5.h,v 1.2.2.2 2004/10/07 17:51:06 le Exp $
+ * $FreeBSD: src/sys/geom/vinum/geom_vinum_raid5.h,v 1.2.2.4 2005/01/31 23:26:01 imp Exp $
  */
 
 #ifndef _GEOM_VINUM_RAID5_H_
@@ -66,6 +66,8 @@ struct gv_raid5_packet {
 
 int	gv_stripe_active(struct gv_plex *, struct bio *);
 int	gv_build_raid5_req(struct gv_plex *, struct gv_raid5_packet *,
+	    struct bio *, caddr_t, off_t, off_t);
+int	gv_check_raid5(struct gv_plex *, struct gv_raid5_packet *,
 	    struct bio *, caddr_t, off_t, off_t);
 int	gv_rebuild_raid5(struct gv_plex *, struct gv_raid5_packet *,
 	    struct bio *, caddr_t, off_t, off_t);

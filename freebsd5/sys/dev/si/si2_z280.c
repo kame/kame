@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1998 Specialix International.
  *
  * Download code for SI/XIO/SX host cards.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/si/si2_z280.c,v 1.5 2003/08/24 18:03:43 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/si/si2_z280.c,v 1.5.4.1 2005/01/30 01:00:01 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>

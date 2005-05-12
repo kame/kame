@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom.h,v 1.84.2.1 2004/08/31 06:14:03 phk Exp $
+ * $FreeBSD: src/sys/geom/geom.h,v 1.84.2.5 2005/02/28 19:32:23 phk Exp $
  */
 
 #ifndef _GEOM_GEOM_H_
@@ -65,7 +65,7 @@ typedef int g_ctl_config_geom_t (struct gctl_req *, struct g_geom *gp, const cha
 typedef void g_init_t (struct g_class *mp);
 typedef void g_fini_t (struct g_class *mp);
 typedef struct g_geom * g_taste_t (struct g_class *, struct g_provider *, int flags);
-typedef int g_ioctl_t(struct g_provider *pp, u_long cmd, void *data, struct thread *td);
+typedef int g_ioctl_t(struct g_provider *pp, u_long cmd, void *data, int fflag, struct thread *td);
 #define G_TF_NORMAL		0
 #define G_TF_INSIST		1
 #define G_TF_TRANSPARENT	2
@@ -111,7 +111,8 @@ struct g_class {
 };
 
 #define G_VERSION_00	0x19950323
-#define G_VERSION	G_VERSION_00
+#define G_VERSION_01	0x20041207	/* add fflag to g_ioctl_t */
+#define G_VERSION	G_VERSION_01
 
 /*
  * The g_geom is an instance of a g_class.
@@ -213,7 +214,6 @@ int g_post_event(g_event_t *func, void *arg, int flag, ...);
 int g_waitfor_event(g_event_t *func, void *arg, int flag, ...);
 void g_cancel_event(void *ref);
 void g_orphan_provider(struct g_provider *pp, int error);
-void g_waitidle(void);
 
 /* geom_subr.c */
 int g_access(struct g_consumer *cp, int nread, int nwrite, int nexcl);
@@ -307,6 +307,8 @@ extern struct sx topology_lock;
 		mtx_assert(&Giant, MA_NOTOWNED);		\
 		sx_xlock(&topology_lock);			\
 	} while (0)
+
+#define g_topology_try_lock()	sx_try_xlock(&topology_lock)
 
 #define g_topology_unlock()					\
 	do {							\

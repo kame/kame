@@ -1,10 +1,10 @@
 /*	$NecBSD: ct_isa.c,v 1.6 1999/07/26 06:32:01 honda Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.11 2004/03/17 17:50:30 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.11.2.1 2005/01/30 00:59:33 imp Exp $");
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1995, 1996, 1997, 1998
  *	NetBSD/pc98 porting staff. All rights reserved.

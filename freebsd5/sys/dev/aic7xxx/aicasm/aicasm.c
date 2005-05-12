@@ -1,4 +1,4 @@
-/*
+/*-
  * Aic7xxx SCSI host adapter firmware asssembler
  *
  * Copyright (c) 1997, 1998, 2000, 2001 Justin T. Gibbs.
@@ -39,7 +39,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm.c#23 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm.c,v 1.37 2004/03/12 21:45:25 trhodes Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm.c,v 1.37.2.1 2005/01/30 00:59:26 imp Exp $
  */
 #include <sys/types.h>
 #include <sys/mman.h>

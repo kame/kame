@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.214 2004/08/16 12:25:47 obrien Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.214.2.1.2.1 2005/05/01 05:38:13 dwhite Exp $
 # Options specific to the i386 platform kernels
 
 AUTO_EOI_1		opt_auto_eoi.h
@@ -162,6 +162,10 @@ IPR_LOG			opt_i4b.h
 # Device options
 DEV_APIC		opt_apic.h
 DEV_NPX			opt_npx.h
+ASR_COMPAT		opt_asr.h
+
+# Debugging
+KDB_STOP_NMI		opt_global.h
 
 # agp options
 AGP_AMD64_GART		opt_agp.h

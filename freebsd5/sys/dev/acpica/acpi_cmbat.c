@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/acpica/acpi_cmbat.c,v 1.36 2004/08/17 18:36:07 njl Exp $
+ * $FreeBSD: src/sys/dev/acpica/acpi_cmbat.c,v 1.36.2.3 2004/12/27 05:45:38 njl Exp $
  */
 
 #include "opt_acpi.h"
@@ -66,6 +66,7 @@ struct acpi_cmbat_softc {
     struct timespec bif_lastupdated;
     struct timespec bst_lastupdated;
 
+    int		    flags;
     int		    present;
     int		    cap;
     int		    min;
@@ -188,6 +189,15 @@ acpi_cmbat_get_bst(void *context)
     if (acpi_PkgInt32(res, 3, &sc->bst.volt) != 0)
 	goto end;
     acpi_cmbat_info_updated(&sc->bst_lastupdated);
+
+    /* XXX If all batteries are critical, perhaps we should suspend. */
+    if (sc->bst.state & ACPI_BATT_STAT_CRITICAL) {
+    	if ((sc->flags & ACPI_BATT_STAT_CRITICAL) == 0) {
+	    sc->flags |= ACPI_BATT_STAT_CRITICAL;
+	    device_printf(dev, "critically low charge!\n");
+	}
+    } else
+	sc->flags &= ~ACPI_BATT_STAT_CRITICAL;
 
 end:
     if (bst_buffer.Pointer != NULL)
@@ -583,7 +593,7 @@ acpi_cmbat_init_battery(void *arg)
     ACPI_VPRINT(dev, acpi_device_get_parent_softc(dev),
 		"battery initialization start\n");
 
-    for (retry = 0; retry < ACPI_CMBAT_RETRY_MAX; retry++, AcpiOsSleep(10, 0)) {
+    for (retry = 0; retry < ACPI_CMBAT_RETRY_MAX; retry++, AcpiOsSleep(10000)) {
 	sc->present = acpi_BatteryIsPresent(dev);
 	if (!sc->present)
 	    continue;

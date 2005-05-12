@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Herb Peyerl (hpeyerl@novatel.ca) All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -19,7 +19,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/vx/if_vxvar.h,v 1.2 2003/10/31 18:32:06 brooks Exp $
+ * $FreeBSD: src/sys/dev/vx/if_vxvar.h,v 1.2.4.1 2005/01/30 01:00:12 imp Exp $
  *
  October 2, 1994
 

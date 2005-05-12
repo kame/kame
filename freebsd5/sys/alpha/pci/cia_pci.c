@@ -60,7 +60,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -88,7 +88,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/cia_pci.c,v 1.17 2003/08/22 07:20:27 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/cia_pci.c,v 1.17.4.1 2005/01/30 00:59:12 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

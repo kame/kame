@@ -1,11 +1,11 @@
 /*	$NetBSD: pcmcia_cis_quirks.c,v 1.6 2000/04/12 21:07:55 scw Exp $ */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pccard/pccard_cis_quirks.c,v 1.13 2004/05/27 15:21:51 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pccard/pccard_cis_quirks.c,v 1.13.2.1 2005/01/30 00:59:57 imp Exp $");
 
 #define	PCCARDDEBUG
 
-/*
+/*-
  * Copyright (c) 1998 Marc Horowitz.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

@@ -5,7 +5,7 @@
  *
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.13.2.1 2000/07/08 02:15:35 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.h,v 1.15 2004/06/21 22:46:36 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.h,v 1.15.2.1 2005/03/13 18:08:56 rwatson Exp $
  */
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
@@ -90,7 +90,7 @@ typedef struct ipstate {
 	} is_ps;
 	u_32_t	is_group;
 	char	is_ifname[4][IFNAMSIZ];
-#if SOLARIS || defined(__sgi)
+#if SOLARIS || defined(__sgi) || (__FreeBSD_version >= 500043)
 	kmutex_t	is_lock;
 #endif
 } ipstate_t;

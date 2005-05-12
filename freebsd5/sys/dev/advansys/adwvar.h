@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic driver definitions and exported functions for the Advanced
  * Systems Inc. Second Generation SCSI controllers
  * 
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  * All rights reserved.
  *
- * $FreeBSD: src/sys/dev/advansys/adwvar.h,v 1.4 2000/06/10 11:06:16 peter Exp $
+ * $FreeBSD: src/sys/dev/advansys/adwvar.h,v 1.4.8.1 2005/01/30 00:59:23 imp Exp $
  */
 
 #ifndef _ADWVAR_H_

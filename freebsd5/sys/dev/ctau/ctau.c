@@ -1,4 +1,4 @@
-/*
+/*-
  * Low-level subroutines for Cronyx-Tau adapter.
  *
  * Copyright (C) 1994-2001 Cronyx Engineering.
@@ -17,7 +17,7 @@
  * Cronyx Id: ctau.c,v 1.1.2.4 2003/12/11 17:33:43 rik Exp $
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ctau/ctau.c,v 1.2 2004/03/04 14:16:12 bms Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ctau/ctau.c,v 1.2.4.1 2005/01/30 00:59:33 imp Exp $");
 
 #include <dev/cx/machdep.h>
 #include <dev/ctau/ctddk.h>

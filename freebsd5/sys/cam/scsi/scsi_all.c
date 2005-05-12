@@ -1,4 +1,4 @@
-/*
+/*-
  * Implementation of Utility functions for all SCSI device types.
  *
  * Copyright (c) 1997, 1998, 1999 Justin T. Gibbs.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.45 2004/08/13 18:45:04 mjacob Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.45.2.2 2005/03/12 10:05:39 delphij Exp $");
 
 #include <sys/param.h>
 
@@ -1971,7 +1971,7 @@ scsi_sense_sbuf(struct cam_device *device, struct ccb_scsiio *csio,
 			 * errors on finicky architectures.  We don't
 			 * ensure that the sense data is pointer aligned.
 			 */
-			bcopy(&csio->sense_data, sense, 
+			bcopy(&csio->sense_data, &sense, 
 			      sizeof(struct scsi_sense_data *));
 		}
 	} else {

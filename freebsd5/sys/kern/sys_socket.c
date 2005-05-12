@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sys_socket.c,v 1.63 2004/07/22 20:40:23 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sys_socket.c,v 1.63.2.3 2005/04/01 15:02:12 rwatson Exp $");
 
 #include "opt_mac.h"
 
@@ -39,8 +39,11 @@ __FBSDID("$FreeBSD: src/sys/kern/sys_socket.c,v 1.63 2004/07/22 20:40:23 rwatson
 #include <sys/file.h>
 #include <sys/filedesc.h>
 #include <sys/mac.h>
+#include <sys/proc.h>
 #include <sys/protosw.h>
 #include <sys/sigio.h>
+#include <sys/signal.h>
+#include <sys/signalvar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/filio.h>			/* XXX */
@@ -114,6 +117,11 @@ soo_write(fp, uio, active_cred, flags, td)
 #endif
 	error = so->so_proto->pr_usrreqs->pru_sosend(so, 0, uio, 0, 0, 0,
 						    uio->uio_td);
+	if (error == EPIPE && (so->so_options & SO_NOSIGPIPE) == 0) {
+		PROC_LOCK(uio->uio_td->td_proc);
+		psignal(uio->uio_td->td_proc, SIGPIPE);
+		PROC_UNLOCK(uio->uio_td->td_proc);
+	}
 	NET_UNLOCK_GIANT();
 	return (error);
 }
@@ -126,8 +134,10 @@ soo_ioctl(fp, cmd, data, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	register struct socket *so = fp->f_data;
+	struct socket *so = fp->f_data;
+	int error = 0;
 
+	NET_LOCK_GIANT();
 	switch (cmd) {
 
 	case FIONBIO:
@@ -137,7 +147,7 @@ soo_ioctl(fp, cmd, data, active_cred, td)
 		else
 			so->so_state &= ~SS_NBIO;
 		SOCK_UNLOCK(so);
-		return (0);
+		break;
 
 	case FIOASYNC:
 		/*
@@ -167,42 +177,50 @@ soo_ioctl(fp, cmd, data, active_cred, td)
 			so->so_snd.sb_flags &= ~SB_ASYNC;
 			SOCKBUF_UNLOCK(&so->so_snd);
 		}
-		return (0);
+		break;
 
 	case FIONREAD:
 		/* Unlocked read. */
 		*(int *)data = so->so_rcv.sb_cc;
-		return (0);
+		break;
 
 	case FIOSETOWN:
-		return (fsetown(*(int *)data, &so->so_sigio));
+		error = fsetown(*(int *)data, &so->so_sigio);
+		break;
 
 	case FIOGETOWN:
 		*(int *)data = fgetown(&so->so_sigio);
-		return (0);
+		break;
 
 	case SIOCSPGRP:
-		return (fsetown(-(*(int *)data), &so->so_sigio));
+		error = fsetown(-(*(int *)data), &so->so_sigio);
+		break;
 
 	case SIOCGPGRP:
 		*(int *)data = -fgetown(&so->so_sigio);
-		return (0);
+		break;
 
 	case SIOCATMARK:
 		/* Unlocked read. */
 		*(int *)data = (so->so_rcv.sb_state & SBS_RCVATMARK) != 0;
-		return (0);
+		break;
+	default:
+		/*
+		 * Interface/routing/protocol specific ioctls:
+		 * interface and routing ioctls should have a
+		 * different entry since a socket's unnecessary
+		 */
+		if (IOCGROUP(cmd) == 'i')
+			error = ifioctl(so, cmd, data, td);
+		else if (IOCGROUP(cmd) == 'r')
+			error = rtioctl(cmd, data);
+		else
+			error = ((*so->so_proto->pr_usrreqs->pru_control)
+			    (so, cmd, data, 0, td));
+		break;
 	}
-	/*
-	 * Interface/routing/protocol specific ioctls:
-	 * interface and routing ioctls should have a
-	 * different entry since a socket's unnecessary
-	 */
-	if (IOCGROUP(cmd) == 'i')
-		return (ifioctl(so, cmd, data, td));
-	if (IOCGROUP(cmd) == 'r')
-		return (rtioctl(cmd, data));
-	return ((*so->so_proto->pr_usrreqs->pru_control)(so, cmd, data, 0, td));
+	NET_UNLOCK_GIANT();
+	return(error);
 }
 
 int
@@ -213,8 +231,14 @@ soo_poll(fp, events, active_cred, td)
 	struct thread *td;
 {
 	struct socket *so = fp->f_data;
-	return so->so_proto->pr_usrreqs->pru_sopoll(so, events,
-	    fp->f_cred, td);
+	int error;
+
+	NET_LOCK_GIANT();
+	error = (so->so_proto->pr_usrreqs->pru_sopoll)
+	    (so, events, fp->f_cred, td);
+	NET_UNLOCK_GIANT();
+
+	return (error);
 }
 
 int

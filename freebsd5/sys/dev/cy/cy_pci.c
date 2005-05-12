@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996, David Greenman
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/cy/cy_pci.c,v 1.35 2004/05/30 20:08:29 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/cy/cy_pci.c,v 1.35.2.1 2005/01/30 00:59:34 imp Exp $");
 
 #include "opt_cy_pci_fastintr.h"
 

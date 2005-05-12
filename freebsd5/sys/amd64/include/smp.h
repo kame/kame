@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/amd64/include/smp.h,v 1.80 2004/05/16 22:11:50 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/smp.h,v 1.80.2.2.2.1 2005/05/01 05:38:12 dwhite Exp $
  *
  */
 
@@ -40,9 +40,7 @@ inthand_t
 	IDTVEC(invltlb),	/* TLB shootdowns - global */
 	IDTVEC(invlpg),		/* TLB shootdowns - 1 page */
 	IDTVEC(invlrng),	/* TLB shootdowns - page range */
-	IDTVEC(hardclock),	/* Forward hardclock() */
-	IDTVEC(statclock),	/* Forward statclock() */
-	IDTVEC(cpuast),		/* Additional software trap on other cpu */ 
+	IDTVEC(ipi_intr_bitmap_handler), /* Bitmap based IPIs */ 
 	IDTVEC(cpustop),	/* CPU stops & waits to be restarted */
 	IDTVEC(rendezvous);	/* handle CPU rendezvous */
 
@@ -54,9 +52,8 @@ void	ipi_all(u_int ipi);
 void	ipi_all_but_self(u_int ipi);
 void	ipi_self(u_int ipi);
 void	forward_statclock(void);
-void	forwarded_statclock(struct clockframe frame);
 void	forward_hardclock(void);
-void	forwarded_hardclock(struct clockframe frame);
+void 	ipi_bitmap_handler(struct clockframe frame);
 u_int	mp_bootaddress(u_int);
 int	mp_grab_cpu_hlt(void);
 void	mp_topology(void);
@@ -67,6 +64,11 @@ void	smp_masked_invlpg_range(u_int mask, vm_offset_t startva,
 	    vm_offset_t endva);
 void	smp_invltlb(void);
 void	smp_masked_invltlb(u_int mask);
+
+#ifdef KDB_STOP_NMI
+int ipi_nmi_handler(void);
+void ipi_nmi_selected(u_int32_t cpus);
+#endif
 
 #endif /* !LOCORE */
 #endif /* SMP */

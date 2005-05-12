@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Lukas Ertl
  * Copyright (c) 1997, 1998, 1999
  *      Nan Yang Computer Services Limited.  All rights reserved.
@@ -35,7 +35,7 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *  
- * $FreeBSD: src/sys/geom/vinum/geom_vinum_var.h,v 1.1.2.2 2004/10/07 17:51:06 le Exp $
+ * $FreeBSD: src/sys/geom/vinum/geom_vinum_var.h,v 1.1.2.6 2005/02/28 20:09:39 le Exp $
  */
 
 #ifndef	_GEOM_VINUM_VAR_H_
@@ -114,6 +114,9 @@
 #define	GV_BIO_SYNCREQ	0x08
 #define	GV_BIO_SUCCEED	0x10
 #define	GV_BIO_REBUILD	0x20
+#define	GV_BIO_CHECK	0x40
+#define	GV_BIO_PARITY	0x80
+#define	GV_BIO_RETRY	0x100
 
 /*
  * hostname is 256 bytes long, but we don't need to shlep multiple copies in
@@ -274,6 +277,7 @@ struct gv_plex {
 
 	struct mtx		bqueue_mtx; /* Lock for the BIO queue. */
 	TAILQ_HEAD(,gv_bioq)	bqueue;	/* BIO queue. */
+	TAILQ_HEAD(,gv_bioq)	wqueue;	/* Waiting BIO queue. */
 	TAILQ_HEAD(,gv_raid5_packet)	packets; /* RAID5 sub-requests. */
 
 	LIST_HEAD(,gv_sd)   subdisks;	/* List of attached subdisks. */

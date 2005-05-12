@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2001 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_ipac.h - definitions for the Siemens IPAC PSB2115 chip
  *	==========================================================
  *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_ipac.h,v 1.2 2001/01/24 08:41:52 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/isic/i4b_ipac.h,v 1.2.10.1 2005/01/31 23:26:10 imp Exp $
  *
  *      last edit-date: [Wed Jan 24 09:10:09 2001]
  *

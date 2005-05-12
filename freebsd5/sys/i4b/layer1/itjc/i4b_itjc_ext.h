@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Sergio Prallon. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *      i4b_itjc - NetJet PCI for split layers
  *      ------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/itjc/i4b_itjc_ext.h,v 1.1 2001/01/11 14:35:45 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/itjc/i4b_itjc_ext.h,v 1.1.10.1 2005/01/31 23:26:11 imp Exp $
  *
  *      last edit-date: [Wed Jan 10 17:15:31 2001]
  *

@@ -1,5 +1,5 @@
 /*	$OpenBSD: p4tcc.c,v 1.1 2003/12/20 18:23:18 tedu Exp $ */
-/*
+/*-
  * Copyright (c) 2003 Ted Unangst
  * Copyright (c) 2004 Maxim Sobolev <sobomax@FreeBSD.org>
  * All rights reserved.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/p4tcc.c,v 1.3 2004/02/29 18:30:35 maxim Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/p4tcc.c,v 1.3.4.1 2005/01/31 23:26:03 imp Exp $");
 
 #include "opt_cpu.h"
 #include <sys/param.h>

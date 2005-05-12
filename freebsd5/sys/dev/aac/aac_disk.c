@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.41 2004/08/12 05:05:06 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.41.2.1 2004/12/10 16:37:13 scottl Exp $");
 
 #include "opt_aac.h"
 
@@ -50,7 +50,7 @@ __FBSDID("$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.41 2004/08/12 05:05:06 scottl
 #include <sys/rman.h>
 
 #include <dev/aac/aacreg.h>
-#include <dev/aac/aac_ioctl.h>
+#include <sys/aac_ioctl.h>
 #include <dev/aac/aacvar.h>
 
 /*

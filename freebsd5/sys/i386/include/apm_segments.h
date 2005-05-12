@@ -1,4 +1,4 @@
-/*
+/*-
  * LP (Laptop Package)
  *
  * Copyright (C) 1994 by HOSOKAWA Tatsumi <hosokawa@mt.cs.keio.ac.jp>
@@ -12,7 +12,7 @@
  *
  * Sep., 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- * $FreeBSD: src/sys/i386/include/apm_segments.h,v 1.8 1999/08/28 00:44:05 peter Exp $
+ * $FreeBSD: src/sys/i386/include/apm_segments.h,v 1.8.26.1 2005/01/31 23:26:04 imp Exp $
  */
 
 #ifndef _MACHINE_APM_SEGMENTS_H

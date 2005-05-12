@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/pci/pci_eb164_intr.s,v 1.4 2000/12/04 17:21:46 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/pci/pci_eb164_intr.s,v 1.4.8.1 2005/01/30 00:59:12 imp Exp $ */
 /* $NetBSD: pci_eb164_intr.s,v 1.5 1997/09/02 13:19:42 thorpej Exp $ */
 
-/*
+/*-
  * Copyright (c) 1996 Carnegie-Mellon University.
  * All rights reserved.
  *

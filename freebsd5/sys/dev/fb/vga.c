@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.31 2004/06/16 09:46:43 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.31.2.2 2005/02/14 09:34:40 obrien Exp $");
 
 #include "opt_vga.h"
 #include "opt_fb.h"
@@ -48,7 +48,7 @@ __FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.31 2004/06/16 09:46:43 phk Exp $");
 #include <vm/pmap.h>
 
 #include <machine/md_var.h>
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 #include <machine/pc/bios.h>
 #endif
 #include <machine/bus.h>
@@ -64,11 +64,7 @@ __FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.31 2004/06/16 09:46:43 phk Exp $");
 
 /* XXX machine/pc/bios.h has got too much i386-specific stuff in it */
 #ifndef BIOS_PADDRTOVADDR
-#if !defined(__amd64__)
 #define	BIOS_PADDRTOVADDR(x)	(x)
-#else
-#define BIOS_PADDRTOVADDR(x)	((x) + KERNBASE)
-#endif
 #endif
 
 int
@@ -471,7 +467,6 @@ static int comp_adpregs(u_char *buf1, u_char *buf2);
 static int probe_adapters(void);
 static int set_line_length(video_adapter_t *adp, int pixel);
 static int set_display_start(video_adapter_t *adp, int x, int y);
-static void filll_io(int val, vm_offset_t d, size_t size);
 
 #ifndef VGA_NO_MODE_CHANGE
 #ifdef VGA_WIDTH90
@@ -486,6 +481,7 @@ static void set_normal_mode(video_adapter_t *adp, u_char *buf);
 #endif
 
 #ifndef VGA_NO_MODE_CHANGE
+static void filll_io(int val, vm_offset_t d, size_t size);
 static void planar_fill(video_adapter_t *adp, int val);
 static void packed_fill(video_adapter_t *adp, int val);
 static void direct_fill(video_adapter_t *adp, int val);
@@ -1330,6 +1326,7 @@ set_display_start(video_adapter_t *adp, int x, int y)
     return 0;
 }
 
+#ifndef VGA_NO_MODE_CHANGE
 #if defined(__i386__) || defined(__amd64__)	/* XXX */
 static void
 fill(int val, void *d, size_t size)
@@ -1349,6 +1346,7 @@ filll_io(int val, vm_offset_t d, size_t size)
 	d += sizeof(u_int32_t);
     }
 }
+#endif /* !VGA_NO_MODE_CHANGE */
 
 /* entry points */
 

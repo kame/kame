@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright (c) 1991,1990,1989,1994,1995,1996 Carnegie Mellon University
  * All Rights Reserved.
  * 
@@ -22,7 +22,7 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *	From: NetBSD: asm.h,v 1.18 1997/11/03 04:22:06 ross Exp
- * $FreeBSD: src/sys/alpha/include/asm.h,v 1.15 2003/01/18 23:43:12 obrien Exp $
+ * $FreeBSD: src/sys/alpha/include/asm.h,v 1.15.6.1 2005/01/30 00:59:10 imp Exp $
  */
 
 #ifndef _MACHINE_ASM_H_

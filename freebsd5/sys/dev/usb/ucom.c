@@ -1,7 +1,7 @@
 /*	$NetBSD: ucom.c,v 1.40 2001/11/13 06:24:54 lukem Exp $	*/
 
 /*-
- * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
+ * Copyright (c) 2001-2003, 2005 Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,9 +27,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.51 2004/07/15 20:47:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.51.2.2.2.1 2005/04/14 20:20:51 iedowse Exp $");
 
-/*
+/*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -381,6 +381,7 @@ ucomopen(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 		    (minor(dev) & UCOM_CALLOUT_MASK))
 			ttyld_modem(tp, 1);
 
+		sc->sc_state |= UCS_RXSTOP;
 		ucomstartread(sc);
 	}
 
@@ -929,9 +930,10 @@ ucomstop(struct tty *tp, int flag)
 
 	DPRINTF(("ucomstop: %d\n", flag));
 
-	if (flag & FREAD) {
+	if ((flag & FREAD) && (sc->sc_state & UCS_RXSTOP) == 0) {
 		DPRINTF(("ucomstop: read\n"));
 		ucomstopread(sc);
+		ucomstartread(sc);
 	}
 
 	if (flag & FWRITE) {
@@ -944,6 +946,8 @@ ucomstop(struct tty *tp, int flag)
 		}
 		splx(s);
 	}
+
+	ucomstart(tp);
 
 	DPRINTF(("ucomstop: done\n"));
 }
@@ -1006,10 +1010,9 @@ ucomstartread(struct ucom_softc *sc)
 
 	DPRINTF(("ucomstartread: start\n"));
 
-	sc->sc_state &= ~UCS_RXSTOP;
-
-	if (sc->sc_bulkin_pipe == NULL)
+	if (sc->sc_bulkin_pipe == NULL || (sc->sc_state & UCS_RXSTOP) == 0)
 		return (USBD_NORMAL_COMPLETION);
+	sc->sc_state &= ~UCS_RXSTOP;
 
 	usbd_setup_xfer(sc->sc_ixfer, sc->sc_bulkin_pipe,
 			(usbd_private_handle)sc,
@@ -1018,7 +1021,8 @@ ucomstartread(struct ucom_softc *sc)
 			USBD_NO_TIMEOUT, ucomreadcb);
 
 	err = usbd_transfer(sc->sc_ixfer);
-	if (err != USBD_IN_PROGRESS) {
+	if (err && err != USBD_IN_PROGRESS) {
+		sc->sc_state |= UCS_RXSTOP;
 		DPRINTF(("ucomstartread: err = %s\n", usbd_errstr(err)));
 		return (err);
 	}
@@ -1043,11 +1047,13 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 		if (!(sc->sc_state & UCS_RXSTOP))
 			printf("%s: ucomreadcb: %s\n",
 			       USBDEVNAME(sc->sc_dev), usbd_errstr(status));
+		sc->sc_state |= UCS_RXSTOP;
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall_async(sc->sc_bulkin_pipe);
 		/* XXX we should restart after some delay. */
 		return;
 	}
+	sc->sc_state |= UCS_RXSTOP;
 
 	usbd_get_xfer_status(xfer, NULL, (void **)&cp, &cc, NULL);
 	DPRINTF(("ucomreadcb: got %d chars, tp = %p\n", cc, tp));
@@ -1121,6 +1127,7 @@ ucom_cleanup(struct ucom_softc *sc)
 
 	ucom_shutdown(sc);
 	if (sc->sc_bulkin_pipe != NULL) {
+		sc->sc_state |= UCS_RXSTOP;
 		usbd_abort_pipe(sc->sc_bulkin_pipe);
 		usbd_close_pipe(sc->sc_bulkin_pipe);
 		sc->sc_bulkin_pipe = NULL;

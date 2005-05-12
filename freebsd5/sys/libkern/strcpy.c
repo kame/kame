@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/strcpy.c,v 1.11 2004/04/07 20:46:10 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/strcpy.c,v 1.11.2.1 2005/01/31 23:26:21 imp Exp $");
 
 #include <sys/libkern.h>
 

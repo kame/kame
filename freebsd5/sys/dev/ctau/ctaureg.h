@@ -1,4 +1,4 @@
-/*
+/*-
  * Defines for Cronyx-Tau adapter, based on Hitachi HD64570 controller.
  *
  * Copyright (C) 1996 Cronyx Engineering.
@@ -12,7 +12,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: ctaureg.h,v 1.1.2.1 2003/11/12 17:16:10 rik Exp $
- * $FreeBSD: src/sys/dev/ctau/ctaureg.h,v 1.1 2004/02/23 20:19:00 rik Exp $
+ * $FreeBSD: src/sys/dev/ctau/ctaureg.h,v 1.1.4.1 2005/01/30 00:59:33 imp Exp $
  */
 
 /*

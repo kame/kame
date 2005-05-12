@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, 1995 Scott Bartram
  * Copyright (c) 1994 Arne H Juul
  * All rights reserved.
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_socksys.c,v 1.19 2003/10/12 04:25:26 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_socksys.c,v 1.19.4.1 2005/01/31 23:26:03 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

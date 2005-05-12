@@ -1,6 +1,8 @@
 /*
  * if_ppp.c - Point-to-Point Protocol (PPP) Asynchronous driver.
- *
+ */
+
+/*-
  * Copyright (c) 1989 Carnegie Mellon University.
  * All rights reserved.
  *
@@ -69,7 +71,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/if_ppp.c,v 1.100.2.1 2004/09/15 15:14:18 andre Exp $ */
+/* $FreeBSD: src/sys/net/if_ppp.c,v 1.100.2.2 2005/01/31 23:26:23 imp Exp $ */
 /* from if_sl.c,v 1.11 84/10/04 12:54:47 rick Exp */
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 

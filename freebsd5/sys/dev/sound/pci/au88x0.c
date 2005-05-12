@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/au88x0.c,v 1.8 2004/07/16 03:59:27 tanimura Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/au88x0.c,v 1.8.2.1 2004/11/23 08:37:48 yongari Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -332,7 +332,7 @@ au88x0_chan_init(kobj_t obj, void *arg,
 	struct au88x0_info *aui = arg;
 	struct au88x0_chan_info *auci = au88x0_channel(aui, dir);
 
-	if (sndbuf_alloc(buf, aui->aui_dmat, aui->aui_bufsize) == -1)
+	if (sndbuf_alloc(buf, aui->aui_dmat, aui->aui_bufsize) != 0)
 		return (NULL);
 	auci->auci_aui = aui;
 	auci->auci_pcmchan = chan;

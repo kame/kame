@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_command.c,v 1.57 2004/07/21 05:55:51 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_command.c,v 1.57.2.2 2005/01/30 00:59:21 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/linker_set.h>
@@ -630,6 +630,7 @@ db_stack_trace(db_expr_t tid, boolean_t hastid, db_expr_t count, char *modif)
 {
 	struct thread *td;
 	db_expr_t radix;
+	pid_t pid;
 	int t;
 
 	/*
@@ -662,5 +663,10 @@ db_stack_trace(db_expr_t tid, boolean_t hastid, db_expr_t count, char *modif)
 		}
 	} else
 		td = kdb_thread;
+	if (td->td_proc != NULL)
+		pid = td->td_proc->p_pid;
+	else
+		pid = -1;
+	db_printf("Tracing pid %d tid %ld td %p\n", pid, (long)td->td_tid, td);
 	db_trace_thread(td, count);
 }

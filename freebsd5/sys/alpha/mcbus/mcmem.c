@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 by Matthew Jacob
  * All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcmem.c,v 1.3 2003/08/22 07:20:26 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcmem.c,v 1.3.4.1 2005/01/30 00:59:11 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

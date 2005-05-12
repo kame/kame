@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, David Greenman
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.15 2003/10/31 18:31:58 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.15.4.1 2005/01/30 00:59:38 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

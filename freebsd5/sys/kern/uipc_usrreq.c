@@ -1,5 +1,5 @@
-/*
- * Copyright 2004 Robert N. M. Watson
+/*-
+ * Copyright 2004-2005 Robert N. M. Watson
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.138.2.2.2.1 2004/10/21 09:30:46 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.138.2.13.2.1 2005/05/07 03:58:25 cperciva Exp $");
 
 #include "opt_mac.h"
 
@@ -124,7 +124,7 @@ static void    unp_mark(struct file *);
 static void    unp_discard(struct file *);
 static void    unp_freerights(struct file **, int);
 static int     unp_internalize(struct mbuf **, struct thread *);
-static int     unp_listen(struct unpcb *, struct thread *);
+static int     unp_listen(struct socket *, struct unpcb *, struct thread *);
 
 static int
 uipc_abort(struct socket *so)
@@ -284,7 +284,7 @@ uipc_listen(struct socket *so, struct thread *td)
 		UNP_UNLOCK();
 		return (EINVAL);
 	}
-	error = unp_listen(unp, td);
+	error = unp_listen(so, unp, td);
 	UNP_UNLOCK();
 	return (error);
 }
@@ -369,7 +369,7 @@ uipc_rcvd(struct socket *so, int flags)
 
 static int
 uipc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
-	  struct mbuf *control, struct thread *td)
+    struct mbuf *control, struct thread *td)
 {
 	int error = 0;
 	struct unpcb *unp;
@@ -452,7 +452,9 @@ uipc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			}
 		}
 
+		SOCKBUF_LOCK(&so->so_snd);
 		if (so->so_snd.sb_state & SBS_CANTSENDMORE) {
+			SOCKBUF_UNLOCK(&so->so_snd);
 			error = EPIPE;
 			break;
 		}
@@ -478,6 +480,7 @@ uipc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 		    (so2->so_rcv.sb_cc - unp->unp_conn->unp_cc);
 		(void)chgsbsize(so->so_cred->cr_uidinfo, &so->so_snd.sb_hiwat,
 		    newhiwat, RLIM_INFINITY);
+		SOCKBUF_UNLOCK(&so->so_snd);
 		unp->unp_conn->unp_cc = so2->so_rcv.sb_cc;
 		sorwakeup_locked(so2);
 		m = NULL;
@@ -584,9 +587,7 @@ struct pr_usrreqs uipc_usrreqs = {
 };
 
 int
-uipc_ctloutput(so, sopt)
-	struct socket *so;
-	struct sockopt *sopt;
+uipc_ctloutput(struct socket *so, struct sockopt *sopt)
 {
 	struct unpcb *unp;
 	struct xucred xu;
@@ -661,10 +662,9 @@ SYSCTL_DECL(_net_local);
 SYSCTL_INT(_net_local, OID_AUTO, inflight, CTLFLAG_RD, &unp_rights, 0, "");
 
 static int
-unp_attach(so)
-	struct socket *so;
+unp_attach(struct socket *so)
 {
-	register struct unpcb *unp;
+	struct unpcb *unp;
 	int error;
 
 	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
@@ -684,27 +684,25 @@ unp_attach(so)
 		if (error)
 			return (error);
 	}
-	unp = uma_zalloc(unp_zone, M_WAITOK);
+	unp = uma_zalloc(unp_zone, M_WAITOK | M_ZERO);
 	if (unp == NULL)
 		return (ENOBUFS);
-	bzero(unp, sizeof *unp);
 	LIST_INIT(&unp->unp_refs);
 	unp->unp_socket = so;
+	so->so_pcb = unp;
 
 	UNP_LOCK();
 	unp->unp_gencnt = ++unp_gencnt;
 	unp_count++;
 	LIST_INSERT_HEAD(so->so_type == SOCK_DGRAM ? &unp_dhead
 			 : &unp_shead, unp, unp_link);
-	so->so_pcb = unp;
 	UNP_UNLOCK();
 
 	return (0);
 }
 
 static void
-unp_detach(unp)
-	register struct unpcb *unp;
+unp_detach(struct unpcb *unp)
 {
 	struct vnode *vp;
 
@@ -753,10 +751,7 @@ unp_detach(unp)
 }
 
 static int
-unp_bind(unp, nam, td)
-	struct unpcb *unp;
-	struct sockaddr *nam;
-	struct thread *td;
+unp_bind(struct unpcb *unp, struct sockaddr *nam, struct thread *td)
 {
 	struct sockaddr_un *soun = (struct sockaddr_un *)nam;
 	struct vnode *vp;
@@ -825,8 +820,10 @@ restart:
 	}
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vput(nd.ni_dvp);
-	if (error)
+	if (error) {
+		vn_finished_write(mp);
 		goto done;
+	}
 	vp = nd.ni_vp;
 	ASSERT_VOP_LOCKED(vp, "unp_bind");
 	soun = (struct sockaddr_un *)sodupsockaddr(nam, M_WAITOK);
@@ -845,14 +842,11 @@ done:
 }
 
 static int
-unp_connect(so, nam, td)
-	struct socket *so;
-	struct sockaddr *nam;
-	struct thread *td;
+unp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
-	register struct sockaddr_un *soun = (struct sockaddr_un *)nam;
-	register struct vnode *vp;
-	register struct socket *so2, *so3;
+	struct sockaddr_un *soun = (struct sockaddr_un *)nam;
+	struct vnode *vp;
+	struct socket *so2, *so3;
 	struct unpcb *unp, *unp2, *unp3;
 	int error, len;
 	struct nameidata nd;
@@ -891,10 +885,6 @@ unp_connect(so, nam, td)
 	UNP_LOCK();
 	unp = sotounpcb(so);
 	if (unp == NULL) {
-		/*
-		 * XXXRW: Temporary debugging printf.
-		 */
-		printf("unp_connect(): lost race to another thread\n");
 		error = EINVAL;
 		goto bad2;
 	}
@@ -977,12 +967,10 @@ bad:
 }
 
 static int
-unp_connect2(so, so2)
-	register struct socket *so;
-	register struct socket *so2;
+unp_connect2(struct socket *so, struct socket *so2)
 {
-	register struct unpcb *unp = sotounpcb(so);
-	register struct unpcb *unp2;
+	struct unpcb *unp = sotounpcb(so);
+	struct unpcb *unp2;
 
 	UNP_LOCK_ASSERT();
 
@@ -1010,10 +998,9 @@ unp_connect2(so, so2)
 }
 
 static void
-unp_disconnect(unp)
-	struct unpcb *unp;
+unp_disconnect(struct unpcb *unp)
 {
-	register struct unpcb *unp2 = unp->unp_conn;
+	struct unpcb *unp2 = unp->unp_conn;
 	struct socket *so;
 
 	UNP_LOCK_ASSERT();
@@ -1041,8 +1028,7 @@ unp_disconnect(unp)
 
 #ifdef notdef
 void
-unp_abort(unp)
-	struct unpcb *unp;
+unp_abort(struct unpcb *unp)
 {
 
 	unp_detach(unp);
@@ -1119,7 +1105,7 @@ unp_pcblist(SYSCTL_HANDLER_ARGS)
 	n = i;			/* in case we lost some during malloc */
 
 	error = 0;
-	xu = malloc(sizeof(*xu), M_TEMP, M_WAITOK);
+	xu = malloc(sizeof(*xu), M_TEMP, M_WAITOK | M_ZERO);
 	for (i = 0; i < n; i++) {
 		unp = unp_list[i];
 		if (unp->unp_gencnt <= gencnt) {
@@ -1169,8 +1155,7 @@ SYSCTL_PROC(_net_local_stream, OID_AUTO, pcblist, CTLFLAG_RD,
 	    "List of active local stream sockets");
 
 static void
-unp_shutdown(unp)
-	struct unpcb *unp;
+unp_shutdown(struct unpcb *unp)
 {
 	struct socket *so;
 
@@ -1182,9 +1167,7 @@ unp_shutdown(unp)
 }
 
 static void
-unp_drop(unp, errno)
-	struct unpcb *unp;
-	int errno;
+unp_drop(struct unpcb *unp, int errno)
 {
 	struct socket *so = unp->unp_socket;
 
@@ -1196,16 +1179,14 @@ unp_drop(unp, errno)
 
 #ifdef notdef
 void
-unp_drain()
+unp_drain(void)
 {
 
 }
 #endif
 
 static void
-unp_freerights(rp, fdcount)
-	struct file **rp;
-	int fdcount;
+unp_freerights(struct file **rp, int fdcount)
 {
 	int i;
 	struct file *fp;
@@ -1223,8 +1204,7 @@ unp_freerights(rp, fdcount)
 }
 
 int
-unp_externalize(control, controlp)
-	struct mbuf *control, **controlp;
+unp_externalize(struct mbuf *control, struct mbuf **controlp)
 {
 	struct thread *td = curthread;		/* XXX */
 	struct cmsghdr *cm = mtod(control, struct cmsghdr *);
@@ -1348,9 +1328,7 @@ unp_init(void)
 }
 
 static int
-unp_internalize(controlp, td)
-	struct mbuf **controlp;
-	struct thread *td;
+unp_internalize(struct mbuf **controlp, struct thread *td)
 {
 	struct mbuf *control = *controlp;
 	struct proc *p = td->td_proc;
@@ -1501,10 +1479,10 @@ out:
 static int	unp_defer, unp_gcing;
 
 static void
-unp_gc()
+unp_gc(void)
 {
-	register struct file *fp, *nextfp;
-	register struct socket *so;
+	struct file *fp, *nextfp;
+	struct socket *so;
 	struct file **extra_ref, **fpp;
 	int nunref, i;
 	int nfiles_snap;
@@ -1709,8 +1687,7 @@ again:
 }
 
 void
-unp_dispose(m)
-	struct mbuf *m;
+unp_dispose(struct mbuf *m)
 {
 
 	if (m)
@@ -1718,24 +1695,25 @@ unp_dispose(m)
 }
 
 static int
-unp_listen(unp, td)
-	struct unpcb *unp;
-	struct thread *td;
+unp_listen(struct socket *so, struct unpcb *unp, struct thread *td)
 {
+	int error;
+
 	UNP_LOCK_ASSERT();
 
-	/*
-	 * XXXRW: Why populate the local peer cred with our own credential?
-	 */
-	cru2x(td->td_ucred, &unp->unp_peercred);
-	unp->unp_flags |= UNP_HAVEPCCACHED;
-	return (0);
+	SOCK_LOCK(so);
+	error = solisten_proto_check(so);
+	if (error == 0) {
+		cru2x(td->td_ucred, &unp->unp_peercred);
+		unp->unp_flags |= UNP_HAVEPCCACHED;
+		solisten_proto(so);
+	}
+	SOCK_UNLOCK(so);
+	return (error);
 }
 
 static void
-unp_scan(m0, op)
-	register struct mbuf *m0;
-	void (*op)(struct file *);
+unp_scan(struct mbuf *m0, void (*op)(struct file *))
 {
 	struct mbuf *m;
 	struct file **rp;
@@ -1784,8 +1762,7 @@ unp_scan(m0, op)
 }
 
 static void
-unp_mark(fp)
-	struct file *fp;
+unp_mark(struct file *fp)
 {
 	if (fp->f_gcflag & FMARK)
 		return;
@@ -1794,8 +1771,7 @@ unp_mark(fp)
 }
 
 static void
-unp_discard(fp)
-	struct file *fp;
+unp_discard(struct file *fp)
 {
 	FILE_LOCK(fp);
 	fp->f_msgcount--;

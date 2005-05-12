@@ -1,4 +1,4 @@
-/*
+/*-
  * Interface for the 93C66/56/46/26/06 serial eeprom parts.
  *
  * Copyright (c) 1995, 1996 Daniel M. Eischen
@@ -70,7 +70,7 @@
 #include "aic7xxx_93cx6.h"
 #else
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.c,v 1.19 2003/12/17 00:02:10 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.c,v 1.19.2.1 2005/01/30 00:59:25 imp Exp $");
 #include <dev/aic7xxx/aic7xxx_osm.h>
 #include <dev/aic7xxx/aic7xxx_inline.h>
 #include <dev/aic7xxx/aic7xxx_93cx6.h>

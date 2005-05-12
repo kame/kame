@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/cissreg.h,v 1.14 2004/07/29 08:06:22 ps Exp $
+ *	$FreeBSD: src/sys/dev/ciss/cissreg.h,v 1.14.6.1 2005/04/28 20:43:28 ps Exp $
  */
 
 /*
@@ -449,6 +449,7 @@ struct ciss_config_table
 #define CISS_BMIC_ID_PDRIVE		0x15
 #define CISS_BMIC_BLINK_PDRIVE		0x16
 #define CISS_BMIC_SENSE_BLINK_PDRIVE	0x17
+#define CISS_BMIC_SOFT_RESET		0x40
 #define CISS_BMIC_FLUSH_CACHE		0xc2
 #define CISS_BMIC_ACCEPT_MEDIA		0xe0
 

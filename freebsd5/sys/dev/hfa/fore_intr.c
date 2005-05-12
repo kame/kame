@@ -1,4 +1,4 @@
-/*
+/*-
  *
  * ===================================
  * HARP  |  Host ATM Research Platform
@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.11 2003/08/22 06:00:26 imp Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.11.4.1 2005/01/30 00:59:43 imp Exp $
  *
  */
 
@@ -54,7 +54,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.11 2003/08/22 06:00:26 imp Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.11.4.1 2005/01/30 00:59:43 imp Exp $");
 #endif
 
 #if defined(sun)

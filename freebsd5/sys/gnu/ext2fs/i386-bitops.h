@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/gnu/ext2fs/i386-bitops.h,v 1.5 1999/11/15 23:16:06 obrien Exp $ */
+/* $FreeBSD: src/sys/gnu/ext2fs/i386-bitops.h,v 1.5.26.1 2005/01/31 23:26:02 imp Exp $ */
 /*
  * this is mixture of i386/bitops.h and asm/string.h
  * taken from the Linux source tree 
@@ -8,7 +8,7 @@
 #ifndef _SYS_GNU_EXT2FS_I386_BITOPS_H_
 #define	_SYS_GNU_EXT2FS_I386_BITOPS_H_
 
-/*
+/*-
  * Copyright 1992, Linus Torvalds.
  */
 

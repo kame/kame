@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998-1999 Andrew Gallatin
  * All rights reserved.
  *
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/osf1/imgact_osf1.c,v 1.20 2003/08/22 07:20:27 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/imgact_osf1.c,v 1.20.4.1 2005/01/30 00:59:11 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/malloc.h>

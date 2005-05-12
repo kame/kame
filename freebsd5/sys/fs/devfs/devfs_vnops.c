@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 2000
@@ -31,7 +31,7 @@
  *	@(#)kernfs_vnops.c	8.15 (Berkeley) 5/21/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vnops.c 1.43
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.73 2004/07/26 07:24:02 cperciva Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.73.2.1 2005/01/31 23:25:55 imp Exp $
  */
 
 /*

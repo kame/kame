@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/net/pfil.c,v 1.8.4.3 2004/10/11 03:45:57 green Exp $ */
+/*	$FreeBSD: src/sys/net/pfil.c,v 1.8.4.4 2005/01/31 23:26:23 imp Exp $ */
 /*	$NetBSD: pfil.c,v 1.20 2001/11/12 23:49:46 lukem Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1996 Matthew R. Green
  * All rights reserved.
  *

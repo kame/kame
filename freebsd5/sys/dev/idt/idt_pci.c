@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Richard Hodges and Matriplex, inc.
  * All rights reserved.
  *
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/idt/idt_pci.c,v 1.4 2004/03/17 17:50:35 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/idt/idt_pci.c,v 1.4.2.1 2005/01/30 00:59:46 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Inline routines shareable across OS platforms.
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
@@ -39,7 +39,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_inline.h#47 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_inline.h,v 1.23 2003/12/17 00:02:10 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_inline.h,v 1.23.2.1 2005/01/30 00:59:25 imp Exp $
  */
 
 #ifndef _AIC7XXX_INLINE_H_

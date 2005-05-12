@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_subr.c,v 1.2 2004/03/20 08:38:33 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_subr.c,v 1.2.2.2 2005/01/30 01:00:08 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -242,6 +242,26 @@ uart_getenv(int devtype, struct uart_devinfo *di)
 	 */
 	if (addr == ~0U)
 		return (EINVAL);
+
+	/*
+	 * Accept only the well-known baudrates. Any invalid baudrate
+	 * is silently replaced with a 0-valued baudrate. The 0 baudrate
+	 * has special meaning. It means that we're not supposed to
+	 * program the baudrate and simply communicate with whatever
+	 * speed the hardware is currently programmed for.
+	 */
+	if (di->baudrate >= 19200) {
+		if (di->baudrate % 19200)
+			di->baudrate = 0;
+	} else if (di->baudrate >= 1200) {
+		if (di->baudrate % 1200)
+			di->baudrate = 0;
+	} else if (di->baudrate > 0) {
+		if (di->baudrate % 75)
+			di->baudrate = 0;
+	} else
+		di->baudrate = 0;
+
 	/* XXX the size of the mapping depends on the UART class. */
 	if (bus_space_map(di->bas.bst, addr, 8, 0, &di->bas.bsh) != 0)
 		return (EINVAL);

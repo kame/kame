@@ -1,4 +1,4 @@
-/*
+/*-
  *       Copyright (c) 2000-03 ICP vortex GmbH
  *       Copyright (c) 2002-03 Intel Corporation
  *       Copyright (c) 2003    Adaptec Inc.
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/iir/iir_ctrl.c,v 1.15 2004/06/16 09:46:46 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/iir/iir_ctrl.c,v 1.15.2.1.2.1 2005/05/06 02:34:18 cperciva Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,12 +102,12 @@ gdt_make_dev(int unit)
 
 #ifdef SDEV_PER_HBA
     dev = make_dev(&iir_cdevsw, hba2minor(unit), UID_ROOT, GID_OPERATOR,
-                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, "iir%d", unit);
+                   S_IRUSR | S_IWUSR, "iir%d", unit);
 #else
     if (sdev_made)
         return (0);
     dev = make_dev(&iir_cdevsw, 0, UID_ROOT, GID_OPERATOR,
-                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, "iir");
+                   S_IRUSR | S_IWUSR, "iir");
     sdev_made = 1;
 #endif
     return (dev);

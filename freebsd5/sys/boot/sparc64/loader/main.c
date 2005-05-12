@@ -1,4 +1,4 @@
-/*
+/*-
  * Initial implementation:
  * Copyright (c) 2001 Robert Drehmel
  * All rights reserved.
@@ -8,7 +8,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.23.2.2 2004/09/09 23:06:55 kensmith Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.23.2.3 2005/01/30 00:59:15 imp Exp $");
 
 /*
  * FreeBSD/sparc64 kernel loader - machine dependent part

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003, 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/uart/uart_cpu.h,v 1.6 2004/08/14 23:54:27 marius Exp $
+ * $FreeBSD: src/sys/dev/uart/uart_cpu.h,v 1.6.2.1 2005/01/30 01:00:08 imp Exp $
  */
 
 #ifndef _DEV_UART_CPU_H_

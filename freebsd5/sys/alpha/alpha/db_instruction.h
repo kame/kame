@@ -1,6 +1,6 @@
 /* $NetBSD: db_instruction.h,v 1.4 1997/09/16 22:53:32 thorpej Exp $ */
 
-/* 
+/*-
  * Mach Operating System
  * Copyright (c) 1993,1992 Carnegie Mellon University
  * All Rights Reserved.
@@ -25,7 +25,7 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/alpha/alpha/db_instruction.h,v 1.6 2004/01/04 23:30:47 obrien Exp $
+ * $FreeBSD: src/sys/alpha/alpha/db_instruction.h,v 1.6.2.1 2005/01/30 00:59:09 imp Exp $
  */
 
 /*

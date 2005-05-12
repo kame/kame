@@ -1,4 +1,4 @@
-/*
+/*-
  * Low level routines for Second Generation
  * Advanced Systems Inc. SCSI controllers chips
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Ported from:
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
  *     
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/advansys/adwlib.c,v 1.9 2003/08/24 17:48:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adwlib.c,v 1.9.4.2 2005/03/02 09:39:24 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -374,7 +374,7 @@ adw_init_chip(struct adw_softc *adw, u_int term_scsicfg1)
 		major_ver = (biosmem[addr + 1] >> 4) & 0xF;
 		if ((adw->chip == ADW_CHIP_ASC3550)
 		 && (major_ver <= 3
-		  || (major_ver == 3 && minor_ver == 1))) {
+		  || (major_ver == 3 && minor_ver <= 1))) {
 			/*
 			 * BIOS 3.1 and earlier location of
 			 * 'wdtr_able' variable.

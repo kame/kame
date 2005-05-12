@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.35 2004/06/16 09:46:59 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.35.2.1 2005/03/03 04:47:55 obrien Exp $");
 
 /* 3dfx driver for FreeBSD 4.x - Finished 11 May 2000, 12:25AM ET
  *
@@ -120,25 +120,25 @@ tdfx_probe(device_t dev)
 	/*
 	 * probe routine called on kernel boot to register supported devices. We get
 	 * a device structure to work with, and we can test the VENDOR/DEVICE IDs to
-	 * see if this PCI device is one that we support. Return 0 if yes, ENXIO if
-	 * not.
+	 * see if this PCI device is one that we support. Return BUS_PRROBE_DEFAULT
+	 * if yes, ENXIO if not.
 	 */
 	switch(pci_get_devid(dev)) {
 	case PCI_DEVICE_ALLIANCE_AT3D:
 		device_set_desc(dev, "ProMotion At3D 3D Accelerator");
-		return 0;
+		return BUS_PROBE_DEFAULT;
 	case PCI_DEVICE_3DFX_VOODOO2:
 		device_set_desc(dev, "3DFX Voodoo II 3D Accelerator");
-		return 0;
+		return BUS_PROBE_DEFAULT;
 	/*case PCI_DEVICE_3DFX_BANSHEE:
 		device_set_desc(dev, "3DFX Voodoo Banshee 2D/3D Graphics Accelerator");
-		return 0;
+		return BUS_PROBE_DEFAULT;
 	case PCI_DEVICE_3DFX_VOODOO3:
 		device_set_desc(dev, "3DFX Voodoo3 2D/3D Graphics Accelerator");
-		return 0;*/
+		return BUS_PROBE_DEFAULT;*/
 	case PCI_DEVICE_3DFX_VOODOO1:
 		device_set_desc(dev, "3DFX Voodoo Graphics 3D Accelerator");
-		return 0;;
+		return BUS_PROBE_DEFAULT;
 	};
 
 	return ENXIO;
@@ -384,12 +384,8 @@ tdfx_setmtrr(device_t dev) {
 		 * If, for some reason, we can't set the MTRR (N/A?) we may still continue
 		 */
 #ifdef DEBUG
-		if(retval == 0) {
-			device_printf(dev, "MTRR Set Type Uncacheable %x\n",
-			    (u_int32_t)tdfx_info->mrdesc.mr_base);
-		} else {
-			device_printf(dev, "Couldn't Set MTRR\n");
-		}
+		device_printf(dev, "MTRR Set Type Uncacheable %x\n",
+		    (u_int32_t)tdfx_info->mrdesc.mr_base);
 #endif
 	}
 #ifdef DEBUG

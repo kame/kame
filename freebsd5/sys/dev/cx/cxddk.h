@@ -1,4 +1,4 @@
-/*
+/*-
  * Defines for Cronyx-Sigma adapter driver.
  *
  * Copyright (C) 1994-2001 Cronyx Engineering.
@@ -15,7 +15,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: cxddk.h,v 1.1.2.1 2003/11/12 17:13:41 rik Exp $
- * $FreeBSD: src/sys/dev/cx/cxddk.h,v 1.1 2003/12/03 07:29:38 imp Exp $
+ * $FreeBSD: src/sys/dev/cx/cxddk.h,v 1.1.6.1 2005/01/30 00:59:34 imp Exp $
  */
 
 #ifndef port_t

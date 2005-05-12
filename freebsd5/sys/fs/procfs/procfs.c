@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Dag-Erling Smørgrav
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993
@@ -37,7 +37,7 @@
  *
  *	@(#)procfs_vfsops.c	8.7 (Berkeley) 5/10/95
  *
- * $FreeBSD: src/sys/fs/procfs/procfs.c,v 1.11 2004/01/07 17:58:51 rwatson Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs.c,v 1.11.2.1 2005/01/31 23:25:58 imp Exp $
  */
 
 #include <sys/param.h>

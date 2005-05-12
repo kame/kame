@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Texas A&M University
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ichwd/ichwd.h,v 1.1 2004/05/11 18:21:38 des Exp $
+ * $FreeBSD: src/sys/dev/ichwd/ichwd.h,v 1.1.2.1 2005/01/30 00:59:45 imp Exp $
  */
 
 #ifndef _ICHWD_H_

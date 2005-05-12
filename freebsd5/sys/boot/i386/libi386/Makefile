@@ -1,7 +1,7 @@
-# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.36 2004/02/07 23:30:45 ru Exp $
+# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.36.2.1 2005/02/13 07:23:31 obrien Exp $
 #
 LIB=			i386
-INTERNALLIB=		true
+INTERNALLIB=
 
 SRCS=	biosacpi.c bioscd.c biosdisk.c biosmem.c biospnp.c \
 	biospci.c biossmap.c bootinfo.c bootinfo32.c bootinfo64.c \

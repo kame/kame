@@ -1,7 +1,7 @@
-# $FreeBSD: src/sys/boot/alpha/libalpha/Makefile,v 1.14 2004/02/11 22:01:17 ru Exp $
+# $FreeBSD: src/sys/boot/alpha/libalpha/Makefile,v 1.14.2.1 2005/02/13 07:23:30 obrien Exp $
 
 LIB=		alpha
-INTERNALLIB=	true
+INTERNALLIB=
 
 #CFLAGS+=	-DDISK_DEBUG
 

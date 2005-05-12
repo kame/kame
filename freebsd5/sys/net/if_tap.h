@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1999-2000 by Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/net/if_tap.h,v 1.1 2000/07/20 17:01:10 nsayer Exp $
+ * $FreeBSD: src/sys/net/if_tap.h,v 1.1.10.1 2005/01/31 23:26:23 imp Exp $
  * $Id: if_tap.h,v 0.7 2000/07/12 04:12:51 max Exp $
  */
 

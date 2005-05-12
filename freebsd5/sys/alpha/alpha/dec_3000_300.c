@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_3000_300.c,v 1.6 2003/08/17 06:42:07 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_3000_300.c,v 1.6.4.1 2005/01/30 00:59:09 imp Exp $");
 
 #include "opt_cpu.h"
 

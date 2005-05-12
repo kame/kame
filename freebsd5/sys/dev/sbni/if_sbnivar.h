@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997-2001 Granch, Ltd. All rights reserved.
  * Author: Denis I.Timofeev <timofeev@granch.ru>
  *
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbnivar.h,v 1.3 2002/08/05 18:14:16 fjoe Exp $
+ * $FreeBSD: src/sys/dev/sbni/if_sbnivar.h,v 1.3.8.1 2005/01/30 01:00:01 imp Exp $
  */
 
 /*

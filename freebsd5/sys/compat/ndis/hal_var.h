@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/ndis/hal_var.h,v 1.4 2004/08/01 20:04:30 wpaul Exp $
+ * $FreeBSD: src/sys/compat/ndis/hal_var.h,v 1.4.2.2 2005/02/18 16:30:09 wpaul Exp $
  */
 
 #ifndef _HAL_VAR_H_
@@ -46,11 +46,13 @@
 extern image_patch_table hal_functbl[];
 
 __BEGIN_DECLS
-__fastcall extern uint8_t hal_lock(REGARGS1(kspin_lock *lock));
-__fastcall void hal_unlock(REGARGS2(kspin_lock *lock, uint8_t newirql));
-__fastcall extern uint8_t hal_raise_irql(REGARGS1(uint8_t irql));
-__fastcall extern void hal_lower_irql(REGARGS1(uint8_t oldirql));
-__stdcall extern uint8_t hal_irql(void);
+extern int hal_libinit(void);
+extern int hal_libfini(void);
+__fastcall extern uint8_t KfAcquireSpinLock(REGARGS1(kspin_lock *lock));
+__fastcall void KfReleaseSpinLock(REGARGS2(kspin_lock *lock, uint8_t newirql));
+__fastcall extern uint8_t KfRaiseIrql(REGARGS1(uint8_t irql));
+__fastcall extern void KfLowerIrql(REGARGS1(uint8_t oldirql));
+__stdcall extern uint8_t KeGetCurrentIrql(void);
 __END_DECLS
 
 #endif /* _HAL_VAR_H_ */

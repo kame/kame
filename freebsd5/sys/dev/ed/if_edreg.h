@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1993, David Greenman. This software may be used, modified,
  *   copied, distributed, and sold, in both source and binary form provided
  *   that the above copyright and these terms are retained. Under no
@@ -6,7 +6,7 @@
  *   of this software, nor does the author assume any responsibility
  *   for damages incurred with its use.
  *
- * $FreeBSD: src/sys/dev/ed/if_edreg.h,v 1.32 2003/10/15 17:22:15 shiba Exp $
+ * $FreeBSD: src/sys/dev/ed/if_edreg.h,v 1.32.4.1 2005/01/30 00:59:38 imp Exp $
  */
 /*
  * National Semiconductor DS8390 NIC register definitions

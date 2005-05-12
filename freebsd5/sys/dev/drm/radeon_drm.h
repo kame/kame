@@ -1,5 +1,5 @@
-/* radeon_drm.h -- Public header for the radeon driver -*- linux-c -*-
- *
+/* radeon_drm.h -- Public header for the radeon driver -*- linux-c -*- */
+/*-
  * Copyright 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Fremont, California.
  * Copyright 2002 Tungsten Graphics, Inc., Cedar Park, Texas.
@@ -29,7 +29,7 @@
  *    Gareth Hughes <gareth@valinux.com>
  *    Keith Whitwell <keith@tungstengraphics.com>
  *
- * $FreeBSD: src/sys/dev/drm/radeon_drm.h,v 1.8 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/radeon_drm.h,v 1.8.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #ifndef __RADEON_DRM_H__

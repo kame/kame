@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-/*
+/*-
  * Additional Copyright (c) 1997 by Matthew Jacob for NASA/Ames Research Center
  */
 
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_eb64plus.c,v 1.17 2004/07/10 22:29:40 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_eb64plus.c,v 1.17.2.1 2005/01/30 00:59:09 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/reboot.h>

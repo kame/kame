@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/intr_machdep.h,v 1.4 2004/08/16 23:12:30 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/intr_machdep.h,v 1.4.2.1 2005/02/14 09:22:20 obrien Exp $
  */
 
 #ifndef __MACHINE_INTR_MACHDEP_H__
@@ -84,6 +84,7 @@ struct intsrc {
 struct intrframe;
 
 extern struct mtx icu_lock;
+extern int elcr_found;
 
 /* XXX: The elcr_* prototypes probably belong somewhere else. */
 int	elcr_probe(void);
@@ -100,6 +101,7 @@ int	intr_register_source(struct intsrc *isrc);
 int	intr_remove_handler(void *cookie);
 void	intr_resume(void);
 void	intr_suspend(void);
+void	intrcnt_add(const char *name, u_long **countp);
 
 #endif	/* !LOCORE */
 #endif	/* _KERNEL */

@@ -1,5 +1,4 @@
-
-/*
+/*-
  * ichsmb.c
  *
  * Author: Archie Cobbs <archie@freebsd.org>
@@ -37,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb.c,v 1.9 2004/03/12 21:45:26 trhodes Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb.c,v 1.9.2.1 2005/01/30 00:59:45 imp Exp $");
 
 /*
  * Support for the SMBus controller logical device which is part of the

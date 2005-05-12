@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_event.c,v 1.50 2004/07/08 16:17:14 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_event.c,v 1.50.2.1 2005/02/28 19:32:24 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD: src/sys/geom/geom_event.c,v 1.50 2004/07/08 16:17:14 phk Exp
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/proc.h>
 #include <machine/stdarg.h>
 #include <sys/errno.h>
 #include <sys/time.h>
@@ -79,8 +80,12 @@ void
 g_waitidle(void)
 {
 
+	g_topology_assert_not();
+	mtx_assert(&Giant, MA_NOTOWNED);
+
 	while (g_pending_events)
 		tsleep(&g_pending_events, PPAUSE, "g_waitidle", hz/5);
+	curthread->td_pflags &= ~TDP_GEOM;
 }
 
 void
@@ -279,6 +284,7 @@ g_post_event_x(g_event_t *func, void *arg, int flag, int wuflag, struct g_event 
 	wakeup(&g_wait_event);
 	if (epp != NULL)
 		*epp = ep;
+	curthread->td_pflags |= TDP_GEOM;
 	return (0);
 }
 

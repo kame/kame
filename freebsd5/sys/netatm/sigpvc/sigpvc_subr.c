@@ -1,4 +1,4 @@
-/*
+/*-
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.13 2003/06/11 07:06:31 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.13.4.1 2005/01/31 23:26:26 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

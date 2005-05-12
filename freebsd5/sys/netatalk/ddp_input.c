@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Robert N. M. Watson
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -47,7 +47,7 @@
  *	+1-313-764-2278
  *	netatalk@umich.edu
  *
- * $FreeBSD: src/sys/netatalk/ddp_input.c,v 1.26 2004/08/10 03:23:05 rwatson Exp $
+ * $FreeBSD: src/sys/netatalk/ddp_input.c,v 1.26.2.3 2005/01/31 23:26:25 imp Exp $
  */
 
 #include "opt_mac.h"
@@ -419,10 +419,12 @@ ddp_input(m, ifp, elh, phase)
 #endif
 
     /* 
-     * If we found one, deliver th epacket to the socket
+     * If we found one, deliver the packet to the socket
      */
-    if (sbappendaddr(&ddp->ddp_socket->so_rcv, (struct sockaddr *)&from,
+    SOCKBUF_LOCK(&ddp->ddp_socket->so_rcv);
+    if (sbappendaddr_locked(&ddp->ddp_socket->so_rcv, (struct sockaddr *)&from,
 	    m, NULL) == 0) {
+    	SOCKBUF_UNLOCK(&ddp->ddp_socket->so_rcv);
 	/* 
 	 * If the socket is full (or similar error) dump the packet.
 	 */
@@ -432,7 +434,7 @@ ddp_input(m, ifp, elh, phase)
     /*
      * And wake up whatever might be waiting for it
      */
-    sorwakeup(ddp->ddp_socket);
+    sorwakeup_locked(ddp->ddp_socket);
     m = NULL;
 out:
     DDP_LIST_SUNLOCK();

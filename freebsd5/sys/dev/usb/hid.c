@@ -2,8 +2,8 @@
 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/hid.c,v 1.23 2003/08/24 17:55:54 obrien Exp $");
-/*
+__FBSDID("$FreeBSD: src/sys/dev/usb/hid.c,v 1.23.4.1 2005/01/30 01:00:09 imp Exp $");
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

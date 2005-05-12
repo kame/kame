@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -32,7 +32,7 @@
  *	@(#)null_vfsops.c	8.2 (Berkeley) 1/21/94
  *
  * @(#)lofs_vfsops.c	1.2 (Berkeley) 6/18/92
- * $FreeBSD: src/sys/fs/nullfs/null_vfsops.c,v 1.63 2004/07/30 22:08:50 phk Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null_vfsops.c,v 1.63.2.1 2005/01/31 23:25:57 imp Exp $
  */
 
 /*

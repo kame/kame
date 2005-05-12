@@ -1,4 +1,4 @@
-/*
+/*-
  * Defines for Cronyx-Tau adapter driver.
  *
  * Copyright (C) 1999-2004 Cronyx Engineering.
@@ -13,7 +13,7 @@
  * works or modified versions.
  *
  * Cronyx Id: ng_cx.h,v 1.1.2.3 2004/01/27 14:39:11 rik Exp $
- * $FreeBSD: src/sys/dev/cx/ng_cx.h,v 1.2 2004/02/14 21:08:11 rik Exp $
+ * $FreeBSD: src/sys/dev/cx/ng_cx.h,v 1.2.4.1 2005/01/30 00:59:34 imp Exp $
  */
 
 #ifdef NETGRAPH

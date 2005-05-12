@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996, Sujal M. Patel
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/isa/pnpreg.h,v 1.5 2002/04/09 11:18:40 phk Exp $
+ *	$FreeBSD: src/sys/isa/pnpreg.h,v 1.5.8.1 2005/01/31 23:26:15 imp Exp $
  *      from: pnp.h,v 1.7 1998/09/13 22:15:44 eivind Exp
  */
 

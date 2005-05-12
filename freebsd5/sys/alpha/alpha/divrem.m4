@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/alpha/divrem.m4,v 1.3 2000/05/01 20:17:45 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/divrem.m4,v 1.3.8.2 2005/01/30 00:59:09 imp Exp $ */
 /*	$NetBSD: divrem.m4,v 1.5 1996/10/17 04:26:25 cgd Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -172,7 +172,7 @@ ifelse(OP, `div',
 ifelse(S, `true',
 `
 	/* Check to see if we should negate it. */
-	subqv	zero, RESULT, T_0
+	subq	zero, RESULT, T_0
 	cmovlbs	NEG, T_0, RESULT
 ')
 

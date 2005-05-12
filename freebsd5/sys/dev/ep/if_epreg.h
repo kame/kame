@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Herb Peyerl (hpeyerl@novatel.ca) All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -19,7 +19,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_epreg.h,v 1.36 2003/11/02 20:08:58 imp Exp $
+ * $FreeBSD: src/sys/dev/ep/if_epreg.h,v 1.36.4.1 2005/01/30 00:59:39 imp Exp $
  */
 
 /*

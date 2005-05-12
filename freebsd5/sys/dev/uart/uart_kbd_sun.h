@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
  * All rights reserved.
  *
@@ -32,7 +32,7 @@
  * Agency (DARPA) and Air Force Research Laboratory, Air Force
  * Materiel Command, USAF, under agreement number F30602-01-2-0537.
  *
- * $FreeBSD: src/sys/dev/uart/uart_kbd_sun.h,v 1.1 2003/11/11 07:33:24 jake Exp $
+ * $FreeBSD: src/sys/dev/uart/uart_kbd_sun.h,v 1.1.4.1 2005/01/30 01:00:08 imp Exp $
  */
 
 /* keyboard commands (host->kbd) */

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-lowlevel.c,v 1.44.2.2 2004/09/30 21:29:19 sos Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-lowlevel.c,v 1.44.2.5 2005/03/24 18:44:27 mdodd Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -297,13 +297,17 @@ ata_end_transaction(struct ata_request *request)
 
     /* ATA PIO data transfer and control commands */
     default:
+	/* XXX Doesn't handle the non-PIO case. */
+	if (request->flags & ATA_R_TIMEOUT)
+	    return ATA_OP_FINISHED;
 
 	/* on control commands read back registers to the request struct */
 	if (request->flags & ATA_R_CONTROL) {
 	    request->u.ata.count = ATA_IDX_INB(ch, ATA_COUNT);
 	    request->u.ata.lba = ATA_IDX_INB(ch, ATA_SECTOR) |
 				 (ATA_IDX_INB(ch, ATA_CYL_LSB) << 8) |
-				 (ATA_IDX_INB(ch, ATA_CYL_MSB) << 16);
+				 (ATA_IDX_INB(ch, ATA_CYL_MSB) << 16) |
+	    			 ((ATA_IDX_INB(ch, ATA_DRIVE) & 0x0f) << 24);
 	}
 
 	/* if we got an error we are done with the HW */
@@ -320,7 +324,7 @@ ata_end_transaction(struct ata_request *request)
 		ata_pio_read(request, request->transfersize);
 
 	    /* update how far we've gotten */
-		request->donecount += request->transfersize;
+	    request->donecount += request->transfersize;
 
 	    /* do we need a scoop more ? */
 	    if (request->bytecount > request->donecount) {
@@ -492,7 +496,7 @@ ata_end_transaction(struct ata_request *request)
 static void
 ata_generic_reset(struct ata_channel *ch)
 {
-    u_int8_t err, lsb, msb, ostat0, ostat1;
+    u_int8_t err = 0, lsb = 0, msb = 0, ostat0, ostat1;
     u_int8_t stat0 = 0, stat1 = 0;
     int mask = 0, timeout;
 
@@ -601,21 +605,28 @@ ata_generic_reset(struct ata_channel *ch)
 	    }
 	}
 	if (mask == 0x01)	/* wait for master only */
-	    if (!(stat0 & ATA_S_BUSY) || (stat0 == 0xff && timeout > 5))
+	    if (!(stat0 & ATA_S_BUSY) || (stat0 == 0xff && timeout > 5) ||
+		(stat0 == err && lsb == err && msb == err && timeout > 5))
 		break;
 	if (mask == 0x02)	/* wait for slave only */
-	    if (!(stat1 & ATA_S_BUSY) || (stat1 == 0xff && timeout > 5))
+	    if (!(stat1 & ATA_S_BUSY) || (stat1 == 0xff && timeout > 5) ||
+		(stat1 == err && lsb == err && msb == err && timeout > 5))
 		break;
 	if (mask == 0x03) {	/* wait for both master & slave */
 	    if (!(stat0 & ATA_S_BUSY) && !(stat1 & ATA_S_BUSY))
 		break;
-	    if (stat0 == 0xff && timeout > 5)
+	    if ((stat0 == 0xff && timeout > 5) ||
+		(stat0 == err && lsb == err && msb == err && timeout > 5))
 		mask &= ~0x01;
-	    if (stat1 == 0xff && timeout > 5)
+	    if ((stat1 == 0xff && timeout > 5) ||
+		(stat1 == err && lsb == err && msb == err && timeout > 5))
 		mask &= ~0x02;
 	}
+	if (mask == 0 && !(stat0 & ATA_S_BUSY) && !(stat1 & ATA_S_BUSY))
+	    break;
+
 	ata_udelay(100000);
-    }	
+    }
 
     if (bootverbose)
 	ata_printf(ch, -1,
@@ -700,7 +711,7 @@ ata_generic_command(struct ata_device *atadev, u_int8_t command,
     ATA_IDX_OUTB(atadev->channel, ATA_ALTSTAT, ATA_A_4BIT);
 
     /* only use 48bit addressing if needed (avoid bugs and overhead) */
-    if ((lba > 268435455 || count > 256) && atadev->param && 
+    if ((lba >= ATA_MAX_28BIT_LBA || count > 256) && atadev->param && 
 	atadev->param->support.command2 & ATA_SUPPORT_ADDRESS48) {
 
 	/* translate command into 48bit version */

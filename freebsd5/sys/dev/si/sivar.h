@@ -1,4 +1,4 @@
-/*
+/*-
  * Device driver for Specialix range (SI/XIO) of serial line multiplexors.
  *
  * Copyright (C) 2000, Peter Wemm <peter@netplex.com.au>
@@ -17,7 +17,7 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- * $FreeBSD: src/sys/dev/si/sivar.h,v 1.1 2000/01/24 07:24:02 peter Exp $
+ * $FreeBSD: src/sys/dev/si/sivar.h,v 1.1.26.1 2005/01/30 01:00:01 imp Exp $
  */
 
 int	siattach(device_t dev);

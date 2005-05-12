@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 2000 Hellmuth Michaelis.
  *
  * All rights reserved.
@@ -31,7 +31,7 @@
  *
  *	Last Edit-Date: [Sun Mar 26 10:38:49 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_tbl.h,v 1.8 2000/03/26 09:17:13 hm Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_tbl.h,v 1.8.8.1 2005/01/31 23:26:06 imp Exp $
  *
  *---------------------------------------------------------------------------*
  *

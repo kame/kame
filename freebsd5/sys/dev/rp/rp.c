@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright (c) Comtrol Corporation <support@comtrol.com>
  * All rights reserved.
  *
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/rp/rp.c,v 1.64 2004/07/15 20:47:38 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/rp/rp.c,v 1.64.2.1 2005/01/30 01:00:00 imp Exp $");
 
 /* 
  * rp.c - for RocketPort FreeBSD

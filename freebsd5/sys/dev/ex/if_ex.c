@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996, Javier Martín Rueda (jmrueda@diatel.upm.es)
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ex/if_ex.c,v 1.53 2004/08/13 23:06:55 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ex/if_ex.c,v 1.53.2.2 2005/01/30 00:59:40 imp Exp $");
 
 /*
  * Intel EtherExpress Pro/10, Pro/10+ Ethernet driver
@@ -697,7 +697,7 @@ ex_rx_intr(struct ex_softc *sc)
 				ipkt->m_len = MHLEN;
 
 				while (pkt_len > 0) {
-					if (pkt_len > MINCLSIZE) {
+					if (pkt_len >= MINCLSIZE) {
 						MCLGET(m, M_DONTWAIT);
 						if (m->m_flags & M_EXT) {
 							m->m_len = MCLBYTES;

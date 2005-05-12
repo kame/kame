@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic register and struct definitions for the BusLogic
  * MultiMaster SCSI host adapters.  Product specific probe and
  * attach routines can be found in:
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/buslogic/btreg.h,v 1.15 2001/08/26 21:51:35 peter Exp $
+ * $FreeBSD: src/sys/dev/buslogic/btreg.h,v 1.15.8.1 2005/01/30 00:59:31 imp Exp $
  */
 
 #ifndef _BTREG_H_

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Copyright (c) 2002 Eric Moore
  * Copyright (c) 2002 LSI Logic Corporation
  * All rights reserved.
@@ -55,7 +55,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/amr/amr_cam.c,v 1.9 2003/08/24 17:48:03 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/amr/amr_cam.c,v 1.9.4.3.2.1 2005/05/06 00:54:02 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -139,10 +139,12 @@ amr_cam_attach(struct amr_softc *sc)
     /*
      * Allocate a devq for all our channels combined.  This should
      * allow for the maximum number of SCSI commands we will accept
-     * at one time.
+     * at one time. Save the pointer in the softc so we can find it later
+     * during detach.
      */
     if ((devq = cam_simq_alloc(AMR_MAX_SCSI_CMDS)) == NULL)
 	return(ENOMEM);
+    sc->amr_cam_devq = devq;
 
     /*
      * Iterate over our channels, registering them with CAM
@@ -182,19 +184,22 @@ amr_cam_attach(struct amr_softc *sc)
 void
 amr_cam_detach(struct amr_softc *sc)
 {
-    int		chn, first;
+    int		chn;
 
-    for (chn = 0, first = 1; chn < sc->amr_maxchan; chn++) {
+    for (chn = 0; chn < sc->amr_maxchan; chn++) {
 
 	/*
 	 * If a sim was allocated for this channel, free it
 	 */
 	if (sc->amr_cam_sim[chn] != NULL) {
 	    xpt_bus_deregister(cam_sim_path(sc->amr_cam_sim[chn]));
-	    cam_sim_free(sc->amr_cam_sim[chn], first ? TRUE : FALSE);
-	    first = 0;
+	    cam_sim_free(sc->amr_cam_sim[chn], FALSE);
 	}
     }
+
+    /* Now free the devq */
+    if (sc->amr_cam_devq != NULL)
+	cam_simq_free(sc->amr_cam_devq);
 }
 
 /********************************************************************************
@@ -257,8 +262,10 @@ amr_cam_action(struct cam_sim *sim, union ccb *ccb)
 	    /* save the channel number in the ccb */
 	    csio->ccb_h.sim_priv.entries[0].field = cam_sim_bus(sim);
 
+	    mtx_lock(&sc->amr_io_lock);
 	    amr_enqueue_ccb(sc, ccb);
 	    amr_startio(sc);
+	    mtx_unlock(&sc->amr_io_lock);
 	    return;
 	}
 	break;
@@ -443,7 +450,7 @@ amr_cam_command(struct amr_softc *sc, struct amr_command **acp)
 	goto out;
     }
 
-    ac->ac_flags |= AMR_CMD_DATAOUT;
+    ac->ac_flags |= AMR_CMD_DATAOUT | AMR_CMD_DATAIN;
 
     ac->ac_ccb_data = csio->data_ptr;
     ac->ac_ccb_length = csio->dxfer_len;
@@ -486,7 +493,11 @@ out:
 static void
 amr_cam_poll(struct cam_sim *sim)
 {
+    struct amr_softc	*sc = cam_sim_softc(sim);
+
+    mtx_lock(&sc->amr_io_lock);
     amr_done(cam_sim_softc(sim));
+    mtx_unlock(&sc->amr_io_lock);
 }
 
  /********************************************************************************
@@ -501,7 +512,7 @@ amr_cam_complete(struct amr_command *ac)
 
     /* XXX note that we're ignoring ac->ac_status - good idea? */
 
-    debug(1, "status 0x%x  scsi_status 0x%x", ac->ac_status, ap->ap_scsi_status);
+    debug(1, "status 0x%x  AP scsi_status 0x%x", ac->ac_status, ap->ap_scsi_status);
 
     /*
      * Hide disks from CAM so that they're not picked up and treated as 'normal' disks.
@@ -547,7 +558,11 @@ amr_cam_complete(struct amr_command *ac)
     free(ap, M_DEVBUF);
     if ((csio->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE)
 	debug(2, "%*D\n", imin(csio->dxfer_len, 16), csio->data_ptr, " ");
+    mtx_unlock(&ac->ac_sc->amr_io_lock);
+    mtx_lock(&Giant);
     xpt_done((union ccb *)csio);
+    mtx_unlock(&Giant);
+    mtx_lock(&ac->ac_sc->amr_io_lock);
     amr_releasecmd(ac);
 }
 
@@ -564,7 +579,7 @@ amr_cam_complete_extcdb(struct amr_command *ac)
 
     /* XXX note that we're ignoring ac->ac_status - good idea? */
 
-    debug(1, "status 0x%x  scsi_status 0x%x", ac->ac_status, aep->ap_scsi_status);
+    debug(1, "status 0x%x  AEP scsi_status 0x%x", ac->ac_status, aep->ap_scsi_status);
 
     /*
      * Hide disks from CAM so that they're not picked up and treated as 'normal' disks.
@@ -610,6 +625,10 @@ amr_cam_complete_extcdb(struct amr_command *ac)
     free(aep, M_DEVBUF);
     if ((csio->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE)
 	debug(2, "%*D\n", imin(csio->dxfer_len, 16), csio->data_ptr, " ");
+    mtx_unlock(&ac->ac_sc->amr_io_lock);
+    mtx_lock(&Giant);
     xpt_done((union ccb *)csio);
+    mtx_unlock(&Giant);
+    mtx_lock(&ac->ac_sc->amr_io_lock);
     amr_releasecmd(ac);
 }

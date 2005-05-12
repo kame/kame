@@ -34,7 +34,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumio.c,v 1.39 2003/05/23 00:59:53 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.100 2004/06/22 06:38:01 le Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.100.2.1 2004/11/29 23:40:17 peter Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -707,7 +707,7 @@ vinum_scandisk(char *devicename)
     /* Open all drives and find which was modified most recently */
     for (cp = devicename; *cp; cp = ep) {
 	char part;					    /* UNIX partition */
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 	int slice;
 #endif
 
@@ -729,7 +729,7 @@ vinum_scandisk(char *devicename)
 
 	goodpart = 0;					    /* no partitions on this disk yet */
 	partnamelen = MAXPATHLEN + np - partname;	    /* remaining length in partition name */
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 	/* first try the partition table */
 	for (slice = 1; slice < 5; slice++)
 	    for (part = 'a'; part < 'i'; part++) {

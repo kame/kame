@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_hdlc.c - software-HDLC constant tables
  *	------------------------------------------
@@ -32,7 +33,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/i4b_hdlc.c,v 1.2 2003/06/10 23:18:32 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/i4b_hdlc.c,v 1.2.4.1 2005/01/31 23:26:09 imp Exp $");
 
 #include <sys/types.h>
 

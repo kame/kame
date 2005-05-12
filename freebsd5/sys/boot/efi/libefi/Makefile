@@ -1,9 +1,9 @@
-# $FreeBSD: src/sys/boot/efi/libefi/Makefile,v 1.14 2004/02/13 04:43:41 marcel Exp $
+# $FreeBSD: src/sys/boot/efi/libefi/Makefile,v 1.14.2.1 2005/02/13 07:23:31 obrien Exp $
 
 .PATH: ${.CURDIR}/../../../${MACHINE_ARCH}/${MACHINE_ARCH}
 
 LIB=		efi
-INTERNALLIB=	true
+INTERNALLIB=
 
 SRCS=	libefi.c efi_console.c time.c copy.c devicename.c module.c
 SRCS+=	delay.c efifs.c efinet.c elf_freebsd.c bootinfo.c pal.S

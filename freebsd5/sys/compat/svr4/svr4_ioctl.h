@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1994 Christos Zoulas
  * All rights reserved.
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_ioctl.h,v 1.5 2002/03/20 05:41:37 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_ioctl.h,v 1.5.8.1 2005/01/30 00:59:20 imp Exp $
  */
 
 #ifndef	_SVR4_IOCTL_H_

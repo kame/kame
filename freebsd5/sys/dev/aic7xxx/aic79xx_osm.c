@@ -1,4 +1,4 @@
-/*
+/*-
  * Bus independent FreeBSD shim for the aic79xx based Adaptec SCSI controllers
  *
  * Copyright (c) 1994-2002, 2004 Justin T. Gibbs.
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.19 2004/08/17 00:14:30 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.19.2.2 2005/02/16 17:43:26 gibbs Exp $");
 
 #include <dev/aic7xxx/aic79xx_osm.h>
 #include <dev/aic7xxx/aic79xx_inline.h>
@@ -592,7 +592,7 @@ ahd_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->hba_misc = 0;
 		cpi->hba_eng_cnt = 0;
 		cpi->max_target = (ahd->features & AHD_WIDE) ? 15 : 7;
-		cpi->max_lun = AHD_NUM_LUNS - 1;
+		cpi->max_lun = AHD_NUM_LUNS_NONPKT - 1;
 		cpi->initiator_id = ahd->our_id;
 		if ((ahd->flags & AHD_RESET_BUS_A) == 0) {
 			cpi->hba_misc |= PIM_NOBUSRESET;

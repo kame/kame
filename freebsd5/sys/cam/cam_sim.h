@@ -1,4 +1,4 @@
-/*
+/*-
  * Data structures and definitions for SCSI Interface Modules (SIMs).
  *
  * Copyright (c) 1997 Justin T. Gibbs.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_sim.h,v 1.5 2001/01/24 01:46:18 jhb Exp $
+ * $FreeBSD: src/sys/cam/cam_sim.h,v 1.5.8.1 2005/01/30 00:59:16 imp Exp $
  */
 
 #ifndef _CAM_CAM_SIM_H

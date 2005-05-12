@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_bmap.c	8.7 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_bmap.c,v 1.57 2004/04/07 20:46:03 imp Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_bmap.c,v 1.57.2.1 2005/01/31 23:26:01 imp Exp $
  */
 
 #include <sys/param.h>

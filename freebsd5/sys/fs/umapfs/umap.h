@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)umap.h	8.4 (Berkeley) 8/20/94
  *
- * $FreeBSD: src/sys/fs/umapfs/umap.h,v 1.17 2004/04/07 20:46:02 imp Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap.h,v 1.17.2.1 2005/01/31 23:25:59 imp Exp $
  */
 
 #define MAPFILEENTRIES 64

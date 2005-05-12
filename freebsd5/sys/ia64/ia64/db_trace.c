@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/db_trace.c,v 1.20 2004/07/21 05:07:09 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/db_trace.c,v 1.20.2.1 2004/11/23 21:08:14 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -57,10 +57,12 @@ db_backtrace(struct thread *td, struct pcb *pcb, int count)
 	db_expr_t offset;
 	uint64_t bsp, cfm, ip, pfs, reg, sp;
 	c_db_sym_t sym;
-	int args, error, i;
+	int args, error, i, quit;
 
+	quit = 0;
+	db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
 	error = unw_create_from_pcb(&rs, pcb);
-	while (!error && count--) {
+	while (!error && count-- && !quit) {
 		error = unw_get_cfm(&rs, &cfm);
 		if (!error)
 			error = unw_get_bsp(&rs, &bsp);

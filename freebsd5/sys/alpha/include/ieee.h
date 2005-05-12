@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/ieee.h,v 1.3 2004/04/05 21:00:50 imp Exp $ */
+/* $FreeBSD: src/sys/alpha/include/ieee.h,v 1.3.2.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: ieee.h,v 1.2 1997/04/06 08:47:27 cgd Exp */
 
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

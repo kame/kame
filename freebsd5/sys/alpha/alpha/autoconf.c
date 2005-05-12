@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/autoconf.c,v 1.60 2004/07/28 21:54:56 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/autoconf.c,v 1.60.2.1 2005/03/22 00:14:16 iedowse Exp $");
 
 #include "opt_bootp.h"
 #include "opt_isa.h"
@@ -54,26 +54,20 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/autoconf.c,v 1.60 2004/07/28 21:54:56 ph
 #include <cam/cam_xpt_sim.h>
 #include <cam/cam_debug.h>
 
+static void	configure_first(void *);
 static void	configure(void *);
-SYSINIT(configure, SI_SUB_CONFIGURE, SI_ORDER_THIRD, configure, NULL)
+static void	configure_final(void *);
 
-static void	configure_finish(void);
-static void	configure_start(void);
+SYSINIT(configure1, SI_SUB_CONFIGURE, SI_ORDER_FIRST, configure_first, NULL);
+/* SI_ORDER_SECOND is hookable */
+SYSINIT(configure2, SI_SUB_CONFIGURE, SI_ORDER_THIRD, configure, NULL);
+/* SI_ORDER_MIDDLE is hookable */
+SYSINIT(configure3, SI_SUB_CONFIGURE, SI_ORDER_ANY, configure_final, NULL);
 
 #ifdef DEV_ISA
 #include <isa/isavar.h>
 device_t isa_bus_device = 0;
 #endif
-
-static void
-configure_start()
-{
-}
-
-static void
-configure_finish()
-{
-}
 
 #if 0
 
@@ -164,9 +158,13 @@ bootdev_ctrl_dev_type(void)
  * Determine i/o configuration for a machine.
  */
 static void
+configure_first(void *dummy)
+{
+}
+
+static void
 configure(void *dummy)
 {
-	configure_start();
 
 	device_add_child(root_bus, platform.iobus, 0);
 
@@ -179,8 +177,11 @@ configure(void *dummy)
 	if (isa_bus_device)
 		isa_probe_children(isa_bus_device);
 #endif
+}
 
-	configure_finish();
+static void
+configure_final(void *dummy)
+{
 
 	/*
 	 * Now we're ready to handle (pending) interrupts.

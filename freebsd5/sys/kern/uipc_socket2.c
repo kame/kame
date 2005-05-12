@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_socket2.c,v 1.137.4.1 2004/10/28 20:04:14 maxim Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_socket2.c,v 1.137.2.6 2005/04/01 05:34:18 rwatson Exp $");
 
 #include "opt_mac.h"
 #include "opt_param.h"
@@ -143,7 +143,7 @@ soisconnected(so)
 			so->so_rcv.sb_flags |= SB_UPCALL;
 			so->so_options &= ~SO_ACCEPTFILTER;
 			SOCK_UNLOCK(so);
-			so->so_upcall(so, so->so_upcallarg, M_TRYWAIT);
+			so->so_upcall(so, so->so_upcallarg, M_DONTWAIT);
 		}
 		return;
 	}
@@ -223,10 +223,10 @@ sonewconn(head, connstatus)
 	over = (head->so_qlen > 3 * head->so_qlimit / 2);
 	ACCEPT_UNLOCK();
 	if (over)
-		return ((struct socket *)0);
+		return (NULL);
 	so = soalloc(M_NOWAIT);
 	if (so == NULL)
-		return ((struct socket *)0);
+		return (NULL);
 	if ((head->so_options & SO_ACCEPTFILTER) != 0)
 		connstatus = 0;
 	so->so_head = head;
@@ -247,8 +247,9 @@ sonewconn(head, connstatus)
 	if (soreserve(so, head->so_snd.sb_hiwat, head->so_rcv.sb_hiwat) ||
 	    (*so->so_proto->pr_usrreqs->pru_attach)(so, 0, NULL)) {
 		sodealloc(so);
-		return ((struct socket *)0);
+		return (NULL);
 	}
+	so->so_state |= connstatus;
 	ACCEPT_LOCK();
 	if (connstatus) {
 		TAILQ_INSERT_TAIL(&head->so_comp, so, so_list);
@@ -256,11 +257,11 @@ sonewconn(head, connstatus)
 		head->so_qlen++;
 	} else {
 		/*
-		 * XXXRW: Keep removing sockets from the head until there's
-		 * room for us to insert on the tail.  In pre-locking
-		 * revisions, this was a simple if(), but as we could be
-		 * racing with other threads and soabort() requires dropping
-		 * locks, we must loop waiting for the condition to be true.
+		 * Keep removing sockets from the head until there's room for
+		 * us to insert on the tail.  In pre-locking revisions, this
+		 * was a simple if(), but as we could be racing with other
+		 * threads and soabort() requires dropping locks, we must
+		 * loop waiting for the condition to be true.
 		 */
 		while (head->so_incqlen > head->so_qlimit) {
 			struct socket *sp;
@@ -279,7 +280,6 @@ sonewconn(head, connstatus)
 	}
 	ACCEPT_UNLOCK();
 	if (connstatus) {
-		so->so_state |= connstatus;
 		sorwakeup(head);
 		wakeup_one(&head->so_timeo);
 	}

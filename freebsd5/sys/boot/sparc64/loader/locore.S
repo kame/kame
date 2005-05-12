@@ -1,4 +1,4 @@
-/*
+/*-
  * Initial implementation:
  * Copyright (c) 2001 Robert Drehmel
  * All rights reserved.
@@ -6,7 +6,7 @@
  * As long as the above copyright statement and this notice remain
  * unchanged, you can do what ever you want with this file. 
  *
- * $FreeBSD: src/sys/boot/sparc64/loader/locore.S,v 1.6 2002/05/29 05:49:58 jake Exp $
+ * $FreeBSD: src/sys/boot/sparc64/loader/locore.S,v 1.6.8.1 2005/01/30 00:59:15 imp Exp $
  */
 
 #define	LOCORE

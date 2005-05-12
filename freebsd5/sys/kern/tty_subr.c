@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, David Greenman
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/tty_subr.c,v 1.42 2004/07/15 20:47:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/tty_subr.c,v 1.42.2.1 2005/01/31 23:26:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

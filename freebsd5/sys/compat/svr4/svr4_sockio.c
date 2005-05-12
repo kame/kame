@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1995 Christos Zoulas
  * All rights reserved.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_sockio.c,v 1.15 2003/06/10 21:35:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_sockio.c,v 1.15.4.1 2005/01/30 00:59:20 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>

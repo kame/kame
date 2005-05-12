@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic driver for the BusLogic MultiMaster SCSI host adapters
  * Product specific probe and attach routines can be found in:
  * sys/dev/buslogic/bt_isa.c	BT-54X, BT-445 cards
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt.c,v 1.43 2003/08/25 09:28:54 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt.c,v 1.43.4.1 2005/01/30 00:59:31 imp Exp $");
 
  /*
   * Special thanks to Leonard N. Zubkoff for writing such a complete and

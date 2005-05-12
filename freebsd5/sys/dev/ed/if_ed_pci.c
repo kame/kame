@@ -18,7 +18,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.36 2004/06/18 01:28:54 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.36.2.1 2005/02/02 22:44:25 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.36 2004/06/18 01:28:54 imp Ex
 
 static struct _pcsid
 {
-	u_int32_t	type;
+	uint32_t	type;
 	const char	*desc;
 } pci_ids[] =
 {
@@ -64,7 +64,7 @@ static int	ed_pci_attach(device_t);
 static int
 ed_pci_probe(device_t dev)
 {
-	u_int32_t	type = pci_get_devid(dev);
+	uint32_t	type = pci_get_devid(dev);
 	struct _pcsid	*ep =pci_ids;
 
 	while (ep->type && ep->type != type)

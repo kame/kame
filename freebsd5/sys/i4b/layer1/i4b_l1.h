@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------*
+ */
+
+/*---------------------------------------------------------------------------*
  *
  *	i4b_l1.h - isdn4bsd layer 1 header file
  *	---------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_l1.h,v 1.13 2001/12/22 09:21:54 gj Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_l1.h,v 1.13.8.1 2005/01/31 23:26:09 imp Exp $
  *
  *      last edit-date: [Tue Jan 23 17:04:57 2001]
  *

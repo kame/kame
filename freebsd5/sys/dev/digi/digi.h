@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/digi/digi.h,v 1.17 2004/07/11 15:18:37 phk Exp $
+ * $FreeBSD: src/sys/dev/digi/digi.h,v 1.17.2.1 2005/02/05 23:42:58 dwhite Exp $
  */
 
 #define	W(p)				(*(u_int16_t *)(p))
@@ -177,7 +177,6 @@ struct digi_softc {
 #endif
 
 	struct digi_p *ports;	/* pointer to array of port descriptors */
-	struct tty *ttys;	/* pointer to array of TTY structures */
 	volatile struct global_data *gdata;
 	u_char window;		/* saved window */
 	int win_size;

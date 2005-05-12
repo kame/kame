@@ -1,4 +1,4 @@
-/*
+/*-
  * Common functions for SCSI Interface Modules (SIMs).
  *
  * Copyright (c) 1997 Justin T. Gibbs.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/cam_sim.c,v 1.7 2003/06/10 17:50:20 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/cam_sim.c,v 1.7.4.1 2005/01/30 00:59:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

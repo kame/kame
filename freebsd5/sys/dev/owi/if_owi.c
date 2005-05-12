@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -100,7 +100,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/owi/if_owi.c,v 1.7 2004/05/23 16:11:50 mux Exp $";
+  "$FreeBSD: src/sys/dev/owi/if_owi.c,v 1.7.2.1 2005/01/30 00:59:56 imp Exp $";
 #endif
 
 static void wi_intr(void *);

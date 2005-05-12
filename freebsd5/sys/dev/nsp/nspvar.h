@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/dev/nsp/nspvar.h,v 1.7 2002/05/31 23:39:04 imp Exp $	*/
+/*	$FreeBSD: src/sys/dev/nsp/nspvar.h,v 1.7.8.1 2005/01/30 00:59:56 imp Exp $	*/
 /*	$NecBSD: nspvar.h,v 1.7.14.5 2001/06/29 06:27:54 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.

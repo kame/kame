@@ -1,6 +1,6 @@
 /* drmP.h -- Private header for Direct Rendering Manager -*- linux-c -*-
- * Created: Mon Jan  4 10:05:05 1999 by faith@precisioninsight.com
- *
+ * Created: Mon Jan  4 10:05:05 1999 by faith@precisioninsight.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All rights reserved.
@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drmP.h,v 1.11 2004/06/16 09:46:42 phk Exp $
+ * $FreeBSD: src/sys/dev/drm/drmP.h,v 1.11.2.1 2005/01/30 00:59:35 imp Exp $
  */
 
 #ifndef _DRM_P_H_

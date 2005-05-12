@@ -1,6 +1,6 @@
 /* mga_state.c -- State support for MGA G200/G400 -*- linux-c -*-
- * Created: Thu Jan 27 02:53:43 2000 by jhartmann@precisioninsight.com
- *
+ * Created: Thu Jan 27 02:53:43 2000 by jhartmann@precisioninsight.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/drm/mga_state.c,v 1.8 2003/08/24 22:04:12 anholt Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/drm/mga_state.c,v 1.8.4.1 2005/01/30 00:59:36 imp Exp $");
 
 #include "dev/drm/mga.h"
 #include "dev/drm/drmP.h"

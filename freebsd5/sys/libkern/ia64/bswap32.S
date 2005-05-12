@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  *	from: NetBSD: htonl.S,v 1.1 1996/04/17 22:36:52 cgd
  *	from: src/sys/libkern/ia64/htonl.S,v 1.2 2002/02/18 20:35:21
  *
- * $FreeBSD: src/sys/libkern/ia64/bswap32.S,v 1.1 2002/02/27 17:16:08 tmm Exp $
+ * $FreeBSD: src/sys/libkern/ia64/bswap32.S,v 1.1.8.1 2005/01/31 23:26:21 imp Exp $
  */
 
 #define	NAME	__bswap32

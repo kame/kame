@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.112.2.1 2004/09/20 05:28:08 sanpei Exp $
+ *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.112.2.6 2005/03/31 19:38:40 iedowse Exp $
  *	$NetBSD: umass.c,v 1.28 2000/04/02 23:46:53 augustss Exp $
  */
 
@@ -162,7 +162,9 @@ SYSCTL_INT(_hw_usb_umass, OID_AUTO, debug, CTLFLAG_RW,
 #define DEVNAME_SIM	"umass-sim"
 
 #define UMASS_MAX_TRANSFER_SIZE		65536
-#define UMASS_DEFAULT_TRANSFER_SPEED	1000
+/* Approximate maximum transfer speeds (assumes 33% overhead). */
+#define UMASS_FULL_TRANSFER_SPEED	1000
+#define UMASS_HIGH_TRANSFER_SPEED	40000
 #define UMASS_FLOPPY_TRANSFER_SPEED	20
 
 #define UMASS_TIMEOUT			5000 /* msecs */
@@ -449,6 +451,14 @@ Static struct umass_devdescr_t umass_devdescrs[] = {
           UMASS_PROTO_ATAPI | UMASS_PROTO_BBB,
 	  IGNORE_RESIDUE
 	},
+	{ USB_VENDOR_TRUMPION, USB_PRODUCT_TRUMPION_C3310, RID_WILDCARD,
+	  UMASS_PROTO_UFI | UMASS_PROTO_CBI,
+	  NO_QUIRKS
+	},
+	{ USB_VENDOR_TWINMOS, USB_PRODUCT_TWINMOS_MDIV, RID_WILDCARD,
+	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
+	  NO_QUIRKS
+	},
 	{ USB_VENDOR_WESTERN,  USB_PRODUCT_WESTERN_EXTHDD, RID_WILDCARD,
 	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
 	  FORCE_SHORT_INQUIRY | NO_START_STOP | IGNORE_RESIDUE
@@ -577,6 +587,7 @@ struct umass_softc {
 	unsigned char 		cam_scsi_command2[CAM_MAX_CDBLEN];
 	struct scsi_sense	cam_scsi_sense;
 	struct scsi_sense	cam_scsi_test_unit_ready;
+	usb_callout_t		cam_scsi_rescan_ch;
 
 	int			timeout;		/* in msecs */
 
@@ -874,6 +885,7 @@ USB_ATTACH(umass)
 
 	sc->iface = uaa->iface;
 	sc->ifaceno = uaa->ifaceno;
+	usb_callout_init(sc->cam_scsi_rescan_ch);
 
 	/* initialise the proto and drive values in the umass_softc (again) */
 	(void) umass_match_proto(sc, sc->iface, uaa->device);
@@ -926,7 +938,7 @@ USB_ATTACH(umass)
 #endif
 
 	if (sc->quirks & ALT_IFACE_1) {
-		err = usbd_set_interface(0, 1);
+		err = usbd_set_interface(uaa->iface, 1);
 		if (err) {
 			DPRINTF(UDMASS_USB, ("%s: could not switch to "
 				"Alt Interface %d\n",
@@ -1121,6 +1133,16 @@ USB_DETACH(umass)
 
 	sc->flags |= UMASS_FLAGS_GONE;
 
+	/* abort all the pipes in case there are transfers active. */
+	usbd_abort_default_pipe(sc->sc_udev);
+	if (sc->bulkout_pipe)
+		usbd_abort_pipe(sc->bulkout_pipe);
+	if (sc->bulkin_pipe)
+		usbd_abort_pipe(sc->bulkin_pipe);
+	if (sc->intrin_pipe)
+		usbd_abort_pipe(sc->intrin_pipe);
+
+	usb_uncallout_drain(sc->cam_scsi_rescan_ch, umass_cam_rescan, sc);
 	if ((sc->proto & UMASS_PROTO_SCSI) ||
 	    (sc->proto & UMASS_PROTO_ATAPI) ||
 	    (sc->proto & UMASS_PROTO_UFI) ||
@@ -1430,6 +1452,14 @@ umass_bbb_state(usbd_xfer_handle xfer, usbd_private_handle priv,
 	DPRINTF(UDMASS_BBB, ("%s: Handling BBB state %d (%s), xfer=%p, %s\n",
 		USBDEVNAME(sc->sc_dev), sc->transfer_state,
 		states[sc->transfer_state], xfer, usbd_errstr(err)));
+
+	/* Give up if the device has detached. */
+	if (sc->flags & UMASS_FLAGS_GONE) {
+		sc->transfer_state = TSTATE_IDLE;
+		sc->transfer_cb(sc, sc->transfer_priv, sc->transfer_datalen,
+		    STATUS_CMD_FAILED);
+		return;
+	}
 
 	switch (sc->transfer_state) {
 
@@ -1884,6 +1914,14 @@ umass_cbi_state(usbd_xfer_handle xfer, usbd_private_handle priv,
 		USBDEVNAME(sc->sc_dev), sc->transfer_state,
 		states[sc->transfer_state], xfer, usbd_errstr(err)));
 
+	/* Give up if the device has detached. */
+	if (sc->flags & UMASS_FLAGS_GONE) {
+		sc->transfer_state = TSTATE_IDLE;
+		sc->transfer_cb(sc, sc->transfer_priv, sc->transfer_datalen,
+		    STATUS_CMD_FAILED);
+		return;
+	}
+
 	switch (sc->transfer_state) {
 
 	/***** CBI Transfer *****/
@@ -2198,15 +2236,16 @@ umass_cam_rescan(void *addr)
 {
 	struct umass_softc *sc = (struct umass_softc *) addr;
 	struct cam_path *path;
-	union ccb *ccb = malloc(sizeof(union ccb), M_USBDEV, M_WAITOK);
-
-	memset(ccb, 0, sizeof(union ccb));
+	union ccb *ccb;
 
 	DPRINTF(UDMASS_SCSI, ("scbus%d: scanning for %s:%d:%d:%d\n",
 		cam_sim_path(sc->umass_sim),
 		USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 		USBDEVUNIT(sc->sc_dev), CAM_LUN_WILDCARD));
 
+	ccb = malloc(sizeof(union ccb), M_USBDEV, M_NOWAIT | M_ZERO);
+	if (ccb == NULL)
+		return;
 	if (xpt_create_path(&path, xpt_periph, cam_sim_path(sc->umass_sim),
 			    CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD)
 	    != CAM_REQ_CMP)
@@ -2233,17 +2272,15 @@ umass_cam_attach(struct umass_softc *sc)
 			cam_sim_path(sc->umass_sim));
 
 	if (!cold) {
-		/* Notify CAM of the new device after 1 second delay. Any
+		/* Notify CAM of the new device after a short delay. Any
 		 * failure is benign, as the user can still do it by hand
 		 * (camcontrol rescan <busno>). Only do this if we are not
 		 * booting, because CAM does a scan after booting has
 		 * completed, when interrupts have been enabled.
 		 */
 
-		/* XXX This will bomb if the driver is unloaded between attach
-		 * and execution of umass_cam_rescan.
-		 */
-		timeout(umass_cam_rescan, sc, MS_TO_TICKS(200));
+		usb_callout(sc->cam_scsi_rescan_ch, MS_TO_TICKS(200),
+		    umass_cam_rescan, sc);
 	}
 
 	return(0);	/* always succesfull */
@@ -2486,9 +2523,15 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 			cpi->max_lun = 0;
 		} else {
 			if (sc->quirks & FLOPPY_SPEED) {
-			    cpi->base_transfer_speed = UMASS_FLOPPY_TRANSFER_SPEED;
+				cpi->base_transfer_speed =
+				    UMASS_FLOPPY_TRANSFER_SPEED;
+			} else if (usbd_get_speed(sc->sc_udev) ==
+			    USB_SPEED_HIGH) {
+				cpi->base_transfer_speed =
+				    UMASS_HIGH_TRANSFER_SPEED;
 			} else {
-			    cpi->base_transfer_speed = UMASS_DEFAULT_TRANSFER_SPEED;
+				cpi->base_transfer_speed =
+				    UMASS_FULL_TRANSFER_SPEED;
 			}
 			cpi->max_lun = sc->maxlun;
 		}
@@ -2591,6 +2634,13 @@ umass_cam_cb(struct umass_softc *sc, void *priv, int residue, int status)
 	union ccb *ccb = (union ccb *) priv;
 	struct ccb_scsiio *csio = &ccb->csio;		/* deref union */
 
+	/* If the device is gone, just fail the request. */
+	if (sc->flags & UMASS_FLAGS_GONE) {
+		ccb->ccb_h.status = CAM_TID_INVALID;
+		xpt_done(ccb);
+		return;
+	}
+
 	csio->resid = residue;
 
 	switch (status) {
@@ -2667,6 +2717,12 @@ umass_cam_sense_cb(struct umass_softc *sc, void *priv, int residue, int status)
 	struct ccb_scsiio *csio = &ccb->csio;		/* deref union */
 	unsigned char *rcmd;
 	int rcmdlen;
+
+	if (sc->flags & UMASS_FLAGS_GONE) {
+		ccb->ccb_h.status = CAM_AUTOSENSE_FAIL;
+		xpt_done(ccb);
+		return;
+	}
 
 	switch (status) {
 	case STATUS_CMD_OK:
@@ -2761,6 +2817,12 @@ umass_cam_quirk_cb(struct umass_softc *sc, void *priv, int residue, int status)
 
 	DPRINTF(UDMASS_SCSI, ("%s: Test unit ready returned status %d\n",
 	USBDEVNAME(sc->sc_dev), status));
+
+	if (sc->flags & UMASS_FLAGS_GONE) {
+		ccb->ccb_h.status = CAM_TID_INVALID;
+		xpt_done(ccb);
+		return;
+	}
 #if 0
 	ccb->ccb_h.status = CAM_REQ_CMP;
 #endif
@@ -2890,6 +2952,7 @@ umass_ufi_transform(struct umass_softc *sc, unsigned char *cmd, int cmdlen,
 
 	case REZERO_UNIT:
 	case REQUEST_SENSE:
+	case FORMAT_UNIT:
 	case INQUIRY:
 	case START_STOP_UNIT:
 	case SEND_DIAGNOSTIC:
@@ -2898,17 +2961,15 @@ umass_ufi_transform(struct umass_softc *sc, unsigned char *cmd, int cmdlen,
 	case READ_10:
 	case WRITE_10:
 	case POSITION_TO_ELEMENT:	/* SEEK_10 */
+	case WRITE_AND_VERIFY:
+	case VERIFY:
 	case MODE_SELECT_10:
 	case MODE_SENSE_10:
 	case READ_12:
 	case WRITE_12:
+	case READ_FORMAT_CAPACITIES:
 		memcpy(*rcmd, cmd, cmdlen);
 		return 1;
-
-	/* Other UFI commands: FORMAT_UNIT, READ_FORMAT_CAPACITY,
-	 * VERIFY, WRITE_AND_VERIFY.
-	 * These should be checked whether they somehow can be made to fit.
-	 */
 
 	default:
 		printf("%s: Unsupported UFI command 0x%02x\n",

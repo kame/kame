@@ -23,9 +23,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/acpica/acpi_pcib_acpi.c,v 1.39.2.2 2004/10/14 23:52:21 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pcib_acpi.c,v 1.39.2.6 2005/03/02 09:28:29 obrien Exp $");
+
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -73,7 +75,7 @@ static void		acpi_pcib_write_config(device_t dev, int bus, int slot,
 static int		acpi_pcib_acpi_route_interrupt(device_t pcib,
 			    device_t dev, int pin);
 static struct resource *acpi_pcib_acpi_alloc_resource(device_t dev,
-  			    device_t child, int type, int *rid,
+			    device_t child, int type, int *rid,
 			    u_long start, u_long end, u_long count,
 			    u_int flags);
 
@@ -92,7 +94,7 @@ static device_method_t acpi_pcib_acpi_methods[] = {
     DEVMETHOD(bus_alloc_resource,	acpi_pcib_acpi_alloc_resource),
     DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
     DEVMETHOD(bus_activate_resource,	bus_generic_activate_resource),
-    DEVMETHOD(bus_deactivate_resource, 	bus_generic_deactivate_resource),
+    DEVMETHOD(bus_deactivate_resource,	bus_generic_deactivate_resource),
     DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
     DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
 
@@ -147,7 +149,7 @@ acpi_pcib_acpi_attach(device_t dev)
      * Get our base bus number by evaluating _BBN.
      * If this doesn't work, we assume we're bus number 0.
      *
-     * XXX note that it may also not exist in the case where we are 
+     * XXX note that it may also not exist in the case where we are
      *     meant to use a private configuration space mechanism for this bus,
      *     so we should dig out our resources and check to see if we have
      *     anything like that.  How do we do this?
@@ -189,8 +191,8 @@ acpi_pcib_acpi_attach(device_t dev)
 		device_printf(dev, "couldn't find _ADR\n");
 	} else {
 	    /* XXX: We assume bus 0. */
-	    slot = addr >> 16;
-	    func = addr & 0xffff;
+	    slot = ACPI_ADR_PCI_SLOT(addr);
+	    func = ACPI_ADR_PCI_FUNC(addr);
 	    if (bootverbose)
 		device_printf(dev, "reading config registers from 0:%d:%d\n",
 		    slot, func);
@@ -264,7 +266,7 @@ acpi_pcib_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 static int
 acpi_pcib_write_ivar(device_t dev, device_t child, int which, uintptr_t value)
 {
-    struct acpi_hpcib_softc 	*sc = device_get_softc(dev);
+    struct acpi_hpcib_softc	*sc = device_get_softc(dev);
 
     switch (which) {
     case PCIB_IVAR_BUS:
@@ -301,8 +303,8 @@ acpi_pcib_acpi_route_interrupt(device_t pcib, device_t dev, int pin)
     return (acpi_pcib_route_interrupt(pcib, dev, pin));
 }
 
-static int acpi_host_mem_start = 0x80000000;
-TUNABLE_INT("hw.acpi.host_mem_start", &acpi_host_mem_start);
+static u_long acpi_host_mem_start = 0x80000000;
+TUNABLE_ULONG("hw.acpi.host_mem_start", &acpi_host_mem_start);
 
 struct resource *
 acpi_pcib_acpi_alloc_resource(device_t dev, device_t child, int type, int *rid,

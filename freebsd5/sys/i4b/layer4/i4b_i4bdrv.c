@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_i4bdrv.c - i4b userland interface driver
  *	--------------------------------------------
@@ -31,10 +32,12 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.41 2004/06/16 09:47:10 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.41.2.1 2005/01/31 23:26:12 imp Exp $");
 
 #include "i4bipr.h"
 #include "i4btel.h"
+#include "i4bing.h"
+#include "i4bisppp.h"
 
 #include <sys/param.h>
 #include <sys/ioccom.h>
@@ -47,9 +50,6 @@ __FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.41 2004/06/16 09:47:10 p
 #include <sys/socket.h>
 #include <sys/selinfo.h>
 #include <net/if.h>
-
-#include "i4bing.h"
-#include "i4bisppp.h"
 
 #include <machine/i4b_debug.h>
 #include <machine/i4b_ioctl.h>

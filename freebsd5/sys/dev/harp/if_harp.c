@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -31,10 +31,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.5 2004/07/15 08:26:01 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.5.2.1 2005/01/30 00:59:43 imp Exp $");
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.5 2004/07/15 08:26:01 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.5.2.1 2005/01/30 00:59:43 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

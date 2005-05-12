@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_types.h	8.3 (Berkeley) 4/28/95
- * $FreeBSD: src/sys/net/if_types.h,v 1.16 2004/04/07 20:46:11 imp Exp $
+ * $FreeBSD: src/sys/net/if_types.h,v 1.16.2.2 2005/03/21 16:05:35 glebius Exp $
  * $NetBSD: if_types.h,v 1.16 2000/04/19 06:30:53 itojun Exp $
  */
 
@@ -247,4 +247,5 @@
 #define	IFT_FAITH	0xf2
 #define	IFT_PFLOG	0xf6
 #define	IFT_PFSYNC	0xf7
+#define	IFT_CARP	0xf8	/* Common Address Redundancy Protocol */
 #endif /* !_NET_IF_TYPES_H_ */

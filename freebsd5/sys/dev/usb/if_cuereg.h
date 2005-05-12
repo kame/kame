@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_cuereg.h,v 1.13 2004/05/23 12:35:24 iedowse Exp $
+ * $FreeBSD: src/sys/dev/usb/if_cuereg.h,v 1.13.2.2 2005/04/01 12:46:26 sobomax Exp $
  */
 
 /*
@@ -116,13 +116,9 @@
 #define CUE_MCAST_TABLE_LEN			64
 
 #define CUE_TIMEOUT		1000
-#define CUE_BUFSZ		1536
 #define CUE_MIN_FRAMELEN	60
 #define CUE_RX_FRAMES		1
 #define CUE_TX_FRAMES		1
-
-#define CUE_RX_LIST_CNT		1
-#define CUE_TX_LIST_CNT		1
 
 #define CUE_CTL_READ		0x01
 #define CUE_CTL_WRITE		0x02
@@ -143,30 +139,11 @@ struct cue_type {
 	u_int16_t		cue_did;
 };
 
-struct cue_softc;
-
-struct cue_chain {
-	struct cue_softc	*cue_sc;
-	usbd_xfer_handle	cue_xfer;
-	char			*cue_buf;
-	struct mbuf		*cue_mbuf;
-	int			cue_accum;
-	int			cue_idx;
-};
-
-struct cue_cdata {
-	struct cue_chain	cue_tx_chain[CUE_TX_LIST_CNT];
-	struct cue_chain	cue_rx_chain[CUE_RX_LIST_CNT];
-	int			cue_tx_prod;
-	int			cue_tx_cons;
-	int			cue_tx_cnt;
-	int			cue_rx_prod;
-};
-
 #define CUE_INC(x, y)		(x) = (x + 1) % y
 
 struct cue_softc {
 	struct arpcom		arpcom;
+	device_t		cue_dev;
 	usbd_device_handle	cue_udev;
 	usbd_interface_handle	cue_iface;
 	int			cue_ed[CUE_ENDPT_MAX];
@@ -175,7 +152,7 @@ struct cue_softc {
 	u_int8_t		cue_mctab[CUE_MCAST_TABLE_LEN];
 	int			cue_if_flags;
 	u_int16_t		cue_rxfilt;
-	struct cue_cdata	cue_cdata;
+	struct ue_cdata		cue_cdata;
 	struct callout_handle	cue_stat_ch;
 #if __FreeBSD_version >= 500000
 	struct mtx		cue_mtx;

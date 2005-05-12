@@ -1,4 +1,4 @@
-/*
+/*-
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.19 2003/07/24 15:25:17 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.19.4.2 2005/03/07 13:08:04 rwatson Exp $");
 
 #ifndef ATM_IP_MODULE
 #include "opt_atm.h"
@@ -522,8 +522,8 @@ ipatm_start()
 		/*
 		 * Now start listening
 		 */
-		if ((err = atm_cm_listen(&ipatm_endpt, (void *)(intptr_t)i,
-				&ipatm_listeners[i].attr,
+		if ((err = atm_cm_listen(NULL, &ipatm_endpt,
+				(void *)(intptr_t)i, &ipatm_listeners[i].attr,
 				&ipatm_listeners[i].conn)) != 0)
 			goto done;
 	}

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_state.c,v 1.2.2.1 2004/09/24 16:23:17 le Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_state.c,v 1.2.2.3 2005/02/10 12:52:32 le Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -37,7 +37,78 @@ __FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_state.c,v 1.2.2.1 2004/09/24 1
 #include <geom/vinum/geom_vinum.h>
 #include <geom/vinum/geom_vinum_share.h>
 
-/* Update drive state; return 1 if the state changes, otherwise 0. */
+void
+gv_setstate(struct g_geom *gp, struct gctl_req *req)
+{
+	struct gv_softc *sc;
+	struct gv_sd *s;
+	struct gv_drive *d;
+	char *obj, *state;
+	int err, f, *flags, newstate, type;
+
+	f = 0;
+	obj = gctl_get_param(req, "object", NULL);
+	if (obj == NULL) {
+		gctl_error(req, "no object given");
+		return;
+	}
+
+	state = gctl_get_param(req, "state", NULL);
+	if (state == NULL) {
+		gctl_error(req, "no state given");
+		return;
+	}
+
+	flags = gctl_get_paraml(req, "flags", sizeof(*flags));
+	if (flags == NULL) {
+		gctl_error(req, "no flags given");
+		return;
+	}
+
+	if (*flags & GV_FLAG_F)
+		f = GV_SETSTATE_FORCE;
+
+	sc = gp->softc;
+	type = gv_object_type(sc, obj);
+	switch (type) {
+	case GV_TYPE_VOL:
+	case GV_TYPE_PLEX:
+		gctl_error(req, "volume or plex state cannot be set currently");
+		break;
+
+	case GV_TYPE_SD:
+		newstate = gv_sdstatei(state);
+		if (newstate < 0) {
+			gctl_error(req, "invalid subdisk state '%s'", state);
+			break;
+		}
+		s = gv_find_sd(sc, obj);
+		err = gv_set_sd_state(s, newstate, f);
+		if (err)
+			gctl_error(req, "cannot set subdisk state");
+		break;
+
+	case GV_TYPE_DRIVE:
+		newstate = gv_drivestatei(state);
+		if (newstate < 0) {
+			gctl_error(req, "invalid drive state '%s'", state);
+			break;
+		}
+		d = gv_find_drive(sc, obj);
+		err = gv_set_drive_state(d, newstate, f);
+		if (err)
+			gctl_error(req, "cannot set drive state");
+		break;
+
+	default:
+		gctl_error(req, "unknown object '%s'", obj);
+		break;
+	}
+
+	return;
+}
+
+/* Update drive state; return 0 if the state changes, otherwise -1. */
 int
 gv_set_drive_state(struct gv_drive *d, int newstate, int flags)
 {
@@ -49,12 +120,12 @@ gv_set_drive_state(struct gv_drive *d, int newstate, int flags)
 	oldstate = d->state;
 	
 	if (newstate == oldstate)
-		return (1);
+		return (0);
 
 	/* We allow to take down an open drive only with force. */
 	if ((newstate == GV_DRIVE_DOWN) && gv_is_open(d->geom) &&
 	    (!(flags & GV_SETSTATE_FORCE)))
-		return (0);
+		return (-1);
 
 	d->state = newstate;
 
@@ -67,7 +138,7 @@ gv_set_drive_state(struct gv_drive *d, int newstate, int flags)
 	if (flags & GV_SETSTATE_CONFIG)
 		gv_save_config_all(d->vinumconf);
 
-	return (1);
+	return (0);
 }
 
 int
@@ -130,6 +201,8 @@ gv_set_sd_state(struct gv_sd *s, int newstate, int flags)
 
 			if (p->org != GV_PLEX_RAID5)
 				break;
+			else if (flags & GV_SETSTATE_FORCE)
+				break;
 			else
 				s->state = GV_SD_STALE;
 
@@ -145,7 +218,7 @@ gv_set_sd_state(struct gv_sd *s, int newstate, int flags)
 			 * first.
 			 */
 			p = s->plex_sc;
-			if (p == NULL)
+			if (p == NULL || flags & GV_SETSTATE_FORCE)
 				break;
 
 			if ((p->org != GV_PLEX_RAID5) &&
@@ -186,10 +259,13 @@ void
 gv_update_sd_state(struct gv_sd *s)
 {
 	struct gv_drive *d;
+	int oldstate;
 
 	KASSERT(s != NULL, ("gv_update_sd_state: NULL s"));
 	d = s->drive_sc;
 	KASSERT(d != NULL, ("gv_update_sd_state: NULL d"));
+
+	oldstate = s->state;
 	
 	/* If our drive isn't up we cannot be up either. */
 	if (d->state != GV_DRIVE_UP)
@@ -203,7 +279,10 @@ gv_update_sd_state(struct gv_sd *s)
 	else
 		s->state = GV_SD_UP;
 	
-	printf("GEOM_VINUM: subdisk %s is %s\n", s->name, gv_sdstate(s->state));
+	if (s->state != oldstate)
+		printf("GEOM_VINUM: subdisk %s state change: %s -> %s\n",
+		    s->name, gv_sdstate(oldstate), gv_sdstate(s->state));
+
 	/* Update the plex, if we have one. */
 	if (s->plex_sc != NULL)
 		gv_update_plex_state(s->plex_sc);
@@ -214,8 +293,11 @@ void
 gv_update_plex_state(struct gv_plex *p)
 {
 	int sdstates;
+	int oldstate;
 
 	KASSERT(p != NULL, ("gv_update_plex_state: NULL p"));
+
+	oldstate = p->state;
 
 	/* First, check the state of our subdisks. */
 	sdstates = gv_sdstatemap(p);
@@ -241,7 +323,10 @@ gv_update_plex_state(struct gv_plex *p)
 	} else
 		p->state = GV_PLEX_DOWN;
 
-	printf("GEOM_VINUM: plex %s is %s\n", p->name, gv_plexstate(p->state));
+	if (p->state != oldstate)
+		printf("GEOM_VINUM: plex %s state change: %s -> %s\n", p->name,
+		    gv_plexstate(oldstate), gv_plexstate(p->state));
+
 	/* Update our volume, if we have one. */
 	if (p->vol_sc != NULL)
 		gv_update_vol_state(p->vol_sc);

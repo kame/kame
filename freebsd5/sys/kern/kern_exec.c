@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993, David Greenman
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_exec.c,v 1.249.2.2 2004/10/09 04:33:02 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_exec.c,v 1.249.2.5 2005/02/27 02:40:09 jeff Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -51,11 +51,11 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_exec.c,v 1.249.2.2 2004/10/09 04:33:02 jul
 #include <sys/proc.h>
 #include <sys/pioctl.h>
 #include <sys/namei.h>
+#include <sys/resourcevar.h>
 #include <sys/sf_buf.h>
 #include <sys/sysent.h>
 #include <sys/shm.h>
 #include <sys/sysctl.h>
-#include <sys/user.h>
 #include <sys/vnode.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
@@ -466,16 +466,7 @@ interpret:
 	 * For security and other reasons, the file descriptor table cannot
 	 * be shared after an exec.
 	 */
-	FILEDESC_LOCK(p->p_fd);
-	if (p->p_fd->fd_refcnt > 1) {
-		struct filedesc *tmp;
-
-		tmp = fdcopy(td->td_proc->p_fd);
-		FILEDESC_UNLOCK(p->p_fd);
-		fdfree(td);
-		p->p_fd = tmp;
-	} else
-		FILEDESC_UNLOCK(p->p_fd);
+	fdunshare(p, td);
 
 	/*
 	 * Malloc things before we need locks.

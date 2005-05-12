@@ -1,5 +1,5 @@
 /* $NetBSD: dec_kn20aa.c,v 1.38 1998/04/17 02:45:19 mjacob Exp $ */
-/*
+/*-
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -25,12 +25,12 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-/*
+/*-
  * Additional Copyright (c) 1997 by Matthew Jacob for NASA/Ames Research Center
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_kn20aa.c,v 1.19 2004/07/10 22:29:40 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_kn20aa.c,v 1.19.2.2 2005/02/26 23:03:34 ticso Exp $");
 
 #include <sys/param.h>
 #include <sys/reboot.h>
@@ -51,7 +51,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_kn20aa.c,v 1.19 2004/07/10 22:29:40 
 void dec_kn20aa_init(void);
 static void dec_kn20aa_cons_init(void);
 static void dec_kn20aa_intr_init(void);
-static void dec_kn20aa_intr_map(void *);
+static int dec_kn20aa_intr_route(device_t pcib, device_t dev, int pin);
 static void dec_kn20aa_intr_disable(int);
 static void dec_kn20aa_intr_enable(int);
 
@@ -81,7 +81,7 @@ dec_kn20aa_init()
 	platform.iobus = "cia";
 	platform.cons_init = dec_kn20aa_cons_init;
 	platform.pci_intr_init  = dec_kn20aa_intr_init;
-	platform.pci_intr_map  = dec_kn20aa_intr_map;
+	platform.pci_intr_route  = dec_kn20aa_intr_route;
 	platform.pci_intr_disable = dec_kn20aa_intr_disable;
 	platform.pci_intr_enable = dec_kn20aa_intr_enable;
 }
@@ -242,58 +242,45 @@ dec_kn20aa_intr_init()
 	dec_kn20aa_intr_enable(31);
 }
 
-void
-dec_kn20aa_intr_map(void *arg)
+static int
+dec_kn20aa_intr_route(device_t pcib, device_t dev, int pin)
 {
-	pcicfgregs *cfg;
+	int irq = 255;
+	int slot = pci_get_slot(dev);
 
-	cfg = (pcicfgregs *)arg;
-	/*
-	 * Slot->interrupt translation.  Appears to work, though it
-	 * may not hold up forever.
-	 *
-	 * The DEC engineers who did this hardware obviously engaged
-	 * in random drug testing.
-	 */
-	switch (cfg->slot) {
+	switch (slot) {
 	case 11:
+		irq = pin - 1;
+		break;
+
 	case 12:
-		cfg->intline = ((cfg->slot - 11) + 0) * 4;
+		irq = 4 + pin - 1;
 		break;
 
 	case 7:
-		cfg->intline = 8;
+		irq = 8 + pin - 1;
 		break;
 
-	case 9:
-		cfg->intline = 12;
-		break;
-
-	case 6:				/* 21040 on AlphaStation 500 */
-		cfg->intline = 13;
+	case 9:				/* slot on AlphaStation 600 only */
+		irq = 12 + pin - 1;
 		break;
 
 	case 8:
-		cfg->intline = 16;
+		irq = 16 + pin - 1;
+		break;
+
+	case 6:				/* 21040 on AlphaStation 500 */
+		if (pin == 1)
+			irq = 13;
 		break;
 
 	case 10:			/* 8275EB on AlphaStation 500 */
-		return;
+		break;
 
 	default:
-		if(!cfg->bus){
-			printf("dec_kn20aa_intr_map: weird slot %d\n",
-			    cfg->slot);
-			return;
-		} else {
-			cfg->intline = cfg->slot;
-		}
+		printf("dec_kn20aa_intr_route: weird slot %d\n", slot);
 	}
-
-	cfg->intline += cfg->bus*16;
-	if (cfg->intline > KN20AA_MAX_IRQ)
-		panic("dec_kn20aa_intr_map: cfg->intline too large (%d)\n",
-		    cfg->intline);
+	return (irq);
 }
 
 void

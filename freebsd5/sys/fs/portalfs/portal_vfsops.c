@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)portal_vfsops.c	8.11 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/portalfs/portal_vfsops.c,v 1.51 2004/07/30 22:08:50 phk Exp $
+ * $FreeBSD: src/sys/fs/portalfs/portal_vfsops.c,v 1.51.2.1 2005/01/31 23:25:58 imp Exp $
  */
 
 /*

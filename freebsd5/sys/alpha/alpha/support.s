@@ -23,10 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/support.s,v 1.17 2004/06/06 21:26:47 phk Exp $
+ * $FreeBSD: src/sys/alpha/alpha/support.s,v 1.17.2.1 2005/01/30 00:59:10 imp Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *

@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pdq/pdq.c,v 1.9 2003/08/24 17:54:16 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pdq/pdq.c,v 1.9.4.1 2005/01/30 00:59:58 imp Exp $");
 
 /*
  * DEC PDQ FDDI Controller O/S independent code
@@ -1579,7 +1579,7 @@ pdq_initialize(
     p = (pdq_uint8_t *) PDQ_OS_MEMALLOC_CONTIG(contig_bytes);
 
     if (p == NULL)
-	printf("%s() - PDQ_OS_MEMALLOC_CONTIG() failed!\n", __FUNCTION__);
+	printf("%s() - PDQ_OS_MEMALLOC_CONTIG() failed!\n", __func__);
 
     if (p != NULL) {
 	pdq_physaddr_t physaddr = PDQ_OS_VA_TO_BUSPA(pdq, p);

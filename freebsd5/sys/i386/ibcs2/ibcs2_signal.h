@@ -1,6 +1,6 @@
 /*	$NetBSD: ibcs2_signal.h,v 1.7 1995/08/14 02:26:01 mycroft Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1994, 1995 Scott Bartram
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_signal.h,v 1.7 2002/03/20 05:45:58 alfred Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_signal.h,v 1.7.8.1 2005/01/31 23:26:03 imp Exp $
  */
 
 #ifndef	_IBCS2_SIGNAL_H

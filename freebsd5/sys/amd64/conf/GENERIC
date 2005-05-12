@@ -16,7 +16,7 @@
 # If you are in doubt as to the purpose or necessity of a line, check first
 # in NOTES.
 #
-# $FreeBSD: src/sys/amd64/conf/GENERIC,v 1.421.2.4.2.1 2004/10/23 20:04:00 kensmith Exp $
+# $FreeBSD: src/sys/amd64/conf/GENERIC,v 1.421.2.11.2.1 2005/04/09 17:28:37 kensmith Exp $
 
 machine		amd64
 cpu		HAMMER
@@ -42,14 +42,16 @@ options 	CD9660			# ISO 9660 Filesystem
 options 	PROCFS			# Process filesystem (requires PSEUDOFS)
 options 	PSEUDOFS		# Pseudo-filesystem framework
 options 	GEOM_GPT		# GUID Partition Tables.
+options 	COMPAT_43		# Needed by COMPAT_LINUX32
 options 	COMPAT_IA32		# Compatible with i386 binaries
 options 	COMPAT_FREEBSD4		# Compatible with FreeBSD4
+options 	COMPAT_LINUX32		# Compatible with i386 linux binaries 
 options 	SCSI_DELAY=15000	# Delay (in ms) before probing SCSI
 options 	KTRACE			# ktrace(1) support
 options 	SYSVSHM			# SYSV-style shared memory
 options 	SYSVMSG			# SYSV-style message queues
 options 	SYSVSEM			# SYSV-style semaphores
-options 	_KPOSIX_PRIORITY_SCHEDULING # Posix P1003_1B real-time extensions
+options 	_KPOSIX_PRIORITY_SCHEDULING # POSIX P1003_1B real-time extensions
 options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
 options 	AHC_REG_PRETTY_PRINT	# Print register bitfields in debug
 					# output.  Adds ~128k to driver.
@@ -59,7 +61,13 @@ options 	ADAPTIVE_GIANT		# Giant mutex is adaptive.
 
 # Workarounds for some known-to-be-broken chipsets (nVidia nForce3-Pro150)
 device		atpic		# 8259A compatability
-options 	NO_MIXED_MODE	# Don't penalize working chipsets
+
+# Enabling NO_MIXED_MODE gives a performance improvement on some motherboards
+# but does not work with some boards (mostly nVidia chipset based).
+#options 	NO_MIXED_MODE	# Don't penalize working chipsets
+
+# Linux 32-bit ABI support
+options 	LINPROCFS		# Cannot be a module yet.
 
 # Bus support.  Do not remove isa, even if you have no isa slots
 device		acpi
@@ -83,6 +91,7 @@ device		ahc		# AHA2940 and onboard AIC7xxx devices
 device		ahd		# AHA39320/29320 and onboard AIC79xx devices
 device		amd		# AMD 53C974 (Tekram DC-390(T))
 device		isp		# Qlogic family
+#device 	ispfw		# Firmware for QLogic HBAs- normally a module
 device		mpt		# LSI-Logic MPT-Fusion
 #device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets + those of `ncr')
@@ -105,6 +114,7 @@ device		ses		# SCSI Environmental Services (and SAF-TE)
 
 # RAID controllers interfaced to the SCSI subsystem
 device		amr		# AMI MegaRAID
+device		arcmsr		# Areca SATA II RAID
 device		ciss		# Compaq Smart RAID 5*
 device		dpt		# DPT Smartcache III, IV - See NOTES for options
 device		iir		# Intel Integrated RAID
@@ -153,7 +163,7 @@ device		ppi		# Parallel port interface device
 # If you've got a "dumb" serial or parallel PCI card that is
 # supported by the puc(4) glue driver, uncomment the following
 # line to enable it (connects to the sio and/or ppc drivers):
-#device         puc
+#device		puc
 
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
@@ -169,6 +179,8 @@ device		bfe		# Broadcom BCM440x 10/100 Ethernet
 device		bge		# Broadcom BCM570xx Gigabit Ethernet
 device		dc		# DEC/Intel 21143 and various workalikes
 device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		lge		# Level 1 LXT1001 gigabit Ethernet
+device		nge		# NatSemi DP83820 gigabit Ethernet
 device		pcn		# AMD Am79C97x PCI 10/100 (precedence over 'lnc')
 device		re		# RealTek 8139C+/8169/8169S/8110S
 device		rl		# RealTek 8129/8139
@@ -179,7 +191,7 @@ device		ste		# Sundance ST201 (D-Link DFE-550TX)
 device		ti		# Alteon Networks Tigon I/II gigabit Ethernet
 device		tl		# Texas Instruments ThunderLAN
 device		tx		# SMC EtherPower II (83c170 ``EPIC'')
-device		vge		# VIA VT612x gigabit ethernet
+device		vge		# VIA VT612x gigabit Ethernet
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
@@ -219,11 +231,13 @@ device		faith		# IPv6-to-IPv4 relaying (translation)
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
+# Note that 'bpf' is required for DHCP.
 device		bpf		# Berkeley packet filter
 
 # USB support
 device		uhci		# UHCI PCI->USB interface
 device		ohci		# OHCI PCI->USB interface
+#device		ehci		# EHCI PCI->USB interface (USB 2.0)
 device		usb		# USB Bus (required)
 #device		udbp		# USB Double Bulk Pipe devices
 device		ugen		# Generic
@@ -237,6 +251,7 @@ device		uscanner	# Scanners
 # USB Ethernet, requires mii
 device		aue		# ADMtek USB Ethernet
 device		axe		# ASIX Electronics USB Ethernet
+device		cdce		# Generic USB over Ethernet
 device		cue		# CATC USB Ethernet
 device		kue		# Kawasaki LSI USB Ethernet
 device		rue		# RealTek RTL8150 USB Ethernet

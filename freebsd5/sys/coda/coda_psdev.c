@@ -1,4 +1,4 @@
-/*
+/*-
  *             Coda: an Experimental Distributed File System
  *                              Release 3.1
  * 
@@ -27,7 +27,7 @@
  * 
  * 	@(#) src/sys/coda/coda_psdev.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
  */
-/* 
+/*-
  * Mach Operating System
  * Copyright (c) 1989 Carnegie-Mellon University
  * All rights reserved.  The CMU software License Agreement specifies
@@ -49,7 +49,7 @@
 /* These routines are the device entry points for Venus. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_psdev.c,v 1.30 2004/06/16 09:46:32 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_psdev.c,v 1.30.2.1 2005/01/30 00:59:17 imp Exp $");
 
 
 extern int coda_nc_initialized;    /* Set if cache has been initialized */

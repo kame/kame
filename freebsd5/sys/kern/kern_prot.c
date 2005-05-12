@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_prot.c,v 1.187.2.1 2004/09/03 06:11:58 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_prot.c,v 1.187.2.3 2005/01/31 23:26:16 imp Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -1275,12 +1275,9 @@ securelevel_gt(struct ucred *cr, int level)
 
 	active_securelevel = securelevel;
 	KASSERT(cr != NULL, ("securelevel_gt: null cr"));
-	if (cr->cr_prison != NULL) {
-		mtx_lock(&cr->cr_prison->pr_mtx);
+	if (cr->cr_prison != NULL)
 		active_securelevel = imax(cr->cr_prison->pr_securelevel,
 		    active_securelevel);
-		mtx_unlock(&cr->cr_prison->pr_mtx);
-	}
 	return (active_securelevel > level ? EPERM : 0);
 }
 
@@ -1291,12 +1288,9 @@ securelevel_ge(struct ucred *cr, int level)
 
 	active_securelevel = securelevel;
 	KASSERT(cr != NULL, ("securelevel_ge: null cr"));
-	if (cr->cr_prison != NULL) {
-		mtx_lock(&cr->cr_prison->pr_mtx);
+	if (cr->cr_prison != NULL)
 		active_securelevel = imax(cr->cr_prison->pr_securelevel,
 		    active_securelevel);
-		mtx_unlock(&cr->cr_prison->pr_mtx);
-	}
 	return (active_securelevel >= level ? EPERM : 0);
 }
 

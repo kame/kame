@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001
  *	John Baldwin <jhb@FreeBSD.org>.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_smp.c,v 1.188.2.2 2004/09/09 09:56:58 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_smp.c,v 1.188.2.4.2.1 2005/05/01 05:38:14 dwhite Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -115,7 +115,7 @@ static volatile int smp_rv_waiters[2];
  * functions trigger at once and cause multiple CPUs to busywait with
  * interrupts disabled. 
  */
-struct mtx smp_rv_mtx;
+struct mtx smp_ipi_mtx;
 
 /*
  * Let the MD SMP code initialize mp_maxid very early if it can.
@@ -141,7 +141,7 @@ mp_start(void *dummy)
 		return;
 	}
 
-	mtx_init(&smp_rv_mtx, "smp rendezvous", NULL, MTX_SPIN);
+	mtx_init(&smp_ipi_mtx, "smp rendezvous", NULL, MTX_SPIN);
 	cpu_mp_start();
 	printf("FreeBSD/SMP: Multiprocessor System Detected: %d CPUs\n",
 	    mp_ncpus);
@@ -254,6 +254,35 @@ stop_cpus(cpumask_t map)
 	return 1;
 }
 
+#ifdef KDB_STOP_NMI
+int
+stop_cpus_nmi(cpumask_t map)
+{
+	int i;
+
+	if (!smp_started)
+		return 0;
+
+	CTR1(KTR_SMP, "stop_cpus(%x)", map);
+
+	/* send the stop IPI to all CPUs in map */
+	ipi_nmi_selected(map);
+
+	i = 0;
+	while ((atomic_load_acq_int(&stopped_cpus) & map) != map) {
+		/* spin */
+		i++;
+#ifdef DIAGNOSTIC
+		if (i == 100000) {
+			printf("timeout stopping cpus\n");
+			break;
+		}
+#endif
+	}
+
+	return 1;
+}
+#endif /* KDB_STOP_NMI */
 
 /*
  * Called by a CPU to restart stopped CPUs. 
@@ -337,7 +366,7 @@ smp_rendezvous(void (* setup_func)(void *),
 	}
 		
 	/* obtain rendezvous lock */
-	mtx_lock_spin(&smp_rv_mtx);
+	mtx_lock_spin(&smp_ipi_mtx);
 
 	/* set static function pointers */
 	smp_rv_setup_func = setup_func;
@@ -354,7 +383,7 @@ smp_rendezvous(void (* setup_func)(void *),
 	smp_rendezvous_action();
 
 	/* release lock */
-	mtx_unlock_spin(&smp_rv_mtx);
+	mtx_unlock_spin(&smp_ipi_mtx);
 }
 #else /* !SMP */
 

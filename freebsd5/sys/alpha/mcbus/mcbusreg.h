@@ -1,6 +1,6 @@
-/* $FreeBSD: src/sys/alpha/mcbus/mcbusreg.h,v 1.2 2001/02/13 22:45:53 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/mcbus/mcbusreg.h,v 1.2.8.1 2005/01/30 00:59:11 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 1998, 2000 by Matthew Jacob
  * All rights reserved.
  *

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/cissvar.h,v 1.9 2004/06/21 20:18:40 scottl Exp $
+ *	$FreeBSD: src/sys/dev/ciss/cissvar.h,v 1.9.6.1 2005/04/28 20:43:28 ps Exp $
  */
 
 /*
@@ -236,6 +236,8 @@ struct ciss_softc
 
     struct cam_devq		*ciss_cam_devq;
     struct cam_sim		**ciss_cam_sim;
+
+    int				ciss_soft_reset;
 
     int				ciss_flags;
 #define CISS_FLAG_NOTIFY_OK	(1<<0)		/* notify command running OK */

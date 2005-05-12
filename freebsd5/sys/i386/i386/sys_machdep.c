@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.92 2004/04/07 20:46:04 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.92.2.1.2.1 2005/05/06 02:40:49 cperciva Exp $");
 
 #include "opt_kstack_pages.h"
 #include "opt_mac.h"
@@ -44,7 +44,6 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.92 2004/04/07 20:46:04 i
 #include <sys/proc.h>
 #include <sys/smp.h>
 #include <sys/sysproto.h>
-#include <sys/user.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -52,7 +51,8 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.92 2004/04/07 20:46:04 i
 #include <vm/vm_extern.h>
 
 #include <machine/cpu.h>
-#include <machine/pcb_ext.h>	/* pcb.h included by sys/user.h */
+#include <machine/pcb.h>
+#include <machine/pcb_ext.h>
 #include <machine/proc.h>
 #include <machine/sysarch.h>
 
@@ -382,10 +382,6 @@ i386_get_ldt(td, args)
 	    uap->start, uap->num, (void *)uap->descs);
 #endif
 
-	/* verify range of LDTs exist */
-	if ((uap->start < 0) || (uap->num <= 0))
-		return(EINVAL);
-
 	if (pldt) {
 		nldt = pldt->ldt_len;
 		num = min(uap->num, nldt);
@@ -395,7 +391,10 @@ i386_get_ldt(td, args)
 		num = min(uap->num, nldt);
 		lp = &ldt[uap->start];
 	}
-	if (uap->start + num > nldt)
+
+	if ((uap->start > (unsigned int)nldt) ||
+	    ((unsigned int)num > (unsigned int)nldt) ||
+	    ((unsigned int)(uap->start + num) > (unsigned int)nldt))
 		return(EINVAL);
 
 	error = copyout(lp, uap->descs, num * sizeof(union descriptor));

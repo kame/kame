@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/isa_dma.c,v 1.16 2004/07/05 20:37:42 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/isa_dma.c,v 1.16.2.1 2005/03/07 13:10:47 phk Exp $");
 
 /*
  * code to manage AT bus
@@ -487,6 +487,19 @@ isa_dmastatus(int chan)
 	if (chan >= 4)			/* high channels move words */
 		cnt *= 2;
 	return(cnt);
+}
+
+/*
+ * Reached terminal count yet ?
+ */
+int
+isa_dmatc(int chan)
+{
+
+	if (chan < 4)
+		return(inb(DMA1_STATUS) & (1 << chan));
+	else
+		return(inb(DMA2_STATUS) & (1 << (chan & 3)));
 }
 
 /*

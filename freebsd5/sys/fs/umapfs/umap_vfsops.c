@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)umap_vfsops.c	8.8 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/umapfs/umap_vfsops.c,v 1.58 2004/07/30 22:08:51 phk Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap_vfsops.c,v 1.58.2.1 2005/01/31 23:25:59 imp Exp $
  */
 
 /*

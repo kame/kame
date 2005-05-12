@@ -1,4 +1,4 @@
-/*
+/*-
  * FreeBSD platform specific, shared driver option settings, data structures,
  * function declarations and includes.
  *
@@ -32,7 +32,7 @@
  *
  * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic_osm_lib.h#5 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic_osm_lib.h,v 1.3 2004/08/17 00:14:31 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic_osm_lib.h,v 1.3.2.2 2005/02/16 23:38:34 gibbs Exp $
  */
 
 /******************************** OS Includes *********************************/
@@ -199,24 +199,34 @@ static __inline u_int aic_get_timeout(struct scb *);
 static __inline void aic_scb_timer_reset(struct scb *, u_int);
 
 static __inline void
-aic_timer_reset(aic_timer_t *timer, u_int usec, aic_callback_t *func, void *arg)
+aic_timer_reset(aic_timer_t *timer, u_int msec, aic_callback_t *func, void *arg)
 {
-	callout_reset(timer, (usec * hz)/1000000, func, arg);
+	uint64_t time;
+
+	time = msec;
+	time *= hz;
+	time /= 1000;
+	callout_reset(timer, time, func, arg);
 }
 
 static __inline u_int
 aic_get_timeout(struct scb *scb)
 {
-	return (scb->io_ctx->ccb_h.timeout * 1000);
+	return (scb->io_ctx->ccb_h.timeout);
 }
 
 static __inline void
-aic_scb_timer_reset(struct scb *scb, u_int usec)
+aic_scb_timer_reset(struct scb *scb, u_int msec)
 {
+	uint64_t time;
+
+	time = msec;
+	time *= hz;
+	time /= 1000;
 	untimeout(aic_platform_timeout, (caddr_t)scb,
 		  scb->io_ctx->ccb_h.timeout_ch);
 	scb->io_ctx->ccb_h.timeout_ch =
-	    timeout(aic_platform_timeout, scb, (usec * hz)/1000000);
+	    timeout(aic_platform_timeout, scb, time);
 }
 
 static __inline void

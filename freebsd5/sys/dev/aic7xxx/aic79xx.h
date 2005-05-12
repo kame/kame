@@ -1,4 +1,4 @@
-/*
+/*-
  * Core definitions and data structures shareable across OS platforms.
  *
  * Copyright (c) 1994-2002 Justin T. Gibbs.
@@ -39,7 +39,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#107 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.21.2.1 2004/09/02 15:32:05 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.21.2.3 2005/02/16 23:38:34 gibbs Exp $
  */
 
 #ifndef _AIC79XX_H_
@@ -1151,7 +1151,7 @@ struct ahd_softc {
 	/*
 	 * Statistics.
 	 */
-#define	AHD_STAT_UPDATE_US	250000 /* 250ms */
+#define	AHD_STAT_UPDATE_MS	250
 #define	AHD_STAT_BUCKETS	4
 	u_int			  cmdcmplt_bucket;
 	uint32_t		  cmdcmplt_counts[AHD_STAT_BUCKETS];

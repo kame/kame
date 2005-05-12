@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/ia64/include/clockvar.h,v 1.2 2001/10/04 15:28:27 dfr Exp $ */
+/* $FreeBSD: src/sys/ia64/include/clockvar.h,v 1.2.8.1 2005/01/31 23:26:14 imp Exp $ */
 /* $NetBSD: clockvar.h,v 1.4 1997/06/22 08:02:18 jonathan Exp $ */
 
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.46 2004/07/26 07:24:02 cperciva Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.46.2.1 2005/01/31 23:25:59 imp Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>

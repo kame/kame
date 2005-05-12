@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.393.2.2.2.1 2004/10/24 18:02:52 scottl Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.393.2.11 2005/04/02 16:37:58 scottl Exp $
 
 # pcic -- currently broken and being worked on out of tree.
 # oldcard -- specialized use for debugging only.
@@ -21,12 +21,14 @@ SUBDIR=	${_3dfx} \
 	${_aout} \
 	${_apm} \
 	${_ar} \
+	${_arcmsr} \
 	${_arcnet} \
 	${_arl} \
 	${_asr} \
 	ath \
 	${_ath_hal} \
 	aue \
+	${_auxio} \
 	${_awi} \
 	axe \
 	bfe \
@@ -41,6 +43,7 @@ SUBDIR=	${_3dfx} \
 	${_cbb} \
 	cd9660 \
 	cd9660_iconv \
+	cdce \
 	${_ciss} \
 	${_cm} \
 	coda \
@@ -49,6 +52,7 @@ SUBDIR=	${_3dfx} \
 	${_cp} \
 	${_crypto} \
 	${_cryptodev} \
+	${_cs} \
 	${_ctau} \
 	cue \
 	${_cx} \
@@ -292,6 +296,7 @@ _awi=		awi
 _bktr=		bktr
 _coff=		coff
 _cp=		cp
+_cs=		cs
 _drm=		drm
 _ed=		ed
 _elink=		elink
@@ -335,6 +340,7 @@ _aac=		aac
 _acpi=		acpi
 _ahb=		ahb
 _arl=		arl
+_arcmsr=	arcmsr
 _asr=		asr
 _bios=		bios
 _cardbus=	cardbus
@@ -378,9 +384,11 @@ _sppp=		sppp
 
 .if ${MACHINE_ARCH} == "amd64"
 _agp=		agp
+_arcmsr=	arcmsr
 _drm=		drm
 _io=		io
-#_ndis=		ndis
+_ndis=		ndis
+_sound=		sound
 .endif
 
 .if ${MACHINE_ARCH} == "ia64"
@@ -423,12 +431,18 @@ _gem=		gem
 .endif
 
 .if ${MACHINE_ARCH} == "sparc64"
+_auxio=		auxio
 _gem=		gem
+_sound=		sound
 .endif
 
 .if defined(MODULES_OVERRIDE) && !defined(ALL_MODULES)
 SUBDIR=${MODULES_OVERRIDE}
 .endif
+
+.for reject in ${WITHOUT_MODULES}
+SUBDIR:= ${SUBDIR:N${reject}}
+.endfor
 
 # Calling kldxref(8) for each module is expensive.
 .if !defined(NO_XREF)

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright by Hannu Savolainen 1995
  * All rights reserved.
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.61 2004/07/16 03:59:09 tanimura Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.61.2.1 2005/01/30 01:00:05 imp Exp $
  */
 
 /*

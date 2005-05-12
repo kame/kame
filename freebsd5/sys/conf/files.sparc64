@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.sparc64,v 1.59 2004/08/15 22:59:34 marius Exp $
+# $FreeBSD: src/sys/conf/files.sparc64,v 1.59.2.4 2005/02/25 16:37:32 marius Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -12,6 +12,8 @@ crypto/blowfish/bf_enc.c	optional	ipsec ipsec_esp
 crypto/des/des_enc.c		optional	ipsec ipsec_esp
 crypto/blowfish/bf_enc.c	optional	crypto
 crypto/des/des_enc.c		optional	crypto
+dev/auxio/auxio.c		optional	auxio sbus
+dev/auxio/auxio.c		optional	auxio ebus
 dev/esp/esp_sbus.c		optional	esp sbus
 dev/esp/lsi64854.c		optional	esp sbus
 dev/fb/creator.c		optional	creator sc
@@ -23,6 +25,8 @@ dev/ofw/ofw_console.c		optional	ofw_console
 dev/ofw/openfirm.c		standard
 dev/ofw/openfirmio.c		standard
 dev/ofw/openpromio.c		standard
+dev/sound/sbus/cs4231.c		optional	snd_audiocs ebus
+dev/sound/sbus/cs4231.c		optional	snd_audiocs sbus
 dev/syscons/scgfbrndr.c		optional	sc
 dev/syscons/schistory.c		optional	sc
 dev/syscons/scmouse.c		optional	sc
@@ -51,16 +55,15 @@ sparc64/fhc/fhc.c		optional	fhc
 sparc64/fhc/fhc_central.c	optional	fhc central
 sparc64/fhc/fhc_nexus.c		optional	fhc
 sparc64/isa/isa.c		optional	isa
-#sparc64/isa/ofw_isa.c		optional	ebus
-#sparc64/isa/ofw_isa.c		optional	isa
-sparc64/isa/ofw_isa.c		standard
+sparc64/isa/isa_dma.c		optional	isa
+sparc64/isa/ofw_isa.c		optional	ebus
+sparc64/isa/ofw_isa.c		optional	isa
 sparc64/pci/apb.c		optional	pci
 sparc64/pci/ofw_pci.c		optional	pci
 sparc64/pci/ofw_pcib.c		optional	pci
 sparc64/pci/ofw_pcib_subr.c	optional	pci
 sparc64/pci/ofw_pcibus.c	optional	pci
-#sparc64/pci/ofw_pci_if.m	optional	pci
-sparc64/pci/ofw_pci_if.m	standard
+sparc64/pci/ofw_pci_if.m	optional	pci
 sparc64/pci/psycho.c		optional	pci
 sparc64/sbus/sbus.c		optional	sbus
 sparc64/sparc64/autoconf.c	standard
@@ -98,6 +101,8 @@ sparc64/sparc64/ofw_bus.c	standard
 sparc64/sparc64/ofw_machdep.c	standard
 sparc64/sparc64/pmap.c		standard
 sparc64/sparc64/prof_machdep.c	optional	profiling-routine
+sparc64/sparc64/rtc.c		optional	rtc ebus
+sparc64/sparc64/rtc.c		optional	rtc isa
 sparc64/sparc64/rwindow.c	standard
 sparc64/sparc64/sc_machdep.c	optional	sc
 sparc64/sparc64/spitfire.c	standard

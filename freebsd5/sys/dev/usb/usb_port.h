@@ -1,13 +1,13 @@
 /*	$OpenBSD: usb_port.h,v 1.18 2000/09/06 22:42:10 rahnds Exp $ */
 /*	$NetBSD: usb_port.h,v 1.54 2002/03/28 21:49:19 ichiro Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.67.2.1 2004/09/26 05:54:28 imp Exp $       */
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.67.2.3 2005/01/30 01:00:10 imp Exp $       */
 
 /* Also already merged from NetBSD:
  *	$NetBSD: usb_port.h,v 1.57 2002/09/27 20:42:01 thorpej Exp $
  *	$NetBSD: usb_port.h,v 1.58 2002/10/01 01:25:26 thorpej Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -388,6 +388,7 @@ typedef struct callout usb_callout_t;
 #define usb_callout_init(h)     callout_init(&(h), 0)
 #define usb_callout(h, t, f, d) callout_reset(&(h), (t), (f), (d))
 #define usb_uncallout(h, f, d)  callout_stop(&(h))
+#define usb_uncallout_drain(h, f, d)  callout_drain(&(h))
 #else
 typedef struct proc *usb_proc_ptr;
 

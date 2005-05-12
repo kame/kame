@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/als4000.h,v 1.2 2001/10/10 17:56:35 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/als4000.h,v 1.2.8.1 2005/01/30 01:00:03 imp Exp $
  */
 
 #define ALS_PCI_ID0 		0x40004005

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/mca.c,v 1.8 2003/02/19 05:47:24 imp Exp $
+ * $FreeBSD: src/sys/ia64/ia64/mca.c,v 1.8.6.1 2005/01/31 23:26:13 imp Exp $
  */
 
 #include <sys/param.h>

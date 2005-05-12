@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_watch.h,v 1.11 1999/08/28 00:41:12 peter Exp $
+ * $FreeBSD: src/sys/ddb/db_watch.h,v 1.11.26.1 2005/01/30 00:59:22 imp Exp $
  */
 
 /*

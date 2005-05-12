@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2001 by Coleman Kane <cokane@FreeBSD.org>
  * All rights reserved.
  *
@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/tdfx/tdfx_pci.h,v 1.3 2001/03/20 19:34:22 cokane Exp $
+ *   $FreeBSD: src/sys/dev/tdfx/tdfx_pci.h,v 1.3.8.1 2005/01/30 01:00:07 imp Exp $
  */
 
 /* tdfx_pci.h -- Prototypes for tdfx device methods */

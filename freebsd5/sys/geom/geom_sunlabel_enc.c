@@ -24,15 +24,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * Functions to encode or decode struct sun_disklabel into a bytestream
+ */
+/* Functions to encode or decode struct sun_disklabel into a bytestream
  * of correct endianess and packing.
  *
  * NB!  This file must be usable both in kernel and userland.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_sunlabel_enc.c,v 1.4 2004/06/01 20:18:24 joerg Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_sunlabel_enc.c,v 1.4.2.1 2005/01/31 23:26:00 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/endian.h>

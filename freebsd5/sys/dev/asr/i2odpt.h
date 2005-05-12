@@ -1,9 +1,10 @@
-/****************************************************************
+/*-
+ *****************************************************************
  * Copyright (c) 1996-2000 Distributed Processing Technology Corporation
  * Copyright (c) 2000 Adaptec Corporation.
  * All rights reserved.
  *
- * $FreeBSD: src/sys/dev/asr/i2odpt.h,v 1.5 2002/05/14 21:59:10 obrien Exp $
+ * $FreeBSD: src/sys/dev/asr/i2odpt.h,v 1.5.8.1 2005/01/30 00:59:28 imp Exp $
  *
  ****************************************************************/
 

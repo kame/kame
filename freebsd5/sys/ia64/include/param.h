@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/ia64/include/param.h,v 1.18 2004/04/07 20:46:07 imp Exp $ */
+/* $FreeBSD: src/sys/ia64/include/param.h,v 1.18.2.2 2005/02/05 01:01:54 das Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -122,7 +122,6 @@
 #define	KSTACK_PAGES	4		/* pages of kernel stack */
 #endif
 #define	KSTACK_GUARD_PAGES 0		/* pages of kstack guard; 0 disables */
-#define	UAREA_PAGES	1		/* pages of u-area */
 
 /*
  * Mach derived conversion macros

@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_dev.c,v 1.79.2.1 2004/10/15 06:12:29 pjd Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_dev.c,v 1.79.2.3 2005/02/28 19:32:24 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -185,7 +185,6 @@ g_dev_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 	else
 		error = g_access(cp, r, w, e);
 	g_topology_unlock();
-	g_waitidle();
 	if (!error)
 		dev->si_bsize_phys = cp->provider->sectorsize;
 	return(error);
@@ -231,7 +230,6 @@ g_dev_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 		    "Completing close anyway, panic may happen later.");
 	}
 	g_topology_unlock();
-	g_waitidle();
 	return (error);
 }
 
@@ -299,13 +297,12 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 
 	default:
 		if (cp->provider->geom->ioctl != NULL) {
-			error = cp->provider->geom->ioctl(cp->provider, cmd, data, td);
+			error = cp->provider->geom->ioctl(cp->provider, cmd, data, fflag, td);
 		} else {
 			error = ENOIOCTL;
 		}
 	}
 
-	g_waitidle();
 	return (error);
 }
 

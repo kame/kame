@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/db_disasm.c,v 1.28 2003/08/25 09:48:46 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/db_disasm.c,v 1.28.4.1 2005/01/31 23:26:03 imp Exp $");
 
 /*
  * Instruction disassembler.

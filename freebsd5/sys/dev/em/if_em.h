@@ -31,11 +31,13 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em.h,v 1.25.2.1 2004/10/15 22:12:59 tackerman Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em.h,v 1.25.2.4 2005/03/23 13:30:21 glebius Exp $*/
 
 #ifndef _EM_H_DEFINED_
 #define _EM_H_DEFINED_
 
+#include "opt_bdg.h"
+#include "opt_carp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,6 +64,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#ifdef DEV_CARP
+#include <netinet/in_var.h>
+#include <netinet/ip_carp.h>
+#endif
 
 #include <sys/bus.h>
 #include <machine/bus.h>
@@ -75,7 +81,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <sys/endian.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
-#include "opt_bdg.h"
 
 #include <dev/em/if_em_hw.h>
 
@@ -280,12 +285,6 @@ struct em_buffer {
         bus_dmamap_t    map;         /* bus_dma map for packet */
 };
 
-struct em_q {
-        bus_dmamap_t       map;         /* bus_dma map for packet */
-        int                nsegs;       /* # of segments/descriptors */
-        bus_dma_segment_t  segs[EM_MAX_SCATTER];
-};
-
 /*
  * Bus dma allocation structure used by
  * em_dma_malloc and em_dma_free.
@@ -346,6 +345,7 @@ struct adapter {
 	int             io_rid;
 	u_int8_t        unit;
 	struct mtx	mtx;
+	int		em_insert_vlan_header;
 
 	/* Info about the board itself */
 	u_int32_t       part_num;

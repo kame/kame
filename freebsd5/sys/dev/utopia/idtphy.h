@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -26,7 +26,7 @@
  *
  * Author: Hartmut Brandt <harti@freebsd.org>
  *
- * $FreeBSD: src/sys/dev/utopia/idtphy.h,v 1.2 2003/07/14 12:12:50 harti Exp $
+ * $FreeBSD: src/sys/dev/utopia/idtphy.h,v 1.2.4.1 2005/01/30 01:00:11 imp Exp $
  *
  * Register definitions for the following chips:
  *	IDT 77105

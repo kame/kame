@@ -1,4 +1,4 @@
-/*
+/*-
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
  *
  * This software may be used, modified, copied, distributed, and sold, in
@@ -19,7 +19,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fe/if_fevar.h,v 1.2 2003/10/31 18:32:00 brooks Exp $
+ * $FreeBSD: src/sys/dev/fe/if_fevar.h,v 1.2.4.2 2005/02/03 00:34:46 imp Exp $
  */
 
 /* How many registers does an fe-supported adapter have at maximum?  */
@@ -139,7 +139,7 @@ void	fe_release_resource(device_t);
 
 int	fe_simple_probe(struct fe_softc const *,
 			struct fe_simple_probe_struct const *);
-int	valid_Ether_p(u_char const *, unsigned);
+int	fe_valid_Ether_p(u_char const *, unsigned);
 void	fe_softc_defaults(struct fe_softc *);
 void	fe_stop(struct fe_softc *sc);
 void	fe_irq_failure(char const *, int, int, char const *);

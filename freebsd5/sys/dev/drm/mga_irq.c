@@ -1,5 +1,5 @@
-/* mga_irq.c -- IRQ handling for radeon -*- linux-c -*-
- *
+/* mga_irq.c -- IRQ handling for radeon -*- linux-c -*- */
+/*-
  * Copyright (C) The Weather Channel, Inc.  2002.  All Rights Reserved.
  * 
  * The Weather Channel (TM) funded Tungsten Graphics to develop the
@@ -29,7 +29,7 @@
  *    Keith Whitwell <keith@tungstengraphics.com>
  *    Eric Anholt <anholt@FreeBSD.org>
  *
- * $FreeBSD: src/sys/dev/drm/mga_irq.c,v 1.3 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_irq.c,v 1.3.4.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/mga.h"

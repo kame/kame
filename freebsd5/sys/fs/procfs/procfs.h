@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,7 +33,7 @@
  *	@(#)procfs.h	8.9 (Berkeley) 5/14/95
  *
  * From:
- * $FreeBSD: src/sys/fs/procfs/procfs.h,v 1.46 2004/04/07 20:46:02 imp Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs.h,v 1.46.2.1 2005/01/31 23:25:58 imp Exp $
  */
 
 #ifdef _KERNEL

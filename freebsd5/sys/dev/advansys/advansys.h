@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic driver definitions and exported functions for the Advanced
  * Systems Inc. SCSI controllers
  * 
@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  * All rights reserved.
  *
- * $FreeBSD: src/sys/dev/advansys/advansys.h,v 1.3 2000/04/07 11:32:36 nyan Exp $
+ * $FreeBSD: src/sys/dev/advansys/advansys.h,v 1.3.8.1 2005/01/30 00:59:23 imp Exp $
  */
 
 #ifndef _ADVANSYS_H_

@@ -63,7 +63,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
+/*-
  * Copyright (c) 1994 Peter Galbavy
  * Copyright (c) 1995 Paul Kranenburg
  * All rights reserved.
@@ -104,7 +104,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/esp/ncr53c9x.c,v 1.6 2004/08/02 22:55:23 trhodes Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/esp/ncr53c9x.c,v 1.6.2.1 2005/01/30 00:59:39 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

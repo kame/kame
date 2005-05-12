@@ -1,4 +1,4 @@
-/*
+/*-
  * CAM SCSI device driver for the Adaptec 174X SCSI Host adapter
  *
  * Copyright (c) 1998 Justin T. Gibbs
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.32 2004/03/17 17:50:25 njl Exp $
+ * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.32.2.1 2005/01/30 00:59:24 imp Exp $
  */
 
 #include <sys/param.h>

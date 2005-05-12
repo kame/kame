@@ -8,7 +8,7 @@
  * Dec 1999, Richard Henderson <rth@twiddle.net>, move to generic \c cmpxchg.
  */
 
-/*
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All rights reserved.
@@ -32,7 +32,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/drm.h,v 1.7 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm.h,v 1.7.2.1 2005/01/30 00:59:35 imp Exp $
  */
 
 

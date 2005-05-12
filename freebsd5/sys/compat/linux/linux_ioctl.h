@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_ioctl.h,v 1.21 2004/07/02 15:31:44 netchild Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_ioctl.h,v 1.21.2.1 2005/01/30 00:59:18 imp Exp $
  */
 
 #ifndef _LINUX_IOCTL_H_

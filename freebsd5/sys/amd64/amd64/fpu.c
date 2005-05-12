@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/fpu.c,v 1.154 2004/06/18 04:01:54 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/fpu.c,v 1.154.2.1 2005/02/05 01:02:48 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/fpu.c,v 1.154 2004/06/18 04:01:54 peter 
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <sys/signalvar.h>
-#include <sys/user.h>
 
 #include <machine/cputypes.h>
 #include <machine/frame.h>

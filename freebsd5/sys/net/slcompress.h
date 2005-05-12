@@ -1,6 +1,7 @@
 /*
  * Definitions for tcp compression routines.
- *
+ */
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +31,7 @@
  *
  *	Van Jacobson (van@helios.ee.lbl.gov), Dec 31, 1989:
  *	- Initial distribution.
- * $FreeBSD: src/sys/net/slcompress.h,v 1.18 2004/04/07 20:46:12 imp Exp $
+ * $FreeBSD: src/sys/net/slcompress.h,v 1.18.2.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _NET_SLCOMPRESS_H_

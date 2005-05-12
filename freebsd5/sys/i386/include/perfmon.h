@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1996 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/perfmon.h,v 1.8 2002/03/20 05:48:58 alfred Exp $
+ * $FreeBSD: src/sys/i386/include/perfmon.h,v 1.8.8.1 2005/01/31 23:26:04 imp Exp $
  */
 
 /*

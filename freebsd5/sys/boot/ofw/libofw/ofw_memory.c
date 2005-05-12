@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Benno Rice
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_memory.c,v 1.5 2004/08/02 03:05:09 grehan Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_memory.c,v 1.5.2.1 2005/01/30 00:59:15 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>

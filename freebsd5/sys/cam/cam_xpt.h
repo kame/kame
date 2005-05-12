@@ -1,4 +1,4 @@
- /*
+/*-
  * Data structures and definitions for dealing with the 
  * Common Access Method Transport (xpt) layer.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.h,v 1.4 2001/03/27 05:45:10 ken Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.h,v 1.4.8.1 2005/01/30 00:59:16 imp Exp $
  */
 
 #ifndef _CAM_CAM_XPT_H

@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic driver for the Advanced Systems Inc. SCSI controllers
  * Product specific probe and attach routines can be found in:
  * 
@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Ported from:
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
  *     
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/advansys/advansys.c,v 1.27 2003/08/24 17:48:01 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/advansys/advansys.c,v 1.27.4.1 2005/01/30 00:59:23 imp Exp $");
  
 #include <sys/param.h>
 #include <sys/systm.h>

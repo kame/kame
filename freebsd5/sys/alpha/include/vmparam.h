@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/alpha/include/vmparam.h,v 1.9 2004/04/05 21:00:50 imp Exp $ */
+/* $FreeBSD: src/sys/alpha/include/vmparam.h,v 1.9.2.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: vmparam.h,v 1.6 1997/09/23 23:23:23 mjacob Exp */
 #ifndef	_ALPHA_VMPARAM_H
 #define	_ALPHA_VMPARAM_H
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.

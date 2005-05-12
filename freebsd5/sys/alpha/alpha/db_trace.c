@@ -42,17 +42,17 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 /*__KERNEL_RCSID(0, "$NetBSD: db_trace.c,v 1.9 2000/12/13 03:16:36 mycroft Exp $");*/
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/db_trace.c,v 1.20 2004/07/21 05:07:08 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/db_trace.c,v 1.20.2.2 2005/02/05 01:02:47 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kdb.h>
 #include <sys/proc.h>
-#include <sys/user.h>
 #include <sys/sysent.h>
 
 #include <machine/db_machdep.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h> 
@@ -213,14 +213,16 @@ db_backtrace(struct thread *td, db_addr_t frame, db_addr_t pc, int count)
 	db_expr_t diff;
 	db_addr_t symval;
 	u_long last_ipl, tfps;
-	int i;
+	int i, quit;
 
 	if (count == -1)
 		count = 1024;
 
 	last_ipl = ~0L;
 	tf = NULL;
-	while (count--) {
+	quit = 0;
+	db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
+	while (count-- && !quit) {
 		sym = db_search_symbol(pc, DB_STGY_ANY, &diff);
 		if (sym == DB_SYM_NULL)
 			return (ENOENT);

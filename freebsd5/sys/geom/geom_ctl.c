@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_ctl.c,v 1.32 2004/06/16 09:47:05 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_ctl.c,v 1.32.2.2.2.1 2005/04/12 13:34:34 pjd Exp $");
 
 #include "opt_geom.h"
 
@@ -98,6 +98,10 @@ gctl_error(struct gctl_req *req, const char *fmt, ...)
 		return (EINVAL);
 
 	/* We only record the first error */
+	if (sbuf_done(req->serror)) {
+		if (!req->nerror)
+			req->nerror = EEXIST;
+	}
 	if (req->nerror)
 		return (req->nerror);
 
@@ -107,11 +111,7 @@ gctl_error(struct gctl_req *req, const char *fmt, ...)
 	sbuf_finish(req->serror);
 	if (g_debugflags & G_F_CTLDUMP)
 		printf("gctl %p error \"%s\"\n", req, sbuf_data(req->serror));
-	req->nerror = copyout(sbuf_data(req->serror), req->error,
-	    imin(req->lerror, sbuf_len(req->serror) + 1));
-	if (!req->nerror)
-		req->nerror = EINVAL;
-	return (req->nerror);
+	return (0);
 }
 
 /*
@@ -447,6 +447,7 @@ static int
 g_ctl_ioctl_ctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
 	struct gctl_req *req;
+	int nerror;
 
 	req = (void *)data;
 	req->nerror = 0;
@@ -472,10 +473,14 @@ g_ctl_ioctl_ctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct th
 		g_waitfor_event(g_ctl_req, req, M_WAITOK, NULL);
 		gctl_copyout(req);
 	}
+	if (sbuf_done(req->serror)) {
+		req->nerror = copyout(sbuf_data(req->serror), req->error,
+		    imin(req->lerror, sbuf_len(req->serror) + 1));
+	}
 
-	g_waitidle();
+	nerror = req->nerror;
 	gctl_free(req);
-	return (req->nerror);
+	return (nerror);
 }
 
 static int

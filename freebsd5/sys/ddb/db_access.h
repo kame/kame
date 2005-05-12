@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_access.h,v 1.10 2002/03/20 05:14:27 alfred Exp $
+ * $FreeBSD: src/sys/ddb/db_access.h,v 1.10.8.1 2005/01/30 00:59:21 imp Exp $
  */
 
 #ifndef _DDB_DB_ACCESS_H_

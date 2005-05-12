@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/raid3/g_raid3_ctl.c,v 1.1.2.1 2004/09/14 15:47:03 pjd Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/raid3/g_raid3_ctl.c,v 1.1.2.3 2005/01/08 16:29:05 pjd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -220,10 +220,12 @@ g_raid3_ctl_configure(struct gctl_req *req, struct g_class *mp)
 static void
 g_raid3_ctl_rebuild(struct gctl_req *req, struct g_class *mp)
 {
+	struct g_raid3_metadata md;
 	struct g_raid3_softc *sc;
 	struct g_raid3_disk *disk;
+	struct g_provider *pp;
 	const char *name;
-	int *nargs;
+	int error, *nargs;
 
 	g_topology_assert();
 	nargs = gctl_get_paraml(req, "nargs", sizeof(*nargs));
@@ -268,8 +270,19 @@ g_raid3_ctl_rebuild(struct gctl_req *req, struct g_class *mp)
 	if ((sc->sc_flags & G_RAID3_DEVICE_FLAG_NOAUTOSYNC) != 0)
 		disk->d_flags |= G_RAID3_DISK_FLAG_FORCE_SYNC;
 	g_raid3_update_metadata(disk);
+	pp = disk->d_consumer->provider;
+	error = g_raid3_read_metadata(disk->d_consumer, &md);
 	g_raid3_event_send(disk, G_RAID3_DISK_STATE_DISCONNECTED,
 	    G_RAID3_EVENT_WAIT);
+	if (error != 0) {
+		gctl_error(req, "Cannot read metadata from %s.", pp->name);
+		return;
+	}
+	error = g_raid3_add_disk(sc, pp, &md);
+	if (error != 0) {
+		gctl_error(req, "Cannot reconnect component %s.", pp->name);
+		return;
+	}
 }
 
 static void
@@ -507,10 +520,11 @@ g_raid3_ctl_remove(struct gctl_req *req, struct g_class *mp)
 		if (g_raid3_clear_metadata(disk) != 0) {
 			gctl_error(req, "Cannot clear metadata on %s.",
 			    g_raid3_get_diskname(disk));
-			sc->sc_bump_syncid = G_RAID3_BUMP_IMMEDIATELY;
+		} else {
+			g_raid3_event_send(disk,
+			    G_RAID3_DISK_STATE_DISCONNECTED,
+			    G_RAID3_EVENT_WAIT);
 		}
-		g_raid3_event_send(disk, G_RAID3_DISK_STATE_DISCONNECTED,
-		    G_RAID3_EVENT_WAIT);
 		break;
 	case G_RAID3_DISK_STATE_NODISK:
 		break;

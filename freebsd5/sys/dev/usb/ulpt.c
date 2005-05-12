@@ -1,6 +1,6 @@
 /*	$NetBSD: ulpt.c,v 1.60 2003/10/04 21:19:50 augustss Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1998, 2003 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.65 2004/08/15 23:39:18 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.65.2.1 2005/01/30 01:00:10 imp Exp $");
 
 /*
  * Printer Class spec: http://www.usb.org/developers/data/devclass/usbprint109.PDF

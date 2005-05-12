@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.27 2004/04/05 21:00:49 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.27.2.1 2005/02/05 01:02:47 das Exp $");
 
 #include "opt_mac.h"
 
@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.27 2004/04/05 21:00:49
 #include <sys/proc.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
-#include <sys/user.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -50,6 +49,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.27 2004/04/05 21:00:49
 #include <vm/vm_extern.h>
 
 #include <machine/cpu.h>
+#include <machine/pcb.h>
 #include <machine/sysarch.h>
 
 #include <vm/vm_kern.h>		/* for kernel_map */

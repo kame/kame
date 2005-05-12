@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1993 by Holger Veit (data part)
  * Copyright 1993 by Brian Moore (audio part)
  * Changes Copyright 1993 by Gary Clark II
@@ -41,7 +41,7 @@
  * the manufacturer or anyone else might provide better documentation,
  * so this file (and the driver) will then have a better quality.
  *
- * $FreeBSD: src/sys/dev/mcd/mcdreg.h,v 1.16 2004/03/12 21:45:27 trhodes Exp $
+ * $FreeBSD: src/sys/dev/mcd/mcdreg.h,v 1.16.2.1 2005/01/30 00:59:53 imp Exp $
  */
 
 #ifndef MCD_H

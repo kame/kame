@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)dead_vnops.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/fs/deadfs/dead_vnops.c,v 1.40 2004/04/07 20:45:59 imp Exp $
+ * $FreeBSD: src/sys/fs/deadfs/dead_vnops.c,v 1.40.2.1 2005/01/31 23:25:55 imp Exp $
  */
 
 #include <sys/param.h>

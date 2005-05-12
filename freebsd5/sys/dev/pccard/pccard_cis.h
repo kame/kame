@@ -1,6 +1,6 @@
-/* $FreeBSD: src/sys/dev/pccard/pccard_cis.h,v 1.1 2003/10/07 03:35:48 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccard_cis.h,v 1.1.4.2 2005/02/03 00:30:02 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -168,6 +168,7 @@
 #define	PCCARD_FUNCTION_SECURITY	9
 #define	PCCARD_FUNCTION_INSTRUMENT	10
 #define CISTPL_FUNCE				0x22
+#define	PCCARD_TPLFE_TYPE_LAN_OLD_NID			0x00	/* Old way? */
 #define	PCCARD_TPLFE_TYPE_LAN_TECH			0x01
 #define	PCCARD_TPLFE_TYPE_LAN_SPEED			0x02
 #define	PCCARD_TPLFE_TYPE_LAN_MEDIA			0x03

@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/tlsb/dwlpxreg.h,v 1.4 2000/01/29 17:23:41 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/dwlpxreg.h,v 1.4.26.1 2005/01/30 00:59:12 imp Exp $ */
 /* $NetBSD: dwlpxreg.h,v 1.9 1998/03/21 22:02:42 mjacob Exp $ */
 
-/*
+/*-
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.

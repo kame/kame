@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_lookup.c,v 1.64 2004/08/04 18:39:07 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_lookup.c,v 1.64.2.1 2005/01/31 23:26:19 imp Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"

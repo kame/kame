@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2004 Lukas Ertl
+ * Copyright (c) 2004, 2005 Lukas Ertl
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_drive.c,v 1.9.2.1 2004/09/24 16:23:17 le Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/vinum/geom_vinum_drive.c,v 1.9.2.3 2005/02/28 20:06:38 le Exp $");
 
 #include <sys/param.h>
 #include <sys/bio.h>
@@ -294,7 +294,6 @@ gv_drive_worker(void *arg)
 	struct bio *bp, *cbp;
 	struct g_geom *gp;
 	struct g_provider *pp;
-	struct g_consumer *cp;
 	struct gv_drive *d;
 	struct gv_sd *s;
 	struct gv_bioq *bq, *bq2;
@@ -332,16 +331,9 @@ gv_drive_worker(void *arg)
 			/* The request had an error, we need to clean up. */
 			if (error != 0) {
 				g_topology_lock();
-				cp = LIST_FIRST(&gp->consumer);
-				if (cp->acr > 0 || cp->acw > 0 || cp->ace > 0)
-					g_access(cp, -cp->acr, -cp->acw,
-					    -cp->ace);
 				gv_set_drive_state(d, GV_DRIVE_DOWN,
 				    GV_SETSTATE_FORCE | GV_SETSTATE_CONFIG);
-				if (cp->nstart == cp->nend) {
-					g_detach(cp);
-					g_destroy_consumer(cp);
-				}
+				g_wither_geom(d->geom, ENXIO);
 				g_topology_unlock();
 			}
 
@@ -535,13 +527,21 @@ gv_drive_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 			d->freelist_entries = 1;
 
 			TAILQ_INIT(&d->bqueue);
-			mtx_init(&d->bqueue_mtx, "gv_drive", NULL, MTX_DEF);
-			kthread_create(gv_drive_worker, d, NULL, 0, 0,
-			    "gv_d %s", d->name);
-			d->flags |= GV_DRIVE_THREAD_ACTIVE;
 
 			/* Save it into the main configuration. */
 			LIST_INSERT_HEAD(&sc->drives, d, drive);
+		}
+
+		/*
+		 * Create a bio queue mutex and a worker thread, if necessary.
+		 */
+		if (mtx_initialized(&d->bqueue_mtx) == 0)
+			mtx_init(&d->bqueue_mtx, "gv_drive", NULL, MTX_DEF);
+
+		if (!(d->flags & GV_DRIVE_THREAD_ACTIVE)) {
+			kthread_create(gv_drive_worker, d, NULL, 0, 0,
+			    "gv_d %s", d->name);
+			d->flags |= GV_DRIVE_THREAD_ACTIVE;
 		}
 
 		g_access(cp, -1, 0, 0);

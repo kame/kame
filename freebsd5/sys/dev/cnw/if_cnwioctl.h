@@ -1,7 +1,7 @@
 /*	$NetBSD: if_cnwioctl.h,v 1.2 1999/11/29 12:54:00 itojun Exp $	*/
-/* $FreeBSD: src/sys/dev/cnw/if_cnwioctl.h,v 1.1 2001/03/16 07:25:42 imp Exp $ */
+/* $FreeBSD: src/sys/dev/cnw/if_cnwioctl.h,v 1.1.8.1 2005/01/30 00:59:32 imp Exp $ */
 
-/*
+/*-
  * Copyright (c) 1996, 1997 Berkeley Software Design, Inc.
  * All rights reserved.
  *

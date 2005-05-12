@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/alpha/include/smp.h,v 1.6 2001/08/13 22:41:15 jhb Exp $
+ * $FreeBSD: src/sys/alpha/include/smp.h,v 1.6.8.2 2005/01/30 00:59:10 imp Exp $
  *
  */
 
@@ -26,7 +26,7 @@
 
 #ifndef LOCORE
 
-extern u_int			boot_cpu_id;
+extern u_int64_t		boot_cpu_id;
 
 void	ipi_selected(u_int cpus, u_int64_t ipi);
 void	ipi_all(u_int64_t ipi);

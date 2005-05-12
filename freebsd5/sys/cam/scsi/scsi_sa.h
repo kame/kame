@@ -1,4 +1,4 @@
-/*
+/*-
  * Structure and function declarations for the
  * SCSI Sequential Access Peripheral driver for CAM.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_sa.h,v 1.9 2001/01/12 02:49:40 steve Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_sa.h,v 1.9.8.1 2005/01/30 00:59:17 imp Exp $
  */
 
 #ifndef	_SCSI_SCSI_SA_H

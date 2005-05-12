@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Portions of this code have been derived from software contributed
  * to the FreeBSD Project by Mark Newton.
  *
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ipc.c,v 1.13 2003/06/10 21:35:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ipc.c,v 1.13.4.1 2005/01/30 00:59:20 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>

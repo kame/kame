@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if.h,v 1.88.2.2 2004/09/13 05:11:40 brooks Exp $
+ * $FreeBSD: src/sys/net/if.h,v 1.88.2.5 2005/02/28 22:03:13 brooks Exp $
  */
 
 #ifndef _NET_IF_H_
@@ -102,7 +102,7 @@ struct if_data {
 	u_long	ifi_iqdrops;		/* dropped on input, this interface */
 	u_long	ifi_noproto;		/* destined for unsupported protocol */
 	u_long	ifi_hwassist;		/* HW offload capabilities */
-	time_t	ifi_epoch;		/* time of attach or stat reset */
+	time_t	ifi_epoch;		/* uptime at attach or stat reset */
 #ifdef __alpha__
 	u_int	ifi_timepad;		/* time_t is int, not long on alpha */
 #endif
@@ -119,7 +119,7 @@ struct if_data {
 #define	IFF_NOARP	0x80		/* no address resolution protocol */
 #define	IFF_PROMISC	0x100		/* receive all packets */
 #define	IFF_ALLMULTI	0x200		/* receive all multicast packets */
-#define	IFF_OACTIVE	0x400		/* transmission in progress */
+#define	IFF_OACTIVE	0x400		/* tx hardware queue is full */
 #define	IFF_SIMPLEX	0x800		/* can't hear own transmissions */
 #define	IFF_LINK0	0x1000		/* per link layer defined bit */
 #define	IFF_LINK1	0x2000		/* per link layer defined bit */

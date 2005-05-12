@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Alan L. Cox <alc@cs.rice.edu>
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/uio_machdep.c,v 1.5 2004/06/03 10:22:45 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/uio_machdep.c,v 1.5.2.1 2005/01/30 00:59:13 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

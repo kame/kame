@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_default.c,v 1.97 2004/07/12 08:14:08 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_default.c,v 1.97.2.2 2005/02/23 23:06:29 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -428,6 +428,7 @@ retry:
 		VM_OBJECT_LOCK(object);
 		if (object->flags & OBJ_DEAD) {
 			VOP_UNLOCK(vp, 0, td);
+			vm_object_set_flag(object, OBJ_DISCONNECTWNT);
 			msleep(object, VM_OBJECT_MTX(object), PDROP | PVM,
 			    "vodead", 0);
 			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);

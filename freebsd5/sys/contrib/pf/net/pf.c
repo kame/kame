@@ -1,6 +1,7 @@
-/*	$FreeBSD: src/sys/contrib/pf/net/pf.c,v 1.18.2.2 2004/10/03 17:04:39 mlaier Exp $	*/
+/*	$FreeBSD: src/sys/contrib/pf/net/pf.c,v 1.18.2.7.2.2 2005/04/25 15:24:30 glebius Exp $	*/
 /*	$OpenBSD: pf.c,v 1.433.2.2 2004/07/17 03:22:34 brad Exp $ */
 /* add	$OpenBSD: pf.c,v 1.448 2004/05/11 07:34:11 dhartmei Exp $ */
+/* add	$OpenBSD: pf.c,v 1.483 2005/03/15 17:38:43 dhartmei Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -2087,6 +2088,8 @@ pf_map_addr(sa_family_t af, struct pf_rule *r, struct pf_addr *saddr,
 
 	get_addr:
 		PF_ACPY(naddr, &rpool->counter, af);
+		if (init_addr != NULL && PF_AZERO(init_addr, af))
+			PF_ACPY(init_addr, naddr, af);
 		PF_AINC(&rpool->counter, af);
 		break;
 	}
@@ -2129,7 +2132,7 @@ pf_get_sport(sa_family_t af, u_int8_t proto, struct pf_rule *r,
 		 * similar 2 portloop in in_pcbbind
 		 */
 		if (!(proto == IPPROTO_TCP || proto == IPPROTO_UDP)) {
-			key.gwy.port = 0;
+			key.gwy.port = dport;
 			if (pf_find_state_all(&key, PF_EXT_GWY, NULL) == NULL)
 				return (0);
 		} else if (low == 0 && high == 0) {
@@ -2329,7 +2332,7 @@ pf_get_translation(struct pf_pdesc *pd, struct mbuf *m, int off, int direction,
 					    saddr, pd->af);
 				break;
 			case PF_IN:
-				if (r->rpool.cur->addr.type == PF_ADDR_DYNIFTL){
+				if (r->src.addr.type == PF_ADDR_DYNIFTL) {
 					if (pd->af == AF_INET) {
 						if (r->src.addr.p.dyn->
 						    pfid_acnt4 < 1)
@@ -2360,7 +2363,7 @@ pf_get_translation(struct pf_pdesc *pd, struct mbuf *m, int off, int direction,
 			}
 			break;
 		case PF_RDR: {
-			if (pf_map_addr(r->af, r, saddr, naddr, NULL, sn))
+			if (pf_map_addr(pd->af, r, saddr, naddr, NULL, sn))
 				return (NULL);
 
 			if (r->rpool.proxy_port[1]) {
@@ -2506,6 +2509,11 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, struct pf_pdesc *pd)
 	}
 #ifdef __FreeBSD__
 	INP_LOCK(inp);
+	if ((inp->inp_socket == NULL) || (inp->inp_socket->so_cred == NULL)) {
+		INP_UNLOCK(inp);
+		INP_INFO_RUNLOCK(pi);
+		return (0);
+	}
 	*uid = inp->inp_socket->so_cred->cr_uid;
 	*gid = inp->inp_socket->so_cred->cr_groups[0];
 	INP_UNLOCK(inp);
@@ -2581,6 +2589,7 @@ pf_get_mss(struct mbuf *m, int off, u_int16_t th_off, sa_family_t af)
 			break;
 		case TCPOPT_MAXSEG:
 			bcopy((caddr_t)(opt + 2), (caddr_t)&mss, 2);
+			NTOHS(mss);
 			/* FALLTHROUGH */
 		default:
 			optlen = opt[1];
@@ -3400,7 +3409,7 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 	if (direction == PF_OUT) {
 		/* check outgoing packet for BINAT/NAT */
 		if ((nr = pf_get_translation(pd, m, off, PF_OUT, kif, &nsn,
-		    saddr, 0, daddr, 0, &pd->naddr, NULL)) != NULL) {
+		    saddr, icmpid, daddr, icmpid, &pd->naddr, NULL)) != NULL) {
 			PF_ACPY(&pd->baddr, saddr, af);
 			switch (af) {
 #ifdef INET
@@ -3424,7 +3433,7 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 	} else {
 		/* check incoming packet for BINAT/RDR */
 		if ((nr = pf_get_translation(pd, m, off, PF_IN, kif, &nsn,
-		    saddr, 0, daddr, 0, &pd->naddr, NULL)) != NULL) {
+		    saddr, icmpid, daddr, icmpid, &pd->naddr, NULL)) != NULL) {
 			PF_ACPY(&pd->baddr, daddr, af);
 			switch (af) {
 #ifdef INET
@@ -4056,9 +4065,9 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct pfi_kif *kif,
 			(*state)->dst.seqdiff = (*state)->src.seqhi -
 			    (*state)->dst.seqlo;
 			(*state)->src.seqhi = (*state)->src.seqlo +
-			    (*state)->src.max_win;
-			(*state)->dst.seqhi = (*state)->dst.seqlo +
 			    (*state)->dst.max_win;
+			(*state)->dst.seqhi = (*state)->dst.seqlo +
+			    (*state)->src.max_win;
 			(*state)->src.wscale = (*state)->dst.wscale = 0;
 			(*state)->src.state = (*state)->dst.state =
 			    TCPS_ESTABLISHED;
@@ -6329,7 +6338,8 @@ pf_test6(int dir, struct ifnet *ifp, struct mbuf **m0)
 			goto done;
 		}
 		if (dir == PF_IN && pf_check_proto_cksum(m, off,
-		    ntohs(h->ip6_plen), IPPROTO_TCP, AF_INET6)) {
+		    ntohs(h->ip6_plen) - (off - sizeof(struct ip6_hdr)),
+		    IPPROTO_TCP, AF_INET6)) {
 			action = PF_DROP;
 			goto done;
 		}
@@ -6367,7 +6377,8 @@ pf_test6(int dir, struct ifnet *ifp, struct mbuf **m0)
 			goto done;
 		}
 		if (dir == PF_IN && uh.uh_sum && pf_check_proto_cksum(m,
-		    off, ntohs(h->ip6_plen), IPPROTO_UDP, AF_INET6)) {
+		    off, ntohs(h->ip6_plen) - (off - sizeof(struct ip6_hdr)),
+		    IPPROTO_UDP, AF_INET6)) {
 			action = PF_DROP;
 			goto done;
 		}
@@ -6406,7 +6417,8 @@ pf_test6(int dir, struct ifnet *ifp, struct mbuf **m0)
 			goto done;
 		}
 		if (dir == PF_IN && pf_check_proto_cksum(m, off,
-		    ntohs(h->ip6_plen), IPPROTO_ICMPV6, AF_INET6)) {
+		    ntohs(h->ip6_plen)  - (off - sizeof(struct ip6_hdr)),
+		    IPPROTO_ICMPV6, AF_INET6)) {
 			action = PF_DROP;
 			goto done;
 		}

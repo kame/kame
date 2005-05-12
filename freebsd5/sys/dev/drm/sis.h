@@ -1,5 +1,5 @@
-/* sis_drv.h -- Private header for sis driver -*- linux-c -*-
- *
+/* sis_drv.h -- Private header for sis driver -*- linux-c -*- */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All rights reserved.
@@ -23,7 +23,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  * 
- * $FreeBSD: src/sys/dev/drm/sis.h,v 1.3 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/sis.h,v 1.3.2.1 2005/01/30 00:59:36 imp Exp $
  */
 /* $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/kernel/sis.h,v 1.3 2002/10/30 12:52:38 alanh Exp $ */
 

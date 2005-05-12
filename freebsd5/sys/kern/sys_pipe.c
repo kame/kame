@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996 John S. Dyson
  * All rights reserved.
  *
@@ -89,7 +89,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sys_pipe.c,v 1.177 2004/08/16 01:27:24 silby Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sys_pipe.c,v 1.177.2.3 2005/02/27 02:39:33 jeff Exp $");
 
 #include "opt_mac.h"
 
@@ -351,6 +351,9 @@ pipe(td, uap)
 	rpipe = &pp->pp_rpipe;
 	wpipe = &pp->pp_wpipe;
 
+	knlist_init(&rpipe->pipe_sel.si_note, PIPE_MTX(rpipe));
+	knlist_init(&wpipe->pipe_sel.si_note, PIPE_MTX(wpipe));
+
 	/* Only the forward direction pipe is backed by default */
 	if (pipe_create(rpipe, 1) || pipe_create(wpipe, 0)) {
 		pipeclose(rpipe);
@@ -384,15 +387,7 @@ pipe(td, uap)
 	FILE_UNLOCK(rf);
 	error = falloc(td, &wf, &fd);
 	if (error) {
-		FILEDESC_LOCK(fdp);
-		if (fdp->fd_ofiles[td->td_retval[0]] == rf) {
-			fdp->fd_ofiles[td->td_retval[0]] = NULL;
-			fdunused(fdp, td->td_retval[0]);
-			FILEDESC_UNLOCK(fdp);
-			fdrop(rf, td);
-		} else {
-			FILEDESC_UNLOCK(fdp);
-		}
+		fdclose(fdp, rf, td->td_retval[0], td);
 		fdrop(rf, td);
 		/* rpipe has been closed by fdrop(). */
 		pipeclose(wpipe);
@@ -573,7 +568,6 @@ pipe_create(pipe, backing)
 		/* If we're not backing this pipe, no need to do anything. */
 		error = 0;
 	}
-	knlist_init(&pipe->pipe_sel.si_note, PIPE_MTX(pipe));
 	return (error);
 }
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Richard Hodges and Matriplex, inc.
  * All rights reserved.
  *
@@ -47,7 +47,7 @@
  *
  ******************************************************************************
  *
- * $FreeBSD: src/sys/dev/idt/idtvar.h,v 1.2 2003/01/01 18:48:50 schweikh Exp $
+ * $FreeBSD: src/sys/dev/idt/idtvar.h,v 1.2.6.1 2005/01/30 00:59:46 imp Exp $
  */
 
 /*******************************************************************************

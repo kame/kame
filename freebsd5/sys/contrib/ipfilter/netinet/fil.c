@@ -100,7 +100,7 @@
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)fil.c	1.36 6/5/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/fil.c,v 1.39 2004/06/29 03:39:06 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/fil.c,v 1.39.2.3 2005/03/13 18:12:04 rwatson Exp $";
 #endif
 
 #ifndef	_KERNEL
@@ -115,10 +115,10 @@ extern	int	opts;
 # define	FR_VERBOSE(verb_pr)
 # define	FR_DEBUG(verb_pr)
 # define	IPLLOG(a, c, d, e)		ipflog(a, c, d, e)
-# if SOLARIS || defined(__sgi)
+# ifdef USE_MUTEX
 extern	KRWLOCK_T	ipf_mutex, ipf_auth, ipf_nat;
 extern	kmutex_t	ipf_rw;
-# endif /* SOLARIS || __sgi */
+# endif /* USE_MUTEX */
 #endif /* _KERNEL */
 
 
@@ -1051,15 +1051,6 @@ int out;
 	fin->fin_out = out;
 #endif /* _KERNEL */
 	
-#ifndef __FreeBSD__
-	/*
-	 * Be careful here: ip_id is in network byte order when called
-	 * from ip_output()
-	 */
-	if ((out) && (v == 4))
-		ip->ip_id = ntohs(ip->ip_id);
-#endif
-
 	changed = 0;
 	fin->fin_v = v;
 	fin->fin_ifp = ifp;
@@ -1304,11 +1295,6 @@ logit:
 		}
 	}
 #endif /* IPFILTER_LOG */
-
-#ifndef __FreeBSD__	
-	if ((out) && (v == 4))
-		ip->ip_id = htons(ip->ip_id);
-#endif
 
 #ifdef	_KERNEL
 	/*
@@ -2135,31 +2121,8 @@ register frentry_t *fr;
 
 void frsync()
 {
-# if !SOLARIS
-	register struct ifnet *ifp;
-
-#  if defined(__OpenBSD__) || ((NetBSD >= 199511) && (NetBSD < 1991011)) || \
-     (defined(__FreeBSD_version) && (__FreeBSD_version >= 300000))
-#   if (NetBSD >= 199905) || defined(__OpenBSD__)
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
-#   elif defined(__FreeBSD_version) && (__FreeBSD_version >= 500043)
-	IFNET_RLOCK();
-	TAILQ_FOREACH(ifp, &ifnet, if_link)
-#   else
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_link.tqe_next)
-#   endif
-#  else
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#  endif
-	{
-		ip_natsync(ifp);
-		ip_statesync(ifp);
-	}
-	ip_natsync((struct ifnet *)-1);
-#  if defined(__FreeBSD_version) && (__FreeBSD_version >= 500043)
-	IFNET_RUNLOCK();
-#  endif
-# endif /* !SOLARIS */
+	ip_natsync(NULL);
+	ip_statesync(NULL);
 
 	WRITE_ENTER(&ipf_mutex);
 	frsynclist(ipacct[0][fr_active]);
@@ -2433,7 +2396,12 @@ void *ipin;
 		ATOMIC_INCL(frstats[out].fr_pull[0]);
 		qf->qf_data = MTOD(m, char *) + ipoff;
 # else
-		m = m_pullup(m, len);
+#  if (__FreeBSD_version >= 490000)
+		if ((len > MHLEN) && ((m->m_flags & M_PKTHDR) != 0))
+			m = m_defrag(m, M_DONTWAIT);
+		else
+#  endif
+			m = m_pullup(m, len);
 		*fin->fin_mp = m;
 		if (m == NULL) {
 			ATOMIC_INCL(frstats[out].fr_pull[1]);

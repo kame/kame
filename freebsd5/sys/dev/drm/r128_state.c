@@ -1,6 +1,6 @@
 /* r128_state.c -- State support for r128 -*- linux-c -*-
- * Created: Thu Jan 27 02:53:43 2000 by gareth@valinux.com
- *
+ * Created: Thu Jan 27 02:53:43 2000 by gareth@valinux.com */
+/*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/r128_state.c,v 1.10 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128_state.c,v 1.10.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/r128.h"

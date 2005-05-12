@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.160 2004/08/16 11:12:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.160.2.5 2005/03/31 22:17:42 sobomax Exp $");
 
 #include "opt_mac.h"
 
@@ -74,12 +74,14 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.160 2004/08/16 11:12:5
 
 #include "opt_compat.h"
 
-#if !COMPAT_LINUX32
-#include <machine/../linux/linux.h>
-#include <machine/../linux/linux_proto.h>
-#else
+#include <compat/linux/linux_sysproto.h>
+
+#ifdef COMPAT_LINUX32
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#else
+#include <machine/../linux/linux.h>
+#include <machine/../linux/linux_proto.h>
 #endif
 
 #include <compat/linux/linux_mib.h>
@@ -761,15 +763,21 @@ linux_newuname(struct thread *td, struct linux_newuname_args *args)
 		}
 		strlcpy(utsname.machine, class, LINUX_MAX_UTSNAME);
 	}
+#elif defined(__amd64__)	/* XXX: Linux can change 'personality'. */
+#ifdef COMPAT_LINUX32
+	strlcpy(utsname.machine, "i686", LINUX_MAX_UTSNAME);
 #else
+	strlcpy(utsname.machine, "x86_64", LINUX_MAX_UTSNAME);
+#endif /* COMPAT_LINUX32 */
+#else /* something other than i386 or amd64 - assume we and Linux agree */
 	strlcpy(utsname.machine, machine, LINUX_MAX_UTSNAME);
-#endif
+#endif /* __i386__ */
 	strlcpy(utsname.domainname, domainname, LINUX_MAX_UTSNAME);
 
 	return (copyout(&utsname, args->buf, sizeof(utsname)));
 }
 
-#if defined(__i386__) || (defined(__amd64__) && COMPAT_LINUX32)
+#if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
 struct l_utimbuf {
 	l_time_t l_actime;
 	l_time_t l_modtime;
@@ -1193,20 +1201,20 @@ linux_old_getrlimit(struct thread *td, struct linux_old_getrlimit_args *args)
 	lim_rlimit(p, which, &bsd_rlim);
 	PROC_UNLOCK(p);
 
-#if !COMPAT_LINUX32
-	rlim.rlim_cur = (unsigned long)bsd_rlim.rlim_cur;
-	if (rlim.rlim_cur == ULONG_MAX)
-		rlim.rlim_cur = LONG_MAX;
-	rlim.rlim_max = (unsigned long)bsd_rlim.rlim_max;
-	if (rlim.rlim_max == ULONG_MAX)
-		rlim.rlim_max = LONG_MAX;
-#else
+#ifdef COMPAT_LINUX32
 	rlim.rlim_cur = (unsigned int)bsd_rlim.rlim_cur;
 	if (rlim.rlim_cur == UINT_MAX)
 		rlim.rlim_cur = INT_MAX;
 	rlim.rlim_max = (unsigned int)bsd_rlim.rlim_max;
 	if (rlim.rlim_max == UINT_MAX)
 		rlim.rlim_max = INT_MAX;
+#else
+	rlim.rlim_cur = (unsigned long)bsd_rlim.rlim_cur;
+	if (rlim.rlim_cur == ULONG_MAX)
+		rlim.rlim_cur = LONG_MAX;
+	rlim.rlim_max = (unsigned long)bsd_rlim.rlim_max;
+	if (rlim.rlim_max == ULONG_MAX)
+		rlim.rlim_max = LONG_MAX;
 #endif
 	return (copyout(&rlim, args->rlim, sizeof(rlim)));
 }
@@ -1422,4 +1430,11 @@ linux_getsid(struct thread *td, struct linux_getsid_args *args)
 	struct getsid_args bsd;
 	bsd.pid = args->pid;
 	return getsid(td, &bsd);
+}
+
+int
+linux_nosys(struct thread *td, struct nosys_args *ignore)
+{
+
+	return (ENOSYS);
 }

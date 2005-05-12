@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2001 Benno Rice.
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.28 2004/08/04 00:21:19 gad Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.28.2.1 2005/01/30 00:59:56 imp Exp $");
 
 #include "opt_comconsole.h"
 #include "opt_ofw.h"

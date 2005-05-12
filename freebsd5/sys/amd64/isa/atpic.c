@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/isa/atpic.c,v 1.13 2004/08/16 23:12:30 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/isa/atpic.c,v 1.13.2.2 2005/02/28 07:40:00 obrien Exp $");
 
 #include "opt_auto_eoi.h"
 #include "opt_isa.h"
@@ -64,14 +64,9 @@ __FBSDID("$FreeBSD: src/sys/amd64/isa/atpic.c,v 1.13 2004/08/16 23:12:30 peter E
 #define	SLAVE	1
 
 /*
- * PC-98 machines wire the slave 8259A to pin 7 on the master PIC, and
  * PC-AT machines wire the slave PIC to pin 2 on the master PIC.
  */
-#ifdef PC98
-#define	ICU_SLAVEID	7
-#else
 #define	ICU_SLAVEID	2
-#endif
 
 /*
  * Determine the base master and slave modes not including auto EOI support.
@@ -100,7 +95,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/isa/atpic.c,v 1.13 2004/08/16 23:12:30 peter E
 static void	atpic_init(void *dummy);
 
 unsigned int imen;	/* XXX */
-static int using_elcr;
 
 inthand_t
 	IDTVEC(atpic_intr0), IDTVEC(atpic_intr1), IDTVEC(atpic_intr2),
@@ -298,7 +292,7 @@ atpic_resume(struct intsrc *isrc)
 
 	if (ai->at_irq == 0) {
 		i8259_init(ap, ap == &atpics[SLAVE]);
-		if (ap == &atpics[SLAVE] && using_elcr)
+		if (ap == &atpics[SLAVE] && elcr_found)
 			elcr_resume();
 	}
 }
@@ -342,7 +336,7 @@ atpic_config_intr(struct intsrc *isrc, enum intr_trigger trig,
 			    vector);
 		return (EINVAL);
 	}
-	if (!using_elcr) {
+	if (!elcr_found) {
 		if (bootverbose)
 			printf("atpic: No ELCR to configure IRQ%u as %s\n",
 			    vector, trig == INTR_TRIGGER_EDGE ? "edge/high" :
@@ -433,8 +427,7 @@ atpic_startup(void)
 	 * assume level trigger for any interrupt that we aren't sure is
 	 * edge triggered.
 	 */
-	if (elcr_probe() == 0) {
-		using_elcr = 1;
+	if (elcr_found) {
 		for (i = 0, ai = atintrs; i < NUM_ISA_IRQS; i++, ai++)
 			ai->at_trigger = elcr_read_trigger(i);
 	} else {

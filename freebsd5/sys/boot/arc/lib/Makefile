@@ -1,7 +1,7 @@
-# $FreeBSD: src/sys/boot/arc/lib/Makefile,v 1.9 2002/05/13 10:53:24 ru Exp $
+# $FreeBSD: src/sys/boot/arc/lib/Makefile,v 1.9.8.1 2005/02/13 07:23:30 obrien Exp $
 
 LIB=		arc
-INTERNALLIB=	true
+INTERNALLIB=
 
 CFLAGS+=	-ffreestanding
 .PATH:		${.CURDIR}/arch/${MACHINE_ARCH}

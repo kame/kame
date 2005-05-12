@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isa/atkbdc_isa.c,v 1.29 2004/05/30 20:27:16 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/isa/atkbdc_isa.c,v 1.29.2.1 2004/11/07 22:33:06 njl Exp $");
 
 #include "opt_kbd.h"
 
@@ -252,8 +252,6 @@ atkbdc_add_child(device_t bus, int order, char *name, int unit)
 		resource_list_add(&ivar->resources, SYS_RES_IRQ, ivar->rid,
 				  t, t, 1);
 
-	if (resource_int_value(name, unit, "flags", &t) == 0)
-		device_set_flags(child, t);
 	if (resource_disabled(name, unit))
 		device_disable(child);
 

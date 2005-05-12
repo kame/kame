@@ -1,6 +1,6 @@
 /* r128_drv.h -- Private header for r128 driver -*- linux-c -*-
- * Created: Mon Dec 13 09:51:11 1999 by faith@precisioninsight.com
- *
+ * Created: Mon Dec 13 09:51:11 1999 by faith@precisioninsight.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All rights reserved.
@@ -30,7 +30,7 @@
  *    Gareth Hughes <gareth@valinux.com>
  *    Michel Dänzer <daenzerm@student.ethz.ch>
  *
- * $FreeBSD: src/sys/dev/drm/r128_drv.h,v 1.8 2004/01/06 04:34:53 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128_drv.h,v 1.8.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #ifndef __R128_DRV_H__

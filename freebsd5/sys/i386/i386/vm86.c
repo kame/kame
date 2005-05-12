@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/vm86.c,v 1.56 2003/08/25 09:48:47 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/vm86.c,v 1.56.4.1 2005/02/05 01:02:49 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,10 +39,9 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/vm86.c,v 1.56 2003/08/25 09:48:47 obrien E
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 
-#include <sys/user.h>
-
 #include <machine/md_var.h>
-#include <machine/pcb_ext.h>	/* pcb.h included via sys/user.h */
+#include <machine/pcb.h>
+#include <machine/pcb_ext.h>
 #include <machine/psl.h>
 #include <machine/specialreg.h>
 #include <machine/sysarch.h>

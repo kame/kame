@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/pci_cfgreg.h,v 1.12 2004/03/13 19:19:13 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/pci_cfgreg.h,v 1.12.2.1 2005/01/30 00:59:13 imp Exp $
  *
  */
 

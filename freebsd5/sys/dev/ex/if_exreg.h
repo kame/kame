@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996, Javier Martín Rueda (jmrueda@diatel.upm.es)
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ex/if_exreg.h,v 1.5 2003/03/29 15:33:04 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ex/if_exreg.h,v 1.5.6.1 2005/01/30 00:59:40 imp Exp $
  */
 
 /*

@@ -63,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.135 2004/06/16 09:46:38 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.135.2.3 2005/03/02 10:27:35 obrien Exp $");
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -107,20 +107,20 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.135 2004/06/16 09:46:38 phk
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/fcntl.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
-#include <sys/vnode.h>
+#include <sys/selinfo.h>
+#include <sys/uio.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 
-#if (__FreeBSD_version >=400000) || (NSMBUS > 0)
 #include <sys/bus.h>		/* used by smbus and newbus */
-#endif
 
 #if (__FreeBSD_version < 500000)
 #include <machine/clock.h>              /* for DELAY */
@@ -131,12 +131,9 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.135 2004/06/16 09:46:38 phk
 #include <dev/pci/pcivar.h>
 #endif
 
-
-#if (__FreeBSD_version >=300000)
 #include <machine/bus_memio.h>	/* for bus space */
 #include <machine/bus.h>
 #include <sys/bus.h>
-#endif
 
 #include <dev/bktr/ioctl_meteor.h>
 #include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
@@ -427,7 +424,7 @@ static void	build_dma_prog( bktr_ptr_t bktr, char i_flag );
 
 static bool_t   getline(bktr_reg_t *, int);
 static bool_t   notclipped(bktr_reg_t * , int , int);     
-static bool_t   split(bktr_reg_t *, volatile u_long **, int, u_long, int, 
+static bool_t   split(bktr_reg_t *, volatile uint32_t **, int, u_long, int, 
 		      volatile u_char ** , int  );
 
 static void	start_capture( bktr_ptr_t bktr, unsigned type );
@@ -1258,7 +1255,7 @@ vbi_read(bktr_ptr_t bktr, struct uio *uio, int ioflag)
 	LOCK_VBI(bktr);
 
 	while(bktr->vbisize == 0) {
-		if (ioflag & IO_NDELAY) {
+		if (ioflag & FNDELAY) {
 			status = EWOULDBLOCK;
 			goto out;
 		}
@@ -2674,7 +2671,7 @@ static bool_t getline(bktr_reg_t *bktr, int x ) {
     return FALSE;
 }
     
-static bool_t split(bktr_reg_t * bktr, volatile u_long **dma_prog, int width ,
+static bool_t split(bktr_reg_t * bktr, volatile uint32_t **dma_prog, int width ,
 		    u_long operation, int pixel_width,
 		    volatile u_char ** target_buffer, int cols ) {
 
@@ -2764,11 +2761,11 @@ static void
 rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 {
 	int			i;
-	volatile u_long		target_buffer, buffer, target,width;
-	volatile u_long		pitch;
-	volatile u_long		*dma_prog;	/* DMA prog is an array of 
+	volatile uint32_t	target_buffer, buffer, target,width;
+	volatile uint32_t	pitch;
+	volatile uint32_t	*dma_prog;	/* DMA prog is an array of 
 						32 bit RISC instructions */
-	volatile u_long		*loop_point;
+	volatile uint32_t	*loop_point;
         struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 	u_int                   Bpp = pf_int->public.Bpp;
 	unsigned int            vbisamples;     /* VBI samples per line */
@@ -2804,7 +2801,7 @@ rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	}
 	bktr->capcontrol = 3 << 2 |  3;
 
-	dma_prog = (u_long *) bktr->dma_prog;
+	dma_prog = (uint32_t *) bktr->dma_prog;
 
 	/* Construct Write */
 
@@ -2846,19 +2843,19 @@ rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 		for (i = 0; i < (rows/interlace); i++) {
 		    target = target_buffer;
 		    if ( notclipped(bktr, i, width)) {
-			split(bktr, (volatile u_long **) &dma_prog,
+			split(bktr, (volatile uint32_t **) &dma_prog,
 			      bktr->y2 - bktr->y, OP_WRITE,
 			      Bpp, (volatile u_char **)(uintptr_t)&target,  cols);
 	
 		    } else {
 			while(getline(bktr, i)) {
 			    if (bktr->y != bktr->y2 ) {
-				split(bktr, (volatile u_long **) &dma_prog,
+				split(bktr, (volatile uint32_t **) &dma_prog,
 				      bktr->y2 - bktr->y, OP_WRITE,
 				      Bpp, (volatile u_char **)(uintptr_t)&target, cols);
 			    }
 			    if (bktr->yclip != bktr->yclip2 ) {
-				split(bktr,(volatile u_long **) &dma_prog,
+				split(bktr,(volatile uint32_t **) &dma_prog,
 				      bktr->yclip2 - bktr->yclip,
 				      OP_SKIP,
 				      Bpp, (volatile u_char **)(uintptr_t)&target,  cols);
@@ -2903,19 +2900,19 @@ rgb_vbi_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 		for (i = 0; i < (rows/interlace); i++) {
 		    target = target_buffer;
 		    if ( notclipped(bktr, i, width)) {
-			split(bktr, (volatile u_long **) &dma_prog,
+			split(bktr, (volatile uint32_t **) &dma_prog,
 			      bktr->y2 - bktr->y, OP_WRITE,
 			      Bpp, (volatile u_char **)(uintptr_t)&target,  cols);
 		    } else {
 			while(getline(bktr, i)) {
 			    if (bktr->y != bktr->y2 ) {
-				split(bktr, (volatile u_long **) &dma_prog,
+				split(bktr, (volatile uint32_t **) &dma_prog,
 				      bktr->y2 - bktr->y, OP_WRITE,
 				      Bpp, (volatile u_char **)(uintptr_t)&target,
 				      cols);
 			    }	
 			    if (bktr->yclip != bktr->yclip2 ) {
-				split(bktr, (volatile u_long **) &dma_prog,
+				split(bktr, (volatile uint32_t **) &dma_prog,
 				      bktr->yclip2 - bktr->yclip, OP_SKIP,
 				      Bpp, (volatile u_char **)(uintptr_t) &target,  cols);
 			    }	
@@ -2946,9 +2943,9 @@ static void
 rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 {
 	int			i;
-	volatile u_long		target_buffer, buffer, target,width;
-	volatile u_long		pitch;
-	volatile  u_long	*dma_prog;
+	volatile uint32_t		target_buffer, buffer, target,width;
+	volatile uint32_t	pitch;
+	volatile  uint32_t	*dma_prog;
         struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 	u_int                   Bpp = pf_int->public.Bpp;
 
@@ -2976,16 +2973,16 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	}
 	bktr->capcontrol = 3 << 2 |  3;
 
-	dma_prog = (u_long *) bktr->dma_prog;
+	dma_prog = (uint32_t *) bktr->dma_prog;
 
 	/* Construct Write */
 
 	if (bktr->video.addr) {
-		target_buffer = (u_long) bktr->video.addr;
+		target_buffer = (uint32_t) bktr->video.addr;
 		pitch = bktr->video.width;
 	}
 	else {
-		target_buffer = (u_long) vtophys(bktr->bigbuf);
+		target_buffer = (uint32_t) vtophys(bktr->bigbuf);
 		pitch = cols*Bpp;
 	}
 
@@ -3000,19 +2997,19 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	for (i = 0; i < (rows/interlace); i++) {
 	    target = target_buffer;
 	    if ( notclipped(bktr, i, width)) {
-		split(bktr, (volatile u_long **) &dma_prog,
+		split(bktr, (volatile uint32_t **) &dma_prog,
 		      bktr->y2 - bktr->y, OP_WRITE,
 		      Bpp, (volatile u_char **)(uintptr_t)&target,  cols);
 
 	    } else {
 		while(getline(bktr, i)) {
 		    if (bktr->y != bktr->y2 ) {
-			split(bktr, (volatile u_long **) &dma_prog,
+			split(bktr, (volatile uint32_t **) &dma_prog,
 			      bktr->y2 - bktr->y, OP_WRITE,
 			      Bpp, (volatile u_char **)(uintptr_t)&target, cols);
 		    }
 		    if (bktr->yclip != bktr->yclip2 ) {
-			split(bktr,(volatile u_long **) &dma_prog,
+			split(bktr,(volatile uint32_t **) &dma_prog,
 			      bktr->yclip2 - bktr->yclip,
 			      OP_SKIP,
 			      Bpp, (volatile u_char **)(uintptr_t)&target,  cols);
@@ -3032,7 +3029,7 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t ) vtophys(bktr->dma_prog);
 		return;
 
 	case 2:
@@ -3041,7 +3038,7 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t ) vtophys(bktr->dma_prog);
 		return;
 
 	case 3:
@@ -3049,7 +3046,7 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 		*dma_prog++ = OP_SYNC | BKTR_GEN_IRQ | BKTR_RESYNC | BKTR_VRO;
 		*dma_prog++ = 0;  /* NULL WORD */
 		*dma_prog++ = OP_JUMP; ;
-		*dma_prog = (u_long ) vtophys(bktr->odd_dma_prog);
+		*dma_prog = (uint32_t ) vtophys(bktr->odd_dma_prog);
 		break;
 	}
 
@@ -3057,7 +3054,7 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 
 	        target_buffer = buffer + pitch; 
 
-		dma_prog = (u_long *) bktr->odd_dma_prog;
+		dma_prog = (uint32_t *) bktr->odd_dma_prog;
 
 		/* sync vre IRQ bit */
 		*dma_prog++ = OP_SYNC | BKTR_RESYNC | BKTR_FM1;
@@ -3066,19 +3063,19 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 		for (i = 0; i < (rows/interlace); i++) {
 		    target = target_buffer;
 		    if ( notclipped(bktr, i, width)) {
-			split(bktr, (volatile u_long **) &dma_prog,
+			split(bktr, (volatile uint32_t **) &dma_prog,
 			      bktr->y2 - bktr->y, OP_WRITE,
 			      Bpp, (volatile u_char **)(uintptr_t)&target,  cols);
 		    } else {
 			while(getline(bktr, i)) {
 			    if (bktr->y != bktr->y2 ) {
-				split(bktr, (volatile u_long **) &dma_prog,
+				split(bktr, (volatile uint32_t **) &dma_prog,
 				      bktr->y2 - bktr->y, OP_WRITE,
 				      Bpp, (volatile u_char **)(uintptr_t)&target,
 				      cols);
 			    }	
 			    if (bktr->yclip != bktr->yclip2 ) {
-				split(bktr, (volatile u_long **) &dma_prog,
+				split(bktr, (volatile uint32_t **) &dma_prog,
 				      bktr->yclip2 - bktr->yclip, OP_SKIP,
 				      Bpp, (volatile u_char **)(uintptr_t)&target,  cols);
 			    }	
@@ -3096,7 +3093,7 @@ rgb_prog( bktr_ptr_t bktr, char i_flag, int cols, int rows, int interlace )
 	*dma_prog++ = OP_SYNC | BKTR_GEN_IRQ | BKTR_RESYNC | BKTR_VRE;
 	*dma_prog++ = 0;  /* NULL WORD */
 	*dma_prog++ = OP_JUMP ;
-	*dma_prog++ = (u_long ) vtophys(bktr->dma_prog) ;
+	*dma_prog++ = (uint32_t ) vtophys(bktr->dma_prog) ;
 	*dma_prog++ = 0;  /* NULL WORD */
 }
 
@@ -3111,8 +3108,8 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 	int			i;
 	volatile unsigned int	inst;
 	volatile unsigned int	inst3;
-	volatile u_long		target_buffer, buffer;
-	volatile  u_long	*dma_prog;
+	volatile uint32_t	target_buffer, buffer;
+	volatile  uint32_t	*dma_prog;
         struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 	int			b;
 
@@ -3127,7 +3124,7 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 	bktr->capcontrol =   1 << 6 | 1 << 4 | 1 << 2 | 3;
 	bktr->capcontrol = 3 << 2 |  3;
 
-	dma_prog = (u_long *) bktr->dma_prog;
+	dma_prog = (uint32_t *) bktr->dma_prog;
 
 	/* Construct Write */
     
@@ -3137,9 +3134,9 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 	inst3 = OP_WRITE | OP_EOL | (cols);
 
 	if (bktr->video.addr)
-		target_buffer = (u_long) bktr->video.addr;
+		target_buffer = (uint32_t) bktr->video.addr;
 	else
-		target_buffer = (u_long) vtophys(bktr->bigbuf);
+		target_buffer = (uint32_t) vtophys(bktr->bigbuf);
 
 	buffer = target_buffer;
 
@@ -3165,7 +3162,7 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
 		return;
 
 	case 2:
@@ -3173,7 +3170,7 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 		*dma_prog++ = OP_SYNC  | BKTR_GEN_IRQ | BKTR_VRO;
 		*dma_prog++ = 0;  /* NULL WORD */
 		*dma_prog++ = OP_JUMP;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
 		return;
 
 	case 3:
@@ -3181,15 +3178,15 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 		*dma_prog++ = OP_SYNC | BKTR_GEN_IRQ | BKTR_RESYNC | BKTR_VRO;
 		*dma_prog++ = 0;  /* NULL WORD */
 		*dma_prog++ = OP_JUMP  ;
-		*dma_prog = (u_long ) vtophys(bktr->odd_dma_prog);
+		*dma_prog = (uint32_t) vtophys(bktr->odd_dma_prog);
 		break;
 	}
 
 	if (interlace == 2) {
 
-		target_buffer =	 (u_long) buffer + cols*2;
+		target_buffer =	 (uint32_t) buffer + cols*2;
 
-		dma_prog = (u_long * ) bktr->odd_dma_prog;
+		dma_prog = (uint32_t *) bktr->odd_dma_prog;
 
 		/* sync vre */
 		*dma_prog++ = OP_SYNC | BKTR_RESYNC | BKTR_FM1;
@@ -3208,10 +3205,10 @@ yuvpack_prog( bktr_ptr_t bktr, char i_flag,
 	*dma_prog++ = OP_SYNC   |  BKTR_GEN_IRQ  | BKTR_RESYNC |  BKTR_VRE;
 	*dma_prog++ = 0;  /* NULL WORD */
 	*dma_prog++ = OP_JUMP ;
-	*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+	*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
 
 	*dma_prog++ = OP_JUMP;
-	*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+	*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
 	*dma_prog++ = 0;  /* NULL WORD */
 }
 
@@ -3225,13 +3222,13 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 
 	int			i;
 	volatile unsigned int	inst;
-	volatile u_long		target_buffer, t1, buffer;
-	volatile u_long		*dma_prog;
+	volatile uint32_t	target_buffer, t1, buffer;
+	volatile uint32_t	*dma_prog;
         struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 
 	OUTB(bktr, BKTR_COLOR_FMT, pf_int->color_fmt);
 
-	dma_prog = (u_long *) bktr->dma_prog;
+	dma_prog = (uint32_t*) bktr->dma_prog;
 
 	bktr->capcontrol =   1 << 6 | 1 << 4 |	3;
 
@@ -3255,9 +3252,9 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 	/* Construct Write */
 	inst  = OP_WRITE123  | OP_SOL | OP_EOL |  (cols); 
 	if (bktr->video.addr)
-		target_buffer = (u_long) bktr->video.addr;
+		target_buffer = (uint32_t) bktr->video.addr;
 	else
-		target_buffer = (u_long) vtophys(bktr->bigbuf);
+		target_buffer = (uint32_t) vtophys(bktr->bigbuf);
     
 	buffer = target_buffer;
 
@@ -3282,7 +3279,7 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP ;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
 		return;
 
 	case 2:
@@ -3290,7 +3287,7 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
 		return;
 
 	case 3:
@@ -3298,15 +3295,15 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP  ;
-		*dma_prog = (u_long ) vtophys(bktr->odd_dma_prog);
+		*dma_prog = (uint32_t) vtophys(bktr->odd_dma_prog);
 		break;
 	}
 
 	if (interlace == 2) {
 
-		dma_prog = (u_long * ) bktr->odd_dma_prog;
+		dma_prog = (uint32_t *) bktr->odd_dma_prog;
 
-		target_buffer  = (u_long) buffer + cols;
+		target_buffer  = (uint32_t) buffer + cols;
 		t1 = buffer + cols/2;
 		*dma_prog++ = OP_SYNC	|   1 << 15 | BKTR_FM3; 
 		*dma_prog++ = 0;  /* NULL WORD */
@@ -3324,7 +3321,7 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 	*dma_prog++ = OP_SYNC  | 1 << 24 | 1 << 15 |   BKTR_VRE; 
 	*dma_prog++ = 0;  /* NULL WORD */
 	*dma_prog++ = OP_JUMP ;
-	*dma_prog++ = (u_long ) vtophys(bktr->dma_prog) ;
+	*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog) ;
 	*dma_prog++ = 0;  /* NULL WORD */
 }
 
@@ -3339,13 +3336,13 @@ yuv12_prog( bktr_ptr_t bktr, char i_flag,
 	int			i;
 	volatile unsigned int	inst;
 	volatile unsigned int	inst1;
-	volatile u_long		target_buffer, t1, buffer;
-	volatile u_long		*dma_prog;
+	volatile uint32_t	target_buffer, t1, buffer;
+	volatile uint32_t	*dma_prog;
         struct meteor_pixfmt_internal *pf_int = &pixfmt_table[ bktr->pixfmt ];
 
 	OUTB(bktr, BKTR_COLOR_FMT, pf_int->color_fmt);
 
-	dma_prog = (u_long *) bktr->dma_prog;
+	dma_prog = (uint32_t *) bktr->dma_prog;
 
 	bktr->capcontrol =   1 << 6 | 1 << 4 |	3;
 
@@ -3356,9 +3353,9 @@ yuv12_prog( bktr_ptr_t bktr, char i_flag,
  	inst  = OP_WRITE123  | OP_SOL | OP_EOL |  (cols); 
  	inst1  = OP_WRITES123  | OP_SOL | OP_EOL |  (cols); 
  	if (bktr->video.addr)
- 		target_buffer = (u_long) bktr->video.addr;
+ 		target_buffer = (uint32_t) bktr->video.addr;
  	else
- 		target_buffer = (u_long) vtophys(bktr->bigbuf);
+ 		target_buffer = (uint32_t) vtophys(bktr->bigbuf);
      
 	buffer = target_buffer;
  	t1 = buffer;
@@ -3386,7 +3383,7 @@ yuv12_prog( bktr_ptr_t bktr, char i_flag,
  		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
  		return;
 
  	case 2:
@@ -3394,22 +3391,22 @@ yuv12_prog( bktr_ptr_t bktr, char i_flag,
  		*dma_prog++ = 0;  /* NULL WORD */
 
 		*dma_prog++ = OP_JUMP;
-		*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+		*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
  		return;
  
  	case 3:
  		*dma_prog++ = OP_SYNC |  1 << 24 | 1 << 15 | BKTR_VRO;
 		*dma_prog++ = 0;  /* NULL WORD */
 		*dma_prog++ = OP_JUMP ;
-		*dma_prog = (u_long ) vtophys(bktr->odd_dma_prog);
+		*dma_prog = (uint32_t) vtophys(bktr->odd_dma_prog);
 		break;
 	}
 
 	if (interlace == 2) {
 
-		dma_prog = (u_long * ) bktr->odd_dma_prog;
+		dma_prog = (uint32_t *) bktr->odd_dma_prog;
 
-		target_buffer  = (u_long) buffer + cols;
+		target_buffer  = (uint32_t) buffer + cols;
 		t1 = buffer + cols/2;
 		*dma_prog++ = OP_SYNC   | 1 << 15 | BKTR_FM3; 
 		*dma_prog++ = 0;  /* NULL WORD */
@@ -3434,7 +3431,7 @@ yuv12_prog( bktr_ptr_t bktr, char i_flag,
 	*dma_prog++ = OP_SYNC |  1 << 24 | 1 << 15 | BKTR_VRE;
 	*dma_prog++ = 0;  /* NULL WORD */
 	*dma_prog++ = OP_JUMP;
-	*dma_prog++ = (u_long ) vtophys(bktr->dma_prog);
+	*dma_prog++ = (uint32_t) vtophys(bktr->dma_prog);
 	*dma_prog++ = 0;  /* NULL WORD */
 }
   

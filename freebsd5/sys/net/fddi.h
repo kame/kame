@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1995 Matt Thomas (thomas@lkg.dec.com)
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_fddi.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/fddi.h,v 1.13 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/net/fddi.h,v 1.13.8.1 2005/01/31 23:26:22 imp Exp $
  */
 
 #ifndef _NETINET_IF_FDDI_H_

@@ -1,8 +1,12 @@
-# $FreeBSD: src/sys/modules/sound/driver/Makefile,v 1.15 2002/08/17 16:23:44 orion Exp $
+# $FreeBSD: src/sys/modules/sound/driver/Makefile,v 1.15.8.1 2004/12/13 11:12:49 yongari Exp $
 
+.if ${MACHINE_ARCH} == "sparc64"
+SUBDIR  = audiocs
+.else
 SUBDIR  = als4000 ad1816 cmi cs4281 csa ds1 emu10k1 es137x ess
 SUBDIR += fm801 ich maestro maestro3 mss neomagic sb16 sb8 sbc solo
 SUBDIR += t4dwave via8233 via82c686 vibes
 SUBDIR += driver uaudio
+.endif
 
 .include <bsd.subdir.mk>

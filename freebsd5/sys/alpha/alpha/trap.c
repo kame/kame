@@ -1,5 +1,5 @@
 /* $NetBSD: trap.c,v 1.31 1998/03/26 02:21:46 thorpej Exp $ */
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/trap.c,v 1.118.2.2 2004/09/03 06:40:24 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/trap.c,v 1.118.2.4 2005/02/05 01:02:47 das Exp $");
 
 /* #include "opt_fix_unaligned_vax_fp.h" */
 #include "opt_ddb.h"
@@ -55,12 +55,12 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/trap.c,v 1.118.2.2 2004/09/03 06:40:24 j
 #include <vm/vm_map.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_param.h>
-#include <sys/user.h>
 #include <sys/ptrace.h>
 #include <machine/clock.h>
 #include <machine/md_var.h>
 #include <machine/reg.h>
 #include <machine/pal.h>
+#include <machine/pcb.h>
 #include <machine/fpu.h>
 
 #ifdef KTRACE

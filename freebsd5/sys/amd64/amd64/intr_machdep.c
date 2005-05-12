@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/intr_machdep.c,v 1.9 2004/08/16 23:12:29 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/intr_machdep.c,v 1.9.2.3 2005/02/14 10:15:07 obrien Exp $
  */
 
 /*
@@ -166,8 +166,8 @@ intr_execute_handlers(struct intsrc *isrc, struct intrframe *iframe)
 	 * argument for counting hardware interrupts when they're
 	 * processed too.
 	 */
-	atomic_add_long(isrc->is_count, 1);
-	atomic_add_int(&cnt.v_intr, 1);
+	(*isrc->is_count)++;
+	cnt.v_intr++;
 
 	it = isrc->is_ithread;
 	if (it == NULL)
@@ -219,7 +219,7 @@ intr_execute_handlers(struct intsrc *isrc, struct intrframe *iframe)
 			error = ithread_schedule(it);
 	}
 	if (error == EINVAL) {
-		atomic_add_long(isrc->is_straycount, 1);
+		(*isrc->is_straycount)++;
 		if (*isrc->is_straycount < MAX_STRAY_LOG)
 			log(LOG_ERR, "stray irq%d\n", vector);
 		else if (*isrc->is_straycount == MAX_STRAY_LOG)
@@ -288,6 +288,17 @@ intrcnt_register(struct intsrc *is)
 	is->is_straycount = &intrcnt[is->is_index + 1];
 }
 
+void
+intrcnt_add(const char *name, u_long **countp)
+{
+
+	mtx_lock_spin(&intr_table_lock);
+	*countp = &intrcnt[intrcnt_index];
+	intrcnt_setname(name, intrcnt_index);
+	intrcnt_index++;
+	mtx_unlock_spin(&intr_table_lock);
+}
+
 static void
 intr_init(void *dummy __unused)
 {
@@ -313,7 +324,7 @@ DB_SHOW_COMMAND(irqs, db_show_irqs)
 	else
 		verbose = 0;
 	isrc = interrupt_sources;
-	db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+	db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
 	for (i = 0; i < NUM_IO_INTS && !quit; i++, isrc++)
 		if (*isrc != NULL)
 			db_dump_ithread((*isrc)->is_ithread, verbose);

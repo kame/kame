@@ -1,6 +1,6 @@
 /* sis_ds.c -- Private header for Direct Rendering Manager -*- linux-c -*-
- * Created: Mon Jan  4 10:05:05 1999 by sclin@sis.com.tw
- *
+ * Created: Mon Jan  4 10:05:05 1999 by sclin@sis.com.tw */
+/*-
  * Copyright 2000 Silicon Integrated Systems Corp, Inc., HsinChu, Taiwan.
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Sung-Ching Lin <sclin@sis.com.tw>
  * 
- * $FreeBSD: src/sys/dev/drm/sis_ds.c,v 1.1 2003/09/09 00:24:31 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/sis_ds.c,v 1.1.4.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #include "dev/drm/sis.h"

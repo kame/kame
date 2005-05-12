@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/disasm/disasm_int.h,v 1.1 2003/10/23 06:01:52 marcel Exp $
+ * $FreeBSD: src/sys/ia64/disasm/disasm_int.h,v 1.1.4.1 2005/01/31 23:26:13 imp Exp $
  */
 
 #ifndef _DISASM_INT_H_

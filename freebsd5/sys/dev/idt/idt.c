@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Richard Hodges and Matriplex, inc.
  * All rights reserved.
  *
@@ -77,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/idt/idt.c,v 1.9 2004/01/14 06:14:35 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/idt/idt.c,v 1.9.2.1 2005/01/30 00:59:46 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

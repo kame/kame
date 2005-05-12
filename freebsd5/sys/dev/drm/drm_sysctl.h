@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright 2003 Eric Anholt
  * All Rights Reserved.
  *
@@ -21,7 +21,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/drm_sysctl.h,v 1.7 2004/01/06 04:34:52 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_sysctl.h,v 1.7.2.2 2005/03/02 10:52:23 obrien Exp $
  */
 
 #ifdef __FreeBSD__
@@ -91,7 +91,7 @@ int DRM(sysctl_init)(drm_device_t *dev)
 		return 1;
 	
 	for (i = 0; i < DRM_SYSCTL_ENTRIES; i++) {
-		oid = sysctl_add_oid( &info->ctx, 
+		oid = SYSCTL_ADD_OID( &info->ctx, 
 			SYSCTL_CHILDREN(top), 
 			OID_AUTO, 
 			DRM(sysctl_list)[i].name, 

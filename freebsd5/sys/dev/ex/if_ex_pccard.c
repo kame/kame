@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ex/if_ex_pccard.c,v 1.10 2004/06/27 13:10:20 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ex/if_ex_pccard.c,v 1.10.2.1 2005/02/01 21:42:25 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ex/if_ex_pccard.c,v 1.10 2004/06/27 13:10:20 imp
 #include <dev/ex/if_exvar.h>
 
 #include <dev/pccard/pccardvar.h>
+#include <dev/pccard/pccard_cis.h>
 
 #include "pccarddevs.h"
 
@@ -88,6 +89,15 @@ static int
 ex_pccard_match(device_t dev)
 {
 	const struct pccard_product *pp;
+	int error;
+	uint32_t	fcn = PCCARD_FUNCTION_UNSPEC;
+
+	/* Make sure we're a network function */
+	error = pccard_get_function(dev, &fcn);
+	if (error != 0)
+		return (error);
+	if (fcn != PCCARD_FUNCTION_NETWORK)
+		return (ENXIO);
 
 	if ((pp = pccard_product_lookup(dev, ex_pccard_products,
 	    sizeof(ex_pccard_products[0]), NULL)) != NULL) {

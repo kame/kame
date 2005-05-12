@@ -5,7 +5,7 @@
  * \author Michel D�zer <michel@daenzer.net>
  */
 
-/*
+/*-
  * Copyright 2002 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  *
@@ -28,7 +28,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/drm_sarea.h,v 1.3 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_sarea.h,v 1.3.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #ifndef _DRM_SAREA_H_

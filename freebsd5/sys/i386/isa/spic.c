@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000  Nick Sayer
  * All rights reserved.
  *
@@ -22,8 +22,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * spic -- the Sony Programmable I/O Controller
+ */
+
+/* spic -- the Sony Programmable I/O Controller
  *
  * This device exists on most recent Sony laptops. It is the means by which
  * you can watch the Jog Dial and some other functions.
@@ -49,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/spic.c,v 1.15 2004/06/16 09:47:08 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/spic.c,v 1.15.2.1 2005/01/31 23:26:05 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

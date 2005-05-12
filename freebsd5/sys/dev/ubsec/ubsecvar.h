@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/dev/ubsec/ubsecvar.h,v 1.7 2003/06/02 23:32:03 sam Exp $ */
+/* $FreeBSD: src/sys/dev/ubsec/ubsecvar.h,v 1.7.4.1 2005/01/30 01:00:09 imp Exp $ */
 /*	$OpenBSD: ubsecvar.h,v 1.35 2002/09/24 18:33:26 jason Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2000 Theo de Raadt
  * Copyright (c) 2001 Patrik Lindergren (patrik@ipunplugged.com)
  *

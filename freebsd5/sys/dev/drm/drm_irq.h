@@ -1,6 +1,6 @@
 /* drm_dma.c -- DMA IOCTL and function support
- * Created: Fri Oct 18 2003 by anholt@FreeBSD.org
- *
+ * Created: Fri Oct 18 2003 by anholt@FreeBSD.org */
+/*-
  * Copyright 2003 Eric Anholt
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Eric Anholt <anholt@FreeBSD.org>
  *
- * $FreeBSD: src/sys/dev/drm/drm_irq.h,v 1.3 2004/03/17 17:50:31 njl Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_irq.h,v 1.3.2.1 2005/01/30 00:59:35 imp Exp $
  */
 
 int DRM(irq_by_busid)( DRM_IOCTL_ARGS )

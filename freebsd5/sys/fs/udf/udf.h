@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf.h,v 1.8 2004/06/23 19:36:09 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/udf.h,v 1.8.2.1 2005/02/25 17:59:45 rwatson Exp $
  */
 
 #define UDF_HASHTBLSIZE 100
@@ -50,7 +50,6 @@ struct udf_mnt {
 	uint32_t		part_start;
 	uint32_t		part_len;
 	uint64_t		root_id;
-	struct vnode		*root_vp;
 	struct long_ad		root_icb;
 	LIST_HEAD(udf_hash_lh, udf_node)	*hashtbl;
 	u_long			hashsz;

@@ -35,7 +35,7 @@
  *
  *	from: NetBSD: hmevar.h,v 1.5 2000/06/25 01:10:04 eeh Exp
  *
- * $FreeBSD: src/sys/dev/hme/if_hmevar.h,v 1.6 2004/08/12 20:37:02 marius Exp $
+ * $FreeBSD: src/sys/dev/hme/if_hmevar.h,v 1.6.2.1 2005/02/21 07:28:19 yongari Exp $
  */
 
 #include <sys/callout.h>
@@ -138,10 +138,15 @@ struct hme_softc {
 	int		sc_csum_features;
 
 	/* Ring descriptor */
-	struct hme_ring		sc_rb;
+	struct hme_ring	sc_rb;
 
-	int			sc_debug;
+	int		sc_debug;
+	struct mtx	sc_lock;
 };
+
+#define HME_LOCK(_sc)		mtx_lock(&(_sc)->sc_lock)
+#define HME_UNLOCK(_sc)		mtx_unlock(&(_sc)->sc_lock)
+#define HME_LOCK_ASSERT(_sc, _what)	mtx_assert(&(_sc)->sc_lock, (_what))
 
 extern devclass_t hme_devclass;
 

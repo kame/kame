@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998-1999 Andrew Gallatin
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/osf1/osf1.h,v 1.5 2002/06/02 20:05:41 schweikh Exp $ 
+ * $FreeBSD: src/sys/alpha/osf1/osf1.h,v 1.5.8.1 2005/01/30 00:59:11 imp Exp $ 
  */
 
 extern struct sysent osf1_sysent[];

@@ -1,4 +1,4 @@
-/*
+/*-
  * Aic7xxx SCSI host adapter firmware asssembler symbol table implementation
  *
  * Copyright (c) 1997 Justin T. Gibbs.
@@ -39,7 +39,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_symbol.c#24 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_symbol.c,v 1.23 2003/01/20 18:01:37 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_symbol.c,v 1.23.6.1 2005/01/30 00:59:26 imp Exp $
  */
 
 #include <sys/types.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -38,7 +38,7 @@
 /* $NetBSD: clock.c,v 1.20 1998/01/31 10:32:47 ross Exp $ */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ia64/ia64/clock.c,v 1.23 2004/04/07 20:46:07 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/ia64/ia64/clock.c,v 1.23.2.1 2005/01/31 23:26:13 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

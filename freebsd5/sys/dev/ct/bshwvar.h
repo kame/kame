@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/dev/ct/bshwvar.h,v 1.3 2002/03/20 02:04:09 alfred Exp $ */
+/* $FreeBSD: src/sys/dev/ct/bshwvar.h,v 1.3.8.1 2005/01/30 00:59:33 imp Exp $ */
 /*	$NecBSD: bshwvar.h,v 1.3.14.3 2001/06/21 04:07:37 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1994, 1995, 1996, 1997, 1998
  *	NetBSD/pc98 porting staff. All rights reserved.

@@ -1,4 +1,4 @@
-/*
+/*-
  * spkr.c -- device driver for console speaker
  *
  * v1.4 by Eric S. Raymond (esr@snark.thyrsus.com) Aug 1993
@@ -7,7 +7,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/spkr.c,v 1.66 2004/06/16 09:47:08 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/spkr.c,v 1.66.2.1 2005/01/31 23:26:05 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

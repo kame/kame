@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/procfs/procfs_type.c,v 1.11 2004/04/07 20:46:02 imp Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_type.c,v 1.11.2.1 2005/01/31 23:25:58 imp Exp $
  */
 
 #include <sys/param.h>

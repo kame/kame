@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vge/if_vge.c,v 1.3.2.1 2004/09/14 21:22:33 wpaul Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vge/if_vge.c,v 1.3.2.3 2005/03/03 05:02:15 obrien Exp $");
 
 /*
  * VIA Networking Technologies VT612x PCI gigabit ethernet NIC driver.
@@ -681,7 +681,7 @@ vge_probe(dev)
 		if ((pci_get_vendor(dev) == t->vge_vid) &&
 		    (pci_get_device(dev) == t->vge_did)) {
 			device_set_desc(dev, t->vge_name);
-			return (0);
+			return (BUS_PROBE_DEFAULT);
 		}
 		t++;
 	}

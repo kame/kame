@@ -1,4 +1,4 @@
-/*
+/*-
  * Implementation of the Target Mode 'Black Hole device' for CAM.
  *
  * Copyright (c) 1999 Justin T. Gibbs.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.20 2003/09/30 08:03:52 simokawa Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.20.4.1 2005/01/30 00:59:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>

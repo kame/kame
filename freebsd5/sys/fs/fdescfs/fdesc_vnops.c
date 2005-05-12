@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)fdesc_vnops.c	8.9 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc_vnops.c,v 1.93 2004/04/07 20:45:59 imp Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc_vnops.c,v 1.93.2.2 2005/02/27 02:37:40 jeff Exp $
  */
 
 /*
@@ -440,7 +440,7 @@ fdesc_readdir(ap)
 
 	fcnt = i - 2;		/* The first two nodes are `.' and `..' */
 
-	FILEDESC_LOCK(fdp);
+	FILEDESC_LOCK_FAST(fdp);
 	while (i < fdp->fd_nfiles + 2 && uio->uio_resid >= UIO_MX) {
 		switch (i) {
 		case 0:	/* `.' */
@@ -456,7 +456,7 @@ fdesc_readdir(ap)
 			break;
 		default:
 			if (fdp->fd_ofiles[fcnt] == NULL) {
-				FILEDESC_UNLOCK(fdp);
+				FILEDESC_UNLOCK_FAST(fdp);
 				goto done;
 			}
 
@@ -470,15 +470,15 @@ fdesc_readdir(ap)
 		/*
 		 * And ship to userland
 		 */
-		FILEDESC_UNLOCK(fdp);
+		FILEDESC_UNLOCK_FAST(fdp);
 		error = uiomove(dp, UIO_MX, uio);
 		if (error)
 			goto done;
-		FILEDESC_LOCK(fdp);
+		FILEDESC_LOCK_FAST(fdp);
 		i++;
 		fcnt++;
 	}
-	FILEDESC_UNLOCK(fdp);
+	FILEDESC_UNLOCK_FAST(fdp);
 
 done:
 	uio->uio_offset = i * UIO_MX;

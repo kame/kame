@@ -1,4 +1,4 @@
-/*
+/*-
  * Data structures and definitions for CAM Control Blocks (CCBs).
  *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.27 2004/06/07 19:12:44 scottl Exp $
+ * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.27.2.1 2005/01/30 00:59:15 imp Exp $
  */
 
 #ifndef _CAM_CAM_CCB_H

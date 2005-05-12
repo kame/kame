@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Wind River Systems
  * Copyright (c) 1997, 1998, 1999, 2000, 2001
  *	Bill Paul <wpaul@bsdi.com>.  All rights reserved.
@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lge/if_lgereg.h,v 1.3 2002/11/14 23:54:52 sam Exp $
+ * $FreeBSD: src/sys/dev/lge/if_lgereg.h,v 1.3.8.1 2005/01/30 00:59:53 imp Exp $
  */
 
 

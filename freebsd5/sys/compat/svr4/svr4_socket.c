@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1996 Christos Zoulas. 
  * All rights reserved.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_socket.c,v 1.23 2004/06/17 17:16:41 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_socket.c,v 1.23.2.1 2005/01/30 00:59:20 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

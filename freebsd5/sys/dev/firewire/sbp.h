@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/sbp.h,v 1.4 2004/05/22 16:14:17 dfr Exp $
+ * $FreeBSD: src/sys/dev/firewire/sbp.h,v 1.4.2.1 2005/01/30 00:59:42 imp Exp $
  *
  */
 

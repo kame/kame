@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_variables.h,v 1.13 2004/07/10 23:47:19 marcel Exp $
+ * $FreeBSD: src/sys/ddb/db_variables.h,v 1.13.2.1 2005/01/30 00:59:22 imp Exp $
  */
 
 /*

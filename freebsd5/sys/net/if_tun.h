@@ -1,6 +1,6 @@
 /*	$NetBSD: if_tun.h,v 1.5 1994/06/29 06:36:27 cgd Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1988, Julian Onions <jpo@cs.nott.ac.uk>
  * Nottingham University 1987.
  *
@@ -13,7 +13,7 @@
  * UCL. This driver is based much more on read/write/select mode of
  * operation though.
  *
- * $FreeBSD: src/sys/net/if_tun.h,v 1.17 2000/01/23 01:47:12 brian Exp $
+ * $FreeBSD: src/sys/net/if_tun.h,v 1.17.26.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _NET_IF_TUN_H_

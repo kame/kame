@@ -77,10 +77,10 @@
 
 #if !defined(lint)
 /* static const char rcsid[] = "@(#)$Id: ip_proxy.c,v 2.9.2.6 2001/07/15 22:06:15 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_proxy.c,v 1.22 2003/02/15 06:23:45 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_proxy.c,v 1.22.6.1 2005/03/13 18:08:56 rwatson Exp $";
 #endif
 
-#if defined(_KERNEL) && (SOLARIS || defined(__sgi))
+#ifdef USE_MUTEX
 extern  KRWLOCK_T       ipf_nat, ipf_state;
 #endif
 

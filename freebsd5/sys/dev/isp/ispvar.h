@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.66 2004/05/24 07:02:25 njl Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.66.2.2 2005/01/30 00:59:48 imp Exp $ */
+/*-
  * Soft Definitions for for Qlogic ISP SCSI adapters.
  *
  * Copyright (c) 1997, 1998, 1999, 2000 by Matthew Jacob
@@ -54,7 +54,7 @@
 #endif
 
 #define	ISP_CORE_VERSION_MAJOR	2
-#define	ISP_CORE_VERSION_MINOR	8
+#define	ISP_CORE_VERSION_MINOR	9
 
 /*
  * Vector for bus specific code to provide specific services.

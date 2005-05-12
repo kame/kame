@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/param.h,v 1.35.2.1 2004/09/10 00:04:16 scottl Exp $ */
+/* $FreeBSD: src/sys/alpha/include/param.h,v 1.35.2.4 2005/02/05 01:01:53 das Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -117,7 +117,6 @@
 #define	KSTACK_PAGES	2		/* pages of kstack (with pcb) */
 #endif
 #define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
-#define	UAREA_PAGES	1		/* pages of u-area */
 
 
 /*

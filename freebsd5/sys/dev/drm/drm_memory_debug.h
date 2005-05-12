@@ -1,6 +1,6 @@
 /* drm_memory.h -- Memory management wrappers for DRM -*- linux-c -*-
- * Created: Thu Feb  4 14:00:34 1999 by faith@valinux.com
- *
+ * Created: Thu Feb  4 14:00:34 1999 by faith@valinux.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_memory_debug.h,v 1.2 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_memory_debug.h,v 1.2.4.1 2005/01/30 00:59:35 imp Exp $
  */
 
 #include "drmP.h"

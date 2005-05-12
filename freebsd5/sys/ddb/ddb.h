@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ddb/ddb.h,v 1.36 2004/07/21 05:07:09 marcel Exp $
+ * $FreeBSD: src/sys/ddb/ddb.h,v 1.36.2.2 2005/01/30 00:59:22 imp Exp $
  */
 
 /*
@@ -38,8 +38,6 @@
 #define	_DDB_DDB_H_
 
 #include <machine/db_machdep.h>		/* type definitions */
-
-#define	DB_LINES_PER_PAGE	20
 
 typedef void db_cmdfcn_t(db_expr_t addr, boolean_t have_addr, db_expr_t count,
 	    char *modif);
@@ -78,6 +76,7 @@ extern int db_store_count;
 extern db_expr_t db_radix;
 extern db_expr_t db_max_width;
 extern db_expr_t db_tab_stop_width;
+extern db_expr_t db_lines_per_page;
 
 struct thread;
 struct vm_map;

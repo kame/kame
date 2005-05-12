@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/acpica/acpi_package.c,v 1.3 2004/04/09 06:40:03 njl Exp $
+ * $FreeBSD: src/sys/dev/acpica/acpi_package.c,v 1.3.2.1 2005/02/25 21:43:38 njl Exp $
  */
 
 #include <sys/param.h>
@@ -103,25 +103,20 @@ acpi_PkgStr(ACPI_OBJECT *res, int idx, void *dst, size_t size)
 }
 
 int
-acpi_PkgGas(device_t dev, ACPI_OBJECT *res, int idx, int *rid,
-	struct resource **dst)
+acpi_PkgGas(device_t dev, ACPI_OBJECT *res, int idx, int *type, int *rid,
+    struct resource **dst)
 {
     ACPI_GENERIC_ADDRESS gas;
-    ACPI_OBJECT		*obj;
+    ACPI_OBJECT *obj;
 
     obj = &res->Package.Elements[idx];
     if (obj == NULL || obj->Type != ACPI_TYPE_BUFFER ||
-	obj->Buffer.Length < sizeof(ACPI_GENERIC_ADDRESS) + 3) {
-
+	obj->Buffer.Length < sizeof(ACPI_GENERIC_ADDRESS) + 3)
 	return (EINVAL);
-    }
 
     memcpy(&gas, obj->Buffer.Pointer + 3, sizeof(gas));
-    *dst = acpi_bus_alloc_gas(dev, rid, &gas);
-    if (*dst == NULL)
-	return (ENXIO);
 
-    return (0);
+    return (acpi_bus_alloc_gas(dev, type, rid, &gas, dst));
 }
 
 ACPI_HANDLE

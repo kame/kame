@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_clone.h,v 1.1 2004/06/22 20:13:25 brooks Exp $
+ * $FreeBSD: src/sys/net/if_clone.h,v 1.1.2.1 2005/01/31 23:26:22 imp Exp $
  */
 
 #ifndef	_NET_IF_CLONE_H_

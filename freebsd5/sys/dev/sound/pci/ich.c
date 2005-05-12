@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Katsurajima Naoto <raven@katsurajima.seya.yokohama.jp>
  * Copyright (c) 2001 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
@@ -32,7 +32,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.42.2.2 2004/10/07 18:38:55 ps Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.42.2.5 2005/03/30 01:09:21 murray Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -282,7 +282,7 @@ ichchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 		return NULL;
 	}
 
-	if (sndbuf_alloc(ch->buffer, sc->dmat, sc->bufsz))
+	if (sndbuf_alloc(ch->buffer, sc->dmat, sc->bufsz) != 0)
 		return NULL;
 
 	ich_wr(sc, ch->regbase + ICH_REG_X_BDBAR, (u_int32_t)(ch->desc_addr), 4);
@@ -664,6 +664,10 @@ ich_pci_probe(device_t dev)
 
 	case 0x00ea10de:
 		device_set_desc(dev, "nVidia nForce3 250");
+		return 0;
+
+	case 0x005910de:
+		device_set_desc(dev, "nVidia nForce4");
 		return 0;
 
 	case 0x74451022:

@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/ia64/ia64/genassym.c,v 1.39 2004/04/07 20:46:07 imp Exp $
+ * $FreeBSD: src/sys/ia64/ia64/genassym.c,v 1.39.2.1 2005/02/05 01:04:53 das Exp $
  */
 
 #include "opt_kstack_pages.h"
@@ -52,12 +52,12 @@
 #include <machine/mutex.h>
 #include <machine/elf.h>
 #include <machine/pal.h>
+#include <machine/pcb.h>
 #include <sys/vmmeter.h>
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
-#include <sys/user.h>
 #include <net/if.h>
 #include <netinet/in.h>
 

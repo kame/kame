@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_bus.c,v 1.156.2.2 2004/10/15 16:03:19 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_bus.c,v 1.156.2.5.2.1 2005/05/06 02:51:09 cperciva Exp $");
 
 #include "opt_bus.h"
 
@@ -1039,15 +1039,10 @@ devclass_get_softc(devclass_t dc, int unit)
 int
 devclass_get_devices(devclass_t dc, device_t **devlistp, int *devcountp)
 {
-	int i;
-	int count;
+	int count, i;
 	device_t *list;
 
-	count = 0;
-	for (i = 0; i < dc->maxunit; i++)
-		if (dc->devices[i])
-			count++;
-
+	count = devclass_get_count(dc);
 	list = malloc(count * sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
 	if (!list)
 		return (ENOMEM);
@@ -1064,6 +1059,23 @@ devclass_get_devices(devclass_t dc, device_t **devlistp, int *devcountp)
 	*devcountp = count;
 
 	return (0);
+}
+
+/**
+ * @brief Get the number of devices in a devclass
+ *
+ * @param dc		the devclass to examine
+ */
+int
+devclass_get_count(devclass_t dc)
+{
+	int count, i;
+
+	count = 0;
+	for (i = 0; i < dc->maxunit; i++)
+		if (dc->devices[i])
+			count++;
+	return (count);
 }
 
 /**
@@ -1484,8 +1496,10 @@ device_delete_child(device_t dev, device_t child)
  * devices which have @p dev as a parent.
  *
  * @param dev		the parent device to search
- * @param unit		the unit number to search for
- * 
+ * @param unit		the unit number to search for.  If the unit is -1,
+ *			return the first child of @p dev which has name
+ *			@p classname (that is, the one with the lowest unit.)
+ *
  * @returns		the device with the given unit number or @c
  *			NULL if there is no such device
  */
@@ -1499,9 +1513,17 @@ device_find_child(device_t dev, const char *classname, int unit)
 	if (!dc)
 		return (NULL);
 
-	child = devclass_get_device(dc, unit);
-	if (child && child->parent == dev)
-		return (child);
+	if (unit != -1) {
+		child = devclass_get_device(dc, unit);
+		if (child && child->parent == dev)
+			return (child);
+	} else {
+		for (unit = 0; unit <= devclass_get_maxunit(dc); unit++) {
+			child = devclass_get_device(dc, unit);
+			if (child && child->parent == dev)
+				return (child);
+		}
+	}
 	return (NULL);
 }
 
@@ -3174,11 +3196,11 @@ bus_setup_intr(device_t dev, struct resource *r, int flags,
 		error = BUS_SETUP_INTR(dev->parent, dev, r, flags,
 		    handler, arg, cookiep);
 		if (error == 0) {
-			if (!(flags & (INTR_MPSAFE | INTR_FAST)))
+			if (bootverbose && !(flags & (INTR_MPSAFE | INTR_FAST)))
 				device_printf(dev, "[GIANT-LOCKED]\n");
 			if (bootverbose && (flags & INTR_MPSAFE))
 				device_printf(dev, "[MPSAFE]\n");
-			if (flags & INTR_FAST)
+			if (bootverbose && (flags & INTR_FAST))
 				device_printf(dev, "[FAST]\n");
 		}
 	} else
@@ -3719,6 +3741,7 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 	/*
 	 * Populate the return array.
 	 */
+	bzero(&udev, sizeof(udev));
 	udev.dv_handle = (uintptr_t)dev;
 	udev.dv_parent = (uintptr_t)dev->parent;
 	if (dev->nameunit == NULL)
@@ -3790,6 +3813,7 @@ sysctl_rman(SYSCTL_HANDLER_ARGS)
 	 * resource manager.
 	 */
 	if (res_idx == -1) {
+		bzero(&urm, sizeof(urm));
 		urm.rm_handle = (uintptr_t)rm;
 		strlcpy(urm.rm_descr, rm->rm_descr, RM_TEXTLEN);
 		urm.rm_start = rm->rm_start;
@@ -3805,6 +3829,7 @@ sysctl_rman(SYSCTL_HANDLER_ARGS)
 	 */
 	TAILQ_FOREACH(res, &rm->rm_list, r_link) {
 		if (res_idx-- == 0) {
+			bzero(&ures, sizeof(ures));
 			ures.r_handle = (uintptr_t)res;
 			ures.r_parent = (uintptr_t)res->r_rm;
 			ures.r_device = (uintptr_t)res->r_dev;

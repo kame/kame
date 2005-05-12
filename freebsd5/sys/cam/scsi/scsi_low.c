@@ -2,7 +2,7 @@
 /*	$NetBSD$	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_low.c,v 1.21 2003/06/14 22:17:38 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_low.c,v 1.21.4.2 2005/04/01 12:29:23 delphij Exp $");
 
 #define	SCSI_LOW_STATICS
 #define	SCSI_LOW_DEBUG
@@ -22,7 +22,7 @@ __FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_low.c,v 1.21 2003/06/14 22:17:38 njl E
 #define	SCSI_LOW_FLAGS_QUIRKS_OK
 #endif	/* __FreeBSD__ */
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1995, 1996, 1997, 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.
@@ -1421,7 +1421,6 @@ scsi_low_attach_cam(slp)
 			CAM_LUN_WILDCARD) != CAM_REQ_CMP) {
 		xpt_bus_deregister(cam_sim_path(slp->sl_si.sim));
 		cam_sim_free(slp->sl_si.sim, /*free_simq*/TRUE);
-		free(slp->sl_si.sim, M_DEVBUF);
 		return ENODEV;
 	}
 

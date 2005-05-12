@@ -1,4 +1,4 @@
-/*
+/*-
  * Bus independent FreeBSD shim for the aic7xxx based Adaptec SCSI controllers
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.c,v 1.41 2004/08/17 00:14:31 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.c,v 1.41.2.1 2005/01/30 00:59:26 imp Exp $");
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
 #include <dev/aic7xxx/aic7xxx_inline.h>

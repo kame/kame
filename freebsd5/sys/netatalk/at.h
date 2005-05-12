@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
  * All Rights Reserved.
  *
@@ -20,7 +20,7 @@
  *	+1-313-763-0525
  *	netatalk@itd.umich.edu
  *
- * $FreeBSD: src/sys/netatalk/at.h,v 1.6 2002/09/06 17:02:29 sobomax Exp $
+ * $FreeBSD: src/sys/netatalk/at.h,v 1.6.8.1 2005/01/31 23:26:25 imp Exp $
  */
 
 #ifndef __AT_HEADER__

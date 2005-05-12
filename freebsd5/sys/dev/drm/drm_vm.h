@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright 2003 Eric Anholt
  * All Rights Reserved.
  *
@@ -22,7 +22,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  *
- * $FreeBSD: src/sys/dev/drm/drm_vm.h,v 1.11 2004/06/16 09:46:42 phk Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_vm.h,v 1.11.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500102

@@ -1,10 +1,11 @@
-/* Copyright (c) 1994, Matthew E. Kimmel.  Permission is hereby granted
+/*-
+ * Copyright (c) 1994, Matthew E. Kimmel.  Permission is hereby granted
  * to use, copy, modify and distribute this software provided that both
  * the copyright notice and this permission notice appear in all copies
  * of the software, derivative works or modified versions, and any
  * portions thereof.
  *
- * $FreeBSD: src/sys/i386/isa/if_elreg.h,v 1.8 2000/12/15 20:09:10 wpaul Exp $
+ * $FreeBSD: src/sys/i386/isa/if_elreg.h,v 1.8.8.1 2005/01/31 23:26:05 imp Exp $
  */
 /* 3COM Etherlink 3C501 Register Definitions */
 

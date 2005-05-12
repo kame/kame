@@ -1,6 +1,6 @@
 /*	$NetBSD: Locore.c,v 1.7 2000/08/20 07:04:59 tsubai Exp $	*/
 
-/*
+/*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
  * All rights reserved.
@@ -32,8 +32,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/openfirm.c,v 1.13 2004/08/16 15:45:26 marius Exp $");
-/*
+__FBSDID("$FreeBSD: src/sys/dev/ofw/openfirm.c,v 1.13.2.1 2005/01/30 00:59:56 imp Exp $");
+/*-
  * Copyright (C) 2000 Benno Rice.
  * All rights reserved.
  *

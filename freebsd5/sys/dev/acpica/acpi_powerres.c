@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_powerres.c,v 1.26.2.1 2004/09/17 04:20:31 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_powerres.c,v 1.26.2.2 2005/02/25 21:43:38 njl Exp $");
 
 #include "opt_acpi.h"
 #include <sys/param.h>
@@ -468,7 +468,7 @@ acpi_pwr_switch_consumer(ACPI_HANDLE consumer, int state)
 			  acpi_name(consumer), state));
 
 	/* XXX is this appropriate?  Should we return to previous state? */
-	goto out;	
+	goto out;
     }
 
     /* Invoke power state switch method (if present) */
@@ -486,7 +486,7 @@ acpi_pwr_switch_consumer(ACPI_HANDLE consumer, int state)
 		goto out;
 	}
     }
-	
+
     /* Transition was successful */
     pc->ac_state = state;
     status = AE_OK;

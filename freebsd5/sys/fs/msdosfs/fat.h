@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/fat.h,v 1.13 2003/12/26 17:24:37 trhodes Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/fat.h,v 1.13.2.1 2005/01/31 23:25:56 imp Exp $ */
 /*	$NetBSD: fat.h,v 1.12 1997/11/17 15:36:36 ws Exp $	*/
 
 /*-
@@ -32,7 +32,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Written by Paul Popelka (paulp@uts.amdahl.com)
  *
  * You can do anything you want with this software, just don't say you wrote

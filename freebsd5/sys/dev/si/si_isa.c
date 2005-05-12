@@ -1,4 +1,4 @@
-/*
+/*-
  * Device driver for Specialix range (SI/XIO) of serial line multiplexors.
  *
  * Copyright (C) 2000, Peter Wemm <peter@netplex.com.au>
@@ -20,7 +20,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/si/si_isa.c,v 1.6 2004/05/30 20:08:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/si/si_isa.c,v 1.6.2.1 2005/01/30 01:00:01 imp Exp $");
 
 #include "opt_debug_si.h"
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Masaru OKI
  * Copyright (c) 1994, 1995, 1998 Scott Bartram
  * Copyright (c) 1994 Adam Glass
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/pecoff/imgact_pecoff.c,v 1.33 2004/06/05 02:18:27 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/pecoff/imgact_pecoff.c,v 1.33.2.2 2005/02/05 01:02:16 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,7 +66,6 @@ __FBSDID("$FreeBSD: src/sys/compat/pecoff/imgact_pecoff.c,v 1.33 2004/06/05 02:1
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
-#include <sys/user.h>
 #include <sys/exec.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
@@ -81,9 +80,6 @@ __FBSDID("$FreeBSD: src/sys/compat/pecoff/imgact_pecoff.c,v 1.33 2004/06/05 02:1
 
 #define PECOFF_PE_SIGNATURE "PE\0\0"
 static int      pecoff_fixup(register_t **, struct image_params *);
-static int 
-pecoff_coredump(register struct thread *, register struct vnode *,
-		off_t);
 #ifndef PECOFF_DEBUG
 #define DPRINTF(a)
 #else
@@ -104,7 +100,7 @@ static struct sysentvec pecoff_sysvec = {
 	&szsigcode,
 	0,
 	"FreeBSD PECoff",
-	pecoff_coredump,
+	NULL,
 	NULL,
 	MINSIGSTKSZ,
 	PAGE_SIZE,
@@ -163,67 +159,6 @@ pecoff_fixup(register_t ** stack_base, struct image_params * imgp)
 	(*stack_base)--;
 	suword(*stack_base, (long) imgp->argc);
 	return 0;
-}
-
-
-static int 
-pecoff_coredump(register struct thread * td, register struct vnode * vp,
-		off_t limit)
-{
-	register struct ucred *cred = td->td_ucred;
-	struct proc *p = td->td_proc;
-	register struct vmspace *vm = p->p_vmspace;
-	char *tempuser;
-	int             error;
-#ifdef PECOFF_DEBUG
-	struct vm_map  *map;
-	struct vm_map_entry *ent;
-	struct reg      regs;
-
-#endif
-	if (ctob((uarea_pages + kstack_pages) + vm->vm_dsize + vm->vm_ssize) >=
-	    limit)
-		return (EFAULT);
-	tempuser = malloc(ctob(uarea_pages + kstack_pages), M_TEMP,
-	    M_WAITOK | M_ZERO);
-	if (tempuser == NULL)
-		return (ENOMEM);
-	PROC_LOCK(p);
-	fill_kinfo_proc(p, &p->p_uarea->u_kproc);
-	PROC_UNLOCK(p);
-	bcopy(p->p_uarea, tempuser, sizeof(struct user));
-	bcopy(td->td_frame,
-	    tempuser + ctob(uarea_pages) +
-	    ((caddr_t)td->td_frame - (caddr_t)td->td_kstack),
-	    sizeof(struct trapframe));
-#if PECOFF_DEBUG
-	fill_regs(td, &regs);
-	printf("EIP%x\n", regs.r_eip);
-	printf("EAX%x EBX%x ECX%x EDI%x\n",
-	       regs.r_eax, regs.r_ebx, regs.r_ecx, regs.r_edi);
-	map = &vm->vm_map;
-	ent = &map->header;
-	printf("%p %p %p\n", ent, ent->prev, ent->next);
-#endif
-	error = vn_rdwr(UIO_WRITE, vp, (caddr_t)tempuser,
-	    ctob(uarea_pages + kstack_pages),
-	    (off_t)0, UIO_SYSSPACE, IO_UNIT, cred, NOCRED,
-	    (int *)NULL, td);
-	free(tempuser, M_TEMP);
-	if (error == 0)
-		error = vn_rdwr_inchunks(UIO_WRITE, vp, vm->vm_daddr,
-		    (int)ctob(vm->vm_dsize),
-		    (off_t)ctob((uarea_pages + kstack_pages)),
-		    UIO_USERSPACE, IO_UNIT, cred, NOCRED, NULL, td);
-	if (error == 0)
-		error = vn_rdwr_inchunks(UIO_WRITE, vp,
-		    (caddr_t)trunc_page(USRSTACK - ctob(vm->vm_ssize)),
-		    round_page(ctob(vm->vm_ssize)),
-		    (off_t)ctob((uarea_pages + kstack_pages)) +
-		    ctob(vm->vm_dsize),
-		    UIO_USERSPACE, IO_UNIT, cred, NOCRED, NULL, td);
-	return (error);
-
 }
 
 static int 

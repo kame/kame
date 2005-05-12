@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2000
  * Dr. Duncan McLennan Barclay, dmlb@ragnet.demon.co.uk.
  *
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ray/if_raydbg.h,v 1.12 2001/12/10 08:09:42 obrien Exp $
+ * $FreeBSD: src/sys/dev/ray/if_raydbg.h,v 1.12.8.1 2005/01/30 00:59:59 imp Exp $
  *
  */
 

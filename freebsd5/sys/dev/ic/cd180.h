@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1995 by Pavel Antonov, Moscow, Russia.
  * Copyright (C) 1995 by Andrey A. Chernov, Moscow, Russia.
  * All rights reserved.
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ic/cd180.h,v 1.4 2002/10/23 15:53:09 jhb Exp $
+ * $FreeBSD: src/sys/dev/ic/cd180.h,v 1.4.8.1 2005/01/30 00:59:45 imp Exp $
  */
 
 /*

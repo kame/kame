@@ -8,11 +8,10 @@
  *                   DC395U2D/U2W(TRM-S2080)
  *                   PCI SCSI Bus Master Host Adapter	
  *                   (SCSI chip set used Tekram ASIC TRM-S1040,TRM-S2080)
- *(C)Copyright 1995-2001 Tekram Technology Co.,Ltd.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.23 2004/05/30 20:08:43 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.23.2.2 2005/03/03 04:50:58 obrien Exp $");
 
 /*
  *	HISTORY:					
@@ -27,8 +26,8 @@ __FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.23 2004/05/30 20:08:43 phk Exp $")
  *  1.11   10/13/2001  Oscar Feng  Fixed wrong Async speed display bug.	
  */
 
-/*
- *
+/*-
+ * (C)Copyright 1995-2001 Tekram Technology Co.,Ltd.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -3694,11 +3693,11 @@ trm_probe(device_t dev)
 	case PCI_DEVICEID_TRMS1040: 
 		device_set_desc(dev,
 		    "Tekram DC395U/UW/F DC315/U Fast20 Wide SCSI Adapter");
-		return (0);
+		return (BUS_PROBE_DEFAULT);
 	case PCI_DEVICEID_TRMS2080:
 		device_set_desc(dev,
 		    "Tekram DC395U2D/U2W Fast40 Wide SCSI Adapter");
-		return 0;
+		return (BUS_PROBE_DEFAULT);
 	default:
 		return (ENXIO);
 	}

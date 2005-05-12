@@ -1,5 +1,5 @@
 /*	$NetBSD: osf1_misc.c,v 1.14 1998/05/20 16:34:29 chs Exp $	*/
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.47.2.1 2004/09/03 15:30:20 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.47.2.5 2005/03/01 09:30:14 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,7 +66,6 @@ __FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.47.2.1 2004/09/03 15:30:2
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 #include <sys/unistd.h>
-#include <sys/user.h>
 #include <sys/utsname.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
@@ -82,6 +81,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.47.2.1 2004/09/03 15:30:2
 #include <machine/cpuconf.h>
 #include <machine/fpu.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/rpb.h>
 
 #include <alpha/osf1/exec_ecoff.h>

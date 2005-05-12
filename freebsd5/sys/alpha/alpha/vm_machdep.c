@@ -39,7 +39,7 @@
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  */
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -67,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.104 2004/05/26 12:09:36 tmm Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.104.2.2 2005/02/05 01:02:47 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -89,6 +89,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.104 2004/05/26 12:09:36
 #include <machine/cpu.h>
 #include <machine/fpu.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/prom.h>
 
 #include <vm/vm.h>
@@ -98,8 +99,6 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.104 2004/05/26 12:09:36
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
 #include <vm/vm_extern.h>
-
-#include <sys/user.h>
 
 /*
  * Finish a fork operation, with process p2 nearly set up.

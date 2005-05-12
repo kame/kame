@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufsmount.h	8.6 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_mount.h,v 1.28 2004/06/20 03:34:21 bde Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_mount.h,v 1.28.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 #ifndef _SYS_GNU_EXT2FS_EXT2_MOUNT_H_

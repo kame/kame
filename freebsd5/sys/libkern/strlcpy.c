@@ -1,6 +1,6 @@
 /*	$OpenBSD: strlcpy.c,v 1.4 1999/05/01 18:56:41 millert Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>
  * All rights reserved.
  *
@@ -31,7 +31,7 @@
 static char *rcsid = "$OpenBSD: strlcpy.c,v 1.4 1999/05/01 18:56:41 millert Exp $");
 #endif /* LIBC_SCCS and not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/strlcpy.c,v 1.6 2002/09/06 06:04:36 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/strlcpy.c,v 1.6.8.1 2005/01/31 23:26:21 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/libkern.h>

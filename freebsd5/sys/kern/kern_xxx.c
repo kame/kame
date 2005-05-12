@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_xxx.c,v 1.42 2004/07/26 07:24:03 cperciva Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_xxx.c,v 1.42.2.2 2005/01/31 23:26:16 imp Exp $");
 
 #include "opt_compat.h"
 
@@ -95,10 +95,8 @@ osethostname(td, uap)
 	name[0] = CTL_KERN;
 	name[1] = KERN_HOSTNAME;
 	mtx_lock(&Giant);
-	if ((error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL)) == 0) {
-		error = userland_sysctl(td, name, 2, 0, 0, 0,
-		    uap->hostname, uap->len, 0);
-	}
+	error = userland_sysctl(td, name, 2, 0, 0, 0, uap->hostname,
+	    uap->len, 0);
 	mtx_unlock(&Giant);
 	return (error);
 }

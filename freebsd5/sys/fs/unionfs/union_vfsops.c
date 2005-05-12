@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994, 1995 The Regents of the University of California.
  * Copyright (c) 1994, 1995 Jan-Simon Pendry.
  * All rights reserved.
@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vfsops.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.67 2004/07/30 22:08:51 phk Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.67.2.2 2005/02/27 02:33:03 jeff Exp $
  */
 
 /*
@@ -238,9 +238,9 @@ union_mount(mp, td)
 	}
 
 	um->um_cred = crhold(td->td_ucred);
-	FILEDESC_LOCK(td->td_proc->p_fd);
+	FILEDESC_LOCK_FAST(td->td_proc->p_fd);
 	um->um_cmode = UN_DIRMODE &~ td->td_proc->p_fd->fd_cmask;
-	FILEDESC_UNLOCK(td->td_proc->p_fd);
+	FILEDESC_UNLOCK_FAST(td->td_proc->p_fd);
 
 	/*
 	 * Depending on what you think the MNT_LOCAL flag might mean,

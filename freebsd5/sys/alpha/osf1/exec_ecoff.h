@@ -1,6 +1,6 @@
 /*	$NetBSD: exec_ecoff.h,v 1.10 1996/09/26 22:39:14 cgd Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1994 Adam Glass
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/alpha/osf1/exec_ecoff.h,v 1.1 1999/12/14 22:35:31 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/osf1/exec_ecoff.h,v 1.1.26.1 2005/01/30 00:59:11 imp Exp $
  */
 
 #ifndef	_SYS_EXEC_ECOFF_H_

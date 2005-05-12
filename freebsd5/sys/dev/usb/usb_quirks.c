@@ -1,6 +1,6 @@
 /*	$NetBSD: usb_quirks.c,v 1.50 2004/06/23 02:30:52 mycroft Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.38.2.1 2004/09/20 05:18:04 sanpei Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.38.2.2 2005/01/30 01:00:10 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Hardware specification of various 8696x based Ethernet cards.
  * Contributed by M. Sekiguchi <seki@sysrap.cs.fujitsu.co.jp>
  *
@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/fe/if_fereg.h,v 1.8 2000/09/14 12:02:07 nyan Exp $ */
+/* $FreeBSD: src/sys/dev/fe/if_fereg.h,v 1.8.10.1 2005/01/30 00:59:41 imp Exp $ */
 
 /*
  * Registers on FMV-180 series' ISA bus interface ASIC.

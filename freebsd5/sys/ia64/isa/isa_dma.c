@@ -31,7 +31,7 @@
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
  *	from: isa_dma.c,v 1.3 1999/05/09 23:56:00 peter Exp $
- * $FreeBSD: src/sys/ia64/isa/isa_dma.c,v 1.6 2004/04/07 20:46:08 imp Exp $
+ * $FreeBSD: src/sys/ia64/isa/isa_dma.c,v 1.6.2.1 2005/03/07 13:10:48 phk Exp $
  */
 
 /*
@@ -488,6 +488,19 @@ isa_dmastatus(int chan)
 	if (chan >= 4)			/* high channels move words */
 		cnt *= 2;
 	return(cnt);
+}
+
+/*
+ * Reached terminal count yet ?
+ */
+int
+isa_dmatc(int chan)
+{
+
+	if (chan < 4)
+		return(inb(DMA1_STATUS) & (1 << chan));
+	else
+		return(inb(DMA2_STATUS) & (1 << (chan & 3)));
 }
 
 /*

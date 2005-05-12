@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Wind River Systems, Inc.
  * All rights reserved.
  * Written by: John Baldwin <jhb@FreeBSD.org>
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_pcpu.c,v 1.5 2003/06/11 00:56:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_pcpu.c,v 1.5.4.1 2005/01/31 23:26:17 imp Exp $");
 
 #include "opt_ddb.h"
 

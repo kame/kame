@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/ispfw/asm_1000.h,v 1.1 2002/07/11 01:55:15 mjacob Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/ispfw/asm_1000.h,v 1.1.8.1 2005/01/30 00:59:48 imp Exp $ */
+/*-
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 Qlogic, Inc.
  * All rights reserved.
  *

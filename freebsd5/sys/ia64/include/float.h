@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/ia64/include/float.h,v 1.7 2004/07/19 08:17:25 das Exp $ */
+/* $FreeBSD: src/sys/ia64/include/float.h,v 1.7.2.1 2005/01/31 23:26:14 imp Exp $ */
 /* From: NetBSD: float.h,v 1.6 1997/07/17 21:36:03 thorpej Exp */
 
-/*
+/*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

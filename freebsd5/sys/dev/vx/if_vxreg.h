@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Herb Peyerl (hpeyerl@novatel.ca) All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -19,7 +19,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/vx/if_vxreg.h,v 1.11 2003/10/25 04:05:33 imp Exp $
+ * $FreeBSD: src/sys/dev/vx/if_vxreg.h,v 1.11.4.1 2005/01/30 01:00:12 imp Exp $
  */
 
 /*

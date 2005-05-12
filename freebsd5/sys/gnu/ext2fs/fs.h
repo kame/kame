@@ -1,10 +1,10 @@
-/*
+/*-
  *  modified for EXT2FS support in Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  */
-/*
+/*-
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.7 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/gnu/ext2fs/fs.h,v 1.16 2004/04/07 20:46:03 imp Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/fs.h,v 1.16.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 /*

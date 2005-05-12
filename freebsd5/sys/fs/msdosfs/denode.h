@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/denode.h,v 1.27.2.1 2004/09/11 03:19:31 tjr Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/denode.h,v 1.27.2.2 2005/01/31 23:25:56 imp Exp $ */
 /*	$NetBSD: denode.h,v 1.25 1997/11/17 15:36:28 ws Exp $	*/
 
 /*-
@@ -32,7 +32,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*
+/*-
  * Written by Paul Popelka (paulp@uts.amdahl.com)
  *
  * You can do anything you want with this software, just don't say you wrote

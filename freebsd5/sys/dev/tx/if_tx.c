@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.86 2004/08/13 23:52:33 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.86.2.1 2005/03/03 05:02:14 obrien Exp $");
 
 /*
  * EtherPower II 10/100 Fast Ethernet (SMC 9432 serie)
@@ -169,7 +169,7 @@ epic_probe(dev)
 
 	if (t != NULL) {
 		device_set_desc(dev, t->name);
-		return (0);
+		return (BUS_PROBE_DEFAULT);
 	}
 
 	return (ENXIO);

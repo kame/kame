@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/contrib/pf/net/pf_ioctl.c,v 1.12.2.4 2004/10/03 17:04:39 mlaier Exp $	*/
+/*	$FreeBSD: src/sys/contrib/pf/net/pf_ioctl.c,v 1.12.2.5 2005/01/21 19:07:44 dhartmei Exp $	*/
 /*	$OpenBSD: pf_ioctl.c,v 1.112.2.2 2004/07/24 18:28:12 brad Exp $ */
 /* add	$OpenBSD: pf_ioctl.c,v 1.118 2004/05/03 07:51:59 kjc Exp $ */
 
@@ -1058,7 +1058,7 @@ pfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 	/* XXX keep in sync with switch() below */
 #ifdef __FreeBSD__
-	if (securelevel_gt(td->td_ucred, 1))
+	if (securelevel_gt(td->td_ucred, 2))
 #else
 	if (securelevel > 1)
 #endif

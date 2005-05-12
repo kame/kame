@@ -1,6 +1,6 @@
 /*	$OpenBSD: sab82532reg.h,v 1.2 2002/04/08 17:49:42 jason Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2001 Jason L. Wright (jason@thought.net)
  * All rights reserved.
  *
@@ -34,7 +34,7 @@
  * Agency (DARPA) and Air Force Research Laboratory, Air Force
  * Materiel Command, USAF, under agreement number F30602-01-2-0537.
  *
- * $FreeBSD: src/sys/dev/sab/sab82532reg.h,v 1.1 2002/08/04 18:36:36 jake Exp $
+ * $FreeBSD: src/sys/dev/sab/sab82532reg.h,v 1.1.8.1 2005/01/30 01:00:00 imp Exp $
  */
 
 /*

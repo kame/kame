@@ -1,9 +1,30 @@
-/*
- * Copyright (c) 2004 Robert N. M. Watson
+/*-
+ * Copyright (c) 2004-2005 Robert N. M. Watson
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
- * All Rights Reserved.  See COPYRIGHT.
+ * All Rights Reserved.
  *
- * $FreeBSD: src/sys/netatalk/ddp_usrreq.c,v 1.42 2004/07/12 18:39:59 rwatson Exp $
+ * Permission to use, copy, modify, and distribute this software and
+ * its documentation for any purpose and without fee is hereby granted,
+ * provided that the above copyright notice appears in all copies and
+ * that both that copyright notice and this permission notice appear
+ * in supporting documentation, and that the name of The University
+ * of Michigan not be used in advertising or publicity pertaining to
+ * distribution of the software without specific, written prior
+ * permission. This software is supplied as is without expressed or
+ * implied warranties of any kind.
+ *
+ * This product includes software developed by the University of
+ * California, Berkeley and its contributors.
+ *
+ *	Research Systems Unix Group
+ *	The University of Michigan
+ *	c/o Wesley Craig
+ *	535 W. William Street
+ *	Ann Arbor, Michigan
+ *	+1-313-764-2278
+ *	netatalk@umich.edu
+ *
+ * $FreeBSD: src/sys/netatalk/ddp_usrreq.c,v 1.42.2.2 2005/02/25 17:58:22 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -218,9 +239,9 @@ ddp_init(void)
 	mtx_init(&atintrq2.ifq_mtx, "at2_inq", NULL, MTX_DEF);
 	mtx_init(&aarpintrq.ifq_mtx, "aarp_inq", NULL, MTX_DEF);
 	DDP_LIST_LOCK_INIT();
-	netisr_register(NETISR_ATALK1, at1intr, &atintrq1, 0);
-	netisr_register(NETISR_ATALK2, at2intr, &atintrq2, 0);
-	netisr_register(NETISR_AARP, aarpintr, &aarpintrq, 0);
+	netisr_register(NETISR_ATALK1, at1intr, &atintrq1, NETISR_MPSAFE);
+	netisr_register(NETISR_ATALK2, at2intr, &atintrq2, NETISR_MPSAFE);
+	netisr_register(NETISR_AARP, aarpintr, &aarpintrq, NETISR_MPSAFE);
 }
 
 #if 0

@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/proc.h,v 1.16 2003/04/17 21:57:16 jhb Exp $ */
+/* $FreeBSD: src/sys/alpha/include/proc.h,v 1.16.6.1 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: proc.h,v 1.3 1997/04/06 08:47:36 cgd Exp */
 
-/*
+/*-
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *

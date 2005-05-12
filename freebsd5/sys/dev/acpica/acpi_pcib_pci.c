@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pcib_pci.c,v 1.10 2004/08/11 14:52:50 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pcib_pci.c,v 1.10.2.1 2005/03/02 09:14:59 obrien Exp $");
 
 #include "opt_acpi.h"
 
@@ -55,12 +55,12 @@ struct acpi_pcib_softc {
     ACPI_HANDLE		ap_handle;
     ACPI_BUFFER		ap_prt;		/* interrupt routing table */
 };
-	
+
 struct acpi_pcib_lookup_info {
     UINT32		address;
     ACPI_HANDLE		handle;
 };
-	
+
 static int		acpi_pcib_pci_probe(device_t bus);
 static int		acpi_pcib_pci_attach(device_t bus);
 static int		acpi_pcib_pci_resume(device_t bus);

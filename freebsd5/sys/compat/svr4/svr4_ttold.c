@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1994 Christos Zoulas
  * All rights reserved.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ttold.c,v 1.13 2004/06/21 22:57:10 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ttold.c,v 1.13.2.1 2005/01/30 00:59:20 imp Exp $");
 
 #ifndef BURN_BRIDGES
 

@@ -1,7 +1,7 @@
 /*	$NetBSD: uhcivar.h,v 1.33 2002/02/11 11:41:30 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.37 2004/08/02 15:37:35 iedowse Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.37.2.2 2005/03/22 00:56:54 iedowse Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -85,7 +85,11 @@ struct uhci_xfer {
 	uhci_intr_info_t iinfo;
 	struct usb_task	abort_task;
 	int curframe;
+	u_int32_t uhci_xfer_flags;
 };
+
+#define UHCI_XFER_ABORTING	0x0001	/* xfer is aborting. */
+#define UHCI_XFER_ABORTWAIT	0x0002	/* abort completion is being awaited. */
 
 #define UXFER(xfer) ((struct uhci_xfer *)(xfer))
 

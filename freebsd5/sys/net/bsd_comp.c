@@ -1,4 +1,5 @@
-/* Because this code is derived from the 4.3BSD compress source:
+/*-
+ * Because this code is derived from the 4.3BSD compress source:
  *
  *
  * Copyright (c) 1985, 1986 The Regents of the University of California.
@@ -36,7 +37,7 @@
 /*
  * This version is for use with mbufs on BSD-derived systems.
  *
- * $FreeBSD: src/sys/net/bsd_comp.c,v 1.21 2004/04/07 20:46:11 imp Exp $
+ * $FreeBSD: src/sys/net/bsd_comp.c,v 1.21.2.1 2005/01/31 23:26:22 imp Exp $
  */
 
 #include "opt_mac.h"

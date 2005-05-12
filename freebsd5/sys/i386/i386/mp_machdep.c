@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.235.2.3 2004/09/24 15:02:33 rik Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.235.2.6.2.2 2005/05/01 05:38:13 dwhite Exp $");
 
 #include "opt_apic.h"
 #include "opt_cpu.h"
@@ -178,6 +178,10 @@ vm_offset_t smp_tlb_addr1;
 vm_offset_t smp_tlb_addr2;
 volatile int smp_tlb_wait;
 
+#ifdef KDB_STOP_NMI
+volatile cpumask_t ipi_nmi_pending;
+#endif 
+
 /*
  * Local data and functions.
  */
@@ -197,8 +201,12 @@ static volatile int aps_ready = 0;
 struct cpu_info {
 	int	cpu_present:1;
 	int	cpu_bsp:1;
+	int	cpu_disabled:1;
 } static cpu_info[MAXCPU];
 static int cpu_apic_ids[MAXCPU];
+
+/* Holds pending bitmap based IPIs per CPU */
+static volatile u_int cpu_ipi_pending[MAXCPU];
 
 static u_int boot_address;
 
@@ -349,8 +357,10 @@ cpu_mp_start(void)
 	POSTCODE(MP_START_POST);
 
 	/* Initialize the logical ID to APIC ID table. */
-	for (i = 0; i < MAXCPU; i++)
+	for (i = 0; i < MAXCPU; i++) {
 		cpu_apic_ids[i] = -1;
+		cpu_ipi_pending[i] = 0;
+	}
 
 	/* Install an inter-CPU IPI for TLB invalidation */
 	setidt(IPI_INVLTLB, IDTVEC(invltlb),
@@ -358,14 +368,6 @@ cpu_mp_start(void)
 	setidt(IPI_INVLPG, IDTVEC(invlpg),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 	setidt(IPI_INVLRNG, IDTVEC(invlrng),
-	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
-
-	/* Install an inter-CPU IPI for forwarding hardclock() */
-	setidt(IPI_HARDCLOCK, IDTVEC(hardclock),
-	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
-	
-	/* Install an inter-CPU IPI for forwarding statclock() */
-	setidt(IPI_STATCLOCK, IDTVEC(statclock),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 	
 	/* Install an inter-CPU IPI for lazy pmap release */
@@ -376,8 +378,8 @@ cpu_mp_start(void)
 	setidt(IPI_RENDEZVOUS, IDTVEC(rendezvous),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 
-	/* Install an inter-CPU IPI for forcing an additional software trap */
-	setidt(IPI_AST, IDTVEC(cpuast),
+	/* Install generic inter-CPU IPI handler */
+	setidt(IPI_BITMAP_VECTOR, IDTVEC(ipi_intr_bitmap_handler),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 
 	/* Install an inter-CPU IPI for CPU stop/restart */
@@ -419,7 +421,11 @@ cpu_mp_announce(void)
 	/* List CPUs */
 	printf(" cpu0 (BSP): APIC ID: %2d\n", boot_cpu_id);
 	for (i = 1, x = 0; x < MAXCPU; x++) {
-		if (cpu_info[x].cpu_present && !cpu_info[x].cpu_bsp) {
+		if (!cpu_info[x].cpu_present || cpu_info[x].cpu_bsp)
+			continue;
+		if (cpu_info[x].cpu_disabled)
+			printf("  cpu (AP): APIC ID: %2d (disabled)\n", x);
+		else {
 			KASSERT(i < mp_ncpus,
 			    ("mp_ncpus and actual cpus are out of whack"));
 			printf(" cpu%d (AP): APIC ID: %2d\n", i++, x);
@@ -635,9 +641,19 @@ start_all_aps(void)
 
 	/* start each AP */
 	for (cpu = 0, apic_id = 0; apic_id < MAXCPU; apic_id++) {
+
+		/* Ignore non-existent CPUs and the BSP. */
 		if (!cpu_info[apic_id].cpu_present ||
 		    cpu_info[apic_id].cpu_bsp)
 			continue;
+
+		/* Don't use this CPU if it has been disabled by a tunable. */
+		if (resource_disabled("lapic", apic_id)) {
+			cpu_info[apic_id].cpu_disabled = 1;
+			mp_ncpus--;
+			continue;
+		}
+
 		cpu++;
 
 		/* save APIC ID for this logical ID */
@@ -912,13 +928,21 @@ smp_tlb_shootdown(u_int vector, vm_offset_t addr1, vm_offset_t addr2)
 	ncpu = mp_ncpus - 1;	/* does not shootdown self */
 	if (ncpu < 1)
 		return;		/* no other cpus */
-	mtx_assert(&smp_rv_mtx, MA_OWNED);
+	mtx_assert(&smp_ipi_mtx, MA_OWNED);
 	smp_tlb_addr1 = addr1;
 	smp_tlb_addr2 = addr2;
 	atomic_store_rel_int(&smp_tlb_wait, 0);
 	ipi_all_but_self(vector);
+	/* 
+	 * Enable interrupts here to workaround Opteron Errata 106.
+	 * The while loop runs entirely out of instruction cache,
+	 * which blocks updates to the cache from other CPUs.
+	 * Interrupts break the lock, allowing the write to post.
+	 */
+	enable_intr();
 	while (smp_tlb_wait < ncpu)
 		ia32_pause();
+	disable_intr();
 }
 
 /*
@@ -998,7 +1022,7 @@ smp_targeted_tlb_shootdown(u_int mask, u_int vector, vm_offset_t addr1, vm_offse
 		if (ncpu < 1)
 			return;
 	}
-	mtx_assert(&smp_rv_mtx, MA_OWNED);
+	mtx_assert(&smp_ipi_mtx, MA_OWNED);
 	smp_tlb_addr1 = addr1;
 	smp_tlb_addr2 = addr2;
 	atomic_store_rel_int(&smp_tlb_wait, 0);
@@ -1006,8 +1030,16 @@ smp_targeted_tlb_shootdown(u_int mask, u_int vector, vm_offset_t addr1, vm_offse
 		ipi_all_but_self(vector);
 	else
 		ipi_selected(mask, vector);
+	/* 
+	 * Enable interrupts here to workaround Opteron Errata 106.
+	 * The while loop runs entirely out of instruction cache,
+	 * which blocks updates to the cache from other CPUs.
+	 * Interrupts break the lock, allowing the write to post.
+	 */
+	enable_intr();
 	while (smp_tlb_wait < ncpu)
 		ia32_pause();
+	disable_intr();
 }
 
 void
@@ -1083,20 +1115,6 @@ smp_masked_invlpg_range(u_int mask, vm_offset_t addr1, vm_offset_t addr2)
  * For statclock, we send an IPI to all CPU's to have them call this
  * function.
  */
-void
-forwarded_statclock(struct clockframe frame)
-{
-	struct thread *td;
-
-	CTR0(KTR_SMP, "forwarded_statclock");
-	td = curthread;
-	td->td_intr_nesting_level++;
-	if (profprocs != 0)
-		profclock(&frame);
-	if (pscnt == psdiv)
-		statclock(&frame);
-	td->td_intr_nesting_level--;
-}
 
 void
 forward_statclock(void)
@@ -1120,17 +1138,6 @@ forward_statclock(void)
  * state and call hardclock_process() on the CPU receiving the clock interrupt
  * and then just use a simple IPI to handle any ast's if needed.
  */
-void
-forwarded_hardclock(struct clockframe frame)
-{
-	struct thread *td;
-
-	CTR0(KTR_SMP, "forwarded_hardclock");
-	td = curthread;
-	td->td_intr_nesting_level++;
-	hardclock_process(&frame);
-	td->td_intr_nesting_level--;
-}
 
 void 
 forward_hardclock(void)
@@ -1147,6 +1154,41 @@ forward_hardclock(void)
 		ipi_selected(map, IPI_HARDCLOCK);
 }
 
+void
+ipi_bitmap_handler(struct clockframe frame)
+{
+	int cpu = PCPU_GET(cpuid);
+	u_int ipi_bitmap;
+	struct thread *td;
+
+	ipi_bitmap = atomic_readandclear_int(&cpu_ipi_pending[cpu]);
+
+	critical_enter();
+
+	/* Nothing to do for AST */
+
+	if (ipi_bitmap & (1 << IPI_HARDCLOCK)) {
+		td = curthread;	
+		td->td_intr_nesting_level++;
+		hardclock_process(&frame);
+		td->td_intr_nesting_level--;	
+	}
+
+	if (ipi_bitmap & (1 << IPI_STATCLOCK)) {
+		CTR0(KTR_SMP, "forwarded_statclock");
+
+		td = curthread;
+		td->td_intr_nesting_level++;
+		if (profprocs != 0)
+			profclock(&frame);
+		if (pscnt == psdiv)
+			statclock(&frame);
+		td->td_intr_nesting_level--;
+	}
+
+	critical_exit();
+}
+
 /*
  * send an IPI to a set of cpus.
  */
@@ -1154,15 +1196,36 @@ void
 ipi_selected(u_int32_t cpus, u_int ipi)
 {
 	int cpu;
+	u_int bitmap = 0;
+	u_int old_pending;
+	u_int new_pending;
+
+	if (IPI_IS_BITMAPED(ipi)) { 
+		bitmap = 1 << ipi;
+		ipi = IPI_BITMAP_VECTOR;
+	}
 
 	CTR3(KTR_SMP, "%s: cpus: %x ipi: %x", __func__, cpus, ipi);
 	while ((cpu = ffs(cpus)) != 0) {
 		cpu--;
+		cpus &= ~(1 << cpu);
+
 		KASSERT(cpu_apic_ids[cpu] != -1,
 		    ("IPI to non-existent CPU %d", cpu));
+
+		if (bitmap) {
+			do {
+				old_pending = cpu_ipi_pending[cpu];
+				new_pending = old_pending | bitmap;
+			} while  (!atomic_cmpset_int(&cpu_ipi_pending[cpu],old_pending, new_pending));	
+
+			if (old_pending)
+				continue;
+		}
+
 		lapic_ipi_vectored(ipi, cpu_apic_ids[cpu]);
-		cpus &= ~(1 << cpu);
 	}
+
 }
 
 /*
@@ -1197,6 +1260,76 @@ ipi_self(u_int ipi)
 	CTR2(KTR_SMP, "%s: ipi: %x", __func__, ipi);
 	lapic_ipi_vectored(ipi, APIC_IPI_DEST_SELF);
 }
+
+#ifdef KDB_STOP_NMI
+/*
+ * send NMI IPI to selected CPUs
+ */
+
+#define	BEFORE_SPIN	1000000
+
+void
+ipi_nmi_selected(u_int32_t cpus)
+{
+
+	int cpu;
+	register_t icrlo;
+
+	icrlo = APIC_DELMODE_NMI | APIC_DESTMODE_PHY | APIC_LEVEL_ASSERT 
+		| APIC_TRIGMOD_EDGE; 
+	
+	CTR2(KTR_SMP, "%s: cpus: %x nmi", __func__, cpus);
+
+
+	atomic_set_int(&ipi_nmi_pending, cpus);
+
+
+	while ((cpu = ffs(cpus)) != 0) {
+		cpu--;
+		cpus &= ~(1 << cpu);
+
+		KASSERT(cpu_apic_ids[cpu] != -1,
+		    ("IPI NMI to non-existent CPU %d", cpu));
+		
+		/* Wait for an earlier IPI to finish. */
+		if (!lapic_ipi_wait(BEFORE_SPIN))
+			panic("ipi_nmi_selected: previous IPI has not cleared");
+
+		lapic_ipi_raw(icrlo,cpu_apic_ids[cpu]);
+	}
+}
+
+
+int
+ipi_nmi_handler()
+{
+	int cpu  = PCPU_GET(cpuid);
+
+	if(!(atomic_load_acq_int(&ipi_nmi_pending) & (1 << cpu)))
+		return 1;
+
+	atomic_clear_int(&ipi_nmi_pending,1 << cpu);
+
+	savectx(&stoppcbs[cpu]);
+
+	/* Indicate that we are stopped */
+	atomic_set_int(&stopped_cpus,1 << cpu);
+
+
+	/* Wait for restart */
+	while(!(atomic_load_acq_int(&started_cpus) & (1 << cpu)))
+	    ia32_pause();
+
+	atomic_clear_int(&started_cpus,1 << cpu);
+	atomic_clear_int(&stopped_cpus,1 << cpu);
+
+	if(cpu == 0 && cpustop_restartfunc != NULL)
+		cpustop_restartfunc();
+
+	return 0;
+}
+     
+#endif /* KDB_STOP_NMI */
 
 /*
  * This is called once the rest of the system is up and running and we're

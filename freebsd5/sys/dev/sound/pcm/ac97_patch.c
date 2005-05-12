@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 2002 FreeBSD, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
 #include <dev/sound/pcm/ac97.h>
 #include <dev/sound/pcm/ac97_patch.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/ac97_patch.c,v 1.2 2003/08/21 15:44:55 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/ac97_patch.c,v 1.2.4.1 2005/01/30 01:00:04 imp Exp $");
 
 void ad1886_patch(struct ac97_info* codec)
 {

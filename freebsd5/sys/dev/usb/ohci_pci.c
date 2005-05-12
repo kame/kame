@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ohci_pci.c,v 1.40 2004/08/02 15:37:35 iedowse Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ohci_pci.c,v 1.40.2.1 2005/03/03 05:02:15 obrien Exp $");
 
 /*
  * USB Open Host Controller driver.
@@ -202,7 +202,7 @@ ohci_pci_probe(device_t self)
 
 	if (desc) {
 		device_set_desc(self, desc);
-		return 0;
+		return BUS_PROBE_DEFAULT;
 	} else {
 		return ENXIO;
 	}

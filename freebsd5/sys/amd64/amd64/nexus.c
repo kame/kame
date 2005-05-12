@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/nexus.c,v 1.62.2.1 2004/08/31 05:26:36 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/nexus.c,v 1.62.2.3 2005/01/30 00:59:13 imp Exp $");
 
 /*
  * This code implements a `root nexus' for Intel Architecture
@@ -259,6 +259,8 @@ nexus_print_child(device_t bus, device_t child)
 
 	retval += bus_print_child_header(bus, child);
 	retval += nexus_print_all_resources(child);
+	if (device_get_flags(child))
+		retval += printf(" flags %#x", device_get_flags(child));
 	retval += printf(" on motherboard\n");	/* XXX "motherboard", ick */
 
 	return (retval);

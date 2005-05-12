@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  *
  * Copyright (c) 2000 Andrew Miklic
  *
- * $FreeBSD: src/sys/dev/fb/gfb.h,v 1.2 2004/06/16 09:46:43 phk Exp $
+ * $FreeBSD: src/sys/dev/fb/gfb.h,v 1.2.2.1 2005/01/30 00:59:41 imp Exp $
  */
 
 #ifndef _FB_GFB_H_

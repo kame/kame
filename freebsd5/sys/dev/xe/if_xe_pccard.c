@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Takeshi Shibagaki
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/xe/if_xe_pccard.c,v 1.21 2004/06/27 13:25:28 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/xe/if_xe_pccard.c,v 1.21.2.1 2005/01/30 01:00:13 imp Exp $");
 
 /* xe pccard interface driver */
 

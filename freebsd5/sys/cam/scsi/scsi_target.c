@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic SCSI Target Kernel Mode Driver
  *
  * Copyright (c) 2002 Nate Lawson.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.63 2004/08/15 06:24:40 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.63.2.2 2005/03/12 09:59:33 delphij Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -543,7 +543,6 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 		  ("write - uio_resid %d\n", uio->uio_resid));
 	while (uio->uio_resid >= sizeof(user_ccb) && error == 0) {
 		union ccb *ccb;
-		int error;
 
 		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		if (error != 0) {

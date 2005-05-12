@@ -1,6 +1,6 @@
-/* $FreeBSD: src/sys/net/ppp_deflate.c,v 1.20 2003/02/19 05:47:29 imp Exp $	*/
+/* $FreeBSD: src/sys/net/ppp_deflate.c,v 1.20.6.1 2005/01/31 23:26:23 imp Exp $	*/
 
-/*
+/*-
  * ppp_deflate.c - interface the zlib procedures for Deflate compression
  * and decompression (as used by gzip) to the PPP code.
  * This version is for use with mbufs on BSD-derived systems.

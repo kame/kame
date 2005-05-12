@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Seigo Tanimura
  * All rights reserved.
  *
@@ -38,7 +38,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.31 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.31.2.2 2005/01/30 01:00:03 imp Exp $");
 
 /* Buffer size on dma transfer. Fixed for CS416x. */
 #define CS461x_BUFFSIZE   (4 * 1024)
@@ -516,7 +516,8 @@ csachan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->channel = c;
 	ch->buffer = b;
 	ch->dir = dir;
-	if (sndbuf_alloc(ch->buffer, csa->parent_dmat, CS461x_BUFFSIZE) == -1) return NULL;
+	if (sndbuf_alloc(ch->buffer, csa->parent_dmat, CS461x_BUFFSIZE) != 0)
+		return NULL;
 	return ch;
 }
 

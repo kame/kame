@@ -1,4 +1,4 @@
-/**
+/*-
  * Granch SBNI16 G.SHDSL Modem driver definitions
  * Written by Denis I. Timofeev, 2002-2003.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbsh/if_sbshreg.h,v 1.1 2003/04/13 06:27:13 fjoe Exp $
+ * $FreeBSD: src/sys/dev/sbsh/if_sbshreg.h,v 1.1.8.1 2005/01/30 01:00:01 imp Exp $
  */
 
 /* SBNI16 controller chip definitions */

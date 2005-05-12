@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997 John S. Dyson.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -19,7 +19,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_aio.c,v 1.174.2.1 2004/09/06 19:32:00 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_aio.c,v 1.174.2.3 2005/03/25 16:28:05 jmg Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -488,7 +488,7 @@ aio_free_entry(struct aiocblist *aiocbe)
 	 * OWNING thread? (or maybe the running thread?)
 	 * There is a semantic problem here...
 	 */
-	knlist_clear(&aiocbe->klist, 0); /* XXXKSE */
+	knlist_delete(&aiocbe->klist, FIRST_THREAD_IN_PROC(p), 0); /* XXXKSE */
 
 	if ((ki->kaio_flags & KAIO_WAKEUP) || ((ki->kaio_flags & KAIO_RUNDOWN)
 	    && ((ki->kaio_buffer_count == 0) && (ki->kaio_queue_count == 0)))) {

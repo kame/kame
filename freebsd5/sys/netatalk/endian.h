@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
  * All Rights Reserved.
  *
@@ -19,6 +19,8 @@
  *	Ann Arbor, Michigan
  *	+1-313-763-0525
  *	netatalk@itd.umich.edu
+ *
+ * $FreeBSD: src/sys/netatalk/endian.h,v 1.3.30.1 2005/01/31 23:26:25 imp Exp $
  */
 
 #ifndef _ATALK_ENDIAN_H_

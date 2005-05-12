@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_acct.c,v 1.71 2004/06/17 17:16:48 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_acct.c,v 1.71.2.3 2005/03/01 09:30:16 obrien Exp $");
 
 #include "opt_mac.h"
 
@@ -229,9 +229,20 @@ acct_process(td)
 	struct vnode *vp;
 	int t, ret;
 
+	/*
+	 * Lockless check of accounting condition before doing the hard
+	 * work.
+	 */
+	if (acctp == NULLVP)
+		return (0);
+
 	mtx_lock(&acct_mtx);
 
-	/* If accounting isn't enabled, don't bother */
+	/*
+	 * If accounting isn't enabled, don't bother.  Have to check again
+	 * once we own the lock in case we raced with disabling of accounting
+	 * by another thread.
+	 */
 	vp = acctp;
 	if (vp == NULLVP) {
 		mtx_unlock(&acct_mtx);

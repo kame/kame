@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.234.2.4 2004/09/18 04:11:35 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.234.2.8.2.1 2005/04/28 23:37:19 davidxu Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.234.2.4 2004/09/18 04:11:35 jul
 #include <sys/ktrace.h>
 #include <sys/unistd.h>	
 #include <sys/sx.h>
+#include <sys/signalvar.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -71,7 +72,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.234.2.4 2004/09/18 04:11:35 jul
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
 
-#include <sys/user.h>
 #include <machine/critical.h>
 
 #ifndef _SYS_SYSPROTO_H_
@@ -218,18 +218,14 @@ fork1(td, flags, pages, procp)
 	 * certain parts of a process from itself.
 	 */
 	if ((flags & RFPROC) == 0) {
-		mtx_lock(&Giant);
 		vm_forkproc(td, NULL, NULL, flags);
-		mtx_unlock(&Giant);
 
 		/*
 		 * Close all file descriptors.
 		 */
 		if (flags & RFCFDG) {
 			struct filedesc *fdtmp;
-			FILEDESC_LOCK(td->td_proc->p_fd);
 			fdtmp = fdinit(td->td_proc->p_fd);
-			FILEDESC_UNLOCK(td->td_proc->p_fd);
 			fdfree(td);
 			p1->p_fd = fdtmp;
 		}
@@ -237,18 +233,8 @@ fork1(td, flags, pages, procp)
 		/*
 		 * Unshare file descriptors (from parent).
 		 */
-		if (flags & RFFDG) {
-			FILEDESC_LOCK(p1->p_fd);
-			if (p1->p_fd->fd_refcnt > 1) {
-				struct filedesc *newfd;
-
-				newfd = fdcopy(td->td_proc->p_fd);
-				FILEDESC_UNLOCK(p1->p_fd);
-				fdfree(td);
-				p1->p_fd = newfd;
-			} else
-				FILEDESC_UNLOCK(p1->p_fd);
-		}
+		if (flags & RFFDG) 
+			fdunshare(p1, td);
 		*procp = NULL;
 		return (0);
 	}
@@ -425,14 +411,10 @@ again:
 	 * Copy filedesc.
 	 */
 	if (flags & RFCFDG) {
-		FILEDESC_LOCK(td->td_proc->p_fd);
-		fd = fdinit(td->td_proc->p_fd);
-		FILEDESC_UNLOCK(td->td_proc->p_fd);
+		fd = fdinit(p1->p_fd);
 		fdtol = NULL;
 	} else if (flags & RFFDG) {
-		FILEDESC_LOCK(p1->p_fd);
-		fd = fdcopy(td->td_proc->p_fd);
-		FILEDESC_UNLOCK(p1->p_fd);
+		fd = fdcopy(p1->p_fd);
 		fdtol = NULL;
 	} else {
 		fd = fdshare(p1->p_fd);
@@ -447,9 +429,9 @@ again:
 			 * shared process leaders.
 			 */
 			fdtol = p1->p_fdtol;
-			FILEDESC_LOCK(p1->p_fd);
+			FILEDESC_LOCK_FAST(p1->p_fd);
 			fdtol->fdl_refcount++;
-			FILEDESC_UNLOCK(p1->p_fd);
+			FILEDESC_UNLOCK_FAST(p1->p_fd);
 		} else {
 			/* 
 			 * Shared file descriptor table, and
@@ -475,29 +457,26 @@ again:
 	PROC_LOCK(p2);
 	PROC_LOCK(p1);
 
-#define RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
-
 	bzero(&p2->p_startzero,
-	    (unsigned) RANGEOF(struct proc, p_startzero, p_endzero));
+	    __rangeof(struct proc, p_startzero, p_endzero));
 	bzero(&td2->td_startzero,
-	    (unsigned) RANGEOF(struct thread, td_startzero, td_endzero));
+	    __rangeof(struct thread, td_startzero, td_endzero));
 	bzero(&kg2->kg_startzero,
-	    (unsigned) RANGEOF(struct ksegrp, kg_startzero, kg_endzero));
+	    __rangeof(struct ksegrp, kg_startzero, kg_endzero));
 
 	bcopy(&p1->p_startcopy, &p2->p_startcopy,
-	    (unsigned) RANGEOF(struct proc, p_startcopy, p_endcopy));
+	    __rangeof(struct proc, p_startcopy, p_endcopy));
 	bcopy(&td->td_startcopy, &td2->td_startcopy,
-	    (unsigned) RANGEOF(struct thread, td_startcopy, td_endcopy));
+	    __rangeof(struct thread, td_startcopy, td_endcopy));
 	bcopy(&td->td_ksegrp->kg_startcopy, &kg2->kg_startcopy,
-	    (unsigned) RANGEOF(struct ksegrp, kg_startcopy, kg_endcopy));
-#undef RANGEOF
+	    __rangeof(struct ksegrp, kg_startcopy, kg_endcopy));
 
 	td2->td_sigstk = td->td_sigstk;
+	td2->td_sigmask = td->td_sigmask;
 
 	/*
 	 * Duplicate sub-structures as needed.
 	 * Increase reference counts on shared objects.
-	 * The p_stats substruct is set in vm_forkproc.
 	 */
 	p2->p_flag = 0;
 	if (p1->p_flag & P_PROFIL)
@@ -535,6 +514,9 @@ again:
 	 * p_limit is copy-on-write.  Bump its refcount.
 	 */
 	p2->p_limit = lim_hold(p1->p_limit);
+
+	pstats_fork(p1->p_stats, p2->p_stats);
+
 	PROC_UNLOCK(p1);
 	PROC_UNLOCK(p2);
 
@@ -659,27 +641,25 @@ again:
 	 * Finish creating the child process.  It will return via a different
 	 * execution path later.  (ie: directly into user mode)
 	 */
-	mtx_lock(&Giant);
 	vm_forkproc(td, p2, td2, flags);
 
 	if (flags == (RFFDG | RFPROC)) {
-		cnt.v_forks++;
-		cnt.v_forkpages += p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize;
+		atomic_add_int(&cnt.v_forks, 1);
+		atomic_add_int(&cnt.v_forkpages, p2->p_vmspace->vm_dsize +
+		    p2->p_vmspace->vm_ssize);
 	} else if (flags == (RFFDG | RFPROC | RFPPWAIT | RFMEM)) {
-		cnt.v_vforks++;
-		cnt.v_vforkpages += p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize;
+		atomic_add_int(&cnt.v_vforks, 1);
+		atomic_add_int(&cnt.v_vforkpages, p2->p_vmspace->vm_dsize +
+		    p2->p_vmspace->vm_ssize);
 	} else if (p1 == &proc0) {
-		cnt.v_kthreads++;
-		cnt.v_kthreadpages += p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize;
+		atomic_add_int(&cnt.v_kthreads, 1);
+		atomic_add_int(&cnt.v_kthreadpages, p2->p_vmspace->vm_dsize +
+		    p2->p_vmspace->vm_ssize);
 	} else {
-		cnt.v_rforks++;
-		cnt.v_rforkpages += p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize;
+		atomic_add_int(&cnt.v_rforks, 1);
+		atomic_add_int(&cnt.v_rforkpages, p2->p_vmspace->vm_dsize +
+		    p2->p_vmspace->vm_ssize);
 	}
-	mtx_unlock(&Giant);
 
 	/*
 	 * Both processes are set up, now check if any loadable modules want

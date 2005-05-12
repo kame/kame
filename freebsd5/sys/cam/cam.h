@@ -1,4 +1,4 @@
-/*
+/*-
  * Data structures and definitions for the CAM system.
  *
  * Copyright (c) 1997 Justin T. Gibbs.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam.h,v 1.10 2002/01/09 03:38:58 msmith Exp $
+ * $FreeBSD: src/sys/cam/cam.h,v 1.10.8.1 2005/01/30 00:59:15 imp Exp $
  */
 
 #ifndef _CAM_CAM_H

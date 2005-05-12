@@ -1,4 +1,4 @@
-/*
+/*-
  * Product specific probe and attach routines for:
  * 	3COM 3C579 and 3C509(in eisa config mode) ethernet controllers
  *
@@ -21,7 +21,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.31 2004/07/22 07:11:15 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.31.2.2 2005/02/01 21:45:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -173,7 +173,7 @@ ep_eisa_attach(device_t dev)
 {
 	struct ep_softc *sc = device_get_softc(dev);
 	struct resource *eisa_io = NULL;
-	u_int32_t eisa_iobase;
+	uint32_t eisa_iobase;
 	int irq;
 	int error = 0;
 	int rid;

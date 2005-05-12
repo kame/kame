@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -31,7 +31,7 @@
  * IDT manual.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/patm/genrtab/genrtab.c,v 1.1 2003/07/15 11:57:24 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/patm/genrtab/genrtab.c,v 1.1.4.1 2005/01/30 00:59:57 imp Exp $");
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -445,7 +445,7 @@ main(int argc, char *argv[])
 	printf(" */\n");
 	printf("\n");
 	printf("#include <sys/cdefs.h>\n");
-	printf("__FBSDID(\"$FreeBSD: src/sys/dev/patm/genrtab/genrtab.c,v 1.1 2003/07/15 11:57:24 harti Exp $\");\n");
+	printf("__FBSDID(\"$FreeBSD: src/sys/dev/patm/genrtab/genrtab.c,v 1.1.4.1 2005/01/30 00:59:57 imp Exp $\");\n");
 	printf("\n");
 	printf("#include <sys/types.h>\n");
 	printf("\n");

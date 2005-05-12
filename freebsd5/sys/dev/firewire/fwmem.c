@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
@@ -35,7 +35,7 @@
 
 #ifdef __FreeBSD__
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.29 2004/06/16 09:46:44 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.29.2.2 2005/01/30 00:59:41 imp Exp $");
 #endif
 
 #include <sys/param.h>
@@ -309,7 +309,7 @@ fwmem_close (struct cdev *dev, int flags, int fmt, fw_proc *td)
 	if (fwmem_debug)
 		printf("%s: refcount=%d\n", __func__, fms->refcount);
 	if (fms->refcount < 1) {
-		free(dev->si_drv1, M_FW);
+		free(dev->si_drv1, M_FWMEM);
 		dev->si_drv1 = NULL;
 	}
 

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_param.c,v 1.64 2004/04/05 21:03:35 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_param.c,v 1.64.2.2 2005/01/31 23:26:17 imp Exp $");
 
 #include "opt_param.h"
 #include "opt_maxusers.h"
@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD: src/sys/kern/subr_param.c,v 1.64 2004/04/05 21:03:35 imp Exp
 
 #ifndef HZ
 #ifdef __amd64__
-#define	HZ 1024
+#define	HZ 1000
 #else
 #define	HZ 100
 #endif

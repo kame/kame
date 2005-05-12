@@ -1,6 +1,6 @@
 /* drm_auth.h -- IOCTLs for authentication -*- linux-c -*-
- * Created: Tue Feb  2 08:37:54 1999 by faith@valinux.com
- *
+ * Created: Tue Feb  2 08:37:54 1999 by faith@valinux.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_auth.h,v 1.5 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_auth.h,v 1.5.4.1 2005/01/30 00:59:35 imp Exp $
  */
 
 #include "dev/drm/drmP.h"

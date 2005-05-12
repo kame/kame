@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000, 2001 Richard Hodges and Matriplex, inc.
  * All rights reserved.
  *
@@ -37,7 +37,7 @@
  *
  ******************************************************************************
  *
- * $FreeBSD: src/sys/dev/idt/idtreg.h,v 1.1 2002/09/30 05:12:34 mdodd Exp $
+ * $FreeBSD: src/sys/dev/idt/idtreg.h,v 1.1.8.1 2005/01/30 00:59:46 imp Exp $
  */
 
 #define	IDT_VERSION	"IDT 1.101"

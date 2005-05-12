@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/i386/include/resource.h,v 1.3 1999/10/14 21:38:30 dfr Exp $ */
-/*
+/* $FreeBSD: src/sys/i386/include/resource.h,v 1.3.26.1 2005/01/31 23:26:04 imp Exp $ */
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and

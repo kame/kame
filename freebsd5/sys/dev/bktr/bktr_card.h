@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_card.h,v 1.7 2004/08/08 01:23:39 sanpei Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_card.h,v 1.7.2.3 2005/03/02 10:27:35 obrien Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -14,7 +14,7 @@
  *
  */
 
-/*
+/*-
  * 1. Redistributions of source code must retain the
  * Copyright (c) 1997 Amancio Hasty, 1999 Roger Hardiman
  * All rights reserved.
@@ -78,7 +78,9 @@
 #define CARD_TERRATVPLUS	16
 #define	CARD_IO_BCTV3		17
 #define	CARD_AOPEN_VA1000	18
-#define	Bt848_MAX_CARD		19
+#define CARD_PINNACLE_PCTV_RAVE	19
+#define CARD_PIXELVIEW_PLAYTV_PAK	20
+#define Bt848_MAX_CARD		21
 
 #define CARD_IO_GV		CARD_IO_BCTV2
 

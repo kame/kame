@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001-2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fatm/if_fatm.c,v 1.14 2004/03/17 17:50:32 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fatm/if_fatm.c,v 1.14.2.1 2005/01/30 00:59:40 imp Exp $");
 
 #include "opt_inet.h"
 #include "opt_natm.h"

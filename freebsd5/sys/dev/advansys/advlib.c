@@ -1,4 +1,4 @@
-/*
+/*-
  * Low level routines for the Advanced Systems Inc. SCSI controllers chips
  *
  * Copyright (c) 1996-1997, 1999-2000 Justin Gibbs.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Ported from:
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
  *     
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/advansys/advlib.c,v 1.21 2003/08/24 17:48:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/advansys/advlib.c,v 1.21.4.1 2005/01/30 00:59:23 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

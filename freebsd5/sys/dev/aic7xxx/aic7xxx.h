@@ -1,4 +1,4 @@
-/*
+/*-
  * Core definitions and data structures shareable across OS platforms.
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
@@ -39,7 +39,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#85 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.51.2.1 2004/08/18 22:16:38 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.51.2.3 2005/02/16 23:38:34 gibbs Exp $
  */
 
 #ifndef _AIC7XXX_H_
@@ -180,6 +180,10 @@ struct seeprom_descriptor;
 
 /* Reset line assertion time in us */
 #define AHC_BUSRESET_DELAY	25
+
+/* Phase change constants used in target mode. */
+#define	AHC_BUSSETTLE_DELAY	400
+#define	AHC_DATARELEASE_DELAY	400
 
 /******************* Chip Characteristics/Operating Settings  *****************/
 /*

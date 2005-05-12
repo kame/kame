@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.48.4.1 2004/10/23 19:22:22 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.48.2.4 2005/02/02 06:44:24 scottl Exp $");
 
 /*
  * PCI bus interface and resource allocation.
@@ -55,7 +55,7 @@ __FBSDID("$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.48.4.1 2004/10/23 19:22:22 sco
 #include <dev/pci/pcivar.h>
 
 #include <dev/aac/aacreg.h>
-#include <dev/aac/aac_ioctl.h>
+#include <sys/aac_ioctl.h>
 #include <dev/aac/aacvar.h>
 
 static int	aac_pci_probe(device_t dev);
@@ -134,6 +134,8 @@ struct aac_ident
 	 "Adaptec SCSI RAID 2810SA"},
 	{0x9005, 0x0285, 0x9005, 0x0293, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
 	 "Adaptec SCSI RAID 21610SA"},
+	{0x9005, 0x0286, 0x9005, 0x028c, AAC_HWIF_RKT, 0,
+	 "Adaptec SCSI RAID 2230S"},
 	{0x9005, 0x0286, 0x9005, 0x028d, AAC_HWIF_RKT, 0,
 	 "Adaptec SCSI RAID 2130S"},
 	{0, 0, 0, 0, 0, 0, 0}
@@ -320,3 +322,65 @@ out:
 		aac_free(sc);
 	return(error);
 }
+
+/*
+ * Do nothing driver that will attach to the SCSI channels of a Dell PERC
+ * controller.  This is needed to keep the power management subsystem from
+ * trying to power down these devices.
+ */
+static int aacch_probe(device_t dev);
+static int aacch_attach(device_t dev);
+static int aacch_detach(device_t dev);
+
+static device_method_t aacch_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		aacch_probe),
+	DEVMETHOD(device_attach,	aacch_attach),
+	DEVMETHOD(device_detach,	aacch_detach),
+	{ 0, 0 }
+};
+
+struct aacch_softc {
+	device_t	dev;
+};
+
+static driver_t aacch_driver = {
+	"aacch",
+	aacch_methods,
+	sizeof(struct aacch_softc)
+};
+
+static devclass_t	aacch_devclass;
+DRIVER_MODULE(aacch, pci, aacch_driver, aacch_devclass, 0, 0);
+
+static int
+aacch_probe(device_t dev)
+{
+
+	if ((pci_get_subvendor(dev) != 0x9005) ||
+	    (pci_get_subdevice(dev) != 0x00c5))
+		return (ENXIO);
+
+	device_set_desc(dev, "AAC RAID Channel");
+	return (-10);
+}
+
+static int
+aacch_attach(device_t dev)
+{
+	struct aacch_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	sc->dev = dev;
+
+	return (0);
+}
+
+static int
+aacch_detach(device_t dev)
+{
+
+	return (0);
+}
+

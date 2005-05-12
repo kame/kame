@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.ORG> wrote this file.  As long as you retain this notice you
@@ -8,7 +8,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_jail.c,v 1.44 2004/06/27 09:03:21 pjd Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_jail.c,v 1.44.2.2 2005/02/22 15:49:22 cperciva Exp $");
 
 #include "opt_mac.h"
 
@@ -66,6 +66,11 @@ int	jail_allow_raw_sockets = 0;
 SYSCTL_INT(_security_jail, OID_AUTO, allow_raw_sockets, CTLFLAG_RW,
     &jail_allow_raw_sockets, 0,
     "Prison root can create raw sockets");
+
+int	jail_chflags_allowed = 0;
+SYSCTL_INT(_security_jail, OID_AUTO, chflags_allowed, CTLFLAG_RW,
+    &jail_chflags_allowed, 0,
+    "Processes in jail can alter system file flags");
 
 /* allprison, lastprid, and prisoncount are protected by allprison_mtx. */
 struct	prisonlist allprison;

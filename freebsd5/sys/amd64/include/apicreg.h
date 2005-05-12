@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996, by Peter Wemm and Steve Passe
  * All rights reserved.
  *
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/apicreg.h,v 1.26 2003/12/11 02:48:25 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/apicreg.h,v 1.26.2.2 2005/02/14 09:22:20 obrien Exp $
  */
 
 #ifndef _MACHINE_APICREG_H_
@@ -330,7 +330,12 @@ typedef struct IOAPIC ioapic_t;
 #define APIC_LVTT_DS		0x00001000
 #define APIC_LVTT_M		0x00010000
 #define APIC_LVTT_TM		0x00020000
+# define APIC_LVTT_TM_ONE_SHOT	0x00000000
+# define APIC_LVTT_TM_PERIODIC	0x00020000
 
+
+/* APIC timer current count */
+#define	APIC_TIMER_MAX_COUNT	0xffffffff
 
 /* fields in TDCR */
 #define APIC_TDCR_2		0x00

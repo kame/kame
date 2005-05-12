@@ -1,7 +1,8 @@
 .file "__moddi3.s"
 
-// $FreeBSD: src/sys/libkern/ia64/__moddi3.S,v 1.3 2003/02/11 20:15:11 schweikh Exp $
-//  
+// $FreeBSD: src/sys/libkern/ia64/__moddi3.S,v 1.3.6.1 2005/01/31 23:26:21 imp Exp $
+
+//-
 // Copyright (c) 2000, Intel Corporation
 // All rights reserved.
 //

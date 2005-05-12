@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/md_var.h,v 1.18 2004/08/11 02:35:05 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/md_var.h,v 1.18.2.1 2005/01/09 05:47:12 marcel Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -86,7 +86,6 @@ void	map_gateway_page(void);
 void	map_pal_code(void);
 void	os_boot_rendez(void);
 void	os_mca(void);
-void	spillfd(void *src, void *dst);
 int	syscall(struct trapframe *);
 void	trap(int, struct trapframe *);
 int	unaligned_fixup(struct trapframe *, struct thread *);

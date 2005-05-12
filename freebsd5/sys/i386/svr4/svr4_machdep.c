@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * Copyright (c) 1994 Christos Zoulas
  * All rights reserved.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.34 2004/01/05 00:29:00 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.34.2.1 2005/01/31 23:26:07 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>

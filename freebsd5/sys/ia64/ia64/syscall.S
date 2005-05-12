@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002, 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/syscall.S,v 1.12 2004/08/07 21:55:15 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/syscall.S,v 1.12.2.2 2005/01/31 23:26:13 imp Exp $
  */
 
 #include <sys/syscall.h>
@@ -116,7 +116,7 @@ gw_ret_ia32:
 }
 
 
-ENTRY(break_sigtramp, 0)
+ENTRY_NOPROFILE(break_sigtramp, 0)
 {	.mib
 	mov		ar.rsc=0
 	cmp.ne		p15,p0=0,gp
@@ -180,7 +180,7 @@ ENTRY(break_sigtramp, 0)
 }
 END(break_sigtramp)
 
-ENTRY(epc_sigtramp, 0)
+ENTRY_NOPROFILE(epc_sigtramp, 0)
 {	.mmi
 	ld8		r16=[r10],8		// function address
 	mov		ar.rsc=0
@@ -220,7 +220,7 @@ END(epc_sigtramp)
 
 	.text
 
-ENTRY(epc_syscall, 8)
+ENTRY_NOPROFILE(epc_syscall, 8)
 	.prologue
 	.unwabi		@svr4, 'E'
 	.save		rp, r0

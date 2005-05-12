@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000,2001 Jonathan Chen.
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.15 2004/05/29 18:09:10 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.15.2.1 2005/01/30 00:59:54 imp Exp $");
 
 /*
  * Driver for the TDK 78Q2120 MII

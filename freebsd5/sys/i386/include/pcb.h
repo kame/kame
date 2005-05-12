@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)pcb.h	5.10 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/pcb.h,v 1.52 2004/07/10 19:55:59 marcel Exp $
+ * $FreeBSD: src/sys/i386/include/pcb.h,v 1.52.6.1 2005/04/18 21:36:17 peter Exp $
  */
 
 #ifndef _I386_PCB_H_
@@ -70,7 +70,7 @@ struct pcb {
 	struct	pcb_ext	*pcb_ext;	/* optional pcb extension */
 	int	pcb_psl;	/* process status long */
 	void	(*pcb_switchout)(void);	/* Special switchout function. */
-	u_long	__pcb_spare[1];	/* adjust to avoid core dump size changes */
+	u_long	pcb_vm86[2];	/* vm86bios scratch space */
 };
 
 #ifdef _KERNEL

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)fdesc_vfsops.c	8.4 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc_vfsops.c,v 1.46 2004/07/30 22:08:49 phk Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc_vfsops.c,v 1.46.2.2 2005/02/27 02:37:18 jeff Exp $
  */
 
 /*
@@ -166,7 +166,7 @@ fdesc_statfs(mp, sbp, td)
 	lim = lim_cur(td->td_proc, RLIMIT_NOFILE);
 	PROC_UNLOCK(td->td_proc);
 	fdp = td->td_proc->p_fd;
-	FILEDESC_LOCK(fdp);
+	FILEDESC_LOCK_FAST(fdp);
 	last = min(fdp->fd_nfiles, lim);
 	freefd = 0;
 	for (i = fdp->fd_freefile; i < last; i++)
@@ -179,7 +179,7 @@ fdesc_statfs(mp, sbp, td)
 	 */
 	if (fdp->fd_nfiles < lim)
 		freefd += (lim - fdp->fd_nfiles);
-	FILEDESC_UNLOCK(fdp);
+	FILEDESC_UNLOCK_FAST(fdp);
 
 	sbp->f_flags = 0;
 	sbp->f_bsize = DEV_BSIZE;

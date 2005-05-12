@@ -1,4 +1,4 @@
-/*
+/*-
  * EISA bus device definitions
  *
  * Copyright (c) 1995, 1996 Justin T. Gibbs.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/eisa/eisaconf.h,v 1.23 2004/06/09 16:08:20 imp Exp $
+ * $FreeBSD: src/sys/dev/eisa/eisaconf.h,v 1.23.2.1 2005/01/30 00:59:38 imp Exp $
  */
 
 #ifndef _DEV_EISA_EISACONF_H_

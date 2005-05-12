@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/fs/msdosfs/bootsect.h,v 1.11 2003/12/26 17:24:37 trhodes Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/bootsect.h,v 1.11.2.1 2005/01/31 23:25:56 imp Exp $ */
 /*	$NetBSD: bootsect.h,v 1.9 1997/11/17 15:36:17 ws Exp $	*/
 
-/*
+/*-
  * Written by Paul Popelka (paulp@uts.amdahl.com)
  *
  * You can do anything you want with this software, just don't say you wrote

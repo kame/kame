@@ -1,5 +1,5 @@
 /*	$NetBSD: sysv_ipc.c,v 1.7 1994/06/29 06:33:11 cgd Exp $	*/
-/*
+/*-
  * Copyright (c) 1994 Herb Peyerl <hpeyerl@novatel.ca>
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sysv_ipc.c,v 1.27 2003/06/11 00:56:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sysv_ipc.c,v 1.27.4.1 2005/01/31 23:26:17 imp Exp $");
 
 #include "opt_sysvipc.h"
 

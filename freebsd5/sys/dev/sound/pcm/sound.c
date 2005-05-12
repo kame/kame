@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * (C) 1997 Luigi Rizzo (luigi@iet.unipi.it)
  * All rights reserved.
@@ -32,7 +32,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.92 2004/07/16 03:59:09 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.92.2.1 2005/01/30 01:00:05 imp Exp $");
 
 devclass_t pcm_devclass;
 

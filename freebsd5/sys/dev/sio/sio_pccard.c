@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.13 2004/05/27 03:49:43 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.13.2.1 2005/01/30 01:00:01 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  *  Device driver optimized for the Symbios/LSI 53C896/53C895A/53C1010 
  *  PCI-SCSI controllers.
  *
@@ -55,7 +55,7 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_fw1.h,v 1.6 2002/12/30 21:18:08 schweikh Exp $ */
+/* $FreeBSD: src/sys/dev/sym/sym_fw1.h,v 1.6.6.1 2005/01/30 01:00:07 imp Exp $ */
 
 /*
  *  Scripts for SYMBIOS-Processor

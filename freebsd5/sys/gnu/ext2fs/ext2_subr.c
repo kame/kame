@@ -1,10 +1,10 @@
-/*
+/*-
  *  modified for Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  */
-/*
+/*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_subr.c	8.2 (Berkeley) 9/21/93
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_subr.c,v 1.27 2004/07/10 21:21:55 marcel Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_subr.c,v 1.27.2.1 2005/01/31 23:26:02 imp Exp $
  */
 
 #include <sys/param.h>

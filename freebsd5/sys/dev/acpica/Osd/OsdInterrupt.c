@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdInterrupt.c,v 1.18 2004/08/13 06:22:24 njl Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdInterrupt.c,v 1.18.2.1 2004/12/19 04:17:49 marks Exp $
  */
 
 /*
@@ -48,7 +48,7 @@ static UINT32		InterruptOverride = 0;
 
 ACPI_STATUS
 AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
-    OSD_HANDLER ServiceRoutine, void *Context)
+    ACPI_OSD_HANDLER ServiceRoutine, void *Context)
 {
     struct acpi_softc	*sc;
 
@@ -105,7 +105,7 @@ error:
 }
 
 ACPI_STATUS
-AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, OSD_HANDLER ServiceRoutine)
+AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, ACPI_OSD_HANDLER ServiceRoutine)
 {
     struct acpi_softc	*sc;
 

@@ -1,6 +1,7 @@
 /*
  * ppp_defs.h - PPP definitions.
- *
+ */
+/*-
  * Copyright (c) 1994 The Australian National University.
  * All rights reserved.
  *
@@ -24,7 +25,7 @@
  * OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
  * OR MODIFICATIONS.
  *
- * $FreeBSD: src/sys/net/ppp_defs.h,v 1.7 2001/06/11 12:38:58 ume Exp $
+ * $FreeBSD: src/sys/net/ppp_defs.h,v 1.7.8.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _PPP_DEFS_H_

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/xmphyreg.h,v 1.3 2002/01/10 18:06:41 archie Exp $
+ * $FreeBSD: src/sys/dev/mii/xmphyreg.h,v 1.3.8.1 2005/01/30 00:59:54 imp Exp $
  */
 
 #ifndef _DEV_MII_XMPHYREG_H_

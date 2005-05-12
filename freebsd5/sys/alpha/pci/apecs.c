@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  */
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -50,12 +50,12 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-/*
+/*-
  * Additional Copyright (c) 1998 by Andrew Gallatin for Duke University 
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/apecs.c,v 1.26 2004/07/01 15:07:27 gallatin Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/apecs.c,v 1.26.2.1 2005/01/30 00:59:12 imp Exp $");
 
 #define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>

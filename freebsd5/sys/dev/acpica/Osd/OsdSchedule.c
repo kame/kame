@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSchedule.c,v 1.29 2004/08/13 06:22:26 njl Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSchedule.c,v 1.29.2.1.2.1 2005/04/22 23:31:31 njl Exp $
  */
 
 /*
@@ -50,6 +50,13 @@
 ACPI_MODULE_NAME("SCHEDULE")
 
 /*
+ * Allow the user to tune the number of task threads we start.  It seems
+ * some systems have problems with increased parallelism.
+ */
+static int acpi_max_threads = ACPI_MAX_THREADS;
+TUNABLE_INT("debug.acpi.max_threads", &acpi_max_threads);
+
+/*
  * This is a little complicated due to the fact that we need to build and then
  * free a 'struct task' for each task we enqueue.
  */
@@ -60,7 +67,7 @@ static void	AcpiOsExecuteQueue(void *arg, int pending);
 
 struct acpi_task {
     struct task			at_task;
-    OSD_EXECUTION_CALLBACK	at_function;
+    ACPI_OSD_EXEC_CALLBACK	at_function;
     void			*at_context;
 };
 
@@ -98,7 +105,7 @@ static void
 acpi_task_thread(void *arg)
 {
     struct acpi_task_queue	*atq;
-    OSD_EXECUTION_CALLBACK	Function;
+    ACPI_OSD_EXEC_CALLBACK	Function;
     void			*Context;
 
     ACPI_LOCK(taskq);
@@ -108,7 +115,7 @@ acpi_task_thread(void *arg)
 	STAILQ_REMOVE_HEAD(&acpi_task_queue, at_q);
 	ACPI_UNLOCK(taskq);
 
-	Function = (OSD_EXECUTION_CALLBACK)atq->at->at_function;
+	Function = (ACPI_OSD_EXEC_CALLBACK)atq->at->at_function;
 	Context = atq->at->at_context;
 
 	Function(Context);
@@ -130,7 +137,7 @@ acpi_task_thread_init(void)
     err = 0;
     STAILQ_INIT(&acpi_task_queue);
 
-    for (i = 0; i < ACPI_MAX_THREADS; i++) {
+    for (i = 0; i < acpi_max_threads; i++) {
 	err = kthread_create(acpi_task_thread, NULL, &acpi_kthread_proc,
 			     0, 0, "acpi_task%d", i);
 	if (err != 0) {
@@ -143,7 +150,7 @@ acpi_task_thread_init(void)
 
 /* This function is called in interrupt context. */
 ACPI_STATUS
-AcpiOsQueueForExecution(UINT32 Priority, OSD_EXECUTION_CALLBACK Function,
+AcpiOsQueueForExecution(UINT32 Priority, ACPI_OSD_EXEC_CALLBACK Function,
     void *Context)
 {
     struct acpi_task	*at;
@@ -188,7 +195,7 @@ static void
 AcpiOsExecuteQueue(void *arg, int pending)
 {
     struct acpi_task_queue	*atq;
-    OSD_EXECUTION_CALLBACK	Function;
+    ACPI_OSD_EXEC_CALLBACK	Function;
     void			*Context;
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
@@ -213,14 +220,14 @@ AcpiOsExecuteQueue(void *arg, int pending)
 }
 
 void
-AcpiOsSleep(UINT32 Seconds, UINT32 Milliseconds)
+AcpiOsSleep(ACPI_INTEGER Milliseconds)
 {
     int		timo;
     static int	dummy;
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
-    timo = (Seconds * hz) + Milliseconds * hz / 1000;
+    timo = Milliseconds * hz / 1000;
 
     /* 
      * If requested sleep time is less than our hz resolution, use
@@ -232,6 +239,26 @@ AcpiOsSleep(UINT32 Seconds, UINT32 Milliseconds)
 	DELAY(Milliseconds * 1000);
 
     return_VOID;
+}
+
+/*
+ * Return the current time in 100 nanosecond units
+ */
+UINT64
+AcpiOsGetTimer(void)
+{
+    struct bintime bt;
+    UINT64 t;
+
+    /* XXX During early boot there is no (decent) timer available yet. */
+    if (cold)
+	panic("acpi: timer op not yet supported during boot");
+
+    binuptime(&bt);
+    t = ((UINT64)10000000 * (uint32_t)(bt.frac >> 32)) >> 32;
+    t += bt.sec * 10000000;
+
+    return (t);
 }
 
 void

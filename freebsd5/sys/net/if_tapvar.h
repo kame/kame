@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1999-2000 by Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -34,7 +34,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/net/if_tapvar.h,v 1.8 2004/06/16 09:47:14 phk Exp $
+ * $FreeBSD: src/sys/net/if_tapvar.h,v 1.8.2.1 2005/01/31 23:26:23 imp Exp $
  * $Id: if_tapvar.h,v 0.6 2000/07/11 02:16:08 max Exp $
  */
 

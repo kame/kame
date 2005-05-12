@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 1994, 1995 Jan-Simon Pendry.
  * Copyright (c) 1992, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vnops.c	8.32 (Berkeley) 6/23/95
- * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.108 2004/07/12 08:14:07 alfred Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.108.2.1 2005/01/31 23:26:00 imp Exp $
  */
 
 #include <sys/param.h>

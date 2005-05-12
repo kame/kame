@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Bernd Walter <ticso@freebsd.org>
  *
  * $URL: https://devel.bwct.de/svn/projects/ubser/ubser.h $
@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/ubser.h,v 1.1 2004/03/01 02:34:48 ticso Exp $
+ * $FreeBSD: src/sys/dev/usb/ubser.h,v 1.1.2.1 2005/01/30 01:00:09 imp Exp $
  */
 
 #ifndef UBSER_H

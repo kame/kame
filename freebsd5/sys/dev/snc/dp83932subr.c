@@ -1,7 +1,7 @@
 /*	$NecBSD: dp83932subr.c,v 1.5.6.2 1999/10/09 05:47:23 kmatsuda Exp $	*/
 /*	$NetBSD$	*/
   
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Kouichi Matsuda.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/snc/dp83932subr.c,v 1.6 2003/08/24 18:03:45 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/snc/dp83932subr.c,v 1.6.4.1 2005/01/30 01:00:02 imp Exp $");
 /*
  * Routines of NEC PC-9801-83, 84, 103, 104, PC-9801N-25 and PC-9801N-J02, J02R 
  * Ethernet interface for NetBSD/pc98, ported by Kouichi Matsuda.

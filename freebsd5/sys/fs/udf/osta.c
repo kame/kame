@@ -3,13 +3,14 @@
  * each code segment.  Slight whitespace modifications have been made for
  * formatting purposes.  Typos/bugs have been fixed.
  *
- * $FreeBSD: src/sys/fs/udf/osta.c,v 1.3 2003/11/05 06:55:23 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/osta.c,v 1.3.4.1 2005/01/31 23:25:59 imp Exp $
  */
 
 #include <fs/udf/osta.h>
 
 /*****************************************************************************/
-/***********************************************************************
+/*-
+ **********************************************************************
  * OSTA compliant Unicode compression, uncompression routines.
  * Copyright 1995 Micro Design International, Inc.
  * Written by Jason M. Rinn.
@@ -253,7 +254,8 @@ main()
 
 /*****************************************************************************/
 #ifdef NEEDS_ISPRINT
-/***********************************************************************
+/*-
+ **********************************************************************
  * OSTA UDF compliant file name translation routine for OS/2,
  * Windows 95, Windows NT, Macintosh and UNIX.
  * Copyright 1995 Micro Design International, Inc.

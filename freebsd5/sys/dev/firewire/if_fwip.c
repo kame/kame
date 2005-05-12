@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004
  *	Doug Rabson
  * Copyright (c) 2002-2003
@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/if_fwip.c,v 1.5 2004/08/13 23:09:41 rwatson Exp $
+ * $FreeBSD: src/sys/dev/firewire/if_fwip.c,v 1.5.2.1 2005/01/30 00:59:42 imp Exp $
  */
 
 #include "opt_inet.h"

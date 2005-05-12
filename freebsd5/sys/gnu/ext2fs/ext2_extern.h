@@ -1,4 +1,4 @@
-/*
+/*-
  *  modified for EXT2FS support in Lites 1.1
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_extern.h	8.3 (Berkeley) 4/16/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_extern.h,v 1.31 2004/06/16 09:47:06 phk Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_extern.h,v 1.31.2.1 2005/01/31 23:26:01 imp Exp $
  */
 
 #ifndef _SYS_GNU_EXT2FS_EXT2_EXTERN_H_

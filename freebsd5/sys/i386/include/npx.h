@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)npx.h	5.3 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/i386/include/npx.h,v 1.27 2004/04/07 20:46:05 imp Exp $
+ * $FreeBSD: src/sys/i386/include/npx.h,v 1.27.2.1 2005/03/29 07:24:38 das Exp $
  */
 
 /*
@@ -134,6 +134,7 @@ union	savefpu {
  * intermediate values are stored in memory or in FPU registers.
  */
 #define	__INITIAL_NPXCW__	0x127F
+#define	__INITIAL_MXCSR__	0x1F80
 
 #ifdef _KERNEL
 int	npxdna(void);

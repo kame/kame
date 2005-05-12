@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997,1998 Maxim Bolotin and Oleg Sharoiko.
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/dev/cs/if_csreg.h,v 1.5 2003/11/04 02:59:57 imp Exp $
+ * $FreeBSD: src/sys/dev/cs/if_csreg.h,v 1.5.4.1 2005/01/30 00:59:32 imp Exp $
  */
 
 #define CS_89x0_IO_PORTS	0x0020

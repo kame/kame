@@ -1,10 +1,10 @@
-/*
+/*-
  * Some data-tables that are often used.
  * Cannot be copyrighted.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/bcd.c,v 1.6 2003/06/11 05:23:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/bcd.c,v 1.6.4.1 2005/01/31 23:26:21 imp Exp $");
 
 #include <sys/libkern.h>
 

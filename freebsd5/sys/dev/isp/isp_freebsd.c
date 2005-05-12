@@ -1,4 +1,4 @@
-/*
+/*-
  * Platform (FreeBSD) dependent common attachment code for Qlogic adapters.
  *
  * Copyright (c) 1997, 1998, 1999, 2000, 2001 by Matthew Jacob
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/isp/isp_freebsd.c,v 1.102.2.1 2004/08/27 15:46:56 mjacob Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/isp/isp_freebsd.c,v 1.102.2.3 2005/01/30 00:59:47 imp Exp $");
 
 #include <dev/isp/isp_freebsd.h>
 #include <sys/unistd.h>
@@ -1497,7 +1497,7 @@ isp_handle_platform_atio(struct ispsoftc *isp, at_entry_t *aep)
 	 * Construct a tag 'id' based upon tag value (which may be 0..255)
 	 * and the handle (which we have to preserve).
 	 */
-	AT_MAKE_TAGID(atiop->tag_id, aep);
+	AT_MAKE_TAGID(atiop->tag_id, 0, aep);
 	if (aep->at_flags & AT_TQAE) {
 		atiop->tag_action = aep->at_tag_type;
 		atiop->ccb_h.status |= CAM_TAG_ACTION_VALID;

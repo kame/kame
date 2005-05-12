@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996 Gardner Buchanan <gbuchanan@shl.com>
  * All rights reserved.
  *
@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/sn/if_snreg.h,v 1.4 2003/10/25 19:56:19 imp Exp $
+ *   $FreeBSD: src/sys/dev/sn/if_snreg.h,v 1.4.4.1 2005/01/30 01:00:02 imp Exp $
  */
 
 /*

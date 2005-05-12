@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/clock.c,v 1.213 2004/07/11 17:50:59 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/clock.c,v 1.213.2.1 2005/03/25 21:31:46 jhb Exp $");
 
 /*
  * Routines to handle clock hardware.
@@ -712,6 +712,7 @@ rtc_restore(void)
 	writertc(RTC_STATUSB, RTCSB_24HR);
 	writertc(RTC_STATUSA, rtc_statusa);
 	writertc(RTC_STATUSB, rtc_statusb);
+	rtcin(RTC_INTR);
 }
 
 /*
@@ -911,6 +912,7 @@ resettodr()
 
 	/* Reenable RTC updates and interrupts. */
 	writertc(RTC_STATUSB, rtc_statusb);
+	rtcin(RTC_INTR);
 }
 
 
@@ -957,6 +959,7 @@ cpu_initclocks()
 		    INTR_TYPE_CLK | INTR_FAST, NULL);
 
 		writertc(RTC_STATUSB, rtc_statusb);
+		rtcin(RTC_INTR);
 	}
 
 	init_TSC_tc();

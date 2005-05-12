@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/db_trace.c,v 1.61.2.1 2004/09/16 17:21:46 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/db_trace.c,v 1.61.2.4 2005/03/25 21:07:21 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -286,10 +286,16 @@ db_nextframe(struct i386_frame **fp, db_addr_t *ip, struct thread *td)
 	ebp = db_get_value((int) &(*fp)->f_frame, 4, FALSE);
 
 	/*
-	 * Figure out frame type.
+	 * Figure out frame type.  We look at the address just before
+	 * the saved instruction pointer as the saved EIP is after the
+	 * call function, and if the function being called is marked as
+	 * dead (such as panic() at the end of dblfault_handler()), then
+	 * the instruction at the saved EIP will be part of a different
+	 * function (syscall() in this example) rather than the one that
+	 * actually made the call.
 	 */
 	frame_type = NORMAL;
-	sym = db_search_symbol(eip, DB_STGY_ANY, &offset);
+	sym = db_search_symbol(eip - 1, DB_STGY_ANY, &offset);
 	db_symbol_values(sym, &name, NULL);
 	if (name != NULL) {
 		if (strcmp(name, "calltrap") == 0 ||
@@ -379,14 +385,16 @@ db_backtrace(struct thread *td, struct trapframe *tf, struct i386_frame *frame,
 	int *argp;
 	db_expr_t offset;
 	c_db_sym_t sym;
-	int narg;
+	int narg, quit;
 	boolean_t first;
 
 	if (count == -1)
 		count = 1024;
 
 	first = TRUE;
-	while (count--) {
+	quit = 0;
+	db_setup_paging(db_simple_pager, &quit, db_lines_per_page);
+	while (count-- && !quit) {
 		sym = db_search_symbol(pc, DB_STGY_ANY, &offset);
 		db_symbol_values(sym, &name, NULL);
 

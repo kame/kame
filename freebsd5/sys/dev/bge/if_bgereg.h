@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Wind River Systems
  * Copyright (c) 1997, 1998, 1999, 2001
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.28.2.1 2004/09/29 14:31:49 ps Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.28.2.5 2005/03/22 14:10:46 avatar Exp $
  */
 
 /*
@@ -1865,11 +1865,13 @@ struct bge_status_block {
 #define BCOM_DEVICEID_BCM5704S		0x16A8
 #define BCOM_DEVICEID_BCM5705		0x1653
 #define BCOM_DEVICEID_BCM5705K		0x1654
+#define BCOM_DEVICEID_BCM5721		0x1659
 #define BCOM_DEVICEID_BCM5705M		0x165D
 #define BCOM_DEVICEID_BCM5705M_ALT	0x165E
 #define BCOM_DEVICEID_BCM5750		0x1676
 #define BCOM_DEVICEID_BCM5750M		0x167C
 #define BCOM_DEVICEID_BCM5751		0x1677
+#define BCOM_DEVICEID_BCM5751M		0x167D
 #define BCOM_DEVICEID_BCM5782		0x1696
 #define BCOM_DEVICEID_BCM5788		0x169C
 #define BCOM_DEVICEID_BCM5901		0x170D
@@ -1905,7 +1907,7 @@ struct bge_status_block {
 #define ALTIMA_VENDORID			0x173b
 #define ALTIMA_DEVICE_AC1000		0x03e8
 #define ALTIMA_DEVICE_AC1002		0x03e9
-#define ALTIMA_DEVICE_AC9100	 	0x03ea			
+#define ALTIMA_DEVICE_AC9100		0x03ea
 
 /*
  * Dell PCI vendor ID
@@ -2149,19 +2151,19 @@ struct bge_gib {
  * Vital product data and structures.
  */
 #define BGE_VPD_FLAG		0x8000
- 
+
 /* VPD structures */
 struct vpd_res {
 	u_int8_t		vr_id;
 	u_int8_t		vr_len;
 	u_int8_t		vr_pad;
 };
- 
+
 struct vpd_key {
 	char			vk_key[2];
 	u_int8_t		vk_len;
 };
- 
+
 #define VPD_RES_ID	0x82	/* ID string */
 #define VPD_RES_READ	0x90	/* start of read only area */
 #define VPD_RES_WRITE	0x81	/* start of read/write area */

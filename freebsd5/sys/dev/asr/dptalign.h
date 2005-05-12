@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996-1999 Distributed Processing Technology Corporation
  * All rights reserved.
  *
@@ -20,7 +20,7 @@
  *
  * DPT Alignment Description File
  *
- * $FreeBSD: src/sys/dev/asr/dptalign.h,v 1.5 2002/05/14 21:59:10 obrien Exp $
+ * $FreeBSD: src/sys/dev/asr/dptalign.h,v 1.5.8.1 2005/01/30 00:59:28 imp Exp $
  */
 #if (!defined(__DPTALIGN_H))
 #define	      __DPTALIGN_H

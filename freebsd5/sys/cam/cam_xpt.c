@@ -1,4 +1,4 @@
-/*
+/*-
  * Implementation of the Common Access Method Transport (XPT) layer.
  *
  * Copyright (c) 1997, 1998, 1999 Justin T. Gibbs.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/cam_xpt.c,v 1.142 2004/07/15 08:25:59 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/cam_xpt.c,v 1.142.2.4 2005/04/01 12:44:03 delphij Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -149,6 +149,7 @@ struct cam_ed {
 #define CAM_DEV_INQUIRY_DATA_VALID	0x40
 	u_int32_t	 tag_delay_count;
 #define	CAM_TAG_DELAY_COUNT		5
+	u_int32_t	 tag_saved_openings;
 	u_int32_t	 refcount;
 	struct		 callout_handle c_handle;
 };
@@ -2529,7 +2530,7 @@ xptplistperiphfunc(struct cam_periph *periph, void *arg)
 					break;
 			}
 
-			if (pdrv == NULL) {
+			if (*pdrv == NULL) {
 				cdm->status = CAM_DEV_MATCH_ERROR;
 				return(0);
 			}
@@ -5028,6 +5029,7 @@ xpt_alloc_device(struct cam_eb *bus, struct cam_et *target, lun_id_t lun_id)
 		device->qfrozen_cnt = 0;
 		device->flags = CAM_DEV_UNCONFIGURED;
 		device->tag_delay_count = 0;
+		device->tag_saved_openings = 0;
 		device->refcount = 1;
 		callout_handle_init(&device->c_handle);
 
@@ -5115,6 +5117,9 @@ xpt_dev_ccbq_resize(struct cam_path *path, int newopenings)
 	if (result == CAM_REQ_CMP && (diff < 0)) {
 		dev->flags |= CAM_DEV_RESIZE_QUEUE_NEEDED;
 	}
+	if ((dev->flags & CAM_DEV_TAG_AFTER_COUNT) != 0
+	 || (dev->inq_flags & SID_CmdQue) != 0)
+		dev->tag_saved_openings = newopenings;
 	/* Adjust the global limit */
 	xpt_max_ccbs += diff;
 	splx(s);
@@ -5660,7 +5665,17 @@ probestart(struct cam_periph *periph, union ccb *start_ccb)
 		if (softc->action == PROBE_INQUIRY)
 			inquiry_len = SHORT_INQUIRY_LENGTH;
 		else
-			inquiry_len = inq_buf->additional_length + 4;
+			inquiry_len = inq_buf->additional_length
+				    + offsetof(struct scsi_inquiry_data,
+                                               additional_length) + 1;
+
+		/*
+		 * Some parallel SCSI devices fail to send an
+		 * ignore wide residue message when dealing with
+		 * odd length inquiry requests.  Round up to be
+		 * safe.
+		 */
+		inquiry_len = roundup2(inquiry_len, 2);
 	
 		scsi_inquiry(csio,
 			     /*retries*/4,
@@ -5812,7 +5827,7 @@ probedone(struct cam_periph *periph, union ccb *done_ccb)
 			switch(periph_qual) {
 			case SID_QUAL_LU_CONNECTED:
 			{
-				u_int8_t alen;
+				u_int8_t len;
 
 				/*
 				 * We conservatively request only
@@ -5824,9 +5839,11 @@ probedone(struct cam_periph *periph, union ccb *done_ccb)
 				 * the amount of information the device
 				 * is willing to give.
 				 */
-				alen = inq_buf->additional_length;
+				len = inq_buf->additional_length
+				    + offsetof(struct scsi_inquiry_data,
+                                               additional_length) + 1;
 				if (softc->action == PROBE_INQUIRY
-				 && alen > (SHORT_INQUIRY_LENGTH - 4)) {
+				 && len > SHORT_INQUIRY_LENGTH) {
 					softc->action = PROBE_FULL_INQUIRY;
 					xpt_release_ccb(done_ccb);
 					xpt_schedule(periph, priority);
@@ -6033,7 +6050,8 @@ probedone(struct cam_periph *periph, union ccb *done_ccb)
 			done_ccb->ccb_h.func_code = XPT_GDEV_TYPE;
 			xpt_action(done_ccb);
 
-			xpt_async(AC_FOUND_DEVICE, xpt_periph->path, done_ccb);
+			xpt_async(AC_FOUND_DEVICE, done_ccb->ccb_h.path,
+				  done_ccb);
 		}
 		xpt_release_ccb(done_ccb);
 		break;
@@ -6686,7 +6704,11 @@ xpt_start_tags(struct cam_path *path)
 	device->flags &= ~CAM_DEV_TAG_AFTER_COUNT;
 	xpt_freeze_devq(path, /*count*/1);
 	device->inq_flags |= SID_CmdQue;
-	newopenings = min(device->quirk->maxtags, sim->max_tagged_dev_openings);
+	if (device->tag_saved_openings != 0)
+		newopenings = device->tag_saved_openings;
+	else
+		newopenings = min(device->quirk->maxtags,
+				  sim->max_tagged_dev_openings);
 	xpt_dev_ccbq_resize(path, newopenings);
 	xpt_setup_ccb(&crs.ccb_h, path, /*priority*/1);
 	crs.ccb_h.func_code = XPT_REL_SIMQ;
@@ -6864,6 +6886,7 @@ xpt_finishconfig(struct cam_periph *periph, union ccb *done_ccb)
 			if (done_ccb->ccb_h.status == CAM_REQ_CMP) {
 				done_ccb->ccb_h.func_code = XPT_SCAN_BUS;
 				done_ccb->ccb_h.cbfcnp = xpt_finishconfig;
+				done_ccb->crcn.flags = 0;
 				xpt_action(done_ccb);
 				return;
 			}

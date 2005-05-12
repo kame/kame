@@ -1,5 +1,4 @@
-
-/*
+/*-
  * ichsmb_var.h
  *
  * Copyright (c) 2000 Whistle Communications, Inc.
@@ -36,7 +35,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/dev/ichsmb/ichsmb_var.h,v 1.2 2000/12/07 02:09:39 archie Exp $
+ * $FreeBSD: src/sys/dev/ichsmb/ichsmb_var.h,v 1.2.8.1 2005/01/30 00:59:45 imp Exp $
  */
 
 #ifndef _DEV_ICHSMB_ICHSMB_VAR_H

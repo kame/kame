@@ -1,5 +1,5 @@
 %{
-/*
+/*-
  * Lexical Analyzer for the Aic7xxx SCSI Host adapter sequencer assembler.
  *
  * Copyright (c) 1997, 1998, 2000 Justin T. Gibbs.
@@ -40,7 +40,7 @@
  *
  * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_scan.l#19 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_scan.l,v 1.22 2003/12/16 23:54:07 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_scan.l,v 1.22.2.1 2005/01/30 00:59:26 imp Exp $
  */
 
 #include <sys/types.h>

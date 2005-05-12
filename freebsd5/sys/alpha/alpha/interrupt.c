@@ -1,5 +1,5 @@
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-/*
+/*-
  * Additional Copyright (c) 1997 by Matthew Jacob for NASA/Ames Research Center.
  * Redistribute and modify at will, leaving only this additional copyright
  * notice.
@@ -33,7 +33,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 /* __KERNEL_RCSID(0, "$NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $");*/
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.82 2004/07/20 06:32:32 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.82.2.2 2005/01/30 00:59:09 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -474,7 +474,7 @@ alpha_clock_interrupt(struct trapframe *framep)
 		/*
 		 * Only one processor drives the actual timer.
 		 */
-		if (PCPU_GET(cpuid) == boot_cpu_id) {
+		if (PCPU_GET(cpuid) == 0) {
 #endif
 			(*platform.clockintr)(framep);
 			/* divide hz (1024) by 8 to get stathz (128) */

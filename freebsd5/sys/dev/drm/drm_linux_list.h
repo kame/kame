@@ -1,6 +1,6 @@
 /* drm_linux_list.h -- linux list functions for the BSDs.
- * Created: Mon Apr 7 14:30:16 1999 by anholt@FreeBSD.org
- *
+ * Created: Mon Apr 7 14:30:16 1999 by anholt@FreeBSD.org */
+/*-
  * Copyright 2003 Eric Anholt
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Eric Anholt <anholt@FreeBSD.org>
  *
- * $FreeBSD: src/sys/dev/drm/drm_linux_list.h,v 1.1 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_linux_list.h,v 1.1.2.1 2005/01/30 00:59:35 imp Exp $
  */
 
 struct list_head {

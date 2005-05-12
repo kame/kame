@@ -44,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/isa/isa_dma.c,v 1.11 2004/04/05 21:00:51 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/isa/isa_dma.c,v 1.11.2.1 2005/03/07 13:10:47 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -486,6 +486,19 @@ isa_dmastatus(int chan)
 	if (chan >= 4)			/* high channels move words */
 		cnt *= 2;
 	return(cnt);
+}
+
+/*
+ * Reached terminal count yet ?
+ */
+int
+isa_dmatc(int chan)
+{
+
+	if (chan < 4)
+		return(inb(DMA1_STATUS) & (1 << chan));
+	else
+		return(inb(DMA2_STATUS) & (1 << (chan & 3)));
 }
 
 /*

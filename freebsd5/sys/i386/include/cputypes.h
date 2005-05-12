@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1993 Christopher G. Demetriou
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cputypes.h,v 1.18 2004/06/03 21:14:52 phk Exp $
+ * $FreeBSD: src/sys/i386/include/cputypes.h,v 1.18.2.1 2005/01/31 23:26:04 imp Exp $
  */
 
 #ifndef _MACHINE_CPUTYPES_H_

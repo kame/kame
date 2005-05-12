@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_iframe.c - i frame handling routines
  *	------------------------------------------
@@ -31,7 +32,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer2/i4b_iframe.c,v 1.13 2003/06/10 23:55:01 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer2/i4b_iframe.c,v 1.13.4.1 2005/01/31 23:26:11 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

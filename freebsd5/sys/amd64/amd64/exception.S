@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/exception.S,v 1.120 2004/08/16 12:51:32 obrien Exp $
+ * $FreeBSD: src/sys/amd64/amd64/exception.S,v 1.120.2.1 2005/01/30 11:58:12 rwatson Exp $
  */
 
 #include "opt_atpic.h"
@@ -130,7 +130,7 @@ IDTVEC(prot)
 	TRAP_ERR(T_PROTFLT)
 IDTVEC(align)
 	TRAP_ERR(T_ALIGNFLT)
-	
+
 	/*
 	 * alltraps entry point.  Use swapgs if this is the first time in the
 	 * kernel from userland.  Reenable interrupts if they were enabled

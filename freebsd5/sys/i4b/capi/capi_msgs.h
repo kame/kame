@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Cubical Solutions Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,10 +21,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+
+/* capi/capi_msgs.h	The CAPI i4b message and handler declarations.
  *
- * capi/capi_msgs.h	The CAPI i4b message and handler declarations.
- *
- * $FreeBSD: src/sys/i4b/capi/capi_msgs.h,v 1.1 2001/05/25 08:39:31 hm Exp $
+ * $FreeBSD: src/sys/i4b/capi/capi_msgs.h,v 1.1.10.1 2005/01/31 23:26:07 imp Exp $
  */
 
 #ifndef _I4B_CAPI_MSGS_H_

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Jake Burkholder <jake@FreeBSD.org>
  * All rights reserved.
  *
@@ -86,7 +86,7 @@ reassigned to keep this true.
 ***/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_switch.c,v 1.78.2.12.2.1 2004/10/22 19:13:07 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_switch.c,v 1.78.2.18 2005/02/05 01:04:45 das Exp $");
 
 #include "opt_sched.h"
 
@@ -456,6 +456,9 @@ setrunqueue(struct thread *td, int flags)
 	struct ksegrp *kg;
 	struct thread *td2;
 	struct thread *tda;
+	CTR5(KTR_SCHED, "setrunqueue: %p(%s) prio %d by %p(%s)",
+            td, td->td_proc->p_comm, td->td_priority, curthread,
+            curthread->td_proc->p_comm);
 
 	CTR3(KTR_RUNQ, "setrunqueue: td:%p kg:%p pid:%d",
 	    td, td->td_ksegrp, td->td_proc->p_pid);
@@ -573,6 +576,8 @@ critical_enter(void)
 	if (td->td_critnest == 0)
 		cpu_critical_enter(td);
 	td->td_critnest++;
+	CTR4(KTR_CRITICAL, "critical_enter by thread %p (%ld, %s) to %d", td,
+	    (long)td->td_proc->p_pid, td->td_proc->p_comm, td->td_critnest);
 }
 
 void
@@ -601,6 +606,8 @@ critical_exit(void)
 	} else {
 		td->td_critnest--;
 	}
+	CTR4(KTR_CRITICAL, "critical_exit by thread %p (%ld, %s) to %d", td,
+	    (long)td->td_proc->p_pid, td->td_proc->p_comm, td->td_critnest);
 }
 
 /*
@@ -906,7 +913,6 @@ runq_remove(struct runq *rq, struct kse *ke)
 
 /****** functions that are temporarily here ***********/
 #include <vm/uma.h>
-#define RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
 extern struct mtx kse_zombie_lock;
 
 /*
@@ -941,7 +947,6 @@ sched_destroyproc(struct proc *p)
 	KASSERT((p->p_numksegrps == 1), ("Cached proc with > 1 ksegrp "));
 }
 
-#define RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
 /*
  * thread is being either created or recycled.
  * Fix up the per-scheduler resources associated with it.
@@ -959,7 +964,6 @@ sched_newthread(struct thread *td)
 	bzero(ke, sizeof(*ke));
 	td->td_sched     = ke;
 	ke->ke_thread	= td;
-	ke->ke_oncpu	= NOCPU;
 	ke->ke_state	= KES_THREAD;
 }
 

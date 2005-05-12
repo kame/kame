@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/nexus.c,v 1.7.2.1 2004/08/31 05:26:37 njl Exp $
+ * $FreeBSD: src/sys/ia64/ia64/nexus.c,v 1.7.2.3 2005/01/31 23:26:13 imp Exp $
  */
 
 /*
@@ -286,6 +286,8 @@ nexus_print_child(device_t bus, device_t child)
 	retval += nexus_print_all_resources(child);
 	if (ndev->nx_pcibus != -1)
 		retval += printf(" pcibus %d", ndev->nx_pcibus);
+	if (device_get_flags(child))
+		retval += printf(" flags %#x", device_get_flags(child));
 	retval += printf(" on motherboard\n");	/* XXX "motherboard", ick */
 
 	return (retval);

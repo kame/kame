@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 David O'Brien <obrien@FreeBSD.org>
  * Copyright (c) 2003 Orlando Bassotto <orlando.bassotto@ieo-research.it>
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
@@ -35,7 +35,7 @@
 #include <dev/pci/pcivar.h>
 #include <sys/queue.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/emu10k1.c,v 1.52 2004/07/24 15:30:23 obrien Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/emu10k1.c,v 1.52.2.2 2005/01/30 01:00:04 imp Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -889,7 +889,7 @@ emurchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b,
 		break;
 	}
 	sc->rnum++;
-	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsz) == -1)
+	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsz) != 0)
 		return NULL;
 	else {
 		snd_mtxlock(sc->lock);

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
 #include "opt_fb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.8.2.1 2004/09/02 06:14:42 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.8.2.3 2005/03/03 04:49:43 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,7 +105,6 @@ static struct cdevsw tga_cdevsw = {
 	.d_ioctl =	pcigfb_ioctl,
 	.d_mmap =	pcigfb_mmap,
 	.d_name =	"tga",
-	.d_maj =	-1,
 };
 
 #endif /* FB_INSTALL_CDEV */
@@ -122,7 +121,7 @@ tga_probe(device_t dev)
 		if((pci_get_vendor(dev) == t->vendor_id) &&
 		   (pci_get_device(dev) == t->device_id)) {
 			device_set_desc(dev, t->name);
-			error = 0;
+			error = BUS_PROBE_DEFAULT;
 			break;
 		}
 		t++;

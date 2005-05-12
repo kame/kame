@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.81.2.3 2004/10/10 15:01:47 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.81.2.4 2005/03/01 19:37:41 gad Exp $
  */
 
 /* ATA register defines */
@@ -155,6 +155,8 @@
 #define ATA_INTR_FLAGS			(INTR_MPSAFE|INTR_TYPE_BIO|INTR_ENTROPY)
 #define ATA_OP_CONTINUES		0
 #define ATA_OP_FINISHED			1
+
+#define ATA_MAX_28BIT_LBA		268435455
 
 /* ATAPI request sense structure */
 struct atapi_sense {

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/acpica/acpi_machdep.c,v 1.4 2004/06/30 04:42:29 njl Exp $
+ * $FreeBSD: src/sys/ia64/acpica/acpi_machdep.c,v 1.4.2.1 2004/11/07 20:24:06 njl Exp $
  */
 
 #include <sys/param.h>
@@ -31,6 +31,7 @@
 
 #include "acpi.h"
 #include <dev/acpica/acpivar.h>
+#include <machine/pal.h>
 
 int
 acpi_machdep_init(device_t dev)
@@ -48,4 +49,10 @@ int
 acpi_machdep_quirks(int *quirks)
 {
 	return (0);
+}
+
+void
+acpi_cpu_c1()
+{
+	ia64_call_pal_static(PAL_HALT_LIGHT, 0, 0, 0);
 }

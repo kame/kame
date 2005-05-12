@@ -1,4 +1,4 @@
-/*
+/*-
  * Definitions for low level routines and data structures
  * for the Advanced Systems Inc. SCSI controllers chips.
  *
@@ -29,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adwlib.h,v 1.7 2000/10/29 16:57:32 phk Exp $
+ * $FreeBSD: src/sys/dev/advansys/adwlib.h,v 1.7.8.1 2005/01/30 00:59:23 imp Exp $
  */
-/*
+/*-
  * Ported from:
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
  *     

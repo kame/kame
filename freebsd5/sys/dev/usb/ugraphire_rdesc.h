@@ -1,6 +1,6 @@
 /*	$NetBSD: usb/ugraphire_rdesc.h,v 1.1 2000/12/29 01:47:49 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ugraphire_rdesc.h,v 1.1 2002/04/07 17:04:01 joe Exp $ */
-/*
+/*	$FreeBSD: src/sys/dev/usb/ugraphire_rdesc.h,v 1.1.10.1 2005/01/30 01:00:10 imp Exp $ */
+/*-
  * Copyright (c) 2000 Nick Hibma <n_hibma@freebsd.org>
  * All rights reserved.
  *

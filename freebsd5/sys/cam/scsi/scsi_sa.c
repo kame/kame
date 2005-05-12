@@ -1,4 +1,4 @@
-/*
+/*-
  * Implementation of SCSI Sequential Access Peripheral driver for CAM.
  *
  * Copyright (c) 1999, 2000 Matthew Jacob
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_sa.c,v 1.101 2004/06/16 09:46:31 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_sa.c,v 1.101.2.1 2005/01/30 00:59:17 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>

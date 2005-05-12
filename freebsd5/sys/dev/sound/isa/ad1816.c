@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright Luigi Rizzo, 1997,1998
  * Copyright by Hannu Savolainen 1994, 1995
@@ -33,7 +33,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.33.2.1 2004/10/15 05:14:10 njl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.33.2.3 2005/01/30 01:00:03 imp Exp $");
 
 struct ad1816_info;
 
@@ -314,7 +314,8 @@ ad1816chan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channe
 	ch->parent = ad1816;
 	ch->channel = c;
 	ch->buffer = b;
-	if (sndbuf_alloc(ch->buffer, ad1816->parent_dmat, ad1816->bufsize) == -1) return NULL;
+	if (sndbuf_alloc(ch->buffer, ad1816->parent_dmat, ad1816->bufsize) != 0)
+		return NULL;
 	return ch;
 }
 

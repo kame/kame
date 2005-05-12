@@ -1,6 +1,6 @@
 /*	$NetBSD: mii.h,v 1.9 2001/05/31 03:07:14 thorpej Exp $	*/
  
-/*
+/*-
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
  * Modification to match BSD/OS 3.0 MII interface by Jason R. Thorpe,
@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/mii.h,v 1.4 2002/04/29 11:57:28 phk Exp $
+ * $FreeBSD: src/sys/dev/mii/mii.h,v 1.4.8.1 2005/01/30 00:59:54 imp Exp $
  */
 
 #ifndef _DEV_MII_MII_H_

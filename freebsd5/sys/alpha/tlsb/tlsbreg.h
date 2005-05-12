@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/tlsb/tlsbreg.h,v 1.2 2000/01/29 16:41:08 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/tlsbreg.h,v 1.2.26.1 2005/01/30 00:59:12 imp Exp $ */
 /* $NetBSD: tlsbreg.h,v 1.5 2000/01/27 22:27:50 mjacob Exp $ */
 
-/*
+/*-
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.

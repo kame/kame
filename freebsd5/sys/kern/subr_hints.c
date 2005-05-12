@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_hints.c,v 1.9 2003/07/02 16:01:38 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_hints.c,v 1.9.4.1 2005/03/13 18:05:26 jmg Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -312,7 +312,7 @@ resource_string_copy(const char *s, int len)
 }
 
 /*
- * err = resource_find_at(&anchor, &name, &unit, resname, value)
+ * err = resource_find_match(&anchor, &name, &unit, resname, value)
  * Iteratively fetch a list of devices wired "at" something
  * res and value are restrictions.  eg: "at", "scbus0".
  * For practical purposes, res = required, value = optional.

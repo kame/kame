@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/dev/dec/mc146818reg.h,v 1.3 2000/05/01 19:54:23 peter Exp $ */
+/* $FreeBSD: src/sys/dev/dec/mc146818reg.h,v 1.3.8.1 2005/01/30 00:59:35 imp Exp $ */
 /*	$NetBSD: mc146818reg.h,v 1.2 1997/03/12 06:53:42 cgd Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
  * 

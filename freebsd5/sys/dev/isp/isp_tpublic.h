@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/isp/isp_tpublic.h,v 1.9 2003/09/13 01:58:51 mjacob Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/isp/isp_tpublic.h,v 1.9.4.1 2005/01/30 00:59:48 imp Exp $ */
+/*-
  * Qlogic ISP Host Adapter Public Target Interface Structures && Routines
  *---------------------------------------
  * Copyright (c) 2000 by Matthew Jacob

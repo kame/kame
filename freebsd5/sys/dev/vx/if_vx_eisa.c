@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1996 Naoki Hamada <nao@tom-yam.or.jp>
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_eisa.c,v 1.22 2004/08/11 20:35:55 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_eisa.c,v 1.22.2.1 2005/01/30 01:00:12 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

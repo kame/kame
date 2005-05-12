@@ -1,4 +1,4 @@
-/*
+/*-
  * Dallas DS2153, DS21x54 single-chip E1 tranceiver registers.
  *
  * Copyright (C) 1996 Cronyx Engineering.
@@ -12,7 +12,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: ds2153.h,v 1.2.4.1 2003/11/12 17:22:33 rik Exp $
- * $FreeBSD: src/sys/dev/ctau/ds2153.h,v 1.1 2004/02/23 20:19:00 rik Exp $
+ * $FreeBSD: src/sys/dev/ctau/ds2153.h,v 1.1.4.1 2005/01/30 00:59:33 imp Exp $
  */
 
 /*

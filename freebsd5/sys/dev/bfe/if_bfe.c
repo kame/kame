@@ -1,9 +1,7 @@
-/*
+/*-
  * Copyright (c) 2003 Stuart Walsh<stu@ipng.org.uk>
  * and Duncan Barclay<dmlb@dmlb.org>
- */
-
-/*
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -28,7 +26,7 @@
 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bfe/if_bfe.c,v 1.15.2.2 2004/10/09 15:20:18 mlaier Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bfe/if_bfe.c,v 1.15.2.5 2005/03/30 01:50:44 avatar Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -539,8 +537,6 @@ bfe_tx_ring_free(struct bfe_softc *sc)
 			sc->bfe_tx_ring[i].bfe_mbuf = NULL;
 			bus_dmamap_unload(sc->bfe_tag,
 					sc->bfe_tx_ring[i].bfe_map);
-			bus_dmamap_destroy(sc->bfe_tag,
-					sc->bfe_tx_ring[i].bfe_map);
 		}
 	}
 	bzero(sc->bfe_tx_list, BFE_TX_LIST_SIZE);
@@ -558,14 +554,11 @@ bfe_rx_ring_free(struct bfe_softc *sc)
 			sc->bfe_rx_ring[i].bfe_mbuf = NULL;
 			bus_dmamap_unload(sc->bfe_tag,
 					sc->bfe_rx_ring[i].bfe_map);
-			bus_dmamap_destroy(sc->bfe_tag,
-					sc->bfe_rx_ring[i].bfe_map);
 		}
 	}
 	bzero(sc->bfe_rx_list, BFE_RX_LIST_SIZE);
 	bus_dmamap_sync(sc->bfe_rx_tag, sc->bfe_rx_map, BUS_DMASYNC_PREREAD);
 }
-
 
 static int
 bfe_list_rx_init(struct bfe_softc *sc)
@@ -615,7 +608,7 @@ bfe_list_newbuf(struct bfe_softc *sc, int c, struct mbuf *m)
 	r = &sc->bfe_rx_ring[c];
 	bus_dmamap_load(sc->bfe_tag, r->bfe_map, mtod(m, void *),
 			MCLBYTES, bfe_dma_map_desc, d, 0);
-	bus_dmamap_sync(sc->bfe_tag, r->bfe_map, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->bfe_tag, r->bfe_map, BUS_DMASYNC_PREREAD);
 
 	ctrl = ETHER_MAX_LEN + 32;
 
@@ -982,6 +975,10 @@ bfe_release_resources(struct bfe_softc *sc)
 		for(i = 0; i < BFE_TX_LIST_CNT; i++) {
 			bus_dmamap_destroy(sc->bfe_tag,
 			    sc->bfe_tx_ring[i].bfe_map);
+		}
+		for(i = 0; i < BFE_RX_LIST_CNT; i++) {
+			bus_dmamap_destroy(sc->bfe_tag,
+			    sc->bfe_rx_ring[i].bfe_map);
 		}
 		bus_dma_tag_destroy(sc->bfe_tag);
 		sc->bfe_tag = NULL;

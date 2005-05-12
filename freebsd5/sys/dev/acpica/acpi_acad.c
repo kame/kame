@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/acpica/acpi_acad.c,v 1.31 2004/08/13 17:47:40 njl Exp $
+ * $FreeBSD: src/sys/dev/acpica/acpi_acad.c,v 1.31.2.1 2004/12/19 04:17:49 marks Exp $
  */
 
 #include "opt_acpi.h"
@@ -238,7 +238,7 @@ acpi_acad_init_acline(void *arg)
 	acpi_acad_get_status(dev);
 	if (sc->status != -1)
 	    break;
-	AcpiOsSleep(10, 0);
+	AcpiOsSleep(10000);
     }
 
     ACPI_VPRINT(dev, acpi_device_get_parent_softc(dev),

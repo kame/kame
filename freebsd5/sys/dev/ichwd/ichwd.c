@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Texas A&M University
  * All rights reserved.
  *
@@ -54,7 +54,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ichwd/ichwd.c,v 1.4 2004/06/13 05:00:19 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ichwd/ichwd.c,v 1.4.2.1 2005/01/30 00:59:45 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

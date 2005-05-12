@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)fdesc.h	8.5 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc.h,v 1.18 2004/07/12 08:14:05 alfred Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc.h,v 1.18.2.1 2005/01/31 23:25:55 imp Exp $
  */
 
 #ifdef _KERNEL

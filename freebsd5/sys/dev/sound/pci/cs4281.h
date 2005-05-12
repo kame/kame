@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/cs4281.h,v 1.3 2001/04/19 13:23:50 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/cs4281.h,v 1.3.8.1 2005/01/30 01:00:03 imp Exp $
  */
 
 #ifndef _CS4281_H_

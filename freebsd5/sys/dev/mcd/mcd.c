@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1993 by Holger Veit (data part)
  * Copyright 1993 by Brian Moore (audio part)
  * Changes Copyright 1993 by Gary Clark II
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mcd/mcd.c,v 1.142 2004/06/16 09:46:49 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mcd/mcd.c,v 1.142.2.1 2005/01/30 00:59:53 imp Exp $");
 static const char COPYRIGHT[] = "mcd-driver (C)1993 by H.Veit & B.Moore";
 
 #include <sys/param.h>

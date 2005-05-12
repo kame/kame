@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1996 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_mib.h,v 1.6 1999/08/28 00:48:19 peter Exp $
+ * $FreeBSD: src/sys/net/if_mib.h,v 1.6.26.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _NET_IF_MIB_H

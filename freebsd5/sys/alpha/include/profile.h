@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/profile.h,v 1.6 2004/05/19 15:41:25 bde Exp $ */
+/* $FreeBSD: src/sys/alpha/include/profile.h,v 1.6.2.2 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: profile.h,v 1.9 1997/04/06 08:47:37 cgd Exp */
 
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -215,11 +215,27 @@ LX98:	ldgp	$29,0($27);	\
  *
  * XXX These macros should probably use inline assembly.
  */
-#define MCOUNT_ENTER(s) \
-	s = _alpha_pal_swpipl(ALPHA_PSL_IPL_HIGH)
-#define MCOUNT_EXIT(s) \
-	(void)_alpha_pal_swpipl(s);
-#define	MCOUNT_DECL(s)	u_long s;
+u_long _alpha_pal_swpipl(u_long);
+
+#define	MCOUNT_ENTER(s)		s = _alpha_pal_swpipl(ALPHA_PSL_IPL_HIGH)
+#define	MCOUNT_EXIT(s)		(void)_alpha_pal_swpipl(s)
+#define	MCOUNT_DECL(s)		u_long s;
+
+void bintr(void);
+void btrap(void);
+void eintr(void);
+void user(void);
+
+#define	MCOUNT_FROMPC_USER(pc)					\
+	((pc < (uintfptr_t)VM_MAXUSER_ADDRESS) ? (uintfptr_t)user : pc)
+
+#define	MCOUNT_FROMPC_INTR(pc)					\
+	((pc >= (uintfptr_t)btrap && pc < (uintfptr_t)eintr) ?	\
+	    ((pc >= (uintfptr_t)bintr) ? (uintfptr_t)bintr :	\
+		(uintfptr_t)btrap) : ~0UL)
+
+_MCOUNT_DECL(uintfptr_t, uintfptr_t);
+
 #else /* !_KERNEL */
 typedef u_long	uintfptr_t;
 #endif

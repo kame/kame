@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Wind River Systems
  * Copyright (c) 1997, 1998, 1999, 2000, 2001
  *	Bill Paul <wpaul@bsdi.com>.  All rights reserved.
@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_ngereg.h,v 1.9.8.1 2004/10/08 23:56:36 scottl Exp $
+ * $FreeBSD: src/sys/dev/nge/if_ngereg.h,v 1.9.8.2 2005/01/30 00:59:55 imp Exp $
  */
 
 #define NGE_CSR			0x00

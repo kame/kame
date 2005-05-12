@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  *
  *	@(#)umap_subr.c	8.9 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/umapfs/umap_subr.c,v 1.33 2004/04/07 20:46:02 imp Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap_subr.c,v 1.33.2.1 2005/01/31 23:25:59 imp Exp $
  */
 
 #include <sys/param.h>

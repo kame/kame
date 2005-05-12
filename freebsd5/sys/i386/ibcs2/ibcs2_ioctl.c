@@ -1,6 +1,6 @@
 /*	$NetBSD: ibcs2_ioctl.c,v 1.6 1995/03/14 15:12:28 scottb Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1994, 1995 Scott Bartram
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_ioctl.c,v 1.30 2004/06/21 22:57:14 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_ioctl.c,v 1.30.2.1 2005/01/31 23:26:03 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/acpica_machdep.h,v 1.6 2004/05/05 20:04:14 njl Exp $
+ * $FreeBSD: src/sys/i386/include/acpica_machdep.h,v 1.6.2.1 2004/11/07 20:24:06 njl Exp $
  */
 
 /******************************************************************************
@@ -93,6 +93,7 @@ extern int	acpi_release_global_lock(uint32_t *lock);
 #define COMPILER_DEPENDENT_UINT64      unsigned long long
 #define ACPI_USE_NATIVE_DIVIDE
 
-void    acpi_SetDefaultIntrModel(int model);
+void	acpi_SetDefaultIntrModel(int model);
+void	acpi_cpu_c1(void);
 
 #endif /* __ACPICA_MACHDEP_H__ */

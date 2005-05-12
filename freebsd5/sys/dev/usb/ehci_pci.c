@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ehci_pci.c,v 1.14 2004/08/02 15:37:34 iedowse Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ehci_pci.c,v 1.14.2.1 2005/03/31 19:45:09 iedowse Exp $");
 
 /*
  * USB Enhanced Host Controller Driver, a.k.a. USB 2.0 controller.
@@ -98,6 +98,13 @@ static const char *ehci_device_generic = "EHCI (generic) USB 2.0 controller";
 
 #define PCI_EHCI_BASE_REG	0x10
 
+#ifdef USB_DEBUG
+#define EHCI_DEBUG USB_DEBUG
+#define DPRINTF(x)	do { if (ehcidebug) logprintf x; } while (0)
+extern int ehcidebug;
+#else
+#define DPRINTF(x)
+#endif
 
 static int ehci_pci_attach(device_t self);
 static int ehci_pci_detach(device_t self);
@@ -313,8 +320,8 @@ ehci_pci_attach(device_t self)
 			if (res != 0 || buscount != 1)
 				continue;
 			bsc = device_get_softc(nbus[0]);
-			printf("ehci_pci_attach: companion %s\n",
-			USBDEVNAME(bsc->bdev));
+			DPRINTF(("ehci_pci_attach: companion %s\n",
+			    USBDEVNAME(bsc->bdev)));
 			sc->sc_comps[ncomp++] = bsc;
 			if (ncomp >= EHCI_COMPANION_MAX)
 				break;

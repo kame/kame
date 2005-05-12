@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 Poul-Henning Kamp
+ * Copyright (c) 2003-2004 Poul-Henning Kamp
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/adlink/adlink.c,v 1.11 2004/06/16 09:46:36 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/adlink/adlink.c,v 1.11.2.1 2005/01/30 00:59:23 imp Exp $");
 
 #ifdef _KERNEL
 #include <sys/param.h>

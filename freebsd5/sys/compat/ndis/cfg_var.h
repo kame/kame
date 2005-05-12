@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/ndis/cfg_var.h,v 1.2 2003/12/18 03:51:21 wpaul Exp $
+ * $FreeBSD: src/sys/compat/ndis/cfg_var.h,v 1.2.2.1 2005/01/30 00:59:19 imp Exp $
  */
 
 #ifndef _CFG_VAR_H_

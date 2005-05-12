@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -70,7 +70,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/owi/if_owi_pccard.c,v 1.2 2004/05/26 00:52:57 imp Exp $";
+  "$FreeBSD: src/sys/dev/owi/if_owi_pccard.c,v 1.2.2.2 2005/02/02 22:54:17 imp Exp $";
 #endif
 
 static int wi_pccard_probe(device_t);
@@ -135,7 +135,7 @@ static const struct pccard_product wi_pccard_products[] = {
 	/* Must be after other LUCENT ones because it is less specific */
 	PCMCIA_CARD(LUCENT, WAVELAN_IEEE, 0),
 	PCMCIA_CARD(NOKIA, C110_WLAN, 0),
-	PCMCIA_CARD(PLANEX_2, GWNS11H, 0),
+	PCMCIA_CARD(PLANEX, GWNS11H, 0),
 	PCMCIA_CARD(PROXIM, RANGELANDS_8430, 0),
 	PCMCIA_CARD(SAMSUNG, SWL_2000N, 0),
 	PCMCIA_CARD(SIMPLETECH, SPECTRUM24_ALT, 0),

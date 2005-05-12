@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/puc_sbus.c,v 1.4 2004/08/12 17:41:30 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc_sbus.c,v 1.4.2.4 2005/03/01 14:20:15 marius Exp $");
 
 #include "opt_puc.h"
 
@@ -99,4 +99,5 @@ static driver_t puc_sbus_driver = {
 	sizeof(struct puc_softc),
 };
 
+DRIVER_MODULE(puc, fhc, puc_sbus_driver, puc_devclass, 0, 0);
 DRIVER_MODULE(puc, sbus, puc_sbus_driver, puc_devclass, 0, 0);

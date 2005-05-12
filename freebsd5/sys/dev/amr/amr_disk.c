@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
+/*-
  * Copyright (c) 2002 Eric Moore
  * Copyright (c) 2002 LSI Logic Corporation
  * All rights reserved.
@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.33 2004/05/30 20:08:25 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.33.2.2 2005/03/04 18:06:18 scottl Exp $");
 
 /*
  * Disk driver for AMI MegaRaid controllers
@@ -256,7 +256,7 @@ amrd_attach(device_t dev)
     sc->amrd_disk->d_name = "amrd";
     sc->amrd_disk->d_dump = (dumper_t *)amrd_dump;
     sc->amrd_disk->d_unit = sc->amrd_unit;
-    sc->amrd_disk->d_flags = DISKFLAG_NEEDSGIANT;
+    sc->amrd_disk->d_flags = 0;
     disk_create(sc->amrd_disk, DISK_VERSION);
 #ifdef FREEBSD_4
     disks_registered++;

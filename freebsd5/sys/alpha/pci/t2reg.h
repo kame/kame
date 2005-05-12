@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Doug Rabson & Andrew Gallatin 
  * All rights reserved.
  *
@@ -45,7 +45,7 @@
  * *                                                               *
  * *****************************************************************
  *
- * $FreeBSD: src/sys/alpha/pci/t2reg.h,v 1.2 2000/12/07 01:06:19 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/pci/t2reg.h,v 1.2.8.1 2005/01/30 00:59:12 imp Exp $
  */
 
 

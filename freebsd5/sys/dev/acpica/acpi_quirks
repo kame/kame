@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/dev/acpica/acpi_quirks,v 1.3.2.1 2004/10/10 03:15:45 njl Exp $
+# $FreeBSD: src/sys/dev/acpica/acpi_quirks,v 1.3.2.2 2005/02/27 21:30:31 obrien Exp $
 #
 # Quirks for ACPI tables can be added here.
 #
@@ -100,6 +100,13 @@ name:		Compaq_Presario_1925
 oem:		FADT "PTLTD " "  FACP  "
 oem_rev:	FADT <= 0x06040000
 quirks:		ACPI_Q_BROKEN
+
+# Compaq R3000Z
+name:		Compaq_R3000Z
+oem:		FADT "NVIDIA" "CK8     "
+oem_rev:	FADT = 0x6040000
+creator:	FADT "PTL_"
+quirks:		ACPI_Q_MADT_IRQ0
 
 # Compaq Thunder 05/18/99
 # XXX Note creator rev should be "=", I think

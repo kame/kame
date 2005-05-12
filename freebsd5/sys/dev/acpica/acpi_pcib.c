@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pcib.c,v 1.50 2004/08/13 06:22:07 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pcib.c,v 1.50.2.1 2004/11/17 07:30:34 njl Exp $");
 
 #include "opt_acpi.h"
 #include <sys/param.h>
@@ -70,11 +70,13 @@ acpi_pcib_attach(device_t dev, ACPI_BUFFER *prt, int busno)
 
     /*
      * Get the PCI interrupt routing table for this bus.  If we can't
-     * get it, this is not an error but may reduce functionality.
+     * get it, this is not an error but may reduce functionality.  There
+     * are several valid bridges in the field that do not have a _PRT, so
+     * only warn about missing tables if bootverbose is set.
      */
     prt->Length = ACPI_ALLOCATE_BUFFER;
     status = AcpiGetIrqRoutingTable(acpi_get_handle(dev), prt);
-    if (ACPI_FAILURE(status))
+    if (ACPI_FAILURE(status) && (bootverbose || status != AE_NOT_FOUND))
 	device_printf(dev,
 	    "could not get PCI interrupt routing table for %s - %s\n",
 	    acpi_name(acpi_get_handle(dev)), AcpiFormatException(status));

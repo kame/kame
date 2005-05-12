@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_mem.h,v 1.1 2000/09/10 14:34:08 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_mem.h,v 1.1.10.1 2005/01/30 00:59:30 imp Exp $ */
 
 /*
  * This is prt of the Driver for Video Capture Cards (Frame grabbers)
@@ -13,7 +13,7 @@
  *            time the bktr driver is loaded.
  */
 
-/*
+/*-
  * 1. Redistributions of source code must retain the
  * Copyright (c) 2000 Roger Hardiman
  * All rights reserved.

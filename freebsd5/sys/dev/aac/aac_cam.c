@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002 Adaptec, Inc.
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.17 2004/08/12 05:05:06 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.17.2.2 2005/01/30 00:59:22 imp Exp $");
 
 /*
  * CAM front-end for communicating with non-DASD devices
@@ -60,7 +60,7 @@ __FBSDID("$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.17 2004/08/12 05:05:06 scottl 
 #include <vm/pmap.h>
 
 #include <dev/aac/aacreg.h>
-#include <dev/aac/aac_ioctl.h>
+#include <sys/aac_ioctl.h>
 #include <dev/aac/aacvar.h>
 
 struct aac_cam {

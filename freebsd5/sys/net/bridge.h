@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998-2002 Luigi Rizzo
  *
  * Work partly supported by: Cisco Systems, Inc. - NSITE lab, RTP, NC
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.h,v 1.12 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/net/bridge.h,v 1.12.8.1 2005/01/31 23:26:22 imp Exp $
  */
 
 extern int do_bridge;

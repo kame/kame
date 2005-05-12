@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997 Justin T. Gibbs.
  * Copyright (c) 1997, 1998, 1999, 2000, 2001, 2002, 2003 Kenneth D. Merry.
  * All rights reserved.
@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-/*
+/*-
  * Portions of this driver taken from the original FreeBSD cd driver.
  * Written by Julian Elischer (julian@tfs.com)
  * for TRW Financial Systems for use under the MACH(2.5) operating system.
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_cd.c,v 1.89.2.1 2004/09/13 06:26:57 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_cd.c,v 1.89.2.3 2005/03/30 14:54:17 ken Exp $");
 
 #include "opt_cd.h"
 
@@ -1929,10 +1929,16 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 	/*
 	 * If we don't have media loaded, check for it.  If still don't
 	 * have media loaded, we can only do a load or eject.
+	 *
+	 * We only care whether media is loaded if this is a cd-specific ioctl
+	 * (thus the IOCGROUP check below).  Note that this will break if
+	 * anyone adds any ioctls into the switch statement below that don't
+	 * have their ioctl group set to 'c'.
 	 */
 	if (((softc->flags & CD_FLAG_VALID_MEDIA) == 0)
 	 && ((cmd != CDIOCCLOSE)
-	  && (cmd != CDIOCEJECT))) {
+	  && (cmd != CDIOCEJECT))
+	 && (IOCGROUP(cmd) == 'c')) {
 		error = cdcheckmedia(periph);
 		if (error != 0) {
 			cam_periph_unlock(periph);

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio.c,v 1.450 2004/07/22 23:16:12 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio.c,v 1.450.2.1 2005/02/12 15:38:09 rwatson Exp $");
 
 #include "opt_comconsole.h"
 #include "opt_compat.h"
@@ -3035,7 +3035,7 @@ siocnputc(struct consdev *cd, int c)
 	}
 	s = spltty();
 	need_unlock = 0;
-	if (sio_inited == 2 && !mtx_owned(&sio_lock)) {
+	if (!kdb_active && sio_inited == 2 && !mtx_owned(&sio_lock)) {
 		mtx_lock_spin(&sio_lock);
 		need_unlock = 1;
 	}

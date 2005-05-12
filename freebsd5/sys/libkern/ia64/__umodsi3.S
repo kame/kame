@@ -1,7 +1,8 @@
 .file "__umodsi3.s"
 
-// $FreeBSD: src/sys/libkern/ia64/__umodsi3.S,v 1.1 2000/10/04 17:53:03 dfr Exp $
-//  
+// $FreeBSD: src/sys/libkern/ia64/__umodsi3.S,v 1.1.8.1 2005/01/31 23:26:21 imp Exp $
+
+//-
 // Copyright (c) 2000, Intel Corporation
 // All rights reserved.
 //

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_l4timer.c,v 1.12 2003/06/11 00:01:05 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_l4timer.c,v 1.12.4.1 2005/01/31 23:26:12 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

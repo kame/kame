@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.217.2.1 2004/09/25 22:21:09 mux Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.217.2.8 2005/03/13 18:56:08 mux Exp $");
 
 /*
  * Intel EtherExpress Pro/100B PCI Fast Ethernet driver
@@ -172,6 +172,7 @@ static struct fxp_ident fxp_ident_table[] = {
     { 0x1051,	-1,	"Intel 82562ET (ICH5/ICH5R) Pro/100 VE Ethernet" },
     { 0x1059,	-1,	"Intel 82551QM Pro/100 M Mobile Connection" },
     { 0x1064,	-1,	"Intel 82562EZ (ICH6)" },
+    { 0x1068,	-1,	"Intel 82801FBM (ICH6-M) Pro/100 VE Ethernet" },
     { 0x1209,	-1,	"Intel 82559ER Embedded 10/100 Ethernet" },
     { 0x1229,	0x01,	"Intel 82557 Pro/100 Ethernet" },
     { 0x1229,	0x02,	"Intel 82557 Pro/100 Ethernet" },
@@ -364,15 +365,18 @@ fxp_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 static int
 fxp_attach(device_t dev)
 {
-	int error = 0;
-	struct fxp_softc *sc = device_get_softc(dev);
-	struct ifnet *ifp;
+	struct fxp_softc *sc;
+	struct fxp_cb_tx *tcbp;
+	struct fxp_tx *txp;
 	struct fxp_rx *rxp;
+	struct ifnet *ifp;
 	u_int32_t val;
 	u_int16_t data, myea[ETHER_ADDR_LEN / 2];
 	int i, rid, m1, m2, prefer_iomap, maxtxseg;
-	int s;
+	int error, s;
 
+	error = 0;
+	sc = device_get_softc(dev);
 	sc->dev = dev;
 	callout_init(&sc->stat_ch, CALLOUT_MPSAFE);
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
@@ -449,11 +453,20 @@ fxp_attach(device_t dev)
 	fxp_autosize_eeprom(sc);
 
 	/*
+	 * Find out the chip revision; lump all 82557 revs together.
+	 */
+	fxp_read_eeprom(sc, &data, 5, 1);
+	if ((data >> 8) == 1)
+		sc->revision = FXP_REV_82557;
+	else
+		sc->revision = pci_get_revid(dev);
+
+	/*
 	 * Determine whether we must use the 503 serial interface.
 	 */
 	fxp_read_eeprom(sc, &data, 6, 1);
-	if ((data & FXP_PHY_DEVICE_MASK) != 0 &&
-	    (data & FXP_PHY_SERIAL_ONLY))
+	if (sc->revision == FXP_REV_82557 && (data & FXP_PHY_DEVICE_MASK) != 0
+	    && (data & FXP_PHY_SERIAL_ONLY))
 		sc->flags |= FXP_FLAG_SERIAL_MEDIA;
 
 	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
@@ -480,7 +493,7 @@ fxp_attach(device_t dev)
 	 */
 	sc->tunable_int_delay = TUNABLE_INT_DELAY;
 	sc->tunable_bundle_max = TUNABLE_BUNDLE_MAX;
-	sc->tunable_noflow = 0;
+	sc->tunable_noflow = 1;
 	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
 	    "int_delay", &sc->tunable_int_delay);
 	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
@@ -488,15 +501,6 @@ fxp_attach(device_t dev)
 	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
 	    "noflow", &sc->tunable_noflow);
 	sc->rnr = 0;
-
-	/*
-	 * Find out the chip revision; lump all 82557 revs together.
-	 */
-	fxp_read_eeprom(sc, &data, 5, 1);
-	if ((data >> 8) == 1)
-		sc->revision = FXP_REV_82557;
-	else
-		sc->revision = pci_get_revid(dev);
 
 	/*
 	 * Enable workarounds for certain chip revision deficiencies.
@@ -658,11 +662,14 @@ fxp_attach(device_t dev)
 	}
 
 	/*
-	 * Pre-allocate the TX DMA maps.
+	 * Pre-allocate the TX DMA maps and setup the pointers to
+	 * the TX command blocks.
 	 */
+	txp = sc->fxp_desc.tx_list;
+	tcbp = sc->fxp_desc.cbl_list;
 	for (i = 0; i < FXP_NTXCB; i++) {
-		error = bus_dmamap_create(sc->fxp_mtag, 0,
-		    &sc->fxp_desc.tx_list[i].tx_map);
+		txp[i].tx_cb = tcbp + i;
+		error = bus_dmamap_create(sc->fxp_mtag, 0, &txp[i].tx_map);
 		if (error) {
 			device_printf(dev, "can't create DMA map for TX\n");
 			goto fail;
@@ -2135,7 +2142,6 @@ fxp_init_body(struct fxp_softc *sc)
 	tcbp = sc->fxp_desc.cbl_list;
 	bzero(tcbp, FXP_TXCB_SZ);
 	for (i = 0; i < FXP_NTXCB; i++) {
-		txp[i].tx_cb = tcbp + i;
 		txp[i].tx_mbuf = NULL;
 		tcbp[i].cb_status = htole16(FXP_CB_STATUS_C | FXP_CB_STATUS_OK);
 		tcbp[i].cb_command = htole16(FXP_CB_COMMAND_NOP);
@@ -2624,7 +2630,7 @@ static u_int32_t fxp_ucode_d101s[] = D101S_RCVBUNDLE_UCODE;
 static u_int32_t fxp_ucode_d102[] = D102_B_RCVBUNDLE_UCODE;
 static u_int32_t fxp_ucode_d102c[] = D102_C_RCVBUNDLE_UCODE;
 
-#define UCODE(x)	x, sizeof(x)
+#define UCODE(x)	x, sizeof(x)/sizeof(u_int32_t)
 
 struct ucode {
 	u_int32_t	revision;
@@ -2651,6 +2657,7 @@ fxp_load_ucode(struct fxp_softc *sc)
 {
 	struct ucode *uc;
 	struct fxp_cb_ucode *cbp;
+	int i;
 
 	for (uc = ucode_table; uc->ucode != NULL; uc++)
 		if (sc->revision == uc->revision)
@@ -2661,7 +2668,8 @@ fxp_load_ucode(struct fxp_softc *sc)
 	cbp->cb_status = 0;
 	cbp->cb_command = htole16(FXP_CB_COMMAND_UCODE | FXP_CB_COMMAND_EL);
 	cbp->link_addr = 0xffffffff;    	/* (no) next command */
-	memcpy(cbp->ucode, uc->ucode, uc->length);
+	for (i = 0; i < uc->length; i++)
+		cbp->ucode[i] = htole32(uc->ucode[i]);
 	if (uc->int_delay_offset)
 		*(u_int16_t *)&cbp->ucode[uc->int_delay_offset] =
 		    htole16(sc->tunable_int_delay + sc->tunable_int_delay / 2);

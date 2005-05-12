@@ -1,4 +1,3 @@
-
 /*-
  * Copyright (c) 1997-2000 Nicolas Souchu
  * Copyright (c) 2001 Alcove - Nicolas Souchu
@@ -25,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppc/ppcvar.h,v 1.1 2003/08/01 05:02:55 ambrisko Exp $
+ * $FreeBSD: src/sys/dev/ppc/ppcvar.h,v 1.1.4.1 2005/01/30 00:59:58 imp Exp $
  *
  */
 

@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/dev/ncv/ncr53c500reg.h,v 1.2 2001/07/14 00:38:50 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/ncv/ncr53c500reg.h,v 1.2.8.1 2005/01/30 00:59:55 imp Exp $	*/
 /*	$NecBSD: ncr53c500reg.h,v 1.5.14.1 2001/06/08 06:27:44 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1995, 1996, 1997, 1998
  *	NetBSD/pc98 porting staff. All rights reserved.

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,7 +33,7 @@
  *
  *      @(#)bpf_filter.c	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/net/bpf_filter.c,v 1.22 2004/04/07 20:46:11 imp Exp $
+ * $FreeBSD: src/sys/net/bpf_filter.c,v 1.22.2.1 2005/01/31 23:26:22 imp Exp $
  */
 
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  *
  * ===================================
  * HARP  |  Host ATM Research Platform
@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_vc.h,v 1.4 2003/07/29 13:32:10 harti Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_vc.h,v 1.4.4.1 2005/01/31 23:26:25 imp Exp $
  *
  */
 

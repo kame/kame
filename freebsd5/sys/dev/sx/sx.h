@@ -1,4 +1,4 @@
-/*
+/*-
  * Device driver for Specialix I/O8+ multiport serial card.
  *
  * Copyright 2003 Frank Mayhar <frank@exit.com>
@@ -24,7 +24,7 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- * $FreeBSD: src/sys/dev/sx/sx.h,v 1.3 2004/07/11 15:18:38 phk Exp $
+ * $FreeBSD: src/sys/dev/sx/sx.h,v 1.3.2.1 2005/01/30 01:00:06 imp Exp $
  */
 
 

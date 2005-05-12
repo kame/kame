@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/dev/isp/ispreg.h,v 1.22 2002/02/17 06:38:22 mjacob Exp $ */
-/*
+/* $FreeBSD: src/sys/dev/isp/ispreg.h,v 1.22.8.1 2005/01/30 00:59:48 imp Exp $ */
+/*-
  * Machine Independent (well, as best as possible) register
  * definitions for Qlogic ISP SCSI adapters.
  *

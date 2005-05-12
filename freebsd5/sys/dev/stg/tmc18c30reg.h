@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/dev/stg/tmc18c30reg.h,v 1.2 2001/07/14 00:38:51 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/stg/tmc18c30reg.h,v 1.2.8.1 2005/01/30 01:00:06 imp Exp $	*/
 /*	$NecBSD: tmc18c30reg.h,v 1.4.24.1 2001/06/08 06:27:50 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1996, 1997, 1998
  *	NetBSD/pc98 porting staff. All rights reserved.

@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.ORG> wrote this file.  As long as you retain this notice you
@@ -6,11 +6,11 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/dev/md/md.c,v 1.127.2.3 2004/09/02 20:08:41 cperciva Exp $
+ * $FreeBSD: src/sys/dev/md/md.c,v 1.127.2.5 2005/02/28 19:32:23 phk Exp $
  *
  */
 
-/*
+/*-
  * The following functions are based in the vn(4) driver: mdstart_swap(),
  * mdstart_vnode(), mdcreate_swap(), mdcreate_vnode() and mddestroy(),
  * and as such under the following copyright:
@@ -735,8 +735,6 @@ mdinit(struct md_s *sc)
 	sc->pp = pp;
 	g_error_provider(pp, 0);
 	g_topology_unlock();
-	if (sc->type != MD_PRELOAD)
-		g_waitidle();
 	PICKUP_GIANT();
 }
 

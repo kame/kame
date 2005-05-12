@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -36,7 +36,7 @@
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  *
- * $FreeBSD: src/sys/fs/nullfs/null_vnops.c,v 1.66 2004/04/07 20:46:01 imp Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null_vnops.c,v 1.66.2.3 2005/03/01 11:32:31 phk Exp $
  */
 
 /*

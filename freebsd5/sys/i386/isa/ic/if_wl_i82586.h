@@ -1,4 +1,4 @@
-/* 
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990,1989 Carnegie Mellon University
  * All Rights Reserved.
@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/i386/isa/ic/if_wl_i82586.h,v 1.2 2000/05/01 19:58:08 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/ic/if_wl_i82586.h,v 1.2.8.1 2005/01/31 23:26:05 imp Exp $
  */
 /*
   Copyright 1988, 1989 by Olivetti Advanced Technology Center, Inc.,

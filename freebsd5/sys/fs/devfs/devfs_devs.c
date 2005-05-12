@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000,2004
  *	Poul-Henning Kamp.  All rights reserved.
  *
@@ -25,7 +25,7 @@
  *
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_devs.c,v 1.31 2004/06/18 08:08:47 phk Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_devs.c,v 1.31.2.1 2005/01/31 23:25:55 imp Exp $
  */
 
 #include "opt_devfs.h"

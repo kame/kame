@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/exception.S,v 1.53 2003/10/28 19:38:25 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/exception.S,v 1.53.4.1 2004/11/09 03:40:51 marcel Exp $
  */
 
 #include <machine/asm.h>
@@ -58,7 +58,7 @@
  *	p11	interrupts were enabled
  *	p10	interrupts were disabled
  */
-ENTRY(exception_save, 0)
+ENTRY_NOPROFILE(exception_save, 0)
 {	.mii
 	mov		r20=ar.unat
 	extr.u		r31=sp,61,3
@@ -358,7 +358,7 @@ END(exception_save)
  * Arguments:
  *	sp+16	trapframe pointer
  */
-ENTRY(exception_restore, 0)
+ENTRY_NOPROFILE(exception_restore, 0)
 {	.mmi
 	rsm		psr.i
 	add		sp=16,sp

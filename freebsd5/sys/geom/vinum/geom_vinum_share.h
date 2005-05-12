@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/vinum/geom_vinum_share.h,v 1.1 2004/06/12 21:16:10 le Exp $
+ * $FreeBSD: src/sys/geom/vinum/geom_vinum_share.h,v 1.1.2.1 2004/12/08 20:19:31 le Exp $
  */
 
 #ifndef _GEOM_VINUM_SHARE_H_
@@ -58,5 +58,6 @@ const char	*gv_plexorg_short(int);
 const char	*gv_plexstate(int);
 const char	*gv_sdstate(int);
 const char	*gv_volstate(int);
+const char	*gv_roughlength(off_t, int);
 
 #endif /* _GEOM_VINUM_SHARE_H_ */

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * Copyright (c) 2000, Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2000, BSDi
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/pci/pci_pir.c,v 1.114 2004/07/01 07:46:28 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/pci/pci_pir.c,v 1.114.2.1 2005/01/31 23:26:07 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_ioctl.h - messages kernel <--> userland
  *	-------------------------------------------
  *
- * $FreeBSD: src/sys/i386/include/i4b_ioctl.h,v 1.21 2002/08/12 07:51:57 hm Exp $
+ * $FreeBSD: src/sys/i386/include/i4b_ioctl.h,v 1.21.8.1 2005/01/31 23:26:04 imp Exp $
  *
  *      last edit-date: [Sun Aug 11 19:19:08 2002]
  *

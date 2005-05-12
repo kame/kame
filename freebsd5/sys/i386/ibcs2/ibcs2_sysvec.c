@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Steven Wallace
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_sysvec.c,v 1.28 2004/07/15 08:26:04 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_sysvec.c,v 1.28.2.1 2005/01/31 23:26:03 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

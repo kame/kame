@@ -1,9 +1,11 @@
-/* $Id: bitops.h,v 1.31 2000/09/23 02:09:21 davem Exp $
+/*-
+ * $Id: bitops.h,v 1.31 2000/09/23 02:09:21 davem Exp $
  * bitops.h: Bit string operations on the V9.
  *
  * Copyright 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
  */
 
+/* $FreeBSD: src/sys/gnu/ext2fs/sparc64-bitops.h,v 1.1.1.1.6.1 2005/01/31 23:26:02 imp Exp $ */
 #ifndef _SPARC64_BITOPS_H
 #define _SPARC64_BITOPS_H
 

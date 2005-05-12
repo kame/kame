@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  * Copyright (c) 1994 John S. Dyson
@@ -148,7 +148,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.166 2004/08/15 20:54:25 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.166.2.2 2005/02/05 01:02:47 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -173,9 +173,8 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.166 2004/08/15 20:54:25 alc E
 #include <vm/vm_pager.h>
 #include <vm/uma.h>
 
-#include <sys/user.h>
-
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/rpb.h>
 
 #ifndef PMAP_SHPGPERPROC

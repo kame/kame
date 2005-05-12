@@ -1,6 +1,5 @@
 /*	$NetBSD: if_en_pci.c,v 1.1 1996/06/22 02:00:31 chuck Exp $	*/
-/*
- *
+/*-
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.
  *
@@ -33,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.33 2004/05/30 20:08:31 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.33.2.1 2005/01/30 00:59:39 imp Exp $");
 
 /*
  * i f _ e n _ p c i . c  
@@ -46,7 +45,7 @@ __FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.33 2004/05/30 20:08:31 phk Ex
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.33 2004/05/30 20:08:31 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.33.2.1 2005/01/30 00:59:39 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

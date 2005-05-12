@@ -1,4 +1,4 @@
-/*
+/*-
  * Device probe and attach routines for the following
  * Advanced Systems Inc. SCSI controllers:
  *
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/advansys/adv_isa.c,v 1.26 2004/05/30 20:08:24 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adv_isa.c,v 1.26.2.1 2005/01/30 00:59:23 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h> 

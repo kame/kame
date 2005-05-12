@@ -37,7 +37,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
+/*-
  * Copyright (c) 1996 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
  *
@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/ia64/include/bus.h,v 1.16 2003/11/07 23:29:42 scottl Exp $ */
+/* $FreeBSD: src/sys/ia64/include/bus.h,v 1.16.4.2 2005/02/25 08:16:55 scottl Exp $ */
 
 #ifndef _MACHINE_BUS_H_
 #define _MACHINE_BUS_H_
@@ -1010,6 +1010,8 @@ typedef void bus_dmamap_callback2_t(void *, bus_dma_segment_t *, int,
 int bus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map,
     struct mbuf *mbuf, bus_dmamap_callback2_t *callback, void *callback_arg,
     int flags);
+int bus_dmamap_load_mbuf_sg(bus_dma_tag_t dmat, bus_dmamap_t map,
+    struct mbuf *mbuf, bus_dma_segment_t *segs, int *nsegs, int flags);
 
 /*
  * Like bus_dmamap_load but for uios.  Note the use of the

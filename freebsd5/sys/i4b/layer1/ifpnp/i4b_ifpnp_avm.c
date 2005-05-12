@@ -1,4 +1,4 @@
-/*
+/*-
  *   Copyright (c) 1999, 2000 Udo Schweigert. All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -27,8 +27,9 @@
  *   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  *   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  *   SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_ifpnp_avm.c: AVM Fritz!Card PnP hardware driver
  *	---------------------------------------------------
@@ -37,7 +38,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_avm.c,v 1.11 2004/03/17 17:50:50 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_avm.c,v 1.11.2.1 2005/01/31 23:26:09 imp Exp $");
 
 #include "opt_i4b.h"
 

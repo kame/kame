@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_cb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_cb.h,v 1.18 2004/06/15 04:13:59 rwatson Exp $
+ * $FreeBSD: src/sys/net/raw_cb.h,v 1.18.2.1 2005/01/31 23:26:23 imp Exp $
  */
 
 #ifndef _NET_RAW_CB_H_

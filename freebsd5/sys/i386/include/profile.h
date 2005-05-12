@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)profile.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/i386/include/profile.h,v 1.37 2004/05/20 16:12:19 bde Exp $
+ * $FreeBSD: src/sys/i386/include/profile.h,v 1.37.2.2 2005/01/31 23:26:04 imp Exp $
  */
 
 #ifndef _MACHINE_PROFILE_H_
@@ -86,6 +86,19 @@ extern int	mcount_lock;
 #define	MCOUNT_EXIT(s)	(write_eflags(s))
 #endif
 #endif /* GUPROF */
+
+void bintr(void);
+void btrap(void);
+void eintr(void);
+void user(void);
+
+#define	MCOUNT_FROMPC_USER(pc)					\
+	((pc < (uintfptr_t)VM_MAXUSER_ADDRESS) ? (uintfptr_t)user : pc)
+
+#define	MCOUNT_FROMPC_INTR(pc)					\
+	((pc >= (uintfptr_t)btrap && pc < (uintfptr_t)eintr) ?	\
+	    ((pc >= (uintfptr_t)bintr) ? (uintfptr_t)bintr :	\
+		(uintfptr_t)btrap) : ~0U)
 
 #else /* !_KERNEL */
 

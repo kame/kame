@@ -1,7 +1,7 @@
 /*	$NetBSD: ehcivar.h,v 1.12 2001/12/31 12:16:57 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ehcivar.h,v 1.4 2004/08/02 15:37:34 iedowse Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ehcivar.h,v 1.4.2.4 2005/03/22 00:56:54 iedowse Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -51,6 +51,7 @@ typedef struct ehci_soft_qtd {
 typedef struct ehci_soft_qh {
 	ehci_qh_t qh;
 	struct ehci_soft_qh *next;
+	struct ehci_soft_qh *prev;
 	struct ehci_soft_qtd *sqtd;
 	ehci_physaddr_t physaddr;
 	int islot;		/* Interrupt list slot. */
@@ -64,10 +65,14 @@ struct ehci_xfer {
 	LIST_ENTRY(ehci_xfer) inext; /* list of active xfers */
 	ehci_soft_qtd_t *sqtdstart;
 	ehci_soft_qtd_t *sqtdend;
+	u_int32_t ehci_xfer_flags;
 #ifdef DIAGNOSTIC
 	int isdone;
 #endif
 };
+#define EHCI_XFER_ABORTING	0x0001	/* xfer is aborting. */
+#define EHCI_XFER_ABORTWAIT	0x0002	/* abort completion is being awaited. */
+
 #define EXFER(xfer) ((struct ehci_xfer *)(xfer))
 
 /*
@@ -106,6 +111,7 @@ typedef struct ehci_softc {
 	char sc_vendor[16];		/* vendor string for root hub */
 	int sc_id_vendor;		/* vendor ID for root hub */
 
+	u_int32_t sc_cmd;		/* shadow of cmd reg during suspend */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	void *sc_powerhook;		/* cookie from power hook */
 	void *sc_shutdownhook;		/* cookie from shutdown hook */

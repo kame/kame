@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/driver.c,v 1.12 2004/07/15 08:26:03 phk Exp $
+ * $FreeBSD: src/sys/dev/sound/driver.c,v 1.12.2.1 2005/01/30 01:00:03 imp Exp $
  */
 
 #include <dev/sound/pcm/sound.h>

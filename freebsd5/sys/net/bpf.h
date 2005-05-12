@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -34,7 +34,7 @@
  *      @(#)bpf.h	8.1 (Berkeley) 6/10/93
  *	@(#)bpf.h	1.34 (LBL)     6/16/96
  *
- * $FreeBSD: src/sys/net/bpf.h,v 1.36 2004/05/30 17:03:48 dwmalone Exp $
+ * $FreeBSD: src/sys/net/bpf.h,v 1.36.2.1 2005/01/31 23:26:22 imp Exp $
  */
 
 #ifndef _NET_BPF_H_

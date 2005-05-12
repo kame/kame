@@ -1,4 +1,4 @@
-/*
+/*-
  * if_ar.h
  *
  * Copyright (C) 1997-1999 Whistle Communications Inc.
@@ -33,7 +33,7 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ar/if_ar.h,v 1.3 2000/11/20 13:43:40 julian Exp $
+ * $FreeBSD: src/sys/dev/ar/if_ar.h,v 1.3.10.1 2005/01/30 00:59:28 imp Exp $
  */
 
 #ifndef _I386_ISA_IF_AR_H_

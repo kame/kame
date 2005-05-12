@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1995 Ugen J.S.Antsilevich
  *
  * Redistribution and use in source forms, with and without modification,
@@ -15,7 +15,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/snp/snp.c,v 1.93 2004/07/15 20:47:39 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/snp/snp.c,v 1.93.2.1 2005/01/30 01:00:02 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

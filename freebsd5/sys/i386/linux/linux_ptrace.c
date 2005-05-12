@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Alexander Kabaev
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/linux/linux_ptrace.c,v 1.13.2.1 2004/10/09 17:10:48 das Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/linux/linux_ptrace.c,v 1.13.2.2 2005/01/31 23:26:06 imp Exp $");
 
 #include "opt_cpu.h"
 

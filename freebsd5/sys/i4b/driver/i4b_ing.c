@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999, 2002 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_ing.c - isdn4bsd B-channel to netgraph driver
  *	-------------------------------------------------
@@ -31,7 +32,7 @@
  *---------------------------------------------------------------------------*/ 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ing.c,v 1.22 2004/07/06 06:43:45 ru Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ing.c,v 1.22.2.1 2005/01/31 23:26:08 imp Exp $");
 
 #include "i4bing.h"
 

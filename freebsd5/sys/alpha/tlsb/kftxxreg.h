@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/tlsb/kftxxreg.h,v 1.4 2000/03/18 07:48:15 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/kftxxreg.h,v 1.4.8.1 2005/01/30 00:59:12 imp Exp $ */
 /* $NetBSD: kftxxreg.h,v 1.5 1998/07/08 00:45:08 mjacob Exp $ */
 
-/*
+/*-
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.

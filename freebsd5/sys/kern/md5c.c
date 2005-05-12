@@ -1,4 +1,4 @@
-/*
+/*-
  * MD5C.C - RSA Data Security, Inc., MD5 message-digest algorithm
  *
  * Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
@@ -30,7 +30,7 @@
  * This file should be kept in sync with src/lib/libmd/md5c.c
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/md5c.c,v 1.23 2003/07/22 10:36:36 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/md5c.c,v 1.23.4.1 2005/01/31 23:26:17 imp Exp $");
 
 #include <sys/types.h>
 

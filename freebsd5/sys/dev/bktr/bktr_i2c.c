@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_i2c.c,v 1.25 2003/12/08 07:59:18 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_i2c.c,v 1.25.2.1 2005/03/02 10:27:35 obrien Exp $");
 
 /*
  * I2C support for the bti2c chipset.
@@ -58,11 +58,9 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_i2c.c,v 1.25 2003/12/08 07:59:18 obrie
 #include <dev/pci/pcireg.h>
 #endif
 
-#if (__FreeBSD_version >= 300000)
 #include <machine/bus_memio.h>          /* for bus space */
 #include <machine/bus.h>
 #include <sys/bus.h>
-#endif
 
 #include <dev/bktr/ioctl_meteor.h>
 #include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */

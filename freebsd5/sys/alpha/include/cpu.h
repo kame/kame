@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/include/cpu.h,v 1.40 2004/08/03 18:44:26 mux Exp $ */
+/* $FreeBSD: src/sys/alpha/include/cpu.h,v 1.40.2.2 2005/01/30 00:59:10 imp Exp $ */
 /* From: NetBSD: cpu.h,v 1.18 1997/09/23 23:17:49 mjacob Exp */
 
-/*
+/*-
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -91,6 +91,11 @@ struct clockframe {
 }
 
 #ifdef _KERNEL
+
+#ifdef GPROF
+extern char btext[];
+extern char etext[];
+#endif
 
 #define	cpu_getstack(td)	(alpha_pal_rdusp())
 #define	cpu_spinwait()		/* nothing */

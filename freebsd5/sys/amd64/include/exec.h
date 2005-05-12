@@ -27,12 +27,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)exec.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/amd64/include/exec.h,v 1.9 2004/04/05 21:25:51 imp Exp $
+ * $FreeBSD: src/sys/amd64/include/exec.h,v 1.9.2.1 2005/02/28 07:42:59 obrien Exp $
  */
 
-#ifndef	_EXEC_H_
-#define	_EXEC_H_
+#ifndef	_MACHINE_EXEC_H_
+#define	_MACHINE_EXEC_H_
 
-#define __LDPGSZ	4096
+#define	__LDPGSZ	4096
 
-#endif /* !_EXEC_H_ */
+#endif /* !_MACHINE_EXEC_H_ */

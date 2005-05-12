@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-all.c,v 1.222.2.4.2.1 2004/10/24 09:31:25 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-all.c,v 1.222.2.10.2.1 2005/04/07 14:26:34 kensmith Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -85,7 +85,8 @@ int ata_wc = 1;
 /* local vars */
 static struct intr_config_hook *ata_delayed_attach = NULL;
 static int ata_dma = 1;
-static int atapi_dma = 1;
+static int atapi_dma = 0;
+static int ata_resuming = 0;
 
 /* sysctl vars */
 SYSCTL_NODE(_hw, OID_AUTO, ata, CTLFLAG_RD, 0, "ATA driver parameters");
@@ -337,19 +338,19 @@ int
 ata_suspend(device_t dev)
 {
     struct ata_channel *ch;
-    int gotit = 0;
 
     if (!dev || !(ch = device_get_softc(dev)))
 	return ENXIO;
 
-    while (!gotit) {
+    while (1) {
 	mtx_lock(&ch->state_mtx);
 	if (ch->state == ATA_IDLE) {
 	    ch->state = ATA_ACTIVE;
-	    gotit = 1;
+	    mtx_unlock(&ch->state_mtx);
+	    break;
 	}
 	mtx_unlock(&ch->state_mtx);
-	tsleep(&gotit, PRIBIO, "atasusp", hz/10);
+	tsleep(ch, PRIBIO, "atasusp", hz/10);
     }
     ch->locking(ch, ATA_LF_UNLOCK);
     return 0;
@@ -364,8 +365,10 @@ ata_resume(device_t dev)
     if (!dev || !(ch = device_get_softc(dev)))
 	return ENXIO;
 
+    ata_resuming = 1;
     error = ata_reinit(ch);
     ata_start(ch);
+    ata_resuming = 0;
     return error;
 }
 
@@ -374,6 +377,9 @@ ata_shutdown(void *arg, int howto)
 {
     struct ata_channel *ch;
     int ctlr;
+
+    if (panicstr != NULL)
+	return;
 
     /* flush cache on all devices */
     for (ctlr = 0; ctlr < devclass_get_maxunit(ata_devclass); ctlr++) {
@@ -546,10 +552,10 @@ ata_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 	    bcopy(iocmd->u.request.u.atapi.ccb, request->u.atapi.ccb, 16);
 	}
 	else {
-	     request->u.ata.command = iocmd->u.request.u.ata.command;
-	     request->u.ata.feature = iocmd->u.request.u.ata.feature;
-	     request->u.ata.lba = iocmd->u.request.u.ata.lba;
-	     request->u.ata.count = iocmd->u.request.u.ata.count;
+	    request->u.ata.command = iocmd->u.request.u.ata.command;
+	    request->u.ata.feature = iocmd->u.request.u.ata.feature;
+	    request->u.ata.lba = iocmd->u.request.u.ata.lba;
+	    request->u.ata.count = iocmd->u.request.u.ata.count;
 	}
 
 	request->timeout = iocmd->u.request.timeout;
@@ -566,6 +572,10 @@ ata_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 
 	ata_queue_request(request);
 
+	iocmd->u.request.u.ata.command = request->u.ata.command;
+	iocmd->u.request.u.ata.feature = request->u.ata.feature;
+	iocmd->u.request.u.ata.lba = request->u.ata.lba;
+	iocmd->u.request.u.ata.count = request->u.ata.count;
 	if (request->result)
 	    iocmd->u.request.error = request->result;
 	else {
@@ -838,7 +848,7 @@ ata_boot_attach(void)
 void
 ata_udelay(int interval)
 {
-    if (interval < (1000000/hz) || ata_delayed_attach)
+    if (interval < (1000000/hz) || ata_delayed_attach || ata_resuming)
 	DELAY(interval);
     else
 	tsleep(&interval, PRIBIO, "ataslp", interval/(1000000/hz));

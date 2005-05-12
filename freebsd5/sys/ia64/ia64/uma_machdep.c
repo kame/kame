@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 The FreeBSD Project
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ia64/ia64/uma_machdep.c,v 1.1 2003/09/20 19:27:48 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ia64/ia64/uma_machdep.c,v 1.1.4.1 2005/01/31 23:26:13 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>

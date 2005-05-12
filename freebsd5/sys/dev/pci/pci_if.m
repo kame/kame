@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 1998 Doug Rabson
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/pci/pci_if.m,v 1.6 2003/07/01 14:08:32 tmm Exp $
+# $FreeBSD: src/sys/dev/pci/pci_if.m,v 1.6.4.1 2005/01/30 00:59:58 imp Exp $
 #
 
 #include <sys/bus.h>

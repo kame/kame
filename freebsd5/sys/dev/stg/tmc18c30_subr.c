@@ -1,4 +1,4 @@
-/*
+/*-
  * [Ported for FreeBSD]
  *  Copyright (c) 2000
  *      Noriaki Mitsunaga, Mitsuru Iwasaki and Takanori Watanabe.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30_subr.c,v 1.3 2004/03/17 17:50:45 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30_subr.c,v 1.3.2.1 2005/01/30 01:00:06 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

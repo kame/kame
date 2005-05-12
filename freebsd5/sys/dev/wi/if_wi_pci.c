@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wi_pci.c,v 1.22 2004/03/17 17:50:48 njl Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wi_pci.c,v 1.22.2.1 2005/01/30 01:00:12 imp Exp $
  */
 
 /*

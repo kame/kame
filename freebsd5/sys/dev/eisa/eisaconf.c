@@ -1,4 +1,4 @@
-/*
+/*-
  * EISA bus probe and attach routines 
  *
  * Copyright (c) 1995, 1996 Justin T. Gibbs.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/eisa/eisaconf.c,v 1.69 2004/08/16 22:05:53 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/eisa/eisaconf.c,v 1.69.2.1 2005/01/30 00:59:38 imp Exp $");
 
 #include "opt_eisa.h"
 

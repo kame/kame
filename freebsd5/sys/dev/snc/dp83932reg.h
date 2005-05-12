@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932reg.h,v 1.1 2000/10/02 14:27:18 nyan Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932reg.h,v 1.1.10.1 2005/01/30 01:00:02 imp Exp $	*/
 /*	$NecBSD: dp83932reg.h,v 1.2 1999/02/12 05:50:13 kmatsuda Exp $	*/
 /*      $NetBSD: if_snreg.h,v 1.4 1997/06/15 20:20:12 scottr Exp $	*/
 
-/*
+/*-
  * Copyright (c) 1991   Algorithmics Ltd (http://www.algor.co.uk)
  * You may use, copy, and modify this program so long as you retain the
  * copyright line.

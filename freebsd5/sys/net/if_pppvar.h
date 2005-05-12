@@ -1,6 +1,7 @@
 /*
  * if_pppvar.h - private structures and declarations for PPP.
- *
+ */
+/*-
  * Copyright (c) 1994 The Australian National University.
  * All rights reserved.
  *
@@ -39,7 +40,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/sys/net/if_pppvar.h,v 1.20 2002/08/09 15:30:46 brooks Exp $
+ * $FreeBSD: src/sys/net/if_pppvar.h,v 1.20.8.1 2005/01/31 23:26:23 imp Exp $
  */
 
 /*

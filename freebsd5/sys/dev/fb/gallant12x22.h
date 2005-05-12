@@ -1,7 +1,7 @@
 /*	$OpenBSD: gallant12x22.h,v 1.2 2002/05/09 08:59:03 maja Exp $ */
 /* 	$NetBSD: gallant12x22.h,v 1.2 1999/05/18 21:51:58 ad Exp $ */
 
-/*
+/*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -35,7 +35,7 @@
  *
  * Derived from: @(#)gallant19.h	8.1 (Berkeley) 6/11/93
  *
- * $FreeBSD: src/sys/dev/fb/gallant12x22.h,v 1.2 2004/04/07 20:45:57 imp Exp $
+ * $FreeBSD: src/sys/dev/fb/gallant12x22.h,v 1.2.2.1 2005/01/30 00:59:41 imp Exp $
  */
 
 static u_char gallant12x22_data[] = {

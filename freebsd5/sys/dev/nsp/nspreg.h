@@ -1,8 +1,8 @@
-/*	$FreeBSD: src/sys/dev/nsp/nspreg.h,v 1.2 2001/07/14 00:38:51 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/nsp/nspreg.h,v 1.2.8.1 2005/01/30 00:59:56 imp Exp $	*/
 /*	$NecBSD: nspreg.h,v 1.4.14.3 2001/06/29 06:27:53 honda Exp $	*/
 /*	$NetBSD$	*/
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1998
  *	NetBSD/pc98 porting staff. All rights reserved.

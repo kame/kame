@@ -61,7 +61,7 @@
 #include <gnu/dev/sound/pci/maestro3_reg.h>
 #include <gnu/dev/sound/pci/maestro3_dsp.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.25 2004/07/16 03:59:27 tanimura Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.25.2.1 2004/11/23 08:37:48 yongari Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -383,7 +383,7 @@ m3_pchan_init(kobj_t kobj, void *devinfo, struct snd_dbuf *b, struct pcm_channel
 	ch->channel = c;
 	ch->fmt = AFMT_U8;
 	ch->spd = DSP_DEFAULT_SPEED;
-	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsz) == -1) {
+	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsz) != 0) {
 		device_printf(sc->dev, "m3_pchan_init chn_allocbuf failed\n");
 		return NULL;
 	}
@@ -663,7 +663,7 @@ m3_rchan_init(kobj_t kobj, void *devinfo, struct snd_dbuf *b, struct pcm_channel
 	ch->channel = c;
 	ch->fmt = AFMT_U8;
 	ch->spd = DSP_DEFAULT_SPEED;
-	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsz) == -1) {
+	if (sndbuf_alloc(ch->buffer, sc->parent_dmat, sc->bufsz) != 0) {
 		device_printf(sc->dev, "m3_rchan_init chn_allocbuf failed\n");
 		return NULL;
 	}

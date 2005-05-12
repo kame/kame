@@ -1,4 +1,4 @@
-/*
+/*-
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_print.c,v 1.28 2004/07/10 23:47:18 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_print.c,v 1.28.2.1 2005/01/30 00:59:21 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kdb.h>

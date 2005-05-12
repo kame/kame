@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Mark Newton
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/svr4/svr4.h,v 1.7 2003/05/12 05:08:38 phk Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4.h,v 1.7.6.1 2005/01/30 00:59:20 imp Exp $
  */
 
 #include "opt_svr4.h"

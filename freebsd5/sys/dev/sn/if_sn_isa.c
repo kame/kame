@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 M. Warner Losh
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_isa.c,v 1.12 2003/11/10 16:04:11 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_isa.c,v 1.12.4.1 2005/01/30 01:00:02 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

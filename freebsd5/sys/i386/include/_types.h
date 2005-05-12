@@ -33,7 +33,7 @@
  *
  *	From: @(#)ansi.h	8.2 (Berkeley) 1/4/94
  *	From: @(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/i386/include/_types.h,v 1.9 2004/03/20 20:41:40 marcel Exp $
+ * $FreeBSD: src/sys/i386/include/_types.h,v 1.9.2.1 2005/02/27 11:16:45 marius Exp $
  */
 
 #ifndef _MACHINE__TYPES_H_
@@ -119,7 +119,7 @@ typedef __builtin_va_list	__va_list;	/* internally known to gcc */
 #else
 typedef	char *			__va_list;
 #endif /* ! (__GNUC__ post 2.95 || __INTEL_COMPILER) */
-#if defined(__GNUC__) && !defined(__INTEL_COMPILER) && !defined(__GNUC_VA_LIST) && !defined(__NO_GNUC_VA_LIST)
+#if defined(__GNUC__) && !defined(__GNUC_VA_LIST) && !defined(__NO_GNUC_VA_LIST)
 #define __GNUC_VA_LIST
 typedef __va_list		__gnuc_va_list;	/* compatibility w/GNU headers*/
 #endif

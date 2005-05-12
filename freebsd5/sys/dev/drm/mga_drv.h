@@ -1,6 +1,6 @@
 /* mga_drv.h -- Private header for the Matrox G200/G400 driver -*- linux-c -*-
- * Created: Mon Dec 13 01:50:01 1999 by jhartmann@precisioninsight.com
- *
+ * Created: Mon Dec 13 01:50:01 1999 by jhartmann@precisioninsight.com */
+/*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All rights reserved.
@@ -27,7 +27,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_drv.h,v 1.7 2004/01/06 04:34:53 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_drv.h,v 1.7.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #ifndef __MGA_DRV_H__

@@ -1,4 +1,4 @@
-/*
+/*-
  *
  * ===================================
  * HARP  |  Host ATM Research Platform
@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_include.h,v 1.6 2002/06/14 16:59:37 arr Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_include.h,v 1.6.8.1 2005/01/30 00:59:43 imp Exp $
  *
  */
 

@@ -37,7 +37,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
+/*-
  * Copyright (c) 1994 Peter Galbavy.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -66,7 +66,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/esp/ncr53c9xvar.h,v 1.4 2004/08/02 22:55:23 trhodes Exp $ */
+/* $FreeBSD: src/sys/dev/esp/ncr53c9xvar.h,v 1.4.2.1 2005/01/30 00:59:39 imp Exp $ */
 
 #ifndef _DEV_IC_NCR53C9XVAR_H_
 #define _DEV_IC_NCR53C9XVAR_H_

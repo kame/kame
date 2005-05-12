@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1996 Gardner Buchanan <gbuchanan@shl.com>
  * All rights reserved.
  *
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn.c,v 1.41 2004/06/09 14:34:02 naddy Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn.c,v 1.41.2.1 2005/01/30 01:00:02 imp Exp $");
 
 /*
  * This is a driver for SMC's 9000 series of Ethernet adapters.

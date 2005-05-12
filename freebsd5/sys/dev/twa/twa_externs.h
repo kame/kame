@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twa/twa_externs.h,v 1.1 2004/03/30 03:45:59 vkashyap Exp $
+ *	$FreeBSD: src/sys/dev/twa/twa_externs.h,v 1.1.4.1 2005/01/11 03:00:48 vkashyap Exp $
  */
 
 /*
@@ -74,4 +74,6 @@ extern int	twa_cam_setup(struct twa_softc *sc);		/* attach to CAM */
 extern void	twa_cam_detach(struct twa_softc *sc);		/* detach from CAM */
 extern void	twa_allow_new_requests(struct twa_softc *sc, void *ccb);/* unfreeze ccb flow from CAM */
 extern void	twa_disallow_new_requests(struct twa_softc *sc);/* freeze ccb flow from CAM */
+extern void	twa_set_timer(struct twa_request *tr);	/* Set a timer to time a given request */
+extern void	twa_unset_timer(struct twa_request *tr);/* Unset a previously set timer */
 

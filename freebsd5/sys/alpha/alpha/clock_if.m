@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 1998 Doug Rabson
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/alpha/alpha/clock_if.m,v 1.5 2000/04/08 14:16:54 dfr Exp $
+# $FreeBSD: src/sys/alpha/alpha/clock_if.m,v 1.5.8.1 2005/01/30 00:59:09 imp Exp $
 #
 
 #include <sys/bus.h>

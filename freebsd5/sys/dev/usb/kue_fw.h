@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/kue_fw.h,v 1.2 2000/04/03 20:58:23 n_hibma Exp $
+ * $FreeBSD: src/sys/dev/usb/kue_fw.h,v 1.2.8.1 2005/01/30 01:00:09 imp Exp $
  */
 
 /*

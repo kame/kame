@@ -1,4 +1,4 @@
-/*
+/*-
  * Hardware structure definitions for the Adaptec 174X CAM SCSI device driver.
  *
  * Copyright (c) 1998 Justin T. Gibbs
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ahb/ahbreg.h,v 1.4 2000/05/26 02:02:12 jake Exp $
+ * $FreeBSD: src/sys/dev/ahb/ahbreg.h,v 1.4.8.1 2005/01/30 00:59:24 imp Exp $
  */
 
 /* Resource Constatns */

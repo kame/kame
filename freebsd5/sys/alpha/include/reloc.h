@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 John Birrell <jb@cimlogic.com.au>.
  * All rights reserved.
  *
@@ -29,5 +29,5 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/reloc.h,v 1.2 2000/05/01 20:17:49 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/reloc.h,v 1.2.8.1 2005/01/30 00:59:10 imp Exp $
  */

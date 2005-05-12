@@ -1,6 +1,6 @@
 /* r128.h -- ATI Rage 128 DRM template customization -*- linux-c -*-
- * Created: Wed Feb 14 16:07:10 2001 by gareth@valinux.com
- *
+ * Created: Wed Feb 14 16:07:10 2001 by gareth@valinux.com */
+/*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/r128.h,v 1.6 2004/06/11 03:26:59 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128.h,v 1.6.2.1 2005/01/30 00:59:36 imp Exp $
  */
 
 #ifndef __R128_H__

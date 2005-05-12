@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994 Charles Hannum.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/elink.h,v 1.8 2003/03/29 13:18:20 mdodd Exp $
+ * $FreeBSD: src/sys/i386/isa/elink.h,v 1.8.6.1 2005/01/31 23:26:05 imp Exp $
  */
 
 #ifdef PC98

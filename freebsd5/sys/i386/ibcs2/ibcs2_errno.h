@@ -1,4 +1,4 @@
-/*
+/*-
  * ibcs2_errno.h
  * Copyright (c) 1995 Scott Bartram
  * All rights reserved.
@@ -27,6 +27,8 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_errno.h,v 1.1.1.1.36.1 2005/01/31 23:26:03 imp Exp $
  */
 
 #ifndef _IBCS2_ERRNO_H

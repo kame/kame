@@ -1,4 +1,4 @@
-/*
+/*-
  * Generic utility routines for the Common Access Method layer.
  *
  * Copyright (c) 1997 Justin T. Gibbs.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/cam.c,v 1.8 2003/06/14 22:17:38 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/cam.c,v 1.8.4.1 2005/01/30 00:59:15 imp Exp $");
 
 #include <sys/param.h>
 #ifdef _KERNEL

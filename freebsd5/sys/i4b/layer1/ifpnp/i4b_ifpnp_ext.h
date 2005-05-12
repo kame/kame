@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Gary Jennejohn. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +21,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *      i4b_ifpnp - Fritz!Card PnP for split layers
  *      -------------------------------------------
@@ -30,7 +31,7 @@
  *	$Id: i4b_ifpnp_ext.h,v 1.2 2000/06/02 16:14:36 hm Exp $
  *	$Ust: src/i4b/layer1-nb/ifpnp/i4b_ifpnp_ext.h,v 1.4 2000/04/18 08:03:05 ust Exp $
  *
- * $FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_ext.h,v 1.1 2000/10/09 13:28:54 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_ext.h,v 1.1.10.1 2005/01/31 23:26:09 imp Exp $
  *
  *      last edit-date: [Fri Jun  2 14:54:57 2000]
  *

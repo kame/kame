@@ -1,5 +1,5 @@
 /* $NetBSD: promcons.c,v 1.13 1998/03/21 22:52:59 mycroft Exp $ */
-/*
+/*-
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.40 2004/07/15 20:47:36 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.40.2.1 2005/01/30 00:59:10 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

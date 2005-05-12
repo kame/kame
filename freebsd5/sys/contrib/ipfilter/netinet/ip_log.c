@@ -4,7 +4,7 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: ip_log.c,v 2.5.2.1 2000/07/19 13:11:47 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_log.c,v 1.27 2004/06/21 22:46:35 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_log.c,v 1.27.2.1 2005/03/13 18:08:56 rwatson Exp $
  */
 #include <sys/param.h>
 #if defined(KERNEL) && !defined(_KERNEL)
@@ -128,7 +128,7 @@
 # endif
 
 
-# if SOLARIS || defined(__sgi)
+# if USE_MUTEX
 extern	kmutex_t	ipl_mutex;
 #  if SOLARIS
 extern	kcondvar_t	iplwait;

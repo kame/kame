@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/alpha/pci/lcareg.h,v 1.2 2000/05/01 20:17:50 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/pci/lcareg.h,v 1.2.8.1 2005/01/30 00:59:12 imp Exp $ */
 /* $NetBSD: lcareg.h,v 1.8 1997/09/05 02:14:31 thorpej Exp $ */
 
-/*
+/*-
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
  *

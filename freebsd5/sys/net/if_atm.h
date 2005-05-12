@@ -1,7 +1,7 @@
 /*      $NetBSD: if_atm.h,v 1.7 1996/11/09 23:02:27 chuck Exp $       */
-/* $FreeBSD: src/sys/net/if_atm.h,v 1.21 2004/01/26 12:13:11 harti Exp $ */
+/* $FreeBSD: src/sys/net/if_atm.h,v 1.21.2.1 2005/01/31 23:26:22 imp Exp $ */
 
-/*
+/*-
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
  * All rights reserved.

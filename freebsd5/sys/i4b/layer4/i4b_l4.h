@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 2001 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,13 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *---------------------------------------------------------------------------
+ */
+
+/*---------------------------------------------------------------------------
  *
  *	i4b_l4.h - kernel interface to userland header file
  *	---------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer4/i4b_l4.h,v 1.8 2001/10/18 11:53:49 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer4/i4b_l4.h,v 1.8.8.1 2005/01/31 23:26:12 imp Exp $
  *
  *      last edit-date: [Thu Oct 18 10:11:51 2001]
  *

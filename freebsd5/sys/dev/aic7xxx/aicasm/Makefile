@@ -1,7 +1,7 @@
 #
 # $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aicasm/Makefile#2 $
 #
-# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.18 2004/03/12 21:36:12 trhodes Exp $
+# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.18.2.1 2005/02/13 07:23:32 obrien Exp $
 
 PROG=	aicasm
 
@@ -33,7 +33,7 @@ CFLAGS+= ${NOSTDINC} -I/usr/include -I.
 .ifdef MAKESRCPATH
 CFLAGS+= -I${MAKESRCPATH}
 .endif
-NOMAN=	noman
+NOMAN=
 YFLAGS= -b ${.TARGET:R} ${.TARGET:M*macro*:S/$(.TARGET)/-p mm/} -d
 LFLAGS+= ${.TARGET:M*macro*:S/$(.TARGET)/-Pmm/}
 

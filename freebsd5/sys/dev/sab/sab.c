@@ -1,6 +1,6 @@
 /*	$OpenBSD: sab.c,v 1.7 2002/04/08 17:49:42 jason Exp $	*/
 
-/*
+/*-
  * Copyright (c) 2001 Jason L. Wright (jason@thought.net)
  * All rights reserved.
  *
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sab/sab.c,v 1.35 2004/08/12 17:41:30 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sab/sab.c,v 1.35.2.1 2005/01/30 01:00:00 imp Exp $");
 
 /*
  * SAB82532 Dual UART driver

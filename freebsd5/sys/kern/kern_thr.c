@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_thr.c,v 1.23.2.6 2004/10/09 15:12:33 mtm Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_thr.c,v 1.23.2.8 2005/02/05 01:04:45 das Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -56,12 +56,6 @@ SYSCTL_INT(_kern_threads, OID_AUTO, thr_scope_sys, CTLFLAG_RW,
 static int thr_concurrency = 0;
 SYSCTL_INT(_kern_threads, OID_AUTO, thr_concurrency, CTLFLAG_RW,
 	&thr_concurrency, 0, "a concurrency value if not default");
-
-/*
- * Back end support functions.
- */
-
-#define	RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
 
 /*
  * System call interface.
@@ -114,15 +108,15 @@ thr_create(struct thread *td, struct thr_create_args *uap)
 	}
 
 	bzero(&newtd->td_startzero,
-	    (unsigned) RANGEOF(struct thread, td_startzero, td_endzero));
+	    __rangeof(struct thread, td_startzero, td_endzero));
 	bcopy(&td->td_startcopy, &newtd->td_startcopy,
-	    (unsigned) RANGEOF(struct thread, td_startcopy, td_endcopy));
+	    __rangeof(struct thread, td_startcopy, td_endcopy));
 
 	if (scope_sys) {
 		bzero(&newkg->kg_startzero,
-		    (unsigned)RANGEOF(struct ksegrp, kg_startzero, kg_endzero));
+		    __rangeof(struct ksegrp, kg_startzero, kg_endzero));
 		bcopy(&kg->kg_startcopy, &newkg->kg_startcopy,
-		    (unsigned)RANGEOF(struct ksegrp, kg_startcopy, kg_endcopy));
+		    __rangeof(struct ksegrp, kg_startcopy, kg_endcopy));
 	}
 
 	newtd->td_proc = td->td_proc;

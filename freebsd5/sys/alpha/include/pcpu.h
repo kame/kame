@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/pcpu.h,v 1.14 2001/12/11 23:33:39 jhb Exp $
+ * $FreeBSD: src/sys/alpha/include/pcpu.h,v 1.14.8.1 2005/01/07 20:07:42 jhb Exp $
  */
 
 #ifndef	_MACHINE_PCPU_H_
@@ -34,6 +34,7 @@
 
 #define	PCPU_MD_FIELDS							\
 	struct alpha_pcb pc_idlepcb;		/* pcb for idling */	\
+	u_int64_t	pc_pal_id;		/* physical CPU ID */	\
 	u_int64_t	pc_idlepcbphys;		/* pa of pc_idlepcb */	\
 	u_int64_t	pc_pending_ipis;	/* pending IPI's */	\
 	u_int32_t	pc_next_asn;		/* next ASN to alloc */	\

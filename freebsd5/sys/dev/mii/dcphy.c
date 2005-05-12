@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.26 2004/05/29 18:13:44 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.26.2.1 2005/01/30 00:59:54 imp Exp $");
 
 /*
  * Pseudo-driver for internal NWAY support on DEC 21143 and workalike

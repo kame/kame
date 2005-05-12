@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/utopia/utopia.c,v 1.7 2004/07/15 08:26:03 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/utopia/utopia.c,v 1.7.2.1 2005/01/30 01:00:11 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

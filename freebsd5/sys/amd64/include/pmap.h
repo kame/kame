@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
@@ -39,7 +39,7 @@
  *
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/pmap.h,v 1.122.2.2 2004/10/10 19:08:00 alc Exp $
+ * $FreeBSD: src/sys/amd64/include/pmap.h,v 1.122.2.3 2005/01/30 00:59:13 imp Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_

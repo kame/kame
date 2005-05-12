@@ -1,6 +1,6 @@
 /* $NetBSD: prom.c,v 1.3 1997/09/06 14:03:58 drochner Exp $ */
 
-/*  
+/*-
  * Mach Operating System
  * Copyright (c) 1992 Carnegie Mellon University
  * All Rights Reserved.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_console.c,v 1.9 2004/08/16 15:45:25 marius Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_console.c,v 1.9.2.1 2005/01/30 00:59:15 imp Exp $");
 
 #include <sys/types.h>
 

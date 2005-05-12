@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.20 2004/08/04 12:18:39 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.20.2.1 2005/01/30 00:59:41 imp Exp $
  *
  */
 #define		PCI_CBMEM		PCIR_BAR(0)

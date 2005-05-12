@@ -31,7 +31,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
+ */
+
+/*
  * This method provides AES encryption with a compiled in key (default
  * all zeroes).
  *
@@ -39,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_aes.c,v 1.26 2004/08/08 07:57:51 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_aes.c,v 1.26.2.1 2005/01/31 23:26:00 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

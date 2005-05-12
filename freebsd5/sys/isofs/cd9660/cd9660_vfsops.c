@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.121 2004/07/30 22:08:51 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.121.2.1 2005/02/21 10:58:07 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -484,7 +484,8 @@ iso_mountfs(devvp, mp, td, argp)
 
 	if (high_sierra) {
 		/* this effectively ignores all the mount flags */
-		log(LOG_INFO, "cd9660: High Sierra Format\n");
+		if (bootverbose)
+			log(LOG_INFO, "cd9660: High Sierra Format\n");
 		isomp->iso_ftype = ISO_FTYPE_HIGH_SIERRA;
 	} else
 		switch (isomp->im_flags&(ISOFSMNT_NORRIP|ISOFSMNT_GENS)) {
@@ -495,7 +496,8 @@ iso_mountfs(devvp, mp, td, argp)
 			  isomp->iso_ftype = ISO_FTYPE_9660;
 			  break;
 		  case 0:
-			  log(LOG_INFO, "cd9660: RockRidge Extension\n");
+			  if (bootverbose)
+			  	  log(LOG_INFO, "cd9660: RockRidge Extension\n");
 			  isomp->iso_ftype = ISO_FTYPE_RRIP;
 			  break;
 		}
@@ -503,7 +505,9 @@ iso_mountfs(devvp, mp, td, argp)
 	/* Decide whether to use the Joliet descriptor */
 
 	if (isomp->iso_ftype != ISO_FTYPE_RRIP && joliet_level) {
-		log(LOG_INFO, "cd9660: Joliet Extension (Level %d)\n", joliet_level);
+		if (bootverbose)
+			log(LOG_INFO, "cd9660: Joliet Extension (Level %d)\n",
+			    joliet_level);
 		rootp = (struct iso_directory_record *)
 			sup->root_directory_record;
 		bcopy (rootp, isomp->root, sizeof isomp->root);

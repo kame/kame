@@ -1,13 +1,13 @@
 /*	$NecBSD: ct.c,v 1.13.12.5 2001/06/26 07:31:53 honda Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ct/ct.c,v 1.9 2004/07/10 20:57:43 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ct/ct.c,v 1.9.2.1 2005/01/30 00:59:33 imp Exp $");
 /*	$NetBSD$	*/
 
 #define	CT_DEBUG
 #define	CT_IO_CONTROL_FLAGS	(CT_USE_CCSEQ | CT_FAST_INTR)
 
-/*
+/*-
  * [NetBSD for NEC PC-98 series]
  *  Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.

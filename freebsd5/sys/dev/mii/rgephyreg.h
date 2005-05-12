@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/rgephyreg.h,v 1.1 2003/09/11 03:53:46 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/rgephyreg.h,v 1.1.4.1 2005/01/30 00:59:54 imp Exp $
  */
 
 #ifndef _DEV_MII_RGEPHYREG_H_

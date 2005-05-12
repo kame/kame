@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/dev/rndtest/rndtest.h,v 1.1 2003/03/11 22:54:44 sam Exp $	*/
+/*	$FreeBSD: src/sys/dev/rndtest/rndtest.h,v 1.1.8.1 2005/01/30 01:00:00 imp Exp $	*/
 /*	$OpenBSD$	*/
 
-/*
+/*-
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
  * All rights reserved.
  *

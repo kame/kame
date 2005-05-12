@@ -1,4 +1,4 @@
-/*
+/*-
  * Low-level subroutines for Cronyx-Sigma adapter.
  *
  * Copyright (C) 1994-2000 Cronyx Engineering.
@@ -12,7 +12,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: csigma.c,v 1.1.2.1 2003/11/12 17:13:41 rik Exp $
- * $FreeBSD: src/sys/dev/cx/csigma.c,v 1.1 2003/12/03 07:29:38 imp Exp $
+ * $FreeBSD: src/sys/dev/cx/csigma.c,v 1.1.6.1 2005/01/30 00:59:34 imp Exp $
  */
 #include <dev/cx/machdep.h>
 #include <dev/cx/cxddk.h>

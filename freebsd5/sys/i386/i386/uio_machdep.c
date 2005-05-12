@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2004 Alan L. Cox <alc@cs.rice.edu>
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -36,13 +36,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/uio_machdep.c,v 1.5.2.1 2004/08/25 18:49:56 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/uio_machdep.c,v 1.5.2.3 2005/03/11 06:35:26 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/sf_buf.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
@@ -84,7 +85,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			cnt = n;
 		page_offset = offset & PAGE_MASK;
 		cnt = min(cnt, PAGE_SIZE - page_offset);
-		sf = sf_buf_alloc(ma[offset >> PAGE_SHIFT], 0);
+		sched_pin();
+		sf = sf_buf_alloc(ma[offset >> PAGE_SHIFT], SFB_CPUPRIVATE);
 		cp = (char *)sf_buf_kva(sf) + page_offset;
 		switch (uio->uio_segflg) {
 		case UIO_USERSPACE:
@@ -96,6 +98,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 				error = copyin(iov->iov_base, cp, cnt);
 			if (error) {
 				sf_buf_free(sf);
+				sched_unpin();
 				goto out;
 			}
 			break;
@@ -109,6 +112,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		}
 		sf_buf_free(sf);
+		sched_unpin();
 		iov->iov_base = (char *)iov->iov_base + cnt;
 		iov->iov_len -= cnt;
 		uio->uio_resid -= cnt;

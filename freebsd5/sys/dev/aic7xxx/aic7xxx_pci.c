@@ -1,4 +1,4 @@
-/*
+/*-
  * Product specific probe and attach routines for:
  *      3940, 2940, aic7895, aic7890, aic7880,
  *	aic7870, aic7860 and aic7850 SCSI controllers
@@ -48,7 +48,7 @@
 #include "aic7xxx_93cx6.h"
 #else
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.32.2.1 2004/09/02 15:29:39 gibbs Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.32.2.2 2005/01/30 00:59:26 imp Exp $");
 #include <dev/aic7xxx/aic7xxx_osm.h>
 #include <dev/aic7xxx/aic7xxx_inline.h>
 #include <dev/aic7xxx/aic7xxx_93cx6.h>

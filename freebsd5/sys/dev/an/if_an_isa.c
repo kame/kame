@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.14 2003/12/30 01:07:12 ambrisko Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.14.2.1 2005/01/30 00:59:28 imp Exp $");
 
 #include "opt_inet.h"
 

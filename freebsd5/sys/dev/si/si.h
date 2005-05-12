@@ -1,4 +1,4 @@
-/*
+/*-
  * Device driver for Specialix range (SI/XIO) of serial line multiplexors.
  * 'C' definitions for Specialix serial multiplex driver.
  *
@@ -30,7 +30,7 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- * $FreeBSD: src/sys/dev/si/si.h,v 1.18 2004/07/11 15:18:38 phk Exp $
+ * $FreeBSD: src/sys/dev/si/si.h,v 1.18.2.1 2005/01/30 01:00:01 imp Exp $
  */
 
 #include <sys/callout.h>

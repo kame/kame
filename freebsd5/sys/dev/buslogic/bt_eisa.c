@@ -1,4 +1,4 @@
-/*
+/*-
  * Product specific probe and attach routines for:
  * 	Buslogic BT74x SCSI controllers
  *
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_eisa.c,v 1.19 2004/03/17 17:50:29 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_eisa.c,v 1.19.2.1 2005/01/30 00:59:31 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

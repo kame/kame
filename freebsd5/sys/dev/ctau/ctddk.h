@@ -1,4 +1,4 @@
-/*
+/*-
  * Defines for Cronyx-Tau adapter driver.
  *
  * Copyright (C) 1994-2003 Cronyx Engineering.
@@ -12,7 +12,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: ctddk.h,v 1.1.2.3 2003/12/11 17:33:44 rik Exp $
- * $FreeBSD: src/sys/dev/ctau/ctddk.h,v 1.1 2004/02/23 20:19:00 rik Exp $
+ * $FreeBSD: src/sys/dev/ctau/ctddk.h,v 1.1.4.1 2005/01/30 00:59:33 imp Exp $
  */
 #define NBRD		3	/* the maximum number of installed boards */
 #define NPORT		32	/* the number of i/o ports per board */

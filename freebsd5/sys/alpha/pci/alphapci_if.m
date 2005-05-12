@@ -1,4 +1,4 @@
-#
+#-
 # Copyright (c) 2000 Doug Rabson
 # All rights reserved.
 #
@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/alpha/pci/alphapci_if.m,v 1.1 2000/08/28 21:48:02 dfr Exp $
+# $FreeBSD: src/sys/alpha/pci/alphapci_if.m,v 1.1.8.1 2005/01/30 00:59:12 imp Exp $
 #
 
 #include <sys/bus.h>

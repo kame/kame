@@ -31,19 +31,22 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
+ */
+
+/*
  * This is the method for dealing with BSD disklabels.  It has been
  * extensively (by my standards at least) commented, in the vain hope that
  * it will serve as the source in future copy&paste operations.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_bsd.c,v 1.70 2004/08/08 07:57:51 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_bsd.c,v 1.70.2.3 2005/03/22 13:41:58 pjd Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/fcntl.h>
 #include <sys/conf.h>
 #include <sys/bio.h>
 #include <sys/malloc.h>
@@ -315,7 +318,7 @@ g_bsd_hotwrite(void *arg, int flag)
  *    * Don't call biowait, g_getattr(), g_setattr() or g_read_data()
  */
 static int
-g_bsd_ioctl(struct g_provider *pp, u_long cmd, void * data, struct thread *td)
+g_bsd_ioctl(struct g_provider *pp, u_long cmd, void * data, int fflag, struct thread *td)
 {
 	struct g_geom *gp;
 	struct g_bsd_softc *ms;
@@ -339,6 +342,8 @@ g_bsd_ioctl(struct g_provider *pp, u_long cmd, void * data, struct thread *td)
 		int error, i;
 		uint64_t sum;
 
+		if (!(fflag & FWRITE))
+			return (EPERM);
 		/* The disklabel to set is the ioctl argument. */
 		buf = g_malloc(BBSIZE, M_WAITOK);
 		p = *(void **)data;
@@ -367,8 +372,9 @@ g_bsd_ioctl(struct g_provider *pp, u_long cmd, void * data, struct thread *td)
 	}
 	case DIOCSDINFO:
 	case DIOCWDINFO: {
+		if (!(fflag & FWRITE))
+			return (EPERM);
 		label = g_malloc(LABELSIZE, M_WAITOK);
-
 		/* The disklabel to set is the ioctl argument. */
 		bsd_disklabel_le_enc(label, data);
 

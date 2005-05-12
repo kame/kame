@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002
  *	M Warner Losh <imp@freebsd.org>.  All rights reserved.
  * Copyright (c) 1997, 1998, 1999
@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/owi/if_wivar.h,v 1.2 2003/11/14 19:00:30 sam Exp $
+ * $FreeBSD: src/sys/dev/owi/if_wivar.h,v 1.2.4.1 2005/01/30 00:59:56 imp Exp $
  */
 
 #define WICACHE			/* turn on signal strength cache code */  

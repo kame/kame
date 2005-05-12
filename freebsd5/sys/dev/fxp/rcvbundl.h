@@ -1,4 +1,4 @@
-/*
+/*-
 Copyright (c) 1999-2001, Intel Corporation 
 
 All rights reserved.
@@ -29,7 +29,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 */
 /*
- * $FreeBSD: src/sys/dev/fxp/rcvbundl.h,v 1.1 2001/10/25 05:23:31 jlemon Exp $
+ * $FreeBSD: src/sys/dev/fxp/rcvbundl.h,v 1.1.10.1 2005/01/30 00:59:42 imp Exp $
  */
 /*
 rcvbundl.h

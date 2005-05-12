@@ -1,4 +1,4 @@
-/*
+/*-
  *********************************************************************
  *	FILE NAME  : amd.h
  *	     BY    : C.L. Huang 	(ching@tekram.com.tw)
@@ -30,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************
- * $FreeBSD: src/sys/dev/amd/amd.h,v 1.5 2002/12/14 19:20:57 scottl Exp $
+ * $FreeBSD: src/sys/dev/amd/amd.h,v 1.5.6.1 2005/01/30 00:59:27 imp Exp $
  */
 
 #ifndef AMD_H

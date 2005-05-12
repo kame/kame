@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/vibes.h,v 1.1 2001/03/19 00:26:40 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/vibes.h,v 1.1.10.1 2005/01/30 01:00:04 imp Exp $
  */
 
 /* ------------------------------------------------------------------------- */

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 1995 by Pavel Antonov, Moscow, Russia.
  * Copyright (C) 1995 by Andrey A. Chernov, Moscow, Russia.
  * Copyright (C) 2002 by John Baldwin <jhb@FreeBSD.org>
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rc/rc.c,v 1.97 2004/07/15 20:47:38 phk Exp $
+ * $FreeBSD: src/sys/dev/rc/rc.c,v 1.97.2.1 2005/01/30 00:59:59 imp Exp $
  */
 
 /*
