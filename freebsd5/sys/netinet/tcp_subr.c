@@ -1091,10 +1091,10 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 		else
 			return (EINVAL);
 	} else {
-		error = in6_embedscope(&a6[0], &addrs[0], NULL, NULL);
+		error = in6_embedscope(&a6[0], &addrs[0]);
 		if (error)
 			return (EINVAL);
-		error = in6_embedscope(&a6[1], &addrs[1], NULL, NULL);
+		error = in6_embedscope(&a6[1], &addrs[1]);
 		if (error)
 			return (EINVAL);
 	}
@@ -2250,10 +2250,10 @@ sysctl_drop(SYSCTL_HANDLER_ARGS)
 			lin = (struct sockaddr_in *)&addrs[1];
 			break;
 		}
-		error = in6_embedscope(&f6, fin6, NULL, NULL);
+		error = in6_embedscope(&f6, fin6);
 		if (error)
 			return (EINVAL);
-		error = in6_embedscope(&l6, lin6, NULL, NULL);
+		error = in6_embedscope(&l6, lin6);
 		if (error)
 			return (EINVAL);
 		break;

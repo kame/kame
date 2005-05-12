@@ -1662,8 +1662,6 @@ ip_setmoptions(struct inpcb *inp, struct sockopt *sopt)
 	struct ip_mreq mreq;
 	struct ifnet *ifp;
 	struct ip_moptions *imo;
-	struct route ro;
-	struct sockaddr_in *dst;
 	int ifindex;
 	int s = 0;
 #ifdef IGMPV3
@@ -2431,8 +2429,8 @@ ip_setmoptions(struct inpcb *inp, struct sockopt *sopt)
 	    imo->imo_multicast_ttl == IP_DEFAULT_MULTICAST_TTL &&
 	    imo->imo_multicast_loop == IP_DEFAULT_MULTICAST_LOOP &&
 	    imo->imo_num_memberships == 0) {
-		free(*imop, M_IPMOPTS);
-		*imop = NULL;
+		free(inp->inp_moptions, M_IPMOPTS);
+		inp->inp_moptions = NULL;
 	}
 
 	return (error);
