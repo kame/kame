@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.403 2005/05/12 18:41:17 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.404 2005/05/12 22:59:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2271,7 +2271,7 @@ icmp6_rip6_input(mp, off)
 #endif
 #ifdef HAVE_NRL_INPCB
 		if (!(in6p->in6p_flags & INP_IPV6))
-			goto docontinue;
+			continue;
 #endif
 #ifdef __FreeBSD__
 		if (in6p->inp_ip_p != IPPROTO_ICMPV6)
