@@ -1,6 +1,6 @@
 Platforms and base versions
 KAME project
-$KAME: VERSION,v 1.47 2005/02/10 08:35:13 itojun Exp $
+$KAME: VERSION,v 1.48 2005/05/12 23:16:37 suz Exp $
 
 
 platform	base version			webpage
@@ -8,4 +8,4 @@ platform	base version			webpage
 netbsd		NetBSD 2.0			http://www.netbsd.org/
 openbsd		OpenBSD 3.6			http://www.openbsd.org/
 freebsd4	FreeBSD 4.11-RELEASE		http://www.freebsd.org/
-freebsd5	FreeBSD 5.3-RELEASE		http://www.freebsd.org/
+freebsd5	FreeBSD 5.4-RELEASE		http://www.freebsd.org/
