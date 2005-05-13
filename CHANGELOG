@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2764 2005/05/12 23:20:18 suz Exp $
+$KAME: CHANGELOG,v 1.2765 2005/05/13 14:30:01 suz Exp $
 
 <200505>
 2005-05-13  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5: sync with 5.4-RELEASE (it includes a fix for
-	the FreeBSD Security Advisory FreeBSD-SA-05:06-08)
+	the FreeBSD Security Advisory FreeBSD-SA-05:06-09)
 	
 2005-05-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c_ia.c (ia_timo): kept the latest server's

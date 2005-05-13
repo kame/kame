@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1993 The Regents of the University of California.
  * All rights reserved.
  *
@@ -10,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -30,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/cpufunc.h,v 1.136 2003/05/15 00:23:40 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/cpufunc.h,v 1.145 2004/07/30 16:44:29 ps Exp $
  */
 
 /*
@@ -42,13 +39,8 @@
 #ifndef _MACHINE_CPUFUNC_H_
 #define	_MACHINE_CPUFUNC_H_
 
-#include <sys/cdefs.h>
-#include <machine/psl.h>
-
-struct thread;
 struct region_descriptor;
 
-__BEGIN_DECLS
 #define readb(va)	(*(volatile u_int8_t *) (va))
 #define readw(va)	(*(volatile u_int16_t *) (va))
 #define readl(va)	(*(volatile u_int32_t *) (va))
@@ -76,12 +68,30 @@ bsfl(u_int mask)
 	return (result);
 }
 
+static __inline u_long
+bsfq(u_long mask)
+{
+	u_long	result;
+
+	__asm __volatile("bsfq %1,%0" : "=r" (result) : "rm" (mask));
+	return (result);
+}
+
 static __inline u_int
 bsrl(u_int mask)
 {
 	u_int	result;
 
 	__asm __volatile("bsrl %1,%0" : "=r" (result) : "rm" (mask));
+	return (result);
+}
+
+static __inline u_long
+bsrq(u_long mask)
+{
+	u_long	result;
+
+	__asm __volatile("bsrq %1,%0" : "=r" (result) : "rm" (mask));
 	return (result);
 }
 
@@ -100,23 +110,30 @@ do_cpuid(u_int ax, u_int *p)
 }
 
 static __inline void
+cpuid_count(u_int ax, u_int cx, u_int *p)
+{
+	__asm __volatile("cpuid"
+			 : "=a" (p[0]), "=b" (p[1]), "=c" (p[2]), "=d" (p[3])
+			 :  "0" (ax), "c" (cx));
+}
+
+static __inline void
 enable_intr(void)
 {
 	__asm __volatile("sti");
 }
 
+#ifdef _KERNEL
+
 #define	HAVE_INLINE_FFS
+#define        ffs(x)  __builtin_ffs(x)
+
+#define	HAVE_INLINE_FFSL
 
 static __inline int
-ffs(int mask)
+ffsl(long mask)
 {
-	/*
-	 * Note that gcc-2's builtin ffs would be used if we didn't declare
-	 * this inline or turn off the builtin.  The builtin is faster but
-	 * broken in gcc-2.4.5 and slower but working in gcc-2.5 and later
-	 * versions.
-	 */
-	 return (mask == 0 ? mask : (int)bsfl((u_int)mask) + 1);
+	return (mask == 0 ? mask : (int)bsfq((u_long)mask) + 1);
 }
 
 #define	HAVE_INLINE_FLS
@@ -126,6 +143,16 @@ fls(int mask)
 {
 	return (mask == 0 ? mask : (int)bsrl((u_int)mask) + 1);
 }
+
+#define	HAVE_INLINE_FLSL
+
+static __inline int
+flsl(long mask)
+{
+	return (mask == 0 ? mask : (int)bsrq((u_long)mask) + 1);
+}
+
+#endif /* _KERNEL */
 
 static __inline void
 halt(void)
@@ -463,6 +490,14 @@ rgs(void)
 	return (sel);
 }
 
+static __inline u_int
+rss(void)
+{
+	u_int sel;
+	__asm __volatile("movl %%ss,%0" : "=rm" (sel));
+	return (sel);
+}
+
 static __inline void
 load_ds(u_int sel)
 {
@@ -523,25 +558,134 @@ load_gs(u_int sel)
 }
 #endif
 
-/* void lidt(struct region_descriptor *addr); */
 static __inline void
 lidt(struct region_descriptor *addr)
 {
 	__asm __volatile("lidt (%0)" : : "r" (addr));
 }
 
-/* void lldt(u_short sel); */
 static __inline void
 lldt(u_short sel)
 {
 	__asm __volatile("lldt %0" : : "r" (sel));
 }
 
-/* void ltr(u_short sel); */
 static __inline void
 ltr(u_short sel)
 {
 	__asm __volatile("ltr %0" : : "r" (sel));
+}
+
+static __inline u_int64_t
+rdr0(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr0,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr0(u_int64_t dr0)
+{
+	__asm __volatile("movq %0,%%dr0" : : "r" (dr0));
+}
+
+static __inline u_int64_t
+rdr1(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr1,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr1(u_int64_t dr1)
+{
+	__asm __volatile("movq %0,%%dr1" : : "r" (dr1));
+}
+
+static __inline u_int64_t
+rdr2(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr2,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr2(u_int64_t dr2)
+{
+	__asm __volatile("movq %0,%%dr2" : : "r" (dr2));
+}
+
+static __inline u_int64_t
+rdr3(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr3,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr3(u_int64_t dr3)
+{
+	__asm __volatile("movq %0,%%dr3" : : "r" (dr3));
+}
+
+static __inline u_int64_t
+rdr4(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr4,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr4(u_int64_t dr4)
+{
+	__asm __volatile("movq %0,%%dr4" : : "r" (dr4));
+}
+
+static __inline u_int64_t
+rdr5(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr5,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr5(u_int64_t dr5)
+{
+	__asm __volatile("movq %0,%%dr5" : : "r" (dr5));
+}
+
+static __inline u_int64_t
+rdr6(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr6,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr6(u_int64_t dr6)
+{
+	__asm __volatile("movq %0,%%dr6" : : "r" (dr6));
+}
+
+static __inline u_int64_t
+rdr7(void)
+{
+	u_int64_t data;
+	__asm __volatile("movq %%dr7,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr7(u_int64_t dr7)
+{
+	__asm __volatile("movq %0,%%dr7" : : "r" (dr7));
 }
 
 static __inline register_t
@@ -565,59 +709,68 @@ intr_restore(register_t rflags)
 int	breakpoint(void);
 u_int	bsfl(u_int mask);
 u_int	bsrl(u_int mask);
-void	cpu_invlpg(u_long addr);
-void	cpu_invlpg_range(u_long start, u_long end);
 void	disable_intr(void);
 void	do_cpuid(u_int ax, u_int *p);
 void	enable_intr(void);
 void	halt(void);
+void	ia32_pause(void);
 u_char	inb(u_int port);
 u_int	inl(u_int port);
 void	insb(u_int port, void *addr, size_t cnt);
 void	insl(u_int port, void *addr, size_t cnt);
 void	insw(u_int port, void *addr, size_t cnt);
+register_t	intr_disable(void);
+void	intr_restore(register_t rf);
 void	invd(void);
 void	invlpg(u_int addr);
-void	invlpg_range(u_int start, u_int end);
 void	invltlb(void);
 u_short	inw(u_int port);
-void	load_cr0(u_int cr0);
-void	load_cr3(u_int cr3);
-void	load_cr4(u_int cr4);
-void	load_fs(u_int sel);
-void	load_gs(u_int sel);
-struct region_descriptor;
 void	lidt(struct region_descriptor *addr);
 void	lldt(u_short sel);
+void	load_cr0(u_long cr0);
+void	load_cr3(u_long cr3);
+void	load_cr4(u_long cr4);
+void	load_dr0(u_int64_t dr0);
+void	load_dr1(u_int64_t dr1);
+void	load_dr2(u_int64_t dr2);
+void	load_dr3(u_int64_t dr3);
+void	load_dr4(u_int64_t dr4);
+void	load_dr5(u_int64_t dr5);
+void	load_dr6(u_int64_t dr6);
+void	load_dr7(u_int64_t dr7);
+void	load_fs(u_int sel);
+void	load_gs(u_int sel);
 void	ltr(u_short sel);
 void	outb(u_int port, u_char data);
 void	outl(u_int port, u_int data);
-void	outsb(u_int port, void *addr, size_t cnt);
-void	outsl(u_int port, void *addr, size_t cnt);
-void	outsw(u_int port, void *addr, size_t cnt);
+void	outsb(u_int port, const void *addr, size_t cnt);
+void	outsl(u_int port, const void *addr, size_t cnt);
+void	outsw(u_int port, const void *addr, size_t cnt);
 void	outw(u_int port, u_short data);
-void	ia32_pause(void);
-u_int	rcr0(void);
-u_int	rcr2(void);
-u_int	rcr3(void);
-u_int	rcr4(void);
-u_int	rfs(void);
-u_int	rgs(void);
+u_long	rcr0(void);
+u_long	rcr2(void);
+u_long	rcr3(void);
+u_long	rcr4(void);
 u_int64_t rdmsr(u_int msr);
 u_int64_t rdpmc(u_int pmc);
+u_int64_t rdr0(void);
+u_int64_t rdr1(void);
+u_int64_t rdr2(void);
+u_int64_t rdr3(void);
+u_int64_t rdr4(void);
+u_int64_t rdr5(void);
+u_int64_t rdr6(void);
+u_int64_t rdr7(void);
 u_int64_t rdtsc(void);
 u_int	read_rflags(void);
+u_int	rfs(void);
+u_int	rgs(void);
 void	wbinvd(void);
 void	write_rflags(u_int rf);
 void	wrmsr(u_int msr, u_int64_t newval);
-void	load_dr7(u_int dr7);
-register_t	intr_disable(void);
-void	intr_restore(register_t rf);
 
 #endif	/* __GNUC__ */
 
-void    reset_dbregs(void);
-
-__END_DECLS
+void	reset_dbregs(void);
 
 #endif /* !_MACHINE_CPUFUNC_H_ */
