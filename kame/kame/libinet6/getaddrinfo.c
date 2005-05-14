@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.215 2005/04/14 06:22:33 suz Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.216 2005/05/14 13:39:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1138,8 +1138,8 @@ matchlen(src, dst)
 		break;
 #endif
 	case AF_INET:
-		s = (u_char *)&((struct sockaddr_in6 *)src)->sin6_addr;
-		d = (u_char *)&((struct sockaddr_in6 *)dst)->sin6_addr;
+		s = (u_char *)&((struct sockaddr_in *)src)->sin_addr;
+		d = (u_char *)&((struct sockaddr_in *)dst)->sin_addr;
 		addrlen = sizeof(struct in_addr);
 		lim = s + addrlen;
 		break;
