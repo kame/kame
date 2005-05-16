@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.50 2005/02/12 08:32:31 suz Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.51 2005/05/16 17:50:56 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1784,7 +1784,7 @@ again:
 	} else
 #endif
 	{
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 		ip->ip_len = htons(hdrlen + len);
 #else
 		ip->ip_len = hdrlen + len;
@@ -1833,7 +1833,12 @@ again:
 #else				  
 				  &inp->inp_route,
 #endif
-		    (inp->inp_socket->so_options & SO_DONTROUTE), 0, inp);
+		    (inp->inp_socket->so_options & SO_DONTROUTE), 0, 
+#ifdef __NetBSD__ 
+				  inp->inp_socket); 
+#else
+				  inp);
+#endif
 	}
 
 	if (error) {
