@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.15 2005/04/25 01:40:10 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.16 2005/05/17 10:31:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -67,7 +67,7 @@
 
 /* Global Variables */
 int mipsock, icmp6sock, mhsock;
-int debug = 0, numerichost = 0;
+int debug = 0, namelookup = 1;
 
 struct mip6stat mip6stat;
 struct mip6_hpfx_list hpfx_head; 
@@ -170,7 +170,7 @@ main(argc, argv)
 			debug = 1;
 			break;
 		case 'n':
-			numerichost = 1;
+			namelookup = 0;
 			break;
 		case 'i':
 			arg_ifname = optarg;

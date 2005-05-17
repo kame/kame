@@ -1,4 +1,4 @@
-/*      $KAME: mdd.c,v 1.3 2005/04/14 06:22:36 suz Exp $  */
+/*      $KAME: mdd.c,v 1.4 2005/05/17 10:31:24 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -66,7 +66,7 @@ static char *cmd;
 int ver_major = 0;
 int ver_minor = 1;
 int debug = 0;
-int numerichost = 0;
+int namelookup = 1;
 int cflag = 0;
 int mflag = 0;
 int hflag = 0;
@@ -169,7 +169,7 @@ main(argc, argv, env)
 			break;
 
 		case 'n':
-			numerichost += 1;
+			namelookup = 0;
 			break;
 
 		case 'm':

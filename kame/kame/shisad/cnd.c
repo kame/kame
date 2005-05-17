@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.6 2005/04/25 01:40:10 keiichi Exp $	*/
+/*	$KAME: cnd.c,v 1.7 2005/05/17 10:31:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -57,6 +57,7 @@
 #include "shisad.h"
 #include "fdlist.h"
 #include "command.h"
+#include "config.h"
 
 /*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
@@ -77,7 +78,7 @@ struct command_table command_table[] = {
 
 /* Global Variables */
 int mhsock, mipsock, icmp6sock;
-int debug = 0, numerichost = 0;
+int debug = 0, namelookup = 1;
 struct mip6stat mip6stat;
 int homeagent_mode = 0;
 
@@ -119,7 +120,7 @@ main(argc, argv)
 			debug = 1;
 			break;
 		case 'n':
-			numerichost = 1;
+			namelookup = 0;
 			break;
 		default:
 			fprintf(stderr, "unknown option\n");
@@ -127,12 +128,16 @@ main(argc, argv)
 			break;
 		}
 	}
-	argc -= optind;
-	argv += optind;
 
 	/* open syslog infomation. */
 	openlog("shisad(cnd)", 0, LOG_DAEMON);
 	syslog(LOG_INFO, "-- Start CN daemon at -- \n");
+
+	/* parse configuration file and set default values. */
+	if (parse_config(CFM_CND, CND_CONFFILE) == 0) {
+		config_get_number(CFT_DEBUG, &debug, config_result);
+		config_get_number(CFT_NAMELOOKUP, &namelookup, config_result);
+	}
 
 	/* open sockets */
 	mhsock_open();

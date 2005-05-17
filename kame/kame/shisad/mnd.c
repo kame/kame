@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.13 2005/04/20 04:10:25 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.14 2005/05/17 10:31:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -73,7 +73,7 @@
 
 /* Global Variables */
 int mipsock, icmp6sock, mhsock, csock;
-int debug = 0, numerichost = 0;
+int debug = 0, namelookup = 1;
 u_char *conffile = NULL;
 struct mip6_mipif_list mipifhead;
 struct mip6_hinfo_list hoa_head;
@@ -182,7 +182,7 @@ main(argc, argv)
                         debug = 1;
                         break;
                 case 'n':
-                        numerichost = 1;
+                        namelookup = 0;
                         break;
 		case 'a':
 			homeagent = optarg;

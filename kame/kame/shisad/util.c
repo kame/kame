@@ -1,4 +1,4 @@
-/*      $KAME: util.c,v 1.1 2005/04/20 04:10:25 t-momose Exp $  */
+/*      $KAME: util.c,v 1.2 2005/05/17 10:31:25 keiichi Exp $  */
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
  *
@@ -35,7 +35,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
-extern int numerichost;
+extern int namelookup;
 
 const char *
 ip6_sprintf(addr)
@@ -46,7 +46,7 @@ ip6_sprintf(addr)
 	struct sockaddr_in6 sin6;
 	int flags = 0;
 
-	if (numerichost)
+	if (namelookup == 0)
 		flags |= NI_NUMERICHOST;
 
 	bzero(&sin6, sizeof(sin6));

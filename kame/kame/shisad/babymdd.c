@@ -1,4 +1,4 @@
-/*      $Id: babymdd.c,v 1.7 2005/03/02 05:35:21 ryuji Exp $  */
+/*      $Id: babymdd.c,v 1.8 2005/05/17 10:31:24 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -132,7 +132,7 @@ static char *msgtypes[] = {
 #endif
 
 int debug = 0;
-int numerichost = 1;
+int namelookup = 0;
 
 int
 main (argc, argv)

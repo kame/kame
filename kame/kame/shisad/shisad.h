@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.11 2005/04/21 13:57:15 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.12 2005/05/17 10:31:24 keiichi Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -79,6 +79,8 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define CND_PIDFILE	"/var/run/cnd.pid"
 #define MND_PIDFILE	"/var/run/mnd.pid"
 #define HAD_PIDFILE	"/var/run/had.pid"
+
+#define CND_CONFFILE	"/etc/cnd.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
 #ifdef MIP_NEMO
@@ -369,7 +371,7 @@ struct binding_cache {
 };
 LIST_HEAD(binding_cache_head, binding_cache);
 
-extern int debug, numerichost;
+extern int debug, namelookup;
 
 /* mh.c */
 void mhsock_open(void);

@@ -1,4 +1,4 @@
-/*      $KAME: mdd_nemo.c,v 1.2 2005/04/14 06:22:36 suz Exp $  */
+/*      $KAME: mdd_nemo.c,v 1.3 2005/05/17 10:31:24 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -234,7 +234,7 @@ ip6_sprintf(addr)
 	int flags = 0;
 
 #if 0   /* This could be useful. Leave it */
-	if (numerichost)
+	if (namelookup == 0)
 		flags |= NI_NUMERICHOST;
 #endif
 

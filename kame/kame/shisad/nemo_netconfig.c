@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.10 2005/03/10 23:43:26 t-momose Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.11 2005/05/17 10:31:24 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -86,7 +86,7 @@ LIST_HEAD(nemo_mnpt_head, nemo_mnpt) nemo_mnpthead;
 int mode;
 int debug = 0;
 int foreground = 0;
-int numerichost = 1;
+int namelookup = 1;
 int staticmode = 0;
 int multiplecoa = 0;
 
@@ -143,7 +143,7 @@ main (argc, argv)
 			foreground = 1;
 			break;
 		case 'n':
-			numerichost = 1;
+			namelookup = 0;
 			break;
 		case 'M':
 			multiplecoa = 1;
@@ -969,7 +969,7 @@ nemo_dump() {
 	      
 	syslog(LOG_INFO, "debug=%s, DNS=%s, MCoA=%s, Static=%s", 
 		(debug)? "on" : "off", 
-		(numerichost)? "off" : "on", 
+		(namelookup)? "on" : "off", 
 		(multiplecoa)? "on" : "off", 
 		(staticmode)? "on" : "off");
 

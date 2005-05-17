@@ -1,4 +1,4 @@
-/*      $Id: movementdetection.c,v 1.4 2005/03/11 06:27:37 keiichi Exp $  */
+/*      $Id: movementdetection.c,v 1.5 2005/05/17 10:31:24 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -123,7 +123,7 @@ static char *msgtypes[] = {
 
 
 int debug = 0;
-int numerichost = 0;
+int namelookup = 1;
 
 int
 main (argc, argv)
@@ -699,7 +699,7 @@ parse_mainconfig() {
 	/* DNS Lookup */
 	if (agetflag("nondns")) {
 		mddinfo.dns = 0;
-		numerichost = 1;
+		namelookup = 0;
 	} else 
 		mddinfo.dns = 1;
 
