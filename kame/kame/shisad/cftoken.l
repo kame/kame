@@ -1,7 +1,11 @@
 %{
 #include <string.h>
 
+#ifndef __OpenBSD__
 #include "cfparse.h"
+#else
+#include "y.tab.h"
+#endif
 
 void cfdebug_print(char *, char *, int);
 

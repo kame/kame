@@ -36,7 +36,7 @@ CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -lcrypto
 YFLAGS+=-d
-CLEANFILES+=cfparse.h cnd.cat8
+CLEANFILES+=cfparse.h
 
 MAN=	cnd.8
 
