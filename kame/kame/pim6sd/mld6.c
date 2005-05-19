@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.52 2004/06/09 15:52:57 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.53 2005/05/19 08:11:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -193,8 +193,8 @@ init_mld6()
     ICMP6_FILTER_SETPASS(MLD_MTRACE_RESP, &filt);
     ICMP6_FILTER_SETPASS(MLD_MTRACE, &filt);
 #endif
-#ifdef MLD6V2_LISTENER_REPORT
-    ICMP6_FILTER_SETPASS(MLD6V2_LISTENER_REPORT,&filt);
+#ifdef HAVE_MLDV2
+    ICMP6_FILTER_SETPASS(MLDV2_LISTENER_REPORT,&filt);
 #endif
 
     if (setsockopt(mld6_socket, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
@@ -414,7 +414,7 @@ accept_mld6(recvlen)
 		if (recvlen == 24)
 			accept_listener_query(src, dst, group,
 					      ntohs(mldh->mld_maxdelay));
-#ifdef MLD6V2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 		if (recvlen >= 28) {
 			if (*hlimp != 1)
 				return;
@@ -431,8 +431,8 @@ accept_mld6(recvlen)
 		accept_listener_done(src, dst, group);
 		return;
 
-#ifdef MLD6V2_LISTENER_REPORT
-	case MLD6V2_LISTENER_REPORT:
+#ifdef HAVE_MLDV2
+	case MLDV2_LISTENER_REPORT:
 		if (*hlimp != 1)
 			return;
 		accept_listenerV2_report(src,dst,(char *)(mldh),recvlen);

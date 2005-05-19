@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.62 2004/08/20 02:48:05 suz Exp $	*/
+/*	$KAME: debug.c,v 1.63 2005/05/19 08:11:26 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -609,7 +609,7 @@ dump_mldgroups(fp)
 
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 		for (grp = v->uv_groups; grp; grp = grp->al_next) {
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 			fprintf(fp, " %-3u %6s %s (#%lu (%s %s #%lu))\n", vifi,
 			    (v->uv_flags & MIFF_REGISTER) ? "regist" : v->uv_name,
 			    sa6_fmt(&grp->al_addr), grp->al_timerid,

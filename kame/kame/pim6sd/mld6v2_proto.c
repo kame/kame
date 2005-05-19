@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.49 2004/07/16 09:28:15 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.50 2005/05/19 08:11:26 suz Exp $
  */
 
 /*
@@ -70,7 +70,7 @@
 #include "callout.h"
 #include "pim6.h"
 
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 
  /* MLDv2 implementation
   *   - MODE_IS_INCLUDE, ALLOW_NEW_SOURCES, BLOCK_OLD_SOURCES,

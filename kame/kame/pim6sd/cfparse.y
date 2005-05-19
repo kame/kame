@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.36 2004/05/19 13:46:03 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.37 2005/05/19 08:11:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -744,7 +744,7 @@ phyint_config()
 	struct uvif *v;
 	mifi_t vifi;
 	struct attr_list *al;
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 	unsigned int qqic;
 	unsigned int realnbr;
 #endif
@@ -816,7 +816,7 @@ phyint_config()
 					    v->uv_mld_version & MLDv2 ? "v2" : "");
 				break;
 			case IFA_QUERY_INT:
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 				/* if the mld version is 2 we have to verify if this */
 				/* value is codable in the QQIC field */
 
@@ -841,7 +841,7 @@ phyint_config()
 					    v->uv_mld_query_interval);
 				break;
 			case IFA_QUERY_INT_RESP:
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 				/* if the mld version is 2 we have to verify if this */
 				/* value is codable in the MAX RESP CODE field */
 				/* if this is mld version 1 we have to verify if this */
@@ -874,7 +874,7 @@ phyint_config()
 					    v->uv_mld_query_rsp_interval);
 				break;
 			case IFA_LLQI:
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 				/* if the mld version is 2 we have to verify if this */
 				/* value is codable in the MAX RESP CODE field */
 				/* if this is mld version 1 we have to verify if this */

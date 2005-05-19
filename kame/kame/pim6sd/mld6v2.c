@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.20 2004/06/09 15:52:57 suz Exp $
+ * $KAME: mld6v2.c,v 1.21 2005/05/19 08:11:26 suz Exp $
  */
 
 /*
@@ -69,7 +69,7 @@
 #include "callout.h"
 #include "timer.h"
 
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 
 #ifndef USE_RFC2292BIS
 extern u_int8_t raopt[IP6OPT_RTALERT_LEN];

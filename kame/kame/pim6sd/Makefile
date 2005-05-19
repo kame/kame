@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.16 2003/09/23 11:09:10 itojun Exp $
+#	$KAME: Makefile,v 1.17 2005/05/19 08:11:26 suz Exp $
 #
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
@@ -80,7 +80,7 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	pim6sd
-CFLAGS+=-DHAVE_STDARG_H
+CFLAGS+=-DHAVE_STDARG_H -DHAVE_MLDV2
 LDADD+=-ly -ll
 SRCS=	mld6.c mld6_proto.c\
 	mld6v2.c mld6v2_proto.c\

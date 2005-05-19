@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.23 2004/07/09 14:51:53 suz Exp $	*/
+/*	$KAME: timer.c,v 1.24 2005/05/19 08:11:27 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -241,7 +241,7 @@ age_vifs()
 		time(&v->uv_querier->al_ctime); /* reset timestamp */
 
 		/* send gen. query, start gen. q timer */
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 		if (v->uv_mld_version & MLDv2)
 			query_groupsV2(v);
 		else
@@ -254,7 +254,7 @@ age_vifs()
 		/* We are in Querier state */
 		/* MLD6 query periodic */
 		IF_TIMEOUT(v->uv_gq_timer) {
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 			if (v->uv_mld_version & MLDv2)
 				query_groupsV2(v);
 			else

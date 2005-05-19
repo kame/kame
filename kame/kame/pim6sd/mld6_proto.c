@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.45 2004/08/24 01:35:20 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.46 2005/05/19 08:11:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -364,7 +364,7 @@ recv_listener_report(mifi, src, grp, mld_version)
 		if (g->al_timerid)
 			g->al_timerid = DeleteTimer(g->al_timerid);
 		g->al_timerid = SetTimer(mifi, g);
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 		/* shift to or continues MLDv1 compatible mode */
 		if ((v->uv_mld_version & MLDv2) && mld_version == MLDv1) {
 			log_msg(LOG_DEBUG, 0,
@@ -376,7 +376,7 @@ recv_listener_report(mifi, src, grp, mld_version)
 			g->al_comp = SetTimerV1compat(mifi, g,
 					MLD6_OLDER_VERSION_HOST_PRESENT);
 		}
-#endif /* MLDV2_LISTENER_REPORT */
+#endif /* HAVE_MLDV2 */
 		goto reflect_it_to_mrt;
 	}
 
@@ -400,7 +400,7 @@ recv_listener_report(mifi, src, grp, mld_version)
 	/* set a timer for expiration */
 	g->al_timer = MLD6_LISTENER_INTERVAL;
 	g->al_timerid = SetTimer(mifi, g);
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 	g->comp_mode = mld_version;
 	if (g->comp_mode == MLDv2)
 		g->filter_mode = MODE_IS_EXCLUDE;
@@ -541,7 +541,7 @@ recv_listener_done(mifi, src, grp)
 		 * if an interface is configured only with MLDv1, query
 		 * is done by MLDv1.
 		 */
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 		if (v->uv_mld_version & MLDv2) {
 			ret = send_mld6v2(MLD_LISTENER_QUERY, 0,
 					  &v->uv_linklocal->pa_addr, NULL,
@@ -684,7 +684,7 @@ SetQueryTimer(g, mifi, to_expire, q_time)
 	int q_time;
 {
 	cbk_t *cbk;
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 	struct uvif *v = &uvifs[mifi];
 #endif
 
@@ -694,7 +694,7 @@ SetQueryTimer(g, mifi, to_expire, q_time)
 	cbk->q_time = q_time;
 	cbk->mifi = mifi;
 
-#ifdef MLDV2_LISTENER_REPORT
+#ifdef HAVE_MLDV2
 	if (v->uv_mld_version & MLDv2) {
 		return timer_setTimer(to_expire, Send_GS_QueryV2, cbk);
 	}

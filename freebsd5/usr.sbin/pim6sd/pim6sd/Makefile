@@ -37,6 +37,7 @@ CFLAGS+= -g -O -Wall -Werror
 CFLAGS+=-I${.OBJDIR}
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
 CFLAGS+=-DHAVE_STDARG_H -DYY_NO_UNPUT
+CFLAGS+=-DHAVE_MLDV2
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
