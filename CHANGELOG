@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2767 2005/05/15 06:59:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2768 2005/05/19 07:45:59 suz Exp $
 
 <200505>
+2005-05-19  SUZUKI, Shinsuke <suz@kame.net>
+	* (freebsd5|netbsd)/sys/sys/sockio.h: assign the same ioctl number 
+	to MSF-API-related ioctls among all *BSDs (to keep binary 
+	compatibilities as much as possible)
+
 2005-05-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (matchlen): corrected a wrong
 	cast from sockaddr_in to sockaddr_in6.

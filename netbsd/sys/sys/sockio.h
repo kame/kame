@@ -164,9 +164,9 @@
 
 #define SIOGBULIST	_IOWR('i', 134, struct if_bulreq) /* get BUL */
 
-#define	SIOCSIPMSFILTER	 _IO('s', 130)			/* set src list */
-#define	SIOCGIPMSFILTER	 _IO('s', 131)			/* get src list */
-#define	SIOCSMSFILTER	 _IO('s', 132)			/* set src list */
-#define	SIOCGMSFILTER	 _IO('s', 133)			/* get src list */
+#define	SIOCSIPMSFILTER	 _IO('s', 140)			/* set src list */
+#define	SIOCGIPMSFILTER	 _IO('s', 141)			/* get src list */
+#define	SIOCSMSFILTER	 _IO('s', 142)			/* set src list */
+#define	SIOCGMSFILTER	 _IO('s', 143)			/* get src list */
 
 #endif /* !_SYS_SOCKIO_H_ */
