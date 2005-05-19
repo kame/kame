@@ -100,6 +100,13 @@ static int in_copy_msf_source_list(struct in_addr_slist *,
 #define	INM_SOURCE_LIST(mode)						\
 	(((mode) == MCAST_INCLUDE) ? inm->inm_source->ims_in		\
 				   : inm->inm_source->ims_ex)
+#define INM_SOURCE_LIST_NONALLOC(mode)					\
+	(INM_SOURCE_LIST(mode) == NULL ||				\
+	(mode == MCAST_INCLUDE &&					\
+	   LIST_EMPTY(inm->inm_source->ims_in->head)) ||		\
+	(mode == MCAST_EXCLUDE && 					\
+	   LIST_EMPTY(inm->inm_source->ims_ex->head)))
+
 #ifndef in_hosteq
 #define in_hosteq(s,t)	((s).s_addr == (t).s_addr)
 #endif
@@ -185,8 +192,7 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 		return EINVAL;
 	}
 
-	if (INM_SOURCE_LIST(mode) == NULL ||
-	    LIST_EMPTY(INM_SOURCE_LIST(mode)->head)) {
+	if (INM_SOURCE_LIST_NONALLOC(mode)) {
 		sin = SIN(&ss[0]);
 		for (; i < numsrc; i++) {
 			if (SIN_ADDR(sin) == INADDR_ANY)
@@ -199,20 +205,26 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			bcopy(sin, &ias->ias_addr, sin->sin_len);
 			ias->ias_refcount = 1;
 			if (INM_SOURCE_LIST(mode) == NULL) {
-				IAS_LIST_ALLOC(INM_SOURCE_LIST(mode));
+				if (mode == MCAST_INCLUDE)
+					IAS_LIST_ALLOC(inm->inm_source->ims_in);
+				else
+					IAS_LIST_ALLOC(inm->inm_source->ims_ex);
 				if (error != 0) {
 					FREE(ias, M_MSFILTER);
 					return error;
 				}
 			}
-			LIST_INSERT_HEAD(INM_SOURCE_LIST(mode)->head,
-					 ias, ias_list);
+			if (mode == MCAST_INCLUDE)
+				LIST_INSERT_HEAD(inm->inm_source->ims_in->head,
+				    ias, ias_list);
+			else
+				LIST_INSERT_HEAD(inm->inm_source->ims_ex->head,
+				    ias, ias_list);
 			j = 1; /* the number of added source */
 			break;
 		}
 		if (i == numsrc)
 			return EINVAL;
-
 		++i; /* the number of checked sources */
 	}
 
@@ -330,9 +342,9 @@ in_delmultisrc(inm, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 		return EINVAL;
 	}
 
-	if (INM_SOURCE_LIST(mode) == NULL ||
-	    LIST_EMPTY(INM_SOURCE_LIST(mode)->head))
+	if (INM_SOURCE_LIST_NONALLOC(mode))
 		return EADDRNOTAVAIL;
+
 	iasl = INM_SOURCE_LIST(mode);
 	fnumsrc = &iasl->numsrc;
 
@@ -498,8 +510,7 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 		goto after_source_list_modification;
 	}
 
-	if (INM_SOURCE_LIST(mode) == NULL ||
-	    LIST_EMPTY(INM_SOURCE_LIST(mode)->head)) {
+	if (INM_SOURCE_LIST_NONALLOC(mode)) {
 		for (i = 0; i < numsrc; i++) {
 			sin = SIN(&ss[i]);
 			if (SIN_ADDR(sin) == INADDR_ANY)
@@ -512,14 +523,21 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			bcopy(sin, &ias->ias_addr, sin->sin_len);
 			ias->ias_refcount = 1;
 			if (INM_SOURCE_LIST(mode) == NULL) {
-				IAS_LIST_ALLOC(INM_SOURCE_LIST(mode));
+				if (mode == MCAST_INCLUDE)
+					IAS_LIST_ALLOC(inm->inm_source->ims_in);
+				else
+					IAS_LIST_ALLOC(inm->inm_source->ims_ex);
 				if (error != 0) {
 					FREE(ias, M_MSFILTER);
 					return error;
 				}
 			}
-			LIST_INSERT_HEAD(INM_SOURCE_LIST(mode)->head, ias,
-					 ias_list);
+			if (mode == MCAST_INCLUDE)
+				LIST_INSERT_HEAD(inm->inm_source->ims_in->head,
+				    ias, ias_list);
+			else
+				LIST_INSERT_HEAD(inm->inm_source->ims_ex->head,
+				    ias, ias_list);
 			k = 1; /* the number of added source */
 			break;
 		}
@@ -650,9 +668,12 @@ in_undomultisrc(inm, numsrc, ss, mode, req)
 	struct in_addr_source *ias, *nias;
 	u_int16_t i;
 
-	if (mode != MCAST_INCLUDE && mode != MCAST_EXCLUDE)
+	if (mode == MCAST_INCLUDE)
+		LIST_FIRST(&head) = LIST_FIRST(inm->inm_source->ims_in->head);
+	else if (mode == MCAST_EXCLUDE)
+		LIST_FIRST(&head) = LIST_FIRST(inm->inm_source->ims_ex->head);
+	else
 		return;
-	LIST_FIRST(&head) = LIST_FIRST(INM_SOURCE_LIST(mode)->head);
 
 	for (i = 0; i < numsrc && SIN(&ss[i]) != NULL; i++) {
 		sin = SIN(&ss[i]);
@@ -685,12 +706,20 @@ in_undomultisrc(inm, numsrc, ss, mode, req)
 			break;
 		}
 	}
-	if ((numsrc != 0) && (INM_SOURCE_LIST(mode)->numsrc == 0)) {
-		FREE(INM_SOURCE_LIST(mode)->head, M_MSFILTER);
-		FREE(INM_SOURCE_LIST(mode), M_MSFILTER);
-		INM_SOURCE_LIST(mode) = NULL;
-		if (mode == MCAST_EXCLUDE)
+	if (mode == MCAST_INCLUDE) {
+		if (numsrc != 0 && inm->inm_source->ims_in->numsrc == 0) {
+			FREE(inm->inm_source->ims_in->head, M_MSFILTER);
+			FREE(inm->inm_source->ims_in, M_MSFILTER);
+			inm->inm_source->ims_in = NULL;
+		}
+	}
+	if (mode == MCAST_EXCLUDE) {
+		if (numsrc != 0 && inm->inm_source->ims_ex->numsrc == 0) {
+			FREE(inm->inm_source->ims_ex->head, M_MSFILTER);
+			FREE(inm->inm_source->ims_ex, M_MSFILTER);
+			inm->inm_source->ims_ex = NULL;
 			inm->inm_source->ims_excnt = 0; /* this must be unneeded... */
+		}
 	}
 }
 

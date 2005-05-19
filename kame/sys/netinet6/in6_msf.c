@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.34 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.35 2005/05/19 07:27:54 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -131,6 +131,12 @@
 #define	IN6M_SOURCE_LIST(mode)						\
 	(((mode) == MCAST_INCLUDE) ? in6m->in6m_source->i6ms_in		\
 				   : in6m->in6m_source->i6ms_ex)
+#define IN6M_SOURCE_LIST_NONALLOC(mode)					\
+	(IN6M_SOURCE_LIST(mode) == NULL ||				\
+	(mode == MCAST_INCLUDE &&					\
+	    LIST_EMPTY(in6m->in6m_source->i6ms_in->head)) ||		\
+	(mode == MCAST_EXCLUDE &&					\
+	    LIST_EMPTY(in6m->in6m_source->i6ms_ex->head)))
 
 #define	in6mm_src	in6m->in6m_source
 #define	IN6M_LIST_EMPTY(name)						\
@@ -219,8 +225,7 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 		return EINVAL;
 	}
 
-	if (IN6M_SOURCE_LIST(mode) == NULL ||
-	    LIST_EMPTY(IN6M_SOURCE_LIST(mode)->head)) {
+	if (IN6M_SOURCE_LIST_NONALLOC(mode)) {
 		for (; i < numsrc; i++) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&SIN6(&ss[0])->sin6_addr))
 				continue;
@@ -232,14 +237,21 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			bcopy(&ss[0], &ias->i6as_addr, ss[0].ss_len);
 			ias->i6as_refcount = 1;
 			if (IN6M_SOURCE_LIST(mode) == NULL) {
-				I6AS_LIST_ALLOC(IN6M_SOURCE_LIST(mode));
+				if (mode == MCAST_INCLUDE)
+					I6AS_LIST_ALLOC(in6m->in6m_source->i6ms_in);
+				else
+					I6AS_LIST_ALLOC(in6m->in6m_source->i6ms_ex);
 				if (error != 0) {
 					FREE(ias, M_MSFILTER);
 					return error;
 				}
 			}
-			LIST_INSERT_HEAD(IN6M_SOURCE_LIST(mode)->head,
-					 ias, i6as_list);
+			if (mode == MCAST_INCLUDE)
+				LIST_INSERT_HEAD(in6m->in6m_source->i6ms_in->head,
+				    ias, i6as_list);
+			else
+				LIST_INSERT_HEAD(in6m->in6m_source->i6ms_ex->head,
+				    ias, i6as_list);
 			j = 1; /* the number of added source */
 			break;
 		}
@@ -354,8 +366,7 @@ in6_delmultisrc(in6m, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 		return EINVAL;
 	}
 
-	if (IN6M_SOURCE_LIST(mode) == NULL ||
-	    LIST_EMPTY(IN6M_SOURCE_LIST(mode)->head))
+	if (IN6M_SOURCE_LIST_NONALLOC(mode))
 		return EADDRNOTAVAIL;
 	iasl = IN6M_SOURCE_LIST(mode);
 	fnumsrc = &iasl->numsrc;
@@ -508,8 +519,7 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 	if (numsrc == 0)
 		goto after_source_list_modification;
 
-	if (IN6M_SOURCE_LIST(mode) == NULL ||
-	    LIST_EMPTY(IN6M_SOURCE_LIST(mode)->head)) {
+	if (IN6M_SOURCE_LIST_NONALLOC(mode)) {
 		for (i = 0; i < numsrc; i++) {
 			if (SS_IS_ADDR_UNSPECIFIED(&ss[i]))
 				continue; /* skip */
@@ -520,15 +530,24 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 				return ENOBUFS;
 			bcopy(&ss[i], &ias->i6as_addr, ss[i].ss_len);
 			ias->i6as_refcount = 1;
+
 			if (IN6M_SOURCE_LIST(mode) == NULL) {
-				I6AS_LIST_ALLOC(IN6M_SOURCE_LIST(mode));
+				if (mode == MCAST_INCLUDE)
+					I6AS_LIST_ALLOC(in6m->in6m_source->i6ms_in);
+				else
+					I6AS_LIST_ALLOC(in6m->in6m_source->i6ms_ex);
 				if (error != 0) {
 					FREE(ias, M_MSFILTER);
 					return error;
 				}
 			}
-			LIST_INSERT_HEAD(IN6M_SOURCE_LIST(mode)->head,
-					 ias, i6as_list);
+			if (mode == MCAST_INCLUDE)
+				LIST_INSERT_HEAD(in6m->in6m_source->i6ms_in->head,
+				    ias, i6as_list);
+			else
+				LIST_INSERT_HEAD(in6m->in6m_source->i6ms_ex->head,
+				    ias, i6as_list);
+
 			k = 1; /* the number of added source */
 			break;
 		}
@@ -654,9 +673,12 @@ in6_undomultisrc(in6m, numsrc, ss, mode, req)
 	struct in6_addr_source *ias, *nias = NULL;
 	u_int16_t i;
 
-	if (mode != MCAST_INCLUDE && mode != MCAST_EXCLUDE)
+	if (mode == MCAST_INCLUDE)
+		LIST_FIRST(&head) = LIST_FIRST(in6m->in6m_source->i6ms_in->head);
+	else if (mode == MCAST_EXCLUDE)
+		LIST_FIRST(&head) = LIST_FIRST(in6m->in6m_source->i6ms_ex->head);
+	else
 		return;
-	LIST_FIRST(&head) = LIST_FIRST(IN6M_SOURCE_LIST(mode)->head);
 
 	for (i = 0; i < numsrc && &ss[i] != NULL; i++) {
 		if (SS_IS_ADDR_UNSPECIFIED(&ss[i]))
@@ -687,10 +709,19 @@ in6_undomultisrc(in6m, numsrc, ss, mode, req)
 			break;
 		}
 	}
-	if ((numsrc != 0) && (IN6M_SOURCE_LIST(mode)->numsrc == 0)) {
-		FREE(IN6M_SOURCE_LIST(mode)->head, M_MSFILTER);
-		FREE(IN6M_SOURCE_LIST(mode), M_MSFILTER);
-		IN6M_SOURCE_LIST(mode) = NULL;
+	if (mode == MCAST_INCLUDE) {
+		if (numsrc != 0 && in6m->in6m_source->i6ms_in->numsrc == 0) {
+			FREE(in6m->in6m_source->i6ms_in->head, M_MSFILTER);
+			FREE(in6m->in6m_source->i6ms_in, M_MSFILTER);
+			in6m->in6m_source->i6ms_in = NULL;
+		}
+	}
+	if (mode == MCAST_EXCLUDE) {
+		if (numsrc != 0 && in6m->in6m_source->i6ms_ex->numsrc == 0) {
+			FREE(in6m->in6m_source->i6ms_ex->head, M_MSFILTER);
+			FREE(in6m->in6m_source->i6ms_ex, M_MSFILTER);
+			in6m->in6m_source->i6ms_ex = NULL;
+		}
 	}
 }
 
