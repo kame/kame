@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.404 2005/05/12 22:59:18 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.405 2005/05/20 08:55:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -938,7 +938,11 @@ icmp6_input(mp, offp, proto)
 #ifdef __OpenBSD__
 			M_DUP_PKTHDR(n, m); /* just for rcvif */
 #elif defined(__FreeBSD__)
-			m_dup_pkthdr(n, m);
+			if (m_dup_pkthdr(n, m) == 0) {
+				m_free(n);
+				n = NULL;
+				break;
+			}
 #else
 			M_COPY_PKTHDR(n, m); /* just for rcvif */
 #endif
@@ -1689,7 +1693,8 @@ ni6_input(m, off)
 #ifdef __OpenBSD__
 	M_DUP_PKTHDR(n, m); /* just for rcvif */
 #elif defined(__FreeBSD__)
-	m_dup_pkthdr(n, m);
+	if (m_dup_pkthdr(n, m) == 0)
+		goto bad;
 #else
 	M_COPY_PKTHDR(n, m); /* just for rcvif */
 #endif
@@ -2355,16 +2360,25 @@ icmp6_rip6_input(mp, off)
 			    m->m_len <= MHLEN) {
 				MGET(n, M_DONTWAIT, m->m_type);
 				if (n != NULL) {
+#if defined(__FreeBSD__)
+					if (m_dup_pkthdr(n, m)) {
+						bcopy(m->m_data, n->m_data, 
+						      m->m_len);
+						n->m_len = m->m_len;
+					} else {
+						m_free(n);
+						n = NULL;
+					}
+#else
 #ifdef __OpenBSD__
 					/* shouldn't this be M_DUP_PKTHDR? */
 					M_MOVE_PKTHDR(n, m);
-#elif defined(__FreeBSD__)
-					m_dup_pkthdr(n, m);
 #else
 					M_COPY_PKTHDR(n, m);
 #endif
 					bcopy(m->m_data, n->m_data, m->m_len);
 					n->m_len = m->m_len;
+#endif
 				}
 			}
 			if (n != NULL ||
@@ -2404,11 +2418,21 @@ icmp6_rip6_input(mp, off)
 
 			MGET(n, M_DONTWAIT, m->m_type);
 			if (n != NULL) {
+#if defined(__FreeBSD__)
+				if (m_dup_pkthdr(n, m)) {
+					bcopy(m->m_data, n->m_data, m->m_len);
+					n->m_len = m->m_len;
+					
+					m_freem(m);
+					m = n;
+				} else {
+					m_freem(n);
+					n = NULL;
+				}
+#else
 #ifdef __OpenBSD__
 				/* shouldn't this be M_DUP_PKTHDR? */
 				M_MOVE_PKTHDR(n, m);
-#elif defined(__FreeBSD__)
-				m_dup_pkthdr(n, m);
 #else
 				M_COPY_PKTHDR(n, m);
 #endif
@@ -2417,6 +2441,7 @@ icmp6_rip6_input(mp, off)
 
 				m_freem(m);
 				m = n;
+#endif
 			}
 		}
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
