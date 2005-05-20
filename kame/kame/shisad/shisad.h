@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.12 2005/05/17 10:31:24 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.13 2005/05/20 09:23:59 keiichi Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -80,7 +80,7 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define MND_PIDFILE	"/var/run/mnd.pid"
 #define HAD_PIDFILE	"/var/run/had.pid"
 
-#define CND_CONFFILE	"/etc/cnd.conf"
+#define CND_CONFFILE	"/usr/local/v6/etc/cnd.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
 #ifdef MIP_NEMO

@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.7 2005/05/17 10:31:24 keiichi Exp $	*/
+/*	$KAME: cnd.c,v 1.8 2005/05/20 09:23:58 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -98,7 +98,7 @@ cn_usage(path)
 		cmd = path;
 	else
 		cmd++;
-	fprintf(stderr, "%s [-dn] [-i if]\n", cmd);
+	fprintf(stderr, "%s [-dn]\n", cmd);
 	exit(0);
 } 
 
@@ -114,7 +114,7 @@ main(argc, argv)
 	FILE *pidfp;
 
 	/* get options */
-	while ((ch = getopt(argc, argv, "dni:")) != -1) {
+	while ((ch = getopt(argc, argv, "dn")) != -1) {
 		switch (ch) {
 		case 'd':
 			debug = 1;
