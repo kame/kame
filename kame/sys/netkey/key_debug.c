@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.39 2004/06/02 10:32:36 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.40 2005/05/20 04:59:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -771,17 +771,10 @@ kdebug_mbufhdr(m)
 
 #ifdef __FreeBSD__
 	if (m->m_flags & M_EXT) {
-#if __FreeBSD_version >= 500000
 		printf("  m_ext{ ext_buf:%p ext_free:%p "
 		       "ext_size:%u }\n",
 			m->m_ext.ext_buf, m->m_ext.ext_free,
 			m->m_ext.ext_size);
-#else
-		printf("  m_ext{ ext_buf:%p ext_free:%p "
-		       "ext_size:%u ext_ref:%p }\n",
-			m->m_ext.ext_buf, m->m_ext.ext_free,
-			m->m_ext.ext_size, m->m_ext.ext_ref);
-#endif
 	}
 #endif
 

@@ -542,7 +542,7 @@ static void key_sa_chgstate __P((struct secasvar *, u_int8_t));
 static void key_sp_dead __P((struct secpolicy *));
 static void key_sp_unlink __P((struct secpolicy *));
 static struct mbuf *key_alloc_mbuf __P((int));
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 struct callout key_timehandler_ch;
 #endif
 
@@ -4923,7 +4923,7 @@ key_timehandler(arg)
 	 * should set timeout based on the most closest timer expiration.
 	 * we don't bother to do that yet.
 	 */
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
 	(void)timeout(key_timehandler, (void *)0, hz);
@@ -4960,10 +4960,8 @@ key_randomfill(p, l)
 #elif defined(__OpenBSD__)
 	get_random_bytes(p, l);
 	n = l;
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	n = (size_t)read_random(p, (u_int)l);
 #elif defined(__FreeBSD__)
-	n = (size_t)read_random_unlimited(p, (u_int)l);
+	n = (size_t)read_random(p, (u_int)l);
 #else
 	*(u_int32_t *)p = arc4random();
 	n = sizeof(u_int32_t);
@@ -7916,7 +7914,7 @@ key_init()
 
 #if defined(__NetBSD__)
 	callout_init(&key_timehandler_ch);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
+#elif defined(__FreeBSD__)
 	callout_init(&key_timehandler_ch, 0);
 #endif
 
@@ -7961,7 +7959,7 @@ key_init()
 	ip6_def_policy->persist = 1;
 #endif
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
 	timeout(key_timehandler, (void *)0, hz);

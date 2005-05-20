@@ -40,17 +40,13 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #ifdef __FreeBSD__
-#if __FreeBSD_version >= 503000
 #include <sys/lock.h>
-#endif
 #include <sys/sysctl.h>
 #endif
 #include <sys/mbuf.h>
 #ifdef __FreeBSD__
 #include <sys/malloc.h>
-#if __FreeBSD_version >= 503000
 #include <sys/mutex.h>
-#endif
 #endif
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -60,14 +56,6 @@
 #ifdef __NetBSD__
 #include <sys/proc.h>
 #include <sys/queue.h>
-#endif
-
-#ifdef __FreeBSD__
-#if __FreeBSD_version >= 500000
- /* include nothing */
-#else
-#include <machine/ipl.h>
-#endif
 #endif
 
 #include <net/raw_cb.h>
@@ -565,7 +553,7 @@ key_attach(struct socket *so, int proto, struct proc *p)
  * derived from net/rtsock.c:rts_bind()
  */
 static int
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 key_bind(struct socket *so, struct sockaddr *nam, struct thread *p)
 #else
 key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
@@ -583,7 +571,7 @@ key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
  * derived from net/rtsock.c:rts_connect()
  */
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 key_connect(struct socket *so, struct sockaddr *nam, struct thread *p)
 #else
 key_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
@@ -660,7 +648,7 @@ key_peeraddr(struct socket *so, struct sockaddr **nam)
  * derived from net/rtsock.c:rts_send()
  */
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
 key_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	 struct mbuf *control, struct thread *p)
 #else
@@ -730,13 +718,13 @@ extern struct domain keydomain;
 struct protosw keysw[] = {
 { SOCK_RAW,	&keydomain,	PF_KEY_V2,	PR_ATOMIC|PR_ADDR,
   0,		
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
   (pr_output_t *)key_output,
 #else
   key_output,
 #endif
   raw_ctlinput,	0,
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
   0,
 #else
   key_usrreq,
