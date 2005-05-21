@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.390 2005/04/26 15:42:23 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.391 2005/05/21 00:10:58 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2510,6 +2510,8 @@ in6_if2idlen(ifp)
 		return (64);
 	case IFT_ISO88025:	/* RFC2470 (IPv6 over Token Ring) */
 		return (64);
+	case IFT_PPP:		/* RFC2472 */
+		return (64);
 	case IFT_ARCNET:	/* RFC2497 */
 		return (64);
 	case IFT_FRELAY:	/* RFC2590 */
@@ -2517,11 +2519,23 @@ in6_if2idlen(ifp)
 	case IFT_IEEE1394:	/* RFC3146 */
 		return (64);
 	case IFT_GIF:
-		return (64);	/* draft-ietf-v6ops-mech-v2-05 */
+		return (64);	/* draft-ietf-v6ops-mech-v2-07 */
 	case IFT_LOOP:
 		return (64);	/* XXX: is this really correct? */
 	default:
-		return (-1);	/* unknown link type */
+		/*
+		 * Unknown link type:
+		 * It might be controversial to use the today's common constant
+		 * of 64 for these cases unconditionally.  For full compliance,
+		 * we should return an error in this case.  On the other hand,
+		 * if we simply miss the standard for the link type or a new
+		 * standard is defined for a new link type, the IFID length
+		 * is very likely to be the common constant.  As a compromise,
+		 * we always use the constant, but make an explicit notice
+		 * indicating the "unknown" case.
+		 */
+		printf("in6_if2idlen: unknown link type (%d)\n", ifp->if_type);
+		return (64);
 	}
 }
 
