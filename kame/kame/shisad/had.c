@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.16 2005/05/17 10:31:24 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.17 2005/05/23 09:41:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -75,8 +75,6 @@ struct mip6_hpfx_list hpfx_head;
 struct nemo_hpt_list hpt_head;
 #endif /* MIP_NEMO */
 
-static char *pid_file = HAD_PIDFILE;
-
 struct ha_ifinfo {
 	char hainfo_ifname[IFNAMSIZ];
 	u_int16_t hainfo_ifindex;
@@ -143,7 +141,6 @@ main(argc, argv)
 	char **argv;
 {
 	int pfds;
-	int pid;
 	int ch = 0;
 	char *arg_ifname;
 	int arg_preference;
@@ -218,13 +215,6 @@ main(argc, argv)
 		sizeof(command_table) / sizeof(struct command_table), 7778);
 	mip6_bc_init();
 
-	/* dump current PID */
-	pid = getpid();
-	if ((pidfp = fopen(pid_file, "w")) != NULL) {
-		fprintf(pidfp, "%d\n", pid);
-		fclose(pidfp);
-	}
-
 	/* register signal handlers. */
 	signal(SIGTERM, terminate);
 	signal(SIGINT, terminate);
@@ -250,6 +240,12 @@ main(argc, argv)
 
 	if (debug == 0)
 		daemon(0, 0);
+
+	/* dump current PID */
+	if ((pidfp = fopen(HAD_PIDFILE, "w")) != NULL) {
+		fprintf(pidfp, "%d\n", getpid());
+		fclose(pidfp);
+	}
 
 	while (1) {
 		clear_revents();
@@ -686,7 +682,7 @@ terminate(dummy)
 {
 	mip6_flush_kernel_bc();
 	mipsock_nodetype_request(MIP6_NODETYPE_HOME_AGENT, 0);
-	unlink(pid_file);
+	unlink(HAD_PIDFILE);
 	exit(1);
 }
 

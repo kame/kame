@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.9 2005/05/23 08:20:26 keiichi Exp $	*/
+/*	$KAME: cnd.c,v 1.10 2005/05/23 09:41:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -85,8 +85,6 @@ int homeagent_mode = 0;
 int debug = 0, namelookup = 1;
 int command_port = CND_COMMAND_PORT;
 
-static char *pid_file = CND_PIDFILE;
-
 static void cn_lists_init(void);
 void flush_bc(void);
 
@@ -112,7 +110,6 @@ main(argc, argv)
 	char **argv;
 {
 	int pfds;
-	int pid;
 	int ch = 0;
 	FILE *pidfp;
 
@@ -167,9 +164,8 @@ main(argc, argv)
 		daemon(0, 0);
 
 	/* dump current PID */
-	pid = getpid();
-	if ((pidfp = fopen(pid_file, "w")) != NULL) {
-		fprintf(pidfp, "%d\n", pid);
+	if ((pidfp = fopen(CND_PIDFILE, "w")) != NULL) {
+		fprintf(pidfp, "%d\n", getpid());
 		fclose(pidfp);
 	}
 
@@ -242,6 +238,6 @@ terminate(dummy)
 {
 	mip6_flush_kernel_bc();
 	mipsock_nodetype_request(MIP6_NODETYPE_CORRESPONDENT_NODE, 0);
-	unlink(pid_file);
+	unlink(CND_PIDFILE);
 	exit(1);
 }
