@@ -30,7 +30,8 @@ static void free_cfe(struct config_entry *);
 %token ADDRSTRING
 %token DEBUG
 %token NAMELOOKUP
-%token INTERFACE IFNAME MIPIFNAME
+%token COMMANDPORT
+%token INTERFACE IFNAME MOBILEINTERFACE MIPIFNAME
 %token HOMEREGISTRATIONLIFETIME
 %token PREFERENCE
 %token PREFIXTABLE EXPLICIT IMPLICIT
@@ -47,8 +48,9 @@ static void free_cfe(struct config_entry *);
 %type <number> INTEGER
 %type <cfe> statements statement
 %type <cfe> debug_statement namelookup_statement
+%type <cfe> commandport_statement
 %type <cfe> homeregistrationlifetime_statement
-%type <cfe> mipinterface_statement interface_statement
+%type <cfe> interface_statement mobileinterface_statement
 %type <cfe> preference_statement
 %type <cfe> prefixtable_config
 %type <cfe> prefixtable_statements prefixtable_statement
@@ -85,8 +87,9 @@ statements:
 statement:
 		debug_statement
 	|	namelookup_statement
-	|	mipinterface_statement
+	|	commandport_statement
 	|	interface_statement
+	|	mobileinterface_statement
 	|	homeregistrationlifetime_statement
 	|	preference_statement
 	|	prefixtable_config
@@ -120,6 +123,20 @@ namelookup_statement:
 		}
 	;
 
+commandport_statement:
+		COMMANDPORT INTEGER EOS
+		{
+			struct config_entry *cfe;
+
+			cfe = alloc_cfe(CFT_COMMANDPORT);
+			if (cfe == NULL)
+				return (-1);
+			cfe->cfe_number = $2;
+
+			$$ = cfe;
+		}
+	;
+
 interface_statement:
 		INTERFACE IFNAME EOS
 		{
@@ -134,8 +151,8 @@ interface_statement:
 		}
 	;
 
-mipinterface_statement:
-		INTERFACE MIPIFNAME EOS
+mobileinterface_statement:
+		MOBILEINTERFACE MIPIFNAME EOS
 		{
 			struct config_entry *cfe;
 
@@ -162,7 +179,7 @@ homeregistrationlifetime_statement:
 		}
 	;
 
-preference_statement
+preference_statement:
 		PREFERENCE INTEGER EOS
 		{
 			struct config_entry *cfe;

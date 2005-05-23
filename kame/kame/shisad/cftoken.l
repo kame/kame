@@ -32,6 +32,7 @@ mipifname	mip[0-9]+
 
 %s S_CONFIG
 %s S_INTERFACE
+%s S_MOBILEINTERFACE
 %s S_PREFIXTABLE
 
 %%
@@ -44,21 +45,23 @@ mipifname	mip[0-9]+
 	/* config parameters */
 <S_CONFIG>debug { D; return (DEBUG); }
 <S_CONFIG>namelookup { D; return (NAMELOOKUP); }
+<S_CONFIG>command-port { D; return (COMMANDPORT); }
+<S_CONFIG>home-registration-lifetime { D; return (HOMEREGISTRATIONLIFETIME ); }
+<S_CONFIG>preference { D; return (PREFERENCE); }
 <S_CONFIG>interface { D; BEGIN S_INTERFACE; return (INTERFACE); }
-<S_INTERFACE>{mipifname} {
-	D;
-	BEGIN S_CONFIG;
-	yylval.string = strdup(yytext);
-	return (MIPIFNAME);
-}
 <S_INTERFACE>{ifname} {
 	D;
 	BEGIN S_CONFIG;
 	yylval.string = strdup(yytext);
 	return (IFNAME);
 }
-<S_CONFIG>home-registration-lifetime { D; return (HOMEREGISTRATIONLIFETIME ); }
-<S_CONFIG>preference { D; return (PREFERENCE); }
+<S_CONFIG>mobile-interface { D; BEGIN S_MOBILEINTERFACE; return (MOBILEINTERFACE); }
+<S_MOBILEINTERFACE>{mipifname} {
+	D;
+	BEGIN S_CONFIG;
+	yylval.string = strdup(yytext);
+	return (MIPIFNAME);
+}
 <S_CONFIG>prefixtable { D; BEGIN S_PREFIXTABLE; return (PREFIXTABLE); }
 <S_PREFIXTABLE>{bcl} { D; return (BCL); }
 <S_PREFIXTABLE>explicit {
