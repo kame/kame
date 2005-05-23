@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.13 2005/05/20 09:23:59 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.14 2005/05/23 09:39:17 keiichi Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -76,11 +76,20 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 /* Macro for modulo 2^^16 comparison */
 #define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
 
+#define CND_COMMAND_PORT	7777
+#define MND_COMMAND_PORT	7778
+#define MRD_COMMAND_PORT	7778
+#define HAD_COMMAND_PORT	7779
+
 #define CND_PIDFILE	"/var/run/cnd.pid"
 #define MND_PIDFILE	"/var/run/mnd.pid"
+#define MRD_PIDFILE	"/var/run/mrd.pid"
 #define HAD_PIDFILE	"/var/run/had.pid"
 
 #define CND_CONFFILE	"/usr/local/v6/etc/cnd.conf"
+#define MND_CONFFILE	"/usr/local/v6/etc/mnd.conf"
+#define MRD_CONFFILE	"/usr/local/v6/etc/mrd.conf"
+#define HAD_CONFFILE	"/usr/local/v6/etc/had.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
 #ifdef MIP_NEMO
