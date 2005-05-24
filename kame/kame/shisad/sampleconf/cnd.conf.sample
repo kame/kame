@@ -1,0 +1,2 @@
+debug 1;
+command-port 7777;

@@ -1,4 +1,0 @@
-#NEMO Prefix Table Configuration
-#HomeAddress MobileNetworkPrefix PrefixLength RegistrationMode BindingID(optional)
-2001:200:0:8c08::328 2001:200:0:8c0a:: 64 explicit 111
-2001:200:0:8c08::328 2001:200:0:8c0a:: 64 explicit 800
