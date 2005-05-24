@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.25 2005/04/27 01:54:05 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.26 2005/05/24 10:15:19 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1860,7 +1860,7 @@ send_mps(hpfx)
 		CMSG_SPACE(sizeof(struct ip6_opt_home_address) + 2 + 4);
 
 #if defined(MIP_MN) && defined(MIP_NEMO)
-        ar_sin6 = nemo_ar_get(hoa, &ar_sin6_orig);
+        ar_sin6 = nemo_ar_get(&bul->bul_coa, &ar_sin6_orig);
         if (ar_sin6) 
                 msg.msg_controllen += 
                         CMSG_SPACE(sizeof(struct sockaddr_in6));
