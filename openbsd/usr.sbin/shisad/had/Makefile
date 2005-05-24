@@ -29,11 +29,14 @@ SRCDIR=	${.CURDIR}/../../../kame/shisad
 PROG=	had
 SRCS=	had.c  callout.c common.c  mh.c \
 	binding.c fdlist.c command.c network.c util.c
+SRCS+=  config.c cfparse.y cftoken.l
 CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -lcrypto
+YFLAGS+=-d
+CLEANFILES+=y.tab.h
 
 MAN=	had.8
 
