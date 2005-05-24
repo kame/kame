@@ -29,11 +29,14 @@ SRCDIR=	${.CURDIR}/../../../kame/shisad
 PROG=	mnd
 SRCS=	mnd.c rr.c mh.c callout.c \
 	fsm.c binding.c network.c  common.c fdlist.c command.c util.c
+SRCS+=	config.c cfparse.y cftoken.l
 CFLAGS+= -g -Wall -Werror -DTEST -DMIP_MN
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -lcrypto
+YFLAGS+=-d
+CLEANFILES+=cfparse.h
 
 MAN=	mnd.8
 
