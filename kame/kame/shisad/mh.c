@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.26 2005/05/24 10:15:19 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.27 2005/05/24 10:16:19 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1662,13 +1662,13 @@ checksum_p(src, dst, addr, len, nxt)
 
 
 static int
-sendmessage(mhdata, mhdatalen, ifindex, src, dst, hoa, rtaddr) 
+sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr) 
 	char *mhdata;
 	int mhdatalen;
 	u_int ifindex;
 	struct in6_addr *src;
 	struct in6_addr *dst;
-	struct in6_addr *hoa;
+	struct in6_addr *haoaddr;
 	struct in6_addr *rtaddr;
 {
         struct sockaddr_in6 addr;
@@ -1697,7 +1697,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, hoa, rtaddr)
         msg.msg_iovlen = 1;
         msg.msg_control = (void *) adata;
         msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
-	if (hoa)  
+	if (haoaddr)  
 		msg.msg_controllen += 
 			CMSG_SPACE(sizeof(struct ip6_opt_home_address) 
 				+ sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN);
@@ -1705,7 +1705,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, hoa, rtaddr)
 		msg.msg_controllen += 
 			CMSG_SPACE(sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr));
 #if defined(MIP_MN) && defined(MIP_NEMO)
-	ar_sin6 = nemo_ar_get(hoa, &ar_sin6_orig);
+	ar_sin6 = nemo_ar_get(haoaddr, &ar_sin6_orig);
 	if (ar_sin6) 
 		msg.msg_controllen += 
 			CMSG_SPACE(sizeof(struct sockaddr_in6));
@@ -1738,7 +1738,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, hoa, rtaddr)
 #endif
 
 	/* Destination Option */
-	if (hoa) {
+	if (haoaddr) {
 		dest = (struct ip6_dest *)(CMSG_DATA(cmsgptr));
 
 		/* padding */
@@ -1755,7 +1755,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, hoa, rtaddr)
 		hoadst->ip6oh_type = 0xc9;
 		hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address) - 
 			sizeof(struct ip6_dest);
-		memcpy(hoadst->ip6oh_addr, hoa, sizeof(struct in6_addr));
+		memcpy(hoadst->ip6oh_addr, haoaddr, sizeof(struct in6_addr));
 		
 		cmsgptr->cmsg_level = IPPROTO_IPV6;
 		cmsgptr->cmsg_type = IPV6_DSTOPTS;

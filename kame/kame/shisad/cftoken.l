@@ -32,8 +32,8 @@ mipifname	mip[0-9]+
 
 %s S_CONFIG
 %s S_INTERFACE
-%s S_MOBILEINTERFACE
 %s S_PREFIXTABLE
+%s S_STATICTUNNEL
 
 %%
 %{
@@ -54,13 +54,6 @@ mipifname	mip[0-9]+
 	BEGIN S_CONFIG;
 	yylval.string = strdup(yytext);
 	return (IFNAME);
-}
-<S_CONFIG>mobile-interface { D; BEGIN S_MOBILEINTERFACE; return (MOBILEINTERFACE); }
-<S_MOBILEINTERFACE>{mipifname} {
-	D;
-	BEGIN S_CONFIG;
-	yylval.string = strdup(yytext);
-	return (MIPIFNAME);
 }
 <S_CONFIG>prefixtable { D; BEGIN S_PREFIXTABLE; return (PREFIXTABLE); }
 <S_PREFIXTABLE>{bcl} { D; return (BCL); }
@@ -86,6 +79,23 @@ mipifname	mip[0-9]+
 }
 <S_PREFIXTABLE>{slash} { D; return (SLASH); }
 <S_PREFIXTABLE>{ecl} { D; BEGIN S_CONFIG; return (ECL); }
+<S_CONFIG>static-tunnel { D; BEGIN S_STATICTUNNEL; return (STATICTUNNEL); }
+<S_STATICTUNNEL>{ifname} {
+	D;
+	yylval.string = strdup(yytext);
+	return (IFNAME);
+}
+<S_STATICTUNNEL>{integer} {
+	D;
+	yylval.number = (int)strtol(yytext, NULL, 10);
+	return (INTEGER);
+}
+<S_STATICTUNNEL>{addrstring} {
+	D;
+	yylval.string = strdup(yytext);
+	return (ADDRSTRING);
+}
+<S_STATICTUNNEL>{ecl} { D; BEGIN S_CONFIG; return (ECL); }
 
 	/* misc */
 {ws} { ; }

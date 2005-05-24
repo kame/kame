@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.14 2005/05/23 09:39:17 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.15 2005/05/24 10:16:19 keiichi Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -79,7 +79,7 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define CND_COMMAND_PORT	7777
 #define MND_COMMAND_PORT	7778
 #define MRD_COMMAND_PORT	7778
-#define HAD_COMMAND_PORT	7779
+#define HAD_COMMAND_PORT	7778
 
 #define CND_PIDFILE	"/var/run/cnd.pid"
 #define MND_PIDFILE	"/var/run/mnd.pid"
@@ -95,8 +95,6 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #ifdef MIP_NEMO
 #define NEMO_PTFILE 	"/etc/prefix_table.conf"
 #endif /* MIP_NEMO */
-
-#define _PATH_SHISADCONF	"/usr/local/v6/etc/shisad.conf"
 
 /*
  * homeprefix_info -> homeprefix_info -> ...
@@ -533,13 +531,13 @@ int send_mpa(struct in6_addr *, u_int16_t, u_short);
 struct nemo_mptable *nemo_mpt_get(struct mip6_hoainfo *, 
 				struct in6_addr *, u_int8_t);
 struct nemo_mptable *nemo_mpt_add(struct mip6_hoainfo *, 
-				  struct in6_addr *, u_int8_t, char *);
+				  struct in6_addr *, u_int8_t, int);
 struct nemo_hptable *nemo_hpt_get(struct in6_addr *, u_int8_t);
 struct nemo_hptable *nemo_hpt_add(struct in6_addr *, struct in6_addr *, 
-				  u_int8_t, char *);
+				  u_int8_t, int);
 
 #define NEMOPREFIXINFO "./nemo_prefixtable.conf"
-void nemo_parse_conf(char *);
+void nemo_parse_conf(void);
 void command_show_pt(int, char *);
 
 #endif /* MIP_NEMO */

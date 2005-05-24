@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.10 2005/05/23 09:41:23 keiichi Exp $	*/
+/*	$KAME: cnd.c,v 1.11 2005/05/24 10:16:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -81,9 +81,12 @@ int mhsock, mipsock, icmp6sock;
 struct mip6stat mip6stat;
 int homeagent_mode = 0;
 
-/* configuration variables */
-int debug = 0, namelookup = 1;
+/* configuration parameters */
+int debug = 0;
+int foreground = 0;
+int namelookup = 1;
 int command_port = CND_COMMAND_PORT;
+char *conffile = CND_CONFFILE;
 
 static void cn_lists_init(void);
 void flush_bc(void);
@@ -99,7 +102,7 @@ cn_usage(path)
 		cmd = path;
 	else
 		cmd++;
-	fprintf(stderr, "%s [-dn]\n", cmd);
+	fprintf(stderr, "%s [-fn] [-c configfile]\n", cmd);
 	exit(0);
 } 
 
@@ -113,27 +116,30 @@ main(argc, argv)
 	int ch = 0;
 	FILE *pidfp;
 
-	/* parse configuration file and set default values. */
-	if (parse_config(CFM_CND, CND_CONFFILE) == 0) {
-		config_get_number(CFT_DEBUG, &debug, config_result);
-		config_get_number(CFT_NAMELOOKUP, &namelookup, config_result);
-		config_get_number(CFT_COMMANDPORT, &command_port, config_result);
-	}
-
 	/* get options */
-	while ((ch = getopt(argc, argv, "dn")) != -1) {
+	while ((ch = getopt(argc, argv, "fnc:")) != -1) {
 		switch (ch) {
-		case 'd':
-			debug = 1;
+		case 'f':
+			foreground = 1;
 			break;
 		case 'n':
 			namelookup = 0;
+			break;
+		case 'c':
+			conffile = optarg;
 			break;
 		default:
 			fprintf(stderr, "unknown option\n");
 			cn_usage();
 			break;
 		}
+	}
+
+	/* parse configuration file and set default values. */
+	if (parse_config(CFM_CND, conffile) == 0) {
+		config_get_number(CFT_DEBUG, &debug, config_params);
+		config_get_number(CFT_COMMANDPORT, &command_port,
+		    config_params);
 	}
 
 	/* open syslog infomation. */
@@ -160,7 +166,7 @@ main(argc, argv)
 	signal(SIGTERM, terminate);
 	signal(SIGINT, terminate);
 
-	if (debug == 0)
+	if (foreground == 0)
 		daemon(0, 0);
 
 	/* dump current PID */

@@ -37,10 +37,10 @@ enum {
 enum {
 	CFT_DEBUG, CFT_NAMELOOKUP, CFT_COMMANDPORT,
 	CFT_HOMEREGISTRATIONLIFETIME,
-	CFT_MOBILEINTERFACE,
 	CFT_INTERFACE,
 	CFT_PREFERENCE,
-	CFT_PREFIXTABLELIST, CFT_PREFIXTABLE
+	CFT_PREFIXTABLELIST, CFT_PREFIXTABLE,
+	CFT_STATICTUNNELLIST, CFT_STATICTUNNEL
 };
 
 enum {
@@ -64,12 +64,23 @@ struct config_prefixtable {
 	int cfpt_binding_id;
 };
 
-extern struct config_entry *config_result;
+struct config_static_tunnel {
+	char *cfst_ifname;
+	struct in6_addr cfst_homeaddress;
+	int cfst_binding_id;
+};
+
+extern struct config_entry *config_params;
+
+extern int parse(int, const char *, struct config_entry **);
 
 int parse_config(int, const char *);
 int config_get_number(int, int *, struct config_entry *);
 int config_get_string(int, char **, struct config_entry *);
 int config_get_list(int, struct config_entry **, struct config_entry *);
+int config_get_interface(const char *, struct config_entry **,
+    struct config_entry *);
 int config_get_prefixtable(struct config_entry **, struct config_entry *);
+int config_get_static_tunnel(struct config_entry **, struct config_entry *);
 
 #endif /* _SHISAD_CONFIG_H_ */

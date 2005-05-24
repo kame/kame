@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.6 2005/04/14 06:22:36 suz Exp $  */
+/*      $KAME: nemo_var.c,v 1.7 2005/05/24 10:16:19 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -62,10 +62,11 @@
 #include "shisad.h"
 #include "stat.h"
 #include "fsm.h"
+#include "config.h"
 
 #ifdef MIP_NEMO 
 
-static char *parse_blank(char *);
+extern struct config_entry *if_params;
 
 #ifdef MIP_MN
 struct nemo_mptable *
@@ -96,7 +97,7 @@ nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 	struct mip6_hoainfo *hoainfo;
 	struct in6_addr *nemoprefix;
 	u_int8_t prefixlen;
-	char *mode;
+	int mode;
 {
 	struct nemo_mptable *newmpt = NULL;
 
@@ -111,13 +112,12 @@ nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 	newmpt->mpt_prefix = *nemoprefix;
 	newmpt->mpt_prefixlen = prefixlen;
 	newmpt->mpt_hoainfo = hoainfo;
-
-	if (strncmp(mode, "implicit", strlen("implicit")) == 0)
-		newmpt->mpt_regmode = NEMO_IMPLICIT;
-	else if (strncmp(mode, "explicit", strlen("explicit")) == 0)
-		newmpt->mpt_regmode = NEMO_EXPLICIT;
-	else
-		newmpt->mpt_regmode = NEMO_ROUTING; /* XXX */
+	if (mode == NEMO_ROUTING) {
+		syslog(LOG_ERR,
+		    "Routing mode is not supported yet\n");
+		return (NULL);
+	}
+	newmpt->mpt_regmode = mode;
 
 	LIST_INSERT_HEAD(&hoainfo->hinfo_mpt_head, newmpt, mpt_entry);
 
@@ -178,7 +178,7 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 	struct in6_addr *hoa;
 	struct in6_addr *nemoprefix;
 	u_int8_t prefixlen;
-	char *mode;
+	int mode;
 {
 	struct nemo_hptable *newpt = NULL;
 
@@ -193,16 +193,12 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 	newpt->hpt_prefix = *nemoprefix;
 	newpt->hpt_prefixlen = prefixlen;
 	newpt->hpt_hoa = *hoa;
-
-	if (strncmp(mode, "implicit", strlen("implicit")) == 0)
-		newpt->hpt_regmode = NEMO_IMPLICIT;
-	else if (strncmp(mode, "explicit", strlen("explicit")) == 0)
-		newpt->hpt_regmode = NEMO_EXPLICIT;
-	else {
-		syslog(LOG_ERR, "Routing Update is not supported\n");
-		free(newpt);
+	if (mode == NEMO_ROUTING) {
+		syslog(LOG_ERR,
+		    "Routing mode is not supported yet\n");
 		return (NULL);
 	}
+	newpt->hpt_regmode = mode;
 
 	LIST_INSERT_HEAD(&hpt_head, newpt, hpt_entry);
 
@@ -217,177 +213,71 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 #endif /* MIP_HA */
 
 void
-nemo_parse_conf(filename)
-	char *filename;
+nemo_parse_conf()
 {
-        FILE *file;
-        int i=0;
-        char buf[256], *head;
+	struct config_entry *cfe;
+	struct config_prefixtable *cfpt;
 #ifdef MIP_MN
 	struct nemo_mptable *mpt;
 	struct mip6_hoainfo *hoainfo = NULL;
 #elif defined(MIP_HA)
 	struct nemo_hptable *hpt;
 #endif /* MIP_MN */
+	int mode = NEMO_IMPLICIT;
 
-#ifdef MIP_MCOA
-#define NEMO_OPTNUM 5
-#else
-#define NEMO_OPTNUM 4
-#endif /* MIP_MCOA */
+	if (config_get_prefixtable(&cfe, if_params) != 0) {
+		syslog(LOG_INFO,
+		    "no prefix table is defined\n");
+		return;
+	}
 
-	char *option[NEMO_OPTNUM];
-        /*
-         * option[0]: HoA 
-         * option[1]: Mobile Network Prefix
-         * option[2]: Mobile Network Prefix Length
-         * option[3]: Registration mode
-         * option[4]: Binding Unique Identifier (optional)
-         */
-	struct nemoprefixinfo {
-		struct in6_addr hoa;
-		struct in6_addr nemopfx;
-		int nemopfxlen;
-		char *mode;
-#ifdef MIP_MCOA
-		u_int16_t bid;
-#endif /* MIP_MCOA */
-		struct in6_addr ha;
-	} npinfo;
+	for (; cfe != NULL; cfe = cfe->cfe_next) {
+		cfpt = (struct config_prefixtable *)cfe->cfe_ptr;
 
-	file = fopen((filename) ? filename : NEMOPREFIXINFO, "r");
-        if(file == NULL) {
-                perror("fopen");
-                exit(0);
-        }
-
-        memset(buf, 0, sizeof(buf));
-        while((fgets(buf, sizeof(buf), file)) != NULL){
-
-		/* ignore comments */
-		if (strchr(buf, '#') != NULL) 
-			continue;
-		if (strchr(buf, ' ') == NULL) 
-			continue;
-		
-		/* parsing all options */
-		for (i = 0; i < NEMO_OPTNUM; i++)
-			option[i] = '\0';
-		head = buf;
-
-                for (i = 0, head = buf; 
-                     (head != NULL) && (i < NEMO_OPTNUM); 
-			head += (strlen(head) + 1), i ++) {
-
-			head = parse_blank(head);
-			option[i] = head;
+		switch (cfpt->cfpt_mode) {
+		case CFPT_IMPLICIT:
+			mode = NEMO_IMPLICIT;
+			break;
+		case CFPT_EXPLICIT:
+			mode = NEMO_EXPLICIT;
+			break;
+		case CFPT_ROUTING:
+			mode = NEMO_ROUTING;
+			break;
 		}
 
-		if (debug) {
-			syslog(LOG_INFO, "parsing nemoconfig file\n");
-			for (i = 0; i < (NEMO_OPTNUM - 2); i ++)  
-				syslog(LOG_INFO, "\t%d=%s\n", i, option[i]);
-
-			if (option[NEMO_OPTNUM - 1]) /* because of optional one */
-				syslog(LOG_INFO, "\t%d=%s\n", i, 
-					option[NEMO_OPTNUM - 1]);
-		}
-
-		memset(&npinfo, 0, sizeof(npinfo));
-                if (inet_pton(AF_INET6, option[0], &npinfo.hoa) < 0) {
-                        fprintf(stderr, "%s is not correct address\n", option[0]);
-                        continue;
-		}
-
-                if (inet_pton(AF_INET6, option[1], &npinfo.nemopfx) < 0) {
-                        fprintf(stderr, "%s is not correct address\n", option[1]);
-                        continue;
-		}
-		npinfo.nemopfxlen = atoi(option[2]);
-		npinfo.mode = option[3];
-
-#ifdef MIP_MCOA
-		if (option[4]) {
-			npinfo.bid = atoi(option[4]);
-		} else 
-			npinfo.bid = 0;
-#endif /* MIP_MCOA */
-
-		/* Insert this npinfo to prefixtable */
+		/* Insert this mobile prefix information to prefixtable */
 #ifdef MIP_MN
-		hoainfo = hoainfo_find_withhoa(&npinfo.hoa);
+		hoainfo = hoainfo_find_withhoa(&cfpt->cfpt_homeaddress);
 		if (hoainfo == NULL)
 			continue;
 
-		mpt = nemo_mpt_get(hoainfo, &npinfo.nemopfx, npinfo.nemopfxlen);
+		mpt = nemo_mpt_get(hoainfo, &cfpt->cfpt_prefix,
+		    cfpt->cfpt_prefixlen);
 		if (mpt) {
 			/* XXX update entry */
 		} else {
-			mpt = nemo_mpt_add(hoainfo, &npinfo.nemopfx, 
-					 npinfo.nemopfxlen, npinfo.mode);
+			mpt = nemo_mpt_add(hoainfo, &cfpt->cfpt_prefix,
+			    cfpt->cfpt_prefixlen,
+			    mode);
 			if (mpt == NULL) 
-				syslog(LOG_ERR, "adding nemoprefix is failed\n");
+				syslog(LOG_ERR,
+				    "adding nemoprefix is failed\n");
 		}
-#elif defined(MIP_HA)
-		hpt = nemo_hpt_get(&npinfo.nemopfx, npinfo.nemopfxlen);
+#endif /* MIP_MN */
+#ifdef MIP_HA
+		hpt = nemo_hpt_get(&cfpt->cfpt_prefix, cfpt->cfpt_prefixlen);
 		if (hpt) {
 			/* XXX update entry */
 		} else {
-			if (nemo_hpt_add(&npinfo.hoa, &npinfo.nemopfx, 
-					 npinfo.nemopfxlen, npinfo.mode) == NULL) 
-				syslog(LOG_ERR, "adding nemoprefix to Prefix Table is failed\n");
+			if (nemo_hpt_add(&cfpt->cfpt_homeaddress,
+				&cfpt->cfpt_prefix, cfpt->cfpt_prefixlen,
+				mode ) == NULL)
+				syslog(LOG_ERR,
+				    "adding nemoprefix to Prefix Table is failed\n");
 		}
-#endif /* MIP_MN */
-			
-		memset(buf, 0, sizeof(buf));
+#endif /* MIP_HA */
 	}
-
-	fclose(file);
-	return;
 }
-
-
-static char *
-parse_blank(char *head) {
-	int w = 0;
-	char *begin = NULL, *end = NULL;
-	
-	begin = head;
-
-	while (begin) {
-		switch (*begin) {
-		case ' ':
-		case '\t':
-			begin ++;
-			break;
-		default:
-			w = 1;
-			break;
-		}
-		if (w)
-			break;
-	}
-
-	w = 0;
-	end = begin;
-	while (end) {
-		switch (*end) {
-		case ' ':
-		case '\t':
-		case '\n':
-			*end = '\0';
-			w = 1;
-			break;
-		default:
-			break;
-		}
-		if (w)
-			break;
-		end ++;
-	}
-
-	return begin;
-
-};
 
 #endif /* MIP_NEMO */

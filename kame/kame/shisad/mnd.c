@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.14 2005/05/17 10:31:24 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.15 2005/05/24 10:16:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -70,17 +70,22 @@
 #include "fsm.h"
 #include "fdlist.h"
 #include "command.h"
+#include "config.h"
 
 /* Global Variables */
 int mipsock, icmp6sock, mhsock, csock;
-int debug = 0, namelookup = 1;
-u_char *conffile = NULL;
 struct mip6_mipif_list mipifhead;
 struct mip6_hinfo_list hoa_head;
 struct no_ro_head noro_head;
 struct mip6stat mip6stat;
 
-static int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
+/* configuration parameters */
+int debug = 0;
+int foreground = 0;
+int namelookup = 1;
+int command_port = MND_COMMAND_PORT;
+int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
+struct config_entry *if_params;
 
 /*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
@@ -136,9 +141,9 @@ void
 mn_usage()
 {
 #ifdef MIP_NEMO
-	char *banner = "mrd [-dn] -f prefixtable -i mip0 mip1 ...\n";
+	char *banner = "mrd [-fn] [-c configfile] mipinterface\n";
 #else
-	char *banner = "mnd [-dn] -i mip0 mip1 ...\n";
+	char *banner = "mnd [-fn] [-c configfile] mipinterface\n";
 #endif /* MIP_NEMO */
 
 	fprintf(stderr, banner);
@@ -157,60 +162,49 @@ main(argc, argv)
 	char **argv;
 {
 	int pfds, ch = 0;
-	char *arg_ifname = NULL;
+	FILE *pidfp;
 	struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul;
 	char *homeagent = NULL;
-	char *argopts = "c:dna:il:";
+	char *argopts = "fnc:a:";
 #ifdef MIP_NEMO
-	char *nemofile = NULL;
+	char *conffile = MRD_CONFFILE;
+#else
+	char *conffile = MND_CONFFILE;
+#endif
 
-	argopts = "c:dna:il:f:";
+#ifdef MIP_NEMO
+	argopts = "fnc:a:t:";
 #endif /* MIP_NEMO */
-
-	if (argc < 2) {
-		mn_usage();
-		exit(-1);
-	}
 
         while ((ch = getopt(argc, argv, argopts)) != -1) {
                 switch (ch) {
-		case 'c':
-			conffile = optarg;
-			break;
-                case 'd':
-                        debug = 1;
+                case 'f':
+                        foreground = 1;
                         break;
                 case 'n':
                         namelookup = 0;
                         break;
+		case 'c':
+			conffile = optarg;
+			break;
 		case 'a':
 			homeagent = optarg;
 			break;
-		case 'i':	/* Is it necessary to use '-i' option? Specifing interface is mandatory for mnd. thus, using option is too lengthy */
-			goto startmn;
-			break;
-		case 'l':
-			if (atoi(optarg) > 0)
-				default_lifetime = atoi(optarg) / 4;
-			break;
-#ifdef MIP_NEMO
-		case 'f':
-			nemofile = optarg;
-			break;
-#endif /* MIP_NEMO */
                 default:
                         fprintf(stderr, "unknown option\n");
                         mn_usage();
                         break;
                 }
         }
+	argc -= optind;
+	argv += optind;
+
+	if (argv == NULL || *argv == NULL) {
+		mn_usage();
+		exit(-1);
+	}
 	
-	mn_usage();
-
-	return (-1);
-
- startmn:
 	/* open syslog infomation. */
 #ifndef MIP_NEMO
 	openlog("shisad(mnd)", 0, LOG_DAEMON);
@@ -220,9 +214,32 @@ main(argc, argv)
 	syslog(LOG_INFO, "Start Mobile Router\n");
 #endif
 
-	if (optind >= argc) {
-		mn_usage();
-		return (-1);
+	/* parse configuration file and set default values. */
+	if (parse_config(
+#ifdef MIP_NEMO
+	    CFM_MRD, 
+#else
+	    CFM_MND,
+#endif
+	    conffile) == 0) {
+		config_get_interface(*argv, &if_params,
+		    config_params);
+	}
+	if (if_params != NULL) {
+		/* get interface specific parameters. */
+		config_get_number(CFT_DEBUG, &debug, if_params);
+		config_get_number(CFT_COMMANDPORT, &command_port,
+		    if_params);
+		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
+		    &default_lifetime, if_params);
+	}
+	if (config_params != NULL) {
+		/* get global parameters. */
+		config_get_number(CFT_DEBUG, &debug, config_params);
+		config_get_number(CFT_COMMANDPORT, &command_port,
+		    config_params);
+		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
+		    &default_lifetime, config_params);
 	}
 
 	mhsock_open();
@@ -236,27 +253,21 @@ main(argc, argv)
 	callout_init();
 	fdlist_init();
 	csock = command_init("mn> ", command_table, 
-		sizeof(command_table) / sizeof(struct command_table), 7778);
+	    sizeof(command_table) / sizeof(struct command_table),
+	    command_port);
 	if (csock < 0) {
 		fprintf(stderr, "Unable to open user interface\n");
 	}
 
-
 	/* Initialization of mip virtual interfaces, home address and
 	 * binding update list */
-	for (; optind < argc; optind ++) {
-		arg_ifname = argv[optind];
-
-		if (arg_ifname == NULL)
-			break;
-
-		if (mnd_add_mipif(arg_ifname) == NULL) {
-			syslog(LOG_ERR, "%s is invalid\n", arg_ifname);
-			exit(0);
-		}
+	if (mnd_add_mipif(*argv) == NULL) {
+		syslog(LOG_ERR, "interface %s is invalid.\n", *argv);
+		exit(-1);
 	}
+
 #ifdef MIP_NEMO
-	nemo_parse_conf(nemofile);
+	nemo_parse_conf();
 #endif /* MIP_NEMO */
 
 #if 1
@@ -299,8 +310,20 @@ main(argc, argv)
 	signal(SIGTERM, terminate);
 	signal(SIGINT, terminate);
 
-	if (debug == 0)
+	if (foreground == 0)
 		daemon(0, 0);
+
+	/* dump current PID */
+	if ((pidfp = fopen(
+#ifdef MIP6_NEMO
+		         MRD_PIDFILE,
+#else
+		         MND_PIDFILE,
+#endif
+			 "w")) != NULL) {
+		fprintf(pidfp, "%d\n", getpid());
+		fclose(pidfp);
+	}
 
 	/* main loop. */
 	while (1) {
@@ -1295,8 +1318,9 @@ mnd_init_homeprefix(mipif)
 	freeifaddrs(ifap);
 	
 	if (LIST_EMPTY(&mipif->mipif_hprefx_head)) {
-		syslog(LOG_ERR, "please configure at least one global home prefix\n");
-		exit(0);
+		syslog(LOG_ERR,
+		    "please configure at least one global home prefix\n");
+		exit(-1);
 	}
 	return;
 }
@@ -1333,6 +1357,12 @@ terminate(dummy)
 	close(mhsock);
 
 	noro_sync();
+
+#ifdef MIP6_NEMO
+	unlink(MRD_PIDFILE);
+#else
+	unlink(MND_PIDFILE);
+#endif
 
 	exit(-1);
 }

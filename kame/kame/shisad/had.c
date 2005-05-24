@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.17 2005/05/23 09:41:23 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.18 2005/05/24 10:16:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -64,10 +64,18 @@
 #include "shisad.h"
 #include "fdlist.h"
 #include "command.h"
+#include "config.h"
 
 /* Global Variables */
 int mipsock, icmp6sock, mhsock;
-int debug = 0, namelookup = 1;
+
+/* configuration parameters */
+struct config_entry *if_params = NULL;
+int debug = 0;
+int foreground = 0;
+int namelookup = 1;
+int command_port = HAD_COMMAND_PORT;
+int preference = 0;
 
 struct mip6stat mip6stat;
 struct mip6_hpfx_list hpfx_head; 
@@ -128,11 +136,7 @@ ha_usage(path)
 		cmd = path;
 	else
 		cmd++;
-#ifdef MIP_NEMO
-	fprintf(stderr, "%s [-dn] -f prefixtable -i ifname -p preference\n", cmd);
-#else
-	fprintf(stderr, "%s [-dn] -i ifname -p preference\n", cmd);
-#endif
+	fprintf(stderr, "%s [-fn] [-c configfile] ifname\n", cmd);
 } 
 
 int
@@ -142,52 +146,29 @@ main(argc, argv)
 {
 	int pfds;
 	int ch = 0;
-	char *arg_ifname;
-	int arg_preference;
+	char *ifname;
 	FILE *pidfp;
+	char *conffile = HAD_CONFFILE;
+	char *options = "fnc:";
 
-#ifdef MIP_NEMO
-	char *confname = NULL;
-	char *options = "dnf:i:p:";
-#else
-	char *options = "dni:p:";
-#endif /* MIP_NEMO */ 
-
-        if (argc < 2) {
+        if (argc < 1) {
 		ha_usage(argv[0]);
 		exit (0);
 	}
 
 	/* get options */
-	arg_ifname = NULL;
-	arg_preference = 0;
+	ifname = NULL;
 	while ((ch = getopt(argc, argv, options)) != -1) {
 		switch (ch) {
-		case 'd':
-			debug = 1;
+		case 'f':
+			foreground = 1;
 			break;
 		case 'n':
 			namelookup = 0;
 			break;
-		case 'i':
-			arg_ifname = optarg;
+		case 'c':
+			conffile = optarg;
 			break;
-#ifdef MIP_NEMO
-		case 'f':
-			confname = optarg;
-			break;
-#endif /* MIP_NEMO */
-		case 'p': {
-			char *p;
-                        arg_preference = strtol(optarg, &p, 0);
-                        if (arg_preference < 1 || *p) {
-				fprintf(stderr, 
-					"%s bad value for preference, use default value", 
-					optarg); 
-				arg_preference = 0; /* use default value */
-			}
-			break;
-		}
 		default:
 			fprintf(stderr, "unknown option\n");
 			ha_usage();
@@ -197,14 +178,28 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (arg_ifname == NULL) {
+	if (argv == NULL || ((ifname = *argv) == NULL)) {
 		fprintf(stderr, "you have to specify interfacename\n"); 
 		exit(1);
 	}
 
 	/* open syslog infomation. */
 	openlog("shisad(had)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "Start HA daemon at %s\n", arg_ifname);
+	syslog(LOG_INFO, "Start HA daemon at %s\n", ifname);
+
+	/* parse configuration file and set default values. */
+	if (parse_config(CFM_HAD, conffile) == 0)
+		config_get_interface(ifname, &if_params, config_params);
+	if (if_params != NULL) {
+		config_get_number(CFT_DEBUG, &debug, if_params);
+		config_get_number(CFT_COMMANDPORT, &command_port, if_params);
+		config_get_number(CFT_PREFERENCE, &preference, if_params);
+	}
+	if (config_params != NULL) {
+		config_get_number(CFT_DEBUG, &debug, if_params);
+		config_get_number(CFT_COMMANDPORT, &command_port, if_params);
+		config_get_number(CFT_PREFERENCE, &preference, if_params);
+	}
 
 	/* start timer */
 	callout_init();
@@ -221,9 +216,9 @@ main(argc, argv)
 
 	/* initialization */
 	ha_lists_init();
-	had_init_homeprefix(arg_ifname, arg_preference);
+	had_init_homeprefix(ifname, preference);
 #ifdef MIP_NEMO
-	nemo_parse_conf(confname);
+	nemo_parse_conf();
 #endif /*MIP_NEMO*/
 
 	/* open sockets */

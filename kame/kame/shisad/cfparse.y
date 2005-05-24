@@ -12,12 +12,11 @@
 extern FILE *yyin;
 
 int config_mode;
-struct config_entry *config_result;
 
 int yylex(void);
 int yyparse(void);
 
-int parse(int, FILE *);
+struct config_entry **config_result;
 
 static struct config_entry *alloc_cfe(int);
 static void free_cfe_list(struct config_entry *);
@@ -31,10 +30,11 @@ static void free_cfe(struct config_entry *);
 %token DEBUG
 %token NAMELOOKUP
 %token COMMANDPORT
-%token INTERFACE IFNAME MOBILEINTERFACE MIPIFNAME
+%token INTERFACE IFNAME
 %token HOMEREGISTRATIONLIFETIME
 %token PREFERENCE
 %token PREFIXTABLE EXPLICIT IMPLICIT
+%token STATICTUNNEL
 
 %union {
 	int number;
@@ -50,17 +50,19 @@ static void free_cfe(struct config_entry *);
 %type <cfe> debug_statement namelookup_statement
 %type <cfe> commandport_statement
 %type <cfe> homeregistrationlifetime_statement
-%type <cfe> interface_statement mobileinterface_statement
+%type <cfe> interface_statement
 %type <cfe> preference_statement
 %type <cfe> prefixtable_config
 %type <cfe> prefixtable_statements prefixtable_statement
+%type <cfe> statictunnel_config
+%type <cfe> statictunnel_statements statictunnel_statement
 
 %%
 
 config:
 		statements
 		{
-			config_result = $1;
+			*config_result = $1;
 		}
 	;
 
@@ -89,10 +91,10 @@ statement:
 	|	namelookup_statement
 	|	commandport_statement
 	|	interface_statement
-	|	mobileinterface_statement
 	|	homeregistrationlifetime_statement
 	|	preference_statement
 	|	prefixtable_config
+	|	statictunnel_config
 	;
 
 debug_statement:
@@ -138,7 +140,7 @@ commandport_statement:
 	;
 
 interface_statement:
-		INTERFACE IFNAME EOS
+		INTERFACE IFNAME BCL statements ECL EOS
 		{
 			struct config_entry *cfe;
 
@@ -146,20 +148,7 @@ interface_statement:
 			if (cfe == NULL)
 				return (-1);
 			cfe->cfe_ptr = $2;
-
-			$$ = cfe;
-		}
-	;
-
-mobileinterface_statement:
-		MOBILEINTERFACE MIPIFNAME EOS
-		{
-			struct config_entry *cfe;
-
-			cfe = alloc_cfe(CFT_MOBILEINTERFACE);
-			if (cfe == NULL)
-				return (-1);
-			cfe->cfe_ptr = $2;
+			cfe->cfe_list = $4;
 
 			$$ = cfe;
 		}
@@ -315,20 +304,101 @@ registration_mode:
 	|	IMPLICIT
 	;
 
+statictunnel_config:
+		STATICTUNNEL BCL statictunnel_statements ECL EOS
+		{
+			struct config_entry *cfe;
+
+			if (config_mode == CFM_CND ||
+			    config_mode == CFM_MND) {
+				printf("not supported\n");
+				return (-1);
+			}
+
+			cfe = alloc_cfe(CFT_STATICTUNNELLIST);
+			if (cfe == NULL) {
+				free_cfe_list($3);
+				return (-1);
+			}
+			cfe->cfe_list = $3;
+
+			$$ = cfe;
+		}
+	;
+
+statictunnel_statements:
+		{ $$ = NULL; }
+	|	statictunnel_statements statictunnel_statement
+		{
+			struct config_entry *cfe_head;
+
+			cfe_head = $1;
+			if (cfe_head == NULL) {
+				$2->cfe_next = NULL;
+				$2->cfe_tail = $2;
+				cfe_head = $2;
+			} else {
+				cfe_head->cfe_tail->cfe_next = $2;
+				cfe_head->cfe_tail = $2->cfe_tail;
+			}
+
+			$$ = cfe_head;
+		}
+	;
+
+statictunnel_statement:
+		IFNAME ADDRSTRING INTEGER EOS
+		{
+			struct config_entry *cfe;
+			struct config_static_tunnel *cfst;
+
+			cfst = (struct config_static_tunnel *)
+				malloc(sizeof(struct config_static_tunnel));
+			if (cfst == NULL)
+				return (-1);
+
+			cfst->cfst_ifname = $1;
+			if (inet_pton(AF_INET6, $2,
+				&cfst->cfst_homeaddress) <= 0) {
+				free(cfst);
+				return (-1);
+			}
+			cfst->cfst_binding_id = $3;
+
+			cfe = alloc_cfe(CFT_STATICTUNNEL);
+			if (cfe == NULL) {
+				free(cfst);
+				return (-1);
+			}				
+			cfe->cfe_ptr = cfst;
+
+			$$ = cfe;
+		}
+	;
+
 %%
 
 int
-parse(mode, in)
+parse(mode, filename, result)
 	int mode;
-	FILE *in;
+	const char *filename;
+	struct config_entry **result;
 {
 	config_mode = mode;
+	config_result = result;
 
-	yyin = in;
+	yyin = fopen(filename, "r");
+	if (yyin == NULL)
+		return (-1);
+
 	while (!feof(yyin)) {
-		if (yyparse())
+		if (yyparse()) {
+			fclose(yyin);
 			return (-1);
+		}
 	}
+	fclose(yyin);
+
 	return (0);
 }
 

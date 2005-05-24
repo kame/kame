@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.11 2005/05/17 10:31:24 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.12 2005/05/24 10:16:19 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -62,6 +62,7 @@
 
 #include "callout.h"
 #include "shisad.h"
+#include "config.h"
 
 /* Variables */
 struct nemo_if {
@@ -89,15 +90,16 @@ int foreground = 0;
 int namelookup = 1;
 int staticmode = 0;
 int multiplecoa = 0;
+struct config_entry *if_params;
 
 /* Functions */
 static int set_nemo_ifinfo();
 static void mainloop();
 static void nemo_terminate(int);
-static int ha_parse_ptconf(char *);
-static int mr_parse_ptconf(char *);
+static int ha_parse_ptconf(void);
+static int mr_parse_ptconf(void);
 static struct nemo_if *find_nemo_if_from_name(char *);
-static void set_static_tun(char *);
+static void set_static_tun(void);
 static struct nemo_if *nemo_setup_forwarding (struct sockaddr *, struct sockaddr *, 
 					      struct in6_addr *, u_int16_t);
 static struct nemo_if *nemo_destroy_forwarding(struct in6_addr *, u_int16_t);
@@ -105,15 +107,15 @@ static void nemo_dump();
 
 void
 nemo_usage() {
-	fprintf(stderr, "nemonetd -d -D -M [-h or -m] -f prefix_table.conf -t static_tun.conf\n");
+	fprintf(stderr, "nemonetd -d -f -M [-h or -m] -c configfile\n");
 	fprintf(stderr, "\t-d: Verbose Debug messages \n");
-	fprintf(stderr, "\t-D: Verbose Debug messages + foreground\n");
+	fprintf(stderr, "\t-f: Foreground mode\n");
 	fprintf(stderr, "\t-h: when Home Agent\n");
 	fprintf(stderr, "\t-m: when Mobile Router\n");
 	fprintf(stderr, "\t-M: Multiple CoA Registration Support\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Note: If prefixtable is not specified, ");
-	fprintf(stderr, "nemonetd will read /etc/prefix_table.conf\n");
+	fprintf(stderr, "nemonetd will read mrd.conf or had.conf\n");
 
 	exit(0);
 }
@@ -123,9 +125,10 @@ main (argc, argv)
 	int argc;
 	char **argv;
 {
-	char *pt_filename = NULL, *tun_filename = NULL;
+	char *conffile = NULL;
 	int ch = 0;
 	int if_number = 0, pt_number = 0;
+	char *ifname = NULL;
 	struct nemo_if *nif;
 	struct nemo_mnpt *npt;
 	
@@ -133,13 +136,12 @@ main (argc, argv)
 	LIST_INIT(&nemo_ifhead);
 
 	mode = 0;
-	while ((ch = getopt(argc, argv, "dDMnhmf:t:")) != -1) {
+	while ((ch = getopt(argc, argv, "dfMnhmc:s")) != -1) {
 		switch (ch) {
 		case 'd':
 			debug = 1;
 			break;
-		case 'D':
-			debug = 1;
+		case 'f':
 			foreground = 1;
 			break;
 		case 'n':
@@ -154,11 +156,10 @@ main (argc, argv)
 		case 'm':
 			mode = MODE_MR;
 			break;
-		case 'f':
-			pt_filename = optarg;
+		case 'c':
+			conffile = optarg;
 			break;
-		case 't':
-			tun_filename = optarg;
+		case 's':
 			staticmode = 1;
 			break;
 		default:
@@ -172,18 +173,64 @@ main (argc, argv)
 	if (mode == 0)
 		nemo_usage();
 
+	if (argv == NULL || ((ifname = *argv) == NULL)) {
+		if (mode == MODE_HA)
+			fprintf(stderr, "specify a home interface.\n");
+		else
+			fprintf(stderr, "specify a mip interface.\n");
+		exit(0);
+	}
+
 	/* open syslog */
 	openlog("shisad(nemod)", 0, LOG_DAEMON);
 	syslog(LOG_INFO, "Start NEMO daemon\n");
 
+	/*
+	 * select a configuration file based on the operatoin mode,
+	 * unless a user specifies it explicitly.
+	 */
+	if (conffile == NULL) {
+		switch (mode) {
+		case MODE_HA:
+			conffile = HAD_CONFFILE;
+			break;
+		case MODE_MR:
+			conffile = MRD_CONFFILE;
+			break;
+		default:
+			nemo_usage();
+			exit(0);
+		}
+	}
+
+	/* parse prefix table configuration file. */
+	if (parse_config(CFM_MRD, conffile) == 0) {
+		config_get_interface(ifname, &if_params, config_params);
+		if (if_params == NULL) {
+			syslog(LOG_ERR,
+			    "no interface definition in "
+			    "a configuration file.\n");
+			exit(0);
+		}
+	}
+	if (if_params != NULL) {
+		config_get_number(CFT_DEBUG, &debug, config_params);
+		config_get_number(CFT_NAMELOOKUP, &namelookup, config_params);
+	}
+	if (config_params != NULL) {
+		config_get_number(CFT_DEBUG, &debug, config_params);
+		config_get_number(CFT_NAMELOOKUP, &namelookup, config_params);
+	}
+
+
 	/* parse prefix table */
 	switch (mode) {
 	case MODE_HA:
-		if (ha_parse_ptconf((pt_filename)?pt_filename:NEMO_PTFILE) > 0)
+		if (ha_parse_ptconf() != 0)
 			exit(0);
 		break;
 	case MODE_MR:
-		if (mr_parse_ptconf((pt_filename)?pt_filename:NEMO_PTFILE) > 0)
+		if (mr_parse_ptconf() != 0)
 			exit(0);
 		break;
 	default:
@@ -210,8 +257,8 @@ main (argc, argv)
 	} 
 	
 	/* statically tunnel mode setting */
-	if (staticmode && tun_filename) 
-		set_static_tun(tun_filename);
+	if (staticmode)
+		set_static_tun();
 
 	signal(SIGTERM, nemo_terminate);
 	signal(SIGHUP, nemo_terminate);
@@ -235,176 +282,87 @@ main (argc, argv)
 };
 
 static int
-ha_parse_ptconf(filename)
-	char *filename;
+ha_parse_ptconf()
 {
-        FILE *file;
-        int i=0;
-        char buf[256], *spacer, *head;
+	struct config_entry *cfe;
+	struct config_prefixtable *cfpt;
+	int mode;
 	struct nemo_mnpt *pt;
-        char *option[NEMO_OPTNUM];
-        /*
-         * option[0]: HoA 
-         * option[1]: Mobile Network Prefix
-         * option[2]: Mobile Network Prefix Length
-         * option[3]: Registration mode
-         * option[4]: Binding Unique Identifier (optional)
-         */
 
-	if (filename == NULL)
-		return (EINVAL);
-	file = fopen(filename, "r");
-        if(file == NULL) {
-		syslog(LOG_ERR, "opening %s is failed %s\n", 
-			filename, strerror(errno));
-                return (errno);
-        }
+	if (config_get_prefixtable(&cfe, if_params) != 0) {
+		syslog(LOG_ERR,
+		    "specify prefix table information in a configuration "
+		    "file.\n");
+		return (-1);
+	}
 
-        memset(buf, 0, sizeof(buf));
-        while((fgets(buf, sizeof(buf), file)) != NULL){
-                /* ignore comments */
-                if (strchr(buf, '#') != NULL) 
-                        continue;
-                if (strchr(buf, ' ') == NULL) 
-                        continue;
-                
-                /* parsing all options */
-                for (i = 0; i < NEMO_OPTNUM; i++)
-                        option[i] = '\0';
-                head = buf;
-                for (i = 0, head = buf; 
-                     (head != NULL) && (i < (multiplecoa)?NEMO_OPTNUM:NEMO_OPTNUM_MCOA); 
-                     head = ++spacer, i ++) {
+	for (; cfe != NULL; cfe = cfe->cfe_next) {
+		cfpt = (struct config_prefixtable *)cfe->cfe_ptr;
 
-                        spacer = strchr(head, ' ');
-                        if (spacer) {
-                                *spacer = '\0';
-                                option[i] = head;
-                        } else {
-                                option[i] = head;
-                                break;
-                        }
-                }
-
-		pt = malloc(sizeof(*pt));
-		if (pt == NULL)
-			return (ENOMEM);
-		memset(pt, 0, sizeof(pt));
-                if (inet_pton(AF_INET6, option[0], &pt->hoa) < 0) {
-                        fprintf(stderr, "%s is not correct address\n", option[0]);
-			free(pt);
-                        continue;
-                }
-                if (inet_pton(AF_INET6, option[1], &pt->nemo_prefix) < 0) {
-                        fprintf(stderr, "%s is not correct address\n", option[1]);
-			free(pt);
-                        continue;
-                }
-		pt->nemo_prefixlen = atoi(option[2]);  
-
-		if (multiplecoa) {
-			if (option[4])
-				pt->bid = atoi(option[4]);
-			else 
-				pt->bid = 0;
+		switch (cfpt->cfpt_mode) {
+		case CFPT_IMPLICIT:
+			mode = NEMO_IMPLICIT;
+			break;
+		case CFPT_EXPLICIT:
+			mode = NEMO_EXPLICIT;
+			break;
+		case CFPT_ROUTING:
+			mode = NEMO_ROUTING;
+			break;
 		}
 
+		pt = malloc(sizeof(struct nemo_mnpt));
+		if (pt == NULL)
+			return (ENOMEM);
+		memset(pt, 0, sizeof(struct nemo_mnpt));
+		memcpy(&pt->hoa, &cfpt->cfpt_homeaddress,
+		    sizeof(struct in6_addr));
+		memcpy(&pt->nemo_prefix, &cfpt->cfpt_prefix,
+		    sizeof(struct in6_addr));
+		pt->nemo_prefixlen = cfpt->cfpt_prefixlen;
+		pt->bid = cfpt->cfpt_binding_id;
 
 		LIST_INSERT_HEAD(&nemo_mnpthead, pt, nemo_mnptentry);
+	}
 
-                memset(buf, 0, sizeof(buf));
-        } 
-	fclose(file);
 	return (0);
-
 };
 
 static int
-mr_parse_ptconf(filename)
-	char *filename;
+mr_parse_ptconf()
 {
-        FILE *file;
-        int i=0;
-        char buf[256], *spacer, *head;
+	struct config_entry *cfe;
+	struct config_prefixtable *cfpt;
 	struct nemo_mnpt *pt;
 
-        char *option[NEMO_OPTNUM];
-        /*
-         * option[0]: HoA 
-         * option[1]: Mobile Network Prefix
-         * option[2]: Mobile Network Prefix Length
-         * option[3]: Registration mode
-         * option[4]: Binding Unique Id (optional)
-         */
+	if (config_get_prefixtable(&cfe, if_params) != 0) {
+		syslog(LOG_ERR,
+		    "specify prefix table information in a configuration "
+		    "file.\n");
+		return (-1);
+	}
 
-	if (filename == NULL)
-		return (EINVAL);
+	for (; cfe != NULL; cfe = cfe->cfe_next) {
+		cfpt = (struct config_prefixtable *)cfe->cfe_ptr;
 
-        file = fopen(filename, "r");
-        if(file == NULL) {
-		syslog(LOG_ERR, "opening %s is failed %s\n", filename, strerror(errno));
-                return (errno);
-        }
-
-        memset(buf, 0, sizeof(buf));
-        while((fgets(buf, sizeof(buf), file)) != NULL){
-                /* ignore comments */
-                if (strchr(buf, '#') != NULL) 
-                        continue;
-                if (strchr(buf, ' ') == NULL) 
-                        continue;
-                
-                /* parsing all options */
-                for (i = 0; i < NEMO_OPTNUM; i++)
-                        option[i] = '\0';
-                head = buf;
-                for (i = 0, head = buf; 
-                     (head != NULL) && (i < (multiplecoa)?NEMO_OPTNUM:NEMO_OPTNUM_MCOA); 
-                     head = ++spacer, i ++) {
-
-                        spacer = strchr(head, ' ');
-                        if (spacer) {
-                                *spacer = '\0';
-                                option[i] = head;
-                        } else {
-                                option[i] = head;
-                                break;
-                        }
-                }
-
-		pt = malloc(sizeof(*pt));
+		
+		pt = malloc(sizeof(struct nemo_mnpt));
 		if (pt == NULL)
 			return (ENOMEM);
-		memset(pt, 0, sizeof(*pt));
+		memset(pt, 0, sizeof(struct nemo_mnpt));
 
-		if (inet_pton(AF_INET6, option[0], &pt->hoa) < 0) {
-			fprintf(stderr, "%s is not correct address\n", option[0]);
-			free(pt);
-			continue;
-		}
-
-		if (inet_pton(AF_INET6, option[1], &pt->nemo_prefix) < 0) {
-			fprintf(stderr, "%s is not correct address\n", option[1]);
-			free(pt);
-			continue;
-		}
-		pt->nemo_prefixlen = atoi(option[2]);
-
-		if (multiplecoa) {
-			if (option[4])
-				pt->bid = atoi(option[4]);
-			else 
-				pt->bid = 0;
-		}
+		memcpy(&pt->hoa, &cfpt->cfpt_homeaddress,
+		    sizeof(struct in6_addr));
+		memcpy(&pt->nemo_prefix, &cfpt->cfpt_prefix,
+		    sizeof(struct in6_addr));
+		pt->nemo_prefixlen = cfpt->cfpt_prefixlen;
+		pt->bid = cfpt->cfpt_binding_id;
 
 		LIST_INSERT_HEAD(&nemo_mnpthead, pt, nemo_mnptentry);
-		memset(buf, 0, sizeof(buf));
-	} 
-	
-	fclose(file);
+	}
+
 	return (0);
 };
-
 
 static int
 set_nemo_ifinfo() {
@@ -480,76 +438,33 @@ set_nemo_ifinfo() {
 
 
 static void
-set_static_tun(filename)
-	char *filename;
+set_static_tun()
 {
+	struct config_entry *cfe;
+	struct config_static_tunnel *cfst;
 	struct nemo_if *nif;
-	FILE *file;
-	int i=0;
-	char buf[256], *spacer, *head;
-	char *option[NEMO_TUNOPTNUM];
-	/*
-	 * option[0]: tun name
-	 * option[1]: HoA
-	 * option[2]: Binding Unique Id (optional)
-	 */ 
-	if (filename == NULL)
-		return; 
-		
-	file = fopen(filename, "r");
-	if(file == NULL) {
-		syslog(LOG_ERR, "opening %s is failed: %s\n", 
-			filename, strerror(errno));
-		nemo_usage();
-		exit(-1);
-	} 
-	
-	
-	memset(buf, 0, sizeof(buf));
-	while((fgets(buf, sizeof(buf), file)) != NULL){
-		/* ignore comments */
-		if (strchr(buf, '#') != NULL) 
-			continue; 
-		if (strchr(buf, ' ') == NULL) 
-			continue;
-                /* parsing all options */
-		
-		for (i = 0; i < NEMO_TUNOPTNUM; i++)
-			option[i] = '\0';
-		head = buf;
-		
-		for (i = 0, head = buf; 
-			(head != NULL) && (i < NEMO_TUNOPTNUM); 
-				head = ++spacer, i ++) { 
-				
-			spacer = strchr(head, ' ');
-			if (spacer) {
-				*spacer = '\0';
-				option[i] = head;
-			} else {
-				option[i] = head;
-				break;
-			}
-		} 
-		
-		nif = find_nemo_if_from_name(option[0]);
+
+	if (config_get_static_tunnel(&cfe, if_params) != 0) {
+		syslog(LOG_ERR,
+		    "specify static tunnel information in a configuration "
+		    "file.\n");
+		exit (-1);
+	}
+
+	for (; cfe != NULL; cfe = cfe->cfe_next) {
+		cfst = (struct config_static_tunnel *)cfe->cfe_ptr;
+
+		nif = find_nemo_if_from_name(cfst->cfst_ifname);
 		if (nif == NULL) {
-			syslog(LOG_ERR, "%s is not available\n", option[0]);
+			syslog(LOG_ERR, "%s is not available\n",
+			    cfst->cfst_ifname);
 			exit(-1);
 		}
-                if (inet_pton(AF_INET6, option[1], &nif->hoa) < 0) {
-			syslog(LOG_ERR, "%s is not correct address\n", option[1]);
-			exit(-1);
-		} 
-		
-		if (multiplecoa) {
-			if (option[2])
-				nif->bid = atoi(option[2]);
-			else 
-				nif->bid = 0;
-		}
-	} 
-	
+		memcpy(&nif->hoa, &cfst->cfst_homeaddress,
+		    sizeof(struct in6_addr));
+		nif->bid = cfst->cfst_binding_id;
+	}
+
 	return; 
 }
 
