@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.6 2005/03/01 18:00:23 keiichi Exp $
+# $Id: mobileip6,v 1.7 2005/05/25 10:07:30 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -11,6 +11,20 @@ name="mobileip6"
 start_cmd="mobileip6_start"
 stop_cmd="mobileip6_stop"
 
+
+eval ipv6_mobile_enable=${ipv6_mobile_enable:=NO}
+eval ipv6_mobile_config_dir=${ipv6_mobile_config_dir:=/usr/local/v6/etc/mobileip6}
+
+eval ipv6_mobile_mobile_node_interfaces=${ipv6_mobile_mobile_node_interfaces:=mip0}
+eval ipv6_mobile_mnd_flags=${ipv6_mobile_mnd_flags:='"-n -c /usr/local/v6/etc/mnd.conf"'}
+eval ipv6_mobile_mrd_flags=${ipv6_mobile_mrd_flags:='"-n -c /usr/local/v6/etc/mrd.conf"'}
+
+eval ipv6_mobile_mdd_program=${ipv6_mobile_mdd_program:=babymdd}
+
+eval ipv6_mobile_home_agent_mode=${ipv6_mobile_home_agent_mode:=mobile_ipv6}
+eval ipv6_mobile_had_flags=${ipv6_mobile_had_flags:='"-n -c /usr/local/v6/etc/had.conf"'}
+
+eval ipv6_mobile_cnd_flags=${ipv6_mobile_cnd_flags:='"-n -c /usr/local/v6/etc/cnd.conf"'}
 
 mobileip6_start() 
 {
@@ -34,10 +48,6 @@ mobileip6_start()
 		;;
 	esac
 
-	if [ -z ${mdd_program} ]; then
-		mdd_program=babymdd
-	fi
-
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		# setup SPD/SA
@@ -53,16 +63,17 @@ mobileip6_start()
 		fi
 
 		echo -n ' mnd'
-		echo -n " ${mdd_program}"
-		for mip_interface in ${ipv6_mobile_virtual_home_interfaces:=mip0}
+		echo -n " ${ipv6_mobile_mdd_program}"
+		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
-			mnd -n -i ${mip_interface}
-			${mdd_program} -h ${mip_interface}
+			mnd ${ipv6_mobile_mnd_flags} ${mip_interface}
+			${ipv6_mobile_mdd_program} -h ${mip_interface}
 		done
 		echo -n ' rtsold'
 		sysctl -w net.inet6.ip6.accept_rtadv=1
 		rtsold -a -m
-		cnd -n
+		echo -n ' cnd'
+		cnd ${ipv6_mobile_cnd_flags}
 		;;
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Rr][Oo][Uu][Tt][Ee][Rr])
 		# setup SPD/SA
@@ -78,19 +89,24 @@ mobileip6_start()
 		fi
 
 		echo -n ' mrd'
-		mrd -n -f /etc/prefixtable.conf -i mip0 
+		echo -n " ${ipv6_mobile_mdd_program}"
 		echo -n ' nemonetd'
-		nemonetd -n -m -f /etc/prefixtable.conf
-		echo -n ' mdd' 
-		mdd -n 
+		nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -m -c /usr/local/v6/etc/mrd.conf'}
+		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
+		do
+			mrd ${ipv6_mobile_mrd_flags} ${mip_interface}
+			${ipv6_mobile_mdd_program} -h ${mip_interface}
+			nemonetd ${nemonetd_flags} ${mip_interface}
+		done
 		echo -n ' rtsold'
 		sysctl -w net.inet6.ip6.accept_forwarding=1
 		sysctl -w net.inet6.ip6.accept_rtadv=1
 		rtsold -a -m 
-		cnd -n 
+		echo -n ' cnd'
+		cnd ${ipv6_mobile_cnd_flags}
 		;;
 	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
-		case ${ipv6_mobile_home_link} in
+		case ${ipv6_mobile_home_interface} in
 		'')
 			;;
 		*)
@@ -106,9 +122,22 @@ mobileip6_start()
 				done
 			fi
 
+			home_prefixes=`mobileip6_getprefixes ${ipv6_mobile_home_interface}`
+			for home_prefix in ${home_prefixes}
+			do
+				# XXX describe the case when plen != 64
+				ifconfig ${ipv6_mobile_home_interface} inet6 ${home_prefix}:fdff:ffff:ffff:fffe prefixlen 64 anycast alias
+			done
+
 			echo -n ' had'
-			had -i ${ipv6_mobile_home_interface}
-			cnd -n
+			had ${ipv6_mobile_had_flags} ${ipv6_mobile_home_interface}
+			if [ ${ipv6_mobile_home_agent_mode} = "nemo" ]; then
+				echo -n ' nemonetd'
+				nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -h -c /usr/local/v6/etc/had.conf'}
+				nemonetd ${nemonetd_flags} ${ipv6_mobile_home_interface}
+			fi
+#			echo -n ' cnd'
+#			cnd ${ipv6_mobile_cnd_flags}
 			echo -n ' rtadvd'
 			rtadvd -m ${ipv6_mobile_home_interface}
 			# take in Router Advertisement
@@ -117,8 +146,8 @@ mobileip6_start()
 		esac
 		;;
 	*)
-		echo -n ' Correspondent Node'
-		cnd -n
+		echo -n ' cnd'
+		cnd ${ipv6_mobile_cnd_flags}
 		;;
 	esac
 
@@ -127,6 +156,22 @@ mobileip6_start()
 
 mobileip6_stop() {
 
+}
+
+mobileip6_getprefixes() {
+	ndp -p 2>/dev/null | while read prefix interface rest; do
+		if [ X$interface = X"if="$1 ]; then
+			case ${prefix} in
+			fe80:*)
+				;;
+			fec0:*)
+				;;
+			[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*)
+				prefix64=`expr "${prefix}" : '\(.*\)::/64'`
+				echo ${prefix64}
+			esac
+		fi
+	done
 }
 
 load_rc_config $name
