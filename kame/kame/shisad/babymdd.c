@@ -1,4 +1,5 @@
-/*      $Id: babymdd.c,v 1.8 2005/05/17 10:31:24 keiichi Exp $  */
+/*	$Id: babymdd.c,v 1.9 2005/05/25 01:49:23 keiichi Exp $	*/
+
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -96,7 +97,7 @@ struct mdd_info babyinfo;
 void
 baby_usage()
 {
-        fprintf(stderr, "babymdd [options] -h mipif interfaces..\n");
+	fprintf(stderr, "babymdd [options] -h mipif interfaces..\n");
 	fprintf(stderr, "\t-h mipif      specify your mip pseudo interface\n");
 	fprintf(stderr, "\tinterfaces    specify interfaces\n");
 	fprintf(stderr, "Options\n");

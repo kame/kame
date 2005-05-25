@@ -1,3 +1,5 @@
+/*	$KAME: config.h,v 1.4 2005/05/25 01:49:24 keiichi Exp $	*/
+
 /*
  * Copyright (C) 2005 WIDE Project.
  * All rights reserved.

@@ -1,8 +1,8 @@
-/*	$KAME: cfparse.y,v 1.4 2005/05/25 01:30:35 keiichi Exp $	*/
+/*	$KAME: cfparse.y,v 1.5 2005/05/25 01:49:23 keiichi Exp $	*/
 
 %{
 /*
- * Copyright (C) 2002 WIDE Project.
+ * Copyright (C) 2005 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

@@ -1,4 +1,5 @@
-/*	$KAME: shisad.h,v 1.15 2005/05/24 10:16:19 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.16 2005/05/25 01:49:24 keiichi Exp $	*/
+
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -28,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SHISAD_H_
-#define _SHISAD_H_
+#ifndef _SHISAD_SHISAD_H_
+#define _SHISAD_SHISAD_H_
 
 extern struct mip6_mninfo mninfo;
 extern int mipsock, mhsock, icmp6sock;
@@ -545,4 +546,5 @@ void command_show_pt(int, char *);
 /* other utility functions */
 char *hexdump(void *, size_t);
 const char *ip6_sprintf(const struct in6_addr *addr);
-#endif /* _SHISAD_H_ */
+
+#endif /* _SHISAD_SHISAD_H_ */

@@ -1,4 +1,5 @@
-/*      $KAME: stat.h,v 1.3 2005/01/12 11:02:37 t-momose Exp $  */
+/*      $KAME: stat.h,v 1.4 2005/05/25 01:49:24 keiichi Exp $  */
+
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -26,6 +27,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#ifndef _SHISAD_STAT_H_
+#define _SHISAD_STAT_H_
 
 struct mip6stat {
 	union _mip6s_mh {
@@ -103,3 +107,6 @@ struct mip6stat {
 };
 
 extern struct mip6stat mip6stat;
+
+#endif /* _SHISAD_STAT_H_ */
+

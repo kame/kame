@@ -1,4 +1,5 @@
-/*      $KAME: rr.c,v 1.3 2005/04/21 13:57:15 t-momose Exp $  */
+/*      $KAME: rr.c,v 1.4 2005/05/25 01:49:24 keiichi Exp $  */
+
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
  *

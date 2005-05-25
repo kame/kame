@@ -1,4 +1,5 @@
-/*      $KAME: binding.c,v 1.13 2005/04/21 13:57:15 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.14 2005/05/25 01:49:23 keiichi Exp $	*/
+
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *

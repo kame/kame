@@ -1,4 +1,5 @@
-/*      $KAME: util.c,v 1.2 2005/05/17 10:31:25 keiichi Exp $  */
+/*      $KAME: util.c,v 1.3 2005/05/25 01:49:24 keiichi Exp $  */
+
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
  *

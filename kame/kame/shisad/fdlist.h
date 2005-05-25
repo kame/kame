@@ -1,4 +1,4 @@
-/*	$KAME: fdlist.h,v 1.1 2004/12/09 02:18:33 t-momose Exp $	*/
+/*	$KAME: fdlist.h,v 1.2 2005/05/25 01:49:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 
+#ifndef _SHISAD_FDLIST_H_
+#define _SHISAD_FDLIST_H_
+
 struct fd_list {
 	SLIST_ENTRY(fd_list) fdl_entry;
 
@@ -48,3 +51,4 @@ int pollfd_array(void);
 void clear_revents(void);
 void dispatch_fdfunctions(struct pollfd *, int);
 
+#endif /* _SHISAD_FDLIST_H_ */

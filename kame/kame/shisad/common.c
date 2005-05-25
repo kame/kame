@@ -1,4 +1,5 @@
-/*      $KAME: common.c,v 1.17 2005/04/14 06:22:35 suz Exp $  */
+/*	$KAME: common.c,v 1.18 2005/05/25 01:49:23 keiichi Exp $	*/
+
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -70,7 +71,7 @@
 extern struct mip6_mipif_list mipifhead;
 
 static const struct in6_addr haanyaddr_ifid64 = {
-        {{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	   0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
 };
 static const struct in6_addr haanyaddr_ifidnn = {

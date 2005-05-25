@@ -1,4 +1,5 @@
-/*      $KAME: nemo_var.c,v 1.7 2005/05/24 10:16:19 keiichi Exp $  */
+/*      $KAME: nemo_var.c,v 1.8 2005/05/25 01:49:24 keiichi Exp $  */
+
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *

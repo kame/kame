@@ -1,4 +1,4 @@
-/*	$KAME: command.h,v 1.2 2005/02/12 15:22:39 t-momose Exp $	*/
+/*	$KAME: command.h,v 1.3 2005/05/25 01:49:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 
+#ifndef _SHISAD_COMMAND_H_
+#define _SHISAD_COMMAND_H_
+
 struct command_table {
 	char *command;
 	void (*cmdfunc)(int, char *);
@@ -39,3 +42,4 @@ struct command_table {
 int command_init(char *, struct command_table *, size_t, u_short);
 void command_printf(int s, const char *fmt, ...);
 
+#endif /* _SHISAD_COMMAND_H_ */

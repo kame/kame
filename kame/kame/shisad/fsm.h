@@ -1,4 +1,4 @@
-/*	$KAME: fsm.h,v 1.1 2004/12/09 02:18:35 t-momose Exp $	*/
+/*	$KAME: fsm.h,v 1.2 2005/05/25 01:49:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _FSM_H_
-#define _FSM_H_
+#ifndef _SHISAD_FSM_H_
+#define _SHISAD_FSM_H_
 
 /* states for the primary fsm. */
 #define MIP6_BUL_REG_FSM_STATE_IDLE		0
@@ -99,4 +99,4 @@ int bul_kick_fsm(struct binding_update_list *, int, struct fsm_message *);
 void bul_retrans_timer(void *);
 void bul_expire_timer(void *);
 
-#endif /* !_FSM_H_ */
+#endif /* !_SHISAD_FSM_H_ */

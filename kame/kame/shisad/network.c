@@ -1,4 +1,5 @@
-/*      $KAME: network.c,v 1.5 2005/04/20 04:10:25 t-momose Exp $  */
+/*      $KAME: network.c,v 1.6 2005/05/25 01:49:24 keiichi Exp $  */
+
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *

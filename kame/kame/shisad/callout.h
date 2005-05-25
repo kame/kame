@@ -1,4 +1,4 @@
-/*	$KAME: callout.h,v 1.3 2005/02/12 15:22:38 t-momose Exp $	*/
+/*	$KAME: callout.h,v 1.4 2005/05/25 01:49:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 
+#ifndef _SHISAD_CALLOUT_H_
+#define _SHISAD_CALLOUT_H_
+
 struct callout_queue_t {
 	TAILQ_ENTRY(callout_queue_t) callout_entry;
 
@@ -52,3 +55,4 @@ void update_callout_entry(CALLOUT_HANDLE ch, int);
 int get_next_timeout();
 void show_callout_table(int, char *);
 
+#endif /* _SHISAD_CALLOUT_H_ */
