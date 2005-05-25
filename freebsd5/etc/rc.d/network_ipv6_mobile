@@ -116,7 +116,7 @@ network_ipv6_mobile_start()
 		${SYSCTL_W} net.inet6.ip6.forwarding=1 > /dev/null
 		# setup SPD/SA
 		if [ `${SYSCTL_N} net.inet6.mip6.use_ipsec` = "1" ]; then
-			for node_dir in ${ipv6_mobile_config_dir:=/usr/local/v6/etc/mobileip6}/*
+			for node_dir in ${ipv6_mobile_config_dir}/*
 			do
 				if [ ! -e ${node_dir}/add ]; then
 					continue;
@@ -155,7 +155,7 @@ network_ipv6_mobile_start()
 		*)
 			# setup SPD/SA
 			if [ `sysctl -n net.inet6.mip6.use_ipsec` = '1' ]; then
-				for node_dir in ${ipv6_mobile_config_dir:=/usr/local/v6/etc/mobileip6}/*
+				for node_dir in ${ipv6_mobile_config_dir}/*
 				do
 					if [ ! -e ${node_dir}/add ]; then
 						continue;
@@ -168,7 +168,7 @@ network_ipv6_mobile_start()
 			home_prefixes=`mobileip6_getprefixes ${ipv6_mobile_home_interface}`
 			for home_prefix in ${home_prefixes}
 			do
-				# XXX desribe the case plen != 64
+				# XXX describe the case when plen != 64
 				ifconfig ${ipv6_mobile_home_interface} inet6 ${home_prefix}:fdff:ffff:ffff:fffe prefixlen 64 anycast alias
 			done
 
