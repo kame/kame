@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2768 2005/05/19 07:45:59 suz Exp $
+$KAME: CHANGELOG,v 1.2769 2005/05/25 03:22:29 keiichi Exp $
 
 <200505>
+Wed May 25 12:20:25 JST 2005	keiichi@iijlab.net
+	* kame/kame/shisa: now shisa daemons uses configuration files
+	instead of command line options.  please check sample
+	configuratoin files located in the shisa directory.
+
 2005-05-19  SUZUKI, Shinsuke <suz@kame.net>
 	* (freebsd5|netbsd)/sys/sys/sockio.h: assign the same ioctl number 
 	to MSF-API-related ioctls among all *BSDs (to keep binary 
