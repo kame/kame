@@ -37,9 +37,19 @@ name="network_ipv6_mobile"
 rcvar=`set_rcvar ipv6_mobile`
 start_cmd="network_ipv6_mobile_start"
 
-echo ${ipv6_mobile_enable:=NO} > /dev/null
-echo ${ipv6_mobile_virtual_home_interfaces:=mip0} > /dev/null
-echo ${ipv6_mobile_mdd_program:=babymdd} > /dev/null
+eval ipv6_mobile_enable=${ipv6_mobile_enable:=NO}
+eval ipv6_mobile_config_dir=${ipv6_mobile_config_dir:=/usr/local/v6/etc/mobileip6}
+
+eval ipv6_mobile_mobile_node_interfaces=${ipv6_mobile_mobile_node_interfaces:=mip0}
+eval ipv6_mobile_mnd_flags=${ipv6_mobile_mnd_flags:='"-n -c /usr/local/v6/etc/mnd.conf"'}
+eval ipv6_mobile_mrd_flags=${ipv6_mobile_mrd_flags:='"-n -c /usr/local/v6/etc/mrd.conf"'}
+
+eval ipv6_mobile_mdd_program=${ipv6_mobile_mdd_program:=babymdd}
+
+eval ipv6_mobile_home_agent_mode=${ipv6_mobile_home_agent_mode:=mobile_ipv6}
+eval ipv6_mobile_had_flags=${ipv6_mobile_had_flags:='"-n -c /usr/local/v6/etc/had.conf"'}
+
+eval ipv6_mobile_cnd_flags=${ipv6_mobile_cnd_flags:='"-n -c /usr/local/v6/etc/cnd.conf"'}
 
 network_ipv6_mobile_start()
 {
@@ -68,12 +78,42 @@ network_ipv6_mobile_start()
 		;;
 	esac
 
-	echo -n ' cnd'
-	cnd -n
-
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		${SYSCTL_W} net.inet6.ip6.accept_rtadv=1 > /dev/null
+		# setup SPD/SA
+		if [ `${SYSCTL_N} net.inet6.mip6.use_ipsec` = "1" ]; then
+			for node_dir in ${ipv6_mobile_config_dir}/*
+			do
+				if [ ! -e ${node_dir}/add ]; then
+					continue;
+				fi
+				setkey -f ${node_dir}/add
+				setkey -f ${node_dir}/spdadd_mobile_node
+			done
+		fi
+
+		echo -n ' mnd'
+		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
+		do
+			mnd ${ipv6_mobile_mnd_flags} ${mip_interface}
+		done
+
+		echo -n " ${ipv6_mobile_mdd_program}"
+		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
+		do
+			${ipv6_mobile_mdd_program} -h ${mip_interface}
+		done
+
+		echo -n ' cnd'
+		cnd ${ipv6_mobile_cnd_flags}
+
+		echo -n ' rtsold'
+		rtsold -a -m
+		;;
+	[Mm][Oo][Bb][Ii][Ll][Ee]_[Rr][Oo][Uu][Tt][Ee][Rr])
+		${SYSCTL_W} net.inet6.ip6.accept_rtadv=1 > /dev/null
+		${SYSCTL_W} net.inet6.ip6.forwarding=1 > /dev/null
 		# setup SPD/SA
 		if [ `${SYSCTL_N} net.inet6.mip6.use_ipsec` = "1" ]; then
 			for node_dir in ${ipv6_mobile_config_dir:=/usr/local/v6/etc/mobileip6}/*
@@ -87,15 +127,24 @@ network_ipv6_mobile_start()
 		fi
 
 		echo -n ' mnd'
-		for mip_interface in ${ipv6_mobile_virtual_home_interfaces}
+		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
-			mnd -n -i ${mip_interface}
+			mrd ${ipv6_mobile_mrd_flags} ${mip_interface}
 		done
+
 		echo -n " ${ipv6_mobile_mdd_program}"
-		for mip_interface in ${ipv6_mobile_virtual_home_interfaces}
+		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
 			${ipv6_mobile_mdd_program} -h ${mip_interface}
 		done
+
+		echo -n ' nemonetd'
+		nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -m -c /usr/local/v6/etc/mrd.conf'}
+		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
+		do
+			nemonetd ${nemonetd_flags} ${mip_interface}
+		done
+
 		echo -n ' rtsold'
 		rtsold -a -m
 		;;
@@ -124,13 +173,28 @@ network_ipv6_mobile_start()
 			done
 
 			echo -n ' had'
-			had -n -i ${ipv6_mobile_home_interface}
+			had ${ipv6_mobile_had_flags} ${ipv6_mobile_home_interface}
+
+			if [ ${ipv6_mobile_home_agent_mode} = "nemo" ]; then
+				echo -n ' nemonetd'
+				nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -h -c /usr/local/v6/etc/had.conf'}
+				nemonetd ${nemonetd_flags} ${ipv6_mobile_home_interface}
+			fi
+
+#			echo -n ' cnd'
+#			cnd ${ipv6_mobile_cnd_flags}
+
 			echo -n ' rtadvd'
 			rtadvd -m ${ipv6_mobile_home_interface}
+
 			# take in Router Advertisement
 			rtsol ${ipv6_mobile_home_interface} > /dev/null 2>&1
 			;;
 		esac
+		;;
+	*)
+		echo -n ' cnd'
+		cnd ${ipv6_mobile_cnd_flags}
 		;;
 	esac
 
