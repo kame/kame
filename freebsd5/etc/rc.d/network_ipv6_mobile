@@ -139,7 +139,8 @@ network_ipv6_mobile_start()
 		done
 
 		echo -n ' nemonetd'
-		nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -m -c /usr/local/v6/etc/mrd.conf'}
+		ipv6_mobile_nemo_down
+		nemonetd_flags=${ipv6_mobile_nemonetd_flags:="-n -m -c /usr/local/v6/etc/mrd.conf"}
 		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
 			nemonetd ${nemonetd_flags} ${mip_interface}
@@ -177,7 +178,8 @@ network_ipv6_mobile_start()
 
 			if [ ${ipv6_mobile_home_agent_mode} = "nemo" ]; then
 				echo -n ' nemonetd'
-				nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -h -c /usr/local/v6/etc/had.conf'}
+				ipv6_mobile_nemo_down
+				nemonetd_flags=${ipv6_mobile_nemonetd_flags:="-n -h -c /usr/local/v6/etc/had.conf"}
 				nemonetd ${nemonetd_flags} ${ipv6_mobile_home_interface}
 			fi
 
@@ -214,6 +216,17 @@ mobileip6_getprefixes() {
 				echo ${prefix64}
 			esac
 		fi
+	done
+}
+
+ipv6_mobile_nemo_down () {
+	for ifname in `ifconfig -l`
+	do
+		case ${ifname} in
+		nemo[0-9]*)
+			ifconfig ${ifname} down
+			;;
+		esac
 	done
 }
 
