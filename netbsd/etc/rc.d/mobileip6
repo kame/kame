@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.7 2005/05/25 10:07:30 keiichi Exp $
+# $Id: mobileip6,v 1.8 2005/05/26 12:46:23 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -91,6 +91,7 @@ mobileip6_start()
 		echo -n ' mrd'
 		echo -n " ${ipv6_mobile_mdd_program}"
 		echo -n ' nemonetd'
+		ipv6_mobile_nemo_down
 		nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -m -c /usr/local/v6/etc/mrd.conf'}
 		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
@@ -133,6 +134,7 @@ mobileip6_start()
 			had ${ipv6_mobile_had_flags} ${ipv6_mobile_home_interface}
 			if [ ${ipv6_mobile_home_agent_mode} = "nemo" ]; then
 				echo -n ' nemonetd'
+				ipv6_mobile_nemo_down
 				nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -h -c /usr/local/v6/etc/had.conf'}
 				nemonetd ${nemonetd_flags} ${ipv6_mobile_home_interface}
 			fi
@@ -171,6 +173,17 @@ mobileip6_getprefixes() {
 				echo ${prefix64}
 			esac
 		fi
+	done
+}
+
+ipv6_mobile_nemo_down () {
+	for ifname in `ifconfig -l`
+	do
+		case ${ifname} in
+		nemo[0-9]*)
+			ifconfig ${ifname} down
+			;;
+		esac
 	done
 }
 
