@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.217 2005/04/14 06:22:41 suz Exp $	*/
+/*	$Id: mip6.c,v 1.218 2005/05/26 04:22:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1321,8 +1321,14 @@ mip6_bc_proxy_control(target, local, cmd)
 #else /* __FreeBSD__ */
 		rt = rtalloc1((struct sockaddr *)&target_sa, 0);
 #endif /* __FreeBSD__ */
-		if (rt)
+		if (rt) {
+#ifdef __FreeBSD__
+			RT_REMREF(rt);
+			RT_UNLOCK(rt);
+#else
 			rt->rt_refcnt--;
+#endif /* __FreeBSD__ */
+		}
 		if (rt == NULL)
 			return (0);
 		if ((rt->rt_flags & RTF_HOST) == 0 ||
@@ -1380,8 +1386,15 @@ mip6_bc_proxy_control(target, local, cmd)
 		if (error == 0) {
 			/* Avoid expiration */
 			if (nrt) {
+#ifdef __FreeBSD__
+				RT_LOCK(nrt);
+				nrt->rt_rmx.rmx_expire = 0;
+				RT_REMREF(nrt);
+				RT_UNLOCK(nrt);
+#else
 				nrt->rt_rmx.rmx_expire = 0;
 				nrt->rt_refcnt--;
+#endif /* __FreeBSD__ */
 			} else
 				error = EINVAL;
 		} else {
