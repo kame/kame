@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.13 2005/05/25 01:49:24 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.14 2005/05/26 06:46:26 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -108,9 +108,10 @@ static void nemo_dump();
 
 void
 nemo_usage() {
-	fprintf(stderr, "nemonetd -d -f -M [-h or -m] -c configfile\n");
+	fprintf(stderr, "nemonetd -d -f -s -M [-h or -m] -c configfile\n");
 	fprintf(stderr, "\t-d: Verbose Debug messages \n");
 	fprintf(stderr, "\t-f: Foreground mode\n");
+	fprintf(stderr, "\t-s: Static tunnel assign mode\n");
 	fprintf(stderr, "\t-h: when Home Agent\n");
 	fprintf(stderr, "\t-m: when Mobile Router\n");
 	fprintf(stderr, "\t-M: Multiple CoA Registration Support\n");
@@ -575,8 +576,10 @@ mainloop() {
 					break;
 
                                 mbu = (struct mipm_bul_info *)buf;
-				/* if R flag is not set, ignore the BU */
-                                if (!(mbu->mipu_flags & (IP6_MH_BU_HOME | IP6_MH_BU_ROUTER))) 
+				/* if H and R flag are not set, ignore the BU */
+                                if ((mbu->mipu_flags & IP6_MH_BU_HOME) == 0)
+					break;
+				if ((mbu->mipu_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				memset(&src, 0, sizeof(src));
 				memset(&dst, 0, sizeof(dst));
@@ -640,8 +643,10 @@ mainloop() {
 
                                 mbu = (struct mipm_bul_info *)buf;
 
-				/* if R flag is not set, ignore the BU */
-                                if (!(mbu->mipu_flags & (IP6_MH_BU_HOME | IP6_MH_BU_ROUTER))) 
+				/* if H and R flag are not set, ignore the BU */
+                                if ((mbu->mipu_flags & IP6_MH_BU_HOME) == 0)
+					break;
+				if ((mbu->mipu_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				hoa = &((struct sockaddr_in6 *)MIPU_HOA(mbu))->sin6_addr;
 				if (hoa == NULL)
@@ -672,8 +677,10 @@ mainloop() {
 					break;
 
                                 mbc = (struct mipm_bc_info *)buf;
-				/* if R flag is not set, ignore the BU */
-                                if (!(mbc->mipc_flags & (IP6_MH_BU_HOME | IP6_MH_BU_ROUTER))) 
+				/* if H and R flag are not set, ignore the BU */
+                                if ((mbc->mipc_flags & IP6_MH_BU_HOME) == 0)
+					break;
+				if ((mbc->mipc_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				hoa = &((struct sockaddr_in6 *)MIPC_HOA(mbc))->sin6_addr;
 				if (hoa == NULL)
@@ -715,8 +722,10 @@ mainloop() {
 					break;
 
                                 mbc = (struct mipm_bc_info *)buf;
-				/* if R flag is not set, ignore the BU */
-                                if (!(mbc->mipc_flags & (IP6_MH_BU_HOME | IP6_MH_BU_ROUTER))) 
+				/* if H and R flag are not set, ignore the BU */
+                                if ((mbc->mipc_flags & IP6_MH_BU_HOME) == 0)
+					break;
+				if ((mbc->mipc_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				hoa = &((struct sockaddr_in6 *)MIPC_HOA(mbc))->sin6_addr;
 				if (hoa == NULL)
