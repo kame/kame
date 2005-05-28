@@ -1,4 +1,4 @@
-.\"	$KAME: cnd.8,v 1.2 2005/01/05 07:23:44 itojun Exp $
+.\"	$KAME: cnd.8,v 1.3 2005/05/28 22:49:43 keiichi Exp $
 .\"
 .\" Copyright (C) 2004 WIDE Project.
 .\" All rights reserved.
@@ -36,8 +36,9 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl d
+.Op Fl f
 .Op Fl n
+.Op Fl c Ar configfile
 .\"
 .Sh DESCRIPTION
 .Nm
@@ -47,10 +48,14 @@ Mobile IPv6 capable kernel is required to enable the function.
 The command line options are:
 .Bl -tag -width indent
 .\"
-.It Fl d
-Print debugging messages.
+.It Fl f
+Foreground mode.
 .It Fl n
 Never lookup hostname from a address on a telnet interface.
+.It Fl c Ar configfile
+Specify an alternative location for the configuration file. By default, 
+.Pa /usr/local/v6/etc/cnd.conf
+is used.
 .El
 .Pp
 An intaractive telnet interface on port 7777 is provided to see it's binding cache.

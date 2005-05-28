@@ -1,4 +1,4 @@
-.\"	$KAME: mnd.8,v 1.3 2005/01/22 12:55:56 t-momose Exp $
+.\"	$KAME: mnd.8,v 1.4 2005/05/28 22:49:43 keiichi Exp $
 .\"
 .\" Copyright (C) 2004 WIDE Project.
 .\" All rights reserved.
@@ -36,9 +36,10 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl d
-.Op Fl i Ar interface
-.Op Fl l Ar lifetime
+.Op Fl f
+.Op Fl n
+.Op Fl c Ar configfile
+.Ar interface
 .\"
 .Sh DESCRIPTION
 .Nm
@@ -58,14 +59,14 @@ separately if you need.
 The command line options are:
 .Bl -tag -width indent
 .\"
-.It Fl i Ar interface
-Spefify Mobile IPv6 pseudo interface such as mip0.
-A home address is taken from attched this interface.
-.It Fl d
-Output debugging messages to 
-.Xr syslogd 8
-.It Fl l Ar lifetime
-Specify default home registration lifetime value. The unit is second.
+.It Fl f
+Foreground mode.
+.It Fl n
+Never lookup symbolic names for host addresses.
+.It Fl c Ar configfile
+Specify an alternative location for the configuration file. By default,
+.Pa /usr/local/v6/etc/mnd.conf
+is used.
 .El
 .Pp
 Telnet interface to see the status of the mobile node is provided on port 7778.
