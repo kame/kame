@@ -656,7 +656,7 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 		return (EADDRNOTAVAIL);
 	}
 #ifndef SCOPEDROUTING
-	addr->sin6_scope_id = lzone;
+	addr->sin6_scope_id = lzone; /* XXX: this should have no effect */
 #endif
 	INP_INFO_WLOCK(&ripcbinfo);
 	INP_LOCK(inp);
