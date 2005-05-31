@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.8 2005/05/26 12:46:23 keiichi Exp $
+# $Id: mobileip6,v 1.9 2005/05/31 02:38:07 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -28,23 +28,28 @@ eval ipv6_mobile_cnd_flags=${ipv6_mobile_cnd_flags:='"-n -c /usr/local/v6/etc/cn
 
 mobileip6_start() 
 {
+	case ${ipv6_mobile_enable} in
+	[Nn][Oo])
+		return 0
+	esac
+
 	echo -n 'Doing Mobile IPv6 network setup:'
 
 	case ${ipv6_mobile_debug_enable} in
 	[Yy][Ee][Ss])
-		sysctl -w net.inet6.mip6.debug=1
+		sysctl -qw net.inet6.mip6.debug=1
 		;;
 	[Nn][Oo])
-		sysctl -w net.inet6.mip6.debug=0
+		sysctl -qw net.inet6.mip6.debug=0
 		;;
 	esac
 
 	case ${ipv6_mobile_security_enable} in
 	[Yy][Ee][Ss])
-		sysctl -w net.inet6.mip6.use_ipsec=1
+		sysctl -qw net.inet6.mip6.use_ipsec=1
 		;;
 	[Nn][Oo])
-		sysctl -w net.inet6.mip6.use_ipsec=0
+		sysctl -qw net.inet6.mip6.use_ipsec=0
 		;;
 	esac
 
@@ -70,7 +75,7 @@ mobileip6_start()
 			${ipv6_mobile_mdd_program} -h ${mip_interface}
 		done
 		echo -n ' rtsold'
-		sysctl -w net.inet6.ip6.accept_rtadv=1
+		sysctl -qw net.inet6.ip6.accept_rtadv=1
 		rtsold -a -m
 		echo -n ' cnd'
 		cnd ${ipv6_mobile_cnd_flags}
@@ -100,8 +105,8 @@ mobileip6_start()
 			nemonetd ${nemonetd_flags} ${mip_interface}
 		done
 		echo -n ' rtsold'
-		sysctl -w net.inet6.ip6.accept_forwarding=1
-		sysctl -w net.inet6.ip6.accept_rtadv=1
+		sysctl -qw net.inet6.ip6.accept_forwarding=1
+		sysctl -qw net.inet6.ip6.accept_rtadv=1
 		rtsold -a -m 
 		echo -n ' cnd'
 		cnd ${ipv6_mobile_cnd_flags}
