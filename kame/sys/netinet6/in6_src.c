@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.153 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: in6_src.c,v 1.154 2005/05/31 00:10:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1074,9 +1074,6 @@ in6_pcbsetport(laddr, inp, p)
  * Generate kernel-internal form (scopeid embedded into s6_addr16[1]).
  * If the address scope of is interface-local or link-local, embed the
  * interface index in the address.
- *
- * This function should be nuked in the future, when we get rid of embedded
- * scopeid thing.
  */
 int
 in6_embedscope(in6, sin6)
@@ -1125,9 +1122,6 @@ in6_embedscope(in6, sin6)
 /*
  * generate standard sockaddr_in6 from embedded form.
  * touches sin6_addr and sin6_scope_id only.
- *
- * this function should be nuked in the future, when we get rid of
- * embedded scopeid thing.
  */
 int
 in6_recoverscope(sin6, in6, ifp)
