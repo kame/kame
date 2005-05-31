@@ -1,10 +1,11 @@
 #!/bin/sh
 #
-# $NetBSD: network,v 1.11.4.7 2001/05/02 22:52:22 he Exp $
+# $NetBSD: network,v 1.44 2003/10/12 09:50:05 jdc Exp $
 #
 
 # PROVIDE: network
 # REQUIRE: ipfilter ipsec mountcritlocal root tty sysctl
+# BEFORE:  NETWORKING
 
 . /etc/rc.subr
 
@@ -21,7 +22,7 @@ network_start()
 	# If $hostname is set, use it for my Internet name,
 	# otherwise use /etc/myname
 	#
-	if [ -z "$hostname" -a -f /etc/myname ]; then
+	if [ -z "$hostname" ] && [ -f /etc/myname ]; then
 		hostname=`cat /etc/myname`
 	fi
 	if [ -n "$hostname" ]; then
@@ -40,7 +41,7 @@ network_start()
 	# Check $domainname first, then /etc/defaultdomain,
 	# for NIS/YP domain name
 	#
-	if [ -z "$domainname" -a -f /etc/defaultdomain ]; then
+	if [ -z "$domainname" ] && [ -f /etc/defaultdomain ]; then
 		domainname=`cat /etc/defaultdomain`
 	fi
 	if [ -n "$domainname" ]; then
@@ -50,20 +51,20 @@ network_start()
 
 	# Flush all routes just to make sure it is clean
 	if checkyesno flushroutes; then
-		route -n flush
+		route -qn flush
 	fi
 
 	# Set the address for the first loopback interface, so that the
 	# auto-route from a newly configured interface's address to lo0
 	# works correctly.
 	#
-	# NOTE: obscure networking problems may occur if lo0 isn't configured...
+	# NOTE: obscure networking problems will occur if lo0 isn't configured.
 	#
 	ifconfig lo0 inet 127.0.0.1
 
-	# According to RFC1122, 127.0.0.0/8 should not leave the node.
+	# According to RFC1122, 127.0.0.0/8 must not leave the node.
 	#
-	route add -inet 127.0.0.0 -netmask 0xff000000 127.0.0.1 -reject
+	route -q add -inet 127.0.0.0 -netmask 0xff000000 127.0.0.1 -reject
 
 	# IPv6 routing setups, and host/router mode selection.
 	#
@@ -80,7 +81,7 @@ network_start()
 		# disallow link-local unicast dest without outgoing scope
 		# identifiers.
 		#
-		route add -inet6 fe80:: -prefixlen 10 ::1 -reject
+		route -q add -inet6 fe80:: -prefixlen 10 ::1 -reject
 
 		# disallow site-local unicast dest without outgoing scope
 		# identifiers.
@@ -88,25 +89,27 @@ network_start()
 		# permissible config for routers that are not on scope
 		# boundary), you may want to comment the following one out.
 		#
-		route add -inet6 fec0:: -prefixlen 10 ::1 -reject
+		if ! checkyesno ip6sitelocal; then
+			route -q add -inet6 fec0:: -prefixlen 10 ::1 -reject
+		fi
 
 		# disallow "internal" addresses to appear on the wire.
 		#
-		route add -inet6 ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject
+		route -q add -inet6 ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject
 
 		# disallow packets to malicious IPv4 compatible prefix
 		#
-		route add -inet6 ::224.0.0.0 -prefixlen 100 ::1 -reject
-		route add -inet6 ::127.0.0.0 -prefixlen 104 ::1 -reject
-		route add -inet6 ::0.0.0.0 -prefixlen 104 ::1 -reject
-		route add -inet6 ::255.0.0.0 -prefixlen 104 ::1 -reject
+		route -q add -inet6 ::224.0.0.0 -prefixlen 100 ::1 -reject
+		route -q add -inet6 ::127.0.0.0 -prefixlen 104 ::1 -reject
+		route -q add -inet6 ::0.0.0.0 -prefixlen 104 ::1 -reject
+		route -q add -inet6 ::255.0.0.0 -prefixlen 104 ::1 -reject
 
 		# disallow packets to malicious 6to4 prefix
 		#
-		route add -inet6 2002:e000:: -prefixlen 20 ::1 -reject
-		route add -inet6 2002:7f00:: -prefixlen 24 ::1 -reject
-		route add -inet6 2002:0000:: -prefixlen 24 ::1 -reject
-		route add -inet6 2002:ff00:: -prefixlen 24 ::1 -reject
+		route -q add -inet6 2002:e000:: -prefixlen 20 ::1 -reject
+		route -q add -inet6 2002:7f00:: -prefixlen 24 ::1 -reject
+		route -q add -inet6 2002:0000:: -prefixlen 24 ::1 -reject
+		route -q add -inet6 2002:ff00:: -prefixlen 24 ::1 -reject
 
 		# Completely disallow packets to IPv4 compatible prefix.
 		# This may conflict with RFC1933 under following circumstances:
@@ -122,41 +125,27 @@ network_start()
 		# Due to rare use of IPv4 compatible address, and security
 		# issues with it, we disable it by default.
 		#
-		route add -inet6 ::0.0.0.0 -prefixlen 96 ::1 -reject
+		route -q add -inet6 ::0.0.0.0 -prefixlen 96 ::1 -reject
 
-		sysctl -w net.inet6.ip6.forwarding=0 >/dev/null
-		sysctl -w net.inet6.ip6.accept_rtadv=0 >/dev/null
-
-		# backward compatibility
-		#
-		if [ -z "$ip6mode" ] && [ -n "$ip6forwarding" ]; then
-			warn 'Please migrate to newer rc.conf' \
-			    '(use ip6mode, not ip6forwarding)'
-			if checkyesno ip6forwarding; then
-				ip6mode=router
-			elif checkyesno rtsol; then
-				ip6mode=autohost
-			else
-				ip6mode=host
-			fi
-		fi
+		sysctl -qw net.inet6.ip6.forwarding=0
+		sysctl -qw net.inet6.ip6.accept_rtadv=0
 
 		case $ip6mode in
 		router)
 			echo 'IPv6 mode: router'
-			sysctl -w net.inet6.ip6.forwarding=1 >/dev/null
+			sysctl -qw net.inet6.ip6.forwarding=1
 			;;
 
 		autohost)
 			echo 'IPv6 mode: autoconfigured host'
-			sysctl -w net.inet6.ip6.accept_rtadv=1 >/dev/null
+			sysctl -qw net.inet6.ip6.accept_rtadv=1
 			;;
 
 		host)	
 			echo 'IPv6 mode: host'
 			;;
 
-		*)	echo 'WARNING: invalid value in ip6mode'
+		*)	warn "invalid \$ip6mode value "\"$ip6mode\"
 			;;
 
 		esac
@@ -169,7 +158,7 @@ network_start()
 	# we do "ifconfig xxN $ifconfig_xxN".
 	# If there is no such variable, we take the contents of the file
 	# /etc/ifconfig.xxN, and run "ifconfig xxN" repeatedly, using each
-	# line of the file as the arguments for a seperate "ifconfig"
+	# line of the file as the arguments for a separate "ifconfig"
 	# invocation.
 	#
 	# In order to configure an interface reasonably, you at the very least
@@ -190,12 +179,11 @@ network_start()
 	#
 	if [ "$net_interfaces" != NO ]; then
 		if checkyesno auto_ifconfig; then
-			tmp="`ifconfig -l`"
+			tmp=`ifconfig -l`
 			for cloner in `ifconfig -C 2>/dev/null`; do
-				for int \
-		    in `/bin/ls /etc/ifconfig.${cloner}[0-9]* 2>/dev/null`; do
-					int=`IFS='.'; set -- $int; echo $2`
-					tmp="$tmp $int"
+				for int in /etc/ifconfig.${cloner}[0-9]*; do
+					[ ! -f $int ] && break
+					tmp="$tmp ${int##*.}"
 				done
 			done
 		else
@@ -203,7 +191,14 @@ network_start()
 		fi
 		echo -n 'Configuring network interfaces:'
 		for int in $tmp; do
-			eval `echo 'args=$ifconfig_'$int`
+			eval args=\$ifconfig_$int
+			if [ -n "$args" ] || [ -f /etc/ifconfig.$int ]; then
+				if ifconfig $int create 2>/dev/null && \
+				   checkyesno ipfilter; then
+					# resync ipf(4)
+					ipf -y >/dev/null
+				fi
+			fi
 			if [ -n "$args" ]; then
 				echo -n " $int"
 				ifconfig $int $args
@@ -212,7 +207,7 @@ network_start()
 				while read args; do
 					[ -z "$args" ] && continue
 					case "$args" in
-					"#"*)
+					"#"*|create)
 						;;
 					"!"*)
 						eval ${args#*!}
@@ -236,14 +231,32 @@ network_start()
 		echo "."
 	fi
 
-	# Check $defaultroute, then /etc/mygate, for the name of my gateway
-	# host. That name must be in /etc/hosts.
+	# Check $defaultroute, then /etc/mygate, for the name or address
+	# of my IPv4 gateway host. If using a name, that name must be in
+	# /etc/hosts.
 	#
-	if [ -z "$defaultroute" -a -f /etc/mygate ]; then
+	if [ -z "$defaultroute" ] && [ -f /etc/mygate ]; then
 		defaultroute=`cat /etc/mygate`
 	fi
 	if [ -n "$defaultroute" ]; then
 		route add default $defaultroute
+	fi
+
+	# Check $defaultroute6, then /etc/mygate6, for the name or address
+	# of my IPv6 gateway host. If using a name, that name must be in
+	# /etc/hosts.  Note that the gateway host address must be a link-local
+	# address if it is not using an stf* interface.
+	#
+	if [ -z "$defaultroute6" ] && [ -f /etc/mygate6 ]; then
+		defaultroute6=`cat /etc/mygate6`
+	fi
+	if [ -n "$defaultroute6" ]; then
+		if [ "$ip6mode" = "autohost" ]; then
+			echo
+			warn \
+	    "ip6mode is set to 'autohost' and a v6 default route is also set."
+		fi
+		route add -inet6 default $defaultroute6
 	fi
 
 	# Check if each configured interface xxN has an $ifaliases_xxN variable
@@ -260,7 +273,7 @@ network_start()
 		done_aliases_message=yes
 	fi
 	for int in $configured_interfaces; do
-		eval `echo 'args=$ifaliases_'$int`
+		eval args=\$ifaliases_$int
 		if [ -n "$args" ]; then
 			set -- $args
 			while [ $# -ge 2 ]; do
@@ -272,8 +285,6 @@ network_start()
 					ifconfig $int inet alias $addr \
 					    netmask $net
 				fi
-				# Use loopback, not the wire
-				route add $addr 127.0.0.1
 			done
 		fi
 	done
@@ -288,7 +299,6 @@ network_start()
 	#
 	#
 	if [ -f /etc/ifaliases ]; then
-	(
 		if [ "$done_aliases_message" != yes ]; then
 			echo "Adding interface aliases:"
 		fi
@@ -299,10 +309,7 @@ network_start()
 			else
 				ifconfig $int inet alias $addr netmask $net
 			fi
-			# use loopback, not the wire
-			route add $addr 127.0.0.1
-		done
-	) < /etc/ifaliases
+		done < /etc/ifaliases
 	fi
 
 	# IPv6 interface autoconfiguration.
@@ -350,15 +357,13 @@ network_stop()
 
 	echo "Deleting aliases."
 	if [ -f /etc/ifaliases ]; then
-	(
 		while read addr int net; do
 			ifconfig $int inet delete $addr
-		done
-	) < /etc/ifaliases
+		done < /etc/ifaliases
 	fi
 
-	for int in $configured_interfaces; do
-		eval `echo 'args=$ifaliases_'$int`
+	for int in `ifconfig -lu`; do
+		eval args=\$ifaliases_$int
 		if [ -n "$args" ]; then
 			set -- $args
 			while [ $# -ge 2 ]; do
@@ -373,15 +378,20 @@ network_stop()
 	echo -n 'Downing network interfaces:'
 	if [ "$net_interfaces" != NO ]; then
 		if checkyesno auto_ifconfig; then
-			tmp="`ifconfig -l`"
+			tmp=`ifconfig -l`
 		else
 			tmp="$net_interfaces"
 		fi
 		for int in $tmp; do
-			eval `echo 'args=$ifconfig_'$int`
+			eval args=\$ifconfig_$int
 			if [ -n "$args" ] || [ -f /etc/ifconfig.$int ]; then
 				echo -n " $int"
 				ifconfig $int down
+				if ifconfig $int destroy 2>/dev/null && \
+				   checkyesno ipfilter; then
+					# resync ipf(4)
+					ipf -y >/dev/null
+				fi
 			fi
 		done
 		echo "."
@@ -389,9 +399,9 @@ network_stop()
 
 	# flush routes
 	#
-	route -n flush
+	route -qn flush
 
 }
 
-load_rc_config $name
+load_rc_config $name ipfilter
 run_rc_command "$1"
