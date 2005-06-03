@@ -26,10 +26,6 @@ afterinstall:
 		${DESTDIR}${PREFIX}/etc/rtadvd.conf.sample
 	cp ${.CURDIR}/kame/bgpd/bgpd.conf \
 		${DESTDIR}${PREFIX}/etc/bgpd.conf.sample
-	cp ${.CURDIR}/kame/racoon/samples/racoon.conf.sample \
-		${DESTDIR}$(PREFIX)/etc/
-	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
-		${DESTDIR}$(PREFIX)/etc/
 	cp ${.CURDIR}/kame/ip6addrctl/ip6addrctl.conf.sample \
 		${DESTDIR}$(PREFIX)/etc/
 	if test -x ${PREFIX}/sbin/inet6d; then \
