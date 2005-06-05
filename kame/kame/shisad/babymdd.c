@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.9 2005/05/25 01:49:23 keiichi Exp $	*/
+/*	$Id: babymdd.c,v 1.10 2005/06/05 12:13:14 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -37,6 +37,7 @@
 #include <syslog.h>
 #include <stdarg.h>
 
+#include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
@@ -48,7 +49,9 @@
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/if_media.h>
+#ifndef NetBSD
 #include <net/if_var.h>
+#endif
 #include <net/route.h>
 #include <net/mipsock.h>
 #include <netinet/in.h>
