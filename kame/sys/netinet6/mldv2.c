@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.35 2005/04/14 06:22:41 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.36 2005/06/06 01:37:55 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3073,7 +3073,7 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 		 * to MLDv2 (XXX)
 		 */
 		in6_clear_all_pending_report(in6m);
-		if (in6m->in6m_refcount == 0) {
+		if (ifma->ifma_refcount == 1) {
 			in6m->in6m_source->i6ms_robvar = 0;
 			mld_stop_listening(in6m);
 		}
