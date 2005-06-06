@@ -74,7 +74,7 @@ int dflag = 0;
 
 char *otherconf_script;
 
-/* protocol constatns */
+/* protocol constants */
 #define MAX_RTR_SOLICITATION_DELAY	1 /* second */
 #define RTR_SOLICITATION_INTERVAL	4 /* seconds */
 #define MAX_RTR_SOLICITATIONS		3 /* times */
