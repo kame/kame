@@ -30,9 +30,7 @@ afterinstall:
 		${DESTDIR}$(PREFIX)/etc/bgpd.conf.sample
 	cp ${.CURDIR}/kame/ip6addrctl/ip6addrctl.conf.sample \
 		${DESTDIR}$(PREFIX)/etc/ip6addrctl.conf.sample
-	cp ${.CURDIR}/kame/racoon/samples/racoon.conf.sample \
-		${DESTDIR}$(PREFIX)/etc/
-	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
+	cp ${.CURDIR}/kame/shisad/sampleconf/*.sample \
 		${DESTDIR}$(PREFIX)/etc/
 	for i in $(DOCS); do \
 		if test -f ${.CURDIR}/../$$i; then \
