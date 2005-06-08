@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.378 2005/05/12 18:41:18 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.379 2005/06/08 08:04:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1906,7 +1906,7 @@ nd6_ioctl(cmd, data, ifp)
 		if (ND.chlim != 0)
 			ND_IFINFO(ifp)->chlim = ND.chlim;
 #undef ND
-		break;
+		/* FALLTHROUGH */
 	case SIOCSIFINFO_FLAGS:
 		ND_IFINFO(ifp)->flags = ndi->ndi.flags;
 		break;

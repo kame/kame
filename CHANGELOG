@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2770 2005/06/06 01:37:55 suz Exp $
+$KAME: CHANGELOG,v 1.2771 2005/06/08 08:04:54 suz Exp $
 
 <200506>
+2005-06-08  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/sys/netinet6/nd6.c: fixed a bug that some of the subcommands
+	 in 'ndp -i ..' command does not work (e.g. accept_rtadv, nud)
+
 2005-06-06  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/netinet6/mldv2.c: send a Multicast-Listener-Done
 	message when stop listening to a group. 
