@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.11 2005/04/14 06:22:38 suz Exp $ */
+/* $Id: mipsock.c,v 1.12 2005/06/09 02:16:10 keiichi Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -638,29 +638,23 @@ mips_notify_bul(type, mbul)
 void
 mips_notify_home_hint(ifindex, prefix, prefixlen) 
 	u_int16_t ifindex;
-	struct in6_addr *prefix;
+	struct sockaddr *prefix;
 	u_int16_t prefixlen;
 {
 	struct mipm_home_hint *hint;
-	struct sockaddr_in6 sin6;
 	struct mbuf *m;
-	int len = sizeof(struct mipm_home_hint) + sizeof(struct sockaddr_in6);
+	int len = sizeof(struct mipm_home_hint) + prefix->sa_len;
 
 	m = mips_msg1(MIPM_HOME_HINT, len);
 	if (m == NULL)
 		return;
-
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *prefix;
 
         hint = mtod(m, struct mipm_home_hint *);
 
 	hint->mipmhh_seq = 0;
 	hint->mipmhh_ifindex = ifindex;
 	hint->mipmhh_prefixlen = prefixlen;
-	bcopy(&sin6, (char *) hint->mipmhh_prefix, sizeof(sin6));
+	bcopy(prefix, (char *) hint->mipmhh_prefix, prefix->sa_len);
 
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
 }
@@ -671,14 +665,13 @@ mips_notify_home_hint(ifindex, prefix, prefixlen)
  */
 void
 mips_notify_rr_hint(hoa, peeraddr)
-	struct in6_addr *hoa;
-	struct in6_addr *peeraddr;
+	struct sockaddr *hoa;
+	struct sockaddr *peeraddr;
 {
 	struct mipm_rr_hint *rr_hint;
-	struct sockaddr_in6 sin6;
 	struct mbuf *m;
 	u_short len = sizeof(struct mipm_rr_hint)
-	    + (2 * sizeof(struct sockaddr_in6));
+	    + hoa->sa_len + peeraddr->sa_len;
 
 	m = mips_msg1(MIPM_RR_HINT, len);
 	if (m == NULL)
@@ -686,17 +679,8 @@ mips_notify_rr_hint(hoa, peeraddr)
 	rr_hint = mtod(m, struct mipm_rr_hint *);
 	rr_hint->mipmrh_seq = 0;
 
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *hoa;
-	bcopy(&sin6, (void *)MIPMRH_HOA(rr_hint), sizeof(sin6));
-
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *peeraddr;
-	bcopy(&sin6, (void *)MIPMRH_PEERADDR(rr_hint), sizeof(sin6));
+	bcopy(hoa, (void *)MIPMRH_HOA(rr_hint), hoa->sa_len);
+	bcopy(peeraddr, (void *)MIPMRH_PEERADDR(rr_hint), peeraddr->sa_len);
 
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
 }
@@ -707,16 +691,15 @@ mips_notify_rr_hint(hoa, peeraddr)
  */
 void
 mips_notify_be_hint(src, coa, hoa, status)
-	struct in6_addr *src;
-	struct in6_addr *coa;
-	struct in6_addr *hoa;
+	struct sockaddr *src;
+	struct sockaddr *coa;
+	struct sockaddr *hoa;
 	u_int8_t status;
 {
 	struct mipm_be_hint *be_hint;
-	struct sockaddr_in6 sin6;
 	struct mbuf *m;
 	u_short len = sizeof(struct mipm_be_hint)
-	    + (3 * sizeof(struct sockaddr_in6));
+	    + src->sa_len + coa->sa_len + hoa->sa_len;
 
 	m = mips_msg1(MIPM_BE_HINT, len);
 	if (m == NULL)
@@ -726,23 +709,9 @@ mips_notify_be_hint(src, coa, hoa, status)
 
 	be_hint->mipmbeh_status = status;
 
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *src;
-	bcopy(&sin6, (void *)MIPMBEH_PEERADDR(be_hint), sizeof(sin6));
-
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *coa;
-	bcopy(&sin6, (void *)MIPMBEH_COA(be_hint), sizeof(sin6));
-
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = *hoa;
-	bcopy(&sin6, (void *)MIPMBEH_HOA(be_hint), sizeof(sin6));
+	bcopy(src, (void *)MIPMBEH_PEERADDR(be_hint), src->sa_len);
+	bcopy(coa, (void *)MIPMBEH_COA(be_hint), coa->sa_len);
+	bcopy(hoa, (void *)MIPMBEH_HOA(be_hint), hoa->sa_len);
 
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
 }

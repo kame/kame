@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.218 2005/05/26 04:22:39 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.219 2005/06/09 02:16:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1552,15 +1552,27 @@ mip6_notify_rr_hint(dst, src)
 	struct in6_addr *dst;
 	struct in6_addr *src;
 {
+	struct sockaddr_in6 src_sin6, dst_sin6;
+
 	if (mip6_rr_hint_ratelimit(dst, src)) {
 		/* rate limited. */
 		return;
 	}
-	mips_notify_rr_hint(dst, src);
-}
-#endif /* NMIP > 0 */
 
-#if NMIP > 0
+	bzero(&src_sin6, sizeof(struct sockaddr_in6));
+	src_sin6.sin6_len = sizeof(struct sockaddr_in6);
+	src_sin6.sin6_family = AF_INET6;
+	src_sin6.sin6_addr = *src;
+
+	bzero(&dst_sin6, sizeof(struct sockaddr_in6));
+	dst_sin6.sin6_len = sizeof(struct sockaddr_in6);
+	dst_sin6.sin6_family = AF_INET6;
+	dst_sin6.sin6_addr = *dst;
+
+	mips_notify_rr_hint((struct sockaddr *)&dst_sin6,
+	    (struct sockaddr *)&src_sin6);
+}
+
 static int
 mip6_rr_hint_ratelimit(dst, src)
 	const struct in6_addr *dst;	/* not used at this moment */

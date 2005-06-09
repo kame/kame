@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.272 2005/04/14 06:22:42 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.273 2005/06/09 02:16:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1381,7 +1381,7 @@ prelist_update(new, dr, m, mcast)
 	 */
 	if (MIP6_IS_MN && mip6_are_homeprefix(new)) {
 		mips_notify_home_hint(new->ndpr_ifp->if_index, 
-		    &new->ndpr_prefix.sin6_addr, new->ndpr_plen);
+		    (struct sockaddr *)&new->ndpr_prefix, new->ndpr_plen);
 		goto end;
 	}
 #endif /* MIP6 && NMIP > 0 */

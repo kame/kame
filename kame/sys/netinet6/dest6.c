@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.69 2005/01/20 09:14:05 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.70 2005/06/09 02:16:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,9 +68,11 @@
 #include <netinet/ip6mh.h>
 #include <netinet6/mip6_var.h>
 
-static int	dest6_swap_hao __P((struct ip6_hdr *, struct ip6aux *,
-				    struct ip6_opt_home_address *));
-static int	dest6_nextopt __P((struct mbuf *, int, struct ip6_opt *));
+static int dest6_swap_hao(struct ip6_hdr *, struct ip6aux *,
+    struct ip6_opt_home_address *);
+static int dest6_nextopt(struct mbuf *, int, struct ip6_opt *);
+static void mip6_notify_be_hint(struct in6_addr *, struct in6_addr *,
+    struct in6_addr *, u_int8_t);
 #endif /* MIP6 */
 
 /*
@@ -342,7 +344,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 			return (0);
 		}
 		/* notify to send a binding error by the mobility socket. */
-		(void)mips_notify_be_hint(&ip6->ip6_src, &ip6->ip6_dst, &home,
+		(void)mip6_notify_be_hint(&ip6->ip6_src, &ip6->ip6_dst, &home,
 		    IP6_MH_BES_UNKNOWN_HAO);
 		return (-1);
 	}
@@ -361,9 +363,39 @@ dest6_mip6_hao(m, mhoff, nxt)
 /*	mip6stat.mip6s_unverifiedhao++;*/
 
 	/* notify to send a binding error by the mobility socket. */
-	(void)mips_notify_be_hint(&ip6->ip6_src, &ip6->ip6_dst, &home,
+	(void)mip6_notify_be_hint(&ip6->ip6_src, &ip6->ip6_dst, &home,
 	    IP6_MH_BES_UNKNOWN_HAO);
 
 	return (-1);
+}
+
+static void
+mip6_notify_be_hint(src, coa, hoa, status)
+	struct in6_addr *src;
+	struct in6_addr *coa;
+	struct in6_addr *hoa;
+	u_int8_t status;
+{
+	struct sockaddr_in6 src_sin6, coa_sin6, hoa_sin6;
+
+	bzero(&src_sin6, sizeof(struct sockaddr_in6));
+	bzero(&coa_sin6, sizeof(struct sockaddr_in6));
+	bzero(&hoa_sin6, sizeof(struct sockaddr_in6));
+
+	src_sin6.sin6_len = sizeof(struct sockaddr_in6);
+	src_sin6.sin6_family = AF_INET6;
+	src_sin6.sin6_addr = *src;
+
+	coa_sin6.sin6_len = sizeof(struct sockaddr_in6);
+	coa_sin6.sin6_family = AF_INET6;
+	coa_sin6.sin6_addr = *coa;
+
+	hoa_sin6.sin6_len = sizeof(struct sockaddr_in6);
+	hoa_sin6.sin6_family = AF_INET6;
+	hoa_sin6.sin6_addr = *hoa;
+
+	mips_notify_be_hint((struct sockaddr *)&src_sin6,
+	    (struct sockaddr *)&coa_sin6,
+	    (struct sockaddr *)&hoa_sin6, status);
 }
 #endif /* MIP6 */

@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.4 2005/03/10 23:30:36 t-momose Exp $ */
+/* $Id: mipsock.h,v 1.5 2005/06/09 02:16:10 keiichi Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -197,9 +197,9 @@ struct mipm_be_hint {
 int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
     struct mbuf *, struct proc *);
 #endif
-void mips_notify_home_hint(u_int16_t, struct in6_addr *, u_int16_t);
-void mips_notify_rr_hint(struct in6_addr *, struct in6_addr *);
-void mips_notify_be_hint(struct in6_addr *, struct in6_addr *,
-    struct in6_addr *, u_int8_t);
+void mips_notify_home_hint(u_int16_t, struct sockaddr *, u_int16_t);
+void mips_notify_rr_hint(struct sockaddr *, struct sockaddr *);
+void mips_notify_be_hint(struct sockaddr *, struct sockaddr *,
+    struct sockaddr *, u_int8_t);
 
 #endif /* !_NET_MIPSOCK_H_ */
