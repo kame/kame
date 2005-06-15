@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.70 2005/06/09 02:16:10 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.71 2005/06/15 07:11:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -223,7 +223,7 @@ dest6_swap_hao(ip6, ip6a, haopt)
 		return (EINVAL);
 
 	/* XXX should we do this at all?  do it now or later? */
-	/* XXX interaction with 2292bis IPV6_RECVDSTOPT */
+	/* XXX interaction with RFC3542 IPV6_RECVDSTOPT */
 	/* XXX interaction with ipsec - should be okay */
 	/* XXX icmp6 responses is modified - which is bad */
 	bcopy(&ip6->ip6_src, &ip6a->ip6a_coa, sizeof(ip6a->ip6a_coa));

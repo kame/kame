@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.360 2005/05/02 10:03:17 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.361 2005/06/15 07:11:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1497,7 +1497,7 @@ ip6_savecontrol(in6p, m, mp)
 			 * jumbo payload option is included, the option which
 			 * is to be removed before returning according to
 			 * RFC2292.
-			 * Note: this constraint is removed in 2292bis.
+			 * Note: this constraint is removed in RFC3542.
 			 */
 			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
 			    IS2292(IPV6_2292HOPOPTS, IPV6_HOPOPTS),

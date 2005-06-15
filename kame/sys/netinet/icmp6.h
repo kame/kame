@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.97 2005/04/01 07:31:01 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.98 2005/06/15 07:11:36 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -487,8 +487,8 @@ struct nd_opt_hdr {		/* Neighbor discovery option header */
 #define ND_OPT_PREFIX_INFORMATION	3
 #define ND_OPT_REDIRECTED_HEADER	4
 #define ND_OPT_MTU			5
-#define ND_OPT_ADV_INTERVAL		7	/* 2292bis-02 */
-#define ND_OPT_HA_INFORMATION		8	/* 2292bis-02 */
+#define ND_OPT_ADV_INTERVAL		7	/* RFC3775 */
+#define ND_OPT_HA_INFORMATION		8	/* RFC3775 */
 #define ND_OPT_SOURCE_ADDRLIST		9	/* will be renamed */
 #define ND_OPT_TARGET_ADDRLIST		10	/* will be renamed */
 
@@ -507,7 +507,7 @@ struct nd_opt_prefix_info {	/* prefix information */
 
 #define ND_OPT_PI_FLAG_ONLINK		0x80
 #define ND_OPT_PI_FLAG_AUTO		0x40
-#define ND_OPT_PI_FLAG_ROUTER		0x20	/* 2292bis-02 */
+#define ND_OPT_PI_FLAG_ROUTER		0x20	/* RFC3775 */
 
 struct nd_opt_rd_hdr {		/* redirected header */
 	u_int8_t	nd_opt_rh_type;

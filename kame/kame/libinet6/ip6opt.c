@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.17 2005/01/13 04:01:10 itojun Exp $	*/
+/*	$KAME: ip6opt.c,v 1.18 2005/06/15 07:11:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -390,8 +390,8 @@ inet6_insert_padopt(u_char *p, int len)
 }
 
 /*
- * The following functions are defined in a successor of RFC2292, aka
- * rfc2292bis.
+ * The following functions are defined in RFC3542, which is a successor
+ * of RFC2292.
  */
 
 int

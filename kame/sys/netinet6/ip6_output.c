@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.468 2005/04/14 06:22:41 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.469 2005/06/15 07:11:36 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2216,7 +2216,7 @@ do { \
 					/*
 					 * We ignore this option for TCP
 					 * sockets.
-					 * (rfc2292bis leaves this case
+					 * (RFC3542 leaves this case
 					 * unspecified.)
 					 */
 					if (uproto != IPPROTO_TCP)
@@ -2374,7 +2374,7 @@ do { \
 			case IPV6_RTHDRDSTOPTS:
 			case IPV6_NEXTHOP:
 			{
-				/* new advanced API (2292bis) */
+				/* new advanced API (RFC3542) */
 				u_char *optbuf;
 #ifdef __FreeBSD__
 				u_char optbuf_storage[MCLBYTES];
@@ -3093,9 +3093,9 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		 * For ICMPv6 sockets, no modification allowed for checksum
 		 * offset, permit "no change" values to help existing apps.
 		 *
-		 * XXX 2292bis says: "An attempt to set IPV6_CHECKSUM
+		 * RFC3542 says: "An attempt to set IPV6_CHECKSUM
 		 * for an ICMPv6 socket will fail."
-		 * The current behavior does not meet 2292bis.
+		 * The current behavior does not meet RFC3542.
 		 */
 		switch (op) {
 #ifdef __FreeBSD__
@@ -4397,8 +4397,8 @@ ip6_setpktopts(control, opt, stickyopt, priv, uproto)
  * item.  "len" can be 0 only when it's a sticky option.
  * We have 4 cases of combination of "sticky" and "cmsg":
  * "sticky=0, cmsg=0": impossible
- * "sticky=0, cmsg=1": RFC2292 or rfc2292bis ancillary data
- * "sticky=1, cmsg=0": rfc2292bis socket option
+ * "sticky=0, cmsg=1": RFC2292 or RFC3542 ancillary data
+ * "sticky=1, cmsg=0": RFC3542 socket option
  * "sticky=1, cmsg=1": RFC2292 socket option
  */
 static int
@@ -4418,8 +4418,8 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 
 	/*
 	 * IPV6_2292xxx is for backward compatibility to RFC2292, and should
-	 * not be specified in the context of rfc2292bis.  Conversely,
-	 * rfc2292bis types should not be specified in the context of RFC2292.
+	 * not be specified in the context of RFC3542.  Conversely,
+	 * RFC3542 types should not be specified in the context of RFC2292.
 	 */
 	if (!cmsg) {
 		switch (optname) {
@@ -4446,7 +4446,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		case IPV6_DONTFRAG:
 		case IPV6_OTCLASS:
 		case IPV6_TCLASS:
-		case IPV6_PREFER_TEMPADDR: /* XXX: not an rfc2292bis option */
+		case IPV6_PREFER_TEMPADDR: /* XXX: not an RFC3542 option */
 			return (ENOPROTOOPT);
 		}
 	}
@@ -4682,7 +4682,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 			 * part of the destination options header must appear
 			 * before the routing header in the ancillary data,
 			 * too.
-			 * RFC2292bis solved the ambiguity by introducing
+			 * RFC3542 solved the ambiguity by introducing
 			 * separate ancillary data or option types.
 			 */
 			if (opt->ip6po_rthdr == NULL)
@@ -4800,7 +4800,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		if (uproto == IPPROTO_TCP || *(int *)buf == 0) {
 			/*
 			 * we ignore this option for TCP sockets.
-			 * (rfc2292bis leaves this case unspecified.)
+			 * (RFC3542 leaves this case unspecified.)
 			 */
 			opt->ip6po_flags &= ~IP6PO_DONTFRAG;
 		} else
