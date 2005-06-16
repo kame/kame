@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2772 2005/06/16 18:33:34 jinmei Exp $
+$KAME: CHANGELOG,v 1.2773 2005/06/16 21:02:18 jinmei Exp $
 
 <200506>
+2005-06-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {kame,*bsd}/sys/(various files): revised scope-related
+	interfaces, clarifying the relationship between the
+	kernel-internal form and the public sockaddr_in6 form.  Details
+	are described in kame/IMPLEMENTATION.  External behavior basically
+	should not change, although several bugs in minor cases were also
+	fixed with the clarification.  Some scope-related functions were
+	deprecated.
+
 2005-06-08  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/nd6.c: fixed a bug that some of the subcommands
 	 in 'ndp -i ..' command does not work (e.g. accept_rtadv, nud)
