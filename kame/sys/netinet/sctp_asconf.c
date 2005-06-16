@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.24 2005/03/06 16:04:16 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.25 2005/06/16 20:44:24 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -76,6 +76,7 @@
 #endif
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
+#include <netinet6/scope6_var.h>
 #endif /* INET6 */
 
 #include <netinet/in_pcb.h>
