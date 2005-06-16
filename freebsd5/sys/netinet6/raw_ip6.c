@@ -691,6 +691,15 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		return EADDRNOTAVAIL;
 	if (addr->sin6_family != AF_INET6)
 		return EAFNOSUPPORT;
+
+	/*
+	 * Application should provide a proper zone ID or the use of
+	 * default zone IDs should be enabled.  Unfortunately, some
+	 * applications do not behave as it should, so we need a
+	 * workaround.  Even if an appropriate ID is not determined,
+	 * we'll see if we can determine the outgoing interface.  If we
+	 * can, determine the zone ID based on the interface below.
+	 */
 	if (addr->sin6_scope_id == 0 && !ip6_use_defzone)
 		scope_ambiguous = 1;
 	if ((error = sa6_embedscope(addr, ip6_use_defzone)) != 0)
