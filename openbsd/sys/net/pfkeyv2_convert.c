@@ -482,9 +482,9 @@ import_flow(struct sockaddr_encap *flow, struct sockaddr_encap *flowmask,
 
 #ifdef INET6
 	case AF_INET6:
-		if (sa6_embedscope(&src, 0) != 0)
+		if (sa6_embedscope(&src->sin6, 0) != 0)
 			return;
-		if (sa6_embedscope(&dst, 0) != 0)
+		if (sa6_embedscope(&dst->sin6, 0) != 0)
 			return;
 
 		/* netmask handling */

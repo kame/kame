@@ -142,6 +142,7 @@
 #include <netinet/in.h>
 #endif
 #include <netinet6/ip6protosw.h>
+#include <netinet6/scope6_var.h>
 #ifdef MLDV2
 #include <netinet6/in6_msf.h>
 #endif
@@ -418,7 +419,7 @@ udp_input(struct mbuf *m, ...)
 #if 0 /*XXX inbound flowinfo */
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ip6->ip6_flow;
 #endif
-		srcsa.sin6 = ip6->ip6_src;
+		srcsa.sin6.sin6_addr = ip6->ip6_src;
 
 		/*
 		 * Convert the kernel-internal form to the standard
@@ -435,7 +436,7 @@ udp_input(struct mbuf *m, ...)
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		dstsa.sin6.sin6_family = AF_INET6;
 		dstsa.sin6.sin6_port = uh->uh_dport;
-		dstsa.sin6_addr = ip6->ip6_dst;
+		dstsa.sin6.sin6_addr = ip6->ip6_dst;
 		break;
 #endif /* INET6 */
 	}

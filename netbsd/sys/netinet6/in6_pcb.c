@@ -1,5 +1,5 @@
 /*	$NetBSD: in6_pcb.c,v 1.61.2.1 2004/04/28 05:56:07 jmc Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.3 2005/06/16 18:31:53 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.4 2005/06/16 19:48:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,6 +213,8 @@ in6_pcbbind(v, nam, p)
 	    (so->so_options & SO_ACCEPTCONN) == 0))
 		wild = 1;
 	if (nam) {
+		int error;
+
 		sin6 = mtod(nam, struct sockaddr_in6 *);
 		if (nam->m_len != sizeof(*sin6))
 			return (EINVAL);

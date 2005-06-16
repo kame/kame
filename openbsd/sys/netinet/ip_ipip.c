@@ -65,6 +65,10 @@
 #include <netinet/ip_ipsp.h>
 #include <netinet/ip_ipip.h>
 
+#ifdef INET6
+#include <netinet6/scope6_var.h>
+#endif
+
 #include "bpfilter.h"
 
 #ifdef ENCDEBUG
@@ -540,8 +544,8 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		ip6o->ip6_vfc |= IPV6_VERSION;
 		ip6o->ip6_plen = htons(m->m_pkthdr.len);
 		ip6o->ip6_hlim = ip_defttl;
-		ip6o->ip6_src = tdb->tdb_src.sin6;
-		ip6o->ip6_dst = tdb->tdb_dst.sin6;
+		ip6o->ip6_src = tdb->tdb_src.sin6.sin6_addr;
+		ip6o->ip6_dst = tdb->tdb_dst.sin6.sin6_addr;
 
 #ifdef INET
 		if (tp == IPVERSION) {
