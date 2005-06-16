@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.386 2005/03/19 02:49:13 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.387 2005/06/16 18:34:52 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -441,18 +441,18 @@ the kernel would not be able to determine the outbound zone for a
 packet to the scoped address.  KAME code tries to address the issue in
 several ways.
 
-The entire architecture of scoped addresses is documented in
-draft-ietf-ipv6-scoping-arch-xx.txt.  One non-trivial point of the
-architecture is that the link scope is (theoretically) larger than the
-interface scope.  That is, two different interfaces can belong to a
-same single link.  However, in a normal operation, we can assume that
-there is 1-to-1 relationship between links and interfaces.  In
-other words, we can usually put links and interfaces in the same scope
-type.  The current KAME implementation assumes the 1-to-1
-relationship.  In particular, we use interface names such as "ne1" as
-unique link identifiers.  This would be much more human-readable and
-intuitive than numeric identifiers, but please keep your mind on the
-theoretical difference between links and interfaces.
+The entire architecture of scoped addresses is documented in RFC4007.
+One non-trivial point of the architecture is that the link scope is
+(theoretically) larger than the interface scope.  That is, two
+different interfaces can belong to a same single link.  However, in a
+normal operation, we can assume that there is 1-to-1 relationship
+between links and interfaces.  In other words, we can usually put
+links and interfaces in the same scope type.  The current KAME
+implementation assumes the 1-to-1 relationship.  In particular, we use
+interface names such as "ne1" as unique link identifiers.  This would
+be much more human-readable and intuitive than numeric identifiers,
+but please keep your mind on the theoretical difference between links
+and interfaces.
 
 Site-local addresses are very vaguely defined in the specs, and both
 the specification and the KAME code need tons of improvements to
@@ -543,11 +543,11 @@ use these APIs have to be prepared about differences in kernels
 anyway.
 
 getaddrinfo(3) and getnameinfo(3) support an extended numeric IPv6
-syntax, as documented in draft-ietf-ipv6-scoping-arch-xx.txt.  You can
-specify the outgoing link, by using the name of the outgoing interface
-as the link, like "fe80::1%ne0" (again, note that we assume there is
-1-to-1 relationship between links and interfaces.)  This way you will
-be able to specify a link-local scoped address without much trouble.
+syntax, as documented in RFC4007.  You can specify the outgoing link,
+by using the name of the outgoing interface as the link, like
+"fe80::1%ne0" (again, note that we assume there is 1-to-1 relationship
+between links and interfaces.)  This way you will be able to specify a
+link-local scoped address without much trouble.
 
 Other APIs like inet_pton(3) and inet_ntop(3) are inherently
 unfriendly with scoped addresses, since they are unable to annotate
