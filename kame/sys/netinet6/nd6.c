@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.380 2005/06/16 18:29:29 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.381 2005/06/16 22:32:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2657,6 +2657,7 @@ nd6_need_cache(ifp)
 	case IFT_CARP:
 #endif
 	case IFT_GIF:		/* XXX need more cases? */
+	case IFT_PPP:
 		return (1);
 	default:
 		return (0);
