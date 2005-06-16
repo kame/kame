@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.164 2005/06/16 18:29:30 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.165 2005/06/16 19:51:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,7 +202,8 @@ rip6_input(mp, offp, proto)
 
 	rip6src.sin6_family = AF_INET6;
 	rip6src.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_recoverscope(&rip6src, &ip6->ip6_src, m->m_pkthdr.rcvif)) {
+	rip6src.sin6_addr = ip6->ip6_src;
+	if (sa6_recoverscope(&rip6src) != 0) {
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -714,9 +715,6 @@ rip6_usrreq(so, req, m, nam, control, p)
 	int s;
 	int error = 0;
 	int priv;
-#ifndef SCOPEDROUTING
-	u_int32_t lzone;
-#endif
 
 	priv = 0;
 #if defined(__NetBSD__) || defined(__FreeBSD__)
