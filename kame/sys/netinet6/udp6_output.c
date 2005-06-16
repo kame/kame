@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.84 2005/06/16 18:29:30 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.85 2005/06/16 19:58:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,6 +216,14 @@ udp6_output(in6p, m, addr6, control)
 		tmp = *fsa6;
 		fsa6 = &tmp;
 
+		/*
+		 * Application should provide a proper zone ID or the use of
+		 * default zone IDs should be enabled.  Unfortunately, some
+		 * applications do not behave as it should, so we need a
+		 * workaround.  Even if an appropriate ID is not determined,
+		 * we'll see if we can determine the outgoing interface.  If we
+		 * can, determine the zone ID based on the interface below.
+		 */
 		if (fsa6->sin6_scope_id == 0 && !ip6_use_defzone)
 			scope_ambiguous = 1;
 		if ((error = sa6_embedscope(fsa6, ip6_use_defzone)) != 0)
