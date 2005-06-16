@@ -78,6 +78,10 @@ __KERNEL_RCSID(0, "$NetBSD: if_spppsubr.c,v 1.75.2.1 2004/04/08 21:16:03 jdc Exp
 #endif
 #include <net/ethertypes.h>
 
+#ifdef INET6
+#include <netinet6/scope6_var.h>
+#endif
+
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
@@ -3369,7 +3373,7 @@ sppp_ipv6cp_RCR(struct sppp *sp, struct lcp_header *h, int len)
 			nohisaddr = IN6_IS_ADDR_UNSPECIFIED(&desiredaddr);
 
 			desiredaddr.s6_addr16[0] = htons(0xfe80);
-			desiredaddr.s6_addr16[1] = htons(sp->pp_if.if_index);
+			(void)in6_setscope(&desiredaddr, &sp->pp_if, NULL);
 
 			if (!collision && !nohisaddr) {
 				/* no collision, hisaddr known - Conf-Ack */
@@ -3512,7 +3516,7 @@ sppp_ipv6cp_RCN_nak(struct sppp *sp, struct lcp_header *h, int len)
 				break;
 			memset(&suggestaddr, 0, sizeof(suggestaddr));
 			suggestaddr.s6_addr16[0] = htons(0xfe80);
-			suggestaddr.s6_addr16[1] = htons(sp->pp_if.if_index);
+			(void)in6_setscope(&suggestaddr, &sp->pp_if, NULL);
 			bcopy(&p[2], &suggestaddr.s6_addr[8], 8);
 
 			sp->ipv6cp.opts |= (1 << IPV6CP_OPT_IFID);

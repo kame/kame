@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.138 2005/04/14 06:22:41 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.139 2005/06/16 18:29:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1676,31 +1676,21 @@ ip6_mdq(m, ifp, rt)
 	 */
 	for (mifp = mif6table, mifi = 0; mifi < nummifs; mifp++, mifi++) {
 		if (IF_ISSET(mifi, &rt->mf6c_ifset)) {
-			struct sockaddr_in6 src_sa, dst_sa;
-			u_int32_t sscopeout, dscopeout;
+			struct in6_addr src0, dst0; /* copies for local work */
+			u_int32_t iszone, idzone, oszone, odzone;
 
 			if (mif6table[mifi].m6_ifp == NULL)
 				continue;
 			/*
 			 * check if the outgoing packet is going to break
 			 * a scope boundary.
-			 * XXX For packets through PIM register tunnel
-			 * interface, we believe a routing daemon.
+			 * XXX: For packets through PIM register tunnel
+			 * interface, we believe the routing daemon.
 			 */
-			bzero(&src_sa, sizeof(src_sa));
-			src_sa.sin6_family = AF_INET6;
-			src_sa.sin6_len = sizeof(src_sa);
-			if (in6_recoverscope(&src_sa, &ip6->ip6_src,
-			    m->m_pkthdr.rcvif)) {
-				ip6stat.ip6s_badscope++;
-				continue;
-			}
-			
-			bzero(&dst_sa, sizeof(dst_sa));
-			dst_sa.sin6_family = AF_INET6;
-			dst_sa.sin6_len = sizeof(dst_sa);
-			if (in6_recoverscope(&dst_sa, &ip6->ip6_dst,
-			    m->m_pkthdr.rcvif)) {
+			src0 = ip6->ip6_src;
+			dst0 = ip6->ip6_dst;
+			if (in6_setscope(&src0, m->m_pkthdr.rcvif, &iszone) ||
+			    in6_setscope(&dst0, m->m_pkthdr.rcvif, &idzone)) {
 				ip6stat.ip6s_badscope++;
 				continue;
 			}
@@ -1708,12 +1698,12 @@ ip6_mdq(m, ifp, rt)
 			if (!(mif6table[rt->mf6c_parent].m6_flags &
 			      MIFF_REGISTER) &&
 			    !(mif6table[mifi].m6_flags & MIFF_REGISTER)) {
-				if (in6_addr2zoneid(mif6table[mifi].m6_ifp,
-				    &ip6->ip6_dst, &dscopeout) ||
-				    in6_addr2zoneid(mif6table[mifi].m6_ifp,
-				    &ip6->ip6_src, &sscopeout) ||
-				    dst_sa.sin6_scope_id != dscopeout ||
-				    src_sa.sin6_scope_id != sscopeout) {
+				if (in6_setscope(&src0, mif6table[mifi].m6_ifp,
+				    &oszone) ||
+				    in6_setscope(&dst0, mif6table[mifi].m6_ifp,
+				    &odzone) ||
+				    iszone != oszone ||
+				    idzone != odzone) {
 					ip6stat.ip6s_badscope++;
 					continue;
 				}

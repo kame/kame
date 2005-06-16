@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.209 2005/05/12 18:41:17 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.210 2005/06/16 18:29:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -623,22 +623,13 @@ in6_ifattach_linklocal(ifp, altifp)
 			return (-1);
 		}
 	}
-	if (in6_addr2zoneid(ifp, &ifra.ifra_addr.sin6_addr,
-			    &ifra.ifra_addr.sin6_scope_id)) {
+	if (in6_setscope(&ifra.ifra_addr.sin6_addr, ifp, NULL))
 		return (-1);
-	}
-	in6_embedscope(&ifra.ifra_addr.sin6_addr, &ifra.ifra_addr); /* XXX */
-#ifndef SCOPEDROUTING
-	ifra.ifra_addr.sin6_scope_id = 0; /* XXX */
-#endif
 
 	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 	ifra.ifra_prefixmask.sin6_family = AF_INET6;
 	ifra.ifra_prefixmask.sin6_addr = in6mask64;
-#ifdef SCOPEDROUTING
-	/* take into account the sin6_scope_id field for routing */
-	ifra.ifra_prefixmask.sin6_scope_id = 0xffffffff;
-#endif
+
 	/* link-local addresses should NEVER expire. */
 	ifra.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 	ifra.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
@@ -833,11 +824,8 @@ in6_nigroup(ifp, name, namelen, sa6)
 	sa6->sin6_addr.s6_addr8[11] = 2;
 	bcopy(digest, &sa6->sin6_addr.s6_addr32[3],
 	    sizeof(sa6->sin6_addr.s6_addr32[3]));
-	if (in6_addr2zoneid(ifp, &sa6->sin6_addr, &sa6->sin6_scope_id)) {
-		return -1; /* XXX: should not fail */
-	}
-	in6_embedscope(&sa6->sin6_addr, sa6);
-	sa6->sin6_scope_id = 0;	/* XXX */
+	if (in6_setscope(&sa6->sin6_addr, ifp, NULL))
+		return (-1); /* XXX: should not fail */
 
 	return 0;
 }
@@ -1083,14 +1071,10 @@ in6_ifdetach(ifp)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_addr = in6addr_linklocal_allnodes;
-	if (in6_addr2zoneid(ifp, &sin6.sin6_addr, &sin6.sin6_scope_id)) {
+	if (in6_setscope(&sin6.sin6_addr, ifp, NULL))
 		/* XXX: should not fail */
 		return;
-	}
-	in6_embedscope(&sin6.sin6_addr, &sin6);	/* XXX */
-#ifndef SCOPEDROUTING
-	sin6.sin6_scope_id = 0;	/* XXX */
-#endif
+
 	if (rt_tables[AF_INET6] != NULL) {
 #ifdef __FreeBSD__
 		RADIX_NODE_HEAD_LOCK(rt_tables[AF_INET6]);

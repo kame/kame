@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.379 2005/06/08 08:04:54 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.380 2005/06/16 18:29:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,6 +92,7 @@
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
@@ -1105,13 +1106,18 @@ nd6_is_new_addr_neighbor(addr, ifp)
 	 */
 	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
 		struct sockaddr_in6 sin6_copy;
+		u_int32_t zone;
 
 		/*
-		 * in6_recoverscope() returns 0 if and only if ifp is attached
-		 * to the link of this address.  We need sin6_copy since
-		 * in6_recoverscope() may modify the content (XXX).
+		 * We need sin6_copy since sa6_recoverscope() may modify the
+		 * content (XXX).
 		 */
-		if (in6_recoverscope(&sin6_copy, &addr->sin6_addr, ifp) == 0)
+		sin6_copy = *addr;
+		if (sa6_recoverscope(&sin6_copy))
+			return (0); /* XXX: should be impossible */
+		if (in6_setscope(&sin6_copy.sin6_addr, ifp, &zone))
+			return (0);
+		if (sin6_copy.sin6_scope_id == zone)
 			return (1);
 		else
 			return (0);
@@ -1181,13 +1187,18 @@ nd6_is_addr_neighbor(addr, ifp)
 	 */
 	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
 		struct sockaddr_in6 sin6_copy;
+		u_int32_t zone;
 
 		/*
-		 * in6_recoverscope() returns 0 if and only if ifp is attached
-		 * to the link of this address.  We need sin6_copy since
-		 * in6_recoverscope() may modify the content (XXX).
+		 * We need sin6_copy since sa6_recoverscope() may modify the
+		 * content (XXX).
 		 */
-		if (in6_recoverscope(&sin6_copy, &addr->sin6_addr, ifp) == 0)
+		sin6_copy = *addr;
+		if (sa6_recoverscope(&sin6_copy))
+			return (0); /* XXX: should be impossible */
+		if (in6_setscope(&sin6_copy.sin6_addr, ifp, &zone))
+			return (0);
+		if (sin6_copy.sin6_scope_id == zone)
 			return (1);
 		else
 			return (0);
@@ -1640,25 +1651,21 @@ nd6_rtrequest(req, rt, info)
 
 			/* join solicited node multicast for proxy ND */
 			if (ifp->if_flags & IFF_MULTICAST) {
-				struct sockaddr_in6 llsol;
+				struct in6_addr llsol;
 				int error;
 
-				llsol = *SIN6(rt_key(rt));
-				llsol.sin6_addr.s6_addr32[0] =
-					htonl(0xff020000);
-				llsol.sin6_addr.s6_addr32[1] = 0;
-				llsol.sin6_addr.s6_addr32[2] = htonl(1);
-				llsol.sin6_addr.s6_addr8[12] = 0xff;
-				if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
-				    &llsol.sin6_scope_id))
+				llsol = SIN6(rt_key(rt))->sin6_addr;
+				llsol.s6_addr32[0] = htonl(0xff020000);
+				llsol.s6_addr32[1] = 0;
+				llsol.s6_addr32[2] = htonl(1);
+				llsol.s6_addr8[12] = 0xff;
+				if (in6_setscope(&llsol, ifp, NULL))
 					break;
-				if (in6_embedscope(&llsol.sin6_addr, &llsol))
-					break;
-				if (in6_addmulti(&llsol.sin6_addr,
-				    ifp, &error, 0) == NULL) {
+				if (in6_addmulti(&llsol, ifp,
+				    &error, 0) == NULL) {
 					nd6log((LOG_ERR, "%s: failed to join "
 					    "%s (errno=%d)\n", if_name(ifp),
-					    ip6_sprintf(&llsol.sin6_addr),
+					    ip6_sprintf(&llsol),
 					    error));
 				}
 			}
@@ -1680,23 +1687,20 @@ nd6_rtrequest(req, rt, info)
 		/* leave from solicited node multicast for proxy ND */
 		if ((rt->rt_flags & RTF_ANNOUNCE) != 0 &&
 		    (ifp->if_flags & IFF_MULTICAST) != 0) {
-			struct sockaddr_in6 llsol;
+			struct in6_addr llsol;
 			struct in6_multi *in6m;
 
-			llsol = *SIN6(rt_key(rt));
-			llsol.sin6_addr.s6_addr32[0] = htonl(0xff020000);
-			llsol.sin6_addr.s6_addr32[1] = 0;
-			llsol.sin6_addr.s6_addr32[2] = htonl(1);
-			llsol.sin6_addr.s6_addr8[12] = 0xff;
-			if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
-			    &llsol.sin6_scope_id) == 0) {
-				IN6_LOOKUP_MULTI(llsol.sin6_addr, ifp, in6m);
-				if (in6m) {
+			llsol = SIN6(rt_key(rt))->sin6_addr;
+			llsol.s6_addr32[0] = htonl(0xff020000);
+			llsol.s6_addr32[1] = 0;
+			llsol.s6_addr32[2] = htonl(1);
+			llsol.s6_addr8[12] = 0xff;
+			if (in6_setscope(&llsol, ifp, NULL) == 0) {
+				IN6_LOOKUP_MULTI(llsol, ifp, in6m);
+				if (in6m)
 					in6_delmulti(in6m);
-				}
-			} else {
-				/* XXX: this should not fail.  bark here? */
-			}
+			} else
+				; /* XXX: should not happen. bark here? */
 		}
 		nd6_inuse--;
 		ln->ln_next->ln_prev = ln->ln_prev;
@@ -1818,8 +1822,7 @@ nd6_ioctl(cmd, data, ifp)
 			struct nd_pfxrouter *pfr;
 			int j;
 
-			(void)in6_embedscope(&oprl->prefix[i].prefix,
-			    &pr->ndpr_prefix);
+			oprl->prefix[i].prefix = pr->ndpr_prefix.sin6_addr;
 			oprl->prefix[i].raflags = pr->ndpr_raf;
 			oprl->prefix[i].prefixlen = pr->ndpr_plen;
 			oprl->prefix[i].vltime = pr->ndpr_vltime;
@@ -1971,27 +1974,18 @@ nd6_ioctl(cmd, data, ifp)
 	case SIOCGNBRINFO_IN6:
 	{
 		struct llinfo_nd6 *ln;
-		struct sockaddr_in6 nb_addr;
+		struct in6_addr nb_addr;
 
-		bzero(&nb_addr, sizeof(nb_addr));
-		nb_addr.sin6_family = AF_INET6;
-		nb_addr.sin6_len = sizeof(nb_addr);
-		nb_addr.sin6_addr = nbi->addr;
-		if (in6_addr2zoneid(ifp, &nb_addr.sin6_addr,
-		    &nb_addr.sin6_scope_id) != 0) {
-			return (EINVAL);
-		}
-		if ((error = in6_embedscope(&nb_addr.sin6_addr, &nb_addr))
-		    != 0) {
+		nb_addr = nbi->addr;
+		if ((error = in6_setscope(&nb_addr, ifp, NULL)) != 0)
 			return (error);
-		}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
 #endif
-		if ((rt = nd6_lookup(&nb_addr.sin6_addr, 0, ifp)) == NULL ||
+		if ((rt = nd6_lookup(&nb_addr, 0, ifp)) == NULL ||
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL) {
 			error = EINVAL;
 			splx(s);
@@ -2998,11 +2992,12 @@ fill_prlist(req)
 #endif
 
 			p->prefix = pr->ndpr_prefix; /* almost redundant */
-			if (in6_recoverscope(&p->prefix,
-			    &p->prefix.sin6_addr, pr->ndpr_ifp) != 0)
+			if (sa6_recoverscope(&p->prefix)) {
 				log(LOG_ERR,
 				    "scope error in prefix list (%s)\n",
 				    ip6_sprintf(&p->prefix.sin6_addr));
+				/* XXX: press on... */
+			}
 			p->raflags = pr->ndpr_raf;
 			p->prefixlen = pr->ndpr_plen;
 			p->vltime = pr->ndpr_vltime;

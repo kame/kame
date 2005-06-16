@@ -136,6 +136,7 @@ __KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.116.2.4 2004/05/28 07:24:17 tron Ex
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
+#include <netinet6/scope6_var.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/udp6_var.h>
 #ifdef MLDV2
@@ -486,9 +487,8 @@ udp6_input(mp, offp, proto)
 	bzero(&dst, sizeof(dst));
 	src.sin6_family = dst.sin6_family = AF_INET6;
 	src.sin6_len = dst.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_recoverscope(&src, &ip6->ip6_src, m->m_pkthdr.rcvif) ||
-	    in6_recoverscope(&dst, &ip6->ip6_dst, m->m_pkthdr.rcvif))
-		goto bad;
+	src.sin6_addr = ip6->ip6_src;
+	dst.sin6_addr = ip6->ip6_dst;
 	src.sin6_port = uh->uh_sport;
 	dst.sin6_port = uh->uh_dport;
 
@@ -574,6 +574,7 @@ udp6_sendup(m, off, src, so)
 	struct socket *so;
 {
 	struct mbuf *n, *opts = NULL;
+	struct sockaddr_in6 *src6 = (struct sockaddr_in6 *)src;
 	struct in6pcb *in6p = NULL;
 
 	if (!so)
@@ -729,7 +730,7 @@ udp6_realinput(af, src, dst, m, off)
 {
 	u_int16_t sport, dport;
 	int rcvcnt;
-	struct in6_addr src6, dst6;
+	struct sockaddr_in6 src_from;
 	const struct in_addr *dst4;
 	struct inpcb_hdr *inph;
 	struct in6pcb *in6p;
@@ -742,8 +743,14 @@ udp6_realinput(af, src, dst, m, off)
 	if (src->sin6_family != AF_INET6 || dst->sin6_family != AF_INET6)
 		goto bad;
 
-	if (in6_embedscope(&src6, src) || in6_embedscope(&dst6, dst))
+	/*
+	 * Convert the kernel-internal form to the standard sockaddr_in6 wrt
+	 * the scope zone.  The former should be hidden from applications.
+	 */
+	src_from = *src;
+	if (sa6_recoverscope(&src_from))
 		goto bad;
+
 	sport = src->sin6_port;
 	dport = dst->sin6_port;
 	dst4 = (struct in_addr *)&dst->sin6_addr.s6_addr[12];
@@ -782,7 +789,7 @@ udp6_realinput(af, src, dst, m, off)
 				continue;
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
-				    &dst6))
+				    &dst->sin6_addr))
 					continue;
 			} else {
 				if (IN6_IS_ADDR_V4MAPPED(&dst->sin6_addr) &&
@@ -791,7 +798,8 @@ udp6_realinput(af, src, dst, m, off)
 			}
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
-				    &src6) || in6p->in6p_fport != sport) {
+				    &src->sin6_addr) ||
+				    in6p->in6p_fport != sport) {
 					continue;
 				}
 			} else {
@@ -808,7 +816,7 @@ udp6_realinput(af, src, dst, m, off)
 			    &dst->sin6_addr) == 0)
 				continue;
 #endif
-			udp6_sendup(m, off, (struct sockaddr *)src,
+			udp6_sendup(m, off, (struct sockaddr *)&src_from,
 				in6p->in6p_socket);
 			rcvcnt++;
 
@@ -828,16 +836,18 @@ udp6_realinput(af, src, dst, m, off)
 		/*
 		 * Locate pcb for datagram.
 		 */
-		in6p = in6_pcblookup_connect(&udbtable, &src6, sport,
-		    &dst6, dport, 0);
+		in6p = in6_pcblookup_connect(&udbtable, &src->sin6_addr, sport,
+		    &dst->sin6_addr, dport, 0);
 		if (in6p == 0) {
 			++udpstat.udps_pcbhashmiss;
-			in6p = in6_pcblookup_bind(&udbtable, &dst6, dport, 0);
+			in6p = in6_pcblookup_bind(&udbtable, &dst->sin6_addr,
+			    dport, 0);
 			if (in6p == 0)
 				return rcvcnt;
 		}
 
-		udp6_sendup(m, off, (struct sockaddr *)src, in6p->in6p_socket);
+		udp6_sendup(m, off, (struct sockaddr *)&src_from,
+		    in6p->in6p_socket);
 		rcvcnt++;
 	}
 

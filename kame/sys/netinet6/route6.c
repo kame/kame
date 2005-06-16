@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.56 2004/12/09 02:19:27 t-momose Exp $	*/
+/*	$KAME: route6.c,v 1.57 2005/06/16 18:29:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,6 +52,7 @@
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 
 #ifdef MIP6
 #include "mip.h"
@@ -181,7 +182,6 @@ ip6_rthdr0(m, ip6, rh0)
 	struct ip6_rthdr0 *rh0;
 {
 	int addrs, index;
-	struct sockaddr_in6 next_sa;
 	struct in6_addr *nextaddr, tmpaddr;
 	struct in6_ifaddr *ifa;
 
@@ -236,26 +236,13 @@ ip6_rthdr0(m, ip6, rh0)
 	}
 
 	/*
-	 * determine the scope zone of the next hop, based on the interface
-	 * of the current hop.
-	 * [draft-ietf-ipngwg-scoping-arch, Section 9]
+	 * Determine the scope zone of the next hop, based on the interface
+	 * of the current hop. [RFC4007, Section 9]
+	 * Then disambiguate the scope zone for the next hop (if necessary). 
 	 */
 	if ((ifa = ip6_getdstifaddr(m)) == NULL)
 		goto bad;
-	/*
-	 * construct a sockaddr_in6 for the next hop with the zone ID,
-	 * then update the recorded destination address.
-	 */
-	bzero(&next_sa, sizeof(next_sa));
-	next_sa.sin6_family = AF_INET6;
-	next_sa.sin6_len = sizeof(next_sa);
-	next_sa.sin6_addr = *nextaddr;
-	if (in6_addr2zoneid(ifa->ia_ifp, nextaddr, &next_sa.sin6_scope_id)) {
-		ip6stat.ip6s_badscope++;
-		goto bad;
-	}
-	if (in6_embedscope(&next_sa.sin6_addr, &next_sa)) {
-		/* XXX: should not happen */
+	if (in6_setscope(nextaddr, ifa->ia_ifp, NULL) != 0) {
 		ip6stat.ip6s_badscope++;
 		goto bad;
 	}
@@ -265,6 +252,7 @@ ip6_rthdr0(m, ip6, rh0)
 	 */
 	tmpaddr = *nextaddr;
 	*nextaddr = ip6->ip6_dst;
+	in6_clearscope(nextaddr); /* XXX */
 	ip6->ip6_dst = tmpaddr;
 
 #ifdef COMPAT_RFC1883
@@ -293,7 +281,6 @@ ip6_rthdr2(m, ip6, rh2)
 {
 	struct in6_addr *nextaddr, tmpaddr;
 	struct in6_ifaddr *ifa;
-	struct sockaddr_in6 next_sa;
 
 	if (rh2->ip6r2_segleft == 0)
 		return (0);
@@ -335,41 +322,25 @@ ip6_rthdr2(m, ip6, rh2)
 
 	/*
 	 * determine the scope zone of the next hop, based on the interface
-	 * of the current hop.
-	 * [draft-ietf-ipngwg-scoping-arch, Section 9]
+	 * of the current hop. [RFC4007, Section 9]
+	 * Then disambiguate the scope zone for the next hop (if necessary).
 	 */
 	if ((ifa = ip6_getdstifaddr(m)) == NULL) 
 		goto bad;
-	/*
-	 * construct a sockaddr_in6 for the next hop with the zone ID,
-	 * then update the recorded destination address.
-	 */
-	bzero(&next_sa, sizeof(next_sa));
-	next_sa.sin6_family = AF_INET6;
-	next_sa.sin6_len = sizeof(next_sa);
-	next_sa.sin6_addr = *nextaddr;
-	if (in6_addr2zoneid(ifa->ia_ifp, nextaddr, &next_sa.sin6_scope_id)) {
+	if (in6_setscope(nextaddr, ifa->ia_ifp, NULL) != 0) {
 		ip6stat.ip6s_badscope++;
 		goto bad;
 	}
-	if (in6_embedscope(&next_sa.sin6_addr, &next_sa)) {
-		/* XXX: should not happen */
-		ip6stat.ip6s_badscope++;
-		goto bad;
-	}
-
 
 	/* Check BUL xxx */
 
-	/* Swap the IPv6 destination address and nextaddr. Forward the packet.  */
+	/*
+	 * Swap the IPv6 destination address and nextaddr. Forward the packet.
+	 */
   	tmpaddr = *nextaddr;
 	*nextaddr = ip6->ip6_dst;
-	if (IN6_IS_ADDR_LINKLOCAL(nextaddr))
-		nextaddr->s6_addr16[1] = 0;
+	in6_clearscope(nextaddr); /* XXX */
 	ip6->ip6_dst = tmpaddr;
-
-	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst))
-		ip6->ip6_dst.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
   	ip6_forward(m, 1);
 

@@ -1,5 +1,5 @@
 /*	$NetBSD: in6_pcb.c,v 1.61.2.1 2004/04/28 05:56:07 jmc Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.2 2004/12/27 05:41:23 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.3 2005/06/16 18:31:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,6 +89,7 @@ __KERNEL_RCSID(0, "$NetBSD: in6_pcb.c,v 1.61.2.1 2004/04/28 05:56:07 jmc Exp $")
 #include <netinet/in_pcb.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
 
@@ -227,11 +228,8 @@ in6_pcbbind(v, nam, p)
 			return (EADDRNOTAVAIL);
 #endif
 
-		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-			return EINVAL;
-		/* this must be cleared for ifa_ifwithaddr() */
-		sin6->sin6_scope_id = 0;
+		if ((error = sa6_embedscope(sin6, ip6_use_defzone)) != 0)
+			return (error);
 
 		lport = sin6->sin6_port;
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
@@ -362,6 +360,7 @@ in6_pcbconnect(v, nam)
 	struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
+	int scope_ambiguous = 0;
 #ifdef INET
 	struct in6_addr mapped;
 #endif
@@ -387,19 +386,17 @@ in6_pcbconnect(v, nam)
 			in6p->in6p_laddr.s6_addr16[5] = htons(0xffff);
 		if (!IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
 			return EINVAL;
-	} else
-	{
-		if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
+	} else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
 			return EINVAL;
-	}
 
 	/* protect *sin6 from overwrites */
 	tmp = *sin6;
 	sin6 = &tmp;
 
-	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-		return EINVAL;
+	if (sin6->sin6_scope_id == 0 && !ip6_use_defzone)
+		scope_ambiguous = 1;
+	if ((error = sa6_embedscope(sin6, ip6_use_defzone)) != 0)
+		return(error);
 
 	/* Source address selection. */
 	if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
@@ -426,8 +423,7 @@ in6_pcbconnect(v, nam)
 #else
 		return EADDRNOTAVAIL;
 #endif
-	} else
-	{
+	} else {
 		/*
 		 * XXX: in6_selectsrc might replace the bound local address
 		 * with the address specified by setsockopt(IPV6_PKTINFO).
@@ -436,6 +432,10 @@ in6_pcbconnect(v, nam)
 		in6a = in6_selectsrc(sin6, in6p->in6p_outputopts,
 		    in6p->in6p_moptions, &in6p->in6p_route,
 		    &in6p->in6p_laddr, &ifp, &error);
+		if (ifp && scope_ambiguous &&
+		    (error = in6_setscope(&sin6->sin6_addr, ifp, NULL)) != 0) {
+			return(error);
+		}
 		if (in6a == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -537,8 +537,8 @@ in6_setsockaddr(in6p, nam)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = in6p->in6p_lport;
-	/* KAME hack: recover scopeid */
-	(void)in6_recoverscope(sin6, &in6p->in6p_laddr, NULL);
+	sin6->sin6_addr = in6p->in6p_laddr;
+	(void)sa6_recoverscope(sin6); /* XXX: we should catch errors */
 }
 
 void
@@ -557,8 +557,8 @@ in6_setpeeraddr(in6p, nam)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = in6p->in6p_fport;
-	/* KAME hack: recover scopeid */
-	(void)in6_recoverscope(sin6, &in6p->in6p_faddr, NULL);
+	sin6->sin6_addr = in6p->in6p_faddr;
+	(void)sa6_recoverscope(sin6);
 }
 
 /*

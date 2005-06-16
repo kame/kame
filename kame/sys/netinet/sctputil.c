@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.37 2005/03/07 23:26:09 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.38 2005/06/16 18:29:25 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -3096,12 +3096,12 @@ sctp_is_same_scope(struct sockaddr_in6 *addr1, struct sockaddr_in6 *addr2)
 	b = *addr2;
 
 	if (a.sin6_scope_id == 0)
-		if (in6_recoverscope(&a, &a.sin6_addr, NULL)) {
+		if (sa6_recoverscope(&a)) {
 			/* can't get scope, so can't match */
 			return (0);
 		}
 	if (b.sin6_scope_id == 0)
-		if (in6_recoverscope(&b, &b.sin6_addr, NULL)) {
+		if (sa6_recoverscope(&b)) {
 			/* can't get scope, so can't match */
 			return (0);
 		}
@@ -3123,8 +3123,7 @@ sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *store)
 		if (IN6_IS_SCOPE_LINKLOCAL(&addr->sin6_addr)) {
 			if (addr->sin6_scope_id == 0) {
 				*store = *addr;
-				if (!in6_recoverscope(store, &store->sin6_addr,
-				    NULL)) {
+				if (sa6_recoverscope(store) == 0) { 
 					/* use the recovered scope */
 					addr = store;
 				}

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.154 2005/05/31 00:10:48 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.155 2005/06/16 18:29:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -205,7 +205,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct ifnet **ifpp;
 	int *errorp;
 {
-	struct in6_addr *dst;
+	struct in6_addr dst;
 	struct ifnet *ifp = NULL;
 	struct in6_ifaddr *ia = NULL, *ia_best = NULL;
 	struct in6_pktinfo *pi = NULL;
@@ -217,7 +217,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	u_int8_t ip6po_usecoa = 0;
 #endif /* MIP6 && NMIP > 0 */
 
-	dst = &dstsock->sin6_addr;
+	dst = dstsock->sin6_addr; /* make a copy for local operation */
 	*errorp = 0;
 	if (ifpp)
 		*ifpp = NULL;
@@ -240,27 +240,22 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		}
 
 		/*
-		 * determine the appropriate zone id of the source based on
+		 * Determine the appropriate zone id of the source based on
 		 * the zone of the destination and the outgoing interface.
+		 * If the specified address is ambiguous wrt the scope zone,
+		 * the interface must be specified; otherwise, ifa_ifwithaddr()
+		 * will fail matching the address.
 		 */
 		bzero(&srcsock, sizeof(srcsock));
 		srcsock.sin6_family = AF_INET6;
 		srcsock.sin6_len = sizeof(srcsock);
 		srcsock.sin6_addr = pi->ipi6_addr;
 		if (ifp) {
-			if (in6_addr2zoneid(ifp, &pi->ipi6_addr,
-					    &srcsock.sin6_scope_id)) {
-				*errorp = EINVAL; /* XXX */
+			*errorp = in6_setscope(&srcsock.sin6_addr, ifp, NULL);
+			if (*errorp != 0)
 				return (NULL);
-			}
 		}
-		if ((*errorp = in6_embedscope(&srcsock.sin6_addr, &srcsock))
-		    != 0) {
-			return (NULL);
-		}
-#ifndef SCOPEDROUTING
-		srcsock.sin6_scope_id = 0; /* XXX: ifa_ifwithaddr expects 0 */
-#endif
+
 		ia6 = (struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)(&srcsock));
 		if (ia6 == NULL ||
 		    (ia6->ia6_flags & (IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))) {
@@ -303,14 +298,15 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	if (ifp == NULL)	/* this should not happen */
 		panic("in6_selectsrc: NULL ifp");
 #endif
-	if (in6_addr2zoneid(ifp, dst, &odstzone)) { /* impossible */
-		*errorp = EIO;	/* XXX */
+	*errorp = in6_setscope(&dst, ifp, &odstzone);
+	if (*errorp != 0)
 		return (NULL);
-	}
+
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		int new_scope = -1, new_matchlen = -1;
 		struct in6_addrpolicy *new_policy = NULL;
 		u_int32_t srczone, osrczone, dstzone;
+		struct in6_addr src;
 		struct ifnet *ifp1 = ia->ia_ifp;
 
 		/*
@@ -319,12 +315,13 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * does not contain the outgoing interface.
 		 * XXX: we should probably use sin6_scope_id here.
 		 */
-		if (in6_addr2zoneid(ifp1, dst, &dstzone) ||
+		if (in6_setscope(&dst, ifp1, &dstzone) ||
 		    odstzone != dstzone) {
 			continue;
 		}
-		if (in6_addr2zoneid(ifp, &ia->ia_addr.sin6_addr, &osrczone) ||
-		    in6_addr2zoneid(ifp1, &ia->ia_addr.sin6_addr, &srczone) ||
+		src = ia->ia_addr.sin6_addr;
+		if (in6_setscope(&src, ifp, &osrczone) ||
+		    in6_setscope(&src, ifp1, &srczone) ||
 		    osrczone != srczone) {
 			continue;
 		}
@@ -345,7 +342,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 #endif /* MIP6 && NMIP > 0 */
 
 		/* Rule 1: Prefer same address */
-		if (IN6_ARE_ADDR_EQUAL(dst, &ia->ia_addr.sin6_addr)) {
+		if (IN6_ARE_ADDR_EQUAL(&dst, &ia->ia_addr.sin6_addr)) {
 			ia_best = ia;
 			BREAK(1); /* there should be no better candidate */
 		}
@@ -355,7 +352,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 
 		/* Rule 2: Prefer appropriate scope */
 		if (dst_scope < 0)
-			dst_scope = in6_addrscope(dst);
+			dst_scope = in6_addrscope(&dst);
 		new_scope = in6_addrscope(&ia->ia_addr.sin6_addr);
 		if (IN6_ARE_SCOPE_CMP(best_scope, new_scope) < 0) {
 			if (IN6_ARE_SCOPE_CMP(best_scope, dst_scope) < 0)
@@ -531,7 +528,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * a large number so that it is easy to assign smaller numbers
 		 * to more preferred rules.
 		 */
-		new_matchlen = in6_matchlen(&ia->ia_addr.sin6_addr, dst);
+		new_matchlen = in6_matchlen(&ia->ia_addr.sin6_addr, &dst);
 		if (best_matchlen < new_matchlen)
 			REPLACE(14);
 		if (new_matchlen < best_matchlen)
@@ -553,7 +550,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			       lookup_addrsel_policy(&ia_best->ia_addr));
 		best_matchlen = (new_matchlen >= 0 ? new_matchlen :
 				 in6_matchlen(&ia_best->ia_addr.sin6_addr,
-					      dst));
+					      &dst));
 
 	  next:
 		continue;
@@ -1069,111 +1066,6 @@ in6_pcbsetport(laddr, inp, p)
 	return (0);
 }
 #endif
-
-/*
- * Generate kernel-internal form (scopeid embedded into s6_addr16[1]).
- * If the address scope of is interface-local or link-local, embed the
- * interface index in the address.
- */
-int
-in6_embedscope(in6, sin6)
-	struct in6_addr *in6;
-	const struct sockaddr_in6 *sin6;
-{
-#ifdef SCOPEDROUTING
-	/*
-	 * XXX: the SCOPEDROUTING code path is NOT expected to work at this
-	 * moment (20011112).  We added this just in case.
-	 */
-	return (0);		/* do nothing */
-#else
-	struct ifnet *ifp;
-	u_int32_t zoneid = sin6->sin6_scope_id;
-
-	*in6 = sin6->sin6_addr;
-
-	/*
-	 * don't try to read sin6->sin6_addr beyond here, since the caller may
-	 * ask us to overwrite existing sockaddr_in6
-	 */
-
-	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
-		/* KAME assumption: link id == interface id */
-		if (zoneid) {
-			if (if_indexlim <= zoneid)
-				return (ENXIO);  /* XXX EINVAL? */
-#ifdef __FreeBSD__
-			ifp = ifnet_byindex(zoneid);
-#else
-			ifp = ifindex2ifnet[zoneid];
-#endif
-			if (ifp == NULL) /* XXX: this can happen for some OS */
-				return (ENXIO);
-
-			/* XXX assignment to 16bit from 32bit variable */
-			in6->s6_addr16[1] = htons(zoneid & 0xffff);
-		}
-	}
-
-	return 0;
-#endif
-}
-
-/*
- * generate standard sockaddr_in6 from embedded form.
- * touches sin6_addr and sin6_scope_id only.
- */
-int
-in6_recoverscope(sin6, in6, ifp)
-	struct sockaddr_in6 *sin6;
-	const struct in6_addr *in6;
-	struct ifnet *ifp;
-{
-	u_int32_t zoneid;
-
-	sin6->sin6_addr = *in6;
-
-	/*
-	 * don't try to read *in6 beyond here, since the caller may
-	 * ask us to overwrite existing sockaddr_in6
-	 */
-
-	sin6->sin6_scope_id = 0;
-	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
-		/*
-		 * KAME assumption: link id == interface id
-		 */
-		zoneid = ntohs(sin6->sin6_addr.s6_addr16[1]);
-		if (zoneid) {
-			/* sanity check */
-			if (zoneid < 0 || if_indexlim <= zoneid)
-				return ENXIO;
-#ifdef __FreeBSD__
-			if (!ifnet_byindex(zoneid))
-#else
-			if (!ifindex2ifnet[zoneid])
-#endif
-				return ENXIO;
-			if (ifp && ifp->if_index != zoneid)
-				return ENXIO;
-			sin6->sin6_addr.s6_addr16[1] = 0;
-			sin6->sin6_scope_id = zoneid;
-		}
-	}
-
-	return 0;
-}
-
-/*
- * just clear the embedded scope identifier.
- */
-void
-in6_clearscope(addr)
-	struct in6_addr *addr;
-{
-	if (IN6_IS_SCOPE_LINKLOCAL(addr) || IN6_IS_ADDR_MC_INTFACELOCAL(addr))
-		addr->s6_addr16[1] = 0;
-}
 
 void
 addrsel_policy_init()

@@ -102,6 +102,7 @@
 #include <netinet/ip_ipsp.h>
 #ifdef INET6
 #include <netinet6/in6_var.h>
+#include <netinet6/scope6_var.h>
 #endif
 #include <net/pfkeyv2.h>
 #include <crypto/cryptodev.h>
@@ -481,8 +482,10 @@ import_flow(struct sockaddr_encap *flow, struct sockaddr_encap *flowmask,
 
 #ifdef INET6
 	case AF_INET6:
-		in6_embedscope(&src->sin6.sin6_addr, &src->sin6);
-		in6_embedscope(&dst->sin6.sin6_addr, &dst->sin6);
+		if (sa6_embedscope(&src, 0) != 0)
+			return;
+		if (sa6_embedscope(&dst, 0) != 0)
+			return;
 
 		/* netmask handling */
 		rt_maskedcopy(&src->sa, &src->sa, &srcmask->sa);

@@ -1092,8 +1092,8 @@ key_allocsa(family, src, dst, proto, spi)
 
 			break;
 		case AF_INET6:
-			if (in6_recoverscope(&sin6, (struct in6_addr *)src,
-			    NULL) != 0)
+			sin6.sin6_addr = *src;
+			if (sa6_recoverscope(&sin6))
 				continue;
 			if (key_sockaddrcmp((struct sockaddr *)&sin6,
 			    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
@@ -1117,8 +1117,8 @@ key_allocsa(family, src, dst, proto, spi)
 
 			break;
 		case AF_INET6:
-			if (in6_recoverscope(&sin6, (struct in6_addr *)dst,
-			    NULL) != 0)
+			sin6.sin6_addr = *(struct in6_addr *)dst;
+			if (sa6_recoverscope(&sin6))
 				continue;
 #if 0
 /* racoon2 guys want us to update ipsecdb. (2004.10.8 keiichi) */
@@ -4305,9 +4305,8 @@ key_ismyaddr6(sin6)
 {
 	struct in6_ifaddr *ia;
 	struct in6_multi *in6m;
-	struct in6_addr in6;
 
-	if (in6_embedscope(&in6, sin6) != 0)
+	if (sa6_embedscope(sin6, 0) != 0)
 		return 0;
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
@@ -4322,7 +4321,7 @@ key_ismyaddr6(sin6)
 		 */
 		in6m = NULL;
 #ifdef __FreeBSD__
-		IN6_LOOKUP_MULTI(in6, ia->ia_ifp, in6m);
+		IN6_LOOKUP_MULTI(sin6->sin6_addr, ia->ia_ifp, in6m);
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
 		     (in6m) != NULL &&
@@ -7657,15 +7656,14 @@ key_parse(m, so)
 #ifdef INET6
 			/*
 			 * Check validity of the scope zone ID of the
-			 * addresses.
-			 * XXX: scope6_check_id may modify the buffer to
-			 * embed the IDs.
+			 * addresses, and embed the zone ID into the address
+			 * if necessary.
 			 */
 			sin6 = (struct sockaddr_in6 *)PFKEY_ADDR_SADDR(src0);
-			if ((error = scope6_check_id(sin6, 0)) != 0)
+			if ((error = sa6_embedscope(sin6, 0)) != 0)
 				goto senderror;
 			sin6 = (struct sockaddr_in6 *)PFKEY_ADDR_SADDR(dst0);
-			if ((error = scope6_check_id(sin6, 0)) != 0)
+			if ((error = sa6_embedscope(sin6, 0)) != 0)
 				goto senderror;
 #endif
 			break;

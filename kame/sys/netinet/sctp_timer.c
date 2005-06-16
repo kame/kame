@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.29 2005/03/06 16:04:18 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.30 2005/06/16 18:29:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -255,28 +255,10 @@ sctp_find_alternate_net(struct sctp_tcb *stcb,
 			alt = TAILQ_FIRST(&stcb->asoc.nets);
 		}
 		if (alt->ro.ro_rt == NULL) {
-#ifndef SCOPEDROUTING
-			struct sockaddr_in6 *sin6;
-			sin6 = (struct sockaddr_in6 *)&alt->ro._l_addr;
-			if (sin6->sin6_family == AF_INET6) {
-#if defined(SCTP_BASE_FREEBSD) || defined(__APPLE__)
-				(void)in6_embedscope(&sin6->sin6_addr, sin6,
-						     NULL, NULL);
-#else
-				(void)in6_embedscope(&sin6->sin6_addr, sin6);
-#endif
-			}
-#endif
 #if defined(__FreeBSD__) || defined(__APPLE__)
 			rtalloc_ign((struct route*)&alt->ro, 0UL);
 #else
 			rtalloc((struct route*)&alt->ro);
-#endif
-#ifndef SCOPEDROUTING
-			if (sin6->sin6_family == AF_INET6) {
-				(void)in6_recoverscope(sin6, &sin6->sin6_addr,
-				    NULL);
-			}
 #endif
 			alt->src_addr_selected = 0;
 		}

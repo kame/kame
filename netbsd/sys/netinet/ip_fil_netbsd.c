@@ -1348,11 +1348,9 @@ frdest_t *fdp;
 	}
 
 	/* KAME */
-	if (IN6_IS_ADDR_LINKLOCAL(&dst6->sin6_addr))
-		dst6->sin6_addr.s6_addr16[1] = htons(ifp->if_index);
-
-	{
-		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
+	if ((error = in6_setscope(&dst6->sin6_addr, ifp, NULL)) != 0)
+		goto bad;
+	else if (ro->ro_rt->rt_flags & RTF_GATEWAY)
 			dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
 		ro->ro_rt->rt_use++;
 

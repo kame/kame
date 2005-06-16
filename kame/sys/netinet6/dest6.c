@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.71 2005/06/15 07:11:36 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.72 2005/06/16 18:29:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,8 +231,9 @@ dest6_swap_hao(ip6, ip6a, haopt)
 	bcopy(&ip6a->ip6a_coa, haopt->ip6oh_addr, sizeof(haopt->ip6oh_addr));
 #if 0
 	/* XXX linklocal address is (currently) not supported */
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-		ip6->ip6_src.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+	if ((error = in6_setscope(&ip6->ip6_src, m->m_pkthdr.rcvif,
+	    NULL)) != 0)
+		return (error);
 #endif
 	ip6a->ip6a_flags |= IP6A_SWAP;
 

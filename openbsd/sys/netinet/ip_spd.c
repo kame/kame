@@ -45,6 +45,7 @@
 #include <netinet/in.h>
 #endif
 #include <netinet6/in6_var.h>
+#include <netinet6/scope6_var.h>
 #endif /* INET6 */
 
 #include <netinet/ip_ipsp.h>
@@ -190,8 +191,12 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		sdst.sin6.sin6_family = ssrc.sin6.sin6_family = AF_INET6;
 		sdst.sin6.sin6_len = ssrc.sin6.sin6_family =
 		    sizeof(struct sockaddr_in6);
-		in6_recoverscope(&ssrc.sin6, &ddst->sen_ip6_src, NULL);
-		in6_recoverscope(&sdst.sin6, &ddst->sen_ip6_dst, NULL);
+		ssrc.sin6 = ddst->sen_ip6_src;
+		if ((*error = sa6_recoverscope(&ssrc.sin6)) != 0)
+			return NULL;
+		sdst.sin6 = ddst->sen_ip6_dst;
+		if ((*error = sa6_recoverscope(&sdst.sin6)) != 0)
+			return NULL;
 
 		/*
 		 * If TCP/UDP, extract the port numbers to use in the lookup.

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.114 2005/04/14 06:22:37 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.115 2005/06/16 18:29:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -931,7 +931,9 @@ gif_ioctl(ifp, cmd, data)
 		}
 		/* set request address into gif_nexthop */
 		bcopy(nh, sc->gif_nexthop, nhlen);
-		in6_embedscope(&satosin6(sc->gif_nexthop)->sin6_addr, satosin6(sc->gif_nexthop));
+		error = sa6_embedscope(satosin6(sc->gif_nexthop), 0);
+		if (error != 0)
+			return (error);
 		break;
 	}
 	case SIOCDIFPHYNEXTHOP: 
@@ -1030,13 +1032,18 @@ gif_set_tunnel(ifp, src, dst)
 #endif
 #ifdef INET6
 	case AF_INET6:
-		/* Check validity of the scope zone ID of the addresses. */
-		if ((error = scope6_check_id((struct sockaddr_in6 *)sc->gif_psrc,
-					     0)) != 0 ||
-		    (error = scope6_check_id((struct sockaddr_in6 *)sc->gif_pdst,
-					     0)) != 0) {
+		/*
+		 * Check validity of the scope zone ID of the addresses, and
+		 * convert it into the kernel internal form if necessary.
+		 */
+		error = sa6_embedscope((struct sockaddr_in6 *)sc->gif_psrc,
+		    0);
+		if (error != 0)
 			break;
-		}
+		error = sa6_embedscope((struct sockaddr_in6 *)sc->gif_pdst,
+		    0);
+		if (error != 0)
+			break;
 		error = in6_gif_attach(sc);
 		break;
 #endif

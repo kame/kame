@@ -148,7 +148,7 @@ in6_pcbbind(inp, nam, cred)
 		if (nam->sa_family != AF_INET6)
 			return (EAFNOSUPPORT);
 
-		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+		if ((error = sa6_embedscope(sin6, ip6_use_defzone)) != 0)
 			return(error);
 
 		lport = sin6->sin6_port;
@@ -164,20 +164,10 @@ in6_pcbbind(inp, nam, cred)
 				reuseport = SO_REUSEADDR|SO_REUSEPORT;
 		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			struct ifaddr *ia = NULL;
-#ifndef SCOPEDROUTING
-			u_int32_t lzone; 
-#endif
 
 			sin6->sin6_port = 0;		/* yech... */
-#ifndef SCOPEDROUTING
-			lzone = sin6->sin6_scope_id;
-			sin6->sin6_scope_id = 0; /* XXX: for ifa_ifwithaddr */
-#endif
 			if ((ia = ifa_ifwithaddr((struct sockaddr *)sin6)) == 0)
 				return (EADDRNOTAVAIL);
-#ifndef SCOPEDROUTING
-			sin6->sin6_scope_id = lzone;
-#endif
 
 			/*
 			 * XXX: bind to an anycast address might accidentally
@@ -300,6 +290,7 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 {
 	register struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
 	int error = 0;
+	int scope_ambiguous = 0;
 
 	if (nam->sa_len != sizeof (*sin6))
 		return (EINVAL);
@@ -308,7 +299,9 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (sin6->sin6_port == 0)
 		return (EADDRNOTAVAIL);
 
-	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+	if (sin6->sin6_scope_id == 0 && !ip6_use_defzone)
+		scope_ambiguous = 1;
+	if ((error = sa6_embedscope(sin6, ip6_use_defzone)) != 0)
 		return(error);
 	INP_INFO_WLOCK_ASSERT(inp->inp_pcbinfo);
 	INP_LOCK_ASSERT(inp);
@@ -328,8 +321,8 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 					      inp->in6p_moptions,
 					      &inp->in6p_route,
 					      &inp->in6p_laddr, &ifp, &error);
-		if (ifp && sin6->sin6_scope_id == 0 &&
-		    (error = scope6_setzoneid(ifp, sin6)) != 0) { /* XXX */
+		if (ifp && scope_ambiguous &&
+		    (error = in6_setscope(&sin6->sin6_addr, ifp, NULL)) != 0) {
 			return(error);
 		}
 
@@ -473,12 +466,7 @@ in6_sockaddr(port, addr_p)
 	sin6->sin6_len = sizeof(*sin6);
 	sin6->sin6_port = port;
 	sin6->sin6_addr = *addr_p;
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
-	else
-		sin6->sin6_scope_id = 0;	/*XXX*/
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
+	(void)sa6_recoverscope(sin6); /* XXX: should catch errors */
 
 	return (struct sockaddr *)sin6;
 }
@@ -1013,11 +1001,8 @@ init_sin6(struct sockaddr_in6 *sin6, struct mbuf *m)
 	sin6->sin6_len = sizeof(*sin6);
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_addr = ip->ip6_src;
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
-	sin6->sin6_scope_id =
-		(m->m_pkthdr.rcvif && IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		? m->m_pkthdr.rcvif->if_index : 0;
+
+	(void)sa6_recoverscope(&sin6); /* XXX: should catch errors... */
 
 	return;
 }

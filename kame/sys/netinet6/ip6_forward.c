@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.152 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.153 2005/06/16 18:29:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,6 +65,7 @@
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 #ifdef MIP6
@@ -138,8 +139,8 @@ ip6_forward(m, srcrt)
 	int error = 0, type = 0, code = 0;
 	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */
-	u_int32_t dstzone;
-	struct sockaddr_in6 sin6;
+	u_int32_t inzone, outzone;
+	struct in6_addr src_in6, dst_in6;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
 	int ipsecrt = 0;
@@ -387,9 +388,8 @@ ip6_forward(m, srcrt)
 	 * which we are acting as a home agent for.
 	 */
 
-	/* XXX need some policy to determine bid for MCOA*/
-	if ((in6_recoverscope(&sin6, &ip6->ip6_dst, m->m_pkthdr.rcvif) == 0) &&
-	    (bce = mip6_bce_get(&sin6.sin6_addr, NULL, NULL, 0)) &&
+	/* XXX need some policy to determine bid for MCOA */
+	if ((bce = mip6_bce_get(&ip6->ip6_dst, NULL, NULL, 0)) &&
 	    bce &&
 	     (bce->mbc_flags & IP6_MH_BU_HOME) &&
 	     (bce->mbc_encap != NULL)) {
@@ -496,27 +496,25 @@ ip6_forward(m, srcrt)
 	 * destination for the reason that the destination is beyond the scope
 	 * of the source address, discard the packet and return an icmp6
 	 * destination unreachable error with Code 2 (beyond scope of source
-	 * address).
-	 * [draft-ietf-ipngwg-icmp-v3-02.txt, Section 3.1]
+	 * address).  We use a local copy of ip6_src, since in6_setscope()
+	 * will possibly modify its first argument.
+	 * [draft-ietf-ipngwg-icmp-v3-04.txt, Section 3.1]
 	 */
-	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_src, &dstzone)) {
+	src_in6 = ip6->ip6_src;
+	if (in6_setscope(&src_in6, rt->rt_ifp, &outzone)) {
 		/* XXX: this should not happen */
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);
 		return;
 	}
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_recoverscope(&sin6, &ip6->ip6_src, m->m_pkthdr.rcvif) != 0) {
-		/* XXX: this should not happen */
+	if (in6_setscope(&src_in6, m->m_pkthdr.rcvif, &inzone)) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);
 		return;
 	}
-	if (sin6.sin6_scope_id != dstzone
+	if (inzone != outzone
 #ifdef IPSEC
 	    && !ipsecrt
 #endif
@@ -549,18 +547,10 @@ ip6_forward(m, srcrt)
 	 * we need an explicit check because we may mistakenly forward the
 	 * packet to a different zone by (e.g.) a default route.
 	 */
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_recoverscope(&sin6, &ip6->ip6_dst, m->m_pkthdr.rcvif) != 0) {
-		/* XXX: this should not happen */
-		ip6stat.ip6s_cantforward++;
-		ip6stat.ip6s_badscope++;
-		m_freem(m);
-		return;
-	}
-	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_dst, &dstzone) ||
-	    sin6.sin6_scope_id != dstzone) {
+	dst_in6 = ip6->ip6_dst;
+	if (in6_setscope(&dst_in6, m->m_pkthdr.rcvif, &inzone) != 0 ||
+	    in6_setscope(&dst_in6, rt->rt_ifp, &outzone) != 0 ||
+	    inzone != outzone) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.361 2005/06/15 07:11:36 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.362 2005/06/16 18:29:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -374,8 +374,6 @@ ip6_input(m)
 	u_int32_t rtalert = ~0;
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
-	struct sockaddr_in6 sa6;
-	u_int32_t srczone, dstzone;
 #if 0
 	struct mbuf *mhist;	/* onion peeling history */
 	caddr_t hist;
@@ -627,7 +625,9 @@ passin:
 	 * Drop packets if the link ID portion is already filled.
 	 * XXX: this is technically not a good behavior.  But, we internally
 	 * use the field to disambiguate link-local addresses, so we cannot
-	 * be generous against those a bit strange addresses.
+	 * be generous against those a bit strange addresses.  This is also
+	 * a very special exception where we should directly refer to the
+	 * embedded portion.
 	 */
 	if (!(m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK)) {
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src) &&
@@ -645,38 +645,13 @@ passin:
 #endif
 
 	/*
-	 * construct source and destination address structures with
-	 * disambiguating their scope zones (if there is ambiguity).
-	 * XXX: sin6_family and sin6_len will NOT be referred to, but we fill
-	 * in these fields just in case.
+	 * Disambiguate address scope zones (if there is ambiguity).
+	 * This routine also checks and reject the cases where src or
+	 * dst are the loopback address and the receiving interface
+	 * is not loopback. 
 	 */
-	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_src, &srczone) ||
-	    in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_dst, &dstzone)) {
-		/*
-		 * Note that these generic checks cover cases that src or
-		 * dst are the loopback address and the receiving interface
-		 * is not loopback.
-		 */
-		ip6stat.ip6s_badscope++;
-		goto bad;
-	}
-
-	bzero(&sa6, sizeof(sa6));
-	sa6.sin6_family = AF_INET6;
-	sa6.sin6_len = sizeof(struct sockaddr_in6);
-
-	sa6.sin6_addr = ip6->ip6_src;
-	sa6.sin6_scope_id = srczone;
-	if (in6_embedscope(&ip6->ip6_src, &sa6)) {
-		/* XXX: should not happen */
-		ip6stat.ip6s_badscope++;
-		goto bad;
-	}
-
-	sa6.sin6_addr = ip6->ip6_dst;
-	sa6.sin6_scope_id = dstzone;
-	if (in6_embedscope(&ip6->ip6_dst, &sa6)) {
-		/* XXX: should not happen */
+	if (in6_setscope(&ip6->ip6_src, m->m_pkthdr.rcvif, NULL) ||
+	    in6_setscope(&ip6->ip6_dst, m->m_pkthdr.rcvif, NULL)) {
 		ip6stat.ip6s_badscope++;
 		goto bad;
 	}
@@ -1661,9 +1636,8 @@ ip6_notify_pmtu(in6p, dst, mtu)
 	bzero(&mtuctl, sizeof(mtuctl));	/* zero-clear for safety */
 	mtuctl.ip6m_mtu = *mtu;
 	mtuctl.ip6m_addr = *dst;
-#ifndef SCOPEDROUTING
-	in6_recoverscope(&mtuctl.ip6m_addr, &mtuctl.ip6m_addr.sin6_addr, NULL);
-#endif
+	if (sa6_recoverscope(&mtuctl.ip6m_addr))
+		return;
 
 	if ((m_mtu = sbcreatecontrol((caddr_t)&mtuctl, sizeof(mtuctl),
 	    IPV6_PATHMTU, IPPROTO_IPV6)) == NULL)

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.47 2005/04/21 18:36:21 nishida Exp $	*/
+/*	$KAME: sctp_output.c,v 1.48 2005/06/16 18:29:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -2341,9 +2341,7 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 		uint16_t flowBottom;
 		u_char tosBottom, tosTop;
 		struct sockaddr_in6 *sin6, tmp, *lsa6, lsa6_tmp;
-		struct sockaddr_in6 lsa6_storage;
 		int prev_scope=0;
-		int error;
 		u_short prev_port=0;
 
 		M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
@@ -2371,7 +2369,11 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 #if defined(SCTP_BASE_FREEBSD) || defined(__APPLE__)
 		if (in6_embedscope(&sin6->sin6_addr, sin6, NULL, NULL) != 0)
 #else
-		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
+		/*
+		 * XXX: appropriate scope zone must be provided or otherwise
+		 * ip6_use_defzone must be 1.
+		 */
+		if (sa6_embedscope(sin6, ip6_use_defzone) != 0)
 #endif
 			return (EINVAL);
 		if (net == NULL) {
@@ -2461,24 +2463,6 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 			return (EHOSTUNREACH);
 		}
 
-#ifndef SCOPEDROUTING
-		/*
-		 * XXX: sa6 may not have a valid sin6_scope_id in
-		 * the non-SCOPEDROUTING case.
-		 */
-		bzero(&lsa6_storage, sizeof(lsa6_storage));
-		lsa6_storage.sin6_family = AF_INET6;
-		lsa6_storage.sin6_len = sizeof(lsa6_storage);
-		if ((error = in6_recoverscope(&lsa6_storage, &lsa6->sin6_addr,
-					      NULL)) != 0) {
-			sctp_m_freem(m);
-			return (error);
-		}
-		/* XXX */
-		lsa6_storage.sin6_addr = lsa6->sin6_addr;
-		lsa6_storage.sin6_port = inp->sctp_lport;
-		lsa6 = &lsa6_storage;
-#endif /* SCOPEDROUTING */
 		ip6h->ip6_src = lsa6->sin6_addr;
 
 		/*
@@ -3553,6 +3537,10 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 				 * we must depend on the source to be added
 				 * implicitly. We cannot assure just because
 				 * we share one link that all links are common.
+				 *
+				 * XXX: never treat link-local case explicitly.
+				 * Use general routines defined in scope6.c.
+				 * (jinmei@kame)
 				 */
 				stc.local_scope = 0;
 				stc.site_scope = 1;
@@ -3560,19 +3548,20 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 				/* we start counting for the private
 				 * address stuff at 1. since the link
 				 * local we source from won't show
-				 * up in our scoped cou8nt.
+				 * up in our scoped count.
 				 */
 				cnt_inits_to=1;
 				/* pull out the scope_id from incoming pkt */
-				(void)in6_recoverscope(sin6, &ip6->ip6_src,
-				    init_pkt->m_pkthdr.rcvif);
 #if defined(SCTP_BASE_FREEBSD) || defined(__APPLE__)
+				(void)in6_recoverscope(sin6, &in6_src,
+				    init_pkt->m_pkthdr.rcvif);
 				in6_embedscope(&sin6->sin6_addr, sin6, NULL,
 				    NULL);
 #else
-				in6_embedscope(&sin6->sin6_addr, sin6);
+				(void)sa6_recoverscope(sin6);
 #endif
 				stc.scope_id = sin6->sin6_scope_id;
+
 			} else if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
 				/*
 				 * If the new destination is SITE_LOCAL

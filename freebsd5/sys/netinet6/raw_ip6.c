@@ -338,6 +338,7 @@ rip6_output(m, va_alist)
 	struct ifnet *oifp = NULL;
 	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
+	int scope_ambiguous = 0;
 	struct in6_addr *in6a;
 	va_list ap;
 
@@ -363,6 +364,17 @@ rip6_output(m, va_alist)
 		optp = &opt;
 	} else
 		optp = in6p->in6p_outputopts;
+
+	/*
+	 * Check and convert scope zone ID into internal form.
+	 * XXX: we may still need to determine the zone later.
+	 */
+	if (!(so->so_state & SS_ISCONNECTED)) {
+		if (dstsock->sin6_scope_id == 0 && !ip6_use_defzone)
+			scope_ambiguous = 1;
+		if ((error = sa6_embedscope(dstsock, ip6_use_defzone)) != 0)
+			goto bad;
+	}
 
 	/*
 	 * For an ICMPv6 packet, we should know its type and code
@@ -396,9 +408,18 @@ rip6_output(m, va_alist)
 	}
 	ip6->ip6_src = *in6a;
 
-	if (oifp && dstsock->sin6_scope_id == 0 &&
-	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
-		goto bad;
+	if (oifp && scope_ambiguous) {
+		/*
+		 * Application should provide a proper zone ID or the use of
+		 * default zone IDs should be enabled.  Unfortunately, some
+		 * applications do not behave as it should, so we need a
+		 * workaround.  Even if an appropriate ID is not determined
+		 * (when it's required), if we can determine the outgoing
+		 * interface. determine the zone ID based on the interface.
+		 */
+		error = in6_setscope(&dstsock->sin6_addr, oifp, NULL);
+		if (error != 0)
+			goto bad;
 	}
 	ip6->ip6_dst = dstsock->sin6_addr;
 
@@ -627,9 +648,6 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct ifaddr *ia = NULL;
 	int error = 0;
-#ifndef SCOPEDROUTING
-	u_int32_t lzone;
-#endif
 
 	if (nam->sa_len != sizeof(*addr))
 		return EINVAL;
@@ -637,12 +655,8 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 		return EAFNOSUPPORT;
 	if (TAILQ_EMPTY(&ifnet) || addr->sin6_family != AF_INET6)
 		return EADDRNOTAVAIL;
-	if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+	if ((error = sa6_embedscope(addr, ip6_use_defzone)) != 0)
 		return(error);
-#ifndef SCOPEDROUTING
-	lzone = addr->sin6_scope_id;
-	addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
-#endif
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 	    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0)
@@ -653,9 +667,7 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
 		return (EADDRNOTAVAIL);
 	}
-#ifndef SCOPEDROUTING
-	addr->sin6_scope_id = lzone; /* XXX: this should have no effect */
-#endif
+
 	INP_INFO_WLOCK(&ripcbinfo);
 	INP_LOCK(inp);
 	inp->in6p_laddr = addr->sin6_addr;
@@ -671,7 +683,7 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct in6_addr *in6a = NULL;
 	struct ifnet *ifp = NULL;
-	int error = 0;
+	int error = 0, scope_ambiguous = 0;
 
 	if (nam->sa_len != sizeof(*addr))
 		return EINVAL;
@@ -679,7 +691,9 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		return EADDRNOTAVAIL;
 	if (addr->sin6_family != AF_INET6)
 		return EAFNOSUPPORT;
-	if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+	if (addr->sin6_scope_id == 0 && !ip6_use_defzone)
+		scope_ambiguous = 1;
+	if ((error = sa6_embedscope(addr, ip6_use_defzone)) != 0)
 		return(error);
 
 	INP_INFO_WLOCK(&ripcbinfo);
@@ -694,18 +708,14 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		return (error ? error : EADDRNOTAVAIL);
 	}
 
-	/* see above */
-	if (ifp && addr->sin6_scope_id == 0 &&
-	    (error = scope6_setzoneid(ifp, addr)) != 0) { /* XXX */
+	/* XXX: see above */
+	if (ifp && scope_ambiguous &&
+	    (error = in6_setscope(&addr->sin6_addr, ifp, NULL)) != 0) {
 		INP_UNLOCK(inp);
 		INP_INFO_WUNLOCK(&ripcbinfo);
 		return(error);
 	}
-	if ((error = in6_embedscope(&inp->in6p_faddr, addr)) != 0) {
-		INP_UNLOCK(inp);
-		INP_INFO_WUNLOCK(&ripcbinfo);
-		return(error);
-	}
+	inp->in6p_faddr = addr->sin6_addr;
 	inp->in6p_laddr = *in6a;
 	soisconnected(so);
 	INP_UNLOCK(inp);
@@ -731,7 +741,6 @@ static int
 rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	 struct mbuf *control, struct thread *td)
 {
-	int error = 0;
 	struct inpcb *inp = sotoinpcb(so);
 	struct sockaddr_in6 tmp;
 	struct sockaddr_in6 *dst;
@@ -779,11 +788,6 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			INP_INFO_WUNLOCK(&ripcbinfo);
 			m_freem(m);
 			return(EAFNOSUPPORT);
-		}
-		if ((error = scope6_check_id(dst, ip6_use_defzone)) != 0) {
-			INP_INFO_WUNLOCK(&ripcbinfo);
-			m_freem(m);
-			return(error);
 		}
 	}
 	ret = rip6_output(m, so, dst, control);

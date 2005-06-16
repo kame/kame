@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.163 2005/05/12 18:41:18 suz Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.164 2005/06/16 18:29:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -470,7 +470,7 @@ rip6_output(m, va_alist)
 	struct ip6_hdr *ip6;
 	struct in6pcb *in6p;
 	u_int	plen = m->m_pkthdr.len;
-	int error = 0;
+	int error = 0, scope_ambiguous = 0;
 	struct ip6_pktopts opt, *optp;
 	struct ifnet *oifp = NULL;
 	int type, code;		/* for ICMPv6 output statistics only */
@@ -512,6 +512,13 @@ rip6_output(m, va_alist)
 	} else
 		optp = in6p->in6p_outputopts;
 
+	if (!(so->so_state & SS_ISCONNECTED)) {
+		if (dstsock->sin6_scope_id == 0 && !ip6_use_defzone)
+			scope_ambiguous = 1;
+		if ((error = sa6_embedscope(dstsock, ip6_use_defzone)) != 0)
+			goto bad;
+	}
+
 	/*
 	 * For an ICMPv6 packet, we should know its type and code
 	 * to update statistics.
@@ -547,8 +554,9 @@ rip6_output(m, va_alist)
 		goto bad;
 	}
 	ip6->ip6_src = *in6;
-	if (oifp && dstsock->sin6_scope_id == 0 &&
-	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
+	if (oifp && scope_ambiguous &&
+	    (error = in6_setscope(&dstsock->sin6_addr, oifp, NULL))
+	    != 0) {
 		goto bad;
 	}
 	ip6->ip6_dst = dstsock->sin6_addr;
@@ -811,7 +819,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+		if ((error = sa6_embedscope(addr, ip6_use_defzone)) != 0)
 			break;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		/*
@@ -823,18 +831,11 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 		}
 #endif
-#ifndef SCOPEDROUTING
-		lzone = addr->sin6_scope_id;
-		addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
-#endif
 		if (IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0) {
 			error = EADDRNOTAVAIL;
 			break;
 		}
-#ifndef SCOPEDROUTING
-		addr->sin6_scope_id = lzone;
-#endif
 		if (ia && ((struct in6_ifaddr *)ia)->ia6_flags &
 		    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|
 		     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
@@ -851,6 +852,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		struct in6_addr *src = NULL;
 		struct sockaddr_in6 sin6;
 		struct ifnet *ifp;
+		int scope_ambiguous = 0;
 
 		if (nam->m_len != sizeof(*addr)) {
 			error = EINVAL;
@@ -869,7 +871,17 @@ rip6_usrreq(so, req, m, nam, control, p)
 		sin6 = *addr;
 		addr = &sin6;
 
-		if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+		/*
+		 * Application should provide a proper zone ID or the use of
+		 * default zone IDs should be enabled.  Unfortunately, some
+		 * applications do not behave as it should, so we need a
+		 * workaround.  Even if an appropriate ID is not determined,
+		 * we'll see if we can determine the outgoing interface.  If we
+		 * can, determine the zone ID based on the interface below.
+		 */
+		if (addr->sin6_scope_id == 0 && !ip6_use_defzone)
+			scope_ambiguous = 1;
+		if ((error = sa6_embedscope(addr, ip6_use_defzone)) != 0)
 			break;
 
 		/* Source address selection. XXX: need pcblookup? */
@@ -881,9 +893,10 @@ rip6_usrreq(so, req, m, nam, control, p)
 				error = EADDRNOTAVAIL;
 			break;
 		}
-		if (ifp && addr->sin6_scope_id == 0 &&
-		    (error = scope6_setzoneid(ifp, addr)) != 0) { /* XXX */
-			break;
+		if (ifp && scope_ambiguous) {
+			error = in6_setscope(&addr->sin6_addr, ifp, NULL);
+			if (error != 0)
+				break;
 		}
 		in6p->in6p_faddr = addr->sin6_addr;
 		in6p->in6p_laddr = *src;
@@ -947,10 +960,6 @@ rip6_usrreq(so, req, m, nam, control, p)
 				dst->sin6_family = AF_INET6;
 			} else if (dst->sin6_family != AF_INET6) {
 				error = EAFNOSUPPORT;
-				break;
-			}
-			if ((error = scope6_check_id(dst, ip6_use_defzone))
-			    != 0) {
 				break;
 			}
 		}

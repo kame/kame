@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.8 2005/04/14 06:22:37 suz Exp $	*/
+/*	$KAME: if_ist.c,v 1.9 2005/06/16 18:29:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -336,7 +336,7 @@ ist_getsrcifa6(ifp)
 		sin6 = (struct sockaddr_in6 *)ia->ifa_addr;
 
 		/*
-		 * assumes the embeddd IPv4 address is unique per among	 
+		 * assumes the embedded IPv4 address is unique per among
 		 * multiple ISATAP prefixed on an ISATAP interface	 
 		 * XXX: really okay?	 
 		 */	 
@@ -377,21 +377,10 @@ isatap_match_prefix(ifp, addr6)
 {
 	struct ifaddr *ia;	 
 	struct in6_ifaddr *ia6;	 
-	struct sockaddr_in6 sa6, *sin6, *mask6;	 
+	struct sockaddr_in6 *sin6, *mask6;	 
 	struct stf_softc *sc;	 
 
 	sc = (struct stf_softc *)ifp;	 
-
-	bzero(&sa6, sizeof(sa6));	 
-	sa6.sin6_family = AF_INET6;	 
-	sa6.sin6_len = sizeof(sa6);	 
-	sa6.sin6_addr = *addr6;	 
-	if (in6_addr2zoneid(ifp, addr6, &sa6.sin6_scope_id)) {	 
-		return 0;	 
-	}	 
-	if (in6_embedscope(&sa6.sin6_addr, &sa6)) {	 
-		return 0;	 
-	}	 
 
 	for (ia = ifp->if_addrlist.tqh_first; ia; ia = ia->ifa_list.tqe_next) {
 		if (ia->ifa_addr == NULL)	 
@@ -401,9 +390,9 @@ isatap_match_prefix(ifp, addr6)
 		ia6 = (struct in6_ifaddr *)ia;
 		sin6 = &ia6->ia_addr;
 		mask6 = &ia6->ia_prefixmask;
-		if (!IN6_IS_ADDR_ISATAP(&sin6->sin6_addr))
+		if (!IN6_IS_ADDR_ISATAP(addr6))
 			continue;
-		if (IN6_ARE_MASKED_ADDR_EQUAL(&sa6.sin6_addr, &sin6->sin6_addr,	 
+		if (IN6_ARE_MASKED_ADDR_EQUAL(addr6, &sin6->sin6_addr,	 
 		    &mask6->sin6_addr))
 			return 1;
 	}	 

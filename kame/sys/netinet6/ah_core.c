@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.62 2004/12/01 07:48:23 suz Exp $	*/
+/*	$KAME: ah_core.c,v 1.63 2005/06/16 18:29:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,7 @@
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet/icmp6.h>
 #endif
 

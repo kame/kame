@@ -522,10 +522,8 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 
 		/* scoped address handling */
 		ip6 = mtod(m, struct ip6_hdr *);
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-			ip6->ip6_src.s6_addr16[1] = 0;
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
-			ip6->ip6_dst.s6_addr16[1] = 0;
+		in6_clearscope(&ip6->ip6_src);
+		in6_clearscope(&ip6->ip6_dst);
 
 		M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
 		if (m == 0) {
@@ -542,8 +540,8 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		ip6o->ip6_vfc |= IPV6_VERSION;
 		ip6o->ip6_plen = htons(m->m_pkthdr.len);
 		ip6o->ip6_hlim = ip_defttl;
-		in6_embedscope(&ip6o->ip6_src, &tdb->tdb_src.sin6);
-		in6_embedscope(&ip6o->ip6_dst, &tdb->tdb_dst.sin6);
+		ip6o->ip6_src = tdb->tdb_src.sin6;
+		ip6o->ip6_dst = tdb->tdb_dst.sin6;
 
 #ifdef INET
 		if (tp == IPVERSION) {

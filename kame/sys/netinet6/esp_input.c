@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.92 2005/04/14 06:22:39 suz Exp $	*/
+/*	$KAME: esp_input.c,v 1.93 2005/06/16 18:29:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1010,7 +1010,6 @@ esp6_ctlinput(cmd, sa, d)
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
-	struct in6_addr ip6c_srcin, in6;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -1075,11 +1074,10 @@ esp6_ctlinput(cmd, sa, d)
 			 * Check to see if we have a valid SA corresponding to
 			 * the address in the ICMP message payload.
 			 */
-			if (in6_embedscope(&ip6c_srcin, ip6cp->ip6c_src) ||
-			    in6_embedscope(&in6, (struct sockaddr_in6 *)sa))
-				return;
-			sav = key_allocsa(AF_INET6, (caddr_t)&ip6c_srcin,
-			    (caddr_t)&in6, IPPROTO_ESP, espp->esp_spi);
+			sav = key_allocsa(AF_INET6,
+			    (caddr_t)&ip6cp->ip6c_src->sin6_addr,
+			    (caddr_t)&((struct sockaddr_in6 *)sa)->sin6_addr,
+			    IPPROTO_ESP, espp->esp_spi);
 			if (sav) {
 				if (sav->state == SADB_SASTATE_MATURE ||
 				    sav->state == SADB_SASTATE_DYING)

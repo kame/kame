@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.108 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.109 2005/06/16 18:29:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -787,10 +787,6 @@ int	in6_are_prefix_equal __P((struct in6_addr *, struct in6_addr *, int));
 void	in6_prefixlen2mask __P((struct in6_addr *, int));
 void	in6_purgeprefix __P((struct ifnet *));
 
-int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *));
-int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
-	struct ifnet *));
-void in6_clearscope __P((struct in6_addr *));
 int in6_src_ioctl __P((u_long, caddr_t));
 #endif /* _KERNEL */
 

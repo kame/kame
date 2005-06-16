@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.83 2005/04/14 06:22:42 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.84 2005/06/16 18:29:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -165,6 +165,7 @@ udp6_output(in6p, m, addr6, control)
 	struct in6_addr *laddr6 = NULL, *faddr6 = NULL;
 	struct sockaddr_in6 *fsa6 = NULL;
 	struct ifnet *oifp = NULL;
+	int scope_ambiguous = 0;
 #ifndef __FreeBSD__ 
 	struct sockaddr_in6 lsa6_mapped; /* XXX ugly */
 #endif
@@ -215,7 +216,9 @@ udp6_output(in6p, m, addr6, control)
 		tmp = *fsa6;
 		fsa6 = &tmp;
 
-		if ((error = scope6_check_id(fsa6, ip6_use_defzone)) != 0)
+		if (fsa6->sin6_scope_id == 0 && !ip6_use_defzone)
+			scope_ambiguous = 1;
+		if ((error = sa6_embedscope(fsa6, ip6_use_defzone)) != 0)
 			return (error);
 	}
 
@@ -291,8 +294,9 @@ udp6_output(in6p, m, addr6, control)
 			laddr6 = in6_selectsrc(fsa6, optp,
 			    in6p->in6p_moptions, &in6p->in6p_route,
 			    &in6p->in6p_laddr, &oifp, &error);
-			if (oifp && fsa6->sin6_scope_id == 0 &&
-			    (error = scope6_setzoneid(oifp, fsa6)) != 0) {
+			if (oifp && scope_ambiguous &&
+			    (error = in6_setscope(&fsa6->sin6_addr,
+			    oifp, NULL))) {
 				goto release;
 			}
 		} else {

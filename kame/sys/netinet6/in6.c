@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.392 2005/06/16 07:33:16 t-momose Exp $	*/
+/*	$KAME: in6.c,v 1.393 2005/06/16 18:29:27 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -612,22 +612,14 @@ in6_control(so, cmd, data, ifp, p)
 		break;
 	}
 	if (sa6 && sa6->sin6_family == AF_INET6) {
-		if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
-			if (sa6->sin6_addr.s6_addr16[1] == 0) {
-				/* link ID is not embedded by the user */
-				sa6->sin6_addr.s6_addr16[1] =
-				    htons(ifp->if_index);
-			} else if (sa6->sin6_addr.s6_addr16[1] !=
-			    htons(ifp->if_index)) {
-				return (EINVAL);	/* link ID contradicts */
-			}
-			if (sa6->sin6_scope_id) {
-				if (sa6->sin6_scope_id !=
-				    (u_int32_t)ifp->if_index)
-					return (EINVAL);
-				sa6->sin6_scope_id = 0; /* XXX: good way? */
-			}
-		}
+		int error = 0;
+
+		if (sa6->sin6_scope_id != 0)
+			error = sa6_embedscope(sa6, 0);
+		else
+			error = in6_setscope(&sa6->sin6_addr, ifp, NULL);
+		if (error != 0)
+			return (error);
 		ia = in6ifa_ifpwithaddr(ifp, &sa6->sin6_addr);
 	} else
 		ia = NULL;
@@ -1031,24 +1023,22 @@ in6_update_ifa(ifp, ifra, ia, flags)
 	dst6 = ifra->ifra_dstaddr;
 	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) != 0 &&
 	    (dst6.sin6_family == AF_INET6)) {
+		struct in6_addr in6_tmp;
 		u_int32_t zoneid;
 
-#ifndef SCOPEDROUTING
-		if ((error = in6_recoverscope(&dst6,
-		    &ifra->ifra_dstaddr.sin6_addr, ifp)) != 0)
-			return (error);
-#endif
-		if (in6_addr2zoneid(ifp, &dst6.sin6_addr, &zoneid))
-			return (EINVAL);
-		if (dst6.sin6_scope_id == 0) /* user omit to specify the ID. */
+		in6_tmp = dst6.sin6_addr;
+		if (in6_setscope(&in6_tmp, ifp, &zoneid))
+			return (EINVAL); /* XXX: should be impossible */
+
+		if (dst6.sin6_scope_id != 0) {
+			if (dst6.sin6_scope_id != zoneid)
+				return (EINVAL);
+		} else		/* user omit to specify the ID. */
 			dst6.sin6_scope_id = zoneid;
-		else if (dst6.sin6_scope_id != zoneid)
-			return (EINVAL); /* scope ID mismatch. */
-		if ((error = in6_embedscope(&dst6.sin6_addr, &dst6)) != 0)
-			return (error);
-#ifndef SCOPEDROUTING
-		dst6.sin6_scope_id = 0; /* XXX */
-#endif
+
+		/* convert into the internal form */
+		if (sa6_embedscope(&dst6, 0))
+			return (EINVAL); /* XXX: should be impossible */
 	}
 	/*
 	 * The destination address can be specified only for a p2p or a
@@ -1262,29 +1252,20 @@ in6_update_ifa(ifp, ifra, ia, flags)
 	in6m_sol = NULL;
 	if ((ifp->if_flags & IFF_MULTICAST) != 0) {
 		struct sockaddr_in6 mltaddr, mltmask;
-#ifndef SCOPEDROUTING
-		u_int32_t zoneid = 0;
-#endif
-		struct sockaddr_in6 llsol;
+		struct in6_addr llsol;
 
 		/* join solicited multicast addr for new host id */
-		bzero(&llsol, sizeof(llsol));
-		llsol.sin6_family = AF_INET6;
-		llsol.sin6_len = sizeof(struct sockaddr_in6);
-		llsol.sin6_addr.s6_addr32[0] = htonl(0xff020000);
-		llsol.sin6_addr.s6_addr32[1] = 0;
-		llsol.sin6_addr.s6_addr32[2] = htonl(1);
-		llsol.sin6_addr.s6_addr32[3] =
-		    ifra->ifra_addr.sin6_addr.s6_addr32[3];
-		llsol.sin6_addr.s6_addr8[12] = 0xff;
-		if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
-		    &llsol.sin6_scope_id)) {
+		llsol.s6_addr32[0] = htonl(0xff020000);
+		llsol.s6_addr32[1] = 0;
+		llsol.s6_addr32[2] = htonl(1);
+		llsol.s6_addr32[3] = ifra->ifra_addr.sin6_addr.s6_addr32[3];
+		llsol.s6_addr8[12] = 0xff;
+		if (in6_setscope(&llsol, ifp, NULL)) {
 			/* XXX: should not happen */
 			log(LOG_ERR, "in6_update_ifa: "
-			    "in6_addr2zoneid failed\n");
+			    "in6_setscope failed\n");
 			goto cleanup;
 		}
-		in6_embedscope(&llsol.sin6_addr, &llsol);
 		delay = 0;
 		if ((flags & IN6_IFAUPDATE_DADDELAY)) {
 			/*
@@ -1297,13 +1278,12 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			delay = arc4random() %
 			    (MAX_RTR_SOLICITATION_DELAY * hz);
 		}
-		imm = in6_joingroup(ifp, &llsol.sin6_addr, &error, delay);
+		imm = in6_joingroup(ifp, &llsol, &error, delay);
 		if (!imm) {
 			nd6log((LOG_ERR, "in6_update_ifa: "
 			    "addmulti failed for %s on %s "
 			    "(errno=%d)\n",
-			    ip6_sprintf(&llsol.sin6_addr),
-			    if_name(ifp), error));
+			    ip6_sprintf(&llsol), if_name(ifp), error));
 			goto cleanup;
 		}
 		LIST_INSERT_HEAD(&ia->ia6_memberships,
@@ -1322,14 +1302,8 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		mltaddr.sin6_len = sizeof(struct sockaddr_in6);
 		mltaddr.sin6_family = AF_INET6;
 		mltaddr.sin6_addr = in6addr_linklocal_allnodes;
-		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
-		    &mltaddr.sin6_scope_id)) {
+		if (in6_setscope(&mltaddr.sin6_addr, ifp, NULL))
 			goto cleanup; /* XXX: should not fail */
-		}
-		/* necessary to fake unicast routing table */
-		in6_embedscope(&mltaddr.sin6_addr, &mltaddr);
-		zoneid = mltaddr.sin6_scope_id;
-		mltaddr.sin6_scope_id = 0;
 
 		/*
 		 * XXX: do we really need this automatic routes?
@@ -1439,14 +1413,8 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		 * (ff01::1%ifN, and ff01::%ifN/32)
 		 */
 		mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
-		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
-		    &mltaddr.sin6_scope_id)) {
+		if (in6_setscope(&mltaddr.sin6_addr, ifp, NULL))
 			goto cleanup; /* XXX: should not fail */
-		}
-		/* necessary to fake unicast routing table */
-		in6_embedscope(&mltaddr.sin6_addr, &mltaddr);
-		zoneid = mltaddr.sin6_scope_id;
-		mltaddr.sin6_scope_id = 0;
 
 		/* XXX: again, do we really need the route? */
 #ifdef __FreeBSD__
@@ -1915,16 +1883,14 @@ in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 			if (!cmp)
 				break;
 
-			bcopy(IFA_IN6(ifa), &candidate, sizeof(candidate));
-#ifndef SCOPEDROUTING
 			/*
 			 * XXX: this is adhoc, but is necessary to allow
 			 * a user to specify fe80::/64 (not /10) for a
 			 * link-local address.
 			 */
-			if (IN6_IS_ADDR_LINKLOCAL(&candidate))
-				candidate.s6_addr16[1] = 0;
-#endif
+			bcopy(IFA_IN6(ifa), &candidate, sizeof(candidate));
+			in6_clearscope(&candidate);
+
 			candidate.s6_addr32[0] &= mask.s6_addr32[0];
 			candidate.s6_addr32[1] &= mask.s6_addr32[1];
 			candidate.s6_addr32[2] &= mask.s6_addr32[2];
@@ -1937,33 +1903,22 @@ in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 		ia = ifa2ia6(ifa);
 
 		if (cmd == SIOCGLIFADDR) {
-#ifndef SCOPEDROUTING
-			struct sockaddr_in6 *s6;
-#endif
+			int error;
 
 			/* fill in the if_laddrreq structure */
 			bcopy(&ia->ia_addr, &iflr->addr, ia->ia_addr.sin6_len);
-#ifndef SCOPEDROUTING		/* XXX see above */
-			s6 = (struct sockaddr_in6 *)&iflr->addr;
-			if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
-				s6->sin6_addr.s6_addr16[1] = 0;
-				if (in6_addr2zoneid(ifp, &s6->sin6_addr,
-				    &s6->sin6_scope_id))
-					return (EINVAL);	/* XXX */
-			}
-#endif
+			error = sa6_recoverscope(
+			    (struct sockaddr_in6 *)&iflr->addr);
+			if (error != 0)
+				return (error);
+
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
 				bcopy(&ia->ia_dstaddr, &iflr->dstaddr,
 				    ia->ia_dstaddr.sin6_len);
-#ifndef SCOPEDROUTING		/* XXX see above */
-				s6 = (struct sockaddr_in6 *)&iflr->dstaddr;
-				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
-					s6->sin6_addr.s6_addr16[1] = 0;
-					if (in6_addr2zoneid(ifp,
-					    &s6->sin6_addr, &s6->sin6_scope_id))
-						return (EINVAL); /* EINVAL */
-				}
-#endif
+				error = sa6_recoverscope(
+				    (struct sockaddr_in6 *)&iflr->dstaddr);
+				if (error != 0)
+					return (error);
 			} else
 				bzero(&iflr->dstaddr, sizeof(iflr->dstaddr));
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.48 2005/03/07 23:26:08 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.49 2005/06/16 18:29:25 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1300,21 +1300,11 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					struct sockaddr_in6 *sin6, lsa6;
 					sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
-						/* we skip unspecifed addresses */
+						/*
+						 * we skip unspecified
+						 * addresses
+						 */
 						continue;
-					}
-					if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-						if (local_scope == 0)
-							continue;
-						if (sin6->sin6_scope_id == 0) {
-							lsa6 = *sin6;
-							if (in6_recoverscope(&lsa6,
-									     &lsa6.sin6_addr,
-									     NULL))
-								/* bad link local address */
-								continue;
-							sin6 = &lsa6;
-						}
 					}
 					if ((site_scope == 0) &&
 					    (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))) {
@@ -4113,6 +4103,7 @@ sctp_accept(struct socket *so, struct mbuf *nam)
 	struct sctp_tcb *stcb;
 	struct sockaddr *prim;
 	struct sctp_inpcb *inp;
+	int error;
 
 	inp = (struct sctp_inpcb *)so->so_pcb;
 
@@ -4167,11 +4158,9 @@ sctp_accept(struct socket *so, struct mbuf *nam)
 		sin6->sin6_port = ((struct sockaddr_in6 *)prim)->sin6_port;
 
 		sin6->sin6_addr = ((struct sockaddr_in6 *)prim)->sin6_addr;
-		if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-			/*      sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);*/
-			in6_recoverscope(sin6, &sin6->sin6_addr, NULL);  /* skip ifp check */
-		else
-			sin6->sin6_scope_id = 0;	/*XXX*/
+		if ((error = sa6_recoverscope(sin6)) != 0)
+			return (error);
+
 #if defined(__FreeBSD__) || defined (__APPLE__)
 		*addr= (struct sockaddr *)sin6;
 #else

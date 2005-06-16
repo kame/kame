@@ -5042,8 +5042,8 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	 * If the packet is too large for the outgoing interface,
 	 * send back an icmp6 error.
 	 */
-	if (IN6_IS_ADDR_LINKLOCAL(&dst->sin6_addr))
-		dst->sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+	if (in6_setscope(&dst->sin6_addr, ifp, NULL) != 0)
+		goto bad;	/* XXX */
 	if ((u_long)m0->m_pkthdr.len <= ifp->if_mtu) {
 		error = nd6_output(ifp, ifp, m0, dst, NULL);
 	} else {

@@ -223,7 +223,7 @@ udp_input(struct mbuf *m, ...)
 #ifdef INET6
 		struct sockaddr_in6 sin6;
 #endif /* INET6 */
-	} srcsa, dstsa;
+	} srcsa, dstsa, srcsa_from;
 #ifdef INET6
 	struct ip6_hdr *ip6;
 #endif /* INET6 */
@@ -401,6 +401,8 @@ udp_input(struct mbuf *m, ...)
 		srcsa.sin.sin_port = uh->uh_sport;
 		srcsa.sin.sin_addr = ip->ip_src;
 
+		srcsa_from.sin = srcsa.sin;
+
 		bzero(&dstsa, sizeof(struct sockaddr_in));
 		dstsa.sin.sin_len = sizeof(struct sockaddr_in);
 		dstsa.sin.sin_family = AF_INET;
@@ -416,24 +418,24 @@ udp_input(struct mbuf *m, ...)
 #if 0 /*XXX inbound flowinfo */
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ip6->ip6_flow;
 #endif
-		in6_recoverscope(&srcsa.sin6, &ip6->ip6_src,
-		    m->m_pkthdr.rcvif);
+		srcsa.sin6 = ip6->ip6_src;
+
+		/*
+		 * Convert the kernel-internal form to the standard
+		 * sockaddr_in6 wrt the scope zone.  The former should be
+		 * hidden from applications.
+		 */
+		srcsa_from.sin6 = srcsa.sin6;
+		if (sa6_recoverscope(&srcsa_from.sin6)) {
+			m_freem(m);
+			return;
+		}
 
 		bzero(&dstsa, sizeof(struct sockaddr_in6));
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		dstsa.sin6.sin6_family = AF_INET6;
 		dstsa.sin6.sin6_port = uh->uh_dport;
-		in6_recoverscope(&dstsa.sin6, &ip6->ip6_dst,
-		    m->m_pkthdr.rcvif);
-
-		/*
-		 * XXX: the address may have embedded scope zone ID, which
-		 * should be hidden from applications.
-		 */
-#ifndef SCOPEDROUTING
-		in6_clearscope(&srcsa.sin6.sin6_addr);
-		in6_clearscope(&dstsa.sin6.sin6_addr);
-#endif
+		dstsa.sin6_addr = ip6->ip6_dst;
 		break;
 #endif /* INET6 */
 	}
@@ -550,7 +552,7 @@ udp_input(struct mbuf *m, ...)
 #endif /* INET6 */
 					m_adj(n, iphlen);
 					if (sbappendaddr(&last->so_rcv,
-					    &srcsa.sa, n, opts) == 0) {
+					    &srcsa_from.sa, n, opts) == 0) {
 						m_freem(n);
 						if (opts)
 							m_freem(opts);
@@ -592,7 +594,7 @@ udp_input(struct mbuf *m, ...)
 #endif /* INET6 */
 		m_adj(m, iphlen);
 		if (sbappendaddr(&last->so_rcv,
-		    &srcsa.sa, m, opts) == 0) {
+		    &srcsa_from.sa, m, opts) == 0) {
 			udpstat.udps_fullsock++;
 			goto bad;
 		}
@@ -732,7 +734,8 @@ udp_input(struct mbuf *m, ...)
 	}
 	iphlen += sizeof(struct udphdr);
 	m_adj(m, iphlen);
-	if (sbappendaddr(&inp->inp_socket->so_rcv, &srcsa.sa, m, opts) == 0) {
+	if (sbappendaddr(&inp->inp_socket->so_rcv,
+	    &srcsa_from.sa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
 	}

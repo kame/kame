@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.233 2005/04/14 06:22:41 suz Exp $	*/
+/*	$KAME: ipsec.c,v 1.234 2005/06/16 18:29:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,6 +81,7 @@
 #include <netinet/ip6.h>
 #ifdef INET6
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #endif
 #include <netinet/in_pcb.h>
 #ifdef INET6
@@ -1220,19 +1221,13 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
+	sin6->sin6_addr = ip6->ip6_src;
 	sin6 = (struct sockaddr_in6 *)&spidx->dst;
 	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_recoverscope((struct sockaddr_in6 *)&spidx->src, &ip6->ip6_src,
-	    NULL) ||
-	    in6_recoverscope((struct sockaddr_in6 *)&spidx->dst, &ip6->ip6_dst,
-	    NULL)) {
-		/* this should be a bug.  we intentionally bark here. */
-		log(LOG_ERR, "ipsec6_setspidx_ipaddr: "
-		    "packet does not have addresses\n");
-		return (EIO);	/* XXX: should not happen */
-	}
+	sin6->sin6_addr = ip6->ip6_dst;
+
 	spidx->prefs = sizeof(struct in6_addr) << 3;
 	spidx->prefd = sizeof(struct in6_addr) << 3;
 
@@ -2433,26 +2428,23 @@ ipsec6_encapsulate(m, sav)
 			bcopy(&bul->mbul_coa, &ip6->ip6_src,
 			    sizeof(ip6->ip6_src));
 		else {
-			bcopy(&((struct sockaddr_in6 *)&sav->sah->saidx.src)->sin6_addr,
-			    &ip6->ip6_src, sizeof(ip6->ip6_src));
+			struct sockaddr_in6 sa6;
 
-			/* updated the recorded packet address */
-			error = in6_embedscope(&ip6->ip6_src,
-			    (struct sockaddr_in6 *)&sav->sah->saidx.src);
-			if (error)
+			sa6 = *(struct sockaddr_in6 *)&sav->sah->saidx.src;
+			if ((error = sa6_embedscope(&sa6, 0)) != 0)
 				return (error);
+			ip6->ip6_src = sa6.sin6_addr;
 		}
 	} else
 #endif /* MIP6 && NMIP > 0 */
 #endif
 	{
-	    bcopy(&((struct sockaddr_in6 *)&sav->sah->saidx.src)->sin6_addr,
-		  &ip6->ip6_src, sizeof(ip6->ip6_src));
-	    /* updated the recorded packet addresses */
-	    error = in6_embedscope(&ip6->ip6_src,
-				   (struct sockaddr_in6 *)&sav->sah->saidx.src);
-	    if (error)
-		return (error);
+		struct sockaddr_in6 sa6;
+
+		sa6 = *(struct sockaddr_in6 *)&sav->sah->saidx.src;
+		if ((error = sa6_embedscope(&sa6, 0)) != 0)
+			return (error);
+		ip6->ip6_src = sa6.sin6_addr;
 	}
 
 #if 0
@@ -2467,13 +2459,12 @@ ipsec6_encapsulate(m, sav)
 #endif /* MIP6 */
 #endif
 	{
-	    bcopy(&((struct sockaddr_in6 *)&sav->sah->saidx.dst)->sin6_addr,
-		  &ip6->ip6_dst, sizeof(ip6->ip6_dst));
-	    /* updated the recorded packet addresses */
-	    error = in6_embedscope(&ip6->ip6_dst,
-				   (struct sockaddr_in6 *)&sav->sah->saidx.dst);
-	    if (error)
-		return (error);
+		struct sockaddr_in6 sa6;
+
+		sa6 = *((struct sockaddr_in6 *)&sav->sah->saidx.dst);
+		if ((error = sa6_embedscope(&sa6, 0)) != 0)
+			return (error);
+		ip6->ip6_dst = sa6.sin6_addr;
 	}
 
 	ip6->ip6_hlim = IPV6_DEFHLIM;
@@ -3054,7 +3045,6 @@ ipsec6_checksa(isr, state, tunnel)
 	struct ip6_hdr *ip6;
 	struct secasindex saidx;
 	struct sockaddr_in6 *sin6;
-	int error;
 
 	if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
 #ifdef DIAGNOSTIC
@@ -3079,8 +3069,7 @@ ipsec6_checksa(isr, state, tunnel)
 		bzero(sin6, sizeof(*sin6));
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_len = sizeof(struct sockaddr_in6);
-		if ((error = in6_recoverscope(sin6, &ip6->ip6_src, NULL)) != 0)
-			return (error);
+		sin6->sin6_addr = ip6->ip6_src;
 		if (tunnel)
 			sin6->sin6_port = IPSEC_PORT_ANY;
 	}
@@ -3089,8 +3078,7 @@ ipsec6_checksa(isr, state, tunnel)
 		bzero(sin6, sizeof(*sin6));
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_len = sizeof(struct sockaddr_in6);
-		if ((error = in6_recoverscope(sin6, &ip6->ip6_dst, NULL)) != 0)
-			return (error);
+		sin6->sin6_addr = ip6->ip6_dst;
 		if (tunnel)
 			sin6->sin6_port = IPSEC_PORT_ANY;
 	}
@@ -3663,23 +3651,14 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 	bzero(&odst, sizeof(odst));
 	osrc.sin6_family = odst.sin6_family = AF_INET6;
 	osrc.sin6_len = odst.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_recoverscope(&osrc, &oip6->ip6_src, NULL) != 0 ||
-	    in6_recoverscope(&odst, &oip6->ip6_dst, NULL) != 0) {
-		/*
-		 * XXX: this should not happen.  It should be better to return
-		 * an error in this case, but the caller of this function
-		 * does not expect the case, so there is no other way than
-		 * panic.
-		 */
-		panic("ipsec6_tunnel_validate: ip6_recoverspace failed");
-	}
+	osrc.sin6_addr = oip6->ip6_src;
+	odst.sin6_addr = oip6->ip6_dst;
 
 	/* AF_INET should be supported, but at this moment we don't. */
 	sin6 = (struct sockaddr_in6 *)&sav->sah->saidx.dst;
 	if (sin6->sin6_family != AF_INET6)
 		return 0;
-	if (!IN6_ARE_ADDR_EQUAL(&odst.sin6_addr, &sin6->sin6_addr) ||
-	    odst.sin6_scope_id != sin6->sin6_scope_id)
+	if (!IN6_ARE_ADDR_EQUAL(&odst.sin6_addr, &sin6->sin6_addr))
 		return 0;
 
 	/* XXX slow */

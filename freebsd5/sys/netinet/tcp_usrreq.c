@@ -919,9 +919,6 @@ tcp6_connect(tp, nam, td)
 	struct rmxp_tao tao;
 	int error;
 
-	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
-		return(error);
-
 	bzero(&tao, sizeof(tao));
 
 	if (inp->inp_lport == 0) {
@@ -934,6 +931,7 @@ tcp6_connect(tp, nam, td)
 	 * Cannot simply call in_pcbconnect, because there might be an
 	 * earlier incarnation of this same connection still in
 	 * TIME_WAIT state, creating an ADDRINUSE error.
+	 * in6_pcbladdr() also handles scope zone IDs.
 	 */
 	error = in6_pcbladdr(inp, nam, &addr6);
 	if (error)

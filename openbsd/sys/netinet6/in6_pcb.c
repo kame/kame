@@ -206,8 +206,8 @@ in6_pcbbind(inp, nam)
 		if (sin6->sin6_family != AF_INET6)
 			return EAFNOSUPPORT;
 
-		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
-			return(error);
+		if ((error = sa6_embedscope(sin6, ip6_use_defzone)) != 0)
+			return (error);
 
 		lport = sin6->sin6_port;
 
@@ -428,6 +428,7 @@ in6_pcbconnect(inp, nam)
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
 	struct sockaddr_in6 tmp;
+	int scope_ambiguous = 0;
 
 	(void)&in6a;				/* XXX fool gcc */
 
@@ -450,7 +451,9 @@ in6_pcbconnect(inp, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
-	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+	if (sin6->sin6_scope_id == 0 && !ip6_use_defzone)
+		scope_ambiguous = 1;
+	if ((error = sa6_embedscope(sin6, ip6_use_defzone)) != 0)
 		return(error);
 
 	/* Source address selection. */
@@ -462,6 +465,10 @@ in6_pcbconnect(inp, nam)
 	in6a = in6_selectsrc(sin6, inp->inp_outputopts6,
 	    inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
 	    &ifp, &error);
+	if (ifp && scope_ambiguous &&
+	    (error = in6_setscope(&sin6->sin6_addr, ifp, NULL)) != 0) {
+		return(error);
+	}
 	if (in6a == 0) {
 		if (error == 0)
 			error = EADDRNOTAVAIL;

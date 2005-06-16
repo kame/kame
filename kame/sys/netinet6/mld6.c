@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.111 2005/04/14 06:22:41 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.112 2005/06/16 18:29:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -108,6 +108,7 @@
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/mld6_var.h>
 
@@ -164,8 +165,6 @@ int mld_verion = 1;
 struct router6_info *Head6;
 
 static struct ip6_pktopts ip6_opts;
-static const struct sockaddr_in6 *all_nodes_linklocal;
-static const struct sockaddr_in6 *all_routers_linklocal;
 static const int ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & 
 			    ~IN6_IFF_TENTATIVE;
 
@@ -186,9 +185,6 @@ mld_init()
 	struct ip6_hbh *hbh = (struct ip6_hbh *)hbh_buf;
 	u_int16_t rtalert_code = htons((u_int16_t)IP6OPT_RTALERT_MLD);
 
-	static struct sockaddr_in6 all_nodes_linklocal0;
-	static struct sockaddr_in6 all_routers_linklocal0;
-
 	/* ip6h_nxt will be fill in later */
 	hbh->ip6h_len = 0;	/* (8 >> 3) - 1 */
 
@@ -198,18 +194,6 @@ mld_init()
 	hbh_buf[4] = IP6OPT_ROUTER_ALERT;
 	hbh_buf[5] = IP6OPT_RTALERT_LEN - 2;
 	bcopy((caddr_t)&rtalert_code, &hbh_buf[6], sizeof(u_int16_t));
-
-	all_nodes_linklocal0.sin6_family = AF_INET6;
-	all_nodes_linklocal0.sin6_len = sizeof(struct sockaddr_in6);
-	all_nodes_linklocal0.sin6_addr = in6addr_linklocal_allnodes;
-
-	all_nodes_linklocal = &all_nodes_linklocal0;
-
-	all_routers_linklocal0.sin6_family = AF_INET6;
-	all_routers_linklocal0.sin6_len = sizeof(struct sockaddr_in6);
-	all_routers_linklocal0.sin6_addr = in6addr_linklocal_allrouters;
-
-	all_routers_linklocal = &all_routers_linklocal0;
 
 	ip6_initpktopts(&ip6_opts);
 	ip6_opts.ip6po_hbh = hbh;
@@ -318,20 +302,12 @@ static void
 mld_start_listening(in6m)
 	struct in6_multi *in6m;
 {
-	struct sockaddr_in6 all_sa;
+	struct in6_addr all_in6;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
 #endif
-
-	/*
-	 * This function must not be called before mld6_init().
-	 * We've once experienced the violation of the order, so we put an
-	 * explicit assertion here.
-	 */
-	if (all_nodes_linklocal == NULL)
-		panic("mld6_start_listening: called too early");
 
 	/*
 	 * RFC2710 page 10:
@@ -340,18 +316,13 @@ mld_start_listening(in6m)
 	 * MLD messages are never sent for multicast addresses whose scope is 0
 	 * (reserved) or 1 (node-local).
 	 */
-	all_sa = *all_nodes_linklocal;
-	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
-	    &all_sa.sin6_scope_id)) {
+	all_in6 = in6addr_linklocal_allnodes;
+	if (in6_setscope(&all_in6, in6m->in6m_ifp, NULL)) {
 		/* XXX: this should not happen! */
 		in6m->in6m_timer = IN6M_TIMER_UNDEF;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	}
-	if (in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
-		/* XXX: this should not happen! */
-		panic("mld6_start_listening: should not happen");
-	}
-	if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &all_sa.sin6_addr) ||
+	if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &all_in6) ||
 	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
 	    IPV6_ADDR_SCOPE_LINKLOCAL) {
 		in6m->in6m_timer = IN6M_TIMER_UNDEF;
@@ -372,17 +343,14 @@ mld_stop_listening(in6m)
 	struct in6_multi *in6m;
 {
 	struct in6_addr allnode, allrouter;
-	struct sockaddr_in6 sa6;
 
-	sa6 = *all_nodes_linklocal;
-	if (in6_addr2zoneid(in6m->in6m_ifp, &sa6.sin6_addr,
-	    &sa6.sin6_scope_id) || in6_embedscope(&allrouter, &sa6)) {
+	allnode = in6addr_linklocal_allnodes;
+	if (in6_setscope(&allnode, in6m->in6m_ifp, NULL)) {
 		/* XXX: this should not happen! */
 		return;
 	}
-	sa6 = *all_routers_linklocal;
-	if (in6_addr2zoneid(in6m->in6m_ifp, &sa6.sin6_addr,
-	    &sa6.sin6_scope_id) || in6_embedscope(&allrouter, &sa6)) {
+	allrouter = in6addr_linklocal_allrouters;
+	if (in6_setscope(&allrouter, in6m->in6m_ifp, NULL)) {
 		/* XXX impossible */
 		return;
 	}
@@ -403,7 +371,7 @@ mld_input(m, off)
 	struct mld_hdr *mldh;
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct in6_multi *in6m = NULL;
-	struct sockaddr_in6 all_sa, mc_sa;
+	struct in6_addr mld_addr, all_in6;
 #ifdef __FreeBSD__
 	struct ifmultiaddr *ifma;
 #else
@@ -453,19 +421,13 @@ mld_input(m, off)
 		return;
 	}
 
-	/* convert the multicast address into a full sockaddr form */
-	bzero(&mc_sa, sizeof(mc_sa));
-	mc_sa.sin6_family = AF_INET6;
-	mc_sa.sin6_len = sizeof(mc_sa);
-	mc_sa.sin6_addr = mldh->mld_addr;
-	if (in6_addr2zoneid(ifp, &mc_sa.sin6_addr, &mc_sa.sin6_scope_id)) {
+	/*
+	 * make a copy for local work (in6_setscope() may modify the 1st arg)
+	 */
+	mld_addr = mldh->mld_addr;
+	if (in6_setscope(&mld_addr, ifp, NULL)) {
 		/* XXX: this should not happen! */
-		m_freem(m);
-		return;
-	}
-	if (in6_embedscope(&mc_sa.sin6_addr, &mc_sa)) {
-		/* XXX: this should not happen! */
-		m_freem(m);
+		m_free(m);
 		return;
 	}
 
@@ -485,17 +447,12 @@ mld_input(m, off)
 		if (ifp->if_flags & IFF_LOOPBACK)
 			break;
 
-		if (!IN6_IS_ADDR_UNSPECIFIED(&mc_sa.sin6_addr) &&
-		    !IN6_IS_ADDR_MULTICAST(&mc_sa.sin6_addr))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&mld_addr) &&
+		    !IN6_IS_ADDR_MULTICAST(&mld_addr))
 			break;	/* print error or log stat? */
 
-		all_sa = *all_nodes_linklocal;
-		if (in6_addr2zoneid(ifp, &all_sa.sin6_addr,
-		    &all_sa.sin6_scope_id)) {
-			/* XXX: this should not happen! */
-			break;
-		}
-		if (in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
+		all_in6 = in6addr_linklocal_allnodes;
+		if (in6_setscope(&all_in6, ifp, NULL)) {
 			/* XXX: this should not happen! */
 			break;
 		}
@@ -532,14 +489,13 @@ mld_input(m, off)
 			if (in6m->in6m_state == MLD_REPORTPENDING)
 				continue; /* we are not yet ready */
 
-			if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr,
-			    &all_sa.sin6_addr) ||
+			if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &all_in6) ||
 			    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
 			    IPV6_ADDR_SCOPE_LINKLOCAL)
 				continue;
 
-			if (!IN6_IS_ADDR_UNSPECIFIED(&mc_sa.sin6_addr) &&
-			    !IN6_ARE_ADDR_EQUAL(&mc_sa.sin6_addr,
+			if (!IN6_IS_ADDR_UNSPECIFIED(&mld_addr) &&
+			    !IN6_ARE_ADDR_EQUAL(&mld_addr,
 			    &in6m->in6m_addr))
 				continue;
 
@@ -570,14 +526,14 @@ mld_input(m, off)
 		if (m->m_flags & M_LOOP) /* XXX: grotty flag, but efficient */
 			break;
 
-		if (!IN6_IS_ADDR_MULTICAST(&mc_sa.sin6_addr))
+		if (!IN6_IS_ADDR_MULTICAST(&mld_addr))
 			break;
 
 		/*
 		 * If we belong to the group being reported, stop
 		 * our timer for that group.
 		 */
-		IN6_LOOKUP_MULTI(mc_sa.sin6_addr, ifp, in6m);
+		IN6_LOOKUP_MULTI(mld_addr, ifp, in6m);
 		if (in6m) {
 			mld_stoptimer(in6m); /* transit to idle state */
 			in6m->in6m_state = MLD_OTHERLISTENER; /* clear flag */

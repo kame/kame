@@ -77,6 +77,10 @@
 #include <netinet/tcp.h>
 #endif
 
+#ifdef INET6
+#include <netinet6/scope6_var.h>
+#endif
+
 #if defined (__FreeBSD__) || defined (__OpenBSD__)
 # include <netinet/if_ether.h>
 #else
@@ -3544,7 +3548,7 @@ sppp_ipv6cp_RCR(struct sppp *sp, struct lcp_header *h, int len)
 			nohisaddr = IN6_IS_ADDR_UNSPECIFIED(&desiredaddr);
 
 			desiredaddr.s6_addr16[0] = htons(0xfe80);
-			desiredaddr.s6_addr16[1] = htons(sp->pp_if.if_index);
+			(void)in6_setscope(&desiredaddr, &sp->pp_if, NULL);
 
 			if (!collision && !nohisaddr) {
 				/* no collision, hisaddr known - Conf-Ack */
@@ -3687,7 +3691,7 @@ sppp_ipv6cp_RCN_nak(struct sppp *sp, struct lcp_header *h, int len)
 				break;
 			bzero(&suggestaddr, sizeof(suggestaddr));
 			suggestaddr.s6_addr16[0] = htons(0xfe80);
-			suggestaddr.s6_addr16[1] = htons(sp->pp_if.if_index);
+			(void)in6_setscope(&suggestaddr, &sp->pp_if, NULL);
 			bcopy(&p[2], &suggestaddr.s6_addr[8], 8);
 
 			sp->ipv6cp.opts |= (1 << IPV6CP_OPT_IFID);

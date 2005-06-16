@@ -1201,12 +1201,12 @@ findpcb:
 			src.sin6.sin6_len = sizeof(struct sockaddr_in6);
 			src.sin6.sin6_family = AF_INET6;
 			src.sin6.sin6_port = th->th_sport;
-			in6_recoverscope(&src.sin6, &ip6->ip6_src, NULL);
+			src.sin6.sin6_addr = ip6->ip6_src;
 
 			dst.sin6.sin6_len = sizeof(struct sockaddr_in6);
 			dst.sin6.sin6_family = AF_INET6;
 			dst.sin6.sin6_port = th->th_dport;
-			in6_recoverscope(&dst.sin6, &ip6->ip6_dst, NULL);
+			dst.sin6.sin6_addr = ip6->ip6_dst;
 			break;
 #endif /* INET6 */
 		default:

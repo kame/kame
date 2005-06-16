@@ -118,7 +118,7 @@
 #endif /* FAST_IPSEC */
 
 /*
- * UDP protocol inplementation.
+ * UDP protocol implementation.
  * Per RFC 768, August, 1980.
  */
 
@@ -487,8 +487,8 @@ udp6_getcred(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
 	if (error)
 		return (error);
-	if ((error = scope6_check_id(&addrs[0], ip6_use_defzone)) != 0 ||
-	    (error = scope6_check_id(&addrs[1], ip6_use_defzone)) != 0) {
+	if ((error = sa6_embedscope(&addrs[0], ip6_use_defzone)) != 0 ||
+	    (error = sa6_embedscope(&addrs[1], ip6_use_defzone)) != 0) {
 		return (error);
 	}
 	s = splnet();

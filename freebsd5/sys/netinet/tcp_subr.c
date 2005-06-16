@@ -1071,7 +1071,6 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct xucred xuc;
 	struct sockaddr_in6 addrs[2];
-	struct in6_addr a6[2];
 	struct inpcb *inp;
 	int error, s, mapped = 0;
 
@@ -1081,8 +1080,8 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
 	if (error)
 		return (error);
-	if ((error = scope6_check_id(&addrs[0], ip6_use_defzone)) != 0 ||
-	    (error = scope6_check_id(&addrs[1], ip6_use_defzone)) != 0) {
+	if ((error = sa6_embedscope(&addrs[0], ip6_use_defzone)) != 0 ||
+	    (error = sa6_embedscope(&addrs[1], ip6_use_defzone)) != 0) {
 		return (error);
 	}
 	if (IN6_IS_ADDR_V4MAPPED(&addrs[0].sin6_addr)) {
@@ -1090,14 +1089,8 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 			mapped = 1;
 		else
 			return (EINVAL);
-	} else {
-		error = in6_embedscope(&a6[0], &addrs[0]);
-		if (error)
-			return (EINVAL);
-		error = in6_embedscope(&a6[1], &addrs[1]);
-		if (error)
-			return (EINVAL);
 	}
+
 	s = splnet();
 	INP_INFO_RLOCK(&tcbinfo);
 	if (mapped == 1)
@@ -1108,8 +1101,9 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 			addrs[0].sin6_port,
 			0, NULL);
 	else
-		inp = in6_pcblookup_hash(&tcbinfo, &a6[1], addrs[1].sin6_port,
-			&a6[0], addrs[0].sin6_port, 0, NULL);
+		inp = in6_pcblookup_hash(&tcbinfo, &addrs[1].sin6_addr,
+		    addrs[1].sin6_port, &addrs[0].sin6_addr,
+		    addrs[0].sin6_port, 0, NULL);
 	if (inp == NULL) {
 		error = ENOENT;
 		goto outunlocked;
@@ -2212,7 +2206,6 @@ sysctl_drop(SYSCTL_HANDLER_ARGS)
 	struct sockaddr_in *fin, *lin;
 #ifdef INET6
 	struct sockaddr_in6 *fin6, *lin6;
-	struct in6_addr f6, l6;
 #endif
 	int error;
 
@@ -2250,10 +2243,10 @@ sysctl_drop(SYSCTL_HANDLER_ARGS)
 			lin = (struct sockaddr_in *)&addrs[1];
 			break;
 		}
-		error = in6_embedscope(&f6, fin6);
+		error = sa6_embedscope(fin6, ip6_use_defzone);
 		if (error)
 			return (EINVAL);
-		error = in6_embedscope(&l6, lin6);
+		error = sa6_embedscope(lin6, ip6_use_defzone);
 		if (error)
 			return (EINVAL);
 		break;
@@ -2272,8 +2265,9 @@ sysctl_drop(SYSCTL_HANDLER_ARGS)
 	switch (addrs[0].ss_family) {
 #ifdef INET6
 	case AF_INET6:
-		inp = in6_pcblookup_hash(&tcbinfo, &f6, fin6->sin6_port,
-		    &l6, lin6->sin6_port, 0, NULL);
+		inp = in6_pcblookup_hash(&tcbinfo, &fin6->sin6_addr,
+		    fin6->sin6_port, &lin6->sin6_addr, lin6->sin6_port,
+		    0, NULL);
 		break;
 #endif
 	case AF_INET:

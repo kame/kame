@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.38 2005/03/06 16:04:18 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.39 2005/06/16 18:29:25 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1294,23 +1294,18 @@ sctp_findassociation_addr(struct mbuf *m, int iphlen, int offset,
 		bzero(from6, sizeof(*from6));
 		from6->sin6_family = to6->sin6_family = AF_INET6;
 		from6->sin6_len = to6->sin6_len = sizeof(struct sockaddr_in6);
-		to6->sin6_addr = ip6->ip6_dst;
 		from6->sin6_addr = ip6->ip6_src;
+		to6->sin6_addr = ip6->ip6_dst;
 		from6->sin6_port = sh->src_port;
 		to6->sin6_port = sh->dest_port;
 		/* Get the scopes in properly to the sin6 addr's */
-		(void)in6_recoverscope(to6, &to6->sin6_addr, NULL);
 #if defined(SCTP_BASE_FREEBSD) || defined(__APPLE__)
+		/* We probably don't need this operation (jinmei@kame) */
+		(void)in6_recoverscope(to6, &to6->sin6_addr, NULL);
 		(void)in6_embedscope(&to6->sin6_addr, to6, NULL, NULL);
-#else
-		(void)in6_embedscope(&to6->sin6_addr, to6);
-#endif
 
 		(void)in6_recoverscope(from6, &from6->sin6_addr, NULL);
-#if defined(SCTP_BASE_FREEBSD) || defined(__APPLE__)
 		(void)in6_embedscope(&from6->sin6_addr, from6, NULL, NULL);
-#else
-		(void)in6_embedscope(&from6->sin6_addr, from6);
 #endif
 	} else {
 		/* Currently not supported. */
@@ -1896,14 +1891,10 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 				if (in6_embedscope(&sin6->sin6_addr, sin6,
 				    ip_inp, NULL) != 0)
 					return (EINVAL);
-#elif defined(__FreeBSD__)
-				error = scope6_check_id(sin6, ip6_use_defzone);
+#else
+				error = sa6_embedscope(sin6, ip6_use_defzone);
 				if (error != 0)
 					return (error);
-#else
-				if (in6_embedscope(&sin6->sin6_addr, sin6) != 0) {
-					return (EINVAL);
-				}
 #endif
 			}
 #ifndef SCOPEDROUTING
@@ -2772,7 +2763,7 @@ sctp_add_remote_addr(struct sctp_tcb *stcb, struct sockaddr *newaddr,
 #endif
 
 	/* Now generate a route for this guy */
-	/* KAME hack: embed scopeid */
+	/* KAME hack: embed scope zone ID */
 	if (newaddr->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
 		sin6 = (struct sockaddr_in6 *)&net->ro._l_addr;
@@ -2780,10 +2771,8 @@ sctp_add_remote_addr(struct sctp_tcb *stcb, struct sockaddr *newaddr,
 		(void)in6_embedscope(&sin6->sin6_addr, sin6,
 		    &stcb->sctp_ep->ip_inp.inp, NULL);
 #else
-		(void)in6_embedscope(&sin6->sin6_addr, sin6);
-#endif
-#ifndef SCOPEDROUTING
-		sin6->sin6_scope_id = 0;
+		if (sa6_embedscope(sin6, ip6_use_defzone) != 0)
+			return (-1);
 #endif
 	}
 #if defined(__FreeBSD__) || defined(__APPLE__)
@@ -2791,11 +2780,6 @@ sctp_add_remote_addr(struct sctp_tcb *stcb, struct sockaddr *newaddr,
 #else
 	rtalloc((struct route *)&net->ro);
 #endif
-	if (newaddr->sa_family == AF_INET6) {
-		struct sockaddr_in6 *sin6;
-		sin6 = (struct sockaddr_in6 *)&net->ro._l_addr;
-		(void)in6_recoverscope(sin6, &sin6->sin6_addr, NULL);
-	}
 	if ((net->ro.ro_rt) &&
 	    (net->ro.ro_rt->rt_ifp)) {
 		net->mtu = net->ro.ro_rt->rt_ifp->if_mtu;

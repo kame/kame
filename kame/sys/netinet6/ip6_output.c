@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.469 2005/06/15 07:11:36 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.470 2005/06/16 18:29:28 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -315,7 +315,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *dst, src_sa, dst_sa;
-	struct in6_addr finaldst;
+	struct in6_addr finaldst, src0, dst0;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
 	u_long mtu;
@@ -901,7 +901,7 @@ skip_ipsec2:;
 				sa.sin6_family = AF_INET6;
 				sa.sin6_len = sizeof(sa);
 				sa.sin6_addr = addr[0];
-				if ((error = scope6_check_id(&sa,
+				if ((error = sa6_embedscope(&sa,
 				    ip6_use_defzone)) != 0) {
 					goto bad;
 				}
@@ -1104,9 +1104,7 @@ skip_ipsec2:;
 	bzero(&dst_sa, sizeof(dst_sa));
 	dst_sa.sin6_family = AF_INET6;
 	dst_sa.sin6_len = sizeof(dst_sa);
-	in6_recoverscope(&dst_sa, &ip6->ip6_dst, NULL);
-	in6_embedscope(&dst_sa.sin6_addr, &dst_sa);
-
+	dst_sa.sin6_addr = ip6->ip6_dst;
 	if ((error = in6_selectroute(&dst_sa, opt, im6o, ro,
 	    &ifp, &rt, clone)) != 0) {
 		switch (error) {
@@ -1154,28 +1152,26 @@ skip_ipsec2:;
 		origifp = ia->ia_ifp;
 	else
 		origifp = ifp;
+
+	src0 = ip6->ip6_src;
+	if (in6_setscope(&src0, origifp, &zone))
+		goto badscope;
 	bzero(&src_sa, sizeof(src_sa));
 	src_sa.sin6_family = AF_INET6;
 	src_sa.sin6_len = sizeof(src_sa);
-	in6_recoverscope(&src_sa, &ip6->ip6_src, NULL);
-	if (in6_addr2zoneid(origifp, &src_sa.sin6_addr, &zone) ||
-	    zone != src_sa.sin6_scope_id) {
-#ifdef SCOPEDEBUG		/* will be removed shortly */
-		printf("ip6 output: bad source scope %s%%%d for %s%%%d on %s\n",
-		    ip6_sprintf(&src_sa.sin6_addr),
-		    src_sa.sin6_scope_id,
-		    ip6_sprintf(&dst_sa.sin6_addr),
-		    dst_sa.sin6_scope_id, if_name(origifp));
-#endif
+	src_sa.sin6_addr = ip6->ip6_src;
+	if (sa6_recoverscope(&src_sa) || zone != src_sa.sin6_scope_id)
 		goto badscope;
-	}
-	if (in6_addr2zoneid(origifp, &dst_sa.sin6_addr, &zone) ||
-	    zone != dst_sa.sin6_scope_id) {
-#ifdef SCOPEDEBUG		/* will be removed shortly */
-		printf("ip6 output: bad dst scope %s%%%d on %s\n",
-		    ip6_sprintf(&dst_sa.sin6_addr),
-		    dst_sa.sin6_scope_id, if_name(origifp));
-#endif
+
+	dst0 = ip6->ip6_dst;
+	if (in6_setscope(&dst0, origifp, &zone))
+		goto badscope;
+	/* re-initialize to be sure */
+	bzero(&dst_sa, sizeof(dst_sa));
+	dst_sa.sin6_family = AF_INET6;
+	dst_sa.sin6_len = sizeof(dst_sa);
+	dst_sa.sin6_addr = ip6->ip6_dst;
+	if (sa6_recoverscope(&dst_sa) || zone != dst_sa.sin6_scope_id) {
 		goto badscope;
 	}
 
@@ -3560,7 +3556,6 @@ ip6_setmoptions(optname, im6op, m)
 	struct ipv6_mreq *mreq;
 	struct ifnet *ifp;
 	struct ip6_moptions *im6o = *im6op;
-	struct sockaddr_in6 sa6_mc;
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
 #else
@@ -3667,11 +3662,6 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 
-		bzero(&sa6_mc, sizeof(sa6_mc));
-		sa6_mc.sin6_family = AF_INET6;
-		sa6_mc.sin6_len = sizeof(sa6_mc);
-		sa6_mc.sin6_addr = mreq->ipv6mr_multiaddr;
-
 		/*
 		 * If no interface was explicitly specified, choose an
 		 * appropriate one according to the given multicast address.
@@ -3686,8 +3676,10 @@ ip6_setmoptions(optname, im6op, m)
 			 */
 			ro.ro_rt = NULL;
 			dst = (struct sockaddr_in6 *)&ro.ro_dst;
-			*dst = sa6_mc;
-			dst->sin6_scope_id = 0;
+			bzero(dst, sizeof(*dst));
+			dst->sin6_family = AF_INET6;
+			dst->sin6_len = sizeof(*dst);
+			dst->sin6_addr = mreq->ipv6mr_multiaddr;
 			rtalloc((struct route *)&ro);
 			if (ro.ro_rt == NULL) {
 				error = EADDRNOTAVAIL;
@@ -3728,13 +3720,7 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 
-		/* Fill in the scope zone ID */
-		if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
-		    &sa6_mc.sin6_scope_id)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
-			break;
-		}
-		if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
+		if (in6_setscope(&mreq->ipv6mr_multiaddr, ifp, NULL)) {
 			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
@@ -3746,7 +3732,7 @@ ip6_setmoptions(optname, im6op, m)
 		     imm != NULL; imm = imm->i6mm_chain.le_next)
 			if (imm->i6mm_maddr->in6m_ifp == ifp &&
 			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
-			    &sa6_mc.sin6_addr))
+			    &mreq->ipv6mr_multiaddr))
 				break;
 		if (imm != NULL) {
 			error = EADDRINUSE;
@@ -3760,7 +3746,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Even this request doesn't add any source filter, create
 		 * msf entry list. This is needed to indicate current msf state.
 		 */
-		imm = in6_joingroup(ifp, &sa6_mc.sin6_addr, &error, 0);
+		imm = in6_joingroup(ifp, &mreq->ipv6mr_multiaddr, &error, 0);
 		if (imm == NULL)
 			break;
 #ifdef MLDV2
@@ -3785,11 +3771,6 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 
-		bzero(&sa6_mc, sizeof(sa6_mc));
-		sa6_mc.sin6_family = AF_INET6;
-		sa6_mc.sin6_len = sizeof(sa6_mc);
-		sa6_mc.sin6_addr = mreq->ipv6mr_multiaddr;
-
 		/*
 		 * If an interface address was specified, get a pointer
 		 * to its ifnet structure.
@@ -3810,18 +3791,10 @@ ip6_setmoptions(optname, im6op, m)
 		}
 
 		/* Fill in the scope zone ID */
-		if (ifp) {
-			if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
-			    &sa6_mc.sin6_scope_id)) {
-				/* XXX: should not happen */
-				error = EADDRNOTAVAIL;
-				break;
-			}
-			if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
-				/* XXX: should not happen */
-				error = EADDRNOTAVAIL;
-				break;
-			}
+		if (ifp && in6_setscope(&mreq->ipv6mr_multiaddr, ifp, NULL)) {
+			/* XXX: should not happen */
+			error = EADDRNOTAVAIL;
+			break;
 		} else if (mreq->ipv6mr_interface != 0) {
 			/*
 			 * This case happens when the (positive) index is in
@@ -3831,6 +3804,8 @@ ip6_setmoptions(optname, im6op, m)
 			error = EADDRNOTAVAIL;
 			break;	    
 		} else {	/* ipv6mr_interface == 0 */
+			struct sockaddr_in6 sa6_mc;
+
 			/*
 			 * The API spec says as follows:
 			 *  If the interface index is specified as 0, the
@@ -3841,10 +3816,14 @@ ip6_setmoptions(optname, im6op, m)
 			 * check if there's ambiguity with the default scope
 			 * zone as the last resort.
 			 */
-			if ((error = scope6_check_id(&sa6_mc,
-			    ip6_use_defzone)) != 0) {
+			bzero(&sa6_mc, sizeof(sa6_mc));
+			sa6_mc.sin6_family = AF_INET6;
+			sa6_mc.sin6_len = sizeof(sa6_mc);
+			sa6_mc.sin6_addr = mreq->ipv6mr_multiaddr;
+			error = sa6_embedscope(&sa6_mc, ip6_use_defzone);
+			if (error != 0)
 				break;
-			}
+			mreq->ipv6mr_multiaddr = sa6_mc.sin6_addr;
 		}
 
 		/*
@@ -3854,7 +3833,7 @@ ip6_setmoptions(optname, im6op, m)
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
 			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
-			    &sa6_mc.sin6_addr))
+			    &mreq->ipv6mr_multiaddr))
 				break;
 		}
 		if (imm == NULL) {
@@ -3875,11 +3854,6 @@ ip6_setmoptions(optname, im6op, m)
 		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, NULL);
 		if (error != 0)
 			break;
-		if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
-			/* XXX: should not happen */
-			error = EADDRNOTAVAIL;
-			break;
-		}
 		/* check for duplication */
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
@@ -4586,16 +4560,13 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
 				return (EINVAL);
 			}
-			if ((error = scope6_check_id(sa6, ip6_use_defzone))
+			if ((error = sa6_embedscope(sa6, ip6_use_defzone))
 			    != 0) {
 				return (error);
 			}
-#ifndef SCOPEDROUTING
-			sa6->sin6_scope_id = 0; /* XXX */
-#endif
 			break;
 		}
-		case AF_LINK:	/* should eventually be supported */
+		case AF_LINK:	/* eventually be supported? */
 		default:
 			return (EAFNOSUPPORT);
 		}
@@ -5078,7 +5049,8 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin6_grp->sin6_len = sizeof(*sin6_grp);
 		sin6_grp->sin6_family = AF_INET6;
 		sin6_grp->sin6_scope_id = SIN6(&greq->gr_group)->sin6_scope_id;
-
+		if ((error = sa6_embedscope(sin6_grp, 0)) != 0)
+			break;
 		if (!IN6_IS_ADDR_MULTICAST(&sin6_grp->sin6_addr)) {
 			error = EINVAL;
 			break;
@@ -5089,17 +5061,11 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		if (error)
 			break;
 
-		/* Fill in the scope zone ID */
-		if (in6_addr2zoneid(*ifp, &sin6_grp->sin6_addr,
-		    &sin6_grp->sin6_scope_id)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
+		if (sin6_grp->sin6_scope_id == 0 &&
+		    (error = in6_setscope(&sin6_grp->sin6_addr, *ifp, NULL))
+		    != 0) {
 			break;
 		}
-		if (in6_embedscope(&sin6_grp->sin6_addr, sin6_grp)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
-			break;
-		}
-
 		break;
 	    }
 
@@ -5133,15 +5099,13 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin6_grp->sin6_addr = SIN6(&gsreq->gsr_group)->sin6_addr;
 		sin6_grp->sin6_len = sizeof(*sin6_grp);
 		sin6_grp->sin6_family = AF_INET6;
-		sin6_grp->sin6_scope_id =SIN6(&gsreq->gsr_group)->sin6_scope_id;
-		/* Fill in the scope zone ID */
-		if (in6_addr2zoneid(*ifp, &sin6_grp->sin6_addr,
-		    &sin6_grp->sin6_scope_id)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
+		sin6_grp->sin6_scope_id =
+		    SIN6(&gsreq->gsr_group)->sin6_scope_id;
+		if ((error = sa6_embedscope(sin6_grp, 0)) != 0)
 			break;
-		}
-		if (in6_embedscope(&sin6_grp->sin6_addr, sin6_grp)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
+		if (sin6_grp->sin6_scope_id == 0 &&
+		    (error = in6_setscope(&sin6_grp->sin6_addr, *ifp, NULL))
+		    != 0) {
 			break;
 		}
 
@@ -5165,17 +5129,14 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin6_src->sin6_addr = SIN6(&gsreq->gsr_source)->sin6_addr;
 		sin6_src->sin6_len = sizeof(*sin6_src);
 		sin6_src->sin6_family = AF_INET6;
-
-		/* Fill in the scope zone ID */
-		if (in6_addr2zoneid(*ifp, &sin6_src->sin6_addr,
-		    &sin6_src->sin6_scope_id)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
+		sin6_src->sin6_scope_id =
+		    SIN6(&gsreq->gsr_source)->sin6_scope_id;
+		if ((error = sa6_embedscope(sin6_src, 0)) != 0)
 			break;
-		}
-		if (in6_embedscope(&sin6_src->sin6_addr, sin6_src)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
+		if (sin6_src->sin6_scope_id == 0 &&
+		    (error = in6_setscope(&sin6_src->sin6_addr, *ifp, NULL))
+		    != 0)
 			break;
-		}
 		if (IN6_IS_ADDR_MULTICAST(&sin6_src->sin6_addr) ||
 		    IN6_IS_ADDR_UNSPECIFIED(&sin6_src->sin6_addr)) {
 #ifdef MLDV2_DEBUG

@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.219 2005/06/09 02:16:11 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.220 2005/06/16 18:29:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -67,6 +67,7 @@
 
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
@@ -765,7 +766,7 @@ mip6_ifa_ifwithin6addr(in6, mipsc)
 	sin6.sin6_len = sizeof(sin6);
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_addr = *in6;
-	if (in6_recoverscope(&sin6, in6, (struct ifnet *)mipsc))
+	if (in6_setscope(&sin6.sin6_addr, (struct ifnet *)mipsc, NULL))
 		return (NULL);
 	return ((struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)&sin6));
 }
@@ -1280,6 +1281,7 @@ mip6_bc_proxy_control(target, local, cmd)
 	int cmd;
 {
 	struct sockaddr_in6 target_sa, local_sa, mask_sa;
+	struct in6_addr daddr;
 	struct sockaddr_dl *sdl;
         struct rtentry *rt, *nrt;
 	struct ifaddr *ifa;
@@ -1290,8 +1292,7 @@ mip6_bc_proxy_control(target, local, cmd)
 	bzero(&local_sa, sizeof(local_sa));
 	local_sa.sin6_len = sizeof(local_sa);
 	local_sa.sin6_family = AF_INET6;
-	/* XXX */ in6_recoverscope(&local_sa, local, NULL);
-	/* XXX */ in6_embedscope(&local_sa.sin6_addr, &local_sa);
+	local_sa.sin6_addr = *local;
 
 	ifa = ifa_ifwithaddr((struct sockaddr *)&local_sa);
 	if (ifa == NULL)
@@ -1302,17 +1303,6 @@ mip6_bc_proxy_control(target, local, cmd)
 	target_sa.sin6_len = sizeof(target_sa);
 	target_sa.sin6_family = AF_INET6;
 	target_sa.sin6_addr = *target;
-	if (in6_addr2zoneid(ifp, &target_sa.sin6_addr,
-		&target_sa.sin6_scope_id)) {
-		mip6log((LOG_ERR, "in6_addr2zoneid failed\n"));
-		return(EIO);
-	}
-	error = in6_embedscope(&target_sa.sin6_addr, &target_sa);
-	if (error != 0) {
-		return(error);
-	}
-	/* clear sin6_scope_id before looking up a routing table. */
-	target_sa.sin6_scope_id = 0;
 
 	switch (cmd) {
 	case RTM_DELETE:
@@ -1403,29 +1393,12 @@ mip6_bc_proxy_control(target, local, cmd)
 			    ip6_sprintf(target), error));
 		}
 
-		{
-			/* very XXX */
-			struct sockaddr_in6 daddr_sa;
-
-			bzero(&daddr_sa, sizeof(daddr_sa));
-			daddr_sa.sin6_family = AF_INET6;
-			daddr_sa.sin6_len = sizeof(daddr_sa);
-			daddr_sa.sin6_addr = in6addr_linklocal_allnodes;
-			if (in6_addr2zoneid(ifp, &daddr_sa.sin6_addr,
-			    &daddr_sa.sin6_scope_id)) {
-				/* XXX: should not happen */
-				mip6log((LOG_ERR, "in6_addr2zoneid failed\n"));
-				error = EIO; /* XXX */
-			}
-			if (error == 0) {
-				error = in6_embedscope(&daddr_sa.sin6_addr,
-				    &daddr_sa);
-			}
-			if (error == 0) {
-				nd6_na_output(ifp, &daddr_sa.sin6_addr,
-				    &target_sa.sin6_addr, ND_NA_FLAG_OVERRIDE,
-				    1, (struct sockaddr *)sdl);
-			}
+		daddr = in6addr_linklocal_allnodes;
+		if ((error = in6_setscope(&daddr, ifp, NULL)) != 0) {
+			mip6log((LOG_ERR, "in6_setscope failed\n"));
+		} else {
+			nd6_na_output(ifp, &daddr, &target_sa.sin6_addr,
+			    ND_NA_FLAG_OVERRIDE, 1, (struct sockaddr *)sdl);
 		}
 
 		break;

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.157 2005/05/12 18:41:18 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.158 2005/06/16 18:29:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,6 +79,7 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
@@ -134,7 +135,6 @@ nd6_ns_input(m, off, icmp6len)
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_neighbor_solicit *nd_ns;
 	struct in6_addr saddr6, daddr6, taddr6;
-	struct sockaddr_in6 taddr6sa;
 	char *lladdr = NULL;
 	struct ifaddr *ifa = NULL;
 	int lladdrlen = 0;
@@ -154,18 +154,13 @@ nd6_ns_input(m, off, icmp6len)
 		return;
 	}
 #endif
+	ip6 = mtod(m, struct ip6_hdr *); /* adjust pointer for safety */
 
 	saddr6 = ip6->ip6_src;
 	daddr6 = ip6->ip6_dst;
-
-	ip6 = mtod(m, struct ip6_hdr *); /* adjust pointer for safety */
-	bzero(&taddr6sa, sizeof(taddr6sa));
-	taddr6sa.sin6_family = AF_INET6;
-	taddr6sa.sin6_len = sizeof(struct sockaddr_in6);
-	taddr6sa.sin6_addr = nd_ns->nd_ns_target;
-	if (in6_addr2zoneid(ifp, &taddr6sa.sin6_addr, &taddr6sa.sin6_scope_id))
-		goto bad;	/* XXX: impossible */
-	in6_embedscope(&taddr6, &taddr6sa); /* XXX */
+	taddr6 = nd_ns->nd_ns_target;
+	if (in6_setscope(&taddr6, ifp, NULL) != 0)
+		goto bad;
 
 	if (ip6->ip6_hlim != 255) {
 		nd6log((LOG_ERR,
@@ -355,18 +350,12 @@ nd6_ns_input(m, off, icmp6len)
 	 * S bit ("solicited") must be zero.
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6)) {
-		struct sockaddr_in6 sa6_all;
+		struct in6_addr in6_all;
 
-		bzero(&sa6_all, sizeof(sa6_all));
-		sa6_all.sin6_family = AF_INET6;
-		sa6_all.sin6_len = sizeof(struct sockaddr_in6);
-		sa6_all.sin6_addr = in6addr_linklocal_allnodes;
-		if (in6_addr2zoneid(ifp, &sa6_all.sin6_addr,
-				    &sa6_all.sin6_scope_id)) {
-			goto bad; /* XXX impossible */
-		}
-		in6_embedscope(&sa6_all.sin6_addr, &sa6_all);
-		nd6_na_output(ifp, &sa6_all.sin6_addr, &taddr6,
+		in6_all = in6addr_linklocal_allnodes;
+		if (in6_setscope(&in6_all, ifp, NULL) != 0)
+			goto bad;
+		nd6_na_output(ifp, &in6_all, &taddr6,
 		    ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE) |
 		    (router ? ND_NA_FLAG_ROUTER : 0),
 		    tlladdr, (struct sockaddr *)proxydl);
@@ -412,7 +401,6 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	struct ip6_hdr *ip6;
 	struct nd_neighbor_solicit *nd_ns;
 	struct in6_addr *src, src_in;
-	struct sockaddr_in6 dst_sa;
 	struct ip6_moptions im6o;
 	int icmp6len;
 	int maxlen;
@@ -472,25 +460,19 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
 	/* determine the source and destination addresses */
-	bzero(&dst_sa, sizeof(dst_sa));
-	dst_sa.sin6_family = AF_INET6;
-	dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	if (daddr6)
-		dst_sa.sin6_addr = *daddr6;
+	if (daddr6 != NULL)
+		ip6->ip6_dst = *daddr6;
 	else {
-		dst_sa.sin6_addr.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
-		dst_sa.sin6_addr.s6_addr16[1] = 0;
-		dst_sa.sin6_addr.s6_addr32[1] = 0;
-		dst_sa.sin6_addr.s6_addr32[2] = IPV6_ADDR_INT32_ONE;
-		dst_sa.sin6_addr.s6_addr32[3] = taddr6->s6_addr32[3];
-		dst_sa.sin6_addr.s6_addr8[12] = 0xff;
-		if (in6_addr2zoneid(ifp, &dst_sa.sin6_addr,
-				    &dst_sa.sin6_scope_id)) {
-			goto bad; /* XXX */
-		}
-		in6_embedscope(&dst_sa.sin6_addr, &dst_sa); /* XXX */
+		ip6->ip6_dst.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
+		ip6->ip6_dst.s6_addr16[1] = 0;
+		ip6->ip6_dst.s6_addr32[1] = 0;
+		ip6->ip6_dst.s6_addr32[2] = IPV6_ADDR_INT32_ONE;
+		ip6->ip6_dst.s6_addr32[3] = taddr6->s6_addr32[3];
+		ip6->ip6_dst.s6_addr8[12] = 0xff;
+		if (in6_setscope(&ip6->ip6_dst, ifp, NULL) != 0)
+			goto bad;
 	}
-	ip6->ip6_dst = dst_sa.sin6_addr;
+
 	if (!dad) {
 		/*
 		 * RFC2461 7.2.2:
@@ -523,6 +505,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 		else {
 			int error;
 			struct ip6_pktopts *popts = NULL;
+			struct sockaddr_in6 dst_sa;
 #if defined(MIP6) && NMIP > 0
 			struct ip6_pktopts opts;
 
@@ -530,6 +513,12 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 			opts.ip6po_flags |= IP6PO_USECOA;
 			popts = &opts;
 #endif /* MIP6 && NMIP > 0 */
+
+			bzero(&dst_sa, sizeof(dst_sa));
+			dst_sa.sin6_family = AF_INET6;
+			dst_sa.sin6_len = sizeof(dst_sa);
+			dst_sa.sin6_addr = ip6->ip6_dst;
+
 			src = in6_selectsrc(&dst_sa,
 			    popts,
 			    NULL, &ro, NULL, NULL, &error);
@@ -553,18 +542,17 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 			if (ia6 == NULL)
 				goto bad;
 			if (ia6->ia6_flags & IN6_IFF_DEREGISTERING) {
-				dst_sa.sin6_addr.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
-				dst_sa.sin6_addr.s6_addr16[1] = 0;
-				dst_sa.sin6_addr.s6_addr32[1] = 0;
-				dst_sa.sin6_addr.s6_addr32[2] = IPV6_ADDR_INT32_ONE;
-				dst_sa.sin6_addr.s6_addr32[3] = taddr6->s6_addr32[3];
-				dst_sa.sin6_addr.s6_addr8[12] = 0xff;
-				if (in6_addr2zoneid(ifp, &dst_sa.sin6_addr,
-					&dst_sa.sin6_scope_id)) {
-					goto bad; /* XXX */
-				}
-				in6_embedscope(&dst_sa.sin6_addr, &dst_sa); /* XXX */
-				ip6->ip6_dst = dst_sa.sin6_addr;
+				ip6->ip6_dst.s6_addr16[0] =
+				    IPV6_ADDR_INT16_MLL;
+				ip6->ip6_dst.s6_addr16[1] = 0;
+				ip6->ip6_dst.s6_addr32[1] = 0;
+				ip6->ip6_dst.s6_addr32[2] =
+				    IPV6_ADDR_INT32_ONE;
+				ip6->ip6_dst.s6_addr32[3] =
+				    taddr6->s6_addr32[3];
+				ip6->ip6_dst.s6_addr8[12] = 0xff;
+				if (in6_setscope(&ip6->ip6_dst, ifp, NULL))
+					goto bad;
 				bzero(&src_in, sizeof(src_in));
 				src = &src_in;
 				dad = 1; /* XXX to set IPV6_UNSPECSRC */
@@ -669,7 +657,6 @@ nd6_na_input(m, off, icmp6len)
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_neighbor_advert *nd_na;
 	struct in6_addr taddr6;
-	struct sockaddr_in6 taddr6sa;
 	int flags;
 	int is_router;
 	int is_solicited;
@@ -706,14 +693,9 @@ nd6_na_input(m, off, icmp6len)
 	is_solicited = ((flags & ND_NA_FLAG_SOLICITED) != 0);
 	is_override = ((flags & ND_NA_FLAG_OVERRIDE) != 0);
 
-	bzero(&taddr6sa, sizeof(taddr6sa));
-	taddr6sa.sin6_family = AF_INET6;
-	taddr6sa.sin6_len = sizeof(taddr6);
-	taddr6sa.sin6_addr = nd_na->nd_na_target;
-	if (in6_addr2zoneid(ifp, &taddr6sa.sin6_addr, &taddr6sa.sin6_scope_id))
+	taddr6 = nd_na->nd_na_target;
+	if (in6_setscope(&taddr6, ifp, NULL))
 		return;		/* XXX: impossible */
-	if (in6_embedscope(&taddr6, &taddr6sa))
-		return;
 
 	if (IN6_IS_ADDR_MULTICAST(&taddr6)) {
 		nd6log((LOG_ERR,
@@ -978,9 +960,9 @@ nd6_na_input(m, off, icmp6len)
  * - anycast advertisement delay rule (RFC2461 7.2.7, SHOULD)
  */
 void
-nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
+nd6_na_output(ifp, daddr6_0, taddr6, flags, tlladdr, sdl0)
 	struct ifnet *ifp;
-	const struct in6_addr *daddr6, *taddr6;
+	const struct in6_addr *daddr6_0, *taddr6;
 	u_long flags;
 	int tlladdr;		/* 1 if include target link-layer address */
 	struct sockaddr *sdl0;	/* sockaddr_dl (= proxy NA) or NULL */
@@ -989,7 +971,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	struct ip6_hdr *ip6;
 	struct nd_neighbor_advert *nd_na;
 	struct ip6_moptions im6o;
-	struct in6_addr *src;
+	struct in6_addr *src, daddr6;
 	struct sockaddr_in6 dst_sa;
 	int icmp6len, maxlen, error;
 	caddr_t mac;
@@ -1005,6 +987,8 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 
 	mac = NULL;
 	bzero(&ro, sizeof(ro));
+
+	daddr6 = *daddr6_0;	/* make a local copy for modification */
 
 	/* estimate the size of message */
 	maxlen = sizeof(*ip6) + sizeof(*nd_na);
@@ -1030,7 +1014,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 		return;
 	m->m_pkthdr.rcvif = NULL;
 
-	if (IN6_IS_ADDR_MULTICAST(daddr6)) {
+	if (IN6_IS_ADDR_MULTICAST(&daddr6)) {
 		m->m_flags |= M_MCAST;
 		im6o.im6o_multicast_ifp = ifp;
 		im6o.im6o_multicast_hlim = 255;
@@ -1048,26 +1032,18 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
-	bzero(&dst_sa, sizeof(dst_sa));
-	dst_sa.sin6_family = AF_INET6;
-	dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	dst_sa.sin6_addr = *daddr6;
-	if (IN6_IS_ADDR_UNSPECIFIED(daddr6)) {
-		/* reply to DAD */
-		dst_sa.sin6_addr.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
-		dst_sa.sin6_addr.s6_addr16[1] = 0;
-		dst_sa.sin6_addr.s6_addr32[1] = 0;
-		dst_sa.sin6_addr.s6_addr32[2] = 0;
-		dst_sa.sin6_addr.s6_addr32[3] = IPV6_ADDR_INT32_ONE;
-		if (in6_addr2zoneid(ifp, &dst_sa.sin6_addr,
-		    &dst_sa.sin6_scope_id)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&daddr6)) {
+		daddr6.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
+		daddr6.s6_addr16[1] = 0;
+		daddr6.s6_addr32[1] = 0;
+		daddr6.s6_addr32[2] = 0;
+		daddr6.s6_addr32[3] = IPV6_ADDR_INT32_ONE;
+		if (in6_setscope(&daddr6, ifp, NULL))
 			goto bad;
-		}
-		in6_embedscope(&dst_sa.sin6_addr, &dst_sa); /* XXX */
 
 		flags &= ~ND_NA_FLAG_SOLICITED;
 	}
-	ip6->ip6_dst = dst_sa.sin6_addr;
+	ip6->ip6_dst = daddr6;
 
 	/*
 	 * Select a source whose scope is the same as that of the dest.
