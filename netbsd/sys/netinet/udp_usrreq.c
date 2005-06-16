@@ -574,7 +574,6 @@ udp6_sendup(m, off, src, so)
 	struct socket *so;
 {
 	struct mbuf *n, *opts = NULL;
-	struct sockaddr_in6 *src6 = (struct sockaddr_in6 *)src;
 	struct in6pcb *in6p = NULL;
 
 	if (!so)
