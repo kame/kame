@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.389 2005/06/16 20:58:40 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.390 2005/06/16 21:23:58 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -516,7 +516,7 @@ Typically, the following functions will be most generally used:
   interface 'ifp' into 'in6'.  If zoneidp is non NULL, *zoneidp will
   also have the zone ID.
 
-The typical usage of these functions are as follows:
+The typical usage of these functions is as follows:
 
 sa6_embedscope() will be used at the socket or transport layer to
 convert a sockaddr_in6 structure passed by an application into the
