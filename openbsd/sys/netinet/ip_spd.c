@@ -191,10 +191,10 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		sdst.sin6.sin6_family = ssrc.sin6.sin6_family = AF_INET6;
 		sdst.sin6.sin6_len = ssrc.sin6.sin6_family =
 		    sizeof(struct sockaddr_in6);
-		ssrc.sin6 = ddst->sen_ip6_src;
+		ssrc.sin6.sin6_addr = ddst->sen_ip6_src;
 		if ((*error = sa6_recoverscope(&ssrc.sin6)) != 0)
 			return NULL;
-		sdst.sin6 = ddst->sen_ip6_dst;
+		sdst.sin6.sin6_addr = ddst->sen_ip6_dst;
 		if ((*error = sa6_recoverscope(&sdst.sin6)) != 0)
 			return NULL;
 
