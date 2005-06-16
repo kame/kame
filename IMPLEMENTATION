@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.390 2005/06/16 21:23:58 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.391 2005/06/16 21:29:11 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -515,6 +515,8 @@ Typically, the following functions will be most generally used:
   Embed zone ID determined by the address scope type for 'in6' and the
   interface 'ifp' into 'in6'.  If zoneidp is non NULL, *zoneidp will
   also have the zone ID.
+
+  This function returns 0 on success, or a non-0 error code otherwise.
 
 The typical usage of these functions is as follows:
 
