@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2773 2005/06/16 21:02:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.2774 2005/06/16 22:34:44 jinmei Exp $
 
 <200506>
+2005-06-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_need_cache): perform NUD on PPP
+	interfaces.
+
 2005-06-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {kame,*bsd}/sys/(various files): revised scope-related
 	interfaces, clarifying the relationship between the
