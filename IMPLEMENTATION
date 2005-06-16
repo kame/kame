@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.391 2005/06/16 21:29:11 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.392 2005/06/16 21:30:52 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -560,7 +560,7 @@ sequence.
 
    sa6_embedscope(dst, ip6_use_defzone);
    in6_selectsrc(dst, ..., &ifp, ...);
-   in6_setscope(dst->sin6_addr, ifp, NULL);
+   in6_setscope(&dst->sin6_addr, ifp, NULL);
 
 sa6_embedscope() first tries to convert sin6_scope_id (or the default
 zone ID) into the kernel-internal form.  This can fail with an
