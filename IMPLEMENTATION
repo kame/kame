@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.387 2005/06/16 18:34:52 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.388 2005/06/16 19:36:39 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -478,6 +478,117 @@ eqauls to the interface index by the assumption of our
 implementation).  The embedded index enables us to identify IPv6
 link-local addresses over multiple links effectively and with only a
 little code change.
+
+The use of the internal format must be limited inside the kernel.  In
+particular, addresses sent by an application should not contain the
+embedded index (except via some very special APIs such as routing
+sockets).  Instead, the index should be specified in the sin6_scope_id
+field of a sockaddr_in6 structure.  Obviously, packets sent to or
+received from must not contain the embedded index either, since the
+index is meaningful only within the sending/receiving node.
+
+In order to deal with the differences, several kernel routines are
+provided.  These are available by including <netinet6/scope_var.h>.
+Typically, the following functions will be most generally used:
+
+- int sa6_embedscope(struct sockaddr_in6 *sa6, int defaultok);
+  Embed sa6->sin6_scope_id into sa6->sin6_addr.  If sin6_scope_id is
+  0, defaultok is non-0, and the default zone ID (see RFC4007) is
+  configured, the default ID will be used instead of the value of the
+  sin6_scope_id field.  On success, sa6->sin6_scope_id will be reset
+  to 0.
+
+  This function returns 0 on success, or a non-0 error code otherwise.
+ 
+- int sa6_recoverscope(struct sockaddr_in6 *sa6);
+  Extract embedded zone ID in sa6->sin6_addr and set
+  sa6->sin6_scope_id to that ID.  The embedded ID will be cleared with
+  0.
+
+  This function returns 0 on success, or a non-0 error code otherwise.
+
+- void in6_clearscope(struct in6_addr *in6);
+  Reset the embedded zone ID in 'in6' to 0.  This function never fails.
+
+- int in6_setscope(struct in6_addr *in6, struct ifnet *ifp,
+                   u_int32_t *zoneidp);
+  Embed zone ID determined by the address scope type for 'in6' and the
+  interface 'ifp' into 'in6'.  If zoneidp is non NULL, *zoneidp will
+  also have the zone ID.
+
+The typical usage of these functions are as follows:
+
+sa6_embedscope() will be used at the socket or transport layer to
+convert a sockaddr_in6 structure passed by an application into the
+kernel-internal form.  In this usage, the second argument is often the
+'ip6_use_defzone' global variable.
+
+sa6_recoverscope() will also be used at the socket or transport layer
+to convert an in6_addr structure with the embedded zone ID into a
+sockaddr_in6 structure with the corresponding ID in the sin6_scope_id
+field (and without the embedded ID in sin6_addr).
+
+in6_clearscope() will be used just before sending a packet to the wire
+to remove the embedded ID.  In general, this must be done at the last
+stage of an output path, since otherwise the address would lose the ID
+and could be ambiguous with regard to scope.
+
+in6_setscope() will be used when the kernel receives a packet from the
+wire to construct the kernel internal form for each address field in
+the packet (typical examples are the source and destination addresses
+of the packet).  In the typical usage, the third argument 'zoneidp'
+will be NULL.  A non-NULL value will be used when the validity of the
+zone ID must be checked, e.g., when forwarding a packet to another
+link (see ip6_forward() for this usage).
+
+An application, when sending a packet, is basically assumed to specify
+the appropriate scope zone of the destination address by the
+sin6_scope_id field (this might be done transparently from the
+application with getaddrinfo() and the extended textual format - see
+below), or at least the default scope zone(s) must be configured as a
+last resort.  In some cases, however, an application could specify an
+ambiguous address with regard to scope, expecting it is disambiguated
+in the kernel by some other means.  A typical usage is to specify the
+outgoing interface through another API, which can disambiguate the
+unspecified scope zone.  Such a usage is not recommended, but the
+kernel implements some trick to deal with even this case.
+
+A rough sketch of the trick can be summarized as the following
+sequence.
+
+   sa6_embedscope(dst, ip6_use_defzone);
+   in6_selectsrc(dst, ..., &ifp, ...);
+   in6_setscope(dst->sin6_addr, ifp, NULL);
+
+sa6_embedscope() first tries to convert sin6_scope_id (or the default
+zone ID) into the kernel-internal form.  This can fail with an
+ambiguous destination, but it still tries to get the outgoing
+interface (ifp) in the attempt of determining the source address of
+the outgoing packet using in6_selectsrc().  If the interface is
+detected, and the scope zone was originally ambiguous, in6_setscope()
+can finally determine the appropriate ID with the address itself and
+the interface, and construct the kernel-internal form.
+
+In any case, kernel routines except ones in netinet6/scope6.c MUST NOT
+directly refer to the embedded form.  They MUST use the above
+interface functions.  In particular, kernel routines MUST NOT have the
+following code fragment:
+
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+		sin6->sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+
+This is bad for several reasons.  First, address ambiguity is not
+specific to link-local addresses (any non-global multicast addresses
+are inherently ambiguous, and this is particularly true for
+interface-local addresses).  Secondly, this is vulnerable to future
+changes of the embedded form (the embedded position may change, or the
+zone ID may not actually be the interface index).  Only scope6.c
+routines should know the details.
+
+The above code fragment should thus actually be as follows:
+
+	in6_setscope(&sin6->sin6_addr, ifp, NULL);
+	(and catch errors if possible and necessary)
 
 1.3.2 Interaction with API
 
