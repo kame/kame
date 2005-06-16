@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.139 2005/06/16 18:29:28 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.140 2005/06/16 19:48:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -136,6 +136,7 @@
 
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/pim6.h>
