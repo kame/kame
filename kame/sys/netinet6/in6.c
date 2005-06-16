@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.391 2005/05/21 00:10:58 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.392 2005/06/16 07:33:16 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2504,6 +2504,9 @@ in6_if2idlen(ifp)
 #endif
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:	/* ditto */
+#endif
+#ifdef IFT_MIP
+	case IFT_MIP:	/* ditto */
 #endif
 		return (64);
 	case IFT_FDDI:		/* RFC2467 */
