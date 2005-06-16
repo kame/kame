@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.388 2005/06/16 19:36:39 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.389 2005/06/16 20:58:40 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -567,7 +567,8 @@ interface (ifp) in the attempt of determining the source address of
 the outgoing packet using in6_selectsrc().  If the interface is
 detected, and the scope zone was originally ambiguous, in6_setscope()
 can finally determine the appropriate ID with the address itself and
-the interface, and construct the kernel-internal form.
+the interface, and construct the kernel-internal form.  See, for
+example, comments in udp6_output() for more concrete example.
 
 In any case, kernel routines except ones in netinet6/scope6.c MUST NOT
 directly refer to the embedded form.  They MUST use the above
