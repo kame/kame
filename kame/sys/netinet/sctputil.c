@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.38 2005/06/16 18:29:25 jinmei Exp $	*/
+/*	$KAME: sctputil.c,v 1.39 2005/06/16 20:54:06 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -99,6 +99,7 @@
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__)
 #include <netinet6/in6_pcb.h>
