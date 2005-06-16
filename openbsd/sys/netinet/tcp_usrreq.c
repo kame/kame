@@ -822,7 +822,7 @@ tcp_ident(oldp, oldlenp, newp, newlen, dodrop)
 		 * intentionally disable using the default zone, since this is
 		 * for identification.
 		 */
-		if ((error = sa6_embedscope(sin6, 0)) != 0)
+		if ((error = sa6_embedscope(fin6, 0)) != 0)
 			return (error);
 		if (error)
 			return EINVAL;
