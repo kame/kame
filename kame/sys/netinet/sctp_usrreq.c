@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.49 2005/06/16 18:29:25 jinmei Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.50 2005/06/16 20:45:29 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -75,6 +75,7 @@
 #include <netinet/ip_var.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/scope6_var.h>
 
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
@@ -1297,7 +1298,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					}
 				} else if ((ifa->ifa_addr->sa_family == AF_INET6) &&
 					   (ipv6_addr_legal)) {
-					struct sockaddr_in6 *sin6, lsa6;
+					struct sockaddr_in6 *sin6;
 					sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 						/*
