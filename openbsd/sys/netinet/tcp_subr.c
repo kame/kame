@@ -97,6 +97,7 @@
 #ifdef INET6
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet6/scope6_var.h>
 #endif /* INET6 */
 
 #ifdef TCP_SIGNATURE
