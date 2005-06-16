@@ -4325,7 +4325,7 @@ key_ismyaddr6(sin6)
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
 		     (in6m) != NULL &&
-		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &in6);
+		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &sin6->sin6_addr);
 		     (in6m) = in6m->in6m_entry.le_next)
 			continue;
 #endif
