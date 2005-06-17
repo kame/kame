@@ -479,7 +479,7 @@ vlan_start(struct ifnet *ifp)
 			continue;
 		}
 
-#ifdef ALTQ
+#if 0 /* a residue of KAME ALTQ */
 		/*
 		 * If ALTQ is enabled on the parent interface, do
 		 * classification; the queueing discipline might

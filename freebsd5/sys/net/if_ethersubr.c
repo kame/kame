@@ -384,7 +384,7 @@ ether_output_frame(struct ifnet *ifp, struct mbuf *m)
 	}
 #endif
 
-#ifdef ALTQ
+#if 0  /* a residue of KAME ALTQ */
 	if (ALTQ_IS_ENABLED(&ifp->if_snd))
 		altq_etherclassify(&ifp->if_snd, m, &pktattr);
 #endif

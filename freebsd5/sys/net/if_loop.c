@@ -99,7 +99,7 @@ struct lo_softc {
 
 int		loioctl(struct ifnet *, u_long, caddr_t);
 static void	lortrequest(int, struct rtentry *, struct rt_addrinfo *);
-#ifdef ALTQ
+#if 0 /* a residue of KAME ALTQ */
 static void	lo_altqstart(struct ifnet *);
 #endif
 int		looutput(struct ifnet *ifp, struct mbuf *m,
@@ -152,7 +152,7 @@ lo_clone_create(ifc, unit)
 	sc->sc_if.if_type = IFT_LOOP;
 	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, ifqmaxlen);
 	IFQ_SET_READY(&sc->sc_if.if_snd);
-#ifdef ALTQ
+#if 0 /* a residue of KAME ALTQ */
 	sc->sc_if.if_start = lo_altqstart;
 #endif
 	sc->sc_if.if_softc = sc;
@@ -288,7 +288,7 @@ if_simloop(ifp, m, af, hlen)
 #endif
 	}
 
-#ifdef ALTQ
+#if 0  /* a residue of KAME ALTQ */
 	/*
 	 * altq for loop is just for debugging.
 	 * only used when called for loop interface (not for
@@ -316,7 +316,7 @@ if_simloop(ifp, m, af, hlen)
 		(*ifp->if_start)(ifp);
 		return (error);
 	}
-#endif /* ALTQ */
+#endif /* KAME ALTQ */
 
 	/* Deliver to upper layer protocol */
 	switch (af) {
@@ -352,7 +352,7 @@ if_simloop(ifp, m, af, hlen)
 	return (0);
 }
 
-#ifdef ALTQ
+#if 0 /* a residue of KAME ALTQ */
 static void
 lo_altqstart(ifp)
 	struct ifnet *ifp;
@@ -421,7 +421,7 @@ lo_altqstart(ifp)
 		schednetisr(isr);
 	}
 }
-#endif /* ALTQ */
+#endif /* KAME ALTQ */
 
 /* ARGSUSED */
 static void
