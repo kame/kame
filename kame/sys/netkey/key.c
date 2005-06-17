@@ -3134,6 +3134,8 @@ key_newsav(m, mhp, sah, errp)
 	if (mhp->msg->sadb_msg_type != SADB_GETSPI) {
 		*errp = key_setsaval(newsav, m, mhp);
 		if (*errp) {
+			if (newsav->spihash.le_prev || newsav->spihash.le_next)
+				LIST_REMOVE(newsav, spihash);
 			KFREE(newsav);
 			return NULL;
 		}
