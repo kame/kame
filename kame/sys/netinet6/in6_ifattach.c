@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.211 2005/06/16 23:13:35 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.212 2005/06/17 05:49:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -936,8 +936,8 @@ in6_ifattach(ifp, altifp)
 	 * Assign a link-local address, if there's none.
 	 * For some interfaces, we should not even try auto-configuring a
 	 * link-local address:
-	 * loopback: ::1 should be regarded as a link-local address
-	 *   (see http://www.atm.tut.fi/list-archive/ipng/msg02583.html)
+	 * loopback: ::1 can be regarded as a link-local address for this IF.
+	 *   (Section 2.5.3 of RFC3513)
 	 * PPP: interface identifier should be negotiated during IP6CP.
 	 */
 	if (ip6_auto_linklocal &&
