@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.8 2005/05/25 01:49:24 keiichi Exp $  */
+/*      $KAME: nemo_var.c,v 1.9 2005/06/20 08:37:30 ryuji Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -158,17 +158,23 @@ command_show_pt(s, dummy)
 
 #ifdef MIP_HA 
 struct nemo_hptable *
-nemo_hpt_get(prefix, prefixlen) 
+nemo_hpt_get(prefix, prefixlen, prefered_coa) 
 	struct in6_addr *prefix;
 	u_int8_t prefixlen;
+	struct in6_addr *prefered_coa;
 {
 	struct nemo_hptable *hpt;
 
 	LIST_FOREACH(hpt, &hpt_head, hpt_entry) {
 		if (prefixlen != hpt->hpt_prefixlen)
 			continue;
-		if (mip6_are_prefix_equal(&hpt->hpt_prefix, prefix, prefixlen))
-			return (hpt);
+		if (mip6_are_prefix_equal(&hpt->hpt_prefix, prefix, prefixlen)) {
+			if ((prefered_coa != NULL) &&
+				!IN6_ARE_ADDR_EQUAL(hoa, &hpt->hpt_hoa))
+				continue;
+			else 
+				return (hpt);
+		}
 	}
 
 	return (NULL);
@@ -267,7 +273,7 @@ nemo_parse_conf()
 		}
 #endif /* MIP_MN */
 #ifdef MIP_HA
-		hpt = nemo_hpt_get(&cfpt->cfpt_prefix, cfpt->cfpt_prefixlen);
+		hpt = nemo_hpt_get(&cfpt->cfpt_prefix, cfpt->cfpt_prefixlen, &cfpt->cfpt_homeaddress);
 		if (hpt) {
 			/* XXX update entry */
 		} else {

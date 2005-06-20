@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.16 2005/05/25 01:49:24 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.17 2005/06/20 08:37:30 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -533,7 +533,7 @@ struct nemo_mptable *nemo_mpt_get(struct mip6_hoainfo *,
 				struct in6_addr *, u_int8_t);
 struct nemo_mptable *nemo_mpt_add(struct mip6_hoainfo *, 
 				  struct in6_addr *, u_int8_t, int);
-struct nemo_hptable *nemo_hpt_get(struct in6_addr *, u_int8_t);
+struct nemo_hptable *nemo_hpt_get(struct in6_addr *, u_int8_t, struct in6_addr *);
 struct nemo_hptable *nemo_hpt_add(struct in6_addr *, struct in6_addr *, 
 				  u_int8_t, int);
 

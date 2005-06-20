@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.27 2005/05/24 10:16:19 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.28 2005/06/20 08:37:29 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -843,7 +843,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		 */
 		for (r = 0; r < mopt.opt_prefix_count; r ++) {
 			hpt = nemo_hpt_get(&mopt.opt_prefix[r]->ip6mopfx_pfx,
-					 mopt.opt_prefix[r]->ip6mopfx_pfxlen);
+					 mopt.opt_prefix[r]->ip6mopfx_pfxlen, hoa);
 
 			/* 
 			 * The requesting prefix is not
