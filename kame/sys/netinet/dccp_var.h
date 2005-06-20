@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.21 2005/02/10 04:25:38 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.22 2005/06/20 17:03:55 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -39,6 +39,26 @@
 #endif
 #endif
 
+typedef u_int64_t dccp_seq;
+
+#define DSEQ_TO_DHDR(x, y) { \
+	((struct dccplhdr *)x)->dh_seq  = htons(y >> 32);\
+	((struct dccplhdr *)x)->dh_seq2 = htonl(y & 4294967295U);\
+}
+
+#define DHDR_TO_DSEQ(x, y) { \
+	x = ((u_int64_t)ntohs(((struct dccplhdr *)y)->dh_seq) << 32) | ntohl((struct dccplhdr *)y->dh_seq2);\
+}
+
+#define DSEQ_TO_DAHDR(x, y) { \
+	((struct dccp_acksublhdr)x).dah_ack  = htons(y >> 32);\
+	((struct dccp_acksublhdr)x).dah_ack2 = htonl(y & 4294967295U);\
+}
+
+#define DAHDR_TO_DSEQ(x, y) { \
+	x = ((u_int64_t)ntohs(((struct dccp_acksublhdr)y).dah_ack) << 32) | ntohl(((struct dccp_acksublhdr)y).dah_ack2);\
+}
+
 struct dccpcb {
 	u_int8_t	state; /* initial, listening, connecting, established,
 				  closing, closed etc */
@@ -58,13 +78,13 @@ struct dccpcb {
 
 	u_int32_t	retrans;
 
-	u_int32_t	seq_snd;
-	u_int32_t	ack_snd; /* ack num to send in Ack or DataAck packet */
-	u_int32_t	gsn_rcv; /* Greatest received sequence number */
+	dccp_seq	seq_snd;
+	dccp_seq	ack_snd; /* ack num to send in Ack or DataAck packet */
+	dccp_seq	gsn_rcv; /* Greatest received sequence number */
 
 	/* values representing last incoming packet. are set in dccp_input */
-	u_int32_t	seq_rcv;	/* Seq num of received packet */
-	u_int32_t	ack_rcv;	/* Ack num received in Ack or DataAck packet */
+	dccp_seq	seq_rcv;	/* Seq num of received packet */
+	dccp_seq	ack_rcv;	/* Ack num received in Ack or DataAck packet */
 	u_int8_t	type_rcv;	/* Type of packet received */
 	u_int32_t	len_rcv;	/* Length of data received */
 	u_int8_t	ndp_rcv;	/* ndp value of received packet */
@@ -94,9 +114,11 @@ struct dccpcb {
 	u_char *ackvector;  /* For acks, 2 bits per packet */
 	u_char *av_hp;	/* head ptr for ackvector */
 	u_int16_t av_size;
-	u_int32_t av_hs, av_ts; /* highest/lowest seq no in ackvector */
+	dccp_seq av_hs, av_ts; /* highest/lowest seq no in ackvector */
 	
 	u_int8_t remote_ackvector; /* Is recv side using AckVector? */
+	u_char      shortseq; /* use short seq number */
+	u_int32_t		sname; /* service core */
 #ifndef __FreeBSD__
 #ifndef INP_IPV6
 #define INP_IPV6	0x1
@@ -200,8 +222,8 @@ extern const char *dccpstates[];
 #define DCCP_SERVER	2
 #define DCCP_CLIENT	3
 
-#define DCCP_SEQ_LT(a, b)	((int)(((a) << 8) - ((b) << 8)) < 0)
-#define DCCP_SEQ_GT(a, b)	((int)(((a) << 8) - ((b) << 8)) > 0)
+#define DCCP_SEQ_LT(a, b)	((int)(((a) << 16) - ((b) << 16)) < 0)
+#define DCCP_SEQ_GT(a, b)	((int)(((a) << 16) - ((b) << 16)) > 0)
 
 /*
  * Names for DCCP sysctl objects

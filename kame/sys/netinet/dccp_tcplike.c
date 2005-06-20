@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.16 2005/02/10 09:27:55 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.17 2005/06/20 17:03:55 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -70,12 +70,12 @@
 #include <netinet/dccp.h>
 #include <netinet/dccp_var.h>
 
-#define TCPLIKE_DEBUG(args)
+#define TCPLIKE_DEBUG(args) dccp_log args
 #define MALLOC_DEBUG(args) log args
-#define CWND_DEBUG(args)
-#define ACKRATIO_DEBUG(args)
-#define LOSS_DEBUG(args)
-#define TIMEOUT_DEBUG(args)
+#define CWND_DEBUG(args) dccp_log args
+#define ACKRATIO_DEBUG(args) dccp_log args
+#define LOSS_DEBUG(args) dccp_log args
+#define TIMEOUT_DEBUG(args) dccp_log args
 
 #if !defined(__FreeBSD__) || __FreeBSD_version < 500000
 #define	INP_INFO_LOCK_INIT(x,y)
@@ -95,21 +95,21 @@
 
 void tcplike_rto_timeout(void *);
 void tcplike_rtt_sample(struct tcplike_send_ccb *, u_int16_t);
-void _add_to_cwndvector(struct tcplike_send_ccb *, u_int32_t);
-void _remove_from_cwndvector(struct tcplike_send_ccb *, u_int32_t);
-int _chop_cwndvector(struct tcplike_send_ccb *, u_int32_t);
+void _add_to_cwndvector(struct tcplike_send_ccb *, u_int64_t);
+void _remove_from_cwndvector(struct tcplike_send_ccb *, u_int64_t);
+int _chop_cwndvector(struct tcplike_send_ccb *, u_int64_t);
 int _cwndvector_size(struct tcplike_send_ccb *);
-u_char _cwndvector_state(struct tcplike_send_ccb *, u_int32_t);
+u_char _cwndvector_state(struct tcplike_send_ccb *, u_int64_t);
 
 void tcplike_send_term(void *);
 void tcplike_recv_term(void *);
 
-void _avlist_add(struct tcplike_recv_ccb *, u_int32_t, u_int32_t);
-u_int32_t _avlist_get(struct tcplike_recv_ccb *, u_int32_t);
+void _avlist_add(struct tcplike_recv_ccb *, u_int64_t, u_int64_t);
+u_int64_t _avlist_get(struct tcplike_recv_ccb *, u_int64_t);
 
 /* extern Ack Vector functions */
 extern void dccp_use_ackvector(struct dccpcb *);
-extern void dccp_update_ackvector(struct dccpcb *, u_int32_t);
+extern void dccp_update_ackvector(struct dccpcb *, u_int64_t);
 extern void dccp_increment_ackvector(struct dccpcb *, u_int32_t);
 extern u_int16_t dccp_generate_ackvector(struct dccpcb *, u_char *);
 extern u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
@@ -364,7 +364,7 @@ tcplike_send_packet(void *ccb, long datasize)
 
 	if (cb->cwnd <= cb->outstanding) {
 		/* May not send. trigger RTO */
-		/*TIMEOUT_DEBUG((LOG_INFO, "cwnd (%d) < outstanding (%d)\n", cb->cwnd, cb->outstanding));*/
+		TIMEOUT_DEBUG((LOG_INFO, "cwnd (%d) < outstanding (%d)\n", cb->cwnd, cb->outstanding));
 		if (!cb->rto_timer_callout) {
 			LOSS_DEBUG((LOG_INFO, "Trigger TCPlike RTO timeout timer. Ticks = %u\n", cb->rto));
 			ticks = (long)cb->rto;
@@ -462,7 +462,7 @@ tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize)
 void
 tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 {
-	u_int32_t acknum, lastok;
+	dccp_seq acknum, lastok;
 	u_int16_t numlostpackets, avsize, i, prev_size;
 	u_int8_t length, state, numokpackets, ackratiocnt;
 	u_char av[10];
@@ -723,7 +723,8 @@ tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 int
 _cwndvector_size(struct tcplike_send_ccb *cb)
 {
-	u_int32_t gap, offset, seqnr, cnt;
+	u_int64_t gap, offset, seqnr;
+	u_int32_t cnt;
 	u_char *t;
 
 	TCPLIKE_DEBUG((LOG_INFO, "Enter cwndvector_size\n"));
@@ -743,9 +744,9 @@ _cwndvector_size(struct tcplike_send_ccb *cb)
 }
 
 u_char
-_cwndvector_state(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+_cwndvector_state(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 {
-	u_int32_t gap, offset;
+	u_int64_t gap, offset;
 	u_char *t;
 
 	/* Check for wrapping */
@@ -753,8 +754,8 @@ _cwndvector_state(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 		/* Not wrapped */
 		gap = seqnr - cb->cv_hs;
 	} else {
-		/* Wrapped */
-		gap = seqnr + 0x1000000 - cb->cv_hs; /* seq nr = 24 bits */
+		/* Wrapped XXXXX */
+		gap = seqnr + 0x1000000000000LL - cb->cv_hs; /* seq nr = 48 bits */
 	}
 
 	if (gap >= cb->cv_size) {
@@ -771,10 +772,9 @@ _cwndvector_state(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 }
 
 void
-_add_to_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+_add_to_cwndvector(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 {
-	u_int32_t offset, dc;
-	int32_t gap;
+	u_int64_t offset, dc, gap;
 	u_char *t, *n;
 	
 	TCPLIKE_DEBUG((LOG_INFO, "Entering add_to_cwndvector\n"));
@@ -832,10 +832,10 @@ _add_to_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 }
 
 void
-_remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+_remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 {
-	u_int32_t offset;
-	int32_t gap;
+	u_int64_t offset;
+	int64_t gap;
 	u_char *t;
 	
 	TCPLIKE_DEBUG((LOG_INFO, "Entering remove_from_cwndvector\n"));
@@ -868,9 +868,9 @@ _remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 }
 
 int
-_chop_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+_chop_cwndvector(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 {
-	int32_t gap, bytegap;
+	int64_t gap, bytegap;
 	u_char *t;
 
 	CWND_DEBUG((LOG_INFO,"Chop cwndvector at: %u\n", seqnr));
@@ -1027,7 +1027,7 @@ tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 	/* We are only interested in acks-on-acks here.
 	 * The "real" ack handling is done be the sender */
 	if (avsize == 0 && cb->pcb->ack_rcv) {
-		u_int32_t ackthru;
+		u_int64_t ackthru;
 		/* We got an Ack without an ackvector.
 		 * This would mean it's an ack on an ack.
 		 */
@@ -1091,7 +1091,7 @@ tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 }
 
 void
-_avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackthru)
+_avlist_add(struct tcplike_recv_ccb *cb, u_int64_t localseq, u_int64_t ackthru)
 {
 	struct ack_list *a;
 	ACK_DEBUG((LOG_INFO,"Adding localseq %u - ackthru %u to avlist\n", localseq, ackthru));
@@ -1113,11 +1113,11 @@ _avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackthru)
  * Searches the av_list. if 'localseq' found, drop it from list and return
  * ackthru
  */
-u_int32_t
-_avlist_get(struct tcplike_recv_ccb *cb, u_int32_t localseq)
+u_int64_t
+_avlist_get(struct tcplike_recv_ccb *cb, u_int64_t localseq)
 {
 	struct ack_list *a, *n, *p;
-	u_int32_t ackthru;
+	u_int64_t ackthru;
 
 	ACK_DEBUG((LOG_INFO,"Getting localseq %u from avlist\n", localseq));
 	a = cb->av_list;

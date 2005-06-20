@@ -1,4 +1,4 @@
-/*	$KAME: dccp.h,v 1.5 2005/02/10 04:25:38 itojun Exp $	*/
+/*	$KAME: dccp.h,v 1.6 2005/06/20 17:03:54 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -44,50 +44,85 @@ struct dccphdr {
 	u_int8_t	dh_off;		/* Data offset */
 #if BYTE_ORDER == LITTLE_ENDIAN
 	u_int8_t	dh_cscov:4,	/* Checksum Length */
-			dh_ccval:4;	/* Number of non data packets */
+				dh_ccval:4;	/* Number of non data packets */
 #else
 	u_int8_t	dh_ccval:4,
-			dh_cscov:4;
+				dh_cscov:4;
 #endif
 	u_short		dh_sum;		/* Checksum */
 
 #if BYTE_ORDER == LITTLE_ENDIAN
-	u_int32_t	dh_res:3,	/* Reserved */
-			dh_type:4,	/* Type of message */
-			dh_x:1,		/* long/short sequence number */
-			dh_seq:24;	/* Sequence number */
-#else
 	u_int32_t	dh_x:1,		/* long/short sequence number */
-			dh_type:4,
-			dh_res:3,
-			dh_seq:24;	
+				dh_type:4,
+				dh_res:3,
+				dh_seq:24;	/* Sequence number */
+#else
+	u_int32_t	dh_res:3,	/* Reserved */
+				dh_type:4,	/* Type of message */
+				dh_x:1,		/* long/short sequence number */
+				dh_seq:24;	
 #endif
-	/*u_int32_t	dh_seq2;*/
 };
+
+struct dccplhdr {
+	u_short		dh_sport;	/* source port */
+	u_short		dh_dport;	/* destination port */
+
+	u_int8_t	dh_off;		/* Data offset */
+#if BYTE_ORDER == LITTLE_ENDIAN
+	u_int8_t	dh_cscov:4,	/* Checksum Length */
+				dh_ccval:4;	/* Number of non data packets */
+#else
+	u_int8_t	dh_ccval:4,
+				dh_cscov:4;
+#endif
+	u_short		dh_sum;		/* Checksum */
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+	u_int8_t	dh_x:1,		/* long/short sequence number */
+				dh_type:4,
+				dh_res:3;
+#else
+	u_int8_t	dh_res:3,	/* Reserved */
+				dh_type:4,	/* Type of message */
+				dh_x:1;		/* long/short sequence number */
+#endif
+	u_int8_t	dh_res2;	
+	u_int16_t	dh_seq;	
+	u_int32_t	dh_seq2;	/* long sequence number */
+};
+
 
 struct dccp_requesthdr {
 	u_int32_t	drqh_sname;	/* Service Name */
 };
 
-struct dccp_ackhdr {
+struct dccp_acksubhdr { 
 #if BYTE_ORDER == LITTLE_ENDIAN
-	u_int32_t	dah_res:8,	/* Reserved */
-			dah_ack:24;	/* Acknowledgement number */
+	u_int32_t	dah_res:8,  /* Reserved */
+				dah_ack:24; /* Acknowledgement number */
 #else
 	u_int32_t	dah_ack:24,
-			dah_res:8;
+				dah_res:8;
 #endif
 };
 
+struct dccp_acksublhdr {
+	u_int16_t	dah_res; /* Reserved */
+	u_int16_t	dah_ack; /* Acknowledgement number */
+	u_int32_t   dah_ack2;
+};
+
+struct dccp_ackhdr {
+	struct dccp_acksubhdr   dash;
+};
+ 
+struct dccp_acklhdr {
+	struct dccp_acksublhdr  dash;
+};
 
 struct dccp_resethdr {
-#if BYTE_ORDER == LITTLE_ENDIAN
-	u_int32_t	drth_res:8,	/* Reserved */
-			drth_ack:24;	/* Acknowledgement number */
-#else
-	u_int32_t	drth_ack:24,
-			drth_res:8;
-#endif
+	struct dccp_acksublhdr  drth_dash;
 	u_int8_t	drth_reason;	/* Reason */
 	u_int8_t	drth_data1;	/* Data 1 */
 	u_int8_t	drth_data2;	/* Data 2 */

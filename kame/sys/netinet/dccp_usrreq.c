@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.51 2005/05/16 17:50:56 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.52 2005/06/20 17:03:55 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -214,10 +214,10 @@ void dccp_timewait_t(void *);
 /* Ack Vector functions */
 #define DCCP_VECTORSIZE 512 /* initial ack and cwnd-vector size. Multiple of 8 ! */
 void dccp_use_ackvector(struct dccpcb *);
-void dccp_update_ackvector(struct dccpcb *, u_int32_t);
-void dccp_increment_ackvector(struct dccpcb *, u_int32_t);
+void dccp_update_ackvector(struct dccpcb *, u_int64_t);
+void dccp_increment_ackvector(struct dccpcb *, u_int64_t);
 u_int16_t dccp_generate_ackvector(struct dccpcb *, u_char *);
-u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
+u_char dccp_ackvector_state(struct dccpcb *, u_int64_t);
 
 /*
  * DCCP initialization
@@ -262,6 +262,7 @@ dccp_input(struct mbuf *m, ...)
 	int iphlen;
 	struct ip *ip = NULL;
 	struct dccphdr *dh;
+	struct dccplhdr *dlh;
 	struct inpcb *inp = NULL, *oinp = NULL;
 #ifdef __NetBSD__
 	struct in6pcb *in6p = NULL, *oin6p = NULL;
@@ -270,6 +271,7 @@ dccp_input(struct mbuf *m, ...)
 	struct ipovly *ipov = NULL;
 	struct dccp_requesthdr *drqh;
 	struct dccp_ackhdr *dah = NULL;
+	struct dccp_acklhdr *dalh = NULL;
 	struct dccp_resethdr *drth;
 	struct socket *so;
 	u_char *optp = NULL;
@@ -278,8 +280,10 @@ dccp_input(struct mbuf *m, ...)
 	struct ip save_ip;
 	char options[DCCP_MAX_OPTIONS];
 	char test[2];
-	u_int32_t cslen, seqnr, low_seqnr, high_seqnr;
+	u_int32_t cslen;
+	dccp_seq seqnr, low_seqnr, high_seqnr;
 	int isipv6 = 0;
+	int is_shortseq; /* Is this shortseq packet? */ 
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
 #endif
@@ -353,8 +357,18 @@ dccp_input(struct mbuf *m, ...)
 		}
 #endif
 	}
-
-	DCCP_DEBUG((LOG_INFO, "Header info: cslen = %u, off = %u, type = %u, reserved = %u, seq = %lu\n", dh->dh_cscov, dh->dh_off, dh->dh_type, dh->dh_res, (unsigned long)ntohl(dh->dh_seq << 8)));
+	dlh = (struct dccplhdr*)dh;	
+	is_shortseq = !dh->dh_x;
+	
+	if (!is_shortseq)
+		DCCP_DEBUG((LOG_INFO, 
+		"Header info: cslen = %u, off = %u, type = %u, reserved = %u, seq = %u.%lu\n",
+			 dlh->dh_cscov, dlh->dh_off, dlh->dh_type, dlh->dh_res, ntohs(dlh->dh_seq),
+			 (unsigned long)ntohl(dlh->dh_seq2)));
+	else
+		DCCP_DEBUG((LOG_INFO, 
+		"Header info(short): cslen = %u, off = %u, type = %u, reserved = %u, seq = %u\n", 
+			dh->dh_cscov, dh->dh_off, dh->dh_type, dh->dh_res, ntohl(dh->dh_seq)));
 
 	/*
 	 * Make mbuf data length reflect DCCP length.
@@ -470,7 +484,14 @@ dccp_input(struct mbuf *m, ...)
 		    INPLOOKUP_WILDCARD);
 #endif
 	}
+#ifdef __NetBSD__
+	if (isipv6)
+		DCCP_DEBUG((LOG_INFO, "in6p=%p\n", in6p));
+	else
+		DCCP_DEBUG((LOG_INFO, "inp=%p\n", inp));
+#else
 	DCCP_DEBUG((LOG_INFO, "inp=%p\n", inp));
+#endif
 
 #ifdef __NetBSD__
 	if (isipv6 ? in6p == NULL : inp == NULL) {
@@ -635,7 +656,7 @@ dccp_input(struct mbuf *m, ...)
 			dp->cslen = ((struct dccpcb *)oinp->inp_ppcb)->cslen;
 			dp->avgpsize = ((struct dccpcb *)oinp->inp_ppcb)->avgpsize;
 		}
-		dp->seq_snd = arc4random() % 16777216;
+		dp->seq_snd = (((u_int64_t)arc4random() << 32) | arc4random()) % 281474976710656LL;
 		INP_UNLOCK(oinp);
 		DCCP_DEBUG((LOG_INFO, "New dp = %u, dp->state = %u!\n", (int)dp, dp->state));
 	}
@@ -645,19 +666,25 @@ dccp_input(struct mbuf *m, ...)
 	/*
 	 * Check if sequence number is inside the loss window 
 	 */
-
-	seqnr = ntohl(dh->dh_seq << 8);
-	
-	if (dp->gsn_rcv == 1073741824)	{
-		dp->gsn_rcv = seqnr;
+	if (!is_shortseq) { 
+		DHDR_TO_DSEQ(seqnr, dlh)
+	} else {
+		/* shortseq */
+		seqnr = convert_longseq(ntohl(dh->dh_seq));
 	}
 
-	low_seqnr = (dp->gsn_rcv - (dp->loss_window / 3)) % 16777216;
-	high_seqnr = (dp->gsn_rcv + (dp->loss_window / 3 * 2)) % 16777216;
+	DCCP_DEBUG((LOG_INFO, "Received DCCP packet with sequence number = %llu , gsn_rcv %llu\n", seqnr, dp->gsn_rcv));
+
+	if (dp->gsn_rcv == 281474976710656LL) dp->gsn_rcv = seqnr;
+	if (dp->gsn_rcv > (dp->loss_window / 4))
+		low_seqnr = (dp->gsn_rcv - (dp->loss_window / 4)) % 281474976710656LL;
+	else
+		low_seqnr = 0ll;
+	high_seqnr = (dp->gsn_rcv + (dp->loss_window / 4 * 3)) % 281474976710656LL;
 
 	if (! (DCCP_SEQ_GT(seqnr, low_seqnr) && DCCP_SEQ_LT(seqnr, high_seqnr))) {
 		dccpstat.dccps_badseq++;
-		DCCP_DEBUG((LOG_INFO, "Recieved DCCP packet with bad sequence number = %u (low_seqnr = %u, high_seqnr = %u)\n", seqnr, low_seqnr, high_seqnr));
+		DCCP_DEBUG((LOG_INFO, "Recieved DCCP packet with bad sequence number = %llu (low_seqnr = %llu, high_seqnr = %llu)\n", seqnr, low_seqnr, high_seqnr));
 		INP_UNLOCK(inp);
 		goto badunlocked;
 	}
@@ -667,21 +694,38 @@ dccp_input(struct mbuf *m, ...)
 		dp->gsn_rcv = seqnr;
 
 	/* Just ignore DCCP-Move for now */
-	if (dh->dh_type == DCCP_TYPE_DATA) {
+	if (dlh->dh_type == DCCP_TYPE_DATA) {
 		extrah_len = 0;
-		optp = (u_char *)(dh + 1);
+		optp = (u_char *)(dlh + 1);
 	} else if (dh->dh_type == DCCP_TYPE_REQUEST) {
-		drqh = (struct dccp_requesthdr *)(dh + 1);
+		drqh = (struct dccp_requesthdr *)(dlh + 1);
+		dp->sname =  drqh->drqh_sname;
 		optp = (u_char *)(drqh + 1);
 		extrah_len = 4;
 	} else if (dh->dh_type == DCCP_TYPE_RESET) {
 		extrah_len = 8 ;
-		drth = (struct dccp_resethdr *)(dh + 1);
+		drth = (struct dccp_resethdr *)(dlh + 1);
 		optp = (u_char *)(drth + 1);
 	} else {
-		extrah_len = 4;
-		dah = (struct dccp_ackhdr *)(dh + 1);
-		optp = (u_char *)(dah + 1);
+		if (!is_shortseq){
+			extrah_len = 8;
+			dalh = (struct dccp_acklhdr *)(dlh + 1);
+			if (dh->dh_type == DCCP_TYPE_RESPONSE) {
+				extrah_len += 4;
+				drqh = (struct dccp_requesthdr *)(dalh + 1);
+				if (drqh->drqh_sname != dp->sname){
+					DCCP_DEBUG((LOG_INFO, "service code in response packet doesn't match!\n"));
+					INP_UNLOCK(inp);
+					goto badunlocked;
+				}
+				optp = (u_char *)(drqh + 1);
+			} else 
+				optp = (u_char *)(dalh + 1);
+		} else {
+			extrah_len = 4;
+			dah = (struct dccp_ackhdr *)(dlh + 1);
+			optp = (u_char *)(dah + 1);
+		}
 
 	}
 
@@ -692,7 +736,10 @@ dccp_input(struct mbuf *m, ...)
 	dp->type_rcv = dh->dh_type;
 	dp->len_rcv = m->m_len - data_off - iphlen; /* Correct length ? */
 	
-	optlen = data_off - (sizeof(struct dccphdr) + extrah_len);
+	if (!is_shortseq)
+		optlen = data_off - (sizeof(struct dccplhdr) + extrah_len);
+	else
+		optlen = data_off - (sizeof(struct dccphdr) + extrah_len);
 
 	if (optlen < 0) {
 		DCCP_DEBUG((LOG_INFO, "Data offset is smaller then it could be, optlen = %i data_off = %i, m_len = %i, iphlen = %i extrah_len = %i !\n", optlen, data_off, m->m_len, iphlen, extrah_len));
@@ -768,7 +815,7 @@ dccp_input(struct mbuf *m, ...)
 		switch (dh->dh_type) {
 		case DCCP_TYPE_RESPONSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REPSONSE\n"));
-			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
+			DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			dp->ack_snd = dp->seq_rcv;
 
 #ifdef __OpenBSD__
@@ -835,7 +882,12 @@ dccp_input(struct mbuf *m, ...)
 			callout_stop(&dp->connect_timer);
 #endif
 
-			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
+			if (!is_shortseq) {
+				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
+			} else {
+				/* shortseq */
+				dp->ack_rcv = ntohl(dah->dash.dah_ack << 8); /* Ack num */
+			} 
 
 			if (dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0) {
 				DCCP_DEBUG((LOG_INFO, "Setting DCCPS_ESTAB & soisconnected\n"));
@@ -893,7 +945,13 @@ dccp_input(struct mbuf *m, ...)
 	
 		case DCCP_TYPE_ACK:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP ACK\n"));
-			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
+			if (!is_shortseq) {
+				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
+			} else {
+				/* shortseq XXX */
+				dp->ack_rcv = ntohl(dah->dash.dah_ack << 8); /* Ack num */
+			} 
+
 			if (dp->cc_in_use[1] > 0) {
 				/* This is called so Acks on Acks can be handled */
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
@@ -903,7 +961,14 @@ dccp_input(struct mbuf *m, ...)
 	
 		case DCCP_TYPE_DATAACK:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP DATAACK\n"));
-			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
+
+			if (!is_shortseq) {
+				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
+			} else {
+				/* shortseq XXX */
+				dp->ack_rcv = ntohl(dah->dash.dah_ack << 8); /* Ack num */
+			} 
+
 			if (dp->cc_in_use[1] > 0) {
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
@@ -1449,8 +1514,10 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 
 	struct ip *ip = NULL;
 	struct dccphdr *dh;
+	struct dccplhdr *dlh;
 	struct dccp_requesthdr *drqh;
 	struct dccp_ackhdr *dah;
+	struct dccp_acklhdr *dalh;
 	struct dccp_resethdr *drth;
 	u_char *optp = NULL;
 	int error = 0;
@@ -1460,6 +1527,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	char options[DCCP_MAX_OPTIONS *2];
 	long len;
 	int isipv6 = 0;
+	int use_shortseq = 0;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
 #endif
@@ -1523,32 +1591,48 @@ again:
 
 	if (extra == DCCP_TYPE_RESET + 2) {
 		DCCP_DEBUG((LOG_INFO, "Force sending of DCCP TYPE_RESET!\n"));
+		DCCP_DEBUG((LOG_INFO, "Force sending of DCCP TYPE_RESET! %llu\n", dp->seq_snd));
 		type = DCCP_TYPE_RESET;
-		extrah_len = 8;
+		extrah_len = 12; 
 	} else if (dp->state <= DCCPS_REQUEST && dp->who == DCCP_CLIENT) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_REQUEST!\n"));
 		type = DCCP_TYPE_REQUEST;
 		dp->state = DCCPS_REQUEST;
-		extrah_len = 4;
+		extrah_len = 4; 
 	} else if (dp->state == DCCPS_REQUEST && dp->who == DCCP_SERVER) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_RESPONSE!\n"));
 		type = DCCP_TYPE_RESPONSE;
 		dp->state = DCCPS_RESPOND;
-		extrah_len = 4;
+		extrah_len = 12; 
 	} else if (dp->state == DCCPS_RESPOND) {
 		DCCP_DEBUG((LOG_INFO, "Still in feature neg, sending DCCP TYPE_ACK!\n"));
 		type = DCCP_TYPE_ACK;
-		extrah_len = 4;
+		if (!dp->shortseq)
+			extrah_len = 8;
+		else {
+			extrah_len = 4;
+			use_shortseq = 1;
+		}
 	} else if (dp->state == DCCPS_ESTAB) {
 		if (dp->ack_snd && len) {
 			DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_DATAACK!\n"));
 			type = DCCP_TYPE_DATAACK;
 			/*(u_int32_t *)&extrah = dp->seq_rcv; */
-			extrah_len = 4;
+			if (!dp->shortseq)
+				extrah_len = 8;
+			else {
+				extrah_len = 4;
+				use_shortseq = 1;
+			}
 		} else if (dp->ack_snd) {
 			DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_ACK!\n"));
 			type = DCCP_TYPE_ACK;
-			extrah_len = 4;
+			if (!dp->shortseq)
+				extrah_len = 8;
+			else {
+				extrah_len = 4;
+				use_shortseq = 1;
+			}
 		} else if (len) {
 			DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_DATA!\n"));
 			type = DCCP_TYPE_DATA;
@@ -1560,11 +1644,11 @@ again:
 	} else if (dp->state == DCCPS_CLIENT_CLOSE) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_CLOSE!\n"));
 		type = DCCP_TYPE_CLOSE;
-		extrah_len = 4;
+		extrah_len = 8;
 	} else if (dp->state == DCCPS_SERVER_CLOSE) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_CLOSEREQ!\n"));
 		type = DCCP_TYPE_CLOSEREQ;
-		extrah_len = 4;
+		extrah_len = 8;
 	} else {
 		DCCP_DEBUG((LOG_INFO, "Hey, we should never get here, state = %u\n", dp->state));
 		return 1;
@@ -1572,14 +1656,14 @@ again:
 
 	/* Adding options. */
 	if (dp->optlen) {
-		DCCP_DEBUG((LOG_INFO, "Copying options from dp->options!\n"));
+		DCCP_DEBUG((LOG_INFO, "Copying options from dp->options! %u\n", dp->optlen));
 		bcopy(dp->options, options , dp->optlen);
 		optlen = dp->optlen;
 		dp->optlen = 0;
 	}
 
 	if (dp->featlen && (optlen + dp->featlen < DCCP_MAX_OPTIONS)) {
-		DCCP_DEBUG((LOG_INFO, "Copying options from dp->features!\n"));
+		DCCP_DEBUG((LOG_INFO, "Copying options from dp->features! %u\n", dp->featlen));
 		bcopy(dp->features, options + optlen, dp->featlen);
 		optlen += dp->featlen;
 	}
@@ -1597,14 +1681,23 @@ again:
 #ifdef INET6
 	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Sending ipv6 packet...\n"));
-		hdrlen = sizeof(struct ip6_hdr) + sizeof(struct dccphdr) +
-		    extrah_len + optlen;
+		if (!use_shortseq)
+			hdrlen = sizeof(struct ip6_hdr) + sizeof(struct dccplhdr) +
+			    extrah_len + optlen;
+		else 
+			hdrlen = sizeof(struct ip6_hdr) + sizeof(struct dccphdr) +
+			    extrah_len + optlen;
 	} else
 #endif
 	{
-		hdrlen = sizeof(struct ip) + sizeof(struct dccphdr) +
-		    extrah_len + optlen;
+		if (!use_shortseq)
+			hdrlen = sizeof(struct ip) + sizeof(struct dccplhdr) +
+		   		extrah_len + optlen;
+		else
+			hdrlen = sizeof(struct ip) + sizeof(struct dccphdr) +
+		   		extrah_len + optlen;
 	}
+	DCCP_DEBUG((LOG_INFO, "Pkt headerlen %u\n", hdrlen));
 
 	if (len > (dp->d_maxseg - extrah_len - optlen)) {
 		len = dp->d_maxseg - extrah_len - optlen;
@@ -1684,6 +1777,7 @@ again:
 		ip->ip_src = inp->inp_laddr;
 		ip->ip_dst = inp->inp_faddr;
 	}
+	dlh = (struct dccplhdr *)dh;
 
 	if (inp) {
 		dh->dh_sport = inp->inp_lport;
@@ -1698,41 +1792,68 @@ again:
 	dh->dh_cscov = dp->cslen;
 	dh->dh_type = type;
 	dh->dh_res = 0; /* Reserved field should be zero */
+	if (!use_shortseq) { 
+		dlh->dh_res2 = 0; /* Reserved field should be zero */
+		dh->dh_off = 4 + (extrah_len / 4) + (optlen / 4);
+	} else		
+		dh->dh_off = 3 + (extrah_len / 4) + (optlen / 4);
 
-	dh->dh_off = 3 + (extrah_len / 4) + (optlen / 4);
+	dp->seq_snd = (dp->seq_snd +1) % 281474976710656LL;
+	if (!use_shortseq) { 
+		DSEQ_TO_DHDR(dlh, dp->seq_snd);
+		dlh->dh_x = 1;
+	} else {
+		/* short sequene number */
+		dh->dh_seq = htonl(dp->seq_snd) >> 8;
+		dh->dh_x = 0;
+	}       
 
-	dp->seq_snd = (dp->seq_snd + 1) % 16777216;
-	dh->dh_seq = htonl(dp->seq_snd) >> 8;
-	dh->dh_x = 0;	/* short sequene number */
-
-	DCCP_DEBUG((LOG_INFO, "Sending with seq %u, (dp->seq_snd = %u)\n\n", dh->dh_seq, dp->seq_snd));
+	if (!use_shortseq)
+		DCCP_DEBUG((LOG_INFO, "Sending with seq %u.%u, (dp->seq_snd = %llu)\n\n", dlh->dh_seq, dlh->dh_seq2, dp->seq_snd));
+	else
+		DCCP_DEBUG((LOG_INFO, "Sending with seq %u, (dp->seq_snd = %llu)\n\n", dh->dh_seq, dp->seq_snd));
 
 	if (dh->dh_type == DCCP_TYPE_REQUEST) {
-		drqh = (struct dccp_requesthdr *)(dh + 1);
-		drqh->drqh_sname = 0; /* Service name must be 0 if not used */
+		drqh = (struct dccp_requesthdr *)(dlh + 1);
+		drqh->drqh_sname = 0;
 		optp = (u_char *)(drqh + 1);
 	} else if (dh->dh_type == DCCP_TYPE_RESET) {
-		drth = (struct dccp_resethdr *)(dh + 1);
-		drth->drth_res = 0; /* Reserved field should be zero */
-		drth->drth_ack = htonl(dp->seq_rcv) >> 8;
+		drth = (struct dccp_resethdr *)(dlh + 1);
+		drth->drth_dash.dah_res = 0;
+		DSEQ_TO_DAHDR(drth->drth_dash, dp->seq_rcv);
 		drth->drth_reason = 0; /* FIX, must be able to specify reason */
 		drth->drth_data1 = 0;
 		drth->drth_data2 = 0;
 		drth->drth_data3 = 0;
 		optp = (u_char *)(drth + 1);
 	} else if (extrah_len) {
-		dah = (struct dccp_ackhdr *)(dh + 1);
-		dah->dah_res = 0; /* Reserved field should be zero */
+		if (!use_shortseq){
+			dalh = (struct dccp_acklhdr *)(dlh + 1);
+			dalh->dash.dah_res = 0; /* Reserved field should be zero */
 
-		if (dp->state == DCCPS_ESTAB) {
-			dah->dah_ack = htonl(dp->ack_snd) >> 8;
-			dp->ack_snd = 0;
-		} else
-			dah->dah_ack = htonl(dp->seq_rcv) >> 8;
+			if (dp->state == DCCPS_ESTAB) {
+				DSEQ_TO_DAHDR(((struct dccp_acklhdr *)dalh)->dash, dp->ack_snd);
+				dp->ack_snd = 0;
+			} else {
+				DSEQ_TO_DAHDR(((struct dccp_acklhdr *)dalh)->dash, dp->seq_rcv);
+			}
+
+			if (dh->dh_type == DCCP_TYPE_RESPONSE) {
+				DCCP_DEBUG((LOG_INFO, "Sending dccp type response\n"));
+				drqh = (struct dccp_requesthdr *)(dalh + 1);
+				drqh->drqh_sname = dp->sname; /* must equal sname on the corresponding DCCP-Request */
+				optp = (u_char *)(drqh + 1);
+			} else 
+				optp = (u_char *)(dalh + 1);
+		} else {
+			/* XXX shortseq */
+			dah = (struct dccp_ackhdr *)(dh + 1);
+
+			optp = (u_char *)(dah + 1);
+		}
 		
-		optp = (u_char *)(dah + 1);
 	} else {
-		optp = (u_char *)(dh + 1);
+		optp = (u_char *)(dlh + 1);
 	}
 
 	if (optlen)
@@ -2246,7 +2367,8 @@ dccp_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	}
 
 	dp->who = DCCP_CLIENT;
-	dp->seq_snd = arc4random() % 16777216;
+	dp->seq_snd = (((u_int64_t)arc4random() << 32) | arc4random()) % 281474976710656LL;
+	DCCP_DEBUG((LOG_INFO, "dccp_connect seq_snd %llu\n", dp->seq_snd));
 
 	dccpstat.dccps_connattempt++;
 
@@ -2855,7 +2977,8 @@ dccp_newdccpcb(struct inpcb *inp)
 	dp->who = DCCP_UNDEF;
 	dp->seq_snd = 0;
 	dp->seq_rcv = 0;
-	dp->gsn_rcv = 1073741824;
+	dp->shortseq = 0;
+	dp->gsn_rcv = 281474976710656LL;
 	dp->optlen = 0;
 	dp->cc_in_use[0] = -1;
 	dp->cc_in_use[1] = -1;
@@ -2903,7 +3026,7 @@ int
 dccp_add_feature_option(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char *val, u_int8_t val_len)
 {
 	int i;
-	DCCP_DEBUG((LOG_INFO, "Entering dccp_add_option, opt = %u, val_len = %u\n", opt, val_len));
+	DCCP_DEBUG((LOG_INFO, "Entering dccp_add_option, opt = %u, val_len = %u optlen %u\n", opt, val_len, dp->optlen));
 
 	if (DCCP_MAX_OPTIONS > (dp->optlen + val_len + 2)) {
 		dp->options[dp->optlen] = opt;
@@ -3167,8 +3290,9 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 					dccp_add_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC, val, 1);
 					if (dp->cc_in_use[1] < 1) {
 						dp->cc_in_use[1] = 0;
+						DCCP_DEBUG((LOG_INFO, "set cc_in_use[1] = %d\n", dp->cc_in_use[1]));
 					} else {
-						DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!!\n"));
+						DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!! %d\n", dp->cc_in_use[1]));
 					}
 				}
 			} else if (opt == DCCP_OPT_CONFIRM) {
@@ -3177,8 +3301,9 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 				if (dp->cc_in_use[1] < 1) {
 					dp->cc_state[1] = (*cc_sw[val[0] + 1].cc_recv_init)(dp);
 					dp->cc_in_use[1] = val[0] + 1;
+					DCCP_DEBUG((LOG_INFO, "confirmed cc_in_use[1] = %d\n", dp->cc_in_use[1]));
 				} else {
-					DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!!\n"));
+					DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!! (confirm) %d\n", dp->cc_in_use[1]));
 				}
 			}
 		
@@ -3770,9 +3895,9 @@ dccp_use_ackvector(struct dccpcb *dp)
  * Set 'seqnr' as the new head in ackvector
  **/
 void
-dccp_update_ackvector(struct dccpcb *dp, u_int32_t seqnr)
+dccp_update_ackvector(struct dccpcb *dp, u_int64_t seqnr)
 {
-	int32_t gap;
+	int64_t gap;
 	u_char *t;
 
 	/* Ignore wrapping for now */
@@ -3803,10 +3928,10 @@ dccp_update_ackvector(struct dccpcb *dp, u_int32_t seqnr)
  * next Ack Vector sent
  **/
 void
-dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
+dccp_increment_ackvector(struct dccpcb *dp, u_int64_t seqnr)
 {
-	u_int32_t offset, dc;
-	int32_t gap;
+	u_int64_t offset, dc;
+	int64_t gap;
 	u_char *t, *n;
 	
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_increment_ackvecktor\n"));
@@ -3869,8 +3994,8 @@ dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
 u_int16_t
 dccp_generate_ackvector(struct dccpcb *dp, u_char *buf)
 {
-	int32_t j;
-	u_int32_t i;
+	int64_t j;
+	u_int64_t i;
 	u_int16_t cnt, oldlen, bufsize;
 	u_char oldstate, st;
 
@@ -3980,9 +4105,9 @@ dccp_generate_ackvector(struct dccpcb *dp, u_char *buf)
 }
 
 u_char
-dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr)
+dccp_ackvector_state(struct dccpcb *dp, u_int64_t seqnr)
 {
-	u_int32_t gap, offset;
+	u_int64_t gap, offset;
 	u_char *t;
 
 	/* Check for wrapping */
@@ -3991,7 +4116,7 @@ dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr)
 		gap = seqnr - dp->av_hs;
 	} else {
 		/* Wrapped */
-		gap = seqnr + 0x1000000 - dp->av_hs; /* seq nr = 24 bits */
+		gap = seqnr + 0x1000000000000LL - dp->av_hs; /* seq nr = 48 bits */
 	}
 
 	if (gap >= dp->av_size) {

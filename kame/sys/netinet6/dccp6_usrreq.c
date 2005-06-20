@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.11 2005/02/10 09:42:55 itojun Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.12 2005/06/20 17:04:44 nishida Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -280,7 +280,7 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	}
 
 	dp->who = DCCP_CLIENT;
-	dp->seq_snd = arc4random() % 16777216;
+	dp->seq_snd = (((u_int64_t)arc4random() << 32) | arc4random()) % 281474976710656LL;
 
 #ifndef __FreeBSD__
 	nam = mtod(m, struct sockaddr *);

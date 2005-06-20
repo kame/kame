@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.h,v 1.8 2003/11/18 04:55:43 ono Exp $	*/
+/*	$KAME: dccp_tcplike.h,v 1.9 2005/06/20 17:03:55 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -129,7 +129,7 @@ void tcplike_send_packet_recv(void *, char *, int);
 
 struct ack_list
 {
-	u_int32_t localseq, ackthru;
+	u_int64_t localseq, ackthru;
 	struct ack_list *next;
 };
 
