@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.381 2005/06/16 22:32:41 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.382 2005/06/20 09:18:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1307,9 +1307,9 @@ nd6_free(rt, gc)
 			 * XXX: the check for ln_state would be redundant,
 			 *      but we intentionally keep it just in case.
 			 */
-			if (dr->expire > time_second * hz)
+			if (dr->expire > time_second)
 				nd6_llinfo_settimer(ln,
-				    dr->expire - time_second * hz);
+				    (dr->expire - time_second) * hz);
 			else
 				nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 			splx(s);
