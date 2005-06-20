@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2775 2005/06/16 23:14:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.2776 2005/06/20 17:58:15 nishida Exp $
 
 <200506>
+2005-06-20  NISHIDA, Yoshifumi <nishida@csl.sony.co.jp>
+    * kame/sys/netinet/dccp.h kame/sys/netinet/dccp_tcplike.c
+      kame/sys/netinet/dccp_tcplike.h kame/sys/netinet/dccp_usrreq.c
+      kame/sys/netinet/dccp_var.h kame/sys/netinet6/dccp6_usrreq.c: 
+	preliminary update to conform to the draft-ietf-dccp-spec-11.txt
+
 2005-06-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach): do not
 	auto-configure link-local addresses on loopback or PPP interfaces.
