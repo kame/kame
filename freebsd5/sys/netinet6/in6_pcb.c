@@ -1002,7 +1002,7 @@ init_sin6(struct sockaddr_in6 *sin6, struct mbuf *m)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_addr = ip->ip6_src;
 
-	(void)sa6_recoverscope(&sin6); /* XXX: should catch errors... */
+	(void)sa6_recoverscope(sin6); /* XXX: should catch errors... */
 
 	return;
 }
