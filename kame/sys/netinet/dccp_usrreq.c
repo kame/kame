@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.53 2005/06/21 01:42:06 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.54 2005/06/21 10:21:03 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -128,10 +128,10 @@
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
+#include <netinet6/dccp6_var.h>
 #endif
 #include <netinet/dccp.h>
 #include <netinet/dccp_var.h>
-#include <netinet6/dccp6_var.h>
 #include <netinet/dccp_cc_sw.h>
 
 #ifdef __FreeBSD__
@@ -667,7 +667,7 @@ dccp_input(struct mbuf *m, ...)
 	 * Check if sequence number is inside the loss window 
 	 */
 	if (!is_shortseq) { 
-		DHDR_TO_DSEQ(seqnr, dlh)
+		DHDR_TO_DSEQ(seqnr, dlh);
 	} else {
 		/* shortseq */
 		seqnr = ntohl(dh->dh_seq);

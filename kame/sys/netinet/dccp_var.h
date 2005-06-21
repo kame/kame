@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.22 2005/06/20 17:03:55 nishida Exp $	*/
+/*	$KAME: dccp_var.h,v 1.23 2005/06/21 10:21:03 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -47,7 +47,7 @@ typedef u_int64_t dccp_seq;
 }
 
 #define DHDR_TO_DSEQ(x, y) { \
-	x = ((u_int64_t)ntohs(((struct dccplhdr *)y)->dh_seq) << 32) | ntohl((struct dccplhdr *)y->dh_seq2);\
+	x = ((u_int64_t)ntohs(y->dh_seq) << 32) | ntohl(y->dh_seq2);\
 }
 
 #define DSEQ_TO_DAHDR(x, y) { \
@@ -56,7 +56,7 @@ typedef u_int64_t dccp_seq;
 }
 
 #define DAHDR_TO_DSEQ(x, y) { \
-	x = ((u_int64_t)ntohs(((struct dccp_acksublhdr)y).dah_ack) << 32) | ntohl(((struct dccp_acksublhdr)y).dah_ack2);\
+	x = ((u_int64_t)ntohs(y.dah_ack) << 32) | ntohl(y.dah_ack2);\
 }
 
 struct dccpcb {
