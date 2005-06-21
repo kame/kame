@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.52 2005/06/20 17:03:55 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.53 2005/06/21 01:42:06 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -670,7 +670,7 @@ dccp_input(struct mbuf *m, ...)
 		DHDR_TO_DSEQ(seqnr, dlh)
 	} else {
 		/* shortseq */
-		seqnr = convert_longseq(ntohl(dh->dh_seq));
+		seqnr = ntohl(dh->dh_seq);
 	}
 
 	DCCP_DEBUG((LOG_INFO, "Received DCCP packet with sequence number = %llu , gsn_rcv %llu\n", seqnr, dp->gsn_rcv));
