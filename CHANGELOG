@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2777 2005/06/21 08:51:35 t-momose Exp $
+$KAME: CHANGELOG,v 1.2778 2005/06/21 18:29:39 jinmei Exp $
 
 <200506>
+2005-06-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd5/sys/netinet6/in6_pcb.c (init_sin6): corrected argument
+	to sa6_recoverscope().  The previous code since June 17th's change
+	could modify invalid memory space (while the possibility should be
+	very rare) so upgrading is necessary.
+
 2005-06-20  NISHIDA, Yoshifumi <nishida@csl.sony.co.jp>
     * kame/sys/netinet/dccp.h kame/sys/netinet/dccp_tcplike.c
       kame/sys/netinet/dccp_tcplike.h kame/sys/netinet/dccp_usrreq.c
