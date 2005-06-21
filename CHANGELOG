@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2776 2005/06/20 17:58:15 nishida Exp $
+$KAME: CHANGELOG,v 1.2777 2005/06/21 08:51:35 t-momose Exp $
 
 <200506>
 2005-06-20  NISHIDA, Yoshifumi <nishida@csl.sony.co.jp>
@@ -7,6 +7,11 @@ $KAME: CHANGELOG,v 1.2776 2005/06/20 17:58:15 nishida Exp $
       kame/sys/netinet/dccp_tcplike.h kame/sys/netinet/dccp_usrreq.c
       kame/sys/netinet/dccp_var.h kame/sys/netinet6/dccp6_usrreq.c: 
 	preliminary update to conform to the draft-ietf-dccp-spec-11.txt
+
+2005-06-20  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>
+	* kame/sys/netinet6/nd6.c: Units of comparison to determine default
+	router expiration are mismateched. This problem was reported and
+	modified by Alan Chang <ccchang@zyxel.com.tw>.
 
 2005-06-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach): do not
