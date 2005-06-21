@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.42 2005/06/16 18:29:30 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.43 2005/06/21 18:26:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -505,7 +505,8 @@ sa6_recoverscope(sin6)
 
 	if (sin6->sin6_scope_id != 0) {
 		log(LOG_NOTICE,
-		    "sa6_recoverscope: assumption failure (non 0 ID)\n");
+		    "sa6_recoverscope: assumption failure (non 0 ID): %s%%%d\n",
+		    ip6_sprintf(&sin6->sin6_addr), sin6->sin6_scope_id);
 		/* XXX: proceed anyway... */
 	}
 	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr) ||
