@@ -1,4 +1,4 @@
-/*	$Id: babymdd.h,v 1.3 2005/05/25 01:49:23 keiichi Exp $	*/
+/*	$Id: babymdd.h,v 1.4 2005/06/21 12:53:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -79,6 +79,7 @@ struct hoa_info {
 struct if_info {
 	LIST_ENTRY(if_info) ifinfo_entry;
 	char ifname[IFNAMSIZ];
+	u_char iftype;
 	u_int16_t ifindex;
 
 	struct sockaddr_storage coa;/* Current CoA */

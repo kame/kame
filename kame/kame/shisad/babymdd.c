@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.10 2005/06/05 12:13:14 ryuji Exp $	*/
+/*	$Id: babymdd.c,v 1.11 2005/06/21 12:53:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1086,29 +1086,33 @@ baby_getifinfo(ifinfo)
 	for (next = ifmsg; next < limit; next += ifm->ifm_msglen) {
 		
 		ifm = (struct if_msghdr *) next;
-		
-		if (ifm->ifm_type == RTM_NEWADDR) {
+
+		if (ifm->ifm_index != ifinfo->ifindex)
+			continue;
+
+		switch (ifm->ifm_type) {
+		case RTM_IFINFO:
+			ifinfo->iftype = ifm->ifm_data.ifi_type;
+			break;
+
+		case RTM_NEWADDR:
 			ifam = (struct ifa_msghdr *) next;
 			
 			get_rtaddrs(ifam->ifam_addrs,
-				    (struct sockaddr *) (ifam + 1), rti_info);
-			sin6 = (struct sockaddr_in6 *) rti_info[RTAX_IFA];
-			memset(&ifr6, 0, sizeof(ifr6));
-			ifr6.ifr_addr = *sin6;
+			    (struct sockaddr *)(ifam + 1), rti_info);
+			sin6 = (struct sockaddr_in6 *)rti_info[RTAX_IFA];
 			
-			/* unknown interface !? */
-			if (if_indextoname(ifm->ifm_index, 
-					   ifr6.ifr_name) == NULL) 
-				continue;
-
-			if (ifm->ifm_index != ifinfo->ifindex)
-				continue;
-			
-			/* MUST be global */
+			/* MUST be a global address. */
 			if (in6_addrscope(&sin6->sin6_addr) !=  
 			    __IPV6_ADDR_SCOPE_GLOBAL) 
 				continue;
 
+			/* get interface flags. */
+			memset(&ifr6, 0, sizeof(ifr6));
+			ifr6.ifr_addr = *sin6;
+			if (if_indextoname(ifm->ifm_index, ifr6.ifr_name)
+			    == NULL) 
+				continue;
 			if (ioctl(babyinfo.linksock, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 				perror("ioctl(SIOCGIFAFLAG_IN6)");
 				continue;
@@ -1116,13 +1120,13 @@ baby_getifinfo(ifinfo)
 			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_READONLY)
 				continue;
 
-			memcpy(&ifinfo->coa, sin6, sizeof(struct sockaddr_in6));
-			
-			free(ifmsg);
-			return;
+			/* XXX how do we handle multiple addresses? */
+			memcpy(&ifinfo->coa, sin6,
+			    sizeof(struct sockaddr_in6));
+			break;
 		}
 	}
-	memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
+
 	if (ifmsg)
 		free(ifmsg);
 
@@ -1175,7 +1179,9 @@ baby_selection() {
 	for (ifinfo = LIST_FIRST(&babyinfo.ifinfo_head); 
 	     ifinfo; ifinfo = ifinfo_next) {
 		ifinfo_next = LIST_NEXT(ifinfo, ifinfo_entry);
-		
+
+		if (ifinfo->iftype == IFT_MIP)
+			continue;
 		if (ifinfo->coa.ss_family != AF_INET6) 
 			continue;
 		
