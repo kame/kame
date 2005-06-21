@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.114 2005/03/14 08:56:54 suz Exp $	*/
+/*	$KAME: ndp.c,v 1.115 2005/06/21 07:58:44 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1121,6 +1121,8 @@ rtrlist()
 		err(1, "sysctl(ICMPV6CTL_ND6_DRLIST)");
 		/*NOTREACHED*/
 	}
+	if (l == 0)
+		return;
 	buf = malloc(l);
 	if (!buf) {
 		err(1, "malloc");
