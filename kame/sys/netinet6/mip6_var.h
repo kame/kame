@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.121 2005/01/31 09:42:57 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.122 2005/06/21 10:53:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -187,8 +187,7 @@ void mip6_md_scan(u_int16_t);
 
 
 /* used by one or more kind of nodetypes. */
-struct in6_ifaddr *mip6_ifa_ifwithin6addr(const struct in6_addr *,
-    struct mip_softc *);
+struct in6_ifaddr *mip6_ifa_ifwithin6addr(const struct in6_addr *);
 struct mbuf *mip6_append_ip6_hdr(struct mbuf **, struct in6_addr *,
     struct in6_addr *);
 int mip6_encapsulate(struct mbuf **, struct in6_addr *, struct in6_addr *);

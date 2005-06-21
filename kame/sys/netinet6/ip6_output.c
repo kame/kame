@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.470 2005/06/16 18:29:28 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.471 2005/06/21 10:53:02 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -846,7 +846,7 @@ skip_ipsec2:;
 		if (hoaopt == NULL) 
 			goto freehdrs;
 
-		if (mip6_ifa_ifwithin6addr(&ip6->ip6_src, NULL) == NULL)
+		if (mip6_ifa_ifwithin6addr(&ip6->ip6_src) == NULL)
 			goto freehdrs;
 
 		ip6 = mtod(m, struct ip6_hdr *);

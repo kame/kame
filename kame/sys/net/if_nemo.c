@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.c,v 1.3 2005/04/14 06:22:38 suz Exp $	*/
+/*	$KAME: if_nemo.c,v 1.4 2005/06/21 10:53:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -920,7 +920,7 @@ nemo_ioctl(ifp, cmd, data)
 		}
 		/* set request address into nemo_nexthop */
 		bcopy(nh, sc->nemo_nexthop, nhlen);
-		in6_embedscope(&satosin6(sc->nemo_nexthop)->sin6_addr, satosin6(sc->nemo_nexthop));
+		sa6_embedscope(satosin6(sc->nemo_nexthop), ip6_use_defzone);
 		break;
 	}
 	case SIOCGIFPHYNEXTHOP: 
@@ -1053,12 +1053,14 @@ nemo_set_tunnel(ifp, src, dst)
 #ifdef INET6
 	case AF_INET6:
 		/* Check validity of the scope zone ID of the addresses. */
-		if ((error = scope6_check_id((struct sockaddr_in6 *)sc->nemo_psrc,
-					     0)) != 0 ||
-		    (error = scope6_check_id((struct sockaddr_in6 *)sc->nemo_pdst,
-					     0)) != 0) {
+		if ((error = sa6_embedscope(
+		    (struct sockaddr_in6 *)sc->nemo_psrc, ip6_use_defzone))
+		    != 0)
 			break;
-		}
+		if ((error = sa6_embedscope(
+		    (struct sockaddr_in6 *)sc->nemo_pdst, ip6_use_defzone))
+		    != 0)
+			break;
 		error = in6_gif_attach((struct gif_softc *)sc);
 		break;
 #endif

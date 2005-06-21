@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.220 2005/06/16 18:29:29 jinmei Exp $	*/
+/*	$Id: mip6.c,v 1.221 2005/06/21 10:53:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -756,18 +756,22 @@ mip6_create_rthdr2(coa)
 
 #if NMIP > 0
 struct in6_ifaddr *
-mip6_ifa_ifwithin6addr(in6, mipsc)
+mip6_ifa_ifwithin6addr(in6)
 	const struct in6_addr *in6;
-	struct mip_softc *mipsc;
 {
 	struct sockaddr_in6 sin6;
 
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(sin6);
+	/*
+	 * in6 must have a scope information embedded in it,
+	 * before being passed to this function.
+	 */
+	bzero(&sin6, sizeof(struct sockaddr_in6));
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_addr = *in6;
-	if (in6_setscope(&sin6.sin6_addr, (struct ifnet *)mipsc, NULL))
+	if (sa6_recoverscope(&sin6) != 0)
 		return (NULL);
+
 	return ((struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)&sin6));
 }
 
@@ -822,9 +826,9 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	if (mipsc == NULL)
 		return (-1);
 
-	ia6_hoa = mip6_ifa_ifwithin6addr(hoa, mipsc);
+	ia6_hoa = mip6_ifa_ifwithin6addr(hoa);
 #endif
-	ia6_hoa = mip6_ifa_ifwithin6addr(hoa, NULL);
+	ia6_hoa = mip6_ifa_ifwithin6addr(hoa);
 	if (ia6_hoa == NULL)
 		return (-1);
 
@@ -995,7 +999,7 @@ mip6_bul_get(src, dst, bid)
 	struct in6_ifaddr *ia6_src;
 	struct mip6_bul_internal *mbul;
 
-	ia6_src = mip6_ifa_ifwithin6addr(src, NULL);
+	ia6_src = mip6_ifa_ifwithin6addr(src);
 	if (ia6_src == NULL)
 		return (NULL);
 	
@@ -1023,7 +1027,7 @@ mip6_bul_get_home_agent(src)
 	struct in6_ifaddr *ia6_src;
 	struct mip6_bul_internal *mbul;
 
-	ia6_src = mip6_ifa_ifwithin6addr(src, NULL);
+	ia6_src = mip6_ifa_ifwithin6addr(src);
 	if (ia6_src == NULL)
 		return (NULL);
 
