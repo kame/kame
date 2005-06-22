@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.115 2005/06/21 07:58:44 t-momose Exp $	*/
+/*	$KAME: ndp.c,v 1.116 2005/06/22 22:42:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -151,7 +151,6 @@ void ifinfo __P((char *, int, char **));
 void rtrlist __P((void));
 void plist __P((void));
 void pfx_flush __P((void));
-void rtrlist __P((void));
 void rtr_flush __P((void));
 void harmonize_rtr __P((void));
 #ifdef SIOCSDEFIFACE_IN6	/* XXX: check SIOCGDEFIFACE_IN6 as well? */
