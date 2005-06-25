@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.14 2005/05/26 06:46:26 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.15 2005/06/25 08:39:57 ryuji Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -51,6 +51,11 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #include <arpa/inet.h>
+
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
+
 
 #define MODE_HA 0x01
 #define MODE_MR 0x02
@@ -525,8 +530,13 @@ find_nemo_if_from_name(ifname)
 
 static void	
 mainloop() {
-	int msock, n, nfds = 0;
+	int msock, n;
+#ifdef HAVE_POLL_H
+	struct pollfd set[1];
+#else
         fd_set fds;
+	int  nfds = 0;
+#endif
         struct mip_msghdr *mhdr = NULL;
 	char buf[256];
 	struct in6_addr local_in6, def, *hoa;
@@ -548,7 +558,20 @@ mainloop() {
                 exit(-1);
         }
 
+#ifdef HAVE_POLL_H
+	set[0].fd = msock;
+	set[0].events = POLLIN;
+#endif /* HAVE_POLL_H */
+
 	while (1) {
+
+#ifdef HAVE_POLL_H
+		if (poll(set, 1, INFTIM) < 0) {
+			syslog(LOG_ERR, "poll %s\n", strerror(errno));
+                        exit(-1);
+                }
+		if (set[0].revents & POLLIN) {
+#else /* HAVE_POLL_H */
 		FD_ZERO(&fds);
 		nfds = -1;
 		FD_SET(msock, &fds);
@@ -560,6 +583,7 @@ mainloop() {
                 }
 
                 if (FD_ISSET(msock, &fds)) {
+#endif /* HAVE_POLL_H */
 			n = read(msock, buf, sizeof(buf));
 			if (n < 0) {
 				syslog(LOG_ERR, "read %s\n", strerror(errno));
