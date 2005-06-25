@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.15 2005/06/25 08:39:57 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.16 2005/06/25 08:45:37 ryuji Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -56,19 +56,13 @@
 #include <poll.h>
 #endif
 
-
-#define MODE_HA 0x01
-#define MODE_MR 0x02
-
-#define NEMO_TUNOPTNUM 3
-#define NEMO_TUNNAME "nemo"
-
-#define NEMO_OPTNUM_MCOA 5
-#define NEMO_OPTNUM 4
-
 #include "callout.h"
 #include "shisad.h"
 #include "config.h"
+
+#define MODE_HA 0x01
+#define MODE_MR 0x02
+#define NEMO_TUNNAME "nemo"
 
 /* Variables */
 struct nemo_if {
