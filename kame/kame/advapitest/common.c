@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.19 2003/11/03 01:25:30 jinmei Exp $ */
+/*	$KAME: common.c,v 1.20 2005/06/25 19:27:01 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -457,8 +457,8 @@ print_options(mh)
 				       (u_long)mtuinfo->ip6m_mtu);
 			}
 			break;
-		}
 #endif
+		}
 	}
 }
 
