@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.116 2005/06/22 22:42:54 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.117 2005/06/28 02:18:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -981,6 +981,10 @@ ifinfo(ifname, argc, argv)
 				newflags |= (f);\
 		}\
 	} while (0)
+/*
+ * XXX: this macro is not 100% correct, in that it matches "nud" against
+ *      "nudbogus".  But we just let it go since this is minor.
+ */
 #define SETVALUE(f, v) \
 	do { \
 		char *valptr; \
