@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.43 2005/06/21 18:26:31 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.44 2005/07/06 07:35:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -561,7 +561,7 @@ in6_setscope(in6, ifp, ret_id)
 	 */
 	if (IN6_IS_ADDR_LOOPBACK(in6)) {
 		if (!(ifp->if_flags & IFF_LOOPBACK))
-			return (-1);
+			return (EINVAL);
 		else {
 			if (ret_id != NULL)
 				*ret_id = 0; /* there's no ambiguity */
