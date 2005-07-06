@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.9 2005/06/20 08:37:30 ryuji Exp $  */
+/*      $KAME: nemo_var.c,v 1.10 2005/07/06 02:16:30 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -158,10 +158,10 @@ command_show_pt(s, dummy)
 
 #ifdef MIP_HA 
 struct nemo_hptable *
-nemo_hpt_get(prefix, prefixlen, prefered_coa) 
+nemo_hpt_get(prefix, prefixlen, preferred_hoa) 
 	struct in6_addr *prefix;
 	u_int8_t prefixlen;
-	struct in6_addr *prefered_coa;
+	struct in6_addr *preferred_hoa;
 {
 	struct nemo_hptable *hpt;
 
@@ -169,8 +169,8 @@ nemo_hpt_get(prefix, prefixlen, prefered_coa)
 		if (prefixlen != hpt->hpt_prefixlen)
 			continue;
 		if (mip6_are_prefix_equal(&hpt->hpt_prefix, prefix, prefixlen)) {
-			if ((prefered_coa != NULL) &&
-				!IN6_ARE_ADDR_EQUAL(hoa, &hpt->hpt_hoa))
+			if ((preferred_hoa != NULL) &&
+			    !IN6_ARE_ADDR_EQUAL(preferred_hoa, &hpt->hpt_hoa))
 				continue;
 			else 
 				return (hpt);
