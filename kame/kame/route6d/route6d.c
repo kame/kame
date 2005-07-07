@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.105 2004/06/14 05:35:59 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.106 2005/07/07 02:06:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.105 2004/06/14 05:35:59 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.106 2005/07/07 02:06:30 keiichi Exp $";
 #endif
 
 #include <stdio.h>
@@ -1461,7 +1461,7 @@ ifconfig()
 				/*NOTREACHED*/
 			}
 			memset(ifcp, 0, sizeof(*ifcp));
-			ifcp->ifc_index = -1;
+			ifcp->ifc_index = if_nametoindex(ifa->ifa_name);
 			ifcp->ifc_next = ifc;
 			ifc = ifcp;
 			nifc++;
@@ -1557,9 +1557,9 @@ ifconfig1(name, sa, ifcp, s)
 		trace(1, "found address %s/%d\n",
 			inet6_n2p(&ifa->ifa_addr), ifa->ifa_plen);
 	}
-	if (ifcp->ifc_index < 0 && IN6_IS_ADDR_LINKLOCAL(&ifa->ifa_addr)) {
+	if (IN6_IS_ADDR_LINKLOCAL(&ifa->ifa_addr)
+	    || IN6_IS_ADDR_LOOPBACK(&ifa->ifa_addr)) {
 		ifcp->ifc_mylladdr = ifa->ifa_addr;
-		ifcp->ifc_index = IN6_LINKLOCAL_IFINDEX(ifa->ifa_addr);
 		memcpy(&ifcp->ifc_ripsin, &ripsin, ripsin.ss_len);
 		SET_IN6_LINKLOCAL_IFINDEX(ifcp->ifc_ripsin.sin6_addr,
 			ifcp->ifc_index);
