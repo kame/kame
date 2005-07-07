@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.44 2005/07/06 07:35:24 keiichi Exp $	*/
+/*	$KAME: scope6.c,v 1.45 2005/07/07 05:02:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -612,4 +612,3 @@ in6_clearscope(in6)
 	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6))
 		in6->s6_addr16[1] = 0;
 }
-
