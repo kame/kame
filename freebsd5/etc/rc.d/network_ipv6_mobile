@@ -126,7 +126,15 @@ network_ipv6_mobile_start()
 			done
 		fi
 
-		echo -n ' mnd'
+		# do not autoconfigure addresses on ingress i/fs
+		if [ X${ipv6_mobile_ingress_interfaces} != X ]; then
+			for iinterface in ${ipv6_mobile_ingress_interfaces}
+			do
+				ndp -i ${iinterface} -- -accept_rtadv
+			done
+		fi
+
+		echo -n ' mrd'
 		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
 			mrd ${ipv6_mobile_mrd_flags} ${mip_interface}

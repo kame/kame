@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.10 2005/07/07 06:14:02 keiichi Exp $
+# $Id: mobileip6,v 1.11 2005/07/07 11:53:49 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -90,6 +90,14 @@ mobileip6_start()
 				fi
 				setkey -f ${node_dir}/add
 				setkey -f ${node_dir}/spdadd_mobile_node
+			done
+		fi
+
+		# do not autoconfigure addresses on ingress i/fs
+		if [ X${ipv6_mobile_ingress_interfaces} != X ]; then
+			for iinterface in ${ipv6_mobile_ingress_interfaces}
+			do
+				ndp -i ${iinterface} -- -accept_rtadv
 			done
 		fi
 
