@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.45 2005/07/07 05:02:45 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.46 2005/07/07 05:06:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -364,88 +364,6 @@ scope6_addr2default(addr)
 
 	return (sid_default.s6id_list[in6_addrscope(addr)]);
 }
-
-#ifdef nomore
-/*
- * XXX: some applications assume the kernel guesses a correct zone ID when the
- * outgoing interface is explicitly specified, and omit specifying the ID.
- * This is a bad manner, but we handle such cases anyway.
- * Note that this function intentionally overrides the argument SIN6.
- */
-int
-scope6_setzoneid(ifp, sin6)
-	struct ifnet *ifp;
-	struct sockaddr_in6 *sin6;
-{
-	u_int32_t zoneid;
-	int error;
-
-	if (in6_addr2zoneid(ifp, &sin6->sin6_addr, &zoneid))
-		return (EADDRNOTAVAIL);
-
-	if (zoneid) {
-		sin6->sin6_scope_id = zoneid;
-		if ((error = in6_embedscope(&sin6->sin6_addr, sin6)) != 0)
-			return (error);
-	}
-
-	return (0);
-}
-
-/*
- * Check if the zone ID in SIN6 is valid according to the scope of the
- * address.  If DFEFAULTOK is true and the zone ID is unspecified, fill the
- * default value for the scope type in the ID field.
- * This function also embeds the zone ID into the 128bit address field if
- * necessary.  This format is internally used in the kernel.
- * As a result, it is ensured that SIN6 has a valid scope zone ID and the
- * address part is converted to the internal form.
- *
- * The caller must expect that SIN6 can be modified within this function;
- * if it is not desired to override the original value a local copy must be
- * made in advance.
- */
-int
-scope6_check_id(sin6, defaultok)
-	struct sockaddr_in6 *sin6;
-	int defaultok;
-{
-	u_int32_t zoneid;
-	struct in6_addr *in6 = &sin6->sin6_addr;
-	struct ifnet *ifp;
-
-	if ((zoneid = sin6->sin6_scope_id) != 0) {
-		/*
-		 * At this moment, we only check interface-local and
-		 * link-local scope IDs, and use interface indices as the
-		 * zone IDs assuming a one-to-one mapping between interfaces
-		 * and links.
-		 * XXX: in6_embedscope() below does the same check (in case
-		 * of !SCOPEDROUTING).  We should eventually centralize the
-		 * check in this function.
-		 */
-		if (IN6_IS_SCOPE_LINKLOCAL(in6) ||
-		    IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
-			if (if_indexlim <= zoneid)
-				return (ENXIO);
-#ifdef __FreeBSD__
-			ifp = ifnet_byindex(zoneid);
-#else
-			ifp = ifindex2ifnet[zoneid];
-#endif
-			if (ifp == NULL) /* XXX: this can happen for some OS */
-				return (ENXIO);
-		}
-	} else if (defaultok)
-		sin6->sin6_scope_id = scope6_addr2default(in6);
-
-	/* KAME hack: embed scopeid */
-	if (in6_embedscope(in6, sin6) != 0)
-		return (EINVAL);
-
-	return (0);
-}
-#endif
 
 /*
  * Validate the specified scope zone ID in the sin6_scope_id field.  If the ID
