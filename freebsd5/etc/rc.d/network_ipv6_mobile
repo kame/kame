@@ -127,10 +127,10 @@ network_ipv6_mobile_start()
 		fi
 
 		# do not autoconfigure addresses on ingress i/fs
-		if [ X${ipv6_mobile_ingress_interfaces} != X ]; then
+		if [ "X${ipv6_mobile_ingress_interfaces}" != 'X' ]; then
 			for iinterface in ${ipv6_mobile_ingress_interfaces}
 			do
-				ndp -i ${iinterface} -- -accept_rtadv
+				ndp -i ${iinterface} -- -accept_rtadv > /dev/null 2>&1
 			done
 		fi
 
