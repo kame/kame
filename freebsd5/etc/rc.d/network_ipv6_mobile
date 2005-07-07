@@ -133,9 +133,10 @@ network_ipv6_mobile_start()
 		done
 
 		echo -n " ${ipv6_mobile_mdd_program}"
+		einterfaces=`ipv6_mobile_get_egress_interfaces ${ipv6_mobile_ingress_interfaces}`
 		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
-			${ipv6_mobile_mdd_program} -h ${mip_interface}
+			${ipv6_mobile_mdd_program} -h ${mip_interface} ${einterfaces}
 		done
 
 		echo -n ' nemonetd'
@@ -203,7 +204,8 @@ network_ipv6_mobile_start()
 	echo ''
 }
 
-mobileip6_getprefixes() {
+mobileip6_getprefixes()
+{
 	ndp -p 2>/dev/null | while read prefix interface rest; do
 		if [ X$interface = X"if="$1 ]; then
 			case ${prefix} in
@@ -219,7 +221,8 @@ mobileip6_getprefixes() {
 	done
 }
 
-ipv6_mobile_nemo_down () {
+ipv6_mobile_nemo_down()
+{
 	for ifname in `ifconfig -l`
 	do
 		case ${ifname} in
@@ -228,6 +231,29 @@ ipv6_mobile_nemo_down () {
 			;;
 		esac
 	done
+}
+
+ipv6_mobile_get_egress_interfaces()
+{
+	eifnames=''
+	for ifname in `ifconfig -l`
+	do
+		case ${ifname} in
+		mip[0-9]*|nemo[0-9]*|faith[0-9]*|pflog[0-9]*|pfsync[0-9]*)
+			continue
+			;;
+		esac
+		eifname=${ifname}
+		for iifname in $@
+		do
+			if [ X${ifname} =  X${iifname} ]; then
+				eifname=''
+				break;
+			fi
+		done
+		eifnames="${eifnames} ${eifname}"
+	done
+	echo ${eifnames}
 }
 
 load_rc_config $name

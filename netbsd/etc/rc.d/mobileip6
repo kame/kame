@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.9 2005/05/31 02:38:07 keiichi Exp $
+# $Id: mobileip6,v 1.10 2005/07/07 06:14:02 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -98,10 +98,11 @@ mobileip6_start()
 		echo -n ' nemonetd'
 		ipv6_mobile_nemo_down
 		nemonetd_flags=${ipv6_mobile_nemonetd_flags:='-n -m -c /usr/local/v6/etc/mrd.conf'}
+		einterfaces=`ipv6_mobile_get_egress_interfaces ${ipv6_mobile_ingress_interfaces}`
 		for mip_interface in ${ipv6_mobile_mobile_node_interfaces}
 		do
 			mrd ${ipv6_mobile_mrd_flags} ${mip_interface}
-			${ipv6_mobile_mdd_program} -h ${mip_interface}
+			${ipv6_mobile_mdd_program} -h ${mip_interface} ${einterfaces}
 			nemonetd ${nemonetd_flags} ${mip_interface}
 		done
 		echo -n ' rtsold'
@@ -190,6 +191,29 @@ ipv6_mobile_nemo_down () {
 			;;
 		esac
 	done
+}
+
+ipv6_mobile_get_egress_interfaces()
+{
+	eifnames=''
+	for ifname in `ifconfig -l`
+	do
+		case ${ifname} in
+		mip[0-9]*|nemo[0-9]*|faith[0-9]*|pflog[0-9]*|pfsync[0-9]*)
+			continue
+			;;
+		esac
+		eifname=${ifname}
+		for iifname in $@
+		do
+			if [ X${ifname} =  X${iifname} ]; then
+				eifname=''
+				break;
+			fi
+		done
+		eifnames="${eifnames} ${eifname}"
+	done
+	echo ${eifnames}
 }
 
 load_rc_config $name
