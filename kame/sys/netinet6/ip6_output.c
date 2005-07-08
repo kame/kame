@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.471 2005/06/21 10:53:02 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.472 2005/07/08 03:24:54 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4743,7 +4743,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		bcopy(rth, opt->ip6po_rthdr, rthlen);
 #ifdef MIP6
 		} else if (rth->ip6r_type == IPV6_RTHDR_TYPE_2) {
-			opt->ip6po_rthdr2 = malloc(rthlen, M_IP6OPT, M_WAITOK);
+			opt->ip6po_rthdr2 = malloc(rthlen, M_IP6OPT, M_NOWAIT);
 			if (opt->ip6po_rthdr2 == NULL)
 				return (ENOBUFS);
 			bcopy(rth, opt->ip6po_rthdr2, rthlen);
