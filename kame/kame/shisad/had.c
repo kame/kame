@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.18 2005/05/24 10:16:19 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.19 2005/07/08 02:16:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -208,18 +208,10 @@ main(argc, argv)
 	fdlist_init();
 	command_init("ha> ", command_table,
 		sizeof(command_table) / sizeof(struct command_table), 7778);
-	mip6_bc_init();
 
 	/* register signal handlers. */
 	signal(SIGTERM, terminate);
 	signal(SIGINT, terminate);
-
-	/* initialization */
-	ha_lists_init();
-	had_init_homeprefix(ifname, preference);
-#ifdef MIP_NEMO
-	nemo_parse_conf();
-#endif /*MIP_NEMO*/
 
 	/* open sockets */
 	mhsock_open();
@@ -229,6 +221,15 @@ main(argc, argv)
 	new_fd_list(mipsock, POLLIN, mipsock_input_common);
 	new_fd_list(mhsock, POLLIN, mh_input_common);
 	new_fd_list(icmp6sock, POLLIN, icmp6_input_common);
+
+	/* initialization */
+	ha_lists_init();
+	had_init_homeprefix(ifname, preference);
+#ifdef MIP_NEMO
+	nemo_parse_conf();
+#endif /*MIP_NEMO*/
+
+	mip6_bc_init();
 
 	/* notify a kernel to behave as a home agent. */
 	mipsock_nodetype_request(MIP6_NODETYPE_HOME_AGENT, 1);
