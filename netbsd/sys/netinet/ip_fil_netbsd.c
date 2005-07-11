@@ -53,6 +53,7 @@ static const char rcsid[] = "@(#)Id: ip_fil_netbsd.c,v 2.55.2.12 2004/07/06 11:1
 # include <netinet/icmp6.h>
 # if (__NetBSD_Version__ >= 106000000)
 #  include <netinet6/nd6.h>
+#  include <netinet6/scope6_var.h>
 # endif
 #endif
 #include "netinet/ip_fil.h"
@@ -1350,22 +1351,20 @@ frdest_t *fdp;
 	/* KAME */
 	if ((error = in6_setscope(&dst6->sin6_addr, ifp, NULL)) != 0)
 		goto bad;
-	else if (ro->ro_rt->rt_flags & RTF_GATEWAY)
-			dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
-		ro->ro_rt->rt_use++;
+	if (ro->ro_rt->rt_flags & RTF_GATEWAY)
+		dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
+	ro->ro_rt->rt_use++;
 
 #if (__NetBSD_Version__ <= 106009999)
-		mtu = nd_ifinfo[ifp->if_index].linkmtu;
+	mtu = nd_ifinfo[ifp->if_index].linkmtu;
 #else
-		mtu = ND_IFINFO(ifp)->linkmtu;
+	mtu = ND_IFINFO(ifp)->linkmtu;
 #endif
-		if (m0->m_pkthdr.len <= mtu) {
-			*mpp = NULL;
-			error = nd6_output(ifp, fin->fin_ifp, m0,
-						   dst6, ro->ro_rt);
-		} else {
-			error = EMSGSIZE;
-		}
+	if (m0->m_pkthdr.len <= mtu) {
+		*mpp = NULL;
+		error = nd6_output(ifp, fin->fin_ifp, m0, dst6, ro->ro_rt);
+	} else {
+		error = EMSGSIZE;
 	}
 bad:
 	if (ro->ro_rt != NULL) {
