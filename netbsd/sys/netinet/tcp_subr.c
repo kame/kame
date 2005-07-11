@@ -863,7 +863,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			}
 		} else if (family == AF_INET6) {
 			if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-			    &tp->t_in6pcb->in6p_faddr))
+			    &tp->t_in6pcb->in6p_faddr)) {
 				panic("tcp_respond: ip6_dst != in6p_faddr");
 			}
 		} else
