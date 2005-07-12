@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.118 2005/07/12 08:39:49 keiichi Exp $	*/
+/*	$KAME: ndp.c,v 1.119 2005/07/12 10:00:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -909,9 +909,15 @@ rtmsg(cmd)
 	case RTM_GET:
 		rtm->rtm_addrs |= RTA_DST;
 	}
+#ifndef __OpenBSD__
 #define NEXTADDR(w, s) \
 	if (rtm->rtm_addrs & (w)) { \
 		bcopy((char *)&s, cp, sizeof(s)); cp += SA_SIZE(&s);}
+#else
+#define NEXTADDR(w, s) \
+	if (rtm->rtm_addrs & (w)) { \
+		bcopy((char *)&s, cp, sizeof(s)); ADVANCE(cp, (struct sockaddr *)&s); }
+#endif
 
 	NEXTADDR(RTA_DST, sin_m);
 	NEXTADDR(RTA_GATEWAY, sdl_m);
