@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.154 2005/07/12 01:13:17 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.155 2005/07/12 01:53:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -149,7 +149,8 @@ ip6_forward(m, srcrt)
 	struct mip6_bc_internal *bce;
 #endif
 #ifndef __FreeBSD__
-	long time_second = time.tv_sec;
+	/* XXX: tine_second is defined in pfvar.h. */
+	/* long time_second = mono_time.tv_sec; */
 #endif
 
 #ifdef IPSEC
