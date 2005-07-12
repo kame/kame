@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.234 2005/06/16 18:29:29 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.235 2005/07/12 01:21:58 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -797,11 +797,6 @@ ipsec6_getpolicybypcb(m, dir, in6p, error)
 	/* sanity check */
 	if (m == NULL || in6p == NULL || error == NULL)
 		panic("ipsec6_getpolicybypcb: NULL pointer was passed.");
-
-#ifdef DIAGNOSTIC
-	if (so->so_proto->pr_domain->dom_family != AF_INET6)
-		panic("ipsec6_getpolicybypcb: socket domain != inet6");
-#endif
 
 	pcbsp = in6p->in6p_sp;
 
