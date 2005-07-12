@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.117 2005/06/28 02:18:41 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.118 2005/07/12 08:39:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -911,7 +911,7 @@ rtmsg(cmd)
 	}
 #define NEXTADDR(w, s) \
 	if (rtm->rtm_addrs & (w)) { \
-		bcopy((char *)&s, cp, sizeof(s)); cp += sizeof(s);}
+		bcopy((char *)&s, cp, sizeof(s)); cp += SA_SIZE(&s);}
 
 	NEXTADDR(RTA_DST, sin_m);
 	NEXTADDR(RTA_GATEWAY, sdl_m);
