@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.19 2005/07/08 02:16:23 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.20 2005/07/13 01:45:31 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -196,9 +196,10 @@ main(argc, argv)
 		config_get_number(CFT_PREFERENCE, &preference, if_params);
 	}
 	if (config_params != NULL) {
-		config_get_number(CFT_DEBUG, &debug, if_params);
-		config_get_number(CFT_COMMANDPORT, &command_port, if_params);
-		config_get_number(CFT_PREFERENCE, &preference, if_params);
+		config_get_number(CFT_DEBUG, &debug, config_params);
+		config_get_number(CFT_COMMANDPORT, &command_port,
+		    config_params);
+		config_get_number(CFT_PREFERENCE, &preference, config_params);
 	}
 
 	/* start timer */
@@ -234,7 +235,7 @@ main(argc, argv)
 	/* notify a kernel to behave as a home agent. */
 	mipsock_nodetype_request(MIP6_NODETYPE_HOME_AGENT, 1);
 
-	if (debug == 0)
+	if (foreground == 0)
 		daemon(0, 0);
 
 	/* dump current PID */
@@ -402,8 +403,10 @@ had_init_homeprefix (ifname, preference)
 		(void)strncpy(ifreq6.ifr_name, ifname, strlen(ifname));
 		memcpy(&ifreq6.ifr_addr, ifa->ifa_addr, ifa->ifa_addr->sa_len);
 
-		if(ioctl(ioctl_s, SIOCGIFAFLAG_IN6, (caddr_t)&ifreq6) < 0) 
+		if(ioctl(ioctl_s, SIOCGIFAFLAG_IN6, (caddr_t)&ifreq6) < 0) {
+			close(ioctl_s);
 			continue;
+		}
 		close(ioctl_s);
 
 		/* dont use anycast addresses as home agent address */
