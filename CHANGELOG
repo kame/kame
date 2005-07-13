@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2779 2005/07/04 12:34:31 suz Exp $
+$KAME: CHANGELOG,v 1.2780 2005/07/13 11:32:29 keiichi Exp $
 
 <200507>
+Wed Jul 13 20:26:31 JST 2005	keiichi@iijlab.net
+	* kame/kame/ndp/ndp.c
+	fixed the proxy directive to work properly.
+
 2005-07-04  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/netinet/ip_fw2.c
 	  FreeBSD Security Advisory FreeBSD-SA-05:13.ipfw
