@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.158 2005/06/16 18:29:30 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.159 2005/07/13 07:46:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1044,6 +1044,10 @@ nd6_na_output(ifp, daddr6_0, taddr6, flags, tlladdr, sdl0)
 		flags &= ~ND_NA_FLAG_SOLICITED;
 	}
 	ip6->ip6_dst = daddr6;
+	bzero(&dst_sa, sizeof(struct sockaddr_in6));
+	dst_sa.sin6_family = AF_INET6;
+	dst_sa.sin6_len = sizeof(struct sockaddr_in6);
+	dst_sa.sin6_addr = daddr6;
 
 	/*
 	 * Select a source whose scope is the same as that of the dest.
