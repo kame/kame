@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.19 2003/04/30 05:09:01 suz Exp $	*/
+/*	$KAME: cftoken.l,v 1.20 2005/07/14 12:39:04 suz Exp $	*/
 
 %{
 /*
@@ -91,6 +91,7 @@ slash		\/
 %s S_PHYINT S_IFCONF S_CANDRP S_CANDBSR S_PREFIX
 %s S_THRES
 %s S_STATICRP
+%s S_STATIC
 
 %%
 %{
@@ -589,6 +590,10 @@ slash		\/
 <S_CNF>static_rp { YYD_ECHO; BEGIN S_STATICRP; return(STATICRP); }
 <S_STATICRP>priority { YYD_ECHO; return(PRIORITY); }
 <S_STATICRP>{semi} { DP("end static_rp"); BEGIN S_CNF; return(EOS); }
+
+	/* static route */
+<S_CNF>static { YYD_ECHO; BEGIN S_STATIC; return(STATIC); }
+<S_STATIC>{semi} { DP("end static"); BEGIN S_CNF; return(EOS); }
 
 	/* various parameters */
 <S_CNF>default_source_metric { YYD_ECHO; return(SRCMETRIC); }

@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.conf.5,v 1.23 2004/11/04 11:16:22 suz Exp $
+.\"	$KAME: pim6sd.conf.5,v 1.24 2005/07/14 12:39:04 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -288,6 +288,13 @@ Another optional parameter
 specifies the priority of the RP.
 The default value is 0, which means the highest priority.
 .\"
+.It Xo
+.Ic static
+.Ar prefix
+.Ar address
+.Ic ;
+.Xc
+Specifics a static route only for RPF calculation.
 .It Xo
 .Ic static_rp
 .Ar prefix

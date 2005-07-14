@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2780 2005/07/13 11:32:29 keiichi Exp $
+$KAME: CHANGELOG,v 1.2781 2005/07/14 12:39:03 suz Exp $
 
 <200507>
+2005-07-14  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/kame/pim6sd/{cfparse.y, cftoken.l, pim6sd.conf.5, 
+	  routesock.c, routesock.h}: implemented a static MRIB
+	  for RPF calculation.
+
 Wed Jul 13 20:26:31 JST 2005	keiichi@iijlab.net
 	* kame/kame/ndp/ndp.c
 	fixed the proxy directive to work properly.

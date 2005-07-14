@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.21 2003/10/21 08:15:45 itojun Exp $	*/
+/*	$KAME: routesock.c,v 1.22 2005/07/14 12:39:04 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -57,6 +57,7 @@
 
 #include <sys/param.h>
 #include <sys/file.h>
+#include <sys/queue.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -81,6 +82,7 @@
 #include "routesock.h"
 #include "mrt.h"
 #include "inet6.h"
+#include "pimd.h"
 
 #ifdef HAVE_ROUTING_SOCKETS
 union sockunion
@@ -175,6 +177,7 @@ k_req_incoming(source, rpfp)
     register char  *cp = m_rtmsg.m_space;
     register int    l;
     struct rpfctl   rpfinfo;
+    struct staticrt *entry;
 
     /* TODO: a hack!!!! */
 #ifdef HAVE_SA_LEN
@@ -203,6 +206,26 @@ k_req_incoming(source, rpfp)
     {
 	rpfp->rpfneighbor = *source;
 	return (TRUE);
+    }
+
+    /*
+     * check the static-rpf configuration
+     */
+    if ((entry = find_static_rt_entry(source)) != NULL) {
+    	mifi_t mifi;
+	struct pim_nbr_entry *nbr;
+
+	if ((mifi = find_vif_direct_local(&entry->gwaddr)) != NO_VIF) {
+	    for (nbr= uvifs[mifi].uv_pim_neighbors; nbr; nbr = nbr->next) {
+	        if (inet6_equal(&nbr->address, &entry->gwaddr))
+			break;
+	    }
+	    if (nbr != NULL) {
+		rpfp->rpfneighbor = nbr->address;
+		rpfp->iif = mifi;
+		return (TRUE);
+	    }
+	}
     }
 
     /* prepare the routing socket params */
@@ -449,3 +472,53 @@ k_req_incoming(source, rpfcinfo)
 }
 
 #endif				/* HAVE_ROUTING_SOCKETS */
+
+TAILQ_HEAD(staticrt_list, staticrt);
+static struct staticrt_list staticrt_head;
+
+int add_static_rt_entry(paddr, plen, gwaddr)
+	struct sockaddr_in6 *paddr;
+	int plen;
+	struct sockaddr_in6 *gwaddr;
+{
+	struct staticrt *entry;
+	struct in6_addr mask;
+
+	memset(&mask, 0, sizeof(mask));
+	MASKLEN_TO_MASK6(plen, mask);
+
+	if (TAILQ_EMPTY(&staticrt_head))
+		TAILQ_INIT(&staticrt_head);
+
+	TAILQ_FOREACH(entry, &staticrt_head, link) {
+		if (inet6_same_prefix(paddr, &entry->paddr, &mask))
+			return -1;
+	}
+	entry = malloc(sizeof(struct staticrt));
+	entry->paddr = *paddr;
+	entry->plen = plen;
+	entry->gwaddr = *gwaddr;
+	TAILQ_INSERT_TAIL(&staticrt_head, entry, link);
+
+	return 0;
+}
+
+struct staticrt *find_static_rt_entry(addr)
+	struct sockaddr_in6 *addr;
+{
+	struct staticrt *entry;
+
+	if (TAILQ_EMPTY(&staticrt_head))
+		return NULL;
+
+	TAILQ_FOREACH(entry, &staticrt_head, link) {
+		struct in6_addr mask;
+		memset(&mask, 0, sizeof(mask));
+		MASKLEN_TO_MASK6(entry->plen, mask);
+
+		if (inet6_match_prefix(addr, &entry->paddr, &mask))
+			return entry;
+	}
+	return NULL;
+}
+

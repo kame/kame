@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.37 2005/05/19 08:11:26 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.38 2005/07/14 12:39:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -38,6 +38,7 @@
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_mroute.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <string.h>
 #include <syslog.h>
 #include <stdio.h>
@@ -46,6 +47,7 @@
 #include "defs.h"
 #include "vif.h"
 #include "mrt.h"
+#include "routesock.h"
 #include "rp.h"
 
 #include "var.h"
@@ -82,6 +84,7 @@ struct attr_list {
 		double number;
 		struct in6_prefix prefix;
 		struct staticrp staticrp;
+		struct staticrt staticrt;
 	}attru;
 };
 
@@ -89,12 +92,12 @@ enum {IFA_FLAG, IFA_PREFERENCE, IFA_METRIC, RPA_PRIORITY, RPA_TIME,
       BSRA_PRIORITY, BSRA_TIME, BSRA_MASKLEN, IN6_PREFIX, THRESA_RATE,
       THRESA_INTERVAL,
       IFA_ROBUST, IFA_QUERY_INT, IFA_QUERY_INT_RESP, IFA_MLD_VERSION, IFA_LLQI,
-      RPA_STATICADDR,
+      RPA_STATICADDR, STATICRT,
      };
 
 static int strict;		/* flag if the grammer check is strict */
 static struct attr_list *rp_attr, *bsr_attr, *grp_prefix, *regthres_attr,
-	*datathres_attr, *static_rp;
+	*datathres_attr, *static_rp, *static_rt;
 static int srcmetric, srcpref, helloperiod, jpperiod, granularity,
 	datatimo, regsuptimo, probetime, asserttimo;
 static double helloperiod_coef, jpperiod_coef;
@@ -113,6 +116,7 @@ static int phyint_config __P((void));
 static int rp_config __P((void));
 static int bsr_config __P((void));
 static int static_rp_config __P((void));
+static int static_rt_config __P((void));
 static int regthres_config __P((void));
 static int datathres_config __P((void));
 
@@ -133,6 +137,7 @@ static int datathres_config __P((void));
 %token ROBUST QUERY_INT QUERY_INT_RESP MLD_VERSION LLQI
 %token GRPPFX
 %token STATICRP
+%token STATIC
 %token CANDRP CANDBSR TIME PRIORITY MASKLEN
 %token NUMBER STRING SLASH ANY
 %token REGTHRES DATATHRES RATE INTERVAL
@@ -159,6 +164,7 @@ statement:
 	|	candrp_statement
 	|	candbsr_statement
 	|	staticrp_statement
+	|	staticroute_statement
 	|	grppfx_statement
 	|	regthres_statement
 	|	datathres_statement
@@ -448,7 +454,6 @@ staticrp_statement:
 		new->attru.staticrp = entry;
 		new->next = static_rp;
 		static_rp = new;
-		static_rp_flag = TRUE;
 	}
 	;
 
@@ -456,6 +461,77 @@ staticrp_priority :
 	  { $$ = PIM_DEFAULT_CAND_RP_PRIORITY; }
 	| PRIORITY NUMBER
 	  { $$ = $2; }
+	;
+
+staticroute_statement: 
+	STATIC STRING SLASH NUMBER STRING EOS {
+		struct staticrt entry;
+		struct attr_list *new;
+		struct addrinfo hints, *res;
+		int syntax_ng = 0;
+
+		bzero(&entry, sizeof(entry));
+		entry.paddr.sin6_family = AF_INET6;
+		entry.paddr.sin6_len = sizeof(entry.paddr);
+		if (inet_pton(AF_INET6, $2.v, &entry.paddr.sin6_addr) != 1) {
+			yywarn("invalid IPv6 address: %s", $2.v);
+			syntax_ng = 1;
+		}
+		if (IN6_IS_ADDR_MULTICAST(&entry.paddr.sin6_addr)) {
+			yywarn("static route prefix(%s) must be unicast",
+			       sa6_fmt(&entry.paddr));
+			syntax_ng = 1;
+		}
+		if (IN6_IS_ADDR_LINKLOCAL(&entry.paddr.sin6_addr)) {
+			yywarn("static route prefix (%s) has a narrow scope ",
+			       sa6_fmt(&entry.paddr));
+			syntax_ng = 1;
+		}
+		free($2.v);	/* XXX: which was allocated dynamically */
+
+		entry.plen = $4;
+		if (entry.plen > 128) {
+			yywarn("invalid prefix length: %d", entry.plen);
+			syntax_ng = 1;
+		}
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET6;
+		hints.ai_flags = AI_NUMERICHOST;
+		if (getaddrinfo($5.v, NULL, &hints, &res)) {
+			yywarn("invalid gateway address: %s", $5.v);
+			syntax_ng = 1;
+		}
+		if (res == NULL || res->ai_addrlen == 0) {
+			yywarn("invalid gateway address: %s", $5.v);
+			syntax_ng = 1;
+		}
+		if (res && res->ai_addr) {
+		    struct sockaddr_in6 *addr; 
+		    addr = (struct sockaddr_in6 *)res->ai_addr;
+		    if (!IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
+			yywarn("gateway address (%s) must be a "
+			       "link-local address", sa6_fmt(addr));
+			syntax_ng = 1;
+		    }
+		}
+		free($5.v);	/* XXX: which was allocated dynamically */
+
+		if (syntax_ng)
+			break;
+		memcpy(&entry.gwaddr, res->ai_addr, res->ai_addrlen);
+		freeaddrinfo(res);
+
+		if ((new = malloc(sizeof(*new))) == NULL) {
+			yyerror("malloc failed");
+			return(0);
+		}
+		memset(new, 0, sizeof(*new));
+		new->type = STATICRT;
+		new->attru.staticrt = entry;
+		new->next = static_rt;
+		static_rt = new;
+	}
 	;
 
 /* group_prefix <group-addr>/<prefix_len> */
@@ -964,6 +1040,27 @@ static_rp_config()
 }
 
 static int
+static_rt_config()
+{
+	struct attr_list *al;
+
+	for (al = static_rt; al; al = al->next) {
+		struct staticrt *entry;
+		int error;
+
+		if (al->type != STATICRT)
+			continue;
+		entry = &al->attru.staticrt;
+
+		error = add_static_rt_entry(&entry->paddr, entry->plen,
+			    &entry->gwaddr);
+		if (error)
+			return error;
+	}
+	return(0);
+}
+
+static int
 rp_config()
 {
 	struct attr_list *al;
@@ -1199,6 +1296,8 @@ cf_post_config()
 
 	static_rp_config();
 
+	static_rt_config();
+
 	if (cand_bsr_flag == TRUE)
 		bsr_config();
 
@@ -1226,6 +1325,7 @@ cf_post_config()
 	if (rp_attr) free_attr_list(rp_attr);
 	if (bsr_attr) free_attr_list(bsr_attr);
 	if (static_rp) free_attr_list(static_rp);
+	if (static_rt) free_attr_list(static_rt);
 	if (regthres_attr) free_attr_list(regthres_attr);
 	if (datathres_attr) free_attr_list(datathres_attr);
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v)
@@ -1245,7 +1345,7 @@ cf_init(s, d)
 	debugonly = d;
 
 	rp_attr = bsr_attr = grp_prefix = regthres_attr	= datathres_attr
-		= static_rp = NULL;
+		= static_rp = static_rt = NULL;
 
 	cand_rp_flag = cand_bsr_flag = static_rp_flag = FALSE;
 	cand_rp_ifname = cand_bsr_ifname = NULL;

@@ -1,4 +1,4 @@
-/*	$KAME: routesock.h,v 1.5 2003/02/07 10:40:48 suz Exp $	*/
+/*	$KAME: routesock.h,v 1.6 2005/07/14 12:39:04 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -49,10 +49,18 @@
 #ifndef ROUTESOCK_H
 #define ROUTESOCK_H
 
+struct staticrt {
+	struct sockaddr_in6 paddr;
+	u_int8 plen;
+	struct sockaddr_in6 gwaddr;
+	TAILQ_ENTRY(staticrt) link;
+};
+
 int init_routesock __P((void));
 extern int routing_socket;
 extern int pid;
-extern int    k_req_incoming         __P((struct sockaddr_in6 *source,
-                      struct rpfctl *rpfp)); 
-
+extern int k_req_incoming __P((struct sockaddr_in6 *src, struct rpfctl *rpfp)); 
+extern struct staticrt * find_static_rt_entry __P((struct sockaddr_in6 *p));
+extern int add_static_rt_entry
+	__P((struct sockaddr_in6 *p, int plen, struct sockaddr_in6 *gw));
 #endif
