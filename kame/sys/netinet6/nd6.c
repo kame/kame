@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.383 2005/07/14 13:23:35 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.384 2005/07/14 14:15:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3046,6 +3046,7 @@ fill_prlist(req)
 #endif
 				*in6 = pfr->router->rtaddr;
 				sa6.sin6_addr = *in6;
+				sa6.sin6_scope_id = 0;
 				if (sa6_recoverscope(&sa6)) {
 					log(LOG_ERR,
 					    "scope error in "
