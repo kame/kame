@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.46 2005/07/07 05:06:54 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.47 2005/07/14 14:14:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -250,73 +250,6 @@ in6_addrscope(addr)
 	}
 
 	return IPV6_ADDR_SCOPE_GLOBAL;
-}
-
-/*
- * When we introduce the "4+28" split semantics in sin6_scope_id,
- * a 32bit integer is not enough to tell a large ID from an error (-1).
- * So, we intentionally use a large type as the return value.
- */
-int
-in6_addr2zoneid(ifp, addr, ret_id)
-	struct ifnet *ifp;	/* must not be NULL */
-	struct in6_addr *addr;	/* must not be NULL */
-	u_int32_t *ret_id;	/* must not be NULL */
-{
-	int scope;
-	u_int32_t zoneid = 0;
-	struct scope6_id *sid = SID(ifp);
-
-#ifdef DIAGNOSTIC
-	if (sid == NULL) { /* should not happen */
-		panic("in6_addr2zoneid: scope array is NULL");
-		/* NOTREACHED */
-	}
-	if (ret_id == NULL) {
-		panic("in6_addr2zoneid: return ID is null");
-		/* NOTREACHED */
-	}
-#endif
-
-	/*
-	 * special case: the loopback address can only belong to a loopback
-	 * interface.
-	 */
-	if (IN6_IS_ADDR_LOOPBACK(addr)) {
-		if (!(ifp->if_flags & IFF_LOOPBACK))
-			return (-1);
-		else {
-			*ret_id = 0; /* there's no ambiguity */
-			return (0);
-		}
-	}
-
-	scope = in6_addrscope(addr);
-
-	switch (scope) {
-	case IPV6_ADDR_SCOPE_INTFACELOCAL: /* should be interface index */
-		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL];
-		break;
-
-	case IPV6_ADDR_SCOPE_LINKLOCAL:
-		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL];
-		break;
-
-	case IPV6_ADDR_SCOPE_SITELOCAL:
-		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_SITELOCAL];
-		break;
-
-	case IPV6_ADDR_SCOPE_ORGLOCAL:
-		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL];
-		break;
-
-	default:
-		zoneid = 0;	/* XXX: treat as global. */
-		break;
-	}
-
-	*ret_id = zoneid;
-	return (0);
 }
 
 void
