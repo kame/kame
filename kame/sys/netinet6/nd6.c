@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.382 2005/06/20 09:18:33 t-momose Exp $	*/
+/*	$KAME: nd6.c,v 1.383 2005/07/14 13:23:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3046,7 +3046,12 @@ fill_prlist(req)
 #endif
 				*in6 = pfr->router->rtaddr;
 				sa6.sin6_addr = *in6;
-				in6_clearscope(&sa6.sin6_addr);
+				if (sa6_recoverscope(&sa6)) {
+					log(LOG_ERR,
+					    "scope error in "
+					    "prefix list (%s)\n",
+					    ip6_sprintf(&pfr->router->rtaddr));
+				}
 #ifdef __FreeBSD__
 				SYSCTL_OUT(req, &sa6, sizeof(sa6));
 #endif
