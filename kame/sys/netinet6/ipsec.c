@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.235 2005/07/12 01:21:58 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.236 2005/07/14 11:35:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2456,7 +2456,7 @@ ipsec6_encapsulate(m, sav)
 	{
 		struct sockaddr_in6 sa6;
 
-		sa6 = *((struct sockaddr_in6 *)&sav->sah->saidx.dst);
+		sa6 = *(struct sockaddr_in6 *)&sav->sah->saidx.dst;
 		if ((error = sa6_embedscope(&sa6, 0)) != 0)
 			return (error);
 		ip6->ip6_dst = sa6.sin6_addr;
