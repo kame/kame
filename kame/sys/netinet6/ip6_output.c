@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.472 2005/07/08 03:24:54 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.473 2005/07/14 11:31:27 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3791,10 +3791,12 @@ ip6_setmoptions(optname, im6op, m)
 		}
 
 		/* Fill in the scope zone ID */
-		if (ifp && in6_setscope(&mreq->ipv6mr_multiaddr, ifp, NULL)) {
-			/* XXX: should not happen */
-			error = EADDRNOTAVAIL;
-			break;
+		if (ifp) {
+			if (in6_setscope(&mreq->ipv6mr_multiaddr, ifp, NULL)) {
+				/* XXX: should not happen */
+				error = EADDRNOTAVAIL;
+				break;
+			}
 		} else if (mreq->ipv6mr_interface != 0) {
 			/*
 			 * This case happens when the (positive) index is in
