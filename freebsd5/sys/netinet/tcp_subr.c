@@ -2245,10 +2245,10 @@ sysctl_drop(SYSCTL_HANDLER_ARGS)
 		}
 		error = sa6_embedscope(fin6, ip6_use_defzone);
 		if (error)
-			return (EINVAL);
+			return (error);
 		error = sa6_embedscope(lin6, ip6_use_defzone);
 		if (error)
-			return (EINVAL);
+			return (error);
 		break;
 #endif
 	case AF_INET:
