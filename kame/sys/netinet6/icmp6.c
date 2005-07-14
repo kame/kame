@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.406 2005/06/16 18:29:27 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.407 2005/07/14 11:05:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2580,8 +2580,6 @@ icmp6_reflect(m, off)
 	 * ip6_input() drops a packet if its src is multicast.
 	 * So, the src is never multicast and can be used as the destination
 	 * of the returned packet.
-	 * We should make a copy of osrc because we're going to update
-	 * the content of the pointer in ip6_setpktaddrs().
 	 */
 	ip6->ip6_src = *src;
 	ip6->ip6_flow = 0;
