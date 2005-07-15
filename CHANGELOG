@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2781 2005/07/14 12:39:03 suz Exp $
+$KAME: CHANGELOG,v 1.2782 2005/07/15 09:20:32 suz Exp $
 
 <200507>
+2005-07-15  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/sys/netinet6/ah_aesxcbcmac.c: fixed an 
+	interoperability problem in AES-XCBC-MAC96.
+	(encryption was always done with the same key)
+
+	Submitted from: Yukiyo Akisada <akisada@64translator.com>
+	
 2005-07-14  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/kame/pim6sd/{cfparse.y, cftoken.l, pim6sd.conf.5, 
 	  routesock.c, routesock.h}: implemented a static MRIB
