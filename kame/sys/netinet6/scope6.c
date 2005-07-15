@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.48 2005/07/15 15:23:53 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.49 2005/07/15 15:28:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -455,7 +455,7 @@ in6_setscope(in6, ifp, ret_id)
 
 /*
  * Just clear the embedded scope identifier.  Return 0 if the original address
- * is intact; return 0 if the address is modified.
+ * is intact; return non 0 if the address is modified.
  */
 int
 in6_clearscope(in6)
