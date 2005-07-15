@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.363 2005/07/15 15:23:53 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.364 2005/07/15 15:25:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -654,7 +654,7 @@ passin:
 	 * dst are the loopback address and the receiving interface
 	 * is not loopback. 
 	 */
-	if (in6_clearscope(&ip6->ip6_src) ||in6_clearscope(&ip6->ip6_dst)) {
+	if (in6_clearscope(&ip6->ip6_src) || in6_clearscope(&ip6->ip6_dst)) {
 		ip6stat.ip6s_badscope++; /* XXX */
 		goto bad;
 	}
