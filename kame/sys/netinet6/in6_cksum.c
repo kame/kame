@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.17 2005/07/15 15:08:34 jinmei Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.18 2005/07/15 15:13:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,7 @@
 #include <sys/systm.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
+#include <netinet6/scope6_var.h>
 
 #include <net/net_osdep.h>
 
