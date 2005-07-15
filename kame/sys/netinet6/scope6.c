@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.47 2005/07/14 14:14:32 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.48 2005/07/15 15:23:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -454,12 +454,20 @@ in6_setscope(in6, ifp, ret_id)
 }
 
 /*
- * just clear the embedded scope identifier.
+ * Just clear the embedded scope identifier.  Return 0 if the original address
+ * is intact; return 0 if the address is modified.
  */
-void
+int
 in6_clearscope(in6)
 	struct in6_addr *in6;
 {
-	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6))
+	int modified = 0;
+
+	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
+		if (in6->s6_addr16[1] != 0)
+			modified = 1;
 		in6->s6_addr16[1] = 0;
+	}
+
+	return (modified);
 }

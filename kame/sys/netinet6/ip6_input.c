@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.362 2005/06/16 18:29:28 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.363 2005/07/15 15:23:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -646,10 +646,18 @@ passin:
 
 	/*
 	 * Disambiguate address scope zones (if there is ambiguity).
-	 * This routine also checks and reject the cases where src or
+	 * We first make sure that the original source or destination address
+	 * is not in our internal form for scoped addresses.  Such addresses
+	 * are not necessarily invalid spec-wise, but we cannot accept them due
+	 * to the usage conflict.
+	 * in6_setscope() then also checks and rejects the cases where src or
 	 * dst are the loopback address and the receiving interface
 	 * is not loopback. 
 	 */
+	if (in6_clearscope(&ip6->ip6_src) ||in6_clearscope(&ip6->ip6_dst)) {
+		ip6stat.ip6s_badscope++; /* XXX */
+		goto bad;
+	}
 	if (in6_setscope(&ip6->ip6_src, m->m_pkthdr.rcvif, NULL) ||
 	    in6_setscope(&ip6->ip6_dst, m->m_pkthdr.rcvif, NULL)) {
 		ip6stat.ip6s_badscope++;
