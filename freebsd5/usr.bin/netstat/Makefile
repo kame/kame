@@ -3,11 +3,12 @@
 
 PROG=	netstat
 SRCS=	if.c inet.c inet6.c main.c mbuf.c mcast.c mroute.c ipx.c route.c \
-	unix.c atalk.c netgraph.c mroute6.c ipsec.c
+	unix.c atalk.c netgraph.c mroute6.c ipsec.c sctp.c
 CFLAGS+=-Wall -I${.CURDIR}
 CFLAGS+=-DIPSEC
 CFLAGS+=-DINET6
 CFLAGS+=-DDCCP
+CFLAGS+=-DSCTP
 WARNS?=	2
 NO_WERROR=
 
