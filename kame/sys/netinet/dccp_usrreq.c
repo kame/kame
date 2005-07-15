@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.54 2005/06/21 10:21:03 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.55 2005/07/15 09:03:05 suz Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -4162,18 +4162,17 @@ dccp_nocc_packet_recv(void *ccb, char* options ,int optlen)
 {
 }
 
-#ifndef __FreeBSD__
 #ifdef DCCP_DEBUG_ON
 void
 dccp_log(int level, char *format, ...)
 {
+#ifndef __FreeBSD__
 	va_list ap;
 
 	va_start(ap, format);
 	vprintf(format,  ap);
 	va_end(ap);
-
+#endif
 	return;
 }
-#endif
 #endif
