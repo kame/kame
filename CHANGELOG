@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2782 2005/07/15 09:20:32 suz Exp $
+$KAME: CHANGELOG,v 1.2783 2005/07/15 15:02:02 jinmei Exp $
 
 <200507>
+2005-07-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_output): do not send
+	ctlinput notification unconditionally when an outgoing packet is
+	larger than the link MTU.  From FreeBSD.
+
 2005-07-15  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/ah_aesxcbcmac.c: fixed an 
 	interoperability problem in AES-XCBC-MAC96.
