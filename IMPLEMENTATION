@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.393 2005/06/16 22:22:40 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.394 2005/07/15 15:32:14 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -507,8 +507,13 @@ Typically, the following functions will be most generally used:
 
   This function returns 0 on success, or a non-0 error code otherwise.
 
-- void in6_clearscope(struct in6_addr *in6);
-  Reset the embedded zone ID in 'in6' to 0.  This function never fails.
+- int in6_clearscope(struct in6_addr *in6);
+  Reset the embedded zone ID in 'in6' to 0.  This function never fails, and
+  returns 0 if the original address is intact or non 0 if the address is
+  modified.  The return value doesn't matter in most cases; currently, the
+  only point where we care about the return value is ip6_input() for checking
+  whether the source or destination addresses of the incoming packet is in
+  the embedded form.
 
 - int in6_setscope(struct in6_addr *in6, struct ifnet *ifp,
                    u_int32_t *zoneidp);
