@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.20 2005/03/06 16:04:18 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.21 2005/07/16 01:18:47 suz Exp $	*/
 
 #ifndef __sctp_pcb_h__
 #define __sctp_pcb_h__
@@ -39,9 +39,6 @@
  * We must have V6 so the size of the proto can be calculated. Otherwise
  * we would not allocate enough for Net/Open BSD :-<
  */
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
-#include <net/pfil.h>
-#endif
 #include <net/if.h>
 #ifdef __FreeBSD__
 #include <net/if_var.h>
