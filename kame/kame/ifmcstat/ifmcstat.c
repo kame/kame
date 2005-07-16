@@ -1,3 +1,5 @@
+/*	$KAME: ifmcstat.c,v 1.47 2005/07/16 08:47:48 jinmei Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
