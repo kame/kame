@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.12 2005/06/09 02:16:10 keiichi Exp $ */
+/* $Id: mipsock.c,v 1.13 2005/07/16 15:35:13 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -66,13 +66,18 @@
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 
+#ifdef __APPLE__
+#include <machine/spl.h>
+#define thread proc
+#endif /* __APPLE__ */
+
 /*MALLOC_DEFINE(M_RTABLE, "routetbl", "routing tables");*/
 
 static struct	sockaddr mips_dst = { 2, PF_MOBILITY, };
 static struct	sockaddr mips_src = { 2, PF_MOBILITY, };
 static struct	sockproto mips_proto = { PF_MOBILITY, };
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 static int mips_abort(struct socket *);
 static int mips_attach(struct socket *, int, struct thread *);
 static int mips_bind(struct socket *, struct sockaddr *, struct thread *);
@@ -85,7 +90,7 @@ static int mips_peeraddr(struct socket *, struct sockaddr **);
 static int mips_shutdown(struct socket *);
 static int mips_sockaddr(struct socket *, struct sockaddr **);
 #endif
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 static int mips_output(struct mbuf *, struct socket *);
 #else
 static int mips_output(struct mbuf *, ...);
@@ -98,7 +103,7 @@ int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf 
 int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *);
 #endif
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 /*
  * It really doesn't make any sense at all for this code to share much
  * with raw_usrreq.c, since its functionality is so restricted.  XXX
@@ -143,7 +148,11 @@ mips_attach(so, proto, p)
 	rp = sotorawcb(so);
 	if (error) {
 		splx(s);
+#ifdef __APPLE__
+		FREE(rp, M_PCB);
+#else
 		free(rp, M_PCB);
+#endif
 		return error;
 	}
 	switch(rp->rcb_proto.sp_protocol) {
@@ -369,7 +378,7 @@ mips_usrreq(so, req, m, nam, control)
 
 /*ARGSUSED*/
 static int
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 mips_output(m, so)
 	register struct mbuf *m;
 	struct socket *so;
@@ -545,7 +554,7 @@ mips_msg1(type, len)
 	if (len > MCLBYTES)
 		panic("mips_msg1");
 	m = m_gethdr(M_DONTWAIT, MT_DATA);
-	if (m && len > MHLEN) {
+	if (m && (size_t)len > MHLEN) {
 		MCLGET(m, M_DONTWAIT);
 		if ((m->m_flags & M_EXT) == 0) {
 			m_free(m);
@@ -725,24 +734,38 @@ extern struct domain mipdomain;		/* or at least forward */
 static struct protosw mipsw[] = {
 { SOCK_RAW,	&mipdomain,	0,		PR_ATOMIC|PR_ADDR,
   0,		mips_output,	raw_ctlinput,	0,
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
   0,
 #else
   mips_usrreq,
 #endif
   raw_init,	0,		0,		0,
-#ifndef __FreeBSD__
+#ifdef __APPLE__
+  0,
+#endif
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
   0/*sysctl_rtable*/
 #else
   &mip_usrreqs
+#endif
+#ifdef __APPLE__
+  ,0,			0,		0,
+  { 0, 0 }, 	0,	{ 0 }
 #endif
 }
 };
 
 struct domain mipdomain =
 { PF_MOBILITY, "mip", 0, 0, 0,
-  mipsw, &mipsw[sizeof(mipsw)/sizeof(mipsw[0])] };
+  mipsw,
+#ifdef __APPLE__
+      0, 0, 0, 0, 0, 0, 0, 0, 
+      { 0, 0 }
+#else
+  &mipsw[sizeof(mipsw)/sizeof(mipsw[0])]
+#endif
+};
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 DOMAIN_SET(mip);
 #endif
