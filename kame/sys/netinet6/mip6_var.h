@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.122 2005/06/21 10:53:03 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.123 2005/07/17 20:40:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -175,8 +175,12 @@ struct mip6_bul_internal *mip6_bul_get(const struct in6_addr *,
 void mip6_bul_remove(struct mip6_bul_internal *);
 void mip6_bul_remove_all(void);
 struct mip6_bul_internal *mip6_bul_get_home_agent(const struct in6_addr *);
+#ifndef __APPLE__
 struct nd_prefixctl;
 int mip6_are_homeprefix(struct nd_prefixctl *);
+#else
+int mip6_are_homeprefix(struct nd_prefix *);
+#endif
 int mip6_ifa6_is_addr_valid_hoa(struct in6_ifaddr *);
 u_int8_t *mip6_create_hoa_opt(struct in6_addr *); 
 struct ip6_opt_home_address *mip6_search_hoa_in_destopt(u_int8_t *);

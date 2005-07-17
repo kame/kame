@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.221 2005/06/21 10:53:02 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.222 2005/07/17 20:40:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -43,13 +43,13 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/syslog.h>
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #include <sys/sysctl.h>
 #endif
 
@@ -82,6 +82,10 @@
 #ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
 #endif
+
+#ifdef __APPLE__
+#include <machine/spl.h>
+#endif /* __APPLE__ */
 
 #include "mip.h"
 
@@ -228,7 +232,7 @@ SYSCTL_SETUP(sysctl_net_inet6_mip6_setup, "sysctl net.inet6.mip6 subtree setup")
 }
 #endif /* __NetBSD__ */
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 SYSCTL_DECL(_net_inet6_mip6);
  
 SYSCTL_INT(_net_inet6_mip6, MIP6CTL_DEBUG, debug, CTLFLAG_RW,
@@ -237,15 +241,21 @@ SYSCTL_INT(_net_inet6_mip6, MIP6CTL_USE_IPSEC, use_ipsec, CTLFLAG_RW,
     &mip6ctl_use_ipsec, 0, "");
 SYSCTL_INT(_net_inet6_mip6, MIP6CTL_RR_HINT_PPSLIM, rr_hint_ppslimit, CTLFLAG_RW,
     &mip6ctl_rr_hint_ppslim, 0, "");
-#endif /* __FreeBSD__ */
+#endif /* __FreeBSD__ || __APPLE__*/
 
 /*
  * Mobility Header processing.
  */
 int
+#ifndef __APPLE__
 mip6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
+#else
+mip6_input(mp, offp)
+	struct mbuf **mp;
+	int *offp;
+#endif
 {
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
@@ -359,7 +369,11 @@ mip6_input(mp, offp, proto)
 	}
 
 	/* deliver the packet using Raw IPv6 interface. */
-	return (rip6_input(mp, offp, proto));
+	return (rip6_input(mp, offp
+#ifndef __APPLE__
+			   ,proto
+#endif
+			   ));
 }
 
 int
@@ -415,7 +429,7 @@ mip6_tunnel_input(mp, offp, proto)
 
 #ifdef __NetBSD__
 		s = splnet();
-#elif defined(__OpenBSD__)
+#elif defined(__OpenBSD__) || defined(__APPLE__)
 		s = splimp();
 #endif
 
@@ -675,6 +689,7 @@ static void
 mip6_bce_update_ipsecdb(bce)
 	struct mip6_bc_internal *bce;
 {
+#ifndef __APPLE__
 #ifdef IPSEC
 /* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
@@ -698,6 +713,7 @@ mip6_bce_update_ipsecdb(bce)
 	key_mip6_update_home_agent_ipsecdb(&hoa_sa, NULL, &coa_sa,
 	    &haaddr_sa);
 #endif /* IPSEC */
+#endif /* __APPLE__ */
 }
 
 void
@@ -769,8 +785,18 @@ mip6_ifa_ifwithin6addr(in6)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_addr = *in6;
+#ifndef __APPLE__
 	if (sa6_recoverscope(&sin6) != 0)
 		return (NULL);
+#else
+	/* XXXX */
+	/* should support scope6.c */
+	if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)
+	    /*||IN6_IS_ADDR_MC_INTFACELOCAL(&sin6.sin6_addr)*/) {
+		sin6.sin6_scope_id = ntohs(sin6.sin6_addr.s6_addr16[1]);
+		sin6.sin6_addr.s6_addr16[1] = 0;
+	}
+#endif
 
 	return ((struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)&sin6));
 }
@@ -917,6 +943,7 @@ static void
 mip6_bul_update_ipsecdb(mbul)
 	struct mip6_bul_internal *mbul;
 {
+#ifndef __APPLE__
 #ifdef IPSEC
 /* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
@@ -940,6 +967,7 @@ mip6_bul_update_ipsecdb(mbul)
 	key_mip6_update_mobile_node_ipsecdb(&hoa_sa, NULL, &coa_sa,
 	    &haaddr_sa);
 #endif
+#endif
 }
 
 void
@@ -957,14 +985,16 @@ mip6_bul_remove_all()
 	s = splnet();
 #endif
 
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #ifdef __FreeBSD__
 	IFNET_RLOCK();
+#endif
 	TAILQ_FOREACH(ifp, &ifnet, if_link)
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
 	TAILQ_FOREACH(ifp, &ifnet, if_list)
 #endif
 	 {
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) 
@@ -1091,7 +1121,7 @@ mip6_create_hoa_opt(coa)
 
 	/* allocating a new buffer space for a home address option. */
 	buflen = optlen + pad + sizeof(struct ip6_opt_home_address);
-	optbuf = (char *)malloc(buflen, M_IP6OPT, M_NOWAIT);
+	MALLOC(optbuf, char *, buflen, M_IP6OPT, M_NOWAIT);
 	if (optbuf == NULL)
 		return (NULL);
 	bzero(optbuf, buflen);
@@ -1202,10 +1232,17 @@ mip6_append_ip6_hdr(mp, osrc, odst)
 
 /* if the prefix is equal to one of home prefixes, return TRUE */
 int
-mip6_are_homeprefix(ndprctl)
-	struct nd_prefixctl *ndprctl;
+mip6_are_homeprefix(ndpr)
+#ifndef __APPLE__
+	struct nd_prefixctl *ndpr;
+#else
+	struct nd_prefix *ndpr;
+#endif
 {
 	struct in6_ifaddr *ia6;
+#ifdef __APPLE__
+#define in6_ifaddr	in6_ifaddrs
+#endif
 
 	for (ia6 = in6_ifaddr; ia6; ia6 = ia6->ia_next) {
 		if (ia6->ia_ifp == NULL)
@@ -1214,10 +1251,13 @@ mip6_are_homeprefix(ndprctl)
 		if (ia6->ia_ifp->if_type != IFT_MIP)
 			continue;
 
-		if (in6_are_prefix_equal(&ndprctl->ndpr_prefix.sin6_addr, &ia6->ia_addr.sin6_addr, ndprctl->ndpr_plen))
+		if (in6_are_prefix_equal(&ndpr->ndpr_prefix.sin6_addr, &ia6->ia_addr.sin6_addr, ndpr->ndpr_plen))
 			return (TRUE);
 	}
 	return (FALSE);
+#ifdef __APPLE__
+#undef in6_ifaddr
+#endif
 }
 
 int
@@ -1310,11 +1350,11 @@ mip6_bc_proxy_control(target, local, cmd)
 
 	switch (cmd) {
 	case RTM_DELETE:
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 		rt = rtalloc1((struct sockaddr *)&target_sa, 0, 0UL);
-#else /* __FreeBSD__ */
+#else /* __FreeBSD__ || __APPLE__ */
 		rt = rtalloc1((struct sockaddr *)&target_sa, 0);
-#endif /* __FreeBSD__ */
+#endif /* __FreeBSD__  || __APPLE__ */
 		if (rt) {
 #ifdef __FreeBSD__
 			RT_REMREF(rt);
@@ -1398,13 +1438,16 @@ mip6_bc_proxy_control(target, local, cmd)
 		}
 
 		daddr = in6addr_linklocal_allnodes;
+#ifndef __APPLE__
 		if ((error = in6_setscope(&daddr, ifp, NULL)) != 0) {
 			mip6log((LOG_ERR, "in6_setscope failed\n"));
-		} else {
-			nd6_na_output(ifp, &daddr, &target_sa.sin6_addr,
-			    ND_NA_FLAG_OVERRIDE, 1, (struct sockaddr *)sdl);
+			break;
 		}
-
+#else
+		daddr.s6_addr16[1] = htons(ifp->if_index);
+#endif 
+		nd6_na_output(ifp, &daddr, &target_sa.sin6_addr,
+			      ND_NA_FLAG_OVERRIDE, 1, (struct sockaddr *)sdl);
 		break;
 
 	default:
@@ -1486,7 +1529,7 @@ mip6_encapsulate(mm, osrc, odst)
 #ifdef IPV6_MINMTU
                 /* XXX */
 	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__)
 		, NULL, NULL
 #else
 		, NULL
@@ -1494,7 +1537,7 @@ mip6_encapsulate(mm, osrc, odst)
 		));
 #else
 	return (ip6_output(m, 0, 0, 0, 0
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__)
 		, NULL, NULL
 #else
 		, NULL
@@ -1516,7 +1559,9 @@ mip6_probe_routers(void)
                      (ln->ln_state == ND6_LLINFO_STALE))) {
                         ln->ln_asked = 0;
                         ln->ln_state = ND6_LLINFO_DELAY;
+#ifndef __APPLE__
                         nd6_llinfo_settimer(ln, 0);
+#endif
                 }
                 ln = ln->ln_next;
         }
@@ -1680,11 +1725,20 @@ mip6_get_logical_src_dst(m, src, dst)
 
 #if NMIP > 0
 void
-mip6_md_scan(u_int16_t ifindex) {
+mip6_md_scan(u_int16_t ifindex)
+{
         int s;
         struct nd_defrouter *dr;
 #ifndef __FreeBSD__
+#ifdef APPLE
+	time_t time_second;
+	struct timeval timenow;
+
+	getmicrotime(&timenow);
+	time_second = (time_t)timenow.tv_sec;
+#else
         long time_second = time.tv_sec;
+#endif
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)

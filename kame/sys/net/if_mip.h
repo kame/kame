@@ -1,4 +1,4 @@
-/*	$ID: $	*/
+/*	$KAME: if_mip.h,v 1.2 2005/07/17 20:40:45 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

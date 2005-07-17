@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.72 2005/06/16 18:29:26 jinmei Exp $	*/
+/*	$KAME: dest6.c,v 1.73 2005/07/17 20:40:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,9 +79,15 @@ static void mip6_notify_be_hint(struct in6_addr *, struct in6_addr *,
  * Destination options header processing.
  */
 int
+#ifndef __APPLE__
 dest6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
+#else
+dest6_input(mp, offp)
+	struct mbuf **mp;
+	int *offp;
+#endif
 {
 	struct mbuf *m = *mp;
 	int off = *offp, dstoptlen, optlen;
@@ -190,7 +196,11 @@ dest6_input(mp, offp, proto)
 #endif /* MIP6 */
 		default:		/* unknown option */
 			optlen = ip6_unknown_opt(opt, m,
-			    opt - mtod(m, u_int8_t *));
+			    opt - mtod(m, u_int8_t *)
+#ifdef __APPLE__
+						 ,0
+#endif					 
+				);
 			if (optlen == -1)
 				return (IPPROTO_DONE);
 			optlen += 2;

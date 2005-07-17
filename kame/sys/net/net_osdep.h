@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.85 2004/05/20 08:15:53 suz Exp $	*/
+/*	$KAME: net_osdep.h,v 1.86 2005/07/17 20:40:45 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -260,6 +260,9 @@
  *	NetBSD 1.5: always use IFAREF whenever reference gets added.
  *		always use IFAFREE whenever reference gets freed.
  *		IFAFREE frees ifaddr when ifa_refcnt reaches 0.
+ *	Darwin: always use ifaref whenever reference gets added.
+ *		always use ifafree whenever reference gets freed.
+ *		ifaref and ifafree are responsible for determining when to free.
  *	others: do not increase refcnt for ifp->if_addrlist and in_ifaddr.
  *		use IFAFREE once when ifaddr is disconnected from
  *		ifp->if_addrlist and in_ifaddr.  IFAFREE frees ifaddr when
@@ -321,7 +324,7 @@
 #define if_name(ifp)	((ifp)->if_xname)
 #else
 struct ifnet;
-extern const char *if_name __P((struct ifnet *));
+extern const char *if_name(struct ifnet *);
 #endif
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -330,8 +333,11 @@ extern const char *if_name __P((struct ifnet *));
 #if defined(__FreeBSD__) && __FreeBSD_version < 500000
 #define HAVE_NEW_BPF
 #endif
+#ifdef __APPLE__
+#define HAVE_OLD_BPF
+#endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__APPLE__)
 #define ifa_list	ifa_link
 #define if_addrlist	if_addrhead
 #define if_list		if_link

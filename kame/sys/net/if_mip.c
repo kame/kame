@@ -1,4 +1,4 @@
-/*	$Id: if_mip.c,v 1.4 2005/04/14 06:22:38 suz Exp $	*/
+/*	$KAME: if_mip.c,v 1.5 2005/07/17 20:40:45 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.

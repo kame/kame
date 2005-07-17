@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.15 2005/04/14 06:22:38 suz Exp $	*/
+/*	$KAME: net_osdep.c,v 1.16 2005/07/17 20:40:45 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,17 +41,23 @@
 #endif
 #include <sys/time.h>
 #include <sys/syslog.h>
+#ifdef __APPLE__
+#include <kern/cpu_number.h>
+#else
 #include <machine/cpu.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
+#ifndef __APPLE__
 #include <net/netisr.h>
+#endif
 #include <net/route.h>
 #include <net/bpf.h>
 
 #include <net/net_osdep.h>
 
-#if 0
+#ifdef __APPLE__
 const char *
 if_name(ifp)
 	struct ifnet *ifp;
@@ -96,7 +102,7 @@ ppsratecheck(lasttime, curpps, maxpps)
 	int s, rv;
 
 	s = splclock();
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
 	tv = mono_time;
 #else
 	microtime(&tv);
