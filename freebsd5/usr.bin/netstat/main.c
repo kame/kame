@@ -138,6 +138,10 @@ static struct nlist nl[] = {
 	{ "_clust_lowm" },
 #define N_CARPSTAT	33
 	{ "_carpstats" },
+#define N_SCTPEPINFO    34
+	{ "_sctppcbinfo" },
+#define N_SCTPPEGS      35
+	{ "_sctp_pegs" },
 	{ "" },
 };
 
@@ -161,6 +165,10 @@ struct protox {
 	{ -1,		-1,		1,	protopr,
 	  dccp_stats,	NULL,		"dccp",	IPPROTO_DCCP },
 #endif /* DCCP */
+#ifdef SCTP
+	{ N_SCTPEPINFO, N_SCTPPEGS,	1,	sctp_protopr,
+	  sctp_stats,	NULL,		"sctp",	0},
+#endif /* SCTP */
 	{ -1,		-1,		1,	protopr,
 	  NULL,		NULL,		"divert",IPPROTO_DIVERT },
 	{ -1,		-1,		1,	protopr,
