@@ -1,4 +1,4 @@
-/*	$KAME: sctp.c,v 1.2 2005/03/07 22:12:18 suz Exp $	*/
+/*	$KAME: sctp.c,v 1.3 2005/07/18 04:12:26 suz Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -84,7 +84,7 @@ void	inet46print	__P((struct sockaddr *, u_int16_t, int));
 
 void
 #if defined(__FreeBSD__)
-sctp_protopr(u_long off, char *name, int af)
+sctp_protopr(u_long off, const char *name, int af)
 #else /* NetBSD and OpenBSD */
 sctp_protopr(off, name)
 	u_long off;
@@ -612,7 +612,7 @@ static char *pegs_name[SCTP_NUMBER_OF_PEGS] = {
 		
 void
 #if defined(__FreeBSD__)
-sctp_stats(u_long off, char *name, int af)
+sctp_stats(u_long off, const char *name, int af)
 #else /* NetBSD and OpenBSD */
 sctp_stats(off, name)
         u_long off;
