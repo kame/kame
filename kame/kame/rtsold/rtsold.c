@@ -275,7 +275,7 @@ main(int argc, char **argv)
 	/* configuration per interface */
 	if (ifinit()) {
 		warnmsg(LOG_ERR, __func__,
-		    "failed to initilizatoin interfaces");
+		    "failed to initialization interfaces");
 		exit(1);
 		/*NOTREACHED*/
 	}
@@ -715,7 +715,7 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 			/*
 			 * After sending MAX_RTR_SOLICITATIONS solicitations,
 			 * we're just waiting for possible replies; there
-			 * will be no more solicatation.  Thus, we change
+			 * will be no more solicitation.  Thus, we change
 			 * the timer value to MAX_RTR_SOLICITATION_DELAY based
 			 * on RFC 2461, Section 6.3.7.
 			 */
