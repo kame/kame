@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.106 2005/07/07 02:06:30 keiichi Exp $	*/
+/*	$KAME: route6d.c,v 1.107 2005/07/19 03:04:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.106 2005/07/07 02:06:30 keiichi Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.107 2005/07/19 03:04:06 keiichi Exp $";
 #endif
 
 #include <stdio.h>
@@ -1462,6 +1462,9 @@ ifconfig()
 			}
 			memset(ifcp, 0, sizeof(*ifcp));
 			ifcp->ifc_index = if_nametoindex(ifa->ifa_name);
+			memcpy(&ifcp->ifc_ripsin, &ripsin, ripsin.ss_len);
+			SET_IN6_LINKLOCAL_IFINDEX(ifcp->ifc_ripsin.sin6_addr,
+				ifcp->ifc_index);
 			ifcp->ifc_next = ifc;
 			ifc = ifcp;
 			nifc++;
@@ -1560,9 +1563,6 @@ ifconfig1(name, sa, ifcp, s)
 	if (IN6_IS_ADDR_LINKLOCAL(&ifa->ifa_addr)
 	    || IN6_IS_ADDR_LOOPBACK(&ifa->ifa_addr)) {
 		ifcp->ifc_mylladdr = ifa->ifa_addr;
-		memcpy(&ifcp->ifc_ripsin, &ripsin, ripsin.ss_len);
-		SET_IN6_LINKLOCAL_IFINDEX(ifcp->ifc_ripsin.sin6_addr,
-			ifcp->ifc_index);
 		setindex2ifc(ifcp->ifc_index, ifcp);
 		ifcp->ifc_mtu = getifmtu(ifcp->ifc_index);
 		if (ifcp->ifc_mtu > RIP6_MAXMTU)
