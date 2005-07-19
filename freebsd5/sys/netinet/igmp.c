@@ -654,13 +654,13 @@ igmpv2_query:
 		 * Querier Present Timeout seconds whenever an IGMPv2
 		 * General Query is received.
 		*/
-		mtx_lock(&igmp_mtx);
 		if (igmp->igmp_group.s_addr == INADDR_ANY) {
 		    if (igmp_version == 3)
 			goto end;
+		    mtx_lock(&igmp_mtx);
 		    igmp_set_hostcompat(ifp, rti, query_ver);
+		    mtx_unlock(&igmp_mtx);
 		}
-		mtx_unlock(&igmp_mtx);
 #endif
 		break;
 
