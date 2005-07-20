@@ -1,4 +1,4 @@
-/*	$Id: mip6.h,v 1.63 2004/12/09 02:19:10 t-momose Exp $	*/
+/*	$Id: mip6.h,v 1.64 2005/07/20 12:56:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -46,7 +46,8 @@
 #define MIP6CTL_DEBUG			1
 #define MIP6CTL_USE_IPSEC		2
 #define MIP6CTL_RR_HINT_PPSLIM		3
-#define MIP6CTL_MAXID			4
+#define MIP6CTL_USE_MIGRATE		4
+#define MIP6CTL_MAXID			5
  
 #define MIP6CTL_NAMES {				\
 	{ 0, 0 },				\

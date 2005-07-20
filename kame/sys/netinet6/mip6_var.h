@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.123 2005/07/17 20:40:46 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.124 2005/07/20 12:56:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -151,6 +151,7 @@ struct mip6stat {
 extern u_int8_t mip6_nodetype;
 extern int mip6ctl_debug;
 extern int mip6ctl_use_ipsec;
+extern int mip6ctl_use_migrate;
 
 /* function prototypes. */
 /* correspondent node functions. */

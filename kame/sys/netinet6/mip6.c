@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.222 2005/07/17 20:40:46 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.223 2005/07/20 12:56:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -113,6 +113,7 @@ int mip6ctl_debug = 1;
 int mip6ctl_debug = 0;
 #endif
 int mip6ctl_rr_hint_ppslim = 10;
+int mip6ctl_use_migrate = 0;
 
 extern struct ip6protosw mip6_tunnel_protosw;
 
@@ -177,6 +178,9 @@ mip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case MIP6CTL_RR_HINT_PPSLIM:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &mip6ctl_rr_hint_ppslim);
+	case MIP6CTL_USE_MIGRATE:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &mip6ctl_use_migrate);
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -229,6 +233,13 @@ SYSCTL_SETUP(sysctl_net_inet6_mip6_setup, "sysctl net.inet6.mip6 subtree setup")
                        NULL, 0, &mip6ctl_rr_hint_ppslim, 0,
                        CTL_NET, PF_INET6, IPPROTO_MH,
                        MIP6CTL_RR_HINT_PPSLIM, CTL_EOL);
+         sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "use_migrate",
+                       SYSCTL_DESCR("Enable SADB_X_MIGRATE"),
+                       NULL, 0, &mip6ctl_use_migrate, 0,
+                       CTL_NET, PF_INET6, IPPROTO_MH,
+                       MIP6CTL_RR_HINT_PPSLIM, CTL_EOL);
 }
 #endif /* __NetBSD__ */
 
@@ -239,8 +250,10 @@ SYSCTL_INT(_net_inet6_mip6, MIP6CTL_DEBUG, debug, CTLFLAG_RW,
     &mip6ctl_debug, 0, "");
 SYSCTL_INT(_net_inet6_mip6, MIP6CTL_USE_IPSEC, use_ipsec, CTLFLAG_RW,
     &mip6ctl_use_ipsec, 0, "");
-SYSCTL_INT(_net_inet6_mip6, MIP6CTL_RR_HINT_PPSLIM, rr_hint_ppslimit, CTLFLAG_RW,
-    &mip6ctl_rr_hint_ppslim, 0, "");
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_RR_HINT_PPSLIM, rr_hint_ppslimit,
+    CTLFLAG_RW, &mip6ctl_rr_hint_ppslim, 0, "");
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_USE_MIGRATE, use_migrate, CTLFLAG_RW,
+    &mip6ctl_use_migrate, 0, "");
 #endif /* __FreeBSD__ || __APPLE__*/
 
 /*

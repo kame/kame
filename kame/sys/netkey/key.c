@@ -545,6 +545,11 @@ static struct mbuf *key_alloc_mbuf __P((int));
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 struct callout key_timehandler_ch;
 #endif
+#ifdef MIP6
+static struct mbuf *key_setmigrate(struct secpolicy *, struct sockaddr *,
+    struct sockaddr *, struct ipsecrequest *, u_int32_t, u_int32_t);
+#endif /* MIP6 */
+
 
 /* %%% IPsec policy management */
 /*
@@ -8407,6 +8412,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct secashead *sa;
 	struct secasindex *sahint;
 	struct mbuf *m;
+	struct sockaddr_in6 sin6;
 
 	LIST_FOREACH(sp, &sptree[IPSEC_DIR_INBOUND], chain) {
 		/* check if we have a valid spidx. */
@@ -8455,8 +8461,20 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			}
 		}
 		/* update the tunnel endpoint of a mobile node side. */
+		sin6 = *(struct sockaddr_in6 *)(&sahint->dst);
 		*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
 
+	if (mip6ctl_use_migrate) {
+		m = key_setmigrate(sp, (struct sockaddr *)haaddr,
+		    (struct sockaddr *)&sin6, isr, 0, 0);
+		if (m == NULL) {
+			mip6log((LOG_ERR,
+			    "key_mip6_update_mobile_node_ipsecdb: "
+			    "failed to allocate a mbuf for "
+			    "SADB_X_MIGRATE in INBOUND processing.\n"));
+			continue;
+		}
+	} else {
 		/* announce the update. */
 		m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 0, 0);
 		if (m == NULL) {
@@ -8466,6 +8484,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			    "SADB_X_SPDUPDATE in INBOUND processing.\n"));
 			continue;
 		}
+	}
 		key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
 	}
 
@@ -8510,8 +8529,20 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			*(struct sockaddr_in6 *)&(sa->saidx.src) = *ncoa;
 		}
 		/* update the tunnel endpoint of a mobile node side. */
+		sin6 = *(struct sockaddr_in6 *)(&sahint->src);
 		*(struct sockaddr_in6 *)(&sahint->src) = *ncoa;
 
+	if (mip6ctl_use_migrate) {
+		m = key_setmigrate(sp, (struct sockaddr *)&sin6,
+		    (struct sockaddr *)haaddr, isr, 1, 0);
+		if (m == NULL) {
+			mip6log((LOG_ERR,
+			    "key_mip6_update_mobile_node_ipsecdb: "
+			    "failed to allocate a mbuf for "
+			    "SADB_X_MIGRATE in OUTBOUND processing.\n"));
+			continue;
+		}
+	} else {
 		/* announce the update. */
 		m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 1, 0);
 		if (m == NULL) {
@@ -8521,6 +8552,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			    "SADB_X_SPDUPDATE in OUTBOUND processing.\n"));
 			continue;
 		}
+	}
 		key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
 	}
 }
@@ -8539,6 +8571,7 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct secashead *sa;
 	struct secasindex *sahint;
 	struct mbuf *m;
+	struct sockaddr_in6 sin6;
 
 	/* update outbound data. */
 	LIST_FOREACH(sp, &sptree[IPSEC_DIR_INBOUND], chain) {
@@ -8581,8 +8614,20 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			*(struct sockaddr_in6 *)&(sa->saidx.src) = *ncoa;
 		}
 		/* update a tunnel endpoint of a mobile node side. */
+		sin6 = *(struct sockaddr_in6 *)(&sahint->src);
 		*(struct sockaddr_in6 *)(&sahint->src) = *ncoa;
 
+	if (mip6ctl_use_migrate) {
+		m = key_setmigrate(sp, (struct sockaddr *)&sin6,
+		    (struct sockaddr *)haaddr, isr, 0, 0);
+		if (m == NULL) {
+			mip6log((LOG_ERR,
+			    "key_mip6_update_home_agent_ipsecdb: "
+			    "failed to allocate a mbuf for "
+			    "SADB_X_MIGRATE in INBOUND processing.\n"));
+			continue;
+		}
+	} else {
 		/* announce the update */
 		m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 0, 0);
 		if (m == NULL) {
@@ -8592,6 +8637,7 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			    "SADB_X_SPDUPDATE in INBOUND processing.\n"));
 			continue;
 		}
+	}
 		key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
 	}
 
@@ -8642,8 +8688,20 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			}
 		}
 		/* update a tunnel endpoint of a mobile node side. */
+		sin6 = *(struct sockaddr_in6 *)(&sahint->dst);
 		*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
 	
+	if (mip6ctl_use_migrate) {
+		m = key_setmigrate(sp, (struct sockaddr *)haaddr,
+		    (struct sockaddr *)&sin6, isr, 1, 0);
+		if (m == NULL) {
+			mip6log((LOG_ERR,
+			    "key_mip6_update_home_agent_ipsecdb: "
+			    "failed to allocate a mbuf for "
+			    "SADB_X_MIGRATE in INBOUND processing.\n"));
+			continue;
+		}
+	} else {
 		/* announce the update */
 		m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 1, 0);
 		if (m == NULL) {
@@ -8653,257 +8711,101 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 			    "SADB_X_SPDUPDATE in OUTBOUND processing.\n"));
 			continue;
 		}
+	}
 		key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
 	}
 }
 
-#if 0
-#if NMIP > 0
-int
-key_mip6_update_mobile_node_ipsecdb_obsoleted(haddr, ocoa, ncoa, haaddr)
-	struct sockaddr_in6 *haddr;
-	struct sockaddr_in6 *ocoa;   /* not used.  may be NULL. */
-	struct sockaddr_in6 *ncoa;
-	struct sockaddr_in6 *haaddr;
-{
+static struct mbuf *
+key_setmigrate(sp, oldsrc, olddst, isr, seq, pid)
 	struct secpolicy *sp;
+	struct sockaddr *oldsrc;
+	struct sockaddr *olddst;
 	struct ipsecrequest *isr;
-	struct secashead *sa;
-	struct secasindex *sahint;
-	struct mbuf *m;
-
-	/* update inbound data. */
-	sp = key_mip6_find_sp(IPSEC_DIR_INBOUND, &sa6_any, haddr);
-	if (sp == NULL)
-		return (-1);
-
-	isr = sp->req;
-	if (isr == NULL)
-		return (-1);
-	sahint = &isr->saidx;
-	if (sahint == NULL)
-		return (-1);
-
-	/* update a SADB from a home agent to a mobile node. */
-	LIST_FOREACH(sa, &sahtree, chain) {
-		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
-			&((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
-			continue;
-/* XXX don't check the old CoA.  instead, we use a uniqid.
-		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
-			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
-			continue;
-*/
-		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
-			continue;
-		if (sa->saidx.reqid == 0)
-			continue;
-		if (sa->saidx.reqid != sahint->reqid)
-			continue;
-
-		/* found. */
-		*(struct sockaddr_in6 *)&(sa->saidx.dst) = *ncoa;
-		if (sa->sa_route.ro_rt) {
-			RTFREE(sa->sa_route.ro_rt);
-			sa->sa_route.ro_rt = NULL;
-		}
-	}
-	/* update a tunnel endpoint of a mobile node side. */
-	*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
-
-	/* announce the update */
-	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 0, 0);
-	if (m == NULL)
-		return (-1);
-	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
-
-	/* update outbound data. */
-	sp = key_mip6_find_sp(IPSEC_DIR_OUTBOUND, haddr, &sa6_any);
-	if (sp == NULL)
-		return (-1);
-
-	isr = sp->req;
-	if (isr == NULL)
-		return (-1);
-	sahint = &isr->saidx;
-	if (sahint == NULL)
-		return (-1);
-
-	/* update a SADB from a mobile node to a home agent. */
-	LIST_FOREACH(sa, &sahtree, chain) {
-/* XXX don't check the old CoA.  instead, we use uniqid.
-		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
-			&((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
-			continue;
-*/
-		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
-			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
-			continue;
-		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
-			continue;
-		if (sa->saidx.reqid == 0)
-			continue;
-		if (sa->saidx.reqid != sahint->reqid)
-			continue;
-
-		/* found. */
-		*(struct sockaddr_in6 *)&(sa->saidx.src) = *ncoa;
-	}
-	/* update a tunnel endpoint of a mobile node side. */
-	*(struct sockaddr_in6 *)(&sahint->src) = *ncoa;
-	
-	/* announce the update */
-	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 1, 0);
-	if (m == NULL)
-		return (-1);
-	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
-	return (0);
-}
-#endif /* NMIP > 0 */
-
-int
-key_mip6_update_home_agent_ipsecdb_obsoleted(haddr, ocoa, ncoa, haaddr)
-	struct sockaddr_in6 *haddr;
-	struct sockaddr_in6 *ocoa;
-	struct sockaddr_in6 *ncoa;
-	struct sockaddr_in6 *haaddr;
+	u_int32_t seq, pid;
 {
-	struct secpolicy *sp;
-	struct ipsecrequest *isr;
-	struct secashead *sa;
-	struct secasindex *sahint;
-	struct mbuf *m;
-
-	/* update inbound data. */
-	sp = key_mip6_find_sp(IPSEC_DIR_INBOUND, haddr, &sa6_any);
-	if (sp == NULL)
-		return (-1);
-
-	isr = sp->req;
-	if (isr == NULL)
-		return (-1);
-	sahint = &isr->saidx;
-	if (sahint == NULL)
-		return (-1);
-
-	/* update a SADB from a mobile node to a home agent. */
-	LIST_FOREACH(sa, &sahtree, chain) {
-/* XXX don't check the old CoA.  instead we use a uniqid.
-		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
-		    &((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
-			continue;
-*/
-		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
-			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
-			continue;
-		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
-			continue;
-		if (sa->saidx.reqid == 0)
-			continue;
-		if (sa->saidx.reqid != sahint->reqid)
-			continue;
-
-		/* found. */
-		*(struct sockaddr_in6 *)&(sa->saidx.src) = *ncoa;
-	}
-	/* update a tunnel endpoint of a mobile node side. */
-	*(struct sockaddr_in6 *)(&sahint->src) = *ncoa;
-
-	/* announce the update */
-	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 0, 0);
-	if (m == NULL)
-		return (-1);
-	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
-
-	/* update outbound data. */
-	sp = key_mip6_find_sp(IPSEC_DIR_OUTBOUND, &sa6_any, haddr);
-	if (sp == NULL)
-		return (-1);
-
-	isr = sp->req;
-	if (isr == NULL)
-		return (-1);
-	sahint = &isr->saidx;
-	if (sahint == NULL)
-		return (-1);
-
-	/* update a SADB from a home agent to a mobile node. */
-	LIST_FOREACH(sa, &sahtree, chain) {
-		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
-			&((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
-			continue;
-/* XXX don't check the old CoA.  instead, we use a uniqid.
-		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
-			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
-			continue;
-*/
-		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
-			continue;
-		if (sa->saidx.reqid == 0)
-			continue;
-		if (sa->saidx.reqid != sahint->reqid)
-			continue;
-
-		/* found. */
-		*(struct sockaddr_in6 *)&(sa->saidx.dst) = *ncoa;
-		if (sa->sa_route.ro_rt) {
-			RTFREE(sa->sa_route.ro_rt);
-			sa->sa_route.ro_rt = NULL;
-		}
-	}
-	/* update a tunnel endpoint of a mobile node side. */
-	*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
+	struct mbuf *result = NULL, *m;
+	struct sadb_x_policy *xpl;
+	int xpllen;
+	caddr_t p;
+	struct sadb_x_ipsecrequest *xisr;
 	
-	/* announce the update */
-	m = key_setdumpsp(sp, SADB_X_SPDUPDATE, 1, 0);
+
+	m = key_setsadbmsg(SADB_X_MIGRATE, 0, SADB_SATYPE_UNSPEC, seq, pid,
+	    sp->refcnt);
 	if (m == NULL)
-		return (-1);
-	key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
+		goto fail;
+	result = m;
 
-	return (0);
+	if (sp->spidx) {
+		m = key_setsadbaddr(SADB_EXT_ADDRESS_SRC,
+		    (struct sockaddr *)&sp->spidx->src, sp->spidx->prefs,
+		    sp->spidx->ul_proto);
+		if (m == NULL)
+			goto fail;
+		m_cat(result, m);
+
+		m = key_setsadbaddr(SADB_EXT_ADDRESS_DST,
+		    (struct sockaddr *)&sp->spidx->dst, sp->spidx->prefs,
+		    sp->spidx->ul_proto);
+		if (m == NULL)
+			goto fail;
+		m_cat(result, m);
+	} else
+		goto fail;
+
+	xpllen = sizeof(struct sadb_x_policy)
+	    + PFKEY_ALIGN8(sizeof(struct sadb_x_ipsecrequest)
+		+ oldsrc->sa_len * 2) * 2;
+
+	m = key_alloc_mbuf(xpllen);
+	if (m == NULL)
+		goto fail;
+	xpl = mtod(m, struct sadb_x_policy *);
+	bzero(xpl, xpllen);
+	xpl->sadb_x_policy_len = PFKEY_UNIT64(xpllen);
+	xpl->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
+	xpl->sadb_x_policy_type = sp->policy;
+	xpl->sadb_x_policy_dir = sp->dir;
+	xpl->sadb_x_policy_id = sp->id;
+	p = (caddr_t)xpl + sizeof(struct sadb_x_policy);
+
+	xisr = (struct sadb_x_ipsecrequest *)p;
+	xisr->sadb_x_ipsecrequest_proto = isr->saidx.proto;
+	xisr->sadb_x_ipsecrequest_mode = isr->saidx.mode;
+	xisr->sadb_x_ipsecrequest_level = isr->level;
+	xisr->sadb_x_ipsecrequest_reqid = isr->saidx.reqid;
+	p += sizeof(struct sadb_x_ipsecrequest);
+	bcopy(oldsrc, p, oldsrc->sa_len);
+	p += oldsrc->sa_len;
+	bcopy(olddst, p, olddst->sa_len);
+	p += olddst->sa_len;
+
+	xisr->sadb_x_ipsecrequest_len = PFKEY_ALIGN8(
+	    sizeof(struct sadb_x_ipsecrequest) + oldsrc->sa_len
+	    + olddst->sa_len);
+
+	xisr = (struct sadb_x_ipsecrequest *)p;
+	xisr->sadb_x_ipsecrequest_proto = isr->saidx.proto;
+	xisr->sadb_x_ipsecrequest_mode = isr->saidx.mode;
+	xisr->sadb_x_ipsecrequest_level = isr->level;
+	xisr->sadb_x_ipsecrequest_reqid = isr->saidx.reqid;
+	p += sizeof(struct sadb_x_ipsecrequest);
+	bcopy(&isr->saidx.src, p, isr->saidx.src.ss_len);
+	p += isr->saidx.src.ss_len;
+	bcopy(&isr->saidx.dst, p, isr->saidx.dst.ss_len);
+	p += isr->saidx.dst.ss_len;
+
+	xisr->sadb_x_ipsecrequest_len = PFKEY_ALIGN8(
+	    sizeof(struct sadb_x_ipsecrequest) + isr->saidx.src.ss_len
+	    + isr->saidx.dst.ss_len);
+
+	m_cat(result, m);
+
+	return(result);
+
+ fail:
+	m_freem(result);
+	return (NULL);
 }
-
-static struct secpolicy *
-key_mip6_find_sp(dir, src, dst)
-	int dir;
-	const struct sockaddr_in6 *src;
-	const struct sockaddr_in6 *dst;
-{
-	struct secpolicy *sp;
-	struct secpolicyindex *spidx;
-
-	LIST_FOREACH(sp, &sptree[dir], chain) {
-		/* check if we have a valid spidx. */
-		if ((spidx = sp->spidx) == NULL)
-			continue;
-
-#if XXX
-		/*
-		 * we modify the CoA of a mobile node in all matched
-		 * SPD entries listed in the kernel SPD entry list.
-		 * this is needed if we want to encrypt all the
-		 * tunneled traffic between mobile nodes and a home
-		 * agent.
-		 *
-		 * does this create any harmful things?
-		 */
-		/* before this XXX, we had the following line. */
-		if (spidx->ul_proto != IPPROTO_MOBILITY)
-			continue;
-#endif
-
-		/* check addresses. */
-		if (!IN6_ARE_ADDR_EQUAL(&src->sin6_addr,
-			&((struct sockaddr_in6 *)&spidx->src)->sin6_addr))
-			continue;
-		if (!IN6_ARE_ADDR_EQUAL(&dst->sin6_addr,
-			&((struct sockaddr_in6 *)&spidx->dst)->sin6_addr))
-			continue;
-
-		/* found. */
-		break;
-	}
-	return (sp);
-}
-#endif
 #endif /* MIP6 */
