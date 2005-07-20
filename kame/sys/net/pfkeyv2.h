@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.41 2005/01/14 04:10:05 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.42 2005/07/20 12:57:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,8 @@ you leave this credit intact on any copies of this file.
 #define SADB_X_SPDSETIDX  20
 #define SADB_X_SPDEXPIRE  21
 #define SADB_X_SPDDELETE2 22	/* by policy id */
-#define SADB_MAX          22
+#define SADB_X_MIGRATE    23	/* sugimoto-mip6-pfkey-migrate */
+#define SADB_MAX          23
 
 struct sadb_msg {
   u_int8_t sadb_msg_version;
