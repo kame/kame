@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.23 2005/06/21 10:21:03 nishida Exp $	*/
+/*	$KAME: dccp_var.h,v 1.24 2005/07/21 05:05:29 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -59,6 +59,16 @@ typedef u_int64_t dccp_seq;
 	x = ((u_int64_t)ntohs(y.dah_ack) << 32) | ntohl(y.dah_ack2);\
 }
 
+#define CONVERT_TO_LONGSEQ(S, ref) \
+    ((((~(S- ref.lo) +1) <= 0x7fffff) && (S < ref.lo))?  \
+        (((u_int64_t)(ref.hi + 1) << 24) | S) % 281474976710656ll: \
+        (((u_int64_t)ref.hi << 24) | S) % 281474976710656ll)
+
+struct ref_seq {
+	u_int32_t hi;
+	u_int32_t lo;
+};
+
 struct dccpcb {
 	u_int8_t	state; /* initial, listening, connecting, established,
 				  closing, closed etc */
@@ -118,7 +128,10 @@ struct dccpcb {
 	
 	u_int8_t remote_ackvector; /* Is recv side using AckVector? */
 	u_char      shortseq; /* use short seq number */
-	u_int32_t		sname; /* service core */
+	u_int32_t	sname;    /* service core */
+	struct ref_seq	ref_seq;   /* reference sequence number */
+	struct ref_seq	ref_ack;   /* reference acknowledge number */
+
 #ifndef __FreeBSD__
 #ifndef INP_IPV6
 #define INP_IPV6	0x1

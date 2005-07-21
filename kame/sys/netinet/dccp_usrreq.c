@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.55 2005/07/15 09:03:05 suz Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.56 2005/07/21 05:05:29 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -657,6 +657,8 @@ dccp_input(struct mbuf *m, ...)
 			dp->avgpsize = ((struct dccpcb *)oinp->inp_ppcb)->avgpsize;
 		}
 		dp->seq_snd = (((u_int64_t)arc4random() << 32) | arc4random()) % 281474976710656LL;
+		dp->ref_seq.hi = dp->seq_snd >> 24;
+		dp->ref_seq.lo = (u_int64_t)(dp->seq_snd & 0xffffff);
 		INP_UNLOCK(oinp);
 		DCCP_DEBUG((LOG_INFO, "New dp = %u, dp->state = %u!\n", (int)dp, dp->state));
 	}
@@ -670,7 +672,7 @@ dccp_input(struct mbuf *m, ...)
 		DHDR_TO_DSEQ(seqnr, dlh);
 	} else {
 		/* shortseq */
-		seqnr = ntohl(dh->dh_seq);
+		seqnr = CONVERT_TO_LONGSEQ(ntohl(dh->dh_seq), dp->ref_seq);
 	}
 
 	DCCP_DEBUG((LOG_INFO, "Received DCCP packet with sequence number = %llu , gsn_rcv %llu\n", seqnr, dp->gsn_rcv));
@@ -816,6 +818,9 @@ dccp_input(struct mbuf *m, ...)
 		case DCCP_TYPE_RESPONSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REPSONSE\n"));
 			DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
+			/* store reference acknowledge number */
+			dp->ref_ack.hi = dp->ack_rcv >> 24;
+			dp->ref_ack.lo = (u_int64_t)(dp->ack_rcv & 0xffffff);
 			dp->ack_snd = dp->seq_rcv;
 
 #ifdef __OpenBSD__
@@ -885,8 +890,8 @@ dccp_input(struct mbuf *m, ...)
 			if (!is_shortseq) {
 				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			} else {
-				/* shortseq */
-				dp->ack_rcv = ntohl(dah->dash.dah_ack << 8); /* Ack num */
+				/* shortseq XXX */
+				dp->ack_rcv = CONVERT_TO_LONGSEQ(ntohl(dah->dash.dah_ack), dp->ref_ack);
 			} 
 
 			if (dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0) {
@@ -948,8 +953,8 @@ dccp_input(struct mbuf *m, ...)
 			if (!is_shortseq) {
 				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			} else {
-				/* shortseq XXX */
-				dp->ack_rcv = ntohl(dah->dash.dah_ack << 8); /* Ack num */
+				/* shortseq */
+				dp->ack_rcv = CONVERT_TO_LONGSEQ(ntohl(dah->dash.dah_ack), dp->ref_ack);
 			} 
 
 			if (dp->cc_in_use[1] > 0) {
@@ -965,8 +970,8 @@ dccp_input(struct mbuf *m, ...)
 			if (!is_shortseq) {
 				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			} else {
-				/* shortseq XXX */
-				dp->ack_rcv = ntohl(dah->dash.dah_ack << 8); /* Ack num */
+				/* shortseq */
+				dp->ack_rcv = CONVERT_TO_LONGSEQ(ntohl(dah->dash.dah_ack), dp->ref_ack);
 			} 
 
 			if (dp->cc_in_use[1] > 0) {
@@ -1848,7 +1853,8 @@ again:
 		} else {
 			/* XXX shortseq */
 			dah = (struct dccp_ackhdr *)(dh + 1);
-
+			dah->dash.dah_res = 0; /* Reserved field should be zero */
+			dah->dash.dah_ack = htonl(dp->seq_rcv) >> 8;
 			optp = (u_char *)(dah + 1);
 		}
 		
@@ -2368,6 +2374,8 @@ dccp_connect(struct socket *so, struct mbuf *m, struct proc *td)
 
 	dp->who = DCCP_CLIENT;
 	dp->seq_snd = (((u_int64_t)arc4random() << 32) | arc4random()) % 281474976710656LL;
+	dp->ref_seq.hi = dp->seq_snd >> 24;
+	dp->ref_seq.lo = (u_int64_t)(dp->seq_snd & 0xffffff);
 	DCCP_DEBUG((LOG_INFO, "dccp_connect seq_snd %llu\n", dp->seq_snd));
 
 	dccpstat.dccps_connattempt++;
