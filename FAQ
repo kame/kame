@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.83 2004/12/09 09:55:39 jinmei Exp $
+$KAME: FAQ,v 1.84 2005/07/21 11:03:20 keiichi Exp $
 
 
 GENERAL
@@ -522,14 +522,6 @@ Q: I have problem diagnosing IPsec issues.  Are there any good tools?
 	% (some operation)
 	% netstat -sn >/tmp/2
 	% diff -c1 /tmp/1 /tmp/2
-
-Q: How can I configure NAT-PT?
-	Natptconfig is a command for configuration of KAME NAT-PT.
-	The manual for the command is natptconfig(8), and the manual
-	for the configuration file is natpt.conf(5).
-	kame/kame/natptconfig/natpt.conf is a simple configuration sample.
-
-	note that NAT-PT code works on freebsd4 only.
 
 Q: When I configure an IPv6 address by ifconfig(8) on a node doing
 stateless autoconfiguration, the interface route corresponding to the
