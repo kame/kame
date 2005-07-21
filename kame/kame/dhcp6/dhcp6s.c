@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.158 2005/04/21 02:25:44 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.159 2005/07/21 06:59:26 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -346,7 +346,7 @@ server6_init()
 
 	if (dhcp6_ctl_authinit(ctlkeyfile, &ctlkey, &ctldigestlen) != 0) {
 		dprintf(LOG_NOTICE, FNAME,
-		    "failed initialize control message authentication");
+		    "failed to initialize control message authentication");
 		/* run the server anyway */
 	}
 
