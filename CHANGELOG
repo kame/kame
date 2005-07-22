@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2784 2005/07/22 03:53:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.2785 2005/07/22 08:52:53 jinmei Exp $
 
 <200507>
+2005-07-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: fixed memory leak for renew/rebind event data.
+	(KAME PR 872 reported by Meng Huan Hsieh)
+
 2005-07-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c: allowed an application to send a
 	packet to a scoped address without explicitly disambiguating the
