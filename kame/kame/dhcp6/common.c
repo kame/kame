@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.127 2005/04/21 02:25:44 suz Exp $	*/
+/*	$KAME: common.c,v 1.128 2005/07/22 08:50:05 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -398,8 +398,7 @@ dhcp6_remove_evdata(ev)
 		TAILQ_REMOVE(&ev->data_list, evd, link);
 		if (evd->destructor)
 			(*evd->destructor)(evd);
-		else
-			free(evd);
+		free(evd);
 	}
 }
 

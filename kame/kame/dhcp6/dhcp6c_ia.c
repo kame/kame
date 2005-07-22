@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.32 2005/05/04 06:09:50 itojun Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.33 2005/07/22 08:50:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -324,8 +324,7 @@ reestablish_ia(ia)
 		TAILQ_REMOVE(&ia->evdata->event->data_list, ia->evdata, link);
 		if (ia->evdata->destructor)
 			ia->evdata->destructor(ia->evdata);
-		else
-			free(ia->evdata);
+		free(ia->evdata);
 		ia->evdata = NULL;
 	}
 
@@ -528,8 +527,7 @@ remove_ia(ia)
 		TAILQ_REMOVE(&ia->evdata->event->data_list, ia->evdata, link);
 		if (ia->evdata->destructor)
 			ia->evdata->destructor(ia->evdata);
-		else
-			free(ia->evdata);
+		free(ia->evdata);
 		ia->evdata = NULL;
 	}
 
@@ -563,8 +561,7 @@ ia_timo(arg)
 		TAILQ_REMOVE(&ia->evdata->event->data_list, ia->evdata, link);
 		if (ia->evdata->destructor)
 			ia->evdata->destructor(ia->evdata);
-		else
-			free(ia->evdata);
+		free(ia->evdata);
 		ia->evdata = NULL;
 	}
 
