@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.17 2005/06/20 17:03:55 nishida Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.18 2005/07/22 09:31:14 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -66,9 +66,9 @@
 #include <netinet/icmp_var.h>
 #include <netinet/ip_var.h>
 
-#include <netinet/dccp_tcplike.h>
 #include <netinet/dccp.h>
 #include <netinet/dccp_var.h>
+#include <netinet/dccp_tcplike.h>
 
 #define TCPLIKE_DEBUG(args) dccp_log args
 #define MALLOC_DEBUG(args) log args
@@ -110,7 +110,7 @@ u_int64_t _avlist_get(struct tcplike_recv_ccb *, u_int64_t);
 /* extern Ack Vector functions */
 extern void dccp_use_ackvector(struct dccpcb *);
 extern void dccp_update_ackvector(struct dccpcb *, u_int64_t);
-extern void dccp_increment_ackvector(struct dccpcb *, u_int32_t);
+extern void dccp_increment_ackvector(struct dccpcb *, u_int64_t);
 extern u_int16_t dccp_generate_ackvector(struct dccpcb *, u_char *);
 extern u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
 
@@ -364,7 +364,7 @@ tcplike_send_packet(void *ccb, long datasize)
 
 	if (cb->cwnd <= cb->outstanding) {
 		/* May not send. trigger RTO */
-		TIMEOUT_DEBUG((LOG_INFO, "cwnd (%d) < outstanding (%d)\n", cb->cwnd, cb->outstanding));
+		DCCP_DEBUG((LOG_INFO, "cwnd (%d) < outstanding (%d)\n", cb->cwnd, cb->outstanding));
 		if (!cb->rto_timer_callout) {
 			LOSS_DEBUG((LOG_INFO, "Trigger TCPlike RTO timeout timer. Ticks = %u\n", cb->rto));
 			ticks = (long)cb->rto;
@@ -531,7 +531,7 @@ tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 	lastok = 0;
 	prev_size = _cwndvector_size(cb);
 	
-	CWND_DEBUG((LOG_INFO, "Start removing from cwndvector\n"));
+	TCPLIKE_DEBUG((LOG_INFO, "Start removing from cwndvector %d\n", avsize));
 	if (avsize == 0)
 		_remove_from_cwndvector(cb, acknum);
 	
@@ -540,13 +540,13 @@ tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 		length = (av[i] & 0x3f) +1;
 		while (length > 0) {
 			if (state == 0) {
-				CWND_DEBUG((LOG_INFO, "Packet %u was OK\n", acknum));
+				CWND_DEBUG((LOG_INFO, "Packet %llu was OK\n", acknum));
 				numokpackets++;
 				lastok = acknum;
 				_remove_from_cwndvector(cb, acknum);
 			} else {
 				if (acknum > cb->oldcwnd_ts) {
-					LOSS_DEBUG((LOG_INFO, "Packet %u was lost\n", acknum));
+					LOSS_DEBUG((LOG_INFO, "Packet %llu was lost %llu state %d\n", acknum, cb->oldcwnd_ts, state));
 					numlostpackets++;
 					dccpstat.tcplikes_send_reploss++;
 				}
@@ -790,7 +790,7 @@ _add_to_cwndvector(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 		gap = seqnr - cb->cv_hs;
 	} else {
 		/* Wrapped */
-		gap = seqnr + 0x1000000 - cb->cv_hs; /* seq nr = 24 bits */
+		gap = seqnr + 0x1000000000000LL - cb->cv_hs; /* seq nr = 48 bits */
 	}
 
 	if (gap >= cb->cv_size) {
@@ -810,7 +810,7 @@ _add_to_cwndvector(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 	*t = *t | (0x01 << offset); /* turn on bit */
 
 	cb->cv_ts = seqnr+1;
-	if (cb->cv_ts == 0x1000000)
+	if (cb->cv_ts == 0x1000000000000LL)
 		cb->cv_ts = 0;
 
 	if (gap > (cb->cv_size - 128)) {
@@ -838,7 +838,7 @@ _remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 	int64_t gap;
 	u_char *t;
 	
-	TCPLIKE_DEBUG((LOG_INFO, "Entering remove_from_cwndvector\n"));
+	DCCP_DEBUG((LOG_INFO, "Entering remove_from_cwndvector\n"));
 	
 	if (cb->cv_hs == cb->cv_ts) {
 		/* Empty cwndvector */
@@ -851,7 +851,7 @@ _remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int64_t seqnr)
 		gap = seqnr - cb->cv_hs;
 	} else {
 		/* Wrapped */
-		gap = seqnr + 0x1000000 - cb->cv_hs; /* seq nr = 24 bits */
+		gap = seqnr + 0x1000000000000LL - cb->cv_hs; /* seq nr = 48 bits */
 	}
 
 	if (gap >= cb->cv_size) {
@@ -1067,7 +1067,7 @@ tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 		}
 	}
 
-	ACK_DEBUG((LOG_INFO, "Adding %u to local ackvector\n", cb->pcb->seq_rcv));
+	ACK_DEBUG((LOG_INFO, "Adding %llu to local ackvector\n", cb->pcb->seq_rcv));
 	dccp_increment_ackvector(cb->pcb, cb->pcb->seq_rcv);
 	cb->unacked++;
 
@@ -1075,12 +1075,13 @@ tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 		/* Time to send an Ack */
 		
 		avsize = dccp_generate_ackvector(cb->pcb, ackvector);
+TCPLIKE_DEBUG((LOG_INFO, "recv_packet avsize %d ackvector %d\n", avsize, ackvector));
 		cb->unacked = 0;
 		if (avsize > 0) {
 			dccp_add_option(cb->pcb, DCCP_OPT_ACK_VECTOR0, ackvector, avsize);
 			cb->pcb->ack_snd = cb->pcb->seq_rcv;
 			_avlist_add(cb, cb->pcb->seq_snd+1, cb->pcb->ack_snd);
-			ACK_DEBUG((LOG_INFO, "Recvr: Sending Ack (%u) w/ Ack Vector\n", cb->pcb->ack_snd));
+			ACK_DEBUG((LOG_INFO, "Recvr: Sending Ack (%llu) w/ Ack Vector\n", cb->pcb->ack_snd));
 			dccpstat.tcplikes_recv_acksent++;
 			dccp_output(cb->pcb, 1);
 		}

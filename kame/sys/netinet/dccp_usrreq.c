@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.56 2005/07/21 05:05:29 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.57 2005/07/22 09:31:14 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -672,7 +672,9 @@ dccp_input(struct mbuf *m, ...)
 		DHDR_TO_DSEQ(seqnr, dlh);
 	} else {
 		/* shortseq */
-		seqnr = CONVERT_TO_LONGSEQ(ntohl(dh->dh_seq), dp->ref_seq);
+		seqnr = CONVERT_TO_LONGSEQ((ntohl(dh->dh_seq) >> 8), dp->ref_pseq);
+		DCCP_DEBUG((LOG_INFO, "short seq conversion %x,  %u %u\n", 
+			ntohl(dh->dh_seq) >> 8, dp->ref_pseq.hi, dp->ref_pseq.lo));
 	}
 
 	DCCP_DEBUG((LOG_INFO, "Received DCCP packet with sequence number = %llu , gsn_rcv %llu\n", seqnr, dp->gsn_rcv));
@@ -698,12 +700,20 @@ dccp_input(struct mbuf *m, ...)
 	/* Just ignore DCCP-Move for now */
 	if (dlh->dh_type == DCCP_TYPE_DATA) {
 		extrah_len = 0;
-		optp = (u_char *)(dlh + 1);
+		if (!is_shortseq)
+			optp = (u_char *)(dlh + 1);
+		else
+			optp = (u_char *)(dh + 1);
 	} else if (dh->dh_type == DCCP_TYPE_REQUEST) {
 		drqh = (struct dccp_requesthdr *)(dlh + 1);
 		dp->sname =  drqh->drqh_sname;
 		optp = (u_char *)(drqh + 1);
 		extrah_len = 4;
+
+		/* store reference peer sequence number */
+		dp->ref_pseq.hi = seqnr >> 24;
+		dp->ref_pseq.lo = (u_int64_t)(seqnr & 0xffffff);
+
 	} else if (dh->dh_type == DCCP_TYPE_RESET) {
 		extrah_len = 8 ;
 		drth = (struct dccp_resethdr *)(dlh + 1);
@@ -721,11 +731,15 @@ dccp_input(struct mbuf *m, ...)
 					goto badunlocked;
 				}
 				optp = (u_char *)(drqh + 1);
+
+				/* store reference peer sequence number */
+				dp->ref_pseq.hi = seqnr >> 24;
+				dp->ref_pseq.lo = (u_int64_t)(seqnr & 0xffffff);
 			} else 
 				optp = (u_char *)(dalh + 1);
 		} else {
 			extrah_len = 4;
-			dah = (struct dccp_ackhdr *)(dlh + 1);
+			dah = (struct dccp_ackhdr *)(dh + 1);
 			optp = (u_char *)(dah + 1);
 		}
 
@@ -818,9 +832,6 @@ dccp_input(struct mbuf *m, ...)
 		case DCCP_TYPE_RESPONSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REPSONSE\n"));
 			DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
-			/* store reference acknowledge number */
-			dp->ref_ack.hi = dp->ack_rcv >> 24;
-			dp->ref_ack.lo = (u_int64_t)(dp->ack_rcv & 0xffffff);
 			dp->ack_snd = dp->seq_rcv;
 
 #ifdef __OpenBSD__
@@ -891,7 +902,7 @@ dccp_input(struct mbuf *m, ...)
 				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			} else {
 				/* shortseq XXX */
-				dp->ack_rcv = CONVERT_TO_LONGSEQ(ntohl(dah->dash.dah_ack), dp->ref_ack);
+				dp->ack_rcv = CONVERT_TO_LONGSEQ((ntohl(dah->dash.dah_ack) >> 8), dp->ref_seq);
 			} 
 
 			if (dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0) {
@@ -954,7 +965,7 @@ dccp_input(struct mbuf *m, ...)
 				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			} else {
 				/* shortseq */
-				dp->ack_rcv = CONVERT_TO_LONGSEQ(ntohl(dah->dash.dah_ack), dp->ref_ack);
+				dp->ack_rcv = CONVERT_TO_LONGSEQ((ntohl(dah->dash.dah_ack) >> 8), dp->ref_seq);
 			} 
 
 			if (dp->cc_in_use[1] > 0) {
@@ -971,7 +982,7 @@ dccp_input(struct mbuf *m, ...)
 				DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			} else {
 				/* shortseq */
-				dp->ack_rcv = CONVERT_TO_LONGSEQ(ntohl(dah->dash.dah_ack), dp->ref_ack);
+				dp->ack_rcv = CONVERT_TO_LONGSEQ((ntohl(dah->dash.dah_ack) >> 8), dp->ref_seq);
 			} 
 
 			if (dp->cc_in_use[1] > 0) {
@@ -1091,7 +1102,7 @@ dccp_input(struct mbuf *m, ...)
 	if (dh->dh_type == DCCP_TYPE_DATA ||
 	    dh->dh_type == DCCP_TYPE_ACK  ||
 	    dh->dh_type == DCCP_TYPE_DATAACK) {
-		DCCP_DEBUG((LOG_INFO, "ACK = %u\n", dp->ack_rcv));
+		DCCP_DEBUG((LOG_INFO, "ACK = %llu\n", dp->ack_rcv));
 		if (dp->cc_in_use[0] > 0) {
 			(*cc_sw[dp->cc_in_use[0]].cc_send_packet_recv)(dp->cc_state[0],options, optlen);
 		}
@@ -2995,6 +3006,8 @@ dccp_newdccpcb(struct inpcb *inp)
 	dp->retrans = 200;
 	dp->avgpsize = 0;
 	dp->d_maxseg = 1400;
+	dp->ref_pseq.hi = 0;
+	dp->ref_pseq.lo = 0;
 
 #ifdef __NetBSD__	
 	switch (family) {
@@ -3880,9 +3893,9 @@ dccp_usrreq(so, req, m, nam, control)
 void
 dccp_use_ackvector(struct dccpcb *dp)
 {
-	ACK_DEBUG((LOG_INFO,"Initializing AckVector\n"));
+	DCCP_DEBUG((LOG_INFO,"Initializing AckVector\n"));
 	if (dp->ackvector > 0) {
-		ACK_DEBUG((LOG_INFO, "It was already initialized!!!\n"));
+		DCCP_DEBUG((LOG_INFO, "It was already initialized!!!\n"));
 		return;
 	}
 	dp->av_size = DCCP_VECTORSIZE;
@@ -3942,9 +3955,9 @@ dccp_increment_ackvector(struct dccpcb *dp, u_int64_t seqnr)
 	int64_t gap;
 	u_char *t, *n;
 	
-	DCCP_DEBUG((LOG_INFO, "Entering dccp_increment_ackvecktor\n"));
+	DCCP_DEBUG((LOG_INFO, "Entering dccp_increment_ackvecktor %d\n", dp->av_size));
 	if (dp->av_size == 0) {
-		ACK_DEBUG((LOG_INFO, "Increment: AckVector NOT YET INITIALIZED!!!\n"));
+		DCCP_DEBUG((LOG_INFO, "Increment: AckVector NOT YET INITIALIZED!!!\n"));
 		dccp_use_ackvector(dp);
 	}
 	
@@ -3959,13 +3972,14 @@ dccp_increment_ackvector(struct dccpcb *dp, u_int64_t seqnr)
 		gap = seqnr - dp->av_hs;
 	} else {
 		/* Wrapped */
-		gap = seqnr + 0x1000000 - dp->av_hs; /* seq nr = 24 bits */
+		gap = seqnr + 0x1000000000000LL - dp->av_hs; /* seqnr = 48 bits */
 	}
+	DCCP_DEBUG((LOG_INFO, "dccp_increment_ackvecktor gap=%llu av_size %d\n", gap, dp->av_size));
 
 	if (gap >= dp->av_size) {
 		/* gap is bigger than ackvector size? baaad */
 		/* maybe we should increase the ackvector here */
-		DCCP_DEBUG((LOG_INFO, "increment_ackvector error. gap: %d, av_size: %d, seqnr: %d\n",
+		DCCP_DEBUG((LOG_INFO, "increment_ackvector error. gap: %llu, av_size: %d, seqnr: %d\n",
 			    gap, dp->av_size, seqnr));
 		return;
 	}
@@ -3978,7 +3992,7 @@ dccp_increment_ackvector(struct dccpcb *dp, u_int64_t seqnr)
 	*t = *t & (~(0x03 << (offset *2))); /* turn off bits, 00 is rcvd, 11 is missing */
 
 	dp->av_ts = seqnr + 1;
-	if (dp->av_ts == 0x1000000)
+	if (dp->av_ts == 0x1000000000000LL)
 		dp->av_ts = 0;
 
 	if (gap > (dp->av_size - 128)) {

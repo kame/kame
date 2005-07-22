@@ -1,4 +1,4 @@
-/*	$KAME: dccp.h,v 1.6 2005/06/20 17:03:54 nishida Exp $	*/
+/*	$KAME: dccp.h,v 1.7 2005/07/22 09:31:13 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -157,12 +157,13 @@ struct dccp_resethdr {
 #define DCCP_OPT_PREFER		34
 #define DCCP_OPT_CONFIRM	35
 #define DCCP_OPT_INIT_COOKIE	36
-#define DCCP_OPT_ACK_VECTOR0	37
-#define DCCP_OPT_ACK_VECTOR1	38
-#define DCCP_OPT_RECV_BUF_DROPS 39
-#define DCCP_OPT_TIMESTAMP	40
-#define DCCP_OPT_TIMESTAMP_ECHO 41
-#define DCCP_OPT_IDENT		42
+#define DCCP_OPT_NDP_COUNT	37
+#define DCCP_OPT_ACK_VECTOR0	38
+#define DCCP_OPT_ACK_VECTOR1	39
+#define DCCP_OPT_RECV_BUF_DROPS 40
+#define DCCP_OPT_TIMESTAMP	41
+#define DCCP_OPT_TIMESTAMP_ECHO 42
+#define DCCP_OPT_IDENT		43
 #define DCCP_OPT_CHALLANGE	44
 
 #define DCCP_REASON_UNSPEC	0

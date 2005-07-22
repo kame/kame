@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.h,v 1.9 2005/06/20 17:03:55 nishida Exp $	*/
+/*	$KAME: dccp_tcplike.h,v 1.10 2005/07/22 09:31:14 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -53,9 +53,9 @@ struct tcplike_send_ccb
 	struct mtx mutex;
 #endif
 	struct dccpcb *pcb; /* Pointer to associated dccpcb */
-	u_int32_t cwnd; /* congestion window */
-	u_int32_t ssthresh;
-	u_int32_t oldcwnd_ts; /* old cwnd tail seqnr */
+	dccp_seq cwnd; /* congestion window */
+	dccp_seq ssthresh;
+	dccp_seq oldcwnd_ts; /* old cwnd tail seqnr */
 	
 	u_int16_t rtt; /* estimated round trip-time */
 	u_int16_t rto; /* Timeout value */
@@ -82,12 +82,12 @@ struct tcplike_send_ccb
 	u_char *cwndvector;  /* 2 bits per packet */
 	u_char *cv_hp;  /* head ptr for cwndvector */
 	u_int16_t cv_size;
-	u_int32_t cv_hs, cv_ts; /* lowest/highest seq no in cwndvector */
+	dccp_seq cv_hs, cv_ts; /* lowest/highest seq no in cwndvector */
 
 	u_int8_t sample_rtt;
 	u_int32_t timestamp;
 
-	u_int32_t rcvd_ack, lost_ack;
+	dccp_seq rcvd_ack, lost_ack;
 };
 
 #ifdef _KERNEL
