@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.131 2005/04/14 06:22:41 suz Exp $	*/
+/*	$KAME: ip6_var.h,v 1.132 2005/07/22 03:50:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -468,14 +468,14 @@ struct in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 	struct in6_addr *, struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route *, struct ifnet **,
-	struct rtentry **, int));
+	struct rtentry **, int, int));
 #else
 struct in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 	struct ip6_pktopts *, struct ip6_moptions *, struct route_in6 *,
 	struct in6_addr *, struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route_in6 *, struct ifnet **,
-	struct rtentry **, int));
+	struct rtentry **, int, int));
 #endif
 
 u_int32_t ip6_randomid __P((void));

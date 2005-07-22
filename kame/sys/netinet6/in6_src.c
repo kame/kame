@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.155 2005/06/16 18:29:27 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.156 2005/07/22 03:50:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -589,7 +589,7 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 
 	clone = IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) ? 0 : 1;
 	if ((error = in6_selectroute(dstsock, opts, mopts, ro, retifp,
-	    &rt, clone)) != 0) {
+	    &rt, clone, 1)) != 0) {
 		return (error);
 	}
 
@@ -627,7 +627,7 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 }
 
 int
-in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
+in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
 	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
@@ -639,6 +639,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	struct ifnet **retifp;
 	struct rtentry **retrt;
 	int clone;		/* meaningful only for bsdi and freebsd. */
+	int norouteok;
 {
 	int error = 0;
 	struct ifnet *ifp = NULL;
@@ -671,7 +672,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		ifp = ifindex2ifnet[pi->ipi6_ifindex];
 #endif
 		if (ifp != NULL &&
-		    (retrt == NULL || IN6_IS_ADDR_MULTICAST(dst))) {
+		    norouteok || retrt == NULL || IN6_IS_ADDR_MULTICAST(dst)) {
 			/*
 			 * we do not have to check or get the route for
 			 * multicast.
