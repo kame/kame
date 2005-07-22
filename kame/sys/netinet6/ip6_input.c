@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.364 2005/07/15 15:25:00 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.365 2005/07/22 03:43:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -655,6 +655,9 @@ passin:
 	 * is not loopback. 
 	 */
 	if (in6_clearscope(&ip6->ip6_src) || in6_clearscope(&ip6->ip6_dst)) {
+		/* just for debug: should be removed soon (20050722) */
+		printf("ip6_input: received scope-embedded address: %s->%s\n",
+		    ip6_sprintf(&ip6->ip6_src), ip6_sprintf(&ip6->ip6_dst));
 		ip6stat.ip6s_badscope++; /* XXX */
 		goto bad;
 	}
