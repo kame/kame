@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2783 2005/07/15 15:02:02 jinmei Exp $
+$KAME: CHANGELOG,v 1.2784 2005/07/22 03:53:28 jinmei Exp $
 
 <200507>
+2005-07-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c: allowed an application to send a
+	packet to a scoped address without explicitly disambiguating the
+	scope zone but with specifying the outgoing interface.  It's a bad
+	practice and should be discouraged, but such code has been spread,
+	unfortunately.
+
 2005-07-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_output): do not send
 	ctlinput notification unconditionally when an outgoing packet is
