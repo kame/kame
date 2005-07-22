@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.156 2005/07/22 03:50:26 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.157 2005/07/22 04:58:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -147,11 +147,17 @@ struct in6_addrpolicy defaultaddrpolicy;
 int ip6_prefer_tempaddr = 0;
 
 #ifdef NEW_STRUCT_ROUTE
+static int selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+	struct ip6_moptions *, struct route *, struct ifnet **,
+	struct rtentry **, int, int));
 static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-	struct ip6_moptions *, struct route *ro, struct ifnet **));
+	struct ip6_moptions *, struct route *, struct ifnet **));
 #else
+static int selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+	struct ip6_moptions *, struct route_in6 *, struct ifnet **,
+	struct rtentry **, int, int));
 static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-	struct ip6_moptions *, struct route_in6 *ro, struct ifnet **));
+	struct ip6_moptions *, struct route_in6 *, struct ifnet **));
 #endif
 
 static struct in6_addrpolicy *lookup_addrsel_policy __P((struct sockaddr_in6 *));
@@ -573,61 +579,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 #undef NEXT
 
 static int
-in6_selectif(dstsock, opts, mopts, ro, retifp)
-	struct sockaddr_in6 *dstsock;
-	struct ip6_pktopts *opts;
-	struct ip6_moptions *mopts;
-#ifdef NEW_STRUCT_ROUTE
-	struct route *ro;
-#else
-	struct route_in6 *ro;
-#endif
-	struct ifnet **retifp;
-{
-	int error, clone;
-	struct rtentry *rt = NULL;
-
-	clone = IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) ? 0 : 1;
-	if ((error = in6_selectroute(dstsock, opts, mopts, ro, retifp,
-	    &rt, clone, 1)) != 0) {
-		return (error);
-	}
-
-	/*
-	 * do not use a rejected or black hole route.
-	 * XXX: this check should be done in the L2 output routine.
-	 * However, if we skipped this check here, we'd see the following
-	 * scenario:
-	 * - install a rejected route for a scoped address prefix
-	 *   (like fe80::/10)
-	 * - send a packet to a destination that matches the scoped prefix,
-	 *   with ambiguity about the scope zone.
-	 * - pick the outgoing interface from the route, and disambiguate the
-	 *   scope zone with the interface.
-	 * - ip6_output() would try to get another route with the "new"
-	 *   destination, which may be valid.
-	 * - we'd see no error on output.
-	 * Although this may not be very harmful, it should still be confusing.
-	 * We thus reject the case here.
-	 */
-	if (rt && (rt->rt_flags & (RTF_REJECT | RTF_BLACKHOLE)))
-		return (rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
-
-	/*
-	 * Adjust the "outgoing" interface.  If we're going to loop the packet
-	 * back to ourselves, the ifp would be the loopback interface.
-	 * However, we'd rather know the interface associated to the
-	 * destination address (which should probably be one of our own
-	 * addresses.)
-	 */
-	if (rt && rt->rt_ifa && rt->rt_ifa->ifa_ifp)
-		*retifp = rt->rt_ifa->ifa_ifp;
-
-	return (0);
-}
-
-int
-in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
+selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
 	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
@@ -638,7 +590,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
 #endif
 	struct ifnet **retifp;
 	struct rtentry **retrt;
-	int clone;		/* meaningful only for bsdi and freebsd. */
+	int clone;
 	int norouteok;
 {
 	int error = 0;
@@ -672,7 +624,8 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
 		ifp = ifindex2ifnet[pi->ipi6_ifindex];
 #endif
 		if (ifp != NULL &&
-		    norouteok || retrt == NULL || IN6_IS_ADDR_MULTICAST(dst)) {
+		    (norouteok || retrt == NULL ||
+		    IN6_IS_ADDR_MULTICAST(dst))) {
 			/*
 			 * we do not have to check or get the route for
 			 * multicast.
@@ -860,6 +813,79 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
 		*retrt = rt;	/* rt may be NULL */
 
 	return (error);
+}
+
+
+static int
+in6_selectif(dstsock, opts, mopts, ro, retifp)
+	struct sockaddr_in6 *dstsock;
+	struct ip6_pktopts *opts;
+	struct ip6_moptions *mopts;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
+	struct route_in6 *ro;
+#endif
+	struct ifnet **retifp;
+{
+	int error, clone;
+	struct rtentry *rt = NULL;
+
+	clone = IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) ? 0 : 1;
+	if ((error = selectroute(dstsock, opts, mopts, ro, retifp,
+	    &rt, clone, 1)) != 0) {
+		return (error);
+	}
+
+	/*
+	 * do not use a rejected or black hole route.
+	 * XXX: this check should be done in the L2 output routine.
+	 * However, if we skipped this check here, we'd see the following
+	 * scenario:
+	 * - install a rejected route for a scoped address prefix
+	 *   (like fe80::/10)
+	 * - send a packet to a destination that matches the scoped prefix,
+	 *   with ambiguity about the scope zone.
+	 * - pick the outgoing interface from the route, and disambiguate the
+	 *   scope zone with the interface.
+	 * - ip6_output() would try to get another route with the "new"
+	 *   destination, which may be valid.
+	 * - we'd see no error on output.
+	 * Although this may not be very harmful, it should still be confusing.
+	 * We thus reject the case here.
+	 */
+	if (rt && (rt->rt_flags & (RTF_REJECT | RTF_BLACKHOLE)))
+		return (rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
+
+	/*
+	 * Adjust the "outgoing" interface.  If we're going to loop the packet
+	 * back to ourselves, the ifp would be the loopback interface.
+	 * However, we'd rather know the interface associated to the
+	 * destination address (which should probably be one of our own
+	 * addresses.)
+	 */
+	if (rt && rt->rt_ifa && rt->rt_ifa->ifa_ifp)
+		*retifp = rt->rt_ifa->ifa_ifp;
+
+	return (0);
+}
+
+int
+in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
+	struct sockaddr_in6 *dstsock;
+	struct ip6_pktopts *opts;
+	struct ip6_moptions *mopts;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
+	struct route_in6 *ro;
+#endif
+	struct ifnet **retifp;
+	struct rtentry **retrt;
+	int clone;		/* meaningful only for bsdi and freebsd. */
+{
+	return (selectroute(dstsock, opts, mopts, ro, retifp,
+	    retrt, clone, 0));
 }
 
 /*

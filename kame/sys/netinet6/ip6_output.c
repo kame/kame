@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.475 2005/07/22 03:50:26 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.476 2005/07/22 04:58:55 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1106,7 +1106,7 @@ skip_ipsec2:;
 	dst_sa.sin6_len = sizeof(dst_sa);
 	dst_sa.sin6_addr = ip6->ip6_dst;
 	if ((error = in6_selectroute(&dst_sa, opt, im6o, ro,
-	    &ifp, &rt, clone, 0)) != 0) {
+	    &ifp, &rt, clone)) != 0) {
 		switch (error) {
 		case EHOSTUNREACH:
 			ip6stat.ip6s_noroute++;
