@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.27 2005/04/23 07:13:53 suz Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.28 2005/07/22 05:28:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,11 +197,11 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 #endif
 				ret = rn_addroute(v_arg, n_arg, head,
 					treenodes);
-			}
+			} else
 #ifdef __FreeBSD__
-			RTFREE_LOCKED(rt2);
+				RTFREE_LOCKED(rt2);
 #else
-			RTFREE(rt2);
+				RTFREE(rt2);
 #endif
 		}
 	} else if (ret == NULL && rt->rt_flags & RTF_CLONING) {
