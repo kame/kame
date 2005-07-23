@@ -160,7 +160,6 @@ void	usage(void);
 void	ifmaybeload(char *name);
 
 #ifdef INET6
-void	in6_fillscopeid(struct sockaddr_in6 *sin6);
 int	prefix(void *, int);
 static	char *sec2str(time_t);
 int	explicit_prefix = 0;
@@ -1436,10 +1435,6 @@ tunnel_status(int s)
 
 	if (ioctl(s, srccmd, (caddr_t)ifrp) < 0)
 		return;
-#ifdef INET6
-	if (ifrp->ifr_addr.sa_family == AF_INET6)
-		in6_fillscopeid((struct sockaddr_in6 *)&ifrp->ifr_addr);
-#endif
 	getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
 	    psrcaddr, sizeof(psrcaddr), 0, 0, niflag);
 #ifdef INET6
@@ -1449,10 +1444,6 @@ tunnel_status(int s)
 
 	if (ioctl(s, dstcmd, (caddr_t)ifrp) < 0)
 		return;
-#ifdef INET6
-	if (ifrp->ifr_addr.sa_family == AF_INET6)
-		in6_fillscopeid((struct sockaddr_in6 *)&ifrp->ifr_addr);
-#endif
 	getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
 	    pdstaddr, sizeof(pdstaddr), 0, 0, niflag);
 
@@ -1540,10 +1531,6 @@ nexthop_status(s)
 	if (ioctl(s, nexthopcmd, (caddr_t)ifrp) < 0)
 		return;
 
-#ifdef INET6
-	if (ifrp->ifr_addr.sa_family == AF_INET6)
-		in6_fillscopeid((struct sockaddr_in6 *)&ifrp->ifr_addr);
-#endif
 	getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
 	    pnexthopaddr, sizeof(pnexthopaddr), 0, 0, niflag);
 #ifdef INET6
@@ -1588,18 +1575,6 @@ in_status(int s __unused, struct rt_addrinfo * info)
 
 #ifdef INET6
 void
-in6_fillscopeid(struct sockaddr_in6 *sin6)
-{
-#if defined(__KAME__) && defined(KAME_SCOPEID)
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-		sin6->sin6_scope_id =
-			ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
-		sin6->sin6_addr.s6_addr[2] = sin6->sin6_addr.s6_addr[3] = 0;
-	}
-#endif
-}
-
-void
 in6_status(int s __unused, struct rt_addrinfo * info)
 {
 	struct sockaddr_in6 *sin, null_sin;
@@ -1636,16 +1611,6 @@ in6_status(int s __unused, struct rt_addrinfo * info)
 	lifetime = ifr6.ifr_ifru.ifru_lifetime;
 	close(s6);
 
-	/* XXX: embedded link local addr check */
-	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr) &&
-	    *(u_short *)&sin->sin6_addr.s6_addr[2] != 0) {
-		u_short index;
-
-		index = *(u_short *)&sin->sin6_addr.s6_addr[2];
-		*(u_short *)&sin->sin6_addr.s6_addr[2] = 0;
-		if (sin->sin6_scope_id == 0)
-			sin->sin6_scope_id = ntohs(index);
-	}
 	scopeid = sin->sin6_scope_id;
 
 	error = getnameinfo((struct sockaddr *)sin, sin->sin6_len, addr_buf,
@@ -1665,17 +1630,6 @@ in6_status(int s __unused, struct rt_addrinfo * info)
 		 */
 		if (sin && sin->sin6_family == AF_INET6) {
 			int error;
-
-			/* XXX: embedded link local addr check */
-			if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr) &&
-			    *(u_short *)&sin->sin6_addr.s6_addr[2] != 0) {
-				u_short index;
-
-				index = *(u_short *)&sin->sin6_addr.s6_addr[2];
-				*(u_short *)&sin->sin6_addr.s6_addr[2] = 0;
-				if (sin->sin6_scope_id == 0)
-					sin->sin6_scope_id = ntohs(index);
-			}
 
 			error = getnameinfo((struct sockaddr *)sin,
 					    sin->sin6_len, addr_buf,
