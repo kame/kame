@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.157 2005/07/22 04:58:55 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.158 2005/07/23 08:09:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -814,7 +814,6 @@ selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
 
 	return (error);
 }
-
 
 static int
 in6_selectif(dstsock, opts, mopts, ro, retifp)
