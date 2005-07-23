@@ -30,6 +30,7 @@
  * $FreeBSD: src/sys/net/rtsock.c,v 1.113.2.4 2005/01/31 23:26:23 imp Exp $
  */
 
+#include "opt_inet6.h"
 #include "opt_sctp.h"
 
 #ifdef __FreeBSD__
@@ -54,6 +55,11 @@
 #include <net/netisr.h>
 #include <net/raw_cb.h>
 #include <net/route.h>
+
+#ifdef INET6
+#include <netinet/in.h>
+#include <netinet6/scope6_var.h>
+#endif
 
 #ifdef SCTP
 extern void sctp_add_ip_address(struct ifaddr *ifa);
@@ -589,6 +595,25 @@ flush:
 		rp = sotorawcb(so);
 	}
 	if (rtm) {
+#ifdef INET6
+		int i;
+
+		/* Special filter for IPv6 scoped addresses (see rtmsg1()) */
+		for (i = 0; i < RTAX_MAX; i++) {
+			struct sockaddr *sa;
+			
+
+			if ((sa = info.rti_info[i]) == NULL)
+				continue;
+			if (sa->sa_family == AF_INET6 &&
+			    sa->sa_len == sizeof(struct sockaddr_in6)) {
+				struct sockaddr_in6 *sa6;
+
+				sa6 = (struct sockaddr_in6 *)sa; 
+				(void)sa6_recoverscope(sa6);
+			}
+		}
+#endif
 		m_copyback(m, 0, rtm->rtm_msglen, (caddr_t)rtm);
 		if (m->m_pkthdr.len < rtm->rtm_msglen) {
 			m_freem(m);
@@ -671,6 +696,17 @@ rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo *rtinfo)
 			return (0); /* should be EINVAL but for compat */
 		}
 		/* accept it */
+#ifdef INET6
+		/*
+		 * In the kernel the scope zone ID of an IPv6 scoped address
+		 * is embedded in its address field.
+		 */
+		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    sa->sa_family == AF_INET6) {
+			if (sa6_embedscope((struct sockaddr_in6 *)sa, 0))
+				return (-1);
+		}
+#endif
 		rtinfo->rti_info[i] = sa;
 		cp += SA_SIZE(sa);
 	}
@@ -727,8 +763,26 @@ rt_msg1(int type, struct rt_addrinfo *rtinfo)
 	rtm = mtod(m, struct rt_msghdr *);
 	bzero((caddr_t)rtm, len);
 	for (i = 0; i < RTAX_MAX; i++) {
+#ifdef INET6
+		struct sockaddr_in6 sa6;
+#endif
+
 		if ((sa = rtinfo->rti_info[i]) == NULL)
 			continue;
+#ifdef INET6
+		/*
+		 * IPv6 scoped addresses may contain their zone IDs in the
+		 * sin6_addr field, which should be hidden from applications.
+		 * XXX: should this part be more generalized (e.g., via
+		 * per-AF function pointers)?
+		 */
+		if (sa->sa_family == AF_INET6 &&
+		    sa->sa_len == sizeof(struct sockaddr_in6)) {
+			sa6 = *(struct sockaddr_in6 *)sa;
+			(void)sa6_recoverscope(&sa6); /* XXX: catch error? */
+			sa = (struct sockaddr *)&sa6;
+		}
+#endif
 		rtinfo->rti_addrs |= (1 << i);
 		dlen = SA_SIZE(sa);
 		m_copyback(m, len, dlen, (caddr_t)sa);
@@ -776,9 +830,20 @@ again:
 		cp += len;
 	for (i = 0; i < RTAX_MAX; i++) {
 		struct sockaddr *sa;
+#ifdef INET6
+		struct sockaddr_in6 sa6;
+#endif
 
 		if ((sa = rtinfo->rti_info[i]) == NULL)
 			continue;
+#ifdef INET6
+		if (sa->sa_family == AF_INET6 &&
+		    sa->sa_len == sizeof(struct sockaddr_in6)) {
+			sa6 = *(struct sockaddr_in6 *)sa;
+			(void)sa6_recoverscope(&sa6); /* XXX: catch error? */
+			sa = (struct sockaddr *)&sa6;
+		}
+#endif
 		rtinfo->rti_addrs |= (1 << i);
 		dlen = SA_SIZE(sa);
 		if (cp) {
