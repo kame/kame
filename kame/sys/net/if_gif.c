@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.115 2005/06/16 18:29:23 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.116 2005/07/23 07:34:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -832,8 +832,15 @@ gif_ioctl(ifp, cmd, data)
 		if (src->sa_len > size)
 			return EINVAL;
 		bcopy((caddr_t)src, (caddr_t)dst, src->sa_len);
+#ifdef INET6
+		if (dst->sa_family == AF_INET6) {
+			error = sa6_recoverscope((struct sockaddr_in6 *)dst);
+			if (error != 0)
+				return (error);
+		}
+#endif
 		break;
-			
+
 	case SIOCGIFPDSTADDR:
 #ifdef INET6
 	case SIOCGIFPDSTADDR_IN6:
@@ -864,6 +871,13 @@ gif_ioctl(ifp, cmd, data)
 		if (src->sa_len > size)
 			return EINVAL;
 		bcopy((caddr_t)src, (caddr_t)dst, src->sa_len);
+#ifdef INET6
+		if (dst->sa_family == AF_INET6) {
+			error = sa6_recoverscope((struct sockaddr_in6 *)dst);
+			if (error != 0)
+				return (error);
+		}
+#endif
 		break;
 
 	case SIOCGLIFPHYADDR:
