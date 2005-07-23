@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.393 2005/06/16 18:29:27 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.394 2005/07/23 08:09:30 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -475,7 +475,7 @@ in6_control(so, cmd, data, ifp, p)
 #ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
 #endif
-	int privileged;
+	int error, privileged;
 
 	privileged = 0;
 #if defined(__NetBSD__)
@@ -695,6 +695,8 @@ in6_control(so, cmd, data, ifp, p)
 
 	case SIOCGIFADDR_IN6:
 		ifr->ifr_addr = ia->ia_addr;
+		if ((error = sa6_recoverscope(&ifr->ifr_addr)) != 0)
+			return (error);
 		break;
 
 	case SIOCGIFDSTADDR_IN6:
@@ -705,6 +707,8 @@ in6_control(so, cmd, data, ifp, p)
 		 * an error?
 		 */
 		ifr->ifr_dstaddr = ia->ia_dstaddr;
+		if ((error = sa6_recoverscope(&ifr->ifr_dstaddr)) != 0)
+			return (error);
 		break;
 
 	case SIOCGIFNETMASK_IN6:
