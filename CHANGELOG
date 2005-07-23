@@ -1,7 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2786 2005/07/22 12:14:29 suz Exp $
+$KAME: CHANGELOG,v 1.2787 2005/07/23 08:20:47 jinmei Exp $
 
 <200507>
+2005-07-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd5/sys/net/rtsock.c: added support for IPv6 scoped
+	  addresses for routing sockets:
+	- route_output() now accepts IPv6 addresses with non-0
+	  sin6_scope_id field and converts those into the kernel internal
+	  form.
+	- rt_msg[12]() recovers the embedded scope zone ID and set the
+	  sin6_scope_id field appropriately.
+	* freebsd5/sbin/{ifconfig,route}: got rid of ugly (but still
+	incomplete) special cases for IPv6 link-local addresses thanks to
+	this change.
+
 2005-07-22  SUZUKI, Shinsuke <suz@kame.net>
 	* freebsd5/sys/fs/devfs/devfs_vnops.c: 
 	  FreeBSD Security Advisory FreeBSD-SA-05:17.devfs
