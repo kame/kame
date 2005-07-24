@@ -983,8 +983,6 @@ in_addmulti(ap, ifp)
 	struct in_multi *inm;
 	struct ifreq ifr;
 	struct in_ifaddr *ia;
-	int dummy;			/* dummy */
-	int *error = &dummy;		/* dummy */
 	int s = splsoftnet();
 
 	/*
@@ -1001,7 +999,6 @@ in_addmulti(ap, ifp)
 	     */
 	    inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR, M_NOWAIT);
 	    if (inm == NULL) {
-		*error = ENOBUFS;
 		splx(s);
 		return (NULL);
 	    }
@@ -1012,7 +1009,6 @@ in_addmulti(ap, ifp)
 	    IFP_TO_IA(ifp, ia);
 	    if (ia == NULL) {
 		free(inm, M_IPMADDR);
-		*error = ENOBUFS /*???*/;
 		splx(s);
 		return (NULL);
 	    }
@@ -1030,7 +1026,6 @@ in_addmulti(ap, ifp)
 		(*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) {
 		LIST_REMOVE(inm, inm_list);
 		free(inm, M_IPMADDR);
-		*error = EINVAL /*???*/;
 		splx(s);
 		return (NULL);
 	    }
