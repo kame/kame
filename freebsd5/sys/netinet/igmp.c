@@ -1077,11 +1077,7 @@ igmp_sendbuf(m, ifp)
 	imo.imo_multicast_loop = 0;
 #endif
 
-	ip_output(m, router_alert, &igmprt, 0, &imo
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		 ,NULL
-#endif
-		 );
+	ip_output(m, router_alert, &igmprt, 0, &imo,NULL);
 	++igmpstat.igps_snd_v3_reports;
 }
 
