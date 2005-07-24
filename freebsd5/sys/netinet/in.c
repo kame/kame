@@ -995,10 +995,9 @@ in_addmulti(ap, ifp)
 	return in_addmulti2(ap, ifp, 0, NULL, MCAST_EXCLUDE, 1, &error);
 #else
 	register struct in_multi *inm;
+	int error;
 	struct sockaddr_in sin;
 	struct ifmultiaddr *ifma;
-	int dummy;			/* dummy */
-	int *error = &dummy;		/* dummy */
 	int s = splnet();
 
 	/*
@@ -1010,8 +1009,8 @@ in_addmulti(ap, ifp)
 	sin.sin_family = AF_INET;
 	sin.sin_len = sizeof sin;
 	sin.sin_addr = *ap;
-	*error = if_addmulti(ifp, (struct sockaddr *)&sin, &ifma);
-	if (*error) {
+	error = if_addmulti(ifp, (struct sockaddr *)&sin, &ifma);
+	if (error) {
 		splx(s);
 		return 0;
 	}
@@ -1030,7 +1029,6 @@ in_addmulti(ap, ifp)
 	inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR,
 	    M_NOWAIT | M_ZERO);
 	if (inm == NULL) {
-		*error = ENOBUFS;
 		splx(s);
 		return (NULL);
 	}
@@ -1076,7 +1074,7 @@ in_delmulti(inm)
 		 * the interface and nuke the packet.
 		 */
 		my_inm = *inm ;
-		ifma->ifma_protospec = 0;
+		ifma->ifma_protospec = NULL;
 		LIST_REMOVE(inm, inm_link);
 		free(inm, M_IPMADDR);
 	}
