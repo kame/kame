@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.h,v 1.2 2005/07/17 20:40:45 t-momose Exp $	*/
+/*	$KAME: if_mip.h,v 1.3 2005/07/25 04:37:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,6 +37,9 @@
 struct mip_softc {
 	struct ifnet          mip_if;
 	LIST_ENTRY(mip_softc) mip_entry;
+#ifdef __APPLE__
+	u_long	mip_proto; /* dlil protocol attached */
+#endif
 };
 LIST_HEAD(mip_softc_list, mip_softc);
 

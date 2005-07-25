@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.c,v 1.5 2005/07/17 20:40:45 t-momose Exp $	*/
+/*	$KAME: if_mip.c,v 1.6 2005/07/25 04:37:50 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -72,7 +72,18 @@
 
 #include <net/net_osdep.h>
 
+#ifdef __APPLE__
+#include <machine/spl.h>
+#include <net/dlil.h>
+
+int mip_demux(struct ifnet *, struct mbuf  *, char *, u_long *);
+static int mip_add_proto(struct ifnet *, u_long, struct ddesc_head_str *);
+static int mip_del_proto(struct ifnet *, u_long);
+int mip_attach_proto_family(struct ifnet *, u_long);
+#endif /* __APPLE__ */
+
 #if NMIP > 0
+#include <net/if_var.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/mip6.h>
 
@@ -99,15 +110,30 @@ mipattach(dummy)
 #endif
 {
 	struct mip_softc *sc;
+	int error = 0;
 	int i;
 
 	LIST_INIT(&mip_softc_list);
 
-	sc = malloc(NMIP * sizeof(struct mip_softc), M_DEVBUF, M_WAITOK);
+	MALLOC(sc, struct mip_softc *, NMIP * sizeof(struct mip_softc), M_DEVBUF, M_WAITOK);
 	bzero(sc, NMIP * sizeof(struct mip_softc));
+#ifdef __APPLE__
+	/* Register protocol registration functions */
+#if 0
+	if ( error = dlil_reg_proto_module(AF_INET, APPLE_IF_FAM_MIP, mip_attach_proto_family, NULL) != 0)
+		printf("dlil_reg_proto_module failed for AF_INET error=%d\n", error);
+#endif
+	if ( error = dlil_reg_proto_module(AF_INET6, APPLE_IF_FAM_MIP, mip_attach_proto_family, NULL) != 0)
+		printf("dlil_reg_proto_module failed for AF_INET6 error=%d\n", error);
+#endif
+
 	for (i = 0 ; i < NMIP; sc++, i++) {
 #ifdef __FreeBSD__
 		if_initname(&sc->mip_if, "mip", i);
+#elif defined(__APPLE__)
+		sc->mip_if.if_name ="mip";
+		sc->mip_if.if_unit = i;
+		sc->mip_if.if_softc	= sc;
 #else
 		snprintf(sc->mip_if.if_xname, sizeof(sc->mip_if.if_xname),
 		    "mip%d", i);
@@ -127,7 +153,16 @@ mipattach(dummy)
 #ifdef __OpenBSD__
 		IFQ_SET_READY(&ifp->if_snd);
 #endif
+#ifndef __APPLE__
 		if_attach(&sc->mip_if);
+#else
+		sc->mip_if.if_family = APPLE_IF_FAM_MIP;
+		sc->mip_if.if_demux = mip_demux;
+		sc->mip_if.if_add_proto = mip_add_proto;
+		sc->mip_if.if_del_proto = mip_del_proto;
+		sc->mip_if.if_output = NULL;
+		dlil_if_attach(&sc->mip_if);
+#endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		if_alloc_sadl(&sc->mip_if);
 #endif
@@ -275,6 +310,8 @@ mip_output(ifp, m, dst, rt)
 		    , &ifp, NULL
 #elif defined(__NetBSD__)
 		    , NULL, &ifp
+#elif defined(__APPLE__)
+		    , &ifp, 0
 #else
 		    , &ifp
 #endif
@@ -299,7 +336,16 @@ mip_output(ifp, m, dst, rt)
 	}
 
 	m_freem(m);
+#ifndef __APPLE__
 	return (0);
+#else
+	/*
+	 * This function would be called when pre_output() function was kicked.
+	 * Returning with EJUSTRETURN is necessarry to avoid call output()
+	 * function.
+	 */
+	return (EJUSTRETURN);
+#endif
 }
 
 int
@@ -422,4 +468,70 @@ mip_is_mip_softc(ifp)
 	return (0);
 }
 
+#ifdef __APPLE__
+int
+mip_demux(
+    struct ifnet *ifp,
+    struct mbuf  *m,
+    char         *frame_header,
+    u_long *protocol_family)
+{
+	struct mip_softc* mip = (struct mip_softc*)ifp->if_softc;
+	
+	/* Only one protocol may be attached to a mip interface. */
+	*protocol_family = /*mip->mip_proto*/AF_INET6;
+	
+	return 0;
+}
+
+static int
+mip_add_proto(struct ifnet *ifp, u_long protocol_family, struct ddesc_head_str *desc_head)
+{
+	/* Only one protocol may be attached at a time */
+	struct mip_softc* mip = (struct mip_softc*)ifp->if_softc;
+
+	if (mip->mip_proto != 0)
+		printf("mip_add_proto: request add_proto for mip%d\n", mip->mip_if.if_unit);
+
+	mip->mip_proto = protocol_family;
+
+	return 0;
+}
+
+static int
+mip_del_proto(struct ifnet *ifp, u_long protocol_family)
+{
+	if (((struct mip_softc*)ifp)->mip_proto == protocol_family)
+		((struct mip_softc*)ifp)->mip_proto = 0;
+	else
+		return ENOENT;
+
+	return 0;
+}
+
+/* Glue code to attach inet to a gif interface through DLIL */
+int
+mip_attach_proto_family(
+	struct ifnet *ifp,
+	u_long protocol_family)
+{
+    struct dlil_proto_reg_str   reg;
+    int   stat;
+
+	bzero(&reg, sizeof(reg));
+    TAILQ_INIT(&reg.demux_desc_head);
+    reg.interface_family = ifp->if_family;
+    reg.unit_number      = ifp->if_unit;
+    reg.input            = NULL;
+    reg.pre_output       = mip_output;
+    reg.protocol_family  = protocol_family;
+
+    stat = dlil_attach_protocol(&reg);
+    if (stat && stat != EEXIST) {
+        panic("mip_attach_proto_family can't attach interface fam=%d\n", protocol_family);
+    }
+
+    return stat;
+}
+#endif /* __APPLE__ */
 #endif /* NMIP > 0 */
