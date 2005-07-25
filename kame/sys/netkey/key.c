@@ -1098,6 +1098,7 @@ key_allocsa(family, src, dst, proto, spi)
 			break;
 		case AF_INET6:
 			sin6.sin6_addr = *src;
+			sin6.sin6_scope_id = 0;
 			if (sa6_recoverscope(&sin6))
 				continue;
 			if (key_sockaddrcmp((struct sockaddr *)&sin6,
@@ -1123,6 +1124,7 @@ key_allocsa(family, src, dst, proto, spi)
 			break;
 		case AF_INET6:
 			sin6.sin6_addr = *(struct in6_addr *)dst;
+			sin6.sin6_scope_id = 0;
 			if (sa6_recoverscope(&sin6))
 				continue;
 #if 0
