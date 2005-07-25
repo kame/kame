@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.223 2005/07/20 12:56:18 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.224 2005/07/25 03:32:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -49,7 +49,7 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/syslog.h>
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__APPLE__)
 #include <sys/sysctl.h>
 #endif
 
