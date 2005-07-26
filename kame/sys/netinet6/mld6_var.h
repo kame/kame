@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.14 2004/07/05 04:43:28 jinmei Exp $	*/
+/*	$KAME: mld6_var.h,v 1.15 2005/07/26 16:34:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -83,7 +83,6 @@ extern int mld_debug;
 #define mldlog(x)	do { if (mld_debug) log x; } while (/*CONSTCOND*/ 0)
 
 void	mld_init(void);
-struct	router6_info * rt6i_init(struct ifnet *);
 void	mld_input(struct mbuf *, int);
 #ifdef MLDV2
 void	mld_start_listening(struct in6_multi *, u_int8_t type);

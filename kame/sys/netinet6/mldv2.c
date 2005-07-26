@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.37 2005/06/16 18:29:29 jinmei Exp $	*/
+/*	$KAME: mldv2.c,v 1.38 2005/07/26 16:34:56 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -266,6 +266,7 @@ static void mld_sendpkt(struct in6_multi *, int, const struct in6_addr *);
 static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
 	int);
 static struct router6_info *find_rt6i(struct ifnet *);
+static struct router6_info *init_rt6i(struct ifnet *);
 static int mld_create_group_record(struct mbuf *, int *, struct in6_multi *,
 			    u_int16_t, u_int16_t *, u_int8_t);
 static void mld_cancel_pending_response(struct ifnet *, struct router6_info *);
@@ -298,8 +299,8 @@ mld_init()
 }
 
 
-struct router6_info *
-rt6i_init(ifp)
+static struct router6_info *
+init_rt6i(ifp)
 	struct ifnet *ifp;
 {
 	struct router6_info *rti = NULL;
@@ -336,7 +337,7 @@ find_rt6i(ifp)
                 }
                 rti = rti->rt6i_next;
         }
-	if ((rti = rt6i_init(ifp)) == NULL)
+	if ((rti = init_rt6i(ifp)) == NULL)
 		return NULL;
         return rti;
 }
@@ -2188,23 +2189,15 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 		 * Let MLD6 know that we have joined a new IP6 multicast
 		 * group.
 		 */
-		for (rt6i = Head6; rt6i != 0; rt6i = rt6i->rt6i_next) {
-			if (rt6i->rt6i_ifp == in6m->in6m_ifp) {
-				in6m->in6m_rti = rt6i;
-				break;
-			}
-		}
+		rt6i = find_rt6i(in6m->in6m_ifp);
 		if (rt6i == NULL) {
-			if ((rt6i = rt6i_init(in6m->in6m_ifp)) == NULL) {
-				LIST_REMOVE(in6m, in6m_entry);
-				free(in6m, M_IPMADDR);
-				*errorp = ENOBUFS;
-				splx(s);
-				return NULL;
-			} else
-				in6m->in6m_rti = rt6i;
+			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m, M_IPMADDR);
+			*errorp = ENOBUFS;
+			splx(s);
+			return NULL;
 		}
-
+		in6m->in6m_rti = rt6i;
 		in6m->in6m_source = NULL;
 		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			splx(s);
@@ -2632,24 +2625,15 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 			splx(s);
 			return NULL;
 		}
-
-		for (rti = Head6; rti != 0; rti = rti->rt6i_next) {
-			if (rti->rt6i_ifp == in6m->in6m_ifp) {
-				in6m->in6m_rti = rti;
-				break;
-			}
+		rti = find_rt6i(in6m->in6m_ifp);
+		if (rti == NULL) {
+			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m, M_IPMADDR);
+			*error = ENOBUFS;
+			splx(s);
+			return NULL;
 		}
-		if (rti == 0) {
-			if ((rti = rt6i_init(in6m->in6m_ifp)) == NULL) {
-				LIST_REMOVE(in6m, in6m_entry);
-				free(in6m, M_IPMADDR);
-				*error = ENOBUFS;
-				splx(s);
-				return NULL;
-			} else
-				in6m->in6m_rti = rti;
-		}
-
+		in6m->in6m_rti = rti;
 		in6m->in6m_source = NULL;
 		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			splx(s);
@@ -2878,23 +2862,15 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 	 * Let MLD6 know that we have joined a new IPv6 multicast
 	 * group.
 	 */
-	for (rti = Head6; rti != 0; rti = rti->rt6i_next) {
-		if (rti->rt6i_ifp == in6m->in6m_ifp) {
-		    in6m->in6m_rti = rti;
-		    break;
-		}
-	}
+	rti = find_rt6i(in6m->in6m_ifp);
 	if (rti == NULL) {
-		if ((rti = rt6i_init(in6m->in6m_ifp)) == NULL) {
-			 LIST_REMOVE(in6m, in6m_entry);
-			 free(in6m, M_IPMADDR);
-			 *errorp = ENOBUFS;
-			 splx(s);
-			 return NULL;
-	    	}
-		in6m->in6m_rti = rti;
-	}
-
+		 LIST_REMOVE(in6m, in6m_entry);
+		 free(in6m, M_IPMADDR);
+		 *errorp = ENOBUFS;
+		 splx(s);
+		 return NULL;
+    	}
+	in6m->in6m_rti = rti;
 	in6m->in6m_source = NULL;
 	if (!in6_is_mld_target(&in6m->in6m_addr)) {
 		splx(s);
@@ -3258,23 +3234,15 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		ifma->ifma_protospec = in6m;
 		LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
 
-		for (rti = Head6; rti != 0; rti = rti->rt6i_next) {
-			if (rti->rt6i_ifp == in6m->in6m_ifp) {
-				in6m->in6m_rti = rti;
-				break;
-			}
-		}
+		rti = find_rt6i(in6m->in6m_ifp);
 		if (rti == NULL) {
-			if ((rti = rt6i_init(in6m->in6m_ifp)) == NULL) {
-				LIST_REMOVE(in6m, in6m_entry);
-				free(in6m, M_IPMADDR);
-				*error = ENOBUFS;
-				splx(s);
-				return NULL;
-			}
-			in6m->in6m_rti = rti;
+			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m, M_IPMADDR);
+			*error = ENOBUFS;
+			splx(s);
+			return NULL;
 		}
-
+		in6m->in6m_rti = rti;
 		in6m->in6m_source = NULL;
 		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			splx(s);
