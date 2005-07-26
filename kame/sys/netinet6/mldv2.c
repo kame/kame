@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.38 2005/07/26 16:34:56 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.39 2005/07/26 16:42:17 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2185,10 +2185,6 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 			splx(s);
 			return (NULL);
 		}
-		/*
-		 * Let MLD6 know that we have joined a new IP6 multicast
-		 * group.
-		 */
 		rt6i = find_rt6i(in6m->in6m_ifp);
 		if (rt6i == NULL) {
 			LIST_REMOVE(in6m, in6m_entry);
@@ -2858,10 +2854,6 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 	ifma->ifma_protospec = in6m;
 	LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
 
-	/*
-	 * Let MLD6 know that we have joined a new IPv6 multicast
-	 * group.
-	 */
 	rti = find_rt6i(in6m->in6m_ifp);
 	if (rti == NULL) {
 		 LIST_REMOVE(in6m, in6m_entry);
