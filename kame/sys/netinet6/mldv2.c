@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.39 2005/07/26 16:42:17 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.40 2005/07/26 16:44:13 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2882,10 +2882,6 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 	in6m->in6m_source->i6ms_mode = newmode;
 	in6m->in6m_source->i6ms_cur->numsrc = newnumsrc;
 
-	/*
-	 * Let MLD know that we have joined a new IPv6 multicast group
-	 * (MLD version is checked in mld_start_listening()).
-	 */
 	if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
 		if (curmode != newmode) {
 			if (newmode == MCAST_INCLUDE)
@@ -2895,6 +2891,11 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 				type = CHANGE_TO_EXCLUDE_MODE;
 		}
 	}
+
+	/*
+	 * Let MLD know that we have joined a new IPv6 multicast group
+	 * (MLD version is checked in mld_start_listening()).
+	 */
 	mld_start_listening(in6m, type);
 	*errorp = 0;
 	if (newhead != NULL)
