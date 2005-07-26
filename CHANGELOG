@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2790 2005/07/26 13:04:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.2791 2005/07/26 18:14:58 suz Exp $
 
 <200507>
+2005-07-26  SUZUKI, Shinsuke <suz@kame.net)
+	* kame/sys/netinet6/{in6_msf.c, in6_var.c, mldv2.c, ip6_output.c}:
+	ports some MLDv1 enhancements into MLDv2.
+	- use callout timer mechanism for protocol timer
+	- impose a random delay (when necessary) according to rfc2462bis
+
 2005-07-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/route6d: route6d now does not care about the kernel
 	internal form for scoped addresses at all.  In particular, it can

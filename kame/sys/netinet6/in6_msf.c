@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.36 2005/07/26 16:59:17 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.37 2005/07/26 18:14:59 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2396,7 +2396,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			imm->i6mm_maddr =
 				in6_addmulti2(&SIN6(sa_grp)->sin6_addr,
 					      ifp, &error,
-					      0, NULL, MCAST_EXCLUDE, init);
+					      0, NULL, MCAST_EXCLUDE, init, 0);
 		}
 		if (error != 0) {
 			mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> EX{NULL} or IN{NULL} -> EX{NULL}\n", error));

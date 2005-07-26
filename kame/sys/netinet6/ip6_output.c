@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.477 2005/07/26 16:59:17 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.478 2005/07/26 18:14:59 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4011,7 +4011,7 @@ ip6_setmoptions(optname, im6op, m)
 		 */
 		imm->i6mm_maddr = in6_addmulti2(&SIN6(&ss_grp)->sin6_addr,
 						ifp, &error, 1,
-						&ss_src, MCAST_INCLUDE, init);
+						&ss_src, MCAST_INCLUDE, init, 0);
 		if (error != 0) {
 			if (init) {
 				IMO_MSF_FREE(msf);
@@ -4153,7 +4153,7 @@ ip6_setmoptions(optname, im6op, m)
 			imm->i6mm_maddr =
 				in6_addmulti2(&SIN6(&ss_grp)->sin6_addr,
 					      ifp, &error, 1,
-					      &ss_src, MCAST_EXCLUDE, 0);
+					      &ss_src, MCAST_EXCLUDE, 0, 0);
 			if (error != 0) {
 				in6_undomopt_source_addr(msf, optname);
 				break;

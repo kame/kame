@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.109 2005/06/16 18:29:28 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.110 2005/07/26 18:14:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -553,22 +553,32 @@ struct in6_multi_mship {
  * Per-interface router version information; referred to when MLDv1/v2 coexists.
  */
 
-struct router6_info {
-        struct  ifnet *rt6i_ifp;
-	int    rt6i_type; /* type of router which is querier on this interface */
-	u_int	rt6i_timer1;	/* MLDv1 Querier Present timer */
-	u_int	rt6i_timer2;	/* MLDv2 Querier Present timer */
-	u_int	rt6i_qrv;	/* Querier Robustness Variable */
-	u_int	rt6i_qqi;	/* Querier Interval Variable */
-	u_int	rt6i_qri;	/* Querier Response Interval */
-	struct router6_info *rt6i_next;
-};
-
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 struct callout;
 #elif defined(__OpenBSD__)
 struct timeout;
 #endif
+
+struct router6_info {
+        struct  ifnet *rt6i_ifp;
+	int    rt6i_type; /* type of router which is querier on this interface */
+	u_int	rt6i_timer1;	/* Older Version Querier Present Timer */
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	struct callout *rt6i_timer1_ch;
+#elif defined(__OpenBSD__)
+	struct timeout *rt6i_timer1_ch;
+#endif
+	u_int	rt6i_timer2;	/* Interface Timer */
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	struct callout *rt6i_timer2_ch;
+#elif defined(__OpenBSD__)
+	struct timeout *rt6i_timer2_ch;
+#endif
+	u_int	rt6i_qrv;	/* Querier Robustness Variable */
+	u_int	rt6i_qqi;	/* Querier Interval Variable */
+	u_int	rt6i_qri;	/* Querier Response Interval */
+	struct router6_info *rt6i_next;
+};
 
 struct	in6_multi {
 	LIST_ENTRY(in6_multi) in6m_entry; /* list glue */
@@ -586,9 +596,6 @@ struct	in6_multi {
 	struct	router6_info *in6m_rti;	/* router info */
 	struct	in6_multi_source *in6m_source;	/* filtered source list */
 
-#ifdef MLDv2
-	u_int	in6m_timer;		/* MLD6 listener report timer */
-#else
 	int	in6m_timer;		/* delay to send the 1st report */
 	struct timeval in6m_timer_expire; /* when the timer expires */
 #if defined(__NetBSD__) || defined(__FreeBSD__)
@@ -596,7 +603,6 @@ struct	in6_multi {
 #elif defined(__OpenBSD__)
 	struct timeout *in6m_timer_ch;
 #endif
-#endif /* MLDv2 */
 };
 
 #define IN6M_TIMER_UNDEF -1
@@ -748,7 +754,7 @@ struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
 int	in6_leavegroup __P((struct in6_multi_mship *));
 #ifdef MLDV2
 struct	in6_multi *in6_addmulti2(struct in6_addr *, struct ifnet *,
-	int *, u_int16_t, struct sockaddr_storage *, u_int, int);
+	int *, u_int16_t, struct sockaddr_storage *, u_int, int, int);
 void	in6_delmulti2(struct in6_multi *, int *, u_int16_t,
 	struct sockaddr_storage *, u_int, int);
 struct	in6_multi *in6_modmulti2(struct in6_addr *, struct ifnet *,
