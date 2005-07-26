@@ -2051,7 +2051,6 @@ in6_alias(struct in6_ifreq *creq)
 
 	sin6 = (struct sockaddr_in6 *)&creq->ifr_addr;
 
-	in6_fillscopeid(sin6);
 	scopeid = sin6->sin6_scope_id;
 	if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
 	    hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
@@ -2070,7 +2069,6 @@ in6_alias(struct in6_ifreq *creq)
 			ifr6.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
 		}
 		sin6 = (struct sockaddr_in6 *)&ifr6.ifr_addr;
-		in6_fillscopeid(sin6);
 		if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
 		    hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
 			strlcpy(hbuf, "", sizeof hbuf);
