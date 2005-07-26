@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.35 2005/05/19 07:27:54 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.36 2005/07/26 16:59:17 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -384,7 +384,7 @@ in6_delmultisrc(in6m, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 			       "???"));
 			in6_undomultisrc(in6m, i, ss, mode, IMS_DELETE_SOURCE);
 			return EADDRNOTAVAIL;
-		} 
+		}
 		if (ref_count == 0)
 			++j; /* the number of deleted sources */
 	}
@@ -1824,7 +1824,7 @@ in6_merge_pending_report(in6m, ias, type)
 }
 
 /*
- * Copy each source address from original head to new one, in order to 
+ * Copy each source address from original head to new one, in order to
  * make a new current state source list.
  * If refcount is 0, all sources except i6as_refcount = 0 are copied.
  * If it's not 0, only sources whose i6as_refcount = refcount are copied.
@@ -1878,7 +1878,7 @@ in6_free_all_msf_source_list(in6m)
 		in6_free_msf_source_list(in6m->in6m_source->i6ms_cur->head);
 		if (in6m->in6m_source->i6ms_cur->head != NULL)
 			FREE(in6m->in6m_source->i6ms_cur->head, M_MSFILTER);
-		FREE(in6m->in6m_source->i6ms_cur, M_MSFILTER); 
+		FREE(in6m->in6m_source->i6ms_cur, M_MSFILTER);
 	}
 	if (in6m->in6m_source->i6ms_rec != NULL) {
 		in6_free_msf_source_list(in6m->in6m_source->i6ms_rec->head);
@@ -1889,7 +1889,7 @@ in6_free_all_msf_source_list(in6m)
 	if (in6m->in6m_source->i6ms_in != NULL) {
 		in6_free_msf_source_list(in6m->in6m_source->i6ms_in->head);
 		if (in6m->in6m_source->i6ms_in->head != NULL)
-			FREE(in6m->in6m_source->i6ms_in->head, M_MSFILTER); 
+			FREE(in6m->in6m_source->i6ms_in->head, M_MSFILTER);
 		FREE(in6m->in6m_source->i6ms_in, M_MSFILTER);
 	}
 	if (in6m->in6m_source->i6ms_ex != NULL) {
@@ -2045,7 +2045,7 @@ in6_merge_msf_source_addr(iasl, src, req)
 }
 
 /*
- * Set multicast source filter of a socket (SIOCSMSFILTER) 
+ * Set multicast source filter of a socket (SIOCSMSFILTER)
  */
 int
 sock6_setmopt_srcfilter(sop, grpfp)
@@ -2221,10 +2221,10 @@ sock6_setmopt_srcfilter(sop, grpfp)
 				break;
 			if (ss->ss_family == AF_INET) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-				if (IN_BADCLASS(SIN_ADDR(ss)) || 
-				    (SIN_ADDR(ss) & IN_CLASSA_NET) == 0) 
+				if (IN_BADCLASS(SIN_ADDR(ss)) ||
+				    (SIN_ADDR(ss) & IN_CLASSA_NET) == 0)
 #else
-				if (IN_BADCLASS(ntohl(SIN_ADDR(ss))) || 
+				if (IN_BADCLASS(ntohl(SIN_ADDR(ss))) ||
 				    (ntohl(SIN_ADDR(ss)) & IN_CLASSA_NET) == 0)
 #endif
 				{
@@ -2348,7 +2348,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		if (init) {
 			IMO_MSF_FREE(msf);
 			LIST_REMOVE(imm, i6mm_chain);
-			FREE(imm, M_IPMADDR);		
+			FREE(imm, M_IPMADDR);
 		}
 		splx(s);
 		return error;
@@ -2387,7 +2387,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	} else if ((grpf->gf_fmode == MCAST_EXCLUDE) &&
 				(grpf->gf_numsrc == 0)) {
 		if (old_num > 0) {
-			imm->i6mm_maddr = 
+			imm->i6mm_maddr =
 				in6_modmulti2(&SIN6(sa_grp)->sin6_addr,
 					      ifp, &error,
 					      0, NULL, MCAST_EXCLUDE, old_num,
@@ -2504,7 +2504,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	} else { /* grpf->gf_fmode == MCAST_EXCLUDE)*/
 		msf->msf_grpjoin = 1;
 	}
-		
+
 
 	if (grpf->gf_numsrc == 0) {
 		in6_freemopt_source_list(msf, msf->msf_head, msf->msf_blkhead);
@@ -2529,7 +2529,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 }
 
 /*
- * Get multicast source filter of a socket (SIOCGMSFILTER) 
+ * Get multicast source filter of a socket (SIOCGMSFILTER)
  */
 int
 sock6_getmopt_srcfilter(sop, grpfp)
@@ -2766,7 +2766,7 @@ match_msf6_per_if(in6m, src, dst)
 		else
 			return 0;
 	}
-	
+
 	/* no source-filter matched */
 	if (in6ms->i6ms_mode == MCAST_INCLUDE)
 		return 0;
@@ -2787,7 +2787,7 @@ match_msf6_per_socket(in6p, src, dst)
 	struct ip6_moptions *im6o;
 	struct in6_multi_mship *imm;
 	struct sock_msf_source *msfsrc;
-	
+
 	if ((im6o = in6p->in6p_moptions) == NULL)
 		return 0;
 
@@ -2865,7 +2865,7 @@ dump_in6_multisrc(void)
 		struct in6_multi_source *ims = NULL;
 
 		log(LOG_DEBUG, "interface %s\n", if_name(ifp));
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) 
+		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
 		{
 			if (ifma->ifma_addr == NULL) {
 				log(LOG_DEBUG, "\tEnd of Group\n");

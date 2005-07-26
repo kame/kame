@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.476 2005/07/22 04:58:55 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.477 2005/07/26 16:59:17 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -203,7 +203,7 @@ extern int ipsec_ipcomp_default_level;
 #include <netinet/ip6mh.h>
 #endif /* NMIP > 0*/
 #endif /* MIP6 */
- 
+
 #include <net/net_osdep.h>
 
 #if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || defined(__FreeBSD__)
@@ -418,7 +418,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #ifdef MIP6
 	/* Find binding cache entry */
 	/* XXX need policy to determine bid for MCOA*/
-	mbc = mip6_bce_get(&ip6->ip6_dst, &ip6->ip6_src, NULL, 0); 
+	mbc = mip6_bce_get(&ip6->ip6_dst, &ip6->ip6_src, NULL, 0);
 	/*
 	 * If a node has a corresponding binding cache, put a Type 2
 	 * Routing Header to directly deliver the packet.  Except, a
@@ -431,29 +431,29 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		rthdr2 = mip6_create_rthdr2(&mbc->mbc_coa);
 		if (rthdr2 == NULL)
 			goto freehdrs;
-		
+
 		MAKE_EXTHDR(rthdr2, &exthdrs.ip6e_rthdr2);
 		free(rthdr2, M_IP6OPT);
 	}
 #endif /* MIP6 */
 
 #if defined(MIP6) && NMIP > 0
-	/* 
+	/*
 	 * If a correspondent binding update list is found and its
 	 * status is BOUND, a packet is sent directly to the
 	 * destination with a Home Address Option.  Except a caller
 	 * didn't specify a Home Address Option explicitly.
 	 */
 	mbul = mip6_bul_get(&ip6->ip6_src, &ip6->ip6_dst, 0/* XXX */);
-	/* 
-	 * Route Optimization: appending a HoA option. 
+	/*
+	 * Route Optimization: appending a HoA option.
 	 */
 	if ((mbul != NULL) && (exthdrs.ip6e_hoa == NULL)) {
 		u_int8_t *hoa_opt;
 
 		if (mbul->mbul_state & MIP6_BUL_STATE_NEEDTUNNEL)
 			goto skip_hoa;
-  
+ 
 		if (ip6->ip6_nxt == IPPROTO_MH) {
 #if 0
 			m_copydata(m, sizeof(struct ip6_hdr),
@@ -557,7 +557,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (exthdrs.ip6e_hbh || exthdrs.ip6e_dest1 ||
 		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2
 #ifdef MIP6
-			|| exthdrs.ip6e_rthdr2 
+			|| exthdrs.ip6e_rthdr2
 #if NMIP > 0
 			|| exthdrs.ip6e_hoa
 #endif /* NMIP > 0 */
@@ -787,7 +787,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 				rh->ip6r_segleft = 0;
 			}
 #endif /* MIP6 */
-  
+
 			bzero(&state, sizeof(state));
 			state.m = m;
 			error = ipsec6_output_trans(&state, nexthdrp, mprev,
@@ -837,13 +837,13 @@ skip_ipsec2:;
 #if defined(MIP6) && NMIP > 0
 	/* Swap HoA and CoA */
 	if (exthdrs.ip6e_hoa) {
-		struct ip6_opt_home_address *hoaopt = NULL; 
+		struct ip6_opt_home_address *hoaopt = NULL;
 		struct in6_addr tmpaddr;
 
 		bzero(&tmpaddr, sizeof(tmpaddr));
 
 		hoaopt = mip6_search_hoa_in_destopt(mtod(exthdrs.ip6e_hoa, caddr_t));
-		if (hoaopt == NULL) 
+		if (hoaopt == NULL)
 			goto freehdrs;
 
 		if (mip6_ifa_ifwithin6addr(&ip6->ip6_src) == NULL)
@@ -851,7 +851,7 @@ skip_ipsec2:;
 
 		ip6 = mtod(m, struct ip6_hdr *);
 		bcopy(&ip6->ip6_src, &tmpaddr, sizeof(ip6->ip6_src));
-		bcopy(hoaopt->ip6oh_addr, 
+		bcopy(hoaopt->ip6oh_addr,
 			&ip6->ip6_src, sizeof(hoaopt->ip6oh_addr));
 		bcopy(&tmpaddr, hoaopt->ip6oh_addr, sizeof(tmpaddr));
 	}
@@ -1511,7 +1511,7 @@ passout:
 #if 0
 		/*
 		 * It is believed this code is a leftover from the
-		 * development of the IPV6_RECVPATHMTU sockopt and 
+		 * development of the IPV6_RECVPATHMTU sockopt and
 		 * associated work to implement RFC3542.
 		 * It's not entirely clear what the intent of the API
 		 * is at this point, so disable this code for now.
@@ -2020,7 +2020,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf *m = *mp;
 	int error, optval;
 	int optlen;
-#if defined(__NetBSD__) 
+#if defined(__NetBSD__)
 	struct proc *p = curproc;	/* XXX */
 #endif
 
@@ -3210,7 +3210,7 @@ ip6_pcbopts(pktopt, m, so)
 	    if (opt->ip6po_pktinfo || opt->ip6po_nexthop ||
 		opt->ip6po_hbh || opt->ip6po_dest1 || opt->ip6po_dest2 ||
 #if defined(MIP6) && NMIP > 0
-		opt->ip6po_hoa || 
+		opt->ip6po_hoa ||
 #endif /* MIP6 && NMIP > 0 */
 		opt->ip6po_rhinfo.ip6po_rhi_rthdr)
 		    printf("ip6_pcbopts: all specified options are cleared.\n");
@@ -3818,7 +3818,7 @@ ip6_setmoptions(optname, im6op, m)
 			 * been detached dynamically (XXX).
 			 */
 			error = EADDRNOTAVAIL;
-			break;	    
+			break;
 		} else {	/* ipv6mr_interface == 0 */
 			struct sockaddr_in6 sa6_mc;
 
@@ -3988,7 +3988,7 @@ ip6_setmoptions(optname, im6op, m)
 		/*
 		 * Set source address to the msf.
 		 * If requested source address was already in the socket list,
-		 * return EADDRNOTAVAIL. (draft-ietf-magma-msf-api-05.txt 
+		 * return EADDRNOTAVAIL. (draft-ietf-magma-msf-api-05.txt
 		 * 4.1.3  1st paragraph)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
@@ -3999,7 +3999,7 @@ ip6_setmoptions(optname, im6op, m)
 				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
 				FREE(imm, M_IPMADDR);
-			} 
+			}
 			break;
 		}
 
@@ -4052,7 +4052,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * If (*,G) join or EXCLUDE join was requested previously,
 		 * return EINVAL.
 		 * If requested source address was not in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL.
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
@@ -4108,7 +4108,7 @@ ip6_setmoptions(optname, im6op, m)
 		}
 
 		/*
-		 * return EIVNAL, since it's invalid to BLOCK non-existent 
+		 * return EIVNAL, since it's invalid to BLOCK non-existent
 		 * membership (draft-ietf-magma-msf-api-05.txt 4.1.3)
 		 */
 		if (imm == NULL) {
@@ -4131,7 +4131,7 @@ ip6_setmoptions(optname, im6op, m)
 		/*
 		 * Set source address to the msf.
 		 * If requested source address was already in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL.
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
@@ -4150,7 +4150,7 @@ ip6_setmoptions(optname, im6op, m)
 			 * EX{non NULL} -> EX{non NULL} only,
 			 * IN{NULL}->EX{non NULL} is prohibited
 			 */
-			imm->i6mm_maddr = 
+			imm->i6mm_maddr =
 				in6_addmulti2(&SIN6(&ss_grp)->sin6_addr,
 					      ifp, &error, 1,
 					      &ss_src, MCAST_EXCLUDE, 0);
@@ -4159,7 +4159,7 @@ ip6_setmoptions(optname, im6op, m)
 				break;
 			}
 		} else {
-			/* 
+			/*
 			 * EX{NULL} -> EX{non NULL}
 			 * msf->msf_grpjoin never goes to 0; otherwise msf
 			 * state goes to IN{NULL} after UNBLOCK(S).
@@ -4193,7 +4193,7 @@ ip6_setmoptions(optname, im6op, m)
 			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
 			    		       &SIN6(&ss_grp)->sin6_addr))
 				break;
-		}		
+
 		if (imm == NULL) {
 			error = EADDRNOTAVAIL;
 			break;
@@ -4204,7 +4204,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * If EXCLUDE join was not requested or INCLUDE join was
 		 * requested previously return EINVAL.
 		 * If requested source address was not in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL.
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
@@ -4682,14 +4682,14 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 			break;
 		case IPV6_DSTOPTS:
 #if defined(MIP6) && NMIP > 0
-			/* 
-			 * Check whether this destination option is 
-			 * home address option. 
-			 * If so, the option must be stored in ip6po_hoa 
+			/*
+			 * Check whether this destination option is
+			 * home address option.
+			 * If so, the option must be stored in ip6po_hoa
 			 */
-			if (mip6_search_hoa_in_destopt((u_int8_t *)dest) != NULL) 
+			if (mip6_search_hoa_in_destopt((u_int8_t *)dest) != NULL)
 				newdest = &opt->ip6po_hoa;
-			else 
+			else
 				newdest = &opt->ip6po_dest2;
 #else
 			newdest = &opt->ip6po_dest2;
@@ -5056,7 +5056,7 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		/*
 		 * bcopy(greq->gr_group, ss_grp) should not be used here,
 		 * since all the fields other than address has to be cleared,
-		 * which are just regarded as a garbage in IPv6 multicast 
+		 * which are just regarded as a garbage in IPv6 multicast
 		 * group management.
 		 */
 		sin6_grp = SIN6(ss_grp);
@@ -5137,7 +5137,7 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		/*
 		 * bcopy(gsreq->gsr_XXX, ss_XXX) should not be used here,
 		 * since I have to clear all the fields other than address,
-		 * which are just regarded as a garbage in IPv6 multicast 
+		 * which are just regarded as a garbage in IPv6 multicast
 		 * group management.
 		 */
 		sin6_src = SIN6(ss_src);
@@ -5169,5 +5169,5 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 
 	return error;
 }
-#endif /* MLDV2 */  
+#endif /* MLDV2 */
 

@@ -685,7 +685,7 @@ in_undomultisrc(inm, numsrc, ss, mode, req)
 			/* sanity check */
 			if (ias->ias_addr.sin_family != sin->sin_family)
 				continue;
-			
+
 			if (SS_CMP(&ias->ias_addr, <, sin))
 				continue;
 			if (SS_CMP(&ias->ias_addr, >, sin)) {
@@ -1110,7 +1110,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 				continue;
 			if (SS_CMP(&in_ias->ias_addr, <, sin))
 				continue;
-			
+
 			/* sanity check */
 			if (ex_ias->ias_addr.sin_family != in_ias->ias_addr.sin_family)
 				continue;
@@ -1221,7 +1221,7 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 				continue; /* skip */
 
 			sin = &ias->ias_addr;
-			
+
 			/* sanity check */
 			if (curias->ias_addr.sin_family != sin->sin_family)
 				continue;
@@ -1357,7 +1357,7 @@ in_undo_new_msf_curhead(inm, sin)
 		/* sanity check */
 		if (ias->ias_addr.sin_family != sin->sin_family)
 			continue;
-	
+
 		if (SS_CMP(&ias->ias_addr, >=, sin))
 			return;
 
@@ -1450,7 +1450,7 @@ in_merge_msf_state(inm, newhead, newmode, newnumsrc)
 				continue;
 			if (ias->ias_addr.sin_family != newias->ias_addr.sin_family)
 				continue;
-			
+
 			if (SS_CMP(&ias->ias_addr, <, sin)) {
 				if (filter == REPORT_FILTER2)
 					continue;
@@ -1836,7 +1836,7 @@ in_merge_pending_report(inm, ias, type)
 }
 
 /*
- * Copy each source address from original head to new one, in order to 
+ * Copy each source address from original head to new one, in order to
  * make a new current state source list.
  * If refcount is 0, all sources except ias_refcount = 0 are copied.
  * If it's not 0, only sources whose ias_refcount = refcount are copied.
@@ -1888,7 +1888,7 @@ in_free_all_msf_source_list(inm)
 		in_free_msf_source_list(inm->inm_source->ims_cur->head);
 		if (inm->inm_source->ims_cur->head != NULL)
 			FREE(inm->inm_source->ims_cur->head, M_MSFILTER);
-		FREE(inm->inm_source->ims_cur, M_MSFILTER); 
+		FREE(inm->inm_source->ims_cur, M_MSFILTER);
 	}
 	if (inm->inm_source->ims_rec != NULL) {
 		in_free_msf_source_list(inm->inm_source->ims_rec->head);
@@ -1899,7 +1899,7 @@ in_free_all_msf_source_list(inm)
 	if (inm->inm_source->ims_in != NULL) {
 		in_free_msf_source_list(inm->inm_source->ims_in->head);
 		if (inm->inm_source->ims_in->head != NULL)
-			FREE(inm->inm_source->ims_in->head, M_MSFILTER); 
+			FREE(inm->inm_source->ims_in->head, M_MSFILTER);
 		FREE(inm->inm_source->ims_in, M_MSFILTER);
 	}
 	if (inm->inm_source->ims_ex != NULL) {
@@ -1964,7 +1964,7 @@ in_free_msf_source_addr(iasl, sin)
 		nias = LIST_NEXT(ias, ias_list);
 		if (ias->ias_addr.sin_family != sin->sin_family)
 			continue;
-      
+
 		if (SS_CMP(&ias->ias_addr, <, sin))
 			continue;
 		else if (SS_CMP(&ias->ias_addr, ==, sin)) {
@@ -2003,7 +2003,7 @@ in_merge_msf_source_addr(iasl, src, req)
 		/* sanity check */
 		if (ias->ias_addr.sin_family != src->sin_family)
 			continue;
-		
+
 		if (SS_CMP(&ias->ias_addr, ==, src)) {
 			if (req == IMS_ADD_SOURCE)
 				return (++ias->ias_refcount);
@@ -2052,7 +2052,7 @@ in_merge_msf_source_addr(iasl, src, req)
 }
 
 /*
- * Set multicast source filter of a socket (SIOCSIPMSFILTER) 
+ * Set multicast source filter of a socket (SIOCSIPMSFILTER)
  */
 int
 ip_setmopt_srcfilter(sop, imsfp)
@@ -2540,7 +2540,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 }
 
 /*
- * Get multicast source filter of a socket (SIOCGIPMSFILTER) 
+ * Get multicast source filter of a socket (SIOCGIPMSFILTER)
  */
 int
 ip_getmopt_srcfilter(sop, imsfp)
@@ -2657,7 +2657,7 @@ ip_getmopt_srcfilter(sop, imsfp)
 }
 
 /*
- * Set multicast source filter of a socket (SIOCSMSFILTER) 
+ * Set multicast source filter of a socket (SIOCSMSFILTER)
  */
 int
 sock_setmopt_srcfilter(sop, grpfp)
@@ -3124,7 +3124,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 }
 
 /*
- * Get multicast source filter of a socket (SIOCGMSFILTER) 
+ * Get multicast source filter of a socket (SIOCGMSFILTER)
  */
 int
 sock_getmopt_srcfilter(sop, grpfp)
@@ -3278,7 +3278,7 @@ in_getmopt_source_list(msf, numsrc, oss, mode)
 
 	if (msf->msf_numsrc != 0) {
 		MALLOC(ss, struct sockaddr_storage *,
-		       sizeof(*ss) * msf->msf_numsrc, M_IPMOPTS, M_WAITOK);
+		       sizeof(*ss) * msf->msf_numsrc, M_IPMOPTS, M_NOWAIT);
 		for (i = 0, msfsrc = LIST_FIRST(msf->msf_head);
 				i < msf->msf_numsrc && msfsrc;
 				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
@@ -3291,7 +3291,7 @@ in_getmopt_source_list(msf, numsrc, oss, mode)
 		*mode = MCAST_INCLUDE;
 	} else if (msf->msf_blknumsrc != 0) {
 		MALLOC(ss, struct sockaddr_storage *,
-		       sizeof(*ss) * msf->msf_blknumsrc, M_IPMOPTS, M_WAITOK);
+		       sizeof(*ss) * msf->msf_blknumsrc, M_IPMOPTS, M_NOWAIT);
 		for (i = 0, msfsrc = LIST_FIRST(msf->msf_blkhead);
 				i < msf->msf_blknumsrc && msfsrc;
 				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
@@ -3332,7 +3332,7 @@ in_setmopt_source_addr(ss, msf, optname)
 	struct sock_msf_source *msfsrc, *newsrc, *lastp = NULL;
 	struct msf_head head;
 	u_int16_t *curnumsrc;
-#if defined(__NetBSD__) || defined(__OpenBSD__)	
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -3399,7 +3399,7 @@ merge_msf_list:
 
 		if (ss->ss_family != msfsrc->src.ss_family)
 			continue;
-		
+
 		if (SS_CMP(ss, >, &msfsrc->src))
 			continue;
 		if (SS_CMP(ss, ==, &msfsrc->src)) {
@@ -3573,16 +3573,16 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 			if (lsrc->sa_len != src->sa_len ||
 			    lsrc->sa_family != src->sa_family)
 				continue;
-			if (lsrc->sa_family != AF_INET && 
+			if (lsrc->sa_family != AF_INET &&
 			    lsrc->sa_family != AF_INET6)
 				continue;
 
 			if (SS_CMP(lsrc, ==, src)) {
 				/*
-				 * Overwrite unspecified address to ss[i]. 
-				 * This entry will be ignored by 
-				 * in*_addmultisrc() or in*_modmultisrc() 
-				 * in order to skip the join procedure for 
+				 * Overwrite unspecified address to ss[i].
+				 * This entry will be ignored by
+				 * in*_addmultisrc() or in*_modmultisrc()
+				 * in order to skip the join procedure for
 				 * this source.
 				 */
 				bzero(src, len);
@@ -3630,7 +3630,7 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 		}
 	}
 	if (msfsrc) {
-		/* 
+		/*
 		 * Remaining sources will be removed.
 		 */
 		LIST_FOREACH(msfsrc, &head, list)
@@ -3877,8 +3877,8 @@ sa_cmp(struct sockaddr *a, struct sockaddr *b)
 		if (diff != 0)
 			return diff;
 	}
-	/* 
-	 * if everything is same, check sin6_scope_id 
+	/*
+	 * if everything is same, check sin6_scope_id
 	 * (IPv6 link-local only; other scope handling it a ToDo task)
 	 */
 	if (a->sa_family == AF_INET6 &&
@@ -3932,7 +3932,7 @@ match_msf4_per_if(inm, src, dst)
 		else
 			return 0;
 	}
-	
+
 	/* no source-filter matched */
 	if (inms->ims_mode == MCAST_INCLUDE)
 		return 0;
@@ -3953,9 +3953,9 @@ match_msf4_per_socket(inp, src, dst)
 	struct sock_msf *msf;
 	struct ip_moptions *imo;
 	struct sock_msf_source *msfsrc;
-	
+
 	/*
-	 * Broadcast data should be accepted; this function assumes that 
+	 * Broadcast data should be accepted; this function assumes that
 	 * dst is not a normal unicast address.
 	 */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -3964,13 +3964,13 @@ match_msf4_per_socket(inp, src, dst)
 	if (!IN_MULTICAST(ntohl(dst->s_addr)))
 #endif
 		return 1;
-		
+
 	if ((imo = inp->inp_moptions) == NULL)
 		return 0;
 	for (i = 0; i < imo->imo_num_memberships; i++) {
 		if (imo->imo_membership[i]->inm_addr.s_addr != dst->s_addr)
 			continue;
-		
+
 		msf = imo->imo_msf[i];
 		if (msf == NULL)
 			continue;
@@ -3982,14 +3982,14 @@ match_msf4_per_socket(inp, src, dst)
 		/* 1. search allow-list */
 		if (msf->msf_numsrc == 0)
 			goto search_block_list;
-		
+
 		LIST_FOREACH(msfsrc, msf->msf_head, list) {
 			if (msfsrc->src.ss_family != AF_INET)
 				continue;
 			if (SIN_ADDR(&msfsrc->src) == src->s_addr)
 				return 1;
 		}
-		
+
 		/* 2. search_block_list */
 	search_block_list:
 		if (msf->msf_blknumsrc == 0)
