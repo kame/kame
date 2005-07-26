@@ -1,4 +1,4 @@
-/*	$KAME: route6d.h,v 1.8 2003/05/28 09:11:13 itojun Exp $	*/
+/*	$KAME: route6d.h,v 1.9 2005/07/26 08:21:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,6 +39,7 @@
 
 #define	IFC_CHANGED	1
 
+/* RIPng packet format */
 struct netinfo6 {
 	struct	in6_addr rip6_dest;
 	u_short	rip6_tag;
