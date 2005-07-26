@@ -378,7 +378,6 @@ void	in_status(int);
 void	in_getaddr(const char *, int);
 void	in_getprefix(const char *, int);
 #ifdef INET6
-void	in6_fillscopeid(struct sockaddr_in6 *sin6);
 void	in6_alias(struct in6_ifreq *);
 void	in6_status(int);
 void	in6_getaddr(const char *, int);
@@ -1806,10 +1805,6 @@ phys_status(int force)
 	(void) strlcpy(req.iflr_name, name, sizeof(req.iflr_name));
 	if (ioctl(s, SIOCGLIFPHYADDR, (caddr_t)&req) < 0)
 		return;
-#ifdef INET6
-	if (req.addr.ss_family == AF_INET6)
-		in6_fillscopeid((struct sockaddr_in6 *)&req.addr);
-#endif /* INET6 */
 	getnameinfo((struct sockaddr *)&req.addr, req.addr.ss_len,
 	    psrcaddr, sizeof(psrcaddr), 0, 0, niflag);
 #ifdef INET6
@@ -1817,10 +1812,6 @@ phys_status(int force)
 		ver = "6";
 #endif /* INET6 */
 
-#ifdef INET6
-	if (req.dstaddr.ss_family == AF_INET6)
-		in6_fillscopeid((struct sockaddr_in6 *)&req.dstaddr);
-#endif /* INET6 */
 	getnameinfo((struct sockaddr *)&req.dstaddr, req.dstaddr.ss_len,
 	    pdstaddr, sizeof(pdstaddr), 0, 0, niflag);
 
@@ -2039,18 +2030,6 @@ setifprefixlen(const char *addr, int d)
 }
 
 #ifdef INET6
-void
-in6_fillscopeid(struct sockaddr_in6 *sin6)
-{
-#if defined(__KAME__) && defined(KAME_SCOPEID)
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-		sin6->sin6_scope_id =
-			ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
-		sin6->sin6_addr.s6_addr[2] = sin6->sin6_addr.s6_addr[3] = 0;
-	}
-#endif /* __KAME__ && KAME_SCOPEID */
-}
-
 /* XXX not really an alias */
 void
 in6_alias(struct in6_ifreq *creq)
@@ -2503,15 +2482,6 @@ in6_getaddr(const char *s, int which)
 	if (res->ai_addrlen != sizeof(struct sockaddr_in6))
 		errx(1, "%s: bad value", s);
 	memcpy(sin6, res->ai_addr, res->ai_addrlen);
-#ifdef __KAME__
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) &&
-	    *(u_int16_t *)&sin6->sin6_addr.s6_addr[2] == 0 &&
-	    sin6->sin6_scope_id) {
-		*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
-		    htons(sin6->sin6_scope_id & 0xffff);
-		sin6->sin6_scope_id = 0;
-	}
-#endif /* __KAME__ */
 	freeaddrinfo(res);
 #endif /* KAME_SCOPEID */
 }
