@@ -605,10 +605,10 @@ flush:
 
 			if ((sa = info.rti_info[i]) == NULL)
 				continue;
-			if (sa->sa_family == AF_INET6 &&
-			    (char *)sa + sa->sa_len <
+			if ((char *)sa + sa->sa_len <=
 			    (char *)rtm + rtm->rtm_msglen &&
-			    sa->sa_len == sizeof(struct sockaddr_in6)) {
+			    sa->sa_len == sizeof(struct sockaddr_in6) &&
+			    sa->sa_family == AF_INET6) {
 				struct sockaddr_in6 *sa6;
 
 				sa6 = (struct sockaddr_in6 *)sa; 
@@ -703,8 +703,9 @@ rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo *rtinfo)
 		 * In the kernel the scope zone ID of an IPv6 scoped address
 		 * is embedded in its address field.
 		 */
-		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
-		    cp + sa->sa_len < cplim && sa->sa_family == AF_INET6) { 
+		if (cp + sa->sa_len <= cplim &&
+		    sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    sa->sa_family == AF_INET6) { 
 			if (sa6_embedscope((struct sockaddr_in6 *)sa, 0))
 				return (-1);
 		}
