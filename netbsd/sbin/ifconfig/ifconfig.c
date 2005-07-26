@@ -359,7 +359,6 @@ void	in_status __P((int));
 void 	in_getaddr __P((const char *, int));
 void 	in_getprefix __P((const char *, int));
 #ifdef INET6
-void	in6_fillscopeid __P((struct sockaddr_in6 *sin6));
 void	in6_alias __P((struct in6_ifreq *));
 void	in6_status __P((int));
 void 	in6_getaddr __P((const char *, int));
@@ -970,21 +969,6 @@ settunnel(src, dst)
 			errx(EXIT_FAILURE, "scope mismatch");
 			/* NOTREACHED */
 		}
-#ifdef __KAME__
-		/* embed scopeid */
-		if (s6->sin6_scope_id && 
-		    (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr) ||
-		     IN6_IS_ADDR_MC_LINKLOCAL(&s6->sin6_addr))) {
-			*(u_int16_t *)&s6->sin6_addr.s6_addr[2] =
-			    htons(s6->sin6_scope_id);
-		}
-		if (d->sin6_scope_id && 
-		    (IN6_IS_ADDR_LINKLOCAL(&d->sin6_addr) ||
-		     IN6_IS_ADDR_MC_LINKLOCAL(&d->sin6_addr))) {
-			*(u_int16_t *)&d->sin6_addr.s6_addr[2] =
-			    htons(d->sin6_scope_id);
-		}
-#endif
 	}
 #endif
 
@@ -2277,10 +2261,6 @@ tunnel_status()
 		ver = "6";
 #endif
 
-#ifdef INET6
-	if (req.dstaddr.ss_family == AF_INET6)
-		in6_fillscopeid((struct sockaddr_in6 *)&req.dstaddr);
-#endif
 	getnameinfo((struct sockaddr *)&req.dstaddr, req.dstaddr.ss_len,
 	    pdstaddr, sizeof(pdstaddr), 0, 0, niflag);
 
@@ -2404,19 +2384,6 @@ setifprefixlen(addr, d)
 }
 
 #ifdef INET6
-void
-in6_fillscopeid(sin6)
-	struct sockaddr_in6 *sin6;
-{
-#if defined(__KAME__) && defined(KAME_SCOPEID)
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-		sin6->sin6_scope_id =
-			ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
-		sin6->sin6_addr.s6_addr[2] = sin6->sin6_addr.s6_addr[3] = 0;
-	}
-#endif
-}
-
 /* XXX not really an alias */
 void
 in6_alias(creq)
@@ -2823,11 +2790,6 @@ in6_getaddr(str, which)
 		errx(EXIT_FAILURE, "%s: bad value", str);
 	memcpy(sin6, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) && sin6->sin6_scope_id) {
-		*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
-			htons(sin6->sin6_scope_id);
-		sin6->sin6_scope_id = 0;
-	}
 	if (slash) {
 		in6_getprefix(slash + 1, MASK);
 		explicit_prefix = 1;
