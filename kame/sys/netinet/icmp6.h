@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.98 2005/06/15 07:11:36 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.99 2005/07/26 16:50:24 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -252,7 +252,7 @@ struct mldv2_hdr {
 	u_int8_t	 	mld_qqi;	/* querier's query interval (QQI) */
 	u_int16_t		mld_numsrc;	/* number of sources (0 for general */
 						/* and group-specific queries) */
-	struct in6_addr		mld_src[1];	/* source address list */	
+	struct in6_addr		mld_src[1];	/* source address list */
 } __attribute__((__packed__));
 
 #define MLD_MRC_EXP(x)	((ntohs(x) >> 12) & 0x0007)
