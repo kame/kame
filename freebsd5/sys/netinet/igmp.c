@@ -112,7 +112,7 @@ SLIST_HEAD(, router_info) router_info_head;
 static struct igmpstat igmpstat;
 int igmpmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int igmpsomaxsrc = SO_MAX_SOURCE_FILTER;
-/* 
+/*
  * igmp_version:
  *	0: igmpv3 with compat-mode
  *	1: igmpv1 only
@@ -203,7 +203,7 @@ static int addrlen = sizeof(struct in_addr);
 	(m)->m_pkthdr.len = sizeof(struct ip) + rhdrlen; \
 	(m)->m_pkthdr.rcvif = (struct ifnet *)0; \
 } while(0)
- 
+
 #ifdef IGMPV3
 static int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
 			int, u_int8_t);
@@ -331,7 +331,7 @@ find_rti(struct ifnet *ifp)
 	return rti;
 }
 
- 
+
 /*
  * Check whether IGMP message carries Router Alert option.
  */
@@ -405,7 +405,7 @@ igmp_get_router_alert(m)
 	}
 	return 0;
 }
-  
+
 void
 igmp_input(register struct mbuf *m, int off)
 {
@@ -596,7 +596,7 @@ set_timer:
 		}
 #endif
 
-		/* 
+		/*
 		 * Dispatch this query to make an appropriate
 		 * version's reply.
 		 */
@@ -865,14 +865,14 @@ state_change_timer:
 			igmp_sendbuf(sm, ifp);
 			sm = NULL;
 		}
-		/* 
+		/*
 		 * Check if this report was pending Source-List-Change
 		 * report or not. It is only the case that robvar was
 		 * not reduced here. (XXX rarely, QRV may be changed
 		 * in a same timing.)
 		 */
 		if (inm->inm_source->ims_robvar == inm->inm_rti->rti_qrv) {
-			/* 
+			/*
 			 * immediately advertise the calculated IGMP report,
 			 * so that you don't have to update ifp for the buffered
 			 * IGMP report message
@@ -1040,7 +1040,7 @@ igmp_sendbuf(m, ifp)
 #ifdef MROUTING
 	extern struct socket *ip_mrouter;
 #endif /* MROUTING */
- 
+
 	/*
 	 * Insert check sum and send the message.
 	 */
@@ -1122,7 +1122,7 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 
 	if (igmp->igmp_code == 0)
 	    /*
-	     * XXX: this interval prevents an IGMP-report flooding caused by 
+	     * XXX: this interval prevents an IGMP-report flooding caused by
 	     * an IGMP-query with Max-Reponce-Code=0 (KAME local design)
 	     */
 	     timer = 10;
@@ -1298,7 +1298,7 @@ igmp_set_hostcompat(ifp, rti, query_ver)
  * If no pending source was recorded, return -1.
  * If some source was recorded as a reply for Group-and-Source-Specific Query,
  * return 0.
- */ 
+ */
 static int
 igmp_record_queried_source(inm, igmp, igmplen)
 	struct in_multi *inm;
@@ -1409,7 +1409,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	    numsrc = inm->inm_source->ims_rec->numsrc;
 	} else
 	    numsrc = inm->inm_source->ims_cur->numsrc;
-  
+
 	if (type == MODE_IS_INCLUDE && numsrc == 0)
 	    return 0; /* no need to send Current-State Report */
 
