@@ -532,9 +532,9 @@ rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo *rtinfo)
 		 */
 		if (cp + sa->sa_len <= cplim &&
 		    sa->sa_len == sizeof(struct sockaddr_in6) &&
-		    sa->sa_family == AF_INET6) { 
-			if (sa6_embedscope((struct sockaddr_in6 *)sa, 0))
-				return (-1);
+		    sa->sa_family == AF_INET6) {
+			/* XXX: we should probably catch errors */
+			(void)sa6_embedscope((struct sockaddr_in6 *)sa, 0);
 		}
 #endif
 		ADVANCE(cp, sa);
