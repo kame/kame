@@ -1,9 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2788 2005/07/26 05:50:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.2789 2005/07/26 08:28:13 jinmei Exp $
 
 <200507>
 2005-07-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* netbsd, openbsd: applied the same changes for routing sockets as
+	* kame/kame/route6d: route6d now does not care about the kernel
+	internal form for scoped addresses at all.  In particular, can
+	transparently specify the source of a RIPng response as a gateway
+	address through the routing socket.
+
+2005-07-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* netbsd/openbsd: applied the same changes for routing sockets as
 	those for FreeBSD (see the next entry).
 
 2005-07-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
