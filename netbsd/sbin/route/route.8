@@ -1,4 +1,4 @@
-.\"	$NetBSD: route.8,v 1.29.2.1 2003/10/02 09:01:20 tron Exp $
+.\"	$NetBSD: route.8,v 1.36 2003/10/02 00:09:06 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -11,11 +11,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 3. All advertising materials mentioning features or use of this software
-.\"    must display the following acknowledgement:
-.\"	This product includes software developed by the University of
-.\"	California, Berkeley and its contributors.
-.\" 4. Neither the name of the University nor the names of its contributors
+.\" 3. Neither the name of the University nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
 .\"
@@ -33,7 +29,7 @@
 .\"
 .\"     @(#)route.8	8.4 (Berkeley) 6/1/94
 .\"
-.Dd October 23, 1998
+.Dd July 19, 2003
 .Dt ROUTE 8
 .Os
 .Sh NAME
@@ -110,6 +106,8 @@ utility provides several commands:
 Add a route.
 .It Cm flush
 Remove all routes.
+.It Cm flushall
+Remove all routes including the default gateway.
 .It Cm delete
 Delete a specific route.
 .It Cm change
@@ -127,14 +125,16 @@ routing lookup misses, or suspected network partitionings.
 The monitor command has the syntax
 .Pp
 .Bd -filled -offset indent -compact
-.Nm "" Op Fl n
+.Nm
+.Op Fl n
 .Cm monitor
 .Ed
 .Pp
 The flush command has the syntax
 .Pp
 .Bd -filled -offset indent -compact
-.Nm "" Op Fl n
+.Nm
+.Op Fl n
 .Cm flush
 .Op Ar family
 .Ed
@@ -157,7 +157,8 @@ delineated family will be manipulated.
 The other commands have the following syntax:
 .Pp
 .Bd -filled -offset indent -compact
-.Nm "" Op Fl n
+.Nm
+.Op Fl n
 .Ar command
 .Op Fl net No \&| Fl host
 .Ar destination gateway
@@ -186,6 +187,11 @@ or if the
 is the symbolic name of a network, then the route is
 assumed to be to a network; otherwise, it is presumed to be a
 route to a host.
+Optionally, the
+.Ar destination
+can also be specified in the
+.Ar net Ns / Ns Ar bits
+format.
 .Pp
 For example,
 .Li 128.32
@@ -328,8 +334,8 @@ the routing tables.
 .Sh EXIT STATUS
 The
 .Nm
-utility exits 0 on success, and \*[Gt]0 if an error occurs.  This includes
-the use of the
+utility exits 0 on success, and \*[Gt]0 if an error occurs.
+This includes the use of the
 .Cm get
 command to look up a route that is incomplete.
 .Sh EXAMPLES
