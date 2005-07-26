@@ -2250,10 +2250,6 @@ tunnel_status()
 	strncpy(req.iflr_name, name, IFNAMSIZ);
 	if (ioctl(s, SIOCGLIFPHYADDR, (caddr_t)&req) == -1)
 		return;
-#ifdef INET6
-	if (req.addr.ss_family == AF_INET6)
-		in6_fillscopeid((struct sockaddr_in6 *)&req.addr);
-#endif
 	getnameinfo((struct sockaddr *)&req.addr, req.addr.ss_len,
 	    psrcaddr, sizeof(psrcaddr), 0, 0, niflag);
 #ifdef INET6
@@ -2408,7 +2404,6 @@ in6_alias(creq)
 
 	sin6 = (struct sockaddr_in6 *)&creq->ifr_addr;
 
-	in6_fillscopeid(sin6);
 	scopeid = sin6->sin6_scope_id;
 	if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
 			hbuf, sizeof(hbuf), NULL, 0, niflag))
@@ -2427,7 +2422,6 @@ in6_alias(creq)
 			ifr6.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
 		}
 		sin6 = (struct sockaddr_in6 *)&ifr6.ifr_addr;
-		in6_fillscopeid(sin6);
 		hbuf[0] = '\0';
 		if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
 				hbuf, sizeof(hbuf), NULL, 0, niflag))
