@@ -700,7 +700,7 @@ skip_ipsec:
 		/*
 		 * If deferred crypto processing is needed, check that
 		 * the interface supports it.
-		 */ 
+		 */
 		mtag = m_tag_find(m, PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED, NULL);
 		if (mtag != NULL && (ifp->if_capenable & IFCAP_IPSEC) == 0) {
 			/* notify IPsec to do its own crypto */
@@ -2116,7 +2116,7 @@ ip_setmoptions(struct inpcb *inp, struct sockopt *sopt)
 		/*
 		 * Set source address to the msf.
 		 * If requested source address was already in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL.
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
@@ -2180,7 +2180,7 @@ ip_setmoptions(struct inpcb *inp, struct sockopt *sopt)
 		 * If (*,G) join or EXCLUDE join was requested previously,
 		 * return EINVAL.
 		 * If requested source address was not in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL.
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
@@ -2281,7 +2281,7 @@ ip_setmoptions(struct inpcb *inp, struct sockopt *sopt)
 		/*
 		 * Set source address to the msf.
 		 * If requested source address was already in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL.
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
@@ -2364,7 +2364,7 @@ ip_setmoptions(struct inpcb *inp, struct sockopt *sopt)
 		 * If (*,G) join or INCLUDE join was requested previously,
 		 * return EINVAL.
 		 * If requested source address was not in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL.
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
