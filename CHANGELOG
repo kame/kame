@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2787 2005/07/23 08:20:47 jinmei Exp $
+$KAME: CHANGELOG,v 1.2788 2005/07/26 05:50:12 jinmei Exp $
 
 <200507>
+2005-07-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* netbsd, openbsd: applied the same changes for routing sockets as
+	those for FreeBSD (see the next entry).
+
 2005-07-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd5/sys/net/rtsock.c: added support for IPv6 scoped
 	  addresses for routing sockets:
