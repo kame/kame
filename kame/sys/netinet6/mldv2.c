@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.45 2005/07/27 06:19:27 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.46 2005/07/27 11:00:02 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -211,7 +211,6 @@ int mld_debug = 0;
 static struct router6_info *Head6;
 
 static struct ip6_pktopts ip6_opts;
-static int mld_state_change_timers_are_running;
 static const int ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & 
 			    ~IN6_IFF_TENTATIVE;
 
@@ -258,6 +257,10 @@ static u_long mld_group_timerresid(struct in6_multi *);
 
 static void mld_interface_timeo(struct router6_info *rt6i);
 static void mld_unset_hostcompat_timeo(struct router6_info *);
+static void mld_start_state_change_timer(struct in6_multi *);
+static void mld_stop_state_change_timer(struct in6_multi *);
+static void mld_state_change_timeo(struct in6_multi *);
+
 static void mld_sendbuf(struct mbuf *, struct ifnet *);
 static int mld_set_timer(struct ifnet *, struct router6_info *,
 	struct mld_hdr *, u_int16_t, u_int8_t);
@@ -288,8 +291,6 @@ mld_init()
 	static u_int8_t hbh_buf[8];
 	struct ip6_hbh *hbh = (struct ip6_hbh *)hbh_buf;
 	u_int16_t rtalert_code = htons((u_int16_t)IP6OPT_RTALERT_MLD);
-
-	mld_state_change_timers_are_running = 0;
 
 	/* ip6h_nxt will be fill in later */
 	hbh->ip6h_len = 0;	/* (8 >> 3) - 1 */
@@ -843,94 +844,83 @@ mld_interface_timeo(rti)
 	rti->rt6i_timer2 = 0;
 }
 
-void
-mld_fasttimeo()
-{
+
+static void
+mld_start_state_change_timer(in6m)
 	struct in6_multi *in6m;
-	struct in6_multistep step;
-	struct ifnet *ifp = NULL;
-	struct mbuf *sm;
-	int sbuflen;
-	int s;
+{
+	struct in6_multi_source *i6ms = in6m->in6m_source;
+
+	if (i6ms == NULL)
+		return;
+	i6ms->i6ms_timer = MLD_RANDOM_DELAY(MLDV2_UNSOL_INTVL * hz);
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	callout_reset(i6ms->i6ms_timer_ch, i6ms->i6ms_timer,
+	    (void (*) __P((void *)))mld_state_change_timeo, in6m);
+#else
+	timeout_set(i6ms->i6ms_timer_ch,
+	    (void (*) __P((void *)))mld_state_change_timeo, in6m);
+	timeout_add(i6ms->i6ms_timer_ch, i6ms->i6ms_timer);
+#endif
+	return;
+}
+
+
+static void
+mld_stop_state_change_timer(in6m)
+	struct in6_multi *in6m;
+{
+	struct in6_multi_source *i6ms = in6m->in6m_source;
+
+	if (i6ms == NULL)
+		return;
+	i6ms->i6ms_timer = IN6M_TIMER_UNDEF;
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	callout_stop(i6ms->i6ms_timer_ch);
+#elif defined(__OpenBSD__)
+	timeout_del(i6ms->i6ms_timer_ch);
+#endif
+	return;
+}
+
+static void
+mld_state_change_timeo(in6m)
+	struct in6_multi *in6m;
+{
+	struct mbuf *sm = NULL;
+	int sbuflen = 0;
+	struct in6_multi_source *i6ms = in6m->in6m_source;
+
+	if (!in6_is_mld_target(&in6m->in6m_addr))
+		return;
+	if (i6ms == NULL)
+		return;
 
 	/*
-	 * Quick check to see if any work needs to be done, in order
-	 * to minimize the overhead of fasttimo processing.
+	 * Check if this report was pending Source-List-Change report or not.
+	 * It is only the case that robvar was not reduced here.
+	 * (XXX rarely, QRV may be changed in a same timing.)
 	 */
-	if (!mld_state_change_timers_are_running)
-		return;
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-
-	mld_state_change_timers_are_running = 0;
-	sm = NULL;
-	sbuflen = 0;
-	IN6_FIRST_MULTI(step, in6m);
-	if (in6m == NULL) {
-		splx(s);
-		return;
-	}
-	ifp = in6m->in6m_ifp;
-	while (in6m != NULL) {
-		/* State-Change Record timer */
-		if (!in6_is_mld_target(&in6m->in6m_addr))
-			goto next_in6m; /* skip */
-
-		if (in6m->in6m_source == NULL)
-			goto next_in6m;
-
-		if (in6m->in6m_source->i6ms_timer == 0)
-			goto next_in6m; /* do nothing */
-
-		--in6m->in6m_source->i6ms_timer;
-		if (in6m->in6m_source->i6ms_timer > 0) {
-			mld_state_change_timers_are_running = 1;
-			goto next_in6m;
-		}
-
-		if (sm != NULL && ifp != in6m->in6m_ifp) {
-			mld_sendbuf(sm, ifp);
-			sm = NULL;
-		}
-
-		/*
-		 * Check if this report was pending Source-List-Change
-		 * report or not. It is only the case that robvar was
-		 * not reduced here. (XXX rarely, QRV may be changed
-		 * in a same timing.)
+	mldlog((LOG_DEBUG, "mld_state_change_timeo: handles pending report"));
+	if (i6ms->i6ms_robvar == in6m->in6m_rti->rt6i_qrv) {
+	    	/* 
+		 * immediately advertise the calculated MLD report,
+		 * so you don't have to update ifp for the buffered 
+		 * MLD report message.
 		 */
-		mldlog((LOG_DEBUG, "mld_fasttimeo: handles pending report\n"));
-		if (in6m->in6m_source->i6ms_robvar
-		    == in6m->in6m_rti->rt6i_qrv) {
-		    	/* 
-			 * immediately advertise the calculated MLD report,
-			 * so you don't have to update ifp for the buffered 
-			 * MLD report message.
-			 */
-			mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 1);
-			sm = NULL;
-		} else if (in6m->in6m_source->i6ms_robvar > 0) {
-			mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 0);
-			ifp = in6m->in6m_ifp;
-		}
-
-		if (in6m->in6m_source->i6ms_robvar != 0) {
-			in6m->in6m_source->i6ms_timer =
-				MLD_RANDOM_DELAY(MLDV2_UNSOL_INTVL * PR_FASTHZ);
-			mld_state_change_timers_are_running = 1;
-		}
-	next_in6m:
-		IN6_NEXT_MULTI(step, in6m);
+		mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 1);
+		sm = NULL;
+	} else if (i6ms->i6ms_robvar > 0) {
+		mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 0);
+		if (sm != NULL)
+			mld_sendbuf(sm, in6m->in6m_ifp);
 	}
 
-	if (sm != NULL)
-		mld_sendbuf(sm, ifp);
-
-	splx(s);
+	/* schedule the next state change report */
+	if (i6ms->i6ms_robvar != 0)
+		mld_start_state_change_timer(in6m);
+	else
+		mld_stop_state_change_timer(in6m);
 }
 
 static void
@@ -1698,12 +1688,14 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			type = CHANGE_TO_INCLUDE_MODE;
 		}
 	}
+	if (in6mm_src->i6ms_robvar <= 0) {
+		mld_stop_state_change_timer(in6m);
+		return;
+	}
 	if (timer_init) {
 		in6mm_src->i6ms_robvar = in6m->in6m_rti->rt6i_qrv;
-		in6mm_src->i6ms_timer
-			= MLD_RANDOM_DELAY(MLD_UNSOL_INTVL * PR_FASTHZ);
-	} else if (!(in6mm_src->i6ms_robvar > 0))
-		return;
+		mld_start_state_change_timer(in6m);
+	}
 
 	/* MCLBYTES is the maximum length even if if_mtu is too big. */
 	max_len = (in6m->in6m_ifp->if_mtu < MCLBYTES) ?
@@ -1791,19 +1783,19 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			/* XXX source address insert didn't finished.
 			* strange... robvar is not reduced */
 		}
-		if (timer_init) {
-			mld_state_change_timers_are_running = 1;
-			mld_sendbuf(m, in6m->in6m_ifp);
-		}
+		if (timer_init)
+			mld_start_state_change_timer(in6m);
 
-		if (--in6mm_src->i6ms_robvar != 0)
+		if (--in6mm_src->i6ms_robvar != 0) {
+			mld_stop_state_change_timer(in6m);
 			return;
+		}
 
 		if (in6mm_src->i6ms_toex != NULL) {
 			/* For TO_EX list, it MUST be deleted after 
 			 * retransmission is done. This is because 
-			 * mld_fasttimeo() doesn't know if the pending TO_EX 
-			 * report exists or not. */
+			 * mld_state_change_timeo() doesn't know if the 
+			 * pending TO_EX report exists or not. */
 			 in6_free_msf_source_list(in6mm_src->i6ms_toex->head);
 			 FREE(in6mm_src->i6ms_toex->head, M_MSFILTER);
 			 FREE(in6mm_src->i6ms_toex, M_MSFILTER);
@@ -1814,13 +1806,11 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		     in6mm_src->i6ms_alw->numsrc > 0) ||
 		     (in6mm_src->i6ms_blk != NULL &&
 		     in6mm_src->i6ms_blk->numsrc > 0)) {
-			mld_state_change_timers_are_running = 1;
 			in6mm_src->i6ms_robvar = in6m->in6m_rti->rt6i_qrv;
-			in6mm_src->i6ms_timer
-		 	     = MLD_RANDOM_DELAY(MLD_UNSOL_INTVL * PR_FASTHZ);
-		} else
-			in6mm_src->i6ms_timer = 0;
-
+			mld_start_state_change_timer(in6m);
+		} else {
+			mld_stop_state_change_timer(in6m);
+		}
 		return;
 	}
 
@@ -1845,20 +1835,21 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			m = *m0;
 			*buflenp = 0;
 		}
-
-		if (timer_init) {
-			mld_state_change_timers_are_running = 1;
+		if (m != NULL) {
 			mld_sendbuf(m, in6m->in6m_ifp);
+			m = NULL;
 		}
+		if (timer_init)
+			mld_start_state_change_timer(in6m);
 		if (--in6mm_src->i6ms_robvar != 0)
 			return;
 
 		if (in6mm_src->i6ms_toin != NULL) {
 			/* For TO_IN list, it MUST be deleted
 			 * after retransmission is done. This is
-			 * because mld_fasttimeo() doesn't know 
-			 * if the pending TO_IN report exists 
-			 * or not. */
+			 * because mld_state_change_timeo() doesn't know 
+			 * if the pending TO_IN report exists or not
+			 */
 			in6_free_msf_source_list(in6mm_src->i6ms_toin->head);
 			FREE(in6mm_src->i6ms_toin->head, M_MSFILTER);
 			FREE(in6mm_src->i6ms_toin, M_MSFILTER);
@@ -1869,13 +1860,11 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		    in6mm_src->i6ms_alw->numsrc > 0) ||
 		     (in6mm_src->i6ms_blk != NULL &&
 		     in6mm_src->i6ms_blk->numsrc > 0)) {
-			mld_state_change_timers_are_running = 1;
 			in6mm_src->i6ms_robvar = in6m->in6m_rti->rt6i_qrv;
-			in6mm_src->i6ms_timer
-			    = MLD_RANDOM_DELAY(MLD_UNSOL_INTVL * PR_FASTHZ);
-		} else
-			in6mm_src->i6ms_timer = 0;
-
+			mld_start_state_change_timer(in6m);
+		} else {
+			mld_stop_state_change_timer(in6m);
+		}
 		return;
 	}
 
@@ -1926,10 +1915,12 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			src_done = 0;
 		}
 	}
-	if (timer_init) {
-		mld_state_change_timers_are_running = 1;
+	if (m != NULL) {
 		mld_sendbuf(m, in6m->in6m_ifp);
+		m = NULL;
 	}
+	if (timer_init)
+		mld_start_state_change_timer(in6m);
 	if (--in6mm_src->i6ms_robvar == 0) {
 		if ((in6mm_src->i6ms_alw != NULL) &&
 		    (in6mm_src->i6ms_alw->numsrc != 0)) {
@@ -1941,7 +1932,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		    	in6_free_msf_source_list(in6mm_src->i6ms_blk->head);
 			in6mm_src->i6ms_blk->numsrc = 0;
 		}
-		in6mm_src->i6ms_timer = 0;
+		mld_stop_state_change_timer(in6m);
 	}
 
 	return;
@@ -2037,7 +2028,7 @@ mld_cancel_pending_response(ifp, rti)
 			goto next_multi;
 
 		in6mm_src->i6ms_robvar = 0;
-		in6mm_src->i6ms_timer = 0;
+		mld_stop_state_change_timer(in6m);
 		in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
 		in6mm_src->i6ms_rec->numsrc = 0;
 		if (in6mm_src->i6ms_alw != NULL) {

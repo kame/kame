@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.h,v 1.9 2004/04/09 07:47:39 suz Exp $	*/
+/*	$KAME: in6_msf.h,v 1.10 2005/07/27 11:00:01 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -83,6 +83,11 @@ struct in6_addr_slist {
 	u_int16_t numsrc;		 /* num of sources of this list	    */
 };
 
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+struct callout;
+#elif defined(__OpenBSD__)
+struct timeout;
+#endif
 struct in6_multi_source {
 	u_int	i6ms_mode;		 /* current source filter mode	    */
 	u_int	i6ms_grpjoin;		 /* (*,G) join request bit	    */
@@ -95,6 +100,11 @@ struct in6_multi_source {
 	struct	in6_addr_slist *i6ms_toin; /* pending TO_IN source address */
 	struct	in6_addr_slist *i6ms_toex; /* pending TO_EX source address */
 	u_int	i6ms_timer;		 /* state-change report timer	    */
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	struct callout *i6ms_timer_ch;
+#elif defined(__OpenBSD__)
+	struct timeout *i6ms_timer_ch;
+#endif
 	u_int	i6ms_robvar;		 /* robustness var. of grp record  */
 };
 

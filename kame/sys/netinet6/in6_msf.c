@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.37 2005/07/26 18:14:59 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.38 2005/07/27 11:00:01 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -191,8 +191,21 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			return ENOBUFS;
 		bzero(in6m->in6m_source, sizeof(struct in6_multi_source));
 
+		MALLOC(in6m->in6m_source->i6ms_timer_ch, struct callout *,
+		    sizeof(struct callout), M_MSFILTER, M_NOWAIT);
+		if (in6m->in6m_source->i6ms_timer_ch == NULL)
+			return ENOBUFS;
+#ifdef __FreeBSD__
+		callout_init(in6m->in6m_source->i6ms_timer_ch, 0);
+#elif defined(__NetBSD__)
+		callout_init(in6m->in6m_source->i6ms_timer_ch);
+#elif defined(__OpenBSD__)
+		bzero(in6m->in6m_source->i6ms_timer_ch, sizeof(struct callout));
+#endif
+
 		I6AS_LIST_ALLOC(in6m->in6m_source->i6ms_cur);
 		if (error != 0) {
+			FREE(in6m->in6m_source->i6ms_timer_ch, M_MSFILTER);
 			FREE(in6m->in6m_source, M_MSFILTER);
 			return error;
 		}
@@ -200,6 +213,8 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 		if (error != 0) {
 			FREE(in6m->in6m_source->i6ms_cur->head, M_MSFILTER);
 			FREE(in6m->in6m_source->i6ms_cur, M_MSFILTER);
+			FREE(in6m->in6m_source->i6ms_timer_ch, M_MSFILTER);
+			FREE(in6m->in6m_source, M_MSFILTER);
 			FREE(in6m->in6m_source, M_MSFILTER);
 			return error;
 		}
@@ -472,6 +487,18 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 		if (in6m->in6m_source == NULL)
 			return ENOBUFS;
 		bzero(in6m->in6m_source, sizeof(struct in6_multi_source));
+
+		MALLOC(in6m->in6m_source->i6ms_timer_ch, struct callout *,
+		    sizeof(struct callout), M_MSFILTER, M_NOWAIT);
+		if (in6m->in6m_source->i6ms_timer_ch == NULL)
+			return ENOBUFS;
+#ifdef __FreeBSD__
+		callout_init(in6m->in6m_source->i6ms_timer_ch, 0);
+#elif defined(__NetBSD__)
+		callout_init(in6m->in6m_source->i6ms_timer_ch);
+#elif defined(__OpenBSD__)
+		bzero(in6m->in6m_source->i6ms_timer_ch, sizeof(struct callout));
+#endif
 
 		I6AS_LIST_ALLOC(in6m->in6m_source->i6ms_cur);
 		if (error != 0) {

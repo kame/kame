@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.18 2005/07/27 06:19:27 suz Exp $	*/
+/*	$KAME: mld6_var.h,v 1.19 2005/07/27 11:00:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -83,9 +83,6 @@ extern int mld_debug;
 
 void	mld_init(void);
 void	mld_input(struct mbuf *, int);
-#ifdef MLDV2
-void	mld_fasttimeo(void);
-#endif
 #if defined(MLDV2) && !defined(__FreeBSD__)
 int	mld_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #endif
