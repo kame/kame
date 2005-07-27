@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.41 2005/07/26 18:14:59 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.42 2005/07/27 00:18:22 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -208,7 +208,7 @@ int mld_debug = 1;
 int mld_debug = 0;
 #endif
 
-struct router6_info *Head6;
+static struct router6_info *Head6;
 
 static struct ip6_pktopts ip6_opts;
 static int mld_state_change_timers_are_running;

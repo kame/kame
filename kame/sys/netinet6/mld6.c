@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.112 2005/06/16 18:29:29 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.113 2005/07/27 00:18:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -162,7 +162,7 @@ int mldmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int mldsomaxsrc = SO_MAX_SOURCE_FILTER;
 int mld_verion = 1;
 
-struct router6_info *Head6;
+static struct router6_info *Head6;
 
 static struct ip6_pktopts ip6_opts;
 static const int ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & 

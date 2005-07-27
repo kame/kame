@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.15 2005/07/26 16:34:56 suz Exp $	*/
+/*	$KAME: mld6_var.h,v 1.16 2005/07/27 00:18:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -77,7 +77,6 @@
 #define	MLDV2_UNSOL_INTVL	1	/* Unsolicited Report Interval (sec) */
 #define	MLD_DEF_QUERY		10	/* v1 Max. Response Time (sec.) */
 
-extern	struct router6_info *Head6;
 extern int mld_debug;
 
 #define mldlog(x)	do { if (mld_debug) log x; } while (/*CONSTCOND*/ 0)
