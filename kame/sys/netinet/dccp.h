@@ -1,4 +1,4 @@
-/*	$KAME: dccp.h,v 1.7 2005/07/22 09:31:13 nishida Exp $	*/
+/*	$KAME: dccp.h,v 1.8 2005/07/27 06:27:24 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -148,23 +148,23 @@ struct dccp_resethdr {
 #define DCCP_FEATURE_CONN_NONCE	8
 #define DCCP_FEATURE_IDENTREG	7
 
-#define DCCP_OPT_PADDING	0
+#define DCCP_OPT_PADDING		0
 #define DCCP_OPT_DATA_DISCARD	1
-#define DCCP_OPT_SLOW_RECV	2
-#define DCCP_OPT_BUF_CLOSED	3
-#define DCCP_OPT_IGNORED	32
-#define DCCP_OPT_CHANGE		33
-#define DCCP_OPT_PREFER		34
-#define DCCP_OPT_CONFIRM	35
+#define DCCP_OPT_SLOW_RECV		2
+#define DCCP_OPT_BUF_CLOSED		3
+#define DCCP_OPT_CHANGE_L		32
+#define DCCP_OPT_CONFIRM_L		33
+#define DCCP_OPT_CHANGE_R		34
+#define DCCP_OPT_CONFIRM_R		35
 #define DCCP_OPT_INIT_COOKIE	36
-#define DCCP_OPT_NDP_COUNT	37
+#define DCCP_OPT_NDP_COUNT		37
 #define DCCP_OPT_ACK_VECTOR0	38
 #define DCCP_OPT_ACK_VECTOR1	39
 #define DCCP_OPT_RECV_BUF_DROPS 40
-#define DCCP_OPT_TIMESTAMP	41
+#define DCCP_OPT_TIMESTAMP		41
 #define DCCP_OPT_TIMESTAMP_ECHO 42
-#define DCCP_OPT_IDENT		43
-#define DCCP_OPT_CHALLANGE	44
+#define DCCP_OPT_ELAPSEDTIME	43
+#define DCCP_OPT_DATACHECKSUM	44
 
 #define DCCP_REASON_UNSPEC	0
 #define DCCP_REASON_CLOSED	1

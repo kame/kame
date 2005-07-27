@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.57 2005/07/22 09:31:14 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.58 2005/07/27 06:27:25 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -786,12 +786,17 @@ dccp_input(struct mbuf *m, ...)
 			if (dp->cc_in_use[1] < 0) {
 				/* To be compatible with Linux implementation */
 				test[0] = DEFAULT_CCID;
+#if 0
 				if (test[0] == 2) {
 					test[1] = 3;
 				} else {
 					test[1] = 2;
 				}	
-				dccp_add_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC, test, 2);
+				dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 2);
+#else
+				/* we only support CCID2 at this moment */   
+				dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 1);
+#endif
 			}
 			if (len > data_off) {
 				DCCP_DEBUG((LOG_INFO, "XXX: len=%d, data_off=%d\n", len, data_off));
@@ -2422,14 +2427,19 @@ dccp_connect(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 
 	test[0] = dp->pref_cc;
+#if 0
 	/* FIX THIS LATER */
 	if (dp->pref_cc == 2) {
 		test[1] = 3;
 	} else {
 		test[1] = 2;
 	}
-	dccp_add_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC, test, 2);
+#endif
+	/* we only support CCID2 at this moment */   
+	dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 1);
+#if 0
 	dccp_add_feature(dp, DCCP_OPT_PREFER, DCCP_FEATURE_CC, test, 2);
+#endif
 
 	error = dccp_output(dp, 0);
 
@@ -3054,7 +3064,7 @@ dccp_add_feature_option(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char 
 		if (opt < 32) {
 			dp->optlen++;
 		} else {
-			if (opt == DCCP_OPT_CONFIRM) {
+			if (opt == DCCP_OPT_CONFIRM_L) {
 				dp->options[dp->optlen + 1] = val_len + 3;
 				dp->options[dp->optlen +2] = feature;
 				dp->optlen += 3;
@@ -3154,6 +3164,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 			}
 
 			switch (opt) {
+#if 0
 			    case DCCP_OPT_IGNORED:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_IGNORED!\n"));
 				if (size != 4) {
@@ -3166,6 +3177,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 					dccp_remove_feature(dp, options[2], options[3]);
 				}
 				break;
+#endif
 
 			    case DCCP_OPT_RECV_BUF_DROPS:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_RECV_BUF_DROPS, size = %u!\n", size));
@@ -3285,18 +3297,18 @@ dccp_remove_feature(struct dccpcb *dp, u_int8_t opt, u_int8_t feature)
 void
 dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val_len, char *val)
 {
-	char ignored[2];
+//	char ignored[2];
 	DCCP_DEBUG((LOG_INFO, "Running dccp_feature_neg, opt = %u, feature = %u len = %u ", opt, feature, val_len));
 
 	switch (feature) {
 		case DCCP_FEATURE_CC:
 			DCCP_DEBUG((LOG_INFO, "Got CCID negotiation, opt = %u, val[0] = %u\n", opt, val[0]));
-			if (opt == DCCP_OPT_CHANGE) {
+			if (opt == DCCP_OPT_CHANGE_R) {
 				if (val[0] == 2 || val[0] == 3 || val[0] == 0) {
-					DCCP_DEBUG((LOG_INFO, "Sending DCCP_OPT_CONFIRM on CCID %u\n", val[0]));
-					dccp_remove_feature(dp, DCCP_OPT_PREFER, DCCP_FEATURE_CC);
-					dccp_remove_feature(dp, DCCP_OPT_CONFIRM, DCCP_FEATURE_CC);
-					dccp_add_feature_option(dp, DCCP_OPT_CONFIRM, DCCP_FEATURE_CC , val, 1);
+					DCCP_DEBUG((LOG_INFO, "Sending DCCP_OPT_CONFIRM_L on CCID %u\n", val[0]));
+//					dccp_remove_feature(dp, DCCP_OPT_PREFER, DCCP_FEATURE_CC);
+					dccp_remove_feature(dp, DCCP_OPT_CONFIRM_L, DCCP_FEATURE_CC);
+					dccp_add_feature_option(dp, DCCP_OPT_CONFIRM_L, DCCP_FEATURE_CC , val, 1);
 					if (dp->cc_in_use[0] < 1) {
 						dp->cc_state[0] = (*cc_sw[val[0] + 1].cc_send_init)(dp);
 						dp->cc_in_use[0] = val[0] + 1;
@@ -3304,6 +3316,7 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 						DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!!\n"));
 					}
 				}
+#if 0
 			} else if (opt == DCCP_OPT_PREFER) {
 				if (val[0] == 2 || val[0] == 3 || val[0] == 0) {
 					DCCP_DEBUG((LOG_INFO, "Sending DCCP_OPT_CHANGE on CCID %u\n", val[0]));
@@ -3316,9 +3329,10 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 						DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!! %d\n", dp->cc_in_use[1]));
 					}
 				}
-			} else if (opt == DCCP_OPT_CONFIRM) {
-				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_CONFIRM on CCID %u\n", val[0]));
-				dccp_remove_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC);
+#endif
+			} else if (opt == DCCP_OPT_CONFIRM_L) {
+				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_CONFIRM_L on CCID %u\n", val[0]));
+				dccp_remove_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC);
 				if (dp->cc_in_use[1] < 1) {
 					dp->cc_state[1] = (*cc_sw[val[0] + 1].cc_recv_init)(dp);
 					dp->cc_in_use[1] = val[0] + 1;
@@ -3332,29 +3346,31 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 
 		case DCCP_FEATURE_ACKVECTOR:
 			ACK_DEBUG((LOG_INFO, "Got _Use Ack Vector_\n"));
-			if (opt == DCCP_OPT_CHANGE) {
+			if (opt == DCCP_OPT_CHANGE_R) {
 				if (val[0] == 1) {
 					dccp_use_ackvector(dp);
-					dccp_remove_feature(dp, DCCP_OPT_CONFIRM, DCCP_FEATURE_ACKVECTOR);
-					dccp_add_feature_option(dp, DCCP_OPT_CONFIRM, DCCP_FEATURE_ACKVECTOR , val, 1);
+					dccp_remove_feature(dp, DCCP_OPT_CONFIRM_L, DCCP_FEATURE_ACKVECTOR);
+					dccp_add_feature_option(dp, DCCP_OPT_CONFIRM_L, DCCP_FEATURE_ACKVECTOR , val, 1);
 				} else {
 					ACK_DEBUG((LOG_INFO, "ERROR. Strange val %u\n", val[0]));
 				}
-			} else if (opt == DCCP_OPT_CONFIRM) {
-					dccp_remove_feature(dp, DCCP_OPT_CONFIRM, DCCP_FEATURE_ACKVECTOR);
+			} else if (opt == DCCP_OPT_CONFIRM_L) {
+					dccp_remove_feature(dp, DCCP_OPT_CONFIRM_L, DCCP_FEATURE_ACKVECTOR);
 			if (val[0] == 1) {
 					dp->remote_ackvector = 1;
 					ACK_DEBUG((LOG_INFO,"Remote side confirmed AckVector usage\n"));
 				} else {
 					ACK_DEBUG((LOG_INFO, "ERROR. Strange val %u\n", val[0]));
 				}
+#if 0
 			} else if (opt == DCCP_OPT_PREFER) {
 				ACK_DEBUG((LOG_INFO, "Prefer Ack Vector? MENTAL!!!!\n"));
+#endif
 			}
 			break;
 			
 		case DCCP_FEATURE_ACKRATIO:
-			if (opt == DCCP_OPT_CHANGE) {
+			if (opt == DCCP_OPT_CHANGE_R) {
 				bcopy(val , &(dp->ack_ratio), 1);
 				ACK_DEBUG((LOG_INFO, "Feature: Change Ack Ratio to %u\n", dp->ack_ratio));
 			}
@@ -3363,9 +3379,11 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 		case DCCP_FEATURE_ECN:
 		case DCCP_FEATURE_MOBILITY:
 		default:
+#if 0
 			ignored[0] = opt;
 			ignored[1] = feature;
 			dccp_add_option(dp, DCCP_OPT_IGNORED, ignored, 2);
+#endif
 		break;
 
 	}

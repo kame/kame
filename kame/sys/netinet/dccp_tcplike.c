@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.18 2005/07/22 09:31:14 nishida Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.19 2005/07/27 06:27:25 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -144,8 +144,8 @@ tcplike_rto_timeout(void *ccb)
 	cb->ack_miss = 0;
 
 	cb->rcvr_ackratio = 1; /* Constraint 2 & 3. We need ACKs asap */
-	dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO);
-	dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO,
+	dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKRATIO);
+	dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKRATIO,
 				 (char *) &cb->rcvr_ackratio, 1);
 	cb->acked_in_win = 0;
 	cb->acked_windows = 0;
@@ -389,8 +389,8 @@ tcplike_send_packet(void *ccb, long datasize)
 	feature[0] = 1;
 	if (cb->pcb->remote_ackvector == 0) {
 		ACK_DEBUG((LOG_INFO, "Adding Change(Use Ack Vector, 1) to outgoing packet\n"));
-		dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKVECTOR);
-		dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKVECTOR, feature, 1);
+		dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKVECTOR);
+		dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKVECTOR, feature, 1);
 	}
 	
 	/* untimeout any active timer */
@@ -449,7 +449,7 @@ tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize)
 	_add_to_cwndvector(cb, cb->pcb->seq_snd);
 	CWND_DEBUG((LOG_INFO, "Sent. CWND value: %u , OUTSTANDING value: %u\n",cb->cwnd, cb->outstanding));
 	
-	dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO);
+	dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKRATIO);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
 #endif
@@ -660,8 +660,8 @@ tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 		if (cb->rcvr_ackratio == 0)
 			cb->rcvr_ackratio = 1;
 		ACKRATIO_DEBUG((LOG_INFO, "Increase Ack Ratio. Now = %u. (cwnd = %u)\n", cb->rcvr_ackratio, cb->cwnd));
-		dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO);
-		dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO,
+		dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKRATIO);
+		dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKRATIO,
 				 (char *) &cb->rcvr_ackratio, 1);
 
 		cb->ack_miss = 0;
@@ -687,8 +687,8 @@ tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 				/* Constraint 3 - AckRatio at least 2 for a cwnd >= 4 */
 				cb->rcvr_ackratio--;
 				ACKRATIO_DEBUG((LOG_INFO, "Decrease ackratio by 1, now: %u\n", cb->rcvr_ackratio));
-				dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO);
-				dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO,
+				dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKRATIO);
+				dccp_add_feature(cb->pcb, DCCP_OPT_CHANGE_R, DCCP_FEATURE_ACKRATIO,
 						 (char *) &cb->rcvr_ackratio, 1);
 			}
 			cb->acked_in_win = 0;
