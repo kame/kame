@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.42 2005/07/27 00:18:22 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.43 2005/07/27 01:02:14 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -940,12 +940,6 @@ mld_fasttimeo()
 		mld_sendbuf(sm, ifp);
 
 	splx(s);
-}
-
-void
-mld_slowtimeo()
-{
-	return;
 }
 
 static void

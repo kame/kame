@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.160 2005/05/12 18:41:18 suz Exp $	*/
+/*	$KAME: in6_proto.c,v 1.161 2005/07/27 01:02:14 suz Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -368,11 +368,7 @@ struct ip6protosw inet6sw[] = {
 #else
   rip6_usrreq,
 #endif
-#ifdef MLDV2
-  icmp6_init,	icmp6_fasttimo,	icmp6_slowtimo,	nd6_drain,
-#else
   icmp6_init,	icmp6_fasttimo,	0,		nd6_drain,
-#endif
 #ifdef __OpenBSD__
   icmp6_sysctl,
 #elif defined(__FreeBSD__)
