@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.44 2005/07/27 01:10:20 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.45 2005/07/27 06:19:27 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -224,8 +224,8 @@ static const int addrlen = sizeof(struct in6_addr);
 #ifdef SYSCTL_DECL
 SYSCTL_DECL(_net_inet6_icmp6);
 #endif
-SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_MAXSRCFILTER, mld_maxsrcfilter, CTLFLAG_RW,
-	&mldmaxsrcfilter, IP_MAX_SOURCE_FILTER, "");
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_MAXSRCFILTER, mld_maxsrcfilter,
+	CTLFLAG_RW, &mldmaxsrcfilter, IP_MAX_SOURCE_FILTER, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_SOMAXSRC, mld_somaxsrc, CTLFLAG_RW,
 	&mldsomaxsrc, SO_MAX_SOURCE_FILTER, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_VERSION, mld_version, CTLFLAG_RW,
@@ -259,13 +259,19 @@ static u_long mld_group_timerresid(struct in6_multi *);
 static void mld_interface_timeo(struct router6_info *rt6i);
 static void mld_unset_hostcompat_timeo(struct router6_info *);
 static void mld_sendbuf(struct mbuf *, struct ifnet *);
-static int mld_set_timer(struct ifnet *, struct router6_info *, struct mld_hdr *,
-		  u_int16_t, u_int8_t);
+static int mld_set_timer(struct ifnet *, struct router6_info *,
+	struct mld_hdr *, u_int16_t, u_int8_t);
 static void mld_set_hostcompat(struct ifnet *, struct router6_info *, int);
-static int mld_record_queried_source(struct in6_multi *, struct mld_hdr *, u_int16_t);
+static int mld_record_queried_source(struct in6_multi *, struct mld_hdr *,
+	u_int16_t);
 static void mld_send_all_current_state_report(struct ifnet *);
-static int mld_send_current_state_report(struct mbuf **, int *, struct in6_multi *);
+static int mld_send_current_state_report(struct mbuf **, int *,
+	struct in6_multi *);
+static void mld_send_state_change_report(struct mbuf **, int *,
+	struct in6_multi *, u_int8_t, int);
 
+static void mld_start_listening(struct in6_multi *, u_int8_t);
+static void mld_stop_listening(struct in6_multi *);
 static void mld_sendpkt(struct in6_multi *, int, const struct in6_addr *);
 
 static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
@@ -273,7 +279,7 @@ static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
 static struct router6_info *find_rt6i(struct ifnet *);
 static struct router6_info *init_rt6i(struct ifnet *);
 static int mld_create_group_record(struct mbuf *, int *, struct in6_multi *,
-			    u_int16_t, u_int16_t *, u_int8_t);
+	u_int16_t, u_int16_t *, u_int8_t);
 static void mld_cancel_pending_response(struct ifnet *, struct router6_info *);
 
 void
@@ -480,7 +486,7 @@ mld_group_timerresid(in6m)
 }
 
 
-void
+static void
 mld_start_listening(in6m, type)
 	struct in6_multi *in6m;
 	u_int8_t type;			/* State-Change report type */
@@ -537,7 +543,7 @@ mld_start_listening(in6m, type)
 	splx(s);
 }
 
-void
+static void
 mld_stop_listening(in6m)
 	struct in6_multi *in6m;
 {
@@ -1645,7 +1651,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
  * there is also a pending Filter-Mode-Change report for the group, Source-
  * List-Change report is not sent and kept as a scheduled report.
  */
-void
+static void
 mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	struct mbuf **m0;
 	int *buflenp;

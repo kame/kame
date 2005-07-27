@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.113 2005/07/27 00:18:22 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.114 2005/07/27 06:19:27 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -169,6 +169,7 @@ static const int ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) &
 			    ~IN6_IFF_TENTATIVE;
 
 static void mld_start_listening(struct in6_multi *);
+static void mld_stop_listening(struct in6_multi *);
 static void mld_sendpkt(struct in6_multi *, int, const struct in6_addr *);
 
 static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
@@ -338,7 +339,7 @@ mld_start_listening(in6m)
 	splx(s);
 }
 
-void
+static void
 mld_stop_listening(in6m)
 	struct in6_multi *in6m;
 {
