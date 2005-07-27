@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.43 2005/07/27 01:02:14 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.44 2005/07/27 01:10:20 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -843,8 +843,8 @@ mld_fasttimeo()
 	struct in6_multi *in6m;
 	struct in6_multistep step;
 	struct ifnet *ifp = NULL;
-	struct mbuf *cm, *sm;
-	int cbuflen, sbuflen;
+	struct mbuf *sm;
+	int sbuflen;
 	int s;
 
 	/*
@@ -861,8 +861,8 @@ mld_fasttimeo()
 #endif
 
 	mld_state_change_timers_are_running = 0;
-	cm = sm = NULL;
-	cbuflen = sbuflen = 0;
+	sm = NULL;
+	sbuflen = 0;
 	IN6_FIRST_MULTI(step, in6m);
 	if (in6m == NULL) {
 		splx(s);
@@ -870,19 +870,6 @@ mld_fasttimeo()
 	}
 	ifp = in6m->in6m_ifp;
 	while (in6m != NULL) {
-		/* Current-State Record timer */
-		if (in6m->in6m_state == MLD_G_QUERY_PENDING_MEMBER ||
-		   in6m->in6m_state == MLD_SG_QUERY_PENDING_MEMBER) {
-			if (cm != NULL && ifp != in6m->in6m_ifp) {
-				mldlog((LOG_DEBUG, "mld_fasttimeo: v2 report\n"));
-				mld_sendbuf(cm, ifp);
-				cm = NULL;
-			}
-			mld_send_current_state_report(&cm, &cbuflen, in6m);
-			ifp = in6m->in6m_ifp;
-			in6m->in6m_state = MLD_OTHERLISTENER;
-		}
-
 		/* State-Change Record timer */
 		if (!in6_is_mld_target(&in6m->in6m_addr))
 			goto next_in6m; /* skip */
@@ -934,8 +921,6 @@ mld_fasttimeo()
 		IN6_NEXT_MULTI(step, in6m);
 	}
 
-	if (cm != NULL)
-		mld_sendbuf(cm, ifp);
 	if (sm != NULL)
 		mld_sendbuf(sm, ifp);
 
