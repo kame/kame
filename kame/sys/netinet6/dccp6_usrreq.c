@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.12 2005/06/20 17:04:44 nishida Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.13 2005/07/27 08:42:56 nishida Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -325,6 +325,7 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 
 	test[0] = dp->pref_cc;
+#if 0
 	/* FIX THIS LATER */
 	if (dp->pref_cc == 2) {
 		test[1] = 3;
@@ -333,6 +334,10 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	}
 	dccp_add_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC, test, 2);
 	dccp_add_feature(dp, DCCP_OPT_PREFER, DCCP_FEATURE_CC, test, 2);
+#else
+	 /* we only support CCID2 at this moment */
+	dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 1);
+#endif
 
 	error = dccp_output(dp, 0);
 
