@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.478 2005/07/26 18:14:59 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.479 2005/07/27 00:08:27 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4193,6 +4193,7 @@ ip6_setmoptions(optname, im6op, m)
 			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
 			    		       &SIN6(&ss_grp)->sin6_addr))
 				break;
+		}
 
 		if (imm == NULL) {
 			error = EADDRNOTAVAIL;
