@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.217 2005/07/18 05:23:47 suz Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.218 2005/07/27 08:17:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -616,14 +616,6 @@ getaddrinfo(hostname, servname, hints, res)
 			pai->ai_family = afd->a_af;
 
 		if (hostname == NULL) {
-#if 0
-			/*
-			 * filter out AFs that are not supported by the kernel
-			 * XXX errno?
-			 */
-			if (!addrconfig(pai->ai_family, &ac))
-				continue;
-#endif
 			error = explore_null(pai, servname,
 			    &afailist[afd - afdl]);
 
