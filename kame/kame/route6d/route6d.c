@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.108 2005/07/26 08:21:28 jinmei Exp $	*/
+/*	$KAME: route6d.c,v 1.109 2005/07/28 07:15:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.108 2005/07/26 08:21:28 jinmei Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.109 2005/07/28 07:15:38 jinmei Exp $";
 #endif
 
 #include <stdio.h>
@@ -1044,7 +1044,6 @@ sendpacket(sin6, len, index)
 	struct iovec iov[2];
 	u_char cmsgbuf[256];
 	struct in6_pktinfo *pi;
-	int idx;
 	struct sockaddr_in6 sincopy;
 
 	/* do not overwrite the given sin */
@@ -1068,7 +1067,7 @@ sendpacket(sin6, len, index)
 		cm->cmsg_type = IPV6_PKTINFO;
 		pi = (struct in6_pktinfo *)CMSG_DATA(cm);
 		memset(&pi->ipi6_addr, 0, sizeof(pi->ipi6_addr)); /*::*/
-		pi->ipi6_ifindex = idx;
+		pi->ipi6_ifindex = index;
 	} else {
 		m.msg_control = NULL;
 		m.msg_controllen = 0;
@@ -1491,6 +1490,7 @@ ifconfig()
 			}
 			memset(ifcp, 0, sizeof(*ifcp));
 			ifcp->ifc_index = if_nametoindex(ifa->ifa_name);
+			setindex2ifc(ifcp->ifc_index, ifcp);
 			memcpy(&ifcp->ifc_ripsin, &ripsin, ripsin.ss_len);
 			/*
 			 * XXX: using interface index for the link ID is not
