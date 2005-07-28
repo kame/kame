@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.59 2005/07/27 08:42:06 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.60 2005/07/28 16:08:17 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -605,6 +605,7 @@ dccp_input(struct mbuf *m, ...)
 			in6p->in6p_faddr = ip6->ip6_src;
 			in6p->in6p_lport = dh->dh_dport;
 			in6p->in6p_fport = dh->dh_sport;
+			in6_pcbstate(in6p, IN6P_CONNECTED);
 #else
 			inp->in6p_laddr = ip6->ip6_dst;
 			inp->in6p_faddr = ip6->ip6_src;
