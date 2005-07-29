@@ -6,3 +6,6 @@ include	"arch/macppc/conf/GENERIC"
 #options	MIP6			# required for all node types
 #pseudo-device	mip	1		# required for a mobile node
 #options	MIP6_DEBUG
+
+# Router Preference on host side
+option		RTPREF

@@ -21,3 +21,4 @@ options 	ALTQ_PRIQ	#priority queue
 #options 	ALTQ_DEBUG	#for debugging
 
 options 	TCP_ECN		# ECN support in TCP
+options		RTPREF		#router preference on host side

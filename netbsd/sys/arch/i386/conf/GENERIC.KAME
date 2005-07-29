@@ -15,7 +15,7 @@ options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
 
 # Router Preference on host side
-#options 	RTPREF
+options 	RTPREF
 
 # ALTQ options
 #options 	ALTQ		#alternate queueing

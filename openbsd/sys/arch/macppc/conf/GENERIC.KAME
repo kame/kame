@@ -16,6 +16,9 @@ option		SCTP		# adds SCTP stack to kernel - requires INET6
 # multipath support in radix routing table
 #option		RADIX_MPATH
 
+# Router Preference on host side
+option		RTPREF
+
 # Source-Specific Multicast (SSM)
 #option 	IGMPV3		# IPv4
 #option 	MLDV2		# IPv6
