@@ -370,6 +370,7 @@ if_attach(struct ifnet *ifp)
 
 	TASK_INIT(&ifp->if_starttask, 0, if_start_deferred, ifp);
 	IF_AFDATA_LOCK_INIT(ifp);
+	IF_ADDR_LOCK_INIT(ifp);
 	ifp->if_afdata_initialized = 0;
 	IFNET_WLOCK();
 	TAILQ_INSERT_TAIL(&ifnet, ifp, if_link);
@@ -1662,97 +1663,231 @@ if_allmulti(struct ifnet *ifp, int onswitch)
 	return error;
 }
 
-/*
- * Add a multicast listenership to the interface in question.
- * The link layer provides a routine which converts
- */
-int
-if_addmulti(struct ifnet *ifp, struct sockaddr *sa, struct ifmultiaddr **retifma)
+struct ifmultiaddr *
+ifmaof_ifpforaddr(struct sockaddr *sa, struct ifnet *ifp)
 {
-	struct sockaddr *llsa, *dupsa;
-	int error, s;
 	struct ifmultiaddr *ifma;
 
-	/*
-	 * If the matching multicast address already exists
-	 * then don't add a new one, just add a reference
-	 */
+	IF_ADDR_LOCK_ASSERT(ifp);
+
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (equal(sa, ifma->ifma_addr)) {
-			ifma->ifma_refcount++;
-			if (retifma)
-				*retifma = ifma;
-			return 0;
-		}
+		if (bcmp(ifma->ifma_addr, sa, sa->sa_len) == 0)
+			break;
+	}
+
+	return ifma;
+}
+
+/*
+ * XXXRW: ifmaof_ifpforaddr() is an unsensible name, and appears not to be
+ * used, so use my more sensibly named version here.
+ */
+static struct ifmultiaddr *
+if_findmulti(struct ifnet *ifp, struct sockaddr *sa)
+{
+
+	IF_ADDR_LOCK_ASSERT(ifp);
+
+	return (ifmaof_ifpforaddr(sa, ifp));
+}
+
+/*
+ * Allocate a new ifmultiaddr and initialize based on passed arguments.  We
+ * make copies of passed sockaddrs.  The ifmultiaddr will not be added to
+ * the ifnet multicast address list here, so the caller must do that and
+ * other setup work (such as notifying the device driver).  The reference
+ * count is initialized to 1.
+ */
+static struct ifmultiaddr *
+if_allocmulti(struct ifnet *ifp, struct sockaddr *sa, struct sockaddr *llsa,
+    int mflags)
+{
+	struct ifmultiaddr *ifma;
+	struct sockaddr *dupsa;
+
+	MALLOC(ifma, struct ifmultiaddr *, sizeof *ifma, M_IFMADDR, mflags |
+	    M_ZERO);
+	if (ifma == NULL)
+		return (NULL);
+
+	MALLOC(dupsa, struct sockaddr *, sa->sa_len, M_IFMADDR, mflags);
+	if (dupsa == NULL) {
+		FREE(ifma, M_IFMADDR);
+		return (NULL);
+	}
+	bcopy(sa, dupsa, sa->sa_len);
+	ifma->ifma_addr = dupsa;
+
+	ifma->ifma_ifp = ifp;
+	ifma->ifma_refcount = 1;
+	ifma->ifma_protospec = NULL;
+
+	if (llsa == NULL) {
+		ifma->ifma_lladdr = NULL;
+		return (ifma);
+	}
+
+	MALLOC(dupsa, struct sockaddr *, llsa->sa_len, M_IFMADDR, mflags);
+	if (dupsa == NULL) {
+		FREE(ifma->ifma_addr, M_IFMADDR);
+		FREE(ifma, M_IFMADDR);
+		return (NULL);
+	}
+	bcopy(llsa, dupsa, llsa->sa_len);
+	ifma->ifma_lladdr = dupsa;
+
+	return (ifma);
+}
+
+/*
+ * if_freemulti: free ifmultiaddr structure and possibly attached related
+ * addresses.  The caller is responsible for implementing reference
+ * counting, notifying the driver, handling routing messages, and releasing
+ * any dependent link layer state.
+ */
+static void
+if_freemulti(struct ifmultiaddr *ifma)
+{
+
+	KASSERT(ifma->ifma_refcount == 1, ("if_freemulti: refcount %d",
+	    ifma->ifma_refcount));
+	KASSERT(ifma->ifma_protospec == NULL,
+	    ("if_freemulti: protospec not NULL"));
+
+	if (ifma->ifma_lladdr != NULL)
+		FREE(ifma->ifma_lladdr, M_IFMADDR);
+	FREE(ifma->ifma_addr, M_IFMADDR);
+	FREE(ifma, M_IFMADDR);
+}
+
+/*
+ * Register an additional multicast address with a network interface.
+ *
+ * - If the address is already present, bump the reference count on the
+ *   address and return.
+ * - If the address is not link-layer, look up a link layer address.
+ * - Allocate address structures for one or both addresses, and attach to the
+ *   multicast address list on the interface.  If automatically adding a link
+ *   layer address, the protocol address will own a reference to the link
+ *   layer address, to be freed when it is freed.
+ * - Notify the network device driver of an addition to the multicast address
+ *   list.
+ *
+ * 'sa' points to caller-owned memory with the desired multicast address.
+ *
+ * 'retifma' will be used to return a pointer to the resulting multicast
+ * address reference, if desired.
+ */
+int
+if_addmulti(struct ifnet *ifp, struct sockaddr *sa,
+    struct ifmultiaddr **retifma)
+{
+ 	struct ifmultiaddr *ifma, *ll_ifma;
+ 	struct sockaddr *llsa;
+ 	int error;
+
+	/*
+ 	 * If the address is already present, return a new reference to it;
+ 	 * otherwise, allocate storage and set up a new address.
+	 */
+	IF_ADDR_LOCK(ifp);
+	ifma = if_findmulti(ifp, sa);
+ 	if (ifma != NULL) {
+ 		ifma->ifma_refcount++;
+ 		if (retifma != NULL)
+ 			*retifma = ifma;
+ 		IF_ADDR_UNLOCK(ifp);
+ 		return (0);
 	}
 
 	/*
-	 * Give the link layer a chance to accept/reject it, and also
-	 * find out which AF_LINK address this maps to, if it isn't one
-	 * already.
+ 	 * The address isn't already present; resolve the protocol address
+ 	 * into a link layer address, and then look that up, bump its
+ 	 * refcount or allocate an ifma for that also.  If 'llsa' was
+ 	 * returned, we will need to free it later.
 	 */
+ 	llsa = NULL;
+ 	ll_ifma = NULL;
 	if (ifp->if_resolvemulti) {
 		error = ifp->if_resolvemulti(ifp, &llsa, sa);
-		if (error) return error;
+ 		if (error)
+ 			goto unlock_out;
 	} else {
 		llsa = 0;
 	}
 
-	MALLOC(ifma, struct ifmultiaddr *, sizeof *ifma, M_IFMADDR, M_WAITOK);
-	MALLOC(dupsa, struct sockaddr *, sa->sa_len, M_IFMADDR, M_WAITOK);
-	bcopy(sa, dupsa, sa->sa_len);
-
-	ifma->ifma_addr = dupsa;
-	ifma->ifma_lladdr = llsa;
-	ifma->ifma_ifp = ifp;
-	ifma->ifma_refcount = 1;
-	ifma->ifma_protospec = 0;
-	rt_newmaddrmsg(RTM_NEWMADDR, ifma);
+ 	/*
+ 	 * Allocate the new address.  Don't hook it up yet, as we may also
+ 	 * need to allocate a link layer multicast address.
+ 	 */
+ 	ifma = if_allocmulti(ifp, sa, llsa, M_NOWAIT);
+ 	if (ifma == NULL) {
+ 		error = ENOMEM;
+ 		goto free_llsa_out;
+ 	}
 
 	/*
-	 * Some network interfaces can scan the address list at
-	 * interrupt time; lock them out.
+	 * If a link layer address is found, we'll need to see if it's
+	 * already present in the address list, or allocate is as well.
+	 * When this block finishes, the link layer address will be on the
+	 * list.
 	 */
-	s = splimp();
-	TAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ifma, ifma_link);
-	splx(s);
+	if (llsa != NULL) {
+		ll_ifma = if_findmulti(ifp, llsa);
+		if (ll_ifma == NULL) {
+			ll_ifma = if_allocmulti(ifp, llsa, NULL, M_NOWAIT);
+			if (ll_ifma == NULL) {
+				if_freemulti(ifma);
+				error = ENOMEM;
+				goto free_llsa_out;
+			}
+			TAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ll_ifma,
+			    ifma_link);
+		} else
+			ll_ifma->ifma_refcount++;
+	}
+ 
+ 	/*
+	 * We now have a new multicast address, ifma, and possibly a new or
+	 * referenced link layer address.  Add the primary address to the
+	 * ifnet address list.
+  	 */
+ 	TAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ifma, ifma_link);
+
 	if (retifma != NULL)
 		*retifma = ifma;
 
-	if (llsa != 0) {
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-			if (equal(ifma->ifma_addr, llsa))
-				break;
-		}
-		if (ifma) {
-			ifma->ifma_refcount++;
-		} else {
-			MALLOC(ifma, struct ifmultiaddr *, sizeof *ifma,
-			       M_IFMADDR, M_WAITOK);
-			MALLOC(dupsa, struct sockaddr *, llsa->sa_len,
-			       M_IFMADDR, M_WAITOK);
-			bcopy(llsa, dupsa, llsa->sa_len);
-			ifma->ifma_addr = dupsa;
-			ifma->ifma_lladdr = NULL;
-			ifma->ifma_ifp = ifp;
-			ifma->ifma_refcount = 1;
-			ifma->ifma_protospec = 0;
-			s = splimp();
-			TAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ifma, ifma_link);
-			splx(s);
-		}
-	}
 	/*
-	 * We are certain we have added something, so call down to the
-	 * interface to let them know about it.
+	 * Must generate the message while holding the lock so that 'ifma'
+	 * pointer is still valid.
+	 *
+	 * XXXRW: How come we don't announce ll_ifma?
 	 */
-	s = splimp();
-	IFF_LOCKGIANT(ifp);
-	ifp->if_ioctl(ifp, SIOCADDMULTI, 0);
-	IFF_UNLOCKGIANT(ifp);
-	splx(s);
+	rt_newmaddrmsg(RTM_NEWMADDR, ifma);
+	IF_ADDR_UNLOCK(ifp);
 
-	return 0;
+  	/*
+  	 * We are certain we have added something, so call down to the
+  	 * interface to let them know about it.
+  	 */
+  	if (ifp->if_ioctl != NULL) {
+  		IFF_LOCKGIANT(ifp);
+  		(void) (*ifp->if_ioctl)(ifp, SIOCADDMULTI, 0);
+  		IFF_UNLOCKGIANT(ifp);
+  	}
+  
+	if (llsa != NULL)
+		FREE(llsa, M_IFMADDR);
+
+	return (0);
+
+free_llsa_out:
+	if (llsa != NULL)
+		FREE(llsa, M_IFMADDR);
+
+unlock_out:
+	IF_ADDR_UNLOCK(ifp);
+	return (error);
 }
 
 /*
@@ -1762,70 +1897,53 @@ if_addmulti(struct ifnet *ifp, struct sockaddr *sa, struct ifmultiaddr **retifma
 int
 if_delmulti(struct ifnet *ifp, struct sockaddr *sa)
 {
-	struct ifmultiaddr *ifma;
-	int s;
+	struct ifmultiaddr *ifma, *ll_ifma;
 
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
-		if (equal(sa, ifma->ifma_addr))
-			break;
-	if (ifma == 0)
+	IF_ADDR_LOCK(ifp);
+	ifma = if_findmulti(ifp, sa);
+	if (ifma == NULL) {
+		IF_ADDR_UNLOCK(ifp);
 		return ENOENT;
-
-	if (ifma->ifma_refcount > 1) {
-		ifma->ifma_refcount--;
-		return 0;
 	}
 
+	if (ifma->ifma_refcount > 1) {
+  		ifma->ifma_refcount--;
+		IF_ADDR_UNLOCK(ifp);
+		return 0;
+	}
+  
+  	sa = ifma->ifma_lladdr;
+	if (sa != NULL)
+		ll_ifma = if_findmulti(ifp, sa);
+	else
+		ll_ifma = NULL;
+
+	/*
+	 * XXXRW: How come we don't announce ll_ifma?
+	 */
 	rt_newmaddrmsg(RTM_DELMADDR, ifma);
-	sa = ifma->ifma_lladdr;
-	s = splimp();
+
 	TAILQ_REMOVE(&ifp->if_multiaddrs, ifma, ifma_link);
+	if_freemulti(ifma);
+
+	if (ll_ifma != NULL) {
+		if (ll_ifma->ifma_refcount == 1) {
+			TAILQ_REMOVE(&ifp->if_multiaddrs, ll_ifma, ifma_link);
+			if_freemulti(ll_ifma);
+		} else
+			ll_ifma->ifma_refcount--;
+	}
+	IF_ADDR_UNLOCK(ifp);
+
 	/*
 	 * Make sure the interface driver is notified
 	 * in the case of a link layer mcast group being left.
 	 */
-	if (ifma->ifma_addr->sa_family == AF_LINK && sa == 0) {
+	if (ifp->if_ioctl) {
 		IFF_LOCKGIANT(ifp);
-		ifp->if_ioctl(ifp, SIOCDELMULTI, 0);
+		(void) (*ifp->if_ioctl)(ifp, SIOCDELMULTI, 0);
 		IFF_UNLOCKGIANT(ifp);
 	}
-	splx(s);
-	free(ifma->ifma_addr, M_IFMADDR);
-	free(ifma, M_IFMADDR);
-	if (sa == 0)
-		return 0;
-
-	/*
-	 * Now look for the link-layer address which corresponds to
-	 * this network address.  It had been squirreled away in
-	 * ifma->ifma_lladdr for this purpose (so we don't have
-	 * to call ifp->if_resolvemulti() again), and we saved that
-	 * value in sa above.  If some nasty deleted the
-	 * link-layer address out from underneath us, we can deal because
-	 * the address we stored was is not the same as the one which was
-	 * in the record for the link-layer address.  (So we don't complain
-	 * in that case.)
-	 */
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
-		if (equal(sa, ifma->ifma_addr))
-			break;
-	if (ifma == 0)
-		return 0;
-
-	if (ifma->ifma_refcount > 1) {
-		ifma->ifma_refcount--;
-		return 0;
-	}
-
-	s = splimp();
-	TAILQ_REMOVE(&ifp->if_multiaddrs, ifma, ifma_link);
-	IFF_LOCKGIANT(ifp);
-	ifp->if_ioctl(ifp, SIOCDELMULTI, 0);
-	IFF_UNLOCKGIANT(ifp);
-	splx(s);
-	free(ifma->ifma_addr, M_IFMADDR);
-	free(sa, M_IFMADDR);
-	free(ifma, M_IFMADDR);
 
 	return 0;
 }
@@ -1899,18 +2017,6 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 #endif
 	}
 	return (0);
-}
-
-struct ifmultiaddr *
-ifmaof_ifpforaddr(struct sockaddr *sa, struct ifnet *ifp)
-{
-	struct ifmultiaddr *ifma;
-
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
-		if (equal(ifma->ifma_addr, sa))
-			break;
-
-	return ifma;
 }
 
 /*

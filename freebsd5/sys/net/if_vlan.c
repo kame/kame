@@ -190,21 +190,27 @@ vlan_setmulti(struct ifnet *ifp)
 	}
 
 	/* Now program new ones. */
+	IF_ADDR_LOCK(ifp);
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		mc = malloc(sizeof(struct vlan_mc_entry), M_VLAN, M_NOWAIT);
-		if (mc == NULL)
+		if (mc == NULL) {
+			IF_ADDR_UNLOCK(ifp);
 			return (ENOMEM);
+		}
 		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
 		    (char *)&mc->mc_addr, ETHER_ADDR_LEN);
 		SLIST_INSERT_HEAD(&sc->vlan_mc_listhead, mc, mc_entries);
 		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
 		    LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_addmulti(ifp_p, (struct sockaddr *)&sdl, &rifma);
-		if (error)
+		if (error) {
+			IF_ADDR_UNLOCK(ifp);
 			return (error);
+		}
 	}
+	IF_ADDR_UNLOCK(ifp);
 
 	return (0);
 }

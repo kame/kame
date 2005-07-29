@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -28,9 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_wb.c,v 1.50 2002/11/14 23:49:09 sam Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.73.2.3 2005/03/01 08:11:52 imp Exp $");
 
 /*
  * Winbond fast ethernet PCI NIC driver
@@ -43,7 +44,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * The Winbond W89C840F chip is a bus master; in some ways it resembles
  * a DEC 'tulip' chip, only not as complicated. Unfortunately, it has
@@ -90,6 +90,7 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
@@ -111,8 +112,8 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -124,12 +125,9 @@
 
 #include <pci/if_wbreg.h>
 
+MODULE_DEPEND(wb, pci, 1, 1, 1);
+MODULE_DEPEND(wb, ether, 1, 1, 1);
 MODULE_DEPEND(wb, miibus, 1, 1, 1);
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_wb.c,v 1.50 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -142,51 +140,48 @@ static struct wb_type wb_devs[] = {
 	{ 0, 0, NULL }
 };
 
-static int wb_probe		(device_t);
-static int wb_attach		(device_t);
-static int wb_detach		(device_t);
+static int wb_probe(device_t);
+static int wb_attach(device_t);
+static int wb_detach(device_t);
 
-static void wb_bfree		(void *addr, void *args);
-static int wb_newbuf		(struct wb_softc *,
-					struct wb_chain_onefrag *,
-					struct mbuf *);
-static int wb_encap		(struct wb_softc *, struct wb_chain *,
-					struct mbuf *);
+static void wb_bfree(void *addr, void *args);
+static int wb_newbuf(struct wb_softc *, struct wb_chain_onefrag *,
+		struct mbuf *);
+static int wb_encap(struct wb_softc *, struct wb_chain *, struct mbuf *);
 
-static void wb_rxeof		(struct wb_softc *);
-static void wb_rxeoc		(struct wb_softc *);
-static void wb_txeof		(struct wb_softc *);
-static void wb_txeoc		(struct wb_softc *);
-static void wb_intr		(void *);
-static void wb_tick		(void *);
-static void wb_start		(struct ifnet *);
-static int wb_ioctl		(struct ifnet *, u_long, caddr_t);
-static void wb_init		(void *);
-static void wb_stop		(struct wb_softc *);
-static void wb_watchdog		(struct ifnet *);
-static void wb_shutdown		(device_t);
-static int wb_ifmedia_upd	(struct ifnet *);
-static void wb_ifmedia_sts	(struct ifnet *, struct ifmediareq *);
+static void wb_rxeof(struct wb_softc *);
+static void wb_rxeoc(struct wb_softc *);
+static void wb_txeof(struct wb_softc *);
+static void wb_txeoc(struct wb_softc *);
+static void wb_intr(void *);
+static void wb_tick(void *);
+static void wb_start(struct ifnet *);
+static int wb_ioctl(struct ifnet *, u_long, caddr_t);
+static void wb_init(void *);
+static void wb_stop(struct wb_softc *);
+static void wb_watchdog(struct ifnet *);
+static void wb_shutdown(device_t);
+static int wb_ifmedia_upd(struct ifnet *);
+static void wb_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
-static void wb_eeprom_putbyte	(struct wb_softc *, int);
-static void wb_eeprom_getword	(struct wb_softc *, int, u_int16_t *);
-static void wb_read_eeprom	(struct wb_softc *, caddr_t, int, int, int);
-static void wb_mii_sync		(struct wb_softc *);
-static void wb_mii_send		(struct wb_softc *, u_int32_t, int);
-static int wb_mii_readreg	(struct wb_softc *, struct wb_mii_frame *);
-static int wb_mii_writereg	(struct wb_softc *, struct wb_mii_frame *);
+static void wb_eeprom_putbyte(struct wb_softc *, int);
+static void wb_eeprom_getword(struct wb_softc *, int, u_int16_t *);
+static void wb_read_eeprom(struct wb_softc *, caddr_t, int, int, int);
+static void wb_mii_sync(struct wb_softc *);
+static void wb_mii_send(struct wb_softc *, u_int32_t, int);
+static int wb_mii_readreg(struct wb_softc *, struct wb_mii_frame *);
+static int wb_mii_writereg(struct wb_softc *, struct wb_mii_frame *);
 
-static void wb_setcfg		(struct wb_softc *, u_int32_t);
-static u_int8_t wb_calchash	(caddr_t);
-static void wb_setmulti		(struct wb_softc *);
-static void wb_reset		(struct wb_softc *);
-static void wb_fixmedia		(struct wb_softc *);
-static int wb_list_rx_init	(struct wb_softc *);
-static int wb_list_tx_init	(struct wb_softc *);
+static void wb_setcfg(struct wb_softc *, u_int32_t);
+static void wb_setmulti(struct wb_softc *);
+static void wb_reset(struct wb_softc *);
+static void wb_fixmedia(struct wb_softc *);
+static int wb_list_rx_init(struct wb_softc *);
+static int wb_list_tx_init(struct wb_softc *);
 
-static int wb_miibus_readreg	(device_t, int, int);
-static int wb_miibus_writereg	(device_t, int, int, int);
-static void wb_miibus_statchg	(device_t);
+static int wb_miibus_readreg(device_t, int, int);
+static int wb_miibus_writereg(device_t, int, int, int);
+static void wb_miibus_statchg(device_t);
 
 #ifdef WB_USEIOSPACE
 #define WB_RES			SYS_RES_IOPORT
@@ -222,7 +217,7 @@ static driver_t wb_driver = {
 
 static devclass_t wb_devclass;
 
-DRIVER_MODULE(if_wb, pci, wb_driver, wb_devclass, 0, 0);
+DRIVER_MODULE(wb, pci, wb_driver, wb_devclass, 0, 0);
 DRIVER_MODULE(miibus, wb, miibus_driver, miibus_devclass, 0, 0);
 
 #define WB_SETBIT(sc, reg, x)				\
@@ -436,9 +431,9 @@ wb_mii_readreg(sc, frame)
 	/* Check for ack */
 	SIO_CLR(WB_SIO_MII_CLK);
 	DELAY(1);
+	ack = CSR_READ_4(sc, WB_SIO) & WB_SIO_MII_DATAOUT;
 	SIO_SET(WB_SIO_MII_CLK);
 	DELAY(1);
-	ack = CSR_READ_4(sc, WB_SIO) & WB_SIO_MII_DATAOUT;
 	SIO_CLR(WB_SIO_MII_CLK);
 	DELAY(1);
 	SIO_SET(WB_SIO_MII_CLK);
@@ -589,37 +584,6 @@ wb_miibus_statchg(dev)
 	return;
 }
 
-static u_int8_t wb_calchash(addr)
-	caddr_t			addr;
-{
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
-			crc <<= 1;
-			c >>= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/*
-	 * return the filter bit position
-	 * Note: I arrived at the following nonsense
-	 * through experimentation. It's not the usual way to
-	 * generate the bit position but it's the only thing
-	 * I could come up with that works.
-	 */
-	return(~(crc >> 26) & 0x0000003F);
-}
-
 /*
  * Program the 64-bit multicast hash filter.
  */
@@ -651,16 +615,19 @@ wb_setmulti(sc)
 	CSR_WRITE_4(sc, WB_MAR1, 0);
 
 	/* now program new ones */
+	IF_ADDR_LOCK(ifp);
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = wb_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ~ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
 			hashes[1] |= (1 << (h - 32));
 		mcnt++;
 	}
+	IF_ADDR_UNLOCK(ifp);
 
 	if (mcnt)
 		rxfilt |= WB_NETCFG_RX_MULTI;
@@ -805,7 +772,7 @@ wb_probe(dev)
 		if ((pci_get_vendor(dev) == t->wb_vid) &&
 		    (pci_get_device(dev) == t->wb_did)) {
 			device_set_desc(dev, t->wb_name);
-			return(0);
+			return (BUS_PROBE_DEFAULT);
 		}
 		t++;
 	}
@@ -822,7 +789,6 @@ wb_attach(dev)
 	device_t		dev;
 {
 	u_char			eaddr[ETHER_ADDR_LEN];
-	u_int32_t		command;
 	struct wb_softc		*sc;
 	struct ifnet		*ifp;
 	int			unit, error = 0, rid;
@@ -832,57 +798,13 @@ wb_attach(dev)
 
 	mtx_init(&sc->wb_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	WB_LOCK(sc);
-
-	/*
-	 * Handle power management nonsense.
-	 */
-
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		u_int32_t		iobase, membase, irq;
-
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, WB_PCI_LOIO, 4);
-		membase = pci_read_config(dev, WB_PCI_LOMEM, 4);
-		irq = pci_read_config(dev, WB_PCI_INTLINE, 4);
-
-		/* Reset the power state. */
-		printf("wb%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, WB_PCI_LOIO, iobase, 4);
-		pci_write_config(dev, WB_PCI_LOMEM, membase, 4);
-		pci_write_config(dev, WB_PCI_INTLINE, irq, 4);
-	}
-
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef WB_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("wb%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("wb%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#endif
 
 	rid = WB_RID;
-	sc->wb_res = bus_alloc_resource(dev, WB_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->wb_res = bus_alloc_resource_any(dev, WB_RES, &rid, RF_ACTIVE);
 
 	if (sc->wb_res == NULL) {
 		printf("wb%d: couldn't map ports/memory\n", unit);
@@ -895,23 +817,12 @@ wb_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->wb_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->wb_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->wb_irq == NULL) {
 		printf("wb%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->wb_irq, INTR_TYPE_NET,
-	    wb_intr, sc, &sc->wb_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
-		printf("wb%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
 
@@ -926,11 +837,6 @@ wb_attach(dev)
 	 */
 	wb_read_eeprom(sc, (caddr_t)&eaddr, 0, 3, 0);
 
-	/*
-	 * A Winbond chip was detected. Inform the world.
-	 */
-	printf("wb%d: Ethernet address: %6D\n", unit, eaddr, ":");
-
 	sc->wb_unit = unit;
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
@@ -939,9 +845,6 @@ wb_attach(dev)
 
 	if (sc->wb_ldata == NULL) {
 		printf("wb%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -950,12 +853,11 @@ wb_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "wb";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = wb_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = wb_start;
 	ifp->if_watchdog = wb_watchdog;
 	ifp->if_init = wb_init;
@@ -967,10 +869,6 @@ wb_attach(dev)
 	 */
 	if (mii_phy_probe(dev, &sc->wb_miibus,
 	    wb_ifmedia_upd, wb_ifmedia_sts)) {
-		bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
-		free(sc->wb_ldata_ptr, M_DEVBUF);
 		error = ENXIO;
 		goto fail;
 	}
@@ -979,18 +877,31 @@ wb_attach(dev)
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, eaddr);
-	WB_UNLOCK(sc);
-	return(0);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->wb_irq, INTR_TYPE_NET,
+	    wb_intr, sc, &sc->wb_intrhand);
+
+	if (error) {
+		printf("wb%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
 	if (error)
-		device_delete_child(dev, sc->wb_miibus);
-	WB_UNLOCK(sc);
-	mtx_destroy(&sc->wb_mtx);
+		wb_detach(dev);
 
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 wb_detach(dev)
 	device_t		dev;
@@ -999,21 +910,33 @@ wb_detach(dev)
 	struct ifnet		*ifp;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->wb_mtx), ("wb mutex not initialized"));
 	WB_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	wb_stop(sc);
-	ether_ifdetach(ifp);
-
-	/* Delete any miibus and phy devices attached to this interface */
+	/* 
+	 * Delete any miibus and phy devices attached to this interface.
+	 * This should only be done if attach succeeded.
+	 */
+	if (device_is_attached(dev)) {
+		wb_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->wb_miibus)
+		device_delete_child(dev, sc->wb_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->wb_miibus);
 
-	bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-	bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
+	if (sc->wb_intrhand)
+		bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
+	if (sc->wb_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
+	if (sc->wb_res)
+		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
 
-	free(sc->wb_ldata_ptr, M_DEVBUF);
+	if (sc->wb_ldata) {
+		contigfree(sc->wb_ldata, sizeof(struct wb_list_data) + 8,
+		    M_DEVBUF);
+	}
 
 	WB_UNLOCK(sc);
 	mtx_destroy(&sc->wb_mtx);
@@ -1149,6 +1072,8 @@ wb_rxeof(sc)
 	int			total_len = 0;
 	u_int32_t		rxstat;
 
+	WB_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 	while(!((rxstat = sc->wb_cdata.wb_rx_head->wb_ptr->wb_status) &
@@ -1203,7 +1128,9 @@ wb_rxeof(sc)
 		m = m0;
 
 		ifp->if_ipackets++;
+		WB_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		WB_LOCK(sc);
 	}
 }
 

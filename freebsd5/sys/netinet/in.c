@@ -101,7 +101,14 @@ static int subnetsarelocal = 0;
 SYSCTL_INT(_net_inet_ip, OID_AUTO, subnets_are_local, CTLFLAG_RW,
 	&subnetsarelocal, 0, "Treat all subnets as directly connected");
 
+/*
+ * The IPv4 multicast list (in_multihead and associated structures)
+ * are protected by the global in_multi_mtx.  See in_var.h for
+ * more details.
+ */
 struct in_multihead in_multihead; /* XXX BSS initialization */
+struct mtx in_multi_mtx;
+MTX_SYSINIT(in_multi_mtx, &in_multi_mtx, "in_multi_mtx", MTX_DEF);
 
 extern struct inpcbinfo	ripcbinfo;
 extern struct inpcbinfo udbinfo;
@@ -998,8 +1005,8 @@ in_addmulti(ap, ifp)
 	int error;
 	struct sockaddr_in sin;
 	struct ifmultiaddr *ifma;
-	int s = splnet();
 
+	IN_MULTI_LOCK();
 	/*
 	 * Call generic routine to add membership or increment
 	 * refcount.  It wants addresses in the form of a sockaddr,
@@ -1011,7 +1018,7 @@ in_addmulti(ap, ifp)
 	sin.sin_addr = *ap;
 	error = if_addmulti(ifp, (struct sockaddr *)&sin, &ifma);
 	if (error) {
-		splx(s);
+		IN_MULTI_UNLOCK();
 		return 0;
 	}
 
@@ -1020,16 +1027,14 @@ in_addmulti(ap, ifp)
 	 * a new record.  Otherwise, we are done.
 	 */
 	if (ifma->ifma_protospec != 0) {
-		splx(s);
+		IN_MULTI_UNLOCK();
 		return ifma->ifma_protospec;
 	}
 
-	/* XXX - if_addmulti uses M_WAITOK.  Can this really be called
-	   at interrupt time?  If so, need to fix if_addmulti. XXX */
 	inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR,
 	    M_NOWAIT | M_ZERO);
 	if (inm == NULL) {
-		splx(s);
+		IN_MULTI_UNLOCK();
 		return (NULL);
 	}
 
@@ -1044,7 +1049,7 @@ in_addmulti(ap, ifp)
 	 * Let IGMP know that we have joined a new IP multicast group.
 	 */
 	igmp_joingroup(inm);
-	splx(s);
+	IN_MULTI_UNLOCK();
 	return (inm);
 #endif
 }
@@ -1061,10 +1066,11 @@ in_delmulti(inm)
 
 	return in_delmulti2(inm, 0, NULL, MCAST_EXCLUDE, 1, &error);
 #else
-	struct ifmultiaddr *ifma = inm->inm_ifma;
+ 	struct ifmultiaddr *ifma;
 	struct in_multi my_inm;
-	int s = splnet();
 
+	IN_MULTI_LOCK();
+	ifma = inm->inm_ifma;
 	my_inm.inm_ifp = NULL ; /* don't send the leave msg */
 	if (ifma->ifma_refcount == 1) {
 		/*
@@ -1082,7 +1088,7 @@ in_delmulti(inm)
 	if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 	if (my_inm.inm_ifp != NULL)
 		igmp_leavegroup(&my_inm);
-	splx(s);
+	IN_MULTI_UNLOCK();
 #endif
 }
 

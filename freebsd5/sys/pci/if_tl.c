@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -28,9 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_tl.c,v 1.72 2002/11/14 23:49:09 sam Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.93.2.3 2005/03/01 08:11:52 imp Exp $");
 
 /*
  * Texas Instruments ThunderLAN driver for FreeBSD 2.2.6 and 3.x.
@@ -49,7 +50,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * Some notes about the ThunderLAN:
  *
@@ -120,7 +120,6 @@
  * TX 'end of frame' interrupt. It will also generate an 'end of channel'
  * interrupt when it reaches the end of the list.
  */
-
 /*
  * Some notes about this driver:
  *
@@ -184,6 +183,7 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -206,8 +206,8 @@
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 /*
  * Default to using PIO register access mode to pacify certain
@@ -218,15 +218,12 @@
 
 #include <pci/if_tlreg.h>
 
+MODULE_DEPEND(tl, pci, 1, 1, 1);
+MODULE_DEPEND(tl, ether, 1, 1, 1);
 MODULE_DEPEND(tl, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_tl.c,v 1.72 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -264,62 +261,61 @@ static struct tl_type tl_devs[] = {
 	{ 0, 0, NULL }
 };
 
-static int tl_probe		(device_t);
-static int tl_attach		(device_t);
-static int tl_detach		(device_t);
-static int tl_intvec_rxeoc	(void *, u_int32_t);
-static int tl_intvec_txeoc	(void *, u_int32_t);
-static int tl_intvec_txeof	(void *, u_int32_t);
-static int tl_intvec_rxeof	(void *, u_int32_t);
-static int tl_intvec_adchk	(void *, u_int32_t);
-static int tl_intvec_netsts	(void *, u_int32_t);
+static int tl_probe(device_t);
+static int tl_attach(device_t);
+static int tl_detach(device_t);
+static int tl_intvec_rxeoc(void *, u_int32_t);
+static int tl_intvec_txeoc(void *, u_int32_t);
+static int tl_intvec_txeof(void *, u_int32_t);
+static int tl_intvec_rxeof(void *, u_int32_t);
+static int tl_intvec_adchk(void *, u_int32_t);
+static int tl_intvec_netsts(void *, u_int32_t);
 
-static int tl_newbuf		(struct tl_softc *, struct tl_chain_onefrag *);
-static void tl_stats_update	(void *);
-static int tl_encap		(struct tl_softc *, struct tl_chain *,
-						struct mbuf *);
+static int tl_newbuf(struct tl_softc *, struct tl_chain_onefrag *);
+static void tl_stats_update(void *);
+static int tl_encap(struct tl_softc *, struct tl_chain *, struct mbuf *);
 
-static void tl_intr		(void *);
-static void tl_start		(struct ifnet *);
-static int tl_ioctl		(struct ifnet *, u_long, caddr_t);
-static void tl_init		(void *);
-static void tl_stop		(struct tl_softc *);
-static void tl_watchdog		(struct ifnet *);
-static void tl_shutdown		(device_t);
-static int tl_ifmedia_upd	(struct ifnet *);
-static void tl_ifmedia_sts	(struct ifnet *, struct ifmediareq *);
+static void tl_intr(void *);
+static void tl_start(struct ifnet *);
+static int tl_ioctl(struct ifnet *, u_long, caddr_t);
+static void tl_init(void *);
+static void tl_stop(struct tl_softc *);
+static void tl_watchdog(struct ifnet *);
+static void tl_shutdown(device_t);
+static int tl_ifmedia_upd(struct ifnet *);
+static void tl_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
-static u_int8_t tl_eeprom_putbyte	(struct tl_softc *, int);
-static u_int8_t	tl_eeprom_getbyte	(struct tl_softc *, int, u_int8_t *);
-static int tl_read_eeprom	(struct tl_softc *, caddr_t, int, int);
+static u_int8_t tl_eeprom_putbyte(struct tl_softc *, int);
+static u_int8_t	tl_eeprom_getbyte(struct tl_softc *, int, u_int8_t *);
+static int tl_read_eeprom(struct tl_softc *, caddr_t, int, int);
 
-static void tl_mii_sync		(struct tl_softc *);
-static void tl_mii_send		(struct tl_softc *, u_int32_t, int);
-static int tl_mii_readreg	(struct tl_softc *, struct tl_mii_frame *);
-static int tl_mii_writereg	(struct tl_softc *, struct tl_mii_frame *);
-static int tl_miibus_readreg	(device_t, int, int);
-static int tl_miibus_writereg	(device_t, int, int, int);
-static void tl_miibus_statchg	(device_t);
+static void tl_mii_sync(struct tl_softc *);
+static void tl_mii_send(struct tl_softc *, u_int32_t, int);
+static int tl_mii_readreg(struct tl_softc *, struct tl_mii_frame *);
+static int tl_mii_writereg(struct tl_softc *, struct tl_mii_frame *);
+static int tl_miibus_readreg(device_t, int, int);
+static int tl_miibus_writereg(device_t, int, int, int);
+static void tl_miibus_statchg(device_t);
 
-static void tl_setmode		(struct tl_softc *, int);
-static int tl_calchash		(caddr_t);
-static void tl_setmulti		(struct tl_softc *);
-static void tl_setfilt		(struct tl_softc *, caddr_t, int);
-static void tl_softreset	(struct tl_softc *, int);
-static void tl_hardreset	(device_t);
-static int tl_list_rx_init	(struct tl_softc *);
-static int tl_list_tx_init	(struct tl_softc *);
+static void tl_setmode(struct tl_softc *, int);
+static uint32_t tl_mchash(const uint8_t *);
+static void tl_setmulti(struct tl_softc *);
+static void tl_setfilt(struct tl_softc *, caddr_t, int);
+static void tl_softreset(struct tl_softc *, int);
+static void tl_hardreset(device_t);
+static int tl_list_rx_init(struct tl_softc *);
+static int tl_list_tx_init(struct tl_softc *);
 
-static u_int8_t tl_dio_read8	(struct tl_softc *, int);
-static u_int16_t tl_dio_read16	(struct tl_softc *, int);
-static u_int32_t tl_dio_read32	(struct tl_softc *, int);
-static void tl_dio_write8	(struct tl_softc *, int, int);
-static void tl_dio_write16	(struct tl_softc *, int, int);
-static void tl_dio_write32	(struct tl_softc *, int, int);
-static void tl_dio_setbit	(struct tl_softc *, int, int);
-static void tl_dio_clrbit	(struct tl_softc *, int, int);
-static void tl_dio_setbit16	(struct tl_softc *, int, int);
-static void tl_dio_clrbit16	(struct tl_softc *, int, int);
+static u_int8_t tl_dio_read8(struct tl_softc *, int);
+static u_int16_t tl_dio_read16(struct tl_softc *, int);
+static u_int32_t tl_dio_read32(struct tl_softc *, int);
+static void tl_dio_write8(struct tl_softc *, int, int);
+static void tl_dio_write16(struct tl_softc *, int, int);
+static void tl_dio_write32(struct tl_softc *, int, int);
+static void tl_dio_setbit(struct tl_softc *, int, int);
+static void tl_dio_clrbit(struct tl_softc *, int, int);
+static void tl_dio_setbit16(struct tl_softc *, int, int);
+static void tl_dio_clrbit16(struct tl_softc *, int, int);
 
 #ifdef TL_USEIOSPACE
 #define TL_RES		SYS_RES_IOPORT
@@ -356,7 +352,7 @@ static driver_t tl_driver = {
 
 static devclass_t tl_devclass;
 
-DRIVER_MODULE(if_tl, pci, tl_driver, tl_devclass, 0, 0);
+DRIVER_MODULE(tl, pci, tl_driver, tl_devclass, 0, 0);
 DRIVER_MODULE(miibus, tl, miibus_driver, miibus_devclass, 0, 0);
 
 static u_int8_t tl_dio_read8(sc, reg)
@@ -891,11 +887,11 @@ tl_setmode(sc, media)
  * Bytes 0-2 and 3-5 are symmetrical, so are folded together.  Then
  * the folded 24-bit value is split into 6-bit portions and XOR'd.
  */
-static int
-tl_calchash(addr)
-	caddr_t			addr;
+static uint32_t
+tl_mchash(addr)
+	const uint8_t *addr;
 {
-	int			t;
+	int t;
 
 	t = (addr[0] ^ addr[3]) << 16 | (addr[1] ^ addr[4]) << 8 |
 		(addr[2] ^ addr[5]);
@@ -965,6 +961,7 @@ tl_setmulti(sc)
 		hashes[1] = 0xFFFFFFFF;
 	} else {
 		i = 1;
+		IF_ADDR_LOCK(ifp);
 		TAILQ_FOREACH_REVERSE(ifma, &ifp->if_multiaddrs, ifmultihead, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 				continue;
@@ -980,13 +977,14 @@ tl_setmulti(sc)
 				continue;
 			}
 
-			h = tl_calchash(
+			h = tl_mchash(
 				LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 			if (h < 32)
 				hashes[0] |= (1 << h);
 			else
 				hashes[1] |= (1 << (h - 32));
 		}
+		IF_ADDR_UNLOCK(ifp);
 	}
 
 	tl_dio_write32(sc, TL_HASH1, hashes[0]);
@@ -1103,7 +1101,7 @@ tl_probe(dev)
 		if ((pci_get_vendor(dev) == t->tl_vid) &&
 		    (pci_get_device(dev) == t->tl_did)) {
 			device_set_desc(dev, t->tl_name);
-			return(0);
+			return (BUS_PROBE_DEFAULT);
 		}
 		t++;
 	}
@@ -1116,7 +1114,6 @@ tl_attach(dev)
 	device_t		dev;
 {
 	int			i;
-	u_int32_t		command;
 	u_int16_t		did, vid;
 	struct tl_type		*t;
 	struct ifnet		*ifp;
@@ -1127,7 +1124,6 @@ tl_attach(dev)
 	did = pci_get_device(dev);
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
-	bzero(sc, sizeof(struct tl_softc));
 
 	t = tl_devs;
 	while(t->tl_name != NULL) {
@@ -1138,31 +1134,22 @@ tl_attach(dev)
 
 	if (t->tl_name == NULL) {
 		device_printf(dev, "unknown device!?\n");
-		goto fail;
+		return (ENXIO);
 	}
 
 	mtx_init(&sc->tl_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	TL_LOCK(sc);
 
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef TL_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		device_printf(dev, "failed to enable I/O ports!\n");
-		error = ENXIO;
-		goto fail;
-	}
 
 	rid = TL_PCI_LOIO;
-	sc->tl_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-		0, ~0, 1, RF_ACTIVE);
+	sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+		RF_ACTIVE);
 
 	/*
 	 * Some cards have the I/O and memory mapped address registers
@@ -1170,23 +1157,17 @@ tl_attach(dev)
 	 */
 	if (sc->tl_res == NULL) {
 		rid = TL_PCI_LOMEM;
-		sc->tl_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-		    0, ~0, 1, RF_ACTIVE);
+		sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+		    RF_ACTIVE);
 	}
 #else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		device_printf(dev, "failed to enable memory mapping!\n");
-		error = ENXIO;
-		goto fail;
-	}
-
 	rid = TL_PCI_LOMEM;
-	sc->tl_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+	    RF_ACTIVE);
 	if (sc->tl_res == NULL) {
 		rid = TL_PCI_LOIO;
-		sc->tl_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-		    0, ~0, 1, RF_ACTIVE);
+		sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+		    RF_ACTIVE);
 	}
 #endif
 
@@ -1213,23 +1194,12 @@ tl_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->tl_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->tl_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->tl_irq == NULL) {
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
 		device_printf(dev, "couldn't map interrupt\n");
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->tl_irq, INTR_TYPE_NET,
-	    tl_intr, sc, &sc->tl_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
-		device_printf(dev, "couldn't set up irq\n");
 		goto fail;
 	}
 
@@ -1240,9 +1210,6 @@ tl_attach(dev)
 	    M_NOWAIT, 0, 0xffffffff, PAGE_SIZE, 0);
 
 	if (sc->tl_ldata == NULL) {
-		bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
 		device_printf(dev, "no memory for list buffers!\n");
 		error = ENXIO;
 		goto fail;
@@ -1266,11 +1233,6 @@ tl_attach(dev)
 	 */
 	if (tl_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
 				sc->tl_eeaddr, ETHER_ADDR_LEN)) {
-		bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
-		contigfree(sc->tl_ldata,
-		    sizeof(struct tl_list_data), M_DEVBUF);
 		device_printf(dev, "failed to read station address\n");
 		error = ENXIO;
 		goto fail;
@@ -1298,19 +1260,12 @@ tl_attach(dev)
                 }
         }
 
-	/*
-	 * A ThunderLAN chip was detected. Inform the world.
-	 */
-	device_printf(dev, "Ethernet address: %6D\n",
-				sc->arpcom.ac_enaddr, ":");
-
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "tl";
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = tl_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = tl_start;
 	ifp->if_watchdog = tl_watchdog;
 	ifp->if_init = tl_init;
@@ -1349,15 +1304,31 @@ tl_attach(dev)
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-	TL_UNLOCK(sc);
-	return(0);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->tl_irq, INTR_TYPE_NET,
+	    tl_intr, sc, &sc->tl_intrhand);
+
+	if (error) {
+		device_printf(dev, "couldn't set up irq\n");
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	TL_UNLOCK(sc);
-	mtx_destroy(&sc->tl_mtx);
+	if (error)
+		tl_detach(dev);
+
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 tl_detach(dev)
 	device_t		dev;
@@ -1366,22 +1337,30 @@ tl_detach(dev)
 	struct ifnet		*ifp;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->tl_mtx), ("tl mutex not initialized"));
 	TL_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	tl_stop(sc);
-	ether_ifdetach(ifp);
-
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		tl_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->tl_miibus)
+		device_delete_child(dev, sc->tl_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->tl_miibus);
 
-	contigfree(sc->tl_ldata, sizeof(struct tl_list_data), M_DEVBUF);
+	if (sc->tl_ldata)
+		contigfree(sc->tl_ldata, sizeof(struct tl_list_data), M_DEVBUF);
 	if (sc->tl_bitrate)
 		ifmedia_removeall(&sc->ifmedia);
 
-	bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-	bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
+	if (sc->tl_intrhand)
+		bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
+	if (sc->tl_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
+	if (sc->tl_res)
+		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
 
 	TL_UNLOCK(sc);
 	mtx_destroy(&sc->tl_mtx);
@@ -1521,6 +1500,8 @@ tl_intvec_rxeof(xsc, type)
 	sc = xsc;
 	ifp = &sc->arpcom.ac_if;
 
+	TL_LOCK_ASSERT(sc);
+
 	while(sc->tl_cdata.tl_rx_head != NULL) {
 		cur_rx = sc->tl_cdata.tl_rx_head;
 		if (!(cur_rx->tl_ptr->tlist_cstat & TL_CSTAT_FRAMECMP))
@@ -1560,7 +1541,9 @@ tl_intvec_rxeof(xsc, type)
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = total_len;
 
+		TL_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		TL_LOCK(sc);
 	}
 
 	return(r);
@@ -2128,6 +2111,8 @@ tl_init(xsc)
 			mii = device_get_softc(sc->tl_miibus);
 			mii_mediachg(mii);
 		}
+	} else {
+		tl_ifmedia_upd(ifp);
 	}
 
 	/* Send the RX go command */

@@ -3070,6 +3070,7 @@ tulip_addr_filter(
 	    }
 	}
     }
+    IF_ADDR_LOCK(&sc->tulip_if);
     if ((sc->tulip_flags & (TULIP_WANTHASHPERFECT|TULIP_WANTHASHONLY)) == 0) {
 	u_int32_t *sp = sc->tulip_setupdata;
 	int idx = 0;
@@ -3121,6 +3122,7 @@ tulip_addr_filter(
 #endif
 	}
     }
+    IF_ADDR_UNLOCK(&sc->tulip_if);
 #if defined(IFF_ALLMULTI)
     if (sc->tulip_flags & TULIP_ALLMULTI)
 	sc->tulip_if.if_flags |= IFF_ALLMULTI;

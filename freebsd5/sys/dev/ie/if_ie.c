@@ -1666,11 +1666,14 @@ static void
 ie_mc_reset(struct ie_softc *sc)
 {
 	struct ifmultiaddr *ifma;
+	struct ifnet *ifp;
 
 	/*
 	 * Step through the list of addresses.
 	 */
 	sc->mcast_count = 0;
+	ifp = &sc->arpcom.ac_if;
+ 	IF_ADDR_LOCK(ifp);
 	TAILQ_FOREACH(ifma, &sc->arpcom.ac_if.if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
@@ -1685,6 +1688,7 @@ ie_mc_reset(struct ie_softc *sc)
 		      &(sc->mcast_addrs[sc->mcast_count]), 6);
 		sc->mcast_count++;
 	}
+	IF_ADDR_UNLOCK(ifp);
 
 setflag:
 	sc->want_mcsetup = 1;

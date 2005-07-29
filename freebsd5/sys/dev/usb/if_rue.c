@@ -22,9 +22,41 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/if_rue.c,v 1.1 2003/05/03 10:16:56 akiyama Exp $
  */
+/*-
+ * Copyright (c) 1997, 1998, 1999, 2000
+ *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Bill Paul.
+ * 4. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY Bill Paul AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL Bill Paul OR THE VOICES IN HIS HEAD
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_rue.c,v 1.16.2.2 2005/04/01 12:46:26 sobomax Exp $");
 
 /*
  * RealTek RTL8150 USB to fast ethernet controller driver.
@@ -38,6 +70,7 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 
@@ -50,12 +83,16 @@
 #include <net/bpf.h>
 
 #include <sys/bus.h>
+#include <machine/bus.h>
+#if __FreeBSD_version < 500000
+#include <machine/clock.h>
+#endif
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_ethersubr.h>
 
 #include <dev/mii/mii.h>
@@ -67,7 +104,7 @@
 #include "miibus_if.h"
 
 #ifdef USB_DEBUG
-static int	ruedebug = 0;
+Static int	ruedebug = 0;
 SYSCTL_NODE(_hw_usb, OID_AUTO, rue, CTLFLAG_RW, 0, "USB rue");
 SYSCTL_INT(_hw_usb_rue, OID_AUTO, debug, CTLFLAG_RW,
 	   &ruedebug, 0, "rue debug level");
@@ -91,15 +128,10 @@ Static struct rue_type rue_devs[] = {
 	{ 0, 0 }
 };
 
-Static struct usb_qdat rue_qdat;
-
 Static int rue_match(device_ptr_t);
 Static int rue_attach(device_ptr_t);
 Static int rue_detach(device_ptr_t);
 
-Static int rue_tx_list_init(struct rue_softc *);
-Static int rue_rx_list_init(struct rue_softc *);
-Static int rue_newbuf(struct rue_softc *, struct rue_chain *, struct mbuf *);
 Static int rue_encap(struct rue_softc *, struct mbuf *, int);
 #ifdef RUE_INTR_PIPE
 Static void rue_intr(usbd_xfer_handle, usbd_private_handle, usbd_status);
@@ -121,7 +153,6 @@ Static int rue_miibus_readreg(device_ptr_t, int, int);
 Static int rue_miibus_writereg(device_ptr_t, int, int, int);
 Static void rue_miibus_statchg(device_ptr_t);
 
-static u_int8_t rue_calchash(caddr_t);
 Static void rue_setmulti(struct rue_softc *);
 Static void rue_reset(struct rue_softc *);
 
@@ -401,6 +432,17 @@ rue_miibus_writereg(device_ptr_t dev, int phy, int reg, int data)
 Static void
 rue_miibus_statchg(device_ptr_t dev)
 {
+	/*
+	 * When the code below is enabled the card starts doing weird
+	 * things after link going from UP to DOWN and back UP.
+	 *
+	 * Looks like some of register writes below messes up PHY
+	 * interface.
+	 *
+	 * No visible regressions were found after commenting this code
+	 * out, so that disable it for good.
+	 */
+#if 0
 	struct rue_softc	*sc = USBGETSOFTC(dev);
 	struct mii_data		*mii = GET_MII(sc);
 	int			bmcr;
@@ -422,35 +464,7 @@ rue_miibus_statchg(device_ptr_t dev)
 	rue_csr_write_2(sc, RUE_BMCR, bmcr);
 
 	RUE_SETBIT(sc, RUE_CR, (RUE_CR_RE | RUE_CR_TE));
-}
-
-/*
- * Calculate CRC of a multicast group address, return the upper 6 bits.
- */
-
-static u_int8_t
-rue_calchash(caddr_t addr)
-{
-	u_int32_t	crc, carry;
-	int		i, j;
-	u_int8_t	c;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF;	/* initial value */
-
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
-			crc <<= 1;
-			c >>= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/* return the filter bit position */
-	return (crc >> 26);
+#endif
 }
 
 /*
@@ -485,16 +499,24 @@ rue_setmulti(struct rue_softc *sc)
 	rue_csr_write_4(sc, RUE_MAR4, 0);
 
 	/* now program new ones */
-	TAILQ_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link) {
+	IF_ADDR_LOCK(ifp);
+#if __FreeBSD_version >= 500000
+	TAILQ_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link)
+#else
+	LIST_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link)
+#endif
+	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = rue_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
 			hashes[1] |= (1 << (h - 32));
 		mcnt++;
 	}
+	IF_ADDR_UNLOCK(ifp);
 
 	if (mcnt)
 		rxcfg |= RUE_RCR_AM;
@@ -573,6 +595,7 @@ USB_ATTACH(rue)
 	bzero(sc, sizeof (struct rue_softc));
 	usbd_devinfo(uaa->device, 0, devinfo);
 
+	sc->rue_dev = self;
 	sc->rue_udev = uaa->device;
 	sc->rue_unit = device_get_unit(self);
 
@@ -626,8 +649,10 @@ USB_ATTACH(rue)
 		}
 	}
 
+#if __FreeBSD_version >= 500000
 	mtx_init(&sc->rue_mtx, device_get_nameunit(self), MTX_NETWORK_LOCK,
 		 MTX_DEF | MTX_RECURSE);
+#endif
 	RUE_LOCK(sc);
 
 	/* Reset the adapter */
@@ -641,19 +666,15 @@ USB_ATTACH(rue)
 		goto error1;
 	}
 
-	/* RealTek RTL8150 was detected */
-	printf("rue%d: Ethernet address: %6D\n", sc->rue_unit, eaddr, ":");
-
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->rue_unit;
-	ifp->if_name = "rue";
+	if_initname(ifp, "rue", sc->rue_unit);
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = rue_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = rue_start;
 	ifp->if_watchdog = rue_watchdog;
 	ifp->if_init = rue_init;
@@ -667,11 +688,15 @@ USB_ATTACH(rue)
 		goto error1;
 	}
 
-	rue_qdat.ifp = ifp;
-	rue_qdat.if_rxstart = rue_rxstart;
+	sc->rue_qdat.ifp = ifp;
+	sc->rue_qdat.if_rxstart = rue_rxstart;
 
 	/* Call MI attach routine */
+#if __FreeBSD_version >= 500000
 	ether_ifattach(ifp, eaddr);
+#else
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 	callout_handle_init(&sc->rue_stat_ch);
 	usb_register_netisr();
 	sc->rue_dying = 0;
@@ -682,7 +707,9 @@ USB_ATTACH(rue)
 
     error1:
 	RUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 	mtx_destroy(&sc->rue_mtx);
+#endif
     error:
 	free(devinfo, M_USBDEV);
 	USB_ATTACH_ERROR_RETURN;
@@ -700,7 +727,11 @@ rue_detach(device_ptr_t dev)
 
 	sc->rue_dying = 1;
 	untimeout(rue_tick, sc, sc->rue_stat_ch);
+#if __FreeBSD_version >= 500000
 	ether_ifdetach(ifp);
+#else
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 
 	if (sc->rue_ep[RUE_ENDPT_TX] != NULL)
 		usbd_abort_pipe(sc->rue_ep[RUE_ENDPT_TX]);
@@ -712,94 +743,9 @@ rue_detach(device_ptr_t dev)
 #endif
 
 	RUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 	mtx_destroy(&sc->rue_mtx);
-
-	return (0);
-}
-
-/*
- * Initialize an RX descriptor and attach an MBUF cluster.
- */
-
-Static int
-rue_newbuf(struct rue_softc *sc, struct rue_chain *c, struct mbuf *m)
-{
-	struct mbuf	*m_new = NULL;
-
-	if (m == NULL) {
-		MGETHDR(m_new, M_NOWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("rue%d: no memory for rx list "
-				"-- packet dropped!\n", sc->rue_unit);
-			return (ENOBUFS);
-		}
-
-		MCLGET(m_new, M_NOWAIT);
-		if (!(m_new->m_flags & M_EXT)) {
-			printf("rue%d: no memory for rx list "
-				"-- packet dropped!\n", sc->rue_unit);
-			m_freem(m_new);
-			return (ENOBUFS);
-		}
-		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
-	} else {
-		m_new = m;
-		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
-		m_new->m_data = m_new->m_ext.ext_buf;
-	}
-
-	m_adj(m_new, ETHER_ALIGN);
-	c->rue_mbuf = m_new;
-
-	return (0);
-}
-
-Static int
-rue_rx_list_init(struct rue_softc *sc)
-{
-	struct rue_cdata	*cd;
-	struct rue_chain	*c;
-	int			i;
-
-	cd = &sc->rue_cdata;
-	for (i = 0; i < RUE_RX_LIST_CNT; i++) {
-		c = &cd->rue_rx_chain[i];
-		c->rue_sc = sc;
-		c->rue_idx = i;
-		if (rue_newbuf(sc, c, NULL) == ENOBUFS)
-			return (ENOBUFS);
-		if (c->rue_xfer == NULL) {
-			c->rue_xfer = usbd_alloc_xfer(sc->rue_udev);
-			if (c->rue_xfer == NULL)
-				return (ENOBUFS);
-		}
-	}
-
-	return (0);
-}
-
-Static int
-rue_tx_list_init(struct rue_softc *sc)
-{
-	struct rue_cdata	*cd;
-	struct rue_chain	*c;
-	int			i;
-
-	cd = &sc->rue_cdata;
-	for (i = 0; i < RUE_TX_LIST_CNT; i++) {
-		c = &cd->rue_tx_chain[i];
-		c->rue_sc = sc;
-		c->rue_idx = i;
-		c->rue_mbuf = NULL;
-		if (c->rue_xfer == NULL) {
-			c->rue_xfer = usbd_alloc_xfer(sc->rue_udev);
-			if (c->rue_xfer == NULL)
-				return (ENOBUFS);
-		}
-		c->rue_buf = malloc(RUE_BUFSZ, M_USBDEV, M_NOWAIT);
-		if (c->rue_buf == NULL)
-			return (ENOBUFS);
-	}
+#endif
 
 	return (0);
 }
@@ -847,23 +793,26 @@ Static void
 rue_rxstart(struct ifnet *ifp)
 {
 	struct rue_softc	*sc;
-	struct rue_chain	*c;
+	struct ue_chain	*c;
 
 	sc = ifp->if_softc;
 	RUE_LOCK(sc);
-	c = &sc->rue_cdata.rue_rx_chain[sc->rue_cdata.rue_rx_prod];
+	c = &sc->rue_cdata.ue_rx_chain[sc->rue_cdata.ue_rx_prod];
 
-	if (rue_newbuf(sc, c, NULL) == ENOBUFS) {
+	c->ue_mbuf = usb_ether_newbuf();
+	if (c->ue_mbuf == NULL) {
+		printf("%s: no memory for rx list "
+		    "-- packet dropped!\n", USBDEVNAME(sc->rue_dev));
 		ifp->if_ierrors++;
 		RUE_UNLOCK(sc);
 		return;
 	}
 
 	/* Setup new transfer. */
-	usbd_setup_xfer(c->rue_xfer, sc->rue_ep[RUE_ENDPT_RX],
-		c, mtod(c->rue_mbuf, char *), RUE_BUFSZ, USBD_SHORT_XFER_OK,
+	usbd_setup_xfer(c->ue_xfer, sc->rue_ep[RUE_ENDPT_RX],
+		c, mtod(c->ue_mbuf, char *), UE_BUFSZ, USBD_SHORT_XFER_OK,
 		USBD_NO_TIMEOUT, rue_rxeof);
-	usbd_transfer(c->rue_xfer);
+	usbd_transfer(c->ue_xfer);
 
 	RUE_UNLOCK(sc);
 }
@@ -876,8 +825,8 @@ rue_rxstart(struct ifnet *ifp)
 Static void
 rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 {
-	struct rue_chain	*c = priv;
-	struct rue_softc	*sc = c->rue_sc;
+	struct ue_chain	*c = priv;
+	struct rue_softc	*sc = c->ue_sc;
 	struct mbuf		*m;
 	struct ifnet		*ifp;
 	int			total_len = 0;
@@ -913,7 +862,7 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 		goto done;
 	}
 
-	m = c->rue_mbuf;
+	m = c->ue_mbuf;
 	bcopy(mtod(m, char *) + total_len - 4, (char *)&r, sizeof (r));
 
 	/* Check recieve packet was valid or not */
@@ -926,7 +875,7 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	total_len -= ETHER_CRC_LEN;
 
 	ifp->if_ipackets++;
-	m->m_pkthdr.rcvif = (struct ifnet *)&rue_qdat;
+	m->m_pkthdr.rcvif = (struct ifnet *)&sc->rue_qdat;
 	m->m_pkthdr.len = m->m_len = total_len;
 
 	/* Put the packet on the special USB input queue. */
@@ -938,7 +887,7 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
     done:
 	/* Setup new transfer. */
 	usbd_setup_xfer(xfer, sc->rue_ep[RUE_ENDPT_RX],
-			c, mtod(c->rue_mbuf, char *), RUE_BUFSZ,
+			c, mtod(c->ue_mbuf, char *), UE_BUFSZ,
 			USBD_SHORT_XFER_OK, USBD_NO_TIMEOUT, rue_rxeof);
 	usbd_transfer(xfer);
 	RUE_UNLOCK(sc);
@@ -952,8 +901,8 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 Static void
 rue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 {
-	struct rue_chain	*c = priv;
-	struct rue_softc	*sc = c->rue_sc;
+	struct ue_chain	*c = priv;
+	struct rue_softc	*sc = c->ue_sc;
 	struct ifnet		*ifp;
 	usbd_status		err;
 
@@ -976,12 +925,12 @@ rue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	ifp->if_timer = 0;
 	ifp->if_flags &= ~IFF_OACTIVE;
-	usbd_get_xfer_status(c->rue_xfer, NULL, NULL, NULL, &err);
+	usbd_get_xfer_status(c->ue_xfer, NULL, NULL, NULL, &err);
 
-	if (c->rue_mbuf != NULL) {
-		c->rue_mbuf->m_pkthdr.rcvif = ifp;
-		usb_tx_done(c->rue_mbuf);
-		c->rue_mbuf = NULL;
+	if (c->ue_mbuf != NULL) {
+		c->ue_mbuf->m_pkthdr.rcvif = ifp;
+		usb_tx_done(c->ue_mbuf);
+		c->ue_mbuf = NULL;
 	}
 
 	if (err)
@@ -1028,16 +977,16 @@ Static int
 rue_encap(struct rue_softc *sc, struct mbuf *m, int idx)
 {
 	int			total_len;
-	struct rue_chain	*c;
+	struct ue_chain	*c;
 	usbd_status		err;
 
-	c = &sc->rue_cdata.rue_tx_chain[idx];
+	c = &sc->rue_cdata.ue_tx_chain[idx];
 
 	/*
 	 * Copy the mbuf data into a contiguous buffer
 	 */
-	m_copydata(m, 0, m->m_pkthdr.len, c->rue_buf);
-	c->rue_mbuf = m;
+	m_copydata(m, 0, m->m_pkthdr.len, c->ue_buf);
+	c->ue_mbuf = m;
 
 	total_len = m->m_pkthdr.len;
 
@@ -1049,18 +998,18 @@ rue_encap(struct rue_softc *sc, struct mbuf *m, int idx)
 	if (total_len < RUE_MIN_FRAMELEN)
 		total_len = RUE_MIN_FRAMELEN;
 
-	usbd_setup_xfer(c->rue_xfer, sc->rue_ep[RUE_ENDPT_TX],
-			c, c->rue_buf, total_len, USBD_FORCE_SHORT_XFER,
+	usbd_setup_xfer(c->ue_xfer, sc->rue_ep[RUE_ENDPT_TX],
+			c, c->ue_buf, total_len, USBD_FORCE_SHORT_XFER,
 			10000, rue_txeof);
 
 	/* Transmit */
-	err = usbd_transfer(c->rue_xfer);
+	err = usbd_transfer(c->ue_xfer);
 	if (err != USBD_IN_PROGRESS) {
 		rue_stop(sc);
 		return (EIO);
 	}
 
-	sc->rue_cdata.rue_tx_cnt++;
+	sc->rue_cdata.ue_tx_cnt++;
 
 	return (0);
 }
@@ -1118,7 +1067,7 @@ rue_init(void *xsc)
 	struct rue_softc	*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct mii_data		*mii = GET_MII(sc);
-	struct rue_chain	*c;
+	struct ue_chain	*c;
 	usbd_status		err;
 	int			i;
 	int			rxcfg;
@@ -1139,21 +1088,23 @@ rue_init(void *xsc)
 	rue_write_mem(sc, RUE_IDR0, sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	/* Init TX ring. */
-	if (rue_tx_list_init(sc) == ENOBUFS) {
+	if (usb_ether_tx_list_init(sc, &sc->rue_cdata,
+	    sc->rue_udev) == ENOBUFS) {
 		printf("rue%d: tx list init failed\n", sc->rue_unit);
 		RUE_UNLOCK(sc);
 		return;
 	}
 
 	/* Init RX ring. */
-	if (rue_rx_list_init(sc) == ENOBUFS) {
+	if (usb_ether_rx_list_init(sc, &sc->rue_cdata,
+	    sc->rue_udev) == ENOBUFS) {
 		printf("rue%d: rx list init failed\n", sc->rue_unit);
 		RUE_UNLOCK(sc);
 		return;
 	}
 
 #ifdef RUE_INTR_PIPE
-	sc->rue_cdata.rue_ibuf = malloc(RUE_INTR_PKTLEN, M_USBDEV, M_NOWAIT);
+	sc->rue_cdata.ue_ibuf = malloc(RUE_INTR_PKTLEN, M_USBDEV, M_NOWAIT);
 #endif
 
 	/*
@@ -1207,7 +1158,7 @@ rue_init(void *xsc)
 	err = usbd_open_pipe_intr(sc->rue_iface, sc->rue_ed[RUE_ENDPT_INTR],
 				  USBD_SHORT_XFER_OK,
 				  &sc->rue_ep[RUE_ENDPT_INTR], sc,
-				  sc->rue_cdata.rue_ibuf, RUE_INTR_PKTLEN,
+				  sc->rue_cdata.ue_ibuf, RUE_INTR_PKTLEN,
 				  rue_intr, RUE_INTR_INTERVAL);
 	if (err) {
 		printf("rue%d: open intr pipe failed: %s\n",
@@ -1218,12 +1169,12 @@ rue_init(void *xsc)
 #endif
 
 	/* Start up the receive pipe. */
-	for (i = 0; i < RUE_RX_LIST_CNT; i++) {
-		c = &sc->rue_cdata.rue_rx_chain[i];
-		usbd_setup_xfer(c->rue_xfer, sc->rue_ep[RUE_ENDPT_RX],
-				c, mtod(c->rue_mbuf, char *), RUE_BUFSZ,
+	for (i = 0; i < UE_RX_LIST_CNT; i++) {
+		c = &sc->rue_cdata.ue_rx_chain[i];
+		usbd_setup_xfer(c->ue_xfer, sc->rue_ep[RUE_ENDPT_RX],
+				c, mtod(c->ue_mbuf, char *), UE_BUFSZ,
 				USBD_SHORT_XFER_OK, USBD_NO_TIMEOUT, rue_rxeof);
-		usbd_transfer(c->rue_xfer);
+		usbd_transfer(c->ue_xfer);
 	}
 
 	ifp->if_flags |= IFF_RUNNING;
@@ -1328,7 +1279,7 @@ Static void
 rue_watchdog(struct ifnet *ifp)
 {
 	struct rue_softc	*sc = ifp->if_softc;
-	struct rue_chain	*c;
+	struct ue_chain	*c;
 	usbd_status		stat;
 
 	RUE_LOCK(sc);
@@ -1336,9 +1287,9 @@ rue_watchdog(struct ifnet *ifp)
 	ifp->if_oerrors++;
 	printf("rue%d: watchdog timeout\n", sc->rue_unit);
 
-	c = &sc->rue_cdata.rue_tx_chain[0];
-	usbd_get_xfer_status(c->rue_xfer, NULL, NULL, NULL, &stat);
-	rue_txeof(c->rue_xfer, c, stat);
+	c = &sc->rue_cdata.ue_tx_chain[0];
+	usbd_get_xfer_status(c->ue_xfer, NULL, NULL, NULL, &stat);
+	rue_txeof(c->ue_xfer, c, stat);
 
 	if (ifp->if_snd.ifq_head != NULL)
 		rue_start(ifp);
@@ -1356,7 +1307,6 @@ rue_stop(struct rue_softc *sc)
 {
 	usbd_status	err;
 	struct ifnet	*ifp;
-	int		i;
 
 	RUE_LOCK(sc);
 
@@ -1414,40 +1364,13 @@ rue_stop(struct rue_softc *sc)
 #endif
 
 	/* Free RX resources. */
-	for (i = 0; i < RUE_RX_LIST_CNT; i++) {
-		if (sc->rue_cdata.rue_rx_chain[i].rue_buf != NULL) {
-			free(sc->rue_cdata.rue_rx_chain[i].rue_buf, M_USBDEV);
-			sc->rue_cdata.rue_rx_chain[i].rue_buf = NULL;
-		}
-		if (sc->rue_cdata.rue_rx_chain[i].rue_mbuf != NULL) {
-			m_freem(sc->rue_cdata.rue_rx_chain[i].rue_mbuf);
-			sc->rue_cdata.rue_rx_chain[i].rue_mbuf = NULL;
-		}
-		if (sc->rue_cdata.rue_rx_chain[i].rue_xfer != NULL) {
-			usbd_free_xfer(sc->rue_cdata.rue_rx_chain[i].rue_xfer);
-			sc->rue_cdata.rue_rx_chain[i].rue_xfer = NULL;
-		}
-	}
-
+	usb_ether_rx_list_free(&sc->rue_cdata);
 	/* Free TX resources. */
-	for (i = 0; i < RUE_TX_LIST_CNT; i++) {
-		if (sc->rue_cdata.rue_tx_chain[i].rue_buf != NULL) {
-			free(sc->rue_cdata.rue_tx_chain[i].rue_buf, M_USBDEV);
-			sc->rue_cdata.rue_tx_chain[i].rue_buf = NULL;
-		}
-		if (sc->rue_cdata.rue_tx_chain[i].rue_mbuf != NULL) {
-			m_freem(sc->rue_cdata.rue_tx_chain[i].rue_mbuf);
-			sc->rue_cdata.rue_tx_chain[i].rue_mbuf = NULL;
-		}
-		if (sc->rue_cdata.rue_tx_chain[i].rue_xfer != NULL) {
-			usbd_free_xfer(sc->rue_cdata.rue_tx_chain[i].rue_xfer);
-			sc->rue_cdata.rue_tx_chain[i].rue_xfer = NULL;
-		}
-	}
+	usb_ether_tx_list_free(&sc->rue_cdata);
 
 #ifdef RUE_INTR_PIPE
-	free(sc->rue_cdata.rue_ibuf, M_USBDEV);
-	sc->rue_cdata.rue_ibuf = NULL;
+	free(sc->rue_cdata.ue_ibuf, M_USBDEV);
+	sc->rue_cdata.ue_ibuf = NULL;
 #endif
 
 	sc->rue_link = 0;

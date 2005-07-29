@@ -1248,6 +1248,11 @@ sysctl_ifmalist(int af, struct walkarg *w)
 			continue;
 		ifa = ifaddr_byindex(ifp->if_index);
 		info.rti_info[RTAX_IFP] = ifa ? ifa->ifa_addr : NULL;
+
+		/*
+		 * XXXRW: Can't acquire IF_ADDR_LOCK() due to call
+	 	 * to SYSCTL_OUT().
+		 */
 		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (af && af != ifma->ifma_addr->sa_family)
 				continue;

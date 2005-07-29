@@ -701,7 +701,9 @@ checkaddresses:;
 		 * arrival interface.
 		 */
 		/* XXX: ToDo: SSM support for non-UDP packet (e.g. ICMP) */
+		IN_MULTI_LOCK();
 		IN_LOOKUP_MULTI(ip->ip_dst, m->m_pkthdr.rcvif, inm);
+		IN_MULTI_UNLOCK();
 		if (inm == NULL) {
 			ipstat.ips_notmember++;
 			m_freem(m);

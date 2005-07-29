@@ -1410,9 +1410,12 @@ sn_getmcf(struct arpcom *ac, uint8_t *mcf)
 	uint32_t index, index2;
 	uint8_t *af = mcf;
 	struct ifmultiaddr *ifma;
+	struct ifnet *ifp;
 
 	bzero(mcf, MCFSZ);
 
+	ifp = &ac->ac_if;
+ 	IF_ADDR_LOCK(ifp);
 	TAILQ_FOREACH(ifma, &ac->ac_if.if_multiaddrs, ifma_link) {
 	    if (ifma->ifma_addr->sa_family != AF_LINK)
 		return 0;
@@ -1426,5 +1429,6 @@ sn_getmcf(struct arpcom *ac, uint8_t *mcf)
 	    }
 	    af[index2 >> 3] |= 1 << (index2 & 7);
 	}
+	IF_ADDR_UNLOCK(ifp);
 	return 1;  /* use multicast filter */
 }

@@ -504,6 +504,7 @@ igmp_input(register struct mbuf *m, int off)
 			++igmpstat.igps_rcv_badqueries; /* invalid query */
 			goto end;
 		}
+		IN_MULTI_UNLOCK();
 
 		if (ifp->if_flags & IFF_LOOPBACK)
 			break;
@@ -632,6 +633,7 @@ igmpv2_query:
 		timer = igmp->igmp_code * PR_FASTHZ / IGMP_TIMER_SCALE;
 		if (timer == 0)
 			timer = 1;
+		IN_MULTI_LOCK();
 		IN_FIRST_MULTI(step, inm);
 		while (inm != NULL) {
 			if (inm->inm_ifp == ifp &&
@@ -703,8 +705,8 @@ igmpv2_query:
 		 * If we belong to the group being reported, stop
 		 * our timer for that group.
 		 */
+		IN_MULTI_LOCK();
 		IN_LOOKUP_MULTI(igmp->igmp_group, ifp, inm);
-
 		if (inm != NULL) {
 			inm->inm_timer = 0;
 			++igmpstat.igps_rcv_ourreports;
@@ -712,6 +714,7 @@ igmpv2_query:
 			inm->inm_state = IGMP_OTHERMEMBER;
 			break;
 		}
+		IN_MULTI_UNLOCK();
 
 		break;
 	}
@@ -731,7 +734,8 @@ end:
 void
 igmp_joingroup(struct in_multi *inm)
 {
-	int s = splnet();
+
+	IN_MULTI_LOCK_ASSERT();
 
 	if (inm->inm_addr.s_addr == igmp_all_hosts_group
 	    || inm->inm_ifp->if_flags & IFF_LOOPBACK) {
@@ -747,12 +751,13 @@ igmp_joingroup(struct in_multi *inm)
 		inm->inm_state = IGMP_IREPORTEDLAST;
 		igmp_timers_are_running = 1;
 	}
-	splx(s);
 }
 
 void
 igmp_leavegroup(struct in_multi *inm)
 {
+
+	IN_MULTI_LOCK_ASSERT();
 
 	if (inm->inm_state == IGMP_IREPORTEDLAST &&
 	    inm->inm_addr.s_addr != igmp_all_hosts_group &&
@@ -776,7 +781,6 @@ igmp_fasttimo(void)
 	struct mbuf *cm, *sm;
 	int cbuflen, sbuflen;
 #endif
-	int s;
 
 	/*
 	 * Quick check to see if any work needs to be done, in order
@@ -786,8 +790,6 @@ igmp_fasttimo(void)
 	if (!igmp_timers_are_running && !interface_timers_are_running
 		&& !state_change_timers_are_running)
 		return;
-
-	s = splnet();
 
 #ifdef IGMPV3
 	if (interface_timers_are_running) {
@@ -810,9 +812,9 @@ igmp_fasttimo(void)
 	if (!igmp_timers_are_running && !state_change_timers_are_running)
 #endif
 	{
-		splx(s);
 		return;
 	}
+	IN_MULTI_LOCK();
 	igmp_timers_are_running = 0;
 #ifdef IGMPV3
 	state_change_timers_are_running = 0;
@@ -899,7 +901,6 @@ next_inm:
 	if (sm != NULL)
 		igmp_sendbuf(sm, ifp);
 #endif
-	splx(s);
 }
 
 void
@@ -966,7 +967,6 @@ igmp_slowtimo(void)
 	}
 	mtx_unlock(&igmp_mtx);
 	IGMP_PRINTF("[igmp.c,_slowtimo] -- > exiting \n");
-	splx(s);
 }
 
 static void
@@ -979,6 +979,9 @@ igmp_sendpkt(struct in_multi *inm, int type, unsigned long addr)
 
 	if (type < 0)
 		return;
+
+	IN_MULTI_LOCK_ASSERT();
+
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
 		return;
@@ -1040,6 +1043,8 @@ igmp_sendbuf(m, ifp)
 #ifdef MROUTING
 	extern struct socket *ip_mrouter;
 #endif /* MROUTING */
+
+	IN_MULTI_LOCK_ASSERT();
 
 	/*
 	 * Insert check sum and send the message.
@@ -1151,6 +1156,7 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 	    timer_g = IGMP_RANDOM_DELAY(timer_g);
 	}
 
+	IN_MULTI_LOCK();
 	IN_FIRST_MULTI(step, inm);
 	while (inm != NULL) {
 	    if (!is_igmp_target(&inm->inm_addr) || inm->inm_ifp != ifp)
@@ -1244,8 +1250,8 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 next_multi:
 	    IN_NEXT_MULTI(step, inm);
 	} /* while */
+	IN_MULTI_UNLOCK();
 
-	splx(s);
 	return 0;
 }
 
@@ -1877,6 +1883,7 @@ igmp_cancel_pending_response(ifp, rti)
 	struct in_multistep step;
 
 	rti->rti_timer3 = 0;
+	IN_MULTI_LOCK();
 	IN_FIRST_MULTI(step, inm);
 	while (inm != NULL) {
 	    if (inm->inm_ifp != ifp)
@@ -1916,6 +1923,7 @@ igmp_cancel_pending_response(ifp, rti)
 next_multi:
 	    IN_NEXT_MULTI(step, inm);
 	}
+	IN_MULTI_UNLOCK();
 }
 #endif /* IGMPV3 */
 
