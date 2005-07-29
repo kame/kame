@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2791 2005/07/26 18:14:58 suz Exp $
+$KAME: CHANGELOG,v 1.2792 2005/07/29 11:09:16 suz Exp $
 
 <200507>
-2005-07-26  SUZUKI, Shinsuke <suz@kame.net)
+2005-07-29  SUZUKI, Shinsuke <suz@kame.net>
+	* freebsd5/*: 
+	- introduced a fine-grain-locking for interface-address list and 
+	  in_multi list.
+	- use malloc() with M_NOWAIT when joining a multicast group in layer2,
+	  drivers.  Error handling routine is also added when malloc() fails.
+	  This is to prevent unnecessary locking failure. (e.g. nd-proxy)
+	Obtained from: freebsd-net
+	ToDo: support it on IGMPv3
+
+2005-07-26  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/{in6_msf.c, in6_var.c, mldv2.c, ip6_output.c}:
 	ports some MLDv1 enhancements into MLDv2.
 	- use callout timer mechanism for protocol timer
