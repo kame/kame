@@ -287,7 +287,7 @@ options 	NEW_STRUCT_ROUTE	# mandatory
 #options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
 
 # Router Preference on host side
-#options 	RTPREF
+options 	RTPREF
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"

@@ -234,7 +234,7 @@ options 	NEW_STRUCT_ROUTE	# mandatory
 #options 	SCTP_ALTERNATE_ROUTE	# alternate route support - TBD
 
 # Router Preference on host side
-#options 	RTPREF
+options 	RTPREF
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"
