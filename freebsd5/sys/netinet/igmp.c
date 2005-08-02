@@ -504,7 +504,6 @@ igmp_input(register struct mbuf *m, int off)
 			++igmpstat.igps_rcv_badqueries; /* invalid query */
 			goto end;
 		}
-		IN_MULTI_UNLOCK();
 
 		if (ifp->if_flags & IFF_LOOPBACK)
 			break;
@@ -650,6 +649,7 @@ igmpv2_query:
 			}
 			IN_NEXT_MULTI(step, inm);
 		}
+		IN_MULTI_UNLOCK();
 #ifdef IGMPV3
 		/*
 		 * IGMPv2 Querier Present is set to Older Version
@@ -895,6 +895,7 @@ next_inm:
 #endif
 		IN_NEXT_MULTI(step, inm);
 	}
+	IN_MULTI_UNLOCK();
 #ifdef IGMPV3
 	if (cm != NULL)
 		igmp_sendbuf(cm, ifp);
@@ -1358,6 +1359,7 @@ igmp_send_all_current_state_report(ifp)
 	struct in_multi *inm;
 	struct in_multistep step;
 
+	IN_MULTI_LOCK();
 	IN_FIRST_MULTI(step, inm);
 	while (inm != NULL) {
 		if (inm->inm_ifp != ifp ||
@@ -1369,6 +1371,7 @@ igmp_send_all_current_state_report(ifp)
 next_multi:
 		IN_NEXT_MULTI(step, inm);
 	}
+	IN_MULTI_UNLOCK();
 	if (m != NULL)
 		igmp_sendbuf(m, ifp);
 }
