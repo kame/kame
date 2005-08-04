@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.384 2005/07/14 14:15:00 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.385 2005/08/04 13:49:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1219,14 +1219,6 @@ nd6_is_addr_neighbor(addr, ifp)
 		    &addr->sin6_addr, &pr->ndpr_mask))
 			return (1);
 	}
-
-	/*
-	 * If the address is assigned on the node of the other side of
-	 * a p2p interface, the address should be a neighbor.
-	 */
-	dstaddr = ifa_ifwithdstaddr((struct sockaddr *)addr);
-	if ((dstaddr != NULL) && (dstaddr->ifa_ifp == ifp))
-		return (1);
 
 	/*
 	 * If the address is assigned on the node of the other side of
