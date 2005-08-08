@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.385 2005/08/04 13:49:40 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.386 2005/08/08 07:22:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2515,7 +2515,7 @@ again:
 	if (ln->ln_state == ND6_LLINFO_STALE) {
 		ln->ln_asked = 0;
 		ln->ln_state = ND6_LLINFO_DELAY;
-		nd6_llinfo_settimer(ln, nd6_delay * hz);
+		nd6_llinfo_settimer(ln, (long)nd6_delay * hz);
 	}
 
 	/*
