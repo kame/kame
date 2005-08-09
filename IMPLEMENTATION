@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.395 2005/07/21 11:03:20 keiichi Exp $
+	$KAME: IMPLEMENTATION,v 1.396 2005/08/09 08:31:06 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -237,7 +237,7 @@ RFC4007: IPv6 Scoped Address Architecture
 draft-chakrabarti-mobileip-mipext-advapi-02.txt:
 	Extension to Sockets API for Mobile IPv6
     * See section 6 about these MIP6 related issues.
-draft-ietf-ipngwg-router-selection-01.txt:
+draft-ietf-ipv6-router-selection-07.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
     * host-side: only router preference is supported.
