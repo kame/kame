@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.159 2005/07/13 07:46:10 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.160 2005/08/10 03:10:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1388,7 +1388,7 @@ nd6_dad_timer(ifa)
 		goto done;
 	}
 	if (ia->ia6_flags & IN6_IFF_DUPLICATED) {
-		log(LOG_ERR, "nd6_dad_timer: called with duplicated address "
+		log(LOG_ERR, "nd6_dad_timer: called with duplicate address "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
@@ -1451,7 +1451,7 @@ nd6_dad_timer(ifa)
 		} else {
 			/*
 			 * We are done with DAD.  No NA came, no NS came.
-			 * No duplicated address found.
+			 * No duplicate address found.
 			 */
 			ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 
