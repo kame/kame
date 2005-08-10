@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.140 2005/06/16 19:48:10 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.141 2005/08/10 05:06:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -600,10 +600,15 @@ ip6_mrouter_init(so, v, cmd)
 
 	pim6 = 0;/* used for stubbing out/in pim stuff */
 
-#if defined(__NetBSD__) || defined(__FreeBSD__)
+#if defined(__FreeBSD__)
+	callout_init(&expire_upcalls_ch, 0);
+	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
+#elif defined(__NetBSD__)
+	callout_init(&expire_upcalls_ch);
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
 #elif defined(__OpenBSD__)
+	bzero(&expire_upcalls_ch, sizeof(expire_upcalls_ch));
 	timeout_set(&expire_upcalls_ch, expire_upcalls, NULL);
 	timeout_add(&expire_upcalls_ch, EXPIRE_TIMEOUT);
 #else
