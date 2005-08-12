@@ -221,7 +221,7 @@ route_output(m, va_alist)
 	struct rtentry *rt = 0;
 	struct rtentry *saved_nrt = 0;
 	struct radix_node_head *rnh;
-	struct rt_addrinfo info;
+	struct rt_addrinfo info, oinfo, *infop = NULL;
 	int len, error = 0;
 	struct ifnet *ifp = 0;
 	struct ifaddr *ifa = 0;
@@ -257,6 +257,7 @@ route_output(m, va_alist)
 	}
 	rtm->rtm_pid = curproc->p_pid;
 	memset(&info, 0, sizeof(info));
+	infop = &info;
 	info.rti_addrs = rtm->rtm_addrs;
 	if (rt_xaddrs((caddr_t)(rtm + 1), len + (caddr_t)rtm, &info))
 		senderr(EINVAL);
@@ -283,6 +284,10 @@ route_output(m, va_alist)
 	if (rtm->rtm_type != RTM_GET &&
 	    suser(curproc->p_ucred, &curproc->p_acflag) != 0)
 		senderr(EACCES);
+
+	/* Remember the original array for possible filtering below */
+	oinfo = info;
+	infop = &oinfo;
 
 	switch (rtm->rtm_type) {
 
@@ -385,6 +390,8 @@ route_output(m, va_alist)
 			}
 			(void)rt_msg2(rtm->rtm_type, &info, (caddr_t)rtm,
 			    (struct walkarg *)0, 0);
+			/* rt_msg2() did the filtering, so we don't have to */
+			infop = NULL;
 			rtm->rtm_flags = rt->rt_flags;
 			rtm->rtm_rmx = rt->rt_rmx;
 			rtm->rtm_addrs = info.rti_addrs;
@@ -471,23 +478,28 @@ flush:
 	}
 	if (rtm) {
 #ifdef INET6
-		int i;
+		if (infop != NULL) {
+			int i;
 
-		/* Special filter for IPv6 scoped addresses (see rtmsg1()) */
-		for (i = 0; i < RTAX_MAX; i++) {
-			struct sockaddr *sa;
-			
+			/*
+			 * Special filter for IPv6 scoped addresses
+			 * (see rtmsg1())
+			 */
+			for (i = 0; i < RTAX_MAX; i++) {
+				struct sockaddr *sa;
 
-			if ((sa = info.rti_info[i]) == NULL)
-				continue;
-			if ((char *)sa + sa->sa_len <=
-			    (char *)rtm + rtm->rtm_msglen &&
-			    sa->sa_len == sizeof(struct sockaddr_in6) &&
-			    sa->sa_family == AF_INET6) {
-				struct sockaddr_in6 *sa6;
+				if ((sa = info.rti_info[i]) == NULL)
+					continue;
+				if ((char *)sa + sa->sa_len <=
+				    (char *)rtm + rtm->rtm_msglen &&
+				    sa->sa_len ==
+				    sizeof(struct sockaddr_in6) &&
+				    sa->sa_family == AF_INET6) {
+					struct sockaddr_in6 *sa6;
 
-				sa6 = (struct sockaddr_in6 *)sa; 
-				(void)sa6_recoverscope(sa6);
+					sa6 = (struct sockaddr_in6 *)sa; 
+					(void)sa6_recoverscope(sa6);
+				}
 			}
 		}
 #endif
