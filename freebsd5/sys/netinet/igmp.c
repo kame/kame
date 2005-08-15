@@ -212,9 +212,9 @@ static void igmp_set_hostcompat(struct ifnet *, struct router_info *, int);
 static int igmp_record_queried_source(struct in_multi *, struct igmp *, int);
 static void igmp_send_all_current_state_report(struct ifnet *);
 static int igmp_send_current_state_report(struct mbuf **, int *, struct in_multi *);
-int igmp_create_group_record(struct mbuf *, int *, struct in_multi *,
+static int igmp_create_group_record(struct mbuf *, int *, struct in_multi *,
 			     u_int16_t, u_int16_t *, u_int8_t);
-void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
+static void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
 #endif
 
 /*
@@ -605,9 +605,7 @@ set_timer:
 
 		error = igmp_set_timer(ifp, rti, igmp, igmplen, query_type);
 		if (error != 0) {
-#ifdef IGMPV3_DEBUG
-			printf("igmp_input: receive bad query\n");
-#endif
+			IGMP_PRINTF("igmp_input: receive bad query\n");
 			goto end;
 		}
 #endif /* IGMPV3 */
@@ -1045,9 +1043,7 @@ igmp_sendbuf(m, ifp)
 	 * Insert check sum and send the message.
 	 */
 	if (m == NULL) {
-#ifdef IGMPV3_DEBUG
-		printf("igmp_sendbuf: mbuf is NULL\n");
-#endif
+		IGMP_PRINTF("igmp_sendbuf: mbuf is NULL\n");
 		return;
 	}
 	m->m_data += sizeof(struct ip);
@@ -1435,9 +1431,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	if (m == NULL) {
 	    SET_REPORTHDR(*m0, numsrc);
 	    if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("igmp_send_current_state_report: error preparing new report header.\n");
-#endif
+		IGMP_PRINTF("igmp_send_current_state_report: error preparing new report header.\n");
 		return error;
 	    }
 	    m = *m0;
@@ -1453,9 +1447,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 		m = NULL;
 		SET_REPORTHDR(*m0, numsrc);
 		if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		    printf("igmp_send_current_state_report: error preparing new report header.\n");
-#endif
+		    IGMP_PRINTF("igmp_send_current_state_report: error preparing new report header.\n");
 		    return error;
 		}
 		m = *m0;
@@ -1470,9 +1462,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	     */
 	    if (igmp_create_group_record(m, buflenp, inm, numsrc,
 					 &src_done, type) != numsrc) {
-#ifdef IGMPV3_DEBUG
-		printf("igmp_send_current_state_report: error of sending MODE_IS_EXCLUDE report?\n");
-#endif
+		IGMP_PRINTF("igmp_send_current_state_report: error of sending MODE_IS_EXCLUDE report?\n");
 		m_freem(m);
 		return EOPNOTSUPP; /* XXX source address insert didn't
 				    * finished. strange... */
@@ -1492,9 +1482,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 		    m = NULL;
 		    SET_REPORTHDR(*m0, numsrc - src_done);
 		    if (error != 0) {
-#ifdef IGMPV3_DEBUG
-			printf("igmp_send_current_state_report: error preparing additional report header.\n");
-#endif
+			IGMP_PRINTF("igmp_send_current_state_report: error preparing additional report header.\n");
 			return error;
 		    }
 		    m = *m0;
@@ -1626,9 +1614,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	if (m == NULL) {
 	    SET_REPORTHDR(*m0, numsrc);
 	    if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("igmp_send_state_change_report: error preparing new report header.\n");
-#endif
+		IGMP_PRINTF("igmp_send_state_change_report: error preparing new report header.\n");
 		return; /* robvar is not reduced */
 	    }
 	    m = *m0;
@@ -1645,9 +1631,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		m = NULL;
 		SET_REPORTHDR(*m0, numsrc);
 		if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		    printf("igmp_send_state_change_report: error preparing new report header.\n");
-#endif
+		    IGMP_PRINTF("igmp_send_state_change_report: error preparing new report header.\n");
 		    return;
 		}
 		m = *m0;
@@ -1665,9 +1649,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		if (igmp_create_group_record
 				(m, buflenp, inm, numsrc, &src_done, type)
 				!= numsrc) {
-#ifdef IGMPV3_DEBUG
-		    printf("igmp_send_state_change_report: error of sending CHANGE_TO_EXCLUDE_MODE report?\n");
-#endif
+		    IGMP_PRINTF("igmp_send_state_change_report: error of sending CHANGE_TO_EXCLUDE_MODE report?\n");
 		    m_freem(m);
 		    return; /* XXX source address insert didn't finished.
 			     * strange... robvar is not reduced */
@@ -1711,9 +1693,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 			m = NULL;
 			SET_REPORTHDR(*m0, numsrc - src_done);
 			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-			    printf("igmp_send_state_change_report: error preparing additional report header.\n");
-#endif
+			    IGMP_PRINTF("igmp_send_state_change_report: error preparing additional report header.\n");
 			    return;
 			}
 			m = *m0;
@@ -1778,9 +1758,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		    m = NULL;
 		    SET_REPORTHDR(*m0, numsrc - src_done);
 		    if (error != 0) {
-#ifdef IGMPV3_DEBUG
-			printf("igmp_send_state_change_report: error preparing additional report header.\n");
-#endif
+			IGMP_PRINTF("igmp_send_state_change_report: error preparing additional report header.\n");
 			return;
 		    }
 		    m = *m0;
@@ -1817,7 +1795,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	return;
 }
 
-int
+static int
 igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 	struct mbuf *m;
 	int *buflenp;
@@ -1879,7 +1857,7 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
  * Cancel all IGMPv3 pending response and retransmission timers on an
  * interface.
  */
-void
+static void
 igmp_cancel_pending_response(ifp, rti)
 	struct ifnet *ifp;
 	struct router_info *rti;
@@ -2594,9 +2572,7 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 		return NULL;
 	    }
 	    if (ifma->ifma_protospec != NULL) {
-#ifdef IGMPV3_DEBUG
-		printf("in_modmulti: there's a corresponding if_multiaddr although IN_LOOKUP_MULTI fails \n");
-#endif
+		IGMP_PRINTF("in_modmulti: there's a corresponding if_multiaddr although IN_LOOKUP_MULTI fails \n");
 		IN_MULTI_UNLOCK();
 		return NULL;
 	    }
