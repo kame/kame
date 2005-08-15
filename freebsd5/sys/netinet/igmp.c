@@ -1519,16 +1519,23 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	 * remaining source addresses are not reported.
 	 * Note that numsrc may or may not be 0.
 	 */
-	if (type == CHANGE_TO_EXCLUDE_MODE) {
+	switch (type) {
+	case CHANGE_TO_EXCLUDE_MODE:
 	    numsrc = inm->inm_source->ims_toex->numsrc;
-	    if (max_len < SOURCE_RECORD_LEN(numsrc)
-				+ sizeof(struct ip) + rhdrlen + ghdrlen)
+	    if (max_len < SOURCE_RECORD_LEN(numsrc) + sizeof(struct ip)
+	        + rhdrlen + ghdrlen)
 		/* toex's numsrc should be fit in a single message. */
-		numsrc = (max_len - sizeof(struct ip)
-				- rhdrlen - ghdrlen) / addrlen;
-	} else if (type == CHANGE_TO_INCLUDE_MODE) {
+		numsrc = (max_len - sizeof(struct ip) - rhdrlen - ghdrlen)
+		    / addrlen;
+	    break;
+
+	case CHANGE_TO_INCLUDE_MODE:
 	    numsrc = inm->inm_source->ims_toin->numsrc;
-	} else { /* ALLOW_NEW_SOURCES and/or BLOCK_OLD_SOURCES */
+	    break;
+
+	case ALLOW_NEW_SOURCES:
+	case BLOCK_OLD_SOURCES:
+	default:
 	    numsrc = 0;
 	    if (inm->inm_source->ims_alw != NULL)
 		numsrc = inm->inm_source->ims_alw->numsrc;
@@ -1544,6 +1551,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		    --inm->inm_source->ims_robvar;
 		return;
 	    }
+	    break;
 	}
 
 	if (m && (ghdrlen + SOURCE_RECORD_LEN(numsrc)
@@ -1680,9 +1688,8 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		    numsrc = inm->inm_source->ims_blk->numsrc;
 		else /* finish group record insertion */
 		    break;
-		src_once = igmp_create_group_record
-					(m, buflenp, inm, numsrc,
-					 &src_done, type);
+		src_once = igmp_create_group_record(m, buflenp, inm, numsrc,
+		    &src_done, type);
 		if (numsrc > src_done) {
 		    igmp_sendbuf(m, inm->inm_ifp);
 		    m = NULL;
@@ -1707,19 +1714,21 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		state_change_timers_are_running = 1;
 		igmp_sendbuf(m, inm->inm_ifp);
 	    }
-	    if (--inm->inm_source->ims_robvar == 0) {
-		if ((inm->inm_source->ims_alw != NULL) &&
-		    		(inm->inm_source->ims_alw->numsrc != 0)) {
-		    in_free_msf_source_list(inm->inm_source->ims_alw->head);
-		    inm->inm_source->ims_alw->numsrc = 0;
-		}
-		if ((inm->inm_source->ims_blk != NULL) &&
-		    		(inm->inm_source->ims_blk->numsrc != 0)) {
-		    in_free_msf_source_list(inm->inm_source->ims_blk->head);
-		    inm->inm_source->ims_blk->numsrc = 0;
-		}
-		inm->inm_source->ims_timer = 0;
+	    if (--inm->inm_source->ims_robvar)
+	        break;
+
+	    /* frees the MSF list, since the robustness variable reached 0 */
+	    if (inm->inm_source->ims_alw != NULL &&
+		inm->inm_source->ims_alw->numsrc != 0) {
+		in_free_msf_source_list(inm->inm_source->ims_alw->head);
+		inm->inm_source->ims_alw->numsrc = 0;
 	    }
+	    if (inm->inm_source->ims_blk != NULL &&
+	 	inm->inm_source->ims_blk->numsrc != 0) {
+		in_free_msf_source_list(inm->inm_source->ims_blk->head);
+		inm->inm_source->ims_blk->numsrc = 0;
+	    }
+	    inm->inm_source->ims_timer = 0;
 	    break;
 	}
 
@@ -1784,12 +1793,12 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 	i = 0;
 	if (iasl != NULL) {
 		for (ias = LIST_FIRST(iasl->head); total < *done;
-				total++, ias = LIST_NEXT(ias, ias_list))
+		    total++, ias = LIST_NEXT(ias, ias_list))
 			; /* adjust a source pointer. */
 		/* Insert source address to mbuf */
 		for (; i < numsrc && ias != NULL && mfreelen > addrlen;
-				i++, total++, mfreelen -= addrlen,
-				ias = LIST_NEXT(ias, ias_list))
+		    i++, total++, mfreelen -= addrlen,
+		    ias = LIST_NEXT(ias, ias_list))
 			bcopy(&ias->ias_addr.sin_addr,
 			      &igmp_ghdr->src[i].s_addr,
 			      sizeof(igmp_ghdr->src[i]));
