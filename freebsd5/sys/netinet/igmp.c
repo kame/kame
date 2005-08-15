@@ -106,8 +106,8 @@
 static MALLOC_DEFINE(M_IGMP, "igmp", "igmp state");
 MALLOC_DEFINE(M_MSFILTER, "msfilter", "multicast source filter");
 
-static struct router_info	*find_rti(struct ifnet *ifp);
-static void	igmp_sendpkt(struct in_multi *, int, unsigned long);
+static struct router_info *find_rti(struct ifnet *, int);
+static void igmp_sendpkt(struct in_multi *, int, unsigned long);
 
 static SLIST_HEAD(, router_info) router_info_head;
 static struct igmpstat igmpstat;
@@ -311,7 +311,7 @@ rti_init(ifp)
 
 
 static struct router_info *
-find_rti(struct ifnet *ifp)
+find_rti(struct ifnet *ifp, int create)
 {
 	struct router_info *rti;
 
@@ -323,6 +323,10 @@ find_rti(struct ifnet *ifp)
 			    "[igmp.c, _find_rti] --> found old entry \n");
 			return rti;
 		}
+	}
+	if (!create) {
+		IGMP_PRINTF( "[igmp.c, _find_rti] --> found no entry\n");
+		return NULL;
 	}
 	if ((rti = rti_init(ifp)) == NULL) {
 		IGMP_PRINTF( "[igmp.c, _find_rti] --> no memory for entry\n");
@@ -463,7 +467,7 @@ igmp_input(register struct mbuf *m, int off)
 		timer = 1;
 
 	mtx_lock(&igmp_mtx);
-	rti = find_rti(ifp);
+	rti = find_rti(ifp, 1);
 	if (rti == NULL) {
 		++igmpstat.igps_rcv_query_fails;
 		goto end; /* XXX */
@@ -738,7 +742,7 @@ igmp_joingroup(struct in_multi *inm)
 		inm->inm_state = IGMP_OTHERMEMBER;
 	} else {
 		mtx_lock(&igmp_mtx);
-		inm->inm_rti = find_rti(inm->inm_ifp);
+		inm->inm_rti = find_rti(inm->inm_ifp, 1);
 		mtx_unlock(&igmp_mtx);
 		igmp_sendpkt(inm, inm->inm_rti->rti_type, 0);
 		inm->inm_timer = IGMP_RANDOM_DELAY(
@@ -2204,26 +2208,23 @@ in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
 	 * Let IGMP know that we have joined a new IP multicast group.
 	 */
 	mtx_lock(&igmp_mtx);
-	SLIST_FOREACH(rti, &router_info_head, rti_list) {
-	    if (rti->rti_ifp == inm->inm_ifp) {
-		inm->inm_rti = rti;
-		break;
-	    }
+	rti = find_rti(inm->inm_ifp, 0);
+	if (rti) {
+	    inm->inm_rti = rti;
+	    mtx_unlock(&igmp_mtx);
+	    break;
 	}
-	if (rti == NULL) {
-	    if ((rti = rti_init(inm->inm_ifp)) == NULL) {
-		LIST_REMOVE(inm, inm_list);
-		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
-		free(inm, M_IPMADDR);
-		*error = ENOBUFS;
-		mtx_unlock(&igmp_mtx);
-		IN_MULTI_UNLOCK();
-		return NULL;
-	    } else {
-		inm->inm_rti = rti;
-		mtx_unlock(&igmp_mtx);
-	    }
+	if ((rti = rti_init(inm->inm_ifp)) == NULL) {
+	    LIST_REMOVE(inm, inm_list);
+	    if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+	    free(inm, M_IPMADDR);
+	    *error = ENOBUFS;
+	    mtx_unlock(&igmp_mtx);
+	    IN_MULTI_UNLOCK();
+	    return NULL;
 	}
+	inm->inm_rti = rti;
+	mtx_unlock(&igmp_mtx);
 
 	inm->inm_source = NULL;
 	if (!is_igmp_target(&inm->inm_addr)) {
@@ -2617,23 +2618,21 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 	    LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
 
 	    mtx_lock(&igmp_mtx);
-	    SLIST_FOREACH(rti, &router_info_head, rti_list) {
-		if (rti->rti_ifp == inm->inm_ifp) {
-		    inm->inm_rti = rti;
-		    break;
-		}
-	    }
-	    if (rti == NULL) {
-		if ((rti = rti_init(inm->inm_ifp)) == NULL) {
-		    LIST_REMOVE(inm, inm_list);
-		    free(inm, M_IPMADDR);
-		    *error = ENOBUFS;
-		    mtx_unlock(&igmp_mtx);
-		    IN_MULTI_UNLOCK();
-		    return NULL;
-	    	}
+	    rti = find_rti(inm->inm_ifp, 0);
+	    if (rti) {
 		inm->inm_rti = rti;
+	        mtx_unlock(&igmp_mtx);
+		break;
 	    }
+	    if ((rti = rti_init(inm->inm_ifp)) == NULL) {
+		LIST_REMOVE(inm, inm_list);
+		free(inm, M_IPMADDR);
+		*error = ENOBUFS;
+		mtx_unlock(&igmp_mtx);
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    }
+	    inm->inm_rti = rti;
 	    mtx_unlock(&igmp_mtx);
 
 	    inm->inm_source = NULL;
