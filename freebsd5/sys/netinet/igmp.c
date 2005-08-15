@@ -137,7 +137,7 @@ SYSCTL_INT(_net_inet_igmp, IGMPCTL_VERSION, version, CTLFLAG_RW,
  * valid, so no reference counting is used.  We allow unlocked reads of
  * router_info data when accessed via an in_multi read-only.
  */
-static struct mtx igmp_mtx;
+struct mtx igmp_mtx;
 static int igmp_timers_are_running;
 static int interface_timers_are_running;
 static int state_change_timers_are_running;
@@ -463,7 +463,6 @@ igmp_input(register struct mbuf *m, int off)
 
 	mtx_lock(&igmp_mtx);
 	rti = find_rti(ifp);
-	mtx_unlock(&igmp_mtx);
 	if (rti == NULL) {
 		++igmpstat.igps_rcv_query_fails;
 		goto end; /* XXX */
@@ -515,7 +514,6 @@ igmp_input(register struct mbuf *m, int off)
 		 */
 		if ((igmp->igmp_code == 0) && (query_ver != IGMP_v3_QUERY)) {
 
-			mtx_lock(&igmp_mtx);
 #ifndef IGMPV3
 			query_ver = IGMP_v1_QUERY; /* overwrite */
 			rti->rti_type = IGMP_v1_ROUTER;
@@ -524,7 +522,6 @@ igmp_input(register struct mbuf *m, int off)
 			if (igmp_version == 0)
 				igmp_set_hostcompat(ifp, rti, query_ver);
 #endif
-			mtx_unlock(&igmp_mtx);
 
 			timer = IGMP_MAX_HOST_REPORT_DELAY * PR_FASTHZ;
 
@@ -605,9 +602,7 @@ set_timer:
 		else if (rti->rti_type == IGMP_v2_ROUTER)
 			goto igmpv2_query;
 
-		mtx_lock(&igmp_mtx);
 		error = igmp_set_timer(ifp, rti, igmp, igmplen, query_type);
-		mtx_unlock(&igmp_mtx);
 		if (error != 0) {
 #ifdef IGMPV3_DEBUG
 			printf("igmp_input: receive bad query\n");
@@ -659,9 +654,7 @@ igmpv2_query:
 		if (igmp->igmp_group.s_addr == INADDR_ANY) {
 		    if (igmp_version == 3)
 			goto end;
-		    mtx_lock(&igmp_mtx);
 		    igmp_set_hostcompat(ifp, rti, query_ver);
-		    mtx_unlock(&igmp_mtx);
 		}
 #endif
 		break;
@@ -718,6 +711,7 @@ igmpv2_query:
 
 		break;
 	}
+	mtx_unlock(&igmp_mtx);
 
 	/*
 	 * Pass all valid IGMP packets up to any process(es) listening
@@ -793,6 +787,7 @@ igmp_fasttimo(void)
 
 #ifdef IGMPV3
 	if (interface_timers_are_running) {
+		mtx_lock(&igmp_mtx);
 		interface_timers_are_running = 0;
 		SLIST_FOREACH(rti, &router_info_head, rti_list) {
 			if (rti->rti_timer3 == 0)
@@ -803,6 +798,7 @@ igmp_fasttimo(void)
 			else
 				interface_timers_are_running = 1;
 		}
+		mtx_unlock(&igmp_mtx);
 	}
 #endif
 
@@ -1044,8 +1040,6 @@ igmp_sendbuf(m, ifp)
 	extern struct socket *ip_mrouter;
 #endif /* MROUTING */
 
-	IN_MULTI_LOCK_ASSERT();
-
 	/*
 	 * Insert check sum and send the message.
 	 */
@@ -1264,6 +1258,8 @@ igmp_set_hostcompat(ifp, rti, query_ver)
 	struct router_info *rti;
 	int query_ver;
 {
+	mtx_assert(&igmp_mtx, MA_OWNED);
+
 	/*
 	 * Keep Older Version Querier Present timer.
 	 */
@@ -1311,6 +1307,8 @@ igmp_record_queried_source(inm, igmp, igmplen)
 	int ref_count;
 	struct sockaddr_in sin;
 	int recorded = 0;
+
+	IN_MULTI_LOCK_ASSERT();
 
 	igmplen -= qhdrlen; /* remaining source list */
 	numsrc = ntohs(igmp->igmp_numsrc);
@@ -1361,8 +1359,10 @@ igmp_send_all_current_state_report(ifp)
 		    !is_igmp_target(&inm->inm_addr))
 			goto next_multi;
 
-		if (igmp_send_current_state_report(&m, &buflen, inm) != 0)
+		if (igmp_send_current_state_report(&m, &buflen, inm) != 0) {
+			IN_MULTI_UNLOCK();
 			return;
+		}
 next_multi:
 		IN_NEXT_MULTI(step, inm);
 	}
@@ -1390,6 +1390,8 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	u_int16_t numsrc, src_once, src_done = 0;
 	u_int8_t type = 0;
 	int error = 0;
+
+	IN_MULTI_LOCK_ASSERT();
 
 	if (!is_igmp_target(&inm->inm_addr) ||
 		(inm->inm_ifp->if_flags & IFF_LOOPBACK) != 0)
@@ -1538,6 +1540,8 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	u_int16_t numsrc, src_once, src_done = 0;
 	int buflen = 0;
 	int error = 0;
+
+	IN_MULTI_LOCK_ASSERT();
 
 	if (!is_igmp_target(&inm->inm_addr) ||
 		(inm->inm_ifp->if_flags & IFF_LOOPBACK) != 0)
@@ -1829,6 +1833,8 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 	u_int16_t i, total;
 	int mfreelen;
 
+	IN_MULTI_LOCK_ASSERT();
+
 	ip = mtod(m, struct ip *);
 	igmp_rhdr = (struct igmp_report_hdr *)((char *)ip + sizeof(*ip));
 	++igmp_rhdr->igmp_grpnum;
@@ -1880,6 +1886,7 @@ igmp_cancel_pending_response(ifp, rti)
 	struct in_multi *inm;
 	struct in_multistep step;
 
+	mtx_lock(&igmp_mtx);
 	rti->rti_timer3 = 0;
 	IN_MULTI_LOCK();
 	IN_FIRST_MULTI(step, inm);
@@ -1922,6 +1929,7 @@ next_multi:
 	    IN_NEXT_MULTI(step, inm);
 	}
 	IN_MULTI_UNLOCK();
+	mtx_unlock(&igmp_mtx);
 }
 #endif /* IGMPV3 */
 
