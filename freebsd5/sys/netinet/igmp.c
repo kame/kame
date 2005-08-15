@@ -293,16 +293,6 @@ igmp_get_router_alert(m)
 	int minlen;
 	int iphlen, optlen;
 
-	++igmpstat.igps_rcv_total;
-
-	/*
-	 * Validate IP Time-to-Live
-	 */
-	if (ip->ip_ttl != 1) {
-		++igmpstat.igps_rcv_badttl;
-		return -1;
-	}
-
 	/*
 	 * Validate lengths
 	 */
@@ -377,6 +367,16 @@ igmp_input(register struct mbuf *m, int off)
 
 	ip = mtod(m, struct ip *);
 	igmplen = ip->ip_len;
+
+	++igmpstat.igps_rcv_total;
+
+	/*
+	 * Validate IP Time-to-Live
+	 */
+	if (ip->ip_ttl != 1) {
+		++igmpstat.igps_rcv_badttl;
+		return -1;
+	}
 
 	/*
 	 * Check length and validate checksum
