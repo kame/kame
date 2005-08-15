@@ -1019,14 +1019,14 @@ in_addmulti(ap, ifp)
 	error = if_addmulti(ifp, (struct sockaddr *)&sin, &ifma);
 	if (error) {
 		IN_MULTI_UNLOCK();
-		return 0;
+		return NULL;
 	}
 
 	/*
 	 * If ifma->ifma_protospec is null, then if_addmulti() created
 	 * a new record.  Otherwise, we are done.
 	 */
-	if (ifma->ifma_protospec != 0) {
+	if (ifma->ifma_protospec != NULL) {
 		IN_MULTI_UNLOCK();
 		return ifma->ifma_protospec;
 	}
@@ -1143,7 +1143,7 @@ in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
 	 * If ifma->ifma_protospec is null, then if_addmulti() created
 	 * a new record.  Otherwise, we are done.
 	 */
-	if (ifma->ifma_protospec != 0) {
+	if (ifma->ifma_protospec != NULL) {
 		inm = (struct in_multi *) ifma->ifma_protospec;
 		/*
 		 * Found it; merge source addresses in inm_source and send
@@ -1251,7 +1251,7 @@ in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
 		break;
 	    }
 	}
-	if (rti == 0) {
+	if (rti == NULL) {
 	    if ((rti = rti_init(inm->inm_ifp)) == NULL) {
 		LIST_REMOVE(inm, inm_list);
 		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
@@ -1349,7 +1349,7 @@ in_delmulti2(inm, numsrc, ss, mode, final, error)
 			/*
 			 * Unlink from list.
 			 */
-			ifma->ifma_protospec = 0;
+			ifma->ifma_protospec = NULL;
 			LIST_REMOVE(inm, inm_list);
 			/*
 			 * Notify the network driver to update its multicast
@@ -1447,7 +1447,7 @@ in_delmulti2(inm, numsrc, ss, mode, final, error)
 		 */
 		in_free_all_msf_source_list(inm);
 		LIST_REMOVE(inm, inm_list);
-		ifma->ifma_protospec = 0;
+		ifma->ifma_protospec = NULL;
 
 		/*
 		 * Notify the network driver to update its multicast
