@@ -152,59 +152,6 @@ static int addrlen = sizeof(struct in_addr);
 
 #define	SOURCE_RECORD_LEN(numsrc)	(numsrc*(sizeof(u_int32_t)))
 
-#define	GET_REPORT_SOURCE_HEAD(inm, type, iasl) { \
-	if ((type) == ALLOW_NEW_SOURCES) \
-		(iasl) = (inm)->inm_source->ims_alw; \
-	else if ((type) == BLOCK_OLD_SOURCES) \
-		(iasl) = (inm)->inm_source->ims_blk; \
-	else if ((type) == CHANGE_TO_INCLUDE_MODE) \
-		(iasl) = (inm)->inm_source->ims_toin; \
-	else if ((type) == CHANGE_TO_EXCLUDE_MODE) \
-		(iasl) = (inm)->inm_source->ims_toex; \
-	else { \
-		if ((inm)->inm_state == IGMP_SG_QUERY_PENDING_MEMBER) \
-			(iasl) = (inm)->inm_source->ims_rec; \
-		else \
-			(iasl) = (inm)->inm_source->ims_cur; \
-	} \
-}
-
-#define	SET_REPORTHDR(m, numsrc) do { \
-	MGETHDR((m), M_DONTWAIT, MT_HEADER); \
-	if ((m) != NULL && \
-		MHLEN - max_linkhdr < sizeof(struct ip) + rhdrlen + ghdrlen \
-					+ SOURCE_RECORD_LEN((numsrc))) { \
-		MCLGET((m), M_DONTWAIT); \
-		if (((m)->m_flags & M_EXT) == 0) { \
-			m_freem((m)); \
-			error = ENOBUFS; \
-			break; \
-		} \
-	} \
-	if ((m) == NULL) { \
-		error = ENOBUFS; \
-		break; \
-	} \
-	(m)->m_data += max_linkhdr; \
-	ip = mtod((m), struct ip *); \
-	buflen = sizeof(struct ip); \
-	ip->ip_len = sizeof(struct ip) + rhdrlen; \
-	ip->ip_tos = 0xc0; \
-	ip->ip_off = 0; \
-	ip->ip_p = IPPROTO_IGMP; \
-	ip->ip_src.s_addr = INADDR_ANY; \
-	ip->ip_dst.s_addr = htonl(INADDR_NEW_ALLRTRS_GROUP); \
-	igmp_rhdr = (struct igmp_report_hdr *)((char *)ip + buflen); \
-	igmp_rhdr->igmp_type = IGMP_V3_MEMBERSHIP_REPORT; \
-	igmp_rhdr->igmp_reserved1 = 0; \
-	igmp_rhdr->igmp_reserved2 = 0; \
-	igmp_rhdr->igmp_grpnum = 0; \
-	buflen += rhdrlen; \
-	(m)->m_len = sizeof(struct ip) + rhdrlen; \
-	(m)->m_pkthdr.len = sizeof(struct ip) + rhdrlen; \
-	(m)->m_pkthdr.rcvif = (struct ifnet *)0; \
-} while(0)
-
 #ifdef IGMPV3
 static int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
 			int, u_int8_t);
@@ -215,6 +162,7 @@ static int igmp_send_current_state_report(struct mbuf **, int *, struct in_multi
 static int igmp_create_group_record(struct mbuf *, int *, struct in_multi *,
 			     u_int16_t, u_int16_t *, u_int8_t);
 static void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
+static int igmp_set_v3report_header(struct mbuf **, int, int *);
 #endif
 
 /*
@@ -1380,9 +1328,6 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	struct in_multi *inm;
 {
 	struct mbuf *m = *m0;
-	struct ip *ip;
-	struct igmp_report_hdr *igmp_rhdr;
-	int buflen = 0;
 	u_int16_t max_len;
 	u_int16_t numsrc, src_once, src_done = 0;
 	u_int8_t type = 0;
@@ -1428,32 +1373,24 @@ igmp_send_current_state_report(m0, buflenp, inm)
 				- rhdrlen - ghdrlen) / addrlen;
 	}
 
+	if (m && ghdrlen + SOURCE_RECORD_LEN(numsrc) > M_TRAILINGSPACE(m)) {
+	    /*
+	     * When remaining buffer is not enough to insert new group record,
+	     * send current buffer and create a new buffer for this record.
+	     */
+	    igmp_sendbuf(m, inm->inm_ifp);
+	    m = NULL;
+	}
+
 	if (m == NULL) {
-	    SET_REPORTHDR(*m0, numsrc);
+	    error = igmp_set_v3report_header(m0, numsrc, buflenp);
 	    if (error != 0) {
-		IGMP_PRINTF("igmp_send_current_state_report: error preparing new report header.\n");
+		IGMP_PRINTF("igmp_send_current_state_report: "
+		    "error preparing new report header.\n");
 		return error;
 	    }
 	    m = *m0;
-	    *buflenp = buflen;
-	} else {
-	    if (ghdrlen + SOURCE_RECORD_LEN(numsrc) > M_TRAILINGSPACE(m)) {
-		/*
-		 * When remaining buffer is not enough to insert new group
-		 * record, send current buffer and create a new buffer for
-		 * this record.
-		 */
-		igmp_sendbuf(m, inm->inm_ifp);
-		m = NULL;
-		SET_REPORTHDR(*m0, numsrc);
-		if (error != 0) {
-		    IGMP_PRINTF("igmp_send_current_state_report: error preparing new report header.\n");
-		    return error;
-		}
-		m = *m0;
-		*buflenp = buflen;
-	    }
-	} /* m == NULL */
+	}
 
 	if (type == MODE_IS_EXCLUDE) {
 	    /*
@@ -1462,7 +1399,8 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	     */
 	    if (igmp_create_group_record(m, buflenp, inm, numsrc,
 					 &src_done, type) != numsrc) {
-		IGMP_PRINTF("igmp_send_current_state_report: error of sending MODE_IS_EXCLUDE report?\n");
+		IGMP_PRINTF("igmp_send_current_state_report: "
+		    "error of sending MODE_IS_EXCLUDE report?\n");
 		m_freem(m);
 		return EOPNOTSUPP; /* XXX source address insert didn't
 				    * finished. strange... */
@@ -1472,23 +1410,23 @@ igmp_send_current_state_report(m0, buflenp, inm)
 		/* XXX Some security implication? */
 		src_once = igmp_create_group_record
 				(m, buflenp, inm, numsrc, &src_done, type);
-		if (numsrc > src_done) {
-		    /*
-		     * Source address insert didn't finished, so, send this
-		     * IGMP report here and try to make separate message
-		     * with remaining sources.
-		     */
-		    igmp_sendbuf(m, inm->inm_ifp);
-		    m = NULL;
-		    SET_REPORTHDR(*m0, numsrc - src_done);
-		    if (error != 0) {
-			IGMP_PRINTF("igmp_send_current_state_report: error preparing additional report header.\n");
-			return error;
-		    }
-		    m = *m0;
-		    *buflenp = buflen;
-		} else /* finish insertion */
-		    break;
+		if (numsrc <= src_done)
+			break; /* finish insertion */
+
+		/*
+		 * Source address insert didn't finished, so, send this IGMP 
+		 * report here and try to make separate message
+		 * with remaining sources.
+		 */
+		igmp_sendbuf(m, inm->inm_ifp);
+		m = NULL;
+		error = igmp_set_v3report_header(m0, numsrc - src_done, buflenp);
+		if (error != 0) {
+		    IGMP_PRINTF("igmp_send_current_state_report: "
+			"error preparing additional report header.\n");
+		    return error;
+		}
+		m = *m0;
 	    } /* while */
 	}
 
@@ -1523,11 +1461,8 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	int timer_init;		/* set this when IPMulticastListen() invoked */
 {
 	struct mbuf *m = *m0;
-	struct ip *ip;
-	struct igmp_report_hdr *igmp_rhdr;
 	u_int16_t max_len;
 	u_int16_t numsrc, src_once, src_done = 0;
-	int buflen = 0;
 	int error = 0;
 
 	IN_MULTI_LOCK_ASSERT();
@@ -1611,17 +1546,8 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	    }
 	}
 
-	if (m == NULL) {
-	    SET_REPORTHDR(*m0, numsrc);
-	    if (error != 0) {
-		IGMP_PRINTF("igmp_send_state_change_report: error preparing new report header.\n");
-		return; /* robvar is not reduced */
-	    }
-	    m = *m0;
-	    *buflenp = buflen;
-	} else {
-	    if (ghdrlen + SOURCE_RECORD_LEN(numsrc)
-			> M_TRAILINGSPACE(m) - sizeof(struct ip) - *buflenp) {
+	if (m && (ghdrlen + SOURCE_RECORD_LEN(numsrc)
+	    > M_TRAILINGSPACE(m) - sizeof(struct ip) - *buflenp)) {
 		/*
 		 * When remaining buffer is not enough to insert new group
 		 * record, send current buffer and create a new buffer for
@@ -1629,19 +1555,19 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		 */
 		igmp_sendbuf(m, inm->inm_ifp);
 		m = NULL;
-		SET_REPORTHDR(*m0, numsrc);
-		if (error != 0) {
-		    IGMP_PRINTF("igmp_send_state_change_report: error preparing new report header.\n");
-		    return;
-		}
-		m = *m0;
-		*buflenp = buflen;
+	}
+	if (m == NULL) {
+	    error = igmp_set_v3report_header(m0, numsrc, buflenp);
+	    if (error != 0) {
+		IGMP_PRINTF("igmp_send_state_change_report: "
+		    "error preparing new report header.\n");
+		return; /* robvar is not reduced */
 	    }
+	    m = *m0;
 	}
 
-	if ((type == CHANGE_TO_INCLUDE_MODE) ||
-			(type == CHANGE_TO_EXCLUDE_MODE)) {
-	    if (type == CHANGE_TO_EXCLUDE_MODE) {
+	switch (type) {
+	case CHANGE_TO_EXCLUDE_MODE:
 		/*
 		 * The number of sources of CHANGE_TO_EXCLUDE_MODE record is
 		 * already adjusted to fit in one buffer.
@@ -1649,7 +1575,8 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		if (igmp_create_group_record
 				(m, buflenp, inm, numsrc, &src_done, type)
 				!= numsrc) {
-		    IGMP_PRINTF("igmp_send_state_change_report: error of sending CHANGE_TO_EXCLUDE_MODE report?\n");
+		    IGMP_PRINTF("igmp_send_state_change_report: "
+		        "error of sending CHANGE_TO_EXCLUDE_MODE report?\n");
 		    m_freem(m);
 		    return; /* XXX source address insert didn't finished.
 			     * strange... robvar is not reduced */
@@ -1682,25 +1609,26 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		    } else
 			inm->inm_source->ims_timer = 0;
 		}
-	    } else if (type == CHANGE_TO_INCLUDE_MODE) {
+		break;
+	
+	case CHANGE_TO_INCLUDE_MODE:
 		while (1) {
 		    /* XXX Some security implication? */
 		    src_once = igmp_create_group_record
 					(m, buflenp, inm, numsrc,
 					 &src_done, type);
-		    if (numsrc > src_done) {
-			igmp_sendbuf(m, inm->inm_ifp);
-			m = NULL;
-			SET_REPORTHDR(*m0, numsrc - src_done);
-			if (error != 0) {
-			    IGMP_PRINTF("igmp_send_state_change_report: error preparing additional report header.\n");
-			    return;
-			}
-			m = *m0;
-			*buflenp = buflen;
-		    } else { /* finish insertion */
-			break;
+		    if (numsrc <= src_done)
+		    	break; /* finish insertion */
+
+		    igmp_sendbuf(m, inm->inm_ifp);
+		    m = NULL;
+		    error = igmp_set_v3report_header(m0, numsrc - src_done, buflenp);
+		    if (error != 0) {
+			IGMP_PRINTF("igmp_send_state_change_report: "
+			    "error preparing additional report header.\n");
+			return;
 		    }
+		    m = *m0;
 		}
 		if (timer_init) {
 		    state_change_timers_are_running = 1;
@@ -1730,9 +1658,11 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		    } else
 			inm->inm_source->ims_timer = 0;
 		}
-	    }
+		break;
 
-	} else { /* ALLOW_NEW_SOURCES and/or BLOCK_OLD_SOURCES */
+	case ALLOW_NEW_SOURCES:
+	case BLOCK_OLD_SOURCES:
+	default:
 	    if ((inm->inm_source->ims_alw != NULL) &&
 			(inm->inm_source->ims_alw->numsrc != 0))
 		type = ALLOW_NEW_SOURCES;
@@ -1756,13 +1686,13 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		if (numsrc > src_done) {
 		    igmp_sendbuf(m, inm->inm_ifp);
 		    m = NULL;
-		    SET_REPORTHDR(*m0, numsrc - src_done);
+		    error = igmp_set_v3report_header(m0, numsrc - src_done, buflenp);
 		    if (error != 0) {
-			IGMP_PRINTF("igmp_send_state_change_report: error preparing additional report header.\n");
+			IGMP_PRINTF("igmp_send_state_change_report: "
+			    "error preparing additional report header.\n");
 			return;
 		    }
 		    m = *m0;
-		    *buflenp = buflen;
 		} else { /* next group record */
 		    if ((type == ALLOW_NEW_SOURCES) &&
 				(inm->inm_source->ims_blk != NULL) &&
@@ -1790,6 +1720,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 		}
 		inm->inm_source->ims_timer = 0;
 	    }
+	    break;
 	}
 
 	return;
@@ -1828,7 +1759,27 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 	m->m_pkthdr.len += ghdrlen;
 	mfreelen = M_TRAILINGSPACE(m) - *buflenp;
 
-	GET_REPORT_SOURCE_HEAD(inm, type, iasl);
+	switch (type) {
+	case ALLOW_NEW_SOURCES:
+		iasl = inm->inm_source->ims_alw;
+		break;
+	case BLOCK_OLD_SOURCES:
+		iasl = inm->inm_source->ims_blk;
+		break;
+	case CHANGE_TO_INCLUDE_MODE:
+		iasl = inm->inm_source->ims_toin;
+		break;
+	case CHANGE_TO_EXCLUDE_MODE:
+		iasl = inm->inm_source->ims_toex;
+		break;
+	default:
+		if (inm->inm_state == IGMP_SG_QUERY_PENDING_MEMBER)
+			iasl = inm->inm_source->ims_rec;
+		else
+			iasl = inm->inm_source->ims_cur;
+		break;
+	}
+
 	total = 0;
 	i = 0;
 	if (iasl != NULL) {
@@ -1910,7 +1861,60 @@ next_multi:
 	IN_MULTI_UNLOCK();
 	mtx_unlock(&igmp_mtx);
 }
+
+
+static int
+igmp_set_v3report_header(m0, numsrc, buflenp)
+	struct mbuf **m0;
+	int numsrc;
+	int *buflenp;
+{
+	struct mbuf *m;
+	struct ip *ip;
+	struct igmp_report_hdr *igmp_rhdr;
+	int buflen;
+
+	if (m0 == NULL)
+		return EINVAL;
+
+	m = *m0;
+	MGETHDR(m, M_DONTWAIT, MT_HEADER);
+	if (m == NULL)
+		return ENOBUFS;
+	if (m != NULL &&
+	    MHLEN - max_linkhdr < sizeof(struct ip) + rhdrlen + ghdrlen
+				+ SOURCE_RECORD_LEN((numsrc))) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_freem(m);
+			return ENOBUFS;
+		}
+	}
+
+	m->m_data += max_linkhdr;
+	ip = mtod(m, struct ip *);
+	buflen = sizeof(struct ip);
+	ip->ip_len = sizeof(struct ip) + rhdrlen;
+	ip->ip_tos = 0xc0;
+	ip->ip_off = 0;
+	ip->ip_p = IPPROTO_IGMP;
+	ip->ip_src.s_addr = INADDR_ANY;
+	ip->ip_dst.s_addr = htonl(INADDR_NEW_ALLRTRS_GROUP);
+	igmp_rhdr = (struct igmp_report_hdr *)((char *)ip + buflen);
+	igmp_rhdr->igmp_type = IGMP_V3_MEMBERSHIP_REPORT;
+	igmp_rhdr->igmp_reserved1 = 0;
+	igmp_rhdr->igmp_reserved2 = 0;
+	igmp_rhdr->igmp_grpnum = 0;
+	buflen += rhdrlen;
+	m->m_len = sizeof(struct ip) + rhdrlen;
+	m->m_pkthdr.len = sizeof(struct ip) + rhdrlen;
+	m->m_pkthdr.rcvif = NULL;
+
+	*buflenp = buflen;
+	return 0;
+}
 #endif /* IGMPV3 */
+
 
 int
 is_igmp_target(grp)
