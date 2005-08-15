@@ -1245,67 +1245,66 @@ in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
 	/*
 	 * Let IGMP know that we have joined a new IP multicast group.
 	 */
-	    SLIST_FOREACH(rti, &router_info_head, rti_list) {
-		if (rti->rti_ifp == inm->inm_ifp) {
-		    inm->inm_rti = rti;
-		    break;
-		}
+	SLIST_FOREACH(rti, &router_info_head, rti_list) {
+	    if (rti->rti_ifp == inm->inm_ifp) {
+		inm->inm_rti = rti;
+		break;
 	    }
-	    if (rti == 0) {
-		if ((rti = rti_init(inm->inm_ifp)) == NULL) {
-		    LIST_REMOVE(inm, inm_list);
-		    if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
-		    free(inm, M_IPMADDR);
-		    *error = ENOBUFS;
-		    splx(s);
-		    return NULL;
-	    	} else
-		    inm->inm_rti = rti;
-	    }
-
-	    inm->inm_source = NULL;
-	    if (!is_igmp_target(&inm->inm_addr)) {
-		splx(s);
-		return inm;
-	    }
-
-	    if ((*error = in_addmultisrc(inm, numsrc, ss, mode, init,
-					&newhead, &newmode, &newnumsrc)) != 0) {
-		in_free_all_msf_source_list(inm);
+	}
+	if (rti == 0) {
+	    if ((rti = rti_init(inm->inm_ifp)) == NULL) {
 		LIST_REMOVE(inm, inm_list);
 		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		free(inm, M_IPMADDR);
+		*error = ENOBUFS;
 		splx(s);
 		return NULL;
-	    }
-	    /* Only newhead was merged in a former function. */
-	    curmode = inm->inm_source->ims_mode;
-	    inm->inm_source->ims_mode = newmode;
-	    inm->inm_source->ims_cur->numsrc = newnumsrc;
+	    } else
+		inm->inm_rti = rti;
+	}
 
-	    /*
-	     * Let IGMP know that we have joined a new IP multicast group
-	     * with source list if upstream router is IGMPv3 capable.
-	     * If the router doesn't speak IGMPv3, then send Report message
-	     * with no source address since it is a first join request.
-	     */
-	    if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
-		if (curmode != newmode) {
-		    if (newmode == MCAST_INCLUDE)
-			type = CHANGE_TO_INCLUDE_MODE; /* never happen? */
-		    else
-			type = CHANGE_TO_EXCLUDE_MODE;
-		}
-		igmp_send_state_change_report
-				(&m, &buflen, inm, type, timer_init);
-	    } else {
-		/*
-		 * If MSF's pending records exist, they must be deleted.
-		 */
-		in_clear_all_pending_report(inm);
-		igmp_joingroup(inm);
+	inm->inm_source = NULL;
+	if (!is_igmp_target(&inm->inm_addr)) {
+	    splx(s);
+	    return inm;
+	}
+
+	if ((*error = in_addmultisrc(inm, numsrc, ss, mode, init,
+					&newhead, &newmode, &newnumsrc)) != 0) {
+	    in_free_all_msf_source_list(inm);
+	    LIST_REMOVE(inm, inm_list);
+	    if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+	    free(inm, M_IPMADDR);
+	    splx(s);
+	    return NULL;
+	}
+	/* Only newhead was merged in a former function. */
+	curmode = inm->inm_source->ims_mode;
+	inm->inm_source->ims_mode = newmode;
+	inm->inm_source->ims_cur->numsrc = newnumsrc;
+
+	/*
+	 * Let IGMP know that we have joined a new IP multicast group
+	 * with source list if upstream router is IGMPv3 capable.
+	 * If the router doesn't speak IGMPv3, then send Report message
+	 * with no source address since it is a first join request.
+	 */
+	if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
+	    if (curmode != newmode) {
+		if (newmode == MCAST_INCLUDE)
+		    type = CHANGE_TO_INCLUDE_MODE; /* never happen? */
+		else
+		    type = CHANGE_TO_EXCLUDE_MODE;
 	    }
-	    *error = 0;
+	    igmp_send_state_change_report(&m, &buflen, inm, type, timer_init);
+	} else {
+	    /*
+	     * If MSF's pending records exist, they must be deleted.
+	     */
+	    in_clear_all_pending_report(inm);
+	    igmp_joingroup(inm);
+	}
+	*error = 0;
 
 	if (newhead != NULL)
 	    /* Each ias is linked from new curhead, so only newhead (not
