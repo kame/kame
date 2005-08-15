@@ -269,10 +269,8 @@ rti_init(ifp)
 	struct ifnet *ifp;
 {
 	struct router_info *rti;
+	mtx_assert(&igmp_mtx, MA_OWNED);
 
-	/*
-	 * XXXRW: return value of malloc not checked, despite M_NOWAIT.
-	 */
 	MALLOC(rti, struct router_info *, sizeof *rti, M_IGMP, M_NOWAIT);
 	if (rti == NULL)
 		return NULL;
@@ -325,8 +323,10 @@ find_rti(struct ifnet *ifp)
 			return rti;
 		}
 	}
-	if ((rti = rti_init(ifp)) == NULL)
+	if ((rti = rti_init(ifp)) == NULL) {
+		IGMP_PRINTF( "[igmp.c, _find_rti] --> no memory for entry\n");
 		return NULL;
+	}
 	IGMP_PRINTF("[igmp.c, _find_rti] --> created an entry \n");
 	return rti;
 }
@@ -907,7 +907,6 @@ next_inm:
 void
 igmp_slowtimo(void)
 {
-	int s = splnet();
 	struct router_info *rti;
 
 	IGMP_PRINTF("[igmp.c,_slowtimo] -- > entering \n");
@@ -1104,7 +1103,8 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 	int timer_i = 0;		/* interface timer */
 	int timer_g = 0;		/* group timer */
 	int error;
-	int s = splnet();
+
+	mtx_assert(&igmp_mtx, MA_OWNED);
 
 	/*
 	 * Parse QRV, QQI, and QRI timer values.
@@ -1233,7 +1233,6 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 		    ++igmpstat.igps_rcv_badqueries;
 		else
 		    ++igmpstat.igps_rcv_query_fails;
-		splx(s);
 		return error;
 	    }
 	    if (error < 0)
@@ -1265,8 +1264,6 @@ igmp_set_hostcompat(ifp, rti, query_ver)
 	struct router_info *rti;
 	int query_ver;
 {
-	int s = splnet();
-
 	/*
 	 * Keep Older Version Querier Present timer.
 	 */
@@ -1294,8 +1291,6 @@ igmp_set_hostcompat(ifp, rti, query_ver)
 			igmp_cancel_pending_response(ifp, rti);
 		}
 	}
-
-	splx(s);
 }
 
 /*
