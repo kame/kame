@@ -340,17 +340,17 @@ igmp_get_router_alert(m)
 		if (igmpdropwithnora && (ip_check_router_alert(ip) != 0)) {
 			++igmpstat.igps_rcv_nora;
 			return -1;
-		} else
-			return 0;
+		}
+		break;
 	case IGMP_V1_MEMBERSHIP_REPORT:
-		return 0;
+		break;
 	case IGMP_V2_MEMBERSHIP_REPORT:
 	case IGMP_HOST_LEAVE_MESSAGE:
 		if (igmpdropwithnora && (ip_check_router_alert(ip) != 0)) {
 			++igmpstat.igps_rcv_nora;
 			return -1;
-		} else
-			return 0;
+		}
+		break;
 	}
 	return 0;
 }
