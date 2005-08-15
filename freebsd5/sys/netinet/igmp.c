@@ -85,6 +85,7 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/sockio.h>
 #include <sys/protosw.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
@@ -108,7 +109,7 @@ MALLOC_DEFINE(M_MSFILTER, "msfilter", "multicast source filter");
 static struct router_info	*find_rti(struct ifnet *ifp);
 static void	igmp_sendpkt(struct in_multi *, int, unsigned long);
 
-SLIST_HEAD(, router_info) router_info_head;
+static SLIST_HEAD(, router_info) router_info_head;
 static struct igmpstat igmpstat;
 int igmpmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int igmpsomaxsrc = SO_MAX_SOURCE_FILTER;
@@ -137,7 +138,7 @@ SYSCTL_INT(_net_inet_igmp, IGMPCTL_VERSION, version, CTLFLAG_RW,
  * valid, so no reference counting is used.  We allow unlocked reads of
  * router_info data when accessed via an in_multi read-only.
  */
-struct mtx igmp_mtx;
+static struct mtx igmp_mtx;
 static int igmp_timers_are_running;
 static int interface_timers_are_running;
 static int state_change_timers_are_running;
@@ -1943,3 +1944,739 @@ is_igmp_target(grp)
 		return 0;
 	return 1;
 }
+
+/*
+ * Add an address to the list of IP multicast addresses for a given interface.
+ * Add source addresses to the list also, if upstream router is IGMPv3 capable
+ * and the number of source is not 0.
+ */
+struct in_multi *
+in_addmulti(ap, ifp)
+	register struct in_addr *ap;
+	register struct ifnet *ifp;
+{
+#ifdef IGMPV3
+	int error;
+
+	return in_addmulti2(ap, ifp, 0, NULL, MCAST_EXCLUDE, 1, &error);
+#else
+	register struct in_multi *inm;
+	int error;
+	struct sockaddr_in sin;
+	struct ifmultiaddr *ifma;
+
+	IN_MULTI_LOCK();
+	/*
+	 * Call generic routine to add membership or increment
+	 * refcount.  It wants addresses in the form of a sockaddr,
+	 * so we build one here (being careful to zero the unused bytes).
+	 */
+	bzero(&sin, sizeof sin);
+	sin.sin_family = AF_INET;
+	sin.sin_len = sizeof sin;
+	sin.sin_addr = *ap;
+	error = if_addmulti(ifp, (struct sockaddr *)&sin, &ifma);
+	if (error) {
+		IN_MULTI_UNLOCK();
+		return NULL;
+	}
+
+	/*
+	 * If ifma->ifma_protospec is null, then if_addmulti() created
+	 * a new record.  Otherwise, we are done.
+	 */
+	if (ifma->ifma_protospec != NULL) {
+		IN_MULTI_UNLOCK();
+		return ifma->ifma_protospec;
+	}
+
+	inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR,
+	    M_NOWAIT | M_ZERO);
+	if (inm == NULL) {
+		IN_MULTI_UNLOCK();
+		return (NULL);
+	}
+
+	inm->inm_addr = *ap;
+	inm->inm_ifp = ifp;
+	inm->inm_ifma = ifma;
+	ifma->ifma_refcount = 1;
+	ifma->ifma_protospec = inm;
+	LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
+
+	/*
+	 * Let IGMP know that we have joined a new IP multicast group.
+	 */
+	igmp_joingroup(inm);
+	IN_MULTI_UNLOCK();
+	return (inm);
+#endif
+}
+
+/*
+ * Delete a multicast address record.
+ */
+void
+in_delmulti(inm)
+	register struct in_multi *inm;
+{
+#ifdef IGMPV3
+	int error;
+
+	return in_delmulti2(inm, 0, NULL, MCAST_EXCLUDE, 1, &error);
+#else
+ 	struct ifmultiaddr *ifma;
+	struct in_multi my_inm;
+
+	IN_MULTI_LOCK();
+	ifma = inm->inm_ifma;
+	my_inm.inm_ifp = NULL ; /* don't send the leave msg */
+	if (ifma->ifma_refcount == 1) {
+		/*
+		 * No remaining claims to this record; let IGMP know that
+		 * we are leaving the multicast group.
+		 * But do it after the if_delmulti() which might reset
+		 * the interface and nuke the packet.
+		 */
+		my_inm = *inm ;
+		ifma->ifma_protospec = NULL;
+		LIST_REMOVE(inm, inm_link);
+		free(inm, M_IPMADDR);
+	}
+	/* XXX - should be separate API for when we have an ifma? */
+	if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+	if (my_inm.inm_ifp != NULL)
+		igmp_leavegroup(&my_inm);
+	IN_MULTI_UNLOCK();
+#endif
+}
+
+#ifdef IGMPV3
+struct in_multi *
+in_addmulti2(ap, ifp, numsrc, ss, mode, init, error)
+	register struct in_addr *ap;
+	register struct ifnet *ifp;
+	u_int16_t numsrc;
+	struct sockaddr_storage *ss;
+	u_int mode;			/* requested filter mode by socket */
+	int init;			/* indicate initial join by socket */
+	int *error;			/* return code of each sub routine */
+{
+	register struct in_multi *inm;
+	struct sockaddr_in sin;
+	struct ifmultiaddr *ifma;
+	struct mbuf *m = NULL;
+	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
+	u_int curmode;			/* current filter mode */
+	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
+	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
+	int timer_init = 1;		/* indicate timer initialization */
+	int buflen = 0;
+	u_int8_t type = 0;		/* State-Change report type */
+	struct router_info *rti;
+
+	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
+	    *error = EINVAL;
+	    return NULL;
+	}
+
+	/*
+	 * Call generic routine to add membership or increment
+	 * refcount.  It wants addresses in the form of a sockaddr,
+	 * so we build one here (being careful to zero the unused bytes).
+	 */
+	IN_MULTI_LOCK();
+	bzero(&sin, sizeof sin);
+	sin.sin_family = AF_INET;
+	sin.sin_len = sizeof sin;
+	sin.sin_addr = *ap;
+	*error = if_addmulti(ifp, (struct sockaddr *)&sin, &ifma);
+	if (*error) {
+		IN_MULTI_UNLOCK();
+		return NULL;
+	}
+
+	/*
+	 * If ifma->ifma_protospec is null, then if_addmulti() created
+	 * a new record.  Otherwise, we are done.
+	 */
+	if (ifma->ifma_protospec != NULL) {
+		inm = (struct in_multi *) ifma->ifma_protospec;
+		/*
+		 * Found it; merge source addresses in inm_source and send
+		 * State-Change Report if needed, and increment the reference
+		 * count. just return if group address is not the target of 
+		 * IGMPv3 (i.e. 224.0.0.1)
+		 */
+		if (!is_igmp_target(ap)) {
+			IN_MULTI_UNLOCK();
+			return inm;
+		}
+
+		/* inm_source is already allocated. */
+		curmode = inm->inm_source->ims_mode;
+		curnumsrc = inm->inm_source->ims_cur->numsrc;
+
+		/*
+	 	 * Add each source address to inm_source and get new source
+		 * filter mode and its calculated source list.
+		 */
+		if ((*error = in_addmultisrc(inm, numsrc, ss, mode, init,
+			 	    &newhead, &newmode, &newnumsrc)) != 0) {
+			IN_MULTI_UNLOCK();
+			return NULL;
+		}
+		if (newhead != NULL) {
+			/*
+			 * Merge new source list to current pending report's 
+			 * source list.
+			 */
+			if ((*error = in_merge_msf_state
+					(inm, newhead, newmode, newnumsrc)) > 0) {
+				/* 
+				 * State-Change Report will not be sent. Just 
+				 * return immediately. 
+				 * Each ias linked from newhead is used by new 
+				 * curhead, so only newhead is freed. 
+				 */
+				FREE(newhead, M_MSFILTER);
+				*error = 0; /* to make caller behave as normal */
+				IN_MULTI_UNLOCK();
+				return inm;
+			}
+		} else {
+			/* Only newhead was merged in a former function. */
+			inm->inm_source->ims_mode = newmode;
+			inm->inm_source->ims_cur->numsrc = newnumsrc;
+		}
+
+		/*
+	 	 * Let IGMP know that we have joined an IP multicast group with
+		 * source list if upstream router is IGMPv3 capable.
+		 * If there was no pending source list change, an ALLOW or a
+		 * BLOCK State-Change Report will not be sent, but a TO_IN or a
+		 * TO_EX State-Change Report will be sent in any case.
+		 */
+		if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
+			if (curmode != newmode || curnumsrc != newnumsrc) {
+				if (curmode != newmode) {
+					if (newmode == MCAST_INCLUDE)
+						type = CHANGE_TO_INCLUDE_MODE;
+					else
+						type = CHANGE_TO_EXCLUDE_MODE;
+				}
+				igmp_send_state_change_report
+					(&m, &buflen, inm, type, timer_init);
+			}
+		} else {
+			/*
+			 * If MSF's pending records exist, they must be deleted.
+			 * Otherwise, ALW or BLK record will be blocked or pending
+			 * list will never be cleaned when upstream router 
+			 * switches to IGMPv3. XXX
+			 */
+			 in_clear_all_pending_report(inm);
+		 }
+		 *error = 0;
+		IN_MULTI_UNLOCK();
+		return ifma->ifma_protospec;
+	}
+
+	/* XXX - if_addmulti uses M_WAITOK.  Can this really be called
+	   at interrupt time?  If so, need to fix if_addmulti. XXX */
+	inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR,
+	    M_NOWAIT | M_ZERO);
+	if (inm == NULL) {
+		*error = ENOBUFS;
+		IN_MULTI_UNLOCK();
+		return (NULL);
+	}
+
+	inm->inm_addr = *ap;
+	inm->inm_ifp = ifp;
+	inm->inm_ifma = ifma;
+	ifma->ifma_refcount = 1;
+	ifma->ifma_protospec = inm;
+	LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
+
+	/*
+	 * Let IGMP know that we have joined a new IP multicast group.
+	 */
+	mtx_lock(&igmp_mtx);
+	SLIST_FOREACH(rti, &router_info_head, rti_list) {
+	    if (rti->rti_ifp == inm->inm_ifp) {
+		inm->inm_rti = rti;
+		break;
+	    }
+	}
+	if (rti == NULL) {
+	    if ((rti = rti_init(inm->inm_ifp)) == NULL) {
+		LIST_REMOVE(inm, inm_list);
+		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+		free(inm, M_IPMADDR);
+		*error = ENOBUFS;
+		mtx_unlock(&igmp_mtx);
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    } else {
+		inm->inm_rti = rti;
+		mtx_unlock(&igmp_mtx);
+	    }
+	}
+
+	inm->inm_source = NULL;
+	if (!is_igmp_target(&inm->inm_addr)) {
+	    IN_MULTI_UNLOCK();
+	    return inm;
+	}
+
+	if ((*error = in_addmultisrc(inm, numsrc, ss, mode, init,
+					&newhead, &newmode, &newnumsrc)) != 0) {
+	    in_free_all_msf_source_list(inm);
+	    LIST_REMOVE(inm, inm_list);
+	    if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+	    free(inm, M_IPMADDR);
+	    IN_MULTI_UNLOCK();
+	    return NULL;
+	}
+	/* Only newhead was merged in a former function. */
+	curmode = inm->inm_source->ims_mode;
+	inm->inm_source->ims_mode = newmode;
+	inm->inm_source->ims_cur->numsrc = newnumsrc;
+
+	/*
+	 * Let IGMP know that we have joined a new IP multicast group
+	 * with source list if upstream router is IGMPv3 capable.
+	 * If the router doesn't speak IGMPv3, then send Report message
+	 * with no source address since it is a first join request.
+	 */
+	if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
+	    if (curmode != newmode) {
+		if (newmode == MCAST_INCLUDE)
+		    type = CHANGE_TO_INCLUDE_MODE; /* never happen? */
+		else
+		    type = CHANGE_TO_EXCLUDE_MODE;
+	    }
+	    igmp_send_state_change_report(&m, &buflen, inm, type, timer_init);
+	} else {
+	    /*
+	     * If MSF's pending records exist, they must be deleted.
+	     */
+	    in_clear_all_pending_report(inm);
+	    igmp_joingroup(inm);
+	}
+	*error = 0;
+
+	if (newhead != NULL)
+	    /* Each ias is linked from new curhead, so only newhead (not
+	     * ias_list) is freed */
+	    FREE(newhead, M_MSFILTER);
+
+	IN_MULTI_UNLOCK();
+	return (inm);
+}
+
+void
+in_delmulti2(inm, numsrc, ss, mode, final, error)
+	register struct in_multi *inm;
+	u_int16_t numsrc;
+	struct sockaddr_storage *ss;
+	u_int mode;			/* requested filter mode by socket */
+	int final;			/* indicate complete leave by socket */
+	int *error;			/* return code of each sub routine */
+{
+	struct ifmultiaddr *ifma = inm->inm_ifma;
+	struct mbuf *m = NULL;
+	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
+	u_int curmode;			/* current filter mode */
+	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
+	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
+	int timer_init = 1;		/* indicate timer initialization */
+	int buflen = 0;
+	u_int8_t type = 0;		/* State-Change report type */
+	struct ifreq ifr;
+
+	bzero(&ifr, sizeof(ifr));
+	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
+		*error = EINVAL;
+		return;
+	}
+	IN_MULTI_LOCK();
+	if (!is_igmp_target(&inm->inm_addr)) {
+		if (--ifma->ifma_refcount == 0) {
+
+			/*
+			 * Unlink from list.
+			 */
+			ifma->ifma_protospec = 0;
+			LIST_REMOVE(inm, inm_list);
+			/*
+			 * Notify the network driver to update its multicast
+			 * reception filter.
+			 */
+			satosin(&ifr.ifr_addr)->sin_family = AF_INET;
+			satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
+			(*inm->inm_ifp->if_ioctl)(inm->inm_ifp, SIOCDELMULTI,
+							     (caddr_t)&ifr);
+			free(inm, M_IPMADDR);
+			if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+		}
+		IN_MULTI_UNLOCK();
+		return;
+	}
+
+	/* inm_source is already allocated */
+	curmode = inm->inm_source->ims_mode;
+	curnumsrc = inm->inm_source->ims_cur->numsrc;
+	/*
+	 * Delete each source address from inm_source and get new source
+	 * filter mode and its calculated source list, and send State-Change
+	 * Report if needed.
+	 */
+	if ((*error = in_delmultisrc(inm, numsrc, ss, mode, final,
+				&newhead, &newmode, &newnumsrc)) != 0) {
+		IN_MULTI_UNLOCK();
+		return;
+	}
+	if (newhead != NULL) {
+		if ((*error = in_merge_msf_state
+				(inm, newhead, newmode, newnumsrc)) > 0) {
+			/* State-Change Report will not be sent. Just return 
+			 * immediately. */
+			FREE(newhead, M_MSFILTER);
+			IN_MULTI_UNLOCK();
+			return;
+		}
+	} else {
+		/* Only newhead was merged in a former function. */
+		inm->inm_source->ims_mode = newmode;
+		inm->inm_source->ims_cur->numsrc = newnumsrc;
+	}
+
+	/*
+	 * If this is a final leave request by the socket, decrease
+	 * refcount.
+	 */
+	if (final)
+		--ifma->ifma_refcount;
+
+	if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
+		if (curmode != newmode || curnumsrc != newnumsrc) {
+			if (curmode != newmode) {
+				if (newmode == MCAST_INCLUDE)
+					type = CHANGE_TO_INCLUDE_MODE;
+				else
+					type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			igmp_send_state_change_report
+				(&m, &buflen, inm, type, timer_init);
+		}
+	} else {
+		/*
+		 * If MSF's pending records exist, they must be deleted.
+		 * Otherwise, ALW or BLK record will be blocked or pending
+		 * list will never be cleaned when upstream router switches
+		 * to IGMPv3. XXX
+		 */
+		in_clear_all_pending_report(inm);
+		if (ifma->ifma_refcount == 0) {
+			inm->inm_source->ims_robvar = 0;
+			igmp_leavegroup(inm);
+		}
+	}
+
+	if (ifma->ifma_refcount == 0) {
+		/*
+		 * We cannot use timer for robstness times report
+		 * transmission when ifma->ifma_refcount becomes 0, since inm
+		 * itself will be removed here. So, in this case, report
+		 * retransmission will be done quickly. XXX my spec.
+		 */
+		timer_init = 0;
+		while (inm->inm_source->ims_robvar > 0) {
+			m = NULL;
+			buflen = 0;
+			igmp_send_state_change_report
+				(&m, &buflen, inm, type, timer_init);
+			if (m != NULL)
+				igmp_sendbuf(m, inm->inm_ifp);
+		}
+		/*
+		 * Unlink from list.
+		 */
+		in_free_all_msf_source_list(inm);
+		LIST_REMOVE(inm, inm_list);
+		ifma->ifma_protospec = NULL;
+
+		/*
+		 * Notify the network driver to update its multicast
+		 * reception filter.
+		 */
+		satosin(&ifr.ifr_addr)->sin_family = AF_INET;
+		satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
+		(*inm->inm_ifp->if_ioctl)
+				(inm->inm_ifp, SIOCDELMULTI, (caddr_t)&ifr);
+		free(inm, M_IPMADDR);
+		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+	}
+	*error = 0;
+	if (newhead != NULL)
+		FREE(newhead, M_MSFILTER);
+	IN_MULTI_UNLOCK();
+}
+
+/*
+ * Add an address to the list of IP multicast addresses for a given interface.
+ * Add source addresses to the list also, if upstream router is IGMPv3 capable
+ * and the number of source is not 0.
+ */
+struct in_multi *
+in_modmulti2(ap, ifp, numsrc, ss, mode,
+		old_num, old_ss, old_mode, init, grpjoin, error)
+	struct in_addr *ap;
+	struct ifnet *ifp;
+	u_int16_t numsrc, old_num;
+	struct sockaddr_storage *ss, *old_ss;
+	u_int mode, old_mode;		/* requested/current filter mode */
+	int init;			/* indicate initial join by socket */
+	u_int grpjoin;			/* on/off of (*,G) join by socket */
+	int *error;			/* return code of each sub routine */
+{
+	struct mbuf *m = NULL;
+	struct in_multi *inm;
+	struct ifmultiaddr *ifma = NULL;
+	struct ifreq ifr;
+	struct ias_head *newhead = NULL;/* this becomes new ims_cur->head */
+	u_int curmode;			/* current filter mode */
+	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
+	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
+	int timer_init = 1;		/* indicate timer initialization */
+	int buflen = 0;
+	u_int8_t type = 0;		/* State-Change report type */
+	struct router_info *rti;
+
+	*error = 0; /* initialize */
+
+	if ((mode != MCAST_INCLUDE && mode != MCAST_EXCLUDE) ||
+		(old_mode != MCAST_INCLUDE && old_mode != MCAST_EXCLUDE)) {
+	    *error = EINVAL;
+	    return NULL;
+	}
+
+	IN_MULTI_LOCK();
+
+	/*
+	 * See if address already in list.
+	 */
+	IN_LOOKUP_MULTI(*ap, ifp, inm);
+
+	if (inm != NULL) {
+	    /*
+	     * If requested multicast address is local address, update
+	     * the condition, join or leave, based on a requested filter.
+	     */
+	    if (!is_igmp_target(&inm->inm_addr)) {
+		if (numsrc != 0) {
+		    IN_MULTI_UNLOCK();
+		    *error = EINVAL;
+		    return NULL; /* source filter is not supported for
+				    local group address. */
+		}
+		if (mode == MCAST_INCLUDE) {
+		    if (--inm->inm_ifma->ifma_refcount == 0) {
+			/*
+			 * Unlink from list.
+			 */
+			LIST_REMOVE(inm, inm_list);
+			/*
+			 * Notify the network driver to update its multicast
+			 * reception filter.
+			 */
+			satosin(&ifr.ifr_addr)->sin_family = AF_INET;
+			satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
+			(*inm->inm_ifp->if_ioctl)(inm->inm_ifp, SIOCDELMULTI,
+								(caddr_t)&ifr);
+			free(inm, M_IPMADDR);
+		    }
+		    IN_MULTI_UNLOCK();
+		    return NULL; /* not an error! */
+		} else if (mode == MCAST_EXCLUDE) {
+		    ++inm->inm_ifma->ifma_refcount;
+		    IN_MULTI_UNLOCK();
+		    return inm;
+		}
+	    }
+
+	    /* inm_source is already allocated. */
+	    curmode = inm->inm_source->ims_mode;
+	    curnumsrc = inm->inm_source->ims_cur->numsrc;
+	    if ((*error = in_modmultisrc(inm, numsrc, ss, mode,
+					old_num, old_ss, old_mode, grpjoin,
+					&newhead, &newmode, &newnumsrc)) != 0) {
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    }
+	    if (newhead != NULL) {
+		/*
+		 * Merge new source list to current pending report's source
+		 * list.
+		 */
+		if ((*error = in_merge_msf_state
+				(inm, newhead, newmode, newnumsrc)) > 0) {
+		    /* State-Change Report will not be sent. Just return
+		     * immediately. */
+		    FREE(newhead, M_MSFILTER);
+		    IN_MULTI_UNLOCK();
+		    return inm;
+		}
+	    } else {
+		/* Only newhead was merged. */
+		inm->inm_source->ims_mode = newmode;
+		inm->inm_source->ims_cur->numsrc = newnumsrc;
+	    }
+
+	    /*
+	     * Let IGMP know that we have joined an IP multicast group with
+	     * source list if upstream router is IGMPv3 capable.
+	     * If there was no pending source list change, an ALLOW or a
+	     * BLOCK State-Change Report will not be sent, but a TO_IN or a
+	     * TO_EX State-Change Report will be sent in any case.
+	     */
+	    if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
+		if (curmode != newmode || curnumsrc != newnumsrc || old_num) {
+			if (curmode != newmode) {
+			    if (newmode == MCAST_INCLUDE)
+				type = CHANGE_TO_INCLUDE_MODE;
+			    else
+				type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			igmp_send_state_change_report
+				(&m, &buflen, inm, type, timer_init);
+		}
+	    } else {
+		/*
+		 * If MSF's pending records exist, they must be deleted.
+		 */
+		in_clear_all_pending_report(inm);
+	    }
+	    *error = 0;
+	    /* for this group address, initial join request by the socket. */
+	    if (init)
+		++inm->inm_ifma->ifma_refcount;
+
+	} else {
+	    struct sockaddr_in sa;
+
+	    /*
+	     * If there is some sources to be deleted, or if the request is
+	     * join a local group address with some filtered address, return.
+	     */
+	    if ((old_num != 0) ||
+		(!is_igmp_target(&inm->inm_addr) && numsrc != 0)) {
+		*error = EINVAL;
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    }
+
+	    /*
+	     * New address; allocate a new multicast record and link it into
+	     * the interface's multicast list.
+	     */
+	    inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR, M_NOWAIT);
+	    if (inm == NULL) {
+		*error = ENOBUFS;
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    }
+
+	    bzero(&sa, sizeof(sa));
+	    sa.sin_family = AF_INET;
+	    sa.sin_len = sizeof(sa);
+	    sa.sin_addr = *ap;
+	    *error = if_addmulti(ifp, (struct sockaddr *)&sa, &ifma);
+	    if (*error) {
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    }
+	    if (ifma->ifma_protospec != NULL) {
+#ifdef IGMPV3_DEBUG
+		printf("in_modmulti: there's a corresponding if_multiaddr although IN_LOOKUP_MULTI fails \n");
+#endif
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    }
+
+	    bzero(inm, sizeof(*inm));
+	    inm->inm_addr = *ap;
+	    inm->inm_ifp = ifp;
+	    inm->inm_ifma = ifma;
+	    ifma->ifma_protospec = inm;
+	    LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
+
+	    mtx_lock(&igmp_mtx);
+	    SLIST_FOREACH(rti, &router_info_head, rti_list) {
+		if (rti->rti_ifp == inm->inm_ifp) {
+		    inm->inm_rti = rti;
+		    break;
+		}
+	    }
+	    if (rti == NULL) {
+		if ((rti = rti_init(inm->inm_ifp)) == NULL) {
+		    LIST_REMOVE(inm, inm_list);
+		    free(inm, M_IPMADDR);
+		    *error = ENOBUFS;
+		    mtx_unlock(&igmp_mtx);
+		    IN_MULTI_UNLOCK();
+		    return NULL;
+	    	}
+		inm->inm_rti = rti;
+	    }
+	    mtx_unlock(&igmp_mtx);
+
+	    inm->inm_source = NULL;
+	    if (!is_igmp_target(&inm->inm_addr)) {
+		IN_MULTI_UNLOCK();
+		return inm;
+	    }
+
+	    if ((*error = in_modmultisrc(inm, numsrc, ss, mode, 0, NULL,
+					MCAST_INCLUDE, grpjoin, &newhead,
+					&newmode, &newnumsrc)) != 0) {
+		in_free_all_msf_source_list(inm);
+		LIST_REMOVE(inm, inm_list);
+		free(inm, M_IPMADDR);
+		IN_MULTI_UNLOCK();
+		return NULL;
+	    }
+	    /* Only newhead was merged in a former function. */
+	    curmode = inm->inm_source->ims_mode;
+	    inm->inm_source->ims_mode = newmode;
+	    inm->inm_source->ims_cur->numsrc = newnumsrc;
+
+	    if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
+		if (curmode != newmode) {
+		    if (newmode == MCAST_INCLUDE)
+			type = CHANGE_TO_INCLUDE_MODE;/* never happen??? */
+		    else
+			type = CHANGE_TO_EXCLUDE_MODE;
+		}
+		igmp_send_state_change_report
+				(&m, &buflen, inm, type, timer_init);
+	    } else {
+		/*
+		 * If MSF's pending records exist, they must be deleted.
+		 */
+		in_clear_all_pending_report(inm);
+		igmp_joingroup(inm);
+	    }
+	    *error = 0;
+	}
+	if (newhead != NULL)
+	    FREE(newhead, M_MSFILTER);
+
+	return inm;
+}
+#endif /* IGMPV3 */
