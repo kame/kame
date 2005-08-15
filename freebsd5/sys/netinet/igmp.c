@@ -375,7 +375,7 @@ igmp_input(register struct mbuf *m, int off)
 	 */
 	if (ip->ip_ttl != 1) {
 		++igmpstat.igps_rcv_badttl;
-		return -1;
+		goto end;
 	}
 
 	/*
