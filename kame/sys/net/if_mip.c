@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.c,v 1.6 2005/07/25 04:37:50 t-momose Exp $	*/
+/*	$KAME: if_mip.c,v 1.7 2005/08/17 01:10:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -83,7 +83,9 @@ int mip_attach_proto_family(struct ifnet *, u_long);
 #endif /* __APPLE__ */
 
 #if NMIP > 0
+#ifdef __FreeBSD__
 #include <net/if_var.h>
+#endif
 #include <netinet6/in6_var.h>
 #include <netinet6/mip6.h>
 
@@ -110,7 +112,9 @@ mipattach(dummy)
 #endif
 {
 	struct mip_softc *sc;
+#ifdef __APPLE__
 	int error = 0;
+#endif
 	int i;
 
 	LIST_INIT(&mip_softc_list);
