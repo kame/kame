@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.18 2005/05/25 01:49:23 keiichi Exp $	*/
+/*	$KAME: common.c,v 1.19 2005/08/18 10:15:31 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -34,33 +34,24 @@
 #include <errno.h>
 
 #include <sys/param.h>
-#include <sys/uio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <sys/syslog.h>
-#include <sys/sysctl.h>
 #include <unistd.h>
-#include <netdb.h>
 
 #include <net/if.h>
-#include <net/if_types.h>
 #ifdef __FreeBSD__
 #include <net/if_var.h>
-#include <net/ethernet.h>
 #endif
 #ifdef __NetBSD__
 #include <net/if_ether.h>
 #endif /* __NetBSD__ */
-#include <net/if_dl.h>
-#include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/ip6mh.h>
 #include <netinet/ip6.h>
 #include <netinet6/mip6.h>
 #include <netinet/icmp6.h>
 #include <net/mipsock.h>
-#include <arpa/inet.h>
 
 #include "callout.h"
 #include "command.h"
@@ -235,172 +226,8 @@ mip6_get_nd6options(ndoptions, options, total)
 
 	return (0);
 }
+
 #endif /* MIP6_CN */ 
-
-
-#ifdef MIP_MN
-/* search the best HA for hoainfo */
-struct home_agent_list *
-mip6_find_hal(hoainfo)
-	struct mip6_hoainfo *hoainfo;
-{
-        struct mip6_hpfxl *hpfx;
-	struct mip6_mipif *mipif = NULL;
-
-	mipif = mnd_get_mipif(hoainfo->hinfo_ifindex);
-	if (mipif == NULL)
-		return (NULL);
-
-	LIST_FOREACH(hpfx, &mipif->mipif_hprefx_head, hpfx_entry) {
-		if (mip6_are_prefix_equal(&hoainfo->hinfo_hoa, 
-					  &hpfx->hpfx_prefix, hpfx->hpfx_prefixlen)) {
-			return (LIST_FIRST(&hpfx->hpfx_hal_head));
-		}
-	}
-
-	return (NULL);
-}
-#endif /* MIP_MN */
-
-void
-mip6_flush_hal(hpfx_entry, exception_flag)
-	struct mip6_hpfxl *hpfx_entry;
-	int exception_flag;
-{
-        struct home_agent_list *hal = NULL, *haln = NULL;
-
-        for (hal = LIST_FIRST(&hpfx_entry->hpfx_hal_head); hal; hal = haln) {
-                haln =  LIST_NEXT(hal, hal_entry);
-
-		if (exception_flag & hal->hal_flag)
-			continue;
-
-		LIST_REMOVE(hal, hal_entry);
-		hal_stop_expire_timer(hal);
-		free(hal);
-	}
-
-	return;
-}
-
-
-void
-mip6_delete_hal(hpfx_entry, gladdr) 
-	struct mip6_hpfxl *hpfx_entry;
-	struct in6_addr *gladdr;
-{
-	struct home_agent_list *hal;
-
-	hal = mip6_get_hal(hpfx_entry, gladdr);
-	if (hal == NULL)
-		return;
-
-	LIST_REMOVE(hal, hal_entry);
-	hal_stop_expire_timer(hal);
-	free(hal);
-	hal = NULL;
-
-	return;
-}
-
-struct home_agent_list *
-mip6_get_hal(hpfx, global)
-	struct mip6_hpfxl *hpfx;
-	struct in6_addr *global;
-{
-        struct home_agent_list *hal = NULL, *haln = NULL;
-
-        for (hal = LIST_FIRST(&hpfx->hpfx_hal_head); hal; hal = haln) {
-                haln =  LIST_NEXT(hal, hal_entry);
-		
-		if (IN6_ARE_ADDR_EQUAL(&hal->hal_ip6addr, global))
-			return (hal);
-	}
-
-	return (NULL);
-}
-
-
-void
-hal_set_expire_timer(hal, tick)
-        struct home_agent_list *hal;
-        int tick;
-{
-        remove_callout_entry(hal->hal_expire);
-        hal->hal_expire = new_callout_entry(tick, hal_expire_timer,
-					    (void *)hal, "hal_expire_timer");
-}
-
-void
-hal_stop_expire_timer(hal)
-        struct home_agent_list *hal;
-{
-        remove_callout_entry(hal->hal_expire);
-}
-
-void
-hal_expire_timer(arg)
-        void *arg;
-{
-        struct home_agent_list *hal = (struct home_agent_list *)arg;
-
-	hal_stop_expire_timer(hal);
-
-	LIST_REMOVE(hal, hal_entry);
-	free(hal);
-	hal = NULL;
-}
-
-void
-mip6_delete_hpfxlist(home_prefix, home_prefixlen, hpfxhead) 
-	struct in6_addr *home_prefix;
-	u_int16_t home_prefixlen;
-	struct mip6_hpfx_list *hpfxhead;
-{
-	struct mip6_hpfxl *hpfx = NULL;
-	struct home_agent_list *hal, *haln;
-
-	hpfx = mip6_get_hpfxlist(home_prefix, home_prefixlen, hpfxhead);
-	if (hpfx == NULL)
-		return;
-
-	for (hal = LIST_FIRST(&hpfx->hpfx_hal_head); hal;
-	     hal = haln) {
-		haln = LIST_NEXT(hal, hal_entry);
-
-		LIST_REMOVE(hal, hal_entry);
-		hal_stop_expire_timer(hal);
-		free(hal);
-		hal = NULL;
-	}
-
-	LIST_REMOVE(hpfx, hpfx_entry);
-	free(hpfx);
-	hpfx = NULL;
-	
-	return;
-}
-
-struct mip6_hpfxl *
-mip6_get_hpfxlist(prefix, prefixlen, hpfxhead) 
-	struct in6_addr *prefix;
-	int prefixlen;
-	struct mip6_hpfx_list *hpfxhead;
-{
-        struct mip6_hpfxl *hpl = NULL, *hpln = NULL;
-
-        for (hpl = LIST_FIRST(hpfxhead); hpl; hpl = hpln) {
-                hpln =  LIST_NEXT(hpl, hpfx_entry);
-		
-		if (prefixlen != hpl->hpfx_prefixlen) 
-			continue;
-
-		if (mip6_are_prefix_equal(prefix, &hpl->hpfx_prefix, prefixlen))
-			return (hpl);
-	}
-	return (NULL);
-}
-
 
 int
 icmp6_input_common(fd)
@@ -955,45 +782,6 @@ mip6_create_addr(addr, ifid, prefix, prefixlen)
 #undef s6_addr8
 	 return;
 }
-
-int
-in6_mask2len(mask, lim0)
-        struct in6_addr *mask;
-        u_char *lim0;
-{
-        int x = 0, y;
-        u_char *lim = lim0, *p;
-
-        /* ignore the scope_id part */
-        if (lim0 == NULL || lim0 - (u_char *)mask > sizeof(*mask))
-                lim = (u_char *)mask + sizeof(*mask);
-        for (p = (u_char *)mask; p < lim; x++, p++) {
-                if (*p != 0xff)
-                        break;
-        }
-        y = 0;
-        if (p < lim) {
-                for (y = 0; y < 8; y++) {
-                        if ((*p & (0x80 >> y)) == 0)
-                                break;
-                }
-        }
-
-        /*
-         * when the limit pointer is given, do a stricter check on the
-         * remaining bits.
-         */
-        if (p < lim) {
-                if (y != 0 && (*p & (0x00ff >> y)) != 0)
-                        return (-1);
-                for (p = p + 1; p < lim; p++)
-                        if (*p != 0)
-                                return (-1);
-        }
-
-        return (x * 8 + y);
-}
-
 
 #if 0
 #ifdef MIP_MN
@@ -1824,30 +1612,3 @@ command_show_stat(s, line)
 	PS("Routing Header type 2", mip6stat.mip6s_orthdr2);
 	PS("reverse tunneled output", mip6stat.mip6s_orevtunnel);
 }
-
-void
-show_hal(s, head)
-	int s;
-	struct mip6_hpfx_list *head;
-{
-        struct mip6_hpfxl *hpfx;
-        struct home_agent_list *hal = NULL;
-
-	LIST_FOREACH(hpfx, head, hpfx_entry) {
-		command_printf(s, "%s/%d\n ", ip6_sprintf(&hpfx->hpfx_prefix),
-			       hpfx->hpfx_prefixlen);
-		LIST_FOREACH(hal, &hpfx->hpfx_hal_head, hal_entry) {
-			command_printf(s, "\t%s ", ip6_sprintf(&hal->hal_ip6addr));
-			command_printf(s, "\t%s\n", 
-				ip6_sprintf(&hal->hal_lladdr));
-#ifdef MIP_HA
-			command_printf(s,
-				       "\t\tlif=%d pref=%d flag=%s %s\n",
-				       hal->hal_lifetime, hal->hal_preference, 
-				       (hal->hal_flag & MIP6_HAL_OWN)  ? "mine" : "",
-				       (hal->hal_flag & MIP6_HAL_STATIC)  ? "static" : "");
-#endif /* MIP_HA */
-		}
-	}
-}
-

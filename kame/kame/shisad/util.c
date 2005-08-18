@@ -1,4 +1,4 @@
-/*      $KAME: util.c,v 1.3 2005/05/25 01:49:24 keiichi Exp $  */
+/*      $KAME: util.c,v 1.4 2005/08/18 10:15:31 t-momose Exp $  */
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -94,4 +94,42 @@ hexdump(addr_arg, len)
 	*p = '\0';
 
 	return (buffer);
+}
+
+int
+in6_mask2len(mask, lim0)
+        struct in6_addr *mask;
+        u_char *lim0;
+{
+        int x = 0, y;
+        u_char *lim = lim0, *p;
+
+        /* ignore the scope_id part */
+        if (lim0 == NULL || lim0 - (u_char *)mask > sizeof(*mask))
+                lim = (u_char *)mask + sizeof(*mask);
+        for (p = (u_char *)mask; p < lim; x++, p++) {
+                if (*p != 0xff)
+                        break;
+        }
+        y = 0;
+        if (p < lim) {
+                for (y = 0; y < 8; y++) {
+                        if ((*p & (0x80 >> y)) == 0)
+                                break;
+                }
+        }
+
+        /*
+         * when the limit pointer is given, do a stricter check on the
+         * remaining bits.
+         */
+        if (p < lim) {
+                if (y != 0 && (*p & (0x00ff >> y)) != 0)
+                        return (-1);
+                for (p = p + 1; p < lim; p++)
+                        if (*p != 0)
+                                return (-1);
+        }
+
+        return (x * 8 + y);
 }

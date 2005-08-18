@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.20 2005/07/13 01:45:31 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.21 2005/08/18 10:15:31 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -451,92 +451,6 @@ had_init_homeprefix (ifname, preference)
 		exit(0);
 	}
 	return;
-}
-
-struct home_agent_list *
-had_add_hal(hpfx_entry, gladdr, lladdr, lifetime, preference, flag) 
-	struct  mip6_hpfxl *hpfx_entry;
-	struct in6_addr *gladdr;
-	struct in6_addr *lladdr;
-	uint16_t lifetime;
-	uint16_t preference;
-	int flag;
-{
-	struct home_agent_list *hal = NULL, *h;
-
-	hal = mip6_get_hal(hpfx_entry, gladdr);
-	if (hal && ((hal->hal_preference != preference))) {
-		/* if preference is changed, need to re-arrange order of hal */
-		mip6_delete_hal(hpfx_entry, gladdr);
-		hal = NULL;
-	}
-
-	if (hal == NULL) {
-		hal = malloc(sizeof(*hal));
-		if (hal == NULL)
-			return (NULL);
-		memset(hal, 0, sizeof(*hal));
-
-		if (LIST_EMPTY(&hpfx_entry->hpfx_hal_head))  {
-			LIST_INSERT_HEAD(&hpfx_entry->hpfx_hal_head, hal, hal_entry);
-		} else {
-			LIST_FOREACH(h, &hpfx_entry->hpfx_hal_head, hal_entry) {
-				if (preference >= h->hal_preference) {
-					LIST_INSERT_BEFORE(h, hal, hal_entry);
-					break;
-				} else if (LIST_NEXT(h, hal_entry) == NULL) {
-					LIST_INSERT_AFTER(h, hal, hal_entry);
-					break;
-				}
-			}
-		}
-	}
-
-	hal->hal_ip6addr = *gladdr;
-	if (lladdr)
-		hal->hal_lladdr = *lladdr;
-	hal->hal_lifetime = lifetime;
-	hal->hal_preference = preference;
-	hal->hal_flag = flag;
-
-	if (hal->hal_expire)
-		update_callout_entry(hal->hal_expire, hal->hal_lifetime);
-	else if (hal->hal_flag != MIP6_HAL_OWN)
-		hal_set_expire_timer(hal, hal->hal_lifetime);
-
-	if (debug)
-		syslog(LOG_INFO, "Home Agent (%s, %d %d) added into home agent list\n", 
-		       ip6_sprintf(gladdr), lifetime, preference);
-		
-	return (hal);
-}
-
-struct mip6_hpfxl *
-had_add_hpfxlist(home_prefix, home_prefixlen) 
-	struct in6_addr *home_prefix;
-	u_int16_t home_prefixlen;
-{
-	struct mip6_hpfxl *hpfx = NULL;
-
-	hpfx = mip6_get_hpfxlist(home_prefix, home_prefixlen, &hpfx_head);
-	if (hpfx)
-		return (hpfx);
-
-	hpfx = malloc(sizeof(*hpfx));
-	if (hpfx == NULL)
-		return (NULL);
-	memset(hpfx, 0, sizeof(*hpfx));
-
-	hpfx->hpfx_prefix = *home_prefix;
-	hpfx->hpfx_prefixlen = home_prefixlen;
-	LIST_INIT(&hpfx->hpfx_hal_head);
-
-	if (debug)
-		syslog(LOG_INFO, "Home Prefix (%s/%d) added into home prefix list\n", 
-		       ip6_sprintf(home_prefix), home_prefixlen);
-	
-	LIST_INSERT_HEAD(&hpfx_head, hpfx, hpfx_entry);
-	return (hpfx);
 }
 
 int
