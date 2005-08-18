@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.17 2005/06/20 08:37:30 ryuji Exp $	*/
+/*	$KAME: shisad.h,v 1.18 2005/08/18 12:08:43 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -522,6 +522,11 @@ struct home_agent_list *had_add_hal(struct mip6_hpfxl *, struct in6_addr *,
 			     struct in6_addr *, uint16_t, uint16_t, int);
 struct mip6_hpfxl *had_add_hpfxlist(struct in6_addr *, u_int16_t);
 int had_is_ha_if(u_int16_t);
+#ifdef MIP_HA
+u_int16_t ha_if(void);
+#else
+#define ha_if()		(0)
+#endif
 struct mip6_hpfxl *had_is_myhomenet(struct in6_addr *);
 int send_haadrep(struct in6_addr *, struct in6_addr *, 
 		 struct mip6_dhaad_req *, u_short);

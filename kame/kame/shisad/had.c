@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.21 2005/08/18 10:15:31 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.22 2005/08/18 12:08:42 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -295,6 +295,12 @@ had_is_ha_if(ifindex)
 	
 	return (0);
 };
+
+u_int16_t
+ha_if()
+{
+	return (ha_ifindex);
+}
 
 struct mip6_hpfxl *
 had_is_myhomenet(hoa)

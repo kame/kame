@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.29 2005/07/25 12:31:46 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.30 2005/08/18 12:08:43 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -916,6 +916,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			memset(&llhoa, 0, sizeof(llhoa));
 			llhoa.s6_addr[0] = 0xfe;
 			llhoa.s6_addr[1] = 0x80;
+			llhoa.s6_addr[3] = ha_if() & 0xff;
 			memcpy(&llhoa.s6_addr[8], &hoa->s6_addr[8], 8);
 			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid, authmethod);
 		}
