@@ -1125,7 +1125,7 @@ in_addmulti(ap, ifp)
 	     * New address; allocate a new multicast record and link it into
 	     * the interface's multicast list.
 	     */
-	    inm = (struct in_multi *)malloc(sizeof(*inm), M_IPMADDR, M_NOWAIT);
+	    inm = pool_get(&inmulti_pool, PR_NOWAIT);
 	    if (inm == NULL) {
 		splx(s);
 		return (NULL);
