@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.386 2005/08/08 07:22:37 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.387 2005/08/18 10:30:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -502,8 +502,6 @@ nd6_llinfo_settimer(ln, tick)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
-#else
-	s = splnet();
 #endif
 
 	if (tick < 0) {
@@ -541,14 +539,18 @@ nd6_llinfo_settimer(ln, tick)
 		}
 	}
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	splx(s);
+#endif
 }
 
 static void
 nd6_llinfo_timer(arg)
 	void *arg;
 {
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s;
+#endif
 	struct llinfo_nd6 *ln;
 	struct rtentry *rt;
 	struct in6_addr *dst;
@@ -557,8 +559,6 @@ nd6_llinfo_timer(arg)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
-#else
-	s = splnet();
 #endif
 
 	ln = (struct llinfo_nd6 *)arg;
@@ -571,7 +571,9 @@ nd6_llinfo_timer(arg)
 			ln->ln_ntick = 0;
 			nd6_llinfo_settimer(ln, ln->ln_ntick);
 		}
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		splx(s);
+#endif
 		return;
 	}
 
@@ -651,7 +653,9 @@ nd6_llinfo_timer(arg)
 		break;
 	}
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	splx(s);
+#endif
 }
 
 /*
