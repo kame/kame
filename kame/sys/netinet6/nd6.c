@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.387 2005/08/18 10:30:38 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.388 2005/08/18 10:32:00 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1862,26 +1862,26 @@ nd6_ioctl(cmd, data, ifp)
 
 		break;
 	case OSIOCGIFINFO_IN6:
+#define ND	ndi->ndi
 		/* XXX: old ndp(8) assumes a positive value for linkmtu. */
-		bzero(&ndi->ndi, sizeof(ndi->ndi));
-		ndi->ndi.linkmtu = IN6_LINKMTU(ifp);
-		ndi->ndi.maxmtu = ND_IFINFO(ifp)->maxmtu;
-		ndi->ndi.basereachable = ND_IFINFO(ifp)->basereachable;
-		ndi->ndi.reachable = ND_IFINFO(ifp)->reachable;
-		ndi->ndi.retrans = ND_IFINFO(ifp)->retrans;
-		ndi->ndi.flags = ND_IFINFO(ifp)->flags;
-		ndi->ndi.recalctm = ND_IFINFO(ifp)->recalctm;
-		ndi->ndi.chlim = ND_IFINFO(ifp)->chlim;
+		bzero(&ND, sizeof(ND));
+		ND.linkmtu = IN6_LINKMTU(ifp);
+		ND.maxmtu = ND_IFINFO(ifp)->maxmtu;
+		ND.basereachable = ND_IFINFO(ifp)->basereachable;
+		ND.reachable = ND_IFINFO(ifp)->reachable;
+		ND.retrans = ND_IFINFO(ifp)->retrans;
+		ND.flags = ND_IFINFO(ifp)->flags;
+		ND.recalctm = ND_IFINFO(ifp)->recalctm;
+		ND.chlim = ND_IFINFO(ifp)->chlim;
 		break;
 	case SIOCGIFINFO_IN6:
-		ndi->ndi = *ND_IFINFO(ifp);
+		ND = *ND_IFINFO(ifp);
 		break;
 	case SIOCSIFINFO_IN6:
 		/* 
 		 * used to change host variables from userland.
 		 * intented for a use on router to reflect RA configurations.
 		 */
-#define ND	ndi->ndi
 		/* 0 means 'unspecified' */
 		if (ND.linkmtu != 0) {
 			if (ND.linkmtu < IPV6_MMTU ||
@@ -1904,11 +1904,11 @@ nd6_ioctl(cmd, data, ifp)
 			ND_IFINFO(ifp)->retrans = ND.retrans;
 		if (ND.chlim != 0)
 			ND_IFINFO(ifp)->chlim = ND.chlim;
-#undef ND
 		/* FALLTHROUGH */
 	case SIOCSIFINFO_FLAGS:
-		ND_IFINFO(ifp)->flags = ndi->ndi.flags;
+		ND_IFINFO(ifp)->flags = ND.flags;
 		break;
+#undef ND
 	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
 		/* sync kernel routing table with the default router list */
 		defrouter_reset();
