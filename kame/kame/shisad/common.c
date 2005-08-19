@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.19 2005/08/18 10:15:31 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.20 2005/08/19 02:01:55 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -38,6 +38,9 @@
 #include <sys/socket.h>
 #include <sys/syslog.h>
 #include <unistd.h>
+#ifdef __OpenBSD__
+#include <sys/uio.h>
+#endif
 
 #include <net/if.h>
 #ifdef __FreeBSD__
