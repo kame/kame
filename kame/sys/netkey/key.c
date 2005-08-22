@@ -8804,6 +8804,22 @@ key_setmigrate(sp, oldsrc, olddst, isr, seq, pid)
 
 	m_cat(result, m);
 
+	if ((result->m_flags & M_PKTHDR) == 0)
+		goto fail;
+
+	if (result->m_len < sizeof(struct sadb_msg)) {
+		result = m_pullup(result, sizeof(struct sadb_msg));
+		if (result == NULL)
+			goto fail;
+	}
+
+	result->m_pkthdr.len = 0;
+	for (m = result; m; m = m->m_next)
+		result->m_pkthdr.len += m->m_len;
+
+	mtod(result, struct sadb_msg *)->sadb_msg_len =
+	    PFKEY_UNIT64(result->m_pkthdr.len);
+
 	return(result);
 
  fail:
