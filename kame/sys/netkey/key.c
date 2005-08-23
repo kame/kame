@@ -8748,7 +8748,7 @@ key_setmigrate(sp, oldsrc, olddst, isr, seq, pid)
 		m_cat(result, m);
 
 		m = key_setsadbaddr(SADB_EXT_ADDRESS_DST,
-		    (struct sockaddr *)&sp->spidx->dst, sp->spidx->prefs,
+		    (struct sockaddr *)&sp->spidx->dst, sp->spidx->prefd,
 		    sp->spidx->ul_proto);
 		if (m == NULL)
 			goto fail;
