@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.23 2005/08/23 08:24:53 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.24 2005/08/23 09:43:43 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -745,7 +745,7 @@ relay_icmp6_error(oicp, oicp_len, ifindex)
 	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 		
 	bzero(buf, sizeof(buf));
-	icp = (struct icm6_hdr *)buf;
+	icp = (struct icmp6_hdr *)buf;
 	switch (oicp->icmp6_type) {
 	case ICMP6_TIME_EXCEEDED:
 	case ICMP6_PARAM_PROB:
