@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.1 2005/08/18 10:15:31 t-momose Exp $	*/
+/*	$KAME: hal.c,v 1.2 2005/08/23 08:24:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -332,3 +332,178 @@ show_hal(s, head)
 		}
 	}
 }
+
+#if defined(MIP_MN) || defined(MIP_HA)
+int
+receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
+	struct nd_router_advert *ra;
+	size_t ralen;
+	int receivedifindex;
+	struct in6_addr *in6_lladdr, *in6_gladdr;
+{
+	int error;
+#ifdef MIP_MN
+	struct mip6_mipif *mif = NULL;
+#endif /* MIP_MN */
+	struct mip6_hpfxl *hpfx = NULL;
+	struct mip6_hpfx_list *hpfxhead = NULL; 
+	struct nd_opt_hdr *pt;
+
+	uint16_t       hai_preference = 0;
+	uint16_t       hai_lifetime = 0;
+	uint8_t        hai_pfxlen = 0;
+
+/*
+	if (debug)
+		syslog(LOG_INFO,
+		"ra lifetime = %d\n", ntohs(ra->nd_ra_router_lifetime));
+*/
+
+	/* parse nd_options */ 
+	memset(&ndopts, 0, sizeof(ndopts));
+	error = mip6_get_nd6options(&ndopts, 
+				    (char *)ra + sizeof(struct nd_router_advert), 
+				    ralen - sizeof(struct nd_router_advert));
+	if (error)
+		return (error);
+
+#if defined(MIP_HA)
+	hpfxhead = &hpfx_head;
+#elif defined(MIP_MN) /* MIP_MN */
+	mif = mnd_get_mipif(receivedifindex);
+	if (mif == NULL)
+		return (0);
+	hpfxhead = &mif->mipif_hprefx_head; 
+#endif /* MIP_HA */
+	if (hpfxhead == NULL)
+		return (0);
+
+	hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
+
+	for (pt = (struct nd_opt_hdr *)ndopts.ndpi_start;
+	     pt <= (struct nd_opt_hdr *)ndopts.ndpi_end;
+	     pt = (struct nd_opt_hdr *)((caddr_t)pt +
+					(pt->nd_opt_len << 3))) {
+		struct nd_opt_prefix_info *pi;
+			
+		if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+			continue;
+		pi = (struct nd_opt_prefix_info *)pt;
+
+		hai_preference = 0;
+		hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
+		hai_pfxlen = pi->nd_opt_pi_prefix_len;
+		in6_gladdr = &pi->nd_opt_pi_prefix;
+#if 0
+		if (hai_lifetime == 0)
+			hai_lifetime = ntohl(pi->nd_opt_pi_valid_time);
+#endif
+			
+/*
+		if (debug)
+			syslog(LOG_INFO, "prefix lifetime = %d\n", hai_lifetime);
+*/
+
+		/* check H flag */
+		if (!(pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
+#if defined(MIP_HA)
+			/* delete HAL */
+			hpfx = mip6_get_hpfxlist(&pi->nd_opt_pi_prefix, 
+						 pi->nd_opt_pi_prefix_len, 
+						 hpfxhead);
+			if (hpfx == NULL) 
+				continue;
+
+			if (mip6_get_hal(hpfx, in6_gladdr))
+				mip6_delete_hal(hpfx, &pi->nd_opt_pi_prefix);
+#endif /* MIP_HA */
+			continue; /* MN ignores RA which not having R flag */
+		}
+
+		/* 
+		 * when the prefix field does not
+		 * have global address, it should
+		 * be ignored 
+		 */
+		if (IN6_IS_ADDR_LINKLOCAL(in6_gladdr)
+		    || IN6_IS_ADDR_MULTICAST(in6_gladdr)
+		    || IN6_IS_ADDR_LOOPBACK(in6_gladdr)
+		    || IN6_IS_ADDR_V4MAPPED(in6_gladdr)
+		    || IN6_IS_ADDR_UNSPECIFIED(in6_gladdr)) 
+			continue;
+
+		/* 
+		 * when the prefix field does not
+		 * contain 128-bit address, it should
+		 * be ignored 
+		 */				
+		if ((in6_gladdr->s6_addr[15] == 0) && 
+		    (in6_gladdr->s6_addr[14] == 0) &&
+		    (in6_gladdr->s6_addr[13] == 0) &&
+		    (in6_gladdr->s6_addr[12] == 0) &&
+		    (in6_gladdr->s6_addr[11] == 0) &&
+		    (in6_gladdr->s6_addr[10] == 0))
+			continue;
+
+		if (debug)
+			syslog(LOG_INFO, "RA received from HA (%s)\n", 
+			       ip6_sprintf(&pi->nd_opt_pi_prefix));
+		/* Home Agent Information Option */
+		if (ndopts.ndhai) {
+			hai_preference = ntohs(ndopts.ndhai->nd_opt_hai_preference);
+			hai_lifetime = ntohs(ndopts.ndhai->nd_opt_hai_lifetime);
+			
+			if (debug)
+				syslog(LOG_INFO, 
+				       "hainfo option found in RA (pref=%d,life=%d)\n", 
+				       hai_preference, hai_lifetime);
+		}
+
+		/* 
+		 * if lifetime is zero, correspondent HA must be 
+		 * removed from home agent list 
+		 */
+		if (hai_lifetime == 0 || 
+		    !(ra->nd_ra_flags_reserved & ND_RA_FLAG_HOME_AGENT)) {
+			hpfx = mip6_get_hpfxlist(&pi->nd_opt_pi_prefix, 
+						 pi->nd_opt_pi_prefix_len, 
+						 hpfxhead);
+			if (hpfx == NULL) 
+				continue;
+
+			if (mip6_get_hal(hpfx, in6_gladdr) == NULL) 
+				continue;
+			
+			mip6_delete_hal(hpfx, &pi->nd_opt_pi_prefix);
+		} else {
+			/* need both linklocal and
+			   global address to add home prefix info */
+			if (in6_gladdr == NULL)
+				continue;
+			
+			hpfx = mip6_get_hpfxlist(in6_gladdr, hai_pfxlen, hpfxhead);
+			if (hpfx == NULL) {
+#if defined(MIP_HA)			
+				continue;
+#else
+				/* add_hpfx XXXX ? */
+#endif /* MIP_HA */
+			}
+#ifdef MIP_HA
+			hpfx->hpfx_vltime = ntohl(pi->nd_opt_pi_valid_time);
+			hpfx->hpfx_pltime = ntohl(pi->nd_opt_pi_preferred_time);
+			
+			/* add or update home agent list */
+			if (had_add_hal(hpfx, in6_gladdr,
+					in6_lladdr, hai_lifetime, hai_preference, 0) == NULL) {
+				/* error = EINVAL; */
+				/* break; */
+				continue;
+			}
+#endif /* MIP_HA */
+		}
+	}
+
+	return (error);
+}
+#endif /* MIP_MN || MIP_HA */

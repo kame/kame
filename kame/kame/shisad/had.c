@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.22 2005/08/18 12:08:42 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.23 2005/08/23 08:24:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -55,6 +55,7 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #include <netinet/ip6mh.h>
+#include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
 #include <net/mipsock.h>
 #include <netinet6/mip6.h>
@@ -685,6 +686,93 @@ send_mpa(dst, mps_id, ifindex)
 		perror ("sendmsg icmp6 @haadreply");
 	else
 		mip6stat.mip6s_ompa++;
+
+	return (errno);
+}
+
+/* Relay icmp error occured on the path of a tunneling */
+/* icmp type and code are specified in rfc2473 */
+int
+relay_icmp6_error(oicp, oicp_len, ifindex)
+	struct icmp6_hdr *oicp;	/* Original ICMP6 message */
+	size_t oicp_len;
+	u_short ifindex;
+{
+	struct msghdr msg;
+	struct iovec iov;
+	struct cmsghdr  *cmsgptr = NULL;
+	struct in6_pktinfo *pi = NULL;
+	struct sockaddr_in6 to;
+	char adata[512], buf[1024];
+	struct icmp6_hdr *icp;
+	struct ip6_hdr *oip6, *iip6;
+
+	oip6 = (struct ip6_hdr *)(oicp + 1);
+	if (oip6->ip6_nxt != IPPROTO_IPV6)
+		return (EINVAL);
+	iip6 = oip6 + 1;
+
+	/* Relaying icmp6 packet should be done
+	   only when this HA manages the destination MN */
+	if (mip6_bc_lookup(&iip6->ip6_dst, &oip6->ip6_dst, 0)) {
+		return (EINVAL);
+	}
+	
+        memset(&to, 0, sizeof(to));
+	to.sin6_family = AF_INET6;
+	to.sin6_addr = iip6->ip6_src;
+	to.sin6_port = 0;
+	to.sin6_scope_id = 0;
+	to.sin6_len = sizeof (struct sockaddr_in6);
+
+	msg.msg_name = (void *)&to;
+	msg.msg_namelen = sizeof(struct sockaddr_in6);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (void *) adata;
+	msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+
+	cmsgptr = CMSG_FIRSTHDR(&msg);
+	pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
+	memset(pi, 0, sizeof(*pi));
+	if (ifindex)
+		pi->ipi6_ifindex = ifindex;
+	else
+		return (-1);
+	cmsgptr->cmsg_level = IPPROTO_IPV6;
+	cmsgptr->cmsg_type = IPV6_PKTINFO;
+	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
+	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+		
+	bzero(buf, sizeof(buf));
+	icp = (struct icm6_hdr *)buf;
+	switch (oicp->icmp6_type) {
+	case ICMP6_TIME_EXCEEDED:
+	case ICMP6_PARAM_PROB:
+	case ICMP6_DST_UNREACH:
+		icp->icmp6_type = ICMP6_DST_UNREACH;
+		icp->icmp6_code = ICMP6_DST_UNREACH_ADDR;
+		break;
+	case ICMP6_PACKET_TOO_BIG:
+		icp->icmp6_type = ICMP6_PACKET_TOO_BIG;
+		break;
+	}
+	icp->icmp6_cksum = 0;
+	memcpy(icp + 1, iip6, oicp_len - sizeof(*oicp) - sizeof(struct ip6_hdr));
+
+	iov.iov_base = buf;
+	iov.iov_len = oicp_len - sizeof(struct ip6_hdr);
+
+	if (debug) 
+		syslog(LOG_INFO, "relaying icmp6 error message to %s\n",
+		       ip6_sprintf(&iip6->ip6_src));
+
+	if (sendmsg(icmp6sock, &msg, 0) < 0)
+		syslog(LOG_ERR, "sendmsg icmp6 @{dest unreach, packet too big} is failed %s\n", strerror(errno));
+#if 0
+	else
+		mip6stat.mip6s_ompa++;
+#endif
 
 	return (errno);
 }

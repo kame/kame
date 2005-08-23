@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.15 2005/05/24 10:16:19 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.16 2005/08/23 08:24:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1331,6 +1331,152 @@ set_default_bu_lifetime(hoainfo)
 	struct mip6_hoainfo *hoainfo;
 {
 	return (default_lifetime);
+}
+
+int
+receive_hadisc_reply(dhrep, dhrep_len)
+	struct mip6_dhaad_rep *dhrep;
+	size_t dhrep_len;
+{
+	int optlen, total;
+	char *options;
+	struct binding_update_list *bul;
+	struct mip6_mipif *mif;
+	struct mip6_hpfxl *hpfx;
+	struct in6_addr *dhrep_addr;
+	struct mip6_hoainfo *hoainfo;
+
+	/* Is this HAADREPLY mine? */
+	hoainfo = hoainfo_get_withdhaadid(ntohs(dhrep->mip6_dhrep_id));
+	if (hoainfo == NULL)
+		return (ENOENT);
+
+#ifdef MIP_NEMO
+	if ((dhrep->mip6_dhrep_reserved & MIP6_DHREP_FLAG_MR) == 0) {
+		/* XXX */
+		syslog(LOG_INFO, "HA does not support the basic NEMO protocol\n");
+		return (ENOENT);
+	} 
+#endif /* MIP_NEMO */
+
+	/*
+	 * When MN receives DHAAD reply, it flushes all home
+	 * agent entries in the list except for static
+	 * configured entries. After flush, new entries will
+	 * be added according to the reply packet 
+	 */
+	mif = mnd_get_mipif(hoainfo->hinfo_ifindex);
+	if (mif == NULL)
+		return (0);
+
+	LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
+		if (mip6_are_prefix_equal(&hoainfo->hinfo_hoa, 
+					  &hpfx->hpfx_prefix, hpfx->hpfx_prefixlen)) {
+			break;
+		}
+	}
+	if (hpfx == NULL)
+		return (ENOENT);
+
+	mip6_flush_hal(hpfx, MIP6_HAL_STATIC);
+
+	options = (char *)dhrep + sizeof(struct mip6_dhaad_rep);
+	total = dhrep_len - sizeof(struct mip6_dhaad_rep);
+	for (optlen = 0; total > 0; total -= optlen) {
+		options += optlen;
+		dhrep_addr = (struct in6_addr *)options; 
+		optlen = sizeof(struct in6_addr);
+		if (mnd_add_hal(hpfx, dhrep_addr, 0) == NULL)
+			continue;
+
+		if (debug) 
+			syslog(LOG_INFO, "%s is added into hal list\n",
+			       ip6_sprintf(dhrep_addr));
+	}
+
+	if ((bul = bul_get_homeflag(&hoainfo->hinfo_hoa)) == NULL)
+		return (0);
+		
+	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
+	bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
+	syslog(LOG_INFO, "DHAAD gets %s\n",
+	       ip6_sprintf(&bul->bul_peeraddr));
+
+#ifdef MIP_MCOA
+	if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
+		struct binding_update_list *mbul;
+
+		for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
+		     mbul = LIST_NEXT(mbul, bul_entry)) {
+			mbul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
+			bul_kick_fsm(mbul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
+		}
+	}
+#endif /* MIP_MCOA */
+
+	return (0);
+}
+
+int
+receive_mpa(mpa, mpalen)
+	struct mip6_prefix_advert *mpa;
+	size_t mpalen;
+{
+	int error = 0;
+	int done = 0;
+	struct mip6_mipif *mif = NULL;
+	struct nd_opt_hdr *pt;
+	struct mip6_hpfx_mn_exclusive mnoption;
+
+	/* Check MPS ID */
+	LIST_FOREACH(mif, &mipifhead, mipif_entry) {
+		if (mif->mipif_mps_id == ntohl(mpa->mip6_pa_id))
+			break;
+	}
+	if (mif == NULL)
+		return (0);
+
+	memset(&ndopts, 0, sizeof(ndopts));
+	error = mip6_get_nd6options(&ndopts,
+				    (char *)mpa + sizeof(struct mip6_prefix_advert),
+				    mpalen - sizeof(struct mip6_prefix_advert));
+		
+	for (pt = (struct nd_opt_hdr *)ndopts.ndpi_start;
+	     pt <= (struct nd_opt_hdr *)ndopts.ndpi_end;
+	     pt = (struct nd_opt_hdr *)((caddr_t)pt +
+					(pt->nd_opt_len << 3))) {
+		struct nd_opt_prefix_info *pi;
+		
+		if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+			continue;
+		pi = (struct nd_opt_prefix_info *)pt;
+			
+		if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
+		    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix))
+			continue;
+
+		/* aggregatable unicast address, rfc2374 XXX */
+		if (pi->nd_opt_pi_prefix_len != 64)
+			continue;
+
+		memset(&mnoption, 0, sizeof(mnoption)); 
+		mnoption.hpfxlist_vltime = 
+			ntohl(pi->nd_opt_pi_valid_time);
+		mnoption.hpfxlist_pltime = 
+			ntohl(pi->nd_opt_pi_preferred_time);
+			
+		mnd_add_hpfxlist(&pi->nd_opt_pi_prefix,
+				 pi->nd_opt_pi_prefix_len,
+				 &mnoption, mif);
+		done = 1;
+	}
+
+	if (!done) {
+		error = EINVAL;
+		syslog(LOG_ERR, "Could not find valid PI in MPA\n");
+	}
+
+	return (error);
 }
 
 static void

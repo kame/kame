@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.18 2005/08/18 12:08:43 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.19 2005/08/23 08:24:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -379,6 +379,12 @@ struct binding_cache {
 };
 LIST_HEAD(binding_cache_head, binding_cache);
 
+struct nd6options {
+	struct nd_opt_prefix_info *ndpi_start, *ndpi_end;	/* could be multiple */
+	struct nd_opt_adv_interval *ndadvi;
+	struct nd_opt_homeagent_info *ndhai;
+};
+extern struct nd6options ndopts;
 extern int debug, namelookup;
 
 /* mh.c */
@@ -389,7 +395,6 @@ int  get_mobility_options(struct ip6_mh *, int, int,
 			 struct mip6_mobility_options *);
 int  mip6_icmp6_create_haanyaddr(struct in6_addr *, struct in6_addr *, int);
 int  in6_mask2len(struct in6_addr *, u_char *);
-struct home_agent_list *mip6_find_hal(struct mip6_hoainfo *);
 int  mh_input(struct in6_addr *, struct in6_addr *, 
    struct in6_addr *, struct in6_addr *, struct ip6_mh *, int);
 #ifdef MIP_MCOA
@@ -476,21 +481,18 @@ int  mipsock_nodetype_request(u_int8_t, u_int8_t);
 int mipsock_behint_input(struct mip_msghdr *);
 void icmp6sock_open(void);
 int  icmp6_input_common(int);
+int mip6_get_nd6options(struct nd6options *, char *, int);
 void mip6_create_addr(struct in6_addr *, const struct in6_addr *, 
 		      struct in6_addr *, u_int8_t);
-struct mip6_hpfxl *mip6_get_hpfxlist(struct in6_addr *, int, 
-				     struct mip6_hpfx_list *);
-struct home_agent_list *mip6_get_hal(struct mip6_hpfxl *, struct in6_addr *);
-void mip6_delete_hal(struct mip6_hpfxl *, struct in6_addr *);
 int mip6_are_prefix_equal(struct in6_addr *, struct in6_addr *, int);
-void mip6_flush_hal(struct mip6_hpfxl *, int);
-void mip6_delete_hpfxlist(struct in6_addr *, u_int16_t, 
-			  struct mip6_hpfx_list *);
 void hal_set_expire_timer(struct home_agent_list *, int);
 void hal_stop_expire_timer(struct home_agent_list *);
-void hal_expire_timer(void *);
 void command_show_stat(int, char *);
-void show_hal(int, struct mip6_hpfx_list *);
+struct ip6_hdr;
+struct ip6_rthdr2 *find_rthdr2(struct ip6_hdr *);
+
+/* cnd.c */
+int cn_receive_dst_unreach(struct icmp6_hdr *);
 
 /* mnd.c */
 int mipsock_bul_request(struct binding_update_list *, u_char);
@@ -507,20 +509,14 @@ struct mip6_hpfxl *mnd_add_hpfxlist(struct in6_addr *,
 struct mip6_mipif *mnd_get_mipif(u_int16_t);
 int send_na_home(struct in6_addr *, u_int16_t);
 int set_default_bu_lifetime(struct mip6_hoainfo *);
+int receive_hadisc_reply(struct mip6_dhaad_rep *, size_t);
+int receive_mpa(struct mip6_prefix_advert *, size_t);
 struct noro_host_list *noro_get(struct in6_addr *);
 void noro_add(struct in6_addr *);
-
 void hpfxlist_expire_timer(void *);
-void hxplist_stop_expire_timer(struct mip6_hpfxl *);
-void hpfxlist_set_expire_timer(struct mip6_hpfxl *, int);
-
-
 
 /* had.c */
 int mipsock_input(struct mip_msghdr *);
-struct home_agent_list *had_add_hal(struct mip6_hpfxl *, struct in6_addr *, 
-			     struct in6_addr *, uint16_t, uint16_t, int);
-struct mip6_hpfxl *had_add_hpfxlist(struct in6_addr *, u_int16_t);
 int had_is_ha_if(u_int16_t);
 #ifdef MIP_HA
 u_int16_t ha_if(void);
@@ -531,6 +527,7 @@ struct mip6_hpfxl *had_is_myhomenet(struct in6_addr *);
 int send_haadrep(struct in6_addr *, struct in6_addr *, 
 		 struct mip6_dhaad_req *, u_short);
 int send_mpa(struct in6_addr *, u_int16_t, u_short);
+int relay_icmp6_error(struct icmp6_hdr *, size_t, u_short);
 
 /* nemo_var.c */
 #ifdef MIP_NEMO
@@ -547,6 +544,24 @@ void nemo_parse_conf(void);
 void command_show_pt(int, char *);
 
 #endif /* MIP_NEMO */
+
+/* hal.c */
+struct home_agent_list *mip6_find_hal(struct mip6_hoainfo *);
+struct home_agent_list *had_add_hal(struct mip6_hpfxl *, struct in6_addr *, 
+			     struct in6_addr *, uint16_t, uint16_t, int);
+struct mip6_hpfxl *had_add_hpfxlist(struct in6_addr *, u_int16_t);
+void mip6_flush_hal(struct mip6_hpfxl *, int);
+void mip6_delete_hal(struct mip6_hpfxl *, struct in6_addr *);
+struct home_agent_list *mip6_get_hal(struct mip6_hpfxl *, struct in6_addr *);
+void hxplist_stop_expire_timer(struct mip6_hpfxl *);
+void hpfxlist_set_expire_timer(struct mip6_hpfxl *, int);
+void hal_expire_timer(void *);
+void mip6_delete_hpfxlist(struct in6_addr *, u_int16_t, 
+			  struct mip6_hpfx_list *);
+struct mip6_hpfxl *mip6_get_hpfxlist(struct in6_addr *, int, 
+				     struct mip6_hpfx_list *);
+void show_hal(int, struct mip6_hpfx_list *);
+int receive_ra(struct nd_router_advert *, size_t, int, struct in6_addr *, struct in6_addr *);
 
 /* other utility functions */
 char *hexdump(void *, size_t);

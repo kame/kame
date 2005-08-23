@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.11 2005/05/24 10:16:19 keiichi Exp $	*/
+/*	$KAME: cnd.c,v 1.12 2005/08/23 08:24:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -49,6 +49,7 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #include <netinet/ip6mh.h>
+#include <netinet/ip6.h>
 #include <net/mipsock.h>
 #include <netinet6/mip6.h>
 
@@ -204,10 +205,29 @@ static void
 cn_lists_init(void)
 {
 	mip6_bc_init();
-
-	return;
 }
 
+int
+cn_receive_dst_unreach(icp)
+	struct icmp6_hdr *icp;
+{
+	struct ip6_hdr *iip6;
+	struct binding_cache *bc;
+	struct ip6_rthdr2 *rth2;
+
+	iip6 = (struct ip6_hdr *)(icp + 1);
+	if ((rth2 = find_rthdr2(iip6)) == NULL)
+		return (0);
+	bc = mip6_bc_lookup((struct in6_addr *)(rth2 + 1), &iip6->ip6_src, 0);
+	if (bc)  {
+		mip6_bc_delete(bc);
+		syslog(LOG_INFO, 
+		       "binding for %s is deleted due to ICMP destunreach.\n",
+		       ip6_sprintf(&iip6->ip6_dst));
+	}
+
+	return (0);
+}
 
 int
 mipsock_input(miphdr)

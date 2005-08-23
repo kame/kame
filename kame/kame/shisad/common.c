@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.20 2005/08/19 02:01:55 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.21 2005/08/23 08:24:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -78,13 +78,8 @@ static const struct in6_addr haanyaddr_ifidnn = {
 #endif
 
 #ifndef MIP_CN
-struct nd6options {
-	struct nd_opt_prefix_info *ndpi_start, *ndpi_end;	/* could be multiple */
-	struct nd_opt_adv_interval *ndadvi;
-	struct nd_opt_homeagent_info *ndhai;
-} ndopts;
+struct nd6options ndopts;
 
-static int mip6_get_nd6options(struct nd6options *, char *, int);
 extern struct mip6_hpfx_list hpfx_head; 
 #endif /* MIP_CN */
 
@@ -164,12 +159,15 @@ icmp6sock_open()
 	ICMP6_FILTER_SETPASS(MIP6_HA_DISCOVERY_REPLY, &filter);
 	ICMP6_FILTER_SETPASS(MIP6_PREFIX_SOLICIT, &filter);
 	ICMP6_FILTER_SETPASS(MIP6_PREFIX_ADVERT, &filter);
-#ifdef MIP_CN
+#if defined(MIP_CN) || defined(MIP_HA)
 	ICMP6_FILTER_SETPASS(ICMP6_DST_UNREACH, &filter);
-#endif /* MIP_CN */
-#ifdef MIP_MN
+#endif /* MIP_CN || MIP_HA */
+#ifdef MIP_HA
+	ICMP6_FILTER_SETPASS(ICMP6_TIME_EXCEEDED, &filter);
+#endif /* MIP_HA */
+#if defined(MIP_MN) || defined(MIP_HA)
 	ICMP6_FILTER_SETPASS(ICMP6_PARAM_PROB, &filter);
-#endif /* MIP_MN */
+#endif /* MIP_MN || MIP_HA */
 	if (setsockopt(icmp6sock, IPPROTO_ICMPV6, 
 		       ICMP6_FILTER, &filter, sizeof(filter)) < 0) {
 		perror("setsockopt ICMP6_FILTER");
@@ -182,7 +180,7 @@ icmp6sock_open()
 }
 
 #ifndef MIP_CN
-static int
+int
 mip6_get_nd6options(ndoptions, options, total) 
 	struct nd6options *ndoptions;
  	char *options;
@@ -249,29 +247,8 @@ icmp6_input_common(fd)
         struct in6_pktinfo *pkt = NULL;
         char adata[512], buf[1024];
 #ifdef MIP_MN
-        struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul;
-	struct mip6_prefix_advert *mpsadv;
-	struct mip6_dhaad_rep *dhrep;
-	struct in6_addr *dhrep_addr;
-	struct mip6_mipif *mif = NULL;
 #endif /* MIP_MN */
-
-#ifndef MIP_CN
-	struct mip6_hpfxl *hpfx = NULL;
-	struct mip6_hpfx_list *hpfxhead = NULL; 
-	struct home_agent_list *hal = NULL;
-	struct nd_opt_hdr *pt;
-
-	struct nd_router_advert *ra;
-        uint16_t       hai_preference = 0;
-        uint16_t       hai_lifetime = 0;
-        uint8_t        hai_pfxlen = 0;
-#endif /* MIP_CN */
-
-#ifdef MIP_HA
-	struct mip6_dhaad_req *dhreq;
-#endif /* MIP_HA */
 
 	memset(&from, 0, sizeof(from));
         msg.msg_name = (void *)&from;
@@ -288,7 +265,7 @@ icmp6_input_common(fd)
         readlen = recvmsg(fd, &msg, 0);
         if (readlen < 0) {
                 perror("recvmsg");
-                return (-1);
+                return (EINVAL);
         }
 
         for (cmsgptr = CMSG_FIRSTHDR(&msg); 
@@ -334,36 +311,8 @@ icmp6_input_common(fd)
 	switch(icp->icmp6_type) {
 #ifdef MIP_CN
 	case ICMP6_DST_UNREACH:
-	{
-		u_int8_t nh;
-		struct ip6_hdr *iip6;
-		struct binding_cache *bc;
-		struct ip6_ext *ext;
-		struct ip6_rthdr2 *rth2;
-
-		iip6 = (struct ip6_hdr *)(icp + 1);
-		for (ext = (struct ip6_ext *)(iip6 + 1), nh = iip6->ip6_nxt;
-		     nh == IPPROTO_HOPOPTS ||
-		     nh == IPPROTO_FRAGMENT ||
-		     nh == IPPROTO_DSTOPTS;
-                     /* sizeof *ext is 2 bytes. */
-		     nh = ext->ip6e_nxt, ext += (ext->ip6e_len + 1) << 2);
-		if (nh != IPPROTO_ROUTING)
-			break;
-
-		rth2 = (struct ip6_rthdr2 *)ext;
-		if (rth2->ip6r2_type != 2)
-			break;
-		bc = mip6_bc_lookup((struct in6_addr *)(rth2 + 1), &iip6->ip6_src, 0);
-		if (bc)  {
-			mip6_bc_delete(bc);
-			syslog(LOG_INFO, 
-			       "binding for %s is deleted due to ICMP destunreach.\n",
-				ip6_sprintf(&iip6->ip6_dst));
-		}
+		error = cn_receive_dst_unreach(icp);
 		break;
-		
-	}
 #endif /* MIP_CN */
 
 #ifndef MIP_CN
@@ -376,168 +325,16 @@ icmp6_input_common(fd)
 	 * procedure.  
 	 */
 	case ND_ROUTER_ADVERT:
-		ra = (struct nd_router_advert *)icp;
-		
-/*
-		if (debug)
-			syslog(LOG_INFO,
-		       		"ra lifetime = %d\n", ntohs(ra->nd_ra_router_lifetime));
-*/
-
-		/* parse nd_options */ 
-		memset(&ndopts, 0, sizeof(ndopts));
-		error = mip6_get_nd6options(&ndopts, 
-			    (char *)icp + sizeof(struct nd_router_advert), 
-				    readlen - sizeof(struct nd_router_advert));
-		if (error)
-			break;
-
-#if defined(MIP_HA)
-		hpfxhead = &hpfx_head;
-#elif defined(MIP_MN) /* MIP_MN */
-		mif = mnd_get_mipif(receivedifindex);
-		if (mif == NULL)
-			break;
-		hpfxhead = &mif->mipif_hprefx_head; 
-#endif /* MIP_HA */
-		if (hpfxhead == NULL)
-			break;
-
-		hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
-
-		for (pt = (struct nd_opt_hdr *)ndopts.ndpi_start;
-		     pt <= (struct nd_opt_hdr *)ndopts.ndpi_end;
-		     pt = (struct nd_opt_hdr *)((caddr_t)pt +
-						(pt->nd_opt_len << 3))) {
-			struct nd_opt_prefix_info *pi;
-			
-			if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
-				continue;
-			pi = (struct nd_opt_prefix_info *)pt;
-
-			hai_preference = 0;
-			hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
-			hai_pfxlen = pi->nd_opt_pi_prefix_len;
-			in6_gladdr = &pi->nd_opt_pi_prefix;
-#if 0
-			if (hai_lifetime == 0)
-				hai_lifetime = ntohl(pi->nd_opt_pi_valid_time);
-#endif
-			
-/*
-			if (debug)
-				syslog(LOG_INFO, "prefix lifetime = %d\n", hai_lifetime);
-*/
-
-                        /* check H flag */
-			if (!(pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
-#if defined(MIP_HA)
-				/* delete HAL */
-				hpfx = mip6_get_hpfxlist(&pi->nd_opt_pi_prefix, 
-							 pi->nd_opt_pi_prefix_len, 
-							 hpfxhead);
-				if (hpfx == NULL) 
-					continue;
-
-				if ((hal = mip6_get_hal(hpfx, in6_gladdr)))
-					mip6_delete_hal(hpfx, &pi->nd_opt_pi_prefix);
-#endif /* MIP_HA */
-				continue; /* MN ignores RA which not having R flag */
-			}
-
-			/* 
-			 * when the prefix field does not
-			 * have global address, it should
-			 * be ignored 
-			 */
-			if (IN6_IS_ADDR_LINKLOCAL(in6_gladdr)
-			    || IN6_IS_ADDR_MULTICAST(in6_gladdr)
-			    || IN6_IS_ADDR_LOOPBACK(in6_gladdr)
-			    || IN6_IS_ADDR_V4MAPPED(in6_gladdr)
-			    || IN6_IS_ADDR_UNSPECIFIED(in6_gladdr)) 
-				continue;
-
-			/* 
-			 * when the prefix field does not
-			 * contain 128-bit address, it should
-			 * be ignored 
-			 */				
-			if ((in6_gladdr->s6_addr[15] == 0) && 
-			    (in6_gladdr->s6_addr[14] == 0) &&
-			    (in6_gladdr->s6_addr[13] == 0) &&
-			    (in6_gladdr->s6_addr[12] == 0) &&
-			    (in6_gladdr->s6_addr[11] == 0) &&
-			    (in6_gladdr->s6_addr[10] == 0))
-				continue;
-
-			if (debug)
-				syslog(LOG_INFO, "RA received from HA (%s)\n", 
-				       ip6_sprintf(&pi->nd_opt_pi_prefix));
-			/* Home Agent Information Option */
-			if (ndopts.ndhai) {
-				hai_preference = ntohs(ndopts.ndhai->nd_opt_hai_preference);
-				hai_lifetime = ntohs(ndopts.ndhai->nd_opt_hai_lifetime);
-
-				if (debug)
-					syslog(LOG_INFO, 
-					       "hainfo option found in RA (pref=%d,life=%d)\n", 
-					       hai_preference, hai_lifetime);
-			}
-
-			/* 
-			 * if lifetime is zero, correspondent HA must be 
-			 * removed from home agent list 
-			 */
-			if (hai_lifetime == 0 || 
-			    !(ra->nd_ra_flags_reserved & ND_RA_FLAG_HOME_AGENT)) {
-				hpfx = mip6_get_hpfxlist(&pi->nd_opt_pi_prefix, 
-						 pi->nd_opt_pi_prefix_len, 
-						 hpfxhead);
-				if (hpfx == NULL) 
-					continue;
-
-				hal = mip6_get_hal(hpfx, in6_gladdr);
-				if (hal == NULL) 
-					continue;
-			
-				mip6_delete_hal(hpfx, &pi->nd_opt_pi_prefix);
-			} else {
-				/* need both linklocal and
-				   global address to add home prefix info */
-				if (in6_gladdr == NULL)
-					continue;
-				
-				hpfx = mip6_get_hpfxlist(in6_gladdr, hai_pfxlen, hpfxhead);
-				if (hpfx == NULL) {
-#if defined(MIP_HA)			
-					continue;
-#else
-					/* add_hpfx XXXX ? */
-#endif /* MIP_HA */
-				}
-#ifdef MIP_HA
-				hpfx->hpfx_vltime = ntohl(pi->nd_opt_pi_valid_time);
-				hpfx->hpfx_pltime = ntohl(pi->nd_opt_pi_preferred_time);
-				
-				/* add or update home agent list */
-				if (had_add_hal(hpfx, in6_gladdr,
-						in6_lladdr, hai_lifetime, hai_preference, 0) == NULL) {
-					/* error = EINVAL; */
-					/* break; */
-					continue;
-				}
-#endif /* MIP_HA */
-			}
-		}
-
+		error = receive_ra((struct nd_router_advert *)icp, readlen,
+				   receivedifindex, in6_lladdr, in6_gladdr);
 		break;
 #endif /* MIP_CN */
 
 #ifdef MIP_HA
 	case MIP6_HA_DISCOVERY_REQUEST:
 		mip6stat.mip6s_dhreq++;
-		dhreq = (struct mip6_dhaad_req *)msg.msg_iov[0].iov_base;
-		error = send_haadrep(&from.sin6_addr, &dst, dhreq, receivedifindex);
+		error = send_haadrep(&from.sin6_addr, &dst,
+				     (struct mip6_dhaad_req *)icp, receivedifindex);
 		break;
 		
 	case MIP6_PREFIX_SOLICIT: 
@@ -545,98 +342,28 @@ icmp6_input_common(fd)
 		struct mip6_prefix_solicit *mps;
 
 		mip6stat.mip6s_mps++;
-		mps = (struct mip6_prefix_solicit *)msg.msg_iov[0].iov_base;
+		mps = (struct mip6_prefix_solicit *)icp;
 		error = send_mpa(&from.sin6_addr, mps->mip6_ps_id, receivedifindex);
 		break;
 	}
-		
+
+	case ICMP6_TIME_EXCEEDED:
+	case ICMP6_PARAM_PROB:
+	case ICMP6_PACKET_TOO_BIG:
+		error = relay_icmp6_error(icp, readlen, receivedifindex);
+		break;
 #endif /* MIP_HA */
 
 #ifdef MIP_MN
 	case MIP6_HA_DISCOVERY_REPLY:
-	{
-		struct mip6_hpfxl *hpfx;
-		struct mip6_mipif *mipif = NULL;
-		char *options;
-		int optlen, total;
-
 		mip6stat.mip6s_dhreply++;
-		dhrep = (struct mip6_dhaad_rep *)msg.msg_iov[0].iov_base;
-
-		/* Is this HAADREPLY mine? */
-		hoainfo = hoainfo_get_withdhaadid(ntohs(dhrep->mip6_dhrep_id));
-		if (hoainfo == NULL) {
-			error = ENOENT;
-			break;
-		}
-
-#ifdef MIP_NEMO
-		if ((dhrep->mip6_dhrep_reserved & MIP6_DHREP_FLAG_MR) == 0) {
-			/* XXX */
-			syslog(LOG_INFO, "HA does not support the basic NEMO protocol\n");
-			error = ENOENT;
-			break;
-		} 
-#endif /* MIP_NEMO */
-
-		/*
-		 * When MN receives DHAAD reply, it flushes all home
-		 * agent entries in the list except for static
-		 * configured entries. After flush, new entries will
-		 * be added according to the reply packet 
-		 */
-
-		mipif = mnd_get_mipif(hoainfo->hinfo_ifindex);
-		if (mipif == NULL)
-			return (0);
-
-		LIST_FOREACH(hpfx, &mipif->mipif_hprefx_head, hpfx_entry) {
-			if (mip6_are_prefix_equal(&hoainfo->hinfo_hoa, 
-						  &hpfx->hpfx_prefix, hpfx->hpfx_prefixlen)) {
-				break;
-			}
-		}
-		if (hpfx == NULL) {
-			error  = ENOENT;
-			break;
-		}
-		mip6_flush_hal(hpfx, MIP6_HAL_STATIC);
-
-                options = (char *)icp + sizeof(struct mip6_dhaad_rep);
-                total = readlen - sizeof(struct mip6_dhaad_rep);
-                for (optlen = 0; total > 0; total -= optlen) {
-                        options += optlen;
-			dhrep_addr = (struct in6_addr *)options; 
-                        optlen = sizeof(struct in6_addr);
-			if (mnd_add_hal(hpfx, dhrep_addr, 0) == NULL)
-				continue;
-
-			if (debug) 
-				syslog(LOG_INFO, "%s is added into hal list\n",
-					ip6_sprintf(dhrep_addr));
-                }
-
-		bul = bul_get_homeflag(&hoainfo->hinfo_hoa);
-		if (bul) {
-			bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
-			bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
-			syslog(LOG_INFO, "DHAAD gets %s\n",
-			       ip6_sprintf(&bul->bul_peeraddr));
-
-#ifdef MIP_MCOA
-			if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
-				struct binding_update_list *mbul;
-
-				for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
-					mbul = LIST_NEXT(mbul, bul_entry)) {
-					mbul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
-					bul_kick_fsm(mbul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
-				}
-			}
-#endif /* MIP_MCOA */
-		}
+		error = receive_hadisc_reply((struct mip6_dhaad_rep *)icp, readlen);
 		break;
-	}
+
+	case MIP6_PREFIX_ADVERT:
+		error = receive_mpa((struct mip6_prefix_advert *)icp, readlen);
+		break;
+
 	case ICMP6_PARAM_PROB:
 		switch (icp->icmp6_code) {
 		case ICMP6_PARAMPROB_NEXTHEADER:
@@ -664,63 +391,7 @@ icmp6_input_common(fd)
 			       "failed.\n");
 		}
 		break;
-	case MIP6_PREFIX_ADVERT:
-	{
-		int done = 0;
-		struct mip6_mipif *mif;
-		struct mip6_hpfx_mn_exclusive mnoption;
 
-		mpsadv = (struct mip6_prefix_advert *)icp;
-
-		/* Check MPS ID */
-		LIST_FOREACH(mif, &mipifhead, mipif_entry) {
-			if (mif->mipif_mps_id == ntohl(mpsadv->mip6_pa_id))
-				break;
-		}
-		if (mif == NULL)
-			break;
-
-		memset(&ndopts, 0, sizeof(ndopts));
-		error = mip6_get_nd6options(&ndopts,
-					    (char *)icp + sizeof(struct mip6_prefix_advert),
-					    readlen - sizeof(struct mip6_prefix_advert));
-		
-		for (pt = (struct nd_opt_hdr *)ndopts.ndpi_start;
-		     pt <= (struct nd_opt_hdr *)ndopts.ndpi_end;
-		     pt = (struct nd_opt_hdr *)((caddr_t)pt +
-						(pt->nd_opt_len << 3))) {
-			struct nd_opt_prefix_info *pi;
-			
-			if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
-				continue;
-			pi = (struct nd_opt_prefix_info *)pt;
-			
-			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
-			    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix))
-				continue;
-
-			/* aggregatable unicast address, rfc2374 XXX */
-			if (pi->nd_opt_pi_prefix_len != 64)
-				continue;
-
-			memset(&mnoption, 0, sizeof(mnoption)); 
-			mnoption.hpfxlist_vltime = 
-				ntohl(pi->nd_opt_pi_valid_time);
-			mnoption.hpfxlist_pltime = 
-				ntohl(pi->nd_opt_pi_preferred_time);
-			
-			mnd_add_hpfxlist(&pi->nd_opt_pi_prefix,
-					 pi->nd_opt_pi_prefix_len,
-					 &mnoption, mif);
-			done = 1;
-		}
-
-		if (!done) {
-			error = EINVAL;
-			syslog(LOG_ERR, "Could not find valid PI in MPA\n");
-		}
-		break;
-	}
 #endif /* MIP_MN */
 	default:
 		break;
@@ -784,6 +455,31 @@ mip6_create_addr(addr, ifid, prefix, prefixlen)
 	 }
 #undef s6_addr8
 	 return;
+}
+
+struct ip6_rthdr2*
+find_rthdr2(ip6)
+	struct ip6_hdr *ip6;
+{
+	u_int8_t nh;
+	struct ip6_ext *ext;
+	struct ip6_rthdr2 *rth2;
+
+	for (ext = (struct ip6_ext *)(ip6 + 1), nh = ip6->ip6_nxt;
+	     nh == IPPROTO_HOPOPTS ||
+		     nh == IPPROTO_FRAGMENT ||
+		     nh == IPPROTO_DSTOPTS;
+	     /* sizeof *ext is 2 bytes. */
+	     nh = ext->ip6e_nxt, ext += (ext->ip6e_len + 1) << 2)
+		;
+	if (nh != IPPROTO_ROUTING)
+		return (NULL);
+
+	rth2 = (struct ip6_rthdr2 *)ext;
+	if (rth2->ip6r2_type != 2)
+		return (NULL);
+
+	return (rth2);
 }
 
 #if 0
