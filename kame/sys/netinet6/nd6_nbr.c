@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.160 2005/08/10 03:10:44 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.161 2005/08/24 08:08:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,14 +240,14 @@ nd6_ns_input(m, off, icmp6len)
 #ifdef DEV_CARP
 	if (ifp->if_carp)
 		ifa = carp_iamatch6(ifp->if_carp, &taddr6);
-	if (!ifa)
+	if (ifa == NULL)
 		ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6);
 #else
 	ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6);
 #endif
 
 	/* (2) check. */
-	if (!ifa) {
+	if (ifa == NULL) {
 		struct rtentry *rt;
 		struct sockaddr_in6 tsin6;
 #ifdef RADIX_MPATH
@@ -287,7 +287,7 @@ nd6_ns_input(m, off, icmp6len)
 		if (rt)
 			rtfree(rt);
 	}
-	if (!ifa) {
+	if (ifa == NULL) {
 		/*
 		 * We've got an NS packet, and we don't have that adddress
 		 * assigned for us.  We MUST silently ignore it.
@@ -473,7 +473,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 			goto bad;
 	}
 
-	if (!dad) {
+	if (dad == NULL) {
 		/*
 		 * RFC2461 7.2.2:
 		 * "If the source address of the packet prompting the
@@ -590,7 +590,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	 *	Multicast NS		MUST add one	add the option
 	 *	Unicast NS		SHOULD add one	add the option
 	 */
-	if (!dad && (mac = nd6_ifptomac(ifp))) {
+	if (dad == NULL && (mac = nd6_ifptomac(ifp))) {
 		int optlen = sizeof(struct nd_opt_hdr) + ifp->if_addrlen;
 		struct nd_opt_hdr *nd_opt = (struct nd_opt_hdr *)(nd_ns + 1);
 		/* 8 byte alignments... */
@@ -803,7 +803,7 @@ nd6_na_input(m, off, icmp6len)
 		/*
 		 * Check if the link-layer address has changed or not.
 		 */
-		if (!lladdr)
+		if (lladdr == NULL)
 			llchange = 0;
 		else {
 			if (sdl->sdl_alen) {
@@ -834,7 +834,7 @@ nd6_na_input(m, off, icmp6len)
 		 *	1	1	y	n	(2a) L *->REACHABLE
 		 *	1	1	y	y	(2a) L *->REACHABLE
 		 */
-		if (!is_override && (lladdr && llchange)) {	   /* (1) */
+		if (!is_override && lladdr != NULL && llchange) { /* (1) */
 			/*
 			 * If state is REACHABLE, make it STALE.
 			 * no other updates should be done.
@@ -845,12 +845,12 @@ nd6_na_input(m, off, icmp6len)
 			}
 			goto freeit;
 		} else if (is_override				   /* (2a) */
-			|| (!is_override && (lladdr && !llchange)) /* (2b) */
-			|| !lladdr) {				   /* (2c) */
+		    || (!is_override && lladdr != NULL && !llchange) /* (2b) */
+		    || lladdr != NULL) {			   /* (2c) */
 			/*
 			 * Update link-local address, if any.
 			 */
-			if (lladdr) {
+			if (lladdr != NULL) {
 				sdl->sdl_alen = ifp->if_addrlen;
 				bcopy(lladdr, LLADDR(sdl), ifp->if_addrlen);
 			}
@@ -1288,7 +1288,7 @@ nd6_dad_start(ifa, delay)
 		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 		return;
 	}
-	if (!ifa->ifa_ifp)
+	if (ifa->ifa_ifp == NULL)
 		panic("nd6_dad_start: ifa->ifa_ifp == NULL");
 	if (!(ifa->ifa_ifp->if_flags & IFF_UP)) {
 		return;
@@ -1350,7 +1350,7 @@ nd6_dad_stop(ifa)
 	if (!dad_init)
 		return;
 	dp = nd6_dad_find(ifa);
-	if (!dp) {
+	if (dp == NULL) {
 		/* DAD wasn't started yet */
 		return;
 	}
@@ -1579,7 +1579,7 @@ nd6_dad_ns_input(ifa)
 	struct dadq *dp;
 	int duplicate;
 
-	if (!ifa)
+	if (ifa == NULL)
 		panic("ifa == NULL in nd6_dad_ns_input");
 
 	ia = (struct in6_ifaddr *)ifa;
@@ -1600,7 +1600,7 @@ nd6_dad_ns_input(ifa)
 	 * if I'm yet to start DAD, someone else started using this address
 	 * first.  I have a duplicate and you win.
 	 */
-	if (!dp || dp->dad_ns_ocount == 0)
+	if (dp == NULL || dp->dad_ns_ocount == 0)
 		duplicate++;
 
 	/* XXX more checks for loopback situation - see nd6_dad_timer too */
@@ -1624,7 +1624,7 @@ nd6_dad_na_input(ifa)
 {
 	struct dadq *dp;
 
-	if (!ifa)
+	if (ifa == NULL)
 		panic("ifa == NULL in nd6_dad_na_input");
 
 	dp = nd6_dad_find(ifa);

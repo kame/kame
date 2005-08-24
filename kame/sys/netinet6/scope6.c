@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.49 2005/07/15 15:28:50 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.50 2005/08/24 08:08:55 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -109,7 +109,7 @@ scope6_set(ifp, idlist)
 	int error = 0;
 	struct scope6_id *sid = SID(ifp);
 
-	if (!sid)	/* paranoid? */
+	if (sid == NULL)	/* paranoid? */
 		return (EINVAL);
 
 	/*
@@ -144,9 +144,9 @@ scope6_set(ifp, idlist)
 			if (i == IPV6_ADDR_SCOPE_LINKLOCAL) {
 				if (idlist->s6id_list[i] >= if_indexlim ||
 #ifdef __FreeBSD__
-				    !ifnet_byindex(idlist->s6id_list[i])
+				    ifnet_byindex(idlist->s6id_list[i]) == NULL
 #else
-				    !ifindex2ifnet[idlist->s6id_list[i]]
+				    ifindex2ifnet[idlist->s6id_list[i]] == NULL
 #endif
 				    ) {
 					/*
@@ -371,9 +371,9 @@ sa6_recoverscope(sin6)
 			if (zoneid < 0 || if_indexlim <= zoneid)
 				return (ENXIO);
 #ifdef __FreeBSD__
-			if (!ifnet_byindex(zoneid))
+			if (ifnet_byindex(zoneid) == NULL)
 #else
-			if (!ifindex2ifnet[zoneid])
+			if (ifindex2ifnet[zoneid] == NULL)
 #endif
 				return (ENXIO);
 			sin6->sin6_addr.s6_addr16[1] = 0;

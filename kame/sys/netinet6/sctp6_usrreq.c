@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.37 2005/06/16 18:29:30 jinmei Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.38 2005/08/24 08:08:56 suz Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1411,7 +1411,7 @@ sctp6_getaddr(struct socket *so, struct mbuf *nam)
 	sin6->sin6_len = sizeof(*sin6);
 
 	inp = (struct sctp_inpcb *)so->so_pcb;
-	if (!inp) {
+	if (inp == NULL) {
 #if defined(__FreeBSD__) || defined(__APPLE__)
 		FREE(sin6, M_SONAME);
 #endif
@@ -1517,7 +1517,7 @@ sctp6_peeraddr(struct socket *so, struct mbuf *nam)
 
 	/* We must recapture incase we blocked */
 	inp = (struct sctp_inpcb *)so->so_pcb;
-	if (!inp) {
+	if (inp == NULL) {
 #if defined(__FreeBSD__) || defined(__APPLE__)
 		FREE(sin6, M_SONAME);
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.273 2005/06/09 02:16:11 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.274 2005/08/24 08:08:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -624,7 +624,7 @@ defrouter_delreq(dr)
 	struct rtentry *oldrt = NULL;
 
 #ifdef DIAGNOSTIC
-	if (!dr)
+	if (dr == NULL)
 		panic("dr == NULL in defrouter_delreq");
 #endif
 
@@ -741,9 +741,9 @@ defrouter_select()
 	 */
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
-		if (!selected_dr &&
-		    (rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
-		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
+		if (selected_dr == NULL &&
+		    (rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) != NULL &&
+		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) != NULL &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			selected_dr = dr;
 		}
@@ -764,8 +764,8 @@ defrouter_select()
 	 * We only prefer the new router when the old one is not reachable
 	 * or when the new one has a really higher preference value.
 	 */
-	if (!selected_dr) {
-		if (!installed_dr || !TAILQ_NEXT(installed_dr, dr_entry))
+	if (selected_dr == NULL) {
+		if (installed_dr == NULL || !TAILQ_NEXT(installed_dr, dr_entry))
 			selected_dr = TAILQ_FIRST(&nd_defrouter);
 		else
 			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
@@ -1521,7 +1521,7 @@ pfxlist_onlink_check()
 	 * If we have no such prefix, check whether we still have a router
 	 * that does not advertise any prefixes.
 	 */
-	if (!pr) {
+	if (pr == NULL) {
 		for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 		    dr = TAILQ_NEXT(dr, dr_entry)) {
 			struct nd_prefix *pr0;
