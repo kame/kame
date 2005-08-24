@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.5 2005/05/25 01:49:23 keiichi Exp $	*/
+/*	$KAME: cfparse.y,v 1.6 2005/08/24 03:12:53 keiichi Exp $	*/
 
 %{
 /*
@@ -63,6 +63,7 @@ static void free_cfe(struct config_entry *);
 %token INTERFACE IFNAME
 %token HOMEREGISTRATIONLIFETIME
 %token PREFERENCE
+%token KEYMANAGEMENT
 %token PREFIXTABLE EXPLICIT IMPLICIT
 %token STATICTUNNEL
 
@@ -82,6 +83,7 @@ static void free_cfe(struct config_entry *);
 %type <cfe> homeregistrationlifetime_statement
 %type <cfe> interface_statement
 %type <cfe> preference_statement
+%type <cfe> keymanagement_statement
 %type <cfe> prefixtable_config
 %type <cfe> prefixtable_statements prefixtable_statement
 %type <cfe> statictunnel_config
@@ -123,6 +125,7 @@ statement:
 	|	interface_statement
 	|	homeregistrationlifetime_statement
 	|	preference_statement
+	|	keymanagement_statement
 	|	prefixtable_config
 	|	statictunnel_config
 	;
@@ -207,6 +210,20 @@ preference_statement:
 			if (cfe == NULL)
 				return (-1);
 			cfe->cfe_number = $2;
+
+			$$ = cfe;
+		}
+	;
+
+keymanagement_statement:
+		KEYMANAGEMENT INTEGER EOS
+		{
+			struct config_entry *cfe;
+
+			cfe = alloc_cfe(CFT_KEYMANAGEMENT);
+			if (cfe == NULL)
+				return (-1);
+			cfe->cfe_number = (($2 == 0) ? 0 : 1);
 
 			$$ = cfe;
 		}

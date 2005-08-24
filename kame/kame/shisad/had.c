@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.24 2005/08/23 09:43:43 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.25 2005/08/24 03:12:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -77,6 +77,7 @@ int foreground = 0;
 int namelookup = 1;
 int command_port = HAD_COMMAND_PORT;
 int preference = 0;
+int keymanagement = 0;
 
 struct mip6stat mip6stat;
 struct mip6_hpfx_list hpfx_head; 
@@ -195,12 +196,16 @@ main(argc, argv)
 		config_get_number(CFT_DEBUG, &debug, if_params);
 		config_get_number(CFT_COMMANDPORT, &command_port, if_params);
 		config_get_number(CFT_PREFERENCE, &preference, if_params);
+		config_get_number(CFT_KEYMANAGEMENT, &keymanagement,
+		    if_params);
 	}
 	if (config_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, config_params);
 		config_get_number(CFT_COMMANDPORT, &command_port,
 		    config_params);
 		config_get_number(CFT_PREFERENCE, &preference, config_params);
+		config_get_number(CFT_KEYMANAGEMENT, &keymanagement,
+		    config_params);
 	}
 
 	/* start timer */

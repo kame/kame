@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.5 2005/05/25 01:27:02 keiichi Exp $	*/
+/*	$KAME: cftoken.l,v 1.6 2005/08/24 03:12:53 keiichi Exp $	*/
 
 %{
 /*
@@ -81,6 +81,7 @@ mipifname	mip[0-9]+
 <S_CONFIG>home-registration-lifetime { D; return (HOMEREGISTRATIONLIFETIME ); }
 <S_CONFIG>preference { D; return (PREFERENCE); }
 <S_CONFIG>interface { D; BEGIN S_INTERFACE; return (INTERFACE); }
+<S_CONFIG>key-management { D; return (KEYMANAGEMENT); }
 <S_INTERFACE>{ifname} {
 	D;
 	BEGIN S_CONFIG;

@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.30 2005/08/18 12:08:43 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.31 2005/08/24 03:12:53 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -71,6 +71,9 @@
 #ifdef MIP_CN
 extern int homeagent_mode;
 #endif /* MIP_CN */
+#ifdef MIP_HA
+extern int keymanagement;
+#endif
 
 #if (defined(MIP_MCOA) || defined(MIP_NEMO)) && !defined(MIP_HA)
 /*
@@ -1448,12 +1451,17 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 	bap->ip6mhba_seqno = htons(seqno);
 	bap->ip6mhba_lifetime = htons(lifetime >> 2);
 
-#if defined(MIP_HA) && defined(MIP_NEMO)
+#ifdef MIP_HA
+	if (keymanagement
+	    && (recv_bu->ip6mhbu_flags & IP6_MH_BU_KEYM))
+		bap->ip6mhba_flags |= IP6_MH_BA_KEYM;
+#ifdef MIP_NEMO
 	/* When BU has R flag, BA must be returned with Rflag */
 	if ((recv_bu->ip6mhbu_flags & IP6_MH_BU_HOME) &&
 	    (recv_bu->ip6mhbu_flags & IP6_MH_BU_ROUTER))
 		bap->ip6mhba_flags |= IP6_MH_BA_ROUTER;
-#endif /* MIP_HA && MIP_NEMO */
+#endif /* MIP_NEMO */
+#endif /* MIP_HA */
 
 	/* section 10.3.1 MAY put Binding Refresh Advice mobility option */
 	if (refresh && (ntohs(bap->ip6mhba_lifetime) != 0)) {

@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.16 2005/08/23 08:24:53 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.17 2005/08/24 03:12:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -85,6 +85,7 @@ int foreground = 0;
 int namelookup = 1;
 int command_port = MND_COMMAND_PORT;
 int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
+int keymanagement = 0;
 struct config_entry *if_params;
 
 /*static void command_show_status(int, char *);*/
@@ -165,6 +166,7 @@ main(argc, argv)
 	FILE *pidfp;
 	struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul;
+	u_int16_t bul_flags;
 	char *homeagent = NULL;
 	char *argopts = "fnc:a:";
 #ifdef MIP_NEMO
@@ -232,6 +234,8 @@ main(argc, argv)
 		    if_params);
 		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
 		    &default_lifetime, if_params);
+		config_get_number(CFT_KEYMANAGEMENT,
+		    &keymanagement, if_params);
 	}
 	if (config_params != NULL) {
 		/* get global parameters. */
@@ -240,6 +244,8 @@ main(argc, argv)
 		    config_params);
 		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
 		    &default_lifetime, config_params);
+		config_get_number(CFT_KEYMANAGEMENT,
+		    &keymanagement, config_params);
 	}
 
 	mhsock_open();
@@ -280,14 +286,17 @@ main(argc, argv)
 	/* let's insert NULL binding update list to each binding update list */
 	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
-		bul = bul_insert(hoainfo, NULL, NULL, IP6_MH_BU_HOME|IP6_MH_BU_ACK
+		bul_flags = IP6_MH_BU_HOME|IP6_MH_BU_ACK
 #ifdef MIP_NEMO
-				 | IP6_MH_BU_ROUTER
+		    | IP6_MH_BU_ROUTER
 #endif
 #ifdef MIP_MCOA 
-				 | IP6_MH_BU_MCOA
+		    | IP6_MH_BU_MCOA
 #endif
-				 , 0);
+		    ;
+		if (keymanagement)
+			bul_flags |= IP6_MH_BU_KEYM;
+		bul = bul_insert(hoainfo, NULL, NULL, bul_flags, 0);
 		if (bul == NULL) {
 			syslog(LOG_ERR,
 			    "cannot insert bul, something wrong\n");
