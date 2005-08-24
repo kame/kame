@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.155 2005/07/12 01:53:00 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.156 2005/08/24 04:14:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,6 +154,25 @@ ip6_forward(m, srcrt)
 #endif
 
 #ifdef IPSEC
+#if defined(MIP6) && NMIP > 0
+	{
+		/*
+		 * XXX skip IPsec policy integrity check if the next
+		 * hop is me.  This is dirty but we need this trick
+		 * when we use an IPsec tunnel mode policy for
+		 * protocol 'any' between a home agent and a mobile
+		 * node.
+		 */
+		struct in6_ifaddr *ia;
+
+		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
+			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
+			    &ip6->ip6_dst))
+				goto skip_ipsec6_in_reject;
+		}
+	}
+#endif /* MIP6 && NMIP > 0 */
 	/*
 	 * Check AH/ESP integrity.
 	 */
@@ -166,6 +185,9 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
+#if defined(MIP6) && NMIP > 0
+ skip_ipsec6_in_reject:
+#endif /* MIP6 && NMIP > 0 */
 #endif /* IPSEC */
 
 	/*
