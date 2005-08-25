@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.397 2005/08/25 07:49:39 suz Exp $	*/
+/*	$KAME: in6.c,v 1.398 2005/08/25 07:58:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2338,6 +2338,12 @@ in6_if_up(ifp)
 			continue;
 		ia = (struct in6_ifaddr *)ifa;
 		if (ia->ia6_flags & IN6_IFF_TENTATIVE) {
+			/*
+			 * The TENTATIVE flag was likely set by hand
+			 * beforehand, implicitly indicating the need for DAD.
+			 * We may be able to skip the random delay in this
+			 * case, but we impose delays just in case.
+			 */
 			nd6_dad_start(ifa,
 			    arc4random() % (MAX_RTR_SOLICITATION_DELAY * hz));
 		}
