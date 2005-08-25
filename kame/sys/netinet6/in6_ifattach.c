@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.212 2005/06/17 05:49:14 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.213 2005/08/25 07:55:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -634,15 +634,6 @@ in6_ifattach_linklocal(ifp, altifp)
 	ifra.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 	ifra.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
 
-#if 0				/* temporarily disabled by jinmei */
-	/*
-	 * Do not let in6_update_ifa() do DAD, since we need a random delay
-	 * before sending an NS at the first time the interface becomes up.
-	 * Instead, in6_if_up() will start DAD with a proper random delay.
-	 */
-	ifra.ifra_flags |= IN6_IFF_NODAD;
-#endif
-
 	/*
 	 * Now call in6_update_ifa() to do a bunch of procedures to configure
 	 * a link-local address. We can set the 3rd argument to NULL, because
@@ -665,11 +656,6 @@ in6_ifattach_linklocal(ifp, altifp)
 		return (-1);
 	}
 
-	/*
-	 * Adjust ia6_flags so that in6_if_up will perform DAD.
-	 * XXX: Some P2P interfaces seem not to send packets just after
-	 * becoming up, so we skip p2p interfaces for safety.
-	 */
 	ia = in6ifa_ifpforlinklocal(ifp, 0); /* ia must not be NULL */
 #ifdef DIAGNOSTIC
 	if (!ia) {
@@ -677,10 +663,6 @@ in6_ifattach_linklocal(ifp, altifp)
 		/* NOTREACHED */
 	}
 #endif
-	if (in6if_do_dad(ifp) && (ifp->if_flags & IFF_POINTOPOINT) == 0) {
-		ia->ia6_flags &= ~IN6_IFF_NODAD;
-		ia->ia6_flags |= IN6_IFF_TENTATIVE;
-	}
 
 	/*
 	 * Make the link-local prefix (fe80::%link/64) as on-link.
