@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.44 2005/08/25 04:33:01 keiichi Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.45 2005/08/25 06:16:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,7 @@ you leave this credit intact on any copies of this file.
 #define SADB_X_SPDSETIDX  20
 #define SADB_X_SPDEXPIRE  21
 #define SADB_X_SPDDELETE2 22	/* by policy id */
-/* #define SADB_X_NAT_T_NEW_MAPPING    23 */
+#define SADB_X_NAT_T_NEW_MAPPING    23
 #define SADB_X_MIGRATE    24	/* sugimoto-mip6-pfkey-migrate */
 #define SADB_MAX          24
 
