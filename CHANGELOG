@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2794 2005/08/10 05:06:45 suz Exp $
+$KAME: CHANGELOG,v 1.2795 2005/08/25 05:24:12 keiichi Exp $
 
 <200508>
+Thu Aug 25 14:21:44 JST 2005	keiichi@iijlab.net
+	* kame/sys/net/pfkeyv2.h,kame/sys/netinet6/ipsec.c,
+	  kame/sys/netkey/key,c,key.h,key_debug.c
+	- added SADB_X_PACKET message type to deliver the information
+	  of triggering packet of IKE negotiation when sending a
+	  KEY_ACQUIRE message.  This change should not cause any
+	  binary compatibility issues, but if you found any, let us
+	  know.
+
+	  Great thanks to Francis Dupont for this extention.
+
 2005-08-10  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/ip6_mroute.c: fixed a kernel crash at the 
 	  start-up time of an IPv6 multicast program (pim6[sd]d, mfc)
