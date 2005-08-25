@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.396 2005/08/25 01:53:03 suz Exp $	*/
+/*	$KAME: in6.c,v 1.397 2005/08/25 07:49:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1228,7 +1228,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		struct in6_addr llsol;
 
 		/* join solicited multicast addr for new host id */
-		llsol.s6_addr32[0] = htonl(0xff020000);
+		llsol.s6_addr32[0] = IPV6_ADDR_INT32_MLL;
 		llsol.s6_addr32[1] = 0;
 		llsol.s6_addr32[2] = htonl(1);
 		llsol.s6_addr32[3] = ifra->ifra_addr.sin6_addr.s6_addr32[3];

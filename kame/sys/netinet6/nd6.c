@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.390 2005/08/25 01:24:35 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.391 2005/08/25 07:49:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1651,7 +1651,7 @@ nd6_rtrequest(req, rt, info)
 				int error;
 
 				llsol = SIN6(rt_key(rt))->sin6_addr;
-				llsol.s6_addr32[0] = htonl(0xff020000);
+				llsol.s6_addr32[0] = IPV6_ADDR_INT32_MLL;
 				llsol.s6_addr32[1] = 0;
 				llsol.s6_addr32[2] = htonl(1);
 				llsol.s6_addr8[12] = 0xff;
@@ -1687,7 +1687,7 @@ nd6_rtrequest(req, rt, info)
 			struct in6_multi *in6m;
 
 			llsol = SIN6(rt_key(rt))->sin6_addr;
-			llsol.s6_addr32[0] = htonl(0xff020000);
+			llsol.s6_addr32[0] = IPV6_ADDR_INT32_MLL;
 			llsol.s6_addr32[1] = 0;
 			llsol.s6_addr32[2] = htonl(1);
 			llsol.s6_addr8[12] = 0xff;
