@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.395 2005/08/08 07:22:16 suz Exp $	*/
+/*	$KAME: in6.c,v 1.396 2005/08/25 01:53:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1267,6 +1267,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		mltmask.sin6_len = sizeof(struct sockaddr_in6);
 		mltmask.sin6_family = AF_INET6;
 		mltmask.sin6_addr = in6mask32;
+#define	MLTMASK_LEN  4	/* mltmask's masklen (=32bit=4octet) */
 
 		/*
 		 * join link-local all-nodes address
@@ -1290,13 +1291,10 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0);
 #endif
 		if (rt) {
-			/*
-			 * 32bit came from "mltmask"
-			 * XXX: only works in !SCOPEDROUTING case.
-			 */
+			/* XXX: only works in !SCOPEDROUTING case. */
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
-			    32 / 8)) {
+			    MLTMASK_LEN)) {
 #ifdef __FreeBSD__
 				RTFREE_LOCKED(rt);
 #else
@@ -1396,10 +1394,9 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0);
 #endif
 		if (rt) {
-			/* 32bit came from "mltmask" */
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
-			    32 / 8)) {
+			    MLTMASK_LEN)) {
 #ifdef __FreeBSD__
 				RTFREE_LOCKED(rt);
 #else
@@ -1448,6 +1445,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			goto cleanup;
 		}
 		LIST_INSERT_HEAD(&ia->ia6_memberships, imm, i6mm_chain);
+#undef	MLTMASK_LEN
 	}
 
 	/*
