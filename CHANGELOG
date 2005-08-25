@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2795 2005/08/25 05:24:12 keiichi Exp $
+$KAME: CHANGELOG,v 1.2796 2005/08/25 07:46:13 jinmei Exp $
 
 <200508>
 Thu Aug 25 14:21:44 JST 2005	keiichi@iijlab.net
@@ -11,7 +11,7 @@ Thu Aug 25 14:21:44 JST 2005	keiichi@iijlab.net
 	  binary compatibility issues, but if you found any, let us
 	  know.
 
-	  Great thanks to Francis Dupont for this extention.
+	  Great thanks to Francis Dupont for this extension.
 
 2005-08-10  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/ip6_mroute.c: fixed a kernel crash at the 
