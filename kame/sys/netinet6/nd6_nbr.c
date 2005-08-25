@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.161 2005/08/24 08:08:55 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.162 2005/08/25 01:24:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,7 +473,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 			goto bad;
 	}
 
-	if (dad == NULL) {
+	if (!dad) {
 		/*
 		 * RFC2461 7.2.2:
 		 * "If the source address of the packet prompting the
@@ -590,7 +590,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	 *	Multicast NS		MUST add one	add the option
 	 *	Unicast NS		SHOULD add one	add the option
 	 */
-	if (dad == NULL && (mac = nd6_ifptomac(ifp))) {
+	if (!dad && (mac = nd6_ifptomac(ifp))) {
 		int optlen = sizeof(struct nd_opt_hdr) + ifp->if_addrlen;
 		struct nd_opt_hdr *nd_opt = (struct nd_opt_hdr *)(nd_ns + 1);
 		/* 8 byte alignments... */

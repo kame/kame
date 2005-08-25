@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.389 2005/08/24 08:08:55 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.390 2005/08/25 01:24:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -366,7 +366,7 @@ nd6_option(ndopts)
 		panic("uninitialized ndopts in nd6_option");
 	if (ndopts->nd_opts_search == NULL)
 		return NULL;
-	if (ndopts->nd_opts_done != NULL)
+	if (ndopts->nd_opts_done)
 		return NULL;
 
 	nd_opt = ndopts->nd_opts_search;
