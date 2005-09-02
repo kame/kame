@@ -336,8 +336,10 @@ key_sendup0(rp, m, promisc, canwait)
 			pfkeystat.in_nomem++;
 			error = ENOBUFS;
 			goto recovery;
-		} else
+		} else {
+			sorwakeup(rp->rcb_socket);
 			error = 0;
+		}
 	}
 	return (error);
 
