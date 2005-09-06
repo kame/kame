@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.24 2004/12/03 12:53:11 jinmei Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.25 2005/09/06 08:38:22 jinmei Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -418,8 +418,6 @@ res_send_timeout(buf, buflen, ans, anssiz, timo_limit)
 	u_int badns;	/* XXX NSMAX can't exceed #/bits in this var */
 	int changeserver = 0;
 	struct sockaddr_storage newnsap;
-
-	printf("res_send_timeout: %p\n", timo_limit);
 
 	if ((_res.options & RES_INIT) == 0 && res_init() == -1) {
 		/* errno should have been set by res_init() in this case. */
