@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.25 2005/08/24 03:12:53 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.26 2005/09/07 08:18:18 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -774,10 +774,6 @@ relay_icmp6_error(oicp, oicp_len, ifindex)
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 		syslog(LOG_ERR, "sendmsg icmp6 @{dest unreach, packet too big} is failed %s\n", strerror(errno));
-#if 0
-	else
-		mip6stat.mip6s_ompa++;
-#endif
 
 	return (errno);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.17 2005/08/24 03:12:53 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.18 2005/09/07 08:18:18 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -114,7 +114,7 @@ struct command_table show_command_table[] = {
 	{"stat", command_show_stat, "statistics"},
 	{"noro", noro_show, ""},
 	{"config", show_current_config, ""},
-	{"callout", show_callout_table, ""},
+	{"callout", show_callout_table, "the list in the callout queue"},
 #ifdef MIP_NEMO
 	{"pt", command_show_pt, "Prefix Table, MR only"},
 #endif /* MIP_NEMO */
@@ -1570,7 +1570,7 @@ noro_init()
 	fclose(file);
 
 	return;
-};
+}
 
 void
 noro_add(tgt)
@@ -1592,7 +1592,7 @@ noro_add(tgt)
 	LIST_INSERT_HEAD(&noro_head, noro, noro_entry); 
 	
 	return;
-};
+}
 
 
 struct noro_host_list *
@@ -1609,7 +1609,7 @@ noro_get(tgt)
 	}
 
 	return (NULL);
-};
+}
 
 
 static void
@@ -1623,7 +1623,7 @@ noro_show(s, dummy)
 	     noro = LIST_NEXT(noro, noro_entry)) {
 		command_printf(s, "%s\n", ip6_sprintf(&noro->noro_host));
 	}
-};
+}
 
 static void
 noro_sync()
@@ -1641,7 +1641,7 @@ noro_sync()
 	}
 
 	fclose(file);
-};
+}
 
 
 static void
