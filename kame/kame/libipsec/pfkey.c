@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.47 2003/10/02 19:52:12 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.48 2005/09/12 00:58:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1764,6 +1764,9 @@ pfkey_align(msg, mhp)
 		case SADB_X_EXT_SA2:
 #ifdef SADB_X_EXT_TAG
 		case SADB_X_EXT_TAG:
+#endif
+#ifdef SADB_X_EXT_PACKET
+		case SADB_X_EXT_PACKET:
 #endif
 			mhp[ext->sadb_ext_type] = (caddr_t)ext;
 			break;
