@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.162 2005/08/25 01:24:35 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.163 2005/09/14 13:44:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -846,7 +846,7 @@ nd6_na_input(m, off, icmp6len)
 			goto freeit;
 		} else if (is_override				   /* (2a) */
 		    || (!is_override && lladdr != NULL && !llchange) /* (2b) */
-		    || lladdr != NULL) {			   /* (2c) */
+		    || lladdr == NULL) {			   /* (2c) */
 			/*
 			 * Update link-local address, if any.
 			 */
