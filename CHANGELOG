@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2796 2005/08/25 07:46:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2797 2005/09/14 13:47:41 jinmei Exp $
+
+<200509>
+2005-09-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_nbr.c (nd6_na_input): fixed incorrect
+	comparison introduced with cleanups on Aug 24th.  This made NUD
+	unworkable, so all KAME snap kernels since then should be
+	upgraded.
 
 <200508>
 Thu Aug 25 14:21:44 JST 2005	keiichi@iijlab.net
