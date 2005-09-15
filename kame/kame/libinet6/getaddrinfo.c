@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.218 2005/07/27 08:17:29 suz Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.219 2005/09/15 07:48:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,13 +204,17 @@ struct explore {
 };
 
 static const struct explore explore[] = {
+	/*
+	 * XXX: at this moment, it is not clear which socket type should be
+	 * used for DCCP.  Since returning DCCP addrinfo for SOCK_DGRAM has
+	 * a bad effect on some existing UDP applications, we deliberately
+	 * exclude DCCP below.
+	 */
 #if 0
 	{ PF_LOCAL, ANY, ANY, NULL, 0x01 },
 #endif
 #ifdef INET6
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
-	{ PF_INET6, SOCK_DGRAM, IPPROTO_DCCP, "dccp", 0x1f },
-	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },	/* PASSIVE */
@@ -219,8 +223,6 @@ static const struct explore explore[] = {
 	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x1d },
 #endif
 	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
-	{ PF_INET, SOCK_DGRAM, IPPROTO_DCCP, "dccp", 0x1f },
-	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x0f },	/* !PASSIVE */
 	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },	/* PASSIVE */
