@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2800 2005/09/15 07:59:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.2801 2005/09/15 08:08:04 jinmei Exp $
 
 <200509>
 2005-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -13,10 +13,6 @@ $KAME: CHANGELOG,v 1.2800 2005/09/15 07:59:31 jinmei Exp $
 
 	This change fixes the problem that name resolution performed in
 	the KAME snap resolver has been failing on FreeBSD 5.4R.
-
-2005-09-15  SUZUKI, Shinsuke <suz@alaxala.net>
-	* freebsd5/lib/libinet6: use KAME's res_init() to enable KAME-specific
-	changes for DNS-resolver.
 
 2005-09-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_nbr.c (nd6_na_input): fixed incorrect
