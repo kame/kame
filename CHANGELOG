@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2797 2005/09/14 13:47:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2798 2005/09/15 00:55:26 suz Exp $
 
 <200509>
+2005-09-15  SUZUKI, Shinsuke <suz@alaxala.net>
+	* freebsd5/lib/libinet6: use KAME's res_init() to enable KAME-specific
+	changes for DNS-resolver.
+
 2005-09-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_nbr.c (nd6_na_input): fixed incorrect
 	comparison introduced with cleanups on Aug 24th.  This made NUD
