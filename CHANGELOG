@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2799 2005/09/15 07:56:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.2800 2005/09/15 07:59:31 jinmei Exp $
 
 <200509>
 2005-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,6 +10,9 @@ $KAME: CHANGELOG,v 1.2799 2005/09/15 07:56:15 jinmei Exp $
 	addrinfo for SOCK_DGRAM has a bad effect on some existing UDP
 	applications.  We'll need to revisit this once the DCCP API is
 	fixed.
+
+	This change fixes the problem that name resolution performed in
+	the KAME snap resolver has been failing on FreeBSD 5.4R.
 
 2005-09-15  SUZUKI, Shinsuke <suz@alaxala.net>
 	* freebsd5/lib/libinet6: use KAME's res_init() to enable KAME-specific
