@@ -17,7 +17,6 @@ SRCS+=	name6.c
 SRCS+=	base64.c herror.c nsap_addr.c 
 #SRCS+=	res_comp.c res_data.c res_debug.c
 #SRCS+=	res_init.c res_mkquery.c res_query.c 
-SRCS+=	res_init.c
 SRCS+=	res_send.c
 SRCS+=	inet_pton.c
 SRCS+=	bindresvport.c
