@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.164 2005/09/15 10:53:45 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.165 2005/09/15 10:54:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -695,7 +695,7 @@ nd6_na_input(m, off, icmp6len)
 
 	taddr6 = nd_na->nd_na_target;
 	if (in6_setscope(&taddr6, ifp, NULL))
-		goto bad;	/* XXX: impossible */
+		goto freeit;	/* XXX: impossible */
 
 	if (IN6_IS_ADDR_MULTICAST(&taddr6)) {
 		nd6log((LOG_ERR,
