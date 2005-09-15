@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2798 2005/09/15 00:55:26 suz Exp $
+$KAME: CHANGELOG,v 1.2799 2005/09/15 07:56:15 jinmei Exp $
 
 <200509>
+2005-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c: removed IPPROTO_SCTP from the
+	explore array for SOCK_DGRAM, according to the usage described in
+	draft-ietf-tsvwg-sctpsocket-11.txt.
+	Also removed IPPROTO_DCCP entries altogether, since returning DCCP
+	addrinfo for SOCK_DGRAM has a bad effect on some existing UDP
+	applications.  We'll need to revisit this once the DCCP API is
+	fixed.
+
 2005-09-15  SUZUKI, Shinsuke <suz@alaxala.net>
 	* freebsd5/lib/libinet6: use KAME's res_init() to enable KAME-specific
 	changes for DNS-resolver.
