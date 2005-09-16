@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.57 2005/09/16 11:30:14 suz Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.58 2005/09/16 11:33:18 suz Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -80,6 +80,11 @@ static int mhops = DHCP6_RELAY_MULTICAST_HOPS;
 
 static struct sockaddr_in6 sa6_server, sa6_client;
 
+struct ifid_list {
+	TAILQ_ENTRY(ifid_list) ilink;
+	unsigned int ifid;
+};
+TAILQ_HEAD(, ifid_list) ifid_list;
 struct prefix_list {
 	TAILQ_ENTRY(prefix_list) plink;
 	struct sockaddr_in6 paddr; /* contains meaningless but enough members */
@@ -329,6 +334,12 @@ relay6_init(int ifnum, char *iflist[])
 	if (csock > maxfd)
 		maxfd = csock;
 	on = 1;
+	if (setsockopt(csock, SOL_SOCKET, SO_REUSEPORT,
+	    &on, sizeof(on)) < 0) {
+		dprintf(LOG_ERR, FNAME, "setsockopt(csock, SO_REUSEPORT): %s",
+		    strerror(errno));
+		goto failexit;
+	}
 	if (setsockopt(csock, IPPROTO_IPV6, IPV6_V6ONLY,
 	    &on, sizeof (on)) < 0) {
 		dprintf(LOG_ERR, FNAME, "setsockopt(csock, IPV6_V6ONLY): %s",
@@ -369,18 +380,33 @@ relay6_init(int ifnum, char *iflist[])
 	    &((struct sockaddr_in6 *)res2->ai_addr)->sin6_addr,
 	    sizeof (mreq6.ipv6mr_multiaddr));
 
+	TAILQ_INIT(&ifid_list);
 	while (ifnum-- > 0) {
 		char *ifp = iflist[0];
-		mreq6.ipv6mr_interface = if_nametoindex(ifp);
-		if (mreq6.ipv6mr_interface == 0)
+		struct ifid_list *ifd;
+
+		ifd = (struct ifid_list *)malloc(sizeof (*ifd));
+		if (ifd == NULL) {
+			dprintf(LOG_WARNING, FNAME,
+			    "memory allocation failed");
+			goto failexit;
+		}
+		memset(ifd, 0, sizeof (*ifd));
+		ifd->ifid = if_nametoindex(ifp);
+		if (ifd->ifid == 0) {
 			dprintf(LOG_ERR, FNAME, "invalid interface %s", ifp);
+			goto failexit;
+		}
+		mreq6.ipv6mr_interface = ifd->ifid;
 
 		if (setsockopt(csock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 		    &mreq6, sizeof (mreq6))) {
 			dprintf(LOG_ERR, FNAME,
 			    "setsockopt(csock, IPV6_JOIN_GROUP): %s",
 			     strerror(errno));
+			goto failexit;
 		}
+		TAILQ_INSERT_TAIL(&ifid_list, ifd, ilink);
 		iflist++;
 	}
 	freeaddrinfo(res2);
@@ -500,6 +526,7 @@ relay6_recv(s, fromclient)
 	struct in6_pktinfo *pi = NULL;
 	struct cmsghdr *cm;
 	struct dhcp6 *dh6;
+	struct ifid_list *ifd;
 	char ifname[IF_NAMESIZE];
 
 	rmh.msg_control = (caddr_t)rmsgctlbuf;
@@ -540,6 +567,14 @@ relay6_recv(s, fromclient)
 		    "failed to get the arrival interface");
 		return;
 	}
+	for (ifd = TAILQ_FIRST(&ifid_list); ifd;
+	     ifd = TAILQ_NEXT(ifd, ilink)) {
+		if (pi->ipi6_ifindex == ifd->ifid)
+			break;
+	}
+	/* not for us? */
+	if (ifd == NULL)
+		return;
 	if (if_indextoname(pi->ipi6_ifindex, ifname) == NULL) {
 		dprintf(LOG_WARNING, FNAME,
 		    "if_indextoname(id = %d): %s",
