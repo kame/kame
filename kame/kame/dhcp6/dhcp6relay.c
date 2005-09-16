@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.56 2005/05/03 06:41:53 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.57 2005/09/16 11:30:14 suz Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -40,7 +40,9 @@
 
 #include <netinet/in.h>
 
+#ifdef __KAME__
 #include <netinet6/in6_var.h>
+#endif
 
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -243,7 +245,9 @@ make_prefix(pstr0)
 	/* fill in each member of the entry */
 	memset(pent, 0, sizeof (*pent));
 	pent->paddr.sin6_family = AF_INET6;
+#ifndef __linux__
 	pent->paddr.sin6_len = sizeof (struct sockaddr_in6);
+#endif
 	pent->paddr.sin6_addr = paddr;
 	pent->plen = plen;
 

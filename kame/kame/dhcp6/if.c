@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.5 2004/09/04 09:26:39 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.6 2005/09/16 11:30:15 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -33,15 +33,17 @@
 #include <sys/queue.h>
 
 #include <net/if.h>
-#include <net/if_dl.h>
-
 #include <netinet/in.h>
+#ifdef __KAME__
+#include <net/if_dl.h>
+#endif
 
 #include <syslog.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ifaddrs.h>
+#include <errno.h>
 
 #include <dhcp6.h>
 #include <config.h>

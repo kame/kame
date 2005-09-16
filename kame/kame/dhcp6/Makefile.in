@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.43 2005/03/02 07:20:13 suz Exp $
+# $Id: Makefile.in,v 1.44 2005/09/16 11:30:13 suz Exp $
 #
 
 prefix=	@prefix@
@@ -90,10 +90,15 @@ cftoken.c: cftoken.l y.tab.h
 	mv lex.yy.c $@	
 
 getaddrinfo.o:	$(srcdir)/missing/getaddrinfo.c
+	$(CC) -c $(srcdir)/missing/$*.c
 getnameinfo.o:	$(srcdir)/missing/getnameinfo.c
+	$(CC) -c $(srcdir)/missing/$*.c
 strlcat.o:	$(srcdir)/missing/strlcat.c
+	$(CC) -c $(srcdir)/missing/$*.c
 strlcpy.o:	$(srcdir)/missing/strlcpy.c
+	$(CC) -c $(srcdir)/missing/$*.c
 arc4random.o:	$(srcdir)/missing/arc4random.c
+	$(CC) -c $(srcdir)/missing/$*.c
 
 $(srcdir)/ianaopts.h: gentab.pl bootp-dhcp-parameters
 	expand bootp-dhcp-parameters | perl gentab.pl > ianaopts.h

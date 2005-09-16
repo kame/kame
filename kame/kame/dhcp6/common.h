@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.41 2005/03/02 07:20:13 suz Exp $	*/
+/*	$KAME: common.h,v 1.42 2005/09/16 11:30:13 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -28,8 +28,12 @@
  * SUCH DAMAGE.
  */
 
+#ifdef __KAME__
 #define IN6_IFF_INVALID (IN6_IFF_ANYCAST|IN6_IFF_TENTATIVE|\
 		IN6_IFF_DUPLICATED|IN6_IFF_DETACHED)
+#else
+#define IN6_IFF_INVALID (0)
+#endif
 
 #ifdef HAVE_ANSI_FUNC
 #define FNAME __func__
@@ -43,6 +47,42 @@
 #ifndef TAILQ_EMPTY
 #define	TAILQ_EMPTY(head) ((head)->tqh_first == NULL)
 #endif
+
+/* and linux *_FIRST and *_NEXT */
+#ifndef LIST_FIRST
+#define	LIST_FIRST(head)	((head)->lh_first)
+#endif
+#ifndef LIST_NEXT
+#define	LIST_NEXT(elm, field)	((elm)->field.le_next)
+#endif
+#ifndef TAILQ_FIRST
+#define	TAILQ_FIRST(head)	((head)->tqh_first)
+#endif
+#ifndef TAILQ_NEXT
+#define	TAILQ_NEXT(elm, field) ((elm)->field.tqe_next)
+#endif
+
+#ifndef SO_REUSEPORT
+#define SO_REUSEPORT SO_REUSEADDR
+#endif
+
+/* s*_len stuff */
+static __inline u_int8_t
+sysdep_sa_len (const struct sockaddr *sa)
+{
+#ifdef __linux__
+  switch (sa->sa_family)
+    {
+    case AF_INET:
+      return sizeof (struct sockaddr_in);
+    case AF_INET6:
+      return sizeof (struct sockaddr_in6);
+    }
+  return sizeof (struct sockaddr_in);
+#else
+  return sa->sa_len;
+#endif
+}
 
 extern int foreground;
 extern int debug_thresh;

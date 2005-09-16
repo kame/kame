@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.159 2005/07/21 06:59:26 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.160 2005/09/16 11:30:14 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -30,7 +30,6 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/sockio.h>
 #include <sys/ioctl.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
@@ -52,7 +51,9 @@
 #endif
 
 #include <netinet/in.h>
+#ifdef __KAME__
 #include <netinet6/in6_var.h>
+#endif
 
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -484,12 +485,14 @@ server6_init()
 		    strerror(errno));
 		exit(1);
 	}
+#ifndef __linux__
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
 		dprintf(LOG_ERR, FNAME, "shutdown(outbound, 0): %s",
 		    strerror(errno));
 		exit(1);
 	}
+#endif
 	freeaddrinfo(res);
 
 	memset(&hints, 0, sizeof(hints));

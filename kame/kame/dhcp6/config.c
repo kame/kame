@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.52 2005/05/03 10:47:27 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.53 2005/09/16 11:30:14 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -31,17 +31,27 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
+#include <sys/ioctl.h>
 
 #include <net/if.h>
-#include <net/if_dl.h>
-
 #include <netinet/in.h>
+#ifdef __KAME__
+#include <net/if_dl.h>
+#endif
+#ifdef __linux__
+#include <linux/if_packet.h>
+#endif
 
 #include <syslog.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ifaddrs.h>
+#include <errno.h>
+#ifdef __linux__
+#define __USE_XOPEN
+#include <time.h>
+#endif
 
 #include <dhcp6.h>
 #include <config.h>
@@ -1092,7 +1102,12 @@ get_default_ifid(pif)
 	struct prefix_ifconf *pif;
 {
 	struct ifaddrs *ifa, *ifap;
+#ifdef __KAME__
 	struct sockaddr_dl *sdl;
+#endif
+#ifdef __linux__
+	struct sockaddr_ll *sll;
+#endif
 
 	if (pif->ifid_len < 64) {
 		dprintf(LOG_NOTICE, FNAME, "ID length too short");
@@ -1111,6 +1126,10 @@ get_default_ifid(pif)
 		if (strcmp(ifa->ifa_name, pif->ifname) != 0)
 			continue;
 
+		if (ifa->ifa_addr == NULL)
+			continue;
+
+#ifdef __KAME__
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
 
@@ -1124,6 +1143,22 @@ get_default_ifid(pif)
 
 		memset(pif->ifid, 0, sizeof(pif->ifid));
 		cp = (char *)(sdl->sdl_data + sdl->sdl_nlen);
+#endif
+#ifdef __linux__
+		if (ifa->ifa_addr->sa_family != AF_PACKET)
+			continue;
+
+		sll = (struct sockaddr_ll *)ifa->ifa_addr;
+		if (sll->sll_halen < 6) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "link layer address is too short (%s)",
+			    pif->ifname);
+			goto fail;
+		}
+
+		memset(pif->ifid, 0, sizeof(pif->ifid));
+		cp = (char *)(sll->sll_addr);
+#endif
 		pif->ifid[8] = cp[0];
 		pif->ifid[8] ^= 0x02; /* reverse the u/l bit*/
 		pif->ifid[9] = cp[1];

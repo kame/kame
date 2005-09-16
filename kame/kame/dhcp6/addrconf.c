@@ -1,4 +1,4 @@
-/*	$KAME: addrconf.c,v 1.7 2005/05/04 11:26:13 jinmei Exp $	*/
+/*	$KAME: addrconf.c,v 1.8 2005/09/16 11:30:13 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -41,8 +41,10 @@
 
 #include <netinet/in.h>
 
+#ifdef __KAME__
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+#endif
 
 #include <errno.h>
 #include <syslog.h>
@@ -381,7 +383,9 @@ na_ifaddrconf(cmd, sa)
 	addr = &sa->addr;
 	memset(&sin6, 0, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
+#ifndef __linux__
 	sin6.sin6_len = sizeof(sin6);
+#endif
 	sin6.sin6_addr = addr->addr;
 
 	return (ifaddrconf(cmd, sa->dhcpif->ifname, &sin6, 128,

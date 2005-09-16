@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.162 2005/07/27 08:20:57 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.163 2005/09/16 11:30:14 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -30,7 +30,6 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
-#include <sys/sockio.h>
 #include <sys/uio.h>
 #include <sys/queue.h>
 #include <errno.h>
@@ -49,10 +48,12 @@
 #ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
-#include <net/if_dl.h>
 
 #include <netinet/in.h>
+#ifdef __KAME__
+#include <net/if_dl.h>
 #include <netinet6/in6_var.h>
+#endif
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -350,12 +351,14 @@ client6_init()
 		    "setsockopt(outbound, IPV6_V6ONLY): %s", strerror(errno));
 		exit(1);
 	}
+#ifndef __linux__
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
 		dprintf(LOG_ERR, FNAME, "shutdown(outbound, 0): %s",
 			strerror(errno));
 		exit(1);
 	}
+#endif
 	freeaddrinfo(res);
 
 	/*
@@ -1397,7 +1400,7 @@ client6_send(ev)
 	dst.sin6_scope_id = ifp->linkid;
 
 	if (sendto(outsock, buf, len, 0, (struct sockaddr *)&dst,
-	    ((struct sockaddr *)&dst)->sa_len) == -1) {
+	    sysdep_sa_len((struct sockaddr *)&dst)) == -1) {
 		dprintf(LOG_ERR, FNAME,
 		    "transmit failed: %s", strerror(errno));
 		goto end;

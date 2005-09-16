@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.128 2005/07/22 08:50:05 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.129 2005/09/16 11:30:13 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -30,7 +30,6 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/sockio.h>
 #include <sys/ioctl.h>
 #include <sys/queue.h>
 #if TIME_WITH_SYS_TIME
@@ -44,15 +43,23 @@
 # endif
 #endif
 #include <net/if.h>
+#include <netinet/in.h>
+#ifdef __KAME__
 #include <net/if_types.h>
 #ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <net/if_dl.h>
+#endif
+#ifdef __linux__
+#include <linux/if_packet.h>
+#endif
 #include <net/if_arp.h>
 
-#include <netinet/in.h>
+#ifdef __KAME__
 #include <netinet6/in6_var.h>
+#endif
+
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -76,6 +83,16 @@
 #include <config.h>
 #include <common.h>
 #include <timer.h>
+
+#ifdef __linux__
+/* from /usr/include/linux/ipv6.h */
+
+struct in6_ifreq {
+	struct in6_addr ifr6_addr;
+	u_int32_t ifr6_prefixlen;
+	unsigned int ifr6_ifindex;
+};
+#endif
 
 #define MAXDNAME 255
 
@@ -516,13 +533,15 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
+#ifndef __linux__
 		if (ifa->ifa_addr->sa_len > sizeof(sin6))
 			continue;
+#endif
 
 		if (in6_matchflags(ifa->ifa_addr, ifa->ifa_name, ignoreflags))
 			continue;
 
-		memcpy(&sin6, ifa->ifa_addr, ifa->ifa_addr->sa_len);
+		memcpy(&sin6, ifa->ifa_addr, sysdep_sa_len(ifa->ifa_addr));
 #ifdef __KAME__
 		if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr)) {
 			sin6.sin6_addr.s6_addr[2] = 0;
@@ -632,7 +651,7 @@ transmit_sa(s, sa, buf, len)
 {
 	int error;
 
-	error = sendto(s, buf, len, 0, sa, sa->sa_len);
+	error = sendto(s, buf, len, 0, sa, sysdep_sa_len(sa));
 
 	return (error != len) ? -1 : 0;
 }
@@ -679,8 +698,10 @@ sa6_plen2mask(sa6, plen)
 
 	memset(sa6, 0, sizeof(*sa6));
 	sa6->sin6_family = AF_INET6;
+#ifndef __linux__
 	sa6->sin6_len = sizeof(*sa6);
-	
+#endif
+
 	for (cp = (u_char *)&sa6->sin6_addr; plen > 7; plen -= 8)
 		*cp++ = 0xff;
 	*cp = 0xff << (8 - plen);
@@ -699,7 +720,8 @@ addr2str(sa)
 	round = (round + 1) & 7;
 	cp = addrbuf[round];
 
-	getnameinfo(sa, sa->sa_len, cp, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+	getnameinfo(sa, sysdep_sa_len(sa), cp, NI_MAXHOST,
+	    NULL, 0, NI_NUMERICHOST);
 
 	return (cp);
 }
@@ -713,7 +735,9 @@ in6addr2str(in6, scopeid)
 
 	memset(&sa6, 0, sizeof(sa6));
 	sa6.sin6_family = AF_INET6;
+#ifndef __linux__
 	sa6.sin6_len = sizeof(sa6);
+#endif
 	sa6.sin6_addr = *in6;
 	sa6.sin6_scope_id = scopeid;
 
@@ -763,6 +787,7 @@ in6_matchflags(addr, ifnam, flags)
 	char *ifnam;
 	int flags;
 {
+#ifdef __KAME__
 	int s;
 	struct in6_ifreq ifr6;
 
@@ -784,6 +809,9 @@ in6_matchflags(addr, ifnam, flags)
 	close(s);
 
 	return (ifr6.ifr_ifru.ifru_flags6 & flags);
+#else
+	return (0);
+#endif
 }
 
 int
@@ -891,7 +919,12 @@ gethwid(buf, len, ifname, hwtypep)
 	u_int16_t *hwtypep;
 {
 	struct ifaddrs *ifa, *ifap;
+#ifdef __KAME__
 	struct sockaddr_dl *sdl;
+#endif
+#ifdef __linux__
+	struct sockaddr_ll *sll;
+#endif
 	ssize_t l;
 
 	if (getifaddrs(&ifap) < 0)
@@ -900,6 +933,9 @@ gethwid(buf, len, ifname, hwtypep)
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		if (ifname && strcmp(ifa->ifa_name, ifname) != 0)
 			continue;
+		if (ifa->ifa_addr == NULL)
+			continue;
+#ifdef __KAME__
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
 
@@ -924,6 +960,20 @@ gethwid(buf, len, ifname, hwtypep)
 		    ifa->ifa_name);
 		memcpy(buf, LLADDR(sdl), sdl->sdl_alen);
 		l = sdl->sdl_alen; /* sdl will soon be freed */
+#endif
+#ifdef __linux__
+		if (ifa->ifa_addr->sa_family != AF_PACKET)
+			continue;
+
+		sll = (struct sockaddr_ll *)ifa->ifa_addr;
+		if (sll->sll_hatype != ARPHRD_ETHER)
+			continue;
+		*hwtypep = ARPHRD_ETHER;
+		dprintf(LOG_DEBUG, FNAME, "found an interface %s for DUID",
+		    ifa->ifa_name);
+		memcpy(buf, sll->sll_addr, sll->sll_halen);
+		l = sll->sll_halen; /* sll will soon be freed */
+#endif
 		freeifaddrs(ifap);
 		return (l);
 	}
@@ -3160,7 +3210,13 @@ ifaddrconf(cmd, ifname, addr, plen, pltime, vltime)
 	int pltime;
 	int vltime;
 {
+#ifdef __KAME__
 	struct in6_aliasreq req;
+#endif
+#ifdef __linux__
+	struct in6_ifreq req;
+	struct ifreq ifr;
+#endif
 	unsigned long ioctl_cmd;
 	char *cmdstr;
 	int s;			/* XXX overhead */
@@ -3168,11 +3224,21 @@ ifaddrconf(cmd, ifname, addr, plen, pltime, vltime)
 	switch(cmd) {
 	case IFADDRCONF_ADD:
 		cmdstr = "add";
+#ifdef __KAME__
 		ioctl_cmd = SIOCAIFADDR_IN6;
+#endif
+#ifdef __linux__
+		ioctl_cmd = SIOCSIFADDR;
+#endif
 		break;
 	case IFADDRCONF_REMOVE:
 		cmdstr = "remove";
+#ifdef __KAME__
 		ioctl_cmd = SIOCDIFADDR_IN6;
+#endif
+#ifdef __linux__
+		ioctl_cmd = SIOCDIFADDR;
+#endif
 		break;
 	default:
 		return (-1);
@@ -3185,12 +3251,27 @@ ifaddrconf(cmd, ifname, addr, plen, pltime, vltime)
 	}
 
 	memset(&req, 0, sizeof(req));
-	memcpy(req.ifra_name, ifname, sizeof(req.ifra_name));
+#ifdef __KAME__
 	req.ifra_addr = *addr;
+	memcpy(req.ifra_name, ifname, sizeof(req.ifra_name));
 	(void)sa6_plen2mask(&req.ifra_prefixmask, plen);
 	/* XXX: should lifetimes be calculated based on the lease duration? */
 	req.ifra_lifetime.ia6t_vltime = vltime;
 	req.ifra_lifetime.ia6t_pltime = pltime;
+#endif
+#ifdef __linux__
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
+	if (ioctl(s, SIOGIFINDEX, &ifr) < 0) {
+		dprintf(LOG_NOTICE, FNAME, "failed to get the index of %s: %s",
+		    ifname, strerror(errno));
+		close(s); 
+		return (-1); 
+	}
+	memcpy(&req.ifr6_addr, &addr->sin6_addr, sizeof(struct in6_addr));
+	req.ifr6_prefixlen = plen;
+	req.ifr6_ifindex = ifr.ifr_ifindex;
+#endif
 
 	if (ioctl(s, ioctl_cmd, &req)) {
 		dprintf(LOG_NOTICE, FNAME, "failed to %s an address on %s: %s",
