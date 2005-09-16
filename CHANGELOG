@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2801 2005/09/15 08:08:04 jinmei Exp $
+$KAME: CHANGELOG,v 1.2802 2005/09/16 11:59:39 suz Exp $
 
 <200509>
+2005-09-16  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/kame/dhcp6:
+	- support compilation on linux
+	- dhcp6relay can listen to multiple interfaces
+	- dhcp6s ignores the received DHCP message unless it comes from the 
+	  listening interface
+	Contributed by: Francis Dupont
+
 2005-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c: removed IPPROTO_SCTP from the
 	explore array for SOCK_DGRAM, according to the usage described in
