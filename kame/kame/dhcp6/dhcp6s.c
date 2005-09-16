@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.160 2005/09/16 11:30:14 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.161 2005/09/16 11:57:19 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -124,6 +124,7 @@ static int debug = 0;
 
 const dhcp6_mode_t dhcp6_mode = DHCP6_MODE_SERVER;
 char *device = NULL;
+int ifidx;
 int insock;			/* inbound UDP port */
 int outsock;			/* outbound UDP port */
 int ctlsock = -1;		/* control TCP port */
@@ -324,7 +325,6 @@ server6_init()
 	struct addrinfo hints;
 	struct addrinfo *res, *res2;
 	int error;
-	int ifidx;
 	int on = 1;
 	struct ipv6_mreq mreq6;
 	static struct iovec iov;
@@ -836,6 +836,9 @@ server6_recv(s)
 		dprintf(LOG_NOTICE, FNAME, "failed to get packet info");
 		return;
 	}
+	/* not for us? */
+	if (pi->ipi6_ifindex != ifidx)
+		return;
 	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
 		dprintf(LOG_INFO, FNAME, "unexpected interface (%d)",
 		    (unsigned int)pi->ipi6_ifindex);
