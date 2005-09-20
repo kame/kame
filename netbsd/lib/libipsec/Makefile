@@ -14,10 +14,12 @@ YPREFIX=__libyy
 LPREFIX=__libyy
 YHEADER=1
 
-MAN=	ipsec_set_policy.3 ipsec_strerror.3
-MLINKS+=ipsec_set_policy.3 ipsec_get_policylen.3 \
-	ipsec_set_policy.3 ipsec_dump_policy.3
+#MAN=	ipsec_set_policy.3 ipsec_strerror.3
+#MLINKS+=ipsec_set_policy.3 ipsec_get_policylen.3 \
+#	ipsec_set_policy.3 ipsec_dump_policy.3
 
 MKPIC=no
+
+libinstall::
 
 .include <bsd.lib.mk>

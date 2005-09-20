@@ -1,6 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/libipsec
 
 LIB=	ipsec
+INTERNALLIB=	yes
 CFLAGS+=-g -I${SRCDIR}
 CFLAGS+=-DIPSEC_DEBUG -DIPSEC -DINET6
 
@@ -14,9 +15,9 @@ CLEANFILES+=	y.tab.c y.tab.h
 YFLAGS+=	-d -p __libyy
 LFLAGS+=	-P__libyy
 
-MAN3=	ipsec_set_policy.3 ipsec_strerror.3
-MLINKS+=ipsec_set_policy.3 ipsec_get_policylen.3 \
-	ipsec_set_policy.3 ipsec_dump_policy.3
+#MAN3=	ipsec_set_policy.3 ipsec_strerror.3
+#MLINKS+=ipsec_set_policy.3 ipsec_get_policylen.3 \
+#	ipsec_set_policy.3 ipsec_dump_policy.3
 
 # FreeBSD special
 SRCS+=	y.tab.h
