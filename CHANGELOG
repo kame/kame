@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2802 2005/09/16 11:59:39 suz Exp $
+$KAME: CHANGELOG,v 1.2803 2005/09/20 05:17:19 keiichi Exp $
 
 <200509>
+Tue Sep 20 14:09:07 JST 2005	keiichi@iijlab.net
+	*kame/{free|net}bsd/lib/libipsec
+	stop installing libipsec.  The main user of the library was
+	racoon, but racoon is not distributed from the KAME kit
+	(instead, it is provided from ipsec-tools with libipsec).  We
+	don't have a strong reason to install the library now.
+
+	also, the basic functions of the libipsec are already being
+	provided from the base distributions of FreeBSD and NetBSD.
+
 2005-09-16  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/kame/dhcp6:
 	- support compilation on linux
