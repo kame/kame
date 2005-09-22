@@ -177,6 +177,10 @@ static int key_preferred_oldsa = 1;	/*preferred old sa rather than new sa.*/
 
 static u_int32_t acq_seq = 0;
 
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+u_int32_t acq_maxpktlen = 512;
+#endif
+
 struct _satailq satailq;		/* list of all SAD entry */
 struct _sptailq sptailq;		/* SPD table + pcb */
 static LIST_HEAD(_sptree, secpolicy) sptree[IPSEC_DIR_MAX];	/* SPD table */
@@ -234,6 +238,11 @@ static const int minsize[] = {
 	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
 	sizeof(struct sadb_x_tag),	/* SADB_X_TAG */
 	0 /*sizeof(struct sadb_x_sa3)*/, /* SADB_X_SA3 */
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+	sizeof(struct sadb_x_packet),	/* SADB_X_EXT_PACKET */
+#endif
+#endif
 };
 static const int maxsize[] = {
 	sizeof(struct sadb_msg),	/* SADB_EXT_RESERVED */
@@ -258,6 +267,11 @@ static const int maxsize[] = {
 	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
 	sizeof(struct sadb_x_tag),	/* SADB_X_TAG */
 	0 /*sizeof(struct sadb_x_sa3)*/, /* SADB_X_SA3 */
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+	0,				/* SADB_X_EXT_PACKET */
+#endif
+#endif
 };
 
 static int ipsec_esp_keymin = 256;
@@ -509,7 +523,12 @@ static struct mbuf *key_getcomb_ah __P((void));
 static struct mbuf *key_getcomb_ipcomp __P((void));
 static struct mbuf *key_getprop __P((const struct secasindex *));
 
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+static int key_acquire __P((struct secasindex *, struct secpolicy *,
+	struct mbuf *));
+#else
 static int key_acquire __P((struct secasindex *, struct secpolicy *));
+#endif
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 static struct secacq *key_newacq __P((struct secasindex *));
 static struct secacq *key_getacq __P((struct secasindex *));
@@ -723,10 +742,18 @@ found:
  * OUT:	0: there are valid requests.
  *	ENOENT: policy may be valid, but SA with REQUIRE is on acquiring.
  */
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+int
+key_checkrequest(isr, saidx, pkt)
+	struct ipsecrequest *isr;
+	struct secasindex *saidx;
+	struct mbuf *pkt;
+#else
 int
 key_checkrequest(isr, saidx)
 	struct ipsecrequest *isr;
 	struct secasindex *saidx;
+#endif
 {
 	u_int level;
 	int error;
@@ -796,7 +823,12 @@ key_checkrequest(isr, saidx)
 		return 0;
 
 	/* there is no SA */
-	if ((error = key_acquire(saidx, isr->sp)) != 0) {
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+	if ((error = key_acquire(saidx, isr->sp, pkt)) != 0)
+#else
+	if ((error = key_acquire(saidx, isr->sp)) != 0)
+#endif
+	{
 		/* XXX What should I do ? */
 		ipseclog((LOG_DEBUG, "key_checkrequest: error %d returned "
 			"from key_acquire.\n", error));
@@ -6284,7 +6316,7 @@ key_getprop(saidx)
  * SADB_ACQUIRE processing called by key_checkrequest() and key_acquire2().
  * send
  *   <base, SA, address(SD), (address(P)), x_policy,
- *       (identity(SD),) (sensitivity,) proposal>
+ *       (identity(SD),) (sensitivity,) proposal, (x_packet)>
  * to KMD, and expect to receive
  *   <base> with SADB_ACQUIRE if error occured,
  * or
@@ -6294,16 +6326,27 @@ key_getprop(saidx)
  * XXX x_policy is outside of RFC2367 (KAME extension).
  * XXX sensitivity is not supported.
  * XXX for ipcomp, RFC2367 does not define how to fill in proposal.
+ * XXX x_packet is an IKEv2 extension.
  * see comment for key_getcomb_ipcomp().
+ *
+ * (note: x_packet exists only if PFKEYV2_SADB_X_EXT_PACKET is set)
  *
  * OUT:
  *    0     : succeed
  *    others: error number
  */
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+static int
+key_acquire(saidx, sp, pkt)
+	struct secasindex *saidx;
+	struct secpolicy *sp;
+	struct mbuf *pkt;
+#else
 static int
 key_acquire(saidx, sp)
 	struct secasindex *saidx;
 	struct secpolicy *sp;
+#endif
 {
 	struct mbuf *result = NULL, *m;
 #ifndef IPSEC_NONBLOCK_ACQUIRE
@@ -6460,6 +6503,40 @@ key_acquire(saidx, sp)
 	 */
 	if (m)
 		m_cat(result, m);
+#endif
+
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+	/*
+	 * add the triggering packet.
+	 */
+	if (pkt) {
+		int copy_len, len;
+		struct sadb_x_packet *ext;
+
+		copy_len = pkt->m_pkthdr.len;
+		if (copy_len > acq_maxpktlen)
+			copy_len = acq_maxpktlen;
+		len = PFKEY_ALIGN8(sizeof(struct sadb_x_packet) + copy_len);
+
+		m = key_alloc_mbuf(len);
+		if (!m || m->m_next) {
+			if (m)
+				m_freem(m);
+			error = ENOBUFS;
+			goto fail;
+		}
+
+		bzero(mtod(m, caddr_t), len);
+		ext = mtod(m, struct sadb_x_packet *);
+		ext->sadb_x_packet_len = PFKEY_UNIT64(len);
+		ext->sadb_x_packet_exttype = SADB_X_EXT_PACKET;
+		ext->sadb_x_packet_copylen = copy_len;
+		m_copydata(pkt, 0, copy_len, (caddr_t)(ext + 1));
+
+		m_cat(result, m);
+	}
+#endif
 #endif
 
 	if ((result->m_flags & M_PKTHDR) == 0) {
@@ -6704,7 +6781,11 @@ key_acquire2(so, m, mhp)
 		return key_senderror(so, m, EEXIST);
 	}
 
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+	error = key_acquire(&saidx, NULL, NULL);
+#else
 	error = key_acquire(&saidx, NULL);
+#endif
 	if (error != 0) {
 		ipseclog((LOG_DEBUG, "key_acquire2: error %d returned "
 			"from key_acquire.\n", mhp->msg->sadb_msg_errno));
@@ -7446,6 +7527,12 @@ static int (*key_typesw[]) __P((struct socket *, struct mbuf *,
 	key_spdadd,	/* SADB_X_SPDSETIDX */
 	NULL,		/* SADB_X_SPDEXPIRE */
 	key_spddelete2,	/* SADB_X_SPDDELETE2 */
+#ifdef SADB_X_NAT_T_NEW_MAPPING
+	NULL,		/* SADB_X_NAT_T_NEW_MAPPING */
+#endif
+#ifdef SADB_X_MIGRATE
+	/*TODO */ NULL,	/* SADB_X_MIGRATE */
+#endif
 };
 
 /*
@@ -7584,6 +7671,9 @@ key_parse(m, so)
 		case SADB_X_SPDSETIDX:
 		case SADB_X_SPDUPDATE:
 		case SADB_X_SPDDELETE2:
+#ifdef SADB_X_MIGRATE
+		case SADB_X_MIGRATE:
+#endif
 			ipseclog((LOG_DEBUG, "key_parse: illegal satype=%u\n",
 			    msg->sadb_msg_type));
 			pfkeystat.out_invsatype++;
@@ -7801,6 +7891,11 @@ key_align(m, mhp)
 		case SADB_X_EXT_POLICY:
 		case SADB_X_EXT_SA2:
 		case SADB_X_EXT_TAG:
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+		case SADB_X_EXT_PACKET:
+#endif
+#endif
 			/* duplicate check */
 			/*
 			 * XXX Are there duplication payloads of either

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.238 2005/08/25 08:14:14 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.239 2005/09/22 09:46:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2818,7 +2818,11 @@ ipsec4_checksa(isr, state)
 		bcopy(&ip->ip_dst, &sin->sin_addr, sizeof(sin->sin_addr));
 	}
 
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+	return key_checkrequest(isr, &saidx, state->m);
+#else
 	return key_checkrequest(isr, &saidx);
+#endif
 }
 /*
  * IPsec output logic for IPv4.
@@ -3047,7 +3051,11 @@ ipsec6_checksa(isr, state, tunnel)
 			panic("ipsec6_checksa/inconsistent tunnel attribute");
 #endif
 		/* When tunnel mode, SA peers must be specified. */
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+		return key_checkrequest(isr, &isr->saidx, state->m);
+#else
 		return key_checkrequest(isr, &isr->saidx);
+#endif
 	}
 
 	/* make SA index for search proper SA */
@@ -3078,7 +3086,11 @@ ipsec6_checksa(isr, state, tunnel)
 			sin6->sin6_port = IPSEC_PORT_ANY;
 	}
 
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+	return key_checkrequest(isr, &saidx, state->m);
+#else
 	return key_checkrequest(isr, &saidx);
+#endif
 }
 
 /*

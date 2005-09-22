@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.42 2005/08/25 08:14:16 keiichi Exp $	*/
+/*	$KAME: key_debug.c,v 1.43 2005/09/22 09:46:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,6 +83,11 @@ static void kdebug_sadb_x_sa2 __P((struct sadb_ext *));
 #ifdef SADB_X_EXT_TAG
 static void kdebug_sadb_x_tag __P((struct sadb_ext *));
 #endif
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+static void kdebug_sadb_x_packet __P((struct sadb_ext *));
+#endif
+#endif
 
 #ifdef _KERNEL
 static void kdebug_secreplay __P((struct secreplay *));
@@ -137,6 +142,12 @@ kdebug_sadb_msg_typestr(type)
 		TYPESTR(X_SPDSETIDX),
 		TYPESTR(X_SPDEXPIRE),
 		TYPESTR(X_SPDDELETE2),
+#ifdef SADB_X_NAT_T_NEW_MAPPING
+		TYPESTR(X_NAT_T_NEW_MAPPING),
+#endif
+#ifdef SADB_X_MIGRATE
+		TYPESTR(X_MIGRATE),
+#endif
 		{ NULL }
 	};
 
@@ -173,6 +184,11 @@ kdebug_sadb_ext_typestr(type)
 #endif
 #ifdef SADB_X_EXT_SA3
 		TYPESTR(X_EXT_SA3),
+#endif
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+		TYPESTR(X_EXT_PACKET),
+#endif
 #endif
 		{ NULL }
 	};
@@ -263,6 +279,13 @@ kdebug_sadb(base)
 		case SADB_X_EXT_TAG:
 			kdebug_sadb_x_tag(ext);
 			break;
+#endif
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+		case SADB_X_EXT_PACKET:
+			kdebug_sadb_x_packet(ext);
+			break;
+#endif
 #endif
 		default:
 			printf("kdebug_sadb: invalid ext_type %u was passed.\n",
@@ -519,6 +542,28 @@ kdebug_sadb_x_tag(ext)
 
 	return;
 }
+#endif
+
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#ifdef SADB_X_EXT_PACKET
+static void
+kdebug_sadb_x_packet(ext)
+	struct sadb_ext *ext;
+{
+	struct sadb_x_packet *pkt = (struct sadb_x_packet *)ext;
+
+	/* sanity check */
+	if (ext == NULL)
+		panic("kdebug_sadb_x_packet: NULL pointer was passed.");
+
+	printf("sadb_x_packet{ copylen=%u\n", pkt->sadb_x_packet_copylen);
+	printf("  packet=");
+	ipsec_hexdump((caddr_t)pkt + sizeof(struct sadb_x_packet),
+		      pkt->sadb_x_packet_copylen);
+	printf(" }\n");
+	return;
+}
+#endif
 #endif
 
 void

@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.46 2005/08/25 08:14:13 keiichi Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.47 2005/09/22 09:46:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,7 +75,7 @@ you leave this credit intact on any copies of this file.
 #define SADB_X_SPDEXPIRE  21
 #define SADB_X_SPDDELETE2 22	/* by policy id */
 #define SADB_X_NAT_T_NEW_MAPPING    23
-#define SADB_X_MIGRATE    24	/* sugimoto-mip6-pfkey-migrate */
+#define SADB_X_MIGRATE    24	/* draft-sugimoto-mip6-pfkey-migrate */
 #define SADB_MAX          24
 
 struct sadb_msg {
@@ -276,6 +276,18 @@ struct sadb_x_tag {
   u_int32_t sadb_x_tag_reserved;
 };
 
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+/* XXX IPsec Triggering Packet Extension */
+/*
+ * This structure is aligned 8 bytes.
+ */
+struct sadb_x_packet {
+  u_int16_t sadb_x_packet_len;
+  u_int16_t sadb_x_packet_exttype;
+  u_int32_t sadb_x_packet_copylen;
+};
+#endif
+
 #define SADB_EXT_RESERVED             0
 #define SADB_EXT_SA                   1
 #define SADB_EXT_LIFETIME_CURRENT     2
@@ -298,7 +310,12 @@ struct sadb_x_tag {
 #define SADB_X_EXT_SA2                19
 #define SADB_X_EXT_TAG                20
 #define SADB_X_EXT_SA3                21
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+#define SADB_X_EXT_PACKET             22
+#define SADB_EXT_MAX                  22
+#else
 #define SADB_EXT_MAX                  21
+#endif
 
 #define SADB_SATYPE_UNSPEC	0
 #define SADB_SATYPE_AH		2

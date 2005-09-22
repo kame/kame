@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.38 2005/08/25 08:14:15 keiichi Exp $	*/
+/*	$KAME: key.h,v 1.39 2005/09/22 09:46:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,8 +55,13 @@ extern struct secpolicy *key_allocsp __P((u_int16_t, struct secpolicyindex *,
 	u_int));
 extern struct secpolicy *key_gettunnel __P((struct sockaddr *,
 	struct sockaddr *, struct sockaddr *, struct sockaddr *));
-extern int key_checkrequest
-	__P((struct ipsecrequest *isr, struct secasindex *));
+#ifdef PFKEYV2_SADB_X_EXT_PACKET
+extern int key_checkrequest __P((struct ipsecrequest *isr,
+	struct secasindex *, struct mbuf *));
+#else
+extern int key_checkrequest __P((struct ipsecrequest *isr,
+	struct secasindex *));
+#endif
 extern struct secasvar *key_allocsa __P((u_int, caddr_t, caddr_t,
 					u_int, u_int32_t));
 extern struct secpolicy *key_getspbyid __P((u_int32_t));

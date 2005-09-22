@@ -373,6 +373,7 @@ IPSEC			opt_ipsec.h
 IPSEC_ESP		opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h
 IPSEC_FILTERGIF		opt_ipsec.h
+PFKEYV2_SADB_X_EXT_PACKET	opt_ipsec.h
 FAST_IPSEC		opt_ipsec.h
 IPDIVERT
 DUMMYNET		opt_ipdn.h
