@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.34 2004/06/14 05:35:14 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.35 2005/09/22 09:53:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -154,6 +154,12 @@ static const char *pfkey_msgtypenames[] = {
 	"dump", "x_promisc", "x_pchange", "x_spdupdate", "x_spdadd",
 	"x_spddelete", "x_spdget", "x_spdacquire", "x_spddump", "x_spdflush",
 	"x_spdsetidx", "x_spdexpire", "x_spddelete2"
+#ifdef SADB_X_NAT_T_NEW_MAPPING
+	,"x_nat_t_new_mapping"
+#endif
+#ifdef SADB_X_MIGRATE
+	,"x_migrate"
+#endif
 };
 
 static struct ipsecstat ipsecstat;
