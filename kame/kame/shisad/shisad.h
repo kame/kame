@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.19 2005/08/23 08:24:53 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.20 2005/09/26 03:09:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -93,9 +93,6 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define HAD_CONFFILE	"/usr/local/v6/etc/had.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
-#ifdef MIP_NEMO
-#define NEMO_PTFILE 	"/etc/prefix_table.conf"
-#endif /* MIP_NEMO */
 
 /*
  * homeprefix_info -> homeprefix_info -> ...
@@ -234,7 +231,6 @@ struct binding_update_list {
 };
 
 #define MIP6_BUL_STATE_DISABLE    0x01
-/*#define MIP6_BUL_STATE_NEEDTUNNEL (MIP6_BUL_STATE_DISABLE)*/
 
 /* 
  * it contains host information for which mnd does not run Route
@@ -281,9 +277,9 @@ struct nemo_mptable {
 
 	/* xxx lifetime etc?! */
 };
-#define mpt_prefix    mpt.pt_prefix    
-#define mpt_prefixlen mpt.pt_prefixlen 
-#define mpt_regmode   mpt.pt_regmode    
+#define mpt_prefix    mpt.pt_prefix
+#define mpt_prefixlen mpt.pt_prefixlen
+#define mpt_regmode   mpt.pt_regmode
 LIST_HEAD(nemo_mpt_list, nemo_mptable);
 #endif /* MIP_NEMO */
 
