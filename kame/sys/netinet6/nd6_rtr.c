@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.274 2005/08/24 08:08:55 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.275 2005/09/26 01:49:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1684,10 +1684,12 @@ pfxlist_onlink_check()
 					    0);
 				}
 			} else {
-				ifa->ia6_flags |= IN6_IFF_DETACHED;
+				if ((ifa->ia6_flags & IN6_IFF_DETACHED) == 0) {
+					ifa->ia6_flags |= IN6_IFF_DETACHED;
 #if defined(MIP6) && NMIP > 0
-				rt_addrinfomsg((struct ifaddr *)ifa);
+					rt_addrinfomsg((struct ifaddr *)ifa);
 #endif /* MIP6 && NMIP > 0 */
+				}
 			}
 		}
 	}
@@ -1695,10 +1697,6 @@ pfxlist_onlink_check()
 		for (ifa = in6_ifaddr; ifa; ifa = ifa->ia_next) {
 			if ((ifa->ia6_flags & IN6_IFF_AUTOCONF) == 0)
 				continue;
-#if defined(MIP6) && NMIP > 0
-			ifa->ia6_flags |= IN6_IFF_DETACHED;
-			rt_addrinfomsg((struct ifaddr *)ifa);
-#else /* defined(MIP6) && NMIP > 0 */
 			if (ifa->ia6_flags & IN6_IFF_DETACHED) {
 				ifa->ia6_flags &= ~IN6_IFF_DETACHED;
 				ifa->ia6_flags |= IN6_IFF_TENTATIVE;
@@ -1708,7 +1706,6 @@ pfxlist_onlink_check()
 				/* Do we need a delay in this case? */
 				nd6_dad_start((struct ifaddr *)ifa, 0);
 			}
-#endif /* MIP6 && NMIP > 0 */
 		}
 	}
 
