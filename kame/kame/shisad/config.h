@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.5 2005/08/24 03:12:53 keiichi Exp $	*/
+/*	$KAME: config.h,v 1.6 2005/09/30 12:01:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.
@@ -42,6 +42,7 @@ enum {
 	CFT_INTERFACE,
 	CFT_PREFERENCE,
 	CFT_KEYMANAGEMENT,
+	CFT_IPV4MNPSUPPORT,
 	CFT_PREFIXTABLELIST, CFT_PREFIXTABLE,
 	CFT_STATICTUNNELLIST, CFT_STATICTUNNEL
 };
@@ -61,7 +62,7 @@ struct config_entry {
 
 struct config_prefixtable {
 	struct in6_addr cfpt_homeaddress;
-	struct in6_addr cfpt_prefix;
+	struct sockaddr_storage cfpt_ss_prefix;
 	int cfpt_prefixlen;
 	int cfpt_mode;
 	int cfpt_binding_id;

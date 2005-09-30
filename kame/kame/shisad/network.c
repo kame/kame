@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.6 2005/05/25 01:49:24 keiichi Exp $  */
+/*      $KAME: network.c,v 1.7 2005/09/30 12:01:56 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -62,24 +62,47 @@
 #include "stat.h"
 #include "fsm.h"
 
+#define SA2SIN6(ss) ((struct sockaddr_in6 *)(ss))
+#define SA2SIN(ss) ((struct sockaddr_in *)(ss))
+
+#ifdef MIP_NEMO
+#ifdef MIP_IPV4MNPSUPPORT
+extern int ipv4mnpsupport;
+#endif /* MIP_IPV4MNPSUPPORT */
+#endif /* MIP_NEMO */
+
+#ifdef MIP_NEMO
+static struct sockaddr_in6 sin6_default = {
+	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
+	IN6ADDR_ANY_INIT
+}; 
+#ifdef MIP_IPV4MNPSUPPORT
+static struct sockaddr_in sin_default = {
+	sizeof(struct sockaddr_in), AF_INET, 0,
+	{INADDR_ANY}
+}; 
+#endif /* MIP_IPV4MNPSUPPORT */
+#endif /* MIP_NEMO */
+
 static struct in6_addrlifetime static_lifetime = 
 	{0, 0, ND6_INFINITE_LIFETIME, ND6_INFINITE_LIFETIME};
 #ifdef MIP_NEMO
 static int nemo_gif_init(char *);
-static int prefixlen(int, struct sockaddr_in6 *);
+static int inet_len2mask(int, int, struct sockaddr *);
 static struct in6_nbrinfo *getnbrinfo __P((struct in6_addr *, int, int));
 #endif
 
 int
-mip6_are_prefix_equal(p1, p2, len)
-        struct in6_addr *p1, *p2;
+inet_are_prefix_equal(p1, p2, len)
+        void *p1, *p2;
         int len;
 {
         int bytelen, bitlen;
+	u_int8_t *cp1, *cp2;
 
         /* sanity check */
         if (0 > len || len > 128) {
-                syslog(LOG_ERR, "mip6_are_prefix_equal:"
+                syslog(LOG_ERR, "inet_are_prefix_equal:"
 		       "invalid prefix length(%d)\n", len);
                 return (0);
         }
@@ -87,11 +110,13 @@ mip6_are_prefix_equal(p1, p2, len)
         bytelen = len / 8;
         bitlen = len % 8;
 
-        if (memcmp(&p1->s6_addr, &p2->s6_addr, bytelen))
+        if (memcmp(p1, p2, bytelen))
                 return (0);
+	cp1 = p1;
+	cp2 = p2;
         if (bitlen != 0 &&
-            p1->s6_addr[bytelen] >> (8 - bitlen) !=
-            p2->s6_addr[bytelen] >> (8 - bitlen))
+            *(cp1 + bytelen) >> (8 - bitlen) !=
+            *(cp2 + bytelen) >> (8 - bitlen))
                 return (0);
 
         return (1);
@@ -386,27 +411,25 @@ nemo_ifflag_set(ifname, flags)
 
 int
 route_add(dest, gate, mask, pfxlen, gifindex)
-	struct in6_addr *dest, *gate, *mask;
+	struct sockaddr *dest, *gate, *mask;
 	int pfxlen;
 	u_int16_t gifindex;
 {
 	int s;
 	int rtm_addrs = RTA_DST|RTA_GATEWAY|RTA_NETMASK;
-	union   sockunion {
-		struct  sockaddr sa;
-		struct  sockaddr_in6 sin6;
-		struct sockaddr_dl sdl;
-	} so_dst, so_gate, so_mask, so_dl;
 	struct{ 
 		struct rt_msghdr m_rtm;
 		char   m_space[512];
 	} m_rtmsg;
 	register char *cp = m_rtmsg.m_space;
 	register int l;
+	struct sockaddr_storage so_mask;
+	struct sockaddr_dl so_dl;
 
-  	memset(&so_dst, 0, sizeof(struct sockaddr_in6));
-	memset(&so_gate, 0, sizeof(struct sockaddr_in6));
-	memset(&so_mask, 0, sizeof(struct sockaddr_in6));
+	if ((dest == NULL) || (gate == NULL))
+		return (-1);
+
+	memset(&so_mask, 0, sizeof(struct sockaddr_storage));
 	memset(&so_dl, 0, sizeof(struct sockaddr_dl));
 	memset(&m_rtmsg, 0, sizeof(m_rtmsg));
   
@@ -416,13 +439,21 @@ route_add(dest, gate, mask, pfxlen, gifindex)
 		return (-1);
 	}
   
-	so_dst.sa.sa_family = so_mask.sa.sa_family = 
-		so_gate.sa.sa_family = AF_INET6;
-	so_dst.sa.sa_len = so_gate.sa.sa_len = 
-		so_mask.sa.sa_len = sizeof(struct sockaddr_in6);
+	if (mask) {
+		memcpy(&so_mask, mask, mask->sa_len);
+	} else {
+		so_mask.ss_len = dest->sa_len;
+		so_mask.ss_family = dest->sa_family;
+		inet_len2mask(so_mask.ss_family, pfxlen,
+		    (struct sockaddr *)&so_mask);
+	}
 
-	if (dest)
-		so_dst.sin6.sin6_addr = *dest;
+	if ((dest->sa_family != gate->sa_family)
+	    || (dest->sa_family != so_mask.ss_family))
+		return (-1);
+	if ((dest->sa_len != gate->sa_len)
+	    || (dest->sa_len != so_mask.ss_len))
+		return (-1);
 
 #if 0
 	if (debug)
@@ -430,21 +461,9 @@ route_add(dest, gate, mask, pfxlen, gifindex)
 		       ip6_sprintf(dest));
 #endif
 
-	if (mask)
-		so_mask.sin6.sin6_addr = *mask;
-	else {
-		prefixlen(pfxlen, &so_mask.sin6);
-	}
-
-	if (gate)
-		so_gate.sin6.sin6_addr = *gate;
-	else {
-		close (s);
-		return (-1);
-	}
-	so_dl.sdl.sdl_family = AF_LINK;
-	so_dl.sdl.sdl_len = sizeof(struct sockaddr_dl);
-	so_dl.sdl.sdl_index = gifindex;
+	so_dl.sdl_family = AF_LINK;
+	so_dl.sdl_len = sizeof(struct sockaddr_dl);
+	so_dl.sdl_index = gifindex;
 	
 #if 0
 	if (debug) {
@@ -468,13 +487,13 @@ route_add(dest, gate, mask, pfxlen, gifindex)
 #define ROUNDUP(a) \
   ((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define NEXTADDR(u) \
-    l = ROUNDUP(u.sa.sa_len); memmove(cp, (char *)&(u), l); cp += l;
+    l = ROUNDUP((u)->sa_len); memcpy(cp, (char *)(u), (u)->sa_len); cp += l;
 
 
-	NEXTADDR(so_dst);
-    	NEXTADDR(so_gate);
-	NEXTADDR(so_mask);
-	NEXTADDR(so_dl);
+	NEXTADDR((struct sockaddr *)dest);
+    	NEXTADDR((struct sockaddr *)gate);
+	NEXTADDR((struct sockaddr *)&so_mask);
+	NEXTADDR((struct sockaddr *)&so_dl);
 	rtmsg.rtm_msglen = l = cp - (char *)&m_rtmsg;
 
 	if (write(s, (char *)&m_rtmsg, l) < 0){
@@ -486,6 +505,8 @@ route_add(dest, gate, mask, pfxlen, gifindex)
 
 	return (0);
 }
+#undef ROUNDUP
+#undef NEXTADDR
 
 /* when gifindex is zero, it indicates default route flush */
 int
@@ -495,11 +516,8 @@ route_del(gifindex)
 	size_t needed;
 	int s, mib[6], rlen, seqno;
 	struct rt_msghdr *rtm;
-	struct sockaddr_in6 *sin6;
+	struct sockaddr *sa;
 	char *buf, *next, *lim;
-	struct in6_addr defaultgw;
-
-	memset(&defaultgw, 0, sizeof(defaultgw));
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -534,18 +552,36 @@ route_del(gifindex)
 	for (next = buf; next < lim; next += rtm->rtm_msglen) {
 
 		rtm = (struct rt_msghdr *)next;
-		sin6 = (struct sockaddr_in6 *)(rtm + 1);
+		sa = (struct sockaddr *)(rtm + 1);
     
-		if(sin6->sin6_family != AF_INET6)
+		if ((sa->sa_family != AF_INET6)
+		    && (sa->sa_family != AF_INET))
 			continue;
 
 		if(gifindex && rtm->rtm_index != gifindex)
 			continue;
 
-		if ((gifindex == 0) && 
-		    !IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &defaultgw)) 
-			continue;
-
+		if (gifindex == 0) {
+			switch (sa->sa_family) {
+			case AF_INET6:
+				if (!IN6_ARE_ADDR_EQUAL(&SA2SIN6(sa)->sin6_addr,
+					&sin6_default.sin6_addr))
+					continue;
+				break;
+#ifdef MIP_NEMO
+#ifdef MIP_IPV4MNPSUPPORT
+			case AF_INET:
+				if (ipv4mnpsupport
+				    && (SA2SIN(sa)->sin_addr.s_addr
+				    != sin_default.sin_addr.s_addr))
+					continue;
+				break;
+#endif /* MIP_IPV4MNPSUPPORT */
+#endif /* MIP_NEMO */
+			default:
+				continue;
+			}
+		}
 #if 0
 		if (debug)
 			syslog(LOG_INFO, "route del addr %s\n", 
@@ -567,30 +603,39 @@ route_del(gifindex)
 }
 
 static int
-prefixlen(pfxlen_tmp, sin6_tmp)
-        int pfxlen_tmp;
-        struct sockaddr_in6 *sin6_tmp;
+inet_len2mask(af, plen, sa)
+	int af, plen;
+        struct sockaddr *sa;
 {
-        int len = pfxlen_tmp;
         int pfxmsk, tmpnum, maxlen;
         char *tgtaddrp;
 
-        maxlen = 128;
-        tgtaddrp = (char *)&sin6_tmp->sin6_addr;
+	switch (af) {
+	case AF_INET6:
+		maxlen = 128;
+		tgtaddrp = (char *)&SA2SIN6(sa)->sin6_addr;
+		break;
+	case AF_INET:
+		maxlen = 32;
+		tgtaddrp = (char *)&SA2SIN(sa)->sin_addr;
+		break;
+	default:
+		syslog(LOG_ERR, "unknown address family (%d).\n", af);
+		return (-1);
+	}
+	if (plen > maxlen)
+		return (-1);
 
-        pfxmsk = pfxlen_tmp >> 3;
-        tmpnum = pfxlen_tmp & 7;
+        pfxmsk = plen >> 3;
+        tmpnum = plen & 7;
 
         memset((void *)tgtaddrp, 0, (maxlen / 8));
-        if( pfxmsk > 0 )
+        if(pfxmsk > 0)
                 memset((void *)tgtaddrp, 0xff, pfxmsk);
-        if( tmpnum > 0 )
+        if(tmpnum > 0)
                 *((u_char *)tgtaddrp + pfxmsk) = (0xff00 >> tmpnum) &  0xff;
 
-        if( maxlen == len )
-                return (-1);
-        else
-                return (len);
+	return (0);
 }
 
 
@@ -637,7 +682,7 @@ nemo_ar_get(coa, ret6)
 		if (ifindex != p->if_index)
 			continue;
 
-		if (mip6_are_prefix_equal(&p->prefix.sin6_addr, 
+		if (inet_are_prefix_equal(&p->prefix.sin6_addr, 
 					  coa, p->prefix.sin6_len) == 0)
 			continue;
 		
@@ -738,7 +783,7 @@ nemo_ar_get(coa, ret6)
 			p6.sin6_addr.s6_addr[3] = 0;
 		}
 
-		if (mip6_are_prefix_equal(&p6.sin6_addr, 
+		if (inet_are_prefix_equal(&p6.sin6_addr, 
 					  coa, PR.prefixlen) == 0)
 			continue;
 		

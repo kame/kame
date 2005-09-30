@@ -34,6 +34,7 @@ SRCS+=  config.c cfparse.y cftoken.l
 CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA
 #CFLAGS+= -DMIP_NEMO
 #CFLAGS+= -DMIP_MCOA
+#CFLAGS+= -DMIP_IPV4MNPSUPPORT
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \

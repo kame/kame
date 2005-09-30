@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.18 2005/09/07 08:18:18 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.19 2005/09/30 12:01:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -86,6 +86,9 @@ int namelookup = 1;
 int command_port = MND_COMMAND_PORT;
 int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
 int keymanagement = 0;
+#ifdef MIP_IPV4MNPSUPPORT
+int ipv4mnpsupport = 0;
+#endif /* MIP_IPV4MNPSUPPORT */
 struct config_entry *if_params;
 
 /*static void command_show_status(int, char *);*/
@@ -236,6 +239,10 @@ main(argc, argv)
 		    &default_lifetime, if_params);
 		config_get_number(CFT_KEYMANAGEMENT,
 		    &keymanagement, if_params);
+#ifdef MIP_IPV4MNPSUPPORT
+		config_get_number(CFT_IPV4MNPSUPPORT,
+		    &ipv4mnpsupport, if_params);
+#endif /* MIP_IPV4MNPSUPPORT */
 	}
 	if (config_params != NULL) {
 		/* get global parameters. */
@@ -246,6 +253,10 @@ main(argc, argv)
 		    &default_lifetime, config_params);
 		config_get_number(CFT_KEYMANAGEMENT,
 		    &keymanagement, config_params);
+#ifdef MIP_IPV4MNPSUPPORT
+		config_get_number(CFT_IPV4MNPSUPPORT,
+		    &ipv4mnpsupport, config_params);
+#endif /* MIP_IPV4MNPSUPPORT */
 	}
 
 	mhsock_open();
@@ -1076,7 +1087,7 @@ add_hal_by_commandline_xxx(homeagent)
 
 	LIST_FOREACH(mif, &mipifhead, mipif_entry) {
 		LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
-			if (mip6_are_prefix_equal(&hpfx->hpfx_prefix,
+			if (inet_are_prefix_equal(&hpfx->hpfx_prefix,
 				&homeagent_in6, hpfx->hpfx_prefixlen)) {
 				/* XXXX can we add the same addr to
 				   multiple prefixes? */
@@ -1379,7 +1390,7 @@ receive_hadisc_reply(dhrep, dhrep_len)
 		return (0);
 
 	LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
-		if (mip6_are_prefix_equal(&hoainfo->hinfo_hoa, 
+		if (inet_are_prefix_equal(&hoainfo->hinfo_hoa, 
 					  &hpfx->hpfx_prefix, hpfx->hpfx_prefixlen)) {
 			break;
 		}

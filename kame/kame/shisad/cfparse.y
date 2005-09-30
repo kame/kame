@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.6 2005/08/24 03:12:53 keiichi Exp $	*/
+/*	$KAME: cfparse.y,v 1.7 2005/09/30 12:01:55 keiichi Exp $	*/
 
 %{
 /*
@@ -35,6 +35,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -64,6 +65,7 @@ static void free_cfe(struct config_entry *);
 %token HOMEREGISTRATIONLIFETIME
 %token PREFERENCE
 %token KEYMANAGEMENT
+%token IPV4MNPSUPPORT
 %token PREFIXTABLE EXPLICIT IMPLICIT
 %token STATICTUNNEL
 
@@ -74,7 +76,7 @@ static void free_cfe(struct config_entry *);
 }
 
 %type <string> ADDRSTRING
-%type <string> MIPIFNAME IFNAME
+%type <string> IFNAME
 %type <string> registration_mode EXPLICIT IMPLICIT
 %type <number> INTEGER
 %type <cfe> statements statement
@@ -84,6 +86,7 @@ static void free_cfe(struct config_entry *);
 %type <cfe> interface_statement
 %type <cfe> preference_statement
 %type <cfe> keymanagement_statement
+%type <cfe> ipv4mnpsupport_statement
 %type <cfe> prefixtable_config
 %type <cfe> prefixtable_statements prefixtable_statement
 %type <cfe> statictunnel_config
@@ -126,6 +129,7 @@ statement:
 	|	homeregistrationlifetime_statement
 	|	preference_statement
 	|	keymanagement_statement
+	|	ipv4mnpsupport_statement
 	|	prefixtable_config
 	|	statictunnel_config
 	;
@@ -229,6 +233,20 @@ keymanagement_statement:
 		}
 	;
 
+ipv4mnpsupport_statement:
+		IPV4MNPSUPPORT INTEGER EOS
+		{
+			struct config_entry *cfe;
+
+			cfe = alloc_cfe(CFT_IPV4MNPSUPPORT);
+			if (cfe == NULL)
+				return (-1);
+			cfe->cfe_number = (($2 == 0) ? 0 : 1);
+
+			$$ = cfe;
+		}
+	;
+
 prefixtable_config:
 		PREFIXTABLE BCL prefixtable_statements ECL EOS
 		{
@@ -276,6 +294,7 @@ prefixtable_statement:
 		{
 			struct config_entry *cfe;
 			struct config_prefixtable *cfpt;
+			struct addrinfo hints, *res0;
 
 			cfpt = (struct config_prefixtable *)
 				malloc(sizeof(struct config_prefixtable));
@@ -283,15 +302,22 @@ prefixtable_statement:
 				return (-1);
 
 			if (inet_pton(AF_INET6, $1,
-				&cfpt->cfpt_homeaddress) <= 0) {
+			    &cfpt->cfpt_homeaddress) <= 0) {
+				free(cfpt);
+				return(-1);
+			}
+
+			memset(&hints, 0, sizeof(struct addrinfo));
+			hints.ai_family = PF_UNSPEC;
+			hints.ai_flags = AI_NUMERICHOST;
+			if (getaddrinfo($2, NULL, &hints, &res0)) {
+				printf("invalid prefix %s\n", $1);
 				free(cfpt);
 				return (-1);
 			}
-			if (inet_pton(AF_INET6, $2,
-				&cfpt->cfpt_prefix) <= 0) {
-				free(cfpt);
-				return (-1);
-			}
+			memcpy(&cfpt->cfpt_ss_prefix, res0->ai_addr,
+			    res0->ai_addrlen);
+			freeaddrinfo(res0);
 			cfpt->cfpt_prefixlen = $4;
 			if (strcmp($5, "explicit") == 0)
 				cfpt->cfpt_mode = CFPT_EXPLICIT;
@@ -312,6 +338,7 @@ prefixtable_statement:
 		{
 			struct config_entry *cfe;
 			struct config_prefixtable *cfpt;
+			struct addrinfo hints, *res0;
 
 			cfpt = (struct config_prefixtable *)
 				malloc(sizeof(struct config_prefixtable));
@@ -319,15 +346,22 @@ prefixtable_statement:
 				return (-1);
 
 			if (inet_pton(AF_INET6, $1,
-				&cfpt->cfpt_homeaddress) <= 0) {
+			    &cfpt->cfpt_homeaddress) <= 0) {
+				free(cfpt);
+				return(-1);
+			}
+
+			memset(&hints, 0, sizeof(struct addrinfo));
+			hints.ai_family = PF_UNSPEC;
+			hints.ai_flags = AI_NUMERICHOST;
+			if (getaddrinfo($2, NULL, &hints, &res0)) {
+				printf("invalid prefix %s\n", $1);
 				free(cfpt);
 				return (-1);
 			}
-			if (inet_pton(AF_INET6, $2,
-				&cfpt->cfpt_prefix) <= 0) {
-				free(cfpt);
-				return (-1);
-			}
+			memcpy(&cfpt->cfpt_ss_prefix, res0->ai_addr,
+			    res0->ai_addrlen);
+			freeaddrinfo(res0);
 			cfpt->cfpt_prefixlen = $4;
 			if (strcmp($5, "explicit") == 0)
 				cfpt->cfpt_mode = CFPT_EXPLICIT;

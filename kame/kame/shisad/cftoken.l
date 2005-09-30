@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.6 2005/08/24 03:12:53 keiichi Exp $	*/
+/*	$KAME: cftoken.l,v 1.7 2005/09/30 12:01:55 keiichi Exp $	*/
 
 %{
 /*
@@ -58,7 +58,7 @@ slash		\/
 comment		\#.*
 digit		[0-9]
 integer		{digit}+
-addrstring	[a-zA-Z0-9:\._][a-zA-Z0-9:\._]*
+addrstring	[a-zA-Z0-9:\.][a-zA-Z0-9:\.]*
 ifname		[a-zA-Z]+[0-9]+
 mipifname	mip[0-9]+
 
@@ -82,6 +82,7 @@ mipifname	mip[0-9]+
 <S_CONFIG>preference { D; return (PREFERENCE); }
 <S_CONFIG>interface { D; BEGIN S_INTERFACE; return (INTERFACE); }
 <S_CONFIG>key-management { D; return (KEYMANAGEMENT); }
+<S_CONFIG>ipv4-mnp-support { D; return (IPV4MNPSUPPORT); }
 <S_INTERFACE>{ifname} {
 	D;
 	BEGIN S_CONFIG;

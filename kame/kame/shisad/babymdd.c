@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.11 2005/06/21 12:53:12 keiichi Exp $	*/
+/*	$Id: babymdd.c,v 1.12 2005/09/30 12:01:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -436,7 +436,7 @@ baby_md_reg(coa, bid)
 		hoa.sin6_len = sizeof(struct sockaddr_in6);
 
 		/* do not send md_info msg for an address generated at a home link */
-		if (mip6_are_prefix_equal(&hoa.sin6_addr, &coa->sin6_addr, 64)) 
+		if (inet_are_prefix_equal(&hoa.sin6_addr, &coa->sin6_addr, 64)) 
 			return (0);
 		
 		len = sizeof(*mdinfo) + sizeof(hoa) + sizeof(*coa);
@@ -500,7 +500,7 @@ baby_mipmsg(mipm, msglen)
 			hoainfo_next = LIST_NEXT(hoainfo, hoainfo_entry);
 
 			if (miphome->mipmhh_prefix && 
-			    mip6_are_prefix_equal(
+			    inet_are_prefix_equal(
 				    &((struct sockaddr_in6 *)miphome->mipmhh_prefix)->sin6_addr,
 				    &storage2sin6(&hoainfo->hoa)->sin6_addr, 
 					miphome->mipmhh_prefixlen)) {
@@ -604,7 +604,7 @@ baby_rtmsg(rtm, msglen)
 					hoainfo_next = LIST_NEXT(hoainfo, hoainfo_entry);
 					
 					if ((ifinfo == babyinfo.coaif) && 
-					    (mip6_are_prefix_equal(&storage2sin6(&hoainfo->hoa)->sin6_addr,
+					    (inet_are_prefix_equal(&storage2sin6(&hoainfo->hoa)->sin6_addr,
 								   &sin6->sin6_addr, 64))) {
 						
 						memset(&ifinfo->coa, 0, 

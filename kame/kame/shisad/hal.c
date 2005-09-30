@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.2 2005/08/23 08:24:53 t-momose Exp $	*/
+/*	$KAME: hal.c,v 1.3 2005/09/30 12:01:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -71,7 +71,7 @@ mip6_find_hal(hoainfo)
 		return (NULL);
 
 	LIST_FOREACH(hpfx, &mipif->mipif_hprefx_head, hpfx_entry) {
-		if (mip6_are_prefix_equal(&hoainfo->hinfo_hoa, 
+		if (inet_are_prefix_equal(&hoainfo->hinfo_hoa, 
 					  &hpfx->hpfx_prefix, hpfx->hpfx_prefixlen)) {
 			return (LIST_FIRST(&hpfx->hpfx_hal_head));
 		}
@@ -301,7 +301,7 @@ mip6_get_hpfxlist(prefix, prefixlen, hpfxhead)
 		if (prefixlen != hpl->hpfx_prefixlen) 
 			continue;
 
-		if (mip6_are_prefix_equal(prefix, &hpl->hpfx_prefix, prefixlen))
+		if (inet_are_prefix_equal(prefix, &hpl->hpfx_prefix, prefixlen))
 			return (hpl);
 	}
 	return (NULL);

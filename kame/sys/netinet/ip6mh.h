@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.2 2004/12/09 02:19:00 t-momose Exp $	*/
+/*	$KAME: ip6mh.h,v 1.3 2005/09/30 12:01:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -278,6 +278,7 @@ struct ip6_mh_opt {
 #define IP6_MHOPT_BAUTH		5	/* Binding Authorization Data */
 #define IP6_MHOPT_PREFIX        6       /* Mobile Network Prefix */
 #define IP6_MHOPT_BID           7       /* Binding Unique Identifier */
+#define IP6_MHOPT_IPV4_PREFIX   8       /* IPv4 Mobile Network Prefix */
 
 /* Binding Refresh Advice */
 struct ip6_mh_opt_refresh_advice {
@@ -346,5 +347,14 @@ struct ip6_mh_opt_bid {
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define IP6OPTBID_STOP	0x0080	/* stop proxy NA */
 #endif /* LITTLE_ENDIAN */
+
+/* IPv4 Mobile Network Prefix Option */
+struct ip6_mh_opt_ipv4_prefix {
+        uint8_t ip6mov4pfx_type;
+        uint8_t ip6mov4pfx_len;
+        uint8_t ip6mov4pfx_reserved;
+        uint8_t ip6mov4pfx_pfxlen;
+        struct in_addr ip6mov4pfx_pfx;
+};
 
 #endif /* not _NETINET_IP6MH_H_ */

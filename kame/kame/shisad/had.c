@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.26 2005/09/07 08:18:18 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.27 2005/09/30 12:01:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -78,6 +78,9 @@ int namelookup = 1;
 int command_port = HAD_COMMAND_PORT;
 int preference = 0;
 int keymanagement = 0;
+#ifdef MIP_IPV4MNPSUPPORT
+int ipv4mnpsupport = 0;
+#endif /* MIP_IPV4MNPSUPPORT */
 
 struct mip6stat mip6stat;
 struct mip6_hpfx_list hpfx_head; 
@@ -315,7 +318,7 @@ had_is_myhomenet(hoa)
 	struct mip6_hpfxl *hpfx = NULL;
 
 	LIST_FOREACH(hpfx, &hpfx_head, hpfx_entry) {
-		if (mip6_are_prefix_equal(&hpfx->hpfx_prefix, hoa,  hpfx->hpfx_prefixlen))
+		if (inet_are_prefix_equal(&hpfx->hpfx_prefix, hoa,  hpfx->hpfx_prefixlen))
 			return (hpfx);
 	}
 

@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.10 2005/07/06 02:16:30 keiichi Exp $  */
+/*      $KAME: nemo_var.c,v 1.11 2005/09/30 12:01:56 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -65,6 +65,9 @@
 #include "fsm.h"
 #include "config.h"
 
+#define SS2SIN6(ss) ((struct sockaddr_in6 *)(ss))
+#define SS2SIN(ss) ((struct sockaddr_in *)(ss))
+
 #ifdef MIP_NEMO 
 
 extern struct config_entry *if_params;
@@ -73,20 +76,40 @@ extern struct config_entry *if_params;
 struct nemo_mptable *
 nemo_mpt_get(hoainfo, nemoprefix, prefixlen)
 	struct mip6_hoainfo *hoainfo;
-	struct in6_addr *nemoprefix;
+	struct sockaddr_storage *nemoprefix;
 	u_int8_t prefixlen;
 {
 	struct nemo_mptable *mpt, *mptn;
+	void *inet_nemoprefix, *inet_prefix;
 
         for (mpt = LIST_FIRST(&hoainfo->hinfo_mpt_head); 
 	     mpt; mpt = mptn) {
 		mptn = LIST_NEXT(mpt, mpt_entry);
 		
+		if (nemoprefix->ss_family != mpt->mpt_ss_prefix.ss_family)
+			continue;
 		if (prefixlen != mpt->mpt_prefixlen)
 			continue;
 
-		if (mip6_are_prefix_equal(nemoprefix, 
-					  &mpt->mpt_prefix, mpt->mpt_prefixlen)) 
+		switch (nemoprefix->ss_family) {
+		case AF_INET6:
+			inet_nemoprefix = &SS2SIN6(nemoprefix)->sin6_addr;
+			inet_prefix = &SS2SIN6(&mpt->mpt_ss_prefix)->sin6_addr;
+			break;
+#ifdef MIP_IPV4MNPSUPPORT
+		case AF_INET:
+			inet_nemoprefix = &SS2SIN(nemoprefix)->sin_addr;
+			inet_prefix = &SS2SIN(&mpt->mpt_ss_prefix)->sin_addr;
+			break;
+#endif /* MIP_IPV4MNPSUPPORT */
+		default:
+			syslog(LOG_ERR,
+			    "nemo_mpt_get: invalid address family (%d).\n",
+			    nemoprefix->ss_family);
+			return (NULL);
+		}
+		if (inet_are_prefix_equal(inet_nemoprefix, inet_prefix,
+		    mpt->mpt_prefixlen)) 
 			return (mpt);
 	}
 
@@ -96,7 +119,7 @@ nemo_mpt_get(hoainfo, nemoprefix, prefixlen)
 struct nemo_mptable *
 nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 	struct mip6_hoainfo *hoainfo;
-	struct in6_addr *nemoprefix;
+	struct sockaddr_storage *nemoprefix;
 	u_int8_t prefixlen;
 	int mode;
 {
@@ -110,7 +133,8 @@ nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 
 	memset(newmpt, 0, sizeof(struct nemo_mptable));
 
-	newmpt->mpt_prefix = *nemoprefix;
+	memcpy(&newmpt->mpt_ss_prefix, nemoprefix,
+	    sizeof(struct sockaddr_storage));
 	newmpt->mpt_prefixlen = prefixlen;
 	newmpt->mpt_hoainfo = hoainfo;
 	if (mode == NEMO_ROUTING) {
@@ -122,9 +146,15 @@ nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 
 	LIST_INSERT_HEAD(&hoainfo->hinfo_mpt_head, newmpt, mpt_entry);
 
-	if (debug)
-		syslog(LOG_INFO, "add mobile network prefix %s into hoainfo\n", 
-		       ip6_sprintf(&newmpt->mpt_prefix));
+	if (debug) {
+		char addrbuf[NI_MAXHOST];
+
+		getnameinfo((struct sockaddr *)&newmpt->mpt_ss_prefix,
+		    newmpt->mpt_ss_prefix.ss_len, addrbuf, sizeof(addrbuf),
+		    NULL, 0, 0);
+		syslog(LOG_INFO,
+		    "add mobile network prefix %s into hoainfo\n", addrbuf);
+	}
 
 	return (newmpt);
 }
@@ -136,6 +166,7 @@ command_show_pt(s, dummy)
 {
 	struct nemo_mptable *mpt, *mptn;
         struct mip6_hoainfo *hoainfo = NULL;
+	char hostname[NI_MAXHOST];
 	
         for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
              hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
@@ -145,8 +176,11 @@ command_show_pt(s, dummy)
 			mptn = LIST_NEXT(mpt, mpt_entry);
 			
 			command_printf(s, "%s ", ip6_sprintf(&hoainfo->hinfo_hoa));
-			command_printf(s, "%s%%%d ", 
-				ip6_sprintf(&mpt->mpt_prefix), mpt->mpt_prefixlen);
+			getnameinfo((struct sockaddr *)&mpt->mpt_ss_prefix,
+			    mpt->mpt_ss_prefix.ss_len, hostname,
+			    sizeof(hostname), NULL, 0, 0);
+			command_printf(s, "%s/%d ", hostname,
+			    mpt->mpt_prefixlen);
 			command_printf(s, "%s\n", 
 				(mpt->mpt_regmode == NEMO_IMPLICIT) ? 
 				"implicit" : "explicit");
@@ -158,17 +192,39 @@ command_show_pt(s, dummy)
 
 #ifdef MIP_HA 
 struct nemo_hptable *
-nemo_hpt_get(prefix, prefixlen, preferred_hoa) 
-	struct in6_addr *prefix;
+nemo_hpt_get(nemoprefix, prefixlen, preferred_hoa) 
+	struct sockaddr_storage *nemoprefix;
 	u_int8_t prefixlen;
 	struct in6_addr *preferred_hoa;
 {
 	struct nemo_hptable *hpt;
+	void *inet_nemoprefix, *inet_prefix;
 
 	LIST_FOREACH(hpt, &hpt_head, hpt_entry) {
+		if (nemoprefix->ss_family != hpt->hpt_ss_prefix.ss_family)
+			continue;
 		if (prefixlen != hpt->hpt_prefixlen)
 			continue;
-		if (mip6_are_prefix_equal(&hpt->hpt_prefix, prefix, prefixlen)) {
+
+		switch (nemoprefix->ss_family) {
+		case AF_INET6:
+			inet_nemoprefix = &SS2SIN6(nemoprefix)->sin6_addr;
+			inet_prefix = &SS2SIN6(&hpt->hpt_ss_prefix)->sin6_addr;
+			break;
+#ifdef MIP_IPV4MNPSUPPORT
+		case AF_INET:
+			inet_nemoprefix = &SS2SIN(nemoprefix)->sin_addr;
+			inet_prefix = &SS2SIN(&hpt->hpt_ss_prefix)->sin_addr;
+			break;
+#endif /* MIP_IPV4MNPSUPPORT */
+		default:
+			syslog(LOG_ERR,
+			    "nemo_hpt_get: invalid address family (%d).\n",
+			    nemoprefix->ss_family);
+			return (NULL);
+		}
+		if (inet_are_prefix_equal(inet_nemoprefix, inet_prefix,
+			prefixlen)) {
 			if ((preferred_hoa != NULL) &&
 			    !IN6_ARE_ADDR_EQUAL(preferred_hoa, &hpt->hpt_hoa))
 				continue;
@@ -183,7 +239,7 @@ nemo_hpt_get(prefix, prefixlen, preferred_hoa)
 struct nemo_hptable *
 nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 	struct in6_addr *hoa;
-	struct in6_addr *nemoprefix;
+	struct sockaddr_storage *nemoprefix;
 	u_int8_t prefixlen;
 	int mode;
 {
@@ -197,7 +253,8 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 
 	memset(newpt, 0, sizeof(struct nemo_hptable));
 
-	newpt->hpt_prefix = *nemoprefix;
+	memcpy(&newpt->hpt_ss_prefix, nemoprefix,
+	    sizeof(struct sockaddr_storage));
 	newpt->hpt_prefixlen = prefixlen;
 	newpt->hpt_hoa = *hoa;
 	if (mode == NEMO_ROUTING) {
@@ -209,9 +266,15 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 
 	LIST_INSERT_HEAD(&hpt_head, newpt, hpt_entry);
 
-	if (debug)
+	if (debug) {
+		char addrbuf[NI_MAXHOST];
+
+		getnameinfo((struct sockaddr *)&newpt->hpt_ss_prefix,
+		    newpt->hpt_ss_prefix.ss_len, addrbuf, sizeof(addrbuf),
+		    NULL, 0, 0);
 		syslog(LOG_INFO, "add mobile network prefix %s into PrefixTable\n", 
-		       ip6_sprintf(&newpt->hpt_prefix));
+		       addrbuf);
+	}
 
 	return (newpt);
 }
@@ -259,12 +322,12 @@ nemo_parse_conf()
 		if (hoainfo == NULL)
 			continue;
 
-		mpt = nemo_mpt_get(hoainfo, &cfpt->cfpt_prefix,
+		mpt = nemo_mpt_get(hoainfo, &cfpt->cfpt_ss_prefix,
 		    cfpt->cfpt_prefixlen);
 		if (mpt) {
 			/* XXX update entry */
 		} else {
-			mpt = nemo_mpt_add(hoainfo, &cfpt->cfpt_prefix,
+			mpt = nemo_mpt_add(hoainfo, &cfpt->cfpt_ss_prefix,
 			    cfpt->cfpt_prefixlen,
 			    mode);
 			if (mpt == NULL) 
@@ -273,12 +336,12 @@ nemo_parse_conf()
 		}
 #endif /* MIP_MN */
 #ifdef MIP_HA
-		hpt = nemo_hpt_get(&cfpt->cfpt_prefix, cfpt->cfpt_prefixlen, &cfpt->cfpt_homeaddress);
+		hpt = nemo_hpt_get(&cfpt->cfpt_ss_prefix, cfpt->cfpt_prefixlen, &cfpt->cfpt_homeaddress);
 		if (hpt) {
 			/* XXX update entry */
 		} else {
 			if (nemo_hpt_add(&cfpt->cfpt_homeaddress,
-				&cfpt->cfpt_prefix, cfpt->cfpt_prefixlen,
+				&cfpt->cfpt_ss_prefix, cfpt->cfpt_prefixlen,
 				mode ) == NULL)
 				syslog(LOG_ERR,
 				    "adding nemoprefix to Prefix Table is failed\n");

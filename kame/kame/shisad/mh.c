@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.31 2005/08/24 03:12:53 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.32 2005/09/30 12:01:56 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -68,9 +68,17 @@
 #include "fsm.h"
 #include "stat.h"
 
+#define SS2SIN6(ss) ((struct sockaddr_in6 *)(ss))
+#define SS2SIN(ss) ((struct sockaddr_in *)(ss))
+
 #ifdef MIP_CN
 extern int homeagent_mode;
 #endif /* MIP_CN */
+#ifdef MIP_MN
+#ifdef MIP_NEMO
+extern int ipv4mnpsupport;
+#endif /* MIP_NEMO */
+#endif /* MIP_MN */
 #ifdef MIP_HA
 extern int keymanagement;
 #endif
@@ -835,6 +843,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (mopt.opt_prefix_count > 0) {
 		struct nemo_hptable *hpt;
 		int r = 0;
+		struct sockaddr_in6 prefix;
 		
 		/* when flags are incorrect,  just ignore this BU?? */
 		if (((flags & IP6_MH_BU_HOME) == 0) &&
@@ -845,8 +854,12 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		 *  verify prefix with prefixtable (explicit mode only)
 		 */
 		for (r = 0; r < mopt.opt_prefix_count; r ++) {
-			hpt = nemo_hpt_get(&mopt.opt_prefix[r]->ip6mopfx_pfx,
-					 mopt.opt_prefix[r]->ip6mopfx_pfxlen, hoa);
+			memset(&prefix, 0, sizeof(struct sockaddr_in6));
+			prefix.sin6_len = sizeof(struct sockaddr_in6);
+			prefix.sin6_family = AF_INET6;
+			prefix.sin6_addr = mopt.opt_prefix[r]->ip6mopfx_pfx;
+			hpt = nemo_hpt_get((struct sockaddr_storage*)&prefix,
+			    mopt.opt_prefix[r]->ip6mopfx_pfxlen, hoa);
 
 			/* 
 			 * The requesting prefix is not
@@ -1164,6 +1177,9 @@ send_bu(bul)
 	mip6_authenticator_t authenticator;
 #ifdef MIP_NEMO
 	struct ip6_mh_opt_prefix prefix_opt;
+#ifdef MIP_IPV4MNPSUPPORT
+	struct ip6_mh_opt_ipv4_prefix v4prefix_opt;
+#endif /* MIP_IPV4MNPSUPPORT */
 #endif /* MIP_NEMO */
 #ifdef MIP_MCOA
 	struct ip6_mh_opt_bid bid_opt;
@@ -1244,9 +1260,11 @@ send_bu(bul)
 		for (; mpt; mpt = mptn) {
 			mptn = LIST_NEXT(mpt, mpt_entry);
 
-			if (mpt->mpt_regmode == NEMO_IMPLICIT) {
-				; /* when implicit mode, nothing to append */
-			} else if (mpt->mpt_regmode == NEMO_EXPLICIT) {
+			/* when not explicit mode, nothing to append */
+			if (mpt->mpt_regmode != NEMO_EXPLICIT)
+				continue;
+
+			if (mpt->mpt_ss_prefix.ss_family == AF_INET6) {
 				pad = MIP6_PADLEN(buflen, 8, 4);  /* 8n+4 */
 				MIP6_FILL_PADDING(bufp + buflen, pad);
 				buflen += pad;
@@ -1255,12 +1273,35 @@ send_bu(bul)
 
 				prefix_opt.ip6mopfx_type = IP6_MHOPT_PREFIX;
 				prefix_opt.ip6mopfx_len = 18;
-				prefix_opt.ip6mopfx_pfxlen = mpt->mpt_prefixlen;
-				prefix_opt.ip6mopfx_pfx = mpt->mpt_prefix;
-				
+				prefix_opt.ip6mopfx_pfxlen
+				    = mpt->mpt_prefixlen;
+				prefix_opt.ip6mopfx_pfx
+				    = SS2SIN6(&mpt->mpt_ss_prefix)->sin6_addr;
+
 				memcpy((bufp + buflen), &prefix_opt, sizeof(prefix_opt));
 				buflen += sizeof(struct ip6_mh_opt_prefix);
-			} 
+			}
+#ifdef MIP_IPV4MNPSUPPORT
+			else if (ipv4mnpsupport
+			    && (mpt->mpt_ss_prefix.ss_family == AF_INET)) {
+				pad = MIP6_PADLEN(buflen, 4, 0);  /* 4n */
+				MIP6_FILL_PADDING(bufp + buflen, pad);
+				buflen += pad;
+
+				memset(&v4prefix_opt, 0, sizeof(v4prefix_opt));
+
+				v4prefix_opt.ip6mov4pfx_type = IP6_MHOPT_IPV4_PREFIX;
+				v4prefix_opt.ip6mov4pfx_len = 6;
+				v4prefix_opt.ip6mov4pfx_pfxlen
+				    = mpt->mpt_prefixlen;
+				v4prefix_opt.ip6mov4pfx_pfx
+				    = SS2SIN(&mpt->mpt_ss_prefix)->sin_addr;
+
+				memcpy((bufp + buflen), &v4prefix_opt,
+				    sizeof(v4prefix_opt));
+				buflen += sizeof(struct ip6_mh_opt_ipv4_prefix);
+			}
+#endif /* MIP_IPV4MNPSUPPORT */
 		}
 	}
 #endif /* MIP_NEMO */

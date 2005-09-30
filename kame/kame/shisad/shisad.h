@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.20 2005/09/26 03:09:17 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.21 2005/09/30 12:01:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -246,9 +246,9 @@ LIST_HEAD(no_ro_head, noro_host_list);
 #ifdef MIP_NEMO
 /* NEMO Prefix Table */
 struct nemo_pt {
-	struct in6_addr     pt_prefix;     /* mobile network prefix */
-	u_int8_t            pt_prefixlen;  /* mobile network prefix length */
-	int                 pt_regmode;    /* Registration mode */
+	struct sockaddr_storage pt_ss_prefix;  /* mobile network prefix */
+	u_int8_t                pt_prefixlen;  /* mobile network prefix len */
+	int                     pt_regmode;    /* Registration mode */
 #define NEMO_IMPLICIT 0x01         /* Implicit mode */ 
 #define NEMO_EXPLICIT 0x02         /* Explicit mode */ 
 #define NEMO_ROUTING  0x03         /* no plan to support this */
@@ -261,9 +261,9 @@ struct nemo_hptable {
 	struct nemo_pt      hpt;
 	struct in6_addr     hpt_hoa;        /* home address of MR */
 };
-#define hpt_prefix    hpt.pt_prefix    
-#define hpt_prefixlen hpt.pt_prefixlen 
-#define hpt_regmode   hpt.pt_regmode    
+#define hpt_ss_prefix hpt.pt_ss_prefix
+#define hpt_prefixlen hpt.pt_prefixlen
+#define hpt_regmode   hpt.pt_regmode
 LIST_HEAD(nemo_hpt_list, nemo_hptable);
 extern struct nemo_hpt_list hpt_head;
 
@@ -277,7 +277,7 @@ struct nemo_mptable {
 
 	/* xxx lifetime etc?! */
 };
-#define mpt_prefix    mpt.pt_prefix
+#define mpt_ss_prefix mpt.pt_ss_prefix
 #define mpt_prefixlen mpt.pt_prefixlen
 #define mpt_regmode   mpt.pt_regmode
 LIST_HEAD(nemo_mpt_list, nemo_mptable);
@@ -458,8 +458,8 @@ int delete_ip6addr(char *, struct in6_addr *, int);
 #ifdef MIP_NEMO
 int nemo_tun_set(struct sockaddr *, struct sockaddr *, u_int16_t, int);
 int nemo_tun_del(char *);
-int route_add(struct in6_addr *, struct in6_addr *, 
-	      struct in6_addr *, int, u_int16_t);
+int route_add(struct sockaddr *, struct sockaddr *, struct sockaddr *, int,
+    u_int16_t);
 int route_del(u_int16_t);
 u_int16_t  get_ifindex_from_address(struct in6_addr *);
 struct sockaddr_in6 *nemo_ar_get(struct in6_addr *coa, 
@@ -480,7 +480,7 @@ int  icmp6_input_common(int);
 int mip6_get_nd6options(struct nd6options *, char *, int);
 void mip6_create_addr(struct in6_addr *, const struct in6_addr *, 
 		      struct in6_addr *, u_int8_t);
-int mip6_are_prefix_equal(struct in6_addr *, struct in6_addr *, int);
+int inet_are_prefix_equal(void *, void *, int);
 void hal_set_expire_timer(struct home_agent_list *, int);
 void hal_stop_expire_timer(struct home_agent_list *);
 void command_show_stat(int, char *);
@@ -527,13 +527,14 @@ int relay_icmp6_error(struct icmp6_hdr *, size_t, u_short);
 
 /* nemo_var.c */
 #ifdef MIP_NEMO
-struct nemo_mptable *nemo_mpt_get(struct mip6_hoainfo *, 
-				struct in6_addr *, u_int8_t);
-struct nemo_mptable *nemo_mpt_add(struct mip6_hoainfo *, 
-				  struct in6_addr *, u_int8_t, int);
-struct nemo_hptable *nemo_hpt_get(struct in6_addr *, u_int8_t, struct in6_addr *);
-struct nemo_hptable *nemo_hpt_add(struct in6_addr *, struct in6_addr *, 
-				  u_int8_t, int);
+struct nemo_mptable *nemo_mpt_get(struct mip6_hoainfo *,
+    struct sockaddr_storage *, u_int8_t);
+struct nemo_mptable *nemo_mpt_add(struct mip6_hoainfo *,
+    struct sockaddr_storage *, u_int8_t, int);
+struct nemo_hptable *nemo_hpt_get(struct sockaddr_storage *, u_int8_t,
+    struct in6_addr *);
+struct nemo_hptable *nemo_hpt_add(struct in6_addr *, struct sockaddr_storage *,
+    u_int8_t, int);
 
 #define NEMOPREFIXINFO "./nemo_prefixtable.conf"
 void nemo_parse_conf(void);

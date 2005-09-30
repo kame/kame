@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.16 2005/06/25 08:45:37 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.17 2005/09/30 12:01:56 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -51,6 +51,7 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #ifdef HAVE_POLL_H
 #include <poll.h>
@@ -77,7 +78,7 @@ LIST_HEAD(nemo_if_head, nemo_if) nemo_ifhead;
 struct nemo_mnpt {
 	LIST_ENTRY(nemo_mnpt) nemo_mnptentry;
 	struct in6_addr hoa;
-	struct in6_addr nemo_prefix;
+	struct sockaddr_storage nemo_ss_prefix;
 	int nemo_prefixlen;
 	u_int16_t bid;
 	struct nemo_if *nemo_if;
@@ -85,12 +86,15 @@ struct nemo_mnpt {
 LIST_HEAD(nemo_mnpt_head, nemo_mnpt) nemo_mnpthead;
 
 int mode;
+struct config_entry *if_params;
 int debug = 0;
 int foreground = 0;
 int namelookup = 1;
 int staticmode = 0;
 int multiplecoa = 0;
-struct config_entry *if_params;
+#ifdef MIP_IPV4MNPSUPPORT
+int ipv4mnpsupport = 0;
+#endif /* MIP_IPV4MNPSUPPORT */
 
 /* Functions */
 static int set_nemo_ifinfo();
@@ -104,6 +108,25 @@ static struct nemo_if *nemo_setup_forwarding (struct sockaddr *, struct sockaddr
 					      struct in6_addr *, u_int16_t);
 static struct nemo_if *nemo_destroy_forwarding(struct in6_addr *, u_int16_t);
 static void nemo_dump();
+
+static struct sockaddr_in6 sin6_default = {
+	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
+	IN6ADDR_ANY_INIT
+}; 
+static struct sockaddr_in6 sin6_loopback = {
+	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
+	IN6ADDR_LOOPBACK_INIT
+};
+#ifdef MIP_IPV4MNPSUPPORT
+static struct sockaddr_in sin_default = {
+	sizeof(struct sockaddr_in), AF_INET, 0,
+	{INADDR_ANY}
+}; 
+static struct sockaddr_in sin_loopback = {
+	sizeof(struct sockaddr_in), AF_INET, 0,
+	{INADDR_LOOPBACK}
+};
+#endif /* MIP_IPV4MNPSUPPORT */
 
 void
 nemo_usage() {
@@ -215,12 +238,20 @@ main (argc, argv)
 		}
 	}
 	if (if_params != NULL) {
-		config_get_number(CFT_DEBUG, &debug, config_params);
-		config_get_number(CFT_NAMELOOKUP, &namelookup, config_params);
+		config_get_number(CFT_DEBUG, &debug, if_params);
+		config_get_number(CFT_NAMELOOKUP, &namelookup, if_params);
+#ifdef MIP_IPV4MNPSUPPORT
+		config_get_number(CFT_IPV4MNPSUPPORT, &ipv4mnpsupport,
+		    if_params);
+#endif /* MIP_IPV4MNPSUPPORT */
 	}
 	if (config_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, config_params);
 		config_get_number(CFT_NAMELOOKUP, &namelookup, config_params);
+#ifdef MIP_IPV4MNPSUPPORT
+		config_get_number(CFT_IPV4MNPSUPPORT, &ipv4mnpsupport,
+		    config_params);
+#endif /* MIP_IPV4MNPSUPPORT */
 	}
 
 
@@ -318,8 +349,8 @@ ha_parse_ptconf()
 		memset(pt, 0, sizeof(struct nemo_mnpt));
 		memcpy(&pt->hoa, &cfpt->cfpt_homeaddress,
 		    sizeof(struct in6_addr));
-		memcpy(&pt->nemo_prefix, &cfpt->cfpt_prefix,
-		    sizeof(struct in6_addr));
+		memcpy(&pt->nemo_ss_prefix, &cfpt->cfpt_ss_prefix,
+		    sizeof(struct sockaddr_storage));
 		pt->nemo_prefixlen = cfpt->cfpt_prefixlen;
 		pt->bid = cfpt->cfpt_binding_id;
 
@@ -354,8 +385,8 @@ mr_parse_ptconf()
 
 		memcpy(&pt->hoa, &cfpt->cfpt_homeaddress,
 		    sizeof(struct in6_addr));
-		memcpy(&pt->nemo_prefix, &cfpt->cfpt_prefix,
-		    sizeof(struct in6_addr));
+		memcpy(&pt->nemo_ss_prefix, &cfpt->cfpt_ss_prefix,
+		    sizeof(struct sockaddr_storage));
 		pt->nemo_prefixlen = cfpt->cfpt_prefixlen;
 		pt->bid = cfpt->cfpt_binding_id;
 
@@ -643,9 +674,17 @@ mainloop() {
 						/* remove default route */
 						route_del(0);
 						/* add default route */
-						route_add(&def, &local_in6, NULL, 0,
-							  if_nametoindex(nif->ifname));
-						
+						route_add((struct sockaddr *)&sin6_default,
+						    (struct sockaddr *)&sin6_loopback,
+						    NULL, 0,
+						    if_nametoindex(nif->ifname));
+#ifdef MIP_IPV4MNPSUPPORT
+						if (ipv4mnpsupport)
+							route_add((struct sockaddr *)&sin_default,
+							    (struct sockaddr *)&sin_loopback,
+							    NULL, 0,
+							    if_nametoindex(nif->ifname));
+#endif /* MIP_IPV4MNPSUPPORT */
 						syslog(LOG_INFO, 
 						"adding a default route to %s\n", nif->ifname);
 					}
@@ -730,8 +769,27 @@ mainloop() {
 						continue;
 
 					npt->nemo_if = nif;
-					route_add(&npt->nemo_prefix, &local_in6, NULL, 
-						  npt->nemo_prefixlen, if_nametoindex(nif->ifname));
+					switch (npt->nemo_ss_prefix.ss_family) {
+					case AF_INET6:
+						route_add((struct sockaddr *)&npt->nemo_ss_prefix,
+						    (struct sockaddr *)&sin6_loopback,
+						    NULL, npt->nemo_prefixlen,
+						    if_nametoindex(nif->ifname));
+						break;
+#ifdef MIP_IPV4MNPSUPPORT
+					case AF_INET:
+						if (ipv4mnpsupport)
+							route_add((struct sockaddr *)&npt->nemo_ss_prefix,
+							    (struct sockaddr *)&sin_loopback,
+							    NULL,
+							    npt->nemo_prefixlen,
+							    if_nametoindex(nif->ifname));
+						break;
+#endif /* MIP_IPV4MNPSUPPORT */
+					default:
+						syslog(LOG_ERR,
+						    "mainloop: unknown address family (%d).\n", npt->nemo_ss_prefix.ss_family);
+					}
 				}
                                 break;
 
@@ -906,6 +964,7 @@ nemo_dump() {
 	struct nemo_if *nif;
 	struct nemo_mnpt *npt;
 	int i = 1;
+	char prefix[NI_MAXHOST];
 
 	syslog(LOG_INFO, "Dump nemod info. for %s\n",
 		 (mode==MODE_HA)? "Home Agent" : "Mobile Router");
@@ -927,9 +986,12 @@ nemo_dump() {
 
 	i = 0;
 	LIST_FOREACH(npt, &nemo_mnpthead, nemo_mnptentry) {
+		getnameinfo((struct sockaddr *)&npt->nemo_ss_prefix,
+		    npt->nemo_ss_prefix.ss_len, prefix, sizeof(prefix),
+		    NULL, 0, 0);
 		syslog(LOG_INFO, "Prefix Table no.%d\n", i);
 		syslog(LOG_INFO, "\tprefix: %s/%d\n", 
-		       ip6_sprintf(&npt->nemo_prefix), npt->nemo_prefixlen);
+		    prefix, npt->nemo_prefixlen);
 		syslog(LOG_INFO, "\thoa: %s\n", ip6_sprintf(&npt->hoa));
 		if (multiplecoa)
 			syslog(LOG_INFO, "\tbid: %d\n", npt->bid);
