@@ -68,13 +68,15 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, subnets_are_local, CTLFLAG_RW,
 	&subnetsarelocal, 0, "Treat all subnets as directly connected");
 
 /*
- * The IPv4 multicast list (in_multihead and associated structures)
- * are protected by the global in_multi_mtx.  See in_var.h for
- * more details.
+ * The IPv4 multicast list (in_multihead and associated structures) are
+ * protected by the global in_multi_mtx.  See in_var.h for more details.  For
+ * now, in_multi_mtx is marked as recursible due to IGMP's calling back into
+ * ip_output() to send IGMP packets while holding the lock; this probably is
+ * not quite desirable.
  */
 struct in_multihead in_multihead; /* XXX BSS initialization */
 struct mtx in_multi_mtx;
-MTX_SYSINIT(in_multi_mtx, &in_multi_mtx, "in_multi_mtx", MTX_DEF);
+MTX_SYSINIT(in_multi_mtx, &in_multi_mtx, "in_multi_mtx", MTX_DEF | MTX_RECURSE);
 
 extern struct inpcbinfo	ripcbinfo;
 extern struct inpcbinfo udbinfo;
