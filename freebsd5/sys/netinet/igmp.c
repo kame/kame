@@ -2288,24 +2288,12 @@ in_delmulti2(inm, numsrc, ss, mode, final, error)
 	}
 	IN_MULTI_LOCK();
 	if (!is_igmp_target(&inm->inm_addr)) {
-		if (--ifma->ifma_refcount == 0) {
-
-			/*
-			 * Unlink from list.
-			 */
+		if (ifma->ifma_refcount == 1) {
 			ifma->ifma_protospec = NULL;
 			LIST_REMOVE(inm, inm_list);
-			/*
-			 * Notify the network driver to update its multicast
-			 * reception filter.
-			 */
-			satosin(&ifr.ifr_addr)->sin_family = AF_INET;
-			satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
-			(*inm->inm_ifp->if_ioctl)(inm->inm_ifp, SIOCDELMULTI,
-							     (caddr_t)&ifr);
 			free(inm, M_IPMADDR);
-			if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		}
+		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		IN_MULTI_UNLOCK();
 		return;
 	}
@@ -2338,13 +2326,6 @@ in_delmulti2(inm, numsrc, ss, mode, final, error)
 		inm->inm_source->ims_cur->numsrc = newnumsrc;
 	}
 
-	/*
-	 * If this is a final leave request by the socket, decrease
-	 * refcount.
-	 */
-	if (final)
-		--ifma->ifma_refcount;
-
 	if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
 		if (curmode != newmode || curnumsrc != newnumsrc) {
 			if (curmode != newmode) {
@@ -2364,44 +2345,38 @@ in_delmulti2(inm, numsrc, ss, mode, final, error)
 		 * to IGMPv3. XXX
 		 */
 		in_clear_all_pending_report(inm);
-		if (ifma->ifma_refcount == 0) {
+		if (ifma->ifma_refcount == 1) {
 			inm->inm_source->ims_robvar = 0;
 			igmp_leavegroup(inm);
 		}
 	}
-
-	if (ifma->ifma_refcount == 0) {
-		/*
-		 * We cannot use timer for robstness times report
-		 * transmission when ifma->ifma_refcount becomes 0, since inm
-		 * itself will be removed here. So, in this case, report
-		 * retransmission will be done quickly. XXX my spec.
-		 */
-		timer_init = 0;
-		while (inm->inm_source->ims_robvar > 0) {
-			m = NULL;
-			buflen = 0;
-			igmp_send_state_change_report
-				(&m, &buflen, inm, type, timer_init);
-			if (m != NULL)
-				igmp_sendbuf(m, inm->inm_ifp);
+	/*
+	 * If this is a final leave request by the socket, decrease refcount.
+	 */
+	if (final) {
+		if (ifma->ifma_refcount == 1) {
+			/*
+			 * We cannot use timer for robstness times report
+			 * transmission when ifma->ifma_refcount becomes 0,
+			 * since in6m itself will be removed here. So, in 
+			 * this case, report retransmission will be done 
+			 * quickly.XXX my spec.
+			 */
+			while (inm->inm_source->ims_robvar > 0) {
+				m = NULL;
+				buflen = 0;
+				igmp_send_state_change_report(&m, &buflen, inm, type, 0);
+				if (m != NULL)
+					igmp_sendbuf(m, inm->inm_ifp);
+			}
+			/*
+			 * Unlink from list.
+			 */
+			in_free_all_msf_source_list(inm);
+			LIST_REMOVE(inm, inm_list);
+			ifma->ifma_protospec = NULL;
+			free(inm, M_IPMADDR);
 		}
-		/*
-		 * Unlink from list.
-		 */
-		in_free_all_msf_source_list(inm);
-		LIST_REMOVE(inm, inm_list);
-		ifma->ifma_protospec = NULL;
-
-		/*
-		 * Notify the network driver to update its multicast
-		 * reception filter.
-		 */
-		satosin(&ifr.ifr_addr)->sin_family = AF_INET;
-		satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
-		(*inm->inm_ifp->if_ioctl)
-				(inm->inm_ifp, SIOCDELMULTI, (caddr_t)&ifr);
-		free(inm, M_IPMADDR);
 		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 	}
 	*error = 0;
@@ -2430,7 +2405,6 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 	struct mbuf *m = NULL;
 	struct in_multi *inm;
 	struct ifmultiaddr *ifma = NULL;
-	struct ifreq ifr;
 	struct ias_head *newhead = NULL;/* this becomes new ims_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
@@ -2469,21 +2443,12 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 				    local group address. */
 		}
 		if (mode == MCAST_INCLUDE) {
-		    if (--inm->inm_ifma->ifma_refcount == 0) {
-			/*
-			 * Unlink from list.
-			 */
+		    if (inm->inm_ifma->ifma_refcount == 1) {
 			LIST_REMOVE(inm, inm_list);
-			/*
-			 * Notify the network driver to update its multicast
-			 * reception filter.
-			 */
-			satosin(&ifr.ifr_addr)->sin_family = AF_INET;
-			satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
-			(*inm->inm_ifp->if_ioctl)(inm->inm_ifp, SIOCDELMULTI,
-								(caddr_t)&ifr);
+			ifma->ifma_protospec = NULL;
 			free(inm, M_IPMADDR);
 		    }
+		    if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		    IN_MULTI_UNLOCK();
 		    return NULL; /* not an error! */
 		} else if (mode == MCAST_EXCLUDE) {
