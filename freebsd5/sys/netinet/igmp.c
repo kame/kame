@@ -2293,7 +2293,7 @@ in_delmulti2(inm, numsrc, ss, mode, final, error)
 			/*
 			 * Unlink from list.
 			 */
-			ifma->ifma_protospec = 0;
+			ifma->ifma_protospec = NULL;
 			LIST_REMOVE(inm, inm_list);
 			/*
 			 * Notify the network driver to update its multicast
