@@ -1886,8 +1886,8 @@ igmp_set_v3report_header(m0, numsrc, buflenp)
 	if (m0 == NULL)
 		return EINVAL;
 
+	MGETHDR(*m0, M_DONTWAIT, MT_HEADER);
 	m = *m0;
-	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
 		return ENOBUFS;
 	if (m != NULL &&
