@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.161 2005/09/16 11:57:19 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.162 2005/10/04 11:53:32 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -836,7 +836,11 @@ server6_recv(s)
 		dprintf(LOG_NOTICE, FNAME, "failed to get packet info");
 		return;
 	}
-	/* not for us? */
+	/*
+	 * DHCPv6 server may receive a DHCPv6 packet from a non-listening 
+	 * interface, when a DHCPv6 relay agent is running on that interface.
+	 * This check prevents such reception.
+	 */
 	if (pi->ipi6_ifindex != ifidx)
 		return;
 	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
