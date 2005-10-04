@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.7 2005/09/30 12:01:56 keiichi Exp $  */
+/*      $KAME: network.c,v 1.8 2005/10/04 02:39:40 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -522,7 +522,11 @@ route_del(gifindex)
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = mib[5] = 0;
+#if defined(MIP_NEMO) && defined(MIP_IPV4MNPSUPPORT)
+	mib[3] = AF_UNSPEC;
+#else
 	mib[3] = AF_INET6;
+#endif
 	mib[4] = NET_RT_DUMP;
 	
 	if(sysctl(mib, 6, NULL, &needed, NULL, 0) < 0){
