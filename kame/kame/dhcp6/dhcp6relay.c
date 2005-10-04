@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.58 2005/09/16 11:33:18 suz Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.59 2005/10/04 11:54:59 suz Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -419,7 +419,7 @@ relay6_init(int ifnum, char *iflist[])
 		dprintf(LOG_ERR, FNAME, "invalid interface %s", relaydevice);
 	/*
 	 * We are not really sure if we need to listen on the downstream
-	 * port to receive packets from serves.  We'll need to clarify the
+	 * port to receive packets from servers.  We'll need to clarify the
 	 * specification, but we do for now.
 	 */
 	hints.ai_flags = AI_PASSIVE;
