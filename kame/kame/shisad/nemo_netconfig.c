@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.17 2005/09/30 12:01:56 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.18 2005/10/04 02:38:48 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -124,7 +124,11 @@ static struct sockaddr_in sin_default = {
 }; 
 static struct sockaddr_in sin_loopback = {
 	sizeof(struct sockaddr_in), AF_INET, 0,
-	{INADDR_LOOPBACK}
+#if BYTE_ORDER == BIG_ENDIAN
+	{0x7f000001}
+#else
+	{0x0100007f}
+#endif
 };
 #endif /* MIP_IPV4MNPSUPPORT */
 
@@ -679,14 +683,17 @@ mainloop() {
 						    NULL, 0,
 						    if_nametoindex(nif->ifname));
 #ifdef MIP_IPV4MNPSUPPORT
-						if (ipv4mnpsupport)
+						if (ipv4mnpsupport) {
 							route_add((struct sockaddr *)&sin_default,
 							    (struct sockaddr *)&sin_loopback,
 							    NULL, 0,
 							    if_nametoindex(nif->ifname));
+							syslog(LOG_INFO, 
+							    "adding an IPv4 default route to %s\n", nif->ifname);
+						}
 #endif /* MIP_IPV4MNPSUPPORT */
 						syslog(LOG_INFO, 
-						"adding a default route to %s\n", nif->ifname);
+						    "adding a default route to %s\n", nif->ifname);
 					}
 					
 					npt->nemo_if = nif;
