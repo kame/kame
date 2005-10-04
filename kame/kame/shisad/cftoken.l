@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.7 2005/09/30 12:01:55 keiichi Exp $	*/
+/*	$KAME: cftoken.l,v 1.8 2005/10/04 07:36:57 keiichi Exp $	*/
 
 %{
 /*
@@ -66,6 +66,7 @@ mipifname	mip[0-9]+
 %s S_INTERFACE
 %s S_PREFIXTABLE
 %s S_STATICTUNNEL
+%s S_IPV4DUMMYTUNNEL
 
 %%
 %{
@@ -130,6 +131,17 @@ mipifname	mip[0-9]+
 	return (ADDRSTRING);
 }
 <S_STATICTUNNEL>{ecl} { D; BEGIN S_CONFIG; return (ECL); }
+<S_CONFIG>ipv4-dummy-tunnel {
+	D;
+	BEGIN S_IPV4DUMMYTUNNEL;
+	return (IPV4DUMMYTUNNEL);
+}
+<S_IPV4DUMMYTUNNEL>{addrstring} {
+	D;
+	yylval.string = strdup(yytext);
+	return (ADDRSTRING);
+}
+<S_IPV4DUMMYTUNNEL>{ecl} { D; BEGIN S_CONFIG; return (ECL); }
 
 	/* misc */
 {ws} { ; }

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.3 2005/05/25 01:49:23 keiichi Exp $	*/
+/*	$KAME: config.c,v 1.4 2005/10/04 07:36:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -129,4 +129,12 @@ config_get_static_tunnel(ret, cfe_head)
 	struct config_entry *cfe_head;
 {
 	return (config_get_list(CFT_STATICTUNNELLIST, ret, cfe_head));
+}
+
+int
+config_get_ipv4_dummy_tunnel(ret, cfe_head)
+	struct config_entry **ret;
+	struct config_entry *cfe_head;
+{
+	return (config_get_list(CFT_IPV4DUMMYTUNNELLIST, ret, cfe_head));
 }

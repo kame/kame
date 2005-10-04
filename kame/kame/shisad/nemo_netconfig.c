@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.18 2005/10/04 02:38:48 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.19 2005/10/04 07:36:57 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -71,6 +71,10 @@ struct nemo_if {
 	char ifname[IFNAMSIZ];
 	struct in6_addr hoa;
 	struct in6_addr coa;
+#ifdef MIP_IPV4MNPSUPPORT
+	struct in_addr ipv4_local_address;
+	struct in_addr ipv4_remote_address;
+#endif /* MIP_IPV4MNPSUPPORT */
 	u_int16_t bid;
 };
 LIST_HEAD(nemo_if_head, nemo_if) nemo_ifhead;
@@ -108,6 +112,9 @@ static struct nemo_if *nemo_setup_forwarding (struct sockaddr *, struct sockaddr
 					      struct in6_addr *, u_int16_t);
 static struct nemo_if *nemo_destroy_forwarding(struct in6_addr *, u_int16_t);
 static void nemo_dump();
+#ifdef MIP_IPV4MNPSUPPORT
+static int parse_ipv4_dummy_tunnel(void);
+#endif /* MIP_IPV4MNPSUPPORT */
 
 static struct sockaddr_in6 sin6_default = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
@@ -295,6 +302,15 @@ main (argc, argv)
 	/* statically tunnel mode setting */
 	if (staticmode)
 		set_static_tun();
+
+#ifdef MIP_IPV4MNPSUPPORT
+	/* set dummy IPv4 addresses on each nemo interface. */
+	if (ipv4mnpsupport
+	    && (parse_ipv4_dummy_tunnel() != 0)) {
+		syslog(LOG_ERR, "failed to assign dummy IPv4 addresses.\n");
+		exit(0);
+	}
+#endif /* MIP_IPV4MNPSUPPORT */
 
 	signal(SIGTERM, nemo_terminate);
 	signal(SIGHUP, nemo_terminate);
@@ -504,6 +520,39 @@ set_static_tun()
 	return; 
 }
 
+#ifdef MIP_IPV4MNPSUPPORT
+static int
+parse_ipv4_dummy_tunnel()
+{
+	struct config_entry *cfe;
+	struct config_ipv4_dummy_tunnel *cfdt;
+	struct nemo_if *nif;
+
+	if (config_get_ipv4_dummy_tunnel(&cfe, config_params) != 0) {
+		syslog(LOG_ERR,
+		    "specify IPv4 dummy tunnel information "
+		    "in the general section.\n");
+		exit (-1);
+	}
+
+	for (; cfe != NULL; cfe = cfe->cfe_next) {
+		cfdt = (struct config_ipv4_dummy_tunnel *)cfe->cfe_ptr;
+
+		nif = find_nemo_if_from_name(cfdt->cfdt_ifname);
+		if (nif == NULL) {
+			syslog(LOG_ERR, "%s is not available\n",
+			    cfdt->cfdt_ifname);
+			exit(-1);
+		}
+		memcpy(&nif->ipv4_local_address, &cfdt->cfdt_local_address,
+		    sizeof(struct in_addr));
+		memcpy(&nif->ipv4_remote_address, &cfdt->cfdt_remote_address,
+		    sizeof(struct in_addr));
+	}
+
+	return (0);
+}
+#endif /* MIP_IPV4MNPSUPPORT */
 
 
 

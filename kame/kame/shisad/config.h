@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.6 2005/09/30 12:01:55 keiichi Exp $	*/
+/*	$KAME: config.h,v 1.7 2005/10/04 07:36:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.
@@ -44,7 +44,8 @@ enum {
 	CFT_KEYMANAGEMENT,
 	CFT_IPV4MNPSUPPORT,
 	CFT_PREFIXTABLELIST, CFT_PREFIXTABLE,
-	CFT_STATICTUNNELLIST, CFT_STATICTUNNEL
+	CFT_STATICTUNNELLIST, CFT_STATICTUNNEL,
+	CFT_IPV4DUMMYTUNNELLIST, CFT_IPV4DUMMYTUNNEL
 };
 
 enum {
@@ -74,6 +75,12 @@ struct config_static_tunnel {
 	int cfst_binding_id;
 };
 
+struct config_ipv4_dummy_tunnel {
+	char *cfdt_ifname;
+	struct in_addr cfdt_local_address;
+	struct in_addr cfdt_remote_address;
+};
+
 extern struct config_entry *config_params;
 
 extern int parse(int, const char *, struct config_entry **);
@@ -86,5 +93,7 @@ int config_get_interface(const char *, struct config_entry **,
     struct config_entry *);
 int config_get_prefixtable(struct config_entry **, struct config_entry *);
 int config_get_static_tunnel(struct config_entry **, struct config_entry *);
+int config_get_ipv4_dummy_tunnel(struct config_entry **,
+    struct config_entry *);
 
 #endif /* _SHISAD_CONFIG_H_ */

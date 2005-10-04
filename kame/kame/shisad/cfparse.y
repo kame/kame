@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.7 2005/09/30 12:01:55 keiichi Exp $	*/
+/*	$KAME: cfparse.y,v 1.8 2005/10/04 07:36:57 keiichi Exp $	*/
 
 %{
 /*
@@ -91,6 +91,8 @@ static void free_cfe(struct config_entry *);
 %type <cfe> prefixtable_statements prefixtable_statement
 %type <cfe> statictunnel_config
 %type <cfe> statictunnel_statements statictunnel_statement
+%type <cfe> ipv4dummytunnel_config
+%type <cfe> ipv4dummytunnel_statements ipv4dummytunnel_statement
 
 %%
 
@@ -479,6 +481,82 @@ statictunnel_statement:
 				return (-1);
 			}				
 			cfe->cfe_ptr = cfst;
+
+			$$ = cfe;
+		}
+	;
+
+ipv4dummytunnel_config:
+		IPV4DUMMYTUNNEL BCL ipv4dummytunnel_statements ECL EOS
+		{
+			struct config_entry *cfe;
+
+			if (config_mode == CFM_CND ||
+			    config_mode == CFM_MND) {
+				printf("not supported\n");
+				return (-1);
+			}
+
+			cfe = alloc_cfe(CFT_IPV4DUMMYTUNNELLIST);
+			if (cfe == NULL) {
+				free_cfe_list($3);
+				return (-1);
+			}
+			cfe->cfe_list = $3;
+
+			$$ = cfe;
+		}
+	;
+
+ipv4dummytunnel_statements:
+		{ $$ = NULL; }
+	|	ipv4dummytunnel_statements ipv4dummytunnel_statement
+		{
+			struct config_entry *cfe_head;
+
+			cfe_head = $1;
+			if (cfe_head == NULL) {
+				$2->cfe_next = NULL;
+				$2->cfe_tail = $2;
+				cfe_head = $2;
+			} else {
+				cfe_head->cfe_tail->cfe_next = $2;
+				cfe_head->cfe_tail = $2->cfe_tail;
+			}
+
+			$$ = cfe_head;
+		}
+	;
+
+ipv4dummytunnel_statement:
+		IFNAME ADDRSTRING ADDRSTRING EOS
+		{
+			struct config_entry *cfe;
+			struct config_ipv4_dummy_tunnel *cfdt;
+
+			cfdt = (struct config_ipv4_dummy_tunnel *)
+			    malloc(sizeof(struct config_ipv4_dummy_tunnel));
+			if (cfdt == NULL)
+				return (-1);
+
+			cfdt->cfdt_ifname = $1;
+			if (inet_pton(AF_INET, $2,
+				&cfdt->cfdt_local_address) <= 0) {
+				free(cfdt);
+				return (-1);
+			}
+			if (inet_pton(AF_INET, $3,
+				&cfdt->cfdt_remote_address) <= 0) {
+				free(cfdt);
+				return (-1);
+			}
+
+			cfe = alloc_cfe(CFT_STATICTUNNEL);
+			if (cfe == NULL) {
+				free(cfdt);
+				return (-1);
+			}				
+			cfe->cfe_ptr = cfdt;
 
 			$$ = cfe;
 		}
