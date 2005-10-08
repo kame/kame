@@ -206,7 +206,7 @@ struct protosw inetsw[] = {
 },
 #endif /* SCTP */
 #ifdef DCCP
-{ SOCK_DGRAM,	&inetdomain,	IPPROTO_DCCP,
+{ SOCK_CONN_DGRAM,	&inetdomain,	IPPROTO_DCCP,
 	PR_CONNREQUIRED|PR_WANTRCVD|PR_ATOMIC|PR_LISTEN|PR_ABRTACPTDIS,
   dccp_input,	0,		dccp_ctlinput,	dccp_ctloutput,
   dccp_usrreq,

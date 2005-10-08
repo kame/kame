@@ -1307,6 +1307,7 @@ file	net80211/ieee80211_rssadapt.c	wlan
 file	netinet/dccp_cc_sw.c		dccp & inet
 file	netinet/dccp_tcplike.c		dccp & inet
 file	netinet/dccp_usrreq.c		dccp & inet
+file	netinet/dccp_tfrc.c		dccp & inet
 file	netinet/if_arp.c		arp | netatalk		needs-flag
 file	netinet/if_atm.c		atm
 file	netinet/in_gif.c		gif & inet
