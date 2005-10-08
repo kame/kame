@@ -1,3 +1,0 @@
-ff05::dead from 3ffe::1@gif0 to ne0 gif1;
-ff05::beef from 3ffe::2@reg0 to dummy0 gif2;
-232.0.0.1 from 192.168.0.1@fxp0 to fwe0;

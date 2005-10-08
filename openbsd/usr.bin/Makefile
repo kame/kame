@@ -2,6 +2,6 @@
 
 SUBDIR+=vmstat systat
 #SUBDIR+=netstat 
-SUBDIR+=mchat mcastread mcastsend
+#SUBDIR+=mchat mcastread mcastsend
 
 .include <bsd.subdir.mk>

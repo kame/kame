@@ -1,5 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2803 2005/09/20 05:17:19 keiichi Exp $
+$KAME: CHANGELOG,v 1.2804 2005/10/08 03:03:18 suz Exp $
+
+<200510>
+2005-10-08  SUZUKI, Shinsuke <suz@alaxala.net>
+	* removed the following multicast-related programs, since they are 
+	  now maintained/developed/released in mcast-tools project.
+		pim6sd (including mtrace6) pim6dd mfc mcastsend mcastread pmsft
 
 <200509>
 Tue Sep 20 14:09:07 JST 2005	keiichi@iijlab.net

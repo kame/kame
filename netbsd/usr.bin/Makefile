@@ -4,7 +4,7 @@
 SUBDIR+=telnet
 SUBDIR+=netstat vmstat systat
 
-SUBDIR+=mcastread mcastsend mchat
+#SUBDIR+=mcastread mcastsend mchat
 SUBDIR+=altqstat
 
 .include <bsd.subdir.mk>
