@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.156 2005/08/24 04:14:37 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.157 2005/10/11 04:28:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,9 +148,10 @@ ip6_forward(m, srcrt)
 #ifdef MIP6 
 	struct mip6_bc_internal *bce;
 #endif
-#ifndef __FreeBSD__
-	/* XXX: tine_second is defined in pfvar.h. */
-	/* long time_second = mono_time.tv_sec; */
+#ifdef __FreeBSD__
+	struct timeval time;
+
+	microtime(&time);
 #endif
 
 #ifdef IPSEC
@@ -201,8 +202,8 @@ ip6_forward(m, srcrt)
 	    IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 		ip6stat.ip6s_cantforward++;
 		/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard) */
-		if (ip6_log_time + ip6_log_interval < time_second) {
-			ip6_log_time = time_second;
+		if (ip6_log_time + ip6_log_interval < time.tv_sec) {
+			ip6_log_time = time.tv_sec;
 			log(LOG_DEBUG,
 			    "cannot forward "
 			    "from %s to %s nxt %d received on %s\n",
@@ -546,8 +547,8 @@ ip6_forward(m, srcrt)
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard);
 
-		if (ip6_log_time + ip6_log_interval < time_second) {
-			ip6_log_time = time_second;
+		if (ip6_log_time + ip6_log_interval < time.tv_sec) {
+			ip6_log_time = time.tv_sec;
 			log(LOG_DEBUG,
 			    "cannot forward "
 			    "src %s, dst %s, nxt %d, rcvif %s, outif %s\n",
