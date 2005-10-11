@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.8 2005/10/04 07:36:57 keiichi Exp $	*/
+/*	$KAME: cfparse.y,v 1.9 2005/10/11 10:04:46 keiichi Exp $	*/
 
 %{
 /*
@@ -65,9 +65,10 @@ static void free_cfe(struct config_entry *);
 %token HOMEREGISTRATIONLIFETIME
 %token PREFERENCE
 %token KEYMANAGEMENT
-%token IPV4MNPSUPPORT
 %token PREFIXTABLE EXPLICIT IMPLICIT
 %token STATICTUNNEL
+%token IPV4MNPSUPPORT
+%token IPV4DUMMYTUNNEL
 
 %union {
 	int number;
@@ -131,9 +132,10 @@ statement:
 	|	homeregistrationlifetime_statement
 	|	preference_statement
 	|	keymanagement_statement
-	|	ipv4mnpsupport_statement
 	|	prefixtable_config
 	|	statictunnel_config
+	|	ipv4mnpsupport_statement
+	|	ipv4dummytunnel_config
 	;
 
 debug_statement:
@@ -541,17 +543,17 @@ ipv4dummytunnel_statement:
 
 			cfdt->cfdt_ifname = $1;
 			if (inet_pton(AF_INET, $2,
-				&cfdt->cfdt_local_address) <= 0) {
+				&cfdt->cfdt_mr_address) <= 0) {
 				free(cfdt);
 				return (-1);
 			}
 			if (inet_pton(AF_INET, $3,
-				&cfdt->cfdt_remote_address) <= 0) {
+				&cfdt->cfdt_ha_address) <= 0) {
 				free(cfdt);
 				return (-1);
 			}
 
-			cfe = alloc_cfe(CFT_STATICTUNNEL);
+			cfe = alloc_cfe(CFT_IPV4DUMMYTUNNEL);
 			if (cfe == NULL) {
 				free(cfdt);
 				return (-1);

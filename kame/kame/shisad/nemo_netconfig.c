@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.19 2005/10/04 07:36:57 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.20 2005/10/11 10:04:46 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -72,8 +72,8 @@ struct nemo_if {
 	struct in6_addr hoa;
 	struct in6_addr coa;
 #ifdef MIP_IPV4MNPSUPPORT
-	struct in_addr ipv4_local_address;
-	struct in_addr ipv4_remote_address;
+	struct in_addr ipv4_mr_dummy_addr;
+	struct in_addr ipv4_ha_dummy_addr;
 #endif /* MIP_IPV4MNPSUPPORT */
 	u_int16_t bid;
 };
@@ -544,9 +544,9 @@ parse_ipv4_dummy_tunnel()
 			    cfdt->cfdt_ifname);
 			exit(-1);
 		}
-		memcpy(&nif->ipv4_local_address, &cfdt->cfdt_local_address,
+		memcpy(&nif->ipv4_mr_dummy_addr, &cfdt->cfdt_mr_address,
 		    sizeof(struct in_addr));
-		memcpy(&nif->ipv4_remote_address, &cfdt->cfdt_remote_address,
+		memcpy(&nif->ipv4_ha_dummy_addr, &cfdt->cfdt_ha_address,
 		    sizeof(struct in_addr));
 	}
 
@@ -897,6 +897,11 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 	u_int16_t bid;
 {
 	struct nemo_if *nif = NULL;
+#ifdef MIP_IPV4MNPSUPPORT
+	int s;
+	struct sockaddr_in sin;
+	struct ifaliasreq ifra;
+#endif /* MIP_IPV4MNPSUPPORT */
 
 	nif = find_nemo_if(hoa, bid);
 	if (nif == NULL) {
@@ -923,6 +928,42 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 
 	/* tunnel disable (just for safety) */
 	nemo_tun_del(nif->ifname);
+
+#ifdef MIP_IPV4MNPSUPPORT
+	if (ipv4mnpsupport ) {
+		memset(&sin, 0, sizeof(struct sockaddr_in));
+		sin.sin_len = sizeof(struct sockaddr_in);
+		sin.sin_family = AF_INET;
+
+		memset(&ifra, 0, sizeof(ifra));
+		strlcpy(ifra.ifra_name, nif->ifname, IFNAMSIZ);
+		if (mode == MODE_MR)
+			sin.sin_addr = nif->ipv4_mr_dummy_addr;
+		else
+			sin.sin_addr = nif->ipv4_ha_dummy_addr;
+		memcpy(&ifra.ifra_addr, &sin, sizeof(struct sockaddr_in));
+		if (mode == MODE_MR)
+			sin.sin_addr = nif->ipv4_ha_dummy_addr;
+		else
+			sin.sin_addr = nif->ipv4_mr_dummy_addr;
+		memcpy(&ifra.ifra_broadaddr, &sin, sizeof(struct sockaddr_in));
+		sin.sin_addr.s_addr = INADDR_BROADCAST;
+		memcpy(&ifra.ifra_mask, &sin, sizeof(struct sockaddr_in));
+
+		s = socket(AF_INET, SOCK_DGRAM, 0);
+		if (s == -1) {
+			syslog(LOG_ERR, "nemo_setup_forwarding: "
+			    "failed to create a socket.\n");
+		} else {
+			if (ioctl(s, SIOCAIFADDR, &ifra) == -1) {
+				syslog(LOG_ERR, "nemo_setup_forwarding: "
+				    "failed to set dummy IPv4 addresses "
+				    "on %s\n", nif->ifname);
+			}
+			close(s);
+		}
+	}
+#endif /* MIP_IPV4MNPSUPPORT */
 
 	if (mode == MODE_HA) {
 		/* tunnel activate */

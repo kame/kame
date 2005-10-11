@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.8 2005/10/04 07:36:57 keiichi Exp $	*/
+/*	$KAME: cftoken.l,v 1.9 2005/10/11 10:04:46 keiichi Exp $	*/
 
 %{
 /*
@@ -135,6 +135,11 @@ mipifname	mip[0-9]+
 	D;
 	BEGIN S_IPV4DUMMYTUNNEL;
 	return (IPV4DUMMYTUNNEL);
+}
+<S_IPV4DUMMYTUNNEL>{ifname} {
+	D;
+	yylval.string = strdup(yytext);
+	return (IFNAME);
 }
 <S_IPV4DUMMYTUNNEL>{addrstring} {
 	D;

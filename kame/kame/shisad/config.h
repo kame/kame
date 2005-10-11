@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.7 2005/10/04 07:36:57 keiichi Exp $	*/
+/*	$KAME: config.h,v 1.8 2005/10/11 10:04:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.
@@ -77,8 +77,8 @@ struct config_static_tunnel {
 
 struct config_ipv4_dummy_tunnel {
 	char *cfdt_ifname;
-	struct in_addr cfdt_local_address;
-	struct in_addr cfdt_remote_address;
+	struct in_addr cfdt_mr_address;
+	struct in_addr cfdt_ha_address;
 };
 
 extern struct config_entry *config_params;
