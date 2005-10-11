@@ -1,4 +1,4 @@
-/*      $KAME: mdd_rtsock.c,v 1.2 2005/04/14 06:22:36 suz Exp $  */
+/*      $KAME: mdd_rtsock.c,v 1.3 2005/10/11 15:24:23 mitsuya Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -136,6 +136,22 @@ is_in_ifl(index, ifl_headp)
 }
 
 int
+get_preference_in_ifl(index, ifl_headp)
+	int index;
+	struct cifl *ifl_headp;
+{
+	struct cif *cifp;
+
+	LIST_FOREACH(cifp, ifl_headp, cif_entries) {
+		if (if_nametoindex(cifp->cif_name) == index)
+			return (cifp->preference);
+	}
+
+	return (0);
+}
+
+
+int
 get_addr_with_ifl(coacl_headp, ifl_headp)
 	struct coacl *coacl_headp;
 	struct cifl *ifl_headp;
@@ -194,6 +210,8 @@ get_addr_with_ifl(coacl_headp, ifl_headp)
 
 			cp = malloc(sizeof(struct coac));
 			memcpy(&cp->coa, sin6, sizeof(cp->coa));
+			cp->preference = get_preference_in_ifl(ifm->ifm_index,
+								ifl_headp);
 			LIST_INSERT_HEAD(coacl_headp, cp, coac_entries);
 		}
 	}

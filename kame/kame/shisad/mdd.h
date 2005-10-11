@@ -1,4 +1,4 @@
-/*      $KAME: mdd.h,v 1.2 2005/02/18 05:57:44 t-momose Exp $  */
+/*      $KAME: mdd.h,v 1.3 2005/10/11 15:24:23 mitsuya Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -54,11 +54,13 @@ struct cif {
 	LIST_ENTRY(cif)		cif_entries;
 	char *			cif_name;
 	int                     cif_linkstatus;
+	int			preference;
 };
 
 struct coac {
 	LIST_ENTRY(coac)	coac_entries;
 	struct sockaddr_in6	coa;
+	int			preference;
 };
 
 LIST_HEAD(bl, binding);
@@ -70,7 +72,7 @@ struct binding *set_hoa(struct in6_addr *, int);
 struct binding *set_hoa_str(char *);
 void get_hoalist(void);
 int _get_hoalist(void);
-void set_coaif(char *);
+void set_coaif(char *, int);
 void get_coaiflist(void);
 void get_coacandidate(void);
 void set_coa(void);
@@ -79,6 +81,7 @@ void print_coaiflist(FILE *);
 void mainloop(void);
 void sync_binding(void);
 int get_addr_with_ifl(struct coacl *, struct cifl *);
+int get_preference_in_ifl(int, struct cifl *);
 int in6_addrscope(struct in6_addr *);
 int chbinding(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int16_t);
 int returntohome(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
