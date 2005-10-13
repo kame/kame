@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $KAME: prepare.pl,v 1.14 2000/07/26 08:11:33 itojun Exp $
+# $KAME: prepare.pl,v 1.15 2005/10/13 02:45:17 t-momose Exp $
 #
 
 $debug = 1;
@@ -72,12 +72,15 @@ sub dig {
 
 		if ($rename{$i}) {
 			$j = $rename{$i};
+			for ($pos = 0; ($pos = index($j, "/", $pos)) != -1; $pos++) {
+				$src = "../" . $src;
+			}
 		} else {
 			$j = $i;
 		}
 
 		if (-d "$curdir/$i" && !$linkdir{$i}) {
-			&dig("$curdir/$i", "../$src/$i", "$dst/$i");
+			&dig("$curdir/$i", "../$src/$i", "$dst/$j");
 		} else {
 			if (! -d "$dst") {
 				print "mkdir -p $dst\n" if $debug;
