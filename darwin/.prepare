@@ -1,3 +1,2 @@
-exclude sys
 linkdir kame
 rename sys xnu/bsd
