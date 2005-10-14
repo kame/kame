@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.27 2005/04/14 06:22:35 suz Exp $	*/
+/*	$KAME: fsm.c,v 1.28 2005/10/14 07:27:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1442,7 +1442,7 @@ bul_reg_fsm(bul, event, data)
 			bul->bul_state |= MIP6_BUL_STATE_DISABLE;
 
 			/* update binding update information in a kernel. */
-			if (mipsock_bul_request(bul, MIPM_BUL_ADD)) {
+			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "updating a binding update entry "
 				    "in a kernel failed.\n");
