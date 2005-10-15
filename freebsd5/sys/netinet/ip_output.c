@@ -2644,7 +2644,6 @@ ip_getmopt_ifargs(sopt, ifp, ia_grp, ia_ifa)
 	struct sockaddr_in *dst;
 	int error = 0;
 	int optname = sopt->sopt_name;
-	int s;
 
 	switch (optname) {
 	case IP_ADD_MEMBERSHIP:
@@ -2652,7 +2651,6 @@ ip_getmopt_ifargs(sopt, ifp, ia_grp, ia_ifa)
 	case IP_ADD_SOURCE_MEMBERSHIP:
 	case IP_BLOCK_SOURCE:
 #endif
-		s = splimp();
 		/*
 		 * If no interface address was provided, use the interface of
 		 * the route to the given multicast address.
@@ -2667,7 +2665,6 @@ ip_getmopt_ifargs(sopt, ifp, ia_grp, ia_ifa)
 			rtalloc_ign(&ro, RTF_CLONING);
 			if (ro.ro_rt == NULL) {
 				error = EADDRNOTAVAIL;
-				splx(s);
 				return error;
 			}
 			*ifp = ro.ro_rt->rt_ifp;
