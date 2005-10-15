@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2805 2005/10/15 07:22:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.2806 2005/10/15 07:47:10 jinmei Exp $
 
 <200510>
 2005-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* raw_ip6.c (rip6_attach): caught failure of MALLOC for
-	icmp6_filter.  The old could dereference to a NULL pointer in the
-	failure case.
+	icmp6_filter.  The old code could dereference to a NULL pointer in
+	the failure case.
 
 2005-10-08  SUZUKI, Shinsuke <suz@alaxala.net>
 	* removed the following multicast-related programs, since they are 
