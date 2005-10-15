@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.46 2005/07/27 11:00:02 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.47 2005/10/15 08:22:40 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3508,7 +3508,6 @@ in6_joingroup(ifp, addr, errorp, delay)
 	imm->i6mm_msf->msf_grpjoin++;
 	if (*errorp != 0) {
 		IMO_MSF_FREE(imm->i6mm_msf);
-		LIST_REMOVE(imm, i6mm_chain);
 		FREE(imm, M_IPMADDR);
 		return NULL;
 	}
