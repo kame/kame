@@ -25,7 +25,8 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.44 2005/09/16 11:30:13 suz Exp $
+# $Id: Makefile.in,v 1.45 2005/10/16 16:25:38 suz Exp $
+# $KAME: Makefile.in,v 1.45 2005/10/16 16:25:38 suz Exp $
 #
 
 prefix=	@prefix@
