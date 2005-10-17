@@ -236,12 +236,17 @@ static const int minsize[] = {
 	0,				/* SADB_X_EXT_KMPRIVATE */
 	sizeof(struct sadb_x_policy),	/* SADB_X_EXT_POLICY */
 	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
 	sizeof(struct sadb_x_tag),	/* SADB_X_TAG */
 	0 /*sizeof(struct sadb_x_sa3)*/, /* SADB_X_SA3 */
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-#ifdef SADB_X_EXT_PACKET
 	sizeof(struct sadb_x_packet),	/* SADB_X_EXT_PACKET */
-#endif
+#else
+	0,
 #endif
 };
 static const int maxsize[] = {
@@ -265,12 +270,17 @@ static const int maxsize[] = {
 	0,				/* SADB_X_EXT_KMPRIVATE */
 	0,				/* SADB_X_EXT_POLICY */
 	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
+	0,				/* (used by NetBSD extension) */
 	sizeof(struct sadb_x_tag),	/* SADB_X_TAG */
 	0 /*sizeof(struct sadb_x_sa3)*/, /* SADB_X_SA3 */
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-#ifdef SADB_X_EXT_PACKET
 	0,				/* SADB_X_EXT_PACKET */
-#endif
+#else
+	0,
 #endif
 };
 
@@ -6506,7 +6516,6 @@ key_acquire(saidx, sp)
 #endif
 
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-#ifdef SADB_X_EXT_PACKET
 	/*
 	 * add the triggering packet.
 	 */
@@ -6536,8 +6545,7 @@ key_acquire(saidx, sp)
 
 		m_cat(result, m);
 	}
-#endif
-#endif
+#endif /* PFKEYV2_SADB_X_EXT_PACKET */
 
 	if ((result->m_flags & M_PKTHDR) == 0) {
 		error = EINVAL;
@@ -7529,9 +7537,13 @@ static int (*key_typesw[]) __P((struct socket *, struct mbuf *,
 	key_spddelete2,	/* SADB_X_SPDDELETE2 */
 #ifdef SADB_X_NAT_T_NEW_MAPPING
 	NULL,		/* SADB_X_NAT_T_NEW_MAPPING */
+#else
+	NULL,
 #endif
 #ifdef SADB_X_MIGRATE
 	/*TODO */ NULL,	/* SADB_X_MIGRATE */
+#else
+	NULL,
 #endif
 };
 
@@ -7892,9 +7904,7 @@ key_align(m, mhp)
 		case SADB_X_EXT_SA2:
 		case SADB_X_EXT_TAG:
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-#ifdef SADB_X_EXT_PACKET
 		case SADB_X_EXT_PACKET:
-#endif
 #endif
 			/* duplicate check */
 			/*

@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.43 2005/09/22 09:46:33 keiichi Exp $	*/
+/*	$KAME: key_debug.c,v 1.44 2005/10/17 06:29:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,9 +84,7 @@ static void kdebug_sadb_x_sa2 __P((struct sadb_ext *));
 static void kdebug_sadb_x_tag __P((struct sadb_ext *));
 #endif
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-#ifdef SADB_X_EXT_PACKET
 static void kdebug_sadb_x_packet __P((struct sadb_ext *));
-#endif
 #endif
 
 #ifdef _KERNEL
@@ -281,11 +279,9 @@ kdebug_sadb(base)
 			break;
 #endif
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-#ifdef SADB_X_EXT_PACKET
 		case SADB_X_EXT_PACKET:
 			kdebug_sadb_x_packet(ext);
 			break;
-#endif
 #endif
 		default:
 			printf("kdebug_sadb: invalid ext_type %u was passed.\n",
@@ -545,7 +541,6 @@ kdebug_sadb_x_tag(ext)
 #endif
 
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-#ifdef SADB_X_EXT_PACKET
 static void
 kdebug_sadb_x_packet(ext)
 	struct sadb_ext *ext;
@@ -563,8 +558,7 @@ kdebug_sadb_x_packet(ext)
 	printf(" }\n");
 	return;
 }
-#endif
-#endif
+#endif /* PFKEYV2_SADB_X_EXT_PACKET */
 
 void
 kdebug_sadb_x_policy(ext)
