@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.29 2005/04/01 06:04:37 suz Exp $	*/
+/*	$KAME: rtadvd.h,v 1.30 2005/10/17 14:40:02 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -124,11 +124,6 @@ struct	rainfo {
 	struct sockaddr_dl *sdl;
 	char	ifname[16];
 	int	phymtu;		/* mtu of the physical interface */
-
-	/* original values of Host variables in kernel */
-	u_int	orig_chlim;		/* CurHopLimit */
-	u_int	orig_retrans;		/* RetransTimer (msec) */
-	u_int	orig_basereachable;	/* BaseReachable (msec) */
 
 	/* Router configuration variables */
 	u_short lifetime;	/* AdvDefaultLifetime */

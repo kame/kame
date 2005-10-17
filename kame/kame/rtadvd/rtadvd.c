@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.91 2005/04/01 07:48:39 suz Exp $	*/
+/*	$KAME: rtadvd.c,v 1.92 2005/10/17 14:40:02 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -437,37 +437,6 @@ die()
 			ra_output(ra);
 		sleep(MIN_DELAY_BETWEEN_RAS);
 	}
-#ifdef SIOCSIFINFO_IN6
-	{
-		int s;
-
-		if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-			syslog(LOG_ERR, "<%s> socket: %s", __func__,
-			       strerror(errno));
-			exit(1);
-		}
-
-		/* 
-		 * reinitialize the RA-relates host variables to the
-		 * default value of the kernel.
-		 */
-		for (ra = ralist; ra; ra = ra->next) {
-			struct in6_ndireq ndi;
-
-			memset(&ndi, 0, sizeof(ndi));
-			strncpy(ndi.ifname, ra->ifname, IFNAMSIZ);
-			ndi.ndi.chlim = ra->orig_chlim;
-			ndi.ndi.retrans = ra->orig_retrans;
-			ndi.ndi.basereachable = ra->orig_basereachable;
-			if (ioctl(s, SIOCSIFINFO_IN6, (caddr_t)&ndi) < 0) {
-				syslog(LOG_INFO,
-				     "<%s> ioctl:SIOCSIFINFO_IN6 at %s: %s",
-				     __func__, ra->ifname, strerror(errno));
-			}
-		}
-		close(s);
-	}
-#endif
 	exit(0);
 	/*NOTREACHED*/
 }

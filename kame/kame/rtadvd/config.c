@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.92 2005/04/14 06:22:35 suz Exp $	*/
+/*	$KAME: config.c,v 1.93 2005/10/17 14:40:02 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -520,11 +520,6 @@ getconfig(intface)
 			syslog(LOG_INFO, "<%s> ioctl:SIOCGIFINFO_IN6 at %s: %s",
 			     __func__, intface, strerror(errno));
 		}
-
-		/* to recover the value when rtadvd dies */
-		tmp->orig_chlim = ndi.ndi.chlim;
-		tmp->orig_retrans = ndi.ndi.retrans;
-		tmp->orig_basereachable = ndi.ndi.basereachable;
 
 		/* reflect the RA info to the host variables in kernel */
 		ndi.ndi.chlim = tmp->hoplimit;

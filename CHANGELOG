@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2807 2005/10/15 08:22:39 suz Exp $
+$KAME: CHANGELOG,v 1.2808 2005/10/17 14:40:02 suz Exp $
 
 <200510>
+2005-10-17  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/kame/rtadvd/config.c, rtadvd.[ch]: not reinitialize
+	the host-variables in kernel to the ones at the start-up time,
+	since RA is a stateless autoconfiguration protocol.
+	Suggested by: Hideaki YOSHIFUJI
+
 2005-10-15  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet6/mldv2.c: fixed a MLDv2-kernel crash when 
 	  an inappropriate address is given to IPV6_JOIN_GROUP API
@@ -330,7 +336,7 @@ Thu Apr 28 16:12:38 JST 2005 sakane@tanu.org
 	(To prevent a DoS attack using 2005-01-21's change)
 
 2005-04-01  SUZUKI, Shinsuke <suz@kame.net>
-	* kame/kame/rtadvd/configc, rtadvd.[ch]: reflect router-variables
+	* kame/kame/rtadvd/config.c, rtadvd.[ch]: reflect router-variables
 	in RA configuration into host-variables in kernel.
 
 <200503>
