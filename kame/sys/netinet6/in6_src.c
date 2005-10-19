@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.158 2005/07/23 08:09:07 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.159 2005/10/19 01:40:32 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -928,7 +928,7 @@ in6_pcbsetport(laddr, in6p, p)
 	struct socket *so = in6p->in6p_socket;
 	struct inpcbtable *table = in6p->in6p_table;
 	int cnt;
-	u_int16_t min, max;
+	u_int16_t minport, maxport;
 	u_int16_t lport, *lastport;
 	int wild = 0;
 	void *t;
@@ -944,27 +944,27 @@ in6_pcbsetport(laddr, in6p, p)
 		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
 			return (EACCES);
 #endif
-		min = ip6_lowportmin;
-		max = ip6_lowportmax;
+		minport = ip6_lowportmin;
+		maxport = ip6_lowportmax;
 		lastport = &table->inpt_lastlow;
 	} else {
-		min = ip6_anonportmin;
-		max = ip6_anonportmax;
+		minport = ip6_anonportmin;
+		maxport = ip6_anonportmax;
 		lastport = &table->inpt_lastport;
 	}
 
-	if (min > max) {	/* sanity check */
+	if (minport > maxport) {	/* sanity check */
 		u_int16_t swp;
 		
-		swp = min;
-		min = max;
-		max = swp;
+		swp = minport;
+		minport = maxport;
+		maxport = swp;
 	}
 
 	lport = *lastport - 1;
-	for (cnt = max - min + 1; cnt; cnt--, lport--) {
-		if (lport < min || lport > max)
-			lport = max;
+	for (cnt = maxport - minport + 1; cnt; cnt--, lport--) {
+		if (lport < minport || lport > maxport)
+			lport = maxport;
 #ifdef INET
 		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
 			t = in_pcblookup_port(table,
