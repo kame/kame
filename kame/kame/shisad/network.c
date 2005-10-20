@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.8 2005/10/04 02:39:40 keiichi Exp $  */
+/*      $KAME: network.c,v 1.9 2005/10/20 08:06:03 kei Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -648,10 +648,9 @@ nemo_ar_get(coa, ret6)
 	struct in6_addr *coa;
 	struct sockaddr_in6 *ret6;
 {
-	int s;
 	struct in6_ifreq dstaddrreq;
 	struct sockaddr_in6 sa6_coa;
-#ifdef ICMPV6CTL_ND6_PRLIST
+#if defined(ICMPV6CTL_ND6_PRLIST) && !defined(__NetBSD__)
 	int mib[] = { CTL_NET, PF_INET6, IPPROTO_ICMPV6, ICMPV6CTL_ND6_PRLIST };
 	char *buf;
 	struct in6_prefix *p, *ep, *n;
@@ -735,7 +734,6 @@ nemo_ar_get(coa, ret6)
 	int s, i;
 	struct timeval time;
 	u_int16_t ifindex;
-	struct sockaddr_in6 sin6;
 
 	ifindex = get_ifindex_from_address(coa);
 	if (ifindex == 0)
@@ -757,13 +755,11 @@ nemo_ar_get(coa, ret6)
 #define PR pr.prefix[i]
 	for (i = 0; PR.if_index && i < PRLSTSIZ ; i++) {
 		struct sockaddr_in6 p6;
-		char namebuf[NI_MAXHOST];
-		int niflags;
 
 		if (ifindex != PR.if_index)
 			continue;
 
-#ifdef NDPRF_ONLINK
+#if defined(NDPRF_ONLINK) && !defined(__NetBSD__)
 		p6 = PR.prefix;
 #else
 		memset(&p6, 0, sizeof(p6));
@@ -807,23 +803,34 @@ nemo_ar_get(coa, ret6)
 				nbi = getnbrinfo(&PR.advrtr[j],
 				    PR.if_index, 0);
 				if (nbi) {
+#if 0
 					switch (nbi->state) {
 					case ND6_LLINFO_REACHABLE:
 					case ND6_LLINFO_STALE:
 					case ND6_LLINFO_DELAY:
 					case ND6_LLINFO_PROBE:
-						memset(&sin6, 0, sizeof(sin6));
-						sin6.sin6_family = AF_INET6;
-						sin6.sin6_len = sizeof(sin6);
-						sin6.sin6_addr = PR.advrtr[j];
-						sin6.sin6_scope_id = PR.if_index;
+						memset(ret6, 0, sizeof(*ret6));
+						ret6->sin6_family = AF_INET6;
+						ret6->sin6_len = sizeof(*ret6);
+						ret6->sin6_addr = PR.advrtr[j];
+						ret6->sin6_scope_id = PR.if_index;
 
 						close (s);
-						return (&sin6);
+						return (ret6);
 					default:
 						break;
 						;
 					}
+#else
+					memset(ret6, 0, sizeof(*ret6));
+					ret6->sin6_family = AF_INET6;
+					ret6->sin6_len = sizeof(*ret6);
+					ret6->sin6_addr = PR.advrtr[j];
+					ret6->sin6_scope_id = PR.if_index;
+
+					close (s);
+					return (ret6);
+#endif
 				} 
 			}
 		} 
