@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.116 2005/01/22 19:23:44 suz Exp $	*/
+/*	$KAME: nd6.h,v 1.117 2005/10/20 07:54:55 kei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,7 +145,6 @@ struct	in6_defrouter {
 	u_short if_index;
 };
 
-#ifdef _KERNEL
 struct	in6_oprlist {
 	char ifname[IFNAMSIZ];
 	struct {
@@ -161,7 +160,6 @@ struct	in6_oprlist {
 		struct	in6_addr advrtr[DRLSTSIZ]; /* XXX: explicit limit */
 	} prefix[PRLSTSIZ];
 };
-#endif
 
 struct	in6_prlist {
 	char ifname[IFNAMSIZ];

@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.160 2005/06/15 07:11:36 keiichi Exp $	*/
+/*	$KAME: in6.h,v 1.161 2005/10/20 07:54:54 kei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,7 +77,7 @@
  * has the table of implementation/integration differences.
  */
 #define __KAME__
-#define __KAME_VERSION		"from cvs repository"
+#define __KAME_VERSION		"SNAP 20051003"
 
 /*
  * Local port number conventions:

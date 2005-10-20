@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.9 2005/06/16 18:29:23 jinmei Exp $	*/
+/*	$KAME: if_ist.c,v 1.10 2005/10/20 07:57:57 kei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -57,7 +57,7 @@
 #include <sys/protosw.h>
 #include <sys/kernel.h>
 #include <sys/queue.h>
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #include <sys/sysctl.h>
 #endif
 #include <sys/syslog.h>
@@ -234,7 +234,9 @@ istattach(dummy)
 		/* turn off ingress filter */
 		sc->sc_if.if_flags  |= IFF_LINK2;
 		sc->sc_if.if_flags |= IFF_MULTICAST;
+#if 0
 		sc->sc_if.if_flags |= IFF_POINTOPOINT;	/* XXX */
+#endif
 
 #ifdef __FreeBSD__
 		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
@@ -640,7 +642,11 @@ struct rtentry *rt;
 	bcopy(&in4, &ip->ip_dst, sizeof(ip->ip_dst));
 	ip->ip_p = IPPROTO_IPV6;
 	ip->ip_ttl = ip_gif_ttl;	/*XXX*/
+#ifdef __NetBSD__
+	ip->ip_len = htons((u_short) m->m_pkthdr.len);
+#else /* __NetBSD */
 	ip->ip_len = m->m_pkthdr.len;	/*host order*/
+#endif /* __NetBSD */
 	if (ifp->if_flags & IFF_LINK1)
 		ip_ecn_ingress(ECN_ALLOWED, &ip->ip_tos, &tos);
 	else
@@ -692,7 +698,7 @@ struct rtentry *rt;
 	}
 	ifp->if_opackets++;
 	return ip_output(m, NULL, &sc->sc_ro, 0, NULL
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 			, NULL
 #endif
 			);
@@ -839,6 +845,11 @@ ist_checkaddr46(sc, in, in6)
 		if (in->s_addr == ptr->sin_addr.s_addr)
 			return 0;
 	}
+
+#if 1
+	if (in->s_addr == (in6)->s6_addr32[3])
+		return 0;
+#endif
  
 	return -1;
 }
@@ -1172,6 +1183,18 @@ ist_sysctl_isatap_rtrlist(SYSCTL_HANDLER_ARGS)
 	return (fill_isatap_rtrlist(req));	 
 }
 #endif /* __FreeBSD__ */
+
+#ifdef __NetBSD__
+int ist_sysctl_isatap_rtrlist(SYSCTLFN_ARGS);
+int
+ist_sysctl_isatap_rtrlist(SYSCTLFN_ARGS)
+{
+	if (namelen != 0)
+		return EINVAL;
+
+	return(fill_isatap_rtrlist(oldp, oldlenp, *oldlenp));
+}
+#endif /* __NetBSD */
 
 #ifndef __FreeBSD__
 int

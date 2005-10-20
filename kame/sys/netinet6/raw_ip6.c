@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.165 2005/06/16 19:51:07 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.166 2005/10/20 07:57:58 kei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -200,6 +200,7 @@ rip6_input(mp, offp, proto)
 
 	rip6stat.rip6s_ipackets++;
 
+	bzero(&rip6src, sizeof(rip6src));
 	rip6src.sin6_family = AF_INET6;
 	rip6src.sin6_len = sizeof(struct sockaddr_in6);
 	rip6src.sin6_addr = ip6->ip6_src;

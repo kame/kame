@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.365 2005/07/22 03:43:33 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.366 2005/10/20 07:57:57 kei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,6 +216,9 @@ extern void ip_forward __P((struct mbuf *, int, struct sockaddr_in *));
 
 #if (defined(__NetBSD__) || defined(__OpenBSD__)) && defined(IFT_IST)
 int fill_isatap_rtrlist(void *, size_t *, size_t);
+#endif
+#if defined(__NetBSD__) && defined(IFT_IST)
+int ist_sysctl_isatap_rtrlist(SYSCTLFN_ARGS);
 #endif
 
 /*
@@ -2375,5 +2378,14 @@ SYSCTL_SETUP(sysctl_net_inet6_ip6_setup, "sysctl net.inet6.ip6 subtree setup")
 		       NULL, 0, &ip6_maxfrags, 0,
 		       CTL_NET, PF_INET6, IPPROTO_IPV6,
 		       IPV6CTL_MAXFRAGS, CTL_EOL);
+#ifdef IFT_IST
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_STRUCT, "isataprtr",
+		       SYSCTL_DESCR("ISATAP Router"),
+		       ist_sysctl_isatap_rtrlist, 0, NULL, 0,
+		       CTL_NET, PF_INET6, IPPROTO_IPV6,
+		       IPV6CTL_ISATAPRTR, CTL_EOL);
+#endif /* IFT_IST */
 }
 #endif

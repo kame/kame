@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.275 2005/09/26 01:49:44 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.276 2005/10/20 07:57:57 kei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1684,7 +1684,13 @@ pfxlist_onlink_check()
 					    0);
 				}
 			} else {
+#ifdef IFT_IST
+				/* ISATAP link is always reachable */
+				if ((ifa->ia6_flags & IN6_IFF_DETACHED) == 0
+					&& ifa->ia_ifp->if_type != IFT_IST) {
+#else
 				if ((ifa->ia6_flags & IN6_IFF_DETACHED) == 0) {
+#endif
 					ifa->ia6_flags |= IN6_IFF_DETACHED;
 #if defined(MIP6) && NMIP > 0
 					rt_addrinfomsg((struct ifaddr *)ifa);
