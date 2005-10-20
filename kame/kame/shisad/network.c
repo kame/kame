@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.9 2005/10/20 08:06:03 kei Exp $  */
+/*      $KAME: network.c,v 1.10 2005/10/20 17:51:16 jinmei Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -650,6 +650,7 @@ nemo_ar_get(coa, ret6)
 {
 	struct in6_ifreq dstaddrreq;
 	struct sockaddr_in6 sa6_coa;
+	int s;
 #if defined(ICMPV6CTL_ND6_PRLIST) && !defined(__NetBSD__)
 	int mib[] = { CTL_NET, PF_INET6, IPPROTO_ICMPV6, ICMPV6CTL_ND6_PRLIST };
 	char *buf;
@@ -731,7 +732,7 @@ nemo_ar_get(coa, ret6)
 #else
 	/* XXX the following code seems buggy.  never expect to work. */
 	struct in6_prlist pr;
-	int s, i;
+	int i;
 	struct timeval time;
 	u_int16_t ifindex;
 
