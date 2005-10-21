@@ -773,7 +773,7 @@ file netinet/sctputil.c			sctp & inet & inet6
 file netinet/dccp_usrreq.c		dccp & (inet | inet6)
 file netinet/dccp_cc_sw.c		dccp & (inet | inet6)
 file netinet/dccp_tcplike.c		dccp & (inet | inet6)
-file netinet/dccp_tfrc.c		dccp & dccp_tfrc & (inet | inet6)
+file netinet/dccp_tfrc.c		dccp & (inet | inet6)
 file netinet/udp_usrreq.c		inet
 file netinet/ip_gre.c			inet
 file netinet/ip_ipsp.c			(inet | inet6) & (ipsec | tcp_signature)
