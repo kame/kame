@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.60 2005/07/28 16:08:17 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.61 2005/10/21 05:33:51 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -785,11 +785,9 @@ dccp_input(struct mbuf *m, ...)
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REQUEST\n"));
 			dp->state = DCCPS_REQUEST;
 			if (dp->cc_in_use[1] < 0) {
-				/* To be compatible with Linux implementation */
 				test[0] = DEFAULT_CCID;
-
-				/* we only support CCID2 at this moment */   
-				dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 1);
+				test[1] = 3;
+				dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 2);
 			}
 			if (len > data_off) {
 				DCCP_DEBUG((LOG_INFO, "XXX: len=%d, data_off=%d\n", len, data_off));
@@ -828,9 +826,9 @@ dccp_input(struct mbuf *m, ...)
 	} else if (dp->state == DCCPS_REQUEST) {
 		switch (dh->dh_type) {
 		case DCCP_TYPE_RESPONSE:
-			DCCP_DEBUG((LOG_INFO, "Got DCCP REPSONSE\n"));
 			DAHDR_TO_DSEQ(dp->ack_rcv, ((struct dccp_acklhdr*)dalh)->dash);
 			dp->ack_snd = dp->seq_rcv;
+			DCCP_DEBUG((LOG_INFO, "Got DCCP REPSONSE %x %llx\n", dp, dp->ack_snd));
 
 #ifdef __OpenBSD__
 			timeout_del(&dp->retrans_timer);
@@ -921,6 +919,7 @@ dccp_input(struct mbuf *m, ...)
 			}
 
 			if (dh->dh_type == DCCP_TYPE_DATAACK && dp->cc_in_use[1] > 0) {
+				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
@@ -952,7 +951,8 @@ dccp_input(struct mbuf *m, ...)
 			DCCP_DEBUG((LOG_INFO, "Got DCCP DATA, state = %i, cc_in_use[1] = %u\n", dp->state, dp->cc_in_use[1]));
 			
 			if (dp->cc_in_use[1] > 0) {
-				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
+				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
+				DCCP_DEBUG((LOG_INFO, "Calling data *cc_sw[%u].cc_recv_packet_recv! %llx %llx dp=%x\n", dp->cc_in_use[1], dp->ack_snd, dp->seq_rcv, dp));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen);
 			}
 			break;
@@ -968,6 +968,7 @@ dccp_input(struct mbuf *m, ...)
 
 			if (dp->cc_in_use[1] > 0) {
 				/* This is called so Acks on Acks can be handled */
+				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
@@ -984,6 +985,7 @@ dccp_input(struct mbuf *m, ...)
 			} 
 
 			if (dp->cc_in_use[1] > 0) {
+				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
@@ -1100,7 +1102,6 @@ dccp_input(struct mbuf *m, ...)
 	if (dh->dh_type == DCCP_TYPE_DATA ||
 	    dh->dh_type == DCCP_TYPE_ACK  ||
 	    dh->dh_type == DCCP_TYPE_DATAACK) {
-		DCCP_DEBUG((LOG_INFO, "ACK = %llu\n", dp->ack_rcv));
 		if (dp->cc_in_use[0] > 0) {
 			(*cc_sw[dp->cc_in_use[0]].cc_send_packet_recv)(dp->cc_state[0],options, optlen);
 		}
@@ -1546,7 +1547,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	struct ip6_hdr *ip6 = NULL;
 #endif
 
-	DCCP_DEBUG((LOG_INFO, "dccp_output start!\n"));
+/*	DCCP_DEBUG((LOG_INFO, "dccp_output start!\n")); */
 
 #ifdef __FreeBSD__
 	isipv6 = (dp->d_inpcb->inp_vflag & INP_IPV6) != 0;
@@ -1556,7 +1557,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	isipv6 = (dp->inp_vflag & INP_IPV6) != 0;
 #endif
 
-	DCCP_DEBUG((LOG_INFO, "Going to send a DCCP packet!\n"));
+/*	DCCP_DEBUG((LOG_INFO, "Going to send a DCCP packet!\n")); */
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_assert(&dp->d_inpcb->inp_mtx, MA_OWNED);
 #endif
@@ -1591,7 +1592,6 @@ again:
 
 	/* Check with CC if we can send... */
 	if (dp->cc_in_use[0] > 0 && dp->state == DCCPS_ESTAB) {
-		DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_send_packet!\n", dp->cc_in_use[0]));
 		if (!(*cc_sw[dp->cc_in_use[0]].cc_send_packet)(dp->cc_state[0], len)) {
 			DCCP_DEBUG((LOG_INFO, "Not allowed to send right now\n"));
 			return 0;
@@ -1604,8 +1604,7 @@ again:
 	}
 
 	if (extra == DCCP_TYPE_RESET + 2) {
-		DCCP_DEBUG((LOG_INFO, "Force sending of DCCP TYPE_RESET!\n"));
-		DCCP_DEBUG((LOG_INFO, "Force sending of DCCP TYPE_RESET! %llu\n", dp->seq_snd));
+		DCCP_DEBUG((LOG_INFO, "Force sending of DCCP TYPE_RESET! seq=%llu\n", dp->seq_snd));
 		type = DCCP_TYPE_RESET;
 		extrah_len = 12; 
 	} else if (dp->state <= DCCPS_REQUEST && dp->who == DCCP_CLIENT) {
@@ -1804,6 +1803,7 @@ again:
 	}
 #endif
 	dh->dh_cscov = dp->cslen;
+	dh->dh_ccval = dp->ccval;
 	dh->dh_type = type;
 	dh->dh_res = 0; /* Reserved field should be zero */
 	if (!use_shortseq) { 
@@ -1823,9 +1823,9 @@ again:
 	}       
 
 	if (!use_shortseq)
-		DCCP_DEBUG((LOG_INFO, "Sending with seq %u.%u, (dp->seq_snd = %llu)\n\n", dlh->dh_seq, dlh->dh_seq2, dp->seq_snd));
+		DCCP_DEBUG((LOG_INFO, "Sending with seq %x.%x, (dp->seq_snd = %llu)\n\n", dlh->dh_seq, dlh->dh_seq2, dp->seq_snd));
 	else
-		DCCP_DEBUG((LOG_INFO, "Sending with seq %u, (dp->seq_snd = %llu)\n\n", dh->dh_seq, dp->seq_snd));
+		DCCP_DEBUG((LOG_INFO, "Sending with seq %x, (dp->seq_snd = %llu)\n\n", dh->dh_seq, dp->seq_snd));
 
 	if (dh->dh_type == DCCP_TYPE_REQUEST) {
 		drqh = (struct dccp_requesthdr *)(dlh + 1);
@@ -2423,7 +2423,6 @@ dccp_connect(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 
 	test[0] = dp->pref_cc;
-	/* we only support CCID2 at this moment */   
 	dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 1);
 
 	error = dccp_output(dp, 0);
@@ -3042,7 +3041,7 @@ int
 dccp_add_feature_option(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char *val, u_int8_t val_len)
 {
 	int i;
-	DCCP_DEBUG((LOG_INFO, "Entering dccp_add_option, opt = %u, val_len = %u optlen %u\n", opt, val_len, dp->optlen));
+	DCCP_DEBUG((LOG_INFO, "Entering dccp_add_feature_option, opt = %u, val_len = %u optlen %u\n", opt, val_len, dp->optlen));
 
 	if (DCCP_MAX_OPTIONS > (dp->optlen + val_len + 2)) {
 		dp->options[dp->optlen] = opt;
@@ -3097,6 +3096,7 @@ dccp_get_option(char *options, int optlen, int type, char *buffer, int buflen)
 		}
 	}
 	/* If we get here the options was not found */
+	DCCP_DEBUG((LOG_INFO, "dccp_get_option option(%d) not found\n", type));
 	return 0;
 }
 
@@ -3165,40 +3165,41 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 #endif
 
 			    case DCCP_OPT_RECV_BUF_DROPS:
-				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_RECV_BUF_DROPS, size = %u!\n", size));
-				for (j=2; j < size; j++) {
-					DCCP_DEBUG((LOG_INFO, "val[%u] = %u ", j-1, options[i+j]));
-				}
-				DCCP_DEBUG((LOG_INFO, "\n"));
+					DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_RECV_BUF_DROPS, size = %u!\n", size));
+					for (j=2; j < size; j++) {
+						DCCP_DEBUG((LOG_INFO, "val[%u] = %u ", j-1, options[i+j]));
+					}
+					DCCP_DEBUG((LOG_INFO, "\n"));
 				break;
 
 			    case DCCP_OPT_TIMESTAMP:
-				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_TIMESTAMP, size = %u\n", size));
+					DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_TIMESTAMP, size = %u\n", size));
 
-				/* Adding TimestampEcho to next outgoing */
-				bcopy(options + i + 2, val, 4);
-				bzero(val + 4, 4);
-				dccp_add_option(dp, DCCP_OPT_TIMESTAMP_ECHO, val, 8);
+					/* Adding TimestampEcho to next outgoing */
+					bcopy(options + i + 2, val, 4);
+					bzero(val + 4, 4);
+					dccp_add_option(dp, DCCP_OPT_TIMESTAMP_ECHO, val, 8);
 				break;
 				
 			    case DCCP_OPT_TIMESTAMP_ECHO:
-				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_TIMESTAMP_ECHO, size = %u\n",size));
-				for (j=2; j < size; j++) {
-					DCCP_DEBUG((LOG_INFO, "val[%u] = %u ", j-1, options[i+j]));
-				}
-				DCCP_DEBUG((LOG_INFO, "\n"));
+					DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_TIMESTAMP_ECHO, size = %u\n",size));
+					for (j=2; j < size; j++) {
+						DCCP_DEBUG((LOG_INFO, "val[%u] = %u ", j-1, options[i+j]));
+					}
+					DCCP_DEBUG((LOG_INFO, "\n"));
 
-				/*
-				bcopy(options + i + 2, &(dp->timestamp_echo), 4);
-				bcopy(options + i + 6, &(dp->timestamp_elapsed), 4);
-				ACK_DEBUG((LOG_INFO, "DATA; echo = %u , elapsed = %u\n",
-					   dp->timestamp_echo, dp->timestamp_elapsed));
-				*/
+					/*
+						bcopy(options + i + 2, &(dp->timestamp_echo), 4);
+						bcopy(options + i + 6, &(dp->timestamp_elapsed), 4);
+						ACK_DEBUG((LOG_INFO, "DATA; echo = %u , elapsed = %u\n",
+						   dp->timestamp_echo, dp->timestamp_elapsed));
+					*/
 				
 				break;
 
 			case DCCP_OPT_ACK_VECTOR0:
 			case DCCP_OPT_ACK_VECTOR1:
+			case DCCP_OPT_ELAPSEDTIME:
 				/* Dont do nothing here. Let the CC deal with it */
 				break;
 				
@@ -3210,7 +3211,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 			i += size - 1;
 
 		} else {
-			DCCP_DEBUG((LOG_INFO, "Got a CCID option, do nothing!"));
+			DCCP_DEBUG((LOG_INFO, "Got a CCID option (%d), do nothing!\n", opt));
 			size = options[i+ 1];
 			if (size < 3 || size > 10) {
 				DCCP_DEBUG((LOG_INFO, "Error, option size = %u\n", size));
@@ -3289,6 +3290,9 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 			DCCP_DEBUG((LOG_INFO, "Got CCID negotiation, opt = %u, val[0] = %u\n", opt, val[0]));
 			if (opt == DCCP_OPT_CHANGE_R) {
 				if (val[0] == 2 || val[0] == 3 || val[0] == 0) {
+					/* try to use preferable CCID */
+					int i;
+					for (i = 1; i < val_len; i ++) if (val[i] == dp->pref_cc) val[0] = dp->pref_cc;
 					DCCP_DEBUG((LOG_INFO, "Sending DCCP_OPT_CONFIRM_L on CCID %u\n", val[0]));
 					dccp_remove_feature(dp, DCCP_OPT_CONFIRM_L, DCCP_FEATURE_CC);
 					dccp_add_feature_option(dp, DCCP_OPT_CONFIRM_L, DCCP_FEATURE_CC , val, 1);

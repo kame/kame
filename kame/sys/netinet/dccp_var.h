@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.25 2005/07/22 09:31:14 nishida Exp $	*/
+/*	$KAME: dccp_var.h,v 1.26 2005/10/21 05:33:52 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -99,8 +99,7 @@ struct dccpcb {
 	u_int32_t	len_rcv;	/* Length of data received */
 	u_int8_t	ndp_rcv;	/* ndp value of received packet */
 
-	u_int8_t	cslen;		/* How much of outgoing packets
-					   are covered by the checksum */
+	u_int8_t	cslen;		/* How much of outgoing packets are covered by the checksum */
 	u_int8_t	pref_cc;	/* Client prefered CC */
 	u_int8_t	ndp;		/* Number of non data packets */
 	u_int32_t	loss_window;	/* Loss window (defaults to 1000)  */
@@ -117,6 +116,7 @@ struct dccpcb {
 	u_int8_t	optlen;
 	char		features[DCCP_MAX_OPTIONS];
 	u_int8_t	featlen;
+	u_int8_t	ccval;		/* ccval */
 
 	u_int32_t	avgpsize;	/* Average packet size */
 
@@ -204,6 +204,22 @@ struct	dccpstat {
 
 	u_long	dccps_opackets;		/* Total output packets */
 	u_long	dccps_obytes;		/* Total output bytes */
+
+	/* TFRC Sender */
+	u_long	tfrcs_send_conn;	/* Connections established */
+	u_long	tfrcs_send_nomem;	/* Not enough memory */
+	u_long	tfrcs_send_erropt;	/* option error */
+	u_long	tfrcs_send_noopt;	/* no option  */
+	u_long	tfrcs_send_fbacks; 	/* sent feedbacks */
+
+	/* TFRC Receiver */
+	u_long	tfrcs_recv_conn;	/* established connection  */
+	u_long	tfrcs_recv_erropt;	/* option error */
+	u_long	tfrcs_recv_losts;	/* lost packets */
+	u_long	tfrcs_recv_nomem;	/* no memory */
+	u_long	tfrcs_recv_noopt;	/* no option */
+	u_long	tfrcs_recv_fbacks; 	/* receipt feedbacks */
+
 };
 
 /*
