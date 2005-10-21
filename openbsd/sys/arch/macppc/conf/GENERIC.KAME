@@ -29,5 +29,5 @@ option		RTPREF
 #option		MIP6_DEBUG
 
 # Datagram Congestion Control Protocol
-option		DCCP
+#option		DCCP
 #option		DCCP_TFRC
