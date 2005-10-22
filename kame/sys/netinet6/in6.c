@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.398 2005/08/25 07:58:45 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.399 2005/10/22 04:39:21 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -718,7 +718,7 @@ in6_control(so, cmd, data, ifp, p)
 			 * signed.
 			 */
 			maxexpire = (-1) &
-			    ~(1 << ((sizeof(maxexpire) * 8) - 1));
+			    ~((time_t)1 << ((sizeof(maxexpire) * 8) - 1));
 			if (ia->ia6_lifetime.ia6t_vltime <
 			    maxexpire - ia->ia6_updatetime) {
 				retlt->ia6t_expire = ia->ia6_updatetime +
@@ -736,7 +736,7 @@ in6_control(so, cmd, data, ifp, p)
 			 * signed.
 			 */
 			maxexpire = (-1) &
-			    ~(1 << ((sizeof(maxexpire) * 8) - 1));
+			    ~((time_t)1 << ((sizeof(maxexpire) * 8) - 1));
 			if (ia->ia6_lifetime.ia6t_pltime <
 			    maxexpire - ia->ia6_updatetime) {
 				retlt->ia6t_preferred = ia->ia6_updatetime +

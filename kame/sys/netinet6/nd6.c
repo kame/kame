@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.391 2005/08/25 07:49:40 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.392 2005/10/22 04:39:21 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1831,7 +1831,8 @@ nd6_ioctl(cmd, data, ifp)
 
 				/* XXX: we assume time_t is signed. */
 				maxexpire = (-1) &
-				    ~(1 << ((sizeof(maxexpire) * 8) - 1));
+				    ~((time_t)1 <<
+				    ((sizeof(maxexpire) * 8) - 1));
 				if (pr->ndpr_vltime <
 				    maxexpire - pr->ndpr_lastupdate) {
 					oprl->prefix[i].expire =
@@ -3007,7 +3008,8 @@ fill_prlist(req)
 
 				/* XXX: we assume time_t is signed. */
 				maxexpire = (-1) &
-					~(1 << ((sizeof(maxexpire) * 8) - 1));
+					~((time_t)1 <<
+					((sizeof(maxexpire) * 8) - 1));
 				if (pr->ndpr_vltime <
 				    maxexpire - pr->ndpr_lastupdate) {
 					p->expire = pr->ndpr_lastupdate +
