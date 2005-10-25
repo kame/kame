@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.366 2005/10/20 07:57:57 kei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.367 2005/10/25 11:02:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2378,7 +2378,7 @@ SYSCTL_SETUP(sysctl_net_inet6_ip6_setup, "sysctl net.inet6.ip6 subtree setup")
 		       NULL, 0, &ip6_maxfrags, 0,
 		       CTL_NET, PF_INET6, IPPROTO_IPV6,
 		       IPV6CTL_MAXFRAGS, CTL_EOL);
-#ifdef IFT_IST
+#if NIST > 0
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
 		       CTLTYPE_STRUCT, "isataprtr",
@@ -2386,6 +2386,6 @@ SYSCTL_SETUP(sysctl_net_inet6_ip6_setup, "sysctl net.inet6.ip6 subtree setup")
 		       ist_sysctl_isatap_rtrlist, 0, NULL, 0,
 		       CTL_NET, PF_INET6, IPPROTO_IPV6,
 		       IPV6CTL_ISATAPRTR, CTL_EOL);
-#endif /* IFT_IST */
+#endif /* NIST */
 }
 #endif
