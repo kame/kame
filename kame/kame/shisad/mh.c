@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.32 2005/09/30 12:01:56 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.33 2005/10/26 17:49:55 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1209,7 +1209,26 @@ send_bu(bul)
 	bup->ip6mhbu_hdr.ip6mh_reserved = 0;
 	bup->ip6mhbu_seqno = htons(++bul->bul_seqno);
 	bup->ip6mhbu_flags = bul->bul_flags;
-	bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
+
+	/*
+	 * The lifetime for CNs should not set less than the remaining
+	 * lifetime of the home registration.  
+	 */
+	if (!(bul->bul_flags & IP6_MH_BU_HOME)) {
+		struct binding_update_list *homebul = NULL;
+		struct timeval now;
+
+		gettimeofday(&now, NULL);
+
+		homebul = bul_get_homeflag(&bul->bul_hoainfo->hinfo_hoa);
+		if (homebul == NULL)
+			return (EINVAL);
+		
+		if (TIMESUB(&homebul->bul_expire->exptime, &now) <= (bul->bul_lifetime << 2))
+			bup->ip6mhbu_lifetime = htons(TIMESUB(&homebul->bul_expire->exptime, &now) >> 2);
+		else 
+			bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
+	}
 
 	/* Adding Alternate Care-of Address Option */	
 	if (bul->bul_flags & IP6_MH_BU_HOME) {

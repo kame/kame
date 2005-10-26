@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.23 2005/10/26 17:03:15 mitsuya Exp $	*/
+/*	$KAME: shisad.h,v 1.24 2005/10/26 17:49:56 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -76,6 +76,8 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 
 /* Macro for modulo 2^^16 comparison */
 #define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
+
+#define TIMESUB(a,b) ((a)->tv_sec - (b)->tv_sec)
 
 #define CND_COMMAND_PORT	7777
 #define MND_COMMAND_PORT	7778

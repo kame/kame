@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.29 2005/10/26 16:56:31 ryuji Exp $	*/
+/*	$KAME: fsm.c,v 1.30 2005/10/26 17:49:55 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2908,7 +2908,7 @@ bul_stop_timers(bul)
 	bul_stop_expire_timer(bul);
 }
 
-#define timesub(a,b) ((a)->tv_sec - (b)->tv_sec)
+
 static void
 bul_print_all(void)
 {
@@ -2937,8 +2937,8 @@ bul_print_all(void)
 			       bul->bul_flags,
 			       bul->bul_reg_fsm_state,
 			       bul->bul_rr_fsm_state,
-			       (bul->bul_retrans) ? timesub(&bul->bul_retrans->exptime, &now) : -1,
-			       (bul->bul_expire) ? timesub(&bul->bul_expire->exptime, &now) : -1
+			       (bul->bul_retrans) ? TIMESUB(&bul->bul_retrans->exptime, &now) : -1,
+			       (bul->bul_expire) ? TIMESUB(&bul->bul_expire->exptime, &now) : -1
 #ifndef MIP_MCOA
 			       );
 #else
@@ -2960,8 +2960,8 @@ bul_print_all(void)
 					       mbul->bul_flags,
 					       mbul->bul_reg_fsm_state,
 					       mbul->bul_rr_fsm_state,
-					       (mbul->bul_retrans) ? timesub(&mbul->bul_retrans->exptime, &now) : -1,
-					       (mbul->bul_expire) ? timesub(&mbul->bul_expire->exptime, &now) : -1,
+					       (mbul->bul_retrans) ? TIMESUB(&mbul->bul_retrans->exptime, &now) : -1,
+					       (mbul->bul_expire) ? TIMESUB(&mbul->bul_expire->exptime, &now) : -1,
 					       mbul->bul_bid);
 					
 				}
