@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.27 2005/09/30 12:01:55 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.28 2005/10/26 16:18:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -283,10 +283,19 @@ mipsock_input(miphdr)
 	struct mip_msghdr *miphdr;
 {
 	int err = 0;
+	struct mipm_dad *mipmdad = NULL;
 
 	switch (miphdr->miph_type) {
 	case MIPM_BE_HINT:
 		mipsock_behint_input(miphdr);
+		break;
+	case MIPM_DAD:
+		mipmdad = (struct mipm_dad *)miphdr;
+		if (mipmdad->mipmdadh_message != MIPM_DAD_DO) {
+			/* do the process of complete of DAD */
+			/* XXX */
+			;
+		}
 		break;
 	default:
 		break;

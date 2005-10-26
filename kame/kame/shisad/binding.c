@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.14 2005/05/25 01:49:23 keiichi Exp $	*/
+/*	$KAME: binding.c,v 1.15 2005/10/26 16:18:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -170,14 +170,24 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 	bc->bc_flags = flags;
 	bc->bc_seqno = seqno;
 	bc->bc_state = BC_STATE_VALID;
+#if 0
+	if (flags & IP6_MH_BU_HOME) {
+		bc->bc_state = BC_STATE_UNDER_DAD;
+	}
+#endif
 	bc->bc_refcnt = 0;
 	bc->bc_authmethod = authmethod;
 #ifdef MIP_MCOA
 	bc->bc_bid = bid;
 #endif /* MIP_MCOA */
 
-	/* insert BC into the kernel via mipsock */
-	mipscok_bc_request(bc, MIPM_BC_ADD);
+	if (bc->bc_state == BC_STATE_VALID) {
+		/* insert BC into the kernel via mipsock */
+		mipscok_bc_request(bc, MIPM_BC_ADD);
+	} else if (bc->bc_state == BC_STATE_UNDER_DAD) {
+		/* XXX */
+		/* do dad start */
+	}
 	
         LIST_INSERT_HEAD(&bchead, bc, bc_entry);
 	bc->bc_refcnt++;
@@ -269,6 +279,21 @@ mip6_bc_lookup(hoa, src, bid)
 
 	return (NULL);
 };
+
+void
+mip6_dad_start()
+{
+}
+
+void
+mip6_dad_failed()
+{
+}
+
+void
+mip6_dad_done()
+{
+}
 
 void
 command_show_bc(s, line)

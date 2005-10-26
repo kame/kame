@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.5 2005/06/09 02:16:10 keiichi Exp $ */
+/* $Id: mipsock.h,v 1.6 2005/10/26 16:18:33 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -177,6 +177,20 @@ struct mipm_be_hint {
     ((struct sockaddr *)((caddr_t)(MIPMBEH_COA(mipmbeh))	\
     + (MIPMBEH_COA(mipmbeh))->sa_len))
 
+struct mipm_dad {
+	struct mip_msghdr mipmbeh_hdr;
+	u_int16_t mipmdadh_message;
+#define MIPM_DAD_DO		0
+#define MIPM_DAD_SUCCESS	1
+#define MIPM_DAD_FAIL		2
+	u_int16_t mipmdadh_ifindex;
+	struct in6_addr mipmdadh_addr6;
+};
+#define mipmdadh_msglen mipmbeh_hdr.miph_msglen
+#define mipmdadh_version mipmbeh_hdr.miph_version
+#define mipmdadh_type mipmbeh_hdr.miph_type
+#define mipmdadh_seq mipmbeh_hdr.miph_seq
+
 #define MIP_VERSION	1
 
 #define MIPM_NODETYPE_INFO	1
@@ -192,6 +206,7 @@ struct mipm_be_hint {
 #define MIPM_HOME_HINT		11
 #define MIPM_RR_HINT		12
 #define MIPM_BE_HINT		13
+#define MIPM_DAD		14
 
 #ifdef __NetBSD__
 int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,

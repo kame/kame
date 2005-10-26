@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.21 2005/09/30 12:01:56 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.22 2005/10/26 16:18:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -350,7 +350,8 @@ struct binding_cache {
         struct in6_addr       bc_myaddr;    /* my addr (needed?) */
         u_int8_t              bc_state;     /* state of this bce */
 #define BC_STATE_VALID		0
-#define BC_STATE_DEPRECATED	1	
+#define BC_STATE_DEPRECATED	1
+#define BC_STATE_UNDER_DAD	2
         u_int16_t             bc_flags;     /* recved BU flags */
         u_int16_t             bc_seqno;     /* recved BU seqno */
         u_int32_t             bc_lifetime;  /* recved BU lifetime */

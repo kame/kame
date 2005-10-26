@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.13 2005/07/16 15:35:13 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.14 2005/10/26 16:18:33 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -401,6 +401,7 @@ mipus_output(m, va_alist)
 	struct mip6_bul_internal *mbul = NULL;
         struct mipm_md_info *mipmd = NULL;
 #endif
+	struct mipm_dad *mipmdad = NULL;
 	struct sockaddr_storage hoa, coa, cnaddr;
 	u_int16_t bid = 0;
 
@@ -534,6 +535,17 @@ mipus_output(m, va_alist)
                 } 
                 break;
 #endif /* NMIP > 0 */
+
+		/* MIPM_DAD_DO is issued from userland */
+		/* MIPM_DAD_SUCCESS or MIPM_DAD_FAIL is returned as a result of the DAD */
+	case MIPM_DAD:
+		mipmdad = (struct mipm_dad *)miph;
+		if (mipmdad->mipmdadh_message == MIPM_DAD_DO) {
+			/* 'do DAD' is ordered */
+			/* XXX */
+			;
+		}
+		break;
 
 	default:
 		return (0);
