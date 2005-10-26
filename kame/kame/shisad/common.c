@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.21 2005/08/23 08:24:52 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.22 2005/10/26 19:57:14 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -361,7 +361,11 @@ icmp6_input_common(fd)
 		break;
 
 	case MIP6_PREFIX_ADVERT:
-		error = receive_mpa((struct mip6_prefix_advert *)icp, readlen);
+		bul = bul_get(&dst, &from.sin6_addr);
+		if (bul == NULL)
+			break;
+
+		error = receive_mpa((struct mip6_prefix_advert *)icp, readlen, bul);
 		break;
 
 	case ICMP6_PARAM_PROB:

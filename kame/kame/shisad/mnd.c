@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.21 2005/10/26 17:03:15 mitsuya Exp $	*/
+/*	$KAME: mnd.c,v 1.22 2005/10/26 19:57:14 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1155,9 +1155,12 @@ hpfxlist_expire_timer(arg)
 		return;
 	}
 
+	/* Soliciting Mobile Prefixes managed by the Home Agent */
 	send_mps(hpfx);
 
-	hpfxlist_set_expire_timer(hpfx, (hpfx->hpfx_vltime - now));
+	/* rate limiting XXX */
+	hpfxlist_set_expire_timer(hpfx, 
+		((hpfx->hpfx_vltime - now) > 5) ? (hpfx->hpfx_vltime - now):5);
 }
 
 #endif /* MIP_MN */
@@ -1455,9 +1458,10 @@ receive_hadisc_reply(dhrep, dhrep_len)
 }
 
 int
-receive_mpa(mpa, mpalen)
+receive_mpa(mpa, mpalen, bul)
 	struct mip6_prefix_advert *mpa;
 	size_t mpalen;
+	struct binding_update_list *bul;
 {
 	int error = 0;
 	int done = 0;
@@ -1465,13 +1469,42 @@ receive_mpa(mpa, mpalen)
 	struct nd_opt_hdr *pt;
 	struct mip6_hpfx_mn_exclusive mnoption;
 
-	/* Check MPS ID */
+	/* 
+	 * determine solicited MPA or unsolicited one. If it is
+	 * unsolicited MPA, the MN must issue a MPS and discard the
+	 * MPA. (sec 11.4.3)
+	 */
 	LIST_FOREACH(mif, &mipifhead, mipif_entry) {
 		if (mif->mipif_mps_id == ntohl(mpa->mip6_pa_id))
 			break;
 	}
-	if (mif == NULL)
+	if (mif == NULL) { /* Unsolicited MPA */
+		struct mip6_hoainfo *hoainfo = NULL;
+		struct mip6_hpfxl *hpfx = NULL;
+
+		hoainfo = hoainfo_find_withhoa(&bul->bul_hoainfo->hinfo_hoa);
+		if (hoainfo == NULL)
+			return (ENOENT);
+
+		mif = mnd_get_mipif(hoainfo->hinfo_ifindex);
+		if (mif == NULL)
+			return (ENOENT);
+
+		LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
+			if (inet_are_prefix_equal(&hoainfo->hinfo_hoa, 
+						  &hpfx->hpfx_prefix, hpfx->hpfx_prefixlen)) {
+				break;
+			}
+		}
+		if (hpfx == NULL)
+			return (ENOENT);
+
+		send_mps(hpfx);
+
 		return (0);
+	}
+
+	/* Solicited MPA */
 
 	memset(&ndopts, 0, sizeof(ndopts));
 	error = mip6_get_nd6options(&ndopts,
