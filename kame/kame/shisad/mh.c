@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.33 2005/10/26 17:49:55 ryuji Exp $  */
+/*      $KAME: mh.c,v 1.34 2005/10/26 18:34:26 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1184,7 +1184,6 @@ send_bu(bul)
 #ifdef MIP_MCOA
 	struct ip6_mh_opt_bid bid_opt;
 
-
 	if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
 		/*syslog(LOG_INFO, "this bul has multiple CoAs, ignore root %d\n", bul->bul_bid);*/
 		return (0);
@@ -1886,11 +1885,9 @@ send_mps(hpfx)
 #if defined(MIP_MN) && defined(MIP_NEMO)
 	struct sockaddr_in6 *ar_sin6, ar_sin6_orig;
 #endif /* MIP_NEMO */ 
-	struct home_agent_list *hal;
 
 	if (hpfx == NULL)
 		return 0;
-	
 	if (hpfx->hpfx_mipif == NULL)
 		return 0;
 
@@ -1900,21 +1897,12 @@ send_mps(hpfx)
 		return 0;
 
 	/* Get destination address of MPS (i.e. HA) */
-	if (LIST_EMPTY(&hpfx->hpfx_hal_head))
-		return 0;
-	hal = LIST_FIRST(&hpfx->hpfx_hal_head);
-	if (hal == NULL)
-		return 0;
-
-	bul = bul_get(hoa, &hal->hal_ip6addr);
-	if(bul == NULL)
-		return 0;
-
-	if (debug)
-		syslog(LOG_INFO, "sending Mobile Prefix Solicitation\n");
+	bul = bul_get_homeflag(hoa);
+	if (bul == NULL)
+		return (0);
 
         memset(&to, 0, sizeof(to));
-        to.sin6_addr = hal->hal_ip6addr;
+        to.sin6_addr = bul->bul_peeraddr;
         to.sin6_family = AF_INET6;
         to.sin6_port = 0;
         to.sin6_scope_id = 0;
@@ -1999,7 +1987,10 @@ send_mps(hpfx)
 
         iov.iov_base = buf;
         iov.iov_len = mpfxlen;
-       
+
+	if (debug)
+		syslog(LOG_INFO, "sending Mobile Prefix Solicitation\n");
+
         if (sendmsg(icmp6sock, &msg, 0) < 0)
                 perror ("sendmsg");
 
