@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.62 2005/10/26 11:36:49 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.63 2005/10/26 18:46:33 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -653,11 +653,13 @@ dccp_input(struct mbuf *m, ...)
 		if (isipv6) {
 			dp->cslen = ((struct dccpcb *)oin6p->in6p_ppcb)->cslen;
 			dp->avgpsize = ((struct dccpcb *)oin6p->in6p_ppcb)->avgpsize;
+			dp->scode = ((struct dccpcb *)oin6p->in6p_ppcb)->scode;
 		} else 
 #endif
 		{
 			dp->cslen = ((struct dccpcb *)oinp->inp_ppcb)->cslen;
 			dp->avgpsize = ((struct dccpcb *)oinp->inp_ppcb)->avgpsize;
+			dp->scode = ((struct dccpcb *)oinp->inp_ppcb)->scode;
 		}
 		dp->seq_snd = (((u_int64_t)arc4random() << 32) | arc4random()) % 281474976710656LL;
 		dp->ref_seq.hi = dp->seq_snd >> 24;
@@ -712,7 +714,15 @@ dccp_input(struct mbuf *m, ...)
 			optp = (u_char *)(dh + 1);
 	} else if (dh->dh_type == DCCP_TYPE_REQUEST) {
 		drqh = (struct dccp_requesthdr *)(dlh + 1);
-		dp->sname =  drqh->drqh_sname;
+		if (ntohl(drqh->drqh_scode) != dp->scode){
+			DCCP_DEBUG((LOG_INFO, "service code in request packet doesn't match! %x %x\n", drqh->drqh_scode, dp->scode));
+			INP_UNLOCK(inp);
+			dp->state = DCCPS_SERVER_CLOSE; /* So disconnect2 doesn't send CLOSEREQ */
+			dccp_disconnect2(dp);
+			dccp_output(dp, DCCP_TYPE_RESET + 2);
+			dccp_close(dp);
+			goto badunlocked;
+		}
 		optp = (u_char *)(drqh + 1);
 		extrah_len = 4;
 
@@ -731,9 +741,13 @@ dccp_input(struct mbuf *m, ...)
 			if (dh->dh_type == DCCP_TYPE_RESPONSE) {
 				extrah_len += 4;
 				drqh = (struct dccp_requesthdr *)(dalh + 1);
-				if (drqh->drqh_sname != dp->sname){
-					DCCP_DEBUG((LOG_INFO, "service code in response packet doesn't match!\n"));
+				if (ntohl(drqh->drqh_scode) != dp->scode){
+					DCCP_DEBUG((LOG_INFO, "service code in response packet doesn't match! %x %x\n", drqh->drqh_scode, dp->scode));
 					INP_UNLOCK(inp);
+					dp->state = DCCPS_CLIENT_CLOSE; /* So disconnect2 doesn't send CLOSEREQ */
+					dccp_disconnect2(dp);
+					dccp_output(dp, DCCP_TYPE_RESET + 2);
+					dccp_close(dp);
 					goto badunlocked;
 				}
 				optp = (u_char *)(drqh + 1);
@@ -925,7 +939,6 @@ dccp_input(struct mbuf *m, ...)
 
 			if (dh->dh_type == DCCP_TYPE_DATAACK && dp->cc_in_use[1] > 0) {
 				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
-//				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv! %llx %llx\n", dp->cc_in_use[1], dp->ack_snd, dp->seq_rcv));
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
@@ -1281,9 +1294,7 @@ dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
 	case DCCP_CCID:
 	case DCCP_CSLEN:
 	case DCCP_MAXSEG:
-#if 0
 	case DCCP_SERVICE:
-#endif
 		
 		if (m->m_len < sizeof(int)) {
 			error = EINVAL;
@@ -1313,11 +1324,9 @@ dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
 				error = EINVAL;
 			}
 			break;
-#if 0
 		case DCCP_SERVICE:
-			/* XXX */
+			dp->scode = optval;
 			break;
-#endif
 		}
 		
 		break;
@@ -1352,6 +1361,9 @@ dccp_optsget(struct dccpcb *dp, int opt, struct mbuf **mp)
 		break;
 	case DCCP_MAXSEG:
 		optval = dp->d_maxseg;
+		break;
+	case DCCP_SERVICE:
+		optval = dp->scode;
 		break;
 	default:
 		error = ENOPROTOOPT;
@@ -1856,7 +1868,7 @@ again:
 
 	if (dh->dh_type == DCCP_TYPE_REQUEST) {
 		drqh = (struct dccp_requesthdr *)(dlh + 1);
-		drqh->drqh_sname = 0;
+		drqh->drqh_scode = htonl(dp->scode);
 		optp = (u_char *)(drqh + 1);
 	} else if (dh->dh_type == DCCP_TYPE_RESET) {
 		drth = (struct dccp_resethdr *)(dlh + 1);
@@ -1885,7 +1897,7 @@ again:
 			if (dh->dh_type == DCCP_TYPE_RESPONSE) {
 				DCCP_DEBUG((LOG_INFO, "Sending dccp type response\n"));
 				drqh = (struct dccp_requesthdr *)(dalh + 1);
-				drqh->drqh_sname = dp->sname; /* must equal sname on the corresponding DCCP-Request */
+				drqh->drqh_scode = htonl(dp->scode); 
 				optp = (u_char *)(drqh + 1);
 			} else 
 				optp = (u_char *)(dalh + 1);

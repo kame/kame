@@ -1,4 +1,4 @@
-/*	$KAME: dccp.h,v 1.9 2005/10/26 11:36:48 nishida Exp $	*/
+/*	$KAME: dccp.h,v 1.10 2005/10/26 18:46:33 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -94,7 +94,7 @@ struct dccplhdr {
 
 
 struct dccp_requesthdr {
-	u_int32_t	drqh_sname;	/* Service Name */
+	u_int32_t	drqh_scode;	/* Service Code */
 };
 
 struct dccp_acksubhdr { 

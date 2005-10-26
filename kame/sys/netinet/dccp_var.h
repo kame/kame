@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.27 2005/10/26 11:36:49 nishida Exp $	*/
+/*	$KAME: dccp_var.h,v 1.28 2005/10/26 18:46:33 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -128,7 +128,7 @@ struct dccpcb {
 	
 	u_int8_t remote_ackvector; /* Is recv side using AckVector? */
 	u_char      shortseq; /* use short seq number */
-	u_int32_t	sname;    /* service core */
+	u_int32_t	scode;    /* service core */
 	struct ref_seq	ref_seq;    /* reference sequence number */
 	struct ref_seq	ref_pseq;   /* reference peer sequence number */
 
