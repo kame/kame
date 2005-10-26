@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.22 2005/10/26 16:18:33 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.23 2005/10/26 17:03:15 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -425,8 +425,8 @@ int check_nonce_reuse(struct mip6_nonces_info *, struct in6_addr *, struct in6_a
 
 /* binding.c */
 struct binding_update_list *bul_get(struct in6_addr *, struct in6_addr *);
-struct binding_update_list *bul_insert(struct mip6_hoainfo *,  struct in6_addr *,
-    struct in6_addr *, u_int16_t, u_int16_t);
+struct binding_update_list *bul_insert(struct mip6_hoainfo *,  struct in6_addr *, struct in6_addr *, u_int16_t, u_int16_t);
+int bul_check_ifid(struct mip6_hoainfo *);
 #ifdef MIP_MCOA
 struct binding_update_list *bul_mcoa_get(struct in6_addr *, struct in6_addr *, u_int16_t);
 #endif /* MIP_MCOA */

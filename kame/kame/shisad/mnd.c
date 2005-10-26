@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.20 2005/10/26 16:56:32 ryuji Exp $	*/
+/*	$KAME: mnd.c,v 1.21 2005/10/26 17:03:15 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -307,6 +307,17 @@ main(argc, argv)
 		    ;
 		if (keymanagement)
 			bul_flags |= IP6_MH_BU_KEYM;
+
+		/*
+		 * RFC3375 Sec. 11.7.1. 
+		 * if the mobile node's link-local address has the same
+		 * interface identifier as the home address for which it is 
+		 * supplying a new care-of address, then the mobile node
+		 * SHOULD set the L bit. 
+		 */
+		if (bul_check_ifid(hoainfo))
+			bul_flags |= IP6_MH_BU_LLOCAL;
+
 		bul = bul_insert(hoainfo, NULL, NULL, bul_flags, 0);
 		if (bul == NULL) {
 			syslog(LOG_ERR,

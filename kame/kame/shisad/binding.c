@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.15 2005/10/26 16:18:33 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.16 2005/10/26 17:03:15 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -35,10 +35,12 @@
 #include <errno.h>
 #include <time.h>
 #include <syslog.h>
+#include <ifaddrs.h>
 #include <sys/socket.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <net/if.h>
 #ifdef __FreeBSD__
 #include <net/if_var.h>
@@ -718,6 +720,45 @@ bul_get_homeflag(hoa)
 	}
 
 	return (NULL);
+};
+
+
+/*
+ * check the mobile node's link-local address has the same interface
+ * identifier as the home address
+ */
+int bul_check_ifid(hoainfo)
+	struct mip6_hoainfo *hoainfo;
+{
+	struct ifaddrs *ifa, *ifap;
+	struct sockaddr *sa;
+	struct in6_addr *address;
+
+	if (getifaddrs(&ifap) != 0) {
+		syslog(LOG_ERR, "%s\n", strerror(errno));
+		return 0;
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		sa = ifa->ifa_addr;
+
+		if (sa->sa_family != AF_INET6)
+			continue;
+		if (ifa->ifa_addr == NULL)
+			continue;
+		address = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
+
+		if (IN6_IS_ADDR_LINKLOCAL(address)) {
+			/* check the last 64 bit */
+
+			if (memcmp(&address->s6_addr[8],
+			    &(hoainfo->hinfo_hoa).s6_addr[8], 8) == 0)
+				return 1;
+		} else
+			continue;
+	}
+
+	return 0;
 };
 
 
