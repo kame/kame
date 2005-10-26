@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.28 2005/10/14 07:27:49 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.29 2005/10/26 16:56:31 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2180,6 +2180,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		syslog(LOG_ERR,
 		    "sequence number is too small.\n");
 		bul->bul_seqno = seqno + 1;
+
 		if (send_bu(bul)) {
 			syslog(LOG_ERR,
 			    "sending a binding update failed.\n");
@@ -2189,6 +2190,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		/* keep current state. */
 		
 		return (-1); /* XXX */
+
 	} else if (seqno != bul->bul_seqno) {
                 syslog(LOG_NOTICE,
 		    "unmached sequence no (%d recv, %d sent) from.\n",
@@ -2197,6 +2199,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		mip6stat.mip6s_seqno++;
                 return (-1);
 	}
+
 	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_NOT_HA) {
 		if ((bul->bul_reg_fsm_state == MIP6_BUL_REG_FSM_STATE_WAITD)
 		    && (bul->bul_retrans_time >= (initial_bindack_timeout_first_reg * 2))) {

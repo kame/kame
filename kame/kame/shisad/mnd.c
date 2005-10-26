@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.19 2005/09/30 12:01:56 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.20 2005/10/26 16:56:32 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -555,7 +555,7 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 #if 1
 	/* ETSI 2004.10.13 */
 {
-	int flags;
+	int flags = 0;
 
 	bul = bul_get_homeflag(&hoainfo->hinfo_hoa);
 	if (bul == NULL) {
@@ -564,12 +564,18 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 		    ip6_sprintf(&hoainfo->hinfo_hoa));
 		return (-1);
 	}
-	flags = IN6_IFF_NODAD|IN6_IFF_HOME;
-	if ((bul->bul_flags & IP6_MH_BU_HOME) &&
-	    ((bul->bul_reg_fsm_state == MIP6_BUL_REG_FSM_STATE_WAITAR) ||
-		(bul->bul_reg_fsm_state == MIP6_BUL_REG_FSM_STATE_BOUND))) {
-		flags |= IN6_IFF_DEREGISTERING;
+	if (bul->bul_flags & IP6_MH_BU_HOME) {
+		if ((bul->bul_reg_fsm_state == MIP6_BUL_REG_FSM_STATE_WAITAR) ||
+			(bul->bul_reg_fsm_state == MIP6_BUL_REG_FSM_STATE_BOUND)) {
+			flags = IN6_IFF_NODAD|IN6_IFF_HOME|IN6_IFF_DEREGISTERING;
+		} else  
+			/* 
+			 * if the home agent doesn't have a bc for the HoA, it
+			 *  should operate DAD for the HoA 
+			 */
+			flags = IN6_IFF_HOME;
 	}
+	
 	err = set_ip6addr(ifname, &hoainfo->hinfo_hoa, 64, flags);
 }
 #else
