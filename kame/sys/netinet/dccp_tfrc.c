@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.13 2005/10/21 05:33:51 nishida Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.14 2005/10/26 11:36:49 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson
@@ -78,21 +78,28 @@
 #include <netinet/dccp_tfrc_lookup.h>
 
 #define TFRCDEBUG
-#define TFRCDEBUGTIMERS
-
 #if 0
+#define TFRCDEBUGTIMERS
 #define NOTFRCSENDER
 #define NOTFRCRECV
 #endif
 
 #ifdef TFRCDEBUG
+#ifdef __FreeBSD__
 #define TFRC_DEBUG(args) log args
+#else
+#define TFRC_DEBUG(args) dccp_log args
+#endif
 #else
 #define TFRC_DEBUG(args)
 #endif
 
 #ifdef TFRCDEBUGTIMERS
+#ifdef __FreeBSD__
 #define TFRC_DEBUG_TIME(args) log args
+#else
+#define TFRC_DEBUG_TIME(args) dccp_log args
+#endif
 #else
 #define TFRC_DEBUG_TIME(args)
 #endif
@@ -250,8 +257,8 @@ tfrc_time_send(void *ccb)
 	struct inpcb *inp;
 
 	if (cb->state == TFRC_SSTATE_TERM) {
-		TFRC_DEBUG((LOG_INFO,
-		    "TFRC - Send timer is ordered to terminate. (tfrc_time_send)\n"));
+		TFRC_DEBUG((LOG_INFO, 
+			"TFRC - Send timer is ordered to terminate. (tfrc_time_send)\n"));
 		return;
 	}
 	if (callout_pending(&cb->ch_stimer)) {
@@ -271,6 +278,7 @@ tfrc_time_send(void *ccb)
 #else
 	timeout_del(&cb->ch_stimer);
 #endif
+
 	dccp_output(cb->pcb, 1);
 	/* make sure we schedule next send time */
 	tfrc_send_packet_sent(cb, 0, -1);
@@ -304,10 +312,8 @@ tfrc_set_send_timer(struct tfrc_send_ccb * cb, struct timeval t_now)
 	t_ticks = (t_temp.tv_usec + 1000000 * t_temp.tv_sec) / (1000000 / hz);
 	if (t_ticks == 0) t_ticks = 1;
 
-#if 0
 	TFRC_DEBUG_TIME((LOG_INFO,
 	    "TFRC scheduled send timer to expire in %ld ticks (hz=%lu)\n", t_ticks, (unsigned long)hz));
-#endif
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&cb->ch_stimer, t_ticks, tfrc_time_send, cb);
@@ -401,13 +407,6 @@ tfrc_time_no_feedback(void *ccb)
 		TFRC_DEBUG((LOG_INFO, "TFRC - No feedback timer is ordered to terminate\n"));
 		goto nf_release;
 	}
-#if 0
-	if (&(cb)->ch_nftimer == NULL || callout_pending(&(cb)->ch_nftimer)) {
-		TFRC_DEBUG((LOG_INFO, "TFRC - Callout pending, exiting...(tfrc_time_no_feedback)\n"));
-		goto nf_release;
-	}
-	cb->ch_nftimer = NULL;
-#endif
 	if (callout_pending(&(cb)->ch_nftimer)) {
 		TFRC_DEBUG((LOG_INFO, "TFRC - Callout pending, exiting...(tfrc_time_no_feedback)\n"));
 		goto nf_release;
@@ -501,9 +500,7 @@ tfrc_time_no_feedback(void *ccb)
 	if (next_time_out == 0)
 		next_time_out = 1;
 
-#if 0
 	TFRC_DEBUG_TIME((LOG_INFO, "TFRC scheduled no feedback timer to expire in %u ticks (hz=%u)\n", next_time_out, hz));
-#endif
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&cb->ch_nftimer, next_time_out, tfrc_time_no_feedback, cb);
@@ -753,12 +750,17 @@ tfrc_send_packet(void *ccb, long datasize)
 				t_temp = t_now;
 				timersub(&t_temp, &(cb->t_last_win_count), &t_temp);
 
-				/* XXX calculate win_count option */
+				/* XXX calculate window counter */
 				if (cb->state == TFRC_SSTATE_NO_FBACK) {
-					/* Assume RTT= t_rto(initial)/4 */
-					uw_win_count = (((double) (t_temp.tv_sec)) + (((double) (t_temp.tv_usec)) / 1000000.0)) / (TFRC_INITIAL_TIMEOUT / (4.0 * TFRC_WIN_COUNT_PER_RTT));
+					/* Assume RTT = t_rto(initial)/4 */
+					uw_win_count = (t_temp.tv_sec + (t_temp.tv_usec / 1000000)) 
+							/ TFRC_INITIAL_TIMEOUT / (4 * TFRC_WIN_COUNT_PER_RTT);
 				} else {
-					uw_win_count = (((double) (t_temp.tv_sec)) + (((double) (t_temp.tv_usec)) / 1000000.0)) / (((double) (cb->rtt)) / (1000000.0 * TFRC_WIN_COUNT_PER_RTT));
+					if (cb->rtt)
+						uw_win_count = (t_temp.tv_sec + (t_temp.tv_usec / 1000000)) 
+								/ cb->rtt / (1000000 * TFRC_WIN_COUNT_PER_RTT);
+					else 
+						uw_win_count = 0; 
 				}
 				uw_win_count += cb->last_win_count;
 				win_count = uw_win_count % TFRC_WIN_COUNT_LIMIT;
@@ -775,25 +777,10 @@ tfrc_send_packet(void *ccb, long datasize)
 		break;
 	}
 
-	if (answer)
-		cb->pcb->ccval = win_count;
-#if 0
-	/* can we send? if so add options and add to packet history */
 	if (answer) {
-		/* Add packet to history */
-
+		cb->pcb->ccval = win_count;
 		new_packet->win_count = win_count;
-
-		/* todo: remove old option */
-
-		/* add option */
-		if (dccp_add_option(cb->pcb, TFRC_OPT_WINDOW_COUNT, (char *) &win_count, 1)) {
-			TFRC_DEBUG((LOG_INFO, "TFRC - Add window counter option failed, send refused! (tfrc_send_packet)!\n"));
-			answer = 0;
-			dccpstat.tfrcs_send_erropt++;
-		}
 	}
-#endif
 
 sp_release:
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -895,6 +882,7 @@ tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize)
 			microtime(&t_now);
 			t_temp = t_now;
 			timeradd(&t_temp, &cb->delta, &t_temp);
+
 			/* Check if next packet can not be sent immediately */
 			if (!(timercmp(&(t_temp), &(cb->t_nom), >))) {
 				tfrc_set_send_timer(cb, t_now);		/* if so schedule sendtimer */
@@ -922,7 +910,8 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 	struct timeval t_now;
 	struct fixpoint x,y;
 	int res;
-	u_int16_t t_elapsed;
+	u_int16_t t_elapsed = 0;
+	u_int32_t t_elapsed_l = 0;
 	u_int32_t pinv;
 	u_int32_t x_recv;
 
@@ -950,13 +939,15 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 		return;
 	}
 
-//	res = dccp_get_option(options, optlen, TFRC_OPT_ELAPSED_TIME, (char *) &t_elapsed, 2);
-	/* XXX the length of EPALSEDTIME otpion might be 6 */ 
-	res = dccp_get_option(options, optlen, DCCP_OPT_ELAPSEDTIME, (char *) &t_elapsed, 4);
+	res = dccp_get_option(options, optlen, DCCP_OPT_ELAPSEDTIME, (char *) &t_elapsed_l, 6);
 	if (res == 0) {
-		TFRC_DEBUG((LOG_INFO, "TFRC - Missing elapsed time option! (tfrc_send_packet_recv)\n"));
-		dccpstat.tfrcs_send_noopt++;
-		return;
+		/* try 2 bytes elapsed time */
+		res = dccp_get_option(options, optlen, DCCP_OPT_ELAPSEDTIME, (char *) &t_elapsed, 4);
+		if (res == 0){
+			TFRC_DEBUG((LOG_INFO, "TFRC - Missing elapsed time option! (tfrc_send_packet_recv)\n"));
+			dccpstat.tfrcs_send_noopt++;
+			return;
+		}
 	}
 	res = dccp_get_option(options, optlen, TFRC_OPT_RECEIVE_RATE, (char *) &x_recv, 4);
 	if (res == 0) {
@@ -966,12 +957,18 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 	}
 	dccpstat.tfrcs_send_fbacks++;
 	/* change byte order */
-	t_elapsed = ntohs(t_elapsed);
+	if (t_elapsed)
+		t_elapsed = ntohs(t_elapsed);
+	else
+		t_elapsed_l = ntohl(t_elapsed_l);
 	x_recv = ntohl(x_recv);
 	pinv = ntohl(pinv);
 	if (pinv == 0xFFFFFFFF) pinv = 0; 
 
-	TFRC_DEBUG((LOG_INFO, "TFRC - Receieved options on ack %llu: pinv=%u, t_elapsed=%u, x_recv=%u ! (tfrc_send_packet_recv)\n", cb->pcb->ack_rcv, pinv, t_elapsed, x_recv));
+	if (t_elapsed)
+		TFRC_DEBUG((LOG_INFO, "TFRC - Receieved options on ack %llu: pinv=%u, t_elapsed=%u, x_recv=%u ! (tfrc_send_packet_recv)\n", cb->pcb->ack_rcv, pinv, t_elapsed, x_recv));
+	else
+		TFRC_DEBUG((LOG_INFO, "TFRC - Receieved options on ack %llu: pinv=%u, t_elapsed=%u, x_recv=%u ! (tfrc_send_packet_recv)\n", cb->pcb->ack_rcv, pinv, t_elapsed_l, x_recv));
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
@@ -1000,7 +997,10 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 		microtime(&t_now);
 		timersub(&t_now, &(elm->t_sent), &t_now);
 		r_sample = t_now.tv_sec * 1000000 + t_now.tv_usec;
-		r_sample = r_sample - ((u_int32_t) t_elapsed) * 1000;	/* t_elapsed in ms */
+		if (t_elapsed)
+			r_sample = r_sample - ((u_int32_t) t_elapsed * 10); /* t_elapsed in us */	
+		else
+			r_sample = r_sample - (t_elapsed_l * 10);	/* t_elapsed in us */
 
 		/* Update RTT estimate by If (No feedback recv) R = R_sample;
 		 * Else R = q*R+(1-q)*R_sample; */
@@ -1008,8 +1008,8 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 			cb->state = TFRC_SSTATE_FBACK;
 			cb->rtt = r_sample;
 		} else {
-			cb->rtt = (u_int32_t) (TFRC_RTT_FILTER_CONST * ((double) (cb->rtt)) +
-			    (1 - TFRC_RTT_FILTER_CONST) * ((double) (r_sample)));
+			cb->rtt = (u_int32_t) (TFRC_RTT_FILTER_CONST * cb->rtt +
+			    (1 - TFRC_RTT_FILTER_CONST) * r_sample);
 		}
 
 		TFRC_DEBUG((LOG_INFO, "TFRC - New RTT estimate %u (tfrc_send_packet_recv)\n", cb->rtt));
@@ -1082,7 +1082,7 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 		}
 
 		/* Schedule no feedback timer to expire in max(4*R, 2*s/X) */
-		/* next_time_out = (u_int32_t) (2 * ((double) (cb->s)) * 1000000 / cb->x); */
+		/* next_time_out = (u_int32_t) (2 * cb->s * 1000000 / cb->x); */
 
 		x.num = 2;
 		x.denom = 1;
@@ -1126,7 +1126,7 @@ sar_release:
 /* Receiver side */
 
 /* Forward declarations */
-double tfrc_calcImean(struct tfrc_recv_ccb *);
+long tfrc_calclmean(struct tfrc_recv_ccb *);
 void tfrc_recv_send_feedback(struct tfrc_recv_ccb *);
 int tfrc_recv_add_hist(struct tfrc_recv_ccb *, struct r_hist_entry *);
 void tfrc_recv_detectLoss(struct tfrc_recv_ccb *);
@@ -1134,7 +1134,9 @@ u_int32_t tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *);
 void tfrc_recv_updateLI(struct tfrc_recv_ccb *, long, u_int8_t);
 
 /* Weights used to calculate loss event rate */
-const double tfrc_recv_w[] = {1, 1, 1, 1, 0.8, 0.6, 0.4, 0.2};
+/* const double tfrc_recv_w[] = { 1,  1,   1,   1,  0.8,  0.6, 0.4, 0.2}; */
+const struct fixpoint tfrc_recv_w[] = {{1,1},  {1,1},  {1,1},  {1,1},  {4,5},  {3,5}, {2,5}, {1,5}};
+
 /* Find a data packet in history
  * args:  cb - ccb of receiver
  *        elm - pointer to element (variable)
@@ -1176,14 +1178,15 @@ const double tfrc_recv_w[] = {1, 1, 1, 1, 0.8, 0.6, 0.4, 0.2};
  * returns: avarage loss interval
  * Tested u:OK
  */
-double
-tfrc_calcImean(struct tfrc_recv_ccb * cb)
+long 
+tfrc_calclmean(struct tfrc_recv_ccb * cb)
 {
 	struct li_hist_entry *elm;
-	double I_tot;
-	double I_tot0 = 0.0;
-	double I_tot1 = 0.0;
-	double W_tot = 0.0;
+	struct fixpoint l_tot;
+	struct fixpoint l_tot0 = {0,0};
+	struct fixpoint l_tot1 = {0,0};
+	struct fixpoint W_tot = {0, 0};
+	struct fixpoint tmp;
 	int i;
 	elm = TAILQ_FIRST(&(cb->li_hist));
 
@@ -1192,8 +1195,17 @@ tfrc_calcImean(struct tfrc_recv_ccb * cb)
 		if (elm == 0)
 			goto I_panic;
 #endif
+
+/* 
 		I_tot0 = I_tot0 + (elm->interval * tfrc_recv_w[i]);
 		W_tot = W_tot + tfrc_recv_w[i];
+*/
+		tmp.num = elm->interval; 
+		tmp.denom = 1;
+		fixpoint_mul(&tmp, &tmp, &tfrc_recv_w[i]);
+		fixpoint_add(&l_tot0, &l_tot0, &tmp);
+		fixpoint_add(&W_tot, &W_tot, &tfrc_recv_w[i]);
+
 		elm = TAILQ_NEXT(elm, linfo);
 	}
 
@@ -1205,23 +1217,48 @@ tfrc_calcImean(struct tfrc_recv_ccb * cb)
 		if (elm == 0)
 			goto I_panic;
 #endif
+/* 
 		I_tot1 = I_tot1 + (elm->interval * tfrc_recv_w[i - 1]);
+*/
+		tmp.num = elm->interval; 
+		tmp.denom = 1;
+		fixpoint_mul(&tmp, &tmp, &tfrc_recv_w[i-1]);
+		fixpoint_add(&l_tot1, &l_tot1, &tmp);
+
 		elm = TAILQ_NEXT(elm, linfo);
 	}
 
-	I_tot = I_tot0;		/* I_tot = max(I_tot0, I_tot1) */
+	/* I_tot = max(I_tot0, I_tot1) */
+	/*
+	I_tot = I_tot0;		
 	if (I_tot0 < I_tot1)
 		I_tot = I_tot1;
 
 	if (I_tot < W_tot)
 		I_tot = W_tot;
-
 	return (I_tot / W_tot);
+	*/
+
+	l_tot.num = l_tot0.num;
+	l_tot.denom = l_tot0.denom;
+	if (fixpoint_cmp(&l_tot0, &l_tot1) < 0){
+		l_tot.num = l_tot1.num;
+		l_tot.denom = l_tot1.denom;
+	}
+
+	if (fixpoint_cmp(&l_tot, &W_tot) < 0){
+		l_tot.num = W_tot.num;
+		l_tot.denom = W_tot.denom;
+	}
+	fixpoint_div(&tmp, &l_tot, &W_tot);
+	return(fixpoint_getlong(&tmp));
+
 #ifdef TFRCDEBUG
 I_panic:
-	panic("TFRC - Missing entry in interval history! (tfrc_calcImean)");
+	panic("TFRC - Missing entry in interval history! (tfrc_calclmean)");
 #endif
 }
+
 /*
  * Send a feedback packet
  * args: cb - ccb for receiver
@@ -1231,7 +1268,7 @@ void
 tfrc_recv_send_feedback(struct tfrc_recv_ccb * cb)
 {
 	u_int32_t x_recv, pinv;
-	u_int16_t t_elapsed;
+	u_int32_t t_elapsed;
 	struct r_hist_entry *elm;
 	struct fixpoint x;
 	struct timeval t_now, t_temp;
@@ -1243,7 +1280,7 @@ tfrc_recv_send_feedback(struct tfrc_recv_ccb * cb)
 		/*  if (cb->p < 0.00000000025)	-> 1/p > 4 000 000 000 */
 		pinv = 0xFFFFFFFF;
 	else {
-		/*	pinv = (u_int32_t) ((double) 1.0 / cb->p); */
+		/*	pinv = (u_int32_t) (1.0 / cb->p); */
 		x.num = 1;
 		x.denom = 1;
 		fixpoint_div(&x, &x, &(cb)->p);
@@ -1277,16 +1314,16 @@ tfrc_recv_send_feedback(struct tfrc_recv_ccb * cb)
 
 	microtime(&t_now);
 	timersub(&t_now, &elm->t_recv, &t_now);
-	t_elapsed = (u_int16_t) (t_now.tv_sec * 1000 + t_now.tv_usec / 1000);
+	t_elapsed = (u_int32_t) (t_now.tv_sec * 100000 + t_now.tv_usec / 10);
 
 	/* change byte order */
-	t_elapsed = htons(t_elapsed);
+	t_elapsed = htonl(t_elapsed);
 	x_recv = htonl(x_recv);
 	pinv = htonl(pinv);
 
 	/* add options from variables above */
 	if (dccp_add_option(cb->pcb, TFRC_OPT_LOSS_RATE, (char *) &pinv, 4)
-	    || dccp_add_option(cb->pcb, DCCP_OPT_ELAPSEDTIME, (char *) &t_elapsed, 2)
+	    || dccp_add_option(cb->pcb, DCCP_OPT_ELAPSEDTIME, (char *) &t_elapsed, 4)
 	    || dccp_add_option(cb->pcb, TFRC_OPT_RECEIVE_RATE, (char *) &x_recv, 4)) {
 		TFRC_DEBUG((LOG_INFO, "TFRC - Can't add options, aborting send feedback (tfrc_send_feedback)"));
 		/* todo: remove options */
@@ -1298,9 +1335,9 @@ tfrc_recv_send_feedback(struct tfrc_recv_ccb * cb)
 	cb->seq_last_counter = elm->seq;
 	microtime(&(cb->t_last_feedback));
 	cb->bytes_recv = 0;
-#if 0
-	TFRC_DEBUG((LOG_INFO, "TFRC - Sending a feedback packet with (t_elapsed %u, pinv %x, x_recv %u, ack=%llu) (tfrc_recv_send_feedback)\n", ntohs(t_elapsed), ntohl(pinv), ntohl(x_recv), elm->seq));
-#endif
+
+	TFRC_DEBUG_TIME((LOG_INFO, "TFRC - Sending a feedback packet with (t_elapsed %u, pinv %x, x_recv %u, ack=%llu) (tfrc_recv_send_feedback)\n", ntohs(t_elapsed), ntohl(pinv), ntohl(x_recv), elm->seq));
+
 	dccpstat.tfrcs_recv_fbacks++;
 	dccp_output(cb->pcb, 1);
 }
@@ -1831,9 +1868,10 @@ tfrc_recv_packet_recv(void *ccb, char *options, int optlen)
 				/* Calculate loss event rate */
 				if (!TAILQ_EMPTY(&(cb->li_hist))) {
 					cb->p.num = 1; 
-					cb->p.denom = tfrc_calcImean(cb);
+					cb->p.denom = tfrc_calclmean(cb);
 				}
 				/* check send conditions then send */
+
 				if (fixpoint_cmp(&(cb)->p, &p_prev) > 0) {
 					TFRC_DEBUG((LOG_INFO, "TFRC - Send a feedback packet because p>p_prev (tfrc_recv_packet_recv)\n"));
 					tfrc_recv_send_feedback(cb);

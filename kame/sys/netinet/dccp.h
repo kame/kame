@@ -1,4 +1,4 @@
-/*	$KAME: dccp.h,v 1.8 2005/07/27 06:27:24 nishida Exp $	*/
+/*	$KAME: dccp.h,v 1.9 2005/10/26 11:36:48 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -181,6 +181,7 @@ struct dccp_resethdr {
 #define DCCP_CCID		0x01
 #define DCCP_CSLEN		0x02
 #define DCCP_MAXSEG		0x04
+#define DCCP_SERVICE	0x08
 
 #define DCCP_NDP_LIMIT          16
 #define DCCP_SEQ_NUM_LIMIT      16777216
@@ -188,4 +189,5 @@ struct dccp_resethdr {
 #define DCCP_CONNECT_TIMER	(75 * hz)
 #define DCCP_CLOSE_TIMER	(75 * hz)
 #define DCCP_TIMEWAIT_TIMER	(60 * hz)
+#define DCCP_MAX_PKTS		100
 #endif

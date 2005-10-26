@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.61 2005/10/21 05:33:51 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.62 2005/10/26 11:36:49 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -65,7 +65,9 @@
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
  */
 
+#if 0
 #define DCCP_DEBUG_ON
+#endif
 #undef ACKDEBUG
 
 #ifdef __FreeBSD__
@@ -680,6 +682,9 @@ dccp_input(struct mbuf *m, ...)
 
 	DCCP_DEBUG((LOG_INFO, "Received DCCP packet with sequence number = %llu , gsn_rcv %llu\n", seqnr, dp->gsn_rcv));
 
+	/* store ccval */
+	dp->ccval = dh->dh_ccval;
+
 	if (dp->gsn_rcv == 281474976710656LL) dp->gsn_rcv = seqnr;
 	if (dp->gsn_rcv > (dp->loss_window / 4))
 		low_seqnr = (dp->gsn_rcv - (dp->loss_window / 4)) % 281474976710656LL;
@@ -920,6 +925,7 @@ dccp_input(struct mbuf *m, ...)
 
 			if (dh->dh_type == DCCP_TYPE_DATAACK && dp->cc_in_use[1] > 0) {
 				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
+//				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv! %llx %llx\n", dp->cc_in_use[1], dp->ack_snd, dp->seq_rcv));
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
@@ -969,7 +975,7 @@ dccp_input(struct mbuf *m, ...)
 			if (dp->cc_in_use[1] > 0) {
 				/* This is called so Acks on Acks can be handled */
 				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
-				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
+				DCCP_DEBUG((LOG_INFO, "Calling ACK *cc_sw[%u].cc_recv_packet_recv! %llx %llx\n", dp->cc_in_use[1], dp->ack_snd, dp->seq_rcv));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
 			break;
@@ -986,7 +992,7 @@ dccp_input(struct mbuf *m, ...)
 
 			if (dp->cc_in_use[1] > 0) {
 				if (!dp->ack_snd) dp->ack_snd = dp->seq_rcv;
-				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
+				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv! %llx %llx\n", dp->cc_in_use[1], dp->ack_snd, dp->seq_rcv));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
 			break;
@@ -1275,6 +1281,9 @@ dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
 	case DCCP_CCID:
 	case DCCP_CSLEN:
 	case DCCP_MAXSEG:
+#if 0
+	case DCCP_SERVICE:
+#endif
 		
 		if (m->m_len < sizeof(int)) {
 			error = EINVAL;
@@ -1283,7 +1292,7 @@ dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
 		optval = *mtod(m, int *);
 		switch (opt) {
 		case DCCP_CCID:
-				/* Add check that optval is a CCID we support!!! */
+			/* Add check that optval is a CCID we support!!! */
 			if (optval == 2 || optval == 3 || optval == 0) {
 				dp->pref_cc = optval;
 			} else {
@@ -1304,6 +1313,11 @@ dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
 				error = EINVAL;
 			}
 			break;
+#if 0
+		case DCCP_SERVICE:
+			/* XXX */
+			break;
+#endif
 		}
 		
 		break;
@@ -1540,14 +1554,14 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	u_int32_t hdrlen, optlen, extrah_len, cslen;
 	u_int8_t type;
 	char options[DCCP_MAX_OPTIONS *2];
-	long len;
+	long len, pktlen;
 	int isipv6 = 0;
 	int use_shortseq = 0;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
 #endif
 
-/*	DCCP_DEBUG((LOG_INFO, "dccp_output start!\n")); */
+	DCCP_DEBUG((LOG_INFO, "dccp_output start!\n"));
 
 #ifdef __FreeBSD__
 	isipv6 = (dp->d_inpcb->inp_vflag & INP_IPV6) != 0;
@@ -1557,7 +1571,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	isipv6 = (dp->inp_vflag & INP_IPV6) != 0;
 #endif
 
-/*	DCCP_DEBUG((LOG_INFO, "Going to send a DCCP packet!\n")); */
+	DCCP_DEBUG((LOG_INFO, "Going to send a DCCP packet!\n"));
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_assert(&dp->d_inpcb->inp_mtx, MA_OWNED);
 #endif
@@ -1579,6 +1593,24 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 		return 0;
 	}
 
+	if (so->so_snd.sb_cc){
+		pktlen = dp->pktlen[dp->pktlenidx];
+	} else 
+		pktlen = 0;
+
+	/* Check with CC if we can send... */
+	if (pktlen && dp->cc_in_use[0] > 0 && dp->state == DCCPS_ESTAB) {
+		if (!(*cc_sw[dp->cc_in_use[0]].cc_send_packet)(dp->cc_state[0], pktlen)) {
+			DCCP_DEBUG((LOG_INFO, "Not allowed to send right now\n"));
+			return 0;
+		}
+	}
+
+	if (pktlen) {
+		dp->pktcnt --;
+		dp->pktlenidx = (dp->pktlenidx +1) % DCCP_MAX_PKTS; 
+	}
+
 again:
 	sendalot = 0;
 
@@ -1587,21 +1619,16 @@ again:
 	 * before removing the packet
 	 */
 	off = 0;
-	len = (long)so->so_snd.sb_cc;
 	optlen = 0;
 
-	/* Check with CC if we can send... */
-	if (dp->cc_in_use[0] > 0 && dp->state == DCCPS_ESTAB) {
-		if (!(*cc_sw[dp->cc_in_use[0]].cc_send_packet)(dp->cc_state[0], len)) {
-			DCCP_DEBUG((LOG_INFO, "Not allowed to send right now\n"));
-			return 0;
-		}
-	}
-
-	if (len > dp->d_maxseg) {
+	if (pktlen > dp->d_maxseg) {
+		/* this should not happen */
+		DCCP_DEBUG((LOG_INFO, "packet will be fragmented! maxseg %d\n", dp->d_maxseg));
 		len = dp->d_maxseg;
+		pktlen -= len;
 		sendalot = 1;
-	}
+	} else
+		len = pktlen;
 
 	if (extra == DCCP_TYPE_RESET + 2) {
 		DCCP_DEBUG((LOG_INFO, "Force sending of DCCP TYPE_RESET! seq=%llu\n", dp->seq_snd));
@@ -2778,7 +2805,22 @@ dccp_send(struct socket *so, int flags, struct mbuf *m, struct mbuf *m_addr,
 		goto release;
 	}
 
+	if (m->m_pkthdr.len > dp->d_maxseg) {
+		/* XXX we should calculate packet size more carefully */
+		INP_UNLOCK(inp);
+		error = EINVAL;
+		goto release;
+	}
+
+	if (dp->pktcnt >= DCCP_MAX_PKTS) {
+		INP_UNLOCK(inp);
+		error = ENOBUFS;
+		goto release;
+	}
+
 	sbappend(&so->so_snd, m);
+	dp->pktlen[(dp->pktlenidx + dp->pktcnt) % DCCP_MAX_PKTS] = m->m_pkthdr.len; 
+	dp->pktcnt ++;
 
 	if (addr && dp->state == DCCPS_CLOSED) {
 #ifdef __FreeBSD__
@@ -3002,6 +3044,8 @@ dccp_newdccpcb(struct inpcb *inp)
 	dp->d_maxseg = 1400;
 	dp->ref_pseq.hi = 0;
 	dp->ref_pseq.lo = 0;
+	dp->pktlenidx = 0;
+	dp->pktcnt = 0;
 
 #ifdef __NetBSD__	
 	switch (family) {
@@ -3149,21 +3193,6 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 			}
 
 			switch (opt) {
-#if 0
-			    case DCCP_OPT_IGNORED:
-				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_IGNORED!\n"));
-				if (size != 4) {
-					DCCP_DEBUG((LOG_INFO, "Error, got a DCCP_OPT_IGNORED but size = %u (should be 4)\n", size));
-					return;
-				}
-				if (options[2] > 32 && options[2] < 36) {
-					/* Feature negotiations */
-					DCCP_DEBUG((LOG_INFO, "Remote DCCP did not understand feature %u, running dccp_remove_feature(dp, %u, %u)\n", options[3], options[2], options[3]));
-					dccp_remove_feature(dp, options[2], options[3]);
-				}
-				break;
-#endif
-
 			    case DCCP_OPT_RECV_BUF_DROPS:
 					DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_RECV_BUF_DROPS, size = %u!\n", size));
 					for (j=2; j < size; j++) {
@@ -4168,7 +4197,7 @@ dccp_nocc_packet_recv(void *ccb, char* options ,int optlen)
 {
 }
 
-#ifdef DCCP_DEBUG_ON
+#if 1
 void
 dccp_log(int level, char *format, ...)
 {

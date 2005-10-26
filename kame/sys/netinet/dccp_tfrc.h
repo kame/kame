@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.h,v 1.9 2005/10/21 05:33:51 nishida Exp $	*/
+/*	$KAME: dccp_tfrc.h,v 1.10 2005/10/26 11:36:49 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -39,7 +39,7 @@
 #define TFRC_MAX_PACKET_SIZE    65535
 
 #define TFRC_OPSYS_TIME_GRAN    10000
-#define TFRC_WIN_COUNT_LIMIT    256
+#define TFRC_WIN_COUNT_LIMIT    16
 #define TFRC_WIN_COUNT_PER_RTT  4
 #define TFRC_SMALLEST_P         0.00004
 /* 

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.26 2005/10/21 05:33:52 nishida Exp $	*/
+/*	$KAME: dccp_var.h,v 1.27 2005/10/26 11:36:49 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -143,6 +143,9 @@ struct dccpcb {
 	u_int8_t	inp_ip_ttl;
 	u_int8_t	inp_ip_tos;
 #endif
+	u_int8_t	pktlen[DCCP_MAX_PKTS];
+	u_int16_t	pktlenidx;
+	u_int16_t	pktcnt;
 };
 
 #ifdef _KERNEL
