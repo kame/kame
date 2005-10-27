@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.16 2005/10/26 17:03:15 mitsuya Exp $	*/
+/*	$KAME: binding.c,v 1.17 2005/10/27 02:46:57 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -733,6 +733,7 @@ int bul_check_ifid(hoainfo)
 	struct ifaddrs *ifa, *ifap;
 	struct sockaddr *sa;
 	struct in6_addr *address;
+	int is_same_ifid = 0;
 
 	if (getifaddrs(&ifap) != 0) {
 		syslog(LOG_ERR, "%s\n", strerror(errno));
@@ -749,14 +750,17 @@ int bul_check_ifid(hoainfo)
 		address = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
 
 		if (IN6_IS_ADDR_LINKLOCAL(address)) {
-			/* check the last 64 bit */
-
+			/* check interface identifier */
 			if (memcmp(&address->s6_addr[8],
 			    &(hoainfo->hinfo_hoa).s6_addr[8], 8) == 0)
-				return 1;
+				is_same_ifid = 1;
 		} else
 			continue;
 	}
+	freeifaddrs(ifap);
+
+	if (is_same_ifid)
+		return 1;
 
 	return 0;
 };

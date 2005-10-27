@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.25 2005/10/26 19:57:15 ryuji Exp $	*/
+/*	$KAME: shisad.h,v 1.26 2005/10/27 02:46:57 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -506,7 +506,6 @@ struct mip6_hpfxl *mnd_add_hpfxlist(struct in6_addr *,
 		    u_int16_t, struct mip6_hpfx_mn_exclusive *, 
 				    struct mip6_mipif *);
 struct mip6_mipif *mnd_get_mipif(u_int16_t);
-int send_na_home(struct in6_addr *, u_int16_t);
 int set_default_bu_lifetime(struct mip6_hoainfo *);
 int receive_hadisc_reply(struct mip6_dhaad_rep *, size_t);
 int receive_mpa(struct mip6_prefix_advert *, size_t, struct binding_update_list *);
