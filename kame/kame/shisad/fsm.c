@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.31 2005/10/27 03:42:30 mitsuya Exp $	*/
+/*	$KAME: fsm.c,v 1.32 2005/10/27 09:15:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -965,20 +965,12 @@ bul_reg_fsm(bul, event, data)
 
 		case MIP6_BUL_FSM_EVENT_REVERSE_PACKET:
 			/* in MIP6_BUL_REG_FSM_STATE_WAITA */
-			if ((bul->bul_flags & IP6_MH_BU_HOME) == 0) {
-				bul_stop_retrans_timer(bul);
+			/*
+			 * a mobile node can send and receive packets
+			 * while waiting for a binding acknowledgement
+			 * using a bi-directional tunnel.
+			 */
 
-				error = bul_rr_fsm(bul,
-				    MIP6_BUL_FSM_EVENT_START_RR, data);
-				if (error) {
-					syslog(LOG_ERR,
-					    "secondary fsm transition "
-					    "failed.\n");
-					return (error);
-				}
-
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_RRINIT;
-			}
 			break;
 
 		case MIP6_BUL_FSM_EVENT_ICMP6_PARAM_PROB:
@@ -1170,19 +1162,12 @@ bul_reg_fsm(bul, event, data)
 
 		case MIP6_BUL_FSM_EVENT_REVERSE_PACKET:
 			/* in MIP6_BUL_REG_FSM_STATE_WAITAR */
-			if ((bul->bul_flags & IP6_MH_BU_HOME) == 0) {
-				bul_stop_retrans_timer(bul);
-				error = bul_rr_fsm(bul,
-				    MIP6_BUL_FSM_EVENT_START_RR, data);
-				if (error) {
-					syslog(LOG_ERR,
-					    "secondary fsm transition "
-					    "failed.\n");	
-					return (error);
-				}
+			/*
+			 * a mobile node can send and receive packets
+			 * while waiting for a binding acknowledgement
+			 * using a bi-directional tunnel.
+			 */
 
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_RRREDO;
-			}
 			break;
 		}
 		break;
