@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.226 2005/10/27 10:29:17 ryuji Exp $	*/
+/*	$Id: mip6.c,v 1.227 2005/10/27 12:01:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -472,7 +472,7 @@ mip6_tunnel_input(mp, offp, proto)
 		   when receiving ICMPv6 error messages. */
 		if (nxt == IPPROTO_ICMPV6) {
 			m_copydata(m, off, sizeof(struct icmp6_hdr),
-			    &icmp6);
+			    (caddr_t)&icmp6);
 			if (icmp6.icmp6_type < ICMP6_ECHO_REQUEST)
 				goto dontstartrr;
 		}
