@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.34 2005/10/26 18:34:26 ryuji Exp $  */
+/*      $KAME: mh.c,v 1.35 2005/10/27 01:50:31 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1227,7 +1227,8 @@ send_bu(bul)
 			bup->ip6mhbu_lifetime = htons(TIMESUB(&homebul->bul_expire->exptime, &now) >> 2);
 		else 
 			bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
-	}
+	} else
+		bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
 
 	/* Adding Alternate Care-of Address Option */	
 	if (bul->bul_flags & IP6_MH_BU_HOME) {
