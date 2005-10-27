@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.6 2005/10/26 16:18:33 t-momose Exp $ */
+/* $Id: mipsock.h,v 1.7 2005/10/27 20:01:19 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -180,9 +180,10 @@ struct mipm_be_hint {
 struct mipm_dad {
 	struct mip_msghdr mipmbeh_hdr;
 	u_int16_t mipmdadh_message;
-#define MIPM_DAD_DO		0
-#define MIPM_DAD_SUCCESS	1
-#define MIPM_DAD_FAIL		2
+#define MIPM_DAD_DO		0	/* u to k */
+#define MIPM_DAD_STOP		1
+#define MIPM_DAD_SUCCESS	128	/* k to u */
+#define MIPM_DAD_FAIL		129
 	u_int16_t mipmdadh_ifindex;
 	struct in6_addr mipmdadh_addr6;
 };
@@ -216,5 +217,6 @@ void mips_notify_home_hint(u_int16_t, struct sockaddr *, u_int16_t);
 void mips_notify_rr_hint(struct sockaddr *, struct sockaddr *);
 void mips_notify_be_hint(struct sockaddr *, struct sockaddr *,
     struct sockaddr *, u_int8_t);
+void mips_notify_dad_result(int, struct in6_addr *, int);
 
 #endif /* !_NET_MIPSOCK_H_ */
