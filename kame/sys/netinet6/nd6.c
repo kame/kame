@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.392 2005/10/22 04:39:21 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.393 2005/10/27 10:29:17 ryuji Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -498,9 +498,9 @@ nd6_llinfo_settimer(ln, tick)
 #ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
-	int s;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+	int s;
 	s = splsoftnet();
 #endif
 
@@ -2316,6 +2316,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	struct m_tag *mtag;
 #endif /* IPSEC */
 #if defined(MIP6) && NMIP > 0
+	int presence;
 	struct ip6_hdr *ip6;
 	struct in6_ifaddr *src_ia6;
 	struct sockaddr_in6 sin6_src;
@@ -2344,7 +2345,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			(bul->mbul_flags & IP6_MH_BU_ROUTER) == 0) {
 			if (ip6->ip6_nxt == IPPROTO_MH)
 				goto dontstartrr;
-			if (mip6_get_logical_src_dst(m, &in6_src, &in6_dst)) {
+
+			if (mip6_get_ip6hdrinfo(m, &in6_src, 
+					&in6_dst, NULL, NULL, 1 /* logical */, &presence)) {
 				mip6log((LOG_ERR, "nd6_output: "
 				    "failed to get logical source and "
 				    "destination addresses.\n"));

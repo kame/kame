@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.225 2005/10/27 02:57:18 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.226 2005/10/27 10:29:17 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -275,6 +275,8 @@ mip6_input(mp, offp)
 	struct ip6_mh *mh;
 	int off = *offp, mhlen;
 	int sum;
+	struct in6_addr src, dst, hoa, rt;
+	int presence = 0;
 
 	mip6stat.mip6s_mh++;
 
@@ -295,6 +297,27 @@ mip6_input(mp, offp)
 		    __LINE__, mh->ip6mh_proto));
 		/* 9.2 discard and SHOULD send ICMP Parameter Problem */
 		mip6stat.mip6s_payloadproto++;
+
+                /* If either a home address option or a routing header
+		 * option is present, the source address of icmp6
+		 * error messages must be carefully choosen. If the
+		 * home registration is not yet completed, the home
+		 * address cannot be used for the source
+		 * address. Instead, the care-of address must be used
+		 * to send the icmp6 error messages.
+		 */
+		if (mip6_get_ip6hdrinfo(m, &src, &dst, &hoa, &rt, 0, &presence)==0) {
+		 	struct m_tag *mtag = NULL;
+			if (presence & RTHDR_PRESENT) {
+				bcopy(&rt, &ip6->ip6_dst, sizeof(struct in6_addr));
+			}
+       			mtag = ip6_findaux(m);
+        		if (mtag) {
+				bcopy(&rt, 
+					&((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
+					sizeof(struct in6_addr));
+			}
+		}
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 		    (caddr_t)&mh->ip6mh_proto - (caddr_t)ip6);
 		return (IPPROTO_DONE);
@@ -312,6 +335,26 @@ mip6_input(mp, offp)
 			__FILE__, __LINE__, mhlen));
 		/* 9.2 discard and SHOULD send ICMP Parameter Problem XXX */
 		ip6stat.ip6s_toosmall++;
+
+                /* If either a home address option or a routing header
+		 * option is present, the source address of icmp6
+		 * error messages must be carefully choosen. If the
+		 * home registration is not yet completed, the home
+		 * address cannot be used for the source
+		 * address. Instead, the care-of address must be used
+		 * to send the icmp6 error messages.
+		 */
+		if (mip6_get_ip6hdrinfo(m, &src, &dst, &hoa, &rt, 0, &presence)==0) {
+		 	struct m_tag *mtag = NULL;
+			if (presence & RTHDR_PRESENT) 
+				bcopy(&rt, &ip6->ip6_dst, sizeof(struct in6_addr));
+       			mtag = ip6_findaux(m);
+        		if (mtag) {
+				bcopy(&rt, 
+					&((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
+					sizeof(struct in6_addr));
+			}
+		}
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 			(caddr_t)&mh->ip6mh_len - (caddr_t)ip6);
 			return (IPPROTO_DONE);
@@ -400,6 +443,7 @@ mip6_tunnel_input(mp, offp, proto)
 	struct icmp6_hdr icmp6;
 	struct in6_addr src, dst;
 	struct mip6_bul_internal *bul, *cnbul;
+	int presence;
 #endif /* NMIP > 0 */
 #ifndef __FreeBSD__
 	int s;
@@ -423,6 +467,7 @@ mip6_tunnel_input(mp, offp, proto)
 		   when receiving tunneled MH messages. */
 		if (nxt == IPPROTO_MH)
 			goto dontstartrr;
+
 		/* a mobile node must not start the RR procedure
 		   when receiving ICMPv6 error messages. */
 		if (nxt == IPPROTO_ICMPV6) {
@@ -432,12 +477,13 @@ mip6_tunnel_input(mp, offp, proto)
 				goto dontstartrr;
 		}
 
-		if (mip6_get_logical_src_dst(m, &src, &dst)) {
+		if (mip6_get_ip6hdrinfo(m, &src, &dst, NULL, NULL, 1 /* logical */, &presence) < 0) {
 			mip6log((LOG_ERR, "mip6_tunnel_input: "
 			    "failded to get logical source and destination "
 			    "addresses.\n"));
 			return (IPPROTO_DONE);
 		}
+
 		bul = mip6_bul_get_home_agent(&dst);
 		if (bul == NULL)
 			goto dontstartrr;
@@ -1641,6 +1687,7 @@ mip6_rr_hint_ratelimit(dst, src)
 #endif /* NMIP > 0 */
 
 #if NMIP > 0
+#if 0
 int
 mip6_get_logical_src_dst(m, src, dst)
 	struct mbuf *m;
@@ -1746,7 +1793,154 @@ mip6_get_logical_src_dst(m, src, dst)
 	}
 	return (0);
 }
+#endif
+
+/* 
+ * Retrieve IPv6 header information such as 
+ *   - source and destination addresses
+ *   - addresses stored in Home Address option and Routing Header (if present)
+
+ * When there are IPv6 options, the address stored in the options are
+ * stored in hoa_addr and rt_addr with the logical flag set to
+ * zero. When the logical flag is set, rt_addr and hoa_addr pointer
+ * must not be NULL. 
+ * 
+ * On the other hand, if the logical flag is up,
+ * this function gives logical source and destination addreses and do
+ * not provide hoa_addr and rt_addr. 
+ */
+int
+mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
+	struct mbuf *m;
+	struct in6_addr *src_addr, *dst_addr, *hoa_addr, *rt_addr;
+	u_int8_t logical;
+	int *presence;
+{
+	struct ip6_hdr ip6;
+	struct ip6_dest ip6d;
+	u_int8_t *ip6dbuf;
+	struct ip6_rthdr ip6r;
+	u_int8_t *ip6o;
+	int off, proto, nxt, ip6dlen, ip6olen;
+
+	
+	if (m == NULL || src_addr == NULL || dst_addr == NULL || presence == NULL) {
+		mip6log((LOG_ERR, "%s: "
+		    "invalid argument (m, src, dst, presence) = (%p, %p, %p, %p).\n",
+			 __FUNCTION__, m, src_addr, dst_addr, presence));
+		return (-1);
+	}
+
+	if ((logical == 0) && (hoa_addr == NULL || rt_addr == NULL)) {
+		mip6log((LOG_ERR, "%s: "
+		    "invalid argument (hoa_addr, rt_addr) = (%p, %p).\n",
+			 __FUNCTION__, hoa_addr, rt_addr));
+		return (-1);
+	}
+
+	*presence = 0;
+
+	/* IPv6 header may be safe to mtod(), but be conservative. */
+	m_copydata(m, 0, sizeof(struct ip6_hdr), (caddr_t)&ip6);
+	*src_addr = ip6.ip6_src;
+	*dst_addr = ip6.ip6_dst;
+
+	off = 0;
+	proto = IPPROTO_IPV6;
+
+	/*
+	 * extract src and dst addresses from HAO and type 2 routing
+	 * header.  note that we cannot directly access to mbuf
+	 * (e.g. by using IP6_EXTHDR_CHECK/GET), since we use this
+	 * function in both input/output pathes.  In a output path,
+	 * the packet is not located on a contiguous memory.
+	 */
+	while ((off = ip6_nexthdr(m, off, proto, &nxt)) != -1) {
+
+		proto = nxt;
+		if (nxt == IPPROTO_DSTOPTS) {
+			m_copydata(m, off, sizeof(struct ip6_dest),
+			    (caddr_t)&ip6d);
+			ip6dlen = (ip6d.ip6d_len + 1) << 3;
+
+			/* copy entire destopt header. */
+			MALLOC(ip6dbuf, u_int8_t *, ip6dlen, M_IP6OPT,
+			    M_NOWAIT);
+			if (ip6dbuf == NULL) {
+				mip6log((LOG_ERR, "%s: "
+				    "failed to allocate memory to copy "
+				    "destination option.\n", __FUNCTION__));
+				return (-1);
+			}
+			m_copydata(m, off, ip6dlen, ip6dbuf);
+
+			ip6dlen -= sizeof(struct ip6_dest);
+			ip6o = ip6dbuf + sizeof(struct ip6_dest);
+			for (ip6olen = 0; ip6dlen > 0;
+			     ip6dlen -= ip6olen, ip6o += ip6olen) {
+				if (*ip6o != IP6OPT_PAD1 &&
+				    (ip6dlen < IP6OPT_MINLEN ||
+					2 + *(ip6o + 1) > ip6dlen)) {
+					mip6log((LOG_ERR,
+					    "%s: destopt too small.\n", __FUNCTION__));
+					FREE(ip6dbuf, M_IP6OPT);
+					return (-1);
+				}
+				if (*ip6o == IP6OPT_PAD1) {
+					/* special case. */
+					ip6olen = 1;
+				} else if (*ip6o == IP6OPT_HOME_ADDRESS) {
+					ip6olen = 2 + *(ip6o + 1);
+					if (ip6olen != sizeof(struct ip6_opt_home_address)) {
+						mip6log((LOG_ERR,
+						    "%s: invalid HAO length.\n", __FUNCTION__));
+						FREE(ip6dbuf, M_IP6OPT);
+						return (-1);
+					}
+					if (logical) {
+						bcopy(ip6o + 2, src_addr,
+						      sizeof(struct in6_addr));
+					} else {
+						bcopy(ip6o + 2, hoa_addr,
+						      sizeof(struct in6_addr));
+					}
+					*presence |= HOA_PRESENT;
+				} else {
+					/* ignore other options. */
+					ip6olen = 2 + *(ip6o + 1);
+				}
+			}
+			FREE(ip6dbuf, M_IP6OPT);
+		}
+		if (nxt == IPPROTO_ROUTING) {
+			m_copydata(m, off, sizeof(struct ip6_rthdr),
+			    (caddr_t)&ip6r);
+			/*
+			 * only type 2 routing header need to be
+			 * checked.
+			 */
+			if (ip6r.ip6r_type != IPV6_RTHDR_TYPE_2)
+				continue;
+			if (ip6r.ip6r_len != 2)
+				continue;
+#if 0
+			if (ip6r.ip6r_segleft != 1)
+				continue;
+#endif
+			if (logical) {
+				m_copydata(m, off + sizeof(struct ip6_rthdr2),
+					   sizeof(struct in6_addr), (caddr_t)dst_addr);
+			} else {
+				m_copydata(m, off + sizeof(struct ip6_rthdr2),
+					   sizeof(struct in6_addr), (caddr_t)rt_addr);
+			}
+			*presence |= RTHDR_PRESENT;
+		}
+	}
+	return (0);
+}
 #endif /* NMIP > 0 */
+
 
 #if NMIP > 0
 void

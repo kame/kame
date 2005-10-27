@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.124 2005/07/20 12:56:18 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.125 2005/10/27 10:29:17 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -186,8 +186,14 @@ int mip6_ifa6_is_addr_valid_hoa(struct in6_ifaddr *);
 u_int8_t *mip6_create_hoa_opt(struct in6_addr *); 
 struct ip6_opt_home_address *mip6_search_hoa_in_destopt(u_int8_t *);
 void mip6_probe_routers(void);
+#if 0
 int mip6_get_logical_src_dst(struct mbuf *, struct in6_addr *,
     struct in6_addr *);
+#endif
+int mip6_get_ip6hdrinfo(struct mbuf *, struct in6_addr *, struct in6_addr *, 
+		struct in6_addr *, struct in6_addr *, u_int8_t, int *);
+#define HOA_PRESENT 	0x01
+#define RTHDR_PRESENT 	0x02
 void mip6_md_scan(u_int16_t);
 
 

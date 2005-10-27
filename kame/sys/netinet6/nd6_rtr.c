@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.276 2005/10/20 07:57:57 kei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.277 2005/10/27 10:29:17 ryuji Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1377,7 +1377,7 @@ prelist_update(new, dr, m, mcast)
 	 * not create a new address from the prefix. The home agent
 	 * may defend the same address by proxy ND due to binding
 	 * registration.  Thus, the new address (i.e. Home Address)
-	 * will be added manually by shiisa.
+	 * will be added manually by shisa.
 	 */
 	if (MIP6_IS_MN && mip6_are_homeprefix(new)) {
 		mips_notify_home_hint(new->ndpr_ifp->if_index, 
