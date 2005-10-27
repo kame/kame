@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.14 2005/10/26 16:18:33 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.15 2005/10/27 20:53:13 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -536,14 +536,14 @@ mipus_output(m, va_alist)
                 break;
 #endif /* NMIP > 0 */
 
-		/* MIPM_DAD_DO is issued from userland */
+		/* MIPM_DAD_DO/STOP are issued from userland */
 		/* MIPM_DAD_SUCCESS or MIPM_DAD_FAIL is returned as a result of the DAD */
 	case MIPM_DAD:
 		mipmdad = (struct mipm_dad *)miph;
 		if (mipmdad->mipmdadh_message == MIPM_DAD_DO) {
-			/* 'do DAD' is ordered */
+			mip6_do_dad(&mipmdad->mipmdadh_addr6, mipmdad->mipmdadh_ifindex);
+		} else if (mipmdad->mipmdadh_message == MIPM_DAD_STOP) {
 			/* XXX */
-			;
 		}
 		break;
 
@@ -733,6 +733,26 @@ mips_notify_be_hint(src, coa, hoa, status)
 	bcopy(src, (void *)MIPMBEH_PEERADDR(be_hint), src->sa_len);
 	bcopy(coa, (void *)MIPMBEH_COA(be_hint), coa->sa_len);
 	bcopy(hoa, (void *)MIPMBEH_HOA(be_hint), hoa->sa_len);
+
+	raw_input(m, &mips_proto, &mips_src, &mips_dst);
+}
+
+void
+mips_notify_dad_result(message, addr, ifindex)
+	int message;
+	struct in6_addr *addr;
+	int ifindex;
+{
+	struct mipm_dad *mipmdad;
+	struct mbuf *m;
+	
+	m = mips_msg1(MIPM_DAD, sizeof(struct mipm_dad));
+	if (m == NULL)
+		return;
+	mipmdad = mtod(m, struct mipm_dad *);
+	mipmdad->mipmdadh_message = message;
+	mipmdad->mipmdadh_ifindex = ifindex;
+	bcopy(addr, &mipmdad->mipmdadh_addr6, sizeof(struct in6_addr));
 
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
 }
