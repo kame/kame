@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.224 2005/07/25 03:32:35 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.225 2005/10/27 02:57:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -396,7 +396,8 @@ mip6_tunnel_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 #if NMIP > 0
-	int nxt;
+	int off, nxt;
+	struct icmp6_hdr icmp6;
 	struct in6_addr src, dst;
 	struct mip6_bul_internal *bul, *cnbul;
 #endif /* NMIP > 0 */
@@ -415,11 +416,22 @@ mip6_tunnel_input(mp, offp, proto)
 		}
 
 #if NMIP > 0
-		if (ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt) == -1) {
+		if ((off = ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt)) == -1) {
 			return (IPPROTO_DONE);
 		}
+		/* a mobile node must not start the RR procedure
+		   when receiving tunneled MH messages. */
 		if (nxt == IPPROTO_MH)
 			goto dontstartrr;
+		/* a mobile node must not start the RR procedure
+		   when receiving ICMPv6 error messages. */
+		if (nxt == IPPROTO_ICMPV6) {
+			m_copydata(m, off, sizeof(struct icmp6_hdr),
+			    &icmp6);
+			if (icmp6.icmp6_type < ICMP6_ECHO_REQUEST)
+				goto dontstartrr;
+		}
+
 		if (mip6_get_logical_src_dst(m, &src, &dst)) {
 			mip6log((LOG_ERR, "mip6_tunnel_input: "
 			    "failded to get logical source and destination "
