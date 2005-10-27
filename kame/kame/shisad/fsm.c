@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.34 2005/10/27 11:02:21 ryuji Exp $	*/
+/*	$KAME: fsm.c,v 1.35 2005/10/27 12:00:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1523,6 +1523,34 @@ bul_reg_fsm(bul, event, data)
 
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
 			}
+			break;
+
+		case MIP6_BUL_FSM_EVENT_BACK:
+			/* in MIP6_BUL_REG_FSM_STATE_BOUND */
+			/*
+			 * a binding update entry for home
+			 * registration should not receive a binding
+			 * ack in this state.
+			 */
+			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0)
+				break;
+
+			/*
+			 * bul_fsm_back_preprocess sends a binding
+			 * update message if the received binding ack
+			 * message from a correspondent node has
+			 * status code IP6_MH_BAS_SEQNO_BAD.
+			 */
+			if (bul_fsm_back_preprocess(bul, data)) {
+				syslog(LOG_ERR,
+				    "processing a binding ack failed.\n");
+				return (-1);
+			}
+
+			bul_set_retrans_timer(bul, bul->bul_refresh << 2);
+
+			bul_set_expire_timer(bul, bul->bul_lifetime << 2);
+
 			break;
 
 		case MIP6_BUL_FSM_EVENT_REGISTERED:
