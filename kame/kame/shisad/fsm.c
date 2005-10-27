@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.32 2005/10/27 09:15:04 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.33 2005/10/27 10:04:42 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -29,6 +29,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <sys/types.h>
@@ -45,6 +46,7 @@
 #endif
 #include <net/if_dl.h>
 #include <net/mipsock.h>
+#include <arpa/inet.h>
 
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
@@ -2721,7 +2723,7 @@ bul_send_unsolicited_na(bul)
 	struct binding_update_list *bul;
 {
 	struct mip6_hoainfo *hinfo;
-	struct in6_addr lladdr = {{{0xff, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	struct in6_addr lladdr = {{{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, \
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }}};
 
 	if (bul == NULL)
@@ -2735,7 +2737,6 @@ bul_send_unsolicited_na(bul)
 
 	if (bul->bul_flags & IP6_MH_BU_LLOCAL) {
 		/* send an unsolicited na to my link-layer address. */
-		bzero(&lladdr, sizeof(lladdr));
 		memcpy(&lladdr.s6_addr[8], &hinfo->hinfo_hoa.s6_addr[8], 8);
 
 		send_unsolicited_na(bul->bul_home_ifindex, &lladdr);
