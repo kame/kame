@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.57 2005/06/16 18:29:30 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.58 2005/10/27 17:16:06 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,7 @@
 #ifdef MIP6
 #include "mip.h"
 #include <netinet/ip6mh.h>
+#include <netinet6/mip6_var.h>
 #endif
 
 #include <netinet/icmp6.h>
@@ -281,17 +282,63 @@ ip6_rthdr2(m, ip6, rh2)
 {
 	struct in6_addr *nextaddr, tmpaddr;
 	struct in6_ifaddr *ifa;
+	struct in6_ifaddr *ia;
+	int  myhoa = 0;
+	int  mycoa = 0;
 
-	if (rh2->ip6r2_segleft == 0)
+	if (rh2->ip6r2_segleft == 0) {
+		nextaddr = (struct in6_addr *)(rh2 + 1);
+
+		if (IN6_IS_ADDR_MULTICAST(nextaddr) ||
+		    IN6_IS_ADDR_UNSPECIFIED(nextaddr) ||
+		    IN6_IS_ADDR_V4MAPPED(nextaddr) ||
+		    IN6_IS_ADDR_V4COMPAT(nextaddr)) {
+			ip6stat.ip6s_badoptions++;
+			goto bad;
+		}
+
+		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||
+		    IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_dst) ||
+		    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst) ||
+		    IN6_IS_ADDR_V4COMPAT(&ip6->ip6_dst)) {
+			ip6stat.ip6s_badoptions++;
+			goto bad;
+		}
+
+		if ((ifa = ip6_getdstifaddr(m)) == NULL) 
+			goto bad;
+		if (in6_setscope(nextaddr, ifa->ia_ifp, NULL) != 0) {
+			ip6stat.ip6s_badscope++;
+			goto bad;
+		}
+
+		/*
+		 * check dst addr = hoa
+		 */
+		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+			if (ia->ia6_flags & IN6_IFF_HOME) 
+				if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &ia->ia_addr.sin6_addr))
+					myhoa = 1;
+
+			if (IN6_ARE_ADDR_EQUAL(nextaddr, &ia->ia_addr.sin6_addr))
+					mycoa = 1;
+		} 
+
+		if (!myhoa || !mycoa) {
+			ip6stat.ip6s_badoptions++;
+			goto bad;
+		} 
+
 		return (0);
+	} 
 
-	/* section 11.3.3 */
-	if (rh2->ip6r2_len != 2) {
+	if (rh2->ip6r2_segleft != 1) { 
 		ip6stat.ip6s_badoptions++;
 		goto bad;
 	}
-
-	if (rh2->ip6r2_segleft != 1) { 
+	
+	/* section 11.3.3 */
+	if (rh2->ip6r2_len != 2) {
 		ip6stat.ip6s_badoptions++;
 		goto bad;
 	}
@@ -331,8 +378,6 @@ ip6_rthdr2(m, ip6, rh2)
 		ip6stat.ip6s_badscope++;
 		goto bad;
 	}
-
-	/* Check BUL xxx */
 
 	/*
 	 * Swap the IPv6 destination address and nextaddr. Forward the packet.
