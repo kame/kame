@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.33 2005/10/27 10:04:42 mitsuya Exp $	*/
+/*	$KAME: fsm.c,v 1.34 2005/10/27 11:02:21 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2356,16 +2356,28 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	}
 #endif /* MIP_NEMO */
 
+	/* Sending MPS for IP6_MH_BAS_PRFX_DISCOV */
 	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_PRFX_DISCOV) {
-#if TODO
-		if (mip6_icmp6_mp_sol_output(&bul->bul_haddr,
-			&bul->bul_paddr)) {
-			syslog(LOG_ERR,
-			    "sending a mobile prefix solicitation message "
-			    "failed\n");
-			/* proceed anyway... */
-		}
-#endif
+                struct mip6_hoainfo *hoainfo = NULL;
+                struct mip6_hpfxl *hpfx = NULL;
+		struct mip6_mipif *mif;
+
+                hoainfo = hoainfo_find_withhoa(&bul->bul_hoainfo->hinfo_hoa);
+                if (hoainfo == NULL)
+                        return (-1);
+
+                mif = mnd_get_mipif(hoainfo->hinfo_ifindex);
+                if (mif == NULL)
+                        return (-1);
+
+                LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
+			if (inet_are_prefix_equal(&bul->bul_peeraddr, &hpfx->hpfx_prefix, 64))
+                                break;
+                }
+                if (hpfx == NULL)
+                        return (-1);
+
+                send_mps(hpfx);
 	}
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.3 2005/09/30 12:01:55 keiichi Exp $	*/
+/*	$KAME: hal.c,v 1.4 2005/10/27 11:02:22 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -344,6 +344,7 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 	int error;
 #ifdef MIP_MN
 	struct mip6_mipif *mif = NULL;
+	struct mip6_hpfx_mn_exclusive mnoption;
 #endif /* MIP_MN */
 	struct mip6_hpfxl *hpfx = NULL;
 	struct mip6_hpfx_list *hpfxhead = NULL; 
@@ -352,12 +353,6 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 	uint16_t       hai_preference = 0;
 	uint16_t       hai_lifetime = 0;
 	uint8_t        hai_pfxlen = 0;
-
-/*
-	if (debug)
-		syslog(LOG_INFO,
-		"ra lifetime = %d\n", ntohs(ra->nd_ra_router_lifetime));
-*/
 
 	/* parse nd_options */ 
 	memset(&ndopts, 0, sizeof(ndopts));
@@ -380,6 +375,7 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 
 	hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
 
+	/* Processing Prefix Option */
 	for (pt = (struct nd_opt_hdr *)ndopts.ndpi_start;
 	     pt <= (struct nd_opt_hdr *)ndopts.ndpi_end;
 	     pt = (struct nd_opt_hdr *)((caddr_t)pt +
@@ -388,6 +384,7 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 			
 		if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
 			continue;
+
 		pi = (struct nd_opt_prefix_info *)pt;
 
 		hai_preference = 0;
@@ -399,11 +396,6 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 			hai_lifetime = ntohl(pi->nd_opt_pi_valid_time);
 #endif
 			
-/*
-		if (debug)
-			syslog(LOG_INFO, "prefix lifetime = %d\n", hai_lifetime);
-*/
-
 		/* check H flag */
 		if (!(pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
 #if defined(MIP_HA)
@@ -421,9 +413,8 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 		}
 
 		/* 
-		 * when the prefix field does not
-		 * have global address, it should
-		 * be ignored 
+		 * when the prefix field does not have a global
+		 * address, the RA should be ignored 
 		 */
 		if (IN6_IS_ADDR_LINKLOCAL(in6_gladdr)
 		    || IN6_IS_ADDR_MULTICAST(in6_gladdr)
@@ -448,6 +439,7 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 		if (debug)
 			syslog(LOG_INFO, "RA received from HA (%s)\n", 
 			       ip6_sprintf(&pi->nd_opt_pi_prefix));
+
 		/* Home Agent Information Option */
 		if (ndopts.ndhai) {
 			hai_preference = ntohs(ndopts.ndhai->nd_opt_hai_preference);
@@ -476,23 +468,27 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 			
 			mip6_delete_hal(hpfx, &pi->nd_opt_pi_prefix);
 		} else {
-			/* need both linklocal and
-			   global address to add home prefix info */
+
+			/* 
+			 * Both linklocal and global address are added
+			 * into the home prefix info 
+			 */
 			if (in6_gladdr == NULL)
 				continue;
 			
+			/* Retrieve home prefix info entry for the received RA */
 			hpfx = mip6_get_hpfxlist(in6_gladdr, hai_pfxlen, hpfxhead);
 			if (hpfx == NULL) {
 #if defined(MIP_HA)			
 				continue;
 #else
-				/* add_hpfx XXXX ? */
+				/* configure HoA and add the new hpfx XXX */
+				continue;
 #endif /* MIP_HA */
 			}
-#ifdef MIP_HA
-			hpfx->hpfx_vltime = ntohl(pi->nd_opt_pi_valid_time);
-			hpfx->hpfx_pltime = ntohl(pi->nd_opt_pi_preferred_time);
-			
+
+
+#ifdef MIP_HA			
 			/* add or update home agent list */
 			if (had_add_hal(hpfx, in6_gladdr,
 					in6_lladdr, hai_lifetime, hai_preference, 0) == NULL) {
@@ -500,6 +496,21 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 				/* break; */
 				continue;
 			}
+#else
+			/* Update/Create Home Prefix List */ 
+			memset(&mnoption, 0, sizeof(mnoption)); 
+			mnoption.hpfxlist_vltime = 
+				ntohl(pi->nd_opt_pi_valid_time);
+			mnoption.hpfxlist_pltime = 
+				ntohl(pi->nd_opt_pi_preferred_time);
+			
+			mnd_add_hpfxlist(&pi->nd_opt_pi_prefix,
+					 pi->nd_opt_pi_prefix_len,
+					 &mnoption, mif);
+
+			/* add or update the home agent list */
+			if (mnd_add_hal(hpfx, in6_gladdr, 0) == NULL)
+				return (EINVAL);
 #endif /* MIP_HA */
 		}
 	}
