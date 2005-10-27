@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.22 2005/10/26 19:57:14 ryuji Exp $	*/
+/*	$KAME: mnd.c,v 1.23 2005/10/27 03:42:30 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1045,6 +1045,109 @@ send_haadreq(hoainfo, hoa_plen, src)
 	syslog(LOG_INFO, "send DHAAD REQUEST\n");
 
 	return (errno);
+}
+
+int
+send_unsolicited_na(ifindex, target)
+	int ifindex;
+	struct in6_addr *target;
+{
+	struct msghdr msg;
+	struct iovec iov;
+	struct sockaddr_in6 to;
+	char adata[512]; /* for ip6_pktopts and hlim */
+	char nabuf[1024]; /* for neighbor advertisement message */
+	struct cmsghdr *cmsgptr;
+	struct in6_pktinfo *pi;
+	struct nd_neighbor_advert *na;
+	size_t nalen;
+	struct nd_opt_hdr *ndopt;
+	struct ifaddrs *ifahead, *ifa;
+
+	if (!ifindex)
+		return (-1);
+	if (target == NULL)
+		return (-1);
+
+	bzero(&to, sizeof(to));
+	to.sin6_len = sizeof(to);
+	to.sin6_family = AF_INET6;
+	to.sin6_addr = in6addr_linklocal_allnodes;
+	to.sin6_scope_id = ifindex;
+
+	msg.msg_name = (void *)&to;
+	msg.msg_namelen = sizeof(to);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (void *)adata;
+	msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo))
+				+ CMSG_SPACE(sizeof(int));
+
+	/*
+	 * set the source address of an unsolicited neighbor
+	 * advertisement message
+	 */
+	cmsgptr = CMSG_FIRSTHDR(&msg);
+	pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
+	bzero(pi, sizeof(*pi));
+        pi->ipi6_ifindex = ifindex;
+        pi->ipi6_addr = *target;
+	cmsgptr->cmsg_level = IPPROTO_IPV6;
+	cmsgptr->cmsg_type = IPV6_PKTINFO;
+	cmsgptr->cmsg_len = CMSG_LEN(sizeof(*pi));
+	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+
+	/* HopLimit Information (always 255) */
+	cmsgptr->cmsg_level = IPPROTO_IPV6;
+	cmsgptr->cmsg_type = IPV6_HOPLIMIT;
+	cmsgptr->cmsg_len = CMSG_LEN(sizeof(int));
+	*(int *)(CMSG_DATA(cmsgptr)) = 255;
+	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+
+	bzero(nabuf, sizeof(nabuf));
+	na = (struct nd_neighbor_advert *)nabuf;
+	na->nd_na_type = ND_NEIGHBOR_ADVERT;
+	na->nd_na_code = 0;
+	na->nd_na_cksum = 0;
+	na->nd_na_flags_reserved = ND_NA_FLAG_OVERRIDE;
+	na->nd_na_target = *target;
+	nalen = sizeof(struct nd_neighbor_advert);
+
+	/* target link-layer option. */
+	if (getifaddrs(&ifahead) != 0) {
+		syslog(LOG_ERR,
+		    "retrieving my link-layer address failed.\n");
+		return (-1);
+	}
+#define ROUNDUP8(a) (1 + (((a) - 1) | 7))
+	for (ifa = ifahead; ifa; ifa = ifa->ifa_next) {
+		struct sockaddr_dl *sdl;
+		if (ifa->ifa_addr->sa_family != AF_LINK)
+			continue;
+		sdl = (struct sockaddr_dl *)(ifa->ifa_addr);
+		if (sdl->sdl_index != ifindex)
+			continue;
+		ndopt = (struct nd_opt_hdr *) (nabuf + nalen);
+		ndopt->nd_opt_type = ND_OPT_TARGET_LINKADDR;
+		ndopt->nd_opt_len = (ROUNDUP8(sdl->sdl_alen + 2)) >> 3;
+		memcpy((void *)(ndopt + 1), LLADDR(sdl), sdl->sdl_alen);
+		nalen += ROUNDUP8(sdl->sdl_alen + 2);
+		break;
+	}
+#undef ROUNDUP8
+	freeifaddrs(ifahead);
+
+	iov.iov_base = nabuf;
+	iov.iov_len = nalen;
+        
+	if (sendmsg(icmp6sock, &msg, 0) == -1) {
+		syslog(LOG_ERR,
+		   "sending an unsolicited neighbor advertisement message "
+		   "failed.\n");
+		return (-1);
+	}
+
+	return 0;
 }
 
 struct home_agent_list *

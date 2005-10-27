@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.26 2005/10/27 02:46:57 mitsuya Exp $	*/
+/*	$KAME: shisad.h,v 1.27 2005/10/27 03:42:30 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -458,6 +458,8 @@ struct binding_cache *mip6_bc_add(struct in6_addr *, struct in6_addr *,
 /* network.c */
 int set_ip6addr(char *, struct in6_addr *, int, int);
 int delete_ip6addr(char *, struct in6_addr *, int);
+int send_unsolicited_na(int, struct in6_addr *);
+
 #ifdef MIP_NEMO
 int nemo_tun_set(struct sockaddr *, struct sockaddr *, u_int16_t, int);
 int nemo_tun_del(char *);
