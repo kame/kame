@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.63 2005/10/26 18:46:33 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.64 2005/10/28 16:48:00 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -714,7 +714,7 @@ dccp_input(struct mbuf *m, ...)
 			optp = (u_char *)(dh + 1);
 	} else if (dh->dh_type == DCCP_TYPE_REQUEST) {
 		drqh = (struct dccp_requesthdr *)(dlh + 1);
-		if (ntohl(drqh->drqh_scode) != dp->scode){
+		if (drqh->drqh_scode != dp->scode){
 			DCCP_DEBUG((LOG_INFO, "service code in request packet doesn't match! %x %x\n", drqh->drqh_scode, dp->scode));
 			INP_UNLOCK(inp);
 			dp->state = DCCPS_SERVER_CLOSE; /* So disconnect2 doesn't send CLOSEREQ */
@@ -741,7 +741,7 @@ dccp_input(struct mbuf *m, ...)
 			if (dh->dh_type == DCCP_TYPE_RESPONSE) {
 				extrah_len += 4;
 				drqh = (struct dccp_requesthdr *)(dalh + 1);
-				if (ntohl(drqh->drqh_scode) != dp->scode){
+				if (drqh->drqh_scode != dp->scode){
 					DCCP_DEBUG((LOG_INFO, "service code in response packet doesn't match! %x %x\n", drqh->drqh_scode, dp->scode));
 					INP_UNLOCK(inp);
 					dp->state = DCCPS_CLIENT_CLOSE; /* So disconnect2 doesn't send CLOSEREQ */
@@ -1868,7 +1868,7 @@ again:
 
 	if (dh->dh_type == DCCP_TYPE_REQUEST) {
 		drqh = (struct dccp_requesthdr *)(dlh + 1);
-		drqh->drqh_scode = htonl(dp->scode);
+		drqh->drqh_scode = dp->scode;
 		optp = (u_char *)(drqh + 1);
 	} else if (dh->dh_type == DCCP_TYPE_RESET) {
 		drth = (struct dccp_resethdr *)(dlh + 1);
@@ -1897,7 +1897,7 @@ again:
 			if (dh->dh_type == DCCP_TYPE_RESPONSE) {
 				DCCP_DEBUG((LOG_INFO, "Sending dccp type response\n"));
 				drqh = (struct dccp_requesthdr *)(dalh + 1);
-				drqh->drqh_scode = htonl(dp->scode); 
+				drqh->drqh_scode = dp->scode; 
 				optp = (u_char *)(drqh + 1);
 			} else 
 				optp = (u_char *)(dalh + 1);
