@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.15 2005/10/27 20:53:13 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.16 2005/11/01 09:28:34 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -541,7 +541,7 @@ mipus_output(m, va_alist)
 	case MIPM_DAD:
 		mipmdad = (struct mipm_dad *)miph;
 		if (mipmdad->mipmdadh_message == MIPM_DAD_DO) {
-			mip6_do_dad(&mipmdad->mipmdadh_addr6, mipmdad->mipmdadh_ifindex);
+			/*mip6_do_dad(&mipmdad->mipmdadh_addr6, mipmdad->mipmdadh_ifindex);*/
 		} else if (mipmdad->mipmdadh_message == MIPM_DAD_STOP) {
 			/* XXX */
 		}
