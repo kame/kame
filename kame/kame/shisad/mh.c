@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.35 2005/10/27 01:50:31 ryuji Exp $  */
+/*      $KAME: mh.c,v 1.36 2005/11/03 12:59:27 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1975,14 +1975,14 @@ send_mps(hpfx)
 			 sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN);
 	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 
-	hpfx->hpfx_mipif->mipif_mps_id = (random() >> 16);
+	hpfx->hpfx_mipif->mipif_mps_id = random(); 
 
         bzero(buf, sizeof(buf));
         mpfx = (struct mip6_prefix_solicit *)buf;
         mpfx->mip6_ps_type = MIP6_PREFIX_SOLICIT;
         mpfx->mip6_ps_code = 0;
         mpfx->mip6_ps_cksum = 0;
-        mpfx->mip6_ps_id = htonl(hpfx->hpfx_mipif->mipif_mps_id);
+        mpfx->mip6_ps_id = htons(hpfx->hpfx_mipif->mipif_mps_id);
         mpfx->mip6_ps_reserved = 0;
         mpfxlen = sizeof(struct mip6_prefix_solicit);
 

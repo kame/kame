@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.4 2005/10/27 11:02:22 ryuji Exp $	*/
+/*	$KAME: hal.c,v 1.5 2005/11/03 12:59:27 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -56,6 +56,7 @@
 #include "shisad.h"
 
 extern struct mip6_hpfx_list hpfx_head; 
+extern struct mip6_mipif_list mipifhead;
 
 #ifdef MIP_MN
 /* search the best HA for hoainfo */
@@ -362,17 +363,6 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 	if (error)
 		return (error);
 
-#if defined(MIP_HA)
-	hpfxhead = &hpfx_head;
-#elif defined(MIP_MN) /* MIP_MN */
-	mif = mnd_get_mipif(receivedifindex);
-	if (mif == NULL)
-		return (0);
-	hpfxhead = &mif->mipif_hprefx_head; 
-#endif /* MIP_HA */
-	if (hpfxhead == NULL)
-		return (0);
-
 	hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
 
 	/* Processing Prefix Option */
@@ -395,6 +385,26 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 		if (hai_lifetime == 0)
 			hai_lifetime = ntohl(pi->nd_opt_pi_valid_time);
 #endif
+
+		/* Find the target hpfx entry */
+#if defined(MIP_HA)
+		hpfxhead = &hpfx_head;
+#elif defined(MIP_MN) /* MIP_MN */
+		LIST_FOREACH(mif, &mipifhead, mipif_entry) {
+			LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
+				if (inet_are_prefix_equal(&hpfx->hpfx_prefix,
+					  in6_gladdr, hai_pfxlen)) 
+					goto hpfx_find;
+			}
+		}
+	hpfx_find:
+		if (mif == NULL || hpfx == NULL)
+			return (0);
+
+		hpfxhead = &mif->mipif_hprefx_head; 
+#endif /* MIP_HA */
+		if (hpfxhead == NULL)
+			return (0);
 			
 		/* check H flag */
 		if (!(pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
@@ -444,7 +454,6 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 		if (ndopts.ndhai) {
 			hai_preference = ntohs(ndopts.ndhai->nd_opt_hai_preference);
 			hai_lifetime = ntohs(ndopts.ndhai->nd_opt_hai_lifetime);
-			
 			if (debug)
 				syslog(LOG_INFO, 
 				       "hainfo option found in RA (pref=%d,life=%d)\n", 
@@ -482,7 +491,11 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 #if defined(MIP_HA)			
 				continue;
 #else
-				/* configure HoA and add the new hpfx XXX */
+				/* 
+				 * MN should configure a new HoA for
+				 * the received prefix, however, SHISA
+				 * will not support this operation 
+				 */
 				continue;
 #endif /* MIP_HA */
 			}
@@ -491,7 +504,7 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 #ifdef MIP_HA			
 			/* add or update home agent list */
 			if (had_add_hal(hpfx, in6_gladdr,
-					in6_lladdr, hai_lifetime, hai_preference, 0) == NULL) {
+				in6_lladdr, hai_lifetime, hai_preference, 0) == NULL) {
 				/* error = EINVAL; */
 				/* break; */
 				continue;
@@ -503,10 +516,9 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 				ntohl(pi->nd_opt_pi_valid_time);
 			mnoption.hpfxlist_pltime = 
 				ntohl(pi->nd_opt_pi_preferred_time);
-			
-			mnd_add_hpfxlist(&pi->nd_opt_pi_prefix,
-					 pi->nd_opt_pi_prefix_len,
-					 &mnoption, mif);
+
+			if (mnd_add_hpfxlist(in6_gladdr,hai_pfxlen, &mnoption, mif) == NULL)
+				return (EINVAL);
 
 			/* add or update the home agent list */
 			if (mnd_add_hal(hpfx, in6_gladdr, 0) == NULL)

@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.23 2005/10/27 03:42:30 mitsuya Exp $	*/
+/*	$KAME: mnd.c,v 1.24 2005/11/03 12:59:27 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1253,10 +1253,20 @@ hpfxlist_expire_timer(arg)
 		syslog(LOG_INFO, 
 		       "Lifetime for the Home Prefix %s is expired\n", 
 		       ip6_sprintf(&hpfx->hpfx_prefix));
+
 		/* delete HoA XXXX */
-		;
+
+		send_mps(hpfx);
+
+		hpfxlist_set_expire_timer(hpfx, 
+			  ((hpfx->hpfx_vltime - now) > 5) ? (hpfx->hpfx_vltime - now):5);
+
 		return;
 	}
+
+	syslog(LOG_INFO, 
+	       "Lifetime for the Home Prefix %s is soon expired\n", 
+	       	ip6_sprintf(&hpfx->hpfx_prefix));
 
 	/* Soliciting Mobile Prefixes managed by the Home Agent */
 	send_mps(hpfx);
@@ -1291,7 +1301,7 @@ mnd_add_hpfxlist(home_prefix, home_prefixlen, hpfx_mnoption, mipif)
 			hpfx->hpfx_pltime = hpfx_mnoption->hpfxlist_pltime;
 			hpfx->hpfx_plexpire = now + hpfx->hpfx_pltime;
 
-			hpfxlist_set_expire_timer(hpfx, hpfx->hpfx_pltime);
+			hpfxlist_set_expire_timer(hpfx, (hpfx->hpfx_pltime - 5));
 		}
 		
 		return (hpfx);
@@ -1308,8 +1318,8 @@ mnd_add_hpfxlist(home_prefix, home_prefixlen, hpfx_mnoption, mipif)
 		hpfx->hpfx_vlexpire = now + hpfx->hpfx_vltime;
 		hpfx->hpfx_pltime = hpfx_mnoption->hpfxlist_pltime;
 		hpfx->hpfx_plexpire = now + hpfx->hpfx_pltime;
-		
-		hpfxlist_set_expire_timer(hpfx, hpfx->hpfx_pltime);
+
+		hpfxlist_set_expire_timer(hpfx, (hpfx->hpfx_pltime - 5));
 	}
 
 	LIST_INIT(&hpfx->hpfx_hal_head);
@@ -1578,7 +1588,7 @@ receive_mpa(mpa, mpalen, bul)
 	 * MPA. (sec 11.4.3)
 	 */
 	LIST_FOREACH(mif, &mipifhead, mipif_entry) {
-		if (mif->mipif_mps_id == ntohl(mpa->mip6_pa_id))
+		if (mif->mipif_mps_id == ntohs(mpa->mip6_pa_id))
 			break;
 	}
 	if (mif == NULL) { /* Unsolicited MPA */
@@ -1608,7 +1618,6 @@ receive_mpa(mpa, mpalen, bul)
 	}
 
 	/* Solicited MPA */
-
 	memset(&ndopts, 0, sizeof(ndopts));
 	error = mip6_get_nd6options(&ndopts,
 				    (char *)mpa + sizeof(struct mip6_prefix_advert),
