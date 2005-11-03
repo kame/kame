@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.65 2005/11/03 06:15:56 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.66 2005/11/03 14:59:28 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -164,9 +164,12 @@
 extern struct dccp_cc_sw cc_sw[];
 
 int	dccp_log_in_vain = 1;
+int	dccp_do_feature_nego = 1;
 #ifdef __FreeBSD__
 SYSCTL_INT(_net_inet_dccp, OID_AUTO, dccp_log_in_vain, CTLFLAG_RW, 
     &dccp_log_in_vain, 0, "Log all incoming DCCP packets");
+SYSCTL_INT(_net_inet_dccp, OID_AUTO, do_feature_nego, CTLFLAG_RW, 
+    &dccp_do_fature_nego, 0, "Enable feature negotiation");
 #endif
 
 struct	inpcbhead dccpb;		/* from dccp_var.h */
@@ -4221,5 +4224,49 @@ dccp_log(int level, char *format, ...)
 	va_end(ap);
 #endif
 	return;
+}
+#endif
+
+#ifdef __NetBSD__
+/*
+ * Sysctl for dccp variables.
+ */
+SYSCTL_SETUP(sysctl_net_inet_dccp_setup, "sysctl net.inet.dccp subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		CTLFLAG_PERMANENT,
+		CTLTYPE_NODE, "net", NULL,
+		NULL, 0, NULL, 0,
+		CTL_NET, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		CTLFLAG_PERMANENT,
+		CTLTYPE_NODE, "inet", NULL,
+		NULL, 0, NULL, 0,
+		CTL_NET, PF_INET, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		CTLFLAG_PERMANENT,
+		CTLTYPE_NODE, "dccp",
+		SYSCTL_DESCR("DCCPv4 related settings"),
+		NULL, 0, NULL, 0,
+		CTL_NET, PF_INET, IPPROTO_DCCP, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		CTLTYPE_INT, "dccp_log_in_vain",
+		SYSCTL_DESCR("log all connection attempt"),
+		NULL, 0, &dccp_log_in_vain, 0,
+		CTL_NET, PF_INET, IPPROTO_DCCP, DCCPCTL_LOGINVAIN,
+		CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		CTLTYPE_INT, "do_feature_nego",
+		SYSCTL_DESCR("enable feature negotiation"),
+		NULL, 0, &dccp_do_feature_nego, 0,
+		CTL_NET, PF_INET, IPPROTO_DCCP, DCCPCTL_DOFEATURENEGO,
+		CTL_EOL);
 }
 #endif

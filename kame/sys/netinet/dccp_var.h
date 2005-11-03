@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.28 2005/10/26 18:46:33 nishida Exp $	*/
+/*	$KAME: dccp_var.h,v 1.29 2005/11/03 14:59:28 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -226,6 +226,12 @@ struct	dccpstat {
 };
 
 /*
+ * Names for DCCP sysctl objects
+ */
+#define DCCPCTL_LOGINVAIN       	1 
+#define DCCPCTL_DOFEATURENEGO       2 
+
+/*
  *	DCCP States
  */
 
@@ -308,6 +314,7 @@ extern u_long	dccp_recvspace;
 extern struct	dccpstat dccpstat; /* dccp statistics */
 extern int	dccp_log_in_vain; /* if we should log connections to
 				     ports w/o listeners */
+extern int	dccp_do_feature_nego; 
 
 extern struct inpcbtable dccpbtable;
 
