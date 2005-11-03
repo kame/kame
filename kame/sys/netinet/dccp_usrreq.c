@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.64 2005/10/28 16:48:00 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.65 2005/11/03 06:15:56 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1824,7 +1824,7 @@ again:
 	{
 		ip = mtod(m, struct ip *);
 		dh = (struct dccphdr *)(ip + 1);
-		bzero(ip, sizeof(ip));
+		bzero(ip, sizeof(struct ip));
 		ip->ip_p = IPPROTO_DCCP;
 		ip->ip_src = inp->inp_laddr;
 		ip->ip_dst = inp->inp_faddr;
