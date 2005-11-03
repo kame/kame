@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.162 2005/07/27 11:00:01 suz Exp $	*/
+/*	$KAME: in6_proto.c,v 1.163 2005/11/03 10:26:03 nishida Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -330,7 +330,7 @@ struct ip6protosw inet6sw[] = {
 },
 #endif /* SCTP */
 #ifdef DCCP
-{ SOCK_DGRAM,	&inet6domain,	IPPROTO_DCCP,	PR_CONNREQUIRED|PR_ATOMIC|PR_LISTEN,
+{ SOCK_CONN_DGRAM,	&inet6domain,	IPPROTO_DCCP,	PR_CONNREQUIRED|PR_ATOMIC|PR_LISTEN,
   dccp6_input,	0,		dccp6_ctlinput,	dccp_ctloutput,
 #ifdef __FreeBSD__
   0,
