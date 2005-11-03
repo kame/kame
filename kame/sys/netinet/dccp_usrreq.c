@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.66 2005/11/03 14:59:28 nishida Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.67 2005/11/03 16:05:04 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -169,7 +169,7 @@ int	dccp_do_feature_nego = 1;
 SYSCTL_INT(_net_inet_dccp, OID_AUTO, dccp_log_in_vain, CTLFLAG_RW, 
     &dccp_log_in_vain, 0, "Log all incoming DCCP packets");
 SYSCTL_INT(_net_inet_dccp, OID_AUTO, do_feature_nego, CTLFLAG_RW, 
-    &dccp_do_fature_nego, 0, "Enable feature negotiation");
+    &dccp_do_feature_nego, 0, "Enable feature negotiation");
 #endif
 
 struct	inpcbhead dccpb;		/* from dccp_var.h */
@@ -2464,8 +2464,10 @@ dccp_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
 #endif
 
-	test[0] = dp->pref_cc;
-	dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 1);
+	if (dccp_do_feature_nego){
+		test[0] = dp->pref_cc;
+		dccp_add_feature(dp, DCCP_OPT_CHANGE_R, DCCP_FEATURE_CC, test, 1);
+	}
 
 	error = dccp_output(dp, 0);
 
@@ -3050,8 +3052,14 @@ dccp_newdccpcb(struct inpcb *inp)
 	dp->shortseq = 0;
 	dp->gsn_rcv = 281474976710656LL;
 	dp->optlen = 0;
-	dp->cc_in_use[0] = -1;
-	dp->cc_in_use[1] = -1;
+	if (dccp_do_feature_nego){
+		dp->cc_in_use[0] = -1;
+		dp->cc_in_use[1] = -1;
+	} else {
+		/* for compatibility with linux */
+		dp->cc_in_use[0] = 4; 
+		dp->cc_in_use[1] = 4;
+	}
 	dp->av_size = 0; /* no ack vector initially */
 	dp->remote_ackvector = 0; /* no ack vector on remote side initially */
 	dp->retrans = 200;
@@ -3087,6 +3095,11 @@ dccp_newdccpcb(struct inpcb *inp)
 	inp->inp_ip.ip_ttl = ip_defttl;
 #endif
 #endif
+	if (!dccp_do_feature_nego){
+		dp->cc_state[0] = (*cc_sw[4].cc_send_init)(dp);
+		dp->cc_state[1] = (*cc_sw[4].cc_recv_init)(dp);
+	}
+
 	return dp;
 }
 
