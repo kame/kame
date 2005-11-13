@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.227 2005/10/27 12:01:14 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.228 2005/11/13 18:59:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -951,7 +951,7 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	    (struct mip_softc *)ia6_hoa->ia_ifp, bid);
 	if (mbul == NULL)
 		return (-1);
-	LIST_INSERT_HEAD(&ia6_hoa->ia6_mbul_list, mbul, mbul_entry);
+	LIST_INSERT_HEAD(MBUL_LIST(ia6_hoa), mbul, mbul_entry);
 
 	/* 
 	 * tunnel setup only when the requested bul is for home
@@ -1075,10 +1075,10 @@ mip6_bul_remove_all()
 				continue;
 			ia6 = (struct in6_ifaddr *)ifa;
 			
-			if (LIST_EMPTY(&ia6->ia6_mbul_list))
+			if (LIST_EMPTY(MBUL_LIST(ia6)))
 				continue;
 
-			for (mbul = LIST_FIRST(&ia6->ia6_mbul_list); mbul;
+			for (mbul = LIST_FIRST(MBUL_LIST(ia6)); mbul;
 			     mbul = nmbul) {
 				nmbul = LIST_NEXT(mbul, mbul_entry);
 				mip6_bul_remove(mbul);
@@ -1104,7 +1104,7 @@ mip6_bul_get(src, dst, bid)
 	if (ia6_src == NULL)
 		return (NULL);
 	
-	for (mbul = LIST_FIRST(&ia6_src->ia6_mbul_list); mbul;
+	for (mbul = LIST_FIRST(MBUL_LIST(&ia6_src)); mbul;
 	     mbul = LIST_NEXT(mbul, mbul_entry)) {
 #ifdef MIP6_MCOA
 		if (bid && (bid =! mbul->mbul_bid))
@@ -1132,7 +1132,7 @@ mip6_bul_get_home_agent(src)
 	if (ia6_src == NULL)
 		return (NULL);
 
-	for (mbul = LIST_FIRST(&ia6_src->ia6_mbul_list); mbul;
+	for (mbul = LIST_FIRST(MBUL_LIST(&ia6_src)); mbul;
 	     mbul = LIST_NEXT(mbul, mbul_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(src, &mbul->mbul_hoa)
 		    && (mbul->mbul_flags & IP6_MH_BU_HOME) != 0)

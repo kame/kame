@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.c,v 1.7 2005/08/17 01:10:13 keiichi Exp $	*/
+/*	$KAME: if_mip.c,v 1.8 2005/11/13 18:59:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -421,10 +421,10 @@ mip_ioctl(ifp, cmd, data)
 				continue;
 
 			ia6 = (struct in6_ifaddr *)ifa;
-			if (LIST_EMPTY(&ia6->ia6_mbul_list)) 
+			if (LIST_EMPTY(MBUL_LIST(ia6)))
 				continue;
 			
-			for (mbul = LIST_FIRST(&ia6->ia6_mbul_list); mbul;
+			for (mbul = LIST_FIRST(MBUL_LIST(ia6)); mbul;
 			     mbul = nmbul) {
 				nmbul = LIST_NEXT(mbul, mbul_entry);
 				
