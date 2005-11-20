@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.24 2005/11/03 12:59:27 ryuji Exp $	*/
+/*	$KAME: mnd.c,v 1.25 2005/11/20 13:12:20 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1591,6 +1591,7 @@ receive_mpa(mpa, mpalen, bul)
 		if (mif->mipif_mps_id == ntohs(mpa->mip6_pa_id))
 			break;
 	}
+
 	if (mif == NULL) { /* Unsolicited MPA */
 		struct mip6_hoainfo *hoainfo = NULL;
 		struct mip6_hpfxl *hpfx = NULL;
@@ -1631,6 +1632,7 @@ receive_mpa(mpa, mpalen, bul)
 		
 		if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
 			continue;
+
 		pi = (struct nd_opt_prefix_info *)pt;
 			
 		if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
@@ -1646,7 +1648,9 @@ receive_mpa(mpa, mpalen, bul)
 			ntohl(pi->nd_opt_pi_valid_time);
 		mnoption.hpfxlist_pltime = 
 			ntohl(pi->nd_opt_pi_preferred_time);
-			
+		
+		/* XXX check the lifetime and send BU if possible */
+		
 		mnd_add_hpfxlist(&pi->nd_opt_pi_prefix,
 				 pi->nd_opt_pi_prefix_len,
 				 &mnoption, mif);

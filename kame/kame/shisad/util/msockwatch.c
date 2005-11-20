@@ -1,4 +1,4 @@
-/*      $KAME: msockwatch.c,v 1.1 2004/12/09 02:18:51 t-momose Exp $  */
+/*      $KAME: msockwatch.c,v 1.2 2005/11/20 13:12:21 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -43,7 +43,7 @@
 #include <net/mipsock.h>
 
 
-int
+void
 main(int argc,char **argv) {
   	char msg[2056], addr_buf[256];
 	int fd, n;
@@ -52,7 +52,7 @@ main(int argc,char **argv) {
 	if ((fd = socket (PF_MOBILITY, SOCK_RAW, NULL)) < 0){ 
 		perror("MIP sock: socket()"); 
 		close(fd); 
-		return 0; 
+		return; 
 	}
 
   	while(1){
@@ -67,8 +67,6 @@ main(int argc,char **argv) {
 			continue;
 		}
 
-		//printf ("-- read %d byte from MIP socket--\n", n);
-
 		switch(miphdr->miph_type) {
 		case MIPM_BC_ADD:
 		case MIPM_BC_UPDATE:
@@ -79,7 +77,7 @@ main(int argc,char **argv) {
 
 			if (mipc->mipc_msglen < 
 			    sizeof(struct mipm_bc_info) + sizeof(struct sockaddr_in6) * 3) {
-				printf("received buffer size is somehow small %d\n", mipc->mipc_msglen);
+				printf("received buffer size is small\n");
 				break;
 			}
 			
@@ -121,8 +119,9 @@ main(int argc,char **argv) {
 
 			mipu = (struct mipm_bul_info *)msg;
 			if (mipu->mipu_msglen < 
-			    sizeof(struct mipm_bul_info) + sizeof(struct sockaddr_in6) * 3) {
-				printf("received buffer size is somehow small %d\n", mipu->mipu_msglen);
+			    sizeof(struct mipm_bul_info) + 
+			    	sizeof(struct sockaddr_in6) * 3) {
+				printf("received buffer size is small\n");
 				break;
 			}
 			
@@ -201,6 +200,9 @@ main(int argc,char **argv) {
 			case MIPM_MD_DEREGFOREIGN:
 				printf("** movememnt detection De-Registration from Foreign **\n");
 				break;
+			case MIPM_MD_SCAN:
+				printf("** movememnt detection Reset Router lifetime **\n");
+				break;
 			default:
 				break;
 			}
@@ -253,5 +255,5 @@ main(int argc,char **argv) {
 		}
 	}
 
-	return 0;
+	return;
 }
