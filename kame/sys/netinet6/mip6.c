@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.228 2005/11/13 18:59:16 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.229 2005/11/20 10:20:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1104,7 +1104,7 @@ mip6_bul_get(src, dst, bid)
 	if (ia6_src == NULL)
 		return (NULL);
 	
-	for (mbul = LIST_FIRST(MBUL_LIST(&ia6_src)); mbul;
+	for (mbul = LIST_FIRST(MBUL_LIST(ia6_src)); mbul;
 	     mbul = LIST_NEXT(mbul, mbul_entry)) {
 #ifdef MIP6_MCOA
 		if (bid && (bid =! mbul->mbul_bid))
@@ -1132,7 +1132,7 @@ mip6_bul_get_home_agent(src)
 	if (ia6_src == NULL)
 		return (NULL);
 
-	for (mbul = LIST_FIRST(MBUL_LIST(&ia6_src)); mbul;
+	for (mbul = LIST_FIRST(MBUL_LIST(ia6_src)); mbul;
 	     mbul = LIST_NEXT(mbul, mbul_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(src, &mbul->mbul_hoa)
 		    && (mbul->mbul_flags & IP6_MH_BU_HOME) != 0)
