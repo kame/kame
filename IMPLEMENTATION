@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.397 2005/11/16 06:19:36 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.398 2005/11/23 04:57:16 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -236,6 +236,7 @@ RFC4007: IPv6 Scoped Address Architecture
 RFC4191: Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
     * host-side: only router preference is supported.
+RFC4242: Information Refresh Time Option for DHCPv6
 
 draft-chakrabarti-mobileip-mipext-advapi-02.txt:
 	Extension to Sockets API for Mobile IPv6
@@ -254,8 +255,7 @@ draft-ietf-ipngwg-icmp-v3-02.txt: ICMPv6 for IPv6 specification (revised)
     * See 1.9 in this document for details.
 draft-itojun-ipv6-tcp-to-anycast-01.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
-draft-ietf-dhc-lifetime-02.txt: Information Refresh Time Option for DHCPv6
-draft-ietf-ipv6-rfc2462bis-06.txt: IPv6 Stateless Address
+draft-ietf-ipv6-rfc2462bis-08.txt: IPv6 Stateless Address
 	Autoconfiguration (revised)
 draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies (expired)
