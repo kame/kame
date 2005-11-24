@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.229 2005/11/20 10:20:05 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.230 2005/11/24 05:31:03 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -307,15 +307,19 @@ mip6_input(mp, offp)
 		 * to send the icmp6 error messages.
 		 */
 		if (mip6_get_ip6hdrinfo(m, &src, &dst, &hoa, &rt, 0, &presence)==0) {
+#if 0
 		 	struct m_tag *mtag = NULL;
+#endif
 			if (presence & RTHDR_PRESENT) {
 				bcopy(&rt, &ip6->ip6_dst, sizeof(struct in6_addr));
-			}
-       			mtag = ip6_findaux(m);
-        		if (mtag) {
-				bcopy(&rt, 
-					&((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
-					sizeof(struct in6_addr));
+#if 0
+				mtag = ip6_findaux(m);
+				if (mtag) {
+					bcopy(&rt, 
+					      &((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
+					      sizeof(struct in6_addr));
+				}
+#endif
 			}
 		}
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
@@ -345,14 +349,19 @@ mip6_input(mp, offp)
 		 * to send the icmp6 error messages.
 		 */
 		if (mip6_get_ip6hdrinfo(m, &src, &dst, &hoa, &rt, 0, &presence)==0) {
+#if 0
 		 	struct m_tag *mtag = NULL;
-			if (presence & RTHDR_PRESENT) 
+#endif
+			if (presence & RTHDR_PRESENT) {
 				bcopy(&rt, &ip6->ip6_dst, sizeof(struct in6_addr));
-       			mtag = ip6_findaux(m);
-        		if (mtag) {
-				bcopy(&rt, 
-					&((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
-					sizeof(struct in6_addr));
+#if 0
+				mtag = ip6_findaux(m);
+				if (mtag) {
+					bcopy(&rt, 
+					      &((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
+					      sizeof(struct in6_addr));
+				}
+#endif
 			}
 		}
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
