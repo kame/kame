@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.13 2005/10/20 08:01:21 kei Exp $
+# $Id: mobileip6,v 1.14 2005/11/25 01:36:17 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -53,13 +53,22 @@ mobileip6_start()
 		;;
 	esac
 
+	case ${ipv6_mobile_migrate_enable} in
+	[Yy][Ee][Ss])
+		sysctl -qw net.inet6.mip6.use_migrate=1
+		;;
+	[Nn][Oo])
+		sysctl -qw net.inet6.mip6.use_migrate=0
+		;;
+	esac
+
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		# setup SPD/SA
 		if [ `sysctl -n net.inet6.mip6.use_ipsec` = '1' ]; then
 			for node_dir in ${ipv6_mobile_config_dir}/*
 			do
-				if [ ! -e ${node_dir}/add ]; then
+				if [ ! -e ${node_dir}/spdadd_mobile_node ]; then
 					continue;
 				fi
 				setkey -f ${node_dir}/add
@@ -85,7 +94,7 @@ mobileip6_start()
 		if [ `sysctl -n net.inet6.mip6.use_ipsec` = '1' ]; then
 			for node_dir in ${ipv6_mobile_config_dir}/*
 			do
-				if [ ! -e ${node_dir}/add ]; then
+				if [ ! -e ${node_dir}/spdadd_mobile_node ]; then
 					continue;
 				fi
 				setkey -f ${node_dir}/add
@@ -129,7 +138,7 @@ mobileip6_start()
 			if [ `sysctl -n net.inet6.mip6.use_ipsec` = '1' ]; then
 				for node_dir in ${ipv6_mobile_config_dir}/*
 				do
-					if [ ! -e ${node_dir}/add ]; then
+					if [ ! -e ${node_dir}/spdadd_home_agent ]; then
 						continue;
 					fi
 					setkey -f ${node_dir}/add
