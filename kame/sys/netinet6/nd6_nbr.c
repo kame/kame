@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.166 2005/11/29 11:47:29 t-momose Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.167 2005/11/29 16:33:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1369,7 +1369,6 @@ nd6_dad_stop(ifa)
 	struct ifaddr *ifa;
 {
 	struct dadq *dp;
-	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 
 	if (!dad_init)
 		return;
