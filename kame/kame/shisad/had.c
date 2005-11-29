@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.28 2005/10/26 16:18:33 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.29 2005/11/29 11:47:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -294,7 +294,7 @@ mipsock_input(miphdr)
 		if (mipmdad->mipmdadh_message != MIPM_DAD_DO) {
 			/* do the process of complete of DAD */
 			/* XXX */
-			;
+			mip6_dad_done(mipmdad->mipmdadh_message, &mipmdad->mipmdadh_addr6);
 		}
 		break;
 	default:

@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.230 2005/11/24 05:31:03 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.231 2005/11/29 11:47:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -364,6 +364,7 @@ mip6_input(mp, offp)
 #endif
 			}
 		}
+
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 			(caddr_t)&mh->ip6mh_len - (caddr_t)ip6);
 			return (IPPROTO_DONE);
@@ -1832,7 +1833,6 @@ mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
 	u_int8_t *ip6o;
 	int off, proto, nxt, ip6dlen, ip6olen;
 
-	
 	if (m == NULL || src_addr == NULL || dst_addr == NULL || presence == NULL) {
 		mip6log((LOG_ERR, "%s: "
 		    "invalid argument (m, src, dst, presence) = (%p, %p, %p, %p).\n",
@@ -1865,7 +1865,6 @@ mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
 	 * the packet is not located on a contiguous memory.
 	 */
 	while ((off = ip6_nexthdr(m, off, proto, &nxt)) != -1) {
-
 		proto = nxt;
 		if (nxt == IPPROTO_DSTOPTS) {
 			m_copydata(m, off, sizeof(struct ip6_dest),
@@ -1991,3 +1990,51 @@ mip6_md_scan(u_int16_t ifindex)
 }
 #endif /* NMIP > 0 */
 
+struct ifaddr *nd6_dad_find_by_addr __P((struct in6_addr *));
+
+void
+mip6_do_dad(addr, ifidx)
+	struct in6_addr *addr;
+	int ifidx;
+{
+	struct ifnet *ifp;
+	struct in6_ifaddr *mip6_ifa;	/* pesudo in6_ifaddr to usee nd6_dad_start() */
+
+	if ((mip6_ifa = (struct in6_ifaddr *)nd6_dad_find_by_addr(addr)) != NULL) {
+		mip6log((LOG_ERR,
+			 "%s is in under DAD. The new request is rejected\n",
+			 ip6_sprintf(addr)));
+		return;
+	}
+
+	if ((ifp = ifnet_byindex(ifidx)) == NULL) {
+		mip6log((LOG_ERR,
+			 "mip6_do_dad(): Couldn't get ifnet correspondent to if index %d. ", ifidx));
+		return;
+	}
+	
+	mip6_ifa = (struct in6_ifaddr *)malloc(sizeof(*mip6_ifa), M_IFADDR, M_WAITOK);
+	bzero(mip6_ifa, sizeof(*mip6_ifa));
+#ifdef __FreeBSD__
+	IFA_LOCK_INIT(&mip6_ifa->ia_ifa);
+#endif
+	mip6_ifa->ia_ifp = ifp;
+	mip6_ifa->ia6_flags |= IN6_IFF_PSEUDOIFA | IN6_IFF_TENTATIVE;
+	mip6_ifa->ia_ifa.ifa_addr = (struct sockaddr *)&mip6_ifa->ia_addr;
+	mip6_ifa->ia_addr.sin6_addr = *addr;
+	mip6_ifa->ia_addr.sin6_family = AF_INET6;
+	mip6_ifa->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
+	nd6_dad_start((struct ifaddr *)mip6_ifa, 0);	/* delay isn't needed in this case, maybe */
+}
+
+void
+mip6_stop_dad(addr, ifidx)
+	struct in6_addr *addr;
+	int ifidx;
+{
+	struct ifaddr *ifa;
+	
+	ifa = nd6_dad_find_by_addr(addr);
+	if (!ifa)
+		nd6_dad_stop(ifa);
+}

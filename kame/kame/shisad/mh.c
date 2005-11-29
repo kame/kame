@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.36 2005/11/03 12:59:27 ryuji Exp $  */
+/*      $KAME: mh.c,v 1.37 2005/11/29 11:47:28 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -49,7 +49,6 @@
 #include <net/route.h>
 #include <net/if_dl.h>
 
-//#include <net/if.h>
 #ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
@@ -83,13 +82,6 @@ extern int ipv4mnpsupport;
 extern int keymanagement;
 #endif
 
-#if (defined(MIP_MCOA) || defined(MIP_NEMO)) && !defined(MIP_HA)
-/*
-static int mhopt_calculatepad(u_int8_t, int);
-static void mhopt_add_pads(char *, int);
-*/
-#endif
-
 #ifdef MIP_MN
 static struct in6_addr *get_hoa_from_ifindex(u_int16_t);
 #endif /* MIP_MN */
@@ -118,7 +110,8 @@ char *mhopt_name[] = {"Pad1",
 		      "Nonce Indices", 
 		      "Binding Authorization Data",
 		      "Mobile Network Prefix (NEMO)",
-		      "Binding Unique Identifier"
+		      "Binding Unique Identifier",
+		      "Unknown option"
 };
 
 static struct ip6_opt_home_address *mip6_search_hoa_in_destopt(u_int8_t *);
@@ -332,7 +325,7 @@ mh_input_common(fd)
 		if (hoaopt) 
 			syslog(LOG_INFO, "  hoa:  %s\n", ip6_sprintf(&hoa));
 		if (rthdr_on) 
-			syslog(LOG_INFO, "  coa:  %s\n", ip6_sprintf(&from.sin6_addr));
+			syslog(LOG_INFO, "  coa:  %s\n", ip6_sprintf(&rtaddr));
 	}
 
 	if (mh->ip6mh_type > IP6_MH_TYPE_MAX)
@@ -370,10 +363,7 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
         while (mh < mhend) {
 
 		if (debug) {
-			if (*mh < 8) 
-				syslog(LOG_INFO, "  %s is found\n", mhopt_name[*mh]);
-			else
-				syslog(LOG_INFO, "  unknown option is found\n");
+			syslog(LOG_INFO, "  %s is found\n", mhopt_name[(*mh < 8) ? *mh : 8]);
 		}
 
 		if (*mh != IP6_MHOPT_BAUTH)	/* Always bind. auth. opt. should be the last option */
@@ -926,6 +916,10 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	} else {
 		/* Requesitng to cache binding (registration) */
 		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid, authmethod);
+		if (bc == NULL) {
+			statuscode = IP6_MH_BAS_INSUFFICIENT;
+			goto sendba;
+		}
 		if (flags & IP6_MH_BU_LLOCAL) {
 			struct in6_addr llhoa;
 
@@ -936,13 +930,17 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			memcpy(&llhoa.s6_addr[8], &hoa->s6_addr[8], 8);
 			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid, authmethod);
 		}
+
+		bc->bc_realcoa = *retcoa;
+		if (bc->bc_state == BC_STATE_UNDER_DAD)
+			return (0);
 	}
 	retcode = 0;
 
  sendba:
 	if (statuscode != IP6_MH_BAS_ACCEPTED ||
 	    (flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))) {
-		send_ba(dst, retcoa, coa, hoa, bu, kbm, 
+		send_ba(dst, retcoa, coa, hoa, flags, kbm, 
 			statuscode, seqno, lifetime, 0 /* refresh */, bid);
 	}
 
@@ -1459,9 +1457,9 @@ send_bu(bul)
 
 #ifndef MIP_MN
 int
-send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, bid) 
-        struct in6_addr *src, *coa, *acoa, *hoa;
-	struct ip6_mh_binding_update *recv_bu;
+send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid) 
+	struct in6_addr *src, *coa, *acoa, *hoa;
+	u_int16_t flags;
 	mip6_kbm_t *kbm_p;
 	u_int8_t status;
 	u_int16_t seqno;
@@ -1513,12 +1511,12 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 
 #ifdef MIP_HA
 	if (keymanagement
-	    && (recv_bu->ip6mhbu_flags & IP6_MH_BU_KEYM))
+	    && (flags & IP6_MH_BU_KEYM))
 		bap->ip6mhba_flags |= IP6_MH_BA_KEYM;
 #ifdef MIP_NEMO
 	/* When BU has R flag, BA must be returned with Rflag */
-	if ((recv_bu->ip6mhbu_flags & IP6_MH_BU_HOME) &&
-	    (recv_bu->ip6mhbu_flags & IP6_MH_BU_ROUTER))
+	if ((flags & IP6_MH_BU_HOME) &&
+	    (flags & IP6_MH_BU_ROUTER))
 		bap->ip6mhba_flags |= IP6_MH_BA_ROUTER;
 #endif /* MIP_NEMO */
 #endif /* MIP_HA */

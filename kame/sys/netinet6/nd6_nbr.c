@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.165 2005/09/15 10:54:56 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.166 2005/11/29 11:47:29 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,6 +93,7 @@
 
 #ifdef MIP6
 #include "mip.h"
+#include <net/mipsock.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #if NMIP > 0
@@ -116,6 +117,9 @@ static void nd6_dad_timer __P((struct ifaddr *));
 static void nd6_dad_ns_output __P((struct dadq *, struct ifaddr *));
 static void nd6_dad_ns_input __P((struct ifaddr *));
 static void nd6_dad_na_input __P((struct ifaddr *));
+#ifdef MIP6
+struct ifaddr *nd6_dad_find_by_addr __P((struct in6_addr *));
+#endif /* MIP6 */
 
 static int dad_ignore_ns = 0;	/* ignore NS in DAD - specwise incorrect*/
 static int dad_maxtry = 15;	/* max # of *tries* to transmit DAD packet */
@@ -723,6 +727,10 @@ nd6_na_input(m, off, icmp6len)
 		lladdrlen = ndopts.nd_opts_tgt_lladdr->nd_opt_len << 3;
 	}
 
+#ifdef MIP6
+	ifa = nd6_dad_find_by_addr(&taddr6);
+	if (!ifa)
+#endif
 	ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6);
 
 	/*
@@ -1204,6 +1212,21 @@ struct dadq {
 static struct dadq_head dadq;
 static int dad_init = 0;
 
+#ifdef MIP6
+struct ifaddr *
+nd6_dad_find_by_addr(addr)
+	struct in6_addr *addr;
+{
+	struct dadq *dp;
+
+	for (dp = dadq.tqh_first; dp; dp = dp->dad_list.tqe_next) {
+		if (IN6_ARE_ADDR_EQUAL(&((struct in6_ifaddr *)dp->dad_ifa)->ia_addr.sin6_addr, addr))
+			return dp->dad_ifa;
+	}
+	return NULL;
+}
+#endif /* MIP6 */
+
 static struct dadq *
 nd6_dad_find(ifa)
 	struct ifaddr *ifa;
@@ -1346,6 +1369,7 @@ nd6_dad_stop(ifa)
 	struct ifaddr *ifa;
 {
 	struct dadq *dp;
+	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 
 	if (!dad_init)
 		return;
@@ -1466,6 +1490,12 @@ nd6_dad_timer(ifa)
 #if defined(MIP6) && NMIP > 0
 			rt_addrinfomsg((struct ifaddr *)ia);
 #endif /* MIP6 && NMIP > 0 */
+#ifdef MIP6
+			if (ia->ia6_flags & IN6_IFF_PSEUDOIFA) {
+				/* Notify the address was not duplicated via mipsock */
+				mips_notify_dad_result(MIPM_DAD_SUCCESS, &ia->ia_addr.sin6_addr, ia->ia_ifp->if_index);
+			}
+#endif /* MIP6 */
 			IFAFREE(ifa);
 		}
 	}
@@ -1541,6 +1571,12 @@ nd6_dad_duplicated(ifa)
 	TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 	free(dp, M_IP6NDP);
 	dp = NULL;
+#ifdef MIP6
+	if (ia->ia6_flags & IN6_IFF_PSEUDOIFA) {
+		/* Notify the address was not duplicated via mipsock */
+		mips_notify_dad_result(MIPM_DAD_FAIL, &ia->ia_addr.sin6_addr, ia->ia_ifp->if_index);
+	}
+#endif /* MIP6 */
 	IFAFREE(ifa);
 }
 

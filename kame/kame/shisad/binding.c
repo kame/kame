@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.17 2005/10/27 02:46:57 mitsuya Exp $	*/
+/*	$KAME: binding.c,v 1.18 2005/11/29 11:47:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -152,7 +152,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 		bc->bc_seqno = seqno;
 		/* update BC in the kernel via mipsock */
 		bc->bc_coa = *coa;
-		mipscok_bc_request(bc, MIPM_BC_UPDATE);
+		mipsock_bc_request(bc, MIPM_BC_UPDATE);
 
 		goto done;
 	} 
@@ -172,11 +172,9 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 	bc->bc_flags = flags;
 	bc->bc_seqno = seqno;
 	bc->bc_state = BC_STATE_VALID;
-#if 0
 	if (flags & IP6_MH_BU_HOME) {
 		bc->bc_state = BC_STATE_UNDER_DAD;
 	}
-#endif
 	bc->bc_refcnt = 0;
 	bc->bc_authmethod = authmethod;
 #ifdef MIP_MCOA
@@ -185,10 +183,10 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 
 	if (bc->bc_state == BC_STATE_VALID) {
 		/* insert BC into the kernel via mipsock */
-		mipscok_bc_request(bc, MIPM_BC_ADD);
+		mipsock_bc_request(bc, MIPM_BC_ADD);
 	} else if (bc->bc_state == BC_STATE_UNDER_DAD) {
-		/* XXX */
 		/* do dad start */
+		mip6_dad_start(hoa);
 	}
 	
         LIST_INSERT_HEAD(&bchead, bc, bc_entry);
@@ -201,7 +199,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 	/* The linklocal entries are handled along with the original
 	   binding cache entry. Thus it doesn't need to have 
 	   a independent timer. */
-	if (!IN6_IS_ADDR_LINKLOCAL(hoa))
+	if (!IN6_IS_ADDR_LINKLOCAL(hoa) && (bc->bc_state != BC_STATE_UNDER_DAD))
 		mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2); 
 
 	return (bc);
@@ -227,6 +225,10 @@ mip6_bc_delete(bcreq)
 
 	switch (bc->bc_state) {
 	case BC_STATE_VALID:
+		/* delete the BCE in the kernel via mipsock */
+		mipsock_bc_request(bc, MIPM_BC_REMOVE);
+		/* Fall through */
+	case BC_STATE_UNDER_DAD:
 		if (bc->bc_llmbc) {
 			mip6_bc_delete(bc->bc_llmbc);
 			bc->bc_llmbc = NULL;
@@ -235,9 +237,8 @@ mip6_bc_delete(bcreq)
 		/* stop timer */
 		mip6_bc_stop_refresh_timer(bc);
 
-		/* delete BC into the kernel via mipsock */
-		mipscok_bc_request(bc, MIPM_BC_REMOVE);
-
+		if (bc->bc_state == BC_STATE_UNDER_DAD)
+			mip6_dad_stop(&bc->bc_hoa);
 		LIST_REMOVE(bc, bc_entry); 
 		if (bc->bc_authmethod == BC_AUTH_RR) {
 			bc->bc_state = BC_STATE_DEPRECATED;
@@ -253,7 +254,6 @@ mip6_bc_delete(bcreq)
 		
 	return;
 };
-
 
 
 /* src can be wildcard */
@@ -282,19 +282,69 @@ mip6_bc_lookup(hoa, src, bid)
 	return (NULL);
 };
 
+/* compose a mipsock message and issue it to the kernel */
 void
-mip6_dad_start()
+mip6_dad_order(message, addr)
+	int message;
+	struct in6_addr *addr;
 {
+	int err;
+	struct mipm_dad mipmdad;
+
+	mipmdad.mipmdadh_msglen = sizeof(mipmdad);
+	mipmdad.mipmdadh_version = MIP_VERSION;
+	mipmdad.mipmdadh_type = MIPM_DAD;
+	mipmdad.mipmdadh_seq = random();
+	mipmdad.mipmdadh_message = message;
+	mipmdad.mipmdadh_ifindex = ha_if();
+	mipmdad.mipmdadh_addr6 = *addr;
+	err = write(mipsock, &mipmdad, sizeof(mipmdad));
 }
 
 void
-mip6_dad_failed()
+mip6_dad_done(message, addr)
+	int message;
+	struct in6_addr *addr;
 {
-}
+	struct binding_cache *bc;
+	time_t now;
 
-void
-mip6_dad_done()
-{
+	now = time(0);
+	bc = mip6_bc_lookup(addr, NULL, 0);
+	if (message == MIPM_DAD_SUCCESS) {
+		/* I got a message the DAD was succeeded */
+		/* the status of the BC should go to the normal */
+		if (!bc || bc->bc_state != BC_STATE_UNDER_DAD) {
+			syslog(LOG_ERR,
+			       "The status of this BC should be UNDER_DAD, inspite of %d\n", bc ? bc->bc_state : -1);
+			return;
+		}
+		
+		syslog(LOG_INFO,
+		       "DAD against the HoA(%s) is suceeded.\n",
+		       ip6_sprintf(addr));
+		bc->bc_state = BC_STATE_VALID;
+		mipsock_bc_request(bc, MIPM_BC_ADD);
+		bc->bc_expire = now + bc->bc_lifetime;
+		if (!IN6_IS_ADDR_LINKLOCAL(addr))
+			mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
+		if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))
+			send_ba(&bc->bc_myaddr, &bc->bc_realcoa,
+				&bc->bc_coa, &bc->bc_hoa, bc->bc_flags,
+				NULL, IP6_MH_BAS_ACCEPTED,
+				bc->bc_seqno, bc->bc_lifetime, 0, 0);
+	} else if (message == MIPM_DAD_FAIL) {
+		/* I got a message the DAD was failed */
+		syslog(LOG_INFO,
+		       "DAD aganist the HoA(%s) is failed.\n",
+		       ip6_sprintf(addr));
+
+		send_ba(&bc->bc_myaddr, &bc->bc_realcoa,
+			&bc->bc_coa, &bc->bc_hoa, bc->bc_flags,
+			NULL, IP6_MH_BAS_DAD_FAILED,
+			bc->bc_seqno, bc->bc_lifetime, 0, 0);
+		mip6_bc_delete(bc);
+	}
 }
 
 void
@@ -307,8 +357,9 @@ command_show_bc(s, line)
 
 	now = time(NULL);
         for (bc = LIST_FIRST(&bchead); bc; bc = LIST_NEXT(bc, bc_entry)) {
-		if (bc->bc_state != BC_STATE_VALID)
+		if (bc->bc_state > BC_STATE_MAX)
 			continue;
+		command_printf(s, "%c ", "VDU"[bc->bc_state]);
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_hoa));
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_coa));
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_myaddr));
@@ -394,7 +445,7 @@ mip6_bc_refresh_timer(arg)
 }
 
 void
-mipscok_bc_request(bc, command) 
+mipsock_bc_request(bc, command) 
 	struct binding_cache *bc;
         u_char command;
 {

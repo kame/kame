@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.27 2005/10/27 03:42:30 mitsuya Exp $	*/
+/*	$KAME: shisad.h,v 1.28 2005/11/29 11:47:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -349,11 +349,13 @@ struct binding_cache {
         LIST_ENTRY(binding_cache) bc_entry;
         struct in6_addr       bc_hoa;       /* peer home address */
         struct in6_addr       bc_coa;       /* peer coa */
-        struct in6_addr       bc_myaddr;    /* my addr (needed?) */
+	struct in6_addr       bc_realcoa;
+        struct in6_addr       bc_myaddr;    /* my addr */
         u_int8_t              bc_state;     /* state of this bce */
 #define BC_STATE_VALID		0
 #define BC_STATE_DEPRECATED	1
 #define BC_STATE_UNDER_DAD	2
+#define BC_STATE_MAX		2
         u_int16_t             bc_flags;     /* recved BU flags */
         u_int16_t             bc_seqno;     /* recved BU seqno */
         u_int32_t             bc_lifetime;  /* recved BU lifetime */
@@ -410,7 +412,7 @@ int  send_hot(struct ip6_mh_home_test_init *, struct in6_addr *,
 int  send_cot(struct ip6_mh_careof_test_init *, struct in6_addr *, 
 	     struct in6_addr *);
 int  send_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *, struct in6_addr *, 
-	    struct ip6_mh_binding_update *, mip6_kbm_t *, u_int8_t, u_int16_t, u_int16_t, int, u_int16_t);
+	    u_int16_t, mip6_kbm_t *, u_int8_t, u_int16_t, u_int16_t, int, u_int16_t);
 int send_mps(struct mip6_hpfxl *);
 
 /* rr.c */
@@ -444,7 +446,11 @@ void mip6_bc_init(void);
 void mip6_flush_kernel_bc(void);
 void mip6_bc_delete(struct binding_cache *);
 void mip6_bc_refresh_timer(void *);
-void mipscok_bc_request(struct binding_cache *, u_char);
+void mipsock_bc_request(struct binding_cache *, u_char);
+void mip6_dad_order(int, struct in6_addr *);
+#define mip6_dad_start(addr)	mip6_dad_order(MIPM_DAD_DO, addr)
+#define mip6_dad_stop(addr)	mip6_dad_order(MIPM_DAD_STOP, addr)
+void mip6_dad_done(int, struct in6_addr *);
 void command_show_bc(int, char *);
 void command_show_kbc(int, char *);
 
