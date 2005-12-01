@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.28 2005/11/29 11:47:28 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.29 2005/12/01 11:23:29 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -372,6 +372,7 @@ struct binding_cache {
         void                  *bc_dad;      /* dad handler */
         time_t                bc_mpa_exp;   /* expiration time for MPA */
         struct binding_cache *bc_llmbc;
+	struct binding_cache *bc_glmbc;
         u_int32_t             bc_refcnt;
         u_int                 bc_brr_sent;
 #ifdef MIP_MCOA

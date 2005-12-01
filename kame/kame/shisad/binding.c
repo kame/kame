@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.18 2005/11/29 11:47:28 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.19 2005/12/01 11:23:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -335,15 +335,23 @@ mip6_dad_done(message, addr)
 				bc->bc_seqno, bc->bc_lifetime, 0, 0);
 	} else if (message == MIPM_DAD_FAIL) {
 		/* I got a message the DAD was failed */
+		struct binding_cache *gbc;
+		
 		syslog(LOG_INFO,
 		       "DAD aganist the HoA(%s) is failed.\n",
 		       ip6_sprintf(addr));
 
-		send_ba(&bc->bc_myaddr, &bc->bc_realcoa,
-			&bc->bc_coa, &bc->bc_hoa, bc->bc_flags,
+		if (IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa))
+			gbc = bc->bc_glmbc;
+		else
+			gbc = bc;
+		send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
+			&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
 			NULL, IP6_MH_BAS_DAD_FAILED,
-			bc->bc_seqno, bc->bc_lifetime, 0, 0);
+			gbc->bc_seqno, gbc->bc_lifetime, 0, 0);
 		mip6_bc_delete(bc);
+		if (gbc != bc)
+			mip6_bc_delete(gbc);
 	}
 }
 

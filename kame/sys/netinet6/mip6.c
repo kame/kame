@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.231 2005/11/29 11:47:28 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.232 2005/12/01 11:23:29 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2022,6 +2022,7 @@ mip6_do_dad(addr, ifidx)
 	mip6_ifa->ia6_flags |= IN6_IFF_PSEUDOIFA | IN6_IFF_TENTATIVE;
 	mip6_ifa->ia_ifa.ifa_addr = (struct sockaddr *)&mip6_ifa->ia_addr;
 	mip6_ifa->ia_addr.sin6_addr = *addr;
+	in6_setscope(&mip6_ifa->ia_addr.sin6_addr, ifp, NULL);
 	mip6_ifa->ia_addr.sin6_family = AF_INET6;
 	mip6_ifa->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
 	nd6_dad_start((struct ifaddr *)mip6_ifa, 0);	/* delay isn't needed in this case, maybe */
