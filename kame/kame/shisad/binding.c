@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.19 2005/12/01 11:23:28 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.20 2005/12/02 04:36:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -306,11 +306,15 @@ mip6_dad_done(message, addr)
 	int message;
 	struct in6_addr *addr;
 {
-	struct binding_cache *bc;
+	struct binding_cache *bc, *gbc;
 	time_t now;
 
 	now = time(0);
 	bc = mip6_bc_lookup(addr, NULL, 0);
+	if (bc && IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa))
+		gbc = bc->bc_glmbc;
+	else
+		gbc = bc;
 	if (message == MIPM_DAD_SUCCESS) {
 		/* I got a message the DAD was succeeded */
 		/* the status of the BC should go to the normal */
@@ -329,22 +333,18 @@ mip6_dad_done(message, addr)
 		if (!IN6_IS_ADDR_LINKLOCAL(addr))
 			mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
 		if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))
-			send_ba(&bc->bc_myaddr, &bc->bc_realcoa,
-				&bc->bc_coa, &bc->bc_hoa, bc->bc_flags,
+			send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
+				&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
 				NULL, IP6_MH_BAS_ACCEPTED,
-				bc->bc_seqno, bc->bc_lifetime, 0, 0);
+				gbc->bc_seqno, gbc->bc_lifetime, 0, 0);
 	} else if (message == MIPM_DAD_FAIL) {
 		/* I got a message the DAD was failed */
-		struct binding_cache *gbc;
-		
 		syslog(LOG_INFO,
 		       "DAD aganist the HoA(%s) is failed.\n",
 		       ip6_sprintf(addr));
 
-		if (IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa))
-			gbc = bc->bc_glmbc;
-		else
-			gbc = bc;
+		if (gbc == NULL || bc == NULL)
+			return;
 		send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
 			&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
 			NULL, IP6_MH_BAS_DAD_FAILED,
