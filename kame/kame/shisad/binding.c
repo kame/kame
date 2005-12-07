@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.20 2005/12/02 04:36:52 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.21 2005/12/07 18:23:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -308,6 +308,7 @@ mip6_dad_done(message, addr)
 {
 	struct binding_cache *bc, *gbc;
 	time_t now;
+	int bid = 0;
 
 	now = time(0);
 	bc = mip6_bc_lookup(addr, NULL, 0);
@@ -315,6 +316,9 @@ mip6_dad_done(message, addr)
 		gbc = bc->bc_glmbc;
 	else
 		gbc = bc;
+#ifdef MIP_MCOA
+	bid = gbc->bc_bid;
+#endif /* MIP_MCOA */
 	if (message == MIPM_DAD_SUCCESS) {
 		/* I got a message the DAD was succeeded */
 		/* the status of the BC should go to the normal */
@@ -336,7 +340,7 @@ mip6_dad_done(message, addr)
 			send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
 				&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
 				NULL, IP6_MH_BAS_ACCEPTED,
-				gbc->bc_seqno, gbc->bc_lifetime, 0, 0);
+				gbc->bc_seqno, gbc->bc_lifetime, bid, 0);
 	} else if (message == MIPM_DAD_FAIL) {
 		/* I got a message the DAD was failed */
 		syslog(LOG_INFO,
@@ -348,7 +352,7 @@ mip6_dad_done(message, addr)
 		send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
 			&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
 			NULL, IP6_MH_BAS_DAD_FAILED,
-			gbc->bc_seqno, gbc->bc_lifetime, 0, 0);
+			gbc->bc_seqno, gbc->bc_lifetime, bid, 0);
 		mip6_bc_delete(bc);
 		if (gbc != bc)
 			mip6_bc_delete(gbc);
