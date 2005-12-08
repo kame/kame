@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.233 2005/12/08 05:38:16 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.234 2005/12/08 06:45:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2010,7 +2010,7 @@ mip6_do_dad(addr, ifidx)
 #ifdef __FreeBSD__
 	ifp = ifnet_byindex(ifidx);
 #else
-	ifp = ifindex2ifnet[ifindex];
+	ifp = ifindex2ifnet[ifidx];
 #endif
 	if (ifp == NULL) {
 		mip6log((LOG_ERR,
