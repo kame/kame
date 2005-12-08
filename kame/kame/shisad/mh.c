@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.38 2005/12/01 11:23:28 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.39 2005/12/08 05:28:38 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -432,7 +432,10 @@ get_bid_option(ip6mh, hlen, ip6mhlen)
 
 	if (get_mobility_options(ip6mh, hlen, ip6mhlen, &mopts) < 0)
 		return (0);
-	return (ntohs(mopts.opt_bid->ip6mobid_bid));
+	if (mopts.opt_bid)
+		return (ntohs(mopts.opt_bid->ip6mobid_bid));
+	else
+		return (0);
 }
 #endif /* MIP_MCOA */
 
