@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.47 2005/10/15 08:22:40 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.48 2005/12/08 14:05:51 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -122,8 +122,8 @@
 #include <sys/protosw.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
-#ifdef __FreeBSD__
 #include <sys/kernel.h>
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #ifdef __OpenBSD__
