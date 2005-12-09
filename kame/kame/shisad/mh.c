@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.39 2005/12/08 05:28:38 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.40 2005/12/09 07:27:54 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -899,8 +899,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #endif /* MIP_CN */
 			mip6_bc_delete(bc);
 			syslog(LOG_INFO,
-			       "binding cache has been deleted. HoA:[%s], CoA[%s]\n",
-			       ip6_sprintf(hoa), ip6_sprintf(coa));
+			       "binding cache has been deleted. HoA:[%s], CoA[%s] lifetime=%d\n",
+			       ip6_sprintf(hoa), ip6_sprintf(coa), lifetime);
 		} else {
 #ifdef MIP_HA
 			/* 10.3.2 */
@@ -1481,17 +1481,8 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 	struct ip6_mh_opt_bid bid_opt;
 #endif /* MIP_MCOA */
 
-
 	if (hoa == NULL)
 		hoa = coa;
-
-	if (debug) {
-		syslog(LOG_INFO, "BA is sent");
-		syslog(LOG_INFO, "  from %s", ip6_sprintf(src));
-		syslog(LOG_INFO, "  to   %s", ip6_sprintf(hoa));
-		syslog(LOG_INFO, "  via  %s", ip6_sprintf(coa));
-		syslog(LOG_INFO, "  status=%d seqno=%d", status, seqno);
-	}
 
 	/* section 9.5.4 if hoa is not unicast global, BA should not be sent */
         if (hoa && (IN6_IS_ADDR_LINKLOCAL(hoa)
@@ -1618,10 +1609,11 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 			   (uint16_t *)bufp, buflen, IPPROTO_MH);
 
 	if (debug) {
-		syslog(LOG_INFO, "BA is transmitted to %s\n",
-		       ip6_sprintf(hoa));
-		syslog(LOG_INFO, "from %s\n", ip6_sprintf(src));
-		syslog(LOG_INFO, "via %s\n", ip6_sprintf(coa));
+		syslog(LOG_INFO, "BA is sent");
+		syslog(LOG_INFO, "  from %s", ip6_sprintf(src));
+		syslog(LOG_INFO, "  to   %s", ip6_sprintf(hoa));
+		syslog(LOG_INFO, "  via  %s", ip6_sprintf(coa));
+		syslog(LOG_INFO, "  status=%d seqno=%d", status, seqno);
 	}
 
 	if (IN6_ARE_ADDR_EQUAL(hoa, coa))
