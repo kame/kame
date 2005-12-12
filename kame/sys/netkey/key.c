@@ -2320,7 +2320,7 @@ key_spddelete(so, m, mhp)
 
 	if (sp->persist) {
 		ipseclog((LOG_DEBUG,
-		    "key_spddelete2: attempt to remove persistent SP:%u.\n",
+		    "key_spddelete: attempt to remove persistent SP:%u.\n",
 		    sp->id));
 		key_freesp(sp);	/* ref gained by key_getsp */
 		return key_senderror(so, m, EPERM);
