@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.142 2005/08/10 05:08:28 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.143 2005/12/12 12:10:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1194,6 +1194,14 @@ socket_send(s, mm, src)
  * The packet is returned unscathed to the caller, unless it is
  * erroneous, in which case a non-zero return value tells the caller to
  * discard it.
+ *
+ * NOTE: this implementation assumes that m->m_pkthdr.rcvif is NULL iff
+ * this function is called in the originating context (i.e., not when
+ * forwarding a packet from other node).  ip6_output(), which is currently the
+ * only function that calls this function is called in the originating context,
+ * explicitly ensures this condition.  It is caller's responsibility to ensure
+ * that if this function is called from somewhere else in the originating
+ * context in the future.
  */
 
 int
