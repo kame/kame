@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.234 2005/12/08 06:45:16 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.235 2005/12/13 00:49:04 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2043,4 +2043,42 @@ mip6_stop_dad(addr, ifidx)
 	ifa = nd6_dad_find_by_addr(addr);
 	if (!ifa)
 		nd6_dad_stop(ifa);
+}
+
+
+struct dadq *nd6_dad_find __P((struct ifaddr *));
+
+/*
+ * Do DAD for link local address on a interface corresponding to the ifindex
+ */
+void
+mip6_do_dad_lladdr(ifidx)
+	int ifidx;
+{
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
+
+#ifdef __FreeBSD__
+	ifp = ifnet_byindex(ifidx);
+#else
+	ifp = ifindex2ifnet[ifidx];
+#endif
+	if (ifp == NULL) {
+		mip6log((LOG_ERR, "mip6_do_dad_lladdr(): Couldn't get ifnet"
+			    " correspondent to if index %d. ", ifidx));
+		return;
+	}
+
+	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0); /* 0 is ok? */
+
+	if (nd6_dad_find(ifa) != NULL) {
+		/* DAD already in progress */
+		mip6log((LOG_ERR,
+			 "mip6_do_dad_lladdr(): DAD already in progress."));
+		return;
+	}
+
+	((struct in6_ifaddr *)ifa)->ia6_flags |= IN6_IFF_TENTATIVE;
+	nd6_dad_start((struct ifaddr *)ifa, 0);
+			/* delay isn't needed in this case, maybe */
 }

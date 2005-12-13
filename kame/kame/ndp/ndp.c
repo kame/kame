@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.121 2005/07/13 11:30:13 keiichi Exp $	*/
+/*	$KAME: ndp.c,v 1.122 2005/12/13 00:49:03 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -455,7 +455,7 @@ set(argc, argv)
 
 overwrite:
 	if (sdl->sdl_family != AF_LINK) {
-		printf("cannot intuit interface index and type for %s\n", host);
+		printf("%d cannot intuit interface index and type for %s\n", sdl->sdl_family, host);
 		return (1);
 	}
 	sdl_m.sdl_type = sdl->sdl_type;

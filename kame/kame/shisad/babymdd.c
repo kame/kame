@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.12 2005/09/30 12:01:55 keiichi Exp $	*/
+/*	$Id: babymdd.c,v 1.13 2005/12/13 00:49:03 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -84,7 +84,7 @@ int baby_mipmsg(struct mip_msghdr *, int);
 
 /* MIPsocket commands */
 static int baby_md_scan(struct if_info *);
-static int baby_md_reg(struct sockaddr_in6 *, u_int16_t);
+static int baby_md_reg(struct sockaddr_in6 *, int, u_int16_t);
 static void baby_md_home(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
 static void get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
 
@@ -417,8 +417,9 @@ baby_md_scan(struct if_info *ifinfo) {
 }
 
 static int
-baby_md_reg(coa, bid) 
+baby_md_reg(coa, ifindex, bid) 
 	struct sockaddr_in6 *coa;
+	int ifindex;
 	u_int16_t bid;
 {
 	int len;
@@ -451,6 +452,7 @@ baby_md_reg(coa, bid)
 		mdinfo->mipm_md_hdr.miph_seq	= random();
 		mdinfo->mipm_md_hint		= MIPM_MD_ADDR;
 		mdinfo->mipm_md_command		= MIPM_MD_REREG;
+		mdinfo->mipm_md_ifindex         = ifindex;
 		
 		memcpy(MIPD_HOA(mdinfo), &hoa, sizeof(hoa));
 		memcpy(MIPD_COA(mdinfo), coa, sizeof(*coa));
@@ -1198,7 +1200,7 @@ baby_selection() {
 		    && !baby_coa_equal(ifinfo)) {
 			
 			fprintf(stderr,"sending reg info\n");
-			baby_md_reg((struct sockaddr_in6 *)&ifinfo->coa, 0); 
+			baby_md_reg((struct sockaddr_in6 *)&ifinfo->coa, ifinfo->ifindex, 0); 
 			memcpy(&ifinfo->pcoa, &ifinfo->coa, 
 			       sizeof(ifinfo->coa));
 			

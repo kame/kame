@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.25 2005/11/20 13:12:20 ryuji Exp $	*/
+/*	$KAME: mnd.c,v 1.26 2005/12/13 00:49:03 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -455,6 +455,7 @@ mipsock_recv_mdinfo(miphdr)
 	struct in6_addr hoa, coa, acoa;
 	int err = 0;
 	u_int16_t bid = 0;
+	struct mipm_dad mipmdad;
 	
 	syslog(LOG_INFO, "mipsock_recv_mdinfo\n");
 
@@ -492,8 +493,31 @@ mipsock_recv_mdinfo(miphdr)
 		/* XXX do we need MIPM_MD_INDEX?! */
 		if (mdinfo->mipm_md_hint == MIPM_MD_INDEX)
 			err = mipsock_md_update_bul_byifindex(mdinfo->mipm_md_ifindex, &coa);
-		else if (mdinfo->mipm_md_hint == MIPM_MD_ADDR)
+		else if (mdinfo->mipm_md_hint == MIPM_MD_ADDR) {
 			err = bul_update_by_mipsock_w_hoa(&hoa, &coa, bid);
+		
+			/*
+			 * do DAD for link local address
+			 */
+			if (mdinfo->mipm_md_ifindex <= 0)
+				syslog(LOG_ERR,
+					"ifindex is not set by (baby)mdd");
+			else {
+				/* write DAD requrest for link local addr */
+				mipmdad.mipmdadh_msglen = sizeof(mipmdad);
+				mipmdad.mipmdadh_version = MIP_VERSION;
+				mipmdad.mipmdadh_type = MIPM_DAD;
+				mipmdad.mipmdadh_seq = random();
+				mipmdad.mipmdadh_message = MIPM_DAD_LINKLOCAL;
+				mipmdad.mipmdadh_ifindex = 
+							mdinfo->mipm_md_ifindex;
+				mipmdad.mipmdadh_addr6 = coa;
+				if (write(mipsock, &mipmdad, sizeof(mipmdad))
+					== -1)
+					syslog(LOG_ERR, "failed to request DAD"
+						    " for link local addr");
+			}
+		}
 		break;
 	case MIPM_MD_DEREGHOME:
 		err = mipsock_md_dereg_bul(&hoa, &coa, mdinfo->mipm_md_ifindex);

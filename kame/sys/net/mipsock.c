@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.17 2005/11/29 11:47:28 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.18 2005/12/13 00:49:04 mitsuya Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -544,6 +544,8 @@ mipus_output(m, va_alist)
 			mip6_do_dad(&mipmdad->mipmdadh_addr6, mipmdad->mipmdadh_ifindex);
 		} else if (mipmdad->mipmdadh_message == MIPM_DAD_STOP) {
 			mip6_stop_dad(&mipmdad->mipmdadh_addr6, mipmdad->mipmdadh_ifindex);
+		} else if (mipmdad->mipmdadh_message == MIPM_DAD_LINKLOCAL) {
+			mip6_do_dad_lladdr(mipmdad->mipmdadh_ifindex);
 		}
 		break;
 

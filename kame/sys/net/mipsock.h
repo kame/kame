@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.7 2005/10/27 20:01:19 t-momose Exp $ */
+/* $Id: mipsock.h,v 1.8 2005/12/13 00:49:04 mitsuya Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -182,6 +182,7 @@ struct mipm_dad {
 	u_int16_t mipmdadh_message;
 #define MIPM_DAD_DO		0	/* u to k */
 #define MIPM_DAD_STOP		1
+#define MIPM_DAD_LINKLOCAL	2	/* play dad for link local addr */
 #define MIPM_DAD_SUCCESS	128	/* k to u */
 #define MIPM_DAD_FAIL		129
 	u_int16_t mipmdadh_ifindex;

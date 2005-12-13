@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.167 2005/11/29 16:33:04 t-momose Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.168 2005/12/13 00:49:04 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,7 +110,7 @@
 #define SDL(s) ((struct sockaddr_dl *)s)
 
 struct dadq;
-static struct dadq *nd6_dad_find __P((struct ifaddr *));
+struct dadq *nd6_dad_find __P((struct ifaddr *));
 static void nd6_dad_starttimer __P((struct dadq *, int));
 static void nd6_dad_stoptimer __P((struct dadq *));
 static void nd6_dad_timer __P((struct ifaddr *));
@@ -1227,7 +1227,7 @@ nd6_dad_find_by_addr(addr)
 }
 #endif /* MIP6 */
 
-static struct dadq *
+struct dadq *
 nd6_dad_find(ifa)
 	struct ifaddr *ifa;
 {

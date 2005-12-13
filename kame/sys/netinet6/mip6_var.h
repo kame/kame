@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.126 2005/11/29 11:47:29 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.127 2005/12/13 00:49:04 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -169,6 +169,7 @@ struct ip6_rthdr2 *mip6_create_rthdr2(struct in6_addr *);
 int mip6_bc_proxy_control(struct in6_addr *, struct in6_addr *, int);
 void mip6_do_dad(struct in6_addr *, int);
 void mip6_stop_dad(struct in6_addr *, int);
+void mip6_do_dad_lladdr(int);
 
 /* mobile node functions. */
 int mip6_bul_add(const struct in6_addr *, const struct in6_addr *,
