@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.12 2005/08/23 08:24:52 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.13 2005/12/14 08:17:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -142,6 +142,8 @@ main(argc, argv)
 		config_get_number(CFT_COMMANDPORT, &command_port,
 		    config_params);
 	}
+
+	kernel_debug(debug);
 
 	/* open syslog infomation. */
 	openlog("shisad(cnd)", 0, LOG_DAEMON);

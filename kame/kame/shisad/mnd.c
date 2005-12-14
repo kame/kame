@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.26 2005/12/13 00:49:03 mitsuya Exp $	*/
+/*	$KAME: mnd.c,v 1.27 2005/12/14 08:17:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -258,6 +258,8 @@ main(argc, argv)
 		    &ipv4mnpsupport, config_params);
 #endif /* MIP_IPV4MNPSUPPORT */
 	}
+
+	kernel_debug(debug);
 
 	mhsock_open();
 	icmp6sock_open();

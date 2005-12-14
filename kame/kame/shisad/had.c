@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.29 2005/11/29 11:47:28 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.30 2005/12/14 08:17:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -211,6 +211,8 @@ main(argc, argv)
 		    config_params);
 	}
 
+	kernel_debug(debug);
+	
 	/* start timer */
 	callout_init();
 

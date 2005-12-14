@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.22 2005/10/26 19:57:14 ryuji Exp $	*/
+/*	$KAME: common.c,v 1.23 2005/12/14 08:17:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -36,6 +36,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 #include <sys/syslog.h>
 #include <unistd.h>
 #ifdef __OpenBSD__
@@ -486,160 +487,6 @@ find_rthdr2(ip6)
 	return (rth2);
 }
 
-#if 0
-#ifdef MIP_MN
-int
-send_na_home(hoa, ifindex)
-	struct in6_addr *hoa;
-	u_int16_t ifindex;
-{
-        struct msghdr msg;
-        struct iovec iov;
-        struct cmsghdr  *cmsgptr = NULL;
-        struct in6_pktinfo *pi = NULL;
-        struct sockaddr_in6 to;
-        char adata[512], buf[1024];
-        struct nd_neighbor_advert *na;
-	struct sockaddr_dl sockdl;
-        size_t nalen = 0;
-	struct nd_opt_hdr *opthdr;
-	char *addr;
-
-        memset(&to, 0, sizeof(to));
-        if (inet_pton(AF_INET6, "ff02::1",&to.sin6_addr) != 1) 
-                return (-1);
-	to.sin6_family = AF_INET6;
-	to.sin6_port = 0;
-	to.sin6_scope_id = 0;
-	to.sin6_len = sizeof (struct sockaddr_in6);
-
-        msg.msg_name = (void *)&to;
-        msg.msg_namelen = sizeof(struct sockaddr_in6);
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = (void *) adata;
-        msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) 
-		+ CMSG_SPACE(sizeof(int));
-
-	/* Packet Information i.e. Source Address */
-	cmsgptr = CMSG_FIRSTHDR(&msg);
-	pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
-	memset(pi, 0, sizeof(*pi));
-	pi->ipi6_ifindex = ifindex;
-
-	cmsgptr->cmsg_level = IPPROTO_IPV6;
-	cmsgptr->cmsg_type = IPV6_PKTINFO;
-	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
-	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
-
-	/* HopLimit Information (always 255) */
-        cmsgptr->cmsg_level = IPPROTO_IPV6;
-        cmsgptr->cmsg_type = IPV6_HOPLIMIT;
-        cmsgptr->cmsg_len = CMSG_LEN(sizeof(int));
-        *(int *)(CMSG_DATA(cmsgptr)) = 255;
-        cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
-		
-	bzero(buf, sizeof(buf));
-	na = (struct nd_neighbor_advert *)buf;
-        na->nd_na_type = ND_NEIGHBOR_ADVERT;
-        na->nd_na_code = 0;
-        na->nd_na_cksum = 0;
-        na->nd_na_flags_reserved = ND_NA_FLAG_OVERRIDE;
-	na->nd_na_target = *hoa;
-	nalen = sizeof(struct nd_neighbor_solicit);
-
-	opthdr = (struct nd_opt_hdr *) (buf + nalen);
-	opthdr->nd_opt_type = ND_OPT_TARGET_LINKADDR; 
-
-	memset(&sockdl, 0, sizeof(sockdl));
-	if  (get_sockdl_from_ifindex(&sockdl, ifindex) == NULL)
-		return (-1);
-
-	switch(sockdl.sdl_type) {
-	case IFT_ETHER:
-#ifdef IFT_IEEE80211
-	case IFT_IEEE80211:
-#endif
-
-#define ROUNDUP8(a) (1 + (((a) - 1) | 7))
-		opthdr->nd_opt_len = (ROUNDUP8(ETHER_ADDR_LEN + 2)) >> 3;
-		addr = (char *)(opthdr + 1);
-		memcpy(addr, LLADDR(&sockdl), ETHER_ADDR_LEN);
-		nalen += ROUNDUP8(ETHER_ADDR_LEN + 2);
-#undef ROUNDUP8
-		break;
-	default:
-		return (-1);
-	}
-
-	iov.iov_base = buf;
-	iov.iov_len = nalen;
-
-	if (debug)
-		syslog(LOG_INFO, "send NA to overwrite HoA ND cache at home\n");
-
-	if (sendmsg(icmp6sock, &msg, 0) < 0)
-		perror ("sendmsg icmp6");
-
-	return (errno);
-}
-
-
-static struct sockaddr_dl *
-get_sockdl_from_ifindex(sdl, ifindex) 
-	struct sockaddr_dl *sdl;
-	u_int16_t ifindex;
-{
-	size_t needed;
-        char *buf, *next;
-        struct if_msghdr *ifm;
-        int mib[6];
-        
-        mib[0] = CTL_NET;
-        mib[1] = PF_ROUTE;
-        mib[2] = 0;
-        mib[3] = AF_INET6;
-        mib[4] = NET_RT_IFLIST;
-        mib[5] = 0;
-        
-        if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0) {
-                perror("sysctl");
-		return (NULL);
-	}
-
-        if ((buf = malloc(needed)) == NULL) {
-                perror("malloc");
-		return (NULL);
-	}
-
-        if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
-                perror("sysctl");
-		free(buf);
-		return (NULL);
-	}
-
-        for (next = buf; next < buf + needed; 
-	     next += ifm->ifm_msglen) {
-                ifm = (struct if_msghdr *)next;
-
-                if (ifm->ifm_type != RTM_IFINFO) 
-			continue;
-
-		if (ifm->ifm_index != ifindex)
-			continue;
-		memcpy(sdl, (struct sockaddr_dl *)(ifm + 1), sizeof(*sdl));
-			
-		free(buf);
-		return (sdl);
-	}
-
-        free(buf); 
-	
-	return (NULL);
-}
-#endif /* MIP_MN */
-#endif
-
 #if defined(MIP_CN) || defined(MIP_HA)
 int
 mipsock_behint_input(miphdr)
@@ -696,6 +543,23 @@ mipsock_nodetype_request(nodetype, enable)
 	return (0);
 }
 
+int
+kernel_debug(mode)
+	int mode;
+{
+	int value;
+	size_t valsize = sizeof(value);
+	int mib[] = {CTL_NET, PF_INET6, IPPROTO_MH, MIP6CTL_DEBUG};
+
+	if (sysctl(mib, sizeof(mib) / sizeof(int), &value, &valsize, mode != -1 ? &mode : NULL , mode != -1 ? sizeof(mode) : 0) < 0) {
+		perror("kernel_debug(): ");
+		return (-1);
+	}
+	if (mode == -1)
+		return (value);
+	else
+		return (mode);
+}
 
 static const char *binding_ack_status_desc[] = {
 	"binding update accepted",

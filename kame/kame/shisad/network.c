@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.13 2005/10/27 03:42:30 mitsuya Exp $  */
+/*      $KAME: network.c,v 1.14 2005/12/14 08:17:51 t-momose Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -91,36 +91,6 @@ static int nemo_gif_init(char *);
 static int inet_len2mask(int, int, struct sockaddr *);
 static struct in6_nbrinfo *getnbrinfo __P((struct in6_addr *, int, int));
 #endif
-
-int
-inet_are_prefix_equal(p1, p2, len)
-        void *p1, *p2;
-        int len;
-{
-        int bytelen, bitlen;
-	u_int8_t *cp1, *cp2;
-
-        /* sanity check */
-        if (0 > len || len > 128) {
-                syslog(LOG_ERR, "inet_are_prefix_equal:"
-		       "invalid prefix length(%d)\n", len);
-                return (0);
-        }
-
-        bytelen = len / 8;
-        bitlen = len % 8;
-
-        if (memcmp(p1, p2, bytelen))
-                return (0);
-	cp1 = p1;
-	cp2 = p2;
-        if (bitlen != 0 &&
-            *(cp1 + bytelen) >> (8 - bitlen) !=
-            *(cp2 + bytelen) >> (8 - bitlen))
-                return (0);
-
-        return (1);
-}
 
 
 int
@@ -969,97 +939,3 @@ get_ifindex_from_address(address)
 	freeifaddrs(ifap);
 	return (0);
 }
-
-#if 0
-int
-send_na(dest, mif)
-	struct in6_addr *dest;
-	struct mobileip6_ifinfo *mif;
-{
-        struct msghdr msg;
-        struct iovec iov;
-        struct cmsghdr  *cmsgptr = NULL;
-        struct in6_pktinfo *pi = NULL;
-        struct sockaddr_in6 to;
-	struct in6_addr from;
-        char adata[512], buf[1024];
-        struct nd_neighbor_advert *na;
-        size_t nalen = 0;
-	struct nd_opt_hdr *opthdr;
-	char *addr;
-
-        memset(&to, 0, sizeof(to));
-        if (inet_pton(AF_INET6, "ff02::1",&to.sin6_addr) != 1) 
-                return (-1);
-	to.sin6_family = AF_INET6;
-	to.sin6_port = 0;
-	to.sin6_scope_id = 0;
-	to.sin6_len = sizeof (struct sockaddr_in6);
-
-        msg.msg_name = (void *)&to;
-        msg.msg_namelen = sizeof(struct sockaddr_in6);
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = (void *) adata;
-        msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) 
-		+ CMSG_SPACE(sizeof(int));
-
-	/* Packet Information i.e. Source Address */
-	cmsgptr = CMSG_FIRSTHDR(&msg);
-	pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
-	memset(pi, 0, sizeof(*pi));
-	pi->ipi6_ifindex = mif->ifindex;
-
-	cmsgptr->cmsg_level = IPPROTO_IPV6;
-	cmsgptr->cmsg_type = IPV6_PKTINFO;
-	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
-	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
-
-	/* HopLimit Information (always 255) */
-        cmsgptr->cmsg_level = IPPROTO_IPV6;
-        cmsgptr->cmsg_type = IPV6_HOPLIMIT;
-        cmsgptr->cmsg_len = CMSG_LEN(sizeof(int));
-        *(int *)(CMSG_DATA(cmsgptr)) = 255;
-        cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
-		
-	bzero(buf, sizeof(buf));
-	na = (struct nd_neighbor_advert *)buf;
-        na->nd_na_type = ND_NEIGHBOR_ADVERT;
-        na->nd_na_code = 0;
-        na->nd_na_cksum = 0;
-        na->nd_na_flags_reserved = ND_NA_FLAG_OVERRIDE;
-	na->nd_na_target = *dest;
-	nalen = sizeof(struct nd_neighbor_solicit);
-
-	opthdr = (struct nd_opt_hdr *) (buf + nalen);
-	opthdr->nd_opt_type = ND_OPT_TARGET_LINKADDR; 
-
-	switch(mif->sockdl.sdl_type) {
-	case IFT_ETHER:
-#ifdef IFT_IEEE80211
-	case IFT_IEEE80211:
-#endif
-		opthdr->nd_opt_len = (ROUNDUP8(ETHER_ADDR_LEN + 2)) >> 3;
-		addr = (char *)(opthdr + 1);
-		memcpy(addr, LLADDR(&mif->sockdl), ETHER_ADDR_LEN);
-		nalen += ROUNDUP8(ETHER_ADDR_LEN + 2);
-		break;
-	default:
-		return (-1);
-	}
-
-	iov.iov_base = buf;
-	iov.iov_len = nalen;
-
-	if (mobileip6var.var_debug > DEBUG_NORMAL)
-		syslog(LOG_INFO, "%s sending NA\n", __FUNCTION__);
-
-	if (sendmsg(icmpsock, &msg, 0) < 0)
-		syslog(LOG_ERR, "%s sendmsg() %s",  
-		       __FUNCTION__, strerror(errno));
-
-	return (errno);
-}
-
-#endif
-

@@ -1,4 +1,4 @@
-/*	$KAME: command.c,v 1.2 2005/02/12 15:22:39 t-momose Exp $	*/
+/*	$KAME: command.c,v 1.3 2005/12/14 08:17:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -34,6 +34,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <strings.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <poll.h>
@@ -185,10 +186,14 @@ dispatch_command(s, command_line, command_table)
 		while (isspace(*arg))
 			arg++;
 
-		if (ctbl->sub_cmds)
-			dispatch_command(s, arg, ctbl->sub_cmds);
-		else
+		if (ctbl->sub_cmds) {
+			if (*arg == '\0')
+				command_help(s, (char *)ctbl->sub_cmds);
+			else
+				dispatch_command(s, arg, ctbl->sub_cmds);
+		} else {
 			(*ctbl->cmdfunc)(s, arg);
+		}
 		return;
 	}
 

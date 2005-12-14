@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.29 2005/12/01 11:23:29 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.30 2005/12/14 08:17:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -492,7 +492,6 @@ int  icmp6_input_common(int);
 int mip6_get_nd6options(struct nd6options *, char *, int);
 void mip6_create_addr(struct in6_addr *, const struct in6_addr *, 
 		      struct in6_addr *, u_int8_t);
-int inet_are_prefix_equal(void *, void *, int);
 void hal_set_expire_timer(struct home_agent_list *, int);
 void hal_stop_expire_timer(struct home_agent_list *);
 void command_show_stat(int, char *);
@@ -572,7 +571,9 @@ void show_hal(int, struct mip6_hpfx_list *);
 int receive_ra(struct nd_router_advert *, size_t, int, struct in6_addr *, struct in6_addr *);
 
 /* other utility functions */
+int inet_are_prefix_equal(void *, void *, int);
 char *hexdump(void *, size_t);
 const char *ip6_sprintf(const struct in6_addr *addr);
+int kernel_debug(int);
 
 #endif /* _SHISAD_SHISAD_H_ */

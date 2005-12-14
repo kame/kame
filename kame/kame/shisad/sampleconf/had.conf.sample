@@ -2,7 +2,8 @@ debug 1;
 
 interface fxp0 {
 	command-port 7778;
-	preference 10;
+	preference 10;	# This directive doesn't affect the actual pref. value.
+			# change the value in rtadvd.conf
 
 	prefixtable {
 #		homeaddress          mobilenetworkpfx  pl mode     bid

@@ -1,4 +1,4 @@
-/*      $KAME: util.c,v 1.4 2005/08/18 10:15:31 t-momose Exp $  */
+/*      $KAME: util.c,v 1.5 2005/12/14 08:17:51 t-momose Exp $  */
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -32,6 +32,7 @@
 #include <string.h>
 
 #include <sys/types.h>
+#include <sys/syslog.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -132,4 +133,34 @@ in6_mask2len(mask, lim0)
         }
 
         return (x * 8 + y);
+}
+
+int
+inet_are_prefix_equal(p1, p2, len)
+        void *p1, *p2;
+        int len;
+{
+        int bytelen, bitlen;
+	u_int8_t *cp1, *cp2;
+
+        /* sanity check */
+        if (0 > len || len > 128) {
+                syslog(LOG_ERR, "inet_are_prefix_equal:"
+		       "invalid prefix length(%d)\n", len);
+                return (0);
+        }
+
+        bytelen = len / 8;
+        bitlen = len % 8;
+
+        if (memcmp(p1, p2, bytelen))
+                return (0);
+	cp1 = p1;
+	cp2 = p2;
+        if (bitlen != 0 &&
+            *(cp1 + bytelen) >> (8 - bitlen) !=
+            *(cp2 + bytelen) >> (8 - bitlen))
+                return (0);
+
+        return (1);
 }
