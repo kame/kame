@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.13 2005/12/13 00:49:03 mitsuya Exp $	*/
+/*	$Id: babymdd.c,v 1.14 2005/12/16 00:10:11 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1259,7 +1259,7 @@ send_rs(struct if_info  *ifinfo) {
 	}
 
         memset(&to, 0, sizeof(to));
-        if (inet_pton(AF_INET6, "ff02::1",&to.sin6_addr) != 1) {
+        if (inet_pton(AF_INET6, "ff02::2",&to.sin6_addr) != 1) {
 		close (icmpsock);
                 return (-1);
 	}
