@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.14 2005/12/16 00:10:11 ryuji Exp $	*/
+/*	$Id: babymdd.c,v 1.15 2005/12/16 02:20:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -65,6 +65,8 @@
 #include "babymdd.h"
 #include "callout.h"
 #include "shisad.h"
+
+#define LINKLOCAL_ALLROUTERS "ff02::2"
 
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
 
@@ -1259,7 +1261,7 @@ send_rs(struct if_info  *ifinfo) {
 	}
 
         memset(&to, 0, sizeof(to));
-        if (inet_pton(AF_INET6, "ff02::2",&to.sin6_addr) != 1) {
+        if (inet_pton(AF_INET6, LINKLOCAL_ALLROUTERS, &to.sin6_addr) != 1) {
 		close (icmpsock);
                 return (-1);
 	}

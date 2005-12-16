@@ -1,4 +1,4 @@
-/*      $KAME: mdd_probe.c,v 1.3 2005/04/14 06:22:36 suz Exp $  */
+/*      $KAME: mdd_probe.c,v 1.4 2005/12/16 02:20:25 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -52,6 +52,8 @@
 #include <arpa/inet.h>
 
 #include "mdd.h"
+
+#define LINKLOCAL_ALLROUTERS "ff02::2"
 
 extern struct cifl     cifl_head;
 
@@ -155,7 +157,7 @@ send_rs(cifp)
 
 
         memset(&to, 0, sizeof(to));
-        if (inet_pton(AF_INET6, "ff02::1",&to.sin6_addr) != 1) {
+        if (inet_pton(AF_INET6, LINKLOCAL_ALLROUTERS, &to.sin6_addr) != 1) {
 		close (icmpsock);
                 return (-1);
 	}
