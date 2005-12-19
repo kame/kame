@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.235 2005/12/13 00:49:04 mitsuya Exp $	*/
+/*	$Id: mip6.c,v 1.236 2005/12/19 06:52:56 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1696,7 +1696,6 @@ mip6_rr_hint_ratelimit(dst, src)
 }
 #endif /* NMIP > 0 */
 
-#if NMIP > 0
 #if 0
 int
 mip6_get_logical_src_dst(m, src, dst)
@@ -1947,7 +1946,6 @@ mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
 	}
 	return (0);
 }
-#endif /* NMIP > 0 */
 
 
 #if NMIP > 0
