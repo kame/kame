@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.236 2005/12/19 06:52:56 mitsuya Exp $	*/
+/*	$Id: mip6.c,v 1.237 2005/12/20 08:53:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2016,7 +2016,7 @@ mip6_do_dad(addr, ifidx)
 		return;
 	}
 	
-	mip6_ifa = (struct in6_ifaddr *)malloc(sizeof(*mip6_ifa), M_IFADDR, M_WAITOK);
+	MALLOC(mip6_ifa, struct in6_ifaddr *, sizeof(*mip6_ifa), M_IFADDR, M_WAIT);
 	bzero(mip6_ifa, sizeof(*mip6_ifa));
 #ifdef __FreeBSD__
 	IFA_LOCK_INIT(&mip6_ifa->ia_ifa);
@@ -2025,7 +2025,14 @@ mip6_do_dad(addr, ifidx)
 	mip6_ifa->ia6_flags |= IN6_IFF_PSEUDOIFA | IN6_IFF_TENTATIVE;
 	mip6_ifa->ia_ifa.ifa_addr = (struct sockaddr *)&mip6_ifa->ia_addr;
 	mip6_ifa->ia_addr.sin6_addr = *addr;
-	in6_setscope(&mip6_ifa->ia_addr.sin6_addr, ifp, NULL);
+#ifndef __APPLE__
+	if ((error = in6_setscope(&mip6_ifa->ia_addr.sin6_addr, ifp, NULL)) != 0) {
+		mip6log((LOG_ERR, "in6_setscope failed\n"));
+		break;
+	}
+#else
+	mip6_ifa->ia_addr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+#endif 
 	mip6_ifa->ia_addr.sin6_family = AF_INET6;
 	mip6_ifa->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
 	nd6_dad_start((struct ifaddr *)mip6_ifa, 0);	/* delay isn't needed in this case, maybe */
