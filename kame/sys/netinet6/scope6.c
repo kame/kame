@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.51 2005/12/23 13:30:57 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.52 2005/12/23 13:38:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -190,7 +190,8 @@ scope6_get(ifp, idlist)
 
 
 /*
- * Get a scope of the address. Node-local, link-local, site-local or global.
+ * Get a scope of the address. Interface-local, link-local, site-local
+ * or global.
  */
 int
 in6_addrscope(addr)
