@@ -1,4 +1,4 @@
-/*	$KAME: scope6_var.h,v 1.12 2005/07/15 15:23:53 jinmei Exp $	*/
+/*	$KAME: scope6_var.h,v 1.13 2005/12/23 11:10:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -36,7 +36,8 @@
 struct scope6_id {
 	/*
 	 * 16 is correspondent to 4bit multicast scope field.
-	 * i.e. from node-local to global with some reserved/unassigned types.
+	 * i.e. from interface-local to global with some
+	 * reserved/unassigned types.
 	 */
 	u_int32_t s6id_list[16];
 };
