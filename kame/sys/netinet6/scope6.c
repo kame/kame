@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.50 2005/08/24 08:08:55 suz Exp $	*/
+/*	$KAME: scope6.c,v 1.51 2005/12/23 13:30:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -238,15 +238,17 @@ in6_addrscope(addr)
 		}
 	}
 
-	/*
-	 * Regard loopback and unspecified addresses as global, since
-	 * they have no ambiguity.
-	 */
 	if (bcmp(&in6addr_loopback, addr, sizeof(*addr) - 1) == 0) {
 		if (addr->s6_addr[15] == 1) /* loopback */
 			return IPV6_ADDR_SCOPE_LINKLOCAL;
-		if (addr->s6_addr[15] == 0) /* unspecified */
-			return IPV6_ADDR_SCOPE_GLOBAL; /* XXX: correct? */
+		if (addr->s6_addr[15] == 0) {
+			/*
+			 * Regard the unspecified addresses as global,
+			 * since it has no ambiguity.
+			 * XXX: not sure if it's correct...
+			 */
+			return IPV6_ADDR_SCOPE_GLOBAL;
+		}
 	}
 
 	return IPV6_ADDR_SCOPE_GLOBAL;
