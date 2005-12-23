@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.52 2005/12/23 13:38:40 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.53 2005/12/23 13:39:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -187,7 +187,6 @@ scope6_get(ifp, idlist)
 
 	return (0);
 }
-
 
 /*
  * Get a scope of the address. Interface-local, link-local, site-local
