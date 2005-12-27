@@ -1,5 +1,5 @@
 /*	$NetBSD: esp_core.c,v 1.33 2003/08/27 00:08:31 thorpej Exp $	*/
-/*	$KAME: esp_core.c,v 1.68 2004/09/29 08:36:01 suz Exp $	*/
+/*	$KAME: esp_core.c,v 1.69 2005/12/27 09:33:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -733,7 +733,7 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 
 	/* skip bodyoff */
 	while (soff < bodyoff) {
-		if (soff + s->m_len > bodyoff) {
+		if (soff + s->m_len >= bodyoff) {
 			sn = bodyoff - soff;
 			break;
 		}
@@ -943,7 +943,7 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	/* skip bodyoff */
 	while (soff < bodyoff) {
-		if (soff + s->m_len > bodyoff) {
+		if (soff + s->m_len >= bodyoff) {
 			sn = bodyoff - soff;
 			break;
 		}
