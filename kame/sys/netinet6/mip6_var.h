@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.127 2005/12/13 00:49:04 mitsuya Exp $	*/
+/*	$KAME: mip6_var.h,v 1.128 2005/12/30 08:57:24 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -189,10 +189,6 @@ int mip6_ifa6_is_addr_valid_hoa(struct in6_ifaddr *);
 u_int8_t *mip6_create_hoa_opt(struct in6_addr *); 
 struct ip6_opt_home_address *mip6_search_hoa_in_destopt(u_int8_t *);
 void mip6_probe_routers(void);
-#if 0
-int mip6_get_logical_src_dst(struct mbuf *, struct in6_addr *,
-    struct in6_addr *);
-#endif
 int mip6_get_ip6hdrinfo(struct mbuf *, struct in6_addr *, struct in6_addr *, 
 		struct in6_addr *, struct in6_addr *, u_int8_t, int *);
 #define HOA_PRESENT 	0x01
@@ -202,8 +198,6 @@ void mip6_md_scan(u_int16_t);
 
 /* used by one or more kind of nodetypes. */
 struct in6_ifaddr *mip6_ifa_ifwithin6addr(const struct in6_addr *);
-struct mbuf *mip6_append_ip6_hdr(struct mbuf **, struct in6_addr *,
-    struct in6_addr *);
 int mip6_encapsulate(struct mbuf **, struct in6_addr *, struct in6_addr *);
 int mip6_tunnel_input(struct mbuf **, int *, int proto);
 void mip6_notify_rr_hint(struct in6_addr *, struct in6_addr *);

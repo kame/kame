@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.238 2005/12/30 08:16:02 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.239 2005/12/30 08:57:24 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -307,19 +307,8 @@ mip6_input(mp, offp)
 		 * to send the icmp6 error messages.
 		 */
 		if (mip6_get_ip6hdrinfo(m, &src, &dst, &hoa, &rt, 0, &presence)==0) {
-#if 0
-		 	struct m_tag *mtag = NULL;
-#endif
 			if (presence & RTHDR_PRESENT) {
 				bcopy(&rt, &ip6->ip6_dst, sizeof(struct in6_addr));
-#if 0
-				mtag = ip6_findaux(m);
-				if (mtag) {
-					bcopy(&rt, 
-					      &((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
-					      sizeof(struct in6_addr));
-				}
-#endif
 			}
 		}
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
@@ -349,19 +338,8 @@ mip6_input(mp, offp)
 		 * to send the icmp6 error messages.
 		 */
 		if (mip6_get_ip6hdrinfo(m, &src, &dst, &hoa, &rt, 0, &presence)==0) {
-#if 0
-		 	struct m_tag *mtag = NULL;
-#endif
 			if (presence & RTHDR_PRESENT) {
 				bcopy(&rt, &ip6->ip6_dst, sizeof(struct in6_addr));
-#if 0
-				mtag = ip6_findaux(m);
-				if (mtag) {
-					bcopy(&rt, 
-					      &((struct ip6aux *)(mtag + 1))->ip6a_dstia6->ia_addr.sin6_addr, 
-					      sizeof(struct in6_addr));
-				}
-#endif
 			}
 		}
 
@@ -726,16 +704,6 @@ mip6_bce_remove_bc(mbc)
 	int s;
 	int error = 0;
 
-#if 0
-	mbc->mbc_refcnt--;
-	if (mbc->mbc_flags & IP6_MH_BU_CLONED) {
-		if (mbc->mbc_refcnt > 1)
-			return (0);
-	} else {
-		if (mbc->mbc_refcnt > 0)
-			return (0);
-	}
-#endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
@@ -744,17 +712,10 @@ mip6_bce_remove_bc(mbc)
 	mip6_bc_list_remove(mbc);
 
 	if (MIP6_IS_HA && (mbc->mbc_flags & IP6_MH_BU_HOME)) {
-#if 0
-		if (MIP6_IS_BC_DAD_WAIT(mbc)) {
-			mip6_dad_stop(mbc);
-		} else {
-#endif
-			error = mip6_bc_proxy_control(&mbc->mbc_hoa,
-						      &mbc->mbc_cnaddr, RTM_DELETE);
-			error = encap_detach(mbc->mbc_encap);
-#if 0
-		}
-#endif
+		mip6_stop_dad(&mbc->mbc_hoa, -1);
+		error = mip6_bc_proxy_control(&mbc->mbc_hoa,
+					      &mbc->mbc_cnaddr, RTM_DELETE);
+		error = encap_detach(mbc->mbc_encap);
 #ifdef IPSEC
 		mip6_bce_update_ipsecdb(mbc);
 #endif /* IPSEC */
@@ -924,17 +885,6 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	struct in6_ifaddr *ia6_hoa;
 	struct mip6_bul_internal *mbul;
 
-#if 0
-#ifdef __FreeBSD__
-	mipsc = (struct mip_softc *)ifnet_byindex(hoa_ifindex);
-#else
-	mipsc = (struct mip_softc *)ifindex2ifnet[hoa_ifindex];
-#endif
-	if (mipsc == NULL)
-		return (-1);
-
-	ia6_hoa = mip6_ifa_ifwithin6addr(hoa);
-#endif
 	ia6_hoa = mip6_ifa_ifwithin6addr(hoa);
 	if (ia6_hoa == NULL)
 		return (-1);
@@ -1225,91 +1175,6 @@ mip6_create_hoa_opt(coa)
 
 	return (optbuf);
 }
-
-#if 0
-/* Append an outer IPv6 header for outgoing packets  */
-struct mbuf *
-mip6_append_ip6_hdr(mp, osrc, odst)
-	struct mbuf **mp;
-	struct in6_addr *osrc;
-	struct in6_addr *odst;
-{
-	struct ip6_hdr *iip6 = NULL, *oip6 = NULL;
-	struct mbuf *m = *mp;
-
-#ifdef  __NetBSD__
-	int sp = splsoftnet();
-#endif 
-	/* Packet size check */
-	if (m->m_len < sizeof(struct ip6_hdr)) {
-		m = m_pullup(m, sizeof(struct ip6_hdr));
-		if (!m) 
-			goto bad;
-	}
-
-	/* Allocate mbuf for outer IPv6 headre */
-	if (m && m->m_next != NULL && m->m_pkthdr.len < MCLBYTES) {
-		struct mbuf *n;
-
-		MGETHDR(n, M_DONTWAIT, MT_HEADER);
-		if (!n) {
-			m_freem(m);
-			goto bad;
-		}
-		MCLGET(n, M_DONTWAIT);
-		if (!(n->m_flags & M_EXT)) {
-			m_freem(m);
-			goto bad;
-		}
-
-		m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
-		n->m_pkthdr = m->m_pkthdr;
-		n->m_len = m->m_pkthdr.len;
-		m_freem(m);
-		m = n;
-	}
-
-	/* Get inner IPv6 header */
-	iip6 = mtod(m, struct ip6_hdr *);
-	iip6->ip6_plen = 
-		htons((u_short)m->m_pkthdr.len - sizeof(struct ip6_hdr));
-
-	/* prepend new IP header */
-	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
-	if (m && (m->m_len < sizeof(struct ip6_hdr)))
-		m = m_pullup(m, sizeof(struct ip6_hdr));
-	if (m == NULL) 
-		goto bad;
-
-	oip6 = mtod(m, struct ip6_hdr *);
-	bzero(oip6, sizeof(struct ip6_hdr));
-
-	/* Filling outer IPv6 header fields */
-	oip6->ip6_flow = 0;
-	oip6->ip6_vfc &= ~IPV6_VERSION_MASK;
-	oip6->ip6_vfc |= IPV6_VERSION;
-	oip6->ip6_plen = 
-		htons((u_short)m->m_pkthdr.len - sizeof(struct ip6_hdr));
-	oip6->ip6_nxt = IPPROTO_IPV6;
-	oip6->ip6_hlim = IPV6_DEFHLIM;
-
-	bcopy(osrc, &oip6->ip6_src, sizeof(struct in6_addr));
-	bcopy(odst, &oip6->ip6_dst, sizeof(struct in6_addr));
-	m->m_pkthdr.rcvif = NULL;
-
-#ifdef  __NetBSD__
-	splx(sp);
-#endif 
-
-	return (m);
-
-  bad:
-#ifdef  __NetBSD__
-	splx(sp);
-#endif
-	return (NULL);
-}
-#endif
 
 /* if the prefix is equal to one of home prefixes, return TRUE */
 int
@@ -1695,114 +1560,6 @@ mip6_rr_hint_ratelimit(dst, src)
 	return ret;
 }
 #endif /* NMIP > 0 */
-
-#if 0
-int
-mip6_get_logical_src_dst(m, src, dst)
-	struct mbuf *m;
-	struct in6_addr *src, *dst;
-{
-	struct ip6_hdr ip6;
-	struct ip6_dest ip6d;
-	u_int8_t *ip6dbuf;
-	struct ip6_rthdr ip6r;
-	u_int8_t *ip6o;
-	int off, proto, nxt, ip6dlen, ip6olen;
-
-	if (m == NULL || src == NULL || dst == NULL) {
-		mip6log((LOG_ERR, "mip6_get_logical_src_dst: "
-		    "invalid argument (m, src, dst) = (%p, %p, %p).\n",
-		    m, src, dst));
-		return (-1);
-	}
-
-	/* IPv6 header may be safe to mtod(), but be conservative. */
-	m_copydata(m, 0, sizeof(struct ip6_hdr), (caddr_t)&ip6);
-	*src = ip6.ip6_src;
-	*dst = ip6.ip6_dst;
-
-	off = 0;
-	proto = IPPROTO_IPV6;
-
-	/*
-	 * extract src and dst addresses from HAO and type 2 routing
-	 * header.  note that we cannot directly access to mbuf
-	 * (e.g. by using IP6_EXTHDR_CHECK/GET), since we use this
-	 * function in both input/output pathes.  In a output path,
-	 * the packet is not located on a contiguous memory.
-	 */
-	while ((off = ip6_nexthdr(m, off, proto, &nxt)) != -1) {
-		proto = nxt;
-		if (nxt == IPPROTO_DSTOPTS) {
-			m_copydata(m, off, sizeof(struct ip6_dest),
-			    (caddr_t)&ip6d);
-			ip6dlen = (ip6d.ip6d_len + 1) << 3;
-
-			/* copy entire destopt header. */
-			MALLOC(ip6dbuf, u_int8_t *, ip6dlen, M_IP6OPT,
-			    M_NOWAIT);
-			if (ip6dbuf == NULL) {
-				mip6log((LOG_ERR, "mip6_get_logical_src_dst: "
-				    "failed to allocate memory to copy "
-				    "destination option.\n"));
-				return (-1);
-			}
-			m_copydata(m, off, ip6dlen, ip6dbuf);
-
-			ip6dlen -= sizeof(struct ip6_dest);
-			ip6o = ip6dbuf + sizeof(struct ip6_dest);
-			for (ip6olen = 0; ip6dlen > 0;
-			     ip6dlen -= ip6olen, ip6o += ip6olen) {
-				if (*ip6o != IP6OPT_PAD1 &&
-				    (ip6dlen < IP6OPT_MINLEN ||
-					2 + *(ip6o + 1) > ip6dlen)) {
-					mip6log((LOG_ERR,
-					    "mip6_get_logical_src_dst: "
-					    "destopt too small.\n"));
-					FREE(ip6dbuf, M_IP6OPT);
-					return (-1);
-				}
-				if (*ip6o == IP6OPT_PAD1) {
-					/* special case. */
-					ip6olen = 1;
-				} else if (*ip6o == IP6OPT_HOME_ADDRESS) {
-					ip6olen = 2 + *(ip6o + 1);
-					if (ip6olen != sizeof(struct ip6_opt_home_address)) {
-						mip6log((LOG_ERR,
-						    "mip6_get_logical_src_dst: "
-						    "invalid HAO length.\n"));
-						FREE(ip6dbuf, M_IP6OPT);
-						return (-1);
-					}
-					bcopy(ip6o + 2, src,
-					    sizeof(struct in6_addr));
-				} else {
-					/* ignore other options. */
-					ip6olen = 2 + *(ip6o + 1);
-				}
-			}
-			FREE(ip6dbuf, M_IP6OPT);
-		}
-		if (nxt == IPPROTO_ROUTING) {
-			m_copydata(m, off, sizeof(struct ip6_rthdr),
-			    (caddr_t)&ip6r);
-			/*
-			 * only type 2 routing header need to be
-			 * checked.
-			 */
-			if (ip6r.ip6r_type != IPV6_RTHDR_TYPE_2)
-				continue;
-			if (ip6r.ip6r_len != 2)
-				continue;
-			if (ip6r.ip6r_segleft != 1)
-				continue;
-			m_copydata(m, off + sizeof(struct ip6_rthdr2),
-			    sizeof(struct in6_addr), (caddr_t)dst);
-		}
-	}
-	return (0);
-}
-#endif
 
 /* 
  * Retrieve IPv6 header information such as 
