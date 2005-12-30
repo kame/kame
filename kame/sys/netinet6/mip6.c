@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.237 2005/12/20 08:53:16 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.238 2005/12/30 08:16:02 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2026,9 +2026,8 @@ mip6_do_dad(addr, ifidx)
 	mip6_ifa->ia_ifa.ifa_addr = (struct sockaddr *)&mip6_ifa->ia_addr;
 	mip6_ifa->ia_addr.sin6_addr = *addr;
 #ifndef __APPLE__
-	if ((error = in6_setscope(&mip6_ifa->ia_addr.sin6_addr, ifp, NULL)) != 0) {
+	if (in6_setscope(&mip6_ifa->ia_addr.sin6_addr, ifp, NULL) != 0) {
 		mip6log((LOG_ERR, "in6_setscope failed\n"));
-		break;
 	}
 #else
 	mip6_ifa->ia_addr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
