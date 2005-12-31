@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.400 2005/10/23 12:15:18 suz Exp $	*/
+/*	$KAME: in6.c,v 1.401 2005/12/31 10:31:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,7 +221,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	 * RTF_LLINFO flag, so that the corresponding host route would have
 	 * the flag, and thus applications that assume traditional behavior
 	 * would be happy.  Note that we assume the caller of the function
-	 * (probably implicitly) set nd6_rtrequest() to ifa->ifa_rtrequest,
+	 * (probably implicitly) has set ifa->ifa_rtrequest to nd6_rtrequest(),
 	 * which changes the outgoing interface to the loopback interface.
 	 */
 	e = rtrequest(cmd, ifa->ifa_addr, ifa->ifa_addr,
