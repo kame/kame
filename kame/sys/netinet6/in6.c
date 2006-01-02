@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.401 2005/12/31 10:31:04 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.402 2006/01/02 09:06:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2386,7 +2386,7 @@ in6if_do_dad(ifp)
 		/*
 		 * Our DAD routine requires the interface up and running.
 		 * However, some interfaces can be up before the RUNNING
-		 * status.  Additionaly, users may try to assign addresses
+		 * status.  Additionally, users may try to assign addresses
 		 * before the interface becomes up (or running).
 		 * We simply skip DAD in such a case as a work around.
 		 * XXX: we should rather mark "tentative" on such addresses,
