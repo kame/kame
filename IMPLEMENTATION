@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.398 2005/11/23 04:57:16 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.399 2006/01/04 02:56:29 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -739,7 +739,7 @@ and ff02::1, respectively, on the link the interface is attached).
 In addition to a link-local address, the loopback address (::1) will be
 assigned to the loopback interface.  Also, ::1/128 and ff01::/32 are
 automatically added to routing table, and loopback interface joins
-node-local multicast group ff01::1.
+interface-local multicast group ff01::1.
 
 1.4.2 Stateless address autoconfiguration on hosts
 
