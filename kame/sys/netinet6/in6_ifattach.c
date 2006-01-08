@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.214 2006/01/08 08:58:25 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.215 2006/01/08 09:21:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,6 +54,12 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#ifdef __FreeBSD__
+#include <net/firewire.h>
+#endif
+#ifdef __NetBSD__
+#include <net/if_ieee1394.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -381,9 +387,32 @@ found:
 	addr = LLADDR(sdl);
 	addrlen = sdl->sdl_alen;
 
-	/* IEEE1394 uses 16byte length address starting with EUI64 */
-	if (ifp->if_type == IFT_IEEE1394 && addrlen > 8)
+	if (ifp->if_type == IFT_IEEE1394) {
+		/*
+		 * LLADDR(sdl) for an IEEE1394 interface encodes the 1394 ARP
+		 * format defined in RFC2734, which begins with the 64-bit
+		 * EUI64 identifier.  We only need the EUI64 part.
+		 */
+		if (addrlen < 8) {
+			log(LOG_ERR,
+			    "unexpected lladdr length for IEEE1394 IF(%s)\n",
+			    if_name(ifp));
+			return (-1);
+		}
 		addrlen = 8;
+#ifdef __FreeBSD__
+		addr =
+		    (char *)&((struct fw_hwaddr *)addr)->sender_unique_ID_hi;
+#elif defined(__NetBSD__)
+		addr = (char *)((struct ieee1394_hwaddr *)addr)->iha_uid;
+#else
+		/*
+		 * Other OSes do not seem to support IEEE1394 (XXX: should
+		 * fall through?)
+		 */
+		return (-1);
+#endif
+	}
 
 	/* get EUI64 */
 	switch (ifp->if_type) {
