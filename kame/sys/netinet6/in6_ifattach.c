@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.213 2005/08/25 07:55:33 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.214 2006/01/08 08:58:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -381,18 +381,9 @@ found:
 	addr = LLADDR(sdl);
 	addrlen = sdl->sdl_alen;
 
-	switch (ifp->if_type) {
-	case IFT_IEEE1394:
-#ifdef IFT_IEEE80211
-	case IFT_IEEE80211:
-#endif
-		/* IEEE1394 uses 16byte length address starting with EUI64 */
-		if (addrlen > 8)
-			addrlen = 8;
-		break;
-	default:
-		break;
-	}
+	/* IEEE1394 uses 16byte length address starting with EUI64 */
+	if (ifp->if_type == IFT_IEEE1394 && addrlen > 8)
+		addrlen = 8;
 
 	/* get EUI64 */
 	switch (ifp->if_type) {
