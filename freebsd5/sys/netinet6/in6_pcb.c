@@ -509,15 +509,8 @@ in6_setsockaddr(so, nam)
 {
 	int s;
 	register struct inpcb *inp;
-	register struct sockaddr_in6 *sin6;
-
-	/*
-	 * Do the malloc first in case it blocks.
-	 */
-	MALLOC(sin6, struct sockaddr_in6 *, sizeof *sin6, M_SONAME, M_WAITOK);
-	bzero(sin6, sizeof *sin6);
-	sin6->sin6_family = AF_INET6;
-	sin6->sin6_len = sizeof(*sin6);
+	struct in6_addr addr;
+	in_port_t port;
 
 	s = splnet();
 	inp = sotoinpcb(so);
@@ -525,15 +518,11 @@ in6_setsockaddr(so, nam)
 		splx(s);
 		return EINVAL;
 	}
-	sin6->sin6_port = inp->inp_lport;
-	sin6->sin6_addr = inp->in6p_laddr;
+	port = inp->inp_lport;
+	addr = inp->in6p_laddr;
 	splx(s);
 
-#ifndef SCOPEDROUTING
-	in6_clearscope(&sin6->sin6_addr);
-#endif
-
-	*nam = (struct sockaddr *) sin6;
+	*nam = in6_sockaddr(port, &addr);
 	return 0;
 }
 
@@ -544,15 +533,8 @@ in6_setpeeraddr(so, nam)
 {
 	int s;
 	struct inpcb *inp;
-	struct sockaddr_in6 *sin6;
-
-	/*
-	 * Do the malloc first in case it blocks.
-	 */
-	MALLOC(sin6, struct sockaddr_in6 *, sizeof(*sin6), M_SONAME, M_WAITOK);
-	bzero((caddr_t)sin6, sizeof (*sin6));
-	sin6->sin6_family = AF_INET6;
-	sin6->sin6_len = sizeof(struct sockaddr_in6);
+	struct in6_addr addr;
+	in_port_t port;
 
 	s = splnet();
 	inp = sotoinpcb(so);
@@ -560,15 +542,11 @@ in6_setpeeraddr(so, nam)
 		splx(s);
 		return EINVAL;
 	}
-	sin6->sin6_port = inp->inp_fport;
- 	sin6->sin6_addr = inp->in6p_faddr;
-  	splx(s);
+	port = inp->inp_fport;
+	addr = inp->in6p_faddr;
+	splx(s);
 
-#ifndef SCOPEDROUTING
-	in6_clearscope(&sin6->sin6_addr);
-#endif
-
-	*nam = (struct sockaddr *) sin6;
+	*nam = in6_sockaddr(port, &addr);
 	return 0;
 }
 
