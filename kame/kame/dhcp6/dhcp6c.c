@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.163 2005/09/16 11:30:14 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.164 2006/01/10 02:46:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -673,6 +673,8 @@ client6_do_ctlcommand(buf, len)
 	char ifname[IFNAMSIZ];
 	time_t now;
 
+	memset(ifname, 0, sizeof(ifname));
+
 	ctlhead = (struct dhcp6ctl *)buf;
 
 	command = ntohs(ctlhead->command);
@@ -808,6 +810,9 @@ client6_ifctl(ifname, command)
 		    ifname);
 		return (-1);
 	}
+
+	dprintf(LOG_DEBUG, FNAME, "%s interface %s",
+	    command == DHCP6CTL_COMMAND_START ? "start" : "stop", ifname);
 
 	switch(command) {
 	case DHCP6CTL_COMMAND_START:
