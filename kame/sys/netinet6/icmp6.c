@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.410 2005/08/09 08:20:11 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.411 2006/01/15 12:26:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -421,7 +421,8 @@ icmp6_error(m, type, code, param)
 	 * XXX: the case of anycast source?
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&oip6->ip6_src) ||
-	    IN6_IS_ADDR_MULTICAST(&oip6->ip6_src))
+	    IN6_IS_ADDR_MULTICAST(&oip6->ip6_src) ||
+	    in6_is_addr_anycast(&oip6->ip6_src))
 		goto freeit;
 
 	/*

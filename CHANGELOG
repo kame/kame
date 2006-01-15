@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2810 2006/01/09 01:59:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.2811 2006/01/15 12:26:56 suz Exp $
 
 <200601>
+2006-01-15  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet6/{icmp6.c, in6.[ch]}: not reply an ICMPv6 Error
+	message for a packet from an obvious anycast address.
+
 2006-01-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd5/sys/netinet6/in6_pcb.c (in6_{set,peer}sockaddr):
 	converted embedded scope zone IDs into the sin6_scope_id field
