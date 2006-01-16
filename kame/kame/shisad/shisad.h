@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.30 2005/12/14 08:17:51 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.31 2006/01/16 06:10:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -555,7 +555,7 @@ void command_show_pt(int, char *);
 /* hal.c */
 struct home_agent_list *mip6_find_hal(struct mip6_hoainfo *);
 struct home_agent_list *had_add_hal(struct mip6_hpfxl *, struct in6_addr *, 
-			     struct in6_addr *, uint16_t, uint16_t, int);
+			     struct in6_addr *, u_int16_t, u_int16_t, int);
 struct mip6_hpfxl *had_add_hpfxlist(struct in6_addr *, u_int16_t);
 void mip6_flush_hal(struct mip6_hpfxl *, int);
 void mip6_delete_hal(struct mip6_hpfxl *, struct in6_addr *);

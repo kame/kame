@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.3 2005/09/30 12:01:56 keiichi Exp $	*/
+/*	$KAME: ip6mh.h,v 1.4 2006/01/16 06:10:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -326,19 +326,19 @@ struct ip6_mh_opt_auth_data {
 
 /* NEMO Basic Support: Mobile Network Prefix Option */
 struct ip6_mh_opt_prefix {
-        uint8_t ip6mopfx_type;
-        uint8_t ip6mopfx_len;
-        uint8_t ip6mopfx_reserved;
-        uint8_t ip6mopfx_pfxlen;
-        struct in6_addr ip6mopfx_pfx;
+	u_int8_t ip6mopfx_type;
+	u_int8_t ip6mopfx_len;
+	u_int8_t ip6mopfx_reserved;
+	u_int8_t ip6mopfx_pfxlen;
+	struct in6_addr ip6mopfx_pfx;
 } __attribute__((__packed__));
 
 /* Multiple CoA Registrations (MIP6_MCOA) */
 struct ip6_mh_opt_bid {
-        uint8_t ip6mobid_type;
-        uint8_t ip6mobid_len;
-        uint16_t ip6mobid_bid;
-        uint16_t ip6mobid_reserved;
+	u_int8_t ip6mobid_type;
+	u_int8_t ip6mobid_len;
+	u_int16_t ip6mobid_bid;
+	u_int16_t ip6mobid_reserved;
 } __attribute__((__packed__));
 /* Binding Unique Identifier flag */
 #if BYTE_ORDER == BIG_ENDIAN
@@ -350,11 +350,11 @@ struct ip6_mh_opt_bid {
 
 /* IPv4 Mobile Network Prefix Option */
 struct ip6_mh_opt_ipv4_prefix {
-        uint8_t ip6mov4pfx_type;
-        uint8_t ip6mov4pfx_len;
-        uint8_t ip6mov4pfx_reserved;
-        uint8_t ip6mov4pfx_pfxlen;
-        struct in_addr ip6mov4pfx_pfx;
+	u_int8_t ip6mov4pfx_type;
+	u_int8_t ip6mov4pfx_len;
+	u_int8_t ip6mov4pfx_reserved;
+	u_int8_t ip6mov4pfx_pfxlen;
+	struct in_addr ip6mov4pfx_pfx;
 };
 
 #endif /* not _NETINET_IP6MH_H_ */
