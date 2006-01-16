@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.101 2005/07/27 11:00:00 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.102 2006/01/16 05:37:06 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -97,6 +97,10 @@
 
 #ifndef _NETINET_ICMP6_H_
 #define _NETINET_ICMP6_H_
+#ifdef __APPLE__
+#include <sys/appleapiopts.h>
+#endif /* __APPLE__ */
+
 
 #define ICMPV6_PLD_MAXLEN	1232	/* IPV6_MMTU - sizeof(struct ip6_hdr)
 					   - sizeof(struct icmp6_hdr) */
@@ -138,7 +142,7 @@ struct icmp6_hdr {
 #define ICMP6_MEMBERSHIP_REPORT		131	/* group membership report */
 #define ICMP6_MEMBERSHIP_REDUCTION	132	/* group membership termination */
 
-#ifndef _KERNEL
+#if (!defined(__APPLE__) && !defined(_KERNEL)) || defined(__APPLE__)
 /* the followings are for backward compatibility to old KAME apps. */
 #define MLD6_LISTENER_QUERY MLD_LISTENER_QUERY
 #define MLD6_LISTENER_REPORT MLD_LISTENER_REPORT
@@ -176,7 +180,7 @@ struct icmp6_hdr {
 #define MLD_MTRACE			201	/* mtrace messages */
 
 /* backward compatibility for applications using old macro names */
-#ifndef _KERNEL
+#if (!defined(__APPLE__) && !defined(_KERNEL)) || defined(__APPLE__)
 #define MLD6_MTRACE_RESP	MLD_MTRACE_RESP
 #define MLD6_MTRACE		MLD_MTRACE
 #define MLD6V2_LISTENER_REPORT	MLDV2_LISTENER_REPORT
@@ -225,7 +229,7 @@ struct mld_hdr {
 } __attribute__((__packed__));
 
 /* definitions to provide backward compatibility to old KAME applications */
-#ifndef _KERNEL
+#if (!defined(__APPLE__) && !defined(_KERNEL)) || defined(__APPLE__)
 #define mld6_hdr	mld_hdr
 #define mld6_type	mld_type
 #define mld6_code	mld_code
@@ -852,6 +856,7 @@ struct icmp6stat {
 #define ICMPV6CTL_ND6_MAXQLEN	24
 #define ICMPV6CTL_MAXID		25
 
+#if !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE))
 #define ICMPV6CTL_NAMES { \
 	{ 0, 0 }, \
 	{ 0, 0 }, \
@@ -891,8 +896,13 @@ struct	in6_multi;
 void	icmp6_init __P((void));
 void	icmp6_paramerror __P((struct mbuf *, int));
 void	icmp6_error __P((struct mbuf *, int, int, int));
+#ifdef __APPLE__
+int	icmp6_input(struct mbuf **, int *);
+void	icmp6_fasttimo(void);
+#else
 void	icmp6_error2 __P((struct mbuf *, int, int, int, struct ifnet *));
 int	icmp6_input __P((struct mbuf **, int *, int));
+#endif
 void	icmp6_reflect __P((struct mbuf *, size_t));
 void	icmp6_prepare __P((struct mbuf *));
 void	icmp6_redirect_input __P((struct mbuf *, int));
@@ -902,19 +912,34 @@ int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif
 
 struct	ip6ctlparam;
+#ifdef __APPLE__
+void	icmp6_mtudisc_update(struct ip6ctlparam *, int);
+#else /* __APPLE__ */
 void	icmp6_mtudisc_update __P((struct ip6ctlparam *,
 				  struct sockaddr_in6 *, int));
+#endif /* __APPLE__ */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 void	icmp6_mtudisc_callback_register __P((void (*)(struct in6_addr *)));
 #endif
 
 /* XXX: is this the right place for these macros? */
+#ifdef __APPLE__
+#define icmp6_ifstat_inc(ifp, tag) \
+do {								\
+	if ((ifp) && (ifp)->if_index <= if_index			\
+	 && (ifp)->if_index < icmp6_ifstatmax			\
+	 && icmp6_ifstat && icmp6_ifstat[(ifp)->if_index]) {	\
+		icmp6_ifstat[(ifp)->if_index]->tag++;		\
+	}							\
+} while (0)
+#else
 #define icmp6_ifstat_inc(ifp, tag) \
 do {								\
 	if (ifp)						\
 		((struct in6_ifextra *)((ifp)->if_afdata[AF_INET6]))->icmp6_ifstat->tag++; \
 } while (/*CONSTCOND*/ 0)
+#endif
 
 #define icmp6_ifoutstat_inc(ifp, type, code) \
 do { \
@@ -971,5 +996,6 @@ do { \
 extern int	icmp6_rediraccept;	/* accept/process redirects */
 extern int	icmp6_redirtimeout;	/* cache time for redirect routes */
 #endif /* _KERNEL */
+#endif /* !__APPLE__ || (__APPLE__ && KERNEL_PRIVATE) */
 
 #endif /* not _NETINET_ICMP6_H_ */
