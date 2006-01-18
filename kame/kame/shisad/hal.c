@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.5 2005/11/03 12:59:27 ryuji Exp $	*/
+/*	$KAME: hal.c,v 1.6 2006/01/18 10:31:34 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -509,6 +509,12 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 				/* break; */
 				continue;
 			}
+			/* Update {valid, preferred} lifetime
+			   with the values received RA
+			*/
+			/* XXX these values are defined for MNs */
+			hpfx->hpfx_vltime = ntohl(pi->nd_opt_pi_valid_time);
+			hpfx->hpfx_pltime = ntohl(pi->nd_opt_pi_preferred_time);
 #else
 			/* Update/Create Home Prefix List */ 
 			memset(&mnoption, 0, sizeof(mnoption)); 
