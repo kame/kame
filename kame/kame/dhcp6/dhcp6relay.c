@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.60 2005/10/16 16:17:18 suz Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.61 2006/01/18 13:25:12 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -180,7 +180,7 @@ main(argc, argv)
 		if (argc != 1) {
 			fprintf(stderr, "you should explicitly specify a "
 			    "relaying interface, when you are to "
-			    "listen to multiple interfaces");
+			    "listen on multiple interfaces");
 			exit(0);
 		}
 		relaydevice = argv[0];
