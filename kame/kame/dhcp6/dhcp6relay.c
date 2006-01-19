@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.61 2006/01/18 13:25:12 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.62 2006/01/19 04:25:16 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -577,7 +577,7 @@ relay6_recv(s, fromclient)
 	 * interface, when a DHCPv6 server is running on that interface.
 	 * This check prevents such reception.
 	 */
-	if (ifd == NULL || pi->ipi6_ifindex != relayifid)
+	if (ifd == NULL && pi->ipi6_ifindex != relayifid)
 		return;
 	if (if_indextoname(pi->ipi6_ifindex, ifname) == NULL) {
 		dprintf(LOG_WARNING, FNAME,
