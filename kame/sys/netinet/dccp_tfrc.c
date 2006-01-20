@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.14 2005/10/26 11:36:49 nishida Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.15 2006/01/20 18:47:38 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson
@@ -351,7 +351,7 @@ tfrc_updateX(struct tfrc_send_ccb * cb, struct timeval t_now)
 			temp = cb->x_calc;
 		cb->x = temp;
 		temp2.num = cb->s;
-		temp2.denom *= TFRC_MAX_BACK_OFF_TIME;
+		temp2.denom = TFRC_MAX_BACK_OFF_TIME;
 		if (fixpoint_cmp(&temp, &temp2) < 0)
 			cb->x = temp2;
 		normalize(&cb->x.num, &cb->x.denom);
