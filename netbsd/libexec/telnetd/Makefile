@@ -44,7 +44,7 @@ DPADD+=	${LIBKRB} ${LIBDES}
 
 VERS!=	cd ${NETBSDSRCDIR}/lib/libvers && ${PRINTOBJDIR}
 
-LDADD+=	 -lcom_err -L${VERS} -lvers -lroken
+LDADD+=	 -lcom_err -L${VERS} -lroken
 DPADD+=	${LIBCOM_ERR} ${LIBROKEN}
 
 .endif
