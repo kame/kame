@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.3 2005/02/12 15:22:38 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.4 2006/01/23 09:08:48 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -63,14 +63,44 @@ static void insert_callout_queue(struct callout_queue_t *);
  *  table are assumed to use in synchronized sequence. Don't operate
  *  them in interrupted procedures. It might cause serious problems.
  *
- *  Entries are TAILQed in order with expiration time. With this 
+ *  Entries are TAILQed in order of expiration time. With this 
  *  order, the system doesn't need the check the expiration in
  *  each second.
  *
+ *  - Initialize
+ *	callout_init();
+ *	This function must be called when the process is started.
+ *
+ *  - Registration
  *  new_callout_entry(s, func, arg):
  *    A function 'func' will be called with an argument 'arg' after
  *    's' seconds. A returned value is a handle of this callout
- *    table which can be used to remove it. 
+ *    table which can be used to remove it.
+ *
+ *  - In the system loop
+ *	This callout framework is supposed to use with poll(2) system call.
+ *	Typical usage are as follows. Another framework 'fdlist' is used
+ *	in this examle.
+ *
+ *	while (1) {
+ *		clear_revents();
+ *	    
+ *		if ((pfds = poll(fdl_fds, fdl_nfds, get_next_timeout())) < 0) {
+ *			perror("poll");
+ *			continue;
+ *		}
+ *		
+ *		if (pfds != 0) {
+ *			dispatch_fdfunctions(fdl_fds, fdl_nfds);
+ *		}
+ *		callout_expire_check();
+ *	}
+ *
+ *	get_next_timeout() function helps to know when the system should
+ *	wake next time.
+ *	callout_expire_check() must be called before the next event
+ *	function would be called.
+ *		
  */
 
 void

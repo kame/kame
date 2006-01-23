@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.21 2005/12/07 18:23:59 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.22 2006/01/23 09:08:48 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -317,14 +317,16 @@ mip6_dad_done(message, addr)
 	else
 		gbc = bc;
 #ifdef MIP_MCOA
-	bid = gbc->bc_bid;
+	if (gbc)
+		bid = gbc->bc_bid;
 #endif /* MIP_MCOA */
 	if (message == MIPM_DAD_SUCCESS) {
 		/* I got a message the DAD was succeeded */
 		/* the status of the BC should go to the normal */
 		if (!bc || bc->bc_state != BC_STATE_UNDER_DAD) {
 			syslog(LOG_ERR,
-			       "The status of this BC should be UNDER_DAD, inspite of %d\n", bc ? bc->bc_state : -1);
+			       "The status of this BCE (for %s) should be UNDER_DAD, inspite of %d\n",
+			       ip6_sprintf(addr), bc ? bc->bc_state : -1);
 			return;
 		}
 		

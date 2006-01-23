@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.30 2005/12/14 08:17:51 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.31 2006/01/23 09:08:48 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -41,7 +41,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#include <sys/sysctl.h>
 #include <sys/uio.h>
 #include <sys/ioctl.h>
 #include <ifaddrs.h>
@@ -91,11 +90,9 @@ struct nemo_hpt_list hpt_head;
 struct ha_ifinfo {
 	char hainfo_ifname[IFNAMSIZ];
 	u_int16_t hainfo_ifindex;
-	struct sockaddr_dl hainfo_sdl;
 } haifinfo;
 #define ha_ifname haifinfo.hainfo_ifname
 #define ha_ifindex haifinfo.hainfo_ifindex 
-#define ha_sdl haifinfo.hainfo_sdl
 
 /* it indicates that entry having MIP6_HA_INIFITY_LIFE is mine */
 #define MIP6_HA_INIFITY_LIFE 0xffff 
@@ -295,11 +292,12 @@ mipsock_input(miphdr)
 		mipmdad = (struct mipm_dad *)miphdr;
 		if (mipmdad->mipmdadh_message != MIPM_DAD_DO) {
 			/* do the process of complete of DAD */
-			/* XXX */
-			mip6_dad_done(mipmdad->mipmdadh_message, &mipmdad->mipmdadh_addr6);
+			mip6_dad_done(mipmdad->mipmdadh_message,
+				      &mipmdad->mipmdadh_addr6);
 		}
 		break;
 	default:
+		/* Ignore other mesages */
 		break;
 	}
 
@@ -342,11 +340,6 @@ had_init_homeprefix (ifname, preference)
 	char *ifname;
 	int preference;
 {
-        size_t needed;
-        char *buf, *next, name[32];
-        struct if_msghdr *ifm;
-        struct sockaddr_dl *sdl;
-	int mib[6];
 	struct ifaddrs *ifa, *ifap;
 	struct sockaddr *sa;
 	struct sockaddr_in6 *addr_sin6, *mask_sin6;
@@ -356,52 +349,8 @@ had_init_homeprefix (ifname, preference)
 
 	memset(&haifinfo, 0, sizeof(haifinfo));
 	
-	mib[0] = CTL_NET;
-	mib[1] = PF_ROUTE;
-	mib[2] = 0;
-	mib[3] = AF_INET6;
-	mib[4] = NET_RT_IFLIST;
-	mib[5] = 0;
-	
-	if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0) {
-                perror("sysctl");
-		return;
-	}
+	strncpy(ha_ifname, ifname, strlen(ifname));
 
-        if ((buf = malloc(needed)) == NULL) {
-                perror("malloc");
-		return;
-	}
-
-        if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
-                perror("sysctl");
-		free(buf);
-		return;
-	}
-
-        for (next = buf; next < buf + needed; 
-	     next += ifm->ifm_msglen) {
-                ifm = (struct if_msghdr *)next;
-
-		if (ifm->ifm_type != RTM_IFINFO) 
-			continue;
-
-		sdl = (struct sockaddr_dl *)(ifm + 1);
-		bzero(name, sizeof(name));
-		strncpy(name, &sdl->sdl_data[0], sdl->sdl_nlen);
-		
-		if (strncmp(name, ifname, strlen(ifname)) == 0) {
-			ha_ifindex = sdl->sdl_index;
-			strncpy(ha_ifname, name, strlen(name));
-			memcpy(&ha_sdl, sdl, sizeof(struct sockaddr_dl));
-			break;
-		}
-        }
-	free(buf); 
-
-	if (ha_ifindex == 0) 
-		return; 
-		
 	if (getifaddrs(&ifap) != 0) {
 		perror("getifaddrs");
 		return;
@@ -413,6 +362,11 @@ had_init_homeprefix (ifname, preference)
 
 		sa = ifa->ifa_addr;
 		
+		if ((sa->sa_family == AF_LINK) &&
+		    (strncmp(ifa->ifa_name, ifname, strlen(ifname)) == 0)) {
+			ha_ifindex = ((struct sockaddr_dl *)sa)->sdl_index;
+		}
+
 		if (sa->sa_family != AF_INET6)
 			continue;
 
