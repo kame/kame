@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.158 2005/10/26 16:18:33 t-momose Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.159 2006/01/24 02:35:14 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -673,6 +673,12 @@ ip6_forward(m, srcrt)
 				return;
 			}
 		}
+#ifdef MIP6
+		/* In case of HA, redirect must not be sent.
+		   XXX It should be considerred, more
+			(lookup BCE or check state or something...) */
+		if (!MIP6_IS_HA) 
+#endif /* defined(MIP6) */
 		type = ND_REDIRECT;
 	}
 
