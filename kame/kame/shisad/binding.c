@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.22 2006/01/23 09:08:48 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.23 2006/01/24 02:40:12 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -336,13 +336,14 @@ mip6_dad_done(message, addr)
 		bc->bc_state = BC_STATE_VALID;
 		mipsock_bc_request(bc, MIPM_BC_ADD);
 		bc->bc_expire = now + bc->bc_lifetime;
-		if (!IN6_IS_ADDR_LINKLOCAL(addr))
+		if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
 			mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
-		if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))
-			send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
-				&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
-				NULL, IP6_MH_BAS_ACCEPTED,
-				gbc->bc_seqno, gbc->bc_lifetime, bid, 0);
+			if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))
+				send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
+					&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
+					NULL, IP6_MH_BAS_ACCEPTED,
+					gbc->bc_seqno, gbc->bc_lifetime, bid, 0);
+		}
 	} else if (message == MIPM_DAD_FAIL) {
 		/* I got a message the DAD was failed */
 		syslog(LOG_INFO,
