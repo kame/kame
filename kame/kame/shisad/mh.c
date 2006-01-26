@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.43 2006/01/26 08:50:21 ryuji Exp $  */
+/*      $KAME: mh.c,v 1.44 2006/01/26 10:02:30 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -37,6 +37,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 
 #include <ifaddrs.h>
 
