@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.23 2005/12/14 08:17:51 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.24 2006/01/26 01:12:15 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1088,9 +1088,9 @@ command_show_stat(s, line)
 	int i;
 	u_quad_t mip6s_mh;
 
-#define PS(msg, value) do {\
+#define PS(msg, value) if (value != 0) {\
          command_printf(s, "     %qu " msg "\n", value);\
-	} while(/*CONSTCOND*/0)
+	} 
 
 	command_printf(s, "Input Statistic:\n");
 

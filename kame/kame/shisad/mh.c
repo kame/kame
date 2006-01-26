@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.40 2005/12/09 07:27:54 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.41 2006/01/26 01:12:15 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -487,9 +487,6 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 	switch(mh->ip6mh_type) {
 	case IP6_MH_TYPE_HOTI:
 #ifdef MIP_CN
-		/* Shisa Statistics: HoTI messages */
-		mip6stat.mip6s_hoti++;
-
 		/* section 9.4.1 Check Home Address Option */
 		if (hoa != NULL) 
 			return (-1);
@@ -506,9 +503,6 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 	case IP6_MH_TYPE_COTI:
 #ifdef MIP_CN
-		/* Shisa Statistics: CoTI messages */
-		mip6stat.mip6s_coti++;
-
 		/* section 9.4.2 Check Home Address Option */
 		if (hoa != NULL) 
 			return (-1);
@@ -566,9 +560,6 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	int statuscode = IP6_MH_BAS_ACCEPTED;
 	u_int16_t bid = 0;
 	int authmethod = BC_AUTH_NONE; 
-
-	/* Shisa Statistics: BU messages */
-	mip6stat.mip6s_bu++;
 
 	/* 
 	 * If home address option is not present, home address
@@ -796,6 +787,11 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			statuscode = IP6_MH_BAS_NOT_HOME_SUBNET;
 			goto sendba;
 		}
+		if (lifetime >= hpfxlist->hpfx_vltime)
+			lifetime = hpfxlist->hpfx_vltime;	/* XXX : Hack for USAGI on TAHI Interop 2006  */
+#if 0
+		lifetime = 420;
+#endif
 #endif /* !MIP_NEMO */
 		/* Home Agent does not process BU w/RR protection */ 
 		if (mopt.opt_nonce) 
@@ -976,10 +972,6 @@ send_brr(src, dst)
         brr.ip6mhbr_hdr.ip6mh_cksum = checksum_p((uint16_t *)src, (uint16_t *)dst, 
 						 (uint16_t *)&brr, sizeof(brr), IPPROTO_MH);
 
-	/* Shisa Statistics: BRR messages */
-	/* XXX: br or brr?? */
-	mip6stat.mip6s_obr++;
-
 	error = sendmessage((char *)&brr, sizeof(brr), 0, src, dst, NULL, NULL);
 	return (error);
 }
@@ -1019,9 +1011,6 @@ send_hoti(bul)
 	err = sendmessage((char *)&hoti, sizeof(hoti), 0,
 	    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr, NULL, NULL);
 
-	/* Shisa Statistics: HoTI messages */
-	mip6stat.mip6s_ohoti++;
-
 	return (err);
 }
 
@@ -1058,9 +1047,6 @@ send_coti(bul)
 
 	err = sendmessage((char *)&coti, sizeof(coti),
 		0, &bul->bul_coa, &bul->bul_peeraddr, NULL, NULL);
-
-	/* Shisa Statistics: CoTI messages */
-	mip6stat.mip6s_ocoti++;
 
 	return (err);
 }
@@ -1109,9 +1095,6 @@ send_hot(hoti, dst, src)
 
 	err = sendmessage((char *)&hot, sizeof(hot), 0, src, dst, NULL, NULL);
 
-	/* Shisa Statistics: HoT messages */
-	mip6stat.mip6s_ohot++;
-
 	return (err);
 }
 
@@ -1155,9 +1138,6 @@ send_cot(coti, dst, src)
 			   sizeof(cot), IPPROTO_MH);
 
 	err = sendmessage((char *)&cot, sizeof(cot), 0, src, dst, NULL, NULL);
-
-	/* Shisa Statistics: CoT messages */
-	mip6stat.mip6s_ocot++;
 
 	return (err);
 }
@@ -1452,9 +1432,6 @@ send_bu(bul)
 		time(&bul->bul_bu_lastsent);
 	}
 
-	/* Shisa Statistics: BU messages */
-	mip6stat.mip6s_obu++;
-
 	return (error);
 }
 #endif
@@ -1625,9 +1602,6 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		mip6stat.mip6s_oba_hist[status]++;
 	}
 
-	/* Shisa Statistics: BA messages */
-	mip6stat.mip6s_oba++;
-	
 	return (err);
 }
 #endif /* MIP_MN */
@@ -1673,9 +1647,6 @@ send_be(dst, src, home, status)
 		mip6stat.mip6s_obe_hist[status]++;
 	}
 
-	/* Shisa Statistics: BE messages */
-	mip6stat.mip6s_obe++;
-	
 	return (err);
 }
 
