@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.6 2006/01/18 10:31:34 t-momose Exp $	*/
+/*	$KAME: hal.c,v 1.7 2006/01/26 08:47:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -319,8 +319,12 @@ show_hal(s, head)
 	LIST_FOREACH(hpfx, head, hpfx_entry) {
 		command_printf(s, "%s/%d\n ", ip6_sprintf(&hpfx->hpfx_prefix),
 			       hpfx->hpfx_prefixlen);
+		command_printf(s,
+				"\tpltime=%d vltime=%d\n",
+				hpfx->hpfx_pltime, hpfx->hpfx_vltime);
 		LIST_FOREACH(hal, &hpfx->hpfx_hal_head, hal_entry) {
-			command_printf(s, "\t%s ", ip6_sprintf(&hal->hal_ip6addr));
+			command_printf(s, "\t%s ",
+				ip6_sprintf(&hal->hal_ip6addr));
 			command_printf(s, "\t%s\n", 
 				ip6_sprintf(&hal->hal_lladdr));
 #ifdef MIP_HA
@@ -499,7 +503,6 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 				continue;
 #endif /* MIP_HA */
 			}
-
 
 #ifdef MIP_HA			
 			/* add or update home agent list */

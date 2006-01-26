@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.24 2006/01/26 01:12:15 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.25 2006/01/26 08:47:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1123,6 +1123,8 @@ command_show_stat(s, line)
 	}
 	PS("DHAAD request", mip6stat.mip6s_dhreq);
 	PS("DHAAD reply", mip6stat.mip6s_dhreply);
+	PS("MPA", mip6stat.mip6s_mpa);
+	PS("MPS", mip6stat.mip6s_mps);
 	PS("Home Address Option", mip6stat.mip6s_hao);
 	PS("unverified Home Address Option", mip6stat.mip6s_unverifiedhao);
 	PS("Routing Header type 2", mip6stat.mip6s_rthdr2);

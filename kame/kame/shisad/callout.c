@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.4 2006/01/23 09:08:48 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.5 2006/01/26 08:47:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -40,9 +40,8 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
-#include <sys/uio.h>
-#include <unistd.h>
 
+#include "command.h"
 #include "callout.h"
 
 #define timermilisec(tvp)	((tvp)->tv_usec / 1000 + (tvp)->tv_sec * 1000)
@@ -239,7 +238,6 @@ show_callout_table(s, line)
 {
 	struct timeval current_time, t;
 	struct callout_queue_t *cq;
-	char msg[1024];
 	
 	gettimeofday(&current_time, NULL);
 	TAILQ_FOREACH(cq, &callout_head, callout_entry) {
@@ -248,10 +246,9 @@ show_callout_table(s, line)
 		tm = localtime((time_t *)&cq->exptime.tv_sec);
 		
   		timersub(&cq->exptime, &current_time, &t);
-		sprintf(msg, "%02d:%02d:%02d(%ld.%06lds) %s()\n",
+		command_printf(s, "%02d:%02d:%02d(%ld.%06lds) %s()\n",
 			tm->tm_hour, tm->tm_min, tm->tm_sec,
 			t.tv_sec, t.tv_usec,
 			cq->funcname);
-		write(s, msg, strlen(msg));
 	}
 }

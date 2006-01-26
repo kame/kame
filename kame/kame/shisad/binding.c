@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.23 2006/01/24 02:40:12 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.24 2006/01/26 08:47:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -454,7 +454,7 @@ mip6_bc_refresh_timer(arg)
 	if (bc->bc_expire < (now +  MIP6_BRR_INTERVAL)) 
 		mip6_bc_set_refresh_timer(bc, (bc->bc_expire) - now);
 	else  /* set timer with the refresh backoff interval */
-		mip6_bc_set_refresh_timer(bc, MIP6_BRR_INTERVAL);
+		mip6_bc_set_refresh_timer(bc, /*MIP6_BRR_INTERVAL*/(bc->bc_expire - now) / 2);
 	
 	return;
 }

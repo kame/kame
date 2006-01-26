@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.31 2006/01/16 06:10:40 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.32 2006/01/26 08:47:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -78,6 +78,19 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
 
 #define TIMESUB(a,b) ((a)->tv_sec - (b)->tv_sec)
+
+/* Calculation pad length to be appended */
+/* xn + y; x must be 2^m */
+#define MIP6_PADLEN(cur_offset, x, y)	\
+	((((x) + (y)) - ((cur_offset) & ((x) - 1))) & ((x) - 1))
+#define MIP6_FILL_PADDING(buf, padlen)			\
+	do {						\
+		bzero((buf), (padlen));			\
+	 	if ((padlen) > 1) {			\
+			(buf)[0] = IP6OPT_PADN;		\
+			(buf)[1] = (padlen) - 2;	\
+		}					\
+	} while (/*CONSTCOND*/ 0)
 
 #define CND_COMMAND_PORT	7777
 #define MND_COMMAND_PORT	7778
