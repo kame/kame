@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.42 2006/01/26 08:47:21 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.43 2006/01/26 08:50:21 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -752,6 +752,13 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	}
 
 #ifdef MIP_HA
+
+	/* if flags is changed during registration, sending BA with 139 */
+	if (bc && (bc->bc_flags != flags)) {
+		statuscode = IP6_MH_BAS_REG_NOT_ALLOWED;
+		goto sendba;
+	}
+
 	/* 
 	 * requesting node's HoA is belong to its Home
 	 * Agent or not. 
@@ -795,12 +802,6 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	}
 #endif /* MIP_NEMO */
 
-	/* if 'H' flags is disabled suddenly, sending BA */
-	if (!(flags & IP6_MH_BU_HOME) &&
-	    (bc && (bc->bc_flags & IP6_MH_BU_HOME))) {
-		statuscode = IP6_MH_BAS_REG_NOT_ALLOWED;
-		goto sendba;
-	}
 
 	/* If nonce Indices opt. was found, it must be silently discarded */
 	/* 9.5.1 */
