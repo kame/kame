@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.98 2006/01/27 07:00:42 mitsuya Exp $	*/
+/*	$KAME: in_gif.c,v 1.99 2006/01/27 08:00:03 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -301,7 +301,11 @@ in_gif_output(ifp, family, m)
 	iphdr.ip_p = proto;
 	/* version will be set in ip_output() */
 	iphdr.ip_ttl = ip_gif_ttl;
+#ifdef __NetBSD__
 	iphdr.ip_len = htons(m->m_pkthdr.len + sizeof(struct ip));
+#else
+	iphdr.ip_len = m->m_pkthdr.len + sizeof(struct ip);
+#endif
 	ip_ecn_ingress((ifp->if_flags & IFF_LINK1) ? ECN_ALLOWED : ECN_NOCARE,
 		       &iphdr.ip_tos, &tos);
 
