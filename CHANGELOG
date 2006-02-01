@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2811 2006/01/15 12:26:56 suz Exp $
+$KAME: CHANGELOG,v 1.2812 2006/02/01 06:27:24 jinmei Exp $
+
+<200602>
+2006-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd5/sys/kern/uipc_mbuf.c (m_pullup): fixed memory leak when
+	the original mbuf had an mtag and the pull-up operation required
+	allocating a new mbuf.
+	Reported by: Garfield Hsieh
 
 <200601>
 2006-01-15  SUZUKI, Shinsuke <suz@alaxala.net>
