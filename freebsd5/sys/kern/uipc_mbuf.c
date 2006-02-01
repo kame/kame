@@ -742,7 +742,7 @@ m_pullup(struct mbuf *n, int len)
 			goto bad;
 		m->m_len = 0;
 		if (n->m_flags & M_PKTHDR) {
-			m_dup_pkthdr(m, n);
+			m_move_pkthdr(m, n);
 			n->m_flags &= ~M_PKTHDR;
 		}
 	}
