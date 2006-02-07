@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.28 2006/01/26 08:47:21 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.29 2006/02/07 07:03:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1285,8 +1285,7 @@ hpfxlist_expire_timer(arg)
 
 		send_mps(hpfx);
 
-		hpfxlist_set_expire_timer(hpfx, 
-			  ((hpfx->hpfx_vltime - now) > 5) ? (hpfx->hpfx_vltime - now):5);
+		hpfxlist_set_expire_timer(hpfx, 5);
 
 		return;
 	}
@@ -1300,7 +1299,7 @@ hpfxlist_expire_timer(arg)
 
 	/* rate limiting XXX */
 	hpfxlist_set_expire_timer(hpfx, 
-		((hpfx->hpfx_vltime - now) > 5) ? (hpfx->hpfx_vltime - now):5);
+		((hpfx->hpfx_vlexpire - now) > 5) ? (hpfx->hpfx_vlexpire - now):5);
 }
 
 #endif /* MIP_MN */
