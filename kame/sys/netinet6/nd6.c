@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.393 2005/10/27 10:29:17 ryuji Exp $	*/
+/*	$KAME: nd6.c,v 1.394 2006/02/07 12:02:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -705,7 +705,7 @@ nd6_timer(ignored_arg)
 	/*
 	 * expire interface addresses.
 	 * in the past the loop was inside prefix expiry processing.
-	 * However, from a stricter speci-confrmance standpoint, we should
+	 * However, from a stricter spec-conformance standpoint, we should
 	 * rather separate address lifetimes and prefix lifetimes.
 	 */
   addrloop:
