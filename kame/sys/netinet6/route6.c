@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.58 2005/10/27 17:16:06 mitsuya Exp $	*/
+/*	$KAME: route6.c,v 1.59 2006/02/09 08:18:58 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,11 +189,7 @@ ip6_rthdr0(m, ip6, rh0)
 	if (rh0->ip6r0_segleft == 0)
 		return (0);
 
-	if (rh0->ip6r0_len % 2
-#ifdef COMPAT_RFC1883
-	    || rh0->ip6r0_len > 46
-#endif
-		) {
+	if (rh0->ip6r0_len % 2) {
 		/*
 		 * Type 0 routing header can't contain more than 23 addresses.
 		 * RFC 2462: this limitation was removed since strict/loose
@@ -256,14 +252,7 @@ ip6_rthdr0(m, ip6, rh0)
 	in6_clearscope(nextaddr); /* XXX */
 	ip6->ip6_dst = tmpaddr;
 
-#ifdef COMPAT_RFC1883
-	if (rh0->ip6r0_slmap[index / 8] & (1 << (7 - (index % 8))))
-		ip6_forward(m, IPV6_SRCRT_NEIGHBOR);
-	else
-		ip6_forward(m, IPV6_SRCRT_NOTNEIGHBOR);
-#else
 	ip6_forward(m, 1);
-#endif
 
 	return (-1);			/* m would be freed in ip6_forward() */
 
