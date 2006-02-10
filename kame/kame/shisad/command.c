@@ -1,4 +1,4 @@
-/*	$KAME: command.c,v 1.3 2005/12/14 08:17:51 t-momose Exp $	*/
+/*	$KAME: command.c,v 1.4 2006/02/10 07:45:50 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -49,6 +49,7 @@ static struct sockaddr_in6 sin6_ci;
 char *prompt = "> ";
 
 void command_help(int, char *);
+void got_interrupt(int, char *);
 void quit_ui(int, char *);
 int command_in(int);
 int new_connection(int);
@@ -147,8 +148,15 @@ command_in(s)
 {
 	int bytes;
 	char buffer[2048];
-	
+
 	bytes = read(s, buffer, 2048);
+
+	/* XXX quick hack for an interrupt, <IAC IP IAC DO TM> */
+	if (memcmp(buffer, "\xff\xf4\xff\xfd\x06", 5) == 0) {
+		got_interrupt(s, buffer);
+		disp_prompt(s);
+		return (0);
+	}
 
 	buffer[bytes] = '\0';
 	while (strlen(buffer) && isspace(buffer[strlen(buffer) - 1]))
@@ -237,3 +245,13 @@ quit_ui(s, line)
 	delete_fd_list_entry(s);
 	close(s);
 }
+
+void got_interrupt(s, line)
+	int s;
+	char *line;
+{
+	char *buffer="\xff\xfc\x06\xff\xf2\n";
+
+	write(s, buffer, 6);
+}
+
