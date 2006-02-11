@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.479 2005/07/27 00:08:27 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.480 2006/02/11 14:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1194,8 +1194,7 @@ skip_ipsec2:;
 			 * address.
 			 */
 			dst = (struct sockaddr_in6 *)opt->ip6po_nexthop;
-		}
-		else if ((rt->rt_flags & RTF_GATEWAY))
+		} else if ((rt->rt_flags & RTF_GATEWAY))
 			dst = (struct sockaddr_in6 *)rt->rt_gateway;
 	}
 
