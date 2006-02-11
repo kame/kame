@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.48 2005/12/08 14:05:51 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.49 2006/02/11 06:11:29 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1688,13 +1688,13 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			type = CHANGE_TO_INCLUDE_MODE;
 		}
 	}
-	if (in6mm_src->i6ms_robvar <= 0) {
-		mld_stop_state_change_timer(in6m);
-		return;
-	}
 	if (timer_init) {
 		in6mm_src->i6ms_robvar = in6m->in6m_rti->rt6i_qrv;
 		mld_start_state_change_timer(in6m);
+	}
+	if (in6mm_src->i6ms_robvar <= 0) {
+		mld_stop_state_change_timer(in6m);
+		return;
 	}
 
 	/* MCLBYTES is the maximum length even if if_mtu is too big. */
