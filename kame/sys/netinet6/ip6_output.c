@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.480 2006/02/11 14:53:19 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.481 2006/02/12 14:53:52 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1765,6 +1765,12 @@ ip6_insert_jumboopt(exthdrs, plen)
 		struct ip6_hbh *hbh;
 
 		mopt = exthdrs->ip6e_hbh;
+		hbh = mtod(mopt, struct ip6_hbh *);
+		if (hbh->ip6h_len == 255) {
+			/* There is no room for another option. */
+			return (EMSGSIZE);
+		}
+
 		if (M_TRAILINGSPACE(mopt) < JUMBOOPTLEN) {
 			/*
 			 * XXX assumption:
