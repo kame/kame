@@ -353,7 +353,7 @@ int		getaddrinfo __P((const char *, const char *,
 int		getnameinfo __P((const struct sockaddr *, socklen_t, char *,
 				 socklen_t, char *, socklen_t, int));
 void		freeaddrinfo __P((struct addrinfo *));
-char		*gai_strerror __P((int));
+const char	*gai_strerror __P((int));
 #endif
 void		setservent __P((int));
 

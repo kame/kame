@@ -302,7 +302,7 @@ int		getaddrinfo(const char *, const char *,
 void		freeaddrinfo(struct addrinfo *);
 int		getnameinfo(const struct sockaddr *, socklen_t,
 		    char *, size_t, char *, size_t, int);
-char		*gai_strerror(int);
+const char	*gai_strerror(int);
 int		net_addrcmp(struct sockaddr *, struct sockaddr *);
 int		getrrsetbyname(const char *, unsigned int, unsigned int, unsigned int, struct rrsetinfo **);
 void		freerrset(struct rrsetinfo *);

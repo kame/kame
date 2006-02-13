@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.219 2005/09/15 07:48:29 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.220 2006/02/13 08:22:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -252,7 +252,7 @@ struct addrconfig {
 	 *   user can specify the preference on the required level for the
 	 *   determination.  For example, we may want to allow the user to
 	 *   explore IPv6 addresses even if the node only has link-local
-	 *   addresses. 
+	 *   addresses.
 	 */
 	int inet_config;	/* flag for AF_INET */
 	int inet6_config;	/* flag for AF_INET6 */
@@ -433,7 +433,7 @@ do { \
 #define MATCH(x, y, w) \
 	((x) == (y) || (/*CONSTCOND*/(w) && ((x) == ANY || (y) == ANY)))
 
-char *
+const char *
 gai_strerror(ecode)
 	int ecode;
 {
