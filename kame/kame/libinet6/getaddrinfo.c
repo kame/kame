@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.220 2006/02/13 08:22:31 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.221 2006/02/15 10:42:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,7 +339,7 @@ static void get_addrselectpolicy __P((struct policyhead *));
 static void free_addrselectpolicy __P((struct policyhead *));
 static struct policyqueue *match_addrselectpolicy __P((struct sockaddr *,
 						       struct policyhead *));
-static int matchlen __P((struct sockaddr *, struct sockaddr *));
+static int matchlength __P((struct sockaddr *, struct sockaddr *));
 
 static const struct ai_errlist {
 	const char *str;
@@ -808,7 +808,7 @@ init(ac, flags)
 					break;
 				}
 				memcpy(&ifr6.ifr_addr, ifap->ifa_addr,
-				    ifap->ifa_addr->sa_len);
+				    (size_t)ifap->ifa_addr->sa_len);
 				if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) == 0) {
 					flags6 = ifr6.ifr_ifru.ifru_flags6;
 					if ((flags6 & (IN6_IFF_NOTREADY|
@@ -876,7 +876,7 @@ reorder(sentinel, ac)
 	}
 
 	/* perform sorting. */
-	qsort(aio, n, sizeof(*aio), comp_dst);
+	qsort(aio, (size_t)n, sizeof(*aio), comp_dst);
 
 	/* reorder the addrinfo chain. */
 	for (i = 0, aip = &sentinel->ai_next; i < n; i++) {
@@ -951,7 +951,8 @@ match_addrselectpolicy(addr, head)
 	struct policyqueue *ent, *bestent = NULL;
 	struct in6_addrpolicy *pol;
 	int matchlen, bestmatchlen = -1;
-	u_char *mp, *ep, *k, *p, m;
+	u_char *mp, *ep, *k, *p;
+	u_int m;
 	struct sockaddr_in6 key;
 
 	switch(addr->sa_family) {
@@ -1050,13 +1051,13 @@ set_source(aio, ph, ac)
 	if (connect(s, ai.ai_addr, ai.ai_addrlen) < 0)
 		goto cleanup;
 	srclen = ai.ai_addrlen;
-	if (getsockname(s, &aio->aio_srcsa, &srclen) < 0) {
+	if (getsockname(s, &aio->aio_srcsa, (socklen_t)&srclen) < 0) {
 		aio->aio_srcsa.sa_family = AF_UNSPEC;
 		goto cleanup;
 	}
 	aio->aio_srcscope = gai_addr2scopetype(&aio->aio_srcsa);
 	aio->aio_srcpolicy = match_addrselectpolicy(&aio->aio_srcsa, ph);
-	aio->aio_matchlen = matchlen(&aio->aio_srcsa, aio->aio_ai->ai_addr);
+	aio->aio_matchlen = matchlength(&aio->aio_srcsa, aio->aio_ai->ai_addr);
 #ifdef INET6
 	if (ai.ai_family == AF_INET6) {
 		struct ifaddrs *ifap;
@@ -1091,7 +1092,7 @@ set_source(aio, ph, ac)
 			memset(&ifr6, 0, sizeof(ifr6));
 			strncpy(ifr6.ifr_name, ifap->ifa_name,
 			    sizeof(ifr6.ifr_name));
-			memcpy(&ifr6.ifr_addr, &aio->aio_srcsa, srclen);
+			memcpy(&ifr6.ifr_addr, &aio->aio_srcsa, (size_t)srclen);
 			if (ifr6.ifr_name[sizeof(ifr6.ifr_name) - 1] == '\0') {
 				/*
 				 * make sure the name doesn't overflow.
@@ -1116,12 +1117,13 @@ set_source(aio, ph, ac)
 }
 
 static int
-matchlen(src, dst)
+matchlength(src, dst)
 	struct sockaddr *src, *dst;
 {
 	int match = 0;
 	u_char *s, *d;
-	u_char *lim, r;
+	u_char *lim;
+	u_int r;
 	int addrlen;
 
 	switch (src->sa_family) {
@@ -2063,7 +2065,7 @@ getanswer(answer, anslen, qname, qtype, pai)
 				had_error++;
 				continue;
 			}
-			strlcpy(bp, tbuf, ep - bp);
+			strlcpy(bp, tbuf, (size_t)(ep - bp));
 			canonname = bp;
 			bp += n;
 			continue;
