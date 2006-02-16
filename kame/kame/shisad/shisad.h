@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.32 2006/01/26 08:47:21 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.33 2006/02/16 05:32:14 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -34,6 +34,9 @@
 
 extern struct mip6_mninfo mninfo;
 extern int mipsock, mhsock, icmp6sock;
+#ifdef DSMIP
+extern int udp4sock;
+#endif
 extern struct mip6stat mip6stat;
 extern struct mip6_hinfo_list hoa_head;
 
@@ -243,6 +246,9 @@ struct binding_update_list {
 	u_int16_t           bul_bid;          /* Binding Unique Identifier */
 	struct binding_update_list_head bul_mcoa_head;
 #endif /* MIP_MCOA */
+#ifdef DSMIP
+	struct in_addr      bul_v4hoa;
+#endif /* DSMIP */
 };
 
 #define MIP6_BUL_STATE_DISABLE    0x01
@@ -501,6 +507,10 @@ void mipsock_open(void);
 int  mipsock_nodetype_request(u_int8_t, u_int8_t);
 int mipsock_behint_input(struct mip_msghdr *);
 void icmp6sock_open(void);
+#ifdef DSMIP
+int  udp4_input_common(int);
+void udp4sock_open(void);
+#endif
 int  icmp6_input_common(int);
 int mip6_get_nd6options(struct nd6options *, char *, int);
 void mip6_create_addr(struct in6_addr *, const struct in6_addr *, 
@@ -521,6 +531,10 @@ int bul_update_by_mipsock_w_hoa(struct in6_addr *, struct in6_addr *,
 				u_int16_t);
 int mipsock_md_update_bul_byifindex(u_int16_t, struct in6_addr *);
 int mipsock_md_dereg_bul(struct in6_addr *, struct in6_addr *, u_int16_t);
+#ifdef DSMIP
+int dsmip_send_bu(char *, int, u_int, struct binding_update_list *);
+
+#endif
 int send_haadreq(struct mip6_hoainfo *, int, struct in6_addr *);
 struct home_agent_list *mnd_add_hal(struct  mip6_hpfxl *, struct in6_addr *, int);
 struct mip6_hpfxl *mnd_add_hpfxlist(struct in6_addr *, 

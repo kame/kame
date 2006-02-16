@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.29 2006/02/07 07:03:26 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.30 2006/02/16 05:32:14 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -74,6 +74,9 @@
 
 /* Global Variables */
 int mipsock, icmp6sock, mhsock, csock;
+#ifdef DSMIP
+int udp4sock;
+#endif /* DSMIP */
 struct mip6_mipif_list mipifhead;
 struct mip6_hinfo_list hoa_head;
 struct no_ro_head noro_head;
@@ -172,6 +175,7 @@ main(argc, argv)
 	struct binding_update_list *bul;
 	u_int16_t bul_flags;
 	char *homeagent = NULL;
+	char *v4homeagent = NULL;
 	char *argopts = "fnc:a:";
 #ifdef MIP_NEMO
 	char *conffile = MRD_CONFFILE;
@@ -182,6 +186,9 @@ main(argc, argv)
 #ifdef MIP_NEMO
 	argopts = "fnc:a:t:";
 #endif /* MIP_NEMO */
+#ifdef DSMIP
+	argopts = "fnc:a:t:A:";
+#endif /* DSMIP */
 
         while ((ch = getopt(argc, argv, argopts)) != -1) {
                 switch (ch) {
@@ -197,6 +204,11 @@ main(argc, argv)
 		case 'a':
 			homeagent = optarg;
 			break;
+#ifdef DSMIP
+		case 'A':
+			v4homeagent = optarg;
+			break;
+#endif /* DSMIP */
                 default:
                         fprintf(stderr, "unknown option\n");
                         mn_usage();
@@ -265,6 +277,9 @@ main(argc, argv)
 	mhsock_open();
 	icmp6sock_open();
 	mipsock_open();
+#ifdef DSMIP
+	udp4sock_open();
+#endif /* DSMIP */
 
 	mn_lists_init();
 
@@ -293,6 +308,10 @@ main(argc, argv)
 #if 1
 	/* ETSI 2004.10.12 XXX */
 	/* install a home agent address, if specified. */
+#ifdef DSMIP
+	if (v4homeagent != NULL)
+		add_hal_by_commandline_xxx(v4homeagent);
+#endif /* DSMIP */
 	if (homeagent != NULL)
 		add_hal_by_commandline_xxx(homeagent);
 #endif
@@ -336,6 +355,9 @@ main(argc, argv)
 	new_fd_list(mipsock, POLLIN, mipsock_input_common);
 	new_fd_list(mhsock, POLLIN, mh_input_common);
 	new_fd_list(icmp6sock, POLLIN, icmp6_input_common);
+#ifdef DSMIP
+	new_fd_list(udp4sock, POLLIN, udp4_input_common);
+#endif /* DSMIP */
 
 	/* notify a kernel to behave as a mobile node. */
 	mipsock_nodetype_request(NODETYPE, 1);
@@ -471,6 +493,42 @@ mipsock_recv_mdinfo(miphdr)
 	       sizeof(struct in6_addr));
 
 	/* Get CoA */
+#ifdef DSMIP
+	switch (MIPD_COA(mdinfo)->sa_family) {
+	case AF_INET:
+		/* put IPv4 address into IPv6 address (mapped address) */
+		memset(&coa, 0, sizeof(struct in6_addr));
+		coa.s6_addr[10] = 0xff;
+		coa.s6_addr[11] = 0xff;
+		memcpy(&coa.s6_addr[12],
+			&((struct sockaddr_in *)MIPD_COA(mdinfo))->sin_addr,
+			sizeof(struct in_addr));
+
+		/* XXX maybe we need more check */
+		break;
+	case AF_INET6:
+		memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr, sizeof(struct in6_addr));
+
+		if (MIPD_COA(mdinfo)->sa_family != AF_INET6)
+			return (0);
+		memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr,
+			sizeof(struct in6_addr));
+
+		/* If new CoA is not global, ignore */
+		if (IN6_IS_ADDR_LINKLOCAL(&coa)
+			|| IN6_IS_ADDR_MULTICAST(&coa)
+			|| IN6_IS_ADDR_LOOPBACK(&coa)
+			|| IN6_IS_ADDR_V4MAPPED(&coa)
+			|| IN6_IS_ADDR_UNSPECIFIED(&coa))
+			return (EINVAL);
+
+		if (debug) 
+			syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
+		break;
+	default:
+		return(0);
+	}
+#else
 	if (MIPD_COA(mdinfo)->sa_family != AF_INET6)
 		return (0);
 	memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr,
@@ -486,6 +544,7 @@ mipsock_recv_mdinfo(miphdr)
 
 	if (debug) 
 		syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
+#endif /* DSMIP */
 
 #ifdef MIP_MCOA
 	memcpy(&bid, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port, sizeof(bid));
@@ -982,6 +1041,18 @@ mipsock_input(miphdr)
 	return (err);
 }
 
+#ifdef DSMIP
+int
+dsmip_send_bu(mhdata, mhdatalen, ifindex, bul) 
+        char *mhdata;
+        int mhdatalen;
+        u_int ifindex;
+        struct binding_update_list *bul;
+{
+
+	return (0);
+}
+#endif /* DSMIP */
 
 int
 send_haadreq(hoainfo, hoa_plen, src)
@@ -1232,8 +1303,14 @@ add_hal_by_commandline_xxx(homeagent)
 		return (-1);
 	}
 
+
 	LIST_FOREACH(mif, &mipifhead, mipif_entry) {
 		LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
+#ifdef DSMIP
+			if(IN6_IS_ADDR_V4MAPPED(&homeagent_in6)) {
+				mnd_add_hal(hpfx, &homeagent_in6, 0);
+			}
+#endif /* DSMIP */
 			if (inet_are_prefix_equal(&hpfx->hpfx_prefix,
 				&homeagent_in6, hpfx->hpfx_prefixlen)) {
 				/* XXXX can we add the same addr to

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.25 2006/01/26 08:47:21 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.26 2006/02/16 05:32:14 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -179,6 +179,53 @@ icmp6sock_open()
 
 	return;
 }
+
+#ifdef DSMIP
+int
+udp4_input_common (fd)
+	int fd;
+{
+	int n;
+	char msg[1280]; 
+
+	n = read(udp4sock, msg, sizeof(msg));
+	if (n < 0) {
+		return (errno);
+	}
+
+        return 0;
+}
+
+void
+udp4sock_open () {
+	struct sockaddr_in server;
+
+syslog(LOG_INFO, "%s:%d", __FILE__, __LINE__);
+
+	memset(&server, 0, sizeof(server));
+#define UDP4PORT 5555 
+	server.sin_port = htons(UDP4PORT);
+	server.sin_family = AF_INET;
+
+	if ((udp4sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+		perror("socket SOCK_DGRAM");
+		exit(1);
+	}
+
+	if(bind(udp4sock, (struct sockaddr *)&server, sizeof(server)))  {
+		if (errno == EADDRINUSE)
+			fprintf(stderr,"daemon already running\n");
+		else
+			perror("bind");
+		exit(1);
+	}
+
+	syslog(LOG_INFO, "UDP4 socket is %d.", udp4sock);
+
+	return;
+	
+}
+#endif /* DSMIP */
 
 #ifndef MIP_CN
 int

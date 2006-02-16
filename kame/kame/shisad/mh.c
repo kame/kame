@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.44 2006/01/26 10:02:30 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.45 2006/02/16 05:32:14 mitsuya Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -52,6 +52,10 @@
 #include <net/mipsock.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
+#ifdef DSMIP
+#include <arpa/inet.h>
+#include <netinet/udp.h>
+#endif /* DSMIP */
 #include <netinet/ip6mh.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
@@ -1154,6 +1158,10 @@ send_bu(bul)
 		return (0);
 	} 
 #endif /* MIP_MCOA */
+#ifdef DSMIP
+	struct ip6_mh_opt_ipv4_hoa v4hoa_opt;
+	char tmp[256];
+#endif /* DSMIP */
 
 	if (debug) {
 		syslog(LOG_INFO, "BU is sent");
@@ -1290,6 +1298,30 @@ send_bu(bul)
 	}
 #endif /* MIP_NEMO */
 
+#ifdef DSMIP
+	if (IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) &&
+			IN6_IS_ADDR_V4MAPPED(&bul->bul_peeraddr)) {
+		pad = MIP6_PADLEN(buflen, 2, 0);
+		MIP6_FILL_PADDING(bufp + buflen, pad);
+		buflen += pad;
+
+		memset(&v4hoa_opt, 0, sizeof(v4hoa_opt));
+
+		v4hoa_opt.ip6mov4hoa_type = IP6_MHOPT_IPV4_HOA;
+		v4hoa_opt.ip6mov4hoa_len = 1;
+		v4hoa_opt.ip6mov4hoa_pfxlen = 32; /* XXX */
+		memcpy(&v4hoa_opt.ip6mov4hoa_v4hoa, &bul->bul_v4hoa,
+			sizeof(bul->bul_v4hoa));
+		syslog(LOG_INFO, "IPv4 Home Address option is added %s/%d\n",
+			inet_ntop(AF_INET6, &bul->bul_v4hoa, tmp,
+				sizeof(bul->bul_v4hoa)),
+				v4hoa_opt.ip6mov4hoa_pfxlen);
+
+		memcpy((bufp + buflen), &v4hoa_opt, sizeof(v4hoa_opt));
+		buflen += sizeof(struct ip6_mh_opt_ipv4_hoa);
+	}
+#endif /* DSMIP */ 
+
 	if (bul->bul_flags & IP6_MH_BU_HOME) {
 		/* Alignment 8n */
 		pad = MIP6_PADLEN(buflen, 8, 0);
@@ -1407,9 +1439,20 @@ send_bu(bul)
 		    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr,
 		    &bul->bul_hoainfo->hinfo_hoa, NULL);
 	else
+#ifdef DSMIP
+		if (IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) &&
+			IN6_IS_ADDR_V4MAPPED(&bul->bul_peeraddr)) {
+			error = dsmip_send_bu((char *)bufp, buflen, 0, bul);
+		} else
+			error = sendmessage((char *)bufp, buflen, 0, 
+		    		&bul->bul_hoainfo->hinfo_hoa,
+				&bul->bul_peeraddr,
+		    		&bul->bul_coa, NULL);
+#else
 		error = sendmessage((char *)bufp, buflen, 0, 
 		    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr,
 		    &bul->bul_coa, NULL);
+#endif /* DSMIP */
 
 	if (error == 0) {
 		time(&bul->bul_bu_lastsent);
@@ -1813,4 +1856,3 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 
 	return (0);
 }
-

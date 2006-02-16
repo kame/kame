@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.15 2005/12/16 02:20:25 keiichi Exp $	*/
+/*	$Id: babymdd.c,v 1.16 2006/02/16 05:32:14 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -69,6 +69,7 @@
 #define LINKLOCAL_ALLROUTERS "ff02::2"
 
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
+#define storage2sin(x) ((struct sockaddr_in *)(x))
 
 /* base functions */
 static void baby_initif();
@@ -86,7 +87,11 @@ int baby_mipmsg(struct mip_msghdr *, int);
 
 /* MIPsocket commands */
 static int baby_md_scan(struct if_info *);
+#ifdef DSMIP
+static int baby_md_reg(struct sockaddr *, int, u_int16_t);
+#else
 static int baby_md_reg(struct sockaddr_in6 *, int, u_int16_t);
+#endif /* DSMIP */
 static void baby_md_home(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
 static void get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
 
@@ -420,7 +425,11 @@ baby_md_scan(struct if_info *ifinfo) {
 
 static int
 baby_md_reg(coa, ifindex, bid) 
+#ifdef DSMIP
+	struct sockaddr *coa;
+#else
 	struct sockaddr_in6 *coa;
+#endif
 	int ifindex;
 	u_int16_t bid;
 {
@@ -428,7 +437,10 @@ baby_md_reg(coa, ifindex, bid)
 	struct mipm_md_info *mdinfo;
 	struct sockaddr_in6 hoa;
 	struct hoa_info *hoainfo, *hoainfo_next;
-	
+#ifdef DSMIP
+	char buf[256];
+#endif /* DSMIP */
+
 	for (hoainfo = LIST_FIRST(&babyinfo.hoainfo_head);
 	     hoainfo; hoainfo = hoainfo_next) {
 		hoainfo_next = LIST_NEXT(hoainfo, hoainfo_entry); 
@@ -439,7 +451,14 @@ baby_md_reg(coa, ifindex, bid)
 		hoa.sin6_len = sizeof(struct sockaddr_in6);
 
 		/* do not send md_info msg for an address generated at a home link */
+#ifdef DSMIP
+		if(coa->sa_family==AF_INET6)
+			if (inet_are_prefix_equal(&hoa.sin6_addr,
+				&((struct sockaddr_in6 *)coa)->sin6_addr, 64)) 
+		/* XXX we are missing this check */
+#else
 		if (inet_are_prefix_equal(&hoa.sin6_addr, &coa->sin6_addr, 64)) 
+#endif
 			return (0);
 		
 		len = sizeof(*mdinfo) + sizeof(hoa) + sizeof(*coa);
@@ -467,8 +486,27 @@ baby_md_reg(coa, ifindex, bid)
 		}
 		free(mdinfo);
 		if (DEBUGNORM) {
+#ifdef DSMIP
+			switch (coa->sa_family) {
+			case AF_INET:
+				inet_ntop(AF_INET, 
+				    &((struct sockaddr_in *)coa)->sin_addr,
+				    buf, sizeof(buf));
+				break;
+			case AF_INET6:
+				inet_ntop(AF_INET6, 
+				    &((struct sockaddr_in6 *)coa)->sin6_addr,
+				    buf, sizeof(buf));
+				break;
+			}
+#endif /* DSMIP */
 			syslog(LOG_INFO, "[binding %s -> %s]\n", 
-			       ip6_sprintf(&hoa.sin6_addr),ip6_sprintf(&coa->sin6_addr));
+			       ip6_sprintf(&hoa.sin6_addr),
+#ifdef DSMIP
+					buf);
+#else
+					ip6_sprintf(&coa->sin6_addr));
+#endif /* DSMIP */
 		}
 	}
 
@@ -570,7 +608,7 @@ baby_rtmsg(rtm, msglen)
 		if (ifinfo == NULL)
 			break;
 
-		baby_getifinfo(ifinfo); 	
+		baby_getifinfo(ifinfo);
 		
 		return (1);
 
@@ -858,6 +896,9 @@ static void
 print_debug () {
 	struct if_info *ifinfo;
 	struct hoa_info *hoainfo;
+#ifdef DSMIP
+	char buf[256];
+#endif /* DSMIP */
 
 	syslog(LOG_INFO, "babymdd info.\n");
 	syslog(LOG_INFO, "\tdebug level %d\n", babyinfo.debug); 
@@ -879,6 +920,13 @@ print_debug () {
 		if (ifinfo->coa.ss_family == AF_INET6)
 			syslog(LOG_INFO, "\t\t%s\n", 
 			       ip6_sprintf(&storage2sin6(&ifinfo->coa)->sin6_addr));
+#ifdef DSMIP
+		if (ifinfo->coa.ss_family == AF_INET)
+			syslog(LOG_INFO, "\t\t%s\n", 
+                                inet_ntop(AF_INET,
+                                    &storage2sin(&ifinfo->coa)->sin_addr,
+                                    buf, sizeof(buf)) );
+#endif /* DSMIP */
 	}
 }
 
@@ -1058,12 +1106,15 @@ baby_getifinfo(ifinfo)
         struct ifa_msghdr *ifam;
         struct sockaddr *rti_info[RTAX_MAX];
         struct in6_ifreq ifr6;
+#ifdef DSMIP
+        struct sockaddr_in *sin;
+#endif /* DSMIP */
         struct sockaddr_in6 *sin6;
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
-	mib[3] = AF_INET6;
+	mib[3] = AF_INET;
 	mib[4] = NET_RT_IFLIST;
 	mib[5] = 0;
 
@@ -1104,6 +1155,19 @@ baby_getifinfo(ifinfo)
 			
 			get_rtaddrs(ifam->ifam_addrs,
 			    (struct sockaddr *)(ifam + 1), rti_info);
+
+#ifdef DSMIP
+			switch (rti_info[RTAX_IFA]->sa_family) {
+			case AF_INET:
+				sin =  (struct sockaddr_in *)rti_info[RTAX_IFA];
+
+				/* Do we need to check the I/F flags? */
+
+				memcpy(&ifinfo->coa, sin,
+			    		sizeof(struct sockaddr_in));
+				break;
+			case AF_INET6:
+#endif /* DSMIP */
 			sin6 = (struct sockaddr_in6 *)rti_info[RTAX_IFA];
 			
 			/* MUST be a global address. */
@@ -1127,6 +1191,10 @@ baby_getifinfo(ifinfo)
 			/* XXX how do we handle multiple addresses? */
 			memcpy(&ifinfo->coa, sin6,
 			    sizeof(struct sockaddr_in6));
+#ifdef DSMIP
+				break;
+			}
+#endif /* DSMIP */
 			break;
 		}
 	}
@@ -1186,7 +1254,12 @@ baby_selection() {
 
 		if (ifinfo->iftype == IFT_MIP)
 			continue;
+#ifdef DSMIP
+		if (ifinfo->coa.ss_family != AF_INET6 &&
+		ifinfo->coa.ss_family != AF_INET)
+#else
 		if (ifinfo->coa.ss_family != AF_INET6) 
+#endif /* DSMIP */
 			continue;
 		
 		/* 
@@ -1202,7 +1275,11 @@ baby_selection() {
 		    && !baby_coa_equal(ifinfo)) {
 			
 			fprintf(stderr,"sending reg info\n");
+#ifdef DSMIP
+			baby_md_reg((struct sockaddr *)&ifinfo->coa, ifinfo->ifindex, 0); 
+#else
 			baby_md_reg((struct sockaddr_in6 *)&ifinfo->coa, ifinfo->ifindex, 0); 
+#endif /* DSMIP */
 			memcpy(&ifinfo->pcoa, &ifinfo->coa, 
 			       sizeof(ifinfo->coa));
 			
