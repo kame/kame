@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.4 2006/01/16 06:10:40 t-momose Exp $	*/
+/*	$KAME: ip6mh.h,v 1.5 2006/02/16 05:56:49 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -279,6 +279,7 @@ struct ip6_mh_opt {
 #define IP6_MHOPT_PREFIX        6       /* Mobile Network Prefix */
 #define IP6_MHOPT_BID           7       /* Binding Unique Identifier */
 #define IP6_MHOPT_IPV4_PREFIX   8       /* IPv4 Mobile Network Prefix */
+#define IP6_MHOPT_IPV4_HOA      9       /* IPv4 Home Address */
 
 /* Binding Refresh Advice */
 struct ip6_mh_opt_refresh_advice {
@@ -340,6 +341,7 @@ struct ip6_mh_opt_bid {
 	u_int16_t ip6mobid_bid;
 	u_int16_t ip6mobid_reserved;
 } __attribute__((__packed__));
+
 /* Binding Unique Identifier flag */
 #if BYTE_ORDER == BIG_ENDIAN
 #define IP6OPTBID_STOP	0x8000	/* stop proxy NA */
@@ -356,5 +358,14 @@ struct ip6_mh_opt_ipv4_prefix {
 	u_int8_t ip6mov4pfx_pfxlen;
 	struct in_addr ip6mov4pfx_pfx;
 };
+
+/* IPv4 Home Address Option */
+struct ip6_mh_opt_ipv4_hoa {
+	u_int8_t ip6mov4hoa_type;
+	u_int8_t ip6mov4hoa_len;
+	u_int8_t ip6mov4hoa_pfxlen;
+	struct in_addr ip6mov4hoa_v4hoa;
+};
+
 
 #endif /* not _NETINET_IP6MH_H_ */
