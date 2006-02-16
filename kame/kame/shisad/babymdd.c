@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.16 2006/02/16 05:32:14 mitsuya Exp $	*/
+/*	$Id: babymdd.c,v 1.17 2006/02/16 05:49:12 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1114,7 +1114,7 @@ baby_getifinfo(ifinfo)
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
-	mib[3] = AF_INET;
+	mib[3] = AF_INET6;
 	mib[4] = NET_RT_IFLIST;
 	mib[5] = 0;
 
