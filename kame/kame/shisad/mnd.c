@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.30 2006/02/16 05:32:14 mitsuya Exp $	*/
+/*	$KAME: mnd.c,v 1.31 2006/02/16 05:37:06 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -175,7 +175,9 @@ main(argc, argv)
 	struct binding_update_list *bul;
 	u_int16_t bul_flags;
 	char *homeagent = NULL;
+#ifdef DSMIP
 	char *v4homeagent = NULL;
+#endif /* DSMIP */
 	char *argopts = "fnc:a:";
 #ifdef MIP_NEMO
 	char *conffile = MRD_CONFFILE;
