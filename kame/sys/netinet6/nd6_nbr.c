@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.169 2005/12/23 11:10:38 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.170 2006/02/17 11:37:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1431,6 +1431,12 @@ nd6_dad_timer(ifa)
 		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 		free(dp, M_IP6NDP);
 		dp = NULL;
+#ifdef MIP6
+		if (ia->ia6_flags & IN6_IFF_PSEUDOIFA) {
+			/* Notify the address was not duplicated via mipsock */
+			mips_notify_dad_result(MIPM_DAD_SUCCESS, &ia->ia_addr.sin6_addr, ia->ia_ifp->if_index);
+		}
+#endif /* MIP6 */		
 		IFAFREE(ifa);
 		goto done;
 	}
