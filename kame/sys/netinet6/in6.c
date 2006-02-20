@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.403 2006/01/15 12:26:57 suz Exp $	*/
+/*	$KAME: in6.c,v 1.404 2006/02/20 11:03:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -708,7 +708,7 @@ in6_control(so, cmd, data, ifp, p)
 	case SIOCGIFSTAT_ICMP6:
 		if (ifp == NULL)
 			return EINVAL;
-		bzero(&ifr->ifr_ifru.ifru_stat,
+		bzero(&ifr->ifr_ifru.ifru_icmp6stat,
 		    sizeof(ifr->ifr_ifru.ifru_icmp6stat));
 		ifr->ifr_ifru.ifru_icmp6stat =
 		    *((struct in6_ifextra *)ifp->if_afdata[AF_INET6])->icmp6_ifstat;
