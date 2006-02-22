@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.17 2006/02/16 05:49:12 mitsuya Exp $	*/
+/*	$Id: babymdd.c,v 1.18 2006/02/22 09:08:33 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -186,7 +186,6 @@ main (argc, argv)
 			break;
 		}
 	}
-
 
 	if (babyinfo.hoa_index <= 0) {
 		baby_usage();
@@ -1114,7 +1113,11 @@ baby_getifinfo(ifinfo)
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
+#ifdef DSMIP
+	mib[3] = AF_INET & AF_INET6;
+#else
 	mib[3] = AF_INET6;
+#endif /* DSMIP */
 	mib[4] = NET_RT_IFLIST;
 	mib[5] = 0;
 
