@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.33 2006/02/16 05:32:14 mitsuya Exp $	*/
+/*	$KAME: shisad.h,v 1.34 2006/02/22 11:03:51 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -36,6 +36,7 @@ extern struct mip6_mninfo mninfo;
 extern int mipsock, mhsock, icmp6sock;
 #ifdef DSMIP
 extern int udp4sock;
+extern int raw4sock;
 #endif
 extern struct mip6stat mip6stat;
 extern struct mip6_hinfo_list hoa_head;
@@ -309,6 +310,7 @@ struct mip6_hoainfo {
 	LIST_ENTRY(mip6_hoainfo) hinfo_entry;
 
 	struct in6_addr hinfo_hoa; /* Home Address */
+	struct in_addr  hinfo_v4hoa; /* Home Address */
 
 	/* if_index of mip virtual interface where HoA is assigned */
 	u_int16_t hinfo_ifindex;
@@ -361,6 +363,9 @@ struct mip6_mobility_options {
 #ifdef MIP_MCOA
 	struct ip6_mh_opt_bid *opt_bid;
 #endif /* MIP_MCOA */
+#ifdef DSMIP
+	struct ip6_mh_opt_ipv4_hoa *opt_v4hoa;
+#endif /* DSMIP */
 };
 
 /* Binding Cache */
@@ -510,6 +515,7 @@ void icmp6sock_open(void);
 #ifdef DSMIP
 int  udp4_input_common(int);
 void udp4sock_open(void);
+void raw4sock_open(void);
 #endif
 int  icmp6_input_common(int);
 int mip6_get_nd6options(struct nd6options *, char *, int);
@@ -532,8 +538,7 @@ int bul_update_by_mipsock_w_hoa(struct in6_addr *, struct in6_addr *,
 int mipsock_md_update_bul_byifindex(u_int16_t, struct in6_addr *);
 int mipsock_md_dereg_bul(struct in6_addr *, struct in6_addr *, u_int16_t);
 #ifdef DSMIP
-int dsmip_send_bu(char *, int, u_int, struct binding_update_list *);
-
+int v4_sendmessage(char *, int, u_int, struct in6_addr *, struct in6_addr *, struct in6_addr *, struct in6_addr *, struct in6_addr *);
 #endif
 int send_haadreq(struct mip6_hoainfo *, int, struct in6_addr *);
 struct home_agent_list *mnd_add_hal(struct  mip6_hpfxl *, struct in6_addr *, int);
@@ -547,6 +552,9 @@ int receive_mpa(struct mip6_prefix_advert *, size_t, struct binding_update_list 
 struct noro_host_list *noro_get(struct in6_addr *);
 void noro_add(struct in6_addr *);
 void hpfxlist_expire_timer(void *);
+#ifdef DSMIP
+struct in_addr *mnd_get_v4hoa_by_ifindex(u_int16_t);
+#endif /* DSMIP */
 
 /* had.c */
 int mipsock_input(struct mip_msghdr *);
@@ -581,6 +589,9 @@ void command_show_pt(int, char *);
 
 /* hal.c */
 struct home_agent_list *mip6_find_hal(struct mip6_hoainfo *);
+#ifdef DSMIP
+struct home_agent_list *mip6_find_hal_v6(struct mip6_hoainfo *);
+#endif /* DSMIP */
 struct home_agent_list *had_add_hal(struct mip6_hpfxl *, struct in6_addr *, 
 			     struct in6_addr *, u_int16_t, u_int16_t, int);
 struct mip6_hpfxl *had_add_hpfxlist(struct in6_addr *, u_int16_t);

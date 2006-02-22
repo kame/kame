@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.45 2006/02/16 05:32:14 mitsuya Exp $  */
+/*      $KAME: mh.c,v 1.46 2006/02/22 11:03:51 mitsuya Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -53,6 +53,8 @@
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #ifdef DSMIP
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <netinet/udp.h>
 #endif /* DSMIP */
@@ -90,7 +92,7 @@ u_int16_t checksum_p(u_int16_t *, u_int16_t *, u_int16_t *, int, int);
  
 char *mh_name[] = {
 	"Binding Refresh Request Message", 
-	"Home Test Init Message", 
+	"Home Test Init Message",
 	"Care-of Test Init Message", 
 	"Home Test Message", 
 	"Care-of Test Message",
@@ -108,6 +110,9 @@ char *mhopt_name[] = {"Pad1",
 		      "Binding Authorization Data",
 		      "Mobile Network Prefix (NEMO)",
 		      "Binding Unique Identifier",
+#ifdef DSMIP
+		      "IPv4 Home Address Option",
+#endif /* DSMIP */
 		      "Unknown option"
 };
 
@@ -125,8 +130,8 @@ mhsock_open()
                 perror("socket for MH");
                 exit(-1);
         }
-#ifdef IPV6_RECVPKTINFO
-        error = setsockopt(mhsock, 
+#ifdef IPV6_RECVPKTINFO	
+        error = setsockopt(mhsock,
 			   IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
         if (error < 0) {
                 perror("setsockopt IPV6_RECVPKTINFO");
@@ -134,7 +139,7 @@ mhsock_open()
                 exit(1);
         }
 #else
-        error = setsockopt(mhsock, 
+        error = setsockopt(mhsock,
 			   IPPROTO_IPV6, IPV6_PKTINFO, &on, sizeof(on));
         if (error < 0) {
                 perror("setsockopt IPV6_PKTINFO");
@@ -150,20 +155,20 @@ mhsock_open()
         }
 
 #ifdef IPV6_RECVRTHDR
-        error = setsockopt(mhsock, 
+        error = setsockopt(mhsock,
 			   IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on));
         if (error < 0) {
                 perror("setsockopt IPV6_RECVRTHDR");
                 exit(1);
         }
 #else
-        error = setsockopt(mhsock, 
+        error = setsockopt(mhsock,
 			   IPPROTO_IPV6, IPV6_RTHDR, &on, sizeof(on));
         if (error < 0) {
                 perror("setsockopt IPV6_RTHDR");
                 exit(1);
         }
-#endif /* IPV6_RECVRTHDR */
+#endif /* IPV6_RECVRTHDR */	
 
 	syslog(LOG_INFO, "MH socket is %d.", mhsock);
         return;
@@ -232,7 +237,7 @@ mh_input_common(fd)
 	}
 
         for (cmsgptr = CMSG_FIRSTHDR(&msg); 
-	     cmsgptr != NULL; 
+	     cmsgptr != NULL;
 	     cmsgptr = CMSG_NXTHDR(&msg, cmsgptr)) {
 
 		/* 
@@ -247,7 +252,7 @@ mh_input_common(fd)
                 }
 
 		/* Getting Home Address Option */
-                if (cmsgptr->cmsg_level == IPPROTO_IPV6 && 
+                if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
 			cmsgptr->cmsg_type == IPV6_DSTOPTS) {
 			dest = (struct ip6_dest *)(CMSG_DATA(cmsgptr));
 			hoaopt = mip6_search_hoa_in_destopt((u_int8_t *)dest);
@@ -255,7 +260,6 @@ mh_input_common(fd)
 			if (hoaopt) {
 				/* Shisa Statistics: Home Address Option */
 				mip6stat.mip6s_hao++;
-			
 				memcpy(&hoa, hoaopt->ip6oh_addr, sizeof(hoa));
 			} else {
 				/* Shisa Statistics: unverified Home Address Option */
@@ -264,7 +268,7 @@ mh_input_common(fd)
 		}
 
 		/* Getting Routing Header Type 2 */
-                if (cmsgptr->cmsg_level == IPPROTO_IPV6 && 
+                if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
 		    cmsgptr->cmsg_type == IPV6_RTHDR) {
 
 			rthdr2 = (struct ip6_rthdr2 *)(CMSG_DATA(cmsgptr));
@@ -388,6 +392,11 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 			mopt->opt_bid = (struct ip6_mh_opt_bid *)mh;
 			break;
 #endif /* MIP_MCOA */
+#ifdef DSMIP
+		case IP6_MHOPT_IPV4_HOA:
+			mopt->opt_v4hoa = (struct ip6_mh_opt_ipv4_hoa *)mh;
+			break;
+#endif /* DSMIP */
 		default:
 			syslog(LOG_INFO,
 			    "invalid mobility option (%02x). \n", *mh);
@@ -562,7 +571,9 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (IN6_IS_ADDR_LINKLOCAL(coa)
 	    || IN6_IS_ADDR_MULTICAST(coa)
 	    || IN6_IS_ADDR_LOOPBACK(coa)
+#ifndef DSMIP
 	    || IN6_IS_ADDR_V4MAPPED(coa)
+#endif /* DSMIP */
 	    || IN6_IS_ADDR_UNSPECIFIED(coa))
 		return (-1);
 
@@ -570,7 +581,9 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (IN6_IS_ADDR_LINKLOCAL(hoa)
 	    || IN6_IS_ADDR_MULTICAST(hoa)
 	    || IN6_IS_ADDR_LOOPBACK(hoa)
+#ifndef DSMIP
 	    || IN6_IS_ADDR_V4MAPPED(hoa)
+#endif /* DSMIP */
 	    || IN6_IS_ADDR_UNSPECIFIED(hoa))
 		return (-1);
 
@@ -1160,7 +1173,7 @@ send_bu(bul)
 #endif /* MIP_MCOA */
 #ifdef DSMIP
 	struct ip6_mh_opt_ipv4_hoa v4hoa_opt;
-	char tmp[256];
+	struct home_agent_list *hal;
 #endif /* DSMIP */
 
 	if (debug) {
@@ -1204,7 +1217,12 @@ send_bu(bul)
 		bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
 
 	/* Adding Alternate Care-of Address Option */	
+#ifdef DSMIP
+	if (bul->bul_flags & IP6_MH_BU_HOME &
+		!IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) ) {
+#else
 	if (bul->bul_flags & IP6_MH_BU_HOME) {
+#endif /* DSMIP */
 		struct ip6_mh_opt_altcoa *acoa_opt;
 		
 		pad = MIP6_PADLEN(buflen, 8, 6);
@@ -1308,13 +1326,14 @@ send_bu(bul)
 		memset(&v4hoa_opt, 0, sizeof(v4hoa_opt));
 
 		v4hoa_opt.ip6mov4hoa_type = IP6_MHOPT_IPV4_HOA;
-		v4hoa_opt.ip6mov4hoa_len = 1;
+		v4hoa_opt.ip6mov4hoa_len = 5;
 		v4hoa_opt.ip6mov4hoa_pfxlen = 32; /* XXX */
-		memcpy(&v4hoa_opt.ip6mov4hoa_v4hoa, &bul->bul_v4hoa,
-			sizeof(bul->bul_v4hoa));
-		syslog(LOG_INFO, "IPv4 Home Address option is added %s/%d\n",
-			inet_ntop(AF_INET6, &bul->bul_v4hoa, tmp,
-				sizeof(bul->bul_v4hoa)),
+		memcpy(&v4hoa_opt.ip6mov4hoa_v4hoa,
+				&bul->bul_hoainfo->hinfo_v4hoa,
+				sizeof(struct in_addr));
+
+		syslog(LOG_INFO, "IPv4 Home Address option is added %s/%d\n", 
+				inet_ntoa(v4hoa_opt.ip6mov4hoa_v4hoa),
 				v4hoa_opt.ip6mov4hoa_pfxlen);
 
 		memcpy((bufp + buflen), &v4hoa_opt, sizeof(v4hoa_opt));
@@ -1442,7 +1461,17 @@ send_bu(bul)
 #ifdef DSMIP
 		if (IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) &&
 			IN6_IS_ADDR_V4MAPPED(&bul->bul_peeraddr)) {
-			error = dsmip_send_bu((char *)bufp, buflen, 0, bul);
+			hal = mip6_find_hal_v6(bul->bul_hoainfo);
+			if (hal == NULL) {
+				syslog(LOG_ERR, "no IPv6 home agent found");
+				return(-1);
+			}
+
+			error = v4_sendmessage((char *)bufp, buflen, 0,
+					&bul->bul_peeraddr, &bul->bul_coa,
+					&hal->hal_ip6addr,
+					&bul->bul_hoainfo->hinfo_hoa,
+					NULL);
 		} else
 			error = sendmessage((char *)bufp, buflen, 0, 
 		    		&bul->bul_hoainfo->hinfo_hoa,
@@ -1474,7 +1503,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 	int refresh;
 	u_int16_t bid;
 {
-	int err;
+	int err = 0;
 	char buf[1024];
 	int buflen = 0;
 	int pad = 0;
@@ -1483,6 +1512,9 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 #ifdef MIP_MCOA
 	struct ip6_mh_opt_bid bid_opt;
 #endif /* MIP_MCOA */
+#ifdef DSMIP
+	struct ip6_mh_opt_ipv4_ack v4ack_opt;
+#endif /* DSMIP */
 
 	if (hoa == NULL)
 		hoa = coa;
@@ -1543,6 +1575,27 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		buflen += sizeof(struct ip6_mh_opt_bid);
 	}
 #endif /* MIP_MCOA */
+
+#ifdef DSMIP
+	if (IN6_IS_ADDR_V4MAPPED(coa)) {
+		pad = MIP6_PADLEN(buflen, 2, 0);
+		MIP6_FILL_PADDING(bufp + buflen, pad);
+		buflen += pad;
+
+		memset(&v4ack_opt, 0, sizeof(v4ack_opt));
+
+		v4ack_opt.ip6mov4ack_type = IP6_MHOPT_IPV4_HOA;
+		v4ack_opt.ip6mov4ack_len = 6;
+		v4ack_opt.ip6mov4ack_status = htons(0);
+		v4ack_opt.ip6mov4ack_pfxlen = 32;
+		memcpy(&v4ack_opt.ip6mov4ack_v4hoa, &coa->s6_addr[12],
+					sizeof(v4ack_opt.ip6mov4ack_v4hoa));
+		syslog(LOG_INFO, "IPv4 Addr Ack option is added\n");
+
+		memcpy((bufp + buflen), &v4ack_opt, sizeof(v4ack_opt));
+		buflen += sizeof(struct ip6_mh_opt_ipv4_ack);
+	}
+#endif /* DSMIP */
 
 #ifdef MIP_CN
 	/* Retrun Routability */
@@ -1622,7 +1675,14 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 	if (IN6_ARE_ADDR_EQUAL(hoa, coa))
 	 	err = sendmessage(bufp, buflen, 0, src, hoa, NULL, NULL);
 	else
+#ifdef DSMIP
+		if (IN6_IS_ADDR_V4MAPPED(coa))
+			err = v4_sendmessage(bufp, buflen, 0, coa, src, coa,
+					NULL, hoa);
+		else
+#else
 		err = sendmessage(bufp, buflen, 0, src, hoa, NULL, coa);
+#endif /* DSMIP */
 
 	if (err == 0) {
 		mip6stat.mip6s_oba_hist[status]++;
@@ -1856,3 +1916,201 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 
 	return (0);
 }
+
+#ifdef DSMIP
+#ifndef MIP_MN
+int
+v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
+	char *mhdata;
+	int mhdatalen;
+	u_int ifindex;
+	struct in6_addr *v4dst;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct in6_addr *hoa;
+	struct in6_addr *rtaddr;
+{
+	struct sockaddr_in addr;
+	char buf[1024];
+	int buflen = 0;
+
+	struct ip *ip;
+	struct ip6_hdr *ip6;
+	struct ip6_dest *dest;
+	struct ip6_opt_home_address *hoadst;
+	struct ip6_rthdr2 *rtopt;
+
+	memset(&addr, 0, sizeof(addr));
+	memset(&buf, 0, sizeof(buf));
+
+	memcpy(&addr.sin_addr, &v4dst->s6_addr[12], sizeof(addr.sin_addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(5555);
+	addr.sin_len = sizeof(addr);
+
+	ip = (struct ip *)buf;
+	ip->ip_v   = IPVERSION;
+	ip->ip_hl  = sizeof(struct ip) >> 2;
+	ip->ip_tos = 0;
+	ip->ip_id  = htons(getpid() & 0xFFFF);
+	ip->ip_off = 0;
+	ip->ip_ttl = MAXTTL;
+	ip->ip_p   = IPPROTO_IPV6;
+	ip->ip_sum = 0;
+	memcpy(&ip->ip_dst, &v4dst->s6_addr[12], sizeof(struct in_addr));
+	buflen += sizeof(struct ip);
+
+	ip6 = (struct ip6_hdr *)(ip + 1);
+	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_hlim = 64;
+	memcpy(&ip6->ip6_src, src, sizeof(struct in6_addr));
+	memcpy(&ip6->ip6_dst, dst, sizeof(struct in6_addr));
+	buflen += sizeof(struct ip6_hdr);
+
+	if (hoa) {
+		ip6->ip6_nxt = IPPROTO_MH;
+
+		dest = (struct ip6_dest *)(ip6 + 1);
+		MIP6_FILL_PADDING((char *)(dest + 1), MIP6_HOAOPT_PADLEN);
+		dest->ip6d_nxt = 0;
+		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address) +
+			sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN) >> 3) - 1;
+		hoadst = (struct ip6_opt_home_address *)
+			((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
+		hoadst->ip6oh_type = 0xc9;
+		hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address) - 
+				sizeof(struct ip6_dest);
+		memcpy(hoadst->ip6oh_addr, hoa, sizeof(struct in6_addr));
+		buflen += sizeof(struct ip6_opt_home_address) + 
+				sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
+	}
+
+        /* Routing Header */
+        if (rtaddr) { 
+		ip6->ip6_nxt = IPPROTO_ROUTING;
+
+		rtopt = (struct ip6_rthdr2 *)(ip6 + 1);
+		rtopt->ip6r2_nxt = IPPROTO_MH;
+		rtopt->ip6r2_len = 2;
+		rtopt->ip6r2_type = 2;
+		rtopt->ip6r2_segleft = 1;
+		rtopt->ip6r2_reserved = 0;
+		memcpy((rtopt + 1), rtaddr, sizeof(struct in6_addr));
+		buflen += sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr);
+        }
+
+	memcpy(buf+buflen, mhdata, mhdatalen);
+	buflen += mhdatalen;
+
+	ip->ip_len = buflen;
+	ip6->ip6_plen = htons(buflen - sizeof(struct ip)
+					- sizeof(struct ip6_hdr));
+
+	if (sendto(raw4sock, buf, buflen, 0, (struct sockaddr *)&addr,
+	    sizeof(addr)) < 0){
+		perror("mh sendmsg ()");
+		syslog(LOG_ERR, "sendmsg error %s", strerror(errno));
+	} else {
+		mip6stat.mip6s_omobility[
+				((struct ip6_mh *)mhdata)->ip6mh_type]++;
+	}
+
+	return (0);
+}
+#else
+int
+v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
+	char *mhdata;
+	int mhdatalen;
+	u_int ifindex;
+	struct in6_addr *v4dst;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct in6_addr *hoa;
+	struct in6_addr *rtaddr;
+{
+	struct sockaddr_in addr;
+	struct msghdr msg;
+	struct iovec iov;
+	char buf[1024];
+	int buflen = 0;
+
+	struct ip6_hdr *ip6;
+	struct ip6_dest *dest;
+	struct ip6_opt_home_address *hoadst;
+	struct ip6_rthdr2 *rtopt;
+
+	memset(&addr, 0, sizeof(addr));
+	memset(&msg, 0, sizeof(msg));
+	memset(&iov, 0, sizeof(iov));
+	memset(&buf, 0, sizeof(buf));
+
+	memcpy(&addr.sin_addr, &v4dst->s6_addr[12], sizeof(addr.sin_addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(5555);
+	addr.sin_len = sizeof(addr);
+
+	msg.msg_name = (void *)&addr;
+	msg.msg_namelen = sizeof(addr);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	ip6 = (struct ip6_hdr *)buf;
+	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_hlim = 64;
+	memcpy(&ip6->ip6_src, src, sizeof(struct in6_addr));
+	memcpy(&ip6->ip6_dst, dst, sizeof(struct in6_addr));
+	buflen += sizeof(struct ip6_hdr);
+
+	if (hoa) {
+		ip6->ip6_nxt = IPPROTO_MH;
+
+		dest = (struct ip6_dest *)(ip6 + 1);
+		MIP6_FILL_PADDING((char *)(dest + 1), MIP6_HOAOPT_PADLEN);
+		dest->ip6d_nxt = 0;
+		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address) +
+			sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN) >> 3) - 1;
+		hoadst = (struct ip6_opt_home_address *)
+			((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
+		hoadst->ip6oh_type = 0xc9;
+		hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address) - 
+				sizeof(struct ip6_dest);
+		memcpy(hoadst->ip6oh_addr, hoa, sizeof(struct in6_addr));
+		buflen += sizeof(struct ip6_opt_home_address) + 
+				sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
+	}
+
+        /* Routing Header */
+        if (rtaddr) { 
+		ip6->ip6_nxt = IPPROTO_ROUTING;
+
+		rtopt = (struct ip6_rthdr2 *)(ip6 + 1);
+		rtopt->ip6r2_nxt = IPPROTO_MH;
+		rtopt->ip6r2_len = 2;
+		rtopt->ip6r2_type = 2;
+		rtopt->ip6r2_segleft = 1;
+		rtopt->ip6r2_reserved = 0;
+		memcpy((rtopt + 1), rtaddr, sizeof(struct in6_addr));
+		buflen += sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr);
+        }
+
+	memcpy(buf+buflen, mhdata, mhdatalen);
+	buflen += mhdatalen;
+
+	ip6->ip6_plen = htons(buflen - sizeof(struct ip6_hdr));
+	iov.iov_base = buf;
+	iov.iov_len = buflen;
+
+	if (sendmsg(udp4sock, &msg, 0) < 0){
+		perror("mh sendmsg ()");
+		syslog(LOG_ERR, "sendmsg error %s", strerror(errno));
+	} else {
+		mip6stat.mip6s_omobility[
+				((struct ip6_mh *)mhdata)->ip6mh_type]++;
+	}
+
+	return (0);
+}
+#endif /* !MIP_MN */
+
+#endif /* DSMIP */

@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.24 2006/01/26 08:47:21 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.25 2006/02/22 11:03:50 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -556,6 +556,9 @@ hoainfo_insert(hoa, ifindex)
 	u_int16_t ifindex;
 {
 	struct mip6_hoainfo *hoainfo = NULL;
+#ifdef DSMIP
+	struct in_addr *v4hoa;
+#endif /* DSMIP */
 
 	hoainfo = hoainfo_find_withhoa(hoa);
 	if (hoainfo)
@@ -569,6 +572,14 @@ hoainfo_insert(hoa, ifindex)
 
 	memcpy(&hoainfo->hinfo_hoa, hoa, sizeof(*hoa));
 	hoainfo->hinfo_ifindex = ifindex;
+
+#ifdef DSMIP
+	v4hoa = mnd_get_v4hoa_by_ifindex(ifindex);
+	if(v4hoa == NULL) { 
+		syslog(LOG_ERR, "no IPv4 home address is assinged");
+	} else
+		memcpy(&hoainfo->hinfo_v4hoa, v4hoa, sizeof(struct in_addr));
+#endif /* DSMIP */
 
 	/* Binding Update List Initialization */
 	LIST_INIT(&hoainfo->hinfo_bul_head);

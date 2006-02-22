@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.31 2006/01/23 09:08:48 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.32 2006/02/22 11:03:50 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -68,6 +68,10 @@
 
 /* Global Variables */
 int mipsock, icmp6sock, mhsock;
+#ifdef DSMIP
+int udp4sock;
+int raw4sock;
+#endif /* DSMIP */
 
 /* configuration parameters */
 struct config_entry *if_params = NULL;
@@ -226,10 +230,17 @@ main(argc, argv)
 	mhsock_open();
 	icmp6sock_open();
 	mipsock_open();
+#ifdef DSMIP
+	udp4sock_open();
+	raw4sock_open();
+#endif /* DSMIP */
 
 	new_fd_list(mipsock, POLLIN, mipsock_input_common);
 	new_fd_list(mhsock, POLLIN, mh_input_common);
 	new_fd_list(icmp6sock, POLLIN, icmp6_input_common);
+#ifdef DSMIP
+	new_fd_list(udp4sock, POLLIN, udp4_input_common);
+#endif /* DSMIP */
 
 	/* initialization */
 	ha_lists_init();

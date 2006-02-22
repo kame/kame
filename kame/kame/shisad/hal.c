@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.7 2006/01/26 08:47:21 t-momose Exp $	*/
+/*	$KAME: hal.c,v 1.8 2006/02/22 11:03:50 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -80,6 +80,32 @@ mip6_find_hal(hoainfo)
 
 	return (NULL);
 }
+#ifdef DSMIP
+struct home_agent_list *
+mip6_find_hal_v6(hoainfo)
+	struct mip6_hoainfo *hoainfo;
+{
+	struct mip6_hpfxl *hpfx;
+	struct mip6_mipif *mipif = NULL;
+	struct home_agent_list *hal;
+
+	mipif = mnd_get_mipif(hoainfo->hinfo_ifindex);
+	if (mipif == NULL)
+		return (NULL);
+
+	LIST_FOREACH(hpfx, &mipif->mipif_hprefx_head, hpfx_entry) {
+		if (inet_are_prefix_equal(&hoainfo->hinfo_hoa,
+		    &hpfx->hpfx_prefix, hpfx->hpfx_prefixlen)) {
+			LIST_FOREACH(hal, &hpfx->hpfx_hal_head, hal_entry) {
+				if(!IN6_IS_ADDR_V4MAPPED(&hal->hal_ip6addr))
+					return (hal);
+			}
+		}
+	}
+
+	return (NULL);
+}
+#endif /* DSMIP */
 #endif /* MIP_MN */
 
 #ifdef MIP_HA

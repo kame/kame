@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.31 2006/02/16 05:37:06 mitsuya Exp $	*/
+/*	$KAME: mnd.c,v 1.32 2006/02/22 11:03:51 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -507,6 +507,9 @@ mipsock_recv_mdinfo(miphdr)
 			sizeof(struct in_addr));
 
 		/* XXX maybe we need more check */
+
+		if (debug) 
+			syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
 		break;
 	case AF_INET6:
 		memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr, sizeof(struct in6_addr));
@@ -1043,18 +1046,6 @@ mipsock_input(miphdr)
 	return (err);
 }
 
-#ifdef DSMIP
-int
-dsmip_send_bu(mhdata, mhdatalen, ifindex, bul) 
-        char *mhdata;
-        int mhdatalen;
-        u_int ifindex;
-        struct binding_update_list *bul;
-{
-
-	return (0);
-}
-#endif /* DSMIP */
 
 int
 send_haadreq(hoainfo, hoa_plen, src)
@@ -1304,7 +1295,6 @@ add_hal_by_commandline_xxx(homeagent)
 		    homeagent);
 		return (-1);
 	}
-
 
 	LIST_FOREACH(mif, &mipifhead, mipif_entry) {
 		LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
@@ -1583,6 +1573,37 @@ mnd_init_homeprefix(mipif)
 	return;
 }
 
+#ifdef DSMIP
+struct in_addr *
+mnd_get_v4hoa_by_ifindex (ifindex) 
+	u_int16_t ifindex;
+{
+	struct ifaddrs *ifa, *ifap;
+	struct sockaddr *sa;
+	struct sockaddr_in *addr_sin;
+
+	if (getifaddrs(&ifap) != 0) { 
+		syslog(LOG_ERR, "%s\n", strerror(errno)); 
+		return NULL;
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		sa = ifa->ifa_addr;
+ 
+		if (sa->sa_family != AF_INET)
+			continue;
+		if (if_nametoindex(ifa->ifa_name) != ifindex)
+			continue;
+ 
+		if (!(ifa->ifa_flags & IFF_UP))
+			continue;
+		addr_sin = (struct sockaddr_in *)ifa->ifa_addr;
+		return (&addr_sin->sin_addr);
+	}
+
+	return NULL;
+}
+#endif /* DSMIP */
 
 int
 set_default_bu_lifetime(hoainfo) 

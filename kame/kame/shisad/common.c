@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.26 2006/02/16 05:32:14 mitsuya Exp $	*/
+/*	$KAME: common.c,v 1.27 2006/02/22 11:03:50 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -56,6 +56,7 @@
 #include <netinet6/mip6.h>
 #include <netinet/icmp6.h>
 #include <net/mipsock.h>
+#include <arpa/inet.h>
 
 #include "callout.h"
 #include "command.h"
@@ -185,13 +186,82 @@ int
 udp4_input_common (fd)
 	int fd;
 {
-	int n;
-	char msg[1280]; 
+#ifdef MIP_HA
+	struct msghdr msg;
+	struct iovec iov;
+	int n, mhlen;
+	char buf[1024], adata[124];
+	struct sockaddr_in from;
+	struct ip6_hdr *ip6;
+	struct ip6_dest *dest;
+	struct ip6_opt_home_address *hoaopt;
+	struct ip6_mh	*mh;
+	char rthdr_on = 0;
+	struct in6_addr hoa;
+	struct in6_addr rtaddr;
 
-	n = read(udp4sock, msg, sizeof(msg));
+	memset(&iov, 0, sizeof(iov));
+	memset(&buf, 0, sizeof(buf));
+	memset(&msg, 0, sizeof(msg));
+	memset(&from, 0, sizeof(from));
+
+	msg.msg_name = (caddr_t)&from;
+	msg.msg_namelen = sizeof(from);
+	iov.iov_base = buf;
+	iov.iov_len = sizeof(buf);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (void *) adata;
+	msg.msg_controllen = sizeof(adata);
+
+	n = recvmsg(udp4sock, &msg, 0);
 	if (n < 0) {
+		perror("recvmsg");
 		return (errno);
 	}
+
+
+	/*
+	 * - check whether it's containing IPv6 home address option
+	 */
+	ip6 = (struct ip6_hdr *)buf;
+
+	dest = (struct ip6_dest *)(buf + sizeof(struct ip6_hdr));
+	MIP6_FILL_PADDING((char *)(dest + 1), MIP6_HOAOPT_PADLEN);
+	/* shall we check dest->ip6d_nxt, dest->ip6d_len?  */
+
+	hoaopt = (struct ip6_opt_home_address *)
+                        ((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
+	/* shall we check hoaopt->ip6oh_type, hoaopt->ip6oh_len?  */
+
+	mh = (struct ip6_mh *)((char *)(hoaopt + 1));
+	mhlen = (mh->ip6mh_len + 1) << 3;
+
+
+	if(memcmp(&from.sin_addr, &ip6->ip6_src.s6_addr[12],
+	    sizeof(struct in_addr)) != 0) {
+		syslog(LOG_ERR, "DSMIP NAT Traversal is not supported yet.");
+		return(-1);
+	}
+	if(hoaopt) {
+		mip6stat.mip6s_hao++;
+		memcpy(&hoa, hoaopt->ip6oh_addr, sizeof(hoa));
+	} else 
+		mip6stat.mip6s_unverifiedhao++;
+
+
+	if (debug) {
+		syslog(LOG_INFO, "ipv4 src %s", inet_ntoa(from.sin_addr));
+		syslog(LOG_INFO, "ipv6 src %s", ip6_sprintf(&ip6->ip6_src));
+		syslog(LOG_INFO, "ipv6 dst %s", ip6_sprintf(&ip6->ip6_dst));
+		syslog(LOG_INFO, "ipv6 hoa %s", ip6_sprintf(&hoa));
+	}
+
+	if (mh_input(&ip6->ip6_src, &ip6->ip6_dst, hoaopt ? &hoa : NULL,
+			rthdr_on ? &rtaddr : NULL, mh, mhlen)) {
+		return (-1);
+	}
+#endif /* MIPHA */
 
         return 0;
 }
@@ -200,12 +270,11 @@ void
 udp4sock_open () {
 	struct sockaddr_in server;
 
-syslog(LOG_INFO, "%s:%d", __FILE__, __LINE__);
-
 	memset(&server, 0, sizeof(server));
 #define UDP4PORT 5555 
 	server.sin_port = htons(UDP4PORT);
 	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	if ((udp4sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
 		perror("socket SOCK_DGRAM");
@@ -225,6 +294,35 @@ syslog(LOG_INFO, "%s:%d", __FILE__, __LINE__);
 	return;
 	
 }
+
+#ifndef MIP_MN
+void
+raw4sock_open () {
+	struct sockaddr_in server;
+	int bool = 1;
+
+	memset(&server, 0, sizeof(server));
+	server.sin_port = 0;
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	if ((raw4sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0){
+		perror("socket SOCK_RAW");
+		exit(1);
+	}
+
+	if (setsockopt(raw4sock, IPPROTO_IP, IP_HDRINCL,
+		    (char *)&bool, sizeof(bool)) < 0) {
+		perror("setsocketopt IP_HDRINCL");
+		exit(1);
+	}
+
+	syslog(LOG_INFO, "RAW4 socket is %d.", raw4sock);
+
+	return;
+	
+}
+#endif /* !MIP_MN */
 #endif /* DSMIP */
 
 #ifndef MIP_CN
