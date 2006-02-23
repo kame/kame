@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.102 2006/01/16 05:37:06 t-momose Exp $	*/
+/*	$KAME: icmp6.h,v 1.103 2006/02/23 16:39:07 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -905,7 +905,7 @@ int	icmp6_input __P((struct mbuf **, int *, int));
 #endif
 void	icmp6_reflect __P((struct mbuf *, size_t));
 void	icmp6_prepare __P((struct mbuf *));
-void	icmp6_redirect_input __P((struct mbuf *, int));
+void	icmp6_redirect_input __P((struct mbuf *, int, int));
 void	icmp6_redirect_output __P((struct mbuf *, struct rtentry *));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));

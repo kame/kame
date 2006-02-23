@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.411 2006/01/15 12:26:57 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.412 2006/02/23 16:39:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1028,11 +1028,11 @@ icmp6_input(mp, offp, proto)
 			goto badlen;
 		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
 			/* give up local */
-			icmp6_redirect_input(m, off);
+			icmp6_redirect_input(m, off, icmp6len);
 			m = NULL;
 			goto freeit;
 		}
-		icmp6_redirect_input(n, off);
+		icmp6_redirect_input(n, off, icmp6len);
 		/* m stays. */
 		break;
 
@@ -2645,14 +2645,14 @@ icmp6_redirect_diag(src6, dst6, tgt6)
 }
 
 void
-icmp6_redirect_input(m, off)
+icmp6_redirect_input(m, off, icmp6len)
 	struct mbuf *m;
 	int off;
+	int icmp6len;
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_redirect *nd_rd;
-	int icmp6len = ntohs(ip6->ip6_plen);
 	char *lladdr = NULL;
 	int lladdrlen = 0;
 	u_char *redirhdr = NULL;
