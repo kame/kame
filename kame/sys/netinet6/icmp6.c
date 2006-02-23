@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.412 2006/02/23 16:39:07 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.413 2006/02/23 16:41:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1288,8 +1288,6 @@ icmp6_notify_error(m, off, icmp6len, code)
 		icmp6src.sin6_flowinfo =
 		    (eip6->ip6_flow & IPV6_FLOWLABEL_MASK);
 
-		if (finaldst == NULL)
-			finaldst = &eip6->ip6_dst;
 		ip6cp.ip6c_m = m;
 		ip6cp.ip6c_icmp6 = icmp6;
 		ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
