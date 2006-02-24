@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.413 2006/02/23 16:41:16 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.414 2006/02/24 11:16:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1237,12 +1237,12 @@ icmp6_notify_error(m, off, icmp6len, code)
 				break;
 			default:
 				/*
-				 * This case includes ESP and the No Next
-				 * Header.  In such cases going to the notify
-				 * label does not have any meaning
-				 * (i.e. ctlfunc will be NULL), but we go
-				 * anyway since we might have to update
-				 * path MTU information.
+				 * In some cases (such as the No Next Header
+				 * case), trying to notify the error may be
+				 * ineffective due to the lack of upper layer
+				 * process.  But we should at least update
+				 * the path MTU size in case of a Too Big
+				 * error.
 				 */
 				goto notify;
 			}
