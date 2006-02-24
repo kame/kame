@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.35 2005/10/27 12:00:17 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.36 2006/02/24 06:17:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2708,6 +2708,36 @@ bul_fsm_try_other_home_agent(bul)
 
 			tmpbul->bul_reg_fsm_state
 			    = MIP6_BUL_REG_FSM_STATE_WAITA;
+#ifdef MIP_MCOA 
+			if (!LIST_EMPTY(&tmpbul->bul_mcoa_head)) {
+				struct binding_update_list *mbul;
+				
+				for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
+				     mbul = LIST_NEXT(bul, bul_entry)) {
+		
+					syslog(LOG_INFO, "found multiple BULISTS\n");
+					memcpy(&mbul->bul_peeraddr, 
+					       &hal->hal_ip6addr, sizeof(struct in6_addr));
+					error = send_bu(mbul);
+					if (error) {
+						syslog(LOG_ERR,
+						       "sending a home registration "
+						       "failed. (%d)\n", error);
+						/* continue and try again. */
+					}
+					
+					mbul->bul_retrans_time
+					    = INITIAL_BINDACK_TIMEOUT;
+					bul_set_retrans_timer(mbul,
+					    mbul->bul_retrans_time);
+					
+					bul_set_expire_timer(mbul,
+					    mbul->bul_lifetime << 2);
+					mbul->bul_reg_fsm_state
+					    = MIP6_BUL_REG_FSM_STATE_WAITA;
+				}
+			}
+#endif /* MIP_MCOA */
 		}
 		return;
 	}
@@ -2800,6 +2830,7 @@ bul_stop_retrans_timer(bul)
 	struct binding_update_list *bul;
 {
 	remove_callout_entry(bul->bul_retrans);
+	bul->bul_retrans = NULL;
 }
 
 void
@@ -2829,6 +2860,7 @@ bul_stop_expire_timer(bul)
 	struct binding_update_list *bul;
 {
 	remove_callout_entry(bul->bul_expire);
+	bul->bul_expire = NULL;
 }
 
 void
