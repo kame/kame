@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.6 2006/02/27 12:24:33 t-momose Exp $	*/
+/*	$KAME: ip6mh.h,v 1.7 2006/02/27 16:20:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -369,7 +369,7 @@ struct ip6_mh_opt_ipv4_prefix {
 struct ip6_mh_opt_mn_id {
 	u_int8_t ip6momnid_type;
 	u_int8_t ip6momnid_len;
-	u_int8_t_ip6mnmnid_subtype;
+	u_int8_t ip6mnmnid_subtype;
 	/* followed by identifier */
 } __attribute__((__packed__));
 
