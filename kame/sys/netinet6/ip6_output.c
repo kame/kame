@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.481 2006/02/12 14:53:52 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.482 2006/02/27 05:57:33 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1934,9 +1934,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 		if (ifp == NULL)
 			ifp = ro_pmtu->ro_rt->rt_ifp;
 		ifmtu = IN6_LINKMTU(ifp);
-		if (mtu == 0) {
-			mtu = ifmtu;
-		} else if (mtu < IPV6_MMTU) {
+		if (mtu < IPV6_MMTU) {
 			/*
 			 * RFC2460 section 5, last paragraph:
 			 * if we record ICMPv6 too big message with
