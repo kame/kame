@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.5 2006/02/16 05:56:49 mitsuya Exp $	*/
+/*	$KAME: ip6mh.h,v 1.6 2006/02/27 12:24:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -240,7 +240,10 @@ struct ip6_mh_binding_ack {
 #define IP6_MH_BAS_INVALID_PREFIX       141 /* Invalid Prefix */
 #define IP6_MH_BAS_NOT_AUTHORIZED       142 /* Not Authorized for Prefix */
 #define IP6_MH_BAS_NO_PREFIX_INFO       143 /* Mobile Network Prefix information unavailable */
-
+/* Following values are defined in RFC4285 */
+#define IP6_MH_BAS_ID_MISMATCH		144
+#define IP6_MH_BAS_MESG_ID_REQD		145
+#define IP6_MH_BAS_AUTH_FAIL		146
 
 /* Binding Error (BE) message */
 struct ip6_mh_binding_error {
@@ -278,8 +281,11 @@ struct ip6_mh_opt {
 #define IP6_MHOPT_BAUTH		5	/* Binding Authorization Data */
 #define IP6_MHOPT_PREFIX        6       /* Mobile Network Prefix */
 #define IP6_MHOPT_BID           7       /* Binding Unique Identifier */
-#define IP6_MHOPT_IPV4_PREFIX   8       /* IPv4 Mobile Network Prefix */
-#define IP6_MHOPT_IPV4_HOA      9       /* IPv4 Home Address */
+#define IP6_MHOPT_MN_ID		8	/* Mobile Node Indentifier Option (RFC4283) */
+#define IP6_MHOPT_AUTH_OPT	9	/* Authentication Option (RFC4285) */
+#define IP6_MHOPT_REPLAY_PROTECTION	10
+#define IP6_MHOPT_IPV4_PREFIX   11       /* IPv4 Mobile Network Prefix */
+#define IP6_MHOPT_IPV4_HOA      12       /* IPv4 Home Address */
 
 /* Binding Refresh Advice */
 struct ip6_mh_opt_refresh_advice {
@@ -358,6 +364,38 @@ struct ip6_mh_opt_ipv4_prefix {
 	u_int8_t ip6mov4pfx_pfxlen;
 	struct in_addr ip6mov4pfx_pfx;
 };
+
+/* Mobile Node Identifier Option */
+struct ip6_mh_opt_mn_id {
+	u_int8_t ip6momnid_type;
+	u_int8_t ip6momnid_len;
+	u_int8_t_ip6mnmnid_subtype;
+	/* followed by identifier */
+} __attribute__((__packed__));
+
+/* Authentication Option (RFC4285) */
+struct ip6_mh_opt_authentication {
+	u_int8_t ip6moauth_type;
+	u_int8_t ip6moauth_len;
+	u_int8_t ip6moauth_subtype;
+	union {
+		u_int8_t __mobility_spi8[4];
+		u_int32_t __mobility_spi32;
+	} __ip6moauth_mobility_spi;
+	/* followed by authentication data */
+} __attribute__((__packed__));
+#define ip6moauth_mobility_spi __ip6moauth_mobility_spi.__mobility_spi32
+
+/* Mobility Message Replay Protection Option */
+struct ip6_mh_opt_replay_protection {
+	u_int8_t ip6morprotect_type;
+	u_int8_t ip6morprotect_len;
+	union {
+		u_int8_t __timestamp8[4];
+		u_int64_t __timestap64;
+	} __ip6morprotect_timestamp;
+} __attribute__((__packed__));
+#define ip6morprotect_timestamp	__ip6morprotect_timestamp.__timestap64
 
 /* IPv4 Home Address Option */
 struct ip6_mh_opt_ipv4_hoa {
