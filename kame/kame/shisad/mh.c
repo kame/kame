@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.46 2006/02/22 11:03:51 mitsuya Exp $  */
+/*      $KAME: mh.c,v 1.47 2006/02/27 09:31:38 mitsuya Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -214,6 +214,8 @@ mh_input_common(fd)
 #define mh_input(src, dst, hoa, rtaddr, mh, mhlen)	\
 	bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 #endif
+
+syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 
 	memset(&iov, 0, sizeof(iov));
 	memset(buf, 0, sizeof(buf));
@@ -1467,6 +1469,9 @@ send_bu(bul)
 				return(-1);
 			}
 
+			/* create tunnel */
+system("ifconfig nemo0 tunnel 203.178.128.64 203.178.128.50 up");
+
 			error = v4_sendmessage((char *)bufp, buflen, 0,
 					&bul->bul_peeraddr, &bul->bul_coa,
 					&hal->hal_ip6addr,
@@ -1680,9 +1685,8 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 			err = v4_sendmessage(bufp, buflen, 0, coa, src, coa,
 					NULL, hoa);
 		else
-#else
-		err = sendmessage(bufp, buflen, 0, src, hoa, NULL, coa);
 #endif /* DSMIP */
+		err = sendmessage(bufp, buflen, 0, src, hoa, NULL, coa);
 
 	if (err == 0) {
 		mip6stat.mip6s_oba_hist[status]++;
@@ -2008,8 +2012,7 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 
 	if (sendto(raw4sock, buf, buflen, 0, (struct sockaddr *)&addr,
 	    sizeof(addr)) < 0){
-		perror("mh sendmsg ()");
-		syslog(LOG_ERR, "sendmsg error %s", strerror(errno));
+		syslog(LOG_ERR, "sendto error %s", strerror(errno));
 	} else {
 		mip6stat.mip6s_omobility[
 				((struct ip6_mh *)mhdata)->ip6mh_type]++;
@@ -2102,7 +2105,6 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 	iov.iov_len = buflen;
 
 	if (sendmsg(udp4sock, &msg, 0) < 0){
-		perror("mh sendmsg ()");
 		syslog(LOG_ERR, "sendmsg error %s", strerror(errno));
 	} else {
 		mip6stat.mip6s_omobility[
