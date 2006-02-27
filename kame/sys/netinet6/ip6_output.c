@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.483 2006/02/27 09:49:07 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.484 2006/02/27 10:00:23 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1963,9 +1963,8 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 			mtu = ifmtu;
 #ifdef __FreeBSD__
 			tcp_hc_updatemtu(&inc, mtu);
-#else
-			ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
 #endif
+			ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
 		}
 	} else if (ifp) {
 		mtu = IN6_LINKMTU(ifp);
