@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.482 2006/02/27 05:57:33 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.483 2006/02/27 09:49:07 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1897,14 +1897,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 	u_int32_t mtu = 0;
 	int alwaysfrag = 0;
 	int error = 0;
-#ifdef __FreeBSD__
-	struct in_conninfo inc;
 
-	bzero(&inc, sizeof(inc));
-	inc.inc_flags = 1; /* IPv6 */
-	inc.inc6_faddr = ((struct sockaddr_in6 *)&ro_pmtu->ro_dst)->sin6_addr;
-	mtu = tcp_hc_getmtu(&inc);
-#else
 	if (ro_pmtu != ro) {
 		/* The first hop and the final destination may differ. */
 		struct sockaddr_in6 *sa6_dst =
@@ -1925,16 +1918,29 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 		}
 	}
 	if (ro_pmtu->ro_rt) {
-		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
-	}
-#endif
-	if (mtu != 0) {
 		u_int32_t ifmtu;
+#ifdef __FreeBSD__
+		struct in_conninfo inc;
+#endif /* __FreeBSD__ */
 
 		if (ifp == NULL)
 			ifp = ro_pmtu->ro_rt->rt_ifp;
 		ifmtu = IN6_LINKMTU(ifp);
-		if (mtu < IPV6_MMTU) {
+#ifdef __FreeBSD__
+		bzero(&inc, sizeof(inc));
+		inc.inc_flags = 1; /* IPv6 */
+		inc.inc6_faddr = *dst;
+
+		mtu = tcp_hc_getmtu(&inc);
+		if (mtu)
+			mtu = min(mtu, ro_pmtu->ro_rt->rt_rmx.rmx_mtu);
+		else
+#else
+		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
+#endif /* __FreeBSD__ */
+		if (mtu == 0) {
+			mtu = ifmtu;
+		} else if (mtu < IPV6_MMTU) {
 			/*
 			 * RFC2460 section 5, last paragraph:
 			 * if we record ICMPv6 too big message with
@@ -2392,7 +2398,7 @@ do { \
 #ifdef __FreeBSD__
 				u_char optbuf_storage[MCLBYTES];
 #endif
-				int optlen;
+				int optbuflen;
 				struct ip6_pktopts **optp;
 
 				/* cannot mix with RFC2292 */
@@ -2411,7 +2417,7 @@ do { \
 				    sizeof(optbuf_storage), 0);
 				if (error)
 					break;
-				optlen = sopt->sopt_valsize;
+				optbuflen = sopt->sopt_valsize;
 				optbuf = optbuf_storage;
 #else
 				if (m && m->m_next) {
@@ -2420,15 +2426,15 @@ do { \
 				}
 				if (m) {
 					optbuf = mtod(m, u_char *);
-					optlen = m->m_len;
+					optbuflen = m->m_len;
 				} else {
 					optbuf = NULL;
-					optlen = 0;
+					optbuflen = 0;
 				}
 #endif
 				optp = &in6p->in6p_outputopts;
 				error = ip6_pcbopt(optname,
-						   optbuf, optlen,
+						   optbuf, optbuflen,
 						   optp, privileged, uproto);
 				break;
 			}
@@ -2704,10 +2710,10 @@ do { \
 				 * empty data.
 				 */
 #ifdef __FreeBSD__
-					sopt->sopt_valsize = 0;
+				sopt->sopt_valsize = 0;
 #else
-					*mp = m_get(M_WAIT, MT_SOOPTS);
-					(*mp)->m_len = 0;
+				*mp = m_get(M_WAIT, MT_SOOPTS);
+				(*mp)->m_len = 0;
 #endif
 				break;
 
