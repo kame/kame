@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.69 2006/02/28 06:55:00 keiichi Exp $	*/
+/*	$KAME: traceroute6.c,v 1.70 2006/02/28 08:05:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -719,7 +719,7 @@ main(argc, argv)
 			exit(1);
 		}
 	}
-#endif /* USE_RFC3542
+#endif /* USE_RFC3542 */
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	/*
