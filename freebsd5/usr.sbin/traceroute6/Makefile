@@ -5,7 +5,7 @@ PROG=	traceroute6
 BINOWN=	root
 BINMODE=4555
 
-CFLAGS+=-DINET6 -DIPSEC -DUSE_RFC2292BIS -DHAVE_GETIPNODEBYNAME
+CFLAGS+=-DINET6 -DIPSEC -DUSE_RFC3542 -DHAVE_GETIPNODEBYNAME
 LDADD+=	-L${.OBJDIR}/../../lib/libipsec -L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+=	${.OBJDIR}/../../lib/libipsec/libipsec.a \

@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.173 2004/07/26 08:04:34 suz Exp $	*/
+/*	$KAME: ping6.c,v 1.174 2006/02/28 06:54:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -309,7 +309,7 @@ main(argc, argv)
 #endif
 	int usepktinfo = 0;
 	struct in6_pktinfo *pktinfo = NULL;
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 	struct ip6_rthdr *rthdr = NULL;
 #endif
 #ifdef IPSEC_POLICY_IPSEC
@@ -569,7 +569,7 @@ main(argc, argv)
 	}
 
 	if (argc > 1) {
-#ifdef IPV6_RECVRTHDR	/* 2292bis */
+#ifdef IPV6_RECVRTHDR	/* RFC3542 */
 		rthlen = CMSG_SPACE(inet6_rth_space(IPV6_RTHDR_TYPE_0,
 		    argc - 1));
 #else  /* RFC2292 */
@@ -869,11 +869,11 @@ main(argc, argv)
 
 	if (argc > 1) {	/* some intermediate addrs are specified */
 		int hops, error;
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 		int rthdrlen;
 #endif
 
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 		rthdrlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, argc - 1);
 		scmsgp->cmsg_len = CMSG_LEN(rthdrlen);
 		scmsgp->cmsg_level = IPPROTO_IPV6;
@@ -887,7 +887,7 @@ main(argc, argv)
 		if ((scmsgp = (struct cmsghdr *)inet6_rthdr_init(scmsgp,
 		    IPV6_RTHDR_TYPE_0)) == 0)
 			errx(1, "can't initialize rthdr");
-#endif /* USE_RFC2292BIS */
+#endif /* USE_RFC3542 */
 
 		for (hops = 0; hops < argc - 1; hops++) {
 			struct addrinfo *iaip;
@@ -899,7 +899,7 @@ main(argc, argv)
 				errx(1,
 				    "bad addr family of an intermediate addr");
 
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 			if (inet6_rth_add(rthdr,
 			    &(SIN6(iaip->ai_addr))->sin6_addr))
 				errx(1, "can't add an intermediate node");
@@ -908,11 +908,11 @@ main(argc, argv)
 			    &(SIN6(iaip->ai_addr))->sin6_addr,
 			    IPV6_RTHDR_LOOSE))
 				errx(1, "can't add an intermediate node");
-#endif /* USE_RFC2292BIS */
+#endif /* USE_RFC3542 */
 			freeaddrinfo(iaip);
 		}
 
-#ifndef USE_RFC2292BIS
+#ifndef USE_RFC3542
 		if (inet6_rthdr_lasthop(scmsgp, IPV6_RTHDR_LOOSE))
 			errx(1, "can't set the last flag");
 #endif
@@ -936,7 +936,7 @@ main(argc, argv)
 		src.sin6_port = ntohs(DUMMY_PORT);
 		src.sin6_scope_id = dst.sin6_scope_id;
 
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 		if (pktinfo &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTINFO,
 		    (void *)pktinfo, sizeof(*pktinfo)))
@@ -1761,7 +1761,7 @@ pr_exthdrs(mhdr)
 	}
 }
 
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 void
 pr_ip6opt(void *extbuf)
 {
@@ -1812,7 +1812,7 @@ pr_ip6opt(void *extbuf)
 	}
 	return;
 }
-#else  /* !USE_RFC2292BIS */
+#else  /* !USE_RFC3542 */
 /* ARGSUSED */
 void
 pr_ip6opt(void *extbuf)
@@ -1820,9 +1820,9 @@ pr_ip6opt(void *extbuf)
 	putchar('\n');
 	return;
 }
-#endif /* USE_RFC2292BIS */
+#endif /* USE_RFC3542 */
 
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 void
 pr_rthdr(void *extbuf)
 {
@@ -1856,7 +1856,7 @@ pr_rthdr(void *extbuf)
 
 }
 
-#else  /* !USE_RFC2292BIS */
+#else  /* !USE_RFC3542 */
 /* ARGSUSED */
 void
 pr_rthdr(void *extbuf)
@@ -1864,7 +1864,7 @@ pr_rthdr(void *extbuf)
 	putchar('\n');
 	return;
 }
-#endif /* USE_RFC2292BIS */
+#endif /* USE_RFC3542 */
 
 int
 pr_bitrange(v, soff, ii)

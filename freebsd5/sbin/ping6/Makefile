@@ -22,6 +22,6 @@ DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
 CFLAGS+=-DKAME_SCOPEID
 
 # new advanced API
-CFLAGS+=-DUSE_RFC2292BIS
+CFLAGS+=-DUSE_RFC3542
 
 .include <bsd.prog.mk>

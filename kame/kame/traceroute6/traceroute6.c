@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.68 2004/01/25 11:16:12 suz Exp $	*/
+/*	$KAME: traceroute6.c,v 1.69 2006/02/28 06:55:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -335,7 +335,7 @@ u_long datalen;			/* How much data */
 #define	ICMP6ECHOLEN	8
 /* XXX: 2064 = 127(max hops in type 0 rthdr) * sizeof(ip6_hdr) + 16(margin) */
 char rtbuf[2064];
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 struct ip6_rthdr *rth;
 #endif
 struct cmsghdr *cmsg;
@@ -432,7 +432,7 @@ main(argc, argv)
 				    "traceroute6: unknown host %s\n", optarg);
 				exit(1);
 			}
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 			if (rth == NULL) {
 				/*
 				 * XXX: We can't detect the number of
@@ -699,7 +699,7 @@ main(argc, argv)
 	if (options & SO_DONTROUTE)
 		(void) setsockopt(sndsock, SOL_SOCKET, SO_DONTROUTE,
 		    (char *)&on, sizeof(on));
-#ifdef USE_RFC2292BIS
+#ifdef USE_RFC3542
 	if (rth) {/* XXX: there is no library to finalize the header... */
 		rth->ip6r_len = rth->ip6r_segleft * 2;
 		if (setsockopt(sndsock, IPPROTO_IPV6, IPV6_RTHDR,
@@ -719,7 +719,7 @@ main(argc, argv)
 			exit(1);
 		}
 	}
-#endif /* USE_RFC2292BIS */
+#endif /* USE_RFC3542
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	/*
