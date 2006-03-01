@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.415 2006/03/01 05:14:35 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.416 2006/03/01 05:21:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2516,6 +2516,11 @@ icmp6_reflect(m, off)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&origdst)) {
 		if ((ia = ip6_getdstifaddr(m))) {
+			/*
+			 * IN6_IFF_NOTREADY should not be set in this case
+			 * since ip6_input() explicitly reject it.
+			 * But we check it just in case.
+			 */
 			if (!(ia->ia6_flags &
 			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY)))
 				src = &ia->ia_addr.sin6_addr;
