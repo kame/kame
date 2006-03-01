@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.7 2006/02/27 16:20:42 keiichi Exp $	*/
+/*	$KAME: ip6mh.h,v 1.8 2006/03/01 12:57:34 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -284,8 +284,10 @@ struct ip6_mh_opt {
 #define IP6_MHOPT_MN_ID		8	/* Mobile Node Indentifier Option (RFC4283) */
 #define IP6_MHOPT_AUTH_OPT	9	/* Authentication Option (RFC4285) */
 #define IP6_MHOPT_REPLAY_PROTECTION	10
+/* Follows are not assigned by IANA */
 #define IP6_MHOPT_IPV4_PREFIX   11       /* IPv4 Mobile Network Prefix */
 #define IP6_MHOPT_IPV4_HOA      12       /* IPv4 Home Address */
+#define IP6_MH_OPT_MAX		12
 
 /* Binding Refresh Advice */
 struct ip6_mh_opt_refresh_advice {
