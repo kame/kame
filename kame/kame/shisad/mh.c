@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.48 2006/03/01 01:21:18 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.49 2006/03/01 11:02:03 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -110,9 +110,11 @@ char *mhopt_name[] = {"Pad1",
 		      "Binding Authorization Data",
 		      "Mobile Network Prefix (NEMO)",
 		      "Binding Unique Identifier",
-#ifdef DSMIP
+		      "Mobile Node ID",
+		      "Authentication",
+		      "Replay Protection",
+		      "IPv4 prefix",
 		      "IPv4 Home Address Option",
-#endif /* DSMIP */
 		      "Unknown option"
 };
 
@@ -191,21 +193,21 @@ int
 mh_input_common(fd)
 	int fd;
 {
-        struct msghdr msg;
-        struct iovec iov;
-        register struct cmsghdr  *cmsgptr = NULL;
+	struct msghdr msg;
+	struct iovec iov;
+	register struct cmsghdr  *cmsgptr = NULL;
 
 	struct ip6_dest *dest;
 	struct ip6_rthdr2 *rthdr2 = NULL; 
 	struct ip6_opt_home_address *hoaopt = NULL;
 	struct ip6_mh *mh;
-        register struct in6_pktinfo *pkt = NULL;
+	register struct in6_pktinfo *pkt = NULL;
 
-        struct sockaddr_in6 from;
+	struct sockaddr_in6 from;
 	u_int receivedifindex;
-        struct in6_addr dst;
-        struct in6_addr hoa;
-        struct in6_addr rtaddr;
+	struct in6_addr dst;
+	struct in6_addr hoa;
+	struct in6_addr rtaddr;
 	char rthdr_on = 0;
 	char adata[1024], buf[1024];
 	int i, mhlen;
@@ -238,7 +240,7 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 		return (-1);
 	}
 
-        for (cmsgptr = CMSG_FIRSTHDR(&msg); 
+	for (cmsgptr = CMSG_FIRSTHDR(&msg); 
 	     cmsgptr != NULL;
 	     cmsgptr = CMSG_NXTHDR(&msg, cmsgptr)) {
 
@@ -246,16 +248,16 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 		 * Getting Destination Address and ifindex of the
 		 * received interface 
 		 */
-                if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+		if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
 		    cmsgptr->cmsg_type == IPV6_PKTINFO) {
-                        pkt = (struct in6_pktinfo *) CMSG_DATA (cmsgptr);
-                        receivedifindex = pkt->ipi6_ifindex;
+			pkt = (struct in6_pktinfo *) CMSG_DATA (cmsgptr);
+			receivedifindex = pkt->ipi6_ifindex;
 			dst = pkt->ipi6_addr;
-                }
+		}
 
 		/* Getting Home Address Option */
-                if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
-			cmsgptr->cmsg_type == IPV6_DSTOPTS) {
+		if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+		    cmsgptr->cmsg_type == IPV6_DSTOPTS) {
 			dest = (struct ip6_dest *)(CMSG_DATA(cmsgptr));
 			hoaopt = mip6_search_hoa_in_destopt((u_int8_t *)dest);
 
@@ -270,7 +272,7 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 		}
 
 		/* Getting Routing Header Type 2 */
-                if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
+		if (cmsgptr->cmsg_level == IPPROTO_IPV6 &&
 		    cmsgptr->cmsg_type == IPV6_RTHDR) {
 
 			rthdr2 = (struct ip6_rthdr2 *)(CMSG_DATA(cmsgptr));
@@ -300,7 +302,7 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 
 
 	mh = (struct ip6_mh *)buf;
-        mhlen = (mh->ip6mh_len + 1) << 3; 
+	mhlen = (mh->ip6mh_len + 1) << 3; 
 
 	if (debug) {
 		int mhtype;
@@ -336,48 +338,49 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
         int hlen, ip6mhlen;
         struct mip6_mobility_options *mopt;
 {
-        u_int8_t *mh, *mhend;
+	u_int8_t *mhopt, *mhend;
 
-        mh = (caddr_t)(ip6mh) + hlen;
-        mhend = (caddr_t)(ip6mh) + ip6mhlen;
+	mhopt = (caddr_t)(ip6mh) + hlen;
+	mhend = (caddr_t)(ip6mh) + ip6mhlen;
 
 	/* Reset Mobility Options */
-        memset(mopt, 0, sizeof(*mopt));
+	memset(mopt, 0, sizeof(*mopt));
 
 #define check_mopt_len(mopt_len)        \
-        if (*(mh + 1) != mopt_len) goto bad;
+        if (*(mhopt + 1) != mopt_len) goto bad;
 #define check_bauth_last() \
 	if (mopt->opt_auth) goto bad;
 
-        while (mh < mhend) {
+        while (mhopt < mhend) {
 
 		if (debug) {
-			syslog(LOG_INFO, "  %s is found\n", mhopt_name[(*mh < 8) ? *mh : 8]);
+			syslog(LOG_INFO, "  %s is found\n",
+			       mhopt_name[(*mhopt <= IP6_MH_OPT_MAX) ? *mhopt : IP6_MH_OPT_MAX + 1]);
 		}
 
-		if (*mh != IP6_MHOPT_BAUTH)	/* Always bind. auth. opt. should be the last option */
+		if (*mhopt != IP6_MHOPT_BAUTH)	/* Always bind. auth. opt. should be the last option */
 			check_bauth_last();
 		
-                switch (*mh) {
+                switch (*mhopt) {
 		case IP6_MHOPT_PAD1:
-			mh++;
+			mhopt++;
 			continue;
 		case IP6_MHOPT_PADN:
 			break;
 		case IP6_MHOPT_ALTCOA:
 			check_mopt_len(16);
-			mopt->opt_altcoa = (struct ip6_mh_opt_altcoa *)mh;
+			mopt->opt_altcoa = (struct ip6_mh_opt_altcoa *)mhopt;
 			break;
 		case IP6_MHOPT_NONCEID:
 			check_mopt_len(4);
-			mopt->opt_nonce = (struct ip6_mh_opt_nonce_index *)mh;
+			mopt->opt_nonce = (struct ip6_mh_opt_nonce_index *)mhopt;
 			break;
 		case IP6_MHOPT_BAUTH:
-			mopt->opt_auth = (struct ip6_mh_opt_auth_data *)mh;
+			mopt->opt_auth = (struct ip6_mh_opt_auth_data *)mhopt;
 			break;
 		case IP6_MHOPT_BREFRESH:
 			check_mopt_len(2);
-			mopt->opt_refresh = (struct ip6_mh_opt_refresh_advice *)mh;
+			mopt->opt_refresh = (struct ip6_mh_opt_refresh_advice *)mhopt;
 			break;
 #ifdef MIP_NEMO
 		case IP6_MHOPT_PREFIX:
@@ -385,27 +388,27 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 			    NEMO_MAX_ALLOW_PREFIX)
 				break;
 			mopt->opt_prefix[mopt->opt_prefix_count] = 
-				(struct ip6_mh_opt_prefix *)mh;
+				(struct ip6_mh_opt_prefix *)mhopt;
 			mopt->opt_prefix_count ++;
 			break;
 #endif /* MIP_NEMO */
 #ifdef MIP_MCOA
 		case IP6_MHOPT_BID:
-			mopt->opt_bid = (struct ip6_mh_opt_bid *)mh;
+			mopt->opt_bid = (struct ip6_mh_opt_bid *)mhopt;
 			break;
 #endif /* MIP_MCOA */
 #ifdef DSMIP
 		case IP6_MHOPT_IPV4_HOA:
-			mopt->opt_v4hoa = (struct ip6_mh_opt_ipv4_hoa *)mh;
+			mopt->opt_v4hoa = (struct ip6_mh_opt_ipv4_hoa *)mhopt;
 			break;
 #endif /* DSMIP */
 		default:
 			syslog(LOG_INFO,
-			    "invalid mobility option (%02x). \n", *mh);
+			    "invalid mobility option (%02x). \n", *mhopt);
 			break;
                 }
 
-                mh += *(mh + 1) + 2;
+		mhopt += *(mhopt + 1) + 2;
         }
 
 #undef check_mopt_len
@@ -441,16 +444,16 @@ mip6_search_hoa_in_destopt(optbuf)
 	register int optlen = 0;
 	int destoptlen = (((struct ip6_dest *)optbuf)->ip6d_len + 1) << 3;
 	
-        optbuf += sizeof(struct ip6_dest);
-        destoptlen -= sizeof(struct ip6_dest);
+ 	optbuf += sizeof(struct ip6_dest);
+	destoptlen -= sizeof(struct ip6_dest);
 
-        for (optlen = 0; destoptlen > 0; 
+ 	for (optlen = 0; destoptlen > 0; 
 	     destoptlen -= optlen, optbuf += optlen) {
 		if (*optbuf == IP6OPT_HOME_ADDRESS)
 			return ((struct ip6_opt_home_address *)optbuf);
 
 		if (*optbuf == IP6OPT_PAD1)
-                        optlen = 1;
+			optlen = 1;
 		else
 			optlen = *(optbuf + 1) + 2;
         }
@@ -539,11 +542,11 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	struct ip6_mh_binding_update *bu;
 	int mhlen;
 {
-        struct mip6_mobility_options mopt;
+	struct mip6_mobility_options mopt;
 	struct binding_cache *bc = NULL;
 	struct in6_addr *coa = NULL, *retcoa = NULL;
 #ifdef MIP_CN
-        mip6_token_t home_token, careof_token;
+	mip6_token_t home_token, careof_token;
 	struct mip6_nonces_info *home_nonces = NULL, *careof_nonces = NULL;
 #endif /* MIP_CN */
 	mip6_kbm_t *kbm = NULL;
@@ -823,7 +826,6 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	}
 #endif /* MIP_NEMO */
 
-
 	/* If nonce Indices opt. was found, it must be silently discarded */
 	/* 9.5.1 */
 	/* XXX This check might not be mandatory. Should consider later */
@@ -1060,7 +1062,7 @@ send_coti(bul)
 /* HoT */
 int 
 send_hot(hoti, dst, src) 
-        struct ip6_mh_home_test_init *hoti;
+	struct ip6_mh_home_test_init *hoti;
 	struct in6_addr *dst;
 	struct in6_addr *src;
 {
@@ -1104,7 +1106,7 @@ send_hot(hoti, dst, src)
 /* CoT */
 int 
 send_cot(coti, dst, src) 
-        struct ip6_mh_careof_test_init *coti;
+	struct ip6_mh_careof_test_init *coti;
 	struct in6_addr *dst;
 	struct in6_addr *src;
 {
@@ -1125,7 +1127,7 @@ send_cot(coti, dst, src)
 	cot.ip6mhct_hdr.ip6mh_type = IP6_MH_TYPE_COT;
 	cot.ip6mhct_hdr.ip6mh_reserved = 0;
 	memcpy((void *)cot.ip6mhct_cookie, (const void *)coti->ip6mhcti_cookie,
-	    sizeof(cot.ip6mhct_cookie));
+	       sizeof(cot.ip6mhct_cookie));
 
 	/* get nonces set */
 	nonce = get_nonces(0);
@@ -1220,12 +1222,11 @@ send_bu(bul)
 		bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
 
 	/* Adding Alternate Care-of Address Option */	
+	if ((bul->bul_flags & IP6_MH_BU_HOME)
 #ifdef DSMIP
-	if (bul->bul_flags & IP6_MH_BU_HOME &
-		!IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) ) {
-#else
-	if (bul->bul_flags & IP6_MH_BU_HOME) {
+	    && !IN6_IS_ADDR_V4MAPPED(&bul->bul_coa)
 #endif /* DSMIP */
+		) {
 		struct ip6_mh_opt_altcoa *acoa_opt;
 		
 		pad = MIP6_PADLEN(buflen, 8, 6);
@@ -1358,7 +1359,6 @@ send_bu(bul)
 
 		goto skip_rr;
 	} 
-
 
 	/* Adding Binding Nonce Index */ 
 	/* padding */
@@ -1796,10 +1796,10 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 	struct in6_addr *haoaddr;
 	struct in6_addr *rtaddr;
 {
-        struct sockaddr_in6 addr;
-        struct msghdr msg;
-        struct iovec iov;
-        struct cmsghdr  *cmsgptr = NULL;
+	struct sockaddr_in6 addr;
+	struct msghdr msg;
+	struct iovec iov;
+	struct cmsghdr  *cmsgptr = NULL;
 	register struct in6_pktinfo *pi;
 	struct ip6_opt_home_address *hoadst;
         struct ip6_rthdr2 *rtopt = NULL;
@@ -1816,12 +1816,12 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 	addr.sin6_scope_id = 0;
 	addr.sin6_len = sizeof (struct sockaddr_in6);
 
-        msg.msg_name = (void *)&addr;
-        msg.msg_namelen = sizeof(struct sockaddr_in6);
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = (void *) adata;
-        msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	msg.msg_name = (void *)&addr;
+	msg.msg_namelen = sizeof(struct sockaddr_in6);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (void *) adata;
+	msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if (haoaddr)  
 		msg.msg_controllen += 
 			CMSG_SPACE(sizeof(struct ip6_opt_home_address) 
