@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.414 2006/02/24 11:16:41 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.415 2006/03/01 05:14:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2511,11 +2511,8 @@ icmp6_reflect(m, off)
 	 * If the incoming packet was addressed directly to us (i.e. unicast),
 	 * use dst as the src for the reply.
 	 * The IN6_IFF_NOTREADY case should be VERY rare, but is possible
-	 * (for example) when we encounter an error while forwarding procedure
-	 * destined to a duplicated address of ours.
-	 * Note that ip6_getdstifaddr() may fail if we are in an error handling
-	 * procedure of an outgoing packet of our own, in which case we need
-	 * to search in the ifaddr list.
+	 * (for example) when an error occurs in an output path for a packet
+	 * whose destination address is tentative for the local node.
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&origdst)) {
 		if ((ia = ip6_getdstifaddr(m))) {
@@ -2525,6 +2522,12 @@ icmp6_reflect(m, off)
 		} else {
 			struct sockaddr_in6 d;
 
+			/*
+			 * ip6_getdstifaddr() may return NULL even if the
+			 * destination address is assigned to the local node
+			 * when the error occurs in an output path.  The owner
+			 * of the address must therefore be checked explicitly.
+			 */
 			bzero(&d, sizeof(d));
 			d.sin6_family = AF_INET6;
 			d.sin6_len = sizeof(d);
