@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.47 2006/02/27 09:31:38 mitsuya Exp $  */
+/*      $KAME: mh.c,v 1.48 2006/03/01 01:21:18 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -548,8 +548,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #endif /* MIP_CN */
 	mip6_kbm_t *kbm = NULL;
 	u_int16_t flags;
-        u_int16_t seqno;
-        u_int32_t lifetime;
+	u_int16_t seqno;
+	u_int32_t lifetime;
 	int retcode = -1;
 	int statuscode = IP6_MH_BAS_ACCEPTED;
 	u_int16_t bid = 0;
@@ -794,7 +794,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		}
 
 		/* Should lifetime be limited by vltime ? */
-		if (lifetime >= hpfxlist->hpfx_vltime)
+		if ((hpfxlist->hpfx_vltime > 0) &&
+		    (lifetime >= hpfxlist->hpfx_vltime))
 			lifetime = hpfxlist->hpfx_vltime;
 #if 0
 		if (lifetime >= 420)
