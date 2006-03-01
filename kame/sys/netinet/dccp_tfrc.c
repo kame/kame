@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.15 2006/01/20 18:47:38 nishida Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.16 2006/03/01 17:34:08 nishida Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson
@@ -757,8 +757,8 @@ tfrc_send_packet(void *ccb, long datasize)
 							/ TFRC_INITIAL_TIMEOUT / (4 * TFRC_WIN_COUNT_PER_RTT);
 				} else {
 					if (cb->rtt)
-						uw_win_count = (t_temp.tv_sec + (t_temp.tv_usec / 1000000)) 
-								/ cb->rtt / (1000000 * TFRC_WIN_COUNT_PER_RTT);
+						uw_win_count = (t_temp.tv_sec * 1000000 + t_temp.tv_usec) 
+								/ cb->rtt / TFRC_WIN_COUNT_PER_RTT;
 					else 
 						uw_win_count = 0; 
 				}
