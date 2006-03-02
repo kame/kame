@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.34 2006/02/22 11:03:51 mitsuya Exp $	*/
+/*	$KAME: shisad.h,v 1.35 2006/03/02 11:11:10 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -128,6 +128,7 @@ struct home_agent_list {
 	int             hal_flag;
 #define MIP6_HAL_OWN    0x01
 #define MIP6_HAL_STATIC 0x02
+#define MIP6_HAL_RA	0x04
 
 	/* HA exclusive field: it is used when ha receives RA */
 	struct mip6_halist_ha_exclusive {

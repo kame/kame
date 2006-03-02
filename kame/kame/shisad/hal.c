@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.8 2006/02/22 11:03:50 mitsuya Exp $	*/
+/*	$KAME: hal.c,v 1.9 2006/03/02 11:11:10 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -358,7 +358,8 @@ show_hal(s, head)
 				       "\t\tlif=%d pref=%d flag=%s %s\n",
 				       hal->hal_lifetime, hal->hal_preference, 
 				       (hal->hal_flag & MIP6_HAL_OWN)  ? "mine" : "",
-				       (hal->hal_flag & MIP6_HAL_STATIC)  ? "static" : "");
+				       (hal->hal_flag & MIP6_HAL_STATIC)  ? "static" : "",
+				       (hal->hal_flag & MIP6_HAL_RA  ? "ra" : ""));
 #endif /* MIP_HA */
 		}
 	}
@@ -533,7 +534,7 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 #ifdef MIP_HA			
 			/* add or update home agent list */
 			if (had_add_hal(hpfx, in6_gladdr,
-				in6_lladdr, hai_lifetime, hai_preference, 0) == NULL) {
+				in6_lladdr, hai_lifetime, hai_preference, MIP6_HAL_RA) == NULL) {
 				/* error = EINVAL; */
 				/* break; */
 				continue;
