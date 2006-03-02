@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.32 2006/02/22 11:03:50 mitsuya Exp $	*/
+/*	$KAME: had.c,v 1.33 2006/03/02 11:35:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -84,6 +84,7 @@ int keymanagement = 0;
 #ifdef MIP_IPV4MNPSUPPORT
 int ipv4mnpsupport = 0;
 #endif /* MIP_IPV4MNPSUPPORT */
+extern int do_proxy_dad;
 
 struct mip6stat mip6stat;
 struct mip6_hpfx_list hpfx_head; 
@@ -105,13 +106,15 @@ static void ha_lists_init(void);
 static void had_init_homeprefix(char *, int);
 static void terminate(int);
 static void command_show_hal(int, char *);
+static void command_show_config(int, char *);
 
 struct command_table show_command_table[] = {
 	{"bc", command_show_bc, "binding chache"},
 	{"kbc", command_show_kbc, "binding chache in kernel"},
 	{"stat", command_show_stat, "statisticts"},
 	{"hal", command_show_hal, "Home Agent List"},
-	{"callout", show_callout_table, "show callout table "},
+	{"callout", show_callout_table, "show callout table"},
+	{"config", command_show_config, "show current configuration for the HA"},
 	{NULL}
 };
 
@@ -588,6 +591,22 @@ terminate(dummy)
 	mipsock_nodetype_request(MIP6_NODETYPE_HOME_AGENT, 0);
 	unlink(HAD_PIDFILE);
 	exit(1);
+}
+
+static void
+command_show_config(s, dummy)
+	int s;
+	char *dummy;
+{
+	command_printf(s, "Current configuration\n");
+	command_printf(s, "debug: %s\n", debug ? "true" : "false");
+	command_printf(s, "name lookup: %s\n", namelookup ? "true" : "false");
+	command_printf(s, "command port: %d\n", command_port);
+	command_printf(s, "key management: %s\n", keymanagement ? "true" : "false");
+#ifdef MIP_IPV4MNPSUPPORT
+	command_printf(s, "ipv4mnpsupport: %s\n", ipv4mnpsupport ?  "true" : "false");
+#endif /* MIP_IPV4MNPSUPPORT */
+	command_printf(s, "proxy DAD: %s\n", do_proxy_dad ?  "true" : "false");
 }
 
 int

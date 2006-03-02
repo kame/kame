@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.25 2006/02/22 11:03:50 mitsuya Exp $	*/
+/*	$KAME: binding.c,v 1.26 2006/03/02 11:35:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -93,6 +93,7 @@ static void mip6_bc_set_refresh_timer(struct binding_cache *, int);
 static void mip6_bc_stop_refresh_timer(struct binding_cache *);
 #endif /* MIP_MN */
 
+int do_proxy_dad = 1;
 
 #ifndef MIP_MN
 /*
@@ -172,7 +173,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 	bc->bc_flags = flags;
 	bc->bc_seqno = seqno;
 	bc->bc_state = BC_STATE_VALID;
-	if (flags & IP6_MH_BU_HOME) {
+	if (do_proxy_dad && (flags & IP6_MH_BU_HOME)) {
 		bc->bc_state = BC_STATE_UNDER_DAD;
 	}
 	bc->bc_refcnt = 0;
@@ -935,7 +936,6 @@ bul_flush(hoainfo)
 	}
 };
 
-
 struct binding_update_list *
 bul_get_nohoa(cookie, coa, peer) 
 	char *cookie;
@@ -946,14 +946,12 @@ bul_get_nohoa(cookie, coa, peer)
 	struct binding_update_list *bul;
 
         for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
-		     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
-
+	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		if (LIST_EMPTY(&hoainfo->hinfo_bul_head))
 			continue;
 
         	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); 
-			bul; bul = LIST_NEXT(bul, bul_entry)) {
-
+		     bul; bul = LIST_NEXT(bul, bul_entry)) {
 			if (IN6_ARE_ADDR_EQUAL(peer, &bul->bul_peeraddr) &&
 				IN6_ARE_ADDR_EQUAL(coa, &bul->bul_coa) &&
 				(bcmp(cookie, &bul->bul_careof_cookie, 
@@ -984,18 +982,13 @@ command_show_bul(s, dummy)
 		     bul = LIST_NEXT(bul, bul_entry)) {
 
 			command_printf(s, "%s ", ip6_sprintf(&bul->bul_peeraddr));
-#ifndef MIP_MCOA
-			command_printf(s, "%s ", 
+			command_printf(s, "%s", 
 				ip6_sprintf(&hoainfo->hinfo_hoa));
-#else
+#ifdef MIP_MCOA
 			if (bul->bul_bid)
-				command_printf(s, "%s$%d ", 
-					ip6_sprintf(&hoainfo->hinfo_hoa), bul->bul_bid);
-			else
-				command_printf(s, "%s ", 
-					ip6_sprintf(&hoainfo->hinfo_hoa));
+				command_printf(s, "$%d", bul->bul_bid);
 #endif /* MIP_MCOA */
-			command_printf(s, "%s\n", 
+			command_printf(s, " %s\n", 
 				ip6_sprintf(&bul->bul_coa));
 			
 			command_printf(s,
@@ -1033,20 +1026,20 @@ command_show_kbul(s, dummy)
 	int sock, i;
 	struct mip6_hoainfo *hoainfo = NULL;
 	char ifname[IFNAMSIZ];
+	struct bul6info bulinfobuff[sizeof(struct bul6info) * 10];
 
-        sock = socket(AF_INET6, SOCK_DGRAM, 0);
-        if (sock < 0) {
-                perror("socket");
-                return;
-        }
+	sock = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (sock < 0) {
+		perror("socket");
+		return;
+	}
 
 	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
-		
 		memset(&bulreq, 0, sizeof(bulreq));
 		bulreq.ifbu_count = 0;
 		bulreq.ifbu_len = sizeof(struct if_bulreq) + sizeof(struct bul6info) * 10;
-		bulreq.ifbu_info = (struct bul6info *)malloc(sizeof(struct bul6info) * 10);
+		bulreq.ifbu_info = (struct bul6info *)bulinfobuff;
 		
 		memset(ifname, 0, sizeof(ifname));
 		if (if_indextoname(hoainfo->hinfo_ifindex, ifname) == NULL) 
@@ -1057,30 +1050,23 @@ command_show_kbul(s, dummy)
 		
 		if (ioctl(sock, SIOGBULIST, &bulreq) < 0) { 
 			perror("ioctl");
-			syslog(LOG_INFO, "ioctl is failed for %s\n", ifname);
-			free(bulreq.ifbu_info);
-			close(sock);
-			return;
+			command_printf(s, "ioctl to get buls is failed for %s\n", ifname);
+			break;
 		} 
         
 		/* dump bul */
-		for (i = 0; i < bulreq.ifbu_count; i ++) {
+		for (i = 0; i < bulreq.ifbu_count; i++) {
 			bul6 = bulreq.ifbu_info + i * sizeof(struct bul6info);
 			command_printf(s, "%s ", ip6_sprintf(&bul6->bul_peeraddr));
 
-#ifndef MIP_MCOA
-			command_printf(s, "%s ", 
+			command_printf(s, "%s", 
 				ip6_sprintf(&bul6->bul_hoa));
-#else
+#ifdef MIP_MCOA
 			if (bul6->bul_bid)
-				command_printf(s, "%s$%d ", 
-					ip6_sprintf(&bul6->bul_hoa), bul6->bul_bid);
-			else
-				command_printf(s, "%s ", 
-					ip6_sprintf(&bul6->bul_hoa));
+				command_printf(s, "$%d", bul6->bul_bid);
 #endif /* MIP_MCOA */
 
-			command_printf(s, "%s\n", 
+			command_printf(s, " %s\n", 
 				ip6_sprintf(&bul6->bul_coa));
 
 			command_printf(s,
@@ -1094,8 +1080,6 @@ command_show_kbul(s, dummy)
 				(bul6->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-');
 		}
         }
-
-	free(bulreq.ifbu_info);
 
 	close(sock);
         
