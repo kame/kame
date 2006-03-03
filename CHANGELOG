@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2816 2006/03/03 05:02:56 suz Exp $
+$KAME: CHANGELOG,v 1.2817 2006/03/03 11:21:23 keiichi Exp $
 
 <200603>
+Fri Mar  3 20:20:37 JST 2006	keiichi@iijlab.net
+	* netbsd/sys/netinet6/in6_pcb.c: send an IPV6_PATHMTU ancillary
+	data when sending a packet which size is larger than the path
+	mtu to the destination.
+
 2005-03-03  SUZUKI, Shinsuke <suz@alaxala.net>
 	* removed the dhcpv6-related programs, since they are 
 	  now maintained/developed/released in wide-dhcpv6 project in sourceforge.net.
