@@ -6,7 +6,7 @@ SUBDIR+=ifmcstat
 #SUBDIR+=racoon
 #SUBDIR+=pim6dd pim6sd 
 SUBDIR+=ip6addrctl
-SUBDIR+=dhcp6
+#SUBDIR+=dhcp6
 SUBDIR+=shisad
 
 .include <bsd.subdir.mk>
