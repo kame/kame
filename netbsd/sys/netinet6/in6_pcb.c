@@ -1,5 +1,5 @@
 /*	$NetBSD: in6_pcb.c,v 1.61.2.1 2004/04/28 05:56:07 jmc Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.4 2005/06/16 19:48:47 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.5 2006/03/03 11:19:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -673,6 +673,22 @@ in6_pcbnotify(table, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr,
 			    &sa6_dst->sin6_addr))
 				goto do_notify;
+		}
+
+		/*
+		 * If the error designates a new path MTU for a destination
+		 * and the application (associated with this socket) wanted to
+		 * know the value, notify. Note that we notify for all
+		 * disconnected sockets if the corresponding application
+		 * wanted. This is because some UDP applications keep sending
+		 * sockets disconnected.
+		 * XXX: should we avoid to notify the value to TCP sockets?
+		 */
+		if (cmd == PRC_MSGSIZE && (in6p->in6p_flags & IN6P_MTU) != 0 &&
+		    (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) ||
+		     IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &sa6_dst->sin6_addr))) {
+			ip6_notify_pmtu(in6p, (struct sockaddr_in6 *)dst,
+					(u_int32_t *)cmdarg);
 		}
 
 		/*
