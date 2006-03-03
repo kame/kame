@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.49 2006/02/11 06:11:29 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.50 2006/03/03 04:03:40 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1688,14 +1688,9 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			type = CHANGE_TO_INCLUDE_MODE;
 		}
 	}
-	if (timer_init) {
+
+	if (timer_init)
 		in6mm_src->i6ms_robvar = in6m->in6m_rti->rt6i_qrv;
-		mld_start_state_change_timer(in6m);
-	}
-	if (in6mm_src->i6ms_robvar <= 0) {
-		mld_stop_state_change_timer(in6m);
-		return;
-	}
 
 	/* MCLBYTES is the maximum length even if if_mtu is too big. */
 	max_len = (in6m->in6m_ifp->if_mtu < MCLBYTES) ?
@@ -1723,6 +1718,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			numsrc = in6mm_src->i6ms_alw->numsrc;
 		if (in6mm_src->i6ms_blk != NULL)
 			numsrc = max(numsrc, in6mm_src->i6ms_blk->numsrc);
+#if 0
 		/*
 		 * XXX following is tentative process. this should not 
 		 * be executed. this is just to avoid "loop" by timer.
@@ -1736,12 +1732,15 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			}
 			return;
 		}
+#endif
 	}
 
 	if (m == NULL) {
 		mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 		if (mldh == NULL) {
-			mldlog((LOG_DEBUG, "mld_send_state_change_report: error preparing new report header.\n"));
+			mldlog((LOG_DEBUG,
+			    "mld_send_state_change_report: "
+			    "error preparing new report header.\n"));
 			return; /* robvar is not reduced */
 		}
 		m = *m0;
@@ -1783,10 +1782,15 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			/* XXX source address insert didn't finished.
 			* strange... robvar is not reduced */
 		}
+
+		if (m != NULL) {
+			mld_sendbuf(m, in6m->in6m_ifp);
+			m = NULL;
+		}
+
 		if (timer_init)
 			mld_start_state_change_timer(in6m);
-
-		if (--in6mm_src->i6ms_robvar != 0) {
+		if (--in6mm_src->i6ms_robvar == 0) {
 			mld_stop_state_change_timer(in6m);
 			return;
 		}
@@ -1839,10 +1843,13 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
 		}
+
 		if (timer_init)
 			mld_start_state_change_timer(in6m);
-		if (--in6mm_src->i6ms_robvar != 0)
+		if (--in6mm_src->i6ms_robvar == 0) {
+			mld_stop_state_change_timer(in6m);
 			return;
+		}
 
 		if (in6mm_src->i6ms_toin != NULL) {
 			/* For TO_IN list, it MUST be deleted
