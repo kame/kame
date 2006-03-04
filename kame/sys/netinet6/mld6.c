@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.114 2005/07/27 06:19:27 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.115 2006/03/04 06:51:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -437,7 +437,8 @@ mld_input(m, off)
 	 *
 	 * In Non-Listener state, we simply don't have a membership record.
 	 * In Delaying Listener state, our timer is running (in6m->in6m_timer)
-	 * In Idle Listener state, our timer is not running (in6m->in6m_timer==0)
+	 * In Idle Listener state, our timer is not running
+	 * (in6m->in6m_timer==IN6M_TIMER_UNDEF)
 	 *
 	 * The flag is in6m->in6m_state, it is set to MLD_OTHERLISTENER if
 	 * we have heard a report from another member, or MLD_IREPORTEDLAST
@@ -819,6 +820,7 @@ in6_delmulti(in6m)
 		 * No remaining claims to this record; let MLD6 know
 		 * that we are leaving the multicast group.
 		 */
+		mld_stoptimer(in6m);
 		mld_stop_listening(in6m);
 
 		/*
