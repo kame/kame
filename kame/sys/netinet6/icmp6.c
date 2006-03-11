@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.416 2006/03/01 05:21:08 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.417 2006/03/11 16:32:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3091,8 +3091,8 @@ icmp6_redirect_output(m0, rt)
 		 * - "attach as much as possible" is the goal
 		 * - pad if not aligned (original size can be guessed by
 		 *   original ip6 header)
-		 * Following code adds the padding if it is simple enough,
-		 * and truncates if not.
+		 * The following code always adjusts the packet by truncation
+		 * if adjustment is necessary.
 		 */
 		if (len - sizeof(*nd_opt_rh) < m0->m_pkthdr.len) {
 			/* not enough room, truncate */
