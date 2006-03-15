@@ -1,4 +1,4 @@
-/*      $KAME: rr.c,v 1.4 2005/05/25 01:49:24 keiichi Exp $  */
+/*      $KAME: rr.c,v 1.5 2006/03/15 09:16:44 t-momose Exp $  */
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -142,17 +142,14 @@ init_nonces()
 	memset(&nonces_array, 0, sizeof(nonces_array));
 	nonces_head = &nonces_array[0];
 	
-	/* ajusting next pointer */
-	for (i = 0; i < (MIP6_NONCE_HISTORY - 1); i++) {
-		nonces_array[i].next  = &nonces_array[i + 1];
+	/* ajusting next and prev pointers  */
+	for (i = 0; i < MIP6_NONCE_HISTORY; i++) {
+		nonces_array[i].next  =
+			&nonces_array[(i == MIP6_NONCE_HISTORY - 1) ? 0 : i + 1];
+		nonces_array[i].prev  =
+			&nonces_array[(i == 0) ? MIP6_NONCE_HISTORY - 1 : i - 1];
 		LIST_INIT(&nonces_array[i].nb_head);
 	}
-	nonces_array[MIP6_NONCE_HISTORY - 1].next = &nonces_array[0];
-	
-	/* ajusting prev pointer */
-	for (i = 1; i < MIP6_NONCE_HISTORY; i++)
-		nonces_array[i].prev  = &nonces_array[i - 1];
-	nonces_array[0].prev = &nonces_array[MIP6_NONCE_HISTORY - 1];
 
 	nonces_head = generate_nonces(&nonces_array[0]);
 };
