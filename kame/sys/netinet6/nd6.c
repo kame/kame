@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.395 2006/02/12 07:16:08 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.396 2006/03/17 07:23:31 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -169,6 +169,7 @@ static void nd6_rtdrain __P((struct rtentry *, struct rttimer *));
 #endif
 static struct llinfo_nd6 *nd6_free __P((struct rtentry *, int));
 static void nd6_llinfo_timer __P((void *));
+static void clear_llinfo_pqueue __P((struct llinfo_nd6 *));
 
 #ifdef __NetBSD__
 struct callout nd6_slowtimo_ch = CALLOUT_INITIALIZER;
@@ -605,9 +606,9 @@ nd6_llinfo_timer(arg)
 				 * assuming every packet in ln_hold has the
 				 * same IP header
 				 */
-				ln->ln_hold = NULL;
 				icmp6_error2(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_ADDR, 0, rt->rt_ifp);
+				clear_llinfo_pqueue(ln);
 			}
 			if (rt)
 				(void)nd6_free(rt, 0);
@@ -1704,8 +1705,7 @@ nd6_rtrequest(req, rt, info)
 		nd6_llinfo_settimer(ln, -1);
 		rt->rt_llinfo = 0;
 		rt->rt_flags &= ~RTF_LLINFO;
-		if (ln->ln_hold)
-			m_freem(ln->ln_hold);
+		clear_llinfo_pqueue(ln);
 		Free((caddr_t)ln);
 	}
 }
@@ -2557,7 +2557,7 @@ again:
 		while (i >= nd6_maxqueuelen) {
 			m_hold = ln->ln_hold;
 			ln->ln_hold = ln->ln_hold->m_nextpkt;
-			m_free(m_hold);
+			m_freem(m_hold);
 			i--;
 		}
 	} else {
@@ -2739,8 +2739,6 @@ void
 nd6_drain()
 {
 	struct llinfo_nd6 *ln, *nln;
-	int count = 0;
-	struct mbuf *mold;
 	int s;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2752,15 +2750,25 @@ nd6_drain()
 	for (ln = llinfo_nd6.ln_next; ln && ln != &llinfo_nd6; ln = nln) {
 		nln = ln->ln_next;
 
-		mold = ln->ln_hold;
-		ln->ln_hold = NULL;
-
-		if (mold) {
-			m_freem(mold);
-			count++;
-		}
+		clear_llinfo_pqueue(ln);
 	}
 	splx(s);
+}
+
+static void 
+clear_llinfo_pqueue(ln)
+	struct llinfo_nd6 *ln;
+{
+	struct mbuf *m_hold, *m_hold_next;
+
+	for (m_hold = ln->ln_hold; m_hold; m_hold = m_hold_next) {
+		m_hold_next = m_hold->m_nextpkt;
+		m_hold->m_nextpkt = NULL;
+		m_freem(m_hold);
+	}
+
+	ln->ln_hold = NULL;
+	return;
 }
 
 #ifndef __FreeBSD__
