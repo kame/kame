@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2820 2006/03/17 07:23:30 suz Exp $
+$KAME: CHANGELOG,v 1.2821 2006/03/22 18:48:46 suz Exp $
 
 <200603>
+2006-03-22  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet6/nd6.c: fixed a kernel crash due to a double-free
+	introduced in the below fix
+
 2006-03-17  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet6/nd6.c: fixed a memory leak for an unresolved
 	packet in ND queue

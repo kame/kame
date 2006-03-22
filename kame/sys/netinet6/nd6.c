@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.396 2006/03/17 07:23:31 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.397 2006/03/22 18:48:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -602,12 +602,18 @@ nd6_llinfo_timer(arg)
 		} else {
 			struct mbuf *m = ln->ln_hold;
 			if (m) {
+				struct mbuf *m0;
+
 				/*
 				 * assuming every packet in ln_hold has the
 				 * same IP header
 				 */
+				m0 = m->m_nextpkt;
+				m->m_nextpkt = NULL;
 				icmp6_error2(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_ADDR, 0, rt->rt_ifp);
+
+				ln->ln_hold = m0;
 				clear_llinfo_pqueue(ln);
 			}
 			if (rt)
