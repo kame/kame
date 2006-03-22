@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.93 2005/10/17 14:40:02 suz Exp $	*/
+/*	$KAME: config.c,v 1.94 2006/03/22 09:05:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -771,7 +771,7 @@ get_prefix(struct rainfo *rai)
 		{
 			p = (u_char *)&pp->prefix;
 			ep = (u_char *)(&pp->prefix + 1);
-			while (m < lim)
+			while (m < lim && p < ep)
 				*p++ &= *m++;
 			while (p < ep)
 				*p++ = 0x00;
