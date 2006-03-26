@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.52 2006/03/26 10:54:55 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.53 2006/03/26 11:01:49 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -834,9 +834,14 @@ mld_start_state_change_timer(in6m)
 {
 	struct in6_multi_source *i6ms = in6m->in6m_source;
 
+	mldlog((LOG_DEBUG, "%s for %s\n",
+	    __FUNCTION__, ip6_sprintf(&in6m->in6m_addr)));
+
 	if (i6ms == NULL)
 		return;
 	i6ms->i6ms_timer = MLD_RANDOM_DELAY(MLDV2_UNSOL_INTVL * hz);
+	mldlog((LOG_DEBUG, "start %s's state-change-timer for %d msec\n",
+		ip6_sprintf(&in6m->in6m_addr), i6ms->i6ms_timer * 1000 / hz));
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(i6ms->i6ms_timer_ch, i6ms->i6ms_timer,
 	    (void (*) __P((void *)))mld_state_change_timeo, in6m);
@@ -854,6 +859,9 @@ mld_stop_state_change_timer(in6m)
 	struct in6_multi *in6m;
 {
 	struct in6_multi_source *i6ms = in6m->in6m_source;
+
+	mldlog((LOG_DEBUG, "%s for %s\n",
+	    __FUNCTION__, ip6_sprintf(&in6m->in6m_addr)));
 
 	if (i6ms == NULL)
 		return;
@@ -873,6 +881,9 @@ mld_state_change_timeo(in6m)
 	struct mbuf *sm = NULL;
 	int sbuflen = 0;
 	struct in6_multi_source *i6ms = in6m->in6m_source;
+
+	mldlog((LOG_DEBUG, "%s for %s\n",
+	    __FUNCTION__, ip6_sprintf(&in6m->in6m_addr)));
 
 	if (!in6_is_mld_target(&in6m->in6m_addr))
 		return;
@@ -919,6 +930,9 @@ mld_sendpkt(in6m, type, dst)
 	struct ifnet *ifp = in6m->in6m_ifp;
 	struct in6_ifaddr *ia = NULL;
 
+	mldlog((LOG_DEBUG, "%s for %s\n",
+	    __FUNCTION__, ip6_sprintf(&in6m->in6m_addr)));
+ 
 	/*
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
@@ -1057,6 +1071,8 @@ mld_sendbuf(mh, ifp)
 	struct mbuf *md;
 	struct in6_ifaddr *ia = NULL;
 
+	mldlog((LOG_DEBUG, "%s\n", __FUNCTION__));
+
 	/*
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
@@ -1095,6 +1111,7 @@ mld_sendbuf(mh, ifp)
 	for (i = 0; i < mld_rhdr->mld_grpnum; i++) {
 		mld_ghdr = (struct mld_group_record_hdr *)
 					((char *)mld_rhdr + len);
+		mldlog((LOG_DEBUG, "  %s\n", ip6_sprintf(&mld_ghdr->group)));
 		len += ghdrlen + SOURCE_RECORD_LEN(mld_ghdr->numsrc);
 		mld_ghdr->numsrc = htons(mld_ghdr->numsrc);
 	}
@@ -1277,7 +1294,8 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 			} else {
 				in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
 				in6mm_src->i6ms_rec->numsrc = 0;
-				in6m->in6m_timer = min(in6m->in6m_timer, timer_g);
+				in6m->in6m_timer =
+				    min(in6m->in6m_timer, timer_g);
 			}
 			in6m->in6m_state = MLD_G_QUERY_PENDING_MEMBER;
 			break;
@@ -1601,7 +1619,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG,
 				    "mld_send_current_state_report: "
-				    "error preparing additional report"
+				    "error preparing additional report "
 				    "header.\n"));
 				return ENOBUFS;
 			}
@@ -1644,6 +1662,9 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	u_int16_t max_len;
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	struct mld_hdr *mldh;
+
+	mldlog((LOG_DEBUG, "%s for %s\n",
+	    __FUNCTION__, ip6_sprintf(&in6m->in6m_addr)));
 
 	if (!in6_is_mld_target(&in6m->in6m_addr) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
@@ -1824,7 +1845,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG,
 					"mld_send_state_change_report: "
-					"error preparing additional report"
+					"error preparing additional report "
 					"header.\n"));
 				return;
 			}
