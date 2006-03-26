@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.53 2006/03/26 11:01:49 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.54 2006/03/26 11:03:45 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -951,8 +951,8 @@ mld_sendpkt(in6m, type, dst)
 
 	/* fill src/dst here */
 	ip6 = mtod(mh, struct ip6_hdr *);
-	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
-	ip6->ip6_dst = dst ? *dst : in6m->in6m_addr;
+	ip6->ip6_src = ia != NULL ? ia->ia_addr.sin6_addr : in6addr_any;
+	ip6->ip6_dst = dst != NULL ? *dst : in6m->in6m_addr;
 
 	mldh->mld_addr = in6m->in6m_addr;
 	in6_clearscope(&mldh->mld_addr); /* XXX */
@@ -988,10 +988,10 @@ mld_sendpkt(in6m, type, dst)
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 	ip6_output(mh, &ip6_opts, NULL,
-		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
+		   ia != NULL ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
 #else
 	ip6_output(mh, &ip6_opts, NULL,
-		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
+		   ia != NULL ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
 #endif
 }
 
@@ -1096,7 +1096,7 @@ mld_sendbuf(mh, ifp)
 
 	/* fill src/dst here */
 	ip6 = mtod(mh, struct ip6_hdr *);
-	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
+	ip6->ip6_src = ia != NULL ? ia->ia_addr.sin6_addr : in6addr_any;
 	ip6->ip6_dst = in6addr_linklocal_allv2routers;
 	 /*
 	  * XXX: it should be impossible to fail at these functions here,
@@ -1128,10 +1128,10 @@ mld_sendbuf(mh, ifp)
 	icmp6_ifstat_inc(ifp, ifs6_out_mldreport);
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 	ip6_output(mh, &ip6_opts, NULL,
-		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
+		   ia != NULL ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
 #else
 	ip6_output(mh, &ip6_opts, NULL,
-		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
+		   ia != NULL ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
 #endif
 }
 
