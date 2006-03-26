@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.50 2006/03/03 04:03:40 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.51 2006/03/26 10:52:23 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -377,7 +377,7 @@ mld_start_group_timer(in6m)
 {
 	struct timeval now;
 
-	mldlog((LOG_DEBUG, "start %s's group-timer for %d msec",
+	mldlog((LOG_DEBUG, "start %s's group-timer for %d msec\n",
 		ip6_sprintf(&in6m->in6m_addr), in6m->in6m_timer * 1000 / hz));
 	microtime(&now);
 	in6m->in6m_timer_expire.tv_sec = now.tv_sec + in6m->in6m_timer / hz;
@@ -440,7 +440,7 @@ mld_group_timeo(in6m)
 	default:
 		/* Current-State Record timer */
 		if (in6m->in6m_rti->rt6i_type == MLD_V1_ROUTER) {
-			mldlog((LOG_DEBUG, "mld_group_timeo: v1 report"));
+			mldlog((LOG_DEBUG, "mld_group_timeo: v1 report\n"));
 			mld_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
 			in6m->in6m_state = MLD_IREPORTEDLAST;
 			break;
@@ -449,7 +449,7 @@ mld_group_timeo(in6m)
 		    in6m->in6m_state == MLD_SG_QUERY_PENDING_MEMBER) {
 		    	struct mbuf *m = NULL;
 			int cbuflen = 0;
-			mldlog((LOG_DEBUG, "mld_group_timeo: v2 report"));
+			mldlog((LOG_DEBUG, "mld_group_timeo: v2 report\n"));
 			mld_send_current_state_report(&m, &cbuflen, in6m);
 			if (m)
 				mld_sendbuf(m, in6m->in6m_ifp);
@@ -901,7 +901,7 @@ mld_state_change_timeo(in6m)
 	 * It is only the case that robvar was not reduced here.
 	 * (XXX rarely, QRV may be changed in a same timing.)
 	 */
-	mldlog((LOG_DEBUG, "mld_state_change_timeo: handles pending report"));
+	mldlog((LOG_DEBUG, "mld_state_change_timeo: handles pending report\n"));
 	if (i6ms->i6ms_robvar == in6m->in6m_rti->rt6i_qrv) {
 	    	/* 
 		 * immediately advertise the calculated MLD report,
@@ -1557,7 +1557,8 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	if (m == NULL) {
 		mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 		if (mldh == NULL) {
-			mldlog((LOG_DEBUG, "mld_send_current_state_report: error preparing new report header\n"));
+			mldlog((LOG_DEBUG, "mld_send_current_state_report: "
+			    "error preparing new report header\n"));
 			return ENOBUFS;
 		}
 		m = *m0;
@@ -1573,7 +1574,9 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			m = NULL;
 			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
-				mldlog((LOG_DEBUG, "mld_send_current_state_report: error preparing new report header.\n"));
+				mldlog((LOG_DEBUG,
+				    "mld_send_current_state_report: "
+				    "error preparing new report header.\n"));
 				return ENOBUFS;
 			}
 			m = *m0;
@@ -1588,7 +1591,9 @@ mld_send_current_state_report(m0, buflenp, in6m)
 		 */
 		if (mld_create_group_record(m, buflenp, in6m, numsrc,
 					   &src_done, type) != numsrc) {
-			mldlog((LOG_DEBUG, "mld_send_current_state_report: error of sending MODE_IS_EXCLUDE report?\n"));
+			mldlog((LOG_DEBUG,
+			    "mld_send_current_state_report: "
+			    "error of sending MODE_IS_EXCLUDE report?\n"));
 			m_freem(m);
 			return EOPNOTSUPP; /* XXX source address insert didn't
 					    * finished. strange... */
@@ -1611,7 +1616,10 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			m = NULL;
 			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
-				mldlog((LOG_DEBUG, "mld_send_current_state_report: error preparing additional report header.\n"));
+				mldlog((LOG_DEBUG,
+				    "mld_send_current_state_report: "
+				    "error preparing additional report"
+				    "header.\n"));
 				return ENOBUFS;
 			}
 			m = *m0;
@@ -1758,7 +1766,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG,
 					"mld_send_state_change_report: "
-					"error preparing new report header.\n"));
+					"error preparing new report header\n"));
 				return; 
 			}
 			m = *m0;
@@ -1833,7 +1841,8 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG,
 					"mld_send_state_change_report: "
-					"error preparing additional report header.\n"));
+					"error preparing additional report"
+					"header.\n"));
 				return;
 			}
 			m = *m0;
@@ -1883,7 +1892,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		(in6mm_src->i6ms_blk->numsrc != 0)) {
 		type = BLOCK_OLD_SOURCES;
 	} else {
-		mldlog((LOG_DEBUG, "improper allow list and block list"));
+		mldlog((LOG_DEBUG, "improper allow list and block list\n"));
 		return;
 	}
 
@@ -1907,7 +1916,8 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG, 
 					"mld_send_state_change_report: "
-					"error preparing additional report header.\n"));
+					"error preparing additional report "
+					"header.\n"));
 				return;
 			}
 			m = *m0;
@@ -2927,14 +2937,18 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 			return NULL;
 		}
 		if (newhead != NULL) {
-			mldlog((LOG_DEBUG, "in6_addmultisrc: non-NULL newhead\n"));
+			mldlog((LOG_DEBUG,
+			    "in6_addmultisrc: non-NULL newhead\n"));
 			/*
 			 * Merge new source list to current pending report's 
 			 * source list.
 			 */
-			if ((*errorp = in6_merge_msf_state
-					(in6m, newhead, newmode, newnumsrc)) > 0) {
-				mldlog((LOG_DEBUG, "in6_addmultisrc: in6_merge_msf_state failed\n"));
+			*errorp = in6_merge_msf_state(in6m, newhead, newmode,
+			    newnumsrc);
+			if (*errorp > 0) {
+				mldlog((LOG_DEBUG,
+				    "in6_addmultisrc: "
+				    "in6_merge_msf_state failed\n"));
 				/* 
 				 * State-Change Report will not be sent. Just 
 				 * return immediately. 
@@ -2968,20 +2982,25 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 					else
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
-				mldlog((LOG_DEBUG, "in6_addmultisrc: send current status\n"));
+				mldlog((LOG_DEBUG, "in6_addmultisrc: "
+				    "send current status\n"));
 				mld_send_state_change_report
 					(&m, &buflen, in6m, type, timer_init);
 			}
 			 else {
-				mldlog((LOG_DEBUG, "in6_addmultisrc: do nothing since there's no change (mode=%d->%d, numsrc=%d->%d)\n", curmode, newmode, curnumsrc, newnumsrc));
+				mldlog((LOG_DEBUG, "in6_addmultisrc: "
+				    "do nothing since there's no change "
+				    "(mode=%d->%d, numsrc=%d->%d)\n",
+				    curmode, newmode, curnumsrc, newnumsrc));
 			}
 		} else {
-			mldlog((LOG_DEBUG, "in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n"));
+			mldlog((LOG_DEBUG, "in6_addmultisrc: "
+			    "clear MLDv2 stat since I'm MLDv1\n"));
 			/*
 			 * If MSF's pending records exist, they must be deleted.
-			 * Otherwise, ALW or BLK record will be blocked or pending
-			 * list will never be cleaned when upstream router 
-			 * switches to MLDv2. XXX
+			 * Otherwise, ALW or BLK record will be blocked or
+			 * pending list will never be cleaned when upstream
+			 * router switches to MLDv2. XXX
 			 */
 			 in6_clear_all_pending_report(in6m);
 		 }
@@ -3127,7 +3146,9 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 	if (newhead != NULL) {
 		if ((*error = in6_merge_msf_state
 				(in6m, newhead, newmode, newnumsrc)) > 0) {
-			mldlog((LOG_DEBUG, "in6_delmulti: state-change report not sent, (error=%d)\n", *error));
+			mldlog((LOG_DEBUG, "in6_delmulti: "
+			    "state-change report not sent, (error=%d)\n",
+			    *error));
 			/* State-Change Report will not be sent. Just return 
 			 * immediately. */
 			FREE(newhead, M_MSFILTER);
@@ -3254,7 +3275,8 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			if (numsrc != 0) {
 				mldlog((LOG_DEBUG,
-				    "in6_modmulti: source filter not supported for %s\n",
+				    "in6_modmulti: "
+				    "source filter not supported for %s\n",
 				    ip6_sprintf(&in6m->in6m_addr)));
 				splx(s);
 				*error = EINVAL;
