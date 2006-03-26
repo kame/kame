@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.55 2006/03/26 11:34:17 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.56 2006/03/26 22:31:19 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -252,10 +252,8 @@ static void mld_set_hostcompat(struct ifnet *, struct router6_info *, int);
 static int mld_record_queried_source(struct in6_multi *, struct mld_hdr *,
 	u_int16_t);
 static void mld_send_all_current_state_report(struct ifnet *);
-static int mld_send_current_state_report(struct mbuf **, int *,
-	struct in6_multi *);
-static void mld_send_state_change_report(struct mbuf **, int *,
-	struct in6_multi *, u_int8_t, int);
+static int mld_send_current_state_report(struct in6_multi *);
+static void mld_send_state_change_report(struct in6_multi *, u_int8_t, int);
 
 static void mld_start_listening(struct in6_multi *, u_int8_t);
 static void mld_stop_listening(struct in6_multi *);
@@ -265,7 +263,7 @@ static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
 	int);
 static struct router6_info *find_rt6i(struct ifnet *);
 static struct router6_info *init_rt6i(struct ifnet *);
-static int mld_create_group_record(struct mbuf *, int *, struct in6_multi *,
+static int mld_create_group_record(struct mbuf *, struct in6_multi *,
 	u_int16_t, u_int16_t *, u_int8_t);
 static void mld_cancel_pending_response(struct ifnet *, struct router6_info *);
 
@@ -354,7 +352,7 @@ find_rt6i(ifp)
         return rti;
 }
 
-
+/* timer for the current-state report of a group */
 static void
 mld_start_group_timer(in6m)
 	struct in6_multi *in6m;
@@ -431,12 +429,8 @@ mld_group_timeo(in6m)
 		} 
 		if (in6m->in6m_state == MLD_G_QUERY_PENDING_MEMBER ||
 		    in6m->in6m_state == MLD_SG_QUERY_PENDING_MEMBER) {
-		    	struct mbuf *m = NULL;
-			int cbuflen = 0;
 			mldlog((LOG_DEBUG, "mld_group_timeo: v2 report\n"));
-			mld_send_current_state_report(&m, &cbuflen, in6m);
-			if (m)
-				mld_sendbuf(m, in6m->in6m_ifp);
+			mld_send_current_state_report(in6m);
 			in6m->in6m_state = MLD_OTHERLISTENER;
 		}
 		break;
@@ -476,9 +470,6 @@ mld_start_listening(in6m, type)
 	struct in6_multi *in6m;
 	u_int8_t type;			/* State-Change report type */
 {
-	struct mbuf *m = NULL;
-	int buflen = 0;
-	int timer_init = 1;		/* indicate timer initialization */
 	struct in6_addr all_in6;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
@@ -512,8 +503,8 @@ mld_start_listening(in6m, type)
 			mldlog((LOG_DEBUG,
 			    "mld_start_listening: send v2 report for %s\n",
 			    ip6_sprintf(&in6m->in6m_addr)));
-			mld_send_state_change_report(&m, &buflen, in6m,
-			    type, timer_init);
+			mld_send_state_change_report(in6m, type, 1);
+			mld_start_state_change_timer(in6m);
 		} else {
 			mldlog((LOG_DEBUG,
 			    "mld_start_listening: send v1 report for %s\n",
@@ -815,6 +806,7 @@ end:
 	return;
 }
 
+/* timer for the answer to a general query */
 static void
 mld_interface_timeo(rti)
 	struct router6_info *rti;
@@ -880,8 +872,6 @@ static void
 mld_state_change_timeo(in6m)
 	struct in6_multi *in6m;
 {
-	struct mbuf *sm = NULL;
-	int sbuflen = 0;
 	struct in6_multi_source *i6ms = in6m->in6m_source;
 
 	mldlog((LOG_DEBUG, "%s for %s\n",
@@ -897,19 +887,10 @@ mld_state_change_timeo(in6m)
 	 * It is only the case that robvar was not reduced here.
 	 * (XXX rarely, QRV may be changed in a same timing.)
 	 */
-	mldlog((LOG_DEBUG, "mld_state_change_timeo: handles pending report\n"));
 	if (i6ms->i6ms_robvar == in6m->in6m_rti->rt6i_qrv) {
-	    	/* 
-		 * immediately advertise the calculated MLD report,
-		 * so you don't have to update ifp for the buffered 
-		 * MLD report message.
-		 */
-		mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 1);
-		sm = NULL;
+		mld_send_state_change_report(in6m, 0, 1);
 	} else if (i6ms->i6ms_robvar > 0) {
-		mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 0);
-		if (sm != NULL)
-			mld_sendbuf(sm, in6m->in6m_ifp);
+		mld_send_state_change_report(in6m, 0, 0);
 	}
 
 	/* schedule the next state change report */
@@ -934,7 +915,7 @@ mld_sendpkt(in6m, type, dst)
 
 	mldlog((LOG_DEBUG, "%s for %s\n",
 	    __FUNCTION__, ip6_sprintf(&in6m->in6m_addr)));
- 
+
 	/*
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
@@ -1482,8 +1463,6 @@ static void
 mld_send_all_current_state_report(ifp)
 	struct ifnet *ifp;
 {
-	struct mbuf *m = NULL;
-	int buflen = 0;
 	struct in6_multi *in6m;
 	struct in6_multistep step;
 
@@ -1493,13 +1472,11 @@ mld_send_all_current_state_report(ifp)
 		    !in6_is_mld_target(&in6m->in6m_addr))
 			goto next_multi;
 
-		if (mld_send_current_state_report(&m, &buflen, in6m) != 0)
+		if (mld_send_current_state_report(in6m) != 0)
 			return;
 next_multi:
 		IN6_NEXT_MULTI(step, in6m);
 	}
-	if (m != NULL)
-		mld_sendbuf(m, ifp);
 }
 
 /*
@@ -1507,13 +1484,10 @@ next_multi:
  * response.
  */
 static int
-mld_send_current_state_report(m0, buflenp, in6m)
-	struct mbuf **m0;	/* mbuf is inherited to put multiple group
-				 * records in one message */
-	int *buflenp;
+mld_send_current_state_report(in6m)
 	struct in6_multi *in6m;
 {
-	struct mbuf *m = *m0;
+	struct mbuf *m = NULL;
 	u_int16_t max_len;
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	u_int8_t type = 0;
@@ -1557,42 +1531,19 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			    - rhdrlen - ghdrlen) / addrlen;
 	}
 
-	if (m == NULL) {
-		mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-		if (mldh == NULL) {
-			mldlog((LOG_DEBUG, "mld_send_current_state_report: "
-			    "error preparing new report header\n"));
-			return ENOBUFS;
-		}
-		m = *m0;
-		*buflenp = 0;
-	} else {
-		if (ghdrlen + SOURCE_RECORD_LEN(numsrc) > MCLBYTES - *buflenp) {
-			/*
-			 * When remaining buffer is not enough to insert new 
-			 * group record, send current buffer and create a new 
-			 * buffer for this record.
-			 */
-			mld_sendbuf(m, in6m->in6m_ifp);
-			m = NULL;
-			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-			if (mldh == NULL) {
-				mldlog((LOG_DEBUG,
-				    "mld_send_current_state_report: "
-				    "error preparing new report header.\n"));
-				return ENOBUFS;
-			}
-			m = *m0;
-			*buflenp = 0;
-		}
-	} /* m == NULL */
+	mldh = mld_allocbuf(&m, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+	if (mldh == NULL) {
+		mldlog((LOG_DEBUG, "mld_send_current_state_report: "
+		    "error preparing new report header\n"));
+		return ENOBUFS;
+	}
 
 	if (type == MODE_IS_EXCLUDE) {
 		/*
 		 * The number of sources of MODE_IS_EXCLUDE record is already
 		 * adjusted to fit in one buffer.
 		 */
-		if (mld_create_group_record(m, buflenp, in6m, numsrc,
+		if (mld_create_group_record(m, in6m, numsrc,
 					   &src_done, type) != numsrc) {
 			mldlog((LOG_DEBUG,
 			    "mld_send_current_state_report: "
@@ -1604,7 +1555,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	} else {
 		while (1) {
 			/* XXX Some security implication? */
-			src_once = mld_create_group_record(m, buflenp, in6m,
+			src_once = mld_create_group_record(m, in6m,
 							   numsrc, &src_done,
 							   type);
 
@@ -1616,8 +1567,8 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			 * with remaining sources.
 			 */
 			mld_sendbuf(m, in6m->in6m_ifp);
-			m = NULL;
-			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			mldh = mld_allocbuf(&m, rhdrlen, in6m,
+			    MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG,
 				    "mld_send_current_state_report: "
@@ -1625,8 +1576,6 @@ mld_send_current_state_report(m0, buflenp, in6m)
 				    "header.\n"));
 				return ENOBUFS;
 			}
-			m = *m0;
-			*buflenp = 0;
 		} /* while */
 	}
 
@@ -1653,14 +1602,12 @@ mld_send_current_state_report(m0, buflenp, in6m)
  * List-Change report is not sent and kept as a scheduled report.
  */
 static void
-mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
-	struct mbuf **m0;
-	int *buflenp;
+mld_send_state_change_report(in6m, type, timer_init)
 	struct in6_multi *in6m;
 	u_int8_t type;
 	int timer_init;		/* set this when IPMulticastListen() invoked */
 {
-	struct mbuf *m = *m0;
+	struct mbuf *m = NULL;
 	u_int16_t max_len;
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	struct mld_hdr *mldh;
@@ -1749,35 +1696,12 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 #endif
 	}
 
-	if (m == NULL) {
-		mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-		if (mldh == NULL) {
-			mldlog((LOG_DEBUG,
-			    "mld_send_state_change_report: "
-			    "error preparing new report header.\n"));
-			return; /* robvar is not reduced */
-		}
-		m = *m0;
-		*buflenp = 0;
-	} else {
-		if (ghdrlen + SOURCE_RECORD_LEN(numsrc) > MCLBYTES - *buflenp) {
-			/*
-			 * When remaining buffer is not enough to insert new 
-			 * group record, send current buffer and create a new
-			 * buffer for this record.
-			 */
-			mld_sendbuf(m, in6m->in6m_ifp);
-			m = NULL;
-			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-			if (mldh == NULL) {
-				mldlog((LOG_DEBUG,
-					"mld_send_state_change_report: "
-					"error preparing new report header\n"));
-				return; 
-			}
-			m = *m0;
-			*buflenp = 0;
-		}
+	mldh = mld_allocbuf(&m, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+	if (mldh == NULL) {
+		mldlog((LOG_DEBUG,
+		    "mld_send_state_change_report: "
+		    "error preparing new report header.\n"));
+		return; /* robvar is not reduced */
 	}
 
 	/* creates records based on type and finish this function */
@@ -1786,7 +1710,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		 * The number of sources of CHANGE_TO_EXCLUDE_MODE 
 		 * record is already adjusted to fit in one buffer.
 		 */
-		if (mld_create_group_record(m, buflenp, in6m, numsrc,
+		if (mld_create_group_record(m, in6m, numsrc,
 					    &src_done, type) != numsrc) {
 			mldlog((LOG_DEBUG, "mld_send_state_change_report: "
 				"error of sending "
@@ -1802,13 +1726,11 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			m = NULL;
 		}
 
-		if (timer_init)
-			mld_start_state_change_timer(in6m);
-		if (--in6mm_src->i6ms_robvar == 0) {
-			mld_stop_state_change_timer(in6m);
+		in6mm_src->i6ms_robvar--;
+		if (in6mm_src->i6ms_robvar != 0)
 			return;
-		}
 
+		/* robustness variable is 0 -> cease the report timer */
 		if (in6mm_src->i6ms_toex != NULL) {
 			/* For TO_EX list, it MUST be deleted after 
 			 * retransmission is done. This is because 
@@ -1818,16 +1740,15 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			 FREE(in6mm_src->i6ms_toex->head, M_MSFILTER);
 			 FREE(in6mm_src->i6ms_toex, M_MSFILTER);
 			 in6mm_src->i6ms_toex = NULL;
-		 }
-		 /* Prepare scheduled Source-List-Change Report */
+		}
+
+		/* Prepare scheduled Source-List-Change Report if necessary */
 		 if ((in6mm_src->i6ms_alw != NULL &&
 		     in6mm_src->i6ms_alw->numsrc > 0) ||
 		     (in6mm_src->i6ms_blk != NULL &&
 		     in6mm_src->i6ms_blk->numsrc > 0)) {
 			in6mm_src->i6ms_robvar = in6m->in6m_rti->rt6i_qrv;
-			mld_start_state_change_timer(in6m);
-		} else {
-			mld_stop_state_change_timer(in6m);
+			return;
 		}
 		return;
 	}
@@ -1835,15 +1756,15 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	if (type == CHANGE_TO_INCLUDE_MODE) {
 		while (1) {
 			/* XXX Some security implication? */
-			src_once = mld_create_group_record(m,
-					buflenp, in6m, numsrc,
+			src_once = mld_create_group_record(m, in6m, numsrc,
 					&src_done, type);
 			if (numsrc <= src_done)
 				break;	/* finish insertion */
 
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
-			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			mldh = mld_allocbuf(&m, rhdrlen, in6m,
+			    MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG,
 					"mld_send_state_change_report: "
@@ -1851,21 +1772,17 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 					"header.\n"));
 				return;
 			}
-			m = *m0;
-			*buflenp = 0;
 		}
 		if (m != NULL) {
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
 		}
 
-		if (timer_init)
-			mld_start_state_change_timer(in6m);
-		if (--in6mm_src->i6ms_robvar == 0) {
-			mld_stop_state_change_timer(in6m);
+		in6mm_src->i6ms_robvar--;
+		if (in6mm_src->i6ms_robvar != 0)
 			return;
-		}
 
+		/* robustness variable is 0 -> cease the report timer */
 		if (in6mm_src->i6ms_toin != NULL) {
 			/* For TO_IN list, it MUST be deleted
 			 * after retransmission is done. This is
@@ -1877,15 +1794,14 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			FREE(in6mm_src->i6ms_toin, M_MSFILTER);
 			in6mm_src->i6ms_toin = NULL;
 		}
-		/* Prepare scheduled Source-List-Change Report */
+
+		/* Prepare scheduled Source-List-Change Report if necessary */
 		if ((in6mm_src->i6ms_alw != NULL &&
 		    in6mm_src->i6ms_alw->numsrc > 0) ||
 		     (in6mm_src->i6ms_blk != NULL &&
 		     in6mm_src->i6ms_blk->numsrc > 0)) {
 			in6mm_src->i6ms_robvar = in6m->in6m_rti->rt6i_qrv;
-			mld_start_state_change_timer(in6m);
-		} else {
-			mld_stop_state_change_timer(in6m);
+			return;
 		}
 		return;
 	}
@@ -1910,15 +1826,15 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			numsrc = in6mm_src->i6ms_blk->numsrc;
 		else /* finish group record insertion */
 			break;
-		src_once = mld_create_group_record(m, buflenp, in6m,
-				numsrc, &src_done, type);
+		src_once = mld_create_group_record(m, in6m, numsrc,
+		    &src_done, type);
 		if (numsrc > src_done) {
 			mld_sendbuf(m, in6m->in6m_ifp);
-			m = NULL;
 			mldlog((LOG_DEBUG,
 				"mld_send_current_state_report: "
 				"re-allocbuf4\n"));
-			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			mldh = mld_allocbuf(&m, rhdrlen, in6m,
+			    MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG, 
 					"mld_send_state_change_report: "
@@ -1926,8 +1842,6 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 					"header.\n"));
 				return;
 			}
-			m = *m0;
-			*buflenp = 0;
 		} else { /* next group record */
 			if ((type == ALLOW_NEW_SOURCES) &&
 			    (in6mm_src->i6ms_blk != NULL) &&
@@ -1942,29 +1856,27 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		mld_sendbuf(m, in6m->in6m_ifp);
 		m = NULL;
 	}
-	if (timer_init)
-		mld_start_state_change_timer(in6m);
-	if (--in6mm_src->i6ms_robvar == 0) {
-		if ((in6mm_src->i6ms_alw != NULL) &&
-		    (in6mm_src->i6ms_alw->numsrc != 0)) {
-			in6_free_msf_source_list(in6mm_src->i6ms_alw->head);
-			in6mm_src->i6ms_alw->numsrc = 0;
-		}
-		if ((in6mm_src->i6ms_blk != NULL) &&
-	    	    (in6mm_src->i6ms_blk->numsrc != 0)) {
-		    	in6_free_msf_source_list(in6mm_src->i6ms_blk->head);
-			in6mm_src->i6ms_blk->numsrc = 0;
-		}
-		mld_stop_state_change_timer(in6m);
-	}
+	in6mm_src->i6ms_robvar--;
+	if (in6mm_src->i6ms_robvar != 0)
+		return;
 
+	/* robustness variable is 0 -> cease the report timer */
+	if ((in6mm_src->i6ms_alw != NULL) &&
+	    (in6mm_src->i6ms_alw->numsrc != 0)) {
+		in6_free_msf_source_list(in6mm_src->i6ms_alw->head);
+		in6mm_src->i6ms_alw->numsrc = 0;
+	}
+	if ((in6mm_src->i6ms_blk != NULL) &&
+    	    (in6mm_src->i6ms_blk->numsrc != 0)) {
+	    	in6_free_msf_source_list(in6mm_src->i6ms_blk->head);
+		in6mm_src->i6ms_blk->numsrc = 0;
+	}
 	return;
 }
 
 static int
-mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
+mld_create_group_record(mh, in6m, numsrc, done, type)
 	struct mbuf *mh;
-	int *buflenp;
 	struct in6_multi *in6m;
 	u_int16_t numsrc;
 	u_int16_t *done;
@@ -1986,19 +1898,18 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 	mld_rhdr = mtod(md, struct mld_report_hdr *);
 	++mld_rhdr->mld_grpnum;
 
-	mld_ghdr = (struct mld_group_record_hdr *) 
-			((char *)(mld_rhdr + 1) + *buflenp);
+	mld_ghdr = (struct mld_group_record_hdr *) ((char *)(mld_rhdr + 1));
 	mld_ghdr->record_type = type;
 	mld_ghdr->auxlen = 0;
 	mld_ghdr->numsrc = 0;
 	bcopy(&in6m->in6m_addr, &mld_ghdr->group, sizeof(mld_ghdr->group));
 	in6_clearscope(&mld_ghdr->group); /* XXX */
-	*buflenp += ghdrlen;
 	md->m_len += ghdrlen;
 	iplen += ghdrlen;
 	mh->m_pkthdr.len += ghdrlen;
-	mfreelen = MCLBYTES - *buflenp;
+	mfreelen = MCLBYTES;
 
+	/* get the head of the appropriate source list */
 	switch (type) {
 	case ALLOW_NEW_SOURCES:
 		iasl = in6m->in6m_source->i6ms_alw;
@@ -2017,6 +1928,7 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 			iasl = in6m->in6m_source->i6ms_rec;
 		else
 			iasl = in6m->in6m_source->i6ms_cur;
+		break;
 	}
 
 	total = 0;
@@ -2038,7 +1950,6 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 	*done = total;
 
 	mld_ghdr->numsrc = i;
-	*buflenp += SOURCE_RECORD_LEN(i);
 	md->m_len += SOURCE_RECORD_LEN(i);
 	iplen += SOURCE_RECORD_LEN(i);
 	ip6->ip6_plen = htons(iplen);
@@ -2183,14 +2094,11 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 	struct	in6_ifaddr *ia;
 	struct	in6_ifreq ifr;
 	struct	in6_multi *in6m;
-	struct	mbuf *m = NULL;
 	struct	i6as_head *newhead = NULL;/* this may become new current head */
 	u_int	curmode;		/* current filter mode */
 	u_int	newmode;		/* newly calculated filter mode */
 	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
-	int	timer_init = 1;		/* indicate timer initialization */
-	int	buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct	router6_info *rt6i;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2276,8 +2184,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 					else
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
-				mld_send_state_change_report
-				(&m, &buflen, in6m, type, timer_init);
+				mld_send_state_change_report(in6m, type, 1);
 			}
 		} else {
 			/*
@@ -2429,14 +2336,11 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 {
 	struct	in6_ifreq ifr;
 	struct	in6_ifaddr *ia;
-	struct	mbuf *m = NULL;
 	struct	i6as_head *newhead = NULL;/* this may become new current head */
 	u_int	curmode;		/* current filter mode */
 	u_int	newmode;		/* newly calculated filter mode */
 	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
-	int	timer_init = 1;		/* indicate timer initialization */
-	int	buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int	s = splsoftnet();
@@ -2530,8 +2434,7 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 				else
 					type = CHANGE_TO_EXCLUDE_MODE;
 			}
-			mld_send_state_change_report
-				(&m, &buflen, in6m, type, timer_init);
+			mld_send_state_change_report(in6m, type, 1);
 		}
 	} else {
 		/*
@@ -2554,15 +2457,9 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 		 * itself will be removed here. So, in this case, report
 		 * retransmission will be done quickly. XXX my spec.
 		 */
-		timer_init = 0;
-		while (in6m->in6m_source->i6ms_robvar > 0) {
-			m = NULL;
-			buflen = 0;
-			mld_send_state_change_report
-				(&m, &buflen, in6m, type, timer_init);
-			if (m != NULL)
-				mld_sendbuf(m, in6m->in6m_ifp);
-		}
+		while (in6m->in6m_source->i6ms_robvar > 0)
+			mld_send_state_change_report(in6m, type, 0);
+
 		in6_free_all_msf_source_list(in6m);
 		LIST_REMOVE(in6m, in6m_entry);
 		if (in6m->in6m_ia) {
@@ -2601,7 +2498,6 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 	int init;			/* indicate initial join by socket */
 	u_int grpjoin;			/* on/off of (*,G) join by socket */
 {
-	struct mbuf *m = NULL;
 	struct in6_multi *in6m;
 	struct in6_ifreq ifr;
 	struct in6_ifaddr *ia;
@@ -2610,8 +2506,6 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 	u_int newmode;			/* newly calculated filter mode */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
 	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
-	int timer_init = 1;		/* indicate timer initialization */
-	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct router6_info *rti;
 	int s;
@@ -2731,8 +2625,8 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 					else
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
-				mld_send_state_change_report(&m, &buflen, in6m,
-				    type, timer_init);
+				mld_send_state_change_report(in6m, type, 1);
+				mld_start_state_change_timer(in6m);
 			}
 		} else {
 			/*
@@ -2741,7 +2635,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 			in6_clear_all_pending_report(in6m);
 		}
 		*error = 0;
-		/* for this group address, initial join request by the socket. */
+		/* for this group address, initial join request by the socket */
 		if (init)
 			++in6m->in6m_refcount;
 
@@ -2844,8 +2738,8 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 				} else
 					type = CHANGE_TO_EXCLUDE_MODE;
 			}
-			mld_send_state_change_report(&m, &buflen, in6m, type,
-			    timer_init);
+			mld_send_state_change_report(in6m, type, 1);
+			mld_start_state_change_timer(in6m);
 		} else {
 			struct in6_multi_mship *imm;
 			/*
@@ -2895,14 +2789,11 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 	struct in6_multi *in6m;
 	struct ifmultiaddr *ifma;
 	struct sockaddr_in6 sa6;
-	struct mbuf *m = NULL;
 	struct i6as_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
 	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
-	int timer_init = 1;		/* indicate timer initialization */
-	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct router6_info *rti;
 	int	s = splnet();
@@ -2981,7 +2872,8 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 				 * curhead, so only newhead is freed. 
 				 */
 				FREE(newhead, M_MSFILTER);
-				*errorp = 0; /* to make caller behave as normal */
+				/* to make caller behave as normal */
+				*errorp = 0;
 				splx(s);
 				return in6m;
 			}
@@ -3009,8 +2901,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 				}
 				mldlog((LOG_DEBUG, "in6_addmultisrc: "
 				    "send current status\n"));
-				mld_send_state_change_report
-					(&m, &buflen, in6m, type, timer_init);
+				mld_send_state_change_report(in6m, type, 1);
 			}
 			 else {
 				mldlog((LOG_DEBUG, "in6_addmultisrc: "
@@ -3127,14 +3018,11 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 	u_int mode;			/* requested filter mode by socket */
 	int final;			/* indicate complete leave by socket */
 {
-	struct mbuf *m = NULL;
 	struct i6as_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
 	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
-	int timer_init = 1;		/* indicate timer initialization */
-	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct ifmultiaddr *ifma = in6m->in6m_ifma;
 	int	s = splnet();
@@ -3194,8 +3082,7 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 				else
 					type = CHANGE_TO_EXCLUDE_MODE;
 			}
-			mld_send_state_change_report
-				(&m, &buflen, in6m, type, timer_init);
+			mld_send_state_change_report(in6m, type, 1);
 		}
 	} else {
 		/*
@@ -3222,14 +3109,9 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 			 * this case, report retransmission will be done 
 			 * quickly.XXX my spec.
 			 */
-			while (in6m->in6m_source->i6ms_robvar > 0) {
-				m = NULL;
-				buflen = 0;
-				mld_send_state_change_report
-					(&m, &buflen, in6m, type, 0);
-				if (m != NULL)
-					mld_sendbuf(m, in6m->in6m_ifp);
-			}
+			while (in6m->in6m_source->i6ms_robvar > 0)
+				mld_send_state_change_report(in6m, type, 0);
+
 			/*
 			 * Unlink from list.
 			 */
@@ -3263,7 +3145,6 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 	int init;			/* indicate initial join by socket */
 	u_int grpjoin;			/* on/off of (*,G) join by socket */
 {
-	struct mbuf *m = NULL;
 	struct in6_multi *in6m;
 	struct ifmultiaddr *ifma = NULL;
 	struct i6as_head *newhead = NULL;/* this becomes new i6ms_cur->head */
@@ -3271,8 +3152,6 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 	u_int newmode;			/* newly calculated filter mode */
 	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
-	int timer_init = 1;		/* indicate timer initialization */
-	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct router6_info *rti;
 	int s;
@@ -3371,8 +3250,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 					else
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
-				mld_send_state_change_report
-					(&m, &buflen, in6m, type, timer_init);
+				mld_send_state_change_report(in6m, type, 1);
 			}
 		} else {
 			/*
@@ -3479,8 +3357,8 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 				} else
 					type = CHANGE_TO_EXCLUDE_MODE;
 			}
-			mld_send_state_change_report(&m, &buflen, in6m, type,
-			    timer_init);
+			mld_send_state_change_report(in6m, type, 1);
+			mld_start_state_change_timer(in6m);
 		} else {
 			/*
 			 * If MSF's pending records exist, they must be deleted.
