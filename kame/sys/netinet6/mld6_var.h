@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.19 2005/07/27 11:00:01 suz Exp $	*/
+/*	$KAME: mld6_var.h,v 1.20 2006/03/26 11:34:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -33,8 +33,6 @@
 #define _NETINET6_MLD6_VAR_H_
 
 #ifdef _KERNEL
-
-#define MLD_RANDOM_DELAY(X) (arc4random() % (X) + 1)
 
 /*
  * States for MLD stop-listening processing
@@ -73,8 +71,6 @@
 #define	MLD_START_CNT		MLD_DEF_RV
 #define	MLD_LAST_INTVL		1000	/* Last Member Query Interval (1 sec) */
 #define	MLD_LAST_CNT		MLD_DEF_RV
-#define MLD_UNSOL_INTVL         10      /* Unsolicited Report Interval (sec) */
-#define	MLDV2_UNSOL_INTVL	1	/* Unsolicited Report Interval (sec) */
 #define	MLD_DEF_QUERY		10	/* v1 Max. Response Time (sec.) */
 
 extern int mld_debug;

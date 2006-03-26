@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.54 2006/03/26 11:03:45 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.55 2006/03/26 11:34:17 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -190,6 +190,7 @@ struct multi6_kludge {
  * multicast address(in seconds)
  */
 #define MLD_UNSOLICITED_REPORT_INTERVAL	10
+#define MLDV2_UNSOLICITED_REPORT_INTERVAL 1
 
 int mldmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int mldsomaxsrc = SO_MAX_SOURCE_FILTER;
@@ -839,7 +840,8 @@ mld_start_state_change_timer(in6m)
 
 	if (i6ms == NULL)
 		return;
-	i6ms->i6ms_timer = MLD_RANDOM_DELAY(MLDV2_UNSOL_INTVL * hz);
+	i6ms->i6ms_timer = arc4random() %
+	    (MLDV2_UNSOLICITED_REPORT_INTERVAL * hz);
 	mldlog((LOG_DEBUG, "start %s's state-change-timer for %d msec\n",
 		ip6_sprintf(&in6m->in6m_addr), i6ms->i6ms_timer * 1000 / hz));
 #if defined(__NetBSD__) || defined(__FreeBSD__)
@@ -1204,7 +1206,7 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 		timer_i = timer * hz / MLD_TIMER_SCALE;
 		if (timer_i == 0)
 			timer_i = hz;
-		timer_i = MLD_RANDOM_DELAY(timer_i);
+		timer_i = arc4random() % timer_i;
 
 		if (callout_pending(rti->rt6i_timer2_ch) &&
 		    rti->rt6i_timer2 != 0 && rti->rt6i_timer2 < timer_i) {
@@ -1231,7 +1233,7 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 		timer_g = timer * hz / MLD_TIMER_SCALE;
 		if (timer_g == 0)
 			timer_g = hz;
-		timer_g = MLD_RANDOM_DELAY(timer_g);
+		timer_g = arc4random() % timer_g;
 		mldlog((LOG_DEBUG,
 		    "mld_set_timer: set group timer to %d\n", timer_g / hz));
 	}
@@ -2016,7 +2018,7 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 		else
 			iasl = in6m->in6m_source->i6ms_cur;
 	}
-}
+
 	total = 0;
 	i = 0;
 	if (iasl != NULL) {
