@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.51 2006/03/26 10:52:23 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.52 2006/03/26 10:54:55 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -232,23 +232,6 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_VERSION, mld_version, CTLFLAG_RW,
 #endif
 
 #define	SOURCE_RECORD_LEN(numsrc)	(numsrc * addrlen)
-
-#define	GET_REPORT_SOURCE_HEAD(in6m, type, iasl) { \
-	if ((type) == ALLOW_NEW_SOURCES) \
-		(iasl) = (in6m)->in6m_source->i6ms_alw; \
-	else if ((type) == BLOCK_OLD_SOURCES) \
-		(iasl) = (in6m)->in6m_source->i6ms_blk; \
-	else if ((type) == CHANGE_TO_INCLUDE_MODE) \
-		(iasl) = (in6m)->in6m_source->i6ms_toin; \
-	else if ((type) == CHANGE_TO_EXCLUDE_MODE) \
-		(iasl) = (in6m)->in6m_source->i6ms_toex; \
-	else { \
-		if ((in6m)->in6m_state == MLD_SG_QUERY_PENDING_MEMBER) \
-			(iasl) = (in6m)->in6m_source->i6ms_rec; \
-		else \
-			(iasl) = (in6m)->in6m_source->i6ms_cur; \
-	} \
-}
 
 static void mld_start_group_timer(struct in6_multi *);
 static void mld_stop_group_timer(struct in6_multi *);
@@ -1993,7 +1976,26 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 	mh->m_pkthdr.len += ghdrlen;
 	mfreelen = MCLBYTES - *buflenp;
 
-	GET_REPORT_SOURCE_HEAD(in6m, type, iasl);
+	switch (type) {
+	case ALLOW_NEW_SOURCES:
+		iasl = in6m->in6m_source->i6ms_alw;
+		break;
+	case BLOCK_OLD_SOURCES:
+		iasl = in6m->in6m_source->i6ms_blk;
+		break;
+	case CHANGE_TO_INCLUDE_MODE:
+		iasl = in6m->in6m_source->i6ms_toin;
+		break;
+	case CHANGE_TO_EXCLUDE_MODE:
+		iasl = in6m->in6m_source->i6ms_toex;
+		break;
+	default:
+		if (in6m->in6m_state == MLD_SG_QUERY_PENDING_MEMBER)
+			iasl = in6m->in6m_source->i6ms_rec;
+		else
+			iasl = in6m->in6m_source->i6ms_cur;
+	}
+}
 	total = 0;
 	i = 0;
 	if (iasl != NULL) {
