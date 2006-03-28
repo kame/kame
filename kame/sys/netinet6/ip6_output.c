@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.484 2006/02/27 10:00:23 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.485 2006/03/28 05:45:22 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4987,7 +4987,11 @@ in6_getmopt_ifargs(optname, ifp, ia_grp, index)
 				break;
 			}
 			*ifp = ro.ro_rt->rt_ifp;
+#ifdef __FreeBSD__
+			RTFREE(ro.ro_rt);
+#else
 			rtfree(ro.ro_rt);
+#endif
 		} else
 #ifdef __FreeBSD__
 			*ifp = ifnet_byindex(index);
