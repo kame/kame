@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.56 2006/03/26 22:31:19 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.57 2006/03/28 07:28:14 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1382,6 +1382,9 @@ static void
 mld_unset_hostcompat_timeo(rti)
 	struct router6_info *rti;
 {
+	mldlog((LOG_DEBUG, "mld_unset_compat: "
+	    "disable MLDv1-compat mode on %s\n", if_name(rti->rt6i_ifp)));
+
 	if (mld_version == 1) {
 		if (rti->rt6i_type != MLD_V1_ROUTER)
 			rti->rt6i_type = MLD_V1_ROUTER;
