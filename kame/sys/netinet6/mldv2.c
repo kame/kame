@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.57 2006/03/28 07:28:14 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.58 2006/03/28 08:50:37 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2229,6 +2229,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 		}
 		IFP_TO_IA6(ifp, ia);
 		if (ia == NULL) {
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			splx(s);
 			*errorp = EADDRNOTAVAIL; /* appropriate? */
@@ -2253,6 +2254,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 			    (caddr_t)&ifr);
 		if (*errorp) {
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			IFAFREE(&ia->ia_ifa);
 			splx(s);
@@ -2261,6 +2263,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 		rt6i = find_rt6i(in6m->in6m_ifp);
 		if (rt6i == NULL) {
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			*errorp = ENOBUFS;
 			splx(s);
@@ -2277,6 +2280,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 		    &newhead, &newmode, &newnumsrc)) != 0) {
 			in6_free_all_msf_source_list(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			splx(s);
 			return NULL;
@@ -2301,7 +2305,9 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 			}
 		}
 
-#ifdef __NetBSD__
+#ifdef __FreeBSD__
+		callout_init(in6m->in6m_timer_ch, 0);
+#elf defined(__NetBSD__)
 		callout_init(in6m->in6m_timer_ch);
 #elif defined(__OpenBSD__)
 		bzero(in6m->in6m_timer_ch, sizeof(*in6m->in6m_timer_ch));
@@ -2391,6 +2397,7 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 			ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
 			(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 			    SIOCDELMULTI, (caddr_t)&ifr);
+			mld_stop_group_timer(in6m);
 			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 		}
@@ -2475,6 +2482,7 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 		ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
 		(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 		    SIOCDELMULTI, (caddr_t)&ifr);
+		mld_stop_group_timer(in6m);
 		free(in6m->in6m_timer_ch, M_IPMADDR);
 		free(in6m, M_IPMADDR);
 	}
@@ -2570,6 +2578,8 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 					    sizeof(ifr.ifr_addr.sin6_addr));
 					(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 					    SIOCDELMULTI, (caddr_t)&ifr);
+					mld_stop_group_timer(in6m);
+					free(in6m->in6m_timer_ch, M_IPMADDR);
 					free(in6m, M_IPMADDR);
 				}
 				splx(s);
@@ -2678,8 +2688,18 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 			splx(s);
 			return (NULL);
 		}
+#ifdef __FreeBSD__
+		callout_init(in6m->in6m_timer_ch, 0);
+#elf defined(__NetBSD__)
+		callout_init(in6m->in6m_timer_ch);
+#elif defined(__OpenBSD__)
+		bzero(in6m->in6m_timer_ch, sizeof(*in6m->in6m_timer_ch));
+#endif
+
 		IFP_TO_IA6(ifp, ia);
 		if (ia == NULL) {
+			mld_stop_group_timer(in6m);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			*error = ENOBUFS /*???*/;
 			splx(s);
@@ -2698,7 +2718,9 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		ifr.ifr_addr.sin6_addr = *ap;
 		if ((ifp->if_ioctl == NULL) ||
 		    (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) {
+			mld_stop_group_timer(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			*error = EINVAL /*???*/;
 			splx(s);
@@ -2706,7 +2728,9 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		}
 		rti = find_rt6i(in6m->in6m_ifp);
 		if (rti == NULL) {
+			mld_stop_group_timer(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			*error = ENOBUFS;
 			splx(s);
@@ -2723,7 +2747,9 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		    MCAST_INCLUDE, grpjoin, &newhead, &newmode,
 		    &newnumsrc)) != 0) {
 			in6_free_all_msf_source_list(in6m);
+			mld_stop_group_timer(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			splx(s);
 			return NULL;
@@ -2952,16 +2978,23 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 	}
 	LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
 
+#ifdef __FreeBSD__
 	callout_init(in6m->in6m_timer_ch, 0);
+#elif defined(__NetBSD__)
+	callout_init(in6m->in6m_timer_ch);
+#elif defined(__OpenBSD__)
+	bzero(in6m->in6m_timer_ch, sizeof(*in6m->in6m_timer_ch));
+#endif
 
 	rti = find_rt6i(in6m->in6m_ifp);
 	if (rti == NULL) {
-		 LIST_REMOVE(in6m, in6m_entry);
-		 free(in6m->in6m_timer_ch, M_IPMADDR);
-		 free(in6m, M_IPMADDR);
-		 *errorp = ENOBUFS;
-		 splx(s);
-		 return NULL;
+		mld_stop_group_timer(in6m);
+		LIST_REMOVE(in6m, in6m_entry);
+		free(in6m->in6m_timer_ch, M_IPMADDR);
+		free(in6m, M_IPMADDR);
+		*errorp = ENOBUFS;
+		splx(s);
+		return NULL;
 	}
 	in6m->in6m_rti = rti;
 	in6m->in6m_source = NULL;
@@ -2973,6 +3006,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 	if ((*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
 	    &newhead, &newmode, &newnumsrc)) != 0) {
 		in6_free_all_msf_source_list(in6m);
+		mld_stop_group_timer(in6m);
 		LIST_REMOVE(in6m, in6m_entry);
 		free(in6m->in6m_timer_ch, M_IPMADDR);
 		free(in6m, M_IPMADDR);
@@ -3037,7 +3071,8 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 	}
 	if (!in6_is_mld_target(&in6m->in6m_addr)) {
 		if (ifma->ifma_refcount == 1) {
-			ifma->ifma_protospec = 0;
+			ifma->ifma_protospec = NULL;
+			mld_stop_group_timer(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
@@ -3119,8 +3154,10 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 			 * Unlink from list.
 			 */
 			in6_free_all_msf_source_list(in6m);
-			ifma->ifma_protospec = 0;
+			ifma->ifma_protospec = NULL;
+			mld_stop_group_timer(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 		}
 		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
@@ -3195,8 +3232,10 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 			}
 			if (mode == MCAST_INCLUDE) {
 				if (ifma->ifma_refcount == 1) {
-					ifma->ifma_protospec = 0;
+					ifma->ifma_protospec = NULL;
+					mld_stop_group_timer(in6m);
 					LIST_REMOVE(in6m, in6m_entry);
+					free(in6m->in6m_timer_ch, M_IPMADDR);
 					free(in6m, M_IPMADDR);
 				}
 				if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
@@ -3320,6 +3359,14 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		in6m->in6m_ifma = ifma;
 		ifma->ifma_protospec = in6m;
 		LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
+		in6m->in6m_timer = IN6M_TIMER_UNDEF;
+		in6m->in6m_timer_ch =
+		    malloc(sizeof(*in6m->in6m_timer_ch), M_IPMADDR, M_NOWAIT);
+		if (in6m->in6m_timer_ch == NULL) {
+			free(in6m, M_IPMADDR);
+			splx(s);
+			return (NULL);
+		}
 
 		rti = find_rt6i(in6m->in6m_ifp);
 		if (rti == NULL) {
@@ -3343,10 +3390,19 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		if (*error != 0) {
 			in6_free_all_msf_source_list(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 			splx(s);
 			return NULL;
 		}
+#ifdef __FreeBSD__
+		callout_init(in6m->in6m_timer_ch, 0);
+#elif defined(__NetBSD__)
+		callout_init(in6m->in6m_timer_ch);
+#elif defined(__OpenBSD__)
+		bzero(in6m->in6m_timer_ch, sizeof(*in6m->in6m_timer_ch));
+#endif
+
 		/* Only newhead was merged in a former function. */
 		curmode = in6m->in6m_source->i6ms_mode;
 		in6m->in6m_source->i6ms_mode = newmode;
