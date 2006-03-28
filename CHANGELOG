@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2822 2006/03/26 22:36:14 suz Exp $
+$KAME: CHANGELOG,v 1.2823 2006/03/28 05:47:16 suz Exp $
 
 <200603>
+2006-03-28  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet6/ip6_output.c: fixed a kernel crash by an ASM
+	join from a userland application (KAME PR sys/932)
+
 2006-03-27  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet6/mldv2.c: fixed several bugs regarding MLDv2-timer
 
