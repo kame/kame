@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.38 2005/07/27 11:00:01 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.39 2006/03/28 06:16:48 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -193,8 +193,10 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 
 		MALLOC(in6m->in6m_source->i6ms_timer_ch, struct callout *,
 		    sizeof(struct callout), M_MSFILTER, M_NOWAIT);
-		if (in6m->in6m_source->i6ms_timer_ch == NULL)
+		if (in6m->in6m_source->i6ms_timer_ch == NULL) {
+			FREE(in6m->in6m_source, M_MSFILTER);
 			return ENOBUFS;
+		}
 #ifdef __FreeBSD__
 		callout_init(in6m->in6m_source->i6ms_timer_ch, 0);
 #elif defined(__NetBSD__)
@@ -214,7 +216,6 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			FREE(in6m->in6m_source->i6ms_cur->head, M_MSFILTER);
 			FREE(in6m->in6m_source->i6ms_cur, M_MSFILTER);
 			FREE(in6m->in6m_source->i6ms_timer_ch, M_MSFILTER);
-			FREE(in6m->in6m_source, M_MSFILTER);
 			FREE(in6m->in6m_source, M_MSFILTER);
 			return error;
 		}
