@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.58 2006/03/28 08:50:37 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.59 2006/03/31 04:10:27 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1555,6 +1555,8 @@ mld_send_current_state_report(in6m)
 			return EOPNOTSUPP; /* XXX source address insert didn't
 					    * finished. strange... */
 		}
+		if (m != NULL)
+			mld_sendbuf(m, in6m->in6m_ifp);
 	} else {
 		while (1) {
 			/* XXX Some security implication? */
