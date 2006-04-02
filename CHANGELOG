@@ -1,5 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2823 2006/03/28 05:47:16 suz Exp $
+$KAME: CHANGELOG,v 1.2824 2006/04/02 22:15:59 suz Exp $
+
+<200604>
+2006-04-02  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet6/mldv2.c: fixed a bug that an MLDv2 IS-IN Report
+	is not advertised for an MLDv2 general Query
 
 <200603>
 2006-03-28  SUZUKI, Shinsuke <suz@alaxala.net>
