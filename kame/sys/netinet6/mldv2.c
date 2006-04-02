@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.59 2006/03/31 04:10:27 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.60 2006/04/02 22:10:54 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -487,7 +487,7 @@ mld_start_listening(in6m, type)
 	all_in6 = in6addr_linklocal_allnodes;
 	if (in6_setscope(&all_in6, in6m->in6m_ifp, NULL)) {
 		/* XXX: this should not happen! */
-		in6m->in6m_timer = 0;
+		in6m->in6m_timer = IN6M_TIMER_UNDEF;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	}
 	if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &all_in6) ||
@@ -496,7 +496,7 @@ mld_start_listening(in6m, type)
 		mldlog((LOG_DEBUG,
 		    "mld_start_listening: not send report for %s\n",
 		    ip6_sprintf(&in6m->in6m_addr)));
-		in6m->in6m_timer = 0;
+		in6m->in6m_timer = IN6M_TIMER_UNDEF;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	} else {
 		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
@@ -651,7 +651,8 @@ mld_input(m, off)
 		 */
 		IN6_LOOKUP_MULTI(mld_addr, ifp, in6m);
 		if (in6m) {
-			in6m->in6m_timer = 0; /* transit to idle state */
+			/* transit to idle state */
+			in6m->in6m_timer = IN6M_TIMER_UNDEF;
 			in6m->in6m_state = MLD_OTHERLISTENER; /* clear flag */
 		}
 		goto end;
@@ -1593,7 +1594,7 @@ mld_send_current_state_report(in6m)
 		in6mm_src->i6ms_rec->numsrc = 0;
 	}
 	in6m->in6m_state = MLD_OTHERLISTENER;
-	in6m->in6m_timer = 0;
+	in6m->in6m_timer = IN6M_TIMER_UNDEF;
 
 	return 0;
 }
