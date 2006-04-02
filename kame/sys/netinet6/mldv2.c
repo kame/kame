@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.61 2006/04/02 22:12:01 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.62 2006/04/02 22:14:43 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1588,6 +1588,8 @@ mld_send_current_state_report(in6m)
 				return ENOBUFS;
 			}
 		} /* while */
+		if (m != NULL)
+			mld_sendbuf(m, in6m->in6m_ifp);
 	}
 
 	/*
