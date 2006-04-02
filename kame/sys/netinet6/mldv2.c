@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.60 2006/04/02 22:10:54 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.61 2006/04/02 22:12:01 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1470,6 +1470,8 @@ mld_send_all_current_state_report(ifp)
 	struct in6_multi *in6m;
 	struct in6_multistep step;
 
+	mldlog((LOG_DEBUG, "%s for %s\n", __FUNCTION__, if_name(ifp)));
+
 	IN6_FIRST_MULTI(step, in6m);
 	while (in6m != NULL) {
 		if (in6m->in6m_ifp != ifp ||
@@ -1496,6 +1498,9 @@ mld_send_current_state_report(in6m)
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	u_int8_t type = 0;
 	struct mld_hdr *mldh;
+
+	mldlog((LOG_DEBUG, "%s for %s\n",
+	    __FUNCTION__, ip6_sprintf(&in6m->in6m_addr)));
 
 	if (!in6_is_mld_target(&in6m->in6m_addr) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
