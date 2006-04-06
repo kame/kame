@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.62 2006/04/02 22:14:43 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.63 2006/04/06 12:32:41 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3170,8 +3170,8 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 			free(in6m->in6m_timer_ch, M_IPMADDR);
 			free(in6m, M_IPMADDR);
 		}
-		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 	}
+	if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 	*error = 0;
 	if (newhead != NULL)
 		FREE(newhead, M_MSFILTER);
