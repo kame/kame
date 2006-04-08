@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.64 2006/04/08 04:38:14 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.65 2006/04/08 04:39:33 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3131,9 +3131,7 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 			mld_stop_listening(in6m);
 		}
 	}
-	/*
-	 * If this is a final leave request by the socket, decrease refcount.
-	 */
+
 	if (final) {
 		if (ifma->ifma_refcount == 1) {
 			/*
