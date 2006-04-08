@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.65 2006/04/08 04:39:33 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.66 2006/04/08 04:43:39 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3117,6 +3117,8 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 					type = CHANGE_TO_EXCLUDE_MODE;
 			}
 			mld_send_state_change_report(in6m, type, 1);
+			if (!final)
+				mld_start_state_change_timer(in6m);
 		}
 	} else {
 		/*
