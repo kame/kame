@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.63 2006/04/06 12:32:41 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.64 2006/04/08 04:38:14 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1687,26 +1687,6 @@ mld_send_state_change_report(in6m, type, timer_init)
 	} else if (type == CHANGE_TO_INCLUDE_MODE) {
 		if (in6mm_src->i6ms_toin != NULL)
 			numsrc = in6mm_src->i6ms_toin->numsrc;
-	} else { /* ALLOW_NEW_SOURCES and/or BLOCK_OLD_SOURCES */
-		if (in6mm_src->i6ms_alw != NULL)
-			numsrc = in6mm_src->i6ms_alw->numsrc;
-		if (in6mm_src->i6ms_blk != NULL)
-			numsrc = max(numsrc, in6mm_src->i6ms_blk->numsrc);
-#if 0
-		/*
-		 * XXX following is tentative process. this should not 
-		 * be executed. this is just to avoid "loop" by timer.
-		 */
-		if (numsrc == 0) {
-			if (*m0 != NULL) {
-				mld_sendbuf(*m0, in6m->in6m_ifp);
-				*m0 = NULL;
-			} else if (in6mm_src->i6ms_robvar > 0) {
-				--in6mm_src->i6ms_robvar;
-			}
-			return;
-		}
-#endif
 	}
 
 	mldh = mld_allocbuf(&m, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
@@ -1819,56 +1799,62 @@ mld_send_state_change_report(in6m, type, timer_init)
 		return;
 	}
 
-	/* ALLOW_NEW_SOURCES and/or BLOCK_OLD_SOURCES */
+	/* 
+	 * ALLOW_NEW_SOURCES and/or BLOCK_OLD_SOURCES 
+	 * You have to scan allow-list and block-list sequencially,
+	 * since both list might have a source address to be announced.
+	 */
 	if ((in6mm_src->i6ms_alw != NULL) &&
 	    (in6mm_src->i6ms_alw->numsrc != 0)) {
 		type = ALLOW_NEW_SOURCES;
-	} else if ((in6mm_src->i6ms_blk != NULL) &&
-		(in6mm_src->i6ms_blk->numsrc != 0)) {
-		type = BLOCK_OLD_SOURCES;
-	} else {
-		mldlog((LOG_DEBUG, "improper allow list and block list\n"));
-		return;
-	}
-
-	while (1) {
-		/* XXX Some security implication? */
-		if (type == ALLOW_NEW_SOURCES)
-			numsrc = in6mm_src->i6ms_alw->numsrc;
-		else if (type == BLOCK_OLD_SOURCES)
-			numsrc = in6mm_src->i6ms_blk->numsrc;
-		else /* finish group record insertion */
-			break;
-		src_once = mld_create_group_record(m, in6m, numsrc,
-		    &src_done, type);
-		if (numsrc > src_done) {
+		numsrc = in6mm_src->i6ms_alw->numsrc;
+		while (1) {
+			src_once = mld_create_group_record(m, in6m, numsrc,
+			    &src_done, type);
 			mld_sendbuf(m, in6m->in6m_ifp);
+			if (numsrc <= src_done)
+				break;
+
 			mldlog((LOG_DEBUG,
 				"mld_send_current_state_report: "
-				"re-allocbuf4\n"));
+				"re-allocbuf(allow)\n"));
+			mldh = mld_allocbuf(&m, rhdrlen, in6m,
+				    MLDV2_LISTENER_REPORT);
+			if (mldh == NULL) {
+				mldlog((LOG_DEBUG, 
+					"mld_send_state_change_report: "
+					"error preparing additional ALLOW"
+					"header.\n"));
+				return;
+			}
+		}
+	}
+	if ((in6mm_src->i6ms_blk != NULL) &&
+	    (in6mm_src->i6ms_blk->numsrc != 0)) {
+		type = BLOCK_OLD_SOURCES;
+		numsrc = in6mm_src->i6ms_blk->numsrc;
+		while (1) {
+			src_once = mld_create_group_record(m, in6m, numsrc,
+			    &src_done, type);
+			mld_sendbuf(m, in6m->in6m_ifp);
+			if (numsrc <= src_done)
+				break;
+
+			mldlog((LOG_DEBUG,
+				"mld_send_current_state_report: "
+				"re-allocbuf(block)\n"));
 			mldh = mld_allocbuf(&m, rhdrlen, in6m,
 			    MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
 				mldlog((LOG_DEBUG, 
 					"mld_send_state_change_report: "
-					"error preparing additional report "
+					"error preparing additional BLOCK"
 					"header.\n"));
 				return;
 			}
-		} else { /* next group record */
-			if ((type == ALLOW_NEW_SOURCES) &&
-			    (in6mm_src->i6ms_blk != NULL) &&
-			    (in6mm_src->i6ms_blk->numsrc != 0))
-				type = BLOCK_OLD_SOURCES;
-			else
-				type = 0;
-			src_done = 0;
 		}
 	}
-	if (m != NULL) {
-		mld_sendbuf(m, in6m->in6m_ifp);
-		m = NULL;
-	}
+
 	in6mm_src->i6ms_robvar--;
 	if (in6mm_src->i6ms_robvar != 0)
 		return;
