@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2824 2006/04/02 22:15:59 suz Exp $
+$KAME: CHANGELOG,v 1.2825 2006/04/09 04:32:18 jinmei Exp $
 
 <200604>
+2006-04-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (ip6_mrouter_done): used
+	if_allmulti(0) for diabling the multicast promiscuous mode for
+	FreeBSD.  Without this change, an IPv6 multicast router would
+	leave interfaces in the promiscuous mode even after the routing
+	daemon terminates.
+
 2006-04-02  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet6/mldv2.c: fixed a bug that an MLDv2 IS-IN Report
 	is not advertised for an MLDv2 general Query
