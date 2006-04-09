@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.144 2006/04/09 04:13:53 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.145 2006/04/09 09:19:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1242,10 +1242,7 @@ ip6_mforward(ip6, ifp, m)
 
 	/*
 	 * Source address check: do not forward packets with unspecified
-	 * source. It was discussed in July 2000, on ipngwg mailing list.
-	 * This is rather more serious than unicast cases, because some
-	 * MLD packets can be sent with the unspecified source address
-	 * (although such packets must normally set the hop limit field to 1).
+	 * source as specified in RFC3513.
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 		ip6stat.ip6s_cantforward++;
