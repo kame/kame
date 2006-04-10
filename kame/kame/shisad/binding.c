@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.26 2006/03/02 11:35:37 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.27 2006/04/10 15:30:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -42,16 +42,16 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <net/if.h>
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #include <net/if_var.h>
 #endif
 #include <net/mipsock.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet/ip6mh.h>
-#include <netinet/in_var.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+//#include <netinet/in_var.h>
+//#include <netinet/in.h>
+//#include <arpa/inet.h>
 
 #ifdef MIP_MN
 #include <sys/sockio.h>

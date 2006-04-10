@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.32 2006/02/22 11:03:51 mitsuya Exp $	*/
+/*	$KAME: mnd.c,v 1.33 2006/04/10 15:30:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -102,6 +102,7 @@ static void show_current_config(int, char *);
 static void mn_lists_init(void);
 static int mipsock_recv_rr_hint(struct mip_msghdr *);
 static void mnd_init_homeprefix(struct mip6_mipif *);
+int  mip6_icmp6_create_haanyaddr(struct in6_addr *, struct in6_addr *, int);
 static struct mip6_mipif *mnd_add_mipif(char *);
 static void terminate(int);
 static int mipsock_md_dereg_bul_fl(struct in6_addr *, struct in6_addr *, 
@@ -1136,6 +1137,32 @@ send_haadreq(hoainfo, hoa_plen, src)
 	syslog(LOG_INFO, "send DHAAD REQUEST\n");
 
 	return (errno);
+}
+
+int
+mip6_icmp6_create_haanyaddr(haanyaddr, mpfx, mpfx_len)
+        struct in6_addr *haanyaddr;
+        struct in6_addr *mpfx;
+	int mpfx_len;
+{
+	static const struct in6_addr haanyaddr_ifid64 = {
+		{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		   0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
+	};
+	static const struct in6_addr haanyaddr_ifidnn = {
+		{{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
+	};
+
+        if (mpfx == NULL)
+                return (EINVAL);
+
+        if (mpfx_len == 64)
+                mip6_create_addr(haanyaddr, &haanyaddr_ifid64, mpfx, mpfx_len);
+        else
+                mip6_create_addr(haanyaddr, &haanyaddr_ifidnn, mpfx, mpfx_len);
+
+        return (0);
 }
 
 int

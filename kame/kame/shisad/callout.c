@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.5 2006/01/26 08:47:21 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.6 2006/04/10 15:30:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -45,6 +45,9 @@
 #include "callout.h"
 
 #define timermilisec(tvp)	((tvp)->tv_usec / 1000 + (tvp)->tv_sec * 1000)
+#ifndef INFTIM
+#define INFTIM	(-1)
+#endif
 
 struct callout_queue_t_head callout_head;
 

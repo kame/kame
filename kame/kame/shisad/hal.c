@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.9 2006/03/02 11:11:10 t-momose Exp $	*/
+/*	$KAME: hal.c,v 1.10 2006/04/10 15:30:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -114,8 +114,8 @@ had_add_hal(hpfx_entry, gladdr, lladdr, lifetime, preference, flag)
 	struct  mip6_hpfxl *hpfx_entry;
 	struct in6_addr *gladdr;
 	struct in6_addr *lladdr;
-	uint16_t lifetime;
-	uint16_t preference;
+	u_int16_t lifetime;
+	u_int16_t preference;
 	int flag;
 {
 	struct home_agent_list *hal = NULL, *h;
@@ -382,9 +382,9 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 	struct mip6_hpfx_list *hpfxhead = NULL; 
 	struct nd_opt_hdr *pt;
 
-	uint16_t       hai_preference = 0;
-	uint16_t       hai_lifetime = 0;
-	uint8_t        hai_pfxlen = 0;
+	u_int16_t hai_preference = 0;
+	u_int16_t hai_lifetime = 0;
+	u_int8_t hai_pfxlen = 0;
 
 	/* parse nd_options */ 
 	memset(&ndopts, 0, sizeof(ndopts));

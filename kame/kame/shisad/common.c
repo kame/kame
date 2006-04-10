@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.27 2006/02/22 11:03:50 mitsuya Exp $	*/
+/*	$KAME: common.c,v 1.28 2006/04/10 15:30:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -65,15 +65,6 @@
 #include "fsm.h"
 
 extern struct mip6_mipif_list mipifhead;
-
-static const struct in6_addr haanyaddr_ifid64 = {
-	{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	   0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
-};
-static const struct in6_addr haanyaddr_ifidnn = {
-        {{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-	   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
-};
 
 #ifdef MIP_MN
 //static struct sockaddr_dl *get_sockdl_from_ifindex(struct sockaddr_dl *, u_int16_t);
@@ -550,25 +541,6 @@ icmp6_input_common(fd)
 	return (error);
 }
 
-
-#ifdef MIP_MN
-int
-mip6_icmp6_create_haanyaddr(haanyaddr, mpfx, mpfx_len)
-        struct in6_addr *haanyaddr;
-        struct in6_addr *mpfx;
-	int mpfx_len;
-{
-        if (mpfx == NULL)
-                return (EINVAL);
-
-        if (mpfx_len == 64)
-                mip6_create_addr(haanyaddr, &haanyaddr_ifid64, mpfx, mpfx_len);
-        else
-                mip6_create_addr(haanyaddr, &haanyaddr_ifidnn, mpfx, mpfx_len);
-
-        return (0);
-}
-#endif /* MIP_HA */
 
 void
 mip6_create_addr(addr, ifid, prefix, prefixlen)

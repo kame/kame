@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.35 2006/03/02 11:11:10 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.36 2006/04/10 15:30:54 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -420,7 +420,6 @@ void mhsock_close(void);
 int  mh_input_common(int);
 int  get_mobility_options(struct ip6_mh *, int, int, 
 			 struct mip6_mobility_options *);
-int  mip6_icmp6_create_haanyaddr(struct in6_addr *, struct in6_addr *, int);
 int  in6_mask2len(struct in6_addr *, u_char *);
 int  mh_input(struct in6_addr *, struct in6_addr *, 
    struct in6_addr *, struct in6_addr *, struct ip6_mh *, int);

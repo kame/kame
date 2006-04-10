@@ -1,4 +1,4 @@
-/*	$KAME: command.c,v 1.4 2006/02/10 07:45:50 t-momose Exp $	*/
+/*	$KAME: command.c,v 1.5 2006/04/10 15:30:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -129,7 +129,7 @@ new_connection(s)
 {
 	int ss;
 	struct sockaddr_in6 sin6;
-	size_t sin6len;
+	socklen_t sin6len;
 
 	sin6len = sizeof(struct sockaddr_in6);
 	if ((ss = accept(s, (struct sockaddr *)&sin6, &sin6len)) < 0) {

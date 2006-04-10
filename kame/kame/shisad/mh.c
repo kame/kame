@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.49 2006/03/01 11:02:03 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.50 2006/04/10 15:30:53 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -974,8 +974,8 @@ send_brr(src, dst)
         brr.ip6mhbr_hdr.ip6mh_proto = IPPROTO_NONE;
         brr.ip6mhbr_hdr.ip6mh_len = (sizeof(brr) >> 3) - 1;
         brr.ip6mhbr_hdr.ip6mh_type = IP6_MH_TYPE_BRR;
-        brr.ip6mhbr_hdr.ip6mh_cksum = checksum_p((uint16_t *)src, (uint16_t *)dst, 
-						 (uint16_t *)&brr, sizeof(brr), IPPROTO_MH);
+        brr.ip6mhbr_hdr.ip6mh_cksum = checksum_p((u_int16_t *)src, (u_int16_t *)dst, 
+						 (u_int16_t *)&brr, sizeof(brr), IPPROTO_MH);
 
 	error = sendmessage((char *)&brr, sizeof(brr), 0, src, dst, NULL, NULL);
 	return (error);
@@ -1009,8 +1009,8 @@ send_hoti(bul)
 		 sizeof(hoti.ip6mhhti_cookie)); 
 
 	hoti.ip6mhhti_hdr.ip6mh_cksum = 
-		checksum_p((uint16_t *)&bul->bul_hoainfo->hinfo_hoa, 
-			(uint16_t *)&bul->bul_peeraddr, (uint16_t *)&hoti, 
+		checksum_p((u_int16_t *)&bul->bul_hoainfo->hinfo_hoa, 
+			(u_int16_t *)&bul->bul_peeraddr, (u_int16_t *)&hoti, 
 				sizeof(hoti), IPPROTO_MH);
 
 	err = sendmessage((char *)&hoti, sizeof(hoti), 0,
@@ -1046,8 +1046,8 @@ send_coti(bul)
 	       sizeof(coti.ip6mhcti_cookie));
 
 	coti.ip6mhcti_hdr.ip6mh_cksum = 
-		checksum_p((uint16_t *)&bul->bul_coa, 
-			(uint16_t *)&bul->bul_peeraddr, (uint16_t *)&coti, 
+		checksum_p((u_int16_t *)&bul->bul_coa, 
+			(u_int16_t *)&bul->bul_peeraddr, (u_int16_t *)&coti, 
 				sizeof(coti), IPPROTO_MH);
 
 	err = sendmessage((char *)&coti, sizeof(coti),
@@ -1094,8 +1094,8 @@ send_hot(hoti, dst, src)
 	create_keygentoken(dst, nonce, (u_int8_t *)hot.ip6mhht_keygen, 0);
 
 	hot.ip6mhht_hdr.ip6mh_cksum = 
-		checksum_p((uint16_t *)src, 
-			   (uint16_t *)dst, (uint16_t *)&hot, 
+		checksum_p((u_int16_t *)src, 
+			   (u_int16_t *)dst, (u_int16_t *)&hot, 
 			   sizeof(hot), IPPROTO_MH);
 
 	err = sendmessage((char *)&hot, sizeof(hot), 0, src, dst, NULL, NULL);
@@ -1138,8 +1138,8 @@ send_cot(coti, dst, src)
 
 	/*cot.ip6mhct_hdr.ip6mh_cksum = 0a*/
 	cot.ip6mhct_hdr.ip6mh_cksum = 
-		checksum_p((uint16_t *)src, 
-			   (uint16_t *)dst, (uint16_t *)&cot, 
+		checksum_p((u_int16_t *)src, 
+			   (u_int16_t *)dst, (u_int16_t *)&cot, 
 			   sizeof(cot), IPPROTO_MH);
 
 	err = sendmessage((char *)&cot, sizeof(cot), 0, src, dst, NULL, NULL);
@@ -1453,9 +1453,9 @@ send_bu(bul)
 	bup->ip6mhbu_hdr.ip6mh_len = (buflen >> 3) - 1;
 	bup->ip6mhbu_hdr.ip6mh_cksum = 0;
 	bup->ip6mhbu_hdr.ip6mh_cksum = 	
-		checksum_p((uint16_t *)&bul->bul_hoainfo->hinfo_hoa, 
-			(uint16_t *)&bul->bul_peeraddr,
-		   	(uint16_t *)bufp, buflen, IPPROTO_MH);
+		checksum_p((u_int16_t *)&bul->bul_hoainfo->hinfo_hoa, 
+			(u_int16_t *)&bul->bul_peeraddr,
+		   	(u_int16_t *)bufp, buflen, IPPROTO_MH);
 	if (bul->bul_hoainfo->hinfo_location == MNINFO_MN_HOME) 
 		error = sendmessage((char *)bufp, buflen, bul->bul_home_ifindex,
 		    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr,
@@ -1667,8 +1667,8 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 	bap->ip6mhba_hdr.ip6mh_len = (buflen >> 3) - 1;
 	bap->ip6mhba_hdr.ip6mh_cksum = 0;
 	bap->ip6mhba_hdr.ip6mh_cksum = 
-		checksum_p((uint16_t *)src, (uint16_t *)hoa,
-			   (uint16_t *)bufp, buflen, IPPROTO_MH);
+		checksum_p((u_int16_t *)src, (u_int16_t *)hoa,
+			   (u_int16_t *)bufp, buflen, IPPROTO_MH);
 
 	if (debug) {
 		syslog(LOG_INFO, "BA is sent");
@@ -1729,8 +1729,8 @@ send_be(dst, src, home, status)
 		       0, sizeof(struct in6_addr));
 
 	be.ip6mhbe_hdr.ip6mh_cksum = 
-		checksum_p((uint16_t *)src, (uint16_t *)dst,
-		(uint16_t *)&be, (be.ip6mhbe_hdr.ip6mh_len + 1) << 3, IPPROTO_MH);
+		checksum_p((u_int16_t *)src, (u_int16_t *)dst,
+		(u_int16_t *)&be, (be.ip6mhbe_hdr.ip6mh_len + 1) << 3, IPPROTO_MH);
 
 	err =  sendmessage((char *)&be, sizeof(be), 
 			   0, src, dst, NULL, NULL);
