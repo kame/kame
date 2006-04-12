@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.h,v 1.3 2005/07/25 04:37:51 t-momose Exp $	*/
+/*	$KAME: if_mip.h,v 1.4 2006/04/12 12:19:31 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,6 +34,7 @@
 
 #define MIP_MTU 1280
 
+#if !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE))
 struct mip_softc {
 	struct ifnet          mip_if;
 	LIST_ENTRY(mip_softc) mip_entry;
@@ -42,6 +43,7 @@ struct mip_softc {
 #endif
 };
 LIST_HEAD(mip_softc_list, mip_softc);
+#endif /* (__APPLE__) || ((__APPLE__) && (KERNEL_PRIVATE)) */
 
 struct bul6info {
         struct in6_addr     bul_peeraddr;   /* peer addr of this BU */
