@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.27 2006/04/10 15:30:52 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.28 2006/04/13 09:25:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -85,6 +85,8 @@ static char *rr_fsm_desc[] = {
   "WAITH",
   "WAITC"
 };
+
+static void command_show_bul_one(int, struct binding_update_list *);
 #endif /* MIP_MN */
 
 #ifndef MIP_MN
@@ -858,33 +860,25 @@ bul_mcoa_get(hoa, peer, bid)
 	if (hoainfo == NULL)
 		return (NULL);
 
-	if (LIST_EMPTY(&hoainfo->hinfo_bul_head))
-		return (NULL);
-
         for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		     bul = LIST_NEXT(bul, bul_entry)) {
 
-		if (IN6_ARE_ADDR_EQUAL(peer, &bul->bul_peeraddr)) {
-			break;
-		} 
-	}
+		if (!IN6_ARE_ADDR_EQUAL(peer, &bul->bul_peeraddr))
+			continue;
 
-	if (bul == NULL)
-		return (NULL);
+		if (bid <= 0) {
+			return (bul);
+		} else {
+			/* search mcoa bul */
+		        for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
+	     		    mbul = LIST_NEXT(mbul, bul_entry)) {
 
-	/* if bid is zero, return normal BU */
-	if (bid <= 0) 
-		return (bul);
+				if (bid && bid == mbul->bul_bid)
+					return (mbul);
+			}
 
-	/* search mcoa bul */
-	if (LIST_EMPTY(&bul->bul_mcoa_head))
-		return (NULL);
-
-        for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
-	     mbul = LIST_NEXT(mbul, bul_entry)) {
-
-		if (bid && bid == mbul->bul_bid)
-			return (mbul);
+			return (NULL);
+		}
 	}
 
 	return (NULL);
@@ -971,50 +965,74 @@ command_show_bul(s, dummy)
 {
 	struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul = NULL;
-        struct timeval now;
-
-        gettimeofday(&now, NULL);
-
+#ifdef MIP_MCOA
+	struct binding_update_list *mbul = NULL;
+#endif
 	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		
 		for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		     bul = LIST_NEXT(bul, bul_entry)) {
-
-			command_printf(s, "%s ", ip6_sprintf(&bul->bul_peeraddr));
-			command_printf(s, "%s", 
-				ip6_sprintf(&hoainfo->hinfo_hoa));
+			command_show_bul_one(s, bul);
 #ifdef MIP_MCOA
-			if (bul->bul_bid)
-				command_printf(s, "$%d", bul->bul_bid);
-#endif /* MIP_MCOA */
-			command_printf(s, " %s\n", 
-				ip6_sprintf(&bul->bul_coa));
+			if (LIST_EMPTY(&bul->bul_mcoa_head))
+				continue;
+			for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
+			    mbul = LIST_NEXT(mbul, bul_entry)) {
+				command_show_bul_one(s, mbul);
+			}
+#endif
 			
-			command_printf(s,
-				"     lif=%d, ref=%d, seq=%d, %c%c%c%c%c%c, %c, ", 
-				bul->bul_lifetime,
-				bul->bul_refresh,
-				bul->bul_seqno,
-				(bul->bul_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
-				(bul->bul_flags & IP6_MH_BU_HOME) ? 'H' : '-',
-				(bul->bul_flags & IP6_MH_BU_LLOCAL) ? 'L' : '-',
-				(bul->bul_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
-				(bul->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
-				(bul->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-',
-				(bul->bul_state & MIP6_BUL_STATE_DISABLE) ? 'D' : '-');
-
-			command_printf(s,
-			    "%s, %s, ret=%ld, exp=%ld\n",
-			    reg_fsm_desc[bul->bul_reg_fsm_state],
-			    rr_fsm_desc[bul->bul_rr_fsm_state],
-			    (bul->bul_retrans) ? 
-			    (bul->bul_retrans->exptime.tv_sec - now.tv_sec) : -1,
-			    (bul->bul_expire) ? 
-			    (bul->bul_expire->exptime.tv_sec - now.tv_sec) : -1);
 		}
 	}
 } 
+
+static void
+command_show_bul_one(s, bul)
+	int s;
+	struct binding_update_list *bul;
+{
+        struct timeval now;
+
+        gettimeofday(&now, NULL);
+
+	command_printf(s, "%s ", ip6_sprintf(&bul->bul_peeraddr));
+#ifndef MIP_MCOA
+	command_printf(s, "%s ", 
+		ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
+#else
+	if (bul->bul_bid)
+		command_printf(s, "%s$%d ", 
+			ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa), bul->bul_bid);
+	else
+		command_printf(s, "%s ", 
+			ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
+#endif /* MIP_MCOA */
+	command_printf(s, "%s\n", 
+		ip6_sprintf(&bul->bul_coa));
+	
+	command_printf(s,
+		"     lif=%d, ref=%d, seq=%d, %c%c%c%c%c%c, %c, ", 
+		bul->bul_lifetime,
+		bul->bul_refresh,
+		bul->bul_seqno,
+		(bul->bul_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
+		(bul->bul_flags & IP6_MH_BU_HOME) ? 'H' : '-',
+		(bul->bul_flags & IP6_MH_BU_LLOCAL) ? 'L' : '-',
+		(bul->bul_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
+		(bul->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
+		(bul->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-',
+		(bul->bul_state & MIP6_BUL_STATE_DISABLE) ? 'D' : '-');
+
+	command_printf(s,
+	    "%s, %s, ret=%ld, exp=%ld\n",
+	    reg_fsm_desc[bul->bul_reg_fsm_state],
+	    rr_fsm_desc[bul->bul_rr_fsm_state],
+	    (bul->bul_retrans) ? 
+	    (bul->bul_retrans->exptime.tv_sec - now.tv_sec) : -1,
+	    (bul->bul_expire) ? 
+	    (bul->bul_expire->exptime.tv_sec - now.tv_sec) : -1);
+}
 
 void
 command_show_kbul(s, dummy)
