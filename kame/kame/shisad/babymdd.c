@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.18 2006/02/22 09:08:33 mitsuya Exp $	*/
+/*	$Id: babymdd.c,v 1.19 2006/04/13 16:07:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -49,7 +49,7 @@
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/if_media.h>
-#ifndef NetBSD
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <net/route.h>
