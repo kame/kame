@@ -1,4 +1,4 @@
-/*      $KAME: mdd.c,v 1.5 2005/10/11 15:24:23 mitsuya Exp $  */
+/*      $KAME: mdd.c,v 1.6 2006/04/13 02:21:26 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -49,6 +49,7 @@
 #include <arpa/inet.h>
 
 #ifdef MIP_MCOA
+#include <sys/param.h>
 #include <sys/sysctl.h>
 #ifdef __FreeBSD__
 #include <net/if_var.h>
@@ -65,6 +66,7 @@ static char *cmd;
 int ver_major = 0;
 int ver_minor = 1;
 int debug = 0;
+int foreground = 0;
 int namelookup = 1;
 int cflag = 0;
 int mflag = 0;
@@ -129,9 +131,9 @@ main(argc, argv, env)
 
 	/*  Option processing */
 #ifndef MIP_MCOA
-	while ((ch=getopt(argc, argv, "i:dnh:mp:")) != -1)
+	while ((ch=getopt(argc, argv, "i:dfnh:mp:")) != -1)
 #else
-        while ((ch=getopt(argc, argv, "x:b:i:dnh:mp:")) != -1) 
+        while ((ch=getopt(argc, argv, "x:b:i:dfnh:mp:")) != -1) 
 #endif /* MIP_MCOA */
 	{
 		switch (ch) {
@@ -169,6 +171,10 @@ main(argc, argv, env)
 			debug += 1;
 			break;
 
+		case 'f':
+			foreground += 1;
+			break;
+
 		case 'n':
 			namelookup = 0;
 			break;
@@ -187,6 +193,8 @@ main(argc, argv, env)
 	}
 	argc -= optind;
 	argv += optind;
+
+	openlog("shisad(mdd)", LOG_PID, LOG_DAEMON);
 
 #ifdef MIP_MCOA
 	if (bid) {
@@ -267,7 +275,7 @@ main(argc, argv, env)
 	signal(SIGTERM, terminate);
 	signal(SIGINT, terminate);
 
-	if (debug == 0) {
+	if (foreground == 0) {
 		if (daemon(0, 0) < 0) {
 			perror("daemon");
 			terminate(0);
@@ -275,7 +283,6 @@ main(argc, argv, env)
 		}
 	}
 
-	openlog("shisad(mdd)", 0, LOG_DAEMON);
 	mainloop();
 
 	/* not reached */
@@ -563,11 +570,6 @@ void
 sync_binding()
 {
 	struct binding *bp;
-	u_int16_t bid = 0;
-
-#ifdef MIP_MCOA
-	bid = bp->bid;
-#endif
 
 	LIST_FOREACH(bp, &bl_head, binding_entries) {
 		if (memcmp(&bp->coa, &bp->pcoa, sizeof(bp->coa)) == 0)
@@ -577,7 +579,7 @@ sync_binding()
 			/* HOME */
 			returntohome(&bp->hoa, &bp->coa, bp->coaifindex);
 		} else if (bp->flags & BF_BOUND) {
-			chbinding(&bp->hoa, &bp->coa, bid);
+			chbinding(&bp->hoa, &bp->coa, bp->bid);
 		}
 	}
 }
@@ -707,6 +709,7 @@ static void
 dereg_detach_coa(difam) 
 	struct ifa_msghdr *difam;
 {
+	struct cif *cifp;
         struct in6_ifreq ifr6;
         struct sockaddr_in6 dsin6, *sin6;
         struct sockaddr *rti_info[RTAX_MAX];
@@ -721,6 +724,13 @@ dereg_detach_coa(difam)
 	/* Skip mip interface */
         if (strncmp(ifname, "mip", strlen("mip")) == 0) 
                 return;
+
+	/* check specified egress interfaces only */
+	LIST_FOREACH(cifp, &cifl_head, cif_entries)
+		if (difam->ifam_index == if_nametoindex(cifp->cif_name))
+			break;
+	if (cifp == NULL)
+		return;
 
         get_rtaddrs(difam->ifam_addrs, (struct sockaddr *) (difam + 1), rti_info);
 	if (rti_info[RTAX_IFA] == NULL)
@@ -857,7 +867,7 @@ mipsock_deregforeign(hoa, deregcoa, newcoa, ifindex, bid)
 	mdinfo->mipm_md_hint		= MIPM_MD_ADDR;
 	mdinfo->mipm_md_command		= MIPM_MD_DEREGFOREIGN;
 	mdinfo->mipm_md_ifindex		= ifindex;
-	mdinfo->mipm_md_bid = bid; 
+	deregcoa->sin6_port             = bid; 
 
 	memcpy(MIPD_HOA(mdinfo), hoa, sizeof(*hoa));
 	memcpy(MIPD_COA(mdinfo), deregcoa, sizeof(*deregcoa));
@@ -905,7 +915,7 @@ chbinding(hoa, coa, bid)
 	mdinfo->mipm_md_hint		= MIPM_MD_ADDR;
 	mdinfo->mipm_md_command		= MIPM_MD_REREG;
 #ifdef MIP_MCOA
-	mdinfo->mipm_md_bid = bid; 
+	coa->sin6_port                  = bid;
 #endif /* MIP_MCOA */
 	memcpy(MIPD_HOA(mdinfo), hoa, sizeof(*hoa));
 	memcpy(MIPD_COA(mdinfo), coa, sizeof(*coa));
