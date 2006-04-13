@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.6 2006/04/10 15:30:52 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.7 2006/04/13 02:08:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -136,11 +136,15 @@ new_callout_entry(exprelative, func, arg, funcname)
 {
 	struct callout_queue_t *newcq;
 
-	if (exprelative <= 0)
+	if (exprelative <= 0) {
+		syslog(LOG_ERR, "new_callout_entry: invalid tick (%d)", exprelative);
 		return (NULL);
+	}
 	newcq = (struct callout_queue_t *)malloc(sizeof(*newcq));
-	if (!newcq)
+	if (!newcq) {
+		syslog(LOG_ERR, "new_callout_entry: memory allocation failed");
 		return (NULL);
+	}
 
 	gettimeofday(&newcq->exptime, NULL);
 	newcq->exptime.tv_sec += exprelative;
@@ -249,9 +253,9 @@ show_callout_table(s, line)
 		tm = localtime((time_t *)&cq->exptime.tv_sec);
 		
   		timersub(&cq->exptime, &current_time, &t);
-		command_printf(s, "%02d:%02d:%02d(%ld.%06lds) %s()\n",
+		command_printf(s, "%02d:%02d:%02d(%ld.%06lds) %s() for %p\n",
 			tm->tm_hour, tm->tm_min, tm->tm_sec,
 			t.tv_sec, t.tv_usec,
-			cq->funcname);
+			cq->funcname, cq->arg);
 	}
 }
