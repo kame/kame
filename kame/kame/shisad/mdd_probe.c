@@ -1,4 +1,4 @@
-/*      $KAME: mdd_probe.c,v 1.4 2005/12/16 02:20:25 keiichi Exp $  */
+/*      $KAME: mdd_probe.c,v 1.5 2006/04/13 02:30:25 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -267,7 +267,6 @@ send_dereg_link(cifp)
 
         if (bp == NULL) 
                 return;
-
 
         /* Detached address must be global */
         if (in6_addrscope(&bp->coa.sin6_addr) != 
