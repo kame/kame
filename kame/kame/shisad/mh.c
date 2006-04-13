@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.50 2006/04/10 15:30:53 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.51 2006/04/13 02:32:09 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1186,6 +1186,9 @@ send_bu(bul)
 		syslog(LOG_INFO, "  from %s", ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
 		syslog(LOG_INFO, "  to   %s", ip6_sprintf(&bul->bul_peeraddr));
 		syslog(LOG_INFO, "  via  %s", ip6_sprintf(&bul->bul_coa));
+		syslog(LOG_INFO, "  seq  %d", bul->bul_seqno);
+		syslog(LOG_INFO, "  life %d", bul->bul_lifetime);
+		syslog(LOG_INFO, "  flgs %x", bul->bul_flags);
 	}
 
 	memset(buf, 0, sizeof(buf));
