@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.37 2006/04/13 09:53:18 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.38 2006/04/13 10:08:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -363,8 +363,6 @@ bul_kick_fsm(bul, event, data)
 	int event;
 	struct fsm_message *data;
 {
-	int ret = 0;
-
 	if (bul == NULL)
 		return (-1);
 
