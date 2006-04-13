@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.36 2006/02/24 06:17:55 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.37 2006/04/13 09:53:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -139,7 +139,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 #else
 		/* bid must be stored in BRR request. retrieve that... XXX */ 
 		bid = get_bid_option(mh, sizeof(struct ip6_mh_binding_request),
-				     fsmmsg.fsmm_datalen);
+		    fsmmsg.fsmm_datalen);
 		bul = bul_mcoa_get(dst, src, bid); 
 #endif /* MIP_MCOA */
 		if (bul == NULL) {
@@ -175,7 +175,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		bul = bul_get(dst, src);
 #else
 		bid = get_bid_option(mh, sizeof(struct ip6_mh_home_test), 
-				     fsmmsg.fsmm_datalen);
+		    fsmmsg.fsmm_datalen);
 		bul = bul_mcoa_get(dst, src, bid);
 #endif /* MIP_MCOA */
 		if (bul == NULL) {
@@ -183,14 +183,13 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 			mip6stat.mip6s_nobue++;
 
 			syslog(LOG_NOTICE,
-			    "no related binding update entry with "
-			    "this HoT.\n");
+			    "no related binding update entry with this HoT.");
 			return (-1);
 		}
 		error = bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_HOT, &fsmmsg);
 		if (error == -1) {
 			syslog(LOG_NOTICE,
-			    "HOT fsm state transition failed.\n");
+			    "HOT fsm (%p) state transition failed.", bul);
 			return (-1);
 		}
 		break;
@@ -209,12 +208,13 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 			syslog(LOG_NOTICE,
 			    "no related binding update entry found with "
-			    "this CoT.\n");
+			    "this CoT.");
 			return (-1);
 		}
 		error = bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_COT, &fsmmsg);
 		if (error == -1) {
-			syslog(LOG_ERR, "COT state transition failed.\n");
+			syslog(LOG_ERR,
+			    "COT fsm (%p) state transition failed.", bul);
 			return (-1);
 		}
 		break;
@@ -226,15 +226,15 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		hinfo = hoainfo_find_withhoa(dst);  
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
-			    "no related HoA found with this BACK.\n"); 
+			    "no related HoA (%s) found with this BACK.",
+			    ip6_sprintf(dst)); 
 			return (-1);
 		}
 #ifndef MIP_MCOA
 		bul = bul_get(dst, src);
 #else
 		bid = get_bid_option(mh, sizeof(struct ip6_mh_binding_ack), 
-				     fsmmsg.fsmm_datalen);
-		syslog(LOG_INFO, "received bid is %d\n", bid);
+		    fsmmsg.fsmm_datalen);
 		bul = bul_mcoa_get(dst, src, bid);
 
 #endif /* MIP_MCOA */
@@ -248,12 +248,13 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		    && rtaddr == NULL) {
 			syslog(LOG_ERR,
 			    "RTHDR2 must be exist when a mobile node is "
-			    "foreign.\n");
+			    "foreign.");
 			return (-1);
 		}
 		error = bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_BACK, &fsmmsg);
 		if (error == -1) {
-			syslog(LOG_ERR, "BACK state transition failed.\n");
+			syslog(LOG_ERR,
+			    "BACK fsm (%p) state transition failed.", bul);
 			return (-1);
 		}
 		break;
@@ -278,10 +279,9 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 #ifndef MIP_MCOA 
 		bul = bul_get(&hinfo->hinfo_hoa, src);
 #else
+		/* bid must be stored in BERROR. retrieve that... XXX */ 
 		bid = get_bid_option(mh, sizeof(struct ip6_mh_binding_error), 
-				     fsmmsg.fsmm_datalen);
-
-		/* bid must be stored in BRR request. retrieve that... XXX */ 
+		    fsmmsg.fsmm_datalen);
 		bul = bul_mcoa_get(&hinfo->hinfo_hoa, src, bid); /* XXX */
 #endif /* MIP_MCOA */
 		if (bul == NULL) {
@@ -290,7 +290,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 			syslog(LOG_NOTICE,
 			    "no related binding update entry found with "
-			    "this BE.\n");
+			    "this BE.");
 			return (-1);
 		}
 
@@ -317,7 +317,8 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 			    ip6mhbe->ip6mhbe_status);
 		}
 		if (error == -1) {
-			syslog(LOG_ERR, "BE state transition failed.\n");
+			syslog(LOG_ERR,
+			    "BE fsm (%p) state transition failed.", bul);
 			return (-1);
 		}
 		break;
@@ -362,19 +363,22 @@ bul_kick_fsm(bul, event, data)
 	int event;
 	struct fsm_message *data;
 {
+	int ret = 0;
+
 	if (bul == NULL)
 		return (-1);
 
 	if (debug) {
 		syslog(LOG_INFO, "event = %d", event);
+		syslog(LOG_INFO, "entering fsm (%p)", bul);
 		bul_print_all();
 	}
 
 	if (event == MIP6_BUL_FSM_EVENT_RETRANS_TIMER) {
 		if (MIP6_BUL_IS_RR_FSM_RUNNING(bul))
-			return(bul_rr_fsm(bul, event, data));
+			return (bul_rr_fsm(bul, event, data));
 		else
-			return(bul_reg_fsm(bul, event, data));
+			return (bul_reg_fsm(bul, event, data));
 	}
 	if (MIP6_BUL_IS_REG_FSM_EVENT(event))
 		return (bul_reg_fsm(bul, event, data));
@@ -382,6 +386,7 @@ bul_kick_fsm(bul, event, data)
 		return (bul_rr_fsm(bul, event, data));
 
 	/* unknown event is specified. */
+	syslog(LOG_ERR, "unknown fsm event %d", event);
 	return (-1);
 }
 
@@ -803,7 +808,7 @@ bul_reg_fsm(bul, event, data)
 			error = bul_fsm_back_preprocess(bul, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "processing a binding ack failed.\n");
+				    "processing a binding ack failed. in WAITA state\n");
 				/*
 				 * a binding update will be
 				 * retransmitted.
@@ -989,7 +994,7 @@ bul_reg_fsm(bul, event, data)
 			error = bul_fsm_back_preprocess(bul, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "processing a binding ack failed.\n");
+				    "processing a binding ack failed. in WAITAR state");
 				/*
 				 * a binding update will be
 				 * retransmitted.
@@ -1180,7 +1185,7 @@ bul_reg_fsm(bul, event, data)
 			/* in MIP6_BUL_REG_FSM_STATE_WAITD */
 			if (bul_fsm_back_preprocess(bul, data)) {
 				syslog(LOG_ERR,
-				    "processing a binding ack failed.\n");
+				    "processing a binding ack failed in WAITD state.\n");
 				return (-1);
 			}
 #ifdef MIP_MCOA
@@ -1799,9 +1804,14 @@ bul_reg_fsm(bul, event, data)
 				struct binding_update_list *mbul;
 				
 				for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
-				     mbul = LIST_NEXT(bul, bul_entry)) {
+				     mbul = LIST_NEXT(mbul, bul_entry)) {
 		
-					syslog(LOG_INFO, "found multiple BULISTS\n");
+					syslog(LOG_INFO, "found multiple BULISTS in kick_fsm\n");
+#if 1 /* XXX keiichi 2006.2.22 */
+					if (mbul->bul_reg_fsm_state !=
+					    MIP6_BUL_REG_FSM_STATE_DHAAD)
+						continue;
+#endif
 					memcpy(&mbul->bul_peeraddr, 
 					       &hal->hal_ip6addr, sizeof(struct in6_addr));
 					error = send_bu(mbul);
@@ -1852,7 +1862,19 @@ bul_reg_fsm(bul, event, data)
 			REGFSMS = MIP6_BUL_REG_FSM_STATE_DHAAD;
 
 			break;
+		case MIP6_BUL_FSM_EVENT_EXPIRE_TIMER:
+			/* in MIP6_BUL_REG_FSM_STATE_DHAAD */
+			/*
+			 * keep current state extending the expiration
+			 * time.
+			 */
+			bul_set_expire_timer(bul, bul->bul_lifetime << 2);
+
+			REGFSMS = MIP6_BUL_REG_FSM_STATE_DHAAD;
+
+			break;
 		}
+	
 		break;
 
 	default:
@@ -2179,9 +2201,11 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 
 	/* check Sequence Number */
 	seqno = ntohs(ip6mhba->ip6mhba_seqno);
-	if (0)
-	dump_ba(fsmmsg->fsmm_src, fsmmsg->fsmm_dst, fsmmsg->fsmm_rtaddr, 
-	    seqno, ntohs(ip6mhba->ip6mhba_lifetime), ip6mhba->ip6mhba_status);
+	if (debug) {
+		dump_ba(fsmmsg->fsmm_src, fsmmsg->fsmm_dst,
+		    fsmmsg->fsmm_rtaddr, seqno,
+		    ntohs(ip6mhba->ip6mhba_lifetime), ip6mhba->ip6mhba_status);
+	}
 	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_SEQNO_BAD) {
                 /*
                  * our home agent has a greater sequence number in its
@@ -2280,8 +2304,10 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		    "bul_fsm_back_preprocess:"
 		    "received an error status %d.\n",
 		    ip6mhba->ip6mhba_status);
+#if 0 /* XXX 2006.2.22 keiichi */
 		bul_fsm_try_other_home_agent(bul);
 		return (-1);
+#endif
 	}
 
 	/* retrieve Mobility Options */
@@ -2666,7 +2692,6 @@ bul_fsm_try_other_home_agent(bul)
 	struct home_agent_list *hal;
 	struct mip6_hpfxl *hpfx;
 	struct mip6_mipif *mif;
-	struct binding_update_list *tmpbul;
 	int error;
 
 	/*
@@ -2684,63 +2709,38 @@ bul_fsm_try_other_home_agent(bul)
 	 */
 	hal = mip6_find_hal(bul->bul_hoainfo);
 	if (hal) {
-		LIST_FOREACH(tmpbul, &bul->bul_hoainfo->hinfo_bul_head,
-		    bul_entry) {
-			if ((tmpbul->bul_flags & IP6_MH_BU_HOME) == 0)
-				continue;
-			tmpbul->bul_peeraddr = hal->hal_ip6addr;
-
-			error = send_bu(tmpbul);
-			if (error) {
-				syslog(LOG_ERR,
-				    "sending a home registration "
-				    "failed. (%d)\n", error);
-				/* continue and try again. */
-			}
-
-			tmpbul->bul_retrans_time
-			    = initial_bindack_timeout_first_reg;
-			bul_set_retrans_timer(tmpbul,
-			    tmpbul->bul_retrans_time);
-
-			bul_set_expire_timer(tmpbul,
-			    tmpbul->bul_lifetime << 2);
-
-			tmpbul->bul_reg_fsm_state
-			    = MIP6_BUL_REG_FSM_STATE_WAITA;
-#ifdef MIP_MCOA 
-			if (!LIST_EMPTY(&tmpbul->bul_mcoa_head)) {
-				struct binding_update_list *mbul;
-				
-				for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
-				     mbul = LIST_NEXT(bul, bul_entry)) {
-		
-					syslog(LOG_INFO, "found multiple BULISTS\n");
-					memcpy(&mbul->bul_peeraddr, 
-					       &hal->hal_ip6addr, sizeof(struct in6_addr));
-					error = send_bu(mbul);
-					if (error) {
-						syslog(LOG_ERR,
-						       "sending a home registration "
-						       "failed. (%d)\n", error);
-						/* continue and try again. */
-					}
-					
-					mbul->bul_retrans_time
-					    = INITIAL_BINDACK_TIMEOUT;
-					bul_set_retrans_timer(mbul,
-					    mbul->bul_retrans_time);
-					
-					bul_set_expire_timer(mbul,
-					    mbul->bul_lifetime << 2);
-					mbul->bul_reg_fsm_state
-					    = MIP6_BUL_REG_FSM_STATE_WAITA;
-				}
-			}
-#endif /* MIP_MCOA */
+		syslog(LOG_ERR, "HA (%s) is found",
+		    ip6_sprintf(&hal->hal_ip6addr));
+		if ((bul->bul_flags & IP6_MH_BU_HOME) == 0) {
+		    syslog(LOG_ERR, "no home flag 0x%x",
+			bul->bul_flags);
+		    return;
 		}
+		bul->bul_peeraddr = hal->hal_ip6addr;
+		syslog(LOG_ERR, "bul_peeraddr is set to %s",
+		    ip6_sprintf(&bul->bul_peeraddr));
+
+		error = send_bu(bul);
+		if (error) {
+		    syslog(LOG_ERR,
+			"sending a home registration "
+			"failed. (%d)\n", error);
+			/* continue and try again. */
+		}
+
+		bul->bul_retrans_time
+		  = initial_bindack_timeout_first_reg;
+		bul_set_retrans_timer(bul,
+				      bul->bul_retrans_time);
+
+		bul_set_expire_timer(bul,
+				     bul->bul_lifetime << 2);
+
+		bul->bul_reg_fsm_state
+			  = MIP6_BUL_REG_FSM_STATE_WAITA;
 		return;
 	}
+	syslog(LOG_ERR, "HA not found");
 					
 	/* keep current state if we haven't been assigned a valid CoA */
 	if (IN6_IS_ADDR_UNSPECIFIED(&bul->bul_coa))
@@ -2750,7 +2750,7 @@ bul_fsm_try_other_home_agent(bul)
 	error = send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa);
 	if (error) {
 		syslog(LOG_ERR,
-		    "sending a DHAAD request message failed. (%d)\n", error);
+		    "sending a DHAAD request message failed. (%d)", error);
 		/* continue and try again. */
 	}
 
@@ -2763,7 +2763,6 @@ bul_fsm_try_other_home_agent(bul)
 
 	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
 	return;
-
 }
 
 static void
@@ -2897,56 +2896,57 @@ bul_print_all(void)
 
 	gettimeofday(&now, NULL);
 
-	syslog(LOG_INFO, "Binding update list\n");
+	syslog(LOG_INFO, "Binding update list");
 	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
-	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
+	    hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
-		     bul = LIST_NEXT(bul, bul_entry)) {
+		    bul = LIST_NEXT(bul, bul_entry)) {
 			syslog(LOG_INFO,
 #ifndef MIP_MCOA
-			    "\tp=%s,c=%s,lt=%d,rf=%d,seq=%d,fl=0x%x,reg=%d,rr=%d,rt=%ld,et=%ld\n",
+			    "\tfsm=%p,p=%s,c=%s,lt=%d,rf=%d,seq=%d,fl=0x%x,reg=%d,rr=%d,rt=%ld,et=%ld",
 #else
-			    "\tp=%s,c=%s,lt=%d,rf=%d,seq=%d,fl=0x%x,reg=%d,rr=%d,rt=%ld,et=%ld bid=%d\n",
+			    "\tfsm=%p,p=%s,c=%s,lt=%d,rf=%d,seq=%d,fl=0x%x,reg=%d,rr=%d,rt=%ld,et=%ld,bid=%d",
 #endif /* MIP_MCOA */
-			       ip6_sprintf(&bul->bul_peeraddr),
-			       ip6_sprintf(&bul->bul_coa),
-			       bul->bul_lifetime,
-			       bul->bul_refresh,
-			       bul->bul_seqno,
-			       bul->bul_flags,
-			       bul->bul_reg_fsm_state,
-			       bul->bul_rr_fsm_state,
-			       (bul->bul_retrans) ? TIMESUB(&bul->bul_retrans->exptime, &now) : -1,
-			       (bul->bul_expire) ? TIMESUB(&bul->bul_expire->exptime, &now) : -1
-#ifndef MIP_MCOA
-			       );
-#else
-			       ,bul->bul_bid);
+			    bul,
+			    ip6_sprintf(&bul->bul_peeraddr),
+			    ip6_sprintf(&bul->bul_coa),
+			    bul->bul_lifetime,
+			    bul->bul_refresh,
+			    bul->bul_seqno,
+			    bul->bul_flags,
+			    bul->bul_reg_fsm_state,
+			    bul->bul_rr_fsm_state,
+			    (bul->bul_retrans)
+			    ? TIMESUB(&bul->bul_retrans->exptime, &now) : -1,
+			    (bul->bul_expire)
+			    ? TIMESUB(&bul->bul_expire->exptime, &now) : -1
+#ifdef MIP_MCOA
+			    ,bul->bul_bid
 #endif /* MIP_MCOA */
-#ifdef MIP_MCOA 
+			);
+#ifdef MIP_MCOA
 			if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
 				struct binding_update_list *mbul;
 				
-				for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
-				     mbul = LIST_NEXT(mbul, bul_entry)) {
+				for (mbul = LIST_FIRST(&bul->bul_mcoa_head);
+				    mbul; mbul = LIST_NEXT(mbul, bul_entry)) {
 					syslog(LOG_INFO,
-					       "\t\tp=%s,c=%s,lt=%d,rf=%d,seq=%d,fl=0x%x,reg=%d,rr=%d,rt=%ld,et=%ld bid=%d\n",
-					       ip6_sprintf(&mbul->bul_peeraddr),
-					       ip6_sprintf(&mbul->bul_coa),
-					       mbul->bul_lifetime,
-					       mbul->bul_refresh,
-					       mbul->bul_seqno,
-					       mbul->bul_flags,
-					       mbul->bul_reg_fsm_state,
-					       mbul->bul_rr_fsm_state,
-					       (mbul->bul_retrans) ? TIMESUB(&mbul->bul_retrans->exptime, &now) : -1,
-					       (mbul->bul_expire) ? TIMESUB(&mbul->bul_expire->exptime, &now) : -1,
-					       mbul->bul_bid);
-					
+					    "\t\tfsm=%p,p=%s,c=%s,lt=%d,rf=%d,seq=%d,fl=0x%x,reg=%d,rr=%d,rt=%ld,et=%ld bid=%d",
+					    mbul,
+					    ip6_sprintf(&mbul->bul_peeraddr),
+					    ip6_sprintf(&mbul->bul_coa),
+					    mbul->bul_lifetime,
+					    mbul->bul_refresh,
+					    mbul->bul_seqno,
+					    mbul->bul_flags,
+					    mbul->bul_reg_fsm_state,
+					    mbul->bul_rr_fsm_state,
+					    (mbul->bul_retrans) ? TIMESUB(&mbul->bul_retrans->exptime, &now) : -1,
+					    (mbul->bul_expire) ? TIMESUB(&mbul->bul_expire->exptime, &now) : -1,
+					    mbul->bul_bid);
 				}
 			}
 #endif /* MIP_MCOA */
-
 		}
 	}
 }
