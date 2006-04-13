@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.20 2005/10/11 10:04:46 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.21 2006/04/13 02:26:24 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -563,7 +563,7 @@ find_nemo_if(hoa, bid)
 {
 	struct nemo_if *nif;
 	short flags;
-	
+
 	LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
 		if (multiplecoa) {
 			if (hoa && IN6_ARE_ADDR_EQUAL(hoa, &nif->hoa)) {
@@ -696,16 +696,17 @@ mainloop() {
 				if (hoa == NULL)
 					break;
 
-				if (debug) {
-					syslog(LOG_INFO, 
-						"cmd=BUL_ADD, hoa=%s, dst=%s, src=%s\n", 
-						ip6_sprintf(hoa), 
-						ip6_sprintf(&dst.sin6_addr), 
-						ip6_sprintf(&src.sin6_addr));
-				}
-
 				if (multiplecoa)
 					memcpy(&bid, &((struct sockaddr_in6 *)MIPU_COA(mbu))->sin6_port, sizeof(bid));
+				if (debug) {
+					syslog(LOG_INFO, 
+						"cmd=BUL_ADD, hoa=%s, dst=%s, src=%s, bid=%d\n", 
+						ip6_sprintf(hoa), 
+						ip6_sprintf(&dst.sin6_addr), 
+						ip6_sprintf(&src.sin6_addr),
+					        bid);
+				}
+
 				nif = nemo_setup_forwarding((struct sockaddr *)&src, 
 							    (struct sockaddr *)&dst, hoa, bid);
 
