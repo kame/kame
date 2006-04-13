@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.278 2006/03/15 09:29:50 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.279 2006/04/13 01:55:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -703,12 +703,7 @@ defrouter_select()
 	 * if the node is not an autoconfigured host, we explicitly exclude
 	 * such cases here for safety.
 	 */
-#if defined(MIP6) && NMIP > 0
-	if ((ip6_forwarding || !ip6_accept_rtadv) && !MIP6_IS_MR) 
-#else
-	if (ip6_forwarding || !ip6_accept_rtadv) 
-#endif /* MIP6 && NMIP > 0 */
-	{
+	if (ip6_forwarding || !ip6_accept_rtadv) {
 		nd6log((LOG_WARNING,
 		    "defrouter_select: called unexpectedly (forwarding=%d, "
 		    "accept_rtadv=%d)\n", ip6_forwarding, ip6_accept_rtadv));
