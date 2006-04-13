@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.33 2006/04/10 15:30:53 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.34 2006/04/13 10:04:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -739,10 +739,8 @@ mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 	if (if_indextoname(ifindex, ifname) == NULL) 
 		return (EINVAL);
 
-	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
-		bul = bul_next) {
+	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul; bul = bul_next) {
 		bul_next = LIST_NEXT(bul, bul_entry);
-
 #ifdef MIP_MCOA
 		/* update bul that matched with the bid */
 		if (bid && !LIST_EMPTY(&bul->bul_mcoa_head)) {
@@ -762,7 +760,7 @@ mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 				mbul->bul_lifetime = 0;
 				mbul->bul_home_ifindex = ifindex;
 				syslog(LOG_INFO, 
-				       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s%d \n",
+				       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s bid = %d \n",
 				       ifname, bid);
 
 				if (bul_kick_fsm(mbul, 
@@ -888,39 +886,43 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 	/* update bul */
 	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		bul = LIST_NEXT(bul, bul_entry)) {
+		/* update CoA */
+		memcpy(&bul->bul_coa, coa, sizeof(*coa));
+
+		if (bid <= 0) {
+			syslog(LOG_INFO,
+			    "change fsm (%p) MIP6_BUL_FSM_EVENT_MOVEMENT",
+			    bul);
+			if (bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_MOVEMENT,
+			    NULL) == -1) {
+				syslog(LOG_ERR, 
+				    "fsm processing of movement detection "
+				    "failed.\n");
+			}
+		}
 #ifdef MIP_MCOA
-		/* update bul that matched with the bid */
-		if (bid && !LIST_EMPTY(&bul->bul_mcoa_head)) {
+		else {
+			/* update bul that matched with the bid */
 			for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
 			     mbul = LIST_NEXT(mbul, bul_entry)) {
-			
+	
 				if (mbul->bul_bid == bid) {
 					/* update CoA */
-					memcpy(&mbul->bul_coa, coa, sizeof(*coa));
-					
-					syslog(LOG_INFO, "change fsm MIP6_BUL_FSM_EVENT_MOVEMENT\n");
-					if (bul_kick_fsm(mbul, MIP6_BUL_FSM_EVENT_MOVEMENT,
-							 NULL) == -1) {
+					memcpy(&mbul->bul_coa, coa,
+					    sizeof(*coa));
+
+					syslog(LOG_INFO, "change fsm (%p, bid = %d) MIP6_BUL_FSM_EVENT_MOVEMENT", mbul, bid);
+					if (bul_kick_fsm(mbul,
+					    MIP6_BUL_FSM_EVENT_MOVEMENT,
+					    NULL) == -1) {
 						syslog(LOG_ERR, 
 						       "fsm processing of movement detection "
 						       "failed.\n");
 					}
-				} 
+				}
 			}
-			continue;
 		}
 #endif /* MIP_MCOA */
-
-		/* update CoA */
-		memcpy(&bul->bul_coa, coa, sizeof(*coa));
-
-		syslog(LOG_INFO, "change fsm MIP6_BUL_FSM_EVENT_MOVEMENT\n");
-		if (bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_MOVEMENT,
-			NULL) == -1) {
-			syslog(LOG_ERR, 
-			    "fsm processing of movement detection "
-			    "failed.\n");
-		}
 	}
 
 	return (0);
@@ -1703,7 +1705,9 @@ receive_hadisc_reply(dhrep, dhrep_len)
 	if ((bul = bul_get_homeflag(&hoainfo->hinfo_hoa)) == NULL)
 		return (0);
 		
+#if 0
 	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
+#endif
 	bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
 	syslog(LOG_INFO, "DHAAD gets %s\n",
 	       ip6_sprintf(&bul->bul_peeraddr));
@@ -1714,7 +1718,9 @@ receive_hadisc_reply(dhrep, dhrep_len)
 
 		for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
 		     mbul = LIST_NEXT(mbul, bul_entry)) {
+#if 0
 			mbul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
+#endif
 			bul_kick_fsm(mbul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
 		}
 	}
