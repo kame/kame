@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.404 2006/02/20 11:03:24 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.405 2006/04/13 01:56:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -909,6 +909,9 @@ in6_control(so, cmd, data, ifp, p)
 		 * the ioctl operation.
 		 * Note that in6_purgeaddr() will decrement ndpr_refcnt.
 		 */
+#if defined(MIP6) && NMIP > 0
+		rt_addrinfomsg((struct ifaddr *)&ia->ia_ifa);
+#endif /* MIP6 && NMIP > 0 */
 		pr = ia->ia6_ndpr;
 		in6_purgeaddr(&ia->ia_ifa);
 		if (pr && pr->ndpr_refcnt == 0)
