@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.239 2005/12/30 08:57:24 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.240 2006/04/17 12:12:12 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -114,6 +114,10 @@ int mip6ctl_debug = 0;
 #endif
 int mip6ctl_rr_hint_ppslim = 10;
 int mip6ctl_use_migrate = 0;
+#ifndef IFA_MBUL_LIST
+struct mip6_bul_list mbul_list;
+#endif
+
 
 extern struct ip6protosw mip6_tunnel_protosw;
 

@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.18 2005/12/13 00:49:04 mitsuya Exp $ */
+/* $Id: mipsock.c,v 1.19 2006/04/17 12:12:12 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -553,7 +553,13 @@ mipus_output(m, va_alist)
 		return (0);
 	}
 	
+#ifdef __APPLE__
+	socket_unlock(so, 0);
+#endif
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
+#ifdef __APPLE__
+	socket_lock(so, 0);
+#endif
 	return (error);
 }
 
