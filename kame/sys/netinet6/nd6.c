@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.397 2006/03/22 18:48:46 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.398 2006/04/20 04:22:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1533,10 +1533,6 @@ nd6_rtrequest(req, rt, info)
 		 *   note that the mechanism needs a mutual agreement
 		 *   between proxies, which means that we need to implement
 		 *   a new protocol, or a new kludge.
-		 * - from RFC2461 6.2.4, host MUST NOT send an unsolicited NA.
-		 *   we need to check ip6forwarding before sending it.
-		 *   (or should we allow proxy ND configuration only for
-		 *   routers?  there's no mention about proxy ND from hosts)
 		 */
 #if 0
 		/* XXX it does not work */
