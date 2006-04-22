@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.279 2006/04/13 01:55:37 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.280 2006/04/22 04:39:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1095,7 +1095,6 @@ prelist_update(new, dr, m, mcast)
 	int s = splnet();
 #endif
 	int error = 0;
-	int newprefix = 0;
 	int auth;
 	struct in6_addrlifetime lt6_tmp;
 
@@ -1162,8 +1161,6 @@ prelist_update(new, dr, m, mcast)
 			pfxrtr_add(pr, dr);
 	} else {
 		struct nd_prefix *newpr = NULL;
-
-		newprefix = 1;
 
 		if (new->ndpr_vltime == 0)
 			goto end;
