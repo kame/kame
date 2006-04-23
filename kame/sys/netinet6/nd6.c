@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.398 2006/04/20 04:22:37 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.399 2006/04/23 02:51:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1160,13 +1160,16 @@ nd6_is_new_addr_neighbor(addr, ifp)
 	/*
 	 * If the default router list is empty, all addresses are regarded
 	 * as on-link, and thus, as a neighbor.
-	 * XXX: we restrict the condition to hosts, because routers usually do
-	 * not have the "default router list".
+	 * XXX: the "on-link" assumption is removed from 2461bis due to its
+	 * harmful side-effect.  We explicitly disable this part so that
+	 * it won't be reinvented by accident.
 	 */
+#if 0
 	if (!ip6_forwarding && TAILQ_FIRST(&nd_defrouter) == NULL &&
 	    nd6_defifindex == ifp->if_index) {
 		return (1);
 	}
+#endif
 
 	return (0);
 }
@@ -1241,13 +1244,16 @@ nd6_is_addr_neighbor(addr, ifp)
 	/*
 	 * If the default router list is empty, all addresses are regarded
 	 * as on-link, and thus, as a neighbor.
-	 * XXX: we restrict the condition to hosts, because routers usually do
-	 * not have the "default router list".
+	 * XXX: the "on-link" assumption is removed from 2461bis due to its
+	 * harmful side-effect.  We explicitly disable this part so that
+	 * it won't be reinvented by accident.
 	 */
+#if 0
 	if (!ip6_forwarding && TAILQ_FIRST(&nd_defrouter) == NULL &&
 	    nd6_defifindex == ifp->if_index) {
 		return (1);
 	}
+#endif
 #endif /* FreeBSD5 */
 
 	/*
