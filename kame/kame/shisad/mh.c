@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.51 2006/04/13 02:32:09 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.52 2006/04/25 11:11:13 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -536,6 +536,11 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 	return (0);
 }
 
+/*
+ * TODO: must revisit this function.
+ * see KAME-snap 9418, 9422, 9423, 9424 from Daniel Jungbluth and
+ * Christian Vogt for more detail
+ */
 int
 receive_bu(src, dst, hoa, rtaddr, bu, mhlen) 
 	struct in6_addr *src, *dst, *hoa, *rtaddr;
