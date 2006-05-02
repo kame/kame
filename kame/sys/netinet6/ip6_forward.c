@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.160 2006/02/16 15:30:12 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.161 2006/05/02 13:44:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -703,7 +703,7 @@ ip6_forward(m, srcrt)
 
 	/*
 	 * Fake scoped addresses. Note that even link-local source or
-	 * destinaion can appear, if the originating node just sends the
+	 * destination can appear, if the originating node just sends the
 	 * packet to us (without address resolution for the destination).
 	 * Since both icmp6_error and icmp6_redirect_output fill the embedded
 	 * link identifiers, we can do this stuff after making a copy for
