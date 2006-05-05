@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.13 2005/12/14 08:17:51 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.14 2006/05/05 15:51:17 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -65,9 +65,9 @@ static void command_flush(int, char *);
 static void terminate(int);
 
 struct command_table show_command_table[] = {
-	{"bc", command_show_bc, "binding chache"},
-	{"kbc", command_show_kbc, "binding chache in kernel"},
-	{"stat", command_show_stat, "statisticts"},
+	{"bc", command_show_bc, "binding cache"},
+	{"kbc", command_show_kbc, "binding cache in kernel"},
+	{"stat", command_show_stat, "statistics"},
 	{"callout", show_callout_table, "show callout table "},
 	{NULL}
 };

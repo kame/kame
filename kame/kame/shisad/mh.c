@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.52 2006/04/25 11:11:13 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.53 2006/05/05 15:51:18 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -149,12 +149,21 @@ mhsock_open()
         }
 #endif /* IPV6_RECVPKTINFO */
 
+#ifdef IPV6_RECVDSTOPTS
         error = setsockopt(mhsock, 
 			   IPPROTO_IPV6, IPV6_RECVDSTOPTS, &on, sizeof(on));
         if (error < 0) {
                 perror("setsockopt IPV6_RECVDSTOPTS");
                 exit(1);
         }
+#else
+        error = setsockopt(mhsock, 
+			   IPPROTO_IPV6, IPV6_DSTOPTS, &on, sizeof(on));
+        if (error < 0) {
+                perror("setsockopt IPV6_RECVDSTOPTS");
+                exit(1);
+        }
+#endif
 
 #ifdef IPV6_RECVRTHDR
         error = setsockopt(mhsock,
@@ -309,14 +318,14 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 		
 		if ((mhtype = mh->ip6mh_type) > IP6_MH_TYPE_MAX)
 			mhtype = IP6_MH_TYPE_MAX;
-		syslog(LOG_INFO, "%s is received\n", mh_name[mhtype]);
-		syslog(LOG_INFO, "  from:[%s] -> dst:[%s]\n",
+		syslog(LOG_INFO, "%s is received", mh_name[mhtype]);
+		syslog(LOG_INFO, "  from:[%s] -> dst:[%s]",
 		       ip6_sprintf(&from.sin6_addr), ip6_sprintf(&dst));
 
 		if (hoaopt) 
-			syslog(LOG_INFO, "  hoa:  %s\n", ip6_sprintf(&hoa));
+			syslog(LOG_INFO, "  hoa:  %s", ip6_sprintf(&hoa));
 		if (rthdr_on) 
-			syslog(LOG_INFO, "  coa:  %s\n", ip6_sprintf(&rtaddr));
+			syslog(LOG_INFO, "  coa:  %s", ip6_sprintf(&rtaddr));
 	}
 
 	if (mh->ip6mh_type > IP6_MH_TYPE_MAX)
@@ -354,7 +363,7 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
         while (mhopt < mhend) {
 
 		if (debug) {
-			syslog(LOG_INFO, "  %s is found\n",
+			syslog(LOG_INFO, "  %s is found",
 			       mhopt_name[(*mhopt <= IP6_MH_OPT_MAX) ? *mhopt : IP6_MH_OPT_MAX + 1]);
 		}
 
@@ -404,7 +413,7 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 #endif /* DSMIP */
 		default:
 			syslog(LOG_INFO,
-			    "invalid mobility option (%02x). \n", *mhopt);
+			    "invalid mobility option (%02x).", *mhopt);
 			break;
                 }
 
@@ -604,7 +613,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	/* retrieve Mobility Options */
 	if (get_mobility_options((struct ip6_mh *)bu, sizeof(*bu), mhlen, &mopt)) {
 		mip6stat.mip6s_invalidopt++;
-		syslog(LOG_ERR, "bad mobility option in BU.\n");
+		syslog(LOG_ERR, "bad mobility option in BU.");
 		return (-1);
 	}
 
@@ -693,17 +702,17 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		/* Authentication is failed, silently discard */
 		if (memcmp(&authenticator, 
 			   ((u_int8_t *)mopt.opt_auth + 2), MIP6_AUTHENTICATOR_SIZE) != 0) {
-			syslog(LOG_ERR, "Authenticator comparison failed\n");
+			syslog(LOG_ERR, "Authenticator comparison failed");
 			if (debug) { 
-				syslog(LOG_INFO, "HomeIndex 0x%x\n", 
+				syslog(LOG_INFO, "HomeIndex 0x%x",
 				       ntohs(mopt.opt_nonce->ip6moni_home_nonce));
-				syslog(LOG_INFO, "Home Token= %s\n",
+				syslog(LOG_INFO, "Home Token= %s",
 				       hexdump(&home_token, MIP6_TOKEN_SIZE));
-				syslog(LOG_INFO, "CareofIndex 0x%x\n",
+				syslog(LOG_INFO, "CareofIndex 0x%x",
 				       ntohs(mopt.opt_nonce->ip6moni_coa_nonce));
-				syslog(LOG_INFO, "Careof Token= %s\n", 
+				syslog(LOG_INFO, "Careof Token= %s", 
 				       hexdump(&careof_token, MIP6_TOKEN_SIZE));
-				syslog(LOG_INFO, "kbm: %s\n",
+				syslog(LOG_INFO, "kbm: %s",
 				       hexdump(kbm, MIP6_KBM_SIZE));
 			}
 			
@@ -733,7 +742,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		 * silently drop this BU 
 		 */
 		if (!(homeagent_mode && (flags & IP6_MH_BU_HOME))) {
-			syslog(LOG_ERR, "No authenticator found in BU\n");
+			syslog(LOG_ERR, "No authenticator found in BU");
 			return (-1);
 		} else {
 			return (0);
@@ -750,7 +759,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	 */
 	if (mopt.opt_bid) {
 		bid = ntohs(mopt.opt_bid->ip6mobid_bid);
-		syslog(LOG_INFO, "BID Option is found %d\n", bid);
+		syslog(LOG_INFO, "BID Option is found %d", bid);
 		/* zero bid is invalid */
 		if (bid == 0) 
 			return (-1); /* XXX */
@@ -774,7 +783,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (bc && MIP6_LEQ(seqno, bc->bc_seqno)) {
 		statuscode = IP6_MH_BAS_SEQNO_BAD;
 		seqno = bc->bc_seqno;
-		syslog(LOG_ERR, "Received sequence number from [%s] is out of window.\n",
+		syslog(LOG_ERR, "Received sequence number from [%s] is out of window.",
 		       ip6_sprintf(hoa));
 		goto sendba;
 	}
@@ -886,7 +895,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 
 #endif /* MIP_HA */
 
-	/* Requesitng to delete binding (de-registration) */
+	/* Requesting to delete a binding (de-registration) */
 	if (lifetime == 0 
 	    || IN6_ARE_ADDR_EQUAL(coa, hoa)) {
 		if (bc) {
@@ -905,7 +914,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #endif /* MIP_CN */
 			mip6_bc_delete(bc);
 			syslog(LOG_INFO,
-			       "binding cache has been deleted. HoA:[%s], CoA[%s] lifetime=%d\n",
+			       "binding cache has been deleted. HoA:[%s], CoA[%s] lifetime=%d",
 			       ip6_sprintf(hoa), ip6_sprintf(coa), lifetime);
 		} else {
 #ifdef MIP_HA
@@ -1173,18 +1182,18 @@ send_bu(bul)
 	struct ip6_mh_opt_ipv4_prefix v4prefix_opt;
 #endif /* MIP_IPV4MNPSUPPORT */
 #endif /* MIP_NEMO */
-#ifdef MIP_MCOA
-	struct ip6_mh_opt_bid bid_opt;
-
-	if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
-		/*syslog(LOG_INFO, "this bul has multiple CoAs, ignore root %d\n", bul->bul_bid);*/
-		return (0);
-	} 
-#endif /* MIP_MCOA */
 #ifdef DSMIP
 	struct ip6_mh_opt_ipv4_hoa v4hoa_opt;
 	struct home_agent_list *hal;
 #endif /* DSMIP */
+#ifdef MIP_MCOA
+	struct ip6_mh_opt_bid bid_opt;
+
+	if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
+		/*syslog(LOG_INFO, "this bul has multiple CoAs, ignore root %d", bul->bul_bid);*/
+		return (0);
+	} 
+#endif /* MIP_MCOA */
 
 	if (debug) {
 		syslog(LOG_INFO, "BU is sent");
@@ -1222,7 +1231,8 @@ send_bu(bul)
 		if (homebul == NULL)
 			return (EINVAL);
 		
-		if (TIMESUB(&homebul->bul_expire->exptime, &now) <= (bul->bul_lifetime << 2))
+		if (homebul->bul_expire &&
+		    TIMESUB(&homebul->bul_expire->exptime, &now) <= (bul->bul_lifetime << 2))
 			bup->ip6mhbu_lifetime = htons(TIMESUB(&homebul->bul_expire->exptime, &now) >> 2);
 		else 
 			bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
@@ -1262,7 +1272,7 @@ send_bu(bul)
 		bid_opt.ip6mobid_len = 4;
 		bid_opt.ip6mobid_bid = htons(bul->bul_bid);
 		bid_opt.ip6mobid_reserved = 0;
-		syslog(LOG_INFO, "BID option is added %d\n", bul->bul_bid);
+		syslog(LOG_INFO, "BID option is added %d", bul->bul_bid);
 
 		memcpy((bufp + buflen), &bid_opt, sizeof(bid_opt));
 		buflen += sizeof(struct ip6_mh_opt_bid);
@@ -1344,7 +1354,7 @@ send_bu(bul)
 				&bul->bul_hoainfo->hinfo_v4hoa,
 				sizeof(struct in_addr));
 
-		syslog(LOG_INFO, "IPv4 Home Address option is added %s/%d\n", 
+		syslog(LOG_INFO, "IPv4 Home Address option is added %s/%d", 
 				inet_ntoa(v4hoa_opt.ip6mov4hoa_v4hoa),
 				v4hoa_opt.ip6mov4hoa_pfxlen);
 
@@ -1416,24 +1426,34 @@ send_bu(bul)
 #if 0
 	if (debug) { 
 		int r = 0;
+		char msg[256];
 	
-		syslog(LOG_ERR, "homeindex=0x%x\n", bul->bul_home_nonce_index);
+		syslog(LOG_ERR, "homeindex=0x%x", bul->bul_home_nonce_index);
+
+		memset(msg, 0, sizeof(msg));
+		sprintf(msg, "hometoken=");
 		syslog(LOG_ERR, "hometoken=");
 
 		for (r = 0; r < MIP6_HOME_TOKEN_SIZE; r++)
-			syslog(LOG_ERR, "0x%x:", bul->bul_home_token[r]);
-		syslog(LOG_ERR, "\n");
+			sprintf(msg + strlen(msg), "0x%x:",
+				bul->bul_home_token[r]);
+		syslog(LOG_ERR, msg);
 	
-		syslog(LOG_ERR, "careofindex=0x%x\n", bul->bul_careof_nonce_index);
-		syslog(LOG_ERR, "careoftoken= ");
+		syslog(LOG_ERR, "careofindex=0x%x",
+		       bul->bul_careof_nonce_index);
+
+		memset(msg, 0, sizeof(msg));	
+		sprintf(msg, "careoftoken= ");
 		for (r = 0; r < MIP6_HOME_TOKEN_SIZE; r++)
-			syslog(LOG_ERR, "0x%x:", bul->bul_careof_token[r]);
-		syslog(LOG_ERR, "\n");
+			sprintf(msg + strlen(msg), "0x%x:",
+			       bul->bul_careof_token[r]);
+		syslog(LOG_ERR, msg);
 	
-		syslog(LOG_ERR, "kbm: ");
+		memset(msg, 0, sizeof(msg));	
+		sprintf(msg, "kbm: ");
 		for (r = 0; r < MIP6_KBM_SIZE; r++)
-			syslog(LOG_ERR, "0x%x:", kbm[r]);
-		syslog(LOG_ERR, "\n");
+			sprintf(msg + strlen(msg), "0x%x:", kbm[r]);
+		syslog(LOG_ERR, msg);
 	}
 #endif
 
@@ -1479,7 +1499,10 @@ send_bu(bul)
 			}
 
 			/* create tunnel */
+# if 0
+/* DON'T LEAVE SUCH ADHOC CODE ONLY FOR YOUR SPECIFIC DEBUGGING ENVIRONMENT SO LONG TIME */
 system("ifconfig nemo0 tunnel 203.178.128.64 203.178.128.50 up");
+#endif
 
 			error = v4_sendmessage((char *)bufp, buflen, 0,
 					&bul->bul_peeraddr, &bul->bul_coa,
@@ -1583,7 +1606,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		bid_opt.ip6mobid_len = 4;
 		bid_opt.ip6mobid_bid = htons(bid);
 		bid_opt.ip6mobid_reserved = 0;
-		syslog(LOG_INFO, "BID option is added %d\n", bid);
+		syslog(LOG_INFO, "BID option is added %d", bid);
 
 		memcpy((bufp + buflen), &bid_opt, sizeof(bid_opt));
 		buflen += sizeof(struct ip6_mh_opt_bid);
@@ -1604,7 +1627,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		v4ack_opt.ip6mov4ack_pfxlen = 32;
 		memcpy(&v4ack_opt.ip6mov4ack_v4hoa, &coa->s6_addr[12],
 					sizeof(v4ack_opt.ip6mov4ack_v4hoa));
-		syslog(LOG_INFO, "IPv4 Addr Ack option is added\n");
+		syslog(LOG_INFO, "IPv4 Addr Ack option is added");
 
 		memcpy((bufp + buflen), &v4ack_opt, sizeof(v4ack_opt));
 		buflen += sizeof(struct ip6_mh_opt_ipv4_ack);
@@ -1860,7 +1883,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 #if defined(MIP_MN) && defined(MIP_NEMO)
 	if (ar_sin6) { 
 		if (debug) 
-			syslog(LOG_INFO, "sendmsg via %s/%d\n", 
+			syslog(LOG_INFO, "sendmsg via %s/%d", 
 				ip6_sprintf(&ar_sin6->sin6_addr), ar_sin6->sin6_scope_id);
 		cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct sockaddr_in6));
 		cmsgptr->cmsg_level = IPPROTO_IPV6;
