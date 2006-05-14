@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.170 2006/02/17 11:37:27 t-momose Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.171 2006/05/14 10:25:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -799,7 +799,7 @@ nd6_na_input(m, off, icmp6len)
 			/*
 			 * This means a router's state has changed from
 			 * non-reachable to probably reachable, and might
-			 * affect the status of associated prefixes..
+			 * affect the status of associated prefixes.
 			 */
 			pfxlist_onlink_check();
 		}
