@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.399 2006/01/04 02:56:29 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.400 2006/05/30 01:10:45 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1075,6 +1075,10 @@ headers.  So, in6_cksum() was implemented to handle packets whose IP6
 header and transport header is not continuous.  TCP/IP6 nor UDP/IP6
 header structure don't exist for checksum calculation.
 
+(The following paragraph does not apply if xxx_input uses m_pulldown() function.
+For more information, please read the following paper: Jun-ichiro Hagino,
+"Mbuf issues in 4.4BSD IPv6/IPsec support (experiences from KAME IPv6/IPsec
+implemntation)", Freenix2000, June 2000.)
 To process IP6 header, extension headers and transport headers easily,
 KAME requires network drivers to store packets in one internal mbuf or
 one or more external mbufs.  A typical old driver prepares two
