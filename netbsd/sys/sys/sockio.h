@@ -162,8 +162,6 @@
 #define	SIOCGIFCAP	_IOWR('i', 118, struct ifcapreq)/* get capabilities */
 #define	SIOCSIFCAP	 _IOW('i', 117, struct ifcapreq)/* set capabilities */
 
-#define SIOGBULIST	_IOWR('i', 134, struct if_bulreq) /* get BUL */
-
 #define	SIOCSIPMSFILTER	 _IO('s', 140)			/* set src list */
 #define	SIOCGIPMSFILTER	 _IO('s', 141)			/* get src list */
 #define	SIOCSMSFILTER	 _IO('s', 142)			/* set src list */

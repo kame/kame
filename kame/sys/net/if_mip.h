@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.h,v 1.4 2006/04/12 12:19:31 t-momose Exp $	*/
+/*	$KAME: if_mip.h,v 1.5 2006/06/08 11:47:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,5 +73,7 @@ int mip_output(struct ifnet *, struct mbuf *, struct sockaddr *,
 int mip_is_mip_softc(struct ifnet *);
 
 #endif /* _KERNEL*/
+
+#define	SIOCGBULIST	_IOWR('i', 134, struct if_bulreq) /* get BUL */
 
 #endif /* !_NET_IF_MIP_H_ */

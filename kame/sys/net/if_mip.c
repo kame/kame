@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.c,v 1.8 2005/11/13 18:59:16 t-momose Exp $	*/
+/*	$KAME: if_mip.c,v 1.9 2006/06/08 11:47:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -403,7 +403,7 @@ mip_ioctl(ifp, cmd, data)
 		}
 		break;
 #if NMIP > 0
-	case SIOGBULIST:
+	case SIOCGBULIST:
 		if (!MIP6_IS_MN)
 			return EOPNOTSUPP;
 
