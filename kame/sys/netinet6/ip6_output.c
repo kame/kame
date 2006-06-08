@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.485 2006/03/28 05:45:22 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.486 2006/06/08 04:26:38 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3219,6 +3219,7 @@ ip6_pcbopts(pktopt, m, so)
 		opt->ip6po_hbh || opt->ip6po_dest1 || opt->ip6po_dest2 ||
 #if defined(MIP6) && NMIP > 0
 		opt->ip6po_hoa ||
+		opt->ip6po_rhinfo2.ip6po_rhi_rthdr ||
 #endif /* MIP6 && NMIP > 0 */
 		opt->ip6po_rhinfo.ip6po_rhi_rthdr)
 		    printf("ip6_pcbopts: all specified options are cleared.\n");
@@ -3457,15 +3458,19 @@ ip6_clearpktopts(pktopt, optname)
 		if (pktopt->ip6po_rhinfo.ip6po_rhi_rthdr)
 			free(pktopt->ip6po_rhinfo.ip6po_rhi_rthdr, M_IP6OPT);
 		pktopt->ip6po_rhinfo.ip6po_rhi_rthdr = NULL;
-#ifdef MIP6
-		if (pktopt->ip6po_rhinfo2.ip6po_rhi_rthdr)
-			free(pktopt->ip6po_rhinfo2.ip6po_rhi_rthdr, M_IP6OPT);
-		pktopt->ip6po_rhinfo2.ip6po_rhi_rthdr = NULL;
-#endif /* MIP6 */
 		if (pktopt->ip6po_route.ro_rt) {
 			RTFREE(pktopt->ip6po_route.ro_rt);
 			pktopt->ip6po_route.ro_rt = NULL;
 		}
+#ifdef MIP6
+		if (pktopt->ip6po_rhinfo2.ip6po_rhi_rthdr)
+			free(pktopt->ip6po_rhinfo2.ip6po_rhi_rthdr, M_IP6OPT);
+		pktopt->ip6po_rhinfo2.ip6po_rhi_rthdr = NULL;
+		if (pktopt->ip6po_route2.ro_rt) {
+			RTFREE(pktopt->ip6po_route2.ro_rt);
+			pktopt->ip6po_route2.ro_rt = NULL;
+		}
+#endif /* MIP6 */
 	}
 	if (optname == -1 || optname == IPV6_DSTOPTS) {
 		if (pktopt->ip6po_dest2)
