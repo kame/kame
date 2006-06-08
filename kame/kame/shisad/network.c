@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.14 2005/12/14 08:17:51 t-momose Exp $  */
+/*      $KAME: network.c,v 1.15 2006/06/08 12:02:00 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -54,8 +54,12 @@
 #include <netinet/icmp6.h>
 #include <netinet/ip6mh.h>
 #include <netinet6/in6_var.h>
+#define _KERNEL /* for in6_oprlist */
 #include <netinet6/nd6.h>
+#undef _KERNEL
 #include <arpa/inet.h>
+
+#include <net/if_nemo.h>
 
 #include "callout.h"
 #include "shisad.h"

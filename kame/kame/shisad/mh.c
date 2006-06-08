@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.53 2006/05/05 15:51:18 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.54 2006/06/08 12:02:00 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -364,7 +364,7 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 
 		if (debug) {
 			syslog(LOG_INFO, "  %s is found",
-			       mhopt_name[(*mhopt <= IP6_MH_OPT_MAX) ? *mhopt : IP6_MH_OPT_MAX + 1]);
+			       mhopt_name[(*mhopt <= IP6_MHOPT_MAX) ? *mhopt : IP6_MHOPT_MAX + 1]);
 		}
 
 		if (*mhopt != IP6_MHOPT_BAUTH)	/* Always bind. auth. opt. should be the last option */

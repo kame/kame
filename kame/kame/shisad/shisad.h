@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.36 2006/04/10 15:30:54 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.37 2006/06/08 12:02:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -106,10 +106,13 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define MRD_PIDFILE	"/var/run/mrd.pid"
 #define HAD_PIDFILE	"/var/run/had.pid"
 
-#define CND_CONFFILE	"/usr/local/v6/etc/cnd.conf"
-#define MND_CONFFILE	"/usr/local/v6/etc/mnd.conf"
-#define MRD_CONFFILE	"/usr/local/v6/etc/mrd.conf"
-#define HAD_CONFFILE	"/usr/local/v6/etc/had.conf"
+#ifndef SYSCONFDIR
+#define SYSCONFDIR	"/usr/local/v6/etc"
+#endif
+#define CND_CONFFILE	SYSCONFDIR "/shisa/cnd.conf"
+#define MND_CONFFILE	SYSCONFDIR "/shisa/mnd.conf"
+#define MRD_CONFFILE	SYSCONFDIR "/shisa/mrd.conf"
+#define HAD_CONFFILE	SYSCONFDIR "/shisa/had.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
 

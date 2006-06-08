@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.28 2006/04/13 09:25:22 keiichi Exp $	*/
+/*	$KAME: binding.c,v 1.29 2006/06/08 12:02:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -49,9 +49,6 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet/ip6mh.h>
-//#include <netinet/in_var.h>
-//#include <netinet/in.h>
-//#include <arpa/inet.h>
 
 #ifdef MIP_MN
 #include <sys/sockio.h>
@@ -1066,7 +1063,7 @@ command_show_kbul(s, dummy)
 		strncpy(bulreq.ifbu_ifname, 
 			ifname, strlen(ifname));
 		
-		if (ioctl(sock, SIOGBULIST, &bulreq) < 0) { 
+		if (ioctl(sock, SIOCGBULIST, &bulreq) < 0) { 
 			perror("ioctl");
 			command_printf(s, "ioctl to get buls is failed for %s\n", ifname);
 			break;
