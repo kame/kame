@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.29 2006/06/08 12:02:00 keiichi Exp $	*/
+/*	$KAME: binding.c,v 1.30 2006/06/09 11:29:58 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -66,21 +66,21 @@ static struct binding_update_list *bul_create(struct in6_addr *,
     struct in6_addr *, u_int16_t, struct mip6_hoainfo *);
 
 static char *reg_fsm_desc[] = {
-  "IDLE",
-  "RRINIT",
-  "RRREDO",
-  "RRDEL",
-  "WAITA",
-  "WAITAR",
-  "WAITD",
-  "BOUND",
-  "DHAAD"
+	"IDLE",
+	"RRINIT",
+	"RRREDO",
+	"RRDEL",
+	"WAITA",
+	"WAITAR",
+	"WAITD",
+	"BOUND",
+	"DHAAD"
 };
 static char *rr_fsm_desc[] = {
-  "START",
-  "WAITHC",
-  "WAITH",
-  "WAITC"
+	"START",
+	"WAITHC",
+	"WAITH",
+	"WAITC"
 };
 
 static void command_show_bul_one(int, struct binding_update_list *);
@@ -90,11 +90,10 @@ static void command_show_bul_one(int, struct binding_update_list *);
 struct binding_cache_head bchead;
 static void mip6_bc_set_refresh_timer(struct binding_cache *, int);
 static void mip6_bc_stop_refresh_timer(struct binding_cache *);
-#endif /* MIP_MN */
+static void mip6_validate_bc(struct binding_cache *);
 
 int do_proxy_dad = 1;
 
-#ifndef MIP_MN
 /*
  * Binding Cache State Change
  *
@@ -122,17 +121,19 @@ mip6_flush_kernel_bc()
 	mipmsg.miph_type = MIPM_BC_FLUSH;
 	if (write(mipsock, &mipmsg, sizeof(struct mip_msghdr)) == -1) {
 		syslog(LOG_ERR,
-		    "removing all bul entries failed.\n");
+		    "removing all bul entries failed.");
 	}
 }
 
 struct binding_cache *
-mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
+mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmethod_done, mobility_spi)
 	struct in6_addr *hoa, *coa, *recvaddr;
 	u_int32_t lifetime;
 	u_int16_t flags;
 	u_int16_t seqno, bid;
 	u_int8_t authmethod;
+	u_int8_t authmethod_done;
+	u_int32_t mobility_spi;
 {
 	struct binding_cache *bc;
 	time_t now;
@@ -146,6 +147,13 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 	 */
 	bc = mip6_bc_lookup(hoa, recvaddr, bid);
 	if (bc) {
+		bc->bc_authmethod = authmethod;
+		bc->bc_authmethod_done = authmethod_done;
+		if ((authmethod ^ authmethod_done) != 0) {
+			bc->bc_state |= BC_STATE_UNDER_AUTH;
+			return (NULL);
+		}
+		
 		bc->bc_myaddr = *recvaddr;
 		bc->bc_lifetime = lifetime;
 		bc->bc_flags = flags;
@@ -153,8 +161,12 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 		/* update BC in the kernel via mipsock */
 		bc->bc_coa = *coa;
 		mipsock_bc_request(bc, MIPM_BC_UPDATE);
-
-		goto done;
+			
+		bc->bc_expire = now + bc->bc_lifetime;
+		
+		if (!IN6_IS_ADDR_LINKLOCAL(hoa) && !(bc->bc_state & BC_STATE_UNDER_DAD))
+			mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
+		return (bc);
 	} 
 
 	/*
@@ -172,38 +184,53 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod)
 	bc->bc_flags = flags;
 	bc->bc_seqno = seqno;
 	bc->bc_state = BC_STATE_VALID;
-	if (do_proxy_dad && (flags & IP6_MH_BU_HOME)) {
-		bc->bc_state = BC_STATE_UNDER_DAD;
+	if (flags & IP6_MH_BU_HOME) {
+		if (do_proxy_dad)
+			bc->bc_state |= BC_STATE_UNDER_DAD;
+#ifdef AUTHID
+		if ((authmethod ^ authmethod_done) != 0)
+			bc->bc_state |= BC_STATE_UNDER_AUTH;
+#endif /* AUTHID */
 	}
 	bc->bc_refcnt = 0;
 	bc->bc_authmethod = authmethod;
+	bc->bc_authmethod_done = authmethod_done;
 #ifdef MIP_MCOA
 	bc->bc_bid = bid;
 #endif /* MIP_MCOA */
 
-	if (bc->bc_state == BC_STATE_VALID) {
-		/* insert BC into the kernel via mipsock */
-		mipsock_bc_request(bc, MIPM_BC_ADD);
-	} else if (bc->bc_state == BC_STATE_UNDER_DAD) {
+	if (bc->bc_state & BC_STATE_UNDER_DAD) {
 		/* do dad start */
 		mip6_dad_start(hoa);
 	}
-	
+
+	mip6_validate_bc(bc);
         LIST_INSERT_HEAD(&bchead, bc, bc_entry);
 	bc->bc_refcnt++;
- done:
 
-	bc->bc_expire = now + bc->bc_lifetime;
+	return (bc);
+}
+
+static void
+mip6_validate_bc(bc)
+	struct binding_cache *bc;
+{
+	time_t now;
+
+	if (bc->bc_state != BC_STATE_VALID)
+		return;
 	
+	now = time(0);
+	/* insert the BC into the kernel via mipsock */
+	mipsock_bc_request(bc, MIPM_BC_ADD);
+	bc->bc_expire = now + bc->bc_lifetime;
 	/* refreshment is called after the half of BC's lifetime */
 	/* The linklocal entries are handled along with the original
 	   binding cache entry. Thus it doesn't need to have 
 	   a independent timer. */
-	if (!IN6_IS_ADDR_LINKLOCAL(hoa) && (bc->bc_state != BC_STATE_UNDER_DAD))
-		mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2); 
-
-	return (bc);
-};
+	if (!IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa))
+		mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
+}
 
 void
 mip6_bc_delete(bcreq)
@@ -223,6 +250,13 @@ mip6_bc_delete(bcreq)
 		return;
 #endif /* 1 */
 
+#ifdef AUTHID
+	if (bc->bc_state & BC_STATE_UNDER_AUTH) {
+		/* stop authentication query here */
+
+		bc->bc_state &= ~BC_STATE_UNDER_AUTH;
+	}
+#endif /* AUTHID */
 	switch (bc->bc_state) {
 	case BC_STATE_VALID:
 		/* delete the BCE in the kernel via mipsock */
@@ -253,8 +287,7 @@ mip6_bc_delete(bcreq)
 	}
 		
 	return;
-};
-
+}
 
 /* src can be wildcard */
 struct binding_cache *
@@ -267,7 +300,6 @@ mip6_bc_lookup(hoa, src, bid)
 
         for (bc = LIST_FIRST(&bchead); bc; bc = bc_nxt) {
 		bc_nxt =  LIST_NEXT(bc, bc_entry);
-
 #ifdef MIP_MCOA
 		if (bid && bid != bc->bc_bid)
 			continue;
@@ -280,7 +312,7 @@ mip6_bc_lookup(hoa, src, bid)
 	}
 
 	return (NULL);
-};
+}
 
 /* compose a mipsock message and issue it to the kernel */
 void
@@ -307,10 +339,8 @@ mip6_dad_done(message, addr)
 	struct in6_addr *addr;
 {
 	struct binding_cache *bc, *gbc;
-	time_t now;
 	int bid = 0;
 
-	now = time(0);
 	bc = mip6_bc_lookup(addr, NULL, 0);
 	if (bc && IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa))
 		gbc = bc->bc_glmbc;
@@ -323,31 +353,30 @@ mip6_dad_done(message, addr)
 	if (message == MIPM_DAD_SUCCESS) {
 		/* I got a message the DAD was succeeded */
 		/* the status of the BC should go to the normal */
-		if (!bc || bc->bc_state != BC_STATE_UNDER_DAD) {
+		if (!bc || !(bc->bc_state & BC_STATE_UNDER_DAD)) {
 			syslog(LOG_ERR,
-			       "The status of this BCE (for %s) should be UNDER_DAD, inspite of %d\n",
+			       "The status of this BCE (for %s) should be UNDER_DAD, inspite of %d",
 			       ip6_sprintf(addr), bc ? bc->bc_state : -1);
 			return;
 		}
 		
 		syslog(LOG_INFO,
-		       "DAD against the HoA(%s) is suceeded.\n",
+		       "DAD against the HoA(%s) is suceeded.",
 		       ip6_sprintf(addr));
-		bc->bc_state = BC_STATE_VALID;
-		mipsock_bc_request(bc, MIPM_BC_ADD);
-		bc->bc_expire = now + bc->bc_lifetime;
-		if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
-			mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
+		bc->bc_state &= ~BC_STATE_UNDER_DAD;
+		mip6_validate_bc(bc);
+		if ((bc->bc_state == BC_STATE_VALID) &&
+		    !IN6_IS_ADDR_LINKLOCAL(addr)) {
 			if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))
 				send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
 					&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
 					NULL, IP6_MH_BAS_ACCEPTED,
-					gbc->bc_seqno, gbc->bc_lifetime, bid, 0);
+					gbc->bc_seqno, gbc->bc_lifetime, 0, bid, 0);
 		}
 	} else if (message == MIPM_DAD_FAIL) {
 		/* I got a message the DAD was failed */
 		syslog(LOG_INFO,
-		       "DAD aganist the HoA(%s) is failed.\n",
+		       "DAD aganist the HoA(%s) is failed.",
 		       ip6_sprintf(addr));
 
 		if (gbc == NULL || bc == NULL)
@@ -355,7 +384,7 @@ mip6_dad_done(message, addr)
 		send_ba(&gbc->bc_myaddr, &gbc->bc_realcoa,
 			&gbc->bc_coa, &gbc->bc_hoa, gbc->bc_flags,
 			NULL, IP6_MH_BAS_DAD_FAILED,
-			gbc->bc_seqno, gbc->bc_lifetime, bid, 0);
+			gbc->bc_seqno, gbc->bc_lifetime, 0, bid, 0);
 		mip6_bc_delete(bc);
 		if (gbc != bc)
 			mip6_bc_delete(gbc);
@@ -374,7 +403,7 @@ command_show_bc(s, line)
         for (bc = LIST_FIRST(&bchead); bc; bc = LIST_NEXT(bc, bc_entry)) {
 		if (bc->bc_state > BC_STATE_MAX)
 			continue;
-		command_printf(s, "%c ", "VDU"[bc->bc_state]);
+		command_printf(s, "%c ", "VUABD"[bc->bc_state]);
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_hoa));
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_coa));
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_myaddr));
@@ -396,7 +425,6 @@ command_show_kbc(s, line)
 {
 	command_printf(s, "Not Supported yet\n");
 }
-
 
 void
 flush_bc()
@@ -425,7 +453,6 @@ mip6_bc_stop_refresh_timer(bc)
 {
 	remove_callout_entry(bc->bc_refresh);
 }
-
 
 void
 mip6_bc_refresh_timer(arg)
@@ -512,7 +539,7 @@ mipsock_bc_request(bc, command)
 
         err = write(mipsock, bcinfo, bcinfo->mipc_msglen);
 	if (err < 0)
-		perror("mipsock_bc_request:write");
+		syslog(LOG_ERR, "%m mipsock_bc_request:write");
 
 	if (debug) {
 		switch (command) {
@@ -529,24 +556,22 @@ mipsock_bc_request(bc, command)
 			break;
 		}
 		syslog(LOG_INFO, "[BC info] HoA  %s", ip6_sprintf(&bc->bc_hoa));
-		syslog(LOG_INFO, "\tCoA  %s\n", ip6_sprintf(&bc->bc_coa));
-		syslog(LOG_INFO, "\tPeer %s\n", ip6_sprintf(&bc->bc_myaddr));
+		syslog(LOG_INFO, "\tCoA  %s", ip6_sprintf(&bc->bc_coa));
+		syslog(LOG_INFO, "\tPeer %s", ip6_sprintf(&bc->bc_myaddr));
 #ifdef MIP_MCOA
-		syslog(LOG_INFO, "\tBID %d\n", bc->bc_bid);
+		syslog(LOG_INFO, "\tBID %d", bc->bc_bid);
 #endif /* MIP_MCOA */
 
-		syslog(LOG_INFO, "\tSeq %d, Lifetime %d\n", 
+		syslog(LOG_INFO, "\tSeq %d, Lifetime %d",
 		       bc->bc_seqno, bc->bc_lifetime);
 
 	}
         
         return;
 }
-#endif /* MIP_MN */
+#endif /* !MIP_MN */
 
 #ifdef MIP_MN 
-
-
 /* 
  * functions for hoainfo structure 
  */
@@ -590,11 +615,11 @@ hoainfo_insert(hoa, ifindex)
 	LIST_INSERT_HEAD(&hoa_head, hoainfo, hinfo_entry);
 
 	if (debug)
-		syslog(LOG_INFO, "hoainfo entry (HoA %s ifindex %d) is added\n", 
+		syslog(LOG_INFO, "hoainfo entry (HoA %s ifindex %d) is added", 
 		       ip6_sprintf(hoa), ifindex); 
 
 	return (hoainfo);
-};
+}
 
 int
 hoainfo_remove(hoa) 
@@ -614,7 +639,7 @@ hoainfo_remove(hoa)
 	hoainfo = NULL;
 
 	return (0);
-};
+}
 
 struct mip6_hoainfo *
 hoainfo_find_withhoa(hoa)
@@ -629,7 +654,7 @@ hoainfo_find_withhoa(hoa)
 	}
 
 	return (NULL);
-};
+}
 
 
 struct mip6_hoainfo *
@@ -645,7 +670,7 @@ hoainfo_get_withdhaadid (id)
 	}
 
 	return (NULL);
-};
+}
 
 /* 
  * functions for bul structure 
@@ -728,7 +753,7 @@ bul_create(peeraddr, coa, flags, hoainfo)
 
 	bul = (struct binding_update_list *)malloc(sizeof(struct binding_update_list));
 	if (bul == NULL) {
-		perror("malloc");
+		syslog(LOG_ERR, "Faild to allocate memory for a bul.");
 		return (NULL);
 	}
 
@@ -748,7 +773,6 @@ bul_create(peeraddr, coa, flags, hoainfo)
 	return (bul);
 }
 
-
 void
 bul_remove(bul)
 	struct binding_update_list *bul;
@@ -766,8 +790,8 @@ bul_remove(bul)
 			LIST_REMOVE(mbul, bul_entry);
 			free(mbul);
 			mbul = NULL;
-		};
-	};
+		}
+	}
 #endif /* MIP_MCOA */
 
 	LIST_REMOVE(bul, bul_entry);
@@ -797,8 +821,7 @@ bul_get_homeflag(hoa)
 	}
 
 	return (NULL);
-};
-
+}
 
 /*
  * check the mobile node's link-local address has the same interface
@@ -840,8 +863,7 @@ int bul_check_ifid(hoainfo)
 		return 1;
 
 	return 0;
-};
-
+}
 
 #ifdef MIP_MCOA
 struct binding_update_list *
@@ -906,7 +928,7 @@ bul_get(hoa, peer)
 	}
 
 	return (NULL);
-};
+}
 
 void
 bul_flush(hoainfo)
@@ -925,7 +947,7 @@ bul_flush(hoainfo)
 		free(bul);
 		bul = NULL;
 	}
-};
+}
 
 struct binding_update_list *
 bul_get_nohoa(cookie, coa, peer) 
@@ -953,7 +975,7 @@ bul_get_nohoa(cookie, coa, peer)
 	}
 
 	return (NULL);
-};
+}
 
 void
 command_show_bul(s, dummy)
@@ -1045,7 +1067,7 @@ command_show_kbul(s, dummy)
 
 	sock = socket(AF_INET6, SOCK_DGRAM, 0);
 	if (sock < 0) {
-		perror("socket");
+		command_printf(s, "faild to open a socket to get kbuls.\n");
 		return;
 	}
 
@@ -1100,5 +1122,4 @@ command_show_kbul(s, dummy)
         
         return;
 }
-
 #endif /* MIP_MN */

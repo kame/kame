@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.54 2006/06/08 12:02:00 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.55 2006/06/09 11:29:58 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -102,20 +102,21 @@ char *mh_name[] = {
 	"Unknown MH Message"
 };
 
-char *mhopt_name[] = {"Pad1", 
-		      "PadN", 
-		      "Binding Refresh Advice", 
-		      "Alternate Care-of Address", 
-		      "Nonce Indices", 
-		      "Binding Authorization Data",
-		      "Mobile Network Prefix (NEMO)",
-		      "Binding Unique Identifier",
-		      "Mobile Node ID",
-		      "Authentication",
-		      "Replay Protection",
-		      "IPv4 prefix",
-		      "IPv4 Home Address Option",
-		      "Unknown option"
+char *mhopt_name[] = {
+	"Pad1", 
+	"PadN", 
+	"Binding Refresh Advice", 
+	"Alternate Care-of Address", 
+	"Nonce Indices", 
+	"Binding Authorization Data",
+	"Mobile Network Prefix (NEMO)",
+	"Binding Unique Identifier",
+	"Mobile Node ID",
+	"Authentication",
+	"Replay Protection",
+	"IPv4 prefix",
+	"IPv4 Home Address Option",
+	"Unknown option"
 };
 
 static struct ip6_opt_home_address *mip6_search_hoa_in_destopt(u_int8_t *);
@@ -317,7 +318,7 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 		int mhtype;
 		
 		if ((mhtype = mh->ip6mh_type) > IP6_MH_TYPE_MAX)
-			mhtype = IP6_MH_TYPE_MAX;
+			mhtype = IP6_MH_TYPE_MAX + 1; /* '+1' is for 'unknown mh type' message */
 		syslog(LOG_INFO, "%s is received", mh_name[mhtype]);
 		syslog(LOG_INFO, "  from:[%s] -> dst:[%s]",
 		       ip6_sprintf(&from.sin6_addr), ip6_sprintf(&dst));
@@ -358,17 +359,18 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 #define check_mopt_len(mopt_len)        \
         if (*(mhopt + 1) != mopt_len) goto bad;
 #define check_bauth_last() \
-	if (mopt->opt_auth) goto bad;
+	if (mopt->opt_bauth) goto bad;
 
         while (mhopt < mhend) {
-
 		if (debug) {
 			syslog(LOG_INFO, "  %s is found",
 			       mhopt_name[(*mhopt <= IP6_MHOPT_MAX) ? *mhopt : IP6_MHOPT_MAX + 1]);
 		}
 
+#ifdef MIP_CN
 		if (*mhopt != IP6_MHOPT_BAUTH)	/* Always bind. auth. opt. should be the last option */
 			check_bauth_last();
+#endif /* MIP_CN */
 		
                 switch (*mhopt) {
 		case IP6_MHOPT_PAD1:
@@ -385,7 +387,7 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 			mopt->opt_nonce = (struct ip6_mh_opt_nonce_index *)mhopt;
 			break;
 		case IP6_MHOPT_BAUTH:
-			mopt->opt_auth = (struct ip6_mh_opt_auth_data *)mhopt;
+			mopt->opt_bauth = (struct ip6_mh_opt_auth_data *)mhopt;
 			break;
 		case IP6_MHOPT_BREFRESH:
 			check_mopt_len(2);
@@ -411,6 +413,30 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 			mopt->opt_v4hoa = (struct ip6_mh_opt_ipv4_hoa *)mhopt;
 			break;
 #endif /* DSMIP */
+#ifdef AUTHID
+		case IP6_MHOPT_MN_ID:
+			mopt->opt_mnid = (struct p6_mh_opt_mn_id *)mhopt;
+			break;
+
+		case IP6_MHOPT_AUTH_OPT:
+			switch (((struct ip6_mh_opt_authentication *)mhopt)->ip6moauth_subtype) {
+			case IP6_MH_AUTHOPT_SUBTYPE_MNHA:
+				mopt->mnha_auth = 
+					(struct ip6_mh_opt_authentication *)mhopt;
+				break;
+			case IP6_MH_AUTHOPT_SUBTYPE_MNAAA:
+				mopt->mnaaa_auth = 
+					(struct ip6_mh_opt_authentication *)mhopt;
+				break;
+			default:
+				syslog(LOG_ERR, "Unknown authentication AAA");
+				break;
+			}
+			break;
+			
+		case IP6_MHOPT_REPLAY_PROTECTION:
+			break;
+#endif /* AUTHID */
 		default:
 			syslog(LOG_INFO,
 			    "invalid mobility option (%02x).", *mhopt);
@@ -469,7 +495,6 @@ mip6_search_hoa_in_destopt(optbuf)
 
 	return (NULL);	/* Not found */
 }
-
 
 #ifndef MIP_MN
 int receive_bu(struct in6_addr *, struct in6_addr *, 
@@ -535,9 +560,6 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 	case IP6_MH_TYPE_BERROR:
 		break;
 	default:
-		/* Shisa Statistics: unknown MH type */
-		mip6stat.mip6s_unknowntype++;
-
 		send_be(src, dst, hoa, IP6_MH_BES_UNKNOWN_MH);
 		break;
 	}
@@ -570,7 +592,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	int retcode = -1;
 	int statuscode = IP6_MH_BAS_ACCEPTED;
 	u_int16_t bid = 0;
-	int authmethod = BC_AUTH_NONE; 
+	int authmethod = BC_AUTH_NONE, authmethod_done = BC_AUTH_NONE;
+	u_int32_t mobility_spi = 0;
 
 	/* 
 	 * If home address option is not present, home address
@@ -631,13 +654,25 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			return (-1);
 	}
 
+#ifdef MIP_CN
+	authmethod |= BC_AUTH_RR;
+#endif /* MIP_CN */
+#ifdef MIP_HA
+#ifdef AUTHID
+	if (use_authid)
+		authmethod |= BC_AUTH_MNHA;
+#else /* AUTHID */
+	authmethod |= BC_AUTH_IPSEC;
+#endif /* AUTHID */
+#endif /* MIP_HA */
+
 	/* 
 	 * Authenticator check if available. BU is protected
 	 * by IPsec when it is sent to Home Agent. Otherwise, all
-	 * packets SHOULD have authenticato and nonce indice
-	 * option.  
+	 * packets SHOULD have a binding authorization and a nonce
+	 * indices options.
 	 */
-	if (mopt.opt_auth && mopt.opt_nonce) {
+	if (mopt.opt_bauth && mopt.opt_nonce) {
 #ifdef MIP_CN
 		int cnnonce = 0;
 		u_int16_t cksum;
@@ -694,14 +729,14 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		
 		/* Calculate authenticator */
 		mip6_calculate_authenticator(kbm, coa, dst, (caddr_t)bu, mhlen, 
-					     (u_int8_t *)mopt.opt_auth + 
+					     (u_int8_t *)mopt.opt_bauth + 
 					     sizeof(struct ip6_mh_opt_auth_data) - (u_int8_t *)bu,
 					     MIP6_AUTHENTICATOR_SIZE, &authenticator);
 		bu->ip6mhbu_hdr.ip6mh_cksum = cksum;
 		
 		/* Authentication is failed, silently discard */
 		if (memcmp(&authenticator, 
-			   ((u_int8_t *)mopt.opt_auth + 2), MIP6_AUTHENTICATOR_SIZE) != 0) {
+			   ((u_int8_t *)mopt.opt_bauth + 2), MIP6_AUTHENTICATOR_SIZE) != 0) {
 			syslog(LOG_ERR, "Authenticator comparison failed");
 			if (debug) { 
 				syslog(LOG_INFO, "HomeIndex 0x%x",
@@ -720,7 +755,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		}
 		if (lifetime > MIP6_MAX_RR_BINDING_LIFE)
 			lifetime = MIP6_MAX_RR_BINDING_LIFE;
-		authmethod = BC_AUTH_RR;
+		authmethod_done = BC_AUTH_RR;
 #endif /* MIP_CN */
 	} else {
 #ifdef MIP_CN
@@ -748,8 +783,29 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			return (0);
 		}
 #elif defined(MIP_HA)
+#ifdef AUTHID
+		if (authmethod & BC_AUTH_MNHA) {
+			if (mopt.mnha_auth == NULL) {
+				/*
+				 * RFC 4285 section 5 says, "When a Binding
+				 * Update or Binding Acknowledgement is
+				 * received without a mobility message
+				 * authentication option ... , the entity
+				 * should silently discard the received
+				 * message."
+				 */
+				syslog(LOG_ERR, "No mobility message authentication option is found");
+				return (-1);
+			}
+
+			auth_opt(hoa, coa, (struct ip6_mh *)bu, &mopt,
+				 &authmethod, &authmethod_done);
+			mobility_spi = mopt.mnha_auth->ip6moauth_mobility_spi;
+		}
+#else /* AUTHID */
 		/* go thorough (assuming IPsec protection in the kernel) */
-		authmethod = BC_AUTH_IPSEC;
+		authmethod_done = BC_AUTH_IPSEC;
+#endif /* AUTHID */
 #endif /* MIP_CN */ 
 	}
 
@@ -782,16 +838,21 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	/* sequence number comparison */
 	if (bc && MIP6_LEQ(seqno, bc->bc_seqno)) {
 		statuscode = IP6_MH_BAS_SEQNO_BAD;
+		syslog(LOG_ERR,
+		       "Received sequence number from [%s] is out of window. "
+		       "[%u] should be larger than [%u]",
+		       ip6_sprintf(hoa), seqno, bc->bc_seqno);
 		seqno = bc->bc_seqno;
-		syslog(LOG_ERR, "Received sequence number from [%s] is out of window.",
-		       ip6_sprintf(hoa));
 		goto sendba;
 	}
 
 #ifdef MIP_HA
-
-	/* if flags is changed during registration, sending BA with 139 */
-	if (bc && (bc->bc_flags != flags)) {
+	/* if flags are changed during registration, sending BA with 139 */
+	if (bc && ((bc->bc_flags ^ flags) & (IP6_MH_BU_HOME
+#ifdef MIP_NEMO
+					     | IP6_MH_BU_ROUTER
+#endif /* MIP_NEMO */
+			   ))) {
 		statuscode = IP6_MH_BAS_REG_NOT_ALLOWED;
 		goto sendba;
 	}
@@ -878,7 +939,6 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 				goto sendba;
 			}
 
-
 			/* check whether MR has authority for MNP */
 			if (!IN6_ARE_ADDR_EQUAL(hoa, &hpt->hpt_hoa)) {
 				statuscode = IP6_MH_BAS_NOT_AUTHORIZED;
@@ -905,9 +965,9 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			   Does it work on MCOA case ?
 			 */
 #ifdef MIP_CN
-			if (home_nonces && (authmethod == BC_AUTH_RR))
+			if (home_nonces && (authmethod & BC_AUTH_RR))
 				retain_bc_to_nonce(home_nonces, bc);
-			if (careof_nonces && (authmethod == BC_AUTH_RR))
+			if (careof_nonces && (authmethod & BC_AUTH_RR))
 				retain_bc_to_nonce(careof_nonces, bc);
 			if (!home_nonces && !careof_nonces)
 				mip6_bc_delete(bc);
@@ -933,7 +993,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		lifetime = 0;	/* Returned lifetime in BA must be zero */
 	} else {
 		/* Requesitng to cache binding (registration) */
-		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid, authmethod);
+		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid, authmethod, authmethod_done, mobility_spi);
 		if (bc == NULL) {
 			statuscode = IP6_MH_BAS_INSUFFICIENT;
 			goto sendba;
@@ -946,12 +1006,12 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			llhoa.s6_addr[1] = 0x80;
 			llhoa.s6_addr[3] = ha_if() & 0xff;
 			memcpy(&llhoa.s6_addr[8], &hoa->s6_addr[8], 8);
-			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid, authmethod);
+			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid, authmethod, authmethod_done, 0);
 			bc->bc_llmbc->bc_glmbc = bc;
 		}
 
 		bc->bc_realcoa = *retcoa;
-		if (bc->bc_state == BC_STATE_UNDER_DAD)
+		if (bc->bc_state & BC_STATE_UNDER_DAD)
 			return (0);
 	}
 	retcode = 0;
@@ -960,7 +1020,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (statuscode != IP6_MH_BAS_ACCEPTED ||
 	    (flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))) {
 		send_ba(dst, retcoa, coa, hoa, flags, kbm, 
-			statuscode, seqno, lifetime, 0 /* refresh */, bid);
+			statuscode, seqno, lifetime, 0 /* refresh */, bid, mobility_spi);
 	}
 
 	return (retcode);
@@ -1530,7 +1590,7 @@ system("ifconfig nemo0 tunnel 203.178.128.64 203.178.128.50 up");
 
 #ifndef MIP_MN
 int
-send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid) 
+send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid, mobility_spi)
 	struct in6_addr *src, *coa, *acoa, *hoa;
 	u_int16_t flags;
 	mip6_kbm_t *kbm_p;
@@ -1539,6 +1599,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 	u_int16_t lifetime;
 	int refresh;
 	u_int16_t bid;
+	u_int32_t mobility_spi;
 {
 	int err = 0;
 	char buf[1024];
@@ -1657,7 +1718,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 
 		auth_opt = (struct ip6_mh_opt_auth_data *)(bufp + buflen);
 		auth_opt->ip6moad_type = IP6_MHOPT_BAUTH;
-		auth_opt->ip6moad_len = MIP6_AUTHENTICATOR_SIZE; 
+		auth_opt->ip6moad_len = MIP6_AUTHENTICATOR_SIZE;
 		buflen += sizeof(*auth_opt);
 		buflen += MIP6_AUTHENTICATOR_SIZE;
 
@@ -1667,7 +1728,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		buflen += pad;
 
 		/* 
-		 * This is not fianl length, but
+		 * This is not final length, but
 		 * mobileip6_authentication_data() needs correct bu
 		 * length for authentication data calculation 
 		 */
@@ -1688,6 +1749,53 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 
  skip_auth:
 #endif /* MIP_CN */
+
+#if defined(MIP_HA) && defined(AUTHID)
+	if (mobility_spi != 0) {
+		struct haauth_users *hausers;
+		struct ip6_mh_opt_authentication *auth_opt;
+		mip6_authenticator_t *authenticator;
+
+		pad = MIP6_PADLEN(buflen, 8, 2);	/* 8n+2 */
+		MIP6_FILL_PADDING(bufp + buflen, pad);
+		buflen += pad;
+
+		auth_opt = (struct ip6_mh_opt_authentication *)(bufp + buflen);
+		auth_opt->ip6moauth_type = IP6_MHOPT_AUTH_OPT;
+		auth_opt->ip6moauth_len =
+			sizeof(struct ip6_mh_opt_authentication)
+			- sizeof(struct ip6_mh_opt) + MIP6_AUTHENTICATOR_SIZE;
+		buflen += sizeof(*auth_opt);
+		buflen += MIP6_AUTHENTICATOR_SIZE;
+
+		/* 
+		 * This is not final length, but
+		 * mobileip6_authentication_data() needs correct bu
+		 * length for authentication data calculation 
+		 */
+		bap->ip6mhba_hdr.ip6mh_len = (buflen >> 3) - 1;
+		bap->ip6mhba_hdr.ip6mh_cksum = 0;
+
+		/* Alignment 8n to sit the end of the packet */
+		pad = MIP6_PADLEN(buflen, 8, 0);
+		MIP6_FILL_PADDING(bufp + buflen, pad);
+		buflen += pad;
+
+		authenticator = (mip6_authenticator_t *)
+			(bufp + (buflen - MIP6_AUTHENTICATOR_SIZE - pad));
+
+		hausers = find_haauth_users(mobility_spi);
+		mip6_calculate_authenticator((mip6_kbm_t *)hausers->sharedkey,
+					     (acoa) ? acoa : coa,
+					     src, 
+					     (caddr_t)bufp,
+					     buflen, 
+					     buflen - pad - MIP6_AUTHENTICATOR_SIZE, 
+					     MIP6_AUTHENTICATOR_SIZE,
+					     authenticator);
+		/* MN-AAA isn't needed as described RFC4285 5.2 */
+	}
+#endif /* MIP_HA && AUTHID */
 
 	/* Alignment 8n */
 	pad = MIP6_PADLEN(buflen, 8, 0);

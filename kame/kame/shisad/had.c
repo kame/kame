@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.33 2006/03/02 11:35:37 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.34 2006/06/09 11:29:58 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -85,6 +85,9 @@ int keymanagement = 0;
 int ipv4mnpsupport = 0;
 #endif /* MIP_IPV4MNPSUPPORT */
 extern int do_proxy_dad;
+#ifdef AUTHID
+int use_authid = 0;
+#endif /* AUTHID */
 
 struct mip6stat mip6stat;
 struct mip6_hpfx_list hpfx_head; 
@@ -253,6 +256,10 @@ main(argc, argv)
 #endif /*MIP_NEMO*/
 
 	mip6_bc_init();
+#ifdef AUTHID
+	if (use_authid)
+		auth_init();
+#endif /* AUTHID */
 
 	/* notify a kernel to behave as a home agent. */
 	mipsock_nodetype_request(MIP6_NODETYPE_HOME_AGENT, 1);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.9 2006/06/09 05:46:13 t-momose Exp $	*/
+/*	$KAME: ip6mh.h,v 1.10 2006/06/09 11:29:58 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -387,6 +387,12 @@ struct ip6_mh_opt_authentication {
 	/* followed by authentication data */
 } __attribute__((__packed__));
 #define ip6moauth_mobility_spi __ip6moauth_mobility_spi.__mobility_spi32
+/* definition for subtype */
+#define IP6_MH_AUTHOPT_SUBTYPE_MNHA	1
+#define IP6_MH_AUTHOPT_SUBTYPE_MNAAA	2
+/* special reserved SPI values */
+#define IP6_MH_AUTHOPT_SPI_HMAC_SHA1	3
+#define IP6_MH_AUTHOPT_SPI_3GPP2	5
 
 /* Mobility Message Replay Protection Option */
 struct ip6_mh_opt_replay_protection {

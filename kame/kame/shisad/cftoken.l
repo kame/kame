@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.9 2005/10/11 10:04:46 keiichi Exp $	*/
+/*	$KAME: cftoken.l,v 1.10 2006/06/09 11:29:58 t-momose Exp $	*/
 
 %{
 /*
@@ -61,6 +61,7 @@ integer		{digit}+
 addrstring	[a-zA-Z0-9:\.][a-zA-Z0-9:\.]*
 ifname		[a-zA-Z]+[0-9]+
 mipifname	mip[0-9]+
+filename	.*
 
 %s S_CONFIG
 %s S_INTERFACE

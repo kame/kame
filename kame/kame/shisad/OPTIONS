@@ -1,0 +1,33 @@
+	Shisa Compile options
+	/* $KAME: OPTIONS,v 1.1 2006/06/09 11:29:57 t-momose Exp $ */
+
+There are several compile options on the Shisa. Some of them are
+mandatory to specify which binaries are being built. The others are
+optinoal options. Somes are used for extentions specified as
+startdard. The rest ones are for experimental codes going on WIDE and
+Nautilus6 projects.
+
+MIP_MN
+MIP_CN
+MIP_HA
+ When building binaries, you have to specify either one.
+
+MIP_NEMO
+
+MIP_MCOA
+ TBD
+
+DSMIP
+ TBD
+
+AUTHID
+ This option enables RFC4283 and RFC4285 features. RFC4285 specifies
+another authentication mechanism. Shisa has a code to process the
+specification, however no codes for actual authentication code because
+such authentication part depends on the operated network policy. Thus,
+you have to add your authentication code on home agent before using
+Shisa on RFC4285 required network.
+ auth_start(), auth_stop() and auth_done() functions are ready in
+auth.c. At this time, these functions have only small template
+codes. You can change and add your specific
+

@@ -1,6 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2826 2006/04/23 02:52:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2827 2006/06/09 11:29:57 t-momose Exp $
 
+<200606>
+2006-06-09  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>
+	* kame/kame/shisad: RFC4285 on home agnets is implemented.
+	
 <200604>
 2006-04-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_is_addr_neighbor): disabled the

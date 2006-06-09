@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.37 2006/06/08 12:02:00 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.38 2006/06/09 11:29:58 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -40,6 +40,11 @@ extern int raw4sock;
 #endif
 extern struct mip6stat mip6stat;
 extern struct mip6_hinfo_list hoa_head;
+extern int debug, namelookup;
+#ifdef AUTHID
+extern int use_authid;
+#endif /* AUTHID */
+
 
 /* protocol constants. */
 #define DHAAD_RETRIES		4
@@ -254,6 +259,9 @@ struct binding_update_list {
 #ifdef DSMIP
 	struct in_addr      bul_v4hoa;
 #endif /* DSMIP */
+#ifdef AUTHID
+	u_int32_t	    bul_spi;
+#endif /* AUTHID */
 };
 
 #define MIP6_BUL_STATE_DISABLE    0x01
@@ -336,7 +344,6 @@ LIST_HEAD(mip6_hinfo_list, mip6_hoainfo);
 #define MNINFO_MN_HOME    0x01
 #define MNINFO_MN_FOREIGN 0x02
 
-
 /* MIP Virtual Interface Information (each Home Link info) */
 struct mip6_mipif {
         LIST_ENTRY(mip6_mipif) mipif_entry;
@@ -357,7 +364,7 @@ struct mip6_mobility_options {
 	struct ip6_mh_opt_refresh_advice *opt_refresh;
 	struct ip6_mh_opt_altcoa *opt_altcoa;
 	struct ip6_mh_opt_nonce_index *opt_nonce;
-	struct ip6_mh_opt_auth_data *opt_auth;
+	struct ip6_mh_opt_auth_data *opt_bauth;
 
 #ifdef MIP_NEMO
 #define NEMO_MAX_ALLOW_PREFIX 10
@@ -370,6 +377,22 @@ struct mip6_mobility_options {
 #ifdef DSMIP
 	struct ip6_mh_opt_ipv4_hoa *opt_v4hoa;
 #endif /* DSMIP */
+
+#ifdef AUTHID
+	struct ip6_mh_opt_mn_id *opt_mnid;
+	/* mobility message authentication option could appear twice
+	   in one pakcet with a different subtype */
+	union {
+		struct ip6_mh_opt_authentication  *opt_authentication[2];
+		struct {
+			struct ip6_mh_opt_authentication *_mnha_auth;
+			struct ip6_mh_opt_authentication *_mnaaa_auth;
+		} _authtype_byname;
+	} _authtype;
+#define opt_authentication	_authtype.opt_authentication
+#define mnha_auth	_authtype._authtype_byname._mnha_auth
+#define mnaaa_auth	_authtype._authtype_byname._mnaaa_auth
+#endif /* AUTHID */
 };
 
 /* Binding Cache */
@@ -381,9 +404,10 @@ struct binding_cache {
         struct in6_addr       bc_myaddr;    /* my addr */
         u_int8_t              bc_state;     /* state of this bce */
 #define BC_STATE_VALID		0
-#define BC_STATE_DEPRECATED	1
-#define BC_STATE_UNDER_DAD	2
-#define BC_STATE_MAX		2
+#define BC_STATE_UNDER_DAD	1
+#define BC_STATE_UNDER_AUTH	2
+#define BC_STATE_DEPRECATED	4
+#define BC_STATE_MAX		4
         u_int16_t             bc_flags;     /* recved BU flags */
         u_int16_t             bc_seqno;     /* recved BU seqno */
         u_int32_t             bc_lifetime;  /* recved BU lifetime */
@@ -391,10 +415,13 @@ struct binding_cache {
         time_t                bc_expire;    /* expiration time of this BC. */
         CALLOUT_HANDLE        bc_refresh;   /* callout handle for retrans */
         u_int8_t              bc_refresh_count;
-	u_int8_t	      bc_authmethod;
+	u_int8_t	      bc_authmethod;	/* to be done */
+	u_int8_t	      bc_authmethod_done; /* done */
 #define BC_AUTH_NONE		0
 #define BC_AUTH_IPSEC		1
 #define BC_AUTH_RR		2
+#define BC_AUTH_MNHA		4
+#define BC_AUTH_MNAAA		8
 
 	/* valid only when BUF_HOME */
         void                  *bc_dad;      /* dad handler */
@@ -415,7 +442,14 @@ struct nd6options {
 	struct nd_opt_homeagent_info *ndhai;
 };
 extern struct nd6options ndopts;
-extern int debug, namelookup;
+
+struct haauth_users {
+	LIST_ENTRY(haauth_users) hauthusers_entry;
+
+	u_int32_t mobility_spi;
+	struct in6_addr hoa;
+	u_int8_t sharedkey[20];
+};
 
 /* mh.c */
 void mhsock_open(void);
@@ -440,7 +474,7 @@ int  send_hot(struct ip6_mh_home_test_init *, struct in6_addr *,
 int  send_cot(struct ip6_mh_careof_test_init *, struct in6_addr *, 
 	     struct in6_addr *);
 int  send_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *, struct in6_addr *, 
-	    u_int16_t, mip6_kbm_t *, u_int8_t, u_int16_t, u_int16_t, int, u_int16_t);
+	    u_int16_t, mip6_kbm_t *, u_int8_t, u_int16_t, u_int16_t, int, u_int16_t, u_int32_t);
 int send_mps(struct mip6_hpfxl *);
 
 /* rr.c */
@@ -487,7 +521,7 @@ void command_show_kbul(int, char *);
 struct binding_cache *mip6_bc_lookup(struct in6_addr *, struct in6_addr *, 
     u_int16_t);
 struct binding_cache *mip6_bc_add(struct in6_addr *, struct in6_addr *, 
-    struct in6_addr *, u_int32_t, u_int16_t, u_int16_t, u_int16_t, u_int8_t);
+    struct in6_addr *, u_int32_t, u_int16_t, u_int16_t, u_int16_t, u_int8_t, u_int8_t, u_int32_t);
 
 /* network.c */
 int set_ip6addr(char *, struct in6_addr *, int, int);
@@ -610,6 +644,14 @@ struct mip6_hpfxl *mip6_get_hpfxlist(struct in6_addr *, int,
 				     struct mip6_hpfx_list *);
 void show_hal(int, struct mip6_hpfx_list *);
 int receive_ra(struct nd_router_advert *, size_t, int, struct in6_addr *, struct in6_addr *);
+
+/* auth.c */
+#ifdef AUTHID
+void auth_init();
+int auth_opt(struct in6_addr *, struct in6_addr *, struct ip6_mh *,
+	     struct mip6_mobility_options *, int *, int *);
+struct haauth_users *find_haauth_users(u_int32_t);
+#endif /* AUTHID */
 
 /* other utility functions */
 int inet_are_prefix_equal(void *, void *, int);

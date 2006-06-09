@@ -34,6 +34,8 @@ CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA
 #CFLAGS+= -DMIP_NEMO
 #CFLAGS+= -DMIP_MCOA
 #CFLAGS+= -DMIP_IPV4MNPSUPPORT
+#CFLAGS+= -DAUTHID
+#SRCS+=auth.c rr.c # XXX rr.c is required only for mip6_calculate_authenticator()
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
