@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.19 2006/04/13 16:07:03 keiichi Exp $	*/
+/*	$Id: babymdd.c,v 1.20 2006/06/13 05:40:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -67,6 +67,8 @@
 #include "shisad.h"
 
 #define LINKLOCAL_ALLROUTERS "ff02::2"
+#define BABYMDD_IFF_IGNOREFLAGS	(IN6_IFF_DUPLICATED|IN6_IFF_DETACHED|\
+    IN6_IFF_NODAD|IN6_IFF_TEMPORARY)
 
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
 #define storage2sin(x) ((struct sockaddr_in *)(x))
@@ -842,7 +844,7 @@ init_hoa(u_int16_t hoaindex) {
 				perror("ioctl(SIOCGIFAFLAG_IN6)");
 				continue;
 			}
-			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_READONLY)
+			if (ifr6.ifr_ifru.ifru_flags6 & BABYMDD_IFF_IGNOREFLAGS)
 				continue;
 #endif
 
@@ -1188,7 +1190,7 @@ baby_getifinfo(ifinfo)
 				perror("ioctl(SIOCGIFAFLAG_IN6)");
 				continue;
 			}
-			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_READONLY)
+			if (ifr6.ifr_ifru.ifru_flags6 & BABYMDD_IFF_IGNOREFLAGS)
 				continue;
 
 			/* XXX how do we handle multiple addresses? */
