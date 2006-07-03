@@ -25,8 +25,10 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.1 2006/06/08 12:02:01 keiichi Exp $
+# $Id: Makefile.in,v 1.2 2006/07/03 08:29:39 keiichi Exp $
 #
+
+VPATH=.:../..
 
 prefix=	@prefix@
 srcdir=	@srcdir@
@@ -71,18 +73,16 @@ cftoken.c: ../../cftoken.l cfparse.h
 	lex ../../cftoken.l
 	mv lex.yy.c $@	
 
-install::
+install:
 	$(INSTALL_PROGRAM) -s -o bin -g bin $(TARGET) $(sbindir)
 
-includes::
+includes:
 
-clean::
+clean:
 	/bin/rm -f *.o $(TARGET) $(CLEANFILES) $(GENSRCS)
 
-distclean:: clean
+distclean: clean
 	/bin/rm -f Makefile config.cache config.log config.status .depend
 
 depend:
 	mkdep ${CFLAGS:M-[ID]*} $(srcdir)/*.c
-
-.PATH: ../..

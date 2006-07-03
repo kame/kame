@@ -25,8 +25,10 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.1 2006/06/08 12:02:00 keiichi Exp $
+# $Id: Makefile.in,v 1.2 2006/07/03 08:29:38 keiichi Exp $
 #
+
+subdirs=obj/mnd obj/babymdd obj/had obj/cnd obj/mrd obj/nemonetd
 
 prefix=	@prefix@
 srcdir=	@srcdir@
@@ -48,40 +50,41 @@ bindir=	@bindir@
 sbindir=@sbindir@
 mandir=	@mandir@
 
-all:
-	cd obj; cd mnd; $(MAKE)
-	cd obj; cd cnd; $(MAKE)
-	cd obj; cd babymdd; $(MAKE)
-	cd obj; cd had; $(MAKE)
-	cd obj; cd mrd; $(MAKE)
-	cd obj; cd nemonetd; $(MAKE)
+all: build
 
-install:
+build: .MAKE
+	for d in $(subdirs) ; do \
+		if test -d $$d ; then \
+			echo "===> Change directory to $$d" ; \
+			(cd $$d && $(MAKE)) || exit 1 ; \
+		fi ; done
+
+install: .MAKE
+	for d in $(subdirs) ; do \
+		if test -d $$d ; then \
+			echo "===> Change directory to $$d" ; \
+			(cd $$d && $(MAKE) install) || exit 1 ; \
+		fi ; done
 	$(INSTALL_DATA) -o bin -g bin mnd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin cnd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin babymdd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin had.8 $(mandir)/man8
-	$(INSTALL_DATA) -o bin -g bin mrd.5 $(mandir)/man8
+	$(INSTALL_DATA) -o bin -g bin mrd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin nemonetd.5 $(mandir)/man8
 
-includes:
+clean: .MAKE
+	for d in $(subdirs) ; do \
+		if test -d $$d ; then \
+			echo "===> Change directory to $$d" ; \
+			(cd $$d && $(MAKE) clean) \
+		fi ; done
 
-clean:
-	cd obj; cd mnd; $(MAKE) clean
-	cd obj; cd cnd; $(MAKE) clean
-	cd obj; cd babymdd; $(MAKE) clean
-	cd obj; cd had; $(MAKE) clean
-	cd obj; cd mrd; $(MAKE) clean
-	cd obj; cd nemonetd; $(MAKE) clean
-
-distclean: clean
-	cd obj; cd mnd; $(MAKE) distclean
-	cd obj; cd cnd; $(MAKE) distclean
-	cd obj; cd babymdd; $(MAKE) distclean
-	cd obj; cd had; $(MAKE) distclean
-	cd obj; cd mrd; $(MAKE) distclean
-	cd obj; cd nemonetd; $(MAKE) distclean
+distclean: .MAKE
+	for d in $(subdirs) ; do \
+		if test -d $$d ; then \
+			echo "===> Change directory to $$d" ; \
+			(cd $$d && $(MAKE) distclean) \
+		fi ; done
 	/bin/rm -f Makefile config.cache config.log config.status .depend
 
-depend:
-	mkdep ${CFLAGS:M-[ID]*} $(srcdir)/*.c
+.MAKE:
