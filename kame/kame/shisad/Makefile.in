@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.2 2006/07/03 08:29:38 keiichi Exp $
+# $Id: Makefile.in,v 1.3 2006/07/03 08:31:26 keiichi Exp $
 #
 
 subdirs=obj/mnd obj/babymdd obj/had obj/cnd obj/mrd obj/nemonetd
@@ -70,7 +70,7 @@ install: .MAKE
 	$(INSTALL_DATA) -o bin -g bin babymdd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin had.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin mrd.8 $(mandir)/man8
-	$(INSTALL_DATA) -o bin -g bin nemonetd.5 $(mandir)/man8
+	$(INSTALL_DATA) -o bin -g bin nemonetd.8 $(mandir)/man8
 
 clean: .MAKE
 	for d in $(subdirs) ; do \
