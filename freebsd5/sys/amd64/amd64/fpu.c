@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/fpu.c,v 1.147 2003/12/06 23:19:47 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/fpu.c,v 1.154.2.1 2005/02/05 01:02:48 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,7 +47,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/fpu.c,v 1.147 2003/12/06 23:19:47 peter 
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <sys/signalvar.h>
-#include <sys/user.h>
 
 #include <machine/cputypes.h>
 #include <machine/frame.h>
@@ -77,6 +72,7 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/fpu.c,v 1.147 2003/12/06 23:19:47 peter 
 #define	fnstsw(addr)		__asm __volatile("fnstsw %0" : "=m" (*(addr)))
 #define	fxrstor(addr)		__asm("fxrstor %0" : : "m" (*(addr)))
 #define	fxsave(addr)		__asm __volatile("fxsave %0" : "=m" (*(addr)))
+#define	ldmxcsr(r)		__asm __volatile("ldmxcsr %0" : : "m" (r))
 #define	start_emulating()	__asm("smsw %%ax; orb %0,%%al; lmsw %%ax" \
 				      : : "n" (CR0_TS) : "ax")
 #define	stop_emulating()	__asm("clts")
@@ -100,6 +96,8 @@ void	stop_emulating(void);
 
 typedef u_char bool_t;
 
+static	void	fpu_clean_state(void);
+
 int	hw_float = 1;
 SYSCTL_INT(_hw,HW_FLOATINGPT, floatingpoint,
 	CTLFLAG_RD, &hw_float, 0, 
@@ -112,28 +110,24 @@ static	bool_t			fpu_cleanstate_ready;
  * Initialize floating point unit.
  */
 void
-fpuinit()
+fpuinit(void)
 {
 	register_t savecrit;
+	u_int mxcsr;
 	u_short control;
 
-	/*
-	 * fpusave() initializes the fpu and sets fpcurthread = NULL
-	 */
 	savecrit = intr_disable();
-	fpusave(&fpu_cleanstate);	/* XXX borrow for now */
+	PCPU_SET(fpcurthread, 0);
 	stop_emulating();
-	/* XXX fpusave() doesn't actually initialize the fpu in the SSE case. */
 	fninit();
 	control = __INITIAL_FPUCW__;
 	fldcw(&control);
-	start_emulating();
-	intr_restore(savecrit);
-
-	savecrit = intr_disable();
-	stop_emulating();
+	mxcsr = __INITIAL_MXCSR__;
+	ldmxcsr(mxcsr);
 	fxsave(&fpu_cleanstate);
 	start_emulating();
+	bzero(fpu_cleanstate.sv_fp, sizeof(fpu_cleanstate.sv_fp));
+	bzero(fpu_cleanstate.sv_xmm, sizeof(fpu_cleanstate.sv_xmm));
 	fpu_cleanstate_ready = 1;
 	intr_restore(savecrit);
 }
@@ -147,8 +141,12 @@ fpuexit(struct thread *td)
 	register_t savecrit;
 
 	savecrit = intr_disable();
-	if (curthread == PCPU_GET(fpcurthread))
-		fpusave(&PCPU_GET(curpcb)->pcb_save);
+	if (curthread == PCPU_GET(fpcurthread)) {
+		stop_emulating();
+		fxsave(&PCPU_GET(curpcb)->pcb_save);
+		start_emulating();
+		PCPU_SET(fpcurthread, 0);
+	}
 	intr_restore(savecrit);
 }
 
@@ -389,7 +387,6 @@ fpudna()
 {
 	struct pcb *pcb;
 	register_t s;
-	u_short control;
 
 	if (PCPU_GET(fpcurthread) == curthread) {
 		printf("fpudna: fpcurthread == curthread %d times\n",
@@ -412,49 +409,20 @@ fpudna()
 	PCPU_SET(fpcurthread, curthread);
 	pcb = PCPU_GET(curpcb);
 
+	fpu_clean_state();
+
 	if ((pcb->pcb_flags & PCB_FPUINITDONE) == 0) {
 		/*
-		 * This is the first time this thread has used the FPU or
-		 * the PCB doesn't contain a clean FPU state.  Explicitly
-		 * initialize the FPU and load the default control word.
+		 * This is the first time this thread has used the FPU,
+		 * explicitly load sanitized registers.
 		 */
-		fninit();
-		control = __INITIAL_FPUCW__;
-		fldcw(&control);
+		fxrstor(&fpu_cleanstate);
 		pcb->pcb_flags |= PCB_FPUINITDONE;
-	} else {
-		/*
-		 * The following frstor may cause a trap when the state
-		 * being restored has a pending error.  The error will
-		 * appear to have been triggered by the current (fpu) user
-		 * instruction even when that instruction is a no-wait
-		 * instruction that should not trigger an error (e.g.,
-		 * instructions are broken the same as frstor, so our
-		 * treatment does not amplify the breakage.
-		 */
+	} else
 		fxrstor(&pcb->pcb_save);
-	}
 	intr_restore(s);
 
 	return (1);
-}
-
-/*
- * Wrapper for fnsave instruction.
- *
- * fpusave() must be called with interrupts disabled, so that it clears
- * fpcurthread atomically with saving the state.  We require callers to do the
- * disabling, since most callers need to disable interrupts anyway to call
- * fpusave() atomically with checking fpcurthread.
- */
-void
-fpusave(struct savefpu *addr)
-{
-
-	stop_emulating();
-	fxsave(addr);
-	start_emulating();
-	PCPU_SET(fpcurthread, NULL);
 }
 
 /*
@@ -510,6 +478,7 @@ fpusetregs(struct thread *td, struct savefpu *addr)
 
 	s = intr_disable();
 	if (td == PCPU_GET(fpcurthread)) {
+		fpu_clean_state();
 		fxrstor(addr);
 		intr_restore(s);
 	} else {
@@ -517,6 +486,37 @@ fpusetregs(struct thread *td, struct savefpu *addr)
 		bcopy(addr, &td->td_pcb->pcb_save, sizeof(*addr));
 	}
 	curthread->td_pcb->pcb_flags |= PCB_FPUINITDONE;
+}
+
+/*
+ * On AuthenticAMD processors, the fxrstor instruction does not restore
+ * the x87's stored last instruction pointer, last data pointer, and last
+ * opcode values, except in the rare case in which the exception summary
+ * (ES) bit in the x87 status word is set to 1.
+ *
+ * In order to avoid leaking this information across processes, we clean
+ * these values by performing a dummy load before executing fxrstor().
+ */
+static	double	dummy_variable = 0.0;
+static void
+fpu_clean_state(void)
+{
+	u_short status;
+
+	/*
+	 * Clear the ES bit in the x87 status word if it is currently
+	 * set, in order to avoid causing a fault in the upcoming load.
+	 */
+	fnstsw(&status);
+	if (status & 0x80)
+		fnclex();
+
+	/*
+	 * Load the dummy variable into the x87 stack.  This mangles
+	 * the x87 stack, but we don't care since we're about to call
+	 * fxrstor() anyway.
+	 */
+	__asm __volatile("ffree %%st(7); fld %0" : : "m" (dummy_variable));
 }
 
 /*

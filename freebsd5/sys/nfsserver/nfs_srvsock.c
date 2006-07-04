@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1989, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,11 +30,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_socket.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.79 2002/07/24 14:24:16 rwatson Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.79 2002/07/24 14:24:16 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.92.2.1 2005/01/31 23:26:47 imp Exp $");
 
 /*
  * Socket operations for use by nfs
@@ -97,12 +92,12 @@ SYSCTL_INT(_vfs_nfsrv, OID_AUTO, realign_count, CTLFLAG_RW, &nfs_realign_count, 
  */
 #define	NFS_CWNDSCALE	256
 #define	NFS_MAXCWND	(NFS_CWNDSCALE * 32)
-struct callout_handle	nfsrv_timer_handle;
+struct callout	nfsrv_callout;
 
 static void	nfs_realign(struct mbuf **pm, int hsiz);	/* XXX SHARED */
 static int	nfsrv_getstream(struct nfssvc_sock *, int);
 
-int (*nfsrv3_procs[NFS_NPROCS])(struct nfsrv_descript *nd,
+int32_t (*nfsrv3_procs[NFS_NPROCS])(struct nfsrv_descript *nd,
 				struct nfssvc_sock *slp,
 				struct thread *td,
 				struct mbuf **mreqp) = {
@@ -145,9 +140,13 @@ nfs_rephead(int siz, struct nfsrv_descript *nd, int err,
 	caddr_t bpos;
 	struct mbuf *mb;
 
+	/* XXXRW: not 100% clear the lock is needed here. */
+	NFSD_LOCK_ASSERT();
+
 	nd->nd_repstat = err;
 	if (err && (nd->nd_flag & ND_NFSV3) == 0)	/* XXX recheck */
 		siz = 0;
+	NFSD_UNLOCK();
 	MGETHDR(mreq, M_TRYWAIT, MT_DATA);
 	mb = mreq;
 	/*
@@ -160,6 +159,7 @@ nfs_rephead(int siz, struct nfsrv_descript *nd, int err,
 		MCLGET(mreq, M_TRYWAIT);
 	} else
 		mreq->m_data += min(max_hdr, M_TRAILINGSPACE(mreq));
+	NFSD_LOCK();
 	tl = mtod(mreq, u_int32_t *);
 	bpos = ((caddr_t)tl) + mreq->m_len;
 	*tl++ = txdr_unsigned(nd->nd_retxid);
@@ -241,13 +241,18 @@ nfs_realign(struct mbuf **pm, int hsiz)	/* XXX COMMON */
 	struct mbuf *n = NULL;
 	int off = 0;
 
+	/* XXXRW: may not need lock? */
+	NFSD_LOCK_ASSERT();
+
 	++nfs_realign_test;
 	while ((m = *pm) != NULL) {
 		if ((m->m_len & 0x3) || (mtod(m, intptr_t) & 0x3)) {
+			NFSD_UNLOCK();
 			MGET(n, M_TRYWAIT, MT_DATA);
 			if (m->m_len >= MINCLSIZE) {
 				MCLGET(n, M_TRYWAIT);
 			}
+			NFSD_LOCK();
 			n->m_len = 0;
 			break;
 		}
@@ -285,6 +290,8 @@ nfs_getreq(struct nfsrv_descript *nd, struct nfsd *nfsd, int has_header)
 	u_int32_t nfsvers, auth_type;
 	int error = 0;
 	struct mbuf *mrep, *md;
+
+	NFSD_LOCK_ASSERT();
 
 	mrep = nd->nd_mrep;
 	md = nd->nd_md;
@@ -359,7 +366,7 @@ nfs_getreq(struct nfsrv_descript *nd, struct nfsd *nfsd, int has_header)
 		 * and related calls.  Right now, this tramples on any
 		 * extensible data in the ucred, fails to initialize the
 		 * mutex, and worse.  This must be fixed before FreeBSD
-		 * 5.0-RELEASE.
+		 * 5.3-RELEASE.
 		 */
 		bzero((caddr_t)&nd->nd_cr, sizeof (struct ucred));
 		nd->nd_cr.cr_ref = 1;
@@ -415,17 +422,31 @@ nfsrv_rcv(struct socket *so, void *arg, int waitflag)
 	struct uio auio;
 	int flags, error;
 
+	/*
+	 * XXXRW: For now, assert Giant here since the NFS server upcall
+	 * will perform socket operations requiring Giant in a non-mpsafe
+	 * kernel.
+	 */
+	NET_ASSERT_GIANT();
+	NFSD_UNLOCK_ASSERT();
+
+	/* XXXRW: Unlocked read. */
 	if ((slp->ns_flag & SLP_VALID) == 0)
 		return;
-#ifdef notdef
+
 	/*
-	 * Define this to test for nfsds handling this under heavy load.
+	 * We can't do this in the context of a socket callback
+	 * because we're called with locks held.
+	 * XXX: SMP
 	 */
 	if (waitflag == M_DONTWAIT) {
+		NFSD_LOCK();
 		slp->ns_flag |= SLP_NEEDQ;
 		goto dorecs;
 	}
-#endif
+
+
+	NFSD_LOCK();
 	auio.uio_td = NULL;
 	if (so->so_type == SOCK_STREAM) {
 		/*
@@ -433,7 +454,8 @@ nfsrv_rcv(struct socket *so, void *arg, int waitflag)
 		 * to an nfsd so that there is feedback to the TCP layer that
 		 * the nfs servers are heavily loaded.
 		 */
-		if (STAILQ_FIRST(&slp->ns_rec) && waitflag == M_DONTWAIT) {
+		if (STAILQ_FIRST(&slp->ns_rec) != NULL &&
+		    waitflag == M_DONTWAIT) {
 			slp->ns_flag |= SLP_NEEDQ;
 			goto dorecs;
 		}
@@ -443,8 +465,10 @@ nfsrv_rcv(struct socket *so, void *arg, int waitflag)
 		 */
 		auio.uio_resid = 1000000000;
 		flags = MSG_DONTWAIT;
+		NFSD_UNLOCK();
 		error = so->so_proto->pr_usrreqs->pru_soreceive
 			(so, &nam, &auio, &mp, NULL, &flags);
+		NFSD_LOCK();
 		if (error || mp == NULL) {
 			if (error == EWOULDBLOCK)
 				slp->ns_flag |= SLP_NEEDQ;
@@ -478,23 +502,28 @@ nfsrv_rcv(struct socket *so, void *arg, int waitflag)
 		do {
 			auio.uio_resid = 1000000000;
 			flags = MSG_DONTWAIT;
+			NFSD_UNLOCK();
 			error = so->so_proto->pr_usrreqs->pru_soreceive
 				(so, &nam, &auio, &mp, NULL, &flags);
 			if (mp) {
 				struct nfsrv_rec *rec;
 				rec = malloc(sizeof(struct nfsrv_rec),
-					     M_NFSRVDESC, waitflag);
+			            M_NFSRVDESC, 
+				    waitflag == M_DONTWAIT ? M_NOWAIT : M_WAITOK);
 				if (!rec) {
 					if (nam)
 						FREE(nam, M_SONAME);
 					m_freem(mp);
+					NFSD_LOCK();
 					continue;
 				}
+				NFSD_LOCK();
 				nfs_realign(&mp, 10 * NFSX_UNSIGNED);
 				rec->nr_address = nam;
 				rec->nr_packet = mp;
 				STAILQ_INSERT_TAIL(&slp->ns_rec, rec, nr_link);
-			}
+			} else
+				NFSD_LOCK();
 			if (error) {
 				if ((so->so_proto->pr_flags & PR_CONNREQUIRED)
 					&& error != EWOULDBLOCK) {
@@ -510,9 +539,10 @@ nfsrv_rcv(struct socket *so, void *arg, int waitflag)
 	 */
 dorecs:
 	if (waitflag == M_DONTWAIT &&
-		(STAILQ_FIRST(&slp->ns_rec)
-		 || (slp->ns_flag & (SLP_NEEDQ | SLP_DISCONN))))
+		(STAILQ_FIRST(&slp->ns_rec) != NULL ||
+		 (slp->ns_flag & (SLP_NEEDQ | SLP_DISCONN))))
 		nfsrv_wakenfsd(slp);
+	NFSD_UNLOCK();
 }
 
 /*
@@ -528,6 +558,8 @@ nfsrv_getstream(struct nfssvc_sock *slp, int waitflag)
 	int len;
 	struct mbuf *om, *m2, *recm;
 	u_int32_t recmark;
+
+	NFSD_LOCK_ASSERT();
 
 	if (slp->ns_flag & SLP_GETSTREAM)
 		panic("nfs getstream");
@@ -563,7 +595,7 @@ nfsrv_getstream(struct nfssvc_sock *slp, int waitflag)
 			slp->ns_flag |= SLP_LASTFRAG;
 		else
 			slp->ns_flag &= ~SLP_LASTFRAG;
-		if (slp->ns_reclen > NFS_MAXPACKET) {
+		if (slp->ns_reclen > NFS_MAXPACKET || slp->ns_reclen <= 0) {
 			slp->ns_flag &= ~SLP_GETSTREAM;
 			return (EPERM);
 		}
@@ -587,8 +619,10 @@ nfsrv_getstream(struct nfssvc_sock *slp, int waitflag)
 
 		while (len < slp->ns_reclen) {
 			if ((len + m->m_len) > slp->ns_reclen) {
+				NFSD_UNLOCK();
 				m2 = m_copym(m, 0, slp->ns_reclen - len,
 					waitflag);
+				NFSD_LOCK();
 				if (m2) {
 					if (om) {
 						om->m_next = m2;
@@ -631,7 +665,10 @@ nfsrv_getstream(struct nfssvc_sock *slp, int waitflag)
 	    *mpp = recm;
 	    if (slp->ns_flag & SLP_LASTFRAG) {
 		struct nfsrv_rec *rec;
-		rec = malloc(sizeof(struct nfsrv_rec), M_NFSRVDESC, waitflag);
+		NFSD_UNLOCK();
+		rec = malloc(sizeof(struct nfsrv_rec), M_NFSRVDESC,
+	            waitflag == M_DONTWAIT ? M_NOWAIT : M_WAITOK);
+		NFSD_LOCK();
 		if (!rec) {
 		    m_freem(slp->ns_frag);
 		} else {
@@ -658,16 +695,21 @@ nfsrv_dorec(struct nfssvc_sock *slp, struct nfsd *nfsd,
 	struct nfsrv_descript *nd;
 	int error;
 
+	NFSD_LOCK_ASSERT();
+
 	*ndp = NULL;
-	if ((slp->ns_flag & SLP_VALID) == 0 || !STAILQ_FIRST(&slp->ns_rec))
+	if ((slp->ns_flag & SLP_VALID) == 0 ||
+	    STAILQ_FIRST(&slp->ns_rec) == NULL)
 		return (ENOBUFS);
 	rec = STAILQ_FIRST(&slp->ns_rec);
 	STAILQ_REMOVE_HEAD(&slp->ns_rec, nr_link);
 	nam = rec->nr_address;
 	m = rec->nr_packet;
 	free(rec, M_NFSRVDESC);
+	NFSD_UNLOCK();
 	MALLOC(nd, struct nfsrv_descript *, sizeof (struct nfsrv_descript),
 		M_NFSRVDESC, M_WAITOK);
+	NFSD_LOCK();
 	nd->nd_md = nd->nd_mrep = m;
 	nd->nd_nam2 = nam;
 	nd->nd_dpos = mtod(m, caddr_t);
@@ -694,6 +736,8 @@ nfsrv_wakenfsd(struct nfssvc_sock *slp)
 {
 	struct nfsd *nd;
 
+	NFSD_LOCK_ASSERT();
+
 	if ((slp->ns_flag & SLP_VALID) == 0)
 		return;
 	TAILQ_FOREACH(nd, &nfsd_head, nfsd_chain) {
@@ -703,7 +747,7 @@ nfsrv_wakenfsd(struct nfssvc_sock *slp)
 				panic("nfsd wakeup");
 			slp->ns_sref++;
 			nd->nfsd_slp = slp;
-			wakeup((caddr_t)nd);
+			wakeup(nd);
 			return;
 		}
 	}
@@ -723,6 +767,9 @@ nfsrv_send(struct socket *so, struct sockaddr *nam, struct mbuf *top)
 {
 	struct sockaddr *sendnam;
 	int error, soflags, flags;
+
+	NET_ASSERT_GIANT();
+	NFSD_UNLOCK_ASSERT();
 
 	soflags = so->so_proto->pr_flags;
 	if ((soflags & PR_CONNREQUIRED) || (so->so_state & SS_ISCONNECTED))
@@ -758,11 +805,10 @@ nfsrv_send(struct socket *so, struct sockaddr *nam, struct mbuf *top)
 void
 nfsrv_timer(void *arg)
 {
-	int s;
 	struct nfssvc_sock *slp;
 	u_quad_t cur_usec;
 
-	s = splnet();
+	NFSD_LOCK();
 	/*
 	 * Scan the write gathering queues for writes that need to be
 	 * completed now.
@@ -773,6 +819,6 @@ nfsrv_timer(void *arg)
 		    LIST_FIRST(&slp->ns_tq)->nd_time <= cur_usec)
 			nfsrv_wakenfsd(slp);
 	}
-	splx(s);
-	nfsrv_timer_handle = timeout(nfsrv_timer, NULL, nfsrv_ticks);
+	NFSD_UNLOCK();
+	callout_reset(&nfsrv_callout, nfsrv_ticks, nfsrv_timer, NULL);
 }
