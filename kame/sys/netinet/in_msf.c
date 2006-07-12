@@ -2107,9 +2107,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 			"the group address is invalid\n"));
 		return EINVAL;
 	}
-	if (imsf->imsf_numsrc != 0)
-		return EINVAL;
-	if (!is_igmp_target(&imsf->imsf_multiaddr))
+	if (imsf->imsf_numsrc != 0 && !is_igmp_target(&imsf->imsf_multiaddr))
 		return EINVAL;
 
 	/*
@@ -2705,15 +2703,13 @@ sock_setmopt_srcfilter(sop, grpfp)
 		return EPFNOSUPPORT;
 
 	in_grp = SIN(&grpf->gf_group);
-	if ((grpf->gf_numsrc != 0))
-		return EINVAL;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	if (!IN_MULTICAST(in_grp->sin_addr.s_addr))
 #else
 	if (!IN_MULTICAST(ntohl(in_grp->sin_addr.s_addr)))
 #endif
 		return EINVAL;
-	if (!is_igmp_target(&in_grp->sin_addr))
+	if (grpf->gf_numsrc != 0 && !is_igmp_target(&in_grp->sin_addr))
 		return EINVAL;
 
 	/*

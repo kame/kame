@@ -1,5 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2827 2006/06/09 11:29:57 t-momose Exp $
+$KAME: CHANGELOG,v 1.2828 2006/07/12 01:48:43 suz Exp $
+
+<200607>
+2006-07-11  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet/in_msf.c: fixed a bug that MSF advanced-API
+	is rejected in case of IPv4
 
 <200606>
 2006-06-09  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>
