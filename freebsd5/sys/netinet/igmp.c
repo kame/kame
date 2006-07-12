@@ -414,6 +414,7 @@ igmp_input(register struct mbuf *m, int off)
 	rti = find_rti(ifp);
 	if (rti == NULL) {
 		++igmpstat.igps_rcv_query_fails;
+		mtx_unlock(&igmp_mtx);
 		goto end; /* XXX */
 	}
 
@@ -450,11 +451,14 @@ igmp_input(register struct mbuf *m, int off)
 #endif
 		else { /* igmplen > 8 && igmplen < 12 */
 			++igmpstat.igps_rcv_badqueries; /* invalid query */
+			mtx_unlock(&igmp_mtx);
 			goto end;
 		}
 
-		if (ifp->if_flags & IFF_LOOPBACK)
+		if (ifp->if_flags & IFF_LOOPBACK) {
+			mtx_unlock(&igmp_mtx);
 			break;
+		}
 
 		/*
 		 * Note IGMPv1's igmp_code is *always* 0, and IGMPv2's
@@ -477,6 +481,7 @@ igmp_input(register struct mbuf *m, int off)
 			if (ip->ip_dst.s_addr != igmp_all_hosts_group ||
 			    igmp->igmp_group.s_addr != 0) {
 				++igmpstat.igps_rcv_badqueries;
+				mtx_unlock(&igmp_mtx);
 				goto end;
 			}
 			++igmpstat.igps_rcv_v1_queries;
@@ -491,6 +496,7 @@ igmp_input(register struct mbuf *m, int off)
 			++igmpstat.igps_rcv_v2_queries;
 			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
 				++igmpstat.igps_rcv_badqueries;
+				mtx_unlock(&igmp_mtx);
 				goto end;
 			}
 			goto igmpv2_query;
@@ -500,18 +506,22 @@ igmp_input(register struct mbuf *m, int off)
 		/*
 		 * Adjust timer for scheduling responses to IGMPv3 query.
 		 */
-		if (query_ver != IGMP_v3_QUERY)
+		if (query_ver != IGMP_v3_QUERY) {
+			mtx_unlock(&igmp_mtx);
 			goto end;
+		}
 		++igmpstat.igps_rcv_v3_queries;
 
 		/* Check query types and keep source list if needed. */
 		if (igmp->igmp_group.s_addr == INADDR_ANY) {
 			if (igmp->igmp_numsrc != 0) {
 				++igmpstat.igps_rcv_badqueries;
+				mtx_unlock(&igmp_mtx);
 				goto end;
 			}
 			if (ip->ip_dst.s_addr != htonl(INADDR_ALLHOSTS_GROUP)) {
 				++igmpstat.igps_rcv_badqueries;
+				mtx_unlock(&igmp_mtx);
 				goto end;
 			}
 			query_type = IGMP_V3_GENERAL_QUERY;
@@ -526,6 +536,7 @@ igmp_input(register struct mbuf *m, int off)
 			goto set_timer;
 		}
 		++igmpstat.igps_rcv_badqueries;
+		mtx_unlock(&igmp_mtx);
 		goto end;
 
 set_timer:
@@ -554,9 +565,11 @@ set_timer:
 		error = igmp_set_timer(ifp, rti, igmp, igmplen, query_type);
 		if (error != 0) {
 			IGMP_PRINTF("igmp_input: receive bad query\n");
+			mtx_unlock(&igmp_mtx);
 			goto end;
 		}
 #endif /* IGMPV3 */
+		mtx_unlock(&igmp_mtx);
 		break;
 
 igmpv1_query:
@@ -574,6 +587,7 @@ igmpv2_query:
 		timer = igmp->igmp_code * PR_FASTHZ / IGMP_TIMER_SCALE;
 		if (timer == 0)
 			timer = 1;
+		mtx_unlock(&igmp_mtx);
 		IN_MULTI_LOCK();
 		IN_FIRST_MULTI(step, inm);
 		while (inm != NULL) {
@@ -591,7 +605,6 @@ igmpv2_query:
 			}
 			IN_NEXT_MULTI(step, inm);
 		}
-		IN_MULTI_UNLOCK();
 #ifdef IGMPV3
 		/*
 		 * IGMPv2 Querier Present is set to Older Version
@@ -601,9 +614,10 @@ igmpv2_query:
 		if (igmp->igmp_group.s_addr == INADDR_ANY) {
 		    if (igmp_version == 3)
 			goto end;
-		    igmp_set_hostcompat(ifp, rti, query_ver);
+		    igmp_set_hostcompat(ifp, inm->inm_rti, query_ver);
 		}
 #endif
+		IN_MULTI_UNLOCK();
 		break;
 
 	case IGMP_V1_MEMBERSHIP_REPORT:
@@ -645,6 +659,7 @@ igmpv2_query:
 		 * If we belong to the group being reported, stop
 		 * our timer for that group.
 		 */
+		mtx_unlock(&igmp_mtx);
 		IN_MULTI_LOCK();
 		IN_LOOKUP_MULTI(igmp->igmp_group, ifp, inm);
 		if (inm != NULL) {
@@ -658,7 +673,6 @@ igmpv2_query:
 
 		break;
 	}
-	mtx_unlock(&igmp_mtx);
 
 	/*
 	 * Pass all valid IGMP packets up to any process(es) listening
@@ -2522,8 +2536,7 @@ in_modmulti2(ap, ifp, numsrc, ss, mode,
 	     * If there is some sources to be deleted, or if the request is
 	     * join a local group address with some filtered address, return.
 	     */
-	    if ((old_num != 0) ||
-		(!is_igmp_target(&inm->inm_addr) && numsrc != 0)) {
+	    if (old_num != 0 || (!is_igmp_target(ap) && numsrc != 0)) {
 		*error = EINVAL;
 		IN_MULTI_UNLOCK();
 		return NULL;
