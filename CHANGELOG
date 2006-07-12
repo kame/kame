@@ -1,10 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2828 2006/07/12 01:48:43 suz Exp $
+$KAME: CHANGELOG,v 1.2829 2006/07/12 03:08:57 suz Exp $
 
 <200607>
 2006-07-11  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet/in_msf.c: fixed a bug that MSF advanced-API
-	is rejected in case of IPv4
+	is rejected in case of IPv4.
+	* kame/sys/netinet/igmp.c: fixed a kernel crash in freebsd5 when
+	MSF advanced-API is used in a kernel with IGMPV3 option on.
 
 <200606>
 2006-06-09  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>
