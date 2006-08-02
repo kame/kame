@@ -1,4 +1,4 @@
-/*	$KAME: command.c,v 1.6 2006/07/03 09:21:07 t-momose Exp $	*/
+/*	$KAME: command.c,v 1.7 2006/08/02 10:30:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -43,6 +43,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include "fdlist.h"
+#include "config.h"
 #include "command.h"
 
 static struct sockaddr_in6 sin6_ci;
@@ -82,16 +83,27 @@ struct command_table basic_command_table[] = {
 };
 struct command_table *commands;
 
+static char *msg_more = "-- MORE -- (push Enter key)";
+int pager_mode = 1;
+
 int
-command_init(p, cmdset, cmdset_size, port)
+command_init(p, cmdset, cmdset_size, port, if_params)
 	char *p;
 	struct command_table *cmdset;
 	size_t cmdset_size;
 	u_short port;
+	struct config_entry *if_params;
 {
 	int i, s;
 	int s_optval = 1;
 	struct command_table *c;
+
+	if (if_params != NULL) {
+		config_get_number(CFT_PAGER, &pager_mode, if_params);
+	}
+	if (config_params != NULL) {
+		config_get_number(CFT_PAGER, &pager_mode, config_params);
+	}
 
 	s = socket(PF_INET6, SOCK_STREAM, 0);
 	if (s < 0) {
@@ -195,8 +207,11 @@ command_in(s)
 			TAILQ_REMOVE(&cc->lb_head, lb, lb_entry);
 			free(lb);
 		}
-		if (lb)
+		if (lb) {
+			/* There would be more buffers to be displayed */
+			write(s, msg_more, strlen(msg_more));
 			return (0);
+		}
 		cc->wait_nextpage = 0;
 	} else {
 		buffer[bytes] = '\0';
@@ -258,14 +273,13 @@ command_printf(int s, const char *fmt, ...)
 	va_list ap;
 	char buffer[512];
 	struct connection_context *cc;
-	char *msg_more = "-- MORE -- (push Enter key)";
 
 	va_start(ap, fmt);
 	vsnprintf(buffer, 512, fmt, ap);
 	va_end(ap);
 
 	cc = find_connection_context_by_socket(s);
-	if (cc && cc->remained_lines-- <= 0) {
+	if (pager_mode && (cc && cc->remained_lines-- <= 0)) {
 		struct line_buffer *lb;
 		
 		lb = malloc(sizeof(struct line_buffer) + strlen(buffer) + 1);
@@ -278,7 +292,7 @@ command_printf(int s, const char *fmt, ...)
 		}
 	} else {
 		write(s, buffer, strlen(buffer));
-		if (cc && cc->remained_lines <= 0) {
+		if (pager_mode && (cc && cc->remained_lines <= 0)) {
 			write(s, msg_more, strlen(msg_more));
 			cc->wait_nextpage = 1;
 		}
