@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.9 2005/10/11 10:04:46 keiichi Exp $	*/
+/*	$KAME: cfparse.y,v 1.10 2006/08/02 10:40:07 t-momose Exp $	*/
 
 %{
 /*
@@ -61,6 +61,8 @@ static void free_cfe(struct config_entry *);
 %token DEBUG
 %token NAMELOOKUP
 %token COMMANDPORT
+%token DAD
+%token PAGER
 %token INTERFACE IFNAME
 %token HOMEREGISTRATIONLIFETIME
 %token PREFERENCE
@@ -69,6 +71,8 @@ static void free_cfe(struct config_entry *);
 %token STATICTUNNEL
 %token IPV4MNPSUPPORT
 %token IPV4DUMMYTUNNEL
+%token AUTHDATABASE
+%token FILENAME
 
 %union {
 	int number;
@@ -80,8 +84,9 @@ static void free_cfe(struct config_entry *);
 %type <string> IFNAME
 %type <string> registration_mode EXPLICIT IMPLICIT
 %type <number> INTEGER
+%type <string> FILENAME
 %type <cfe> statements statement
-%type <cfe> debug_statement namelookup_statement
+%type <cfe> debug_statement namelookup_statement dad_statement pager_statement
 %type <cfe> commandport_statement
 %type <cfe> homeregistrationlifetime_statement
 %type <cfe> interface_statement
@@ -94,6 +99,7 @@ static void free_cfe(struct config_entry *);
 %type <cfe> statictunnel_statements statictunnel_statement
 %type <cfe> ipv4dummytunnel_config
 %type <cfe> ipv4dummytunnel_statements ipv4dummytunnel_statement
+%type <cfe> authdatabase_statement
 
 %%
 
@@ -136,6 +142,9 @@ statement:
 	|	statictunnel_config
 	|	ipv4mnpsupport_statement
 	|	ipv4dummytunnel_config
+	|	dad_statement
+	|	pager_statement
+	|	authdatabase_statement
 	;
 
 debug_statement:
@@ -161,6 +170,48 @@ namelookup_statement:
 			if (cfe == NULL)
 				return (-1);
 			cfe->cfe_number = $2;
+
+			$$ = cfe;
+		}
+	;
+
+dad_statement:
+		DAD INTEGER EOS
+		{
+			struct config_entry *cfe;
+
+			cfe = alloc_cfe(CFT_DAD);
+			if (cfe == NULL)
+				return (-1);
+			cfe->cfe_number = $2;
+
+			$$ = cfe;
+		}
+	;
+
+pager_statement:
+		PAGER INTEGER EOS
+		{
+			struct config_entry *cfe;
+
+			cfe = alloc_cfe(CFT_PAGER);
+			if (cfe == NULL)
+				return (-1);
+			cfe->cfe_number = $2;
+
+			$$ = cfe;
+		}
+	;
+
+authdatabase_statement:
+		AUTHDATABASE FILENAME EOS
+		{
+			struct config_entry *cfe;
+
+			cfe = alloc_cfe(CFT_AUTHDATABASE);
+			if (cfe == NULL)
+				return (-1);
+			cfe->cfe_ptr = $2;
 
 			$$ = cfe;
 		}

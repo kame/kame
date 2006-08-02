@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.10 2006/06/09 11:29:58 t-momose Exp $	*/
+/*	$KAME: cftoken.l,v 1.11 2006/08/02 10:40:07 t-momose Exp $	*/
 
 %{
 /*
@@ -61,13 +61,14 @@ integer		{digit}+
 addrstring	[a-zA-Z0-9:\.][a-zA-Z0-9:\.]*
 ifname		[a-zA-Z]+[0-9]+
 mipifname	mip[0-9]+
-filename	.*
+filename	[a-zA-Z0-9:\.\-\+]*
 
 %s S_CONFIG
 %s S_INTERFACE
 %s S_PREFIXTABLE
 %s S_STATICTUNNEL
 %s S_IPV4DUMMYTUNNEL
+%s S_AUTHDATABASE
 
 %%
 %{
@@ -85,6 +86,19 @@ filename	.*
 <S_CONFIG>interface { D; BEGIN S_INTERFACE; return (INTERFACE); }
 <S_CONFIG>key-management { D; return (KEYMANAGEMENT); }
 <S_CONFIG>ipv4-mnp-support { D; return (IPV4MNPSUPPORT); }
+<S_CONFIG>homelink-dad {D; return (DAD); }
+<S_CONFIG>pager {D; return (PAGER); }
+<S_CONFIG>auth-database {D; BEGIN S_AUTHDATABASE; return (AUTHDATABASE); }
+<S_AUTHDATABASE>{filename} {
+	D;
+	BEGIN S_CONFIG;
+	yylval.string = strdup(yytext);
+	return (FILENAME);
+}	
+<S_AUTHDATABASE>{semi} {
+	D;
+	return (EOS);
+}	
 <S_INTERFACE>{ifname} {
 	D;
 	BEGIN S_CONFIG;
@@ -171,9 +185,9 @@ cfdebug_print(w, t, l)
 {
 #if 0
 	if (w) {
-		fprintf(stderr, "<%d>%s [%s] (%d)", yy_start, w, t, l);
+		fprintf(stderr, "<%d>%s [%s] (%d)\n", yy_start, w, t, l);
 	} else {
-		fprintf(stderr, "<%d>[%s] (%d)", yy_start, t, l);
+		fprintf(stderr, "<%d>[%s] (%d)\n", yy_start, t, l);
 	}
 #endif
 }
