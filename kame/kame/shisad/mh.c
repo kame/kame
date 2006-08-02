@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.55 2006/06/09 11:29:58 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.56 2006/08/02 11:00:56 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -310,9 +310,8 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 		    sizeof(struct in6_addr));
 	}
 
-
 	mh = (struct ip6_mh *)buf;
-	mhlen = (mh->ip6mh_len + 1) << 3; 
+	mhlen = (mh->ip6mh_len + 1) << 3;
 
 	if (debug) {
 		int mhtype;
@@ -800,7 +799,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 
 			auth_opt(hoa, coa, (struct ip6_mh *)bu, &mopt,
 				 &authmethod, &authmethod_done);
-			mobility_spi = mopt.mnha_auth->ip6moauth_mobility_spi;
+			mobility_spi = ntohl(mopt.mnha_auth->ip6moauth_mobility_spi);
 		}
 #else /* AUTHID */
 		/* go thorough (assuming IPsec protection in the kernel) */
@@ -1011,7 +1010,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		}
 
 		bc->bc_realcoa = *retcoa;
-		if (bc->bc_state & BC_STATE_UNDER_DAD)
+		if (bc->bc_state & (BC_STATE_UNDER_DAD | BC_STATE_UNDER_AUTH))
 			return (0);
 	}
 	retcode = 0;
@@ -1756,7 +1755,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		struct ip6_mh_opt_authentication *auth_opt;
 		mip6_authenticator_t *authenticator;
 
-		pad = MIP6_PADLEN(buflen, 8, 2);	/* 8n+2 */
+		pad = MIP6_PADLEN(buflen, 4, 1);	/* 4n+1 */
 		MIP6_FILL_PADDING(bufp + buflen, pad);
 		buflen += pad;
 
@@ -1765,6 +1764,8 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		auth_opt->ip6moauth_len =
 			sizeof(struct ip6_mh_opt_authentication)
 			- sizeof(struct ip6_mh_opt) + MIP6_AUTHENTICATOR_SIZE;
+		auth_opt->ip6moauth_subtype = IP6_MH_AUTHOPT_SUBTYPE_MNHA;
+		auth_opt->ip6moauth_mobility_spi = htonl(mobility_spi);
 		buflen += sizeof(*auth_opt);
 		buflen += MIP6_AUTHENTICATOR_SIZE;
 
@@ -1776,7 +1777,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		bap->ip6mhba_hdr.ip6mh_len = (buflen >> 3) - 1;
 		bap->ip6mhba_hdr.ip6mh_cksum = 0;
 
-		/* Alignment 8n to sit the end of the packet */
+		/* Alignment 8n to sit at the end of the packet */
 		pad = MIP6_PADLEN(buflen, 8, 0);
 		MIP6_FILL_PADDING(bufp + buflen, pad);
 		buflen += pad;
@@ -1785,14 +1786,26 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 			(bufp + (buflen - MIP6_AUTHENTICATOR_SIZE - pad));
 
 		hausers = find_haauth_users(mobility_spi);
-		mip6_calculate_authenticator((mip6_kbm_t *)hausers->sharedkey,
-					     (acoa) ? acoa : coa,
-					     src, 
-					     (caddr_t)bufp,
-					     buflen, 
-					     buflen - pad - MIP6_AUTHENTICATOR_SIZE, 
-					     MIP6_AUTHENTICATOR_SIZE,
-					     authenticator);
+		if (!hausers)
+			syslog(LOG_ERR, "No authentication data for spi:%d was found.", mobility_spi);
+		else
+#if 0
+			calculate_authenticator(hausers->sharedkey, hausers->keylen,
+						(acoa) ? acoa : coa,
+						hoa, (caddr_t)bufp,
+						buflen, 
+						buflen - pad - MIP6_AUTHENTICATOR_SIZE, 
+						MIP6_AUTHENTICATOR_SIZE,
+						(u_int8_t *)authenticator, MIP6_AUTHENTICATOR_SIZE);
+#else
+			calculate_authenticator(hausers->sharedkey, hausers->keylen,
+						(acoa) ? acoa : coa,
+						hoa, (caddr_t)bufp,
+						buflen, 
+						buflen - pad - MIP6_AUTHENTICATOR_SIZE, 
+						MIP6_AUTHENTICATOR_SIZE,
+						(u_int8_t *)authenticator, MIP6_AUTHENTICATOR_SIZE);
+#endif
 		/* MN-AAA isn't needed as described RFC4285 5.2 */
 	}
 #endif /* MIP_HA && AUTHID */

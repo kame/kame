@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.14 2006/05/05 15:51:17 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.15 2006/08/02 11:00:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -159,7 +159,7 @@ main(argc, argv)
 
 	/* initialization */
 	fdlist_init();
-	if (command_init("cn> ", command_table, sizeof(command_table) / sizeof(struct command_table), command_port) < 0) {
+	if (command_init("cn> ", command_table, sizeof(command_table) / sizeof(struct command_table), command_port, NULL) < 0) {
 		fprintf(stderr, "Unable to open user interface\n");
 	}
 	cn_lists_init();

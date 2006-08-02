@@ -1,19 +1,22 @@
 debug 1;
+# pager 1;
+# homelink-dad 1;
+# auth-database /usr/local/v6/etc/authdata;
 
 interface fxp0 {
 	command-port 7778;
 	preference 10;	# This directive doesn't affect the actual pref. value.
 			# change the value in rtadvd.conf
 
-	prefixtable {
+#	prefixtable {
 #		homeaddress          mobilenetworkpfx  pl mode     bid
-		2001:200:0:8c08::328 2001:200:0:8c0a::/64 explicit 111;
-		2001:200:0:8c08::328 2001:200:0:8c0a::/64 explicit 800;
-	};
+#		2001:200:0:8c08::328 2001:200:0:8c0a::/64 explicit 111;
+#		2001:200:0:8c08::328 2001:200:0:8c0a::/64 explicit 800;
+#	};
 
-	static-tunnel {
+#	static-tunnel {
 #		if    homeaddress          bid
-		nemo3 2001:200:0:8c08::328 111;
-		nemo6 2001:200:0:8c08::328 800;
-	};
+#		nemo3 2001:200:0:8c08::328 111;
+#		nemo6 2001:200:0:8c08::328 800;
+#	};
 };

@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.30 2006/06/09 11:29:58 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.31 2006/08/02 11:00:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -90,7 +90,6 @@ static void command_show_bul_one(int, struct binding_update_list *);
 struct binding_cache_head bchead;
 static void mip6_bc_set_refresh_timer(struct binding_cache *, int);
 static void mip6_bc_stop_refresh_timer(struct binding_cache *);
-static void mip6_validate_bc(struct binding_cache *);
 
 int do_proxy_dad = 1;
 
@@ -149,17 +148,20 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmet
 	if (bc) {
 		bc->bc_authmethod = authmethod;
 		bc->bc_authmethod_done = authmethod_done;
-		if ((authmethod ^ authmethod_done) != 0) {
-			bc->bc_state |= BC_STATE_UNDER_AUTH;
-			return (NULL);
-		}
 		
 		bc->bc_myaddr = *recvaddr;
 		bc->bc_lifetime = lifetime;
 		bc->bc_flags = flags;
 		bc->bc_seqno = seqno;
-		/* update BC in the kernel via mipsock */
 		bc->bc_coa = *coa;
+		bc->bc_mobility_spi = mobility_spi;
+
+		if ((authmethod ^ authmethod_done) != 0) {
+			bc->bc_state |= BC_STATE_UNDER_AUTH;
+			return (bc);
+		}
+
+		/* update BC in the kernel via mipsock */
 		mipsock_bc_request(bc, MIPM_BC_UPDATE);
 			
 		bc->bc_expire = now + bc->bc_lifetime;
@@ -198,6 +200,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmet
 #ifdef MIP_MCOA
 	bc->bc_bid = bid;
 #endif /* MIP_MCOA */
+	bc->bc_mobility_spi = mobility_spi;
 
 	if (bc->bc_state & BC_STATE_UNDER_DAD) {
 		/* do dad start */
@@ -211,7 +214,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmet
 	return (bc);
 }
 
-static void
+void
 mip6_validate_bc(bc)
 	struct binding_cache *bc;
 {

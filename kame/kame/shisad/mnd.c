@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.34 2006/04/13 10:04:34 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.35 2006/08/02 11:00:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -292,7 +292,7 @@ main(argc, argv)
 	fdlist_init();
 	csock = command_init("mn> ", command_table, 
 	    sizeof(command_table) / sizeof(struct command_table),
-	    command_port);
+	    command_port, if_params);
 	if (csock < 0) {
 		fprintf(stderr, "Unable to open user interface\n");
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.34 2006/06/09 11:29:58 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.35 2006/08/02 11:00:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -118,6 +118,9 @@ struct command_table show_command_table[] = {
 	{"hal", command_show_hal, "Home Agent List"},
 	{"callout", show_callout_table, "show callout table"},
 	{"config", command_show_config, "show current configuration for the HA"},
+#ifdef AUTHID
+	{"auth", command_show_authdata, "show authentication database"},
+#endif
 	{NULL}
 };
 
@@ -136,6 +139,8 @@ struct command_table command_table[] = {
 	{"show", NULL, "Show status", show_command_table},
 	{"flush", NULL, "Flush stat, bc, hal", flush_command},
 };
+
+extern int pager_mode;
 
 void
 ha_usage(path)
@@ -204,15 +209,19 @@ main(argc, argv)
 		config_get_interface(ifname, &if_params, config_params);
 	if (if_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, if_params);
+		config_get_number(CFT_NAMELOOKUP, &namelookup, if_params);
 		config_get_number(CFT_COMMANDPORT, &command_port, if_params);
+		config_get_number(CFT_DAD, &do_proxy_dad, if_params);
 		config_get_number(CFT_PREFERENCE, &preference, if_params);
 		config_get_number(CFT_KEYMANAGEMENT, &keymanagement,
 		    if_params);
 	}
 	if (config_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, config_params);
+		config_get_number(CFT_NAMELOOKUP, &namelookup, config_params);
 		config_get_number(CFT_COMMANDPORT, &command_port,
 		    config_params);
+		config_get_number(CFT_DAD, &do_proxy_dad, config_params);
 		config_get_number(CFT_PREFERENCE, &preference, config_params);
 		config_get_number(CFT_KEYMANAGEMENT, &keymanagement,
 		    config_params);
@@ -226,7 +235,7 @@ main(argc, argv)
 	/* Various Initialization */
 	fdlist_init();
 	command_init("ha> ", command_table,
-		sizeof(command_table) / sizeof(struct command_table), 7778);
+		sizeof(command_table) / sizeof(struct command_table), command_port, if_params);
 
 	/* register signal handlers. */
 	signal(SIGTERM, terminate);
@@ -258,7 +267,7 @@ main(argc, argv)
 	mip6_bc_init();
 #ifdef AUTHID
 	if (use_authid)
-		auth_init();
+		auth_init(if_params, config_params);
 #endif /* AUTHID */
 
 	/* notify a kernel to behave as a home agent. */
@@ -606,14 +615,17 @@ command_show_config(s, dummy)
 	char *dummy;
 {
 	command_printf(s, "Current configuration\n");
-	command_printf(s, "debug: %s\n", debug ? "true" : "false");
+	command_printf(s, "debug: %s\n", debug ? "on" : "off");
 	command_printf(s, "name lookup: %s\n", namelookup ? "true" : "false");
 	command_printf(s, "command port: %d\n", command_port);
+#ifndef AUTHID
 	command_printf(s, "key management: %s\n", keymanagement ? "true" : "false");
+#endif
 #ifdef MIP_IPV4MNPSUPPORT
 	command_printf(s, "ipv4mnpsupport: %s\n", ipv4mnpsupport ?  "true" : "false");
 #endif /* MIP_IPV4MNPSUPPORT */
 	command_printf(s, "proxy DAD: %s\n", do_proxy_dad ?  "true" : "false");
+	command_printf(s, "pager mode: %s\n", pager_mode ?  "true" : "false");
 }
 
 int

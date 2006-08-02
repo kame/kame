@@ -1,4 +1,4 @@
-/*	$KAME: auth.c,v 1.1 2006/06/09 11:29:58 t-momose Exp $	*/
+/*	$KAME: auth.c,v 1.2 2006/08/02 11:00:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2006 WIDE Project.  All rights reserved.
@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <ctype.h>
 #include <poll.h>
 #include <syslog.h>
@@ -45,30 +46,46 @@
 #include "callout.h"
 #include "fdlist.h"
 #include "shisad.h"
+#include "command.h"
+#include "config.h"
 
 LIST_HEAD(haauth_users_head, haauth_users) haauth_users_head = LIST_HEAD_INITIALIZER(haauth_users_head);
+struct sockaddr_in6 aaa_server = {sizeof(struct sockaddr_in6), AF_INET6, 0, 0};
 
 static int ha_auth(struct in6_addr *, struct in6_addr *,
 		   struct ip6_mh_opt_authentication *, struct ip6_mh *,
 		   mip6_authenticator_t *);
-void aaa_auth_start(void);
-int aaa_auth_done(int);
+void aaa_auth_start(struct in6_addr *, struct in6_addr *,
+		    struct ip6_mh_opt_mn_id *, struct ip6_mh *);
+int aaa_auth_reply_from_aaa(int);
 static void ha_auth_init();
 static void aaa_auth_init();
+#if 0
+static void aaa_auth_done(int);
+#endif
+static int get_secret(char *, int, u_int8_t *, int *);
 
-char *auth_database = "/usr/local/v6/etc/authdata";
+char *auth_database = SYSCONFDIR "/authdata";
 
 void
-auth_init()
+auth_init(if_params, config_params)
+	struct config_entry *if_params;
+	struct config_entry *config_params;
 {
+	if (if_params != NULL) {
+		config_get_string(CFT_AUTHDATABASE, &auth_database, if_params);
+	}
+	if (config_params != NULL) {
+		config_get_string(CFT_AUTHDATABASE, &auth_database, config_params);
+	}
+	
 	ha_auth_init();
 	aaa_auth_init();
 }
 
 
 /*
-  return value:
-  status codes of BA
+  return value: status code of BA
 */
 int
 auth_opt(hoa, coa, mh, mopt, authmethod, authmethod_done)
@@ -88,26 +105,30 @@ auth_opt(hoa, coa, mh, mopt, authmethod, authmethod_done)
 		switch (mopt_auth->ip6moauth_subtype) {
 			
 		case IP6_MH_AUTHOPT_SUBTYPE_MNHA:
-			/* To authorize:
-			   pick parameters
-			   calculate authenticate
+			/* pick parameters and 
+			   calculate authenticator with
+			   the parameters to authenticate.
 			*/
 			*authmethod |= BC_AUTH_MNHA;
 			if (ha_auth(hoa, coa, mopt_auth, mh, &authenticator) ==  0 &&
-			    memcmp((caddr_t)&authenticator, (caddr_t)(mopt_auth + 1), MIP6_AUTHENTICATOR_SIZE) == 0)
+			    memcmp((caddr_t)&authenticator, (caddr_t)(mopt_auth + 1), MIP6_AUTHENTICATOR_SIZE) == 0) {
 				statuscode = IP6_MH_BAS_ACCEPTED;
-			else
+			} else {
 				statuscode = IP6_MH_BAS_AUTH_FAIL;
+				syslog(LOG_ERR, "authenticator received from BU: %s",
+				       hexdump(mopt_auth + 1, MIP6_AUTHENTICATOR_SIZE));
+				syslog(LOG_ERR, "Calculated authenticator: %s",
+				       hexdump(&authenticator, MIP6_AUTHENTICATOR_SIZE));
+			}
 			*authmethod_done |= BC_AUTH_MNHA;
 			break;
 			
 		case IP6_MH_AUTHOPT_SUBTYPE_MNAAA:
-			/* To authorize: send a query to an AAA later.
+			/* To authorize: send a query to an AAA server.
 			   This is an asynchoronous process because an
 			   AAA server is usually another entity.
 			*/
-			/* Make a query here */
-			aaa_auth_start();
+			aaa_auth_start(hoa, coa, mopt->opt_mnid, mh);
 			*authmethod |= BC_AUTH_MNAAA;
 			break;
 			
@@ -135,15 +156,20 @@ ha_auth(hoa, coa, mopt_auth, mh, authenticator)
 	struct haauth_users *hausers;
 
 	hausers = find_haauth_users(ntohl(mopt_auth->ip6moauth_mobility_spi));
-	if (hausers == NULL)
+	if (hausers == NULL) {
+		syslog(LOG_INFO, "No such user(spi=%d) was registered",
+		       ntohl(mopt_auth->ip6moauth_mobility_spi));
 		return (-1);
+	}
 
 	cksum = mh->ip6mh_cksum;
 	mh->ip6mh_cksum = 0;
-	mip6_calculate_authenticator((mip6_kbm_t *)hausers->sharedkey, hoa, coa,
-				     (caddr_t)mh, (mh->ip6mh_len + 1) << 3,
-				     (caddr_t)(mopt_auth + 1) - (caddr_t)mh,
-				     MIP6_AUTHENTICATOR_SIZE, authenticator);
+	calculate_authenticator(hausers->sharedkey, hausers->keylen, coa, hoa,
+				(caddr_t)mh,
+				(caddr_t)(mopt_auth + 1) - (caddr_t)mh,
+				(caddr_t)(mopt_auth + 1) - (caddr_t)mh,
+				0,
+				(u_int8_t *)authenticator, MIP6_AUTHENTICATOR_SIZE);
 	mh->ip6mh_cksum = cksum;
 
 	return (0);
@@ -163,6 +189,56 @@ find_haauth_users(spi)
 	return (NULL);
 }
 
+static int
+get_secret(sharedkeyp, secretkey_size, secretkey, keylen)
+	char *sharedkeyp;
+	int secretkey_size;
+	u_int8_t *secretkey;
+	int *keylen;
+{
+	if (*sharedkeyp == '\'' || *sharedkeyp == '\"') {
+		int i = 0;
+		
+		sharedkeyp++;
+		while (sharedkeyp[i] != '\'' && sharedkeyp[i] != '\"'
+		       && i < secretkey_size) {
+			i++;
+		}
+		if (sharedkeyp[i] != '\'' && sharedkeyp[i] != '\"') {
+			syslog(LOG_WARNING, "shared key is too long. truncated.");
+			i = secretkey_size;
+		}
+		memcpy(secretkey, sharedkeyp, i);
+		*keylen = i;
+	} else 	if (*sharedkeyp == '0' && *(sharedkeyp + 1) == 'x') {
+		/* it might be a sequence of hex */
+		char *ep;
+		char *hexchr = "0123456789ABCDEFabcdef";
+		int loopend = 0, i = 0;
+		u_int v;
+
+		sharedkeyp += 2;
+		ep = sharedkeyp + strlen(sharedkeyp);
+		do {
+			if (!strchr(hexchr, *sharedkeyp) ||
+			    !strchr(hexchr, *(sharedkeyp + 1)))
+				loopend = 1;
+			sscanf(sharedkeyp, "%2x", &v);
+			((u_int8_t *)secretkey)[i++]
+				= v & 0xff;
+			sharedkeyp += 2;
+		} while (i < secretkey_size && (sharedkeyp < ep) && !loopend);
+		if (i == secretkey_size && sharedkeyp < ep)
+			syslog(LOG_WARNING, "shared key is too long. truncated.");
+		*keylen = i;
+	} else {
+		syslog(LOG_ERR, "No secret was found");
+		return (-1);
+	}
+
+	return (0);
+}
+
 /*
   Read and construct MN-HA authenticator database
 
@@ -170,14 +246,14 @@ find_haauth_users(spi)
 ---  
 # the line started '#' shows comment.
 # one data is described in one line. spi followed by shared key separated by space
-10000		'shared-key in 20byte'  # byte's' is trimmed 
-10001           0x0102030405060708090a0b0c0d0e0f10111213
+10000		'shared-key in 16'  # The string 'bytes' to be trailed is trimmed 
+10001           0x0102030405060708090a0b0c0d0e0f10
 ---  
  */
 static void
 ha_auth_init()
 {
-	char *p, *spip, *sharedkeyp, *last;
+	char *p, *spip, *last;
 	char read_buffer[1024];
 	FILE *keytable;
 	struct haauth_users *hausers;
@@ -188,8 +264,14 @@ ha_auth_init()
 	}
 	
 	while (fgets(read_buffer, sizeof(read_buffer), keytable) != NULL) {
-		if ((p = strchr(read_buffer, '\n')) == NULL)
+		int base = 10;
+		
+		read_buffer[sizeof(read_buffer) - 1] = '\0';
+		if ((p = strchr(read_buffer, '\n')) == NULL &&
+		    strlen(read_buffer) >= sizeof(read_buffer) - 1) {
+			syslog(LOG_ERR, "The line was too long. [%1024s]", read_buffer);
 			continue; /* the line was too long */
+		}
 		*p = '\0';
 
 		p = read_buffer;
@@ -203,62 +285,75 @@ ha_auth_init()
 
 		hausers = malloc(sizeof(*hausers));
 		memset(hausers, '\0', sizeof(*hausers));
-		hausers->mobility_spi = atoi(spip);
-		
-		sharedkeyp = strtok_r(NULL, " \t", &last);
-		if (*sharedkeyp == '\'' || *sharedkeyp == '\"') {
-			int i = 0;
-			
-			sharedkeyp++;
-			while (sharedkeyp[i] != '\'' && sharedkeyp[i] && '\"'
-			       && i < MIP6_AUTHENTICATOR_SIZE) {
-				i++;
-			}
-			memcpy(hausers->sharedkey, sharedkeyp, i);
-		} else {
-			/* it might be hex */
-			if (*sharedkeyp == '0' &&
-			    *(sharedkeyp + 1) == 'x') {
-				char *ep;
-				char *hexchr = "0123456789ABCDEFabcdef";
-				int loopend = 0, i = 0;
-				u_int v;
-
-				sharedkeyp += 2;
-				ep = sharedkeyp + strlen(sharedkeyp);
-				do {
-					if (!strchr(hexchr, *sharedkeyp) ||
-					    !strchr(hexchr, *(sharedkeyp + 1)))
-						loopend = 1;
-					sscanf(sharedkeyp, "%2x", &v);
-					((u_int8_t *)&hausers->sharedkey)[i] = v & 0xff;
-					sharedkeyp += 2;
-				} while ((sharedkeyp < ep) && !loopend);
-			}
+		if (spip[0] == '0' && spip[1] == 'x') {
+			spip += 2; /* for '0x' */
+			base = 16;
 		}
+		hausers->mobility_spi = strtol(spip, NULL, base);
+		if (get_secret(strtok_r(NULL, " \t", &last), SECRETKEY_SIZE, hausers->sharedkey, &hausers->keylen) < 0) {
+			free(hausers);
+			continue;
+		}
+		
+		if (debug)
+			syslog(LOG_INFO, "spi: %d  [%s]\n",
+			       hausers->mobility_spi,
+			       hexdump(hausers->sharedkey, hausers->keylen));
 		LIST_INSERT_HEAD(&haauth_users_head, hausers, hauthusers_entry);
 	}
 
 	fclose(keytable);
 }
 
-int aaa_socket;
+void
+command_show_authdata(s, dummy)
+	int s;
+	char *dummy;
+{
+	struct haauth_users *hausers;
+
+	command_printf(s, "Authentication database\n");
+	LIST_FOREACH(hausers, &haauth_users_head, hauthusers_entry) {
+		command_printf(s, "%d [%s]\n",
+			       hausers->mobility_spi,
+			       hexdump(hausers->sharedkey, hausers->keylen));
+	}
+}
 
 static void
 aaa_auth_init()
 {
-	/* Normally, the function will do following process:
-	   1) Open  socket to the AAA server
-	   2) register it's handle
-	*/
-//	new_fd_list(aaa_socket, POLLIN, aaa_auth_done);
 } 
 
 void
-aaa_auth_start()
+aaa_auth_start(hoa, coa, mopt_mnid, mh)
+	struct in6_addr *hoa, *coa;
+	struct ip6_mh_opt_mn_id *mopt_mnid;
+	struct ip6_mh *mh;
 {
-	/* Send a query packet here with the aaa_socket */
-	/* And start a timer to resend if needed */
+#if 0
+	int mnid_len;
+	char *mnid;
+
+	if ((mopt_mnid == NULL) ||
+	    (mopt_mnid->ip6mnmnid_subtype != 1)) {
+		syslog(LOG_ERR, "No MN ID option was found.");
+		return;
+	}
+	mnid_len = mopt_mnid->ip6momnid_len - 1; /* '-1' is for the subtype field */
+	if (mnid_len <= 0) {
+		syslog(LOG_ERR, "MN ID length is too short.");
+		return;
+	}
+	mnid = (char *)(mopt_mnid + 1);
+
+	if ((aaa_socket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+		syslog(LOG_ERR,
+		       "Opening UDP socket to the AAA server was failed.");
+		return;
+	}
+	new_fd_list(aaa_socket, POLLIN, aaa_auth_reply_from_aaa);
+#endif
 }
 
 void
@@ -271,41 +366,56 @@ aaa_auth_stop()
  *  indicates a socket to talk an AAA server.
  *
  *  What implementors should do here are:
- *  1) 
+ *  1) Receive a reply packet from AAA
+ *  2) Validate the message in the packet
+ *  3) Judge the result from the AAA
+ *  4) Pass to aaa_auth_done()
  */
 int
-aaa_auth_done(fd)
+aaa_auth_reply_from_aaa(fd)
 	int fd;
 {
-#if  0
-	struct binding_cache *bc;
+#if 0
+	/* Judge the result from the AAA */
+	aaa_auth_done(success);
+#endif	
+	return (0);
+}
 
-	bc = find_bc_somehow();
-	
-	/* Judge the validity of this result somehow */
-		
+#if 0
+static void
+aaa_auth_done(success)
+	int success;
+{
+	struct binding_cache *bc = NULL;
+
+	/* Find a binding cache somehow */
+
+	if (!bc)
+		return;
+
 	if (success) {
 		/* the authentication was succeeded. */
-		bc->authmethod_done |= BC_AUTH_MNAAA;
-		if (bc->authmethod ^ bc->authmethod_done == 0)
+		bc->bc_authmethod_done |= BC_AUTH_MNAAA;
+		if ((bc->bc_authmethod ^ bc->bc_authmethod_done) == 0)
 			bc->bc_state &= ~BC_STATE_UNDER_AUTH;
-		mip6_bc_validate(bc);
+		mip6_validate_bc(bc);
 		if ((bc->bc_state == BC_STATE_VALID) &&
-		    !IN6_IS_ADDR_LINKLOCAL(addr)) {
+		    !IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa)) {
 			if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))
 				send_ba(&bc->bc_myaddr, &bc->bc_realcoa,
 					&bc->bc_coa, &bc->bc_hoa, bc->bc_flags,
 					NULL, IP6_MH_BAS_ACCEPTED,
-					bc->bc_seqno, bc->bc_lifetime, bc->bc_bid, 0);
+					bc->bc_seqno, bc->bc_lifetime, 0, 0/*bc->bc_bid*/, bc->bc_mobility_spi);
 		}
 	} else {
 		/* the authentication was failed. */
 		send_ba(&bc->bc_myaddr, &bc->bc_realcoa,
 			&bc->bc_coa, &bc->bc_hoa, bc->bc_flags,
-			NULL, IP6_MH_BAS_XXX,
-			bc->bc_seqno, bc->bc_lifetime, bc->bc_bid, 0);
+			NULL, IP6_MH_BAS_AUTH_FAIL,
+			bc->bc_seqno, bc->bc_lifetime, 0, 0/*bc->bc_bid*/, bc->bc_mobility_spi);
 		mip6_bc_delete(bc);
 	}
-#endif
-	return 0;
+
 }
+#endif

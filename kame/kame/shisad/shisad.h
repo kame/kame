@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.38 2006/06/09 11:29:58 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.39 2006/08/02 11:00:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -114,10 +114,10 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #ifndef SYSCONFDIR
 #define SYSCONFDIR	"/usr/local/v6/etc"
 #endif
-#define CND_CONFFILE	SYSCONFDIR "/shisa/cnd.conf"
-#define MND_CONFFILE	SYSCONFDIR "/shisa/mnd.conf"
-#define MRD_CONFFILE	SYSCONFDIR "/shisa/mrd.conf"
-#define HAD_CONFFILE	SYSCONFDIR "/shisa/had.conf"
+#define CND_CONFFILE	SYSCONFDIR "/cnd.conf"
+#define MND_CONFFILE	SYSCONFDIR "/mnd.conf"
+#define MRD_CONFFILE	SYSCONFDIR "/mrd.conf"
+#define HAD_CONFFILE	SYSCONFDIR "/had.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
 
@@ -433,6 +433,7 @@ struct binding_cache {
 #ifdef MIP_MCOA
 	u_int16_t             bc_bid; /* Binding Unique Identifier */
 #endif /* MIP_MCOA */
+	u_int32_t	      bc_mobility_spi;
 };
 LIST_HEAD(binding_cache_head, binding_cache);
 
@@ -443,12 +444,15 @@ struct nd6options {
 };
 extern struct nd6options ndopts;
 
+#define SECRETKEY_SIZE	16
+
 struct haauth_users {
 	LIST_ENTRY(haauth_users) hauthusers_entry;
 
 	u_int32_t mobility_spi;
 	struct in6_addr hoa;
-	u_int8_t sharedkey[20];
+	u_int8_t sharedkey[SECRETKEY_SIZE];
+	int keylen;
 };
 
 /* mh.c */
@@ -479,8 +483,16 @@ int send_mps(struct mip6_hpfxl *);
 
 /* rr.c */
 void mip6_calculate_kbm(mip6_token_t *, mip6_token_t *, mip6_kbm_t *);
+/*
 void mip6_calculate_authenticator(mip6_kbm_t *, struct in6_addr *, 
     struct in6_addr *, caddr_t, size_t, int, size_t, mip6_authenticator_t *);
+*/
+#define mip6_calculate_authenticator(key_bm, addr1, addr2, data, datalen, \
+				     exclude_offset, exclude_data_len,	  \
+				     authenticator)                       \
+  calculate_authenticator((u_int8_t *)key_bm, sizeof(mip6_kbm_t), addr1, addr2,\
+			  data, datalen, exclude_offset, exclude_data_len, \
+			  (u_int8_t *)authenticator, MIP6_AUTHENTICATOR_SIZE);
 struct mip6_nonces_info *get_nonces(u_int16_t);
 struct mip6_nonces_info * generate_nonces(struct mip6_nonces_info *);
 void init_nonces (void);
@@ -512,6 +524,7 @@ void mipsock_bc_request(struct binding_cache *, u_char);
 void mip6_dad_order(int, struct in6_addr *);
 #define mip6_dad_start(addr)	mip6_dad_order(MIPM_DAD_DO, addr)
 #define mip6_dad_stop(addr)	mip6_dad_order(MIPM_DAD_STOP, addr)
+void mip6_validate_bc(struct binding_cache *);
 void mip6_dad_done(int, struct in6_addr *);
 void command_show_bc(int, char *);
 void command_show_kbc(int, char *);
@@ -563,6 +576,9 @@ void hal_stop_expire_timer(struct home_agent_list *);
 void command_show_stat(int, char *);
 struct ip6_hdr;
 struct ip6_rthdr2 *find_rthdr2(struct ip6_hdr *);
+int kernel_debug(int);
+void calculate_authenticator(u_int8_t *, size_t, struct in6_addr *, 
+			     struct in6_addr *, caddr_t, size_t, int, size_t, u_int8_t*, size_t);
 
 /* cnd.c */
 int cn_receive_dst_unreach(struct icmp6_hdr *);
@@ -647,16 +663,17 @@ int receive_ra(struct nd_router_advert *, size_t, int, struct in6_addr *, struct
 
 /* auth.c */
 #ifdef AUTHID
-void auth_init();
+struct config_entry;
+void auth_init(struct config_entry *, struct config_entry *);
 int auth_opt(struct in6_addr *, struct in6_addr *, struct ip6_mh *,
 	     struct mip6_mobility_options *, int *, int *);
 struct haauth_users *find_haauth_users(u_int32_t);
+void command_show_authdata(int, char *);
 #endif /* AUTHID */
 
 /* other utility functions */
 int inet_are_prefix_equal(void *, void *, int);
 char *hexdump(void *, size_t);
 const char *ip6_sprintf(const struct in6_addr *addr);
-int kernel_debug(int);
 
 #endif /* _SHISAD_SHISAD_H_ */

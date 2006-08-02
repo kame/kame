@@ -1,4 +1,4 @@
-/*      $KAME: rr.c,v 1.6 2006/04/25 11:11:13 keiichi Exp $  */
+/*      $KAME: rr.c,v 1.7 2006/08/02 11:00:56 t-momose Exp $  */
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -76,6 +76,7 @@ mip6_calculate_kbm(home_token, careof_token, kbm)
  *   - - - - - - - ->
  *     exclude_offset
  */
+#if 0
 void
 mip6_calculate_authenticator(key_bm, addr1, addr2, data, datalen,
 			     exclude_offset, exclude_data_len, authenticator)
@@ -132,6 +133,7 @@ mip6_calculate_authenticator(key_bm, addr1, addr2, data, datalen,
 		syslog(LOG_INFO, "authenticator = %s\n", 
 		       hexdump(authenticator, MIP6_AUTHENTICATOR_SIZE));
 }
+#endif
 
 #ifdef MIP_CN
 void 

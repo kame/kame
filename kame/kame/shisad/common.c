@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.28 2006/04/10 15:30:53 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.29 2006/08/02 11:00:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -57,6 +57,10 @@
 #include <netinet/icmp6.h>
 #include <net/mipsock.h>
 #include <arpa/inet.h>
+
+#include <openssl/sha.h>
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
 
 #include "callout.h"
 #include "command.h"
@@ -1297,4 +1301,96 @@ command_show_stat(s, line)
 	PS("Home Address Option", mip6stat.mip6s_ohao);
 	PS("Routing Header type 2", mip6stat.mip6s_orthdr2);
 	PS("reverse tunneled output", mip6stat.mip6s_orevtunnel);
+}
+
+#define DUMP 0
+
+/*
+ *   <------------------ datalen ------------------->
+ *                  <-- exclude_data_len ---> 
+ *   ---------------+-----------------------+--------
+ *   ^              <--                   -->
+ *   data     The area excluded from calculation Auth.
+ *   - - - - - - - ->
+ *     exclude_offset
+ *
+ *  If you don't need to exclude any area, you have to
+ *  specify as follows:
+ *    exclude_offset:   same as datalen
+ *    exclude_data_len: 0
+ */
+void
+calculate_authenticator(key, keylen, addr1, addr2, data, datalen,
+			exclude_offset, exclude_data_len,
+			authenticator, authenticator_len)
+	u_int8_t *key;
+	size_t keylen;
+	struct in6_addr *addr1, *addr2;
+	caddr_t data;
+	size_t datalen;
+	int exclude_offset;
+	size_t exclude_data_len;
+	u_int8_t *authenticator;
+	size_t authenticator_len;
+{
+	int restlen;
+	HMAC_CTX hmac_ctx;
+	u_int8_t sha1result[20];
+
+#if DUMP
+	if (debug) {
+		syslog(LOG_INFO, "key = %s\n",
+		       hexdump(key, keylen));
+		syslog(LOG_INFO, "addr1 = %s\n",
+		       ip6_sprintf(addr1));
+		syslog(LOG_INFO, "addr2 = %s\n",
+		       ip6_sprintf(addr2));
+		syslog(LOG_INFO, "datalen = %d\n", datalen);
+		syslog(LOG_INFO, "exclude_offset = %d\n", exclude_offset);
+		syslog(LOG_INFO, "exclude_data_len = %d\n", exclude_data_len);
+	}
+#endif
+
+#ifndef __NetBSD__
+	HMAC_CTX_init(&hmac_ctx);
+#endif
+	HMAC_Init(&hmac_ctx, (u_int8_t *)key, keylen, EVP_sha1());
+	HMAC_Update(&hmac_ctx, (u_int8_t *)addr1, sizeof(*addr1));
+#if DUMP
+	syslog(LOG_INFO, "addr1: %s", hexdump((u_int8_t *)addr1, sizeof(*addr1)));
+#endif
+	HMAC_Update(&hmac_ctx, (u_int8_t *)addr2, sizeof(*addr2));
+#if DUMP
+	syslog(LOG_INFO, "addr2: %s", hexdump((u_int8_t *)addr2, sizeof(*addr2)));
+#endif
+	HMAC_Update(&hmac_ctx, (u_int8_t *)data, exclude_offset);
+#if DUMP
+	syslog(LOG_INFO, "data: %s", hexdump((u_int8_t *)data, exclude_offset));
+#endif
+
+	/* 
+	 * Exclude authdata field in the mobility option to calculate
+	 * authdata But it should be included padding area 
+	 */
+
+	restlen = datalen - (exclude_offset + exclude_data_len);
+	if (restlen > 0) {
+		HMAC_Update(&hmac_ctx, 
+			    (u_int8_t *) data + exclude_offset + exclude_data_len,
+			    restlen);
+#if DUMP
+	syslog(LOG_INFO, "restdata: %s", hexdump((u_int8_t *) data + exclude_offset + exclude_data_len, restlen));
+#endif
+	}
+
+	HMAC_Final(&hmac_ctx, (u_int8_t *)sha1result, NULL);
+	
+	/* First96 */
+	memcpy((void *)authenticator, (const void *)sha1result, 
+	       authenticator_len);
+#if DUMP
+	if (debug)
+		syslog(LOG_INFO, "authenticator = %s\n", 
+		       hexdump(authenticator, authenticator_len));
+#endif
 }
