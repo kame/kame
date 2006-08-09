@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.367 2005/10/25 11:02:20 t-momose Exp $	*/
+/*	$KAME: ip6_input.c,v 1.368 2006/08/09 18:01:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1588,7 +1588,7 @@ ip6_savecontrol(in6p, m, mp)
 
 			default:
 				/*
-			 	 * other cases have been filtered in the above.
+				 * other cases have been filtered in the above.
 				 * none will visit this case.  here we supply
 				 * the code just in case (nxt overwritten or
 				 * other cases).
