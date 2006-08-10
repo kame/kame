@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.73 2005/07/17 20:40:46 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.74 2006/08/10 17:55:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,7 @@
 #ifdef MIP6
 #include <net/mipsock.h>
 #include <netinet/ip6mh.h>
+#include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 
 static int dest6_swap_hao(struct ip6_hdr *, struct ip6aux *,
@@ -106,7 +107,7 @@ dest6_input(mp, offp)
 #endif /* MIP6 */
 	/* validation of the length of the header */
 #ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(*dstopts), IPPROTO_DONE);
+	IP6_EXTHDR_CHECK(m, off, (int)sizeof(*dstopts), IPPROTO_DONE);
 	dstopts = (struct ip6_dest *)(mtod(m, caddr_t) + off);
 #else
 	IP6_EXTHDR_GET(dstopts, struct ip6_dest *, m, off, sizeof(*dstopts));
@@ -145,6 +146,10 @@ dest6_input(mp, offp)
 #ifdef MIP6
 		case IP6OPT_HOME_ADDRESS:
 			/* HAO must appear only once */
+			if ((mip6_nodetype &
+			     (MIP6_NODETYPE_HOME_AGENT |
+			      MIP6_NODETYPE_CORRESPONDENT_NODE)) == 0)
+				goto nomip;
 			n = ip6_addaux(m);
 			if (!n) {
 				/* not enough core */
@@ -193,6 +198,7 @@ dest6_input(mp, offp)
 			 * beleive this HAO is a correct one.
 			 */
 			break;
+		nomip:
 #endif /* MIP6 */
 		default:		/* unknown option */
 			optlen = ip6_unknown_opt(opt, m,
@@ -228,7 +234,6 @@ dest6_swap_hao(ip6, ip6a, haopt)
 	struct ip6aux *ip6a;
 	struct ip6_opt_home_address *haopt;
 {
-
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
 		return (EINVAL);
 
@@ -302,6 +307,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	n = ip6_findaux(m);
 	if (!n)
 		return (0);
+
 	ip6a = (struct ip6aux *) (n + 1);
 
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
@@ -311,25 +317,20 @@ dest6_mip6_hao(m, mhoff, nxt)
 	/* find home address */
 	off = 0;
 	proto = IPPROTO_IPV6;
-	while (1) {
+	while (proto != IPPROTO_DSTOPTS) {
 		int nxt;
 		newoff = ip6_nexthdr(m, off, proto, &nxt);
 		if (newoff < 0 || newoff < off)
 			return (0);	/* XXX */
 		off = newoff;
 		proto = nxt;
-		if (proto == IPPROTO_DSTOPTS)
-			break;
 	}
 	ip6o.ip6o_type = IP6OPT_PADN;
 	ip6o.ip6o_len = 0;
-	while (1) {
-		newoff = dest6_nextopt(m, off, &ip6o);
-		if (newoff < 0)
+	while (ip6o.ip6o_type != IP6OPT_HOME_ADDRESS) {
+		off = dest6_nextopt(m, off, &ip6o);
+		if (off < 0)
 			return (0);	/* XXX */
-		off = newoff;
-		if (ip6o.ip6o_type == IP6OPT_HOME_ADDRESS)
-			break;
 	}
 	m_copydata(m, off, sizeof(struct ip6_opt_home_address),
 	    (caddr_t)&haopt);

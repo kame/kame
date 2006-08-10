@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.c,v 1.9 2006/06/08 11:47:37 keiichi Exp $	*/
+/*	$KAME: if_mip.c,v 1.10 2006/08/10 17:55:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -80,6 +80,8 @@ int mip_demux(struct ifnet *, struct mbuf  *, char *, u_long *);
 static int mip_add_proto(struct ifnet *, u_long, struct ddesc_head_str *);
 static int mip_del_proto(struct ifnet *, u_long);
 int mip_attach_proto_family(struct ifnet *, u_long);
+int mip_pre_output(struct ifnet *ifp, u_long protocol_family, struct mbuf **m0,
+				   const struct sockaddr *dst, caddr_t rt, char *frame, char *address);
 #endif /* __APPLE__ */
 
 #if NMIP > 0
@@ -164,7 +166,7 @@ mipattach(dummy)
 		sc->mip_if.if_demux = mip_demux;
 		sc->mip_if.if_add_proto = mip_add_proto;
 		sc->mip_if.if_del_proto = mip_del_proto;
-		sc->mip_if.if_output = NULL;
+		sc->mip_if.if_output = NULL;	/* pre_output returns error or EJUSTRETURN */
 		dlil_if_attach(&sc->mip_if);
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -187,15 +189,32 @@ mipattach(dummy)
 	}
 }
 
+#ifndef __APPLE__
 int
 mip_output(ifp, m, dst, rt)
      struct ifnet *ifp;
      struct mbuf *m;
      struct sockaddr *dst;
      struct rtentry *rt;
+#else
+int
+mip_pre_output(
+	struct ifnet *ifp,
+	u_long protocol_family,
+	struct mbuf **m0,
+	const struct sockaddr *dst,
+	caddr_t rt0,
+	char *frame,
+	char *address)
+#endif /* __APPLE__ */
 {
+	int error = 0;
 	struct mip6_bul_internal *mbul;
 	struct ip6_hdr *ip6;
+#ifdef __APPLE__
+	register struct mbuf * m = *m0;
+	struct rtentry *rt = (struct rtentry *)rt0;
+#endif /* __APPLE__ */
 
 	/* This function is copyed from looutput */
 
@@ -295,7 +314,11 @@ mip_output(ifp, m, dst, rt)
 		if (m && m->m_len < sizeof(struct ip6_hdr))
 			m = m_pullup(m, sizeof(struct ip6_hdr));
 		if (m == NULL)
+#ifdef __APPLE__
+			return (EJUSTRETURN);
+#else
 			return (0);
+#endif
 
 		ip6 = mtod(m, struct ip6_hdr *);
 		ip6->ip6_flow = 0;
@@ -307,9 +330,14 @@ mip_output(ifp, m, dst, rt)
 		ip6->ip6_src = mbul->mbul_coa;
 		ip6->ip6_dst = mbul->mbul_peeraddr;
 		mip6stat.mip6s_orevtunnel++;
-#ifdef IPV6_MINMTU
 		/* XXX */
-		return (ip6_output(m, 0, 0, IPV6_MINMTU, 0
+		error = ip6_output(m, 0, 0,
+#ifdef IPV6_MINMTU
+				   IPV6_MINMTU,
+#else
+				   0,
+#endif /* IPV6_MINMTU*/
+				   0
 #ifdef __FreeBSD__
 		    , &ifp, NULL
 #elif defined(__NetBSD__)
@@ -319,18 +347,12 @@ mip_output(ifp, m, dst, rt)
 #else
 		    , &ifp
 #endif
-		    ));
-#else
-		return (ip6_output(m, 0, 0, 0, 0
-#ifdef __FreeBSD__
-		    , &ifp, NULL
-#elif defined(__NetBSD__)
-		    , NULL, &ifp
-#else
-		    , &ifp
-#endif
-		    ));
-#endif
+			);
+#ifdef __APPLE__
+		if (error == 0)
+			error = EJUSTRETURN;
+#endif /* __APPLE__ */
+		return (error);
  done:
 		break;
 	default:
@@ -527,7 +549,7 @@ mip_attach_proto_family(
     reg.interface_family = ifp->if_family;
     reg.unit_number      = ifp->if_unit;
     reg.input            = NULL;
-    reg.pre_output       = mip_output;
+    reg.pre_output       = mip_pre_output;
     reg.protocol_family  = protocol_family;
 
     stat = dlil_attach_protocol(&reg);
