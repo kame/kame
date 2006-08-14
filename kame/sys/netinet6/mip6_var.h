@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.128 2005/12/30 08:57:24 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.129 2006/08/14 16:31:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -199,7 +199,11 @@ void mip6_md_scan(u_int16_t);
 /* used by one or more kind of nodetypes. */
 struct in6_ifaddr *mip6_ifa_ifwithin6addr(const struct in6_addr *);
 int mip6_encapsulate(struct mbuf **, struct in6_addr *, struct in6_addr *);
-int mip6_tunnel_input(struct mbuf **, int *, int proto);
+#ifdef __APPLE__
+int mip6_tunnel_input(struct mbuf **, int *);
+#else
+int mip6_tunnel_input(struct mbuf **, int *, int);
+#endif /* __APPLE__ */
 void mip6_notify_rr_hint(struct in6_addr *, struct in6_addr *);
 
 /* a sysctl entry. */

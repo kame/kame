@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.240 2006/04/17 12:12:12 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.241 2006/08/14 16:31:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -425,9 +425,15 @@ mip6_input(mp, offp)
 }
 
 int
+#ifndef __APPLE__
 mip6_tunnel_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
+#else
+mip6_tunnel_input(mp, offp)
+	struct mbuf **mp;
+	int *offp;
+#endif
 {
 	struct mbuf *m = *mp;
 #if NMIP > 0
@@ -436,10 +442,24 @@ mip6_tunnel_input(mp, offp, proto)
 	struct in6_addr src, dst;
 	struct mip6_bul_internal *bul, *cnbul;
 	int presence;
+#ifdef __APPLE__
+	int proto;
+	u_int8_t exthdr[2];
+#endif /* __APPLE__ */
 #endif /* NMIP > 0 */
 #ifndef __FreeBSD__
 	int s;
 #endif
+
+#ifdef __APPLE__
+	off = sizeof(struct ip6_hdr);
+	proto = mtod(m, struct ip6_hdr *)->ip6_nxt;
+	while (off < *offp) {
+		m_copydata(m, off, sizeof(exthdr), (caddr_t)exthdr);
+		proto = exthdr[0];
+		off += (exthdr[1] + 1) << 3;
+	}
+#endif /* __APPLE__ */
 
 	m_adj(m, *offp);
 
@@ -490,6 +510,9 @@ mip6_tunnel_input(mp, offp, proto)
 
 		mip6stat.mip6s_revtunnel++;
 
+#ifdef __APPLE__
+		proto_input(PF_INET6, m);
+#else __APPLE__
 #ifdef __NetBSD__
 		s = splnet();
 #elif defined(__OpenBSD__) || defined(__APPLE__)
@@ -511,6 +534,7 @@ mip6_tunnel_input(mp, offp, proto)
 #ifndef __FreeBSD__
 		splx(s);
 #endif
+#endif /* __APPLE__ */		
 		break;
 	default:
 		mip6log((LOG_ERR, "protocol %d not supported.\n", proto));
@@ -763,7 +787,7 @@ mip6_bce_update_ipsecdb(bce)
 }
 
 void
-mip6_bce_remove_all (void)
+mip6_bce_remove_all(void)
 {
 	struct mip6_bc_internal *mbc, *mbcn = NULL;
 	int s;
@@ -1242,6 +1266,7 @@ mip6_bul_encapcheck(m, off, proto, arg)
 	struct mip6_bul_internal *mbul = (struct mip6_bul_internal *)arg;
 	struct ip6_hdr *ip6;
 
+printf("mip6_bul_encapcheck(mbul = %x) begin\n", mbul);
 	if (mbul == NULL) {
 		return (0);
 	}
