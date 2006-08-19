@@ -36,7 +36,8 @@ CFLAGS+= -I../../../xnu/bsd -I${.OBJDIR} -I${SRCDIR}
 #LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 #	-L/usr/local/v6/lib -linet6 -lssl -lcrypto
 
-MAN8=	nemonetd.8
+#MAN8=	nemonetd.8
+MAN8=
 
 .PATH:	${SRCDIR}
 

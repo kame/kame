@@ -34,7 +34,8 @@ CFLAGS+= -I../../../xnu/bsd -I${.OBJDIR} -I${SRCDIR}
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6
 	
 
-MAN8=	babymdd.8
+#MAN8=	babymdd.8
+MAN8=
 
 .PATH:	${SRCDIR}
 

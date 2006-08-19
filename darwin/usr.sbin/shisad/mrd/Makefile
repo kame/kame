@@ -36,7 +36,8 @@ CFLAGS+= -I../../../xnu/bsd -I${.OBJDIR} -I${SRCDIR}
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-lssl -lcrypto
 
-MAN8=	mnd.8
+#MAN8=	mnd.8
+MAN8=
 
 .PATH:	${SRCDIR}
 
