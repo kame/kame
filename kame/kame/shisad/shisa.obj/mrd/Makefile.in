@@ -25,10 +25,8 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.2 2006/07/03 08:29:39 keiichi Exp $
+# $Id: Makefile.in,v 1.1 2006/08/22 07:23:23 keiichi Exp $
 #
-
-VPATH=.:../..
 
 prefix=	@prefix@
 srcdir=	@srcdir@
@@ -36,13 +34,13 @@ sysconfdir= @sysconfdir@
 localdbdir= @localdbdir@
 
 CFLAGS=	@CFLAGS@ @DEFS@ -DSYSCONFDIR=\"${sysconfdir}\" \
-	-DMIP_MN \
+	-DMIP_MN -DMIP_NEMO \
 	-I../..
 LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
-LIBS=	@LIBS@
+LIBS=	@LIBS@ -lcrypto
 CC=	@CC@
-TARGET=	babymdd
+TARGET=	mrd
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
@@ -54,12 +52,16 @@ sbindir=@sbindir@
 mandir=	@mandir@
 
 GENSRCS=	cfparse.c cftoken.c
-OBJS=	babymdd.o network.o util.o \
+OBJS=	mnd.o binding.o common.o fsm.o hal.o mh.o nemo_var.o network.o rr.o \
+	callout.o fdlist.o command.o util.o config.o \
 	$(GENSRCS:%.c=%.o)
 CLEANFILES+=	cfparse.h
 
+.PATH:	${.CURDIR}/../..
+
 all:	$(TARGET)
-babymdd:	$(OBJS) $(LIBOBJS)
+
+mrd:	$(OBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBOBJS) $(LIBS)
 
 cfparse.c cfparse.h: ../../cfparse.y
@@ -79,7 +81,7 @@ includes:
 clean:
 	/bin/rm -f *.o $(TARGET) $(CLEANFILES) $(GENSRCS)
 
-distclean:: clean
+distclean: clean
 	/bin/rm -f Makefile config.cache config.log config.status .depend
 
 depend:

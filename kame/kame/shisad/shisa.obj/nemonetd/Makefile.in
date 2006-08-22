@@ -25,10 +25,8 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.2 2006/07/03 08:29:39 keiichi Exp $
+# $Id: Makefile.in,v 1.1 2006/08/22 07:23:23 keiichi Exp $
 #
-
-VPATH=.:../..
 
 prefix=	@prefix@
 srcdir=	@srcdir@
@@ -58,7 +56,10 @@ OBJS=	nemo_netconfig.o network.o util.o config.o \
 	$(GENSRCS:%.c=%.o)
 CLEANFILES+=	cfparse.h
 
+.PATH:	${.CURDIR}/../..
+
 all:	$(TARGET)
+
 nemonetd:	$(OBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBOBJS) $(LIBS)
 

@@ -25,10 +25,10 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.3 2006/07/03 08:31:26 keiichi Exp $
+# $Id: Makefile.in,v 1.4 2006/08/22 07:23:23 keiichi Exp $
 #
 
-subdirs=obj/mnd obj/babymdd obj/had obj/cnd obj/mrd obj/nemonetd
+subdirs=shisa.obj/mnd shisa.obj/babymdd shisa.obj/had shisa.obj/cnd shisa.obj/mrd shisa.obj/nemonetd
 
 prefix=	@prefix@
 srcdir=	@srcdir@

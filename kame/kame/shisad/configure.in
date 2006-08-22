@@ -23,4 +23,4 @@ AC_FUNC_MEMCMP
 AC_TYPE_SIGNAL
 AC_CHECK_FUNCS(gettimeofday select socket strdup strerror strtol)
 
-AC_OUTPUT(Makefile obj/mnd/Makefile obj/cnd/Makefile obj/babymdd/Makefile obj/had/Makefile obj/mrd/Makefile obj/nemonetd/Makefile)
+AC_OUTPUT(Makefile shisa.obj/mnd/Makefile shisa.obj/cnd/Makefile shisa.obj/babymdd/Makefile shisa.obj/had/Makefile shisa.obj/mrd/Makefile shisa.obj/nemonetd/Makefile)
