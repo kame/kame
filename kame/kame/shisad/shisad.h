@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.39 2006/08/02 11:00:56 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.40 2006/08/25 07:02:15 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -517,6 +517,7 @@ struct mip6_hoainfo *hoainfo_insert(struct in6_addr *, u_int16_t);
 int hoainfo_remove(struct in6_addr *);
 struct mip6_hoainfo *hoainfo_get_withdhaadid (u_int16_t);
 void mip6_bc_init(void);
+void flush_bc(void);
 void mip6_flush_kernel_bc(void);
 void mip6_bc_delete(struct binding_cache *);
 void mip6_bc_refresh_timer(void *);

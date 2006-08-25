@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.15 2006/08/02 11:00:56 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.16 2006/08/25 07:02:15 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -90,7 +90,6 @@ int command_port = CND_COMMAND_PORT;
 char *conffile = CND_CONFFILE;
 
 static void cn_lists_init(void);
-void flush_bc(void);
 
 void
 cn_usage(path)

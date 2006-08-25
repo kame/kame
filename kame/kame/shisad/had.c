@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.35 2006/08/02 11:00:56 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.36 2006/08/25 07:02:15 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -569,8 +569,8 @@ had_flush_bc(s, line)
 	char *line;
 {
 	command_printf(s, "-- Clear Binding Cache --\n");
-	/*flush_bc();*/
-	mip6_flush_kernel_bc();
+	flush_bc();
+	/*mip6_flush_kernel_bc();*/
 }
 
 static void
