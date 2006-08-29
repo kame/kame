@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.104 2006/03/06 15:31:30 t-momose Exp $	*/
+/*	$KAME: icmp6.h,v 1.105 2006/08/29 02:00:19 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -300,12 +300,14 @@ struct mld_group_record_hdr {
 /*
  * Group Record Types in the MLD Membership Report
  */
+#ifndef MODE_IS_INCLUDE
 #define MODE_IS_INCLUDE                 1
 #define MODE_IS_EXCLUDE                 2
 #define CHANGE_TO_INCLUDE_MODE          3
 #define CHANGE_TO_EXCLUDE_MODE          4
 #define ALLOW_NEW_SOURCES               5
 #define BLOCK_OLD_SOURCES               6
+#endif
 
 /*
  * Neighbor Discovery

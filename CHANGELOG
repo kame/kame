@@ -1,5 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2829 2006/07/12 03:08:57 suz Exp $
+$KAME: CHANGELOG,v 1.2830 2006/08/29 02:00:18 suz Exp $
+
+<200608>
+2006-08-29  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet/icmp6.h: use ifdef for IGMPv3/MLDv2-related state
+	macros to prevent a macro duplication in userland applications.
+	(suggested by Hitoshi Asaeda)
 
 <200607>
 2006-07-11  SUZUKI, Shinsuke <suz@alaxala.net>
