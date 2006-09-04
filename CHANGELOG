@@ -1,5 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2830 2006/08/29 02:00:18 suz Exp $
+$KAME: CHANGELOG,v 1.2831 2006/09/04 07:13:12 suz Exp $
+
+<200609>
+2006-09-04  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet6/{in6_msf.c, mldv2.c}: fixed several bugs regarding
+	  MLDv2 (suggested by Yu-Jung Lee)
+	  - returns an error code when the MSF state change fails due to a
+	    lack of memory
+	  - fixed a bug that an MLDv2 State-Change Report is not always
+	    advertised robustness-variables times.
+	  - MLDv1-compat-timer properly checks the current compat-timer
+	    status
 
 <200608>
 2006-08-29  SUZUKI, Shinsuke <suz@alaxala.net>
