@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.67 2006/09/04 06:59:34 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.68 2006/09/04 07:09:31 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -248,7 +248,7 @@ static void mld_state_change_timeo(struct in6_multi *);
 static void mld_sendbuf(struct mbuf *, struct ifnet *);
 static int mld_set_timer(struct ifnet *, struct router6_info *,
 	struct mld_hdr *, u_int16_t, u_int8_t);
-static void mld_set_hostcompat(struct ifnet *, struct router6_info *, int);
+static void mld_set_hostcompat(struct router6_info *);
 static int mld_record_queried_source(struct in6_multi *, struct mld_hdr *,
 	u_int16_t);
 static void mld_send_all_current_state_report(struct ifnet *);
@@ -798,7 +798,7 @@ mldv1_query:
 			goto end;
 		}
 		mldlog((LOG_DEBUG, "shift to MLDv1-compat mode\n"));
-		mld_set_hostcompat(ifp, rt6i, query_ver);
+		mld_set_hostcompat(rt6i);
 	}
 	goto end;
 
@@ -1327,38 +1327,33 @@ next_multi:
  * Set MLD Host Compatibility Mode.
  */
 static void
-mld_set_hostcompat(ifp, rti, query_ver)
-	struct ifnet *ifp;
+mld_set_hostcompat(rti)
 	struct router6_info *rti;
-	int query_ver;
 {
+	struct ifnet *ifp = rti->rt6i_ifp;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
-#else   
-	int s = splnet();
 #endif
 
-	mldlog((LOG_DEBUG,
-		"mld_set_compat: query_ver=%d for %s\n",
-		query_ver, if_name(ifp)));
+	rti->rt6i_timer1 = rti->rt6i_qrv * rti->rt6i_qqi + rti->rt6i_qri;
+	rti->rt6i_timer1 *= hz;
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	callout_reset(rti->rt6i_timer1_ch, rti->rt6i_timer1,
+	    (void (*) __P((void *)))mld_unset_hostcompat_timeo, rti);
+#else
+	timeout_set(rti->rt6i_timer_ch,
+	    (void (*) __P((void *)))mld_unset_hostcompat_timeo, rti);
+	timeout_add(rt6i->rt6i_timer1_ch, rti->rt6i_timer1);
+#endif
+	mldlog((LOG_DEBUG, "mld_set_hostcompat: timer=%d for %s\n",
+	    rti->rt6i_timer1, if_name(ifp)));
+
 	/*
 	 * Keep Older Version Querier Present timer.
 	 */
-	if (query_ver == MLD_V1_ROUTER) {
-		mldlog((LOG_DEBUG, "mld_set_compat: just keep the timer\n"));
-		rti->rt6i_timer1 = rti->rt6i_qrv * rti->rt6i_qqi
-		    + rti->rt6i_qri;
-		rti->rt6i_timer1 *= hz;
-#if defined(__NetBSD__) || defined(__FreeBSD__)
-		callout_reset(rti->rt6i_timer1_ch, rti->rt6i_timer1,
-		    (void (*) __P((void *)))mld_unset_hostcompat_timeo, rti);
-#else
-		timeout_set(rti->rt6i_timer_ch,
-		    (void (*) __P((void *)))mld_unset_hostcompat_timeo, rti);
-		timeout_add(rt6i->rt6i_timer1_ch, rti->rt6i_timer1);
-#endif
-		splx(s);
-		return;
+	if (rti->rt6i_type == MLD_V1_ROUTER) {
+		mldlog((LOG_DEBUG, "mld_set_hostcompat: just keep the timer\n"));
+		goto end;
 	}
 
 	/*
@@ -1366,17 +1361,18 @@ mld_set_hostcompat(ifp, rti, query_ver)
 	 * its compatability mode, cancel all its pending response and
 	 * retransmission timers.
 	 */
-	mldlog((LOG_DEBUG, "mld_set_compat: timer=%d\n", rti->rt6i_timer1));
 	if (rti->rt6i_timer1 > 0) {
-		if (rti->rt6i_type != MLD_V1_ROUTER) {
-			mldlog((LOG_DEBUG, "mld_set_compat: "
-				"set timer to MLDv1-compat mode\n"));
-			rti->rt6i_type = MLD_V1_ROUTER;
-			mld_cancel_pending_response(ifp, rti);
-		}
+		mldlog((LOG_DEBUG, "mld_set_hostcompat: "
+			"set timer to MLDv1-compat mode\n"));
+		rti->rt6i_type = MLD_V1_ROUTER;
+		mld_cancel_pending_response(ifp, rti);
 	}
 
+end:
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	splx(s);
+#endif
+	return;
 }
 
 static void
