@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.39 2006/03/28 06:16:48 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.40 2006/09/04 06:48:54 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -785,8 +785,6 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 				 * See mld_send_state_change_report().
 				 */
 				I6AS_LIST_ALLOC(in6mm_src->i6ms_toex);
-				if (error != 0)
-					; /* XXX give up TO_EX transmission */
 			}
 			goto change_state_1;
 		}
@@ -798,8 +796,6 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 			/* To make TO_EX transmission */
 			I6AS_LIST_ALLOC(in6mm_src->i6ms_toex);
-			if (error != 0)
-				; /* XXX */
 			goto free_source_list_1;
 		 }
 
@@ -829,7 +825,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 	change_state_1:
 		*newmode = MCAST_EXCLUDE;
 		*newnumsrc = 0;
-		return 0;
+		return error;
 	}
 
 	/* Case 2: There is no member for this group. */
@@ -846,8 +842,6 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 				 * See mld_send_state_change_report().
 				 */
 				I6AS_LIST_ALLOC(in6mm_src->i6ms_toin);
-				if (error != 0)
-					; /* XXX give up TO_IN transmission */
 			}
 			goto change_state_2;
 		}
@@ -860,8 +854,6 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 
 			/* To make TO_IN transmission */
 			I6AS_LIST_ALLOC(in6mm_src->i6ms_toin);
-			if (error != 0)
-				; /* XXX */
 			goto free_source_list_2;
 		}
 
@@ -888,7 +880,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 	change_state_2:
 		*newmode = MCAST_INCLUDE;
 		*newnumsrc = 0;
-		return 0;
+		return error;
 	}
 
 	/* Case 3: Source list of EXCLUDE filter is set for this group. */
