@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.66 2006/04/08 04:43:39 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.67 2006/09/04 06:59:34 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2184,6 +2184,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
 				mld_send_state_change_report(in6m, type, 1);
+				mld_start_state_change_timer(in6m);
 			}
 		} else {
 			/*
@@ -2441,6 +2442,8 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 					type = CHANGE_TO_EXCLUDE_MODE;
 			}
 			mld_send_state_change_report(in6m, type, 1);
+			if (!final)
+				mld_start_state_change_timer(in6m);
 		}
 	} else {
 		/*
@@ -3289,6 +3292,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
 				mld_send_state_change_report(in6m, type, 1);
+				mld_start_state_change_timer(in6m);
 			}
 		} else {
 			/*
