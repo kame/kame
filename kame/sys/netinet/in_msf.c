@@ -2621,17 +2621,12 @@ ip_getmopt_srcfilter(sop, imsfp)
 		return error;
 	}
 
-	if (imsf->imsf_fmode != MCAST_INCLUDE &&
-			imsf->imsf_fmode != MCAST_EXCLUDE) {
-		if (imop->imo_msf[i]->msf_numsrc > 0)
-			imsf->imsf_fmode = MCAST_INCLUDE;
-		else
-			imsf->imsf_fmode = MCAST_EXCLUDE;
-	}
-	if (imsf->imsf_fmode == MCAST_INCLUDE) {
+	if (imop->imo_msf[i]->msf_numsrc > 0) {
+		imsf->imsf_fmode = MCAST_INCLUDE;
 		LIST_FIRST(&head) = LIST_FIRST(imop->imo_msf[i]->msf_head);
 		numsrc = min(imop->imo_msf[i]->msf_numsrc, imsf->imsf_numsrc);
 	} else {
+		imsf->imsf_fmode = MCAST_EXCLUDE;
 		LIST_FIRST(&head) = LIST_FIRST(imop->imo_msf[i]->msf_blkhead);
 		numsrc = min(imop->imo_msf[i]->msf_blknumsrc,imsf->imsf_numsrc);
 	}

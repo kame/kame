@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.40 2006/09/04 06:48:54 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.41 2006/09/05 04:25:48 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2636,17 +2636,12 @@ sock6_getmopt_srcfilter(sop, grpfp)
 		return error;
 	}
 
-	if (grpf->gf_fmode != MCAST_INCLUDE &&
-			grpf->gf_fmode != MCAST_EXCLUDE) {
-		if (msf->msf_numsrc > 0)
-			grpf->gf_fmode = MCAST_INCLUDE;
-		else
-			grpf->gf_fmode = MCAST_EXCLUDE;
-	}
-	if (grpf->gf_fmode == MCAST_INCLUDE) {
+	if (msf->msf_numsrc > 0) {
+		grpf->gf_fmode = MCAST_INCLUDE;
 		LIST_FIRST(&head) = LIST_FIRST(msf->msf_head);
 		numsrc = min(msf->msf_numsrc, grpf->gf_numsrc);
 	} else {
+		grpf->gf_fmode = MCAST_EXCLUDE;
 		LIST_FIRST(&head) = LIST_FIRST(msf->msf_blkhead);
 		numsrc = min(msf->msf_blknumsrc, grpf->gf_numsrc);
 	}
