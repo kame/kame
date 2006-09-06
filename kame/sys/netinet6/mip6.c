@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.241 2006/08/14 16:31:37 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.242 2006/09/06 06:15:23 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -512,7 +512,7 @@ mip6_tunnel_input(mp, offp)
 
 #ifdef __APPLE__
 		proto_input(PF_INET6, m);
-#else __APPLE__
+#else
 #ifdef __NetBSD__
 		s = splnet();
 #elif defined(__OpenBSD__) || defined(__APPLE__)
@@ -1266,7 +1266,6 @@ mip6_bul_encapcheck(m, off, proto, arg)
 	struct mip6_bul_internal *mbul = (struct mip6_bul_internal *)arg;
 	struct ip6_hdr *ip6;
 
-printf("mip6_bul_encapcheck(mbul = %x) begin\n", mbul);
 	if (mbul == NULL) {
 		return (0);
 	}
