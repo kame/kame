@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.69 2006/09/06 07:24:22 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.70 2006/09/06 08:25:15 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -790,7 +790,8 @@ mldv1_query:
 	 * MLDv1 Querier Present is set to Older Version Querier Present 
 	 * Timeout seconds whenever an MLDv1 General Query is received.
 	 */
-	if (IN6_ARE_ADDR_EQUAL(&mld_addr, &in6addr_any)) {
+	if (query_ver == MLD_V1_ROUTER &&
+	    IN6_ARE_ADDR_EQUAL(&mld_addr, &in6addr_any)) {
 		if (mld_version == 2) {
 			mldlog((LOG_DEBUG,
 				"not shift to MLDv1-compat mode "
