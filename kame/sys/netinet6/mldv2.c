@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.68 2006/09/04 07:09:31 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.69 2006/09/06 07:24:22 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2926,6 +2926,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init, delay)
 				mldlog((LOG_DEBUG, "in6_addmultisrc: "
 				    "send current status\n"));
 				mld_send_state_change_report(in6m, type, 1);
+				mld_start_state_change_timer(in6m);
 			}
 			 else {
 				mldlog((LOG_DEBUG, "in6_addmultisrc: "
