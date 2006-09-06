@@ -1,11 +1,28 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2832 2006/09/05 04:25:48 suz Exp $
+$KAME: CHANGELOG,v 1.2833 2006/09/06 07:08:53 suz Exp $
 
 <200609>
+2006-09-06  SUZUKI, Shinsuke <suz@alaxala.net>
+	* freebsd5/sys/net/if_loop.c: 
+	  let a loop-backed IPv6 packet go to lo0's BPF, while
+	  software-emulated loopbacked ethernet frame still
+	  goes to the physical I/F's BPF.
+
+	  This closes the todo issue of the following item in 
+	  CHANGELOG.2000.  
+
+	  > Tue May 30 01:29:04 JST 2000  itojun@iijlab.net
+	  ...
+	  > XXX if_simloop() call from ip6_output() causes junk to be injected
+	  > to bpf buffer.  we may need some fix separately from this commit.
+
+	  (suggested by Max Laier)
+
 2006-09-05  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet/in_msf.c, kame/sys/netinet6/in6_msf.c:
-	does not search MSF by 'fmode' in case of SIOCGMSFILTER or SIOCGIPMSFILTER.
-	(RFC3768 5.1.2 and 5.2.2)
+	does not search MSF by 'fmode' in case of SIOCGMSFILTER or 
+	SIOCGIPMSFILTER.  (RFC3768 5.1.2 and 5.2.2)
+	(suggested by Yu-Jung Lee)
 
 2006-09-04  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet6/{in6_msf.c, mldv2.c}: fixed several bugs regarding
