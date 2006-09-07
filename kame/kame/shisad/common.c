@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.29 2006/08/02 11:00:56 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.30 2006/09/07 17:59:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -129,21 +129,39 @@ icmp6sock_open()
 		exit(-1);
 	}
 	error = setsockopt(icmp6sock, 
-		IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on));
+		IPPROTO_IPV6, 
+#ifdef IPV6_RECVPKTINFO
+			   IPV6_RECVPKTINFO,
+#else
+			   IPV6_PKTINFO,
+#endif
+			   &on, sizeof(on));
 	if (error < 0) {
 		perror("setsockopt IPV6_RECVPKTINFO for ICMPv6");
 		exit(1);
 	}
 
 	error = setsockopt(icmp6sock, 
-		IPPROTO_IPV6, IPV6_RECVDSTOPTS, &on, sizeof(on));
+		IPPROTO_IPV6,
+#ifdef IPV6_RECVDSTOPTS
+			   IPV6_RECVDSTOPTS,
+#else
+			   IPV6_DSTOPTS,
+#endif
+			   &on, sizeof(on));
 	if (error < 0) {
 		perror("setsockopt IPV6_RECVDSTOPTS for ICMPv6");
 		exit(1);
 	}
 
 	error = setsockopt(icmp6sock, 
-		IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on));
+		IPPROTO_IPV6,
+#ifdef IPV6_RECVRTHDR
+			   IPV6_RECVRTHDR,
+#else
+			   IPV6_RTHDR,
+#endif
+			   &on, sizeof(on));
 	if (error < 0) {
 		perror("setsockopt IPV6_RECVRTHDR for ICMPv6");
 		exit(1);

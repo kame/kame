@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.20 2006/06/13 05:40:36 keiichi Exp $	*/
+/*	$Id: babymdd.c,v 1.21 2006/09/07 17:59:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1334,8 +1334,13 @@ send_rs(struct if_info  *ifinfo) {
 			       __FUNCTION__, strerror(errno));
 		return (0);
 	}
-	if (setsockopt(icmpsock, IPPROTO_IPV6, 
-		       IPV6_RECVPKTINFO, &on, sizeof(on)) < 0) {
+	if (setsockopt(icmpsock, IPPROTO_IPV6,
+#ifdef IPV6_RECVPKTINFO
+		       IPV6_RECVPKTINFO,
+#else
+		       IPV6_PKTINFO,
+#endif
+		       &on, sizeof(on)) < 0) {
 		if (DEBUGHIGH)
 			syslog(LOG_ERR, "%s setsockopt: %s\n",  
 			       __FUNCTION__, strerror(errno));

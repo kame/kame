@@ -1,4 +1,4 @@
-/*      $KAME: rr.c,v 1.7 2006/08/02 11:00:56 t-momose Exp $  */
+/*      $KAME: rr.c,v 1.8 2006/09/07 17:59:57 t-momose Exp $  */
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -205,7 +205,8 @@ check_nonce_reuse(ninfo, hoa, coa)
 	struct mip6_nonce_blockedbce *nb;
 
 	LIST_FOREACH(nb, &ninfo->nb_head, nb_entry) {
-		if (IN6_ARE_ADDR_EQUAL(hoa, &nb->nb_bc->bc_hoa)) {
+		if (IN6_ARE_ADDR_EQUAL(hoa, &nb->nb_bc->bc_hoa) &&
+		    IN6_ARE_ADDR_EQUAL(coa, &nb->nb_bc->bc_coa)) {
 			return (1);
 		}
 	}
