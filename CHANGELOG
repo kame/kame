@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2834 2006/09/06 08:31:36 suz Exp $
+$KAME: CHANGELOG,v 1.2835 2006/09/08 05:43:59 suz Exp $
 
 <200609>
+2006-09-08  SUZUKI, Shinsuke <suz@alaxala.net>
+	* kame/sys/netinet6/mldv2.c:
+	  - stop updating MLDv1-compat-timer when an MLDv2 Query is received
+	    in MLDv1-compat-mode (the 2006-09-06's commit is not enough)
+
 2006-09-06  SUZUKI, Shinsuke <suz@alaxala.net>
 	* kame/sys/netinet6/mldv2.c:
 	  - stop updating MLDv1-compat-timer when an MLDv2 Query is received

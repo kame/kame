@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.70 2006/09/06 08:25:15 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.71 2006/09/08 05:44:00 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -691,7 +691,7 @@ mld_input(m, off)
 		goto end;
 	}
 	if (mldlen == MLD_MINLEN || mld_version == 1) {
-		rt6i->rt6i_type = query_ver = MLD_V1_ROUTER;
+		query_ver = MLD_V1_ROUTER;
 		mldlog((LOG_DEBUG, "regard it as MLDv1 Query from %s for %s\n",
 		       ip6_sprintf(&ip6->ip6_src),
 		       ip6_sprintf(&mldh->mld_addr)));
@@ -801,6 +801,7 @@ mldv1_query:
 		mldlog((LOG_DEBUG, "shift to MLDv1-compat mode\n"));
 		mld_set_hostcompat(rt6i);
 	}
+	rt6i->rt6i_type = MLD_V1_ROUTER;
 	goto end;
 
 end:
@@ -1349,24 +1350,24 @@ mld_set_hostcompat(rti)
 	mldlog((LOG_DEBUG, "mld_set_hostcompat: timer=%d for %s\n",
 	    rti->rt6i_timer1, if_name(ifp)));
 
-	/*
-	 * Keep Older Version Querier Present timer.
-	 */
-	if (rti->rt6i_type == MLD_V1_ROUTER) {
+	switch (rti->rt6i_type) {
+	case MLD_V1_ROUTER:
+		/* Keep Older Version Querier Present timer */
 		mldlog((LOG_DEBUG, "mld_set_hostcompat: just keep the timer\n"));
 		goto end;
-	}
-
-	/*
-	 * Check/set host compatibility mode. Whenever a host changes
-	 * its compatability mode, cancel all its pending response and
-	 * retransmission timers.
-	 */
-	if (rti->rt6i_timer1 > 0) {
+	case MLD_V2_ROUTER:
+		/*
+		 * Check/set host compatibility mode. Whenever a host changes
+		 * its compatability mode, cancel all its pending response and
+		 * retransmission timers.
+		 */
 		mldlog((LOG_DEBUG, "mld_set_hostcompat: "
 			"set timer to MLDv1-compat mode\n"));
-		rti->rt6i_type = MLD_V1_ROUTER;
 		mld_cancel_pending_response(ifp, rti);
+		break;
+	default:
+		/* impossible */
+		break;
 	}
 
 end:
