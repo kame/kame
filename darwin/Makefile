@@ -1,6 +1,7 @@
 .include <bsd.own.mk>			# for configuration variables.
 
-SUBDIR=	lib include
+#SUBDIR=	lib include
+SUBDIR=	usr.sbin
 
 #build:
 #	$(MAKE) includes
@@ -22,30 +23,30 @@ beforeinstall:
 	done
 
 afterinstall:
-	cp ${.CURDIR}/kame/rtadvd/rtadvd.conf \
-		${DESTDIR}${PREFIX}/etc/rtadvd.conf.sample
-	cp ${.CURDIR}/kame/bgpd/bgpd.conf \
-		${DESTDIR}${PREFIX}/etc/bgpd.conf.sample
-	cp ${.CURDIR}/kame/racoon/samples/racoon.conf.sample \
-		${DESTDIR}$(PREFIX)/etc/
-	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
-		${DESTDIR}$(PREFIX)/etc/
-	cp ${.CURDIR}/kame/ip6addrctl/ip6addrctl.conf.sample \
-		${DESTDIR}$(PREFIX)/etc/
-	if test -x ${PREFIX}/sbin/inet6d; then \
-		cp ${.CURDIR}/kame/inet6d/inet6d.conf \
-			${DESTDIR}${PREFIX}/etc/inet6d.conf.sample; \
-	fi
+#	cp ${.CURDIR}/kame/rtadvd/rtadvd.conf \
+#		${DESTDIR}${PREFIX}/etc/rtadvd.conf.sample
+#	cp ${.CURDIR}/kame/bgpd/bgpd.conf \
+#		${DESTDIR}${PREFIX}/etc/bgpd.conf.sample
+#	cp ${.CURDIR}/kame/racoon/samples/racoon.conf.sample \
+#		${DESTDIR}$(PREFIX)/etc/
+#	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
+#		${DESTDIR}$(PREFIX)/etc/
+#	cp ${.CURDIR}/kame/ip6addrctl/ip6addrctl.conf.sample \
+#		${DESTDIR}$(PREFIX)/etc/
+#	if test -x ${PREFIX}/sbin/inet6d; then \
+#		cp ${.CURDIR}/kame/inet6d/inet6d.conf \
+#			${DESTDIR}${PREFIX}/etc/inet6d.conf.sample; \
+#	fi
 	for i in ${DOCS}; do \
 		if test -f ${.CURDIR}/../$$i; then \
 			cp ${.CURDIR}/../$$i ${DESTDIR}${PREFIX}/share/doc/kame; \
 		fi \
 	done
-	cp ${.CURDIR}/INSTALL ${DESTDIR}${PREFIX}/share/doc/kame/INSTALL.netbsd
-	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
-		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev
-	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
-		${.CURDIR}/kame/send-pr/send-pr \
-		${DESTDIR}${PREFIX}/bin/kame-send-pr
+#	cp ${.CURDIR}/INSTALL ${DESTDIR}${PREFIX}/share/doc/kame/INSTALL.netbsd
+#	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+#		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev
+#	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+#		${.CURDIR}/kame/send-pr/send-pr \
+#		${DESTDIR}${PREFIX}/bin/kame-send-pr
 
 .include <bsd.subdir.mk>
