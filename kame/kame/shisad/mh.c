@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.56 2006/08/02 11:00:56 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.57 2006/09/11 12:00:10 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -341,13 +341,16 @@ syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
 	return (0);
 }
 
+/* Analyze options in the mobility header */
+/* Reuslts are stored in 'mopt' and non-Null members show
+   the option exsist in the header */
 int
 get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
-        struct ip6_mh *ip6mh;
-        int hlen, ip6mhlen;
-        struct mip6_mobility_options *mopt;
+	struct ip6_mh *ip6mh;
+	int hlen, ip6mhlen;
+	struct mip6_mobility_options *mopt;
 {
-	u_int8_t *mhopt, *mhend;
+	caddr_t mhopt, mhend;
 
 	mhopt = (caddr_t)(ip6mh) + hlen;
 	mhend = (caddr_t)(ip6mh) + ip6mhlen;
