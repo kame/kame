@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.161 2006/05/02 13:44:11 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.162 2006/09/21 12:47:44 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -413,8 +413,7 @@ ip6_forward(m, srcrt)
 
 	/* XXX need some policy to determine bid for MCOA */
 	if ((bce = mip6_bce_get(&ip6->ip6_dst, NULL, NULL, 0)) &&
-	    (bce->mbc_flags & IP6_MH_BU_HOME) &&
-	    (bce->mbc_encap != NULL)) {
+	    (bce->mbc_flags & IP6_MH_BU_HOME)) {
 		if (IN6_IS_ADDR_LINKLOCAL(&bce->mbc_hoa)
 		    || IN6_IS_ADDR_SITELOCAL(&bce->mbc_hoa)) {
 			ip6stat.ip6s_cantforward++;

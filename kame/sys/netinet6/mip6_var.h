@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.129 2006/08/14 16:31:38 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.130 2006/09/21 12:47:44 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -62,7 +62,6 @@ struct mip6_bc_internal {
 #ifdef MIP6_MCOA
 	u_int16_t       mbc_bid;      /* Binding Unique Identifier */
 #endif /* MIP6_MCOA */
- 	const struct encaptab *mbc_encap;
 };
 LIST_HEAD(mip6_bc_list, mip6_bc_internal);
 
