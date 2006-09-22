@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.31 2006/08/02 11:00:56 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.32 2006/09/22 00:42:55 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -411,7 +411,7 @@ command_show_bc(s, line)
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_coa));
 		command_printf(s, "%s ", ip6_sprintf(&bc->bc_myaddr));
 		command_printf(s, "%d/%d %c%c%c%c %d\n",
-			(int)(bc->bc_expire - now),
+			bc->bc_expire ? (int)(bc->bc_expire - now) : 0,
 			bc->bc_lifetime,
 			(bc->bc_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
 			(bc->bc_flags & IP6_MH_BU_HOME) ? 'H' : '-',
