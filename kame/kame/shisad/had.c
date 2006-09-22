@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.36 2006/08/25 07:02:15 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.37 2006/09/22 01:03:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -202,7 +202,7 @@ main(argc, argv)
 
 	/* open syslog infomation. */
 	openlog("shisad(had)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "Start HA daemon at %s\n", ifname);
+	syslog(LOG_INFO, "Start HA daemon at %s", ifname);
 
 	/* parse configuration file and set default values. */
 	if (parse_config(CFM_HAD, conffile) == 0)
@@ -213,6 +213,7 @@ main(argc, argv)
 		config_get_number(CFT_COMMANDPORT, &command_port, if_params);
 		config_get_number(CFT_DAD, &do_proxy_dad, if_params);
 		config_get_number(CFT_PREFERENCE, &preference, if_params);
+		config_get_number(CFT_PAGER, &pager_mode, if_params);
 		config_get_number(CFT_KEYMANAGEMENT, &keymanagement,
 		    if_params);
 	}
@@ -223,6 +224,7 @@ main(argc, argv)
 		    config_params);
 		config_get_number(CFT_DAD, &do_proxy_dad, config_params);
 		config_get_number(CFT_PREFERENCE, &preference, config_params);
+		config_get_number(CFT_PAGER, &pager_mode, config_params);
 		config_get_number(CFT_KEYMANAGEMENT, &keymanagement,
 		    config_params);
 	}
@@ -456,7 +458,7 @@ had_init_homeprefix (ifname, preference)
 	freeifaddrs(ifap);
 	
 	if (LIST_EMPTY(&hpfx_head)) {
-		syslog(LOG_ERR, "please configure at least one global home prefix at %s\n", 
+		syslog(LOG_ERR, "please configure at least one global home prefix at %s", 
 		       ifname); 
 		exit(0);
 	}
@@ -523,7 +525,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 	if (hpfx == NULL) {
 		if (debug)
 			syslog(LOG_INFO, 
-			       "no matched home prefix list is found, drop dhaad request\n");
+			       "no matched home prefix list is found, drop dhaad request");
 		return (0);
 	}
 
@@ -532,17 +534,18 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 	LIST_FOREACH(hal, &hpfx->hpfx_hal_head, hal_entry) {
 		if (reqlen + sizeof(struct in6_addr) >= sizeof(buf)) {
 			syslog(LOG_INFO,
-			       "adding %s into DHAAD reply was missed\n",
+			       "adding %s into DHAAD reply was missed",
 			       ip6_sprintf(&hal->hal_ip6addr));
 			break;	/* no more space */
 		}
 
-		syslog(LOG_INFO, "add %s into DHAAD reply \n", ip6_sprintf(&hal->hal_ip6addr));
+		syslog(LOG_INFO, "add %s into DHAAD reply",
+		       ip6_sprintf(&hal->hal_ip6addr));
 		memcpy((buf + reqlen), &hal->hal_ip6addr, sizeof(struct in6_addr));
 
 		if ((hal->hal_flag == MIP6_HAL_OWN) && !src_decided) {
 			pi->ipi6_addr = hal->hal_ip6addr;
-			syslog(LOG_INFO, "Src addr was deceided as [%s]\n",
+			syslog(LOG_INFO, "Src addr was deceided as [%s]",
 			       ip6_sprintf(&pi->ipi6_addr));
 			src_decided = 1;
 		}
@@ -553,7 +556,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 	iov.iov_len = reqlen;
 	
 	if (debug) 
-		syslog(LOG_INFO, "send DHAAD reply to %s\n", ip6_sprintf(dst));
+		syslog(LOG_INFO, "send DHAAD reply to %s", ip6_sprintf(dst));
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 		perror ("sendmsg icmp6 @haadreply");
@@ -702,7 +705,7 @@ send_mpa(dst, mps_id, ifindex)
 	iov.iov_len = reqlen;
 	
 	if (debug) 
-		syslog(LOG_INFO, "send MPA to %s\n", ip6_sprintf(dst));
+		syslog(LOG_INFO, "send MPA to %s", ip6_sprintf(dst));
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 		perror ("sendmsg icmp6 @haadreply");
@@ -786,11 +789,11 @@ relay_icmp6_error(oicp, oicp_len, ifindex)
 	iov.iov_len = oicp_len - sizeof(struct ip6_hdr);
 
 	if (debug) 
-		syslog(LOG_INFO, "relaying icmp6 error message to %s\n",
+		syslog(LOG_INFO, "relaying icmp6 error message to %s",
 		       ip6_sprintf(&iip6->ip6_src));
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
-		syslog(LOG_ERR, "sendmsg icmp6 @{dest unreach, packet too big} is failed %s\n", strerror(errno));
+		syslog(LOG_ERR, "sendmsg icmp6 @{dest unreach, packet too big} is failed %s", strerror(errno));
 
 	return (errno);
 }
