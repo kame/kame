@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.10 2006/08/02 10:40:07 t-momose Exp $	*/
+/*	$KAME: cfparse.y,v 1.11 2006/09/28 03:05:53 keiichi Exp $	*/
 
 %{
 /*
@@ -45,6 +45,8 @@ extern FILE *yyin;
 
 int yylex(void);
 int yyparse(void);
+void yyerror(char *);
+int yywrap(void);
 
 static int config_mode;
 static struct config_entry **config_result;

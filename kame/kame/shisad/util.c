@@ -1,4 +1,4 @@
-/*      $KAME: util.c,v 1.5 2005/12/14 08:17:51 t-momose Exp $  */
+/*      $KAME: util.c,v 1.6 2006/09/28 03:05:53 keiichi Exp $  */
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -33,9 +33,16 @@
 
 #include <sys/types.h>
 #include <sys/syslog.h>
+#include <sys/time.h>
+#include <sys/queue.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/icmp6.h>
+#include <netinet/ip6mh.h>
+
+#include "callout.h"
+#include "shisad.h"
 
 extern int namelookup;
 

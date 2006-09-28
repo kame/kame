@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.7 2006/04/13 02:08:07 keiichi Exp $	*/
+/*	$KAME: callout.c,v 1.8 2006/09/28 03:05:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -130,7 +130,7 @@ callout_expire_check()
 CALLOUT_HANDLE
 new_callout_entry(exprelative, func, arg, funcname)
 	int exprelative;	/* Relative time of expire (s) */
-	void (*func)();		/* Function to be called */
+	void (*func)(void *);	/* Function to be called */
 	void *arg;		/* An argument to pass the function */
 	char *funcname;		/* Function name used for debugging */
 {

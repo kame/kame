@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.11 2006/08/02 10:40:07 t-momose Exp $	*/
+/*	$KAME: cftoken.l,v 1.12 2006/09/28 03:05:53 keiichi Exp $	*/
 
 %{
 /*
@@ -39,6 +39,8 @@
 #endif
 
 void cfdebug_print(char *, char *, int);
+
+int yylex(void);
 
 static int yy_first_time = 1;
 

@@ -1,4 +1,4 @@
-/*	$KAME: command.c,v 1.7 2006/08/02 10:30:01 t-momose Exp $	*/
+/*	$KAME: command.c,v 1.8 2006/09/28 03:05:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -215,7 +215,7 @@ command_in(s)
 		cc->wait_nextpage = 0;
 	} else {
 		buffer[bytes] = '\0';
-		while (strlen(buffer) && isspace(buffer[strlen(buffer) - 1]))
+		while (strlen(buffer) && isspace((int)buffer[strlen(buffer) - 1]))
 			buffer[strlen(buffer) - 1] = '\0';
 		if (strlen(buffer) > 0)
 			dispatch_command(s, buffer, commands);
@@ -249,7 +249,7 @@ dispatch_command(s, command_line, command_table)
 
 		arg = command_line + strlen(ctbl->command);
 
-		while (isspace(*arg))
+		while (isspace((int)*arg))
 			arg++;
 
 		if (ctbl->sub_cmds) {

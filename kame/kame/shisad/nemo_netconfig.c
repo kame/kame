@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.21 2006/04/13 02:26:24 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.22 2006/09/28 03:05:53 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -100,21 +100,25 @@ int multiplecoa = 0;
 int ipv4mnpsupport = 0;
 #endif /* MIP_IPV4MNPSUPPORT */
 
+int main(int, char **);
+
 /* Functions */
-static int set_nemo_ifinfo();
-static void mainloop();
+static int set_nemo_ifinfo(void);
+static void mainloop(void);
 static void nemo_terminate(int);
 static int ha_parse_ptconf(void);
 static int mr_parse_ptconf(void);
+static struct nemo_if *find_nemo_if(struct in6_addr *, u_int16_t);
 static struct nemo_if *find_nemo_if_from_name(char *);
 static void set_static_tun(void);
 static struct nemo_if *nemo_setup_forwarding (struct sockaddr *, struct sockaddr *, 
 					      struct in6_addr *, u_int16_t);
 static struct nemo_if *nemo_destroy_forwarding(struct in6_addr *, u_int16_t);
-static void nemo_dump();
+static void nemo_dump(void);
 #ifdef MIP_IPV4MNPSUPPORT
 static int parse_ipv4_dummy_tunnel(void);
 #endif /* MIP_IPV4MNPSUPPORT */
+static void nemo_usage(void);
 
 static struct sockaddr_in6 sin6_default = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
@@ -139,7 +143,7 @@ static struct sockaddr_in sin_loopback = {
 };
 #endif /* MIP_IPV4MNPSUPPORT */
 
-void
+static void
 nemo_usage() {
 	fprintf(stderr, "nemonetd -d -f -s -M [-h or -m] -c configfile\n");
 	fprintf(stderr, "\t-d: Verbose Debug messages \n");
@@ -1058,7 +1062,8 @@ nemo_terminate(dummy)
 
 
 static void
-nemo_dump() {
+nemo_dump()
+{
 	struct nemo_if *nif;
 	struct nemo_mnpt *npt;
 	int i = 1;

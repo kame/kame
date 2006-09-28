@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.35 2006/08/02 11:00:56 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.36 2006/09/28 03:05:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -94,11 +94,14 @@ int ipv4mnpsupport = 0;
 #endif /* MIP_IPV4MNPSUPPORT */
 struct config_entry *if_params;
 
+int main(int, char **);
+
 /*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
 static void command_show_hal(int, char *);
 static void show_current_config(int, char *);
 
+static void mn_usage(void);
 static void mn_lists_init(void);
 static int mipsock_recv_rr_hint(struct mip_msghdr *);
 static void mnd_init_homeprefix(struct mip6_mipif *);
@@ -146,7 +149,7 @@ struct command_table command_table[] = {
 #endif /* MIP_NEMO */
 
 
-void
+static void
 mn_usage()
 {
 #ifdef MIP_NEMO
@@ -164,6 +167,7 @@ mn_usage()
 #endif /* MIP_NEMO */
         return;
 }
+
 
 int
 main(argc, argv)
@@ -1493,6 +1497,7 @@ mnd_add_mipif(ifname)
 	return (mif);
 }
 
+#if 0
 void
 mnd_delete_mipif(ifindex)
 	u_int16_t ifindex;
@@ -1500,6 +1505,7 @@ mnd_delete_mipif(ifindex)
 	/* never delete mipif */
 	return; 
 }
+#endif
 
 
 struct mip6_mipif *

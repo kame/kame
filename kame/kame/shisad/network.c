@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.15 2006/06/08 12:02:00 keiichi Exp $  */
+/*      $KAME: network.c,v 1.16 2006/09/28 03:05:53 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -908,9 +908,6 @@ getnbrinfo(addr, ifindex, warning)
 }
 
 
-#endif /* MIP_NEMO */
-
-
 /* get an ifindex of the address */
 u_int16_t 
 get_ifindex_from_address(address)
@@ -943,3 +940,4 @@ get_ifindex_from_address(address)
 	freeifaddrs(ifap);
 	return (0);
 }
+#endif /* MIP_NEMO */

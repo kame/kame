@@ -1,4 +1,4 @@
-/*	$KAME: callout.h,v 1.4 2005/05/25 01:49:23 keiichi Exp $	*/
+/*	$KAME: callout.h,v 1.5 2006/09/28 03:05:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -47,12 +47,12 @@ TAILQ_HEAD(callout_queue_t_head, callout_queue_t);
 
 /*extern struct callout_queue_t_head callout_head;*/
 
-void callout_init();
-void callout_expire_check();
-CALLOUT_HANDLE new_callout_entry(int, void (*)(), void *, char *);
+void callout_init(void);
+void callout_expire_check(void);
+CALLOUT_HANDLE new_callout_entry(int, void (*)(void *), void *, char *);
 void remove_callout_entry(CALLOUT_HANDLE ch);
 void update_callout_entry(CALLOUT_HANDLE ch, int);
-int get_next_timeout();
+int get_next_timeout(void);
 void show_callout_table(int, char *);
 
 #endif /* _SHISAD_CALLOUT_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.37 2006/09/22 01:03:04 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.38 2006/09/28 03:05:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -105,6 +105,9 @@ struct ha_ifinfo {
 /* it indicates that entry having MIP6_HA_INIFITY_LIFE is mine */
 #define MIP6_HA_INIFITY_LIFE 0xffff 
 
+int main(int, char **);
+
+static void ha_usage(char *);
 static void ha_lists_init(void);
 static void had_init_homeprefix(char *, int);
 static void terminate(int);
@@ -142,7 +145,7 @@ struct command_table command_table[] = {
 
 extern int pager_mode;
 
-void
+static void
 ha_usage(path)
 	char *path;
 {
@@ -188,7 +191,7 @@ main(argc, argv)
 			break;
 		default:
 			fprintf(stderr, "unknown option\n");
-			ha_usage();
+			ha_usage(argv[0]);
 			break;
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.21 2006/09/07 17:59:57 t-momose Exp $	*/
+/*	$Id: babymdd.c,v 1.22 2006/09/28 03:05:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -73,17 +73,19 @@
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
 #define storage2sin(x) ((struct sockaddr_in *)(x))
 
+int main(int, char **);
+
 /* base functions */
-static void baby_initif();
+static void baby_initif(void);
 static void init_hoa(u_int16_t);
 static struct if_info *init_if(char *);
-static void print_debug();
-static void baby_terminate();
-static void baby_reset();
+static void print_debug(void);
+static void baby_terminate(int);
+static void baby_reset(void);
 
 void baby_getifinfo(struct if_info *);
-void baby_selection();
-int baby_checklink();
+void baby_selection(void);
+int baby_checklink(void);
 int baby_rtmsg(struct rt_msghdr *, int);
 int baby_mipmsg(struct mip_msghdr *, int);
 
@@ -103,10 +105,12 @@ static int is_hoa_ornot(struct in6_addr *);
 static int in6_addrscope(struct in6_addr *);
 static struct if_info *baby_ifindex2ifinfo(u_int16_t);
 static int send_rs(struct if_info  *);
+static int next_sa(struct sockaddr *);
+static void baby_usage(void);
 
 struct mdd_info babyinfo;
 
-void
+static void
 baby_usage()
 {
 	fprintf(stderr, "babymdd [options] -h mipif interfaces..\n");
@@ -273,7 +277,7 @@ main (argc, argv)
         if (!babyinfo.nondaemon) {
                 if (daemon(0, 0) < 0) {
                         perror("daemon");
-			baby_terminate();
+			baby_terminate(0 /* dummy */);
                         exit(-1);
                 }
         }
@@ -963,7 +967,9 @@ baby_reset() {
 
 
 static void 
-baby_terminate() {
+baby_terminate(arg)
+	int arg;	/* not used */
+{
 
 	baby_reset();
 	exit(0);

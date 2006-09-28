@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.16 2006/08/25 07:02:15 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.17 2006/09/28 03:05:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -60,6 +60,11 @@
 #include "command.h"
 #include "config.h"
 
+int main(int, char **);
+
+static void cn_usage(char *);
+static void cn_lists_init(void);
+
 /*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
 static void terminate(int);
@@ -89,9 +94,7 @@ int namelookup = 1;
 int command_port = CND_COMMAND_PORT;
 char *conffile = CND_CONFFILE;
 
-static void cn_lists_init(void);
-
-void
+static void
 cn_usage(path)
 	char *path;
 {
@@ -130,7 +133,7 @@ main(argc, argv)
 			break;
 		default:
 			fprintf(stderr, "unknown option\n");
-			cn_usage();
+			cn_usage(argv[0]);
 			break;
 		}
 	}
