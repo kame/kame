@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.36 2006/09/28 03:05:53 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.37 2006/09/29 08:00:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -292,7 +292,7 @@ main(argc, argv)
 
 	noro_init();
 
-	callout_init();
+	shisad_callout_init();
 	fdlist_init();
 	csock = command_init("mn> ", command_table, 
 	    sizeof(command_table) / sizeof(struct command_table),

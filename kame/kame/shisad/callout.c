@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.8 2006/09/28 03:05:53 keiichi Exp $	*/
+/*	$KAME: callout.c,v 1.9 2006/09/29 08:00:50 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -106,7 +106,7 @@ static void insert_callout_queue(struct callout_queue_t *);
  */
 
 void
-callout_init()
+shisad_callout_init(void)
 {
 	TAILQ_INIT(&callout_head);
 }

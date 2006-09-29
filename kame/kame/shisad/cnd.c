@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.17 2006/09/28 03:05:53 keiichi Exp $	*/
+/*	$KAME: cnd.c,v 1.18 2006/09/29 08:00:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -157,7 +157,7 @@ main(argc, argv)
 	icmp6sock_open();
 
 	/* start timer */
-	callout_init();
+	shisad_callout_init();
 
 	/* initialization */
 	fdlist_init();

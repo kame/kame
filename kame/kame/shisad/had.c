@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.38 2006/09/28 03:05:53 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.39 2006/09/29 08:00:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -235,7 +235,7 @@ main(argc, argv)
 	kernel_debug(debug);
 	
 	/* start timer */
-	callout_init();
+	shisad_callout_init();
 
 	/* Various Initialization */
 	fdlist_init();
