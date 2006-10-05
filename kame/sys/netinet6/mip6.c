@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.243 2006/09/21 12:47:44 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.244 2006/10/05 15:31:47 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -118,6 +118,18 @@ int mip6ctl_use_migrate = 0;
 #ifndef IFA_MBUL_LIST
 struct mip6_bul_list mbul_list;
 #endif
+
+#ifdef __APPLE__
+lck_mtx_t 	*bc_mtx;	/*### global binding cache mutex for now */
+lck_attr_t 	*bc_mtx_attr;
+lck_grp_t 	*bc_mtx_grp;
+lck_grp_attr_t 	*bc_mtx_grp_attr;
+
+lck_mtx_t 	*bul_mtx;	/*### global binding uptade list mutex for now */
+lck_attr_t 	*bul_mtx_attr;
+lck_grp_t 	*bul_mtx_grp;
+lck_grp_attr_t 	*bul_mtx_grp_attr;
+#endif /* __APPLE__ */
 
 
 extern struct ip6protosw mip6_tunnel_protosw;
@@ -761,7 +773,7 @@ static void
 mip6_bce_update_ipsecdb(bce)
 	struct mip6_bc_internal *bce;
 {
-#ifndef __APPLE__
+//#ifndef __APPLE__
 #ifdef IPSEC
 /* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
@@ -785,7 +797,7 @@ mip6_bce_update_ipsecdb(bce)
 	key_mip6_update_home_agent_ipsecdb(&hoa_sa, NULL, &coa_sa,
 	    &haaddr_sa);
 #endif /* IPSEC */
-#endif /* __APPLE__ */
+//#endif /* __APPLE__ */
 }
 
 void
@@ -1004,7 +1016,7 @@ static void
 mip6_bul_update_ipsecdb(mbul)
 	struct mip6_bul_internal *mbul;
 {
-#ifndef __APPLE__
+//#ifndef __APPLE__
 #ifdef IPSEC
 /* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
@@ -1028,7 +1040,7 @@ mip6_bul_update_ipsecdb(mbul)
 	key_mip6_update_mobile_node_ipsecdb(&hoa_sa, NULL, &coa_sa,
 	    &haaddr_sa);
 #endif
-#endif
+//#endif
 }
 
 void
@@ -1572,8 +1584,8 @@ mip6_notify_rr_hint(dst, src)
 
 static int
 mip6_rr_hint_ratelimit(dst, src)
-	const struct in6_addr *dst;	/* not used at this moment */
-	const struct in6_addr *src;	/* not used at this moment */
+	const struct in6_addr *dst __attribute__((unused));	/* not used at this moment */
+	const struct in6_addr *src __attribute__((unused));	/* not used at this moment */
 {
 	int ret;
 
@@ -1826,7 +1838,7 @@ mip6_do_dad(addr, ifidx)
 void
 mip6_stop_dad(addr, ifidx)
 	struct in6_addr *addr;
-	int ifidx;
+	int ifidx __attribute__((unused));	/* not used at this moment */
 {
 	struct ifaddr *ifa;
 	
