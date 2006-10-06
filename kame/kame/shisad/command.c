@@ -1,4 +1,4 @@
-/*	$KAME: command.c,v 1.8 2006/09/28 03:05:53 keiichi Exp $	*/
+/*	$KAME: command.c,v 1.9 2006/10/06 08:22:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -49,6 +49,7 @@
 static struct sockaddr_in6 sin6_ci;
 char *prompt = "> ";
 
+#define MAX_SCREENWIDTH 80
 #define MAX_SCREENLINES	24
 
 struct line_buffer {
@@ -68,7 +69,7 @@ LIST_HEAD_INITIALIZER(connect_ctx_head);
 
 
 void command_help(int, char *);
-static void got_interrupt(int, char *);
+static void telnet_cntl(int, char *, int);
 void quit_ui(int, char *);
 int command_in(int);
 int new_connection(int);
@@ -194,18 +195,19 @@ command_in(s)
 
 	bytes = read(s, buffer, 2048);
 
-	/* XXX quick hack for an interrupt, <IAC IP IAC DO TM> */
-	if (memcmp(buffer, "\xff\xf4\xff\xfd\x06", 5) == 0) {
-		got_interrupt(s, buffer);
+	if (bytes > 0 && buffer[0] == '\xff') {
+		telnet_cntl(s, buffer, bytes);
 	} else if (cc && cc->wait_nextpage) {
 		/* dump the buffer */
 		int i = MAX_SCREENLINES;
 		struct line_buffer *lb;
 		
-		while ((lb = TAILQ_FIRST(&cc->lb_head)) && --i > 0) {
+		while ((lb = TAILQ_FIRST(&cc->lb_head)) &&
+		       (i -= (strlen(lb->line) + MAX_SCREENWIDTH) / MAX_SCREENWIDTH) > 0) {
 			write(s, lb->line, strlen(lb->line));
 			TAILQ_REMOVE(&cc->lb_head, lb, lb_entry);
 			free(lb);
+			lb = NULL;
 		}
 		if (lb) {
 			/* There would be more buffers to be displayed */
@@ -271,20 +273,27 @@ void
 command_printf(int s, const char *fmt, ...)
 {
 	va_list ap;
-	char buffer[512];
+	static char buffer[512] = "";
 	struct connection_context *cc;
 
 	va_start(ap, fmt);
-	vsnprintf(buffer, 512, fmt, ap);
+	vsnprintf(buffer + strlen(buffer),
+		  sizeof(buffer) - strlen(buffer), fmt, ap);
 	va_end(ap);
+	if ((strlen(buffer) < sizeof(buffer) - 1) &&
+	    (buffer[strlen(buffer) - 1] != '\n'))
+		return;
 
 	cc = find_connection_context_by_socket(s);
-	if (pager_mode && (cc && cc->remained_lines-- <= 0)) {
+	if (pager_mode &&
+	    (cc &&
+	     (cc->remained_lines -= (strlen(buffer) + MAX_SCREENWIDTH) / MAX_SCREENWIDTH) <= 0)) {
 		struct line_buffer *lb;
 		
 		lb = malloc(sizeof(struct line_buffer) + strlen(buffer) + 1);
 		if (!lb) {
-			syslog(LOG_ERR, "memory allocation for line buffers was failed");
+			syslog(LOG_ERR,
+			       "memory allocation for line buffers was failed");
 			write(s, buffer, strlen(buffer));
 		} else {
 			strcpy(lb->line, buffer);
@@ -292,11 +301,14 @@ command_printf(int s, const char *fmt, ...)
 		}
 	} else {
 		write(s, buffer, strlen(buffer));
-		if (pager_mode && (cc && cc->remained_lines <= 0)) {
-			write(s, msg_more, strlen(msg_more));
-			cc->wait_nextpage = 1;
-		}
 	}
+	
+	if (pager_mode && (cc && cc->remained_lines <= 0 && cc->wait_nextpage == 0)) {
+		write(s, msg_more, strlen(msg_more));
+		cc->wait_nextpage = 1;
+	}
+
+	buffer[0] = '\0';
 }
 
 void
@@ -343,14 +355,32 @@ quit_ui(s, line)
 	close(s);
 }
 
+char *hexdump(void *, size_t);
+extern int debug;
+
 static void
-got_interrupt(s, line)
+telnet_cntl(s, line, bytes)
 	int s;
 	char *line;
+	int bytes;
 {
-	char *buffer="\xff\xfc\x06\xff\xf2\n";
+	/* XXX quick hack for an interrupt, <IAC IP IAC DO TM> */
+	if (memcmp(line, "\xff\xf4\xff\xfd\x06", 5) == 0) {
+		char *buffer="\xff\xfc\x06\xff\xf2\n";
 
-	write(s, buffer, 6);
+		write(s, buffer, 6);
+		return;
+	}
+
+#if 0
+	/* Just for debug use */
+	if (debug) {
+		char *hex;
+	
+		hex = hexdump(line, bytes);
+		write(s, hex, strlen(hex));
+	}
+#endif
 }
 
 void
