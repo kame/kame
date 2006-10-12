@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.16 2006/09/28 03:05:53 keiichi Exp $  */
+/*      $KAME: network.c,v 1.17 2006/10/12 05:32:20 mitsuya Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -836,7 +836,8 @@ nemo_ar_get(coa, ret6)
 	} else {
 		close (s);
 		*ret6 = dstaddrreq.ifr_dstaddr;
-		ret6->sin6_scope_id = ifindex;
+		if (IN6_IS_ADDR_LINKLOCAL(&ret6->sin6_addr))
+			ret6->sin6_scope_id = ifindex;
 		return (ret6);
 	}
 	close (s);
