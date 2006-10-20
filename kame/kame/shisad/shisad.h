@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.40 2006/08/25 07:02:15 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.41 2006/10/20 07:41:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -536,6 +536,7 @@ struct binding_cache *mip6_bc_lookup(struct in6_addr *, struct in6_addr *,
     u_int16_t);
 struct binding_cache *mip6_bc_add(struct in6_addr *, struct in6_addr *, 
     struct in6_addr *, u_int32_t, u_int16_t, u_int16_t, u_int16_t, u_int8_t, u_int8_t, u_int32_t);
+void flush_bc(void);
 
 /* network.c */
 int set_ip6addr(char *, struct in6_addr *, int, int);
@@ -669,6 +670,7 @@ void auth_init(struct config_entry *, struct config_entry *);
 int auth_opt(struct in6_addr *, struct in6_addr *, struct ip6_mh *,
 	     struct mip6_mobility_options *, int *, int *);
 struct haauth_users *find_haauth_users(u_int32_t);
+struct haauth_users *find_haauth_users_with_hoa(struct in6_addr *);
 void command_show_authdata(int, char *);
 #endif /* AUTHID */
 

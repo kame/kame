@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.57 2006/09/11 12:00:10 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.58 2006/10/20 07:41:16 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -227,7 +227,7 @@ mh_input_common(fd)
 	bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 #endif
 
-syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);
+/*syslog(LOG_INFO, "XXXX %s:%d", __FILE__, __LINE__);*/
 
 	memset(&iov, 0, sizeof(iov));
 	memset(buf, 0, sizeof(buf));
@@ -787,7 +787,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #elif defined(MIP_HA)
 #ifdef AUTHID
 		if (authmethod & BC_AUTH_MNHA) {
-			if (mopt.mnha_auth == NULL) {
+			if ((mopt.mnha_auth == NULL) &&
+			    (mopt.mnaaa_auth == NULL)) {
 				/*
 				 * RFC 4285 section 5 says, "When a Binding
 				 * Update or Binding Acknowledgement is
@@ -796,13 +797,23 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 				 * should silently discard the received
 				 * message."
 				 */
-				syslog(LOG_ERR, "No mobility message authentication option is found");
+				syslog(LOG_ERR,
+				       "No mobility message authentication option is found");
 				return (-1);
 			}
 
-			auth_opt(hoa, coa, (struct ip6_mh *)bu, &mopt,
-				 &authmethod, &authmethod_done);
-			mobility_spi = ntohl(mopt.mnha_auth->ip6moauth_mobility_spi);
+			authmethod = 0;
+			statuscode = auth_opt(hoa, coa, (struct ip6_mh *)bu,
+					      &mopt,
+					      &authmethod, &authmethod_done);
+			mobility_spi = 0;
+			if (mopt.mnha_auth)
+				mobility_spi = ntohl(mopt.mnha_auth->ip6moauth_mobility_spi);
+			if (((authmethod ^ authmethod_done) == 0) &&
+			    (statuscode != IP6_MH_BAS_ACCEPTED)) {
+				retcode = -1;
+				goto sendba;
+			}
 		}
 #else /* AUTHID */
 		/* go thorough (assuming IPsec protection in the kernel) */
@@ -1615,6 +1626,9 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 #ifdef DSMIP
 	struct ip6_mh_opt_ipv4_ack v4ack_opt;
 #endif /* DSMIP */
+#ifdef AUTHID
+	struct haauth_users *hausers;
+#endif /* AUTHID */
 
 	if (hoa == NULL)
 		hoa = coa;
@@ -1753,8 +1767,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 #endif /* MIP_CN */
 
 #if defined(MIP_HA) && defined(AUTHID)
-	if (mobility_spi != 0) {
-		struct haauth_users *hausers;
+	if ((hausers = find_haauth_users_with_hoa(hoa)) != NULL) {
 		struct ip6_mh_opt_authentication *auth_opt;
 		mip6_authenticator_t *authenticator;
 
@@ -1768,12 +1781,12 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 			sizeof(struct ip6_mh_opt_authentication)
 			- sizeof(struct ip6_mh_opt) + MIP6_AUTHENTICATOR_SIZE;
 		auth_opt->ip6moauth_subtype = IP6_MH_AUTHOPT_SUBTYPE_MNHA;
-		auth_opt->ip6moauth_mobility_spi = htonl(mobility_spi);
+		auth_opt->ip6moauth_mobility_spi = htonl(hausers->mobility_spi);
 		buflen += sizeof(*auth_opt);
 		buflen += MIP6_AUTHENTICATOR_SIZE;
 
 		/* 
-		 * This is not final length, but
+		 * This is not a final length, but
 		 * mobileip6_authentication_data() needs correct bu
 		 * length for authentication data calculation 
 		 */
@@ -1788,28 +1801,18 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		authenticator = (mip6_authenticator_t *)
 			(bufp + (buflen - MIP6_AUTHENTICATOR_SIZE - pad));
 
-		hausers = find_haauth_users(mobility_spi);
-		if (!hausers)
-			syslog(LOG_ERR, "No authentication data for spi:%d was found.", mobility_spi);
-		else
-#if 0
-			calculate_authenticator(hausers->sharedkey, hausers->keylen,
-						(acoa) ? acoa : coa,
-						hoa, (caddr_t)bufp,
-						buflen, 
-						buflen - pad - MIP6_AUTHENTICATOR_SIZE, 
-						MIP6_AUTHENTICATOR_SIZE,
-						(u_int8_t *)authenticator, MIP6_AUTHENTICATOR_SIZE);
-#else
-			calculate_authenticator(hausers->sharedkey, hausers->keylen,
-						(acoa) ? acoa : coa,
-						hoa, (caddr_t)bufp,
-						buflen, 
-						buflen - pad - MIP6_AUTHENTICATOR_SIZE, 
-						MIP6_AUTHENTICATOR_SIZE,
-						(u_int8_t *)authenticator, MIP6_AUTHENTICATOR_SIZE);
-#endif
+		calculate_authenticator(hausers->sharedkey, hausers->keylen,
+					(acoa) ? acoa : coa,
+					hoa, (caddr_t)bufp,
+					buflen, 
+					buflen - pad - MIP6_AUTHENTICATOR_SIZE, 
+					MIP6_AUTHENTICATOR_SIZE,
+					(u_int8_t *)authenticator,
+					MIP6_AUTHENTICATOR_SIZE);
 		/* MN-AAA isn't needed as described RFC4285 5.2 */
+	} else {
+		syslog(LOG_ERR, "No authentication data for HoA:%s was found.",
+		       ip6_sprintf(hoa));
 	}
 #endif /* MIP_HA && AUTHID */
 

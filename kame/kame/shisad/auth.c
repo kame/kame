@@ -1,4 +1,4 @@
-/*	$KAME: auth.c,v 1.2 2006/08/02 11:00:56 t-momose Exp $	*/
+/*	$KAME: auth.c,v 1.3 2006/10/20 07:41:15 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2006 WIDE Project.  All rights reserved.
@@ -35,9 +35,12 @@
 #include <ctype.h>
 #include <poll.h>
 #include <syslog.h>
+#include <netdb.h>
 
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/queue.h>
+#include <sys/param.h>
 
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
@@ -78,6 +81,7 @@ auth_init(if_params, config_params)
 	if (config_params != NULL) {
 		config_get_string(CFT_AUTHDATABASE, &auth_database, config_params);
 	}
+	syslog(LOG_INFO, "auth_database: %s", auth_database);
 	
 	ha_auth_init();
 	aaa_auth_init();
@@ -110,17 +114,20 @@ auth_opt(hoa, coa, mh, mopt, authmethod, authmethod_done)
 			   the parameters to authenticate.
 			*/
 			*authmethod |= BC_AUTH_MNHA;
+			*authmethod_done |= BC_AUTH_MNHA;
 			if (ha_auth(hoa, coa, mopt_auth, mh, &authenticator) ==  0 &&
 			    memcmp((caddr_t)&authenticator, (caddr_t)(mopt_auth + 1), MIP6_AUTHENTICATOR_SIZE) == 0) {
 				statuscode = IP6_MH_BAS_ACCEPTED;
 			} else {
 				statuscode = IP6_MH_BAS_AUTH_FAIL;
-				syslog(LOG_ERR, "authenticator received from BU: %s",
+				syslog(LOG_ERR,
+				       "authenticator received from BU(Hoa:[%s], SPI=%d): %s",
+				       ip6_sprintf(hoa),
+				       ntohl(mopt_auth->ip6moauth_mobility_spi),
 				       hexdump(mopt_auth + 1, MIP6_AUTHENTICATOR_SIZE));
 				syslog(LOG_ERR, "Calculated authenticator: %s",
 				       hexdump(&authenticator, MIP6_AUTHENTICATOR_SIZE));
 			}
-			*authmethod_done |= BC_AUTH_MNHA;
 			break;
 			
 		case IP6_MH_AUTHOPT_SUBTYPE_MNAAA:
@@ -189,6 +196,20 @@ find_haauth_users(spi)
 	return (NULL);
 }
 
+struct haauth_users *
+find_haauth_users_with_hoa(hoa)
+	struct in6_addr *hoa;
+{
+	struct haauth_users *hausers;
+
+	LIST_FOREACH(hausers, &haauth_users_head, hauthusers_entry) {
+		if (IN6_ARE_ADDR_EQUAL(&hausers->hoa, hoa))
+			return (hausers);
+	}
+
+	return (NULL);
+}
+
 static int
 get_secret(sharedkeyp, secretkey_size, secretkey, keylen)
 	char *sharedkeyp;
@@ -196,6 +217,9 @@ get_secret(sharedkeyp, secretkey_size, secretkey, keylen)
 	u_int8_t *secretkey;
 	int *keylen;
 {
+	if (sharedkeyp == NULL)
+		return (-1);
+
 	if (*sharedkeyp == '\'' || *sharedkeyp == '\"') {
 		int i = 0;
 		
@@ -245,21 +269,25 @@ get_secret(sharedkeyp, secretkey_size, secretkey, keylen)
   The format of authentication Database is described as followed:
 ---  
 # the line started '#' shows comment.
-# one data is described in one line. spi followed by shared key separated by space
-10000		'shared-key in 16'  # The string 'bytes' to be trailed is trimmed 
-10001           0x0102030405060708090a0b0c0d0e0f10
+# one data is described in one line. The line contains 'HoA', 'SPI' and 16octets secret separated with space(including TAB).
+2001:DB8:0:80be::1000 10000	'shared-key in 16'  # The string 'bytes' to be trailed is trimmed 
+2001:DB8:0:80be::1001 10001           0x0102030405060708090a0b0c0d0e0f10
 ---  
  */
 static void
 ha_auth_init()
 {
-	char *p, *spip, *last;
+	int error;
+	char *p, *spip, *last, *addr;
 	char read_buffer[1024];
 	FILE *keytable;
 	struct haauth_users *hausers;
+	struct addrinfo hints, *res0;
 
 	if ((keytable = fopen(auth_database, "r")) == NULL) {
-		syslog(LOG_ERR, "Opening authentication database was failed (%s)", auth_database);
+		syslog(LOG_ERR,
+		       "Authdata: Opening authentication database was failed (%s)",
+		       auth_database);
 		return;
 	}
 	
@@ -269,7 +297,8 @@ ha_auth_init()
 		read_buffer[sizeof(read_buffer) - 1] = '\0';
 		if ((p = strchr(read_buffer, '\n')) == NULL &&
 		    strlen(read_buffer) >= sizeof(read_buffer) - 1) {
-			syslog(LOG_ERR, "The line was too long. [%1024s]", read_buffer);
+			syslog(LOG_ERR, "Authdata: The line was too long. [%1024s]",
+			       read_buffer);
 			continue; /* the line was too long */
 		}
 		*p = '\0';
@@ -279,24 +308,47 @@ ha_auth_init()
 			p++;
 		if (*p == '#')
 			continue;	/* comment line */
-
-		if ((spip = strtok_r(p, " \t", &last)) == NULL)
-			continue;
-
+		
 		hausers = malloc(sizeof(*hausers));
 		memset(hausers, '\0', sizeof(*hausers));
+		
+		if ((spip = addr = strtok_r(p, " \t", &last)) == NULL) {
+			free(hausers);
+			continue;
+		}
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_flags = AI_NUMERICHOST;
+		if ((error = getaddrinfo(addr, NULL, &hints, &res0)) != 0) {
+			syslog(LOG_ERR, "Authdata: Failed to get HoA[%s] because %s",
+			       addr, gai_strerror(error));
+		} else if (res0->ai_family != AF_INET6) {
+			syslog(LOG_ERR, "Authdata: Not IPv6 address [%s]", addr);
+		} else {
+			hausers->hoa = ((struct sockaddr_in6 *)res0->ai_addr)->sin6_addr;
+			freeaddrinfo(res0);
+		
+			if ((spip = strtok_r(NULL, " \t", &last)) == NULL) {
+				free(hausers);
+				continue;
+			}
+		}
+
 		if (spip[0] == '0' && spip[1] == 'x') {
 			spip += 2; /* for '0x' */
 			base = 16;
 		}
 		hausers->mobility_spi = strtol(spip, NULL, base);
-		if (get_secret(strtok_r(NULL, " \t", &last), SECRETKEY_SIZE, hausers->sharedkey, &hausers->keylen) < 0) {
+		if (get_secret(strtok_r(NULL, " \t", &last), SECRETKEY_SIZE,
+			       hausers->sharedkey, &hausers->keylen) < 0) {
 			free(hausers);
 			continue;
 		}
 		
 		if (debug)
-			syslog(LOG_INFO, "spi: %d  [%s]\n",
+			syslog(LOG_INFO, "%s  spi: %d  [%s]\n",
+			       ip6_sprintf(&hausers->hoa),
 			       hausers->mobility_spi,
 			       hexdump(hausers->sharedkey, hausers->keylen));
 		LIST_INSERT_HEAD(&haauth_users_head, hausers, hauthusers_entry);
@@ -314,7 +366,8 @@ command_show_authdata(s, dummy)
 
 	command_printf(s, "Authentication database\n");
 	LIST_FOREACH(hausers, &haauth_users_head, hauthusers_entry) {
-		command_printf(s, "%d [%s]\n",
+		command_printf(s, "%s %d [%s]\n",
+			       ip6_sprintf(&hausers->hoa),
 			       hausers->mobility_spi,
 			       hexdump(hausers->sharedkey, hausers->keylen));
 	}
@@ -357,7 +410,8 @@ aaa_auth_start(hoa, coa, mopt_mnid, mh)
 }
 
 void
-aaa_auth_stop()
+aaa_auth_stop(hoa)
+	struct in6_addr *hoa;
 {
 }
 
@@ -378,7 +432,7 @@ aaa_auth_reply_from_aaa(fd)
 #if 0
 	/* Judge the result from the AAA */
 	aaa_auth_done(success);
-#endif	
+#endif
 	return (0);
 }
 

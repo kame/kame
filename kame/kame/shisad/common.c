@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.30 2006/09/07 17:59:57 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.31 2006/10/20 07:41:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -845,9 +845,9 @@ static const char *binding_ack_status_desc[] = {
 	"#141",
 	"#142",
 	"#143",
-	"#144",
-	"#145",
-	"#146",
+	"ID of RFC4285 mismatched",
+	"MIPV6-MESG-ID_REQD",
+	"Authentication of RFC4285 was failed",
 	"#147",
 	"#148",
 	"#149",
