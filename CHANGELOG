@@ -1,5 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2835 2006/09/08 05:43:59 suz Exp $
+$KAME: CHANGELOG,v 1.2836 2006/10/25 07:14:33 jinmei Exp $
+
+<200610>
+2006-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/route6d/route6d.c (riprecv): implemented more
+	validation checks about incoming responses per RFC2080, and one
+	additional heuristic check for safer operation.
+
+2006-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rip6query/rip6query.c (main): added some new options
+	various options to customize the packet.
 
 <200609>
 2006-09-08  SUZUKI, Shinsuke <suz@alaxala.net>
