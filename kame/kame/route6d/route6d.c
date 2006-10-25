@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.110 2006/10/25 06:33:11 jinmei Exp $	*/
+/*	$KAME: route6d.c,v 1.111 2006/10/25 06:38:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.110 2006/10/25 06:33:11 jinmei Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.111 2006/10/25 06:38:13 jinmei Exp $";
 #endif
 
 #include <stdio.h>
@@ -1223,12 +1223,12 @@ riprecv()
 	 * requests, an incoming response must always come from an on-link
 	 * node.  Although this is normally ensured by the source address
 	 * check above, it may not 100% be safe because there are router
-	 * implementations that (invalidly) allows a packet with a link-local
+	 * implementations that (invalidly) allow a packet with a link-local
 	 * source address to be forwarded to a different link.
-	 * So we also check: whether the destination address is also a
-	 * link-local address or the hop limit is 255.  Note that RFC2080
-	 * does not require the specific hop limit for a unicast response,
-	 * so we cannot assume the limitation.
+	 * So we also check whether the destination address is a link-local
+	 * address or the hop limit is 255.  Note that RFC2080 does not require
+	 * the specific hop limit for a unicast response, so we cannot assume
+	 * the limitation.
 	 */
 	if (!IN6_IS_ADDR_LINKLOCAL(&pi->ipi6_addr) && *hlimp != 255) {
 		trace(1,
