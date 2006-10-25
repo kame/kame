@@ -1,4 +1,4 @@
-.\"	$KAME: rip6query.8,v 1.7 2001/11/16 07:08:30 itojun Exp $
+.\"	$KAME: rip6query.8,v 1.8 2006/10/25 05:45:59 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -37,6 +37,10 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl I Ar interface
+.Op Fl P Ar source port
+.Op Fl h Ar hop limit
+.Op Fl p Ar prefix
+.Op Fl s Ar source address
 .Op Fl w Ar time
 .Ar destination
 .\"
@@ -45,16 +49,46 @@
 requests remote RIPng daemon on
 .Ar destination
 to dump RIPng routing information.
+It can also send a RIPng response message when
+.Fl r
+option is specified.
 .Fl I
 lets you specify outgoing
 .Ar interface
-for the query packet,
-and is useful when link-local address is specified for
-.Ar destination .
+for the query packet.
+This was useful for a link-local address specified as
+.Ar destination
+to disambiguate the outgoing link, but now it is mostly obsoleted
+because the link can be specified using the textual representation
+for scoped addresses as defined in RFC4007.
+When the
+.Fl P
+or
+.fl s
+option is specified, the source port or the source address for the
+outgoing message packet is set to the specified value, respectively.
+Similarly, the
+.Fl h
+option specifies the hop limit value of the IPv6 header for the
+outgoing packet.
+The
+.Fl p
+option specified a particular prefix for the request or response
+message.  For a request message, it means a request for the route to
+the destination specified by the prefix;
+by default,
+.Nm
+requests the entire routing table of the remote router.
+For a response message, this option must be given and specifies the
+destination of the RTE.
 .Fl w
 specifies the time in seconds to wait for the initial
 response from a gateway.
 The default value is 5 seconds.
+When the response message is generated,
+this option is ignored and
+.Nm
+does not wait at all and 
 .\"
 .Sh SEE ALSO
 .Xr route6d 8

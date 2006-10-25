@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.19 2004/06/14 05:35:59 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.20 2006/10/25 05:45:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,11 +80,17 @@ main(argc, argv)
 	socklen_t flen;
 	int c;
 	int ifidx = -1;
+	int hlim = -1;
+	u_char rip6_cmd = RIP6_REQUEST;
+
 	int error;
 	char pbuf[NI_MAXSERV];
+	char *prefixstr = NULL;
+	char *srcaddr = NULL;
+	char *srcport = NULL;
 	struct addrinfo hints, *res;
 
-	while ((c = getopt(argc, argv, "I:w:")) != -1) {
+	while ((c = getopt(argc, argv, "I:w:p:P:h:rs:")) != -1) {
 		switch (c) {
 		case 'I':
 			ifidx = if_nametoindex(optarg);
@@ -92,6 +98,23 @@ main(argc, argv)
 				errx(1, "invalid interface %s", optarg);
 				/*NOTREACHED*/
 			}
+			break;
+		case 'P':
+			srcport = optarg;
+			break;
+		case 'h':
+			hlim = atoi(optarg);
+			if (hlim <= 0 || hlim > 255)
+				errx(1, "invalid hop limit: %s", optarg);
+			break;
+		case 'p':
+			prefixstr = optarg;
+			break;
+		case 'r':
+			rip6_cmd = RIP6_RESPONSE;
+			break;
+		case 's':
+			srcaddr = optarg;
 			break;
 		case 'w':
 			query_wait = atoi(optarg);
@@ -110,9 +133,41 @@ main(argc, argv)
 		exit(1);
 	}
 
+	if (rip6_cmd == RIP6_RESPONSE && prefixstr == NULL)
+		errx(1, "-p must be specified for a response");
+
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		err(1, "socket");
 		/*NOTREACHED*/
+	}
+
+	if (hlim > 0) {
+		 if (setsockopt(s, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
+		     &hlim, sizeof(hlim)) == -1) {
+			 err(1, "setsockopt(IPV6_UNICAST_HOPS)");
+		 }
+		 if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+		     &hlim, sizeof(hlim)) == -1) {
+			 err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
+		 }
+	}
+
+	if (srcaddr != NULL || srcport != NULL) {
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET6;
+		hints.ai_flags = AI_PASSIVE;
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = IPPROTO_UDP;
+		error = getaddrinfo(srcaddr, srcport, &hints, &res);
+		if (error) {
+			errx(1, "getaddrinfo failed for [%s]:%s: %s",
+			    srcaddr ? srcaddr : "(unspec)",
+			    srcport ? srcport : "(unspec)",
+			    gai_strerror(error));
+		}
+		if (bind(s, res->ai_addr, res->ai_addrlen) < 0)
+			err(1, "bind");
+		freeaddrinfo(res);
 	}
 
 	/* getaddrinfo is preferred for addr%scope syntax */
@@ -120,6 +175,7 @@ main(argc, argv)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
 	error = getaddrinfo(argv[0], pbuf, &hints, &res);
 	if (error) {
 		errx(1, "%s: %s", argv[0], gai_strerror(error));
@@ -141,20 +197,42 @@ main(argc, argv)
 		err(1, "malloc");
 		/*NOTREACHED*/
 	}
-	ripbuf->rip6_cmd = RIP6_REQUEST;
+	/*ripbuf->rip6_cmd = RIP6_REQUEST;*/
+	ripbuf->rip6_cmd = rip6_cmd;
 	ripbuf->rip6_vers = RIP6_VERSION;
 	ripbuf->rip6_res1[0] = 0;
 	ripbuf->rip6_res1[1] = 0;
 	np = ripbuf->rip6_nets;
-	bzero(&np->rip6_dest, sizeof(struct in6_addr));
 	np->rip6_tag = 0;
-	np->rip6_plen = 0;
-	np->rip6_metric = HOPCNT_INFINITY6;
+
+	if (prefixstr != NULL) {
+		char *cp;
+		int plen;
+
+		cp = strchr(prefixstr, '/');
+		if (cp == NULL)
+			errx(1, "invalid prefix format: prefixstr: %s",
+			    prefixstr);
+		*cp = '\0';
+		if (inet_pton(AF_INET6, prefixstr, &np->rip6_dest) != 1)
+			errx(1, "inet_pton failed for %s", prefixstr);
+		plen = atoi(cp + 1);
+		if (plen < 0 || plen > 128)
+			errx(1, "invalid prefix length: %s\n", cp + 1);
+		np->rip6_plen = (u_char)plen;
+		np->rip6_metric = 1; /* dummy metric */
+	} else {
+		bzero(&np->rip6_dest, sizeof(struct in6_addr));
+		np->rip6_plen = 0;
+		np->rip6_metric = HOPCNT_INFINITY6;
+	}
 	if (sendto(s, ripbuf, RIPSIZE(1), 0, (struct sockaddr *)&sin6,
 	    sizeof(struct sockaddr_in6)) < 0) {
 		err(1, "send");
 		/*NOTREACHED*/
 	}
+	if (rip6_cmd == RIP6_RESPONSE)
+		exit(0);
 	signal(SIGALRM, sigalrm_handler);
 	for (;;) {
 		flen = sizeof(fsock);
@@ -185,7 +263,10 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "Usage: rip6query [-I iface] [-w wait] address\n");
+	fprintf(stderr,
+	    "Usage: rip6query [-r] [-I iface] [-w wait] [-p prefix]\n"
+	    "                 [-h hop_limit] [-s source_address] "
+	    "[-P source_port] address\n");
 }
 
 /* getnameinfo() is preferred as we may be able to show ifindex as ifname */
