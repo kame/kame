@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.39 2006/06/09 11:29:58 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.40 2006/11/11 14:32:36 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -124,10 +124,6 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 	switch(mh->ip6mh_type) {
 	case IP6_MH_TYPE_BRR:
-		/* Shisa Statistics: BRR messages */
-		/* XXX: br or brr?? */
-		mip6stat.mip6s_br++;
-
 		hinfo = hoainfo_find_withhoa(dst);
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
@@ -160,9 +156,6 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_HOT:
-		/* Shisa Statistics: HoT messages */
-		mip6stat.mip6s_hot++;
-
 		if (hoa || rtaddr)
 			break;
 		hinfo = hoainfo_find_withhoa(dst);  
@@ -195,9 +188,6 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_COT:
-		/* Shisa Statistics: CoT messages */
-		mip6stat.mip6s_cot++;
-
 		if (hoa || rtaddr)
 			break;
 		ip6mhct = (struct ip6_mh_careof_test *)mh;
@@ -220,9 +210,6 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_BACK:
-		/* Shisa Statistics: BA messages */
-		mip6stat.mip6s_ba++;
-
 		hinfo = hoainfo_find_withhoa(dst);  
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
@@ -260,9 +247,6 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_BERROR:
-		/* Shisa Statistics: BE Messages */
-		mip6stat.mip6s_be++;
-
 		ip6mhbe = (struct ip6_mh_binding_error *)mh;
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&ip6mhbe->ip6mhbe_homeaddr))
