@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.407 2006/11/14 07:36:59 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.408 2006/11/14 07:50:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,8 +161,8 @@ MALLOC_DEFINE(M_IP6OPT, "ip6_options", "IPv6 options");
  */
 const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
 const struct in6_addr in6addr_loopback = IN6ADDR_LOOPBACK_INIT;
-const struct in6_addr in6addr_nodelocal_allnodes =
-	IN6ADDR_NODELOCAL_ALLNODES_INIT;
+const struct in6_addr in6addr_intfacelocal_allnodes =
+	IN6ADDR_INTFACELOCAL_ALLNODES_INIT;
 const struct in6_addr in6addr_linklocal_allnodes =
 	IN6ADDR_LINKLOCAL_ALLNODES_INIT;
 const struct in6_addr in6addr_linklocal_allrouters =
@@ -1389,7 +1389,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		 * join interface-local all-nodes address.
 		 * (ff01::1%ifN, and ff01::%ifN/32)
 		 */
-		mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
+		mltaddr.sin6_addr = in6addr_intfacelocal_allnodes;
 		if (in6_setscope(&mltaddr.sin6_addr, ifp, NULL))
 			goto cleanup; /* XXX: should not fail */
 
