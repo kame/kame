@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.163 2006/01/15 12:26:57 suz Exp $	*/
+/*	$KAME: in6.h,v 1.164 2006/11/14 07:59:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -229,7 +229,7 @@ extern const struct in6_addr in6mask128;
 
 extern const struct in6_addr in6addr_any;
 extern const struct in6_addr in6addr_loopback;
-extern const struct in6_addr in6addr_nodelocal_allnodes;
+extern const struct in6_addr in6addr_intfacelocal_allnodes;
 extern const struct in6_addr in6addr_linklocal_allnodes;
 extern const struct in6_addr in6addr_linklocal_allrouters;
 #ifdef MLDV2
