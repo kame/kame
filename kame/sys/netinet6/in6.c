@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.405 2006/04/13 01:56:57 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.406 2006/11/14 04:44:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,7 +161,7 @@ MALLOC_DEFINE(M_IP6OPT, "ip6_options", "IPv6 options");
 #endif
 
 /*
- * Definitions of some costant IP6 addresses.
+ * Definitions of some constant IP6 addresses.
  */
 const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
 const struct in6_addr in6addr_loopback = IN6ADDR_LOOPBACK_INIT;
