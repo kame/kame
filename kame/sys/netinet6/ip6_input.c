@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.368 2006/08/09 18:01:36 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.369 2006/11/14 07:37:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -623,7 +623,6 @@ passin:
 	}
 #endif
 
-#ifndef SCOPEDROUTING
 	/*
 	 * Drop packets if the link ID portion is already filled.
 	 * XXX: this is technically not a good behavior.  But, we internally
@@ -645,7 +644,6 @@ passin:
 			goto bad;
 		}
 	}
-#endif
 
 	/*
 	 * Disambiguate address scope zones (if there is ambiguity).

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.115 2005/04/14 06:22:40 suz Exp $	*/
+/*	$KAME: in6_gif.c,v 1.116 2006/11/14 07:36:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -664,12 +664,8 @@ in6_gif_ctlinput(cmd, sa, d)
 
 		dst6 = (struct sockaddr_in6 *)&sc->gif_ro6.ro_dst;
 		if (
-#ifdef SCOPEDROUTING
-			SA6_ARE_ADDR_EQUAL((struct sockaddr_in6 *)sa, dst6)
-#else
 			IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)sa)->sin6_addr,
 					   &dst6->sin6_addr)
-#endif
 			) {
 			/* flush route cache */
 			RTFREE(sc->gif_ro6.ro_rt);

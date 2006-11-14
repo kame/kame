@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.486 2006/06/08 04:26:38 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.487 2006/11/14 07:37:00 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4873,14 +4873,13 @@ ip6_mloopback(ifp, m, dst)
 #endif
 
 	ip6 = mtod(copym, struct ip6_hdr *);
-#ifndef SCOPEDROUTING
+
 	/*
 	 * clear embedded scope identifiers if necessary.
 	 * in6_clearscope will touch the addresses only when necessary.
 	 */
 	in6_clearscope(&ip6->ip6_src);
 	in6_clearscope(&ip6->ip6_dst);
-#endif
 
 #ifdef __FreeBSD__
 	(void)if_simloop(ifp, copym, dst->sin6_family, 0);

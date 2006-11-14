@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.159 2005/10/19 01:40:32 t-momose Exp $	*/
+/*	$KAME: in6_src.c,v 1.160 2006/11/14 07:37:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -731,9 +731,7 @@ selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone, norouteok)
 			bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
 			sa6 = (struct sockaddr_in6 *)&ro->ro_dst;
 			*sa6 = *dstsock;
-#ifndef SCOPEDROUTING		/* XXX */
 			sa6->sin6_scope_id = 0;
-#endif
 			if (clone) {
 #ifdef RADIX_MPATH
 				rtalloc_mpath((struct route *)ro,

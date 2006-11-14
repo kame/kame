@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.406 2006/11/14 04:44:03 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.407 2006/11/14 07:36:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,12 +103,10 @@
 #else
 #include <netinet/if_ether.h>
 #endif
-#ifndef SCOPEDROUTING
 #if defined(__OpenBSD__) || defined(__FreeBSD__)
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
-#endif
 #endif
 
 #ifdef __OpenBSD__
@@ -122,10 +120,8 @@
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/scope6_var.h>
-#ifndef SCOPEDROUTING
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <netinet6/in6_pcb.h>
-#endif
 #endif
 
 #ifdef MLDV2
@@ -1302,7 +1298,6 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0);
 #endif
 		if (rt) {
-			/* XXX: only works in !SCOPEDROUTING case. */
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 			    MLTMASK_LEN)) {

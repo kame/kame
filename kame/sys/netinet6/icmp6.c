@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.417 2006/03/11 16:32:21 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.418 2006/11/14 07:36:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1335,9 +1335,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #else
 	struct rtentry *rt = NULL;
 #endif
-#ifndef SCOPEDROUTING
 	struct sockaddr_in6 dst_tmp;
-#endif
 
 #if 0
 	/*
@@ -1384,11 +1382,9 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 		return;
 #endif
 
-#ifndef SCOPEDROUTING		/* XXX */
 	dst_tmp = *dst;
 	dst_tmp.sin6_scope_id = 0;
 	dst = &dst_tmp;
-#endif
 
 	/* sin6.sin6_scope_id = XXX: should be set if DST is a scoped addr */
 #ifdef __FreeBSD__

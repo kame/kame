@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.162 2006/09/21 12:47:44 t-momose Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.163 2006/11/14 07:37:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -737,14 +737,13 @@ ip6_forward(m, srcrt)
 	}
 	else
 		origifp = rt->rt_ifp;
-#ifndef SCOPEDROUTING
+
 	/*
 	 * clear embedded scope identifiers if necessary.
 	 * in6_clearscope will touch the addresses only when necessary.
 	 */
 	in6_clearscope(&ip6->ip6_src);
 	in6_clearscope(&ip6->ip6_dst);
-#endif
 
 #if defined(__NetBSD__) && defined(PFIL_HOOKS)
 	/*
