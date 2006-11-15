@@ -1,4 +1,4 @@
-/*	$KAME: ifmcstat.c,v 1.47 2005/07/16 08:47:48 jinmei Exp $	*/
+/*	$KAME: ifmcstat.c,v 1.48 2006/11/15 05:13:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -424,13 +424,14 @@ in6_multientry(mc)
 	struct in6_multi multi;
 #ifdef HAVE_MLDV2
 	struct in6_multi_source src;
-#endif
 	struct router6_info rt6i;
+#endif
 
 	KREAD(mc, &multi, struct in6_multi);
 	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_addr));
 	printf(" refcnt %u\n", multi.in6m_refcount);
 
+#ifdef HAVE_MLDV2
 	if (multi.in6m_rti != NULL) {
 		KREAD(multi.in6m_rti, &rt6i, struct router_info);
 		printf("\t\t\t");
@@ -438,17 +439,14 @@ in6_multientry(mc)
 		case MLD_V1_ROUTER:
 			printf("mldv1");
 			break;
-#ifdef HAVE_MLDV2
 		case MLD_V2_ROUTER:
 			printf("mldv2");
 			break;
-#endif
 		default:
 			printf("mldv?(%d)", rt6i.rt6i_type);
 			break;
 		}
 
-#ifdef HAVE_MLDV2
 		if (multi.in6m_source == NULL) {
 			printf("\n");
 			return(multi.in6m_entry.le_next);
@@ -468,10 +466,8 @@ in6_multientry(mc)
 		in6_addr_slistentry(src.i6ms_blk, "blocked");
 		in6_addr_slistentry(src.i6ms_toin, "to-include");
 		in6_addr_slistentry(src.i6ms_ex, "to-exclude");
-#else
-		printf("\n");
-#endif
 	}
+#endif
 	return(multi.in6m_entry.le_next);
 }
 
