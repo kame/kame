@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.174 2006/02/28 06:54:59 keiichi Exp $	*/
+/*	$KAME: ping6.c,v 1.175 2006/11/16 22:48:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,10 +569,10 @@ main(argc, argv)
 	}
 
 	if (argc > 1) {
-#ifdef IPV6_RECVRTHDR	/* RFC3542 */
+#ifdef IPV6_RECVRTHDR
 		rthlen = CMSG_SPACE(inet6_rth_space(IPV6_RTHDR_TYPE_0,
 		    argc - 1));
-#else  /* RFC2292 */
+#else
 		rthlen = inet6_rthdr_space(IPV6_RTHDR_TYPE_0, argc - 1);
 #endif
 		if (rthlen == 0) {

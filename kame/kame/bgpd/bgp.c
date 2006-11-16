@@ -173,11 +173,11 @@ connect_try(struct rpcb *bnp)
 
   if (bnp->rp_mode & BGPO_IFSTATIC) {
     static struct in6_pktinfo *pktinfo = NULL;
-#ifndef USE_RFC2292BIS
+#ifndef IPV6_RECVPKTINFO
     static struct cmsghdr     *cmsgp = NULL;
 #endif
 
-#ifdef USE_RFC2292BIS
+#ifdef IPV6_RECVPKTINFO
     if (pktinfo == NULL &&
 	(pktinfo = (struct in6_pktinfo *)malloc(sizeof(*pktinfo))) == NULL)
       fatalx("<connect_try>: malloc");
@@ -188,7 +188,7 @@ connect_try(struct rpcb *bnp)
     if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO,
 		   (void *)pktinfo, sizeof(*pktinfo)) < 0)
       fatal("<connect_try>: setsockopt(IPV6_PKTINFO)");
-#else  /* old advanced API */
+#else
     if (cmsgp == NULL &&
 	(cmsgp =
 	 (struct cmsghdr *)malloc(CMSG_SPACE(sizeof(struct in6_pktinfo))))

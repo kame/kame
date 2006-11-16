@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.19 2004/07/04 11:04:07 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.20 2006/11/16 22:48:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -218,7 +218,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	static struct iovec iov[2];
 	static u_char *cmsgbuf;
 	int cmsglen, hbhlen = 0;
-#ifdef USE_RFC2292BIS
+#ifdef IPV6_RECVPKTINFO
 	void *hbhbuf = NULL, *optp = NULL;
 	int currentlen;
 #else
@@ -273,7 +273,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	src.s6_addr[2] = src.s6_addr[3] = 0;
 #endif
 
-#ifdef USE_RFC2292BIS
+#ifdef IPV6_RECVPKTINFO
 	if ((hbhlen = inet6_opt_init(NULL, 0)) == -1)
 		errx(1, "inet6_opt_init(0) failed");
 	if ((hbhlen = inet6_opt_append(NULL, 0, hbhlen, IP6OPT_ROUTER_ALERT, 2,
@@ -302,7 +302,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	memcpy(&pi->ipi6_addr, &src, sizeof(pi->ipi6_addr));
 	/* specifiy to insert router alert option in a hop-by-hop opt hdr. */
 	cmsgp = CMSG_NXTHDR(&m, cmsgp);
-#ifdef USE_RFC2292BIS
+#ifdef IPV6_RECVPKTINFO
 	cmsgp->cmsg_len = CMSG_LEN(hbhlen);
 	cmsgp->cmsg_level = IPPROTO_IPV6;
 	cmsgp->cmsg_type = IPV6_HOPOPTS;
@@ -317,7 +317,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	(void)inet6_opt_set_val(optp, 0, &rtalert_code, sizeof(rtalert_code));
 	if ((currentlen = inet6_opt_finish(hbhbuf, hbhlen, currentlen)) == -1)
 		errx(1, "inet6_opt_finish(buf) failed");
-#else  /* old advanced API */
+#else
 	if (inet6_option_init((void *)cmsgp, &cmsgp, IPV6_HOPOPTS))
 		errx(1, "inet6_option_init failed\n");
 	raopt[0] = IP6OPT_ROUTER_ALERT;
