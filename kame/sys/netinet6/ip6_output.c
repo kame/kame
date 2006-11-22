@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.487 2006/11/14 07:37:00 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.488 2006/11/22 07:07:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1904,7 +1904,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 		    (struct sockaddr_in6 *)&ro_pmtu->ro_dst;
 		if (ro_pmtu->ro_rt &&
 		    ((ro_pmtu->ro_rt->rt_flags & RTF_UP) == 0 ||
-		      !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr, dst))) {
+		     !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr, dst))) {
 			RTFREE(ro_pmtu->ro_rt);
 			ro_pmtu->ro_rt = (struct rtentry *)NULL;
 		}
