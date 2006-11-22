@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.488 2006/11/22 07:07:17 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.489 2006/11/22 07:11:16 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -453,7 +453,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 
 		if (mbul->mbul_state & MIP6_BUL_STATE_NEEDTUNNEL)
 			goto skip_hoa;
- 
+
 		if (ip6->ip6_nxt == IPPROTO_MH) {
 #if 0
 			m_copydata(m, sizeof(struct ip6_hdr),
@@ -1401,18 +1401,18 @@ passout:
 	 *
 	 * the logic here is rather complex:
 	 * 1: normal case (dontfrag == 0, alwaysfrag == 0)
-	 * 1-a:	send as is if tlen <= path mtu
-	 * 1-b:	fragment if tlen > path mtu
+	 * 1-a: send as is if tlen <= path mtu
+	 * 1-b: fragment if tlen > path mtu
 	 *
 	 * 2: if user asks us not to fragment (dontfrag == 1)
-	 * 2-a:	send as is if tlen <= interface mtu
-	 * 2-b:	error if tlen > interface mtu
+	 * 2-a: send as is if tlen <= interface mtu
+	 * 2-b: error if tlen > interface mtu
 	 *
 	 * 3: if we always need to attach fragment header (alwaysfrag == 1)
-	 *	always fragment
+	 *      always fragment
 	 *
 	 * 4: if dontfrag == 1 && alwaysfrag == 1
-	 *	error, as we cannot handle this conflicting request
+	 *      error, as we cannot handle this conflicting request
 	 */
 	tlen = m->m_pkthdr.len;
 
