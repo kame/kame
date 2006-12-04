@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.490 2006/12/04 06:36:37 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.491 2006/12/04 06:39:16 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1121,14 +1121,13 @@ skip_ipsec2:;
 		/* XXX: the FORWARDING flag can be set for mrouting. */
 		in6_ifstat_inc(ifp, ifs6_out_request);
 	}
-	if (rt != NULL) {
-		ia = (struct in6_ifaddr *)(rt->rt_ifa);
+
+	ia = (struct in6_ifaddr *)(rt->rt_ifa);
 #ifdef RTUSE
-		RTUSE(rt);
+	RTUSE(rt);
 #else
-		rt->rt_use++;
+	rt->rt_use++;
 #endif
-	}
 
 	/*
 	 * The outgoing interface must be in the zone of source and
