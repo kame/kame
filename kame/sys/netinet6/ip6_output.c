@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.492 2006/12/04 06:46:27 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.493 2006/12/04 07:28:57 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1122,11 +1122,13 @@ skip_ipsec2:;
 		in6_ifstat_inc(ifp, ifs6_out_request);
 	}
 
-	ia = (struct in6_ifaddr *)(rt->rt_ifa);
+	if (rt) {
+		ia = (struct in6_ifaddr *)(rt->rt_ifa);
 #ifdef RTUSE
-	RTUSE(rt);
+		RTUSE(rt);
 #else
-	rt->rt_use++;
+		rt->rt_use++;
+	}
 #endif
 
 	/*
