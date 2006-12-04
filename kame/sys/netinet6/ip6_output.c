@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.489 2006/11/22 07:11:16 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.490 2006/12/04 06:36:37 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -995,23 +995,10 @@ skip_ipsec2:;
 	if (sproto != 0) {
 	        s = splnet();
 
-		/* fill in IPv6 header which would be filled later */
-		if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
-			if (opt && opt->ip6po_hlim != -1)
-				ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
-		} else {
-			if (im6o != NULL)
-				ip6->ip6_hlim = im6o->im6o_multicast_hlim;
-			else
-				ip6->ip6_hlim = ip6_defmcasthlim;
-			if (opt && opt->ip6po_hlim != -1)
-				ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
-
-			/*
-			 * XXX what should we do if ip6_hlim == 0 and the
-			 * packet gets tunneled?
-			 */
-		}
+		/*
+		 * XXX what should we do if ip6_hlim == 0 and the
+		 * packet gets tunneled?
+		 */
 
 		tdb = gettdb(sspi, &sdst, sproto);
 		if (tdb == NULL) {
