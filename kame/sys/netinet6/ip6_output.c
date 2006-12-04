@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.491 2006/12/04 06:39:16 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.492 2006/12/04 06:46:27 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1204,7 +1204,7 @@ skip_ipsec2:;
 		}
 		IN6_LOOKUP_MULTI(ip6->ip6_dst, ifp, in6m);
 		if (in6m != NULL &&
-		   (im6o == NULL || im6o->im6o_multicast_loop)) {
+		    (im6o == NULL || im6o->im6o_multicast_loop)) {
 			/*
 			 * If we belong to the destination multicast group
 			 * on the outgoing interface, and the caller did not
