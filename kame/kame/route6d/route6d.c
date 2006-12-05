@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.111 2006/10/25 06:38:13 jinmei Exp $	*/
+/*	$KAME: route6d.c,v 1.112 2006/12/05 17:15:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.111 2006/10/25 06:38:13 jinmei Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.112 2006/12/05 17:15:45 jinmei Exp $";
 #endif
 
 #include <stdio.h>
@@ -115,7 +115,7 @@ struct	ifc {			/* Configuration of an interface */
 	int	ifc_joined;			/* joined to ff02::9 */
 };
 
-struct	ifac {			/* Adddress associated to an interface */ 
+struct	ifac {			/* Address associated to an interface */ 
 	struct	ifc *ifa_conf;		/* back pointer */
 	struct	ifac *ifa_next;
 	struct	sockaddr_in6 ifa_addr;	/* address */
