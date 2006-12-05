@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.20 2005/06/25 19:27:01 jinmei Exp $ */
+/*	$KAME: common.c,v 1.21 2006/12/05 04:35:43 itojun Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -468,7 +468,7 @@ print_opthdr(void *extbuf)
 	struct ip6_hbh *ext;
 	int currentlen;
 	u_int8_t type;
-	size_t extlen, len;
+	socklen_t extlen, len;
 	void *databuf;
 	size_t offset;
 	u_int16_t value2;
