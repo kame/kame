@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.34 2004/04/05 12:46:39 suz Exp $ */
+/*	$KAME: sender.c,v 1.35 2006/12/05 04:35:20 itojun Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -83,7 +83,9 @@ main(argc, argv)
 	char *finaldst;
 	char *nexthop = NULL, *stickynexthop = NULL;
 	char *tempaddrp = NULL, *stickytempaddrp = NULL;
+#ifdef IPV6_PREFER_TEMPADDR
 	int tempaddr;
+#endif
 	struct iovec msgiov;
 	char *e, *databuf, *stickybuf;
 	int stickylen;
