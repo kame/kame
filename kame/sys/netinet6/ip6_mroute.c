@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.145 2006/04/09 09:19:36 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.146 2006/12/08 17:48:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1812,7 +1812,7 @@ phyint_send(ip6, mifp, m)
 	 * on the outgoing interface, loop back a copy.
 	 */
 	/* 
-	 * Does not have to check source info, as it's alreay covered by 
+	 * Does not have to check source info, as it's already covered by 
 	 * ip6_input
 	 */
 	bzero(&dst6, sizeof(dst6));
