@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.h,v 1.3 2006/09/06 15:04:19 t-momose Exp $	*/
+/*	$KAME: if_nemo.h,v 1.4 2006/12/12 10:27:04 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,7 +50,7 @@
 #include <netinet/in.h>
 /* xxx sigh, why route have struct route instead of pointer? */
 
-#if !defined(__APPLE__) && (defined(__APPLE__) && defined(KERNEL_PRIVATE))
+#if !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE))
 struct encaptab;
 
 #ifdef __FreeBSD__
@@ -100,13 +100,13 @@ struct nemo_softc {
 #define nemo_ro6 nemosc_nemoscr.nemoscr_ro6
 #endif
 
-#endif /* !defined(__APPLE__) && (defined(__APPLE__) && defined(KERNEL_PRIVATE)) */
+#endif /* !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE)) */
 
 #define GIF_MTU		(1280)	/* Default MTU */
 #define	GIF_MTU_MIN	(1280)	/* Minimum MTU */
 #define	GIF_MTU_MAX	(32767)	/* Maximum MTU */
 
-#if !defined(__APPLE__) && (defined(__APPLE__) && defined(KERNEL_PRIVATE))
+#if !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE))
 
 extern int nnemo;
 extern struct nemo_softc *nemo_softc;
@@ -128,6 +128,6 @@ void nemo_start __P((struct ifnet *));
 int nemo_encapcheck __P((const struct mbuf *, int, int, void *));
 #endif
 
-#endif /* !defined(__APPLE__) && (defined(__APPLE__) && defined(KERNEL_PRIVATE)) */
+#endif /* !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE)) */
 
 #endif /* _NET_IF_GIF_H_ */
