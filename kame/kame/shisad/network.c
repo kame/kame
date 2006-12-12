@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.17 2006/10/12 05:32:20 mitsuya Exp $  */
+/*      $KAME: network.c,v 1.18 2006/12/12 09:49:13 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -224,6 +224,23 @@ nemo_tun_set(src, dst, gifindex, nxthop_enable)
 	src6 = (struct sockaddr_in6 *)src;
 	dst6 = (struct sockaddr_in6 *)dst;
 	
+	if (nxthop_enable) {
+		/* get the access router address. */
+		if (nemo_ar_get(&src6->sin6_addr, &ar)) {
+			memset(&nexthopreq, 0, sizeof(struct in6_ifreq));
+			strncpy(nexthopreq.ifr_name, if_name, strlen(if_name));
+			memcpy(&nexthopreq.ifr_ifru.ifru_addr, &ar,
+			    sizeof(struct sockaddr_in6));
+			if (ioctl(ioctls, SIOCSIFPHYNEXTHOP_IN6, &nexthopreq) < 0) {
+				perror("ioctl: failed to set next hop of nemo");
+				/* XXX */
+			}
+		} else {
+			syslog(LOG_ERR,
+			    "cannot get AR's link-local address\n");
+		}
+	}
+	    
 	memset(&in6_addreq, 0, sizeof(in6_addreq)); 
 
 	strncpy(in6_addreq.ifra_name, if_name, strlen(if_name));
@@ -242,24 +259,6 @@ nemo_tun_set(src, dst, gifindex, nxthop_enable)
 		return (errno);
 	}
 
-	if (nxthop_enable) {
-		/* get the access router address. */
-		if (nemo_ar_get(&src6->sin6_addr, &ar)) {
-			memset(&nexthopreq, 0, sizeof(struct in6_ifreq));
-			strncpy(nexthopreq.ifr_name, if_name, strlen(if_name));
-			memcpy(&nexthopreq.ifr_ifru.ifru_addr, &ar,
-			    sizeof(struct sockaddr_in6));
-			if (ioctl(ioctls, SIOCSIFPHYNEXTHOP_IN6, &nexthopreq) < 0) {
-				perror("ioctl: failed to set next hop of nemo");
-				/* XXX */
-			}
-		} else {
-			syslog(LOG_ERR,
-			    "cannot get AR's link-local address\n");
-		}
-	}
-	    
-	
 	close(ioctls);
 
 	return (0);
