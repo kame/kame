@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.177 2006/12/15 06:01:13 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.178 2006/12/15 06:12:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,6 +111,9 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
+#ifdef __OpenBSD__
+#include <netinet/ip_ah.h>
+#endif
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <netdb.h>
@@ -2554,13 +2557,16 @@ pr_retip(ip6, end)
 			hlen = (((struct ip6_rthdr *)cp)->ip6r_len+1) << 3;
 			nh = ((struct ip6_rthdr *)cp)->ip6r_nxt;
 			break;
-#ifdef IPSEC
 		case IPPROTO_AH:
 			printf("AH ");
+#ifdef __OpenBSD__
+			hlen = (((struct ah *)cp)->ah_hl+2) << 2;
+			nh = ((struct ah *)cp)->ah_nh;
+#else
 			hlen = (((struct ah *)cp)->ah_len+2) << 2;
 			nh = ((struct ah *)cp)->ah_nxt;
-			break;
 #endif
+			break;
 		case IPPROTO_ICMPV6:
 			printf("ICMP6: type = %d, code = %d\n",
 			    *cp, *(cp + 1));
