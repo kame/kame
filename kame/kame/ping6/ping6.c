@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.176 2006/11/20 08:05:45 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.177 2006/12/15 06:01:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1769,7 +1769,8 @@ pr_ip6opt(void *extbuf)
 	struct ip6_hbh *ext;
 	int currentlen;
 	u_int8_t type;
-	size_t extlen, len;
+	size_t extlen;
+	socklen_t len;
 	void *databuf;
 	size_t offset;
 	u_int16_t value2;
