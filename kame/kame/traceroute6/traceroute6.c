@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.70 2006/02/28 08:05:33 keiichi Exp $	*/
+/*	$KAME: traceroute6.c,v 1.71 2006/12/19 14:49:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1122,27 +1122,6 @@ packet_ok(mhdr, cc, seq)
 	int *hlimp;
 	char hbuf[NI_MAXHOST];
 
-#ifdef OLDRAWSOCKET
-	int hlen;
-	struct ip6_hdr *ip;
-#endif
-
-#ifdef OLDRAWSOCKET
-	ip = (struct ip6_hdr *) buf;
-	hlen = sizeof(struct ip6_hdr);
-	if (cc < hlen + sizeof(struct icmp6_hdr)) {
-		if (verbose) {
-			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
-			    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0)
-				strlcpy(hbuf, "invalid", sizeof(hbuf));
-			printf("packet too short (%d bytes) from %s\n", cc,
-			    hbuf);
-		}
-		return (0);
-	}
-	cc -= hlen;
-	icp = (struct icmp6_hdr *)(buf + hlen);
-#else
 	if (cc < sizeof(struct icmp6_hdr)) {
 		if (verbose) {
 			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
@@ -1153,7 +1132,6 @@ packet_ok(mhdr, cc, seq)
 		return(0);
 	}
 	icp = (struct icmp6_hdr *)buf;
-#endif
 	/* get optional information via advanced API */
 	rcvpktinfo = NULL;
 	hlimp = NULL;
@@ -1302,15 +1280,9 @@ print(mhdr, cc)
 		printf(" %s", inetname((struct sockaddr *)from));
 
 	if (verbose) {
-#ifdef OLDRAWSOCKET
-		printf(" %d bytes to %s", cc,
-		    rcvpktinfo ? inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
-		    hbuf, sizeof(hbuf)) : "?");
-#else
 		printf(" %d bytes of data to %s", cc,
 		    rcvpktinfo ?  inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
 		    hbuf, sizeof(hbuf)) : "?");
-#endif
 	}
 }
 
