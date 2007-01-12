@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.32 2006/09/22 00:42:55 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.33 2007/01/12 04:13:45 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -885,15 +885,16 @@ bul_mcoa_get(hoa, peer, bid)
         for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		     bul = LIST_NEXT(bul, bul_entry)) {
 
-		if (!IN6_ARE_ADDR_EQUAL(peer, &bul->bul_peeraddr))
-			continue;
-
 		if (bid <= 0) {
 			return (bul);
 		} else {
 			/* search mcoa bul */
 		        for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
 	     		    mbul = LIST_NEXT(mbul, bul_entry)) {
+
+				if (!IN6_ARE_ADDR_EQUAL(peer,
+						&mbul->bul_peeraddr))
+					continue;
 
 				if (bid && bid == mbul->bul_bid)
 					return (mbul);

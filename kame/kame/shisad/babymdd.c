@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.22 2006/09/28 03:05:53 keiichi Exp $	*/
+/*	$Id: babymdd.c,v 1.23 2007/01/12 04:13:45 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -166,7 +166,7 @@ main (argc, argv)
 
 	memset(&babyinfo, 0, sizeof(babyinfo));
 
-        while ((ch = getopt(argc, argv, "h:dDfnp")) != -1) {
+        while ((ch = getopt(argc, argv, "h:dDfnpb")) != -1) {
 		switch (ch) {
 		case 'h':
 			babyinfo.hoa_index = if_nametoindex(optarg);
@@ -482,6 +482,7 @@ baby_md_reg(coa, ifindex, bid)
 		
 		memcpy(MIPD_HOA(mdinfo), &hoa, sizeof(hoa));
 		memcpy(MIPD_COA(mdinfo), coa, sizeof(*coa));
+		((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port = bid;
 		
 		if (write(babyinfo.mipsock, mdinfo, len) < 0) {
 			if (DEBUGNORM)
@@ -877,17 +878,31 @@ static struct if_info *
 init_if(char *targetif) {
 	struct if_info *ifinfo;
 	u_int16_t index = 0;
+	int bid = 0;
+	char ifname[IFNAMSIZ], *pa;
 
-	index = if_nametoindex(targetif);
+	pa = strchr(targetif, ':');
+	if (pa == NULL) {
+		strncpy(ifname, targetif, strlen(targetif));
+		ifname[strlen(targetif)]= '\0';
+	} else {
+		strncpy(ifname, targetif, strlen(targetif) - strlen(pa));
+		ifname[strlen(targetif) - strlen(pa)]= '\0';
+		pa++;
+		bid = atoi(pa);
+	}
+
+	index = if_nametoindex(ifname);
 	if (index == 0) {
-		syslog(LOG_ERR, "%s is not correct, ignore\n", targetif);
+		syslog(LOG_ERR, "%s is not correct, ignore\n", ifname);
 		return NULL;
 	}
 
 	ifinfo = malloc(sizeof(struct if_info));
 	memset(ifinfo, 0, sizeof(struct if_info));
-	strncpy(ifinfo->ifname, targetif, strlen(targetif));
+	strncpy(ifinfo->ifname, ifname, strlen(ifname));
 	ifinfo->ifindex = index;
+	ifinfo->bid = bid;
 
 	/* add to babyinfo iflist */
 	LIST_INSERT_HEAD(&babyinfo.ifinfo_head, ifinfo, ifinfo_entry);
@@ -1287,9 +1302,9 @@ baby_selection() {
 			
 			fprintf(stderr,"sending reg info\n");
 #ifdef DSMIP
-			baby_md_reg((struct sockaddr *)&ifinfo->coa, ifinfo->ifindex, 0); 
+			baby_md_reg((struct sockaddr *)&ifinfo->coa, ifinfo->ifindex, ifinfo->bid); 
 #else
-			baby_md_reg((struct sockaddr_in6 *)&ifinfo->coa, ifinfo->ifindex, 0); 
+			baby_md_reg((struct sockaddr_in6 *)&ifinfo->coa, ifinfo->ifindex, ifinfo->bid); 
 #endif /* DSMIP */
 			memcpy(&ifinfo->pcoa, &ifinfo->coa, 
 			       sizeof(ifinfo->coa));

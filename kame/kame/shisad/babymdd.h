@@ -1,4 +1,4 @@
-/*	$Id: babymdd.h,v 1.4 2005/06/21 12:53:12 keiichi Exp $	*/
+/*	$Id: babymdd.h,v 1.5 2007/01/12 04:13:45 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -89,6 +89,8 @@ struct if_info {
 
 	int priority;
 	int linkstatus;
+
+	int bid;
 };
 
 #endif /* _SHISAD_BABYMDD_H_ */
