@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.33 2007/01/12 04:13:45 mitsuya Exp $	*/
+/*	$KAME: binding.c,v 1.34 2007/01/13 18:46:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -611,9 +611,8 @@ hoainfo_insert(hoa, ifindex)
 
 	/* Binding Update List Initialization */
 	LIST_INIT(&hoainfo->hinfo_bul_head);
-#ifdef MIP_NEMO
+	/* Tunnel information initialization */
 	LIST_INIT(&hoainfo->hinfo_mpt_head);
-#endif /* MIP_NEMO */
 
 	LIST_INSERT_HEAD(&hoa_head, hoainfo, hinfo_entry);
 

@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.39 2006/09/29 08:00:51 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.40 2007/01/13 18:46:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -91,7 +91,7 @@ int use_authid = 0;
 
 struct mip6stat mip6stat;
 struct mip6_hpfx_list hpfx_head; 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 struct nemo_hpt_list hpt_head;
 #endif /* MIP_NEMO */
 
@@ -265,7 +265,7 @@ main(argc, argv)
 	/* initialization */
 	ha_lists_init();
 	had_init_homeprefix(ifname, preference);
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	nemo_parse_conf();
 #endif /*MIP_NEMO*/
 
@@ -520,7 +520,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 	dhrep->mip6_dhrep_code = 0;
 	dhrep->mip6_dhrep_cksum = 0;
 	dhrep->mip6_dhrep_id = dhreq->mip6_dhreq_id;
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	dhrep->mip6_dhrep_reserved |= MIP6_DHREP_FLAG_MR;
 #endif
 

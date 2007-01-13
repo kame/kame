@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.13 2006/10/20 07:41:16 t-momose Exp $	*/
+/*	$KAME: cftoken.l,v 1.14 2007/01/13 18:46:21 keiichi Exp $	*/
 
 %{
 /*
@@ -83,7 +83,10 @@ filename	[a-zA-Z0-9:\.\-\+/=#\$%]*
 <S_CONFIG>debug { D; return (DEBUG); }
 <S_CONFIG>namelookup { D; return (NAMELOOKUP); }
 <S_CONFIG>command-port { D; return (COMMANDPORT); }
-<S_CONFIG>home-registration-lifetime { D; return (HOMEREGISTRATIONLIFETIME ); }
+<S_CONFIG>home-registration-lifetime { D; return (HOMEREGISTRATIONLIFETIME); }
+<S_CONFIG>mobile-node-mode { D; return (MOBILENODEMODE ); }
+<S_CONFIG>mobile-host { D; yylval.string = strdup(yytext); return (MOBILENODEMODEVALUE); }
+<S_CONFIG>mobile-router { D; yylval.string = strdup(yytext); return (MOBILENODEMODEVALUE); }
 <S_CONFIG>preference { D; return (PREFERENCE); }
 <S_CONFIG>interface { D; BEGIN S_INTERFACE; return (INTERFACE); }
 <S_CONFIG>key-management { D; return (KEYMANAGEMENT); }
@@ -112,12 +115,12 @@ filename	[a-zA-Z0-9:\.\-\+/=#\$%]*
 <S_PREFIXTABLE>explicit {
 	D;
 	yylval.string = strdup(yytext);
-	return (EXPLICIT);
+	return (MNPMODEVALUE);
 }
 <S_PREFIXTABLE>implicit {
 	D;
 	yylval.string = strdup(yytext);
-	return (IMPLICIT);
+	return (MNPMODEVALUE);
 }
 <S_PREFIXTABLE>{integer} {
 	D;

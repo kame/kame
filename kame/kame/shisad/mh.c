@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.58 2006/10/20 07:41:16 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.59 2007/01/13 18:46:21 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -69,6 +69,7 @@
 #include "shisad.h"
 #include "fsm.h"
 #include "stat.h"
+#include "config.h"
 
 #define SS2SIN6(ss) ((struct sockaddr_in6 *)(ss))
 #define SS2SIN(ss) ((struct sockaddr_in *)(ss))
@@ -77,9 +78,10 @@
 extern int homeagent_mode;
 #endif /* MIP_CN */
 #ifdef MIP_MN
-#ifdef MIP_NEMO
+extern int mobile_node_mode;
+#ifdef IPV4MNPSUPPORT
 extern int ipv4mnpsupport;
-#endif /* MIP_NEMO */
+#endif /* IPV4MNPSUPPORT */
 #endif /* MIP_MN */
 #ifdef MIP_HA
 extern int keymanagement;
@@ -395,7 +397,6 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 			check_mopt_len(2);
 			mopt->opt_refresh = (struct ip6_mh_opt_refresh_advice *)mhopt;
 			break;
-#ifdef MIP_NEMO
 		case IP6_MHOPT_PREFIX:
 			if (mopt->opt_prefix_count >= 
 			    NEMO_MAX_ALLOW_PREFIX)
@@ -404,7 +405,6 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 				(struct ip6_mh_opt_prefix *)mhopt;
 			mopt->opt_prefix_count ++;
 			break;
-#endif /* MIP_NEMO */
 #ifdef MIP_MCOA
 		case IP6_MHOPT_BID:
 			mopt->opt_bid = (struct ip6_mh_opt_bid *)mhopt;
@@ -862,7 +862,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #ifdef MIP_HA
 	/* if flags are changed during registration, sending BA with 139 */
 	if (bc && ((bc->bc_flags ^ flags) & (IP6_MH_BU_HOME
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 					     | IP6_MH_BU_ROUTER
 #endif /* MIP_NEMO */
 			   ))) {
@@ -875,7 +875,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	 * Agent or not. 
 	 */
 	if (flags & IP6_MH_BU_HOME) {
-#ifndef MIP_NEMO /* NEMO must be releaxed with this */
+#if 0 /* !MIP_NEMO */ /* NEMO must be releaxed with this */
 		struct mip6_hpfxl *hpfxlist;
 		
 		hpfxlist = had_is_myhomenet(hoa);
@@ -902,7 +902,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	} else if (flags & IP6_MH_BU_KEYM) {
 		/* Not Implemented yet */
 	} 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	else if (flags & IP6_MH_BU_ROUTER) {
 		/* When R flag is set, H flag is mandated */
 		if ((flags & IP6_MH_BU_HOME) == 0) {
@@ -920,7 +920,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (mopt.opt_nonce)
 		return (-1);
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	/* Mobile Network Prefix Verfication */
 	if (mopt.opt_prefix_count > 0) {
 		struct nemo_hptable *hpt;
@@ -1249,12 +1249,10 @@ send_bu(bul)
 	struct ip6_mh_opt_nonce_index nonce_opt; 
 	mip6_kbm_t kbm;
 	mip6_authenticator_t authenticator;
-#ifdef MIP_NEMO
 	struct ip6_mh_opt_prefix prefix_opt;
 #ifdef MIP_IPV4MNPSUPPORT
 	struct ip6_mh_opt_ipv4_prefix v4prefix_opt;
 #endif /* MIP_IPV4MNPSUPPORT */
-#endif /* MIP_NEMO */
 #ifdef DSMIP
 	struct ip6_mh_opt_ipv4_hoa v4hoa_opt;
 	struct home_agent_list *hal;
@@ -1352,9 +1350,9 @@ send_bu(bul)
 	}
 #endif /* MIP_MCOA */
 
-#ifdef MIP_NEMO
 	/* Adding Mobile Network Prefix Option */	
-	if (bul->bul_flags & IP6_MH_BU_ROUTER) {
+	if (mobile_node_mode == CFV_MOBILEROUTER
+	    && (bul->bul_flags & IP6_MH_BU_ROUTER) != 0) {
 		struct nemo_mptable *mpt, *mptn;
 
 		/* R flag MUST be always set only to Home Registration */
@@ -1409,7 +1407,6 @@ send_bu(bul)
 #endif /* MIP_IPV4MNPSUPPORT */
 		}
 	}
-#endif /* MIP_NEMO */
 
 #ifdef DSMIP
 	if (IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) &&
@@ -1442,11 +1439,11 @@ send_bu(bul)
 		MIP6_FILL_PADDING(bufp + buflen, pad);
 		buflen += pad;
 
-#ifdef MIP_NEMO
-		/* R flag MUST be always set to Home Registration */
-		if ((bul->bul_flags & IP6_MH_BU_ROUTER) == (int)NULL) 
+		/* R flag MUST be always set to Home Registration
+		   if the node is a mobile router. */
+		if (mobile_node_mode == CFV_MOBILEROUTER
+		    && (bul->bul_flags & IP6_MH_BU_ROUTER) == 0) 
 			return (EINVAL);
-#endif /* MIP_NEMO */
 
 		goto skip_rr;
 	} 
@@ -1657,7 +1654,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 	if (keymanagement
 	    && (flags & IP6_MH_BU_KEYM))
 		bap->ip6mhba_flags |= IP6_MH_BA_KEYM;
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	/* When BU has R flag, BA must be returned with Rflag */
 	if ((flags & IP6_MH_BU_HOME) &&
 	    (flags & IP6_MH_BU_ROUTER))
@@ -1963,8 +1960,8 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
         struct ip6_rthdr2 *rtopt = NULL;
 	struct ip6_dest *dest;
         char adata [1024];
-#if defined(MIP_MN) && defined(MIP_NEMO)
-	struct sockaddr_in6 *ar_sin6, ar_sin6_orig;
+#if defined(MIP_MN)
+	struct sockaddr_in6 *ar_sin6 = NULL, ar_sin6_orig;
 #endif
 
 	memset(&addr, 0, sizeof(addr));
@@ -1987,12 +1984,14 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 	if (rtaddr)
 		msg.msg_controllen += 
 			CMSG_SPACE(sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr));
-#if defined(MIP_MN) && defined(MIP_NEMO)
-	ar_sin6 = nemo_ar_get(haoaddr, &ar_sin6_orig);
-	if (ar_sin6) 
-		msg.msg_controllen += 
-			CMSG_SPACE(sizeof(struct sockaddr_in6));
-#endif /*MIP_NEMO */
+#if defined(MIP_MN)
+	if (mobile_node_mode == CFV_MOBILEROUTER) {
+		ar_sin6 = nemo_ar_get(haoaddr, &ar_sin6_orig);
+		if (ar_sin6) 
+			msg.msg_controllen += 
+				CMSG_SPACE(sizeof(struct sockaddr_in6));
+	}
+#endif /* MIP_MN */
         iov.iov_base = mhdata;
         iov.iov_len = mhdatalen;
 	
@@ -2007,8 +2006,9 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 
-#if defined(MIP_MN) && defined(MIP_NEMO)
-	if (ar_sin6) { 
+#if defined(MIP_MN)
+	if (mobile_node_mode == CFV_MOBILEROUTER
+	    && ar_sin6 != NULL) { 
 		if (debug) 
 			syslog(LOG_INFO, "sendmsg via %s/%d", 
 				ip6_sprintf(&ar_sin6->sin6_addr), ar_sin6->sin6_scope_id);
@@ -2018,7 +2018,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 		memcpy(CMSG_DATA(cmsgptr), ar_sin6, sizeof(struct sockaddr_in6));
 		cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 	}
-#endif
+#endif /* MIP_MN */
 
 	/* Destination Option */
 	if (haoaddr) {

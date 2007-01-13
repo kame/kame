@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.22 2006/09/28 03:05:53 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.23 2007/01/13 18:46:21 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -63,7 +63,7 @@
 
 #define MODE_HA 0x01
 #define MODE_MR 0x02
-#define NEMO_TUNNAME "nemo"
+#define NEMO_TUNNAME "mtun"
 
 /* Variables */
 struct nemo_if {
@@ -120,10 +120,13 @@ static int parse_ipv4_dummy_tunnel(void);
 #endif /* MIP_IPV4MNPSUPPORT */
 static void nemo_usage(void);
 
+#if 0
+/* when PF is not available */
 static struct sockaddr_in6 sin6_default = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
 	IN6ADDR_ANY_INIT
 }; 
+#endif /* when PF is not available */
 static struct sockaddr_in6 sin6_loopback = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
 	IN6ADDR_LOOPBACK_INIT
@@ -234,7 +237,7 @@ main (argc, argv)
 			conffile = HAD_CONFFILE;
 			break;
 		case MODE_MR:
-			conffile = MRD_CONFFILE;
+			conffile = MND_CONFFILE;
 			break;
 		default:
 			nemo_usage();
@@ -356,13 +359,13 @@ ha_parse_ptconf()
 		cfpt = (struct config_prefixtable *)cfe->cfe_ptr;
 
 		switch (cfpt->cfpt_mode) {
-		case CFPT_IMPLICIT:
+		case CFV_IMPLICIT:
 			mode = NEMO_IMPLICIT;
 			break;
-		case CFPT_EXPLICIT:
+		case CFV_EXPLICIT:
 			mode = NEMO_EXPLICIT;
 			break;
-		case CFPT_ROUTING:
+		case CFV_ROUTING:
 			mode = NEMO_ROUTING;
 			break;
 		}
@@ -729,6 +732,8 @@ mainloop() {
 						continue;
 
 					if ((multiplecoa && bid <= 0) || multiplecoa == 0) {
+#if 0
+/* when PF is not available. */
 						/* remove default route */
 						route_del(0);
 						/* add default route */
@@ -736,6 +741,7 @@ mainloop() {
 						    (struct sockaddr *)&sin6_loopback,
 						    NULL, 0,
 						    if_nametoindex(nif->ifname));
+#endif /* when PF is not available. */
 #ifdef MIP_IPV4MNPSUPPORT
 						if (ipv4mnpsupport) {
 							route_add((struct sockaddr *)&sin_default,

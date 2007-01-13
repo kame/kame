@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.40 2006/11/11 14:32:36 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.41 2007/01/13 18:46:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -59,6 +59,9 @@
 #include "shisad.h"
 #include "stat.h"
 #include "fsm.h"
+#include "config.h"
+
+extern int mobile_node_mode;
 
 int initial_bindack_timeout_first_reg = 2; /* the spec says more than 1.5 */
 
@@ -2235,8 +2238,8 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		}
 	}
 
-#ifdef MIP_NEMO
-	if (ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
+	if (mobile_node_mode == CFV_MOBILEROUTER
+	    && ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
 		struct nemo_mptable *mpt;
 
                 mpt = LIST_FIRST(&bul->bul_hoainfo->hinfo_mpt_head);
@@ -2277,8 +2280,6 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 			}
 		}
 	}
-
-#endif /* MIP_NEMO */
 
 	/* check the status code */
 	if (ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
@@ -2365,15 +2366,15 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		refresh = lifetime;
 	bul->bul_refresh = refresh;
 
-#ifdef MIP_NEMO
 	/* 
 	 * When HA returns BA without R flag, MR must trigger DHAAD to
 	 * find right NEMO HAs. If such BA indicates successful
 	 * registration, MR MUST de-register the binding from legacy
 	 * HA.
 	 */
-	if ((bul->bul_flags & IP6_MH_BU_HOME) &&
-	    (bul->bul_flags & IP6_MH_BU_ROUTER)) {
+	if (mobile_node_mode == CFV_MOBILEROUTER
+	    && bul->bul_flags & IP6_MH_BU_HOME
+	    && bul->bul_flags & IP6_MH_BU_ROUTER) {
 		if (!(ip6mhba->ip6mhba_flags & IP6_MH_BA_ROUTER)) {
 			/* sending DHAAD again XXX */
 			if (send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa) > 0)
@@ -2390,7 +2391,6 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 			return (-1);
 		}
 	}
-#endif /* MIP_NEMO */
 
 	/* Sending MPS for IP6_MH_BAS_PRFX_DISCOV */
 	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_PRFX_DISCOV) {

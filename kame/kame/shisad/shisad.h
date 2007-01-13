@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.41 2006/10/20 07:41:16 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.42 2007/01/13 18:46:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -103,12 +103,10 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 
 #define CND_COMMAND_PORT	7777
 #define MND_COMMAND_PORT	7778
-#define MRD_COMMAND_PORT	7778
 #define HAD_COMMAND_PORT	7778
 
 #define CND_PIDFILE	"/var/run/cnd.pid"
 #define MND_PIDFILE	"/var/run/mnd.pid"
-#define MRD_PIDFILE	"/var/run/mrd.pid"
 #define HAD_PIDFILE	"/var/run/had.pid"
 
 #ifndef SYSCONFDIR
@@ -116,7 +114,6 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #endif
 #define CND_CONFFILE	SYSCONFDIR "/cnd.conf"
 #define MND_CONFFILE	SYSCONFDIR "/mnd.conf"
-#define MRD_CONFFILE	SYSCONFDIR "/mrd.conf"
 #define HAD_CONFFILE	SYSCONFDIR "/had.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
@@ -277,7 +274,7 @@ struct noro_host_list {
 };
 LIST_HEAD(no_ro_head, noro_host_list);
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 /* NEMO Prefix Table */
 struct nemo_pt {
 	struct sockaddr_storage pt_ss_prefix;  /* mobile network prefix */
@@ -334,7 +331,7 @@ struct mip6_hoainfo {
 	time_t    hinfo_mps_lastsent;
 
 	struct binding_update_list_head hinfo_bul_head; 	/* Binding Update List */
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	struct nemo_mpt_list hinfo_mpt_head; 	/* Mobile Network Prefix */
 #endif /* MIP_NEMO */
 };
@@ -366,7 +363,7 @@ struct mip6_mobility_options {
 	struct ip6_mh_opt_nonce_index *opt_nonce;
 	struct ip6_mh_opt_auth_data *opt_bauth;
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 #define NEMO_MAX_ALLOW_PREFIX 10
 	struct ip6_mh_opt_prefix *opt_prefix[NEMO_MAX_ALLOW_PREFIX];
 	int opt_prefix_count;
@@ -543,7 +540,7 @@ int set_ip6addr(char *, struct in6_addr *, int, int);
 int delete_ip6addr(char *, struct in6_addr *, int);
 int send_unsolicited_na(int, struct in6_addr *);
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 int nemo_tun_set(struct sockaddr *, struct sockaddr *, u_int16_t, int);
 int nemo_tun_del(char *);
 int route_add(struct sockaddr *, struct sockaddr *, struct sockaddr *, int,
@@ -626,7 +623,7 @@ int send_mpa(struct in6_addr *, u_int16_t, u_short);
 int relay_icmp6_error(struct icmp6_hdr *, size_t, u_short);
 
 /* nemo_var.c */
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 struct nemo_mptable *nemo_mpt_get(struct mip6_hoainfo *,
     struct sockaddr_storage *, u_int8_t);
 struct nemo_mptable *nemo_mpt_add(struct mip6_hoainfo *,
@@ -636,7 +633,6 @@ struct nemo_hptable *nemo_hpt_get(struct sockaddr_storage *, u_int8_t,
 struct nemo_hptable *nemo_hpt_add(struct in6_addr *, struct sockaddr_storage *,
     u_int8_t, int);
 
-#define NEMOPREFIXINFO "./nemo_prefixtable.conf"
 void nemo_parse_conf(void);
 void command_show_pt(int, char *);
 

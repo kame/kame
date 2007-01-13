@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.37 2006/09/29 08:00:51 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.38 2007/01/13 18:46:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -87,6 +87,7 @@ int debug = 0;
 int foreground = 0;
 int namelookup = 1;
 int command_port = MND_COMMAND_PORT;
+int mobile_node_mode = CFV_MOBILEHOST;
 int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
 int keymanagement = 0;
 #ifdef MIP_IPV4MNPSUPPORT
@@ -126,45 +127,28 @@ struct command_table show_command_table[] = {
 	{"noro", noro_show, ""},
 	{"config", show_current_config, ""},
 	{"callout", show_callout_table, "the list in the callout queue"},
-#ifdef MIP_NEMO
 	{"pt", command_show_pt, "Prefix Table, MR only"},
-#endif /* MIP_NEMO */
 	{NULL}
 };
 
 struct command_table command_table[] = {
 	{"show", NULL, "Show stat, bul, hal, kbul, noro, config"
-#ifdef MIP_NEMO
 	 ", pt"
-#endif /* MIP_NEMO */
 	 , show_command_table
 	},
 	{"flush", command_flush, "Flush stat, bul, hal, noro"},
 };
 
-#ifdef MIP_NEMO
-#define NODETYPE MIP6_NODETYPE_MOBILE_ROUTER
-#else /* MIP_NEMO */
-#define NODETYPE MIP6_NODETYPE_MOBILE_NODE
-#endif /* MIP_NEMO */
-
-
 static void
 mn_usage()
 {
-#ifdef MIP_NEMO
-	char *banner = "mrd [-fn] [-c configfile] mipinterface\n";
-#else
 	char *banner = "mnd [-fn] [-c configfile] mipinterface\n";
-#endif /* MIP_NEMO */
 
 	fprintf(stderr, banner);
+	fprintf(stderr, "Basic NEMO Support version\n");
 #ifdef MIP_MCOA
 	fprintf(stderr, "Multiple CoA Reg Support version\n");
 #endif /* MIP_MCOA */
-#ifdef MIP_NEMO
-	fprintf(stderr, "Basic NEMO Support version\n");
-#endif /* MIP_NEMO */
         return;
 }
 
@@ -184,13 +168,9 @@ main(argc, argv)
 	char *v4homeagent = NULL;
 #endif /* DSMIP */
 	char *argopts = "fnc:a:";
-#ifdef MIP_NEMO
-	char *conffile = MRD_CONFFILE;
-#else
 	char *conffile = MND_CONFFILE;
-#endif
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	argopts = "fnc:a:t:";
 #endif /* MIP_NEMO */
 #ifdef DSMIP
@@ -231,17 +211,17 @@ main(argc, argv)
 	}
 	
 	/* open syslog infomation. */
-#ifndef MIP_NEMO
-	openlog("shisad(mnd)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "Start Mobile Node\n");
-#else
+#if 1 /* MIP_NEMO */
 	openlog("shisad(mrd)", 0, LOG_DAEMON);
 	syslog(LOG_INFO, "Start Mobile Router\n");
+#else
+	openlog("shisad(mnd)", 0, LOG_DAEMON);
+	syslog(LOG_INFO, "Start Mobile Node\n");
 #endif
 
 	/* parse configuration file and set default values. */
 	if (parse_config(
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	    CFM_MRD, 
 #else
 	    CFM_MND,
@@ -254,6 +234,8 @@ main(argc, argv)
 		/* get interface specific parameters. */
 		config_get_number(CFT_DEBUG, &debug, if_params);
 		config_get_number(CFT_COMMANDPORT, &command_port,
+		    if_params);
+		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
 		    if_params);
 		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
 		    &default_lifetime, if_params);
@@ -308,7 +290,7 @@ main(argc, argv)
 		exit(-1);
 	}
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	nemo_parse_conf();
 #endif /* MIP_NEMO */
 
@@ -327,7 +309,7 @@ main(argc, argv)
 	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		bul_flags = IP6_MH_BU_HOME|IP6_MH_BU_ACK
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 		    | IP6_MH_BU_ROUTER
 #endif
 #ifdef MIP_MCOA 
@@ -367,7 +349,8 @@ main(argc, argv)
 #endif /* DSMIP */
 
 	/* notify a kernel to behave as a mobile node. */
-	mipsock_nodetype_request(NODETYPE, 1);
+	mipsock_nodetype_request(mobile_node_mode == CFV_MOBILEHOST ?
+				 MIP6_NODETYPE_MOBILE_NODE : MIP6_NODETYPE_MOBILE_ROUTER, 1);
 
 	/* register signal handlers. */
 	signal(SIGTERM, terminate);
@@ -1067,7 +1050,7 @@ send_haadreq(hoainfo, hoa_plen, src)
         struct sockaddr_in6 to;
         char adata[512], buf[1024];
 	struct mip6_dhaad_req dhreq;
-#if defined(MIP_MN) && defined(MIP_NEMO)
+#if defined(MIP_MN)
 	struct sockaddr_in6 *ar_sin6 = NULL, ar_sin6_orig;
 #endif
 
@@ -1087,13 +1070,12 @@ send_haadreq(hoainfo, hoa_plen, src)
         msg.msg_iovlen = 1;
         msg.msg_control = (void *) adata;
         msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
-#if defined(MIP_MN) && defined(MIP_NEMO)
+#if defined(MIP_MN)
 	ar_sin6 = nemo_ar_get(src, &ar_sin6_orig);
 	if (ar_sin6)
 		msg.msg_controllen += 
 			CMSG_SPACE(sizeof(struct sockaddr_in6));
-#endif /*MIP_NEMO */
-
+#endif /* MIP_NEMO */
 
 	/* Packet Information i.e. Source Address */
 	cmsgptr = CMSG_FIRSTHDR(&msg);
@@ -1108,8 +1090,7 @@ send_haadreq(hoainfo, hoa_plen, src)
 		syslog(LOG_INFO, "send DHAAD req from %s to %s\n",
 		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
 		
-	
-#if defined(MIP_MN) && defined(MIP_NEMO)
+#if defined(MIP_MN)
 	if (ar_sin6) { 
 		if (debug)
 			syslog(LOG_INFO, "send ICMP msg via %s/%d\n", 
@@ -1130,10 +1111,10 @@ send_haadreq(hoainfo, hoa_plen, src)
 	dhreq.mip6_dhreq_code = 0;
 	dhreq.mip6_dhreq_cksum = 0;
 	dhreq.mip6_dhreq_id = htons(++hoainfo->hinfo_dhaad_id);
-#ifndef MIP_NEMO
-	dhreq.mip6_dhreq_reserved = 0;
-#else
+#if 1 /* MIP_NEMO */
 	dhreq.mip6_dhreq_reserved = MIP6_DHREQ_FLAG_MR;
+#else
+	dhreq.mip6_dhreq_reserved = 0;
 #endif /* MIP_NEMO */
 	
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
@@ -1534,7 +1515,7 @@ mnd_init_homeprefix(mipif)
 	struct mip6_hpfxl *hpfxent = NULL;
 	struct mip6_hoainfo *hoa = NULL;
 	struct mip6_hpfx_mn_exclusive mnoption;
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	struct nemo_mptable *mpt = NULL;
 #endif /* MIP_NEMO */
 
@@ -1586,7 +1567,7 @@ mnd_init_homeprefix(mipif)
 			continue;
 		}
 		
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 		LIST_FOREACH(mpt, &hoa->hinfo_mpt_head, mpt_entry) {
 			if (mpt->mpt_ha.s6_addr == 0)
 				continue;
@@ -1665,7 +1646,7 @@ receive_hadisc_reply(dhrep, dhrep_len)
 	if (hoainfo == NULL)
 		return (ENOENT);
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 	if ((dhrep->mip6_dhrep_reserved & MIP6_DHREP_FLAG_MR) == 0) {
 		/* XXX */
 		syslog(LOG_INFO, "HA does not support the basic NEMO protocol\n");
@@ -1751,7 +1732,7 @@ send_mps(hpfx)
         struct ip6_dest *dest;
         struct ip6_opt_home_address *hoadst;
 	struct in6_addr *hoa;
-#if defined(MIP_MN) && defined(MIP_NEMO)
+#if defined(MIP_MN)
 	struct sockaddr_in6 *ar_sin6, ar_sin6_orig;
 #endif /* MIP_NEMO */ 
 
@@ -1785,7 +1766,7 @@ send_mps(hpfx)
         msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
 		CMSG_SPACE(sizeof(struct ip6_opt_home_address) + 2 + 4);
 
-#if defined(MIP_MN) && defined(MIP_NEMO)
+#if defined(MIP_MN)
         ar_sin6 = nemo_ar_get(&bul->bul_coa, &ar_sin6_orig);
         if (ar_sin6) 
                 msg.msg_controllen += 
@@ -1802,7 +1783,7 @@ send_mps(hpfx)
         cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
         cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 
-#if defined(MIP_MN) && defined(MIP_NEMO)
+#if defined(MIP_MN)
         if (ar_sin6) { 
                 if (debug) 
                         syslog(LOG_INFO, "sendmsg via %s/%d\n", 
@@ -2015,7 +1996,8 @@ terminate(dummy)
 	struct mip_msghdr mipmsg;
 
 	/* stop acting as a mobile node. */
-	mipsock_nodetype_request(NODETYPE, 0);
+	mipsock_nodetype_request(mobile_node_mode == CFV_MOBILEHOST ?
+				 MIP6_NODETYPE_MOBILE_NODE : MIP6_NODETYPE_MOBILE_ROUTER, 0);
 
 	/* flush all bul registered in a kernel. */
 	memset(&mipmsg, 0, sizeof(struct mip_msghdr));

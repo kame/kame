@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.11 2005/09/30 12:01:56 keiichi Exp $  */
+/*      $KAME: nemo_var.c,v 1.12 2007/01/13 18:46:21 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -68,7 +68,7 @@
 #define SS2SIN6(ss) ((struct sockaddr_in6 *)(ss))
 #define SS2SIN(ss) ((struct sockaddr_in *)(ss))
 
-#ifdef MIP_NEMO 
+#if 1 /* MIP_NEMO */
 
 extern struct config_entry *if_params;
 
@@ -305,13 +305,13 @@ nemo_parse_conf()
 		cfpt = (struct config_prefixtable *)cfe->cfe_ptr;
 
 		switch (cfpt->cfpt_mode) {
-		case CFPT_IMPLICIT:
+		case CFV_IMPLICIT:
 			mode = NEMO_IMPLICIT;
 			break;
-		case CFPT_EXPLICIT:
+		case CFV_EXPLICIT:
 			mode = NEMO_EXPLICIT;
 			break;
-		case CFPT_ROUTING:
+		case CFV_ROUTING:
 			mode = NEMO_ROUTING;
 			break;
 		}

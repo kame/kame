@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.18 2006/12/12 09:49:13 keiichi Exp $  */
+/*      $KAME: network.c,v 1.19 2007/01/13 18:46:21 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -69,13 +69,13 @@
 #define SA2SIN6(ss) ((struct sockaddr_in6 *)(ss))
 #define SA2SIN(ss) ((struct sockaddr_in *)(ss))
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 #ifdef MIP_IPV4MNPSUPPORT
 extern int ipv4mnpsupport;
 #endif /* MIP_IPV4MNPSUPPORT */
 #endif /* MIP_NEMO */
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 static struct sockaddr_in6 sin6_default = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
 	IN6ADDR_ANY_INIT
@@ -90,11 +90,11 @@ static struct sockaddr_in sin_default = {
 
 static struct in6_addrlifetime static_lifetime = 
 	{0, 0, ND6_INFINITE_LIFETIME, ND6_INFINITE_LIFETIME};
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 static int nemo_gif_init(char *);
 static int inet_len2mask(int, int, struct sockaddr *);
 static struct in6_nbrinfo *getnbrinfo __P((struct in6_addr *, int, int));
-#endif
+#endif /* MIP_NEMO */
 
 
 int
@@ -182,7 +182,7 @@ delete_ip6addr(ifname, ip6addr, prefixlen)
 }
 
 
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 int
 nemo_tun_set(src, dst, gifindex, nxthop_enable)
 	struct sockaddr *src;
@@ -192,8 +192,9 @@ nemo_tun_set(src, dst, gifindex, nxthop_enable)
 {
 	int ioctls = 0;
 	struct in6_aliasreq in6_addreq;
+	struct sockaddr_in6 *src6, *dst6;
 	struct in6_ifreq nexthopreq;
-	struct sockaddr_in6 *src6, *dst6, ar;
+	struct sockaddr_in6 ar;
 	char if_name[IFNAMSIZ];
 
 	if (src->sa_family != dst->sa_family) 
@@ -240,7 +241,7 @@ nemo_tun_set(src, dst, gifindex, nxthop_enable)
 			    "cannot get AR's link-local address\n");
 		}
 	}
-	    
+
 	memset(&in6_addreq, 0, sizeof(in6_addreq)); 
 
 	strncpy(in6_addreq.ifra_name, if_name, strlen(if_name));
@@ -495,11 +496,11 @@ route_del(gifindex)
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = mib[5] = 0;
-#if defined(MIP_NEMO) && defined(MIP_IPV4MNPSUPPORT)
+#if 1 /* defined(MIP_NEMO) */ && defined(MIP_IPV4MNPSUPPORT)
 	mib[3] = AF_UNSPEC;
 #else
 	mib[3] = AF_INET6;
-#endif
+#endif /* MIP_NEMO && MIP_IPV4MNPSUPPORT */
 	mib[4] = NET_RT_DUMP;
 	
 	if(sysctl(mib, 6, NULL, &needed, NULL, 0) < 0){
@@ -545,7 +546,7 @@ route_del(gifindex)
 					&sin6_default.sin6_addr))
 					continue;
 				break;
-#ifdef MIP_NEMO
+#if 1 /* MIP_NEMO */
 #ifdef MIP_IPV4MNPSUPPORT
 			case AF_INET:
 				if (ipv4mnpsupport
@@ -702,7 +703,7 @@ nemo_ar_get(coa, ret6)
 		}
 	}
 	free(buf);
-#else
+#else /* defined(ICMPV6CTL_ND6_PRLIST) && !defined(__NetBSD__) */
 	/* XXX the following code seems buggy.  never expect to work. */
 	struct in6_prlist pr;
 	int i;
@@ -804,14 +805,14 @@ nemo_ar_get(coa, ret6)
 
 					close (s);
 					return (ret6);
-#endif
+#endif /* 0 */
 				} 
 			}
 		} 
 	}
 #undef PR
 	close(s);
-#endif
+#endif /* defined(ICMPV6CTL_ND6_PRLIST) && !defined(__NetBSD__) */
 	/*
 	 * we couldn't find the address of the access router from
 	 * prefix information.  try to get the destination address of
