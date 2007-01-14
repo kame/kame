@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.24 2007/01/14 01:41:10 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.25 2007/01/14 05:10:07 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -98,6 +98,7 @@ struct config_entry *if_params;
 int debug = 0;
 int foreground = 0;
 int namelookup = 1;
+int mobile_node_mode = CFV_MOBILEHOST;
 int staticmode = 0;
 int multiplecoa = 0;
 #ifdef MIP_IPV4MNPSUPPORT
@@ -262,6 +263,8 @@ main (argc, argv)
 	if (if_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, if_params);
 		config_get_number(CFT_NAMELOOKUP, &namelookup, if_params);
+		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
+		    if_params);
 #ifdef MIP_IPV4MNPSUPPORT
 		config_get_number(CFT_IPV4MNPSUPPORT, &ipv4mnpsupport,
 		    if_params);
@@ -270,6 +273,8 @@ main (argc, argv)
 	if (config_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, config_params);
 		config_get_number(CFT_NAMELOOKUP, &namelookup, config_params);
+		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
+		    config_params);
 #ifdef MIP_IPV4MNPSUPPORT
 		config_get_number(CFT_IPV4MNPSUPPORT, &ipv4mnpsupport,
 		    config_params);
@@ -284,7 +289,8 @@ main (argc, argv)
 			exit(0);
 		break;
 	case MODE_MR:
-		if (mr_parse_ptconf() != 0)
+		if (mobile_node_mode == CFV_MOBILEROUTER
+		    && mr_parse_ptconf() != 0)
 			exit(0);
 		break;
 	default:
@@ -692,7 +698,8 @@ mainloop() {
 				/* if H and R flag are not set, ignore the BU */
                                 if ((mbu->mipu_flags & IP6_MH_BU_HOME) == 0)
 					break;
-				if ((mbu->mipu_flags & IP6_MH_BU_ROUTER) == 0) 
+				if (mobile_node_mode == CFV_MOBILEROUTER
+				    && (mbu->mipu_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				memset(&src, 0, sizeof(src));
 				memset(&dst, 0, sizeof(dst));
@@ -736,7 +743,7 @@ mainloop() {
 						continue;
 
 					if ((multiplecoa && bid <= 0) || multiplecoa == 0) {
-#if 0
+#ifdef NO_PF
 /* when PF is not available. */
 						/* remove default route */
 						route_del(0);
@@ -792,9 +799,11 @@ mainloop() {
 					
 					if (npt->nemo_if) {
 						npt->nemo_if = NULL; 
+#ifdef NO_PF
 						/* remove default route */
 						if ((multiplecoa && (bid <= 0)) || multiplecoa == 0) 
 							route_del(0);
+#endif /* NO_PF */
 						
 					}
                                 }
@@ -1063,8 +1072,10 @@ nemo_terminate(dummy)
 	}
 
 	if (multiplecoa == 0) {
+#ifdef NO_PF
 		if (mode == MODE_MR)
 			route_del(0);
+#endif /* NO_PF */
 	}
 
 	exit(-1);

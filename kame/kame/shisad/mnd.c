@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.38 2007/01/13 18:46:21 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.39 2007/01/14 05:10:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -251,6 +251,8 @@ main(argc, argv)
 		config_get_number(CFT_DEBUG, &debug, config_params);
 		config_get_number(CFT_COMMANDPORT, &command_port,
 		    config_params);
+		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
+		    config_params);
 		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
 		    &default_lifetime, config_params);
 		config_get_number(CFT_KEYMANAGEMENT,
@@ -291,7 +293,8 @@ main(argc, argv)
 	}
 
 #if 1 /* MIP_NEMO */
-	nemo_parse_conf();
+	if (mobile_node_mode == CFV_MOBILEROUTER)
+		nemo_parse_conf();
 #endif /* MIP_NEMO */
 
 #if 1
@@ -310,7 +313,7 @@ main(argc, argv)
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		bul_flags = IP6_MH_BU_HOME|IP6_MH_BU_ACK
 #if 1 /* MIP_NEMO */
-		    | IP6_MH_BU_ROUTER
+		    | (mobile_node_mode == CFV_MOBILEROUTER ? IP6_MH_BU_ROUTER : 0)
 #endif
 #ifdef MIP_MCOA 
 		    | IP6_MH_BU_MCOA
