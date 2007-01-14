@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.23 2007/01/12 04:13:45 mitsuya Exp $	*/
+/*	$Id: babymdd.c,v 1.24 2007/01/14 05:15:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -411,12 +411,12 @@ baby_md_scan(struct if_info *ifinfo) {
 		return (-1);
 
 	memset(&mdinfo, 0, sizeof(mdinfo));
-	mdinfo.mipm_md_hdr.miph_msglen	= sizeof(mdinfo);
-	mdinfo.mipm_md_hdr.miph_version = MIP_VERSION;
-	mdinfo.mipm_md_hdr.miph_type	= MIPM_MD_INFO;
-	mdinfo.mipm_md_hdr.miph_seq	= random();
-	mdinfo.mipm_md_command		= MIPM_MD_SCAN;
-	mdinfo.mipm_md_ifindex          = ifinfo->ifindex;
+	mdinfo.mipmmi_hdr.miph_msglen	= sizeof(mdinfo);
+	mdinfo.mipmmi_hdr.miph_version = MIP_VERSION;
+	mdinfo.mipmmi_hdr.miph_type	= MIPM_MD_INFO;
+	mdinfo.mipmmi_hdr.miph_seq	= random();
+	mdinfo.mipmmi_command		= MIPM_MD_SCAN;
+	mdinfo.mipmmi_ifindex          = ifinfo->ifindex;
 
 	if (write(babyinfo.mipsock, &mdinfo, sizeof(babyinfo)) < 0) {
 		if (DEBUGNORM)
@@ -472,13 +472,13 @@ baby_md_reg(coa, ifindex, bid)
 			return (-1);
 		
 		memset(mdinfo, 0, len);
-		mdinfo->mipm_md_hdr.miph_msglen	= len;
-		mdinfo->mipm_md_hdr.miph_version = MIP_VERSION;
-		mdinfo->mipm_md_hdr.miph_type	= MIPM_MD_INFO;
-		mdinfo->mipm_md_hdr.miph_seq	= random();
-		mdinfo->mipm_md_hint		= MIPM_MD_ADDR;
-		mdinfo->mipm_md_command		= MIPM_MD_REREG;
-		mdinfo->mipm_md_ifindex         = ifindex;
+		mdinfo->mipmmi_hdr.miph_msglen	= len;
+		mdinfo->mipmmi_hdr.miph_version = MIP_VERSION;
+		mdinfo->mipmmi_hdr.miph_type	= MIPM_MD_INFO;
+		mdinfo->mipmmi_hdr.miph_seq	= random();
+		mdinfo->mipmmi_hint		= MIPM_MD_ADDR;
+		mdinfo->mipmmi_command		= MIPM_MD_REREG;
+		mdinfo->mipmmi_ifindex         = ifindex;
 		
 		memcpy(MIPD_HOA(mdinfo), &hoa, sizeof(hoa));
 		memcpy(MIPD_COA(mdinfo), coa, sizeof(*coa));
@@ -568,9 +568,9 @@ baby_mipmsg(mipm, msglen)
 		break;
 	case MIPM_MD_INFO:
                 mipmd = (struct mipm_md_info *)mipm;
-                if (mipmd->mipm_md_command == MIPM_MD_SCAN) {
+                if (mipmd->mipmmi_command == MIPM_MD_SCAN) {
 
-			ifinfo = baby_ifindex2ifinfo(mipmd->mipm_md_ifindex);
+			ifinfo = baby_ifindex2ifinfo(mipmd->mipmmi_ifindex);
 			if (ifinfo != NULL)                        
 				send_rs(ifinfo);
                 } 
@@ -1439,13 +1439,13 @@ baby_md_home(hoa, coa, ifindex)
                 return;
 
         memset(mdinfo, 0, len);
-        mdinfo->mipm_md_hdr.miph_msglen = len;
-        mdinfo->mipm_md_hdr.miph_version = MIP_VERSION;
-        mdinfo->mipm_md_hdr.miph_type   = MIPM_MD_INFO;
-        mdinfo->mipm_md_hdr.miph_seq    = random();
-        mdinfo->mipm_md_hint            = MIPM_MD_ADDR;
-        mdinfo->mipm_md_command         = MIPM_MD_DEREGHOME;
-        mdinfo->mipm_md_ifindex         = ifindex;
+        mdinfo->mipmmi_hdr.miph_msglen = len;
+        mdinfo->mipmmi_hdr.miph_version = MIP_VERSION;
+        mdinfo->mipmmi_hdr.miph_type   = MIPM_MD_INFO;
+        mdinfo->mipmmi_hdr.miph_seq    = random();
+        mdinfo->mipmmi_hint            = MIPM_MD_ADDR;
+        mdinfo->mipmmi_command         = MIPM_MD_DEREGHOME;
+        mdinfo->mipmmi_ifindex         = ifindex;
         memcpy(MIPD_HOA(mdinfo), hoa, sizeof(*hoa));
         memcpy(MIPD_COA(mdinfo), hoa, sizeof(*hoa));
 

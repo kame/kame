@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.40 2007/01/13 18:46:21 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.41 2007/01/14 05:15:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -325,10 +325,10 @@ mipsock_input(miphdr)
 		break;
 	case MIPM_DAD:
 		mipmdad = (struct mipm_dad *)miphdr;
-		if (mipmdad->mipmdadh_message != MIPM_DAD_DO) {
+		if (mipmdad->mipmdad_message != MIPM_DAD_DO) {
 			/* do the process of complete of DAD */
-			mip6_dad_done(mipmdad->mipmdadh_message,
-				      &mipmdad->mipmdadh_addr6);
+			mip6_dad_done(mipmdad->mipmdad_message,
+				      &mipmdad->mipmdad_addr6);
 		}
 		break;
 	default:

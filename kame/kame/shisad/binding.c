@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.34 2007/01/13 18:46:21 keiichi Exp $	*/
+/*	$KAME: binding.c,v 1.35 2007/01/14 05:15:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -162,7 +162,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmet
 		}
 
 		/* update BC in the kernel via mipsock */
-		mipsock_bc_request(bc, MIPM_BC_UPDATE);
+		mipsock_bc_request(bc, MIPM_BC_ADD);
 			
 		bc->bc_expire = now + bc->bc_lifetime;
 		
@@ -326,13 +326,13 @@ mip6_dad_order(message, addr)
 	int err;
 	struct mipm_dad mipmdad;
 
-	mipmdad.mipmdadh_msglen = sizeof(mipmdad);
-	mipmdad.mipmdadh_version = MIP_VERSION;
-	mipmdad.mipmdadh_type = MIPM_DAD;
-	mipmdad.mipmdadh_seq = random();
-	mipmdad.mipmdadh_message = message;
-	mipmdad.mipmdadh_ifindex = ha_if();
-	mipmdad.mipmdadh_addr6 = *addr;
+	mipmdad.mipmdad_msglen = sizeof(mipmdad);
+	mipmdad.mipmdad_version = MIP_VERSION;
+	mipmdad.mipmdad_type = MIPM_DAD;
+	mipmdad.mipmdad_seq = random();
+	mipmdad.mipmdad_message = message;
+	mipmdad.mipmdad_ifindex = ha_if();
+	mipmdad.mipmdad_addr6 = *addr;
 	err = write(mipsock, &mipmdad, sizeof(mipmdad));
 }
 
@@ -500,7 +500,6 @@ mipsock_bc_request(bc, command)
 	struct sockaddr_in6 hoa_s6, coa_s6, cn_s6;
 	
 	if (command != MIPM_BC_ADD &&
-	    command != MIPM_BC_UPDATE &&
 	    command != MIPM_BC_REMOVE) {
 		syslog(LOG_ERR, "mipsock_bc_request: "
 		    "invalid command %d\n", command);
@@ -523,24 +522,22 @@ mipsock_bc_request(bc, command)
         memset(buf, 0, sizeof(buf));
         bcinfo = (struct mipm_bc_info *)buf;
 
-        bcinfo->mipc_msglen = sizeof(struct mipm_bc_info) 
+        bcinfo->mipmci_msglen = sizeof(struct mipm_bc_info) 
 		+ sizeof(struct sockaddr_in6) * 3;
-        bcinfo->mipc_version = MIP_VERSION;
-        bcinfo->mipc_type = command;
-        bcinfo->mipc_seq = random();
-        bcinfo->mipc_flags = bc->bc_flags;
-        bcinfo->mipc_seqno = bc->bc_seqno;
-        bcinfo->mipc_lifetime = bc->bc_lifetime;
+        bcinfo->mipmci_version = MIP_VERSION;
+        bcinfo->mipmci_type = command;
+        bcinfo->mipmci_seq = random();
+        bcinfo->mipmci_flags = bc->bc_flags;
+        bcinfo->mipmci_lifetime = bc->bc_lifetime;
 #ifdef MIP_MCOA
 	coa_s6.sin6_port = bc->bc_bid;
 #endif /* MIP_MCOA */
 
-        /* bcinfo->mipc_coa_ifname xxx */
         memcpy(MIPC_HOA(bcinfo), &hoa_s6, hoa_s6.sin6_len);
         memcpy(MIPC_COA(bcinfo), &coa_s6, coa_s6.sin6_len);
         memcpy(MIPC_CNADDR(bcinfo), &cn_s6, cn_s6.sin6_len);
 
-        err = write(mipsock, bcinfo, bcinfo->mipc_msglen);
+        err = write(mipsock, bcinfo, bcinfo->mipmci_msglen);
 	if (err < 0)
 		syslog(LOG_ERR, "%m mipsock_bc_request:write");
 
@@ -548,9 +545,6 @@ mipsock_bc_request(bc, command)
 		switch (command) {
 		case MIPM_BC_ADD:
 			syslog(LOG_INFO, "binding cache add request\n");
-			break;
-		case MIPM_BC_UPDATE:
-			syslog(LOG_INFO, "binding cache update request\n");
 			break;
 		case MIPM_BC_REMOVE:
 			syslog(LOG_INFO, "binding cache remove request\n");

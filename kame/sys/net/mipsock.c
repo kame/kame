@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.19 2006/04/17 12:12:12 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.20 2007/01/14 05:15:23 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -46,9 +46,7 @@
 #include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/syslog.h>
-#ifdef __OpenBSD__
 #include <sys/proc.h>
-#endif /* __OpenBSD__ */
 
 #include <net/if.h>
 #include <net/mipsock.h>
@@ -71,11 +69,11 @@
 #define thread proc
 #endif /* __APPLE__ */
 
-/*MALLOC_DEFINE(M_RTABLE, "routetbl", "routing tables");*/
+DOMAIN_DEFINE(mipdomain);	/* foward declare and add to link set */
 
-static struct	sockaddr mips_dst = { 2, PF_MOBILITY, };
-static struct	sockaddr mips_src = { 2, PF_MOBILITY, };
-static struct	sockproto mips_proto = { PF_MOBILITY, };
+static struct	sockaddr mips_dst = { .sa_len = 2, .sa_family = PF_MOBILITY, };
+static struct	sockaddr mips_src = { .sa_len = 2, .sa_family = PF_MOBILITY, };
+static struct	sockproto mips_proto = { .sp_family = PF_MOBILITY, };
 
 #if defined(__FreeBSD__) || defined(__APPLE__)
 static int mips_abort(struct socket *);
@@ -96,12 +94,6 @@ static int mips_output(struct mbuf *, struct socket *);
 static int mips_output(struct mbuf *, ...);
 #endif
 static struct mbuf *mips_msg1(int type, int len);
-
-#if defined(__NetBSD__)
-int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
-#elif defined(__OpenBSD__)
-int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *);
-#endif
 
 #if defined(__FreeBSD__) || defined(__APPLE__)
 /*
@@ -306,21 +298,8 @@ static struct pr_usrreqs mip_usrreqs = {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 /*ARGSUSED*/
 int
-#ifdef __NetBSD__
-mips_usrreq(so, req, m, nam, control, p)
-#else
-mips_usrreq(so, req, m, nam, control)
-#endif
-	struct socket *so;
-	int req;
-	struct mbuf *m;
-	struct mbuf *nam;
-	struct mbuf *control;
-#ifdef __NetBSD__
-	struct proc *p;
-#else
-#define p curproc
-#endif
+mips_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
+    struct mbuf *control, struct lwp *l)
 {
 	int error = 0;
 	struct rawcb *rp = sotorawcb(so);
@@ -344,7 +323,7 @@ mips_usrreq(so, req, m, nam, control)
 	 * and send "safe" commands to the routing socket.
 	 */
 	if (req == PRU_ATTACH) {
-		if (p == 0)
+		if (l == 0)
 			error = EACCES;
 		else
 			error = raw_attach(so, (int)(long)nam);
@@ -352,7 +331,7 @@ mips_usrreq(so, req, m, nam, control)
 #ifdef __OpenBSD__
 		error = raw_usrreq(so, req, m, nam, control);
 #else
-		error = raw_usrreq(so, req, m, nam, control, p);
+		error = raw_usrreq(so, req, m, nam, control, l);
 #endif
 
 	rp = sotorawcb(so);
@@ -372,7 +351,6 @@ mips_usrreq(so, req, m, nam, control)
 	return (error);
 }
 #ifdef __OpenBSD__
-#undef p
 #endif
 #endif
 
@@ -386,7 +364,7 @@ mips_output(m, so)
 #if __STDC__
 mips_output(struct mbuf *m, ...)
 #else
-mipus_output(m, va_alist)
+mips_output(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
@@ -406,10 +384,11 @@ mipus_output(m, va_alist)
 	u_int16_t bid = 0;
 
 	miph = mtod(m, struct mip_msghdr *);
+	miph->miph_pid = curproc->p_pid;
 
 	switch (miph->miph_type) {
 	case MIPM_BC_ADD:
-	case MIPM_BC_UPDATE:
+/*	case MIPM_BC_UPDATE:*/
 		mipc = (struct mipm_bc_info *)miph;
 		bcopy(MIPC_CNADDR(mipc), &cnaddr, MIPC_CNADDR(mipc)->sa_len);
 		bcopy(MIPC_HOA(mipc), &hoa, MIPC_HOA(mipc)->sa_len);
@@ -422,7 +401,7 @@ mipus_output(m, va_alist)
 			error = mip6_bce_update((struct sockaddr_in6 *)&cnaddr,
 						(struct sockaddr_in6 *)&hoa,
 						(struct sockaddr_in6 *)&coa,
-						mipc->mipc_flags, bid);
+						mipc->mipmci_flags, bid);
 			break;
 		default:
 			error = EPFNOSUPPORT;
@@ -443,7 +422,7 @@ mipus_output(m, va_alist)
 			error = mip6_bce_remove_addr((struct sockaddr_in6 *)&cnaddr,
 						     (struct sockaddr_in6 *)&hoa,
 						     (struct sockaddr_in6 *)&coa,
-						     mipc->mipc_flags, bid);
+						     mipc->mipmci_flags, bid);
 			break;
 		default:
 			error = EPFNOSUPPORT;
@@ -479,7 +458,7 @@ mipus_output(m, va_alist)
 
 #if NMIP > 0
 	case MIPM_BUL_ADD:
-	case MIPM_BUL_UPDATE:
+/*	case MIPM_BUL_UPDATE: */
 		mipu = (struct mipm_bul_info *)miph;
 		/* Non IPv6 address is not supported (only for MIP6) */
 		bcopy(MIPU_PEERADDR(mipu), &cnaddr, MIPU_PEERADDR(mipu)->sa_len);
@@ -498,9 +477,9 @@ mipus_output(m, va_alist)
 			error = mip6_bul_add(&((struct sockaddr_in6 *)&cnaddr)->sin6_addr,
 					     &((struct sockaddr_in6 *)&hoa)->sin6_addr,
 					     &((struct sockaddr_in6 *)&coa)->sin6_addr,
-					     mipu->mipu_hoa_ifindex,
-					     mipu->mipu_flags,
-					     mipu->mipu_state, bid);
+					     mipu->mipmui_hoa_ifindex,
+					     mipu->mipmui_flags,
+					     mipu->mipmui_state, bid);
 			break;
 		default:
 			error = EPFNOSUPPORT;
@@ -530,8 +509,8 @@ mipus_output(m, va_alist)
 	case MIPM_HOME_HINT:
 	case MIPM_MD_INFO:
                 mipmd = (struct mipm_md_info *)miph;
-                if (mipmd->mipm_md_command == MIPM_MD_SCAN) {
-                        mip6_md_scan(mipmd->mipm_md_ifindex);
+                if (mipmd->mipmmi_command == MIPM_MD_SCAN) {
+                        mip6_md_scan(mipmd->mipmmi_ifindex);
                 } 
                 break;
 #endif /* NMIP > 0 */
@@ -540,12 +519,12 @@ mipus_output(m, va_alist)
 		/* MIPM_DAD_SUCCESS or MIPM_DAD_FAIL is returned as a result of the DAD */
 	case MIPM_DAD:
 		mipmdad = (struct mipm_dad *)miph;
-		if (mipmdad->mipmdadh_message == MIPM_DAD_DO) {
-			mip6_do_dad(&mipmdad->mipmdadh_addr6, mipmdad->mipmdadh_ifindex);
-		} else if (mipmdad->mipmdadh_message == MIPM_DAD_STOP) {
-			mip6_stop_dad(&mipmdad->mipmdadh_addr6, mipmdad->mipmdadh_ifindex);
-		} else if (mipmdad->mipmdadh_message == MIPM_DAD_LINKLOCAL) {
-			mip6_do_dad_lladdr(mipmdad->mipmdadh_ifindex);
+		if (mipmdad->mipmdad_message == MIPM_DAD_DO) {
+			mip6_do_dad(&mipmdad->mipmdad_addr6, mipmdad->mipmdad_ifindex);
+		} else if (mipmdad->mipmdad_message == MIPM_DAD_STOP) {
+			mip6_stop_dad(&mipmdad->mipmdad_addr6, mipmdad->mipmdad_ifindex);
+		} else if (mipmdad->mipmdad_message == MIPM_DAD_LINKLOCAL) {
+			mip6_do_dad_lladdr(mipmdad->mipmdad_ifindex);
 		}
 		break;
 
@@ -553,13 +532,7 @@ mipus_output(m, va_alist)
 		return (0);
 	}
 	
-#ifdef __APPLE__
-	socket_unlock(so, 0);
-#endif
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
-#ifdef __APPLE__
-	socket_lock(so, 0);
-#endif
 	return (error);
 }
 
@@ -596,72 +569,6 @@ mips_msg1(type, len)
 	miph->miph_type = type;
 	return (m);
 }
-
-#if 0
-void
-mips_notify_bc(type, mbc)
-	u_char type;
-	struct mip6_bc *mbc;
-{
-	register struct mipm_bc_info *mipc;
-	register struct mbuf *m;
-	struct sockaddr_in6 *hoa_sin6, *coa_sin6;
-
-	m = mips_msg1(type, sizeof(struct mipm_bc_info) + sizeof(struct sockaddr_in6) * 2);
-	if (m == NULL)
-		return;
-	mipc = mtod(m, struct mipm_bc_info *);
-	hoa = (struct sockaddr_in6 *)(mipc + 1)
-	coa = hoa + 1;
-	bzero(hoa_sin6, sizeof(struct sockaddr_in6));
-	bzero(coa_sin6, sizeof(struct sockaddr_in6));
-	hoa_sin6->sin6_family = coa_sin6->sin6_family = AF_INET6;
-	hoa_sin6->sin6_len = coa_sin6->sin6_len = sizeof(struct sockaddr_in6);
-	hoa_sin6->sin6_addr = mbc->mbc_phaddr;
-	coa_sin6->sin6_addr = mbc->mbc_pcoa;
-	raw_input(m, &mips_proto, &mips_src, &mips_dst);
-}
-#endif
-
-#if 0
-void
-mips_notify_bul(type, mbul)
-	u_char type;
-	struct mip6_bul_internal *mbul;
-{
-	struct mipm_bul_info *mipu;
-	struct mbuf *m;
-	struct ifaddr *coaifa;
-	struct sockaddr_in6 *hoa_sin6, *coa_sin6, *peeraddr_sin6;
-
-	m = mips_msg1(type, sizeof(struct mipm_bul_info) + sizeof(struct sockaddr_in6) * 3);
-	if (m == NULL)
-		return;
-	mipu = mtod(m, struct mipm_bul_info *);
-	hoa_sin6 = (struct sockaddr_in6 *)(mipu + 1);
-	coa_sin6 = hoa_sin6 + 1;
-	peeraddr_sin6 = coa_sin6 + 1;
-	bzero(hoa_sin6, sizeof(struct sockaddr_in6));
-	bzero(coa_sin6, sizeof(struct sockaddr_in6));
-	bzero(peeraddr_sin6, sizeof(struct sockaddr_in6));
-	hoa_sin6->sin6_family
-	    = coa_sin6->sin6_family
-	    = peeraddr_sin6->sin6_family
-	    = AF_INET6;
-	hoa_sin6->sin6_len
-	    = coa_sin6->sin6_len
-	    = peeraddr_sin6->sin6_len
-	    = sizeof(struct sockaddr_in6);
-	hoa_sin6->sin6_addr = mbul->mbul_hoa;
-	coa_sin6->sin6_addr = mbul->mbul_coa;
-	peeraddr_sin6->sin6_addr = mbul->mbul_peeraddr;
-	coaifa = ifa_ifwithaddr((struct sockaddr *)&mbul->mbul_coa);
-	sprintf(mipu->mipu_coa_ifname, "%s%d", coaifa->ifa_ifp->if_name,
-	    coaifa->ifa_ifp->if_unit);
-	mipu->mipu_flags = mbul->mbul_flags;
-	raw_input(m, &mips_proto, &mips_src, &mips_dst);
-}
-#endif
 
 
 void
@@ -758,9 +665,9 @@ mips_notify_dad_result(message, addr, ifindex)
 	if (m == NULL)
 		return;
 	mipmdad = mtod(m, struct mipm_dad *);
-	mipmdad->mipmdadh_message = message;
-	mipmdad->mipmdadh_ifindex = ifindex;
-	bcopy(addr, &mipmdad->mipmdadh_addr6, sizeof(struct in6_addr));
+	mipmdad->mipmdad_message = message;
+	mipmdad->mipmdad_ifindex = ifindex;
+	bcopy(addr, &mipmdad->mipmdad_addr6, sizeof(struct in6_addr));
 
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
 }
@@ -783,7 +690,8 @@ static struct protosw mipsw[] = {
 #ifdef __APPLE__
   0,
 #endif
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(__NetBSD__)
+#elif !defined(__FreeBSD__) && !defined(__APPLE__)
   0/*sysctl_rtable*/
 #else
   &mip_usrreqs
@@ -795,15 +703,11 @@ static struct protosw mipsw[] = {
 }
 };
 
-struct domain mipdomain =
-{ PF_MOBILITY, "mip", 0, 0, 0,
-  mipsw,
-#ifdef __APPLE__
-      0, 0, 0, 0, 0, 0, 0, 0, 
-      { 0, 0 }
-#else
-  &mipsw[sizeof(mipsw)/sizeof(mipsw[0])]
-#endif
+struct domain mipdomain = {
+	.dom_family = PF_MOBILITY,
+	.dom_name = "mip",
+	.dom_protosw = mipsw,
+	.dom_protoswNPROTOSW = &mipsw[sizeof(mipsw)/sizeof(mipsw[0])],
 };
 
 #if defined(__FreeBSD__) || defined(__APPLE__)

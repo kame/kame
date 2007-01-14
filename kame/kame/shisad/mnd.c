@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.39 2007/01/14 05:10:07 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.40 2007/01/14 05:15:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -415,16 +415,15 @@ mipsock_bul_request(bul, command)
 	struct sockaddr_in6 hoa_s6, coa_s6, peer_s6;
 
 	if (command != MIPM_BUL_ADD &&
-	    command != MIPM_BUL_UPDATE &&
 	    command != MIPM_BUL_REMOVE) {
 		syslog(LOG_ERR, "mipsock_bul_request: "
-		    "invalid command %d\n", command);
+		    "invalid command %d", command);
 		return (EOPNOTSUPP);
 	}
 
 	if (bul->bul_hoainfo == NULL) {
 		syslog(LOG_ERR, "mipsock_bul_request: "
-		    "no related home address info\n");
+		    "no related home address info");
 		return (EINVAL);
 	}
 
@@ -444,23 +443,22 @@ mipsock_bul_request(bul, command)
 	memset(buf, 0, sizeof(buf));
 	buinfo = (struct mipm_bul_info *)buf;
 
-	buinfo->mipu_msglen = 
+	buinfo->mipmui_msglen = 
 		sizeof(struct mipm_bul_info) + sizeof(struct sockaddr_in6) * 3;
-	buinfo->mipu_version = MIP_VERSION;
-	buinfo->mipu_type = command;
-	buinfo->mipu_seq = random();
-	buinfo->mipu_flags = bul->bul_flags;
-	buinfo->mipu_hoa_ifindex = bul->bul_hoainfo->hinfo_ifindex;
+	buinfo->mipmui_version = MIP_VERSION;
+	buinfo->mipmui_type = command;
+	buinfo->mipmui_seq = random();
+	buinfo->mipmui_flags = bul->bul_flags;
+	buinfo->mipmui_hoa_ifindex = bul->bul_hoainfo->hinfo_ifindex;
 #ifdef MIP_MCOA
 	coa_s6.sin6_port = bul->bul_bid;
 #endif /* MIP_MCOA */
-	/* buinfo->mipu_coa_ifname xxx */
-	buinfo->mipu_state = bul->bul_state;
+	buinfo->mipmui_state = bul->bul_state;
 	memcpy(MIPU_HOA(buinfo), &hoa_s6, hoa_s6.sin6_len);
 	memcpy(MIPU_COA(buinfo), &coa_s6, coa_s6.sin6_len);
 	memcpy(MIPU_PEERADDR(buinfo), &peer_s6, peer_s6.sin6_len);
 
- 	err = write(mipsock, buinfo, buinfo->mipu_msglen);
+ 	err = write(mipsock, buinfo, buinfo->mipmui_msglen);
 	
 	return (0);
 }
@@ -546,30 +544,30 @@ mipsock_recv_mdinfo(miphdr)
 	memcpy(&bid, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port, sizeof(bid));
 #endif /* MIP_MCOA */
 	/* Update bul according to md_hint */
-	switch (mdinfo->mipm_md_command) {
+	switch (mdinfo->mipmmi_command) {
 	case MIPM_MD_REREG:
 		/* XXX do we need MIPM_MD_INDEX?! */
-		if (mdinfo->mipm_md_hint == MIPM_MD_INDEX)
-			err = mipsock_md_update_bul_byifindex(mdinfo->mipm_md_ifindex, &coa);
-		else if (mdinfo->mipm_md_hint == MIPM_MD_ADDR) {
+		if (mdinfo->mipmmi_hint == MIPM_MD_INDEX)
+			err = mipsock_md_update_bul_byifindex(mdinfo->mipmmi_ifindex, &coa);
+		else if (mdinfo->mipmmi_hint == MIPM_MD_ADDR) {
 			err = bul_update_by_mipsock_w_hoa(&hoa, &coa, bid);
 		
 			/*
 			 * do DAD for link local address
 			 */
-			if (mdinfo->mipm_md_ifindex <= 0)
+			if (mdinfo->mipmmi_ifindex <= 0)
 				syslog(LOG_ERR,
 					"ifindex is not set by (baby)mdd");
 			else {
 				/* write DAD requrest for link local addr */
-				mipmdad.mipmdadh_msglen = sizeof(mipmdad);
-				mipmdad.mipmdadh_version = MIP_VERSION;
-				mipmdad.mipmdadh_type = MIPM_DAD;
-				mipmdad.mipmdadh_seq = random();
-				mipmdad.mipmdadh_message = MIPM_DAD_LINKLOCAL;
-				mipmdad.mipmdadh_ifindex = 
-							mdinfo->mipm_md_ifindex;
-				mipmdad.mipmdadh_addr6 = coa;
+				mipmdad.mipmdad_msglen = sizeof(mipmdad);
+				mipmdad.mipmdad_version = MIP_VERSION;
+				mipmdad.mipmdad_type = MIPM_DAD;
+				mipmdad.mipmdad_seq = random();
+				mipmdad.mipmdad_message = MIPM_DAD_LINKLOCAL;
+				mipmdad.mipmdad_ifindex = 
+							mdinfo->mipmmi_ifindex;
+				mipmdad.mipmdad_addr6 = coa;
 				if (write(mipsock, &mipmdad, sizeof(mipmdad))
 					== -1)
 					syslog(LOG_ERR, "failed to request DAD"
@@ -578,7 +576,7 @@ mipsock_recv_mdinfo(miphdr)
 		}
 		break;
 	case MIPM_MD_DEREGHOME:
-		err = mipsock_md_dereg_bul(&hoa, &coa, mdinfo->mipm_md_ifindex);
+		err = mipsock_md_dereg_bul(&hoa, &coa, mdinfo->mipmmi_ifindex);
 		break;
 	case MIPM_MD_DEREGFOREIGN:
 		/* Get CoA to send de-reg BU */
@@ -587,11 +585,11 @@ mipsock_recv_mdinfo(miphdr)
 		memcpy(&acoa, &((struct sockaddr_in6 *)MIPD_COA2(mdinfo))->sin6_addr, sizeof(struct in6_addr));
 
 		err = mipsock_md_dereg_bul_fl(&hoa, &coa, &acoa, 
-					      mdinfo->mipm_md_ifindex, bid);
+					      mdinfo->mipmmi_ifindex, bid);
 		break;
 	default:
 		syslog(LOG_ERR, "unsupported md_info command %d\n",
-		    mdinfo->mipm_md_command);
+		    mdinfo->mipmmi_command);
 		err = EOPNOTSUPP;
 		break;
 	}
@@ -1017,11 +1015,11 @@ mipsock_input(miphdr)
 
 	switch (miphdr->miph_type) {
 	case MIPM_BC_ADD:
-        case MIPM_BC_UPDATE:
-        case MIPM_BC_REMOVE:
-        case MIPM_BUL_ADD:
-        case MIPM_BUL_UPDATE:
-        case MIPM_BUL_REMOVE:
+	/*case MIPM_BC_UPDATE:*/
+	case MIPM_BC_REMOVE:
+	case MIPM_BUL_ADD:
+	/*case MIPM_BUL_UPDATE:*/
+	case MIPM_BUL_REMOVE:
 	case MIPM_NODETYPE_INFO:
 	case MIPM_BUL_FLUSH:
 	case MIPM_HOME_HINT: /* ignore, it's for MD deamon*/
@@ -1090,7 +1088,7 @@ send_haadreq(hoainfo, hoa_plen, src)
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 	if (debug)
-		syslog(LOG_INFO, "send DHAAD req from %s to %s\n",
+		syslog(LOG_INFO, "send DHAAD req from %s to %s",
 		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
 		
 #if defined(MIP_MN)
