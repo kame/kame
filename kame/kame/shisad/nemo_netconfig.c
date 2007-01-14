@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.25 2007/01/14 05:10:07 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.26 2007/01/14 05:23:54 t-momose Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -696,10 +696,10 @@ mainloop() {
 
                                 mbu = (struct mipm_bul_info *)buf;
 				/* if H and R flag are not set, ignore the BU */
-                                if ((mbu->mipu_flags & IP6_MH_BU_HOME) == 0)
+                                if ((mbu->mipmui_flags & IP6_MH_BU_HOME) == 0)
 					break;
 				if (mobile_node_mode == CFV_MOBILEROUTER
-				    && (mbu->mipu_flags & IP6_MH_BU_ROUTER) == 0) 
+				    && (mbu->mipmui_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				memset(&src, 0, sizeof(src));
 				memset(&dst, 0, sizeof(dst));
@@ -779,9 +779,9 @@ mainloop() {
                                 mbu = (struct mipm_bul_info *)buf;
 
 				/* if H and R flag are not set, ignore the BU */
-                                if ((mbu->mipu_flags & IP6_MH_BU_HOME) == 0)
+                                if ((mbu->mipmui_flags & IP6_MH_BU_HOME) == 0)
 					break;
-				if ((mbu->mipu_flags & IP6_MH_BU_ROUTER) == 0) 
+				if ((mbu->mipmui_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				hoa = &((struct sockaddr_in6 *)MIPU_HOA(mbu))->sin6_addr;
 				if (hoa == NULL)
@@ -815,9 +815,9 @@ mainloop() {
 
                                 mbc = (struct mipm_bc_info *)buf;
 				/* if H and R flag are not set, ignore the BU */
-                                if ((mbc->mipc_flags & IP6_MH_BU_HOME) == 0)
+                                if ((mbc->mipmci_flags & IP6_MH_BU_HOME) == 0)
 					break;
-				if ((mbc->mipc_flags & IP6_MH_BU_ROUTER) == 0) 
+				if ((mbc->mipmci_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				hoa = &((struct sockaddr_in6 *)MIPC_HOA(mbc))->sin6_addr;
 				if (hoa == NULL)
@@ -879,9 +879,9 @@ mainloop() {
 
                                 mbc = (struct mipm_bc_info *)buf;
 				/* if H and R flag are not set, ignore the BU */
-                                if ((mbc->mipc_flags & IP6_MH_BU_HOME) == 0)
+                                if ((mbc->mipmci_flags & IP6_MH_BU_HOME) == 0)
 					break;
-				if ((mbc->mipc_flags & IP6_MH_BU_ROUTER) == 0) 
+				if ((mbc->mipmci_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				hoa = &((struct sockaddr_in6 *)MIPC_HOA(mbc))->sin6_addr;
 				if (hoa == NULL)
