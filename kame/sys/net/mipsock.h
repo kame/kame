@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.9 2007/01/14 05:15:23 t-momose Exp $ */
+/* $Id: mipsock.h,v 1.10 2007/01/14 09:50:16 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -242,8 +242,10 @@ struct mipm_dad {
 #define MIPM_BE_HINT		13
 #define MIPM_DAD		14
 
+#ifdef __NetBSD__
 int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
     struct mbuf *, struct lwp *);
+#endif /* __NetBSD__ */
 void mips_notify_home_hint(u_int16_t, struct sockaddr *, u_int16_t);
 void mips_notify_rr_hint(struct sockaddr *, struct sockaddr *);
 void mips_notify_be_hint(struct sockaddr *, struct sockaddr *,
