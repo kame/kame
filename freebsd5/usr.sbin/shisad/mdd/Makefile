@@ -28,8 +28,9 @@ SRCDIR=	${.CURDIR}/../../../kame/shisad
 
 PROG=	mdd
 SRCS=	mdd.c  mdd_rtsock.c mdd_probe.c 
-#CFLAGS+= -g -Wall -Werror  -DMIP_MCOA
 CFLAGS+= -g -Wall -Werror
+CFLAGS+= -DNO_PF
+#CFLAGS+= -DMIP_MCOA
 
 #LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 #	-L/usr/local/v6/lib -linet6 -lssl -lcrypto

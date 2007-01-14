@@ -30,6 +30,7 @@ PROG=	nemonetd
 SRCS=	nemo_netconfig.c network.c util.c
 SRCS+=	config.c cfparse.y cftoken.l
 CFLAGS+= -g -Wall -Werror  -DMIP_NEMO
+CFLAGS+= -DNO_PF
 #CFLAGS+= -DMIP_MCOA
 #CFLAGS+= -DMIP_IPV4MNPSUPPORT
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}

@@ -32,6 +32,7 @@ SRCS=	cnd.c rr.c callout.c  mh.c \
 SRCS+=	config.c cfparse.y cftoken.l
 	
 CFLAGS+= -g -Wall -Werror -DMIP_CN
+CFLAGS+= -DNO_PF
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \

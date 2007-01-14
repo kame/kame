@@ -31,6 +31,7 @@ SRCS=	had.c  callout.c common.c  mh.c \
 	binding.c fdlist.c command.c network.c nemo_var.c util.c hal.c
 SRCS+=	config.c cfparse.y cftoken.l
 CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA
+CFLAGS+= -DNO_PF
 #CFLAGS+= -DMIP_NEMO
 #CFLAGS+= -DMIP_MCOA
 #CFLAGS+= -DMIP_IPV4MNPSUPPORT
