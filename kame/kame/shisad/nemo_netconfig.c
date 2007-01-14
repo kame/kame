@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.23 2007/01/13 18:46:21 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.24 2007/01/14 01:41:10 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -63,7 +63,11 @@
 
 #define MODE_HA 0x01
 #define MODE_MR 0x02
+#ifdef NO_PF
+#define NEMO_TUNNAME "nemo"
+#else
 #define NEMO_TUNNAME "mtun"
+#endif /* NO_PF */
 
 /* Variables */
 struct nemo_if {
