@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.12 2007/01/13 18:46:21 keiichi Exp $	*/
+/*	$KAME: cfparse.y,v 1.13 2007/01/14 05:56:42 keiichi Exp $	*/
 
 %{
 /*
@@ -68,8 +68,6 @@ static void free_cfe(struct config_entry *);
 %token PAGER
 %token INTERFACE IFNAME
 %token HOMEREGISTRATIONLIFETIME
-%token MOBILENODEMODE
-%token MOBILENODEMODEVALUE
 %token PREFERENCE
 %token KEYMANAGEMENT
 %token PREFIXTABLE
@@ -88,14 +86,12 @@ static void free_cfe(struct config_entry *);
 
 %type <string> ADDRSTRING
 %type <string> IFNAME
-%type <string> MOBILENODEMODEVALUE
 %type <string> MNPMODEVALUE
 %type <number> INTEGER
 %type <string> FILENAME
 %type <cfe> statements statement
 %type <cfe> debug_statement namelookup_statement dad_statement pager_statement
 %type <cfe> commandport_statement
-%type <cfe> mobilenodemode_statement
 %type <cfe> homeregistrationlifetime_statement
 %type <cfe> interface_statement
 %type <cfe> preference_statement
@@ -143,7 +139,6 @@ statement:
 	|	namelookup_statement
 	|	commandport_statement
 	|	interface_statement
-	|	mobilenodemode_statement
 	|	homeregistrationlifetime_statement
 	|	preference_statement
 	|	keymanagement_statement
@@ -250,27 +245,6 @@ interface_statement:
 				return (-1);
 			cfe->cfe_ptr = $2;
 			cfe->cfe_list = $4;
-
-			$$ = cfe;
-		}
-	;
-
-mobilenodemode_statement:
-		MOBILENODEMODE MOBILENODEMODEVALUE EOS
-		{
-			struct config_entry *cfe;
-
-			cfe = alloc_cfe(CFT_MOBILENODEMODE);
-			if (cfe == NULL)
-				return (-1);
-			if (strcmp($2, "mobile-host") == 0)
-				cfe->cfe_number = CFV_MOBILEHOST;
-			else if (strcmp($2, "mobile-router") == 0)
-				cfe->cfe_number = CFV_MOBILEROUTER;
-			else {
-				printf("unknown mobile node type\n");
-				return (-1);
-			}
 
 			$$ = cfe;
 		}

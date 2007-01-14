@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.40 2007/01/14 05:15:23 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.41 2007/01/14 05:56:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -87,7 +87,7 @@ int debug = 0;
 int foreground = 0;
 int namelookup = 1;
 int command_port = MND_COMMAND_PORT;
-int mobile_node_mode = CFV_MOBILEHOST;
+int mobileroutersupport = 0;
 int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
 int keymanagement = 0;
 #ifdef MIP_IPV4MNPSUPPORT
@@ -169,6 +169,7 @@ main(argc, argv)
 #endif /* DSMIP */
 	char *argopts = "fnc:a:";
 	char *conffile = MND_CONFFILE;
+	struct config_entry *dummy;
 
 #if 1 /* MIP_NEMO */
 	argopts = "fnc:a:t:";
@@ -235,8 +236,8 @@ main(argc, argv)
 		config_get_number(CFT_DEBUG, &debug, if_params);
 		config_get_number(CFT_COMMANDPORT, &command_port,
 		    if_params);
-		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
-		    if_params);
+		if (config_get_prefixtable(&dummy, if_params) == 0)
+			mobileroutersupport = 1;
 		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
 		    &default_lifetime, if_params);
 		config_get_number(CFT_KEYMANAGEMENT,
@@ -251,8 +252,8 @@ main(argc, argv)
 		config_get_number(CFT_DEBUG, &debug, config_params);
 		config_get_number(CFT_COMMANDPORT, &command_port,
 		    config_params);
-		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
-		    config_params);
+		if (config_get_prefixtable(&dummy, if_params) == 0)
+			mobileroutersupport = 1;
 		config_get_number(CFT_HOMEREGISTRATIONLIFETIME,
 		    &default_lifetime, config_params);
 		config_get_number(CFT_KEYMANAGEMENT,
@@ -293,7 +294,7 @@ main(argc, argv)
 	}
 
 #if 1 /* MIP_NEMO */
-	if (mobile_node_mode == CFV_MOBILEROUTER)
+	if (mobileroutersupport)
 		nemo_parse_conf();
 #endif /* MIP_NEMO */
 
@@ -313,7 +314,7 @@ main(argc, argv)
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		bul_flags = IP6_MH_BU_HOME|IP6_MH_BU_ACK
 #if 1 /* MIP_NEMO */
-		    | (mobile_node_mode == CFV_MOBILEROUTER ? IP6_MH_BU_ROUTER : 0)
+		    | (mobileroutersupport ? IP6_MH_BU_ROUTER : 0)
 #endif
 #ifdef MIP_MCOA 
 		    | IP6_MH_BU_MCOA
@@ -352,7 +353,7 @@ main(argc, argv)
 #endif /* DSMIP */
 
 	/* notify a kernel to behave as a mobile node. */
-	mipsock_nodetype_request(mobile_node_mode == CFV_MOBILEHOST ?
+	mipsock_nodetype_request(mobileroutersupport ?
 				 MIP6_NODETYPE_MOBILE_NODE : MIP6_NODETYPE_MOBILE_ROUTER, 1);
 
 	/* register signal handlers. */
@@ -1997,7 +1998,7 @@ terminate(dummy)
 	struct mip_msghdr mipmsg;
 
 	/* stop acting as a mobile node. */
-	mipsock_nodetype_request(mobile_node_mode == CFV_MOBILEHOST ?
+	mipsock_nodetype_request(mobileroutersupport ?
 				 MIP6_NODETYPE_MOBILE_NODE : MIP6_NODETYPE_MOBILE_ROUTER, 0);
 
 	/* flush all bul registered in a kernel. */

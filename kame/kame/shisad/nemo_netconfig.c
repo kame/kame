@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.27 2007/01/14 05:29:38 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.28 2007/01/14 05:56:42 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -98,7 +98,7 @@ struct config_entry *if_params;
 int debug = 0;
 int foreground = 0;
 int namelookup = 1;
-int mobile_node_mode = CFV_MOBILEHOST;
+int mobileroutersupport = 0;
 int staticmode = 0;
 int multiplecoa = 0;
 #ifdef MIP_IPV4MNPSUPPORT
@@ -178,6 +178,7 @@ main (argc, argv)
 	char *ifname = NULL;
 	struct nemo_if *nif;
 	struct nemo_mnpt *npt;
+	struct config_entry *dummy;
 	
 	LIST_INIT(&nemo_mnpthead);
 	LIST_INIT(&nemo_ifhead);
@@ -263,8 +264,8 @@ main (argc, argv)
 	if (if_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, if_params);
 		config_get_number(CFT_NAMELOOKUP, &namelookup, if_params);
-		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
-		    if_params);
+		if (config_get_prefixtable(&dummy, if_params) == 0)
+			mobileroutersupport = 1;
 #ifdef MIP_IPV4MNPSUPPORT
 		config_get_number(CFT_IPV4MNPSUPPORT, &ipv4mnpsupport,
 		    if_params);
@@ -273,8 +274,8 @@ main (argc, argv)
 	if (config_params != NULL) {
 		config_get_number(CFT_DEBUG, &debug, config_params);
 		config_get_number(CFT_NAMELOOKUP, &namelookup, config_params);
-		config_get_number(CFT_MOBILENODEMODE, &mobile_node_mode,
-		    config_params);
+		if (config_get_prefixtable(&dummy, if_params) == 0)
+			mobileroutersupport = 1;
 #ifdef MIP_IPV4MNPSUPPORT
 		config_get_number(CFT_IPV4MNPSUPPORT, &ipv4mnpsupport,
 		    config_params);
@@ -289,7 +290,7 @@ main (argc, argv)
 			exit(0);
 		break;
 	case MODE_MR:
-		if (mobile_node_mode == CFV_MOBILEROUTER
+		if (mobileroutersupport
 		    && mr_parse_ptconf() != 0)
 			exit(0);
 		break;
@@ -697,7 +698,7 @@ mainloop() {
 				/* if H and R flag are not set, ignore the BU */
                                 if ((mbu->mipmui_flags & IP6_MH_BU_HOME) == 0)
 					break;
-				if (mobile_node_mode == CFV_MOBILEROUTER
+				if (mobileroutersupport
 				    && (mbu->mipmui_flags & IP6_MH_BU_ROUTER) == 0) 
 					break;
 				memset(&src, 0, sizeof(src));

@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.59 2007/01/13 18:46:21 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.60 2007/01/14 05:56:42 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -78,7 +78,7 @@
 extern int homeagent_mode;
 #endif /* MIP_CN */
 #ifdef MIP_MN
-extern int mobile_node_mode;
+extern int mobileroutersupport;
 #ifdef IPV4MNPSUPPORT
 extern int ipv4mnpsupport;
 #endif /* IPV4MNPSUPPORT */
@@ -1351,7 +1351,7 @@ send_bu(bul)
 #endif /* MIP_MCOA */
 
 	/* Adding Mobile Network Prefix Option */	
-	if (mobile_node_mode == CFV_MOBILEROUTER
+	if (mobileroutersupport
 	    && (bul->bul_flags & IP6_MH_BU_ROUTER) != 0) {
 		struct nemo_mptable *mpt, *mptn;
 
@@ -1441,7 +1441,7 @@ send_bu(bul)
 
 		/* R flag MUST be always set to Home Registration
 		   if the node is a mobile router. */
-		if (mobile_node_mode == CFV_MOBILEROUTER
+		if (mobileroutersupport
 		    && (bul->bul_flags & IP6_MH_BU_ROUTER) == 0) 
 			return (EINVAL);
 
@@ -1985,7 +1985,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 		msg.msg_controllen += 
 			CMSG_SPACE(sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr));
 #if defined(MIP_MN)
-	if (mobile_node_mode == CFV_MOBILEROUTER) {
+	if (mobileroutersupport) {
 		ar_sin6 = nemo_ar_get(haoaddr, &ar_sin6_orig);
 		if (ar_sin6) 
 			msg.msg_controllen += 
@@ -2007,7 +2007,7 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 
 #if defined(MIP_MN)
-	if (mobile_node_mode == CFV_MOBILEROUTER
+	if (mobileroutersupport
 	    && ar_sin6 != NULL) { 
 		if (debug) 
 			syslog(LOG_INFO, "sendmsg via %s/%d", 

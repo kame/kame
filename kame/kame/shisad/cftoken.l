@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.14 2007/01/13 18:46:21 keiichi Exp $	*/
+/*	$KAME: cftoken.l,v 1.15 2007/01/14 05:56:42 keiichi Exp $	*/
 
 %{
 /*
@@ -84,9 +84,6 @@ filename	[a-zA-Z0-9:\.\-\+/=#\$%]*
 <S_CONFIG>namelookup { D; return (NAMELOOKUP); }
 <S_CONFIG>command-port { D; return (COMMANDPORT); }
 <S_CONFIG>home-registration-lifetime { D; return (HOMEREGISTRATIONLIFETIME); }
-<S_CONFIG>mobile-node-mode { D; return (MOBILENODEMODE ); }
-<S_CONFIG>mobile-host { D; yylval.string = strdup(yytext); return (MOBILENODEMODEVALUE); }
-<S_CONFIG>mobile-router { D; yylval.string = strdup(yytext); return (MOBILENODEMODEVALUE); }
 <S_CONFIG>preference { D; return (PREFERENCE); }
 <S_CONFIG>interface { D; BEGIN S_INTERFACE; return (INTERFACE); }
 <S_CONFIG>key-management { D; return (KEYMANAGEMENT); }

@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.41 2007/01/13 18:46:21 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.42 2007/01/14 05:56:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -61,7 +61,7 @@
 #include "fsm.h"
 #include "config.h"
 
-extern int mobile_node_mode;
+extern int mobileroutersupport;
 
 int initial_bindack_timeout_first_reg = 2; /* the spec says more than 1.5 */
 
@@ -2238,7 +2238,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		}
 	}
 
-	if (mobile_node_mode == CFV_MOBILEROUTER
+	if (mobileroutersupport
 	    && ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
 		struct nemo_mptable *mpt;
 
@@ -2372,7 +2372,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	 * registration, MR MUST de-register the binding from legacy
 	 * HA.
 	 */
-	if (mobile_node_mode == CFV_MOBILEROUTER
+	if (mobileroutersupport
 	    && bul->bul_flags & IP6_MH_BU_HOME
 	    && bul->bul_flags & IP6_MH_BU_ROUTER) {
 		if (!(ip6mhba->ip6mhba_flags & IP6_MH_BA_ROUTER)) {
