@@ -6,3 +6,4 @@ MANDIR=	/usr/local/v6/man/man
 ETCDIR=	/usr/local/v6/etc
 DOCDIR=	/usr/local/v6/share/doc
 CFLAGS+=-DHAVE_SCOPELIB
+CFLAGS+=-DNO_PF
