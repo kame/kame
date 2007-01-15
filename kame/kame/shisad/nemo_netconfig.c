@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.28 2007/01/14 05:56:42 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.29 2007/01/15 02:56:05 t-momose Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -125,7 +125,7 @@ static int parse_ipv4_dummy_tunnel(void);
 #endif /* MIP_IPV4MNPSUPPORT */
 static void nemo_usage(void);
 
-#if 0
+#if NO_PF
 /* when PF is not available */
 static struct sockaddr_in6 sin6_default = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
