@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.419 2007/01/15 21:27:22 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.420 2007/01/16 11:06:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -798,7 +798,8 @@ icmp6_input(mp, offp, proto)
 		} else {
 	 deliverecho:
 			nip6 = mtod(n, struct ip6_hdr *);
-			IP6_EXTHDR_GET(nicmp6, struct icmp6_hdr *, n, off, NULL);
+			IP6_EXTHDR_GET(nicmp6, struct icmp6_hdr *, n, off,
+			    sizeof(*nicmp6));
 			noff = off;
 		}
 		nicmp6->icmp6_type = ICMP6_ECHO_REPLY;
