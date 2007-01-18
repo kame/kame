@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.244 2006/10/05 15:31:47 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.245 2007/01/18 03:52:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -58,6 +58,9 @@
 #include <net/route.h>
 #include <net/mipsock.h>
 #include <net/net_osdep.h>
+#ifdef __APPLE__
+#include <net/kpi_protocol.h>
+#endif /* __APPLE__ */
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>

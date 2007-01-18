@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.20 2007/01/14 05:15:23 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.21 2007/01/18 03:52:38 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -298,8 +298,21 @@ static struct pr_usrreqs mip_usrreqs = {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 /*ARGSUSED*/
 int
-mips_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
-    struct mbuf *control, struct lwp *l)
+#ifdef __NetBSD__
+mips_usrreq(so, req, m, nam, control, p)
+#else
+mips_usrreq(so, req, m, nam, control)
+#endif
+	struct socket *so;
+	int req;
+	struct mbuf *m;
+	struct mbuf *nam;
+	struct mbuf *control;
+#ifdef __NetBSD__
+	struct proc *p;
+#else
+#define p curproc
+#endif
 {
 	int error = 0;
 	struct rawcb *rp = sotorawcb(so);
@@ -331,7 +344,7 @@ mips_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
 #ifdef __OpenBSD__
 		error = raw_usrreq(so, req, m, nam, control);
 #else
-		error = raw_usrreq(so, req, m, nam, control, l);
+		error = raw_usrreq(so, req, m, nam, control, p);
 #endif
 
 	rp = sotorawcb(so);
@@ -384,7 +397,11 @@ mips_output(m, va_alist)
 	u_int16_t bid = 0;
 
 	miph = mtod(m, struct mip_msghdr *);
+#ifndef __APPLE__
 	miph->miph_pid = curproc->p_pid;
+#else
+	miph->miph_pid = proc_selfpid();
+#endif
 
 	switch (miph->miph_type) {
 	case MIPM_BC_ADD:
@@ -707,7 +724,12 @@ struct domain mipdomain = {
 	.dom_family = PF_MOBILITY,
 	.dom_name = "mip",
 	.dom_protosw = mipsw,
+#ifdef __APPLE__
+      0, 0, 0, 0, 0, 0, 0, 0, 
+      { 0, 0 }
+#else
 	.dom_protoswNPROTOSW = &mipsw[sizeof(mipsw)/sizeof(mipsw[0])],
+#endif
 };
 
 #if defined(__FreeBSD__) || defined(__APPLE__)
