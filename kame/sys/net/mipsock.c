@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.22 2007/01/19 08:22:53 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.23 2007/01/19 12:47:55 keiichi Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -67,10 +67,6 @@
 #ifdef __APPLE__
 #include <machine/spl.h>
 #define thread proc
-#endif /* __APPLE__ */
-
-#ifndef __APPLE__
-DOMAIN_DEFINE(mipdomain);	/* foward declare and add to link set */
 #endif /* __APPLE__ */
 
 static struct	sockaddr mips_dst = { .sa_len = 2, .sa_family = PF_MOBILITY, };
@@ -338,7 +334,7 @@ mips_usrreq(so, req, m, nam, control)
 	 * and send "safe" commands to the routing socket.
 	 */
 	if (req == PRU_ATTACH) {
-		if (l == 0)
+		if (p == 0)
 			error = EACCES;
 		else
 			error = raw_attach(so, (int)(long)nam);
