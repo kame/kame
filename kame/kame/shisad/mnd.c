@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.42 2007/01/19 06:53:11 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.43 2007/01/19 08:09:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1119,11 +1119,11 @@ send_haadreq(hoainfo, hoa_plen, src)
 #endif /* MIP_NEMO */
 	
 	if (sendmsg(icmp6sock, &msg, 0) < 0) {
-		syslog(LOG_ERR, "sending DHAAD REQUEST from %s to %d was failed",
+		syslog(LOG_ERR, "sending DHAAD REQUEST from %s to %s was failed",
 		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
 	} else {
 		mip6stat.mip6s_odhreq++;
-		syslog(LOG_INFO, "sent DHAAD REQUEST from %s to %d was failed",
+		syslog(LOG_INFO, "sent DHAAD REQUEST from %s to %s was failed",
 		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
 	}
 
