@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.494 2006/12/04 07:30:30 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.495 2007/01/19 07:57:34 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1123,8 +1123,8 @@ skip_ipsec2:;
 		RTUSE(rt);
 #else
 		rt->rt_use++;
-	}
 #endif
+	}
 
 	if ((flags & IPV6_FORWARDING) == 0) {
 		/* XXX: the FORWARDING flag can be set for mrouting. */
