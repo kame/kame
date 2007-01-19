@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.21 2007/01/18 03:52:38 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.22 2007/01/19 08:22:53 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -69,7 +69,9 @@
 #define thread proc
 #endif /* __APPLE__ */
 
+#ifndef __APPLE__
 DOMAIN_DEFINE(mipdomain);	/* foward declare and add to link set */
+#endif /* __APPLE__ */
 
 static struct	sockaddr mips_dst = { .sa_len = 2, .sa_family = PF_MOBILITY, };
 static struct	sockaddr mips_src = { .sa_len = 2, .sa_family = PF_MOBILITY, };
@@ -396,7 +398,26 @@ mips_output(m, va_alist)
 	struct sockaddr_storage hoa, coa, cnaddr;
 	u_int16_t bid = 0;
 
+#define senderr(e) do { error = e; goto flush;} while (/*CONSTCOND*/ 0)
 	miph = mtod(m, struct mip_msghdr *);
+
+
+	/*
+	 * Perform permission checking, only privileged sockets
+	 * may perform operations other than RTM_GET
+	 */
+	if (
+#ifdef __APPLE__
+		(so->so_state & SS_PRIV == 0) && (error = EPERM)
+#elif defined(__FreeBSD__)
+		(error = suser(curthread)) != 0
+#else
+		(suser(curproc->p_ucred, &curproc->p_acflag) != 0) && (error = EACCES)
+#endif						  
+		) {
+		senderr(error);
+	}
+
 #ifndef __APPLE__
 	miph->miph_pid = curproc->p_pid;
 #else
@@ -547,6 +568,16 @@ mips_output(m, va_alist)
 
 	default:
 		return (0);
+	}
+
+flush:
+	if (miph) {
+		if (error)
+			miph->miph_errno = error;
+/*
+		else
+			miph->miph_flags |= RTF_DONE;
+*/
 	}
 	
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);

@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.74 2006/08/10 17:55:00 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.75 2007/01/19 08:22:53 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -318,12 +318,12 @@ dest6_mip6_hao(m, mhoff, nxt)
 	off = 0;
 	proto = IPPROTO_IPV6;
 	while (proto != IPPROTO_DSTOPTS) {
-		int nxt;
-		newoff = ip6_nexthdr(m, off, proto, &nxt);
+		int nxth;
+		newoff = ip6_nexthdr(m, off, proto, &nxth);
 		if (newoff < 0 || newoff < off)
 			return (0);	/* XXX */
 		off = newoff;
-		proto = nxt;
+		proto = nxth;
 	}
 	ip6o.ip6o_type = IP6OPT_PADN;
 	ip6o.ip6o_len = 0;
