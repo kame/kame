@@ -25,17 +25,17 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.4 2006/08/22 07:23:23 keiichi Exp $
+# $Id: Makefile.in,v 1.5 2007/01/19 11:00:31 keiichi Exp $
 #
-
-subdirs=shisa.obj/mnd shisa.obj/babymdd shisa.obj/had shisa.obj/cnd shisa.obj/mrd shisa.obj/nemonetd
 
 prefix=	@prefix@
 srcdir=	@srcdir@
 sysconfdir= @sysconfdir@
-localdbdir= @localdbdir@
+datarootdir= @datarootdir@
 
-CFLAGS=	@CFLAGS@ @DEFS@ -DSYSCONFDIR=\"${sysconfdir}\"
+TARGET=	mnd mrd babymdd had nemonetd cnd
+
+CFLAGS=	-Wall -Werror @CFLAGS@ @DEFS@ -DSYSCONFDIR=\"${sysconfdir}\"
 LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
 LIBS=	@LIBS@
@@ -50,41 +50,134 @@ bindir=	@bindir@
 sbindir=@sbindir@
 mandir=	@mandir@
 
-all: build
+GENSRCS=	cfparse.c cftoken.c
+CLEANFILES+=	cfparse.h
 
-build: .MAKE
-	for d in $(subdirs) ; do \
-		if test -d $$d ; then \
-			echo "===> Change directory to $$d" ; \
-			(cd $$d && $(MAKE)) || exit 1 ; \
-		fi ; done
+MNDOBJS=	mnd-binding.o mnd-common.o mnd-hal.o mnd-mh.o mnd-mnd.o \
+	mnd-nemo_var.o \
+	fsm.o rr.o \
+	callout.o command.o config.o fdlist.o network.o util.o \
+	$(GENSRCS:%.c=%.o)
+MNDCFLAGS=	-DMIP_MN
+MNDLIBS=	-lcrypto
 
-install: .MAKE
-	for d in $(subdirs) ; do \
-		if test -d $$d ; then \
-			echo "===> Change directory to $$d" ; \
-			(cd $$d && $(MAKE) install) || exit 1 ; \
-		fi ; done
+MRDOBJS=	mrd-binding.o mrd-common.o mrd-hal.o mrd-mh.o mrd-mnd.o \
+	mrd-nemo_var.o \
+	fsm.o rr.o \
+	callout.o command.o config.o fdlist.o network.o util.o \
+	$(GENSRCS:%.c=%.o)
+MRDCFLAGS=	-DMIP_MN
+#MRDCFLAGS+=	-DMIP_MCOA
+MRDLIBS=	-lcrypto
+
+BABYMDDOBJS=	babymdd.o network.o util.o \
+	$(GENSRCS:%.c=%.o)
+
+HADOBJS=	had-binding.o had-common.o had-had.o had-hal.o had-mh.o \
+	had-nemo_var.o \
+	callout.o command.o config.o fdlist.o network.o util.o \
+	$(GENSRCS:%.c=%.o)
+HADCFLAGS=	-DMIP_HA
+#HADCFLAGS+=	-DMIP_MCOA
+#HADCFLAGS+=	-DAUTHID
+HADLIBS=	-lcrypto
+
+NEMONETDOBJS=	config.o nemo_netconfig.o network.o util.o \
+	$(GENSRCS:%.c=%.o)
+
+CNDOBJS=	callout.o cnd.o command.o config.o fdlist.o network.o util.o \
+	cnd-binding.o cnd-common.o cnd-mh.o cnd-rr.o \
+	$(GENSRCS:%.c=%.o)
+CNDCFLAGS=	-DMIP_CN
+CNDLIBS=	-lcrypto
+
+all: $(TARGET)
+
+mnd: $(MNDOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(MNDOBJS) $(MNDLIBS)
+mnd-binding.o: binding.c
+	$(CC) $(MNDCFLAGS) -o $@ -c binding.c
+mnd-common.o: common.c
+	$(CC) $(MNDCFLAGS) -o $@ -c common.c
+mnd-hal.o: hal.c
+	$(CC) $(MNDCFLAGS) -o $@ -c hal.c
+mnd-mh.o: mh.c
+	$(CC) $(MNDCFLAGS) -o $@ -c mh.c
+mnd-mnd.o: mnd.c
+	$(CC) $(MNDCFLAGS) -o $@ -c mnd.c
+mnd-nemo_var.o: nemo_var.c
+	$(CC) $(MNDCFLAGS) -o $@ -c nemo_var.c
+
+mrd: $(MRDOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(MRDOBJS) $(MRDLIBS)
+mrd-binding.o: binding.c
+	$(CC) $(MRDCFLAGS) -o $@ -c binding.c
+mrd-common.o: common.c
+	$(CC) $(MRDCFLAGS) -o $@ -c common.c
+mrd-hal.o: hal.c
+	$(CC) $(MRDCFLAGS) -o $@ -c hal.c
+mrd-mh.o: mh.c
+	$(CC) $(MRDCFLAGS) -o $@ -c mh.c
+mrd-mnd.o: mnd.c
+	$(CC) $(MRDCFLAGS) -o $@ -c mnd.c
+mrd-nemo_var.o: nemo_var.c
+	$(CC) $(MRDCFLAGS) -o $@ -c nemo_var.c
+
+babymdd: $(BABYMDDOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(BABYMDDOBJS)
+
+had: $(HADOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(HADOBJS) $(HADLIBS)
+had-binding.o :binding.c
+	$(CC) $(HADCFLAGS) -o $@ -c binding.c
+had-common.o: common.c
+	$(CC) $(HADCFLAGS) -o $@ -c common.c
+had-had.o: had.c
+	$(CC) $(HADCFLAGS) -o $@ -c had.c
+had-hal.o: hal.c
+	$(CC) $(HADCFLAGS) -o $@ -c hal.c
+had-mh.o: mh.c
+	$(CC) $(HADCFLAGS) -o $@ -c mh.c
+had-nemo_var.o: nemo_var.c
+	$(CC) $(HADCFLAGS) -o $@ -c nemo_var.c
+
+nemonetd: $(NEMONETDOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(NEMONETDOBJS)
+
+cnd: $(CNDOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(CNDOBJS) $(CNDLIBS)
+cnd-binding.o:
+	$(CC) $(CNDCFLAGS) -o $@ -c binding.c
+cnd-common.o:
+	$(CC) $(CNDCFLAGS) -o $@ -c common.c
+cnd-mh.o:
+	$(CC) $(CNDCFLAGS) -o $@ -c mh.c
+cnd-rr.o:
+	$(CC) $(CNDCFLAGS) -o $@ -c rr.c
+
+cfparse.c cfparse.h: cfparse.y
+	@YACC@ -d cfparse.y
+	mv y.tab.h cfparse.h
+	mv y.tab.c cfparse.c
+cftoken.c: cftoken.l cfparse.h
+	@LEX@ cftoken.l
+	mv lex.yy.c cftoken.c
+
+install::
+	-mkdir -p $(sbindir) $(mandir)
+	$(INSTALL_PROGRAM) -s -o bin -g bin $(TARGET) $(sbindir)
 	$(INSTALL_DATA) -o bin -g bin mnd.8 $(mandir)/man8
-	$(INSTALL_DATA) -o bin -g bin cnd.8 $(mandir)/man8
+	$(INSTALL_DATA) -o bin -g bin mrd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin babymdd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin had.8 $(mandir)/man8
-	$(INSTALL_DATA) -o bin -g bin mrd.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin nemonetd.8 $(mandir)/man8
+	$(INSTALL_DATA) -o bin -g bin cnd.8 $(mandir)/man8
 
-clean: .MAKE
-	for d in $(subdirs) ; do \
-		if test -d $$d ; then \
-			echo "===> Change directory to $$d" ; \
-			(cd $$d && $(MAKE) clean) \
-		fi ; done
+clean::
+	/bin/rm -f *.o $(TARGET) $(CLEANFILES) $(GENSRCS)
 
-distclean: .MAKE
-	for d in $(subdirs) ; do \
-		if test -d $$d ; then \
-			echo "===> Change directory to $$d" ; \
-			(cd $$d && $(MAKE) distclean) \
-		fi ; done
+distclean:: clean
 	/bin/rm -f Makefile config.cache config.log config.status .depend
 
-.MAKE:
+depend:
+	mkdep ${CFLAGS:M-[ID]*} $(srcdir)/*.c
