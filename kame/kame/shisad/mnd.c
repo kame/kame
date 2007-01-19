@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.41 2007/01/14 05:56:42 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.42 2007/01/19 06:53:11 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -128,7 +128,6 @@ struct command_table show_command_table[] = {
 	{"config", show_current_config, ""},
 	{"callout", show_callout_table, "the list in the callout queue"},
 	{"pt", command_show_pt, "Prefix Table, MR only"},
-	{NULL}
 };
 
 struct command_table command_table[] = {
@@ -1114,16 +1113,19 @@ send_haadreq(hoainfo, hoa_plen, src)
 	dhreq.mip6_dhreq_cksum = 0;
 	dhreq.mip6_dhreq_id = htons(++hoainfo->hinfo_dhaad_id);
 #if 1 /* MIP_NEMO */
-	dhreq.mip6_dhreq_reserved = MIP6_DHREQ_FLAG_MR;
+	dhreq.mip6_dhreq_reserved = mobileroutersupport ? MIP6_DHREQ_FLAG_MR : 0;
 #else
 	dhreq.mip6_dhreq_reserved = 0;
 #endif /* MIP_NEMO */
 	
-	if (sendmsg(icmp6sock, &msg, 0) < 0)
-		perror ("sendmsg icmp6 @ haddreq");
-
-	mip6stat.mip6s_odhreq++;
-	syslog(LOG_INFO, "send DHAAD REQUEST\n");
+	if (sendmsg(icmp6sock, &msg, 0) < 0) {
+		syslog(LOG_ERR, "sending DHAAD REQUEST from %s to %d was failed",
+		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
+	} else {
+		mip6stat.mip6s_odhreq++;
+		syslog(LOG_INFO, "sent DHAAD REQUEST from %s to %d was failed",
+		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
+	}
 
 	return (errno);
 }
