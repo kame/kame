@@ -30,7 +30,6 @@ PROG=	mnd
 SRCS=	mnd.c rr.c callout.c mh.c fsm.c binding.c network.c  common.c fdlist.c command.c nemo_var.c util.c hal.c
 SRCS+=	config.c cfparse.y cftoken.l
 CFLAGS+= -g -Wall -Werror -DMIP_MN
-CFLAGS+= -DNO_PF
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \

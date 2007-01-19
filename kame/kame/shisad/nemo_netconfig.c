@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.29 2007/01/15 02:56:05 t-momose Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.30 2007/01/19 03:56:12 keiichi Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -63,11 +63,11 @@
 
 #define MODE_HA 0x01
 #define MODE_MR 0x02
-#ifdef NO_PF
+#ifdef MIP_NO_MTUN
 #define NEMO_TUNNAME "nemo"
 #else
 #define NEMO_TUNNAME "mtun"
-#endif /* NO_PF */
+#endif /* MIP_NO_MTUN */
 
 /* Variables */
 struct nemo_if {
@@ -125,13 +125,13 @@ static int parse_ipv4_dummy_tunnel(void);
 #endif /* MIP_IPV4MNPSUPPORT */
 static void nemo_usage(void);
 
-#if NO_PF
-/* when PF is not available */
+#ifndef MIP_USE_PF
+/* when PF is not used */
 static struct sockaddr_in6 sin6_default = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
 	IN6ADDR_ANY_INIT
 }; 
-#endif /* when PF is not available */
+#endif /* !MIP_USE_PF */
 static struct sockaddr_in6 sin6_loopback = {
 	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
 	IN6ADDR_LOOPBACK_INIT
@@ -743,8 +743,8 @@ mainloop() {
 						continue;
 
 					if ((multiplecoa && bid <= 0) || multiplecoa == 0) {
-#ifdef NO_PF
-/* when PF is not available. */
+#ifndef MIP_USE_PF
+/* when PF is not used. */
 						/* remove default route */
 						route_del(0);
 						/* add default route */
@@ -752,7 +752,7 @@ mainloop() {
 						    (struct sockaddr *)&sin6_loopback,
 						    NULL, 0,
 						    if_nametoindex(nif->ifname));
-#endif /* when PF is not available. */
+#endif /* !MIP_USE_PF */
 #ifdef MIP_IPV4MNPSUPPORT
 						if (ipv4mnpsupport) {
 							route_add((struct sockaddr *)&sin_default,
@@ -799,11 +799,11 @@ mainloop() {
 					
 					if (npt->nemo_if) {
 						npt->nemo_if = NULL; 
-#ifdef NO_PF
+#ifndef MIP_USE_PF
 						/* remove default route */
 						if ((multiplecoa && (bid <= 0)) || multiplecoa == 0) 
 							route_del(0);
-#endif /* NO_PF */
+#endif /* !MIP_USE_PF */
 						
 					}
                                 }
@@ -1071,10 +1071,10 @@ nemo_terminate(dummy)
 	}
 
 	if (multiplecoa == 0) {
-#ifdef NO_PF
+#ifndef MIP_USE_PF
 		if (mode == MODE_MR)
 			route_del(0);
-#endif /* NO_PF */
+#endif /* !MIP_USE_PF */
 	}
 
 	exit(-1);

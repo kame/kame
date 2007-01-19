@@ -29,7 +29,6 @@ SRCDIR=	${.CURDIR}/../../../kame/shisad
 PROG=	babymdd
 SRCS=	babymdd.c network.c util.c
 CFLAGS+= -g -Wall -Werror -DMIP6_MN
-CFLAGS+= -DNO_PF
 CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
