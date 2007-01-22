@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.23 2007/01/19 12:47:55 keiichi Exp $ */
+/* $Id: mipsock.c,v 1.24 2007/01/22 22:02:54 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -397,7 +397,6 @@ mips_output(m, va_alist)
 #define senderr(e) do { error = e; goto flush;} while (/*CONSTCOND*/ 0)
 	miph = mtod(m, struct mip_msghdr *);
 
-
 	/*
 	 * Perform permission checking, only privileged sockets
 	 * may perform operations other than RTM_GET
@@ -576,7 +575,13 @@ flush:
 */
 	}
 	
+#ifdef __APPLE__
+	socket_unlock(so, 0);
+#endif /* __APPLE__ */
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
+#ifdef __APPLE__
+	socket_lock(so, 0);
+#endif /* __APPLE__ */
 	return (error);
 }
 
