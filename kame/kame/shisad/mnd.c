@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.43 2007/01/19 08:09:53 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.44 2007/01/22 22:10:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -211,12 +211,12 @@ main(argc, argv)
 	}
 	
 	/* open syslog infomation. */
-#if 1 /* MIP_NEMO */
+#if 0 /* MIP_NEMO */
 	openlog("shisad(mrd)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "Start Mobile Router\n");
+	syslog(LOG_INFO, "Start Mobile Router");
 #else
 	openlog("shisad(mnd)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "Start Mobile Node\n");
+	syslog(LOG_INFO, "Start Mobile Node");
 #endif
 
 	/* parse configuration file and set default values. */
@@ -288,7 +288,7 @@ main(argc, argv)
 	/* Initialization of mip virtual interfaces, home address and
 	 * binding update list */
 	if (mnd_add_mipif(*argv) == NULL) {
-		syslog(LOG_ERR, "interface %s is invalid.\n", *argv);
+		syslog(LOG_ERR, "interface %s is invalid.", *argv);
 		exit(-1);
 	}
 
@@ -335,11 +335,11 @@ main(argc, argv)
 		bul = bul_insert(hoainfo, NULL, NULL, bul_flags, 0);
 		if (bul == NULL) {
 			syslog(LOG_ERR,
-			    "cannot insert bul, something wrong\n");
+			    "cannot insert bul, something wrong");
 			 continue;
 		}
 
-		syslog(LOG_INFO, "Kick fsm to MOVEMENT\n");
+		syslog(LOG_INFO, "Kick fsm to MOVEMENT");
 		/* kick the fsm to start its state transition. */
 		bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_MOVEMENT, NULL);
 	}
@@ -353,7 +353,7 @@ main(argc, argv)
 
 	/* notify a kernel to behave as a mobile node. */
 	mipsock_nodetype_request(mobileroutersupport ?
-				 MIP6_NODETYPE_MOBILE_NODE : MIP6_NODETYPE_MOBILE_ROUTER, 1);
+				 MIP6_NODETYPE_MOBILE_ROUTER : MIP6_NODETYPE_MOBILE_NODE, 1);
 
 	/* register signal handlers. */
 	signal(SIGTERM, terminate);
@@ -473,7 +473,7 @@ mipsock_recv_mdinfo(miphdr)
 	u_int16_t bid = 0;
 	struct mipm_dad mipmdad;
 	
-	syslog(LOG_INFO, "mipsock_recv_mdinfo\n");
+	syslog(LOG_INFO, "mipsock_recv_mdinfo");
 
 	mdinfo = (struct mipm_md_info *)miphdr;
 
@@ -588,7 +588,7 @@ mipsock_recv_mdinfo(miphdr)
 					      mdinfo->mipmmi_ifindex, bid);
 		break;
 	default:
-		syslog(LOG_ERR, "unsupported md_info command %d\n",
+		syslog(LOG_ERR, "unsupported md_info command %d",
 		    mdinfo->mipmmi_command);
 		err = EOPNOTSUPP;
 		break;
@@ -603,7 +603,7 @@ mipsock_md_update_bul_byifindex(ifindex, coa)
 	struct in6_addr *coa;
 {
 	syslog(LOG_ERR,
-	       "mipsock_md_update_bul_byifindex is not supported yet\n");
+	       "mipsock_md_update_bul_byifindex is not supported yet");
 	return (0);
 }
 
@@ -632,7 +632,7 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 	err = delete_ip6addr(mipifname, &hoainfo->hinfo_hoa, 64);
 	if (err) {
 		syslog(LOG_ERR,
-		    "removing a home address (%s) from %s failed.\n",
+		    "removing a home address (%s) from %s failed.",
 		    ip6_sprintf(&hoainfo->hinfo_hoa), mipifname);
 		return (err);
 	}
@@ -651,7 +651,7 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 	bul = bul_get_homeflag(&hoainfo->hinfo_hoa);
 	if (bul == NULL) {
 		syslog(LOG_ERR, "mipsock_md_dereg_bul: "
-		    "received home hint, but there is no bul for %s\n",
+		    "received home hint, but there is no bul for %s",
 		    ip6_sprintf(&hoainfo->hinfo_hoa));
 		return (-1);
 	}
@@ -675,7 +675,7 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 #endif
 	if (err) {
 		syslog(LOG_ERR,
-		    "assigning a home address (%s) to %s failed.\n",
+		    "assigning a home address (%s) to %s failed.",
 		    ip6_sprintf(&hoainfo->hinfo_hoa), ifname);
 		return (err);
 	}
@@ -695,12 +695,12 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 		bul->bul_home_ifindex = ifindex;
 		/* send de-registration */
 		syslog(LOG_INFO, 
-		       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s\n",
+		       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s",
 		       ifname);
 
 		if (bul_kick_fsm(bul,  MIP6_BUL_FSM_EVENT_RETURNING_HOME, NULL) == -1) {
 			syslog(LOG_ERR, 
-			       "fsm processing of movement detection failed.\n");
+			       "fsm processing of movement detection failed.");
 		}
 	}
 
@@ -748,13 +748,13 @@ mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 				mbul->bul_lifetime = 0;
 				mbul->bul_home_ifindex = ifindex;
 				syslog(LOG_INFO, 
-				       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s bid = %d \n",
+				       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s bid = %d",
 				       ifname, bid);
 
 				if (bul_kick_fsm(mbul, 
 						 MIP6_BUL_FSM_EVENT_RETURNING_HOME, NULL) == -1) {
 					syslog(LOG_ERR, 
-					       "fsm processing of movement detection failed.\n");
+					       "fsm processing of movement detection failed.");
 				}
 			}
 			continue;
@@ -772,12 +772,12 @@ mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 
 		/* send de-registration */
 		syslog(LOG_INFO, 
-		       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s\n",
+		       "change fsm MIP6_BUL_FSM_EVENT_RETURNING_HOME to %s",
 		       ifname);
 
 		if (bul_kick_fsm(bul,  MIP6_BUL_FSM_EVENT_RETURNING_HOME, NULL) == -1) {
 			syslog(LOG_ERR, 
-			       "fsm processing of movement detection failed.\n");
+			       "fsm processing of movement detection failed.");
 		}
 	}
 
@@ -809,7 +809,7 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 		return (ENOENT);
 
 	if (getifaddrs(&ifap) != 0) {
-		syslog(LOG_ERR, "%s\n", strerror(errno));
+		syslog(LOG_ERR, "%s", strerror(errno));
 		return (-1);
 	}
 
@@ -828,7 +828,7 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 				if (delete_ip6addr(ifa->ifa_name, hoa, 64 /* XXX */)) {
 					syslog(LOG_ERR,
 					    "removing a home address "
-					    "from a physical i/f failed.\n");
+					    "from a physical i/f failed.");
 					freeifaddrs(ifap);
 					return (-1);
 				}
@@ -839,7 +839,7 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 
 					syslog(LOG_ERR,
 					    "adding a home address "
-					    "to a mip virtual i/f failed.\n");
+					    "to a mip virtual i/f failed.");
 					/* XXX recover the old phy addr. */
 					freeifaddrs(ifap);
 					return (-1);
@@ -867,7 +867,7 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 				mbul->bul_reg_fsm_state = bul->bul_reg_fsm_state;
 			} 
 		} else 
-			syslog(LOG_INFO," bul unknown with %d\n", bid);
+			syslog(LOG_INFO," bul unknown with %d", bid);
 	};
 #endif /* MIP_MCOA */
 
@@ -885,7 +885,7 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 			    NULL) == -1) {
 				syslog(LOG_ERR, 
 				    "fsm processing of movement detection "
-				    "failed.\n");
+				    "failed.");
 			}
 		}
 #ifdef MIP_MCOA
@@ -905,7 +905,7 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 					    NULL) == -1) {
 						syslog(LOG_ERR, 
 						       "fsm processing of movement detection "
-						       "failed.\n");
+						       "failed.");
 					}
 				}
 			}
@@ -945,7 +945,7 @@ mipsock_recv_rr_hint(miphdr)
 	if (noro_get(&sin6->sin6_addr)) {
 		
 		syslog(LOG_INFO, 
-		       "MN cannot start RO for %s\n", ip6_sprintf(&sin6->sin6_addr));
+		       "MN cannot start RO for %s", ip6_sprintf(&sin6->sin6_addr));
 		return (0);		
 	}
 
@@ -968,7 +968,7 @@ mipsock_recv_rr_hint(miphdr)
 #ifndef MIP_MCOA
 	error = bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_REVERSE_PACKET, &fsmmsg);
 	if (error == -1) {
-		syslog(LOG_ERR, "fsm processing failed.\n");
+		syslog(LOG_ERR, "fsm processing failed.");
 	}
 #else
 	{
@@ -982,7 +982,7 @@ mipsock_recv_rr_hint(miphdr)
 			error = bul_kick_fsm(bul, 
 			     MIP6_BUL_FSM_EVENT_REVERSE_PACKET, &fsmmsg);
 			if (error == -1) {
-				syslog(LOG_ERR, "fsm processing failed.\n");
+				syslog(LOG_ERR, "fsm processing failed.");
 			}
 		}
 
@@ -998,7 +998,7 @@ mipsock_recv_rr_hint(miphdr)
 			error = bul_kick_fsm(newbul, 
 				     MIP6_BUL_FSM_EVENT_REVERSE_PACKET, &fsmmsg);
 			if (error == -1) {
-				syslog(LOG_ERR, "fsm processing failed.\n");
+				syslog(LOG_ERR, "fsm processing failed.");
 			}
 		}
 	}
@@ -1123,7 +1123,7 @@ send_haadreq(hoainfo, hoa_plen, src)
 		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
 	} else {
 		mip6stat.mip6s_odhreq++;
-		syslog(LOG_INFO, "sent DHAAD REQUEST from %s to %s was failed",
+		syslog(LOG_INFO, "sent DHAAD REQUEST from %s to %s",
 		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
 	}
 
@@ -1225,7 +1225,7 @@ send_unsolicited_na(ifindex, target)
 	/* target link-layer option. */
 	if (getifaddrs(&ifahead) != 0) {
 		syslog(LOG_ERR,
-		    "retrieving my link-layer address failed.\n");
+		    "retrieving my link-layer address failed.");
 		return (-1);
 	}
 #define ROUNDUP8(a) (1 + (((a) - 1) | 7))
@@ -1252,7 +1252,7 @@ send_unsolicited_na(ifindex, target)
 	if (sendmsg(icmp6sock, &msg, 0) == -1) {
 		syslog(LOG_ERR,
 		   "sending an unsolicited neighbor advertisement message "
-		   "failed.\n");
+		   "failed.");
 		return (-1);
 	}
 
@@ -1293,7 +1293,7 @@ mnd_add_hal(hpfx_entry, gladdr, flag)
 	}
 
 	if (debug)
-		syslog(LOG_INFO, "Home Agent (%s) added into home agent list\n", 
+		syslog(LOG_INFO, "Home Agent (%s) added into home agent list", 
 		       ip6_sprintf(gladdr));
 		
 	return (hal);
@@ -1309,7 +1309,7 @@ add_hal_by_commandline_xxx(homeagent)
 
 	if (inet_pton(AF_INET6, homeagent, &homeagent_in6) != 1) {
 		syslog(LOG_ERR,
-		    "the specified home agent addrss (%s) is invalid.\n",
+		    "the specified home agent addrss (%s) is invalid.",
 		    homeagent);
 		return (-1);
 	}
@@ -1365,7 +1365,7 @@ hpfxlist_expire_timer(arg)
 
 	if (hpfx->hpfx_vlexpire <= now) {
 		syslog(LOG_INFO, 
-		       "Lifetime for the Home Prefix %s is expired\n", 
+		       "Lifetime for the Home Prefix %s is expired", 
 		       ip6_sprintf(&hpfx->hpfx_prefix));
 
 		/* delete HoA XXXX */
@@ -1378,7 +1378,7 @@ hpfxlist_expire_timer(arg)
 	}
 
 	syslog(LOG_INFO, 
-	       "Lifetime for the Home Prefix %s is soon expired\n", 
+	       "Lifetime for the Home Prefix %s is soon expired",
 	       	ip6_sprintf(&hpfx->hpfx_prefix));
 
 	/* Soliciting Mobile Prefixes managed by the Home Agent */
@@ -1438,7 +1438,7 @@ mnd_add_hpfxlist(home_prefix, home_prefixlen, hpfx_mnoption, mipif)
 	LIST_INIT(&hpfx->hpfx_hal_head);
 
 	if (debug)
-		syslog(LOG_INFO, "Home Prefix (%s/%d) added into home prefix list\n", 
+		syslog(LOG_INFO, "Home Prefix (%s/%d) added into home prefix list",
 		       ip6_sprintf(home_prefix), home_prefixlen);
 	
 	LIST_INSERT_HEAD(&mipif->mipif_hprefx_head, hpfx, hpfx_entry);
@@ -1455,7 +1455,7 @@ mnd_add_mipif(ifname)
 
 	ifindex = if_nametoindex(ifname);
 	if (ifindex == 0) {
-		syslog(LOG_ERR, "%s %s\n", ifname, strerror(errno));
+		syslog(LOG_ERR, "%s %s", ifname, strerror(errno));
 		return (NULL);
 	}
 	
@@ -1476,7 +1476,7 @@ mnd_add_mipif(ifname)
 	LIST_INSERT_HEAD(&mipifhead, mif, mipif_entry);
 
 	if (debug)
-		syslog(LOG_ERR, "%s is added successfully\n", ifname);
+		syslog(LOG_ERR, "%s is added successfully", ifname);
 
 	
 	return (mif);
@@ -1524,7 +1524,7 @@ mnd_init_homeprefix(mipif)
 #endif /* MIP_NEMO */
 
 	if (getifaddrs(&ifap) != 0) {
-		syslog(LOG_ERR, "%s\n", strerror(errno));
+		syslog(LOG_ERR, "%s", strerror(errno));
 		return;
 	}
 	
@@ -1566,7 +1566,7 @@ mnd_init_homeprefix(mipif)
 		hpfxent = mnd_add_hpfxlist(&addr_sin6->sin6_addr, 
 			prefixlen, &mnoption, mipif);
 		if (hpfxent == NULL) {
-			syslog(LOG_ERR, "fail to add home prefix entry %s\n", 
+			syslog(LOG_ERR, "fail to add home prefix entry %s",
 			       ip6_sprintf(&addr_sin6->sin6_addr));
 			continue;
 		}
@@ -1576,7 +1576,7 @@ mnd_init_homeprefix(mipif)
 			if (mpt->mpt_ha.s6_addr == 0)
 				continue;
 			if (mnd_add_hal(hpfxent, &mpt->mpt_ha, 0) == NULL) {
-				syslog(LOG_ERR, "fail to add home agent entry %s\n",
+				syslog(LOG_ERR, "fail to add home agent entry %s",
 				       ip6_sprintf(&mpt->mpt_ha));
 			}
 		}
@@ -1587,7 +1587,7 @@ mnd_init_homeprefix(mipif)
 	
 	if (LIST_EMPTY(&mipif->mipif_hprefx_head)) {
 		syslog(LOG_ERR,
-		    "please configure at least one global home prefix\n");
+		    "please configure at least one global home prefix");
 		exit(-1);
 	}
 	return;
@@ -1603,7 +1603,7 @@ mnd_get_v4hoa_by_ifindex (ifindex)
 	struct sockaddr_in *addr_sin;
 
 	if (getifaddrs(&ifap) != 0) { 
-		syslog(LOG_ERR, "%s\n", strerror(errno)); 
+		syslog(LOG_ERR, "%s", strerror(errno)); 
 		return NULL;
 	}
 
@@ -1651,9 +1651,10 @@ receive_hadisc_reply(dhrep, dhrep_len)
 		return (ENOENT);
 
 #if 1 /* MIP_NEMO */
-	if ((dhrep->mip6_dhrep_reserved & MIP6_DHREP_FLAG_MR) == 0) {
+	if (mobileroutersupport &&
+	    (dhrep->mip6_dhrep_reserved & MIP6_DHREP_FLAG_MR) == 0) {
 		/* XXX */
-		syslog(LOG_INFO, "HA does not support the basic NEMO protocol\n");
+		syslog(LOG_INFO, "HA does not support the basic NEMO protocol");
 		return (ENOENT);
 	} 
 #endif /* MIP_NEMO */
@@ -1689,7 +1690,7 @@ receive_hadisc_reply(dhrep, dhrep_len)
 			continue;
 
 		if (debug) 
-			syslog(LOG_INFO, "%s is added into hal list\n",
+			syslog(LOG_INFO, "%s is added into hal list",
 			       ip6_sprintf(dhrep_addr));
 	}
 
@@ -1700,7 +1701,7 @@ receive_hadisc_reply(dhrep, dhrep_len)
 	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
 #endif
 	bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
-	syslog(LOG_INFO, "DHAAD gets %s\n",
+	syslog(LOG_INFO, "DHAAD gets %s",
 	       ip6_sprintf(&bul->bul_peeraddr));
 
 #ifdef MIP_MCOA
@@ -1790,7 +1791,7 @@ send_mps(hpfx)
 #if defined(MIP_MN)
         if (ar_sin6) { 
                 if (debug) 
-                        syslog(LOG_INFO, "sendmsg via %s/%d\n", 
+                        syslog(LOG_INFO, "sendmsg via %s/%d",
 			       ip6_sprintf(&ar_sin6->sin6_addr), 
 			       ar_sin6->sin6_scope_id);
                 cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct sockaddr_in6));
@@ -1843,7 +1844,7 @@ send_mps(hpfx)
         iov.iov_len = mpfxlen;
 
 	if (debug)
-		syslog(LOG_INFO, "sending Mobile Prefix Solicitation\n");
+		syslog(LOG_INFO, "sending Mobile Prefix Solicitation");
 
         if (sendmsg(icmp6sock, &msg, 0) < 0)
                 perror ("sendmsg");
@@ -1863,7 +1864,7 @@ get_hoa_from_ifindex(ifindex)
 	struct binding_update_list *bul = NULL;
 	
         if (getifaddrs(&ifap) != 0) {
-                syslog(LOG_ERR, "%s\n", strerror(errno));
+                syslog(LOG_ERR, "%s", strerror(errno));
                 return NULL;
         }
         for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -1987,7 +1988,7 @@ receive_mpa(mpa, mpalen, bul)
 
 	if (!done) {
 		error = EINVAL;
-		syslog(LOG_ERR, "Could not find valid PI in MPA\n");
+		syslog(LOG_ERR, "Could not find valid PI in MPA");
 	}
 
 	return (error);
@@ -2001,7 +2002,7 @@ terminate(dummy)
 
 	/* stop acting as a mobile node. */
 	mipsock_nodetype_request(mobileroutersupport ?
-				 MIP6_NODETYPE_MOBILE_NODE : MIP6_NODETYPE_MOBILE_ROUTER, 0);
+				 MIP6_NODETYPE_MOBILE_ROUTER : MIP6_NODETYPE_MOBILE_NODE, 0);
 
 	/* flush all bul registered in a kernel. */
 	memset(&mipmsg, 0, sizeof(struct mip_msghdr));
@@ -2009,7 +2010,7 @@ terminate(dummy)
 	mipmsg.miph_type = MIPM_BUL_FLUSH;
 	if (write(mipsock, &mipmsg, sizeof(struct mip_msghdr)) == -1) {
 		syslog(LOG_ERR,
-		    "removing all bul entries failed.\n");
+		    "removing all bul entries failed.");
 	}
 
 	close(csock);	
@@ -2060,7 +2061,7 @@ noro_init()
 		}
 
 		if (noro_get(&noro_addr)) {
-			syslog(LOG_ERR, "%s is duplicated in %s\n", buf, MND_NORO_FILE);
+			syslog(LOG_ERR, "%s is duplicated in %s", buf, MND_NORO_FILE);
 			continue;
 		}
 
