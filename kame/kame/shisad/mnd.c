@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.44 2007/01/22 22:10:22 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.45 2007/01/23 14:28:55 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -128,6 +128,7 @@ struct command_table show_command_table[] = {
 	{"config", show_current_config, ""},
 	{"callout", show_callout_table, "the list in the callout queue"},
 	{"pt", command_show_pt, "Prefix Table, MR only"},
+	{NULL}	/* The last {NULL} is needed for the sub command table */
 };
 
 struct command_table command_table[] = {
