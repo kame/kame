@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.245 2007/01/18 03:52:38 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.246 2007/01/26 12:51:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -104,7 +104,7 @@
 	 % MIP6_BC_HASH_SIZE)
 struct mip6_bc_internal *mip6_bc_hash[MIP6_BC_HASH_SIZE];
 struct mip6_bc_list mip6_bc_list = LIST_HEAD_INITIALIZER(mip6_bc_list);
-struct encaptab *mbc_encap = NULL;
+const struct encaptab *mbc_encap = NULL;
 
 struct mip6stat mip6stat;
 u_int8_t mip6_nodetype = MIP6_NODETYPE_NONE;
@@ -144,10 +144,18 @@ static struct timeval mip6_rr_hint_ppslim_last;
 static struct mip6_bul_internal *mip6_bul_create(const struct in6_addr *,
     const struct in6_addr *, const struct in6_addr *, u_int16_t, u_int8_t,
     struct mip_softc *, u_int16_t);
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
+int mip6_bul_encapcheck(struct mbuf *, int, int, void *arg);
+#else
 int mip6_bul_encapcheck(const struct mbuf *, int, int, void *arg);
+#endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
 static void mip6_bul_update_ipsecdb(struct mip6_bul_internal *);
 #endif /* NMIP > 0 */
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
+int mip6_rev_encapcheck(struct mbuf *, int, int, void *arg);
+#else
 int mip6_rev_encapcheck(const struct mbuf *, int, int, void *arg);
+#endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
 
 static struct mip6_bc_internal *mip6_bce_new_entry(struct in6_addr *,
     struct in6_addr *, struct in6_addr *, struct ifaddr *, u_int16_t,
@@ -293,10 +301,8 @@ mip6_input(mp, offp)
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
 	struct ip6_mh *mh;
-	int off = *offp, mhlen;
-	int sum;
+	int off = *offp, mhlen, sum, presence = 0;
 	struct in6_addr src, dst, hoa, rt;
-	int presence = 0;
 
 	mip6stat.mip6s_mh++;
 
@@ -311,11 +317,16 @@ mip6_input(mp, offp)
 	if (mh == NULL)
 		return (IPPROTO_DONE);
 #endif
+
+	/* 
+	 * Section 9.2 of RFC3775 said the node MUST discard
+	 * and SHOULD send ICMP Parameter Problem
+	 */
 	if (mh->ip6mh_proto != IPPROTO_NONE) {
 		mip6log((LOG_INFO,
 		    "mip6_input:%d: Payload Proto %d.\n",
 		    __LINE__, mh->ip6mh_proto));
-		/* 9.2 discard and SHOULD send ICMP Parameter Problem */
+
 		mip6stat.mip6s_payloadproto++;
 
                 /* If either a home address option or a routing header
@@ -337,8 +348,9 @@ mip6_input(mp, offp)
 	}
 
 	/*
-	 * Section 9.2 If length is invalid, issue ICMP param prob,
-	 * code0. 
+	 * Section 9.2 of RFC3775. If the length is invalid, the node
+	 * MUST discard the packet and SHOULD send ICMP parameter
+	 * problem, Code 0.
 	 */
 	mhlen = (mh->ip6mh_len + 1) << 3;
 	if (mhlen < IP6OPT_MINLEN ||
@@ -346,7 +358,7 @@ mip6_input(mp, offp)
 	     && mhlen < mhdefaultlen[mh->ip6mh_type])) {
 		mip6log((LOG_INFO, "%s:%d: Mobility Header Length %d.\n",
 			__FILE__, __LINE__, mhlen));
-		/* 9.2 discard and SHOULD send ICMP Parameter Problem XXX */
+
 		ip6stat.ip6s_toosmall++;
 
                 /* If either a home address option or a routing header
@@ -364,13 +376,12 @@ mip6_input(mp, offp)
 		}
 
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-			(caddr_t)&mh->ip6mh_len - (caddr_t)ip6);
-			return (IPPROTO_DONE);
+		    (caddr_t)&mh->ip6mh_len - (caddr_t)ip6);
+
+		return (IPPROTO_DONE);
 	}
 
-	/*
-	 * calculate the checksum
-	 */
+	/* validate the checksum */
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, mhlen, IPPROTO_DONE);
 	mh = (struct ip6_mh *)(mtod(m, caddr_t) + off);
@@ -387,6 +398,7 @@ mip6_input(mp, offp)
 		    mh->ip6mh_type, sum, ip6_sprintf(&ip6->ip6_src)));
 		m_freem(m);
 		mip6stat.mip6s_checksum++;
+
 		return (IPPROTO_DONE);
 	}
 
@@ -394,13 +406,14 @@ mip6_input(mp, offp)
 #if NMIP > 0
 	case IP6_MH_TYPE_BACK:
 	{
-		struct mip6_bul_internal *mbul;
 		/*
-		 * find the binding update entry related to this
-		 * binding ack message.  if the bue is for home
-		 * registration, make sure the packet is protected by
-		 * IPsec.
+		 * Search the binding update entry correspondent to
+		 * the Binding Acknowledgement (BA) message. If this BA is
+		 * for the home registration, the BA MUST be protected
+		 * by IPsec. Otherwise, BA is silently discarded.
 		 */
+		struct mip6_bul_internal *mbul;
+
 		mbul = mip6_bul_get(&ip6->ip6_src, &ip6->ip6_dst, 0 /* XXX */);
 		if (mbul != NULL
 		    && (mbul->mbul_flags & IP6_MH_BU_HOME) != 0
@@ -414,10 +427,11 @@ mip6_input(mp, offp)
 			{
 				mip6log((LOG_ERR,
 				    "mip6_input: an unprotected binding "
-				    "update from %s\n",
+				    "acknowledgement from %s\n",
 				    ip6_sprintf(&ip6->ip6_src)));
 				m_freem(m);
 				mip6stat.mip6s_unprotected++;
+
 				return (IPPROTO_DONE);
 			}
 		}
@@ -425,10 +439,38 @@ mip6_input(mp, offp)
 	}
 #endif /* NMIP > 0 */
 	case IP6_MH_TYPE_BU:
+	{
 		/*
-		 * XXX if this BU is home registration, check if the
-		 * packet is protected by IPsec.
+		 * If this Binding Update message (BU) is for the home
+		 * registration, the BU MUST be protected by
+		 * IPsec. Otherwise, BU is silently discarded.
 		 */
+		struct ip6_mh_binding_update *bu;
+
+		bu = (struct ip6_mh_binding_update *)mh;
+		if ((bu->ip6mhbu_flags & IP6_MH_BU_HOME)
+		    && mip6ctl_use_ipsec) {
+#ifndef __OpenBSD__
+			if (((m->m_flags & M_DECRYPTED) == 0)
+			    && (m->m_flags & M_AUTHIPHDR) == 0)
+#else /* !__OpenBSD__ */
+			if ((m->m_flags & M_AUTH) == 0)
+#endif /* __OpenBSD__ */
+			{
+				mip6log((LOG_ERR,
+					 "mip6_input: an unprotected binding "
+					 "update from %s\n",
+					 ip6_sprintf(&ip6->ip6_src)));
+				m_freem(m);
+				mip6stat.mip6s_unprotected++;
+				
+				return (IPPROTO_DONE);
+			}
+		}
+		break;
+	}
+
+	default:
 		break;
 	}
 
@@ -526,12 +568,12 @@ mip6_tunnel_input(mp, offp)
 
 		mip6stat.mip6s_revtunnel++;
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 		proto_input(PF_INET6, m);
 #else
-#ifdef __NetBSD__
+#if defined(__NetBSD__)
 		s = splnet();
-#elif defined(__OpenBSD__) || defined(__APPLE__)
+#elif defined(__OpenBSD__)
 		s = splimp();
 #endif
 
@@ -545,11 +587,11 @@ mip6_tunnel_input(mp, offp)
 			goto bad;
 		}
 		IF_ENQUEUE(&ip6intrq, m);
-#endif
+#endif /* __FreeBSD__ */
 
 #ifndef __FreeBSD__
 		splx(s);
-#endif
+#endif /* !__FreeBSD__ */
 #endif /* __APPLE__ */		
 		break;
 	default:
@@ -660,7 +702,7 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 		goto bc_update_ipsecdb;
 	} 
 
-	/* there is no existing bc entry.  create a new one. */
+	/* No existing BC entry is found.  Create a new one. */
 	ifa = ifa_ifwithaddr((struct sockaddr *)cnaddr);
 	bce = mip6_bce_new_entry(&cnaddr->sin6_addr, &hoa->sin6_addr,
 	    &coa->sin6_addr, ifa, flags, bid);
@@ -670,13 +712,13 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 	}
 	mip6_bc_list_insert(bce);
 		
-	/* a home agent creates a proxy ND entry for a mobile node. */
+	/* The home agent creates a proxy ND entry for the mobile node. */
 	if (MIP6_IS_HA && bce != NULL &&
 	    (flags & IP6_MH_BU_HOME) != 0) {
 		if (mbc_encap == NULL) {
 			mbc_encap = encap_attach_func(AF_INET6, IPPROTO_IPV6,
-						      mip6_rev_encapcheck,
-						      (void *)&mip6_tunnel_protosw, NULL);
+			    mip6_rev_encapcheck,
+			    (void *)&mip6_tunnel_protosw, NULL);
 		}
 		if (mbc_encap == NULL) {
 			mip6log((LOG_ERR, "mip6_bce_update: "
@@ -776,7 +818,6 @@ static void
 mip6_bce_update_ipsecdb(bce)
 	struct mip6_bc_internal *bce;
 {
-//#ifndef __APPLE__
 #ifdef IPSEC
 /* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
@@ -800,7 +841,6 @@ mip6_bce_update_ipsecdb(bce)
 	key_mip6_update_home_agent_ipsecdb(&hoa_sa, NULL, &coa_sa,
 	    &haaddr_sa);
 #endif /* IPSEC */
-//#endif /* __APPLE__ */
 }
 
 void
@@ -822,8 +862,11 @@ mip6_bce_remove_all(void)
 	splx(s);
 }
 
-/* Preparing a type2 routing header for outgoing packets  */
-/* 	The caller must free the returned buffer */
+/* 
+ * Create a Type 2 Routing Header for outgoing packets. The caller
+ * must free the returned buffer (struct ip6_rthdr2 *) when it
+ * finished.
+ */
 struct ip6_rthdr2 *
 mip6_create_rthdr2(coa)
 	struct in6_addr *coa;
@@ -832,10 +875,10 @@ mip6_create_rthdr2(coa)
 	size_t len;
 
 	/*
-	 * Mobile IPv6 uses type 2 routing header for route
-	 * optimization. if the packet has a type 1 routing header
-	 * already, we must add a type 2 routing header after the type
-	 * 1 routing header.
+	 * Mobile IPv6 uses a Type 2 Routing Header for route
+	 * optimization. If the packet has a Type 1 Routing Header
+	 * already, we must add the Type 2 Routing Header after the
+	 * Type 1 one.
 	 */
 
 	len = sizeof(struct ip6_rthdr2)	+ sizeof(struct in6_addr);
@@ -845,7 +888,7 @@ mip6_create_rthdr2(coa)
 	}
 	bzero(rthdr2, len);
 
-	/* rthdr2->ip6r2_nxt = will be filled later in ip6_output */
+	/* The rthdr2->ip6r2_nxt field will be filled later in ip6_output */
 	rthdr2->ip6r2_len = 2;
 	rthdr2->ip6r2_type = 2;
 	rthdr2->ip6r2_segleft = 1;
@@ -876,8 +919,7 @@ mip6_ifa_ifwithin6addr(in6)
 	if (sa6_recoverscope(&sin6) != 0)
 		return (NULL);
 #else
-	/* XXXX */
-	/* should support scope6.c */
+	/* It should support scope6.c */
 	if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)
 	    /*||IN6_IS_ADDR_MC_INTFACELOCAL(&sin6.sin6_addr)*/) {
 		sin6.sin6_scope_id = ntohs(sin6.sin6_addr.s6_addr16[1]);
@@ -900,9 +942,8 @@ mip6_bul_create(peeraddr, hoa, coa, flags, state, sc, bid)
 
 	MALLOC(mbul, struct mip6_bul_internal *,
 	    sizeof(struct mip6_bul_internal), M_TEMP, M_NOWAIT);
-	if (mbul == NULL) {
+	if (mbul == NULL)
 		return (NULL);
-	}
 
 	bzero(mbul, sizeof(*mbul));
 	mbul->mbul_peeraddr = *peeraddr;
@@ -943,7 +984,7 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 		return (EINVAL);
 		
 	/* 
-	 * If the correspondent entry exists, the entry is removed
+	 * If the target entry exists, the entry is removed
 	 * first. Then, the requested bul will be added right after
 	 * this deletion.  
 	 */
@@ -960,13 +1001,14 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 
 	/* 
 	 * tunnel setup only when the requested bul is for home
-	 * registration. (and not for the basic NEMO protocol)
+	 * registration. In NEMO case, the tunnel will be setup in
+	 * the SHISA daemon.
 	 */
 	if ((mbul->mbul_flags & IP6_MH_BU_HOME) && 
 	    (mbul->mbul_flags & IP6_MH_BU_ROUTER) == 0) {
+#ifndef MIP_USE_PF
 		mbul->mbul_encap = encap_attach_func(AF_INET6, IPPROTO_IPV6,
-		    mip6_bul_encapcheck,
-		    (void *)&mip6_tunnel_protosw, mbul);
+		    mip6_bul_encapcheck, (void *)&mip6_tunnel_protosw, mbul);
 		if (error) {
 			mip6log((LOG_ERR, "tunnel move failed.\n"));
 			/* XXX notifiy to upper XXX */
@@ -974,6 +1016,7 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 			
 			return (error);
 		}
+#endif /* !MIP_USE_PF */
 #ifdef IPSEC
 		mip6_bul_update_ipsecdb(mbul);
 #endif
@@ -986,7 +1029,10 @@ void
 mip6_bul_remove(mbul)
 	struct mip6_bul_internal *mbul;
 {
-	int s, error;
+	int s;
+#ifndef MIP_USE_PF
+	int error;
+#endif /* !MIP_USE_PF */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
@@ -996,15 +1042,17 @@ mip6_bul_remove(mbul)
 
 	LIST_REMOVE(mbul, mbul_entry);
 
+	/* Removing Tunnel encap */
 	if ((mbul->mbul_flags & IP6_MH_BU_HOME) && 
 	    (mbul->mbul_flags & IP6_MH_BU_ROUTER) == 0) {
-		/* close encaptab */
+#ifndef MIP_USE_PF
 		error = encap_detach(mbul->mbul_encap);
 		mbul->mbul_encap = NULL;
 		if (error) {
 			mip6log((LOG_ERR, "mip6_bul_remove: "
 			    "tunnel deletione failed.\n"));
 		}
+#endif /* !MIP_USE_PF */
 #ifdef IPSEC
 		mip6_bul_update_ipsecdb(mbul);
 #endif
@@ -1019,7 +1067,6 @@ static void
 mip6_bul_update_ipsecdb(mbul)
 	struct mip6_bul_internal *mbul;
 {
-//#ifndef __APPLE__
 #ifdef IPSEC
 /* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
@@ -1043,7 +1090,6 @@ mip6_bul_update_ipsecdb(mbul)
 	key_mip6_update_mobile_node_ipsecdb(&hoa_sa, NULL, &coa_sa,
 	    &haaddr_sa);
 #endif
-//#endif
 }
 
 void
@@ -1112,7 +1158,7 @@ mip6_bul_get(src, dst, bid)
 	for (mbul = LIST_FIRST(MBUL_LIST(ia6_src)); mbul;
 	     mbul = LIST_NEXT(mbul, mbul_entry)) {
 #ifdef MIP6_MCOA
-		if (bid && (bid =! mbul->mbul_bid))
+		if (bid && (bid != mbul->mbul_bid))
 			continue;
 #endif /* MIP6_MCOA */
 
@@ -1156,7 +1202,7 @@ mip6_search_hoa_in_destopt(u_int8_t *optbuf)
 	optbuf += sizeof(struct ip6_dest);
 	destoptlen -= sizeof(struct ip6_dest);
 
-	/* search hoa destination option */
+	/* search a HoA destination option */
 	for (optlen = 0; destoptlen > 0; 
 		destoptlen -= optlen, optbuf += optlen) {
 
@@ -1176,8 +1222,10 @@ mip6_search_hoa_in_destopt(u_int8_t *optbuf)
 	return (NULL);
 }
 
-/* Preparing a Home Address option for outgoing packets  */
-/* 	The caller must free the returned buffer */
+/* 
+ * Create a HoA Destination Option for outgoing packets. The caller
+ * must free the returned buffer when it finished.
+ */
 u_int8_t *
 mip6_create_hoa_opt(coa)
 	struct in6_addr *coa;
@@ -1190,12 +1238,12 @@ mip6_create_hoa_opt(coa)
 	optlen = sizeof(struct ip6_dest);
 
 	/*
-	 * calculate the padding size for a home address destination
-	 * option (8n + 6).
+	 * calculate the padding size for the HoA destination option
+	 * (8n + 6).
 	 */
 	pad = MIP6_PADLEN(optlen, 8, 6);
 
-	/* allocating a new buffer space for a home address option. */
+	/* allocating a new buffer space for the HoA option. */
 	buflen = optlen + pad + sizeof(struct ip6_opt_home_address);
 	MALLOC(optbuf, char *, buflen, M_IP6OPT, M_NOWAIT);
 	if (optbuf == NULL)
@@ -1208,7 +1256,7 @@ mip6_create_hoa_opt(coa)
 	MIP6_FILL_PADDING(optbuf + optlen, pad);
 	optlen += pad;
 
-	/* filing a home address destination option fields. */
+	/* filing the HoA destination option fields. */
 	ha_opt = (struct ip6_opt_home_address *)(optbuf + optlen);
 	ha_opt->ip6oh_type = IP6OPT_HOME_ADDRESS;
 	ha_opt->ip6oh_len = IP6OPT_HALEN;
@@ -1221,7 +1269,10 @@ mip6_create_hoa_opt(coa)
 	return (optbuf);
 }
 
-/* if the prefix is equal to one of home prefixes, return TRUE */
+/* 
+ * If the given prefix is equal to one of home prefixes, return
+ * TRUE. Otherwise, it returns zero (FALSE)
+ */
 int
 mip6_are_homeprefix(ndpr)
 #ifndef __APPLE__
@@ -1242,7 +1293,8 @@ mip6_are_homeprefix(ndpr)
 		if (ia6->ia_ifp->if_type != IFT_MIP)
 			continue;
 
-		if (in6_are_prefix_equal(&ndpr->ndpr_prefix.sin6_addr, &ia6->ia_addr.sin6_addr, ndpr->ndpr_plen))
+		if (in6_are_prefix_equal(&ndpr->ndpr_prefix.sin6_addr,
+		    &ia6->ia_addr.sin6_addr, ndpr->ndpr_plen))
 			return (TRUE);
 	}
 	return (FALSE);
@@ -1261,7 +1313,7 @@ mip6_ifa6_is_addr_valid_hoa(ifa6)
 		return (0);
 
 	if (ifa6->ia_ifp->if_type != IFT_MIP) {
-		/* the home address is home now. */
+		/* The Mobile Node is attached to the home link */
 		if ((ifa6->ia6_flags & IN6_IFF_DEREGISTERING) == 0)
 			return (1);
 	} else {
@@ -1275,7 +1327,11 @@ mip6_ifa6_is_addr_valid_hoa(ifa6)
 
 int
 mip6_bul_encapcheck(m, off, proto, arg)
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
+	struct mbuf *m;
+#else
 	const struct mbuf *m;
+#endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
 	int off;
 	int proto;
 	void *arg;
@@ -1283,17 +1339,17 @@ mip6_bul_encapcheck(m, off, proto, arg)
 	struct mip6_bul_internal *mbul = (struct mip6_bul_internal *)arg;
 	struct ip6_hdr *ip6;
 
-	if (mbul == NULL) {
+	if (mbul == NULL)
 		return (0);
-	}
 	if (mbul->mbul_mip == NULL)
 		return (0);
 
 	ip6 = mtod(m, struct ip6_hdr*);
 
 	/*
-	 * check whether this packet is from a correct sender (our
-	 * home agent) to the CoA of the mobile node.
+	 * Validation of source and destination address.  The sender
+	 * MUST be Home Agent and the desitnation MUST be CoA of the
+	 * mobile node.
 	 */
 	if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &mbul->mbul_peeraddr)
 	    || !(IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &mbul->mbul_coa)))
@@ -1303,6 +1359,7 @@ mip6_bul_encapcheck(m, off, proto, arg)
 	 * XXX: should we compare the ifid of the inner dstaddr of the
 	 * incoming packet and the ifid of the mobile node's?  these
 	 * check will be done in the ip6_input and later.
+	 * Ryuji: No.
 	 */
 
 	return (128);
@@ -1323,7 +1380,7 @@ mip6_bc_proxy_control(target, local, cmd)
 	struct ifnet *ifp;
 	int flags, error = 0;
 
-	/* create a sockaddr_in6 structure for my address. */
+	/* create a sockaddr_in6 structure for own address (local). */
 	bzero(&local_sa, sizeof(local_sa));
 	local_sa.sin6_len = sizeof(local_sa);
 	local_sa.sin6_family = AF_INET6;
@@ -1359,7 +1416,7 @@ mip6_bc_proxy_control(target, local, cmd)
 		if ((rt->rt_flags & RTF_HOST) == 0 ||
 		    (rt->rt_flags & RTF_ANNOUNCE) == 0) {
 			/*
-			 * there is a rtentry, but is not a host nor
+			 * there is a rtentry, but it is not a host nor
 			 * a proxy entry.
 			 */
 			return (0);
@@ -1450,15 +1507,14 @@ mip6_bc_proxy_control(target, local, cmd)
 	return (error);
 }
 
-/*
- *	For Home agent
- *	Reverse tunnel is allowed in following case:
- *	|Outer src|Outer Dest|Inner Src|Inner Dest|
- *	|  CoA    |Home agent|   HoA   |  xxxx    | Payload
- */
+/*  validation of the Source Address in the outer IPv6 header. */
 int
 mip6_rev_encapcheck(m, off, proto, arg)
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
+	struct mbuf *m;
+#else
 	const struct mbuf *m;
+#endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
 	int off;
 	int proto;
 	void *arg;
@@ -1472,8 +1528,8 @@ mip6_rev_encapcheck(m, off, proto, arg)
 	mbc = mip6_bce_get(&iip6->ip6_src, &oip6->ip6_dst, &oip6->ip6_src, 0);
 	if (mbc && IN6_ARE_ADDR_EQUAL(&mbc->mbc_coa, &oip6->ip6_src))
 		return (128);
-	else
-		return (0);
+
+	return (0);
 }
 
 int
@@ -1486,9 +1542,8 @@ mip6_encapsulate(mm, osrc, odst)
 	struct ip6_mh mh;
 
 	/* check whether this packet can be tunneled or not */
-
 	ip6 = mtod(m, struct ip6_hdr *);
-	/* If packet is MH and BE originated by this node   */
+	/* If packet is Binding Error originated by this node, ignore it  */
 	if (ip6->ip6_nxt == IPPROTO_MH) {
 		m_copydata(m, sizeof(struct ip6_hdr),
 			sizeof(struct ip6_mh), (caddr_t)&mh);
@@ -1502,7 +1557,7 @@ mip6_encapsulate(mm, osrc, odst)
 	if (m && m->m_len < sizeof(struct ip6_hdr))
 		m = m_pullup(m, sizeof(struct ip6_hdr));
 	if (m == NULL)
-		return (ENOBUFS);
+		return (-1);
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow = 0;
@@ -1516,16 +1571,6 @@ mip6_encapsulate(mm, osrc, odst)
 	mip6stat.mip6s_orevtunnel++;
 
    done:
-#if 0/*def IPV6_MINMTU*/
-                /* XXX */
-	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__)
-		, NULL, NULL
-#else
-		, NULL
-#endif
-		));
-#else
 	return (ip6_output(m, 0, 0, 0, 0
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__)
 		, NULL, NULL
@@ -1533,7 +1578,6 @@ mip6_encapsulate(mm, osrc, odst)
 		, NULL
 #endif
 		));
-#endif
 }
 
 #if NMIP > 0
@@ -1587,8 +1631,8 @@ mip6_notify_rr_hint(dst, src)
 
 static int
 mip6_rr_hint_ratelimit(dst, src)
-	const struct in6_addr *dst __attribute__((unused));	/* not used at this moment */
-	const struct in6_addr *src __attribute__((unused));	/* not used at this moment */
+	const struct in6_addr *dst;	/* not used at this moment */
+	const struct in6_addr *src;	/* not used at this moment */
 {
 	int ret;
 
@@ -1608,16 +1652,14 @@ mip6_rr_hint_ratelimit(dst, src)
 /* 
  * Retrieve IPv6 header information such as 
  *   - source and destination addresses
- *   - addresses stored in Home Address option and Routing Header (if present)
+ *   - addresses stored in HoA option and RT header (if present)
 
  * When there are IPv6 options, the address stored in the options are
- * stored in hoa_addr and rt_addr with the logical flag set to
+ * kept in hoa_addr and rt_addr with the logical flag set to
  * zero. When the logical flag is set, rt_addr and hoa_addr pointer
- * must not be NULL. 
- * 
- * On the other hand, if the logical flag is up,
+ * must not be NULL. On the other hand, if the logical flag is up,
  * this function gives logical source and destination addreses and do
- * not provide hoa_addr and rt_addr. 
+ * not provide hoa_addr and rt_addr.
  */
 int
 mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
@@ -1635,15 +1677,16 @@ mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
 
 	if (m == NULL || src_addr == NULL || dst_addr == NULL || presence == NULL) {
 		mip6log((LOG_ERR, "%s: "
-		    "invalid argument (m, src, dst, presence) = (%p, %p, %p, %p).\n",
-			 __FUNCTION__, m, src_addr, dst_addr, presence));
+		    "invalid argument (m, src, dst, presence) "
+		    "= (%p, %p, %p, %p).\n",
+		    __FUNCTION__, m, src_addr, dst_addr, presence));
 		return (-1);
 	}
 
 	if ((logical == 0) && (hoa_addr == NULL || rt_addr == NULL)) {
 		mip6log((LOG_ERR, "%s: "
 		    "invalid argument (hoa_addr, rt_addr) = (%p, %p).\n",
-			 __FUNCTION__, hoa_addr, rt_addr));
+		    __FUNCTION__, hoa_addr, rt_addr));
 		return (-1);
 	}
 
@@ -1659,7 +1702,7 @@ mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
 
 	/*
 	 * extract src and dst addresses from HAO and type 2 routing
-	 * header.  note that we cannot directly access to mbuf
+	 * header.  Note that we cannot directly access to mbuf
 	 * (e.g. by using IP6_EXTHDR_CHECK/GET), since we use this
 	 * function in both input/output pathes.  In a output path,
 	 * the packet is not located on a contiguous memory.
@@ -1763,9 +1806,11 @@ mip6_md_scan(u_int16_t ifindex)
 	getmicrotime(&timenow);
 	time_second = (time_t)timenow.tv_sec;
 #else
+#if defined(__NetBSD__) && __NetBSD_Version__ < 400000000
         long time_second = time.tv_sec;
-#endif
-#endif
+#endif /* __NetBSD__ && __NetBSD_Version__ < 400000000 */
+#endif /* APPLE */
+#endif /* !__FreeBSD__ */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
         s = splsoftnet();
@@ -1789,7 +1834,7 @@ mip6_md_scan(u_int16_t ifindex)
 }
 #endif /* NMIP > 0 */
 
-struct ifaddr *nd6_dad_find_by_addr __P((struct in6_addr *));
+struct ifaddr *nd6_dad_find_by_addr(struct in6_addr *);
 
 void
 mip6_do_dad(addr, ifidx)
@@ -1835,13 +1880,17 @@ mip6_do_dad(addr, ifidx)
 #endif 
 	mip6_ifa->ia_addr.sin6_family = AF_INET6;
 	mip6_ifa->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
-	nd6_dad_start((struct ifaddr *)mip6_ifa, 0);	/* delay isn't needed in this case, maybe */
+	/*
+	 * start the DAD procedure.  delay isn't needed in this case,
+	 * maybe.
+	 */
+	nd6_dad_start((struct ifaddr *)mip6_ifa, 0);
 }
 
 void
 mip6_stop_dad(addr, ifidx)
 	struct in6_addr *addr;
-	int ifidx __attribute__((unused));	/* not used at this moment */
+	int ifidx;	/* not used at this moment */
 {
 	struct ifaddr *ifa;
 	
@@ -1850,11 +1899,11 @@ mip6_stop_dad(addr, ifidx)
 		nd6_dad_stop(ifa);
 }
 
-
-struct dadq *nd6_dad_find __P((struct ifaddr *));
+struct dadq *nd6_dad_find(struct ifaddr *);
 
 /*
- * Do DAD for link local address on a interface corresponding to the ifindex
+ * Running DAD for the link local address on an interface
+ * corresponding to the ifindex
  */
 void
 mip6_do_dad_lladdr(ifidx)
@@ -1884,6 +1933,9 @@ mip6_do_dad_lladdr(ifidx)
 	}
 
 	((struct in6_ifaddr *)ifa)->ia6_flags |= IN6_IFF_TENTATIVE;
+	/*
+	 * start the DAD procedure.  delay isn't needed in this case,
+	 * maybe.
+	 */
 	nd6_dad_start((struct ifaddr *)ifa, 0);
-			/* delay isn't needed in this case, maybe */
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.130 2006/09/21 12:47:44 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.131 2007/01/26 12:51:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -31,19 +31,22 @@
 #ifndef _NETINET6_MIP6_VAR_H_
 #define _NETINET6_MIP6_VAR_H_
 
-/* the binding update list entry used in the kernel */
+/* 
+ * The Binding Update List entry used in the kernel. 
+ * This entry is stored in in6_ifaddr (in6_var.h) 
+ */
 struct mip6_bul_internal {
 	LIST_ENTRY(mip6_bul_internal) mbul_entry;
-	struct in6_addr     mbul_peeraddr;   /* peer addr of this BUL */
-	struct in6_addr     mbul_hoa;        /* HoA */
-	struct in6_addr     mbul_coa;        /* CoA */
-	u_int16_t           mbul_flags;      /* Flags: Ack, LL, Key, Home */
+	struct in6_addr     mbul_peeraddr;   /* peer address of this BUL */
+	struct in6_addr     mbul_hoa;        /* home address */
+	struct in6_addr     mbul_coa;        /* care-of address */
+	u_int16_t           mbul_flags;      /* flags: Ack, LL, Key, Home */
 	struct mip_softc    *mbul_mip;       /* back pointer to mip */
+	const struct encaptab *mbul_encap;
+	u_int8_t            mbul_state;     /* internal state */
 #ifdef MIP6_MCOA
 	u_int16_t           mbul_bid;        /* Binding Unique Identifier */
 #endif /* MIP6_MCOA */
-	const struct encaptab *mbul_encap;
-	u_int8_t            mbul_state;     /* internal state */
 };
 /*LIST_HEAD(mip6_bul_list, mip6_bul_internal); defined in in6_var.h */
 
