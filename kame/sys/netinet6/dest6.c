@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.75 2007/01/19 08:22:53 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.76 2007/01/26 11:00:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -234,6 +234,7 @@ dest6_swap_hao(ip6, ip6a, haopt)
 	struct ip6aux *ip6a;
 	struct ip6_opt_home_address *haopt;
 {
+
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
 		return (EINVAL);
 
@@ -304,12 +305,11 @@ dest6_mip6_hao(m, mhoff, nxt)
 	if ((nxt == IPPROTO_HOPOPTS) || (nxt == IPPROTO_DSTOPTS)) {
 		return (0);
 	}
+
 	n = ip6_findaux(m);
 	if (!n)
 		return (0);
-
 	ip6a = (struct ip6aux *) (n + 1);
-
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
 		return (0);
 
