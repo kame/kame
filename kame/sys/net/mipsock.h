@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.11 2007/01/18 03:52:38 t-momose Exp $ */
+/* $Id: mipsock.h,v 1.12 2007/01/26 09:50:56 keiichi Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -243,10 +243,18 @@ struct mipm_dad {
 #define MIPM_DAD		14
 
 #if defined(__NetBSD__)
-int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
+int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
+    struct mbuf *,
+#if __NetBSD_Version__ >= 400000000
+    struct lwp *
+#else
+    struct proc *
+#endif /* __NetBSD__Version__ >= 400000000 */
+    );
 #elif defined(__OpenBSD__)
-int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *);
-#endif
+int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
+    struct mbuf*);
+#endif /* __OpenBSD__ */
 void mips_notify_home_hint(u_int16_t, struct sockaddr *, u_int16_t);
 void mips_notify_rr_hint(struct sockaddr *, struct sockaddr *);
 void mips_notify_be_hint(struct sockaddr *, struct sockaddr *,

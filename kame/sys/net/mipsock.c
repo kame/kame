@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.24 2007/01/22 22:02:54 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.25 2007/01/26 09:50:56 keiichi Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -47,6 +47,9 @@
 #include <sys/protosw.h>
 #include <sys/syslog.h>
 #include <sys/proc.h>
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
+#include <sys/kauth.h>
+#endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
 
 #include <net/if.h>
 #include <net/mipsock.h>
@@ -68,6 +71,10 @@
 #include <machine/spl.h>
 #define thread proc
 #endif /* __APPLE__ */
+
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
+DOMAIN_DEFINE(mipdomain);	/* foward declare and add to link set */
+#endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
 
 static struct	sockaddr mips_dst = { .sa_len = 2, .sa_family = PF_MOBILITY, };
 static struct	sockaddr mips_src = { .sa_len = 2, .sa_family = PF_MOBILITY, };
@@ -307,10 +314,14 @@ mips_usrreq(so, req, m, nam, control)
 	struct mbuf *nam;
 	struct mbuf *control;
 #ifdef __NetBSD__
+#if __NetBSD_Version__ >= 400000000
+	struct lwp *p;
+#else
 	struct proc *p;
+#endif /* __NetBSD_Version__ >= 400000000 */
 #else
 #define p curproc
-#endif
+#endif /* __NetBSD__ */
 {
 	int error = 0;
 	struct rawcb *rp = sotorawcb(so);
@@ -402,13 +413,20 @@ mips_output(m, va_alist)
 	 * may perform operations other than RTM_GET
 	 */
 	if (
-#ifdef __APPLE__
+#if defined(__APPLE__)
 		(so->so_state & SS_PRIV == 0) && (error = EPERM)
 #elif defined(__FreeBSD__)
 		(error = suser(curthread)) != 0
+#elif defined(__NetBSD__)
+#if __NetBSD_Version__ >= 400000000
+		/* XXX is KAUTH_NETWORK_ROUTE correct? */
+		(kauth_authorize_network(curlwp->l_cred, KAUTH_NETWORK_ROUTE,
+		    0, miph, NULL, NULL) != 0) && (error = EACCES)
 #else
-		(suser(curproc->p_ucred, &curproc->p_acflag) != 0) && (error = EACCES)
-#endif						  
+		(suser(curproc->p_ucred, &curproc->p_acflag) != 0)
+		&& (error = EACCES)
+#endif /* __NetBSD_Version >= 400000000 */
+#endif         
 		) {
 		senderr(error);
 	}
@@ -565,7 +583,7 @@ mips_output(m, va_alist)
 		return (0);
 	}
 
-flush:
+ flush:
 	if (miph) {
 		if (error)
 			miph->miph_errno = error;
@@ -574,7 +592,7 @@ flush:
 			miph->miph_flags |= RTF_DONE;
 */
 	}
-	
+
 #ifdef __APPLE__
 	socket_unlock(so, 0);
 #endif /* __APPLE__ */
@@ -757,8 +775,8 @@ struct domain mipdomain = {
 	.dom_name = "mip",
 	.dom_protosw = mipsw,
 #ifdef __APPLE__
-      0, 0, 0, 0, 0, 0, 0, 0, 
-      { 0, 0 }
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	{ 0, 0 }
 #else
 	.dom_protoswNPROTOSW = &mipsw[sizeof(mipsw)/sizeof(mipsw[0])],
 #endif
