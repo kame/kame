@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.24 2007/01/14 05:15:23 t-momose Exp $	*/
+/*	$Id: babymdd.c,v 1.25 2007/01/31 17:33:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -67,8 +67,8 @@
 #include "shisad.h"
 
 #define LINKLOCAL_ALLROUTERS "ff02::2"
-#define BABYMDD_IFF_IGNOREFLAGS	(IN6_IFF_DUPLICATED|IN6_IFF_DETACHED|\
-    IN6_IFF_NODAD|IN6_IFF_TEMPORARY)
+#define BABYMDD_IFF_IGNOREFLAGS	(IN6_IFF_DUPLICATED|IN6_IFF_DETACHED|	\
+				 IN6_IFF_NODAD|IN6_IFF_TEMPORARY)
 
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
 #define storage2sin(x) ((struct sockaddr_in *)(x))
@@ -117,11 +117,10 @@ baby_usage()
 	fprintf(stderr, "\t-h mipif      specify your mip pseudo interface\n");
 	fprintf(stderr, "\tinterfaces    specify interfaces\n");
 	fprintf(stderr, "Options\n");
-        fprintf(stderr, "\t-d            turn on debug mode\n");
-        fprintf(stderr, "\t-D            turn on verbose debug mode\n");
-        fprintf(stderr, "\t-p interval   polling link status per interval(sec)\n");
+	fprintf(stderr, "\t-d            turn on debug mode\n");
+	fprintf(stderr, "\t-D            turn on verbose debug mode\n");
+	fprintf(stderr, "\t-p interval   polling link status per interval(sec)\n");
 }
-
 
 #if 0
 static char *msgtypes[] = {
@@ -153,8 +152,8 @@ int namelookup = 0;
 
 int
 main (argc, argv)
-        int argc;
-        char **argv;
+	int argc;
+	char **argv;
 {
 	int ch, n;
 	int nfds;
@@ -166,7 +165,7 @@ main (argc, argv)
 
 	memset(&babyinfo, 0, sizeof(babyinfo));
 
-        while ((ch = getopt(argc, argv, "h:dDfnpb")) != -1) {
+	while ((ch = getopt(argc, argv, "h:dDfnpb")) != -1) {
 		switch (ch) {
 		case 'h':
 			babyinfo.hoa_index = if_nametoindex(optarg);
@@ -198,12 +197,12 @@ main (argc, argv)
 		exit(0);
 	}
 
-        argc -= optind;
-        argv += optind;
+	argc -= optind;
+	argv += optind;
 
-        /* open syslog */
-        openlog("shisad(baby)", 0, LOG_DAEMON);
-        syslog(LOG_INFO, "babymdd start !!\n");
+	/* open syslog */
+	openlog("shisad(baby)", 0, LOG_DAEMON);
+	syslog(LOG_INFO, "babymdd start !!");
 
 	/* mdd initialization */
 	LIST_INIT(&babyinfo.ifinfo_head);
@@ -213,28 +212,28 @@ main (argc, argv)
 	babyinfo.rtsock = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (babyinfo.rtsock < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "%s rtocket: %s\n",  
+			syslog(LOG_ERR, "%s rtocket: %s",
 			       __FUNCTION__, strerror(errno));
 		exit (0);
 	}
 
 	/* open a socket for linkinfo */
-        babyinfo.linksock = socket(PF_INET6, SOCK_DGRAM, 0);
-        if (babyinfo.linksock < 0) {
+	babyinfo.linksock = socket(PF_INET6, SOCK_DGRAM, 0);
+	if (babyinfo.linksock < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "%s linksocket: %s\n",  
+			syslog(LOG_ERR, "%s linksocket: %s",
 			       __FUNCTION__, strerror(errno));
-                exit (-1);
-        }
+		exit (-1);
+	}
 
 	/* open a mipsock */
-        babyinfo.mipsock = socket(PF_MOBILITY, SOCK_RAW, 0);
-        if (babyinfo.mipsock < 0) {
+	babyinfo.mipsock = socket(PF_MOBILITY, SOCK_RAW, 0);
+	if (babyinfo.mipsock < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "%s mipsocket: %s\n",  
+			syslog(LOG_ERR, "%s mipsocket: %s",
 			       __FUNCTION__, strerror(errno));
-                exit (-1);
-        }
+		exit (-1);
+	}
 
 	/* initilization of home addresses */
 	init_hoa(babyinfo.hoa_index);
@@ -251,7 +250,6 @@ main (argc, argv)
 			if (ifinfo)
 				ifinfo->priority = priority++;
 		}
-
 	} else {
 		while (argc--) {
 			ifinfo = init_if(*argv++);
@@ -265,22 +263,21 @@ main (argc, argv)
 	baby_initif();
 
 	/* dump Configuration */
- 	if (DEBUGHIGH) {
+ 	if (DEBUGHIGH)
 		print_debug();
-	}
 
-        signal(SIGHUP, baby_terminate);
-        signal(SIGINT, baby_terminate);
-        signal(SIGKILL, baby_terminate);
-        signal(SIGTERM, baby_terminate);
+	signal(SIGHUP, baby_terminate);
+	signal(SIGINT, baby_terminate);
+	signal(SIGKILL, baby_terminate);
+	signal(SIGTERM, baby_terminate);
 
-        if (!babyinfo.nondaemon) {
-                if (daemon(0, 0) < 0) {
-                        perror("daemon");
+	if (!babyinfo.nondaemon) {
+		if (daemon(0, 0) < 0) {
+			perror("daemon");
 			baby_terminate(0 /* dummy */);
-                        exit(-1);
-                }
-        }
+			exit(-1);
+		}
+	}
 
 	baby_selection();
 
@@ -291,34 +288,33 @@ main (argc, argv)
 	lastlinkcheck = time(0);
 
 	while (1) {
-		                
-                FD_ZERO(&fds);
+		FD_ZERO(&fds);
 		nfds = -1;
-                FD_SET(babyinfo.rtsock, &fds);
+		FD_SET(babyinfo.rtsock, &fds);
 		if (babyinfo.rtsock >= nfds)    
 			nfds = babyinfo.rtsock + 1;
-                FD_SET(babyinfo.mipsock, &fds);
+		FD_SET(babyinfo.mipsock, &fds);
 		if (babyinfo.mipsock >= nfds)    
 			nfds = babyinfo.mipsock + 1;
 
-                if (select(nfds, &fds, NULL, NULL, NULL) < 0) {
+		if (select(nfds, &fds, NULL, NULL, NULL) < 0) {
 			if (DEBUGNORM)
-				syslog(LOG_ERR, "select %s\n", strerror(errno));
-                        exit(-1);
-                }
-                if (FD_ISSET(babyinfo.rtsock, &fds)) {
-                        n = read(babyinfo.rtsock, buf, sizeof(buf));
-                        if (n < 0) 
-                                continue;
+				syslog(LOG_ERR, "select %s", strerror(errno));
+			exit(-1);
+		}
 
+		if (FD_ISSET(babyinfo.rtsock, &fds)) {
+			n = read(babyinfo.rtsock, buf, sizeof(buf));
+			if (n < 0) 
+				continue;
 			if (baby_rtmsg((struct rt_msghdr *)buf, n))
 				baby_selection();
 		}
 
-                if (FD_ISSET(babyinfo.mipsock, &fds)) {
-                        n = read(babyinfo.mipsock, buf, sizeof(buf));
-                        if (n < 0) 
-                                continue;
+		if (FD_ISSET(babyinfo.mipsock, &fds)) {
+			n = read(babyinfo.mipsock, buf, sizeof(buf));
+			if (n < 0) 
+				continue;
 
 			if (baby_mipmsg((struct mip_msghdr *)buf, n))
 				baby_selection();
@@ -335,12 +331,13 @@ main (argc, argv)
 	}
 
 	return (0);
-};
+}
 
 /* check link status */
 int
-baby_checklink() {
-        struct ifmediareq ifmr;
+baby_checklink()
+{
+	struct ifmediareq ifmr;
 	struct if_info *ifinfo, *ifinfo_next;
 
 	for (ifinfo = LIST_FIRST(&babyinfo.ifinfo_head); ifinfo; 
@@ -365,12 +362,12 @@ baby_checklink() {
 				send_rs(ifinfo);
 
 				if (DEBUGHIGH)
-					syslog(LOG_INFO, "%s link up\n", ifinfo->ifname); 
+					syslog(LOG_INFO, "%s link up", ifinfo->ifname); 
 
 			} else {
 				if (DEBUGHIGH)
 					syslog(LOG_INFO, 
-					       "%s link failed\n", ifinfo->ifname); 
+					       "%s link failed", ifinfo->ifname); 
 				baby_md_scan(ifinfo);
 				send_rs(ifinfo);
 
@@ -384,12 +381,12 @@ baby_checklink() {
 			if (ifmr.ifm_status & IFM_ACTIVE) {
 				send_rs(ifinfo);
 				if (DEBUGHIGH)
-					syslog(LOG_INFO, "%s link up\n", ifinfo->ifname); 
+					syslog(LOG_INFO, "%s link up", ifinfo->ifname); 
 			}
 			else {
 				if (DEBUGHIGH)
 					syslog(LOG_INFO, 
-					       "%s link failed\n", ifinfo->ifname); 
+					       "%s link failed", ifinfo->ifname); 
 				baby_md_scan(ifinfo);
 				send_rs(ifinfo);
 
@@ -404,7 +401,8 @@ baby_checklink() {
 
 /* reset router lifetime of NDP, 0 = success, -1 = error */
 static int
-baby_md_scan(struct if_info *ifinfo) {
+baby_md_scan(struct if_info *ifinfo)
+{
 	struct mipm_md_info mdinfo;
 	
 	if (!ifinfo)
@@ -412,15 +410,15 @@ baby_md_scan(struct if_info *ifinfo) {
 
 	memset(&mdinfo, 0, sizeof(mdinfo));
 	mdinfo.mipmmi_hdr.miph_msglen	= sizeof(mdinfo);
-	mdinfo.mipmmi_hdr.miph_version = MIP_VERSION;
+	mdinfo.mipmmi_hdr.miph_version	= MIP_VERSION;
 	mdinfo.mipmmi_hdr.miph_type	= MIPM_MD_INFO;
 	mdinfo.mipmmi_hdr.miph_seq	= random();
 	mdinfo.mipmmi_command		= MIPM_MD_SCAN;
-	mdinfo.mipmmi_ifindex          = ifinfo->ifindex;
+	mdinfo.mipmmi_ifindex		= ifinfo->ifindex;
 
 	if (write(babyinfo.mipsock, &mdinfo, sizeof(babyinfo)) < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "%s: write %s\n", 
+			syslog(LOG_ERR, "%s: write %s",
 			       __FUNCTION__, strerror(errno));
 		return (-1);
 	}
@@ -456,18 +454,20 @@ baby_md_reg(coa, ifindex, bid)
 		hoa.sin6_len = sizeof(struct sockaddr_in6);
 
 		/* do not send md_info msg for an address generated at a home link */
+		if (
 #ifdef DSMIP
-		if(coa->sa_family==AF_INET6)
-			if (inet_are_prefix_equal(&hoa.sin6_addr,
-				&((struct sockaddr_in6 *)coa)->sin6_addr, 64)) 
-		/* XXX we are missing this check */
+			(coa->sa_family == AF_INET6) &&
+			(inet_are_prefix_equal(&hoa.sin6_addr,
+					       &((struct sockaddr_in6 *)coa)->sin6_addr, 64))
+			/* XXX we are missing this check */
 #else
-		if (inet_are_prefix_equal(&hoa.sin6_addr, &coa->sin6_addr, 64)) 
+			inet_are_prefix_equal(&hoa.sin6_addr, &coa->sin6_addr, 64)
 #endif
+			)
 			return (0);
 		
 		len = sizeof(*mdinfo) + sizeof(hoa) + sizeof(*coa);
-		mdinfo = (struct mipm_md_info *) malloc(len);
+		mdinfo = (struct mipm_md_info *)malloc(len);
 		if (mdinfo == NULL)
 			return (-1);
 		
@@ -478,7 +478,7 @@ baby_md_reg(coa, ifindex, bid)
 		mdinfo->mipmmi_hdr.miph_seq	= random();
 		mdinfo->mipmmi_hint		= MIPM_MD_ADDR;
 		mdinfo->mipmmi_command		= MIPM_MD_REREG;
-		mdinfo->mipmmi_ifindex         = ifindex;
+		mdinfo->mipmmi_ifindex		= ifindex;
 		
 		memcpy(MIPD_HOA(mdinfo), &hoa, sizeof(hoa));
 		memcpy(MIPD_COA(mdinfo), coa, sizeof(*coa));
@@ -486,7 +486,7 @@ baby_md_reg(coa, ifindex, bid)
 		
 		if (write(babyinfo.mipsock, mdinfo, len) < 0) {
 			if (DEBUGNORM)
-				syslog(LOG_ERR, "%s: write %s\n", 
+				syslog(LOG_ERR, "%s: write %s",
 				       __FUNCTION__, strerror(errno));
 			return (-1);
 		}
@@ -496,26 +496,27 @@ baby_md_reg(coa, ifindex, bid)
 			switch (coa->sa_family) {
 			case AF_INET:
 				inet_ntop(AF_INET, 
-				    &((struct sockaddr_in *)coa)->sin_addr,
-				    buf, sizeof(buf));
+					  &((struct sockaddr_in *)coa)->sin_addr,
+					  buf, sizeof(buf));
 				break;
 			case AF_INET6:
 				inet_ntop(AF_INET6, 
-				    &((struct sockaddr_in6 *)coa)->sin6_addr,
-				    buf, sizeof(buf));
+					  &((struct sockaddr_in6 *)coa)->sin6_addr,
+					  buf, sizeof(buf));
 				break;
 			}
 #endif /* DSMIP */
-			syslog(LOG_INFO, "[binding %s -> %s]\n", 
+			syslog(LOG_INFO, "[binding %s -> %s]",
 			       ip6_sprintf(&hoa.sin6_addr),
 #ifdef DSMIP
-					buf);
+			       buf
 #else
-					ip6_sprintf(&coa->sin6_addr));
+			       ip6_sprintf(&coa->sin6_addr)
 #endif /* DSMIP */
+				);
 		}
 	}
-
+	
 	return (0);
 }
 
@@ -535,7 +536,7 @@ baby_mipmsg(mipm, msglen)
 		miphome = (struct mipm_home_hint *)mipm;
 
 		ifinfo = baby_ifindex2ifinfo(miphome->mipmhh_ifindex);
-		if (ifinfo == NULL)                        
+		if (ifinfo == NULL)
 			break;
 		
 		/* 
@@ -551,7 +552,7 @@ baby_mipmsg(mipm, msglen)
 			    inet_are_prefix_equal(
 				    &((struct sockaddr_in6 *)miphome->mipmhh_prefix)->sin6_addr,
 				    &storage2sin6(&hoainfo->hoa)->sin6_addr, 
-					miphome->mipmhh_prefixlen)) {
+				    miphome->mipmhh_prefixlen)) {
 
 				babyinfo.whereami = IAMHOME;
 
@@ -567,13 +568,12 @@ baby_mipmsg(mipm, msglen)
 		}
 		break;
 	case MIPM_MD_INFO:
-                mipmd = (struct mipm_md_info *)mipm;
-                if (mipmd->mipmmi_command == MIPM_MD_SCAN) {
-
+		mipmd = (struct mipm_md_info *)mipm;
+		if (mipmd->mipmmi_command == MIPM_MD_SCAN) {
 			ifinfo = baby_ifindex2ifinfo(mipmd->mipmmi_ifindex);
-			if (ifinfo != NULL)                        
+			if (ifinfo != NULL)
 				send_rs(ifinfo);
-                } 
+		} 
 		break;
 	default:
 		break;
@@ -589,17 +589,17 @@ baby_rtmsg(rtm, msglen)
 	struct rt_msghdr *rtm;
 	int msglen;
 {
-        struct ifa_msghdr *ifam;
-        struct in6_ifreq ifr6;
+	struct ifa_msghdr *ifam;
+	struct in6_ifreq ifr6;
 	struct if_info *ifinfo;
-        struct sockaddr *rti_info[RTAX_MAX];
+	struct sockaddr *rti_info[RTAX_MAX];
 	struct sockaddr_in6 *sin6;
 	struct hoa_info *hoainfo, *hoainfo_next;
 
 #if 0
 	if (DEBUGHIGH) {
 		if (msgtypes[rtm->rtm_type])
-			syslog(LOG_INFO, "\t%s:\n", msgtypes[rtm->rtm_type]);
+			syslog(LOG_INFO, "\t%s:", msgtypes[rtm->rtm_type]);
 	}
 #endif
 	
@@ -632,11 +632,10 @@ baby_rtmsg(rtm, msglen)
 			    (struct sockaddr *) (ifam + 1), rti_info);
 
 		if (rti_info[RTAX_IFA]->sa_family == AF_INET6) {
-
 			sin6 = (struct sockaddr_in6 *) rti_info[RTAX_IFA];
 
 			if (DEBUGHIGH)
-				syslog(LOG_INFO, "%s becomes invalid\n", 
+				syslog(LOG_INFO, "%s becomes invalid",
 				       ip6_sprintf(&sin6->sin6_addr));
 
 			/* 
@@ -646,7 +645,6 @@ baby_rtmsg(rtm, msglen)
 			 * ADDRINFO case.
 			 */
 			if (babyinfo.whereami == IAMHOME) {
-
 				for (hoainfo = LIST_FIRST(&babyinfo.hoainfo_head); hoainfo; 
 				     hoainfo = hoainfo_next) {
 					hoainfo_next = LIST_NEXT(hoainfo, hoainfo_entry);
@@ -722,7 +720,7 @@ baby_rtmsg(rtm, msglen)
 		 */
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED) {
 			if (DEBUGHIGH)
-				syslog(LOG_INFO, "%s is detached\n", 
+				syslog(LOG_INFO, "%s is detached",
 				       ip6_sprintf(&sin6->sin6_addr)); 
 
 			/* 
@@ -755,10 +753,10 @@ baby_rtmsg(rtm, msglen)
 	return (0);	
 }
 
-#define MAYHAVE(var, cap, def)  \
-	do {                    \
-		if ((var = agetnum(cap)) < 0)  \
-			var = def;  \
+#define MAYHAVE(var, cap, def)			\
+	do {					\
+		if ((var = agetnum(cap)) < 0)	\
+			var = def;		\
 	} while (0)
 
 
@@ -767,7 +765,8 @@ baby_rtmsg(rtm, msglen)
  * 1 hoa
  */
 static int
-is_hoa_ornot(struct in6_addr *addr) {
+is_hoa_ornot(struct in6_addr *addr)
+{
 	struct hoa_info  *hoainfo, *hoainfo_next;
 
 	for (hoainfo = LIST_FIRST(&babyinfo.hoainfo_head); hoainfo; 
@@ -787,14 +786,15 @@ is_hoa_ornot(struct in6_addr *addr) {
  * prefixes 
  */
 static void
-init_hoa(u_int16_t hoaindex) {
+init_hoa(u_int16_t hoaindex)
+{
 	int mib[6], len;
 	char *ifmsg = NULL, *next, *limit;
-        struct if_msghdr *ifm;
-        struct ifa_msghdr *ifam;
-        struct sockaddr *rti_info[RTAX_MAX];
-        struct in6_ifreq ifr6;
-        struct sockaddr_in6 *sin6;
+	struct if_msghdr *ifm;
+	struct ifa_msghdr *ifam;
+	struct sockaddr *rti_info[RTAX_MAX];
+	struct in6_ifreq ifr6;
+	struct sockaddr_in6 *sin6;
 	struct hoa_info *hinfo;
 
 	mib[0] = CTL_NET;
@@ -806,24 +806,23 @@ init_hoa(u_int16_t hoaindex) {
 
 	if (sysctl(mib, 6, NULL, (size_t *)&len, NULL, 0) < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "sysctl %s\n", strerror(errno));
+			syslog(LOG_ERR, "sysctl %s", strerror(errno));
 		return;
 	}
 	if ((ifmsg = malloc(len)) == NULL) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "malloc %s\n", strerror(errno));
+			syslog(LOG_ERR, "malloc %s", strerror(errno));
 		return;
 	}
 	if (sysctl(mib, 6, ifmsg, (size_t *)&len, NULL, 0) < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "sysctl %s\n", strerror(errno));
+			syslog(LOG_ERR, "sysctl %s", strerror(errno));
 		free(ifmsg);
 		return;
 	}
  
 	limit = ifmsg +  len;
 	for (next = ifmsg; next < limit; next += ifm->ifm_msglen) {
-		
 		ifm = (struct if_msghdr *) next;
 
 		/* unknown interface !? */
@@ -875,7 +874,8 @@ init_hoa(u_int16_t hoaindex) {
 }
 
 static struct if_info *
-init_if(char *targetif) {
+init_if(char *targetif)
+{
 	struct if_info *ifinfo;
 	u_int16_t index = 0;
 	int bid = 0;
@@ -894,7 +894,7 @@ init_if(char *targetif) {
 
 	index = if_nametoindex(ifname);
 	if (index == 0) {
-		syslog(LOG_ERR, "%s is not correct, ignore\n", ifname);
+		syslog(LOG_ERR, "%s is not correct, ignore", ifname);
 		return NULL;
 	}
 
@@ -908,51 +908,52 @@ init_if(char *targetif) {
 	LIST_INSERT_HEAD(&babyinfo.ifinfo_head, ifinfo, ifinfo_entry);
 
 	return (ifinfo);
-};
+}
 
 
 /* Print all the information stored in babymdd */
 static void
-print_debug () {
+print_debug()
+{
 	struct if_info *ifinfo;
 	struct hoa_info *hoainfo;
 #ifdef DSMIP
 	char buf[256];
 #endif /* DSMIP */
 
-	syslog(LOG_INFO, "babymdd info.\n");
-	syslog(LOG_INFO, "\tdebug level %d\n", babyinfo.debug); 
-	syslog(LOG_INFO, "\tDNS is %s\n", 
+	syslog(LOG_INFO, "babymdd info.");
+	syslog(LOG_INFO, "\tdebug level %d", babyinfo.debug); 
+	syslog(LOG_INFO, "\tDNS is %s", 
 	       (babyinfo.dns) ? "active" : "inactive");
-	syslog(LOG_INFO, "\tmdd is %s\n", 
+	syslog(LOG_INFO, "\tmdd is %s",
 	       (babyinfo.nondaemon) ? "forwarground":"background");
 
-	syslog(LOG_INFO, "\tHoA:\n");
+	syslog(LOG_INFO, "\tHoA:");
 	LIST_FOREACH(hoainfo, &babyinfo.hoainfo_head, hoainfo_entry) {
-		syslog(LOG_INFO, "%s\n", 
+		syslog(LOG_INFO, "%s",
 		       ip6_sprintf(&storage2sin6(&hoainfo->hoa)->sin6_addr));
 	}
 
-	syslog(LOG_INFO, "\tCoA:\n");
+	syslog(LOG_INFO, "\tCoA:");
 	LIST_FOREACH(ifinfo, &babyinfo.ifinfo_head, ifinfo_entry) {
-		syslog(LOG_INFO, "\t\tifname %s\n", ifinfo->ifname);
-		syslog(LOG_INFO, "\t\tpriority %d\n", ifinfo->priority);
+		syslog(LOG_INFO, "\t\tifname %s", ifinfo->ifname);
+		syslog(LOG_INFO, "\t\tpriority %d", ifinfo->priority);
 		if (ifinfo->coa.ss_family == AF_INET6)
-			syslog(LOG_INFO, "\t\t%s\n", 
+			syslog(LOG_INFO, "\t\t%s", 
 			       ip6_sprintf(&storage2sin6(&ifinfo->coa)->sin6_addr));
 #ifdef DSMIP
 		if (ifinfo->coa.ss_family == AF_INET)
-			syslog(LOG_INFO, "\t\t%s\n", 
-                                inet_ntop(AF_INET,
-                                    &storage2sin(&ifinfo->coa)->sin_addr,
-                                    buf, sizeof(buf)) );
+			syslog(LOG_INFO, "\t\t%s",
+			       inet_ntop(AF_INET,
+					 &storage2sin(&ifinfo->coa)->sin_addr,
+					 buf, sizeof(buf)) );
 #endif /* DSMIP */
 	}
 }
 
-
 void
-baby_reset() {
+baby_reset()
+{
 	struct if_info *ifinfo, *ifinfo_next;
 	struct hoa_info *hoainfo, *hoainfo_next;
 
@@ -964,7 +965,7 @@ baby_reset() {
 		LIST_REMOVE(hoainfo, hoainfo_entry);
 		free(hoainfo);
 		hoainfo = NULL;
-	};
+	}
 	
 	/* Clear all the memory for coa_info entries */
 	for (ifinfo = LIST_FIRST(&babyinfo.ifinfo_head); ifinfo; 
@@ -974,24 +975,23 @@ baby_reset() {
 		LIST_REMOVE(ifinfo, ifinfo_entry);
 		free(ifinfo);
 		ifinfo = NULL;
-	};
+	}
 
-	syslog(LOG_INFO, "goodbye\n");
+	syslog(LOG_INFO, "goodbye");
 	return;
-};
-
+}
 
 static void 
 baby_terminate(arg)
 	int arg;	/* not used */
 {
-
 	baby_reset();
 	exit(0);
 }
 
 static void
-baby_initif() {
+baby_initif()
+{
 	struct if_info *ifinfo, *ifinfo_next;
 
 	/* Sorting by priority  */
@@ -1059,7 +1059,7 @@ in6_addrscope(addr)
 		case __IPV6_ADDR_SCOPE_LINKLOCAL:
 			return (__IPV6_ADDR_SCOPE_LINKLOCAL);
 			break;
-                case __IPV6_ADDR_SCOPE_SITELOCAL:
+		case __IPV6_ADDR_SCOPE_SITELOCAL:
 			return (__IPV6_ADDR_SCOPE_SITELOCAL);
 			break;
 		default:
@@ -1088,32 +1088,31 @@ in6_addrscope(addr)
 
 static int
 next_sa(sa)
-        struct sockaddr *sa;
+	struct sockaddr *sa;
 {
-        if (sa->sa_len) {
-                return (ROUNDUP(sa->sa_len, sizeof (u_long)));
-        } else {
-                return (sizeof(u_long));
-        }
+	if (sa->sa_len) {
+		return (ROUNDUP(sa->sa_len, sizeof (u_long)));
+	} else {
+		return (sizeof(u_long));
+	}
 }
-
 
 static void
 get_rtaddrs(addrs, sa, rti_info)
-        int addrs;
-        struct sockaddr *sa;
-        struct sockaddr *rti_info[];
+	int addrs;
+	struct sockaddr *sa;
+	struct sockaddr *rti_info[];
 {
-        int i;
+	int i;
 
-        for (i=0; i < RTAX_MAX; i++) {
-                if (addrs & (1 << i)) {
-                        rti_info[i] = sa;
-                        sa = (struct sockaddr *) ((caddr_t) sa + next_sa(sa));
-                } else {
-                        rti_info[i] = NULL;
-                }
-        }
+	for (i=0; i < RTAX_MAX; i++) {
+		if (addrs & (1 << i)) {
+			rti_info[i] = sa;
+			sa = (struct sockaddr *) ((caddr_t) sa + next_sa(sa));
+		} else {
+			rti_info[i] = NULL;
+		}
+	}
 }
 
 void
@@ -1123,15 +1122,15 @@ baby_getifinfo(ifinfo)
 	int mib[6];
 	char *ifmsg = NULL;
 	int len;
-        char *next, *limit;
-        struct if_msghdr *ifm;
-        struct ifa_msghdr *ifam;
-        struct sockaddr *rti_info[RTAX_MAX];
-        struct in6_ifreq ifr6;
+	char *next, *limit;
+	struct if_msghdr *ifm;
+	struct ifa_msghdr *ifam;
+	struct sockaddr *rti_info[RTAX_MAX];
+	struct in6_ifreq ifr6;
 #ifdef DSMIP
-        struct sockaddr_in *sin;
+	struct sockaddr_in *sin;
 #endif /* DSMIP */
-        struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 *sin6;
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -1146,26 +1145,25 @@ baby_getifinfo(ifinfo)
 
 	if (sysctl(mib, 6, NULL, (size_t *)&len, NULL, 0) < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "sysctl %s\n", strerror(errno));
+			syslog(LOG_ERR, "sysctl %s", strerror(errno));
 		return;
 	}
 	if ((ifmsg = malloc(len)) == NULL) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "malloc %s\n", strerror(errno));
+			syslog(LOG_ERR, "malloc %s", strerror(errno));
 		return;
 	}
 	if (sysctl(mib, 6, ifmsg, (size_t *)&len, NULL, 0) < 0) {
 		if (DEBUGNORM)
-			syslog(LOG_ERR, "sysctl %s\n", strerror(errno));
+			syslog(LOG_ERR, "sysctl %s", strerror(errno));
 		free(ifmsg);
 		return;
 	}
  
 	memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
-        
+	
 	limit = ifmsg +  len;
 	for (next = ifmsg; next < limit; next += ifm->ifm_msglen) {
-		
 		ifm = (struct if_msghdr *) next;
 
 		if (ifm->ifm_index != ifinfo->ifindex)
@@ -1180,47 +1178,45 @@ baby_getifinfo(ifinfo)
 			ifam = (struct ifa_msghdr *) next;
 			
 			get_rtaddrs(ifam->ifam_addrs,
-			    (struct sockaddr *)(ifam + 1), rti_info);
+				    (struct sockaddr *)(ifam + 1), rti_info);
 
-#ifdef DSMIP
 			switch (rti_info[RTAX_IFA]->sa_family) {
+#ifdef DSMIP
 			case AF_INET:
 				sin =  (struct sockaddr_in *)rti_info[RTAX_IFA];
 
 				/* Do we need to check the I/F flags? */
 
 				memcpy(&ifinfo->coa, sin,
-			    		sizeof(struct sockaddr_in));
+				       sizeof(struct sockaddr_in));
 				break;
+#endif /* DSMIP */
 			case AF_INET6:
-#endif /* DSMIP */
-			sin6 = (struct sockaddr_in6 *)rti_info[RTAX_IFA];
+				sin6 = (struct sockaddr_in6 *)rti_info[RTAX_IFA];
 			
-			/* MUST be a global address. */
-			if (in6_addrscope(&sin6->sin6_addr) !=  
-			    __IPV6_ADDR_SCOPE_GLOBAL) 
-				continue;
+				/* MUST be a global address. */
+				if (in6_addrscope(&sin6->sin6_addr) !=  
+				    __IPV6_ADDR_SCOPE_GLOBAL) 
+					continue;
 
-			/* get interface flags. */
-			memset(&ifr6, 0, sizeof(ifr6));
-			ifr6.ifr_addr = *sin6;
-			if (if_indextoname(ifm->ifm_index, ifr6.ifr_name)
-			    == NULL) 
-				continue;
-			if (ioctl(babyinfo.linksock, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
-				perror("ioctl(SIOCGIFAFLAG_IN6)");
-				continue;
-			}
-			if (ifr6.ifr_ifru.ifru_flags6 & BABYMDD_IFF_IGNOREFLAGS)
-				continue;
+				/* get interface flags. */
+				memset(&ifr6, 0, sizeof(ifr6));
+				ifr6.ifr_addr = *sin6;
+				if (if_indextoname(ifm->ifm_index, ifr6.ifr_name)
+				    == NULL) 
+					continue;
+				if (ioctl(babyinfo.linksock, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+					perror("ioctl(SIOCGIFAFLAG_IN6)");
+					continue;
+				}
+				if (ifr6.ifr_ifru.ifru_flags6 & BABYMDD_IFF_IGNOREFLAGS)
+					continue;
 
-			/* XXX how do we handle multiple addresses? */
-			memcpy(&ifinfo->coa, sin6,
-			    sizeof(struct sockaddr_in6));
-#ifdef DSMIP
+				/* XXX how do we handle multiple addresses? */
+				memcpy(&ifinfo->coa, sin6,
+				       sizeof(struct sockaddr_in6));
 				break;
 			}
-#endif /* DSMIP */
 			break;
 		}
 	}
@@ -1233,7 +1229,8 @@ baby_getifinfo(ifinfo)
 
 /* detrmin which CoAs are passed to mobile network daemon */
 void
-baby_selection() {
+baby_selection()
+{
 	struct if_info *ifinfo, *ifinfo_next;
 
 	if (babyinfo.whereami == IAMHOME) {
@@ -1265,8 +1262,8 @@ baby_selection() {
 				hoainfo_next = LIST_NEXT(hoainfo, hoainfo_entry); 
 				
 				baby_md_home(storage2sin6(&hoainfo->hoa), 
-				    storage2sin6(&ifinfo->coa), 
-				    ifinfo->ifindex);
+					     storage2sin6(&ifinfo->coa), 
+					     ifinfo->ifindex);
 			}
 		}
 
@@ -1280,12 +1277,13 @@ baby_selection() {
 
 		if (ifinfo->iftype == IFT_MIP)
 			continue;
+		if (
 #ifdef DSMIP
-		if (ifinfo->coa.ss_family != AF_INET6 &&
-		ifinfo->coa.ss_family != AF_INET)
+			(ifinfo->coa.ss_family != AF_INET) &&
 #else
-		if (ifinfo->coa.ss_family != AF_INET6) 
+			(ifinfo->coa.ss_family != AF_INET6)
 #endif /* DSMIP */
+			)
 			continue;
 		
 		/* 
@@ -1319,9 +1317,9 @@ baby_selection() {
 	return;
 }
 
-
 static int
-baby_coa_equal(struct if_info *ifinfo) {
+baby_coa_equal(struct if_info *ifinfo) 
+{
 
 	if ((ifinfo->coa.ss_family != 0) && 
 	    (ifinfo->coa.ss_family != ifinfo->pcoa.ss_family)) 
@@ -1334,24 +1332,25 @@ baby_coa_equal(struct if_info *ifinfo) {
 	}
 
 	return (0);
-};
+}
 
 static int
-send_rs(struct if_info  *ifinfo) {
-        struct msghdr msg;
-        struct iovec iov;
-        struct cmsghdr  *cmsgptr = NULL;
-        struct in6_pktinfo *pi = NULL;
-        struct sockaddr_in6 to;
-        char adata[512], buf[1024];
-        struct nd_router_solicit *rs;
-        size_t rslen = 0;
+send_rs(struct if_info  *ifinfo)
+{
+	struct msghdr msg;
+	struct iovec iov;
+	struct cmsghdr  *cmsgptr = NULL;
+	struct in6_pktinfo *pi = NULL;
+	struct sockaddr_in6 to;
+	char adata[512], buf[1024];
+	struct nd_router_solicit *rs;
+	size_t rslen = 0;
 	int icmpsock = -1, on = 1;
 
 	icmpsock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	if (icmpsock < 0) {
 		if (DEBUGHIGH)
-			syslog(LOG_ERR, "%s socket: %s\n",  
+			syslog(LOG_ERR, "%s socket: %s",
 			       __FUNCTION__, strerror(errno));
 		return (0);
 	}
@@ -1363,27 +1362,27 @@ send_rs(struct if_info  *ifinfo) {
 #endif
 		       &on, sizeof(on)) < 0) {
 		if (DEBUGHIGH)
-			syslog(LOG_ERR, "%s setsockopt: %s\n",  
+			syslog(LOG_ERR, "%s setsockopt: %s",
 			       __FUNCTION__, strerror(errno));
 		return (0);
 	}
 
-        memset(&to, 0, sizeof(to));
-        if (inet_pton(AF_INET6, LINKLOCAL_ALLROUTERS, &to.sin6_addr) != 1) {
+	memset(&to, 0, sizeof(to));
+	if (inet_pton(AF_INET6, LINKLOCAL_ALLROUTERS, &to.sin6_addr) != 1) {
 		close (icmpsock);
-                return (-1);
+		return (-1);
 	}
 	to.sin6_family = AF_INET6;
 	to.sin6_port = 0;
 	to.sin6_scope_id = 0;
 	to.sin6_len = sizeof (struct sockaddr_in6);
 
-        msg.msg_name = (void *)&to;
-        msg.msg_namelen = sizeof(struct sockaddr_in6);
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = (void *) adata;
-        msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) 
+	msg.msg_name = (void *)&to;
+	msg.msg_namelen = sizeof(struct sockaddr_in6);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (void *) adata;
+	msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) 
 		+ CMSG_SPACE(sizeof(int));
 
 	/* Packet Information i.e. Source Address */
@@ -1396,18 +1395,18 @@ send_rs(struct if_info  *ifinfo) {
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 
-        cmsgptr->cmsg_level = IPPROTO_IPV6;
-        cmsgptr->cmsg_type = IPV6_HOPLIMIT;
-        cmsgptr->cmsg_len = CMSG_LEN(sizeof(int));
-        *(int *)(CMSG_DATA(cmsgptr)) = 255;
-        cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+	cmsgptr->cmsg_level = IPPROTO_IPV6;
+	cmsgptr->cmsg_type = IPV6_HOPLIMIT;
+	cmsgptr->cmsg_len = CMSG_LEN(sizeof(int));
+	*(int *)(CMSG_DATA(cmsgptr)) = 255;
+	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 		
 	bzero(buf, sizeof(buf));
 	rs = (struct nd_router_solicit *)buf;
-        rs->nd_rs_type = ND_ROUTER_SOLICIT;
-        rs->nd_rs_code = 0;
-        rs->nd_rs_cksum = 0;
-        rs->nd_rs_reserved = 0;
+	rs->nd_rs_type = ND_ROUTER_SOLICIT;
+	rs->nd_rs_code = 0;
+	rs->nd_rs_cksum = 0;
+	rs->nd_rs_reserved = 0;
 	rslen = sizeof(struct nd_router_solicit);
 
 	iov.iov_base = buf;
@@ -1415,43 +1414,43 @@ send_rs(struct if_info  *ifinfo) {
 	
 	if (sendmsg(icmpsock, &msg, 0) < 0) {
 		if (DEBUGHIGH)
-			syslog(LOG_ERR, "%s sendmsg() %s\n",  
+			syslog(LOG_ERR, "%s sendmsg() %s",
 			       __FUNCTION__, strerror(errno));
 	}
 
 	close (icmpsock);
-	return errno;
+	return (errno);
 }
 
 
 static void
 baby_md_home(hoa, coa, ifindex)
-        struct sockaddr_in6 *hoa;
-        struct sockaddr_in6 *coa;
-        int ifindex;
+	struct sockaddr_in6 *hoa;
+	struct sockaddr_in6 *coa;
+	int ifindex;
 {
-        int len;
-        struct mipm_md_info *mdinfo;
+	int len;
+	struct mipm_md_info *mdinfo;
 
-        len = sizeof(*mdinfo) + sizeof(*hoa) + sizeof(*coa);
-        mdinfo = (struct mipm_md_info *) malloc(len);
-        if (mdinfo == NULL)
-                return;
+	len = sizeof(*mdinfo) + sizeof(*hoa) + sizeof(*coa);
+	mdinfo = (struct mipm_md_info *) malloc(len);
+	if (mdinfo == NULL)
+		return;
 
-        memset(mdinfo, 0, len);
-        mdinfo->mipmmi_hdr.miph_msglen = len;
-        mdinfo->mipmmi_hdr.miph_version = MIP_VERSION;
-        mdinfo->mipmmi_hdr.miph_type   = MIPM_MD_INFO;
-        mdinfo->mipmmi_hdr.miph_seq    = random();
-        mdinfo->mipmmi_hint            = MIPM_MD_ADDR;
-        mdinfo->mipmmi_command         = MIPM_MD_DEREGHOME;
-        mdinfo->mipmmi_ifindex         = ifindex;
-        memcpy(MIPD_HOA(mdinfo), hoa, sizeof(*hoa));
-        memcpy(MIPD_COA(mdinfo), hoa, sizeof(*hoa));
+	memset(mdinfo, 0, len);
+	mdinfo->mipmmi_hdr.miph_msglen = len;
+	mdinfo->mipmmi_hdr.miph_version = MIP_VERSION;
+	mdinfo->mipmmi_hdr.miph_type   = MIPM_MD_INFO;
+	mdinfo->mipmmi_hdr.miph_seq    = random();
+	mdinfo->mipmmi_hint            = MIPM_MD_ADDR;
+	mdinfo->mipmmi_command         = MIPM_MD_DEREGHOME;
+	mdinfo->mipmmi_ifindex         = ifindex;
+	memcpy(MIPD_HOA(mdinfo), hoa, sizeof(*hoa));
+	memcpy(MIPD_COA(mdinfo), hoa, sizeof(*hoa));
 
 	if (write(babyinfo.mipsock, mdinfo, len) < 0) {
 		if (DEBUGNORM) {
-			syslog(LOG_ERR, "%s write: %s\n", 
+			syslog(LOG_ERR, "%s write: %s",
 			       __FUNCTION__, strerror(errno));
 		}
 		return;
@@ -1461,15 +1460,16 @@ baby_md_home(hoa, coa, ifindex)
 		free(mdinfo);
 
 	if (DEBUGNORM) {
-                syslog(LOG_INFO, "Returning HOME: %s\n",
+		syslog(LOG_INFO, "Returning HOME: %s",
 		       ip6_sprintf(&hoa->sin6_addr));
-        }
+	}
 
-        return;
+	return;
 }
 
 static struct if_info *
-baby_ifindex2ifinfo(u_int16_t ifindex) {
+baby_ifindex2ifinfo(u_int16_t ifindex)
+{
 	struct if_info *ifinfo = NULL, *ifinfo_next = NULL;
 
 	for (ifinfo = LIST_FIRST(&babyinfo.ifinfo_head); ifinfo; 
@@ -1480,6 +1480,5 @@ baby_ifindex2ifinfo(u_int16_t ifindex) {
 			break;
 	}
 
-	return ifinfo;
+	return (ifinfo);
 }
-
