@@ -1,4 +1,4 @@
-/*	$Id: babymdd.h,v 1.5 2007/01/12 04:13:45 mitsuya Exp $	*/
+/*	$Id: babymdd.h,v 1.6 2007/02/02 05:34:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -46,6 +46,8 @@
 #define DEBUGHIGH (babyinfo.debug >= DEBUG_HIGH) 
 #define DEBUGNORM (babyinfo.debug >= DEBUG_NORMAL)
 #define DEBUGNONE (babyinfo.debug == DEBUG_NONE)
+
+#define MDD_PIDFILE	"/var/run/babymdd.pid"
 
 struct mdd_info {
 	int debug;

@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.25 2007/01/31 17:33:56 t-momose Exp $	*/
+/*	$Id: babymdd.c,v 1.26 2007/02/02 05:34:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -81,6 +81,7 @@ static void init_hoa(u_int16_t);
 static struct if_info *init_if(char *);
 static void print_debug(void);
 static void baby_terminate(int);
+static void baby_sighup(int);
 static void baby_reset(void);
 
 void baby_getifinfo(struct if_info *);
@@ -91,11 +92,7 @@ int baby_mipmsg(struct mip_msghdr *, int);
 
 /* MIPsocket commands */
 static int baby_md_scan(struct if_info *);
-#ifdef DSMIP
 static int baby_md_reg(struct sockaddr *, int, u_int16_t);
-#else
-static int baby_md_reg(struct sockaddr_in6 *, int, u_int16_t);
-#endif /* DSMIP */
 static void baby_md_home(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
 static void get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
 
@@ -162,6 +159,7 @@ main (argc, argv)
 	time_t now, lastlinkcheck;
 	struct if_info *ifinfo;
 	int priority = 0;
+	FILE *pidfp;
 
 	memset(&babyinfo, 0, sizeof(babyinfo));
 
@@ -266,10 +264,10 @@ main (argc, argv)
  	if (DEBUGHIGH)
 		print_debug();
 
-	signal(SIGHUP, baby_terminate);
 	signal(SIGINT, baby_terminate);
 	signal(SIGKILL, baby_terminate);
 	signal(SIGTERM, baby_terminate);
+	signal(SIGHUP, baby_sighup);
 
 	if (!babyinfo.nondaemon) {
 		if (daemon(0, 0) < 0) {
@@ -279,10 +277,16 @@ main (argc, argv)
 		}
 	}
 
+	/* dump current PID */
+	if ((pidfp = fopen(MDD_PIDFILE, "w")) != NULL) {
+		fprintf(pidfp, "%d\n", getpid());
+		fclose(pidfp);
+	}
+
 	baby_selection();
 
 	if (DEBUGHIGH) {
-		syslog(LOG_INFO, "<Interface Status>\n");
+		syslog(LOG_INFO, "<Interface Status>");
 		print_debug();
 	}
 	lastlinkcheck = time(0);
@@ -298,6 +302,8 @@ main (argc, argv)
 			nfds = babyinfo.mipsock + 1;
 
 		if (select(nfds, &fds, NULL, NULL, NULL) < 0) {
+			if (errno == EINTR)
+				continue;
 			if (DEBUGNORM)
 				syslog(LOG_ERR, "select %s", strerror(errno));
 			exit(-1);
@@ -405,6 +411,8 @@ baby_md_scan(struct if_info *ifinfo)
 {
 	struct mipm_md_info mdinfo;
 	
+	unlink(MDD_PIDFILE);
+
 	if (!ifinfo)
 		return (-1);
 
@@ -428,11 +436,7 @@ baby_md_scan(struct if_info *ifinfo)
 
 static int
 baby_md_reg(coa, ifindex, bid) 
-#ifdef DSMIP
 	struct sockaddr *coa;
-#else
-	struct sockaddr_in6 *coa;
-#endif
 	int ifindex;
 	u_int16_t bid;
 {
@@ -440,9 +444,6 @@ baby_md_reg(coa, ifindex, bid)
 	struct mipm_md_info *mdinfo;
 	struct sockaddr_in6 hoa;
 	struct hoa_info *hoainfo, *hoainfo_next;
-#ifdef DSMIP
-	char buf[256];
-#endif /* DSMIP */
 
 	for (hoainfo = LIST_FIRST(&babyinfo.hoainfo_head);
 	     hoainfo; hoainfo = hoainfo_next) {
@@ -457,16 +458,14 @@ baby_md_reg(coa, ifindex, bid)
 		if (
 #ifdef DSMIP
 			(coa->sa_family == AF_INET6) &&
+#endif
+			/* XXX we are missing this check */
 			(inet_are_prefix_equal(&hoa.sin6_addr,
 					       &((struct sockaddr_in6 *)coa)->sin6_addr, 64))
-			/* XXX we are missing this check */
-#else
-			inet_are_prefix_equal(&hoa.sin6_addr, &coa->sin6_addr, 64)
-#endif
 			)
 			return (0);
 		
-		len = sizeof(*mdinfo) + sizeof(hoa) + sizeof(*coa);
+		len = sizeof(*mdinfo) + sizeof(hoa) + coa->sa_len;
 		mdinfo = (struct mipm_md_info *)malloc(len);
 		if (mdinfo == NULL)
 			return (-1);
@@ -481,7 +480,7 @@ baby_md_reg(coa, ifindex, bid)
 		mdinfo->mipmmi_ifindex		= ifindex;
 		
 		memcpy(MIPD_HOA(mdinfo), &hoa, sizeof(hoa));
-		memcpy(MIPD_COA(mdinfo), coa, sizeof(*coa));
+		memcpy(MIPD_COA(mdinfo), coa, coa->sa_len);
 		((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port = bid;
 		
 		if (write(babyinfo.mipsock, mdinfo, len) < 0) {
@@ -493,25 +492,17 @@ baby_md_reg(coa, ifindex, bid)
 		free(mdinfo);
 		if (DEBUGNORM) {
 #ifdef DSMIP
-			switch (coa->sa_family) {
-			case AF_INET:
-				inet_ntop(AF_INET, 
-					  &((struct sockaddr_in *)coa)->sin_addr,
-					  buf, sizeof(buf));
-				break;
-			case AF_INET6:
-				inet_ntop(AF_INET6, 
-					  &((struct sockaddr_in6 *)coa)->sin6_addr,
-					  buf, sizeof(buf));
-				break;
-			}
+			char buf[256];
+
+			inet_ntop(coa->sa_family, coa->sa_data,
+				  buf, sizeof(buf));
 #endif /* DSMIP */
 			syslog(LOG_INFO, "[binding %s -> %s]",
 			       ip6_sprintf(&hoa.sin6_addr),
 #ifdef DSMIP
 			       buf
 #else
-			       ip6_sprintf(&coa->sin6_addr)
+			       ip6_sprintf(&((struct sockaddr_in6 *)coa)->sin6_addr)
 #endif /* DSMIP */
 				);
 		}
@@ -990,6 +981,18 @@ baby_terminate(arg)
 }
 
 static void
+baby_sighup(arg)
+	int arg;	/* not used */
+{
+	syslog(LOG_INFO, "HUP received");
+	if (babyinfo.whereami != IAMFOREIGN)
+		return;
+
+	baby_md_reg((struct sockaddr *)&babyinfo.coaif->coa,
+		    babyinfo.coaif->ifindex, babyinfo.coaif->bid); 
+}
+
+static void
 baby_initif()
 {
 	struct if_info *ifinfo, *ifinfo_next;
@@ -1299,11 +1302,7 @@ baby_selection()
 		    && !baby_coa_equal(ifinfo)) {
 			
 			fprintf(stderr,"sending reg info\n");
-#ifdef DSMIP
 			baby_md_reg((struct sockaddr *)&ifinfo->coa, ifinfo->ifindex, ifinfo->bid); 
-#else
-			baby_md_reg((struct sockaddr_in6 *)&ifinfo->coa, ifinfo->ifindex, ifinfo->bid); 
-#endif /* DSMIP */
 			memcpy(&ifinfo->pcoa, &ifinfo->coa, 
 			       sizeof(ifinfo->coa));
 			

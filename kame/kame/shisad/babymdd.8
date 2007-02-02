@@ -1,4 +1,4 @@
-.\"	$KAME: babymdd.8,v 1.1 2005/03/01 18:18:51 ryuji Exp $
+.\"	$KAME: babymdd.8,v 1.2 2007/02/02 05:34:27 t-momose Exp $
 .\"
 .\" Copyright (C) 2004 WIDE Project.
 .\" All rights reserved.
@@ -85,6 +85,12 @@ If no interface is specified,
 will watch all the available interfaces.
 .El
 .Pp
+Upon receipt of SIGHUP, 
+.Nm
+will reissue a movement message even if an actual movement hadn't occured.
+This would be useful when 
+.Xr mnd 8
+had restarted and it needs to get a movement information as an initial condition.
 .\"
 .Sh SEE ALSO
 .Xr mnd 8
