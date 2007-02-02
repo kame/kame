@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.31 2006/10/20 07:41:16 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.32 2007/02/02 17:35:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -69,10 +69,6 @@
 #include "fsm.h"
 
 extern struct mip6_mipif_list mipifhead;
-
-#ifdef MIP_MN
-//static struct sockaddr_dl *get_sockdl_from_ifindex(struct sockaddr_dl *, u_int16_t);
-#endif
 
 #ifndef MIP_CN
 struct nd6options ndopts;
@@ -196,7 +192,7 @@ icmp6sock_open()
 
 #ifdef DSMIP
 int
-udp4_input_common (fd)
+udp4_input_common(fd)
 	int fd;
 {
 #ifdef MIP_HA
@@ -233,7 +229,6 @@ udp4_input_common (fd)
 		return (errno);
 	}
 
-
 	/*
 	 * - check whether it's containing IPv6 home address option
 	 */
@@ -250,7 +245,6 @@ udp4_input_common (fd)
 	mh = (struct ip6_mh *)((char *)(hoaopt + 1));
 	mhlen = (mh->ip6mh_len + 1) << 3;
 
-
 	if(memcmp(&from.sin_addr, &ip6->ip6_src.s6_addr[12],
 	    sizeof(struct in_addr)) != 0) {
 		syslog(LOG_ERR, "DSMIP NAT Traversal is not supported yet.");
@@ -261,7 +255,6 @@ udp4_input_common (fd)
 		memcpy(&hoa, hoaopt->ip6oh_addr, sizeof(hoa));
 	} else 
 		mip6stat.mip6s_unverifiedhao++;
-
 
 	if (debug) {
 		syslog(LOG_INFO, "ipv4 src %s", inet_ntoa(from.sin_addr));
@@ -280,7 +273,8 @@ udp4_input_common (fd)
 }
 
 void
-udp4sock_open () {
+udp4sock_open()
+{
 	struct sockaddr_in server;
 
 	memset(&server, 0, sizeof(server));
@@ -310,7 +304,8 @@ udp4sock_open () {
 
 #ifndef MIP_MN
 void
-raw4sock_open () {
+raw4sock_open()
+{
 	struct sockaddr_in server;
 	int bool = 1;
 
