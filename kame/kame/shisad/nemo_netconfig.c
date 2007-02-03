@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.30 2007/01/19 03:56:12 keiichi Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.31 2007/02/03 10:00:27 t-momose Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -35,6 +35,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <syslog.h>
+
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
@@ -42,6 +43,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/sysctl.h>
+
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/route.h>
@@ -152,7 +154,8 @@ static struct sockaddr_in sin_loopback = {
 #endif /* MIP_IPV4MNPSUPPORT */
 
 static void
-nemo_usage() {
+nemo_usage()
+{
 	fprintf(stderr, "nemonetd -d -f -s -M [-h or -m] -c configfile\n");
 	fprintf(stderr, "\t-d: Verbose Debug messages \n");
 	fprintf(stderr, "\t-f: Foreground mode\n");
@@ -163,12 +166,10 @@ nemo_usage() {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Note: If prefixtable is not specified, ");
 	fprintf(stderr, "nemonetd will read mrd.conf or had.conf\n");
-
-	exit(0);
 }
 
 int
-main (argc, argv)
+main(argc, argv)
 	int argc;
 	char **argv;
 {
@@ -213,13 +214,20 @@ main (argc, argv)
 		default:
 			fprintf(stderr, "unknown execution option\n");
 			nemo_usage();
+			exit(0);
+			/* Not reach */
+			break;
 		}
 	}
 	argc -= optind;
 	argv += optind;
 
-	if (mode == 0)
+	if (mode == 0) {
+		fprintf(stderr,
+			"you should specify the mode of this node with -h or -m\n");
 		nemo_usage();
+		exit(0);
+	}
 
 	if (argv == NULL || ((ifname = *argv) == NULL)) {
 		if (mode == MODE_HA)
@@ -231,7 +239,7 @@ main (argc, argv)
 
 	/* open syslog */
 	openlog("shisad(nemod)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "Start NEMO daemon\n");
+	syslog(LOG_INFO, "Start NEMO daemon");
 
 	/*
 	 * select a configuration file based on the operatoin mode,
@@ -245,9 +253,6 @@ main (argc, argv)
 		case MODE_MR:
 			conffile = MND_CONFFILE;
 			break;
-		default:
-			nemo_usage();
-			exit(0);
 		}
 	}
 
@@ -257,7 +262,7 @@ main (argc, argv)
 		if (if_params == NULL) {
 			syslog(LOG_ERR,
 			    "no interface definition in "
-			    "a configuration file.\n");
+			    "a configuration file.");
 			exit(0);
 		}
 	}
@@ -282,7 +287,6 @@ main (argc, argv)
 #endif /* MIP_IPV4MNPSUPPORT */
 	}
 
-
 	/* parse prefix table */
 	switch (mode) {
 	case MODE_HA:
@@ -294,26 +298,23 @@ main (argc, argv)
 		    && mr_parse_ptconf() != 0)
 			exit(0);
 		break;
-	default:
-		nemo_usage();
-		exit(0);
 	}
 
 	/* get nemotun from the kernel and flush all states */
 	if (set_nemo_ifinfo()) {
-		syslog(LOG_ERR, "set_nemo_ifinfo %s\n", strerror(errno));
-		return (-1);
+		syslog(LOG_ERR, "set_nemo_ifinfo %s", strerror(errno));
+		exit(-1);
 	}
 
 	LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
-		if_number ++;
+		if_number++;
 	}
 	LIST_FOREACH(npt, &nemo_mnpthead, nemo_mnptentry) {
-		pt_number ++;
+		pt_number++;
 	}
 
 	if (if_number < pt_number) {
-		syslog(LOG_ERR, "Create %d of nemo interfaces\n", pt_number);	
+		syslog(LOG_ERR, "Create %d of nemo interfaces", pt_number);
 		exit(0);
 	} 
 	
@@ -325,7 +326,7 @@ main (argc, argv)
 	/* set dummy IPv4 addresses on each nemo interface. */
 	if (ipv4mnpsupport
 	    && (parse_ipv4_dummy_tunnel() != 0)) {
-		syslog(LOG_ERR, "failed to assign dummy IPv4 addresses.\n");
+		syslog(LOG_ERR, "failed to assign dummy IPv4 addresses.");
 		exit(0);
 	}
 #endif /* MIP_IPV4MNPSUPPORT */
@@ -340,16 +341,15 @@ main (argc, argv)
 
 	if (!foreground) {
 		if (daemon(0, 0) < 0) {
-			syslog(LOG_ERR, "daemon execution %s\n", strerror(errno));
+			syslog(LOG_ERR, "daemon execution %s", strerror(errno));
 			nemo_terminate(0);
-			exit(-1);
 		}
 	}
 
 	mainloop();
 
 	return (0);
-};
+}
 
 static int
 ha_parse_ptconf()
@@ -362,7 +362,7 @@ ha_parse_ptconf()
 	if (config_get_prefixtable(&cfe, if_params) != 0) {
 		syslog(LOG_ERR,
 		    "specify prefix table information in a configuration "
-		    "file.\n");
+		    "file.");
 		return (-1);
 	}
 
@@ -396,7 +396,7 @@ ha_parse_ptconf()
 	}
 
 	return (0);
-};
+}
 
 static int
 mr_parse_ptconf()
@@ -408,7 +408,7 @@ mr_parse_ptconf()
 	if (config_get_prefixtable(&cfe, if_params) != 0) {
 		syslog(LOG_ERR,
 		    "specify prefix table information in a configuration "
-		    "file.\n");
+		    "file.");
 		return (-1);
 	}
 
@@ -432,10 +432,11 @@ mr_parse_ptconf()
 	}
 
 	return (0);
-};
+}
 
 static int
-set_nemo_ifinfo() {
+set_nemo_ifinfo()
+{
 	size_t needed;
 	char *buf, *next, name[IFNAMSIZ];
 	struct if_msghdr *ifm;
@@ -504,8 +505,7 @@ set_nemo_ifinfo() {
         free(buf); 
 
 	return (0);
-};
-
+}
 
 static void
 set_static_tun()
@@ -517,7 +517,7 @@ set_static_tun()
 	if (config_get_static_tunnel(&cfe, if_params) != 0) {
 		syslog(LOG_ERR,
 		    "specify static tunnel information in a configuration "
-		    "file.\n");
+		    "file.");
 		exit (-1);
 	}
 
@@ -526,7 +526,7 @@ set_static_tun()
 
 		nif = find_nemo_if_from_name(cfst->cfst_ifname);
 		if (nif == NULL) {
-			syslog(LOG_ERR, "%s is not available\n",
+			syslog(LOG_ERR, "%s is not available",
 			    cfst->cfst_ifname);
 			exit(-1);
 		}
@@ -571,8 +571,6 @@ parse_ipv4_dummy_tunnel()
 	return (0);
 }
 #endif /* MIP_IPV4MNPSUPPORT */
-
-
 
 static struct nemo_if *
 find_nemo_if(hoa, bid)
@@ -625,7 +623,8 @@ find_nemo_if_from_name(ifname)
 }
 
 static void	
-mainloop() {
+mainloop()
+{
 	int msock, n;
 #ifdef HAVE_POLL_H
 	struct pollfd set[1];
@@ -660,13 +659,12 @@ mainloop() {
 #endif /* HAVE_POLL_H */
 
 	while (1) {
-
 #ifdef HAVE_POLL_H
 		if (poll(set, 1, INFTIM) < 0) {
 			syslog(LOG_ERR, "poll %s\n", strerror(errno));
                         exit(-1);
                 }
-		if (set[0].revents & POLLIN) {
+		if (set[0].revents & POLLIN)
 #else /* HAVE_POLL_H */
 		FD_ZERO(&fds);
 		nfds = -1;
@@ -678,8 +676,9 @@ mainloop() {
                         exit(-1);
                 }
 
-                if (FD_ISSET(msock, &fds)) {
+                if (FD_ISSET(msock, &fds))
 #endif /* HAVE_POLL_H */
+		{
 			n = read(msock, buf, sizeof(buf));
 			if (n < 0) {
 				syslog(LOG_ERR, "read %s\n", strerror(errno));
@@ -760,11 +759,11 @@ mainloop() {
 							    NULL, 0,
 							    if_nametoindex(nif->ifname));
 							syslog(LOG_INFO, 
-							    "adding an IPv4 default route to %s\n", nif->ifname);
+							    "adding an IPv4 default route to %s", nif->ifname);
 						}
 #endif /* MIP_IPV4MNPSUPPORT */
 						syslog(LOG_INFO, 
-						    "adding a default route to %s\n", nif->ifname);
+						    "adding a default route to %s", nif->ifname);
 					}
 					
 					npt->nemo_if = nif;
@@ -929,7 +928,7 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 	nif = find_nemo_if(hoa, bid);
 	if (nif == NULL) {
 		syslog(LOG_ERR, 
-		       "No more available nemo interfaces\n");
+		       "No more available nemo interfaces");
 		return (NULL);
 	}
 	
@@ -976,12 +975,12 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 		s = socket(AF_INET, SOCK_DGRAM, 0);
 		if (s == -1) {
 			syslog(LOG_ERR, "nemo_setup_forwarding: "
-			    "failed to create a socket.\n");
+			    "failed to create a socket.");
 		} else {
 			if (ioctl(s, SIOCAIFADDR, &ifra) == -1) {
 				syslog(LOG_ERR, "nemo_setup_forwarding: "
 				    "failed to set dummy IPv4 addresses "
-				    "on %s\n", nif->ifname);
+				    "on %s", nif->ifname);
 			}
 			close(s);
 		}
@@ -1025,7 +1024,8 @@ nemo_destroy_forwarding (hoa, bid)
 	nif = find_nemo_if(hoa, bid);
 	if (nif == NULL) {
 		syslog(LOG_ERR, 
-		       "No associated nemo interfaces for %s\n", ip6_sprintf(hoa));
+		       "No associated nemo interfaces for %s",
+		       ip6_sprintf(hoa));
 		return (NULL);
 	}
 
@@ -1089,7 +1089,7 @@ nemo_dump()
 	int i = 1;
 	char prefix[NI_MAXHOST];
 
-	syslog(LOG_INFO, "Dump nemod info. for %s\n",
+	syslog(LOG_INFO, "Dump nemod info. for %s",
 		 (mode==MODE_HA)? "Home Agent" : "Mobile Router");
 	      
 	syslog(LOG_INFO, "debug=%s, DNS=%s, MCoA=%s, Static=%s", 
@@ -1099,12 +1099,12 @@ nemo_dump()
 		(staticmode)? "on" : "off");
 
 	LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
-		syslog(LOG_INFO, "nemo tunnel no.%d %s\n", 
+		syslog(LOG_INFO, "nemo tunnel no.%d %s",
 			i++, nif->ifname);
 		if (multiplecoa)
-			syslog(LOG_INFO, "\tbid: %d\n", nif->bid);
+			syslog(LOG_INFO, "\tbid: %d", nif->bid);
 		if (staticmode) 
-			syslog(LOG_INFO, "\thoa: %s\n", ip6_sprintf(&nif->hoa));
+			syslog(LOG_INFO, "\thoa: %s", ip6_sprintf(&nif->hoa));
 	}
 
 	i = 0;
@@ -1112,11 +1112,11 @@ nemo_dump()
 		getnameinfo((struct sockaddr *)&npt->nemo_ss_prefix,
 		    npt->nemo_ss_prefix.ss_len, prefix, sizeof(prefix),
 		    NULL, 0, 0);
-		syslog(LOG_INFO, "Prefix Table no.%d\n", i);
-		syslog(LOG_INFO, "\tprefix: %s/%d\n", 
+		syslog(LOG_INFO, "Prefix Table no.%d", i);
+		syslog(LOG_INFO, "\tprefix: %s/%d", 
 		    prefix, npt->nemo_prefixlen);
-		syslog(LOG_INFO, "\thoa: %s\n", ip6_sprintf(&npt->hoa));
+		syslog(LOG_INFO, "\thoa: %s", ip6_sprintf(&npt->hoa));
 		if (multiplecoa)
-			syslog(LOG_INFO, "\tbid: %d\n", npt->bid);
+			syslog(LOG_INFO, "\tbid: %d", npt->bid);
 	}
 }

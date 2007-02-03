@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.46 2007/02/03 03:19:12 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.47 2007/02/03 10:00:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -124,8 +124,8 @@ struct command_table show_command_table[] = {
 	{"kbul", command_show_kbul, "Binding Update List in kernel"},
 	{"hal", command_show_hal, "Home Agent List"},
 	{"stat", command_show_stat, "statistics"},
-	{"noro", noro_show, ""},
-	{"config", show_current_config, ""},
+	{"noro", noro_show, "Nodes that have no capability of routing optimization"},
+	{"config", show_current_config, "Current configuration"},
 	{"callout", show_callout_table, "the list in the callout queue"},
 	{"pt", command_show_pt, "Prefix Table, MR only"},
 	{NULL}	/* The last {NULL} is needed for the sub command table */
