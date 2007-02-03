@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.42 2007/01/14 05:56:42 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.43 2007/02/03 03:19:12 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -130,7 +130,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		hinfo = hoainfo_find_withhoa(dst);
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
-			    "no related HoA found with this BRR.\n");
+			    "no related HoA found with this BRR.");
 			return (-1);
 		}
 #ifndef MIP_MCOA
@@ -1883,6 +1883,12 @@ bul_rr_fsm(bul, event, fsmmsg)
 	/* sanity check. */
 	if (bul == NULL)
 		return (-1);
+
+	if ((bul->bul_state & MIP6_BUL_STATE_DISABLE) ||
+	    noro_get(&bul->bul_peeraddr)) {
+		bul->bul_state |= MIP6_BUL_STATE_DISABLE;
+		event = MIP6_BUL_FSM_EVENT_STOP_RR;
+	}
 
 	error = 0;
 

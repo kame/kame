@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.45 2007/01/23 14:28:55 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.46 2007/02/03 03:19:12 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -943,10 +943,11 @@ mipsock_recv_rr_hint(miphdr)
 	fsmmsg.fsmm_src = &sin6->sin6_addr;
 
 	/* if the destination address is listed in NoRO list, just ignore */
-	if (noro_get(&sin6->sin6_addr)) {
-		
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
+	    noro_get(&sin6->sin6_addr)) {
 		syslog(LOG_INFO, 
-		       "MN cannot start RO for %s", ip6_sprintf(&sin6->sin6_addr));
+		       "MN cannot start RO for %s",
+		       ip6_sprintf(&sin6->sin6_addr));
 		return (0);		
 	}
 
@@ -1479,20 +1480,8 @@ mnd_add_mipif(ifname)
 	if (debug)
 		syslog(LOG_ERR, "%s is added successfully", ifname);
 
-	
 	return (mif);
 }
-
-#if 0
-void
-mnd_delete_mipif(ifindex)
-	u_int16_t ifindex;
-{
-	/* never delete mipif */
-	return; 
-}
-#endif
-
 
 struct mip6_mipif *
 mnd_get_mipif(ifindex)
@@ -1507,7 +1496,6 @@ mnd_get_mipif(ifindex)
 
 	return (NULL);
 }
-
 
 static void
 mnd_init_homeprefix(mipif)
