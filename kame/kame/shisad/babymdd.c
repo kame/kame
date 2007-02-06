@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.26 2007/02/02 05:34:27 t-momose Exp $	*/
+/*	$Id: babymdd.c,v 1.27 2007/02/06 01:09:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -218,19 +218,17 @@ main (argc, argv)
 	/* open a socket for linkinfo */
 	babyinfo.linksock = socket(PF_INET6, SOCK_DGRAM, 0);
 	if (babyinfo.linksock < 0) {
-		if (DEBUGNORM)
-			syslog(LOG_ERR, "%s linksocket: %s",
-			       __FUNCTION__, strerror(errno));
+		syslog(LOG_ERR, "%s linksocket: %s",
+		       __FUNCTION__, strerror(errno));
 		exit (-1);
 	}
 
 	/* open a mipsock */
 	babyinfo.mipsock = socket(PF_MOBILITY, SOCK_RAW, 0);
 	if (babyinfo.mipsock < 0) {
-		if (DEBUGNORM)
-			syslog(LOG_ERR, "%s mipsocket: %s",
-			       __FUNCTION__, strerror(errno));
-		exit (-1);
+		syslog(LOG_ERR, "%s mipsocket: %s",
+		       __FUNCTION__, strerror(errno));
+		exit(-1);
 	}
 
 	/* initilization of home addresses */
@@ -304,9 +302,7 @@ main (argc, argv)
 		if (select(nfds, &fds, NULL, NULL, NULL) < 0) {
 			if (errno == EINTR)
 				continue;
-			if (DEBUGNORM)
-				syslog(LOG_ERR, "select %s", strerror(errno));
-			exit(-1);
+			syslog(LOG_ERR, "select %s", strerror(errno));
 		}
 
 		if (FD_ISSET(babyinfo.rtsock, &fds)) {
