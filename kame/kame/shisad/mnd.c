@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.47 2007/02/03 10:00:27 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.48 2007/02/06 05:56:42 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <unistd.h>
 #include <errno.h>
 #include <syslog.h>
@@ -118,6 +119,9 @@ static int add_hal_by_commandline_xxx(char *);
 static void noro_init(void);
 static void noro_show(int, char *);
 static void noro_sync(void);
+static void command_add_noro(int, char *);
+
+static void config_lifetime(int, char *);
 
 struct command_table show_command_table[] = {
 	{"bul", command_show_bul, "Binding Update List in Shisa"},
@@ -131,11 +135,23 @@ struct command_table show_command_table[] = {
 	{NULL}	/* The last {NULL} is needed for the sub command table */
 };
 
+struct command_table add_command_table[] = {
+	{"noro", command_add_noro, ""},
+	{NULL}	/* The last {NULL} is needed for the sub command table */
+};
+
+struct command_table config_command_table[] = {
+	{"lifetime", config_lifetime, "Change the value of default Binding lifetime"},
+	{NULL}	/* The last {NULL} is needed for the sub command table */
+};
+
 struct command_table command_table[] = {
 	{"show", NULL, "Show stat, bul, hal, kbul, noro, config"
 	 ", pt"
 	 , show_command_table
 	},
+	{"add", NULL, "add ", add_command_table},
+	{"config", NULL, "Configuration parameters", config_command_table},
 	{"flush", command_flush, "Flush stat, bul, hal, noro"},
 };
 
@@ -339,6 +355,8 @@ main(argc, argv)
 			    "cannot insert bul, something wrong");
 			 continue;
 		}
+		/* The HoA is registered as a no RO host */
+		noro_add(&hoainfo->hinfo_hoa);
 
 		syslog(LOG_INFO, "Kick fsm to MOVEMENT");
 		/* kick the fsm to start its state transition. */
@@ -1121,8 +1139,8 @@ send_haadreq(hoainfo, hoa_plen, src)
 #endif /* MIP_NEMO */
 	
 	if (sendmsg(icmp6sock, &msg, 0) < 0) {
-		syslog(LOG_ERR, "sending DHAAD REQUEST from %s to %s was failed",
-		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr));
+		syslog(LOG_ERR, "sending DHAAD REQUEST from %s to %s was failed: %s",
+		       ip6_sprintf(src), ip6_sprintf(&to.sin6_addr), strerror(errno));
 	} else {
 		mip6stat.mip6s_odhreq++;
 		syslog(LOG_INFO, "sent DHAAD REQUEST from %s to %s",
@@ -1354,8 +1372,6 @@ hxplist_stop_expire_timer(hpfx)
         remove_callout_entry(hpfx->hpfx_retrans);
 }
 
-
-
 void
 hpfxlist_expire_timer(arg)
 	void *arg;
@@ -1390,7 +1406,6 @@ hpfxlist_expire_timer(arg)
 	hpfxlist_set_expire_timer(hpfx, 
 		((hpfx->hpfx_vlexpire - now) > 5) ? (hpfx->hpfx_vlexpire - now):5);
 }
-
 #endif /* MIP_MN */
 
 struct mip6_hpfxl *
@@ -1619,6 +1634,31 @@ set_default_bu_lifetime(hoainfo)
 	struct mip6_hoainfo *hoainfo;
 {
 	return (default_lifetime);
+}
+
+static void
+config_lifetime(s, arg)
+	int s;
+	char *arg;
+{
+	int val;
+
+	if (*arg == '\0') {
+		command_printf(s, "Usage: config lifetime <lifetime in second>\nThe value will be truncated in units of 4sec");
+		return;
+	}
+	
+	val = strtol(arg, NULL, 10) >> 2;
+	if (val == 0) {
+		command_printf(s, "The specified value is invalid\n");
+	} else if (val > USHRT_MAX) {
+		command_printf(s, "The specified value is too big\n");
+	} else {
+		if (val != strtol(arg, NULL, 10)) {
+			command_printf(s, "The sepecified value is truncated to %d(s)\n", val << 2);
+		}
+		default_lifetime = val;
+	}
 }
 
 int
@@ -2068,7 +2108,13 @@ noro_init()
 	return;
 }
 
-void
+/*
+   Return value:
+   1: success
+   0: something wrong happens (the address was already registered)
+   -1: some system error occures. errno is set
+ */
+int
 noro_add(tgt)
 	struct in6_addr *tgt;
 { 
@@ -2076,18 +2122,17 @@ noro_add(tgt)
 
 	noro = noro_get(tgt);
 	if (noro)
-		return;
+		return (0);
 
 	noro = malloc(sizeof(struct noro_host_list));
-	if (noro == NULL) {
-		perror("malloc");
-		return;
-	}
+	if (noro == NULL)
+		return (-1);
+
 	memset(noro, 0, sizeof(struct noro_host_list));
 	noro->noro_host = *tgt;
 	LIST_INSERT_HEAD(&noro_head, noro, noro_entry); 
 	
-	return;
+	return (1);
 }
 
 
@@ -2099,7 +2144,6 @@ noro_get(tgt)
 
         for (noro = LIST_FIRST(&noro_head); noro; 
 	     noro = LIST_NEXT(noro, noro_entry)) {
-		
 		if (IN6_ARE_ADDR_EQUAL(tgt, &noro->noro_host)) 
 			return (noro);
 	}
@@ -2122,12 +2166,42 @@ noro_show(s, dummy)
 }
 
 static void
+command_add_noro(s, arg)
+	int s;
+	char *arg;
+{
+	struct in6_addr addr;
+	
+	if (*arg == '\0') {
+		command_printf(s, "Usage: add noro <address>\n");
+		return;
+	}
+
+	if (inet_pton(AF_INET6, arg, &addr) != 1) {
+		command_printf(s, "The specified address [%s] is not persable\n", arg);
+		return;
+	}
+
+	switch (noro_add(&addr)) {
+	case 0:
+		command_printf(s, "The address is already registered\n");
+		break;
+	case -1:
+		command_printf(s, "Error has occured - %s\n", strerror(errno));
+		break;
+	default:
+		/* Nothing to do */
+		break;
+	}
+}
+
+static void
 noro_sync()
 { 
         FILE *file;
 	struct noro_host_list *noro = NULL;
 	
-	file = fopen(MND_NORO_FILE, "r");
+	file = fopen(MND_NORO_FILE, "w");
         if(file == NULL) 
                 return;
 
@@ -2158,28 +2232,19 @@ command_flush(s, arg)
 	int s;
 	char *arg;
 {
-	char msg[1024];
-
+	command_printf(s, "Not implemented at all\n");
 	if (strcmp(arg, "bul") == 0) {
 		/*flush_bc();*/
-		sprintf(msg, "-- Clear Binding Update List --\n");
-		write(s, msg, strlen(msg));
-
+		command_printf(s, "-- Clear Binding Update List --\n");
 	} else if (strcmp(arg, "stat") == 0) {
-		sprintf(msg, "-- Clear Shisa Statistics --\n");
-		write(s, msg, strlen(msg));
-
+		command_printf(s, "-- Clear Shisa Statistics --\n");
 	} else if (strcmp(arg, "hal") == 0) {
-		sprintf(msg, "-- Clear Home Agent List --\n");
-		write(s, msg, strlen(msg));
+		command_printf(s, "-- Clear Home Agent List --\n");
 	} else if (strcmp(arg, "noro") == 0) {
-		sprintf(msg, "-- Clear No Route Optimization Host --\n");
-		write(s, msg, strlen(msg));
+		command_printf(s, "-- Clear No Route Optimization Host --\n");
 	} else {
-		sprintf(msg, "Available options are:\n");
-		sprintf(msg + strlen(msg), "\tbul (Binding Update List)\n\thal (Home Agent List)\n\tstat (Statistics)\n\tnoro (No Route Optimization Hosts)\n\n");
-		write(s, msg, strlen(msg));
-
+		command_printf(s, "Available options are:\n");
+		command_printf(s, "\tbul (Binding Update List)\n\thal (Home Agent List)\n\tstat (Statistics)\n\tnoro (No Route Optimization Hosts)\n\n");
 	}
 }
 
@@ -2188,6 +2253,10 @@ show_current_config(s, dummy)
 	int s;
 	char *dummy;
 {
+	command_printf(s, "Current configuration\n");
+	command_printf(s, "debug: %s\n", debug ? "on" : "off");
+	command_printf(s, "name lookup: %s\n", namelookup ? "true" : "false");
+	command_printf(s, "command port: %d\n", command_port);
 	command_printf(s, "Binding Update Lifetime for Home registration: %d(s)\n",
 		default_lifetime * 4);
 }
