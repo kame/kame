@@ -48,5 +48,7 @@ afterinstall:
 #	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
 #		${.CURDIR}/kame/send-pr/send-pr \
 #		${DESTDIR}${PREFIX}/bin/kame-send-pr
+	cp -p ${.CURDIR}/kame/shisad/sampleconf/*.conf.sample \
+		${DESTDIR}${PREFIX}/etc/rtadvd.conf.sample
 
 .include <bsd.subdir.mk>
