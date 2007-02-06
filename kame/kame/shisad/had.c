@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.41 2007/01/14 05:15:23 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.42 2007/02/06 05:58:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -171,10 +171,13 @@ main(argc, argv)
 	char *conffile = HAD_CONFFILE;
 	char *options = "fnc:";
 
+#if 0
+	/* XXX Is this code needed ? */
         if (argc < 1) {
 		ha_usage(argv[0]);
 		exit (0);
 	}
+#endif
 
 	/* get options */
 	ifname = NULL;

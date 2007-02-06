@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.32 2007/02/02 17:35:59 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.33 2007/02/06 05:58:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -181,8 +181,7 @@ icmp6sock_open()
 #endif /* MIP_MN || MIP_HA */
 	if (setsockopt(icmp6sock, IPPROTO_ICMPV6, 
 		       ICMP6_FILTER, &filter, sizeof(filter)) < 0) {
-		perror("setsockopt ICMP6_FILTER");
-		exit(1);
+		syslog(LOG_ERR, "setsockopt ICMP6_FILTER was failed. but the system continues.");
 	}
 
 	syslog(LOG_INFO, "ICMP6 socket is %d.", icmp6sock);

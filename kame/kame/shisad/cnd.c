@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.18 2006/09/29 08:00:51 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.19 2007/02/06 05:58:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -106,7 +106,6 @@ cn_usage(path)
 	else
 		cmd++;
 	fprintf(stderr, "%s [-fn] [-c configfile]\n", cmd);
-	exit(0);
 } 
 
 
@@ -134,6 +133,8 @@ main(argc, argv)
 		default:
 			fprintf(stderr, "unknown option\n");
 			cn_usage(argv[0]);
+			exit(0);
+			/* Not reach */
 			break;
 		}
 	}

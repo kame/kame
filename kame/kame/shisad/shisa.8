@@ -1,4 +1,4 @@
-.\"	$KAME: shisa.8,v 1.1 2007/02/02 08:58:59 t-momose Exp $
+.\"	$KAME: shisa.8,v 1.2 2007/02/06 05:58:52 t-momose Exp $
 .\"
 .\" Copyright (C) 2004-2007 WIDE Project.
 .\" All rights reserved.
@@ -41,16 +41,6 @@ is an implemenation of Mobile IPv6(MIPv6) based on RFC3775, and NEMO based on RF
 supports most of features specified RFC3775, RFC3776 and RFC3963 to be a mobile node, a correspondent node, a home agent and a mobile router.
 And also some other specifications partially.
 .Pp
-The name of
-.Nm
-is derived from a name of a lion-shaped roof ornament of Okinawa, the south island in Japan.
-The shisa implemenation team had the 1st camp in Okinawa in 2004 spring and 
-.Nm
-was borned there.
-The team named the MIP6/NEMO code
-.Nm
-after the famous ornament in the birthplace.
-.Pp
 .Nm
 consists of kernel parts and several userland daemons.
 Operating packets such as inserting or extracting extention headers specialized for MIPv6, and handling tunnelled packets are done in the kernel side.
@@ -71,9 +61,18 @@ intorduces a new interface between kernel and userland, which is called 'mobilit
 .Xr http://www.mobileip.jp/
 .\"
 .Sh HISTORY
-The
+The name of
 .Nm
-was born in 2004 and merged into the kame source tree in December 2004.
+is derived from a name of a lion-shaped roof ornament of Okinawa, the south island in Japan.
+The shisa implemenation team had the 1st camp in Okinawa in 2004 spring and 
+.Nm
+was born there.
+The team named the MIP6/NEMO code
+.Nm
+after the famous ornament in the birthplace.
+.Pp
+And The
+.Nm
+was merged into the kame source tree in December 2004.
 .Sh BUGS
 Nothing.
-
