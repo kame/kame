@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.48 2007/02/06 05:56:42 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.49 2007/02/09 22:57:08 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -95,6 +95,8 @@ int keymanagement = 0;
 int ipv4mnpsupport = 0;
 #endif /* MIP_IPV4MNPSUPPORT */
 struct config_entry *if_params;
+extern int pager_mode;
+int do_rr = 1;
 
 int main(int, char **);
 
@@ -119,9 +121,13 @@ static int add_hal_by_commandline_xxx(char *);
 static void noro_init(void);
 static void noro_show(int, char *);
 static void noro_sync(void);
+static void noro_delete(struct in6_addr *);
 static void command_add_noro(int, char *);
+static void command_delete_noro(int, char *);
 
 static void config_lifetime(int, char *);
+static void config_debug(int, char *);
+static void config_pager_mode(int, char *);
 
 struct command_table show_command_table[] = {
 	{"bul", command_show_bul, "Binding Update List in Shisa"},
@@ -136,12 +142,19 @@ struct command_table show_command_table[] = {
 };
 
 struct command_table add_command_table[] = {
-	{"noro", command_add_noro, ""},
+	{"noro", command_add_noro, "add a noro entry"},
+	{NULL}	/* The last {NULL} is needed for the sub command table */
+};
+
+struct command_table delete_command_table[] = {
+	{"noro", command_delete_noro, "delete a noro entry"},
 	{NULL}	/* The last {NULL} is needed for the sub command table */
 };
 
 struct command_table config_command_table[] = {
 	{"lifetime", config_lifetime, "Change the value of default Binding lifetime"},
+	{"debug", config_debug, "Change debug mode"},
+	{"pager", config_pager_mode, "Change paging mode"},
 	{NULL}	/* The last {NULL} is needed for the sub command table */
 };
 
@@ -151,6 +164,7 @@ struct command_table command_table[] = {
 	 , show_command_table
 	},
 	{"add", NULL, "add ", add_command_table},
+	{"delete", NULL, "delete an entry of something", delete_command_table},
 	{"config", NULL, "Configuration parameters", config_command_table},
 	{"flush", command_flush, "Flush stat, bul, hal, noro"},
 };
@@ -165,7 +179,7 @@ mn_usage()
 #ifdef MIP_MCOA
 	fprintf(stderr, "Multiple CoA Reg Support version\n");
 #endif /* MIP_MCOA */
-        return;
+	return;
 }
 
 
@@ -194,14 +208,14 @@ main(argc, argv)
 	argopts = "fnc:a:t:A:";
 #endif /* DSMIP */
 
-        while ((ch = getopt(argc, argv, argopts)) != -1) {
-                switch (ch) {
-                case 'f':
-                        foreground = 1;
-                        break;
-                case 'n':
-                        namelookup = 0;
-                        break;
+	while ((ch = getopt(argc, argv, argopts)) != -1) {
+		switch (ch) {
+		case 'f':
+			foreground = 1;
+			break;
+		case 'n':
+			namelookup = 0;
+			break;
 		case 'c':
 			conffile = optarg;
 			break;
@@ -213,12 +227,12 @@ main(argc, argv)
 			v4homeagent = optarg;
 			break;
 #endif /* DSMIP */
-                default:
-                        fprintf(stderr, "unknown option\n");
-                        mn_usage();
-                        break;
-                }
-        }
+		default:
+			fprintf(stderr, "unknown option\n");
+			mn_usage();
+			break;
+		}
+	}
 	argc -= optind;
 	argv += optind;
 
@@ -384,9 +398,9 @@ main(argc, argv)
 	/* dump current PID */
 	if ((pidfp = fopen(
 #ifdef MIP6_NEMO
-		         MRD_PIDFILE,
+		     MRD_PIDFILE,
 #else
-		         MND_PIDFILE,
+		     MND_PIDFILE,
 #endif
 			 "w")) != NULL) {
 		fprintf(pidfp, "%d\n", getpid());
@@ -503,8 +517,8 @@ mipsock_recv_mdinfo(miphdr)
 	       sizeof(struct in6_addr));
 
 	/* Get CoA */
-#ifdef DSMIP
 	switch (MIPD_COA(mdinfo)->sa_family) {
+#ifdef DSMIP
 	case AF_INET:
 		/* put IPv4 address into IPv6 address (mapped address) */
 		memset(&coa, 0, sizeof(struct in6_addr));
@@ -519,11 +533,8 @@ mipsock_recv_mdinfo(miphdr)
 		if (debug) 
 			syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
 		break;
+#endif
 	case AF_INET6:
-		memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr, sizeof(struct in6_addr));
-
-		if (MIPD_COA(mdinfo)->sa_family != AF_INET6)
-			return (0);
 		memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr,
 			sizeof(struct in6_addr));
 
@@ -538,26 +549,10 @@ mipsock_recv_mdinfo(miphdr)
 		if (debug) 
 			syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
 		break;
+
 	default:
 		return(0);
 	}
-#else
-	if (MIPD_COA(mdinfo)->sa_family != AF_INET6)
-		return (0);
-	memcpy(&coa, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_addr,
-	       sizeof(struct in6_addr));
-
-	/* If new CoA is not global, ignore */
-	if (IN6_IS_ADDR_LINKLOCAL(&coa)
-	    || IN6_IS_ADDR_MULTICAST(&coa)
-	    || IN6_IS_ADDR_LOOPBACK(&coa)
-	    || IN6_IS_ADDR_V4MAPPED(&coa)
-	    || IN6_IS_ADDR_UNSPECIFIED(&coa))
-		return (EINVAL);
-
-	if (debug) 
-		syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
-#endif /* DSMIP */
 
 #ifdef MIP_MCOA
 	memcpy(&bid, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port, sizeof(bid));
@@ -803,8 +798,6 @@ mipsock_md_dereg_bul_fl(hoa, oldcoa, newcoa, ifindex, bid)
 	return (0);
 }
 
-
-
 /* re-registration. */
 int 
 bul_update_by_mipsock_w_hoa(hoa, coa, bid)
@@ -812,7 +805,6 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 	u_int16_t bid;
 {
 	struct ifaddrs *ifa, *ifap;
-	struct sockaddr *sa;
 	char mipname[IFNAMSIZ];
 	struct mip6_hoainfo *hoainfo;
 	struct binding_update_list *bul;
@@ -833,46 +825,40 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 	}
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		sa = ifa->ifa_addr;
-		
-		if (sa->sa_family != AF_INET6)
+		if ((ifa->ifa_addr)->sa_family != AF_INET6)
 			continue;
 
 		if (IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr,
-				       hoa)) {
-
-			if (if_nametoindex(ifa->ifa_name) != hoainfo->hinfo_ifindex) {
-
-				/* move a home address to a virtual i/f. */
-				if (delete_ip6addr(ifa->ifa_name, hoa, 64 /* XXX */)) {
-					syslog(LOG_ERR,
-					    "removing a home address "
-					    "from a physical i/f failed.");
-					freeifaddrs(ifap);
-					return (-1);
-				}
-
-				if (set_ip6addr(if_indextoname(hoainfo->hinfo_ifindex, 
-					mipname), hoa, 64 /* XXX */,
-					IN6_IFF_NODAD|IN6_IFF_HOME)) {
-
-					syslog(LOG_ERR,
-					    "adding a home address "
-					    "to a mip virtual i/f failed.");
-					/* XXX recover the old phy addr. */
-					freeifaddrs(ifap);
-					return (-1);
-				}
-
-				/* set FOREIGN as a mobile node's location. */
-				hoainfo->hinfo_location = MNINFO_MN_FOREIGN;
+				       hoa) &&
+		    (if_nametoindex(ifa->ifa_name) != hoainfo->hinfo_ifindex)) {
+			/* move a home address to a virtual i/f. */
+			if (delete_ip6addr(ifa->ifa_name, hoa, 64 /* XXX */)) {
+				syslog(LOG_ERR,
+				       "removing a home address "
+				       "from a physical i/f failed.");
+				freeifaddrs(ifap);
+				return (-1);
 			}
+			
+			if (set_ip6addr(if_indextoname(hoainfo->hinfo_ifindex, 
+						       mipname), hoa, 64 /* XXX */,
+					IN6_IFF_NODAD|IN6_IFF_HOME)) {
+				syslog(LOG_ERR,
+				       "adding a home address "
+				       "to a mip virtual i/f failed.");
+				/* XXX recover the old phy addr. */
+				freeifaddrs(ifap);
+				return (-1);
+			}
+
+			/* set FOREIGN as a mobile node's location. */
+			hoainfo->hinfo_location = MNINFO_MN_FOREIGN;
 		}
 	}
 	freeifaddrs(ifap);
 
 #ifdef MIP_MCOA
-        /* for bootstrap */
+	/* for bootstrap */
 	if (bid) {
 		bul = bul_get_homeflag(&hoainfo->hinfo_hoa);
 		if (bul) {
@@ -887,7 +873,7 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 			} 
 		} else 
 			syslog(LOG_INFO," bul unknown with %d", bid);
-	};
+	}
 #endif /* MIP_MCOA */
 
 	/* update bul */
@@ -912,7 +898,6 @@ bul_update_by_mipsock_w_hoa(hoa, coa, bid)
 			/* update bul that matched with the bid */
 			for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
 			     mbul = LIST_NEXT(mbul, bul_entry)) {
-	
 				if (mbul->bul_bid == bid) {
 					/* update CoA */
 					memcpy(&mbul->bul_coa, coa,
@@ -1049,7 +1034,8 @@ mipsock_input(miphdr)
 		err = mipsock_recv_mdinfo(miphdr);
 		break;
 	case MIPM_RR_HINT:
-		err = mipsock_recv_rr_hint(miphdr);
+		if (do_rr)
+			err = mipsock_recv_rr_hint(miphdr);
 		break;
 	default:
 		break;
@@ -1064,33 +1050,33 @@ send_haadreq(hoainfo, hoa_plen, src)
 	int hoa_plen;
 	struct in6_addr *src;
 {
-        struct msghdr msg;
-        struct iovec iov;
-        struct cmsghdr  *cmsgptr = NULL;
-        struct in6_pktinfo *pi = NULL;
-        struct sockaddr_in6 to;
-        char adata[512], buf[1024];
+	struct msghdr msg;
+	struct iovec iov;
+	struct cmsghdr  *cmsgptr = NULL;
+	struct in6_pktinfo *pi = NULL;
+	struct sockaddr_in6 to;
+	char adata[512], buf[1024];
 	struct mip6_dhaad_req dhreq;
 #if defined(MIP_MN)
 	struct sockaddr_in6 *ar_sin6 = NULL, ar_sin6_orig;
 #endif
 
-        memset(&to, 0, sizeof(to));
-        if (mip6_icmp6_create_haanyaddr(&to.sin6_addr, 
+	memset(&to, 0, sizeof(to));
+	if (mip6_icmp6_create_haanyaddr(&to.sin6_addr, 
 				&hoainfo->hinfo_hoa, hoa_plen)) 
-                return (EINVAL);
+		return (EINVAL);
 
 	to.sin6_family = AF_INET6;
 	to.sin6_port = 0;
 	to.sin6_scope_id = 0;
 	to.sin6_len = sizeof (struct sockaddr_in6);
 
-        msg.msg_name = (void *)&to;
-        msg.msg_namelen = sizeof(struct sockaddr_in6);
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = (void *) adata;
-        msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	msg.msg_name = (void *)&to;
+	msg.msg_namelen = sizeof(struct sockaddr_in6);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (void *) adata;
+	msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 #if defined(MIP_MN)
 	ar_sin6 = nemo_ar_get(src, &ar_sin6_orig);
 	if (ar_sin6)
@@ -1102,7 +1088,7 @@ send_haadreq(hoainfo, hoa_plen, src)
 	cmsgptr = CMSG_FIRSTHDR(&msg);
 	pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
 	memset(pi, 0, sizeof(*pi));
-        pi->ipi6_addr = *src;
+	pi->ipi6_addr = *src;
 	cmsgptr->cmsg_level = IPPROTO_IPV6;
 	cmsgptr->cmsg_type = IPV6_PKTINFO;
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
@@ -1114,7 +1100,7 @@ send_haadreq(hoainfo, hoa_plen, src)
 #if defined(MIP_MN)
 	if (ar_sin6) { 
 		if (debug)
-			syslog(LOG_INFO, "send ICMP msg via %s/%d\n", 
+			syslog(LOG_INFO, "send ICMP msg via %s/%d",
 				ip6_sprintf(&ar_sin6->sin6_addr), ar_sin6->sin6_scope_id);
 		cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct sockaddr_in6));
 		cmsgptr->cmsg_level = IPPROTO_IPV6;
@@ -1152,8 +1138,8 @@ send_haadreq(hoainfo, hoa_plen, src)
 
 int
 mip6_icmp6_create_haanyaddr(haanyaddr, mpfx, mpfx_len)
-        struct in6_addr *haanyaddr;
-        struct in6_addr *mpfx;
+	struct in6_addr *haanyaddr;
+	struct in6_addr *mpfx;
 	int mpfx_len;
 {
 	static const struct in6_addr haanyaddr_ifid64 = {
@@ -1165,15 +1151,15 @@ mip6_icmp6_create_haanyaddr(haanyaddr, mpfx, mpfx_len)
 		   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
 	};
 
-        if (mpfx == NULL)
-                return (EINVAL);
+	if (mpfx == NULL)
+		return (EINVAL);
 
-        if (mpfx_len == 64)
-                mip6_create_addr(haanyaddr, &haanyaddr_ifid64, mpfx, mpfx_len);
-        else
-                mip6_create_addr(haanyaddr, &haanyaddr_ifidnn, mpfx, mpfx_len);
+	if (mpfx_len == 64)
+		mip6_create_addr(haanyaddr, &haanyaddr_ifid64, mpfx, mpfx_len);
+	else
+		mip6_create_addr(haanyaddr, &haanyaddr_ifidnn, mpfx, mpfx_len);
 
-        return (0);
+	return (0);
 }
 
 int
@@ -1219,8 +1205,8 @@ send_unsolicited_na(ifindex, target)
 	cmsgptr = CMSG_FIRSTHDR(&msg);
 	pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
 	bzero(pi, sizeof(*pi));
-        pi->ipi6_ifindex = ifindex;
-        pi->ipi6_addr = *target;
+	pi->ipi6_ifindex = ifindex;
+	pi->ipi6_addr = *target;
 	cmsgptr->cmsg_level = IPPROTO_IPV6;
 	cmsgptr->cmsg_type = IPV6_PKTINFO;
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(*pi));
@@ -1268,7 +1254,7 @@ send_unsolicited_na(ifindex, target)
 
 	iov.iov_base = nabuf;
 	iov.iov_len = nalen;
-        
+	
 	if (sendmsg(icmp6sock, &msg, 0) == -1) {
 		syslog(LOG_ERR,
 		   "sending an unsolicited neighbor advertisement message "
@@ -1356,27 +1342,26 @@ add_hal_by_commandline_xxx(homeagent)
 #ifdef MIP_MN
 void
 hpfxlist_set_expire_timer(hpfx, tick)
-        struct mip6_hpfxl *hpfx;
-        int tick;
+	struct mip6_hpfxl *hpfx;
+	int tick;
 {
-        remove_callout_entry(hpfx->hpfx_retrans);
-        hpfx->hpfx_retrans = new_callout_entry(tick, hpfxlist_expire_timer,
-				       (void *)hpfx, "hpfxlist_expire_timer");
+	remove_callout_entry(hpfx->hpfx_retrans);
+	hpfx->hpfx_retrans = new_callout_entry(tick, hpfxlist_expire_timer,
+					       (void *)hpfx, "hpfxlist_expire_timer");
 }
-
 
 void
 hxplist_stop_expire_timer(hpfx)
-        struct mip6_hpfxl *hpfx;
+	struct mip6_hpfxl *hpfx;
 {
-        remove_callout_entry(hpfx->hpfx_retrans);
+	remove_callout_entry(hpfx->hpfx_retrans);
 }
 
 void
 hpfxlist_expire_timer(arg)
 	void *arg;
 {
-        struct mip6_hpfxl *hpfx = (struct mip6_hpfxl *)arg;
+	struct mip6_hpfxl *hpfx = (struct mip6_hpfxl *)arg;
 	time_t now = time(0);
 
 	hxplist_stop_expire_timer(hpfx);
@@ -1517,7 +1502,6 @@ mnd_init_homeprefix(mipif)
 	struct mip6_mipif *mipif;
 {
 	struct ifaddrs *ifa, *ifap;
-	struct sockaddr *sa;
 	struct sockaddr_in6 *addr_sin6, *mask_sin6;
 	int prefixlen = 0;
 	struct mip6_hpfxl *hpfxent = NULL;
@@ -1533,9 +1517,7 @@ mnd_init_homeprefix(mipif)
 	}
 	
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		sa = ifa->ifa_addr;
-		
-		if (sa->sa_family != AF_INET6)
+		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		if (if_nametoindex(ifa->ifa_name) != mipif->mipif_ifindex) 
 			continue;
@@ -1754,17 +1736,17 @@ int
 send_mps(hpfx)
 	struct mip6_hpfxl *hpfx;
 {
-        struct msghdr msg;
-        struct iovec iov;
-        struct cmsghdr  *cmsgptr = NULL;
-        struct in6_pktinfo *pi = NULL;
-        struct sockaddr_in6 to;
-        char adata[512], buf[1024];
-        struct mip6_prefix_solicit *mpfx;
-        size_t mpfxlen = 0;
-        struct binding_update_list *bul;
-        struct ip6_dest *dest;
-        struct ip6_opt_home_address *hoadst;
+	struct msghdr msg;
+	struct iovec iov;
+	struct cmsghdr  *cmsgptr = NULL;
+	struct in6_pktinfo *pi = NULL;
+	struct sockaddr_in6 to;
+	char adata[512], buf[1024];
+	struct mip6_prefix_solicit *mpfx;
+	size_t mpfxlen = 0;
+	struct binding_update_list *bul;
+	struct ip6_dest *dest;
+	struct ip6_opt_home_address *hoadst;
 	struct in6_addr *hoa;
 #if defined(MIP_MN)
 	struct sockaddr_in6 *ar_sin6, ar_sin6_orig;
@@ -1785,54 +1767,54 @@ send_mps(hpfx)
 	if (bul == NULL)
 		return (0);
 
-        memset(&to, 0, sizeof(to));
-        to.sin6_addr = bul->bul_peeraddr;
-        to.sin6_family = AF_INET6;
-        to.sin6_port = 0;
-        to.sin6_scope_id = 0;
-        to.sin6_len = sizeof (struct sockaddr_in6);
+	memset(&to, 0, sizeof(to));
+	to.sin6_addr = bul->bul_peeraddr;
+	to.sin6_family = AF_INET6;
+	to.sin6_port = 0;
+	to.sin6_scope_id = 0;
+	to.sin6_len = sizeof (struct sockaddr_in6);
 
-        msg.msg_name = (void *)&to;
-        msg.msg_namelen = sizeof(struct sockaddr_in6);
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = (void *) adata;
-        msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
+	msg.msg_name = (void *)&to;
+	msg.msg_namelen = sizeof(struct sockaddr_in6);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (void *) adata;
+	msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
 		CMSG_SPACE(sizeof(struct ip6_opt_home_address) + 2 + 4);
 
 #if defined(MIP_MN)
-        ar_sin6 = nemo_ar_get(&bul->bul_coa, &ar_sin6_orig);
-        if (ar_sin6) 
-                msg.msg_controllen += 
-                        CMSG_SPACE(sizeof(struct sockaddr_in6));
+	ar_sin6 = nemo_ar_get(&bul->bul_coa, &ar_sin6_orig);
+	if (ar_sin6) 
+		msg.msg_controllen += 
+			CMSG_SPACE(sizeof(struct sockaddr_in6));
 #endif /*MIP_NEMO */
 
-        /* Packet Information i.e. Source Address */
-        cmsgptr = CMSG_FIRSTHDR(&msg);
-        pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
-        memset(pi, 0, sizeof(*pi));
-        pi->ipi6_addr = *hoa;
-        cmsgptr->cmsg_level = IPPROTO_IPV6;
-        cmsgptr->cmsg_type = IPV6_PKTINFO;
-        cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
-        cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+	/* Packet Information i.e. Source Address */
+	cmsgptr = CMSG_FIRSTHDR(&msg);
+	pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
+	memset(pi, 0, sizeof(*pi));
+	pi->ipi6_addr = *hoa;
+	cmsgptr->cmsg_level = IPPROTO_IPV6;
+	cmsgptr->cmsg_type = IPV6_PKTINFO;
+	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
+	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 
 #if defined(MIP_MN)
-        if (ar_sin6) { 
-                if (debug) 
-                        syslog(LOG_INFO, "sendmsg via %s/%d",
+	if (ar_sin6) { 
+		if (debug) 
+			syslog(LOG_INFO, "sendmsg via %s/%d",
 			       ip6_sprintf(&ar_sin6->sin6_addr), 
 			       ar_sin6->sin6_scope_id);
-                cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct sockaddr_in6));
-                cmsgptr->cmsg_level = IPPROTO_IPV6;
-                cmsgptr->cmsg_type = IPV6_NEXTHOP;
-                memcpy(CMSG_DATA(cmsgptr), ar_sin6, 
+		cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct sockaddr_in6));
+		cmsgptr->cmsg_level = IPPROTO_IPV6;
+		cmsgptr->cmsg_type = IPV6_NEXTHOP;
+		memcpy(CMSG_DATA(cmsgptr), ar_sin6, 
 		       sizeof(struct sockaddr_in6));
-                cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
-        }
+		cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+	}
 #endif
 
-        /* Destination Option */
+	/* Destination Option */
 	dest = (struct ip6_dest *)(CMSG_DATA(cmsgptr));
 	
 	/* padding */
@@ -1860,51 +1842,48 @@ send_mps(hpfx)
 
 	hpfx->hpfx_mipif->mipif_mps_id = random(); 
 
-        bzero(buf, sizeof(buf));
-        mpfx = (struct mip6_prefix_solicit *)buf;
-        mpfx->mip6_ps_type = MIP6_PREFIX_SOLICIT;
-        mpfx->mip6_ps_code = 0;
-        mpfx->mip6_ps_cksum = 0;
-        mpfx->mip6_ps_id = htons(hpfx->hpfx_mipif->mipif_mps_id);
-        mpfx->mip6_ps_reserved = 0;
-        mpfxlen = sizeof(struct mip6_prefix_solicit);
+	bzero(buf, sizeof(buf));
+	mpfx = (struct mip6_prefix_solicit *)buf;
+	mpfx->mip6_ps_type = MIP6_PREFIX_SOLICIT;
+	mpfx->mip6_ps_code = 0;
+	mpfx->mip6_ps_cksum = 0;
+	mpfx->mip6_ps_id = htons(hpfx->hpfx_mipif->mipif_mps_id);
+	mpfx->mip6_ps_reserved = 0;
+	mpfxlen = sizeof(struct mip6_prefix_solicit);
 
-        iov.iov_base = buf;
-        iov.iov_len = mpfxlen;
+	iov.iov_base = buf;
+	iov.iov_len = mpfxlen;
 
 	if (debug)
 		syslog(LOG_INFO, "sending Mobile Prefix Solicitation");
 
-        if (sendmsg(icmp6sock, &msg, 0) < 0)
-                perror ("sendmsg");
+	if (sendmsg(icmp6sock, &msg, 0) < 0)
+		perror ("sendmsg");
 
 	hpfx->hpfx_mipif->mipif_mps_lastsent = time(0);
 
-        return errno;
+	return (errno);
 }
 
 static struct in6_addr *
 get_hoa_from_ifindex(ifindex)
 	u_int16_t ifindex;
 {
-        struct ifaddrs *ifa, *ifap;
-        struct sockaddr *sa;
+	struct ifaddrs *ifa, *ifap;
 	struct in6_addr *address;
 	struct binding_update_list *bul = NULL;
 	
-        if (getifaddrs(&ifap) != 0) {
-                syslog(LOG_ERR, "%s", strerror(errno));
-                return NULL;
-        }
-        for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-                sa = ifa->ifa_addr;
-                
-                if (sa->sa_family != AF_INET6)
-                        continue;
-                if (ifa->ifa_addr == NULL)
-                        continue;
+	if (getifaddrs(&ifap) != 0) {
+		syslog(LOG_ERR, "%s", strerror(errno));
+		return (NULL);
+	}
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		if (ifa->ifa_addr == NULL)
+			continue;
+
 		address = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
-                
 		if (IN6_IS_ADDR_LINKLOCAL(address)
 		    || IN6_IS_ADDR_MULTICAST(address)
 		    || IN6_IS_ADDR_LOOPBACK(address)
@@ -1912,20 +1891,13 @@ get_hoa_from_ifindex(ifindex)
 		    || IN6_IS_ADDR_UNSPECIFIED(address)) 
 			continue;
 		
-		bul = bul_get_homeflag(address);
-		if (bul == NULL)
-			continue;
-
-		break;
-	}
-
-	if (bul) {
-		freeifaddrs(ifap);
-		return &bul->bul_hoainfo->hinfo_hoa;
+		if ((bul = bul_get_homeflag(address)))
+			break;
 	}
 
 	freeifaddrs(ifap);
-	return NULL;
+	
+	return (bul ? &bul->bul_hoainfo->hinfo_hoa : NULL);
 }
 
 int
@@ -2065,17 +2037,17 @@ terminate(dummy)
 static void
 noro_init()
 { 
-        FILE *file;
+	FILE *file;
 	char buf[256], *bl;
 	struct in6_addr noro_addr;
 	struct noro_host_list *noro;
 	
 	file = fopen(MND_NORO_FILE, "r");
-        if(file == NULL) 
-                return;
+	if(file == NULL) 
+		return;
 
-        memset(buf, 0, sizeof(buf));
-        while((fgets(buf, sizeof(buf), file)) != NULL){
+	memset(buf, 0, sizeof(buf));
+	while((fgets(buf, sizeof(buf), file)) != NULL){
 		/* ignore comments */
 		if (strchr(buf, '#') != NULL) 
 			continue;
@@ -2084,9 +2056,9 @@ noro_init()
 		if (bl) 
 			*bl = '\0';
 
-                if (inet_pton(AF_INET6, buf, &noro_addr) < 0) {
-                        fprintf(stderr, "%s is not correct address\n", buf);
-                        continue;
+		if (inet_pton(AF_INET6, buf, &noro_addr) < 0) {
+			fprintf(stderr, "%s is not correct address", buf);
+			continue;
 		}
 
 		if (noro_get(&noro_addr)) {
@@ -2142,7 +2114,7 @@ noro_get(tgt)
 { 
 	struct noro_host_list *noro = NULL;
 
-        for (noro = LIST_FIRST(&noro_head); noro; 
+	for (noro = LIST_FIRST(&noro_head); noro; 
 	     noro = LIST_NEXT(noro, noro_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(tgt, &noro->noro_host)) 
 			return (noro);
@@ -2151,6 +2123,22 @@ noro_get(tgt)
 	return (NULL);
 }
 
+static void
+noro_delete(tgt)
+	struct in6_addr *tgt;
+{
+	struct noro_host_list *noro = NULL;
+
+	for (noro = LIST_FIRST(&noro_head); noro; 
+	     noro = LIST_NEXT(noro, noro_entry)) {
+		if (!IN6_ARE_ADDR_EQUAL(tgt, &noro->noro_host))
+			continue;
+
+		LIST_REMOVE(noro, noro_entry);
+		free(noro);
+		return;
+	}
+}
 
 static void
 noro_show(s, dummy)
@@ -2159,7 +2147,7 @@ noro_show(s, dummy)
 { 
 	struct noro_host_list *noro = NULL;
 
-        for (noro = LIST_FIRST(&noro_head); noro; 
+	for (noro = LIST_FIRST(&noro_head); noro; 
 	     noro = LIST_NEXT(noro, noro_entry)) {
 		command_printf(s, "%s\n", ip6_sprintf(&noro->noro_host));
 	}
@@ -2178,7 +2166,7 @@ command_add_noro(s, arg)
 	}
 
 	if (inet_pton(AF_INET6, arg, &addr) != 1) {
-		command_printf(s, "The specified address [%s] is not persable\n", arg);
+		command_printf(s, "The specified address [%s] is not parsable\n", arg);
 		return;
 	}
 
@@ -2196,18 +2184,39 @@ command_add_noro(s, arg)
 }
 
 static void
+command_delete_noro(s, arg)
+	int s;
+	char *arg;
+{
+	struct in6_addr addr;
+	
+	if (*arg == '\0') {
+		command_printf(s, "Usage: delete noro <address>\n");
+		return;
+	}
+
+	if (inet_pton(AF_INET6, arg, &addr) != 1) {
+		command_printf(s, "The specified address [%s] is not parsable\n", arg);
+		return;
+	}
+
+	noro_delete(&addr);
+}
+
+static void
 noro_sync()
 { 
-        FILE *file;
+	FILE *file;
 	struct noro_host_list *noro = NULL;
 	
 	file = fopen(MND_NORO_FILE, "w");
-        if(file == NULL) 
-                return;
+	if (file == NULL) 
+		return;
 
-        for (noro = LIST_FIRST(&noro_head); noro; 
+	for (noro = LIST_FIRST(&noro_head); noro; 
 	     noro = LIST_NEXT(noro, noro_entry)) {
 		fputs(ip6_sprintf(&noro->noro_host), file);
+		fputc('\n', file);
 	}
 
 	fclose(file);
@@ -2221,7 +2230,7 @@ command_show_hal(s, dummy)
 {
 	struct mip6_mipif *mipif = NULL;
 
-        LIST_FOREACH(mipif, &mipifhead, mipif_entry) {
+	LIST_FOREACH(mipif, &mipifhead, mipif_entry) {
 		show_hal(s, &mipif->mipif_hprefx_head);
 	}
 }
@@ -2256,7 +2265,43 @@ show_current_config(s, dummy)
 	command_printf(s, "Current configuration\n");
 	command_printf(s, "debug: %s\n", debug ? "on" : "off");
 	command_printf(s, "name lookup: %s\n", namelookup ? "true" : "false");
+	command_printf(s, "pager mode: %s\n", pager_mode ?  "true" : "false");
 	command_printf(s, "command port: %d\n", command_port);
 	command_printf(s, "Binding Update Lifetime for Home registration: %d(s)\n",
 		default_lifetime * 4);
+}
+
+static void
+config_debug(s, arg)
+	int s;
+	char *arg;
+{
+	int val;
+
+	if (*arg == '\0') {
+		command_printf(s, "Usage: config debug <parameter; 0 or 1>\n");
+		return;
+	}
+	
+	val = strtol(arg, NULL, 10);
+	if (debug != val) {
+		debug = val;
+		kernel_debug(debug);
+	}
+}
+
+static void
+config_pager_mode(s, arg)
+	int s;
+	char *arg;
+{
+	int val;
+
+	if (*arg == '\0') {
+		command_printf(s, "Usage: config pager <parameter; 0 or 1>\n");
+		return;
+	}
+	
+	val = strtol(arg, NULL, 10);
+	pager_mode = val;
 }
