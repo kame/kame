@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.33 2007/02/06 05:58:52 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.34 2007/02/09 22:58:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -400,6 +400,7 @@ icmp6_input_common(fd)
         struct in6_pktinfo *pkt = NULL;
         char adata[512], buf[1024];
 #ifdef MIP_MN
+	struct in6_addr *peer;
 	struct binding_update_list *bul;
 #endif /* MIP_MN */
 
@@ -525,17 +526,24 @@ icmp6_input_common(fd)
 		switch (icp->icmp6_code) {
 		case ICMP6_PARAMPROB_NEXTHEADER:
 			/* Check whether this ICMP is for MH */
-			break;
+			peer = &from.sin6_addr;
+			goto paramprob_transition;
 		case ICMP6_PARAMPROB_HEADER:
 		case ICMP6_PARAMPROB_OPTION:
 			return (0);
 		}
+		break;
 
+	case ICMP6_DST_UNREACH:
+		peer = &((struct ip6_hdr *)(icp + 1))->ip6_dst;
+		/* Fall Through */
+
+	paramprob_transition:
 		/* when multiple coa is supported, MN/MR can not
                  * determin which BU is failed or not. so remove all
                  * BU entries anyway 
 		 */
-		bul = bul_get(&dst, &from.sin6_addr);
+		bul = bul_get(&dst, peer);
 		if (bul == NULL)
 			break;
 
@@ -545,7 +553,7 @@ icmp6_input_common(fd)
 			syslog(LOG_ERR,
 			       "state transision by "
 			       "MIP6_BUL_FSM_EVENT_ICMP6_PARAM_PROB "
-			       "failed.\n");
+			       "failed.");
 		}
 		break;
 
@@ -1351,15 +1359,15 @@ calculate_authenticator(key, keylen, addr1, addr2, data, datalen,
 
 #if DUMP
 	if (debug) {
-		syslog(LOG_INFO, "key = %s\n",
+		syslog(LOG_INFO, "key = %s",
 		       hexdump(key, keylen));
-		syslog(LOG_INFO, "addr1 = %s\n",
+		syslog(LOG_INFO, "addr1 = %s",
 		       ip6_sprintf(addr1));
-		syslog(LOG_INFO, "addr2 = %s\n",
+		syslog(LOG_INFO, "addr2 = %s",
 		       ip6_sprintf(addr2));
-		syslog(LOG_INFO, "datalen = %d\n", datalen);
-		syslog(LOG_INFO, "exclude_offset = %d\n", exclude_offset);
-		syslog(LOG_INFO, "exclude_data_len = %d\n", exclude_data_len);
+		syslog(LOG_INFO, "datalen = %d", datalen);
+		syslog(LOG_INFO, "exclude_offset = %d", exclude_offset);
+		syslog(LOG_INFO, "exclude_data_len = %d", exclude_data_len);
 	}
 #endif
 
@@ -1402,7 +1410,7 @@ calculate_authenticator(key, keylen, addr1, addr2, data, datalen,
 	       authenticator_len);
 #if DUMP
 	if (debug)
-		syslog(LOG_INFO, "authenticator = %s\n", 
+		syslog(LOG_INFO, "authenticator = %s",
 		       hexdump(authenticator, authenticator_len));
 #endif
 }
