@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.27 2007/02/06 01:09:23 t-momose Exp $	*/
+/*	$Id: babymdd.c,v 1.28 2007/02/10 04:30:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -72,6 +72,8 @@
 
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
 #define storage2sin(x) ((struct sockaddr_in *)(x))
+
+int force_mdreg = 0;
 
 int main(int, char **);
 
@@ -290,6 +292,12 @@ main (argc, argv)
 	lastlinkcheck = time(0);
 
 	while (1) {
+		if (force_mdreg) {
+			if (babyinfo.whereami == IAMFOREIGN)
+				baby_md_reg((struct sockaddr *)&babyinfo.coaif->coa,
+					    babyinfo.coaif->ifindex, babyinfo.coaif->bid); 
+			force_mdreg = 0;
+		}
 		FD_ZERO(&fds);
 		nfds = -1;
 		FD_SET(babyinfo.rtsock, &fds);
@@ -487,20 +495,12 @@ baby_md_reg(coa, ifindex, bid)
 		}
 		free(mdinfo);
 		if (DEBUGNORM) {
-#ifdef DSMIP
 			char buf[256];
 
-			inet_ntop(coa->sa_family, coa->sa_data,
-				  buf, sizeof(buf));
-#endif /* DSMIP */
 			syslog(LOG_INFO, "[binding %s -> %s]",
 			       ip6_sprintf(&hoa.sin6_addr),
-#ifdef DSMIP
-			       buf
-#else
-			       ip6_sprintf(&((struct sockaddr_in6 *)coa)->sin6_addr)
-#endif /* DSMIP */
-				);
+			       inet_ntop(coa->sa_family, coa->sa_data,
+					 buf, sizeof(buf)));
 		}
 	}
 	
@@ -554,6 +554,7 @@ baby_mipmsg(mipm, msglen)
 			}
 		}
 		break;
+
 	case MIPM_MD_INFO:
 		mipmd = (struct mipm_md_info *)mipm;
 		if (mipmd->mipmmi_command == MIPM_MD_SCAN) {
@@ -981,11 +982,7 @@ baby_sighup(arg)
 	int arg;	/* not used */
 {
 	syslog(LOG_INFO, "HUP received");
-	if (babyinfo.whereami != IAMFOREIGN)
-		return;
-
-	baby_md_reg((struct sockaddr *)&babyinfo.coaif->coa,
-		    babyinfo.coaif->ifindex, babyinfo.coaif->bid); 
+	force_mdreg = 1;
 }
 
 static void
