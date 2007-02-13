@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.43 2007/02/06 05:58:52 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.44 2007/02/13 02:32:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -439,7 +439,6 @@ struct nd6options {
 	struct nd_opt_adv_interval *ndadvi;
 	struct nd_opt_homeagent_info *ndhai;
 };
-extern struct nd6options ndopts;
 
 #define SECRETKEY_SIZE	16
 

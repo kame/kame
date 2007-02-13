@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.34 2007/02/09 22:58:25 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.35 2007/02/13 02:32:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -67,15 +67,6 @@
 #include "stat.h"
 #include "shisad.h"
 #include "fsm.h"
-
-extern struct mip6_mipif_list mipifhead;
-
-#ifndef MIP_CN
-struct nd6options ndopts;
-
-extern struct mip6_hpfx_list hpfx_head; 
-#endif /* MIP_CN */
-
 
 void
 mipsock_open()
@@ -332,7 +323,6 @@ raw4sock_open()
 #endif /* !MIP_MN */
 #endif /* DSMIP */
 
-#ifndef MIP_CN
 int
 mip6_get_nd6options(ndoptions, options, total) 
 	struct nd6options *ndoptions;
@@ -380,8 +370,6 @@ mip6_get_nd6options(ndoptions, options, total)
 
 	return (0);
 }
-
-#endif /* MIP6_CN */ 
 
 int
 icmp6_input_common(fd)

@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.49 2007/02/09 22:57:08 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.50 2007/02/13 02:32:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1858,7 +1858,7 @@ send_mps(hpfx)
 		syslog(LOG_INFO, "sending Mobile Prefix Solicitation");
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
-		perror ("sendmsg");
+		perror ("send mps");
 
 	hpfx->hpfx_mipif->mipif_mps_lastsent = time(0);
 
@@ -1909,6 +1909,7 @@ receive_mpa(mpa, mpalen, bul)
 	int error = 0;
 	int done = 0;
 	struct mip6_mipif *mif = NULL;
+	struct nd6options ndopts;
 	struct nd_opt_hdr *pt;
 	struct mip6_hpfx_mn_exclusive mnoption;
 

@@ -1,4 +1,4 @@
-/*	$KAME: hal.c,v 1.10 2006/04/10 15:30:53 t-momose Exp $	*/
+/*	$KAME: hal.c,v 1.11 2007/02/13 02:32:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2005 WIDE Project.  All rights reserved.
@@ -380,6 +380,7 @@ receive_ra(ra, ralen, receivedifindex, in6_lladdr, in6_gladdr)
 #endif /* MIP_MN */
 	struct mip6_hpfxl *hpfx = NULL;
 	struct mip6_hpfx_list *hpfxhead = NULL; 
+	struct nd6options ndopts;
 	struct nd_opt_hdr *pt;
 
 	u_int16_t hai_preference = 0;
