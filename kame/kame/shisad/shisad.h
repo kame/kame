@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.44 2007/02/13 02:32:41 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.45 2007/02/13 10:54:29 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -580,6 +580,7 @@ void calculate_authenticator(u_int8_t *, size_t, struct in6_addr *,
 
 /* cnd.c */
 int cn_receive_dst_unreach(struct icmp6_hdr *);
+int have_session(struct in6_addr *);
 
 /* mnd.c */
 int mipsock_bul_request(struct binding_update_list *, u_char);
