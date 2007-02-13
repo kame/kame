@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.35 2007/01/14 05:15:23 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.36 2007/02/13 08:02:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -100,7 +100,7 @@ int do_proxy_dad = 1;
  *       +---------------------+
  *      \|/                    |      no BU and expire
  * [Registering] -> [Requesting BU if needed] -> [Remove]
- *          soon be expired                
+ *          soon be expired
  */
 void
 mip6_bc_init()
@@ -208,7 +208,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmet
 	}
 
 	mip6_validate_bc(bc);
-        LIST_INSERT_HEAD(&bchead, bc, bc_entry);
+	LIST_INSERT_HEAD(&bchead, bc, bc_entry);
 	bc->bc_refcnt++;
 
 	return (bc);
@@ -301,7 +301,7 @@ mip6_bc_lookup(hoa, src, bid)
 {
 	struct binding_cache *bc, *bc_nxt = NULL;
 
-        for (bc = LIST_FIRST(&bchead); bc; bc = bc_nxt) {
+	for (bc = LIST_FIRST(&bchead); bc; bc = bc_nxt) {
 		bc_nxt =  LIST_NEXT(bc, bc_entry);
 #ifdef MIP_MCOA
 		if (bid && bid != bc->bc_bid)
@@ -403,7 +403,7 @@ command_show_bc(s, line)
 	struct binding_cache *bc;
 
 	now = time(NULL);
-        for (bc = LIST_FIRST(&bchead); bc; bc = LIST_NEXT(bc, bc_entry)) {
+	for (bc = LIST_FIRST(&bchead); bc; bc = LIST_NEXT(bc, bc_entry)) {
 		if (bc->bc_state > BC_STATE_MAX)
 			continue;
 		command_printf(s, "%c ", "VUABD"[bc->bc_state]);
@@ -434,7 +434,7 @@ flush_bc()
 {
 	struct binding_cache *bc, *bc_nxt = NULL;
 
-        for (bc = LIST_FIRST(&bchead); bc; bc = bc_nxt) {
+	for (bc = LIST_FIRST(&bchead); bc; bc = bc_nxt) {
 		bc_nxt =  LIST_NEXT(bc, bc_entry);
 		mip6_bc_delete(bc);
 	}
@@ -466,7 +466,8 @@ mip6_bc_refresh_timer(arg)
 
 #ifdef MIP_CN
 	/* Sending BRR with backoff timer till renewing this BC  */
-	send_brr(&bc->bc_myaddr, &bc->bc_hoa);
+	if (have_session(&bc->bc_hoa))
+		send_brr(&bc->bc_myaddr, &bc->bc_hoa);
 	bc->bc_refresh_count++;
 #endif /* MIP_CN */
 
@@ -492,7 +493,7 @@ mip6_bc_refresh_timer(arg)
 void
 mipsock_bc_request(bc, command) 
 	struct binding_cache *bc;
-        u_char command;
+	u_char command;
 {
 	char buf[1024];
 	int err = 0;
@@ -510,34 +511,34 @@ mipsock_bc_request(bc, command)
 	memset(&coa_s6, 0, sizeof(coa_s6));
 	memset(&cn_s6, 0, sizeof(cn_s6));
 	
-        hoa_s6.sin6_len = coa_s6.sin6_len = 
-                cn_s6.sin6_len = sizeof(struct sockaddr_in6);
-        hoa_s6.sin6_family = coa_s6.sin6_family =
-                cn_s6.sin6_family = AF_INET6;
-        
-        hoa_s6.sin6_addr = bc->bc_hoa;
-        coa_s6.sin6_addr = bc->bc_coa;
-        cn_s6.sin6_addr = bc->bc_myaddr;
+	hoa_s6.sin6_len = coa_s6.sin6_len = 
+		cn_s6.sin6_len = sizeof(struct sockaddr_in6);
+	hoa_s6.sin6_family = coa_s6.sin6_family =
+		cn_s6.sin6_family = AF_INET6;
+	
+	hoa_s6.sin6_addr = bc->bc_hoa;
+	coa_s6.sin6_addr = bc->bc_coa;
+	cn_s6.sin6_addr = bc->bc_myaddr;
 
-        memset(buf, 0, sizeof(buf));
-        bcinfo = (struct mipm_bc_info *)buf;
+	memset(buf, 0, sizeof(buf));
+	bcinfo = (struct mipm_bc_info *)buf;
 
-        bcinfo->mipmci_msglen = sizeof(struct mipm_bc_info) 
+	bcinfo->mipmci_msglen = sizeof(struct mipm_bc_info) 
 		+ sizeof(struct sockaddr_in6) * 3;
-        bcinfo->mipmci_version = MIP_VERSION;
-        bcinfo->mipmci_type = command;
-        bcinfo->mipmci_seq = random();
-        bcinfo->mipmci_flags = bc->bc_flags;
-        bcinfo->mipmci_lifetime = bc->bc_lifetime;
+	bcinfo->mipmci_version = MIP_VERSION;
+	bcinfo->mipmci_type = command;
+	bcinfo->mipmci_seq = random();
+	bcinfo->mipmci_flags = bc->bc_flags;
+	bcinfo->mipmci_lifetime = bc->bc_lifetime;
 #ifdef MIP_MCOA
 	coa_s6.sin6_port = bc->bc_bid;
 #endif /* MIP_MCOA */
 
-        memcpy(MIPC_HOA(bcinfo), &hoa_s6, hoa_s6.sin6_len);
-        memcpy(MIPC_COA(bcinfo), &coa_s6, coa_s6.sin6_len);
-        memcpy(MIPC_CNADDR(bcinfo), &cn_s6, cn_s6.sin6_len);
+	memcpy(MIPC_HOA(bcinfo), &hoa_s6, hoa_s6.sin6_len);
+	memcpy(MIPC_COA(bcinfo), &coa_s6, coa_s6.sin6_len);
+	memcpy(MIPC_CNADDR(bcinfo), &cn_s6, cn_s6.sin6_len);
 
-        err = write(mipsock, bcinfo, bcinfo->mipmci_msglen);
+	err = write(mipsock, bcinfo, bcinfo->mipmci_msglen);
 	if (err < 0)
 		syslog(LOG_ERR, "%m mipsock_bc_request:write");
 
@@ -563,8 +564,8 @@ mipsock_bc_request(bc, command)
 		       bc->bc_seqno, bc->bc_lifetime);
 
 	}
-        
-        return;
+	
+	return;
 }
 #endif /* !MIP_MN */
 
@@ -643,7 +644,7 @@ hoainfo_find_withhoa(hoa)
 {
 	struct mip6_hoainfo *hoainfo = NULL;
 
-        for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
+	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
 		     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(hoa, &hoainfo->hinfo_hoa))
 			return (hoainfo);
@@ -674,9 +675,9 @@ hoainfo_get_withdhaadid (id)
 struct binding_update_list *
 bul_insert(hoainfo, peeraddr, coa, flags, bid)
 	struct mip6_hoainfo *hoainfo;
-        struct in6_addr *peeraddr;
-        struct in6_addr *coa;
-        u_int16_t flags, bid;
+	struct in6_addr *peeraddr;
+	struct in6_addr *coa;
+	u_int16_t flags, bid;
 {
 
 	struct binding_update_list *bul;
@@ -684,8 +685,8 @@ bul_insert(hoainfo, peeraddr, coa, flags, bid)
 	if (hoainfo == NULL)
 		return (NULL);
 	
-        bul = bul_get(&hoainfo->hinfo_hoa, peeraddr);
-        if (bul != NULL) {
+	bul = bul_get(&hoainfo->hinfo_hoa, peeraddr);
+	if (bul != NULL) {
 		if (bid == 0) 
 			return (bul);
 #ifdef MIP_MCOA
@@ -741,8 +742,8 @@ bul_insert(hoainfo, peeraddr, coa, flags, bid)
 
 static struct binding_update_list *
 bul_create(peeraddr, coa, flags, hoainfo) 
-        struct in6_addr *peeraddr, *coa;
-        u_int16_t flags;
+	struct in6_addr *peeraddr, *coa;
+	u_int16_t flags;
 	struct mip6_hoainfo *hoainfo;
 {
 	struct binding_update_list *bul = NULL;
@@ -809,7 +810,7 @@ bul_get_homeflag(hoa)
 	if (LIST_EMPTY(&hoainfo->hinfo_bul_head))
 		return (NULL);
 
-        for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
+	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		     bul = LIST_NEXT(bul, bul_entry)) {
 
 		if (bul->bul_flags & IP6_MH_BU_HOME) 
@@ -875,14 +876,14 @@ bul_mcoa_get(hoa, peer, bid)
 	if (hoainfo == NULL)
 		return (NULL);
 
-        for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
+	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		     bul = LIST_NEXT(bul, bul_entry)) {
 
 		if (bid <= 0) {
 			return (bul);
 		} else {
 			/* search mcoa bul */
-		        for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
+			for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
 	     		    mbul = LIST_NEXT(mbul, bul_entry)) {
 
 				if (!IN6_ARE_ADDR_EQUAL(peer,
@@ -917,9 +918,8 @@ bul_get(hoa, peer)
 	if (LIST_EMPTY(&hoainfo->hinfo_bul_head))
 		return (NULL);
 
-        for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
+	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		     bul = LIST_NEXT(bul, bul_entry)) {
-
 		if (IN6_ARE_ADDR_EQUAL(peer, &bul->bul_peeraddr))
 			return (bul);
 	}
@@ -933,7 +933,7 @@ bul_flush(hoainfo)
 {
 	struct binding_update_list *bul, *buln;
 
-        for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); 
+	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); 
 		bul; bul = buln) {
 		buln = LIST_NEXT(bul, bul_entry);
 
@@ -955,12 +955,12 @@ bul_get_nohoa(cookie, coa, peer)
 	struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul;
 
-        for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
+	for (hoainfo = LIST_FIRST(&hoa_head); hoainfo;
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		if (LIST_EMPTY(&hoainfo->hinfo_bul_head))
 			continue;
 
-        	for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); 
+		for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); 
 		     bul; bul = LIST_NEXT(bul, bul_entry)) {
 			if (IN6_ARE_ADDR_EQUAL(peer, &bul->bul_peeraddr) &&
 				IN6_ARE_ADDR_EQUAL(coa, &bul->bul_coa) &&
@@ -1008,9 +1008,9 @@ command_show_bul_one(s, bul)
 	int s;
 	struct binding_update_list *bul;
 {
-        struct timeval now;
+	struct timeval now;
 
-        gettimeofday(&now, NULL);
+	gettimeofday(&now, NULL);
 
 	command_printf(s, "%s ", ip6_sprintf(&bul->bul_peeraddr));
 #ifndef MIP_MCOA
@@ -1087,7 +1087,7 @@ command_show_kbul(s, dummy)
 			command_printf(s, "ioctl to get buls is failed for %s\n", ifname);
 			break;
 		} 
-        
+		
 		/* dump bul */
 		for (i = 0; i < bulreq.ifbu_count; i++) {
 			bul6 = bulreq.ifbu_info + i * sizeof(struct bul6info);
@@ -1113,10 +1113,10 @@ command_show_kbul(s, dummy)
 				(bul6->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
 				(bul6->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-');
 		}
-        }
+	}
 
 	close(sock);
-        
-        return;
+	
+	return;
 }
 #endif /* MIP_MN */

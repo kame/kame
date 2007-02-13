@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.19 2007/02/06 05:58:52 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.20 2007/02/13 08:02:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -40,16 +40,21 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/sockio.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/icmp6.h>
 #include <netinet/ip6mh.h>
 #include <netinet/ip6.h>
+#include <netinet/tcp.h>
+#include <netinet/tcp_var.h>
 #include <net/mipsock.h>
 #include <netinet6/mip6.h>
 
@@ -227,7 +232,7 @@ cn_receive_dst_unreach(icp)
 	if (bc)  {
 		mip6_bc_delete(bc);
 		syslog(LOG_INFO, 
-		       "binding for %s is deleted due to ICMP destunreach.\n",
+		       "binding for %s is deleted due to ICMP destunreach.",
 		       ip6_sprintf(&iip6->ip6_dst));
 	}
 
@@ -271,4 +276,59 @@ terminate(dummy)
 	mipsock_nodetype_request(MIP6_NODETYPE_CORRESPONDENT_NODE, 0);
 	unlink(CND_PIDFILE);
 	exit(1);
+}
+
+#undef EXP_SESSIONTEST
+
+/*
+ * Check whether sessions exist between specified node
+ */
+int
+have_session(addr)
+	struct in6_addr *addr;
+{
+#ifdef EXP_SESSIONTEST
+	char *mibvar = "net.inet.tcp.pcblist";
+	char *buf;
+	struct xinpgen *xig, *oxig;
+	size_t len = 0;
+	struct inpcb *inp;
+
+	if (sysctlbyname(mibvar, 0, &len, 0, 0) < 0) {
+		return (0);
+	}        
+	if ((buf = malloc(len)) == 0) {
+		return (0);
+	}
+	if (sysctlbyname(mibvar, buf, &len, 0, 0) < 0) {
+		free(buf);
+		return (0);
+	}
+        
+        if (len <= sizeof(struct xinpgen)) {
+            free(buf);
+            return (0);
+        }
+            
+	oxig = xig = (struct xinpgen *)buf;
+	for (xig = (struct xinpgen *)((char *)xig + xig->xig_len);
+	     xig->xig_len > sizeof(struct xinpgen);
+	     xig = (struct xinpgen *)((char *)xig + xig->xig_len)) {
+		inp = &((struct xtcpcb *)xig)->xt_inp;
+		if ((inp->inp_vflag & INP_IPV6) == 0 ||
+		    IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
+			continue;
+
+		if (IN6_ARE_ADDR_EQUAL(addr, &inp->in6p_faddr)) {
+			/* XXX Is checking tcp state needed ?*/
+			free(buf);
+			return (1);
+		}
+	}
+
+	free(buf);
+	return (0);
+#else /* EXP_SESSIONTEST */
+	return (1);
+#endif /* EXP_SESSIONTEST */
 }
