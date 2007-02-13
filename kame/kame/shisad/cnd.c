@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.20 2007/02/13 08:02:22 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.21 2007/02/13 16:11:48 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -49,12 +49,16 @@
 #include <net/if_var.h>
 #endif
 #include <netinet/in.h>
+#ifndef __OpenBSD__
 #include <netinet/in_pcb.h>
+#endif /* __OpenBSD__ */
 #include <netinet/icmp6.h>
 #include <netinet/ip6mh.h>
 #include <netinet/ip6.h>
+#ifndef __OpenBSD__
 #include <netinet/tcp.h>
 #include <netinet/tcp_var.h>
+#endif /* __OpenBSD__ */
 #include <net/mipsock.h>
 #include <netinet6/mip6.h>
 
