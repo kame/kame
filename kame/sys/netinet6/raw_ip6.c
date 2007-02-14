@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.166 2005/10/20 07:57:58 kei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.167 2007/02/14 10:25:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -791,7 +791,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 
 	case PRU_ABORT:
 		soisdisconnected(so);
-		/* Fallthrough */
+		/* FALLTHROUGH */
 	case PRU_DETACH:
 		if (in6p == 0)
 			panic("rip6_detach");
