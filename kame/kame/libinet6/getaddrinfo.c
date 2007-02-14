@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.221 2006/02/15 10:42:25 t-momose Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.222 2007/02/14 10:24:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2112,11 +2112,8 @@ getanswer(answer, anslen, qname, qtype, pai)
 			}
 #endif
 			if (!haveanswer) {
-				int nn;
-
 				canonname = bp;
-				nn = strlen(bp) + 1;	/* for the \0 */
-				bp += nn;
+				bp += strlen(bp) + 1;	/* for the \0 */
 			}
 
 			/* don't overwrite pai */
@@ -3184,11 +3181,8 @@ getanswer(answer, anslen, qname, qtype, pai)
 			}
 #endif
 			if (!haveanswer) {
-				int nn;
-
 				canonname = bp;
-				nn = strlen(bp) + 1;	/* for the \0 */
-				bp += nn;
+				bp += strlen(bp) + 1;	/* for the \0 */
 			}
 
 			/* don't overwrite pai */
@@ -4163,11 +4157,8 @@ getanswer(answer, anslen, qname, qtype, pai)
 			}
 #endif
 			if (!haveanswer) {
-				int nn;
-
 				canonname = bp;
-				nn = strlen(bp) + 1;	/* for the \0 */
-				bp += nn;
+				bp += strlen(bp) + 1;	/* for the \0 */
 			}
 
 			/* don't overwrite pai */
@@ -5360,11 +5351,8 @@ getanswer(answer, anslen, qname, qtype, pai)
 			}
 #endif
 			if (!haveanswer) {
-				int nn;
-
 				canonname = bp;
-				nn = strlen(bp) + 1;	/* for the \0 */
-				bp += nn;
+				bp += strlen(bp) + 1;	/* for the \0 */
 			}
 
 			/* don't overwrite pai */
