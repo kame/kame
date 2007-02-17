@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.21 2007/02/13 16:11:48 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.22 2007/02/17 12:11:42 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -48,8 +48,14 @@
 #ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
+#ifdef __NetBSD__
+#include <net/route.h>
+#endif /* __NetBSD__ */
 #include <netinet/in.h>
 #ifndef __OpenBSD__
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip_var.h>
 #include <netinet/in_pcb.h>
 #endif /* __OpenBSD__ */
 #include <netinet/icmp6.h>
@@ -57,6 +63,11 @@
 #include <netinet/ip6.h>
 #ifndef __OpenBSD__
 #include <netinet/tcp.h>
+#include <netinet/tcp_seq.h>
+#define TCPSTATES
+#include <netinet/tcp_fsm.h>
+#define TCPTIMERS
+#include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
 #endif /* __OpenBSD__ */
 #include <net/mipsock.h>
@@ -292,6 +303,53 @@ have_session(addr)
 	struct in6_addr *addr;
 {
 #ifdef EXP_SESSIONTEST
+#ifdef __NetBSD__
+	struct kinfo_pcb *pcblist;
+	int mib[8];
+	size_t namelen = 0, size = 0, i;
+	char *mibname = "net.inet6.tcp6.pcblist";
+
+	memset(mib, 0, sizeof(mib));
+
+	/* get dynamic pcblist node */
+	if (sysctlnametomib(mibname, mib, &namelen) == -1) {
+		if (errno == ENOENT)
+			return (0);
+	}
+
+	if (sysctl(mib, sizeof(mib) / sizeof(*mib), NULL, &size,
+		   NULL, 0) == -1)
+		return (0);
+		
+	if ((pcblist = malloc(size)) == NULL)
+		return (0);
+	memset(pcblist, 0, size);
+
+	mib[6] = sizeof(*pcblist);
+	mib[7] = size / sizeof(*pcblist);
+
+	if (sysctl(mib, sizeof(mib) / sizeof(*mib), pcblist,
+		   &size, NULL, 0) == -1) {
+		free(pcblist);
+		return (0);
+	}
+
+	for (i = 0; i < size / sizeof(*pcblist); i++) {
+		struct sockaddr_in6 src, dst;
+
+		memcpy(&src, &pcblist[i].ki_s, sizeof(src));
+		memcpy(&dst, &pcblist[i].ki_d, sizeof(dst));
+
+		if (IN6_ARE_ADDR_EQUAL(addr, &dst.sin6_addr)) {
+			/* XXX Is checking tcp state needed ?*/
+			free(pcblist);
+			return (1);
+		}
+	}
+	
+	free(pcblist);
+	return (0);
+#else /* __NetBSD__ */
 	char *mibvar = "net.inet.tcp.pcblist";
 	char *buf;
 	struct xinpgen *xig, *oxig;
@@ -332,6 +390,7 @@ have_session(addr)
 
 	free(buf);
 	return (0);
+#endif /* __NetBSD__ */
 #else /* EXP_SESSIONTEST */
 	return (1);
 #endif /* EXP_SESSIONTEST */
