@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.20 2007/02/13 04:37:46 keiichi Exp $  */
+/*      $KAME: network.c,v 1.21 2007/02/17 15:59:25 t-momose Exp $  */
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -59,11 +59,13 @@
 #undef _KERNEL
 #include <arpa/inet.h>
 
+#if 0	/* Is this header necessary for this file ? */
 #ifdef MIP_NO_MTUN
 #include <net/if_nemo.h>
 #else
 #include <net/if_mtun.h>
 #endif /* MIP_NO_MTUN */
+#endif
 
 #include "callout.h"
 #include "shisad.h"
