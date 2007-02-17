@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.9 2006/09/29 08:00:50 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.10 2007/02/17 14:07:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -245,16 +245,34 @@ show_callout_table(s, line)
 {
 	struct timeval current_time, t;
 	struct callout_queue_t *cq;
+	struct tm *ctm;
 	
 	gettimeofday(&current_time, NULL);
+	ctm = localtime((time_t *)&current_time.tv_sec);
+	
 	TAILQ_FOREACH(cq, &callout_head, callout_entry) {
-		struct tm *tm;
-		
-		tm = localtime((time_t *)&cq->exptime.tv_sec);
+		struct tm *etm;
+		int dispday = 0;
+
+		etm = localtime((time_t *)&cq->exptime.tv_sec);
+		if (ctm->tm_year != etm->tm_year) {
+			command_printf(s, "%04d/", etm->tm_year + 1900);
+			dispday = 1;
+		}
+		if (dispday || (ctm->tm_mon != etm->tm_mon)) {
+			command_printf(s, "%02d/", etm->tm_mon);
+			dispday = 1;
+		}
+		if (dispday || (ctm->tm_mday != etm->tm_mday)) {
+			if (!dispday)
+				command_printf(s, "+%02d ", etm->tm_mday - ctm->tm_mday);
+			else
+				command_printf(s, "%02d ", etm->tm_mday);
+		}
 		
   		timersub(&cq->exptime, &current_time, &t);
 		command_printf(s, "%02d:%02d:%02d(%ld.%06lds) %s() for %p\n",
-			tm->tm_hour, tm->tm_min, tm->tm_sec,
+			etm->tm_hour, etm->tm_min, etm->tm_sec,
 			t.tv_sec, t.tv_usec,
 			cq->funcname, cq->arg);
 	}
