@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.35 2007/02/13 02:32:41 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.36 2007/02/17 13:09:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -161,9 +161,7 @@ icmp6sock_open()
 	ICMP6_FILTER_SETPASS(MIP6_HA_DISCOVERY_REPLY, &filter);
 	ICMP6_FILTER_SETPASS(MIP6_PREFIX_SOLICIT, &filter);
 	ICMP6_FILTER_SETPASS(MIP6_PREFIX_ADVERT, &filter);
-#if defined(MIP_CN) || defined(MIP_HA)
 	ICMP6_FILTER_SETPASS(ICMP6_DST_UNREACH, &filter);
-#endif /* MIP_CN || MIP_HA */
 #ifdef MIP_HA
 	ICMP6_FILTER_SETPASS(ICMP6_TIME_EXCEEDED, &filter);
 #endif /* MIP_HA */
@@ -531,6 +529,8 @@ icmp6_input_common(fd)
                  * determin which BU is failed or not. so remove all
                  * BU entries anyway 
 		 */
+		syslog(LOG_ERR, "ICMP6 error: hoa=%s peer=%s",
+		       ip6_sprintf(&dst), ip6_sprintf(peer));
 		bul = bul_get(&dst, peer);
 		if (bul == NULL)
 			break;
