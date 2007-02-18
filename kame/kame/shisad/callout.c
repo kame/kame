@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.10 2007/02/17 14:07:57 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.11 2007/02/18 18:09:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -206,10 +206,20 @@ update_callout_entry(ch, sec)
 	CALLOUT_HANDLE ch;
 	int sec;
 {
-	/*struct timeval exptime;*/
+	struct callout_queue_t *cq;
+
+	if (sec == 0)
+		return;
 
 	/* This is the very simplest way. there must be 
 	   more efficient ways */
+	TAILQ_FOREACH(cq, &callout_head, callout_entry) {
+		if (cq == ch)
+			break;
+	}
+	if (cq == NULL)
+		return;
+
 	TAILQ_REMOVE(&callout_head, ch, callout_entry);
 	gettimeofday(&ch->exptime, NULL);
 	ch->exptime.tv_sec += sec;

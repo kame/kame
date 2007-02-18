@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.43 2007/02/03 03:19:12 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.44 2007/02/18 18:09:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -88,12 +88,13 @@ static void dump_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *,
 static void bul_print_all(void);
 
 static int bul_send_unsolicited_na(struct binding_update_list *);
-
-static void bul_set_retrans_timer(struct binding_update_list *, int);
 static void bul_stop_retrans_timer(struct binding_update_list *);
-static void bul_set_expire_timer(struct binding_update_list *, int);
-static void bul_stop_expire_timer(struct binding_update_list *);
 static void bul_stop_timers(struct binding_update_list *);
+
+#define bul_set_retrans_timer(bul, tick)	\
+	update_callout_entry((bul)->bul_retrans, (tick))
+#define bul_set_expire_timer(bul, tick)		\
+	update_callout_entry((bul)->bul_expire, (tick))
 
 /*
  * return value:
@@ -147,13 +148,13 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 			syslog(LOG_NOTICE,
 			    "no related binding update entry with "
-			    "this BRR.\n");
+			    "this BRR.");
 			return (-1);
 		}
 		error = bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_BRR, &fsmmsg);
 		if (error == -1) {
 			syslog(LOG_NOTICE,
-			    "BRR fsm state transition failed.\n");
+			    "BRR fsm state transition failed.");
 			return (-1);
 		}
 		break;
@@ -164,7 +165,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		hinfo = hoainfo_find_withhoa(dst);  
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
-			    "no related HoA found with this HoT.\n");
+			    "no related HoA found with this HoT.");
 			return (-1);
 		}
 #ifndef MIP_MCOA
@@ -231,7 +232,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		if (bul == NULL) {
 			syslog(LOG_NOTICE,
 			    "no matching binding update entry found with "
-			    "this BACK.\n");
+			    "this BACK.");
 			return (-1);
 		}
 		if (!IN6_ARE_ADDR_EQUAL(&bul->bul_coa, &hinfo->hinfo_hoa)
@@ -259,7 +260,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		}
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
-			    "no related HoA found with this BE.\n");
+			    "no related HoA found with this BE.");
 			return (-1);
 		}
 
@@ -300,7 +301,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 		default:
 			syslog(LOG_INFO,
-			    "unknown BE status code (status = %u).\n",
+			    "unknown BE status code (status = %u).",
 			    ip6mhbe->ip6mhbe_status);
 		}
 		if (error == -1) {
@@ -318,7 +319,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 	default:
 		syslog(LOG_ERR,
-		    "Unknown Mobility Header Message is received\n");
+		    "Unknown Mobility Header Message is received");
 
 		/* 
 		 * SECTION 9.2 if MH type has unknown value, issue BE
@@ -396,13 +397,13 @@ bul_reg_fsm(bul, event, data)
 			bul->bul_lifetime
 			    = set_default_bu_lifetime(bul->bul_hoainfo);
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
-				if (!IN6_IS_ADDR_UNSPECIFIED(&bul->bul_peeraddr)){
+				if (!IN6_IS_ADDR_UNSPECIFIED(&bul->bul_peeraddr)) {
 					error = send_bu(bul);
 					if (error) {
 						syslog(LOG_ERR,
 						    "sending a home "
 						    "registration "
-						    "failed. (%d)\n", error);
+						    "failed. (%d)", error);
 						/* continue and try again. */
 					}
 
@@ -424,7 +425,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "secondary fsm transition "
-					    "failed (%d).\n", error);
+					    "failed (%d).", error);
 					return (error);
 				}
 
@@ -459,7 +460,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "secondary fsm transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -499,7 +500,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a binding update "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -514,7 +515,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a binding upate "
-					    "failed. (%d)\n", error);
+					    "failed. (%d)", error);
 					return (error);
 				}
 
@@ -525,10 +526,12 @@ bul_reg_fsm(bul, event, data)
 				if (bul_fsm_back_register(bul, data)) {
 					syslog(LOG_ERR,
 					    "registering a binding update "
-					    "entry failed.\n");
+					    "entry failed.");
 					return (-1);
 				}
 
+				/* This timer for a CN is not needed at this time */
+				/* bul_refresh value for a CN is not set anywhere */
 				bul_set_retrans_timer(bul,
 				    bul->bul_refresh << 2);
 
@@ -556,7 +559,7 @@ bul_reg_fsm(bul, event, data)
 			    MIP6_BUL_FSM_EVENT_STOP_RR, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -582,7 +585,7 @@ bul_reg_fsm(bul, event, data)
 			}
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -598,7 +601,7 @@ bul_reg_fsm(bul, event, data)
 			    MIP6_BUL_FSM_EVENT_STOP_RR, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -616,7 +619,7 @@ bul_reg_fsm(bul, event, data)
 			    MIP6_BUL_FSM_EVENT_STOP_RR, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -640,7 +643,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a binding upate "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -655,7 +658,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a binding upate "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -666,7 +669,7 @@ bul_reg_fsm(bul, event, data)
 				if (bul_fsm_back_register(bul, data)) {
 					syslog(LOG_ERR,
 					    "registering a binding update "
-					    "entry failed.\n");
+					    "entry failed.");
 					return (-1);
 				}
 
@@ -688,7 +691,7 @@ bul_reg_fsm(bul, event, data)
 			    MIP6_BUL_FSM_EVENT_STOP_RR, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -700,7 +703,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			REGFSMS = MIP6_BUL_REG_FSM_STATE_IDLE;
@@ -712,7 +715,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			error = bul_rr_fsm(bul,
@@ -724,7 +727,7 @@ bul_reg_fsm(bul, event, data)
 			}
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -737,7 +740,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			error = bul_rr_fsm(bul,
@@ -749,7 +752,7 @@ bul_reg_fsm(bul, event, data)
 			}
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -762,7 +765,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			bul_stop_retrans_timer(bul);
@@ -771,7 +774,7 @@ bul_reg_fsm(bul, event, data)
 			    MIP6_BUL_FSM_EVENT_STOP_RR, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -793,7 +796,7 @@ bul_reg_fsm(bul, event, data)
 			error = bul_fsm_back_preprocess(bul, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "processing a binding ack failed. in WAITA state\n");
+				    "processing a binding ack failed. in WAITA state");
 				/*
 				 * a binding update will be
 				 * retransmitted.
@@ -807,7 +810,7 @@ bul_reg_fsm(bul, event, data)
 			if (bul_fsm_back_register(bul, data)) {
 				syslog(LOG_ERR,
 				    "registering a binding update entry "
-				    "failed.\n");
+				    "failed.");
 				return (-1);
 			}
 
@@ -832,7 +835,7 @@ bul_reg_fsm(bul, event, data)
 			error = send_bu(bul);
 			if (error) {
 				syslog(LOG_ERR,
-				    "sending a binding update failed.\n");
+				    "sending a binding update failed.");
 				/* continue and try again. */
 			}
 
@@ -904,7 +907,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -922,7 +925,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -944,7 +947,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -993,7 +996,7 @@ bul_reg_fsm(bul, event, data)
 			if (bul_fsm_back_register(bul, data)) {
 				syslog(LOG_ERR,
 				    "registering a binding update entry "
-				    "failed.\n");
+				    "failed.");
 				return (-1);
 			}
 
@@ -1027,7 +1030,7 @@ bul_reg_fsm(bul, event, data)
 			error = send_bu(bul);
 			if (error) {
 				syslog(LOG_ERR,
-				    "sending a binding upate failed.\n");
+				    "sending a binding upate failed.");
 				/*
 				 * a binding update will be
 				 * retransmitted.
@@ -1051,7 +1054,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
@@ -1082,7 +1085,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			break;
@@ -1092,14 +1095,14 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
 				error = send_bu(bul);
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -1118,7 +1121,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -1132,13 +1135,13 @@ bul_reg_fsm(bul, event, data)
 				if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 					syslog(LOG_ERR,
 					    "removing bul entry from kernel "
-					    "failed.\n");
+					    "failed.");
 				}
 				error = send_bu(bul);
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 					return (error);
 				}
@@ -1170,7 +1173,7 @@ bul_reg_fsm(bul, event, data)
 			/* in MIP6_BUL_REG_FSM_STATE_WAITD */
 			if (bul_fsm_back_preprocess(bul, data)) {
 				syslog(LOG_ERR,
-				    "processing a binding ack failed in WAITD state.\n");
+				    "processing a binding ack failed in WAITD state.");
 				return (-1);
 			}
 #ifdef MIP_MCOA
@@ -1179,7 +1182,7 @@ bul_reg_fsm(bul, event, data)
 #endif /* MIP_MCOA */
 			if (bul_fsm_back_deregister(bul, data)) {
 				syslog(LOG_ERR,
-				    "returning home failed.\n");
+				    "returning home failed.");
 				return (-1);
 			}
 #ifdef MIP_MCOA
@@ -1194,7 +1197,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			/* keep a home registration entry for reuse. */
@@ -1225,7 +1228,7 @@ bul_reg_fsm(bul, event, data)
 			error = send_bu(bul);
 			if (error) {
 				syslog(LOG_ERR,
-				    "sending a binding upate failed.\n");
+				    "sending a binding upate failed.");
 				return (error);
 			}
 
@@ -1251,7 +1254,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			/* keep a home registration entry for reuse. */
@@ -1292,7 +1295,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -1318,7 +1321,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a binding update "
-					    "failed.\n");
+					    "failed.");
 					/* continue */
 				}
 
@@ -1333,14 +1336,14 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a binding upate "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
 				if (bul_fsm_back_deregister(bul, data)) {
 					syslog(LOG_ERR,
 					    "deregistering a binding update "
-					    "entry failed.\n");
+					    "entry failed.");
 					return (-1);
 				}
 
@@ -1352,7 +1355,7 @@ bul_reg_fsm(bul, event, data)
 				if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 					syslog(LOG_ERR,
 					    "removing bul entry from kernel "
-					    "failed.\n");
+					    "failed.");
 				}
 				bul_remove(bul);
 				bul = NULL;
@@ -1367,7 +1370,7 @@ bul_reg_fsm(bul, event, data)
 			    MIP6_BUL_FSM_EVENT_STOP_RR, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -1377,7 +1380,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 			bul_remove(bul);
 			bul = NULL;
@@ -1396,7 +1399,7 @@ bul_reg_fsm(bul, event, data)
 			}
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -1412,7 +1415,7 @@ bul_reg_fsm(bul, event, data)
 			    MIP6_BUL_FSM_EVENT_STOP_RR, data);
 			if (error) {
 				syslog(LOG_ERR,
-				    "second fsm state transition failed.\n");
+				    "second fsm state transition failed.");
 				return (error);
 			}
 
@@ -1422,7 +1425,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "updating a binding update entry "
-				    "in a kernel failed.\n");
+				    "in a kernel failed.");
 				return (-1);
 			}
 
@@ -1444,7 +1447,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			/* remove a binding update entry for CN. */
@@ -1464,7 +1467,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -1482,7 +1485,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -1496,13 +1499,13 @@ bul_reg_fsm(bul, event, data)
 				if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 					syslog(LOG_ERR,
 					    "removing bul entry from kernel "
-					    "failed.\n");
+					    "failed.");
 				}
 				error = send_bu(bul);
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -1533,7 +1536,7 @@ bul_reg_fsm(bul, event, data)
 			 */
 			if (bul_fsm_back_preprocess(bul, data)) {
 				syslog(LOG_ERR,
-				    "processing a binding ack failed.\n");
+				    "processing a binding ack failed.");
 				return (-1);
 			}
 
@@ -1549,7 +1552,7 @@ bul_reg_fsm(bul, event, data)
 				if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 					syslog(LOG_ERR,
 					    "removing bul entry from kernel "
-					    "failed.\n");
+					    "failed.");
 				}
 
 				bul_stop_retrans_timer(bul);
@@ -1559,7 +1562,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -1573,14 +1576,14 @@ bul_reg_fsm(bul, event, data)
 				if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 					syslog(LOG_ERR,
 					    "removing bul entry from kernel "
-					    "failed.\n");
+					    "failed.");
 				}
 
 				error = send_bu(bul);
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -1599,7 +1602,7 @@ bul_reg_fsm(bul, event, data)
 				if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 					syslog(LOG_ERR,
 					    "removing bul entry from kernel "
-					    "failed.\n");
+					    "failed.");
 				}
 
 				error = bul_rr_fsm(bul,
@@ -1607,7 +1610,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -1631,7 +1634,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "secondary fsm transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -1648,7 +1651,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "sending a home registration "
-					    "failed.\n");
+					    "failed.");
 					/* continue and try again. */
 				}
 
@@ -1666,7 +1669,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -1694,7 +1697,7 @@ bul_reg_fsm(bul, event, data)
 			if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 				syslog(LOG_ERR,
 				    "removing bul entry from kernel "
-				    "failed.\n");
+				    "failed.");
 			}
 
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
@@ -1713,7 +1716,7 @@ bul_reg_fsm(bul, event, data)
 				if (mipsock_bul_request(bul, MIPM_BUL_REMOVE)) {
 					syslog(LOG_ERR,
 					    "removing bul entry from kernel "
-					    "failed.\n");
+					    "failed.");
 				}
 
 				bul_stop_retrans_timer(bul);
@@ -1723,7 +1726,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 				error = bul_rr_fsm(bul,
@@ -1731,7 +1734,7 @@ bul_reg_fsm(bul, event, data)
 				if (error) {
 					syslog(LOG_ERR,
 					    "second fsm state transition "
-					    "failed.\n");
+					    "failed.");
 					return (error);
 				}
 
@@ -1768,12 +1771,12 @@ bul_reg_fsm(bul, event, data)
 				break;
 
 			memcpy(&bul->bul_peeraddr, &hal->hal_ip6addr, sizeof(struct in6_addr));
-			syslog(LOG_INFO, "%s peer addd--------> add\n", ip6_sprintf(&bul->bul_peeraddr));
+			syslog(LOG_INFO, "%s peer addd--------> add", ip6_sprintf(&bul->bul_peeraddr));
 			error = send_bu(bul);
 			if (error) {
 				syslog(LOG_ERR,
 				    "sending a home registration "
-				    "failed. (%d)\n", error);
+				    "failed. (%d)", error);
 				/* continue and try again. */
 			}
 
@@ -1791,7 +1794,7 @@ bul_reg_fsm(bul, event, data)
 				for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
 				     mbul = LIST_NEXT(mbul, bul_entry)) {
 		
-					syslog(LOG_INFO, "found multiple BULISTS in kick_fsm\n");
+					syslog(LOG_INFO, "found multiple BULISTS in kick_fsm");
 #if 1 /* XXX keiichi 2006.2.22 */
 					if (mbul->bul_reg_fsm_state !=
 					    MIP6_BUL_REG_FSM_STATE_DHAAD)
@@ -1803,7 +1806,7 @@ bul_reg_fsm(bul, event, data)
 					if (error) {
 						syslog(LOG_ERR,
 						       "sending a home registration "
-						       "failed. (%d)\n", error);
+						       "failed. (%d)", error);
 						/* continue and try again. */
 					}
 					
@@ -1941,7 +1944,7 @@ bul_rr_fsm(bul, event, fsmmsg)
 			if (bul_fsm_save_hot_info(bul,
 			    (struct ip6_mh_home_test *)(fsmmsg->fsmm_data))) {
 				syslog(LOG_ERR, "bul_rr_fsm: "
-				    "saving hot failed.\n");
+				    "saving hot failed.");
 				/* keep current state. */
 				break;
 			}
@@ -1958,7 +1961,7 @@ bul_rr_fsm(bul, event, fsmmsg)
 			if (bul_fsm_save_cot_info(bul,
 			    (struct ip6_mh_careof_test *)(fsmmsg->fsmm_data))) {
 				syslog(LOG_ERR, "bul_rr_fsm: "
-				    "saving cot failed.\n");
+				    "saving cot failed.");
 				/* keep current state. */
 				break;
 			}
@@ -2013,7 +2016,7 @@ bul_rr_fsm(bul, event, fsmmsg)
 			if (bul_fsm_save_hot_info(bul,
 			    (struct ip6_mh_home_test *)(fsmmsg->fsmm_data))) {
 				syslog(LOG_ERR, "bul_rr_fsm: "
-				    "saving hot failed.\n");
+				    "saving hot failed.");
 				/* keep current state. */
 				break;
 			}
@@ -2023,7 +2026,7 @@ bul_rr_fsm(bul, event, fsmmsg)
 			    fsmmsg);
 			if (error) {
 				syslog(LOG_ERR,
-				    "primary fsm state transition failed.\n");
+				    "primary fsm state transition failed.");
 				return (error);
 			}
 
@@ -2073,7 +2076,7 @@ bul_rr_fsm(bul, event, fsmmsg)
 			if (bul_fsm_save_cot_info(bul,
 			    (struct ip6_mh_careof_test *)(fsmmsg->fsmm_data))) {
 				syslog(LOG_ERR, "bul_rr_fsm: "
-				    "saving cot failed.\n");
+				    "saving cot failed.");
 				/* keep current state. */
 				break;
 			}
@@ -2083,7 +2086,7 @@ bul_rr_fsm(bul, event, fsmmsg)
 			    fsmmsg);
 			if (error) {
 				syslog(LOG_ERR,
-				    "primary fsm state transition failed.\n");
+				    "primary fsm state transition failed.");
 				return (error);
 			}
 
@@ -2140,7 +2143,7 @@ bul_fsm_save_hot_info(bul, ip6mhht)
 	if (memcmp((void *)ip6mhht->ip6mhht_cookie,
 	    (void *)bul->bul_home_cookie, sizeof(mip6_cookie_t)) != 0) {
 		syslog(LOG_INFO, "bul_fsm_save_hot_info: "
-		    "the cookie doesn't match.\n");
+		    "the cookie doesn't match.");
 		return (-1);
 	}
 	bul->bul_home_nonce_index = htons(ip6mhht->ip6mhht_nonce_index);
@@ -2161,7 +2164,7 @@ bul_fsm_save_cot_info(bul, ip6mhct)
 	if (memcmp((void *)ip6mhct->ip6mhct_cookie,
 	    (void *)bul->bul_careof_cookie, sizeof(mip6_cookie_t)) != 0) {
 		syslog(LOG_INFO, "bul_fsm_save_cot_info: "
-		    "the cookie doesn't match.\n");
+		    "the cookie doesn't match.");
 		return (-1);
 	}
 	bul->bul_careof_nonce_index = htons(ip6mhct->ip6mhct_nonce_index);
@@ -2198,36 +2201,36 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		    ntohs(ip6mhba->ip6mhba_lifetime), ip6mhba->ip6mhba_status);
 	}
 	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_SEQNO_BAD) {
-                /*
-                 * our home agent has a greater sequence number in its
-                 * binging cache entriy of mine.  we should resent
-                 * binding update with greater than the sequence
-                 * number of the binding cache already exists in our
-                 * home agent.  this binding ack is valid though the
-                 * sequence number doesn't match.
-                 */
+		/*
+		 * our home agent has a greater sequence number in its
+		 * binging cache entriy of mine.  we should resent
+		 * binding update with greater than the sequence
+		 * number of the binding cache already exists in our
+		 * home agent.  this binding ack is valid though the
+		 * sequence number doesn't match.
+		 */
 		/* XXX should be in fsm? */
 		syslog(LOG_ERR,
-		    "sequence number is too small.\n");
+		       "sequence number is too small. Rcv:%u Expect:%u",
+		       seqno, bul->bul_seqno);
 		bul->bul_seqno = seqno + 1;
 
 		if (send_bu(bul)) {
 			syslog(LOG_ERR,
-			    "sending a binding update failed.\n");
+			    "sending a binding update failed.");
 		}
 		bul->bul_retrans_time = initial_bindack_timeout_first_reg;
 		bul_set_retrans_timer(bul, bul->bul_retrans_time);
 		/* keep current state. */
 		
 		return (-1); /* XXX */
-
 	} else if (seqno != bul->bul_seqno) {
-                syslog(LOG_NOTICE,
-		    "unmached sequence no (%d recv, %d sent) from.\n",
-		    seqno, bul->bul_seqno);
-                /* silently ignore. */
+		syslog(LOG_NOTICE,
+		       "unmached sequence no (%d recv, %d sent) from.",
+		       seqno, bul->bul_seqno);
+		/* silently ignore. */
 		mip6stat.mip6s_seqno++;
-                return (-1);
+		return (-1);
 	}
 
 	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_NOT_HA) {
@@ -2248,7 +2251,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	    && ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
 		struct nemo_mptable *mpt;
 
-                mpt = LIST_FIRST(&bul->bul_hoainfo->hinfo_mpt_head);
+		mpt = LIST_FIRST(&bul->bul_hoainfo->hinfo_mpt_head);
 		if (mpt == NULL) {
 			/* something wrong */
 			return (-1);
@@ -2291,7 +2294,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	if (ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
 		syslog(LOG_NOTICE,
 		    "bul_fsm_back_preprocess:"
-		    "received an error status %d.\n",
+		    "received an error status %d.",
 		    ip6mhba->ip6mhba_status);
 #if 0 /* XXX 2006.2.22 keiichi */
 		bul_fsm_try_other_home_agent(bul);
@@ -2303,7 +2306,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	if (get_mobility_options((struct ip6_mh *)ip6mhba, 
 		 sizeof(*ip6mhba), ip6mhbalen, &mopt)) {
 		mip6stat.mip6s_invalidopt++;
-		syslog(LOG_ERR, "bad mobility option in BACK.\n");
+		syslog(LOG_ERR, "bad mobility option in BACK.");
 		return (-1);
 	}
 
@@ -2336,7 +2339,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		if (memcmp((caddr_t)mopt.opt_bauth + 2, &authenticator,
 			MIP6_AUTHENTICATOR_SIZE) != 0) {
 			syslog(LOG_ERR,
-			    "BACK authenticator mismatch.\n");
+			    "BACK authenticator mismatch.");
 			return (-1);
 		}
 	} else if (!(bul->bul_flags & IP6_MH_BU_HOME)) /* Not Home Registration */
@@ -2400,26 +2403,26 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 
 	/* Sending MPS for IP6_MH_BAS_PRFX_DISCOV */
 	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_PRFX_DISCOV) {
-                struct mip6_hoainfo *hoainfo = NULL;
-                struct mip6_hpfxl *hpfx = NULL;
+		struct mip6_hoainfo *hoainfo = NULL;
+		struct mip6_hpfxl *hpfx = NULL;
 		struct mip6_mipif *mif;
 
-                hoainfo = hoainfo_find_withhoa(&bul->bul_hoainfo->hinfo_hoa);
-                if (hoainfo == NULL)
-                        return (-1);
+		hoainfo = hoainfo_find_withhoa(&bul->bul_hoainfo->hinfo_hoa);
+		if (hoainfo == NULL)
+			return (-1);
 
-                mif = mnd_get_mipif(hoainfo->hinfo_ifindex);
-                if (mif == NULL)
-                        return (-1);
+		mif = mnd_get_mipif(hoainfo->hinfo_ifindex);
+		if (mif == NULL)
+			return (-1);
 
-                LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
+		LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
 			if (inet_are_prefix_equal(&bul->bul_peeraddr, &hpfx->hpfx_prefix, 64))
-                                break;
-                }
-                if (hpfx == NULL)
-                        return (-1);
+				break;
+		}
+		if (hpfx == NULL)
+			return (-1);
 
-                send_mps(hpfx);
+		send_mps(hpfx);
 	}
 
 	return (0);
@@ -2431,62 +2434,62 @@ dump_ba (src, dst, rtaddr, seq, lifetime, status)
 	u_int16_t seq, lifetime;
 	u_int8_t status;
 {
-        /* Dump Binding Acknowledge */
-        syslog(LOG_INFO, "\tBA Src   %s\n", ip6_sprintf(src));
-        syslog(LOG_INFO, "\tBA Dst   %s\n", ip6_sprintf(dst));
-        syslog(LOG_INFO, "\tBA Rtopt %s\n", rtaddr ? ip6_sprintf(rtaddr) : "(null)");
+	/* Dump Binding Acknowledge */
+	syslog(LOG_INFO, "\tBA Src   %s", ip6_sprintf(src));
+	syslog(LOG_INFO, "\tBA Dst   %s", ip6_sprintf(dst));
+	syslog(LOG_INFO, "\tBA Rtopt %s", rtaddr ? ip6_sprintf(rtaddr) : "(null)");
 
 
-        syslog(LOG_INFO, "\tBA Sequence No. %d\n", seq);
-        syslog(LOG_INFO, "\tBA Lifetime     %d\n", lifetime);
-		syslog(LOG_INFO, "\tBA Status: ");
-        switch (status) {
-        case IP6_MH_BAS_ACCEPTED:
-                syslog(LOG_INFO, "\tBinding Update accepted\n");
-                break;
-        case IP6_MH_BAS_PRFX_DISCOV:
-                syslog(LOG_INFO, "\tAccepted but prefix discovery necessary\n");
-                break;
-        case IP6_MH_BAS_UNSPECIFIED:
-                syslog(LOG_INFO, "\tReason unspecified");
-                break;
-        case IP6_MH_BAS_PROHIBIT:
-                syslog(LOG_INFO, "\tAdministratively prohibited\n");
-                break;
-        case IP6_MH_BAS_INSUFFICIENT:
-                syslog(LOG_INFO, "\tInsufficient resources\n");
-                break;
-        case IP6_MH_BAS_HA_NOT_SUPPORTED:
-                syslog(LOG_INFO, "\tHome registration not supported\n");
-                break;
-        case IP6_MH_BAS_NOT_HOME_SUBNET:
-                syslog(LOG_INFO, "\tNot home subnet\n"); 
-                break;
-        case IP6_MH_BAS_NOT_HA:
-                syslog(LOG_INFO, "\tNot home agent for this mobile node\n");
-                break;
-        case IP6_MH_BAS_DAD_FAILED:
-                syslog(LOG_INFO, "\tDuplicate Address Detection failed\n");
-                break;
-        case IP6_MH_BAS_SEQNO_BAD:
-                syslog(LOG_INFO, "\tSequence number out of window\n");
-                break;
-        case IP6_MH_BAS_HOME_NI_EXPIRED:
-                syslog(LOG_INFO, "\tExpired home nonce index\n");
-                break;
-        case IP6_MH_BAS_COA_NI_EXPIRED:
-                syslog(LOG_INFO, "\tExpired care-of nonce index\n");
-                break;
-        case IP6_MH_BAS_NI_EXPIRED:
-                syslog(LOG_INFO, "\tExpired nonces\n");
-                break;
-        case IP6_MH_BAS_REG_NOT_ALLOWED:
-                syslog(LOG_INFO, "\tRegistration type change disallowed\n");
-                break;
-        default:
-                syslog(LOG_INFO, "\tUnknown\n");
-                break;
-        }
+	syslog(LOG_INFO, "\tBA Sequence No. %d", seq);
+	syslog(LOG_INFO, "\tBA Lifetime     %d", lifetime);
+	syslog(LOG_INFO, "\tBA Status: ");
+	switch (status) {
+	case IP6_MH_BAS_ACCEPTED:
+		syslog(LOG_INFO, "\tBinding Update accepted");
+		break;
+	case IP6_MH_BAS_PRFX_DISCOV:
+		syslog(LOG_INFO, "\tAccepted but prefix discovery necessary");
+		break;
+	case IP6_MH_BAS_UNSPECIFIED:
+		syslog(LOG_INFO, "\tReason unspecified");
+		break;
+	case IP6_MH_BAS_PROHIBIT:
+		syslog(LOG_INFO, "\tAdministratively prohibited");
+		break;
+	case IP6_MH_BAS_INSUFFICIENT:
+		syslog(LOG_INFO, "\tInsufficient resources");
+		break;
+	case IP6_MH_BAS_HA_NOT_SUPPORTED:
+		syslog(LOG_INFO, "\tHome registration not supported");
+		break;
+	case IP6_MH_BAS_NOT_HOME_SUBNET:
+		syslog(LOG_INFO, "\tNot home subnet");
+		break;
+	case IP6_MH_BAS_NOT_HA:
+		syslog(LOG_INFO, "\tNot home agent for this mobile node");
+		break;
+	case IP6_MH_BAS_DAD_FAILED:
+		syslog(LOG_INFO, "\tDuplicate Address Detection failed");
+		break;
+	case IP6_MH_BAS_SEQNO_BAD:
+		syslog(LOG_INFO, "\tSequence number out of window");
+		break;
+	case IP6_MH_BAS_HOME_NI_EXPIRED:
+		syslog(LOG_INFO, "\tExpired home nonce index");
+		break;
+	case IP6_MH_BAS_COA_NI_EXPIRED:
+		syslog(LOG_INFO, "\tExpired care-of nonce index");
+		break;
+	case IP6_MH_BAS_NI_EXPIRED:
+		syslog(LOG_INFO, "\tExpired nonces");
+		break;
+	case IP6_MH_BAS_REG_NOT_ALLOWED:
+		syslog(LOG_INFO, "\tRegistration type change disallowed");
+		break;
+	default:
+		syslog(LOG_INFO, "\tUnknown");
+		break;
+	}
 }
 
 static int
@@ -2497,7 +2500,7 @@ bul_fsm_back_register(bul, data)
 	
 	if (bul->bul_lifetime == 0) {
 		syslog(LOG_WARNING,
-		    "lifetime is zero.\n");
+		    "lifetime is zero.");
 		/* XXX ignored */
 #ifdef TODO
 		/* removed BUL from the kernel ?! */
@@ -2506,8 +2509,8 @@ bul_fsm_back_register(bul, data)
 
 	/* inject binding information to kernel. */
 	if (mipsock_bul_request(bul, MIPM_BUL_ADD)) {
-		syslog(LOG_ERR, "updating a binding update entry in a kernel "
-		    "failed.\n");
+		syslog(LOG_ERR,
+		       "updating a binding update entry in a kernel failed.");
 		return (-1);
 	}
 
@@ -2516,7 +2519,7 @@ bul_fsm_back_register(bul, data)
 	error = mip6_bu_list_notify_binding_change(sc, 0);
 	if (error) {
 		syslog(LOG_ERR,
-		    "updating the bining cache entries of all CNs failed.\n");
+		    "updating the bining cache entries of all CNs failed.");
 		return (error);
 	}
 #endif
@@ -2536,7 +2539,7 @@ bul_fsm_back_deregister(bul, data)
 	if (set_ip6addr(homeifname, &bul->bul_hoainfo->hinfo_hoa, 64,
 		IN6_IFF_NODAD|IN6_IFF_HOME)) {
 		syslog(LOG_ERR,
-		    "removing IFF_DEREGISTERING flag failed.\n");
+		    "removing IFF_DEREGISTERING flag failed.");
 	}
 
 	if (bul->bul_flags & IP6_MH_BU_HOME) {
@@ -2563,7 +2566,7 @@ bul_fsm_back_deregister(bul, data)
 		/* XXX scope? how? */
 		if ((ifa = ifa_ifwithaddr((struct sockaddr *)&coa_sa)) == NULL) {
 			mip6log((LOG_ERR,
-				    "%s:%d: can't find CoA interface\n",
+				    "%s:%d: can't find CoA interface",
 				    __FILE__, __LINE__));
 			m_freem(m);
 			return (EINVAL);	/* XXX */
@@ -2577,7 +2580,7 @@ bul_fsm_back_deregister(bul, data)
 			&daddr.sin6_scope_id)) {
 			/* XXX: should not happen */
 			mip6log((LOG_ERR,
-				    "%s:%d: in6_addr2zoneid failed\n",
+				    "%s:%d: in6_addr2zoneid failed",
 				    __FILE__, __LINE__));
 			m_freem(m);
 			return (EIO);
@@ -2585,7 +2588,7 @@ bul_fsm_back_deregister(bul, data)
 		if ((error = in6_embedscope(&daddr.sin6_addr, &daddr))) {
 			/* XXX: should not happen */
 			mip6log((LOG_ERR,
-				    "%s:%d: in6_embedscope failed\n",
+				    "%s:%d: in6_embedscope failed",
 				    __FILE__, __LINE__));
 			m_freem(m);
 			return (error);
@@ -2594,7 +2597,7 @@ bul_fsm_back_deregister(bul, data)
 		nd6_na_output(ifa->ifa_ifp, &daddr.sin6_addr,
 		    &mbu->mbu_haddr, ND_NA_FLAG_OVERRIDE, 1, NULL);
 		mip6log((LOG_INFO,
-			    "%s:%d: send a unsolicited na for %s\n",
+			    "%s:%d: send a unsolicited na for %s",
 			    __FILE__, __LINE__,
 			    ip6_sprintf(&mbu->mbu_haddr)));
 	}
@@ -2620,7 +2623,7 @@ bul_fsm_back_deregister(bul, data)
 			&lladdr.sin6_scope_id)) {
 			/* XXX: should not happen */
 			mip6log((LOG_ERR,
-				    "%s:%d: in6_addr2zoneid failed\n",
+				    "%s:%d: in6_addr2zoneid failed",
 				    __FILE__, __LINE__));
 			m_freem(m);
 			return (EIO);
@@ -2629,7 +2632,7 @@ bul_fsm_back_deregister(bul, data)
 			 &lladdr))) {
 			/* XXX: should not happen */
 			mip6log((LOG_ERR,
-				    "%s:%d: in6_embedscope failed\n",
+				    "%s:%d: in6_embedscope failed",
 				    __FILE__, __LINE__));
 			m_freem(m);
 			return (error);
@@ -2640,7 +2643,7 @@ bul_fsm_back_deregister(bul, data)
 		    NULL);
 
 		mip6log((LOG_INFO,
-			    "%s:%d: send a unsolicited na for %s\n",
+			    "%s:%d: send a unsolicited na for %s",
 			    __FILE__, __LINE__,
 			    ip6_sprintf(&lladdr.sin6_addr)));
 	}
@@ -2650,7 +2653,7 @@ bul_fsm_back_deregister(bul, data)
 		error = mip6_bu_list_notify_binding_change(sc, 1);
 		if (error) {
 			mip6log((LOG_ERR,
-				    "%s:%d: removing the bining cache entries of all CNs failed.\n",
+				    "%s:%d: removing the bining cache entries of all CNs failed.",
 				    __FILE__, __LINE__));
 			m_freem(m);
 			return (error);
@@ -2664,7 +2667,7 @@ bul_fsm_back_deregister(bul, data)
 	error = mip6_bu_list_remove_all(&sc->hif_bu_list, 0);
 	if (error) {
 		mip6log((LOG_ERR,
-			    "%s:%d: BU remove all failed.\n",
+			    "%s:%d: BU remove all failed.",
 			    __FILE__, __LINE__));
 		m_freem(m);
 		return (error);
@@ -2712,7 +2715,7 @@ bul_fsm_try_other_home_agent(bul)
 		if (error) {
 		    syslog(LOG_ERR,
 			"sending a home registration "
-			"failed. (%d)\n", error);
+			"failed. (%d)", error);
 			/* continue and try again. */
 		}
 
@@ -2803,16 +2806,6 @@ bul_send_unsolicited_na(bul)
 }
 
 static void
-bul_set_retrans_timer(bul, tick)
-	struct binding_update_list *bul;
-	int tick;
-{
-	remove_callout_entry(bul->bul_retrans);
-	bul->bul_retrans = new_callout_entry(tick, bul_retrans_timer,
-	    (void *)bul, "bul_retrans_timer");
-}
-
-static void
 bul_stop_retrans_timer(bul)
 	struct binding_update_list *bul;
 {
@@ -2829,17 +2822,7 @@ bul_retrans_timer(arg)
 
 	error = bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_RETRANS_TIMER, NULL);
 	if (error == 1)
-		syslog(LOG_INFO, "a binding update entry is removed.\n");
-}
-
-static void
-bul_set_expire_timer(bul, tick)
-	struct binding_update_list *bul;
-	int tick;
-{
-	remove_callout_entry(bul->bul_expire);
-	bul->bul_expire = new_callout_entry(tick, bul_expire_timer,
-	    (void *)bul, "bul_expire_timer");
+		syslog(LOG_INFO, "a binding update entry is removed.");
 }
 
 static void
@@ -2859,7 +2842,7 @@ bul_expire_timer(arg)
 
 	bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_EXPIRE_TIMER, NULL);
 	if (error == 1)
-		syslog(LOG_INFO, "a binding update entry is removed.\n");
+		syslog(LOG_INFO, "a binding update entry is removed.");
 }
 
 static void
