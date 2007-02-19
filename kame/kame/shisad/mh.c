@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.60 2007/01/14 05:56:42 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.61 2007/02/19 08:13:04 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1569,11 +1569,6 @@ send_bu(bul)
 			}
 
 			/* create tunnel */
-# if 0
-/* DON'T LEAVE SUCH ADHOC CODE ONLY FOR YOUR SPECIFIC DEBUGGING ENVIRONMENT SO LONG TIME */
-system("ifconfig nemo0 tunnel 203.178.128.64 203.178.128.50 up");
-#endif
-
 			error = v4_sendmessage((char *)bufp, buflen, 0,
 					&bul->bul_peeraddr, &bul->bul_coa,
 					&hal->hal_ip6addr,
@@ -1631,11 +1626,11 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		hoa = coa;
 
 	/* section 9.5.4 if hoa is not unicast global, BA should not be sent */
-        if (hoa && (IN6_IS_ADDR_LINKLOCAL(hoa)
-            || IN6_IS_ADDR_MULTICAST(hoa)
-            || IN6_IS_ADDR_LOOPBACK(hoa)
-            || IN6_IS_ADDR_V4MAPPED(hoa)
-            || IN6_IS_ADDR_UNSPECIFIED(hoa)))
+	if (hoa && (IN6_IS_ADDR_LINKLOCAL(hoa)
+		    || IN6_IS_ADDR_MULTICAST(hoa)
+		    || IN6_IS_ADDR_LOOPBACK(hoa)
+		    || IN6_IS_ADDR_V4MAPPED(hoa)
+		    || IN6_IS_ADDR_UNSPECIFIED(hoa)))
 		return (EINVAL);
 
 	memset(buf, 0, sizeof(buf));
@@ -1675,7 +1670,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 		buflen += pad;
 
 		memset(&bid_opt, 0, sizeof(bid_opt));
-                
+		
 		bid_opt.ip6mobid_type = IP6_MHOPT_BID;
 		bid_opt.ip6mobid_len = 4;
 		bid_opt.ip6mobid_bid = htons(bid);
@@ -1902,42 +1897,42 @@ checksum_p(src, dst, addr, len, nxt)
 	u_int16_t *src, *dst, *addr;
 	int len, nxt;
 {
-        int sum;
-        u_int16_t s;
+	int sum;
+	u_int16_t s;
 
 	if (src == NULL || dst == NULL || addr == NULL)
 		return (-1);
 
-        sum = 0;
+	sum = 0;
 
-        /* add pseudo ip header */
-        s = 8;
-        while (s--) {
-                sum += *src++;
-                sum += *dst++;
-        }
+	/* add pseudo ip header */
+	s = 8;
+	while (s--) {
+		sum += *src++;
+		sum += *dst++;
+	}
 
-        sum += htons(len >> 16);
-        sum += htons(len & 0xffff);
-        sum += htons(nxt);
+	sum += htons(len >> 16);
+	sum += htons(len & 0xffff);
+	sum += htons(nxt);
 
-        /* add payload data */
-        while (len > 1) {
-                sum += *addr++;
-                len -= 2;
-        }
+	/* add payload data */
+	while (len > 1) {
+		sum += *addr++;
+		len -= 2;
+	}
 
-        if (len) {
-                s = 0;
-                *(unsigned char *)(&s) = *(unsigned char *)addr;
-                sum += s;
-        }
+	if (len) {
+		s = 0;
+		*(unsigned char *)(&s) = *(unsigned char *)addr;
+		sum += s;
+	}
 
-        /* add overflow counts */
-        while (sum >> 16)
-                sum  = (sum >> 16) + (sum & 0xffff);
+	/* add overflow counts */
+	while (sum >> 16)
+		sum  = (sum >> 16) + (sum & 0xffff);
 
-        return (~sum);
+	return (~sum);
 }
 
 
@@ -1957,9 +1952,9 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 	struct cmsghdr  *cmsgptr = NULL;
 	register struct in6_pktinfo *pi;
 	struct ip6_opt_home_address *hoadst;
-        struct ip6_rthdr2 *rtopt = NULL;
+	struct ip6_rthdr2 *rtopt = NULL;
 	struct ip6_dest *dest;
-        char adata [1024];
+	char adata [1024];
 #if defined(MIP_MN)
 	struct sockaddr_in6 *ar_sin6 = NULL, ar_sin6_orig;
 #endif
@@ -1992,8 +1987,8 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 				CMSG_SPACE(sizeof(struct sockaddr_in6));
 	}
 #endif /* MIP_MN */
-        iov.iov_base = mhdata;
-        iov.iov_len = mhdatalen;
+	iov.iov_base = mhdata;
+	iov.iov_len = mhdatalen;
 	
 	/* Packet Information i.e. Source Address */
 	cmsgptr = CMSG_FIRSTHDR(&msg);
@@ -2148,8 +2143,8 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 				sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
 	}
 
-        /* Routing Header */
-        if (rtaddr) { 
+	/* Routing Header */
+	if (rtaddr) { 
 		ip6->ip6_nxt = IPPROTO_ROUTING;
 
 		rtopt = (struct ip6_rthdr2 *)(ip6 + 1);
@@ -2160,7 +2155,7 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 		rtopt->ip6r2_reserved = 0;
 		memcpy((rtopt + 1), rtaddr, sizeof(struct in6_addr));
 		buflen += sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr);
-        }
+	}
 
 	memcpy(buf+buflen, mhdata, mhdatalen);
 	buflen += mhdatalen;
@@ -2242,8 +2237,8 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 				sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
 	}
 
-        /* Routing Header */
-        if (rtaddr) { 
+	/* Routing Header */
+	if (rtaddr) { 
 		ip6->ip6_nxt = IPPROTO_ROUTING;
 
 		rtopt = (struct ip6_rthdr2 *)(ip6 + 1);
@@ -2254,7 +2249,7 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 		rtopt->ip6r2_reserved = 0;
 		memcpy((rtopt + 1), rtaddr, sizeof(struct in6_addr));
 		buflen += sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr);
-        }
+	}
 
 	memcpy(buf+buflen, mhdata, mhdatalen);
 	buflen += mhdatalen;

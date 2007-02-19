@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.11 2007/02/18 18:09:57 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.12 2007/02/19 08:13:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -201,7 +201,7 @@ remove_callout_entry(ch)
 	/* There are no necessary to reschedule the expiration. */
 }
 
-void
+int
 update_callout_entry(ch, sec)
 	CALLOUT_HANDLE ch;
 	int sec;
@@ -209,7 +209,7 @@ update_callout_entry(ch, sec)
 	struct callout_queue_t *cq;
 
 	if (sec == 0)
-		return;
+		return (-1);
 
 	/* This is the very simplest way. there must be 
 	   more efficient ways */
@@ -218,12 +218,14 @@ update_callout_entry(ch, sec)
 			break;
 	}
 	if (cq == NULL)
-		return;
+		return (0);
 
 	TAILQ_REMOVE(&callout_head, ch, callout_entry);
 	gettimeofday(&ch->exptime, NULL);
 	ch->exptime.tv_sec += sec;
 	insert_callout_queue(ch);
+
+	return (1);
 }
 
 int
@@ -255,35 +257,35 @@ show_callout_table(s, line)
 {
 	struct timeval current_time, t;
 	struct callout_queue_t *cq;
-	struct tm *ctm;
+	struct tm ctm;
 	
 	gettimeofday(&current_time, NULL);
-	ctm = localtime((time_t *)&current_time.tv_sec);
+	localtime_r((time_t *)&current_time.tv_sec, &ctm);
 	
 	TAILQ_FOREACH(cq, &callout_head, callout_entry) {
-		struct tm *etm;
+		struct tm etm;
 		int dispday = 0;
 
-		etm = localtime((time_t *)&cq->exptime.tv_sec);
-		if (ctm->tm_year != etm->tm_year) {
-			command_printf(s, "%04d/", etm->tm_year + 1900);
+		localtime_r((time_t *)&cq->exptime.tv_sec, &etm);
+		if (ctm.tm_year != etm.tm_year) {
+			command_printf(s, "%04d/", etm.tm_year + 1900);
 			dispday = 1;
 		}
-		if (dispday || (ctm->tm_mon != etm->tm_mon)) {
-			command_printf(s, "%02d/", etm->tm_mon);
+		if (dispday || (ctm.tm_mon != etm.tm_mon)) {
+			command_printf(s, "%02d/", etm.tm_mon);
 			dispday = 1;
 		}
-		if (dispday || (ctm->tm_mday != etm->tm_mday)) {
+		if (dispday || (ctm.tm_mday != etm.tm_mday)) {
 			if (!dispday)
-				command_printf(s, "+%02d ", etm->tm_mday - ctm->tm_mday);
+				command_printf(s, "+%02d ", etm.tm_mday - ctm.tm_mday);
 			else
-				command_printf(s, "%02d ", etm->tm_mday);
+				command_printf(s, "%02d ", etm.tm_mday);
 		}
 		
   		timersub(&cq->exptime, &current_time, &t);
 		command_printf(s, "%02d:%02d:%02d(%ld.%06lds) %s() for %p\n",
-			etm->tm_hour, etm->tm_min, etm->tm_sec,
-			t.tv_sec, t.tv_usec,
-			cq->funcname, cq->arg);
+			       etm.tm_hour, etm.tm_min, etm.tm_sec,
+			       t.tv_sec, t.tv_usec,
+			       cq->funcname, cq->arg);
 	}
 }

@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.28 2007/02/10 04:30:56 t-momose Exp $	*/
+/*	$Id: babymdd.c,v 1.29 2007/02/19 08:13:03 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -293,9 +293,13 @@ main (argc, argv)
 
 	while (1) {
 		if (force_mdreg) {
-			if (babyinfo.whereami == IAMFOREIGN)
-				baby_md_reg((struct sockaddr *)&babyinfo.coaif->coa,
-					    babyinfo.coaif->ifindex, babyinfo.coaif->bid); 
+			if (babyinfo.whereami == IAMFOREIGN) {
+				if (babyinfo.coaif == NULL)
+					syslog(LOG_ERR, "No CoA i/f available");
+				else
+					baby_md_reg((struct sockaddr *)&babyinfo.coaif->coa,
+						    babyinfo.coaif->ifindex, babyinfo.coaif->bid);
+			}
 			force_mdreg = 0;
 		}
 		FD_ZERO(&fds);

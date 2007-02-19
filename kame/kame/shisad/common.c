@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.36 2007/02/17 13:09:26 t-momose Exp $	*/
+/*	$KAME: common.c,v 1.37 2007/02/19 08:13:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -529,7 +529,8 @@ icmp6_input_common(fd)
                  * determin which BU is failed or not. so remove all
                  * BU entries anyway 
 		 */
-		syslog(LOG_ERR, "ICMP6 error: hoa=%s peer=%s",
+		syslog(LOG_ERR, "ICMP6 error: type:%02x cod:%02x hoa=%s peer=%s",
+		       icp->icmp6_type, icp->icmp6_code,
 		       ip6_sprintf(&dst), ip6_sprintf(peer));
 		bul = bul_get(&dst, peer);
 		if (bul == NULL)

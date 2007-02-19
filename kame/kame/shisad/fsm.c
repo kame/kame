@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.44 2007/02/18 18:09:57 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.45 2007/02/19 08:13:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -92,9 +92,21 @@ static void bul_stop_retrans_timer(struct binding_update_list *);
 static void bul_stop_timers(struct binding_update_list *);
 
 #define bul_set_retrans_timer(bul, tick)	\
-	update_callout_entry((bul)->bul_retrans, (tick))
+	do {								\
+		if (update_callout_entry((bul)->bul_retrans, (tick)) == 0) { \
+			(bul)->bul_retrans = 				\
+				new_callout_entry((tick), bul_retrans_timer, \
+						  (void *)(bul), "bul_retrans_timer"); \
+		}							\
+	} while (/*CONTSTCOND*/0)
 #define bul_set_expire_timer(bul, tick)		\
-	update_callout_entry((bul)->bul_expire, (tick))
+	do {								\
+		if (update_callout_entry((bul)->bul_expire, (tick)) == 0) { \
+			(bul)->bul_expire =	\
+				new_callout_entry((tick), bul_expire_timer, \
+						  (void *)(bul), "bul_expire_timer"); \
+		}							\
+	} while (/*CONTSTCOND*/0)
 
 /*
  * return value:

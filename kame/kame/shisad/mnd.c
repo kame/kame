@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.50 2007/02/13 02:32:41 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.51 2007/02/19 08:13:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1348,6 +1348,9 @@ hpfxlist_set_expire_timer(hpfx, tick)
 	remove_callout_entry(hpfx->hpfx_retrans);
 	hpfx->hpfx_retrans = new_callout_entry(tick, hpfxlist_expire_timer,
 					       (void *)hpfx, "hpfxlist_expire_timer");
+	if (hpfx->hpfx_retrans == NULL) {
+		syslog(LOG_ERR, "hpfxlist_set_expire_time() was failed (tick = %d)", tick);
+	}
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$KAME: callout.h,v 1.6 2006/09/29 08:00:51 t-momose Exp $	*/
+/*	$KAME: callout.h,v 1.7 2007/02/19 08:13:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -51,7 +51,7 @@ void shisad_callout_init(void);
 void callout_expire_check(void);
 CALLOUT_HANDLE new_callout_entry(int, void (*)(void *), void *, char *);
 void remove_callout_entry(CALLOUT_HANDLE ch);
-void update_callout_entry(CALLOUT_HANDLE ch, int);
+int update_callout_entry(CALLOUT_HANDLE ch, int);
 int get_next_timeout(void);
 void show_callout_table(int, char *);
 
