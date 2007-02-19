@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.45 2007/02/19 08:13:04 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.46 2007/02/19 09:07:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -90,6 +90,7 @@ static void bul_print_all(void);
 static int bul_send_unsolicited_na(struct binding_update_list *);
 static void bul_stop_retrans_timer(struct binding_update_list *);
 static void bul_stop_timers(struct binding_update_list *);
+static void bul_stop_expire_timer(struct binding_update_list *);
 
 #define bul_set_retrans_timer(bul, tick)	\
 	do {								\
