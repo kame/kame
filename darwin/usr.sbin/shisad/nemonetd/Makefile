@@ -30,7 +30,7 @@ PROG=	nemonetd
 SRCS=	nemo_netconfig.c network.c util.c
 SRCS+=	config.c cfparse.y cftoken.l
 #CFLAGS+= -g -Wall -Werror  -DMIP_NEMO -DMIP_MCOA
-CFLAGS+= -g -Wall -Werror  -DMIP_NEMO
+CFLAGS+= -g -Wall -Werror  -DMIP_NEMO -DMIP_NO_MTUN
 CFLAGS+= -I../../../xnu/bsd -I${.OBJDIR} -I${SRCDIR}
 
 #LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \

@@ -28,11 +28,11 @@ SRCDIR=	${.CURDIR}/../../../kame/shisad
 
 PROG=	babymdd
 SRCS=	babymdd.c network.c util.c
-CFLAGS+= -g -Wall -Werror -DMIP6_MN
+CFLAGS+= -g -Wall -Werror -DMIP6_MN -DMIP_NO_MTUN
 CFLAGS+= -I../../../xnu/bsd -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6
-	
+
 
 #MAN8=	babymdd.8
 MAN8=

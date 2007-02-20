@@ -30,7 +30,7 @@ PROG=	had
 SRCS=	had.c  callout.c common.c  mh.c hal.c \
 	binding.c fdlist.c command.c network.c nemo_var.c util.c
 SRCS+=	config.c cfparse.y cftoken.l
-CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA
+CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA -DMIP_NO_MTUN
 #CFLAGS+= -g -Wall -Werror -DTEST -DMIP_HA -DMIP_NEMO  -DMIP_MCOA
 CFLAGS+= -I../../../xnu/bsd -I${.OBJDIR} -I${SRCDIR}
 
