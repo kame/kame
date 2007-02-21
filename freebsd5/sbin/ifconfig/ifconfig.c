@@ -70,6 +70,10 @@ static const char rcsid[] =
 #include <net/if_ist.h>
 #endif
 
+#ifdef MIP6
+#include <net/if_nemo.h>
+#endif
+
 #ifndef NO_IPX
 /* IPX */
 #define	IPXIP
@@ -170,13 +174,15 @@ typedef	void c_func2(const char *arg, const char *arg2, int s, const struct afsw
 c_func	setatphase, setatrange;
 c_func	setifaddr, setifbroadaddr, setifdstaddr, setifnetmask;
 c_func2	settunnel;
-c_func	setnexthop;
 c_func	deletetunnel;
 #ifdef IFT_IST
 c_func	setisataprouter;
 c_func	deleteisataprouter;
 #endif
+#ifdef MIP6
+c_func	setnexthop;
 c_func	deletenexthop;
+#endif
 #ifdef INET6
 c_func	setifprefixlen;
 c_func	setip6flags;
@@ -254,8 +260,10 @@ struct	cmd {
 	{ "isataprtr",	NEXTARG,	setisataprouter },
 	{ "deleteisataprtr", NEXTARG,	deleteisataprouter },
 #endif
+#ifdef MIP6
 	{ "nexthop",	NEXTARG,	setnexthop },
 	{ "deletenexthop", 0,		deletenexthop },
+#endif
 	{ "link0",	IFF_LINK0,	setifflags },
 	{ "-link0",	-IFF_LINK0,	setifflags },
 	{ "link1",	IFF_LINK1,	setifflags },
@@ -876,6 +884,16 @@ settunnel(const char *src, const char *dst, int s, const struct afswtch *afp)
 	freeaddrinfo(dstres);
 }
 
+/* ARGSUSED */
+void
+deletetunnel(const char *vname, int param, int s, const struct afswtch *afp)
+{
+
+	if (ioctl(s, SIOCDIFPHYADDR, &ifr) < 0)
+		err(1, "SIOCDIFPHYADDR");
+}
+
+#ifdef MIP6
 /*ARGSUSED*/
 void
 setnexthop(addr, param, s, afp)
@@ -930,15 +948,6 @@ setnexthop(addr, param, s, afp)
 
 /* ARGSUSED */
 void
-deletetunnel(const char *vname, int param, int s, const struct afswtch *afp)
-{
-
-	if (ioctl(s, SIOCDIFPHYADDR, &ifr) < 0)
-		err(1, "SIOCDIFPHYADDR");
-}
-
-/* ARGSUSED */
-void
 deletenexthop(vname, param, s, afp)
 	const char *vname;
 	int param;
@@ -948,6 +957,7 @@ deletenexthop(vname, param, s, afp)
 	if (ioctl(s, SIOCDIFPHYNEXTHOP, &ifr) < 0)
 		err(1, "SIOCDIFPHYNEXTHOP");
 }
+#endif
 
 #ifdef IFT_IST
 void
