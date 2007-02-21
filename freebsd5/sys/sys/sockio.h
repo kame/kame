@@ -135,9 +135,6 @@
 #define	SIOCGLIFPHYADDR	_IOWR('i', 75, struct if_laddrreq) /* get gif addrs */
 #define	SIOCGSTFMODE	_IOWR('i', 76, struct ifreq)	/* get stf mode */
 #define	SIOCSSTFMODE	 _IOW('i', 77, struct ifreq)	/* set stf mode */
-#define	SIOCSIFPHYNEXTHOP   _IOW('i', 78, struct ifreq) /* set gif nexthop addres */
-#define	SIOCDIFPHYNEXTHOP   _IOW('i', 79, struct ifreq) /* delete gif nexthop addres */
-#define	SIOCGIFPHYNEXTHOP	_IOWR('i', 80, struct ifreq)	/* get gif nexthop addr */
 
 #define	SIOCGPRIVATE_0	_IOWR('i', 80, struct ifreq)	/* device private 0 */
 #define	SIOCGPRIVATE_1	_IOWR('i', 81, struct ifreq)	/* device private 1 */

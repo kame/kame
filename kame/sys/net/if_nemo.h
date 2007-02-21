@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.h,v 1.4 2006/12/12 10:27:04 mitsuya Exp $	*/
+/*	$KAME: if_nemo.h,v 1.5 2007/02/21 02:44:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,5 +129,9 @@ int nemo_encapcheck __P((const struct mbuf *, int, int, void *));
 #endif
 
 #endif /* !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE)) */
+
+#define SIOCSIFPHYNEXTHOP  _IOW('i', 78, struct ifreq) /* set nemo nxthop */
+#define SIOCDIFPHYNEXTHOP  _IOW('i', 79, struct ifreq) /* delete nemo nxthop */
+#define SIOCGIFPHYNEXTHOP _IOWR('i', 80, struct ifreq) /* get nemo nxthop */
 
 #endif /* _NET_IF_GIF_H_ */

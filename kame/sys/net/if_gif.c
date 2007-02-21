@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.116 2005/07/23 07:34:14 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.117 2007/02/21 02:44:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -908,54 +908,7 @@ gif_ioctl(ifp, cmd, data)
 	case SIOCSIFFLAGS:
 		/* if_ioctl() takes care of it */
 		break;
-#ifdef MIP6
-	case SIOCSIFPHYNEXTHOP: 
-	case SIOCSIFPHYNEXTHOP_IN6: {
-		struct sockaddr *nh = NULL;
-		int nhlen = 0;
 
-		switch (ifr->ifr_addr.sa_family) {
-#ifdef INET
-		case AF_INET:	/* IP supports Multicast */
-			error = EAFNOSUPPORT;
-			break;
-#endif /* INET */
-#ifdef INET6
-		case AF_INET6:	/* IP6 supports Multicast */
-			nh = (struct sockaddr *)
-				&(((struct in6_ifreq *)data)->ifr_addr);
-			nhlen = sizeof(((struct in6_ifreq *)data)->ifr_addr);
-			break;
-#endif /* INET6 */
-		default:  /* Other protocols doesn't support Multicast */
-			error = EAFNOSUPPORT;
-			break;
-		}
-
-		if (error)
-			return error;
-
-		/* if pointer is null, allocate memory */
-		if (sc->gif_nexthop == NULL) {
-			sc->gif_nexthop = (struct sockaddr *)malloc(nhlen, M_IFADDR, M_WAITOK);
-			if (sc->gif_nexthop == NULL)
-				return ENOMEM;
-
-			bzero(sc->gif_nexthop, nhlen);
-		}
-		/* set request address into gif_nexthop */
-		bcopy(nh, sc->gif_nexthop, nhlen);
-		error = sa6_embedscope(satosin6(sc->gif_nexthop), 0);
-		if (error != 0)
-			return (error);
-		break;
-	}
-	case SIOCDIFPHYNEXTHOP: 
-		/* if pointer is not null, free the memory */
-		if (sc->gif_nexthop) 
-			free(sc->gif_nexthop, M_IFADDR);
-		break;
-#endif
 	default:
 		error = EINVAL;
 		break;

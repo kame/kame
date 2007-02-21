@@ -135,9 +135,6 @@
 #define	SIOCGLIFPHYADDR	_IOWR('i', 75, struct if_laddrreq) /* get gif addrs */
 #define	SIOCGSTFMODE	_IOWR('i', 76, struct ifreq)	/* get stf mode */
 #define	SIOCSSTFMODE	 _IOW('i', 77, struct ifreq)	/* set stf mode */
-#define	SIOCSIFPHYNEXTHOP   _IOW('i', 78, struct ifreq) /* set gif addres */
-#define	SIOCDIFPHYNEXTHOP   _IOW('i', 79, struct ifreq) /* delete gif addres */
-#define	SIOCGIFPHYNEXTHOP   _IOW('i', 80, struct ifreq) /* get gif addres */
 
 #define	SIOCZIFDATA	_IOWR('i', 129, struct ifdatareq) /* get if_data then
 							     zero ctrs*/
