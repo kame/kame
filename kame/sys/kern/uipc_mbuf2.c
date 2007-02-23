@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.47 2005/04/14 06:22:37 suz Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.48 2007/02/23 17:50:22 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -387,9 +387,10 @@ m_dup1(m, off, len, wait)
 #ifdef __OpenBSD__
 		M_MOVE_PKTHDR(n, m);
 #elif defined(__FreeBSD__)
-		if (!m_dup_pkthdr(n, m))
+		if (!m_dup_pkthdr(n, m)) {
 			m_free(n);
 			return NULL;
+		}
 #endif
 	}
 	m_copydata(m, off, len, mtod(n, caddr_t));
