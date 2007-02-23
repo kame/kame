@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.48 2007/02/23 17:50:22 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.49 2007/02/23 18:09:54 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -81,7 +81,7 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 
-#ifndef __NetBSD__
+#ifdef __FreeBSD__
 /* can't call it m_dup(), as freebsd[34] uses m_dup() with different arg */
 static struct mbuf *m_dup1 __P((struct mbuf *, int, int, int));
 #endif
@@ -244,6 +244,8 @@ m_pulldown(m, off, len, offp)
 
 #ifdef __NetBSD__
 		o = m_dup(n, off, n->m_len - off, M_DONTWAIT);
+#elif defined(__OpenBSD__)
+		o = m_copym2(n, off, n->m_len - off, M_DONTWAIT);
 #else
 		o = m_dup1(n, off, n->m_len - off, M_DONTWAIT);
 #endif
@@ -350,7 +352,7 @@ ok:
 	return n;
 }
 
-#ifndef __NetBSD__
+#ifdef __FreeBSD__
 static struct mbuf *
 m_dup1(m, off, len, wait)
 	struct mbuf *m;
@@ -384,14 +386,10 @@ m_dup1(m, off, len, wait)
 		return NULL;
 
 	if (copyhdr) {
-#ifdef __OpenBSD__
-		M_MOVE_PKTHDR(n, m);
-#elif defined(__FreeBSD__)
 		if (!m_dup_pkthdr(n, m)) {
 			m_free(n);
 			return NULL;
 		}
-#endif
 	}
 	m_copydata(m, off, len, mtod(n, caddr_t));
 	n->m_len = len;
