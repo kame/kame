@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.45 2007/02/13 10:54:29 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.46 2007/02/27 01:44:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -115,6 +115,7 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define CND_CONFFILE	SYSCONFDIR "/cnd.conf"
 #define MND_CONFFILE	SYSCONFDIR "/mnd.conf"
 #define HAD_CONFFILE	SYSCONFDIR "/had.conf"
+#define IPSEC_CONFFILE	SYSCONFDIR "../../etc/racoon2.conf"
 
 #define MND_NORO_FILE 	"/etc/ro.deny"
 
@@ -259,9 +260,13 @@ struct binding_update_list {
 #ifdef AUTHID
 	u_int32_t	    bul_spi;
 #endif /* AUTHID */
+#ifdef IPSEC
+	void		    *bul_ipsec_data;
+#endif
 };
 
 #define MIP6_BUL_STATE_DISABLE    0x01
+#define MIP6_BUL_STATE_USEIPSEC   0x02
 
 /* 
  * it contains host information for which mnd does not run Route
@@ -431,6 +436,9 @@ struct binding_cache {
 	u_int16_t             bc_bid; /* Binding Unique Identifier */
 #endif /* MIP_MCOA */
 	u_int32_t	      bc_mobility_spi;
+#ifdef IPSEC
+	void		      *bc_ipsec_data;
+#endif
 };
 LIST_HEAD(binding_cache_head, binding_cache);
 
@@ -521,7 +529,7 @@ void mipsock_bc_request(struct binding_cache *, u_char);
 void mip6_dad_order(int, struct in6_addr *);
 #define mip6_dad_start(addr)	mip6_dad_order(MIPM_DAD_DO, addr)
 #define mip6_dad_stop(addr)	mip6_dad_order(MIPM_DAD_STOP, addr)
-void mip6_validate_bc(struct binding_cache *);
+int mip6_validate_bc(struct binding_cache *);
 void mip6_dad_done(int, struct in6_addr *);
 void command_show_bc(int, char *);
 void command_show_kbc(int, char *);
@@ -669,6 +677,31 @@ struct haauth_users *find_haauth_users(u_int32_t);
 struct haauth_users *find_haauth_users_with_hoa(struct in6_addr *);
 void command_show_authdata(int, char *);
 #endif /* AUTHID */
+
+/* ipsec.c */
+#ifdef IPSEC
+int ipsec_init(char *);
+void ipsec_clean(void);
+int sadb_socket(void);
+int sadb_poll(int);
+int spmif_socket(void);
+int spmif_poll(int);
+
+int use_ipsec(void);
+
+#ifdef MIP_HA
+int ipsec_bc_request(struct binding_cache *, int);
+void ipsec_bc_data_release(struct binding_cache *);
+#endif
+#ifdef MIP_MN
+/* I-D says ASAP but current implementation is after Binding Acknowledgment */
+#define MIPM_BUL_AFTER_BA	0x1000
+int ipsec_bul_request(struct binding_update_list *, int);
+void ipsec_bul_data_release(struct binding_update_list *);
+int bul_can_use_ipsec(struct binding_update_list *);
+#endif
+
+#endif
 
 /* other utility functions */
 int inet_are_prefix_equal(void *, void *, int);

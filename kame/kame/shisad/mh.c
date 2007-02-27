@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.61 2007/02/19 08:13:04 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.62 2007/02/27 01:44:12 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -278,7 +278,8 @@ mh_input_common(fd)
 				mip6stat.mip6s_hao++;
 				memcpy(&hoa, hoaopt->ip6oh_addr, sizeof(hoa));
 			} else {
-				/* Shisa Statistics: unverified Home Address Option */
+				/* Shisa Statistics:
+				   unverified Home Address Option */
 				mip6stat.mip6s_unverifiedhao++;
 			}
 		}
@@ -292,7 +293,8 @@ mh_input_common(fd)
 				/* Shisa Statistics: Routing Header type 2 */
 				mip6stat.mip6s_rthdr2++;
 
-				memcpy(&rtaddr, (rthdr2 + 1),sizeof(struct in6_addr));
+				memcpy(&rtaddr, rthdr2 + 1,
+				    sizeof(struct in6_addr));
 				rthdr_on = 1;
 			}
 		}
@@ -319,7 +321,8 @@ mh_input_common(fd)
 		int mhtype;
 		
 		if ((mhtype = mh->ip6mh_type) > IP6_MH_TYPE_MAX)
-			mhtype = IP6_MH_TYPE_MAX + 1; /* '+1' is for 'unknown mh type' message */
+			/* '+ 1' is for 'unknown mh type' message */
+			mhtype = IP6_MH_TYPE_MAX + 1;
 		syslog(LOG_INFO, "%s is received", mh_name[mhtype]);
 		syslog(LOG_INFO, "  from:[%s] -> dst:[%s]",
 		       ip6_sprintf(&from.sin6_addr), ip6_sprintf(&dst));
@@ -368,11 +371,13 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
         while (mhopt < mhend) {
 		if (debug) {
 			syslog(LOG_INFO, "  %s is found",
-			       mhopt_name[(*mhopt <= IP6_MHOPT_MAX) ? *mhopt : IP6_MHOPT_MAX + 1]);
+			       mhopt_name[(*mhopt <= IP6_MHOPT_MAX) ?
+					  *mhopt : IP6_MHOPT_MAX + 1]);
 		}
 
 #ifdef MIP_CN
-		if (*mhopt != IP6_MHOPT_BAUTH)	/* Always bind. auth. opt. should be the last option */
+		if (*mhopt != IP6_MHOPT_BAUTH)
+			/* Always bind. auth. opt. should be the last option */
 			check_bauth_last();
 #endif /* MIP_CN */
 		
@@ -421,7 +426,8 @@ get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 			break;
 
 		case IP6_MHOPT_AUTH_OPT:
-			switch (((struct ip6_mh_opt_authentication *)mhopt)->ip6moauth_subtype) {
+			switch (((struct ip6_mh_opt_authentication *)mhopt)
+					->ip6moauth_subtype) {
 			case IP6_MH_AUTHOPT_SUBTYPE_MNHA:
 				mopt->mnha_auth = 
 					(struct ip6_mh_opt_authentication *)mhopt;
@@ -557,7 +563,8 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 		/* CN and HA just ignore */
 		break;
 	case IP6_MH_TYPE_BU:
-		return (receive_bu(src, dst, hoa, rtaddr, (struct ip6_mh_binding_update *)mh, mhlen));
+		return (receive_bu(src, dst, hoa, rtaddr,
+				   (struct ip6_mh_binding_update *)mh, mhlen));
 		break;
 	case IP6_MH_TYPE_BERROR:
 		break;
@@ -636,7 +643,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	flags = bu->ip6mhbu_flags;
 
 	/* retrieve Mobility Options */
-	if (get_mobility_options((struct ip6_mh *)bu, sizeof(*bu), mhlen, &mopt)) {
+	if (get_mobility_options((struct ip6_mh *)bu, sizeof(*bu), mhlen,
+	    &mopt)) {
 		mip6stat.mip6s_invalidopt++;
 		syslog(LOG_ERR, "bad mobility option in BU.");
 		return (-1);
@@ -697,48 +705,57 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		if (home_nonces == NULL) {
 			statuscode = IP6_MH_BAS_HOME_NI_EXPIRED;
 		} else {
-			create_keygentoken(hoa, home_nonces, (u_int8_t *)&home_token, 0);
+			create_keygentoken(hoa, home_nonces,
+			    (u_int8_t *)&home_token, 0);
 		}
 
 		if (lifetime != 0 
 		    && !IN6_ARE_ADDR_EQUAL(coa, hoa)) {
-			careof_nonces = get_nonces(ntohs(mopt.opt_nonce->ip6moni_coa_nonce));
+			careof_nonces = get_nonces(
+			    ntohs(mopt.opt_nonce->ip6moni_coa_nonce));
 			if (careof_nonces == NULL) {
 				if (home_nonces == NULL)
 					statuscode = IP6_MH_BAS_NI_EXPIRED;
 				else
 					statuscode = IP6_MH_BAS_COA_NI_EXPIRED;
 			} else {
-				create_keygentoken(coa, careof_nonces, (u_int8_t *)careof_token, 1);
+				create_keygentoken(coa, careof_nonces,
+				    (u_int8_t *)careof_token, 1);
 			}
 			cnnonce = 1;
 		}
 		
-		if ((home_nonces && check_nonce_reuse(home_nonces, hoa, coa)) ||
-		    (careof_nonces && check_nonce_reuse(careof_nonces, hoa, coa)))
+		if ((home_nonces &&
+		     check_nonce_reuse(home_nonces, hoa, coa)) ||
+		    (careof_nonces &&
+		     check_nonce_reuse(careof_nonces, hoa, coa)))
 			statuscode = IP6_MH_BAS_NI_EXPIRED;
 
 		if (statuscode != IP6_MH_BAS_ACCEPTED)
 			goto sendba;
 
-		/* Create Kbm = Hash(home keygen token | care-of keygen token) */
+		/* Create
+		   Kbm = Hash(home keygen token | care-of keygen token) */
 		kbm = alloca(sizeof(*kbm));
-		mip6_calculate_kbm(&home_token, (cnnonce) ? &careof_token : NULL, kbm);
+		mip6_calculate_kbm(&home_token,
+		    (cnnonce) ? &careof_token : NULL, kbm);
 		
-		/* Compare Calculated Authentication Data into Authenticator field */ 
+		/* Compare Calculated Authentication Data to
+		   Authenticator field */ 
 		cksum = bu->ip6mhbu_hdr.ip6mh_cksum;
 		bu->ip6mhbu_hdr.ip6mh_cksum = 0;
 		
 		/* Calculate authenticator */
-		mip6_calculate_authenticator(kbm, coa, dst, (caddr_t)bu, mhlen, 
-					     (u_int8_t *)mopt.opt_bauth + 
-					     sizeof(struct ip6_mh_opt_auth_data) - (u_int8_t *)bu,
-					     MIP6_AUTHENTICATOR_SIZE, &authenticator);
+		mip6_calculate_authenticator(kbm, coa, dst, (caddr_t)bu, mhlen,
+		    (u_int8_t *)mopt.opt_bauth
+		    + sizeof(struct ip6_mh_opt_auth_data)
+		    - (u_int8_t *)bu, MIP6_AUTHENTICATOR_SIZE, &authenticator);
 		bu->ip6mhbu_hdr.ip6mh_cksum = cksum;
 		
 		/* Authentication is failed, silently discard */
 		if (memcmp(&authenticator, 
-			   ((u_int8_t *)mopt.opt_bauth + 2), MIP6_AUTHENTICATOR_SIZE) != 0) {
+			   (u_int8_t *)mopt.opt_bauth + 2,
+			   MIP6_AUTHENTICATOR_SIZE) != 0) {
 			syslog(LOG_ERR, "Authenticator comparison failed");
 			if (debug) { 
 				syslog(LOG_INFO, "HomeIndex 0x%x",
@@ -748,7 +765,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 				syslog(LOG_INFO, "CareofIndex 0x%x",
 				       ntohs(mopt.opt_nonce->ip6moni_coa_nonce));
 				syslog(LOG_INFO, "Careof Token= %s", 
-				       hexdump(&careof_token, MIP6_TOKEN_SIZE));
+				       hexdump(&careof_token,
+					       MIP6_TOKEN_SIZE));
 				syslog(LOG_INFO, "kbm: %s",
 				       hexdump(kbm, MIP6_KBM_SIZE));
 			}
@@ -763,7 +781,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #ifdef MIP_CN
 		/*
 		 * According to the TAHI conformance test tool,
-		 * the judgement of 'H' bit should be done proior
+		 * the judgement of 'H' bit should be done prior
 		 * authentic confirmation.
 		 */
 		if (!homeagent_mode && (flags & IP6_MH_BU_HOME)) {
@@ -987,7 +1005,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #endif /* MIP_CN */
 			mip6_bc_delete(bc);
 			syslog(LOG_INFO,
-			       "binding cache has been deleted. HoA:[%s], CoA[%s] lifetime=%d",
+			       "binding cache has been deleted. "
+			       "HoA:[%s], CoA[%s] lifetime=%d",
 			       ip6_sprintf(hoa), ip6_sprintf(coa), lifetime);
 		} else {
 #ifdef MIP_HA
@@ -1005,8 +1024,9 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			
 		lifetime = 0;	/* Returned lifetime in BA must be zero */
 	} else {
-		/* Requesitng to cache binding (registration) */
-		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid, authmethod, authmethod_done, mobility_spi);
+		/* Requesting to cache binding (registration) */
+		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid,
+				 authmethod, authmethod_done, mobility_spi);
 		if (bc == NULL) {
 			statuscode = IP6_MH_BAS_INSUFFICIENT;
 			goto sendba;
@@ -1019,7 +1039,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			llhoa.s6_addr[1] = 0x80;
 			llhoa.s6_addr[3] = ha_if() & 0xff;
 			memcpy(&llhoa.s6_addr[8], &hoa->s6_addr[8], 8);
-			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid, authmethod, authmethod_done, 0);
+			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime,
+			    flags, seqno, bid, authmethod, authmethod_done, 0);
 			bc->bc_llmbc->bc_glmbc = bc;
 		}
 
@@ -1032,8 +1053,8 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
  sendba:
 	if (statuscode != IP6_MH_BAS_ACCEPTED ||
 	    (flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))) {
-		send_ba(dst, retcoa, coa, hoa, flags, kbm, 
-			statuscode, seqno, lifetime, 0 /* refresh */, bid, mobility_spi);
+		send_ba(dst, retcoa, coa, hoa, flags, kbm, statuscode, seqno,
+		    lifetime, 0 /* refresh */, bid, mobility_spi);
 	}
 
 	return (retcode);
@@ -1061,10 +1082,11 @@ send_brr(src, dst)
         brr.ip6mhbr_hdr.ip6mh_proto = IPPROTO_NONE;
         brr.ip6mhbr_hdr.ip6mh_len = (sizeof(brr) >> 3) - 1;
         brr.ip6mhbr_hdr.ip6mh_type = IP6_MH_TYPE_BRR;
-        brr.ip6mhbr_hdr.ip6mh_cksum = checksum_p((u_int16_t *)src, (u_int16_t *)dst, 
-						 (u_int16_t *)&brr, sizeof(brr), IPPROTO_MH);
+        brr.ip6mhbr_hdr.ip6mh_cksum = checksum_p((u_int16_t *)src,
+	    (u_int16_t *)dst, (u_int16_t *)&brr, sizeof(brr), IPPROTO_MH);
 
-	error = sendmessage((char *)&brr, sizeof(brr), 0, src, dst, NULL, NULL);
+	error = sendmessage((char *)&brr, sizeof(brr), 0, src, dst, NULL,
+	    NULL);
 	return (error);
 }
 
@@ -1079,8 +1101,10 @@ send_hoti(bul)
 
 	if (debug) {
 		syslog(LOG_INFO, "HoTI is sent");
-		syslog(LOG_INFO, "  from %s", ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
-		syslog(LOG_INFO, "  to   %s", ip6_sprintf(&bul->bul_peeraddr));
+		syslog(LOG_INFO, "  from %s",
+		    ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
+		syslog(LOG_INFO, "  to   %s",
+		    ip6_sprintf(&bul->bul_peeraddr));
 	}
 
 	memset(&hoti, 0, sizeof(hoti));
@@ -1092,13 +1116,12 @@ send_hoti(bul)
 	    MIP6_COOKIE_SIZE);
 
 	memcpy((void *)hoti.ip6mhhti_cookie,
-	    (const void *)bul->bul_home_cookie, 
-		 sizeof(hoti.ip6mhhti_cookie)); 
+	    (const void *)bul->bul_home_cookie, sizeof(hoti.ip6mhhti_cookie)); 
 
 	hoti.ip6mhhti_hdr.ip6mh_cksum = 
-		checksum_p((u_int16_t *)&bul->bul_hoainfo->hinfo_hoa, 
-			(u_int16_t *)&bul->bul_peeraddr, (u_int16_t *)&hoti, 
-				sizeof(hoti), IPPROTO_MH);
+	    checksum_p((u_int16_t *)&bul->bul_hoainfo->hinfo_hoa, 
+	    (u_int16_t *)&bul->bul_peeraddr, (u_int16_t *)&hoti, sizeof(hoti),
+	    IPPROTO_MH);
 
 	err = sendmessage((char *)&hoti, sizeof(hoti), 0,
 	    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr, NULL, NULL);
@@ -1129,16 +1152,15 @@ send_coti(bul)
 	    MIP6_COOKIE_SIZE);
 
 	memcpy((void *)coti.ip6mhcti_cookie,
-	       (const void *)bul->bul_careof_cookie,
-	       sizeof(coti.ip6mhcti_cookie));
+	    (const void *)bul->bul_careof_cookie,
+	    sizeof(coti.ip6mhcti_cookie));
 
-	coti.ip6mhcti_hdr.ip6mh_cksum = 
-		checksum_p((u_int16_t *)&bul->bul_coa, 
-			(u_int16_t *)&bul->bul_peeraddr, (u_int16_t *)&coti, 
-				sizeof(coti), IPPROTO_MH);
+	coti.ip6mhcti_hdr.ip6mh_cksum =  checksum_p((u_int16_t *)&bul->bul_coa,
+	    (u_int16_t *)&bul->bul_peeraddr, (u_int16_t *)&coti, sizeof(coti),
+	    IPPROTO_MH);
 
-	err = sendmessage((char *)&coti, sizeof(coti),
-		0, &bul->bul_coa, &bul->bul_peeraddr, NULL, NULL);
+	err = sendmessage((char *)&coti, sizeof(coti), 0, &bul->bul_coa,
+	    &bul->bul_peeraddr, NULL, NULL);
 
 	return (err);
 }
@@ -1168,7 +1190,8 @@ send_hot(hoti, dst, src)
 	hot.ip6mhht_hdr.ip6mh_len =  (sizeof(hot) >> 3) - 1;
 	hot.ip6mhht_hdr.ip6mh_type = IP6_MH_TYPE_HOT;
 	hot.ip6mhht_hdr.ip6mh_reserved = 0;
-	bcopy(hoti->ip6mhhti_cookie,  hot.ip6mhht_cookie, sizeof(hot.ip6mhht_cookie));
+	bcopy(hoti->ip6mhhti_cookie, hot.ip6mhht_cookie,
+	    sizeof(hot.ip6mhht_cookie));
 	memcpy((void *)hot.ip6mhht_cookie, (const void *)hoti->ip6mhhti_cookie,
 	    sizeof(hot.ip6mhht_cookie));
 
@@ -1180,10 +1203,8 @@ send_hot(hoti, dst, src)
 	hot.ip6mhht_nonce_index = htons(nonce->nonce_index);
 	create_keygentoken(dst, nonce, (u_int8_t *)hot.ip6mhht_keygen, 0);
 
-	hot.ip6mhht_hdr.ip6mh_cksum = 
-		checksum_p((u_int16_t *)src, 
-			   (u_int16_t *)dst, (u_int16_t *)&hot, 
-			   sizeof(hot), IPPROTO_MH);
+	hot.ip6mhht_hdr.ip6mh_cksum = checksum_p((u_int16_t *)src,
+	    (u_int16_t *)dst, (u_int16_t *)&hot, sizeof(hot), IPPROTO_MH);
 
 	err = sendmessage((char *)&hot, sizeof(hot), 0, src, dst, NULL, NULL);
 
@@ -1213,7 +1234,8 @@ send_cot(coti, dst, src)
 	cot.ip6mhct_hdr.ip6mh_len = (sizeof(cot) >> 3) - 1;
 	cot.ip6mhct_hdr.ip6mh_type = IP6_MH_TYPE_COT;
 	cot.ip6mhct_hdr.ip6mh_reserved = 0;
-	memcpy((void *)cot.ip6mhct_cookie, (const void *)coti->ip6mhcti_cookie,
+	memcpy((void *)cot.ip6mhct_cookie,
+	       (const void *)coti->ip6mhcti_cookie,
 	       sizeof(cot.ip6mhct_cookie));
 
 	/* get nonces set */
@@ -1224,10 +1246,8 @@ send_cot(coti, dst, src)
 	create_keygentoken(dst, nonce, (u_int8_t *)cot.ip6mhct_keygen, 1);
 
 	/*cot.ip6mhct_hdr.ip6mh_cksum = 0a*/
-	cot.ip6mhct_hdr.ip6mh_cksum = 
-		checksum_p((u_int16_t *)src, 
-			   (u_int16_t *)dst, (u_int16_t *)&cot, 
-			   sizeof(cot), IPPROTO_MH);
+	cot.ip6mhct_hdr.ip6mh_cksum = checksum_p((u_int16_t *)src,
+	    (u_int16_t *)dst, (u_int16_t *)&cot, sizeof(cot), IPPROTO_MH);
 
 	err = sendmessage((char *)&cot, sizeof(cot), 0, src, dst, NULL, NULL);
 
@@ -1261,14 +1281,17 @@ send_bu(bul)
 	struct ip6_mh_opt_bid bid_opt;
 
 	if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
-		/*syslog(LOG_INFO, "this bul has multiple CoAs, ignore root %d", bul->bul_bid);*/
+		/*syslog(LOG_INFO,
+		  "this bul has multiple CoAs, ignore root %d",
+		  bul->bul_bid);*/
 		return (0);
 	} 
 #endif /* MIP_MCOA */
 
 	if (debug) {
 		syslog(LOG_INFO, "BU is sent");
-		syslog(LOG_INFO, "  from %s", ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
+		syslog(LOG_INFO, "  from %s",
+		    ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
 		syslog(LOG_INFO, "  to   %s", ip6_sprintf(&bul->bul_peeraddr));
 		syslog(LOG_INFO, "  via  %s", ip6_sprintf(&bul->bul_coa));
 		syslog(LOG_INFO, "  seq  %d", bul->bul_seqno);
@@ -1303,19 +1326,23 @@ send_bu(bul)
 			return (EINVAL);
 		
 		if (homebul->bul_expire &&
-		    TIMESUB(&homebul->bul_expire->exptime, &now) <= (bul->bul_lifetime << 2))
-			bup->ip6mhbu_lifetime = htons(TIMESUB(&homebul->bul_expire->exptime, &now) >> 2);
+		    TIMESUB(&homebul->bul_expire->exptime,
+			    &now) <= (bul->bul_lifetime << 2))
+			bup->ip6mhbu_lifetime =
+				htons(TIMESUB(&homebul->bul_expire->exptime,
+					      &now) >> 2);
 		else 
 			bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
 	} else
 		bup->ip6mhbu_lifetime = htons(bul->bul_lifetime);
 
 	/* Adding Alternate Care-of Address Option */	
-	if ((bul->bul_flags & IP6_MH_BU_HOME)
+	if (((bul->bul_flags & IP6_MH_BU_HOME) ||
+	     (bul->bul_state & MIP6_BUL_STATE_USEIPSEC))
 #ifdef DSMIP
 	    && !IN6_IS_ADDR_V4MAPPED(&bul->bul_coa)
 #endif /* DSMIP */
-		) {
+	   ) {
 		struct ip6_mh_opt_altcoa *acoa_opt;
 		
 		pad = MIP6_PADLEN(buflen, 8, 6);
@@ -1326,7 +1353,8 @@ send_bu(bul)
 		acoa_opt->ip6moa_type = IP6_MHOPT_ALTCOA;
 		acoa_opt->ip6moa_len = 16; 
 		memcpy((void *)acoa_opt->ip6moa_addr,
-		    (const void *)&bul->bul_coa, sizeof(acoa_opt->ip6moa_addr));
+		       (const void *)&bul->bul_coa,
+		       sizeof(acoa_opt->ip6moa_addr));
 		buflen += sizeof(struct ip6_mh_opt_altcoa);
         }
 
@@ -1381,7 +1409,9 @@ send_bu(bul)
 				prefix_opt.ip6mopfx_pfx
 				    = SS2SIN6(&mpt->mpt_ss_prefix)->sin6_addr;
 
-				memcpy((bufp + buflen), &prefix_opt, sizeof(prefix_opt));
+				memcpy(bufp + buflen,
+				       &prefix_opt,
+				       sizeof(prefix_opt));
 				buflen += sizeof(struct ip6_mh_opt_prefix);
 			}
 #ifdef MIP_IPV4MNPSUPPORT
@@ -1393,16 +1423,19 @@ send_bu(bul)
 
 				memset(&v4prefix_opt, 0, sizeof(v4prefix_opt));
 
-				v4prefix_opt.ip6mov4pfx_type = IP6_MHOPT_IPV4_PREFIX;
+				v4prefix_opt.ip6mov4pfx_type =
+					IP6_MHOPT_IPV4_PREFIX;
 				v4prefix_opt.ip6mov4pfx_len = 6;
 				v4prefix_opt.ip6mov4pfx_pfxlen
 				    = mpt->mpt_prefixlen;
 				v4prefix_opt.ip6mov4pfx_pfx
 				    = SS2SIN(&mpt->mpt_ss_prefix)->sin_addr;
 
-				memcpy((bufp + buflen), &v4prefix_opt,
-				    sizeof(v4prefix_opt));
-				buflen += sizeof(struct ip6_mh_opt_ipv4_prefix);
+				memcpy(bufp + buflen,
+				       &v4prefix_opt,
+				       sizeof(v4prefix_opt));
+				buflen +=
+					sizeof(struct ip6_mh_opt_ipv4_prefix);
 			}
 #endif /* MIP_IPV4MNPSUPPORT */
 		}
@@ -1410,7 +1443,7 @@ send_bu(bul)
 
 #ifdef DSMIP
 	if (IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) &&
-			IN6_IS_ADDR_V4MAPPED(&bul->bul_peeraddr)) {
+	    IN6_IS_ADDR_V4MAPPED(&bul->bul_peeraddr)) {
 		pad = MIP6_PADLEN(buflen, 2, 0);
 		MIP6_FILL_PADDING(bufp + buflen, pad);
 		buflen += pad;
@@ -1421,19 +1454,20 @@ send_bu(bul)
 		v4hoa_opt.ip6mov4hoa_len = 5;
 		v4hoa_opt.ip6mov4hoa_pfxlen = 32; /* XXX */
 		memcpy(&v4hoa_opt.ip6mov4hoa_v4hoa,
-				&bul->bul_hoainfo->hinfo_v4hoa,
-				sizeof(struct in_addr));
+		       &bul->bul_hoainfo->hinfo_v4hoa,
+		       sizeof(struct in_addr));
 
 		syslog(LOG_INFO, "IPv4 Home Address option is added %s/%d", 
-				inet_ntoa(v4hoa_opt.ip6mov4hoa_v4hoa),
-				v4hoa_opt.ip6mov4hoa_pfxlen);
+		       inet_ntoa(v4hoa_opt.ip6mov4hoa_v4hoa),
+		       v4hoa_opt.ip6mov4hoa_pfxlen);
 
 		memcpy((bufp + buflen), &v4hoa_opt, sizeof(v4hoa_opt));
 		buflen += sizeof(struct ip6_mh_opt_ipv4_hoa);
 	}
 #endif /* DSMIP */ 
 
-	if (bul->bul_flags & IP6_MH_BU_HOME) {
+	if ((bul->bul_flags & IP6_MH_BU_HOME) ||
+	    (bul->bul_state & MIP6_BUL_STATE_USEIPSEC)) {
 		/* Alignment 8n */
 		pad = MIP6_PADLEN(buflen, 8, 0);
 		MIP6_FILL_PADDING(bufp + buflen, pad);
@@ -1555,13 +1589,17 @@ send_bu(bul)
 			(u_int16_t *)&bul->bul_peeraddr,
 		   	(u_int16_t *)bufp, buflen, IPPROTO_MH);
 	if (bul->bul_hoainfo->hinfo_location == MNINFO_MN_HOME) 
-		error = sendmessage((char *)bufp, buflen, bul->bul_home_ifindex,
-		    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr,
-		    &bul->bul_hoainfo->hinfo_hoa, NULL);
+		error = sendmessage((char *)bufp,
+				    buflen,
+				    bul->bul_home_ifindex,
+				    &bul->bul_hoainfo->hinfo_hoa,
+				    &bul->bul_peeraddr,
+				    &bul->bul_hoainfo->hinfo_hoa,
+				    NULL);
 	else
 #ifdef DSMIP
 		if (IN6_IS_ADDR_V4MAPPED(&bul->bul_coa) &&
-			IN6_IS_ADDR_V4MAPPED(&bul->bul_peeraddr)) {
+		    IN6_IS_ADDR_V4MAPPED(&bul->bul_peeraddr)) {
 			hal = mip6_find_hal_v6(bul->bul_hoainfo);
 			if (hal == NULL) {
 				syslog(LOG_ERR, "no IPv6 home agent found");
@@ -1569,20 +1607,31 @@ send_bu(bul)
 			}
 
 			/* create tunnel */
-			error = v4_sendmessage((char *)bufp, buflen, 0,
-					&bul->bul_peeraddr, &bul->bul_coa,
-					&hal->hal_ip6addr,
-					&bul->bul_hoainfo->hinfo_hoa,
-					NULL);
+
+			error = v4_sendmessage((char *)bufp,
+					       buflen,
+					       0,
+					       &bul->bul_peeraddr,
+					       &bul->bul_coa,
+					       &hal->hal_ip6addr,
+					       &bul->bul_hoainfo->hinfo_hoa,
+					       NULL);
 		} else
-			error = sendmessage((char *)bufp, buflen, 0, 
-		    		&bul->bul_hoainfo->hinfo_hoa,
-				&bul->bul_peeraddr,
-		    		&bul->bul_coa, NULL);
+			error = sendmessage((char *)bufp,
+					    buflen,
+					    0, 
+					    &bul->bul_hoainfo->hinfo_hoa,
+					    &bul->bul_peeraddr,
+					    &bul->bul_coa,
+					    NULL);
 #else
-		error = sendmessage((char *)bufp, buflen, 0, 
-		    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr,
-		    &bul->bul_coa, NULL);
+		error = sendmessage((char *)bufp,
+				    buflen,
+				    0, 
+				    &bul->bul_hoainfo->hinfo_hoa,
+				    &bul->bul_peeraddr,
+				    &bul->bul_coa,
+				    NULL);
 #endif /* DSMIP */
 
 	if (error == 0) {
@@ -1595,7 +1644,8 @@ send_bu(bul)
 
 #ifndef MIP_MN
 int
-send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid, mobility_spi)
+send_ba(src, coa, acoa, hoa, flags, kbm_p, status,
+    seqno, lifetime, refresh, bid, mobility_spi)
 	struct in6_addr *src, *coa, *acoa, *hoa;
 	u_int16_t flags;
 	mip6_kbm_t *kbm_p;
@@ -1834,7 +1884,7 @@ send_ba(src, coa, acoa, hoa, flags, kbm_p, status, seqno, lifetime, refresh, bid
 #ifdef DSMIP
 		if (IN6_IS_ADDR_V4MAPPED(coa))
 			err = v4_sendmessage(bufp, buflen, 0, coa, src, coa,
-					NULL, hoa);
+					     NULL, hoa);
 		else
 #endif /* DSMIP */
 		err = sendmessage(bufp, buflen, 0, src, hoa, NULL, coa);
@@ -1879,11 +1929,13 @@ send_be(dst, src, home, status)
 		       0, sizeof(struct in6_addr));
 
 	be.ip6mhbe_hdr.ip6mh_cksum = 
-		checksum_p((u_int16_t *)src, (u_int16_t *)dst,
-		(u_int16_t *)&be, (be.ip6mhbe_hdr.ip6mh_len + 1) << 3, IPPROTO_MH);
+		checksum_p((u_int16_t *)src,
+			   (u_int16_t *)dst,
+			   (u_int16_t *)&be,
+			   (be.ip6mhbe_hdr.ip6mh_len + 1) << 3,
+			   IPPROTO_MH);
 
-	err =  sendmessage((char *)&be, sizeof(be), 
-			   0, src, dst, NULL, NULL);
+	err =  sendmessage((char *)&be, sizeof(be), 0, src, dst, NULL, NULL);
 	if (err == 0) {
 		mip6stat.mip6s_obe_hist[status]++;
 	}
@@ -2006,11 +2058,14 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 	    && ar_sin6 != NULL) { 
 		if (debug) 
 			syslog(LOG_INFO, "sendmsg via %s/%d", 
-				ip6_sprintf(&ar_sin6->sin6_addr), ar_sin6->sin6_scope_id);
+				ip6_sprintf(&ar_sin6->sin6_addr),
+			       ar_sin6->sin6_scope_id);
 		cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct sockaddr_in6));
 		cmsgptr->cmsg_level = IPPROTO_IPV6;
 		cmsgptr->cmsg_type = IPV6_NEXTHOP;
-		memcpy(CMSG_DATA(cmsgptr), ar_sin6, sizeof(struct sockaddr_in6));
+		memcpy(CMSG_DATA(cmsgptr),
+		       ar_sin6,
+		       sizeof(struct sockaddr_in6));
 		cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 	}
 #endif /* MIP_MN */
@@ -2024,8 +2079,9 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 		MIP6_FILL_PADDING((char *)(dest + 1), MIP6_HOAOPT_PADLEN);
 
 		dest->ip6d_nxt = 0;
-		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address) +
-			sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN) >> 3) - 1;
+		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address)
+				   + sizeof(struct ip6_dest)
+				   + MIP6_HOAOPT_PADLEN) >> 3) - 1;
 
 		hoadst = (struct ip6_opt_home_address *)
 			((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
@@ -2037,9 +2093,10 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 		
 		cmsgptr->cmsg_level = IPPROTO_IPV6;
 		cmsgptr->cmsg_type = IPV6_DSTOPTS;
-		cmsgptr->cmsg_len = 
-			CMSG_LEN(sizeof(struct ip6_opt_home_address) + 
-			sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN);
+		cmsgptr->cmsg_len =
+			CMSG_LEN(sizeof(struct ip6_opt_home_address)
+				 + sizeof(struct ip6_dest)
+				 + MIP6_HOAOPT_PADLEN);
 		cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 	}
 
@@ -2058,8 +2115,8 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 
 		cmsgptr->cmsg_level = IPPROTO_IPV6;
 		cmsgptr->cmsg_type = IPV6_RTHDR;
-		cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr2) + 
-			sizeof(struct in6_addr));
+		cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr2)
+					     + sizeof(struct in6_addr));
 		cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
 	}
 
@@ -2069,7 +2126,8 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, haoaddr, rtaddr)
 		fprintf(stderr, "%s -> %s\n",
 			ip6_sprintf(src), ip6_sprintf(dst));
 	} else {
-		mip6stat.mip6s_omobility[((struct ip6_mh *)mhdata)->ip6mh_type]++;
+		mip6stat.mip6s_omobility[
+			((struct ip6_mh *)mhdata)->ip6mh_type]++;
 	}
 
 	return (0);
@@ -2131,16 +2189,17 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 		dest = (struct ip6_dest *)(ip6 + 1);
 		MIP6_FILL_PADDING((char *)(dest + 1), MIP6_HOAOPT_PADLEN);
 		dest->ip6d_nxt = 0;
-		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address) +
-			sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN) >> 3) - 1;
+		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address)
+				   + izeof(struct ip6_dest)
+				   + MIP6_HOAOPT_PADLEN) >> 3) - 1;
 		hoadst = (struct ip6_opt_home_address *)
 			((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
 		hoadst->ip6oh_type = 0xc9;
-		hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address) - 
-				sizeof(struct ip6_dest);
+		hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address)
+			- sizeof(struct ip6_dest);
 		memcpy(hoadst->ip6oh_addr, hoa, sizeof(struct in6_addr));
-		buflen += sizeof(struct ip6_opt_home_address) + 
-				sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
+		buflen += sizeof(struct ip6_opt_home_address)
+			+ sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
 	}
 
 	/* Routing Header */
@@ -2162,10 +2221,10 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 
 	ip->ip_len = buflen;
 	ip6->ip6_plen = htons(buflen - sizeof(struct ip)
-					- sizeof(struct ip6_hdr));
+	    - sizeof(struct ip6_hdr));
 
 	if (sendto(raw4sock, buf, buflen, 0, (struct sockaddr *)&addr,
-	    sizeof(addr)) < 0){
+	    sizeof(addr)) < 0) {
 		syslog(LOG_ERR, "sendto error %s", strerror(errno));
 	} else {
 		mip6stat.mip6s_omobility[
@@ -2225,16 +2284,16 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 		dest = (struct ip6_dest *)(ip6 + 1);
 		MIP6_FILL_PADDING((char *)(dest + 1), MIP6_HOAOPT_PADLEN);
 		dest->ip6d_nxt = 0;
-		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address) +
-			sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN) >> 3) - 1;
+		dest->ip6d_len = ((sizeof(struct ip6_opt_home_address)
+		    + sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN) >> 3) - 1;
 		hoadst = (struct ip6_opt_home_address *)
-			((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
+		    ((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
 		hoadst->ip6oh_type = 0xc9;
-		hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address) - 
-				sizeof(struct ip6_dest);
+		hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address)
+		    - sizeof(struct ip6_dest);
 		memcpy(hoadst->ip6oh_addr, hoa, sizeof(struct in6_addr));
-		buflen += sizeof(struct ip6_opt_home_address) + 
-				sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
+		buflen += sizeof(struct ip6_opt_home_address)
+		    + sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN;
 	}
 
 	/* Routing Header */
@@ -2262,7 +2321,7 @@ v4_sendmessage(mhdata, mhdatalen, ifindex, v4dst, src, dst, hoa, rtaddr)
 		syslog(LOG_ERR, "sendmsg error %s", strerror(errno));
 	} else {
 		mip6stat.mip6s_omobility[
-				((struct ip6_mh *)mhdata)->ip6mh_type]++;
+		    ((struct ip6_mh *)mhdata)->ip6mh_type]++;
 	}
 
 	return (0);

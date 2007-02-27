@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.42 2007/02/06 05:58:52 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.43 2007/02/27 01:44:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -166,10 +166,18 @@ main(argc, argv)
 {
 	int pfds;
 	int ch = 0;
+#ifdef MIP_IPSEC
+	int fd;
+#endif /* MIP_IPSEC */
 	char *ifname;
 	FILE *pidfp;
 	char *conffile = HAD_CONFFILE;
+#ifdef MIP_IPSEC
+	char *ipsecconffile = IPSEC_CONFFILE;
+	char *options = "fnc:C:";
+#else
 	char *options = "fnc:";
+#endif /* MIP_IPSEC */
 
 #if 0
 	/* XXX Is this code needed ? */
@@ -192,6 +200,11 @@ main(argc, argv)
 		case 'c':
 			conffile = optarg;
 			break;
+#ifdef MIP_IPSEC
+		case 'C':
+			ipsecconffile = optarg;
+			break;
+#endif /* MIP_IPSEC */
 		default:
 			fprintf(stderr, "unknown option\n");
 			ha_usage(argv[0]);
@@ -253,6 +266,10 @@ main(argc, argv)
 	mhsock_open();
 	icmp6sock_open();
 	mipsock_open();
+#ifdef MIP_IPSEC
+	if (use_ipsec() && ipsec_init(ipsecconffile) < 0)
+		fprintf(stderr, "IPsec initialization failed\n");
+#endif /* MIP_IPSEC */
 #ifdef DSMIP
 	udp4sock_open();
 	raw4sock_open();
@@ -261,6 +278,12 @@ main(argc, argv)
 	new_fd_list(mipsock, POLLIN, mipsock_input_common);
 	new_fd_list(mhsock, POLLIN, mh_input_common);
 	new_fd_list(icmp6sock, POLLIN, icmp6_input_common);
+#ifdef MIP_IPSEC
+	if ((fd = sadb_socket()) >= 0)
+		new_fd_list(fd, POLLIN, sadb_poll);
+	if ((fd = spmif_socket()) >= 0)
+		new_fd_list(fd, POLLIN, spmif_poll);
+#endif /* MIP_IPSEC */
 #ifdef DSMIP
 	new_fd_list(udp4sock, POLLIN, udp4_input_common);
 #endif /* DSMIP */
@@ -421,7 +444,7 @@ had_init_homeprefix (ifname, preference)
 		(void)strncpy(ifreq6.ifr_name, ifname, strlen(ifname));
 		memcpy(&ifreq6.ifr_addr, ifa->ifa_addr, ifa->ifa_addr->sa_len);
 
-		if(ioctl(ioctl_s, SIOCGIFAFLAG_IN6, (caddr_t)&ifreq6) < 0) {
+		if (ioctl(ioctl_s, SIOCGIFAFLAG_IN6, (caddr_t)&ifreq6) < 0) {
 			close(ioctl_s);
 			continue;
 		}
@@ -578,6 +601,9 @@ had_flush_bc(s, line)
 	char *line;
 {
 	command_printf(s, "-- Clear Binding Cache --\n");
+#ifdef IPsec
+	command_printf(s, "Can junk IPsec state?!\n");
+#endif
 	flush_bc();
 	/*mip6_flush_kernel_bc();*/
 }

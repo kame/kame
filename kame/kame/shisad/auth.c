@@ -1,4 +1,4 @@
-/*	$KAME: auth.c,v 1.3 2006/10/20 07:41:15 t-momose Exp $	*/
+/*	$KAME: auth.c,v 1.4 2007/02/27 01:44:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2006 WIDE Project.  All rights reserved.
@@ -453,7 +453,8 @@ aaa_auth_done(success)
 		bc->bc_authmethod_done |= BC_AUTH_MNAAA;
 		if ((bc->bc_authmethod ^ bc->bc_authmethod_done) == 0)
 			bc->bc_state &= ~BC_STATE_UNDER_AUTH;
-		mip6_validate_bc(bc);
+		/* XXX is (void) OK? */
+		(void)mip6_validate_bc(bc);
 		if ((bc->bc_state == BC_STATE_VALID) &&
 		    !IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa)) {
 			if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))

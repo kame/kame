@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.5 2007/01/19 11:00:31 keiichi Exp $
+# $Id: Makefile.in,v 1.6 2007/02/27 01:44:12 keiichi Exp $
 #
 
 prefix=	@prefix@
@@ -57,6 +57,7 @@ MNDOBJS=	mnd-binding.o mnd-common.o mnd-hal.o mnd-mh.o mnd-mnd.o \
 	mnd-nemo_var.o \
 	fsm.o rr.o \
 	callout.o command.o config.o fdlist.o network.o util.o \
+	@IPSEC_O@ \
 	$(GENSRCS:%.c=%.o)
 MNDCFLAGS=	-DMIP_MN
 MNDLIBS=	-lcrypto
@@ -76,6 +77,7 @@ BABYMDDOBJS=	babymdd.o network.o util.o \
 HADOBJS=	had-binding.o had-common.o had-had.o had-hal.o had-mh.o \
 	had-nemo_var.o \
 	callout.o command.o config.o fdlist.o network.o util.o \
+	@IPSEC_O@ \
 	$(GENSRCS:%.c=%.o)
 HADCFLAGS=	-DMIP_HA
 #HADCFLAGS+=	-DMIP_MCOA
@@ -180,4 +182,4 @@ distclean:: clean
 	/bin/rm -f Makefile config.cache config.log config.status .depend
 
 depend:
-	mkdep ${CFLAGS:M-[ID]*} $(srcdir)/*.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -M $(MNDOBJS:%.o=%c) > .depend

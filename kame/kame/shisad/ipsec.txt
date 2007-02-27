@@ -1,0 +1,69 @@
+Code comes from the racoon1 (today ipsec-tools) support for exprimental
+shisa (i.e., before it was integrated in the KAME distrib).
+I don't put the MN-CN support because it needs FSM adaptation
+and should conflict with current work on alternative authentication.
+
+Functions are:
+ - int ipsec_int(char *ipsecconffile): read the conf file (racoon2.conf)
+   and open two sockets, one for sadb (aka PF_KEY), the other for spmif
+   (aka interface to SPMD).
+ - void ipsec_clean(void): close sockets, cleanup.
+ - int sadb_socket(void) and int spmif_socket(void): return the file
+   descriptors to make select/poll on them.
+ - int sadb_poll(int fd) and int spmif_poll(int fd): service functions to
+   be called when input is available. The argument is only for compaitbility.
+ - int use_ipsec(void): check if the system context has IPsec support
+   (keymanagement on, net.inet6.mip6.use_ipsec on and use_migrate off).
+ - int ipsec_bc_request(struct binding_cache *bc, int command): add, update
+   and remove the IPsec infos (tunnel SPD and remote) related to a MN.
+   Use on an HA.
+ - void ipsec_bc_data_release(struct binding_cache *bc): delete cached info,
+   to be called before releasing a BC entry to avoid memory leaks.
+ - int ipsec_bul_request(struct binding_update_list *bul, int command):
+   same then ipsec_bc_request() but deals with HAs on a MN.
+   There are two places to call it, current code is compatible the
+   existing implementation but not compliant with Sugimoto's I-D.
+ - void ipsec_bul_data_release(struct binding_update_list *bul):
+   same than ipsec_bc_data_release().
+ - int bul_can_use_ipsec(struct binding_update_list *bul):
+   unused function from the MN-CN IPsec old code, check if a correspondent
+   can get BUs to it protected by IPsec. Should work with HAs too
+   even one relies on config for this (:-).
+
+Racoon2 details:
+ - the tunnel SPD must be auto_ipsec tunnel unique with a reqid,
+   SA src and dst. Traffic selectors must be simple addresses for
+   protocol MH/135 or any, initialized to home address and home agent
+   address. When they are marked dynamic (i.e., install off) add and
+   delete use spmif create and remove them.
+ - the linked required remote entry must have the right mobility role
+   (MN for BCs, HA for BULs).
+ - KINK has no support for migrate,
+ - IMHO the HA should be always passive but it is not checked.
+ - default policy (i.e., when the tunnel is off) for HoTi/HoT should
+   be very restrictive: it is safer even it could kill MN-MN RO.
+
+Other mobility protocols:
+ - K flag is still a problem when it is not set (i.e., possible
+   interop issue: what to do?)
+ - NEMO (flag router in BUs) is not supported
+ - MCOA (bid != 0) is not supported
+ - MN-CN is not support but I had it in my old code and I have copied
+   the main part into bul_can_use_ipsec(). The kernel has to
+   be updated too to accept (mark as verified) IPsec protected HoAs
+ - of course there is nothing particular for FMIP...
+
+Integration details:
+ - the IPsec code is protected by IPSEC ifdefs for the MN and HA parts
+   (nothing yet for the CN).
+ - as the racoon2 library includes a parser yacc and lex have to by
+   prefixed by -p/-P in obj/{had,mnd}/Makefile.in.
+ - as the previous fix leaves a yy* symbol, a sed translates it...
+ - configure stuff (I have no autoconf on my working box and no really
+   working autoconf on others) must be updated to compute the
+   racoon2 path for related Makefiles.
+ - the IPSEC CFLAG should be configurable.
+ - stdarg.h should be added in AC_CHECK_HEADERS.
+ - HAVE_SA_LEN can be computed or simply left as 1 (no Linux here...).
+ - HAVE_FUNC_MACRO stuff should be imported from iked/configure.in.
+ - don't forget OS specific Makefiles (used as alternatives to configure).

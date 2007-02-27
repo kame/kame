@@ -1,4 +1,4 @@
-/*	$KAME: binding.c,v 1.36 2007/02/13 08:02:22 t-momose Exp $	*/
+/*	$KAME: binding.c,v 1.37 2007/02/27 01:44:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -120,12 +120,13 @@ mip6_flush_kernel_bc()
 	mipmsg.miph_type = MIPM_BC_FLUSH;
 	if (write(mipsock, &mipmsg, sizeof(struct mip_msghdr)) == -1) {
 		syslog(LOG_ERR,
-		    "removing all bul entries failed.");
+		    "removing all bc entries failed.");
 	}
 }
 
 struct binding_cache *
-mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmethod_done, mobility_spi)
+mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid,
+	    authmethod, authmethod_done, mobility_spi)
 	struct in6_addr *hoa, *coa, *recvaddr;
 	u_int32_t lifetime;
 	u_int16_t flags;
@@ -163,10 +164,15 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmet
 
 		/* update BC in the kernel via mipsock */
 		mipsock_bc_request(bc, MIPM_BC_ADD);
+#ifdef MIP_IPSEC
+		if (ipsec_bc_request(bc, MIPM_BC_UPDATE) < 0)
+			return (bc);
+#endif /* MIP_IPSEC */
 			
 		bc->bc_expire = now + bc->bc_lifetime;
 		
-		if (!IN6_IS_ADDR_LINKLOCAL(hoa) && !(bc->bc_state & BC_STATE_UNDER_DAD))
+		if (!IN6_IS_ADDR_LINKLOCAL(hoa)
+		    && !(bc->bc_state & BC_STATE_UNDER_DAD))
 			mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
 		return (bc);
 	} 
@@ -201,29 +207,34 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid, authmethod, authmet
 	bc->bc_bid = bid;
 #endif /* MIP_MCOA */
 	bc->bc_mobility_spi = mobility_spi;
-
 	if (bc->bc_state & BC_STATE_UNDER_DAD) {
 		/* do dad start */
 		mip6_dad_start(hoa);
+	} else if (mip6_validate_bc(bc) < 0) {
+		free(bc);
+		return (NULL);
 	}
-
-	mip6_validate_bc(bc);
-	LIST_INSERT_HEAD(&bchead, bc, bc_entry);
+        LIST_INSERT_HEAD(&bchead, bc, bc_entry);
 	bc->bc_refcnt++;
 
 	return (bc);
 }
 
-void
+int
 mip6_validate_bc(bc)
 	struct binding_cache *bc;
 {
 	time_t now;
 
 	if (bc->bc_state != BC_STATE_VALID)
-		return;
+		return (0);
 	
 	now = time(0);
+#ifdef MIP_IPSEC
+	/* IPsec can fail: do it first */
+	if (ipsec_bc_request(bc, MIPM_BC_ADD) < 0)
+		return (-1);
+#endif /* MIP_IPSEC */
 	/* insert the BC into the kernel via mipsock */
 	mipsock_bc_request(bc, MIPM_BC_ADD);
 	bc->bc_expire = now + bc->bc_lifetime;
@@ -233,6 +244,7 @@ mip6_validate_bc(bc)
 	   a independent timer. */
 	if (!IN6_IS_ADDR_LINKLOCAL(&bc->bc_hoa))
 		mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2);
+	return (0);
 }
 
 void
@@ -264,6 +276,9 @@ mip6_bc_delete(bcreq)
 	case BC_STATE_VALID:
 		/* delete the BCE in the kernel via mipsock */
 		mipsock_bc_request(bc, MIPM_BC_REMOVE);
+#ifdef MIP_IPSEC
+		(void) ipsec_bc_request(bc, MIPM_BC_REMOVE);
+#endif /* MIP_IPSEC */
 		/* Fall through */
 	case BC_STATE_UNDER_DAD:
 		if (bc->bc_llmbc) {
@@ -283,6 +298,9 @@ mip6_bc_delete(bcreq)
 		}
 		/* Fall through */
 	case BC_STATE_DEPRECATED:
+#ifdef MIP_IPSEC
+		ipsec_bc_data_release(bc);
+#endif /* MIP_IPSEC */
 		if (--bc->bc_refcnt == 0) {
 			free(bc);
 		}
@@ -292,7 +310,7 @@ mip6_bc_delete(bcreq)
 	return;
 }
 
-/* src can be wildcard */
+/* src and bid can be wildcard */
 struct binding_cache *
 mip6_bc_lookup(hoa, src, bid) 
 	struct in6_addr *hoa;
@@ -367,7 +385,14 @@ mip6_dad_done(message, addr)
 		       "DAD against the HoA(%s) is suceeded.",
 		       ip6_sprintf(addr));
 		bc->bc_state &= ~BC_STATE_UNDER_DAD;
-		mip6_validate_bc(bc);
+		if (mip6_validate_bc(bc) < 0) {
+			syslog(LOG_INFO,
+			       "IPsec init failure after DAD for %s\n",
+			       ip6_sprintf(addr));
+			mip6_bc_delete(bc);
+			if (gbc != bc)
+				mip6_bc_delete(gbc);
+		}
 		if ((bc->bc_state == BC_STATE_VALID) &&
 		    !IN6_IS_ADDR_LINKLOCAL(addr)) {
 			if (bc->bc_flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))
@@ -379,7 +404,7 @@ mip6_dad_done(message, addr)
 	} else if (message == MIPM_DAD_FAIL) {
 		/* I got a message the DAD was failed */
 		syslog(LOG_INFO,
-		       "DAD aganist the HoA(%s) is failed.",
+		       "DAD against the HoA(%s) is failed.",
 		       ip6_sprintf(addr));
 
 		if (gbc == NULL || bc == NULL)
@@ -447,7 +472,7 @@ mip6_bc_set_refresh_timer(bc, tick)
 {
 	remove_callout_entry(bc->bc_refresh);
 	bc->bc_refresh = new_callout_entry(tick, mip6_bc_refresh_timer,
-					   (void *)bc, "mip6_bc_refresh_timer");
+	    (void *)bc, "mip6_bc_refresh_timer");
 }
 
 static void
@@ -485,7 +510,8 @@ mip6_bc_refresh_timer(arg)
 	if (bc->bc_expire < (now +  MIP6_BRR_INTERVAL)) 
 		mip6_bc_set_refresh_timer(bc, (bc->bc_expire) - now);
 	else  /* set timer with the refresh backoff interval */
-		mip6_bc_set_refresh_timer(bc, /*MIP6_BRR_INTERVAL*/(bc->bc_expire - now) / 2);
+		mip6_bc_set_refresh_timer(bc,
+		    /*MIP6_BRR_INTERVAL*/(bc->bc_expire - now) / 2);
 	
 	return;
 }
@@ -553,7 +579,8 @@ mipsock_bc_request(bc, command)
 		default:
 			break;
 		}
-		syslog(LOG_INFO, "[BC info] HoA  %s", ip6_sprintf(&bc->bc_hoa));
+		syslog(LOG_INFO, "[BC info] HoA  %s",
+		    ip6_sprintf(&bc->bc_hoa));
 		syslog(LOG_INFO, "\tCoA  %s", ip6_sprintf(&bc->bc_coa));
 		syslog(LOG_INFO, "\tPeer %s", ip6_sprintf(&bc->bc_myaddr));
 #ifdef MIP_MCOA
@@ -613,7 +640,7 @@ hoainfo_insert(hoa, ifindex)
 
 	if (debug)
 		syslog(LOG_INFO, "hoainfo entry (HoA %s ifindex %d) is added", 
-		       ip6_sprintf(hoa), ifindex); 
+		    ip6_sprintf(hoa), ifindex); 
 
 	return (hoainfo);
 }
@@ -693,8 +720,10 @@ bul_insert(hoainfo, peeraddr, coa, flags, bid)
 		else {
 			struct binding_update_list *bul2;
 
-			/* if primary bul is active and bul matched with bid is also active */
-			bul2 = bul_mcoa_get(&hoainfo->hinfo_hoa, peeraddr, bid);
+			/* if primary bul is active and bul matched
+			   with bid is also active */
+			bul2 = bul_mcoa_get(&hoainfo->hinfo_hoa,
+					    peeraddr, bid);
 			if (bul2)
 				return (bul2);
 			
@@ -705,8 +734,10 @@ bul_insert(hoainfo, peeraddr, coa, flags, bid)
 			LIST_INSERT_HEAD(&bul->bul_mcoa_head, bul2, bul_entry);
 			
 			if (debug)
-				syslog(LOG_INFO, "insert bul %s w/ %d into hoainfo\n", 
-				       ip6_sprintf(&hoainfo->hinfo_hoa), bul2->bul_bid);
+				syslog(LOG_INFO,
+				    "insert bul %s w/ %d into hoainfo\n", 
+				    ip6_sprintf(&hoainfo->hinfo_hoa),
+				    bul2->bul_bid);
 			return (bul2);
 		}
 #endif /* MIP_MCOA */
@@ -727,8 +758,9 @@ bul_insert(hoainfo, peeraddr, coa, flags, bid)
 		bul2->bul_bid = bid;
 		LIST_INSERT_HEAD(&bul->bul_mcoa_head, bul2, bul_entry);
 		if (debug)
-			syslog(LOG_ERR, "insert bul %s w/ %d into hoainfo\n",
-			       ip6_sprintf(&hoainfo->hinfo_hoa), bul2->bul_bid);
+			syslog(LOG_ERR,
+			    "insert bul %s w/ %d into hoainfo\n",
+			    ip6_sprintf(&hoainfo->hinfo_hoa), bul2->bul_bid);
 		return (bul2);
 	}
 #endif /* MIP_MCOA */
@@ -748,9 +780,10 @@ bul_create(peeraddr, coa, flags, hoainfo)
 {
 	struct binding_update_list *bul = NULL;
 
-	bul = (struct binding_update_list *)malloc(sizeof(struct binding_update_list));
+	bul = (struct binding_update_list *)
+	    malloc(sizeof(struct binding_update_list));
 	if (bul == NULL) {
-		syslog(LOG_ERR, "Faild to allocate memory for a bul.");
+		syslog(LOG_ERR, "Failed to allocate memory for a bul\n");
 		return (NULL);
 	}
 
@@ -776,6 +809,9 @@ bul_remove(bul)
 {
 	if (bul == NULL)
 		return;
+#ifdef MIP_IPSEC
+	ipsec_bul_data_release(bul);
+#endif /* MIP_IPSEC */
 #ifdef MIP_MCOA 
 	if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
 		struct binding_update_list *mbul, *mbuln;
@@ -784,6 +820,9 @@ bul_remove(bul)
 			     mbul = mbuln) {
 			mbuln = LIST_NEXT(mbul, bul_entry);
 
+#ifdef MIP_IPSEC
+			ipsec_bul_data_release(mbul);
+#endif /* MIP_IPSEC */
 			LIST_REMOVE(mbul, bul_entry);
 			free(mbul);
 			mbul = NULL;
@@ -834,7 +873,7 @@ int bul_check_ifid(hoainfo)
 
 	if (getifaddrs(&ifap) != 0) {
 		syslog(LOG_ERR, "%s\n", strerror(errno));
-		return 0;
+		return (0);
 	}
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -857,9 +896,9 @@ int bul_check_ifid(hoainfo)
 	freeifaddrs(ifap);
 
 	if (is_same_ifid)
-		return 1;
+		return (1);
 
-	return 0;
+	return (0);
 }
 
 #ifdef MIP_MCOA
@@ -938,7 +977,8 @@ bul_flush(hoainfo)
 		buln = LIST_NEXT(bul, bul_entry);
 
 #ifdef TODO
-		/* before removing the entry, MUST remove bu entry in the kernel */
+		/* before removing the entry, MUST remove bu entry
+		   in the kernel */
 #endif
 		LIST_REMOVE(bul, bul_entry); 
 		free(bul);
@@ -1015,30 +1055,38 @@ command_show_bul_one(s, bul)
 	command_printf(s, "%s ", ip6_sprintf(&bul->bul_peeraddr));
 #ifndef MIP_MCOA
 	command_printf(s, "%s ", 
-		ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
+	    ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
 #else
 	if (bul->bul_bid)
 		command_printf(s, "%s$%d ", 
-			ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa), bul->bul_bid);
+		    ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa), bul->bul_bid);
 	else
 		command_printf(s, "%s ", 
-			ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
+		    ip6_sprintf(&bul->bul_hoainfo->hinfo_hoa));
 #endif /* MIP_MCOA */
-	command_printf(s, "%s\n", 
-		ip6_sprintf(&bul->bul_coa));
+	command_printf(s, "%s\n", ip6_sprintf(&bul->bul_coa));
 	
 	command_printf(s,
-		"     lif=%d, ref=%d, seq=%d, %c%c%c%c%c%c, %c, ", 
-		bul->bul_lifetime,
-		bul->bul_refresh,
-		bul->bul_seqno,
-		(bul->bul_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
-		(bul->bul_flags & IP6_MH_BU_HOME) ? 'H' : '-',
-		(bul->bul_flags & IP6_MH_BU_LLOCAL) ? 'L' : '-',
-		(bul->bul_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
-		(bul->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
-		(bul->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-',
-		(bul->bul_state & MIP6_BUL_STATE_DISABLE) ? 'D' : '-');
+#ifdef MIP_IPSEC
+	    "     lif=%d, ref=%d, seq=%d, %c%c%c%c%c%c, %c%c, ", 
+#else
+	    "     lif=%d, ref=%d, seq=%d, %c%c%c%c%c%c, %c, ", 
+#endif /* MIP_IPSEC */
+	    bul->bul_lifetime,
+	    bul->bul_refresh,
+	    bul->bul_seqno,
+	    (bul->bul_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
+	    (bul->bul_flags & IP6_MH_BU_HOME) ? 'H' : '-',
+	    (bul->bul_flags & IP6_MH_BU_LLOCAL) ? 'L' : '-',
+	    (bul->bul_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
+	    (bul->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
+	    (bul->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-',
+	    (bul->bul_state & MIP6_BUL_STATE_DISABLE) ? 'D' : '-'
+#ifdef MIP_IPSEC
+	    ,
+	    (bul->bul_state & MIP6_BUL_STATE_USEIPSEC) ? 'I' : '-'
+#endif /* MIP_IPSEC */
+		);
 
 	command_printf(s,
 	    "%s, %s, ret=%ld, exp=%ld\n",
@@ -1072,7 +1120,8 @@ command_show_kbul(s, dummy)
 	     hoainfo = LIST_NEXT(hoainfo, hinfo_entry)) {
 		memset(&bulreq, 0, sizeof(bulreq));
 		bulreq.ifbu_count = 0;
-		bulreq.ifbu_len = sizeof(struct if_bulreq) + sizeof(struct bul6info) * 10;
+		bulreq.ifbu_len = sizeof(struct if_bulreq)
+		    + sizeof(struct bul6info) * 10;
 		bulreq.ifbu_info = (struct bul6info *)bulinfobuff;
 		
 		memset(ifname, 0, sizeof(ifname));
@@ -1084,14 +1133,16 @@ command_show_kbul(s, dummy)
 		
 		if (ioctl(sock, SIOCGBULIST, &bulreq) < 0) { 
 			perror("ioctl");
-			command_printf(s, "ioctl to get buls is failed for %s\n", ifname);
+			command_printf(s,
+			    "ioctl to get buls is failed for %s\n", ifname);
 			break;
 		} 
 		
 		/* dump bul */
 		for (i = 0; i < bulreq.ifbu_count; i++) {
 			bul6 = bulreq.ifbu_info + i * sizeof(struct bul6info);
-			command_printf(s, "%s ", ip6_sprintf(&bul6->bul_peeraddr));
+			command_printf(s, "%s ",
+				       ip6_sprintf(&bul6->bul_peeraddr));
 
 			command_printf(s, "%s", 
 				ip6_sprintf(&bul6->bul_hoa));
@@ -1100,18 +1151,18 @@ command_show_kbul(s, dummy)
 				command_printf(s, "$%d", bul6->bul_bid);
 #endif /* MIP_MCOA */
 
-			command_printf(s, " %s\n", 
-				ip6_sprintf(&bul6->bul_coa));
+			command_printf(s, " %s\n",
+			    ip6_sprintf(&bul6->bul_coa));
 
 			command_printf(s,
-				"     %s, %c%c%c%c%c%c\n", 
-				if_indextoname(bul6->bul_ifindex, ifname), 
-				(bul6->bul_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
-				(bul6->bul_flags & IP6_MH_BU_HOME) ? 'H' : '-',
-				(bul6->bul_flags & IP6_MH_BU_LLOCAL) ? 'L' : '-',
-				(bul6->bul_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
-				(bul6->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
-				(bul6->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-');
+			    "     %s, %c%c%c%c%c%c\n", 
+			    if_indextoname(bul6->bul_ifindex, ifname), 
+			    (bul6->bul_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
+			    (bul6->bul_flags & IP6_MH_BU_HOME) ? 'H' : '-',
+			    (bul6->bul_flags & IP6_MH_BU_LLOCAL) ? 'L' : '-',
+			    (bul6->bul_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
+			    (bul6->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
+			    (bul6->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-');
 		}
 	}
 

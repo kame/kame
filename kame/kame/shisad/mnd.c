@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.51 2007/02/19 08:13:04 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.52 2007/02/27 01:44:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -189,6 +189,9 @@ main(argc, argv)
 	char **argv;
 {
 	int pfds, ch = 0;
+#ifdef MIP_IPSEC
+	int fd;
+#endif /* MIP_IPSEC */
 	FILE *pidfp;
 	struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul;
@@ -197,9 +200,14 @@ main(argc, argv)
 #ifdef DSMIP
 	char *v4homeagent = NULL;
 #endif /* DSMIP */
-	char *argopts = "fnc:a:";
 	char *conffile = MND_CONFFILE;
 	struct config_entry *dummy;
+#ifdef MIP_IPSEC
+	char *argopts = "fnc:a:C:";
+	char *ipsecconffile = IPSEC_CONFFILE;
+#else
+	char *argopts = "fnc:a:";
+#endif /* MIP_IPSEC */
 
 #if 1 /* MIP_NEMO */
 	argopts = "fnc:a:t:";
@@ -227,12 +235,17 @@ main(argc, argv)
 			v4homeagent = optarg;
 			break;
 #endif /* DSMIP */
-		default:
-			fprintf(stderr, "unknown option\n");
-			mn_usage();
+#ifdef MIP_IPSEC
+		case 'C':
+			ipsecconffile = optarg;
 			break;
-		}
-	}
+#endif /* MIP_IPSEC */
+                default:
+                        fprintf(stderr, "unknown option\n");
+                        mn_usage();
+                        break;
+                }
+        }
 	argc -= optind;
 	argv += optind;
 
@@ -299,6 +312,10 @@ main(argc, argv)
 	mhsock_open();
 	icmp6sock_open();
 	mipsock_open();
+#ifdef MIP_IPSEC
+	if (use_ipsec() && ipsec_init(ipsecconffile) < 0)
+		fprintf(stderr, "IPsec initialization failed\n");
+#endif /* MIP_IPSEC */
 #ifdef DSMIP
 	udp4sock_open();
 #endif /* DSMIP */
@@ -380,6 +397,12 @@ main(argc, argv)
 	new_fd_list(mipsock, POLLIN, mipsock_input_common);
 	new_fd_list(mhsock, POLLIN, mh_input_common);
 	new_fd_list(icmp6sock, POLLIN, icmp6_input_common);
+#ifdef MIP_IPSEC
+	if ((fd = sadb_socket()) >= 0)
+		new_fd_list(fd, POLLIN, sadb_poll);
+	if ((fd = spmif_socket()) >= 0)
+		new_fd_list(fd, POLLIN, spmif_poll);
+#endif /* MIP_IPSEC */
 #ifdef DSMIP
 	new_fd_list(udp4sock, POLLIN, udp4_input_common);
 #endif /* DSMIP */
@@ -640,7 +663,7 @@ mipsock_md_dereg_bul(hoa, coa, ifindex)
 	if (!IN6_ARE_ADDR_EQUAL(hoa, coa)) 
 		return (EINVAL);
 
-	/* Remove HoA from viturla interface */
+	/* Remove HoA from virtual interface */
 	if (if_indextoname(hoainfo->hinfo_ifindex, mipifname) == NULL) 
 		return (EINVAL);
 	err = delete_ip6addr(mipifname, &hoainfo->hinfo_hoa, 64);

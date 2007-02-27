@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.46 2007/02/19 09:07:00 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.47 2007/02/27 01:44:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -88,6 +88,8 @@ static void dump_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *,
 static void bul_print_all(void);
 
 static int bul_send_unsolicited_na(struct binding_update_list *);
+
+
 static void bul_stop_retrans_timer(struct binding_update_list *);
 static void bul_stop_timers(struct binding_update_list *);
 static void bul_stop_expire_timer(struct binding_update_list *);
@@ -410,7 +412,11 @@ bul_reg_fsm(bul, event, data)
 			bul->bul_lifetime
 			    = set_default_bu_lifetime(bul->bul_hoainfo);
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
-				if (!IN6_IS_ADDR_UNSPECIFIED(&bul->bul_peeraddr)) {
+				if (!IN6_IS_ADDR_UNSPECIFIED(&bul->bul_peeraddr)
+#ifdef MIP_IPSEC
+				    && !ipsec_bul_request(bul, MIPM_BUL_ADD)
+#endif /* MIP_IPSEC */
+				   ) {
 					error = send_bu(bul);
 					if (error) {
 						syslog(LOG_ERR,
@@ -910,6 +916,10 @@ bul_reg_fsm(bul, event, data)
 				bul_set_expire_timer(bul,
 				    bul->bul_lifetime << 2);
 
+#ifdef MIP_IPSEC
+				(void) ipsec_bul_request(bul, MIPM_BUL_UPDATE);
+#endif /* MIP_IPSEC */
+
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
 			} else {
 				/* XXX no need? */
@@ -949,7 +959,9 @@ bul_reg_fsm(bul, event, data)
 
 				bul_set_expire_timer(bul,
 				    bul->bul_lifetime << 2);
-
+#ifdef MIP_IPSEC
+				(void) ipsec_bul_request(bul, MIPM_BUL_REMOVE);
+#endif /* MIP_IPSEC */
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITD;
 			} else {
 				/* XXX no need? */
@@ -1124,6 +1136,10 @@ bul_reg_fsm(bul, event, data)
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
+#ifdef MIP_IPSEC
+				(void) ipsec_bul_request(bul, MIPM_BUL_UPDATE);
+#endif /* MIP_IPSEC */
+
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
 			} else {
 				/* XXX no need? */
@@ -1163,7 +1179,9 @@ bul_reg_fsm(bul, event, data)
 				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
-
+#ifdef MIP_IPSEC
+				(void) ipsec_bul_request(bul, MIPM_BUL_REMOVE);
+#endif /* MIP_IPSEC */
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITD;
 			}
 			break;
@@ -1319,6 +1337,9 @@ bul_reg_fsm(bul, event, data)
 
 				bul_set_expire_timer(bul,
 				    bul->bul_lifetime << 2);
+#ifdef MIP_IPSEC
+				(void) ipsec_bul_request(bul, MIPM_BUL_UPDATE);
+#endif /* MIP_IPSEC */
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
 			}
 			break;
@@ -1526,7 +1547,9 @@ bul_reg_fsm(bul, event, data)
 				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
-
+#ifdef MIP_IPSEC
+				(void) ipsec_bul_request(bul, MIPM_BUL_UPDATE);
+#endif /* MIP_IPSEC */
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
 			}
 			break;
@@ -1604,7 +1627,9 @@ bul_reg_fsm(bul, event, data)
 				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
-
+#ifdef MIP_IPSEC
+				(void) ipsec_bul_request(bul, MIPM_BUL_REMOVE);
+#endif /* MIP_IPSEC */
 				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITD;
 			}
 			break;
@@ -1779,12 +1804,31 @@ bul_reg_fsm(bul, event, data)
 			 * Start retransmission timer,
 			 * Start expire timer.
 			 */
+#ifdef MIP_IPSEC
+		    next:
+#endif /* MIP_IPSEC */
 			hal = mip6_find_hal(bul->bul_hoainfo);
 			if (hal == NULL)
 				break;
 
-			memcpy(&bul->bul_peeraddr, &hal->hal_ip6addr, sizeof(struct in6_addr));
-			syslog(LOG_INFO, "%s peer addd--------> add", ip6_sprintf(&bul->bul_peeraddr));
+			memcpy(&bul->bul_peeraddr, &hal->hal_ip6addr,
+			    sizeof(struct in6_addr));
+			syslog(LOG_INFO, "%s peer addd--------> add\n",
+			    ip6_sprintf(&bul->bul_peeraddr));
+#ifdef MIP_IPSEC
+			if (ipsec_bul_request(bul, MIPM_BUL_ADD) < 0) {
+				struct mip6_hpfxl *hpfx;
+				struct mip6_mipif *mif;
+
+				mif = mnd_get_mipif(bul->bul_hoainfo->hinfo_ifindex);
+				LIST_FOREACH(hpfx,
+					     &mif->mipif_hprefx_head,
+					     hpfx_entry)
+					mip6_delete_hal(hpfx,
+							&bul->bul_peeraddr);
+				goto next;
+			}
+#endif /* MIP_IPSEC */
 			error = send_bu(bul);
 			if (error) {
 				syslog(LOG_ERR,
@@ -1804,7 +1848,8 @@ bul_reg_fsm(bul, event, data)
 			if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
 				struct binding_update_list *mbul;
 				
-				for (mbul = LIST_FIRST(&bul->bul_mcoa_head); mbul;
+				for (mbul = LIST_FIRST(&bul->bul_mcoa_head);
+				     mbul;
 				     mbul = LIST_NEXT(mbul, bul_entry)) {
 		
 					syslog(LOG_INFO, "found multiple BULISTS in kick_fsm");
@@ -1813,8 +1858,10 @@ bul_reg_fsm(bul, event, data)
 					    MIP6_BUL_REG_FSM_STATE_DHAAD)
 						continue;
 #endif
+					/* XXX needs IPsec on MCOA? */
 					memcpy(&mbul->bul_peeraddr, 
-					       &hal->hal_ip6addr, sizeof(struct in6_addr));
+					       &hal->hal_ip6addr,
+					       sizeof(struct in6_addr));
 					error = send_bu(mbul);
 					if (error) {
 						syslog(LOG_ERR,
@@ -2520,19 +2567,28 @@ bul_fsm_back_register(bul, data)
 #endif
 	}
 
+#ifdef MIP_IPSEC
+	if (bul->bul_ipsec_data == NULL &&
+	    ipsec_bul_request(bul, MIPM_BUL_ADD | MIPM_BUL_AFTER_BA) < 0)
+		return (-1);
+#endif /* MIP_IPSEC */
 	/* inject binding information to kernel. */
 	if (mipsock_bul_request(bul, MIPM_BUL_ADD)) {
 		syslog(LOG_ERR,
 		       "updating a binding update entry in a kernel failed.");
 		return (-1);
 	}
+#ifdef MIP_IPSEC
+	if (ipsec_bul_request(bul, MIPM_BUL_UPDATE | MIPM_BUL_AFTER_BA) < 0)
+		return (-1);
+#endif /* MIP_IPSEC */
 
 #if TODO
 	/* notify all the CNs that we have a new coa. */
 	error = mip6_bu_list_notify_binding_change(sc, 0);
 	if (error) {
 		syslog(LOG_ERR,
-		    "updating the bining cache entries of all CNs failed.");
+		    "updating the binding cache entries of all CNs failed.\n");
 		return (error);
 	}
 #endif
@@ -2555,6 +2611,9 @@ bul_fsm_back_deregister(bul, data)
 		    "removing IFF_DEREGISTERING flag failed.");
 	}
 
+#ifdef MIP_IPSEC
+	(void)ipsec_bul_request(bul, MIPM_BUL_REMOVE | MIPM_BUL_AFTER_BA);
+#endif /* MIP_IPSEC */
 	if (bul->bul_flags & IP6_MH_BU_HOME) {
 		/* send an unsolicited neighbor advertisement message. */
 		bul_send_unsolicited_na(bul);
@@ -2698,12 +2757,19 @@ bul_fsm_try_other_home_agent(bul)
 	struct mip6_mipif *mif;
 	int error;
 
+#ifdef MIP_IPSEC
+   next:
+#endif /* MIP_IPSEC */
 	/*
 	 * remove the unavailable home agent from the home agent list.
 	 */
 	mif = mnd_get_mipif(bul->bul_hoainfo->hinfo_ifindex);
 	LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
 		mip6_delete_hal(hpfx, &bul->bul_peeraddr);
+#ifdef MIP_IPSEC
+		(void) ipsec_bul_request(bul, MIPM_BUL_REMOVE);
+		bul->bul_peeraddr = in6addr_any;
+#endif /* MIP_IPSEC */
 	}
 
 	/* 
@@ -2724,6 +2790,15 @@ bul_fsm_try_other_home_agent(bul)
 		syslog(LOG_ERR, "bul_peeraddr is set to %s",
 		    ip6_sprintf(&bul->bul_peeraddr));
 
+#ifdef MIP_IPSEC
+		if (ipsec_bul_request(bul, MIPM_BUL_ADD) < 0) {
+			if (debug)
+				syslog(LOG_INFO,
+				       "IPsec drops candidate HA %s\n",
+				       ip6_sprintf(&bul->bul_peeraddr));
+			goto next;
+		}
+#endif /* MIP_IPSEC */
 		error = send_bu(bul);
 		if (error) {
 		    syslog(LOG_ERR,
