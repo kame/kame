@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.122 2005/12/13 00:49:03 mitsuya Exp $	*/
+/*	$KAME: ndp.c,v 1.123 2007/03/27 02:29:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -343,7 +343,7 @@ file(name)
 	args[3] = &arg[3][0];
 	args[4] = &arg[4][0];
 	retval = 0;
-	while (fgets(line, 100, fp) != NULL) {
+	while (fgets(line, sizeof(line), fp) != NULL) {
 		i = sscanf(line, "%49s %49s %49s %49s %49s",
 		    arg[0], arg[1], arg[2], arg[3], arg[4]);
 		if (i < 2) {
@@ -387,9 +387,9 @@ set(argc, argv)
 	int argc;
 	char **argv;
 {
-	register struct sockaddr_in6 *sin = &sin_m;
-	register struct sockaddr_dl *sdl;
-	register struct rt_msghdr *rtm = &(m_rtmsg.m_rtm);
+	struct sockaddr_in6 *sin = &sin_m;
+	struct sockaddr_dl *sdl;
+	struct rt_msghdr *rtm = &(m_rtmsg.m_rtm);
 	struct addrinfo hints, *res;
 	int gai_error;
 	u_char *ea;
@@ -508,7 +508,7 @@ delete(host)
 	char *host;
 {
 	struct sockaddr_in6 *sin = &sin_m;
-	register struct rt_msghdr *rtm = &m_rtmsg.m_rtm;
+	struct rt_msghdr *rtm = &m_rtmsg.m_rtm;
 	struct sockaddr_dl *sdl;
 	struct addrinfo hints, *res;
 	int gai_error;
@@ -879,9 +879,9 @@ rtmsg(cmd)
 {
 	static int seq;
 	int rlen;
-	register struct rt_msghdr *rtm = &m_rtmsg.m_rtm;
-	register char *cp = m_rtmsg.m_space;
-	register int l;
+	struct rt_msghdr *rtm = &m_rtmsg.m_rtm;
+	char *cp = m_rtmsg.m_space;
+	int l;
 
 	errno = 0;
 	if (cmd == RTM_DELETE)
