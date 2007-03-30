@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.408 2006/11/14 07:50:23 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.409 2007/03/30 09:41:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -815,7 +815,7 @@ in6_control(so, cmd, data, ifp, p)
 		if (pr0.ndpr_plen == 128) {
 			break;	/* we don't need to install a host route. */
 #if defined(MIP6) && NMIP > 0
-		} else if ((ia->ia6_flags & IN6_IFF_HOME) && (ifp->if_type == IFT_MIP)) {
+		} else if ((ia->ia6_flags & IN6_IFF_HOME) && (ifp->if_type == IFT_MOBILEIP)) {
 			break;  /* we don't need to install a interface route. for home address */
 #endif 
 		}
@@ -2481,8 +2481,8 @@ in6_if2idlen(ifp)
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:	/* ditto */
 #endif
-#ifdef IFT_MIP
-	case IFT_MIP:	/* ditto */
+#ifdef IFT_MOBILEIP
+	case IFT_MOBILEIP:	/* ditto */
 #endif
 		return (64);
 	case IFT_FDDI:		/* RFC2467 */

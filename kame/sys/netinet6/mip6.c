@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.246 2007/01/26 12:51:45 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.247 2007/03/30 09:41:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1290,7 +1290,7 @@ mip6_are_homeprefix(ndpr)
 		if (ia6->ia_ifp == NULL)
 			continue;
 
-		if (ia6->ia_ifp->if_type != IFT_MIP)
+		if (ia6->ia_ifp->if_type != IFT_MOBILEIP)
 			continue;
 
 		if (in6_are_prefix_equal(&ndpr->ndpr_prefix.sin6_addr,
@@ -1312,7 +1312,7 @@ mip6_ifa6_is_addr_valid_hoa(ifa6)
 	if ((ifa6->ia6_flags & IN6_IFF_HOME) == 0)
 		return (0);
 
-	if (ifa6->ia_ifp->if_type != IFT_MIP) {
+	if (ifa6->ia_ifp->if_type != IFT_MOBILEIP) {
 		/* The Mobile Node is attached to the home link */
 		if ((ifa6->ia6_flags & IN6_IFF_DEREGISTERING) == 0)
 			return (1);

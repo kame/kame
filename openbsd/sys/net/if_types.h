@@ -266,7 +266,7 @@
 #define	IFT_ENC		0xf4		/* Encapsulation */
 #define	IFT_PFLOG	0xf5		/* Packet filter logging */
 #define	IFT_PFSYNC	0xf6		/* Packet filter state syncing */
-#define IFT_MIP		0xf7
+#define IFT_MOBILEIP	0xf7
 #define IFT_IST		0xf9
 
 #endif /* _NET_IF_TYPES_H_ */

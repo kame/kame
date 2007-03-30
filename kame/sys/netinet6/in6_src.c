@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.160 2006/11/14 07:37:00 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.161 2007/03/30 09:41:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -397,16 +397,16 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * address and SA is not, then prefer SB.
 		 */
 		if (((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
-			ia_best->ia_ifp->if_type != IFT_MIP)
+			ia_best->ia_ifp->if_type != IFT_MOBILEIP)
 		    &&
 		    ((ia->ia6_flags & IN6_IFF_HOME) != 0 &&
-			ia->ia_ifp->if_type == IFT_MIP))
+			ia->ia_ifp->if_type == IFT_MOBILEIP))
 			NEXT(4);
 		if (((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
-			ia_best->ia_ifp->if_type == IFT_MIP)
+			ia_best->ia_ifp->if_type == IFT_MOBILEIP)
 		    &&
 		    ((ia->ia6_flags & IN6_IFF_HOME) != 0 &&
-			ia->ia_ifp->if_type != IFT_MIP))
+			ia->ia_ifp->if_type != IFT_MOBILEIP))
 			REPLACE(4);
 		if (ip6po_usecoa == 0) {
 			/*

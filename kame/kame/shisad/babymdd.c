@@ -1,4 +1,4 @@
-/*	$Id: babymdd.c,v 1.29 2007/02/19 08:13:03 t-momose Exp $	*/
+/*	$Id: babymdd.c,v 1.30 2007/03/30 09:41:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1275,7 +1275,7 @@ baby_selection()
 	     ifinfo; ifinfo = ifinfo_next) {
 		ifinfo_next = LIST_NEXT(ifinfo, ifinfo_entry);
 
-		if (ifinfo->iftype == IFT_MIP)
+		if (ifinfo->iftype == IFT_MOBILEIP)
 			continue;
 		if (
 #ifdef DSMIP

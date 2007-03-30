@@ -1,4 +1,4 @@
-/*      $KAME: mdd_rtsock.c,v 1.3 2005/10/11 15:24:23 mitsuya Exp $  */
+/*      $KAME: mdd_rtsock.c,v 1.4 2007/03/30 09:41:15 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -429,7 +429,7 @@ _get_hoalist()
 
 		sdl = (struct sockaddr_dl *)(ifm + 1);
 
-		if (sdl->sdl_type == IFT_MIP) {
+		if (sdl->sdl_type == IFT_MOBILEIP) {
 			index[indexp++] = ifm->ifm_index;
 			if (indexp >= 10)
 				break;

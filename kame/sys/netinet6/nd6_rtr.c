@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.280 2006/04/22 04:39:16 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.281 2007/03/30 09:41:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1625,7 +1625,7 @@ pfxlist_onlink_check()
 		     * even when we don't have autoconfigured
 		     * addresses.
 		     */
-	  	    && !((ifa->ia6_flags & IN6_IFF_HOME) && (ifa->ia_ifp->if_type != IFT_MIP)) 
+	  	    && !((ifa->ia6_flags & IN6_IFF_HOME) && (ifa->ia_ifp->if_type != IFT_MOBILEIP)) 
 #endif /* MIP6 && NMIP > 0 */
 			)
 			continue;
@@ -1647,7 +1647,7 @@ pfxlist_onlink_check()
 			if (!(ifa->ia6_flags & IN6_IFF_AUTOCONF)
 #if defined(MIP6) && NMIP > 0
 			    /* see the comment above. */
-			    && !((ifa->ia6_flags & IN6_IFF_HOME) && (ifa->ia_ifp->if_type != IFT_MIP)) 
+			    && !((ifa->ia6_flags & IN6_IFF_HOME) && (ifa->ia_ifp->if_type != IFT_MOBILEIP)) 
 #endif /* MIP6 && NMIP > 0 */
 				)
 				continue;

@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.c,v 1.10 2006/08/10 17:55:00 t-momose Exp $	*/
+/*	$KAME: if_mip.c,v 1.11 2007/03/30 09:41:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -148,7 +148,7 @@ mipattach(dummy)
 		sc->mip_if.if_mtu = MIP_MTU;
 		sc->mip_if.if_ioctl = mip_ioctl;
 		sc->mip_if.if_output = mip_output;
-		sc->mip_if.if_type = IFT_MIP;
+		sc->mip_if.if_type = IFT_MOBILEIP;
 #ifdef __NetBSD__
 		sc->mip_if.if_dlt = DLT_NULL;
 #endif
