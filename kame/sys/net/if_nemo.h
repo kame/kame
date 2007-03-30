@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.h,v 1.6 2007/03/30 09:40:46 keiichi Exp $	*/
+/*	$KAME: if_nemo.h,v 1.7 2007/03/30 09:47:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,7 +133,5 @@ int nemo_encapcheck __P((const struct mbuf *, int, int, void *));
 #define SIOCSIFPHYNEXTHOP  _IOW('i', 78, struct ifreq) /* set nemo nxthop */
 #define SIOCDIFPHYNEXTHOP  _IOW('i', 79, struct ifreq) /* delete nemo nxthop */
 #define SIOCGIFPHYNEXTHOP _IOWR('i', 80, struct ifreq) /* get nemo nxthop */
-#define SIOCSIFPHYNEXTHOP_IN6  _IOW('i', 140, struct ifreq) /* set nxthop */
-#define SIOCGIFPHYNEXTHOP_IN6 _IOWR('i', 141, struct ifreq) /* delete nxthop */
 
 #endif /* _NET_IF_GIF_H_ */
