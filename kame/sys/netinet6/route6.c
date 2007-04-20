@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.60 2006/06/25 02:21:47 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.61 2007/04/20 23:39:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,8 +62,10 @@
 
 #include <netinet/icmp6.h>
 
+#if 0
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr0 *));
+#endif
 
 #if defined(MIP6) && NMIP > 0
 static int ip6_rthdr2 __P((struct mbuf *, struct ip6_hdr *,
@@ -106,6 +108,7 @@ route6_input(mp, offp, proto)
 #endif
 
 	switch (rh->ip6r_type) {
+#if 0
 	case IPV6_RTHDR_TYPE_0:
 		rhlen = (rh->ip6r_len + 1) << 3;
 		if (rh->ip6r_segleft == 0)
@@ -134,6 +137,7 @@ route6_input(mp, offp, proto)
 #endif
 		if (ip6_rthdr0(m, ip6, (struct ip6_rthdr0 *)rh))
 			return (IPPROTO_DONE);
+#endif
 		break;
 #if defined(MIP6) && NMIP > 0
 	case IPV6_RTHDR_TYPE_2:
@@ -170,6 +174,7 @@ route6_input(mp, offp, proto)
 	return (rh->ip6r_nxt);
 }
 
+#if 0
 /*
  * Type0 routing header processing
  *
@@ -260,6 +265,7 @@ ip6_rthdr0(m, ip6, rh0)
 	m_freem(m);
 	return (-1);
 }
+#endif
 
 #if defined(MIP6) && NMIP > 0
 /* Type2 routing header processing */
