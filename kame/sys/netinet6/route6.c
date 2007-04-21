@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.61 2007/04/20 23:39:11 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.62 2007/04/21 08:10:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,8 +137,8 @@ route6_input(mp, offp, proto)
 #endif
 		if (ip6_rthdr0(m, ip6, (struct ip6_rthdr0 *)rh))
 			return (IPPROTO_DONE);
-#endif
 		break;
+#endif
 #if defined(MIP6) && NMIP > 0
 	case IPV6_RTHDR_TYPE_2:
 		rhlen = (rh->ip6r_len + 1) << 3;
