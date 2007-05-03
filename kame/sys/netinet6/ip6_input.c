@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.370 2007/04/08 17:04:31 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.371 2007/05/03 22:07:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -375,7 +375,7 @@ ip6_input(m)
 	int off = sizeof(struct ip6_hdr), nest;
 	u_int32_t plen;
 	u_int32_t rtalert = ~0;
-	int nxt, ours = 0;
+	int nxt, ours = 0, rh_present = 0;
 	struct ifnet *deliverifp = NULL;
 #if 0
 	struct mbuf *mhist;	/* onion peeling history */
@@ -1056,9 +1056,11 @@ passin:
 	in6_ifstat_inc(deliverifp, ifs6_in_deliver);
 	nest = 0;
 
+	rh_present = 0;
 	while (nxt != IPPROTO_DONE) {
 		if (ip6_hdrnestlimit && (++nest > ip6_hdrnestlimit)) {
 			ip6stat.ip6s_toomanyhdr++;
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_hdrerr);
 			goto bad;
 		}
 
@@ -1087,6 +1089,15 @@ passin:
 			goto bad;
 		}
 #endif
+
+		if (nxt == IPPROTO_ROUTING) {
+			if (rh_present++) {
+				in6_ifstat_inc(m->m_pkthdr.rcvif,
+				    ifs6_in_hdrerr);
+				ip6stat.ip6s_badoptions++;
+				goto bad;
+			}
+		}
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 		/*
