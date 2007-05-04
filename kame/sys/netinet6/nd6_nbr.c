@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.172 2007/05/04 01:43:28 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.173 2007/05/04 04:48:52 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -927,6 +927,10 @@ nd6_na_input(m, off, icmp6len)
 	if (ln->ln_hold) {
 		struct mbuf *m_hold, *m_hold_next;
 
+		/*
+		 * reset the ln_hold in advance, to explicitly prevent a
+		 * ln_hold lookup in nd6_output() (wouldn't happen, though...)
+		 */
 		for (m_hold = ln->ln_hold, ln->ln_hold = NULL;
 		    m_hold; m_hold = m_hold_next) {
 			m_hold_next = m_hold->m_nextpkt;
