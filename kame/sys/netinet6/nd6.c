@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.399 2006/04/23 02:51:26 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.400 2007/05/04 01:43:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2147,24 +2147,17 @@ fail:
 
 			if (ln->ln_hold) {
 				struct mbuf *m_hold, *m_hold_next;
-				for (m_hold = ln->ln_hold; m_hold;
-				     m_hold = m_hold_next) {
-					struct mbuf *mpkt = NULL;
-			
+				for (m_hold = ln->ln_hold, ln->ln_hold = NULL;
+				    m_hold; m_hold = m_hold_next) {
 					m_hold_next = m_hold->m_nextpkt;
-					mpkt = m_copym(m_hold, 0, M_COPYALL, M_DONTWAIT);
-					if (mpkt == NULL) {
-						m_freem(m_hold);
-						break;
-					}
-					mpkt->m_nextpkt = NULL;
+					m_hold->m_nextpkt = NULL;
 
 					/*
 					 * we assume ifp is not a p2p here, so
 					 * just set the 2nd argument as the 
 					 * 1st one.
 					 */
-					nd6_output(ifp, ifp, mpkt,
+					nd6_output(ifp, ifp, m_hold,
 					     (struct sockaddr_in6 *)rt_key(rt),
 					     rt);
 				}

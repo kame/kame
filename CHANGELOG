@@ -1,5 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2836 2006/10/25 07:14:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.2837 2007/05/04 01:43:28 suz Exp $
+
+<200705>
+2007-05-04  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/sys/netinet6/{nd6.c, nd6_nbr.c}: fixed a memory leak in
+	unresolved ND queue processing. (Reported by Hikaru Abe)
 
 <200610>
 2006-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
