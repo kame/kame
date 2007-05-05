@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.62 2007/04/21 08:10:49 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.63 2007/05/05 10:11:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,6 +109,21 @@ route6_input(mp, offp, proto)
 
 	switch (rh->ip6r_type) {
 #if 0
+	/*
+	 * See http://www.secdev.org/conf/IPv6_RH_security-csw07.pdf
+	 * for why IPV6_RTHDR_TYPE_0 is baned here.
+	 *
+	 * We return ICMPv6 parameter problem so that innocent people
+	 * (not an attacker) would notice about the use of IPV6_RTHDR_TYPE_0.
+	 * Since there's no amplification, and ICMPv6 error will be rate-
+	 * controlled, it shouldn't cause any problem.
+	 * If you are concerned about this, you may want to use the following
+	 * code fragment:
+	 *
+	 * case IPV6_RTHDR_TYPE_0:
+	 *	m_freem(m);
+	 *	return (IPPROTO_DONE);
+	 */
 	case IPV6_RTHDR_TYPE_0:
 		rhlen = (rh->ip6r_len + 1) << 3;
 		if (rh->ip6r_segleft == 0)
