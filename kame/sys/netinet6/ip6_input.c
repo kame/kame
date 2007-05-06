@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.371 2007/05/03 22:07:39 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.372 2007/05/06 14:35:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1090,6 +1090,18 @@ passin:
 		}
 #endif
 
+		/*
+		 * here we try to reject packets with more than 1 routing
+		 * headers.  we do this here (instead of tagging mbuf route6.c) 
+		 * for the sake of computational costs, such as malloc().
+		 *
+		 * the code could be too restrictive - there could be
+		 * actual use of more than 1 routing headers on a packet,
+		 * which cannot be used to do bad things unlike
+		 * IPV6_RTHDR_TYPE_0.  we will revisit it later when update
+		 * to RFC2460 gets published.
+		 *	Sun May  6 23:34:20 JST 2007
+		 */
 		if (nxt == IPPROTO_ROUTING) {
 			if (rh_present++) {
 				in6_ifstat_inc(m->m_pkthdr.rcvif,
