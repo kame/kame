@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.84 2005/07/21 11:03:20 keiichi Exp $
+$KAME: FAQ,v 1.85 2007/05/11 08:27:55 itojun Exp $
 
 
 GENERAL
@@ -581,7 +581,7 @@ Q: What is the crypto export/import situation in Japan?
 	attorney is :-)
 
 	See "crypto law survey page",
-	http://cwis.kub.nl/~frw/people/koops/cls2.htm#ja, for more
+	http://rechten.uvt.nl/koops/cryptolaw/cls2.htm#ja, for more
 	information. (the page is really great)
 
 Q: Can I download KAME without infringing crypto law?
