@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.85 2007/05/11 08:27:55 itojun Exp $
+$KAME: FAQ,v 1.86 2007/05/13 14:56:52 itojun Exp $
 
 
 GENERAL
@@ -593,7 +593,7 @@ Q: Can I download KAME without infringing crypto law?
 
 	For import to your country, please check "crypto law survey
 	page" for your country.  Please proceed to
-	http://cwis.kub.nl/~frw/people/koops/lawsurvy.htm.
+	http://rechten.uvt.nl/koops/cryptolaw/index.htm.
 
 Q: Under what kind of license is the KAME kit redistributed?
 	The KAME kit itself obeys the following BSD-like AS-IS license.
