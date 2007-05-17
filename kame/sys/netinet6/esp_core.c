@@ -1,5 +1,5 @@
 /*	$NetBSD: esp_core.c,v 1.33 2003/08/27 00:08:31 thorpej Exp $	*/
-/*	$KAME: esp_core.c,v 1.69 2005/12/27 09:33:43 jinmei Exp $	*/
+/*	$KAME: esp_core.c,v 1.70 2007/05/17 00:00:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,9 +151,11 @@ static const struct esp_algorithm esp_algorithms[] = {
 		esp_common_ivlen, esp_cbc_decrypt,
 		esp_cbc_encrypt, esp_twofish_schedule,
 		esp_twofish_blockdecrypt, esp_twofish_blockencrypt },
+#if 0
 	{ 16, 8, esp_aesctr_mature, 160, 288, esp_aesctr_schedlen, "aes-ctr",
 		esp_common_ivlen, esp_aesctr_decrypt,
 		esp_aesctr_encrypt, esp_aesctr_schedule },
+#endif
 };
 
 const struct esp_algorithm *
@@ -176,8 +178,10 @@ esp_algorithm_lookup(idx)
 		return &esp_algorithms[5];
 	case SADB_X_EALG_TWOFISHCBC:
 		return &esp_algorithms[6];
+#if 0
 	case SADB_X_EALG_AESCTR:
 		return &esp_algorithms[7];
+#endif
 	default:
 		return NULL;
 	}
