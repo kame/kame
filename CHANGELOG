@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2837 2007/05/04 01:43:28 suz Exp $
+$KAME: CHANGELOG,v 1.2838 2007/05/17 18:42:41 jinmei Exp $
 
 <200705>
+2007-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c: Disabled responding to NI queries
+	from a global address by default as specified in RFC4620.
+	It can be re-enabled by setting the 0x8 flag of
+	net.inet6.icmp6.nodeinfo.
+
 2007-05-04  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/{nd6.c, nd6_nbr.c}: fixed a memory leak in
 	unresolved ND queue processing. (Reported by Hikaru Abe)
