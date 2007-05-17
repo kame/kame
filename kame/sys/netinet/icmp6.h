@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.105 2006/08/29 02:00:19 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.106 2007/05/17 18:27:40 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1001,6 +1001,11 @@ do { \
 
 extern int	icmp6_rediraccept;	/* accept/process redirects */
 extern int	icmp6_redirtimeout;	/* cache time for redirect routes */
+
+#define ICMP6_NODEINFO_FQDNOK		0x1
+#define ICMP6_NODEINFO_NODEADDROK	0x2
+#define ICMP6_NODEINFO_TMPADDROK	0x4
+#define ICMP6_NODEINFO_GLOBALOK		0x8
 #endif /* _KERNEL */
 #endif /* !__APPLE__ || (__APPLE__ && KERNEL_PRIVATE) */
 
