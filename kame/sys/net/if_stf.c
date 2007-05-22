@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.121 2005/04/14 06:22:38 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.122 2007/05/22 12:19:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -69,8 +69,9 @@
  *
  * 6to4 interface has security issues.  Refer to
  * http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
- * for details.  The code tries to filter out some of malicious packets.
- * Note that there is no way to be 100% secure.
+ * and RFC3946 for details.  The code tries to filter out some of malicious
+ * packets.
+ * Note that there is NO WAY to be 100% secure.
  */
 
 #ifdef __FreeBSD__
@@ -753,7 +754,7 @@ stf_checkaddr4(sc, in, inifp)
 
 	/*
 	 * reject packet with IPv4 link-local (169.254.0.0/16) in case of 6to4,
-	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
+	 * as suggested in RFC3946.
 	 */
 	if (((ntohl(in->s_addr) & 0xff000000) >> 24) == 169 &&
 	     ((ntohl(in->s_addr) & 0x00ff0000) >> 16) == 254)
@@ -836,15 +837,13 @@ stf_checkaddr6(sc, in6, inifp)
 		return -1;
 
 	/*
-	 * reject link-local and site-local unicast
-	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
+	 * reject link-local and site-local unicast as suggested in RFC3946.
 	 */
 	if (IN6_IS_ADDR_LINKLOCAL(in6) || IN6_IS_ADDR_SITELOCAL(in6))
 		return -1;
 
 	/*
-	 * reject node-local and link-local multicast
-	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
+	 * reject node-local and link-local multicast as suggested in RFC3946.
 	 */
 #ifdef IN6_IS_ADDR_MC_INTFACELOCAL
 	if (IN6_IS_ADDR_MC_INTFACELOCAL(in6) || IN6_IS_ADDR_MC_LINKLOCAL(in6))

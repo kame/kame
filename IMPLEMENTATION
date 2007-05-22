@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.400 2006/05/30 01:10:45 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.401 2007/05/22 12:19:45 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -179,7 +179,7 @@ RFC3041: Privacy Extensions for Stateless Address Autoconfiguration in IPv6
 RFC3056: Connection of IPv6 Domains via IPv4 Clouds
     * So-called "6to4".
     * "stf" interface implements it.  Be sure to read
-      draft-itojun-ipv6-transition-abuse-01.txt
+      draft-itojun-ipv6-transition-abuse-01.txt and RFC3964
       below before configuring it, there can be security issues.
 RFC3142: An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
@@ -229,6 +229,10 @@ RFC3776: Using IPsec to Protect Mobile IPv6 Signaling between Mobile
 	Nodes and Home Agents
 RFC3810: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
     * host-side implementation & router-side implementation (pim6sd).
+RFC3946: Security Considerations for 6to4
+    * "stf" interface implements some address filters.  Refer to stf(4)
+      for details.  Since there's no way to make 6to4 interface 100% secure,
+      we do not include "stf" interface into GENERIC.v6 compilation.
 RFC4007: IPv6 Scoped Address Architecture
     * some part of the documentation (especially about the routing
       model) is not supported yet.
@@ -271,6 +275,14 @@ draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
 draft-ietf-nemo-basic-03.txt:
 	Network Mobility (NEMO) Basic Support Protocol
+draft-cmetz-v6ops-v4mapped-api-harmful-01.txt:
+	IPv4-Mapped Address API Considered Harmful
+draft-itojun-v6ops-v4mapped-harmful-02.txt:
+	IPv4-Mapped Addresses on the Wire Considered Harmful
+draft-ietf-v6ops-security-overview-06.txt:
+	IPv6 Transition/Co-existence Security Considerations
+    * "IPv4-Mapped blah Considered Harmful" draft with better wording.
+      see seciton 2.2 for more detail.
 
 1.2 Neighbor Discovery
 
@@ -1383,8 +1395,8 @@ mapped address or not.  This adds many twists:
   servers on the kernel can be hosed by IPv6 native packet that has IPv4
   mapped address in IPv6 header source, and can generate unwanted IPv4 packets.
   draft-itojun-ipv6-transition-abuse-01.txt, draft-cmetz-v6ops-v4mapped-api-
-  harmful-00.txt, and draft-itojun-v6ops-v4mapped-harmful-01.txt
-  has more on this scenario.
+  harmful-01.txt, draft-itojun-v6ops-v4mapped-harmful-02.txt and
+  draft-ietf-v6ops-security-overview-06.txt have more on this scenario.
 
 Due to the above twists, some of KAME userland programs has restrictions on
 the use of IPv4 mapped addresses:
@@ -1517,8 +1529,8 @@ base header, or IPv6 routing header.  Also, KAME default configuration file
 is written carefully, to avoid those attacks.
 
 draft-itojun-ipv6-transition-abuse-01.txt, draft-cmetz-v6ops-v4mapped-api-
-harmful-00.txt and draft-itojun-v6ops-v4mapped-harmful-01.txt has more on
-this issue.
+harmful-01.txt, draft-itojun-v6ops-v4mapped-harmful-02.txt and
+draft-ietf-v6ops-security-overview-06.txt have more on this issue.
 
 1.15 Node's required addresses
 
