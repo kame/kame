@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.h,v 1.7 2007/03/30 09:47:22 keiichi Exp $	*/
+/*	$KAME: if_nemo.h,v 1.8 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,20 +112,20 @@ extern int nnemo;
 extern struct nemo_softc *nemo_softc;
 
 /* Prototypes */
-void nemoattach0 __P((struct nemo_softc *));
+void nemoattach0(struct nemo_softc *);
 #ifndef __OpenBSD__
-void nemo_input __P((struct mbuf *, int, struct ifnet *));
+void nemo_input(struct mbuf *, int, struct ifnet *);
 #endif
-int nemo_output __P((struct ifnet *, struct mbuf *,
-		    struct sockaddr *, struct rtentry *));
-int nemo_ioctl __P((struct ifnet *, u_long, caddr_t));
-int nemo_set_tunnel __P((struct ifnet *, struct sockaddr *, struct sockaddr *));
-void nemo_delete_tunnel __P((struct ifnet *));
+int nemo_output(struct ifnet *, struct mbuf *, struct sockaddr *,
+	struct rtentry *);
+int nemo_ioctl(struct ifnet *, u_long, caddr_t);
+int nemo_set_tunnel(struct ifnet *, struct sockaddr *, struct sockaddr *);
+void nemo_delete_tunnel(struct ifnet *);
 #ifdef __OpenBSD__
-void nemo_start __P((struct ifnet *));
+void nemo_start(struct ifnet *);
 #endif
 #ifdef GIF_ENCAPCHECK
-int nemo_encapcheck __P((const struct mbuf *, int, int, void *));
+int nemo_encapcheck(const struct mbuf *, int, int, void *);
 #endif
 
 #endif /* !defined(__APPLE__) || (defined(__APPLE__) && defined(KERNEL_PRIVATE)) */

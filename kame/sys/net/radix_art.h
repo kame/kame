@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.h,v 1.5 2002/11/05 03:48:31 itojun Exp $	*/
+/*	$KAME: radix_art.h,v 1.6 2007/06/14 12:09:42 itojun Exp $	*/
 /*	$NetBSD: radix.h,v 1.10 2000/11/06 11:07:37 itojun Exp $	*/
 
 /*
@@ -133,17 +133,17 @@ struct art_node_head {
 	unsigned int art_limit;			/* max prefixlen */
 };
 
-void	 rn_art_init __P((void));
-int	 rn_art_inithead __P((void **, int));
-void	 rn_art_setlimit __P((struct radix_node_head *, unsigned int));
+void	 rn_art_init(void);
+int	 rn_art_inithead(void **, int);
+void	 rn_art_setlimit(struct radix_node_head *, unsigned int);
 struct radix_node
-	 *rn_art_addroute __P((void *, void *, struct radix_node_head *,
-			struct radix_node [2])),
-	 *rn_art_delete __P((void *, void *, struct radix_node_head *)),
-	 *rn_art_insert __P((void *, struct radix_node_head *, int *,
-			struct radix_node [2])),
-	 *rn_art_lookup __P((void *, void *, struct radix_node_head *)),
-	 *rn_art_match __P((void *, struct radix_node_head *));
+	 *rn_art_addroute(void *, void *, struct radix_node_head *,
+			struct radix_node [2]),
+	 *rn_art_delete(void *, void *, struct radix_node_head *),
+	 *rn_art_insert(void *, struct radix_node_head *, int *,
+			struct radix_node [2]),
+	 *rn_art_lookup(void *, void *, struct radix_node_head *),
+	 *rn_art_match(void *, struct radix_node_head *);
 #endif
 
 #endif /* _NET_RADIX_ART_H_ */

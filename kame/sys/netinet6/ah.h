@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.21 2004/05/21 08:17:57 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.22 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,45 +68,45 @@ struct ah_algorithm_state {
 };
 
 struct ah_algorithm {
-	int (*sumsiz) __P((struct secasvar *));
-	int (*mature) __P((struct secasvar *));
+	int (*sumsiz)(struct secasvar *);
+	int (*mature)(struct secasvar *);
 	int keymin;	/* in bits */
 	int keymax;	/* in bits */
 	const char *name;
-	int (*init) __P((struct ah_algorithm_state *, struct secasvar *));
-	void (*update) __P((struct ah_algorithm_state *, u_int8_t *, size_t));
-	void (*result) __P((struct ah_algorithm_state *, u_int8_t *, size_t));
+	int (*init)(struct ah_algorithm_state *, struct secasvar *);
+	void (*update)(struct ah_algorithm_state *, u_int8_t *, size_t);
+	void (*result)(struct ah_algorithm_state *, u_int8_t *, size_t);
 };
 
 #define	AH_MAXSUMSIZE	(512 / 8)
 
-extern const struct ah_algorithm *ah_algorithm_lookup __P((int));
+extern const struct ah_algorithm *ah_algorithm_lookup(int);
 
 /* cksum routines */
-extern int ah_hdrlen __P((struct secasvar *));
+extern int ah_hdrlen(struct secasvar *);
 
-extern size_t ah_hdrsiz __P((struct ipsecrequest *));
+extern size_t ah_hdrsiz(struct ipsecrequest *);
 #ifdef __FreeBSD__
-extern void ah4_input __P((struct mbuf *, int));
+extern void ah4_input(struct mbuf *, int);
 #else
-extern void ah4_input __P((struct mbuf *, ...));
+extern void ah4_input(struct mbuf *, ...);
 #endif
-extern int ah4_output __P((struct mbuf *, struct ipsecrequest *));
-extern int ah4_calccksum __P((struct mbuf *, u_int8_t *, size_t,
-	const struct ah_algorithm *, struct secasvar *));
+extern int ah4_output(struct mbuf *, struct ipsecrequest *);
+extern int ah4_calccksum(struct mbuf *, u_int8_t *, size_t,
+	const struct ah_algorithm *, struct secasvar *);
 
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */
-extern void *ah4_ctlinput __P((int, struct sockaddr *, void *));
+extern void *ah4_ctlinput(int, struct sockaddr *, void *);
 #endif
 
 #ifdef INET6
-extern int ah6_input __P((struct mbuf **, int *, int));
-extern int ah6_output __P((struct mbuf *, u_char *, struct mbuf *,
-	struct ipsecrequest *));
-extern int ah6_calccksum __P((struct mbuf *, u_int8_t *, size_t,
-	const struct ah_algorithm *, struct secasvar *));
+extern int ah6_input(struct mbuf **, int *, int);
+extern int ah6_output(struct mbuf *, u_char *, struct mbuf *,
+	struct ipsecrequest *);
+extern int ah6_calccksum(struct mbuf *, u_int8_t *, size_t,
+	const struct ah_algorithm *, struct secasvar *);
 
-extern void ah6_ctlinput __P((int, struct sockaddr *, void *));
+extern void ah6_ctlinput(int, struct sockaddr *, void *);
 #endif /* INET6 */
 
 #endif /* _KERNEL */

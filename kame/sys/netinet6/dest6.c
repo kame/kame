@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.76 2007/01/26 11:00:00 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.77 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,13 +81,9 @@ static void mip6_notify_be_hint(struct in6_addr *, struct in6_addr *,
  */
 int
 #ifndef __APPLE__
-dest6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+dest6_input(struct mbuf **mp, int *offp, int proto)
 #else
-dest6_input(mp, offp)
-	struct mbuf **mp;
-	int *offp;
+dest6_input(struct mbuf **mp, int *offp)
 #endif
 {
 	struct mbuf *m = *mp;
@@ -229,10 +225,8 @@ dest6_input(mp, offp)
 
 #ifdef MIP6
 static int
-dest6_swap_hao(ip6, ip6a, haopt)
-	struct ip6_hdr *ip6;
-	struct ip6aux *ip6a;
-	struct ip6_opt_home_address *haopt;
+dest6_swap_hao(struct ip6_hdr *ip6, struct ip6aux *ip6a,
+	struct ip6_opt_home_address *haopt)
 {
 
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
@@ -257,10 +251,7 @@ dest6_swap_hao(ip6, ip6a, haopt)
 }
 
 static int
-dest6_nextopt(m, off, ip6o)
-	struct mbuf *m;
-	int off;
-	struct ip6_opt *ip6o;
+dest6_nextopt(struct mbuf *m, int off, struct ip6_opt *ip6o)
 {
 	u_int8_t type;
 
@@ -288,9 +279,7 @@ dest6_nextopt(m, off, ip6o)
 }
 
 int
-dest6_mip6_hao(m, mhoff, nxt)
-	struct mbuf *m;
-	int mhoff, nxt;
+dest6_mip6_hao(struct mbuf *m, int mhoff, int nxt)
 {
 	struct ip6_hdr *ip6;
 	struct ip6aux *ip6a;
@@ -382,11 +371,8 @@ dest6_mip6_hao(m, mhoff, nxt)
 }
 
 static void
-mip6_notify_be_hint(src, coa, hoa, status)
-	struct in6_addr *src;
-	struct in6_addr *coa;
-	struct in6_addr *hoa;
-	u_int8_t status;
+mip6_notify_be_hint(struct in6_addr *src, struct in6_addr *coa,
+	struct in6_addr *hoa, u_int8_t status)
 {
 	struct sockaddr_in6 src_sin6, coa_sin6, hoa_sin6;
 

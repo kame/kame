@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.64 2007/05/05 11:23:38 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.65 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,19 +63,19 @@
 #include <netinet/icmp6.h>
 
 #if 0
-static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
-    struct ip6_rthdr0 *));
+static int ip6_rthdr0(struct mbuf *, struct ip6_hdr *, struct ip6_rthdr0 *);
 #endif
 
 #if defined(MIP6) && NMIP > 0
-static int ip6_rthdr2 __P((struct mbuf *, struct ip6_hdr *,
-    struct ip6_rthdr2 *));
+static int ip6_rthdr2(struct mbuf *, struct ip6_hdr *, struct ip6_rthdr2 *);
 #endif /* defined(MIP6) && NMIP > 0 */
 
+/*
+ * proto is unused
+ */
+
 int
-route6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;	/* proto is unused */
+route6_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct ip6_hdr *ip6;
 	struct mbuf *m = *mp;
@@ -197,10 +197,7 @@ route6_input(mp, offp, proto)
  * as it was dropped between RFC1883 and RFC2460.
  */
 static int
-ip6_rthdr0(m, ip6, rh0)
-	struct mbuf *m;
-	struct ip6_hdr *ip6;
-	struct ip6_rthdr0 *rh0;
+ip6_rthdr0(struct mbuf *m, struct ip6_hdr *ip6, struct ip6_rthdr0 *rh0)
 {
 	int addrs, index;
 	struct in6_addr *nextaddr, tmpaddr;
@@ -285,10 +282,7 @@ ip6_rthdr0(m, ip6, rh0)
 #if defined(MIP6) && NMIP > 0
 /* Type2 routing header processing */
 static int
-ip6_rthdr2(m, ip6, rh2)
-	struct mbuf *m;
-	struct ip6_hdr *ip6;
-	struct ip6_rthdr2 *rh2;
+ip6_rthdr2(struct mbuf *m, struct ip6_hdr *ip6, struct ip6_rthdr2 *rh2)
 {
 	struct in6_addr *nextaddr, tmpaddr;
 	struct in6_ifaddr *ifa;

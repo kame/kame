@@ -46,10 +46,10 @@
 #include	<crypto/twofish/twofish.h>
 #include	<crypto/twofish/table.h>
 
-static int ParseHexDword __P((int, CONST char *, DWORD *, char *));
-static DWORD RS_MDS_Encode __P((DWORD, DWORD));
-static void BuildMDS __P((void));
-static void ReverseRoundSubkeys __P((keyInstance *, BYTE));
+static int ParseHexDword(int, CONST char *, DWORD *, char *);
+static DWORD RS_MDS_Encode(DWORD, DWORD);
+static void BuildMDS(void);
+static void ReverseRoundSubkeys(keyInstance *, BYTE);
 
 #if   defined(min_key)  && !defined(MIN_KEY)
 #define	MIN_KEY		1			/* toupper() */
@@ -539,7 +539,7 @@ static void ReverseRoundSubkeys(keyInstance *key,BYTE newDir)
 		{ Xor32(dst,src,i  ); Xor32(dst,src,i+1); Xor32(dst,src,i+2); Xor32(dst,src,i+3); }	\
 	}
 #else						/* do it as a function call */
-static void Xor256 __P((void *, void *, BYTE));
+static void Xor256(void *, void *, BYTE);
 
 static void Xor256(void *dst,void *src,BYTE b)
 	{

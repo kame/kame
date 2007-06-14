@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.51 2004/06/02 05:53:14 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.52 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,15 +80,14 @@
 
 #include <net/net_osdep.h>
 
-static int esp_output __P((struct mbuf *, u_char *, struct mbuf *,
-	struct ipsecrequest *, int));
+static int esp_output(struct mbuf *, u_char *, struct mbuf *,
+	struct ipsecrequest *, int);
 
 /*
  * compute ESP header size.
  */
 size_t
-esp_hdrsiz(isr)
-	struct ipsecrequest *isr;
+esp_hdrsiz(struct ipsecrequest *isr)
 {
 	struct secasvar *sav;
 	const struct esp_algorithm *algo;
@@ -179,12 +178,8 @@ esp_hdrsiz(isr)
  *	<-----------------> espoff
  */
 static int
-esp_output(m, nexthdrp, md, isr, af)
-	struct mbuf *m;
-	u_char *nexthdrp;
-	struct mbuf *md;
-	struct ipsecrequest *isr;
-	int af;
+esp_output(struct mbuf *m, u_char *nexthdrp, struct mbuf *md,
+	struct ipsecrequest *isr, int af)
 {
 	struct mbuf *n;
 	struct mbuf *mprev;
@@ -691,11 +686,10 @@ fail:
 
 #ifdef INET
 int
-esp4_output(m, isr)
-	struct mbuf *m;
-	struct ipsecrequest *isr;
+esp4_output(struct mbuf *m, struct ipsecrequest *isr)
 {
 	struct ip *ip;
+
 	if (m->m_len < sizeof(struct ip)) {
 		ipseclog((LOG_DEBUG, "esp4_output: first mbuf too short\n"));
 		m_freem(m);
@@ -709,12 +703,10 @@ esp4_output(m, isr)
 
 #ifdef INET6
 int
-esp6_output(m, nexthdrp, md, isr)
-	struct mbuf *m;
-	u_char *nexthdrp;
-	struct mbuf *md;
-	struct ipsecrequest *isr;
+esp6_output(struct mbuf *m, u_char *nexthdrp, struct mbuf *md,
+	struct ipsecrequest *isr)
 {
+
 	if (m->m_len < sizeof(struct ip6_hdr)) {
 		ipseclog((LOG_DEBUG, "esp6_output: first mbuf too short\n"));
 		m_freem(m);

@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.29 2004/12/18 02:38:39 suz Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.30 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -70,11 +70,11 @@
 
 #include <net/net_osdep.h>
 
-static void *deflate_alloc __P((void *, u_int, u_int));
-static void deflate_free __P((void *, void *));
-static int deflate_common __P((struct mbuf *, struct mbuf *, size_t *, int));
-static int deflate_compress __P((struct mbuf *, struct mbuf *, size_t *));
-static int deflate_decompress __P((struct mbuf *, struct mbuf *, size_t *));
+static void *deflate_alloc(void *, u_int, u_int);
+static void deflate_free(void *, void *);
+static int deflate_common(struct mbuf *, struct mbuf *, size_t *, int);
+static int deflate_compress(struct mbuf *, struct mbuf *, size_t *);
+static int deflate_decompress(struct mbuf *, struct mbuf *, size_t *);
 
 /*
  * We need to use default window size (2^15 = 32Kbytes as of writing) for
@@ -92,8 +92,7 @@ static const struct ipcomp_algorithm ipcomp_algorithms[] = {
 };
 
 const struct ipcomp_algorithm *
-ipcomp_algorithm_lookup(idx)
-	int idx;
+ipcomp_algorithm_lookup(int idx)
 {
 
 	if (idx == SADB_X_CALG_DEFLATE)
@@ -102,30 +101,24 @@ ipcomp_algorithm_lookup(idx)
 }
 
 static void *
-deflate_alloc(aux, items, siz)
-	void *aux;
-	u_int items;
-	u_int siz;
+deflate_alloc(void *aux, u_int items, u_int siz)
 {
 	void *ptr;
+
 	ptr = malloc(items * siz, M_TEMP, M_NOWAIT);
 	return ptr;
 }
 
 static void
-deflate_free(aux, ptr)
-	void *aux;
-	void *ptr;
+deflate_free(void *aux, void *ptr)
 {
+
 	free(ptr, M_TEMP);
 }
 
+/* mode - 0: compress 1: decompress */
 static int
-deflate_common(m, md, lenp, mode)
-	struct mbuf *m;
-	struct mbuf *md;
-	size_t *lenp;
-	int mode;	/* 0: compress 1: decompress */
+deflate_common(struct mbuf *m, struct mbuf *md, size_t *lenp, int mode)
 {
 	struct mbuf *mprev;
 	struct mbuf *p;
@@ -327,11 +320,9 @@ fail:
 }
 
 static int
-deflate_compress(m, md, lenp)
-	struct mbuf *m;
-	struct mbuf *md;
-	size_t *lenp;
+deflate_compress(struct mbuf *m, struct mbuf *md, size_t *lenp)
 {
+
 	if (!m)
 		panic("m == NULL in deflate_compress");
 	if (!md)
@@ -343,11 +334,9 @@ deflate_compress(m, md, lenp)
 }
 
 static int
-deflate_decompress(m, md, lenp)
-	struct mbuf *m;
-	struct mbuf *md;
-	size_t *lenp;
+deflate_decompress(struct mbuf *m, struct mbuf *md, size_t *lenp)
 {
+
 	if (!m)
 		panic("m == NULL in deflate_decompress");
 	if (!md)

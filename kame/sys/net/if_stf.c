@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.122 2007/05/22 12:19:45 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.123 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -68,7 +68,7 @@
  * either.
  *
  * 6to4 interface has security issues.  Refer to
- * http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
+ * http://ftp.itojun.org/pub/paper/draft-itojun-ipv6-transition-abuse-01.txt
  * and RFC3946 for details.  The code tries to filter out some of malicious
  * packets.
  * Note that there is NO WAY to be 100% secure.
@@ -198,30 +198,29 @@ struct protosw in_stf_protosw =
 };
 
 #ifdef __FreeBSD__
-void stfattach __P((void *));
+void stfattach(void *);
 #else
-void stfattach __P((int));
+void stfattach(int);
 #endif
-static int stf_encapcheck __P((const struct mbuf *, int, int, void *));
-static struct in6_ifaddr *stf_getsrcifa6 __P((struct ifnet *));
-static int stf_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
-	struct rtentry *));
-static int isrfc1918addr __P((struct in_addr *));
-static int stf_checkaddr4 __P((struct stf_softc *, struct in_addr *,
-	struct ifnet *));
-static int stf_checkaddr6 __P((struct stf_softc *, struct in6_addr *,
-	struct ifnet *));
-static int stf_checkaddr46 __P((struct stf_softc *, struct in_addr *,
-	struct in6_addr *));
-static void stf_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
-static int stf_ioctl __P((struct ifnet *, u_long, caddr_t));
+static int stf_encapcheck(const struct mbuf *, int, int, void *);
+static struct in6_ifaddr *stf_getsrcifa6(struct ifnet *);
+static int stf_output(struct ifnet *, struct mbuf *, struct sockaddr *,
+	struct rtentry *);
+static int isrfc1918addr(struct in_addr *);
+static int stf_checkaddr4(struct stf_softc *, struct in_addr *,
+	struct ifnet *);
+static int stf_checkaddr6(struct stf_softc *, struct in6_addr *,
+	struct ifnet *);
+static int stf_checkaddr46(struct stf_softc *, struct in_addr *,
+	struct in6_addr *);
+static void stf_rtrequest(int, struct rtentry *, struct rt_addrinfo *);
+static int stf_ioctl(struct ifnet *, u_long, caddr_t);
 
 void
-stfattach(dummy)
 #ifdef __FreeBSD__
-	void *dummy;
+stfattach(void *dummy)
 #else
-	int dummy;
+stfattach(int dummy)
 #endif
 {
 	struct stf_softc *sc;
@@ -290,11 +289,7 @@ PSEUDO_SET(stfattach, if_stf);
 #endif
 
 static int
-stf_encapcheck(m, off, proto, arg)
-	const struct mbuf *m;
-	int off;
-	int proto;
-	void *arg;
+stf_encapcheck(const struct mbuf *m, int off, int proto, void *arg)
 {
 	struct ip ip;
 	struct in6_ifaddr *ia6;
@@ -358,8 +353,7 @@ stf_encapcheck(m, off, proto, arg)
 }
 
 static struct in6_ifaddr *
-stf_getsrcifa6(ifp)
-	struct ifnet *ifp;
+stf_getsrcifa6(struct ifnet *ifp)
 {
 	struct ifaddr *ia;
 	struct in_ifaddr *ia4;
@@ -413,11 +407,8 @@ stf_getsrcifa6(ifp)
 #endif
 
 static int
-stf_output(ifp, m, dst, rt)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct sockaddr *dst;
-	struct rtentry *rt;
+stf_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	struct rtentry *rt)
 {
 #ifdef __OpenBSD__
 	struct stf_softc *sc;
@@ -707,9 +698,9 @@ stf_output(ifp, m, dst, rt)
 }
 
 static int
-isrfc1918addr(in)
-	struct in_addr *in;
+isrfc1918addr(struct in_addr *in)
 {
+
 	/*
 	 * returns 1 if private address range:
 	 * 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
@@ -722,11 +713,9 @@ isrfc1918addr(in)
 	return 0;
 }
 
+/* inifp - incoming interface */
 static int
-stf_checkaddr4(sc, in, inifp)
-	struct stf_softc *sc;
-	struct in_addr *in;
-	struct ifnet *inifp;	/* incoming interface */
+stf_checkaddr4(struct stf_softc *sc, struct in_addr *in, struct ifnet *inifp)
 {
 	struct in_ifaddr *ia4;
 
@@ -811,11 +800,9 @@ stf_checkaddr4(sc, in, inifp)
 	return 0;
 }
 
+/* inifp - incoming interface */
 static int
-stf_checkaddr6(sc, in6, inifp)
-	struct stf_softc *sc;
-	struct in6_addr *in6;
-	struct ifnet *inifp;	/* incoming interface */
+stf_checkaddr6(struct stf_softc *sc, struct in6_addr *in6, struct ifnet *inifp)
 {
 
 	/*
@@ -858,20 +845,18 @@ stf_checkaddr6(sc, in6, inifp)
 static int
 stf_checkaddr46(struct stf_softc *sc, struct in_addr *in, struct in6_addr *in6)
 {
+
 	return 1;
 }
 
 void
 #ifdef __FreeBSD__
-in_stf_input(m, off)
-	struct mbuf *m;
-	int off;
+in_stf_input(struct mbuf *m, int off)
 #else
 #if __STDC__
 in_stf_input(struct mbuf *m, ...)
 #else
-in_stf_input(m, va_alist)
-	struct mbuf *m;
+in_stf_input(struct mbuf *m, va_alist)
 #endif
 #endif
 {
@@ -1023,10 +1008,7 @@ in_stf_input(m, va_alist)
 
 /* ARGSUSED */
 static void
-stf_rtrequest(cmd, rt, info)
-	int cmd;
-	struct rtentry *rt;
-	struct rt_addrinfo *info;
+stf_rtrequest(int cmd, strut rtentry *rt, struct rt_addrinfo *info)
 {
 
 	if (rt)
@@ -1034,10 +1016,7 @@ stf_rtrequest(cmd, rt, info)
 }
 
 static int
-stf_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct ifaddr *ifa;
 	struct ifreq *ifr;

@@ -1,4 +1,4 @@
-/*	$KAME: esp_twofish.c,v 1.7 2003/07/19 10:42:36 itojun Exp $	*/
+/*	$KAME: esp_twofish.c,v 1.8 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,17 +52,14 @@
  * suggests assymetric key setup.
  */
 size_t
-esp_twofish_schedlen(algo)
-	const struct esp_algorithm *algo;
+esp_twofish_schedlen(const struct esp_algorithm *algo)
 {
 
 	return sizeof(keyInstance) * 2;
 }
 
 int
-esp_twofish_schedule(algo, sav)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
+esp_twofish_schedule(const struct esp_algorithm *algo, struct secasvar *sav)
 {
 	keyInstance *k;
 
@@ -77,11 +74,7 @@ esp_twofish_schedule(algo, sav)
 }
 
 int
-esp_twofish_blockdecrypt(algo, sav, s, d)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
-	u_int8_t *s;
-	u_int8_t *d;
+esp_twofish_blockdecrypt(const struct esp_algorithm *algo, struct secasvar *sav, u_int8_t *s, u_int8_t *d)
 {
 	cipherInstance c;
 	keyInstance *p;
@@ -97,11 +90,8 @@ esp_twofish_blockdecrypt(algo, sav, s, d)
 }
 
 int
-esp_twofish_blockencrypt(algo, sav, s, d)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
-	u_int8_t *s;
-	u_int8_t *d;
+esp_twofish_blockencrypt(const struct esp_algorithm *algo,
+	struct secasvar *sav, u_int8_t *s, u_int8_t *d)
 {
 	cipherInstance c;
 	keyInstance *p;

@@ -1,4 +1,4 @@
-/*	$KAME: esp_aesctr.c,v 1.3 2005/04/21 05:40:22 itojun Exp $	*/
+/*	$KAME: esp_aesctr.c,v 1.4 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -69,8 +69,7 @@ typedef struct {
 } aesctr_ctx;
 
 int
-esp_aesctr_mature(sav)
-	struct secasvar *sav;
+esp_aesctr_mature(struct secasvar *sav)
 {
 	int keylen;
 	const struct esp_algorithm *algo;
@@ -103,17 +102,14 @@ esp_aesctr_mature(sav)
 }
 
 size_t
-esp_aesctr_schedlen(algo)
-	const struct esp_algorithm *algo;
+esp_aesctr_schedlen(const struct esp_algorithm *algo)
 {
 
 	return sizeof(aesctr_ctx);
 }
 
 int
-esp_aesctr_schedule(algo, sav)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
+esp_aesctr_schedule(const struct esp_algorithm *algo, struct secasvar *sav)
 {
 	aesctr_ctx *ctx;
 	int keylen;
@@ -129,12 +125,8 @@ esp_aesctr_schedule(algo, sav)
 }
 
 int
-esp_aesctr_decrypt(m, off, sav, algo, ivlen)
-	struct mbuf *m;
-	size_t off;
-	struct secasvar *sav;
-	const struct esp_algorithm *algo;
-	int ivlen;
+esp_aesctr_decrypt(struct mbuf *m, size_t off, struct secasvar *sav,
+	const struct esp_algorithm *algo, int ivlen)
 {
 	struct mbuf *s;
 	struct mbuf *d, *d0 = NULL, *dp;
@@ -295,13 +287,8 @@ nomem:
 }
 
 int
-esp_aesctr_encrypt(m, off, plen, sav, algo, ivlen)
-	struct mbuf *m;
-	size_t off;
-	size_t plen;
-	struct secasvar *sav;
-	const struct esp_algorithm *algo;
-	int ivlen;
+esp_aesctr_encrypt(struct mbuf *m, size_t off, size_t plen,
+	struct secasvar *sav, const struct esp_algorithm *algo, int ivlen)
 {
 	struct mbuf *s;
 	struct mbuf *d, *d0, *dp;

@@ -1,4 +1,4 @@
-/*	$KAME: esp_aesctr.h,v 1.2 2003/07/20 00:29:38 itojun Exp $	*/
+/*	$KAME: esp_aesctr.h,v 1.3 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -29,12 +29,12 @@
  * SUCH DAMAGE.
  */
 
-extern int esp_aesctr_mature __P((struct secasvar *));
-extern size_t esp_aesctr_schedlen __P((const struct esp_algorithm *));
-extern int esp_aesctr_schedule __P((const struct esp_algorithm *,
-	struct secasvar *));
-extern int esp_aesctr_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, const struct esp_algorithm *, int));
-extern int esp_aesctr_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, const struct esp_algorithm *, int));
+extern int esp_aesctr_mature(struct secasvar *);
+extern size_t esp_aesctr_schedlen(const struct esp_algorithm *);
+extern int esp_aesctr_schedule(const struct esp_algorithm *,
+	struct secasvar *);
+extern int esp_aesctr_decrypt(struct mbuf *, size_t,
+	struct secasvar *, const struct esp_algorithm *, int);
+extern int esp_aesctr_encrypt(struct mbuf *, size_t, size_t,
+	struct secasvar *, const struct esp_algorithm *, int);
 

@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp.h,v 1.12 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: ipcomp.h,v 1.13 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -62,23 +62,23 @@ struct ipcomp {
 
 #if defined(KERNEL) || defined(_KERNEL)
 struct ipcomp_algorithm {
-	int (*compress) __P((struct mbuf *, struct mbuf *, size_t *));
-	int (*decompress) __P((struct mbuf *, struct mbuf *, size_t *));
+	int (*compress)(struct mbuf *, struct mbuf *, size_t *);
+	int (*decompress)(struct mbuf *, struct mbuf *, size_t *);
 	size_t minplen;		/* minimum required length for compression */
 };
 
 struct ipsecrequest;
-extern const struct ipcomp_algorithm *ipcomp_algorithm_lookup __P((int));
+extern const struct ipcomp_algorithm *ipcomp_algorithm_lookup(int);
 #ifdef __FreeBSD__
-extern void ipcomp4_input __P((struct mbuf *, int));
+extern void ipcomp4_input(struct mbuf *, int);
 #else
-extern void ipcomp4_input __P((struct mbuf *, ...));
+extern void ipcomp4_input(struct mbuf *, ...);
 #endif
-extern int ipcomp4_output __P((struct mbuf *, struct ipsecrequest *));
+extern int ipcomp4_output(struct mbuf *, struct ipsecrequest *);
 #ifdef INET6
-extern int ipcomp6_input __P((struct mbuf **, int *, int));
-extern int ipcomp6_output __P((struct mbuf *, u_char *, struct mbuf *,
-	struct ipsecrequest *));
+extern int ipcomp6_input(struct mbuf **, int *, int);
+extern int ipcomp6_output(struct mbuf *, u_char *, struct mbuf *,
+	struct ipsecrequest *);
 #endif
 #endif /* KERNEL */
 

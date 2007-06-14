@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.163 2006/11/14 07:37:00 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.164 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -127,11 +127,8 @@ extern struct pfil_head inet6_pfil_hook;	/* XXX */
  * protocol deal with that.
  *
  */
-
 void
-ip6_forward(m, srcrt)
-	struct mbuf *m;
-	int srcrt;
+ip6_forward(struct mbuf *m, int srcrt)
 {
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct sockaddr_in6 *dst = NULL;

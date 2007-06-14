@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.134 2006/02/20 10:35:04 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.135 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,126 +352,116 @@ extern int	mldsomaxsrc;           /* maximum num .of msf per socket */
 extern int	mldalways_v2;
 
 #ifdef __FreeBSD__
-int	icmp6_ctloutput __P((struct socket *, struct sockopt *sopt));
+int	icmp6_ctloutput(struct socket *, struct sockopt *sopt);
 #else
-int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+int	icmp6_ctloutput(int, struct socket *, int, int, struct mbuf **);
 #endif
 
 struct in6_ifaddr;
-void	ip6_init __P((void));
-void	ip6intr __P((void));
-void	ip6_input __P((struct mbuf *));
-struct in6_ifaddr *ip6_getdstifaddr __P((struct mbuf *));
-void	ip6_freepcbopts __P((struct ip6_pktopts *));
-void	ip6_freemoptions __P((struct ip6_moptions *));
-int	ip6_unknown_opt __P((u_int8_t *, struct mbuf *, int));
-u_int8_t *ip6_get_prevhdr __P((struct mbuf *, int));
-int	ip6_nexthdr __P((struct mbuf *, int, int, int *));
-int	ip6_lasthdr __P((struct mbuf *, int, int, int *));
+void	ip6_init(void);
+void	ip6intr(void);
+void	ip6_input(struct mbuf *);
+struct in6_ifaddr *ip6_getdstifaddr(struct mbuf *);
+void	ip6_freepcbopts(struct ip6_pktopts *);
+void	ip6_freemoptions(struct ip6_moptions *);
+int	ip6_unknown_opt(u_int8_t *, struct mbuf *, int);
+u_int8_t *ip6_get_prevhdr(struct mbuf *, int);
+int	ip6_nexthdr(struct mbuf *, int, int, int *);
+int	ip6_lasthdr(struct mbuf *, int, int, int *);
 
-struct m_tag *ip6_addaux __P((struct mbuf *));
-struct m_tag *ip6_findaux __P((struct mbuf *));
-void	ip6_delaux __P((struct mbuf *));
+struct m_tag *ip6_addaux(struct mbuf *);
+struct m_tag *ip6_findaux(struct mbuf *);
+void	ip6_delaux(struct mbuf *);
 
-int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
-int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
-				 u_int32_t *));
+int	ip6_mforward(struct ip6_hdr *, struct ifnet *, struct mbuf *);
+int	ip6_process_hopopts(struct mbuf *, u_int8_t *, int, u_int32_t *,
+    u_int32_t *);
 #if defined(__FreeBSD__) || defined(__OpenBSD__)
-void	ip6_savecontrol __P((struct inpcb *, struct mbuf *,
-	struct mbuf **));
-void	ip6_notify_pmtu __P((struct inpcb *, struct sockaddr_in6 *,
-	u_int32_t *));
+void	ip6_savecontrol(struct inpcb *, struct mbuf *, struct mbuf **);
+void	ip6_notify_pmtu(struct inpcb *, struct sockaddr_in6 *, u_int32_t *);
 #else
-void	ip6_savecontrol __P((struct in6pcb *, struct mbuf *,
-	struct mbuf **));
-void	ip6_notify_pmtu __P((struct in6pcb *, struct sockaddr_in6 *,
-	u_int32_t *));
+void	ip6_savecontrol(struct in6pcb *, struct mbuf *, struct mbuf **);
+void	ip6_notify_pmtu(struct in6pcb *, struct sockaddr_in6 *, u_int32_t *);
 #endif
-int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+int	ip6_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 
-void	ip6_forward __P((struct mbuf *, int));
+void	ip6_forward(struct mbuf *, int);
 
-void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
+void	ip6_mloopback(struct ifnet *, struct mbuf *, struct sockaddr_in6 *);
 #if defined(NEW_STRUCT_ROUTE) || defined(__FreeBSD__)
-int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
-			struct route *,
-			int,
-			struct ip6_moptions *, struct ifnet **,
-			struct inpcb *));
+int	ip6_output(struct mbuf *, struct ip6_pktopts *, struct route *,
+    int, struct ip6_moptions *, struct ifnet **, struct inpcb *);
 #elif defined(__NetBSD__)
-int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
-			struct route_in6 *, int, struct ip6_moptions *,
-			struct socket *, struct ifnet **));
+int	ip6_output(struct mbuf *, struct ip6_pktopts *, struct route_in6 *,
+    int, struct ip6_moptions *, struct socket *, struct ifnet **);
 #else
-int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
-			struct route_in6 *,
-			int,
-			struct ip6_moptions *, struct ifnet **));
+int	ip6_output(struct mbuf *, struct ip6_pktopts *, struct route_in6 *,
+    int, struct ip6_moptions *, struct ifnet **);
 #endif
 #ifdef __FreeBSD__
-int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
+int	ip6_ctloutput(struct socket *, struct sockopt *sopt);
 #else
-int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+int	ip6_ctloutput(int, struct socket *, int, int, struct mbuf **);
 #endif
 #ifdef __FreeBSD__
-int	ip6_raw_ctloutput __P((struct socket *, struct sockopt *));
+int	ip6_raw_ctloutput(struct socket *, struct sockopt *);
 #else
-int	ip6_raw_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+int	ip6_raw_ctloutput(int, struct socket *, int, int, struct mbuf **);
 #endif
-void	ip6_initpktopts __P((struct ip6_pktopts *));
-int	ip6_setpktopts __P((struct mbuf *, struct ip6_pktopts *,
-    struct ip6_pktopts *, int, int));
-void	ip6_clearpktopts __P((struct ip6_pktopts *, int));
-struct ip6_pktopts *ip6_copypktopts __P((struct ip6_pktopts *, int));
+void	ip6_initpktopts(struct ip6_pktopts *);
+int	ip6_setpktopts(struct mbuf *, struct ip6_pktopts *,
+    struct ip6_pktopts *, int, int);
+void	ip6_clearpktopts(struct ip6_pktopts *, int);
+struct ip6_pktopts *ip6_copypktopts(struct ip6_pktopts *, int);
 #if defined(__FreeBSD__) || defined(__OpenBSD__)
-int	ip6_optlen __P((struct inpcb *));
+int	ip6_optlen(struct inpcb *);
 #else
-int	ip6_optlen __P((struct in6pcb *));
+int	ip6_optlen(struct in6pcb *);
 #endif
 
-int	route6_input __P((struct mbuf **, int *, int));
+int	route6_input(struct mbuf **, int *, int);
 
-void	frag6_init __P((void));
-int	frag6_input __P((struct mbuf **, int *, int));
-void	frag6_slowtimo __P((void));
-void	frag6_drain __P((void));
+void	frag6_init(void);
+int	frag6_input(struct mbuf **, int *, int);
+void	frag6_slowtimo(void);
+void	frag6_drain(void);
 
-void	rip6_init __P((void));
-int	rip6_input __P((struct mbuf **, int *, int));
-void	rip6_ctlinput __P((int, struct sockaddr *, void *));
+void	rip6_init(void);
+int	rip6_input(struct mbuf **, int *, int);
+void	rip6_ctlinput(int, struct sockaddr *, void *);
 #ifdef __FreeBSD__
-int	rip6_ctloutput __P((struct socket *, struct sockopt *));
+int	rip6_ctloutput(struct socket *, struct sockopt *);
 #else
-int	rip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+int	rip6_ctloutput(int, struct socket *, int, int, struct mbuf **);
 #endif
-int	rip6_output __P((struct mbuf *, ...));
-int	rip6_usrreq __P((struct socket *,
-	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
+int	rip6_output(struct mbuf *, ...);
+int	rip6_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
+    struct mbuf *, struct proc *);
 
-int	dest6_input __P((struct mbuf **, int *, int));
+int	dest6_input(struct mbuf **, int *, int);
 #ifdef MIP6
-int	dest6_mip6_hao __P((struct mbuf *, int, int));
-int	mip6_input __P((struct mbuf **, int *, int));
+int	dest6_mip6_hao(struct mbuf *, int, int);
+int	mip6_input(struct mbuf **, int *, int);
 #endif
 
 #ifdef NEW_STRUCT_ROUTE
-struct in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
+struct in6_addr *in6_selectsrc(struct sockaddr_in6 *,
 	struct ip6_pktopts *, struct ip6_moptions *, struct route *,
-	struct in6_addr *, struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+	struct in6_addr *, struct ifnet **, int *);
+int in6_selectroute(struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route *, struct ifnet **,
-	struct rtentry **, int));
+	struct rtentry **, int);
 #else
-struct in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
+struct in6_addr *in6_selectsrc(struct sockaddr_in6 *,
 	struct ip6_pktopts *, struct ip6_moptions *, struct route_in6 *,
-	struct in6_addr *, struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+	struct in6_addr *, struct ifnet **, int *);
+int in6_selectroute(struct sockaddr_in6 *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route_in6 *, struct ifnet **,
-	struct rtentry **, int));
+	struct rtentry **, int);
 #endif
 
-u_int32_t ip6_randomid __P((void));
-u_int32_t ip6_randomflowlabel __P((void));
+u_int32_t ip6_randomid(void);
+u_int32_t ip6_randomflowlabel(void);
 #endif /* _KERNEL */
 
 #endif /* !_NETINET6_IP6_VAR_H_ */

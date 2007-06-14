@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.10 2005/10/20 07:57:57 kei Exp $	*/
+/*	$KAME: if_ist.c,v 1.11 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -182,11 +182,10 @@ int fill_isatap_rtrlist(void *, size_t *, size_t);
 #endif
 
 void
-istattach(dummy)
 #ifdef __FreeBSD__
-	void *dummy;
+istattach(void *dummy)
 #else
-	int dummy;
+istattach(int dummy)
 #endif
 {
 	struct ist_softc *sc;
@@ -261,11 +260,7 @@ PSEUDO_SET(istattach, if_ist);
 #endif
 
 static int
-ist_encapcheck(m, off, proto, arg)
-	const struct mbuf *m;
-	int off;
-	int proto;
-	void *arg;
+ist_encapcheck(const struct mbuf *m, int off, int proto, void *arg)
 {
 	struct ip ip;
 	struct in6_ifaddr *ia6;
@@ -319,8 +314,7 @@ ist_encapcheck(m, off, proto, arg)
 }
 
 static struct in6_ifaddr *
-ist_getsrcifa6(ifp)
-	struct ifnet *ifp;
+ist_getsrcifa6(struct ifnet *ifp)
 {
 	struct ifaddr *ia;
 	struct in_ifaddr *ia4;
@@ -373,9 +367,7 @@ ist_getsrcifa6(ifp)
 }
 
 static int	 
-isatap_match_prefix(ifp, addr6)	 
-	struct ifnet *ifp;	 
-	struct in6_addr *addr6;	 
+isatap_match_prefix(struct ifnet *ifp, struct in6_addr *addr6)	 
 {
 	struct ifaddr *ia;	 
 	struct in6_ifaddr *ia6;	 
@@ -407,11 +399,8 @@ isatap_match_prefix(ifp, addr6)
 #endif
 
 static int
-ist_output(ifp, m, dst, rt)
-struct ifnet *ifp;
-struct mbuf *m;
-struct sockaddr *dst;
-struct rtentry *rt;
+ist_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	struct rtentry *rt)
 {
 #ifdef __OpenBSD__
 	struct ist_softc *sc;
@@ -705,11 +694,10 @@ struct rtentry *rt;
 #endif
 }
 
+/* inifp - incoming interface */
 static int
-ist_checkaddr4(sc, in, inifp)
-	struct ist_softc *sc;
-	struct in_addr *in;
-	struct ifnet *inifp;	/* incoming interface */
+ist_checkaddr4(struct ist_softc *sc, struct in_addr *in, struct ifnet *inifp)
+	struct ifnet *inifp;	
 {
 	struct in_ifaddr *ia4;
 
@@ -782,11 +770,9 @@ ist_checkaddr4(sc, in, inifp)
 	return 0;
 }
 
+/* inifp - incoming interface */
 static int
-ist_checkaddr6(sc, in6, inifp)
-	struct ist_softc *sc;
-	struct in6_addr *in6;
-	struct ifnet *inifp;	/* incoming interface */
+ist_checkaddr6(struct ist_softc *sc, struct in6_addr *in6, struct ifnet *inifp)
 {
 
 	/*
@@ -824,10 +810,7 @@ ist_checkaddr6(sc, in6, inifp)
  * you must check the validity of each address by stf_checkaddr[46] in advance.
  */
 static int
-ist_checkaddr46(sc, in, in6)
-	struct ist_softc *sc;
-	struct in_addr *in;
-	struct in6_addr *in6;
+ist_checkaddr46(struct ist_softc *sc, struct in_addr *in, struct in6_addr *in6)
 {
 	struct isatap_rtr *rtr;
 
@@ -856,15 +839,12 @@ ist_checkaddr46(sc, in, in6)
 
 void
 #ifdef __FreeBSD__
-in_ist_input(m, off)
-	struct mbuf *m;
-	int off;
+in_ist_input(struct mbuf *m, int off)
 #else
 #if __STDC__
 in_ist_input(struct mbuf *m, ...)
 #else
-in_ist_input(m, va_alist)
-	struct mbuf *m;
+in_ist_input(struct mbuf *m, va_alist)
 #endif
 #endif /* __FreeBSD__ */
 {
@@ -1020,10 +1000,7 @@ in_ist_input(m, va_alist)
 
 /* ARGSUSED */
 static void
-ist_rtrequest(cmd, rt, info)
-	int cmd;
-	struct rtentry *rt;
-	struct rt_addrinfo *info;
+ist_rtrequest(int cmd, struct rtentry *rt, struct rt_addrinfo *info)
 {
 
 	if (rt)
@@ -1031,10 +1008,7 @@ ist_rtrequest(cmd, rt, info)
 }
 
 static int
-ist_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+ist_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	struct proc *p = curproc;	/* XXX */
@@ -1198,13 +1172,10 @@ ist_sysctl_isatap_rtrlist(SYSCTLFN_ARGS)
 
 #ifndef __FreeBSD__
 int
-fill_isatap_rtrlist(oldp, oldlenp, ol)
-	void *oldp;
-	size_t *oldlenp, ol;
+fill_isatap_rtrlist(void *oldp, size_t *oldlenp, size_t ol)
 #else
 static int
-fill_isatap_rtrlist(req)
-	struct sysctl_req *req;
+fill_isatap_rtrlist(struct sysctl_req *req)
 #endif
 {
 	int error = 0;

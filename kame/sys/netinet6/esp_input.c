@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.93 2005/06/16 18:29:27 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.94 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,16 +112,12 @@ extern u_char ip_protox[];
 
 void
 #ifdef __FreeBSD__
-esp4_input(m, off)
-	struct mbuf *m;
-	int off;
+esp4_input(struct mbuf *m, int off)
 #else
 #if __STDC__
 esp4_input(struct mbuf *m, ...)
 #else
-esp4_input(m, va_alist)
-	struct mbuf *m;
-	va_dcl
+esp4_input(struct mbuf *m, va_alist)
 #endif
 #endif
 {
@@ -509,10 +505,7 @@ bad:
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */
 /* assumes that ip header and esp header are contiguous on mbuf */
 void *
-esp4_ctlinput(cmd, sa, v)
-	int cmd;
-	struct sockaddr *sa;
-	void *v;
+esp4_ctlinput(int cmd, struct sockaddr *sa, void *v)
 {
 	struct ip *ip = v;
 	struct esp *esp;
@@ -563,9 +556,7 @@ esp4_ctlinput(cmd, sa, v)
 
 #ifdef INET6
 int
-esp6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+esp6_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct mbuf *m = *mp;
 	int off = *offp;
@@ -998,10 +989,7 @@ bad:
 }
 
 void
-esp6_ctlinput(cmd, sa, d)
-	int cmd;
-	struct sockaddr *sa;
-	void *d;
+esp6_ctlinput(int cmd, struct sockaddr *sa, void *d)
 {
 	const struct newesp *espp;
 	struct newesp esp;

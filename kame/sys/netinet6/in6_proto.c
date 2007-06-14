@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.165 2007/05/17 18:27:41 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.166 2007/06/14 12:09:43 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -545,7 +545,7 @@ struct ip6protosw mip6_tunnel_protosw =
 #endif /* MIP6 */
 
 #ifdef __FreeBSD__
-extern int in6_inithead __P((void **, int));
+extern int in6_inithead(void **, int);
 #endif
 
 struct domain inet6domain =

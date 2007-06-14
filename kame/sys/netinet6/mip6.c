@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.247 2007/03/30 09:41:15 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.248 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -185,14 +185,10 @@ static int mhdefaultlen[] = {
  */
 #if defined(__OpenBSD__)
 int
-mip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
+mip6_sysctl(int *name, u_int namelen, void *oldp, size_t oldlenp, void *newp,
+	size_t newlen)
 {
+
 	/* All sysctl names at this level are terminal. */
 	if (namelen != 1)
 		return ENOTDIR;
@@ -289,13 +285,9 @@ SYSCTL_INT(_net_inet6_mip6, MIP6CTL_USE_MIGRATE, use_migrate, CTLFLAG_RW,
  */
 int
 #ifndef __APPLE__
-mip6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+mip6_input(struct mbuf **mp, int *offp, int proto)
 #else
-mip6_input(mp, offp)
-	struct mbuf **mp;
-	int *offp;
+mip6_input(struct mbuf **mp, int *offp)
 #endif
 {
 	struct mbuf *m = *mp;
@@ -484,13 +476,9 @@ mip6_input(mp, offp)
 
 int
 #ifndef __APPLE__
-mip6_tunnel_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+mip6_tunnel_input(struct mbuf **mp, int *offp, int proto)
 #else
-mip6_tunnel_input(mp, offp)
-	struct mbuf **mp;
-	int *offp;
+mip6_tunnel_input(struct mbuf **mp, int *offp)
 #endif
 {
 	struct mbuf *m = *mp;
@@ -607,11 +595,8 @@ mip6_tunnel_input(mp, offp)
 }
 
 struct mip6_bc_internal *
-mip6_bce_get(hoa, cnaddr, coa, bid)
-	struct in6_addr *hoa;
-	struct in6_addr *cnaddr;
-	struct in6_addr *coa;
-	u_int16_t bid;
+mip6_bce_get(struct in6_addr *hoa, struct in6_addr *cnaddr,
+	struct in6_addr *coa, u_int16_t bid)
 {
 	struct mip6_bc_internal *mbc;
 	int hash = MIP6_BC_HASH_ID(hoa, cnaddr);
@@ -634,10 +619,9 @@ mip6_bce_get(hoa, cnaddr, coa, bid)
 }
 
 static struct mip6_bc_internal *
-mip6_bce_new_entry(cnaddr, hoa, coa, ifa, flags, bid)
-	struct in6_addr *cnaddr, *hoa, *coa;
-	struct ifaddr *ifa;
-	u_int16_t flags, bid;
+mip6_bce_new_entry(struct in6_addr *cnaddr, struct in6_addr *hoa,
+	struct in6_addr *coa, struct ifaddr *ifa, u_int16_t flags,
+	u_int16_t bid)
 {
 	struct mip6_bc_internal *mbc = NULL;
 
@@ -660,8 +644,7 @@ mip6_bce_new_entry(cnaddr, hoa, coa, ifa, flags, bid)
 }
 
 static void
-mip6_bc_list_insert(mbc)
-	struct mip6_bc_internal *mbc;
+mip6_bc_list_insert(struct mip6_bc_internal *mbc)
 {
 	int hash = MIP6_BC_HASH_ID(&mbc->mbc_hoa, &mbc->mbc_cnaddr);
 
@@ -674,9 +657,8 @@ mip6_bc_list_insert(mbc)
 }
 
 int
-mip6_bce_update(cnaddr, hoa, coa, flags, bid)
-	struct sockaddr_in6 *cnaddr, *hoa, *coa;
-	u_int16_t flags, bid;
+mip6_bce_update(struct sockaddr_in6 *cnaddr, struct sockaddr_in6 *hoa,
+	struct sockaddr_in6 *coa, u_int16_t flags, u_int16_t bid)
 {
 	int s;
 	int error = 0;
@@ -752,8 +734,7 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 }
 
 void
-mip6_bc_list_remove(mbc)
-	struct mip6_bc_internal *mbc;
+mip6_bc_list_remove(struct mip6_bc_internal *mbc)
 {
 	int hash = MIP6_BC_HASH_ID(&mbc->mbc_hoa, &mbc->mbc_cnaddr);
 
@@ -771,9 +752,8 @@ mip6_bc_list_remove(mbc)
 }
 
 int
-mip6_bce_remove_addr(cnaddr, hoa, coa, flags, bid)
-	struct sockaddr_in6 *cnaddr, *hoa, *coa;
-	u_int16_t flags, bid;
+mip6_bce_remove_addr(struct sockaddr_in6 *cnaddr, struct sockaddr_in6 *hoa,
+	struct sockaddr_in6 *coa, u_int16_t flags, u_int16_t bid)
 {
 	struct mip6_bc_internal *mbc;
 
@@ -786,8 +766,7 @@ mip6_bce_remove_addr(cnaddr, hoa, coa, flags, bid)
 }
 
 int
-mip6_bce_remove_bc(mbc)
-	struct mip6_bc_internal *mbc;
+mip6_bce_remove_bc(struct mip6_bc_internal *mbc)
 {
 	int s;
 	int error = 0;
@@ -815,12 +794,12 @@ mip6_bce_remove_bc(mbc)
 }
 
 static void
-mip6_bce_update_ipsecdb(bce)
-	struct mip6_bc_internal *bce;
+mip6_bce_update_ipsecdb(struct mip6_bc_internal *bce)
 {
 #ifdef IPSEC
-/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
+
+	/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 
 	/* update the ipsecdb. */
 	bzero(&hoa_sa, sizeof(struct sockaddr_in6));
@@ -868,8 +847,7 @@ mip6_bce_remove_all(void)
  * finished.
  */
 struct ip6_rthdr2 *
-mip6_create_rthdr2(coa)
-	struct in6_addr *coa;
+mip6_create_rthdr2(struct in6_addr *coa)
 {
 	struct ip6_rthdr2 *rthdr2;
 	size_t len;
@@ -902,8 +880,7 @@ mip6_create_rthdr2(coa)
 
 #if NMIP > 0
 struct in6_ifaddr *
-mip6_ifa_ifwithin6addr(in6)
-	const struct in6_addr *in6;
+mip6_ifa_ifwithin6addr(const struct in6_addr *in6)
 {
 	struct sockaddr_in6 sin6;
 
@@ -931,12 +908,9 @@ mip6_ifa_ifwithin6addr(in6)
 }
 
 static struct mip6_bul_internal *
-mip6_bul_create(peeraddr, hoa, coa, flags, state, sc, bid)
-	const struct in6_addr *peeraddr, *hoa, *coa;
-	u_int16_t flags;
-	u_int8_t state;
-	struct mip_softc *sc;
-	u_int16_t bid;
+mip6_bul_create(const struct in6_addr *peeraddr, const struct in6_addr *hoa,
+	const struct in6_addr *coa, u_int16_t flags, u_int8_t state,
+	struct mip_softc *sc, u_int16_t bid)
 {
 	struct mip6_bul_internal *mbul;
 
@@ -960,12 +934,9 @@ mip6_bul_create(peeraddr, hoa, coa, flags, state, sc, bid)
 }
 
 int
-mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
-	const struct in6_addr *peeraddr, *hoa, *coa;
-	u_short hoa_ifindex;
-	u_int16_t flags;
-	u_int8_t state;
-	u_int16_t bid;
+mip6_bul_add(const struct in6_addr *peeraddr, const struct in6_addr *hoa,
+	const struct in6_addr *coa, u_short hoa_ifindex, u_int16_t flags,
+	u_int8_t state, u_int16_t bid)
 {
 	int error = 0;
 	struct in6_ifaddr *ia6_hoa;
@@ -1026,8 +997,7 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 }
 
 void
-mip6_bul_remove(mbul)
-	struct mip6_bul_internal *mbul;
+mip6_bul_remove(struct mip6_bul_internal *mbul)
 {
 	int s;
 #ifndef MIP_USE_PF
@@ -1064,12 +1034,12 @@ mip6_bul_remove(mbul)
 }
 
 static void
-mip6_bul_update_ipsecdb(mbul)
-	struct mip6_bul_internal *mbul;
+mip6_bul_update_ipsecdb(struct mip6_bul_internal *mbul)
 {
 #ifdef IPSEC
-/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
+
+	/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
 
 	/* update ipsecdb. */
 	bzero(&hoa_sa, sizeof(struct sockaddr_in6));
@@ -1093,11 +1063,11 @@ mip6_bul_update_ipsecdb(mbul)
 }
 
 void
-mip6_bul_remove_all()
+mip6_bul_remove_all(void)
 {
 	int s;
-	register struct ifnet *ifp;
-	register struct ifaddr *ifa;
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
 	struct in6_ifaddr *ia6;
 	struct mip6_bul_internal *mbul, *nmbul;
 
@@ -1144,9 +1114,8 @@ mip6_bul_remove_all()
 }
 
 struct mip6_bul_internal *
-mip6_bul_get(src, dst, bid)
-	const struct in6_addr *src, *dst;
-	u_int16_t bid;
+mip6_bul_get(const struct in6_addr *src, const struct in6_addr *dst,
+	u_int16_t bid)
 {
 	struct in6_ifaddr *ia6_src;
 	struct mip6_bul_internal *mbul;
@@ -1173,8 +1142,7 @@ mip6_bul_get(src, dst, bid)
 
 
 struct mip6_bul_internal *
-mip6_bul_get_home_agent(src)
-	const struct in6_addr *src;
+mip6_bul_get_home_agent(const struct in6_addr *src)
 {
 	struct in6_ifaddr *ia6_src;
 	struct mip6_bul_internal *mbul;
@@ -1227,12 +1195,11 @@ mip6_search_hoa_in_destopt(u_int8_t *optbuf)
  * must free the returned buffer when it finished.
  */
 u_int8_t *
-mip6_create_hoa_opt(coa)
-	struct in6_addr *coa;
+mip6_create_hoa_opt(struct in6_addr *coa)
 {
 	struct ip6_opt_home_address *ha_opt;
 	struct ip6_dest *ip6dest;
-	register char *optbuf;
+	char *optbuf;
 	size_t pad, optlen, buflen;
 
 	optlen = sizeof(struct ip6_dest);
@@ -1274,11 +1241,10 @@ mip6_create_hoa_opt(coa)
  * TRUE. Otherwise, it returns zero (FALSE)
  */
 int
-mip6_are_homeprefix(ndpr)
 #ifndef __APPLE__
-	struct nd_prefixctl *ndpr;
+mip6_are_homeprefix(struct nd_prefixctl *ndpr)
 #else
-	struct nd_prefix *ndpr;
+mip6_are_homeprefix(struct nd_prefix *ndpr)
 #endif
 {
 	struct in6_ifaddr *ia6;
@@ -1304,8 +1270,7 @@ mip6_are_homeprefix(ndpr)
 }
 
 int
-mip6_ifa6_is_addr_valid_hoa(ifa6)
-	struct in6_ifaddr *ifa6;
+mip6_ifa6_is_addr_valid_hoa(struct in6_ifaddr *ifa6)
 {
 	struct mip6_bul_internal *mbul;
 
@@ -1326,15 +1291,11 @@ mip6_ifa6_is_addr_valid_hoa(ifa6)
 }
 
 int
-mip6_bul_encapcheck(m, off, proto, arg)
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
-	struct mbuf *m;
+mip6_bul_encapcheck(struct mbuf *m, int off, int proto, void *arg)
 #else
-	const struct mbuf *m;
+mip6_bul_encapcheck(const struct mbuf *m, int off, int proto, void *arg)
 #endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
-	int off;
-	int proto;
-	void *arg;
 {
 	struct mip6_bul_internal *mbul = (struct mip6_bul_internal *)arg;
 	struct ip6_hdr *ip6;
@@ -1367,10 +1328,7 @@ mip6_bul_encapcheck(m, off, proto, arg)
 #endif /* NMIP > 0*/
 
 int
-mip6_bc_proxy_control(target, local, cmd)
-	struct in6_addr *target;
-	struct in6_addr *local;
-	int cmd;
+mip6_bc_proxy_control(struct in6_addr *target, struct in6_addr *local, int cmd)
 {
 	struct sockaddr_in6 target_sa, local_sa, mask_sa;
 	struct in6_addr daddr;
@@ -1509,15 +1467,11 @@ mip6_bc_proxy_control(target, local, cmd)
 
 /*  validation of the Source Address in the outer IPv6 header. */
 int
-mip6_rev_encapcheck(m, off, proto, arg)
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 400000000
-	struct mbuf *m;
+mip6_rev_encapcheck(struct mbuf *m, int off, int proto, void *arg)
 #else
-	const struct mbuf *m;
+mip6_rev_encapcheck(const struct mbuf *m, int off, int proto, void *arg)
 #endif /* __NetBSD__ && __NetBSD_Version__ >= 400000000 */
-	int off;
-	int proto;
-	void *arg;
 {
 	struct ip6_hdr *oip6, *iip6;
 	struct mip6_bc_internal *mbc;
@@ -1533,9 +1487,7 @@ mip6_rev_encapcheck(m, off, proto, arg)
 }
 
 int
-mip6_encapsulate(mm, osrc, odst)
-	struct mbuf **mm;
-	struct in6_addr *osrc, *odst;
+mip6_encapsulate(struct mbuf **mm, struct in6_addr *osrc, struct in6_addr *odst)
 {
 	struct mbuf *m = *mm;
 	struct ip6_hdr *ip6;
@@ -1604,9 +1556,7 @@ mip6_probe_routers(void)
 
 #if NMIP > 0
 void
-mip6_notify_rr_hint(dst, src)
-	struct in6_addr *dst;
-	struct in6_addr *src;
+mip6_notify_rr_hint(struct in6_addr *dst, struct in6_addr *src)
 {
 	struct sockaddr_in6 src_sin6, dst_sin6;
 
@@ -1629,10 +1579,9 @@ mip6_notify_rr_hint(dst, src)
 	    (struct sockaddr *)&src_sin6);
 }
 
+/* arguments not used at this moment */
 static int
-mip6_rr_hint_ratelimit(dst, src)
-	const struct in6_addr *dst;	/* not used at this moment */
-	const struct in6_addr *src;	/* not used at this moment */
+mip6_rr_hint_ratelimit(const struct in6_addr *dst, const struct in6_addr *src)
 {
 	int ret;
 
@@ -1662,11 +1611,9 @@ mip6_rr_hint_ratelimit(dst, src)
  * not provide hoa_addr and rt_addr.
  */
 int
-mip6_get_ip6hdrinfo(m, src_addr, dst_addr, hoa_addr, rt_addr, logical, presence)
-	struct mbuf *m;
-	struct in6_addr *src_addr, *dst_addr, *hoa_addr, *rt_addr;
-	u_int8_t logical;
-	int *presence;
+mip6_get_ip6hdrinfo(struct mbuf *m, struct in6_addr *src_addr,
+	struct in6_addr *dst_addr, struct in6_addr *hoa_addr,
+	struct in6_addr *rt_addr, u_int8_t logical, int *presence)
 {
 	struct ip6_hdr ip6;
 	struct ip6_dest ip6d;
@@ -1837,9 +1784,7 @@ mip6_md_scan(u_int16_t ifindex)
 struct ifaddr *nd6_dad_find_by_addr(struct in6_addr *);
 
 void
-mip6_do_dad(addr, ifidx)
-	struct in6_addr *addr;
-	int ifidx;
+mip6_do_dad(struct in6_addr *addr, int ifidx)
 {
 	struct ifnet *ifp;
 	struct in6_ifaddr *mip6_ifa;	/* pesudo in6_ifaddr to usee nd6_dad_start() */
@@ -1887,10 +1832,9 @@ mip6_do_dad(addr, ifidx)
 	nd6_dad_start((struct ifaddr *)mip6_ifa, 0);
 }
 
+/* ifidx - not used at this moment */
 void
-mip6_stop_dad(addr, ifidx)
-	struct in6_addr *addr;
-	int ifidx;	/* not used at this moment */
+mip6_stop_dad(struct in6_addr *addr, int ifidx)
 {
 	struct ifaddr *ifa;
 	
@@ -1906,8 +1850,7 @@ struct dadq *nd6_dad_find(struct ifaddr *);
  * corresponding to the ifindex
  */
 void
-mip6_do_dad_lladdr(ifidx)
-	int ifidx;
+mip6_do_dad_lladdr(int ifidx)
 {
 	struct ifnet *ifp;
 	struct ifaddr *ifa;

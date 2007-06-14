@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.41 2006/09/05 04:25:48 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.42 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -158,15 +158,9 @@ static int in6_copy_msf_source_list(struct in6_addr_slist *,
  * Add source addresses to multicast address record.
  */
 int
-in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
-	struct in6_multi *in6m;
-	u_int16_t numsrc;
-	struct sockaddr_storage *ss;
-	u_int mode;
-	int init;
-	struct i6as_head **newhead;
-	u_int *newmode;
-	u_int16_t *newnumsrc;
+in6_addmultisrc(struct in6_multi *in6m, u_int16_t numsrc,
+	struct sockaddr_storage *ss, u_int mode, int init,
+	struct i6as_head **newhead, u_int *newmode, u_int16_t *newnumsrc)
 {
 	struct in6_addr_slist *iasl;
 	struct in6_addr_source *ias;
@@ -346,15 +340,9 @@ after_source_list_addition:
  * Delete source addresses from multicast address record.
  */
 int
-in6_delmultisrc(in6m, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
-	struct in6_multi *in6m;
-	u_int16_t numsrc;
-	struct sockaddr_storage *ss;
-	u_int mode;
-	int final;
-	struct i6as_head **newhead;
-	u_int *newmode;
-	u_int16_t *newnumsrc;
+in6_delmultisrc(struct in6_multi *in6m, u_int16_t numsrc,
+	struct sockaddr_storage *ss, u_int mode, int final,
+	struct i6as_head **newhead, u_int *newmode, u_int16_t *newnumsrc)
 {
 	struct in6_addr_slist *iasl = NULL;
 	struct in6_addr_source *ias, *nias;
@@ -455,16 +443,10 @@ after_source_list_deletion:
 }
 
 int
-in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
-			newhead, newmode, newnumsrc)
-	struct in6_multi *in6m;
-	u_int16_t numsrc, old_num;
-	struct sockaddr_storage *ss, *old_ss;
-	u_int mode, old_mode;
-	u_int grpjoin;
-	struct i6as_head **newhead;
-	u_int *newmode;
-	u_int16_t *newnumsrc;
+in6_modmultisrc(struct in6_multi *in6m, u_int16_t numsrc,
+	struct sockaddr_storage *ss, u_int mode, u_int16_t old_num,
+	struct sockaddr_storage *old_ss, u_int old_mode, u_int grpjoin,
+	struct i6as_head **newhead, u_int *newmode, u_int16_t *newnumsrc)
 {
 	struct in6_addr_slist *iasl, *oiasl = NULL;
 	struct in6_addr_source *ias, *nias;
@@ -690,12 +672,8 @@ after_source_list_modification:
  * This should be called with numsrc != 0.
  */
 void
-in6_undomultisrc(in6m, numsrc, ss, mode, req)
-	struct in6_multi *in6m;
-	u_int16_t numsrc;
-	struct sockaddr_storage *ss;
-	u_int mode;
-	int req;
+in6_undomultisrc(struct in6_multi *in6m, u_int16_t numsrc,
+	struct sockaddr_storage *ss, u_int mode, int req)
 {
 	struct i6as_head head;
 	struct in6_addr_source *ias, *nias = NULL;
@@ -758,11 +736,8 @@ in6_undomultisrc(in6m, numsrc, ss, mode, req)
  * reception state of an interface is changed.
  */
 int
-in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
-	struct in6_multi *in6m;
-	struct i6as_head **newhead;
-	u_int *newmode;
-	u_int16_t *newnumsrc;
+in6_get_new_msf_state(struct in6_multi *in6m, struct i6as_head **newhead,
+	u_int *newmode, u_int16_t *newnumsrc)
 {
 	struct in6_addr_source *in_ias, *ex_ias, *newias, *nias, *lastp = NULL;
 	struct i6as_head inhead, exhead;
@@ -1190,11 +1165,8 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
  * will be clean up, and new timer for merged report will be set.
  */
 static int
-in6_merge_msf_head(in6m, iasl, refcount, filter)
-	struct in6_multi *in6m;
-	struct in6_addr_slist *iasl;
-	u_int refcount;
-	u_int filter;
+in6_merge_msf_head(struct in6_multi *in6m, struct in6_addr_slist *iasl,
+	u_int refcount, u_int filter)
 {
 	struct i6as_head head;
 	struct in6_addr_source *ias = NULL, *curias = NULL, *newias, *lastp = NULL;
@@ -1333,9 +1305,7 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 }
 
 static void
-in6_undo_new_msf_curhead(in6m, src)
-	struct in6_multi *in6m;
-	struct sockaddr_in6 *src;
+in6_undo_new_msf_curhead(struct in6_multi *in6m, struct sockaddr_in6 *src)
 {
 	struct in6_addr_source *ias = NULL;
 
@@ -1381,12 +1351,10 @@ in6_undo_new_msf_curhead(in6m, src)
  *	-1: no pending source list change (not an error)
  *	    only the case of sending an ALLOW or BLOCK State-Change Report
  */
+/* newhead - new i6ms_cur->head */
 int
-in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
-	struct in6_multi *in6m;
-	struct i6as_head *newhead;	/* new i6ms_cur->head */
-	u_int newmode;
-	u_int16_t newnumsrc;
+in6_merge_msf_state(struct in6_multi *in6m, struct i6as_head *newhead,
+	u_int newmode, u_int16_t newnumsrc)
 {
 	struct in6_addr_source *ias = NULL, *newias, *nias;
 	struct i6as_head curhead;	/* current i6ms_cur->head */
@@ -1595,9 +1563,9 @@ giveup:
 }
 
 void
-in6_clear_all_pending_report(in6m)
-	struct in6_multi *in6m;
+in6_clear_all_pending_report(struct in6_multi *in6m)
 {
+
 	in6_clear_pending_report(in6m, REPORT_FILTER1); /* covering FILTER2 */
 	in6_clear_pending_report(in6m, REPORT_FILTER3);
 	in6_clear_pending_report(in6m, REPORT_FILTER4);
@@ -1609,9 +1577,7 @@ in6_clear_all_pending_report(in6m)
  * will not be sent. That change is notified by responce of later Queries.
  */
 static void
-in6_clear_pending_report(in6m, filter)
-	struct in6_multi *in6m;
-	u_int filter;
+in6_clear_pending_report(struct in6_multi *in6m, u_int filter)
 {
 	if ((filter == REPORT_FILTER1) || (filter == REPORT_FILTER2)) {
 		if (in6m->in6m_source->i6ms_alw != NULL) {
@@ -1655,10 +1621,8 @@ in6_clear_pending_report(in6m, filter)
  * contradictory pending records are freed. XXX my spec.
  */
 static int
-in6_merge_pending_report(in6m, ias, type)
-	struct in6_multi *in6m;
-	struct in6_addr_source *ias;
-	u_int8_t type;
+in6_merge_pending_report(struct in6_multi *in6m, struct in6_addr_source *ias,
+	u_int8_t type)
 {
 	struct in6_addr_source *newias;
 	int ref_count;
@@ -1850,9 +1814,8 @@ in6_merge_pending_report(in6m, ias, type)
  * If it's not 0, only sources whose i6as_refcount = refcount are copied.
  */
 static int
-in6_copy_msf_source_list(iasl, newiasl, refcount)
-	struct in6_addr_slist *iasl, *newiasl;
-	u_int refcount;
+in6_copy_msf_source_list(struct in6_addr_slist *iasl,
+	struct in6_addr_slist *newiasl, u_int refcount)
 {
 	struct in6_addr_source *ias, *newias, *lastp = NULL;
 	u_int16_t i = 0;
@@ -1888,8 +1851,7 @@ in6_copy_msf_source_list(iasl, newiasl, refcount)
 }
 
 void
-in6_free_all_msf_source_list(in6m)
-	struct in6_multi *in6m;
+in6_free_all_msf_source_list(struct in6_multi *in6m)
 {
 	if ((in6m == NULL) || (in6m->in6m_source == NULL))
 		return;
@@ -1946,8 +1908,7 @@ in6_free_all_msf_source_list(in6m)
 }
 
 void
-in6_free_msf_source_list(head)
-	struct i6as_head *head;
+in6_free_msf_source_list(struct i6as_head *head)
 {
 	struct in6_addr_source *ias, *nias;
 
@@ -1962,9 +1923,7 @@ in6_free_msf_source_list(head)
 }
 
 void
-in6_free_msf_source_addr(iasl, src)
-	struct in6_addr_slist *iasl;
-	struct sockaddr_in6 *src;
+in6_free_msf_source_addr(struct in6_addr_slist *iasl, struct sockaddr_in6 *src)
 {
 	struct in6_addr_source *ias, *nias;
 
@@ -2000,12 +1959,14 @@ in6_free_msf_source_addr(iasl, src)
  *	when request is to delete source address;
  *		more than or equal to 0: source reference count
  *		-1: error (EADDRNOTAVAIL)
+ *
+ * iasl - target source list
+ * src - source to be merged
+ * req - request to add or delete
  */
 int
-in6_merge_msf_source_addr(iasl, src, req)
-	struct in6_addr_slist *iasl;	/* target source list */
-	struct sockaddr_in6 *src;	/* source to be merged */
-	int req;			/* request to add or delete */
+in6_merge_msf_source_addr(struct in6_addr_slist *iasl,
+	struct sockaddr_in6 *src, int req)
 {
 	struct in6_addr_source *ias, *newias, *lastp = NULL;
 
@@ -2068,9 +2029,7 @@ in6_merge_msf_source_addr(iasl, src, req)
  * Set multicast source filter of a socket (SIOCSMSFILTER)
  */
 int
-sock6_setmopt_srcfilter(sop, grpfp)
-	struct socket *sop;
-	struct group_filter **grpfp;
+sock6_setmopt_srcfilter(struct socket *sop, struct group_filter **grpfp)
 {
 	struct in6pcb *ipcbp;
 	struct ip6_moptions *imop;
@@ -2552,9 +2511,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
  * Get multicast source filter of a socket (SIOCGMSFILTER)
  */
 int
-sock6_getmopt_srcfilter(sop, grpfp)
-	struct socket *sop;
-	struct group_filter **grpfp;
+sock6_getmopt_srcfilter(struct socket *sop, struct group_filter **grpfp)
 {
 	struct in6pcb *ipcbp;
 	struct ip6_moptions *imop;
@@ -2664,41 +2621,35 @@ sock6_getmopt_srcfilter(sop, grpfp)
 }
 
 int
-in6_getmopt_source_list(msf, numsrc, oss, mode)
-	struct sock_msf *msf;
-	u_int16_t *numsrc;
-	struct sockaddr_storage **oss;
-	u_int *mode;
+in6_getmopt_source_list(struct sock_msf *msf, u_int16_t *numsrc,
+	struct sockaddr_storage **oss, u_int mode)
 {
+
 	return (in_getmopt_source_list(msf, numsrc, oss, mode));
 }
 
 int
-in6_setmopt_source_addr(ss, msf, optname)
-	struct sockaddr_storage *ss;
-	struct sock_msf *msf;
-	int optname;
+in6_setmopt_source_addr(struct sockaddr_storage *ss, struct sock_msf *msf,
+	int optname)
 {
+
 	return (in_setmopt_source_addr(ss, msf, optname));
 }
 
 int
-in6_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
-	struct sock_msf *msf;
-	u_int16_t numsrc;
-	struct sockaddr_storage *ss, *old_ss;
-	u_int mode;
-	u_int16_t *add_num, *old_num;
+in6_setmopt_source_list(struct sock_msf *msf, u_int16_t numsrc,
+	struct sockaddr_storage *ss, u_int mode, u_int16_t *add_num,
+	u_int16_t *old_num, struct sockaddr_storage *old_ss)
 {
+
 	return (in_setmopt_source_list(msf, numsrc, ss, mode, add_num,
 				       old_num, old_ss));
 }
 
 void
-in6_undomopt_source_addr(msf, optname)
-	struct sock_msf *msf;
-	int optname;
+in6_undomopt_source_addr(struct sock_msf *msf, int optname)
 {
+
 	if (optname != MCAST_JOIN_SOURCE_GROUP &&
 	    optname != MCAST_LEAVE_SOURCE_GROUP &&
 	    optname != MCAST_BLOCK_SOURCE &&
@@ -2708,10 +2659,9 @@ in6_undomopt_source_addr(msf, optname)
 }
 
 void
-in6_cleanmopt_source_addr(msf, optname)
-	struct sock_msf *msf;
-	int optname;
+in6_cleanmopt_source_addr(struct sock_msf *msf, int optname)
 {
+
 	if (optname != MCAST_JOIN_SOURCE_GROUP &&
 	    optname != MCAST_LEAVE_SOURCE_GROUP &&
 	    optname != MCAST_BLOCK_SOURCE &&
@@ -2722,19 +2672,17 @@ in6_cleanmopt_source_addr(msf, optname)
 }
 
 void
-in6_undomopt_source_list(msf, mode)
-	struct sock_msf *msf;
-	u_int mode;
+in6_undomopt_source_list(struct sock_msf *msf, u_int mode)
 {
+
 	in_undomopt_source_list(msf, mode);
 }
 
 void
-in6_freemopt_source_list(msf, msf_head, msf_blkhead)
-	struct sock_msf *msf;
-	struct msf_head *msf_head;
-	struct msf_head *msf_blkhead;
+in6_freemopt_source_list(struct sock_msf *msf, struct msf_head *msf_head,
+	struct msf_head *msf_blkhead)
 {
+
 	in_freemopt_source_list(msf, msf_head, msf_blkhead);
 }
 
@@ -2743,10 +2691,8 @@ in6_freemopt_source_list(msf, msf_head, msf_blkhead)
  * source filter). return 1/0 if matches/not matches, respectively.
  */
 int
-match_msf6_per_if(in6m, src, dst)
-	struct in6_multi *in6m;
-	struct in6_addr *src;
-	struct in6_addr *dst;
+match_msf6_per_if(struct in6_multi *in6m, struct in6_addr *src,
+	struct in6_addr *dst)
 {
 	struct in6_multi_source *in6ms;
 	struct in6_addr_source *i6as;
@@ -2793,10 +2739,8 @@ match_msf6_per_if(in6m, src, dst)
  * source filter).  return 1/0 if matches/not matches, respectively.
  */
 int
-match_msf6_per_socket(in6p, src, dst)
-	struct in6pcb *in6p;
-	struct in6_addr *src;
-	struct in6_addr *dst;
+match_msf6_per_socket(struct in6pcb *in6p, struct in6_addr *src,
+	struct in6_addr *dst)
 {
 	struct sock_msf *msf;
 	struct ip6_moptions *im6o;
@@ -2848,6 +2792,7 @@ match_msf6_per_socket(in6p, src, dst)
 	/* no group address matched */
 	return 0;
 }
+
 #ifdef __FreeBSD__
 #ifdef MLDV2_DEBUG
 static void

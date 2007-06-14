@@ -1,4 +1,4 @@
-/*	$KAME: sha1.c,v 1.5 2000/11/08 06:13:08 itojun Exp $	*/
+/*	$KAME: sha1.c,v 1.6 2007/06/14 12:09:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,11 +87,10 @@ static u_int32_t _K[] = { 0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6 };
 		sha1_step(ctxt);		\
      }
 
-static void sha1_step __P((struct sha1_ctxt *));
+static void sha1_step(struct sha1_ctxt *);
 
 static void
-sha1_step(ctxt)
-	struct sha1_ctxt *ctxt;
+sha1_step(struct sha1_ctxt *ctxt)
 {
 	u_int32_t	a, b, c, d, e;
 	size_t t, s;
@@ -175,9 +174,9 @@ sha1_step(ctxt)
 /*------------------------------------------------------------*/
 
 void
-sha1_init(ctxt)
-	struct sha1_ctxt *ctxt;
+sha1_init(struct sha1_ctxt *ctxt)
 {
+
 	bzero(ctxt, sizeof(struct sha1_ctxt));
 	H(0) = 0x67452301;
 	H(1) = 0xefcdab89;
@@ -187,8 +186,7 @@ sha1_init(ctxt)
 }
 
 void
-sha1_pad(ctxt)
-	struct sha1_ctxt *ctxt;
+sha1_pad(struct sha1_ctxt *ctxt)
 {
 	size_t padlen;		/*pad length in bytes*/
 	size_t padstart;
@@ -222,10 +220,7 @@ sha1_pad(ctxt)
 }
 
 void
-sha1_loop(ctxt, input0, len)
-	struct sha1_ctxt *ctxt;
-	const caddr_t input0;
-	size_t len;
+sha1_loop(struct sha1_ctxt *ctxt, const caddr_t input0, size_t len)
 {
 	const u_int8_t *input;
 	size_t gaplen;
@@ -252,9 +247,7 @@ sha1_loop(ctxt, input0, len)
 }
 
 void
-sha1_result(ctxt, digest0)
-	struct sha1_ctxt *ctxt;
-	caddr_t digest0;
+sha1_result(struct sha1_ctxt *ctxt, caddr_t digest0)
 {
 	u_int8_t *digest;
 

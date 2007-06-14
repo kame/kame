@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.h,v 1.10 2004/11/06 15:44:28 itojun Exp $	*/
+/*	$KAME: radix_mpath.h,v 1.11 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -43,25 +43,24 @@
 struct route;
 struct rtentry;
 struct sockaddr;
-int	rn_mpath_capable __P((struct radix_node_head *));
-struct radix_node *rn_mpath_next __P((struct radix_node *));
-int rn_mpath_count __P((struct radix_node *));
-struct rtentry *rt_mpath_matchgate __P((struct rtentry *, struct sockaddr *));
+int	rn_mpath_capable(struct radix_node_head *);
+struct radix_node *rn_mpath_next(struct radix_node *);
+int rn_mpath_count(struct radix_node *);
+struct rtentry *rt_mpath_matchgate(struct rtentry *, struct sockaddr *);
 #ifdef __OpenBSD__
-int rt_mpath_conflict __P((struct radix_node_head *, struct rtentry *,
-	struct sockaddr *, int));
+int rt_mpath_conflict(struct radix_node_head *, struct rtentry *,
+	struct sockaddr *, int);
 #else
-int rt_mpath_conflict __P((struct radix_node_head *, struct rtentry *,
-	struct sockaddr *));
+int rt_mpath_conflict(struct radix_node_head *, struct rtentry *,
+	struct sockaddr *);
 #endif
-void rtalloc_mpath __P((struct route *, int));
-struct radix_node *rn_mpath_lookup __P((void *, void *,
-	struct radix_node_head *));
+void rtalloc_mpath(struct route *, int);
+struct radix_node *rn_mpath_lookup(void *, void *, struct radix_node_head *);
 #ifdef __FreeBSD__
-int	rn4_mpath_inithead __P((void **, int));
-int	rn6_mpath_inithead __P((void **, int));
+int	rn4_mpath_inithead(void **, int);
+int	rn6_mpath_inithead(void **, int);
 #else
-int	rn_mpath_inithead __P((void **, int));
+int	rn_mpath_inithead(void **, int);
 #endif
 
 #ifdef __FreeBSD__

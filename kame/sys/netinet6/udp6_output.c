@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.85 2005/06/16 19:58:07 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.86 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,27 +136,16 @@
 #define udp6s_opackets	udps_opackets
 #endif
 
+int
 #ifdef __FreeBSD__
-int
-udp6_output(in6p, m, addr6, control, p)
-	struct in6pcb *in6p;
-	struct mbuf *m;
-	struct mbuf *control;
-	struct sockaddr *addr6;
-	struct thread *p;
+udp6_output(struct in6pcb *in6p, struct mbuf *m, struct sockaddr *addr6,
+	struct mbuf *control, struct thread *p)
 #elif defined(__NetBSD__)
-int
-udp6_output(in6p, m, addr6, control, p)
-	struct in6pcb *in6p;
-	struct mbuf *m;
-	struct mbuf *addr6, *control;
-	struct proc *p;
+udp6_output(struct in6pcb *in6p, struct mbuf *m, struct mbuf *addr6,
+	struct mbuf *control, struct proc *p)
 #else
-int
-udp6_output(in6p, m, addr6, control)
-	struct in6pcb *in6p;
-	struct mbuf *m;
-	struct mbuf *addr6, *control;
+udp6_output(struct in6pcb *in6p, struct mbuf *m, struct mbuf *addr6,
+	struct mbuf *control)
 #endif
 {
 	u_int32_t plen = sizeof(struct udphdr) + m->m_pkthdr.len;

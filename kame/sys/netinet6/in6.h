@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.165 2006/11/28 03:21:07 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.166 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -871,30 +871,30 @@ in6_cksum_phdr(const struct in6_addr *src, const struct in6_addr *dst,
 }
 #endif
 
-int	in6_cksum __P((struct mbuf *, u_int8_t, u_int32_t, u_int32_t));
+int	in6_cksum(struct mbuf *, u_int8_t, u_int32_t, u_int32_t);
 #if defined(__FreeBSD__) || defined(__NetBSD__)
-int	in6_localaddr __P((struct in6_addr *));
+int	in6_localaddr(struct in6_addr *);
 #endif
-int	in6_is_addr_anycast __P((struct in6_addr *));
-int	in6_addrscope __P((struct in6_addr *));
-struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
-extern void in6_if_up __P((struct ifnet *));
+int	in6_is_addr_anycast(struct in6_addr *);
+int	in6_addrscope(struct in6_addr *);
+struct	in6_ifaddr *in6_ifawithifp(struct ifnet *, struct in6_addr *);
+extern void in6_if_up(struct ifnet *);
 extern	u_char	ip6_protox[];
 
 #ifdef __FreeBSD__
 struct sockaddr;
 
-void	in6_sin6_2_sin __P((struct sockaddr_in *sin,
-			    struct sockaddr_in6 *sin6));
-void	in6_sin_2_v4mapsin6 __P((struct sockaddr_in *sin,
-				 struct sockaddr_in6 *sin6));
-void	in6_sin6_2_sin_in_sock __P((struct sockaddr *nam));
-void	in6_sin_2_v4mapsin6_in_sock __P((struct sockaddr **nam));
+void	in6_sin6_2_sin(struct sockaddr_in *sin,
+			    struct sockaddr_in6 *sin6);
+void	in6_sin_2_v4mapsin6(struct sockaddr_in *sin,
+				 struct sockaddr_in6 *sin6);
+void	in6_sin6_2_sin_in_sock(struct sockaddr *nam);
+void	in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam);
 #endif
 #ifndef __FreeBSD__
-extern int in6_src_sysctl __P((void *, size_t *, void *, size_t));
+extern int in6_src_sysctl(void *, size_t *, void *, size_t);
 #endif
-extern void addrsel_policy_init __P((void));
+extern void addrsel_policy_init(void);
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
 #define	sin6tosa(sin6)	((struct sockaddr *)(sin6))
@@ -910,43 +910,43 @@ extern int      (*faithprefix_p)(struct in6_addr *);
 __BEGIN_DECLS
 struct cmsghdr;
 
-extern int inet6_option_space __P((int));
-extern int inet6_option_init __P((void *, struct cmsghdr **, int));
-extern int inet6_option_append __P((struct cmsghdr *, const u_int8_t *,
-	int, int));
-extern u_int8_t *inet6_option_alloc __P((struct cmsghdr *, int, int, int));
-extern int inet6_option_next __P((const struct cmsghdr *, u_int8_t **));
-extern int inet6_option_find __P((const struct cmsghdr *, u_int8_t **, int));
+extern int inet6_option_space(int);
+extern int inet6_option_init(void *, struct cmsghdr **, int);
+extern int inet6_option_append(struct cmsghdr *, const u_int8_t *,
+	int, int);
+extern u_int8_t *inet6_option_alloc(struct cmsghdr *, int, int, int);
+extern int inet6_option_next(const struct cmsghdr *, u_int8_t **);
+extern int inet6_option_find(const struct cmsghdr *, u_int8_t **, int);
 
-extern size_t inet6_rthdr_space __P((int, int));
-extern struct cmsghdr *inet6_rthdr_init __P((void *, int));
-extern int inet6_rthdr_add __P((struct cmsghdr *, const struct in6_addr *,
-		unsigned int));
-extern int inet6_rthdr_lasthop __P((struct cmsghdr *, unsigned int));
+extern size_t inet6_rthdr_space(int, int);
+extern struct cmsghdr *inet6_rthdr_init(void *, int);
+extern int inet6_rthdr_add(struct cmsghdr *, const struct in6_addr *,
+		unsigned int);
+extern int inet6_rthdr_lasthop(struct cmsghdr *, unsigned int);
 #if 0 /* not implemented yet */
-extern int inet6_rthdr_reverse __P((const struct cmsghdr *, struct cmsghdr *));
+extern int inet6_rthdr_reverse(const struct cmsghdr *, struct cmsghdr *);
 #endif
-extern int inet6_rthdr_segments __P((const struct cmsghdr *));
-extern struct in6_addr *inet6_rthdr_getaddr __P((struct cmsghdr *, int));
-extern int inet6_rthdr_getflags __P((const struct cmsghdr *, int));
+extern int inet6_rthdr_segments(const struct cmsghdr *);
+extern struct in6_addr *inet6_rthdr_getaddr(struct cmsghdr *, int);
+extern int inet6_rthdr_getflags(const struct cmsghdr *, int);
 
-extern int inet6_opt_init __P((void *, socklen_t));
-extern int inet6_opt_append __P((void *, socklen_t, int, u_int8_t,
-				 socklen_t, u_int8_t, void **));
-extern int inet6_opt_finish __P((void *, socklen_t, int));
-extern int inet6_opt_set_val __P((void *, int, void *, socklen_t));
+extern int inet6_opt_init(void *, socklen_t);
+extern int inet6_opt_append(void *, socklen_t, int, u_int8_t,
+				 socklen_t, u_int8_t, void **);
+extern int inet6_opt_finish(void *, socklen_t, int);
+extern int inet6_opt_set_val(void *, int, void *, socklen_t);
 
-extern int inet6_opt_next __P((void *, socklen_t, int, u_int8_t *,
-			       socklen_t *, void **));
-extern int inet6_opt_find __P((void *, socklen_t, int, u_int8_t,
-			  socklen_t *, void **));
-extern int inet6_opt_get_val __P((void *, int, void *, socklen_t));
-extern socklen_t inet6_rth_space __P((int, int));
-extern void *inet6_rth_init __P((void *, socklen_t, int, int));
-extern int inet6_rth_add __P((void *, const struct in6_addr *));
-extern int inet6_rth_reverse __P((const void *, void *));
-extern int inet6_rth_segments __P((const void *));
-extern struct in6_addr *inet6_rth_getaddr __P((const void *, int));
+extern int inet6_opt_next(void *, socklen_t, int, u_int8_t *,
+			       socklen_t *, void **);
+extern int inet6_opt_find(void *, socklen_t, int, u_int8_t,
+			  socklen_t *, void **);
+extern int inet6_opt_get_val(void *, int, void *, socklen_t);
+extern socklen_t inet6_rth_space(int, int);
+extern void *inet6_rth_init(void *, socklen_t, int, int);
+extern int inet6_rth_add(void *, const struct in6_addr *);
+extern int inet6_rth_reverse(const void *, void *);
+extern int inet6_rth_segments(const void *);
+extern struct in6_addr *inet6_rth_getaddr(const void *, int);
 
 /*
  * the followings two functions are experimental.
@@ -954,8 +954,8 @@ extern struct in6_addr *inet6_rth_getaddr __P((const void *, int));
  */
 struct sockaddr;		/* XXX: to suppress compilation warnings */
 
-extern int addr2scopetype __P((struct sockaddr *));
-extern int inet_zoneid __P((int, int, char *, u_int32_t *));
+extern int addr2scopetype(struct sockaddr *);
+extern int inet_zoneid(int, int, char *, u_int32_t *);
 __END_DECLS
 #endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 

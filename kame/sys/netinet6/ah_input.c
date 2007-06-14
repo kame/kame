@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.93 2005/06/16 18:29:26 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.94 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,16 +106,12 @@ extern u_char ip_protox[];
 
 void
 #ifdef __FreeBSD__
-ah4_input(m, off)
-	struct mbuf *m;
-	int off;
+ah4_input(struct mbuf *m, int off)
 #else
 #if __STDC__
 ah4_input(struct mbuf *m, ...)
 #else
-ah4_input(m, va_alist)
-	struct mbuf *m;
-	va_dcl
+ah4_input(struct mbuf *m, va_alist)
 #endif
 #endif
 {
@@ -624,10 +620,7 @@ fail:
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */
 /* assumes that ip header and ah header are contiguous on mbuf */
 void *
-ah4_ctlinput(cmd, sa, v)
-	int cmd;
-	struct sockaddr *sa;
-	void *v;
+ah4_ctlinput(int cmd, struct sockaddr *sa, void *v)
 {
 	struct ip *ip = v;
 	struct ah *ah;
@@ -678,9 +671,7 @@ ah4_ctlinput(cmd, sa, v)
 
 #ifdef INET6
 int
-ah6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+ah6_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct mbuf *m = *mp;
 	int off = *offp;
@@ -1073,10 +1064,7 @@ fail:
 }
 
 void
-ah6_ctlinput(cmd, sa, d)
-	int cmd;
-	struct sockaddr *sa;
-	void *d;
+ah6_ctlinput(int cmd, struct sockaddr *sa, void *d)
 {
 	const struct newah *ahp;
 	struct newah ah;

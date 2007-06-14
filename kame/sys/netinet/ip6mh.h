@@ -1,4 +1,4 @@
-/*	$KAME: ip6mh.h,v 1.10 2006/06/09 11:29:58 t-momose Exp $	*/
+/*	$KAME: ip6mh.h,v 1.11 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -412,6 +412,5 @@ struct ip6_mh_opt_ipv4_hoa {
 	u_int8_t ip6mov4hoa_pfxlen;
 	struct in_addr ip6mov4hoa_v4hoa;
 };
-
 
 #endif /* not _NETINET_IP6MH_H_ */

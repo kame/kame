@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.373 2007/05/08 02:53:12 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.374 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -201,17 +201,17 @@ int ip6_fw_enable = 1;
 
 struct ip6stat ip6stat;
 
-static void ip6_init2 __P((void *));
-static struct m_tag *ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
-static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
+static void ip6_init2(void *);
+static struct m_tag *ip6_setdstifaddr(struct mbuf *, struct in6_ifaddr *);
+static int ip6_hopopts_input(u_int32_t *, u_int32_t *, struct mbuf **, int *);
 #ifdef PULLDOWN_TEST
-static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
+static struct mbuf *ip6_pullexthdr(struct mbuf *, size_t, int);
 #endif
 
 #ifdef NATPT
 extern int natpt_enable;
-extern int natpt_in6 __P((struct mbuf *, struct mbuf **));
-extern void ip_forward __P((struct mbuf *, int, struct sockaddr_in *));
+extern int natpt_in6(struct mbuf *, struct mbuf **);
+extern void ip_forward(struct mbuf *, int, struct sockaddr_in *);
 #endif
 
 #if (defined(__NetBSD__) || defined(__OpenBSD__)) && defined(IFT_IST)
@@ -226,7 +226,7 @@ int ist_sysctl_isatap_rtrlist(SYSCTLFN_ARGS);
  * All protocols not implemented in kernel go to raw IP6 protocol handler.
  */
 void
-ip6_init()
+ip6_init(void)
 {
 	struct ip6protosw *pr;
 	int i;
@@ -279,8 +279,7 @@ ip6_init()
 }
 
 static void
-ip6_init2(dummy)
-	void *dummy;
+ip6_init2(void *dummy)
 {
 
 	/* nd6_timer_init */
@@ -332,7 +331,7 @@ SYSINIT(netinet6init2, SI_SUB_PROTO_DOMAIN, SI_ORDER_MIDDLE, ip6_init2, NULL);
  * IP6 input interrupt handling. Just pass the packet to ip6_input.
  */
 void
-ip6intr()
+ip6intr(void)
 {
 	int s;
 	struct mbuf *m;
@@ -368,8 +367,7 @@ extern struct	route_in6 ip6_forward_rt;
 #endif
 
 void
-ip6_input(m)
-	struct mbuf *m;
+ip6_input(struct mbuf *m)
 {
 	struct ip6_hdr *ip6;
 	int off = sizeof(struct ip6_hdr), nest;
@@ -1142,9 +1140,7 @@ passin:
  * XXX backward compatibility wrapper
  */
 static struct m_tag *
-ip6_setdstifaddr(m, ia6)
-	struct mbuf *m;
-	struct in6_ifaddr *ia6;
+ip6_setdstifaddr(struct mbuf *m, struct in6_ifaddr *ia6)
 {
 	struct m_tag *mtag;
 
@@ -1155,8 +1151,7 @@ ip6_setdstifaddr(m, ia6)
 }
 
 struct in6_ifaddr *
-ip6_getdstifaddr(m)
-	struct mbuf *m;
+ip6_getdstifaddr(struct mbuf *m)
 {
 	struct m_tag *mtag;
 
@@ -1170,13 +1165,12 @@ ip6_getdstifaddr(m)
 /*
  * Hop-by-Hop options header processing. If a valid jumbo payload option is
  * included, the real payload length will be stored in plenp.
+ *
+ * rtalertp -  XXX: should be stored more smart way
  */
 static int
-ip6_hopopts_input(plenp, rtalertp, mp, offp)
-	u_int32_t *plenp;
-	u_int32_t *rtalertp;	/* XXX: should be stored more smart way */
-	struct mbuf **mp;
-	int *offp;
+ip6_hopopts_input(u_int32_t *plenp, u_int32_t *rtalertp, struct mbuf **mp, 
+	int *offp)
 {
 	struct mbuf *m = *mp;
 	int off = *offp, hbhlen;
@@ -1228,12 +1222,8 @@ ip6_hopopts_input(plenp, rtalertp, mp, offp)
  * opthead + hbhlen is located in continuous memory region.
  */
 int
-ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
-	struct mbuf *m;
-	u_int8_t *opthead;
-	int hbhlen;
-	u_int32_t *rtalertp;
-	u_int32_t *plenp;
+ip6_process_hopopts(struct mbuf *m, u_int8_t *opthead, int hbhlen, 
+	u_int32_t *rtalertp, u_int32_t *plenp)
 {
 	struct ip6_hdr *ip6;
 	int optlen = 0;
@@ -1365,10 +1355,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
  * is not continuous in order to return an ICMPv6 error.
  */
 int
-ip6_unknown_opt(optp, m, off)
-	u_int8_t *optp;
-	struct mbuf *m;
-	int off;
+ip6_unknown_opt(u_int8_t *optp, struct mbuf *m, int off)
 {
 	struct ip6_hdr *ip6;
 
@@ -1409,13 +1396,11 @@ ip6_unknown_opt(optp, m, off)
  * very first mbuf on the mbuf chain.
  */
 void
-ip6_savecontrol(in6p, m, mp)
 #if defined(__FreeBSD__) || defined(HAVE_NRL_INPCB)
-	struct inpcb *in6p;
+ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
 #else
-	struct in6pcb *in6p;
+ip6_savecontrol(struct in6pcb *in6p, struct mbuf *m, struct mbuf **mp)
 #endif
-	struct mbuf *m, **mp;
 {
 #define IS2292(x, y)	((in6p->in6p_flags & IN6P_RFC2292) ? (x) : (y))
 #ifdef HAVE_NRL_INPCB
@@ -1658,14 +1643,11 @@ ip6_savecontrol(in6p, m, mp)
 }
 
 void
-ip6_notify_pmtu(in6p, dst, mtu)
 #if defined(__FreeBSD__) || defined(HAVE_NRL_INPCB)
-	struct inpcb *in6p;
+ip6_notify_pmtu(struct inpcb *in6p, struct sockaddr_in6 *dst, u_int32_t *mtu)
 #else
-	struct in6pcb *in6p;
+ip6_notify_pmtu(struct in6pcb *in6p, struct sockaddr_in6 *dst, u_int32_t *mtu)
 #endif
-	struct sockaddr_in6 *dst;
-	u_int32_t *mtu;
 {
 	struct socket *so;
 	struct mbuf *m_mtu;
@@ -1711,10 +1693,7 @@ ip6_notify_pmtu(in6p, dst, mtu)
  * contains the result, or NULL on error.
  */
 static struct mbuf *
-ip6_pullexthdr(m, off, nxt)
-	struct mbuf *m;
-	size_t off;
-	int nxt;
+ip6_pullexthdr(struct mbuf *m, size_t off, int nxt)
 {
 	struct ip6_ext ip6e;
 	size_t elen;
@@ -1774,9 +1753,7 @@ ip6_pullexthdr(m, off, nxt)
  * we develop `neater' mechanism to process extension headers.
  */
 u_int8_t *
-ip6_get_prevhdr(m, off)
-	struct mbuf *m;
-	int off;
+ip6_get_prevhdr(struct mbuf *m, int off)
 {
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 
@@ -1815,11 +1792,7 @@ ip6_get_prevhdr(m, off)
  * get next header offset.  m will be retained.
  */
 int
-ip6_nexthdr(m, off, proto, nxtp)
-	struct mbuf *m;
-	int off;
-	int proto;
-	int *nxtp;
+ip6_nexthdr(struct mbuf *m, int off, int proto, int *nxtp)
 {
 	struct ip6_hdr ip6;
 	struct ip6_ext ip6e;
@@ -1901,11 +1874,7 @@ ip6_nexthdr(m, off, proto, nxtp)
  * get offset for the last header in the chain.  m will be kept untainted.
  */
 int
-ip6_lasthdr(m, off, proto, nxtp)
-	struct mbuf *m;
-	int off;
-	int proto;
-	int *nxtp;
+ip6_lasthdr(struct mbuf *m, int off, int proto, int *nxtp)
 {
 	int newoff;
 	int nxt;
@@ -1930,10 +1899,7 @@ ip6_lasthdr(m, off, proto, nxtp)
 
 #ifdef __OpenBSD__
 void
-pfctlinput2(cmd, sa, ctlparam)
-	int cmd;
-	struct sockaddr *sa;
-	void *ctlparam;
+pfctlinput2(int cmd, struct sockaddr *sa, void *ctlparam)
 {
 	struct domain *dp;
 	struct protosw *pr;
@@ -1957,8 +1923,7 @@ pfctlinput2(cmd, sa, ctlparam)
 #endif
 
 struct m_tag *
-ip6_addaux(m)
-	struct mbuf *m;
+ip6_addaux(struct mbuf *m)
 {
 	struct m_tag *mtag;
 
@@ -1975,8 +1940,7 @@ ip6_addaux(m)
 }
 
 struct m_tag *
-ip6_findaux(m)
-	struct mbuf *m;
+ip6_findaux(struct mbuf *m)
 {
 	struct m_tag *mtag;
 
@@ -1985,8 +1949,7 @@ ip6_findaux(m)
 }
 
 void
-ip6_delaux(m)
-	struct mbuf *m;
+ip6_delaux(struct mbuf *m)
 {
 	struct m_tag *mtag;
 
@@ -2012,13 +1975,8 @@ u_char	inet6ctlerrmap[PRC_NCMDS] = {
 #include <sys/sysctl.h>
 
 int
-ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
+ip6_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, 
+	void *newp, size_t newlen)
 {
 	int old, error;
 

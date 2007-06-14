@@ -75,22 +75,21 @@ struct sockaddr key_src = { 2, PF_KEY, };
 
 struct pfkeystat pfkeystat;
 
-static int key_sendup0 __P((struct rawcb *, struct mbuf *, int, int));
+static int key_sendup0(struct rawcb *, struct mbuf *, int, int);
 
 #ifdef __FreeBSD__
-static int key_receive __P((struct socket *, struct sockaddr **, struct uio *,
-	struct mbuf **, struct mbuf **, int *));
+static int key_receive(struct socket *, struct sockaddr **, struct uio *,
+	struct mbuf **, struct mbuf **, int *);
 #else
-static int key_receive __P((struct socket *, struct mbuf **, struct uio *,
-	struct mbuf **, struct mbuf **, int *));
+static int key_receive(struct socket *, struct mbuf **, struct uio *,
+	struct mbuf **, struct mbuf **, int *);
 #endif
 
-#ifdef __FreeBSD__
 static int
+#ifdef __FreeBSD__
 key_receive(struct socket *so, struct sockaddr **paddr, struct uio *uio,
 	struct mbuf **mp0, struct mbuf **controlp, int *flagsp)
 #else
-static int
 key_receive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 	struct mbuf **mp0, struct mbuf **controlp, int *flagsp)
 #endif
@@ -116,19 +115,13 @@ key_receive(struct socket *so, struct mbuf **paddr, struct uio *uio,
  * key_usrreq()
  * derived from net/rtsock.c:route_usrreq()
  */
+int
 #ifndef __NetBSD__
-int
-key_usrreq(so, req, m, nam, control)
-	struct socket *so;
-	int req;
-	struct mbuf *m, *nam, *control;
+key_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
+	struct mbuf *control)
 #else
-int
-key_usrreq(so, req, m, nam, control, p)
-	struct socket *so;
-	int req;
-	struct mbuf *m, *nam, *control;
-	struct proc *p;
+key_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
+	struct mbuf *control, struct proc *p)
 #endif /*__NetBSD__*/
 {
 	int error = 0;
@@ -206,9 +199,7 @@ int
 #if __STDC__
 key_output(struct mbuf *m, ...)
 #else
-key_output(m, va_alist)
-	struct mbuf *m;
-	va_dcl
+key_output(struct mbuf *m, va_alist)
 #endif
 {
 	struct sadb_msg *msg;
@@ -274,11 +265,7 @@ end:
  * send message to the socket.
  */
 static int
-key_sendup0(rp, m, promisc, canwait)
-	struct rawcb *rp;
-	struct mbuf *m;
-	int promisc;
-	int canwait;
+key_sendup0(struct rawcb *rp, struct mbuf *m, int promisc, int canwait)
 {
 	struct keycb *kp = (struct keycb *)rp;
 	struct mbuf *n;
@@ -368,10 +355,7 @@ recovery:
 
 /* so can be NULL if target != KEY_SENDUP_ONE */
 int
-key_sendup_mbuf(so, m, target)
-	struct socket *so;
-	struct mbuf *m;
-	int target;
+key_sendup_mbuf(struct socket *so, struct mbuf *m, int target)
 {
 	struct mbuf *n;
 	struct keycb *kp;
@@ -491,6 +475,7 @@ static int
 key_abort(struct socket *so)
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_abort(so);
 	splx(s);
@@ -502,11 +487,7 @@ key_abort(struct socket *so)
  * derived from net/rtsock.c:rts_attach()
  */
 static int
-#ifdef __FreeBSD__
 key_attach(struct socket *so, int proto, struct thread *p)
-#else
-key_attach(struct socket *so, int proto, struct proc *p)
-#endif
 {
 	struct keycb *kp;
 	int s, error;
@@ -555,13 +536,10 @@ key_attach(struct socket *so, int proto, struct proc *p)
  * derived from net/rtsock.c:rts_bind()
  */
 static int
-#ifdef __FreeBSD__
 key_bind(struct socket *so, struct sockaddr *nam, struct thread *p)
-#else
-key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
-#endif
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_bind(so, nam, p); /* xxx just EINVAL */
 	splx(s);
@@ -573,13 +551,10 @@ key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
  * derived from net/rtsock.c:rts_connect()
  */
 static int
-#ifdef __FreeBSD__
 key_connect(struct socket *so, struct sockaddr *nam, struct thread *p)
-#else
-key_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
-#endif
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_connect(so, nam, p); /* XXX just EINVAL */
 	splx(s);
@@ -625,6 +600,7 @@ static int
 key_disconnect(struct socket *so)
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_disconnect(so);
 	splx(s);
@@ -639,6 +615,7 @@ static int
 key_peeraddr(struct socket *so, struct sockaddr **nam)
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_peeraddr(so, nam);
 	splx(s);
@@ -650,15 +627,11 @@ key_peeraddr(struct socket *so, struct sockaddr **nam)
  * derived from net/rtsock.c:rts_send()
  */
 static int
-#ifdef __FreeBSD__
 key_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
-	 struct mbuf *control, struct thread *p)
-#else
-key_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
-	 struct mbuf *control, struct proc *p)
-#endif
+	struct mbuf *control, struct thread *p)
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_send(so, flags, m, nam, control, p);
 	splx(s);
@@ -673,6 +646,7 @@ static int
 key_shutdown(struct socket *so)
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_shutdown(so);
 	splx(s);
@@ -687,6 +661,7 @@ static int
 key_sockaddr(struct socket *so, struct sockaddr **nam)
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_sockaddr(so, nam);
 	splx(s);

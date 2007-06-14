@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.53 2005/12/23 13:39:38 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.54 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -56,15 +56,14 @@ static struct scope6_id sid_default;
 	(((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->scope6_id)
 
 void
-scope6_init()
+scope6_init(void)
 {
 
 	bzero(&sid_default, sizeof(sid_default));
 }
 
 struct scope6_id *
-scope6_ifattach(ifp)
-	struct ifnet *ifp;
+scope6_ifattach(struct ifnet *ifp)
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
@@ -93,17 +92,14 @@ scope6_ifattach(ifp)
 }
 
 void
-scope6_ifdetach(sid)
-	struct scope6_id *sid;
+scope6_ifdetach(struct scope6_id *sid)
 {
 
 	free(sid, M_IFADDR);
 }
 
 int
-scope6_set(ifp, idlist)
-	struct ifnet *ifp;
-	struct scope6_id *idlist;
+scope6_set(struct ifnet *ifp, struct scope6_id *idlist)
 {
 	int i, s;
 	int error = 0;
@@ -174,9 +170,7 @@ scope6_set(ifp, idlist)
 }
 
 int
-scope6_get(ifp, idlist)
-	struct ifnet *ifp;
-	struct scope6_id *idlist;
+scope6_get(struct ifnet *ifp, struct scope6_id *idlist)
 {
 	struct scope6_id *sid = SID(ifp);
 
@@ -193,8 +187,7 @@ scope6_get(ifp, idlist)
  * or global.
  */
 int
-in6_addrscope(addr)
-	struct in6_addr *addr;
+in6_addrscope(struct in6_addr *addr)
 {
 	int scope;
 
@@ -254,10 +247,11 @@ in6_addrscope(addr)
 	return IPV6_ADDR_SCOPE_GLOBAL;
 }
 
+/* ifp - note that this might be NULL */
 void
-scope6_setdefault(ifp)
-	struct ifnet *ifp;	/* note that this might be NULL */
+scope6_setdefault(struct ifnet *ifp)
 {
+
 	/*
 	 * Currently, this function just sets the default "interfaces"
 	 * and "links" according to the given interface.
@@ -277,8 +271,7 @@ scope6_setdefault(ifp)
 }
 
 int
-scope6_get_default(idlist)
-	struct scope6_id *idlist;
+scope6_get_default(struct scope6_id *idlist)
 {
 
 	*idlist = sid_default;
@@ -287,9 +280,9 @@ scope6_get_default(idlist)
 }
 
 u_int32_t
-scope6_addr2default(addr)
-	struct in6_addr *addr;
+scope6_addr2default(struct in6_addr *addr)
 {
+
 	/*
 	 * special case: The loopback address should be considered as
 	 * link-local, but there's no ambiguity in the syntax.
@@ -309,9 +302,7 @@ scope6_addr2default(addr)
  * address.
  */
 int
-sa6_embedscope(sin6, defaultok)
-	struct sockaddr_in6 *sin6;
-	int defaultok;
+sa6_embedscope(struct sockaddr_in6 *sin6, int defaultok)
 {
 	struct ifnet *ifp;
 	u_int32_t zoneid;
@@ -351,8 +342,7 @@ sa6_embedscope(sin6, defaultok)
  * generate standard sockaddr_in6 from embedded form.
  */
 int
-sa6_recoverscope(sin6)
-	struct sockaddr_in6 *sin6;
+sa6_recoverscope(struct sockaddr_in6 *sin6)
 {
 	u_int32_t zoneid;
 
@@ -390,12 +380,11 @@ sa6_recoverscope(sin6)
  * Determine the appropriate scope zone ID for in6 and ifp.  If ret_id is
  * non NULL, it is set to the zone ID.  If the zone ID needs to be embedded
  * in the in6_addr structure, in6 will be modified. 
+ *
+ * ret_id - unnecessary?
  */
 int
-in6_setscope(in6, ifp, ret_id)
-	struct in6_addr *in6;
-	struct ifnet *ifp;
-	u_int32_t *ret_id;	/* unnecessary? */
+in6_setscope(struct in6_addr *in6, struct ifnet *ifp, u_int32_t *ret_id)
 {
 	int scope;
 	u_int32_t zoneid = 0;
@@ -460,8 +449,7 @@ in6_setscope(in6, ifp, ret_id)
  * is intact; return non 0 if the address is modified.
  */
 int
-in6_clearscope(in6)
-	struct in6_addr *in6;
+in6_clearscope(struct in6_addr *in6)
 {
 	int modified = 0;
 

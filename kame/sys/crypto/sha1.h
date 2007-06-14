@@ -1,4 +1,4 @@
-/*	$KAME: sha1.h,v 1.5 2000/03/27 04:36:23 sumikawa Exp $	*/
+/*	$KAME: sha1.h,v 1.6 2007/06/14 12:09:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,10 +54,10 @@ struct sha1_ctxt {
 };
 
 #if defined(KERNEL) || defined(_KERNEL)
-extern void sha1_init __P((struct sha1_ctxt *));
-extern void sha1_pad __P((struct sha1_ctxt *));
-extern void sha1_loop __P((struct sha1_ctxt *, const caddr_t, size_t));
-extern void sha1_result __P((struct sha1_ctxt *, caddr_t));
+extern void sha1_init(struct sha1_ctxt *);
+extern void sha1_pad(struct sha1_ctxt *);
+extern void sha1_loop(struct sha1_ctxt *, const caddr_t, size_t);
+extern void sha1_result(struct sha1_ctxt *, caddr_t);
 
 /* compatibilty with other SHA1 source codes */
 typedef struct sha1_ctxt SHA1_CTX;

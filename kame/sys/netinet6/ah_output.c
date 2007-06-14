@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.40 2004/05/25 01:16:03 suz Exp $	*/
+/*	$KAME: ah_output.c,v 1.41 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,7 +81,7 @@
 #include <net/net_osdep.h>
 
 #ifdef INET
-static struct in_addr *ah4_finaldst __P((struct mbuf *));
+static struct in_addr *ah4_finaldst(struct mbuf *);
 #endif
 
 /*
@@ -90,8 +90,7 @@ static struct in_addr *ah4_finaldst __P((struct mbuf *));
  * virtual interface, and control MTU/MSS by the interface MTU.
  */
 size_t
-ah_hdrsiz(isr)
-	struct ipsecrequest *isr;
+ah_hdrsiz(struct ipsecrequest *isr)
 {
 	const struct ah_algorithm *algo;
 	size_t hdrsiz;
@@ -146,9 +145,7 @@ ah_hdrsiz(isr)
  * the function does not modify m.
  */
 int
-ah4_output(m, isr)
-	struct mbuf *m;
-	struct ipsecrequest *isr;
+ah4_output(struct mbuf *m, struct ipsecrequest *isr)
 {
 	struct secasvar *sav = isr->sav;
 	const struct ah_algorithm *algo;
@@ -332,8 +329,7 @@ ah4_output(m, isr)
 
 /* Calculate AH length */
 int
-ah_hdrlen(sav)
-	struct secasvar *sav;
+ah_hdrlen(struct secasvar *sav)
 {
 	const struct ah_algorithm *algo;
 	int plen, ahlen;
@@ -359,11 +355,8 @@ ah_hdrlen(sav)
  * Fill in the Authentication Header and calculate checksum.
  */
 int
-ah6_output(m, nexthdrp, md, isr)
-	struct mbuf *m;
-	u_char *nexthdrp;
-	struct mbuf *md;
-	struct ipsecrequest *isr;
+ah6_output(struct mbuf *m, u_char *nexthdrp, struct mbuf *md,
+	struct ipsecrequest *isr)
 {
 	struct mbuf *mprev;
 	struct mbuf *mah;
@@ -513,8 +506,7 @@ ah6_output(m, nexthdrp, md, isr)
  * The mbuf must be pulled up toward, at least, ip option part.
  */
 static struct in_addr *
-ah4_finaldst(m)
-	struct mbuf *m;
+ah4_finaldst(struct mbuf *m)
 {
 	struct ip *ip;
 	int optlen;

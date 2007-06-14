@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.31 2004/05/25 01:16:39 suz Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.32 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,51 +126,51 @@ struct ip6protosw {
 
 /* protocol-protocol hooks */
 	int	(*pr_input)		/* input to protocol (from below) */
-			__P((struct mbuf **, int *, int));
+			(struct mbuf **, int *, int);
 	int	(*pr_output)		/* output to protocol (from above) */
-			__P((struct mbuf *, ...));
+			(struct mbuf *, ...);
 	void	(*pr_ctlinput)		/* control input (from below) */
-			__P((int, struct sockaddr *, void *));
+			(int, struct sockaddr *, void *);
 #ifdef __FreeBSD__
 	int	(*pr_ctloutput)		/* control output (from above) */
-			__P((struct socket *, struct sockopt *));
+			(struct socket *, struct sockopt *);
 #else
 	int	(*pr_ctloutput)		/* control output (from above) */
-			__P((int, struct socket *, int, int, struct mbuf **));
+			(int, struct socket *, int, int, struct mbuf **);
 #endif
 
 /* user-protocol hook */
 #ifndef __FreeBSD__
 	int	(*pr_usrreq)		/* user request: see list below */
-			__P((struct socket *, int, struct mbuf *,
-			     struct mbuf *, struct mbuf *, struct proc *));
+			(struct socket *, int, struct mbuf *,
+			     struct mbuf *, struct mbuf *, struct proc *);
 #else
 	int	(*pr_usrreq)		/* user request: see list below */
-			__P((struct socket *, int, struct mbuf *,
-			     struct mbuf *, struct mbuf *));
+			(struct socket *, int, struct mbuf *,
+			     struct mbuf *, struct mbuf *);
 #endif
 
 /* utility hooks */
 	void	(*pr_init)		/* initialization hook */
-			__P((void));
+			(void);
 
 	void	(*pr_fasttimo)		/* fast timeout (200ms) */
-			__P((void));
+			(void);
 	void	(*pr_slowtimo)		/* slow timeout (500ms) */
-			__P((void));
+			(void);
 	void	(*pr_drain)		/* flush any excess space possible */
-			__P((void));
+			(void);
 #ifdef __FreeBSD__
 	struct	pr_usrreqs *pr_usrreqs;	/* supersedes pr_usrreq() */
 #else
 	int	(*pr_sysctl)		/* sysctl for protocol */
-			__P((int *, u_int, void *, size_t *, void *, size_t));
+			(int *, u_int, void *, size_t *, void *, size_t);
 #endif
 };
 
 extern struct ip6protosw inet6sw[];
 
 #ifdef __OpenBSD__
-void pfctlinput2 __P((int, struct sockaddr *, void *));
+void pfctlinput2(int, struct sockaddr *, void *);
 #endif
 #endif /* !_NETINET6_IP6PROTOSW_H_ */

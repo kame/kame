@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.40 2005/04/27 11:35:29 suz Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.41 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -150,24 +150,21 @@ SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, verbose_limit, CTLFLAG_RW, &fw6_verbose_
 			} while (/*CONSTCOND*/ 0)
 #define SNPARGS(buf, len) buf + len, sizeof(buf) > len ? sizeof(buf) - len : 0
 
-static int	add_entry6 __P((struct ip6_fw_head *chainptr, struct ip6_fw *frwl));
-static int	del_entry6 __P((struct ip6_fw_head *chainptr, u_short number));
-static int	zero_entry6 __P((struct mbuf *m));
-static struct ip6_fw *check_ip6fw_struct __P((struct ip6_fw *m));
-static struct ip6_fw *check_ip6fw_mbuf __P((struct mbuf *fw));
-static int	ip6opts_match __P((struct ip6_hdr **ip6, struct ip6_fw *f,
-				   struct mbuf **m,
-				   int *off, int *nxt, u_short *offset));
-static int	port_match6 __P((u_short *portptr, int nports, u_short port,
-				int range_flag));
-static int	tcp6flg_match __P((struct tcphdr *tcp6, struct ip6_fw *f));
-static int	icmp6type_match __P((struct icmp6_hdr *  icmp, struct ip6_fw * f));
-static void	ip6fw_report __P((struct ip6_fw *f, struct ip6_hdr *ip6,
-				struct ifnet *rif, struct ifnet *oif, int off, int nxt));
+static int	add_entry6(struct ip6_fw_head *, struct ip6_fw *);
+static int	del_entry6(struct ip6_fw_head *, u_short);
+static int	zero_entry6(struct mbuf *);
+static struct ip6_fw *check_ip6fw_struct(struct ip6_fw *);
+static struct ip6_fw *check_ip6fw_mbuf(struct mbuf *);
+static int	ip6opts_match(struct ip6_hdr **, struct ip6_fw *,
+	struct mbuf **, int *, int *, u_short *);
+static int	port_match6(u_short *, int, u_short, int);
+static int	tcp6flg_match(struct tcphdr *, struct ip6_fw *);
+static int	icmp6type_match(struct icmp6_hdr *, struct ip6_fw *);
+static void	ip6fw_report(struct ip6_fw *, struct ip6_hdr *,
+	struct ifnet *, struct ifnet *, int, int);
 
-static int	ip6_fw_chk __P((struct ip6_hdr **pip6, struct ifnet *oif,
-				struct mbuf **m));
-static int	ip6_fw_ctl __P((int stage, struct mbuf **mm));
+static int	ip6_fw_chk(struct ip6_hdr **, struct ifnet *, struct mbuf **);
+static int	ip6_fw_ctl(int, struct mbuf **);
 
 static char err_prefix[] = "ip6_fw_ctl:";
 
@@ -183,6 +180,7 @@ inline
 int
 port_match6(u_short *portptr, int nports, u_short port, int range_flag)
 {
+
 	if (!nports)
 		return 1;
 	if (range_flag) {
@@ -266,7 +264,7 @@ is_icmp6_query(struct ip6_hdr *ip6, int off)
 
 static int
 ip6opts_match(struct ip6_hdr **pip6, struct ip6_fw *f, struct mbuf **m,
-	      int *off, int *nxt, u_short *offset)
+	int *off, int *nxt, u_short *offset)
 {
 	int len;
 	struct ip6_hdr *ip6 = *pip6;
@@ -353,6 +351,7 @@ inline
 int
 iface_match(struct ifnet *ifp, union ip6_fw_if *ifu, int byname)
 {
+
 	/* Check by name or by IP address */
 	if (byname) {
 #if defined(__NetBSD__) || defined(__FreeBSD__)
@@ -1010,6 +1009,7 @@ zero_entry6(struct mbuf *m)
 static struct ip6_fw *
 check_ip6fw_mbuf(struct mbuf *m)
 {
+
 	/* Check length */
 	if (m->m_len != sizeof(struct ip6_fw)) {
 		dprintf(("%s len=%d, want %d\n", err_prefix, m->m_len,
@@ -1022,6 +1022,7 @@ check_ip6fw_mbuf(struct mbuf *m)
 static struct ip6_fw *
 check_ip6fw_struct(struct ip6_fw *frwl)
 {
+
 	/* Check for invalid flag bits */
 	if ((frwl->fw_flg & ~IPV6_FW_F_MASK) != 0) {
 		dprintf(("%s undefined flag bits set (flags=%x)\n",
@@ -1352,7 +1353,6 @@ static moduledata_t ip6fwmod = {
         ip6fw_modevent,
         0
 };
+
 DECLARE_MODULE(ip6fw, ip6fwmod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 #endif
-
-

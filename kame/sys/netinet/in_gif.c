@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.99 2006/01/27 08:00:03 mitsuya Exp $	*/
+/*	$KAME: in_gif.c,v 1.100 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,8 +89,8 @@
 
 #include <net/net_osdep.h>
 
-static int gif_validate4 __P((const struct ip *, struct gif_softc *,
-	struct ifnet *));
+static int gif_validate4(const struct ip *, struct gif_softc *,
+	struct ifnet *);
 
 #if NGIF > 0
 int ip_gif_ttl = GIF_TTL;
@@ -131,10 +131,7 @@ struct protosw in_gif_protosw =
 #endif
 
 int
-in_gif_output(ifp, family, m)
-	struct ifnet	*ifp;
-	int		family;
-	struct mbuf	*m;
+in_gif_output(struct ifnet *ifp, int family, struct mbuf *m)
 {
 #ifdef __OpenBSD__
 	struct gif_softc *sc = (struct gif_softc*)ifp;
@@ -376,16 +373,12 @@ in_gif_output(ifp, family, m)
 
 void
 #ifdef __FreeBSD__
-in_gif_input(m, off)
-	struct mbuf *m;
-	int off;
+in_gif_input(struct mbuf *m, int off)
 #else
 #if __STDC__
 in_gif_input(struct mbuf *m, ...)
 #else
-in_gif_input(m, va_alist)
-	struct mbuf *m;
-	va_dcl
+in_gif_input(struct mbuf *m, va_alist)
 #endif
 #endif
 {
@@ -509,10 +502,7 @@ in_gif_input(m, va_alist)
  * validate outer address.
  */
 static int
-gif_validate4(ip, sc, ifp)
-	const struct ip *ip;
-	struct gif_softc *sc;
-	struct ifnet *ifp;
+gif_validate4(const struct ip *ip, struct gif_softc *sc, struct ifnet *ifp)
 {
 	struct sockaddr_in *src, *dst;
 	struct in_ifaddr *ia4;
@@ -590,11 +580,7 @@ gif_validate4(ip, sc, ifp)
  * matched the physical addr family.  see gif_encapcheck().
  */
 int
-gif_encapcheck4(m, off, proto, arg)
-	const struct mbuf *m;
-	int off;
-	int proto;
-	void *arg;
+gif_encapcheck4(const struct mbuf *m, int off, int proto, void *arg)
 {
 	struct ip ip;
 	struct gif_softc *sc;
@@ -612,8 +598,7 @@ gif_encapcheck4(m, off, proto, arg)
 #endif
 
 int
-in_gif_attach(sc)
-	struct gif_softc *sc;
+in_gif_attach(struct gif_softc *sc)
 {
 #ifndef GIF_ENCAPCHECK
 	struct sockaddr_in mask4;
@@ -637,8 +622,7 @@ in_gif_attach(sc)
 }
 
 int
-in_gif_detach(sc)
-	struct gif_softc *sc;
+in_gif_detach(struct gif_softc *sc)
 {
 	int error;
 

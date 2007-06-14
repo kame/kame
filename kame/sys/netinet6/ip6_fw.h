@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.h,v 1.12 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: ip6_fw.h,v 1.13 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -218,8 +218,8 @@ void ip6_fw_init(void);
 
 /* Firewall hooks */
 struct ip6_hdr;
-typedef	int ip6_fw_chk_t __P((struct ip6_hdr**, struct ifnet*, struct mbuf**));
-typedef	int ip6_fw_ctl_t __P((int, struct mbuf**));
+typedef	int ip6_fw_chk_t(struct ip6_hdr**, struct ifnet*, struct mbuf**);
+typedef	int ip6_fw_ctl_t(int, struct mbuf**);
 extern	ip6_fw_chk_t *ip6_fw_chk_ptr;
 extern	ip6_fw_ctl_t *ip6_fw_ctl_ptr;
 #ifdef __FreeBSD__

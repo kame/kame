@@ -1,4 +1,4 @@
-/*	$KAME: keysock.h,v 1.10 2004/05/26 02:55:31 itojun Exp $	*/
+/*	$KAME: keysock.h,v 1.11 2007/06/14 12:09:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,23 +67,23 @@ struct keycb {
 	struct rawcb kp_raw;	/* rawcb */
 	int kp_promisc;		/* promiscuous mode */
 	int kp_registered;	/* registered socket */
-	int (*kp_receive) (struct socket *, struct mbuf **, struct uio *,
+	int (*kp_receive)(struct socket *, struct mbuf **, struct uio *,
 		struct mbuf **, struct mbuf **, int *);
 	struct mbuf *kp_queue;	/* queued mbufs, linked by m_nextpkt */
 };
 
 extern struct pfkeystat pfkeystat;
 
-extern int key_output __P((struct mbuf *, ...));
+extern int key_output(struct mbuf *, ...);
 #ifndef __NetBSD__
-extern int key_usrreq __P((struct socket *,
-	int, struct mbuf *, struct mbuf *, struct mbuf *));
+extern int key_usrreq(struct socket *,
+	int, struct mbuf *, struct mbuf *, struct mbuf *);
 #else
-extern int key_usrreq __P((struct socket *,
-	int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
+extern int key_usrreq(struct socket *,
+	int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
 #endif
 
-extern int key_sendup_mbuf __P((struct socket *, struct mbuf *, int));
+extern int key_sendup_mbuf(struct socket *, struct mbuf *, int);
 #endif /* _KERNEL */
 
 #endif /*_NETKEY_KEYSOCK_H_*/

@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.41 2005/04/14 06:22:37 suz Exp $	*/
+/*	$KAME: if_faith.c,v 1.42 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -108,16 +108,16 @@
 
 #include <net/net_osdep.h>
 
-static int faithioctl __P((struct ifnet *, u_long, caddr_t));
-int faithoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
-	struct rtentry *));
-static void faithrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
+static int faithioctl(struct ifnet *, u_long, caddr_t);
+int faithoutput(struct ifnet *, struct mbuf *, struct sockaddr *,
+	struct rtentry *);
+static void faithrtrequest(int, struct rtentry *, struct rt_addrinfo *);
 
 #ifdef __FreeBSD__
-void faithattach __P((void *));
+void faithattach(void *);
 PSEUDO_SET(faithattach, if_faith);
 #else
-void faithattach __P((int));
+void faithattach(int);
 #endif
 
 static struct ifnet faithif[NFAITH];
@@ -126,11 +126,10 @@ static struct ifnet faithif[NFAITH];
 
 /* ARGSUSED */
 void
-faithattach(faith)
 #ifdef __FreeBSD__
-	void *faith;
+faithattach(void *faith)
 #else
-	int faith;
+faithattach(int faith)
 #endif
 {
 	struct ifnet *ifp;
@@ -173,11 +172,8 @@ faithattach(faith)
 }
 
 int
-faithoutput(ifp, m, dst, rt)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct sockaddr *dst;
-	struct rtentry *rt;
+faithoutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	struct rtentry *rt)
 {
 #ifndef __FreeBSD__
 	int s;
@@ -281,11 +277,9 @@ faithoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
-faithrtrequest(cmd, rt, info)
-	int cmd;
-	struct rtentry *rt;
-	struct rt_addrinfo *info;
+faithrtrequest(int cmd, struct rtentry *rt, struct rt_addrinfo *info)
 {
+
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
 	}
@@ -296,10 +290,7 @@ faithrtrequest(cmd, rt, info)
  */
 /* ARGSUSED */
 static int
-faithioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+faithioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct ifaddr *ifa;
 	struct ifreq *ifr = (struct ifreq *)data;
@@ -359,8 +350,7 @@ faithioctl(ifp, cmd, data)
  * XXX could be layer violation to call sys/net from sys/netinet6
  */
 int
-faithprefix(in6)
-	struct in6_addr *in6;
+faithprefix(struct in6_addr *in6)
 {
 	struct rtentry *rt;
 	struct sockaddr_in6 sin6;

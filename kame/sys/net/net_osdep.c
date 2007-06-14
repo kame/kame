@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.16 2005/07/17 20:40:45 t-momose Exp $	*/
+/*	$KAME: net_osdep.c,v 1.17 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,8 +59,7 @@
 
 #ifdef __APPLE__
 const char *
-if_name(ifp)
-	struct ifnet *ifp;
+if_name(struct ifnet *ifp)
 {
 #define MAXNUMBUF	8
 	static char nam[MAXNUMBUF][IFNAMSIZ + 10];	/*enough?*/
@@ -91,12 +90,11 @@ if_name(ifp)
 
 /*
  * ppsratecheck(): packets (or events) per second limitation.
+ *
+ * maxpps - maximum pps allowed
  */
 int
-ppsratecheck(lasttime, curpps, maxpps)
-	struct timeval *lasttime;
-	int *curpps;
-	int maxpps;	/* maximum pps allowed */
+ppsratecheck(struct timeval *lasttime, int *curpps, int maxpps)
 {
 	struct timeval tv, delta;
 	int s, rv;
@@ -149,4 +147,3 @@ ppsratecheck(lasttime, curpps, maxpps)
 	return (rv);
 }
 #endif
-

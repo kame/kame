@@ -1,4 +1,4 @@
-/*	$KAME: ah_aesxcbcmac.h,v 1.3 2003/07/20 18:01:20 itojun Exp $	*/
+/*	$KAME: ah_aesxcbcmac.h,v 1.4 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -29,10 +29,10 @@
  * SUCH DAMAGE.
  */
 
-extern int ah_aes_xcbc_mac_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-extern void ah_aes_xcbc_mac_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-extern void ah_aes_xcbc_mac_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
+extern int ah_aes_xcbc_mac_init(struct ah_algorithm_state *,
+	struct secasvar *);
+extern void ah_aes_xcbc_mac_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+extern void ah_aes_xcbc_mac_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
 

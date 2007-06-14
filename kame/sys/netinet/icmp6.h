@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.106 2007/05/17 18:27:40 jinmei Exp $	*/
+/*	$KAME: icmp6.h,v 1.107 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -895,38 +895,37 @@ struct	rtentry;
 struct	rttimer;
 struct	in6_multi;
 # endif
-void	icmp6_init __P((void));
-void	icmp6_paramerror __P((struct mbuf *, int));
-void	icmp6_error __P((struct mbuf *, int, int, int));
+void	icmp6_init(void);
+void	icmp6_paramerror(struct mbuf *, int);
+void	icmp6_error(struct mbuf *, int, int, int);
 #ifdef __APPLE__
 int	icmp6_input(struct mbuf **, int *);
 void	icmp6_fasttimo(void);
 #else
-void	icmp6_error2 __P((struct mbuf *, int, int, int, struct ifnet *));
-int	icmp6_input __P((struct mbuf **, int *, int));
+void	icmp6_error2(struct mbuf *, int, int, int, struct ifnet *);
+int	icmp6_input(struct mbuf **, int *, int);
 #endif
-void	icmp6_reflect __P((struct mbuf *, size_t));
-void	icmp6_prepare __P((struct mbuf *));
+void	icmp6_reflect(struct mbuf *, size_t);
+void	icmp6_prepare(struct mbuf *);
 #ifdef __APPLE__
-void	icmp6_redirect_input __P((struct mbuf *, int));
+void	icmp6_redirect_input(struct mbuf *, int);
 #else
-void	icmp6_redirect_input __P((struct mbuf *, int, int));
+void	icmp6_redirect_input(struct mbuf *, int, int);
 #endif
-void	icmp6_redirect_output __P((struct mbuf *, struct rtentry *));
+void	icmp6_redirect_output(struct mbuf *, struct rtentry *);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+int	icmp6_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #endif
 
 struct	ip6ctlparam;
 #ifdef __APPLE__
 void	icmp6_mtudisc_update(struct ip6ctlparam *, int);
 #else /* __APPLE__ */
-void	icmp6_mtudisc_update __P((struct ip6ctlparam *,
-				  struct sockaddr_in6 *, int));
+void	icmp6_mtudisc_update(struct ip6ctlparam *, struct sockaddr_in6 *, int);
 #endif /* __APPLE__ */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-void	icmp6_mtudisc_callback_register __P((void (*)(struct in6_addr *)));
+void	icmp6_mtudisc_callback_register(void (*)(struct in6_addr *));
 #endif
 
 /* XXX: is this the right place for these macros? */

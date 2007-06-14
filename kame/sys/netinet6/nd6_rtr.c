@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.281 2007/03/30 09:41:15 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.282 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,25 +83,24 @@
 
 #define SDL(s)	((struct sockaddr_dl *)s)
 
-static int rtpref __P((struct nd_defrouter *));
-static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
-static int prelist_update __P((struct nd_prefixctl *, struct nd_defrouter *,
-    struct mbuf *, int));
-static struct in6_ifaddr *in6_ifadd __P((struct nd_prefixctl *, int));
-static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
-	struct nd_defrouter *));
-static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
-static void pfxrtr_del __P((struct nd_pfxrouter *));
-static struct nd_pfxrouter *find_pfxlist_reachable_router
-	__P((struct nd_prefix *));
-static void defrouter_delreq __P((struct nd_defrouter *));
-static void nd6_rtmsg __P((int, struct rtentry *));
+static int rtpref(struct nd_defrouter *);
+static struct nd_defrouter *defrtrlist_update(struct nd_defrouter *);
+static int prelist_update(struct nd_prefixctl *, struct nd_defrouter *,
+	struct mbuf *, int);
+static struct in6_ifaddr *in6_ifadd(struct nd_prefixctl *, int);
+static struct nd_pfxrouter *pfxrtr_lookup(struct nd_prefix *,
+	struct nd_defrouter *);
+static void pfxrtr_add(struct nd_prefix *, struct nd_defrouter *);
+static void pfxrtr_del(struct nd_pfxrouter *);
+static struct nd_pfxrouter *find_pfxlist_reachable_router(struct nd_prefix *);
+static void defrouter_delreq(struct nd_defrouter *);
+static void nd6_rtmsg(int, struct rtentry *);
 
-static int in6_init_prefix_ltimes __P((struct nd_prefix *));
-static void in6_init_address_ltimes __P((struct nd_prefix *,
-	struct in6_addrlifetime *));
+static int in6_init_prefix_ltimes(struct nd_prefix *);
+static void in6_init_address_ltimes(struct nd_prefix *,
+	struct in6_addrlifetime *);
 
-static int rt6_deleteroute __P((struct radix_node *, void *));
+static int rt6_deleteroute(struct radix_node *, void *);
 
 extern int nd6_recalc_reachtm_interval;
 
@@ -130,9 +129,7 @@ int ip6_temp_regen_advance = TEMPADDR_REGEN_ADVANCE;
  * Based on RFC 2461
  */
 void
-nd6_rs_input(m, off, icmp6len)
-	struct	mbuf *m;
-	int off, icmp6len;
+nd6_rs_input(struct mbuf *m, int off, int icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
@@ -225,9 +222,7 @@ nd6_rs_input(m, off, icmp6len)
  * TODO: ND_RA_FLAG_{OTHER,MANAGED} processing
  */
 void
-nd6_ra_input(m, off, icmp6len)
-	struct	mbuf *m;
-	int off, icmp6len;
+nd6_ra_input(struct mbuf *m, int off, int icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct nd_ifinfo *ndi = ND_IFINFO(ifp);
@@ -472,14 +467,12 @@ nd6_ra_input(m, off, icmp6len)
 }
 
 /*
- * default router list proccessing sub routines
+ * default router list processing sub routines
  */
 
 /* tell the change to user processes watching the routing socket. */
 static void
-nd6_rtmsg(cmd, rt)
-	int cmd;
-	struct rtentry *rt;
+nd6_rtmsg(int cmd, struct rtentry *rt)
 {
 	struct rt_addrinfo info;
 
@@ -497,8 +490,7 @@ nd6_rtmsg(cmd, rt)
 }
 
 void
-defrouter_addreq(new)
-	struct nd_defrouter *new;
+defrouter_addreq(struct nd_defrouter *new)
 {
 	struct sockaddr_in6 def, mask, gate;
 	struct rtentry *newrt = NULL;
@@ -540,9 +532,7 @@ defrouter_addreq(new)
 }
 
 struct nd_defrouter *
-defrouter_lookup(addr, ifp)
-	struct in6_addr *addr;
-	struct ifnet *ifp;
+defrouter_lookup(struct in6_addr *addr, struct ifnet *ifp)
 {
 	struct nd_defrouter *dr;
 
@@ -558,8 +548,7 @@ defrouter_lookup(addr, ifp)
 }
 
 void
-defrtrlist_del(dr)
-	struct nd_defrouter *dr;
+defrtrlist_del(struct nd_defrouter *dr)
 {
 	struct nd_defrouter *deldr = NULL;
 	struct nd_prefix *pr;
@@ -608,8 +597,7 @@ defrtrlist_del(dr)
  * not be called from anywhere else.
  */
 static void
-defrouter_delreq(dr)
-	struct nd_defrouter *dr;
+defrouter_delreq(struct nd_defrouter *dr)
 {
 	struct sockaddr_in6 def, mask, gw;
 	struct rtentry *oldrt = NULL;
@@ -650,7 +638,7 @@ defrouter_delreq(dr)
  * remove all default routes from default router list
  */
 void
-defrouter_reset()
+defrouter_reset(void)
 {
 	struct nd_defrouter *dr;
 
@@ -686,7 +674,7 @@ defrouter_reset()
  * complicated and the possibility of introducing bugs.
  */
 void
-defrouter_select()
+defrouter_select(void)
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
@@ -785,6 +773,7 @@ defrouter_select()
 static int
 rtpref(struct nd_defrouter *dr)
 {
+
 #ifdef RTPREF
 	switch (dr->flags & ND_RA_FLAG_RTPREF_MASK) {
 	case ND_RA_FLAG_RTPREF_HIGH:
@@ -810,8 +799,7 @@ rtpref(struct nd_defrouter *dr)
 }
 
 static struct nd_defrouter *
-defrtrlist_update(new)
-	struct nd_defrouter *new;
+defrtrlist_update(struct nd_defrouter *new)
 {
 	struct nd_defrouter *dr, *n;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -877,7 +865,7 @@ insert:
 	/*
 	 * Insert the new router in the Default Router List;
 	 * The Default Router List should be in the descending order
-	 * of router-preferece.  Routers with the same preference are
+	 * of router-preference.  Routers with the same preference are
 	 * sorted in the arriving time order.
 	 */
 
@@ -900,9 +888,7 @@ insert:
 }
 
 static struct nd_pfxrouter *
-pfxrtr_lookup(pr, dr)
-	struct nd_prefix *pr;
-	struct nd_defrouter *dr;
+pfxrtr_lookup(struct nd_prefix *pr, struct nd_defrouter *dr)
 {
 	struct nd_pfxrouter *search;
 
@@ -915,9 +901,7 @@ pfxrtr_lookup(pr, dr)
 }
 
 static void
-pfxrtr_add(pr, dr)
-	struct nd_prefix *pr;
-	struct nd_defrouter *dr;
+pfxrtr_add(struct nd_prefix *pr,struct nd_defrouter *dr)
 {
 	struct nd_pfxrouter *new;
 
@@ -933,16 +917,15 @@ pfxrtr_add(pr, dr)
 }
 
 static void
-pfxrtr_del(pfr)
-	struct nd_pfxrouter *pfr;
+pfxrtr_del(struct nd_pfxrouter *pfr)
 {
+
 	LIST_REMOVE(pfr, pfr_entry);
 	free(pfr, M_IP6NDP);
 }
 
 struct nd_prefix *
-nd6_prefix_lookup(key)
-	struct nd_prefixctl *key;
+nd6_prefix_lookup(struct nd_prefixctl *key)
 {
 	struct nd_prefix *search;
 
@@ -959,10 +942,8 @@ nd6_prefix_lookup(key)
 }
 
 int
-nd6_prelist_add(pr, dr, newp)
-	struct nd_prefixctl *pr;
-	struct nd_prefix **newp;
-	struct nd_defrouter *dr;
+nd6_prelist_add(struct nd_prefixctl *pr, struct nd_defrouter *dr,
+	struct nd_prefix **newp)
 {
 	struct nd_prefix *new = NULL;
 	int error = 0;
@@ -1027,8 +1008,7 @@ nd6_prelist_add(pr, dr, newp)
 }
 
 void
-prelist_remove(pr)
-	struct nd_prefix *pr;
+prelist_remove(struct nd_prefix *pr)
 {
 	struct nd_pfxrouter *pfr, *next;
 	int e, s;
@@ -1078,12 +1058,10 @@ prelist_remove(pr)
 	pfxlist_onlink_check();
 }
 
+/* dr - may be NULL */
 static int
-prelist_update(new, dr, m, mcast)
-	struct nd_prefixctl *new;
-	struct nd_defrouter *dr; /* may be NULL */
-	struct mbuf *m;
-	int mcast;
+prelist_update(struct nd_prefixctl *new, struct nd_defrouter *dr,
+	struct mbuf *m, int mcast)
 {
 	struct in6_ifaddr *ia6 = NULL, *ia6_match = NULL;
 	struct ifaddr *ifa;
@@ -1451,8 +1429,7 @@ prelist_update(new, dr, m, mcast)
  * XXX: lengthy function name...
  */
 static struct nd_pfxrouter *
-find_pfxlist_reachable_router(pr)
-	struct nd_prefix *pr;
+find_pfxlist_reachable_router(struct nd_prefix *pr)
 {
 	struct nd_pfxrouter *pfxrtr;
 	struct rtentry *rt;
@@ -1484,7 +1461,7 @@ find_pfxlist_reachable_router(pr)
  * is no router around us.
  */
 void
-pfxlist_onlink_check()
+pfxlist_onlink_check(void)
 {
 	struct nd_prefix *pr;
 	struct in6_ifaddr *ifa;
@@ -1700,8 +1677,7 @@ pfxlist_onlink_check()
 }
 
 int
-nd6_prefix_onlink(pr)
-	struct nd_prefix *pr;
+nd6_prefix_onlink(struct nd_prefix *pr)
 {
 	struct ifaddr *ifa;
 	struct ifnet *ifp = pr->ndpr_ifp;
@@ -1829,8 +1805,7 @@ nd6_prefix_onlink(pr)
 }
 
 int
-nd6_prefix_offlink(pr)
-	struct nd_prefix *pr;
+nd6_prefix_offlink(struct nd_prefix *pr)
 {
 	int error = 0;
 	struct ifnet *ifp = pr->ndpr_ifp;
@@ -1918,9 +1893,7 @@ nd6_prefix_offlink(pr)
 }
 
 static struct in6_ifaddr *
-in6_ifadd(pr, mcast)
-	struct nd_prefixctl *pr;
-	int mcast;
+in6_ifadd(struct nd_prefixctl *pr, int mcast)
 {
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct ifaddr *ifa;
@@ -2051,10 +2024,9 @@ in6_ifadd(pr, mcast)
 	return (ia);		/* this is always non-NULL */
 }
 
+/* ia0 - corresponding public address */
 int
-in6_tmpifadd(ia0, forcegen, delay)
-	const struct in6_ifaddr *ia0; /* corresponding public address */
-	int forcegen, delay;
+in6_tmpifadd(const struct in6_ifaddr *ia0, int forcegen, int delay)
 {
 	struct ifnet *ifp = ia0->ia_ifa.ifa_ifp;
 	struct in6_ifaddr *newia, *ia;
@@ -2241,9 +2213,7 @@ in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
  * it shouldn't be called when acting as a router.
  */
 void
-rt6_flush(gateway, ifp)
-	struct in6_addr *gateway;
-	struct ifnet *ifp;
+rt6_flush(struct in6_addr *gateway, struct ifnet *ifp)
 {
 	struct radix_node_head *rnh = rt_tables[AF_INET6];
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2269,9 +2239,7 @@ rt6_flush(gateway, ifp)
 }
 
 static int
-rt6_deleteroute(rn, arg)
-	struct radix_node *rn;
-	void *arg;
+rt6_deleteroute(struct radix_node *rn, void *arg)
 {
 #define SIN6(s)	((struct sockaddr_in6 *)s)
 	struct rtentry *rt = (struct rtentry *)rn;
@@ -2304,8 +2272,7 @@ rt6_deleteroute(rn, arg)
 }
 
 int
-nd6_setdefaultiface(ifindex)
-	int ifindex;
+nd6_setdefaultiface(int ifindex)
 {
 	int error = 0;
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.29 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.30 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -266,15 +266,15 @@ struct rtdetq {		/* XXX: rtdetq is also defined in ip_mroute.h */
 #define MAX_UPQ6	4		/* max. no of pkts in upcall Q */
 
 #ifdef __FreeBSD__
-int	ip6_mrouter_set __P((struct socket *so, struct sockopt *sopt));
-int	ip6_mrouter_get __P((struct socket *so, struct sockopt *sopt));
+int	ip6_mrouter_set(struct socket *so, struct sockopt *sopt);
+int	ip6_mrouter_get(struct socket *so, struct sockopt *sopt);
 #else
-int	ip6_mrouter_set __P((int, struct socket *, struct mbuf *));
-int	ip6_mrouter_get __P((int, struct socket *, struct mbuf **));
+int	ip6_mrouter_set(int, struct socket *, struct mbuf *);
+int	ip6_mrouter_get(int, struct socket *, struct mbuf **);
 #endif
-int	ip6_mrouter_done __P((void));
-void	ip6_mrouter_detach __P((struct ifnet *));
-int	mrt6_ioctl __P((int, caddr_t));
+int	ip6_mrouter_done(void);
+void	ip6_mrouter_detach(struct ifnet *);
+int	mrt6_ioctl(int, caddr_t);
 #endif /* _KERNEL */
 
 #endif /* !_NETINET6_IP6_MROUTE_H_ */

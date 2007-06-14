@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.421 2007/05/17 18:27:40 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.422 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,7 +184,7 @@ extern int icmp6_nodeinfo;
  */
 struct icmp6_mtudisc_callback {
 	LIST_ENTRY(icmp6_mtudisc_callback) mc_list;
-	void (*mc_func) __P((struct in6_addr *));
+	void (*mc_func)(struct in6_addr *);
 };
 
 LIST_HEAD(, icmp6_mtudisc_callback) icmp6_mtudisc_callbacks =
@@ -209,31 +209,32 @@ static int icmp6_redirect_lowat = 1024;
 struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
 
-static void icmp6_errcount __P((struct icmp6errstat *, int, int));
-static int icmp6_rip6_input __P((struct mbuf **, int));
-static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
-static const char *icmp6_redirect_diag __P((struct in6_addr *,
-	struct in6_addr *, struct in6_addr *));
-static struct mbuf *ni6_input __P((struct mbuf *, int));
-static struct mbuf *ni6_nametodns __P((const char *, int, int));
-static int ni6_dnsmatch __P((const char *, int, const char *, int));
-static int ni6_addrs __P((struct icmp6_nodeinfo *, struct mbuf *,
-			  struct ifnet **, struct in6_addr *));
-static int ni6_store_addrs __P((struct icmp6_nodeinfo *, struct icmp6_nodeinfo *,
-				struct ifnet *, int));
-static int icmp6_notify_error __P((struct mbuf *, int, int, int));
-static int icmp6_recover_src __P((struct mbuf *));
+static void icmp6_errcount(struct icmp6errstat *, int, int);
+static int icmp6_rip6_input(struct mbuf **, int);
+static int icmp6_ratelimit(const struct in6_addr *, const int, const int);
+static const char *icmp6_redirect_diag(struct in6_addr *,
+	struct in6_addr *, struct in6_addr *);
+static struct mbuf *ni6_input(struct mbuf *, int);
+static struct mbuf *ni6_nametodns(const char *, int, int);
+static int ni6_dnsmatch(const char *, int, const char *, int);
+static int ni6_addrs(struct icmp6_nodeinfo *, struct mbuf *,
+	struct ifnet **, struct in6_addr *);
+static int ni6_store_addrs(struct icmp6_nodeinfo *, struct icmp6_nodeinfo *,
+	struct ifnet *, int);
+static int icmp6_notify_error(struct mbuf *, int, int, int);
+static int icmp6_recover_src(struct mbuf *);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
-static void icmp6_redirect_timeout __P((struct rtentry *, struct rttimer *));
+static struct rtentry *icmp6_mtudisc_clone(struct sockaddr *);
+static void icmp6_redirect_timeout(struct rtentry *, struct rttimer *);
 #endif
 #ifndef __FreeBSD__
-static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
+static void icmp6_mtudisc_timeout(struct rtentry *, struct rttimer *);
 #endif
 
 void
-icmp6_init()
+icmp6_init(void)
 {
+
 	mld_init();
 	icmp6_mtudisc_timeout_q = rt_timer_queue_create(pmtu_expire);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -242,9 +243,7 @@ icmp6_init()
 }
 
 static void
-icmp6_errcount(stat, type, code)
-	struct icmp6errstat *stat;
-	int type, code;
+icmp6_errcount(struct icmp6errstat *stat, int type, int code)
 {
 	switch (type) {
 	case ICMP6_DST_UNREACH:
@@ -304,8 +303,7 @@ icmp6_errcount(stat, type, code)
  * Register a Path MTU Discovery callback.
  */
 void
-icmp6_mtudisc_callback_register(func)
-	void (*func) __P((struct in6_addr *));
+icmp6_mtudisc_callback_register(void (*func)(struct in6_addr *))
 {
 	struct icmp6_mtudisc_callback *mc;
 
@@ -329,10 +327,7 @@ icmp6_mtudisc_callback_register(func)
  * may not contain enough scope zone information.
  */
 void
-icmp6_error2(m, type, code, param, ifp)
-	struct mbuf *m;
-	int type, code, param;
-	struct ifnet *ifp;
+icmp6_error2(struct mbuf *m, int type, int code, int param, struct ifnet *ifp)
 {
 	struct ip6_hdr *ip6;
 
@@ -363,9 +358,7 @@ icmp6_error2(m, type, code, param, ifp)
  * Generate an error packet of type error in response to bad IP6 packet.
  */
 void
-icmp6_error(m, type, code, param)
-	struct mbuf *m;
-	int type, code, param;
+icmp6_error(struct mbuf *m, int type, int code, int param)
 {
 	struct ip6_hdr *oip6, *nip6;
 	struct icmp6_hdr *icmp6, icp;
@@ -548,9 +541,7 @@ icmp6_error(m, type, code, param)
  * Process a received ICMP6 message.
  */
 int
-icmp6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+icmp6_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct mbuf *m = *mp, *n;
 	struct ip6_hdr *ip6, *nip6;
@@ -1090,9 +1081,7 @@ icmp6_input(mp, offp, proto)
 }
 
 static int
-icmp6_notify_error(m, off, icmp6len, code)
-	struct mbuf *m;
-	int off, icmp6len, code;
+icmp6_notify_error(struct mbuf *m, int off, int icmp6len, int code)
 {
 	struct icmp6_hdr *icmp6;
 	struct ip6_hdr *eip6;
@@ -1119,7 +1108,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 
 	/* Detect the upper level protocol */
 	{
-		void (*ctlfunc) __P((int, struct sockaddr *, void *));
+		void (*ctlfunc)(int, struct sockaddr *, void *);
 		u_int8_t nxt = eip6->ip6_nxt;
 		int eoff = off + sizeof(struct icmp6_hdr) +
 		    sizeof(struct ip6_hdr);
@@ -1308,7 +1297,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 #endif
 		}
 
-		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
+		ctlfunc = (void (*)(int, struct sockaddr *, void *))
 		    (inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {
 			(void) (*ctlfunc)(code, (struct sockaddr *)&icmp6dst,
@@ -1324,10 +1313,8 @@ icmp6_notify_error(m, off, icmp6len, code)
 
 
 void
-icmp6_mtudisc_update(ip6cp, dst, validated)
-	struct ip6ctlparam *ip6cp;
-	struct sockaddr_in6 *dst;
-	int validated;
+icmp6_mtudisc_update(struct ip6ctlparam *ip6cp, struct sockaddr_in6 *dst,
+	int validated)
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	unsigned long rtcount;
@@ -1444,9 +1431,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif
 static struct mbuf *
-ni6_input(m, off)
-	struct mbuf *m;
-	int off;
+ni6_input(struct mbuf *m, int off)
 {
 	struct icmp6_nodeinfo *ni6, *nni6;
 	struct mbuf *n = NULL;
@@ -1777,12 +1762,11 @@ ni6_input(m, off)
  *
  * XXX names with less than 2 dots (like "foo" or "foo.section") will be
  * treated as truncated name (two \0 at the end).  this is a wild guess.
+ *
+ * old - return pascal string if non-zero
  */
 static struct mbuf *
-ni6_nametodns(name, namelen, old)
-	const char *name;
-	int namelen;
-	int old;	/* return pascal string if non-zero */
+ni6_nametodns(const char *name, int namelen, int old)
 {
 	struct mbuf *m;
 	char *cp, *ep;
@@ -1889,11 +1873,7 @@ ni6_nametodns(name, namelen, old)
  * XXX upper/lowercase match (see RFC2065)
  */
 static int
-ni6_dnsmatch(a, alen, b, blen)
-	const char *a;
-	int alen;
-	const char *b;
-	int blen;
+ni6_dnsmatch(const char *a, int alen, const char *b, int blen)
 {
 	const char *a0, *b0;
 	int l;
@@ -1953,11 +1933,8 @@ ni6_dnsmatch(a, alen, b, blen)
  * calculate the number of addresses to be returned in the node info reply.
  */
 static int
-ni6_addrs(ni6, m, ifpp, subj)
-	struct icmp6_nodeinfo *ni6;
-	struct mbuf *m;
-	struct ifnet **ifpp;
-	struct in6_addr *subj;
+ni6_addrs(struct icmp6_nodeinfo *ni6, struct mbuf *m, struct ifnet **ifpp,
+	struct in6_addr *subj)
 {
 	struct ifnet *ifp;
 	struct in6_ifaddr *ifa6;
@@ -2050,10 +2027,8 @@ ni6_addrs(ni6, m, ifpp, subj)
 }
 
 static int
-ni6_store_addrs(ni6, nni6, ifp0, resid)
-	struct icmp6_nodeinfo *ni6, *nni6;
-	struct ifnet *ifp0;
-	int resid;
+ni6_store_addrs(struct icmp6_nodeinfo *ni6, struct icmp6_nodeinfo *nni6,
+	struct ifnet *ifp0, int resid)
 {
 	struct ifnet *ifp = ifp0 ? ifp0 : TAILQ_FIRST(&ifnet);
 	struct in6_ifaddr *ifa6;
@@ -2196,9 +2171,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
  * XXX almost dup'ed code with rip6_input.
  */
 static int
-icmp6_rip6_input(mp, off)
-	struct mbuf **mp;
-	int off;
+icmp6_rip6_input(struct mbuf **mp, int off)
 {
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
@@ -2347,7 +2320,7 @@ icmp6_rip6_input(mp, off)
 #if defined(__FreeBSD__)
 					if (m_dup_pkthdr(n, m)) {
 						bcopy(m->m_data, n->m_data, 
-						      m->m_len);
+						    m->m_len);
 						n->m_len = m->m_len;
 					} else {
 						m_free(n);
@@ -2462,9 +2435,7 @@ icmp6_rip6_input(mp, off)
  * up, and to make the code simpler at this stage.
  */
 void
-icmp6_reflect(m, off)
-	struct	mbuf *m;
-	size_t off;
+icmp6_reflect(struct mbuf *m, size_t off)
 {
 	struct ip6_hdr *ip6;
 	struct icmp6_hdr *icmp6;
@@ -2659,8 +2630,8 @@ icmp6_reflect(m, off)
 }
 
 static const char *
-icmp6_redirect_diag(src6, dst6, tgt6)
-	struct in6_addr *src6, *dst6, *tgt6;
+icmp6_redirect_diag(struct in6_addr *src6, struct in6_addr *dst6,
+	struct in6_addr *tgt6)
 {
 	static char buf[1024];
 
@@ -2670,10 +2641,7 @@ icmp6_redirect_diag(src6, dst6, tgt6)
 }
 
 void
-icmp6_redirect_input(m, off, icmp6len)
-	struct mbuf *m;
-	int off;
-	int icmp6len;
+icmp6_redirect_input(struct mbuf *m, int off, int icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
@@ -2927,9 +2895,7 @@ icmp6_redirect_input(m, off, icmp6len)
 }
 
 void
-icmp6_redirect_output(m0, rt)
-	struct mbuf *m0;
-	struct rtentry *rt;
+icmp6_redirect_output(struct mbuf *m0, struct rtentry *rt)
 {
 	struct ifnet *ifp;	/* my outgoing interface */
 	struct in6_addr *nexthop, *ifp_ll6;
@@ -3199,15 +3165,10 @@ fail:
  */
 int
 #ifdef __FreeBSD__
-icmp6_ctloutput(so, sopt)
-	struct socket *so;
-	struct sockopt *sopt;
+icmp6_ctloutput(struct socket *so, struct sockopt *sopt)
 #else
-icmp6_ctloutput(op, so, level, optname, mp)
-	int op;
-	struct socket *so;
-	int level, optname;
-	struct mbuf **mp;
+icmp6_ctloutput(int op, struct socket *so, int level, int optname,
+	struct mbuf **mp)
 #endif
 {
 	int error = 0;
@@ -3261,7 +3222,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 				break;
 			}
 			bcopy(p, in6p->in6p_icmp6filt,
-				sizeof(struct icmp6_filter));
+			    sizeof(struct icmp6_filter));
 			error = 0;
 #endif
 			break;
@@ -3296,7 +3257,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			m->m_len = sizeof(struct icmp6_filter);
 			p = mtod(m, struct icmp6_filter *);
 			bcopy(in6p->in6p_icmp6filt, p,
-				sizeof(struct icmp6_filter));
+			    sizeof(struct icmp6_filter));
 			error = 0;
 #endif
 			break;
@@ -3323,12 +3284,11 @@ icmp6_ctloutput(op, so, level, optname, mp)
  * limitation.
  *
  * XXX per-destination/type check necessary?
+ *
+ * arguments are not used at this moment
  */
 static int
-icmp6_ratelimit(dst, type, code)
-	const struct in6_addr *dst;	/* not used at this moment */
-	const int type;			/* not used at this moment */
-	const int code;			/* not used at this moment */
+icmp6_ratelimit(const struct in6_addr *dst, const int type, const int code)
 {
 	int ret;
 
@@ -3351,10 +3311,11 @@ icmp6_ratelimit(dst, type, code)
  * the sender (ex. icmp6_error).
  *
  * returns 0 if succeeded.
+ *
+ * m - original ip6 packet
  */
 static int
-icmp6_recover_src(m)
-	struct mbuf *m; /* original ip6 packet */
+icmp6_recover_src(struct mbuf *m)
 {
 	int off, nxt, finished = 0;
 	struct ip6_hdr *oip6;
@@ -3438,12 +3399,12 @@ icmp6_recover_src(m)
 
 					/* swap */
 					bcopy(haopt->ip6oh_addr, &t,
-					      sizeof(haopt->ip6oh_addr));
+					    sizeof(haopt->ip6oh_addr));
 					bcopy(&oip6->ip6_src,
-					      haopt->ip6oh_addr,
-					      sizeof(oip6->ip6_src));
+					    haopt->ip6oh_addr,
+					    sizeof(oip6->ip6_src));
 					bcopy(&t, &oip6->ip6_src,
-					      sizeof(t));
+					    sizeof(t));
 					finished = 1;
 					break;
 				default:
@@ -3492,8 +3453,7 @@ icmp6_recover_src(m)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rtentry *
-icmp6_mtudisc_clone(dst)
-	struct sockaddr *dst;
+icmp6_mtudisc_clone(struct sockaddr *dst)
 {
 	struct rtentry *rt;
 	int    error;
@@ -3529,9 +3489,7 @@ icmp6_mtudisc_clone(dst)
 }
 
 static void
-icmp6_redirect_timeout(rt, r)
-	struct rtentry *rt;
-	struct rttimer *r;
+icmp6_redirect_timeout(struct rtentry *rt, struct rttimer *r)
 {
 	if (rt == NULL)
 		panic("icmp6_redirect_timeout: bad route to timeout");
@@ -3545,9 +3503,7 @@ icmp6_redirect_timeout(rt, r)
 
 #ifndef __FreeBSD__
 static void
-icmp6_mtudisc_timeout(rt, r)
-	struct rtentry *rt;
-	struct rttimer *r;
+icmp6_mtudisc_timeout(struct rtentry *rt, struct rttimer *r)
 {
 	if (rt == NULL)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
@@ -3565,13 +3521,8 @@ icmp6_mtudisc_timeout(rt, r)
 #ifdef __OpenBSD__
 #include <sys/sysctl.h>
 int
-icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
+icmp6_sysctl(int name, u_int namelen, void *oldp, size_t oldlenp, void *newp,
+	size_t newlen)
 {
 
 	/* All sysctl names at this level are terminal. */

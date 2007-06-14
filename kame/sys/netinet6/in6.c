@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.409 2007/03/30 09:41:15 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.410 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,12 +185,12 @@ const struct sockaddr_in6 sa6_any =
 static int in6_lifaddr_ioctl(struct socket *, u_long, caddr_t,
 	struct ifnet *, struct thread *);
 #else
-static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
-	struct ifnet *, struct proc *));
+static int in6_lifaddr_ioctl(struct socket *, u_long, caddr_t,
+	struct ifnet *, struct proc *);
 #endif
-static int in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
-	struct sockaddr_in6 *, int));
-static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
+static int in6_ifinit(struct ifnet *, struct in6_ifaddr *,
+	struct sockaddr_in6 *, int);
+static void in6_unlink_ifa(struct in6_ifaddr *, struct ifnet *);
 
 #ifdef __FreeBSD__
 int	(*faithprefix_p)(struct in6_addr *);
@@ -384,9 +384,7 @@ in6_ifremloop(struct ifaddr *ifa)
 }
 
 int
-in6_mask2len(mask, lim0)
-	struct in6_addr *mask;
-	u_char *lim0;
+in6_mask2len(struct in6_addr *mask, u_char *lim0)
 {
 	int x = 0, y;
 	u_char *lim = lim0, *p;
@@ -426,19 +424,11 @@ in6_mask2len(mask, lim0)
 
 int
 #ifdef __FreeBSD__
-in6_control(so, cmd, data, ifp, p)
-	struct	socket *so;
-	u_long cmd;
-	caddr_t	data;
-	struct ifnet *ifp;
-	struct thread *p;
+in6_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
+	struct thread *p)
 #else
-in6_control(so, cmd, data, ifp, p)
-	struct	socket *so;
-	u_long cmd;
-	caddr_t	data;
-	struct ifnet *ifp;
-	struct proc *p;
+in6_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
+	struct proc *p)
 #endif
 {
 	struct	in6_ifreq *ifr = (struct in6_ifreq *)data;
@@ -938,11 +928,8 @@ in6_control(so, cmd, data, ifp, p)
  * XXX: should this be performed under splnet()?
  */
 int
-in6_update_ifa(ifp, ifra, ia, flags)
-	struct ifnet *ifp;
-	struct in6_aliasreq *ifra;
-	struct in6_ifaddr *ia;
-	int flags;
+in6_update_ifa(struct ifnet *ifp, struct in6_aliasreq *ifra,
+	struct in6_ifaddr *ia, int flags)
 {
 	int error = 0, hostIsNew = 0, plen = -1;
 	struct in6_ifaddr *oia;
@@ -1509,8 +1496,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 }
 
 void
-in6_purgeaddr(ifa)
-	struct ifaddr *ifa;
+in6_purgeaddr(struct ifaddr *ifa)
 {
 	struct ifnet *ifp = ifa->ifa_ifp;
 	struct in6_ifaddr *ia = (struct in6_ifaddr *) ifa;
@@ -1562,9 +1548,7 @@ in6_purgeaddr(ifa)
 }
 
 static void
-in6_unlink_ifa(ia, ifp)
-	struct in6_ifaddr *ia;
-	struct ifnet *ifp;
+in6_unlink_ifa(struct in6_ifaddr *ia, struct ifnet *ifp)
 {
 	struct in6_ifaddr *oia;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1646,8 +1630,7 @@ in6_unlink_ifa(ia, ifp)
 }
 
 void
-in6_purgeif(ifp)
-	struct ifnet *ifp;
+in6_purgeif(struct ifnet *ifp)
 {
 	struct ifaddr *ifa, *nifa;
 
@@ -1686,19 +1669,11 @@ in6_purgeif(ifp)
  */
 static int
 #ifdef __FreeBSD__
-in6_lifaddr_ioctl(so, cmd, data, ifp, p)
-	struct socket *so;
-	u_long cmd;
-	caddr_t	data;
-	struct ifnet *ifp;
-	struct thread *p;
+in6_lifaddr_ioctl(struct socket *so, u_long cmd, caddr_t data,
+	struct ifnet *ifp, struct thread *p)
 #else
-in6_lifaddr_ioctl(so, cmd, data, ifp, p)
-	struct socket *so;
-	u_long cmd;
-	caddr_t	data;
-	struct ifnet *ifp;
-	struct proc *p;
+in6_lifaddr_ioctl(struct socket *so, u_long cmd, caddr_t data,
+	struct ifnet *ifp, struct proc *p)
 #endif
 {
 	struct if_laddrreq *iflr = (struct if_laddrreq *)data;
@@ -1940,11 +1915,8 @@ in6_lifaddr_ioctl(so, cmd, data, ifp, p)
  * and routing table entry.
  */
 static int
-in6_ifinit(ifp, ia, sin6, newhost)
-	struct ifnet *ifp;
-	struct in6_ifaddr *ia;
-	struct sockaddr_in6 *sin6;
-	int newhost;
+in6_ifinit(struct ifnet *ifp, struct in6_ifaddr *ia,
+	struct sockaddr_in6 *sin6, int newhost)
 {
 	int	error = 0, plen, ifacount = 0;
 #ifdef __NetBSD__
@@ -2023,9 +1995,7 @@ in6_ifinit(ifp, ia, sin6, newhost)
  * Find an IPv6 interface link-local address specific to an interface.
  */
 struct in6_ifaddr *
-in6ifa_ifpforlinklocal(ifp, ignoreflags)
-	struct ifnet *ifp;
-	int ignoreflags;
+in6ifa_ifpforlinklocal(struct ifnet *ifp, int ignoreflags)
 {
 	struct ifaddr *ifa;
 
@@ -2055,9 +2025,7 @@ in6ifa_ifpforlinklocal(ifp, ignoreflags)
  * find the internet address corresponding to a given interface and address.
  */
 struct in6_ifaddr *
-in6ifa_ifpwithaddr(ifp, addr)
-	struct ifnet *ifp;
-	struct in6_addr *addr;
+in6ifa_ifpwithaddr(struct ifnet *ifp, struct in6_addr *addr)
 {
 	struct ifaddr *ifa;
 
@@ -2084,8 +2052,7 @@ in6ifa_ifpwithaddr(ifp, addr)
 static char digits[] = "0123456789abcdef";
 static int ip6round = 0;
 char *
-ip6_sprintf(addr)
-	const struct in6_addr *addr;
+ip6_sprintf(const struct in6_addr *addr)
 {
 	static char ip6buf[8][48];
 	int i;
@@ -2134,8 +2101,7 @@ ip6_sprintf(addr)
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 int
-in6_localaddr(in6)
-	struct in6_addr *in6;
+in6_localaddr(struct in6_addr *in6)
 {
 	struct in6_ifaddr *ia;
 
@@ -2163,8 +2129,7 @@ in6_localaddr(in6)
  * it within a node.
  */
 int
-in6_is_addr_anycast(in6)
-	struct in6_addr *in6;
+in6_is_addr_anycast(struct in6_addr *in6)
 {
 	struct in6_ifaddr *ia;
 
@@ -2197,8 +2162,7 @@ in6_is_addr_anycast(in6)
  * hard coding...
  */
 int
-in6_matchlen(src, dst)
-struct in6_addr *src, *dst;
+in6_matchlen(struct in6_addr *src, struct in6_addr *dst)
 {
 	int match = 0;
 	u_char *s = (u_char *)src, *d = (u_char *)dst;
@@ -2218,9 +2182,7 @@ struct in6_addr *src, *dst;
 
 /* XXX: to be scope conscious */
 int
-in6_are_prefix_equal(p1, p2, len)
-	struct in6_addr *p1, *p2;
-	int len;
+in6_are_prefix_equal(struct in6_addr *p1, struct in6_addr *p2, int len)
 {
 	int bytelen, bitlen;
 
@@ -2245,9 +2207,7 @@ in6_are_prefix_equal(p1, p2, len)
 }
 
 void
-in6_prefixlen2mask(maskp, len)
-	struct in6_addr *maskp;
-	int len;
+in6_prefixlen2mask(struct in6_addr *maskp, int len)
 {
 	u_char maskarray[8] = {0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff};
 	int bytelen, bitlen, i;
@@ -2273,9 +2233,7 @@ in6_prefixlen2mask(maskp, len)
  * found, return the first valid address from designated IF.
  */
 struct in6_ifaddr *
-in6_ifawithifp(ifp, dst)
-	struct ifnet *ifp;
-	struct in6_addr *dst;
+in6_ifawithifp(struct ifnet *ifp, struct in6_addr *dst)
 {
 	int dst_scope =	in6_addrscope(dst), blen = -1, tlen;
 	struct ifaddr *ifa;
@@ -2365,8 +2323,7 @@ in6_ifawithifp(ifp, dst)
  * perform DAD when interface becomes IFF_UP.
  */
 void
-in6_if_up(ifp)
-	struct ifnet *ifp;
+in6_if_up(struct ifnet *ifp)
 {
 	struct ifaddr *ifa;
 	struct in6_ifaddr *ia;
@@ -2400,8 +2357,7 @@ in6_if_up(ifp)
 }
 
 int
-in6if_do_dad(ifp)
-	struct ifnet *ifp;
+in6if_do_dad(struct ifnet *ifp)
 {
 	if ((ifp->if_flags & IFF_LOOPBACK) != 0)
 		return (0);
@@ -2441,7 +2397,7 @@ in6if_do_dad(ifp)
  * to in6_maxmtu.
  */
 void
-in6_setmaxmtu()
+in6_setmaxmtu(void)
 {
 	unsigned long maxmtu = 0;
 	struct ifnet *ifp;
@@ -2467,8 +2423,7 @@ in6_setmaxmtu()
  * consistent, and those really are as of August 2004.
  */
 int
-in6_if2idlen(ifp)
-	struct ifnet *ifp;
+in6_if2idlen(struct ifnet *ifp)
 {
 	switch (ifp->if_type) {
 	case IFT_ETHER:		/* RFC2464 */
@@ -2519,8 +2474,7 @@ in6_if2idlen(ifp)
 }
 
 void *
-in6_domifattach(ifp)
-	struct ifnet *ifp;
+in6_domifattach(struct ifnet *ifp)
 {
 	struct in6_ifextra *ext;
 
@@ -2542,9 +2496,7 @@ in6_domifattach(ifp)
 }
 
 void
-in6_domifdetach(ifp, aux)
-	struct ifnet *ifp;
-	void *aux;
+in6_domifdetach(struct ifnet *ifp, void *aux)
 {
 	struct in6_ifextra *ext = (struct in6_ifextra *)aux;
 
@@ -2563,6 +2515,7 @@ in6_domifdetach(ifp, aux)
 void
 in6_sin6_2_sin(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
 {
+
 	bzero(sin, sizeof(*sin));
 	sin->sin_len = sizeof(struct sockaddr_in);
 	sin->sin_family = AF_INET;
@@ -2574,6 +2527,7 @@ in6_sin6_2_sin(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
 void
 in6_sin_2_v4mapsin6(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
 {
+
 	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_family = AF_INET6;

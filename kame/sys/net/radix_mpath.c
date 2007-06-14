@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.17 2004/11/08 10:29:39 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.18 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -56,16 +56,14 @@
 static u_int32_t hashjitter;
 
 int
-rn_mpath_capable(rnh)
-	struct radix_node_head *rnh;
+rn_mpath_capable(struct radix_node_head *rnh)
 {
 
 	return rnh->rnh_multipath;
 }
 
 struct radix_node *
-rn_mpath_next(rn)
-	struct radix_node *rn;
+rn_mpath_next(struct radix_node *rn)
 {
 	struct radix_node *next;
 
@@ -79,8 +77,7 @@ rn_mpath_next(rn)
 }
 
 int
-rn_mpath_count(rn)
-	struct radix_node *rn;
+rn_mpath_count(struct radix_node *rn)
 {
 	int i;
 
@@ -91,9 +88,7 @@ rn_mpath_count(rn)
 }
 
 struct rtentry *
-rt_mpath_matchgate(rt, gate)
-	struct rtentry *rt;
-	struct sockaddr *gate;
+rt_mpath_matchgate(struct rtentry *rt, struct sockaddr *gate)
 {
 	struct radix_node *rn;
 
@@ -121,15 +116,11 @@ rt_mpath_matchgate(rt, gate)
  */
 int
 #ifdef __OpenBSD__
-rt_mpath_conflict(rnh, rt, netmask, mpathok)
+rt_mpath_conflict(struct radix_node_head *rnh, struct rtentry *rt,
+	struct sockaddr *netmask, int mpathok)
 #else
-rt_mpath_conflict(rnh, rt, netmask)
-#endif
-	struct radix_node_head *rnh;
-	struct rtentry *rt;
-	struct sockaddr *netmask;
-#ifdef __OpenBSD__
-	int mpathok;
+rt_mpath_conflict(struct radix_node_head *rnh, struct rtentry *rt,
+	struct sockaddr *netmask)
 #endif
 {
 	struct radix_node *rn, *rn1;
@@ -233,9 +224,7 @@ rt_mpath_conflict(rnh, rt, netmask)
 }
 
 void
-rtalloc_mpath(ro, hash)
-	struct route *ro;
-	int hash;
+rtalloc_mpath(struct route *ro, int hash)
 {
 	struct radix_node *rn0, *rn;
 	int n;
@@ -281,13 +270,11 @@ rtalloc_mpath(ro, hash)
 }
 
 #ifdef __FreeBSD__
-extern int	in6_inithead __P((void **head, int off));
-extern int	in_inithead __P((void **head, int off));
+extern int	in6_inithead(void **head, int off);
+extern int	in_inithead(void **head, int off);
 
 int
-rn4_mpath_inithead(head, off)
-	void **head;
-	int off;
+rn4_mpath_inithead(void **head, int off)
 {
 	struct radix_node_head *rnh;
 
@@ -301,9 +288,7 @@ rn4_mpath_inithead(head, off)
 }
 
 int
-rn6_mpath_inithead(head, off)
-	void **head;
-	int off;
+rn6_mpath_inithead(void **head, int off)
 {
 	struct radix_node_head *rnh;
 
@@ -315,12 +300,9 @@ rn6_mpath_inithead(head, off)
 	} else
 		return 0;
 }
-
 #else
 int
-rn_mpath_inithead(head, off)
-	void **head;
-	int off;
+rn_mpath_inithead(void **head, int off)
 {
 	struct radix_node_head *rnh;
 

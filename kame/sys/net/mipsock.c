@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.26 2007/02/13 02:17:02 keiichi Exp $ */
+/* $Id: mipsock.c,v 1.27 2007/06/14 12:09:42 itojun Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -106,8 +106,7 @@ static struct mbuf *mips_msg1(int type, int len);
  * with raw_usrreq.c, since its functionality is so restricted.  XXX
  */
 static int
-mips_abort(so)
-	struct socket *so;
+mips_abort(struct socket *so)
 {
 	int s, error;
 	s = splnet();
@@ -119,10 +118,7 @@ mips_abort(so)
 /* pru_accept is EOPNOTSUPP */
 
 static int
-mips_attach(so, proto, p)
-	struct socket *so;
-	int proto;
-	struct thread *p;
+mips_attach(struct socket *so, int proto, struct thread *p)
 {
 	struct rawcb *rp;
 	int s, error;
@@ -166,10 +162,7 @@ mips_attach(so, proto, p)
 }
 
 static int
-mips_bind(so, nam, p)
-	struct socket *so;
-	struct sockaddr *nam;
-	struct thread *p;
+mips_bind(struct socket *so, struct sockaddr *nam, struct thread *p)
 {
 	int s, error;
 
@@ -180,10 +173,7 @@ mips_bind(so, nam, p)
 }
 
 static int
-mips_connect(so, nam, p)
-	struct socket *so;
-	struct sockaddr *nam;
-	struct thread *p;
+mips_connect(struct socket *so, struct sockaddr *nam, struct thread *p)
 {
 	int s, error;
 
@@ -197,8 +187,7 @@ mips_connect(so, nam, p)
 /* pru_control is EOPNOTSUPP */
 
 static int
-mips_detach(so)
-	struct socket *so;
+mips_detach(struct socket *so)
 {
 	struct rawcb *rp = sotorawcb(so);
 	int s, error;
@@ -218,8 +207,7 @@ mips_detach(so)
 }
 
 static int
-mips_disconnect(so)
-	struct socket *so;
+mips_disconnect(struct socket *so)
 {
 	int s, error;
 
@@ -232,9 +220,7 @@ mips_disconnect(so)
 /* pru_listen is EOPNOTSUPP */
 
 static int
-mips_peeraddr(so, nam)
-	struct socket *so;
-	struct sockaddr **nam;
+mips_peeraddr(struct socket *so, struct sockaddr **nam)
 {
 	int s, error;
 
@@ -248,13 +234,8 @@ mips_peeraddr(so, nam)
 /* pru_rcvoob is EOPNOTSUPP */
 
 static int
-mips_send(so, flags, m, nam, control, p)
-	struct socket *so;
-	int flags;
-	struct mbuf *m;
-	struct sockaddr *nam;
-	struct mbuf *control;
-	struct thread *p;
+mips_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
+	struct mbuf *control, struct thread *p)
 {
 	int s, error;
 
@@ -267,8 +248,7 @@ mips_send(so, flags, m, nam, control, p)
 /* pru_sense is null */
 
 static int
-mips_shutdown(so)
-	struct socket *so;
+mips_shutdown(struct socket *so)
 {
 	int s, error;
 
@@ -279,9 +259,7 @@ mips_shutdown(so)
 }
 
 static int
-mips_sockaddr(so, nam)
-	struct socket *so;
-	struct sockaddr **nam;
+mips_sockaddr(struct socket *so, struct sockaddr **nam)
 {
 	int s, error;
 
@@ -304,22 +282,16 @@ static struct pr_usrreqs mip_usrreqs = {
 /*ARGSUSED*/
 int
 #ifdef __NetBSD__
-mips_usrreq(so, req, m, nam, control, p)
-#else
-mips_usrreq(so, req, m, nam, control)
-#endif
-	struct socket *so;
-	int req;
-	struct mbuf *m;
-	struct mbuf *nam;
-	struct mbuf *control;
-#ifdef __NetBSD__
 #if __NetBSD_Version__ >= 400000000
-	struct lwp *p;
+mips_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
+	struct mbuf *control, struct lwp *p)
 #else
-	struct proc *p;
-#endif /* __NetBSD_Version__ >= 400000000 */
+mips_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
+	struct mbuf *control, struct proc *p)
+#endif
 #else
+mips_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
+	struct mbuf *control)
 #define p curproc
 #endif /* __NetBSD__ */
 {
@@ -379,16 +351,12 @@ mips_usrreq(so, req, m, nam, control)
 /*ARGSUSED*/
 static int
 #if defined(__FreeBSD__) || defined(__APPLE__)
-mips_output(m, so)
-	register struct mbuf *m;
-	struct socket *so;
+mips_output(struct mbuf *m, struct socket *so)
 #else
 #if __STDC__
 mips_output(struct mbuf *m, ...)
 #else
-mips_output(m, va_alist)
-	struct mbuf *m;
-	va_dcl
+mips_output(struct mbuf *m, va_alist)
 #endif
 #endif
 {
@@ -614,9 +582,7 @@ mips_output(m, va_alist)
 }
 
 static struct mbuf *
-mips_msg1(type, len)
-	int type;
-	int len;
+mips_msg1(int type, int len)
 {
 	register struct mip_msghdr *miph;
 	register struct mbuf *m;
@@ -649,10 +615,8 @@ mips_msg1(type, len)
 
 
 void
-mips_notify_home_hint(ifindex, prefix, prefixlen) 
-	u_int16_t ifindex;
-	struct sockaddr *prefix;
-	u_int16_t prefixlen;
+mips_notify_home_hint(u_int16_t ifindex, struct sockaddr *prefix,
+	u_int16_t prefixlen) 
 {
 	struct mipm_home_hint *hint;
 	struct mbuf *m;
@@ -677,9 +641,7 @@ mips_notify_home_hint(ifindex, prefix, prefixlen)
  * initiate RR procedure.
  */
 void
-mips_notify_rr_hint(hoa, peeraddr)
-	struct sockaddr *hoa;
-	struct sockaddr *peeraddr;
+mips_notify_rr_hint(struct sockaddr *hoa, struct sockaddr *peeraddr)
 {
 	struct mipm_rr_hint *rr_hint;
 	struct mbuf *m;
@@ -703,11 +665,8 @@ mips_notify_rr_hint(hoa, peeraddr)
  * usually sent when an invalid home address is received.
  */
 void
-mips_notify_be_hint(src, coa, hoa, status)
-	struct sockaddr *src;
-	struct sockaddr *coa;
-	struct sockaddr *hoa;
-	u_int8_t status;
+mips_notify_be_hint(struct sockaddr *src, struct sockaddr *coa,
+	struct sockaddr *hoa, u_int8_t status)
 {
 	struct mipm_be_hint *be_hint;
 	struct mbuf *m;
@@ -730,10 +689,7 @@ mips_notify_be_hint(src, coa, hoa, status)
 }
 
 void
-mips_notify_dad_result(message, addr, ifindex)
-	int message;
-	struct in6_addr *addr;
-	int ifindex;
+mips_notify_dad_result(int message, struct in6_addr *addr, int ifindex)
 {
 	struct mipm_dad *mipmdad;
 	struct mbuf *m;

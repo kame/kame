@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.111 2005/11/20 10:05:02 t-momose Exp $	*/
+/*	$KAME: in6_var.h,v 1.112 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -764,12 +764,12 @@ do {									\
 	}								\
 } while (/*CONSTCOND*/ 0)
 
-struct	in6_multi *in6_addmulti __P((struct in6_addr *,
-	struct ifnet *, int *, int));
-void	in6_delmulti __P((struct in6_multi *));
-struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
-	struct in6_addr *, int *, int));
-int	in6_leavegroup __P((struct in6_multi_mship *));
+struct	in6_multi *in6_addmulti(struct in6_addr *,
+	struct ifnet *, int *, int);
+void	in6_delmulti(struct in6_multi *);
+struct in6_multi_mship *in6_joingroup(struct ifnet *,
+	struct in6_addr *, int *, int);
+int	in6_leavegroup(struct in6_multi_mship *);
 #ifdef MLDV2
 struct	in6_multi *in6_addmulti2(struct in6_addr *, struct ifnet *,
 	int *, u_int16_t, struct sockaddr_storage *, u_int, int, int);
@@ -781,37 +781,37 @@ struct	in6_multi *in6_modmulti2(struct in6_addr *, struct ifnet *,
 #endif
 
 
-int	in6_mask2len __P((struct in6_addr *, u_char *));
+int	in6_mask2len(struct in6_addr *, u_char *);
 #ifdef __FreeBSD__
 int	in6_control(struct socket *, u_long, caddr_t, struct ifnet *,
 		    struct thread *);
 #else
-int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
-	struct proc *));
+int	in6_control(struct socket *, u_long, caddr_t, struct ifnet *,
+	struct proc *);
 #endif
-int	in6_update_ifa __P((struct ifnet *, struct in6_aliasreq *,
-	struct in6_ifaddr *, int));
-void	in6_purgeaddr __P((struct ifaddr *));
-int	in6if_do_dad __P((struct ifnet *));
-void	in6_purgeif __P((struct ifnet *));
-void	in6_savemkludge __P((struct in6_ifaddr *));
-void	in6_setmaxmtu   __P((void));
-int	in6_if2idlen   __P((struct ifnet *));
-void	*in6_domifattach __P((struct ifnet *));
-void	in6_domifdetach __P((struct ifnet *, void *));
-void	in6_restoremkludge __P((struct in6_ifaddr *, struct ifnet *));
-void	in6_createmkludge __P((struct ifnet *));
-void	in6_purgemkludge __P((struct ifnet *));
-struct in6_ifaddr *in6ifa_ifpforlinklocal __P((struct ifnet *, int));
-struct in6_ifaddr *in6ifa_ifpwithaddr __P((struct ifnet *, struct in6_addr *));
-char	*ip6_sprintf __P((const struct in6_addr *));
-int	in6_addr2zoneid __P((struct ifnet *, struct in6_addr *, u_int32_t *));
-int	in6_matchlen __P((struct in6_addr *, struct in6_addr *));
-int	in6_are_prefix_equal __P((struct in6_addr *, struct in6_addr *, int));
-void	in6_prefixlen2mask __P((struct in6_addr *, int));
-void	in6_purgeprefix __P((struct ifnet *));
+int	in6_update_ifa(struct ifnet *, struct in6_aliasreq *,
+	struct in6_ifaddr *, int);
+void	in6_purgeaddr(struct ifaddr *);
+int	in6if_do_dad(struct ifnet *);
+void	in6_purgeif(struct ifnet *);
+void	in6_savemkludge(struct in6_ifaddr *);
+void	in6_setmaxmtu  (void);
+int	in6_if2idlen  (struct ifnet *);
+void	*in6_domifattach(struct ifnet *);
+void	in6_domifdetach(struct ifnet *, void *);
+void	in6_restoremkludge(struct in6_ifaddr *, struct ifnet *);
+void	in6_createmkludge(struct ifnet *);
+void	in6_purgemkludge(struct ifnet *);
+struct in6_ifaddr *in6ifa_ifpforlinklocal(struct ifnet *, int);
+struct in6_ifaddr *in6ifa_ifpwithaddr(struct ifnet *, struct in6_addr *);
+char	*ip6_sprintf(const struct in6_addr *);
+int	in6_addr2zoneid(struct ifnet *, struct in6_addr *, u_int32_t *);
+int	in6_matchlen(struct in6_addr *, struct in6_addr *);
+int	in6_are_prefix_equal(struct in6_addr *, struct in6_addr *, int);
+void	in6_prefixlen2mask(struct in6_addr *, int);
+void	in6_purgeprefix(struct ifnet *);
 
-int in6_src_ioctl __P((u_long, caddr_t));
+int in6_src_ioctl(u_long, caddr_t);
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_IN6_VAR_H_ */

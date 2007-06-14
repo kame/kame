@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.29 2005/04/14 06:22:37 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.30 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -115,16 +115,16 @@
 
 #include <net/net_osdep.h>
 
-static int dummyioctl __P((struct ifnet *, u_long, caddr_t));
-int dummyoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
-	struct rtentry *));
-static void dummyrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
+static int dummyioctl(struct ifnet *, u_long, caddr_t);
+int dummyoutput(struct ifnet *, struct mbuf *, struct sockaddr *,
+	struct rtentry *);
+static void dummyrtrequest(int, struct rtentry *, struct rt_addrinfo *);
 
 #ifdef __FreeBSD__
-void dummyattach __P((void *));
+void dummyattach(void *);
 PSEUDO_SET(dummyattach, if_dummy);
 #else
-void dummyattach __P((int));
+void dummyattach(int);
 #endif
 
 #ifdef TINY_DUMMYMTU
@@ -137,11 +137,10 @@ static struct	ifnet dummyif[NDUMMY];
 
 /* ARGSUSED */
 void
-dummyattach(dummy)
 #ifdef __FreeBSD__
-	void *dummy;
+dummyattach(void *dummy)
 #else
-	int dummy;
+dummyattach(int dummy)
 #endif
 {
 	struct ifnet *ifp;
@@ -175,20 +174,17 @@ dummyattach(dummy)
 #endif
 #if NBPFILTER > 0
 #ifdef HAVE_NEW_BPFATTACH
-		bpfattach(ifp, DLT_NULL, sizeof(u_int));
+		bpfattach(ifp, DLT_NULL, sizeof(u_int);
 #else
-		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int));
+		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int);
 #endif
 #endif
 	}
 }
 
 int
-dummyoutput(ifp, m, dst, rt)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct sockaddr *dst;
-	struct rtentry *rt;
+dummyoutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	struct rtentry *rt)
 {
 #ifndef __FreeBSD__
 	int s;
@@ -201,7 +197,7 @@ dummyoutput(ifp, m, dst, rt)
 #if NBPFILTER > 0
 	/* BPF write needs to be handled specially */
 	if (dst->sa_family == AF_UNSPEC) {
-		dst->sa_family = *(mtod(m, int *));
+		dst->sa_family = *mtod(m, int *);
 		m->m_len -= sizeof(int);
 		m->m_pkthdr.len -= sizeof(int);
 		m->m_data += sizeof(int);
@@ -324,11 +320,9 @@ dummyoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
-dummyrtrequest(cmd, rt, info)
-	int cmd;
-	struct rtentry *rt;
-	struct rt_addrinfo *info;
+dummyrtrequest(int cmd, struct rtentry *rt, struct rt_addrinfo *info)
 {
+
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
 	}
@@ -339,10 +333,7 @@ dummyrtrequest(cmd, rt, info)
  */
 /* ARGSUSED */
 static int
-dummyioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+dummyioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct ifaddr *ifa;
 	struct ifreq *ifr = (struct ifreq *)data;

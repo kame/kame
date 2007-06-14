@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.c,v 1.8 2005/07/23 07:41:27 jinmei Exp $	*/
+/*	$KAME: if_nemo.c,v 1.9 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,14 +113,14 @@
 LIST_HEAD(, nemo_softc) nemo_softc_list;
 
 #ifdef __FreeBSD__
-void nemoattach __P((void *));
+void nemoattach(void *);
 #else
-void nemoattach __P((int));
+void nemoattach(int);
 #endif
 #ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
-void nemonetisr __P((void));
+void nemonetisr(void);
 #endif
-void nemointr __P((void *));
+void nemointr(void *);
 #if defined(__NetBSD__) && defined(ISO)
 static struct mbuf *nemo_eon_encap(struct mbuf *);
 static struct mbuf *nemo_eon_decap(struct ifnet *, struct mbuf *);
@@ -133,11 +133,10 @@ int nnemo;			/* number of interfaces */
 struct nemo_softc *nemo_softc = NULL;
 
 void
-nemoattach(dummy)
 #ifdef __FreeBSD__
-	void *dummy;
+nemoattach(void *dummy)
 #else
-	int dummy;
+nemoattach(int dummy)
 #endif
 {
 	struct nemo_softc *sc;
@@ -166,8 +165,7 @@ nemoattach(dummy)
 }
 
 void
-nemoattach0(sc)
-	struct nemo_softc *sc;
+nemoattach0(struct nemo_softc *sc)
 {
 
 	sc->encap_cookie4 = sc->encap_cookie6 = NULL;
@@ -212,8 +210,7 @@ PSEUDO_SET(nemoattach, if_nemo);
 
 #ifdef __OpenBSD__
 void
-nemo_start(ifp)
-	struct ifnet *ifp;
+nemo_start(struct ifnet *ifp)
 {
 #if NBRIDGE > 0
 	struct sockaddr dst;
@@ -257,11 +254,7 @@ nemo_start(ifp)
 
 #ifdef GIF_ENCAPCHECK
 int
-nemo_encapcheck(m, off, proto, arg)
-	const struct mbuf *m;
-	int off;
-	int proto;
-	void *arg;
+nemo_encapcheck(const struct mbuf *m, int off, int proto, void *arg)
 {
 	struct ip ip;
 	struct nemo_softc *sc;
@@ -324,12 +317,10 @@ nemo_encapcheck(m, off, proto, arg)
 }
 #endif
 
+/* rt - added in net2 */
 int
-nemo_output(ifp, m, dst, rt)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct sockaddr *dst;
-	struct rtentry *rt;	/* added in net2 */
+nemo_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	struct rtentry *rt)
 {
 	struct nemo_softc *sc = (struct nemo_softc*)ifp;
 	int error = 0;
@@ -434,7 +425,7 @@ nemo_output(ifp, m, dst, rt)
 
 #ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 void
-nemonetisr()
+nemonetisr(void)
 {
 	struct nemo_softc *sc;
 
@@ -446,8 +437,7 @@ nemonetisr()
 #endif
 
 void
-nemointr(arg)
-	void *arg;
+nemointr(void *arg)
 {
 	struct nemo_softc *sc;
 	struct ifnet *ifp;
@@ -519,10 +509,7 @@ nemointr(arg)
 
 #ifndef __OpenBSD__	/* on openbsd, ipip_input() does it instead */
 void
-nemo_input(m, af, ifp)
-	struct mbuf *m;
-	int af;
-	struct ifnet *ifp;
+nemo_input(struct mbuf *m, int af, struct ifnet *ifp)
 {
 #ifndef __FreeBSD__
 	int s;
@@ -635,10 +622,7 @@ nemo_input(m, af, ifp)
 
 /* XXX how should we handle IPv6 scope on SIOC[GS]IFPHYADDR? */
 int
-nemo_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+nemo_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct nemo_softc *sc  = (struct nemo_softc*)ifp;
 	struct ifreq     *ifr = (struct ifreq*)data;
@@ -992,10 +976,7 @@ nemo_ioctl(ifp, cmd, data)
 }
 
 int
-nemo_set_tunnel(ifp, src, dst)
-	struct ifnet *ifp;
-	struct sockaddr *src;
-	struct sockaddr *dst;
+nemo_set_tunnel(struct ifnet *ifp, struct sockaddr *src, struct sockaddr *dst)
 {
 	struct nemo_softc *sc = (struct nemo_softc *)ifp;
 	struct nemo_softc *sc2;
@@ -1125,8 +1106,7 @@ nemo_set_tunnel(ifp, src, dst)
 }
 
 void
-nemo_delete_tunnel(ifp)
-	struct ifnet *ifp;
+nemo_delete_tunnel(struct ifnet *ifp)
 {
 	struct nemo_softc *sc = (struct nemo_softc *)ifp;
 	int s;

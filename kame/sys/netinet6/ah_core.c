@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.63 2005/06/16 18:29:26 jinmei Exp $	*/
+/*	$KAME: ah_core.c,v 1.64 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,66 +110,66 @@
 
 #include <net/net_osdep.h>
 
-static int ah_sumsiz_1216 __P((struct secasvar *));
-static int ah_sumsiz_zero __P((struct secasvar *));
-static int ah_common_mature __P((struct secasvar *));
-static int ah_none_mature __P((struct secasvar *));
-static int ah_none_init __P((struct ah_algorithm_state *, struct secasvar *));
-static void ah_none_loop __P((struct ah_algorithm_state *, u_int8_t *, size_t));
-static void ah_none_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
-static int ah_keyed_md5_mature __P((struct secasvar *));
-static int ah_keyed_md5_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_keyed_md5_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_keyed_md5_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
-static int ah_keyed_sha1_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_keyed_sha1_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_keyed_sha1_result __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static int ah_hmac_md5_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_hmac_md5_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_hmac_md5_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
-static int ah_hmac_sha1_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_hmac_sha1_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_hmac_sha1_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
-static int ah_hmac_sha2_256_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_hmac_sha2_256_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_hmac_sha2_256_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
-static int ah_hmac_sha2_384_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_hmac_sha2_384_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_hmac_sha2_384_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
-static int ah_hmac_sha2_512_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_hmac_sha2_512_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_hmac_sha2_512_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
-static int ah_hmac_ripemd160_init __P((struct ah_algorithm_state *,
-	struct secasvar *));
-static void ah_hmac_ripemd160_loop __P((struct ah_algorithm_state *, u_int8_t *,
-	size_t));
-static void ah_hmac_ripemd160_result __P((struct ah_algorithm_state *,
-	u_int8_t *, size_t));
+static int ah_sumsiz_1216(struct secasvar *);
+static int ah_sumsiz_zero(struct secasvar *);
+static int ah_common_mature(struct secasvar *);
+static int ah_none_mature(struct secasvar *);
+static int ah_none_init(struct ah_algorithm_state *, struct secasvar *);
+static void ah_none_loop(struct ah_algorithm_state *, u_int8_t *, size_t);
+static void ah_none_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
+static int ah_keyed_md5_mature(struct secasvar *);
+static int ah_keyed_md5_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_keyed_md5_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_keyed_md5_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
+static int ah_keyed_sha1_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_keyed_sha1_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_keyed_sha1_result(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static int ah_hmac_md5_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_hmac_md5_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_hmac_md5_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
+static int ah_hmac_sha1_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_hmac_sha1_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_hmac_sha1_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
+static int ah_hmac_sha2_256_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_hmac_sha2_256_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_hmac_sha2_256_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
+static int ah_hmac_sha2_384_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_hmac_sha2_384_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_hmac_sha2_384_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
+static int ah_hmac_sha2_512_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_hmac_sha2_512_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_hmac_sha2_512_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
+static int ah_hmac_ripemd160_init(struct ah_algorithm_state *,
+	struct secasvar *);
+static void ah_hmac_ripemd160_loop(struct ah_algorithm_state *, u_int8_t *,
+	size_t);
+static void ah_hmac_ripemd160_result(struct ah_algorithm_state *,
+	u_int8_t *, size_t);
 
-static void ah_update_mbuf __P((struct mbuf *, int, int,
-	const struct ah_algorithm *, struct ah_algorithm_state *));
+static void ah_update_mbuf(struct mbuf *, int, int,
+	const struct ah_algorithm *, struct ah_algorithm_state *);
 
 /* checksum algorithms */
 static const struct ah_algorithm ah_algorithms[] = {
@@ -216,8 +216,7 @@ static const struct ah_algorithm ah_algorithms[] = {
 };
 
 const struct ah_algorithm *
-ah_algorithm_lookup(idx)
-	int idx;
+ah_algorithm_lookup(int idx)
 {
 
 	switch (idx) {
@@ -252,9 +251,9 @@ ah_algorithm_lookup(idx)
 
 
 static int
-ah_sumsiz_1216(sav)
-	struct secasvar *sav;
+ah_sumsiz_1216(struct secasvar *sav)
 {
+
 	if (!sav)
 		panic("ah_sumsiz_1216: null pointer is passed");
 	if (sav->flags & SADB_X_EXT_OLD)
@@ -264,17 +263,16 @@ ah_sumsiz_1216(sav)
 }
 
 static int
-ah_sumsiz_zero(sav)
-	struct secasvar *sav;
+ah_sumsiz_zero(struct secasvar *sav)
 {
+
 	if (!sav)
 		panic("ah_sumsiz_zero: null pointer is passed");
 	return 0;
 }
 
 static int
-ah_common_mature(sav)
-	struct secasvar *sav;
+ah_common_mature(struct secasvar *sav)
 {
 	const struct ah_algorithm *algo;
 
@@ -301,9 +299,9 @@ ah_common_mature(sav)
 }
 
 static int
-ah_none_mature(sav)
-	struct secasvar *sav;
+ah_none_mature(struct secasvar *sav)
 {
+
 	if (sav->sah->saidx.proto == IPPROTO_AH) {
 		ipseclog((LOG_ERR,
 		    "ah_none_mature: protocol and algorithm mismatch.\n"));
@@ -313,42 +311,35 @@ ah_none_mature(sav)
 }
 
 static int
-ah_none_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_none_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
+
 	state->foo = NULL;
 	return 0;
 }
 
+/*ARGSUSED*/
 static void
-ah_none_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t * addr;
-	size_t len;
+ah_none_loop(struct ah_algorithm_state *state, u_int8_t *addr, size_t len)
 {
 }
 
+/*ARGSUSED*/
 static void
-ah_none_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_none_result(struct ah_algorithm_state *state, u_int8_t *addr, size_t l)
 {
 }
 
 static int
-ah_keyed_md5_mature(sav)
-	struct secasvar *sav;
+ah_keyed_md5_mature(struct secasvar *sav)
 {
+
 	/* anything is okay */
 	return 0;
 }
 
 static int
-ah_keyed_md5_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_keyed_md5_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	size_t padlen;
 	size_t keybitlen;
@@ -404,11 +395,9 @@ ah_keyed_md5_init(state, sav)
 }
 
 static void
-ah_keyed_md5_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t * addr;
-	size_t len;
+ah_keyed_md5_loop(struct ah_algorithm_state *state, u_int8_t *addr, size_t len)
 {
+
 	if (!state)
 		panic("ah_keyed_md5_loop: what?");
 
@@ -416,10 +405,7 @@ ah_keyed_md5_loop(state, addr, len)
 }
 
 static void
-ah_keyed_md5_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_keyed_md5_result(struct ah_algorithm_state *state, u_int8_t *addr, size_t l)
 {
 	u_char digest[MD5_RESULTLEN];
 
@@ -437,9 +423,7 @@ ah_keyed_md5_result(state, addr, l)
 }
 
 static int
-ah_keyed_sha1_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_keyed_sha1_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	SHA1_CTX *ctxt;
 	size_t padlen;
@@ -495,10 +479,7 @@ ah_keyed_sha1_init(state, sav)
 }
 
 static void
-ah_keyed_sha1_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t * addr;
-	size_t len;
+ah_keyed_sha1_loop(struct ah_algorithm_state *state, u_int8_t *addr, size_t len)
 {
 	SHA1_CTX *ctxt;
 
@@ -510,10 +491,7 @@ ah_keyed_sha1_loop(state, addr, len)
 }
 
 static void
-ah_keyed_sha1_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_keyed_sha1_result(struct ah_algorithm_state *state, u_int8_t *addr, size_t l)
 {
 	u_char digest[SHA1_RESULTLEN];	/* SHA-1 generates 160 bits */
 	SHA1_CTX *ctxt;
@@ -533,9 +511,7 @@ ah_keyed_sha1_result(state, addr, l)
 }
 
 static int
-ah_hmac_md5_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_hmac_md5_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	u_char *ipad;
 	u_char *opad;
@@ -586,10 +562,7 @@ ah_hmac_md5_init(state, sav)
 }
 
 static void
-ah_hmac_md5_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t * addr;
-	size_t len;
+ah_hmac_md5_loop(struct ah_algorithm_state *state, u_int8_t *addr, size_t len)
 {
 	MD5_CTX *ctxt;
 
@@ -600,10 +573,7 @@ ah_hmac_md5_loop(state, addr, len)
 }
 
 static void
-ah_hmac_md5_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_hmac_md5_result(struct ah_algorithm_state *state, u_int8_t *addr, size_t l)
 {
 	u_char digest[MD5_RESULTLEN];
 	u_char *ipad;
@@ -630,9 +600,7 @@ ah_hmac_md5_result(state, addr, l)
 }
 
 static int
-ah_hmac_sha1_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_hmac_sha1_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	u_char *ipad;
 	u_char *opad;
@@ -684,10 +652,7 @@ ah_hmac_sha1_init(state, sav)
 }
 
 static void
-ah_hmac_sha1_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t * addr;
-	size_t len;
+ah_hmac_sha1_loop(struct ah_algorithm_state *state, u_int8_t *addr, size_t len)
 {
 	SHA1_CTX *ctxt;
 
@@ -699,10 +664,7 @@ ah_hmac_sha1_loop(state, addr, len)
 }
 
 static void
-ah_hmac_sha1_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_hmac_sha1_result(struct ah_algorithm_state *state, u_int8_t *addr, size_t l)
 {
 	u_char digest[SHA1_RESULTLEN];	/* SHA-1 generates 160 bits */
 	u_char *ipad;
@@ -729,9 +691,7 @@ ah_hmac_sha1_result(state, addr, l)
 }
 
 static int
-ah_hmac_sha2_256_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_hmac_sha2_256_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	u_char *ipad;
 	u_char *opad;
@@ -786,10 +746,8 @@ ah_hmac_sha2_256_init(state, sav)
 }
 
 static void
-ah_hmac_sha2_256_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t len;
+ah_hmac_sha2_256_loop(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t len)
 {
 	SHA256_CTX *ctxt;
 
@@ -801,10 +759,8 @@ ah_hmac_sha2_256_loop(state, addr, len)
 }
 
 static void
-ah_hmac_sha2_256_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_hmac_sha2_256_result(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t l)
 {
 	u_char digest[SHA256_DIGEST_LENGTH];
 	u_char *ipad;
@@ -832,9 +788,7 @@ ah_hmac_sha2_256_result(state, addr, l)
 }
 
 static int
-ah_hmac_sha2_384_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_hmac_sha2_384_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	u_char *ipad;
 	u_char *opad;
@@ -890,10 +844,8 @@ ah_hmac_sha2_384_init(state, sav)
 }
 
 static void
-ah_hmac_sha2_384_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t len;
+ah_hmac_sha2_384_loop(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t len)
 {
 	SHA384_CTX *ctxt;
 
@@ -905,10 +857,8 @@ ah_hmac_sha2_384_loop(state, addr, len)
 }
 
 static void
-ah_hmac_sha2_384_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_hmac_sha2_384_result(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t l)
 {
 	u_char digest[SHA384_DIGEST_LENGTH];
 	u_char *ipad;
@@ -936,9 +886,7 @@ ah_hmac_sha2_384_result(state, addr, l)
 }
 
 static int
-ah_hmac_sha2_512_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_hmac_sha2_512_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	u_char *ipad;
 	u_char *opad;
@@ -994,10 +942,8 @@ ah_hmac_sha2_512_init(state, sav)
 }
 
 static void
-ah_hmac_sha2_512_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t len;
+ah_hmac_sha2_512_loop(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t len)
 {
 	SHA512_CTX *ctxt;
 
@@ -1009,10 +955,8 @@ ah_hmac_sha2_512_loop(state, addr, len)
 }
 
 static void
-ah_hmac_sha2_512_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_hmac_sha2_512_result(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t l)
 {
 	u_char digest[SHA512_DIGEST_LENGTH];
 	u_char *ipad;
@@ -1040,9 +984,7 @@ ah_hmac_sha2_512_result(state, addr, l)
 }
 
 static int
-ah_hmac_ripemd160_init(state, sav)
-	struct ah_algorithm_state *state;
-	struct secasvar *sav;
+ah_hmac_ripemd160_init(struct ah_algorithm_state *state, struct secasvar *sav)
 {
 	u_char *ipad;
 	u_char *opad;
@@ -1098,10 +1040,8 @@ ah_hmac_ripemd160_init(state, sav)
 }
 
 static void
-ah_hmac_ripemd160_loop(state, addr, len)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t len;
+ah_hmac_ripemd160_loop(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t len)
 {
 	RMD160_CTX *ctxt;
 
@@ -1113,10 +1053,8 @@ ah_hmac_ripemd160_loop(state, addr, len)
 }
 
 static void
-ah_hmac_ripemd160_result(state, addr, l)
-	struct ah_algorithm_state *state;
-	u_int8_t *addr;
-	size_t l;
+ah_hmac_ripemd160_result(struct ah_algorithm_state *state, u_int8_t *addr,
+	size_t l)
 {
 	u_char digest[RIPEMD160_RESULTLEN];
 	u_char *ipad;
@@ -1149,12 +1087,8 @@ ah_hmac_ripemd160_result(state, addr, l)
  * go generate the checksum.
  */
 static void
-ah_update_mbuf(m, off, len, algo, algos)
-	struct mbuf *m;
-	int off;
-	int len;
-	const struct ah_algorithm *algo;
-	struct ah_algorithm_state *algos;
+ah_update_mbuf(struct mbuf *m, int off, int len,
+	const struct ah_algorithm *algo, struct ah_algorithm_state *algos)
 {
 	struct mbuf *n;
 	int tlen;
@@ -1199,12 +1133,8 @@ ah_update_mbuf(m, off, len, algo, algos)
  * Don't use m_copy(), it will try to share cluster mbuf by using refcnt.
  */
 int
-ah4_calccksum(m, ahdat, len, algo, sav)
-	struct mbuf *m;
-	u_int8_t * ahdat;
-	size_t len;
-	const struct ah_algorithm *algo;
-	struct secasvar *sav;
+ah4_calccksum(struct mbuf *m, u_int8_t *ahdat, size_t len,
+	const struct ah_algorithm *algo, struct secasvar *sav)
 {
 	int off;
 	int hdrtype;
@@ -1442,12 +1372,8 @@ fail:
  * Don't use m_copy(), it will try to share cluster mbuf by using refcnt.
  */
 int
-ah6_calccksum(m, ahdat, len, algo, sav)
-	struct mbuf *m;
-	u_int8_t * ahdat;
-	size_t len;
-	const struct ah_algorithm *algo;
-	struct secasvar *sav;
+ah6_calccksum(struct mbuf *m, u_int8_t *ahdat, size_t len,
+	const struct ah_algorithm *algo, struct secasvar *sav)
 {
 	int newoff, off;
 	int proto, nxt;

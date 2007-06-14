@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.h,v 1.11 2004/05/26 10:08:00 itojun Exp $	*/
+/*	$KAME: in_gif.h,v 1.12 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,15 +38,15 @@ extern int ip_gif_ttl;
 
 struct gif_softc;
 #ifdef __FreeBSD__
-void in_gif_input __P((struct mbuf *, int));
+void in_gif_input(struct mbuf *, int);
 #else
-void in_gif_input __P((struct mbuf *, ...));
+void in_gif_input(struct mbuf *, ...);
 #endif
-int in_gif_output __P((struct ifnet *, int, struct mbuf *));
+int in_gif_output(struct ifnet *, int, struct mbuf *);
 #ifdef GIF_ENCAPCHECK
-int gif_encapcheck4 __P((const struct mbuf *, int, int, void *));
+int gif_encapcheck4(const struct mbuf *, int, int, void *);
 #endif
-int in_gif_attach __P((struct gif_softc *));
-int in_gif_detach __P((struct gif_softc *));
+int in_gif_attach(struct gif_softc *);
+int in_gif_detach(struct gif_softc *);
 
 #endif /*_NETINET_IN_GIF_H_*/

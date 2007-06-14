@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.15 2004/02/10 12:34:57 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.16 2007/06/14 12:09:42 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -70,7 +70,7 @@
 /*
  * ART: Allotment Routing Table, by Donald Knuth and Yoichi Hariguchi
  *	<yoichi@yottanet.com>
- * The implementation is by Jun-ichiro itojun Hagino <itojun@iijlab.net>
+ * The implementation is by Jun-ichiro itojun Hagino <itojun@itojun.org>
  *
  * We have multiple ART tables which hold 2^(ART_BITLEN + 1) elements.
  * A table will serve 2^(ART_BITLEN) bits in the address bits.  For example,
@@ -132,8 +132,8 @@
  * ART algorithm is memory-eater; well, we have plenty of memory to spare,
  * and we need a speedup.  However, we do need to worry about kernel VM
  * shortage.  Here are some test results with ART_BITLEN == 8:
- *	IPv4, 10000 random entires - around 1700 phys pages (6.8M)
- *	IPv4, 20000 random entires - around 2400 phys pages (9.6M)
+ *	IPv4, 10000 random entries - around 1700 phys pages (6.8M)
+ *	IPv4, 20000 random entries - around 2400 phys pages (9.6M)
  *
  * External interface is kept compatible with radix node, so that we do not
  * surprise existing code too much.  However, because of it, we have certain
@@ -214,38 +214,35 @@ static struct pool art_pool;
 #endif
 
 #if defined(RADIX_ART_TRACE) || defined(RADIX_ART_TEST)
-static void art_printaddr __P((u_int8_t *, size_t));
+static void art_printaddr(u_int8_t *, size_t);
 #endif
 #ifdef RADIX_ART_TRACE
-static void art_printidx __P((struct art_table *, artidx_t));
+static void art_printidx(struct art_table *, artidx_t);
 #endif
-static struct art_table *art_newtable __P((struct art_table *));
-static void art_deltable __P((struct art_table *));
-static inline artidx_t art_getidx __P((u_int8_t *, int, int));
-static artidx_t art_offset __P((u_int8_t *, int, int, struct art_table *));
-static struct radix_node *art_lookup __P((u_int8_t *, int, struct art_table *));
-static inline void art_changeleaf __P((struct art_table *, artidx_t, void *,
-	void *));
-static void art_change __P((struct art_table *, artidx_t, void *, void *));
-static int art_insert __P((u_int8_t *, int, struct art_table *, void *));
-static int art_gc __P((u_int8_t *, int, int, struct art_table *,
-	struct art_table *, artidx_t));
-static int art_delete __P((u_int8_t *, int, struct art_table *, void *));
-static int art_prefixlen __P((void *, struct radix_node_head *));
+static struct art_table *art_newtable(struct art_table *);
+static void art_deltable(struct art_table *);
+static inline artidx_t art_getidx(u_int8_t *, int, int);
+static artidx_t art_offset(u_int8_t *, int, int, struct art_table *);
+static struct radix_node *art_lookup(u_int8_t *, int, struct art_table *);
+static inline void art_changeleaf(struct art_table *, artidx_t, void *, void *);
+static void art_change(struct art_table *, artidx_t, void *, void *);
+static int art_insert(u_int8_t *, int, struct art_table *, void *);
+static int art_gc(u_int8_t *, int, int, struct art_table *,
+	struct art_table *, artidx_t);
+static int art_delete(u_int8_t *, int, struct art_table *, void *);
+static int art_prefixlen(void *, struct radix_node_head *);
 
 #ifndef __NetBSD__
 extern struct radix_node
-	 *rn_delete __P((void *, void *, struct radix_node_head *)),
-	 *rn_insert __P((void *, struct radix_node_head *, int *,
-			struct radix_node [2])),
-	 *rn_lookup __P((void *, void *, struct radix_node_head *));
+	 *rn_delete(void *, void *, struct radix_node_head *),
+	 *rn_insert(void *, struct radix_node_head *, int *,
+			struct radix_node [2]),
+	 *rn_lookup(void *, void *, struct radix_node_head *);
 #endif
 
 #if defined(RADIX_ART_TRACE) || defined(RADIX_ART_TEST)
 static void
-art_printaddr(p, l)
-	u_int8_t *p;
-	size_t l;
+art_printaddr(u_int8_t p, size_t l)
 {
 	size_t i;
 
@@ -256,9 +253,7 @@ art_printaddr(p, l)
 
 #ifdef RADIX_ART_TRACE
 static void
-art_printidx(t, v)
-	struct art_table *t;
-	artidx_t v;
+art_printidx(struct art_table *t, artidx_t v)
 {
 
 #ifdef ART_BITLEN_CONSTANT
@@ -275,8 +270,7 @@ art_printidx(t, v)
 #endif
 
 static struct art_table *
-art_newtable(parent)
-	struct art_table *parent;
+art_newtable(struct art_table *parent)
 {
 	struct art_table *t;
 
@@ -304,8 +298,7 @@ art_newtable(parent)
 }
 
 static void
-art_deltable(t)
-	struct art_table *t;
+art_deltable(struct art_table *t)
 {
 
 #ifdef __NetBSD__
@@ -320,10 +313,7 @@ art_deltable(t)
 }
 
 static inline artidx_t
-art_getidx(p, off, l)
-	u_int8_t *p;
-	int off;
-	int l;
+art_getidx(u_int8_t *p, int off, int l)
 {
 	u_int32_t v;
 
@@ -345,11 +335,7 @@ art_getidx(p, off, l)
 }
 
 static artidx_t
-art_offset(p, offset, prefixlen, t)
-	u_int8_t *p;
-	int offset;
-	int prefixlen;
-	struct art_table *t;
+art_offset(u_int8_t *p, int offset, int prefixlen, struct art_table *t)
 {
 	int l;
 	artidx_t v;
@@ -386,10 +372,7 @@ art_offset(p, offset, prefixlen, t)
  * table has a loop (should not happen).
  */
 static struct radix_node *
-art_lookup(p, prefixlen, t)
-	u_int8_t *p;
-	int prefixlen;
-	struct art_table *t;
+art_lookup(u_int8_t *p, int prefixlen, struct art_table *t)
 {
 	artidx_t v;
 	int forever;
@@ -452,12 +435,13 @@ again:
 	return NULL;
 }
 
+/*
+ * v - starting point
+ * o - old value
+ * n - new value
+ */
 static inline void
-art_changeleaf(t, v, o, n)
-	struct art_table *t;
-	artidx_t v;	/* starting point */
-	void *o;	/* old value */
-	void *n;	/* new value */
+art_changeleaf(struct art_table *t, artidx_t v, void *o, void *n)
 {
 	struct art_table *child;
 	void *r;
@@ -494,13 +478,13 @@ art_changeleaf(t, v, o, n)
  * - go all the way down the binary tree, until we hit some entry that is not
  *   the old value
  * - update entries, backtracking one by one
+ *
+ * s - starting point
+ * o - old value
+ * n - new value
  */
 static void
-art_change(t, s, o, n)
-	struct art_table *t;
-	artidx_t s;	/* starting point */
-	void *o;	/* old value */
-	void *n;	/* new value */
+art_change(struct art_table *t, artidx_t s, void *o, void *n)
 {
 	artidx_t v = s;
 
@@ -554,11 +538,7 @@ moveup:
  * art_table[ART_BASEIDX] set, t's reference count is increased by 2 (not 1).
  */
 static int
-art_insert(p, prefixlen, t, n)
-	u_int8_t *p;
-	int prefixlen;
-	struct art_table *t;
-	void *n;
+art_insert(u_int8_t *p, int prefixlen, struct art_table *t, void *n)
 {
 	artidx_t v;
 	struct art_table *child;
@@ -656,13 +636,8 @@ again:
 }
 
 static int
-art_gc(p, offset, prefixlen, t, parent, pv)
-	u_int8_t *p;
-	int offset;
-	int prefixlen;
-	struct art_table *t;
-	struct art_table *parent;
-	artidx_t pv;
+art_gc(u_int8_t *p, int offset, int prefixlen, struct art_table *t,
+	struct art_table *parent, artidx_t pv)
 {
 	artidx_t v;
 
@@ -698,11 +673,7 @@ art_gc(p, offset, prefixlen, t, parent, pv)
 }
 
 static int
-art_delete(p0, prefixlen0, t0, o)
-	u_int8_t *p0;
-	int prefixlen0;
-	struct art_table *t0;
-	void *o;
+art_delete(u_int8_t *p0, int prefixlen0, struct art_table *t0, void *o)
 {
 	artidx_t v;
 	struct art_table *child;
@@ -831,9 +802,7 @@ done:
 }
 
 static int
-art_prefixlen(m_arg, head)
-	void *m_arg;
-	struct radix_node_head *head;
+art_prefixlen(void *m_arg, struct radix_node_head *head)
 {
 	u_int8_t *netmask = (u_int8_t *)m_arg;
 	u_int8_t *sp, *cp, *ep;
@@ -882,9 +851,7 @@ art_prefixlen(m_arg, head)
 }
 
 struct radix_node *
-rn_art_lookup(v_arg, m_arg, head)
-	void *v_arg, *m_arg;
-	struct radix_node_head *head;
+rn_art_lookup(void *v_arg, void *m_arg, struct radix_node_head *head)
 {
 	u_int8_t *p;
 	int prefixlen;
@@ -955,19 +922,15 @@ rn_art_lookup(v_arg, m_arg, head)
 }
 
 struct radix_node *
-rn_art_match(v_arg, head)
-	void *v_arg;
-	struct radix_node_head *head;
+rn_art_match(void *v_arg, struct radix_node_head *head)
 {
 
 	return rn_art_lookup(v_arg, NULL, head);
 }
 
 struct radix_node *
-rn_art_addroute(v_arg, n_arg, head, treenodes)
-	void *v_arg, *n_arg;
-	struct radix_node_head *head;
-	struct radix_node treenodes[2];
+rn_art_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
+	struct radix_node treenodes[2])
 {
 	u_int8_t *p;
 	int prefixlen;
@@ -1018,10 +981,8 @@ rn_art_addroute(v_arg, n_arg, head, treenodes)
 }
 
 struct radix_node *
-rn_art_delete(v_arg, netmask_arg, head, rn)
-	void *v_arg, *netmask_arg;
-	struct radix_node_head *head;
-	struct radix_node *rn;
+rn_art_delete(void *v_arg, void *netmask_arg, struct radix_node_head *head,
+	struct radix_node *rn)
 {
 	u_int8_t *p;
 	int prefixlen;
@@ -1064,18 +1025,14 @@ rn_art_delete(v_arg, netmask_arg, head, rn)
 
 /* XXX should be integrated into struct domain */
 void
-rn_art_setlimit(head, limit)
-	struct radix_node_head *head;
-	unsigned int limit;
+rn_art_setlimit(struct radix_node_head *head, unsigned int limit)
 {
 
 	((struct art_node_head *)head)->art_limit = limit;
 }
 
 int
-rn_art_inithead(head, off)
-	void **head;
-	int off;
+rn_art_inithead(void **head, int off)
 {
 	struct art_node_head *rnh;
 	int ret;
@@ -1110,7 +1067,7 @@ rn_art_inithead(head, off)
 }
 
 void
-rn_art_init()
+rn_art_init(void)
 {
 
 #ifdef DIAGNOSTIC

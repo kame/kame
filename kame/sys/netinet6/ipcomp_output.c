@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.26 2004/06/02 05:53:16 itojun Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.27 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -82,8 +82,8 @@
 
 #include <net/net_osdep.h>
 
-static int ipcomp_output __P((struct mbuf *, u_char *, struct mbuf *,
-	struct ipsecrequest *, int));
+static int ipcomp_output(struct mbuf *, u_char *, struct mbuf *,
+	struct ipsecrequest *, int);
 
 /*
  * Modify the packet so that the payload is compressed.
@@ -104,12 +104,8 @@ static int ipcomp_output __P((struct mbuf *, u_char *, struct mbuf *,
  *	<-----------------> compoff
  */
 static int
-ipcomp_output(m, nexthdrp, md, isr, af)
-	struct mbuf *m;
-	u_char *nexthdrp;
-	struct mbuf *md;
-	struct ipsecrequest *isr;
-	int af;
+ipcomp_output(struct mbuf *m, u_char *nexthdrp, struct mbuf *md,
+	struct ipsecrequest *isr, int af)
 {
 	struct mbuf *n;
 	struct mbuf *md0;
@@ -349,11 +345,10 @@ fail:
 
 #ifdef INET
 int
-ipcomp4_output(m, isr)
-	struct mbuf *m;
-	struct ipsecrequest *isr;
+ipcomp4_output(struct mbuf *m, struct ipsecrequest *isr)
 {
 	struct ip *ip;
+
 	if (m->m_len < sizeof(struct ip)) {
 		ipseclog((LOG_DEBUG, "ipcomp4_output: first mbuf too short\n"));
 		ipsecstat.out_inval++;
@@ -368,12 +363,10 @@ ipcomp4_output(m, isr)
 
 #ifdef INET6
 int
-ipcomp6_output(m, nexthdrp, md, isr)
-	struct mbuf *m;
-	u_char *nexthdrp;
-	struct mbuf *md;
-	struct ipsecrequest *isr;
+ipcomp6_output(struct mbuf *m, u_char *nexthdrp, struct mbuf *md,
+	struct ipsecrequest *isr)
 {
+
 	if (m->m_len < sizeof(struct ip6_hdr)) {
 		ipseclog((LOG_DEBUG, "ipcomp6_output: first mbuf too short\n"));
 		ipsec6stat.out_inval++;

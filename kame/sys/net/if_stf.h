@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.h,v 1.10 2004/12/10 01:01:12 suz Exp $	*/
+/*	$KAME: if_stf.h,v 1.11 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -55,9 +55,9 @@ struct stf_softc {
 
 #ifdef _KERNEL
 #ifdef __FreeBSD__
-void in_stf_input __P((struct mbuf *, int));
+void in_stf_input(struct mbuf *, int);
 #else
-void in_stf_input __P((struct mbuf *, ...));
+void in_stf_input(struct mbuf *, ...);
 #endif
 
 #endif /* _KERNEL */

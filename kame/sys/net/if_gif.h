@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.39 2005/04/14 06:22:37 suz Exp $	*/
+/*	$KAME: if_gif.h,v 1.40 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,20 +105,20 @@ extern struct gif_softc *gif_softc;
 extern LIST_HEAD(gif_softc_list, gif_softc) gif_softc_list;
 
 /* Prototypes */
-void gifattach0 __P((struct gif_softc *));
+void gifattach0(struct gif_softc *)
 #ifndef __OpenBSD__
-void gif_input __P((struct mbuf *, int, struct ifnet *));
+void gif_input(struct mbuf *, int, struct ifnet *)
 #endif
-int gif_output __P((struct ifnet *, struct mbuf *,
-		    struct sockaddr *, struct rtentry *));
-int gif_ioctl __P((struct ifnet *, u_long, caddr_t));
-int gif_set_tunnel __P((struct ifnet *, struct sockaddr *, struct sockaddr *));
-void gif_delete_tunnel __P((struct ifnet *));
+int gif_output(struct ifnet *, struct mbuf *, struct sockaddr *,
+	struct rtentry *)
+int gif_ioctl(struct ifnet *, u_long, caddr_t)
+int gif_set_tunnel(struct ifnet *, struct sockaddr *, struct sockaddr *)
+void gif_delete_tunnel(struct ifnet *)
 #ifdef __OpenBSD__
-void gif_start __P((struct ifnet *));
+void gif_start(struct ifnet *)
 #endif
 #ifdef GIF_ENCAPCHECK
-int gif_encapcheck __P((const struct mbuf *, int, int, void *));
+int gif_encapcheck(const struct mbuf *, int, int, void *)
 #endif
 
 #endif /* _NET_IF_GIF_H_ */

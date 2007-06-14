@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.76 2004/12/27 05:41:18 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.77 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -354,83 +354,80 @@ extern int ip6_esp_randpad;
 
 #define ipseclog(x)	do { if (ipsec_debug) log x; } while (/*CONSTCOND*/ 0)
 
-extern int ipsec_pcbconn __P((struct inpcbpolicy *));
-extern int ipsec_pcbdisconn __P((struct inpcbpolicy *));
-extern int ipsec_invalpcbcacheall __P((void));
+extern int ipsec_pcbconn(struct inpcbpolicy *);
+extern int ipsec_pcbdisconn(struct inpcbpolicy *);
+extern int ipsec_invalpcbcacheall(void);
 
-extern struct secpolicy *ipsec4_getpolicybysock
-	__P((struct mbuf *, u_int, struct socket *, int *));
+extern struct secpolicy *ipsec4_getpolicybysock(struct mbuf *, u_int,
+	struct socket *, int *);
 struct inpcb;
-extern struct secpolicy *ipsec4_getpolicybypcb
-	(struct mbuf *m, u_int dir, struct inpcb *, int *);
-extern struct secpolicy *ipsec4_getpolicybyaddr
-	__P((struct mbuf *, u_int, int, int *));
-extern struct secpolicy *ipsec4_getpolicybytag
-	__P((struct mbuf *, u_int, int *));
+extern struct secpolicy *ipsec4_getpolicybypcb(struct mbuf *m, u_int dir,
+	struct inpcb *, int *);
+extern struct secpolicy *ipsec4_getpolicybyaddr(struct mbuf *, u_int, int,
+	int *);
+extern struct secpolicy *ipsec4_getpolicybytag(struct mbuf *, u_int, int *);
 
 #ifdef INET6
-extern struct secpolicy *ipsec6_getpolicybysock
-	__P((struct mbuf *, u_int, struct socket *, int *));
-extern struct secpolicy *ipsec6_getpolicybyaddr
-	__P((struct mbuf *, u_int, int, int *));
-extern struct secpolicy *ipsec6_getpolicybytag
-	__P((struct mbuf *, u_int, int *));
+extern struct secpolicy *ipsec6_getpolicybysock(struct mbuf *, u_int,
+	struct socket *, int *);
+extern struct secpolicy *ipsec6_getpolicybyaddr(struct mbuf *, u_int, int,
+	int *);
+extern struct secpolicy *ipsec6_getpolicybytag(struct mbuf *, u_int, int *);
 #endif /* INET6 */
 
 struct inpcb;
 #ifdef INET6
 struct in6pcb;
 #endif
-extern int ipsec_init_pcbpolicy __P((struct socket *, struct inpcbpolicy **));
-extern int ipsec_copy_pcbpolicy
-	__P((struct inpcbpolicy *, struct inpcbpolicy *));
-extern u_int ipsec_get_reqlevel __P((struct ipsecrequest *, int));
+extern int ipsec_init_pcbpolicy(struct socket *, struct inpcbpolicy **);
+extern int ipsec_copy_pcbpolicy(struct inpcbpolicy *, struct inpcbpolicy *);
+extern u_int ipsec_get_reqlevel(struct ipsecrequest *, int);
 
-extern int ipsec4_set_policy __P((struct inpcb *, int, caddr_t, size_t, int));
-extern int ipsec4_get_policy __P((struct inpcb *inpcb, caddr_t request,
-	size_t len, struct mbuf **mp));
-extern int ipsec4_delete_pcbpolicy __P((struct inpcb *));
-extern int ipsec4_in_reject_so __P((struct mbuf *, struct socket *));
-extern int ipsec4_in_reject __P((struct mbuf *, struct inpcb *));
+extern int ipsec4_set_policy(struct inpcb *, int, caddr_t, size_t, int);
+extern int ipsec4_get_policy(struct inpcb *inpcb, caddr_t request,
+	size_t len, struct mbuf **mp);
+extern int ipsec4_delete_pcbpolicy(struct inpcb *);
+extern int ipsec4_in_reject_so(struct mbuf *, struct socket *);
+extern int ipsec4_in_reject(struct mbuf *, struct inpcb *);
 
 #ifdef INET6
-extern int ipsec6_in_reject_so __P((struct mbuf *, struct socket *));
+extern int ipsec6_in_reject_so(struct mbuf *, struct socket *);
 #ifdef __FreeBSD__
-extern int ipsec6_delete_pcbpolicy __P((struct inpcb *));
-extern int ipsec6_set_policy __P((struct inpcb *, int, caddr_t, size_t, int));
-extern int ipsec6_get_policy __P((struct inpcb *, caddr_t, size_t,
-	    struct mbuf **));
-extern int ipsec6_in_reject __P((struct mbuf *, struct inpcb *));
+extern int ipsec6_delete_pcbpolicy(struct inpcb *);
+extern int ipsec6_set_policy(struct inpcb *, int, caddr_t, size_t, int);
+extern int ipsec6_get_policy(struct inpcb *, caddr_t, size_t,
+	    struct mbuf **);
+extern int ipsec6_in_reject(struct mbuf *, struct inpcb *);
 #else
-extern int ipsec6_delete_pcbpolicy __P((struct in6pcb *));
-extern int ipsec6_set_policy __P((struct in6pcb *, int, caddr_t, size_t, int));
-extern int ipsec6_get_policy __P((struct in6pcb *, caddr_t, size_t,
-	    struct mbuf **));
-extern int ipsec6_in_reject __P((struct mbuf *, struct in6pcb *));
+extern int ipsec6_delete_pcbpolicy(struct in6pcb *);
+extern int ipsec6_set_policy(struct in6pcb *, int, caddr_t, size_t, int);
+extern int ipsec6_get_policy(struct in6pcb *, caddr_t, size_t,
+	    struct mbuf **);
+extern int ipsec6_in_reject(struct mbuf *, struct in6pcb *);
 #endif
 #endif /* INET6 */
 
 struct secas;
 struct tcpcb;
 struct tcp6cb;
-extern int ipsec_chkreplay __P((u_int32_t, struct secasvar *));
-extern int ipsec_updatereplay __P((u_int32_t, struct secasvar *));
+extern int ipsec_chkreplay(u_int32_t, struct secasvar *);
+extern int ipsec_updatereplay(u_int32_t, struct secasvar *);
 
-extern size_t ipsec4_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
+extern size_t ipsec4_hdrsiz(struct mbuf *, u_int, struct inpcb *);
 #ifdef __FreeBSD__
-extern size_t ipsec_hdrsiz_tcp __P((struct tcpcb *));
+extern size_t ipsec_hdrsiz_tcp(struct tcpcb *);
 #else
-extern size_t ipsec4_hdrsiz_tcp __P((struct tcpcb *));
+extern size_t ipsec4_hdrsiz_tcp(struct tcpcb *);
 #endif
 #ifdef INET6
 #ifdef __FreeBSD__
-extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
+extern size_t ipsec6_hdrsiz(struct mbuf *, u_int, struct inpcb *);
 #else
-extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct in6pcb *));
+extern size_t ipsec6_hdrsiz(struct mbuf *, u_int, struct in6pcb *);
 #ifdef __NetBSD__
-extern size_t ipsec6_hdrsiz_tcp __P((struct tcpcb *));
+extern size_t ipsec6_hdrsiz_tcp(struct tcpcb *);
 #else
-extern size_t ipsec6_hdrsiz_tcp __P((struct tcp6cb *));
+extern size_t ipsec6_hdrsiz_tcp(struct tcp6cb *);
 #endif
 #endif
 #endif
@@ -439,50 +436,47 @@ struct ip;
 #ifdef INET6
 struct ip6_hdr;
 #endif
-extern const char *ipsec4_logpacketstr __P((struct ip *, u_int32_t));
+extern const char *ipsec4_logpacketstr(struct ip *, u_int32_t);
 #ifdef INET6
-extern const char *ipsec6_logpacketstr __P((struct ip6_hdr *, u_int32_t));
+extern const char *ipsec6_logpacketstr(struct ip6_hdr *, u_int32_t);
 #endif
-extern const char *ipsec_logsastr __P((struct secasvar *));
+extern const char *ipsec_logsastr(struct secasvar *);
 
-extern void ipsec_dumpmbuf __P((struct mbuf *));
+extern void ipsec_dumpmbuf(struct mbuf *);
 
-extern int ipsec4_output __P((struct ipsec_output_state *, struct secpolicy *,
-	int));
+extern int ipsec4_output(struct ipsec_output_state *, struct secpolicy *, int);
 #ifdef INET6
-extern int ipsec6_output_trans __P((struct ipsec_output_state *, u_char *,
-	struct mbuf *, struct secpolicy *, int, int *));
-extern int ipsec6_output_tunnel __P((struct ipsec_output_state *,
-	struct secpolicy *, int));
+extern int ipsec6_output_trans(struct ipsec_output_state *, u_char *,
+	struct mbuf *, struct secpolicy *, int, int *);
+extern int ipsec6_output_tunnel(struct ipsec_output_state *,
+	struct secpolicy *, int);
 #endif
-extern int ipsec4_tunnel_validate __P((struct mbuf *, int, u_int,
-	struct secasvar *));
+extern int ipsec4_tunnel_validate(struct mbuf *, int, u_int, struct secasvar *);
 #ifdef INET6
-extern int ipsec6_tunnel_validate __P((struct mbuf *, int, u_int,
-	struct secasvar *));
+extern int ipsec6_tunnel_validate(struct mbuf *, int, u_int, struct secasvar *);
 #endif
-extern struct mbuf *ipsec_copypkt __P((struct mbuf *));
-extern void ipsec_delaux __P((struct mbuf *));
-extern int ipsec_setsocket __P((struct mbuf *, struct socket *));
-extern struct socket *ipsec_getsocket __P((struct mbuf *));
-extern int ipsec_addhist __P((struct mbuf *, int, u_int32_t));
-extern int ipsec_getnhist __P((struct mbuf *));
-extern struct ipsec_history *ipsec_gethist __P((struct mbuf *, int *));
-extern void ipsec_clearhist __P((struct mbuf *));
+extern struct mbuf *ipsec_copypkt(struct mbuf *);
+extern void ipsec_delaux(struct mbuf *);
+extern int ipsec_setsocket(struct mbuf *, struct socket *);
+extern struct socket *ipsec_getsocket(struct mbuf *);
+extern int ipsec_addhist(struct mbuf *, int, u_int32_t);
+extern int ipsec_getnhist(struct mbuf *);
+extern struct ipsec_history *ipsec_gethist(struct mbuf *, int *);
+extern void ipsec_clearhist(struct mbuf *);
 
 #ifdef __NetBSD__
-extern int ipsec_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
-extern int ipsec6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+extern int ipsec_sysctl(int *, u_int, void *, size_t *, void *, size_t);
+extern int ipsec6_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #endif
 
 #endif /* _KERNEL */
 
 #ifndef _KERNEL
-extern caddr_t ipsec_set_policy __P((char *, int));
-extern int ipsec_get_policylen __P((caddr_t));
-extern char *ipsec_dump_policy __P((caddr_t, char *));
+extern caddr_t ipsec_set_policy(char *, int);
+extern int ipsec_get_policylen(caddr_t);
+extern char *ipsec_dump_policy(caddr_t, char *);
 
-extern const char *ipsec_strerror __P((void));
+extern const char *ipsec_strerror(void);
 #endif /* !_KERNEL */
 
 #endif /* _NETINET6_IPSEC_H_ */

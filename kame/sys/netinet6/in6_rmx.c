@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.28 2005/07/22 05:28:50 keiichi Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.29 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,7 +115,7 @@
 #define tvtohz hzto
 #endif
 
-extern int	in6_inithead __P((void **head, int off));
+extern int	in6_inithead(void **head, int off);
 
 #define RTPRF_OURS		RTF_PROTO3	/* set on routes we manage */
 
@@ -493,11 +493,12 @@ in6_mtutimo(void *rock)
 
 #if 0
 void
-in6_rtqdrain()
+in6_rtqdrain(void)
 {
 	struct radix_node_head *rnh = rt_tables[AF_INET6];
 	struct rtqk_arg arg;
 	int s;
+
 	arg.found = arg.killed = 0;
 	arg.rnh = rnh;
 	arg.nextstop = 0;

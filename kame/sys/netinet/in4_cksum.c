@@ -1,4 +1,4 @@
-/*	$KAME: in4_cksum.c,v 1.11 2002/07/29 09:06:50 itojun Exp $	*/
+/*	$KAME: in4_cksum.c,v 1.12 2007/06/14 12:09:42 itojun Exp $	*/
 /*	$NetBSD: in_cksum.c,v 1.13 1996/10/13 02:03:03 christos Exp $	*/
 
 /*
@@ -90,10 +90,7 @@
 #define REDUCE {l_util.l = sum; sum = l_util.s[0] + l_util.s[1]; ADDCARRY(sum);}
 
 int
-in4_cksum(m, nxt, off, len)
-	struct mbuf *m;
-	u_int8_t nxt;
-	int off, len;
+in4_cksum(struct mbuf *m, u_int8_t nxt, int off, int len)
 {
 	u_int16_t *w;
 	int sum = 0;

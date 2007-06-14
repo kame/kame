@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.39 2005/09/22 09:46:33 keiichi Exp $	*/
+/*	$KAME: key.h,v 1.40 2007/06/14 12:09:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -51,44 +51,42 @@ struct sadb_msg;
 struct sadb_x_policy;
 union sockaddr_union;
 
-extern struct secpolicy *key_allocsp __P((u_int16_t, struct secpolicyindex *,
-	u_int));
-extern struct secpolicy *key_gettunnel __P((struct sockaddr *,
-	struct sockaddr *, struct sockaddr *, struct sockaddr *));
+extern struct secpolicy *key_allocsp(u_int16_t, struct secpolicyindex *, u_int);
+extern struct secpolicy *key_gettunnel(struct sockaddr *,
+	struct sockaddr *, struct sockaddr *, struct sockaddr *);
 #ifdef PFKEYV2_SADB_X_EXT_PACKET
-extern int key_checkrequest __P((struct ipsecrequest *isr,
-	struct secasindex *, struct mbuf *));
+extern int key_checkrequest(struct ipsecrequest *isr,
+	struct secasindex *, struct mbuf *);
 #else
-extern int key_checkrequest __P((struct ipsecrequest *isr,
-	struct secasindex *));
+extern int key_checkrequest(struct ipsecrequest *isr,
+	struct secasindex *);
 #endif
-extern struct secasvar *key_allocsa __P((u_int, caddr_t, caddr_t,
-					u_int, u_int32_t));
-extern struct secpolicy *key_getspbyid __P((u_int32_t));
-extern void key_freesp __P((struct secpolicy *));
-extern void key_freesav __P((struct secasvar *));
-extern struct secpolicy *key_newsp __P((u_int32_t));
-extern struct secpolicy *key_msg2sp __P((struct sadb_x_policy *,
-	size_t, int *));
-extern struct mbuf *key_sp2msg __P((struct secpolicy *));
-extern int key_cmpspidx_exactly
-	__P((struct secpolicyindex *, struct secpolicyindex *));
-extern int key_cmpspidx_withmask
-	__P((struct secpolicyindex *, struct secpolicyindex *));
-extern int key_spdacquire __P((struct secpolicy *));
-extern struct mbuf *key_setdumpsp __P((struct secpolicy *,
-	u_int8_t, u_int32_t, u_int32_t));
-extern void key_timehandler __P((void *));
-extern void key_randomfill __P((void *, size_t));
-extern void key_freereg __P((struct socket *));
-struct mbuf *key_setdumpsa_spi __P((u_int32_t));
-extern int key_parse __P((struct mbuf *, struct socket *));
-extern void key_init __P((void));
-extern int key_checktunnelsanity __P((struct secasvar *, u_int,
-					caddr_t, caddr_t));
-extern void key_sa_recordxfer __P((struct secasvar *, struct mbuf *));
-extern void key_sa_routechange __P((struct sockaddr *));
-extern void key_sa_stir_iv __P((struct secasvar *));
+extern struct secasvar *key_allocsa(u_int, caddr_t, caddr_t, u_int, u_int32_t);
+extern struct secpolicy *key_getspbyid(u_int32_t);
+extern void key_freesp(struct secpolicy *);
+extern void key_freesav(struct secasvar *);
+extern struct secpolicy *key_newsp(u_int32_t);
+extern struct secpolicy *key_msg2sp(struct sadb_x_policy *,
+	size_t, int *);
+extern struct mbuf *key_sp2msg(struct secpolicy *);
+extern int key_cmpspidx_exactly(struct secpolicyindex *,
+	struct secpolicyindex *);
+extern int key_cmpspidx_withmask(struct secpolicyindex *,
+	struct secpolicyindex *);
+extern int key_spdacquire(struct secpolicy *);
+extern struct mbuf *key_setdumpsp(struct secpolicy *,
+	u_int8_t, u_int32_t, u_int32_t);
+extern void key_timehandler(void *);
+extern void key_randomfill(void *, size_t);
+extern void key_freereg(struct socket *);
+struct mbuf *key_setdumpsa_spi(u_int32_t);
+extern int key_parse(struct mbuf *, struct socket *);
+extern void key_init(void);
+extern int key_checktunnelsanity(struct secasvar *, u_int,
+					caddr_t, caddr_t);
+extern void key_sa_recordxfer(struct secasvar *, struct mbuf *);
+extern void key_sa_routechange(struct sockaddr *);
+extern void key_sa_stir_iv(struct secasvar *);
 
 /* to keep compatibility with FAST_IPSEC */
 #ifdef TCP_SIGNATURE
@@ -115,7 +113,7 @@ MALLOC_DECLARE(M_SECA);
 #endif
 
 #ifdef __NetBSD__
-extern int key_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+extern int key_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #endif
 
 #endif /* defined(_KERNEL) */

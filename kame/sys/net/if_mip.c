@@ -1,4 +1,4 @@
-/*	$KAME: if_mip.c,v 1.11 2007/03/30 09:41:15 keiichi Exp $	*/
+/*	$KAME: if_mip.c,v 1.12 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -106,11 +106,10 @@ PSEUDO_SET(mipattach, if_mip);
 #endif
 
 void
-mipattach(dummy)
 #ifdef __FreeBSD__
-	void *dummy;
+mipattach(void *dummy)
 #else
-	int dummy;
+mipattach(int dummy)
 #endif
 {
 	struct mip_softc *sc;
@@ -191,21 +190,12 @@ mipattach(dummy)
 
 #ifndef __APPLE__
 int
-mip_output(ifp, m, dst, rt)
-     struct ifnet *ifp;
-     struct mbuf *m;
-     struct sockaddr *dst;
-     struct rtentry *rt;
+mip_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	struct rtentry *rt)
 #else
 int
-mip_pre_output(
-	struct ifnet *ifp,
-	u_long protocol_family,
-	struct mbuf **m0,
-	const struct sockaddr *dst,
-	caddr_t rt0,
-	char *frame,
-	char *address)
+mip_pre_output(struct ifnet *ifp, u_long protocol_family, struct mbuf **m0,
+	const struct sockaddr *dst, caddr_t rt0, char *frame, char *address)
 #endif /* __APPLE__ */
 {
 	int error = 0;
@@ -375,10 +365,7 @@ mip_pre_output(
 }
 
 int
-mip_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+mip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	int s, error;
 	struct ifreq *ifr = (struct ifreq *)data;
@@ -481,8 +468,7 @@ mip_ioctl(ifp, cmd, data)
 }
 
 int
-mip_is_mip_softc(ifp)
-	struct ifnet *ifp;
+mip_is_mip_softc(struct ifnet *ifp)
 {
 	struct mip_softc *mipsc;
 
@@ -496,11 +482,8 @@ mip_is_mip_softc(ifp)
 
 #ifdef __APPLE__
 int
-mip_demux(
-    struct ifnet *ifp,
-    struct mbuf  *m,
-    char         *frame_header,
-    u_long *protocol_family)
+mip_demux(struct ifnet *ifp, struct mbuf  *m, char *frame_header,
+	u_long *protocol_family)
 {
 	struct mip_softc* mip = (struct mip_softc*)ifp->if_softc;
 	
@@ -511,7 +494,8 @@ mip_demux(
 }
 
 static int
-mip_add_proto(struct ifnet *ifp, u_long protocol_family, struct ddesc_head_str *desc_head)
+mip_add_proto(struct ifnet *ifp, u_long protocol_family,
+	struct ddesc_head_str *desc_head)
 {
 	/* Only one protocol may be attached at a time */
 	struct mip_softc* mip = (struct mip_softc*)ifp->if_softc;
@@ -537,9 +521,7 @@ mip_del_proto(struct ifnet *ifp, u_long protocol_family)
 
 /* Glue code to attach inet to a gif interface through DLIL */
 int
-mip_attach_proto_family(
-	struct ifnet *ifp,
-	u_long protocol_family)
+mip_attach_proto_family(struct ifnet *ifp, u_long protocol_family)
 {
     struct dlil_proto_reg_str   reg;
     int   stat;

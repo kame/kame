@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.14 2003/08/28 08:23:20 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.15 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,17 +47,14 @@
 #include <net/net_osdep.h>
 
 size_t
-esp_rijndael_schedlen(algo)
-	const struct esp_algorithm *algo;
+esp_rijndael_schedlen(const struct esp_algorithm *algo)
 {
 
 	return sizeof(rijndael_ctx);
 }
 
 int
-esp_rijndael_schedule(algo, sav)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
+esp_rijndael_schedule(const struct esp_algorithm *algo, struct secasvar *sav)
 {
 	rijndael_ctx *ctx;
 
@@ -68,11 +65,8 @@ esp_rijndael_schedule(algo, sav)
 }
 
 int
-esp_rijndael_blockdecrypt(algo, sav, s, d)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
-	u_int8_t *s;
-	u_int8_t *d;
+esp_rijndael_blockdecrypt(const struct esp_algorithm *algo,
+	struct secasvar *sav, u_int8_t *s, u_int8_t *d)
 {
 	rijndael_ctx *ctx;
 
@@ -82,11 +76,8 @@ esp_rijndael_blockdecrypt(algo, sav, s, d)
 }
 
 int
-esp_rijndael_blockencrypt(algo, sav, s, d)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
-	u_int8_t *s;
-	u_int8_t *d;
+esp_rijndael_blockencrypt(const struct esp_algorithm *algo,
+	struct secasvar *sav, u_int8_t *s, u_int8_t *d)
 {
 	rijndael_ctx *ctx;
 

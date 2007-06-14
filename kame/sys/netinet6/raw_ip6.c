@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.167 2007/02/14 10:25:55 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.168 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -169,7 +169,7 @@ struct rip6stat rip6stat;
  * Initialize raw connection block queue.
  */
 void
-rip6_init()
+rip6_init(void)
 {
 
 #ifdef __OpenBSD__
@@ -185,9 +185,7 @@ rip6_init()
  * mbuf chain.
  */
 int
-rip6_input(mp, offp, proto)
-	struct	mbuf **mp;
-	int	*offp, proto;
+rip6_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct mbuf *m = *mp, *opts = NULL;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
@@ -331,10 +329,7 @@ rip6_input(mp, offp, proto)
 }
 
 void
-rip6_ctlinput(cmd, sa, d)
-	int cmd;
-	struct sockaddr *sa;
-	void *d;
+rip6_ctlinput(int cmd, struct sockaddr *sa, void *d)
 {
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
@@ -342,7 +337,7 @@ rip6_ctlinput(cmd, sa, d)
 	struct ip6ctlparam *ip6cp = NULL;
 	const struct sockaddr_in6 *sa6_src = NULL;
 	void *cmdarg;
-	void (*notify) __P((struct in6pcb *, int)) = in6_rtchange;
+	void (*notify)(struct in6pcb *, int) = in6_rtchange;
 	int nxt;
 
 	if (sa->sa_family != AF_INET6 ||
@@ -461,9 +456,7 @@ int
 #if __STDC__
 rip6_output(struct mbuf *m, ...)
 #else
-rip6_output(m, va_alist)
-	struct mbuf *m;
-	va_dcl
+rip6_output(struct mbuf *m, va_alist)
 #endif
 {
 	struct socket *so;
@@ -655,11 +648,8 @@ rip6_output(m, va_alist)
  * Raw IPv6 socket option processing.
  */
 int
-rip6_ctloutput(op, so, level, optname, mp)
-	int op;
-	struct socket *so;
-	int level, optname;
-	struct mbuf **mp;
+rip6_ctloutput(int op, struct socket *so, int level, int optname,
+	struct mbuf **mp)
 {
 	int error = 0;
 
@@ -706,11 +696,8 @@ extern	u_long rip6_sendspace;
 extern	u_long rip6_recvspace;
 
 int
-rip6_usrreq(so, req, m, nam, control, p)
-	struct socket *so;
-	int req;
-	struct mbuf *m, *nam, *control;
-	struct proc *p;
+rip6_usrreq(struct socket *so, int req, struct mbuf *m, 
+	struct mbuf *nam, struct mbuf *control, struct proc *p)
 {
 	struct in6pcb *in6p = sotoin6pcb(so);
 	int s;

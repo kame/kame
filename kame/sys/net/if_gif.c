@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.117 2007/02/21 02:44:12 keiichi Exp $	*/
+/*	$KAME: if_gif.c,v 1.118 2007/06/14 12:09:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,14 +118,14 @@
 struct gif_softc_list gif_softc_list;
 
 #ifdef __FreeBSD__
-void gifattach __P((void *));
+void gifattach(void *);
 #else
-void gifattach __P((int));
+void gifattach(int);
 #endif
 #ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
-void gifnetisr __P((void));
+void gifnetisr(void);
 #endif
-void gifintr __P((void *));
+void gifintr(void *);
 #if defined(__NetBSD__) && defined(ISO)
 static struct mbuf *gif_eon_encap(struct mbuf *);
 static struct mbuf *gif_eon_decap(struct ifnet *, struct mbuf *);
@@ -138,11 +138,10 @@ int ngif;			/* number of interfaces */
 struct gif_softc *gif_softc = NULL;
 
 void
-gifattach(dummy)
 #ifdef __FreeBSD__
-	void *dummy;
+gifattach(void *dummy)
 #else
-	int dummy;
+gifattach(int dummy)
 #endif
 {
 	struct gif_softc *sc;
@@ -171,8 +170,7 @@ gifattach(dummy)
 }
 
 void
-gifattach0(sc)
-	struct gif_softc *sc;
+gifattach0(struct gif_softc *sc)
 {
 
 	sc->encap_cookie4 = sc->encap_cookie6 = NULL;
@@ -217,8 +215,7 @@ PSEUDO_SET(gifattach, if_gif);
 
 #ifdef __OpenBSD__
 void
-gif_start(ifp)
-	struct ifnet *ifp;
+gif_start(struct ifnet *ifp)
 {
 #if NBRIDGE > 0
 	struct sockaddr dst;
@@ -262,11 +259,7 @@ gif_start(ifp)
 
 #ifdef GIF_ENCAPCHECK
 int
-gif_encapcheck(m, off, proto, arg)
-	const struct mbuf *m;
-	int off;
-	int proto;
-	void *arg;
+gif_encapcheck(const struct mbuf *m, int off, int proto, void *arg)
 {
 	struct ip ip;
 	struct gif_softc *sc;
@@ -329,12 +322,10 @@ gif_encapcheck(m, off, proto, arg)
 }
 #endif
 
+/* rt - added in net2 */
 int
-gif_output(ifp, m, dst, rt)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct sockaddr *dst;
-	struct rtentry *rt;	/* added in net2 */
+gif_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	struct rtentry *rt)
 {
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	int error = 0;
@@ -447,7 +438,7 @@ gif_output(ifp, m, dst, rt)
 
 #ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 void
-gifnetisr()
+gifnetisr(void)
 {
 	struct gif_softc *sc;
 
@@ -459,8 +450,7 @@ gifnetisr()
 #endif
 
 void
-gifintr(arg)
-	void *arg;
+gifintr(void *arg)
 {
 	struct gif_softc *sc;
 	struct ifnet *ifp;
@@ -532,10 +522,7 @@ gifintr(arg)
 
 #ifndef __OpenBSD__	/* on openbsd, ipip_input() does it instead */
 void
-gif_input(m, af, ifp)
-	struct mbuf *m;
-	int af;
-	struct ifnet *ifp;
+gif_input(struct mbuf *m, int af, struct ifnet *ifp)
 {
 #ifndef __FreeBSD__
 	int s;
@@ -652,10 +639,7 @@ gif_input(m, af, ifp)
 
 /* XXX how should we handle IPv6 scope on SIOC[GS]IFPHYADDR? */
 int
-gif_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
+gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct gif_softc *sc  = (struct gif_softc*)ifp;
 	struct ifreq     *ifr = (struct ifreq*)data;
@@ -918,10 +902,7 @@ gif_ioctl(ifp, cmd, data)
 }
 
 int
-gif_set_tunnel(ifp, src, dst)
-	struct ifnet *ifp;
-	struct sockaddr *src;
-	struct sockaddr *dst;
+gif_set_tunnel(struct ifnet *ifp, struct sockaddr *src, struct sockaddr *dst)
 {
 	struct gif_softc *sc = (struct gif_softc *)ifp;
 	struct gif_softc *sc2;
@@ -1054,8 +1035,7 @@ gif_set_tunnel(ifp, src, dst)
 }
 
 void
-gif_delete_tunnel(ifp)
-	struct ifnet *ifp;
+gif_delete_tunnel(struct ifnet *ifp)
 {
 	struct gif_softc *sc = (struct gif_softc *)ifp;
 	int s;

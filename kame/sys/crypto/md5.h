@@ -1,4 +1,4 @@
-/*	$KAME: md5.h,v 1.5 2002/11/05 03:48:31 itojun Exp $	*/
+/*	$KAME: md5.h,v 1.6 2007/06/14 12:09:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,10 +57,10 @@ typedef struct {
 	u_int8_t	md5_buf[MD5_BUFLEN];
 } md5_ctxt;
 
-extern void md5_init __P((md5_ctxt *));
-extern void md5_loop __P((md5_ctxt *, u_int8_t *, u_int));
-extern void md5_pad __P((md5_ctxt *));
-extern void md5_result __P((u_int8_t *, md5_ctxt *));
+extern void md5_init(md5_ctxt *);
+extern void md5_loop(md5_ctxt *, u_int8_t *, u_int);
+extern void md5_pad(md5_ctxt *);
+extern void md5_result(u_int8_t *, md5_ctxt *);
 
 /* compatibility */
 #define MD5_CTX		md5_ctxt

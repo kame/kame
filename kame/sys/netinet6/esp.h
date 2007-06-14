@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.22 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.23 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,52 +76,52 @@ struct secasvar;
 struct esp_algorithm {
 	size_t padbound;	/* pad boundary, in byte */
 	int ivlenval;		/* iv length, in byte */
-	int (*mature) __P((struct secasvar *));
+	int (*mature)(struct secasvar *);
 	int keymin;	/* in bits */
 	int keymax;	/* in bits */
-	size_t (*schedlen) __P((const struct esp_algorithm *));
+	size_t (*schedlen)(const struct esp_algorithm *);
 	const char *name;
-	int (*ivlen) __P((const struct esp_algorithm *, struct secasvar *));
-	int (*decrypt) __P((struct mbuf *, size_t,
-		struct secasvar *, const struct esp_algorithm *, int));
-	int (*encrypt) __P((struct mbuf *, size_t, size_t,
-		struct secasvar *, const struct esp_algorithm *, int));
+	int (*ivlen)(const struct esp_algorithm *, struct secasvar *);
+	int (*decrypt)(struct mbuf *, size_t,
+		struct secasvar *, const struct esp_algorithm *, int);
+	int (*encrypt)(struct mbuf *, size_t, size_t,
+		struct secasvar *, const struct esp_algorithm *, int);
 	/* not supposed to be called directly */
-	int (*schedule) __P((const struct esp_algorithm *, struct secasvar *));
-	int (*blockdecrypt) __P((const struct esp_algorithm *,
-		struct secasvar *, u_int8_t *, u_int8_t *));
-	int (*blockencrypt) __P((const struct esp_algorithm *,
-		struct secasvar *, u_int8_t *, u_int8_t *));
+	int (*schedule)(const struct esp_algorithm *, struct secasvar *);
+	int (*blockdecrypt)(const struct esp_algorithm *,
+		struct secasvar *, u_int8_t *, u_int8_t *);
+	int (*blockencrypt)(const struct esp_algorithm *,
+		struct secasvar *, u_int8_t *, u_int8_t *);
 };
 
-extern const struct esp_algorithm *esp_algorithm_lookup __P((int));
-extern int esp_max_padbound __P((void));
-extern int esp_max_ivlen __P((void));
+extern const struct esp_algorithm *esp_algorithm_lookup(int);
+extern int esp_max_padbound(void);
+extern int esp_max_ivlen(void);
 
 /* crypt routines */
-extern int esp4_output __P((struct mbuf *, struct ipsecrequest *));
+extern int esp4_output(struct mbuf *, struct ipsecrequest *);
 #ifdef __FreeBSD__
-extern void esp4_input __P((struct mbuf *, int));
+extern void esp4_input(struct mbuf *, int);
 #else
-extern void esp4_input __P((struct mbuf *, ...));
+extern void esp4_input(struct mbuf *, ...);
 #endif
-extern size_t esp_hdrsiz __P((struct ipsecrequest *));
+extern size_t esp_hdrsiz(struct ipsecrequest *);
 
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */
-extern void *esp4_ctlinput __P((int, struct sockaddr *, void *));
+extern void *esp4_ctlinput(int, struct sockaddr *, void *);
 #endif
 
 #ifdef INET6
-extern int esp6_output __P((struct mbuf *, u_char *, struct mbuf *,
-	struct ipsecrequest *));
-extern int esp6_input __P((struct mbuf **, int *, int));
+extern int esp6_output(struct mbuf *, u_char *, struct mbuf *,
+	struct ipsecrequest *);
+extern int esp6_input(struct mbuf **, int *, int);
 
-extern void esp6_ctlinput __P((int, struct sockaddr *, void *));
+extern void esp6_ctlinput(int, struct sockaddr *, void *);
 #endif /* INET6 */
 
-extern int esp_schedule __P((const struct esp_algorithm *, struct secasvar *));
-extern int esp_auth __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, u_char *));
+extern int esp_schedule(const struct esp_algorithm *, struct secasvar *);
+extern int esp_auth(struct mbuf *, size_t, size_t,
+	struct secasvar *, u_char *);
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_ESP_H_ */

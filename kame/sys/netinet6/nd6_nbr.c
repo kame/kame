@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.173 2007/05/04 04:48:52 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.174 2007/06/14 12:09:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,15 +110,15 @@
 #define SDL(s) ((struct sockaddr_dl *)s)
 
 struct dadq;
-struct dadq *nd6_dad_find __P((struct ifaddr *));
-static void nd6_dad_starttimer __P((struct dadq *, int));
-static void nd6_dad_stoptimer __P((struct dadq *));
-static void nd6_dad_timer __P((struct ifaddr *));
-static void nd6_dad_ns_output __P((struct dadq *, struct ifaddr *));
-static void nd6_dad_ns_input __P((struct ifaddr *));
-static void nd6_dad_na_input __P((struct ifaddr *));
+struct dadq *nd6_dad_find(struct ifaddr *);
+static void nd6_dad_starttimer(struct dadq *, int);
+static void nd6_dad_stoptimer(struct dadq *);
+static void nd6_dad_timer(struct ifaddr *);
+static void nd6_dad_ns_output(struct dadq *, struct ifaddr *);
+static void nd6_dad_ns_input(struct ifaddr *);
+static void nd6_dad_na_input(struct ifaddr *);
 #ifdef MIP6
-struct ifaddr *nd6_dad_find_by_addr __P((struct in6_addr *));
+struct ifaddr *nd6_dad_find_by_addr(struct in6_addr *);
 #endif /* MIP6 */
 
 static int dad_ignore_ns = 0;	/* ignore NS in DAD - specwise incorrect*/
@@ -131,9 +131,7 @@ static int dad_maxtry = 15;	/* max # of *tries* to transmit DAD packet */
  * Based on RFC 2462 (duplicate address detection)
  */
 void
-nd6_ns_input(m, off, icmp6len)
-	struct mbuf *m;
-	int off, icmp6len;
+nd6_ns_input(struct mbuf *m, int off, int icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
@@ -307,8 +305,7 @@ nd6_ns_input(m, off, icmp6len)
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
 		nd6log((LOG_INFO, "nd6_ns_input: lladdrlen mismatch for %s "
 		    "(if %d, NS packet %d)\n",
-		    ip6_sprintf(&taddr6),
-		    ifp->if_addrlen, lladdrlen - 2));
+		    ip6_sprintf(&taddr6), ifp->if_addrlen, lladdrlen - 2));
 		goto bad;
 	}
 
@@ -336,7 +333,7 @@ nd6_ns_input(m, off, icmp6len)
 		 * If source address is unspecified address, it is for
 		 * duplicate address detection.
 		 *
-		 * If not, the packet is for addess resolution;
+		 * If not, the packet is for address resolution;
 		 * silently ignore it.
 		 */
 		if (IN6_IS_ADDR_UNSPECIFIED(&saddr6))
@@ -393,13 +390,13 @@ nd6_ns_input(m, off, icmp6len)
  *
  * Based on RFC 2461
  * Based on RFC 2462 (duplicate address detection)
+ *
+ * ln - for source address determination
+ * dad - duplicate address detection
  */
 void
-nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
-	struct ifnet *ifp;
-	const struct in6_addr *daddr6, *taddr6;
-	struct llinfo_nd6 *ln;	/* for source address determination */
-	int dad;	/* duplicate address detection */
+nd6_ns_output(struct ifnet *ifp, const struct in6_addr *daddr6,
+	const struct in6_addr *taddr6, struct llinfo_nd6 *ln, int dad)
 {
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -651,9 +648,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
  * - anycast advertisement delay rule (RFC2461 7.2.7, SHOULD)
  */
 void
-nd6_na_input(m, off, icmp6len)
-	struct mbuf *m;
-	int off, icmp6len;
+nd6_na_input(struct mbuf *m, int off, int icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
@@ -961,14 +956,14 @@ nd6_na_input(m, off, icmp6len)
  * the following items are not implemented yet:
  * - proxy advertisement delay rule (RFC2461 7.2.8, last paragraph, SHOULD)
  * - anycast advertisement delay rule (RFC2461 7.2.7, SHOULD)
+ *
+ * tlladdr - if we are to include target link-layer address
+ * sdl0 - sockaddr_dl (= proxy NA) or NULL
  */
 void
-nd6_na_output(ifp, daddr6_0, taddr6, flags, tlladdr, sdl0)
-	struct ifnet *ifp;
-	const struct in6_addr *daddr6_0, *taddr6;
-	u_long flags;
-	int tlladdr;		/* 1 if include target link-layer address */
-	struct sockaddr *sdl0;	/* sockaddr_dl (= proxy NA) or NULL */
+nd6_na_output(struct ifnet *ifp, const struct in6_addr *daddr6_0,
+	const struct in6_addr *taddr6, u_long flags, int tlladdr,
+	struct sockaddr *sdl0)
 {
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -1158,9 +1153,9 @@ nd6_na_output(ifp, daddr6_0, taddr6, flags, tlladdr, sdl0)
 }
 
 caddr_t
-nd6_ifptomac(ifp)
-	struct ifnet *ifp;
+nd6_ifptomac(struct ifnet *ifp)
 {
+
 	switch (ifp->if_type) {
 	case IFT_ARCNET:
 	case IFT_ETHER:
@@ -1209,8 +1204,7 @@ static int dad_init = 0;
 
 #ifdef MIP6
 struct ifaddr *
-nd6_dad_find_by_addr(addr)
-	struct in6_addr *addr;
+nd6_dad_find_by_addr(struct in6_addr *addr)
 {
 	struct dadq *dp;
 
@@ -1223,8 +1217,7 @@ nd6_dad_find_by_addr(addr)
 #endif /* MIP6 */
 
 struct dadq *
-nd6_dad_find(ifa)
-	struct ifaddr *ifa;
+nd6_dad_find(struct ifaddr *ifa)
 {
 	struct dadq *dp;
 
@@ -1236,27 +1229,24 @@ nd6_dad_find(ifa)
 }
 
 static void
-nd6_dad_starttimer(dp, ticks)
-	struct dadq *dp;
-	int ticks;
+nd6_dad_starttimer(struct dadq *dp, int ticks)
 {
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&dp->dad_timer_ch, ticks,
-	    (void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa);
+	    (void (*) (void *))nd6_dad_timer, (void *)dp->dad_ifa);
 #elif defined(__OpenBSD__)
-	timeout_set(&dp->dad_timer_ch, (void (*) __P((void *)))nd6_dad_timer,
+	timeout_set(&dp->dad_timer_ch, (void (*) (void *))nd6_dad_timer,
 	    (void *)dp->dad_ifa);
 	timeout_add(&dp->dad_timer_ch, ticks);
 #else
-	timeout((void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa,
+	timeout((void (*) (void *))nd6_dad_timer, (void *)dp->dad_ifa,
 	    ticks);
 #endif
 }
 
 static void
-nd6_dad_stoptimer(dp)
-	struct dadq *dp;
+nd6_dad_stoptimer(struct dadq *dp)
 {
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
@@ -1264,7 +1254,7 @@ nd6_dad_stoptimer(dp)
 #elif defined(__OpenBSD__)
 	timeout_del(&dp->dad_timer_ch);
 #else
-	untimeout((void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa);
+	untimeout((void (*) (void *))nd6_dad_timer, (void *)dp->dad_ifa);
 #endif
 }
 
@@ -1272,9 +1262,7 @@ nd6_dad_stoptimer(dp)
  * Start Duplicate Address Detection (DAD) for specified interface address.
  */
 void
-nd6_dad_start(ifa, delay)
-	struct ifaddr *ifa;
-	int delay;
+nd6_dad_start(struct ifaddr *ifa, int delay)
 {
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	struct dadq *dp;
@@ -1360,8 +1348,7 @@ nd6_dad_start(ifa, delay)
  * terminate DAD unconditionally.  used for address removals.
  */
 void
-nd6_dad_stop(ifa)
-	struct ifaddr *ifa;
+nd6_dad_stop(struct ifaddr *ifa)
 {
 	struct dadq *dp;
 
@@ -1382,8 +1369,7 @@ nd6_dad_stop(ifa)
 }
 
 static void
-nd6_dad_timer(ifa)
-	struct ifaddr *ifa;
+nd6_dad_timer(struct ifaddr *ifa)
 {
 	int s;
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
@@ -1505,8 +1491,7 @@ done:
 }
 
 void
-nd6_dad_duplicated(ifa)
-	struct ifaddr *ifa;
+nd6_dad_duplicated(struct ifaddr *ifa)
 {
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	struct ifnet *ifp;
@@ -1581,9 +1566,7 @@ nd6_dad_duplicated(ifa)
 }
 
 static void
-nd6_dad_ns_output(dp, ifa)
-	struct dadq *dp;
-	struct ifaddr *ifa;
+nd6_dad_ns_output(struct dadq *dp, struct ifaddr *ifa)
 {
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	struct ifnet *ifp = ifa->ifa_ifp;
@@ -1607,8 +1590,7 @@ nd6_dad_ns_output(dp, ifa)
 }
 
 static void
-nd6_dad_ns_input(ifa)
-	struct ifaddr *ifa;
+nd6_dad_ns_input(struct ifaddr *ifa)
 {
 	struct in6_ifaddr *ia;
 	const struct in6_addr *taddr6;
@@ -1655,8 +1637,7 @@ nd6_dad_ns_input(ifa)
 }
 
 static void
-nd6_dad_na_input(ifa)
-	struct ifaddr *ifa;
+nd6_dad_na_input(struct ifaddr *ifa)
 {
 	struct dadq *dp;
 

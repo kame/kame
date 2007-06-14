@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.53 2006/02/20 10:35:04 jinmei Exp $	*/
+/*	$KAME: frag6.c,v 1.54 2007/06/14 12:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,22 +68,22 @@
  */
 #define IN6_IFSTAT_STRICT
 
-static void frag6_enq __P((struct ip6asfrag *, struct ip6asfrag *));
-static void frag6_deq __P((struct ip6asfrag *));
-static void frag6_insque __P((struct ip6q *, struct ip6q *));
-static void frag6_remque __P((struct ip6q *));
-static void frag6_freef __P((struct ip6q *));
+static void frag6_enq(struct ip6asfrag *, struct ip6asfrag *);
+static void frag6_deq(struct ip6asfrag *);
+static void frag6_insque(struct ip6q *, struct ip6q *);
+static void frag6_remque(struct ip6q *);
+static void frag6_freef(struct ip6q *);
 
 static int ip6q_locked;
 u_int frag6_nfragpackets;
 u_int frag6_nfrags;
 struct	ip6q ip6q;	/* ip6 reassemble queue */
 
-static __inline int ip6q_lock_try __P((void));
-static __inline void ip6q_unlock __P((void));
+static __inline int ip6q_lock_try(void);
+static __inline void ip6q_unlock(void);
 
 static __inline int
-ip6q_lock_try()
+ip6q_lock_try(void)
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s;
@@ -113,7 +113,7 @@ ip6q_lock_try()
 }
 
 static __inline void
-ip6q_unlock()
+ip6q_unlock(void)
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s;
@@ -165,7 +165,7 @@ MALLOC_DEFINE(M_FTABLE, "fragment", "fragment reassembly header");
  * Initialise reassembly queue and fragment identifier.
  */
 void
-frag6_init()
+frag6_init(void)
 {
 
 #ifdef __FreeBSD__
@@ -209,9 +209,7 @@ frag6_init()
  * Fragment input
  */
 int
-frag6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+frag6_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct mbuf *m = *mp, *t;
 	struct ip6_hdr *ip6;
@@ -647,8 +645,7 @@ insert:
  * associated datagrams.
  */
 void
-frag6_freef(q6)
-	struct ip6q *q6;
+frag6_freef(struct ip6q *q6)
 {
 	struct ip6asfrag *af6, *down6;
 
@@ -692,8 +689,7 @@ frag6_freef(q6)
  * Like insque, but pointers in middle of structure.
  */
 void
-frag6_enq(af6, up6)
-	struct ip6asfrag *af6, *up6;
+frag6_enq(struct ip6asfrag *af6, struct ip6asfrag *up6)
 {
 
 	IP6Q_LOCK_CHECK();
@@ -708,8 +704,7 @@ frag6_enq(af6, up6)
  * To frag6_enq as remque is to insque.
  */
 void
-frag6_deq(af6)
-	struct ip6asfrag *af6;
+frag6_deq(struct ip6asfrag *af6)
 {
 
 	IP6Q_LOCK_CHECK();
@@ -719,8 +714,7 @@ frag6_deq(af6)
 }
 
 void
-frag6_insque(new, old)
-	struct ip6q *new, *old;
+frag6_insque(struct ip6q *new, struct ip6q *old)
 {
 
 	IP6Q_LOCK_CHECK();
@@ -732,8 +726,7 @@ frag6_insque(new, old)
 }
 
 void
-frag6_remque(p6)
-	struct ip6q *p6;
+frag6_remque(struct ip6q *p6)
 {
 
 	IP6Q_LOCK_CHECK();
@@ -748,7 +741,7 @@ frag6_remque(p6)
  * queue, discard it.
  */
 void
-frag6_slowtimo()
+frag6_slowtimo(void)
 {
 	struct ip6q *q6;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -805,7 +798,7 @@ frag6_slowtimo()
  * Drain off all datagram fragments.
  */
 void
-frag6_drain()
+frag6_drain(void)
 {
 
 	if (ip6q_lock_try() == 0)
