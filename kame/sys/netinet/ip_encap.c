@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.104 2007/06/14 12:09:42 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.105 2007/06/14 13:51:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -124,12 +124,14 @@
 #include <netinet/icmp6.h>
 #endif
 
-#include <machine/stdarg.h>
-
 #ifdef __NetBSD__
 # ifdef MROUTING
 #  include <netinet/ip_mroute.h>
 # endif
+#endif
+
+#ifndef __OpenBSD__	/* version??? */
+#include <machine/stdarg.h>
 #endif
 
 #include <net/net_osdep.h>
@@ -610,7 +612,7 @@ encap_afcheck(int af, const struct sockaddr *sp, const struct sockaddr *dp)
 const struct encaptab *
 encap_attach(int af, int proto, const struct sockaddr *sp,
 	const struct sockaddr *sm, const struct sockaddr *dp,
-	const struct sockaddr *dm, const struct sockaddr *psw, void *arg)
+	const struct sockaddr *dm, const struct protosw *psw, void *arg)
 {
 	struct encaptab *ep;
 	int error;

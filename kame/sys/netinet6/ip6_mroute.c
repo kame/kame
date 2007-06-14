@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.147 2007/06/14 12:09:44 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.148 2007/06/14 13:51:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1188,6 +1188,7 @@ ip6_mforward(struct ip6_hdr *ip6, struct ifnet *ifp, struct mbuf *m)
 	struct mbuf *mm;
 	int s;
 	mifi_t mifi;
+	struct sockaddr_in6 sin6;
 #ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
@@ -1334,6 +1335,9 @@ ip6_mforward(struct ip6_hdr *ip6, struct ifnet *ifp, struct mbuf *m)
 			/*
 			 * Send message to routing daemon
 			 */
+			bzero(&sin6, sizeof(sin6));
+			sin6.sin6_family = AF_INET6;
+			sin6.sin6_len = sizeof(sin6);
 			sin6.sin6_addr = ip6->ip6_src;
 
 			im = NULL;
@@ -1523,6 +1527,7 @@ ip6_mdq(struct mbuf *m, struct ifnet *ifp, struct mf6c *rt)
 	mifi_t mifi, iif;
 	struct mif6 *mifp;
 	int plen = m->m_pkthdr.len;
+	struct sockaddr_in6 sin6;
 
 /*
  * Macro to send packet on mif.  Since RSVP packets don't get counted on
@@ -1567,8 +1572,6 @@ ip6_mdq(struct mbuf *m, struct ifnet *ifp, struct mf6c *rt)
 				 * unnecessary PIM assert.
 				 * XXX: M_LOOP is an ad-hoc hack...
 				 */
-				static struct sockaddr_in6 sin6 =
-				{ sizeof(sin6), AF_INET6 };
 
 				struct mbuf *mm;
 				struct mrt6msg *im;
@@ -1588,6 +1591,9 @@ ip6_mdq(struct mbuf *m, struct ifnet *ifp, struct mf6c *rt)
 				oim = NULL;
 #endif
 				im = NULL;
+				bzero(&sin6, sizeof(sin6));
+				sin6.sin6_family = AF_INET6;
+				sin6.sin6_len = sizeof(sin6);
 				switch (ip6_mrouter_ver) {
 #ifdef MRT6_OINIT
 				case MRT6_OINIT:

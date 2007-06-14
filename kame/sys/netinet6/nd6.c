@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.402 2007/06/14 12:09:44 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.403 2007/06/14 13:51:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2739,7 +2739,7 @@ clear_llinfo_pqueue(struct llinfo_nd6 *ln)
  * inp - sysctl arg, need copyin
  */
 int
-nd6_sysctl(int name, void *oldp, size_t oldlenp, void *newp, size_t newlen)
+nd6_sysctl(int name, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
 	void *p;
 	size_t ol, l;
@@ -2825,7 +2825,7 @@ nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS)
 
 static int
 #ifndef __FreeBSD__
-fill_drlist(void *oldp, size_t oldlenp, size_t ol)
+fill_drlist(void *oldp, size_t *oldlenp, size_t ol)
 #else
 fill_drlist(struct sysctl_req *req)
 #endif

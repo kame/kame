@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.100 2007/06/14 12:09:42 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.101 2007/06/14 13:51:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,7 +85,9 @@
 #include "bridge.h"
 #endif
 
+#ifndef __OpenBSD__	/* version??? */
 #include <machine/stdarg.h>
+#endif
 
 #include <net/net_osdep.h>
 

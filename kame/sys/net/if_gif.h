@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.40 2007/06/14 12:09:42 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.41 2007/06/14 13:51:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,20 +105,20 @@ extern struct gif_softc *gif_softc;
 extern LIST_HEAD(gif_softc_list, gif_softc) gif_softc_list;
 
 /* Prototypes */
-void gifattach0(struct gif_softc *)
+void gifattach0(struct gif_softc *);
 #ifndef __OpenBSD__
-void gif_input(struct mbuf *, int, struct ifnet *)
+void gif_input(struct mbuf *, int, struct ifnet *);
 #endif
 int gif_output(struct ifnet *, struct mbuf *, struct sockaddr *,
-	struct rtentry *)
-int gif_ioctl(struct ifnet *, u_long, caddr_t)
-int gif_set_tunnel(struct ifnet *, struct sockaddr *, struct sockaddr *)
-void gif_delete_tunnel(struct ifnet *)
+	struct rtentry *);
+int gif_ioctl(struct ifnet *, u_long, caddr_t);
+int gif_set_tunnel(struct ifnet *, struct sockaddr *, struct sockaddr *);
+void gif_delete_tunnel(struct ifnet *);
 #ifdef __OpenBSD__
-void gif_start(struct ifnet *)
+void gif_start(struct ifnet *);
 #endif
 #ifdef GIF_ENCAPCHECK
-int gif_encapcheck(const struct mbuf *, int, int, void *)
+int gif_encapcheck(const struct mbuf *, int, int, void *);
 #endif
 
 #endif /* _NET_IF_GIF_H_ */

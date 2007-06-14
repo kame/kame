@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.168 2007/06/14 12:09:44 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.169 2007/06/14 13:51:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -119,7 +119,9 @@
 #include <netinet6/ipsec.h>
 #endif /* IPSEC */
 
+#ifndef __OpenBSD__	/* version??? */
 #include <machine/stdarg.h>
+#endif
 
 #include "faith.h"
 #if defined(NFAITH) && 0 < NFAITH

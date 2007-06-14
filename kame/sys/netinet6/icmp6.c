@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.422 2007/06/14 12:09:43 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.423 2007/06/14 13:51:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3521,7 +3521,7 @@ icmp6_mtudisc_timeout(struct rtentry *rt, struct rttimer *r)
 #ifdef __OpenBSD__
 #include <sys/sysctl.h>
 int
-icmp6_sysctl(int name, u_int namelen, void *oldp, size_t oldlenp, void *newp,
+icmp6_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 	size_t newlen)
 {
 

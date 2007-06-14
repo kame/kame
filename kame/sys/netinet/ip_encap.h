@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.h,v 1.16 2007/06/14 12:09:42 itojun Exp $	*/
+/*	$KAME: ip_encap.h,v 1.17 2007/06/14 13:51:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,7 +66,7 @@ const struct encaptab *encap_attach(int, int, const struct sockaddr *,
 	const struct sockaddr *, const struct sockaddr *,
 	const struct sockaddr *, const struct protosw *, void *);
 const struct encaptab *encap_attach_func(int, int,
-	int (*)(const struct mbuf *, int, int, void *)),
+	int (*)(const struct mbuf *, int, int, void *),
 	const struct protosw *, void *);
 void	encap6_ctlinput(int, struct sockaddr *, void *);
 int	encap_detach(const struct encaptab *);

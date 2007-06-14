@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.216 2007/06/14 12:09:43 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.217 2007/06/14 13:51:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -355,7 +355,7 @@ generate_tmp_ifid(u_int8_t *seed0, const u_int8_t *seed1, u_int8_t *ret)
  * in6 - upper 64bits are preserved
  */
 int
-in6_get_hw_ifid(struct ifnet *ifp, struct ifnet *in6)
+in6_get_hw_ifid(struct ifnet *ifp, struct in6_addr *in6)
 {
 	struct ifaddr *ifa;
 	struct sockaddr_dl *sdl;

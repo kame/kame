@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.162 2007/06/14 12:09:43 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.163 2007/06/14 13:51:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -577,7 +577,6 @@ in6_selectsrc(struct sockaddr_in6 *dstsock, struct ip6_pktopts *opts,
 
 static int
 #ifdef NEW_STRUCT_ROUTE
-#else
 selectroute(struct sockaddr_in6 *dstsock, struct ip6_pktopts *opts,
 	struct ip6_moptions *mopts, struct route *ro, struct ifnet **retifp,
 	struct rtentry **retrt, int clone, int norouteok)
@@ -1128,7 +1127,7 @@ struct walkarg {
 
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 int
-in6_src_sysctl(void *oldp, size_t oldlenp, void *newp, size_t newlen)
+in6_src_sysctl(void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
 	int error = 0;
 	int s;
@@ -1193,7 +1192,7 @@ in6_src_sysctl(SYSCTL_HANDLER_ARGS)
 #endif /* FreeBSD */
 
 int
-in6_src_ioctl(u_long cmd, caddr_tdata)
+in6_src_ioctl(u_long cmd, caddr_t data)
 {
 	int i;
 	struct in6_addrpolicy ent0;
