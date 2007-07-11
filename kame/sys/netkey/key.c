@@ -950,7 +950,7 @@ key_do_allocsa_policy(struct secashead *sah, u_int state)
 		 * suitable candidate and the lifetime of the SA is not
 		 * permanent.
 		 */
-		if (d->lft_c->sadb_lifetime_addtime != 0) {
+		if (d->lft_h->sadb_lifetime_addtime != 0) {
 			struct mbuf *m, *result = NULL;
 
 			key_sa_chgstate(d, SADB_SASTATE_DEAD);
