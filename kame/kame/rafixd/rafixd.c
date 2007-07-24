@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.8 2004/07/06 10:21:49 jinmei Exp $	*/
+/*	$KAME: rafixd.c,v 1.9 2007/07/24 22:01:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -511,7 +511,7 @@ bpf_open(iface)
 	struct ifreq ifr;
 	
 	do {
-		sprintf(dev, "/dev/bpf%d", n++);
+		snprintf(dev, sizeof(dev), "/dev/bpf%d", n++);
 		fd = open(dev, O_RDWR);
 	} while (fd < 0 && n < 4);
 
@@ -527,7 +527,7 @@ bpf_open(iface)
 	}
 
 	bzero(&ifr, sizeof(ifr));
-	strcpy(ifr.ifr_name, iface);
+	strlcpy(ifr.ifr_name, iface, sizeof(ifr.ifr_name));
 	if (ioctl(fd, BIOCSETIF, &ifr) < 0) {
 		perror("ioctl(BIOCSETIF)");
 		return (-1);
