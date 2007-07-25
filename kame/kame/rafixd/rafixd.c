@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.11 2007/07/25 05:22:45 itojun Exp $	*/
+/*	$KAME: rafixd.c,v 1.12 2007/07/25 05:32:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -531,8 +531,8 @@ bpf_open(iface)
 
 	bzero(&ifr, sizeof(ifr));
 	/*
-	 * Note: don't use strlcpy() here.  ifr.ifr_name may not always be
-	 * NUL-terminated.
+	 * Note: don't use strlcpy() here.  ifr.ifr_name does not need to be
+	 * NUL-terminated, and iface is a NUL-terminated string.
 	 */
 	strncpy(ifr.ifr_name, iface, sizeof(ifr.ifr_name));
 	if (ioctl(fd, BIOCSETIF, &ifr) < 0) {
