@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2003/03/12 15:59:09 jinmei Exp $
+#	$KAME: Makefile,v 1.2 2007/07/25 00:46:16 itojun Exp $
 # Copyright (c) 2003 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,10 @@ DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 .endif
 
-#XXX: write it!
-NOMAN=1
+.if (${OPSYS} != "NetBSD")
+MAN8=	rafixd.8
+.else
+MAN=	rafixd.8
+.endif
 
 .include <bsd.prog.mk>
