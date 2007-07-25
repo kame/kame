@@ -1,4 +1,4 @@
-.\"	$KAME: rafixd.8,v 1.1 2007/07/24 23:51:04 itojun Exp $
+.\"	$KAME: rafixd.8,v 1.2 2007/07/25 00:57:32 itojun Exp $
 .\"
 .\" Copyright (C) 2003, 2007 WIDE Project.
 .\" All rights reserved.
@@ -43,8 +43,11 @@
 .\"
 .Sh DESCRIPTION
 .Nm
-is the daemon program which looks over all the router advertisements (RAs)
-on the link, and disables it if it is potentially from rogue RA sources.
+is the daemon program which disables rogue router advertisements (RAs).
+It looks over all the RAs on links connected to
+Ar interfaces ,
+then disables the source of the RAs from becoming routers for nodes,
+if RAs contain rogue prefix information.
 The rogue RA sources include misconfigured routers/hosts, nodes that
 impersonate as a router to hijack traffic, and so forth.
 .Pp
@@ -66,8 +69,13 @@ Register a
 .El
 .Pp
 .Nm
-listens to RAs on the specified
-.Ar interface .
+detects RAs that contain prefix information option that matches the prefixes
+specified by
+.Fl p ,
+and then throws out RAs against it with router lifetime set to 0.
+By doing so, those sources that have sent RAs with offending
+.Ar prefix
+will not be able to become routers for the nodes listening to the RAs.
 .\"
 .Sh RETURN VALUES
 The
@@ -81,3 +89,6 @@ program exits 0 on success, and >0 on failures.
 The
 .Nm
 was implemented by KAME project.
+.Sh BUGS
+.Nm
+may not work with 802.11 wireless network.
