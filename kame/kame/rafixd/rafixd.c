@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.10 2007/07/25 04:54:58 jinmei Exp $	*/
+/*	$KAME: rafixd.c,v 1.11 2007/07/25 05:22:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -251,8 +251,7 @@ add_interface(ifname)
 	}
 	memset(ifp, 0, sizeof(*ifp));
 	/*
-	 * strlcpy() is okay since we have a margin for a null char in
-	 * ifp->ifname.
+	 * strlcpy() is okay since we have a margin for a NUL in ifp->ifname.
 	 */
 	strlcpy(ifp->ifname, ifname, sizeof(ifp->ifname));
 	ifp->ifindex = index;
@@ -533,7 +532,7 @@ bpf_open(iface)
 	bzero(&ifr, sizeof(ifr));
 	/*
 	 * Note: don't use strlcpy() here.  ifr.ifr_name may not always be
-	 * null-terminated.
+	 * NUL-terminated.
 	 */
 	strncpy(ifr.ifr_name, iface, sizeof(ifr.ifr_name));
 	if (ioctl(fd, BIOCSETIF, &ifr) < 0) {
