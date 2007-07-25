@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.h,v 1.2 2003/03/14 10:01:24 jinmei Exp $	*/
+/*	$KAME: rafixd.h,v 1.3 2007/07/25 04:54:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -46,7 +46,8 @@ struct prefix {
 struct ifinfo {
 	struct ifinfo *next;
 
-	char ifname[IF_NAMESIZE]; /* interface name */
+	char ifname[IF_NAMESIZE + 1]; /* interface name including one byte
+				       of margin for a terminator */
 	unsigned int ifindex;	/* corresponding interface index */
 };
 
