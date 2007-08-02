@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.30 2007/06/14 12:09:42 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.31 2007/08/02 10:39:14 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -174,9 +174,9 @@ dummyattach(int dummy)
 #endif
 #if NBPFILTER > 0
 #ifdef HAVE_NEW_BPFATTACH
-		bpfattach(ifp, DLT_NULL, sizeof(u_int);
+		bpfattach(ifp, DLT_NULL, sizeof(u_int));
 #else
-		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int);
+		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int));
 #endif
 #endif
 	}
