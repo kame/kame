@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.11 2007/06/14 12:09:42 itojun Exp $	*/
+/*	$KAME: if_ist.c,v 1.12 2007/08/04 04:27:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -697,7 +697,6 @@ ist_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 /* inifp - incoming interface */
 static int
 ist_checkaddr4(struct ist_softc *sc, struct in_addr *in, struct ifnet *inifp)
-	struct ifnet *inifp;	
 {
 	struct in_ifaddr *ia4;
 
