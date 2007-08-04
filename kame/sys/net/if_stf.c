@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.123 2007/06/14 12:09:42 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.124 2007/08/04 04:25:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1008,7 +1008,7 @@ in_stf_input(struct mbuf *m, va_alist)
 
 /* ARGSUSED */
 static void
-stf_rtrequest(int cmd, strut rtentry *rt, struct rt_addrinfo *info)
+stf_rtrequest(int cmd, struct rtentry *rt, struct rt_addrinfo *info)
 {
 
 	if (rt)
