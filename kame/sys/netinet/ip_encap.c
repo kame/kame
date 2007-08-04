@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.105 2007/06/14 13:51:33 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.106 2007/08/04 04:27:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -964,8 +964,8 @@ mask_matchlen(const struct sockaddr *sa)
 
 #ifndef USE_RADIX
 static int
-mask_match(const struct encaptab *ep, const struct encaptab *sp,
-	const struct encaptab *dp)
+mask_match(const struct encaptab *ep, const struct sockaddr *sp,
+	const struct sockaddr *dp)
 {
 	struct sockaddr_storage s;
 	struct sockaddr_storage d;
