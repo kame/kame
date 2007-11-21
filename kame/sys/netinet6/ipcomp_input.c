@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.36 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.37 2007/11/21 08:59:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -290,7 +290,7 @@ ipcomp6_input(mp, offp, proto)
 	off = *offp;
 
 	md = m_pulldown(m, off, sizeof(*ipcomp), NULL);
-	if (!m) {
+	if (!md) {
 		m = NULL;	/* already freed */
 		ipseclog((LOG_DEBUG, "IPv6 IPComp input: assumption failed "
 		    "(pulldown failure)\n"));
