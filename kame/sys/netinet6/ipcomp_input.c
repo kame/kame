@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.37 2007/11/21 08:59:26 jinmei Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.38 2008/02/29 03:50:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
