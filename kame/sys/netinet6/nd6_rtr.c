@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.282 2007/06/14 12:09:44 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.283 2008/10/03 22:40:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,11 +162,25 @@ nd6_rs_input(struct mbuf *m, int off, int icmp6len)
 	}
 
 	/*
-	 * Don't update the neighbor cache, if src = ::.
-	 * This indicates that the src has no IP address assigned yet.
+	 * Don't update the neighbor cache, if src = :: or a non-neighbor.
+	 * The former case indicates that the src has no IP address assigned
+	 * yet.  See nd6_ns_input() for the latter case.
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src))
 		goto freeit;
+	else {
+		struct sockaddr_in6 src_sa6;
+
+		bzero(&src_sa6, sizeof(src_sa6));
+		src_sa6.sin6_family = AF_INET6;
+		src_sa6.sin6_len = sizeof(src_sa6);
+		src_sa6.sin6_addr = ip6->ip6_src;
+		if (!nd6_is_addr_neighbor(&src_sa6, ifp)) {
+			nd6log((LOG_INFO, "nd6_rs_input: "
+				"RS packet from non-neighbor\n"));
+			goto freeit;
+		}
+	}
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len,);
